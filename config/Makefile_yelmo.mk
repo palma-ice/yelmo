@@ -51,10 +51,6 @@ $(objdir)/solver_ssa_sico5.o: $(srcdir)/physics/solver_ssa_sico5.F90 $(objdir)/y
 							$(objdir)/yelmo_tools.o
 	$(FC) $(DFLAGS) $(FFLAGS) $(INC_LIS) -c -o $@ $<
 
-$(objdir)/solver_ssa_sor.o: $(srcdir)/physics/solver_ssa_sor.f90 $(objdir)/yelmo_defs.o \
-							$(objdir)/yelmo_tools.o
-	$(FC) $(DFLAGS) $(FFLAGS) -c -o $@ $<
-
 $(objdir)/solver_tridiagonal.o: $(srcdir)/physics/solver_tridiagonal.f90 $(objdir)/yelmo_defs.o
 	$(FC) $(DFLAGS) $(FFLAGS) -c -o $@ $<
 
@@ -166,7 +162,6 @@ yelmo_physics =  	   $(objdir)/basal_dragging.o \
 					   $(objdir)/mass_conservation.o \
 					   $(objdir)/mass_conservation_impl_sico.o \
 					   $(objdir)/solver_ssa_sico5.o \
-					   $(objdir)/solver_ssa_sor.o \
 					   $(objdir)/solver_tridiagonal.o \
 					   $(objdir)/velocity_hybrid_pd12.o \
 					   $(objdir)/velocity_sia.o

@@ -1,0 +1,307 @@
+&eismint
+
+    domain       = "EISMINT"             ! "EISMINT"
+    experiment   = "moving"              ! "fixed", "moving", "mismip", "EXPA", "EXPB", "EXPF","BUELER-A", "BUELER-B", "HALFAR", "HALFAR-MED"
+    dx           = 50.0                  ! [km] Grid resolution (EISMINT1 = 50km, EISMINT2 = 25km)
+    with_ssa     = False                 ! Include ssa in experiment?
+    topo_fixed   = False                 ! Calculate the topography, or use Heiko's topo file.  
+    dyn_fixed    = False                 ! Fix dynamics after first calculation? 
+    topo_fixed_file = /Users/robinson/models/EURICE/yelmo/tests/heiko_imau-ice_help_fields_eismint_M_200kyr.nc
+
+    ! Timing parameters 
+    time_init    = 0.0                  ! [yr] Starting time 
+    time_end     = 100000.0             ! [yr] Ending time 
+    dtt          = 5.0                  ! [yr] Main loop timestep 
+    dt2D_out     = 5000.0               ! [yr] Frequency of writing 2D output files 
+
+    ! Settings for transient EISMINT1 experiments 
+    period       = 0.0                  ! [yr] for transient experiments (normally 0.0 yr or 20e3 yr)
+    dT_test      = 0.0                  ! [K]  to test an imposed constant temperature anomaly 
+/
+
+&yelmo
+    domain          = "EISMINT"
+    grid_name       = "EISMINT"
+    experiment      = "EISMINT"         ! "None", "EISMINT", "MISMIP3D", "BUELER"  to apply special boundary conditions   
+    restart         = "no"
+    zeta_scale      = "tanh"            ! "linear", "exp", "tanh"
+    zeta_exp        = 2.0  
+    nz_aa           = 21                ! Vertical resolution in ice
+    dtmin           = 0.001             ! [a] Minimum timestep 
+    dtmax           = 5.0               ! [a] Maximum timestep
+    ntt             = 1                 ! [--] Thermodynamics call frequency (how many dynamic timesteps to skip)
+    cfl_max         = 0.01              ! Maximum value is 1.0, lower will be more stable
+    cfl_diff_max    = 0.12              ! Bueler et al (2007), Eq. 25  
+    
+/
+
+&ytopo
+    method            = "dynamic"       ! "fixed", "relax", "dynamic"
+    init              = "presentday"    ! "icefree", "presentday"
+    solver            = "expl"          ! "expl", "impl-upwind"
+    margin2nd         = False           ! Apply second-order upwind approximation to gradients at the margin
+    calv_method       = "flux"          ! "zero", "simple", "flux", "kill"
+    use_bmb           = False 
+    use_calv_subgrid  = False 
+    ocean_kill        = False 
+    grline_fixed      = False 
+    topo_fixed        = False
+    topo_relax_dt     = 2000
+    topo_fixed_dt     = -1              ! <= 0 for always fixed, positive value to 'unfix' topo after interval
+    calv_dt           = 1.0             ! [a] Calving frequency 
+    H_calv            = 200.0 
+    H_min             = 1e-5            ! [m] Minimum ice thickness (thinner ice is deleted)
+    gl_sep            = 2               ! 1: Linear f_grnd_acx/acy and binary f_grnd, 2: area f_grnd, average to acx/acy
+    gl_sep_nx         = 15              ! [-] Number of interpolation points (nx*nx) to calculate grounded area at grounding line
+    neff_p            = 0.0             ! Effective pressure: connectivity to the ocean (0: none, 1: full)
+/
+
+&ydyn
+    solver              = "hybrid-vel"    ! "fixed","hybrid-vel", "hybrid-shear", "hybrid-pd12"
+    mix_method          = 1               ! -2: sia, -1: ssa, 0: sia|ssa, 1: sia+ssa 2: ssa vel. fraction
+    calc_diffusivity    = False           ! Calculate 2D diffusivity term for diagnostics
+    m_drag              = 1.0             ! Dragging law exponent 
+    beta_max            = 1e5             ! [Pa a m-1] Maximum value of beta for which ssa should be calculated 
+    beta_method         = 2               ! 0: constant beta; 1: power law; 2: effective pressure
+    beta_gl_sep         = 0               !  -1: Apply subgrid treatment on ac-nodes (beta_gl_stag=2) 0: No subgrid treatment, 1: beta*f_grnd_aa        
+    beta_gl_scale       = 1               !  0: No scaling, 1: beta*f_beta_gl, 2: H_grnd linear scaling, 3: Zstar scaling 
+    beta_gl_stag        = 0               !  0: simple staggering, 1: Upstream beta at gl, 2: f_grnd_ac scaling 
+    f_beta_gl           = 1.0             ! [-] Scaling of beta at the grounding line (for beta_gl_method=1)
+    taud_gl_method      = 0               !  0: binary, no subgrid, 1: Two-sided gradient
+    C_bed_method        = 1               ! -1: set externally; 0: cf_stream everywhere; 1: cf_stream/cf_frozen 
+    beta_const          = 1e3             ! [Pa a m−1] Constant value of basal friction coefficient to be used
+    H_grnd_lim          = 500.0           ! [m] For beta_sep_method=2, reduce beta linearly between H_grnd=0 and H_grnd_lim 
+    H_sed_sat           = 250.0           ! [m] Sediment thickness at which sediment effect is saturated
+    cf_frozen           = 100.0           ! [a m-1] Bed roughness coefficient, frozen 
+    cf_stream           = 20.0            ! [a m-1] Bed roughness coefficient, stream  
+    cf_fac_sed          = 1.0             ! [-] Scaling of roughness for sediments 
+    cf_sia              = 15.0            ! [m a-1 Pa-1] Bed roughness coefficient for SIA sliding
+    streaming_margin    = True            ! Impose cf_stream at the margin and grline independent of f_pmp
+    n_sm_beta           = 0               ! [-] Standard deviation in gridpoints for Gaussian smoothing of beta (0==no smoothing)
+    ssa_vel_max         = 5000.0          ! [m a-1] SSA velocity limit to avoid spurious results 
+    ssa_iter_max        = 10              ! Number of maximum allowed iterations over ssa to converge on vel. solution
+    ssa_iter_rel        = 0.7             ! [--] Relaxation fraction [0:1] to stabilize ssa iterations
+    ssa_iter_conv       = 1e-2            ! [--] L2 relative error convergence limit to exit ssa iterations
+
+/
+ 
+&ymat
+    flow_law                = "glen"
+    rf_method               = 0         ! -1: set externally; 0: rf_const everywhere; 1: standard function 
+    rf_const                = 1e-16     ! [Pa^-3 a^-1]
+    rf_use_eismint2         = True      ! Only applied for rf_method=1
+    n_glen                  = 3.0 
+    visc_min                = 1e3 
+    use_2D_enh              = False 
+    enh_shear               = 1.0
+    enh_stream              = 1.0
+    enh_shlf                = 1.0
+
+    age_method              = "None"    ! "None", "expl", "impl"
+    age_impl_kappa          = 1.5       ! [m2 a-1] Artificial diffusion term for implicit age solving 
+
+/
+
+&ytherm
+    method         = "active"           ! "fixed", "robin", "active"
+    cond_bed       = False              ! True for active conductive bedrock (ie, Q_geo)
+    gamma          = 1.0                ! [K] Scalar for the pressure melting point decay function 
+    nzr            = 11                 ! [-] Number of vertical grid points in bedrock 
+    H_rock         = 6000.0             ! [m] Vertical grid step in bedrock 
+    use_strain_sia = False              ! True: calculate strain heating from SIA approx.
+    n_sm_qstrn     = 0                  ! [-] Standard deviation in gridpoints for Gaussian smoothing of strain heating (0==no smoothing)
+    use_const_cp   = True               ! Use specified constant value of heat capacity?
+    const_cp       = 2009.0             ! [J kg-1 K-1] Specific heat capacity 
+    use_const_kt   = True               ! Use specified constant value of heat conductivity?
+    const_kt       = 6.62e7             ! [J a-1 m-1 K-1] Thermal conductivity [W m-1 K-1 * sec_year] => [J a-1 m-1 K-1]
+    kt_m           = 1.0e8              ! [J a-1 m-1 K-1] Thermal conductivity of the mantle (lithosphere)
+    cp_m           = 1000.0             ! [J kg-1 K-1] Specific heat capacity of the mantle (lithosphere)
+    rho_m          = 2000.0             ! [kg m-3] Density of the mantle (lithosphere)
+
+/
+
+! ===== EXTERNAL LIBRARIES =====
+
+&sealevel
+    sl_path            = "input/sealevel_waelbroeck2002.dat"
+/
+
+&snapclim
+    clim_type          = "const"
+    fname_at           = "input/alpha_grow-decline.dat"
+    fname_ap           = "input/alpha_grow-decline.dat"
+    fname_ao           = "input/alpha_grow-decline.dat"
+    fname_bt           = "input/beta_ngrip_millennial.dat"
+    fname_bp           = "input/beta_ngrip_millennial.dat"
+    fname_bo           = "input/beta_ocean_subsurface_birelax_1.2.dat"
+    spatial_const_clim = FALSE
+    ta_clim1           = 0.0 
+    ta_clim2           = -20.0 
+    ta_clim3           = -20.0
+    spatial_const_ocn  = TRUE 
+    to_clim1           = 0.0 
+    to_clim2           = -2.0
+    to_clim3           = -2.0
+    lapse              = 0.0080 0.0065    ! lapse_ann, lapse_sum 
+/
+
+&snapclim_hybrid
+    hybrid_path        = "ice_data/Greenland/paleo300ka_hybrid_aicc2012.nc"
+    f_eem              = 1.0 
+    f_glac             = 1.0 
+    f_hol              = 1.0 
+    f_seas             = 1.0 
+    f_to               = 0.2
+/
+
+&snapclim_clim0
+    clim_path      = "ice_data/{domain}/{grid_name}/{grid_name}_MARv3.5-ERA-30km-monthly_1981-2010.nc"
+    clim_names     = "zs" "t3m" "sf" "rf"                                                   ! Default (if monthly = True) : "zs" "t3m" "sf" "rf"
+    clim_monthly   = True                                                                   ! If True and no snowfall (sf) then the third variable is precip and the fourth one irrelevant
+    clim_year_bp   = 0
+    ocn_path      = "ice_data/{domain}/{grid_name}/ERA-INT-ORAS4/{grid_name}_ERA-INT-ORAS4_1981-2010.nc"
+    ocn_names     = "depth" "mask_ocn" "to"
+    ocn_monthly   = True
+    ocn_year_bp   = 0
+/
+
+&snapclim_clim1
+    clim_path     = "ice_data/{domain}/{grid_name}/Montoya2008_sig250km/{grid_name}_present.nc"
+    clim_names    = "zs" "t2m_ann" "t2m_sum" "pr_ann"
+    clim_monthly  = False
+    clim_year_bp  = 0
+    ocn_path      = "ice_data/{domain}/{grid_name}/Montoya2008_sig100km/{grid_name}_present_ocean.nc"
+    ocn_names     = "depth" "mask_ocn" "to"
+    ocn_monthly   = False
+    ocn_year_bp   = 0
+/
+
+&snapclim_clim2
+    clim_path     = "ice_data/{domain}/{grid_name}/Montoya2008_sig250km/{grid_name}_lgm_1p7weak.nc"
+    clim_names    = "zs" "t2m_ann" "t2m_sum" "pr_ann"
+    clim_monthly  = False
+    clim_year_bp  = -21000
+    ocn_path      = "ice_data/{domain}/{grid_name}/Montoya2008_sig100km/{grid_name}_lgm_1p7weak_ocean.nc"
+    ocn_names     = "depth" "mask_ocn" "to"
+    ocn_monthly   = False
+    ocn_year_bp   = -21000
+/
+
+&snapclim_clim3
+    clim_path     = "ice_data/{domain}/{grid_name}/Montoya2008_sig250km/{grid_name}_lgm_1p7strong.nc"
+    clim_names    = "zs" "t2m_ann" "t2m_sum" "pr_ann"
+    clim_monthly  = False
+    clim_year_bp  = -21000
+    ocn_path      = "ice_data/{domain}/{grid_name}/Montoya2008_sig100km/{grid_name}_lgm_1p7strong_ocean.nc"
+    ocn_names     = "depth" "mask_ocn" "to"
+    ocn_monthly   = False
+    ocn_year_bp   = -21000
+/
+
+&smbpal_par
+    const_insol = True
+    const_kabp  = 0.0
+    insol_fldr  = "input_1D"
+    abl_method  = "pdd"  ! "itm" or "pdd"
+    sigma_snow  = 5.0     ! Standard deviation of temperature [K] over ice and snow
+    sigma_melt  = 5.0     ! Standard deviation of temperature [K] in ablation zone
+    sigma_land  = 5.0     ! Standard deviation of temperature [K] over land 
+    
+    sf_a        = 0.273   ! Snow fraction function (parameter a)
+    sf_b        = 273.6   ! Snow fraction function (parameter b)
+    firn_fac    = 0.0266  ! Reduction in surface temp versus melting [K/mm w.e.]
+
+    mm_snow = 3.0         ! PDD snow melt factor [mm w.e./K-d]
+    mm_ice  = 8.0         ! PDD ice melt factor  [mm w.e./K-d]
+    
+/
+
+&itm_par
+        
+    H_snow_max      =  5.0e3         ! Maximum allowed snowpack thickness [mm w.e.]
+    Pmaxfrac        =  0.6           ! Refreezing factor 
+
+    ! ## ITM 
+    trans_a         =  0.46 
+    trans_b         =  6e-5
+    trans_c         =  0.01
+    itm_c           = -75.0
+    itm_t           =  10.0
+    itm_b           =  -2.0 
+    itm_lat0        =  65.0 
+
+    ! ## Surface albedo
+    alb_snow_dry       =  0.8
+    alb_snow_wet       =  0.65
+    alb_ice            =  0.4
+    alb_land           =  0.2
+    alb_forest         =  0.1
+    alb_ocean          =  0.1
+    H_snow_crit_desert =  10.0
+    H_snow_crit_forest = 100.0
+    melt_crit          =   0.5      ! Critical melt rate to reduce snow albedo [mm/day]
+
+/
+
+&marine_shelf
+    bmb_shlf_method    = "anom"
+    T_shlf_method      = "mean"
+    use_obs            = False
+    obs_path           = "ice_data/{domain}/{grid_name}/{grid_name}_BMELT-R13.nc"
+    obs_name           = "bm_actual_sm"
+    obs_f              = 1.0
+    obs_lim            = 100.0
+    basin_name         = "None" !"northwest" "northeast" "east"
+    basin_bmb          = 0.0    !        -1.0       -1.0   -1.0
+    c_shlf             = -0.1 
+    kappa_shlf         = -9999.0 
+    f_grz_shlf         = 10.0
+    c_grz              = -1.0 
+    kappa_grz          = -10.0 
+    grz_length         = 20.0   ! [km]   
+    c_deep             = -50.0
+    depth_deep         = 500.0
+    T_fp               = -1.8
+    depth_min          = 1100.0
+    depth_max          = 1500.0
+    
+/
+
+&basal_hydrology
+    init_method       = 0             ! 0: no water; 1: constant value; 2: f(H)
+    H0                = 100           ! [m] Spatially constant initial water pressure value
+    H0_ice_min        = 10            ! [m] Minimum ice thickness for initial water pressure 
+    H0_ice_max        = 2000          ! [m] Maximum ice thickness for initial water pressure
+    H0_min            = 0             ! [m] Minimum initial water pressure 
+    H0_max            = 500           ! [m] Maximum initial water pressure
+    
+    method            = 1             ! H_water method (0: const, 1: bucket (local); 2: diffusion)
+    H_water_max       = 500.0         ! [m] Maximum water height in bucket method
+    till_max          = 20.0          ! [m] Maximum till thickness
+    till_porosity     = 0.5           ! [1] Porosity of till
+    till_infiltr      = 1.0e-03       ! [m/a] Rate water can infiltrate till
+    kond              = 1.0e-06       ! [m/s] Till conductivity (diffusion constant)
+
+/
+
+&sediments
+    use_obs   = True
+    obs_path  = "ice_data/{domain}/{grid_name}/{grid_name}_SED-L97.nc"
+    obs_name  = "z_sed"
+
+/
+
+&geothermal
+    use_obs   = True 
+    obs_path  = "ice_data/{domain}/{grid_name}/{grid_name}_GHF-M05.nc"
+    obs_name  = "ghf"
+    ghf_const = 50.0           ! [mW/m^2]
+
+/
+
+&isostasy 
+    method       = 2         ! 0: constant lithosphere depression; 1: LLRA (not tested); 2: ELRA
+    tau          = 3000.0 
+    fname_kelvin = "input/kelvin.res" 
+
+/

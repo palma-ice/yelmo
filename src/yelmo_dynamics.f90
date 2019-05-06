@@ -1,0 +1,1560 @@
+
+module yelmo_dynamics
+
+    use nml 
+    use ncio 
+
+    use yelmo_defs
+    use yelmo_tools, only : stagger_aa_acx, stagger_aa_acy, stagger_ac_aa, &
+        calc_magnitude_from_staggered_ice, calc_vertical_integrated_2D
+
+    use velocity_hybrid_pd12 
+    use velocity_sia 
+    use solver_ssa_sico5
+    use basal_dragging  
+    
+    ! Note: 3D arrays defined such that first index (k=1) == base, and max index (k=nk) == surface 
+    
+    implicit none
+
+    private
+
+    public :: ydyn_par_load, ydyn_alloc, ydyn_dealloc
+    public :: calc_ydyn
+    public :: check_vel_convergence
+    
+contains
+
+    subroutine calc_ydyn(dyn,tpo,mat,thrm,bnd,time)
+        ! Velocity is a steady-state solution to a given set of boundary conditions (topo, material, etc).
+        ! However, the time is passed to be able to treat relaxation conditions for stability, etc. 
+
+        implicit none
+        
+        type(ydyn_class),   intent(INOUT) :: dyn
+        type(ytopo_class),  intent(IN)    :: tpo 
+        type(ymat_class),   intent(IN)    :: mat
+        type(ytherm_class), intent(IN)    :: thrm 
+        type(ybound_class), intent(IN)    :: bnd   
+        real(prec),         intent(IN)    :: time 
+
+        ! Local variables 
+        real(prec) :: dt 
+
+        ! Initialize time if necessary 
+        if (dyn%par%time .gt. time) then 
+            dyn%par%time = time
+        end if 
+
+        ! Get time step
+        dt = time - dyn%par%time 
+
+        ! ===== Calculate the horizontal velocity components =====
+        ! These calculations are done assuming that the final
+        ! 3D horizontal velocity fields (ux/uy) will be comprised
+        ! of an internal shear contribution (ux_i/uy_i) and a plug
+        ! flow contribution represented by basal velocity (ux_b/uy_b)
+
+        select case(dyn%par%solver)
+
+            case("fixed") 
+                ! Do nothing - dynamics is fixed 
+
+            case("hybrid-vel","hybrid-shear")
+                ! Classic mix methods
+
+                call calc_ydyn_adhoc(dyn,tpo,mat,thrm,bnd,dt)
+
+            case("hybrid-pd12")
+                ! Variational approach of Pollard and de Conto (2012)
+
+                call calc_ydyn_pd12(dyn,tpo,mat,thrm,bnd)
+
+            case DEFAULT 
+
+                write(*,*) "calc_ydyn:: Error: ydyn solver not recognized." 
+                write(*,*) "solver should be one of: ['fixed','hybrid','hybrid-pd12']"
+                write(*,*) "solver = ", trim(dyn%par%solver) 
+                stop 
+
+        end select 
+
+        ! Advance ydyn timestep 
+        dyn%par%time = time
+
+        return
+
+    end subroutine calc_ydyn
+    
+    subroutine calc_ydyn_adhoc(dyn,tpo,mat,thrm,bnd,dt)
+        ! Velocity is a steady-state solution to a given set of boundary conditions (topo, material, etc)
+        ! so no time step is passed here. 
+
+        implicit none
+        
+        type(ydyn_class),   intent(INOUT) :: dyn
+        type(ytopo_class),  intent(IN)    :: tpo 
+        type(ymat_class),   intent(IN)    :: mat
+        type(ytherm_class), intent(IN)    :: thrm 
+        type(ybound_class), intent(IN)    :: bnd  
+        real(prec),         intent(IN)    :: dt 
+
+        ! Local variables
+        integer :: iter, n_iter
+        integer :: i, j, k, nx, ny, nz_aa, nz_ac    
+        real(prec), allocatable :: H_ice_acx(:,:) 
+        real(prec), allocatable :: H_ice_acy(:,:) 
+
+        real(prec), allocatable :: ux_b_old(:,:) 
+        real(prec), allocatable :: uy_b_old(:,:) 
+        real(prec), allocatable :: ux_b_prev(:,:) 
+        real(prec), allocatable :: uy_b_prev(:,:) 
+
+        ! For vertical velocity calculation 
+        real(prec), allocatable :: bmb(:,:)
+
+        logical :: calc_ssa 
+        logical :: is_converged
+        logical :: write_ssa_diagnostics
+
+        nx    = dyn%par%nx 
+        ny    = dyn%par%ny 
+        nz_aa = dyn%par%nz_aa 
+        nz_ac = dyn%par%nz_ac 
+        
+        allocate(H_ice_acx(nx,ny))
+        allocate(H_ice_acy(nx,ny))
+        allocate(bmb(nx,ny))
+
+        allocate(ux_b_old(nx,ny))
+        allocate(uy_b_old(nx,ny))
+        
+        allocate(ux_b_prev(nx,ny))
+        allocate(uy_b_prev(nx,ny))
+        
+        ! Stagger the ice thickness, aa=>ac nodes
+        H_ice_acx = stagger_aa_acx(tpo%now%H_ice)
+        H_ice_acy = stagger_aa_acy(tpo%now%H_ice)
+
+        ! ===== Calculate driving stress ==============================
+
+        ! Calculate driving stress 
+        call calc_driving_stress_ac(dyn%now%taud_acx,dyn%now%taud_acy,tpo%now%H_ice,tpo%now%z_srf,bnd%z_bed,bnd%z_sl, &
+                 tpo%now%H_grnd,tpo%now%f_grnd,tpo%now%f_grnd_acx,tpo%now%f_grnd_acy,dyn%par%dx,method=dyn%par%taud_gl_method)
+
+        ! ===== Calculate shear (ie, SIA) velocity solution ===========
+
+        select case(trim(dyn%par%solver))
+
+            case("hybrid-vel") 
+                ! Use classic-style SIA solver (solve directly for velocity)
+
+                ! Calculate the 3D horizontal shear velocity fields
+                call calc_uxy_sia_3D(dyn%now%ux_i,dyn%now%uy_i,tpo%now%H_ice,tpo%now%dzsdx,tpo%now%dzsdy, &
+                                     mat%now%ATT,dyn%par%zeta_aa,dyn%par%dx,mat%par%n_glen,rho_ice,g)
+                
+                ! Then simply integrate from 3D velocity field (faster than 2D solver below)
+                dyn%now%ux_i_bar = calc_vertical_integrated_2D(dyn%now%ux_i,dyn%par%zeta_aa)
+                dyn%now%uy_i_bar = calc_vertical_integrated_2D(dyn%now%uy_i,dyn%par%zeta_aa)
+                
+                ! Internal method to SIA module (slower than vertical integration above) - use for testing only
+                !call calc_uxy_sia_2D(dyn%now%ux_i_bar,dyn%now%uy_i_bar,tpo%now%H_ice,tpo%now%dzsdx,tpo%now%dzsdy, &
+                !                     mat%now%ATT,dyn%par%zeta_aa,dyn%par%dx,mat%par%n_glen,rho_ice,g)
+                
+                ! Calculate 2D diffusivity too (for timestepping and diagnostics)
+                ! (mainly interesting for benchmark experiments EISMINT, Bueler, etc)
+                call calc_diffusivity_2D(dyn%now%dd_ab_bar,tpo%now%H_ice,tpo%now%dzsdx,tpo%now%dzsdy, &
+                                        mat%now%ATT,dyn%par%zeta_aa,dyn%par%dx,mat%par%n_glen,rho_ice,g)
+
+                ! Set terms from hybrid-shear solver to zero that are not calculated here
+                dyn%now%duxdz     = 0.0 
+                dyn%now%duydz     = 0.0 
+                dyn%now%dd_ab     = 0.0 
+                dyn%now%duxdz_bar = 0.0 
+                dyn%now%duydz_bar = 0.0 
+
+            case("hybrid-shear")
+                ! Use 3D shear solver for SIA calculations (solve for shear and integrate to get velocity)
+                ! ie, following Pollard and de Conto (2012) 
+
+                ! Ensure PD12 stretching terms are zero  
+                dyn%now%lhs_x          = 0.0 
+                dyn%now%lhs_y          = 0.0 
+                dyn%now%sigma_horiz_sq = 0.0 
+                
+                ! Calculate the 3D vertical shear fields 
+                call calc_shear_3D(dyn%now%duxdz,dyn%now%duydz,dyn%now%dd_ab, &
+                                   dyn%now%taud_acx,dyn%now%taud_acy,mat%now%ATT, &
+                                   dyn%now%lhs_x,dyn%now%lhs_y,dyn%now%sigma_horiz_sq, &
+                                   dyn%par%zeta_aa,mat%par%n_glen,boundaries=dyn%par%boundaries)
+
+                ! Calculate the vertically averaged shear (for potential use in ssa viscosity) 
+                dyn%now%duxdz_bar = calc_vertical_integrated_2D(dyn%now%duxdz,dyn%par%zeta_aa)
+                dyn%now%duydz_bar = calc_vertical_integrated_2D(dyn%now%duydz,dyn%par%zeta_aa)
+                
+                ! Integrate vertically to get 3D horizontal shear velocity fields
+                dyn%now%ux_i = calc_vertical_integrated_3D_ice(dyn%now%duxdz,H_ice_acx,dyn%par%zeta_aa)
+                dyn%now%uy_i = calc_vertical_integrated_3D_ice(dyn%now%duydz,H_ice_acy,dyn%par%zeta_aa)
+
+                ! Calculate depth-averaged horizontal shear velocity fields
+                dyn%now%ux_i_bar  = calc_vertical_integrated_2D(dyn%now%ux_i,dyn%par%zeta_aa) 
+                dyn%now%uy_i_bar  = calc_vertical_integrated_2D(dyn%now%uy_i,dyn%par%zeta_aa) 
+
+                ! Calculate diagnostic diffusivity field 
+                ! ajr: this value is not correct, use the direct diffusivity calculation
+                !dyn%now%dd_ab_bar  = calc_vertical_integrated_2D(dyn%now%dd_ab,dyn%par%zeta_aa) 
+                call calc_diffusivity_2D(dyn%now%dd_ab_bar,tpo%now%H_ice,tpo%now%dzsdx,tpo%now%dzsdy, &
+                                        mat%now%ATT,dyn%par%zeta_aa,dyn%par%dx,mat%par%n_glen,rho_ice,g)
+
+            case DEFAULT 
+
+                write(*,*) "calc_ydyn_adhoc:: Error: solver not recognized: ", trim(dyn%par%solver)
+                stop 
+
+        end select 
+
+        ! ===== Calculate sliding velocity solution ===================
+
+        ! Update bed roughness coefficient C_bed (which is independent of velocity)
+        call calc_ydyn_cbed(dyn,tpo,thrm,bnd)
+
+        ! == Iterate over strain rate, viscosity and ssa velocity solutions until convergence ==
+        ! Note: ssa solution is defined for ux_b/uy_b fields here, not ux_bar/uy_bar as in PD12
+
+        is_converged = .FALSE. 
+
+        ! Store old solution (from previous time step) to be able to apply relaxation 
+        ! to avoid too fast propagation of waves
+        ux_b_old = dyn%now%ux_b
+        uy_b_old = dyn%now%uy_b
+        
+        write_ssa_diagnostics = .FALSE. 
+
+!         if (tpo%now%f_grnd(18,3) .gt. 0.0) then 
+!             write_ssa_diagnostics = .TRUE.
+
+!             call yelmo_write_init_ssa("yelmo_ssa.nc",time_init=1.0) 
+!         end if 
+
+        do iter = 1, dyn%par%ssa_iter_max
+
+            ! Store previous solution 
+            ux_b_prev = dyn%now%ux_b 
+            uy_b_prev = dyn%now%uy_b 
+
+            !   1. Calculate basal drag coefficient beta (beta, beta_acx, beta_acy) 
+
+            call calc_ydyn_beta(dyn,tpo,mat,bnd)
+            !call calc_ydyn_beta_ac(dyn,tpo,mat,bnd)
+            
+            !   2. Calculate effective viscosity
+            
+            ! ---------------------------------------------------------------------
+            ! Stable viscosity solutions for SSA solver:
+
+!             dyn%now%visc_eff = 1e10 
+
+!             dyn%now%visc_eff = mat%now%visc_eff 
+                
+            ! Use 3D rate factor, but 2D shear:
+            ! Note: disable shear contribution to viscosity for this solver, for mixed terms use hybrid-pd12 option.
+            ! Note: Here visc_eff is calculated using ux_b and uy_b (ssa velocity), not ux_bar/uy_bar as in hybrid-pd12. 
+            dyn%now%visc_eff = calc_visc_eff(dyn%now%ux_b,dyn%now%uy_b,dyn%now%duxdz_bar*0.0,dyn%now%duydz_bar*0.0, &
+                                             tpo%now%H_ice,mat%now%ATT,dyn%par%zeta_aa,dyn%par%dx,dyn%par%dy,mat%par%n_glen)
+            
+            !   3. Calculate SSA solution
+
+            ! Define grid points with ssa active
+            call set_ssa_masks(dyn%now%ssa_mask_acx,dyn%now%ssa_mask_acy,dyn%now%beta_acx,dyn%now%beta_acy, &
+                               tpo%now%H_ice,tpo%now%f_grnd_acx,tpo%now%f_grnd_acy,dyn%par%beta_max,dyn%par%use_ssa)
+
+            ! Determine whether SSA solver should be called 
+            calc_ssa = .FALSE. 
+            if (dyn%par%use_ssa .and. maxval(dyn%now%ssa_mask_acx+dyn%now%ssa_mask_acy) .gt. 0) calc_ssa = .TRUE.    
+            
+            if (calc_ssa) then
+                ! Call ssa solver to determine ux_b/uy_b, where ssa_mask_acx/y are > 0
+
+                call calc_vxy_ssa_matrix(dyn%now%ux_b,dyn%now%uy_b,dyn%now%ux_bar*0.0,dyn%now%uy_bar*0.0, &
+                                         dyn%now%beta_acx,dyn%now%beta_acy,dyn%now%visc_eff,dyn%now%ssa_mask_acx, &
+                                         dyn%now%ssa_mask_acy,tpo%now%H_ice,dyn%now%taud_acx,dyn%now%taud_acy,tpo%now%H_grnd, &
+                                         bnd%z_sl,bnd%z_bed, & 
+                                         dyn%par%dx,dyn%par%dy,dyn%par%ssa_vel_max,dyn%par%boundaries, &
+                                         dyn%now%gfa1,dyn%now%gfa2,dyn%now%gfb1,dyn%now%gfb2)
+
+            else 
+                ! Reset basal velocity zero 
+
+                dyn%now%ux_b = 0.0 
+                dyn%now%uy_b = 0.0 
+                
+            end if 
+            
+            ! Apply relaxation to keep things stable
+            call relax_ssa(dyn%now%ux_b,dyn%now%uy_b,ux_b_prev,uy_b_prev,rel=dyn%par%ssa_iter_rel)
+
+            ! Check for convergence
+            is_converged = check_vel_convergence(dyn%now%ux_b,dyn%now%uy_b,ux_b_prev,uy_b_prev, &
+                                        dyn%par%ssa_iter_conv,iter,yelmo_write_log)
+
+            if (write_ssa_diagnostics) then  
+                call write_step_2D_ssa(tpo,dyn,"yelmo_ssa.nc",ux_b_prev,uy_b_prev,time=real(iter,prec))    
+            end if 
+
+            ! Exit iterations if ssa solution has converged
+            if (is_converged) exit 
+
+        end do 
+        ! == END iterations ==
+
+        if (write_ssa_diagnostics) then 
+            stop 
+        end if 
+
+        ! ===== Combine sliding and shear into hybrid fields ==========
+
+        select case(dyn%par%mix_method)
+            ! Determine how to mix shearing (ux_i/uy_i) and sliding (ux_b/uy_b)
+            ! Generally purely floating ice is only given by the SSA solution;
+            ! Grounded or partially grounded ice is given by the hybrid solution 
+
+            case(-2)
+                ! Purely sia model
+                ! (correspondingly, floating ice is killed in yelmo_topography)
+                
+                if (dyn%par%cf_sia .gt. 0.0) then 
+                    ! Calculate basal velocity from Weertman sliding law (Greve 1997)
+                    
+                    call calc_uxy_b_sia(dyn%now%ux_b,dyn%now%uy_b,tpo%now%H_ice,tpo%now%dzsdx,tpo%now%dzsdy, &
+                                thrm%now%f_pmp,dyn%par%zeta_aa,dyn%par%dx,dyn%par%cf_sia,rho_ice,g)
+                
+                else 
+                    ! Otherwise no basal sliding in SIA-only mode
+                
+                    dyn%now%ux_b   = 0.0_prec 
+                    dyn%now%uy_b   = 0.0_prec
+                    
+                end if 
+
+                ! SIA solution everywhere, potentially with additional parameterized basal sliding
+                dyn%now%ux_bar = dyn%now%ux_i_bar + dyn%now%ux_b 
+                dyn%now%uy_bar = dyn%now%uy_i_bar + dyn%now%uy_b 
+
+            case(-1)
+                ! Purely ssa model
+
+                dyn%now%ux_i     = 0.0_prec 
+                dyn%now%uy_i     = 0.0_prec 
+                dyn%now%ux_i_bar = 0.0_prec 
+                dyn%now%uy_i_bar = 0.0_prec 
+                
+                dyn%now%ux_bar = dyn%now%ux_b 
+                dyn%now%uy_bar = dyn%now%uy_b 
+
+            case(0)
+                ! Binary mixing (either shearing or sliding)
+
+                ! TO DO 
+
+                write(*,*) "mix_method=0 not implemented yet."
+                stop 
+
+            case(1)
+                ! Shear when not sliding, otherwise shear+sliding 
+                ! (ie, sia or sia+ssa)
+
+                ! Hybrid solution everywhere 
+                dyn%now%ux_bar = dyn%now%ux_i_bar + dyn%now%ux_b 
+                dyn%now%uy_bar = dyn%now%uy_i_bar + dyn%now%uy_b 
+
+            case(2)
+                ! Weighted mixing 
+
+                ! TO DO 
+
+                write(*,*) "mix_method=2 not implemented yet."
+                stop 
+
+            case DEFAULT
+
+                write(*,*) "mix_method not recognized."
+                write(*,*) "mix_method = ", dyn%par%mix_method
+                stop 
+
+        end select
+
+        ! ===== Calculate 3D velocity fields ========================== 
+
+        ! Fill in horizontal velocity as the sum of shear and basal velocity 
+        do k = 1, nz_aa 
+            dyn%now%ux(:,:,k)  = dyn%now%ux_i(:,:,k) + dyn%now%ux_b 
+            dyn%now%uy(:,:,k)  = dyn%now%uy_i(:,:,k) + dyn%now%uy_b 
+        end do 
+
+        ! Calculate the vertical velocity through continuity
+
+        if (dyn%par%use_bmb) then 
+            bmb = tpo%now%bmb 
+        else 
+            bmb = 0.0 
+        end if 
+
+        call calc_uz_3D(dyn%now%uz,dyn%now%ux,dyn%now%uy,tpo%now%H_ice,bnd%z_bed, &
+                        bnd%smb,bmb,dyn%par%zeta_aa,dyn%par%zeta_ac,dyn%par%dx,dyn%par%dy)
+        
+        ! ===== Additional diagnostic variables =======================
+
+        ! 3b. Diagnose the shear reduction terms of PD12 
+        call calc_shear_reduction(dyn%now%lhs_x,dyn%now%lhs_y,dyn%now%ux_b,dyn%now%uy_b,dyn%now%visc_eff,dyn%par%dx)
+        
+        ! 3c. Diagnose the effective horizontal stress squared
+        dyn%now%sigma_horiz_sq = calc_stress_eff_horizontal_squared(dyn%now%ux_bar,dyn%now%uy_bar, &
+                                            mat%now%ATT_bar,dyn%par%dx,dyn%par%dy,mat%par%n_glen)
+
+        ! Calculate basal stress (input to thermodynamics)
+        call calc_basal_stress(dyn%now%taub_acx,dyn%now%taub_acy,dyn%now%beta_acx,dyn%now%beta_acy, &
+                               dyn%now%ux_b,dyn%now%uy_b)
+
+        ! Diagnose ice flux 
+        call calc_ice_flux(dyn%now%qq_acx,dyn%now%qq_acy,dyn%now%ux_bar,dyn%now%uy_bar,tpo%now%H_ice, &
+                            dyn%par%dx,dyn%par%dy)
+        dyn%now%qq        = calc_magnitude_from_staggered_ice(dyn%now%qq_acx,dyn%now%qq_acy,tpo%now%H_ice)
+
+        dyn%now%taub      = calc_magnitude_from_staggered_ice(dyn%now%taub_acx,dyn%now%taub_acy,tpo%now%H_ice)
+        dyn%now%taud      = calc_magnitude_from_staggered_ice(dyn%now%taud_acx,dyn%now%taud_acy,tpo%now%H_ice)
+
+        dyn%now%lhs_xy    = calc_magnitude_from_staggered_ice(dyn%now%lhs_x,dyn%now%lhs_y,tpo%now%H_ice)
+        dyn%now%uxy_b     = calc_magnitude_from_staggered_ice(dyn%now%ux_b,dyn%now%uy_b,tpo%now%H_ice)
+        dyn%now%uxy_i_bar = calc_magnitude_from_staggered_ice(dyn%now%ux_i_bar,dyn%now%uy_i_bar,tpo%now%H_ice)
+        dyn%now%uxy_bar   = calc_magnitude_from_staggered_ice(dyn%now%ux_bar,dyn%now%uy_bar,tpo%now%H_ice)
+
+        do k = 1, nz_aa
+            dyn%now%uxy(:,:,k) = calc_magnitude_from_staggered_ice(dyn%now%ux(:,:,k),dyn%now%uy(:,:,k),tpo%now%H_ice)
+        end do 
+
+        ! Store surface velocities for easy access too 
+        dyn%now%ux_s  = dyn%now%ux(:,:,nz_aa)
+        dyn%now%uy_s  = dyn%now%uy(:,:,nz_aa)
+        dyn%now%uxy_s = dyn%now%uxy(:,:,nz_aa)
+
+        ! Determine ratio of basal to surface velocity
+        dyn%now%f_vbvs = calc_vel_ratio(uxy_base=dyn%now%uxy_b,uxy_srf=dyn%now%uxy_s)
+
+        return
+
+    end subroutine calc_ydyn_adhoc
+
+    subroutine calc_ydyn_pd12(dyn,tpo,mat,thrm,bnd)
+        ! Velocity is a steady-state solution to a given set of boundary conditions (topo, material, etc)
+        ! so no time step is passed here. 
+
+        implicit none
+        
+        type(ydyn_class),   intent(INOUT) :: dyn
+        type(ytopo_class),  intent(IN)    :: tpo 
+        type(ymat_class),   intent(IN)    :: mat
+        type(ytherm_class), intent(IN)    :: thrm 
+        type(ybound_class), intent(IN)    :: bnd  
+
+        ! Local variables
+        integer :: iter, n_iter
+        integer :: k, nx, ny, nz_aa, nz_ac    
+        real(prec), allocatable :: H_ice_acx(:,:) 
+        real(prec), allocatable :: H_ice_acy(:,:) 
+
+        real(prec), allocatable :: ux_bar_old(:,:) 
+        real(prec), allocatable :: uy_bar_old(:,:) 
+        real(prec), allocatable :: ux_bar_prev(:,:) 
+        real(prec), allocatable :: uy_bar_prev(:,:) 
+        
+        ! For vertical velocity calculation 
+        real(prec), allocatable :: bmb(:,:)
+
+        logical :: calc_ssa 
+        logical :: is_converged
+        logical :: write_ssa_diagnostics
+        
+        nx    = dyn%par%nx 
+        ny    = dyn%par%ny 
+        nz_aa = dyn%par%nz_aa 
+        nz_ac = dyn%par%nz_ac 
+
+        allocate(H_ice_acx(nx,ny))
+        allocate(H_ice_acy(nx,ny))
+        allocate(bmb(nx,ny))
+
+        ! Stagger the ice thickness, Aa=>Ab nodes
+        H_ice_acx = stagger_aa_acx(tpo%now%H_ice)
+        H_ice_acy = stagger_aa_acy(tpo%now%H_ice)
+
+        ! Update bed roughness coefficient C_bed (which is independent of velocity)
+        call calc_ydyn_cbed(dyn,tpo,thrm,bnd)
+        
+        ! Calculate driving stress 
+        call calc_driving_stress_ac(dyn%now%taud_acx,dyn%now%taud_acy,tpo%now%H_ice,tpo%now%z_srf,bnd%z_bed,bnd%z_sl, &
+                 tpo%now%H_grnd,tpo%now%f_grnd,tpo%now%f_grnd_acx,tpo%now%f_grnd_acy,dyn%par%dx,method=dyn%par%taud_gl_method)
+
+        ! Calculate 2D diffusivity too (for timestepping and diagnostics)
+!         call calc_diffusivity_2D(dyn%now%dd_ab_bar,tpo%now%H_ice,tpo%now%dzsdx,tpo%now%dzsdy, &
+!                                  mat%now%ATT,dyn%par%zeta_aa,dyn%par%dx,mat%par%n_glen,rho_ice,g)
+!         dyn%now%dd_ab_bar  = calc_vertical_integrated_2D(dyn%now%dd_ab,dyn%par%zeta_aa) 
+        
+        ! == Iterate over strain rate, viscosity and velocity solutions until convergence ==
+
+        ! Initially set the mixing terms to zero 
+        dyn%now%lhs_x          = 0.0 
+        dyn%now%lhs_y          = 0.0 
+        dyn%now%sigma_horiz_sq = 0.0 
+        dyn%now%duxdz_bar      = 0.0 
+        dyn%now%duydz_bar      = 0.0 
+
+        is_converged  = .FALSE. 
+
+        ! Store old solution (from previous time step) to be able to apply relaxation 
+        ! to avoid too fast propagation of waves
+        ux_bar_old = dyn%now%ux_bar
+        uy_bar_old = dyn%now%uy_bar
+        
+        write_ssa_diagnostics = .FALSE. 
+
+!         if (tpo%now%f_grnd(18,3) .gt. 0.0) then 
+!             write_ssa_diagnostics = .TRUE.
+
+!             call yelmo_write_init_ssa("yelmo_ssa.nc",time_init=1.0) 
+!         end if 
+
+        do iter = 1, dyn%par%ssa_iter_max
+
+            ! Store previous solution 
+            ux_bar_prev = dyn%now%ux_bar 
+            uy_bar_prev = dyn%now%uy_bar 
+            
+            ! 1. Calculate effective stress due to stretching terms, and driving stress reduction
+
+            dyn%now%sigma_horiz_sq = calc_stress_eff_horizontal_squared(dyn%now%ux_bar,dyn%now%uy_bar, &
+                                            mat%now%ATT_bar,dyn%par%dx,dyn%par%dy,mat%par%n_glen)
+
+            call calc_shear_reduction(dyn%now%lhs_x,dyn%now%lhs_y,dyn%now%ux_b,dyn%now%uy_b,dyn%now%visc_eff,dyn%par%dx)
+            
+            ! 2. Calculate the vertical shear fields 
+            ! (accounting for effective stress with stretching and reduced driving stress)
+            
+            call calc_shear_3D(dyn%now%duxdz,dyn%now%duydz,dyn%now%dd_ab, &
+                               dyn%now%taud_acx,dyn%now%taud_acy,mat%now%ATT, &
+                               dyn%now%lhs_x,dyn%now%lhs_y,dyn%now%sigma_horiz_sq, &
+                               dyn%par%zeta_aa,mat%par%n_glen,boundaries=dyn%par%boundaries)
+
+            ! Calculate the vertically averaged shear for use in ssa viscosity 
+            dyn%now%duxdz_bar = calc_vertical_integrated_2D(dyn%now%duxdz,dyn%par%zeta_aa)
+            dyn%now%duydz_bar = calc_vertical_integrated_2D(dyn%now%duydz,dyn%par%zeta_aa)
+            
+            ! 3. Calculate shear velocity values ux_i/uy_i 
+
+            ! Calculate the 3D shear velocity field
+            dyn%now%ux_i = calc_vertical_integrated_3D_ice(dyn%now%duxdz,H_ice_acx,dyn%par%zeta_aa)
+            dyn%now%uy_i = calc_vertical_integrated_3D_ice(dyn%now%duydz,H_ice_acy,dyn%par%zeta_aa)
+            
+            ! Calculate the vertically averaged shear velocity field 
+            dyn%now%ux_i_bar  = calc_vertical_integrated_2D(dyn%now%ux_i,dyn%par%zeta_aa) 
+            dyn%now%uy_i_bar  = calc_vertical_integrated_2D(dyn%now%uy_i,dyn%par%zeta_aa) 
+            
+!             if (iter .eq. 1) then 
+!                 ! Set the hybrid solution equal to the shear solution initially 
+
+!                 dyn%now%ux_bar = dyn%now%ux_i_bar 
+!                 dyn%now%uy_bar = dyn%now%uy_i_bar 
+
+!             end if 
+
+            ! 4. Calculate basal velocity from previous u_bar and ux_i_bar
+            
+            call calc_vel_basal(dyn%now%ux_b,dyn%now%uy_b,dyn%now%ux_bar,dyn%now%uy_bar, &
+                                dyn%now%ux_i_bar,dyn%now%uy_i_bar)
+            
+            ! 5. Calculate effective viscosity, including shear terms
+            
+            ! ---------------------------------------------------------------------
+            ! Stable viscosity solutions for SSA solver:
+
+!             dyn%now%visc_eff = 1e10 
+
+!             dyn%now%visc_eff = mat%now%visc_eff 
+                
+            ! Use 3D rate factor, but 2D shear:
+!             dyn%now%visc_eff = calc_visc_eff(dyn%now%ux_b,dyn%now%uy_b,dyn%now%duxdz_bar,dyn%now%duydz_bar, &
+!                                              tpo%now%H_ice,mat%now%ATT,dyn%par%zeta_aa,dyn%par%dx,dyn%par%dy,mat%par%n_glen)
+            dyn%now%visc_eff = calc_visc_eff(dyn%now%ux_bar,dyn%now%uy_bar,dyn%now%duxdz_bar*0.0,dyn%now%duydz_bar*0.0, &
+                                             tpo%now%H_ice,mat%now%ATT,dyn%par%zeta_aa,dyn%par%dx,dyn%par%dy,mat%par%n_glen)
+            
+            ! ---------------------------------------------------------------------
+            
+            ! 6. Calculate basal drag coefficient beta (beta, beta_acx, beta_acy) 
+
+            call calc_ydyn_beta(dyn,tpo,mat,bnd)
+
+            ! 7. Calculate SSA solution if needed
+
+            ! Define grid points with ssa active
+            call set_ssa_masks(dyn%now%ssa_mask_acx,dyn%now%ssa_mask_acy,dyn%now%beta_acx,dyn%now%beta_acy, &
+                               tpo%now%H_ice,tpo%now%f_grnd_acx,tpo%now%f_grnd_acy,dyn%par%beta_max,dyn%par%use_ssa)
+
+            ! Determine whether SSA solver should be called 
+            calc_ssa = .FALSE. 
+            if (dyn%par%use_ssa .and. maxval(dyn%now%ssa_mask_acx+dyn%now%ssa_mask_acy) .gt. 0) calc_ssa = .TRUE.    
+
+            if (calc_ssa) then
+                ! Call ssa solver to determine ux_bar/uy_bar, where ssa_mask_acx/y are > 0
+                
+                call calc_vxy_ssa_matrix(dyn%now%ux_bar,dyn%now%uy_bar,dyn%now%ux_b*0.0,dyn%now%uy_b*0.0, &
+                                         dyn%now%beta_acx,dyn%now%beta_acy,dyn%now%visc_eff,dyn%now%ssa_mask_acx, &
+                                         dyn%now%ssa_mask_acy,tpo%now%H_ice,dyn%now%taud_acx,dyn%now%taud_acy,tpo%now%H_grnd, &
+                                         bnd%z_sl,bnd%z_bed, & 
+                                         dyn%par%dx,dyn%par%dy,dyn%par%ssa_vel_max,dyn%par%boundaries, &
+                                         dyn%now%gfa1,dyn%now%gfa2,dyn%now%gfb1,dyn%now%gfb2)   
+
+            end if 
+             
+            ! 7. Ensure that shear solution is applied where no SSA is calculated 
+
+            where (dyn%now%ssa_mask_acx .eq. 0) dyn%now%ux_bar = dyn%now%ux_i_bar 
+            where (dyn%now%ssa_mask_acy .eq. 0) dyn%now%uy_bar = dyn%now%uy_i_bar  
+            
+            ! Apply relaxation to keep things stable
+            call relax_ssa(dyn%now%ux_bar,dyn%now%uy_bar,ux_bar_prev,uy_bar_prev,rel=dyn%par%ssa_iter_rel)
+
+            ! Check convergence of ssa solution 
+            is_converged = check_vel_convergence(dyn%now%ux_bar,dyn%now%uy_bar,ux_bar_prev,uy_bar_prev, &
+                                        dyn%par%ssa_iter_conv,iter,yelmo_write_log)
+
+            if (write_ssa_diagnostics) then  
+                call write_step_2D_ssa(tpo,dyn,"yelmo_ssa.nc",ux_bar_prev,uy_bar_prev,time=real(iter,prec))    
+            end if 
+
+            ! Exit iterations if ssa solution has converged
+            if (is_converged) exit 
+
+        end do 
+        ! == END iterations ==
+
+        if (write_ssa_diagnostics) then 
+            stop 
+        end if 
+
+        ! ===== Calculate 3D velocity fields ====== 
+
+        ! Re-calculate basal velocity from current solution u_bar and ux_i_bar
+            
+        call calc_vel_basal(dyn%now%ux_b,dyn%now%uy_b,dyn%now%ux_bar,dyn%now%uy_bar, &
+                            dyn%now%ux_i_bar,dyn%now%uy_i_bar)
+        
+        ! Fill in horizontal velocity as the sum of shear and basal velocity 
+        do k = 1, nz_aa 
+            dyn%now%ux(:,:,k)  = dyn%now%ux_i(:,:,k) + dyn%now%ux_b 
+            dyn%now%uy(:,:,k)  = dyn%now%uy_i(:,:,k) + dyn%now%uy_b 
+        end do 
+
+        ! Calculate the vertical velocity through continuity
+
+        if (dyn%par%use_bmb) then 
+            bmb = tpo%now%bmb 
+        else 
+            bmb = 0.0 
+        end if 
+
+        call calc_uz_3D(dyn%now%uz,dyn%now%ux,dyn%now%uy,tpo%now%H_ice,bnd%z_bed, &
+                        bnd%smb,bmb,dyn%par%zeta_aa,dyn%par%zeta_ac,dyn%par%dx,dyn%par%dy)
+
+        ! ===== Additional diagnostic variables ==========
+
+        ! Calculate basal stress (input to thermodynamics)
+        call calc_basal_stress(dyn%now%taub_acx,dyn%now%taub_acy,dyn%now%beta_acx,dyn%now%beta_acy, &
+                               dyn%now%ux_b,dyn%now%uy_b)
+
+        ! Diagnose ice flux 
+        call calc_ice_flux(dyn%now%qq_acx,dyn%now%qq_acy,dyn%now%ux_bar,dyn%now%uy_bar,tpo%now%H_ice, &
+                            dyn%par%dx,dyn%par%dy)
+        dyn%now%qq        = calc_magnitude_from_staggered_ice(dyn%now%qq_acx,dyn%now%qq_acy,tpo%now%H_ice)
+
+        dyn%now%taub      = calc_magnitude_from_staggered_ice(dyn%now%taub_acx,dyn%now%taub_acy,tpo%now%H_ice)
+        dyn%now%taud      = calc_magnitude_from_staggered_ice(dyn%now%taud_acx,dyn%now%taud_acy,tpo%now%H_ice)
+
+        dyn%now%lhs_xy    = calc_magnitude_from_staggered_ice(dyn%now%lhs_x,dyn%now%lhs_y,tpo%now%H_ice)
+        dyn%now%uxy_b     = calc_magnitude_from_staggered_ice(dyn%now%ux_b,dyn%now%uy_b,tpo%now%H_ice)
+        dyn%now%uxy_i_bar = calc_magnitude_from_staggered_ice(dyn%now%ux_i_bar,dyn%now%uy_i_bar,tpo%now%H_ice)
+        dyn%now%uxy_bar   = calc_magnitude_from_staggered_ice(dyn%now%ux_bar,dyn%now%uy_bar,tpo%now%H_ice)
+
+        do k = 1, nz_aa
+            dyn%now%uxy(:,:,k) = calc_magnitude_from_staggered_ice(dyn%now%ux(:,:,k),dyn%now%uy(:,:,k),tpo%now%H_ice)
+        end do 
+
+        ! Store surface velocities for easy access too 
+        dyn%now%ux_s  = dyn%now%ux(:,:,nz_aa)
+        dyn%now%uy_s  = dyn%now%uy(:,:,nz_aa)
+        dyn%now%uxy_s = dyn%now%uxy(:,:,nz_aa)
+
+        ! Determine ratio of basal to surface velocity
+        dyn%now%f_vbvs = calc_vel_ratio(uxy_base=dyn%now%uxy_b,uxy_srf=dyn%now%uxy_s)
+
+        return
+
+    end subroutine calc_ydyn_pd12
+
+    function check_vel_convergence(ux,uy,ux_prev,uy_prev,ssa_resid_tol,iter,log) result(is_converged)
+
+        implicit none 
+
+        real(prec), intent(IN) :: ux(:,:) 
+        real(prec), intent(IN) :: uy(:,:) 
+        real(prec), intent(IN) :: ux_prev(:,:) 
+        real(prec), intent(IN) :: uy_prev(:,:)  
+        real(prec), intent(IN) :: ssa_resid_tol 
+        integer,    intent(IN) :: iter 
+        logical,    intent(IN) :: log 
+        logical :: is_converged
+
+        ! Local variables 
+        real(prec) :: ux_resid_max 
+        real(prec) :: uy_resid_max 
+        real(prec) :: res1, res2, resid 
+        character(len=1) :: converged_txt 
+
+        real(prec), parameter :: ssa_vel_tolerance = 1e-2   ! [m/a] only consider points with velocity above this tolerance limit
+        
+        ! Calculate residual acoording to the L2 relative error norm
+        ! (as Eq. 65 in Gagliardini et al., GMD, 2013)
+
+        if (count(abs(ux) .gt. ssa_vel_tolerance) .gt. 0 .or. &
+            count(abs(uy) .gt. ssa_vel_tolerance) .gt. 0) then
+
+            res1 = sqrt( sum((ux-ux_prev)*(ux-ux_prev),mask=abs(ux).gt.ssa_vel_tolerance) &
+                       + sum((uy-uy_prev)*(uy-uy_prev),mask=abs(uy).gt.ssa_vel_tolerance) )
+
+            res2 = sqrt( sum((ux+ux_prev)*(ux+ux_prev),mask=abs(ux).gt.ssa_vel_tolerance) &
+                       + sum((uy+uy_prev)*(uy+uy_prev),mask=abs(uy).gt.ssa_vel_tolerance) )
+            res2 = max(res2,1e-5)
+
+            resid = 2.0*res1/res2 
+
+        else 
+            ! No points available for comparison, set residual equal to zero 
+
+            resid = 0.0 
+
+        end if 
+
+        ! Check for convergence
+!         if (max(ux_resid_max,uy_resid_max) .le. ssa_resid_tol) then
+        if (resid .le. ssa_resid_tol) then 
+            is_converged = .TRUE. 
+            converged_txt = "C"
+        else
+            is_converged = .FALSE. 
+            converged_txt = ""
+        end if 
+
+        if (log .and. is_converged) then
+            ! Write summary to log if desired 
+
+            ! Also calculate maximum error magnitude for perspective
+            if (count(abs(ux) .gt. ssa_vel_tolerance) .gt. 0) then 
+                ux_resid_max = maxval(abs(ux-ux_prev),mask=abs(ux).gt.ssa_vel_tolerance)
+            else 
+                ux_resid_max = 0.0 
+            end if 
+
+            if (count(abs(uy) .gt. ssa_vel_tolerance) .gt. 0) then 
+                uy_resid_max = maxval(abs(uy - uy_prev),mask=abs(uy).gt.ssa_vel_tolerance)
+            else 
+                uy_resid_max = 0.0 
+            end if 
+
+            ! Write summary to log
+            write(*,"(a,i4,3g12.4,a2)") &
+                "ssa: ", iter, resid, ux_resid_max, uy_resid_max, trim(converged_txt)
+
+        end if 
+        
+        return 
+
+    end function check_vel_convergence
+
+    elemental subroutine relax_ssa(ux,uy,ux_prev,uy_prev,rel)
+        ! Relax velocity solution with previous iteration 
+
+        implicit none 
+
+        real(prec), intent(INOUT) :: ux
+        real(prec), intent(INOUT) :: uy
+        real(prec), intent(IN)    :: ux_prev
+        real(prec), intent(IN)    :: uy_prev
+        real(prec), intent(IN)    :: rel
+
+        !real(prec), parameter :: du_max = 100.0 
+
+        ! Apply relaxation 
+        ux = rel*ux + (1.0-rel)*ux_prev 
+        uy = rel*uy + (1.0-rel)*uy_prev
+
+        ! Additionally avoid really abrupt changes 
+        !if (abs(ux-ux_prev) .gt. du_max) ux = ux_prev + sign(du_max,ux-ux_prev)
+        !if (abs(uy-uy_prev) .gt. du_max) uy = uy_prev + sign(du_max,uy-uy_prev)
+        
+        return 
+
+    end subroutine relax_ssa
+
+    subroutine calc_ydyn_beta(dyn,tpo,mat,bnd)
+        ! Update beta based on parameter choices
+
+        implicit none
+        
+        type(ydyn_class),   intent(INOUT) :: dyn
+        type(ytopo_class),  intent(IN)    :: tpo 
+        type(ymat_class),   intent(IN)    :: mat 
+        type(ybound_class), intent(IN)    :: bnd   
+
+        ! 1. Apply beta method of choice 
+        select case(dyn%par%beta_method)
+
+            case(-1)
+                ! beta (aa-nodes) has been defined externally - do nothing
+
+            case(0)
+                ! Constant beta everywhere 
+                dyn%now%beta = dyn%par%beta_const 
+
+            case(1) 
+                ! Calculate beta from power-law function (eg, MISMIP3D style)
+                ! beta = c_b**(-1/m)*|u_b|**((1-m)/m)
+                call calc_beta_aa_power(dyn%now%beta,dyn%now%ux_b,dyn%now%uy_b,dyn%now%C_bed,dyn%par%m_drag)
+            
+            case(2)
+                ! Calculate beta = c_b*N_eff 
+
+                ! First calculate beta from the linear equation (beta = c_b)
+                call calc_beta_aa_linear(dyn%now%beta,dyn%now%C_bed)
+
+                ! Additionally scale by N_eff (beta = c_b*N_eff)
+                call scale_beta_aa_Neff(dyn%now%beta,tpo%now%N_eff)
+
+            case DEFAULT 
+                ! Not recognized 
+
+                write(*,*) "calc_ydyn_beta:: Error: beta_method not recognized."
+                write(*,*) "beta_method = ", dyn%par%beta_method
+                stop 
+
+        end select 
+
+        ! 2. Apply grounding-line sub-element parameterization (sep, ie, subgrid method)
+        select case(dyn%par%beta_gl_sep)
+
+            case(-1) 
+                ! Apply ac-node subgrid treatment, therefore do nothing here 
+                
+                !  Simply set beta to zero where purely floating
+                where (tpo%now%f_grnd .eq. 0.0) dyn%now%beta = 0.0 
+                
+                if (dyn%par%beta_gl_stag .ne. 2) then 
+                    write(*,*) "calc_ydyn_beta_aa:: Error: beta_gl_stag must equal 2 for beta_gl_sep=-1."
+                    write(*,*) "beta_gl_sep  = ", dyn%par%beta_gl_sep
+                    write(*,*) "beta_gl_stag = ", dyn%par%beta_gl_stag
+                    stop 
+                end if 
+
+                if (tpo%par%gl_sep .ne. 1) then 
+                    write(*,*) "calc_ydyn_beta_aa:: Error: gl_sep must equal 1 for beta_gl_sep=-1."
+                    write(*,*) "beta_gl_sep  = ", dyn%par%beta_gl_sep
+                    write(*,*) "gl_sep       = ", tpo%par%gl_sep
+                    stop 
+                end if 
+                
+            case(0)
+                ! No subgrid weighting at the grounding line,
+                ! simply set beta to zero where purely floating  
+
+                where (tpo%now%f_grnd .eq. 0.0) dyn%now%beta = 0.0 
+
+            case(1)
+                ! Apply aa-node subgrid grounded fraction 
+                dyn%now%beta = dyn%now%beta * tpo%now%f_grnd 
+
+            case DEFAULT 
+
+                write(*,*) "calc_ydyn_beta_aa:: Error: beta_gl_sep not recognized."
+                write(*,*) "beta_gl_sep = ", dyn%par%beta_gl_sep
+                stop 
+
+        end select 
+
+        ! 2. Apply beta-scaling method at/near the grounding line (beta=0 for floating ice, etc)
+
+        select case(dyn%par%beta_gl_scale) 
+
+            case(0)
+                ! No scaling, keep beta as before
+                
+            case(1) 
+                ! Apply fractional parameter at grounding line 
+
+                call scale_beta_aa_grline(dyn%now%beta,tpo%now%f_grnd,dyn%par%f_beta_gl)
+
+            case(2) 
+                ! Apply H_grnd scaling, reducing beta linearly towards zero at the grounding line 
+
+                call scale_beta_aa_Hgrnd(dyn%now%beta,tpo%now%H_grnd,dyn%par%H_grnd_lim)
+
+            case(3) 
+                ! Apply scaling according to thickness above flotation (Zstar approach of Gladstone et al., 2017)
+                ! norm==.TRUE., so that zstar-scaling is bounded between 0 and 1, and thus won't affect 
+                ! choice of C_bed value that is independent of this scaling. 
+                call scale_beta_aa_zstar(dyn%now%beta,tpo%now%H_ice,bnd%z_bed,bnd%z_sl,norm=.TRUE.)
+
+            case DEFAULT 
+
+                write(*,*) "calc_ydyn_beta_aa:: Error: beta_gl_scale not recognized."
+                write(*,*) "beta_gl_scale = ", dyn%par%beta_gl_scale
+                stop 
+
+        end select 
+
+        ! 3. Apply smoothing if desired (only for points with beta > 0)
+        if (dyn%par%n_sm_beta .gt. 0) then 
+            call smooth_beta_aa(dyn%now%beta,dyn%par%dx,dyn%par%n_sm_beta)
+        end if 
+
+        ! ================================================================
+        ! Note: At this point the beta_aa field is available with beta=0 
+        ! for floating points and beta > 0 for non-floating points
+        ! ================================================================
+
+        ! 4. Apply staggering method with particular care for the grounding line 
+        select case(dyn%par%beta_gl_stag) 
+
+            case(0) 
+                ! Apply pure staggering everywhere (ac(i) = 0.5*(aa(i)+aa(i+1))
+                
+                call stagger_beta_aa_simple(dyn%now%beta_acx,dyn%now%beta_acy,dyn%now%beta)
+
+            case(1) 
+                ! Apply upstream beta_aa value at ac-node with at least one neighbor H_grnd_aa > 0
+
+                call stagger_beta_aa_upstream(dyn%now%beta_acx,dyn%now%beta_acy,dyn%now%beta,tpo%now%f_grnd)
+
+            case(2)
+                ! Apply subgrid scaling fraction at the grounding line when staggering 
+
+                ! Note: now subgrid treatment is handled on aa-nodes above (using beta_gl_sep)
+
+                call stagger_beta_aa_subgrid(dyn%now%beta_acx,dyn%now%beta_acy,dyn%now%beta,tpo%now%f_grnd, &
+                                                tpo%now%f_grnd_acx,tpo%now%f_grnd_acy)
+
+!                 call stagger_beta_aa_subgrid_1(dyn%now%beta_acx,dyn%now%beta_acy,dyn%now%beta,tpo%now%H_grnd, &
+!                                             tpo%now%f_grnd,tpo%now%f_grnd_acx,tpo%now%f_grnd_acy)
+                
+            case DEFAULT 
+
+                write(*,*) "calc_ydyn_beta_aa:: Error: beta_gl_stag not recognized."
+                write(*,*) "beta_gl_stag = ", dyn%par%beta_gl_stag
+                stop 
+
+        end select 
+
+        return 
+
+    end subroutine calc_ydyn_beta 
+
+    subroutine calc_ydyn_cbed(dyn,tpo,thrm,bnd)
+        ! Update C_bed based on parameter choices
+
+        implicit none
+        
+        type(ydyn_class),   intent(INOUT) :: dyn
+        type(ytopo_class),  intent(IN)    :: tpo 
+        type(ytherm_class), intent(IN)    :: thrm
+        type(ybound_class), intent(IN)    :: bnd  
+
+        integer :: i, j, nx, ny 
+        integer :: i1, i2, j1, j2 
+
+        nx = size(dyn%now%C_bed,1)
+        ny = size(dyn%now%C_bed,2)
+        
+        select case(dyn%par%C_bed_method)
+
+            case(-1)
+                ! C_bed has been defined externally - do nothing
+
+            case(0)
+                ! Constant C_bed everywhere based on cf_stream
+
+                dyn%now%C_bed = dyn%par%cf_stream
+
+            case(1)
+                ! Set C_bed according to temperate character of base
+
+                ! Smooth transition between temperate and frozen C_bed
+                dyn%now%C_bed = (thrm%now%f_pmp)*dyn%par%cf_stream &
+                            + (1.0_prec - thrm%now%f_pmp)*dyn%par%cf_frozen 
+
+
+                if (dyn%par%streaming_margin) then 
+                    ! Ensure that both the margin points and the grounding line
+                    ! are always considered streaming, independent of their
+                    ! thermodynamic character (as sometimes these can incorrectly become frozen)
+
+                
+                    ! Ensure any marginal point is also treated as streaming 
+                    do j = 1, ny 
+                    do i = 1, nx 
+
+                        i1 = max(i-1,1)
+                        i2 = min(i+1,nx)
+                        j1 = max(j-1,1)
+                        j2 = min(j+1,ny)
+
+                        if (tpo%now%H_ice(i,j) .gt. 0.0 .and. &
+                            (tpo%now%H_ice(i1,j) .le. 0.0 .or. &
+                             tpo%now%H_ice(i2,j) .le. 0.0 .or. &
+                             tpo%now%H_ice(i,j1) .le. 0.0 .or. &
+                             tpo%now%H_ice(i,j2) .le. 0.0)) then 
+
+                            dyn%now%C_bed(i,j) = dyn%par%cf_stream
+
+                        end if 
+
+                    end do 
+                    end do 
+
+                    ! Also ensure that grounding line is also considered streaming
+                    where(tpo%now%is_grline) dyn%now%C_bed = dyn%par%cf_stream
+
+                end if
+
+            case DEFAULT 
+                ! Not recognized 
+
+                write(*,*) "calc_ydyn_cbed:: Error: C_bed_method not recognized."
+                write(*,*) "C_bed_method = ", dyn%par%C_bed_method
+                stop 
+                
+        end select 
+
+        return 
+
+    end subroutine calc_ydyn_cbed
+
+    subroutine ydyn_par_load(par,filename,zeta_aa,zeta_ac,nx,ny,dx,init)
+
+        type(ydyn_param_class), intent(OUT) :: par
+        character(len=*),       intent(IN)  :: filename
+        real(prec),             intent(IN)  :: zeta_aa(:)
+        real(prec),             intent(IN)  :: zeta_ac(:)
+        integer,                intent(IN)  :: nx, ny 
+        real(prec),             intent(IN)  :: dx   
+        logical, optional,      intent(IN)  :: init 
+
+        ! Local variables 
+        logical :: init_pars 
+
+        init_pars = .FALSE.
+        if (present(init)) init_pars = .TRUE. 
+        
+        call nml_read(filename,"ydyn","solver",             par%solver,             init=init_pars)
+        call nml_read(filename,"ydyn","mix_method",         par%mix_method,         init=init_pars)
+        call nml_read(filename,"ydyn","calc_diffusivity",   par%calc_diffusivity,   init=init_pars)
+        call nml_read(filename,"ydyn","m_drag",             par%m_drag,             init=init_pars)
+        call nml_read(filename,"ydyn","beta_max",           par%beta_max,           init=init_pars)
+        call nml_read(filename,"ydyn","beta_method",        par%beta_method,        init=init_pars)
+        call nml_read(filename,"ydyn","beta_const",         par%beta_const,         init=init_pars)
+        call nml_read(filename,"ydyn","beta_gl_sep",        par%beta_gl_sep,        init=init_pars)
+        call nml_read(filename,"ydyn","beta_gl_scale",      par%beta_gl_scale,      init=init_pars)
+        call nml_read(filename,"ydyn","beta_gl_stag",       par%beta_gl_stag,       init=init_pars)
+        call nml_read(filename,"ydyn","f_beta_gl",          par%f_beta_gl,          init=init_pars)
+        call nml_read(filename,"ydyn","taud_gl_method",     par%taud_gl_method,     init=init_pars)
+        call nml_read(filename,"ydyn","H_grnd_lim",         par%H_grnd_lim,         init=init_pars)
+        call nml_read(filename,"ydyn","H_sed_sat",          par%H_sed_sat,          init=init_pars)
+        call nml_read(filename,"ydyn","C_bed_method",       par%C_bed_method,       init=init_pars)
+        call nml_read(filename,"ydyn","cf_frozen",          par%cf_frozen,          init=init_pars)
+        call nml_read(filename,"ydyn","cf_stream",          par%cf_stream,          init=init_pars)
+        call nml_read(filename,"ydyn","cf_fac_sed",         par%cf_fac_sed,         init=init_pars)
+        call nml_read(filename,"ydyn","cf_sia",             par%cf_sia,             init=init_pars)
+        call nml_read(filename,"ydyn","streaming_margin",   par%streaming_margin,   init=init_pars)
+        call nml_read(filename,"ydyn","n_sm_beta",          par%n_sm_beta,          init=init_pars)
+        call nml_read(filename,"ydyn","ssa_vel_max",        par%ssa_vel_max,        init=init_pars)
+        call nml_read(filename,"ydyn","ssa_iter_max",       par%ssa_iter_max,       init=init_pars)
+        call nml_read(filename,"ydyn","ssa_iter_rel",       par%ssa_iter_rel,       init=init_pars)
+        call nml_read(filename,"ydyn","ssa_iter_conv",      par%ssa_iter_conv,      init=init_pars)
+        
+
+        ! Perform parameter consistency checks 
+        if ( par%cf_fac_sed .gt. 1.0 ) then 
+            write(*,*) "bdrag_par_load:: error: cf_fac_sed must be less than or equal to 1.0."
+            write(*,*) "cf_fac_sed = ", par%cf_fac_sed
+            stop 
+        end if 
+
+        ! === Set internal parameters ======
+
+        par%nx    = nx 
+        par%ny    = ny 
+        par%dx    = dx 
+        par%dy    = dx 
+        par%nz_aa = size(zeta_aa,1)  
+        par%nz_ac = size(zeta_ac,1)
+
+        if (allocated(par%zeta_aa)) deallocate(par%zeta_aa)
+        allocate(par%zeta_aa(par%nz_aa))
+        par%zeta_aa = zeta_aa 
+        
+        if (allocated(par%zeta_ac)) deallocate(par%zeta_ac)
+        allocate(par%zeta_ac(par%nz_ac))
+        par%zeta_ac = zeta_ac 
+        
+        ! Define how boundaries of grid should be treated 
+        ! This should only be modified by the dom%par%experiment variable
+        ! in yelmo_init. By default set boundaries to zero 
+        par%boundaries = "zeros" 
+        
+        ! Set use_bmb to decide whether bmb should enter into the calculation of vertical velocity from continuity
+        ! By default, this is true, but it will automatically be set to match ydyn%par%use_bmb 
+        par%use_bmb = .TRUE. 
+
+        ! By default use ssa too, unless otherwise desired (can be set externally)
+        par%use_ssa  = .TRUE. 
+
+        ! Specifically deactivate ssa for mix_method=-2 
+        if (par%mix_method .eq. -2) par%use_ssa = .FALSE. 
+
+        ! Define current time as unrealistic value
+        par%time = 1000000000   ! [a] 1 billion years in the future
+        
+        return
+
+    end subroutine ydyn_par_load
+
+    subroutine ydyn_alloc(now,nx,ny,nz_aa,nz_ac)
+
+        implicit none 
+
+        type(ydyn_state_class), intent(INOUT) :: now 
+        integer, intent(IN) :: nx, ny, nz_aa, nz_ac   
+
+        call ydyn_dealloc(now)
+
+        allocate(now%ux(nx,ny,nz_aa)) 
+        allocate(now%uy(nx,ny,nz_aa)) 
+        allocate(now%uxy(nx,ny,nz_aa)) 
+        allocate(now%uz(nx,ny,nz_ac)) 
+
+        allocate(now%ux_bar(nx,ny)) 
+        allocate(now%uy_bar(nx,ny))
+        allocate(now%uxy_bar(nx,ny))
+        
+        allocate(now%ux_b(nx,ny)) 
+        allocate(now%uy_b(nx,ny))
+        allocate(now%uxy_b(nx,ny))
+
+        allocate(now%ux_s(nx,ny)) 
+        allocate(now%uy_s(nx,ny))
+        allocate(now%uxy_s(nx,ny))
+        
+        allocate(now%ux_i(nx,ny,nz_aa)) 
+        allocate(now%uy_i(nx,ny,nz_aa))
+        allocate(now%ux_i_bar(nx,ny)) 
+        allocate(now%uy_i_bar(nx,ny))
+        allocate(now%uxy_i_bar(nx,ny))
+
+        allocate(now%dd_ab(nx,ny,nz_aa))
+        allocate(now%dd_ab_bar(nx,ny))
+
+        allocate(now%sigma_horiz_sq(nx,ny))
+        allocate(now%lhs_x(nx,ny)) 
+        allocate(now%lhs_y(nx,ny)) 
+        allocate(now%lhs_xy(nx,ny)) 
+        
+        allocate(now%duxdz(nx,ny,nz_aa)) 
+        allocate(now%duydz(nx,ny,nz_aa))
+        allocate(now%duxdz_bar(nx,ny)) 
+        allocate(now%duydz_bar(nx,ny))
+
+        allocate(now%taud_acx(nx,ny)) 
+        allocate(now%taud_acy(nx,ny)) 
+        allocate(now%taud(nx,ny)) 
+        
+        allocate(now%taub_acx(nx,ny)) 
+        allocate(now%taub_acy(nx,ny)) 
+        allocate(now%taub(nx,ny)) 
+
+        allocate(now%qq_acx(nx,ny)) 
+        allocate(now%qq_acy(nx,ny)) 
+        allocate(now%qq(nx,ny)) 
+
+        allocate(now%visc_eff(nx,ny))  
+        
+        allocate(now%C_bed(nx,ny)) 
+        
+        allocate(now%beta_acx(nx,ny))
+        allocate(now%beta_acy(nx,ny))
+        allocate(now%beta(nx,ny))
+        
+        allocate(now%f_vbvs(nx,ny)) 
+        
+        allocate(now%ssa_mask_acx(nx,ny)) 
+        allocate(now%ssa_mask_acy(nx,ny)) 
+        
+        allocate(now%gfa1(nx,ny)) 
+        allocate(now%gfa2(nx,ny)) 
+        allocate(now%gfb1(nx,ny)) 
+        allocate(now%gfb2(nx,ny)) 
+        
+        ! Set all variables to zero intially
+        now%ux                = 0.0 
+        now%uy                = 0.0 
+        now%uxy               = 0.0 
+        now%uz                = 0.0 
+
+        now%ux_bar            = 0.0 
+        now%uy_bar            = 0.0
+        now%uxy_bar           = 0.0
+
+        now%ux_b              = 0.0 
+        now%uy_b              = 0.0
+        now%uxy_b             = 0.0
+
+        now%ux_s              = 0.0 
+        now%uy_s              = 0.0
+        now%uxy_s             = 0.0
+        
+        now%ux_i              = 0.0 
+        now%uy_i              = 0.0
+        now%ux_i_bar          = 0.0 
+        now%uy_i_bar          = 0.0
+        now%uxy_i_bar         = 0.0
+        
+        now%dd_ab             = 0.0
+        now%dd_ab_bar         = 0.0
+        
+        now%sigma_horiz_sq    = 0.0
+        now%lhs_x             = 0.0 
+        now%lhs_y             = 0.0 
+        now%lhs_xy            = 0.0 
+        
+        now%duxdz             = 0.0 
+        now%duydz             = 0.0
+        now%duxdz_bar         = 0.0 
+        now%duydz_bar         = 0.0
+
+        now%taud_acx          = 0.0 
+        now%taud_acy          = 0.0 
+        now%taud              = 0.0 
+        
+        now%taub_acx          = 0.0 
+        now%taub_acy          = 0.0 
+        now%taub              = 0.0 
+        
+        now%qq_acx            = 0.0 
+        now%qq_acy            = 0.0 
+        now%qq                = 0.0 
+        
+        now%visc_eff          = 0.0  
+        
+        now%C_bed             = 0.0 
+        
+        now%beta_acx          = 0.0 
+        now%beta_acy          = 0.0 
+        now%beta              = 0.0 
+        
+        now%f_vbvs            = 0.0 
+
+        now%ssa_mask_acx      = 0.0 
+        now%ssa_mask_acy      = 0.0 
+
+        return 
+
+    end subroutine ydyn_alloc 
+
+    subroutine ydyn_dealloc(now)
+
+        implicit none 
+
+        type(ydyn_state_class), intent(INOUT) :: now
+
+        if (allocated(now%ux))              deallocate(now%ux) 
+        if (allocated(now%uy))              deallocate(now%uy) 
+        if (allocated(now%uxy))             deallocate(now%uxy) 
+        if (allocated(now%uz))              deallocate(now%uz) 
+
+        if (allocated(now%ux_bar))          deallocate(now%ux_bar) 
+        if (allocated(now%uy_bar))          deallocate(now%uy_bar)
+        if (allocated(now%uxy_bar))         deallocate(now%uxy_bar)
+        
+        if (allocated(now%ux_b))            deallocate(now%ux_b) 
+        if (allocated(now%uy_b))            deallocate(now%uy_b)
+        if (allocated(now%uxy_b))           deallocate(now%uxy_b)
+        
+        if (allocated(now%ux_s))            deallocate(now%ux_s) 
+        if (allocated(now%uy_s))            deallocate(now%uy_s)
+        if (allocated(now%uxy_s))           deallocate(now%uxy_s)
+        
+        if (allocated(now%ux_i))            deallocate(now%ux_i) 
+        if (allocated(now%uy_i))            deallocate(now%uy_i)
+
+        if (allocated(now%ux_i_bar))        deallocate(now%ux_i_bar) 
+        if (allocated(now%uy_i_bar))        deallocate(now%uy_i_bar)
+        if (allocated(now%uxy_i_bar))       deallocate(now%uxy_i_bar)
+        
+        if (allocated(now%dd_ab))           deallocate(now%dd_ab)
+        if (allocated(now%dd_ab_bar))         deallocate(now%dd_ab_bar)
+        
+        if (allocated(now%sigma_horiz_sq))  deallocate(now%sigma_horiz_sq)
+        if (allocated(now%lhs_x))           deallocate(now%lhs_x) 
+        if (allocated(now%lhs_y))           deallocate(now%lhs_y) 
+        if (allocated(now%lhs_xy))          deallocate(now%lhs_xy) 
+        
+        if (allocated(now%duxdz))           deallocate(now%duxdz) 
+        if (allocated(now%duydz))           deallocate(now%duydz)
+        if (allocated(now%duxdz_bar))       deallocate(now%duxdz_bar) 
+        if (allocated(now%duydz_bar))       deallocate(now%duydz_bar)
+
+        if (allocated(now%taud_acx))        deallocate(now%taud_acx) 
+        if (allocated(now%taud_acy))        deallocate(now%taud_acy) 
+        if (allocated(now%taud))            deallocate(now%taud) 
+        
+        if (allocated(now%taub_acx))        deallocate(now%taub_acx) 
+        if (allocated(now%taub_acy))        deallocate(now%taub_acy) 
+        if (allocated(now%taub))            deallocate(now%taub) 
+        
+        if (allocated(now%qq_acx))          deallocate(now%qq_acx) 
+        if (allocated(now%qq_acy))          deallocate(now%qq_acy) 
+        if (allocated(now%qq))              deallocate(now%qq) 
+        
+        if (allocated(now%visc_eff))        deallocate(now%visc_eff) 
+        
+        if (allocated(now%C_bed))           deallocate(now%C_bed) 
+        
+        if (allocated(now%beta_acx))        deallocate(now%beta_acx) 
+        if (allocated(now%beta_acy))        deallocate(now%beta_acy) 
+        if (allocated(now%beta))            deallocate(now%beta) 
+        
+        if (allocated(now%f_vbvs))          deallocate(now%f_vbvs) 
+
+        if (allocated(now%ssa_mask_acx))    deallocate(now%ssa_mask_acx) 
+        if (allocated(now%ssa_mask_acy))    deallocate(now%ssa_mask_acy) 
+
+        return 
+
+    end subroutine ydyn_dealloc 
+    
+    subroutine ydyn_set_borders(ux,uy,boundaries)
+
+        implicit none 
+
+        real(prec),       intent(INOUT) :: ux(:,:) 
+        real(prec),       intent(INOUT) :: uy(:,:) 
+        character(len=*), intent(IN)    :: boundaries 
+
+        ! Local variables 
+        integer :: nx, ny 
+
+        nx = size(ux,1)
+        ny = size(ux,2) 
+
+        ! Post processing of velocity field ================
+
+        if (.TRUE.) then 
+            ! ajr: do not use yet, not well tested 
+
+        select case(trim(boundaries))
+
+            case("zeros","EISMINT")
+
+                ! Border values are zero by default, do nothing 
+
+            case("MISMIP3D")
+
+                ! === MISMIP3D =====
+
+                ! x=0, dome - zero velocity 
+                ux(1,:)    = 0.0       
+                uy(1,:)    = 0.0 
+
+                ! x=800km, no ice - zero by default 
+                ux(nx,:)   = 0.0 
+                uy(nx,:)   = 0.0 
+
+                ! y=-50km, free-slip condition, no tangential velocity   
+                uy(:,1)    = 0.0 
+
+                ! y=50km, free-slip condition, no tangential velocity  
+                uy(:,ny)     = 0.0 
+
+            case("infinite")
+                ! ajr: we should check setting border H values equal to inner neighbors
+                
+                write(*,*) "calc_ice_thickness:: error: boundary method not implemented yet: "//trim(boundaries)
+                write(*,*) "TO DO!"
+                stop 
+
+            case DEFAULT 
+
+                write(*,*) "calc_ice_thickness:: error: boundary method not recognized: "//trim(boundaries)
+                stop 
+
+        end select 
+        
+        end if 
+
+        return 
+
+    end subroutine ydyn_set_borders 
+
+    subroutine yelmo_write_init_ssa(filename,time_init)
+
+        implicit none 
+
+        character(len=*),  intent(IN) :: filename 
+        real(prec),        intent(IN) :: time_init
+
+        ! Initialize netcdf file and dimensions
+        call nc_create(filename)
+        call nc_write_dim(filename,"xc",     x=0.0,dx=20.0,nx=41,         units="kilometers")
+        call nc_write_dim(filename,"yc",     x=-50.0,dx=20.0,nx=6,        units="kilometers")
+        call nc_write_dim(filename,"time",   x=time_init,dx=1.0_prec,nx=1,units="iter",unlimited=.TRUE.)
+
+        return
+
+    end subroutine yelmo_write_init_ssa 
+
+    subroutine write_step_2D_ssa(tpo,dyn,filename,ux_b_prev,uy_b_prev,time)
+
+        implicit none 
+        
+        type(ytopo_class), intent(IN) :: tpo 
+        type(ydyn_class),  intent(IN) :: dyn 
+        character(len=*),  intent(IN) :: filename
+        real(prec), intent(IN) :: ux_b_prev(:,:) 
+        real(prec), intent(IN) :: uy_b_prev(:,:) 
+        real(prec), intent(IN) :: time
+
+        ! Local variables
+        integer    :: ncid, n, i, j, nx, ny  
+        real(prec) :: time_prev 
+
+        nx = tpo%par%nx 
+        ny = tpo%par%ny 
+
+        ! Open the file for writing
+        call nc_open(filename,ncid,writable=.TRUE.)
+
+        ! Determine current writing time step 
+        n = nc_size(filename,"time",ncid)
+        call nc_read(filename,"time",time_prev,start=[n],count=[1],ncid=ncid) 
+        if (abs(time-time_prev).gt.1e-5) n = n+1 
+
+        ! Update the time step
+        call nc_write(filename,"time",time,dim1="time",start=[n],count=[1],ncid=ncid)
+
+        ! == yelmo_topography ==
+        call nc_write(filename,"H_ice",tpo%now%H_ice,units="m",long_name="Ice thickness", &
+                      dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
+        call nc_write(filename,"z_srf",tpo%now%z_srf,units="m",long_name="Surface elevation", &
+                      dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
+        call nc_write(filename,"mask_bed",tpo%now%mask_bed,units="",long_name="Bed mask", &
+                      dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
+        call nc_write(filename,"N_eff",tpo%now%N_eff,units="Pa",long_name="Effective pressure", &
+                      dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
+        
+        call nc_write(filename,"dzsrfdt",tpo%now%dzsrfdt,units="m/a",long_name="Surface elevation change", &
+                      dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
+        call nc_write(filename,"dHicedt",tpo%now%dHicedt,units="m/a",long_name="Ice thickness change", &
+                      dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
+        
+        call nc_write(filename,"H_grnd",tpo%now%H_grnd,units="m",long_name="Ice thickness overburden", &
+                      dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
+        
+        call nc_write(filename,"f_grnd",tpo%now%f_grnd,units="1",long_name="Grounded fraction", &
+                      dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
+        call nc_write(filename,"f_grnd_acx",tpo%now%f_grnd_acx,units="1",long_name="Grounded fraction (acx)", &
+                      dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
+        call nc_write(filename,"f_grnd_acy",tpo%now%f_grnd_acy,units="1",long_name="Grounded fraction (acy)", &
+                      dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
+        call nc_write(filename,"f_ice",tpo%now%f_ice,units="1",long_name="Ice-covered fraction", &
+                      dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
+
+        call nc_write(filename,"calv",tpo%now%calv,units="m/a",long_name="Calving rate", &
+                      dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
+
+        ! == yelmo_dynamics ==
+
+        call nc_write(filename,"ssa_mask_acx",dyn%now%ssa_mask_acx,units="1",long_name="SSA mask (acx)", &
+                      dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
+        call nc_write(filename,"ssa_mask_acy",dyn%now%ssa_mask_acy,units="1",long_name="SSA mask (acy)", &
+                      dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
+
+        call nc_write(filename,"C_bed",dyn%now%C_bed,units="m a^-1 Pa^-2",long_name="Dragging constant", &
+                      dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
+        call nc_write(filename,"beta",dyn%now%beta,units="Pa m^3 a^-3",long_name="Dragging coefficient", &
+                      dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
+        call nc_write(filename,"beta_acx",dyn%now%beta_acx,units="Pa m^3 a^-3",long_name="Dragging coefficient (acx)", &
+                      dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
+        call nc_write(filename,"beta_acy",dyn%now%beta_acy,units="Pa m^3 a^-3",long_name="Dragging coefficient (acy)", &
+                      dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
+        call nc_write(filename,"dyn_visc_eff",dyn%now%visc_eff,units="Pa a^-1",long_name="Vertically averaged viscosity", &
+                      dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
+
+        call nc_write(filename,"taud_acx",dyn%now%taud_acx,units="Pa",long_name="Driving stress, x-direction", &
+                      dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
+        call nc_write(filename,"taud_acy",dyn%now%taud_acy,units="Pa",long_name="Driving stress, y-direction", &
+                      dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
+        
+        call nc_write(filename,"sigma_horiz_sq",dyn%now%sigma_horiz_sq,units="1",long_name="Horizontal stress components squared", &
+                      dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
+        call nc_write(filename,"lhs_x",dyn%now%lhs_x,units="Pa",long_name="Shear reduction (x)", &
+                      dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
+        call nc_write(filename,"lhs_y",dyn%now%lhs_y,units="Pa",long_name="Shear reduction (y)", &
+                      dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
+        call nc_write(filename,"lhs_xy",dyn%now%lhs_xy,units="Pa",long_name="Shear reduction magnitude", &
+                      dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
+
+!         call nc_write(filename,"ux_i_bar",dyn%now%ux_i_bar,units="m/a",long_name="Internal shear velocity (x)", &
+!                        dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
+!         call nc_write(filename,"uy_i_bar",dyn%now%uy_i_bar,units="m/a",long_name="Internal shear velocity (y)", &
+!                        dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
+!         call nc_write(filename,"uxy_i_bar",dyn%now%uxy_i_bar,units="m/a",long_name="Internal shear velocity magnitude", &
+!                        dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
+
+        call nc_write(filename,"ux_b",dyn%now%ux_b,units="m/a",long_name="Basal sliding velocity (x)", &
+                      dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
+        call nc_write(filename,"uy_b",dyn%now%uy_b,units="m/a",long_name="Basal sliding velocity (y)", &
+                      dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
+        call nc_write(filename,"uxy_b",dyn%now%uxy_b,units="m/a",long_name="Basal sliding velocity magnitude", &
+                     dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
+        
+        call nc_write(filename,"ux_b_diff",dyn%now%ux_b-ux_b_prev,units="m/a",long_name="Basal sliding velocity difference (x)", &
+                      dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
+        call nc_write(filename,"uy_b_diff",dyn%now%uy_b-uy_b_prev,units="m/a",long_name="Basal sliding velocity difference (y)", &
+                      dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
+        
+!         call nc_write(filename,"ux",dyn%now%ux,units="m/a",long_name="Horizontal velocity (x)", &
+!                       dim1="xc",dim2="yc",dim3="zeta",dim4="time",start=[1,1,1,n],ncid=ncid)
+!         call nc_write(filename,"uy",dyn%now%uy,units="m/a",long_name="Horizontal velocity (y)", &
+!                       dim1="xc",dim2="yc",dim3="zeta",dim4="time",start=[1,1,1,n],ncid=ncid)
+!         call nc_write(filename,"uxy",dyn%now%uxy,units="m/a",long_name="Horizontal velocity magnitude", &
+!                       dim1="xc",dim2="yc",dim3="zeta",dim4="time",start=[1,1,1,n],ncid=ncid)
+!         call nc_write(filename,"uz",dyn%now%uz,units="m/a",long_name="Vertical velocity", &
+!                       dim1="xc",dim2="yc",dim3="zeta",dim4="time",start=[1,1,1,n],ncid=ncid)
+
+!         call nc_write(filename,"f_vbvs",dyn%now%f_vbvs,units="1",long_name="Basal to surface velocity fraction", &
+!                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
+!         call nc_write(filename,"f_shear_bar",mat%now%f_shear_bar,units="1",long_name="Vertically averaged shearing fraction", &
+!                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
+        
+        ! Close the netcdf file
+        call nc_close(ncid)
+
+        return 
+
+    end subroutine write_step_2D_ssa
+    
+end module yelmo_dynamics

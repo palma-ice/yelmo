@@ -1,0 +1,15 @@
+FC  = ifort
+
+INC_NC  = -I/home/fispalma22/work/librairies/netcdflib/include
+LIB_NC  = -L/home/fispalma22/work/librairies/netcdflib/lib -lnetcdf
+
+LISROOT = /home/fispalma25/apps/lis/lis
+INC_LIS = -I${LISROOT}/include 
+LIB_LIS = -L${LISROOT}/lib/ -llis
+
+FFLAGS  = -module $(objdir) -L$(objdir)
+LFLAGS  = $(LIB_NC) $(LIB_LIS) -Wl,-zmuldefs
+
+DFLAGS_NODEBUG = -vec-report0 -O2 -fp-model precise
+DFLAGS_DEBUG   = -C -traceback -ftrapuv -fpe0 -check all -vec-report0 -fp-model precise
+DFLAGS_PROFILE = -vec-report0 -O2 -fp-model precise -pg

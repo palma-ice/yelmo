@@ -10,30 +10,12 @@ program yelmo_benchmarks
 
     use ice_benchmarks 
 
-    ! External libraries
-    use sealevel 
-    use isostasy  
-
-    use marine_shelf 
-    use smbpal   
-    use basal_hydrology 
-    use sediments 
-    use geothermal
-    
     implicit none 
 
     type(yelmo_class)     :: yelmo1
 
     type(bueler_test_type) :: buel 
-
-    type(sealevel_class)   :: sealev 
-    type(marshelf_class)   :: mshlf1 
-    type(smbpal_class)     :: smbpal1 
-    type(hydro_class)      :: hyd1  
-    type(sediments_class)  :: sed1 
-    type(geothermal_class) :: gthrm1
-    type(isos_class)       :: isos1
-
+    
     character(len=56)  :: domain 
     character(len=256) :: outfldr, file2D, file1D, file_compare
     character(len=512) :: path_par, path_const 

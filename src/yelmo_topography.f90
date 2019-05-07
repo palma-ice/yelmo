@@ -262,7 +262,7 @@ contains
 
     end subroutine calc_ytopo
 
-    subroutine ytopo_load_H_ice(tpo,nml_path,nml_group,domain,grid_name)
+    subroutine ytopo_load_H_ice(tpo,nml_path,nml_group,domain,grid_name,ice_allowed)
         ! Update the topography of the yelmo domain 
 
         implicit none
@@ -270,6 +270,7 @@ contains
         type(ytopo_class), intent(INOUT) :: tpo
         character(len=*), intent(IN)     :: nml_path, nml_group
         character(len=*), intent(IN)     :: domain, grid_name 
+        logical,          intent(IN)     :: ice_allowed(:,:) 
 
         ! Local variables
         logical            :: load_var
@@ -291,6 +292,9 @@ contains
         ! Clean up field 
         where(tpo%now%H_ice  .lt. 1.0) tpo%now%H_ice = 0.0 
 
+        ! Artificially delete ice from locations that are not allowed
+        where (.not. ice_allowed) tpo%now%H_ice = 0.0 
+            
         ! Reset H_ice to zero if initialization parameter is set to "icefree"
         if (trim(tpo%par%init) == "icefree") tpo%now%H_ice = 0.d0
 
@@ -1165,12 +1169,21 @@ end if
         ny = size(bmb,2) 
 
         ! Combine floating and grounded parts into one field =========================
-        
-        ! Weighted average
-        !bmb = f_grnd*bmb_grnd + (1.0-f_grnd)*bmb_shlf
+        ! (Note: use of where-statement allows bmb_shlf to be set negative everywhere,
+        ! but only be applied where it is relevant.)
+        where (f_grnd .eq. 1.0) 
+            ! Purely grounded, use only bmb_grnd 
+            bmb = bmb_grnd 
+        elsewhere
+            ! Comine bmb_grnd and bmb_shlf 
 
-        ! Simply add the two fields for now to avoid complications with f_grnd
-        bmb = bmb_grnd + bmb_shlf 
+            ! Add the two fields for now to avoid complications with f_grnd
+            bmb = bmb_grnd + bmb_shlf 
+
+            ! Weighted average
+            !bmb = f_grnd*bmb_grnd + (1.0-f_grnd)*bmb_shlf
+
+        end where 
 
 
         if (diffuse_bmb_shlf) then 

@@ -13,11 +13,12 @@ module yelmo_data
 
 contains
 
-    subroutine ydata_load(dta)
+    subroutine ydata_load(dta,ice_allowed)
 
         implicit none 
 
         type(ydata_class), intent(INOUT) :: dta 
+        logical,           intent(IN)    :: ice_allowed(:,:) 
 
         ! Local variables 
         character(len=1028) :: filename 
@@ -27,7 +28,7 @@ contains
         ! Allocate temporary array for loading monthly data 
         allocate(tmp(size(dta%pd%H_ice,1),size(dta%pd%H_ice,2),12))
 
-        if (dta%par%pd_load_data) then 
+        if (dta%par%pd_topo_load) then 
             ! Load present-day data from specified files and fields
 
             ! =========================================
@@ -42,88 +43,69 @@ contains
             ! Clean up field 
             where(dta%pd%H_ice  .lt. 1.0) dta%pd%H_ice = 0.0 
 
+            ! Artificially delete ice from locations that are not allowed
+            where (.not. ice_allowed) 
+                dta%pd%H_ice = 0.0 
+                dta%pd%z_srf = max(dta%pd%z_bed,0.0)
+            end where 
+            
+        end if 
+
+        if (dta%par%pd_tsrf_load) then 
+            ! Load present-day data for surface temperature (or near-surface temperature)
+
             ! =========================================
             ! Load climate data from netcdf file 
-            filename = dta%par%pd_clim_path
-            nms      = dta%par%pd_clim_names 
+            filename = dta%par%pd_tsrf_path
+            nms(1)   = dta%par%pd_tsrf_name 
 
-            ! == t2m, pr ==
-            
-            if (dta%par%pd_clim_monthly) then
-                
-                call nc_read(filename,nms(2), tmp, missing_value=mv)
-                dta%pd%t2m_ann = sum(tmp,dim=3) / 12.0
-
-                if (trim(dta%par%domain) == "Antarctica") then 
-                    ! Southern Hemisphere summer
-                    dta%pd%t2m_sum = (tmp(:,:,12) + tmp(:,:,1) + tmp(:,:,2)) / 3.0 
-                else 
-                    ! Northern Hemisphere summer 
-                    dta%pd%t2m_sum = sum(tmp(:,:,6:8),dim=3) / 3.0
-                end if
-
-                call nc_read(filename,nms(3), tmp, missing_value=mv)
-                dta%pd%pr_ann = sum(tmp,dim=3) / 12.0 
-                
-                if (trim(nms(3)) == "sf" .and. trim(nms(4)) == "rf") then 
-                    ! Load rainfall too, to get sum 
-                    call nc_read(filename,nms(4), tmp, missing_value=mv)
-                    dta%pd%pr_ann = dta%pd%pr_ann + sum(tmp,dim=3) / 12.0
-                end if 
-
-                ! Convert from mm we / day to m ie / a 
-                dta%pd%pr_ann = dta%pd%pr_ann * conv_mmdwe_maie
-
+            if (dta%par%pd_tsrf_monthly) then
+                ! Monthly data => annual mean 
+                call nc_read(filename,nms(1), tmp, missing_value=mv)
+                dta%pd%T_srf = sum(tmp,dim=3) / 12.0
             else 
-                call nc_read(filename,nms(2), dta%pd%t2m_ann, missing_value=mv)
-                dta%pd%t2m_sum = mv
-
-                call nc_read(filename,nms(3), dta%pd%pr_ann, missing_value=mv)
-                if (trim(nms(3)) == "sf" .and. trim(nms(4)) == "rf") then
-                    call nc_read(filename,nms(3), tmp(:,:,1), missing_value=mv)
-                    dta%pd%pr_ann = dta%pd%pr_ann + tmp(:,:,1)
-                end if
-
-                ! Convert from mm we / a to m ie / a 
-                dta%pd%pr_ann = dta%pd%pr_ann * conv_mmdwe_maie
-
+                ! Annual mean 
+                call nc_read(filename,nms(1), dta%pd%T_srf, missing_value=mv)
             end if 
 
             ! Make sure temperatures are in Kelvin 
-            if (minval(dta%pd%t2m_ann,mask=dta%pd%t2m_ann .ne. mv) .lt. 100.0) then
+            if (minval(dta%pd%T_srf,mask=dta%pd%T_srf .ne. mv) .lt. 100.0) then
                 ! Probably in Celcius, convert...
-                dta%pd%t2m_ann = dta%pd%t2m_ann + 273.15 
-                dta%pd%t2m_sum = dta%pd%t2m_sum + 273.15
+                dta%pd%T_srf = dta%pd%T_srf + 273.15 
             end if 
 
-            
+        end if 
+
+        if (dta%par%pd_smb_load) then 
+            ! Load present-day data for surface mass balance 
+
             ! =========================================
             ! Load smb data from netcdf file 
             filename = dta%par%pd_smb_path
             nms(1)   = dta%par%pd_smb_name
 
-            ! == smb == 
-
             if (dta%par%pd_smb_monthly) then 
                 call nc_read(filename,nms(1), tmp, missing_value=mv)
-                dta%pd%smb_ann = sum(tmp,dim=3) / 12.0
+                dta%pd%smb = sum(tmp,dim=3) / 12.0
 
                 ! Convert from mm we / day to m ie / a 
-                dta%pd%smb_ann = dta%pd%smb_ann * conv_mmdwe_maie
+                dta%pd%smb = dta%pd%smb * conv_mmdwe_maie
 
             else 
-                call nc_read(filename,nms(1), dta%pd%smb_ann, missing_value=mv)
+                call nc_read(filename,nms(1), dta%pd%smb, missing_value=mv)
 
                 ! Convert from mm we / a to m ie / a 
-                dta%pd%smb_ann = dta%pd%smb_ann * conv_mmawe_maie
+                dta%pd%smb = dta%pd%smb * conv_mmawe_maie
 
             end if 
 
             ! Clean smb to avoid tiny values 
-            where (abs(dta%pd%smb_ann) .lt. 1e-3) dta%pd%smb_ann = 0.0
+            where (abs(dta%pd%smb) .lt. 1e-3) dta%pd%smb = 0.0
             
-            ! Limit smb to ice and land points 
-            !where (dta%pd%z_srf .eq. 0.0) dta%pd%smb_ann = mv 
+        end if 
+
+        if (dta%par%pd_vel_load) then 
+            ! Load present-day data for surface velocity 
 
             ! =========================================
             ! Load vel data from netcdf file 
@@ -136,25 +118,29 @@ contains
                 dta%pd%uxy_s = sqrt(dta%pd%ux_s**2 + dta%pd%uy_s**2)
 
             ! Make sure that velocity is zero where no ice exists 
-            where (dta%pd%H_ice .lt. 1.0) 
-                dta%pd%ux_s  = 0.0 
-                dta%pd%uy_s  = 0.0 
-                dta%pd%uxy_s = 0.0 
-            end where 
+            ! (if data was loaded)
+            if (dta%par%pd_topo_load) then 
 
-            ! Summarize data loading 
-            write(*,*) "ydata_load:: range(H_ice):   ", minval(dta%pd%H_ice),   maxval(dta%pd%H_ice)
-            write(*,*) "ydata_load:: range(z_srf):   ", minval(dta%pd%z_srf),   maxval(dta%pd%z_srf)
-            write(*,*) "ydata_load:: range(z_bed):   ", minval(dta%pd%z_bed),   maxval(dta%pd%z_bed)
-            write(*,*) "ydata_load:: range(t2m_ann): ", minval(dta%pd%t2m_ann), maxval(dta%pd%t2m_ann)
-            write(*,*) "ydata_load:: range(t2m_sum): ", minval(dta%pd%t2m_sum), maxval(dta%pd%t2m_sum)
-            write(*,*) "ydata_load:: range(pr_ann):  ", minval(dta%pd%pr_ann),  maxval(dta%pd%pr_ann)
-            write(*,*) "ydata_load:: range(smb_ann): ", minval(dta%pd%smb_ann,dta%pd%smb_ann .ne. mv), &
-                                                        maxval(dta%pd%smb_ann,dta%pd%smb_ann .ne. mv)
-            write(*,*) "ydata_load:: range(uxy_s):   ", minval(dta%pd%uxy_s,dta%pd%uxy_s .ne. mv), &
-                                                        maxval(dta%pd%uxy_s,dta%pd%uxy_s .ne. mv)
-            
+                where (dta%pd%H_ice .lt. 1.0) 
+                    dta%pd%ux_s  = 0.0 
+                    dta%pd%uy_s  = 0.0 
+                    dta%pd%uxy_s = 0.0 
+                end where 
+
+            end if 
+
         end if 
+
+        ! Summarize data loading 
+        write(*,*) "ydata_load:: range(H_ice):   ", minval(dta%pd%H_ice),   maxval(dta%pd%H_ice)
+        write(*,*) "ydata_load:: range(z_srf):   ", minval(dta%pd%z_srf),   maxval(dta%pd%z_srf)
+        write(*,*) "ydata_load:: range(z_bed):   ", minval(dta%pd%z_bed),   maxval(dta%pd%z_bed)
+        write(*,*) "ydata_load:: range(T_srf):   ", minval(dta%pd%T_srf), maxval(dta%pd%T_srf)
+        write(*,*) "ydata_load:: range(smb):     ", minval(dta%pd%smb,dta%pd%smb .ne. mv), &
+                                                    maxval(dta%pd%smb,dta%pd%smb .ne. mv)
+        write(*,*) "ydata_load:: range(uxy_s):   ", minval(dta%pd%uxy_s,dta%pd%uxy_s .ne. mv), &
+                                                    maxval(dta%pd%uxy_s,dta%pd%uxy_s .ne. mv)
+            
 
         return 
 
@@ -173,21 +159,24 @@ contains
         if (present(init)) init_pars = .TRUE. 
  
         ! Store parameter values in output object
-        call nml_read(filename,"yelmo_data","pd_load_data",    par%pd_load_data,    init=init_pars)
+        call nml_read(filename,"yelmo_data","pd_topo_load",    par%pd_topo_load,    init=init_pars)
         call nml_read(filename,"yelmo_data","pd_topo_path",    par%pd_topo_path,    init=init_pars)
         call nml_read(filename,"yelmo_data","pd_topo_names",   par%pd_topo_names,   init=init_pars)
-        call nml_read(filename,"yelmo_data","pd_clim_path",    par%pd_clim_path,    init=init_pars)
-        call nml_read(filename,"yelmo_data","pd_clim_names",   par%pd_clim_names,   init=init_pars)
-        call nml_read(filename,"yelmo_data","pd_clim_monthly", par%pd_clim_monthly, init=init_pars)
+        call nml_read(filename,"yelmo_data","pd_tsrf_load",    par%pd_tsrf_load,    init=init_pars)
+        call nml_read(filename,"yelmo_data","pd_tsrf_path",    par%pd_tsrf_path,    init=init_pars)
+        call nml_read(filename,"yelmo_data","pd_tsrf_name",    par%pd_tsrf_name,    init=init_pars)
+        call nml_read(filename,"yelmo_data","pd_tsrf_monthly", par%pd_tsrf_monthly, init=init_pars)
+        call nml_read(filename,"yelmo_data","pd_smb_load",     par%pd_smb_load,     init=init_pars)
         call nml_read(filename,"yelmo_data","pd_smb_path",     par%pd_smb_path,     init=init_pars)
         call nml_read(filename,"yelmo_data","pd_smb_name",     par%pd_smb_name,     init=init_pars)
         call nml_read(filename,"yelmo_data","pd_smb_monthly",  par%pd_smb_monthly,  init=init_pars)
+        call nml_read(filename,"yelmo_data","pd_vel_load",     par%pd_vel_load,     init=init_pars)
         call nml_read(filename,"yelmo_data","pd_vel_path",     par%pd_vel_path,     init=init_pars)
         call nml_read(filename,"yelmo_data","pd_vel_names",    par%pd_vel_names,    init=init_pars)
         
         ! Subsitute domain/grid_name
         call yelmo_parse_path(par%pd_topo_path,domain,grid_name)
-        call yelmo_parse_path(par%pd_clim_path,domain,grid_name)
+        call yelmo_parse_path(par%pd_tsrf_path,domain,grid_name)
         call yelmo_parse_path(par%pd_smb_path, domain,grid_name)
         call yelmo_parse_path(par%pd_vel_path, domain,grid_name)
 
@@ -211,10 +200,8 @@ contains
         allocate(pd%z_srf(nx,ny))
         allocate(pd%z_bed(nx,ny))
         
-        allocate(pd%t2m_ann(nx,ny))
-        allocate(pd%t2m_sum(nx,ny))
-        allocate(pd%pr_ann(nx,ny))
-        allocate(pd%smb_ann(nx,ny))
+        allocate(pd%T_srf(nx,ny))
+        allocate(pd%smb(nx,ny))
         
         allocate(pd%ux_s(nx,ny))
         allocate(pd%uy_s(nx,ny))
@@ -226,22 +213,20 @@ contains
         
         allocate(pd%err_uxy_s(nx,ny))
         
-        pd%H_ice       = 0.0 
-        pd%z_srf       = 0.0 
-        pd%z_bed       = 0.0 
+        pd%H_ice        = 0.0 
+        pd%z_srf        = 0.0 
+        pd%z_bed        = 0.0 
         
-        pd%t2m_ann     = 0.0 
-        pd%t2m_sum     = 0.0 
-        pd%pr_ann      = 0.0 
-        pd%smb_ann     = 0.0
+        pd%T_srf        = 0.0 
+        pd%smb          = 0.0 
 
-        pd%ux_s      = 0.0 
-        pd%uy_s      = 0.0 
-        pd%uxy_s     = 0.0 
+        pd%ux_s         = 0.0 
+        pd%uy_s         = 0.0 
+        pd%uxy_s        = 0.0 
         
-        pd%err_H_ice   = 0.0 
-        pd%err_z_srf   = 0.0 
-        pd%err_z_bed   = 0.0 
+        pd%err_H_ice    = 0.0 
+        pd%err_z_srf    = 0.0 
+        pd%err_z_bed    = 0.0 
         
         pd%err_uxy_s = 0.0 
         
@@ -258,10 +243,8 @@ contains
         if (allocated(pd%z_srf)) deallocate(pd%z_srf)
         if (allocated(pd%z_bed)) deallocate(pd%z_bed)
         
-        if (allocated(pd%t2m_ann)) deallocate(pd%t2m_ann)
-        if (allocated(pd%t2m_sum)) deallocate(pd%t2m_sum)
-        if (allocated(pd%pr_ann))  deallocate(pd%pr_ann)
-        if (allocated(pd%smb_ann)) deallocate(pd%smb_ann)
+        if (allocated(pd%T_srf)) deallocate(pd%T_srf)
+        if (allocated(pd%smb)) deallocate(pd%smb)
         
         if (allocated(pd%ux_s))  deallocate(pd%ux_s)
         if (allocated(pd%uy_s))  deallocate(pd%uy_s)

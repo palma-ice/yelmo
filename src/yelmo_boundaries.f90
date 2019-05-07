@@ -8,146 +8,14 @@ module yelmo_boundaries
     implicit none
     
     private
-    public :: ybound_alloc, ybound_dealloc
-    public :: ybound_load_z_bed 
-    public :: ybound_load_pd 
     public :: ybound_load_masks
     public :: ybound_define_ice_allowed
-
-contains
-
-    subroutine ybound_load_z_bed(bnd,nml_path,nml_group,domain,grid_name)
-        ! Load the bedrock elevation boundary field
-
-        implicit none
-
-        type(ybound_class), intent(INOUT) :: bnd
-        character(len=*),   intent(IN)    :: nml_path, nml_group
-        character(len=*),   intent(IN)    :: domain, grid_name 
-
-        ! Local variables
-        logical            :: load_var
-        character(len=512) :: filename
-        character(len=56)  :: vname
-
-        ! == z_bed =====
-        call nml_read(nml_path,nml_group,"z_bed_load",load_var)
-
-        if (load_var) then 
-            call nml_read(nml_path,nml_group,"z_bed_path",filename)
-            call yelmo_parse_path(filename,domain,grid_name)
-            call nml_read(nml_path,nml_group,"z_bed_nm",  vname)
-            call nc_read(filename,vname,bnd%z_bed)
-        else 
-            bnd%z_bed = 0.0  
-        end if 
-        
-        write(*,*) "ybound_load_z_bed:: range(z_bed):  ", minval(bnd%z_bed),  maxval(bnd%z_bed)
-
-        return 
-
-    end subroutine ybound_load_z_bed 
+    public :: ybound_load_z_bed 
+    public :: ybound_alloc, ybound_dealloc
     
-    subroutine ybound_load_pd(bnd,nml_path,nml_group,domain,grid_name)
-        ! Load all boundary fields for the present day (except z_bed, handled via ybound_load_zbed) 
-
-        ! ajr: not used yet, needs testing...
-
-        implicit none
-
-        type(ybound_class), intent(INOUT) :: bnd 
-        character(len=*),   intent(IN)    :: nml_path, nml_group 
-        character(len=*),   intent(IN)    :: domain, grid_name
-
-        ! Local variables
-        logical            :: load_var
-        character(len=512) :: filename
-        character(len=56)  :: vname 
-
-        ! == z_sl =====
-
-        bnd%z_sl = 0.0 
-
-        ! == H_sed =====
-        call nml_read(nml_path,nml_group,"H_sed_load",load_var)
-        if (load_var) then 
-            call nml_read(nml_path,nml_group,"H_sed_path",filename)
-            call yelmo_parse_path(filename,domain,grid_name)
-            call nml_read(nml_path,nml_group,"H_sed_nm",  vname)
-            call nc_read(filename,vname,bnd%H_sed)
-        else 
-            bnd%H_sed = mv 
-        end if 
-        
-        ! == H_w =====
-        call nml_read(nml_path,nml_group,"H_w_load",load_var)
-        if (load_var) then 
-            call nml_read(nml_path,nml_group,"H_w_path",filename)
-            call yelmo_parse_path(filename,domain,grid_name)
-            call nml_read(nml_path,nml_group,"H_w_nm",  vname)
-            call nc_read(filename,vname,bnd%H_w)
-        else 
-            bnd%H_w = mv 
-        end if 
-        
-        ! == smb =====
-        call nml_read(nml_path,nml_group,"smb_load",load_var)
-        if (load_var) then 
-            call nml_read(nml_path,nml_group,"smb_path",filename)
-            call yelmo_parse_path(filename,domain,grid_name)
-            call nml_read(nml_path,nml_group,"smb_nm",  vname)
-            call nc_read(filename,vname,bnd%smb)
-        else 
-            bnd%smb = mv 
-        end if 
-
-        ! == T_srf =====
-        call nml_read(nml_path,nml_group,"T_srf_load",load_var)
-        if (load_var) then 
-            call nml_read(nml_path,nml_group,"T_srf_path",filename)
-            call yelmo_parse_path(filename,domain,grid_name)
-            call nml_read(nml_path,nml_group,"T_srf_nm",  vname)
-            call nc_read(filename,vname,bnd%T_srf)
-        else 
-            bnd%T_srf = mv 
-        end if 
-
-        ! == bmb_shlf =====
-        call nml_read(nml_path,nml_group,"bmb_shlf_load",load_var)
-        if (load_var) then 
-            call nml_read(nml_path,nml_group,"bmb_shlf_path",filename)
-            call yelmo_parse_path(filename,domain,grid_name)
-            call nml_read(nml_path,nml_group,"bmb_shlf_nm",  vname)
-            call nc_read(filename,vname,bnd%bmb_shlf)
-        else 
-            bnd%bmb_shlf = mv 
-        end if 
-
-        ! == T_shlf =====
-        call nml_read(nml_path,nml_group,"T_shlf_load",load_var)
-        if (load_var) then 
-            call nml_read(nml_path,nml_group,"T_shlf_path",filename)
-            call yelmo_parse_path(filename,domain,grid_name)
-            call nml_read(nml_path,nml_group,"T_shlf_nm",  vname)
-            call nc_read(filename,vname,bnd%T_shlf)
-        else 
-            bnd%T_shlf = mv 
-        end if 
-
-        ! == Q_geo =====
-        call nml_read(nml_path,nml_group,"Q_geo_load",load_var)
-        if (load_var) then 
-            call nml_read(nml_path,nml_group,"Q_geo_path",filename)
-            call yelmo_parse_path(filename,domain,grid_name)
-            call nml_read(nml_path,nml_group,"Q_geo_nm",  vname)
-            call nc_read(filename,vname,bnd%Q_geo)
-        else 
-            bnd%Q_geo = mv 
-        end if 
-
-        return 
-
-    end subroutine ybound_load_pd 
+    public :: ybound_load_pd 
+    
+contains
 
     subroutine ybound_load_masks(bnd,nml_path,nml_group,domain,grid_name)
         ! Load masks for managing regions and basins, etc. 
@@ -319,6 +187,38 @@ contains
 
     end subroutine ybound_define_ice_allowed
 
+    subroutine ybound_load_z_bed(bnd,nml_path,nml_group,domain,grid_name)
+        ! Load the bedrock elevation boundary field
+
+        implicit none
+
+        type(ybound_class), intent(INOUT) :: bnd
+        character(len=*),   intent(IN)    :: nml_path, nml_group
+        character(len=*),   intent(IN)    :: domain, grid_name 
+
+        ! Local variables
+        logical            :: load_var
+        character(len=512) :: filename
+        character(len=56)  :: vname
+
+        ! == z_bed =====
+        call nml_read(nml_path,nml_group,"z_bed_load",load_var)
+
+        if (load_var) then 
+            call nml_read(nml_path,nml_group,"z_bed_path",filename)
+            call yelmo_parse_path(filename,domain,grid_name)
+            call nml_read(nml_path,nml_group,"z_bed_nm",  vname)
+            call nc_read(filename,vname,bnd%z_bed)
+        else 
+            bnd%z_bed = 0.0  
+        end if 
+        
+        write(*,*) "ybound_load_z_bed:: range(z_bed):  ", minval(bnd%z_bed),  maxval(bnd%z_bed)
+
+        return 
+
+    end subroutine ybound_load_z_bed 
+    
     subroutine ybound_alloc(now,nx,ny)
 
         implicit none 
@@ -391,5 +291,110 @@ contains
         return 
 
     end subroutine ybound_dealloc 
+
+! ajr: unused...
+! Note: some of this functionality is now in yelmo_data. Careful thought
+! needed about which routines are relevant and in which module they should appear...
+    
+    subroutine ybound_load_pd(bnd,nml_path,nml_group,domain,grid_name)
+        ! Load all boundary fields for the present day (except z_bed, handled via ybound_load_zbed) 
+
+        ! ajr: not used yet, needs testing...
+
+        implicit none
+
+        type(ybound_class), intent(INOUT) :: bnd 
+        character(len=*),   intent(IN)    :: nml_path, nml_group 
+        character(len=*),   intent(IN)    :: domain, grid_name
+
+        ! Local variables
+        logical            :: load_var
+        character(len=512) :: filename
+        character(len=56)  :: vname 
+
+        ! == z_sl =====
+
+        bnd%z_sl = 0.0 
+
+        ! == H_sed =====
+        call nml_read(nml_path,nml_group,"H_sed_load",load_var)
+        if (load_var) then 
+            call nml_read(nml_path,nml_group,"H_sed_path",filename)
+            call yelmo_parse_path(filename,domain,grid_name)
+            call nml_read(nml_path,nml_group,"H_sed_nm",  vname)
+            call nc_read(filename,vname,bnd%H_sed)
+        else 
+            bnd%H_sed = mv 
+        end if 
+        
+        ! == H_w =====
+        call nml_read(nml_path,nml_group,"H_w_load",load_var)
+        if (load_var) then 
+            call nml_read(nml_path,nml_group,"H_w_path",filename)
+            call yelmo_parse_path(filename,domain,grid_name)
+            call nml_read(nml_path,nml_group,"H_w_nm",  vname)
+            call nc_read(filename,vname,bnd%H_w)
+        else 
+            bnd%H_w = mv 
+        end if 
+        
+        ! == smb =====
+        call nml_read(nml_path,nml_group,"smb_load",load_var)
+        if (load_var) then 
+            call nml_read(nml_path,nml_group,"smb_path",filename)
+            call yelmo_parse_path(filename,domain,grid_name)
+            call nml_read(nml_path,nml_group,"smb_nm",  vname)
+            call nc_read(filename,vname,bnd%smb)
+        else 
+            bnd%smb = mv 
+        end if 
+
+        ! == T_srf =====
+        call nml_read(nml_path,nml_group,"T_srf_load",load_var)
+        if (load_var) then 
+            call nml_read(nml_path,nml_group,"T_srf_path",filename)
+            call yelmo_parse_path(filename,domain,grid_name)
+            call nml_read(nml_path,nml_group,"T_srf_nm",  vname)
+            call nc_read(filename,vname,bnd%T_srf)
+        else 
+            bnd%T_srf = mv 
+        end if 
+
+        ! == bmb_shlf =====
+        call nml_read(nml_path,nml_group,"bmb_shlf_load",load_var)
+        if (load_var) then 
+            call nml_read(nml_path,nml_group,"bmb_shlf_path",filename)
+            call yelmo_parse_path(filename,domain,grid_name)
+            call nml_read(nml_path,nml_group,"bmb_shlf_nm",  vname)
+            call nc_read(filename,vname,bnd%bmb_shlf)
+        else 
+            bnd%bmb_shlf = mv 
+        end if 
+
+        ! == T_shlf =====
+        call nml_read(nml_path,nml_group,"T_shlf_load",load_var)
+        if (load_var) then 
+            call nml_read(nml_path,nml_group,"T_shlf_path",filename)
+            call yelmo_parse_path(filename,domain,grid_name)
+            call nml_read(nml_path,nml_group,"T_shlf_nm",  vname)
+            call nc_read(filename,vname,bnd%T_shlf)
+        else 
+            bnd%T_shlf = mv 
+        end if 
+
+        ! == Q_geo =====
+        call nml_read(nml_path,nml_group,"Q_geo_load",load_var)
+        if (load_var) then 
+            call nml_read(nml_path,nml_group,"Q_geo_path",filename)
+            call yelmo_parse_path(filename,domain,grid_name)
+            call nml_read(nml_path,nml_group,"Q_geo_nm",  vname)
+            call nc_read(filename,vname,bnd%Q_geo)
+        else 
+            bnd%Q_geo = mv 
+        end if 
+
+        return 
+
+    end subroutine ybound_load_pd 
 
 end module yelmo_boundaries

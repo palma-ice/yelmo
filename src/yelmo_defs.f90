@@ -461,15 +461,18 @@ module yelmo_defs
     ! =========================================================================
     
     type ydata_param_class 
-        logical             :: pd_load_data 
+        logical             :: pd_topo_load 
         character(len=1028) :: pd_topo_path 
-        character(len=56)   :: pd_topo_names(3) 
-        character(len=1028) :: pd_clim_path 
-        character(len=56)   :: pd_clim_names(4) 
-        logical             :: pd_clim_monthly 
+        character(len=56)   :: pd_topo_names(3)
+        logical             :: pd_tsrf_load  
+        character(len=1028) :: pd_tsrf_path 
+        character(len=56)   :: pd_tsrf_name
+        logical             :: pd_tsrf_monthly
+        logical             :: pd_smb_load 
         character(len=1028) :: pd_smb_path 
         character(len=56)   :: pd_smb_name
-        logical             :: pd_smb_monthly  
+        logical             :: pd_smb_monthly 
+        logical             :: pd_vel_load  
         character(len=1028) :: pd_vel_path 
         character(len=56)   :: pd_vel_names(2) 
         
@@ -480,11 +483,11 @@ module yelmo_defs
         ! Variables that contain observations / reconstructions for comparison/inversion
         real(prec), allocatable :: H_ice(:,:), z_srf(:,:), z_bed(:,:) 
         real(prec), allocatable :: ux_s(:,:), uy_s(:,:), uxy_s(:,:) 
-        real(prec), allocatable :: t2m_ann(:,:), t2m_sum(:,:), pr_ann(:,:), smb_ann(:,:) 
+        real(prec), allocatable :: T_srf(:,:), smb(:,:) 
         ! Comparison metrics 
         real(prec), allocatable :: err_H_ice(:,:), err_z_srf(:,:), err_z_bed(:,:)
         real(prec), allocatable :: err_uxy_s(:,:)
-
+        
     end type
 
     type ydata_class 

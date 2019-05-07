@@ -23,7 +23,7 @@ module yelmo_ice
     implicit none 
 
     private
-    public :: yelmo_init, yelmo_init_state_1, yelmo_init_state_2
+    public :: yelmo_init, yelmo_init_topo, yelmo_init_state
     public :: yelmo_update, yelmo_update_equil, yelmo_end 
     public :: yelmo_print_bound, yelmo_set_time
 
@@ -209,17 +209,19 @@ contains
 
     end subroutine yelmo_update_equil
 
-    subroutine yelmo_init(dom,filename,grid_def,domain,grid_name)
+    subroutine yelmo_init(dom,filename,grid_def,time,load_topo,domain,grid_name)
         ! Initialize a yelmo domain, including the grid itself, 
         ! and all sub-components (topo,dyn,mat,therm,bound,data)
 
         implicit none
 
         type(yelmo_class) :: dom 
-        character(len=*), intent(IN) :: filename 
-        character(len=*), intent(IN) :: grid_def 
-        character(len=*), intent(IN), optional :: domain
-        character(len=*), intent(IN), optional :: grid_name 
+        character(len=*),  intent(IN) :: filename 
+        character(len=*),  intent(IN) :: grid_def 
+        real(prec),        intent(IN) :: time 
+        logical, optional, intent(IN) :: load_topo 
+        character(len=*),  intent(IN), optional :: domain
+        character(len=*),  intent(IN), optional :: grid_name 
 
         ! Local variables  
         integer :: i, nz1, nz2 
@@ -361,16 +363,30 @@ contains
         ! Allocate the yelmo data objects (arrays, etc)
         call ybound_alloc(dom%bnd,dom%grd%nx,dom%grd%ny)
 
-        write(*,*) "yelmo_init:: boundary intialized."
+        ! Load region/basin masks
+        call ybound_load_masks(dom%bnd,filename,"yelmo_masks",dom%par%domain,dom%par%grid_name)
+        
+        ! Update the ice_allowed mask based on domain definition 
+        call ybound_define_ice_allowed(dom%bnd,dom%par%domain)
+        
+        write(*,*) "yelmo_init:: boundary intialized (loaded masks)."
         
         call ydata_par_load(dom%dta%par,filename,dom%par%domain,dom%par%grid_name,init=.TRUE.)
         call ydata_alloc(dom%dta%pd,dom%grd%nx,dom%grd%ny,dom%par%nz_aa)
 
         ! Load data objects 
-        call ydata_load(dom%dta)
+        call ydata_load(dom%dta,dom%bnd%ice_allowed)
 
-        write(*,*) "yelmo_init:: data intialized."
+        write(*,*) "yelmo_init:: data intialized (loaded data if desired)."
         
+        ! == topography ==
+
+        ! Determine how to manage initial topography (H_ice,z_bed)
+        call yelmo_init_topo(dom,filename,time,load_topo)
+
+        write(*,*) "yelmo_init:: topo intialized (loaded data if desired)."
+        
+
         write(*,*) 
         write(*,*) "yelmo_init:: Initialization complete for domain: "// &
                    trim(dom%par%domain) 
@@ -379,7 +395,7 @@ contains
 
     end subroutine yelmo_init 
 
-    subroutine yelmo_init_state_1(dom,filename,time,load_topo)
+    subroutine yelmo_init_topo(dom,filename,time,load_topo)
         ! This subroutine is the first step to intializing 
         ! the state variables. It initializes only the topography
         ! to facilitate calculation of boundary variables (eg, T_srf),
@@ -409,17 +425,11 @@ contains
 
             if (load_topo_from_par) then 
 
-                ! Load ice thickness from file
-                call ytopo_load_H_ice(dom%tpo,filename,"yelmo_topo_init",dom%par%domain,dom%par%grid_name)
-
                 ! Load bedrock elevation from file 
-                call ybound_load_z_bed(dom%bnd,filename,"yelmo_topo_init",dom%par%domain,dom%par%grid_name)
+                call ybound_load_z_bed(dom%bnd,filename,"yelmo_init_topo",dom%par%domain,dom%par%grid_name)
                 
-                ! Load region/basin masks
-                call ybound_load_masks(dom%bnd,filename,"yelmo_masks",dom%par%domain,dom%par%grid_name)
-                
-                ! Update the ice_allowed mask based on domain definition 
-                call ybound_define_ice_allowed(dom%bnd,dom%par%domain)
+                ! Load ice thickness from file
+                call ytopo_load_H_ice(dom%tpo,filename,"yelmo_init_topo",dom%par%domain,dom%par%grid_name,dom%bnd%ice_allowed)
 
             end if 
 
@@ -440,9 +450,9 @@ contains
 
         return 
 
-    end subroutine yelmo_init_state_1
+    end subroutine yelmo_init_topo
 
-    subroutine yelmo_init_state_2(dom,filename,time,thrm_method)
+    subroutine yelmo_init_state(dom,filename,time,thrm_method)
         ! This subroutine is the second step to intializing 
         ! the state variables. It initializes ice temperatures,
         ! material properties and dynamics. It is called after the topography
@@ -474,7 +484,7 @@ contains
             ! Consistency check 
             if (trim(thrm_method) .ne. "linear" .and. trim(thrm_method) .ne. "robin" &
                 .and. trim(thrm_method) .ne. "robin-cold") then 
-                write(*,*) "yelmo_init_state_2:: Error: temperature initialization must be &
+                write(*,*) "yelmo_init_state:: Error: temperature initialization must be &
                            &'linear', 'robin' or 'robin-cold' in order to properly prescribe &
                            &initial temperatures."
                 stop 
@@ -520,7 +530,7 @@ contains
         
         return 
 
-    end subroutine yelmo_init_state_2 
+    end subroutine yelmo_init_state 
 
     subroutine yelmo_par_load(par,filename,domain,grid_name)
 

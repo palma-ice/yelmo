@@ -75,8 +75,8 @@ contains
             case("Greenland")
                 bnd%regions = bnd%index_grl
             case DEFAULT 
-                write(*,*) "read_input:: error domain not recognized: "//trim(domain)
-                stop 
+                ! Assign a default value everywhere 
+                bnd%regions = 1.0  
 
         end select
 

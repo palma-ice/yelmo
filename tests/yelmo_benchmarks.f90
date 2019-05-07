@@ -109,8 +109,8 @@ program yelmo_benchmarks
     ! Next define grid 
     call yelmo_init_grid(yelmo1%grd,grid_name,units="km",dx=dx,nx=nx,dy=dx,ny=nx)
 
-    ! Initialize data objects
-    call yelmo_init(yelmo1,filename=path_par,grid_def="none",domain=domain,grid_name=grid_name)
+    ! Initialize data objects (without loading topography, which will be defined inline below)
+    call yelmo_init(yelmo1,filename=path_par,grid_def="none",time=time_init,load_topo=.FALSE.,domain=domain,grid_name=grid_name)
     
     ! Update parameter values with EISMINT choices 
     yelmo1%dyn%par%use_ssa    = with_ssa 
@@ -267,23 +267,18 @@ program yelmo_benchmarks
     ! Check boundary values 
     call yelmo_print_bound(yelmo1%bnd)
 
-    ! Initialize state variables (topo only)
-    call yelmo_init_state_1(yelmo1,path_par,time=time_init,load_topo=.FALSE.)
     ! Initialize state variables (dyn,therm,mat)
-    call yelmo_init_state_2(yelmo1,path_par,time=time_init,thrm_method="robin")
+    call yelmo_init_state(yelmo1,path_par,time=time_init,thrm_method="robin")
 
-    ! Set time equal to initial time
-    time = time_init 
-
-    ! Write initial state 
+    ! == Write initial state ==
      
     ! 2D file 
     call yelmo_write_init(yelmo1,file2D,time_init=time_init,units="years")
-    call write_step_2D(yelmo1,file2D,time=time)  
+    call write_step_2D(yelmo1,file2D,time=time_init)  
     
     ! 1D file 
     call write_yreg_init(yelmo1,file1D,time_init=time_init,units="years",mask=yelmo1%bnd%ice_allowed)
-    call write_yreg_step(yelmo1%reg,file1D,time=time) 
+    call write_yreg_step(yelmo1%reg,file1D,time=time_init) 
 
     ! Comparison file 
     call yelmo_write_init(yelmo1,file_compare,time_init=time_init,units="years")
@@ -294,6 +289,7 @@ program yelmo_benchmarks
         yelmo1%dyn%par%solver = "fixed"
     end if 
 
+    
     ! Advance timesteps
     do n = 1, ceiling((time_end-time_init)/dtt)
 

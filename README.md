@@ -1,47 +1,21 @@
-# yelmo
-Yelmo ice sheet model code base
+# Yelmo
 
+This is the code repository for the ice sheet model Yelmo.
+While the model has been designed to be easy to use, there
+are many parameters that require knowledge of ice-sheet
+physics and numerous parameterizations. The (growing) model documentation
+is provide to provide help with proper use of the model. 
 
+The model is described in the following article:
+Robinson et al., in prep.
 
-# Getting started 
+The model documentation can be found here:
+https://palma-ice.github.io/yelmo-docs
 
+## Dependencies
 
+[NetCDF](https://www.unidata.ucar.edu/software/netcdf/docs/getting_and_building_netcdf.html)
+[Library of Iterative Solvers for Linear Systems](http://www.ssisc.org/lis/)
 
-
-# Installing NetCDF
-
-
-
-# Installing LIS
-
-1. Download the LIS source:
-https://www.ssisc.org/lis/
-
-2. Configure the package and install it
-in the location of your choice (make sure to enable the Fortran90 interface):
-```
-cd lis-2.0.18
-./configure --prefix=$HOME/apps/lis/2.0.18 --enable-f90
-make
-make install
-make install check
-
-# Make a handy link to this version of LIS
-ln -s 2.0.18 lis
-```
-Note: make sure to set the environment variables `CC` and `FC` to set 
-a specific compiler, for example for gcc/gfortran use the following configure command:
-```
-CC=gcc FC=gfortran ./configure --prefix=$HOME/apps/lis/2.0.18 --enable-f90
-```
-
-3. Add LIS path to the LD\_LIBRARY\_PATH in .bash\_profile, .bashrc or .bash\_aliases:
-```
-# lis library paths
-LD_LIBRARY_PATH=$HOME/apps/lis/lis/lib:$LD_LIBRARY_PATH
-export LD_LIBRARY_PATH
-```
-
-That' it. LIS should now be available to use with Yelmo.
-
-
+See:
+https://palma-ice.github.io/yelmo-docs/dependencies/

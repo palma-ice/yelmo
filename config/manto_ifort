@@ -3,7 +3,7 @@ FC  = ifort
 INC_NC  = -I/home/jalvarez/work/librairies/netcdflib/include
 LIB_NC  = -L/home/jalvarez/work/librairies/netcdflib/lib -lnetcdf
 
-LISROOT = /home/robinson/apps/lis/lis
+LISROOT = /home/student/apps/lis/lis
 INC_LIS = -I${LISROOT}/include 
 LIB_LIS = -L${LISROOT}/lib/ -llis
 

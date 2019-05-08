@@ -5,10 +5,10 @@ Script to run one yelmo simulation.
 '''
 import subprocess as subp 
 import sys, os, argparse, shutil, glob, datetime, json
-from runner.ext.namelist import Namelist
+#from runner.ext.namelist import Namelist
 
 # Shortcut to namelist fuctionality
-nml = Namelist()  # you could use your own module for reading namelist
+#nml = Namelist()  # you could use your own module for reading namelist
 
 
 def run_yelmo():
@@ -69,6 +69,10 @@ initmip = libyelmo/bin/yelmo_initmip.x
     
 
     # Additional options, consistency checks
+
+    if with_runner:
+        print("run_yelmo.py is not currently configured to run with the runner module. Do not use option -x.")
+        sys.exit()
 
     # Copy the executable file to the output directory, or
     # call it from its compiled location?    

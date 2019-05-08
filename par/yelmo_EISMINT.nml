@@ -22,6 +22,7 @@
 &yelmo
     domain          = "EISMINT"
     grid_name       = "EISMINT"
+    grid_path       = "none"
     experiment      = "EISMINT"         ! "None", "EISMINT", "MISMIP3D", "BUELER"  to apply special boundary conditions   
     restart         = "no"
     zeta_scale      = "tanh"            ! "linear", "exp", "tanh"
@@ -127,4 +128,32 @@
     regions_load  = False 
     regions_path  = "none"
     regions_nms   = "mask" "None"
+/
+
+&yelmo_init_topo
+    H_ice_load = False 
+    H_ice_path = "none"
+    H_ice_nm   = "H_ice"            ! [m] Ice thickness 
+    z_bed_load = False 
+    z_bed_path = "none"
+    z_bed_nm   = "z_bed"            ! [m] Bedrock elevation 
+
+/
+
+&yelmo_data 
+    pd_topo_load      = False 
+    pd_topo_path      = "none"
+    pd_topo_names     = "H_ice" "z_srf" "z_bed"      ! Ice thickness, Surface elevation, Bedrock elevation
+    pd_tsrf_load      = False 
+    pd_tsrf_path      = "none"
+    pd_tsrf_name      = "T_srf"                      ! Surface temperature (or near-surface temperature)
+    pd_tsrf_monthly   = False
+    pd_smb_load       = False 
+    pd_smb_path       = "none"
+    pd_smb_name       = "smb"                        ! Surface mass balance 
+    pd_smb_monthly    = False 
+    pd_vel_load       = False 
+    pd_vel_path       = "none"
+    pd_vel_names      = "ux_srf" "uy_srf"            ! Surface velocity 
+
 /

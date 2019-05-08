@@ -78,10 +78,12 @@ contains
         ! Modify axis values as needed to get units of [m]
         if (trim(units) .eq. "kilometers") then 
 
-            grd%xc = grd%xc *1e3
-            grd%yc = grd%yc *1e3
-            grd%x  = grd%x  *1e3
-            grd%y  = grd%y  *1e3
+            grd%xc   = grd%xc *1e3
+            grd%yc   = grd%yc *1e3
+            grd%x    = grd%x  *1e3
+            grd%y    = grd%y  *1e3
+
+            grd%area = grd%area *1e3*1e3 
 
         else if (trim(units) .eq. "meters") then 
             ! Pass - do nothing
@@ -761,7 +763,7 @@ contains
             call nc_write_attr(fnm,"lat2D","_CoordinateAxisType","Lat")
         end if 
 
-        call nc_write(fnm,"area",  grid%area,  dim1=xnm,dim2=ynm,grid_mapping=grid%mtype)
+        call nc_write(fnm,"area",  grid%area*1e-6,  dim1=xnm,dim2=ynm,grid_mapping=grid%mtype,units="km^2")
         if (grid%is_projection) call nc_write_attr(fnm,"area","coordinates","lat2D lon2D")
         !call nc_write(fnm,"border",grid%border,dim1=xnm,dim2=ynm,grid_mapping=grid%mtype)
         !if (grid%is_projection) call nc_write_attr(fnm,"border","coordinates","lat2D lon2D")

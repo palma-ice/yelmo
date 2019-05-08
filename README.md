@@ -14,8 +14,8 @@ https://palma-ice.github.io/yelmo-docs
 
 ## Dependencies
 
-[NetCDF](https://www.unidata.ucar.edu/software/netcdf/docs/getting_and_building_netcdf.html)
-[Library of Iterative Solvers for Linear Systems](http://www.ssisc.org/lis/)
+- [NetCDF](https://www.unidata.ucar.edu/software/netcdf/docs/getting_and_building_netcdf.html)
+- [Library of Iterative Solvers for Linear Systems](http://www.ssisc.org/lis/)
 
 See:
 https://palma-ice.github.io/yelmo-docs/dependencies/

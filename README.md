@@ -29,6 +29,11 @@ make install check
 # Make a handy link to this version of LIS
 ln -s 2.0.18 lis
 ```
+Note: make sure to set the environment variables `CC` and `FC` to set 
+a specific compiler, for example for gcc/gfortran use the following configure command:
+```
+CC=gcc FC=gfortran ./configure --prefix=$HOME/apps/lis/2.0.18 --enable-f90
+```
 
 3. Add LIS path to the LD\_LIBRARY\_PATH in .bash\_profile, .bashrc or .bash\_aliases:
 ```

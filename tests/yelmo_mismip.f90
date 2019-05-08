@@ -10,27 +10,9 @@ program yelmo_mismip
 
     use mismip3D 
 
-    ! External libraries
-    use sealevel 
-    use isostasy  
-
-    use marine_shelf 
-    use smbpal   
-    use basal_hydrology 
-    use sediments 
-    use geothermal
-    
     implicit none 
 
     type(yelmo_class)     :: yelmo1
-
-    type(sealevel_class)   :: sealev 
-    type(marshelf_class)   :: mshlf1 
-    type(smbpal_class)     :: smbpal1 
-    type(hydro_class)      :: hyd1  
-    type(sediments_class)  :: sed1 
-    type(geothermal_class) :: gthrm1
-    type(isos_class)       :: isos1
 
     character(len=56)  :: domain, grid_name  
     character(len=256) :: outfldr, file2D, file1D, file_restart
@@ -140,7 +122,8 @@ program yelmo_mismip
     ! === Initialize ice sheet model =====
 
     ! Initialize data objects
-    call yelmo_init(yelmo1,filename=path_par,grid_def="none",domain=domain,grid_name=grid_name)
+    call yelmo_init(yelmo1,filename=path_par,grid_def="none",time=time_init,load_topo=.FALSE., &
+                        domain=domain,grid_name=grid_name)
 
     if (trim(experiment) .eq. "RF") then
         ! Ensure rate factor (and counter) is set for first value if performing RF experiment 
@@ -177,14 +160,11 @@ program yelmo_mismip
     call mismip3D_topo_init(yelmo1%bnd%z_bed,yelmo1%tpo%now%H_ice,yelmo1%tpo%now%z_srf, &
                             yelmo1%grd%xc*1e-3,yelmo1%grd%yc*1e-3,experiment)
     
-    ! Initialize state variables (topo)
-    call yelmo_init_state_1(yelmo1,path_par,time=time_init,load_topo=.FALSE.) 
-
     time     = time_init 
     yelmo1%dyn%par%use_ssa = .TRUE. 
 
-    ! Update the remaining variables (dyn,therm,mat)
-    call yelmo_init_state_2(yelmo1,path_par,time=time_init,thrm_method="robin")
+    ! Initialize the yelmo state (dyn,therm,mat)
+    call yelmo_init_state(yelmo1,path_par,time=time_init,thrm_method="robin")
 
     ! Write initial state 
     x_gl      = find_x_gl(yelmo1%grd%x*1e-3,yelmo1%grd%y*1e-3,yelmo1%tpo%now%H_grnd)

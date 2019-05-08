@@ -92,7 +92,7 @@ program yelmo_test
     mask_noice = .FALSE. 
     where(yelmo1%dta%pd%H_ice .le. 0.0) mask_noice = .TRUE. 
 
-    ! Impose additional negative mass balance to no ice points 2 [m/a i.e.] melting
+    ! Impose additional negative mass balance to no ice points 2 [m.i.e./a] melting
     where(mask_noice) yelmo1%bnd%smb = yelmo1%dta%pd%smb - 2.0 
 
     ! Impose a colder boundary temperature for equilibration step 

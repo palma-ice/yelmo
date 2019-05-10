@@ -1,11 +1,9 @@
 FC = gfortran
 
-NETCDF_FORTRANROOT  = /home/student/apps/netcdf-fortran/netcdf-fortran
-NETCDF_CROOT        = /home/student/apps/netcdf-c/netcdf-c
-INC_NC  = -I${NETCDF_FORTRANROOT}/include
-LIB_NC  = -L${NETCDF_FORTRANROOT}/lib -lnetcdff -L${NETCDF_CROOT}/lib -lnetcdf -lnetcdf -ldl -lz -lcurl -lm
+INC_NC  = -I/usr/include
+LIB_NC  = -L/usr/lib -lnetcdff -Wl,-Bsymbolic-functions -Wl,-z,relro -Wl,-z,now -lnetcdf -lnetcdf -ldl -lz -lcurl -lm
 
-LISROOT = /home/student/apps/lis/lis
+LISROOT = /home/apps/lis/lis
 INC_LIS = -I${LISROOT}/include 
 LIB_LIS = -L${LISROOT}/lib/ -llis
 

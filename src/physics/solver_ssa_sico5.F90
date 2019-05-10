@@ -804,7 +804,10 @@ end do
 deallocate(lgs_a_value, lgs_a_index, lgs_a_ptr)
 deallocate(lgs_b_value, lgs_x_value)
 
-! Limit the velocity =====================
+! Limit velocity for thin ice thicknesses ==========
+call limit_vel_thickness(vx_m,vy_m,H_ice,u_lim_thk=1000.0)
+
+! Limit the velocity generally =====================
 call limit_vel(vx_m,ulim)
 call limit_vel(vy_m,ulim)
 
@@ -1209,6 +1212,47 @@ end if
         
     end subroutine set_sico_masks_old 
     
+    subroutine limit_vel_thickness(ux,uy,H_ice,u_lim_thk)
+
+        implicit none 
+
+        real(prec), intent(INOUT) :: ux(:,:) 
+        real(prec), intent(INOUT) :: uy(:,:) 
+        real(prec), intent(IN)    :: H_ice(:,:) 
+        real(prec), intent(IN)    :: u_lim_thk 
+
+        ! Local variables 
+        integer    :: i, j, nx, ny 
+        real(prec) :: H_mid 
+        real(prec), parameter :: H_lim = 2.0 
+
+        nx = size(H_ice,1)
+        ny = size(H_ice,2) 
+
+        ! acx
+        do j = 1, ny 
+        do i = 1, nx-1
+
+          H_mid = 0.5*(H_ice(i,j)+H_ice(i+1,j))
+          if (H_mid .le. H_lim) call limit_vel(ux(i,j),u_lim_thk)
+
+        end do 
+        end do  
+
+        ! acy
+        do j = 1, ny-1 
+        do i = 1, nx
+
+          H_mid = 0.5*(H_ice(i,j)+H_ice(i,j+1))
+          if (H_mid .le. H_lim) call limit_vel(uy(i,j),u_lim_thk)
+
+        end do 
+        end do  
+        
+        return 
+
+    end subroutine limit_vel_thickness
+
     elemental subroutine limit_vel(u,u_lim)
         ! Apply a velocity limit (for stability)
 

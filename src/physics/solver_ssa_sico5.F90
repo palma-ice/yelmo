@@ -1223,8 +1223,8 @@ end if
 
         ! Local variables 
         integer    :: i, j, nx, ny 
-        real(prec) :: H_mid 
-        real(prec), parameter :: H_lim = 2.0 
+        real(prec) :: H_mid, u_lim  
+        real(prec), parameter :: H_lim = 10.0 
 
         nx = size(H_ice,1)
         ny = size(H_ice,2) 
@@ -1234,7 +1234,10 @@ end if
         do i = 1, nx-1
 
           H_mid = 0.5*(H_ice(i,j)+H_ice(i+1,j))
-          if (H_mid .le. H_lim) call limit_vel(ux(i,j),u_lim_thk)
+          if (H_mid .le. H_lim) then 
+            u_lim = u_lim_thk*H_mid/H_lim 
+            call limit_vel(ux(i,j),u_lim)
+          end if 
 
         end do 
         end do  
@@ -1244,8 +1247,11 @@ end if
         do i = 1, nx
 
           H_mid = 0.5*(H_ice(i,j)+H_ice(i,j+1))
-          if (H_mid .le. H_lim) call limit_vel(uy(i,j),u_lim_thk)
-
+          if (H_mid .le. H_lim) then 
+            u_lim = u_lim_thk*H_mid/H_lim 
+            call limit_vel(uy(i,j),u_lim)
+          end if
+          
         end do 
         end do  
         

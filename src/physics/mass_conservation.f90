@@ -74,9 +74,6 @@ contains
 
         end select 
         
-!         ! Limit advected ice thickess to minimum at the margin
-!         call limit_margin_thickness(H_ice,H_min)
-        
         ! Next, handle mass balance in order to be able to diagnose
         ! precisely how much mass was lost/gained 
         mb_applied = mbal !- calv 

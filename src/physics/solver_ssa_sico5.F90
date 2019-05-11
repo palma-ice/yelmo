@@ -128,10 +128,10 @@ contains
 
         ! Set maske and grounding line / calving front flags
 
-        call set_sico_masks(maske,flag_ice_front_1,flag_ice_front_2, &
-                    flag_grounding_line_1,flag_grounding_line_2, H_ice, H_grnd)
-!         call set_sico_masks_old(maske,flag_ice_front_1,flag_ice_front_2, &
+!         call set_sico_masks(maske,flag_ice_front_1,flag_ice_front_2, &
 !                     flag_grounding_line_1,flag_grounding_line_2, H_ice, H_grnd)
+        call set_sico_masks_old(maske,flag_ice_front_1,flag_ice_front_2, &
+                    flag_grounding_line_1,flag_grounding_line_2, H_ice, H_grnd)
 
         gfa1 = maske
         gfb1 = flag_ice_front_1

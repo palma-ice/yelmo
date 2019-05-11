@@ -805,7 +805,7 @@ deallocate(lgs_a_value, lgs_a_index, lgs_a_ptr)
 deallocate(lgs_b_value, lgs_x_value)
 
 ! Limit velocity for thin ice thicknesses ==========
-call limit_vel_thickness(vx_m,vy_m,H_ice,u_lim_thk=1000.0)
+!call limit_vel_thickness(vx_m,vy_m,H_ice,u_lim_thk=1000.0)
 
 ! Limit the velocity generally =====================
 call limit_vel(vx_m,ulim)

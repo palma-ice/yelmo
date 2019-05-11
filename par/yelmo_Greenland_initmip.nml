@@ -2,11 +2,11 @@
     
     ! Timing parameters 
     time_init    = -30e3                ! [yr] Starting time 
-    time_end     = 0.0                  ! [yr] Ending time
+    time_end     = -25e3                ! [yr] Ending time
     time_equil   = 0.0                  ! [yr] Equiibration time 
     dtt          = 1.0                  ! [yr] Main loop timestep 
     dt1D_out     = 100.0                ! [yr] Frequency of writing 1D output files 
-    dt2D_out     = 1000.0               ! [yr] Frequency of writing 2D output files 
+    dt2D_out     = 100.0                ! [yr] Frequency of writing 2D output files 
 /
 
 &yelmo
@@ -42,7 +42,7 @@
     topo_fixed_dt     = -1              ! <= 0 for always fixed, positive value to 'unfix' topo after interval
     calv_dt           = 1e-5            ! [a] Calving frequency 
     H_calv            = 200.0 
-    H_min             = 1e-5            ! [m] Minimum ice thickness (thinner ice is deleted)
+    H_min             = 1.0             ! [m] Minimum ice thickness (thinner ice is deleted)
     gl_sep            = 1               ! 1: Linear f_grnd_acx/acy and binary f_grnd, 2: area f_grnd, average to acx/acy
     gl_sep_nx         = 15              ! [-] Number of interpolation points (nx*nx) to calculate grounded area at grounding line
     diffuse_bmb_shlf  = False           ! Allow bmb_shlf to permeate inland at the grounding line 

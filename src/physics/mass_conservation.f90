@@ -74,9 +74,9 @@ contains
 
         end select 
         
-        ! Limit advected ice thickness to above the minimum limit value
-        where (H_ice .le. H_min) H_ice = 0.0 
-
+!         ! Limit advected ice thickess to minimum at the margin
+!         call limit_margin_thickness(H_ice,H_min)
+        
         ! Next, handle mass balance in order to be able to diagnose
         ! precisely how much mass was lost/gained 
         mb_applied = mbal !- calv 
@@ -89,7 +89,10 @@ contains
 
         ! Apply modified mass balance to update the ice thickness 
         H_ice = H_ice + dt*mb_applied
-        where (H_ice .le. H_min) H_ice = 0.0 
+
+        ! Limit ice thickess to minimum at the margin
+        call limit_margin_thickness(H_ice,mb_applied,H_min)
+        !where (H_ice .le. H_min) H_ice = 0.0 
 
         ! Finally, treat calving at the floating ice margin 
 !         where (calv .gt. 0.0) H_ice = max(0.0,H_ice-calv*dt)
@@ -450,5 +453,40 @@ contains
         return
 
     end subroutine calc_adv2D_impl_upwind
+
+    subroutine limit_margin_thickness(H_ice,mb_applied,H_min)
+
+        implicit none 
+
+        real(prec), intent(INOUT) :: H_ice(:,:) 
+        real(prec), intent(INOUT) :: mb_applied(:,:) 
+        real(prec), intent(IN)    :: H_min
+        
+        ! Local variables 
+        integer :: i, j, nx, ny 
+        logical :: is_margin 
+
+        nx = size(H_ice,1)
+        ny = size(H_ice,2)
+
+        do j = 2, ny-1 
+        do i = 2, nx-1 
+
+            ! Determine if ice-covered point has an ice-free neighbor (ie, at the ice margin)
+            is_margin = (H_ice(i,j) .gt. 0.0 &
+                .and. minval([H_ice(i-1,j),H_ice(i+1,j),H_ice(i,j-1),H_ice(i,j+1)]) .eq. 0.0)
+
+            ! If margin point is too thin, impose ablation to set ice thickness to zero
+            if (is_margin .and. H_ice(i,j) .lt. H_min) then 
+                mb_applied(i,j) = mb_applied(i,j) - H_ice(i,j) 
+                H_ice(i,j)      = 0.0 
+            end if 
+
+        end do 
+        end do 
+        
+        return 
+
+    end subroutine limit_margin_thickness
 
 end module mass_conservation

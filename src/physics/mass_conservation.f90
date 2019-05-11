@@ -465,6 +465,7 @@ contains
         ! Local variables 
         integer :: i, j, nx, ny 
         logical :: is_margin 
+        real(prec) :: H_max_neighbor
 
         nx = size(H_ice,1)
         ny = size(H_ice,2)
@@ -478,8 +479,15 @@ contains
 
             ! If grounded margin point is too thin, impose ablation to set ice thickness to zero
             if (is_margin .and. H_ice(i,j) .lt. H_min) then 
-                mb_applied(i,j) = mb_applied(i,j) - H_ice(i,j) 
-                H_ice(i,j)      = 0.0 
+
+                ! Check if all neighbors are pretty thin too
+                H_max_neighbor = maxval([H_ice(i-1,j),H_ice(i+1,j),H_ice(i,j-1),H_ice(i,j+1)])
+
+                if (H_max_neighbor .gt. 10.0*H_min) then 
+                    mb_applied(i,j) = mb_applied(i,j) - H_ice(i,j) 
+                    H_ice(i,j)      = 0.0 
+                end if
+
             end if 
 
         end do 

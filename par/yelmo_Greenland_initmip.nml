@@ -2,11 +2,11 @@
     
     ! Timing parameters 
     time_init    = -30e3                ! [yr] Starting time 
-    time_end     = -25e3                ! [yr] Ending time
+    time_end     = 0.0                  ! [yr] Ending time
     time_equil   = 0.0                  ! [yr] Equiibration time 
     dtt          = 1.0                  ! [yr] Main loop timestep 
     dt1D_out     = 100.0                ! [yr] Frequency of writing 1D output files 
-    dt2D_out     = 100.0                ! [yr] Frequency of writing 2D output files 
+    dt2D_out     = 1000.0               ! [yr] Frequency of writing 2D output files 
 /
 
 &yelmo
@@ -66,7 +66,7 @@
     H_grnd_lim          = 500.0           ! [m] For beta_sep_method=2, reduce beta linearly between H_grnd=0 and H_grnd_lim 
     H_sed_sat           = 250.0           ! [m] Sediment thickness at which sediment effect is saturated
     cf_frozen           = 100.0           ! [a m-1] Bed roughness coefficient, frozen 
-    cf_stream           = 100.0            ! [a m-1] Bed roughness coefficient, stream  
+    cf_stream           =  50.0           ! [a m-1] Bed roughness coefficient, stream  
     cf_fac_sed          = 1.0             ! [-] Scaling of roughness for sediments 
     cf_sia              = 0.0             ! [m a-1 Pa-1] Bed roughness coefficient for SIA sliding
     streaming_margin    = True            ! Impose cf_stream at the margin and grline independent of f_pmp

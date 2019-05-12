@@ -19,7 +19,7 @@ contains
     subroutine apply_calving(H_ice,calv,f_grnd,dt)
 
         implicit none 
-        
+
         real(prec), intent(INOUT) :: H_ice(:,:) 
         real(prec), intent(INOUT) :: calv(:,:) 
         real(prec), intent(INOUT) :: f_grnd(:,:) 
@@ -122,7 +122,7 @@ contains
 
     end function calc_calving_rate_simple
     
-    function calc_calving_rate_flux(H_ice,f_grnd,f_ice,mbal,ux_bar,uy_bar,dx,dt,H_calv) result(calv)
+    function calc_calving_rate_flux(H_ice,f_grnd,f_ice,mbal,ux,uy,dx,dt,H_calv) result(calv)
         ! Calculate the calving rate [m/a] based on a simple threshold rule
         ! H_ice < H_calv
 
@@ -132,8 +132,8 @@ contains
         real(prec), intent(IN) :: f_grnd(:,:)               ! [-] Grounded fraction
         real(prec), intent(IN) :: f_ice(:,:)                ! [-] Ice area fraction
         real(prec), intent(IN) :: mbal(:,:)                 ! [m/a] Net mass balance 
-        real(prec), intent(IN) :: ux_bar(:,:)               ! [m/a] velocity, x-direction (ac-nodes)
-        real(prec), intent(IN) :: uy_bar(:,:)               ! [m/a] velocity, y-direction (ac-nodes)
+        real(prec), intent(IN) :: ux(:,:)               ! [m/a] velocity, x-direction (ac-nodes)
+        real(prec), intent(IN) :: uy(:,:)               ! [m/a] velocity, y-direction (ac-nodes)
         real(prec), intent(IN) :: dx, dt 
         real(prec), intent(IN) :: H_calv                    ! [m] Threshold for calving
         real(prec) :: calv(size(H_ice,1),size(H_ice,2)) 
@@ -172,8 +172,8 @@ contains
                 ! Calculate strain rate locally (Aa node)
                 ! Note: dx should probably account for f_ice somehow,  
                 ! but this would only a minor adjustment
-                eps_xx = (ux_bar(i,j) - ux_bar(i-1,j))/dx
-                eps_yy = (uy_bar(i,j) - uy_bar(i,j-1))/dx
+                eps_xx = (ux(i,j) - ux(i-1,j))/dx
+                eps_yy = (uy(i,j) - uy(i,j-1))/dx
 
                 ! Calculate thickness change via conservation
                 dHdt(i,j) = mbal(i,j) - Hfrac(i,j)*(eps_xx+eps_yy)
@@ -212,20 +212,20 @@ contains
 
                 positive_mb = (mbal(i,j).gt.0.0)
 
-                test_mij = ( ((Hdiff(i-1,j).gt.0.0).and.(ux_bar(i,j).ge.0.0)  &  ! neighbor (i-1,j) total > hcoup
-                    .and.  (dHdt(i-1,j).gt.(-Hdiff(i-1,j)*abs(ux_bar(i-1,j)/dx)))) & 
+                test_mij = ( ((Hdiff(i-1,j).gt.0.0).and.(ux(i,j).ge.0.0)  &  ! neighbor (i-1,j) total > hcoup
+                    .and.  (dHdt(i-1,j).gt.(-Hdiff(i-1,j)*abs(ux(i-1,j)/dx)))) & 
                     .or.(f_grnd(i-1,j).gt.0.0.and.positive_mb )) !
 
-                test_pij = ( ((Hdiff(i+1,j).gt.0.0).and.(ux_bar(i+1,j).le.0.0) & ! neighbor (i+1,j) total > hcoup
-                    .and.(dHdt(i+1,j).gt.(-Hdiff(i+1,j)*abs(ux_bar(i+1,j)/dx)))) &
+                test_pij = ( ((Hdiff(i+1,j).gt.0.0).and.(ux(i,j).le.0.0) & ! neighbor (i+1,j) total > hcoup
+                    .and.(dHdt(i+1,j).gt.(-Hdiff(i+1,j)*abs(ux(i,j)/dx)))) &
                     .or.(f_grnd(i+1,j).gt.0.0.and.positive_mb) ) !
 
-                test_imj = ( ((Hdiff(i,j-1).gt.0.0).and.(uy_bar(i,j).ge.0.0)  &  ! neighbor (i,j-1) total > hcoup
-                    .and.(dHdt(i,j-1).gt.(-Hdiff(i,j-1)*abs(uy_bar(i,j-1)/dx))))&
+                test_imj = ( ((Hdiff(i,j-1).gt.0.0).and.(uy(i,j).ge.0.0)  &  ! neighbor (i,j-1) total > hcoup
+                    .and.(dHdt(i,j-1).gt.(-Hdiff(i,j-1)*abs(uy(i,j-1)/dx))))&
                     .or.(f_grnd(i,j-1).gt.0.0.and.positive_mb ) ) !
 
-                test_ipj = ( ((Hdiff(i,j+1).gt.0.0).and.(uy_bar(i,j+1).le.0.0) & ! neighbor (i,j+1) total > hcoup
-                    .and.(dHdt(i,j+1).gt.(-Hdiff(i,j+1)*abs(uy_bar(i,j+1)/dx))))&
+                test_ipj = ( ((Hdiff(i,j+1).gt.0.0).and.(uy(i,j).le.0.0) & ! neighbor (i,j+1) total > hcoup
+                    .and.(dHdt(i,j+1).gt.(-Hdiff(i,j+1)*abs(uy(i,j)/dx))))&
                     .or.(f_grnd(i,j+1).gt.0.0.and.positive_mb ) ) !
 
                 if ((.not.(test_mij.or.test_pij.or.test_imj.or.test_ipj))) then

@@ -16,22 +16,24 @@ module calving
     
 contains 
 
-    subroutine apply_calving(H_ice,calv,dt,H_min)
+    subroutine apply_calving(H_ice,calv,f_grnd,dt)
 
         implicit none 
 
         real(prec), intent(INOUT) :: H_ice(:,:) 
         real(prec), intent(INOUT) :: calv(:,:) 
-        real(prec), intent(IN)    :: dt 
-        real(prec), intent(IN)    :: H_min 
+        real(prec), intent(INOUT) :: f_grnd(:,:) 
+        real(prec), intent(IN)    :: dt  
         
         ! Ensure calving is limited to amount of available ice to calve  
-        where((H_ice-dt*calv) .lt. 0.0) calv = H_ice/dt
+        where(f_grnd .eq. 0.0 .and. (H_ice-dt*calv) .lt. 0.0) calv = H_ice/dt
 
         ! Apply modified mass balance to update the ice thickness 
         H_ice = H_ice - dt*calv
-        where (H_ice .le. H_min) H_ice = 0.0 
-
+        
+        ! Also ensure tiny numeric ice thicknesses are removed
+        where (f_grnd .eq. 0.0 .and. H_ice .lt. 1e-5) H_ice = 0.0 
+        
         return 
         
     end subroutine apply_calving

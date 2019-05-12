@@ -139,7 +139,7 @@ contains
                 end select
 
                 ! Apply calving rate, ensure only available ice is deleted 
-                call apply_calving(tpo%now%H_ice,tpo%now%calv,dt_calv,H_min=tpo%par%H_min)
+                call apply_calving(tpo%now%H_ice,tpo%now%calv,tpo%now%f_grnd,dt_calv)
                 
                 ! Updating current calving time 
                 tpo%par%time_calv = time 

@@ -88,7 +88,7 @@ contains
         H_ice = H_ice + dt*mb_applied
 
         ! Limit grounded ice thickess to minimum at the margin
-        call limit_grounded_margin_thickness(H_ice,mb_applied,f_grnd,H_min) 
+        call limit_grounded_margin_thickness(H_ice,mb_applied,f_grnd,H_min,dt) 
 
         ! Also ensure tiny numeric ice thicknesses are removed
         where (H_ice .lt. 1e-5) H_ice = 0.0 
@@ -453,7 +453,7 @@ contains
 
     end subroutine calc_adv2D_impl_upwind
 
-    subroutine limit_grounded_margin_thickness(H_ice,mb_applied,f_grnd,H_min)
+    subroutine limit_grounded_margin_thickness(H_ice,mb_applied,f_grnd,H_min,dt)
 
         implicit none 
 
@@ -461,6 +461,7 @@ contains
         real(prec), intent(INOUT) :: mb_applied(:,:) 
         real(prec), intent(IN)    :: f_grnd(:,:) 
         real(prec), intent(IN)    :: H_min
+        real(prec), intent(IN)    :: dt
         
         ! Local variables 
         integer :: i, j, nx, ny 
@@ -480,11 +481,11 @@ contains
             ! If grounded margin point is too thin, impose ablation to set ice thickness to zero
             if (is_margin .and. H_ice(i,j) .lt. H_min) then 
 
-                ! Check if all neighbors are pretty thin too
+                ! Check if any neighbor is pretty thick too
                 H_max_neighbor = maxval([H_ice(i-1,j),H_ice(i+1,j),H_ice(i,j-1),H_ice(i,j+1)])
 
-                if (H_max_neighbor .gt. 10.0*H_min) then 
-                    mb_applied(i,j) = mb_applied(i,j) - H_ice(i,j) 
+                if (H_max_neighbor .ge. 10.0*H_min) then 
+                    mb_applied(i,j) = mb_applied(i,j) - H_ice(i,j)/dt
                     H_ice(i,j)      = 0.0 
                 end if
 

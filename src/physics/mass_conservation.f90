@@ -88,7 +88,8 @@ contains
         H_ice = H_ice + dt*mb_applied
 
         ! Limit grounded ice thickess to minimum at the margin
-        call limit_grounded_margin_thickness(H_ice,mb_applied,f_grnd,H_min,dt) 
+        !call limit_grounded_margin_thickness(H_ice,mb_applied,f_grnd,H_min,dt) 
+        call limit_grounded_margin_thickness_flux(H_ice,mb_applied,f_grnd,mbal,ux,uy,dx,dt,H_min)
 
         ! Also ensure tiny numeric ice thicknesses are removed
         where (H_ice .lt. 1e-5) H_ice = 0.0 
@@ -498,4 +499,125 @@ contains
 
     end subroutine limit_grounded_margin_thickness
 
+    subroutine limit_grounded_margin_thickness_flux(H_ice,mb_applied,f_grnd,mbal,ux_bar,uy_bar,dx,dt,H_min)
+        ! Calculate the calving rate [m/a] based on a simple threshold rule
+        ! H_ice < H_min
+
+        implicit none 
+
+        real(prec), intent(INOUT) :: H_ice(:,:)                ! [m] Ice thickness 
+        real(prec), intent(INOUT) :: mb_applied(:,:) 
+        real(prec), intent(IN) :: f_grnd(:,:)               ! [-] Grounded fraction
+        real(prec), intent(IN) :: mbal(:,:)                 ! [m/a] Net mass balance 
+        real(prec), intent(IN) :: ux_bar(:,:)               ! [m/a] velocity, x-direction (ac-nodes)
+        real(prec), intent(IN) :: uy_bar(:,:)               ! [m/a] velocity, y-direction (ac-nodes)
+        real(prec), intent(IN) :: dx, dt 
+        real(prec), intent(IN) :: H_min                    ! [m] Threshold for calving
+
+        ! Local variables 
+        integer :: i, j, nx, ny
+        real(prec) :: eps_xx, eps_yy  
+        logical :: test_mij, test_pij, test_imj, test_ipj
+        logical :: positive_mb 
+        real(prec), allocatable :: dHdt(:,:), Hdiff(:,:), Hfrac(:,:) 
+        real(prec), allocatable :: f_ice(:,:)                ! [-] Ice area fraction
+        integer :: n_free
+
+        nx = size(H_ice,1)
+        ny = size(H_ice,2)
+
+        allocate(dHdt(nx,ny))
+        allocate(Hdiff(nx,ny))
+        allocate(Hfrac(nx,ny))
+        allocate(f_ice(nx,ny))
+
+        ! Local representation of f_ice (binary) - improve in future
+        f_ice = 0.0
+        where(H_ice .gt. 0.0) f_ice = 1.0 
+
+        ! Determine ice thickness accounting for fraction  
+        where (H_ice .gt. 1.0 .and. f_ice .gt. 0.0) 
+            Hfrac = H_ice / f_ice 
+        elsewhere 
+            Hfrac = 0.0
+        end where 
+
+        ! Ice thickness above threshold
+        Hdiff = Hfrac - H_min
+
+        ! Diagnosed lagrangian rate of change
+        dHdt = 0.0 
+
+        do j = 2, ny
+        do i = 2, nx
+        
+                ! Calculate strain rate locally (Aa node)
+                ! Note: dx should probably account for f_ice somehow,  
+                ! but this would only a minor adjustment
+                eps_xx = (ux_bar(i,j) - ux_bar(i-1,j))/dx
+                eps_yy = (uy_bar(i,j) - uy_bar(i,j-1))/dx
+
+                ! Calculate thickness change via conservation
+                dHdt(i,j) = mbal(i,j) - Hfrac(i,j)*(eps_xx+eps_yy)
+
+        end do 
+        end do
+        
+        do j = 2, ny-1
+        do i = 2, nx-1
+
+            ! Determine how many ice-free points are bordering grounded ice point
+
+            if (f_grnd(i,j) .gt. 0.0 .and. f_ice(i,j) .gt. 0.0) then
+                ! Grounded ice-covered point
+
+                n_free = count([f_ice(i-1,j).eq.0.0, &
+                                f_ice(i+1,j).eq.0.0, &
+                                f_ice(i,j-1).eq.0.0, &
+                                f_ice(i,j+1).eq.0.0])
+
+            else
+                ! No ice-free points bordering point 
+
+                n_free = 0 
+
+            end if
+
+            if (n_free .gt. 0 .and. Hdiff(i,j).le.0.0) then 
+                ! Check if current point is at the margin,
+                ! and has thickness less than threshold, or if
+                ! ice below H_min limit, accounting for mass flux from inland
+
+                positive_mb = (mbal(i,j).gt.0.0)
+
+                test_mij = ( ((Hdiff(i-1,j).gt.0.0).and.(ux_bar(i,j).ge.0.0)  &  ! neighbor (i-1,j) total > hcoup
+                    .and.  (dHdt(i-1,j).gt.(-Hdiff(i-1,j)*abs(ux_bar(i-1,j)/dx)))) & 
+                    .or.(f_grnd(i-1,j).gt.0.0.and.positive_mb )) !
+
+                test_pij = ( ((Hdiff(i+1,j).gt.0.0).and.(ux_bar(i+1,j).le.0.0) & ! neighbor (i+1,j) total > hcoup
+                    .and.(dHdt(i+1,j).gt.(-Hdiff(i+1,j)*abs(ux_bar(i+1,j)/dx)))) &
+                    .or.(f_grnd(i+1,j).gt.0.0.and.positive_mb) ) !
+
+                test_imj = ( ((Hdiff(i,j-1).gt.0.0).and.(uy_bar(i,j).ge.0.0)  &  ! neighbor (i,j-1) total > hcoup
+                    .and.(dHdt(i,j-1).gt.(-Hdiff(i,j-1)*abs(uy_bar(i,j-1)/dx))))&
+                    .or.(f_grnd(i,j-1).gt.0.0.and.positive_mb ) ) !
+
+                test_ipj = ( ((Hdiff(i,j+1).gt.0.0).and.(uy_bar(i,j+1).le.0.0) & ! neighbor (i,j+1) total > hcoup
+                    .and.(dHdt(i,j+1).gt.(-Hdiff(i,j+1)*abs(uy_bar(i,j+1)/dx))))&
+                    .or.(f_grnd(i,j+1).gt.0.0.and.positive_mb ) ) !
+
+                if ((.not.(test_mij.or.test_pij.or.test_imj.or.test_ipj))) then
+                    mb_applied(i,j) = mb_applied(i,j) - Hfrac(i,j) / dt    
+                    H_ice(i,j)      = 0.0          
+                end if  
+
+            end if
+
+        end do
+        end do
+
+        return 
+
+    end subroutine limit_grounded_margin_thickness_flux
+    
 end module mass_conservation

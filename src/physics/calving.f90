@@ -19,7 +19,7 @@ contains
     subroutine apply_calving(H_ice,calv,f_grnd,dt)
 
         implicit none 
-
+        
         real(prec), intent(INOUT) :: H_ice(:,:) 
         real(prec), intent(INOUT) :: calv(:,:) 
         real(prec), intent(INOUT) :: f_grnd(:,:) 

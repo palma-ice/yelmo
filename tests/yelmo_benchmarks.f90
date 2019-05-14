@@ -32,7 +32,7 @@ program yelmo_benchmarks
     integer    :: nx  
 
     real(4) :: start, finish
-
+    
     ! Start timing 
     call cpu_time(start)
 
@@ -289,7 +289,7 @@ program yelmo_benchmarks
         yelmo1%dyn%par%solver = "fixed"
     end if 
 
-    
+
     ! Advance timesteps
     do n = 1, ceiling((time_end-time_init)/dtt)
 
@@ -344,12 +344,12 @@ program yelmo_benchmarks
         end select 
 
         ! == MODEL OUTPUT =======================================================
-        if (mod(time,dt2D_out)==0) then
+        if (mod(nint(time*100),nint(dt2D_out*100))==0) then 
             call write_step_2D(yelmo1,file2D,time=time) 
             call write_step_2D_bueler(yelmo1,buel,file_compare,time)   
         end if 
 
-        if (mod(time,dt1D_out)==0) then 
+        if (mod(nint(time*100),nint(dt1D_out*100))==0) then 
             call write_yreg_step(yelmo1%reg,file1D,time=time) 
         end if 
 

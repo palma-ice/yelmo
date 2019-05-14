@@ -479,19 +479,26 @@ contains
             is_margin = (H_ice(i,j) .gt. 0.0 .and. f_grnd(i,j) .gt. 0.0 &
                 .and. minval([H_ice(i-1,j),H_ice(i+1,j),H_ice(i,j-1),H_ice(i,j+1)]) .eq. 0.0)
 
-            ! If grounded margin point is too thin, impose ablation to set ice thickness to zero
-            if (is_margin .and. H_ice(i,j) .lt. H_min) then 
+!             ! If grounded margin point is too thin, impose ablation to set ice thickness to zero
+!             if (is_margin .and. H_ice(i,j) .lt. H_min) then 
 
-                ! Check if any neighbor is pretty thick too
-                H_max_neighbor = maxval([H_ice(i-1,j),H_ice(i+1,j),H_ice(i,j-1),H_ice(i,j+1)])
+!                 ! Check if any neighbor is pretty thick too
+!                 H_max_neighbor = maxval([H_ice(i-1,j),H_ice(i+1,j),H_ice(i,j-1),H_ice(i,j+1)])
 
-                if (H_max_neighbor .ge. 10.0*H_min) then 
-                    mb_applied(i,j) = mb_applied(i,j) - H_ice(i,j)/dt
-                    H_ice(i,j)      = 0.0 
-                end if
+!                 if (H_max_neighbor .ge. 10.0*H_min) then 
+!                     mb_applied(i,j) = mb_applied(i,j) - H_ice(i,j)/dt
+!                     H_ice(i,j)      = 0.0 
+!                 end if
 
-            end if 
+!             end if 
 
+            ! If grounded margin point is too thin and mass balance not positive, 
+            ! impose ablation to set ice thickness to zero
+            if (is_margin .and. H_ice(i,j) .lt. H_min .and. mb_applied(i,j) .le. 0.0) then 
+                mb_applied(i,j) = mb_applied(i,j) - H_ice(i,j)/dt
+                H_ice(i,j)      = 0.0 
+            end if
+            
         end do 
         end do 
 
@@ -590,24 +597,24 @@ contains
 
                 positive_mb = (mbal(i,j).gt.0.0)
 
-                test_mij = ( ((Hdiff(i-1,j).gt.0.0).and.(ux(i,j).ge.0.0)  &  ! neighbor (i-1,j) total > hcoup
+                test_mij = ( ((Hdiff(i-1,j).gt.0.0).and.(ux(i,j).ge.0.0)  &  ! neighbor (i-1,j) total > H_min
                     .and.  (dHdt(i-1,j).gt.(-Hdiff(i-1,j)*abs(ux(i-1,j)/dx)))) & 
-                    .or.(f_grnd(i-1,j).gt.0.0.and.positive_mb )) !
+                    .or.(f_grnd(i-1,j).gt.0.0.and.positive_mb) ) !
 
-                test_pij = ( ((Hdiff(i+1,j).gt.0.0).and.(ux(i,j).le.0.0) & ! neighbor (i+1,j) total > hcoup
+                test_pij = ( ((Hdiff(i+1,j).gt.0.0).and.(ux(i,j).le.0.0) & ! neighbor (i+1,j) total > H_min
                     .and.(dHdt(i+1,j).gt.(-Hdiff(i+1,j)*abs(ux(i,j)/dx)))) &
                     .or.(f_grnd(i+1,j).gt.0.0.and.positive_mb) ) !
 
-                test_imj = ( ((Hdiff(i,j-1).gt.0.0).and.(uy(i,j).ge.0.0)  &  ! neighbor (i,j-1) total > hcoup
+                test_imj = ( ((Hdiff(i,j-1).gt.0.0).and.(uy(i,j).ge.0.0)  &  ! neighbor (i,j-1) total > H_min
                     .and.(dHdt(i,j-1).gt.(-Hdiff(i,j-1)*abs(uy(i,j-1)/dx))))&
-                    .or.(f_grnd(i,j-1).gt.0.0.and.positive_mb ) ) !
+                    .or.(f_grnd(i,j-1).gt.0.0.and.positive_mb) ) !
 
-                test_ipj = ( ((Hdiff(i,j+1).gt.0.0).and.(uy(i,j).le.0.0) & ! neighbor (i,j+1) total > hcoup
+                test_ipj = ( ((Hdiff(i,j+1).gt.0.0).and.(uy(i,j).le.0.0) & ! neighbor (i,j+1) total > H_min
                     .and.(dHdt(i,j+1).gt.(-Hdiff(i,j+1)*abs(uy(i,j)/dx))))&
-                    .or.(f_grnd(i,j+1).gt.0.0.and.positive_mb ) ) !
+                    .or.(f_grnd(i,j+1).gt.0.0.and.positive_mb) ) !
 
                 if ((.not.(test_mij.or.test_pij.or.test_imj.or.test_ipj))) then
-                    mb_applied(i,j) = mb_applied(i,j) - Hfrac(i,j) / dt    
+                    mb_applied(i,j) = mb_applied(i,j) - H_ice(i,j) / dt    
                     H_ice(i,j)      = 0.0          
                 end if  
 

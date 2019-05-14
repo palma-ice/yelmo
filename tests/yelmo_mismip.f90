@@ -228,11 +228,11 @@ program yelmo_mismip
                 yelmo1%grd%x*1e-3,yelmo1%grd%y*1e-3,x_gl=x_gl_stnd,experiment=exp_now)
 
         ! == MODEL OUTPUT =======================================================
-        if (mod(time,dt2D_out)==0) then  
+        if (mod(nint(time*100),nint(dt2D_out*100))==0) then  
             call write_step_2D(yelmo1,file2D,time=time,x_gl=x_gl)    
         end if 
 
-        if (mod(time,5.0*dtt)==0) then
+        if (mod(nint(time*100),nint((5.0*dtt)*100))==0) then
             write(*,"(a,2f14.4,a10,g14.3,f10.2)") "time = ",  &
                 time, maxval(yelmo1%tpo%now%H_ice), trim(exp_now), yelmo1%mat%par%rf_const, x_gl 
         end if 

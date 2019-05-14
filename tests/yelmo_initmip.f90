@@ -20,7 +20,7 @@ program yelmo_test
 
     ! Concavity field 
     real(prec), allocatable :: channels(:,:) 
-
+    
     ! Start timing 
     call cpu_time(cpu_start_time)
 
@@ -142,11 +142,11 @@ program yelmo_test
 
         ! == MODEL OUTPUT =======================================================
 
-        if (mod(time,dt2D_out)==0) then 
+        if (mod(nint(time*100),nint(dt2D_out*100))==0) then
             call write_step_2D(yelmo1,file2D,time=time)
         end if 
 
-        if (mod(time,dt1D_out)==0) then 
+        if (mod(nint(time*100),nint(dt1D_out*100))==0) then 
             call write_yreg_step(yelmo1%reg,file1D,time=time) 
         end if 
 

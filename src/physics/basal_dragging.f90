@@ -156,17 +156,16 @@ contains
         integer    :: i, j, nx, ny
         integer    :: i1, i2, j1, j2 
         real(prec) :: ux_b_mid, uy_b_mid, uxy_b
-        real(prec) :: exp1, exp2
+        real(prec) :: exp1
         real(prec) :: C_bed_ac 
 
-        real(prec), parameter :: u_b_min    = 1e-3_prec  ! [m/a] Minimum velocity is positive small value
+        real(prec), parameter :: u_b_min    = 1e-3_prec  ! [m/a] Minimum velocity is positive small value to avoid divide by zero
 
         nx = size(beta,1)
         ny = size(beta,2)
         
         ! Pre-define exponents
-        exp1 = 1.0_prec/m_drag
-        exp2 = (1.0_prec-m_drag)/m_drag
+        exp1 = (1.0_prec/m_drag - 1.0_prec) 
         
         ! Initially set friction to zero everywhere
         beta = 0.0_prec 
@@ -181,14 +180,14 @@ contains
             ! Calculate magnitude of basal velocity on aa-node 
             ux_b_mid  = 0.5_prec*(ux_b(i1,j)+ux_b(i,j))
             uy_b_mid  = 0.5_prec*(uy_b(i,j1)+uy_b(i,j))
-            uxy_b     = (ux_b_mid**2 + uy_b_mid**2 + u_b_min**2)**0.5
+            uxy_b     = (ux_b_mid**2 + uy_b_mid**2 + u_b_min**2)**0.5_prec
 
-            ! Nonlinear beta as a function of basal velocity (unless m==1)
-            if (uxy_b .eq. 0.0) then 
-                beta(i,j) = C_bed(i,j)**exp1
+            ! Nonlinear beta as a function of basal velocity (unless m==1) 
+            if (m_drag .eq. 1.0_prec) then 
+                beta(i,j) = C_bed(i,j) 
             else 
-                beta(i,j) = C_bed(i,j)**exp1 * uxy_b**exp2 
-            end if  
+                beta(i,j) = C_bed(i,j) * uxy_b**exp1
+            end if 
 
         end do
         end do
@@ -222,13 +221,13 @@ contains
         real(prec) :: exp1, exp2
         real(prec) :: C_bed_ac 
 
-        real(prec), parameter :: u_b_min    = 1e-3_prec  ! [m/a] Minimum velocity is positive small value
+        real(prec), parameter :: u_b_min    = 1e-3_prec  ! [m/a] Minimum velocity is positive small value to avoid divide by zero
 
         nx = size(beta,1)
         ny = size(beta,2)
         
         ! Pre-define exponents
-        exp2 = 1.0/m_drag
+        exp1 = 1.0_prec/m_drag
         
         ! Initially set friction to zero everywhere
         beta = 0.0_prec 
@@ -243,14 +242,10 @@ contains
             ! Calculate magnitude of basal velocity on aa-node 
             ux_b_mid  = 0.5_prec*(ux_b(i1,j)+ux_b(i,j))
             uy_b_mid  = 0.5_prec*(uy_b(i,j1)+uy_b(i,j))
-            uxy_b     = (ux_b_mid**2 + uy_b_mid**2 + u_b_min**2)**0.5
+            uxy_b     = (ux_b_mid**2 + uy_b_mid**2 + u_b_min**2)**0.5_prec
 
             ! Nonlinear beta as a function of basal velocity (unless m==1)
-            if (uxy_b .eq. 0.0) then 
-                beta(i,j) = C_bed(i,j)
-            else 
-                beta(i,j) = C_bed(i,j) * (uxy_b / (uxy_b+u_0))**exp2 * uxy_b**(-1) 
-            end if  
+            beta(i,j) = C_bed(i,j) * (uxy_b / (uxy_b+u_0))**exp1 * uxy_b**(-1.0_prec)
 
         end do
         end do

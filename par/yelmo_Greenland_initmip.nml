@@ -55,7 +55,7 @@
     calc_diffusivity    = False           ! Calculate 2D diffusivity term for diagnostics
     m_drag              = 1.0             ! Dragging law exponent 
     beta_max            = 1e5             ! [Pa a m-1] Maximum value of beta for which ssa should be calculated 
-    beta_method         = 2               ! 0: constant beta; 1: power law; 2: effective pressure
+    beta_method         = 2               ! 0: constant beta; 1: powerlaw; 2: powerlaw+N_eff; 3: coulomb+N_eff
     beta_gl_sep         = -1              !  -1: Apply subgrid treatment on ac-nodes (beta_gl_stag=2) 0: No subgrid treatment, 1: beta*f_grnd_aa        
     beta_gl_scale       = 1               !  0: No scaling, 1: beta*f_beta_gl, 2: H_grnd linear scaling, 3: Zstar scaling 
     beta_gl_stag        = 2               !  0: simple staggering, 1: Upstream beta at gl, 2: f_grnd_ac scaling 
@@ -66,7 +66,7 @@
     H_grnd_lim          = 500.0           ! [m] For beta_sep_method=2, reduce beta linearly between H_grnd=0 and H_grnd_lim 
     H_sed_sat           = 250.0           ! [m] Sediment thickness at which sediment effect is saturated
     cf_frozen           = 100.0           ! [a m-1] Bed roughness coefficient, frozen 
-    cf_stream           =  50.0           ! [a m-1] Bed roughness coefficient, stream  
+    cf_stream           = 100.0           ! [a m-1] Bed roughness coefficient, stream  
     cf_fac_sed          = 1.0             ! [-] Scaling of roughness for sediments 
     cf_sia              = 0.0             ! [m a-1 Pa-1] Bed roughness coefficient for SIA sliding
     streaming_margin    = True            ! Impose cf_stream at the margin and grline independent of f_pmp

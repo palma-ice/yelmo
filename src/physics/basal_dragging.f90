@@ -24,6 +24,7 @@ module basal_dragging
     ! Beta functions (aa-nodes)
     public :: calc_beta_aa_linear
     public :: calc_beta_aa_power
+    public :: calc_beta_aa_coulomb
 
     ! Beta scaling functions (aa-nodes)
     public :: scale_beta_aa_Neff
@@ -196,6 +197,68 @@ contains
         
     end subroutine calc_beta_aa_power
     
+    subroutine calc_beta_aa_coulomb(beta,ux_b,uy_b,C_bed,m_drag,u_0)
+        ! Calculate basal friction coefficient (beta) that
+        ! enters the SSA solver as a function of basal velocity
+        ! Pollard and de Conto (2012), inverse of Eq. 10, given in text
+        ! following Eq. 7: beta = c_b**(-1/m)*|u_b|**((1-m)/m)
+        ! Note: Calculated on ac-nodes
+        ! Note: beta should be calculated for bed everywhere, 
+        ! independent of floatation, which is accounted for later
+        
+        implicit none
+        
+        real(prec), intent(OUT) :: beta(:,:)        ! aa-nodes
+        real(prec), intent(IN)  :: ux_b(:,:)        ! ac-nodes
+        real(prec), intent(IN)  :: uy_b(:,:)        ! ac-nodes
+        real(prec), intent(IN)  :: C_bed(:,:)       ! Aa nodes
+        real(prec), intent(IN)  :: m_drag
+        real(prec), intent(IN)  :: u_0
+
+        ! Local variables
+        integer    :: i, j, nx, ny
+        integer    :: i1, i2, j1, j2 
+        real(prec) :: ux_b_mid, uy_b_mid, uxy_b
+        real(prec) :: exp1, exp2
+        real(prec) :: C_bed_ac 
+
+        real(prec), parameter :: u_b_min    = 1e-3_prec  ! [m/a] Minimum velocity is positive small value
+
+        nx = size(beta,1)
+        ny = size(beta,2)
+        
+        ! Pre-define exponents
+        exp2 = 1.0/m_drag
+        
+        ! Initially set friction to zero everywhere
+        beta = 0.0_prec 
+
+        ! x-direction 
+        do j = 1, ny
+        do i = 1, nx
+
+            i1 = max(i-1,1)
+            j1 = max(j-1,1) 
+            
+            ! Calculate magnitude of basal velocity on aa-node 
+            ux_b_mid  = 0.5_prec*(ux_b(i1,j)+ux_b(i,j))
+            uy_b_mid  = 0.5_prec*(uy_b(i,j1)+uy_b(i,j))
+            uxy_b     = (ux_b_mid**2 + uy_b_mid**2 + u_b_min**2)**0.5
+
+            ! Nonlinear beta as a function of basal velocity (unless m==1)
+            if (uxy_b .eq. 0.0) then 
+                beta(i,j) = C_bed(i,j)
+            else 
+                beta(i,j) = C_bed(i,j) * (uxy_b / (uxy_b+u_0))**exp2 * uxy_b**(-1) 
+            end if  
+
+        end do
+        end do
+        
+        return
+        
+    end subroutine calc_beta_aa_coulomb
+
     ! ================================================================================
     !
     ! Scaling functions 

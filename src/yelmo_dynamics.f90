@@ -825,15 +825,24 @@ contains
 
             case(1) 
                 ! Calculate beta from power-law function (eg, MISMIP3D style)
-                ! beta = c_b**(-1/m)*|u_b|**((1-m)/m)
+                ! beta = c_b*|u_b|**((1-m)/m)
                 call calc_beta_aa_power(dyn%now%beta,dyn%now%ux_b,dyn%now%uy_b,dyn%now%C_bed,dyn%par%m_drag)
             
             case(2)
                 ! Calculate beta = c_b*N_eff 
 
                 ! First calculate beta from the linear equation (beta = c_b)
-                call calc_beta_aa_linear(dyn%now%beta,dyn%now%C_bed)
+                !call calc_beta_aa_linear(dyn%now%beta,dyn%now%C_bed)
+                call calc_beta_aa_power(dyn%now%beta,dyn%now%ux_b,dyn%now%uy_b,dyn%now%C_bed,dyn%par%m_drag)
+            
+                ! Additionally scale by N_eff (beta = c_b*N_eff)
+                call scale_beta_aa_Neff(dyn%now%beta,tpo%now%N_eff)
 
+            case(3)
+                ! Calculate beta from regularized Coulomb law (Joughin et al., GRL, 2019)
+
+                call calc_beta_aa_coulomb(dyn%now%beta,dyn%now%ux_b,dyn%now%uy_b,dyn%now%C_bed,dyn%par%m_drag,u_0=300.0)
+                
                 ! Additionally scale by N_eff (beta = c_b*N_eff)
                 call scale_beta_aa_Neff(dyn%now%beta,tpo%now%N_eff)
 

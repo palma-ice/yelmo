@@ -142,6 +142,10 @@ program yelmo_test
 
         ! == MODEL OUTPUT =======================================================
 
+        if (time .ge. -28330.0) then 
+            dt2D_out = dtt 
+        end if 
+        
         if (mod(nint(time*100),nint(dt2D_out*100))==0) then
             call write_step_2D(yelmo1,file2D,time=time)
         end if 
@@ -317,7 +321,7 @@ contains
         call nc_write(filename,"taud_acy",ylmo%dyn%now%taud_acy,units="Pa",long_name="Driving stress (y)", &
                        dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
         
-        
+
         ! Close the netcdf file
         call nc_close(ncid)
 

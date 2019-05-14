@@ -2,11 +2,11 @@
     
     ! Timing parameters 
     time_init    = -30e3                ! [yr] Starting time 
-    time_end     = 0.0                  ! [yr] Ending time
+    time_end     = -28e3                ! [yr] Ending time
     time_equil   = 0.0                  ! [yr] Equiibration time 
     dtt          = 1.0                  ! [yr] Main loop timestep 
     dt1D_out     = 100.0                ! [yr] Frequency of writing 1D output files 
-    dt2D_out     = 1000.0               ! [yr] Frequency of writing 2D output files 
+    dt2D_out     = 100.0                ! [yr] Frequency of writing 2D output files 
 /
 
 &yelmo

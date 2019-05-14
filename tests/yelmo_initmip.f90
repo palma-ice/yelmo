@@ -142,10 +142,10 @@ program yelmo_test
 
         ! == MODEL OUTPUT =======================================================
 
-        if (time .ge. -28330.0) then 
+        if (time .ge. -28450.0) then 
             dt2D_out = dtt 
         end if 
-        
+
         if (mod(nint(time*100),nint(dt2D_out*100))==0) then
             call write_step_2D(yelmo1,file2D,time=time)
         end if 

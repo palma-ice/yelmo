@@ -721,7 +721,7 @@ contains
             write(*,*) 
             write(*,*) 
             write(*,"(a)") "yelmo_check_kill:: Error: model has likely crashed, very high value of H_ice or uxy_bar found."
-            write(*,"(a11,f8.3)")   "timestep = ", time 
+            write(*,"(a11,f15.3)")   "timestep = ", time 
             write(*,"(a16,2g14.4)") "range(H_ice):   ", minval(dom%tpo%now%H_ice), maxval(dom%tpo%now%H_ice)
             write(*,"(a16,2g14.4)") "range(uxy_bar): ", minval(dom%dyn%now%uxy_bar), maxval(dom%dyn%now%uxy_bar)
             write(*,*) 

@@ -20,7 +20,7 @@ program yelmo_test
 
     ! Concavity field 
     real(prec), allocatable :: channels(:,:) 
-    
+
     ! Start timing 
     call cpu_time(cpu_start_time)
 
@@ -59,7 +59,7 @@ program yelmo_test
     yelmo1%bnd%H_w      = 0.0           ! [m]
     yelmo1%bnd%Q_geo    = 50.0          ! [mW/m2]
     
-    yelmo1%bnd%bmb_shlf = -10.0         ! [m.i.e./a]
+    yelmo1%bnd%bmb_shlf = -20.0         ! [m.i.e./a]
     yelmo1%bnd%T_shlf   = T0            ! [K]   
 
     ! Impose present-day surface mass balance and present-day temperature field
@@ -92,8 +92,8 @@ program yelmo_test
     mask_noice = .FALSE. 
     where(yelmo1%dta%pd%H_ice .le. 0.0) mask_noice = .TRUE. 
 
-    ! Impose additional negative mass balance to no ice points 2 [m.i.e./a] melting
-    where(mask_noice) yelmo1%bnd%smb = yelmo1%dta%pd%smb - 2.0 
+    ! Impose additional negative mass balance to no ice points 5 [m.i.e./a] melting
+    where(mask_noice) yelmo1%bnd%smb = yelmo1%dta%pd%smb - 5.0 
 
     ! Impose a colder boundary temperature for equilibration step 
     ! -5 [K] for mimicking glacial times

@@ -88,8 +88,8 @@ contains
         H_ice = H_ice + dt*mb_applied
 
         ! Limit grounded ice thickess to minimum at the margin
-        !call limit_grounded_margin_thickness(H_ice,mb_applied,f_grnd,H_min,dt) 
-        call limit_grounded_margin_thickness_flux(H_ice,mb_applied,f_grnd,mbal,ux,uy,dx,dt,H_min)
+        call limit_grounded_margin_thickness(H_ice,mb_applied,f_grnd,H_min,dt) 
+        !call limit_grounded_margin_thickness_flux(H_ice,mb_applied,f_grnd,mbal,ux,uy,dx,dt,H_min)
 
         ! Also ensure tiny numeric ice thicknesses are removed
         where (H_ice .lt. 1e-5) H_ice = 0.0 

@@ -20,7 +20,7 @@
     nz_aa           = 21                ! Vertical resolution in ice
     dtmin           = 0.01              ! [a] Minimum timestep 
     dtmax           = 1.0               ! [a] Maximum timestep
-    ntt             = 2                 ! [--] Thermodynamics call frequency (how many dynamic timesteps to skip)
+    ntt             = 1                 ! [--] Thermodynamics call frequency (how many dynamic timesteps to skip)
     cfl_max         = 1.0               ! Maximum value is 1.0, lower will be more stable
     cfl_diff_max    = 0.12              ! Bueler et al (2007), Eq. 25 
     
@@ -42,7 +42,7 @@
     topo_fixed_dt     = -1              ! <= 0 for always fixed, positive value to 'unfix' topo after interval
     calv_dt           = 1e-5            ! [a] Calving frequency 
     H_calv            = 200.0 
-    H_min             = 10.0            ! [m] Minimum ice thickness at grounded margin (thinner ice is ablated) - helps with stability
+    H_min             = 1.0             ! [m] Minimum ice thickness at grounded margin (thinner ice is ablated) - helps with stability
     gl_sep            = 1               ! 1: Linear f_grnd_acx/acy and binary f_grnd, 2: area f_grnd, average to acx/acy
     gl_sep_nx         = 15              ! [-] Number of interpolation points (nx*nx) to calculate grounded area at grounding line
     diffuse_bmb_shlf  = False           ! Allow bmb_shlf to permeate inland at the grounding line 

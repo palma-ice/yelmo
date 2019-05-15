@@ -706,7 +706,7 @@ contains
         ! Local variables 
         logical :: kill_it  
         real(prec), parameter :: H_lim = 1e5   ! [m] 
-        real(prec), parameter :: u_lim = 1e6   ! [m/a]
+        real(prec), parameter :: u_lim = 1e5   ! [m/a]
 
         kill_it = .FALSE. 
 

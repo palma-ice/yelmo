@@ -137,7 +137,7 @@ contains
         call nc_write(filename,"ATT",      dom%mat%now%ATT,         units="",dim1="xc",dim2="yc",dim3="zeta",ncid=ncid)
         call nc_write(filename,"ATT_bar",  dom%mat%now%ATT_bar,     units="",dim1="xc",dim2="yc",ncid=ncid)
         call nc_write(filename,"visc",     dom%mat%now%visc,        units="",dim1="xc",dim2="yc",dim3="zeta",ncid=ncid)
-        call nc_write(filename,"visc_bar", dom%mat%now%visc_bar,    units="",dim1="xc",dim2="yc",ncid=ncid)
+        call nc_write(filename,"visc_int", dom%mat%now%visc_int,    units="",dim1="xc",dim2="yc",ncid=ncid)
         
         ! == ytherm variables ===
         call nc_write(filename,"T_ice",     dom%thrm%now%T_ice,     units="",dim1="xc",dim2="yc",dim3="zeta",ncid=ncid)
@@ -304,7 +304,7 @@ contains
         call nc_read(filename,"ATT",      dom%mat%now%ATT,            ncid=ncid)
         call nc_read(filename,"ATT_bar",  dom%mat%now%ATT_bar,        ncid=ncid)
         call nc_read(filename,"visc",     dom%mat%now%visc,           ncid=ncid)
-        call nc_read(filename,"visc_bar", dom%mat%now%visc_bar,       ncid=ncid)
+        call nc_read(filename,"visc_int", dom%mat%now%visc_int,       ncid=ncid)
         
         ! == ytherm variables ===
         call nc_read(filename,"T_ice",     dom%thrm%now%T_ice,        ncid=ncid)

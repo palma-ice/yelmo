@@ -1501,15 +1501,15 @@ contains
         call nc_write(filename,"ssa_mask_acy",dyn%now%ssa_mask_acy,units="1",long_name="SSA mask (acy)", &
                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
 
-        call nc_write(filename,"C_bed",dyn%now%C_bed,units="m a^-1 Pa^-2",long_name="Dragging constant", &
+        call nc_write(filename,"C_bed",dyn%now%C_bed,units="",long_name="Dragging constant", &
                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-        call nc_write(filename,"beta",dyn%now%beta,units="Pa m^3 a^-3",long_name="Dragging coefficient", &
+        call nc_write(filename,"beta",dyn%now%beta,units="Pa a m^-1",long_name="Dragging coefficient", &
                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-        call nc_write(filename,"beta_acx",dyn%now%beta_acx,units="Pa m^3 a^-3",long_name="Dragging coefficient (acx)", &
+        call nc_write(filename,"beta_acx",dyn%now%beta_acx,units="Pa a m^-1",long_name="Dragging coefficient (acx)", &
                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-        call nc_write(filename,"beta_acy",dyn%now%beta_acy,units="Pa m^3 a^-3",long_name="Dragging coefficient (acy)", &
+        call nc_write(filename,"beta_acy",dyn%now%beta_acy,units="Pa a m^-1",long_name="Dragging coefficient (acy)", &
                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-        call nc_write(filename,"dyn_visc_eff",dyn%now%visc_eff,units="Pa a^-1",long_name="Vertically averaged viscosity", &
+        call nc_write(filename,"dyn_visc_eff",dyn%now%visc_eff,units="Pa a",long_name="Vertically averaged viscosity", &
                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
 
         call nc_write(filename,"taud_acx",dyn%now%taud_acx,units="Pa",long_name="Driving stress, x-direction", &

@@ -1,7 +1,7 @@
 module solver_ssa_sico5
     ! This ssa solver code was adapted from SICOPOLIS (v5-dev, svn revision 1421) module calc_vxy_m.F90. 
     
-    use yelmo_defs, only : sp, dp, prec, rho_ice, rho_sw, g
+    use yelmo_defs, only : sp, dp, prec, rho_ice, rho_sw, g 
 
     implicit none 
 
@@ -24,14 +24,14 @@ contains
         real(prec), intent(INOUT) :: vy_m(:,:)
         real(prec), intent(IN)    :: vx_bnd(:,:) 
         real(prec), intent(IN)    :: vy_bnd(:,:) 
-        real(prec), intent(IN)    :: beta_acx(:,:)
-        real(prec), intent(IN)    :: beta_acy(:,:)
-        real(prec), intent(IN)    :: visc_eff(:,:)
+        real(prec), intent(IN)    :: beta_acx(:,:)        ! [Pa a m^-1] Basal friction
+        real(prec), intent(IN)    :: beta_acy(:,:)        ! [Pa a m^-1] Basal friction
+        real(prec), intent(IN)    :: visc_eff(:,:)        ! [Pa a m] Vertically integrated viscosity
         integer,    intent(IN)    :: ssa_mask_acx(:,:) 
         integer,    intent(IN)    :: ssa_mask_acy(:,:) 
         real(prec), intent(IN)    :: H_ice(:,:)
-        real(prec), intent(IN)    :: taud_acx(:,:)
-        real(prec), intent(IN)    :: taud_acy(:,:)   
+        real(prec), intent(IN)    :: taud_acx(:,:)        ! [Pa] Driving stress (acx nodes)
+        real(prec), intent(IN)    :: taud_acy(:,:)        ! [Pa] Driving stress (acy nodes)
         real(prec), intent(IN)    :: H_grnd(:,:)  
         real(prec), intent(IN)    :: z_sl(:,:) 
         real(prec), intent(IN)    :: z_bed(:,:) 
@@ -50,7 +50,7 @@ contains
         integer    :: i1, j1, i00, j00
         real(prec) :: inv_dxi, inv_deta, inv_dxi_deta, inv_dxi2, inv_deta2
         real(prec) :: factor_rhs_2, factor_rhs_3a, factor_rhs_3b
-        real(prec) :: rho_sw_ice, H_ice_now, beta_now, taud_now, H_ocn_now   
+        real(prec) :: rho_sw_ice, H_ice_now, beta_now, taud_now, H_ocn_now    
         character(len=256) :: ch_solver_set_option
         integer    :: IMAX, JMAX 
 
@@ -61,10 +61,10 @@ contains
         !logical, allocatable    :: flag_grounded_front_a_2(:,:) 
         logical, allocatable    :: flag_grounded_front_b_1(:,:) 
         logical, allocatable    :: flag_grounded_front_b_2(:,:) 
-        logical, allocatable    :: flag_grounding_line_1(:,:) 
-        logical, allocatable    :: flag_grounding_line_2(:,:) 
-        logical, allocatable    :: flag_ice_front_1(:,:)
-        logical, allocatable    :: flag_ice_front_2(:,:)  
+        logical, allocatable    :: is_grline_1(:,:) 
+        logical, allocatable    :: is_grline_2(:,:) 
+        logical, allocatable    :: is_front_1(:,:)
+        logical, allocatable    :: is_front_2(:,:)  
         real(prec), allocatable :: vis_int_g(:,:) 
         real(prec), allocatable :: vis_int_sgxy(:,:) 
         real(prec), allocatable :: H_ice_1(:,:) 
@@ -99,10 +99,10 @@ contains
         allocate(ij2n(nx,ny))
 
         allocate(maske(nx,ny))
-        allocate(flag_grounding_line_1(nx,ny))
-        allocate(flag_grounding_line_2(nx,ny))
-        allocate(flag_ice_front_1(nx,ny))
-        allocate(flag_ice_front_2(nx,ny))
+        allocate(is_grline_1(nx,ny))
+        allocate(is_grline_2(nx,ny))
+        allocate(is_front_1(nx,ny))
+        allocate(is_front_2(nx,ny))
         
         allocate(vis_int_g(nx,ny))
         allocate(vis_int_sgxy(nx,ny))
@@ -132,20 +132,18 @@ contains
         inv_dxi2      = 1.0_prec/(dxi*dxi)
         inv_deta2     = 1.0_prec/(deta*deta)
 
-        factor_rhs_2  = 0.5_prec*rho_ice*G*(rho_sw-rho_ice)/rho_sw
-        factor_rhs_3a = 0.5_prec*rho_ice*G
-        factor_rhs_3b = 0.5_prec*rho_sw*G
+        factor_rhs_2  = 0.5_prec*rho_ice*g*(rho_sw-rho_ice)/rho_sw
+        factor_rhs_3a = 0.5_prec*rho_ice*g
+        factor_rhs_3b = 0.5_prec*rho_sw*g
 
         ! Set maske and grounding line / calving front flags
 
-!         call set_sico_masks(maske,flag_ice_front_1,flag_ice_front_2, &
-!                     flag_grounding_line_1,flag_grounding_line_2, H_ice_1, H_grnd)
-        call set_sico_masks_old(maske,flag_ice_front_1,flag_ice_front_2, &
-                    flag_grounding_line_1,flag_grounding_line_2, H_ice_1, H_grnd)
+!         call set_sico_masks(maske,is_front_1,is_front_2,is_grline_1,is_grline_2, H_ice_1, H_grnd)
+        call set_sico_masks_old(maske,is_front_1,is_front_2,is_grline_1,is_grline_2, H_ice_1, H_grnd)
 
         gfa1 = maske
-        gfb1 = flag_ice_front_1
-        gfb2 = flag_ice_front_2
+        gfb1 = is_front_1
+        gfb2 = is_front_2
         
         !-------- Depth-integrated viscosity on the staggered grid
         !                                       [at (i+1/2,j+1/2)] --------
@@ -239,22 +237,22 @@ do n=1, nmax-1, 2
       else if (ssa_mask_acx(i,j) .gt. 0) then 
 
         if ( &
-              ( flag_ice_front_1(i,j).and.flag_ice_front_2(i+1,j) ) &
+              ( is_front_1(i,j).and.is_front_2(i+1,j) ) &
               .or. &
-              ( flag_ice_front_2(i,j).and.flag_ice_front_1(i+1,j) ) &
+              ( is_front_2(i,j).and.is_front_1(i+1,j) ) &
             ) then
             ! one neighbour is floating ice and the other is ocean
             ! (calving front)
 
-           if (flag_ice_front_1(i,j)) then
-              i1 = i     ! floating ice marker
-           else   ! flag_ice_front_1(i+1,j)==.true.
-              i1 = i+1   ! floating ice marker
+           if (is_front_1(i,j)) then
+              i1 = i     ! ice-front marker
+           else   ! is_front_1(i+1,j)==.true.
+              i1 = i+1   ! ice-front marker 
            end if
 
-           if (.not.( flag_ice_front_2(i1-1,j) &
+           if (.not.( is_front_2(i1-1,j) &
                       .and. &
-                      flag_ice_front_2(i1+1,j) ) ) then
+                      is_front_2(i1+1,j) ) ) then
               ! discretization of the x-component of the BC
 
               nc = 2*ij2n(i1-1,j)-1
@@ -289,7 +287,7 @@ do n=1, nmax-1, 2
               if (z_sl(i1,j)-z_bed(i1,j) .gt. 0.0) then 
                 ! Bed below sea level 
                   H_ocn_now = min(rho_ice/rho_sw*H_ice_1(i1,j), &    ! Flotation depth 
-                                  z_sl(i1,j)-z_bed(i1,j))          ! Grounded depth 
+                                  z_sl(i1,j)-z_bed(i1,j))            ! Grounded depth 
 
               else 
                 ! Bed above sea level 
@@ -300,15 +298,19 @@ do n=1, nmax-1, 2
                lgs_b_value(nr) = factor_rhs_3a*H_ice_1(i1,j)*H_ice_1(i1,j) &
                                - factor_rhs_3b*H_ocn_now*H_ocn_now
 
-              !write(*,*) "ssaxc:", H_ice_1(i1,j), H_ocn_now, H_ocn_now/H_ice_1(i1,j)
+!               if (abs(vx_m(i,j)) .gt. 4e3) then 
+!                 write(*,*) "ssaxcf:", H_ice_1(i1,j), H_ocn_now/H_ice_1(i1,j), vx_m(i,j), vis_int_g(i1,j)
+!               else if (abs(vx_m(i,j)) .lt. 0.5e3) then 
+!                 write(*,*) "ssaxcs:", H_ice_1(i1,j), H_ocn_now/H_ice_1(i1,j), vx_m(i,j), vis_int_g(i1,j)
+!               end if 
 
               ! =========================================================
               
 
               lgs_x_value(nr) = vx_m(i,j)
 
-           else   !      (flag_ice_front_2(i1-1,j)==.true.)
-                  ! .and.(flag_ice_front_2(i1+1,j)==.true.);
+           else   !      (is_front_2(i1-1,j)==.true.)
+                  ! .and.(is_front_2(i1+1,j)==.true.);
                   ! velocity assumed to be zero
 
               k  = k+1
@@ -528,22 +530,22 @@ do n=1, nmax-1, 2
       else if ( ssa_mask_acy(i,j) .gt. 0 ) then 
           
         if ( &
-              ( flag_ice_front_1(i,j).and.flag_ice_front_2(i,j+1) ) &
+              ( is_front_1(i,j).and.is_front_2(i,j+1) ) &
               .or. &
-              ( flag_ice_front_2(i,j).and.flag_ice_front_1(i,j+1) ) &
+              ( is_front_2(i,j).and.is_front_1(i,j+1) ) &
             ) then
             ! one neighbour is floating ice and the other is ocean
             ! (calving front)
 
-         if (flag_ice_front_1(i,j)) then
-            j1 = j     ! floating ice marker
-         else   ! flag_ice_front_1(i,j+1)==.true.
-            j1 = j+1   ! floating ice marker
+         if (is_front_1(i,j)) then
+            j1 = j     ! ice-front marker
+         else   ! is_front_1(i,j+1)==.true.
+            j1 = j+1   ! ice-front marker
          end if
 
-         if (.not.( flag_ice_front_2(i,j1-1) &
+         if (.not.( is_front_2(i,j1-1) &
                     .and. &
-                    flag_ice_front_2(i,j1+1) ) ) then
+                    is_front_2(i,j1+1) ) ) then
             ! discretization of the y-component of the BC
 
             nc = 2*ij2n(i-1,j1)-1
@@ -578,7 +580,7 @@ do n=1, nmax-1, 2
               if (z_sl(i,j1)-z_bed(i,j1) .gt. 0.0) then 
                 ! Bed below sea level 
                   H_ocn_now = min(rho_ice/rho_sw*H_ice_1(i,j1), &    ! Flotation depth 
-                                  z_sl(i,j1)-z_bed(i,j1))          ! Grounded depth 
+                                  z_sl(i,j1)-z_bed(i,j1))            ! Grounded depth 
 
               else 
                 ! Bed above sea level 
@@ -594,8 +596,8 @@ do n=1, nmax-1, 2
               
             lgs_x_value(nr) = vy_m(i,j)
 
-         else   !      (flag_ice_front_2(i,j1-1)==.true.)
-                ! .and.(flag_ice_front_2(i,j1+1)==.true.);
+         else   !      (is_front_2(i,j1-1)==.true.)
+                ! .and.(is_front_2(i,j1+1)==.true.);
                 ! velocity assumed to be zero
 
             k  = k+1
@@ -971,6 +973,14 @@ end subroutine calc_vxy_ssa_matrix
                H_ice(i,j2) .gt. 0.0)) then 
 
             front2(i,j) = .TRUE. 
+
+          end if 
+
+          if (.TRUE.) then 
+            ! Disable detection of grounded fronts for now,
+            ! because it is more stable this way...
+
+            if ( front1(i,j) .and. (.not. is_float) ) front1(i,j) = .FALSE. 
 
           end if 
 

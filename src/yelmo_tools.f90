@@ -12,6 +12,7 @@ module yelmo_tools
     public :: calc_magnitude_from_staggered_ice
     public :: stagger_ac_aa
     public :: stagger_aa_ab
+    public :: stagger_aa_ab_ice 
     public :: stagger_ab_aa 
     public :: stagger_aa_acx
     public :: stagger_aa_acy
@@ -191,6 +192,60 @@ contains
         return
 
     end function stagger_aa_ab 
+    
+    function stagger_aa_ab_ice(u,H_ice) result(ustag)
+        ! Stagger from Aa => Ab
+        ! Four point average from corner Aa nodes to central Ab node 
+
+        implicit none 
+
+        real(prec), intent(IN)  :: u(:,:) 
+        real(prec), intent(IN)  :: H_ice(:,:) 
+        real(prec) :: ustag(size(u,1),size(u,2)) 
+
+        ! Local variables 
+        integer :: i, j, nx, ny, k   
+
+        nx = size(u,1)
+        ny = size(u,2) 
+
+        ustag = 0.0_prec 
+
+        do j = 1, ny-1 
+        do i = 1, nx-1
+            k = 0 
+            ustag(i,j) = 0.0 
+            if (H_ice(i,j) .gt. 0.0) then 
+                ustag(i,j) = ustag(i,j) + u(i,j) 
+                k = k+1
+            end if 
+
+            if (H_ice(i+1,j) .gt. 0.0) then 
+                ustag(i,j) = ustag(i,j) + u(i+1,j) 
+                k = k+1 
+            end if 
+            
+            if (H_ice(i,j+1) .gt. 0.0) then 
+                ustag(i,j) = ustag(i,j) + u(i,j+1) 
+                k = k+1 
+            end if 
+            
+            if (H_ice(i+1,j+1) .gt. 0.0) then 
+                ustag(i,j) = ustag(i,j) + u(i+1,j+1) 
+                k = k+1 
+            end if 
+            
+            if (k .gt. 0) then 
+                ustag(i,j) = ustag(i,j) / real(k,prec)
+            end if 
+
+            !ustag(i,j) = 0.25_prec*(u(i+1,j+1)+u(i+1,j)+u(i,j+1)+u(i,j))
+        end do 
+        end do 
+
+        return
+
+    end function stagger_aa_ab_ice 
     
     function stagger_ab_aa(u) result(ustag)
         ! Stagger from Ab => Aa

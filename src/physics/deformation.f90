@@ -39,7 +39,7 @@ contains
         real(prec), intent(IN) :: enh_shear           ! [--] Enhancement factor for shearing regions (SIA grounded)
         real(prec), intent(IN) :: enh_stream          ! [--] Enhancement factor for stream regions (SSA grounded)
         real(prec), intent(IN) :: enh_shlf            ! [--] Enhancement factor for ice shelf regions (SSA floating)
-        real(prec) :: enh(size(f_shear,1),size(f_shear,2),size(f_shear,3))
+        real(prec) :: enh(size(f_shear,1),size(f_shear,2),size(f_shear,3))  ! [--] 
         
         ! Local variables
         integer :: k, nx, ny, nz_aa 
@@ -76,7 +76,7 @@ contains
         real(prec), intent(IN) :: enh_shear     ! [--] Enhancement factor for shearing regions (SIA grounded)
         real(prec), intent(IN) :: enh_stream    ! [--] Enhancement factor for stream regions (SSA grounded)
         real(prec), intent(IN) :: enh_shlf      ! [--] Enhancement factor for ice shelf regions (SSA floating)
-        real(prec) :: enh
+        real(prec) :: enh                       ! [--] 
         
         ! Local variables
         real(prec) :: enh_ssa_tmp, f_tmp 
@@ -94,10 +94,10 @@ contains
 
     function calc_viscosity_glen(de,ATT,n_glen,visc_min) result(visc)
         ! Calculate viscosity based on Glen's flow law 
-        ! ATT [Pa a-3] is the "depth dependent ice stiffness parameter based on
+        ! ATT [a^-1 Pa^-3] is the "depth dependent ice stiffness parameter based on
         !     vertical variations in temperature, chemistry and crystal fabric" (MacAyeal, 1989, JGR)
-        ! de [a-1] is the second-invariant of the strain rate tensor 
-        ! visc [Pa / a] is the 3D, temperature dependent viscosity field 
+        ! de [a^-1] is the second-invariant of the strain rate tensor 
+        ! visc [Pa a] is the 3D, temperature dependent viscosity field 
 
         ! Equation: visc = 0.5 * ATT^(-1/n_glen) * (de)^((1-n_glen)/n_glen)
         ! ATT  => from Greve and Blatter (2009), Eq. 4.15 (written as `A(T_prime)`)
@@ -106,17 +106,17 @@ contains
 
         implicit none
         
-        real(prec), intent(IN)  :: de(:,:,:)        ! [a^(1/3)] second-invariant of the strain rate tensor
-        real(prec), intent(IN)  :: ATT(:,:,:)       ! [Pa/a^3] Rate factor 
+        real(prec), intent(IN)  :: de(:,:,:)        ! [a^-1] second-invariant of the strain rate tensor
+        real(prec), intent(IN)  :: ATT(:,:,:)       ! [a^-1 Pa^-3] Rate factor 
         real(prec), intent(IN)  :: n_glen           ! Glen's flow law exponent
-        real(prec), intent(IN)  :: visc_min         ! Minimum allowed viscosity (for stability, ~1e3 Pa a-1)
+        real(prec), intent(IN)  :: visc_min         ! [Pa a] Minimum allowed viscosity (for stability, ~1e3)
         
-        real(prec) :: visc(size(ATT,1),size(ATT,2),size(ATT,3)) ! [Pa-a] 3D viscosity field
+        real(prec) :: visc(size(ATT,1),size(ATT,2),size(ATT,3)) ! [Pa a] 3D viscosity field
 
         ! Local variables
         integer :: k, nz  
         real(prec) :: exp1, exp2  
-        real(prec), parameter :: de_0 = 1.0e-4    ! [a^(1/3)]
+        real(prec), parameter :: de_0 = 1.0e-4    ! [a^-1]
 
         nz = size(visc,3)
 
@@ -136,10 +136,10 @@ contains
 
     function calc_viscosity_glen_2D(de,ATT,n_glen,visc_min) result(visc)
         ! Calculate viscosity based on Glen's flow law 
-        ! ATT [Pa / a^3] is the "depth dependent ice stiffness parameter based on
+        ! ATT [a^-1 Pa^-3] is the "depth dependent ice stiffness parameter based on
         !     vertical variations in temperature, chemistry and crystal fabric" (MacAyeal, 1989, JGR)
-        ! de [] is the second-invariant of the strain rate tensor 
-        ! visc [Pa / a] is the 2D, temperature dependent viscosity field 
+        ! de [a^-1] is the second-invariant of the strain rate tensor 
+        ! visc [Pa a] is the 2D, temperature dependent viscosity field 
 
         ! Equation: visc = 0.5 * ATT^(-1/n_glen) * (de)^((1-n_glen)/n_glen)
         ! ATT  => from Greve and Blatter (2009), Eq. 4.15 (written as `A(T_prime)`)
@@ -148,17 +148,17 @@ contains
 
         implicit none
            
-        real(prec), intent(IN)  :: de(:,:)          ! [a^(1/3)] second-invariant of the strain rate tensor
-        real(prec), intent(IN)  :: ATT(:,:,:)       ! [Pa/a^3] Rate factor 
+        real(prec), intent(IN)  :: de(:,:)          ! [a^-1] second-invariant of the strain rate tensor
+        real(prec), intent(IN)  :: ATT(:,:,:)       ! [a^-1 Pa^-3] Rate factor 
         real(prec), intent(IN)  :: n_glen           ! Glen's flow law exponent
-        real(prec), intent(IN)  :: visc_min         ! Minimum allowed viscosity (for stability, ~1e3 Pa)
+        real(prec), intent(IN)  :: visc_min         ! [Pa a] Minimum allowed viscosity (for stability, ~1e3)
         
-        real(prec) :: visc(size(ATT,1),size(ATT,2),size(ATT,3)) ! [Pa-a] 3D viscosity field
+        real(prec) :: visc(size(ATT,1),size(ATT,2),size(ATT,3)) ! [Pa a] 3D viscosity field
 
         ! Local variables
         integer :: k, nz_aa  
         real(prec) :: exp1, exp2  
-        real(prec), parameter :: de_0 = 1.0e-4    ! [a^(1/3)]
+        real(prec), parameter :: de_0 = 1.0e-4    ! [a^-1]
         
         nz_aa = size(visc,3)
 
@@ -294,7 +294,7 @@ contains
         real(prec), intent(IN) :: ux_bar(:,:)    ! [m/a] Vertically integrated vel., x
         real(prec), intent(IN) :: uy_bar(:,:)    ! [m/a] Vertically integrated vel., y
         real(prec), intent(IN) :: dx, dy         ! [m] Resolution
-        type(strain_2D_class)  :: strn2D         ! Strain rate tensor
+        type(strain_2D_class)  :: strn2D         ! [a^-1] Strain rate tensor
 
         ! Local variables
         integer :: i, j, k, nx, ny, nz
@@ -348,7 +348,7 @@ contains
 
         implicit none
          
-        type(strain_3D_class), intent(INOUT) :: strn 
+        type(strain_3D_class), intent(INOUT) :: strn  ! [a^-1] 
         real(prec), intent(IN) :: vx(:,:,:) 
         real(prec), intent(IN) :: vy(:,:,:) 
         real(prec), intent(IN) :: vz(:,:,:) 
@@ -383,7 +383,7 @@ contains
 
         implicit none
         
-        type(strain_3D_class), intent(INOUT) :: strn                ! on aa-nodes (3D)
+        type(strain_3D_class), intent(INOUT) :: strn                ! [a^-1] on aa-nodes (3D)
         real(prec), intent(IN) :: vx(:,:,:)                         ! nx,ny,nz_aa
         real(prec), intent(IN) :: vy(:,:,:)                         ! nx,ny,nz_aa
         real(prec), intent(IN) :: vz(:,:,:)                         ! nx,ny,nz_ac
@@ -409,7 +409,7 @@ contains
         real(prec), allocatable :: shear_squared(:)
         
         real(prec), parameter :: epsi   = 1e-5
-        real(prec), parameter :: de_max = 0.5    ! [1/a]
+        real(prec), parameter :: de_max = 0.5    ! [a^-1] 
 
         ! Determine sizes and allocate local variables 
         nx    = size(vx,1)

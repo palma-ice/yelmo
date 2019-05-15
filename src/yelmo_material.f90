@@ -152,9 +152,9 @@ contains
         
         mat%now%visc = calc_viscosity_glen(mat%now%strn%de,mat%now%ATT,mat%par%n_glen,mat%par%visc_min)
         
-        ! Calculate visc_bar (vertically averaged visc) as diagnostic quantity
-        mat%now%visc_bar = calc_vertical_integrated_2D(mat%now%visc,mat%par%zeta_aa)
-        where(tpo%now%H_ice .gt. 0.0) mat%now%visc_bar = mat%now%visc_bar*tpo%now%H_ice 
+        ! Calculate visc_int (vertically integrated visc) as diagnostic quantity
+        mat%now%visc_int = calc_vertical_integrated_2D(mat%now%visc,mat%par%zeta_aa)
+        where(tpo%now%H_ice .gt. 0.0) mat%now%visc_int = mat%now%visc_int*tpo%now%H_ice 
         
         if (mat%par%calc_age .and. dt .gt. 0.0) then 
             ! Perform calculations of age tracer: dep_time (deposition time)
@@ -260,7 +260,7 @@ contains
         allocate(now%ATT_bar(nx,ny))
         
         allocate(now%visc(nx,ny,nz_aa))
-        allocate(now%visc_bar(nx,ny))
+        allocate(now%visc_int(nx,ny))
 
         allocate(now%f_shear_bar(nx,ny)) 
 
@@ -285,7 +285,7 @@ contains
         now%ATT          = 0.0 
         now%ATT_bar      = 0.0    
         now%visc         = 0.0 
-        now%visc_bar     = 0.0 
+        now%visc_int     = 0.0 
 
         now%f_shear_bar  = 0.0 
 
@@ -320,7 +320,7 @@ contains
         if (allocated(now%ATT_bar))     deallocate(now%ATT_bar)
 
         if (allocated(now%visc))        deallocate(now%visc)
-        if (allocated(now%visc_bar))    deallocate(now%visc_bar)
+        if (allocated(now%visc_int))    deallocate(now%visc_int)
         
         if (allocated(now%f_shear_bar)) deallocate(now%f_shear_bar)
 

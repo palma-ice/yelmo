@@ -511,9 +511,9 @@ contains
             f_ice = 0.0 
         end where
 
-if (.FALSE.) then 
-        ! For floating points at the border of ice and no ice,
-        ! determine the fraction of ice in the cell.
+        ! For ice-covered points with ice-free neighbors (ie, at the floating or grounded margin),
+        ! determine the fraction of grid point that should be ice covered. 
+
         do j = 2, ny-1
         do i = 2, nx-1 
 
@@ -547,11 +547,7 @@ if (.FALSE.) then
 
         end do 
         end do 
-
-end if 
-        ! Note: for now, do not treat fraction of grounded ice,
-        ! however this should be considered in the future.
-
+        
         return 
 
     end function calc_ice_fraction

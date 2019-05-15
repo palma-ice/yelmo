@@ -2,7 +2,8 @@ module velocity_hybrid_pd12
 
     use nml 
     use yelmo_defs ,only  : sp, dp, prec, rho_ice, rho_sw, rho_w, g
-    use yelmo_tools, only : stagger_aa_ab, integrate_trapezoid1D_1D, integrate_trapezoid1D_pt, minmax
+    use yelmo_tools, only : stagger_aa_ab, stagger_aa_ab_ice, &
+                    integrate_trapezoid1D_1D, integrate_trapezoid1D_pt, minmax
 
     implicit none 
 
@@ -580,7 +581,9 @@ contains
     function calc_visc_eff(ux,uy,duxdz,duydz,H_ice,ATT,zeta_aa,dx,dy,n) result(visc)
         ! Calculate effective viscosity eta to be used in SSA solver
         ! Pollard and de Conto (2012), Eqs. 2a/b and Eq. 4 (`visc=mu*H_ice*A**(-1/n)`)
-        ! Note: calculated on same nodes as eps_sq (Aa nodes by default)
+        ! Note: calculated on same nodes as eps_sq (aa-nodes by default)
+        ! Note: this is equivalent to the vertically-integrated viscosity, 
+        ! since it is multiplied with H_ice 
 
         implicit none 
         
@@ -593,7 +596,7 @@ contains
         real(prec), intent(IN) :: zeta_aa(:)  ! Vertical axis (sigma-coordinates from 0 to 1)
         real(prec), intent(IN) :: dx, dy
         real(prec), intent(IN) :: n
-        real(prec) :: visc(size(ux,1),size(ux,2))
+        real(prec) :: visc(size(ux,1),size(ux,2))   ! [Pa a m]
         
         ! Local variables 
         integer :: i, j, nx, ny, k, nz_aa 
@@ -621,7 +624,7 @@ contains
         ! Initialize viscosity to minimum value 
         visc = visc_min 
         
-        ! Loop over domain to calculate viscosity at each Aa node
+        ! Loop over domain to calculate viscosity at each aa-node
 
         do j = 1, ny
         do i = 1, nx
@@ -828,6 +831,7 @@ contains
         ! This will be used to calculate H_mid on the acx/acy nodes,
         ! but it should come from ab-nodes instead of ac-nodes for stability 
         ! Note: this is disabled, as it seemed not to affect results
+        !Hi_ab = stagger_aa_ab_ice(H_ice,H_ice)
         Hi_ab = stagger_aa_ab(H_ice)
         
         ! Define shortcut parameter 

@@ -332,7 +332,7 @@ module yelmo_defs
         real(prec), allocatable :: ATT(:,:,:) 
         real(prec), allocatable :: ATT_bar(:,:)
         real(prec), allocatable :: visc(:,:,:) 
-        real(prec), allocatable :: visc_bar(:,:) 
+        real(prec), allocatable :: visc_int(:,:) 
 
         real(prec), allocatable :: f_shear_bar(:,:) 
         

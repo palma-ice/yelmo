@@ -50,7 +50,7 @@ contains
         integer    :: i1, j1, i00, j00
         real(prec) :: inv_dxi, inv_deta, inv_dxi_deta, inv_dxi2, inv_deta2
         real(prec) :: factor_rhs_2, factor_rhs_3a, factor_rhs_3b
-        real(prec) :: rho_sw_ice, H_mid, beta_now, taud_now, H_ocn_now   
+        real(prec) :: rho_sw_ice, H_ice_now, beta_now, taud_now, H_ocn_now   
         character(len=256) :: ch_solver_set_option
         integer    :: IMAX, JMAX 
 
@@ -67,6 +67,7 @@ contains
         logical, allocatable    :: flag_ice_front_2(:,:)  
         real(prec), allocatable :: vis_int_g(:,:) 
         real(prec), allocatable :: vis_int_sgxy(:,:) 
+        real(prec), allocatable :: H_ice_1(:,:) 
         logical :: is_mismip 
 
 ! Include header for lis solver fortran interface
@@ -106,6 +107,8 @@ contains
         allocate(vis_int_g(nx,ny))
         allocate(vis_int_sgxy(nx,ny))
 
+        allocate(H_ice_1(nx,ny))
+
         !--- External yelmo arguments => local sicopolis variable names ---
         dxi          = dx 
         deta         = dy 
@@ -113,6 +116,13 @@ contains
         vis_int_g    = visc_eff 
 
         rho_sw_ice   = rho_sw/rho_ice ! Ratio of density of seawater to ice [--]
+
+        ! Set ice thickness for use internally
+        ! Limit to at least H_ice=1.0m where ice is present,
+        ! to help make grounded margin points more stable. 
+        H_ice_1 = H_ice 
+        where(H_ice .gt. 0.0 .and. H_ice .lt. 1.0) H_ice_1 = 1.0 
+
 
         !-------- Abbreviations --------
 
@@ -129,9 +139,9 @@ contains
         ! Set maske and grounding line / calving front flags
 
 !         call set_sico_masks(maske,flag_ice_front_1,flag_ice_front_2, &
-!                     flag_grounding_line_1,flag_grounding_line_2, H_ice, H_grnd)
+!                     flag_grounding_line_1,flag_grounding_line_2, H_ice_1, H_grnd)
         call set_sico_masks_old(maske,flag_ice_front_1,flag_ice_front_2, &
-                    flag_grounding_line_1,flag_grounding_line_2, H_ice, H_grnd)
+                    flag_grounding_line_1,flag_grounding_line_2, H_ice_1, H_grnd)
 
         gfa1 = maske
         gfb1 = flag_ice_front_1
@@ -140,7 +150,7 @@ contains
         !-------- Depth-integrated viscosity on the staggered grid
         !                                       [at (i+1/2,j+1/2)] --------
 
-        call stagger_visc_aa_ab(vis_int_sgxy,vis_int_g,H_ice)
+        call stagger_visc_aa_ab(vis_int_sgxy,vis_int_g,H_ice_1)
 
         !-------- Basal drag parameter (for shelfy stream) --------
 
@@ -194,7 +204,6 @@ do n=1, nmax-1, 2
     if ( (i /= nx).and.(j /= 1).and.(j /= ny) ) then
       ! inner point on the staggered grid in x-direction
 
-      H_mid     = 0.50_prec*(H_ice(i,j)+H_ice(i+1,j))
       beta_now  = beta_acx(i,j) 
       taud_now  = taud_acx(i,j) 
 
@@ -272,14 +281,14 @@ do n=1, nmax-1, 2
               lgs_a_value(k) = 2.0_prec*inv_deta*vis_int_g(i1,j)
               lgs_a_index(k) = nc
 
-              !lgs_b_value(nr) = factor_rhs_2*H_ice(i1,j)*H_ice(i1,j)
+              !lgs_b_value(nr) = factor_rhs_2*H_ice_1(i1,j)*H_ice_1(i1,j)
 
               ! =========================================================
               ! Generalized solution for all ice fronts (floating and grounded)
 
               if (z_sl(i1,j)-z_bed(i1,j) .gt. 0.0) then 
                 ! Bed below sea level 
-                  H_ocn_now = min(rho_ice/rho_sw*H_ice(i1,j), &    ! Flotation depth 
+                  H_ocn_now = min(rho_ice/rho_sw*H_ice_1(i1,j), &    ! Flotation depth 
                                   z_sl(i1,j)-z_bed(i1,j))          ! Grounded depth 
 
               else 
@@ -288,10 +297,10 @@ do n=1, nmax-1, 2
 
               end if 
 
-               lgs_b_value(nr) = factor_rhs_3a*H_ice(i1,j)*H_ice(i1,j) &
+               lgs_b_value(nr) = factor_rhs_3a*H_ice_1(i1,j)*H_ice_1(i1,j) &
                                - factor_rhs_3b*H_ocn_now*H_ocn_now
 
-              !write(*,*) "ssaxc:", H_ice(i1,j), H_ocn_now, H_ocn_now/H_ice(i1,j)
+              !write(*,*) "ssaxc:", H_ice_1(i1,j), H_ocn_now, H_ocn_now/H_ice_1(i1,j)
 
               ! =========================================================
               
@@ -484,7 +493,6 @@ do n=1, nmax-1, 2
    if ( (j /= ny).and.(i /= 1).and.(i /= nx) ) then
       ! inner point on the staggered grid in y-direction
 
-      H_mid     = 0.50_prec*(H_ice(i,j)+H_ice(i,j+1))
       beta_now  = beta_acy(i,j) 
       taud_now  = taud_acy(i,j) 
 
@@ -562,14 +570,14 @@ do n=1, nmax-1, 2
             lgs_a_value(k) = 4.0_prec*inv_deta*vis_int_g(i,j1)
             lgs_a_index(k) = nc
 
-!             lgs_b_value(nr) = factor_rhs_2*H_ice(i,j1)*H_ice(i,j1)
+!             lgs_b_value(nr) = factor_rhs_2*H_ice_1(i,j1)*H_ice_1(i,j1)
 
               ! =========================================================
               ! Generalized solution for all ice fronts (floating and grounded)
               
               if (z_sl(i,j1)-z_bed(i,j1) .gt. 0.0) then 
                 ! Bed below sea level 
-                  H_ocn_now = min(rho_ice/rho_sw*H_ice(i,j1), &    ! Flotation depth 
+                  H_ocn_now = min(rho_ice/rho_sw*H_ice_1(i,j1), &    ! Flotation depth 
                                   z_sl(i,j1)-z_bed(i,j1))          ! Grounded depth 
 
               else 
@@ -578,7 +586,7 @@ do n=1, nmax-1, 2
 
               end if 
               
-               lgs_b_value(nr) = factor_rhs_3a*H_ice(i,j1)*H_ice(i,j1) &
+               lgs_b_value(nr) = factor_rhs_3a*H_ice_1(i,j1)*H_ice_1(i,j1) &
                                - factor_rhs_3b*H_ocn_now*H_ocn_now
 
 

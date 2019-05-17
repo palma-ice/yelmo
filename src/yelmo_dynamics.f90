@@ -255,7 +255,7 @@ contains
 !             dyn%now%visc_eff = 1e10 
 
 !             dyn%now%visc_eff = mat%now%visc_eff 
-                
+            
             ! Use 3D rate factor, but 2D shear:
             ! Note: disable shear contribution to viscosity for this solver, for mixed terms use hybrid-pd12 option.
             ! Note: Here visc_eff is calculated using ux_b and uy_b (ssa velocity), not ux_bar/uy_bar as in hybrid-pd12. 

@@ -138,8 +138,8 @@ contains
 
         ! Set maske and grounding line / calving front flags
 
-!         call set_sico_masks(maske,is_front_1,is_front_2,is_grline_1,is_grline_2, H_ice_1, H_grnd)
-        call set_sico_masks_old(maske,is_front_1,is_front_2,is_grline_1,is_grline_2, H_ice_1, H_grnd)
+        call set_sico_masks(maske,is_front_1,is_front_2,is_grline_1,is_grline_2, H_ice_1, H_grnd)
+!         call set_sico_masks_old(maske,is_front_1,is_front_2,is_grline_1,is_grline_2, H_ice_1, H_grnd)
 
         gfa1 = maske
         gfb1 = is_front_1
@@ -241,8 +241,8 @@ do n=1, nmax-1, 2
               .or. &
               ( is_front_2(i,j).and.is_front_1(i+1,j) ) &
             ) then
-            ! one neighbour is floating ice and the other is ocean
-            ! (calving front)
+            ! one neighbour is ice-covered and the other is ice-free
+            ! (calving front, grounded ice front)
 
            if (is_front_1(i,j)) then
               i1 = i     ! ice-front marker
@@ -295,8 +295,23 @@ do n=1, nmax-1, 2
 
               end if 
 
-               lgs_b_value(nr) = factor_rhs_3a*H_ice_1(i1,j)*H_ice_1(i1,j) &
-                               - factor_rhs_3b*H_ocn_now*H_ocn_now
+              H_ice_now = H_ice_1(i1,j)
+
+              lgs_b_value(nr) = factor_rhs_3a*H_ice_now*H_ice_now &
+                              - factor_rhs_3b*H_ocn_now*H_ocn_now
+
+              if (i .eq. 80 .and. j .eq. 70) then 
+                ! Margin point
+                write(*,*) "front ", vx_m(i1,j), vx_m(i1-1,j), vy_m(i1,j), vy_m(i1,j-1)
+                write(*,*) "front ",vx_m(i1,j)-vx_m(i1-1,j), vy_m(i1,j)-vy_m(i1,j-1)
+                write(*,*) "front ",4.0_prec*inv_dxi*vis_int_g(i1,j)*(vx_m(i1,j)-vx_m(i1-1,j))
+                write(*,*) "front ",2.0_prec*inv_deta*vis_int_g(i1,j)*(vy_m(i1,j)-vy_m(i1,j-1))
+                write(*,*) "front ",lgs_b_value(nr), &
+                  4.0_prec*inv_dxi*vis_int_g(i1,j)*(vx_m(i1,j)-vx_m(i1-1,j)) &
+                + 2.0_prec*inv_deta*vis_int_g(i1,j)*(vy_m(i1,j)-vy_m(i1,j-1)) &
+                - lgs_b_value(nr)
+                write(*,*) "front "  
+              end if 
 
 !               if (abs(vx_m(i,j)) .gt. 4e3) then 
 !                 write(*,*) "ssaxcf:", H_ice_1(i1,j), H_ocn_now/H_ice_1(i1,j), vx_m(i,j), vis_int_g(i1,j)
@@ -306,9 +321,8 @@ do n=1, nmax-1, 2
 
               ! =========================================================
               
-
               lgs_x_value(nr) = vx_m(i,j)
-
+              
            else   !      (is_front_2(i1-1,j)==.true.)
                   ! .and.(is_front_2(i1+1,j)==.true.);
                   ! velocity assumed to be zero
@@ -534,8 +548,8 @@ do n=1, nmax-1, 2
               .or. &
               ( is_front_2(i,j).and.is_front_1(i,j+1) ) &
             ) then
-            ! one neighbour is floating ice and the other is ocean
-            ! (calving front)
+            ! one neighbour is ice-covered and the other is ice-free
+            ! (calving front, grounded ice front)
 
          if (is_front_1(i,j)) then
             j1 = j     ! ice-front marker
@@ -587,15 +601,16 @@ do n=1, nmax-1, 2
                 H_ocn_now = 0.0 
 
               end if 
-              
-               lgs_b_value(nr) = factor_rhs_3a*H_ice_1(i,j1)*H_ice_1(i,j1) &
-                               - factor_rhs_3b*H_ocn_now*H_ocn_now
 
+              H_ice_now = H_ice_1(i,j1)
+              
+               lgs_b_value(nr) = factor_rhs_3a*H_ice_now*H_ice_now &
+                               - factor_rhs_3b*H_ocn_now*H_ocn_now  
 
               ! =========================================================
               
             lgs_x_value(nr) = vy_m(i,j)
-
+             
          else   !      (is_front_2(i,j1-1)==.true.)
                 ! .and.(is_front_2(i,j1+1)==.true.);
                 ! velocity assumed to be zero
@@ -901,6 +916,8 @@ end subroutine calc_vxy_ssa_matrix
         integer    :: i1, i2, j1, j2 
         logical    :: is_float 
         
+        logical, parameter :: disable_grounded_fronts = .TRUE. 
+
         nx = size(maske,1)
         ny = size(maske,2)
         
@@ -976,11 +993,11 @@ end subroutine calc_vxy_ssa_matrix
 
           end if 
 
-          if (.TRUE.) then 
+          if (disable_grounded_fronts) then 
             ! Disable detection of grounded fronts for now,
             ! because it is more stable this way...
 
-            if ( front1(i,j) .and. (.not. is_float) ) front1(i,j) = .FALSE. 
+            if ( front1(i,j) .and. maske(i,j) .eq. 0 ) front1(i,j) = .FALSE. 
 
           end if 
 

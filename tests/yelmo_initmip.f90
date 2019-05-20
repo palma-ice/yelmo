@@ -59,7 +59,7 @@ program yelmo_test
     yelmo1%bnd%H_w      = 0.0           ! [m]
     yelmo1%bnd%Q_geo    = 50.0          ! [mW/m2]
     
-    yelmo1%bnd%bmb_shlf = -10.0         ! [m.i.e./a]
+    yelmo1%bnd%bmb_shlf = -20.0         ! [m.i.e./a]
     yelmo1%bnd%T_shlf   = T0            ! [K]   
 
     ! Impose present-day surface mass balance and present-day temperature field
@@ -70,22 +70,22 @@ program yelmo_test
 
     time = time_init 
 
-!     ! Define channel field 
-!     allocate(channels(yelmo1%grd%nx,yelmo1%grd%ny))
+    ! Define channel field 
+    allocate(channels(yelmo1%grd%nx,yelmo1%grd%ny))
 
-!     ! Update C_bed, if needed
-!     if (yelmo1%dyn%par%C_bed_method .eq. -1) then 
-!         call calc_ydyn_cbed_external(yelmo1%dyn,yelmo1%tpo,yelmo1%thrm,yelmo1%bnd,channels)
-!     end if 
+    ! Update C_bed, if needed
+    if (yelmo1%dyn%par%C_bed_method .eq. -1) then 
+        call calc_ydyn_cbed_external(yelmo1%dyn,yelmo1%tpo,yelmo1%thrm,yelmo1%bnd,channels)
+    end if 
 
     ! Initialize state variables (dyn,therm,mat)
     ! (initialize temps with robin method with a cold base)
     call yelmo_init_state(yelmo1,path_par,time=time_init,thrm_method="robin-cold")
 
-!     ! Update C_bed again, if needed
-!     if (yelmo1%dyn%par%C_bed_method .eq. -1) then 
-!         call calc_ydyn_cbed_external(yelmo1%dyn,yelmo1%tpo,yelmo1%thrm,yelmo1%bnd,channels)
-!     end if 
+    ! Update C_bed again, if needed
+    if (yelmo1%dyn%par%C_bed_method .eq. -1) then 
+        call calc_ydyn_cbed_external(yelmo1%dyn,yelmo1%tpo,yelmo1%thrm,yelmo1%bnd,channels)
+    end if 
     
     ! Define no-ice mask from present-day data
     allocate(mask_noice(yelmo1%grd%nx,yelmo1%grd%ny))
@@ -118,10 +118,10 @@ program yelmo_test
         ! Get current time 
         time = time_init + n*dtt
 
-!         ! Update C_bed if needed
-!         if (yelmo1%dyn%par%C_bed_method .eq. -1) then 
-!             call calc_ydyn_cbed_external(yelmo1%dyn,yelmo1%tpo,yelmo1%thrm,yelmo1%bnd,channels)
-!         end if 
+        ! Update C_bed if needed
+        if (yelmo1%dyn%par%C_bed_method .eq. -1) then 
+            call calc_ydyn_cbed_external(yelmo1%dyn,yelmo1%tpo,yelmo1%thrm,yelmo1%bnd,channels)
+        end if 
         
         ! Update temperature and smb as needed in time (ISMIP6)
         if (time .ge. -10e6 .and. time .lt. -10e3) then 
@@ -204,14 +204,14 @@ contains
         
         ! initmip specific error metrics 
         tmp = ylmo%tpo%now%H_ice-ylmo%dta%pd%H_ice
-        if (count(tmp .ne. 0.0) .gt. 0) then 
+        if (n .gt. 1 .or. count(tmp .ne. 0.0) .gt. 0) then 
             H_rmse = sqrt(sum(tmp**2)/count(tmp .ne. 0.0))
         else 
             H_rmse = mv 
         end if 
 
         tmp = ylmo%dyn%now%uxy_s-ylmo%dta%pd%uxy_s
-        if (count(tmp .ne. 0.0) .gt. 0) then 
+        if (n .gt. 1 .or. count(tmp .ne. 0.0) .gt. 0) then 
             uxy_rmse = sqrt(sum(tmp**2)/count(tmp .ne. 0.0))
         else
             uxy_rmse = mv

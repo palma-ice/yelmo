@@ -307,8 +307,8 @@ contains
                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
         
         ! Channels 
-        call nc_write(filename,"channels",channels,units="m m-1",long_name="Channel diagnosis", &
-                      dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
+!         call nc_write(filename,"channels",channels,units="m m-1",long_name="Channel diagnosis", &
+!                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
         
 
         ! Diagnostics 

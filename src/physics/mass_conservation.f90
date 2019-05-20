@@ -87,7 +87,7 @@ contains
         ! Apply modified mass balance to update the ice thickness 
         H_ice = H_ice + dt*mb_applied
 
-        ! Limit grounded ice thickess to minimum at the margin
+        ! Limit grounded ice thickess to above minimum and below inland neighbor at the margin
         call limit_grounded_margin_thickness(H_ice,mb_applied,f_grnd,H_min,dt) 
         !call limit_grounded_margin_thickness_flux(H_ice,mb_applied,f_grnd,mbal,ux,uy,dx,dt,H_min)
 
@@ -467,36 +467,42 @@ contains
         ! Local variables 
         integer :: i, j, nx, ny 
         logical :: is_margin 
-        real(prec) :: H_max_neighbor
+        real(prec) :: H_min_neighbor, H_diff 
+
+        real(prec), allocatable :: H_ice_0(:,:) 
 
         nx = size(H_ice,1)
         ny = size(H_ice,2)
+
+        allocate(H_ice_0(nx,ny))
+        H_ice_0 = H_ice 
 
         do j = 2, ny-1 
         do i = 2, nx-1 
 
             ! Determine if ice-covered point has an ice-free neighbor (ie, at the ice margin)
-            is_margin = (H_ice(i,j) .gt. 0.0 .and. f_grnd(i,j) .gt. 0.0 &
-                .and. minval([H_ice(i-1,j),H_ice(i+1,j),H_ice(i,j-1),H_ice(i,j+1)]) .eq. 0.0)
+            is_margin = (H_ice_0(i,j) .gt. 0.0 .and. f_grnd(i,j) .gt. 0.0 &
+                .and. minval([H_ice_0(i-1,j),H_ice_0(i+1,j),H_ice_0(i,j-1),H_ice_0(i,j+1)]) .eq. 0.0)
 
-!             ! If grounded margin point is too thin, impose ablation to set ice thickness to zero
-!             if (is_margin .and. H_ice(i,j) .lt. H_min) then 
+            if (is_margin .and. H_ice_0(i,j) .lt. H_min .and. mb_applied(i,j) .le. 0.0) then 
+                ! If grounded margin point is too thin and mass balance not positive, 
+                ! impose ablation to set ice thickness to zero
 
-!                 ! Check if any neighbor is pretty thick too
-!                 H_max_neighbor = maxval([H_ice(i-1,j),H_ice(i+1,j),H_ice(i,j-1),H_ice(i,j+1)])
-
-!                 if (H_max_neighbor .ge. 10.0*H_min) then 
-!                     mb_applied(i,j) = mb_applied(i,j) - H_ice(i,j)/dt
-!                     H_ice(i,j)      = 0.0 
-!                 end if
-
-!             end if 
-
-            ! If grounded margin point is too thin and mass balance not positive, 
-            ! impose ablation to set ice thickness to zero
-            if (is_margin .and. H_ice(i,j) .lt. H_min .and. mb_applied(i,j) .le. 0.0) then 
-                mb_applied(i,j) = mb_applied(i,j) - H_ice(i,j)/dt
+                mb_applied(i,j) = mb_applied(i,j) - H_ice_0(i,j)/dt
                 H_ice(i,j)      = 0.0 
+
+            else if (is_margin) then 
+                ! Check if margin is thicker than inland neighbors
+
+                H_min_neighbor = minval([H_ice_0(i-1,j),H_ice_0(i+1,j),H_ice_0(i,j-1),H_ice_0(i,j+1)], &
+                                    mask=[H_ice_0(i-1,j),H_ice_0(i+1,j),H_ice_0(i,j-1),H_ice_0(i,j+1)] .gt. 0.0)
+
+                if(H_ice_0(i,j) .gt. H_min_neighbor) then 
+                    H_diff = H_ice_0(i,j)-0.5*H_min_neighbor
+                    mb_applied(i,j) = mb_applied(i,j) - H_diff/dt 
+                    H_ice(i,j)      = H_ice_0(i,j)-H_diff
+                end if 
+
             end if
             
         end do 

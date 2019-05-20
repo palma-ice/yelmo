@@ -2,11 +2,11 @@
     
     ! Timing parameters 
     time_init    = -30e3                ! [yr] Starting time 
-    time_end     = -29e3                ! [yr] Ending time
+    time_end     = 0.0                  ! [yr] Ending time
     time_equil   = 0.0                  ! [yr] Equiibration time 
     dtt          = 0.5                  ! [yr] Main loop timestep 
     dt1D_out     = 100.0                ! [yr] Frequency of writing 1D output files 
-    dt2D_out     = 0.5                  ! [yr] Frequency of writing 2D output files 
+    dt2D_out     = 500.0                ! [yr] Frequency of writing 2D output files 
 /
 
 &yelmo
@@ -51,7 +51,7 @@
 
 &ydyn
     solver              = "hybrid-vel"    ! "fixed","hybrid-vel", "hybrid-shear", "hybrid-pd12"
-    mix_method          = 1               ! -2: sia, -1: ssa, 0: sia|ssa, 1: sia+ssa 2: ssa vel. fraction
+    mix_method          = -2              ! -2: sia, -1: ssa, 0: sia|ssa, 1: sia+ssa 2: ssa vel. fraction
     calc_diffusivity    = False           ! Calculate 2D diffusivity term for diagnostics
     m_drag              = 1.0             ! Dragging law exponent 
     beta_max            = 1e5             ! [Pa a m-1] Maximum value of beta for which ssa should be calculated 
@@ -61,7 +61,7 @@
     beta_gl_stag        = 2               !  0: simple staggering, 1: Upstream beta at gl, 2: f_grnd_ac scaling 
     f_beta_gl           = 1.0             ! [-] Scaling of beta at the grounding line (for beta_gl_method=1)
     taud_gl_method      = 0               !  0: binary, no subgrid, 1: Two-sided gradient
-    C_bed_method        = -1              ! -1: set externally; 0: cf_stream everywhere; 1: cf_stream/cf_frozen 
+    C_bed_method        = 0               ! -1: set externally; 0: cf_stream everywhere; 1: cf_stream/cf_frozen 
     beta_const          = 1e3             ! [Pa a m−1] Constant value of basal friction coefficient to be used
     H_grnd_lim          = 500.0           ! [m] For beta_sep_method=2, reduce beta linearly between H_grnd=0 and H_grnd_lim 
     H_sed_sat           = 250.0           ! [m] Sediment thickness at which sediment effect is saturated

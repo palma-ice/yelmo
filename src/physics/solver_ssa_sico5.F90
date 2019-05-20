@@ -300,18 +300,21 @@ do n=1, nmax-1, 2
               lgs_b_value(nr) = factor_rhs_3a*H_ice_now*H_ice_now &
                               - factor_rhs_3b*H_ocn_now*H_ocn_now
 
-              if (i .eq. 80 .and. j .eq. 70) then 
-                ! Margin point
-                write(*,*) "front ", vx_m(i1,j), vx_m(i1-1,j), vy_m(i1,j), vy_m(i1,j-1)
-                write(*,*) "front ",vx_m(i1,j)-vx_m(i1-1,j), vy_m(i1,j)-vy_m(i1,j-1)
-                write(*,*) "front ",4.0_prec*inv_dxi*vis_int_g(i1,j)*(vx_m(i1,j)-vx_m(i1-1,j))
-                write(*,*) "front ",2.0_prec*inv_deta*vis_int_g(i1,j)*(vy_m(i1,j)-vy_m(i1,j-1))
-                write(*,*) "front ",lgs_b_value(nr), &
-                  4.0_prec*inv_dxi*vis_int_g(i1,j)*(vx_m(i1,j)-vx_m(i1-1,j)) &
-                + 2.0_prec*inv_deta*vis_int_g(i1,j)*(vy_m(i1,j)-vy_m(i1,j-1)) &
-                - lgs_b_value(nr)
-                write(*,*) "front "  
-              end if 
+!               if (i .eq. 80 .and. j .eq. 70) then 
+!                 ! Margin point
+!                 write(*,*) "front ", vx_m(i1,j), vx_m(i1-1,j), vy_m(i1,j), vy_m(i1,j-1)
+!                 write(*,*) "front ",vx_m(i1,j)-vx_m(i1-1,j), vy_m(i1,j)-vy_m(i1,j-1)
+!                 write(*,*) "front ",4.0_prec*inv_dxi*vis_int_g(i1,j)*(vx_m(i1,j)-vx_m(i1-1,j))
+!                 write(*,*) "front ",2.0_prec*inv_deta*vis_int_g(i1,j)*(vy_m(i1,j)-vy_m(i1,j-1))
+!                 write(*,*) "front ",lgs_b_value(nr), &
+!                   4.0_prec*inv_dxi*vis_int_g(i1,j)*(vx_m(i1,j)-vx_m(i1-1,j)) &
+!                 + 2.0_prec*inv_deta*vis_int_g(i1,j)*(vy_m(i1,j)-vy_m(i1,j-1)) &
+!                 - lgs_b_value(nr)
+!                 write(*,*) "front ", H_ice_1(i1-1,j+1), H_ice_1(i1,j+1), H_ice_1(i1+1,j+1)
+!                 write(*,*) "front ", H_ice_1(i1-1,j),   H_ice_1(i1,j),   H_ice_1(i1+1,j)
+!                 write(*,*) "front ", H_ice_1(i1-1,j-1), H_ice_1(i1,j-1), H_ice_1(i1+1,j-1)
+!                 write(*,*) "front "  
+!               end if 
 
 !               if (abs(vx_m(i,j)) .gt. 4e3) then 
 !                 write(*,*) "ssaxcf:", H_ice_1(i1,j), H_ocn_now/H_ice_1(i1,j), vx_m(i,j), vis_int_g(i1,j)

@@ -51,21 +51,21 @@ yelmo-static: $(yelmo_libs) $(yelmo_physics) $(yelmo_base) $(yelmo_tests)
 
 # Test programs that use yelmo-static
 initmip : yelmo-static
-		$(FC) $(DLAGS) $(FFLAGS) $(INC_LIS) -o $(bindir)/yelmo_initmip.x tests/yelmo_initmip.f90 \
+		$(FC) $(DFLAGS) $(FFLAGS) $(INC_LIS) -o $(bindir)/yelmo_initmip.x tests/yelmo_initmip.f90 \
 			-L${CURDIR}/libyelmo/include -lyelmo $(LFLAGS) $(objdir)/nml.o
 		@echo " "
 		@echo "    yelmo_initmip.x is ready."
 		@echo " "
 
 benchmarks : yelmo-static
-		$(FC) $(DLAGS) $(FFLAGS) $(INC_LIS) -o $(bindir)/yelmo_benchmarks.x tests/yelmo_benchmarks.f90 \
+		$(FC) $(DFLAGS) $(FFLAGS) $(INC_LIS) -o $(bindir)/yelmo_benchmarks.x tests/yelmo_benchmarks.f90 \
 			-L${CURDIR}/libyelmo/include -lyelmo $(LFLAGS) $(objdir)/nml.o
 		@echo " "
 		@echo "    yelmo_benchmarks.x is ready."
 		@echo " "
 
 mismip : yelmo-static
-		$(FC) $(DLAGS) $(FFLAGS) $(INC_LIS) -o $(bindir)/yelmo_mismip.x tests/yelmo_mismip.f90 \
+		$(FC) $(DFLAGS) $(FFLAGS) $(INC_LIS) -o $(bindir)/yelmo_mismip.x tests/yelmo_mismip.f90 \
 			-L${CURDIR}/libyelmo/include -lyelmo $(LFLAGS) $(objdir)/nml.o
 		@echo " "
 		@echo "    yelmo_mismip.x is ready."

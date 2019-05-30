@@ -20,9 +20,8 @@ def run_yelmo():
     parser = argparse.ArgumentParser()
 
     # Add options
-    parser.add_argument('-e','--exe',type=str,default='test',
+    parser.add_argument('-e','--exe',type=str,default='benchmarks',
         help='''Define the executable file to use here. Shortcuts:
-test = libyelmo/bin/yelmo_test.x;
 benchmarks = libyelmo/bin/yelmo_benchmarks.x;
 mismip = libyelmo/bin/yelmo_mismip.x;
 initmip = libyelmo/bin/yelmo_initmip.x
@@ -82,9 +81,7 @@ initmip = libyelmo/bin/yelmo_initmip.x
     if submit: run = True 
 
     # Expand executable path shortcut if defined
-    if exe_path == "test":
-        exe_path = "libyelmo/bin/yelmo_test.x" 
-    elif exe_path == "benchmarks":
+    if exe_path == "benchmarks":
         exe_path = "libyelmo/bin/yelmo_benchmarks.x"
     elif exe_path == "mismip":
         exe_path = "libyelmo/bin/yelmo_mismip.x" 

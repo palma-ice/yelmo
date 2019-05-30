@@ -53,7 +53,7 @@ contains
 
         ! Local variables 
         integer :: i, j, nx, ny
-        real(prec) :: Hfrac
+        real(prec) :: H_mrgn
         logical :: is_front 
         integer :: n_ocean 
 
@@ -88,25 +88,9 @@ contains
                 ! If this point is an ice front, check for calving
 
                 ! Determine ice thickness accounting for fraction  
-                if (f_ice(i,j) .gt. 0.0) then 
-                    Hfrac = H_ice(i,j) / f_ice(i,j) 
-                else 
-                    Hfrac = 0.0
-                end if
+                H_mrgn = H_ice(i,j) / f_ice(i,j) 
 
-!                 if (n_ocean .gt. 0 .and. n_ocean .le. 2 .and. Hfrac .le. H_calv) then 
-!                     ! Calculate calving rate if current point has thickness less than threshold. 
-
-!                     calv(i,j) = H_ice(i,j) / dt  
-
-!                 else if (n_ocean .gt. 2 .and. Hfrac .le. 2.0*H_calv) then 
-!                     ! For more open ice front, set higher threshold for calving 
-
-!                     calv(i,j) = H_ice(i,j) / dt 
-
-!                 end if 
-
-                if (n_ocean .gt. 0 .and. Hfrac .le. H_calv) then 
+                if (n_ocean .gt. 0 .and. H_mrgn .le. H_calv) then 
                     ! Apply calving at front, delete all ice in point (H_ice) 
 
                     calv(i,j) = H_ice(i,j) / dt 
@@ -143,25 +127,17 @@ contains
         real(prec) :: eps_xx, eps_yy  
         logical :: test_mij, test_pij, test_imj, test_ipj
         logical :: positive_mb 
-        real(prec), allocatable :: dHdt(:,:), Hdiff(:,:), Hfrac(:,:) 
+        real(prec), allocatable :: dHdt(:,:), H_diff(:,:) 
         integer :: n_ocean 
 
         nx = size(H_ice,1)
         ny = size(H_ice,2)
 
         allocate(dHdt(nx,ny))
-        allocate(Hdiff(nx,ny))
-        allocate(Hfrac(nx,ny))
-
-        ! Determine ice thickness accounting for fraction  
-        where (H_ice .gt. 1.0 .and. f_ice .gt. 0.0) 
-            Hfrac = H_ice / f_ice 
-        elsewhere 
-            Hfrac = 0.0
-        end where 
+        allocate(H_diff(nx,ny))
 
         ! Ice thickness above threshold
-        Hdiff = Hfrac - H_calv
+        H_diff = H_ice - H_calv
 
         ! Diagnosed lagrangian rate of change
         dHdt = 0.0 
@@ -176,7 +152,7 @@ contains
                 eps_yy = (uy(i,j) - uy(i,j-1))/dx
 
                 ! Calculate thickness change via conservation
-                dHdt(i,j) = mbal(i,j) - Hfrac(i,j)*(eps_xx+eps_yy)
+                dHdt(i,j) = mbal(i,j) - H_ice(i,j)*(eps_xx+eps_yy)
 
         end do 
         end do
@@ -205,31 +181,31 @@ contains
 
             end if
 
-            if (n_ocean .gt. 0 .and. Hdiff(i,j).le.0.0) then 
+            if (n_ocean .gt. 0 .and. H_diff(i,j).le.0.0) then 
                 ! Check if current point is at the floating ice front,
                 ! and has thickness less than threshold, or if
                 ! ice below H_calv limit, accounting for mass flux from inland
 
                 positive_mb = (mbal(i,j).gt.0.0)
 
-                test_mij = ( ((Hdiff(i-1,j).gt.0.0).and.(ux(i,j).ge.0.0)  &  ! neighbor (i-1,j) total > hcoup
-                    .and.  (dHdt(i-1,j).gt.(-Hdiff(i-1,j)*abs(ux(i-1,j)/dx)))) & 
+                test_mij = ( ((H_diff(i-1,j).gt.0.0).and.(ux(i,j).ge.0.0)  &  ! neighbor (i-1,j) total > hcoup
+                    .and.  (dHdt(i-1,j).gt.(-H_diff(i-1,j)*abs(ux(i-1,j)/dx)))) & 
                     .or.(f_grnd(i-1,j).gt.0.0.and.positive_mb )) !
 
-                test_pij = ( ((Hdiff(i+1,j).gt.0.0).and.(ux(i,j).le.0.0) & ! neighbor (i+1,j) total > hcoup
-                    .and.(dHdt(i+1,j).gt.(-Hdiff(i+1,j)*abs(ux(i,j)/dx)))) &
+                test_pij = ( ((H_diff(i+1,j).gt.0.0).and.(ux(i,j).le.0.0) & ! neighbor (i+1,j) total > hcoup
+                    .and.(dHdt(i+1,j).gt.(-H_diff(i+1,j)*abs(ux(i,j)/dx)))) &
                     .or.(f_grnd(i+1,j).gt.0.0.and.positive_mb) ) !
 
-                test_imj = ( ((Hdiff(i,j-1).gt.0.0).and.(uy(i,j).ge.0.0)  &  ! neighbor (i,j-1) total > hcoup
-                    .and.(dHdt(i,j-1).gt.(-Hdiff(i,j-1)*abs(uy(i,j-1)/dx))))&
+                test_imj = ( ((H_diff(i,j-1).gt.0.0).and.(uy(i,j).ge.0.0)  &  ! neighbor (i,j-1) total > hcoup
+                    .and.(dHdt(i,j-1).gt.(-H_diff(i,j-1)*abs(uy(i,j-1)/dx))))&
                     .or.(f_grnd(i,j-1).gt.0.0.and.positive_mb ) ) !
 
-                test_ipj = ( ((Hdiff(i,j+1).gt.0.0).and.(uy(i,j).le.0.0) & ! neighbor (i,j+1) total > hcoup
-                    .and.(dHdt(i,j+1).gt.(-Hdiff(i,j+1)*abs(uy(i,j)/dx))))&
+                test_ipj = ( ((H_diff(i,j+1).gt.0.0).and.(uy(i,j).le.0.0) & ! neighbor (i,j+1) total > hcoup
+                    .and.(dHdt(i,j+1).gt.(-H_diff(i,j+1)*abs(uy(i,j)/dx))))&
                     .or.(f_grnd(i,j+1).gt.0.0.and.positive_mb ) ) !
 
                 if ((.not.(test_mij.or.test_pij.or.test_imj.or.test_ipj))) then
-                    calv(i,j) = Hfrac(i,j) / dt             
+                    calv(i,j) = H_ice(i,j) / dt             
                 end if  
 
             end if

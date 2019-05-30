@@ -190,7 +190,6 @@ contains
         call calc_grline(tpo%now%is_grline,tpo%now%f_grnd)
 
         ! Calculate the ice-covered fraction of each grid cell 
-        ! ajr: note, this should be improved to treat both floating and grounded ice points...
         tpo%now%f_ice = calc_ice_fraction(tpo%now%H_ice,tpo%now%f_grnd)
         
         ! Calculate the bed mask
@@ -477,19 +476,22 @@ contains
     ! ============================================================
 
     function calc_ice_fraction(H_ice,f_grnd) result(f_ice)
+        ! Determine the area fraction of a grid cell
+        ! that is ice-covered. Assume that marginal points
+        ! have equal thickness to inland neighbors 
 
         implicit none 
 
-        real(prec), intent(IN) :: H_ice(:,:) 
-        real(prec), intent(IN) :: f_grnd(:,:)  
-        real(prec) :: f_ice(size(H_ice,1),size(H_ice,2))
+        real(prec), intent(IN) :: H_ice(:,:)                ! [m] Ice thickness on standard grid (aa-nodes)
+        real(prec), intent(IN) :: f_grnd(:,:)               ! [--] Grounded fraction (aa-nodes)
+        real(prec) :: f_ice(size(H_ice,1),size(H_ice,2))    ! [--] Ice covered fraction (aa-nodes)
 
         ! Local variables 
         integer :: i, j, nx, ny 
         real(prec) :: dx, dy 
         real(prec) :: H_ref(4)
         logical :: mask_ref(4)
-        real(prec) :: H_frac 
+        real(prec) :: H_mrgn 
 
         nx = size(H_ice,1)
         ny = size(H_ice,2)
@@ -499,17 +501,12 @@ contains
         dy = 1.0 
 
         ! Initially set fraction to one everywhere there is ice 
-        ! and zero everywhere there is no ice 
-        where (f_grnd .eq. 0.0 .and. H_ice .gt. 0.0)
-            ! Floating ice 
-            f_ice = 1.0
-        else where ( f_grnd .gt. 0.0 .and. H_ice .gt. 0.0 )
-            ! Grounded ice 
-            f_ice = 1.0 
-        elsewhere
-            ! No ice  
-            f_ice = 0.0 
-        end where
+        ! and zero everywhere there is no ice
+        f_ice = 0.0  
+        where (H_ice .gt. 0.0) f_ice = 1.0
+
+if (.FALSE.) then 
+    ! For now, ice-fraction is disabled 
 
         ! For ice-covered points with ice-free neighbors (ie, at the floating or grounded margin),
         ! determine the fraction of grid point that should be ice covered. 
@@ -517,29 +514,30 @@ contains
         do j = 2, ny-1
         do i = 2, nx-1 
 
-            if (f_grnd(i,j) .eq. 0.0 .and. f_ice(i,j) .gt. 0.0 .and. &
+            if (f_ice(i,j) .gt. 0.0 .and. &
                 count([f_ice(i-1,j),f_ice(i+1,j),f_ice(i,j-1),f_ice(i,j+1)].eq.0) .gt. 0) then 
-                ! This point is at the calving front 
+                ! This point is at the ice margin
 
                 H_ref    = [H_ice(i-1,j),H_ice(i+1,j),H_ice(i,j-1),H_ice(i,j+1)]
-                mask_ref = ([f_grnd(i-1,j),f_grnd(i+1,j),f_grnd(i,j-1),f_grnd(i,j+1)] .eq. 0.0 &
-                            .and. H_ref .gt. 0.0) .or. &
-                           ([f_grnd(i-1,j),f_grnd(i+1,j),f_grnd(i,j-1),f_grnd(i,j+1)] .gt. 0.0 &
-                            .and. H_ref .gt. 0.0)
+                mask_ref = (H_ref .gt. 0.0)
 
                 if (count(mask_ref) .gt. 0) then 
                     ! Neighbors with ice should generally be found, but put this check just in case
 
                     ! Determine height to give to partially filled cell as average of neighbors
-                    H_frac = sum(H_ref,mask=mask_ref)/real(count(mask_ref))
+                    H_mrgn = sum(H_ref,mask=mask_ref)/real(count(mask_ref))
+
+                    ! If margin point is grounded, then assign it with 
+                    ! a thickness of half of neighbor-average
+                    if (f_grnd(i,j) .eq. 1.0) H_mrgn = 0.5 * H_mrgn
 
                     ! Determine the cell ice fraction
                     ! Note: fraction is determined as a ratio of 
                     ! thicknesses, derived from volume conservation 
-                    ! vol = H_ice*dx*dy = H_frac*area_frac 
+                    ! vol = H_ice*dx*dy = H_mrgn*area_frac 
                     ! f_ice = area_frac / (dx*dy)
-                    ! f_ice = H_ice/H_frac 
-                    f_ice(i,j) = min( H_ice(i,j) / H_frac, 1.0 ) 
+                    ! f_ice = H_ice/H_mrgn 
+                    f_ice(i,j) = min( H_ice(i,j) / H_mrgn, 1.0 ) 
 
                 end if
 
@@ -547,7 +545,9 @@ contains
 
         end do 
         end do 
-        
+
+end if 
+
         return 
 
     end function calc_ice_fraction
@@ -585,22 +585,24 @@ contains
 
     end subroutine calc_z_srf 
 
-    elemental subroutine calc_z_srf_max(z_srf,H_ice,z_bed,z_sl)
+    subroutine calc_z_srf_max(z_srf,H_ice,z_bed,z_sl)
         ! Calculate surface elevation
         ! Adapted from Pattyn (2017), Eq. 1
         
         implicit none 
 
-        real(prec), intent(INOUT) :: z_srf
-        real(prec), intent(IN)    :: H_ice
-        real(prec), intent(IN)    :: z_bed
-        real(prec), intent(IN)    :: z_sl
+        real(prec), intent(INOUT) :: z_srf(:,:) 
+        real(prec), intent(IN)    :: H_ice(:,:)
+        real(prec), intent(IN)    :: z_bed(:,:)
+        real(prec), intent(IN)    :: z_sl(:,:)
 
         ! Local variables
         real(prec) :: rho_ice_sw
+        real(prec) :: H_mrgn 
 
         rho_ice_sw = rho_ice/rho_sw ! Ratio of density of ice to seawater [--]
         
+        ! Initially calculate surface elevation everywhere 
         z_srf = max(z_bed + H_ice, z_sl + (1.0-rho_ice_sw)*H_ice)
         
         return 

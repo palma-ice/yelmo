@@ -139,7 +139,7 @@ contains
         ! ===== Calculate driving stress ==============================
 
         ! Calculate driving stress 
-        call calc_driving_stress_ac(dyn%now%taud_acx,dyn%now%taud_acy,tpo%now%H_ice,tpo%now%z_srf,bnd%z_bed,bnd%z_sl, &
+        call calc_driving_stress_ac(dyn%now%taud_acx,dyn%now%taud_acy,tpo%now%H_ice,tpo%now%f_ice,tpo%now%z_srf,bnd%z_bed,bnd%z_sl, &
                  tpo%now%H_grnd,tpo%now%f_grnd,tpo%now%f_grnd_acx,tpo%now%f_grnd_acy,dyn%par%dx,method=dyn%par%taud_gl_method)
 
         ! ===== Calculate shear (ie, SIA) velocity solution ===========
@@ -491,7 +491,7 @@ contains
         call calc_ydyn_cbed(dyn,tpo,thrm,bnd)
         
         ! Calculate driving stress 
-        call calc_driving_stress_ac(dyn%now%taud_acx,dyn%now%taud_acy,tpo%now%H_ice,tpo%now%z_srf,bnd%z_bed,bnd%z_sl, &
+        call calc_driving_stress_ac(dyn%now%taud_acx,dyn%now%taud_acy,tpo%now%H_ice,tpo%now%f_ice,tpo%now%z_srf,bnd%z_bed,bnd%z_sl, &
                  tpo%now%H_grnd,tpo%now%f_grnd,tpo%now%f_grnd_acx,tpo%now%f_grnd_acy,dyn%par%dx,method=dyn%par%taud_gl_method)
 
         ! Calculate 2D diffusivity too (for timestepping and diagnostics)

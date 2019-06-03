@@ -199,9 +199,9 @@ contains
     subroutine calc_beta_aa_coulomb(beta,ux_b,uy_b,C_bed,m_drag,u_0)
         ! Calculate basal friction coefficient (beta) that
         ! enters the SSA solver as a function of basal velocity
-        ! Pollard and de Conto (2012), inverse of Eq. 10, given in text
-        ! following Eq. 7: beta = c_b**(-1/m)*|u_b|**((1-m)/m)
-        ! Note: Calculated on ac-nodes
+        ! using a regularized Coulomb friction law following
+        ! Joughin et al (2019), GRL, Eqs. 2a/2b
+        ! Note: Calculated on aa-nodes
         ! Note: beta should be calculated for bed everywhere, 
         ! independent of floatation, which is accounted for later
         
@@ -212,7 +212,7 @@ contains
         real(prec), intent(IN)  :: uy_b(:,:)        ! ac-nodes
         real(prec), intent(IN)  :: C_bed(:,:)       ! Aa nodes
         real(prec), intent(IN)  :: m_drag
-        real(prec), intent(IN)  :: u_0
+        real(prec), intent(IN)  :: u_0              ! [m/a] 
 
         ! Local variables
         integer    :: i, j, nx, ny
@@ -221,7 +221,7 @@ contains
         real(prec) :: exp1, exp2
         real(prec) :: C_bed_ac 
 
-        real(prec), parameter :: u_b_min    = 1e-3_prec  ! [m/a] Minimum velocity is positive small value to avoid divide by zero
+        real(prec), parameter :: u_b_min    = 1e-1_prec  ! [m/a] Minimum velocity is positive small value to avoid divide by zero
 
         nx = size(beta,1)
         ny = size(beta,2)
@@ -242,7 +242,10 @@ contains
             ! Calculate magnitude of basal velocity on aa-node 
             ux_b_mid  = 0.5_prec*(ux_b(i1,j)+ux_b(i,j))
             uy_b_mid  = 0.5_prec*(uy_b(i,j1)+uy_b(i,j))
-            uxy_b     = (ux_b_mid**2 + uy_b_mid**2 + u_b_min**2)**0.5_prec
+            uxy_b     = (ux_b_mid**2 + uy_b_mid**2)**0.5_prec
+
+            ! Ensure velocity is not zero (to avoid really high values of beta)
+            uxy_b     = max(uxy_b,u_b_min)
 
             ! Nonlinear beta as a function of basal velocity (unless m==1)
             beta(i,j) = C_bed(i,j) * (uxy_b / (uxy_b+u_0))**exp1 * uxy_b**(-1.0_prec)

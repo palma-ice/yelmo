@@ -154,6 +154,7 @@ module yelmo_defs
         integer    :: mix_method        ! Method for mixing sia and ssa velocity solutions
         logical    :: calc_diffusivity  ! Calculate diagnostic diffusivity field
         real(prec) :: m_drag            ! Sliding law exponent (m==1: plastic)
+        real(prec) :: u_0               ! [m/a] Regularized coulomb friction velocity 
         real(prec) :: beta_max          ! Maximum value of beta for which ssa should be calculated
         integer    :: beta_method
         real(prec) :: beta_const

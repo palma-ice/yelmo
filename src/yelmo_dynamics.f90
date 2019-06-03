@@ -841,7 +841,7 @@ contains
             case(3)
                 ! Calculate beta from regularized Coulomb law (Joughin et al., GRL, 2019)
 
-                call calc_beta_aa_coulomb(dyn%now%beta,dyn%now%ux_b,dyn%now%uy_b,dyn%now%C_bed,dyn%par%m_drag,u_0=300.0)
+                call calc_beta_aa_coulomb(dyn%now%beta,dyn%now%ux_b,dyn%now%uy_b,dyn%now%C_bed,dyn%par%m_drag,dyn%par%u_0)
                 
                 ! Additionally scale by N_eff (beta = c_b*N_eff)
                 call scale_beta_aa_Neff(dyn%now%beta,tpo%now%N_eff)
@@ -1040,6 +1040,13 @@ contains
 
                 end if
 
+            case(2)
+                ! Set C_bed according to bed elevation and or temperate, etc. (experimental)
+
+                write(*,*) "To do!!!!!"
+                stop 
+                
+
             case DEFAULT 
                 ! Not recognized 
 
@@ -1073,6 +1080,7 @@ contains
         call nml_read(filename,"ydyn","mix_method",         par%mix_method,         init=init_pars)
         call nml_read(filename,"ydyn","calc_diffusivity",   par%calc_diffusivity,   init=init_pars)
         call nml_read(filename,"ydyn","m_drag",             par%m_drag,             init=init_pars)
+        call nml_read(filename,"ydyn","u_0",                par%u_0,                init=init_pars)
         call nml_read(filename,"ydyn","beta_max",           par%beta_max,           init=init_pars)
         call nml_read(filename,"ydyn","beta_method",        par%beta_method,        init=init_pars)
         call nml_read(filename,"ydyn","beta_const",         par%beta_const,         init=init_pars)

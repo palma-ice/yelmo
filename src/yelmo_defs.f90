@@ -169,7 +169,9 @@ module yelmo_defs
         real(prec) :: cf_stream
         real(prec) :: cf_frozen
         real(prec) :: cf_fac_sed
-        real(prec) :: cf_sia 
+        real(prec) :: cf_sia
+        real(prec) :: cf_z1 
+        real(prec) :: cf_z0  
         logical    :: streaming_margin      ! Ensure margin and grline are considered streaming?
         integer    :: n_sm_beta 
         real(prec) :: ssa_vel_max

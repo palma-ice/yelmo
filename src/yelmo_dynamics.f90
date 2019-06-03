@@ -985,6 +985,7 @@ contains
 
         integer :: i, j, nx, ny 
         integer :: i1, i2, j1, j2 
+        real(prec) :: f_scale 
 
         nx = size(dyn%now%C_bed,1)
         ny = size(dyn%now%C_bed,2)
@@ -1043,9 +1044,22 @@ contains
             case(2)
                 ! Set C_bed according to bed elevation and or temperate, etc. (experimental)
 
-                write(*,*) "To do!!!!!"
-                stop 
-                
+                ! First set C_bed == cf_stream everywhere 
+                dyn%now%C_bed = dyn%par%cf_stream 
+
+                ! Next, apply lambda functions [0:1] to reduce friction
+                !  where appropriate 
+
+                do j = 1, ny 
+                do i = 1, nx 
+
+                    ! Scale C_bed as a function bedrock elevation 
+                    f_scale = exp( (bnd%z_bed(i,j) - dyn%par%cf_z1) / (dyn%par%cf_z1 - dyn%par%cf_z0) )
+                    if (f_scale .gt. 1.0) f_scale = 1.0 
+                    dyn%now%C_bed(i,j) = dyn%now%C_bed(i,j) * f_scale 
+
+                end do 
+                end do 
 
             case DEFAULT 
                 ! Not recognized 
@@ -1096,6 +1110,8 @@ contains
         call nml_read(filename,"ydyn","cf_stream",          par%cf_stream,          init=init_pars)
         call nml_read(filename,"ydyn","cf_fac_sed",         par%cf_fac_sed,         init=init_pars)
         call nml_read(filename,"ydyn","cf_sia",             par%cf_sia,             init=init_pars)
+        call nml_read(filename,"ydyn","cf_z1",              par%cf_z1,              init=init_pars)
+        call nml_read(filename,"ydyn","cf_z0",              par%cf_z0,              init=init_pars)
         call nml_read(filename,"ydyn","streaming_margin",   par%streaming_margin,   init=init_pars)
         call nml_read(filename,"ydyn","n_sm_beta",          par%n_sm_beta,          init=init_pars)
         call nml_read(filename,"ydyn","ssa_vel_max",        par%ssa_vel_max,        init=init_pars)

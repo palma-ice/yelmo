@@ -62,14 +62,16 @@
     beta_gl_stag        = 2               !  0: simple staggering, 1: Upstream beta at gl, 2: f_grnd_ac scaling 
     f_beta_gl           = 1.0             ! [-] Scaling of beta at the grounding line (for beta_gl_method=1)
     taud_gl_method      = 0               !  0: binary, no subgrid, 1: Two-sided gradient
-    C_bed_method        = 0              ! -1: set externally; 0: cf_stream everywhere; 1: cf_stream/cf_frozen 
+    C_bed_method        = 2               ! -1: set externally; 0: cf_stream everywhere; 1: cf_stream/cf_frozen; 2: cf_stream*f_zbed 
     beta_const          = 1e3             ! [Pa a m−1] Constant value of basal friction coefficient to be used
     H_grnd_lim          = 500.0           ! [m] For beta_sep_method=2, reduce beta linearly between H_grnd=0 and H_grnd_lim 
     H_sed_sat           = 250.0           ! [m] Sediment thickness at which sediment effect is saturated
     cf_frozen           = 100.0           ! [a m-1] Bed roughness coefficient, frozen 
-    cf_stream           = 1e4             ! [a m-1] Bed roughness coefficient, stream  
+    cf_stream           = 5e4             ! [a m-1] Bed roughness coefficient, stream  
     cf_fac_sed          = 1.0             ! [-] Scaling of roughness for sediments 
     cf_sia              = 0.0             ! [m a-1 Pa-1] Bed roughness coefficient for SIA sliding
+    cf_z1               = 200.0           ! [m] Bedrock elevation above which scaling goes to f_scale=1
+    cf_z0               = -200.0          ! [m] Bedrock elevation at which scaling goes to f_scale=e(-1)
     streaming_margin    = True            ! Impose cf_stream at the margin and grline independent of f_pmp
     n_sm_beta           = 0               ! [-] Standard deviation in gridpoints for Gaussian smoothing of beta (0==no smoothing)
     ssa_vel_max         = 5000.0          ! [m a-1] SSA velocity limit to avoid spurious results 

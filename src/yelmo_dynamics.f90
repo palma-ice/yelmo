@@ -142,6 +142,11 @@ contains
         call calc_driving_stress_ac(dyn%now%taud_acx,dyn%now%taud_acy,tpo%now%H_ice,tpo%now%f_ice,tpo%now%z_srf,bnd%z_bed,bnd%z_sl, &
                  tpo%now%H_grnd,tpo%now%f_grnd,tpo%now%f_grnd_acx,tpo%now%f_grnd_acy,dyn%par%dx,method=dyn%par%taud_gl_method)
 
+        ! ===== Calculate effective pressure ==============================
+
+        ! Calculate effective pressure 
+        call calc_ydyn_neff(dyn,tpo,thrm,bnd)
+
         ! ===== Calculate shear (ie, SIA) velocity solution ===========
 
         select case(trim(dyn%par%solver))
@@ -1098,7 +1103,7 @@ contains
 
             case(0)
                 ! Effective pressure == overburden pressure 
-                dyn%now%N_eff = rho_ice*g*tpo%now%H_ice 
+                dyn%now%N_eff = calc_effective_pressure_overburden(tpo%now%H_ice,tpo%now%f_grnd.lt.1.0)
 
             case(1) 
                 ! Effective pressure diminishes with marine character
@@ -1117,7 +1122,7 @@ contains
                     H_w = dyn%par%neff_w_max * thrm%now%f_pmp  
                 end if 
 
-                dyn%now%N_eff = calc_effective_pressure_till(H_w,tpo%now%H_ice,tpo%now%f_grnd.le.1.0,dyn%par%neff_w_max, &
+                dyn%now%N_eff = calc_effective_pressure_till(H_w,tpo%now%H_ice,tpo%now%f_grnd.lt.1.0,dyn%par%neff_w_max, &
                                             dyn%par%neff_N0,dyn%par%neff_delta,dyn%par%neff_e0,dyn%par%neff_Cc) 
 
             case DEFAULT 
@@ -1178,8 +1183,15 @@ contains
         call nml_read(filename,"ydyn","ssa_iter_rel",       par%ssa_iter_rel,       init=init_pars)
         call nml_read(filename,"ydyn","ssa_iter_conv",      par%ssa_iter_conv,      init=init_pars)
         
-        call nml_read(filename,"ydyn_neff","neff_p",        par%neff_p,           init=init_pars)
-        
+        call nml_read(filename,"ydyn_neff","neff_method",   par%neff_method,        init=init_pars)
+        call nml_read(filename,"ydyn_neff","neff_p",        par%neff_p,             init=init_pars)
+        call nml_read(filename,"ydyn_neff","neff_use_water",par%neff_use_water,     init=init_pars)
+        call nml_read(filename,"ydyn_neff","neff_w_max",    par%neff_w_max,         init=init_pars)
+        call nml_read(filename,"ydyn_neff","neff_N0",       par%neff_N0,            init=init_pars)
+        call nml_read(filename,"ydyn_neff","neff_delta",    par%neff_delta,         init=init_pars)
+        call nml_read(filename,"ydyn_neff","neff_e0",       par%neff_e0,            init=init_pars)
+        call nml_read(filename,"ydyn_neff","neff_Cc",       par%neff_Cc,            init=init_pars)
+
         ! Perform parameter consistency checks 
         if ( par%cf_fac_sed .gt. 1.0 ) then 
             write(*,*) "bdrag_par_load:: error: cf_fac_sed must be less than or equal to 1.0."

@@ -20,6 +20,7 @@ module basal_dragging
     private
 
     ! Effective pressure
+    public :: calc_effective_pressure_overburden
     public :: calc_effective_pressure_marine
     public :: calc_effective_pressure_till
 
@@ -44,6 +45,26 @@ module basal_dragging
     public :: stagger_beta_aa_subgrid_1 
     
 contains 
+
+    elemental function calc_effective_pressure_overburden(H_ice,is_float) result(N_eff)
+        ! Effective pressure as overburden pressure N_eff = rho*g*H_ice 
+
+        implicit none 
+
+        real(prec), intent(IN) :: H_ice 
+        logical,    intent(IN) :: is_float 
+        real(prec) :: N_eff                 ! Output in [bar] == [1e-5 Pa] 
+
+        ! Calculate effective pressure (overburden pressure)
+        ! Convert from [Pa] => [bar]
+        N_eff = 1e-5 * (rho_ice*g*H_ice)
+
+        ! No remaining pressure at base for floating ice
+        if (is_float) N_eff = 0.0 
+
+        return 
+
+    end function calc_effective_pressure_overburden
 
     elemental function calc_effective_pressure_marine(H_ice,z_bed,z_sl,H_w,p) result(N_eff)
         ! Effective pressure as a function of connectivity to the ocean
@@ -129,9 +150,41 @@ contains
         ! Convert from [Pa] => [bar]
         N_eff = 1e-5 * min( N0*(delta*P0/N0)**s * 10**((e0/Cc)*(1-s)), P0 ) 
 
+        ! No remaining pressure at base for floating ice
+        if (is_float) N_eff = 0.0 
+
         return 
 
     end function calc_effective_pressure_till
+
+
+!     elemental function calc_C_bed_till(z_bed,C_bed_z0,C_bed_z1) result(N_eff)
+!         ! Calculate the effective pressure of the till
+!         ! following van Pelt and Bueler (2015), Eq. 23.
+        
+!         implicit none 
+        
+!         real(prec), intent(IN)    :: H_w
+!         real(prec), intent(IN)    :: H_ice
+!         logical,    intent(IN)    :: is_float  
+!         real(prec), intent(IN)    :: H_w_max            ! [m] Maximum allowed water depth 
+!         real(prec), intent(IN)    :: N0                 ! [Pa] Reference effective pressure 
+!         real(prec), intent(IN)    :: delta              ! [--] Fraction of overburden pressure for saturated till
+!         real(prec), intent(IN)    :: e0                 ! [--] Reference void ratio at N0 
+!         real(prec), intent(IN)    :: Cc                 ! [--] Till compressibility 
+!         real(prec)                :: N_eff              ! [Pa] Effective pressure 
+        
+!         ! Local variables 
+!         real(prec) :: phi, f_scale 
+
+!         ! Scale till angle phi as a function bedrock elevation 
+!         f_scale = exp( (z_bed - C_bed_z1) / (C_bed_z1 - C_bed_z0) )
+!         if (f_scale .gt. 1.0) f_scale = 1.0 
+!         phi = phi * f_scale 
+
+!         return 
+
+!     end function calc_C_bed_till
 
     ! ================================================================================
     !

@@ -46,7 +46,6 @@
     gl_sep            = 1               ! 1: Linear f_grnd_acx/acy and binary f_grnd, 2: area f_grnd, average to acx/acy
     gl_sep_nx         = 15              ! [-] Number of interpolation points (nx*nx) to calculate grounded area at grounding line
     diffuse_bmb_shlf  = False           ! Allow bmb_shlf to permeate inland at the grounding line 
-    neff_p            = 1.0             ! Effective pressure: connectivity to the ocean (0: none, 1: full)
 /
 
 &ydyn
@@ -82,14 +81,14 @@
 /
 
 &ydyn_neff 
-        neff_method     = 2                 ! -1: external N_eff, 0: overburden pressure, 1: Leguy param., 2: Till pressure
-        neff_p          = 0.0               ! *neff_method=1* marine connectivity exponent
-        neff_use_water  = False             ! *neff_method=2* Use H_w field or parameterize it?
-        neff_w_max      = 2.0               ! [m]  *neff_method=2* Maximum allowed water layer thickness for Till pressure 
-        neff_N0         = 1000.0            ! [Pa] *neff_method=2* Reference effective pressure 
-        neff_delta      = 0.04              ! [--] *neff_method=2* Fraction of overburden pressure for saturated till
-        neff_e0         = 0.69              ! [--] *neff_method=2* Reference void ratio at N0 
-        neff_Cc         = 0.12              ! [--] *neff_method=2* Till compressibility    
+    neff_method     = 2                 ! -1: external N_eff, 0: overburden pressure, 1: Leguy param., 2: Till pressure
+    neff_p          = 0.0               ! *neff_method=1* marine connectivity exponent (0: none, 1: full)
+    neff_use_water  = False             ! *neff_method=2* Use H_w field or parameterize it?
+    neff_w_max      = 2.0               ! [m]  *neff_method=2* Maximum allowed water layer thickness for Till pressure 
+    neff_N0         = 1000.0            ! [Pa] *neff_method=2* Reference effective pressure 
+    neff_delta      = 0.04              ! [--] *neff_method=2* Fraction of overburden pressure for saturated till
+    neff_e0         = 0.69              ! [--] *neff_method=2* Reference void ratio at N0 
+    neff_Cc         = 0.12              ! [--] *neff_method=2* Till compressibility    
 /
 
 &ydyn_till

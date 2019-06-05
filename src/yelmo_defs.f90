@@ -85,7 +85,6 @@ module yelmo_defs
         integer    :: gl_sep 
         integer    :: gl_sep_nx 
         logical    :: diffuse_bmb_shlf 
-        real(prec) :: neff_p 
 
         ! Internal parameters 
         real(prec) :: time 
@@ -129,8 +128,6 @@ module yelmo_defs
         logical,    allocatable :: is_grline(:,:)   ! Grounding line points
         logical,    allocatable :: is_grz(:,:)      ! Grounding line plus grounded neighbors
         
-        real(prec), allocatable :: N_eff(:,:)       ! Effective pressure
-
     end type
 
     ! ytopo class
@@ -151,11 +148,11 @@ module yelmo_defs
     type ydyn_param_class
 
         character(len=256) :: solver 
-        integer    :: mix_method        ! Method for mixing sia and ssa velocity solutions
-        logical    :: calc_diffusivity  ! Calculate diagnostic diffusivity field
-        real(prec) :: m_drag            ! Sliding law exponent (m==1: plastic)
-        real(prec) :: u_0               ! [m/a] Regularized coulomb friction velocity 
-        real(prec) :: beta_max          ! Maximum value of beta for which ssa should be calculated
+        integer    :: mix_method            ! Method for mixing sia and ssa velocity solutions
+        logical    :: calc_diffusivity      ! Calculate diagnostic diffusivity field
+        real(prec) :: m_drag                ! Sliding law exponent (m==1: plastic)
+        real(prec) :: u_0                   ! [m/a] Regularized coulomb friction velocity 
+        real(prec) :: beta_max              ! Maximum value of beta for which ssa should be calculated
         integer    :: beta_method
         real(prec) :: beta_const
         integer    :: beta_gl_sep           ! Beta grounding-line subelement (subgrid) parameterization
@@ -166,18 +163,27 @@ module yelmo_defs
         real(prec) :: H_grnd_lim 
         real(prec) :: H_sed_sat
         integer    :: C_bed_method 
+        real(prec) :: C_bed_z0  
+        real(prec) :: C_bed_z1 
         real(prec) :: cf_stream
         real(prec) :: cf_frozen
         real(prec) :: cf_fac_sed
         real(prec) :: cf_sia
-        real(prec) :: cf_z1 
-        real(prec) :: cf_z0  
         logical    :: streaming_margin      ! Ensure margin and grline are considered streaming?
         integer    :: n_sm_beta 
         real(prec) :: ssa_vel_max
         integer    :: ssa_iter_max 
         real(prec) :: ssa_iter_rel 
         real(prec) :: ssa_iter_conv 
+
+        integer    :: neff_method
+        real(prec) :: neff_p 
+        logical    :: neff_use_water 
+        real(prec) :: neff_w_max
+        real(prec) :: neff_N0
+        real(prec) :: neff_delta 
+        real(prec) :: neff_e0 
+        real(prec) :: neff_Cc 
 
         ! Internal parameters 
         character(len=256) :: boundaries 
@@ -248,6 +254,7 @@ module yelmo_defs
         
         real(prec), allocatable :: visc_eff(:,:)
 
+        real(prec), allocatable :: N_eff(:,:)       ! Effective pressure
         real(prec), allocatable :: C_bed(:,:)  
         real(prec), allocatable :: beta_acx(:,:) 
         real(prec), allocatable :: beta_acy(:,:) 

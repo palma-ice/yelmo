@@ -19,7 +19,9 @@ module basal_dragging
 
     private
 
-    public :: calc_effective_pressure
+    ! Effective pressure
+    public :: calc_effective_pressure_marine
+    public :: calc_effective_pressure_till
 
     ! Beta functions (aa-nodes)
     public :: calc_beta_aa_linear
@@ -40,22 +42,10 @@ module basal_dragging
     public :: stagger_beta_aa_upstream
     public :: stagger_beta_aa_subgrid
     public :: stagger_beta_aa_subgrid_1 
-
-    ! Extra...
-    public :: calc_beta_ac_linear
-    public :: calc_beta_ac_power
-    public :: scale_beta_ac_binary
-    public :: scale_beta_ac_fraction
-    public :: scale_beta_ac_Neff
-
-    public :: scale_beta_ac_Hgrnd
-    public :: scale_beta_ac_zstar
-    public :: scale_beta_ac_l14
-    
     
 contains 
 
-    elemental function calc_effective_pressure(H_ice,z_bed,z_sl,H_w,p) result(N_eff)
+    elemental function calc_effective_pressure_marine(H_ice,z_bed,z_sl,H_w,p) result(N_eff)
         ! Effective pressure as a function of connectivity to the ocean
         ! as defined by Leguy et al. (2014), Eq. 14, and modified
         ! by Robinson and Alvarez-Solas to account for basal water pressure (to do!)
@@ -108,7 +98,40 @@ contains
 
         return 
 
-    end function calc_effective_pressure
+    end function calc_effective_pressure_marine
+
+    elemental function calc_effective_pressure_till(H_w,H_ice,is_float,H_w_max,N0,delta,e0,Cc) result(N_eff)
+        ! Calculate the effective pressure of the till
+        ! following van Pelt and Bueler (2015), Eq. 23.
+        
+        implicit none 
+        
+        real(prec), intent(IN)    :: H_w
+        real(prec), intent(IN)    :: H_ice
+        logical,    intent(IN)    :: is_float  
+        real(prec), intent(IN)    :: H_w_max            ! [m] Maximum allowed water depth 
+        real(prec), intent(IN)    :: N0                 ! [Pa] Reference effective pressure 
+        real(prec), intent(IN)    :: delta              ! [--] Fraction of overburden pressure for saturated till
+        real(prec), intent(IN)    :: e0                 ! [--] Reference void ratio at N0 
+        real(prec), intent(IN)    :: Cc                 ! [--] Till compressibility 
+        real(prec)                :: N_eff              ! [Pa] Effective pressure 
+        
+        ! Local variables 
+        real(prec) :: P0, s 
+
+        ! Get overburden pressure 
+        P0 = rho_ice*g*H_ice
+
+        ! Get ratio of water layer thickness to maximum
+        s  = min(H_w/H_w_max,1.0)  
+
+        ! Calculate the effective pressure in the till (van Pelt and Bueler, 2015, Eq. 23-24)
+        ! Convert from [Pa] => [bar]
+        N_eff = 1e-5 * min( N0*(delta*P0/N0)**s * 10**((e0/Cc)*(1-s)), P0 ) 
+
+        return 
+
+    end function calc_effective_pressure_till
 
     ! ================================================================================
     !
@@ -794,489 +817,6 @@ contains
     ! ================================================================================
 
 
-
-! ===== beta (ac-nodes) formulation, calculate beta on ac-nodes directly =====
-
-    subroutine calc_beta_ac_linear(beta_acx,beta_acy,C_bed)
-        ! Calculate basal friction coefficient (beta) that
-        ! enters the SSA solver as a function of basal velocity
-        ! Pollard and de Conto (2012), inverse of Eq. 10, given following Eq. 7
-        ! Note: Calculated on ac-nodes
-        ! Note: beta should be calculated for bed everywhere, 
-        ! independent of floatation, which is accounted for later
-        
-        implicit none
-        
-        real(prec), intent(OUT) :: beta_acx(:,:)    ! ac-nodes
-        real(prec), intent(OUT) :: beta_acy(:,:)    ! ac-nodes
-        real(prec), intent(IN)  :: C_bed(:,:)       ! Aa nodes
-        
-        ! Local variables
-        integer    :: i, j, nx, ny
-        integer    :: i1, i2, j1, j2 
-        real(prec) :: C_bed_ac 
-
-        nx = size(beta_acx,1)
-        ny = size(beta_acx,2)
-        
-        ! Initially set friction to zero everywhere
-        beta_acx = 0.0_prec 
-        beta_acy = 0.0_prec 
-        
-        ! x-direction 
-        do j = 1, ny
-        do i = 1, nx-1
-
-            ! Get topo and bed quantities on Ac node 
-            beta_acx(i,j) = 0.5_prec*(C_bed(i,j)+C_bed(i+1,j))
-
-        end do
-        end do
-        
-        ! y-direction 
-        do j = 1, ny-1
-        do i = 1, nx
-
-            ! Get bed roughness on ac-node 
-            beta_acy(i,j) = 0.5_prec*(C_bed(i,j)+C_bed(i,j+1))  
-
-        end do
-        end do
-        
-        return
-        
-    end subroutine calc_beta_ac_linear
-    
-    subroutine calc_beta_ac_power(beta_acx,beta_acy,ux_b,uy_b,C_bed,m_drag)
-        ! Calculate basal friction coefficient (beta) that
-        ! enters the SSA solver as a function of basal velocity
-        ! Pollard and de Conto (2012), inverse of Eq. 10, given in text
-        ! following Eq. 7: beta = c_b**(-1/m)*|u_b|**((1-m)/m)
-        ! Note: Calculated on ac-nodes
-        ! Note: beta should be calculated for bed everywhere, 
-        ! independent of floatation, which is accounted for later
-        
-        implicit none
-        
-        real(prec), intent(OUT) :: beta_acx(:,:)    ! ac-nodes
-        real(prec), intent(OUT) :: beta_acy(:,:)    ! ac-nodes
-        real(prec), intent(IN)  :: ux_b(:,:)        ! ac-nodes
-        real(prec), intent(IN)  :: uy_b(:,:)        ! ac-nodes
-        real(prec), intent(IN)  :: C_bed(:,:)       ! Aa nodes
-        real(prec), intent(IN)  :: m_drag
-        
-        ! Local variables
-        integer    :: i, j, nx, ny
-        integer    :: i1, i2, j1, j2 
-        real(prec) :: ux_b_ac, uy_b_ac, uxy_b_ac
-        real(prec) :: exp1, exp2
-        real(prec) :: C_bed_ac 
-
-        real(prec), parameter :: u_b_min    = 1e-3_prec  ! [m/a] Minimum velocity is positive small value
-
-        nx = size(beta_acx,1)
-        ny = size(beta_acx,2)
-        
-        ! Pre-define exponents
-        exp1 = 1.0_prec/m_drag
-        exp2 = (1.0_prec-m_drag)/m_drag
-        
-        ! Initially set friction to zero everywhere
-        beta_acx = 0.0_prec 
-        beta_acy = 0.0_prec 
-        
-        ! x-direction 
-        do j = 1, ny
-        do i = 1, nx-1
-
-            j1 = max(j-1,1) 
-
-            ! Get topo and bed quantities on Ac node 
-            C_bed_ac = 0.5_prec*(C_bed(i,j)+C_bed(i+1,j))
-
-            ! Calculate magnitude of basal velocity on Ac node 
-            ! ux is defined on Ac node, get uy on the ux Ac node 
-            ux_b_ac  = ux_b(i,j)
-            uy_b_ac  = 0.25_prec*(uy_b(i,j)+uy_b(i,j1)+uy_b(i+1,j)+uy_b(i+1,j1))
-            uxy_b_ac = (ux_b_ac**2 + uy_b_ac**2 + u_b_min**2)**0.5
-
-            ! Nonlinear beta as a function of basal velocity (unless m==1)
-            if (uxy_b_ac .eq. 0.0) then 
-                beta_acx(i,j) = C_bed_ac**exp1
-            else 
-                beta_acx(i,j) = C_bed_ac**exp1 * uxy_b_ac**exp2 
-            end if  
-
-        end do
-        end do
-        
-        ! y-direction 
-        do j = 1, ny-1
-        do i = 1, nx
-
-            i1 = max(i-1,1) 
-            
-            ! Get bed roughness on ac-node 
-            C_bed_ac = 0.5_prec*(C_bed(i,j)+C_bed(i,j+1))  
-
-            ! Calculate magnitude of basal velocity on Ac node 
-            ! uy is defined on ac-node, get ux on the uy Ac node 
-            uy_b_ac  = uy_b(i,j)
-            ux_b_ac  = 0.25_prec*(ux_b(i,j)+ux_b(i1,j)+ux_b(i,j+1)+ux_b(i1,j+1))
-            uxy_b_ac = (ux_b_ac**2 + uy_b_ac**2 + u_b_min**2)**0.5
-
-            ! Nonlinear beta as a function of basal velocity (unless m==1)
-            if (uxy_b_ac .eq. 0.0) then 
-                beta_acy(i,j) =  C_bed_ac**exp1 
-            else 
-                beta_acy(i,j) =  C_bed_ac**exp1 * uxy_b_ac**exp2 
-            end if  
-
-        end do
-        end do
-        
-        return
-        
-    end subroutine calc_beta_ac_power
-    
-    subroutine scale_beta_ac_binary(beta_acx,beta_acy,f_grnd_acx,f_grnd_acy)
-        ! Modify basal friction coefficient by grounded/floating binary mask
-        ! (via the grounded fraction)
-
-        implicit none
-        
-        real(prec), intent(INOUT) :: beta_acx(:,:)   ! ac-nodes
-        real(prec), intent(INOUT) :: beta_acy(:,:)   ! ac-nodes
-        real(prec), intent(IN)    :: f_grnd_acx(:,:) ! ac-nodes
-        real(prec), intent(IN)    :: f_grnd_acy(:,:) ! ac-nodes
-        
-        ! Local variables
-        integer    :: i, j, nx, ny
-
-        nx = size(f_grnd_acx,1)
-        ny = size(f_grnd_acx,2) 
-
-        ! acx-nodes 
-        do j = 1, ny 
-        do i = 1, nx-1
-
-            if (f_grnd_acx(i,j) .lt. 1.0) beta_acx(i,j) = 0.0 
-
-        end do 
-        end do 
-
-        beta_acx(nx,:) = beta_acx(nx-1,:) 
-
-        ! acy-nodes 
-        do j = 1, ny-1 
-        do i = 1, nx
-
-            if (f_grnd_acy(i,j) .lt. 1.0) beta_acy(i,j) = 0.0 
-
-        end do 
-        end do 
-        
-        beta_acy(:,ny) = beta_acy(:,ny-1) 
-
-        return
-        
-    end subroutine scale_beta_ac_binary
-    
-    subroutine scale_beta_ac_fraction(beta_acx,beta_acy,f_grnd_acx,f_grnd_acy)
-        ! Modify basal friction coefficient by grounded ice fraction at grounding line
-
-        implicit none
-        
-        real(prec), intent(INOUT) :: beta_acx(:,:)   ! ac-nodes
-        real(prec), intent(INOUT) :: beta_acy(:,:)   ! ac-nodes
-        real(prec), intent(IN)    :: f_grnd_acx(:,:) ! ac-nodes
-        real(prec), intent(IN)    :: f_grnd_acy(:,:) ! ac-nodes
-        
-        ! Local variables
-        integer    :: i, j, nx, ny
-
-        nx = size(f_grnd_acx,1)
-        ny = size(f_grnd_acx,2) 
-
-        ! acx-nodes 
-        do j = 1, ny 
-        do i = 1, nx-1
-
-            beta_acx(i,j) = f_grnd_acx(i,j) * beta_acx(i,j)
-
-        end do 
-        end do 
-
-        beta_acx(nx,:) = beta_acx(nx-1,:) 
-
-        ! acy-nodes 
-        do j = 1, ny-1 
-        do i = 1, nx
-
-            beta_acy(i,j) = f_grnd_acy(i,j) * beta_acy(i,j)
-
-        end do 
-        end do 
-        
-        beta_acy(:,ny) = beta_acy(:,ny-1) 
-
-        return
-        
-    end subroutine scale_beta_ac_fraction
-    
-    subroutine scale_beta_ac_Neff(beta_acx,beta_acy,N_eff)
-        ! Calculate scalar between 0 and 1 to modify basal friction coefficient
-        ! as ice approaches and achieves floatation, and apply.
-        
-        implicit none
-        
-        real(prec), intent(INOUT) :: beta_acx(:,:)    ! ac-nodes
-        real(prec), intent(INOUT) :: beta_acy(:,:)    ! ac-nodes
-        real(prec), intent(IN)    :: N_eff(:,:)       ! aa-nodes, [bar]     
-
-        ! Local variables
-        integer    :: i, j, nx, ny 
-        real(prec) :: N_eff_mid 
-
-        nx = size(beta_acx,1)
-        ny = size(beta_acx,2) 
-
-        ! acx-nodes 
-        do j = 1, ny 
-        do i = 1, nx-1 
-
-            N_eff_mid     = 0.5_prec*(N_eff(i,j)+N_eff(i+1,j))
-            beta_acx(i,j) = N_eff_mid * beta_acx(i,j) 
-
-        end do 
-        end do  
-
-        ! acy-nodes 
-        do j = 1, ny-1 
-        do i = 1, nx 
-
-            N_eff_mid     = 0.5_prec*(N_eff(i,j)+N_eff(i,j+1))
-            beta_acy(i,j) = N_eff_mid * beta_acy(i,j) 
-
-        end do 
-        end do  
-
-        return
-        
-    end subroutine scale_beta_ac_Neff
-
-    subroutine scale_beta_ac_Hgrnd(beta_acx,beta_acy,H_grnd,H_grnd_lim)
-        ! Calculate scalar between 0 and 1 to modify basal friction coefficient
-        ! as ice approaches and achieves floatation, and apply.
-        
-        implicit none
-        
-        real(prec), intent(INOUT) :: beta_acx(:,:)    ! ac-nodes
-        real(prec), intent(INOUT) :: beta_acy(:,:)    ! ac-nodes
-        real(prec), intent(IN)    :: H_grnd(:,:)      ! aa-nodes
-        real(prec), intent(IN)    :: H_grnd_lim       
-
-        ! Local variables
-        integer    :: i, j, nx, ny
-        real(prec) :: H_grnd_mid 
-        real(prec) :: f_scale 
-
-        nx = size(H_grnd,1)
-        ny = size(H_grnd,2) 
-
-        ! Consistency check 
-        if (H_grnd_lim .le. 0.0) then 
-            write(*,*) "scale_beta_ac_Hgrnd:: Error: H_grnd_lim must be positive."
-            write(*,*) "H_grnd_lim = ", H_grnd_lim
-            stop 
-        end if 
-
-        ! acx-nodes 
-        do j = 1, ny 
-        do i = 1, nx-1 
-
-            H_grnd_mid    = 0.5_prec*(H_grnd(i,j)+H_grnd(i+1,j))
-
-            f_scale       = max( min(H_grnd_mid,H_grnd_lim)/H_grnd_lim, 0.0) 
-
-            beta_acx(i,j) = f_scale * beta_acx(i,j) 
-
-        end do 
-        end do  
-
-        ! acy-nodes 
-        do j = 1, ny-1 
-        do i = 1, nx 
-
-            H_grnd_mid    = 0.5_prec*(H_grnd(i,j)+H_grnd(i,j+1))
-
-            f_scale       = max( min(H_grnd_mid,H_grnd_lim)/H_grnd_lim, 0.0) 
-
-            beta_acy(i,j) = f_scale * beta_acy(i,j) 
-
-        end do 
-        end do  
-
-        return
-        
-    end subroutine scale_beta_ac_Hgrnd
-    
-    subroutine scale_beta_ac_zstar(beta_acx,beta_acy,H_ice,z_bed,z_sl,norm)
-        ! Calculate scalar between 0 and 1 to modify basal friction coefficient
-        ! as ice approaches and achieves floatation, and apply.
-        ! Following "Zstar" approach of Gladstone et al. (2017) 
-        
-        implicit none
-        
-        real(prec), intent(INOUT) :: beta_acx(:,:)    ! ac-nodes
-        real(prec), intent(INOUT) :: beta_acy(:,:)    ! ac-nodes
-        real(prec), intent(IN)    :: H_ice(:,:)       ! aa-nodes
-        real(prec), intent(IN)    :: z_bed(:,:)       ! aa-nodes        
-        real(prec), intent(IN)    :: z_sl(:,:)        ! aa-nodes        
-        logical,    intent(IN)    :: norm             ! Normalize by H_ice? 
-
-        ! Local variables
-        integer    :: i, j, nx, ny
-        real(prec) :: H_ice_mid, z_bed_mid, z_sl_mid 
-        real(prec) :: f_scale 
-        real(prec) :: rho_sw_ice 
-
-        rho_sw_ice = rho_sw / rho_ice 
-
-        nx = size(H_ice,1)
-        ny = size(H_ice,2) 
-
-        ! acx-nodes 
-        do j = 1, ny 
-        do i = 1, nx-1 
-
-            H_ice_mid    = 0.5_prec*(H_ice(i,j)+H_ice(i+1,j))
-            z_bed_mid    = 0.5_prec*(z_bed(i,j)+z_bed(i+1,j))
-            z_sl_mid     = 0.5_prec*(z_sl(i,j)+z_sl(i+1,j))
-            
-            if (z_bed_mid > z_sl_mid) then 
-                ! Land based above sea level 
-                f_scale = H_ice_mid 
-            else
-                ! Marine based 
-                f_scale = max(0.0_prec, H_ice_mid - (z_sl_mid-z_bed_mid)*rho_sw_ice)
-            end if 
-
-            if (norm .and. H_ice_mid .gt. 0.0) f_scale = f_scale / H_ice_mid 
-
-            beta_acx(i,j) = f_scale * beta_acx(i,j) 
-
-        end do 
-        end do  
-
-        ! acy-nodes 
-        do j = 1, ny-1 
-        do i = 1, nx 
-
-            H_ice_mid    = 0.5_prec*(H_ice(i,j)+H_ice(i,j+1))
-            z_bed_mid    = 0.5_prec*(z_bed(i,j)+z_bed(i,j+1))
-            z_sl_mid     = 0.5_prec*(z_sl(i,j)+z_sl(i,j+1))
-            
-            if (z_bed_mid > z_sl_mid) then 
-                ! Land based above sea level 
-                f_scale = H_ice_mid 
-            else
-                ! Marine based 
-                f_scale = max(0.0_prec, H_ice_mid - (z_sl_mid-z_bed_mid)*rho_sw_ice)
-            end if 
-
-            if (norm .and. H_ice_mid .gt. 0.0) f_scale = f_scale / H_ice_mid 
-            
-            beta_acy(i,j) = f_scale * beta_acy(i,j) 
-
-        end do 
-        end do  
-
-        return
-        
-    end subroutine scale_beta_ac_zstar
-    
-    subroutine scale_beta_ac_l14(beta_acx,beta_acy,ux_b,uy_b,ATT_base,H_ice,z_bed,z_sl,H_w,m_drag,p,m_max,lambda_max)
-        ! Calculate scalar between 0 and 1 to modify basal friction coefficient
-        ! as ice approaches and achieves floatation, and apply.
-        ! Following Leguy et al. (2014), Eq. 15
-
-        ! ajr: This scaling causes crashing for MISMIP3D, something is wrong!! 
-        
-        implicit none
-        
-        real(prec), intent(INOUT) :: beta_acx(:,:)    ! ac-nodes
-        real(prec), intent(INOUT) :: beta_acy(:,:)    ! ac-nodes
-        real(prec), intent(INOUT) :: ux_b(:,:)        ! ac-nodes
-        real(prec), intent(INOUT) :: uy_b(:,:)        ! ac-nodes
-        real(prec), intent(IN)    :: ATT_base(:,:)    ! aa-nodes
-        real(prec), intent(IN)    :: H_ice(:,:)       ! aa-nodes
-        real(prec), intent(IN)    :: z_bed(:,:)       ! aa-nodes        
-        real(prec), intent(IN)    :: z_sl(:,:)        ! aa-nodes        
-        real(prec), intent(IN)    :: H_w(:,:)         ! aa-nodes
-        real(prec), intent(IN)    :: m_drag           ! Dragging law exponent 
-        real(prec), intent(IN)    :: p                ! [0:1], 0: no ocean connectivity, 1: full ocean connectivity
-        real(prec), intent(IN)    :: m_max            ! Maximum bed obstacle slope (0-1?) 
-        real(prec), intent(IN)    :: lambda_max       ! [m] Wavelength of bedrock bumps
-
-        ! Local variables
-        integer    :: i, j, nx, ny
-        real(prec) :: H_ice_mid, z_bed_mid, z_sl_mid, H_w_mid 
-        real(prec) :: Neff_mid, ATT_base_mid, uxy_b  
-        real(prec) :: f_scale 
-        real(prec) :: rho_sw_ice 
-
-        rho_sw_ice = rho_sw / rho_ice 
-
-        nx = size(H_ice,1)
-        ny = size(H_ice,2) 
-
-        ! acx-nodes 
-        do j = 2, ny 
-        do i = 1, nx-1 
-
-            H_ice_mid     = 0.5_prec*(H_ice(i,j)+H_ice(i+1,j))
-            z_bed_mid     = 0.5_prec*(z_bed(i,j)+z_bed(i+1,j))
-            z_sl_mid      = 0.5_prec*(z_sl(i,j)+z_sl(i+1,j))
-            H_w_mid       = 0.5_prec*(H_w(i,j)+H_w(i+1,j))
-            ATT_base_mid  = 0.5_prec*(ATT_base(i,j)+ATT_base(i+1,j))
-            
-            Neff_mid      = calc_effective_pressure(H_ice_mid,z_bed_mid,z_sl_mid,H_w_mid,p)
-            uxy_b         = sqrt(ux_b(i,j)**2 + (0.25_prec*(uy_b(i,j)+uy_b(i+1,j)+uy_b(i,j-1)+uy_b(i+1,j-1)))**2)
-
-            f_scale       = calc_l14_scalar(Neff_mid,uxy_b,ATT_base_mid,m_drag,m_max,lambda_max)
-
-            beta_acx(i,j) = f_scale * beta_acx(i,j) 
-
-        end do 
-        end do  
-
-        beta_acx(:,1) = beta_acx(:,2) 
-
-        ! acy-nodes 
-        do j = 1, ny-1 
-        do i = 1, nx 
-
-            H_ice_mid     = 0.5_prec*(H_ice(i,j)+H_ice(i,j+1))
-            z_bed_mid     = 0.5_prec*(z_bed(i,j)+z_bed(i,j+1))
-            z_sl_mid      = 0.5_prec*(z_sl(i,j)+z_sl(i,j+1))
-            H_w_mid       = 0.5_prec*(H_w(i,j)+H_w(i,j+1))
-            ATT_base_mid  = 0.5_prec*(ATT_base(i,j)+ATT_base(i,j+1))
-            
-            Neff_mid      = calc_effective_pressure(H_ice_mid,z_bed_mid,z_sl_mid,H_w_mid,p)
-            uxy_b         = sqrt(uy_b(i,j)**2 + (0.25_prec*(ux_b(i,j)+ux_b(i,j+1)+ux_b(i-1,j)+ux_b(i-1,j+1)))**2)
-
-            f_scale       = calc_l14_scalar(Neff_mid,uxy_b,ATT_base_mid,m_drag,m_max,lambda_max)
-
-            beta_acy(i,j) = f_scale * beta_acy(i,j) 
-
-        end do 
-        end do  
-
-        return
-        
-    end subroutine scale_beta_ac_l14
-    
     function calc_l14_scalar(N_eff,uxy_b,ATT_base,m_drag,m_max,lambda_max) result(f_np)
         ! Calculate a friction scaling coefficient as a function
         ! of velocity and effective pressure, following

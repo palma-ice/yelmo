@@ -63,6 +63,8 @@
     f_beta_gl           = 1.0             ! [-] Scaling of beta at the grounding line (for beta_gl_method=1)
     taud_gl_method      = 0               !  0: binary, no subgrid, 1: Two-sided gradient
     C_bed_method        = 2               ! -1: set externally; 0: cf_stream everywhere; 1: cf_stream/cf_frozen; 2: cf_stream*f_zbed 
+    C_bed_z0            = -200.0          ! [m] Bedrock elevation at which scaling goes to f_scale=e(-1)
+    C_bed_z1            = 200.0           ! [m] Bedrock elevation above which scaling goes to f_scale=1
     beta_const          = 1e3             ! [Pa a m−1] Constant value of basal friction coefficient to be used
     H_grnd_lim          = 500.0           ! [m] For beta_sep_method=2, reduce beta linearly between H_grnd=0 and H_grnd_lim 
     H_sed_sat           = 250.0           ! [m] Sediment thickness at which sediment effect is saturated
@@ -70,8 +72,6 @@
     cf_stream           = 5e4             ! [a m-1] Bed roughness coefficient, stream  
     cf_fac_sed          = 1.0             ! [-] Scaling of roughness for sediments 
     cf_sia              = 0.0             ! [m a-1 Pa-1] Bed roughness coefficient for SIA sliding
-    cf_z1               = 200.0           ! [m] Bedrock elevation above which scaling goes to f_scale=1
-    cf_z0               = -200.0          ! [m] Bedrock elevation at which scaling goes to f_scale=e(-1)
     streaming_margin    = True            ! Impose cf_stream at the margin and grline independent of f_pmp
     n_sm_beta           = 0               ! [-] Standard deviation in gridpoints for Gaussian smoothing of beta (0==no smoothing)
     ssa_vel_max         = 5000.0          ! [m a-1] SSA velocity limit to avoid spurious results 
@@ -80,7 +80,25 @@
     ssa_iter_conv       = 1e-2            ! [--] L2 relative error convergence limit to exit ssa iterations
 
 /
- 
+
+&ydyn_neff 
+        neff_method     = 2                 ! -1: external N_eff, 0: overburden pressure, 1: Leguy param., 2: Till pressure
+        neff_p          = 0.0               ! *neff_method=1* marine connectivity exponent
+        neff_use_water  = False             ! *neff_method=2* Use H_w field or parameterize it?
+        neff_w_max      = 2.0               ! [m]  *neff_method=2* Maximum allowed water layer thickness for Till pressure 
+        neff_N0         = 1000.0            ! [Pa] *neff_method=2* Reference effective pressure 
+        neff_delta      = 0.04              ! [--] *neff_method=2* Fraction of overburden pressure for saturated till
+        neff_e0         = 0.69              ! [--] *neff_method=2* Reference void ratio at N0 
+        neff_Cc         = 0.12              ! [--] *neff_method=2* Till compressibility    
+/
+
+&ydyn_till
+    phi_min             =  5              ! [degrees] Till friction angle, minimum
+    phi_max             = 20              ! [degrees] Till friction angle, maximum
+
+
+/
+
 &ymat
     flow_law                = "glen"
     rf_method               = 1         ! -1: set externally; 0: rf_const everywhere; 1: standard function 

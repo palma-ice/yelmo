@@ -9,8 +9,7 @@ module yelmo_topography
     
     use mass_conservation
     use calving
-    use basal_dragging, only : calc_effective_pressure  
-
+    
     implicit none
     
     ! Key for matching bed types given by mask_bed 
@@ -55,8 +54,7 @@ contains
         real(prec) :: dx, dt, dt_calv    
         integer :: i, j, nx, ny  
         real(prec), allocatable :: mbal(:,:) 
-        real(prec) :: N_eff_min 
-
+        
         nx = size(tpo%now%H_ice,1)
         ny = size(tpo%now%H_ice,2)
 
@@ -230,13 +228,6 @@ contains
         call calc_gradient_ac_ice(tpo%now%dzsdx,tpo%now%dzsdy,tpo%now%z_srf,tpo%now%H_ice,tpo%par%dx,tpo%par%margin2nd)
         call calc_gradient_ac_ice(tpo%now%dHicedx,tpo%now%dHicedy,tpo%now%H_ice,tpo%now%H_ice,tpo%par%dx,tpo%par%margin2nd)
         
-        ! Calculate effective pressure [bar = 1e-5 Pa == 1e-5 kg m^-1 s^-2]
-        tpo%now%N_eff = calc_effective_pressure(tpo%now%H_ice,bnd%z_bed,bnd%z_sl,bnd%H_w,p=tpo%par%neff_p)
-
-!         ! Ensure effective pressure is never zero 
-!         N_eff_min = minval(tpo%now%N_eff,mask=tpo%now%N_eff .ne. 0.0)
-!         where(tpo%now%N_eff .lt. N_eff_min) tpo%now%N_eff = N_eff_min
-        
         ! Calculate distance to ice margin 
         !tpo%now%dist_margin = distance_to_margin(tpo%now%H_ice,tpo%par%dx)
 
@@ -338,8 +329,6 @@ contains
         call nml_read(filename,"ytopo","gl_sep",            par%gl_sep,           init=init_pars)
         call nml_read(filename,"ytopo","gl_sep_nx",         par%gl_sep_nx,        init=init_pars)
         call nml_read(filename,"ytopo","diffuse_bmb_shlf",  par%diffuse_bmb_shlf, init=init_pars)
-                
-        call nml_read(filename,"ytopo","neff_p",            par%neff_p,           init=init_pars)
         
         ! === Set internal parameters =====
 
@@ -399,8 +388,6 @@ contains
         allocate(now%is_grline(nx,ny))
         allocate(now%is_grz(nx,ny))
 
-        allocate(now%N_eff(nx,ny))
-
         now%H_ice      = 0.0 
         now%z_srf      = 0.0  
         now%dzsrfdt    = 0.0 
@@ -422,8 +409,7 @@ contains
         now%mask_bed   = 0.0 
         now%is_grline  = .FALSE. 
         now%is_grz     = .FALSE. 
-        now%N_eff      = 0.0 
-
+        
         return 
     end subroutine ytopo_alloc 
 
@@ -463,8 +449,6 @@ contains
         if (allocated(now%is_grline))  deallocate(now%is_grline)
         if (allocated(now%is_grz))     deallocate(now%is_grz)
 
-        if (allocated(now%N_eff))      deallocate(now%N_eff)
-        
         return 
 
     end subroutine ytopo_dealloc 

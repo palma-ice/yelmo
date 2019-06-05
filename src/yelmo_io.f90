@@ -91,8 +91,6 @@ contains
         call nc_write(filename,"is_grline",dom%tpo%now%is_grline,units="1",dim1="xc",dim2="yc",ncid=ncid)
         call nc_write(filename,"is_grz",   dom%tpo%now%is_grz,   units="1",dim1="xc",dim2="yc",ncid=ncid)
         
-        call nc_write(filename,"N_eff",    dom%tpo%now%N_eff,    units="bar",dim1="xc",dim2="yc",ncid=ncid)
-        
         ! == ydyn variables ===
 
         ! ajr: to do !!!
@@ -112,6 +110,7 @@ contains
 !         call nc_write(filename,"f_vbvs",    dom%dyn%now%f_vbvs,units="1",dim1="xc",dim2="yc",ncid=ncid)
         
 !         call nc_write(filename,"C_bed",  dom%dyn%now%C_bed,  units="?",dim1="xc",dim2="yc",ncid=ncid)
+!         call nc_write(filename,"N_eff",    dom%dyn%now%N_eff,    units="bar",dim1="xc",dim2="yc",ncid=ncid)
 !         call nc_write(filename,"beta_c",dom%dyn%now%beta_c,units="?",dim1="xc",dim2="yc",ncid=ncid)
         
 !         call nc_write(filename,"tau_b",  dom%dyn%now%tau_b,  units="?",dim1="xc",dim2="yc",ncid=ncid)
@@ -221,8 +220,6 @@ contains
         call nc_read(filename,"is_grline",dom%tpo%now%is_grline,ncid=ncid)
         call nc_read(filename,"is_grz",   dom%tpo%now%is_grz,   ncid=ncid)
         
-        call nc_read(filename,"N_eff",    dom%tpo%now%N_eff,    ncid=ncid)
-        
         ! Close the netcdf file
         call nc_close(ncid)
 
@@ -276,7 +273,9 @@ contains
 !         call nc_read(filename,"ssa_active",dom%dyn%now%ssa_active,ncid=ncid)
         
 !         call nc_read(filename,"f_vbvs",    dom%dyn%now%f_vbvs,    ncid=ncid)
-        
+
+!         call nc_read(filename,"N_eff",    dom%dyn%now%N_eff,    ncid=ncid)
+
 !         call nc_read(filename,"beta",      dom%dyn%now%beta,      ncid=ncid)
 !         call nc_read(filename,"beta_c",    dom%dyn%now%beta_c,    ncid=ncid)
         

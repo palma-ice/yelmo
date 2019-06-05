@@ -836,7 +836,7 @@ contains
                 call calc_beta_aa_power(dyn%now%beta,dyn%now%ux_b,dyn%now%uy_b,dyn%now%C_bed,dyn%par%m_drag)
             
                 ! Additionally scale by N_eff (beta = c_b*N_eff)
-                call scale_beta_aa_Neff(dyn%now%beta,tpo%now%N_eff)
+                call scale_beta_aa_Neff(dyn%now%beta,dyn%now%N_eff)
 
             case(3)
                 ! Calculate beta from regularized Coulomb law (Joughin et al., GRL, 2019)
@@ -844,7 +844,7 @@ contains
                 call calc_beta_aa_coulomb(dyn%now%beta,dyn%now%ux_b,dyn%now%uy_b,dyn%now%C_bed,dyn%par%m_drag,dyn%par%u_0)
                 
                 ! Additionally scale by N_eff (beta = c_b*N_eff)
-                call scale_beta_aa_Neff(dyn%now%beta,tpo%now%N_eff)
+                call scale_beta_aa_Neff(dyn%now%beta,dyn%now%N_eff)
 
             case DEFAULT 
                 ! Not recognized 
@@ -1054,7 +1054,7 @@ contains
                 do i = 1, nx 
 
                     ! Scale C_bed as a function bedrock elevation 
-                    f_scale = exp( (bnd%z_bed(i,j) - dyn%par%cf_z1) / (dyn%par%cf_z1 - dyn%par%cf_z0) )
+                    f_scale = exp( (bnd%z_bed(i,j) - dyn%par%C_bed_z1) / (dyn%par%C_bed_z1 - dyn%par%C_bed_z0) )
                     if (f_scale .gt. 1.0) f_scale = 1.0 
                     dyn%now%C_bed(i,j) = dyn%now%C_bed(i,j) * f_scale 
 
@@ -1073,6 +1073,65 @@ contains
         return 
 
     end subroutine calc_ydyn_cbed
+
+    subroutine calc_ydyn_neff(dyn,tpo,thrm,bnd)
+        ! Update N_eff based on parameter choices
+
+        implicit none
+        
+        type(ydyn_class),   intent(INOUT) :: dyn
+        type(ytopo_class),  intent(IN)    :: tpo 
+        type(ytherm_class), intent(IN)    :: thrm
+        type(ybound_class), intent(IN)    :: bnd  
+
+        ! Local variables 
+        real(prec), allocatable :: H_w(:,:) 
+
+        ! Allocate local H_w variable to represent water layer thickness if not available
+        allocate(H_w(dyn%par%nx,dyn%par%ny)) 
+
+        ! Calculate effective pressure [bar = 1e-5 Pa == 1e-5 kg m^-1 s^-2]
+        select case(dyn%par%neff_method)
+
+            case(-1) 
+                ! Do nothing, effective pressure is calculated externally 
+
+            case(0)
+                ! Effective pressure == overburden pressure 
+                dyn%now%N_eff = rho_ice*g*tpo%now%H_ice 
+
+            case(1) 
+                ! Effective pressure diminishes with marine character
+                ! following Leguy et al. (2014) 
+
+                dyn%now%N_eff = calc_effective_pressure_marine(tpo%now%H_ice,bnd%z_bed,bnd%z_sl,bnd%H_w,p=dyn%par%neff_p)
+
+            case(2)
+                ! Effective pressure as basal till pressure
+                ! following van Pelt and Bueler (2015)
+
+                ! Determine whether to use actual water layer thickness or parameterized layer thickness
+                if (dyn%par%neff_use_water) then 
+                    H_w = bnd%H_w 
+                else 
+                    H_w = dyn%par%neff_w_max * thrm%now%f_pmp  
+                end if 
+
+                dyn%now%N_eff = calc_effective_pressure_till(H_w,tpo%now%H_ice,tpo%now%f_grnd.le.1.0,dyn%par%neff_w_max, &
+                                            dyn%par%neff_N0,dyn%par%neff_delta,dyn%par%neff_e0,dyn%par%neff_Cc) 
+
+            case DEFAULT 
+
+                write(*,*) "ydyn_calc_Neff:: Error: neff_method not recognized, must be one of [-1,0,1,2]."
+                write(*,*) "neff_method = ", dyn%par%neff_method 
+                stop 
+
+        end select 
+        
+
+        return 
+
+    end subroutine calc_ydyn_neff
 
     subroutine ydyn_par_load(par,filename,zeta_aa,zeta_ac,nx,ny,dx,init)
 
@@ -1106,12 +1165,12 @@ contains
         call nml_read(filename,"ydyn","H_grnd_lim",         par%H_grnd_lim,         init=init_pars)
         call nml_read(filename,"ydyn","H_sed_sat",          par%H_sed_sat,          init=init_pars)
         call nml_read(filename,"ydyn","C_bed_method",       par%C_bed_method,       init=init_pars)
+        call nml_read(filename,"ydyn","C_bed_z0",           par%C_bed_z0,           init=init_pars)
+        call nml_read(filename,"ydyn","C_bed_z1",           par%C_bed_z1,           init=init_pars)
         call nml_read(filename,"ydyn","cf_frozen",          par%cf_frozen,          init=init_pars)
         call nml_read(filename,"ydyn","cf_stream",          par%cf_stream,          init=init_pars)
         call nml_read(filename,"ydyn","cf_fac_sed",         par%cf_fac_sed,         init=init_pars)
         call nml_read(filename,"ydyn","cf_sia",             par%cf_sia,             init=init_pars)
-        call nml_read(filename,"ydyn","cf_z1",              par%cf_z1,              init=init_pars)
-        call nml_read(filename,"ydyn","cf_z0",              par%cf_z0,              init=init_pars)
         call nml_read(filename,"ydyn","streaming_margin",   par%streaming_margin,   init=init_pars)
         call nml_read(filename,"ydyn","n_sm_beta",          par%n_sm_beta,          init=init_pars)
         call nml_read(filename,"ydyn","ssa_vel_max",        par%ssa_vel_max,        init=init_pars)
@@ -1119,7 +1178,8 @@ contains
         call nml_read(filename,"ydyn","ssa_iter_rel",       par%ssa_iter_rel,       init=init_pars)
         call nml_read(filename,"ydyn","ssa_iter_conv",      par%ssa_iter_conv,      init=init_pars)
         
-
+        call nml_read(filename,"ydyn_neff","neff_p",        par%neff_p,           init=init_pars)
+        
         ! Perform parameter consistency checks 
         if ( par%cf_fac_sed .gt. 1.0 ) then 
             write(*,*) "bdrag_par_load:: error: cf_fac_sed must be less than or equal to 1.0."
@@ -1227,6 +1287,8 @@ contains
         
         allocate(now%C_bed(nx,ny)) 
         
+        allocate(now%N_eff(nx,ny))
+
         allocate(now%beta_acx(nx,ny))
         allocate(now%beta_acy(nx,ny))
         allocate(now%beta(nx,ny))
@@ -1294,6 +1356,8 @@ contains
         
         now%C_bed             = 0.0 
         
+        now%N_eff             = 0.0 
+
         now%beta_acx          = 0.0 
         now%beta_acy          = 0.0 
         now%beta              = 0.0 
@@ -1365,6 +1429,8 @@ contains
         if (allocated(now%visc_eff))        deallocate(now%visc_eff) 
         
         if (allocated(now%C_bed))           deallocate(now%C_bed) 
+        
+        if (allocated(now%N_eff))      deallocate(now%N_eff)
         
         if (allocated(now%beta_acx))        deallocate(now%beta_acx) 
         if (allocated(now%beta_acy))        deallocate(now%beta_acy) 
@@ -1495,8 +1561,6 @@ contains
                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
         call nc_write(filename,"mask_bed",tpo%now%mask_bed,units="",long_name="Bed mask", &
                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-        call nc_write(filename,"N_eff",tpo%now%N_eff,units="Pa",long_name="Effective pressure", &
-                      dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
         
         call nc_write(filename,"dzsrfdt",tpo%now%dzsrfdt,units="m/a",long_name="Surface elevation change", &
                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
@@ -1526,6 +1590,8 @@ contains
                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
 
         call nc_write(filename,"C_bed",dyn%now%C_bed,units="",long_name="Dragging constant", &
+                      dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
+        call nc_write(filename,"N_eff",dyn%now%N_eff,units="Pa",long_name="Effective pressure", &
                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
         call nc_write(filename,"beta",dyn%now%beta,units="Pa a m^-1",long_name="Dragging coefficient", &
                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)

@@ -285,7 +285,7 @@ contains
         call nc_write(filename,"mb_applied",ylmo%tpo%now%mb_applied,units="m",long_name="Applied net mass balance", &
                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
 
-        call nc_write(filename,"N_eff",ylmo%tpo%now%N_eff,units="bar",long_name="Effective pressure", &
+        call nc_write(filename,"N_eff",ylmo%dyn%now%N_eff,units="bar",long_name="Effective pressure", &
                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
         
         call nc_write(filename,"C_bed",ylmo%dyn%now%C_bed,units="",long_name="Dragging constant", &

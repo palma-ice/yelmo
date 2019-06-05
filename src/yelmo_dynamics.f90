@@ -851,6 +851,14 @@ contains
                 ! Additionally scale by N_eff (beta = c_b*N_eff)
                 call scale_beta_aa_Neff(dyn%now%beta,dyn%now%N_eff)
 
+            case(4)
+                ! Calculate beta from the power-law as defined by Bueler and van Pelt (2015)
+
+                call calc_beta_aa_power_pism(dyn%now%beta,dyn%now%ux_b,dyn%now%uy_b,dyn%now%C_bed,dyn%par%m_drag,dyn%par%u_0)
+
+                ! Additionally scale by N_eff (beta = c_b*N_eff)
+                call scale_beta_aa_Neff(dyn%now%beta,dyn%now%N_eff)
+                
             case DEFAULT 
                 ! Not recognized 
 
@@ -1071,7 +1079,7 @@ contains
 
                 dyn%now%C_bed = calc_C_bed_till_linear(bnd%z_bed,bnd%z_sl,dyn%par%till_phi_min,dyn%par%till_phi_max, &
                                                         dyn%par%till_phi_zmin,dyn%par%till_phi_zmax)
-                
+
             case DEFAULT 
                 ! Not recognized 
 

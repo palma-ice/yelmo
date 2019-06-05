@@ -52,10 +52,10 @@
     solver              = "hybrid-vel"    ! "fixed","hybrid-vel", "hybrid-shear", "hybrid-pd12"
     mix_method          = 1               ! -2: sia, -1: ssa, 0: sia|ssa, 1: sia+ssa 2: ssa vel. fraction
     calc_diffusivity    = False           ! Calculate 2D diffusivity term for diagnostics
-    m_drag              = 3.0             ! Dragging law exponent 
-    u_0                 = 300.0           ! [m/a] Coulomb friction regularization term (velocity threshold)
+    m_drag              = 1.0             ! Dragging law exponent 
+    u_0                 = 300.0           ! [m/a] Coulomb friction regularization term (velocity threshold), or pism-style power law
     beta_max            = 1e10            ! [Pa a m-1] Maximum value of beta for which ssa should be calculated 
-    beta_method         = 3               ! 0: constant beta; 1: power law; 2: effective pressure; 3: regularized Coulomb law
+    beta_method         = 4               ! 0: constant beta; 1: power law; 2: effective pressure; 3: regularized Coulomb law, 4: pism power law
     beta_gl_sep         = -1              !  -1: Apply subgrid treatment on ac-nodes (beta_gl_stag=2) 0: No subgrid treatment, 1: beta*f_grnd_aa        
     beta_gl_scale       = 1               !  0: No scaling, 1: beta*f_beta_gl, 2: H_grnd linear scaling, 3: Zstar scaling 
     beta_gl_stag        = 2               !  0: simple staggering, 1: Upstream beta at gl, 2: f_grnd_ac scaling 

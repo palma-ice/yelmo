@@ -61,7 +61,7 @@
     beta_gl_stag        = 2               !  0: simple staggering, 1: Upstream beta at gl, 2: f_grnd_ac scaling 
     f_beta_gl           = 1.0             ! [-] Scaling of beta at the grounding line (for beta_gl_method=1)
     taud_gl_method      = 0               !  0: binary, no subgrid, 1: Two-sided gradient
-    C_bed_method        = 2               ! -1: set externally; 0: cf_stream everywhere; 1: cf_stream/cf_frozen; 2: cf_stream*f_zbed 
+    C_bed_method        = 3               ! -1: set externally; 0: cf_stream everywhere; 1: cf_stream/cf_frozen; 2: cf_stream*f_zbed; till strength 
     C_bed_z0            = -200.0          ! [m] Bedrock elevation at which scaling goes to f_scale=e(-1)
     C_bed_z1            = 200.0           ! [m] Bedrock elevation above which scaling goes to f_scale=1
     beta_const          = 1e3             ! [Pa a m−1] Constant value of basal friction coefficient to be used
@@ -92,10 +92,10 @@
 /
 
 &ydyn_till
-    phi_min             =  5              ! [degrees] Till friction angle, minimum
-    phi_max             = 20              ! [degrees] Till friction angle, maximum
-
-
+    till_phi_min    =  5                ! [degrees] Till friction angle, minimum
+    till_phi_max    = 20                ! [degrees] Till friction angle, maximum
+    till_phi_zmin   = 0.0               ! [m] Bedrock elevation for till_phi_min
+    till_phi_zmax   = 500.0             ! [m] Bedrock elevation for phi_max 
 /
 
 &ymat

@@ -185,6 +185,11 @@ module yelmo_defs
         real(prec) :: neff_e0 
         real(prec) :: neff_Cc 
 
+        real(prec) :: till_phi_min 
+        real(prec) :: till_phi_max 
+        real(prec) :: till_phi_zmin 
+        real(prec) :: till_phi_zmax 
+        
         ! Internal parameters 
         character(len=256) :: boundaries 
         logical    :: use_ssa                    ! Should ssa be used? 

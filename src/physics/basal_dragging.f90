@@ -24,6 +24,9 @@ module basal_dragging
     public :: calc_effective_pressure_marine
     public :: calc_effective_pressure_till
 
+    ! C_bed functions
+    public :: calc_C_bed_till_linear
+
     ! Beta functions (aa-nodes)
     public :: calc_beta_aa_linear
     public :: calc_beta_aa_power
@@ -147,8 +150,7 @@ contains
         s  = min(H_w/H_w_max,1.0)  
 
         ! Calculate the effective pressure in the till (van Pelt and Bueler, 2015, Eq. 23-24)
-        ! Convert from [Pa] => [bar]
-        N_eff = 1e-5 * min( N0*(delta*P0/N0)**s * 10**((e0/Cc)*(1-s)), P0 ) 
+        N_eff = min( N0*(delta*P0/N0)**s * 10**((e0/Cc)*(1-s)), P0 ) 
 
         ! No remaining pressure at base for floating ice
         if (is_float) N_eff = 0.0 
@@ -158,33 +160,41 @@ contains
     end function calc_effective_pressure_till
 
 
-!     elemental function calc_C_bed_till(z_bed,C_bed_z0,C_bed_z1) result(N_eff)
-!         ! Calculate the effective pressure of the till
-!         ! following van Pelt and Bueler (2015), Eq. 23.
+    elemental function calc_C_bed_till_linear(z_bed,z_sl,phi_min,phi_max,phi_zmin,phi_zmax) result(C_bed)
+        ! Calculate the effective pressure of the till
+        ! following van Pelt and Bueler (2015), Eq. 23.
         
-!         implicit none 
+        implicit none 
         
-!         real(prec), intent(IN)    :: H_w
-!         real(prec), intent(IN)    :: H_ice
-!         logical,    intent(IN)    :: is_float  
-!         real(prec), intent(IN)    :: H_w_max            ! [m] Maximum allowed water depth 
-!         real(prec), intent(IN)    :: N0                 ! [Pa] Reference effective pressure 
-!         real(prec), intent(IN)    :: delta              ! [--] Fraction of overburden pressure for saturated till
-!         real(prec), intent(IN)    :: e0                 ! [--] Reference void ratio at N0 
-!         real(prec), intent(IN)    :: Cc                 ! [--] Till compressibility 
-!         real(prec)                :: N_eff              ! [Pa] Effective pressure 
-        
-!         ! Local variables 
-!         real(prec) :: phi, f_scale 
+        real(prec), intent(IN)    :: z_bed              ! [m] Bedrock elevation
+        real(prec), intent(IN)    :: z_sl               ! [m] Sea level 
+        real(prec), intent(IN)    :: phi_min            ! [deg] Minimum till angle 
+        real(prec), intent(IN)    :: phi_max            ! [deg] Maximum till angle 
+        real(prec), intent(IN)    :: phi_zmin           ! [m] C[z=zmin] = tan(phi_min)
+        real(prec), intent(IN)    :: phi_zmax           ! [m] C[z=zmax] = tan(phi_max) 
+        real(prec)                :: C_bed 
 
-!         ! Scale till angle phi as a function bedrock elevation 
-!         f_scale = exp( (z_bed - C_bed_z1) / (C_bed_z1 - C_bed_z0) )
-!         if (f_scale .gt. 1.0) f_scale = 1.0 
-!         phi = phi * f_scale 
+        ! Local variables 
+        real(prec) :: phi, f_scale, z_rel  
 
-!         return 
+        ! Get bedrock elevation relative to sea level 
+!         z_rel = z_sl - z_bed 
+        z_rel = z_bed               ! Relative to present-day sea level 
 
-!     end function calc_C_bed_till
+        ! Scale till angle phi as a function bedrock elevation 
+        f_scale = (z_rel - phi_zmin) / (phi_zmax - phi_zmin)
+        f_scale = min(f_scale,1.0)
+        f_scale = max(f_scale,0.0)
+
+        ! Linear ramp between phi_min and phi_max 
+        phi = (1.0-f_scale)*phi_min + f_scale*phi_max
+
+        ! Calculate bed friction coefficient as the tangent
+        C_bed = tan(phi*pi/180.0)
+
+        return 
+
+    end function calc_C_bed_till_linear
 
     ! ================================================================================
     !

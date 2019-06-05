@@ -1058,7 +1058,7 @@ contains
                 do j = 1, ny 
                 do i = 1, nx 
 
-                    ! Scale C_bed as a function bedrock elevation 
+                    ! Scale C_bed as a function bedrock elevation relative to sea level
                     f_scale = exp( (bnd%z_bed(i,j) - dyn%par%C_bed_z1) / (dyn%par%C_bed_z1 - dyn%par%C_bed_z0) )
                     if (f_scale .gt. 1.0) f_scale = 1.0 
                     dyn%now%C_bed(i,j) = dyn%now%C_bed(i,j) * f_scale 
@@ -1066,6 +1066,12 @@ contains
                 end do 
                 end do 
 
+            case(3)
+                ! Set C_bed following tan(phi), and linear ramp between phi_min to phi_max with elevation
+
+                dyn%now%C_bed = calc_C_bed_till_linear(bnd%z_bed,bnd%z_sl,dyn%par%till_phi_min,dyn%par%till_phi_max, &
+                                                        dyn%par%till_phi_zmin,dyn%par%till_phi_zmax)
+                
             case DEFAULT 
                 ! Not recognized 
 
@@ -1182,6 +1188,11 @@ contains
         call nml_read(filename,"ydyn","ssa_iter_max",       par%ssa_iter_max,       init=init_pars)
         call nml_read(filename,"ydyn","ssa_iter_rel",       par%ssa_iter_rel,       init=init_pars)
         call nml_read(filename,"ydyn","ssa_iter_conv",      par%ssa_iter_conv,      init=init_pars)
+        
+        call nml_read(filename,"ydyn_till","till_phi_min",  par%till_phi_min,       init=init_pars)
+        call nml_read(filename,"ydyn_till","till_phi_max",  par%till_phi_max,       init=init_pars)
+        call nml_read(filename,"ydyn_till","till_phi_zmin", par%till_phi_zmin,      init=init_pars)
+        call nml_read(filename,"ydyn_till","till_phi_zmax", par%till_phi_zmax,      init=init_pars)
         
         call nml_read(filename,"ydyn_neff","neff_method",   par%neff_method,        init=init_pars)
         call nml_read(filename,"ydyn_neff","neff_p",        par%neff_p,             init=init_pars)

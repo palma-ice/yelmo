@@ -71,6 +71,13 @@ mismip : yelmo-static
 		@echo "    yelmo_mismip.x is ready."
 		@echo " "
 
+opt : yelmo-static
+		$(FC) $(DFLAGS) $(FFLAGS) $(INC_LIS) -o $(bindir)/yelmo_opt.x tests/yelmo_opt.f90 \
+			-L${CURDIR}/libyelmo/include -lyelmo $(LFLAGS) $(objdir)/nml.o
+		@echo " "
+		@echo "    yelmo_opt.x is ready."
+		@echo " "
+
 .PHONY : usage
 usage:
 	@echo ""
@@ -79,6 +86,7 @@ usage:
 	@echo " make initmip    : compiles yelmo_initmip.x, for running yelmo on a given domain defined in param file."
 	@echo " make benchmarks : compiles yelmo_benchmarks.x, for running various EISMINT domain experiments.""
 	@echo " make mismip     : compiles yelmo_mismip.x, for running various MISMIP domain experiments.""
+	@echo " make opt        : compiles yelmo_opt.x, for running various MISMIP domain experiments.""
 	@echo " make clean      : cleans object files"
 	@echo ""
 

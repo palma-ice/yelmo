@@ -24,7 +24,8 @@ def run_yelmo():
         help='''Define the executable file to use here. Shortcuts:
 benchmarks = libyelmo/bin/yelmo_benchmarks.x;
 mismip = libyelmo/bin/yelmo_mismip.x;
-initmip = libyelmo/bin/yelmo_initmip.x
+initmip = libyelmo/bin/yelmo_initmip.x;
+opt = libyelmo/bin/yelmo_opt.x
 ''')
     parser.add_argument('-r','--run',action="store_true",
         help='Run the executable after preparing the job?')
@@ -87,7 +88,9 @@ initmip = libyelmo/bin/yelmo_initmip.x
         exe_path = "libyelmo/bin/yelmo_mismip.x" 
     elif exe_path == "initmip":
         exe_path = "libyelmo/bin/yelmo_initmip.x" 
-
+    elif exe_path == "opt":
+        exe_path = "libyelmo/bin/yelmo_opt.x" 
+    
     # Also extract executable and path filenames 
     exe_fname = os.path.basename(exe_path)
     par_fname = os.path.basename(par_path)

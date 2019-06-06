@@ -1133,7 +1133,7 @@ contains
                 if (dyn%par%neff_use_water) then 
                     H_w = bnd%H_w 
                 else 
-                    H_w = dyn%par%neff_w_max * thrm%now%f_pmp  
+                    H_w = dyn%par%neff_w_max * 0.5 * thrm%now%f_pmp  
                 end if 
 
                 dyn%now%N_eff = calc_effective_pressure_till(H_w,tpo%now%H_ice,tpo%now%f_grnd.lt.1.0,dyn%par%neff_w_max, &

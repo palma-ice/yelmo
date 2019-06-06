@@ -18,9 +18,6 @@ program yelmo_test
     ! No-ice mask (to impose additional melting)
     logical, allocatable :: mask_noice(:,:)  
 
-    ! Concavity field 
-    real(prec), allocatable :: channels(:,:) 
-
     ! Start timing 
     call cpu_time(cpu_start_time)
 
@@ -70,23 +67,10 @@ program yelmo_test
 
     time = time_init 
 
-    ! Define channel field 
-    allocate(channels(yelmo1%grd%nx,yelmo1%grd%ny))
-
-    ! Update C_bed, if needed
-    if (yelmo1%dyn%par%C_bed_method .eq. -1) then 
-        call calc_ydyn_cbed_external(yelmo1%dyn,yelmo1%tpo,yelmo1%thrm,yelmo1%bnd,channels)
-    end if 
-
     ! Initialize state variables (dyn,therm,mat)
     ! (initialize temps with robin method with a cold base)
     call yelmo_init_state(yelmo1,path_par,time=time_init,thrm_method="robin-cold")
 
-    ! Update C_bed again, if needed
-    if (yelmo1%dyn%par%C_bed_method .eq. -1) then 
-        call calc_ydyn_cbed_external(yelmo1%dyn,yelmo1%tpo,yelmo1%thrm,yelmo1%bnd,channels)
-    end if 
-    
     ! Define no-ice mask from present-day data
     allocate(mask_noice(yelmo1%grd%nx,yelmo1%grd%ny))
     mask_noice = .FALSE. 
@@ -118,11 +102,6 @@ program yelmo_test
         ! Get current time 
         time = time_init + n*dtt
 
-        ! Update C_bed if needed
-        if (yelmo1%dyn%par%C_bed_method .eq. -1) then 
-            call calc_ydyn_cbed_external(yelmo1%dyn,yelmo1%tpo,yelmo1%thrm,yelmo1%bnd,channels)
-        end if 
-        
         ! Update temperature and smb as needed in time (ISMIP6)
         if (time .ge. -10e6 .and. time .lt. -10e3) then 
             ! Glacial period, impose cold climate 
@@ -285,7 +264,7 @@ contains
         call nc_write(filename,"mb_applied",ylmo%tpo%now%mb_applied,units="m",long_name="Applied net mass balance", &
                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
 
-        call nc_write(filename,"N_eff",ylmo%dyn%now%N_eff,units="bar",long_name="Effective pressure", &
+        call nc_write(filename,"N_eff",ylmo%dyn%now%N_eff*1e-5,units="1e5 Pa (Bar)",long_name="Effective pressure", &
                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
         
         call nc_write(filename,"C_bed",ylmo%dyn%now%C_bed,units="",long_name="Dragging constant", &
@@ -306,11 +285,6 @@ contains
         call nc_write(filename,"uxy_s_errpd",ylmo%dyn%now%uxy_s-ylmo%dta%pd%uxy_s,units="m",long_name="Ice thickness error wrt present day", &
                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
         
-        ! Channels 
-        call nc_write(filename,"channels",channels,units="m m-1",long_name="Channel diagnosis", &
-                      dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-        
-
         ! Diagnostics 
         call nc_write(filename,"taud_acx",ylmo%dyn%now%taud_acx,units="Pa",long_name="Driving stress (x)", &
                        dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
@@ -324,178 +298,6 @@ contains
         return 
 
     end subroutine write_step_2D
-
-    subroutine calc_ydyn_cbed_external(dyn,tpo,thrm,bnd,channels)
-        ! Update C_bed based on parameter choices
-
-        implicit none
-        
-        type(ydyn_class),   intent(INOUT) :: dyn
-        type(ytopo_class),  intent(IN)    :: tpo 
-        type(ytherm_class), intent(IN)    :: thrm
-        type(ybound_class), intent(IN)    :: bnd  
-        real(prec),         intent(INOUT) :: channels(:,:) 
-
-        integer :: i, j, nx, ny 
-        integer :: i1, i2, j1, j2 
-        real(prec), allocatable :: f_channel(:,:) 
-
-        real(prec) :: channel_lim = 1e-6 
-
-        nx = size(dyn%now%C_bed,1)
-        ny = size(dyn%now%C_bed,2)
-        
-        allocate(f_channel(nx,ny)) 
-
-        ! Set C_bed according to temperate character of base
-
-        ! Smooth transition between temperate and frozen C_bed
-        dyn%now%C_bed = (thrm%now%f_pmp)*dyn%par%cf_stream &
-                    + (1.0_prec - thrm%now%f_pmp)*dyn%par%cf_frozen 
-
-        if (dyn%par%streaming_margin) then 
-            ! Ensure that both the margin points and the grounding line
-            ! are always considered streaming, independent of their
-            ! thermodynamic character (as sometimes these can incorrectly become frozen)
-
-        
-            ! Ensure any marginal point is also treated as streaming 
-            do j = 1, ny 
-            do i = 1, nx 
-
-                i1 = max(i-1,1)
-                i2 = min(i+1,nx)
-                j1 = max(j-1,1)
-                j2 = min(j+1,ny)
-
-                if (tpo%now%H_ice(i,j) .gt. 0.0 .and. &
-                    (tpo%now%H_ice(i1,j) .le. 0.0 .or. &
-                     tpo%now%H_ice(i2,j) .le. 0.0 .or. &
-                     tpo%now%H_ice(i,j1) .le. 0.0 .or. &
-                     tpo%now%H_ice(i,j2) .le. 0.0)) then 
-
-                    dyn%now%C_bed(i,j) = dyn%par%cf_stream
-
-                end if 
-
-            end do 
-            end do 
-
-            ! Also ensure that grounding line is also considered streaming
-            where(tpo%now%is_grline) dyn%now%C_bed = dyn%par%cf_stream
-
-        end if 
-
-        ! == Until here, C_bed is defined as normally with C_bed_method=1,
-        !    now refine to increase only marginal velocities 
-
-        ! Reduce C_bed further for low elevation points
-        !where(tpo%now%z_srf .lt. 1500.0) dyn%now%C_bed = 0.5*dyn%now%C_bed
-
-        ! Next diagnose channels
-        call calc_channels(channels,tpo%now%z_srf,dyn%now%ux_bar,dyn%now%uy_bar,tpo%par%dx)
-
-        ! Finally scale C_bed according to concavity of channels 
-        !f_channel = exp(-channels/channel_lim)
-        !where(f_channel .lt. 0.1) f_channel = 0.1 
-        !where(f_channel .gt. 2.0) f_channel = 2.0  
-
-        f_channel = 1.0 
-
-        dyn%now%C_bed = dyn%now%C_bed * f_channel 
-        
-        return 
-
-    end subroutine calc_ydyn_cbed_external
-
-
-    subroutine calc_channels(channels,z_bed,ux,uy,dx)
-
-        implicit none 
-
-        real(prec), intent(OUT) :: channels(:,:) 
-        real(prec), intent(IN)  :: z_bed(:,:) 
-        real(prec), intent(IN)  :: ux(:,:) 
-        real(prec), intent(IN)  :: uy(:,:) 
-        real(prec), intent(IN)  :: dx 
-
-        ! Local variables 
-        integer :: i, j, nx, ny 
-        real(prec) :: ux_aa, uy_aa, uxy 
-        real(prec) :: dzdx1, dzdx2 
-        real(prec) :: dz2dx2, dz2dy2
-        real(prec) :: theta   ! [rad] Angle of direction of ice flow
-        real(prec) :: alpha   ! [rad] Angle of direction perpindicular to ice flow 
-
-        ! Finite-difference coefficients
-        real(prec), parameter :: fm2 = -1.0/12.0 
-        real(prec), parameter :: fm1 =  4.0/3.0 
-        real(prec), parameter :: f0  = -5.0/2.0 
-        real(prec), parameter :: fp1 =  4.0/3.0
-        real(prec), parameter :: fp2 = -1.0/12.0 
-         
-        
-        
-        nx = size(channels,1)
-        ny = size(channels,2)
-
-        ! Set channels to zero initially 
-        channels = 0.0 
-
-        ! Find channels based on change in elevation perpendicular to flow direction,
-        ! then (to do!) negative component for along flow direction  
-        do j = 3, ny-2 
-        do i = 3, nx-2 
-
-            ! Get velocity of current grid point 
-            ux_aa = 0.5*(ux(i-1,j) + ux(i,j))
-            uy_aa = 0.5*(uy(i,j-1) + uy(i,j))
-            uxy   = sqrt(ux_aa**2 + uy_aa**2)
-
-            if (uxy .gt. 0.0) then 
-
-                ! Get direction perpindicular ice flow 
-                alpha = atan2(uy_aa,ux_aa) - pi/2.0 
-
-                ! Only modify areas with some velocity available 
-
-                ! Calculate second-derivative in each direction (2nd order)
-                dz2dx2 = (1.0/dx**2)*sum([fm2,fm1,f0,fp1,fp2]*z_bed(i-2:i+2,j))
-                dz2dy2 = (1.0/dx**2)*sum([fm2,fm1,f0,fp1,fp2]*z_bed(i,j-2:j+2))
-                
-                ! Scale derivative in each direction to get approximate concavity in
-                ! direction of interest 
-                channels(i,j) = cos(alpha)*dz2dx2 + sin(alpha)*dz2dy2
-
-!                 if (abs(ux_aa) .gt. abs(uy_aa)) then 
-!                     ! Flow predominantly in x-direction
-
-!                     dzdx1         = (z_bed(i,j)   - z_bed(i,j-1)) / dx 
-!                     dzdx2         = (z_bed(i,j+1) - z_bed(i,j))   / dx 
-!                     channels(i,j) = (dzdx2-dzdx1) / dx 
-
-!                     !channels(i,j) = (0.5*(z_bed(i,j-1)+z_bed(i,j+1)) - z_bed(i,j)) / dx 
-
-!                 else 
-!                     ! Flow predominantly in y-direction 
-
-!                     dzdx1         = (z_bed(i,j)   - z_bed(i-1,j)) / dx 
-!                     dzdx2         = (z_bed(i+1,j) - z_bed(i,j))   / dx 
-!                     channels(i,j) = (dzdx2-dzdx1) / dx 
-                    
-!                     !channels(i,j) = (0.5*(z_bed(i-1,j)+z_bed(i+1,j)) - z_bed(i,j)) / dx 
-
-!                 end if 
-
-
-            end if 
-
-        end do 
-        end do 
-
-        return 
-
-    end subroutine calc_channels
 
 end program yelmo_test 
 

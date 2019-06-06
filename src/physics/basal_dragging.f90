@@ -57,11 +57,10 @@ contains
 
         real(prec), intent(IN) :: H_ice 
         logical,    intent(IN) :: is_float 
-        real(prec) :: N_eff                 ! Output in [bar] == [1e-5 Pa] 
+        real(prec) :: N_eff                 ! [Pa]
 
-        ! Calculate effective pressure (overburden pressure)
-        ! Convert from [Pa] => [bar]
-        N_eff = 1e-5 * (rho_ice*g*H_ice)
+        ! Calculate effective pressure [Pa] (overburden pressure)
+        N_eff = (rho_ice*g*H_ice)
 
         ! No remaining pressure at base for floating ice
         if (is_float) N_eff = 0.0 
@@ -85,7 +84,7 @@ contains
         real(prec), intent(IN) :: z_sl 
         real(prec), intent(IN) :: H_w 
         real(prec), intent(IN) :: p       ! [0:1], 0: no ocean connectivity, 1: full ocean connectivity
-        real(prec) :: N_eff                 ! Output in [bar] == [1e-5 Pa] 
+        real(prec) :: N_eff               ! [Pa]
 
         ! Local variables  
         real(prec) :: H_float     ! Maximum ice thickness to allow floating ice
@@ -117,9 +116,8 @@ contains
 
         end if 
 
-        ! Calculate effective pressure (overburden pressure minus basal water pressure)
-        ! Convert from [Pa] => [bar]
-        N_eff = 1e-5 * ((rho_ice*g*H_ice) - p_w) 
+        ! Calculate effective pressure [Pa] (overburden pressure minus basal water pressure)
+        N_eff = (rho_ice*g*H_ice) - p_w 
 
         return 
 
@@ -150,7 +148,7 @@ contains
         ! Get ratio of water layer thickness to maximum
         s  = min(H_w/H_w_max,1.0)  
 
-        ! Calculate the effective pressure in the till (van Pelt and Bueler, 2015, Eq. 23-24)
+        ! Calculate the effective pressure in the till [Pa] (van Pelt and Bueler, 2015, Eq. 23-24)
         N_eff = min( N0*(delta*P0/N0)**s * 10**((e0/Cc)*(1-s)), P0 ) 
 
         ! No remaining pressure at base for floating ice
@@ -188,7 +186,7 @@ contains
         f_scale = max(f_scale,0.0)
 
         ! Linear ramp between phi_min and phi_max 
-        phi = (1.0-f_scale)*phi_min + f_scale*phi_max
+        phi = phi_min + f_scale*(phi_max-phi_min)
 
         ! Calculate bed friction coefficient as the tangent
         C_bed = tan(phi*pi/180.0)

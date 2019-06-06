@@ -148,7 +148,7 @@ program yelmo_test
 
         ! Update C_bed based on error correction
         call update_C_bed_thickness(yelmo1%dyn%now%C_bed,dCbed,yelmo1%dta%pd%err_z_srf, &
-                                    yelmo1%tpo%now%H_ice,yelmo1%tpo%par%dx)
+                                    yelmo1%tpo%now%H_ice,yelmo1%tpo%par%dx,phi_min,phi_max)
 
         ! Run model for time_iter yrs with this C_bed configuration (no change in boundaries)
         call yelmo_update_equil(yelmo1,time,time_tot=time_iter,topo_fixed=topo_fixed,dt=5.0,ssa_vel_max=5000.0)
@@ -334,6 +334,65 @@ contains
         return 
 
     end subroutine guess_C_bed
+
+    subroutine update_C_bed_thickness(C_bed,dCbed,err_z_srf,H_ice,dx,phi_min,phi_max)
+
+        implicit none 
+
+        real(prec), intent(INOUT) :: C_bed(:,:) 
+        real(prec), intent(INOUT) :: dCbed(:,:) 
+        real(prec), intent(IN)    :: err_z_srf(:,:) 
+        real(prec), intent(IN)    :: H_ice(:,:) 
+        real(prec), intent(IN)    :: dx 
+        real(prec), intent(IN)    :: phi_min 
+        real(prec), intent(IN)    :: phi_max 
+
+        ! Local variables 
+        integer :: i, j, nx, ny
+        real(prec) :: phi, dphi, f_dz 
+        real(prec), allocatable   :: C_bed_prev(:,:) 
+
+        real(prec), parameter :: dphi_min  = -0.5       ! [degrees]
+        real(prec), parameter :: dphi_max  =  1.0       ! [degrees]
+        real(prec), parameter :: err_z_fac = 200.0      ! [m] 
+
+        nx = size(C_bed,1)
+        ny = size(C_bed,2) 
+
+        allocate(C_bed_prev(nx,ny))
+
+        ! Store initial C_bed solution 
+        C_bed_prev = C_bed 
+
+        do j = 1, ny 
+        do i = 1, nx 
+
+            if (err_z_srf(i,j) .gt. 0.0) then 
+                ! Update where elevation error exists
+
+                f_dz = err_z_srf(i,j) / err_z_fac 
+                f_dz = max(f_dz, dphi_min)
+                f_dz = min(f_dz, dphi_max)
+
+                dphi = f_dz 
+                phi  = atan(C_bed(i,j)) + dphi 
+                phi  = max(phi,phi_min)
+                phi  = min(phi,phi_max)
+
+                C_bed(i,j) = tan(phi)
+
+            end if 
+
+        end do 
+        end do 
+
+        dCbed = C_bed - C_bed_prev
+
+        return 
+
+    end subroutine update_C_bed_thickness
+
+    ! Extra...
 
     subroutine calc_ydyn_cbed_external(dyn,tpo,thrm,bnd,channels)
         ! Update C_bed based on parameter choices

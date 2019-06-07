@@ -24,6 +24,7 @@ program yelmo_test
     real(prec) :: phi_min, phi_max 
 
     real(prec), allocatable :: dCbed(:,:) 
+    real(prec), allocatable :: phi(:,:) 
 
     ! No-ice mask (to impose additional melting)
     logical, allocatable :: mask_noice(:,:)  
@@ -97,11 +98,14 @@ program yelmo_test
     allocate(dCbed(yelmo1%grd%nx,yelmo1%grd%ny))
     dCbed = 0.0 
 
+    allocate(phi(yelmo1%grd%nx,yelmo1%grd%ny))
+    phi = phi_min  
+
     ! Define channel field 
     allocate(channels(yelmo1%grd%nx,yelmo1%grd%ny))
 
     ! Set initial guess of C_bed as a function of present-day velocity 
-    call guess_C_bed(yelmo1%dyn%now%C_bed,yelmo1%dta%pd%uxy_s,phi_min,phi_max)
+    call guess_C_bed(yelmo1%dyn%now%C_bed,phi,yelmo1%dta%pd%uxy_s,phi_min,phi_max)
 
     ! Initialize state variables (dyn,therm,mat)
     ! (initialize temps with robin method with a cold base)
@@ -130,7 +134,7 @@ program yelmo_test
     
     ! 2D file 
     call yelmo_write_init(yelmo1,file2D,time_init=0.0,units="years")  
-    call write_step_2D_opt(yelmo1,file2D,time=0.0,dCbed=dCbed)  
+    call write_step_2D_opt(yelmo1,file2D,time=0.0,dCbed=dCbed,phi=phi)  
 
     ! Initially assume we are working with topo_fixed...
     topo_fixed = .TRUE. 
@@ -147,7 +151,7 @@ program yelmo_test
         yelmo1%tpo%now%z_srf = yelmo1%dta%pd%z_srf 
 
         ! Update C_bed based on error correction
-        call update_C_bed_thickness(yelmo1%dyn%now%C_bed,dCbed,yelmo1%dta%pd%err_z_srf, &
+        call update_C_bed_thickness(yelmo1%dyn%now%C_bed,dCbed,phi,yelmo1%dta%pd%err_z_srf, &
                                     yelmo1%tpo%now%H_ice,yelmo1%tpo%par%dx,phi_min,phi_max)
 
         ! Run model for time_iter yrs with this C_bed configuration (no change in boundaries)
@@ -162,7 +166,7 @@ program yelmo_test
 
         time = real(q,prec)
         
-        call write_step_2D_opt(yelmo1,file2D,time=time,dCbed=dCbed)
+        call write_step_2D_opt(yelmo1,file2D,time=time,dCbed=dCbed,phi=phi)
         
         ! Summary 
         write(*,*) "q= ", q, maxval(abs(yelmo1%dta%pd%err_z_srf))
@@ -180,7 +184,7 @@ program yelmo_test
 
 contains
 
-    subroutine write_step_2D_opt(ylmo,filename,time,dCbed)
+    subroutine write_step_2D_opt(ylmo,filename,time,dCbed,phi)
 
         implicit none 
         
@@ -188,6 +192,7 @@ contains
         character(len=*),  intent(IN) :: filename
         real(prec), intent(IN) :: time
         real(prec), intent(IN) :: dCbed(:,:) 
+        real(prec), intent(IN) :: phi(:,:)
 
         ! Local variables
         integer    :: ncid, n
@@ -221,6 +226,9 @@ contains
                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
         call nc_write(filename,"dCbed",dCbed,units="-",long_name="Bed constant change", &
                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
+        call nc_write(filename,"phi",phi,units="degrees",long_name="Till friction angle", &
+                      dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
+        
         call nc_write(filename,"N_eff",ylmo%dyn%now%N_eff,units="Pa",long_name="Effective pressure", &
                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
         call nc_write(filename,"beta",ylmo%dyn%now%beta,units="Pa a m-1",long_name="Basal friction coefficient", &
@@ -289,18 +297,18 @@ contains
 
     end subroutine write_step_2D_opt
 
-    subroutine guess_C_bed(C_bed,uxy_s,phi_min,phi_max)
+    subroutine guess_C_bed(C_bed,phi,uxy_s,phi_min,phi_max)
 
         implicit none 
 
         real(prec), intent(INOUT) :: C_bed(:,:) 
+        real(prec), intent(INOUT) :: phi(:,:) 
         real(prec), intent(IN)    :: uxy_s(:,:) 
         real(prec), intent(IN)    :: phi_min
         real(prec), intent(IN)    :: phi_max
 
         ! Local variables 
         integer :: i, j, nx, ny 
-        real(prec) :: phi
         real(prec) :: logvel, logvel_max, f_scale    
 
         nx = size(C_bed,1)
@@ -314,19 +322,19 @@ contains
             if (uxy_s(i,j) .gt. 0.0) then 
                 ! Calculate expected till angle versus velocity 
 
-                logvel  = max(0.0,log(uxy_s(i,j)))
-                f_scale = logvel / logvel_max
-                phi     = phi_max - f_scale*(phi_max-phi_min)
+                logvel   = max(0.0,log(uxy_s(i,j)))
+                f_scale  = logvel / logvel_max
+                phi(i,j) = phi_max - f_scale*(phi_max-phi_min)
 
             else 
                 ! Set phi to the minimum 
 
-                phi = phi_min 
+                phi(i,j) = phi_min 
 
             end if 
 
             ! Calculate C_bed following till friction approach (Bueler and van Pelt, 2015)
-            C_bed(i,j) = tan(phi*pi/180)
+            C_bed(i,j) = tan(phi(i,j)*pi/180)
 
         end do 
         end do
@@ -335,12 +343,13 @@ contains
 
     end subroutine guess_C_bed
 
-    subroutine update_C_bed_thickness(C_bed,dCbed,err_z_srf,H_ice,dx,phi_min,phi_max)
+    subroutine update_C_bed_thickness(C_bed,dCbed,phi,err_z_srf,H_ice,dx,phi_min,phi_max)
 
         implicit none 
 
         real(prec), intent(INOUT) :: C_bed(:,:) 
         real(prec), intent(INOUT) :: dCbed(:,:) 
+        real(prec), intent(INOUT) :: phi(:,:) 
         real(prec), intent(IN)    :: err_z_srf(:,:) 
         real(prec), intent(IN)    :: H_ice(:,:) 
         real(prec), intent(IN)    :: dx 
@@ -349,7 +358,7 @@ contains
 
         ! Local variables 
         integer :: i, j, nx, ny
-        real(prec) :: phi, dphi, f_dz 
+        real(prec) :: dphi, f_dz 
         real(prec), allocatable   :: C_bed_prev(:,:) 
 
         real(prec), parameter :: dphi_min  = -0.5       ! [degrees]
@@ -375,11 +384,11 @@ contains
                 f_dz = min(f_dz, dphi_max)
 
                 dphi = f_dz 
-                phi  = atan(C_bed(i,j)) + dphi 
-                phi  = max(phi,phi_min)
-                phi  = min(phi,phi_max)
+                phi(i,j)  = phi(i,j) + dphi 
+                phi(i,j)  = max(phi(i,j),phi_min)
+                phi(i,j)  = min(phi(i,j),phi_max)
 
-                C_bed(i,j) = tan(phi)
+                C_bed(i,j) = tan(phi(i,j)*pi/180.0)
 
             end if 
 

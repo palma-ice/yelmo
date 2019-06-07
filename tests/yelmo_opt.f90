@@ -56,8 +56,8 @@ program yelmo_test
 
     ! Simulation parameters
     time_init       = 0.0           ! [yr] Starting time
-    time_iter       = 100.0         ! [yr] Simulation time for each iteration
-    qmax            = 5             ! Total number of iterations
+    time_iter       = 200.0         ! [yr] Simulation time for each iteration
+    qmax            = 50            ! Total number of iterations
     qmax_topo_fixed = 0             ! Number of initial iterations that should use topo_fixed=.TRUE. 
 
     phi_min         =  5.0 

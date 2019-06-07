@@ -56,7 +56,7 @@ program yelmo_test
 
     ! Simulation parameters
     time_init       = 0.0           ! [yr] Starting time
-    time_iter       = 200.0         ! [yr] Simulation time for each iteration
+    time_iter       = 500.0         ! [yr] Simulation time for each iteration
     qmax            = 50            ! Total number of iterations
     qmax_topo_fixed = 0             ! Number of initial iterations that should use topo_fixed=.TRUE. 
 
@@ -71,7 +71,7 @@ program yelmo_test
 
     yelmo1%dyn%par%beta_method       = 3        ! 0: constant beta; 1: power law; 2: effective pressure; 3: regularized Coulomb law, 4: pism power law
     yelmo1%dyn%par%m_drag            = 3.0      ! Dragging law exponent 
-    !yelmo1%dyn%par%cf_stream         = 5e4      ! [a m-1] Bed roughness coefficient, stream  
+    yelmo1%dyn%par%cf_stream         = 0.1      ! [--] Friction scalar, unitless for reg. coulomb law  
     
     yelmo1%dyn%par%neff_method       = 2        ! -1: external N_eff, 0: overburden pressure, 1: Leguy param., 2: Till pressure
     
@@ -105,7 +105,7 @@ program yelmo_test
     allocate(channels(yelmo1%grd%nx,yelmo1%grd%ny))
 
     ! Set initial guess of C_bed as a function of present-day velocity 
-    call guess_C_bed(yelmo1%dyn%now%C_bed,phi,yelmo1%dta%pd%uxy_s,phi_min,phi_max)
+    call guess_C_bed(yelmo1%dyn%now%C_bed,phi,yelmo1%dta%pd%uxy_s,phi_min,phi_max,yelmo1%dyn%par%cf_stream)
 
     ! Initialize state variables (dyn,therm,mat)
     ! (initialize temps with robin method with a cold base)
@@ -152,7 +152,7 @@ program yelmo_test
 
         ! Update C_bed based on error correction
         call update_C_bed_thickness(yelmo1%dyn%now%C_bed,dCbed,phi,yelmo1%dta%pd%err_z_srf, &
-                                    yelmo1%tpo%now%H_ice,yelmo1%tpo%par%dx,phi_min,phi_max)
+                                    yelmo1%tpo%now%H_ice,yelmo1%tpo%par%dx,phi_min,phi_max,yelmo1%dyn%par%cf_stream)
 
         ! Run model for time_iter yrs with this C_bed configuration (no change in boundaries)
         call yelmo_update_equil(yelmo1,time,time_tot=time_iter,topo_fixed=topo_fixed,dt=5.0,ssa_vel_max=5000.0)
@@ -214,7 +214,6 @@ contains
         ! Update the time step
         call nc_write(filename,"time",time,dim1="time",start=[n],count=[1],ncid=ncid)
 
-        ! == yelmo_topography ==
         call nc_write(filename,"H_ice",ylmo%tpo%now%H_ice,units="m",long_name="Ice thickness", &
                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
         call nc_write(filename,"z_srf",ylmo%tpo%now%z_srf,units="m",long_name="Surface elevation", &
@@ -241,12 +240,17 @@ contains
         call nc_write(filename,"uxy_b",ylmo%dyn%now%uxy_b,units="m/a",long_name="Basal sliding velocity magnitude", &
                      dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
 
+        call nc_write(filename,"f_pmp",ylmo%thrm%now%f_pmp,units="",long_name="Basal temperate fraction", &
+                      dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
+        
         ! Boundary variables (forcing)
         call nc_write(filename,"z_bed",ylmo%bnd%z_bed,units="m",long_name="Bedrock elevation", &
                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
         call nc_write(filename,"smb",ylmo%bnd%smb,units="m a-1",long_name="Annual surface mass balance (ice equiv.)", &
                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-        call nc_write(filename,"T_srf",ylmo%bnd%T_srf,units="K",long_name="Surface temperature ", &
+        call nc_write(filename,"T_srf",ylmo%bnd%T_srf,units="K",long_name="Surface temperature", &
+                      dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
+        call nc_write(filename,"H_w",ylmo%bnd%H_w,units="m",long_name="Basal water layer", &
                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
 
         ! Target data (not time dependent)
@@ -297,7 +301,7 @@ contains
 
     end subroutine write_step_2D_opt
 
-    subroutine guess_C_bed(C_bed,phi,uxy_s,phi_min,phi_max)
+    subroutine guess_C_bed(C_bed,phi,uxy_s,phi_min,phi_max,cf_stream)
 
         implicit none 
 
@@ -306,6 +310,7 @@ contains
         real(prec), intent(IN)    :: uxy_s(:,:) 
         real(prec), intent(IN)    :: phi_min
         real(prec), intent(IN)    :: phi_max
+        real(prec), intent(IN)    :: cf_stream 
 
         ! Local variables 
         integer :: i, j, nx, ny 
@@ -334,7 +339,7 @@ contains
             end if 
 
             ! Calculate C_bed following till friction approach (Bueler and van Pelt, 2015)
-            C_bed(i,j) = tan(phi(i,j)*pi/180)
+            C_bed(i,j) = cf_stream*tan(phi(i,j)*pi/180)
 
         end do 
         end do
@@ -343,7 +348,7 @@ contains
 
     end subroutine guess_C_bed
 
-    subroutine update_C_bed_thickness(C_bed,dCbed,phi,err_z_srf,H_ice,dx,phi_min,phi_max)
+    subroutine update_C_bed_thickness(C_bed,dCbed,phi,err_z_srf,H_ice,dx,phi_min,phi_max,cf_stream)
 
         implicit none 
 
@@ -355,6 +360,7 @@ contains
         real(prec), intent(IN)    :: dx 
         real(prec), intent(IN)    :: phi_min 
         real(prec), intent(IN)    :: phi_max 
+        real(prec), intent(IN)    :: cf_stream 
 
         ! Local variables 
         integer :: i, j, nx, ny
@@ -388,7 +394,7 @@ contains
                 phi(i,j)  = max(phi(i,j),phi_min)
                 phi(i,j)  = min(phi(i,j),phi_max)
 
-                C_bed(i,j) = tan(phi(i,j)*pi/180.0)
+                C_bed(i,j) = cf_stream*tan(phi(i,j)*pi/180.0)
 
             end if 
 

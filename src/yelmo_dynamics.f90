@@ -223,63 +223,49 @@ contains
         ! Update bed roughness coefficient C_bed (which is independent of velocity)
         call calc_ydyn_cbed(dyn,tpo,thrm,bnd)
 
-        ! == Iterate over strain rate, viscosity and ssa velocity solutions until convergence ==
-        ! Note: ssa solution is defined for ux_b/uy_b fields here, not ux_bar/uy_bar as in PD12
+        ! Define grid points with ssa active (uses beta from previous timestep)
+        call set_ssa_masks(dyn%now%ssa_mask_acx,dyn%now%ssa_mask_acy,dyn%now%beta_acx,dyn%now%beta_acy, &
+                           tpo%now%H_ice,tpo%now%f_grnd_acx,tpo%now%f_grnd_acy,dyn%par%beta_max,dyn%par%use_ssa)
 
-        is_converged = .FALSE. 
-
-        ! Store old solution (from previous time step) to be able to apply relaxation 
-        ! to avoid too fast propagation of waves
-        ux_b_old = dyn%now%ux_b
-        uy_b_old = dyn%now%uy_b
-        
-        write_ssa_diagnostics = .FALSE. 
-
-!         if (tpo%now%f_grnd(18,3) .gt. 0.0) then 
-!             write_ssa_diagnostics = .TRUE.
-
-!             call yelmo_write_init_ssa("yelmo_ssa.nc",time_init=1.0) 
-!         end if 
-
-        do iter = 1, dyn%par%ssa_iter_max
-
-            ! Store previous solution 
-            ux_b_prev = dyn%now%ux_b 
-            uy_b_prev = dyn%now%uy_b 
-
-            !   1. Calculate basal drag coefficient beta (beta, beta_acx, beta_acy) 
-
-            call calc_ydyn_beta(dyn,tpo,mat,bnd)
-            !call calc_ydyn_beta_ac(dyn,tpo,mat,bnd)
+        ! Determine whether SSA solver should be called 
+        calc_ssa = .FALSE. 
+        if (dyn%par%use_ssa .and. maxval(dyn%now%ssa_mask_acx+dyn%now%ssa_mask_acy) .gt. 0) calc_ssa = .TRUE.    
             
-            !   2. Calculate effective viscosity
-            
-            ! ---------------------------------------------------------------------
-            ! Stable viscosity solutions for SSA solver:
+        if (calc_ssa) then
+            ! == Iterate over strain rate, viscosity and ssa velocity solutions until convergence ==
+            ! Note: ssa solution is defined for ux_b/uy_b fields here, not ux_bar/uy_bar as in PD12
 
-!             dyn%now%visc_eff = 1e10 
+            is_converged = .FALSE. 
 
-!             dyn%now%visc_eff = mat%now%visc_eff 
-            
-            ! Use 3D rate factor, but 2D shear:
-            ! Note: disable shear contribution to viscosity for this solver, for mixed terms use hybrid-pd12 option.
-            ! Note: Here visc_eff is calculated using ux_b and uy_b (ssa velocity), not ux_bar/uy_bar as in hybrid-pd12. 
-            dyn%now%visc_eff = calc_visc_eff(dyn%now%ux_b,dyn%now%uy_b,dyn%now%duxdz_bar*0.0,dyn%now%duydz_bar*0.0, &
-                                             tpo%now%H_ice,mat%now%ATT,dyn%par%zeta_aa,dyn%par%dx,dyn%par%dy,mat%par%n_glen)
-            
-            !   3. Calculate SSA solution
+            write_ssa_diagnostics = .FALSE. 
 
-            ! Define grid points with ssa active
-            call set_ssa_masks(dyn%now%ssa_mask_acx,dyn%now%ssa_mask_acy,dyn%now%beta_acx,dyn%now%beta_acy, &
-                               tpo%now%H_ice,tpo%now%f_grnd_acx,tpo%now%f_grnd_acy,dyn%par%beta_max,dyn%par%use_ssa)
+!             if (tpo%now%f_grnd(18,3) .gt. 0.0) then 
+!                 write_ssa_diagnostics = .TRUE.
 
-            ! Determine whether SSA solver should be called 
-            calc_ssa = .FALSE. 
-            if (dyn%par%use_ssa .and. maxval(dyn%now%ssa_mask_acx+dyn%now%ssa_mask_acy) .gt. 0) calc_ssa = .TRUE.    
-            
-            if (calc_ssa) then
+!                 call yelmo_write_init_ssa("yelmo_ssa.nc",time_init=1.0) 
+!             end if 
+          
+            do iter = 1, dyn%par%ssa_iter_max
+
+                ! Store previous solution 
+                ux_b_prev = dyn%now%ux_b 
+                uy_b_prev = dyn%now%uy_b 
+
+                !   1. Calculate basal drag coefficient beta (beta, beta_acx, beta_acy) 
+
+                call calc_ydyn_beta(dyn,tpo,mat,bnd)
+
+                !   2. Calculate effective viscosity
+                
+                ! Use 3D rate factor, but 2D shear:
+                ! Note: disable shear contribution to viscosity for this solver, for mixed terms use hybrid-pd12 option.
+                ! Note: Here visc_eff is calculated using ux_b and uy_b (ssa velocity), not ux_bar/uy_bar as in hybrid-pd12. 
+                dyn%now%visc_eff = calc_visc_eff(dyn%now%ux_b,dyn%now%uy_b,dyn%now%duxdz_bar*0.0,dyn%now%duydz_bar*0.0, &
+                                                 tpo%now%H_ice,mat%now%ATT,dyn%par%zeta_aa,dyn%par%dx,dyn%par%dy,mat%par%n_glen)
+                
+                !   3. Calculate SSA solution
+                
                 ! Call ssa solver to determine ux_b/uy_b, where ssa_mask_acx/y are > 0
-
                 call calc_vxy_ssa_matrix(dyn%now%ux_b,dyn%now%uy_b,dyn%now%ux_bar*0.0,dyn%now%uy_bar*0.0, &
                                          dyn%now%beta_acx,dyn%now%beta_acy,dyn%now%visc_eff,dyn%now%ssa_mask_acx, &
                                          dyn%now%ssa_mask_acy,tpo%now%H_ice,dyn%now%taud_acx,dyn%now%taud_acy,tpo%now%H_grnd, &
@@ -287,30 +273,30 @@ contains
                                          dyn%par%dx,dyn%par%dy,dyn%par%ssa_vel_max,dyn%par%boundaries, &
                                          dyn%now%gfa1,dyn%now%gfa2,dyn%now%gfb1,dyn%now%gfb2)
 
-            else 
-                ! Reset basal velocity zero 
+                ! Apply relaxation to keep things stable
+                call relax_ssa(dyn%now%ux_b,dyn%now%uy_b,ux_b_prev,uy_b_prev,rel=dyn%par%ssa_iter_rel)
 
-                dyn%now%ux_b = 0.0 
-                dyn%now%uy_b = 0.0 
-                
-            end if 
-            
-            ! Apply relaxation to keep things stable
-            call relax_ssa(dyn%now%ux_b,dyn%now%uy_b,ux_b_prev,uy_b_prev,rel=dyn%par%ssa_iter_rel)
+                ! Check for convergence
+                is_converged = check_vel_convergence(dyn%now%ux_b,dyn%now%uy_b,ux_b_prev,uy_b_prev, &
+                                            dyn%par%ssa_iter_conv,iter,yelmo_write_log)
 
-            ! Check for convergence
-            is_converged = check_vel_convergence(dyn%now%ux_b,dyn%now%uy_b,ux_b_prev,uy_b_prev, &
-                                        dyn%par%ssa_iter_conv,iter,yelmo_write_log)
+                if (write_ssa_diagnostics) then  
+                    call write_step_2D_ssa(tpo,dyn,"yelmo_ssa.nc",ux_b_prev,uy_b_prev,time=real(iter,prec))    
+                end if 
 
-            if (write_ssa_diagnostics) then  
-                call write_step_2D_ssa(tpo,dyn,"yelmo_ssa.nc",ux_b_prev,uy_b_prev,time=real(iter,prec))    
-            end if 
+                ! Exit iterations if ssa solution has converged
+                if (is_converged) exit 
 
-            ! Exit iterations if ssa solution has converged
-            if (is_converged) exit 
+            end do 
+            ! == END iterations ==
 
-        end do 
-        ! == END iterations ==
+        else 
+            ! No ssa calculations performed, set basal velocity fields to zeor 
+
+            dyn%now%ux_b = 0.0 
+            dyn%now%uy_b = 0.0 
+
+        end if 
 
         if (write_ssa_diagnostics) then 
             stop 

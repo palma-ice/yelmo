@@ -379,7 +379,7 @@ contains
             if (err_z_srf(i,j) .gt. 0.0) then 
                 ! Update where elevation error exists
 
-                f_dz = err_z_srf(i,j) / err_z_fac 
+                f_dz = -err_z_srf(i,j) / err_z_fac 
                 f_dz = max(f_dz, dphi_min)
                 f_dz = min(f_dz, dphi_max)
 

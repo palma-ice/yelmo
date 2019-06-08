@@ -16,7 +16,7 @@ module yelmo_dynamics
     ! Note: 3D arrays defined such that first index (k=1) == base, and max index (k=nk) == surface 
     
     implicit none
-
+      
     private
 
     public :: ydyn_par_load, ydyn_alloc, ydyn_dealloc
@@ -104,9 +104,6 @@ contains
         integer :: i, j, k, nx, ny, nz_aa, nz_ac    
         real(prec), allocatable :: H_ice_acx(:,:) 
         real(prec), allocatable :: H_ice_acy(:,:) 
-
-        real(prec), allocatable :: ux_b_old(:,:) 
-        real(prec), allocatable :: uy_b_old(:,:) 
         real(prec), allocatable :: ux_b_prev(:,:) 
         real(prec), allocatable :: uy_b_prev(:,:) 
 
@@ -126,9 +123,6 @@ contains
         allocate(H_ice_acy(nx,ny))
         allocate(bmb(nx,ny))
 
-        allocate(ux_b_old(nx,ny))
-        allocate(uy_b_old(nx,ny))
-        
         allocate(ux_b_prev(nx,ny))
         allocate(uy_b_prev(nx,ny))
         
@@ -140,7 +134,8 @@ contains
 
         ! Calculate driving stress 
         call calc_driving_stress_ac(dyn%now%taud_acx,dyn%now%taud_acy,tpo%now%H_ice,tpo%now%f_ice,tpo%now%z_srf,bnd%z_bed,bnd%z_sl, &
-                 tpo%now%H_grnd,tpo%now%f_grnd,tpo%now%f_grnd_acx,tpo%now%f_grnd_acy,dyn%par%dx,method=dyn%par%taud_gl_method)
+                 tpo%now%H_grnd,tpo%now%f_grnd,tpo%now%f_grnd_acx,tpo%now%f_grnd_acy,dyn%par%dx, &
+                 method=dyn%par%taud_gl_method,beta_gl_stag=dyn%par%beta_gl_stag)
 
         ! ===== Calculate effective pressure ==============================
 
@@ -235,6 +230,8 @@ contains
             ! == Iterate over strain rate, viscosity and ssa velocity solutions until convergence ==
             ! Note: ssa solution is defined for ux_b/uy_b fields here, not ux_bar/uy_bar as in PD12
 
+            if (.FALSE.) then 
+
             is_converged = .FALSE. 
 
             write_ssa_diagnostics = .FALSE. 
@@ -264,7 +261,7 @@ contains
                                                  tpo%now%H_ice,mat%now%ATT,dyn%par%zeta_aa,dyn%par%dx,dyn%par%dy,mat%par%n_glen)
                 
                 !   3. Calculate SSA solution
-                
+
                 ! Call ssa solver to determine ux_b/uy_b, where ssa_mask_acx/y are > 0
                 call calc_vxy_ssa_matrix(dyn%now%ux_b,dyn%now%uy_b,dyn%now%ux_bar*0.0,dyn%now%uy_bar*0.0, &
                                          dyn%now%beta_acx,dyn%now%beta_acy,dyn%now%visc_eff,dyn%now%ssa_mask_acx, &
@@ -289,6 +286,12 @@ contains
 
             end do 
             ! == END iterations ==
+
+            else 
+
+            call calc_ydyn_ssa(dyn,tpo,mat,bnd)
+
+            end if 
 
         else 
             ! No ssa calculations performed, set basal velocity fields to zeor 
@@ -483,7 +486,8 @@ contains
         
         ! Calculate driving stress 
         call calc_driving_stress_ac(dyn%now%taud_acx,dyn%now%taud_acy,tpo%now%H_ice,tpo%now%f_ice,tpo%now%z_srf,bnd%z_bed,bnd%z_sl, &
-                 tpo%now%H_grnd,tpo%now%f_grnd,tpo%now%f_grnd_acx,tpo%now%f_grnd_acy,dyn%par%dx,method=dyn%par%taud_gl_method)
+                 tpo%now%H_grnd,tpo%now%f_grnd,tpo%now%f_grnd_acx,tpo%now%f_grnd_acy,dyn%par%dx, &
+                 method=dyn%par%taud_gl_method,beta_gl_stag=dyn%par%beta_gl_stag)
 
         ! Calculate 2D diffusivity too (for timestepping and diagnostics)
 !         call calc_diffusivity_2D(dyn%now%dd_ab_bar,tpo%now%H_ice,tpo%now%dzsdx,tpo%now%dzsdy, &
@@ -794,6 +798,106 @@ contains
 
     end subroutine relax_ssa
 
+    subroutine calc_ydyn_ssa(dyn,tpo,mat,bnd)
+        ! Update beta based on parameter choices
+
+        implicit none
+        
+        type(ydyn_class),   intent(INOUT) :: dyn
+        type(ytopo_class),  intent(IN)    :: tpo 
+        type(ymat_class),   intent(IN)    :: mat 
+        type(ybound_class), intent(IN)    :: bnd   
+
+        ! Local variables
+        integer :: iter, nx, ny  
+        real(prec), allocatable :: ux_b_prev(:,:) 
+        real(prec), allocatable :: uy_b_prev(:,:) 
+
+        logical :: is_converged
+        logical :: write_ssa_diagnostics
+
+        type(ydyn_class) :: dyn1   ! Use for alternate grounding line treatment 
+
+        type ssa_helper_type 
+            real(prec), allocatable :: ux(:,:) 
+            real(prec), allocatable :: uy(:,:) 
+            real(prec), allocatable :: beta_acx(:,:) 
+            real(prec), allocatable :: beta_acy(:,:) 
+            real(prec), allocatable :: visc_eff(:,:) 
+
+        end type 
+        
+        ! Initially set dyn and dyn1 equal 
+        dyn1 = dyn 
+
+        ! Modify dyn1 parameters concerning beta 
+        dyn1%par%beta_gl_sep   = 0     ! No subgrid grounding line treatment 
+        dyn1%par%beta_gl_scale = 0     ! No special scaling at gl 
+
+        is_converged          = .FALSE. 
+        write_ssa_diagnostics = .FALSE. 
+
+        nx    = dyn%par%nx 
+        ny    = dyn%par%ny
+
+        allocate(ux_b_prev(nx,ny))
+        allocate(uy_b_prev(nx,ny))
+        
+!             if (tpo%now%f_grnd(18,3) .gt. 0.0) then 
+!                 write_ssa_diagnostics = .TRUE.
+
+!                 call yelmo_write_init_ssa("yelmo_ssa.nc",time_init=1.0) 
+!             end if 
+          
+        do iter = 1, dyn%par%ssa_iter_max
+
+            ! Store previous solution 
+            ux_b_prev = dyn%now%ux_b 
+            uy_b_prev = dyn%now%uy_b 
+
+            !   1. Calculate basal drag coefficient beta (beta, beta_acx, beta_acy) 
+
+            call calc_ydyn_beta(dyn,tpo,mat,bnd)
+
+            !   2. Calculate effective viscosity
+            
+            ! Use 3D rate factor, but 2D shear:
+            ! Note: disable shear contribution to viscosity for this solver, for mixed terms use hybrid-pd12 option.
+            ! Note: Here visc_eff is calculated using ux_b and uy_b (ssa velocity), not ux_bar/uy_bar as in hybrid-pd12. 
+            dyn%now%visc_eff = calc_visc_eff(dyn%now%ux_b,dyn%now%uy_b,dyn%now%duxdz_bar*0.0,dyn%now%duydz_bar*0.0, &
+                                             tpo%now%H_ice,mat%now%ATT,dyn%par%zeta_aa,dyn%par%dx,dyn%par%dy,mat%par%n_glen)
+            
+            !   3. Calculate SSA solution
+
+            ! Call ssa solver to determine ux_b/uy_b, where ssa_mask_acx/y are > 0
+            call calc_vxy_ssa_matrix(dyn%now%ux_b,dyn%now%uy_b,dyn%now%ux_bar*0.0,dyn%now%uy_bar*0.0, &
+                                     dyn%now%beta_acx,dyn%now%beta_acy,dyn%now%visc_eff,dyn%now%ssa_mask_acx, &
+                                     dyn%now%ssa_mask_acy,tpo%now%H_ice,dyn%now%taud_acx,dyn%now%taud_acy,tpo%now%H_grnd, &
+                                     bnd%z_sl,bnd%z_bed, & 
+                                     dyn%par%dx,dyn%par%dy,dyn%par%ssa_vel_max,dyn%par%boundaries, &
+                                     dyn%now%gfa1,dyn%now%gfa2,dyn%now%gfb1,dyn%now%gfb2)
+
+            ! Apply relaxation to keep things stable
+            call relax_ssa(dyn%now%ux_b,dyn%now%uy_b,ux_b_prev,uy_b_prev,rel=dyn%par%ssa_iter_rel)
+
+            ! Check for convergence
+            is_converged = check_vel_convergence(dyn%now%ux_b,dyn%now%uy_b,ux_b_prev,uy_b_prev, &
+                                        dyn%par%ssa_iter_conv,iter,yelmo_write_log)
+
+            if (write_ssa_diagnostics) then  
+                call write_step_2D_ssa(tpo,dyn,"yelmo_ssa.nc",ux_b_prev,uy_b_prev,time=real(iter,prec))    
+            end if 
+
+            ! Exit iterations if ssa solution has converged
+            if (is_converged) exit 
+
+        end do 
+        ! == END iterations ==
+
+        return 
+
+    end subroutine calc_ydyn_ssa 
+
     subroutine calc_ydyn_beta(dyn,tpo,mat,bnd)
         ! Update beta based on parameter choices
 
@@ -949,7 +1053,12 @@ contains
 
                 call stagger_beta_aa_upstream(dyn%now%beta_acx,dyn%now%beta_acy,dyn%now%beta,tpo%now%f_grnd)
 
-            case(2)
+            case(2) 
+                ! Apply downstream beta_aa value (==0.0) at ac-node with at least one neighbor H_grnd_aa > 0
+
+                call stagger_beta_aa_downstream(dyn%now%beta_acx,dyn%now%beta_acy,dyn%now%beta,tpo%now%f_grnd)
+
+            case(3)
                 ! Apply subgrid scaling fraction at the grounding line when staggering 
 
                 ! Note: now subgrid treatment is handled on aa-nodes above (using beta_gl_sep)

@@ -45,6 +45,7 @@ module basal_dragging
     ! Beta staggering functions (aa- to ac-nodes)
     public :: stagger_beta_aa_simple
     public :: stagger_beta_aa_upstream
+    public :: stagger_beta_aa_downstream
     public :: stagger_beta_aa_subgrid
     public :: stagger_beta_aa_subgrid_1 
     
@@ -627,8 +628,8 @@ contains
         ! Modify basal friction coefficient by grounded/floating binary mask
         ! (via the grounded fraction)
         ! Analagous to method "NSEP" in Seroussi et al (2014): 
-        ! Friction is zero if a staggered node contains a floating fraction,
-        ! ie, f_grnd_acx/acy > 1.0 
+        ! Friction is upstream value if a staggered node contains a floating fraction,
+        ! ie, f_grnd_acx/acy < 1.0 & > 0.0 
 
         implicit none
         
@@ -651,33 +652,13 @@ contains
         do i = 1, nx-1
 
             if (f_grnd(i,j) .eq. 0.0 .and. f_grnd(i+1,j) .eq. 0.0) then 
-                ! Purely floating points only considered floating (ie, domain more grounded)
-
-                is_float = .TRUE. 
-
-            else 
-                ! Grounded 
-
-                is_float = .FALSE. 
-
-            end if 
-
-            if (is_float) then
-                ! Consider ac-node floating
-
                 beta_acx(i,j) = 0.0 
-
+            else if (f_grnd(i,j) .gt. 0.0 .and. f_grnd(i+1,j) .eq. 0.0) then 
+                beta_acx(i,j) = beta(i,j)
+            else if (f_grnd(i,j) .eq. 0.0 .and. f_grnd(i+1,j) .gt. 0.0) then
+                beta_acx(i,j) = beta(i+1,j)
             else 
-                ! Consider ac-node grounded 
-
-                if (f_grnd(i,j) .gt. 0.0 .and. f_grnd(i+1,j) .eq. 0.0) then 
-                    beta_acx(i,j) = beta(i,j)
-                else if (f_grnd(i,j) .eq. 0.0 .and. f_grnd(i+1,j) .gt. 0.0) then
-                    beta_acx(i,j) = beta(i+1,j)
-                else 
-                    beta_acx(i,j) = 0.5_prec*(beta(i,j)+beta(i+1,j))
-                end if 
-                
+                beta_acx(i,j) = 0.5_prec*(beta(i,j)+beta(i+1,j))
             end if 
             
         end do 
@@ -689,33 +670,13 @@ contains
         do i = 1, nx
 
             if (f_grnd(i,j) .eq. 0.0 .and. f_grnd(i,j+1) .eq. 0.0) then 
-                ! Purely floating points only considered floating (ie, domain more grounded)
-
-                is_float = .TRUE. 
-
-            else 
-                ! Grounded 
-
-                is_float = .FALSE. 
-
-            end if 
-
-            if (is_float) then
-                ! Consider ac-node floating
-
                 beta_acy(i,j) = 0.0 
-
+            else if (f_grnd(i,j) .gt. 0.0 .and. f_grnd(i,j+1) .eq. 0.0) then 
+                beta_acy(i,j) = beta(i,j)
+            else if (f_grnd(i,j) .eq. 0.0 .and. f_grnd(i,j+1) .gt. 0.0) then
+                beta_acy(i,j) = beta(i,j+1)
             else 
-                ! Consider ac-node grounded 
-
-                if (f_grnd(i,j) .gt. 0.0 .and. f_grnd(i,j+1) .eq. 0.0) then 
-                    beta_acy(i,j) = beta(i,j)
-                else if (f_grnd(i,j) .eq. 0.0 .and. f_grnd(i,j+1) .gt. 0.0) then
-                    beta_acy(i,j) = beta(i,j+1)
-                else 
-                    beta_acy(i,j) = 0.5_prec*(beta(i,j)+beta(i,j+1))
-                end if 
-                
+                beta_acy(i,j) = 0.5_prec*(beta(i,j)+beta(i,j+1))
             end if 
             
         end do 
@@ -725,6 +686,61 @@ contains
         return
         
     end subroutine stagger_beta_aa_upstream
+    
+    subroutine stagger_beta_aa_downstream(beta_acx,beta_acy,beta,f_grnd)
+        ! Modify basal friction coefficient by grounded/floating binary mask
+        ! (via the grounded fraction)
+        ! Analagous to method "NSEP" in Seroussi et al (2014): 
+        ! Friction is zero if a staggered node contains a floating fraction,
+        ! ie, f_grnd_acx/acy < 1.0 & > 0.0 
+
+        implicit none
+        
+        real(prec), intent(INOUT) :: beta_acx(:,:)   ! ac-nodes
+        real(prec), intent(INOUT) :: beta_acy(:,:)   ! ac-nodes
+        real(prec), intent(IN)    :: beta(:,:)       ! aa-nodes
+        real(prec), intent(IN)    :: f_grnd(:,:)     ! aa-nodes    
+        
+        ! Local variables
+        integer    :: i, j, nx, ny 
+        logical    :: is_float 
+
+        nx = size(beta_acx,1)
+        ny = size(beta_acx,2) 
+
+        ! === Stagger to ac-nodes === 
+
+        ! acx-nodes
+        do j = 1, ny 
+        do i = 1, nx-1
+
+            if (f_grnd(i,j) .eq. 0.0 .or. f_grnd(i+1,j) .eq. 0.0) then 
+                beta_acx(i,j) = 0.0 
+            else 
+                beta_acx(i,j) = 0.5_prec*(beta(i,j)+beta(i+1,j))
+            end if 
+            
+        end do 
+        end do 
+        beta_acx(nx,:) = beta_acx(nx-1,:) 
+        
+        ! acy-nodes 
+        do j = 1, ny-1 
+        do i = 1, nx
+
+            if (f_grnd(i,j) .eq. 0.0 .or. f_grnd(i,j+1) .eq. 0.0) then 
+                beta_acy(i,j) = 0.0 
+            else 
+                beta_acy(i,j) = 0.5_prec*(beta(i,j)+beta(i,j+1))
+            end if 
+            
+        end do 
+        end do 
+        beta_acy(:,ny) = beta_acy(:,ny-1) 
+        
+        return
+        
+    end subroutine stagger_beta_aa_downstream
     
     subroutine stagger_beta_aa_subgrid(beta_acx,beta_acy,beta,f_grnd,f_grnd_acx,f_grnd_acy)
         ! Modify basal friction coefficient by grounded/floating binary mask

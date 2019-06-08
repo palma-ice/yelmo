@@ -784,7 +784,7 @@ contains
     end subroutine calc_basal_stress
 
     subroutine calc_driving_stress_ac(taud_acx,taud_acy,H_ice,f_ice,z_srf,z_bed,z_sl,H_grnd, &
-                                      f_grnd,f_grnd_acx,f_grnd_acy,dx,method)
+                                      f_grnd,f_grnd_acx,f_grnd_acy,dx,method,beta_gl_stag)
         ! taud = rho_ice*g*H_ice
         ! Calculate driving stress on staggered grid points, with 
         ! special treatment of the grounding line 
@@ -807,6 +807,7 @@ contains
         real(prec), intent(IN)  :: f_grnd_acy(:,:)
         real(prec), intent(IN)  :: dx 
         integer,    intent(IN)  :: method        ! Which driving stress calculation to use
+        integer,    intent(IN)  :: beta_gl_stag  ! Method of grounding line staggering of beta 
 
         ! Local variables 
         integer :: i, j, nx, ny 
@@ -880,8 +881,80 @@ contains
 
         select case(method)
 
+            case(-1)
+                ! One-sided choice
+                ! between upstream or downstream driving stress 
+                ! at grounding line
+
+                if (beta_gl_stag .eq. 1) then 
+                    ! Upstream beta assigned at gl (ie, beta=beta_upstream)
+
+if (.FALSE.) then 
+                    ! x-direction 
+                    do j = 1, ny 
+                    do i = 2, nx-1 
+
+                        if (f_grnd(i,j) .eq. 0.0 .and. f_grnd(i+1,j) .gt. 0.0) then 
+                            taud_acx(i,j) = taud_acx(i+1,j) 
+                        else if (f_grnd(i,j) .gt. 0.0 .and. f_grnd(i+1,j) .eq. 0.0) then  
+                            taud_acx(i,j) = taud_acx(i-1,j)
+                        end if 
+
+                    end do 
+                    end do 
+
+                    ! y-direction 
+                    do j = 2, ny-1 
+                    do i = 1, nx 
+
+                        if (f_grnd(i,j) .eq. 0.0 .and. f_grnd(i,j+1) .gt. 0.0) then 
+                            taud_acy(i,j) = taud_acy(i,j+1) 
+                        else if (f_grnd(i,j) .gt. 0.0 .and. f_grnd(i,j+1) .eq. 0.0) then  
+                            taud_acy(i,j) = taud_acy(i,j-1)
+                        end if 
+
+                    end do 
+                    end do 
+end if 
+                else if (beta_gl_stag .eq. 2) then 
+                    ! Downstream beta assigned at gl (ie, beta=0)
+
+                    ! x-direction 
+                    do j = 1, ny 
+                    do i = 2, nx-1 
+
+                        if (f_grnd(i,j) .eq. 0.0 .and. f_grnd(i+1,j) .gt. 0.0) then 
+                            taud_acx(i,j) = taud_acx(i-1,j) 
+                        else if (f_grnd(i,j) .gt. 0.0 .and. f_grnd(i+1,j) .eq. 0.0) then  
+                            taud_acx(i,j) = taud_acx(i+1,j)
+                        end if 
+
+                    end do 
+                    end do 
+
+                    ! y-direction 
+                    do j = 2, ny-1 
+                    do i = 1, nx 
+
+                        if (f_grnd(i,j) .eq. 0.0 .and. f_grnd(i,j+1) .gt. 0.0) then 
+                            taud_acy(i,j) = taud_acy(i,j-1) 
+                        else if (f_grnd(i,j) .gt. 0.0 .and. f_grnd(i,j+1) .eq. 0.0) then  
+                            taud_acy(i,j) = taud_acy(i,j+1)
+                        end if 
+
+                    end do 
+                    end do 
+
+                else 
+
+                    write(*,*) "calc_driving_stress_ac:: Error: Wrong choice of beta_gl_stag for this method."
+                    stop 
+
+                end if 
+
             case(1)
                 ! Weighted average using the grounded fraction (ac-nodes)
+                ! or one-sided choice
                 ! between surface slope and virtual slope of 
                 ! floating ice (using ice thickness)
 
@@ -892,16 +965,46 @@ contains
                     if ( f_grnd_acx(i,j) .gt. 0.0 .and. f_grnd_acx(i,j) .lt. 1.0) then 
                         ! Grounding line point (ac-node)
 
+                        ! Get the ice thickness at the ac-node as the average of two neighbors
+                        H_gl    = 0.5_prec*(H_ice(i,j)+H_ice(i+1,j))
+
                         ! Get slope of grounded point and virtual floating point (using H_ice),
                         ! then assume slope is the weighted average of the two 
                         dzsdx_1 = (z_srf(i+1,j)-z_srf(i,j)) / dx 
                         dzsdx_2 = (H_ice(i+1,j)-H_ice(i,j)) / dx 
-                        dzsdx   = f_grnd_acx(i,j)*dzsdx_1 + (1.0-f_grnd_acx(i,j))*dzsdx_2 
+                        dzsdx   = f_grnd_acx(i,j)*dzsdx_1 + (1.0-f_grnd_acx(i,j))*dzsdx_2  
+                        
+                        if (beta_gl_stag .eq. 1) then 
+                            ! Upstream beta assigned at gl (ie, beta=beta_upstream)
+
+                            ! Take slope from grounded point
+                            !dzsdx   = dzsdx_1 
+                            
+                            ! Define H_gl as the grounded ice thickness
+                            if (f_grnd(i,j) .gt. 0.0) then 
+                                H_gl = H_ice(i,j) 
+                            else 
+                                H_gl = H_ice(i+1,j)
+                            end if 
+
+                        else if (beta_gl_stag .eq. 2) then 
+                            ! Downstream beta assigned at gl (ie, beta=0)
+
+                            ! Take slope from floating assumption
+                            !dzsdx   = dzsdx_1 
+                            
+                            ! Define H_gl as the floating ice thickness
+                            if (f_grnd(i,j) .eq. 0.0) then 
+                                H_gl = H_ice(i,j) 
+                            else 
+                                H_gl = H_ice(i+1,j)
+                            end if 
+
+                        end if 
+
+                        ! Limit the slope
                         call minmax(dzsdx,slope_max)  
-
-                        ! Get the ice thickness at the ac-node
-                        H_gl    = 0.5_prec*(H_ice(i,j)+H_ice(i+1,j))
-
+                                                    
                         ! Get the driving stress
                         taud_old = taud_acx(i,j) 
                         taud_acx(i,j) = rhog * H_gl * dzsdx
@@ -922,15 +1025,44 @@ contains
                     if ( f_grnd_acy(i,j) .gt. 0.0 .and. f_grnd_acy(i,j) .lt. 1.0) then 
                         ! Grounding line point (ac-node)
 
+                        ! Get the ice thickness at the ac-node as the average of two neighbors
+                        H_gl    = 0.5_prec*(H_ice(i,j)+H_ice(i,j+1))
+
                         ! Get slope of grounded point and virtual floating point (using H_ice),
                         ! then assume slope is the weighted average of the two 
                         dzsdx_1 = (z_srf(i,j+1)-z_srf(i,j)) / dx 
                         dzsdx_2 = (H_ice(i,j+1)-H_ice(i,j)) / dx 
-                        dzsdx   = f_grnd_acy(i,j)*dzsdx_1 + (1.0-f_grnd_acy(i,j))*dzsdx_2 
-                        call minmax(dzsdx,slope_max)  
+                        dzsdx   = f_grnd_acy(i,j)*dzsdx_1 + (1.0-f_grnd_acy(i,j))*dzsdx_2  
+                        
+                        if (beta_gl_stag .eq. 1) then 
+                            ! Upstream beta assigned at gl (ie, beta=beta_upstream)
 
-                        ! Get the ice thickness at the ac-node
-                        H_gl    = 0.5_prec*(H_ice(i,j)+H_ice(i,j+1))
+                            ! Take slope from grounded point
+                            !dzsdx   = dzsdx_1 
+                            
+                            ! Define H_gl as the grounded ice thickness
+                            if (f_grnd(i,j) .gt. 0.0) then 
+                                H_gl = H_ice(i,j) 
+                            else 
+                                H_gl = H_ice(i,j+1)
+                            end if 
+
+                        else if (beta_gl_stag .eq. 2) then 
+                            ! Downstream beta assigned at gl (ie, beta=0)
+
+                            ! Take slope from floating assumption
+                            !dzsdx   = dzsdx_1 
+                            
+                            ! Define H_gl as the floating ice thickness
+                            if (f_grnd(i,j) .eq. 0.0) then 
+                                H_gl = H_ice(i,j) 
+                            else 
+                                H_gl = H_ice(i,j+1)
+                            end if 
+
+                        end if 
+                        
+                        call minmax(dzsdx,slope_max)  
 
                         ! Get the driving stress
                         taud_acy(i,j) = rhog * H_gl * dzsdx

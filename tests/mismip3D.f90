@@ -93,8 +93,9 @@ contains
 
         ! 1e7 [Pa^1/3 m^-1/3 s^1/3] *[a/sec_year]^1/3 = 31651.76 [Pa^1/3 m^-1/3 a^1/3]**3 = 3.170981e+13 [Pa^1 m^-1 a^1]
 !         real(prec), parameter :: C_bed_ref = 31651.76**3    ! [Pa (m/a)^-1] == 1e7 [Pa^1/3 (m/s)^-1/3]
-        real(prec), parameter :: C_bed_ref = 3.170981e13    ! [Pa (m/a)^-1] == 1e7 [Pa^1/3 (m/s)^-1/3]
-        
+        !real(prec), parameter :: C_bed_ref = 3.170981e13    ! [Pa (m/a)^-1] == 1e7 [Pa^1/3 (m/s)^-1/3]
+        real(prec), parameter :: C_bed_ref = 31651.76
+
         nx = size(T_srf,1)
         ny = size(T_srf,2)
 

@@ -11,7 +11,7 @@ module mass_conservation
 
 contains 
 
-    subroutine calc_ice_thickness(H_ice,mb_applied,f_grnd,ux,uy,mbal,calv,dx,dt, &
+    subroutine calc_ice_thickness(H_ice,mb_applied,f_grnd,H_ocn,ux,uy,mbal,calv,dx,dt, &
                                                     solver,boundaries,ice_allowed,H_min)
         ! Interface subroutine to update ice thickness through application
         ! of advection, vertical mass balance terms and calving 
@@ -21,6 +21,7 @@ contains
         real(prec),       intent(INOUT) :: H_ice(:,:)           ! [m]   Ice thickness 
         real(prec),       intent(OUT)   :: mb_applied(:,:)      ! [m/a] Actual mass balance applied to real ice points
         real(prec),       intent(IN)    :: f_grnd(:,:)          ! [--]  Grounded fraction 
+        real(prec),       intent(IN)    :: H_ocn(:,:)           ! [m]   Ocean thickness (ie, depth)
         real(prec),       intent(IN)    :: ux(:,:)              ! [m/a] Depth-averaged velocity, x-direction (ac-nodes)
         real(prec),       intent(IN)    :: uy(:,:)              ! [m/a] Depth-averaged velocity, y-direction (ac-nodes)
         real(prec),       intent(IN)    :: mbal(:,:)            ! [m/a] Net mass balance; mbal = smb+bmb  !-calv 
@@ -86,6 +87,10 @@ contains
 
         ! Apply modified mass balance to update the ice thickness 
         H_ice = H_ice + dt*mb_applied
+
+        ! Limit grounded ice thickness to below maximum threshold value
+        ! based on shear stress limit 
+        !call limit_grounded_margin_thickness_stress(H_ice,mb_applied,f_grnd,H_ocn,dt)
 
         ! Limit grounded ice thickess to above minimum and below inland neighbor at the margin
 !         call limit_grounded_margin_thickness(H_ice,mb_applied,f_grnd,H_min,dt) 
@@ -632,5 +637,55 @@ contains
         return 
 
     end subroutine limit_grounded_margin_thickness_flux
+    
+    subroutine limit_grounded_margin_thickness_stress(H_ice,mb_applied,f_grnd,H_ocn,dt)
+        ! Remove marginal ice that exceeds a stress threshold following
+        ! Bassis and Walker (2012), Eq. 2.12 
+
+        implicit none 
+
+        real(prec), intent(INOUT) :: H_ice(:,:)             ! [m] Ice thickness 
+        real(prec), intent(INOUT) :: mb_applied(:,:)        ! [m/a] Applied mass balance
+        real(prec), intent(IN)    :: f_grnd(:,:)            ! [-] Grounded fraction
+        real(prec), intent(IN)    :: H_ocn(:,:)             ! [m] Ocean thickness (depth)
+        real(prec), intent(IN)    :: dt 
+
+        ! Local variables 
+        integer    :: i, j, nx, ny
+        real(prec) :: H_max 
+        real(prec) :: rho_ice_g, rho_sw_ice 
+
+        real(prec), parameter :: tau_c = 1e6                ! [1e6 Pa] Depth-integrated shear stress in ice 
+        real(prec), parameter :: r     = 0.0                ! [--] Crevasse fraction 
+        nx = size(H_ice,1)
+        ny = size(H_ice,2)
+
+        rho_ice_g  = rho_ice * g 
+        rho_sw_ice = rho_sw / rho_ice 
+
+        do j = 1, ny 
+        do i = 1, nx 
+
+            ! Check grounded, ice-covered points only 
+            if (H_ice(i,j) .gt. 0.0 .and. f_grnd(i,j) .gt. 0.0) then 
+
+                H_max = (1.0-r)*tau_c/rho_ice_g + sqrt(((1.0-r)*tau_c/rho_ice_g)**2 + rho_sw_ice*H_ocn(i,j)**2)
+
+                if (H_ice(i,j) .gt. H_max) then 
+                    ! Critical stress exceeded, calve this ice - pass to mb_applied for now...
+
+                    mb_applied(i,j) = mb_applied(i,j) - H_ice(i,j) / dt    
+                    H_ice(i,j)      = 0.0  
+
+                end if 
+
+            end if 
+
+        end do 
+        end do 
+
+        return 
+
+    end subroutine limit_grounded_margin_thickness_stress
     
 end module mass_conservation

@@ -221,16 +221,16 @@ do n=1, nmax-1, 2
         ! (eg for prescribed velocity corresponding to prescribed grounding line flux)
 
         ! TO DO 
-        write(*,*) "solver_ssa_sico5:: Error: prescribed boundary conditions not yet tested!"
-        stop "solver_ssa_sico5 error, see log."
+        !write(*,*) "solver_ssa_sico5:: Error: prescribed boundary conditions not yet tested!"
+        !stop "solver_ssa_sico5 error, see log."
         
         k  = k+1
         ! if (k > n_sprs) stop ' calc_vxy_ssa_matrix: n_sprs too small!'
         lgs_a_value(k)  = 1.0   ! diagonal element only
         lgs_a_index(k)  = nr
 
-        lgs_b_value(nr) = vx_bnd(i,j)
-        lgs_x_value(nr) = vx_bnd(i,j)
+        lgs_b_value(nr) = vx_m(i,j)
+        lgs_x_value(nr) = vx_m(i,j)
       
       ! === Proceed with normal ssa checks =================
       
@@ -531,16 +531,16 @@ do n=1, nmax-1, 2
         ! (eg for prescribed velocity corresponding to prescribed grounding line flux)
 
         ! TO DO
-        write(*,*) "solver_ssa_sico5:: Error: prescribed boundary conditions not yet tested!"
-        stop "solver_ssa_sico5 error, see log."
+        !write(*,*) "solver_ssa_sico5:: Error: prescribed boundary conditions not yet tested!"
+        !stop "solver_ssa_sico5 error, see log."
 
         k  = k+1
         ! if (k > n_sprs) stop ' calc_vxy_ssa_matrix: n_sprs too small!'
         lgs_a_value(k)  = 1.0   ! diagonal element only
         lgs_a_index(k)  = nr
 
-        lgs_b_value(nr) = vy_bnd(i,j)
-        lgs_x_value(nr) = vy_bnd(i,j)
+        lgs_b_value(nr) = vy_m(i,j)
+        lgs_x_value(nr) = vy_m(i,j)
       
       ! === Proceed with normal ssa checks =================
 

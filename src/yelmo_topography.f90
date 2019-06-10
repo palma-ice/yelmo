@@ -95,7 +95,8 @@ contains
 
             ! 1. Calculate the ice thickness conservation and apply bedrock uplift -----
             call calc_ice_thickness(tpo%now%H_ice,tpo%now%mb_applied, &
-                                    tpo%now%f_grnd,dyn%now%ux_bar,dyn%now%uy_bar, &
+                                    tpo%now%f_grnd,bnd%z_sl-bnd%z_bed, &
+                                    dyn%now%ux_bar,dyn%now%uy_bar, &
                                     mbal=mbal,calv=tpo%now%calv*0.0,dx=tpo%par%dx,dt=dt, &
                                     solver=trim(tpo%par%solver),boundaries=trim(tpo%par%boundaries), &
                                     ice_allowed=bnd%ice_allowed,H_min=tpo%par%H_min)
@@ -185,7 +186,7 @@ contains
 !         call filter_f_grnd(tpo%now%f_grnd)
 
         ! Calculate the grounding line mask 
-        call calc_grline(tpo%now%is_grline,tpo%now%f_grnd)
+        call calc_grline(tpo%now%is_grline,tpo%now%is_grz,tpo%now%f_grnd)
 
         ! Calculate the ice-covered fraction of each grid cell 
         tpo%now%f_ice = calc_ice_fraction(tpo%now%H_ice,tpo%now%f_grnd)
@@ -998,13 +999,15 @@ end if
         integer :: i, j, nx, ny 
         real(prec), allocatable :: f_grnd_old(:,:) 
         logical, allocatable :: is_grline(:,:) 
-
+        logical, allocatable :: is_grz(:,:) 
+        
         nx = size(f_grnd,1)
         ny = size(f_grnd,2)
 
         allocate(f_grnd_old(nx,ny))
         allocate(is_grline(nx,ny))
-
+        allocate(is_grz(nx,ny))
+        
         ! == LAKES ==
         f_grnd_old = f_grnd
         do i = 2, nx-1 
@@ -1029,7 +1032,7 @@ end if
         f_grnd_old = f_grnd 
 
         ! Calculate intermediate grounding line estimate 
-        call calc_grline(is_grline,f_grnd)
+        call calc_grline(is_grline,is_grz,f_grnd)
 
         do i = 2, nx-1 
         do j = 2, ny-1 
@@ -1056,11 +1059,12 @@ end if
 
     end subroutine filter_f_grnd
 
-    subroutine calc_grline(is_grline,f_grnd)
+    subroutine calc_grline(is_grline,is_grz,f_grnd)
 
         implicit none 
 
-        logical, intent(OUT) :: is_grline(:,:) 
+        logical,    intent(OUT) :: is_grline(:,:)   ! grounding line 
+        logical,    intent(OUT) :: is_grz(:,:)      ! grounding zone 
         real(prec), intent(IN)  :: f_grnd(:,:)
 
         ! Local variables 
@@ -1069,6 +1073,9 @@ end if
 
         nx = size(is_grline,1)
         ny = size(is_grline,2)
+
+
+        ! 1. Determine grounding line ===========================================
 
         is_grline = .FALSE. 
  
@@ -1093,6 +1100,25 @@ end if
         end do 
         end do 
 
+        ! 2. Determine grounding line zone ===========================================
+        
+        is_grz = .FALSE. 
+ 
+        do j = 1, ny 
+        do i = 1, nx
+
+            im1 = max(1, i-1)
+            ip1 = min(nx,i+1)
+            
+            jm1 = max(1, j-1)
+            jp1 = min(ny,j+1)
+
+            ! Neighbor with the grounding line, or grounding line 
+            is_grz(i,j) = ( count(is_grline(im1:ip1,jm1:jp1)) .gt. 0 )
+
+        end do 
+        end do 
+        
         return 
 
     end subroutine calc_grline

@@ -101,7 +101,7 @@ contains
 
         ! Local variables
         integer :: iter, n_iter
-        integer :: i, j, k, nx, ny, nz_aa, nz_ac    
+        integer :: i, j, k, nx, ny, nz_aa, nz_ac   
         real(prec), allocatable :: H_ice_acx(:,:) 
         real(prec), allocatable :: H_ice_acy(:,:) 
         real(prec), allocatable :: ux_b_prev(:,:) 
@@ -113,6 +113,10 @@ contains
         logical :: calc_ssa 
         logical :: is_converged
         logical :: write_ssa_diagnostics
+
+        type(ydyn_class) :: dyn1 
+        type(ydyn_class) :: dyn2 
+        logical          :: is_grz_mid 
 
         nx    = dyn%par%nx 
         ny    = dyn%par%ny 
@@ -289,8 +293,106 @@ contains
 
             else 
 
-            call calc_ydyn_ssa(dyn,tpo,mat,bnd)
+if (.FALSE.) then 
+            ! Set dyn1 equal to previous solution 
+            dyn1 = dyn 
 
+            ! Determine ssa mask for points near grounding line
+            dyn1%now%ssa_mask_acx = -1.0 
+            dyn1%now%ssa_mask_acy = -1.0  
+             
+            do j = 1, ny 
+            do i = 1, nx-1 
+
+                is_grz_mid = tpo%now%is_grz(i,j) .or. tpo%now%is_grz(i+1,j)
+                if (dyn%now%ssa_mask_acx(i,j) .gt. 0.0 .and. is_grz_mid) then 
+                    dyn1%now%ssa_mask_acx(i,j) = 1.0 
+                end if 
+
+            end do 
+            end do 
+
+            do j = 1, ny-1 
+            do i = 1, nx 
+
+                is_grz_mid = tpo%now%is_grz(i,j) .or. tpo%now%is_grz(i,j+1)
+                if (dyn%now%ssa_mask_acy(i,j) .gt. 0.0 .and. is_grz_mid) then 
+                    dyn1%now%ssa_mask_acy(i,j) = 1.0 
+                end if 
+
+            end do 
+            end do 
+            
+            ! Now populate dyn2 
+            dyn2 = dyn1 
+
+            ! Modify dyn1 parameters concerning beta 
+            dyn1%par%taud_gl_method = 1 
+            dyn1%par%beta_gl_sep    = 0     ! No subgrid grounding line treatment 
+            dyn1%par%beta_gl_scale  = 0     ! No special scaling at gl 
+            dyn1%par%beta_gl_stag   = 1     ! Upstream scaling 
+
+            ! Calculate driving stress 
+            call calc_driving_stress_ac(dyn1%now%taud_acx,dyn1%now%taud_acy,tpo%now%H_ice,tpo%now%f_ice,tpo%now%z_srf,bnd%z_bed,bnd%z_sl, &
+                     tpo%now%H_grnd,tpo%now%f_grnd,tpo%now%f_grnd_acx,tpo%now%f_grnd_acy,dyn1%par%dx, &
+                     method=dyn1%par%taud_gl_method,beta_gl_stag=dyn1%par%beta_gl_stag)
+
+            call calc_ydyn_ssa(dyn1,tpo,mat,bnd)
+
+            ! Set dyn2 equal to previous solution 
+            !dyn2 = dyn 
+
+            ! Modify dyn1 parameters concerning beta 
+            dyn2%par%taud_gl_method = 1 
+            dyn2%par%beta_gl_sep    = 0     ! No subgrid grounding line treatment 
+            dyn2%par%beta_gl_scale  = 0     ! No special scaling at gl 
+            dyn2%par%beta_gl_stag   = 2     ! Downstream scaling 
+            
+            ! Calculate driving stress 
+            call calc_driving_stress_ac(dyn2%now%taud_acx,dyn2%now%taud_acy,tpo%now%H_ice,tpo%now%f_ice,tpo%now%z_srf,bnd%z_bed,bnd%z_sl, &
+                     tpo%now%H_grnd,tpo%now%f_grnd,tpo%now%f_grnd_acx,tpo%now%f_grnd_acy,dyn2%par%dx, &
+                     method=dyn2%par%taud_gl_method,beta_gl_stag=dyn2%par%beta_gl_stag)
+
+            call calc_ydyn_ssa(dyn2,tpo,mat,bnd)
+            
+            ! Get weighted-average of the two solutions 
+
+            !dyn%now%taud_acx = tpo%now%f_grnd_acx*dyn1%now%taud_acx + (1.0-tpo%now%f_grnd_acx)*dyn2%now%taud_acx
+            !dyn%now%taud_acy = tpo%now%f_grnd_acy*dyn1%now%taud_acy + (1.0-tpo%now%f_grnd_acy)*dyn2%now%taud_acy
+            
+            do j = 1, ny 
+            do i = 1, nx 
+                if (tpo%now%f_grnd_acx(i,j) .gt. 0.0 .and. tpo%now%f_grnd_acx(i,j) .lt. 1.0) then 
+                    dyn%now%ux_b(i,j) = tpo%now%f_grnd_acx(i,j)*dyn1%now%ux_b(i,j) &
+                                        + (1.0-tpo%now%f_grnd_acx(i,j))*dyn2%now%ux_b(i,j)
+                    dyn%now%ux_b(i,j) = dyn1%now%ux_b(i,j)
+                    dyn%now%ssa_mask_acx(i,j) = -1.0 
+                end if 
+
+            end do 
+            end do 
+
+            do j = 1, ny 
+            do i = 1, nx 
+                if (tpo%now%f_grnd_acy(i,j) .gt. 0.0 .and. tpo%now%f_grnd_acy(i,j) .lt. 1.0) then 
+                    dyn%now%uy_b(i,j) = tpo%now%f_grnd_acy(i,j)*dyn1%now%uy_b(i,j) &
+                                        + (1.0-tpo%now%f_grnd_acy(i,j))*dyn2%now%uy_b(i,j)
+                    dyn%now%uy_b(i,j) = dyn1%now%uy_b(i,j)
+                    dyn%now%ssa_mask_acy(i,j) = -1.0 
+                end if 
+
+            end do 
+            end do 
+end if 
+
+            call calc_ydyn_ssa(dyn,tpo,mat,bnd)
+            
+!             ! Recalculate beta and visc for current velocity solution
+!             call calc_ydyn_beta(dyn,tpo,mat,bnd)
+
+!             dyn%now%visc_eff = calc_visc_eff(dyn%now%ux_b,dyn%now%uy_b,dyn%now%duxdz_bar*0.0,dyn%now%duydz_bar*0.0, &
+!                                              tpo%now%H_ice,mat%now%ATT,dyn%par%zeta_aa,dyn%par%dx,dyn%par%dy,mat%par%n_glen)
+            
             end if 
 
         else 
@@ -827,12 +929,6 @@ contains
 
         end type 
         
-        ! Initially set dyn and dyn1 equal 
-        dyn1 = dyn 
-
-        ! Modify dyn1 parameters concerning beta 
-        dyn1%par%beta_gl_sep   = 0     ! No subgrid grounding line treatment 
-        dyn1%par%beta_gl_scale = 0     ! No special scaling at gl 
 
         is_converged          = .FALSE. 
         write_ssa_diagnostics = .FALSE. 

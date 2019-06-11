@@ -679,12 +679,10 @@ end if
             if (calc_ssa) then
                 ! Call ssa solver to determine ux_bar/uy_bar, where ssa_mask_acx/y are > 0
                 
-                call calc_vxy_ssa_matrix(dyn%now%ux_bar,dyn%now%uy_bar,dyn%now%ux_b*0.0,dyn%now%uy_b*0.0, &
-                                         dyn%now%beta_acx,dyn%now%beta_acy,dyn%now%visc_eff,dyn%now%ssa_mask_acx, &
-                                         dyn%now%ssa_mask_acy,tpo%now%H_ice,dyn%now%taud_acx,dyn%now%taud_acy,tpo%now%H_grnd, &
-                                         bnd%z_sl,bnd%z_bed, & 
-                                         dyn%par%dx,dyn%par%dy,dyn%par%ssa_vel_max,dyn%par%boundaries, &
-                                         dyn%now%gfa1,dyn%now%gfa2,dyn%now%gfb1,dyn%now%gfb2)   
+                call calc_vxy_ssa_matrix(dyn%now%ux_bar,dyn%now%uy_bar,dyn%now%beta_acx,dyn%now%beta_acy,dyn%now%visc_eff, &
+                                     dyn%now%ssa_mask_acx,dyn%now%ssa_mask_acy,tpo%now%H_ice, &
+                                     dyn%now%taud_acx,dyn%now%taud_acy,tpo%now%H_grnd,bnd%z_sl,bnd%z_bed, &
+                                     dyn%par%dx,dyn%par%dy,dyn%par%ssa_vel_max,dyn%par%boundaries)
 
             end if 
              
@@ -994,12 +992,10 @@ end if
             !   3. Calculate SSA solution
 
             ! Call ssa solver to determine ux_b/uy_b, where ssa_mask_acx/y are > 0
-            call calc_vxy_ssa_matrix(dyn%now%ux_b,dyn%now%uy_b,dyn%now%ux_bar*0.0,dyn%now%uy_bar*0.0, &
-                                     dyn%now%beta_acx,dyn%now%beta_acy,dyn%now%visc_eff,dyn%now%ssa_mask_acx, &
-                                     dyn%now%ssa_mask_acy,tpo%now%H_ice,dyn%now%taud_acx,dyn%now%taud_acy,tpo%now%H_grnd, &
-                                     bnd%z_sl,bnd%z_bed, & 
-                                     dyn%par%dx,dyn%par%dy,dyn%par%ssa_vel_max,dyn%par%boundaries, &
-                                     dyn%now%gfa1,dyn%now%gfa2,dyn%now%gfb1,dyn%now%gfb2)
+            call calc_vxy_ssa_matrix(dyn%now%ux_b,dyn%now%uy_b,dyn%now%beta_acx,dyn%now%beta_acy,dyn%now%visc_eff, &
+                                     dyn%now%ssa_mask_acx,dyn%now%ssa_mask_acy,tpo%now%H_ice, &
+                                     dyn%now%taud_acx,dyn%now%taud_acy,tpo%now%H_grnd,bnd%z_sl,bnd%z_bed, &
+                                     dyn%par%dx,dyn%par%dy,dyn%par%ssa_vel_max,dyn%par%boundaries)
 
             ! Apply relaxation to keep things stable
             call relax_ssa(dyn%now%ux_b,dyn%now%uy_b,ux_b_prev,uy_b_prev,rel=dyn%par%ssa_iter_rel)

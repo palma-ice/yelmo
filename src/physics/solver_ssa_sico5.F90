@@ -10,9 +10,9 @@ module solver_ssa_sico5
 
 contains 
 
-    subroutine calc_vxy_ssa_matrix(vx_m,vy_m,vx_bnd,vy_bnd,beta_acx,beta_acy,visc_eff, &
+    subroutine calc_vxy_ssa_matrix(vx_m,vy_m,beta_acx,beta_acy,visc_eff, &
                     ssa_mask_acx,ssa_mask_acy,H_ice,taud_acx,taud_acy,H_grnd,z_sl,z_bed, &
-                    dx,dy,ulim,boundaries,gfa1,gfa2,gfb1,gfb2)
+                    dx,dy,ulim,boundaries)
         ! Solution of the system of linear equations for the horizontal velocities
         ! vx_m, vy_m in the shallow shelf approximation.
         ! Adapted from sicopolis version 5-dev (svn revision 1421)
@@ -20,16 +20,14 @@ contains
     
         implicit none
 
-        real(prec), intent(INOUT) :: vx_m(:,:)
-        real(prec), intent(INOUT) :: vy_m(:,:)
-        real(prec), intent(IN)    :: vx_bnd(:,:) 
-        real(prec), intent(IN)    :: vy_bnd(:,:) 
-        real(prec), intent(IN)    :: beta_acx(:,:)        ! [Pa a m^-1] Basal friction
-        real(prec), intent(IN)    :: beta_acy(:,:)        ! [Pa a m^-1] Basal friction
-        real(prec), intent(IN)    :: visc_eff(:,:)        ! [Pa a m] Vertically integrated viscosity
-        integer,    intent(IN)    :: ssa_mask_acx(:,:) 
-        integer,    intent(IN)    :: ssa_mask_acy(:,:) 
-        real(prec), intent(IN)    :: H_ice(:,:)
+        real(prec), intent(INOUT) :: vx_m(:,:)            ! [m a^-1] Horizontal velocity x (acx-nodes)
+        real(prec), intent(INOUT) :: vy_m(:,:)            ! [m a^-1] Horizontal velocity y (acy-nodes)
+        real(prec), intent(IN)    :: beta_acx(:,:)        ! [Pa a m^-1] Basal friction (acx-nodes)
+        real(prec), intent(IN)    :: beta_acy(:,:)        ! [Pa a m^-1] Basal friction (acy-nodes)
+        real(prec), intent(IN)    :: visc_eff(:,:)        ! [Pa a m] Vertically integrated viscosity (aa-nodes)
+        integer,    intent(IN)    :: ssa_mask_acx(:,:)    ! [--] Mask to determine ssa solver actions (acx-nodes)
+        integer,    intent(IN)    :: ssa_mask_acy(:,:)    ! [--] Mask to determine ssa solver actions (acy-nodes)
+        real(prec), intent(IN)    :: H_ice(:,:)           ! [m]  Ice thickness (aa-nodes)
         real(prec), intent(IN)    :: taud_acx(:,:)        ! [Pa] Driving stress (acx nodes)
         real(prec), intent(IN)    :: taud_acy(:,:)        ! [Pa] Driving stress (acy nodes)
         real(prec), intent(IN)    :: H_grnd(:,:)  
@@ -38,10 +36,6 @@ contains
         real(prec), intent(IN)    :: dx, dy
         real(prec), intent(IN)    :: ulim 
         character(len=*), intent(IN) :: boundaries 
-        integer,    intent(INOUT) :: gfa1(:,:) 
-        logical,    intent(INOUT) :: gfa2(:,:) 
-        logical,    intent(INOUT) :: gfb1(:,:) 
-        logical,    intent(INOUT) :: gfb2(:,:) 
         
         ! Local variables
         integer    :: nx, ny
@@ -139,11 +133,6 @@ contains
         ! Set maske and grounding line / calving front flags
 
         call set_sico_masks(maske,is_front_1,is_front_2,is_grline_1,is_grline_2, H_ice_1, H_grnd)
-!         call set_sico_masks_old(maske,is_front_1,is_front_2,is_grline_1,is_grline_2, H_ice_1, H_grnd)
-
-        gfa1 = maske
-        gfb1 = is_front_1
-        gfb2 = is_front_2
         
         !-------- Depth-integrated viscosity on the staggered grid
         !                                       [at (i+1/2,j+1/2)] --------
@@ -219,7 +208,7 @@ do n=1, nmax-1, 2
       else if (ssa_mask_acx(i,j) .eq. -1) then 
         ! Assign prescribed boundary velocity to this point
         ! (eg for prescribed velocity corresponding to analytical grounding line flux)
-        
+
         k  = k+1
         ! if (k > n_sprs) stop ' calc_vxy_ssa_matrix: n_sprs too small!'
         lgs_a_value(k)  = 1.0   ! diagonal element only

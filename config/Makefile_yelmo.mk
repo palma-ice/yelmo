@@ -21,6 +21,10 @@ $(objdir)/basal_dragging.o: $(srcdir)/physics/basal_dragging.f90 $(objdir)/yelmo
 							$(objdir)/yelmo_tools.o
 	$(FC) $(DFLAGS) $(FFLAGS) -c -o $@ $<
 
+$(objdir)/grounding_line_flux.o: $(srcdir)/physics/grounding_line_flux.f90 $(objdir)/yelmo_defs.o \
+							$(objdir)/yelmo_tools.o
+	$(FC) $(DFLAGS) $(FFLAGS) -c -o $@ $<
+
 $(objdir)/calving.o: $(srcdir)/physics/calving.f90 $(objdir)/yelmo_defs.o
 	$(FC) $(DFLAGS) $(FFLAGS) -c -o $@ $<
 
@@ -153,6 +157,7 @@ yelmo_libs = 		   $(objdir)/gaussian_filter.o \
 			 		   $(objdir)/ncio.o
 
 yelmo_physics =  	   $(objdir)/basal_dragging.o \
+					   $(objdir)/grounding_line_flux.o \
 					   $(objdir)/calving.o \
 					   $(objdir)/deformation.o \
 					   $(objdir)/enthalpy.o \

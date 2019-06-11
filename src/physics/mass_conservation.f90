@@ -536,9 +536,10 @@ contains
         integer :: i, j, nx, ny
         real(prec) :: eps_xx, eps_yy  
         logical :: test_mij, test_pij, test_imj, test_ipj
-        logical :: positive_mb 
+        logical :: is_margin, positive_mb 
         real(prec), allocatable :: dHdt(:,:), Hdiff(:,:), Hfrac(:,:) 
         real(prec), allocatable :: f_ice(:,:)                ! [-] Ice area fraction
+        real(prec), allocatable :: H_ice_0(:,:) 
         integer :: n_free
 
         nx = size(H_ice,1)

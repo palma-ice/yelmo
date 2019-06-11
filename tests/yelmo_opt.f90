@@ -57,11 +57,11 @@ program yelmo_test
     ! Simulation parameters
     time_init       = 0.0           ! [yr] Starting time
     time_iter       = 500.0         ! [yr] Simulation time for each iteration
-    qmax            = 50            ! Total number of iterations
+    qmax            = 200           ! Total number of iterations
     qmax_topo_fixed = 0             ! Number of initial iterations that should use topo_fixed=.TRUE. 
 
-    phi_min         =  5.0 
-    phi_max         = 50.0 
+    phi_min         =  2.0 
+    phi_max         = 40.0 
 
     ! Prescribe key parameters here that should be set for beta optimization exercise 
     yelmo1%dyn%par%C_bed_method      = -1       ! C_Bed is set external to yelmo calculations
@@ -369,7 +369,7 @@ contains
 
         real(prec), parameter :: dphi_min  = -0.5       ! [degrees]
         real(prec), parameter :: dphi_max  =  1.0       ! [degrees]
-        real(prec), parameter :: err_z_fac = 200.0      ! [m] 
+        real(prec), parameter :: err_z_fac = 100.0      ! [m] 
 
         nx = size(C_bed,1)
         ny = size(C_bed,2) 

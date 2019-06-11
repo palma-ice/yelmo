@@ -45,7 +45,7 @@ module basal_dragging
     ! Beta staggering functions (aa- to ac-nodes)
     public :: stagger_beta_aa_simple
     public :: stagger_beta_aa_upstream
-    public :: stagger_beta_aa_downstream
+    public :: stagger_beta_aa_downstream    
     public :: stagger_beta_aa_subgrid
     public :: stagger_beta_aa_subgrid_1 
     

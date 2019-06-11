@@ -14,7 +14,8 @@ module grounding_line_flux
 
 contains 
 
-    subroutine calc_grounding_line_flux(qq_gl_acx,qq_gl_acy,H_ice,ATT_bar,f_grnd,f_grnd_acx,f_grnd_acy,n_glen,Q0,f_drag)
+    subroutine calc_grounding_line_flux(qq_gl_acx,qq_gl_acy,H_ice,ATT_bar,C_bed,ux_bar,uy_bar, &
+                                            f_grnd,f_grnd_acx,f_grnd_acy,n_glen,m_drag,Q0,f_drag)
 
         implicit none 
 
@@ -22,17 +23,24 @@ contains
         real(prec), intent(OUT) :: qq_gl_acy(:,:)       ! [m^2 a^-1] Diagnosed grounding line flux (acy-nodes)
         real(prec), intent(IN)  :: H_ice(:,:)           ! [m] Ice thickness (aa-nodes)
         real(prec), intent(IN)  :: ATT_bar(:,:)         ! [a^-1 Pa^-3] Depth-averaged rate factor
-        real(prec), intent(OUT) :: f_grnd(:,:)          ! [--] Grounding line fraction (aa-nodes) - binary variable
-        real(prec), intent(OUT) :: f_grnd_acx(:,:)      ! [--] Grounding line fraction (aa-nodes) - binary variable
-        real(prec), intent(OUT) :: f_grnd_acy(:,:)      ! [--] Grounding line fraction (aa-nodes) - binary variable
+        real(prec), intent(IN)  :: C_bed(:,:)           ! [Pa a m^-1] Basal friction coefficient 
+        real(prec), intent(IN)  :: ux_bar(:,:)          ! [m a^-1] Depth-averaged horizontal veloctiy, x-direction (acx-nodes)
+        real(prec), intent(IN)  :: uy_bar(:,:)          ! [m a^-1] Depth-averaged horizontal veloctiy, y-direction (acy-nodes)
+        real(prec), intent(IN)  :: f_grnd(:,:)          ! [--] Grounding line fraction (aa-nodes) - binary variable
+        real(prec), intent(IN)  :: f_grnd_acx(:,:)      ! [--] Grounding line fraction (acx-nodes)
+        real(prec), intent(IN)  :: f_grnd_acy(:,:)      ! [--] Grounding line fraction (acy-nodes)
         real(prec), intent(IN)  :: n_glen               ! [--] Glen's flow law exponent 
+        real(prec), intent(IN)  :: m_drag               ! [--] Power law exponent
         real(prec), intent(IN)  :: Q0                   ! [?] Scaling coefficient, in the range of 0.60-0.65
         real(prec), intent(IN)  :: f_drag               ! [--] Dragging coefficient, f_drag ~ 0.6 
 
         ! Local variables
         integer    :: i, j, nx, ny
         logical    :: is_gl  
-        real(prec) :: H_gl, A_gl, qq_gl    
+        real(prec) :: H_gl, A_gl, C_bed_gl, qq_gl    
+        real(prec) :: qq_left, qq_right, H_now, f_lin
+
+        character(len=56), parameter :: gl_flux_method = "power" 
 
         nx = size(H_ice,1)
         ny = size(H_ice,2) 
@@ -43,7 +51,7 @@ contains
 
         ! acx-nodes 
         do j = 1, ny 
-        do i = 1, nx
+        do i = 3, nx-3
             
             ! Determine if grounding-line sits between aa-nodes
             is_gl = (f_grnd(i,j) .gt. 0.0 .and. f_grnd(i+1,j) .eq. 0.0) .or. & 
@@ -52,26 +60,113 @@ contains
             if (is_gl) then 
                 ! For grounding-line points, diagnose flux 
 
-                ! Determine ice thicknes at the grounding line 
+                ! 1. Determine quantities at the grounding line ==============================
+
                 if (f_grnd(i,j) .gt. 0.0 .and. f_grnd(i+1,j) .eq. 0.0) then 
                     ! Floating to the right
 
-                    H_gl = H_ice(i,j)*f_grnd_acx(i,j)   + (1.0-f_grnd_acx(i,j))*H_ice(i+1,j)
+                    H_gl = H_ice(i,j)  *f_grnd_acx(i,j) + (1.0-f_grnd_acx(i,j))*H_ice(i+1,j)
                     A_gl = ATT_bar(i,j)*f_grnd_acx(i,j) + (1.0-f_grnd_acx(i,j))*ATT_bar(i+1,j)
                     
-                    qq_gl = calc_gl_flux_tsai(H_gl,A_gl,n_glen,Q0,f_drag)
+                    C_bed_gl = C_bed(i,j)   ! Upstream (non-zero) C_bed 
 
                 else if (f_grnd(i,j) .eq. 0.0 .and. f_grnd(i+1,j) .gt. 0.0) then
                     ! Floating to the left
 
-                    H_gl = H_ice(i,j)*(1.0-f_grnd_acx(i,j))   + f_grnd_acx(i,j)*H_ice(i+1,j)
+                    H_gl = H_ice(i,j)  *(1.0-f_grnd_acx(i,j)) + f_grnd_acx(i,j)*H_ice(i+1,j)
                     A_gl = ATT_bar(i,j)*(1.0-f_grnd_acx(i,j)) + f_grnd_acx(i,j)*ATT_bar(i+1,j)
 
-                    qq_gl = calc_gl_flux_tsai(H_gl,A_gl,n_glen,Q0,f_drag)
+                    C_bed_gl = C_bed(i+1,j)   ! Upstream (non-zero) C_bed 
                     
                 end if 
 
-                
+                ! 2. Calculate flux directly at the grounding line ============================
+
+                select case(trim(gl_flux_method))
+
+                    case("power")
+                        ! Calculate magnitude of flux given a Coulomb friction relation, following Tsai et al. (2015)
+                        
+                        !write(*,*) "calc_grounding_line_flux:: Error: gl_flux with 'power' method explodes - check m_drag."
+                        !stop 
+
+                        qq_gl = calc_gl_flux_power(H_gl,A_gl,C_bed_gl,n_glen,m_drag)
+
+                    case("coulomb")
+                        ! Calculate magnitude of flux given a Coulomb friction relation, following Tsai et al. (2015)
+                        
+                        qq_gl = calc_gl_flux_coulomb(H_gl,A_gl,n_glen,Q0,f_drag)
+
+                    case DEFAULT 
+
+                        write(*,*) "calc_grounding_line_flux:: Error: gl_flux_method not recognized, &
+                                   &must be 'coulomb' (Tsai) or 'power' (Schoof)"
+                        write(*,*) "gl_flux_method: ", trim(gl_flux_method)
+                        stop 
+
+                end select 
+
+                ! Assign a direction to the flux as well (direction of flow)
+                qq_gl = sign(qq_gl,ux_bar(i,j))
+
+
+                ! 3. Interpolate prescribed gl-flux to ac-nodes to the left and right of gl. ==
+
+                if (f_grnd_acx(i,j) .lt. 0.5) then 
+                    ! Grounding line is between acx(i,j) and acx(i-1,j), so 
+                    ! it should be interpolated to those two points
+
+                    ! Left side 
+
+                    H_now   = 0.5*(H_ice(i-2,j) + H_ice(i-1,j)) 
+                    qq_left = H_now * ux_bar(i-2,j) 
+
+                    ! Get the ratio of left grid cell width to the 
+                    ! total distance between qq_left and qq_gl 
+                    f_lin = 1.0 / ( 1.0 + (0.5 + f_grnd_acx(i,j)) )
+
+                    qq_gl_acx(i-1,j) = (1.0-f_lin)*qq_left + f_lin*qq_gl
+
+                    ! Right side 
+
+                    H_now   = 0.5*(H_ice(i+1,j) + H_ice(i+2,j)) 
+                    qq_right = H_now * ux_bar(i+1,j) 
+
+                    ! Get the ratio of distance from gl to ac(i,j) to the 
+                    ! total distance between qq_gl and qq_right 
+                    f_lin = (0.5-f_grnd_acx(i,j)) / ( 1.0 + (0.5-f_grnd_acx(i,j)) )
+
+                    qq_gl_acx(i,j) = (1.0-f_lin)*qq_gl + f_lin*qq_right
+
+                else
+                    ! Grounding line is between acx(i,j) and acx(i+1,j)
+
+                    ! Left side 
+
+                    H_now   = 0.5*(H_ice(i-1,j) + H_ice(i,j)) 
+                    qq_left = H_now * ux_bar(i-1,j) 
+
+                    ! Get the ratio of left grid cell width to the 
+                    ! total distance between qq_left and qq_gl 
+                    f_lin = 1.0 / ( 1.0 + (f_grnd_acx(i,j)-0.5) )
+
+                    qq_gl_acx(i,j) = (1.0-f_lin)*qq_left + f_lin*qq_gl
+
+                    ! Right side 
+
+                    H_now   = 0.5*(H_ice(i+2,j) + H_ice(i+3,j)) 
+                    qq_right = H_now * ux_bar(i+2,j) 
+
+                    ! Get the ratio of distance from gl to ac(i,j) to the 
+                    ! total distance between qq_gl and qq_right  
+                    f_lin = (1.5-f_grnd_acx(i,j)) / ( 1.0 + (1.5-f_grnd_acx(i,j)) )
+
+                    qq_gl_acx(i+1,j) = (1.0-f_lin)*qq_gl + f_lin*qq_right
+
+                end if 
+
+                !qq_gl_acx(i,j) = qq_gl 
+
             end if 
 
         end do 
@@ -90,7 +185,40 @@ contains
 
     end subroutine calc_grounding_line_flux
 
-    elemental function calc_gl_flux_tsai(H_gl,A_gl,n_glen,Q0,f_drag) result(qq_gl)
+    elemental function calc_gl_flux_power(H_gl,A_gl,C_bed,n_glen,m_drag) result(qq_gl)
+        ! Calculate the analytical grounding-line flux solution
+        ! following Schoof (2007)
+        
+        implicit none 
+
+        real(prec), intent(IN)  :: H_gl                 ! [m] Grounding-line ice thickness
+        real(prec), intent(IN)  :: A_gl                 ! [a-1 Pa-3] Grounding-line rate factor
+        real(prec), intent(IN)  :: C_bed                ! [Pa a/m] Basal friction coefficient
+        real(prec), intent(IN)  :: n_glen               ! [--] Glen's flow law exponent 
+        real(prec), intent(IN)  :: m_drag               ! [--] Power-law dragging exponent
+        real(prec) :: qq_gl                             ! [m2 / a] Grounding-line flux 
+        
+        ! Local variables 
+        real(prec) :: density_factor
+        real(prec) :: m_inv 
+
+        ! Invert m_drag to be consistent with the Schoof (2007) formulation 
+        m_inv = 1.0 / m_drag 
+
+        ! Calculate constant density factor 
+        density_factor = (1.0 - rho_ice/rho_sw)**n_glen
+
+        ! Calculate grounding line flux following Tsai et al. (2015), Eq. 38
+        qq_gl = ( A_gl * (rho_ice*g)**(n_glen+1.0) * density_factor / ((4.0**n_glen)*C_bed) ) **(1.0/(m_inv+1.0)) & 
+                                 * H_gl**( (m_inv+n_glen+3.0)/(m_inv+1.0) )
+
+        return 
+
+    end function calc_gl_flux_power
+
+    elemental function calc_gl_flux_coulomb(H_gl,A_gl,n_glen,Q0,f_drag) result(qq_gl)
+        ! Calculate the analytical grounding-line flux solution
+        ! following Tsai et al. (2015)
 
         implicit none 
 
@@ -113,8 +241,7 @@ contains
 
         return 
 
-    end function calc_gl_flux_tsai
-
+    end function calc_gl_flux_coulomb
 
 
 end module grounding_line_flux 

@@ -382,7 +382,7 @@ contains
         do j = 1, ny 
         do i = 1, nx 
 
-            if (err_z_srf(i,j) .gt. 0.0) then 
+            if (err_z_srf(i,j) .ne. 0.0) then 
                 ! Update where elevation error exists
 
                 f_dz = -err_z_srf(i,j) / err_z_fac 

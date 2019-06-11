@@ -12,7 +12,8 @@ module yelmo_dynamics
     use velocity_sia 
     use solver_ssa_sico5
     use basal_dragging  
-    
+    use grounding_line_flux 
+
     ! Note: 3D arrays defined such that first index (k=1) == base, and max index (k=nk) == surface 
     
     implicit none
@@ -111,12 +112,11 @@ contains
         real(prec), allocatable :: bmb(:,:)
 
         logical :: calc_ssa 
-        logical :: is_converged
-        logical :: write_ssa_diagnostics
 
         type(ydyn_class) :: dyn1 
         type(ydyn_class) :: dyn2 
         logical          :: is_grz_mid 
+        real(prec)       :: H_mid 
 
         nx    = dyn%par%nx 
         ny    = dyn%par%ny 
@@ -234,66 +234,8 @@ contains
             ! == Iterate over strain rate, viscosity and ssa velocity solutions until convergence ==
             ! Note: ssa solution is defined for ux_b/uy_b fields here, not ux_bar/uy_bar as in PD12
 
-            if (.FALSE.) then 
-
-            is_converged = .FALSE. 
-
-            write_ssa_diagnostics = .FALSE. 
-
-!             if (tpo%now%f_grnd(18,3) .gt. 0.0) then 
-!                 write_ssa_diagnostics = .TRUE.
-
-!                 call yelmo_write_init_ssa("yelmo_ssa.nc",time_init=1.0) 
-!             end if 
-          
-            do iter = 1, dyn%par%ssa_iter_max
-
-                ! Store previous solution 
-                ux_b_prev = dyn%now%ux_b 
-                uy_b_prev = dyn%now%uy_b 
-
-                !   1. Calculate basal drag coefficient beta (beta, beta_acx, beta_acy) 
-
-                call calc_ydyn_beta(dyn,tpo,mat,bnd)
-
-                !   2. Calculate effective viscosity
-                
-                ! Use 3D rate factor, but 2D shear:
-                ! Note: disable shear contribution to viscosity for this solver, for mixed terms use hybrid-pd12 option.
-                ! Note: Here visc_eff is calculated using ux_b and uy_b (ssa velocity), not ux_bar/uy_bar as in hybrid-pd12. 
-                dyn%now%visc_eff = calc_visc_eff(dyn%now%ux_b,dyn%now%uy_b,dyn%now%duxdz_bar*0.0,dyn%now%duydz_bar*0.0, &
-                                                 tpo%now%H_ice,mat%now%ATT,dyn%par%zeta_aa,dyn%par%dx,dyn%par%dy,mat%par%n_glen)
-                
-                !   3. Calculate SSA solution
-
-                ! Call ssa solver to determine ux_b/uy_b, where ssa_mask_acx/y are > 0
-                call calc_vxy_ssa_matrix(dyn%now%ux_b,dyn%now%uy_b,dyn%now%ux_bar*0.0,dyn%now%uy_bar*0.0, &
-                                         dyn%now%beta_acx,dyn%now%beta_acy,dyn%now%visc_eff,dyn%now%ssa_mask_acx, &
-                                         dyn%now%ssa_mask_acy,tpo%now%H_ice,dyn%now%taud_acx,dyn%now%taud_acy,tpo%now%H_grnd, &
-                                         bnd%z_sl,bnd%z_bed, & 
-                                         dyn%par%dx,dyn%par%dy,dyn%par%ssa_vel_max,dyn%par%boundaries, &
-                                         dyn%now%gfa1,dyn%now%gfa2,dyn%now%gfb1,dyn%now%gfb2)
-
-                ! Apply relaxation to keep things stable
-                call relax_ssa(dyn%now%ux_b,dyn%now%uy_b,ux_b_prev,uy_b_prev,rel=dyn%par%ssa_iter_rel)
-
-                ! Check for convergence
-                is_converged = check_vel_convergence(dyn%now%ux_b,dyn%now%uy_b,ux_b_prev,uy_b_prev, &
-                                            dyn%par%ssa_iter_conv,iter,yelmo_write_log)
-
-                if (write_ssa_diagnostics) then  
-                    call write_step_2D_ssa(tpo,dyn,"yelmo_ssa.nc",ux_b_prev,uy_b_prev,time=real(iter,prec))    
-                end if 
-
-                ! Exit iterations if ssa solution has converged
-                if (is_converged) exit 
-
-            end do 
-            ! == END iterations ==
-
-            else 
-
-if (.FALSE.) then 
+if (.FALSE.) then
+! Testing exotic mixing solutions for treating the grounding line  
             ! Set dyn1 equal to previous solution 
             dyn1 = dyn 
 
@@ -384,27 +326,62 @@ if (.FALSE.) then
             end do 
             end do 
 end if 
+            
+if (.FALSE.) then 
+            ! Testing prescribed grounding-line flux 
+            call calc_grounding_line_flux(dyn%now%qq_gl_acx,dyn%now%qq_gl_acy,tpo%now%H_ice,mat%now%ATT_bar, &
+                                    dyn%now%beta,dyn%now%ux_bar,dyn%now%uy_bar,tpo%now%f_grnd,tpo%now%f_grnd_acx, &
+                                    tpo%now%f_grnd_acy,dyn%par%n_glen,dyn%par%m_drag,Q0=0.61,f_drag=0.6)
 
+            ! Where qq_gl is present, prescribe velocity and set mask to -1
+
+            ! acx nodes 
+            do j = 1, ny 
+            do i = 1, nx-1
+
+                H_mid = 0.5*(tpo%now%H_ice(i,j)+tpo%now%H_ice(i+1,j))
+                
+                if (dyn%now%qq_gl_acx(i,j) .ne. 0.0 .and. H_mid .gt. 0.0) then 
+                    ! Prescribe velocity at this point 
+
+!                     if (j == 5) then 
+!                         write(*,*) "qq_gl", dyn%now%qq_gl_acx(i,j), dyn%now%ux_b(i,j), dyn%now%qq_gl_acx(i,j) / H_mid
+!                     end if 
+
+                    dyn%now%ux_b(i,j) = dyn%now%qq_gl_acx(i,j) / H_mid 
+                    dyn%now%ssa_mask_acx(i,j) = -1
+
+                end if 
+
+            end do 
+            end do 
+
+            ! acy nodes 
+            do j = 1, ny-1 
+            do i = 1, nx
+
+                H_mid = 0.5*(tpo%now%H_ice(i,j)+tpo%now%H_ice(i,j+1))
+                
+                if (dyn%now%qq_gl_acy(i,j) .ne. 0.0 .and. H_mid .gt. 0.0) then 
+                    ! Prescribe velocity at this point 
+
+                    dyn%now%uy_b(i,j) = dyn%now%qq_gl_acy(i,j) / H_mid 
+                    dyn%now%ssa_mask_acy(i,j) = -1
+
+                end if 
+
+            end do 
+            end do 
+end if 
+            
             call calc_ydyn_ssa(dyn,tpo,mat,bnd)
             
-!             ! Recalculate beta and visc for current velocity solution
-!             call calc_ydyn_beta(dyn,tpo,mat,bnd)
-
-!             dyn%now%visc_eff = calc_visc_eff(dyn%now%ux_b,dyn%now%uy_b,dyn%now%duxdz_bar*0.0,dyn%now%duydz_bar*0.0, &
-!                                              tpo%now%H_ice,mat%now%ATT,dyn%par%zeta_aa,dyn%par%dx,dyn%par%dy,mat%par%n_glen)
-            
-            end if 
-
         else 
             ! No ssa calculations performed, set basal velocity fields to zeor 
 
             dyn%now%ux_b = 0.0 
             dyn%now%uy_b = 0.0 
 
-        end if 
-
-        if (write_ssa_diagnostics) then 
-            stop 
         end if 
 
         ! ===== Combine sliding and shear into hybrid fields ==========
@@ -901,7 +878,8 @@ end if
     end subroutine relax_ssa
 
     subroutine calc_ydyn_ssa(dyn,tpo,mat,bnd)
-        ! Update beta based on parameter choices
+        ! Calculate the ssa solution via a linearized Picard iteration
+        ! over beta, visc and velocity
 
         implicit none
         
@@ -911,24 +889,15 @@ end if
         type(ybound_class), intent(IN)    :: bnd   
 
         ! Local variables
-        integer :: iter, nx, ny  
+        integer :: iter, i, j, nx, ny
+        real(prec) :: H_mid   
         real(prec), allocatable :: ux_b_prev(:,:) 
         real(prec), allocatable :: uy_b_prev(:,:) 
+        integer,    allocatable :: ssa_mask_acx(:,:) 
+        integer,    allocatable :: ssa_mask_acy(:,:) 
 
         logical :: is_converged
         logical :: write_ssa_diagnostics
-
-        type(ydyn_class) :: dyn1   ! Use for alternate grounding line treatment 
-
-        type ssa_helper_type 
-            real(prec), allocatable :: ux(:,:) 
-            real(prec), allocatable :: uy(:,:) 
-            real(prec), allocatable :: beta_acx(:,:) 
-            real(prec), allocatable :: beta_acy(:,:) 
-            real(prec), allocatable :: visc_eff(:,:) 
-
-        end type 
-        
 
         is_converged          = .FALSE. 
         write_ssa_diagnostics = .FALSE. 
@@ -939,12 +908,19 @@ end if
         allocate(ux_b_prev(nx,ny))
         allocate(uy_b_prev(nx,ny))
         
+        allocate(ssa_mask_acx(nx,ny))
+        allocate(ssa_mask_acy(nx,ny))
+
 !             if (tpo%now%f_grnd(18,3) .gt. 0.0) then 
 !                 write_ssa_diagnostics = .TRUE.
 
 !                 call yelmo_write_init_ssa("yelmo_ssa.nc",time_init=1.0) 
 !             end if 
-          
+    
+        ! Store original ssa mask 
+        ssa_mask_acx = dyn%now%ssa_mask_acx
+        ssa_mask_acy = dyn%now%ssa_mask_acy
+        
         do iter = 1, dyn%par%ssa_iter_max
 
             ! Store previous solution 
@@ -963,6 +939,58 @@ end if
             dyn%now%visc_eff = calc_visc_eff(dyn%now%ux_b,dyn%now%uy_b,dyn%now%duxdz_bar*0.0,dyn%now%duydz_bar*0.0, &
                                              tpo%now%H_ice,mat%now%ATT,dyn%par%zeta_aa,dyn%par%dx,dyn%par%dy,mat%par%n_glen)
             
+            !   X. Prescribe grounding-line flux 
+if (.FALSE.) then
+            ! Testing prescribed grounding-line flux 
+            call calc_grounding_line_flux(dyn%now%qq_gl_acx,dyn%now%qq_gl_acy,tpo%now%H_ice,mat%now%ATT_bar, &
+                                    dyn%now%C_bed,dyn%now%ux_bar,dyn%now%uy_bar,tpo%now%f_grnd,tpo%now%f_grnd_acx, &
+                                    tpo%now%f_grnd_acy,dyn%par%n_glen,dyn%par%m_drag,Q0=0.61,f_drag=0.6)
+
+            ! Where qq_gl is present, prescribe velocity and set mask to -1
+
+            ! Restore original ssa mask (without grounding line flags)
+            dyn%now%ssa_mask_acx = ssa_mask_acx
+            dyn%now%ssa_mask_acy = ssa_mask_acy
+            
+            ! acx nodes 
+            do j = 1, ny 
+            do i = 1, nx-1
+
+                H_mid = 0.5*(tpo%now%H_ice(i,j)+tpo%now%H_ice(i+1,j))
+                
+                if (dyn%now%qq_gl_acx(i,j) .ne. 0.0 .and. H_mid .gt. 0.0) then 
+                    ! Prescribe velocity at this point 
+
+!                     if (j == 5) then 
+!                         write(*,*) "qq_gl", dyn%now%qq_gl_acx(i,j), dyn%now%ux_b(i,j), dyn%now%qq_gl_acx(i,j) / H_mid
+!                     end if 
+
+                    dyn%now%ux_b(i,j) = dyn%now%qq_gl_acx(i,j) / H_mid 
+                    dyn%now%ssa_mask_acx(i,j) = -1
+
+                end if 
+
+            end do 
+            end do 
+
+            ! acy nodes 
+            do j = 1, ny-1 
+            do i = 1, nx
+
+                H_mid = 0.5*(tpo%now%H_ice(i,j)+tpo%now%H_ice(i,j+1))
+                
+                if (dyn%now%qq_gl_acy(i,j) .ne. 0.0 .and. H_mid .gt. 0.0) then 
+                    ! Prescribe velocity at this point 
+
+                    dyn%now%uy_b(i,j) = dyn%now%qq_gl_acy(i,j) / H_mid 
+                    dyn%now%ssa_mask_acy(i,j) = -1
+                    
+                end if 
+
+            end do 
+            end do
+end if 
+
             !   3. Calculate SSA solution
 
             ! Call ssa solver to determine ux_b/uy_b, where ssa_mask_acx/y are > 0
@@ -989,6 +1017,10 @@ end if
 
         end do 
         ! == END iterations ==
+
+        if (write_ssa_diagnostics) then 
+            stop 
+        end if 
 
         return 
 
@@ -1501,6 +1533,9 @@ end if
         allocate(now%taub_acy(nx,ny)) 
         allocate(now%taub(nx,ny)) 
 
+        allocate(now%qq_gl_acx(nx,ny)) 
+        allocate(now%qq_gl_acy(nx,ny)) 
+
         allocate(now%qq_acx(nx,ny)) 
         allocate(now%qq_acy(nx,ny)) 
         allocate(now%qq(nx,ny)) 
@@ -1569,6 +1604,9 @@ end if
         now%taub_acx          = 0.0 
         now%taub_acy          = 0.0 
         now%taub              = 0.0 
+        
+        now%qq_gl_acx         = 0.0 
+        now%qq_gl_acy         = 0.0 
         
         now%qq_acx            = 0.0 
         now%qq_acy            = 0.0 
@@ -1643,6 +1681,9 @@ end if
         if (allocated(now%taub_acx))        deallocate(now%taub_acx) 
         if (allocated(now%taub_acy))        deallocate(now%taub_acy) 
         if (allocated(now%taub))            deallocate(now%taub) 
+        
+        if (allocated(now%qq_gl_acx))       deallocate(now%qq_gl_acx) 
+        if (allocated(now%qq_gl_acy))       deallocate(now%qq_gl_acy) 
         
         if (allocated(now%qq_acx))          deallocate(now%qq_acx) 
         if (allocated(now%qq_acy))          deallocate(now%qq_acy) 

@@ -253,6 +253,9 @@ module yelmo_defs
         real(prec), allocatable :: taub_acy(:,:) 
         real(prec), allocatable :: taub(:,:)
         
+        real(prec), allocatable :: qq_gl_acx(:,:) 
+        real(prec), allocatable :: qq_gl_acy(:,:) 
+        
         real(prec), allocatable :: qq_acx(:,:) 
         real(prec), allocatable :: qq_acy(:,:) 
         real(prec), allocatable :: qq(:,:)

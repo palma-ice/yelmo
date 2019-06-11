@@ -36,7 +36,7 @@ contains
 
         ! Local variables
         integer    :: i, j, nx, ny
-        logical    :: is_gl  
+        logical    :: is_gl, float_right, float_left   
         real(prec) :: H_gl, A_gl, C_bed_gl, qq_gl    
         real(prec) :: qq_left, qq_right, H_now, f_lin
 
@@ -54,15 +54,17 @@ contains
         do i = 3, nx-3
             
             ! Determine if grounding-line sits between aa-nodes
-            is_gl = (f_grnd(i,j) .gt. 0.0 .and. f_grnd(i+1,j) .eq. 0.0) .or. & 
-                    (f_grnd(i,j) .eq. 0.0 .and. f_grnd(i+1,j) .gt. 0.0)
+            float_right = (f_grnd(i,j) .gt. 0.0 .and. f_grnd(i+1,j) .eq. 0.0)
+            float_left  = (f_grnd(i,j) .eq. 0.0 .and. f_grnd(i+1,j) .gt. 0.0)
+            is_gl       = (float_right .or. float_left)
+                    
 
             if (is_gl) then 
                 ! For grounding-line points, diagnose flux 
 
                 ! 1. Determine quantities at the grounding line ==============================
 
-                if (f_grnd(i,j) .gt. 0.0 .and. f_grnd(i+1,j) .eq. 0.0) then 
+                if (float_right) then 
                     ! Floating to the right
 
                     H_gl = H_ice(i,j)  *f_grnd_acx(i,j) + (1.0-f_grnd_acx(i,j))*H_ice(i+1,j)
@@ -70,7 +72,7 @@ contains
                     
                     C_bed_gl = C_bed(i,j)   ! Upstream (non-zero) C_bed 
 
-                else if (f_grnd(i,j) .eq. 0.0 .and. f_grnd(i+1,j) .gt. 0.0) then
+                else
                     ! Floating to the left
 
                     H_gl = H_ice(i,j)  *(1.0-f_grnd_acx(i,j)) + f_grnd_acx(i,j)*H_ice(i+1,j)
@@ -108,7 +110,6 @@ contains
 
                 ! Assign a direction to the flux as well (direction of flow)
                 qq_gl = sign(qq_gl,ux_bar(i,j))
-
 
                 ! 3. Interpolate prescribed gl-flux to ac-nodes to the left and right of gl. ==
 
@@ -164,8 +165,6 @@ contains
                     qq_gl_acx(i+1,j) = (1.0-f_lin)*qq_gl + f_lin*qq_right
 
                 end if 
-
-                !qq_gl_acx(i,j) = qq_gl 
 
             end if 
 

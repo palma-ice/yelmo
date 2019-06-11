@@ -22,7 +22,7 @@ contains
         real(prec), intent(OUT) :: qq_gl_acx(:,:)       ! [m^2 a^-1] Diagnosed grounding line flux (acx-nodes)
         real(prec), intent(OUT) :: qq_gl_acy(:,:)       ! [m^2 a^-1] Diagnosed grounding line flux (acy-nodes)
         real(prec), intent(IN)  :: H_ice(:,:)           ! [m] Ice thickness (aa-nodes)
-        real(prec), intent(IN)  :: ATT_bar(:,:)         ! [a^-1 Pa^-3] Depth-averaged rate factor
+        real(prec), intent(IN)  :: ATT_bar(:,:)         ! [a^-1 Pa^-n] Depth-averaged rate factor
         real(prec), intent(IN)  :: C_bed(:,:)           ! [Pa a m^-1] Basal friction coefficient 
         real(prec), intent(IN)  :: ux_bar(:,:)          ! [m a^-1] Depth-averaged horizontal veloctiy, x-direction (acx-nodes)
         real(prec), intent(IN)  :: uy_bar(:,:)          ! [m a^-1] Depth-averaged horizontal veloctiy, y-direction (acy-nodes)

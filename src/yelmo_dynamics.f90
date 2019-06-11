@@ -798,7 +798,7 @@ contains
                                              tpo%now%H_ice,mat%now%ATT,dyn%par%zeta_aa,dyn%par%dx,dyn%par%dy,mat%par%n_glen)
             
             !   X. Prescribe grounding-line flux 
-if (.FALSE.) then
+if (.TRUE.) then
             ! Testing prescribed grounding-line flux/vel 
             call calc_grounding_line_flux(dyn%now%qq_gl_acx,dyn%now%qq_gl_acy,tpo%now%H_ice,mat%now%ATT_bar, &
                                     dyn%now%C_bed,dyn%now%ux_b,dyn%now%uy_b,tpo%now%f_grnd,tpo%now%f_grnd_acx, &
@@ -822,7 +822,7 @@ if (.FALSE.) then
 !                     if (j == 5) then 
 !                         write(*,*) "qq_gl", dyn%now%qq_gl_acx(i,j), dyn%now%ux_b(i,j), dyn%now%qq_gl_acx(i,j) / H_mid
 !                     end if 
-
+                    
                     dyn%now%ux_b(i,j) = dyn%now%qq_gl_acx(i,j) / H_mid 
                     dyn%now%ssa_mask_acx(i,j) = -1
 

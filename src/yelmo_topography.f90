@@ -172,7 +172,7 @@ contains
             case(1) 
                 ! Binary f_grnd, linear f_grnd_acx/acy based on H_grnd
 
-                call calc_f_grnd_subgrid_ac_linear(tpo%now%f_grnd,tpo%now%f_grnd_acx,tpo%now%f_grnd_acy,tpo%now%H_grnd)
+                call calc_f_grnd_subgrid_linear(tpo%now%f_grnd,tpo%now%f_grnd_acx,tpo%now%f_grnd_acy,tpo%now%H_grnd)
 
             case(2)
                 ! Grounded area f_gnrd, average to f_grnd_acx/acy 
@@ -876,7 +876,7 @@ end if
         
     end subroutine calc_f_grnd_subgrid_area
     
-    subroutine calc_f_grnd_subgrid_ac_linear(f_grnd,f_grnd_x,f_grnd_y,H_grnd)
+    subroutine calc_f_grnd_subgrid_linear(f_grnd,f_grnd_x,f_grnd_y,H_grnd)
         ! Calculate the grounded fraction of a cell in the x- and y-directions
         ! at the ac nodes
         !
@@ -904,11 +904,11 @@ end if
         nx = size(f_grnd,1)
         ny = size(f_grnd,2)
 
-        ! Central Aa node
+        ! Central aa-node
         f_grnd = 1.0
         where (H_grnd < 0.0) f_grnd = 0.0
         
-        ! x-direction, Ac node
+        ! x-direction, ac-node
         f_grnd_x = 1.0
         do j = 1, ny 
         do i = 1, nx-1 
@@ -944,7 +944,7 @@ end if
         end do 
         end do 
 
-        ! y-direction, Ac node
+        ! y-direction, ac-node
         f_grnd_y = 1.0
         do j = 1, ny-1 
         do i = 1, nx 
@@ -986,7 +986,7 @@ end if
         
         return 
 
-    end subroutine calc_f_grnd_subgrid_ac_linear
+    end subroutine calc_f_grnd_subgrid_linear
     
     subroutine filter_f_grnd(f_grnd)
         ! Remove isolated floating points inside of grounded ice 

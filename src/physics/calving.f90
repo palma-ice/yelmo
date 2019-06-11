@@ -180,7 +180,7 @@ contains
                 n_ocean = 0 
 
             end if
-
+            
             if (n_ocean .gt. 0 .and. H_diff(i,j).le.0.0) then 
                 ! Check if current point is at the floating ice front,
                 ! and has thickness less than threshold, or if

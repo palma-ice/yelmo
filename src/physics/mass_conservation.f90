@@ -90,7 +90,7 @@ contains
 
         ! Limit grounded ice thickness to below maximum threshold value
         ! based on shear stress limit 
-        !call limit_grounded_margin_thickness_stress(H_ice,mb_applied,f_grnd,H_ocn,dt)
+        call limit_grounded_margin_thickness_stress(H_ice,mb_applied,f_grnd,H_ocn,dt)
 
         ! Limit grounded ice thickess to above minimum and below inland neighbor at the margin
 !         call limit_grounded_margin_thickness(H_ice,mb_applied,f_grnd,H_min,dt) 
@@ -378,7 +378,7 @@ contains
 
         end if
 
-        ! attribution des elements des diagonales
+        ! Populate diagonals
         do j=2,ny-1
         do i=2,nx-1
 
@@ -518,8 +518,8 @@ contains
     end subroutine limit_grounded_margin_thickness
 
     subroutine limit_grounded_margin_thickness_flux(H_ice,mb_applied,f_grnd,mbal,ux,uy,dx,dt,H_min)
-        ! Calculate the calving rate [m/a] based on a simple threshold rule
-        ! H_ice < H_min
+        ! Remove marginal ice that is too thin (H_ice < H_min) with mass balance
+        ! and cannot be replenished from upstream flux
 
         implicit none 
 
@@ -548,7 +548,8 @@ contains
         allocate(Hdiff(nx,ny))
         allocate(Hfrac(nx,ny))
         allocate(f_ice(nx,ny))
-
+        allocate(H_ice_0(nx,ny))
+        
         ! Local representation of f_ice (binary) - improve in future
         f_ice = 0.0
         where(H_ice .gt. 0.0) f_ice = 1.0 
@@ -569,9 +570,9 @@ contains
         do j = 2, ny
         do i = 2, nx
         
-                ! Calculate strain rate locally (Aa node)
+                ! Calculate strain rate locally (aa-node)
                 ! Note: dx should probably account for f_ice somehow,  
-                ! but this would only a minor adjustment
+                ! but would maybe only be a minor adjustment
                 eps_xx = (ux(i,j) - ux(i-1,j))/dx
                 eps_yy = (uy(i,j) - uy(i,j-1))/dx
 
@@ -581,10 +582,17 @@ contains
         end do 
         end do
         
+        ! Store original ice thickness field 
+        H_ice_0 = H_ice 
+        
         do j = 2, ny-1
         do i = 2, nx-1
 
             ! Determine how many ice-free points are bordering grounded ice point
+
+            ! Determine if grounded, ice-covered point has an ice-free neighbor (ie, at the grounded ice margin)
+            is_margin = (H_ice_0(i,j) .gt. 0.0 .and. f_grnd(i,j) .gt. 0.0 &
+                .and. minval([H_ice_0(i-1,j),H_ice_0(i+1,j),H_ice_0(i,j-1),H_ice_0(i,j+1)]) .eq. 0.0)
 
             if (f_grnd(i,j) .gt. 0.0 .and. f_ice(i,j) .gt. 0.0) then
                 ! Grounded ice-covered point
@@ -625,7 +633,7 @@ contains
                     .or.(f_grnd(i,j+1).gt.0.0.and.positive_mb) ) !
 
                 if ((.not.(test_mij.or.test_pij.or.test_imj.or.test_ipj))) then
-                    mb_applied(i,j) = mb_applied(i,j) - H_ice(i,j) / dt    
+                    mb_applied(i,j) = mb_applied(i,j) - H_ice_0(i,j) / dt    
                     H_ice(i,j)      = 0.0          
                 end if  
 
@@ -652,29 +660,55 @@ contains
 
         ! Local variables 
         integer    :: i, j, nx, ny
-        real(prec) :: H_max 
-        real(prec) :: rho_ice_g, rho_sw_ice 
+        real(prec) :: tau_c, H_max, H_ocn_now 
+        logical    :: is_margin  
+        real(prec) :: rho_ice_g, rho_sw_ice, rho_ice_sw  
+        real(prec), allocatable :: H_ice_0(:,:) 
 
-        real(prec), parameter :: tau_c = 1e6                ! [1e6 Pa] Depth-integrated shear stress in ice 
+        real(prec), parameter :: C0    = 1e6                ! [Pa] Depth-averaged shear stress in ice 
+        real(prec), parameter :: alpha = 0.0                ! [--] Friction coefficient for Bassis and Walker (2012), Eq. 2.13
         real(prec), parameter :: r     = 0.0                ! [--] Crevasse fraction 
+        
+        rho_ice_g  = rho_ice * g 
+        rho_sw_ice = rho_sw / rho_ice 
+        rho_ice_sw = rho_ice / rho_sw 
+
         nx = size(H_ice,1)
         ny = size(H_ice,2)
 
-        rho_ice_g  = rho_ice * g 
-        rho_sw_ice = rho_sw / rho_ice 
+        allocate(H_ice_0(nx,ny))
+        H_ice_0 = H_ice 
+        
+        do j = 2, ny-1
+        do i = 2, nx-1 
 
-        do j = 1, ny 
-        do i = 1, nx 
+            ! Determine if grounded, ice-covered point has an ice-free neighbor (ie, at the grounded ice margin)
+            is_margin = (H_ice_0(i,j) .gt. 0.0 .and. f_grnd(i,j) .gt. 0.0 &
+                .and. minval([H_ice_0(i-1,j),H_ice_0(i+1,j),H_ice_0(i,j-1),H_ice_0(i,j+1)]) .eq. 0.0)
 
-            ! Check grounded, ice-covered points only 
-            if (H_ice(i,j) .gt. 0.0 .and. f_grnd(i,j) .gt. 0.0) then 
+            if (is_margin) then 
+                ! Determine if this margin point should fail 
 
-                H_max = (1.0-r)*tau_c/rho_ice_g + sqrt(((1.0-r)*tau_c/rho_ice_g)**2 + rho_sw_ice*H_ocn(i,j)**2)
+                ! Calculate depth of seawater (limited by ice thickness and flotation criterion)
+                if (H_ocn(i,j) .gt. 0.0) then 
+                    H_ocn_now = min(rho_ice_sw*H_ice_0(i,j),H_ocn(i,j))
+                else 
+                    H_ocn_now = 0.0 
+                end if 
 
-                if (H_ice(i,j) .gt. H_max) then 
+                ! Get depth-averaged shear-stress in ice, Bassis and Walker (2012), Eq. 2.13 vertically integrated
+                ! alpha = 0.65: model S1 validated for cold ice 
+                ! alpha = 0.4 : model S2 for warmer ice 
+                ! alpha = 0.0 : model S3 for purely plastic yielding (default)
+                tau_c = C0 + 0.5*alpha*rho_ice_g*H_ice_0(i,j)
+
+                ! Get critical ice thickness to cause stress failure
+                H_max = (1.0-r)*tau_c/rho_ice_g + sqrt(((1.0-r)*tau_c/rho_ice_g)**2 + rho_sw_ice*H_ocn_now**2)
+
+                if (H_ice_0(i,j) .gt. H_max) then 
                     ! Critical stress exceeded, calve this ice - pass to mb_applied for now...
 
-                    mb_applied(i,j) = mb_applied(i,j) - H_ice(i,j) / dt    
+                    mb_applied(i,j) = mb_applied(i,j) - H_ice_0(i,j) / dt    
                     H_ice(i,j)      = 0.0  
 
                 end if 

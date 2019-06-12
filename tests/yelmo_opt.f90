@@ -440,7 +440,7 @@ end if
         end do 
 
         ! Additionally, apply a Gaussian filter to C_bed to ensure smooth transitions 
-        call filter_gaussian(var=C_bed,sigma=64.0,dx=dx) !, &
+!         call filter_gaussian(var=C_bed,sigma=64.0,dx=dx) !, &
                                 !mask=err_z_srf .ne. 0.0)
         
         dCbed = C_bed - C_bed_prev

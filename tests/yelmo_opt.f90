@@ -388,18 +388,22 @@ contains
             if (err_z_srf(i,j) .ne. 0.0) then 
                 ! Update where elevation error exists
 
+                ! Get adjustment rate given error in z_srf 
                 f_dz = -err_z_srf(i,j) / err_z_fac 
                 f_dz = max(f_dz, dphi_min)
                 f_dz = min(f_dz, dphi_max)
-
-                dphi      = f_dz 
+                dphi = f_dz 
+                
+                ! 1. Apply change at current point 
+if (.FALSE.) then 
                 phi(i,j)  = phi(i,j) + dphi 
                 phi(i,j)  = max(phi(i,j),phi_min)
                 phi(i,j)  = min(phi(i,j),phi_max)
 
                 C_bed(i,j) = cf_stream*tan(phi(i,j)*pi/180.0)
+end if 
 
-                ! Also apply change downstream (this may overlap with other changes)
+                ! 2. Apply change downstream (this may overlap with other changes)
 
                 ux_aa = 0.5*(ux(i,j)+ux(i+1,j))
                 uy_aa = 0.5*(uy(i,j)+uy(i,j+1))
@@ -424,7 +428,6 @@ contains
 
                 end if 
 
-                dphi        = f_dz 
                 phi(i1,j1)  = phi(i1,j1) + dphi 
                 phi(i1,j1)  = max(phi(i1,j1),phi_min)
                 phi(i1,j1)  = min(phi(i1,j1),phi_max)

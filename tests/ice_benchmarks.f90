@@ -356,20 +356,20 @@ contains
 
 !                 Surface mass balance 
 
-                ! To allow floating ice to grow
-                R_el = 1000.0 + dR_el ! [km]
-                s    = 0.01           ! [m/a / km]
+!                 ! To allow floating ice to grow
+!                 R_el = 1000.0 + dR_el ! [km]
+!                 s    = 0.01           ! [m/a / km]
   
-                do j = 1, ny 
-                do i = 1, nx
+!                 do j = 1, ny 
+!                 do i = 1, nx
                 
-                    dist = sqrt((xx(i,j)-x_summit)**2 + (yy(i,j)-y_summit)**2) *1e-3  ! [km]
-                    smb(i,j) = min(0.5,s*(R_el-dist))
+!                     dist = sqrt((xx(i,j)-x_summit)**2 + (yy(i,j)-y_summit)**2) *1e-3  ! [km]
+!                     smb(i,j) = min(0.5,s*(R_el-dist))
 
-                end do 
-                end do 
+!                 end do 
+!                 end do 
                 
-!                 smb = 0.3   ! [m/a]
+                smb = 0.3   ! [m/a]
                 
                 ! Geothermal heat flux 
 

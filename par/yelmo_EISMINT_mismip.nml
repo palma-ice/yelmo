@@ -1,0 +1,149 @@
+&eismint
+
+    domain       = "EISMINT"             ! "EISMINT"
+    experiment   = "mismip"              ! "fixed", "moving", "mismip", "EXPA", "EXPB", "EXPF","BUELER-A", "BUELER-B", "HALFAR", "HALFAR-MED"
+    dx           = 50.0                  ! [km] Grid resolution (EISMINT1 = 50km, EISMINT2 = 25km)
+    with_ssa     = True                  ! Include ssa in experiment?
+    topo_fixed   = False                 ! Calculate the topography, or use Heiko's topo file.  
+    dyn_fixed    = False                 ! Fix dynamics after first calculation? 
+    topo_fixed_file = /Users/robinson/models/EURICE/yelmo/tests/heiko_imau-ice_help_fields_eismint_M_200kyr.nc
+
+    ! Timing parameters 
+    time_init    = 0.0                  ! [yr] Starting time 
+    time_end     = 100e3                ! [yr] Ending time 
+    dtt          = 5.0                  ! [yr] Main loop timestep 
+    dt2D_out     = 500.0                ! [yr] Frequency of writing 2D output files 
+
+    ! Settings for transient EISMINT1 experiments 
+    period       = 0.0                  ! [yr] for transient experiments (normally 0.0 yr or 20e3 yr)
+    dT_test      = 0.0                  ! [K]  to test an imposed constant temperature anomaly 
+/
+
+&yelmo
+    domain          = "EISMINT"
+    grid_name       = "EISMINT"
+    grid_path       = "none"
+    experiment      = "EISMINT"         ! "None", "EISMINT", "MISMIP3D", "BUELER"  to apply special boundary conditions   
+    restart         = "no"
+    zeta_scale      = "tanh"            ! "linear", "exp", "tanh"
+    zeta_exp        = 2.0  
+    nz_aa           = 21                ! Vertical resolution in ice
+    dtmin           = 0.001             ! [a] Minimum timestep 
+    dtmax           = 5.0               ! [a] Maximum timestep
+    ntt             = 1                 ! [--] Thermodynamics call frequency (how many dynamic timesteps to skip)
+    cfl_max         = 0.01              ! Maximum value is 1.0, lower will be more stable
+    cfl_diff_max    = 0.12              ! Bueler et al (2007), Eq. 25  
+    
+/
+
+&ytopo
+    method            = "dynamic"       ! "fixed", "relax", "dynamic"
+    init              = "presentday"    ! "icefree", "presentday"
+    solver            = "impl-upwind"   ! "expl", "impl-upwind"
+    margin2nd         = False           ! Apply second-order upwind approximation to gradients at the margin
+    surf_gl_method    = 0               ! 0: binary (max grnd/flt elevation), 1: subgrid average elevation
+    calv_method       = "flux"          ! "zero", "simple", "flux", "kill"
+    use_bmb           = False 
+    use_calv_subgrid  = False 
+    ocean_kill        = False 
+    grline_fixed      = False 
+    topo_fixed        = False
+    topo_relax_dt     = 2000
+    topo_fixed_dt     = -1              ! <= 0 for always fixed, positive value to 'unfix' topo after interval
+    calv_dt           = 1e-5            ! [a] Calving frequency 
+    H_calv            = 0.0 
+    H_min             = 1.0             ! [m] Minimum ice thickness at grounded margin (thinner ice is ablated) - helps with stability
+    gl_sep            = 1               ! 1: Linear f_grnd_acx/acy and binary f_grnd, 2: area f_grnd, average to acx/acy
+    gl_sep_nx         = 15              ! [-] Number of interpolation points (nx*nx) to calculate grounded area at grounding line
+    neff_p            = 0.0             ! Effective pressure: connectivity to the ocean (0: none, 1: full)
+/
+
+&ydyn
+    solver              = "hybrid-vel"    ! "fixed","hybrid-vel", "hybrid-shear", "hybrid-pd12"
+    mix_method          = -1              ! -2: sia, -1: ssa, 0: sia|ssa, 1: sia+ssa 2: ssa vel. fraction
+    calc_diffusivity    = False           ! Calculate 2D diffusivity term for diagnostics
+    m_drag              = 3.0             ! Dragging law exponent 
+    beta_max            = 1e20            ! [Pa a m-1] Maximum value of beta for which ssa should be calculated 
+    beta_method         = 1               ! 0: constant beta; 1: power law; 2: effective pressure; 3: regularized Coulomb law, 4: pism power law
+    beta_gl_sep         = 0               !  -1: Apply subgrid treatment on ac-nodes (beta_gl_stag=2) 0: No subgrid treatment, 1: beta*f_grnd_aa        
+    beta_gl_scale       = 0               !  0: No scaling, 1: beta*f_beta_gl, 2: H_grnd linear scaling, 3: Zstar scaling 
+    beta_gl_stag        = 1               !  0: simple staggering, 1: Upstream beta at gl, 2: downstream, 3: f_grnd_ac scaling 
+    f_beta_gl           = 1.0             ! [-] Scaling of beta at the grounding line (for beta_gl_method=1)
+    taud_gl_method      = -1              !  0: binary, no subgrid, 1: Two-sided gradient
+    C_bed_method        = -1              ! -1: set externally; 0: cf_stream everywhere; 1: cf_stream/cf_frozen 
+    beta_const          = 1e3             ! [Pa a m−1] Constant value of basal friction coefficient to be used
+    H_grnd_lim          = 500.0           ! [m] For beta_sep_method=2, reduce beta linearly between H_grnd=0 and H_grnd_lim 
+    H_sed_sat           = 250.0           ! [m] Sediment thickness at which sediment effect is saturated
+    cf_frozen           = 100.0           ! [a m-1] Bed roughness coefficient, frozen 
+    cf_stream           = 20.0            ! [a m-1] Bed roughness coefficient, stream  
+    cf_fac_sed          = 1.0             ! [-] Scaling of roughness for sediments 
+    cf_sia              = 15.0            ! [m a-1 Pa-1] Bed roughness coefficient for SIA sliding
+    streaming_margin    = True            ! Impose cf_stream at the margin and grline independent of f_pmp
+    n_sm_beta           = 0               ! [-] Standard deviation in gridpoints for Gaussian smoothing of beta (0==no smoothing)
+    ssa_vel_max         = 5000.0          ! [m a-1] SSA velocity limit to avoid spurious results 
+    ssa_iter_max        = 10              ! Number of maximum allowed iterations over ssa to converge on vel. solution
+    ssa_iter_rel        = 0.7             ! [--] Relaxation fraction [0:1] to stabilize ssa iterations
+    ssa_iter_conv       = 1e-2            ! [--] L2 relative error convergence limit to exit ssa iterations
+
+/
+
+&ydyn_neff 
+    neff_method     = 0                 ! -1: external N_eff, 0: overburden pressure, 1: Leguy param., 2: Till pressure
+    neff_p          = 0.0               ! *neff_method=1* marine connectivity exponent (0: none, 1: full)
+    neff_use_water  = False             ! *neff_method=2* Use H_w field or parameterize it?
+    neff_w_max      = 2.0               ! [m]  *neff_method=2* Maximum allowed water layer thickness for Till pressure 
+    neff_N0         = 1000.0            ! [Pa] *neff_method=2* Reference effective pressure 
+    neff_delta      = 0.04              ! [--] *neff_method=2* Fraction of overburden pressure for saturated till
+    neff_e0         = 0.69              ! [--] *neff_method=2* Reference void ratio at N0 
+    neff_Cc         = 0.12              ! [--] *neff_method=2* Till compressibility    
+/
+
+&ydyn_till
+    till_phi_min    =  5                ! [degrees] Till friction angle, minimum
+    till_phi_max    = 20                ! [degrees] Till friction angle, maximum
+    till_phi_zmin   = 0.0               ! [m] Bedrock elevation for till_phi_min
+    till_phi_zmax   = 500.0             ! [m] Bedrock elevation for phi_max 
+/
+
+&ymat
+    flow_law                = "glen"
+    rf_method               = 0             ! -1: set externally; 0: rf_const everywhere; 1: standard function 
+    rf_const                = 3.1536e-18    ! 1e-25 [Pa^-3 s^-1] ==> 3.1536e-18 [Pa^-3 a^-1]
+    rf_use_eismint2         = False         ! Only applied for rf_method=1 
+    n_glen                  = 3.0 
+    visc_min                = 1e3 
+    use_2D_enh              = False 
+    enh_shear               = 1.0
+    enh_stream              = 1.0
+    enh_shlf                = 1.0
+
+    age_method              = "None"    ! "None", "expl", "impl"
+    age_impl_kappa          = 1.5       ! [m2 a-1] Artificial diffusion term for implicit age solving 
+
+/
+
+&ytherm
+    method         = "fixed"            ! "fixed", "robin", "active"
+    cond_bed       = False              ! True for active conductive bedrock (ie, Q_geo)
+    gamma          = 1.0                ! [K] Scalar for the pressure melting point decay function 
+    nzr            = 11                 ! [-] Number of vertical grid points in bedrock 
+    H_rock         = 6000.0             ! [m] Vertical grid step in bedrock 
+    use_strain_sia = False              ! True: calculate strain heating from SIA approx.
+    use_const_cp   = True               ! Use specified constant value of heat capacity?
+    const_cp       = 2009.0             ! [J kg-1 K-1] Specific heat capacity 
+    use_const_kt   = True               ! Use specified constant value of heat conductivity?
+    const_kt       = 6.62e7             ! [J a-1 m-1 K-1] Thermal conductivity [W m-1 K-1 * sec_year] => [J a-1 m-1 K-1]
+    kt_m           = 1.0e8              ! [J a-1 m-1 K-1] Thermal conductivity of the mantle (lithosphere)
+    cp_m           = 1000.0             ! [J kg-1 K-1] Specific heat capacity of the mantle (lithosphere)
+    rho_m          = 2000.0             ! [kg m-3] Density of the mantle (lithosphere)
+
+/
+
+&yelmo_masks
+    basins_load   = False 
+    basins_path   = "none" 
+    basins_nms    = "basin" "basin_mask"
+    regions_load  = False 
+    regions_path  = "none"
+    regions_nms   = "mask" "None"
+/

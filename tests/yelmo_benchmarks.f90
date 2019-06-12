@@ -9,6 +9,7 @@ program yelmo_benchmarks
     use deformation 
 
     use ice_benchmarks 
+    use mismip3D 
 
     implicit none 
 
@@ -236,7 +237,18 @@ program yelmo_benchmarks
             ! Update topography to match exact solution to start 
             yelmo1%tpo%now%H_ice  = buel%H_ice
             yelmo1%tpo%now%z_srf  = yelmo1%bnd%z_bed + yelmo1%tpo%now%H_ice
-            
+        
+        case("mismip") 
+
+            ! Make sure beta is defined externally and law is compatible 
+            yelmo1%dyn%par%C_bed_method = -1
+            yelmo1%dyn%par%beta_method  =  1 
+            yelmo1%dyn%par%m_drag       =  3.0 
+
+            ! Initialize mismip boundary values 
+            call mismip3D_boundaries(yelmo1%bnd%T_srf,yelmo1%bnd%smb,yelmo1%bnd%Q_geo,yelmo1%dyn%now%C_bed, &
+                        yelmo1%grd%x*1e-3,yelmo1%grd%y*1e-3,x_gl=800.0,experiment="Stnd")
+
         case DEFAULT 
             ! EISMINT 
 
@@ -321,10 +333,16 @@ program yelmo_benchmarks
 
             case("HALFAR-MED")
 
-            ! Initialize BUELER-B (but with conditions between Bueler-B and HALFAR - not too big, not too small)
-            call bueler_test_BC(buel%H_ice,buel%mbal,buel%u_b,yelmo1%grd%x,yelmo1%grd%y, &
-                        time=time,R0=200.0_prec,H0=3000.0_prec,lambda=0.0_prec,n=3.0_prec,A=1e-16_prec,rho_ice=rho_ice,g=g)
-              
+                ! Initialize BUELER-B (but with conditions between Bueler-B and HALFAR - not too big, not too small)
+                call bueler_test_BC(buel%H_ice,buel%mbal,buel%u_b,yelmo1%grd%x,yelmo1%grd%y, &
+                            time=time,R0=200.0_prec,H0=3000.0_prec,lambda=0.0_prec,n=3.0_prec,A=1e-16_prec,rho_ice=rho_ice,g=g)
+            
+            case("mismip") 
+            
+                ! Initialize mismip boundary values 
+                call mismip3D_boundaries(yelmo1%bnd%T_srf,yelmo1%bnd%smb,yelmo1%bnd%Q_geo,yelmo1%dyn%now%C_bed, &
+                            yelmo1%grd%x*1e-3,yelmo1%grd%y*1e-3,x_gl=800.0,experiment="Stnd")
+
             case DEFAULT 
 
                 call eismint_boundaries(yelmo1%bnd%T_srf,yelmo1%bnd%smb,yelmo1%bnd%Q_geo, &

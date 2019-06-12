@@ -1,7 +1,7 @@
 &mismip
 
     domain       = "MISMIP3D"           ! "MISMIP3D"
-    experiment   = "Stnd"               ! "Stnd", "RF"
+    experiment   = "RF"                 ! "Stnd", "RF"
     dx           =  20.0                ! [km] Grid resolution (EISMINT1 = 50km, EISMINT2 = 25km)
 
     ! Timing parameters 

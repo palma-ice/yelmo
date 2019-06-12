@@ -15,7 +15,7 @@ module grounding_line_flux
 contains 
 
     subroutine calc_grounding_line_flux(qq_gl_acx,qq_gl_acy,H_ice,ATT_bar,C_bed,ux_bar,uy_bar, &
-                                            f_grnd,f_grnd_acx,f_grnd_acy,n_glen,m_drag,Q0,f_drag)
+                                            f_grnd,f_grnd_acx,f_grnd_acy,n_glen,m_drag,Q0,f_drag,gl_flux_method)
 
         implicit none 
 
@@ -33,14 +33,13 @@ contains
         real(prec), intent(IN)  :: m_drag               ! [--] Power law exponent
         real(prec), intent(IN)  :: Q0                   ! [?] Scaling coefficient, in the range of 0.60-0.65
         real(prec), intent(IN)  :: f_drag               ! [--] Dragging coefficient, f_drag ~ 0.6 
+        character(len=*), intent(IN) :: gl_flux_method  ! "power" or "coulomb" method 
 
         ! Local variables
         integer    :: i, j, nx, ny
         logical    :: is_gl, float_right, float_left   
         real(prec) :: H_gl, A_gl, C_bed_gl, qq_gl    
         real(prec) :: qq_left, qq_right, H_now, f_lin
-
-        character(len=56), parameter :: gl_flux_method = "power" 
 
         nx = size(H_ice,1)
         ny = size(H_ice,2) 
@@ -112,7 +111,7 @@ contains
                 qq_gl = sign(qq_gl,ux_bar(i,j))
 
                 ! 3. Interpolate prescribed gl-flux to ac-nodes to the left and right of gl. ==
-
+                
                 if (f_grnd_acx(i,j) .lt. 0.5) then 
                     ! Grounding line is between acx(i,j) and acx(i-1,j), so 
                     ! it should be interpolated to those two points
@@ -198,17 +197,13 @@ contains
         real(prec) :: qq_gl                             ! [m2 / a] Grounding-line flux 
         
         ! Local variables 
-        real(prec) :: density_factor
         real(prec) :: m_inv 
 
         ! Invert m_drag to be consistent with the Schoof (2007) formulation 
         m_inv = 1.0 / m_drag 
 
-        ! Calculate constant density factor 
-        density_factor = (1.0 - rho_ice/rho_sw)**n_glen
-
         ! Calculate grounding line flux following Tsai et al. (2015), Eq. 38
-        qq_gl = ( A_gl * (rho_ice*g)**(n_glen+1.0) * density_factor / ((4.0**n_glen)*C_bed) ) **(1.0/(m_inv+1.0)) & 
+        qq_gl = ( A_gl * (rho_ice*g)**(n_glen+1.0) * (1.0 - rho_ice/rho_sw)**n_glen / ((4.0**n_glen)*C_bed) ) **(1.0/(m_inv+1.0)) & 
                                  * H_gl**( (m_inv+n_glen+3.0)/(m_inv+1.0) )
 
         return 
@@ -228,15 +223,9 @@ contains
         real(prec), intent(IN)  :: f_drag               ! [--] Dragging coefficient, f_drag ~ 0.6 
         real(prec) :: qq_gl                             ! [m2 / a] Grounding-line flux 
         
-        ! Local variables 
-        real(prec) :: density_factor
-
-        ! Calculate constant density factor 
-        density_factor = (1.0 - rho_ice/rho_sw)**(n_glen-1.0)
-
         ! Calculate grounding line flux following Tsai et al. (2015), Eq. 38
         qq_gl = Q0 * 8.0 * A_gl * (rho_ice*g)**n_glen / ((4.0**n_glen)*f_drag) & 
-                                * density_factor * H_gl**(n_glen+2.0)
+                                * (1.0 - rho_ice/rho_sw)**(n_glen-1.0) * H_gl**(n_glen+2.0)
 
         return 
 

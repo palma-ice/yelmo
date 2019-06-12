@@ -194,7 +194,6 @@ module yelmo_defs
         character(len=256) :: boundaries 
         logical    :: use_ssa                    ! Should ssa be used? 
         logical    :: use_bmb                    ! Set to match `use_bmb` in ytopo_param_class 
-        real(prec) :: n_glen                     ! Flow law exponent (n_glen=3)
         integer    :: nx, ny, nz_aa, nz_ac 
         real(prec) :: dx, dy
         real(prec), allocatable :: zeta_aa(:)   ! Layer centers (aa-nodes), plus base and surface: nz_aa points 

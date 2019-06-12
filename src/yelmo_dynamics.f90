@@ -803,8 +803,8 @@ if (.FALSE.) then
 
             ! Calculate the analytical grounding-line flux 
             call calc_grounding_line_flux(dyn%now%qq_gl_acx,dyn%now%qq_gl_acy,tpo%now%H_ice,mat%now%ATT_bar, &
-                                    dyn%now%C_bed,dyn%now%ux_b,dyn%now%uy_b,tpo%now%f_grnd,tpo%now%f_grnd_acx, &
-                                    tpo%now%f_grnd_acy,dyn%par%n_glen,dyn%par%m_drag,Q0=0.61,f_drag=0.6)
+                        dyn%now%C_bed,dyn%now%ux_b,dyn%now%uy_b,tpo%now%f_grnd,tpo%now%f_grnd_acx,tpo%now%f_grnd_acy, &
+                        mat%par%n_glen,dyn%par%m_drag,Q0=0.61,f_drag=0.6,gl_flux_method="coulomb")
 
             ! Where qq_gl is present, prescribe velocity and set mask to -1
 
@@ -821,9 +821,9 @@ if (.FALSE.) then
                 if (dyn%now%qq_gl_acx(i,j) .ne. 0.0 .and. H_mid .gt. 0.0) then 
                     ! Prescribe velocity at this point 
 
-!                     if (j == 5) then 
-!                         write(*,*) "qq_gl", dyn%now%qq_gl_acx(i,j), dyn%now%ux_b(i,j), dyn%now%qq_gl_acx(i,j) / H_mid
-!                     end if 
+                    if (j == 3) then 
+                        write(*,*) "glf", dyn%now%qq_gl_acx(i,j), dyn%now%ux_b(i,j), dyn%now%qq_gl_acx(i,j) / H_mid
+                    end if 
                     
                     dyn%now%ux_b(i,j) = dyn%now%qq_gl_acx(i,j) / H_mid 
                     dyn%now%ssa_mask_acx(i,j) = -1

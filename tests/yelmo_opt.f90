@@ -136,14 +136,14 @@ program yelmo_test
     call yelmo_write_init(yelmo1,file2D,time_init=0.0,units="years")  
     call write_step_2D_opt(yelmo1,file2D,time=0.0,dCbed=dCbed,phi=phi)  
 
-    ! Initially assume we are working with topo_fixed...
+    ! Initially assume we are working with topo_fixed... (only for optimizing velocity)
     topo_fixed = .TRUE. 
     
     ! Perform loops over beta:
     ! update beta, calculate topography and velocity for 100 years, get error, try again
     do q = 1, qmax 
 
-        ! Determine whether this iteration maintains topo_fixed conditions
+        ! Determine whether this iteration maintains topo_fixed conditions (only for optimizing velocity)
         if (q .gt. qmax_topo_fixed) topo_fixed = .FALSE. 
 
         ! Reset topography to initial state 
@@ -439,6 +439,10 @@ end if
         end do 
         end do 
 
+        ! Additionally, apply a Gaussian filter to C_bed to ensure smooth transitions 
+        call filter_gaussian(var=C_bed,sigma=64.0,dx=dx) !, &
+                                !mask=err_z_srf .ne. 0.0)
+        
         dCbed = C_bed - C_bed_prev
 
         return 

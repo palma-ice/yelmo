@@ -151,8 +151,8 @@ program yelmo_test
         yelmo1%tpo%now%z_srf = yelmo1%dta%pd%z_srf 
 
         ! Update C_bed based on error correction
-        call update_C_bed_thickness(yelmo1%dyn%now%C_bed,dCbed,phi,yelmo1%dta%pd%err_z_srf, &
-                                    yelmo1%tpo%now%H_ice,yelmo1%tpo%par%dx,phi_min,phi_max,yelmo1%dyn%par%cf_stream)
+        call update_C_bed_thickness(yelmo1%dyn%now%C_bed,dCbed,phi,yelmo1%dta%pd%err_z_srf,yelmo1%tpo%now%H_ice, &
+                    yelmo1%dyn%now%ux_bar,yelmo1%dyn%now%uy_bar,yelmo1%tpo%par%dx,phi_min,phi_max,yelmo1%dyn%par%cf_stream)
 
         ! Run model for time_iter yrs with this C_bed configuration (no change in boundaries)
         call yelmo_update_equil(yelmo1,time,time_tot=time_iter,topo_fixed=topo_fixed,dt=5.0,ssa_vel_max=5000.0)
@@ -348,7 +348,7 @@ contains
 
     end subroutine guess_C_bed
 
-    subroutine update_C_bed_thickness(C_bed,dCbed,phi,err_z_srf,H_ice,dx,phi_min,phi_max,cf_stream)
+    subroutine update_C_bed_thickness(C_bed,dCbed,phi,err_z_srf,H_ice,ux,uy,dx,phi_min,phi_max,cf_stream)
 
         implicit none 
 
@@ -357,14 +357,17 @@ contains
         real(prec), intent(INOUT) :: phi(:,:) 
         real(prec), intent(IN)    :: err_z_srf(:,:) 
         real(prec), intent(IN)    :: H_ice(:,:) 
+        real(prec), intent(IN)    :: ux(:,:) 
+        real(prec), intent(IN)    :: uy(:,:) 
         real(prec), intent(IN)    :: dx 
         real(prec), intent(IN)    :: phi_min 
         real(prec), intent(IN)    :: phi_max 
         real(prec), intent(IN)    :: cf_stream 
 
         ! Local variables 
-        integer :: i, j, nx, ny
-        real(prec) :: dphi, f_dz 
+        integer :: i, j, nx, ny, i1, j1 
+        real(prec) :: dphi, f_dz
+        real(prec) :: ux_aa, uy_aa  
         real(prec), allocatable   :: C_bed_prev(:,:) 
 
         real(prec), parameter :: dphi_min  = -0.5       ! [degrees]
@@ -379,8 +382,8 @@ contains
         ! Store initial C_bed solution 
         C_bed_prev = C_bed 
 
-        do j = 1, ny 
-        do i = 1, nx 
+        do j = 2, ny-1 
+        do i = 2, nx-1 
 
             if (err_z_srf(i,j) .ne. 0.0) then 
                 ! Update where elevation error exists
@@ -389,12 +392,44 @@ contains
                 f_dz = max(f_dz, dphi_min)
                 f_dz = min(f_dz, dphi_max)
 
-                dphi = f_dz 
+                dphi      = f_dz 
                 phi(i,j)  = phi(i,j) + dphi 
                 phi(i,j)  = max(phi(i,j),phi_min)
                 phi(i,j)  = min(phi(i,j),phi_max)
 
                 C_bed(i,j) = cf_stream*tan(phi(i,j)*pi/180.0)
+
+                ! Also apply change downstream (this may overlap with other changes)
+
+                ux_aa = 0.5*(ux(i,j)+ux(i+1,j))
+                uy_aa = 0.5*(uy(i,j)+uy(i,j+1))
+                
+                if ( abs(ux_aa) .gt. abs(uy_aa) ) then 
+                    ! Downstream in x-direction 
+                    j1 = j 
+                    if (ux_aa .lt. 0.0) then 
+                        i1 = i-1 
+                    else
+                        i1 = i+1 
+                    end if 
+
+                else 
+                    ! Downstream in y-direction 
+                    i1 = i 
+                    if (uy_aa .lt. 0.0) then 
+                        j1 = j-1 
+                    else
+                        j1 = j+1 
+                    end if 
+
+                end if 
+
+                dphi        = f_dz 
+                phi(i1,j1)  = phi(i1,j1) + dphi 
+                phi(i1,j1)  = max(phi(i1,j1),phi_min)
+                phi(i1,j1)  = min(phi(i1,j1),phi_max)
+
+                C_bed(i1,j1) = cf_stream*tan(phi(i1,j1)*pi/180.0)
 
             end if 
 

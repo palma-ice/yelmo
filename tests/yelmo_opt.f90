@@ -384,14 +384,22 @@ contains
 
         real(prec), allocatable   :: C_bed_prev(:,:) 
 
-        real(prec), parameter :: dphi_min  = -0.5       ! [degrees]
-        real(prec), parameter :: dphi_max  =  1.0       ! [degrees]
-        real(prec), parameter :: err_z_fac = 100.0      ! [m] 
+        real(prec) :: dphi_min  
+        real(prec) :: dphi_max 
+        real(prec) :: err_z_fac
+        real(prec) :: f_relax  
 
         nx = size(C_bed,1)
         ny = size(C_bed,2) 
 
         allocate(C_bed_prev(nx,ny))
+
+        ! Optimization parameters 
+        dphi_min  = -0.5       ! [degrees] maximum rate of change (negative)
+        dphi_max  =  1.0       ! [degrees] maximum rate of change (positive)
+        err_z_fac = 100.0      ! [m]       Elevation-error scale for maximum
+
+        f_relax   = 0.0 
 
         ! Store initial C_bed solution 
         C_bed_prev = C_bed 
@@ -401,6 +409,11 @@ contains
             zsrf_rmse = sqrt(sum(err_z_srf**2)/count(err_z_srf .ne. 0.0))
         else 
             zsrf_rmse = 0.0 
+        end if 
+
+        if (zsrf_rmse .lt. 80.0) then 
+            ! Slow down the optimization to reduce waves, if we are near the solution
+            err_z_fac = 200.0 
         end if 
 
         do j = 2, ny-1 
@@ -461,9 +474,14 @@ end if
         end do 
 
         ! Additionally, apply a Gaussian filter to C_bed to ensure smooth transitions
-        dx_km = dx*1e-3  
-        call filter_gaussian(var=C_bed,sigma=64.0,dx=dx_km)     !,mask=err_z_srf .ne. 0.0)
+!         dx_km = dx*1e-3  
+!         call filter_gaussian(var=C_bed,sigma=64.0,dx=dx_km)     !,mask=err_z_srf .ne. 0.0)
         
+        ! Get new solution as a relaxation with old solution 
+        C_bed = f_relax*C_bed_prev + (1.0-f_relax)*C_bed 
+
+
+        ! Diagnose current rate of change of C_bed 
         dCbed = C_bed - C_bed_prev
 
         return 

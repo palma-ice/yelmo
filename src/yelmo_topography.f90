@@ -150,6 +150,15 @@ contains
 
             end if 
 
+            ! Apply special case for symmetric EISMINT domain when basal sliding is active
+            ! (ensure summit thickness does not grow disproportionately)
+            if (trim(tpo%par%boundaries) .eq. "EISMINT" .and. maxval(dyn%now%uxy_b) .gt. 0.0) then 
+                i = (tpo%par%nx-1)/2 
+                j = (tpo%par%ny-1)/2
+                tpo%now%H_ice(i,j) = (tpo%now%H_ice(i-1,j)+tpo%now%H_ice(i+1,j) &
+                                        +tpo%now%H_ice(i,j-1)+tpo%now%H_ice(i,j+1)) / 4.0 
+            end if  
+
             ! Determine the rate of change of ice thickness [m/a]
             tpo%now%dHicedt = (tpo%now%H_ice - tpo%now%dHicedt)/dt
 

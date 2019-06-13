@@ -1413,11 +1413,6 @@ end if
         allocate(now%ssa_mask_acx(nx,ny)) 
         allocate(now%ssa_mask_acy(nx,ny)) 
         
-        allocate(now%gfa1(nx,ny)) 
-        allocate(now%gfa2(nx,ny)) 
-        allocate(now%gfb1(nx,ny)) 
-        allocate(now%gfb2(nx,ny)) 
-        
         ! Set all variables to zero intially
         now%ux                = 0.0 
         now%uy                = 0.0 
@@ -1551,7 +1546,7 @@ end if
         
         if (allocated(now%C_bed))           deallocate(now%C_bed) 
         
-        if (allocated(now%N_eff))      deallocate(now%N_eff)
+        if (allocated(now%N_eff))           deallocate(now%N_eff)
         
         if (allocated(now%beta_acx))        deallocate(now%beta_acx) 
         if (allocated(now%beta_acy))        deallocate(now%beta_acy) 

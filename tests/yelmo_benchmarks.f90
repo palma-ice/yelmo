@@ -338,7 +338,7 @@ program yelmo_benchmarks
                             time=time,R0=200.0_prec,H0=3000.0_prec,lambda=0.0_prec,n=3.0_prec,A=1e-16_prec,rho_ice=rho_ice,g=g)
             
             case("mismip") 
-            
+
                 ! Initialize mismip boundary values 
                 call mismip3D_boundaries(yelmo1%bnd%T_srf,yelmo1%bnd%smb,yelmo1%bnd%Q_geo,yelmo1%dyn%now%C_bed, &
                             yelmo1%grd%x*1e-3,yelmo1%grd%y*1e-3,x_gl=800.0,experiment="Stnd")
@@ -557,16 +557,7 @@ contains
                       dim1="xc",dim2="yc",dim3="zeta",dim4="time",start=[1,1,1,n],ncid=ncid)
 
         ! == yelmo_dynamics ==
-
-        call nc_write(filename,"gfa1",ylmo%dyn%now%gfa1,units="1",long_name="SSA helper mask", &
-                      dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-        call nc_write(filename,"gfa2",ylmo%dyn%now%gfa2,units="1",long_name="SSA helper mask", &
-                      dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-        call nc_write(filename,"gfb1",ylmo%dyn%now%gfb1,units="1",long_name="SSA helper mask", &
-                      dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-        call nc_write(filename,"gfb2",ylmo%dyn%now%gfb2,units="1",long_name="SSA helper mask", &
-                      dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-
+        
         call nc_write(filename,"ssa_mask_acx",ylmo%dyn%now%ssa_mask_acx,units="1",long_name="SSA mask (acx)", &
                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
         call nc_write(filename,"ssa_mask_acy",ylmo%dyn%now%ssa_mask_acy,units="1",long_name="SSA mask (acy)", &

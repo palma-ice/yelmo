@@ -32,7 +32,6 @@ program yelmo_mismip
     real(prec) :: ATT_time, ATT_dt 
     logical    :: is_converged, exit_loop 
     real(prec) :: err  
-    real(prec), allocatable :: ux_bar_prev(:,:), uy_bar_prev(:,:) 
 
     real(4) :: start, finish
 
@@ -131,10 +130,6 @@ program yelmo_mismip
         yelmo1%mat%par%rf_const = ATT_values(q_att)
     end if 
 
-    ! Allocate extra grid vars 
-    allocate(ux_bar_prev(yelmo1%grd%nx,yelmo1%grd%ny))
-    allocate(uy_bar_prev(yelmo1%grd%nx,yelmo1%grd%ny))
-
     ! Load boundary values
 
     yelmo1%bnd%z_sl     = 0.0
@@ -170,9 +165,7 @@ program yelmo_mismip
     x_gl      = find_x_gl(yelmo1%grd%x*1e-3,yelmo1%grd%y*1e-3,yelmo1%tpo%now%H_grnd)
     call write_step_2D(yelmo1,file2D,time=time,x_gl=x_gl) 
 
-    ! Assign unrealistic previous values 
-    ux_bar_prev = 1e8
-    uy_bar_prev = 1e8
+    ! Set exit to false
     exit_loop   = .FALSE. 
 
     ! Advance timesteps

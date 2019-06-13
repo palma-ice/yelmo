@@ -271,11 +271,6 @@ module yelmo_defs
 
         integer,    allocatable :: ssa_mask_acx(:,:) 
         integer,    allocatable :: ssa_mask_acy(:,:) 
-
-        integer,    allocatable :: gfa1(:,:) 
-        logical,    allocatable :: gfa2(:,:) 
-        logical,    allocatable :: gfb1(:,:) 
-        logical,    allocatable :: gfb2(:,:) 
         
     end type
 

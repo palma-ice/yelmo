@@ -161,7 +161,7 @@ contains
         integer    :: ncid, n
         real(prec) :: time_prev 
 
-        real(prec) :: uxy_rmse, H_rmse 
+        real(prec) :: uxy_rmse, H_rmse, loguxy_rmse 
         real(prec), allocatable :: tmp(:,:) 
 
         allocate(tmp(ylmo%grd%nx,ylmo%grd%ny))
@@ -195,10 +195,20 @@ contains
         else
             uxy_rmse = mv
         end if 
+
+        tmp = abs(ylmo%dyn%now%uxy_s-ylmo%dta%pd%uxy_s)
+        where(tmp .gt. 0.0) tmp = log(tmp) 
+        if (n .gt. 1 .or. count(tmp .ne. 0.0) .gt. 0) then 
+            loguxy_rmse = sqrt(sum(tmp**2)/count(tmp .ne. 0.0))
+        else
+            loguxy_rmse = mv
+        end if 
         
         call nc_write(filename,"rmse_H",H_rmse,units="m",long_name="RMSE - Ice thickness", &
                       dim1="time",start=[n],count=[1],ncid=ncid)
         call nc_write(filename,"rmse_uxy",uxy_rmse,units="m/a",long_name="RMSE - Surface velocity", &
+                      dim1="time",start=[n],count=[1],ncid=ncid)
+        call nc_write(filename,"rmse_uxy_log",loguxy_rmse,units="m/a",long_name="RMSE - Log surface velocity", &
                       dim1="time",start=[n],count=[1],ncid=ncid)
         
         ! == ISMIP6 specific variables 

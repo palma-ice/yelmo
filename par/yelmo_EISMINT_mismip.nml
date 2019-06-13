@@ -1,13 +1,10 @@
 &eismint
 
     domain       = "EISMINT"             ! "EISMINT"
-    experiment   = "mismip"              ! "fixed", "moving", "mismip", "EXPA", "EXPB", "EXPF","BUELER-A", "BUELER-B", "HALFAR", "HALFAR-MED"
+    experiment   = "linear"              ! "linear", "overdeepened", "flat"
     dx           = 50.0                  ! [km] Grid resolution (EISMINT1 = 50km, EISMINT2 = 25km)
     with_ssa     = True                  ! Include ssa in experiment?
-    topo_fixed   = False                 ! Calculate the topography, or use Heiko's topo file.  
-    dyn_fixed    = False                 ! Fix dynamics after first calculation? 
-    topo_fixed_file = /Users/robinson/models/EURICE/yelmo/tests/heiko_imau-ice_help_fields_eismint_M_200kyr.nc
-
+    
     ! Timing parameters 
     time_init    = 0.0                  ! [yr] Starting time 
     time_end     = 100e3                ! [yr] Ending time 

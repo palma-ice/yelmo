@@ -111,7 +111,7 @@ contains
 
         select case(trim(boundaries))
 
-            case("zeros","EISMINT")
+            case("zeros")
 
                 ! Set border values to zero
                 H_ice(1,:)  = 0.0
@@ -119,6 +119,14 @@ contains
                 H_ice(:,1)  = 0.0
                 H_ice(:,ny) = 0.0
 
+            case("EISMINT")
+
+                ! Set border values to zero
+                H_ice(1,:)  = 0.0
+                H_ice(nx,:) = 0.0
+                H_ice(:,1)  = 0.0
+                H_ice(:,ny) = 0.0
+                
             case("MISMIP3D")
 
                 ! === MISMIP3D =====

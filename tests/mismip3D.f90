@@ -10,6 +10,7 @@ module mismip3D
     public :: mismip3D_topo_init
     public :: mismip3D_boundaries
     public :: find_x_gl
+    public :: find_x_gl_2D 
 
 contains 
 
@@ -101,13 +102,15 @@ contains
 
         select case(trim(experiment))
 
-            case("Stnd")
+            case("Stnd","Stnd-0.3")
 
                 ! Surface temperature 
                 T_srf = T0 
 
                 ! Surface mass balance 
                 smb = 0.5    ! [m/a]
+
+                if (trim(experiment) .eq. "Stnd-0.3") smb = 0.3   ! [m/a] 
 
                 ! Geothermal heat flux 
                 ghf = 42.0   ! [mW/m2]
@@ -207,6 +210,60 @@ contains
         return 
         
     end function find_x_gl 
+
+    subroutine find_x_gl_2D(x_gl,x_gl_std,xx,yy,f_grnd)
+        ! Find the position of the grounding line in the x-direction 
+        implicit none 
+
+        real(prec), intent(OUT) :: x_gl
+        real(prec), intent(OUT) :: x_gl_std 
+        real(prec), intent(IN)  :: xx(:,:) 
+        real(prec), intent(IN)  :: yy(:,:) 
+        real(prec), intent(IN)  :: f_grnd(:,:) 
+        
+        ! Local variables 
+        integer :: i, j, nx, ny 
+        integer :: n_gl  
+
+        real(prec), allocatable :: x_gl_2D(:,:) 
+
+        nx = size(xx,1)
+        ny = size(xx,2) 
+
+        allocate(x_gl_2D(nx,ny))
+        x_gl_2D = 0.0 
+
+        do j = 1, ny 
+        do i = 1, nx 
+
+            if (f_grnd(i,j) .gt. 0.0 .and. &
+                    count(f_grnd(i-1:i+1,j-1:j+1) .eq. 0.0) .gt. 0) then 
+                ! Grounding line point 
+
+                x_gl_2D(i,j) = sqrt(xx(i,j)**2+yy(i,j)**2)
+
+            end if 
+
+        end do 
+        end do 
+
+        n_gl = count(x_gl_2D .gt. 0.0) 
+
+        if (n_gl .gt. 0.0) then 
+
+            x_gl     = sum(x_gl_2D,mask=x_gl_2D.gt.0.0) / real(n_gl,prec)
+            x_gl_std = sqrt(sum((x_gl_2D-x_gl)**2,mask=x_gl_2D.gt.0.0)) / real(n_gl,prec)
+
+        else 
+
+            x_gl     = 0.0 
+            x_gl_std = 0.0 
+
+        end if 
+
+        return 
+        
+    end subroutine find_x_gl_2D 
 
 end module mismip3D 
 

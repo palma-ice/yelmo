@@ -1153,8 +1153,11 @@ contains
                 ! Set C_bed according to bed elevation and or temperate, etc. (experimental)
 
                 ! First set C_bed == cf_stream everywhere 
-                dyn%now%C_bed = dyn%par%cf_stream 
+                !dyn%now%C_bed = dyn%par%cf_stream 
+                dyn%now%C_bed = (thrm%now%f_pmp)*dyn%par%cf_stream &
+                            + (1.0_prec - thrm%now%f_pmp)*dyn%par%cf_frozen
 
+                
                 ! Next, apply lambda functions [0:1] to reduce friction
                 !  where appropriate 
 
@@ -1163,7 +1166,7 @@ contains
 
                     ! Scale C_bed as a function bedrock elevation relative to sea level
                     f_scale = exp( (bnd%z_bed(i,j) - dyn%par%C_bed_z1) / (dyn%par%C_bed_z1 - dyn%par%C_bed_z0) )
-                    if (f_scale .gt. 1.0) f_scale = 1.0 
+                    if (f_scale .gt. 1.0) f_scale = 1.0
                     dyn%now%C_bed(i,j) = dyn%now%C_bed(i,j) * f_scale 
 
                 end do 
@@ -1174,6 +1177,36 @@ contains
 
                 dyn%now%C_bed = calc_C_bed_till_linear(bnd%z_bed,bnd%z_sl,dyn%par%till_phi_min,dyn%par%till_phi_max, &
                                                         dyn%par%till_phi_zmin,dyn%par%till_phi_zmax)
+
+
+            case(4)
+                    ! Set C_bed according to bed elevation (but linearly, no as in case 2)
+
+                ! First set C_bed == cf_stream everywhere 
+                !dyn%now%C_bed = dyn%par%cf_stream 
+                dyn%now%C_bed = (thrm%now%f_pmp)*dyn%par%cf_stream &
+                            + (1.0_prec - thrm%now%f_pmp)*dyn%par%cf_frozen
+
+
+                ! Next, apply a linear  functions [0:1] to reduce friction
+                !  where appropriate 
+
+                do j = 1, ny
+                do i = 1, nx
+
+                    ! Scale C_bed as a function bedrock elevation relative to sea level
+                    ! The equations is Cbed = ((Cmax - Cmin)/(z1 -z0)) * (z - z0) + Cmin 
+                    
+                    dyn%now%C_bed(i,j) =(dyn%par%C_bed_max - dyn%par%C_bed_min) * (bnd%z_bed(i,j) - dyn%par%C_bed_z0)
+                    dyn%now%C_bed(i,j) = dyn%now%C_bed(i,j) / (dyn%par%C_bed_z1 - dyn%par%C_bed_z0) 
+                    dyn%now%C_bed(i,j) = dyn%now%C_bed(i,j) + dyn%par%C_bed_min 
+
+                    if (bnd%z_bed(i,j) .gt. dyn%par%C_bed_z1) dyn%now%C_bed(i,j) = dyn%par%C_bed_max
+                    if (bnd%z_bed(i,j) .lt. dyn%par%C_bed_z0) dyn%now%C_bed(i,j) = dyn%par%C_bed_min
+
+                end do
+                end do
+
 
             case DEFAULT 
                 ! Not recognized 
@@ -1281,6 +1314,8 @@ contains
         call nml_read(filename,"ydyn","C_bed_method",       par%C_bed_method,       init=init_pars)
         call nml_read(filename,"ydyn","C_bed_z0",           par%C_bed_z0,           init=init_pars)
         call nml_read(filename,"ydyn","C_bed_z1",           par%C_bed_z1,           init=init_pars)
+        call nml_read(filename,"ydyn","C_bed_min",          par%C_bed_min,           init=init_pars)
+        call nml_read(filename,"ydyn","C_bed_max",          par%C_bed_max,           init=init_pars)        
         call nml_read(filename,"ydyn","cf_frozen",          par%cf_frozen,          init=init_pars)
         call nml_read(filename,"ydyn","cf_stream",          par%cf_stream,          init=init_pars)
         call nml_read(filename,"ydyn","cf_fac_sed",         par%cf_fac_sed,         init=init_pars)

@@ -65,8 +65,8 @@ program yelmo_test
 
     ! Prescribe key parameters here that should be set for beta optimization exercise 
     yelmo1%dyn%par%C_bed_method      = -1       ! C_Bed is set external to yelmo calculations
-    yelmo1%mat%par%rf_method         = 0        ! Constant rate factor (no thermodynamics)
-    yelmo1%mat%par%rf_const          = 1e-17    ! [Pa^-3 a^-1]
+!     yelmo1%mat%par%rf_method         = 0        ! Constant rate factor (no thermodynamics)
+!     yelmo1%mat%par%rf_const          = 1e-17    ! [Pa^-3 a^-1]
 !     yelmo1%thrm%par%method           = "fixed"  ! No thermodynamics calculations 
 
     yelmo1%dyn%par%beta_method       = 3        ! 0: constant beta; 1: power law; 2: effective pressure; 3: regularized Coulomb law, 4: pism power law
@@ -105,7 +105,7 @@ program yelmo_test
     allocate(channels(yelmo1%grd%nx,yelmo1%grd%ny))
 
     ! Set initial guess of C_bed as a function of present-day velocity 
-    call guess_C_bed(yelmo1%dyn%now%C_bed,phi,yelmo1%dta%pd%uxy_s,phi_min,phi_max,yelmo1%dyn%par%cf_stream)
+    call guess_C_bed(yelmo1%dyn%now%C_bed,phi,yelmo1%dta%pd%uxy_s,phi_min,0.5*phi_max,yelmo1%dyn%par%cf_stream)
 
     ! Initialize state variables (dyn,therm,mat)
     ! (initialize temps with robin method with a cold base)
@@ -198,8 +198,10 @@ contains
         integer    :: ncid, n
         real(prec) :: time_prev 
 
+        real(prec) :: uxy_rmse, H_rmse, zsrf_rmse 
+        real(prec) :: rmse, err  
         real(prec), allocatable :: tmp(:,:) 
-        real(prec) :: rmse, err, npts  
+        
 
         allocate(tmp(ylmo%grd%nx,ylmo%grd%ny))
 
@@ -274,26 +276,36 @@ contains
         call nc_write(filename,"pd_err_z_srf_sm",tmp,units="m",long_name="Smooth surface elevation error (present day)", &
                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
         
-        ! Get cumulative error diagnostics (z_srf)
-        npts = ylmo%tpo%par%nx*ylmo%tpo%par%ny 
-        err  = sum(ylmo%dta%pd%err_z_srf) / real(npts,prec)
-        rmse = sqrt( sum(ylmo%dta%pd%err_z_srf**2) / real(npts,prec) ) 
+        ! initmip specific error metrics 
+        tmp = ylmo%tpo%now%H_ice-ylmo%dta%pd%H_ice
+        if (n .gt. 1 .or. count(tmp .ne. 0.0) .gt. 0) then 
+            H_rmse = sqrt(sum(tmp**2)/count(tmp .ne. 0.0))
+        else 
+            H_rmse = mv 
+        end if 
 
-        call nc_write(filename,"err_z_srf",err,units="m",long_name="Mean surface elevation error (present day)", &
-                      dim1="time",start=[n],ncid=ncid)
-        call nc_write(filename,"rmse_z_srf",rmse,units="m",long_name="Root mean square error (present day z_srf)", &
-                      dim1="time",start=[n],ncid=ncid)
+        tmp = ylmo%dyn%now%uxy_s-ylmo%dta%pd%uxy_s
+        if (n .gt. 1 .or. count(tmp .ne. 0.0) .gt. 0) then 
+            uxy_rmse = sqrt(sum(tmp**2)/count(tmp .ne. 0.0))
+        else
+            uxy_rmse = mv
+        end if 
         
-        ! Get cumulative error diagnostics (uxy_s)
-        npts = ylmo%tpo%par%nx*ylmo%tpo%par%ny 
-        err  = sum(ylmo%dta%pd%err_uxy_s) / real(npts,prec)
-        rmse = sqrt( sum(ylmo%dta%pd%err_uxy_s**2) / real(npts,prec) ) 
+        ! surface elevation too 
+        tmp = ylmo%dta%pd%err_z_srf
+        if (n .gt. 1 .or. count(tmp .ne. 0.0) .gt. 0) then 
+            zsrf_rmse = sqrt(sum(tmp**2)/count(tmp .ne. 0.0))
+        else 
+            zsrf_rmse = mv 
+        end if 
 
-        call nc_write(filename,"err_uxy_s",err,units="m a^-1",long_name="Mean surface velocity error (present day)", &
-                      dim1="time",start=[n],ncid=ncid)
-        call nc_write(filename,"rmse_uxy_s",rmse,units="m a^-1",long_name="Root mean square error (present day uxy_s)", &
-                      dim1="time",start=[n],ncid=ncid)
-        
+        call nc_write(filename,"rmse_H",H_rmse,units="m",long_name="RMSE - Ice thickness", &
+                      dim1="time",start=[n],count=[1],ncid=ncid)
+        call nc_write(filename,"rmse_uxy",uxy_rmse,units="m/a",long_name="RMSE - Surface velocity", &
+                      dim1="time",start=[n],count=[1],ncid=ncid)
+        call nc_write(filename,"rmse_zsrf",zsrf_rmse,units="m",long_name="RMSE - Surface elevation", &
+                      dim1="time",start=[n],count=[1],ncid=ncid)
+
         ! Close the netcdf file
         call nc_close(ncid)
 
@@ -367,7 +379,9 @@ contains
         ! Local variables 
         integer :: i, j, nx, ny, i1, j1 
         real(prec) :: dphi, f_dz
-        real(prec) :: ux_aa, uy_aa  
+        real(prec) :: ux_aa, uy_aa 
+        real(prec) :: zsrf_rmse 
+
         real(prec), allocatable   :: C_bed_prev(:,:) 
 
         real(prec), parameter :: dphi_min  = -0.5       ! [degrees]
@@ -381,6 +395,13 @@ contains
 
         ! Store initial C_bed solution 
         C_bed_prev = C_bed 
+
+        ! Calculate global rmse error 
+        if (count(err_z_srf .ne. 0.0) .gt. 0) then 
+            zsrf_rmse = sqrt(sum(err_z_srf**2)/count(err_z_srf .ne. 0.0))
+        else 
+            zsrf_rmse = 0.0 
+        end if 
 
         do j = 2, ny-1 
         do i = 2, nx-1 
@@ -440,8 +461,7 @@ end if
         end do 
 
         ! Additionally, apply a Gaussian filter to C_bed to ensure smooth transitions 
-!         call filter_gaussian(var=C_bed,sigma=64.0,dx=dx) !, &
-                                !mask=err_z_srf .ne. 0.0)
+        call filter_gaussian(var=C_bed,sigma=128.0,dx=dx)     !,mask=err_z_srf .ne. 0.0)
         
         dCbed = C_bed - C_bed_prev
 

@@ -195,7 +195,7 @@ contains
         else
             uxy_rmse = mv
         end if 
-
+        
         call nc_write(filename,"rmse_H",H_rmse,units="m",long_name="RMSE - Ice thickness", &
                       dim1="time",start=[n],count=[1],ncid=ncid)
         call nc_write(filename,"rmse_uxy",uxy_rmse,units="m/a",long_name="RMSE - Surface velocity", &

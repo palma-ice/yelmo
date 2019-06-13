@@ -399,7 +399,7 @@ contains
         dphi_max  =  1.0       ! [degrees] maximum rate of change (positive)
         err_z_fac = 100.0      ! [m]       Elevation-error scale for maximum
 
-        f_relax   = 0.0 
+        f_relax   = 0.7 
 
         ! Store initial C_bed solution 
         C_bed_prev = C_bed 
@@ -411,10 +411,10 @@ contains
             zsrf_rmse = 0.0 
         end if 
 
-        if (zsrf_rmse .lt. 80.0) then 
-            ! Slow down the optimization to reduce waves, if we are near the solution
-            err_z_fac = 200.0 
-        end if 
+!         if (zsrf_rmse .lt. 80.0) then 
+!             ! Slow down the optimization to reduce waves, if we are near the solution
+!             err_z_fac = 200.0 
+!         end if 
 
         do j = 2, ny-1 
         do i = 2, nx-1 

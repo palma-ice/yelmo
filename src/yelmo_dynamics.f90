@@ -1172,6 +1172,9 @@ contains
                 end do 
                 end do 
 
+                if (bnd%z_bed(i,j) .lt. dyn%par%C_bed_z0) dyn%now%C_bed(i,j) = dyn%par%C_bed_min
+
+
             case(3)
                 ! Set C_bed following tan(phi), and linear ramp between phi_min to phi_max with elevation
 

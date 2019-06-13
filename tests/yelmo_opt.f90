@@ -65,8 +65,8 @@ program yelmo_test
 
     ! Prescribe key parameters here that should be set for beta optimization exercise 
     yelmo1%dyn%par%C_bed_method      = -1       ! C_Bed is set external to yelmo calculations
-!     yelmo1%mat%par%rf_method         = 0        ! Constant rate factor (no thermodynamics)
-!     yelmo1%mat%par%rf_const          = 1e-17    ! [Pa^-3 a^-1]
+    yelmo1%mat%par%rf_method         = 0        ! Constant rate factor (no thermodynamics)
+    yelmo1%mat%par%rf_const          = 1e-17    ! [Pa^-3 a^-1]
 !     yelmo1%thrm%par%method           = "fixed"  ! No thermodynamics calculations 
 
     yelmo1%dyn%par%beta_method       = 3        ! 0: constant beta; 1: power law; 2: effective pressure; 3: regularized Coulomb law, 4: pism power law

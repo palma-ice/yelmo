@@ -1169,10 +1169,11 @@ contains
                     if (f_scale .gt. 1.0) f_scale = 1.0
                     dyn%now%C_bed(i,j) = dyn%now%C_bed(i,j) * f_scale 
 
-                end do 
-                end do 
 
-                if (bnd%z_bed(i,j) .lt. dyn%par%C_bed_z0) dyn%now%C_bed(i,j) = dyn%par%C_bed_min
+                    if (dyn%now%C_bed(i,j).lt.dyn%par%C_bed_min) dyn%now%C_bed(i,j) = dyn%par%C_bed_min
+  
+                end do 
+                end do 
 
 
             case(3)

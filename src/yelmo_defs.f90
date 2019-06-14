@@ -151,10 +151,10 @@ module yelmo_defs
         character(len=256) :: sia_solver 
         integer    :: mix_method            ! Method for mixing sia and ssa velocity solutions
         logical    :: calc_diffusivity      ! Calculate diagnostic diffusivity field
+        integer    :: beta_method
+        logical    :: beta_with_neff 
         real(prec) :: m_drag                ! Sliding law exponent (m==1: plastic)
         real(prec) :: u_0                   ! [m/a] Regularized coulomb friction velocity 
-        real(prec) :: beta_max              ! Maximum value of beta for which ssa should be calculated
-        integer    :: beta_method
         real(prec) :: beta_const
         integer    :: beta_gl_sep           ! Beta grounding-line subelement (subgrid) parameterization
         integer    :: beta_gl_scale         ! Beta grounding-line scaling method (beta => 0 at gl?)
@@ -172,6 +172,7 @@ module yelmo_defs
         real(prec) :: cf_sia
         logical    :: streaming_margin      ! Ensure margin and grline are considered streaming?
         integer    :: n_sm_beta 
+        real(prec) :: ssa_beta_max          ! Maximum value of beta for which ssa should be calculated
         real(prec) :: ssa_vel_max
         integer    :: ssa_iter_max 
         real(prec) :: ssa_iter_rel 

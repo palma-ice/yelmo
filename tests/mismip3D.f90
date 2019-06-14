@@ -9,6 +9,7 @@ module mismip3D
     private 
     public :: mismip3D_topo_init
     public :: mismip3D_boundaries
+    public :: perturb_C_bed
     public :: find_x_gl
     public :: find_x_gl_2D 
 
@@ -75,30 +76,15 @@ contains
 
     end subroutine mismip3D_topo_init
 
-    subroutine mismip3D_boundaries(T_srf,smb,ghf,C_bed,xx,yy,x_gl,experiment)
+    subroutine mismip3D_boundaries(T_srf,smb,ghf,experiment)
 
         implicit none 
 
         real(prec), intent(OUT) :: T_srf(:,:) 
         real(prec), intent(OUT) :: smb(:,:) 
         real(prec), intent(OUT) :: ghf(:,:) 
-        real(prec), intent(OUT) :: C_bed(:,:) 
-        real(prec), intent(IN)  :: xx(:,:) 
-        real(prec), intent(IN)  :: yy(:,:) 
-        real(prec), intent(IN)  :: x_gl
+        
         character(len=*), intent(IN) :: experiment 
-
-        ! Local variables 
-        integer    :: i, j, nx, ny 
-        real(prec) :: y_gl, xc, yc, a_ref
-
-        ! 1e7 [Pa^1/3 m^-1/3 s^1/3] *[a/sec_year]^1/3 = 31651.76 [Pa^1/3 m^-1/3 a^1/3]**3 = 3.170981e+13 [Pa^1 m^-1 a^1]
-!         real(prec), parameter :: C_bed_ref = 31651.76**3    ! [Pa (m/a)^-1] == 1e7 [Pa^1/3 (m/s)^-1/3]
-        !real(prec), parameter :: C_bed_ref = 3.170981e13    ! [Pa (m/a)^-1] == 1e7 [Pa^1/3 (m/s)^-1/3]
-        real(prec), parameter :: C_bed_ref = 31651.76
-
-        nx = size(T_srf,1)
-        ny = size(T_srf,2)
 
         select case(trim(experiment))
 
@@ -115,9 +101,6 @@ contains
                 ! Geothermal heat flux 
                 ghf = 42.0   ! [mW/m2]
 
-                ! Set bed friction coefficient 
-                C_bed = C_bed_ref 
-
             case("RF")
 
                 ! Surface temperature 
@@ -128,9 +111,6 @@ contains
 
                 ! Geothermal heat flux 
                 ghf = 42.0   ! [mW/m2]
-
-                ! Set bed friction coefficient 
-                C_bed = C_bed_ref 
 
             case("P75S")
 
@@ -143,14 +123,6 @@ contains
                 ! Geothermal heat flux 
                 ghf = 42.0   ! [mW/m2]
 
-                ! Set bed friction coefficient
-                xc    = 150.0 
-                yc    =  10.0 
-                y_gl  =   0.0  
-                a_ref = 0.75 
-                C_bed = C_bed_ref * &
-                    ( 1.0 - a_ref*exp(-(xx-x_gl)**2/(2.0*xc**2)-(yy-y_gl)**2/(2.0*yc**2)) )
-
             case DEFAULT 
 
                 write(*,*) "Experiment not recognized: "//trim(experiment)
@@ -161,6 +133,37 @@ contains
         return 
 
     end subroutine mismip3D_boundaries  
+
+    subroutine perturb_C_bed(C_bed,xx,yy,x_gl)
+
+        implicit none 
+
+        real(prec), intent(INOUT) :: C_bed(:,:) 
+        real(prec), intent(IN)    :: xx(:,:) 
+        real(prec), intent(IN)    :: yy(:,:) 
+        real(prec), intent(IN)    :: x_gl
+
+        ! Local variables 
+        real(prec) :: xc 
+        real(prec) :: yc 
+        real(prec) :: y_gl, a_ref  
+        
+! 1e7 [Pa^1/3 m^-1/3 s^1/3] *[a/sec_year]^1/3 = 31651.76 [Pa^1/3 m^-1/3 a^1/3]**3 = 3.170981e+13 [Pa^1 m^-1 a^1]
+!         real(prec), parameter :: C_bed_ref = 31651.76**3    ! [Pa (m/a)^-1] == 1e7 [Pa^1/3 (m/s)^-1/3]
+        !real(prec), parameter :: C_bed_ref = 3.170981e13    ! [Pa (m/a)^-1] == 1e7 [Pa^1/3 (m/s)^-1/3]
+        real(prec), parameter :: C_bed_ref = 31651.76
+
+        ! Set bed friction coefficient
+        xc    = 150.0 
+        yc    =  10.0 
+        y_gl  =   0.0  
+        a_ref =  0.75 
+        C_bed = C_bed_ref * &
+            ( 1.0 - a_ref*exp(-(xx-x_gl)**2/(2.0*xc**2)-(yy-y_gl)**2/(2.0*yc**2)) )
+
+        return 
+
+    end subroutine perturb_C_bed
 
     function find_x_gl(xx,yy,H_grnd) result(x_gl)
         ! Find the position of the grounding line in the x-direction 

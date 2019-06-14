@@ -244,7 +244,7 @@ contains
 
         ! Define grid points with ssa active (uses beta from previous timestep)
         call set_ssa_masks(dyn%now%ssa_mask_acx,dyn%now%ssa_mask_acy,dyn%now%beta_acx,dyn%now%beta_acy, &
-                           tpo%now%H_ice,tpo%now%f_grnd_acx,tpo%now%f_grnd_acy,dyn%par%beta_max,dyn%par%use_ssa)
+                           tpo%now%H_ice,tpo%now%f_grnd_acx,tpo%now%f_grnd_acy,dyn%par%ssa_beta_max,dyn%par%use_ssa)
 
         ! Determine whether SSA solver should be called 
         calc_ssa = .FALSE. 
@@ -550,7 +550,7 @@ contains
 
             ! Define grid points with ssa active
             call set_ssa_masks(dyn%now%ssa_mask_acx,dyn%now%ssa_mask_acy,dyn%now%beta_acx,dyn%now%beta_acy, &
-                               tpo%now%H_ice,tpo%now%f_grnd_acx,tpo%now%f_grnd_acy,dyn%par%beta_max,dyn%par%use_ssa)
+                               tpo%now%H_ice,tpo%now%f_grnd_acx,tpo%now%f_grnd_acy,dyn%par%ssa_beta_max,dyn%par%use_ssa)
 
             ! Determine whether SSA solver should be called 
             calc_ssa = .FALSE. 
@@ -916,7 +916,7 @@ end if
 
         ! Local variables 
         integer :: i, j 
-
+        
         ! 1. Apply beta method of choice 
         select case(dyn%par%beta_method)
 
@@ -924,40 +924,32 @@ end if
                 ! beta (aa-nodes) has been defined externally - do nothing
 
             case(0)
-                ! Constant beta everywhere 
+                ! Constant beta everywhere
+
                 dyn%now%beta = dyn%par%beta_const 
 
             case(1) 
+                ! Calculate beta from a linear law (beta = c_b)
+                ! (equivalent to power law with m_drag=1.0)
+
+                call calc_beta_aa_linear(dyn%now%beta,dyn%now%C_bed)
+
+            case(2) 
                 ! Calculate beta from power-law function (eg, MISMIP3D style)
                 ! beta = c_b*|u_b|**((1-m)/m)
-                call calc_beta_aa_power(dyn%now%beta,dyn%now%ux_b,dyn%now%uy_b,dyn%now%C_bed,dyn%par%m_drag)
-            
-            case(2)
-                ! Calculate beta = c_b*N_eff 
 
-                ! First calculate beta from the linear equation (beta = c_b)
-                !call calc_beta_aa_linear(dyn%now%beta,dyn%now%C_bed)
                 call calc_beta_aa_power(dyn%now%beta,dyn%now%ux_b,dyn%now%uy_b,dyn%now%C_bed,dyn%par%m_drag)
-            
-                ! Additionally scale by N_eff (beta = c_b*N_eff)
-                call scale_beta_aa_Neff(dyn%now%beta,dyn%now%N_eff)
-
+                
             case(3)
                 ! Calculate beta from regularized Coulomb law (Joughin et al., GRL, 2019)
 
                 call calc_beta_aa_coulomb(dyn%now%beta,dyn%now%ux_b,dyn%now%uy_b,dyn%now%C_bed,dyn%par%m_drag,dyn%par%u_0)
                 
-                ! Additionally scale by N_eff (beta = c_b*N_eff)
-                call scale_beta_aa_Neff(dyn%now%beta,dyn%now%N_eff)
-
             case(4)
                 ! Calculate beta from the power-law as defined by Bueler and van Pelt (2015)
 
                 call calc_beta_aa_power_pism(dyn%now%beta,dyn%now%ux_b,dyn%now%uy_b,dyn%now%C_bed,dyn%par%m_drag,dyn%par%u_0)
 
-                ! Additionally scale by N_eff (beta = c_b*N_eff)
-                call scale_beta_aa_Neff(dyn%now%beta,dyn%now%N_eff)
-                
             case DEFAULT 
                 ! Not recognized 
 
@@ -966,6 +958,13 @@ end if
                 stop 
 
         end select 
+
+        if (dyn%par%beta_with_neff) then 
+            ! Additionally scale by N_eff (beta = beta*N_eff)
+
+            call scale_beta_aa_Neff(dyn%now%beta,dyn%now%N_eff)
+
+        end if 
 
         ! 2. Apply grounding-line sub-element parameterization (sep, ie, subgrid method)
         select case(dyn%par%beta_gl_sep)
@@ -976,8 +975,8 @@ end if
                 !  Simply set beta to zero where purely floating
                 where (tpo%now%f_grnd .eq. 0.0) dyn%now%beta = 0.0 
                 
-                if (dyn%par%beta_gl_stag .ne. 2) then 
-                    write(*,*) "calc_ydyn_beta_aa:: Error: beta_gl_stag must equal 2 for beta_gl_sep=-1."
+                if (dyn%par%beta_gl_stag .ne. 3) then 
+                    write(*,*) "calc_ydyn_beta_aa:: Error: beta_gl_stag must equal 3 for beta_gl_sep=-1."
                     write(*,*) "beta_gl_sep  = ", dyn%par%beta_gl_sep
                     write(*,*) "beta_gl_stag = ", dyn%par%beta_gl_stag
                     stop 
@@ -1044,13 +1043,18 @@ end if
             call smooth_beta_aa(dyn%now%beta,dyn%par%dx,dyn%par%n_sm_beta)
         end if 
 
-        ! Apply additional condition at the summit to reduce singularity
-        ! in symmetric EISMINT experiments with sliding active
+        ! Apply additional condition for particular experiments
         if (trim(dyn%par%boundaries) .eq. "EISMINT") then 
+            ! Redefine beta at the summit to reduce singularity
+            ! in symmetric EISMINT experiments with sliding active
             i = (dyn%par%nx-1)/2 
             j = (dyn%par%ny-1)/2
             dyn%now%beta(i,j) = (dyn%now%beta(i-1,j)+dyn%now%beta(i+1,j) &
                                     +dyn%now%beta(i,j-1)+dyn%now%beta(i,j+1)) / 4.0 
+        else if (trim(dyn%par%boundaries) .eq. "MISMIP3D") then 
+            ! Redefine beta at the summit to reduce singularity
+            ! in MISMIP symmetric experiments
+            dyn%now%beta(1,:) = dyn%now%beta(2,:) 
         end if 
 
         ! ================================================================
@@ -1285,10 +1289,10 @@ end if
         call nml_read(filename,"ydyn","sia_solver",         par%sia_solver,         init=init_pars)
         call nml_read(filename,"ydyn","mix_method",         par%mix_method,         init=init_pars)
         call nml_read(filename,"ydyn","calc_diffusivity",   par%calc_diffusivity,   init=init_pars)
+        call nml_read(filename,"ydyn","beta_method",        par%beta_method,        init=init_pars)
+        call nml_read(filename,"ydyn","beta_with_neff",     par%beta_with_neff,     init=init_pars)
         call nml_read(filename,"ydyn","m_drag",             par%m_drag,             init=init_pars)
         call nml_read(filename,"ydyn","u_0",                par%u_0,                init=init_pars)
-        call nml_read(filename,"ydyn","beta_max",           par%beta_max,           init=init_pars)
-        call nml_read(filename,"ydyn","beta_method",        par%beta_method,        init=init_pars)
         call nml_read(filename,"ydyn","beta_const",         par%beta_const,         init=init_pars)
         call nml_read(filename,"ydyn","beta_gl_sep",        par%beta_gl_sep,        init=init_pars)
         call nml_read(filename,"ydyn","beta_gl_scale",      par%beta_gl_scale,      init=init_pars)
@@ -1306,6 +1310,7 @@ end if
         call nml_read(filename,"ydyn","cf_sia",             par%cf_sia,             init=init_pars)
         call nml_read(filename,"ydyn","streaming_margin",   par%streaming_margin,   init=init_pars)
         call nml_read(filename,"ydyn","n_sm_beta",          par%n_sm_beta,          init=init_pars)
+        call nml_read(filename,"ydyn","ssa_beta_max",       par%ssa_beta_max,       init=init_pars)
         call nml_read(filename,"ydyn","ssa_vel_max",        par%ssa_vel_max,        init=init_pars)
         call nml_read(filename,"ydyn","ssa_iter_max",       par%ssa_iter_max,       init=init_pars)
         call nml_read(filename,"ydyn","ssa_iter_rel",       par%ssa_iter_rel,       init=init_pars)

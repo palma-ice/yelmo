@@ -971,37 +971,9 @@ end if
                         ! Get slope of grounded point and virtual floating point (using H_ice),
                         ! then assume slope is the weighted average of the two 
                         dzsdx_1 = (z_srf(i+1,j)-z_srf(i,j)) / dx 
-                        dzsdx_2 = (H_ice(i+1,j)-H_ice(i,j)) / dx 
+                        dzsdx_2 = 0.0 !(H_ice(i+1,j)-H_ice(i,j)) / dx 
                         dzsdx   = f_grnd_acx(i,j)*dzsdx_1 + (1.0-f_grnd_acx(i,j))*dzsdx_2  
                         
-                        if (beta_gl_stag .eq. 1) then 
-                            ! Upstream beta assigned at gl (ie, beta=beta_upstream)
-
-                            ! Take slope from grounded point
-                            !dzsdx   = dzsdx_1 
-                            
-                            ! Define H_gl as the grounded ice thickness
-                            if (f_grnd(i,j) .gt. 0.0) then 
-                                H_gl = H_ice(i,j) 
-                            else 
-                                H_gl = H_ice(i+1,j)
-                            end if 
-
-                        else if (beta_gl_stag .eq. 2) then 
-                            ! Downstream beta assigned at gl (ie, beta=0)
-
-                            ! Take slope from floating assumption
-                            !dzsdx   = dzsdx_1 
-                            
-                            ! Define H_gl as the floating ice thickness
-                            if (f_grnd(i,j) .eq. 0.0) then 
-                                H_gl = H_ice(i,j) 
-                            else 
-                                H_gl = H_ice(i+1,j)
-                            end if 
-
-                        end if 
-
                         ! Limit the slope
                         call minmax(dzsdx,slope_max)  
                                                     
@@ -1031,36 +1003,8 @@ end if
                         ! Get slope of grounded point and virtual floating point (using H_ice),
                         ! then assume slope is the weighted average of the two 
                         dzsdx_1 = (z_srf(i,j+1)-z_srf(i,j)) / dx 
-                        dzsdx_2 = (H_ice(i,j+1)-H_ice(i,j)) / dx 
+                        dzsdx_2 = 0.0 !(H_ice(i,j+1)-H_ice(i,j)) / dx 
                         dzsdx   = f_grnd_acy(i,j)*dzsdx_1 + (1.0-f_grnd_acy(i,j))*dzsdx_2  
-                        
-                        if (beta_gl_stag .eq. 1) then 
-                            ! Upstream beta assigned at gl (ie, beta=beta_upstream)
-
-                            ! Take slope from grounded point
-                            !dzsdx   = dzsdx_1 
-                            
-                            ! Define H_gl as the grounded ice thickness
-                            if (f_grnd(i,j) .gt. 0.0) then 
-                                H_gl = H_ice(i,j) 
-                            else 
-                                H_gl = H_ice(i,j+1)
-                            end if 
-
-                        else if (beta_gl_stag .eq. 2) then 
-                            ! Downstream beta assigned at gl (ie, beta=0)
-
-                            ! Take slope from floating assumption
-                            !dzsdx   = dzsdx_1 
-                            
-                            ! Define H_gl as the floating ice thickness
-                            if (f_grnd(i,j) .eq. 0.0) then 
-                                H_gl = H_ice(i,j) 
-                            else 
-                                H_gl = H_ice(i,j+1)
-                            end if 
-
-                        end if 
                         
                         call minmax(dzsdx,slope_max)  
 

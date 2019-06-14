@@ -78,9 +78,9 @@ contains
             time_now = time_now + dt_now
             if (time-time_now .lt. time_tol) time_now = time 
             
-            if (yelmo_write_log) then 
-                write(*,"(a,1f14.4,3g14.4)") "timestepping: ", time_now, dt_now, minval(dom%par%dt_adv), minval(dom%par%dt_diff)
-            end if 
+!             if (yelmo_write_log) then 
+!                 write(*,"(a,1f14.4,3g14.4)") "timestepping: ", time_now, dt_now, minval(dom%par%dt_adv), minval(dom%par%dt_diff)
+!             end if 
             
             ! Calculate topography (elevation, ice thickness, calving, etc.)
             call calc_ytopo(dom%tpo,dom%dyn,dom%thrm,dom%bnd,time_now,topo_fixed=dom%tpo%par%topo_fixed)

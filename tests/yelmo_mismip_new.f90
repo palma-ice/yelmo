@@ -134,15 +134,9 @@ program yelmo_mismip
     select case(trim(experiment))
 
         case("linear","overdeepened") 
-
-            ! Make sure beta is defined externally and law is compatible 
-            yelmo1%dyn%par%C_bed_method = -1
-            yelmo1%dyn%par%beta_method  =  1 
-            yelmo1%dyn%par%m_drag       =  3.0 
-
+            
             ! Initialize mismip boundary values 
-            call mismip3D_boundaries(yelmo1%bnd%T_srf,yelmo1%bnd%smb,yelmo1%bnd%Q_geo,yelmo1%dyn%now%C_bed, &
-                        yelmo1%grd%x*1e-3,yelmo1%grd%y*1e-3,x_gl=800.0,experiment="Stnd-0.3") 
+            call mismip3D_boundaries(yelmo1%bnd%T_srf,yelmo1%bnd%smb,yelmo1%bnd%Q_geo,experiment="Stnd-0.3") 
 
         case DEFAULT 
             ! EISMINT - just for testing
@@ -266,8 +260,7 @@ program yelmo_mismip
             case("linear","overdeepened") 
             
                 ! Initialize mismip boundary values 
-                call mismip3D_boundaries(yelmo1%bnd%T_srf,yelmo1%bnd%smb,yelmo1%bnd%Q_geo,yelmo1%dyn%now%C_bed, &
-                            yelmo1%grd%x*1e-3,yelmo1%grd%y*1e-3,x_gl=800.0,experiment="Stnd-0.3")
+                call mismip3D_boundaries(yelmo1%bnd%T_srf,yelmo1%bnd%smb,yelmo1%bnd%Q_geo,experiment="Stnd-0.3")
 
             case DEFAULT 
 
@@ -429,7 +422,7 @@ contains
         ! == yelmo_material ==
 !         call nc_write(filename,"enh_bar",ylmo%mat%now%enh_bar,units="1",long_name="Vertically averaged enhancement factor", &
 !                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-!         call nc_write(filename,"visc_bar",ylmo%mat%now%visc_bar,units="Pa a m",long_name="Vertically averaged 3D viscosity", &
+!         call nc_write(filename,"visc_int",ylmo%mat%now%visc_int,units="Pa a m",long_name="Vertically integrated 3D viscosity", &
 !                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
 !         call nc_write(filename,"ATT",ylmo%mat%now%ATT,units="a^-1 Pa^-3",long_name="Rate factor", &
 !                       dim1="xc",dim2="yc",dim3="zeta",dim4="time",start=[1,1,1,n],ncid=ncid)

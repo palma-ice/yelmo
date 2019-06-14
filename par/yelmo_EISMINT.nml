@@ -62,25 +62,29 @@
     sia_solver          = "vel"           ! "vel", "shear", "none"
     mix_method          = 1               ! -2: sia, -1: ssa, 0: sia|ssa, 1: sia+ssa 2: ssa vel. fraction
     calc_diffusivity    = False           ! Calculate 2D diffusivity term for diagnostics
+    beta_method         = 3               ! 0: constant beta; 1: linear law; 2: power law; 3: regularized Coulomb law, 4: pism power law
+    beta_with_neff      = False           ! Additionally scale beta by effective pressure? (beta=Neff*[beta_default])
     m_drag              = 3.0             ! Dragging law exponent 
-    u_0                 = 300.0           ! [m/a] Coulomb friction regularization term (velocity threshold)
-    beta_max            = 1e5             ! [Pa a m-1] Maximum value of beta for which ssa should be calculated 
-    beta_method         = 3               ! 0: constant beta; 1: power law; 2: effective pressure; 3: regularized Coulomb law
-    beta_gl_sep         = 0               !  -1: Apply subgrid treatment on ac-nodes (beta_gl_stag=2) 0: No subgrid treatment, 1: beta*f_grnd_aa        
-    beta_gl_scale       = 1               !  0: No scaling, 1: beta*f_beta_gl, 2: H_grnd linear scaling, 3: Zstar scaling 
-    beta_gl_stag        = 0               !  0: simple staggering, 1: Upstream beta at gl, 2: f_grnd_ac scaling 
+    u_0                 = 300.0           ! [m/a] Regularization term for regularized Coulomb law (beta_method=3)
+    beta_const          = 1e3             ! [Pa a m−1] Constant value of basal friction coefficient to be used
+    beta_gl_sep         = 0               !  -1: Apply subgrid treatment on ac-nodes (beta_gl_stag=3) 0: No subgrid treatment, 1: beta*f_grnd_aa        
+    beta_gl_scale       = 0               !  0: No scaling, 1: beta*f_beta_gl, 2: H_grnd linear scaling, 3: Zstar scaling 
+    beta_gl_stag        = 0               !  0: simple staggering, 1: Upstream beta at gl, 2: downstream, 3: f_grnd_ac scaling 
     f_beta_gl           = 1.0             ! [-] Scaling of beta at the grounding line (for beta_gl_method=1)
     taud_gl_method      = 0               !  0: binary, no subgrid, 1: Two-sided gradient
-    C_bed_method        = 0               ! -1: set externally; 0: cf_stream everywhere; 1: cf_stream/cf_frozen 
-    beta_const          = 1e3             ! [Pa a m−1] Constant value of basal friction coefficient to be used
+    C_bed_method        = 0               ! -1: set externally; 0: cf_stream everywhere; 1: cf_stream/cf_frozen; 2: cf_stream*f_zbed; 3: till strength 
+    C_bed_z0            = -200.0          ! [m] Bedrock elevation at which scaling goes to f_scale=e(-1)
+    C_bed_z1            = 200.0           ! [m] Bedrock elevation above which scaling goes to f_scale=1
     H_grnd_lim          = 500.0           ! [m] For beta_sep_method=2, reduce beta linearly between H_grnd=0 and H_grnd_lim 
     H_sed_sat           = 250.0           ! [m] Sediment thickness at which sediment effect is saturated
     cf_frozen           = 100.0           ! [a m-1] Bed roughness coefficient, frozen 
-    cf_stream           = 20.0            ! [a m-1] Bed roughness coefficient, stream  
+    !cf_stream           = 31651.76        ! [a m-1] Bed roughness coefficient, stream  
+    cf_stream           = 2.3e5           ! [a m-1] Bed roughness coefficient, stream  
     cf_fac_sed          = 1.0             ! [-] Scaling of roughness for sediments 
     cf_sia              = 15.0            ! [m a-1 Pa-1] Bed roughness coefficient for SIA sliding
     streaming_margin    = True            ! Impose cf_stream at the margin and grline independent of f_pmp
     n_sm_beta           = 0               ! [-] Standard deviation in gridpoints for Gaussian smoothing of beta (0==no smoothing)
+    ssa_beta_max        = 1e20            ! [Pa a m-1] Maximum value of beta for which ssa should be calculated 
     ssa_vel_max         = 5000.0          ! [m a-1] SSA velocity limit to avoid spurious results 
     ssa_iter_max        = 10              ! Number of maximum allowed iterations over ssa to converge on vel. solution
     ssa_iter_rel        = 0.7             ! [--] Relaxation fraction [0:1] to stabilize ssa iterations

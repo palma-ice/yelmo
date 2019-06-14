@@ -71,7 +71,8 @@ program yelmo_test
 
     yelmo1%dyn%par%beta_method       = 3        ! 0: constant beta; 1: power law; 2: effective pressure; 3: regularized Coulomb law, 4: pism power law
     yelmo1%dyn%par%m_drag            = 3.0      ! Dragging law exponent 
-    yelmo1%dyn%par%cf_stream         = 0.1      ! [--] Friction scalar, unitless for reg. coulomb law  
+    yelmo1%dyn%par%u_0               = 300.0    ! Dragging law exponent 
+    yelmo1%dyn%par%cf_stream         = 0.5      ! [--] Friction scalar, unitless for reg. coulomb law  
     
     yelmo1%dyn%par%neff_method       = 2        ! -1: external N_eff, 0: overburden pressure, 1: Leguy param., 2: Till pressure
     
@@ -216,6 +217,11 @@ contains
         ! Update the time step
         call nc_write(filename,"time",time,dim1="time",start=[n],count=[1],ncid=ncid)
 
+        ! Write model speed 
+        call nc_write(filename,"speed",ylmo%par%model_speed,units="kyr/hr",long_name="Model speed (Yelmo only)", &
+                      dim1="time",start=[n],count=[1],ncid=ncid)
+        
+        ! Variables
         call nc_write(filename,"H_ice",ylmo%tpo%now%H_ice,units="m",long_name="Ice thickness", &
                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
         call nc_write(filename,"z_srf",ylmo%tpo%now%z_srf,units="m",long_name="Surface elevation", &
@@ -399,7 +405,7 @@ contains
         dphi_max  =  1.0       ! [degrees] maximum rate of change (positive)
         err_z_fac = 100.0      ! [m]       Elevation-error scale for maximum
 
-        f_relax   = 0.0 
+        f_relax   = 0.0        ! Relaxation fraction (so far this didnt help, ajr 2019-06-14)
 
         ! Store initial C_bed solution 
         C_bed_prev = C_bed 
@@ -414,7 +420,6 @@ contains
         if (zsrf_rmse .lt. 80.0) then 
             ! Slow down the optimization to reduce waves, if we are near the solution
             err_z_fac = 200.0 
-            f_relax   = 0.7
         end if 
 
         do j = 2, ny-1 

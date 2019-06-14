@@ -894,6 +894,9 @@ end if
         type(ymat_class),   intent(IN)    :: mat 
         type(ybound_class), intent(IN)    :: bnd   
 
+        ! Local variables 
+        integer :: i, j 
+        
         ! 1. Apply beta method of choice 
         select case(dyn%par%beta_method)
 
@@ -1019,6 +1022,15 @@ end if
         ! 3. Apply smoothing if desired (only for points with beta > 0)
         if (dyn%par%n_sm_beta .gt. 0) then 
             call smooth_beta_aa(dyn%now%beta,dyn%par%dx,dyn%par%n_sm_beta)
+        end if 
+
+        ! Apply additional condition at the summit to reduce singularity
+        ! in symmetric EISMINT experiments with sliding active
+        if (trim(dyn%par%boundaries) .eq. "EISMINT") then 
+            i = (dyn%par%nx-1)/2 
+            j = (dyn%par%ny-1)/2
+            dyn%now%beta(i,j) = (dyn%now%beta(i-1,j)+dyn%now%beta(i+1,j) &
+                                    +dyn%now%beta(i,j-1)+dyn%now%beta(i,j+1)) / 4.0 
         end if 
 
         ! ================================================================

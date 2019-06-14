@@ -163,12 +163,17 @@ program yelmo_mismip
 !     ATT_values = sec_year*1e-26*[464.16,215.44,100.00,46.416,21.544,10.0,4.6416,2.1544,1.0, &
 !                                  2.1544,4.6416,10.0,21.544,46.416,100.00,215.44,464.16]
     
-    ! Shorter experiment (Pattyn, 2017)
-    n_att      = 7
-    allocate(ATT_values(n_att))
-    ATT_values = [1e-16,1e-17,1e-18,1e-19,1e-18,1e-17,1e-16]
+!     ! Shorter experiment (Pattyn, 2017)
+!     n_att      = 7
+!     allocate(ATT_values(n_att))
+!     ATT_values = [1e-16,1e-17,1e-18,1e-19,1e-18,1e-17,1e-16]
     
-    ATT_time   = 10e3
+    ! Shorter experiment 2 (Pattyn, 2017)
+    n_att      = 3
+    allocate(ATT_values(n_att))
+    ATT_values = [1e-16,1e-17,1e-16]
+    
+    ATT_time   = 15e3
     ATT_dt     =  2e3 
     time_end   = ATT_time + n_att*ATT_dt + 50e3
     dt2D_out   = 500.0 
@@ -203,9 +208,8 @@ program yelmo_mismip
     ! Initialize state variables (dyn,therm,mat)
     call yelmo_init_state(yelmo1,path_par,time=time_init,thrm_method="robin")
 
-    ! Define initial grounding line 
-    x_gl     = 0.0 
-    x_gl_std = 0.0 
+    ! Calculate grounding line position 
+    call find_x_gl_2D(x_gl,x_gl_std,yelmo1%grd%x*1e-3,yelmo1%grd%y*1e-3,yelmo1%tpo%now%f_grnd)
 
     ! == Write initial state ==
      
@@ -220,7 +224,6 @@ program yelmo_mismip
 
     ! Set exit to false
     exit_loop   = .FALSE. 
-
 
     ! Advance timesteps
     do n = 1, ceiling((time_end-time_init)/dtt)
@@ -237,7 +240,7 @@ program yelmo_mismip
         if (time .gt. ATT_time+ATT_dt) then 
             ! Ensure minimum time per step has been reached before checking convergence
 
-            write(*,*) "err: ", time, ATT_time, err, yelmo1%mat%par%rf_const, q_att 
+            !write(*,*) "err: ", time, ATT_time, err, yelmo1%mat%par%rf_const, q_att 
         
             if (is_converged .and. q_att == n_att) then 
                 ! If output timestep also reached,
@@ -290,7 +293,7 @@ program yelmo_mismip
         write(*,"(a,f14.4)") "time = ", time
 
         if (mod(nint(time*100),nint((5.0*dtt)*100))==0) then
-            write(*,"(a,2f14.4,a10,g14.3,f10.2)") "time = ",  &
+            write(*,"(a,2f14.1,g14.3,f14.1,f10.1)") "mism: ",  &
                 time, maxval(yelmo1%tpo%now%H_ice), yelmo1%mat%par%rf_const, x_gl, x_gl_std 
         end if 
 

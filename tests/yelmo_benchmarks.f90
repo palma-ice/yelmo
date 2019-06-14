@@ -399,50 +399,7 @@ program yelmo_benchmarks
     print '("Time = ",f12.3," min.")', (finish-start)/60.0 
 
 contains
-
-    subroutine write_step_2D_small(ylmo,filename,time)
-
-        implicit none 
-        
-        type(yelmo_class), intent(IN) :: ylmo
-        character(len=*),  intent(IN) :: filename
-        real(prec), intent(IN) :: time
-
-        ! Local variables
-        integer    :: ncid, n
-        real(prec) :: time_prev 
-
-        ! Open the file for writing
-        call nc_open(filename,ncid,writable=.TRUE.)
-
-        ! Determine current writing time step 
-        n = nc_size(filename,"time",ncid)
-        call nc_read(filename,"time",time_prev,start=[n],count=[1],ncid=ncid) 
-        if (abs(time-time_prev).gt.1e-5) n = n+1 
-
-        ! Update the time step
-        call nc_write(filename,"time",time,dim1="time",start=[n],count=[1],ncid=ncid)
-
-        ! == yelmo_topography ==
-        call nc_write(filename,"H_ice",ylmo%tpo%now%H_ice,units="m",long_name="Ice thickness", &
-                      dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-        call nc_write(filename,"z_srf",ylmo%tpo%now%z_srf,units="m",long_name="Surface elevation", &
-                      dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-        call nc_write(filename,"mask_bed",ylmo%tpo%now%mask_bed,units="",long_name="Bed mask", &
-                      dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-        
-        call nc_write(filename,"z_bed",ylmo%bnd%z_bed,units="m",long_name="Bedrock elevation", &
-                      dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-        call nc_write(filename,"z_sl",ylmo%bnd%z_sl,units="m",long_name="Sea level rel. to present", &
-                      dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-        
-        ! Close the netcdf file
-        call nc_close(ncid)
-
-        return 
-
-    end subroutine write_step_2D_small
-
+    
     subroutine write_step_2D(ylmo,filename,time,buel)
 
         implicit none 
@@ -470,6 +427,10 @@ contains
         ! Update the time step
         call nc_write(filename,"time",time,dim1="time",start=[n],count=[1],ncid=ncid)
 
+        ! Write model speed 
+        call nc_write(filename,"speed",ylmo%par%model_speed,units="kyr/hr",long_name="Model speed (Yelmo only)", &
+                      dim1="time",start=[n],count=[1],ncid=ncid)
+        
         ! Time step limits 
         call nc_write(filename,"dt_adv",ylmo%par%dt_adv,units="a",long_name="Advective timestep", &
                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
@@ -557,7 +518,7 @@ contains
                       dim1="xc",dim2="yc",dim3="zeta",dim4="time",start=[1,1,1,n],ncid=ncid)
 
         ! == yelmo_dynamics ==
-        
+
         call nc_write(filename,"ssa_mask_acx",ylmo%dyn%now%ssa_mask_acx,units="1",long_name="SSA mask (acx)", &
                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
         call nc_write(filename,"ssa_mask_acy",ylmo%dyn%now%ssa_mask_acy,units="1",long_name="SSA mask (acy)", &

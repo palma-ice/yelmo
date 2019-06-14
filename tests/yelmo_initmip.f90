@@ -163,8 +163,10 @@ contains
 
         real(prec) :: uxy_rmse, H_rmse, loguxy_rmse 
         real(prec), allocatable :: tmp(:,:) 
-
+        real(prec), allocatable :: tmp2(:,:) 
+        
         allocate(tmp(ylmo%grd%nx,ylmo%grd%ny))
+        allocate(tmp2(ylmo%grd%nx,ylmo%grd%ny))
 
         ! Open the file for writing
         call nc_open(filename,ncid,writable=.TRUE.)
@@ -196,10 +198,13 @@ contains
             uxy_rmse = mv
         end if 
 
-        tmp = abs(ylmo%dyn%now%uxy_s-ylmo%dta%pd%uxy_s)
-        where(tmp .gt. 0.0) tmp = log(tmp) 
-        if (n .gt. 1 .or. count(tmp .ne. 0.0) .gt. 0) then 
-            loguxy_rmse = sqrt(sum(tmp**2)/count(tmp .ne. 0.0))
+        tmp = ylmo%dta%pd%uxy_s 
+        where(ylmo%dta%pd%uxy_s .gt. 0.0) tmp = log(tmp)
+        tmp1 = ylmo%dyn%now%uxy_s 
+        where(ylmo%dyn%now%uxy_s .gt. 0.0) tmp1 = log(tmp1)
+        
+        if (n .gt. 1 .or. count(tmp1-tmp .ne. 0.0) .gt. 0) then 
+            loguxy_rmse = sqrt(sum((tmp1-tmp)**2)/count(tmp1-tmp .ne. 0.0))
         else
             loguxy_rmse = mv
         end if 

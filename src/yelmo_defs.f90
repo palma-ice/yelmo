@@ -148,6 +148,7 @@ module yelmo_defs
     type ydyn_param_class
 
         character(len=256) :: solver 
+        character(len=256) :: sia_solver 
         integer    :: mix_method            ! Method for mixing sia and ssa velocity solutions
         logical    :: calc_diffusivity      ! Calculate diagnostic diffusivity field
         real(prec) :: m_drag                ! Sliding law exponent (m==1: plastic)
@@ -271,7 +272,7 @@ module yelmo_defs
 
         integer,    allocatable :: ssa_mask_acx(:,:) 
         integer,    allocatable :: ssa_mask_acy(:,:) 
-        
+
     end type
 
     ! ydyn class

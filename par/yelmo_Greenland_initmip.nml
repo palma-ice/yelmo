@@ -49,7 +49,8 @@
 /
 
 &ydyn
-    solver              = "hybrid-vel"    ! "fixed","hybrid-vel", "hybrid-shear", "hybrid-pd12"
+    solver              = "hybrid-adhoc"  ! "fixed", "hybrid-adhoc", "hybrid-pd12"    
+    sia_solver          = "vel"           ! "vel", "shear", "none"
     mix_method          = 1               ! -2: sia, -1: ssa, 0: sia|ssa, 1: sia+ssa 2: ssa vel. fraction
     calc_diffusivity    = False           ! Calculate 2D diffusivity term for diagnostics
     m_drag              = 1.0             ! Dragging law exponent 

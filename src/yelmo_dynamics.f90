@@ -61,7 +61,7 @@ contains
             case("fixed") 
                 ! Do nothing - dynamics is fixed 
 
-            case("hybrid-vel","hybrid-shear")
+            case("hybrid-adhoc")
                 ! Classic mix methods
 
                 call calc_ydyn_adhoc(dyn,tpo,mat,thrm,bnd,dt)
@@ -74,7 +74,7 @@ contains
             case DEFAULT 
 
                 write(*,*) "calc_ydyn:: Error: ydyn solver not recognized." 
-                write(*,*) "solver should be one of: ['fixed','hybrid','hybrid-pd12']"
+                write(*,*) "solver should be one of: ['fixed','hybrid-adhoc','hybrid-pd12']"
                 write(*,*) "solver = ", trim(dyn%par%solver) 
                 stop 
 
@@ -148,9 +148,9 @@ contains
 
         ! ===== Calculate shear (ie, SIA) velocity solution ===========
 
-        select case(trim(dyn%par%solver))
+        select case(trim(dyn%par%sia_solver))
 
-            case("hybrid-vel") 
+            case("vel") 
                 ! Use classic-style SIA solver (solve directly for velocity)
 
                 ! Calculate the 3D horizontal shear velocity fields
@@ -170,14 +170,14 @@ contains
                 call calc_diffusivity_2D(dyn%now%dd_ab_bar,tpo%now%H_ice,tpo%now%dzsdx,tpo%now%dzsdy, &
                                         mat%now%ATT,dyn%par%zeta_aa,dyn%par%dx,mat%par%n_glen,rho_ice,g)
 
-                ! Set terms from hybrid-shear solver to zero that are not calculated here
+                ! Set terms from shear solver to zero that are not calculated here
                 dyn%now%duxdz     = 0.0 
                 dyn%now%duydz     = 0.0 
                 dyn%now%dd_ab     = 0.0 
                 dyn%now%duxdz_bar = 0.0 
                 dyn%now%duydz_bar = 0.0 
 
-            case("hybrid-shear")
+            case("shear")
                 ! Use 3D shear solver for SIA calculations (solve for shear and integrate to get velocity)
                 ! ie, following Pollard and de Conto (2012) 
 
@@ -210,9 +210,29 @@ contains
                 call calc_diffusivity_2D(dyn%now%dd_ab_bar,tpo%now%H_ice,tpo%now%dzsdx,tpo%now%dzsdy, &
                                         mat%now%ATT,dyn%par%zeta_aa,dyn%par%dx,mat%par%n_glen,rho_ice,g)
 
+            case("none")
+
+                ! Set shear velocity terms to zero 
+                dyn%now%ux_i      = 0.0 
+                dyn%now%uy_i      = 0.0 
+                dyn%now%ux_i_bar  = 0.0 
+                dyn%now%uy_i_bar  = 0.0
+
+                ! Set terms from shear solver to zero that are not calculated here
+                dyn%now%duxdz     = 0.0 
+                dyn%now%duydz     = 0.0 
+                dyn%now%dd_ab     = 0.0 
+                dyn%now%duxdz_bar = 0.0 
+                dyn%now%duydz_bar = 0.0 
+
+                ! Ensure PD12 stretching terms are zero  
+                dyn%now%lhs_x          = 0.0 
+                dyn%now%lhs_y          = 0.0 
+                dyn%now%sigma_horiz_sq = 0.0 
+                
             case DEFAULT 
 
-                write(*,*) "calc_ydyn_adhoc:: Error: solver not recognized: ", trim(dyn%par%solver)
+                write(*,*) "calc_ydyn_adhoc:: Error: sia solver not recognized: ", trim(dyn%par%sia_solver)
                 stop 
 
         end select 
@@ -896,7 +916,7 @@ end if
 
         ! Local variables 
         integer :: i, j 
-        
+
         ! 1. Apply beta method of choice 
         select case(dyn%par%beta_method)
 
@@ -1262,6 +1282,7 @@ end if
         if (present(init)) init_pars = .TRUE. 
         
         call nml_read(filename,"ydyn","solver",             par%solver,             init=init_pars)
+        call nml_read(filename,"ydyn","sia_solver",         par%sia_solver,         init=init_pars)
         call nml_read(filename,"ydyn","mix_method",         par%mix_method,         init=init_pars)
         call nml_read(filename,"ydyn","calc_diffusivity",   par%calc_diffusivity,   init=init_pars)
         call nml_read(filename,"ydyn","m_drag",             par%m_drag,             init=init_pars)

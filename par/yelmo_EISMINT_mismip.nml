@@ -4,7 +4,7 @@
     experiment   = "linear"              ! "linear", "overdeepened", "flat"
     dx           = 50.0                  ! [km] Grid resolution (EISMINT1 = 50km, EISMINT2 = 25km)
     with_ssa     = True                  ! Include ssa in experiment?
-    
+
     ! Timing parameters 
     time_init    = 0.0                  ! [yr] Starting time 
     time_end     = 100e3                ! [yr] Ending time 
@@ -56,7 +56,8 @@
 /
 
 &ydyn
-    solver              = "hybrid-vel"    ! "fixed","hybrid-vel", "hybrid-shear", "hybrid-pd12"
+    solver              = "hybrid-adhoc"  ! "fixed", "hybrid-adhoc", "hybrid-pd12"    
+    sia_solver          = "none"          ! "vel", "shear", "none"
     mix_method          = -1              ! -2: sia, -1: ssa, 0: sia|ssa, 1: sia+ssa 2: ssa vel. fraction
     calc_diffusivity    = False           ! Calculate 2D diffusivity term for diagnostics
     m_drag              = 3.0             ! Dragging law exponent 

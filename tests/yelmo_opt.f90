@@ -333,7 +333,8 @@ contains
         nx = size(C_bed,1)
         ny = size(C_bed,2)
 
-        logvel_max = log(maxval(uxy_s))
+        !logvel_max = log(maxval(uxy_s))
+        logvel_max = 100.0 
 
         do j = 1, ny 
         do i = 1, nx 
@@ -343,6 +344,7 @@ contains
 
                 logvel   = max(0.0,log(uxy_s(i,j)))
                 f_scale  = logvel / logvel_max
+                if (f_scale .gt. 1.0) f_scale = 1.0 
                 phi(i,j) = phi_max - f_scale*(phi_max-phi_min)
 
             else 

@@ -56,7 +56,7 @@
     beta_method         = 3               ! 0: constant beta; 1: linear law; 2: power law; 3: regularized Coulomb law, 4: pism power law
     beta_with_neff      = True            ! Additionally scale beta by effective pressure? (beta=Neff*[beta_default])
     m_drag              = 3.0             ! Dragging law exponent 
-    u_0                 = 100.0           ! [m/a] Regularization term for regularized Coulomb law (beta_method=3)
+    u_0                 = 300.0           ! [m/a] Regularization term for regularized Coulomb law (beta_method=3)
     beta_const          = 1e3             ! [Pa a m−1] Constant value of basal friction coefficient to be used
     beta_gl_sep         = 0               !  -1: Apply subgrid treatment on ac-nodes (beta_gl_stag=3) 0: No subgrid treatment, 1: beta*f_grnd_aa        
     beta_gl_scale       = 0               !  0: beta*beta_gl_f, 1: H_grnd linear scaling, 2: Zstar scaling 
@@ -70,7 +70,7 @@
     H_sed_sat           = 250.0           ! [m] Sediment thickness at which sediment effect is saturated
     cf_frozen           = 100.0           ! [a m-1] Bed roughness coefficient, frozen 
     cf_stream           = 1e0             ! [a m-1] Bed roughness coefficient, stream  
-    cf_fac_sed          = 1.0             ! [-] Scaling of roughness for sediments 
+    cf_fac_sed          = 0.1             ! [-] Scaling of roughness for sediments 
     cf_sia              = 0.0             ! [m a-1 Pa-1] Bed roughness coefficient for SIA sliding
     streaming_margin    = True            ! Impose cf_stream at the margin and grline independent of f_pmp
     n_sm_beta           = 0               ! [-] Standard deviation in gridpoints for Gaussian smoothing of beta (0==no smoothing)
@@ -83,7 +83,7 @@
 /
 
 &ydyn_neff 
-    neff_method     = 1                 ! -1: external N_eff, 0: overburden pressure, 1: Leguy param., 2: Till pressure
+    neff_method     = 2                 ! -1: external N_eff, 0: overburden pressure, 1: Leguy param., 2: Till pressure
     neff_p          = 0.0               ! *neff_method=1* marine connectivity exponent (0: none, 1: full)
     neff_use_water  = False             ! *neff_method=2* Use H_w field or parameterize it?
     neff_w_max      = 2.0               ! [m]  *neff_method=2* Maximum allowed water layer thickness for Till pressure 

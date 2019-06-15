@@ -163,10 +163,10 @@ contains
 
         real(prec) :: uxy_rmse, H_rmse, loguxy_rmse 
         real(prec), allocatable :: tmp(:,:) 
-        real(prec), allocatable :: tmp2(:,:) 
+        real(prec), allocatable :: tmp1(:,:) 
         
         allocate(tmp(ylmo%grd%nx,ylmo%grd%ny))
-        allocate(tmp2(ylmo%grd%nx,ylmo%grd%ny))
+        allocate(tmp1(ylmo%grd%nx,ylmo%grd%ny))
 
         ! Open the file for writing
         call nc_open(filename,ncid,writable=.TRUE.)

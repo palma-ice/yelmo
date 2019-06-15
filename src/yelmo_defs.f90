@@ -159,7 +159,7 @@ module yelmo_defs
         integer    :: beta_gl_sep           ! Beta grounding-line subelement (subgrid) parameterization
         integer    :: beta_gl_scale         ! Beta grounding-line scaling method (beta => 0 at gl?)
         integer    :: beta_gl_stag          ! Beta grounding-line staggering method 
-        real(prec) :: f_beta_gl             ! Fraction of beta at gl 
+        real(prec) :: beta_gl_f             ! Fraction of beta at gl 
         integer    :: taud_gl_method        ! Driving stress grounding line treatment 
         real(prec) :: H_grnd_lim 
         real(prec) :: H_sed_sat

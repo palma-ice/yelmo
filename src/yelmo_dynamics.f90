@@ -916,7 +916,7 @@ end if
 
         ! Local variables 
         integer :: i, j 
-        
+
         ! 1. Apply beta method of choice 
         select case(dyn%par%beta_method)
 
@@ -1011,20 +1011,17 @@ end if
 
         select case(dyn%par%beta_gl_scale) 
 
-            case(0)
-                ! No scaling, keep beta as before
-                
+            case(0) 
+                ! Apply fractional parameter at grounding line, no scaling when beta_gl_f=1.0
+
+                call scale_beta_aa_grline(dyn%now%beta,tpo%now%f_grnd,dyn%par%beta_gl_f)
+
             case(1) 
-                ! Apply fractional parameter at grounding line 
-
-                call scale_beta_aa_grline(dyn%now%beta,tpo%now%f_grnd,dyn%par%f_beta_gl)
-
-            case(2) 
                 ! Apply H_grnd scaling, reducing beta linearly towards zero at the grounding line 
 
                 call scale_beta_aa_Hgrnd(dyn%now%beta,tpo%now%H_grnd,dyn%par%H_grnd_lim)
 
-            case(3) 
+            case(2) 
                 ! Apply scaling according to thickness above flotation (Zstar approach of Gladstone et al., 2017)
                 ! norm==.TRUE., so that zstar-scaling is bounded between 0 and 1, and thus won't affect 
                 ! choice of C_bed value that is independent of this scaling. 
@@ -1297,7 +1294,7 @@ end if
         call nml_read(filename,"ydyn","beta_gl_sep",        par%beta_gl_sep,        init=init_pars)
         call nml_read(filename,"ydyn","beta_gl_scale",      par%beta_gl_scale,      init=init_pars)
         call nml_read(filename,"ydyn","beta_gl_stag",       par%beta_gl_stag,       init=init_pars)
-        call nml_read(filename,"ydyn","f_beta_gl",          par%f_beta_gl,          init=init_pars)
+        call nml_read(filename,"ydyn","beta_gl_f",          par%beta_gl_f,          init=init_pars)
         call nml_read(filename,"ydyn","taud_gl_method",     par%taud_gl_method,     init=init_pars)
         call nml_read(filename,"ydyn","H_grnd_lim",         par%H_grnd_lim,         init=init_pars)
         call nml_read(filename,"ydyn","H_sed_sat",          par%H_sed_sat,          init=init_pars)

@@ -66,7 +66,7 @@ program yelmo_test
     ! Prescribe key parameters here that should be set for beta optimization exercise 
     yelmo1%dyn%par%C_bed_method      = -1       ! C_Bed is set external to yelmo calculations
     yelmo1%mat%par%rf_method         = 0        ! Constant rate factor (no thermodynamics)
-    yelmo1%mat%par%rf_const          = 1e-18    ! [Pa^-3 a^-1]
+    yelmo1%mat%par%rf_const          = 1e-17    ! [Pa^-3 a^-1]
 !     yelmo1%thrm%par%method           = "fixed"  ! No thermodynamics calculations 
     
     ! === Set initial boundary conditions for current time and yelmo state =====
@@ -398,7 +398,7 @@ contains
         allocate(C_bed_prev(nx,ny))
 
         ! Optimization parameters 
-        dphi_min  = -1.0       ! [degrees] maximum rate of change (negative)
+        dphi_min  = -0.5       ! [degrees] maximum rate of change (negative)
         dphi_max  =  1.0       ! [degrees] maximum rate of change (positive)
         
         ! Store initial C_bed solution 

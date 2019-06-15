@@ -86,7 +86,7 @@ program yelmo_test
     yelmo1%bnd%H_w      = 0.0           ! [m]
     yelmo1%bnd%Q_geo    = 50.0          ! [mW/m2]
     
-    yelmo1%bnd%bmb_shlf = -50.0         ! [m.i.e./a]
+    yelmo1%bnd%bmb_shlf = -5.0          ! [m.i.e./a]
     yelmo1%bnd%T_shlf   = T0            ! [K]   
 
     ! Impose present-day surface mass balance and present-day temperature field

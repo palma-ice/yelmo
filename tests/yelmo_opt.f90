@@ -70,13 +70,6 @@ program yelmo_test
     yelmo1%mat%par%rf_method         = 0        ! Constant rate factor (no thermodynamics)
     yelmo1%mat%par%rf_const          = 1e-17    ! [Pa^-3 a^-1]
 !     yelmo1%thrm%par%method           = "fixed"  ! No thermodynamics calculations 
-
-    yelmo1%dyn%par%beta_method       = 3        ! 0: constant beta; 1: power law; 2: effective pressure; 3: regularized Coulomb law, 4: pism power law
-    yelmo1%dyn%par%m_drag            = 3.0      ! Dragging law exponent 
-    yelmo1%dyn%par%u_0               = 300.0    ! Dragging law exponent 
-    yelmo1%dyn%par%cf_stream         = 1.0      ! [--] Friction scalar, unitless for reg. coulomb law  
-    
-    yelmo1%dyn%par%neff_method       = 2        ! -1: external N_eff, 0: overburden pressure, 1: Leguy param., 2: Till pressure
     
     ! === Set initial boundary conditions for current time and yelmo state =====
     ! ybound: z_bed, z_sl, H_sed, H_w, smb, T_srf, bmb_shlf , Q_geo
@@ -86,7 +79,7 @@ program yelmo_test
     yelmo1%bnd%H_w      = 0.0           ! [m]
     yelmo1%bnd%Q_geo    = 50.0          ! [mW/m2]
     
-    yelmo1%bnd%bmb_shlf = -5.0          ! [m.i.e./a]
+    yelmo1%bnd%bmb_shlf = -1.0          ! [m.i.e./a]
     yelmo1%bnd%T_shlf   = T0            ! [K]   
 
     ! Impose present-day surface mass balance and present-day temperature field

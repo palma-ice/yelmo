@@ -18,8 +18,8 @@ program yelmo_test
     real(4) :: cpu_start_time, cpu_end_time 
 
     ! Optimization variables 
-    real(prec) :: time_iter, f_iter_early, time_iter_now 
-    integer    :: q, qmax, qmax_topo_fixed, qmax_iter_early 
+    real(prec) :: time_iter
+    integer    :: q, qmax, qmax_topo_fixed 
     logical    :: topo_fixed 
     real(prec) :: phi_min, phi_max 
 
@@ -59,8 +59,6 @@ program yelmo_test
     time_iter       = 500.0         ! [yr] Simulation time for each iteration
     qmax            = 200           ! Total number of iterations
     qmax_topo_fixed = 0             ! Number of initial iterations that should use topo_fixed=.TRUE. 
-    qmax_iter_early = 10            ! How many iterations should be considered for less timesteps
-    f_iter_early    = 0.2           ! time_iter_now = time_iter*f_iter_early when q < qmax_iter_early
 
     phi_min         =  2.0 
     phi_max         = 30.0 
@@ -130,7 +128,7 @@ program yelmo_test
     
     ! 2D file 
     call yelmo_write_init(yelmo1,file2D,time_init=0.0,units="years")  
-    call write_step_2D_opt(yelmo1,file2D,time=0.0,dCbed=dCbed,phi=phi,time_iter_now=0.0)  
+    call write_step_2D_opt(yelmo1,file2D,time=0.0,dCbed=dCbed,phi=phi)  
 
     ! Initially assume we are working with topo_fixed... (only for optimizing velocity)
     topo_fixed = .TRUE. 
@@ -138,10 +136,6 @@ program yelmo_test
     ! Perform loops over beta:
     ! update beta, calculate topography and velocity for 100 years, get error, try again
     do q = 1, qmax 
-
-        ! Determine if the number of iterations should be reduced for initial timesteps
-        time_iter_now = time_iter 
-        if (q .lt. qmax_iter_early) time_iter_now = time_iter * f_iter_early
 
         ! Determine whether this iteration maintains topo_fixed conditions (only for optimizing velocity)
         if (q .gt. qmax_topo_fixed) topo_fixed = .FALSE. 
@@ -153,13 +147,13 @@ program yelmo_test
         ! Update C_bed based on error correction
         call update_C_bed_thickness(yelmo1%dyn%now%C_bed,dCbed,phi,yelmo1%dta%pd%err_z_srf,yelmo1%tpo%now%H_ice, &
                     yelmo1%dyn%now%ux_bar,yelmo1%dyn%now%uy_bar,yelmo1%tpo%par%dx,phi_min,phi_max, &
-                    yelmo1%dyn%par%cf_stream,time_iter_now)
+                    yelmo1%dyn%par%cf_stream)
 
         ! Reset thermodynamics
         call yelmo_init_state(yelmo1,path_par,time=time_init,thrm_method="robin-cold")
 
         ! Run model for time_iter yrs with this C_bed configuration (no change in boundaries)
-        call yelmo_update_equil(yelmo1,time,time_tot=time_iter_now,topo_fixed=topo_fixed,dt=5.0,ssa_vel_max=5000.0)
+        call yelmo_update_equil(yelmo1,time,time_tot=time_iter,topo_fixed=topo_fixed,dt=5.0,ssa_vel_max=5000.0)
         
         ! Calculate error 
         yelmo1%dta%pd%err_H_ice   = yelmo1%tpo%now%H_ice - yelmo1%dta%pd%H_ice 
@@ -170,7 +164,7 @@ program yelmo_test
 
         time = real(q,prec)
         
-        call write_step_2D_opt(yelmo1,file2D,time=time,dCbed=dCbed,phi=phi,time_iter_now=time_iter_now)
+        call write_step_2D_opt(yelmo1,file2D,time=time,dCbed=dCbed,phi=phi)
         
         ! Summary 
         write(*,*) "q= ", q, maxval(abs(yelmo1%dta%pd%err_z_srf))
@@ -188,7 +182,7 @@ program yelmo_test
 
 contains
 
-    subroutine write_step_2D_opt(ylmo,filename,time,dCbed,phi,time_iter_now)
+    subroutine write_step_2D_opt(ylmo,filename,time,dCbed,phi)
 
         implicit none 
         
@@ -197,7 +191,6 @@ contains
         real(prec), intent(IN) :: time
         real(prec), intent(IN) :: dCbed(:,:) 
         real(prec), intent(IN) :: phi(:,:)
-        real(prec), intent(IN) :: time_iter_now
 
         ! Local variables
         integer    :: ncid, n
@@ -223,10 +216,6 @@ contains
 
         ! Write model speed 
         call nc_write(filename,"speed",ylmo%par%model_speed,units="kyr/hr",long_name="Model speed (Yelmo only)", &
-                      dim1="time",start=[n],count=[1],ncid=ncid)
-            
-        ! Write the number of time steps for this iteration
-        call nc_write(filename,"time_iter",time_iter_now,units="yr",long_name="Years of simulation per iteration", &
                       dim1="time",start=[n],count=[1],ncid=ncid)
         
         ! Variables
@@ -374,7 +363,7 @@ contains
 
     end subroutine guess_C_bed
 
-    subroutine update_C_bed_thickness(C_bed,dCbed,phi,err_z_srf,H_ice,ux,uy,dx,phi_min,phi_max,cf_stream,time_iter)
+    subroutine update_C_bed_thickness(C_bed,dCbed,phi,err_z_srf,H_ice,ux,uy,dx,phi_min,phi_max,cf_stream)
 
         implicit none 
 
@@ -389,7 +378,6 @@ contains
         real(prec), intent(IN)    :: phi_min 
         real(prec), intent(IN)    :: phi_max 
         real(prec), intent(IN)    :: cf_stream 
-        real(prec), intent(IN)    :: time_iter 
 
         ! Local variables 
         integer :: i, j, nx, ny, i1, j1 
@@ -429,15 +417,7 @@ contains
             ! Slow down the optimization to reduce waves, if we are near the solution
             err_z_fac = 200.0 
         end if 
-
-        ! Scale the error scale depending on how many iterations are being run
-        ! (smaller scale for less iterations, since less change in z_srf can be expected)
-        if (time_iter .le. 100.0) then 
-            err_z_fac = err_z_fac*0.5
-        else if (time_iter .le. 200.0) then 
-            err_z_fac = err_z_fac*0.8
-        end if 
-
+        
         do j = 2, ny-1 
         do i = 2, nx-1 
 

@@ -56,7 +56,7 @@
     beta_method         = 3               ! 0: constant beta; 1: linear law; 2: power law; 3: regularized Coulomb law, 4: pism power law
     beta_with_neff      = True            ! Additionally scale beta by effective pressure? (beta=Neff*[beta_default])
     m_drag              = 3.0             ! Dragging law exponent 
-    u_0                 = 100.0           ! [m/a] Regularization term for regularized Coulomb law (beta_method=3)
+    u_0                 = 300.0           ! [m/a] Regularization term for regularized Coulomb law (beta_method=3)
     beta_const          = 1e3             ! [Pa a m−1] Constant value of basal friction coefficient to be used
     beta_gl_sep         = 0               !  -1: Apply subgrid treatment on ac-nodes (beta_gl_stag=3) 0: No subgrid treatment, 1: beta*f_grnd_aa        
     beta_gl_scale       = 0               !  0: beta*beta_gl_f, 1: H_grnd linear scaling, 2: Zstar scaling 

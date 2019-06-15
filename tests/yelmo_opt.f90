@@ -98,7 +98,7 @@ program yelmo_test
     allocate(channels(yelmo1%grd%nx,yelmo1%grd%ny))
 
     ! Set initial guess of C_bed as a function of present-day velocity 
-    call guess_C_bed(yelmo1%dyn%now%C_bed,phi,yelmo1%dta%pd%uxy_s,phi_min,0.5*phi_max,yelmo1%dyn%par%cf_stream)
+    call guess_C_bed(yelmo1%dyn%now%C_bed,phi,yelmo1%dta%pd%uxy_s,2.0*phi_min,0.5*phi_max,yelmo1%dyn%par%cf_stream)
 
     ! Initialize state variables (dyn,therm,mat)
     ! (initialize temps with robin method with a cold base)

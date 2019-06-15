@@ -69,7 +69,7 @@
     H_grnd_lim          = 500.0           ! [m] For beta_sep_method=2, reduce beta linearly between H_grnd=0 and H_grnd_lim 
     H_sed_sat           = 250.0           ! [m] Sediment thickness at which sediment effect is saturated
     cf_frozen           = 100.0           ! [a m-1] Bed roughness coefficient, frozen 
-    cf_stream           = 1e0             ! [a m-1] Bed roughness coefficient, stream  
+    cf_stream           = 0.5             ! [a m-1] Bed roughness coefficient, stream  
     cf_fac_sed          = 0.1             ! [-] Scaling of roughness for sediments 
     cf_sia              = 0.0             ! [m a-1 Pa-1] Bed roughness coefficient for SIA sliding
     streaming_margin    = True            ! Impose cf_stream at the margin and grline independent of f_pmp

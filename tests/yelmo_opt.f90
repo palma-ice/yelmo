@@ -66,7 +66,7 @@ program yelmo_test
     ! Prescribe key parameters here that should be set for beta optimization exercise 
     yelmo1%dyn%par%C_bed_method      = -1       ! C_Bed is set external to yelmo calculations
     yelmo1%mat%par%rf_method         = 0        ! Constant rate factor (no thermodynamics)
-    yelmo1%mat%par%rf_const          = 1e-17    ! [Pa^-3 a^-1]
+    yelmo1%mat%par%rf_const          = 1e-18    ! [Pa^-3 a^-1]
 !     yelmo1%thrm%par%method           = "fixed"  ! No thermodynamics calculations 
     
     ! === Set initial boundary conditions for current time and yelmo state =====
@@ -93,7 +93,6 @@ program yelmo_test
     dCbed = 0.0 
 
     allocate(phi(yelmo1%grd%nx,yelmo1%grd%ny))
-    phi = phi_min  
 
     ! Define channel field 
     allocate(channels(yelmo1%grd%nx,yelmo1%grd%ny))
@@ -150,7 +149,7 @@ program yelmo_test
                     yelmo1%dyn%par%cf_stream)
 
         ! Reset thermodynamics
-        call yelmo_init_state(yelmo1,path_par,time=time_init,thrm_method="robin-cold")
+        !call yelmo_init_state(yelmo1,path_par,time=time,thrm_method="robin-cold")
 
         ! Run model for time_iter yrs with this C_bed configuration (no change in boundaries)
         call yelmo_update_equil(yelmo1,time,time_tot=time_iter,topo_fixed=topo_fixed,dt=5.0,ssa_vel_max=5000.0)
@@ -417,7 +416,7 @@ contains
             ! Slow down the optimization to reduce waves, if we are near the solution
             err_z_fac = 200.0 
         end if 
-        
+
         do j = 2, ny-1 
         do i = 2, nx-1 
 

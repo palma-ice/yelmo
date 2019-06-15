@@ -334,7 +334,7 @@ contains
         ny = size(C_bed,2)
 
         !logvel_max = log(maxval(uxy_s))
-        logvel_max = 100.0 
+        logvel_max = log(100.0) 
 
         do j = 1, ny 
         do i = 1, nx 

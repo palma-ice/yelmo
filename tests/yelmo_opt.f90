@@ -57,7 +57,7 @@ program yelmo_test
     ! Simulation parameters
     time_init       = 0.0           ! [yr] Starting time
     time_iter       = 500.0         ! [yr] Simulation time for each iteration
-    qmax            = 200           ! Total number of iterations
+    qmax            = 101           ! Total number of iterations
     qmax_topo_fixed = 0             ! Number of initial iterations that should use topo_fixed=.TRUE. 
 
     phi_min         =  2.0 
@@ -143,10 +143,16 @@ program yelmo_test
         yelmo1%tpo%now%H_ice = yelmo1%dta%pd%H_ice 
         yelmo1%tpo%now%z_srf = yelmo1%dta%pd%z_srf 
 
-        ! Update C_bed based on error correction
-        call update_C_bed_thickness(yelmo1%dyn%now%C_bed,dCbed,phi,yelmo1%dta%pd%err_z_srf,yelmo1%tpo%now%H_ice, &
-                    yelmo1%dyn%now%ux_bar,yelmo1%dyn%now%uy_bar,yelmo1%tpo%par%dx,phi_min,phi_max, &
-                    yelmo1%dyn%par%cf_stream)
+        if (q .lt. qmax) then
+            ! Update C_bed based on error correction
+            call update_C_bed_thickness(yelmo1%dyn%now%C_bed,dCbed,phi,yelmo1%dta%pd%err_z_srf,yelmo1%tpo%now%H_ice, &
+                        yelmo1%dyn%now%ux_bar,yelmo1%dyn%now%uy_bar,yelmo1%tpo%par%dx,phi_min,phi_max, &
+                        yelmo1%dyn%par%cf_stream)
+        else
+            ! Now run to steady-state
+            write(*,*) "Now run with fixed C_bed to equilibrate ice sheet."
+            time_iter = 5000.0 
+        end if 
 
         ! Reset thermodynamics
         !call yelmo_init_state(yelmo1,path_par,time=time,thrm_method="robin-cold")
@@ -381,7 +387,7 @@ contains
         real(prec), intent(IN)    :: cf_stream 
 
         ! Local variables 
-        integer :: i, j, nx, ny, i1, j1, i2, j2  
+        integer :: i, j, nx, ny, i1, j1  
         real(prec) :: dphi, dx_km, f_dz
         real(prec) :: ux_aa, uy_aa 
         real(prec) :: zsrf_rmse 
@@ -411,7 +417,7 @@ contains
             zsrf_rmse = 0.0 
         end if 
 
-        if (zsrf_rmse .gt. 100.0) then
+        if (zsrf_rmse .gt. 90.0) then
             ! Maintain a faster scale
             err_z_fac = 100.0      ! [m]       Elevation-error scale for maximum
         else
@@ -448,25 +454,19 @@ end if
                 if ( abs(ux_aa) .gt. abs(uy_aa) ) then 
                     ! Downstream in x-direction 
                     j1 = j 
-                    j2 = j 
                     if (ux_aa .lt. 0.0) then 
                         i1 = i-1 
-                        i2 = i-2
                     else
                         i1 = i+1
-                        i2 = i+2 
                     end if 
 
                 else 
                     ! Downstream in y-direction 
                     i1 = i 
-                    i2 = i 
                     if (uy_aa .lt. 0.0) then 
                         j1 = j-1
-                        j2 = j-2 
                     else
                         j1 = j+1
-                        j2 = j+2 
                     end if 
 
                 end if 
@@ -477,13 +477,6 @@ end if
 
                 C_bed(i1,j1) = cf_stream*tan(phi(i1,j1)*pi/180.0)
 
-                ! Also apply further downstream (weaker) 
-                phi(i2,j2)  = phi(i2,j2) + dphi*0.5
-                phi(i2,j2)  = max(phi(i2,j2),phi_min)
-                phi(i2,j2)  = min(phi(i2,j2),phi_max)
-
-                C_bed(i2,j2) = cf_stream*tan(phi(i2,j2)*pi/180.0)
-                
             end if 
 
         end do 

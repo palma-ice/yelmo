@@ -1191,8 +1191,16 @@ end if
             case(3)
                 ! Set C_bed following tan(phi), and linear ramp between phi_min to phi_max with elevation
 
-                dyn%now%C_bed = calc_C_bed_till_linear(bnd%z_bed,bnd%z_sl,dyn%par%till_phi_min,dyn%par%till_phi_max, &
-                                                        dyn%par%till_phi_zmin,dyn%par%till_phi_zmax)
+                if (dyn%par%till_method .eq. 0) then 
+                    ! Constant till friction angle 
+                    dyn%now%C_bed = calc_C_bed_till_const(dyn%par%till_min)
+
+                else 
+                    ! Linear till friction angle versus elevation
+                    dyn%now%C_bed = calc_C_bed_till_linear(bnd%z_bed,bnd%z_sl,dyn%par%till_phi_min,dyn%par%till_phi_max, &
+                                                            dyn%par%till_phi_zmin,dyn%par%till_phi_zmax)
+
+                end if 
 
             case DEFAULT 
                 ! Not recognized 
@@ -1313,6 +1321,7 @@ end if
         call nml_read(filename,"ydyn","ssa_iter_rel",       par%ssa_iter_rel,       init=init_pars)
         call nml_read(filename,"ydyn","ssa_iter_conv",      par%ssa_iter_conv,      init=init_pars)
         
+        call nml_read(filename,"ydyn_till","till_method",   par%till_method,        init=init_pars)
         call nml_read(filename,"ydyn_till","till_phi_min",  par%till_phi_min,       init=init_pars)
         call nml_read(filename,"ydyn_till","till_phi_max",  par%till_phi_max,       init=init_pars)
         call nml_read(filename,"ydyn_till","till_phi_zmin", par%till_phi_zmin,      init=init_pars)

@@ -94,6 +94,7 @@
 /
 
 &ydyn_till
+    till_method     =  0                ! 0: phi = till_phi_min [const], 1: phi = f(z_bed) [linear]
     till_phi_min    =  5                ! [degrees] Till friction angle, minimum
     till_phi_max    = 20                ! [degrees] Till friction angle, maximum
     till_phi_zmin   = 0.0               ! [m] Bedrock elevation for till_phi_min

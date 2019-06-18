@@ -187,6 +187,7 @@ module yelmo_defs
         real(prec) :: neff_e0 
         real(prec) :: neff_Cc 
 
+        integer    :: till_method 
         real(prec) :: till_phi_min 
         real(prec) :: till_phi_max 
         real(prec) :: till_phi_zmin 

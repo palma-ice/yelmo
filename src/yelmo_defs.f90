@@ -165,7 +165,9 @@ module yelmo_defs
         real(prec) :: H_sed_sat
         integer    :: C_bed_method 
         real(prec) :: C_bed_z0  
-        real(prec) :: C_bed_z1 
+        real(prec) :: C_bed_z1
+        real(prec) :: C_bed_min
+        real(prec) :: C_bed_max       
         real(prec) :: cf_stream
         real(prec) :: cf_frozen
         real(prec) :: cf_fac_sed

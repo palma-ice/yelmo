@@ -1193,7 +1193,7 @@ end if
 
                 if (dyn%par%till_method .eq. 0) then 
                     ! Constant till friction angle 
-                    dyn%now%C_bed = calc_C_bed_till_const(dyn%par%till_min)
+                    dyn%now%C_bed = calc_C_bed_till_const(dyn%par%till_phi_min)
 
                 else 
                     ! Linear till friction angle versus elevation
@@ -1320,7 +1320,7 @@ end if
         call nml_read(filename,"ydyn","ssa_iter_max",       par%ssa_iter_max,       init=init_pars)
         call nml_read(filename,"ydyn","ssa_iter_rel",       par%ssa_iter_rel,       init=init_pars)
         call nml_read(filename,"ydyn","ssa_iter_conv",      par%ssa_iter_conv,      init=init_pars)
-        
+
         call nml_read(filename,"ydyn_till","till_method",   par%till_method,        init=init_pars)
         call nml_read(filename,"ydyn_till","till_phi_min",  par%till_phi_min,       init=init_pars)
         call nml_read(filename,"ydyn_till","till_phi_max",  par%till_phi_max,       init=init_pars)

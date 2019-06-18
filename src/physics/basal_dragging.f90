@@ -25,6 +25,7 @@ module basal_dragging
     public :: calc_effective_pressure_till
 
     ! C_bed functions
+    public :: calc_C_bed_till_const
     public :: calc_C_bed_till_linear
 
     ! Beta functions (aa-nodes)
@@ -159,6 +160,21 @@ contains
 
     end function calc_effective_pressure_till
 
+    elemental function calc_C_bed_till_const(phi) result(C_bed)
+        ! Calculate the effective pressure of the till
+        ! following van Pelt and Bueler (2015), Eq. 23.
+        
+        implicit none 
+        
+        real(prec), intent(IN)    :: phi                ! [deg] Constant till angle  
+        real(prec)                :: C_bed 
+
+        ! Calculate bed friction coefficient as the tangent
+        C_bed = tan(phi*pi/180.0)
+
+        return 
+
+    end function calc_C_bed_till_const
 
     elemental function calc_C_bed_till_linear(z_bed,z_sl,phi_min,phi_max,phi_zmin,phi_zmax) result(C_bed)
         ! Calculate the effective pressure of the till

@@ -21,7 +21,7 @@ program yelmo_test
     real(prec) :: time_iter
     integer    :: q, qmax, qmax_topo_fixed 
     logical    :: topo_fixed 
-    real(prec) :: phi_min, phi_max 
+    real(prec) :: phi_min, phi_max  
 
     real(prec), allocatable :: dCbed(:,:) 
     real(prec), allocatable :: phi(:,:) 
@@ -146,8 +146,8 @@ program yelmo_test
         if (q .lt. qmax) then
             ! Update C_bed based on error correction
             call update_C_bed_thickness(yelmo1%dyn%now%C_bed,dCbed,phi,yelmo1%dta%pd%err_z_srf,yelmo1%tpo%now%H_ice, &
-                        yelmo1%dyn%now%ux_bar,yelmo1%dyn%now%uy_bar,yelmo1%tpo%par%dx,phi_min,phi_max, &
-                        yelmo1%dyn%par%cf_stream)
+                        yelmo1%bnd%z_bed,yelmo1%dyn%now%ux_bar,yelmo1%dyn%now%uy_bar,yelmo1%tpo%par%dx,phi_min,phi_max, &
+                        yelmo1%dyn%par%cf_stream,yelmo1%dyn%par%C_bed_z0,yelmo1%dyn%par%C_bed_z1,yelmo1%dyn%par%C_bed_min)
         else
             ! Now run to steady-state
             write(*,*) "Now run with fixed C_bed to equilibrate ice sheet."
@@ -370,7 +370,8 @@ contains
 
     end subroutine guess_C_bed
 
-    subroutine update_C_bed_thickness(C_bed,dCbed,phi,err_z_srf,H_ice,ux,uy,dx,phi_min,phi_max,cf_stream)
+    subroutine update_C_bed_thickness(C_bed,dCbed,phi,err_z_srf,H_ice,z_bed,ux,uy,dx,phi_min,phi_max, &
+                        cf_stream,C_bed_z0,C_bed_z1,C_bed_min)
 
         implicit none 
 
@@ -379,16 +380,20 @@ contains
         real(prec), intent(INOUT) :: phi(:,:) 
         real(prec), intent(IN)    :: err_z_srf(:,:) 
         real(prec), intent(IN)    :: H_ice(:,:) 
+        real(prec), intent(IN)    :: z_bed(:,:) 
         real(prec), intent(IN)    :: ux(:,:) 
         real(prec), intent(IN)    :: uy(:,:) 
         real(prec), intent(IN)    :: dx 
         real(prec), intent(IN)    :: phi_min 
         real(prec), intent(IN)    :: phi_max 
         real(prec), intent(IN)    :: cf_stream 
+        real(prec), intent(IN)    :: C_bed_z0
+        real(prec), intent(IN)    :: C_bed_z1 
+        real(prec), intent(IN)    :: C_bed_min 
 
         ! Local variables 
         integer :: i, j, nx, ny, i1, j1  
-        real(prec) :: dphi, dx_km, f_dz
+        real(prec) :: dphi, dx_km, f_dz, f_scale 
         real(prec) :: ux_aa, uy_aa 
         real(prec) :: zsrf_rmse 
 
@@ -437,13 +442,18 @@ contains
                 f_dz = min(f_dz, dphi_max)
                 dphi = f_dz 
                 
+                ! Calculate scaling with elevation 
+                ! Scale C_bed as a function bedrock elevation relative to sea level
+                f_scale = exp( (z_bed(i,j) - C_bed_z1) / (C_bed_z1 - C_bed_z0) )
+                if (f_scale .gt. 1.0) f_scale = 1.0
+                                
                 ! 1. Apply change at current point 
 if (.FALSE.) then 
                 phi(i,j)  = phi(i,j) + dphi 
                 phi(i,j)  = max(phi(i,j),phi_min)
                 phi(i,j)  = min(phi(i,j),phi_max)
 
-                C_bed(i,j) = cf_stream*tan(phi(i,j)*pi/180.0)
+                C_bed(i,j) = (cf_stream*f_scale)*tan(phi(i,j)*pi/180.0)
 end if 
 
                 ! 2. Apply change downstream (this may overlap with other changes)
@@ -475,13 +485,16 @@ end if
                 phi(i1,j1)  = max(phi(i1,j1),phi_min)
                 phi(i1,j1)  = min(phi(i1,j1),phi_max)
 
-                C_bed(i1,j1) = cf_stream*tan(phi(i1,j1)*pi/180.0)
+                C_bed(i1,j1) = (cf_stream*f_scale)*tan(phi(i1,j1)*pi/180.0)
 
             end if 
 
         end do 
         end do 
 
+        ! Ensure C_bed is not below lower limit 
+        where (C_bed .lt. C_bed_min) C_bed = C_bed_min 
+            
         ! Additionally, apply a Gaussian filter to C_bed to ensure smooth transitions
 !         dx_km = dx*1e-3  
 !         call filter_gaussian(var=C_bed,sigma=64.0,dx=dx_km)     !,mask=err_z_srf .ne. 0.0)

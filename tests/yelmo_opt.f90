@@ -477,8 +477,8 @@ end if
 
                 C_bed(i1,j1) = cf_stream*tan(phi(i1,j1)*pi/180.0)
 
-                ! Also apply further downstream 
-                phi(i2,j2)  = phi(i2,j2) + dphi 
+                ! Also apply further downstream (weaker) 
+                phi(i2,j2)  = phi(i2,j2) + dphi*0.5
                 phi(i2,j2)  = max(phi(i2,j2),phi_min)
                 phi(i2,j2)  = min(phi(i2,j2),phi_max)
 

@@ -75,7 +75,7 @@ program yelmo_test
     yelmo1%bnd%H_w      = 0.0           ! [m]
     yelmo1%bnd%Q_geo    = 50.0          ! [mW/m2]
     
-    yelmo1%bnd%bmb_shlf = -1.0          ! [m.i.e./a]
+    yelmo1%bnd%bmb_shlf = -20.0          ! [m.i.e./a]
     yelmo1%bnd%T_shlf   = T0            ! [K]   
 
     ! Impose present-day surface mass balance and present-day temperature field
@@ -108,8 +108,8 @@ program yelmo_test
     where(mask_noice) yelmo1%bnd%smb = yelmo1%dta%pd%smb - 2.0 
 
     ! Saturate maximum smb to 1.5 m/a 
-    where(yelmo1%bnd%smb .gt. 1.5) yelmo1%bnd%smb = 1.5 
-    
+    !where(yelmo1%bnd%smb .gt. 1.5) yelmo1%bnd%smb = 1.5 
+
     ! ============================================================================================
     ! Step 1: Relaxtion step: run SIA model for 100 years to smooth out the input
     ! topography that will be used as a target. 

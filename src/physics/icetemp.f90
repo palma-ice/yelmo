@@ -18,7 +18,7 @@ contains
                             T_srf,H_ice,H_w,H_grnd,f_grnd,zeta_aa,zeta_ac,dzeta_a,dzeta_b,dt,dx)
         ! Solver for thermodynamics of ice 
         ! Note zeta=height, k=1 base, k=nz surface 
-
+        
         implicit none 
 
         real(prec), intent(INOUT) :: T_ice(:,:,:)   ! [K] Ice column temperature

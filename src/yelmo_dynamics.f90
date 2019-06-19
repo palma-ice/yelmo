@@ -1054,6 +1054,9 @@ end if
             dyn%now%beta(1,:) = dyn%now%beta(2,:) 
         end if 
 
+        ! Finally ensure that beta is higher than the lower allowed limit
+        where(dyn%now%beta .gt. 0.0 .and. dyn%now%beta .lt. dyn%par%beta_min) dyn%now%beta = dyn%par%beta_min 
+        
         ! ================================================================
         ! Note: At this point the beta_aa field is available with beta=0 
         ! for floating points and beta > 0 for non-floating points
@@ -1346,14 +1349,15 @@ end if
         call nml_read(filename,"ydyn","C_bed_method",       par%C_bed_method,       init=init_pars)
         call nml_read(filename,"ydyn","C_bed_z0",           par%C_bed_z0,           init=init_pars)
         call nml_read(filename,"ydyn","C_bed_z1",           par%C_bed_z1,           init=init_pars)
-        call nml_read(filename,"ydyn","C_bed_min",          par%C_bed_min,           init=init_pars)
-        call nml_read(filename,"ydyn","C_bed_max",          par%C_bed_max,           init=init_pars)        
+        call nml_read(filename,"ydyn","C_bed_min",          par%C_bed_min,          init=init_pars)
+        call nml_read(filename,"ydyn","C_bed_max",          par%C_bed_max,          init=init_pars)        
         call nml_read(filename,"ydyn","cf_frozen",          par%cf_frozen,          init=init_pars)
         call nml_read(filename,"ydyn","cf_stream",          par%cf_stream,          init=init_pars)
         call nml_read(filename,"ydyn","cf_fac_sed",         par%cf_fac_sed,         init=init_pars)
         call nml_read(filename,"ydyn","cf_sia",             par%cf_sia,             init=init_pars)
         call nml_read(filename,"ydyn","streaming_margin",   par%streaming_margin,   init=init_pars)
         call nml_read(filename,"ydyn","n_sm_beta",          par%n_sm_beta,          init=init_pars)
+        call nml_read(filename,"ydyn","beta_min",           par%beta_min,           init=init_pars)
         call nml_read(filename,"ydyn","ssa_beta_max",       par%ssa_beta_max,       init=init_pars)
         call nml_read(filename,"ydyn","ssa_vel_max",        par%ssa_vel_max,        init=init_pars)
         call nml_read(filename,"ydyn","ssa_iter_max",       par%ssa_iter_max,       init=init_pars)

@@ -175,6 +175,7 @@ module yelmo_defs
         real(prec) :: cf_sia
         logical    :: streaming_margin      ! Ensure margin and grline are considered streaming?
         integer    :: n_sm_beta 
+        real(prec) :: beta_min              ! Minimum allowed value of beta
         real(prec) :: ssa_beta_max          ! Maximum value of beta for which ssa should be calculated
         real(prec) :: ssa_vel_max
         integer    :: ssa_iter_max 

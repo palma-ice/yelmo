@@ -122,7 +122,7 @@ program yelmo_test
     ! spin up the thermodynamics and have a reference state to reset.
     ! Store the reference state for future use.
 
-    call yelmo_update_equil(yelmo1,time,time_tot=1e3,  topo_fixed=.TRUE.,dt=5.0,ssa_vel_max=0.0)
+    call yelmo_update_equil(yelmo1,time,time_tot=20e3,topo_fixed=.TRUE.,dt=5.0,ssa_vel_max=0.0)
 
     ! Store the reference state
     yelmo_ref = yelmo1 

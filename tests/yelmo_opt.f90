@@ -87,10 +87,10 @@ program yelmo_test
     time = time_init 
 
     ! Allocate rate of change of C_bed
-    allocate(dCbed(yelmo1%grd%nx,yelmo1%grd%ny))
-    dCbed = 0.0 
-
     allocate(phi(yelmo1%grd%nx,yelmo1%grd%ny))
+    allocate(dCbed(yelmo1%grd%nx,yelmo1%grd%ny))
+    phi   = 0.0 
+    dCbed = 0.0 
 
     ! Set initial guess of C_bed as a function of present-day velocity 
     call guess_C_bed(yelmo1%dyn%now%C_bed,phi,yelmo1%dta%pd%uxy_s,phi_min,phi_max,yelmo1%dyn%par%cf_stream)

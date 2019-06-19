@@ -10,7 +10,8 @@ program yelmo_test
     implicit none 
 
     type(yelmo_class)      :: yelmo1
-
+    type(yelmo_class)      :: yelmo_ref 
+    
     character(len=256) :: outfldr, file1D, file2D, file_restart, domain 
     character(len=512) :: path_par, path_const  
     real(prec) :: time_init, time_end, time_equil, time, dtt, dt1D_out, dt2D_out   
@@ -28,9 +29,6 @@ program yelmo_test
 
     ! No-ice mask (to impose additional melting)
     logical, allocatable :: mask_noice(:,:)  
-
-    ! Concavity field 
-    real(prec), allocatable :: channels(:,:) 
 
     ! Start timing 
     call cpu_time(cpu_start_time)
@@ -94,9 +92,6 @@ program yelmo_test
 
     allocate(phi(yelmo1%grd%nx,yelmo1%grd%ny))
 
-    ! Define channel field 
-    allocate(channels(yelmo1%grd%nx,yelmo1%grd%ny))
-
     ! Set initial guess of C_bed as a function of present-day velocity 
     call guess_C_bed(yelmo1%dyn%now%C_bed,phi,yelmo1%dta%pd%uxy_s,phi_min,phi_max,yelmo1%dyn%par%cf_stream)
 
@@ -112,20 +107,27 @@ program yelmo_test
     ! Impose additional negative mass balance to no ice points of 2 [m.i.e./a] melting
     where(mask_noice) yelmo1%bnd%smb = yelmo1%dta%pd%smb - 2.0 
 
-    ! Run yelmo for several years with constant boundary conditions and topo
-    ! to equilibrate thermodynamics and dynamics
-    call yelmo_update_equil(yelmo1,time,time_tot=100.0,topo_fixed=.FALSE.,dt=1.0,ssa_vel_max=500.0)
+    ! ============================================================================================
+    ! Step 1: Relaxtion step: run SIA model for 100 years to smooth out the input
+    ! topography that will be used as a target. 
+
+    call yelmo_update_equil(yelmo1,time,time_tot=100.0,topo_fixed=.FALSE.,dt=1.0,ssa_vel_max=0.0)
     
     ! Define present topo as present-day dataset for comparison 
     yelmo1%dta%pd%H_ice = yelmo1%tpo%now%H_ice 
     yelmo1%dta%pd%z_srf = yelmo1%tpo%now%z_srf 
 
-    ! Calculate initial error 
-    yelmo1%dta%pd%err_H_ice   = yelmo1%tpo%now%H_ice - yelmo1%dta%pd%H_ice 
-    yelmo1%dta%pd%err_z_srf   = yelmo1%tpo%now%z_srf - yelmo1%dta%pd%z_srf 
-    yelmo1%dta%pd%err_uxy_s   = yelmo1%dyn%now%uxy_s - yelmo1%dta%pd%uxy_s 
+    ! ============================================================================================
+    ! Step 2: Run the model for several ka in SIA mode with topo_fixed to
+    ! spin up the thermodynamics and have a reference state to reset.
+    ! Store the reference state for future use.
+
+    call yelmo_update_equil(yelmo1,time,time_tot=10e3,topo_fixed=.TRUE.,dt=5.0,ssa_vel_max=0.0)
     
-    ! 2D file 
+    ! Store the reference state
+    yelmo_ref = yelmo1 
+
+    ! Initialize the 2D output file and write the initial model state 
     call yelmo_write_init(yelmo1,file2D,time_init=0.0,units="years")  
     call write_step_2D_opt(yelmo1,file2D,time=0.0,dCbed=dCbed,phi=phi)  
 
@@ -139,10 +141,6 @@ program yelmo_test
         ! Determine whether this iteration maintains topo_fixed conditions (only for optimizing velocity)
         if (q .gt. qmax_topo_fixed) topo_fixed = .FALSE. 
 
-        ! Reset topography to initial state 
-        yelmo1%tpo%now%H_ice = yelmo1%dta%pd%H_ice 
-        yelmo1%tpo%now%z_srf = yelmo1%dta%pd%z_srf 
-
         if (q .lt. qmax) then
             ! Update C_bed based on error correction
             call update_C_bed_thickness(yelmo1%dyn%now%C_bed,dCbed,phi,yelmo1%dta%pd%err_z_srf,yelmo1%tpo%now%H_ice, &
@@ -154,16 +152,13 @@ program yelmo_test
             time_iter = 5000.0 
         end if 
 
-        ! Reset thermodynamics
-        !call yelmo_init_state(yelmo1,path_par,time=time,thrm_method="robin-cold")
-
+        ! Reset model to the initial state, with updated C_bed field 
+        yelmo_ref%dyn%now%C_bed = yelmo1%dyn%now%C_bed 
+        yelmo1 = yelmo_ref 
+        
         ! Run model for time_iter yrs with this C_bed configuration (no change in boundaries)
         call yelmo_update_equil(yelmo1,time,time_tot=time_iter,topo_fixed=topo_fixed,dt=5.0,ssa_vel_max=5000.0)
         
-        ! Calculate error 
-        yelmo1%dta%pd%err_H_ice   = yelmo1%tpo%now%H_ice - yelmo1%dta%pd%H_ice 
-        yelmo1%dta%pd%err_z_srf   = yelmo1%tpo%now%z_srf - yelmo1%dta%pd%z_srf 
-        yelmo1%dta%pd%err_uxy_s = yelmo1%dyn%now%uxy_s   - yelmo1%dta%pd%uxy_s 
         
         ! == MODEL OUTPUT =======================================================
 
@@ -494,7 +489,7 @@ end if
 
         ! Ensure C_bed is not below lower limit 
         where (C_bed .lt. C_bed_min) C_bed = C_bed_min 
-            
+
         ! Additionally, apply a Gaussian filter to C_bed to ensure smooth transitions
 !         dx_km = dx*1e-3  
 !         call filter_gaussian(var=C_bed,sigma=64.0,dx=dx_km)     !,mask=err_z_srf .ne. 0.0)

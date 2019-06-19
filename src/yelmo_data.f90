@@ -10,8 +10,28 @@ module yelmo_data
     private
     public :: ydata_alloc, ydata_dealloc
     public :: ydata_par_load, ydata_load 
-
+    public :: ydata_compare
+    
 contains
+
+    subroutine ydata_compare(dta,tpo,dyn,thrm,bnd)
+
+        implicit none 
+
+        type(ydata_class),  intent(INOUT) :: dta
+        type(ytopo_class),  intent(IN)    :: tpo 
+        type(ydyn_class),   intent(IN)    :: dyn 
+        type(ytherm_class), intent(IN)    :: thrm
+        type(ybound_class), intent(IN)    :: bnd
+        
+        ! Calculate errors
+        dta%pd%err_H_ice   = tpo%now%H_ice - dta%pd%H_ice 
+        dta%pd%err_z_srf   = tpo%now%z_srf - dta%pd%z_srf 
+        dta%pd%err_uxy_s   = dyn%now%uxy_s - dta%pd%uxy_s 
+        
+        return 
+
+    end subroutine ydata_compare 
 
     subroutine ydata_load(dta,ice_allowed)
 

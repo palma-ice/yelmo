@@ -121,6 +121,9 @@ contains
         ! Update regional calculations (for now entire domain with ice)
         call calc_yregions(dom%reg,dom%tpo,dom%dyn,dom%thrm,dom%mat,dom%bnd,mask=dom%bnd%ice_allowed)
 
+        ! Compare with data 
+        call ydata_compare(dom%dta,dom%tpo,dom%dyn,dom%thrm,dom%bnd)
+
         ! Calculate model speed [model-kyr / hr]
         call yelmo_calc_speed(dom%par%model_speed,dom%par%model_speeds,time_start,time_now,cpu_start_time)
 

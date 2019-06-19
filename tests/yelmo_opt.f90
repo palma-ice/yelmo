@@ -122,14 +122,18 @@ program yelmo_test
     ! spin up the thermodynamics and have a reference state to reset.
     ! Store the reference state for future use.
 
-    call yelmo_update_equil(yelmo1,time,time_tot=10e3,topo_fixed=.TRUE.,dt=5.0,ssa_vel_max=0.0)
-    
+    call yelmo_update_equil(yelmo1,time,time_tot=1e3,  topo_fixed=.TRUE.,dt=5.0,ssa_vel_max=0.0)
+
     ! Store the reference state
     yelmo_ref = yelmo1 
 
     ! Initialize the 2D output file and write the initial model state 
     call yelmo_write_init(yelmo1,file2D,time_init=0.0,units="years")  
     call write_step_2D_opt(yelmo1,file2D,time=0.0,dCbed=dCbed,phi=phi)  
+
+!     call yelmo_update_equil(yelmo_ref,time,time_tot=500.0,topo_fixed=.FALSE.,dt=0.5,ssa_vel_max=500.0)
+!     call write_step_2D_opt(yelmo_ref,file2D,time=1.0,dCbed=dCbed,phi=phi)  
+!     stop "Done."
 
     ! Initially assume we are working with topo_fixed... (only for optimizing velocity)
     topo_fixed = .TRUE. 
@@ -157,7 +161,7 @@ program yelmo_test
         yelmo1 = yelmo_ref 
         
         ! Run model for time_iter yrs with this C_bed configuration (no change in boundaries)
-        call yelmo_update_equil(yelmo1,time,time_tot=time_iter,topo_fixed=topo_fixed,dt=5.0,ssa_vel_max=5000.0)
+        call yelmo_update_equil(yelmo1,time,time_tot=time_iter,topo_fixed=topo_fixed,dt=0.5,ssa_vel_max=5000.0)
         
 
         ! == MODEL OUTPUT =======================================================

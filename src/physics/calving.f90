@@ -306,8 +306,8 @@ contains
         real(prec) :: calv(size(H_ice,1),size(H_ice,2)) 
 
         ! Kill all floating ice, including partially grounded ice
-        where (f_grnd .lt. 1.0) calv = H_ice / dt 
-
+        where (f_grnd .eq. 0.0) calv = H_ice / dt 
+        
         return 
 
     end function calc_calving_rate_kill

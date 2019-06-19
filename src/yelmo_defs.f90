@@ -82,6 +82,7 @@ module yelmo_defs
         real(prec) :: calv_dt 
         real(prec) :: H_calv 
         real(prec) :: H_min 
+        real(prec) :: grad_lim 
         integer    :: gl_sep 
         integer    :: gl_sep_nx 
         logical    :: diffuse_bmb_shlf 

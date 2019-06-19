@@ -235,8 +235,8 @@ contains
         end if 
         
         ! Calculate the surface slope (on staggered Ac x/y nodes)
-        call calc_gradient_ac_ice(tpo%now%dzsdx,tpo%now%dzsdy,tpo%now%z_srf,tpo%now%H_ice,tpo%par%dx,tpo%par%margin2nd)
-        call calc_gradient_ac_ice(tpo%now%dHicedx,tpo%now%dHicedy,tpo%now%H_ice,tpo%now%H_ice,tpo%par%dx,tpo%par%margin2nd)
+        call calc_gradient_ac_ice(tpo%now%dzsdx,tpo%now%dzsdy,tpo%now%z_srf,tpo%now%H_ice,tpo%par%dx,tpo%par%margin2nd,tpo%par%grad_lim)
+        call calc_gradient_ac_ice(tpo%now%dHicedx,tpo%now%dHicedy,tpo%now%H_ice,tpo%now%H_ice,tpo%par%dx,tpo%par%margin2nd,tpo%par%grad_lim)
         
         ! Calculate distance to ice margin 
         !tpo%now%dist_margin = distance_to_margin(tpo%now%H_ice,tpo%par%dx)
@@ -336,6 +336,7 @@ contains
         call nml_read(filename,"ytopo","calv_dt",           par%calv_dt,          init=init_pars)
         call nml_read(filename,"ytopo","H_calv",            par%H_calv,           init=init_pars)
         call nml_read(filename,"ytopo","H_min",             par%H_min,            init=init_pars)
+        call nml_read(filename,"ytopo","grad_lim",          par%grad_lim,         init=init_pars)
         call nml_read(filename,"ytopo","gl_sep",            par%gl_sep,           init=init_pars)
         call nml_read(filename,"ytopo","gl_sep_nx",         par%gl_sep_nx,        init=init_pars)
         call nml_read(filename,"ytopo","diffuse_bmb_shlf",  par%diffuse_bmb_shlf, init=init_pars)

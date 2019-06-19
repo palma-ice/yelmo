@@ -469,7 +469,7 @@ contains
 
     end subroutine calc_gradient_ac
     
-    subroutine calc_gradient_ac_ice(dvardx,dvardy,var,H_ice,dx,margin2nd)
+    subroutine calc_gradient_ac_ice(dvardx,dvardy,var,H_ice,dx,margin2nd,grad_lim)
         ! Calculate gradient on ac nodes 
         ! for an ice sheet, only using non-zero thickness points
 
@@ -481,6 +481,7 @@ contains
         real(prec), intent(IN)  :: H_ice(:,:)
         real(prec), intent(IN)  :: dx 
         logical,    intent(IN)  :: margin2nd 
+        real(prec), intent(IN)  :: grad_lim 
 
         ! Local variables 
         integer :: i, j, nx, ny 
@@ -581,125 +582,13 @@ contains
 
         end if 
 
+        ! Finally, ensure that gradient is beneath desired limit 
+        where (dvardx .gt. grad_lim) dvardx = grad_lim 
+        where (dvardy .gt. grad_lim) dvardy = grad_lim 
+        
         return 
 
     end subroutine calc_gradient_ac_ice
-    
-    subroutine calc_gradient2nd_ac_ice(dvardx,dvardy,var,H_ice,dx,margin2nd)
-        ! Calculate 2nd-order gradient on ac nodes 
-        ! for an ice sheet, only using non-zero thickness points
-
-        implicit none 
-
-        real(prec), intent(OUT) :: dvardx(:,:) 
-        real(prec), intent(OUT) :: dvardy(:,:) 
-        real(prec), intent(IN)  :: var(:,:) 
-        real(prec), intent(IN)  :: H_ice(:,:)
-        real(prec), intent(IN)  :: dx 
-        logical,    intent(IN)  :: margin2nd 
-
-        ! Local variables 
-        integer :: i, j, nx, ny 
-        real(prec) :: dy 
-        real(prec) :: H0, H1, H2 
-
-        nx = size(var,1)
-        ny = size(var,2)
-
-        ! Assume y-resolution is identical to x-resolution 
-        dy = dx 
-
-        ! Slope in x-direction
-        do j = 1, ny 
-        do i = 1, nx-1 
-            dvardx(i,j) = (var(i+1,j)-var(i,j))/dx 
-        end do 
-        end do 
-
-        ! Slope in y-direction
-        do j = 1, ny-1 
-        do i = 1, nx 
-            dvardy(i,j) = (var(i,j+1)-var(i,j))/dy
-        end do 
-        end do 
-
-        ! === Modify margin gradients =========================
-        ! Following Saito et al (2007) by applying a second-order, upwind gradient
-
-        if (margin2nd) then
-
-            ! Slope in x-direction
-            do j = 1, ny 
-            do i = 3, nx-3
-
-                if (H_ice(i,j) .gt. 0.0 .and. H_ice(i+1,j) .eq. 0.0) then 
-                    ! Margin point (ice-free to the right)
-
-                    H0 = var(i+1,j) 
-                    H1 = var(i,j)
-                    H2 = var(i-1,j)
-
-                    if (H_ice(i-1,j) .gt. 0.0 .and. H_ice(i-2,j) .gt. 0.0) then 
-                        ! Second-order upwind if possible 
-                        dvardx(i,j) = (3.0*H0 - 4.0*H1 + H2) / (2.0*dx)
-                    end if 
-
-                else if (H_ice(i+1,j) .gt. 0.0 .and. H_ice(i,j) .eq. 0.0) then
-                    ! Margin point (ice-free to the left)
-
-                    H0 = var(i,j) 
-                    H1 = var(i+1,j)
-                    H2 = var(i+2,j)
-
-                    if (H_ice(i+2,j) .gt. 0.0 .and. H_ice(i+3,j) .gt. 0.0) then 
-                        ! Second-order upwind if possible
-                        dvardx(i,j) = -(3.0*H0 - 4.0*H1 + H2) / (2.0*dx) 
-                    end if 
-
-
-                end if 
-
-            end do 
-            end do 
-            
-            ! Slope in y-direction
-            do j = 3, ny-3 
-            do i = 1, nx
-
-                if (H_ice(i,j) .gt. 0.0 .and. H_ice(i,j+1) .eq. 0.0) then 
-                    ! Margin point (ice-free to the top)
-
-                    H0 = var(i,j+1) 
-                    H1 = var(i,j)
-                    H2 = var(i,j-1)
-
-                    if (H_ice(i,j-1) .gt. 0.0 .and. H_ice(i,j-2) .gt. 0.0) then 
-                        ! Second-order upwind if possible
-                        dvardy(i,j) = (3.0*H0 - 4.0*H1 + H2) / (2.0*dy)
-                    end if 
-
-                else if (H_ice(i,j+1) .gt. 0.0 .and. H_ice(i,j) .eq. 0.0) then
-                    ! Margin point (ice-free to the bottom)
-
-                    H0 = var(i,j) 
-                    H1 = var(i,j+1)
-                    H2 = var(i,j+2)
-
-                    if (H_ice(i,j+2) .gt. 0.0 .and. H_ice(i,j+3) .gt. 0.0) then 
-                        ! Second-order upwind if possible
-                        dvardy(i,j) = -(3.0*H0 - 4.0*H1 + H2) / (2.0*dy)
-                    end if 
-                    
-                end if 
-
-            end do 
-            end do
-
-        end if 
-
-        return 
-
-    end subroutine calc_gradient2nd_ac_ice
     
     function mean_mask(var,mask) result(ave)
 

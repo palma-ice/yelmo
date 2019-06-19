@@ -107,6 +107,9 @@ program yelmo_test
     ! Impose additional negative mass balance to no ice points of 2 [m.i.e./a] melting
     where(mask_noice) yelmo1%bnd%smb = yelmo1%dta%pd%smb - 2.0 
 
+    ! Saturate maximum smb to 1.5 m/a 
+    where(yelmo1%bnd%smb .gt. 1.5) yelmo1%bnd%smb = 1.5 
+    
     ! ============================================================================================
     ! Step 1: Relaxtion step: run SIA model for 100 years to smooth out the input
     ! topography that will be used as a target. 

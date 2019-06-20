@@ -1056,7 +1056,7 @@ end if
 
         ! Finally ensure that beta is higher than the lower allowed limit
         where(dyn%now%beta .gt. 0.0 .and. dyn%now%beta .lt. dyn%par%beta_min) dyn%now%beta = dyn%par%beta_min 
-        
+
         ! ================================================================
         ! Note: At this point the beta_aa field is available with beta=0 
         ! for floating points and beta > 0 for non-floating points
@@ -1295,7 +1295,7 @@ end if
                 if (dyn%par%neff_use_water) then 
                     H_w = bnd%H_w 
                 else 
-                    H_w = dyn%par%neff_w_max * 0.5 * thrm%now%f_pmp  
+                    H_w = dyn%par%neff_w_max * thrm%now%f_pmp  
                 end if 
 
                 dyn%now%N_eff = calc_effective_pressure_till(H_w,tpo%now%H_ice,tpo%now%f_grnd.lt.1.0,dyn%par%neff_w_max, &

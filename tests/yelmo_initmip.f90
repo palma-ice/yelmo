@@ -5,9 +5,12 @@ program yelmo_test
     use ncio 
     use yelmo 
     
+    use basal_hydro_simple 
+
     implicit none 
 
     type(yelmo_class)      :: yelmo1
+    type(hydro_class)      :: hyd1 
 
     character(len=256) :: outfldr, file1D, file2D, file_restart, domain 
     character(len=512) :: path_par, path_const  
@@ -48,12 +51,16 @@ program yelmo_test
     ! Initialize data objects and load initial topography
     call yelmo_init(yelmo1,filename=path_par,grid_def="file",time=time_init)
 
+    ! Also intialize simple basal hydrology object
+    call hydro_init(hyd1,filename=path_par,nx=yelmo1%grd%nx,ny=yelmo1%grd%ny)
+    call hydro_init_state(hyd1,yelmo1%tpo%now%H_ice,yelmo1%tpo%now%f_grnd,time)
+
     ! === Set initial boundary conditions for current time and yelmo state =====
     ! ybound: z_bed, z_sl, H_sed, H_w, smb, T_srf, bmb_shlf , Q_geo
 
     yelmo1%bnd%z_sl     = 0.0           ! [m]
     yelmo1%bnd%H_sed    = 0.0           ! [m]
-    yelmo1%bnd%H_w      = 0.0           ! [m]
+    yelmo1%bnd%H_w      = hyd1%now%H_w  ! [m]
     yelmo1%bnd%Q_geo    = 50.0          ! [mW/m2]
     
     yelmo1%bnd%bmb_shlf = -20.0         ! [m.i.e./a]
@@ -81,11 +88,11 @@ program yelmo_test
 
     ! Impose a colder boundary temperature for equilibration step 
     ! -5 [K] for mimicking glacial times
-    yelmo1%bnd%T_srf = yelmo1%dta%pd%T_srf - 10.0  
+!     yelmo1%bnd%T_srf = yelmo1%dta%pd%T_srf - 10.0  
 
     ! Run yelmo for several years with constant boundary conditions and topo
     ! to equilibrate thermodynamics and dynamics
-    call yelmo_update_equil(yelmo1,time,time_tot=time_equil,topo_fixed=.FALSE.,dt=1.0,ssa_vel_max=500.0)
+    call yelmo_update_equil(yelmo1,time,time_tot=time_equil,topo_fixed=.FALSE.,dt=0.5,ssa_vel_max=500.0)
     
     ! 2D file 
     call yelmo_write_init(yelmo1,file2D,time_init=time,units="years")  
@@ -95,30 +102,36 @@ program yelmo_test
     call write_yreg_init(yelmo1,file1D,time_init=time_init,units="years",mask=yelmo1%bnd%ice_allowed)
     call write_yreg_step(yelmo1%reg,file1D,time=time) 
     
-
     ! Advance timesteps
     do n = 1, ceiling((time_end-time_init)/dtt)
 
         ! Get current time 
         time = time_init + n*dtt
 
-        ! Update temperature and smb as needed in time (ISMIP6)
-        if (time .ge. -10e6 .and. time .lt. -10e3) then 
-            ! Glacial period, impose cold climate 
-            yelmo1%bnd%T_srf = yelmo1%dta%pd%T_srf - 10.0 
+!         ! Update temperature and smb as needed in time (ISMIP6)
+!         if (time .ge. -10e6 .and. time .lt. -10e3) then 
+!             ! Glacial period, impose cold climate 
+!             yelmo1%bnd%T_srf = yelmo1%dta%pd%T_srf - 10.0 
 
-        else if (time .ge. -10e3 .and. time .lt. -8e3) then
-            ! Holocene optimum 
-            yelmo1%bnd%T_srf = yelmo1%dta%pd%T_srf + 1.0 
+!         else if (time .ge. -10e3 .and. time .lt. -8e3) then
+!             ! Holocene optimum 
+!             yelmo1%bnd%T_srf = yelmo1%dta%pd%T_srf + 1.0 
 
-        else if (time .ge. -8e3) then 
-            ! Entering Holocene, impose present-day temperatures 
-            yelmo1%bnd%T_srf = yelmo1%dta%pd%T_srf
-        end if 
+!         else if (time .ge. -8e3) then 
+!             ! Entering Holocene, impose present-day temperatures 
+!             yelmo1%bnd%T_srf = yelmo1%dta%pd%T_srf
+!         end if 
 
         ! Update ice sheet 
         call yelmo_update(yelmo1,time)
 
+        ! Update basal hydrology 
+        call hydro_update(hyd1,yelmo1%tpo%now%H_ice,yelmo1%tpo%now%f_grnd, &
+                    yelmo1%thrm%now%bmb_grnd*rho_ice/rho_w,time)
+
+        ! Pass updated boundary variables to yelmo 
+        yelmo1%bnd%H_w = hyd1%now%H_w 
+        
         ! == MODEL OUTPUT =======================================================
 
         if (mod(nint(time*100),nint(dt2D_out*100))==0) then
@@ -294,10 +307,13 @@ contains
         call nc_write(filename,"f_pmp",ylmo%thrm%now%f_pmp,units="1",long_name="Fraction of grid point at pmp", &
                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
 
-        ! Ice thickness comparison with present-day 
-        call nc_write(filename,"H_ice_errpd",ylmo%tpo%now%H_ice-ylmo%dta%pd%H_ice,units="m",long_name="Ice thickness error wrt present day", &
+        call nc_write(filename,"H_w",ylmo%bnd%H_w,units="m water equiv.",long_name="Basal water layer thickness", &
                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-        call nc_write(filename,"uxy_s_errpd",ylmo%dyn%now%uxy_s-ylmo%dta%pd%uxy_s,units="m",long_name="Ice thickness error wrt present day", &
+        
+        ! Ice thickness comparison with present-day 
+        call nc_write(filename,"pd_err_z_srf",ylmo%dta%pd%err_z_srf,units="m",long_name="Surface elevation error (present day)", &
+                      dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
+        call nc_write(filename,"pd_err_uxy_s",ylmo%dta%pd%err_uxy_s,units="m",long_name="Surface velocity error (present day)", &
                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
         
         ! Diagnostics 

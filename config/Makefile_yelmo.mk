@@ -15,6 +15,9 @@ $(objdir)/nml.o: $(libdir)/nml.f90
 $(objdir)/gaussian_filter.o: $(libdir)/gaussian_filter.f90
 	$(FC) $(DFLAGS) $(FFLAGS) -c -o $@ $<
 
+$(objdir)/basal_hydro_simple.o: $(libdir)/basal_hydro_simple.f90 $(objdir)/nml.o $(objdir)/yelmo_defs.o
+	$(FC) $(DFLAGS) $(FFLAGS) -c -o $@ $<
+
 ## INTERNAL PHYSICS LIBRARIES ###############################
 
 $(objdir)/basal_dragging.o: $(srcdir)/physics/basal_dragging.f90 $(objdir)/yelmo_defs.o \
@@ -153,6 +156,7 @@ $(objdir)/mismip3D.o: $(testdir)/mismip3D.f90 $(objdir)/ncio.o $(objdir)/yelmo_d
 #############################################################
 
 yelmo_libs = 		   $(objdir)/gaussian_filter.o \
+					   $(objdir)/basal_hydro_simple.o \
 					   $(objdir)/nml.o \
 			 		   $(objdir)/ncio.o
 

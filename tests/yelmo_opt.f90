@@ -6,12 +6,15 @@ program yelmo_test
     use yelmo 
     
     use gaussian_filter 
+    use basal_hydro_simple 
 
     implicit none 
 
     type(yelmo_class)      :: yelmo1
     type(yelmo_class)      :: yelmo_ref 
-    
+    type(hydro_class)      :: hyd1 
+    type(hydro_class)      :: hyd_ref 
+
     character(len=256) :: outfldr, file1D, file2D, file_restart, domain 
     character(len=512) :: path_par, path_const  
     real(prec) :: time_init, time_end, time_equil, time, dtt, dt1D_out, dt2D_out   
@@ -52,6 +55,10 @@ program yelmo_test
     ! Initialize data objects and load initial topography
     call yelmo_init(yelmo1,filename=path_par,grid_def="file",time=time_init)
 
+    ! Also intialize simple basal hydrology object
+    call hydro_init(hyd1,filename=path_par,nx=yelmo1%grd%nx,ny=yelmo1%grd%ny)
+    call hydro_init_state(hyd1,yelmo1%tpo%now%H_ice,yelmo1%tpo%now%f_grnd,time)
+
     ! Simulation parameters
     time_init           = 0.0       ! [yr] Starting time
     time_iter           = 500.0     ! [yr] Simulation time for each iteration
@@ -59,7 +66,7 @@ program yelmo_test
     qmax_topo_fixed     = 0         ! Number of initial iterations that should use topo_fixed=.TRUE. 
     qmax_iter_length    = 10        ! Number of iterations at which iteration length should increase
     phi_min             =  2.0      ! Minimum allowed friction angle
-    phi_max             = 30.0      ! Maximum allowed friction angle 
+    phi_max             = 60.0      ! Maximum allowed friction angle 
 
     ! Prescribe key parameters here that should be set for beta optimization exercise 
     yelmo1%dyn%par%C_bed_method      = -1       ! C_Bed is set external to yelmo calculations
@@ -72,7 +79,7 @@ program yelmo_test
 
     yelmo1%bnd%z_sl     = 0.0           ! [m]
     yelmo1%bnd%H_sed    = 0.0           ! [m]
-    yelmo1%bnd%H_w      = 0.0           ! [m]
+    yelmo1%bnd%H_w      = hyd1%now%H_w  ! [m]
     yelmo1%bnd%Q_geo    = 50.0          ! [mW/m2]
     
     yelmo1%bnd%bmb_shlf = -20.0         ! [m.i.e./a]
@@ -124,11 +131,13 @@ program yelmo_test
     ! Step 2: Run the model for several ka in SIA mode with topo_fixed to
     ! spin up the thermodynamics and have a reference state to reset.
     ! Store the reference state for future use.
+    ! Note: using yelmo_update_equil_external allows for running with interactive hydrology via hyd1 object
 
-    call yelmo_update_equil(yelmo1,time,time_tot=5e3,topo_fixed=.TRUE.,dt=5.0,ssa_vel_max=0.0)
+    call yelmo_update_equil_external(yelmo1,hyd1,time,time_tot=5e3,topo_fixed=.TRUE.,dt=5.0,ssa_vel_max=0.0)
 
     ! Store the reference state
     yelmo_ref = yelmo1 
+    hyd_ref   = hyd1 
 
     ! Initialize the 2D output file and write the initial model state 
     call yelmo_write_init(yelmo1,file2D,time_init=0.0,units="years")  
@@ -163,12 +172,15 @@ program yelmo_test
             time_iter = 5000.0 
         end if 
 
-        ! Reset model to the initial state, with updated C_bed field 
+        ! Reset model to the initial state (including H_w), with updated C_bed field 
         yelmo_ref%dyn%now%C_bed = yelmo1%dyn%now%C_bed 
         yelmo1 = yelmo_ref 
+        hyd1   = hyd_ref 
         
-        ! Run model for time_iter yrs with this C_bed configuration (no change in boundaries)
-        call yelmo_update_equil(yelmo1,time,time_tot=time_iter,topo_fixed=topo_fixed,dt=0.5,ssa_vel_max=5000.0)
+        call yelmo_update_equil_external(yelmo1,hyd1,time,time_tot=time_iter,topo_fixed=topo_fixed,dt=0.5,ssa_vel_max=5000.0)
+
+!         ! Run model for time_iter yrs with this C_bed configuration (no change in boundaries)
+!         call yelmo_update_equil(yelmo1,time,time_tot=time_iter,topo_fixed=topo_fixed,dt=0.5,ssa_vel_max=5000.0)
         
         ! == MODEL OUTPUT =======================================================
 
@@ -206,12 +218,13 @@ contains
         integer    :: ncid, n
         real(prec) :: time_prev 
 
-        real(prec) :: uxy_rmse, H_rmse, zsrf_rmse 
+        real(prec) :: uxy_rmse, H_rmse, zsrf_rmse, loguxy_rmse 
         real(prec) :: rmse, err  
         real(prec), allocatable :: tmp(:,:) 
+        real(prec), allocatable :: tmp1(:,:) 
         
-
         allocate(tmp(ylmo%grd%nx,ylmo%grd%ny))
+        allocate(tmp1(ylmo%grd%nx,ylmo%grd%ny))
 
         ! Open the file for writing
         call nc_open(filename,ncid,writable=.TRUE.)
@@ -290,20 +303,13 @@ contains
                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
         
         ! initmip specific error metrics 
-        tmp = ylmo%tpo%now%H_ice-ylmo%dta%pd%H_ice
+        tmp = ylmo%dta%pd%err_H_ice
         if (n .gt. 1 .or. count(tmp .ne. 0.0) .gt. 0) then 
             H_rmse = sqrt(sum(tmp**2)/count(tmp .ne. 0.0))
         else 
             H_rmse = mv 
         end if 
 
-        tmp = ylmo%dyn%now%uxy_s-ylmo%dta%pd%uxy_s
-        if (n .gt. 1 .or. count(tmp .ne. 0.0) .gt. 0) then 
-            uxy_rmse = sqrt(sum(tmp**2)/count(tmp .ne. 0.0))
-        else
-            uxy_rmse = mv
-        end if 
-        
         ! surface elevation too 
         tmp = ylmo%dta%pd%err_z_srf
         if (n .gt. 1 .or. count(tmp .ne. 0.0) .gt. 0) then 
@@ -312,13 +318,33 @@ contains
             zsrf_rmse = mv 
         end if 
 
+        tmp = ylmo%dta%pd%err_uxy_s
+        if (n .gt. 1 .or. count(tmp .ne. 0.0) .gt. 0) then 
+            uxy_rmse = sqrt(sum(tmp**2)/count(tmp .ne. 0.0))
+        else
+            uxy_rmse = mv
+        end if 
+
+        tmp = ylmo%dta%pd%uxy_s 
+        where(ylmo%dta%pd%uxy_s .gt. 0.0) tmp = log(tmp)
+        tmp1 = ylmo%dyn%now%uxy_s 
+        where(ylmo%dyn%now%uxy_s .gt. 0.0) tmp1 = log(tmp1)
+        
+        if (n .gt. 1 .or. count(tmp1-tmp .ne. 0.0) .gt. 0) then 
+            loguxy_rmse = sqrt(sum((tmp1-tmp)**2)/count(tmp1-tmp .ne. 0.0))
+        else
+            loguxy_rmse = mv
+        end if 
+        
         call nc_write(filename,"rmse_H",H_rmse,units="m",long_name="RMSE - Ice thickness", &
-                      dim1="time",start=[n],count=[1],ncid=ncid)
-        call nc_write(filename,"rmse_uxy",uxy_rmse,units="m/a",long_name="RMSE - Surface velocity", &
                       dim1="time",start=[n],count=[1],ncid=ncid)
         call nc_write(filename,"rmse_zsrf",zsrf_rmse,units="m",long_name="RMSE - Surface elevation", &
                       dim1="time",start=[n],count=[1],ncid=ncid)
-
+        call nc_write(filename,"rmse_uxy",uxy_rmse,units="m/a",long_name="RMSE - Surface velocity", &
+                      dim1="time",start=[n],count=[1],ncid=ncid)
+        call nc_write(filename,"rmse_uxy_log",loguxy_rmse,units="log(m/a)",long_name="RMSE - Log surface velocity", &
+                      dim1="time",start=[n],count=[1],ncid=ncid)
+        
         ! Close the netcdf file
         call nc_close(ncid)
 
@@ -448,17 +474,23 @@ contains
                 dphi = f_dz 
                 
                 ! Calculate scaling with elevation 
-                ! Scale C_bed as a function bedrock elevation relative to sea level
-                f_scale = exp( (z_bed(i,j) - C_bed_z1) / (C_bed_z1 - C_bed_z0) )
-                if (f_scale .gt. 1.0) f_scale = 1.0
-                                
+
+                ! Exponential scaling 
+!                 f_scale = exp( (z_bed(i,j) - C_bed_z1) / (C_bed_z1 - C_bed_z0) )
+!                 if (f_scale .gt. 1.0) f_scale = 1.0
+                
+                ! Linear scaling 
+                f_scale = (z_bed(i,j) - C_bed_z0) / (C_bed_z1 - C_bed_z0)
+                if (f_scale .lt. 0.0) f_scale = 0.0 
+                if (f_scale .gt. 1.0) f_scale = 1.0 
+
                 ! 1. Apply change at current point 
 if (.FALSE.) then 
-                phi(i,j)  = phi(i,j) + dphi 
+                phi(i,j)  = f_scale*phi(i,j) + dphi 
                 phi(i,j)  = max(phi(i,j),phi_min)
                 phi(i,j)  = min(phi(i,j),phi_max)
 
-                C_bed(i,j) = (cf_stream*f_scale)*tan(phi(i,j)*pi/180.0)
+                C_bed(i,j) = cf_stream*tan(phi(i,j)*pi/180.0)
 end if 
 
                 ! 2. Apply change downstream (this may overlap with other changes)
@@ -486,11 +518,11 @@ end if
 
                 end if 
 
-                phi(i1,j1)  = phi(i1,j1) + dphi 
+                phi(i1,j1)  = f_scale*phi(i1,j1) + dphi 
                 phi(i1,j1)  = max(phi(i1,j1),phi_min)
                 phi(i1,j1)  = min(phi(i1,j1),phi_max)
 
-                C_bed(i1,j1) = (cf_stream*f_scale)*tan(phi(i1,j1)*pi/180.0)
+                C_bed(i1,j1) = cf_stream*tan(phi(i1,j1)*pi/180.0)
 
             end if 
 
@@ -511,6 +543,90 @@ end if
 
     end subroutine update_C_bed_thickness
 
+    subroutine yelmo_update_equil_external(dom,hyd,time,time_tot,dt,topo_fixed,ssa_vel_max)
+        ! Iterate yelmo solutions to equilibrate without updating boundary conditions
+
+        type(yelmo_class), intent(INOUT) :: dom
+        type(hydro_class), intent(INOUT) :: hyd 
+        real(prec), intent(IN) :: time            ! [yr] Current time
+        real(prec), intent(IN) :: time_tot        ! [yr] Equilibration time 
+        real(prec), intent(IN) :: dt              ! Local dt to be used for all modules
+        logical,    intent(IN) :: topo_fixed      ! Should topography be fixed? 
+        real(prec), intent(IN) :: ssa_vel_max     ! Local vel limit to be used, if == 0.0, no ssa used
+
+        ! Local variables 
+        real(prec) :: time_now  
+        integer    :: n, nstep 
+        logical    :: use_ssa         ! Should ssa be active?  
+        logical    :: dom_topo_fixed
+        logical    :: dom_use_ssa 
+        real(prec) :: dom_dtmax 
+        integer    :: dom_ntt 
+        real(prec) :: dom_ssa_vel_max 
+
+        ! Only run equilibration if time_tot > 0 
+
+        if (time_tot .gt. 0.0) then 
+
+            ! Consistency check
+            use_ssa = .FALSE. 
+            if (ssa_vel_max .gt. 0.0) use_ssa = .TRUE. 
+
+            ! Save original model choices 
+            dom_topo_fixed  = dom%tpo%par%topo_fixed 
+            dom_use_ssa     = dom%dyn%par%use_ssa 
+            dom_dtmax       = dom%par%dtmax
+            dom_ntt         = dom%par%ntt 
+            dom_ssa_vel_max = dom%dyn%par%ssa_vel_max
+
+            ! Set model choices equal to equilibration choices 
+            dom%tpo%par%topo_fixed  = topo_fixed 
+            dom%dyn%par%use_ssa     = use_ssa 
+            dom%par%dtmax           = dt 
+            dom%par%ntt             = 1 
+            dom%dyn%par%ssa_vel_max = ssa_vel_max
+
+            write(*,*) 
+            write(*,*) "Starting equilibration steps, time to run [yrs]: ", time_tot 
+
+            do n = 1, ceiling(time_tot/dt)
+
+                time_now = time + n*dt
+                call yelmo_update(dom,time_now)
+
+                ! Update basal hydrology 
+                call hydro_update(hyd,dom%tpo%now%H_ice,dom%tpo%now%f_grnd, &
+                            dom%thrm%now%bmb_grnd*rho_ice/rho_w,time_now)
+
+                ! Pass updated hydrology variable to Yelmo boundary field
+                dom%bnd%H_w = hyd%now%H_w 
+
+            end do
+
+            ! Restore original model choices 
+            dom%tpo%par%topo_fixed  = dom_topo_fixed 
+            dom%dyn%par%use_ssa     = dom_use_ssa 
+            dom%par%dtmax           = dom_dtmax 
+            dom%par%ntt             = dom_ntt 
+            dom%dyn%par%ssa_vel_max = dom_ssa_vel_max
+
+            write(*,*) 
+            write(*,*) "Equilibration complete."
+            write(*,*) 
+
+        end if 
+
+        ! Reset model time back to input time 
+        dom%tpo%par%time      = time 
+        dom%tpo%par%time_calv = time
+        dom%thrm%par%time     = time 
+
+        hyd%now%time          = time 
+
+        return
+
+    end subroutine yelmo_update_equil_external
+    
     ! Extra...
 
     subroutine calc_ydyn_cbed_external(dyn,tpo,thrm,bnd,channels)

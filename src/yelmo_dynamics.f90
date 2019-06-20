@@ -1216,7 +1216,8 @@ end if
             case(4)
                     ! Set C_bed according to bed elevation (but linearly, no as in case 2)
 
-                ! First set C_bed == cf_stream everywhere 
+                ! First set C_bed == cf_stream everywhere or mix of cf_stream/cf_frozen 
+
                 !dyn%now%C_bed = dyn%par%cf_stream 
                 dyn%now%C_bed = (thrm%now%f_pmp)*dyn%par%cf_stream &
                             + (1.0_prec - thrm%now%f_pmp)*dyn%par%cf_frozen
@@ -1229,14 +1230,20 @@ end if
                 do i = 1, nx
 
                     ! Scale C_bed as a function bedrock elevation relative to sea level
-                    ! The equations is Cbed = ((Cmax - Cmin)/(z1 -z0)) * (z - z0) + Cmin 
-                    
-                    dyn%now%C_bed(i,j) =(dyn%par%C_bed_max - dyn%par%C_bed_min) * (bnd%z_bed(i,j) - dyn%par%C_bed_z0)
-                    dyn%now%C_bed(i,j) = dyn%now%C_bed(i,j) / (dyn%par%C_bed_z1 - dyn%par%C_bed_z0) 
-                    dyn%now%C_bed(i,j) = dyn%now%C_bed(i,j) + dyn%par%C_bed_min 
+                    f_scale = (bnd%z_bed(i,j) - dyn%par%C_bed_z0) / (dyn%par%C_bed_z1 - dyn%par%C_bed_z0)
+                    if (f_scale .lt. 0.0) f_scale = 0.0 
+                    if (f_scale .gt. 1.0) f_scale = 1.0
+                    dyn%now%C_bed(i,j) = dyn%now%C_bed(i,j) * f_scale 
 
-                    if (bnd%z_bed(i,j) .gt. dyn%par%C_bed_z1) dyn%now%C_bed(i,j) = dyn%par%C_bed_max
-                    if (bnd%z_bed(i,j) .lt. dyn%par%C_bed_z0) dyn%now%C_bed(i,j) = dyn%par%C_bed_min
+!                     ! Scale C_bed as a function bedrock elevation relative to sea level
+!                     ! The equations is Cbed = ((Cmax - Cmin)/(z1 -z0)) * (z - z0) + Cmin 
+                    
+!                     dyn%now%C_bed(i,j) =(dyn%par%C_bed_max - dyn%par%C_bed_min) * (bnd%z_bed(i,j) - dyn%par%C_bed_z0)
+!                     dyn%now%C_bed(i,j) = dyn%now%C_bed(i,j) / (dyn%par%C_bed_z1 - dyn%par%C_bed_z0) 
+!                     dyn%now%C_bed(i,j) = dyn%now%C_bed(i,j) + dyn%par%C_bed_min 
+
+!                     if (bnd%z_bed(i,j) .gt. dyn%par%C_bed_z1) dyn%now%C_bed(i,j) = dyn%par%C_bed_max
+!                     if (bnd%z_bed(i,j) .lt. dyn%par%C_bed_z0) dyn%now%C_bed(i,j) = dyn%par%C_bed_min
 
                 end do
                 end do
@@ -1250,6 +1257,9 @@ end if
                 stop 
                 
         end select 
+
+        ! Ensure C_bed is not below lower limit 
+        where (dyn%now%C_bed .lt. dyn%par%C_bed_min) dyn%now%C_bed = dyn%par%C_bed_min 
 
         return 
 

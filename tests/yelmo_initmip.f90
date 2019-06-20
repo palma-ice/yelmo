@@ -131,7 +131,7 @@ program yelmo_test
 
         ! Pass updated boundary variables to yelmo 
         yelmo1%bnd%H_w = hyd1%now%H_w 
-        
+
         ! == MODEL OUTPUT =======================================================
 
         if (mod(nint(time*100),nint(dt2D_out*100))==0) then
@@ -174,7 +174,7 @@ contains
         integer    :: ncid, n
         real(prec) :: time_prev 
 
-        real(prec) :: uxy_rmse, H_rmse, loguxy_rmse 
+        real(prec) :: uxy_rmse, H_rmse, zsrf_rmse, loguxy_rmse 
         real(prec), allocatable :: tmp(:,:) 
         real(prec), allocatable :: tmp1(:,:) 
         
@@ -204,7 +204,15 @@ contains
             H_rmse = mv 
         end if 
 
-        tmp = ylmo%dyn%now%uxy_s-ylmo%dta%pd%uxy_s
+        ! surface elevation too 
+        tmp = ylmo%dta%pd%err_z_srf
+        if (n .gt. 1 .or. count(tmp .ne. 0.0) .gt. 0) then 
+            zsrf_rmse = sqrt(sum(tmp**2)/count(tmp .ne. 0.0))
+        else 
+            zsrf_rmse = mv 
+        end if 
+
+        tmp = ylmo%dta%pd%err_uxy_s
         if (n .gt. 1 .or. count(tmp .ne. 0.0) .gt. 0) then 
             uxy_rmse = sqrt(sum(tmp**2)/count(tmp .ne. 0.0))
         else
@@ -224,9 +232,11 @@ contains
         
         call nc_write(filename,"rmse_H",H_rmse,units="m",long_name="RMSE - Ice thickness", &
                       dim1="time",start=[n],count=[1],ncid=ncid)
+        call nc_write(filename,"rmse_zsrf",zsrf_rmse,units="m",long_name="RMSE - Surface elevation", &
+                      dim1="time",start=[n],count=[1],ncid=ncid)
         call nc_write(filename,"rmse_uxy",uxy_rmse,units="m/a",long_name="RMSE - Surface velocity", &
                       dim1="time",start=[n],count=[1],ncid=ncid)
-        call nc_write(filename,"rmse_uxy_log",loguxy_rmse,units="m/a",long_name="RMSE - Log surface velocity", &
+        call nc_write(filename,"rmse_uxy_log",loguxy_rmse,units="log(m/a)",long_name="RMSE - Log surface velocity", &
                       dim1="time",start=[n],count=[1],ncid=ncid)
         
         ! == ISMIP6 specific variables 

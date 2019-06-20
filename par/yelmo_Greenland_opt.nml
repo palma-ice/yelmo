@@ -1,14 +1,3 @@
-&control
-    
-    ! Timing parameters 
-    time_init    = -30e3                ! [yr] Starting time 
-    time_end     = -20e3                ! [yr] Ending time
-    time_equil   = 0.0                  ! [yr] Equiibration time 
-    dtt          = 0.5                  ! [yr] Main loop timestep 
-    dt1D_out     = 100.0                ! [yr] Frequency of writing 1D output files 
-    dt2D_out     = 50.0                 ! [yr] Frequency of writing 2D output files 
-/
-
 &yelmo
     domain          = "Greenland"
     grid_name       = "GRL-16KM"
@@ -54,26 +43,26 @@
     sia_solver          = "vel"           ! "vel", "shear", "none"
     mix_method          = 1               ! -2: sia, -1: ssa, 0: sia|ssa, 1: sia+ssa 2: ssa vel. fraction
     calc_diffusivity    = False           ! Calculate 2D diffusivity term for diagnostics
-    beta_method         = 1               ! 0: constant beta; 1: linear law; 2: power law; 3: regularized Coulomb law, 4: pism power law
+    beta_method         = 4               ! 0: constant beta; 1: linear law; 2: power law; 3: regularized Coulomb law, 4: pism power law
     beta_with_neff      = True            ! Additionally scale beta by effective pressure? (beta=Neff*[beta_default])
-    m_drag              = 3.0             ! Dragging law exponent 
-    u_0                 = 300.0           ! [m/a] Regularization term for regularized Coulomb law (beta_method=3)
+    m_drag              = 0.5             ! Dragging law exponent 
+    u_0                 = 100.0           ! [m/a] Regularization term for regularized Coulomb law (beta_method=3)
     beta_const          = 1e3             ! [Pa a m−1] Constant value of basal friction coefficient to be used
     beta_gl_sep         = 0               !  -1: Apply subgrid treatment on ac-nodes (beta_gl_stag=3) 0: No subgrid treatment, 1: beta*f_grnd_aa        
     beta_gl_scale       = 0               !  0: beta*beta_gl_f, 1: H_grnd linear scaling, 2: Zstar scaling 
     beta_gl_stag        = 0               !  0: simple staggering, 1: Upstream beta at gl, 2: downstream, 3: f_grnd_ac scaling 
     beta_gl_f           = 1.0             ! [-] Scaling of beta at the grounding line (for beta_gl_method=1)
     taud_gl_method      = 0               !  0: binary, no subgrid, 1: Two-sided gradient
-    C_bed_method        = 3               ! -1: set externally; 0: cf_stream everywhere; 1: cf_stream/cf_frozen; 2: cf_stream*f_zbed; 3: till strength 
-    C_bed_z0            = 0.0             ! [m] Bedrock elevation at which scaling goes to f_scale=e(-1)
-    C_bed_z1            = 500.0           ! [m] Bedrock elevation above which scaling goes to f_scale=1
-    C_bed_min           = 1e-5            ! [a m-1] Bed roughness at bedrock elevation C_bed_z0 or below (used for having a lower limit in cbedmethod2 (exp) and C_bed_method = 4)
-    C_bed_max           = 50e-5           ! [a m-1] Bed roughness at bedrock elevation C_bed_z1 or above (only used for C_bed_method = 4)
+    C_bed_method        = 3               ! -1: set externally; 0: cf_stream everywhere; 1: cf_stream/cf_frozen; 2: cf_stream*fexp_zbed; 3: till strength, 4: cf_stream*flin_zbed 
+    C_bed_z0            = -700.0          ! [m] Bedrock elevation at which scaling goes to f_scale=e(-1)
+    C_bed_z1            =  700.0          ! [m] Bedrock elevation above which scaling goes to f_scale=1
+    C_bed_min           = 1e-4            ! [Pa a m-1] Minimum allowed value for C_bed for C_bed_method=[2,4]
+    C_bed_max           = 500.0           ! [Pa a m-1] Maximum allowed value for C_bed for C_bed_method=[2,4]
     H_grnd_lim          = 500.0           ! [m] For beta_sep_method=2, reduce beta linearly between H_grnd=0 and H_grnd_lim 
     H_sed_sat           = 250.0           ! [m] Sediment thickness at which sediment effect is saturated
-    cf_frozen           = 100.0           ! [a m-1] Bed roughness coefficient, frozen 
+    cf_frozen           = 1.0             ! [a m-1] Bed roughness coefficient, frozen 
     cf_stream           = 1.0             ! [a m-1] Bed roughness coefficient, stream  
-    cf_fac_sed          = 0.1             ! [-] Scaling of roughness for sediments 
+    cf_fac_sed          = 1.0             ! [-] Scaling of roughness for sediments 
     cf_sia              = 0.0             ! [m a-1 Pa-1] Bed roughness coefficient for SIA sliding
     streaming_margin    = True            ! Impose cf_stream at the margin and grline independent of f_pmp
     n_sm_beta           = 0               ! [-] Standard deviation in gridpoints for Gaussian smoothing of beta (0==no smoothing)
@@ -87,18 +76,18 @@
 /
 
 &ydyn_neff 
-    neff_method     = 1                 ! -1: external N_eff, 0: overburden pressure, 1: Leguy param., 2: Till pressure
-    neff_p          = 0.0               ! *neff_method=1* marine connectivity exponent (0: none, 1: full)
-    neff_use_water  = False             ! *neff_method=2* Use H_w field? If not, parameterize it.
+    neff_method     = 2                 ! -1: external N_eff, 0: overburden pressure, 1: Leguy param., 2: Till pressure
+    neff_p          = 1.0               ! *neff_method=1* marine connectivity exponent (0: none, 1: full)
+    neff_use_water  = True              ! *neff_method=2* Use H_w field? If not, parameterize it.
     neff_w_max      = 2.0               ! [m]  *neff_method=2* Maximum allowed water layer thickness for Till pressure 
     neff_N0         = 1000.0            ! [Pa] *neff_method=2* Reference effective pressure 
-    neff_delta      = 0.04              ! [--] *neff_method=2* Fraction of overburden pressure for saturated till
+    neff_delta      = 0.02              ! [--] *neff_method=2* Fraction of overburden pressure for saturated till
     neff_e0         = 0.69              ! [--] *neff_method=2* Reference void ratio at N0 
     neff_Cc         = 0.12              ! [--] *neff_method=2* Till compressibility    
 /
 
 &ydyn_till
-    till_method     =  0                ! 0: phi = till_phi_min [const], 1: phi = f(z_bed) [linear]
+    till_method     =  1                ! 0: phi = till_phi_min [const], 1: phi = f(z_bed) [linear]
     till_phi_min    =  5                ! [degrees] Till friction angle, minimum
     till_phi_max    = 40                ! [degrees] Till friction angle, maximum
     till_phi_zmin   = -700.0            ! [m] Bedrock elevation for till_phi_min
@@ -175,5 +164,13 @@
     pd_vel_path       = "input/{domain}/{grid_name}/{grid_name}_VEL-J18.nc"
     pd_vel_names      = "ux_srf" "uy_srf"            ! Surface velocity 
 
+/
+
+&basal_hydro_simple
+    init_method       = 0             ! 0: no water; 1: constant value
+    method            = 1             ! 0: constant; 1: local bucket method
+    H_w_init          = 0.0           ! [m] Initial water layer thickness (init_method=1)
+    H_w_max           = 2.0           ! [m] Maximum allowed water thickness under ice sheet
+    till_rate         = 1e-3          ! [m/a] Till infiltration (drainage) rate 
 /
 

@@ -211,7 +211,7 @@ contains
         return
 
     end subroutine yelmo_update_equil
-
+    
     subroutine yelmo_init(dom,filename,grid_def,time,load_topo,domain,grid_name)
         ! Initialize a yelmo domain, including the grid itself, 
         ! and all sub-components (topo,dyn,mat,therm,bound,data)

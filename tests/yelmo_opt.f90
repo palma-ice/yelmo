@@ -20,7 +20,7 @@ program yelmo_test
 
     ! Optimization variables 
     real(prec) :: time_iter
-    integer    :: q, qmax, qmax_topo_fixed 
+    integer    :: q, qmax, qmax_topo_fixed, qmax_iter_length  
     logical    :: topo_fixed 
     real(prec) :: phi_min, phi_max  
 
@@ -53,13 +53,13 @@ program yelmo_test
     call yelmo_init(yelmo1,filename=path_par,grid_def="file",time=time_init)
 
     ! Simulation parameters
-    time_init       = 0.0           ! [yr] Starting time
-    time_iter       = 500.0         ! [yr] Simulation time for each iteration
-    qmax            = 101           ! Total number of iterations
-    qmax_topo_fixed = 0             ! Number of initial iterations that should use topo_fixed=.TRUE. 
-
-    phi_min         =  2.0 
-    phi_max         = 30.0 
+    time_init           = 0.0       ! [yr] Starting time
+    time_iter           = 500.0     ! [yr] Simulation time for each iteration
+    qmax                = 101       ! Total number of iterations
+    qmax_topo_fixed     = 0         ! Number of initial iterations that should use topo_fixed=.TRUE. 
+    qmax_iter_length    = 10        ! Number of iterations at which iteration length should increase
+    phi_min             =  2.0      ! Minimum allowed friction angle
+    phi_max             = 30.0      ! Maximum allowed friction angle 
 
     ! Prescribe key parameters here that should be set for beta optimization exercise 
     yelmo1%dyn%par%C_bed_method      = -1       ! C_Bed is set external to yelmo calculations
@@ -125,7 +125,7 @@ program yelmo_test
     ! spin up the thermodynamics and have a reference state to reset.
     ! Store the reference state for future use.
 
-    call yelmo_update_equil(yelmo1,time,time_tot=20e3,topo_fixed=.TRUE.,dt=5.0,ssa_vel_max=0.0)
+    call yelmo_update_equil(yelmo1,time,time_tot=5e3,topo_fixed=.TRUE.,dt=5.0,ssa_vel_max=0.0)
 
     ! Store the reference state
     yelmo_ref = yelmo1 
@@ -148,6 +148,10 @@ program yelmo_test
         ! Determine whether this iteration maintains topo_fixed conditions (only for optimizing velocity)
         if (q .gt. qmax_topo_fixed) topo_fixed = .FALSE. 
 
+        ! Increase iteration time after several iterations to ensure convergence on
+        ! a beta that performs well towards equilibration
+        if (q .gt. qmax_iter_length) time_iter = 1000.0 
+
         if (q .lt. qmax) then
             ! Update C_bed based on error correction
             call update_C_bed_thickness(yelmo1%dyn%now%C_bed,dCbed,phi,yelmo1%dta%pd%err_z_srf,yelmo1%tpo%now%H_ice, &
@@ -166,7 +170,6 @@ program yelmo_test
         ! Run model for time_iter yrs with this C_bed configuration (no change in boundaries)
         call yelmo_update_equil(yelmo1,time,time_tot=time_iter,topo_fixed=topo_fixed,dt=0.5,ssa_vel_max=5000.0)
         
-
         ! == MODEL OUTPUT =======================================================
 
         time = real(q,prec)

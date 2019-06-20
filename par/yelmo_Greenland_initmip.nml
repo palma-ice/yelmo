@@ -89,7 +89,7 @@
 &ydyn_neff 
     neff_method     = 2                 ! -1: external N_eff, 0: overburden pressure, 1: Leguy param., 2: Till pressure
     neff_p          = 1.0               ! *neff_method=1* marine connectivity exponent (0: none, 1: full)
-    neff_use_water  = False             ! *neff_method=2* Use H_w field or parameterize it?
+    neff_use_water  = True              ! *neff_method=2* Use H_w field or parameterize it?
     neff_w_max      = 2.0               ! [m]  *neff_method=2* Maximum allowed water layer thickness for Till pressure 
     neff_N0         = 1000.0            ! [Pa] *neff_method=2* Reference effective pressure 
     neff_delta      = 0.02              ! [--] *neff_method=2* Fraction of overburden pressure for saturated till

@@ -596,7 +596,7 @@ end if
 
                 ! Update basal hydrology 
                 call hydro_update(hyd,dom%tpo%now%H_ice,dom%tpo%now%f_grnd, &
-                            dom%thrm%now%bmb_grnd*rho_ice/rho_w,time_now)
+                            -dom%thrm%now%bmb_grnd*rho_ice/rho_w,time_now)
 
                 ! Pass updated hydrology variable to Yelmo boundary field
                 dom%bnd%H_w = hyd%now%H_w 

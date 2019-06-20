@@ -127,7 +127,7 @@ program yelmo_test
 
         ! Update basal hydrology 
         call hydro_update(hyd1,yelmo1%tpo%now%H_ice,yelmo1%tpo%now%f_grnd, &
-                    yelmo1%thrm%now%bmb_grnd*rho_ice/rho_w,time)
+                    -yelmo1%thrm%now%bmb_grnd*rho_ice/rho_w,time)
 
         ! Pass updated boundary variables to yelmo 
         yelmo1%bnd%H_w = hyd1%now%H_w 

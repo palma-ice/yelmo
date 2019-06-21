@@ -151,7 +151,7 @@
 &yelmo_data 
     pd_topo_load      = True 
     pd_topo_path      = "input/{domain}/{grid_name}/{grid_name}_TOPO-M17.nc"
-    pd_topo_names     = "H_ice" "z_srf" "z_bed"      ! Ice thickness, Surface elevation, Bedrock elevation
+    pd_topo_names     = "H_ice" "z_srf" "z_bed" "z_bed_sd"      ! Ice thickness, Surface elevation, Bedrock elevation, Stdev(z_bed)
     pd_tsrf_load      = True 
     pd_tsrf_path      = "input/{domain}/{grid_name}/{grid_name}_MARv3.9-ERA-INT_ann_1980-1999.nc"
     pd_tsrf_name      = "T_srf"                      ! Surface temperature (or near-surface temperature)

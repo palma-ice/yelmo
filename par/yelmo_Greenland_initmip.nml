@@ -3,7 +3,7 @@
     ! Timing parameters 
     time_init    = 0.0                  ! [yr] Starting time 
     time_end     = 50e3                 ! [yr] Ending time
-    time_equil   = 100.0                ! [yr] Equiibration time 
+    time_equil   = 10.0                ! [yr] Equilibration time 
     dtt          = 0.5                  ! [yr] Main loop timestep 
     dt1D_out     = 100.0                ! [yr] Frequency of writing 1D output files 
     dt2D_out     = 100.0                ! [yr] Frequency of writing 2D output files 
@@ -162,7 +162,7 @@
 &yelmo_data 
     pd_topo_load      = True 
     pd_topo_path      = "input/{domain}/{grid_name}/{grid_name}_TOPO-M17.nc"
-    pd_topo_names     = "H_ice" "z_srf" "z_bed"      ! Ice thickness, Surface elevation, Bedrock elevation
+    pd_topo_names     = "H_ice" "z_srf" "z_bed" "z_bed_sd"      ! Ice thickness, Surface elevation, Bedrock elevation, Stdev(z_bed)
     pd_tsrf_load      = True 
     pd_tsrf_path      = "input/{domain}/{grid_name}/{grid_name}_MARv3.9-ERA-INT_ann_1980-1999.nc"
     pd_tsrf_name      = "T_srf"                      ! Surface temperature (or near-surface temperature)

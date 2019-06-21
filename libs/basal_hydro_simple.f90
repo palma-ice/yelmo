@@ -162,6 +162,7 @@ contains
         
         ! Local variables 
         integer :: i, j, nx, ny 
+        integer :: im1, ip1, jm1, jp1 
 
         nx = size(H_ice,1)
         ny = size(H_ice,2)
@@ -195,19 +196,30 @@ contains
         ! Set floating points to the maximum water thickness
         where (f_grnd .eq. 0.0) hyd%now%H_w = hyd%par%H_w_max  
 
-        do j = 2, ny-1 
-        do i = 2, nx-1 
 
+        ! Additionally set points at the grounding line to
+        ! the maximum water thickness 
+        do j = 1, ny 
+        do i = 1, nx
+
+            im1 = max(1, i-1)
+            ip1 = min(nx,i+1)
+            
+            jm1 = max(1, j-1)
+            jp1 = min(ny,j+1)
+
+            ! Grounded point or partially floating point with floating neighbors
             if (H_ice(i,j) .gt. 0.0 .and. f_grnd(i,j) .gt. 0.0 .and. &
-                count([f_grnd(i-1,j),f_grnd(i+1,j),f_grnd(i,j-1),f_grnd(i,j+1)].eq.0.0) .gt. 0) then 
-
-                hyd%now%H_w = hyd%par%H_w_max 
+                (f_grnd(im1,j) .eq. 0.0 .or. f_grnd(ip1,j) .eq. 0.0 .or. &
+                 f_grnd(i,jm1) .eq. 0.0 .or. f_grnd(i,jp1) .eq. 0.0) ) then 
+                
+                hyd%now%H_w(i,j) = hyd%par%H_w_max 
 
             end if 
 
         end do 
         end do 
-
+        
         ! Set the current time and time step 
         hyd%now%time = time 
         hyd%now%dt   = 0.0 
@@ -297,6 +309,7 @@ contains
 
         ! Local variables 
         integer :: i, j, nx, ny 
+        integer :: im1, ip1, jm1, jp1 
 
         nx = size(H_ice,1)
         ny = size(H_ice,2)
@@ -323,18 +336,28 @@ contains
 
         end where 
 
-        do j = 2, ny-1 
-        do i = 2, nx-1 
+        ! Additionally set points at the grounding line to
+        ! the maximum water thickness 
+        do j = 1, ny 
+        do i = 1, nx
 
+            im1 = max(1, i-1)
+            ip1 = min(nx,i+1)
+            
+            jm1 = max(1, j-1)
+            jp1 = min(ny,j+1)
+
+            ! Grounded point or partially floating point with floating neighbors
             if (H_ice(i,j) .gt. 0.0 .and. f_grnd(i,j) .gt. 0.0 .and. &
-                count([f_grnd(i-1,j),f_grnd(i+1,j),f_grnd(i,j-1),f_grnd(i,j+1)].eq.0.0) .gt. 0) then 
-
-                H_w = H_w_max 
+                (f_grnd(im1,j) .eq. 0.0 .or. f_grnd(ip1,j) .eq. 0.0 .or. &
+                 f_grnd(i,jm1) .eq. 0.0 .or. f_grnd(i,jp1) .eq. 0.0) ) then 
                 
+                H_w(i,j) = H_w_max
+
             end if 
 
         end do 
-        end do 
+        end do  
 
         return 
 

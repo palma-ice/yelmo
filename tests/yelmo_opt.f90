@@ -133,7 +133,7 @@ program yelmo_test
     ! Store the reference state for future use.
     ! Note: using yelmo_update_equil_external allows for running with interactive hydrology via hyd1 object
 
-    call yelmo_update_equil_external(yelmo1,hyd1,time,time_tot=5e3,topo_fixed=.TRUE.,dt=5.0,ssa_vel_max=0.0)
+    call yelmo_update_equil_external(yelmo1,hyd1,time,time_tot=20e3,topo_fixed=.TRUE.,dt=5.0,ssa_vel_max=0.0)
 
     ! Store the reference state
     yelmo_ref = yelmo1 

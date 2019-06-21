@@ -155,12 +155,13 @@
 /
 
 &yelmo_init_topo
-    H_ice_load = False 
-    H_ice_path = "none"
-    H_ice_nm   = "H_ice"            ! [m] Ice thickness 
-    z_bed_load = False 
-    z_bed_path = "none"
-    z_bed_nm   = "z_bed"            ! [m] Bedrock elevation 
+    H_ice_load      = False 
+    H_ice_path      = "none"
+    H_ice_nm        = "H_ice"               ! [m] Ice thickness 
+    z_bed_load      = False 
+    z_bed_path      = "none"
+    z_bed_nm        = "z_bed"               ! [m] Bedrock elevation 
+    z_bed_sd_nm     = "z_bed_sd"            ! [m] Bedrock elevation standard deviation (if available) 
 
 /
 

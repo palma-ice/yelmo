@@ -451,6 +451,7 @@ module yelmo_defs
 
         ! Variables that save the current boundary conditions
         real(prec), allocatable :: z_bed(:,:)
+        real(prec), allocatable :: z_bed_sd(:,:) 
         real(prec), allocatable :: z_sl(:,:)
         real(prec), allocatable :: H_sed(:,:)
         real(prec), allocatable :: H_w(:,:)
@@ -482,7 +483,7 @@ module yelmo_defs
     type ydata_param_class 
         logical             :: pd_topo_load 
         character(len=1028) :: pd_topo_path 
-        character(len=56)   :: pd_topo_names(4)
+        character(len=56)   :: pd_topo_names(3)
         logical             :: pd_tsrf_load  
         character(len=1028) :: pd_tsrf_path 
         character(len=56)   :: pd_tsrf_name
@@ -500,7 +501,7 @@ module yelmo_defs
 
     type ydata_pd_class   ! pd = present-day
         ! Variables that contain observations / reconstructions for comparison/inversion
-        real(prec), allocatable :: H_ice(:,:), z_srf(:,:), z_bed(:,:), z_bed_sd(:,:) 
+        real(prec), allocatable :: H_ice(:,:), z_srf(:,:), z_bed(:,:)
         real(prec), allocatable :: ux_s(:,:), uy_s(:,:), uxy_s(:,:) 
         real(prec), allocatable :: T_srf(:,:), smb(:,:) 
         ! Comparison metrics 

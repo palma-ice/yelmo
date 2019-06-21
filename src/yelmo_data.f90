@@ -54,18 +54,11 @@ contains
             ! =========================================
             ! Load topography data from netcdf file 
             filename = dta%par%pd_topo_path
-            nms(1:4) = dta%par%pd_topo_names 
+            nms(1:3) = dta%par%pd_topo_names 
 
             call nc_read(filename,nms(1), dta%pd%H_ice, missing_value=mv)
             call nc_read(filename,nms(2), dta%pd%z_srf, missing_value=mv)
             call nc_read(filename,nms(3), dta%pd%z_bed, missing_value=mv) 
-
-            if (len_trim(nms(4)) .gt. 0) then 
-                ! Stdev(z_bed) exists...
-                call nc_read(filename,nms(4), dta%pd%z_bed_sd, missing_value=mv)
-            else
-                dta%pd%z_bed_sd = 0.0 
-            end if 
 
             ! Clean up field 
             where(dta%pd%H_ice  .lt. 1.0) dta%pd%H_ice = 0.0 
@@ -159,15 +152,14 @@ contains
         end if 
 
         ! Summarize data loading 
-        write(*,*) "ydata_load:: range(H_ice):    ", minval(dta%pd%H_ice),   maxval(dta%pd%H_ice)
-        write(*,*) "ydata_load:: range(z_srf):    ", minval(dta%pd%z_srf),   maxval(dta%pd%z_srf)
-        write(*,*) "ydata_load:: range(z_bed):    ", minval(dta%pd%z_bed),   maxval(dta%pd%z_bed)
-        write(*,*) "ydata_load:: range(z_bed_sd): ", minval(dta%pd%z_bed_sd),maxval(dta%pd%z_bed_sd)
-        write(*,*) "ydata_load:: range(T_srf):    ", minval(dta%pd%T_srf), maxval(dta%pd%T_srf)
-        write(*,*) "ydata_load:: range(smb):      ", minval(dta%pd%smb,dta%pd%smb .ne. mv), &
-                                                     maxval(dta%pd%smb,dta%pd%smb .ne. mv)
-        write(*,*) "ydata_load:: range(uxy_s):    ", minval(dta%pd%uxy_s,dta%pd%uxy_s .ne. mv), &
-                                                     maxval(dta%pd%uxy_s,dta%pd%uxy_s .ne. mv)
+        write(*,*) "ydata_load:: range(H_ice): ", minval(dta%pd%H_ice),   maxval(dta%pd%H_ice)
+        write(*,*) "ydata_load:: range(z_srf): ", minval(dta%pd%z_srf),   maxval(dta%pd%z_srf)
+        write(*,*) "ydata_load:: range(z_bed): ", minval(dta%pd%z_bed),   maxval(dta%pd%z_bed)
+        write(*,*) "ydata_load:: range(T_srf): ", minval(dta%pd%T_srf), maxval(dta%pd%T_srf)
+        write(*,*) "ydata_load:: range(smb):   ", minval(dta%pd%smb,dta%pd%smb .ne. mv), &
+                                                  maxval(dta%pd%smb,dta%pd%smb .ne. mv)
+        write(*,*) "ydata_load:: range(uxy_s): ", minval(dta%pd%uxy_s,dta%pd%uxy_s .ne. mv), &
+                                                  maxval(dta%pd%uxy_s,dta%pd%uxy_s .ne. mv)
             
 
         return 
@@ -227,7 +219,6 @@ contains
         allocate(pd%H_ice(nx,ny))
         allocate(pd%z_srf(nx,ny))
         allocate(pd%z_bed(nx,ny))
-        allocate(pd%z_bed_sd(nx,ny))
         
         allocate(pd%T_srf(nx,ny))
         allocate(pd%smb(nx,ny))
@@ -245,7 +236,6 @@ contains
         pd%H_ice        = 0.0 
         pd%z_srf        = 0.0 
         pd%z_bed        = 0.0 
-        pd%z_bed_sd     = 0.0 
         
         pd%T_srf        = 0.0 
         pd%smb          = 0.0 
@@ -272,7 +262,6 @@ contains
         if (allocated(pd%H_ice))        deallocate(pd%H_ice)
         if (allocated(pd%z_srf))        deallocate(pd%z_srf)
         if (allocated(pd%z_bed))        deallocate(pd%z_bed)
-        if (allocated(pd%z_bed_sd))     deallocate(pd%z_bed_sd)
         
         if (allocated(pd%T_srf))        deallocate(pd%T_srf)
         if (allocated(pd%smb))          deallocate(pd%smb)

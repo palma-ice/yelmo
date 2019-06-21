@@ -209,11 +209,22 @@ contains
             call yelmo_parse_path(filename,domain,grid_name)
             call nml_read(nml_path,nml_group,"z_bed_nm",  vname)
             call nc_read(filename,vname,bnd%z_bed)
+
+            call nml_read(nml_path,nml_group,"z_bed_sd_nm",  vname)
+            
+            if (trim(vname) .ne. "") then 
+                call nc_read(filename,vname,bnd%z_bed_sd)
+            else
+                bnd%z_bed_sd = 0.0 
+            end if 
+
         else 
-            bnd%z_bed = 0.0  
+            bnd%z_bed    = 0.0 
+            bnd%z_bed_sd = 0.0  
         end if 
         
-        write(*,*) "ybound_load_z_bed:: range(z_bed):  ", minval(bnd%z_bed),  maxval(bnd%z_bed)
+        write(*,*) "ybound_load_z_bed:: range(z_bed):     ", minval(bnd%z_bed),    maxval(bnd%z_bed)
+        write(*,*) "ybound_load_z_bed:: range(z_bed_sd):  ", minval(bnd%z_bed_sd), maxval(bnd%z_bed_sd)
 
         return 
 
@@ -229,6 +240,7 @@ contains
         call ybound_dealloc(now)
 
         allocate(now%z_bed(nx,ny))
+        allocate(now%z_bed_sd(nx,ny))
         allocate(now%z_sl(nx,ny))
         allocate(now%H_sed(nx,ny))
         allocate(now%H_w(nx,ny))
@@ -246,6 +258,7 @@ contains
         allocate(now%ice_allowed(nx,ny))
         
         now%z_bed       = 0.0 
+        now%z_bed_sd    = 0.0
         now%z_sl        = 0.0 
         now%H_sed       = 0.0 
         now%H_w         = 0.0 
@@ -271,15 +284,16 @@ contains
 
         type(ybound_class) :: now
 
-        if (allocated(now%z_bed))    deallocate(now%z_bed)
-        if (allocated(now%z_sl))     deallocate(now%z_sl)
-        if (allocated(now%H_sed))    deallocate(now%H_sed)
-        if (allocated(now%H_w))      deallocate(now%H_w)
-        if (allocated(now%smb))      deallocate(now%smb)
-        if (allocated(now%T_srf))    deallocate(now%T_srf)
-        if (allocated(now%bmb_shlf)) deallocate(now%bmb_shlf)
-        if (allocated(now%T_shlf))   deallocate(now%T_shlf)
-        if (allocated(now%Q_geo))    deallocate(now%Q_geo)
+        if (allocated(now%z_bed))       deallocate(now%z_bed)
+        if (allocated(now%z_bed_sd))    deallocate(now%z_bed_sd)
+        if (allocated(now%z_sl))        deallocate(now%z_sl)
+        if (allocated(now%H_sed))       deallocate(now%H_sed)
+        if (allocated(now%H_w))         deallocate(now%H_w)
+        if (allocated(now%smb))         deallocate(now%smb)
+        if (allocated(now%T_srf))       deallocate(now%T_srf)
+        if (allocated(now%bmb_shlf))    deallocate(now%bmb_shlf)
+        if (allocated(now%T_shlf))      deallocate(now%T_shlf)
+        if (allocated(now%Q_geo))       deallocate(now%Q_geo)
         
         if (allocated(now%basins))      deallocate(now%basins)
         if (allocated(now%basin_mask))  deallocate(now%basin_mask)

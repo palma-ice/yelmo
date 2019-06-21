@@ -97,9 +97,10 @@ contains
             call calc_ice_thickness(tpo%now%H_ice,tpo%now%mb_applied, &
                                     tpo%now%f_grnd,bnd%z_sl-bnd%z_bed, &
                                     dyn%now%ux_bar,dyn%now%uy_bar, &
-                                    mbal=mbal,calv=tpo%now%calv*0.0,dx=tpo%par%dx,dt=dt, &
+                                    mbal=mbal,calv=tpo%now%calv*0.0,z_bed_sd=bnd%z_bed_sd,dx=tpo%par%dx,dt=dt, &
                                     solver=trim(tpo%par%solver),boundaries=trim(tpo%par%boundaries), &
-                                    ice_allowed=bnd%ice_allowed,H_min=tpo%par%H_min)
+                                    ice_allowed=bnd%ice_allowed,H_min=tpo%par%H_min, &
+                                    sd_min=tpo%par%sd_min,sd_max=tpo%par%sd_max,calv_max=tpo%par%calv_max)
             
             ! ====== CALVING ======
             if (dt_calv .ge. tpo%par%calv_dt) then 
@@ -328,7 +329,6 @@ contains
         
         call nml_read(filename,"ytopo","use_bmb",           par%use_bmb,          init=init_pars)
         call nml_read(filename,"ytopo","use_calv_subgrid",  par%use_calv_subgrid, init=init_pars)
-        call nml_read(filename,"ytopo","ocean_kill",        par%ocean_kill,       init=init_pars)
         call nml_read(filename,"ytopo","grline_fixed",      par%grline_fixed,     init=init_pars)
         call nml_read(filename,"ytopo","topo_fixed",        par%topo_fixed,       init=init_pars)
         call nml_read(filename,"ytopo","topo_relax_dt",     par%topo_relax_dt,    init=init_pars)
@@ -336,6 +336,9 @@ contains
         call nml_read(filename,"ytopo","calv_dt",           par%calv_dt,          init=init_pars)
         call nml_read(filename,"ytopo","H_calv",            par%H_calv,           init=init_pars)
         call nml_read(filename,"ytopo","H_min",             par%H_min,            init=init_pars)
+        call nml_read(filename,"ytopo","sd_min",            par%sd_min,           init=init_pars)
+        call nml_read(filename,"ytopo","sd_max",            par%sd_max,           init=init_pars)
+        call nml_read(filename,"ytopo","calv_max",          par%calv_max,         init=init_pars)
         call nml_read(filename,"ytopo","grad_lim",          par%grad_lim,         init=init_pars)
         call nml_read(filename,"ytopo","gl_sep",            par%gl_sep,           init=init_pars)
         call nml_read(filename,"ytopo","gl_sep_nx",         par%gl_sep_nx,        init=init_pars)
@@ -376,6 +379,7 @@ contains
         allocate(now%dHicedt(nx,ny))
         allocate(now%bmb(nx,ny))
         allocate(now%mb_applied(nx,ny))
+        allocate(now%calv_grnd(nx,ny))
         allocate(now%calv(nx,ny))
 
         allocate(now%dzsdx(nx,ny))
@@ -405,6 +409,7 @@ contains
         now%dHicedt    = 0.0
         now%bmb        = 0.0  
         now%mb_applied = 0.0 
+        now%calv_grnd  = 0.0
         now%calv       = 0.0
         now%dzsdx      = 0.0 
         now%dzsdy      = 0.0 
@@ -437,6 +442,7 @@ contains
         if (allocated(now%dHicedt))    deallocate(now%dHicedt)
         if (allocated(now%bmb))        deallocate(now%bmb)
         if (allocated(now%mb_applied)) deallocate(now%mb_applied)
+        if (allocated(now%calv_grnd))  deallocate(now%calv_grnd)
         if (allocated(now%calv))       deallocate(now%calv)
 
         if (allocated(now%dzsdx))      deallocate(now%dzsdx)

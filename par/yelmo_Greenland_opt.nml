@@ -24,7 +24,6 @@
     surf_gl_method    = 0               ! 0: binary (max grnd/flt elevation), 1: subgrid average elevation
     use_bmb           = True
     use_calv_subgrid  = False 
-    ocean_kill        = False 
     grline_fixed      = False 
     topo_fixed        = False
     topo_relax_dt     = 2000

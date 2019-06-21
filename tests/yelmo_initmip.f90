@@ -51,8 +51,6 @@ program yelmo_test
     ! Initialize data objects and load initial topography
     call yelmo_init(yelmo1,filename=path_par,grid_def="file",time=time_init)
 
-    stop 
-    
     ! Also intialize simple basal hydrology object
     call hydro_init(hyd1,filename=path_par,nx=yelmo1%grd%nx,ny=yelmo1%grd%ny)
     call hydro_init_state(hyd1,yelmo1%tpo%now%H_ice,yelmo1%tpo%now%f_grnd,time)
@@ -65,7 +63,7 @@ program yelmo_test
     yelmo1%bnd%H_w      = hyd1%now%H_w  ! [m]
     yelmo1%bnd%Q_geo    = 50.0          ! [mW/m2]
     
-    yelmo1%bnd%bmb_shlf = -20.0         ! [m.i.e./a]
+    yelmo1%bnd%bmb_shlf = -10.0         ! [m.i.e./a]
     yelmo1%bnd%T_shlf   = T0            ! [K]   
 
     ! Impose present-day surface mass balance and present-day temperature field

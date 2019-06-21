@@ -307,9 +307,9 @@ contains
 
         ! Kill all floating ice, including partially grounded ice
         where (f_grnd .eq. 0.0) calv = H_ice / dt 
-        
+
         return 
 
     end function calc_calving_rate_kill
-
+    
 end module calving 

@@ -42,7 +42,6 @@
     calv_method       = "flux"          ! "zero", "simple", "flux", "kill"
     use_bmb           = False 
     use_calv_subgrid  = False 
-    ocean_kill        = False 
     grline_fixed      = False 
     topo_fixed        = False
     topo_relax_dt     = 2000

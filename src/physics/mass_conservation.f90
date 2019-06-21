@@ -11,8 +11,8 @@ module mass_conservation
 
 contains 
 
-    subroutine calc_ice_thickness(H_ice,mb_applied,f_grnd,H_ocn,ux,uy,mbal,calv,dx,dt, &
-                                                    solver,boundaries,ice_allowed,H_min)
+    subroutine calc_ice_thickness(H_ice,mb_applied,f_grnd,H_ocn,ux,uy,mbal,calv,z_bed_sd,dx,dt, &
+                                    solver,boundaries,ice_allowed,H_min,sd_min,sd_max,calv_max)
         ! Interface subroutine to update ice thickness through application
         ! of advection, vertical mass balance terms and calving 
 
@@ -26,19 +26,27 @@ contains
         real(prec),       intent(IN)    :: uy(:,:)              ! [m/a] Depth-averaged velocity, y-direction (ac-nodes)
         real(prec),       intent(IN)    :: mbal(:,:)            ! [m/a] Net mass balance; mbal = smb+bmb  !-calv 
         real(prec),       intent(IN)    :: calv(:,:)            ! [m/a] Calving rate 
+        real(prec),       intent(IN)    :: z_bed_sd(:,:)        ! [m]   Standard deviation of bed topography
         real(prec),       intent(IN)    :: dx                   ! [m]   Horizontal resolution
         real(prec),       intent(IN)    :: dt                   ! [a]   Timestep 
         character(len=*), intent(IN)    :: solver               ! Solver to use for the ice thickness advection equation
         character(len=*), intent(IN)    :: boundaries           ! What boundary conditions should apply?
         logical,          intent(IN)    :: ice_allowed(:,:)     ! Mask of where ice is allowed to be greater than zero 
-        real(prec),       intent(IN)    :: H_min                ! [m]   Minimum allowed ice thickness 
-        
+        real(prec),       intent(IN)    :: H_min                ! [m]   Minimum allowed ice thickness parameter
+        real(prec),       intent(IN)    :: sd_min               ! [m]   Minimum stdev(z_bed) parameter
+        real(prec),       intent(IN)    :: sd_max               ! [m]   Maximum stdev(z_bed) parameter
+        real(prec),       intent(IN)    :: calv_max             ! [m]   Maximum grounded calving rate parameter
+
         ! Local variables 
         integer :: i, j, nx, ny 
         integer :: n 
+        real(prec), allocatable :: calv_grnd(:,:) 
 
         nx = size(H_ice,1)
         ny = size(H_ice,2)
+
+        allocate(calv_grnd(nx,ny))
+        calv_grnd = 0.0 
 
         ! 1. Apply mass conservation =================
 
@@ -75,9 +83,12 @@ contains
 
         end select 
         
+        ! Determine grounded calving 
+        calv_grnd = calc_calving_rate_grounded(H_ice,f_grnd,z_bed_sd,sd_min,sd_max,calv_max,dt)
+
         ! Next, handle mass balance in order to be able to diagnose
         ! precisely how much mass was lost/gained 
-        mb_applied = mbal !- calv 
+        mb_applied = mbal - calv_grnd !- calv 
 
         ! Ensure ice cannot form in open ocean 
         where(f_grnd .eq. 0.0 .and. H_ice .eq. 0.0)  mb_applied = 0.0  
@@ -731,4 +742,58 @@ contains
 
     end subroutine limit_grounded_margin_thickness_stress
     
+    function calc_calving_rate_grounded(H_ice,f_grnd,z_bed_sd,sd_min,sd_max,calv_max,dt) result(calv)
+        ! Parameterize grounded ice-margin calving as a function of 
+        ! standard deviation of bedrock at each grid point.
+        ! Assumes that higher variability in subgrid implies cliffs
+        ! that are not represented at low resolution. 
+
+        implicit none 
+
+        real(prec), intent(IN) :: H_ice(:,:)                ! [m] Ice thickness 
+        real(prec), intent(IN) :: f_grnd(:,:)               ! [-] Grounded fraction
+        real(prec), intent(IN) :: z_bed_sd(:,:)             ! [m] Standard deviation of bedrock topography
+        real(prec), intent(IN) :: sd_min                    ! [m] stdev(z_bed) at/below which calv=0
+        real(prec), intent(IN) :: sd_max                    ! [m] stdev(z_bed) at/above which calv=calv_max 
+        real(prec), intent(IN) :: calv_max                  ! [m/a] Maximum allowed calving rate
+        real(prec), intent(IN) :: dt 
+        real(prec) :: calv(size(H_ice,1),size(H_ice,2))     ! [m/a] Calculated calving rate 
+
+        ! Local variables
+        integer :: i, j, nx, ny  
+        real(prec) :: f_scale 
+        logical    :: is_grnd_margin 
+
+        nx = size(H_ice,1)
+        ny = size(H_ice,2)
+
+        calv = 0.0 
+        
+        do j = 2, ny-1
+        do i = 2, nx-1 
+
+            ! Determine if grounded, ice-covered point has an ice-free neighbor (ie, at the grounded ice margin)
+            is_grnd_margin = (H_ice(i,j) .gt. 0.0 .and. f_grnd(i,j) .gt. 0.0 &
+                .and. minval([H_ice(i-1,j),H_ice(i+1,j),H_ice(i,j-1),H_ice(i,j+1)]) .eq. 0.0)
+
+            if (is_grnd_margin) then
+                ! Grounded ice-covered point
+
+                f_scale = (z_bed_sd(i,j) - sd_min)/(sd_max-sd_min)
+                if (f_scale .lt. 0.0) f_scale = 0.0 
+                if (f_scale .gt. 1.0) f_scale = 1.0 
+
+                ! Calculate calving rate from linear function, limited
+                ! to available ice thickness 
+                calv(i,j) = min(f_scale*calv_max, H_ice(i,j)/dt) 
+                
+            end if 
+
+        end do 
+        end do 
+
+        return 
+
+    end function calc_calving_rate_grounded
+
 end module mass_conservation

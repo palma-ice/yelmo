@@ -75,13 +75,15 @@ module yelmo_defs
         
         logical    :: use_bmb  
         logical    :: use_calv_subgrid 
-        logical    :: ocean_kill  
         logical    :: grline_fixed 
         logical    :: topo_fixed
         real(prec) :: topo_relax_dt, topo_fixed_dt
         real(prec) :: calv_dt 
         real(prec) :: H_calv 
-        real(prec) :: H_min 
+        real(prec) :: H_min
+        real(prec) :: sd_min 
+        real(prec) :: sd_max 
+        real(prec) :: calv_max  
         real(prec) :: grad_lim 
         integer    :: gl_sep 
         integer    :: gl_sep_nx 
@@ -103,6 +105,7 @@ module yelmo_defs
         real(prec), allocatable :: dHicedt(:,:)    ! Ice thickness rate of change [m/a] 
         real(prec), allocatable :: bmb(:,:)        ! Combined field of bmb_grnd and bmb_shlf 
         real(prec), allocatable :: mb_applied(:,:) ! Actual mass balance applied [m/a], for mass balance accounting
+        real(prec), allocatable :: calv_grnd(:,:)  ! Grounded calving [m/a]
         real(prec), allocatable :: calv(:,:)       ! Calving [m/a]
         real(prec), allocatable :: calv_mean(:,:)  ! Calving [m/a]
         real(prec), allocatable :: calv_times(:)   ! Calving

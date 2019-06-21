@@ -424,7 +424,7 @@ contains
 
         ! Local variables 
         integer :: i, j, nx, ny, i1, j1  
-        real(prec) :: dphi, dx_km, f_dz, f_scale 
+        real(prec) :: dphi, dx_km, f_dz 
         real(prec) :: ux_aa, uy_aa 
         real(prec) :: zsrf_rmse 
 
@@ -473,20 +473,9 @@ contains
                 f_dz = min(f_dz, dphi_max)
                 dphi = f_dz 
                 
-                ! Calculate scaling with elevation 
-
-                ! Exponential scaling 
-!                 f_scale = exp( (z_bed(i,j) - C_bed_z1) / (C_bed_z1 - C_bed_z0) )
-!                 if (f_scale .gt. 1.0) f_scale = 1.0
-                
-                ! Linear scaling 
-                f_scale = (z_bed(i,j) - C_bed_z0) / (C_bed_z1 - C_bed_z0)
-                if (f_scale .lt. 0.0) f_scale = 0.0 
-                if (f_scale .gt. 1.0) f_scale = 1.0 
-
                 ! 1. Apply change at current point 
 if (.FALSE.) then 
-                phi(i,j)  = f_scale*phi(i,j) + dphi 
+                phi(i,j)  = phi(i,j) + dphi 
                 phi(i,j)  = max(phi(i,j),phi_min)
                 phi(i,j)  = min(phi(i,j),phi_max)
 
@@ -518,7 +507,7 @@ end if
 
                 end if 
 
-                phi(i1,j1)  = f_scale*phi(i1,j1) + dphi 
+                phi(i1,j1)  = phi(i1,j1) + dphi 
                 phi(i1,j1)  = max(phi(i1,j1),phi_min)
                 phi(i1,j1)  = min(phi(i1,j1),phi_max)
 

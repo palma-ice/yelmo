@@ -382,6 +382,8 @@ contains
         allocate(now%calv_grnd(nx,ny))
         allocate(now%calv(nx,ny))
 
+        allocate(now%H_ref(nx,ny))
+        
         allocate(now%dzsdx(nx,ny))
         allocate(now%dzsdy(nx,ny))
 
@@ -411,6 +413,7 @@ contains
         now%mb_applied = 0.0 
         now%calv_grnd  = 0.0
         now%calv       = 0.0
+        now%H_ref      = 0.0 
         now%dzsdx      = 0.0 
         now%dzsdy      = 0.0 
         now%dHicedx    = 0.0 
@@ -445,6 +448,8 @@ contains
         if (allocated(now%calv_grnd))  deallocate(now%calv_grnd)
         if (allocated(now%calv))       deallocate(now%calv)
 
+        if (allocated(now%H_ref))      deallocate(now%H_ref)
+        
         if (allocated(now%dzsdx))      deallocate(now%dzsdx)
         if (allocated(now%dzsdy))      deallocate(now%dzsdy)
         if (allocated(now%dHicedx))    deallocate(now%dHicedx)

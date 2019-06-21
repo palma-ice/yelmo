@@ -51,6 +51,9 @@
     calv_dt           = 1.0             ! [a] Calving frequency 
     H_calv            = 200.0 
     H_min             = 1.0             ! [m] Minimum ice thickness at grounded margin (thinner ice is ablated) - helps with stability
+    sd_min            = 100.0           ! [m] calv_grnd(z_bed_sd <= sd_min) = 0.0 
+    sd_max            = 500.0           ! [m] calv_grnd(z_bed_sd >= sd_max) = calv_max  
+    calv_max          = 0.0             ! [m/a] Maximum grounded calving rate from high stdev(z_bed)
     gl_sep            = 2               ! 1: Linear f_grnd_acx/acy and binary f_grnd, 2: area f_grnd, average to acx/acy
     gl_sep_nx         = 15              ! [-] Number of interpolation points (nx*nx) to calculate grounded area at grounding line
     neff_p            = 0.0             ! Effective pressure: connectivity to the ocean (0: none, 1: full)

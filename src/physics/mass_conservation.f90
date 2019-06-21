@@ -769,31 +769,104 @@ contains
 
         calv = 0.0 
         
+        if (calv_max .gt. 0.0) then 
+            ! Determine grounded calving rate 
+
+            do j = 2, ny-1
+            do i = 2, nx-1 
+
+                ! Determine if grounded, ice-covered point has an ice-free neighbor (ie, at the grounded ice margin)
+                is_grnd_margin = (H_ice(i,j) .gt. 0.0 .and. f_grnd(i,j) .gt. 0.0 &
+                    .and. minval([H_ice(i-1,j),H_ice(i+1,j),H_ice(i,j-1),H_ice(i,j+1)]) .eq. 0.0)
+
+                if (is_grnd_margin) then
+                    ! Grounded ice-covered point
+
+                    f_scale = (z_bed_sd(i,j) - sd_min)/(sd_max-sd_min)
+                    if (f_scale .lt. 0.0) f_scale = 0.0 
+                    if (f_scale .gt. 1.0) f_scale = 1.0 
+
+                    ! Calculate calving rate from linear function, limited
+                    ! to available ice thickness 
+                    calv(i,j) = min(f_scale*calv_max, H_ice(i,j)/dt) 
+                    
+                end if 
+
+            end do 
+            end do 
+
+        end if 
+        
+        return 
+
+    end function calc_calving_rate_grounded
+
+    subroutine calc_ice_margin(H_ice,H_ref,f_ice,f_grnd)
+        ! Determine the area fraction of a grid cell
+        ! that is ice-covered. Assume that marginal points
+        ! have equal thickness to inland neighbors 
+
+        implicit none 
+
+        real(prec), intent(INOUT) :: H_ice(:,:)                ! [m] Ice thickness on standard grid (aa-nodes)
+        real(prec), intent(INOUT) :: H_ref(:,:)                ! [m] Margin ice thickness for partially filled cells, V_cell = H_ref*f_ice
+        real(prec), intent(INOUT) :: f_ice(:,:)                ! [--] Ice covered fraction (aa-nodes)
+        real(prec), intent(IN) :: f_grnd(:,:)               ! [--] Grounded fraction (aa-nodes)
+
+        ! Local variables 
+        integer :: i, j, nx, ny 
+        real(prec) :: H_neighb(4)
+        logical :: mask_neighb(4)
+        real(prec) :: H_mrgn 
+
+        nx = size(H_ice,1)
+        ny = size(H_ice,2)
+
+        ! Initially set fraction to one everywhere there is ice 
+        ! and zero everywhere there is no ice
+        f_ice = 0.0  
+        where (H_ice .gt. 0.0) f_ice = 1.0
+
+        ! For ice-covered points with ice-free neighbors (ie, at the floating or grounded margin),
+        ! determine the fraction of grid point that should be ice covered. 
+
         do j = 2, ny-1
         do i = 2, nx-1 
 
-            ! Determine if grounded, ice-covered point has an ice-free neighbor (ie, at the grounded ice margin)
-            is_grnd_margin = (H_ice(i,j) .gt. 0.0 .and. f_grnd(i,j) .gt. 0.0 &
-                .and. minval([H_ice(i-1,j),H_ice(i+1,j),H_ice(i,j-1),H_ice(i,j+1)]) .eq. 0.0)
+            if (f_ice(i,j) .gt. 0.0 .and. &
+                count([f_ice(i-1,j),f_ice(i+1,j),f_ice(i,j-1),f_ice(i,j+1)].eq.0) .gt. 0) then 
+                ! This point is at the ice margin
 
-            if (is_grnd_margin) then
-                ! Grounded ice-covered point
+                H_neighb    = [H_ice(i-1,j),H_ice(i+1,j),H_ice(i,j-1),H_ice(i,j+1)]
+                mask_neighb = (H_neighb .gt. 0.0)
 
-                f_scale = (z_bed_sd(i,j) - sd_min)/(sd_max-sd_min)
-                if (f_scale .lt. 0.0) f_scale = 0.0 
-                if (f_scale .gt. 1.0) f_scale = 1.0 
+                if (count(mask_neighb) .gt. 0) then 
+                    ! Neighbors with ice should generally be found, but put this check just in case
 
-                ! Calculate calving rate from linear function, limited
-                ! to available ice thickness 
-                calv(i,j) = min(f_scale*calv_max, H_ice(i,j)/dt) 
-                
-            end if 
+                    ! Determine height to give to partially filled cell as average of neighbors
+                    H_mrgn = sum(H_neighb,mask=mask_neighb)/real(count(mask_neighb))
+
+                    ! If margin point is grounded, then assign it with 
+                    ! a thickness of half of neighbor-average
+                    if (f_grnd(i,j) .eq. 1.0) H_mrgn = 0.5 * H_mrgn
+
+                    ! Determine the cell ice fraction
+                    ! Note: fraction is determined as a ratio of 
+                    ! thicknesses, derived from volume conservation 
+                    ! vol = H_ice*dx*dy = H_mrgn*area_frac 
+                    ! f_ice = area_frac / (dx*dy)
+                    ! f_ice = H_ice/H_mrgn 
+                    f_ice(i,j) = min( H_ice(i,j) / H_mrgn, 1.0 ) 
+
+                end if
+
+            end if  
 
         end do 
         end do 
 
         return 
 
-    end function calc_calving_rate_grounded
-
+    end subroutine calc_ice_margin
+    
 end module mass_conservation

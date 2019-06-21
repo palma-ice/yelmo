@@ -314,7 +314,7 @@ contains
         nx = size(H_ice,1)
         ny = size(H_ice,2)
 
-        where (f_grnd .eq. 0.0 .and. H_ice .gt. 0.0)
+        where (f_grnd .gt. 0.0 .and. H_ice .gt. 0.0)
             ! Grounded ice point
 
             ! Update mass balance of H_w

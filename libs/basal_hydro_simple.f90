@@ -100,7 +100,7 @@ contains
                 case(1)
                     ! Local mass balance of H_w 
 
-                    call calc_basal_water_local(hyd%now%H_w,H_ice,bmb_w,f_grnd.eq.0.0, &
+                    call calc_basal_water_local(hyd%now%H_w,H_ice,bmb_w,f_grnd, &
                                                     hyd%now%dt,hyd%par%till_rate,hyd%par%H_w_max)
 
                 case DEFAULT 
@@ -160,6 +160,12 @@ contains
         real(prec), intent(IN) :: f_grnd(:,:)  
         real(prec), intent(IN) :: time 
         
+        ! Local variables 
+        integer :: i, j, nx, ny 
+
+        nx = size(H_ice,1)
+        ny = size(H_ice,2)
+
         ! Initialize using the method of choice (par%init_method)
 
         select case(hyd%par%init_method)
@@ -188,7 +194,20 @@ contains
 
         ! Set floating points to the maximum water thickness
         where (f_grnd .eq. 0.0) hyd%now%H_w = hyd%par%H_w_max  
-        
+
+        do j = 2, ny-1 
+        do i = 2, nx-1 
+
+            if (H_ice(i,j) .gt. 0.0 .and. f_grnd(i,j) .gt. 0.0 .and. &
+                count([f_grnd(i-1,j),f_grnd(i+1,j),f_grnd(i,j-1),f_grnd(i,j+1)].eq.0.0) .gt. 0) then 
+
+                hyd%now%H_w = hyd%par%H_w_max 
+
+            end if 
+
+        end do 
+        end do 
+
         ! Set the current time and time step 
         hyd%now%time = time 
         hyd%now%dt   = 0.0 
@@ -263,7 +282,7 @@ contains
 
     ! ==== BASAL HYDROLOGY PHYSICS ===============================
 
-    subroutine calc_basal_water_local(H_w,H_ice,bmb_w,is_float,dt,till_rate,H_w_max)
+    subroutine calc_basal_water_local(H_w,H_ice,bmb_w,f_grnd,dt,till_rate,H_w_max)
         ! Calculate the basal water layer thickness based on a simple local 
         ! water balance: dHw/dt = bmb_w - 
         implicit none 
@@ -271,12 +290,18 @@ contains
         real(prec), intent(INOUT) :: H_w(:,:)         ! [m] Water layer thickness
         real(prec), intent(IN)    :: H_ice(:,:)       ! [m] Ice thickness 
         real(prec), intent(IN)    :: bmb_w(:,:)       ! [m/a] Basal water mass balance
-        logical,    intent(IN)    :: is_float(:,:)    ! [-] Floating mask 
+        real(prec), intent(IN)    :: f_grnd(:,:)      ! [-] Grounded fraction
         real(prec), intent(IN)    :: dt               ! [a] Timestep 
         real(prec), intent(IN)    :: till_rate        ! [m/a] Till drainage rate 
         real(prec), intent(IN)    :: H_w_max          ! [m] Maximum allowed water depth 
 
-        where (.not. is_float .and. H_ice .ge. 0.1)
+        ! Local variables 
+        integer :: i, j, nx, ny 
+
+        nx = size(H_ice,1)
+        ny = size(H_ice,2)
+
+        where (f_grnd .eq. 0.0 .and. H_ice .gt. 0.0)
             ! Grounded ice point
 
             ! Update mass balance of H_w
@@ -286,7 +311,7 @@ contains
             H_w = max(H_w,0.0)
             H_w = min(H_w,H_w_max)
 
-        else where (.not. is_float) 
+        else where (f_grnd .gt. 0.0) 
             ! Ice-free land above sea level 
 
             H_w = 0.0 
@@ -297,6 +322,19 @@ contains
             H_w = H_w_max 
 
         end where 
+
+        do j = 2, ny-1 
+        do i = 2, nx-1 
+
+            if (H_ice(i,j) .gt. 0.0 .and. f_grnd(i,j) .gt. 0.0 .and. &
+                count([f_grnd(i-1,j),f_grnd(i+1,j),f_grnd(i,j-1),f_grnd(i,j+1)].eq.0.0) .gt. 0) then 
+
+                H_w = H_w_max 
+                
+            end if 
+
+        end do 
+        end do 
 
         return 
 

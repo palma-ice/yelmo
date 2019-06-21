@@ -65,8 +65,8 @@ program yelmo_test
     qmax                = 101       ! Total number of iterations
     qmax_topo_fixed     = 0         ! Number of initial iterations that should use topo_fixed=.TRUE. 
     qmax_iter_length    = 10        ! Number of iterations at which iteration length should increase
-    phi_min             =  2.0      ! Minimum allowed friction angle
-    phi_max             = 60.0      ! Maximum allowed friction angle 
+    phi_min             =  5.0      ! Minimum allowed friction angle
+    phi_max             = 40.0      ! Maximum allowed friction angle 
 
     ! Prescribe key parameters here that should be set for beta optimization exercise 
     yelmo1%dyn%par%C_bed_method      = -1       ! C_Bed is set external to yelmo calculations

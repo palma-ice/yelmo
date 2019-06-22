@@ -583,8 +583,10 @@ contains
         end if 
 
         ! Finally, ensure that gradient is beneath desired limit 
-        where (dvardx .gt. grad_lim) dvardx = grad_lim 
-        where (dvardy .gt. grad_lim) dvardy = grad_lim 
+        where (dvardx .gt. grad_lim)  dvardx =  grad_lim 
+        where (dvardy .gt. grad_lim)  dvardy =  grad_lim 
+        where (dvardx .lt. -grad_lim) dvardx = -grad_lim 
+        where (dvardy .lt. -grad_lim) dvardy = -grad_lim 
         
         return 
 

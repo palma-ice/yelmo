@@ -10,9 +10,9 @@
 
     ! Timing parameters 
     time_init    = 0.0                  ! [yr] Starting time 
-    time_end     = 100e3                ! [yr] Ending time 
+    time_end     = 25e3                 ! [yr] Ending time 
     dtt          = 5.0                  ! [yr] Main loop timestep 
-    dt2D_out     = 1000.0               ! [yr] Frequency of writing 2D output files 
+    dt2D_out     = 500.0                ! [yr] Frequency of writing 2D output files 
 
     ! Settings for transient EISMINT1 experiments 
     period       = 0.0                  ! [yr] for transient experiments (normally 0.0 yr or 20e3 yr)
@@ -41,7 +41,7 @@
     init              = "presentday"    ! "icefree", "presentday"
     solver            = "expl"          ! "expl", "impl-upwind"
     margin2nd         = False           ! Apply second-order upwind approximation to gradients at the margin
-    calv_method       = "flux"          ! "zero", "simple", "flux", "kill"
+    calv_method       = "zero"          ! "zero", "simple", "flux", "kill"
     use_bmb           = False 
     use_calv_subgrid  = False 
     grline_fixed      = False 
@@ -54,6 +54,7 @@
     sd_min            = 100.0           ! [m] calv_grnd(z_bed_sd <= sd_min) = 0.0 
     sd_max            = 500.0           ! [m] calv_grnd(z_bed_sd >= sd_max) = calv_max  
     calv_max          = 0.0             ! [m/a] Maximum grounded calving rate from high stdev(z_bed)
+    grad_lim          = 0.1             ! [m/m] Maximum allowed sloped in gradient calculations (dz/dx,dH/dx)
     gl_sep            = 2               ! 1: Linear f_grnd_acx/acy and binary f_grnd, 2: area f_grnd, average to acx/acy
     gl_sep_nx         = 15              ! [-] Number of interpolation points (nx*nx) to calculate grounded area at grounding line
     neff_p            = 0.0             ! Effective pressure: connectivity to the ocean (0: none, 1: full)
@@ -83,7 +84,7 @@
     !cf_stream           = 31651.76        ! [a m-1] Bed roughness coefficient, stream  
     cf_stream           = 2.3e5           ! [a m-1] Bed roughness coefficient, stream  
     cf_fac_sed          = 1.0             ! [-] Scaling of roughness for sediments 
-    cf_sia              = 15.0            ! [m a-1 Pa-1] Bed roughness coefficient for SIA sliding
+    cf_sia              = 0.0             ! [m a-1 Pa-1] Bed roughness coefficient for SIA sliding
     streaming_margin    = True            ! Impose cf_stream at the margin and grline independent of f_pmp
     n_sm_beta           = 0               ! [-] Standard deviation in gridpoints for Gaussian smoothing of beta (0==no smoothing)
     ssa_beta_max        = 1e20            ! [Pa a m-1] Maximum value of beta for which ssa should be calculated 

@@ -110,7 +110,7 @@ module yelmo_defs
         real(prec), allocatable :: calv_mean(:,:)  ! Calving [m/a]
         real(prec), allocatable :: calv_times(:)   ! Calving
 
-        real(prec), allocatable :: H_ref(:,:)      ! [m] Margin ice thickness in partially filled cells 
+        real(prec), allocatable :: H_margin(:,:)   ! [m] Margin ice thickness in partially filled cells 
 
         real(prec), allocatable :: dzsdx(:,:)      ! Surface elevation slope [m m-1], Ac x nodes
         real(prec), allocatable :: dzsdy(:,:)      ! Surface elevation slope [m m-1], Ac y nodes

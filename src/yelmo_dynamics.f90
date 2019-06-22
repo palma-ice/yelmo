@@ -137,7 +137,7 @@ contains
         ! ===== Calculate driving stress ==============================
 
         ! Calculate driving stress 
-        call calc_driving_stress_ac(dyn%now%taud_acx,dyn%now%taud_acy,tpo%now%H_ice,tpo%now%f_ice,tpo%now%z_srf,bnd%z_bed,bnd%z_sl, &
+        call calc_driving_stress_ac(dyn%now%taud_acx,dyn%now%taud_acy,tpo%now%H_ice,tpo%now%z_srf,bnd%z_bed,bnd%z_sl, &
                  tpo%now%H_grnd,tpo%now%f_grnd,tpo%now%f_grnd_acx,tpo%now%f_grnd_acy,dyn%par%dx, &
                  method=dyn%par%taud_gl_method,beta_gl_stag=dyn%par%beta_gl_stag)
 
@@ -444,7 +444,7 @@ contains
         call calc_ydyn_cbed(dyn,tpo,thrm,bnd)
         
         ! Calculate driving stress 
-        call calc_driving_stress_ac(dyn%now%taud_acx,dyn%now%taud_acy,tpo%now%H_ice,tpo%now%f_ice,tpo%now%z_srf,bnd%z_bed,bnd%z_sl, &
+        call calc_driving_stress_ac(dyn%now%taud_acx,dyn%now%taud_acy,tpo%now%H_ice,tpo%now%z_srf,bnd%z_bed,bnd%z_sl, &
                  tpo%now%H_grnd,tpo%now%f_grnd,tpo%now%f_grnd_acx,tpo%now%f_grnd_acy,dyn%par%dx, &
                  method=dyn%par%taud_gl_method,beta_gl_stag=dyn%par%beta_gl_stag)
 
@@ -1916,7 +1916,7 @@ end module yelmo_dynamics
 !             dyn1%par%beta_gl_stag   = 1     ! Upstream scaling 
 
 !             ! Calculate driving stress 
-!             call calc_driving_stress_ac(dyn1%now%taud_acx,dyn1%now%taud_acy,tpo%now%H_ice,tpo%now%f_ice,tpo%now%z_srf,bnd%z_bed,bnd%z_sl, &
+!             call calc_driving_stress_ac(dyn1%now%taud_acx,dyn1%now%taud_acy,tpo%now%H_ice,tpo%now%z_srf,bnd%z_bed,bnd%z_sl, &
 !                      tpo%now%H_grnd,tpo%now%f_grnd,tpo%now%f_grnd_acx,tpo%now%f_grnd_acy,dyn1%par%dx, &
 !                      method=dyn1%par%taud_gl_method,beta_gl_stag=dyn1%par%beta_gl_stag)
 
@@ -1932,7 +1932,7 @@ end module yelmo_dynamics
 !             dyn2%par%beta_gl_stag   = 2     ! Downstream scaling 
             
 !             ! Calculate driving stress 
-!             call calc_driving_stress_ac(dyn2%now%taud_acx,dyn2%now%taud_acy,tpo%now%H_ice,tpo%now%f_ice,tpo%now%z_srf,bnd%z_bed,bnd%z_sl, &
+!             call calc_driving_stress_ac(dyn2%now%taud_acx,dyn2%now%taud_acy,tpo%now%H_ice,tpo%now%z_srf,bnd%z_bed,bnd%z_sl, &
 !                      tpo%now%H_grnd,tpo%now%f_grnd,tpo%now%f_grnd_acx,tpo%now%f_grnd_acy,dyn2%par%dx, &
 !                      method=dyn2%par%taud_gl_method,beta_gl_stag=dyn2%par%beta_gl_stag)
 

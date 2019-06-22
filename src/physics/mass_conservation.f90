@@ -11,7 +11,7 @@ module mass_conservation
 
 contains 
 
-    subroutine calc_ice_thickness(H_ice,mb_applied,f_grnd,H_ocn,ux,uy,mbal,calv,z_bed_sd,dx,dt, &
+    subroutine calc_ice_thickness(H_ice,H_margin,f_ice,mb_applied,f_grnd,H_ocn,ux,uy,mbal,calv,z_bed_sd,dx,dt, &
                                     solver,boundaries,ice_allowed,H_min,sd_min,sd_max,calv_max)
         ! Interface subroutine to update ice thickness through application
         ! of advection, vertical mass balance terms and calving 
@@ -19,6 +19,8 @@ contains
         implicit none 
 
         real(prec),       intent(INOUT) :: H_ice(:,:)           ! [m]   Ice thickness 
+        real(prec),       intent(INOUT) :: H_margin(:,:)        ! [m]   Margin ice thickness (assuming full area coverage) 
+        real(prec),       intent(INOUT) :: f_ice(:,:)           ! [m]   Ice area fraction 
         real(prec),       intent(OUT)   :: mb_applied(:,:)      ! [m/a] Actual mass balance applied to real ice points
         real(prec),       intent(IN)    :: f_grnd(:,:)          ! [--]  Grounded fraction 
         real(prec),       intent(IN)    :: H_ocn(:,:)           ! [m]   Ocean thickness (ie, depth)
@@ -83,12 +85,14 @@ contains
 
         end select 
         
-        ! Determine grounded calving 
-        calv_grnd = calc_calving_rate_grounded(H_ice,f_grnd,z_bed_sd,sd_min,sd_max,calv_max,dt)
+        ! Add ice in the margin buffer to current ice thickness,
+        ! set the buffer to zero  
+        !H_ice    = H_ice + H_margin 
+        H_margin = 0.0 
 
         ! Next, handle mass balance in order to be able to diagnose
         ! precisely how much mass was lost/gained 
-        mb_applied = mbal - calv_grnd !- calv 
+        mb_applied = mbal
 
         ! Ensure ice cannot form in open ocean 
         where(f_grnd .eq. 0.0 .and. H_ice .eq. 0.0)  mb_applied = 0.0  
@@ -99,6 +103,15 @@ contains
         ! Apply modified mass balance to update the ice thickness 
         H_ice = H_ice + dt*mb_applied
 
+        ! Determine how much ice goes into the margin buffer 
+        !call calc_ice_margin(H_ice,H_margin,f_ice,f_grnd)
+
+if (.FALSE.) then 
+    ! ajr: disable these for now to test new margin scheme!!
+
+        ! Determine grounded calving 
+        calv_grnd = calc_calving_rate_grounded(H_ice,f_grnd,z_bed_sd,sd_min,sd_max,calv_max,dt)
+
         ! Limit grounded ice thickness to below maximum threshold value
         ! based on shear stress limit 
         call limit_grounded_margin_thickness_stress(H_ice,mb_applied,f_grnd,H_ocn,dt)
@@ -106,6 +119,9 @@ contains
         ! Limit grounded ice thickess to above minimum and below inland neighbor at the margin
 !         call limit_grounded_margin_thickness(H_ice,mb_applied,f_grnd,H_min,dt) 
         call limit_grounded_margin_thickness_flux(H_ice,mb_applied,f_grnd,mbal,ux,uy,dx,dt,H_min)
+
+end if 
+
 
         ! Also ensure tiny numeric ice thicknesses are removed
         where (H_ice .lt. 1e-5) H_ice = 0.0 
@@ -556,8 +572,7 @@ contains
         real(prec) :: eps_xx, eps_yy  
         logical :: test_mij, test_pij, test_imj, test_ipj
         logical :: is_margin, positive_mb 
-        real(prec), allocatable :: dHdt(:,:), Hdiff(:,:), Hfrac(:,:) 
-        real(prec), allocatable :: f_ice(:,:)                ! [-] Ice area fraction
+        real(prec), allocatable :: dHdt(:,:), Hdiff(:,:) 
         real(prec), allocatable :: H_ice_0(:,:) 
         integer :: n_free
 
@@ -566,23 +581,10 @@ contains
 
         allocate(dHdt(nx,ny))
         allocate(Hdiff(nx,ny))
-        allocate(Hfrac(nx,ny))
-        allocate(f_ice(nx,ny))
         allocate(H_ice_0(nx,ny))
         
-        ! Local representation of f_ice (binary) - improve in future
-        f_ice = 0.0
-        where(H_ice .gt. 0.0) f_ice = 1.0 
-
-        ! Determine ice thickness accounting for fraction  
-        where (H_ice .gt. 1.0 .and. f_ice .gt. 0.0) 
-            Hfrac = H_ice / f_ice 
-        elsewhere 
-            Hfrac = 0.0
-        end where 
-
         ! Ice thickness above threshold
-        Hdiff = Hfrac - H_min
+        Hdiff = H_ice - H_min
 
         ! Diagnosed lagrangian rate of change
         dHdt = 0.0 
@@ -591,13 +593,11 @@ contains
         do i = 2, nx
         
                 ! Calculate strain rate locally (aa-node)
-                ! Note: dx should probably account for f_ice somehow,  
-                ! but would maybe only be a minor adjustment
                 eps_xx = (ux(i,j) - ux(i-1,j))/dx
                 eps_yy = (uy(i,j) - uy(i,j-1))/dx
 
                 ! Calculate thickness change via conservation
-                dHdt(i,j) = mbal(i,j) - Hfrac(i,j)*(eps_xx+eps_yy)
+                dHdt(i,j) = mbal(i,j) - H_ice(i,j)*(eps_xx+eps_yy)
 
         end do 
         end do
@@ -614,13 +614,13 @@ contains
             is_margin = (H_ice_0(i,j) .gt. 0.0 .and. f_grnd(i,j) .gt. 0.0 &
                 .and. minval([H_ice_0(i-1,j),H_ice_0(i+1,j),H_ice_0(i,j-1),H_ice_0(i,j+1)]) .eq. 0.0)
 
-            if (f_grnd(i,j) .gt. 0.0 .and. f_ice(i,j) .gt. 0.0) then
+            if (f_grnd(i,j) .gt. 0.0 .and. H_ice(i,j) .gt. 0.0) then
                 ! Grounded ice-covered point
 
-                n_free = count([f_ice(i-1,j).eq.0.0, &
-                                f_ice(i+1,j).eq.0.0, &
-                                f_ice(i,j-1).eq.0.0, &
-                                f_ice(i,j+1).eq.0.0])
+                n_free = count([H_ice(i-1,j).eq.0.0, &
+                                H_ice(i+1,j).eq.0.0, &
+                                H_ice(i,j-1).eq.0.0, &
+                                H_ice(i,j+1).eq.0.0])
 
             else
                 ! No ice-free points bordering point 
@@ -796,28 +796,28 @@ contains
             end do 
 
         end if 
-        
+
         return 
 
     end function calc_calving_rate_grounded
 
-    subroutine calc_ice_margin(H_ice,H_ref,f_ice,f_grnd)
+    subroutine calc_ice_margin(H_ice,H_margin,f_ice,f_grnd)
         ! Determine the area fraction of a grid cell
         ! that is ice-covered. Assume that marginal points
         ! have equal thickness to inland neighbors 
 
         implicit none 
 
-        real(prec), intent(INOUT) :: H_ice(:,:)                ! [m] Ice thickness on standard grid (aa-nodes)
-        real(prec), intent(INOUT) :: H_ref(:,:)                ! [m] Margin ice thickness for partially filled cells, V_cell = H_ref*f_ice
-        real(prec), intent(INOUT) :: f_ice(:,:)                ! [--] Ice covered fraction (aa-nodes)
-        real(prec), intent(IN) :: f_grnd(:,:)               ! [--] Grounded fraction (aa-nodes)
+        real(prec), intent(INOUT) :: H_ice(:,:)             ! [m] Ice thickness on standard grid (aa-nodes)
+        real(prec), intent(INOUT) :: H_margin(:,:)          ! [m] Margin ice thickness for partially filled cells, H_margin*1.0 = H_ref*f_ice
+        real(prec), intent(INOUT) :: f_ice(:,:)             ! [--] Ice covered fraction (aa-nodes)
+        real(prec), intent(IN)    :: f_grnd(:,:)            ! [--] Grounded fraction (aa-nodes)
 
         ! Local variables 
         integer :: i, j, nx, ny 
         real(prec) :: H_neighb(4)
         logical :: mask_neighb(4)
-        real(prec) :: H_mrgn 
+        real(prec) :: H_ref 
 
         nx = size(H_ice,1)
         ny = size(H_ice,2)
@@ -833,8 +833,8 @@ contains
         do j = 2, ny-1
         do i = 2, nx-1 
 
-            if (f_ice(i,j) .gt. 0.0 .and. &
-                count([f_ice(i-1,j),f_ice(i+1,j),f_ice(i,j-1),f_ice(i,j+1)].eq.0) .gt. 0) then 
+            if (H_ice(i,j) .gt. 0.0 .and. &
+                minval([H_ice(i-1,j),H_ice(i+1,j),H_ice(i,j-1),H_ice(i,j+1)]) .eq. 0.0) then 
                 ! This point is at the ice margin
 
                 H_neighb    = [H_ice(i-1,j),H_ice(i+1,j),H_ice(i,j-1),H_ice(i,j+1)]
@@ -844,21 +844,39 @@ contains
                     ! Neighbors with ice should generally be found, but put this check just in case
 
                     ! Determine height to give to partially filled cell as average of neighbors
-                    H_mrgn = sum(H_neighb,mask=mask_neighb)/real(count(mask_neighb))
+                    H_ref = sum(H_neighb,mask=mask_neighb)/real(count(mask_neighb),prec)
 
+                    ! Experimental:
                     ! If margin point is grounded, then assign it with 
                     ! a thickness of half of neighbor-average
-                    if (f_grnd(i,j) .eq. 1.0) H_mrgn = 0.5 * H_mrgn
+                    !if (f_grnd(i,j) .eq. 1.0) H_ref = 0.5 * H_ref
 
                     ! Determine the cell ice fraction
                     ! Note: fraction is determined as a ratio of 
                     ! thicknesses, derived from volume conservation 
-                    ! vol = H_ice*dx*dy = H_mrgn*area_frac 
+                    ! vol = H_ice*dx*dy = H_ref*area_frac 
                     ! f_ice = area_frac / (dx*dy)
-                    ! f_ice = H_ice/H_mrgn 
-                    f_ice(i,j) = min( H_ice(i,j) / H_mrgn, 1.0 ) 
+                    ! f_ice = H_ice/H_ref 
+                    f_ice(i,j) = min( H_ice(i,j) / H_ref, 1.0 ) 
 
-                end if
+                else 
+                    ! Island point, assume the cell is full
+
+                    H_ref = H_ice(i,j) 
+                    f_ice(i,j) = 1.0 
+
+                end if 
+
+
+                ! Now determine if ice should be in buffer (with f_ice < 1.0)
+                if (f_ice(i,j) .gt. 0.0 .and. f_ice(i,j) .lt. 1.0) then 
+                    ! Ice exists, but does not fill the entire cell, therefore
+                    ! move ice to the buffer 
+
+                    H_margin(i,j) = H_ice(i,j)
+                    H_ice(i,j)    = 0.0 
+
+                end if 
 
             end if  
 

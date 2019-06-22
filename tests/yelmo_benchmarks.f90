@@ -240,14 +240,8 @@ program yelmo_benchmarks
         
         case("mismip") 
 
-            ! Make sure beta is defined externally and law is compatible 
-            yelmo1%dyn%par%C_bed_method = -1
-            yelmo1%dyn%par%beta_method  =  1 
-            yelmo1%dyn%par%m_drag       =  3.0 
-
             ! Initialize mismip boundary values 
-            call mismip3D_boundaries(yelmo1%bnd%T_srf,yelmo1%bnd%smb,yelmo1%bnd%Q_geo,yelmo1%dyn%now%C_bed, &
-                        yelmo1%grd%x*1e-3,yelmo1%grd%y*1e-3,x_gl=800.0,experiment="Stnd")
+            call mismip3D_boundaries(yelmo1%bnd%T_srf,yelmo1%bnd%smb,yelmo1%bnd%Q_geo,experiment="Stnd") 
 
         case DEFAULT 
             ! EISMINT 
@@ -340,8 +334,7 @@ program yelmo_benchmarks
             case("mismip") 
 
                 ! Initialize mismip boundary values 
-                call mismip3D_boundaries(yelmo1%bnd%T_srf,yelmo1%bnd%smb,yelmo1%bnd%Q_geo,yelmo1%dyn%now%C_bed, &
-                            yelmo1%grd%x*1e-3,yelmo1%grd%y*1e-3,x_gl=800.0,experiment="Stnd")
+                call mismip3D_boundaries(yelmo1%bnd%T_srf,yelmo1%bnd%smb,yelmo1%bnd%Q_geo,experiment="Stnd") 
 
             case DEFAULT 
 
@@ -439,6 +432,8 @@ contains
         
         ! == yelmo_topography ==
         call nc_write(filename,"H_ice",ylmo%tpo%now%H_ice,units="m",long_name="Ice thickness", &
+                      dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
+        call nc_write(filename,"H_margin",ylmo%tpo%now%H_margin,units="m",long_name="Margin ice thickness", &
                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
         call nc_write(filename,"z_srf",ylmo%tpo%now%z_srf,units="m",long_name="Surface elevation", &
                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)

@@ -94,7 +94,7 @@ contains
             end if 
 
             ! 1. Calculate the ice thickness conservation and apply bedrock uplift -----
-            call calc_ice_thickness(tpo%now%H_ice,tpo%now%mb_applied, &
+            call calc_ice_thickness(tpo%now%H_ice,tpo%now%H_margin,tpo%now%f_ice,tpo%now%mb_applied, &
                                     tpo%now%f_grnd,bnd%z_sl-bnd%z_bed, &
                                     dyn%now%ux_bar,dyn%now%uy_bar, &
                                     mbal=mbal,calv=tpo%now%calv*0.0,z_bed_sd=bnd%z_bed_sd,dx=tpo%par%dx,dt=dt, &
@@ -106,9 +106,6 @@ contains
             if (dt_calv .ge. tpo%par%calv_dt) then 
                 ! Diagnose calving rate at desired timestep frequency [m/a]
 
-                ! Update the ice-covered fraction to be more precise with calving 
-                tpo%now%f_ice = calc_ice_fraction(tpo%now%H_ice,tpo%now%f_grnd)
-                
                 select case(trim(tpo%par%calv_method))
 
                     case("zero")
@@ -118,12 +115,12 @@ contains
                     case("simple") 
                         ! Use simple threshold method
 
-                        tpo%now%calv  = calc_calving_rate_simple(tpo%now%H_ice,tpo%now%f_grnd,tpo%now%f_ice,dt_calv,tpo%par%H_calv)
+                        tpo%now%calv  = calc_calving_rate_simple(tpo%now%H_ice,tpo%now%f_grnd,dt_calv,tpo%par%H_calv)
                     
                     case("flux") 
                         ! Use threshold+flux method from GRISLI 
 
-                        tpo%now%calv  = calc_calving_rate_flux(tpo%now%H_ice,tpo%now%f_grnd,tpo%now%f_ice, &
+                        tpo%now%calv  = calc_calving_rate_flux(tpo%now%H_ice,tpo%now%f_grnd, &
                                                mbal,dyn%now%ux_bar,dyn%now%uy_bar,tpo%par%dx,dt_calv,tpo%par%H_calv)
                     
                     case("kill") 
@@ -198,9 +195,6 @@ contains
         ! Calculate the grounding line mask 
         call calc_grline(tpo%now%is_grline,tpo%now%is_grz,tpo%now%f_grnd)
 
-        ! Calculate the ice-covered fraction of each grid cell 
-        tpo%now%f_ice = calc_ice_fraction(tpo%now%H_ice,tpo%now%f_grnd)
-        
         ! Calculate the bed mask
         tpo%now%mask_bed = gen_mask_bed(tpo%now%H_ice,thrm%now%f_pmp,tpo%now%f_grnd,tpo%now%is_grline)
 
@@ -382,7 +376,7 @@ contains
         allocate(now%calv_grnd(nx,ny))
         allocate(now%calv(nx,ny))
 
-        allocate(now%H_ref(nx,ny))
+        allocate(now%H_margin(nx,ny))
         
         allocate(now%dzsdx(nx,ny))
         allocate(now%dzsdy(nx,ny))
@@ -413,7 +407,7 @@ contains
         now%mb_applied = 0.0 
         now%calv_grnd  = 0.0
         now%calv       = 0.0
-        now%H_ref      = 0.0 
+        now%H_margin   = 0.0 
         now%dzsdx      = 0.0 
         now%dzsdy      = 0.0 
         now%dHicedx    = 0.0 
@@ -448,7 +442,7 @@ contains
         if (allocated(now%calv_grnd))  deallocate(now%calv_grnd)
         if (allocated(now%calv))       deallocate(now%calv)
 
-        if (allocated(now%H_ref))      deallocate(now%H_ref)
+        if (allocated(now%H_margin))   deallocate(now%H_margin)
         
         if (allocated(now%dzsdx))      deallocate(now%dzsdx)
         if (allocated(now%dzsdy))      deallocate(now%dzsdy)
@@ -480,83 +474,6 @@ contains
     ! Calculations
     !
     ! ============================================================
-
-    function calc_ice_fraction(H_ice,f_grnd) result(f_ice)
-        ! Determine the area fraction of a grid cell
-        ! that is ice-covered. Assume that marginal points
-        ! have equal thickness to inland neighbors 
-
-        implicit none 
-
-        real(prec), intent(IN) :: H_ice(:,:)                ! [m] Ice thickness on standard grid (aa-nodes)
-        real(prec), intent(IN) :: f_grnd(:,:)               ! [--] Grounded fraction (aa-nodes)
-        real(prec) :: f_ice(size(H_ice,1),size(H_ice,2))    ! [--] Ice covered fraction (aa-nodes)
-
-        ! Local variables 
-        integer :: i, j, nx, ny 
-        real(prec) :: dx, dy 
-        real(prec) :: H_ref(4)
-        logical :: mask_ref(4)
-        real(prec) :: H_mrgn 
-
-        nx = size(H_ice,1)
-        ny = size(H_ice,2)
-
-        ! Set dx/dy to one, since the volume is only used in a relative sense 
-        dx = 1.0 
-        dy = 1.0 
-
-        ! Initially set fraction to one everywhere there is ice 
-        ! and zero everywhere there is no ice
-        f_ice = 0.0  
-        where (H_ice .gt. 0.0) f_ice = 1.0
-
-if (.FALSE.) then 
-    ! For now, ice-fraction is disabled 
-
-        ! For ice-covered points with ice-free neighbors (ie, at the floating or grounded margin),
-        ! determine the fraction of grid point that should be ice covered. 
-
-        do j = 2, ny-1
-        do i = 2, nx-1 
-
-            if (f_ice(i,j) .gt. 0.0 .and. &
-                count([f_ice(i-1,j),f_ice(i+1,j),f_ice(i,j-1),f_ice(i,j+1)].eq.0) .gt. 0) then 
-                ! This point is at the ice margin
-
-                H_ref    = [H_ice(i-1,j),H_ice(i+1,j),H_ice(i,j-1),H_ice(i,j+1)]
-                mask_ref = (H_ref .gt. 0.0)
-
-                if (count(mask_ref) .gt. 0) then 
-                    ! Neighbors with ice should generally be found, but put this check just in case
-
-                    ! Determine height to give to partially filled cell as average of neighbors
-                    H_mrgn = sum(H_ref,mask=mask_ref)/real(count(mask_ref))
-
-                    ! If margin point is grounded, then assign it with 
-                    ! a thickness of half of neighbor-average
-                    if (f_grnd(i,j) .eq. 1.0) H_mrgn = 0.5 * H_mrgn
-
-                    ! Determine the cell ice fraction
-                    ! Note: fraction is determined as a ratio of 
-                    ! thicknesses, derived from volume conservation 
-                    ! vol = H_ice*dx*dy = H_mrgn*area_frac 
-                    ! f_ice = area_frac / (dx*dy)
-                    ! f_ice = H_ice/H_mrgn 
-                    f_ice(i,j) = min( H_ice(i,j) / H_mrgn, 1.0 ) 
-
-                end if
-
-            end if  
-
-        end do 
-        end do 
-
-end if 
-
-        return 
-
-    end function calc_ice_fraction
 
     elemental subroutine calc_z_srf(z_srf,H_ice,H_grnd,z_bed,z_sl)
         ! Calculate surface elevation

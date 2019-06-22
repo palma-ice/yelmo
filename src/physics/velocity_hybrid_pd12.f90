@@ -783,7 +783,7 @@ contains
 
     end subroutine calc_basal_stress
 
-    subroutine calc_driving_stress_ac(taud_acx,taud_acy,H_ice,f_ice,z_srf,z_bed,z_sl,H_grnd, &
+    subroutine calc_driving_stress_ac(taud_acx,taud_acy,H_ice,z_srf,z_bed,z_sl,H_grnd, &
                                       f_grnd,f_grnd_acx,f_grnd_acy,dx,method,beta_gl_stag)
         ! taud = rho_ice*g*H_ice
         ! Calculate driving stress on staggered grid points, with 
@@ -797,7 +797,6 @@ contains
         real(prec), intent(OUT) :: taud_acx(:,:)
         real(prec), intent(OUT) :: taud_acy(:,:) 
         real(prec), intent(IN)  :: H_ice(:,:)
-        real(prec), intent(IN)  :: f_ice(:,:)
         real(prec), intent(IN)  :: z_srf(:,:)
         real(prec), intent(IN)  :: z_bed(:,:)
         real(prec), intent(IN)  :: z_sl(:,:)
@@ -833,8 +832,8 @@ contains
         ! This will be used to calculate H_mid on the acx/acy nodes,
         ! but it should come from ab-nodes instead of ac-nodes for stability 
         ! Note: this is disabled, as it seemed not to affect results
-        !Hi_ab = stagger_aa_ab_ice(H_ice,H_ice)
-        Hi_ab = stagger_aa_ab(H_ice/max(f_ice,1e-2))
+        Hi_ab = stagger_aa_ab_ice(H_ice,H_ice)
+        !Hi_ab = stagger_aa_ab(H_ice)
         
         ! Define shortcut parameter 
         rhog = rho_ice * g 

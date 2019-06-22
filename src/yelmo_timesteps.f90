@@ -127,15 +127,17 @@ contains
 
         implicit none 
         
-        real(prec), intent(IN) :: ux(:,:)        ! acx-nodes
-        real(prec), intent(IN) :: uy(:,:)         ! acy-nodes 
+        real(prec), intent(IN) :: ux(:,:)           ! acx-nodes
+        real(prec), intent(IN) :: uy(:,:)           ! acy-nodes 
         real(prec), intent(IN) :: dx, dy
-        real(prec), intent(IN) :: cfl_max             ! Maximum Courant number, default cfl_max=1.0
-        real(prec) :: dt(size(ux,1),size(ux,2))  ! aa-nodes 
+        real(prec), intent(IN) :: cfl_max           ! Maximum Courant number, default cfl_max=1.0
+        real(prec) :: dt(size(ux,1),size(ux,2))     ! aa-nodes 
 
         ! Local variables  
         integer :: i, j, nx, ny 
         real(prec) :: ux_now, uy_now 
+
+        real(prec), parameter :: eps = 1e-1         ! [m/a] Small factor to avoid divide by zero 
 
         nx = size(ux,1)
         ny = size(ux,2)
@@ -151,8 +153,8 @@ contains
             
             !dt(i,j) = cfl_max * 1.0 / max(ux_now/dx + uy_now/dy,1e-3)
 
-            dt(i,j) = cfl_max * 1.0 / max(abs(ux(i-1,j))/dx + abs(ux(i,j))/dx &
-                                        + abs(uy(i,j-1))/dy + abs(uy(i,j))/dy,1e-3)
+            dt(i,j) = cfl_max * 1.0 / (abs(ux(i-1,j))/dx + abs(ux(i,j))/dx &
+                                       + abs(uy(i,j-1))/dy + abs(uy(i,j))/dy + eps/(dx+dy))
             
         end do 
         end do 

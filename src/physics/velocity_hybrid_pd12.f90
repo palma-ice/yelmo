@@ -849,8 +849,8 @@ contains
         taud_acx = 0.0_prec  
         do j = 2, ny 
         do i = 1, nx-1 
-            H_mid         = 0.5_prec * (Hi_ab(i,j)+Hi_ab(i,j-1))
-!             H_mid         = 0.5_prec*(H_ice(i,j)+H_ice(i+1,j))
+!             H_mid         = 0.5_prec * (Hi_ab(i,j)+Hi_ab(i,j-1))
+            H_mid         = 0.5_prec*(H_ice(i,j)+H_ice(i+1,j))
             dzsdx         = (z_srf(i+1,j)-z_srf(i,j)) / dx
             call minmax(dzsdx,slope_max)  
             taud_acx(i,j) = rhog * H_mid * dzsdx 
@@ -863,8 +863,8 @@ contains
         taud_acy = 0.0_prec  
         do j = 1, ny-1 
         do i = 2, nx 
-            H_mid         = 0.5_prec * (Hi_ab(i,j)+Hi_ab(i-1,j))
-!             H_mid         = 0.5_prec*(H_ice(i,j)+H_ice(i,j+1))
+!             H_mid         = 0.5_prec * (Hi_ab(i,j)+Hi_ab(i-1,j))
+            H_mid         = 0.5_prec*(H_ice(i,j)+H_ice(i,j+1))
             dzsdy         = (z_srf(i,j+1)-z_srf(i,j)) / dy
             call minmax(dzsdy,slope_max)   
             taud_acy(i,j) = rhog * H_mid * dzsdy 

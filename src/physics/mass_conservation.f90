@@ -87,7 +87,7 @@ contains
         
         ! Add ice in the margin buffer to current ice thickness,
         ! set the buffer to zero  
-        !H_ice    = H_ice + H_margin 
+        H_ice    = H_ice + H_margin 
         H_margin = 0.0 
 
         ! Next, handle mass balance in order to be able to diagnose
@@ -104,7 +104,7 @@ contains
         H_ice = H_ice + dt*mb_applied
 
         ! Determine how much ice goes into the margin buffer 
-        !call calc_ice_margin(H_ice,H_margin,f_ice,f_grnd)
+        call calc_ice_margin(H_ice,H_margin,f_ice,f_grnd)
 
 if (.FALSE.) then 
     ! ajr: disable these for now to test new margin scheme!!
@@ -818,9 +818,12 @@ end if
         real(prec) :: H_neighb(4)
         logical :: mask_neighb(4)
         real(prec) :: H_ref 
+        real(prec), allocatable :: H_ice_0(:,:) 
 
         nx = size(H_ice,1)
         ny = size(H_ice,2)
+
+        allocate(H_ice_0(nx,ny))
 
         ! Initially set fraction to one everywhere there is ice 
         ! and zero everywhere there is no ice
@@ -830,26 +833,31 @@ end if
         ! For ice-covered points with ice-free neighbors (ie, at the floating or grounded margin),
         ! determine the fraction of grid point that should be ice covered. 
 
+        H_ice_0 = H_ice 
+
         do j = 2, ny-1
         do i = 2, nx-1 
 
-            if (H_ice(i,j) .gt. 0.0 .and. &
-                minval([H_ice(i-1,j),H_ice(i+1,j),H_ice(i,j-1),H_ice(i,j+1)]) .eq. 0.0) then 
+            ! Store neighbor heights 
+            H_neighb = [H_ice_0(i-1,j),H_ice_0(i+1,j),H_ice_0(i,j-1),H_ice_0(i,j+1)]
+            
+            if (H_ice(i,j) .gt. 0.0 .and. minval(H_neighb) .eq. 0.0) then 
                 ! This point is at the ice margin
 
-                H_neighb    = [H_ice(i-1,j),H_ice(i+1,j),H_ice(i,j-1),H_ice(i,j+1)]
+                ! Store mask of neighbors with ice 
                 mask_neighb = (H_neighb .gt. 0.0)
 
                 if (count(mask_neighb) .gt. 0) then 
                     ! Neighbors with ice should generally be found, but put this check just in case
 
                     ! Determine height to give to partially filled cell as average of neighbors
-                    H_ref = sum(H_neighb,mask=mask_neighb)/real(count(mask_neighb),prec)
-
+!                     H_ref = sum(H_neighb,mask=mask_neighb)/real(count(mask_neighb),prec)
+                    H_ref = minval(H_neighb,mask=mask_neighb)
+                    
                     ! Experimental:
                     ! If margin point is grounded, then assign it with 
                     ! a thickness of half of neighbor-average
-                    !if (f_grnd(i,j) .eq. 1.0) H_ref = 0.5 * H_ref
+                    if (f_grnd(i,j) .eq. 1.0) H_ref = 0.5 * H_ref
 
                     ! Determine the cell ice fraction
                     ! Note: fraction is determined as a ratio of 
@@ -866,7 +874,6 @@ end if
                     f_ice(i,j) = 1.0 
 
                 end if 
-
 
                 ! Now determine if ice should be in buffer (with f_ice < 1.0)
                 if (f_ice(i,j) .gt. 0.0 .and. f_ice(i,j) .lt. 1.0) then 

@@ -8,6 +8,7 @@ module mass_conservation
 
     private
     public :: calc_ice_thickness
+    public :: apply_calving_ice_margin
 
 contains 
 
@@ -817,7 +818,7 @@ end if
         integer :: i, j, nx, ny 
         real(prec) :: H_neighb(4)
         logical :: mask_neighb(4)
-        real(prec) :: H_ref 
+        real(prec) :: H_ref, H_ref_x, H_ref_y 
         real(prec), allocatable :: H_ice_0(:,:) 
 
         nx = size(H_ice,1)
@@ -835,8 +836,8 @@ end if
 
         H_ice_0 = H_ice 
 
-        do j = 2, ny-1
-        do i = 2, nx-1 
+        do j = 3, ny-2
+        do i = 3, nx-2 
 
             ! Store neighbor heights 
             H_neighb = [H_ice_0(i-1,j),H_ice_0(i+1,j),H_ice_0(i,j-1),H_ice_0(i,j+1)]
@@ -848,17 +849,116 @@ end if
                 mask_neighb = (H_neighb .gt. 0.0)
 
                 if (count(mask_neighb) .gt. 0) then 
-                    ! Neighbors with ice should generally be found, but put this check just in case
+                    ! This point has ice-covered neighbors (generally true)
 
-                    ! Determine height to give to partially filled cell as average of neighbors
-!                     H_ref = sum(H_neighb,mask=mask_neighb)/real(count(mask_neighb),prec)
-                    H_ref = minval(H_neighb,mask=mask_neighb)
+                    ! Determine height to give to partially filled cell
+                    if (f_grnd(i,j) .eq. 0.0) then 
+                        ! Floating point, set H_ref = minimum of neighbors
+
+                        H_ref = minval(H_neighb,mask=mask_neighb)
+
+                    else 
+                        ! Grounded point, set H_ref < min(H_neighb) arbitrarily (0.5 works well)
+                        H_ref = 0.5*minval(H_neighb,mask=mask_neighb)
+
+                    end if 
+
+
+!                     else 
+!                         ! Grounded point, calculate H_ref from slope of neighbors 
+
+!                         ! Get H_ref from x-direction ========
+
+!                         if (H_ice_0(i-1,j) .gt. 0.0 .and. H_ice_0(i+1,j) .gt. 0.0) then 
+!                             ! Both x-neighbors have ice
+
+!                             H_ref_x = 0.5*(H_ice_0(i-1,j) + H_ice(i+1,j))
+
+!                         else if (H_ice_0(i-1,j) .gt. 0.0) then
+!                             ! Left x-neighbor has ice
+
+!                             if (H_ice_0(i-2,j) .gt. 0.0) then 
+!                                 ! Ice upstream, calculate H_ref via slope 
+!                                 ! y = y1 + dx*(y1-y2)/dx = 2*y1 - y2 
+
+!                                 H_ref_x = 2.0*H_ice_0(i-1,j) - H_ice(i-2,j)
+
+!                             else
+!                                 ! No ice further upstream, set to half of neighbor 
+!                                 ! (arbitrarily less than 1.0)
+                                
+!                                 H_ref_x = 0.5*H_ice_0(i-1,j)
+
+!                             end if  
+
+!                         else 
+!                             ! Right x-neighbor has ice 
+
+!                             if (H_ice_0(i+2,j) .gt. 0.0) then
+!                                 ! Ice upstream, calculate H_ref via slope 
+!                                 ! y = y1 + dx*(y1-y2)/dx = 2*y1 - y2 
+
+!                                 H_ref_x = 2.0*H_ice_0(i+1,j) - H_ice(i+2,j)
+                            
+!                             else 
+!                                 ! No ice further upstream, set to half of neighbor 
+!                                 ! (arbitrarily less than 1.0)
+                                
+!                                 H_ref_x = 0.5*H_ice_0(i+1,j)
+
+!                             end if  
+
+!                         end if 
+
+!                         ! Get H_ref from y-direction ========
+                        
+!                         if (H_ice_0(i,j-1) .gt. 0.0 .and. H_ice_0(i,j+1) .gt. 0.0) then 
+!                             ! Both y-neighbors have ice
+
+!                             H_ref_y = 0.5*(H_ice_0(i,j-1) + H_ice(i,j+1))
+
+!                         else if (H_ice_0(i,j-1) .gt. 0.0) then
+!                             ! Left y-neighbor has ice
+
+!                             if (H_ice_0(i,j-2) .gt. 0.0) then
+!                                 ! Ice upstream, calculate H_ref via slope 
+!                                 ! y = y1 + dx*(y1-y2)/dx = 2*y1 - y2 
+
+!                                 H_ref_y = 2.0*H_ice_0(i,j-1) - H_ice(i,j-2)
+                            
+!                             else
+!                                 ! No ice further upstream, set to half of neighbor 
+!                                 ! (arbitrarily less than 1.0)
+                                
+!                                 H_ref_y = 0.5*H_ice_0(i,j-1)
+                                   
+!                             end if  
+
+!                         else 
+!                             ! Right y-neighbor has ice 
+
+!                             if (H_ice_0(i,j+2) .gt. 0.0) then 
+!                                 ! Ice upstream, calculate H_ref via slope 
+!                                 ! y = y1 + dx*(y1-y2)/dx = 2*y1 - y2 
+
+!                                 H_ref_y = 2.0*H_ice_0(i,j+1) - H_ice(i,j+2)
+                            
+!                             else 
+!                                 ! No ice further upstream, set to half of neighbor 
+!                                 ! (arbitrarily less than 1.0)
+                                
+!                                 H_ref_y = 0.5*H_ice_0(i,j+1)
+                                  
+!                             end if  
+
+!                         end if 
+
+!                         ! Set H_ref as the average of the two directions 
+!                         H_ref = 0.5*(H_ref_x + H_ref_y) 
+
+!                     end if 
+
                     
-                    ! Experimental:
-                    ! If margin point is grounded, then assign it with 
-                    ! a thickness of half of neighbor-average
-                    if (f_grnd(i,j) .eq. 1.0) H_ref = 0.5 * H_ref
-
                     ! Determine the cell ice fraction
                     ! Note: fraction is determined as a ratio of 
                     ! thicknesses, derived from volume conservation 
@@ -868,10 +968,11 @@ end if
                     f_ice(i,j) = min( H_ice(i,j) / H_ref, 1.0 ) 
 
                 else 
-                    ! Island point, assume the cell is full
+                    ! Island point, assume the cell is not full to 
+                    ! ensure it is assigned as an H_margin point
 
                     H_ref = H_ice(i,j) 
-                    f_ice(i,j) = 1.0 
+                    f_ice(i,j) = 0.1 
 
                 end if 
 
@@ -893,5 +994,43 @@ end if
         return 
 
     end subroutine calc_ice_margin
+    
+    subroutine apply_calving_ice_margin(calving,H_margin,H_ice,dt)
+        ! Apply calving to isolated (island) H_margin points
+
+        implicit none 
+
+        real(prec), intent(INOUT) :: calving(:,:)           ! [m/a] Calving rate
+        real(prec), intent(INOUT) :: H_margin(:,:)          ! [m]   Margin ice thickness for partially filled cells, H_margin*1.0 = H_ref*f_ice
+        real(prec), intent(IN)    :: H_ice(:,:)             ! [m]   Ice thickness on standard grid (aa-nodes)
+        real(prec), intent(IN)    :: dt                     ! [a]   Timestep 
+
+        ! Local variables 
+        integer :: i, j, nx, ny 
+        real(prec) :: H_neighb(4)
+
+        nx = size(H_ice,1)
+        ny = size(H_ice,2)
+
+        do j = 2, ny-1
+        do i = 2, nx-1 
+
+            ! Store neighbor heights 
+            H_neighb = [H_ice(i-1,j),H_ice(i+1,j),H_ice(i,j-1),H_ice(i,j+1)]
+            
+            if (H_margin(i,j) .gt. 0.0 .and. maxval(H_neighb) .eq. 0.0) then 
+                ! This point is at the ice margin and has no ice-covered neighbors
+
+                calving(i,j)  = calving(i,j) + H_margin(i,j) / dt 
+                H_margin(i,j) = 0.0 
+
+            end if  
+
+        end do 
+        end do 
+
+        return 
+
+    end subroutine apply_calving_ice_margin
     
 end module mass_conservation

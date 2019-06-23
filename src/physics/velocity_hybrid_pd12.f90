@@ -819,7 +819,7 @@ contains
         real(prec) :: taud_old, fac_gl   
 
         real(prec), allocatable :: Hi_ab(:,:) 
-        
+
         real(prec), parameter :: slope_max = 0.05   ! Very high limit == 0.05, low limit < 0.01 
 
         nx = size(H_ice,1)

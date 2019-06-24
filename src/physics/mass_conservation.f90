@@ -858,8 +858,8 @@ end if
                         H_ref = minval(H_neighb,mask=mask_neighb)
 
                     else 
-                        ! Grounded point, set H_ref < min(H_neighb) arbitrarily (0.5 works well)
-                        H_ref = 0.5*minval(H_neighb,mask=mask_neighb)
+                        ! Grounded point, set H_ref < mean(H_neighb) arbitrarily (0.5 works well)
+                        H_ref = 0.5*sum(H_neighb,mask=mask_neighb)/real(mask_neighb,prec)
 
                     end if 
 

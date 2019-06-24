@@ -902,9 +902,10 @@ end if
                         H_ref = minval(H_neighb,mask=mask_neighb)
 
                     else 
-                        ! Grounded point, set H_ref < mean(H_neighb) arbitrarily (0.5 works well)
-                        H_ref = 0.5*sum(H_neighb,mask=mask_neighb.and.H_neighb.gt.H_ice_0(i,j)) &
-                                    / real(count(mask_neighb.and.H_neighb.gt.H_ice_0(i,j)),prec)
+                        ! Grounded point, set H_ref < mean([H_neighb > H_ice_now]) arbitrarily (0.5 works well)
+                        ! ie, mean(H_neighb) is only determined from thicker/upstream neighbors 
+                        H_ref = 0.8*sum(H_neighb,mask=H_neighb.gt.H_ice_0(i,j)) &
+                                    / real(count(H_neighb.gt.H_ice_0(i,j)),prec)
 
                     end if 
 

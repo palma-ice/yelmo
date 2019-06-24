@@ -23,7 +23,7 @@ program yelmo_test
 
     ! Optimization variables 
     real(prec) :: time_iter
-    integer    :: q, qmax, qmax_topo_fixed, qmax_iter_length  
+    integer    :: q, qmax, qmax_topo_fixed, qmax_iter_length_1, qmax_iter_length_2  
     logical    :: topo_fixed 
     real(prec) :: phi_min, phi_max  
 
@@ -64,7 +64,8 @@ program yelmo_test
     time_iter           = 500.0     ! [yr] Simulation time for each iteration
     qmax                = 51        ! Total number of iterations
     qmax_topo_fixed     = 0         ! Number of initial iterations that should use topo_fixed=.TRUE. 
-    qmax_iter_length    = 10        ! Number of iterations at which iteration length should increase
+    qmax_iter_length_1  = 10        ! 1st number of iterations at which iteration length should increase
+    qmax_iter_length_2  = 30        ! 2nd number of iterations at which iteration length should increase
     phi_min             =  5.0      ! Minimum allowed friction angle
     phi_max             = 70.0      ! Maximum allowed friction angle 
 
@@ -159,8 +160,9 @@ program yelmo_test
 
         ! Increase iteration time after several iterations to ensure convergence on
         ! a beta that performs well towards equilibration
-        if (q .gt. qmax_iter_length) time_iter = 1000.0 
-
+        if (q .gt. qmax_iter_length_1) time_iter = 1000.0 
+        if (q .gt. qmax_iter_length_2) time_iter = 2000.0 
+        
         if (q .lt. qmax) then
             ! Update C_bed based on error correction
             call update_C_bed_thickness(yelmo1%dyn%now%C_bed,dCbed,phi,yelmo1%dta%pd%err_z_srf,yelmo1%tpo%now%H_ice, &
@@ -169,7 +171,7 @@ program yelmo_test
         else
             ! Now run to steady-state
             write(*,*) "Now run with fixed C_bed to equilibrate ice sheet."
-            time_iter = 5000.0 
+            time_iter = 10000.0 
         end if 
 
         ! Reset model to the initial state (including H_w), with updated C_bed field 
@@ -247,6 +249,9 @@ contains
         call nc_write(filename,"z_srf",ylmo%tpo%now%z_srf,units="m",long_name="Surface elevation", &
                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
         call nc_write(filename,"mask_bed",ylmo%tpo%now%mask_bed,units="",long_name="Bed mask", &
+                      dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
+        
+        call nc_write(filename,"dHicedt",ylmo%tpo%now%dHicedt,units="m/a",long_name="Ice thickness change", &
                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
         
         call nc_write(filename,"C_bed",ylmo%dyn%now%C_bed,units="",long_name="Bed constant", &

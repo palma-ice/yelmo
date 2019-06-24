@@ -125,7 +125,7 @@ contains
         call ydata_compare(dom%dta,dom%tpo,dom%dyn,dom%thrm,dom%bnd)
 
         ! Calculate model speed [model-kyr / hr]
-        call yelmo_calc_speed(dom%par%model_speed,dom%par%model_speeds,time_start,time_now,cpu_start_time)
+        call yelmo_calc_speed(dom%par%model_speed,dom%par%model_speeds,time_start,time_now,real(cpu_start_time,prec))
 
         ! Write some diagnostics to make sure something useful is happening 
         if (yelmo_write_log) then 

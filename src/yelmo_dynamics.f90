@@ -824,7 +824,7 @@ if (.FALSE.) then
             ! Calculate the analytical grounding-line flux 
             call calc_grounding_line_flux(dyn%now%qq_gl_acx,dyn%now%qq_gl_acy,tpo%now%H_ice,mat%now%ATT_bar, &
                         dyn%now%C_bed,dyn%now%ux_b,dyn%now%uy_b,tpo%now%f_grnd,tpo%now%f_grnd_acx,tpo%now%f_grnd_acy, &
-                        mat%par%n_glen,dyn%par%m_drag,Q0=0.61,f_drag=0.6,gl_flux_method="coulomb")
+                        mat%par%n_glen,dyn%par%m_drag,Q0=0.61_prec,f_drag=0.6_prec,gl_flux_method="coulomb")
 
             ! Where qq_gl is present, prescribe velocity and set mask to -1
 

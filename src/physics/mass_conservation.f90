@@ -63,7 +63,7 @@ contains
 
             case("impl-upwind") 
 
-                call calc_adv2D_impl_upwind(H_ice,ux,uy,mbal*0.0,dx,dx,dt,f_upwind=1.0)
+                call calc_adv2D_impl_upwind(H_ice,ux,uy,mbal*0.0,dx,dx,dt,f_upwind=1.0_prec)
             
             ! Other solvers below...
             case("expl-sico")

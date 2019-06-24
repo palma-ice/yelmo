@@ -191,7 +191,7 @@ program yelmo_benchmarks
 
             ! Initialize BUELER-B 
             call bueler_test_BC(buel%H_ice,buel%mbal,buel%u_b,yelmo1%grd%x,yelmo1%grd%y, &
-                        time=0.0,R0=750.0_prec,H0=3600.0_prec,lambda=0.0_prec,n=3.0_prec,A=1e-16_prec,rho_ice=rho_ice,g=g)
+                        time=0.0_prec,R0=750.0_prec,H0=3600.0_prec,lambda=0.0_prec,n=3.0_prec,A=1e-16_prec,rho_ice=rho_ice,g=g)
 
             yelmo1%bnd%T_srf = 223.15 
             yelmo1%bnd%Q_geo = 42.0 
@@ -208,7 +208,7 @@ program yelmo_benchmarks
 
             ! Initialize BUELER-B (but with HALFAR conditions)
             call bueler_test_BC(buel%H_ice,buel%mbal,buel%u_b,yelmo1%grd%x,yelmo1%grd%y, &
-                        time=0.0,R0=21.2132_prec,H0=707.1_prec,lambda=0.0_prec,n=3.0_prec,A=1e-16_prec,rho_ice=rho_ice,g=g)
+                        time=0.0_prec,R0=21.2132_prec,H0=707.1_prec,lambda=0.0_prec,n=3.0_prec,A=1e-16_prec,rho_ice=rho_ice,g=g)
 
             yelmo1%bnd%T_srf = 223.15 
             yelmo1%bnd%Q_geo = 42.0 
@@ -225,7 +225,7 @@ program yelmo_benchmarks
 
             ! Initialize BUELER-B (but with conditions between Bueler-B and HALFAR - not too big, not too small)
             call bueler_test_BC(buel%H_ice,buel%mbal,buel%u_b,yelmo1%grd%x,yelmo1%grd%y, &
-                        time=0.0,R0=200.0_prec,H0=3000.0_prec,lambda=0.0_prec,n=3.0_prec,A=1e-16_prec,rho_ice=rho_ice,g=g)
+                        time=0.0_prec,R0=200.0_prec,H0=3000.0_prec,lambda=0.0_prec,n=3.0_prec,A=1e-16_prec,rho_ice=rho_ice,g=g)
 
             yelmo1%bnd%T_srf = 223.15 
             yelmo1%bnd%Q_geo = 42.0 

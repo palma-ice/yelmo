@@ -373,7 +373,7 @@ contains
 
     end subroutine calc_strain_heating_sia
 
-    subroutine calc_basal_heating(Q_b,ux_b,uy_b,taub_acx,taub_acy)
+    subroutine calc_basal_heating0(Q_b,ux_b,uy_b,taub_acx,taub_acy)
         ! Qb [J a-1 m-2] == [m a-1] * [J m-3]
         ! Note: grounded ice fraction f_grnd_acx/y not used here, because taub_acx/y already accounts
         ! for the grounded fraction via beta_acx/y: Q_b = tau_b*u = -beta*u*u.
@@ -408,9 +408,9 @@ contains
         Q_b = 0.0  
 
         ! Get basal frictional heating on centered nodes (aa-grid)
-        do j = 2, ny-1
-        do i = 2, nx-1
-            
+        do j = 2, ny
+        do i = 2, nx
+
             ! Average from ac-nodes to aa-node
             Q_b(i,j) = 0.25*(Qb_acx(i,j)+Qb_acx(i-1,j)+Qb_acy(i,j)+Qb_acy(i,j-1))
 
@@ -419,9 +419,9 @@ contains
 
         return 
 
-    end subroutine calc_basal_heating
+    end subroutine calc_basal_heating0
 
-    subroutine calc_basal_heating1(Q_b,ux_b,uy_b,taub_acx,taub_acy)
+    subroutine calc_basal_heating(Q_b,ux_b,uy_b,taub_acx,taub_acy)
         ! Qb [J a-1 m-2] == [m a-1] * [J m-3]
         ! Note: grounded ice fraction f_grnd_acx/y not used here, because taub_acx/y already accounts
         ! for the grounded fraction via beta_acx/y: Q_b = tau_b*u = -beta*u*u.
@@ -447,8 +447,8 @@ contains
         Q_b = 0.0  
 
         ! Get basal frictional heating on centered nodes (aa-grid)
-        do j = 2, ny-1
-        do i = 2, nx-1
+        do j = 2, ny
+        do i = 2, nx
 
             ! Determine basal frictional heating values (staggered acx/acy nodes)
             ! [Pa m a-1] == [J a-1 m-2]
@@ -465,7 +465,7 @@ contains
 
         return 
 
-    end subroutine calc_basal_heating1
+    end subroutine calc_basal_heating
 
     elemental function calc_specific_heat_capacity(T_ice) result(cp)
 

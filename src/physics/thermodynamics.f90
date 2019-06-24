@@ -364,6 +364,48 @@ contains
     end subroutine calc_strain_heating_sia
 
     subroutine calc_basal_heating(Q_b,ux_b,uy_b,taub_acx,taub_acy)
+         ! Qb [J a-1 m-2] == [m a-1] * [J m-3]
+         ! Note: grounded ice fraction f_grnd_acx/y not used here, because taub_acx/y already accounts
+         ! for the grounded fraction via beta_acx/y: Q_b = tau_b*u = -beta*u*u.
+
+        real(prec), intent(OUT) :: Q_b(:,:)               ! [J a-1 K-1] Basal heat production (friction)
+        real(prec), intent(IN)  :: ux_b(:,:)              ! Basal velocity, x-component (staggered x)
+        real(prec), intent(IN)  :: uy_b(:,:)              ! Basal velocity, y-compenent (staggered y)
+        real(prec), intent(IN)  :: taub_acx(:,:)          ! Basal friction (staggered x)
+        real(prec), intent(IN)  :: taub_acy(:,:)          ! Basal friction (staggered y)
+        
+        ! Local variables
+        integer    :: i, j, nx, ny 
+        real(prec), allocatable :: Qb_acx(:,:)
+        real(prec), allocatable :: Qb_acy(:,:)
+
+        nx = size(Q_b,1)
+        ny = size(Q_b,2)
+
+        allocate(Qb_acx(nx,ny))
+        allocate(Qb_acy(nx,ny))
+
+        ! Determine basal frictional heating values (staggered acx/acy nodes)
+        Qb_acx = abs(ux_b*taub_acx)   ! [Pa m a-1] == [J a-1 m-2]
+        Qb_acy = abs(uy_b*taub_acy)   ! [Pa m a-1] == [J a-1 m-2]
+
+        Q_b = 0.0  
+ 
+        ! Get basal frictional heating on centered nodes (aa-grid)          
+        do j = 2, ny
+        do i = 2, nx
+
+             ! Average from ac-nodes to aa-node
+             Q_b(i,j) = 0.25*(Qb_acx(i,j)+Qb_acx(i-1,j)+Qb_acy(i,j)+Qb_acy(i,j-1))
+ 
+        end do 
+        end do 
+ 
+        return 
+ 
+    end subroutine calc_basal_heating
+
+    subroutine calc_basal_heating1(Q_b,ux_b,uy_b,taub_acx,taub_acy)
         ! Q_b [J a-1 m-2] == [m a-1] * [J m-3]
         ! Note: grounded ice fraction f_grnd_acx/y not used here, because taub_acx/y already accounts
         ! for the grounded fraction via beta_acx/y: Q_b = tau_b*u = -beta*u*u.
@@ -407,7 +449,7 @@ contains
 
         return 
 
-    end subroutine calc_basal_heating
+    end subroutine calc_basal_heating1
 
     elemental function calc_specific_heat_capacity(T_ice) result(cp)
 

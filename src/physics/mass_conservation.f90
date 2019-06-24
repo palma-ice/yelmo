@@ -891,12 +891,15 @@ end if
 
                     end if 
 
-!                     if (f_grnd(i,j) .gt. 0.0) then 
-!                         ! For grounded ice, set H_ref < H_neighb arbitrarily (0.5 works well)
+                    if (f_grnd(i,j) .gt. 0.0) then 
+                        ! For grounded ice, set H_ref < H_neighb arbitrarily (0.5 works well)
 
-!                         H_ref = 0.5*H_ref 
+                        H_ref = 0.5*H_ref 
 
-!                     end if 
+                    end if 
+
+
+
 
 !                     ! Determine height to give to partially filled cell
 !                     if (f_grnd(i,j) .eq. 0.0) then 
@@ -909,23 +912,6 @@ end if
 !                         H_ref = 0.5*sum(H_neighb,mask=mask_neighb)/real(count(mask_neighb),prec)
 
 !                     end if 
-
-
-
-
-
-
-                    ! Determine height to give to partially filled cell
-                    if (f_grnd(i,j) .eq. 0.0) then 
-                        ! Floating point, set H_ref = minimum of neighbors
-
-                        H_ref = minval(H_neighb,mask=mask_neighb)
-
-                    else 
-                        ! Grounded point, set H_ref < mean(H_neighb) arbitrarily (0.5 works well)
-                        H_ref = 0.5*sum(H_neighb,mask=mask_neighb)/real(count(mask_neighb),prec)
-
-                    end if 
 
 
 !                     else 

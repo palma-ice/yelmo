@@ -15,7 +15,7 @@ module yelmo_defs
     integer,  parameter :: sp  = kind(1.0)
 
     ! Choose the precision of the library (sp,dp)
-    integer,  parameter :: prec = dp 
+    integer,  parameter :: prec = sp 
 
     ! Missing value and aliases
     real(prec), parameter :: MISSING_VALUE_DEFAULT = real(-9999.0,prec)

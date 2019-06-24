@@ -422,6 +422,7 @@ contains
         
         ! Local variables
         integer    :: i, j, nx, ny 
+        integer    :: im1, jm1 
         real(prec) :: Qb_acx_1, Qb_acx_2, Qb_acy_1, Qb_acy_2   
 
         nx = size(Q_b,1)
@@ -434,15 +435,18 @@ contains
         do j = 2, ny
         do i = 2, nx
 
+            im1 = max(i-1,1)
+            jm1 = max(j-1,1)
+
             ! Determine basal frictional heating values (staggered acx/acy nodes)
             ! [Pa m a-1] == [J a-1 m-2]
-            Qb_acx_1 = abs(ux_b(i-1,j)*taub_acx(i-1,j))
+            Qb_acx_1 = abs(ux_b(im1,j)*taub_acx(im1,j))
             Qb_acx_2 = abs(ux_b(i,j)  *taub_acx(i,j))
-            Qb_acy_1 = abs(uy_b(i,j-1)*taub_acy(i,j-1))
+            Qb_acy_1 = abs(uy_b(i,jm1)*taub_acy(i,jm1))
             Qb_acy_2 = abs(uy_b(i,j)  *taub_acy(i,j))
             
             ! Average from ac-nodes to aa-node
-            Q_b(i,j) = 0.25_dp*(Qb_acx_1+Qb_acx_2+Qb_acy_1+Qb_acy_2)
+            Q_b(i,j) = 0.25*(Qb_acx_1+Qb_acx_2+Qb_acy_1+Qb_acy_2)
 
 !             ! Determine basal frictional heating values (staggered acx/acy nodes)
 !             ! [Pa m a-1] == [J a-1 m-2]

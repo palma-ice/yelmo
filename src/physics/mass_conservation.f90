@@ -105,7 +105,7 @@ contains
         H_ice = H_ice + dt*mb_applied
 
         ! Determine how much ice goes into the margin buffer 
-        call calc_ice_margin(H_ice,H_margin,f_ice,f_grnd)
+        call calc_ice_margin(H_ice,H_margin,f_ice,f_grnd,ux,uy)
 
 if (.FALSE.) then 
     ! ajr: disable these for now to test new margin scheme!!
@@ -802,7 +802,7 @@ end if
 
     end function calc_calving_rate_grounded
 
-    subroutine calc_ice_margin(H_ice,H_margin,f_ice,f_grnd)
+    subroutine calc_ice_margin(H_ice,H_margin,f_ice,f_grnd,ux,uy)
         ! Determine the area fraction of a grid cell
         ! that is ice-covered. Assume that marginal points
         ! have equal thickness to inland neighbors 
@@ -813,12 +813,15 @@ end if
         real(prec), intent(INOUT) :: H_margin(:,:)          ! [m] Margin ice thickness for partially filled cells, H_margin*1.0 = H_ref*f_ice
         real(prec), intent(INOUT) :: f_ice(:,:)             ! [--] Ice covered fraction (aa-nodes)
         real(prec), intent(IN)    :: f_grnd(:,:)            ! [--] Grounded fraction (aa-nodes)
+        real(prec), intent(IN)    :: ux(:,:)
+        real(prec), intent(IN)    :: uy(:,:)
 
         ! Local variables 
-        integer :: i, j, nx, ny 
+        integer :: i, j, nx, ny, i1, j1  
         real(prec) :: H_neighb(4)
         logical :: mask_neighb(4)
-        real(prec) :: H_ref, H_ref_x, H_ref_y 
+        real(prec) :: H_ref, H_ref_x, H_ref_y
+        real(prec) :: ux_aa, uy_aa  
         real(prec), allocatable :: H_ice_0(:,:) 
 
         nx = size(H_ice,1)
@@ -850,6 +853,67 @@ end if
 
                 if (count(mask_neighb) .gt. 0) then 
                     ! This point has ice-covered neighbors (generally true)
+
+
+                    ! Determine upstream neighbor
+                    ux_aa = 0.5*(ux(i,j)+ux(i-1,j))
+                    uy_aa = 0.5*(uy(i,j)+uy(i,j-1))
+
+                    if (abs(ux_aa) .gt. abs(uy_aa)) then 
+                        ! Upstream x-direction 
+
+                        if (ux(i-1,j) .gt. 0.0) then 
+                            ! Upstream to the left 
+                            H_ref = H_ice_0(i-1,j)
+                        else if (ux(i,j) .lt. 0.0) then 
+                            ! Upstream to the right
+                            H_ref = H_ice_0(i+1,j)
+                        else 
+                            ! No upstream, ensure this point is treated like margin 
+                            ! with f_ice = 0.1 = H_ice / H_ref
+                            H_ref = 10.0*H_ice_0(i,j) 
+                        end if 
+
+                    else 
+                        ! Upstream y-direction 
+
+                        if (uy(i,j-1) .gt. 0.0) then 
+                            ! Upstream to the bottm 
+                            H_ref = H_ice_0(i,j-1)
+                        else if (uy(i,j) .lt. 0.0) then 
+                            ! Upstream to the top
+                            H_ref = H_ice_0(i,j+1)
+                        else 
+                            ! No upstream, ensure this point is treated like margin 
+                            ! with f_ice = 0.1 = H_ice / H_ref
+                            H_ref = 10.0*H_ice_0(i,j) 
+                        end if 
+
+                    end if 
+
+                    if (f_grnd(i,j) .gt. 0.0) then 
+                        ! For grounded ice, set H_ref < H_neighb arbitrarily (0.5 works well)
+
+                        H_ref = 0.5*H_ref 
+
+                    end if 
+
+!                     ! Determine height to give to partially filled cell
+!                     if (f_grnd(i,j) .eq. 0.0) then 
+!                         ! Floating point, set H_ref = minimum of neighbors
+
+!                         H_ref = minval(H_neighb,mask=mask_neighb)
+
+!                     else 
+!                         ! Grounded point, set H_ref < mean(H_neighb) arbitrarily (0.5 works well)
+!                         H_ref = 0.5*sum(H_neighb,mask=mask_neighb)/real(count(mask_neighb),prec)
+
+!                     end if 
+
+
+
+
+
 
                     ! Determine height to give to partially filled cell
                     if (f_grnd(i,j) .eq. 0.0) then 

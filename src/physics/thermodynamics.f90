@@ -5,8 +5,6 @@ module thermodynamics
     ! remerged into icetemp as one module. 
 
     use yelmo_defs, only : prec, sec_year, pi, T0, g, rho_ice, rho_sw, rho_w
-    use yelmo_tools, only : smooth_gauss_2D    
-    use gaussian_filter 
 
     implicit none 
 
@@ -18,7 +16,6 @@ module thermodynamics
     public :: calc_advec_vertical_column
     public :: calc_advec_horizontal_column
     public :: calc_strain_heating
-    public :: smooth_strain_heating
     public :: calc_strain_heating_sia
     public :: calc_basal_heating
     public :: calc_specific_heat_capacity
@@ -290,60 +287,6 @@ contains
 
     end subroutine calc_strain_heating
     
-    subroutine smooth_strain_heating(Q_strn,H_ice,dx,n_smooth)
-
-        ! Smooth out strain heating to avoid noise 
-
-        implicit none
-
-        real(prec), intent(INOUT) :: Q_strn(:,:,:)      ! nx,ny,nz_aa [K a-1] Heat production
-        real(prec), intent(IN)    :: H_ice(:,:) 
-        real(prec), intent(IN)    :: dx             ! [m]
-        integer,    intent(IN)    :: n_smooth       ! [--] Number of points corresponding to 1-sigma
-        
-        ! Local variables
-        integer    :: k, nz_aa 
-        real(prec) :: dx_km, sigma  
-
-        nz_aa = size(Q_strn,3)
-
-        dx_km = dx*1e-3 
-        sigma = dx_km*n_smooth 
-
-        do k = 2, nz_aa-1 
-             call smooth_gauss_2D(Q_strn(:,:,k),mask_apply=H_ice .gt. 0.0,dx=dx_km,sigma=sigma,mask_use=H_ice .gt. 0.0)
-        end do 
-
-        return 
-
-    end subroutine smooth_strain_heating
-
-!     subroutine smooth_strain_heating(Q_strn,H_ice,dx)
-
-!         ! Smooth out strain heating to avoid noise 
-
-!         implicit none
-
-!         real(prec), intent(OUT) :: Q_strn(:,:,:)      ! nx,ny,nz_aa [K a-1] Heat production
-!         real(prec), intent(IN)  :: H_ice(:,:) 
-!         real(prec), intent(IN)  :: dx 
-
-!         ! Local variables
-!         integer :: i, j, k, nx, ny, nz_aa 
-
-!         nx    = size(Q_strn,1)
-!         ny    = size(Q_strn,2)
-!         nz_aa = size(Q_strn,3)
-
-!         ! Perform smoothing layer-by-layer except for k=1 and k=nz_aa
-!         do k = 2, nz_aa-1 
-!             call filter_gaussian(Q_strn(:,:,k),dx,dx,H_ice .gt. 0.0)
-!         end do 
-
-!         return 
-
-!     end subroutine smooth_strain_heating
-
     subroutine calc_strain_heating_sia(Q_strn,ux,uy,dzsdx,dzsdy,cp,H_ice,rho_ice,zeta_aa,zeta_ac)
 
         ! Calculate the general 3D internal strain heating
@@ -355,6 +298,9 @@ contains
         ! Units: [K a-1]
         ! Note: rho_ice / rho_ice removed from equation 
         
+        ! Note: these units are currently inconsistent with units used in code!!
+        ! see calc_strain_heating above. 
+
         implicit none
 
         real(prec),            intent(OUT) :: Q_strn(:,:,:)      ! nx,ny,nz_aa  [Pa m a-1 ??] Heat production
@@ -444,7 +390,7 @@ contains
         
         ! Local variables
         integer    :: i, j, nx, ny 
-        real(prec) :: Qb_acx_1, Qb_acx_2, Qb_acy_1, Qb_acy_2 
+        real(prec) :: Qb_acx_1, Qb_acx_2, Qb_acy_1, Qb_acy_2   
 
         nx = size(Q_b,1)
         ny = size(Q_b,2)

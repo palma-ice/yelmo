@@ -3,7 +3,8 @@ module yelmo_thermodynamics
 
     use nml 
     use yelmo_defs 
-
+    use yelmo_tools, only : smooth_gauss_2D, smooth_gauss_3D
+    
     use thermodynamics 
     use icetemp  
     use enthalpy 
@@ -81,11 +82,18 @@ contains
         
         ! Smooth strain heating 
         if (thrm%par%n_sm_qstrn .gt. 0) then 
-            call smooth_strain_heating(thrm%now%Q_strn,tpo%now%H_ice,thrm%par%dx,thrm%par%n_sm_qstrn)
+            call smooth_gauss_3D(thrm%now%Q_strn,tpo%now%H_ice.gt.0.0,thrm%par%dx,thrm%par%n_sm_qstrn, &
+                                    tpo%now%H_ice.gt.0.0)
         end if 
         
         ! Calculate the basal frictional heating 
         call calc_basal_heating(thrm%now%Q_b,dyn%now%ux_b,dyn%now%uy_b,dyn%now%taub_acx,dyn%now%taub_acy)
+
+        ! Smooth basal frictional heating 
+        if (thrm%par%n_sm_qb .gt. 0) then 
+            call smooth_gauss_2D(thrm%now%Q_b,tpo%now%H_ice.gt.0.0,thrm%par%dx,thrm%par%n_sm_qb, &
+                                    tpo%now%H_ice.gt.0.0)
+        end if 
 
         if ( dt .gt. 0.0 ) then     
             ! Ice thermodynamics should evolve, perform calculations 
@@ -170,22 +178,23 @@ contains
         if (present(init)) init_pars = .TRUE. 
  
         ! Store local parameter values in output object
-        call nml_read(filename,"ytherm","method",         par%method,     init=init_pars)
-        call nml_read(filename,"ytherm","cond_bed",       par%cond_bed,   init=init_pars)
-        call nml_read(filename,"ytherm","gamma",          par%gamma,      init=init_pars)
-        call nml_read(filename,"ytherm","nzr",            par%nzr,        init=init_pars)
-        call nml_read(filename,"ytherm","H_rock",         par%H_rock,     init=init_pars)
+        call nml_read(filename,"ytherm","method",         par%method,           init=init_pars)
+        call nml_read(filename,"ytherm","cond_bed",       par%cond_bed,         init=init_pars)
+        call nml_read(filename,"ytherm","gamma",          par%gamma,            init=init_pars)
+        call nml_read(filename,"ytherm","nzr",            par%nzr,              init=init_pars)
+        call nml_read(filename,"ytherm","H_rock",         par%H_rock,           init=init_pars)
         
-        call nml_read(filename,"ytherm","n_sm_qstrn", par%n_sm_qstrn, init=init_pars)
-        call nml_read(filename,"ytherm","use_strain_sia", par%use_strain_sia, init=init_pars)
-        call nml_read(filename,"ytherm","use_const_cp",   par%use_const_cp,   init=init_pars)
-        call nml_read(filename,"ytherm","const_cp",       par%const_cp,       init=init_pars)
-        call nml_read(filename,"ytherm","use_const_kt",   par%use_const_kt,   init=init_pars)
-        call nml_read(filename,"ytherm","const_kt",       par%const_kt,       init=init_pars)
+        call nml_read(filename,"ytherm","use_strain_sia", par%use_strain_sia,   init=init_pars)
+        call nml_read(filename,"ytherm","n_sm_qstrn",     par%n_sm_qstrn,       init=init_pars)
+        call nml_read(filename,"ytherm","n_sm_qb",        par%n_sm_qb,          init=init_pars)
+        call nml_read(filename,"ytherm","use_const_cp",   par%use_const_cp,     init=init_pars)
+        call nml_read(filename,"ytherm","const_cp",       par%const_cp,         init=init_pars)
+        call nml_read(filename,"ytherm","use_const_kt",   par%use_const_kt,     init=init_pars)
+        call nml_read(filename,"ytherm","const_kt",       par%const_kt,         init=init_pars)
         
-        call nml_read(filename,"ytherm","kt_m",           par%kt_m,       init=init_pars)
-        call nml_read(filename,"ytherm","cp_m",           par%cp_m,       init=init_pars)
-        call nml_read(filename,"ytherm","rho_m",          par%rho_m,      init=init_pars)
+        call nml_read(filename,"ytherm","kt_m",           par%kt_m,             init=init_pars)
+        call nml_read(filename,"ytherm","cp_m",           par%cp_m,             init=init_pars)
+        call nml_read(filename,"ytherm","rho_m",          par%rho_m,            init=init_pars)
         
         ! Set internal parameters
         par%nx  = nx

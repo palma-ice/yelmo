@@ -6,7 +6,7 @@ module yelmo_dynamics
 
     use yelmo_defs
     use yelmo_tools, only : stagger_aa_acx, stagger_aa_acy, stagger_ac_aa, &
-        calc_magnitude_from_staggered_ice, calc_vertical_integrated_2D
+        calc_magnitude_from_staggered_ice, calc_vertical_integrated_2D, smooth_gauss_2D
 
     use velocity_hybrid_pd12 
     use velocity_sia 
@@ -1037,7 +1037,8 @@ end if
 
         ! 3. Apply smoothing if desired (only for points with beta > 0)
         if (dyn%par%n_sm_beta .gt. 0) then 
-            call smooth_beta_aa(dyn%now%beta,dyn%par%dx,dyn%par%n_sm_beta)
+            call smooth_gauss_2D(dyn%now%beta,dyn%now%beta.gt.0.0,dyn%par%dx,dyn%par%n_sm_beta,dyn%now%beta.gt.0.0)
+
         end if 
 
         ! Apply additional condition for particular experiments

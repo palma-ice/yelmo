@@ -12,7 +12,7 @@ module basal_dragging
 
     use yelmo_defs, only : sp, dp, prec, pi, g, rho_sw, rho_ice, rho_w  
 
-    use yelmo_tools, only : stagger_aa_acx, stagger_aa_acy, smooth_gauss_2D
+    use yelmo_tools, only : stagger_aa_acx, stagger_aa_acy
 
     implicit none 
 
@@ -40,9 +40,6 @@ module basal_dragging
     public :: scale_beta_aa_Hgrnd 
     public :: scale_beta_aa_zstar
     
-    ! Beta smoothing functions (aa-nodes)
-    public :: smooth_beta_aa
-
     ! Beta staggering functions (aa- to ac-nodes)
     public :: stagger_beta_aa_simple
     public :: stagger_beta_aa_upstream
@@ -566,35 +563,6 @@ contains
         
     end subroutine scale_beta_aa_zstar
 
-    ! ================================================================================
-    !
-    ! Smoothing functions 
-    !
-    ! ================================================================================
-
-    subroutine smooth_beta_aa(beta,dx,n_smooth)
-        ! Smooth the grounded beta field to avoid discontinuities that
-        ! may crash the model. Ensure that points with 
-        ! low values of beta are not too far away from neighborhood values 
-
-        implicit none 
-
-        real(prec), intent(INOUT) :: beta(:,:) 
-        real(prec), intent(IN)    :: dx           ! [m]
-        integer,    intent(IN)    :: n_smooth     ! [--] Number of points corresponding to 1-sigma
-
-        ! Local variables 
-        real(prec) :: dx_km, sigma 
-
-        dx_km = dx*1e-3 
-        sigma = dx_km*n_smooth 
-
-        call smooth_gauss_2D(beta,mask_apply=beta .gt. 0.0,dx=dx_km,sigma=sigma,mask_use=beta .gt. 0.0)
-
-        return 
-
-    end subroutine smooth_beta_aa
-    
     ! ================================================================================
     !
     ! Staggering functions 

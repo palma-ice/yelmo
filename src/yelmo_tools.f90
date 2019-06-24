@@ -28,7 +28,8 @@ module yelmo_tools
     public :: fill_borders 
     
     public :: smooth_gauss_2D
-
+    public :: smooth_gauss_3D
+    
     ! Integration functions
     public :: test_integration
     public :: integrate_trapezoid1D_pt
@@ -655,21 +656,47 @@ contains
 
     end subroutine fill_borders
 
-    subroutine smooth_gauss_2D(var,mask_apply,dx,sigma,mask_use)
+    subroutine smooth_gauss_3D(var,mask_apply,dx,n_smooth,mask_use)
+
+        ! Smooth out strain heating to avoid noise 
+
+        implicit none
+
+        real(prec), intent(INOUT) :: var(:,:,:)      ! nx,ny,nz_aa: 3D variable
+        logical,    intent(IN)    :: mask_apply(:,:) 
+        real(prec), intent(IN)    :: dx 
+        integer,    intent(IN)    :: n_smooth  
+        logical,    intent(IN), optional :: mask_use(:,:) 
+
+        ! Local variables
+        integer    :: k, nz_aa  
+
+        nz_aa = size(var,3)
+
+        do k = 1, nz_aa 
+             call smooth_gauss_2D(var(:,:,k),mask_apply,dx,n_smooth,mask_use)
+        end do 
+
+        return 
+
+    end subroutine smooth_gauss_3D
+    
+    subroutine smooth_gauss_2D(var,mask_apply,dx,n_smooth,mask_use)
         ! Smooth out a field to avoid noise 
         ! mask_apply designates where smoothing should be applied 
         ! mask_use   designates which points can be considered in the smoothing filter 
 
         implicit none
 
-        real(prec), intent(OUT) :: var(:,:)      ! [nx,ny]
-        logical,    intent(IN)  :: mask_apply(:,:) 
-        real(prec), intent(IN)  :: dx 
-        real(prec), intent(IN)  :: sigma 
+        real(prec), intent(INOUT) :: var(:,:)      ! [nx,ny] 2D variable
+        logical,    intent(IN)    :: mask_apply(:,:) 
+        real(prec), intent(IN)    :: dx 
+        integer,    intent(IN)    :: n_smooth  
         logical,    intent(IN), optional :: mask_use(:,:) 
 
         ! Local variables
-        integer :: i, j, nx, ny, n, n2   
+        integer :: i, j, nx, ny, n, n2
+        real(prec) :: sigma    
         real(prec), allocatable :: filter0(:,:), filter(:,:) 
         real(prec), allocatable :: var_old(:,:) 
         logical,    allocatable :: mask_use_local(:,:) 
@@ -678,6 +705,8 @@ contains
         ny    = size(var,2)
         n     = 5 
         n2    = (n-1)/2 
+
+        sigma = dx*n_smooth 
 
         allocate(var_old(nx,ny))
         allocate(mask_use_local(nx,ny))

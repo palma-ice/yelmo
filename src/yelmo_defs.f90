@@ -388,8 +388,9 @@ module yelmo_defs
         real(prec)          :: dzr       ! Vertical resolution in bedrock [m]
         real(prec)          :: H_rock    ! Total bedrock thickness [m] - determined as (nzr-1)*dzr 
         
-        integer             :: n_sm_qstrn    ! Standard deviation (in points) for Gaussian smoothing of strain heating
         logical             :: use_strain_sia 
+        integer             :: n_sm_qstrn    ! Standard deviation (in points) for Gaussian smoothing of strain heating
+        integer             :: n_sm_qb       ! Standard deviation (in points) for Gaussian smoothing of basal heating
         logical             :: use_const_cp 
         real(prec)          :: const_cp 
         logical             :: use_const_kt 

@@ -105,7 +105,7 @@ contains
         H_ice = H_ice + dt*mb_applied
 
         ! Determine how much ice goes into the margin buffer 
-        call calc_ice_margin(H_ice,H_margin,f_ice,f_grnd,ux,uy)
+        call calc_ice_margin(H_ice,H_margin,f_ice,f_grnd)
 
 if (.FALSE.) then 
     ! ajr: disable these for now to test new margin scheme!!
@@ -802,7 +802,7 @@ end if
 
     end function calc_calving_rate_grounded
 
-    subroutine calc_ice_margin(H_ice,H_margin,f_ice,f_grnd,ux,uy)
+    subroutine calc_ice_margin(H_ice,H_margin,f_ice,f_grnd)
         ! Determine the area fraction of a grid cell
         ! that is ice-covered. Assume that marginal points
         ! have equal thickness to inland neighbors 
@@ -813,15 +813,12 @@ end if
         real(prec), intent(INOUT) :: H_margin(:,:)          ! [m] Margin ice thickness for partially filled cells, H_margin*1.0 = H_ref*f_ice
         real(prec), intent(INOUT) :: f_ice(:,:)             ! [--] Ice covered fraction (aa-nodes)
         real(prec), intent(IN)    :: f_grnd(:,:)            ! [--] Grounded fraction (aa-nodes)
-        real(prec), intent(IN)    :: ux(:,:)
-        real(prec), intent(IN)    :: uy(:,:)
 
         ! Local variables 
         integer :: i, j, nx, ny, i1, j1  
         real(prec) :: H_neighb(4)
         logical :: mask_neighb(4)
-        real(prec) :: H_ref, H_ref_x, H_ref_y
-        real(prec) :: ux_aa, uy_aa  
+        real(prec) :: H_ref  
         real(prec), allocatable :: H_ice_0(:,:) 
 
         nx = size(H_ice,1)
@@ -904,106 +901,13 @@ end if
                     else 
                         ! Grounded point, set H_ref < mean([H_neighb > H_ice_now]) arbitrarily (0.5 works well)
                         ! ie, mean(H_neighb) is only determined from thicker/upstream neighbors 
-                        H_ref = 0.8*sum(H_neighb,mask=H_neighb.gt.H_ice_0(i,j)) &
-                                    / real(count(H_neighb.gt.H_ice_0(i,j)),prec)
+!                         H_ref = 0.8*sum(H_neighb,mask=H_neighb.gt.H_ice_0(i,j)) &
+!                                     / real(count(H_neighb.gt.H_ice_0(i,j)),prec)
 
-                    end if 
+                        H_ref = 0.8*sum(H_ice_0(i-1:i+1,j-1:j+1),mask=H_ice_0(i-1:i+1,j-1:j+1).gt.H_ice_0(i,j)) &
+                                    / real(count(H_ice_0(i-1:i+1,j-1:j+1).gt.H_ice_0(i,j)),prec)
 
-
-!                     else 
-!                         ! Grounded point, calculate H_ref from slope of neighbors 
-
-!                         ! Get H_ref from x-direction ========
-
-!                         if (H_ice_0(i-1,j) .gt. 0.0 .and. H_ice_0(i+1,j) .gt. 0.0) then 
-!                             ! Both x-neighbors have ice
-
-!                             H_ref_x = 0.5*(H_ice_0(i-1,j) + H_ice(i+1,j))
-
-!                         else if (H_ice_0(i-1,j) .gt. 0.0) then
-!                             ! Left x-neighbor has ice
-
-!                             if (H_ice_0(i-2,j) .gt. 0.0) then 
-!                                 ! Ice upstream, calculate H_ref via slope 
-!                                 ! y = y1 + dx*(y1-y2)/dx = 2*y1 - y2 
-
-!                                 H_ref_x = 2.0*H_ice_0(i-1,j) - H_ice(i-2,j)
-
-!                             else
-!                                 ! No ice further upstream, set to half of neighbor 
-!                                 ! (arbitrarily less than 1.0)
-                                
-!                                 H_ref_x = 0.5*H_ice_0(i-1,j)
-
-!                             end if  
-
-!                         else 
-!                             ! Right x-neighbor has ice 
-
-!                             if (H_ice_0(i+2,j) .gt. 0.0) then
-!                                 ! Ice upstream, calculate H_ref via slope 
-!                                 ! y = y1 + dx*(y1-y2)/dx = 2*y1 - y2 
-
-!                                 H_ref_x = 2.0*H_ice_0(i+1,j) - H_ice(i+2,j)
-                            
-!                             else 
-!                                 ! No ice further upstream, set to half of neighbor 
-!                                 ! (arbitrarily less than 1.0)
-                                
-!                                 H_ref_x = 0.5*H_ice_0(i+1,j)
-
-!                             end if  
-
-!                         end if 
-
-!                         ! Get H_ref from y-direction ========
-                        
-!                         if (H_ice_0(i,j-1) .gt. 0.0 .and. H_ice_0(i,j+1) .gt. 0.0) then 
-!                             ! Both y-neighbors have ice
-
-!                             H_ref_y = 0.5*(H_ice_0(i,j-1) + H_ice(i,j+1))
-
-!                         else if (H_ice_0(i,j-1) .gt. 0.0) then
-!                             ! Left y-neighbor has ice
-
-!                             if (H_ice_0(i,j-2) .gt. 0.0) then
-!                                 ! Ice upstream, calculate H_ref via slope 
-!                                 ! y = y1 + dx*(y1-y2)/dx = 2*y1 - y2 
-
-!                                 H_ref_y = 2.0*H_ice_0(i,j-1) - H_ice(i,j-2)
-                            
-!                             else
-!                                 ! No ice further upstream, set to half of neighbor 
-!                                 ! (arbitrarily less than 1.0)
-                                
-!                                 H_ref_y = 0.5*H_ice_0(i,j-1)
-                                   
-!                             end if  
-
-!                         else 
-!                             ! Right y-neighbor has ice 
-
-!                             if (H_ice_0(i,j+2) .gt. 0.0) then 
-!                                 ! Ice upstream, calculate H_ref via slope 
-!                                 ! y = y1 + dx*(y1-y2)/dx = 2*y1 - y2 
-
-!                                 H_ref_y = 2.0*H_ice_0(i,j+1) - H_ice(i,j+2)
-                            
-!                             else 
-!                                 ! No ice further upstream, set to half of neighbor 
-!                                 ! (arbitrarily less than 1.0)
-                                
-!                                 H_ref_y = 0.5*H_ice_0(i,j+1)
-                                  
-!                             end if  
-
-!                         end if 
-
-!                         ! Set H_ref as the average of the two directions 
-!                         H_ref = 0.5*(H_ref_x + H_ref_y) 
-
-!                     end if 
-
+                    end if
                     
                     ! Determine the cell ice fraction
                     ! Note: fraction is determined as a ratio of 
@@ -1011,14 +915,14 @@ end if
                     ! vol = H_ice*dx*dy = H_ref*area_frac 
                     ! f_ice = area_frac / (dx*dy)
                     ! f_ice = H_ice/H_ref 
+                    ! Note: H_ref == 0.0 probably won't happen, but keep if-statement 
+                    ! for safety 
+
                     if (H_ref .gt. 0.0) then 
                         f_ice(i,j) = min( H_ice(i,j) / H_ref, 1.0 ) 
                     else 
                         f_ice(i,j) = 1.0 
                     end if 
-
-                    ! Note: H_ref == 0.0 probably won't happen, but keep if-statement 
-                    ! for safety 
 
                 else 
                     ! Island point, assume the cell is not full to 

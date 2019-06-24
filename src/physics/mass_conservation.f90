@@ -854,43 +854,36 @@ end if
                 if (count(mask_neighb) .gt. 0) then 
                     ! This point has ice-covered neighbors (generally true)
 
+                    ! Upstream x-direction 
 
-                    ! Determine upstream neighbor
-                    ux_aa = 0.5*(ux(i,j)+ux(i-1,j))
-                    uy_aa = 0.5*(uy(i,j)+uy(i,j-1))
-
-                    if (abs(ux_aa) .gt. abs(uy_aa)) then 
-                        ! Upstream x-direction 
-
-                        if (ux(i-1,j) .gt. 0.0) then 
-                            ! Upstream to the left 
-                            H_ref = H_ice_0(i-1,j)
-                        else if (ux(i,j) .lt. 0.0) then 
-                            ! Upstream to the right
-                            H_ref = H_ice_0(i+1,j)
-                        else 
-                            ! No upstream, ensure this point is treated like margin 
-                            ! with f_ice = 0.1 = H_ice / H_ref
-                            H_ref = 10.0*H_ice_0(i,j) 
-                        end if 
-
+                    if (ux(i-1,j) .gt. 0.0) then 
+                        ! Upstream to the left 
+                        H_ref_x = H_ice_0(i-1,j)
+                    else if (ux(i,j) .lt. 0.0) then 
+                        ! Upstream to the right
+                        H_ref_x = H_ice_0(i+1,j)
                     else 
-                        ! Upstream y-direction 
-
-                        if (uy(i,j-1) .gt. 0.0) then 
-                            ! Upstream to the bottm 
-                            H_ref = H_ice_0(i,j-1)
-                        else if (uy(i,j) .lt. 0.0) then 
-                            ! Upstream to the top
-                            H_ref = H_ice_0(i,j+1)
-                        else 
-                            ! No upstream, ensure this point is treated like margin 
-                            ! with f_ice = 0.1 = H_ice / H_ref
-                            H_ref = 10.0*H_ice_0(i,j) 
-                        end if 
-
+                        ! No upstream, ensure this point is treated like margin 
+                        ! with f_ice = 0.1 = H_ice / H_ref
+                        H_ref_x = 10.0*H_ice_0(i,j) 
                     end if 
 
+                    ! Upstream y-direction 
+
+                    if (uy(i,j-1) .gt. 0.0) then 
+                        ! Upstream to the bottm 
+                        H_ref_y = H_ice_0(i,j-1)
+                    else if (uy(i,j) .lt. 0.0) then 
+                        ! Upstream to the top
+                        H_ref_y = H_ice_0(i,j+1)
+                    else 
+                        ! No upstream, ensure this point is treated like margin 
+                        ! with f_ice = 0.1 = H_ice / H_ref
+                        H_ref_y = 10.0*H_ice_0(i,j) 
+                    end if 
+
+                    H_ref = 0.5*(H_ref_x*H_ref_y)
+                    
 !                     if (f_grnd(i,j) .gt. 0.0) then 
 !                         ! For grounded ice, set H_ref < H_neighb arbitrarily (0.5 works well)
 

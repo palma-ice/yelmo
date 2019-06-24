@@ -882,7 +882,8 @@ end if
                         H_ref_y = 10.0*H_ice_0(i,j) 
                     end if 
 
-                    H_ref = 0.5*(H_ref_x*H_ref_y)
+                    !H_ref = 0.5*(H_ref_x*H_ref_y)   <== interesting buggy case that eliminates frozen ring!
+                    H_ref = 0.5*(H_ref_x+H_ref_y)
                     
 !                     if (f_grnd(i,j) .gt. 0.0) then 
 !                         ! For grounded ice, set H_ref < H_neighb arbitrarily (0.5 works well)

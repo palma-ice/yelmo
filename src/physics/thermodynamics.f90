@@ -4,7 +4,7 @@ module thermodynamics
     ! Note: once icetemp is working well, this module could be 
     ! remerged into icetemp as one module. 
 
-    use yelmo_defs, only : prec, sec_year, pi, T0, g, rho_ice, rho_sw, rho_w
+    use yelmo_defs, only : prec, dp, sec_year, pi, T0, g, rho_ice, rho_sw, rho_w
 
     implicit none 
 
@@ -422,7 +422,7 @@ contains
         
         ! Local variables
         integer    :: i, j, nx, ny 
-        real(prec) :: Qb_acx_1, Qb_acx_2, Qb_acy_1, Qb_acy_2   
+        real(dp)   :: Qb_acx_1, Qb_acx_2, Qb_acy_1, Qb_acy_2   
 
         nx = size(Q_b,1)
         ny = size(Q_b,2)
@@ -436,19 +436,19 @@ contains
 
             ! Determine basal frictional heating values (staggered acx/acy nodes)
             ! [Pa m a-1] == [J a-1 m-2]
-            Qb_acx_1 = abs(ux_b(i-1,j)*taub_acx(i-1,j))
-            Qb_acx_2 = abs(ux_b(i,j)  *taub_acx(i,j))
-            Qb_acy_1 = abs(uy_b(i,j-1)*taub_acy(i,j-1))
-            Qb_acy_2 = abs(uy_b(i,j)  *taub_acy(i,j))
+            Qb_acx_1 = dabs(real(ux_b(i-1,j)*taub_acx(i-1,j),dp))
+            Qb_acx_2 = dabs(real(ux_b(i,j)  *taub_acx(i,j),dp))
+            Qb_acy_1 = dabs(real(uy_b(i,j-1)*taub_acy(i,j-1),dp))
+            Qb_acy_2 = dabs(real(uy_b(i,j)  *taub_acy(i,j),dp))
             
             ! Average from ac-nodes to aa-node
-            Q_b(i,j) = 0.25*(Qb_acx_1+Qb_acx_2+Qb_acy_1+Qb_acy_2)
+            Q_b(i,j) = real(0.25_dp*(Qb_acx_1+Qb_acx_2+Qb_acy_1+Qb_acy_2),prec)
 
         end do
         end do
-        
+
         return 
-        
+
     end subroutine calc_basal_heating
 
     elemental function calc_specific_heat_capacity(T_ice) result(cp)

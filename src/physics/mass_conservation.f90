@@ -1011,7 +1011,14 @@ end if
                     ! vol = H_ice*dx*dy = H_ref*area_frac 
                     ! f_ice = area_frac / (dx*dy)
                     ! f_ice = H_ice/H_ref 
-                    f_ice(i,j) = min( H_ice(i,j) / H_ref, 1.0 ) 
+                    if (H_ref .gt. 0.0) then 
+                        f_ice(i,j) = min( H_ice(i,j) / H_ref, 1.0 ) 
+                    else 
+                        f_ice(i,j) = 1.0 
+                    end if 
+
+                    ! Note: H_ref == 0.0 probably won't happen, but keep if-statement 
+                    ! for safety 
 
                 else 
                     ! Island point, assume the cell is not full to 

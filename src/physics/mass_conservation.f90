@@ -836,8 +836,8 @@ end if
 
         H_ice_0 = H_ice 
 
-        do j = 3, ny-2
-        do i = 3, nx-2 
+        do j = 2, ny-1
+        do i = 2, nx-1 
 
             ! Store neighbor heights 
             H_neighb = [H_ice_0(i-1,j),H_ice_0(i+1,j),H_ice_0(i,j-1),H_ice_0(i,j+1)]

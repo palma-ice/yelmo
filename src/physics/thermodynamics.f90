@@ -363,7 +363,7 @@ contains
 
     end subroutine calc_strain_heating_sia
 
-    subroutine calc_basal_heating(Q_b,ux_b,uy_b,taub_acx,taub_acy)
+    subroutine calc_basal_heating(Q_b,ux_b,uy_b,taub_acx,taub_acy,H_ice)
          ! Qb [J a-1 m-2] == [m a-1] * [J m-3]
          ! Note: grounded ice fraction f_grnd_acx/y not used here, because taub_acx/y already accounts
          ! for the grounded fraction via beta_acx/y: Q_b = tau_b*u = -beta*u*u.
@@ -373,9 +373,10 @@ contains
         real(prec), intent(IN)  :: uy_b(:,:)              ! Basal velocity, y-compenent (staggered y)
         real(prec), intent(IN)  :: taub_acx(:,:)          ! Basal friction (staggered x)
         real(prec), intent(IN)  :: taub_acy(:,:)          ! Basal friction (staggered y)
-        
+        real(prec), intent(IN)  :: H_ice(:,:)
+
         ! Local variables
-        integer    :: i, j, nx, ny 
+        integer    :: i, j, nx, ny, npt 
         real(prec), allocatable :: Qb_acx(:,:)
         real(prec), allocatable :: Qb_acy(:,:)
 
@@ -392,11 +393,36 @@ contains
         Q_b = 0.0  
  
         ! Get basal frictional heating on centered nodes (aa-grid)          
-        do j = 2, ny
-        do i = 2, nx
+        do j = 2, ny-1
+        do i = 2, nx-1
 
-             ! Average from ac-nodes to aa-node
-             Q_b(i,j) = 0.25*(Qb_acx(i,j)+Qb_acx(i-1,j)+Qb_acy(i,j)+Qb_acy(i,j-1))
+            npt      = 0 
+            Q_b(i,j) = 0.0 
+
+            if (H_ice(i,j) .gt. 0.0 .and. H_ice(i+1,j) .gt. 0.0) then 
+                Q_b(i,j) = Q_b(i,j) + Qb_acx(i,j)
+                npt = npt+1 
+            end if 
+
+            if (H_ice(i,j) .gt. 0.0 .and. H_ice(i-1,j) .gt. 0.0) then 
+                Q_b(i,j) = Q_b(i,j) + Qb_acx(i-1,j)
+                npt = npt+1 
+            end if 
+            
+            if (H_ice(i,j) .gt. 0.0 .and. H_ice(i,j+1) .gt. 0.0) then 
+                Q_b(i,j) = Q_b(i,j) + Qb_acy(i,j)
+                npt = npt+1 
+            end if 
+
+            if (H_ice(i,j) .gt. 0.0 .and. H_ice(i,j-1) .gt. 0.0) then 
+                Q_b(i,j) = Q_b(i,j) + Qb_acy(i,j-1)
+                npt = npt+1 
+            end if 
+            
+            if (npt .gt. 0) Q_b(i,j) = Q_b(i,j) / real(npt,prec)
+
+            ! Average from ac-nodes to aa-node
+!             Q_b(i,j) = 0.25*(Qb_acx(i,j)+Qb_acx(i-1,j)+Qb_acy(i,j)+Qb_acy(i,j-1))
  
         end do 
         end do 

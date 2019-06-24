@@ -430,7 +430,7 @@ contains
     subroutine calc_basal_heating(Q_b,ux_b,uy_b,taub_acx,taub_acy)
         ! Qb [J a-1 m-2] == [m a-1] * [J m-3]
         ! Note: grounded ice fraction f_grnd_acx/y not used here, because taub_acx/y already accounts
-        ! for the grounded fraction.
+        ! for the grounded fraction via beta_acx/y: Q_b = tau_b*u = -beta*u*u.
         ! Note: it is assumed that strain heating is zero at the very base (no thickness) layer, so
         ! it is not included here. 
 
@@ -444,28 +444,27 @@ contains
         
         ! Local variables
         integer    :: i, j, nx, ny 
-        real(prec), allocatable :: Qb_acx(:,:), Qb_acy(:,:)
-        
+        real(prec) :: Qb_acx_1, Qb_acx_2, Qb_acy_1, Qb_acy_2 
+
         nx = size(Q_b,1)
         ny = size(Q_b,2)
-
-        ! Allocate staggered friction heat variables 
-        allocate(Qb_acx(nx,ny))
-        allocate(Qb_acy(nx,ny)) 
-
-        ! Determine basal frictional heating values (staggered acx/acy nodes)
-        Qb_acx = abs(ux_b*taub_acx)   ! [Pa m a-1] == [J a-1 m-2]
-        Qb_acy = abs(uy_b*taub_acy)   ! [Pa m a-1] == [J a-1 m-2]
 
         ! Initially set basal heating to zero everywhere 
         Q_b = 0.0  
 
-        ! Get basal frictional heating on centered nodes (Aa grid)
+        ! Get basal frictional heating on centered nodes (aa-grid)
         do j = 2, ny-1
         do i = 2, nx-1
 
-            ! Average from Ac nodes to Aa node
-            Q_b(i,j) = 0.25*(Qb_acx(i,j)+Qb_acx(i-1,j)+Qb_acy(i,j)+Qb_acy(i,j-1))
+            ! Determine basal frictional heating values (staggered acx/acy nodes)
+            ! [Pa m a-1] == [J a-1 m-2]
+            Qb_acx_1 = abs(ux_b(i-1,j)*taub_acx(i-1,j))
+            Qb_acx_2 = abs(ux_b(i,j)  *taub_acx(i,j))
+            Qb_acy_1 = abs(uy_b(i,j-1)*taub_acy(i,j-1))
+            Qb_acy_2 = abs(uy_b(i,j)  *taub_acy(i,j))
+            
+            ! Average from ac-nodes to aa-node
+            Q_b(i,j) = 0.25*(Qb_acx_1+Qb_acx_2+Qb_acy_1+Qb_acy_2)
 
         end do
         end do

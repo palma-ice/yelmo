@@ -763,8 +763,8 @@ contains
         ! Note: calculated on ac-nodes.
         ! taub [Pa] 
         ! beta [Pa a m-1]
-        ! ux   [m a-1]
-        ! taub = beta*ux 
+        ! u    [m a-1]
+        ! taub = -beta*u 
 
         implicit none 
 
@@ -776,8 +776,8 @@ contains
         real(prec), intent(IN)  :: uy_b(:,:)       ! [m a-1] Basal velocity (acy nodes)
         
         ! Calculate basal stress 
-        taub_acx = beta_acx * ux_b 
-        taub_acy = beta_acy * uy_b 
+        taub_acx = -beta_acx * ux_b 
+        taub_acy = -beta_acy * uy_b 
 
         return 
 

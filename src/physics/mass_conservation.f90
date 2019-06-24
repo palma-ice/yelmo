@@ -851,47 +851,6 @@ end if
                 if (count(mask_neighb) .gt. 0) then 
                     ! This point has ice-covered neighbors (generally true)
 
-!                     ! Upstream x-direction 
-
-!                     if (ux(i-1,j) .gt. 0.0) then 
-!                         ! Upstream to the left 
-!                         H_ref_x = H_ice_0(i-1,j)
-!                     else if (ux(i,j) .lt. 0.0) then 
-!                         ! Upstream to the right
-!                         H_ref_x = H_ice_0(i+1,j)
-!                     else 
-!                         ! No upstream, ensure this point is treated like margin 
-!                         ! with f_ice = 0.1 = H_ice / H_ref
-!                         H_ref_x = 10.0*H_ice_0(i,j) 
-!                     end if 
-
-!                     ! Upstream y-direction 
-
-!                     if (uy(i,j-1) .gt. 0.0) then 
-!                         ! Upstream to the bottm 
-!                         H_ref_y = H_ice_0(i,j-1)
-!                     else if (uy(i,j) .lt. 0.0) then 
-!                         ! Upstream to the top
-!                         H_ref_y = H_ice_0(i,j+1)
-!                     else 
-!                         ! No upstream, ensure this point is treated like margin 
-!                         ! with f_ice = 0.1 = H_ice / H_ref
-!                         H_ref_y = 10.0*H_ice_0(i,j) 
-!                     end if 
-
-!                     !H_ref = 0.5*(H_ref_x*H_ref_y)   !<== interesting buggy case that eliminates frozen ring!
-!                     H_ref = 0.5*(H_ref_x+H_ref_y)   !<== interesting funny case that makes a stable square!
-                    
-!                     if (f_grnd(i,j) .gt. 0.0) then 
-!                         ! For grounded ice, set H_ref < H_neighb arbitrarily (0.5 works well)
-
-!                         H_ref = 0.5*H_ref 
-
-!                     end if 
-
-
-
-
                     ! Determine height to give to partially filled cell
                     if (f_grnd(i,j) .eq. 0.0) then 
                         ! Floating point, set H_ref = minimum of neighbors
@@ -899,13 +858,8 @@ end if
                         H_ref = minval(H_neighb,mask=mask_neighb)
 
                     else 
-                        ! Grounded point, set H_ref < mean([H_neighb > H_ice_now]) arbitrarily (0.5 works well)
-                        ! ie, mean(H_neighb) is only determined from thicker/upstream neighbors 
-!                         H_ref = 0.8*sum(H_neighb,mask=H_neighb.gt.H_ice_0(i,j)) &
-!                                     / real(count(H_neighb.gt.H_ice_0(i,j)),prec)
-
-                        H_ref = 0.8*sum(H_ice_0(i-1:i+1,j-1:j+1),mask=H_ice_0(i-1:i+1,j-1:j+1).gt.H_ice_0(i,j)) &
-                                    / real(count(H_ice_0(i-1:i+1,j-1:j+1).gt.H_ice_0(i,j)),prec)
+                        ! Grounded point, set H_ref < H_mean arbitrarily (0.5 works well)
+                        H_ref = 0.5*sum(H_neighb,mask=mask_neighb) / real(count(mask_neighb),prec)
 
                     end if
                     

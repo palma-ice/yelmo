@@ -55,7 +55,7 @@
     sd_max            = 500.0           ! [m] calv_grnd(z_bed_sd >= sd_max) = calv_max  
     calv_max          = 0.0             ! [m/a] Maximum grounded calving rate from high stdev(z_bed)
     grad_lim          = 0.1             ! [m/m] Maximum allowed sloped in gradient calculations (dz/dx,dH/dx)
-    gl_sep            = 2               ! 1: Linear f_grnd_acx/acy and binary f_grnd, 2: area f_grnd, average to acx/acy
+    gl_sep            = 1               ! 1: Linear f_grnd_acx/acy and binary f_grnd, 2: area f_grnd, average to acx/acy
     gl_sep_nx         = 15              ! [-] Number of interpolation points (nx*nx) to calculate grounded area at grounding line
     neff_p            = 0.0             ! Effective pressure: connectivity to the ocean (0: none, 1: full)
 /
@@ -65,8 +65,8 @@
     sia_solver          = "vel"           ! "vel", "shear", "none"
     mix_method          = 1               ! -2: sia, -1: ssa, 0: sia|ssa, 1: sia+ssa 2: ssa vel. fraction
     calc_diffusivity    = False           ! Calculate 2D diffusivity term for diagnostics
-    beta_method         = 3               ! 0: constant beta; 1: linear law; 2: power law; 3: regularized Coulomb law, 4: pism power law
-    beta_with_neff      = False           ! Additionally scale beta by effective pressure? (beta=Neff*[beta_default])
+    beta_method         = 1               ! 0: constant beta; 1: linear law; 2: power law; 3: regularized Coulomb law, 4: pism power law
+    beta_with_neff      = True            ! Additionally scale beta by effective pressure? (beta=Neff*[beta_default])
     m_drag              = 3.0             ! Dragging law exponent 
     u_0                 = 300.0           ! [m/a] Regularization term for regularized Coulomb law (beta_method=3)
     beta_const          = 1e3             ! [Pa a m−1] Constant value of basal friction coefficient to be used
@@ -75,26 +75,25 @@
     beta_gl_stag        = 0               !  0: simple staggering, 1: Upstream beta at gl, 2: downstream, 3: f_grnd_ac scaling 
     f_beta_gl           = 1.0             ! [-] Scaling of beta at the grounding line (for beta_gl_method=1)
     taud_gl_method      = 0               !  0: binary, no subgrid, 1: Two-sided gradient
-    C_bed_method        = 0               ! -1: set externally; 0: cf_stream everywhere; 1: cf_stream/cf_frozen; 2: cf_stream*f_zbed; 3: till strength 
+    C_bed_method        = 1               ! -1: set externally; 0: cf_stream everywhere; 1: cf_stream/cf_frozen 
     C_bed_z0            = -200.0          ! [m] Bedrock elevation at which scaling goes to f_scale=e(-1)
     C_bed_z1            = 200.0           ! [m] Bedrock elevation above which scaling goes to f_scale=1
     H_grnd_lim          = 500.0           ! [m] For beta_sep_method=2, reduce beta linearly between H_grnd=0 and H_grnd_lim 
     H_sed_sat           = 250.0           ! [m] Sediment thickness at which sediment effect is saturated
-    cf_frozen           = 100.0           ! [a m-1] Bed roughness coefficient, frozen 
-    !cf_stream           = 31651.76        ! [a m-1] Bed roughness coefficient, stream  
-    cf_stream           = 2.3e5           ! [a m-1] Bed roughness coefficient, stream  
+    cf_frozen           = 100e-5          ! [a m-1] Bed roughness coefficient, frozen 
+    cf_stream           = 20e-5           ! [a m-1] Bed roughness coefficient, stream  
     cf_fac_sed          = 1.0             ! [-] Scaling of roughness for sediments 
-    cf_sia              = 0.0             ! [m a-1 Pa-1] Bed roughness coefficient for SIA sliding
+    cf_sia              = 0 .0            ! [m a-1 Pa-1] Bed roughness coefficient for SIA sliding
     streaming_margin    = True            ! Impose cf_stream at the margin and grline independent of f_pmp
     n_sm_beta           = 0               ! [-] Standard deviation in gridpoints for Gaussian smoothing of beta (0==no smoothing)
+    beta_min            = 0.0             ! [Pa a m-1] Minimum value of beta allowed for grounded ice (for stability)
     ssa_beta_max        = 1e20            ! [Pa a m-1] Maximum value of beta for which ssa should be calculated 
     ssa_vel_max         = 5000.0          ! [m a-1] SSA velocity limit to avoid spurious results 
-    ssa_iter_max        = 10              ! Number of maximum allowed iterations over ssa to converge on vel. solution
+    ssa_iter_max        = 20              ! Number of maximum allowed iterations over ssa to converge on vel. solution
     ssa_iter_rel        = 0.7             ! [--] Relaxation fraction [0:1] to stabilize ssa iterations
     ssa_iter_conv       = 1e-2            ! [--] L2 relative error convergence limit to exit ssa iterations
 
 /
-
 &ydyn_neff 
     neff_method     = 0                 ! -1: external N_eff, 0: overburden pressure, 1: Leguy param., 2: Till pressure
     neff_p          = 0.0               ! *neff_method=1* marine connectivity exponent (0: none, 1: full)
@@ -138,6 +137,7 @@
     H_rock         = 6000.0             ! [m] Vertical grid step in bedrock 
     use_strain_sia = False              ! True: calculate strain heating from SIA approx.
     n_sm_qstrn     = 0                  ! [-] Standard deviation in gridpoints for Gaussian smoothing of strain heating (0==no smoothing)
+    n_sm_qb        = 0                  ! [-] Standard deviation in gridpoints for Gaussian smoothing of basal heating (0==no smoothing)
     use_const_cp   = True               ! Use specified constant value of heat capacity?
     const_cp       = 2009.0             ! [J kg-1 K-1] Specific heat capacity 
     use_const_kt   = True               ! Use specified constant value of heat conductivity?

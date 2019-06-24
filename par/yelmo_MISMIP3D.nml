@@ -131,6 +131,8 @@
     nzr            = 11                 ! [-] Number of vertical grid points in bedrock 
     H_rock         = 6000.0             ! [m] Vertical grid step in bedrock 
     use_strain_sia = False              ! True: calculate strain heating from SIA approx.
+    n_sm_qstrn     = 0                  ! [-] Standard deviation in gridpoints for Gaussian smoothing of strain heating (0==no smoothing)
+    n_sm_qb        = 0                  ! [-] Standard deviation in gridpoints for Gaussian smoothing of basal heating (0==no smoothing)
     use_const_cp   = True               ! Use specified constant value of heat capacity?
     const_cp       = 2009.0             ! [J kg-1 K-1] Specific heat capacity 
     use_const_kt   = True               ! Use specified constant value of heat conductivity?

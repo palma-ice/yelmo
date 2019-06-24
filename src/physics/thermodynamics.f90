@@ -231,17 +231,15 @@ contains
     end subroutine calc_advec_horizontal_column
     
     subroutine calc_strain_heating(Q_strn,de,visc,cp,rho_ice)
-
-                ! Calculate the general 3D internal strain heating
+        ! Calculate the general 3D internal strain heating
         ! as sum(D_ij*tau_ij)  (strain*stress)
         ! where stress has been calculated as stress_ij = 2*visc*strain
-        !!!!! Units: Q_strn = Q * 1/(cp*rho) = [J a-1 m-3] * [K m3 J-1] = [K a-1]
         ! Units: Q_Strn [J a-1 m-3]
 
         ! Note: we use the simpler approach because in the shallow
         ! model, the stress rate is simply the strain rate squared
 
-        ! Directly from Q_strn = tr(stress*strain)/cp
+        ! Directly from Q_strn = tr(stress*strain)
         ! (Cuffey and Patterson (2010) pag. 417, eq. 9.30)
 
 !         Q_strn = ( strss%txx*strn%dxx &
@@ -249,12 +247,12 @@ contains
 !                  + strss%tzz*strn%dzz &    ! this term is not available yet in the code, would need to be calculated
 !              + 2.0*strss%txy*strn%dxy &
 !              + 2.0*strss%txz*strn%dxz &
-!              + 2.0*strss%tyz*strn%dyz ) * 1.0/(cp*rho_ice) 
+!              + 2.0*strss%tyz*strn%dyz )
 
         ! Simpler approach:
         ! Calculate Q_strn from effective strain rate and viscosity
         ! (Greve and Blatter (2009) eqs. 4.7 and 5.65): 
-        !     Q_strn = tr(stress*strn)/cp = tr(2*visc*strn*strn)/cp = 2*visc*tr(strn*strn)/cp = 4*visc*de^2/cp
+        !     Q_strn = tr(stress*strn) = tr(2*visc*strn*strn) = 2*visc*tr(strn*strn) = 4*visc*de^2
         !     with tr(strn*strn) = 2*de^2
 
         implicit none
@@ -273,13 +271,8 @@ contains
 
         ! Calculate strain heating 
         ! following Greve and Blatter (2009), Eqs. 4.7 and 5.65
-        Q_strn = 4.0*visc * de**2 !* 1.0/(cp*rho_ice) 
+        Q_strn = 4.0*visc * de**2
         
-        ! Set basal and surface layer values equal to zero for consistency
-        ! (since basal and surface layer thickness is technically zero)
-!         Q_strn(:,:,1)     = 0.0 
-!         Q_strn(:,:,nz_aa) = 0.0 
-
         ! Limit strain heating to reasonable values 
         !where (Q_strn .gt. Q_strn_max) Q_strn = Q_strn_max
 
@@ -292,14 +285,11 @@ contains
         ! Calculate the general 3D internal strain heating
         ! as sum(D_ij*tau_ij)  (strain*stress)
         ! where stress has been calculated as stress_ij = 2*visc*strain
-        ! Units: Q_strn = Q * 1/(cp*rho) = [J a-1 m-3] * [K m3 J-1] = [K a-1]
+        ! Units: Q_strn = Q [J a-1 m-3]
 
-        ! Q_strn = rho*g*H*(duxdz*dzsdx + duydz*dzsdy) / (rho*cp)
-        ! Units: [K a-1]
-        ! Note: rho_ice / rho_ice removed from equation 
-        
-        ! Note: these units are currently inconsistent with units used in code!!
-        ! see calc_strain_heating above. 
+        ! SIA approximation:
+        ! Q_strn = rho*g*H*(duxdz*dzsdx + duydz*dzsdy)
+        ! Units: [J a-1 m-3]
 
         implicit none
 
@@ -356,7 +346,7 @@ contains
                     
                     depth = H_ice(i,j)*(1.0-zeta_aa(k))
                     
-                    Q_strn(i,j,k) = (-g*depth / cp(i,j,k)) * (duxdz*dzsdx_aa + duydz*dzsdy_aa)
+                    Q_strn(i,j,k) = (-rho_ice*g*depth) * (duxdz*dzsdx_aa + duydz*dzsdy_aa)
                     
                 end do 
 
@@ -373,56 +363,8 @@ contains
 
     end subroutine calc_strain_heating_sia
 
-    subroutine calc_basal_heating0(Q_b,ux_b,uy_b,taub_acx,taub_acy)
-        ! Qb [J a-1 m-2] == [m a-1] * [J m-3]
-        ! Note: grounded ice fraction f_grnd_acx/y not used here, because taub_acx/y already accounts
-        ! for the grounded fraction via beta_acx/y: Q_b = tau_b*u = -beta*u*u.
-        ! Note: it is assumed that strain heating is zero at the very base (no thickness) layer, so
-        ! it is not included here. 
-
-        implicit none 
-
-        real(prec), intent(OUT) :: Q_b(:,:)               ! [J a-1 K-1] Basal heat production (friction)
-        real(prec), intent(IN)  :: ux_b(:,:)              ! Basal velocity, x-component (staggered x)
-        real(prec), intent(IN)  :: uy_b(:,:)              ! Basal velocity, y-compenent (staggered y)
-        real(prec), intent(IN)  :: taub_acx(:,:)          ! Basal friction (staggered x)
-        real(prec), intent(IN)  :: taub_acy(:,:)          ! Basal friction (staggered y)
-        
-        ! Local variables
-        integer    :: i, j, nx, ny 
-        real(prec), allocatable :: Qb_acx(:,:), Qb_acy(:,:)
-
-        nx = size(Q_b,1)
-        ny = size(Q_b,2)
-
-        ! Allocate staggered friction heat variables 
-        allocate(Qb_acx(nx,ny))
-        allocate(Qb_acy(nx,ny))
-
-        ! Determine basal frictional heating values (staggered acx/acy nodes)
-        Qb_acx = abs(ux_b*taub_acx)   ! [Pa m a-1] == [J a-1 m-2]
-        Qb_acy = abs(uy_b*taub_acy)   ! [Pa m a-1] == [J a-1 m-2]
- 
-
-        ! Initially set basal heating to zero everywhere 
-        Q_b = 0.0  
-
-        ! Get basal frictional heating on centered nodes (aa-grid)
-        do j = 2, ny
-        do i = 2, nx
-
-            ! Average from ac-nodes to aa-node
-            Q_b(i,j) = 0.25*(Qb_acx(i,j)+Qb_acx(i-1,j)+Qb_acy(i,j)+Qb_acy(i,j-1))
-
-        end do
-        end do
-
-        return 
-
-    end subroutine calc_basal_heating0
-
     subroutine calc_basal_heating(Q_b,ux_b,uy_b,taub_acx,taub_acy)
-        ! Qb [J a-1 m-2] == [m a-1] * [J m-3]
+        ! Q_b [J a-1 m-2] == [m a-1] * [J m-3]
         ! Note: grounded ice fraction f_grnd_acx/y not used here, because taub_acx/y already accounts
         ! for the grounded fraction via beta_acx/y: Q_b = tau_b*u = -beta*u*u.
         ! Note: it is assumed that strain heating is zero at the very base (no thickness) layer, so

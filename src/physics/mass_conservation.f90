@@ -859,8 +859,9 @@ end if
 
                     else 
                         ! Grounded point, set H_ref < H_mean arbitrarily (0.5 works well)
-                        H_ref = 0.5*sum(H_neighb,mask=mask_neighb) / real(count(mask_neighb),prec)
-                        !H_ref = 0.5*minval(H_neighb,mask=mask_neighb)
+                        ! Note: H_min instead of H_mean seems to work better (tested with EISMINT2 EXPA + sliding)
+                        !H_ref = 0.5*sum(H_neighb,mask=mask_neighb) / real(count(mask_neighb),prec)
+                        H_ref = 0.5*minval(H_neighb,mask=mask_neighb)
                     end if
                     
                     ! Determine the cell ice fraction

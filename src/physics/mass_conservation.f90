@@ -859,7 +859,7 @@ end if
 
                     else 
                         ! Grounded point, set H_ref < H_mean arbitrarily (0.5 works well)
-                        H_ref = 0.5*sum(H_neighb,mask=mask_neighb) / real(count(mask_neighb),prec)
+                        H_ref = 0.2*sum(H_neighb,mask=mask_neighb) / real(count(mask_neighb),prec)
 
                     end if
                     

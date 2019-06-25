@@ -376,7 +376,7 @@ contains
         real(prec), intent(IN)  :: H_ice(:,:)
 
         ! Local variables
-        integer    :: i, j, nx, ny, npt 
+        integer    :: i, j, nx, ny 
         real(prec), allocatable :: Qb_acx(:,:)
         real(prec), allocatable :: Qb_acy(:,:)
 
@@ -395,34 +395,9 @@ contains
         ! Get basal frictional heating on centered nodes (aa-grid)          
         do j = 2, ny-1
         do i = 2, nx-1
-
-            npt      = 0 
-            Q_b(i,j) = 0.0 
-
-            if (H_ice(i,j) .gt. 0.0 .and. H_ice(i+1,j) .gt. 0.0) then 
-                Q_b(i,j) = Q_b(i,j) + Qb_acx(i,j)
-                npt = npt+1 
-            end if 
-
-            if (H_ice(i,j) .gt. 0.0 .and. H_ice(i-1,j) .gt. 0.0) then 
-                Q_b(i,j) = Q_b(i,j) + Qb_acx(i-1,j)
-                npt = npt+1 
-            end if 
             
-            if (H_ice(i,j) .gt. 0.0 .and. H_ice(i,j+1) .gt. 0.0) then 
-                Q_b(i,j) = Q_b(i,j) + Qb_acy(i,j)
-                npt = npt+1 
-            end if 
-
-            if (H_ice(i,j) .gt. 0.0 .and. H_ice(i,j-1) .gt. 0.0) then 
-                Q_b(i,j) = Q_b(i,j) + Qb_acy(i,j-1)
-                npt = npt+1 
-            end if 
-            
-            if (npt .gt. 0) Q_b(i,j) = Q_b(i,j) / real(npt,prec)
-
             ! Average from ac-nodes to aa-node
-!             Q_b(i,j) = 0.25*(Qb_acx(i,j)+Qb_acx(i-1,j)+Qb_acy(i,j)+Qb_acy(i,j-1))
+            Q_b(i,j) = 0.25*(Qb_acx(i,j)+Qb_acx(i-1,j)+Qb_acy(i,j)+Qb_acy(i,j-1))
  
         end do 
         end do 

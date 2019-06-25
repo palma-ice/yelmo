@@ -368,7 +368,7 @@ contains
          ! Note: grounded ice fraction f_grnd_acx/y not used here, because taub_acx/y already accounts
          ! for the grounded fraction via beta_acx/y: Q_b = tau_b*u = -beta*u*u.
 
-        real(prec), intent(OUT) :: Q_b(:,:)               ! [J a-1 K-1] Basal heat production (friction)
+        real(prec), intent(INOUT) :: Q_b(:,:)               ! [J a-1 K-1] Basal heat production (friction)
         real(prec), intent(IN)  :: ux_b(:,:)              ! Basal velocity, x-component (staggered x)
         real(prec), intent(IN)  :: uy_b(:,:)              ! Basal velocity, y-compenent (staggered y)
         real(prec), intent(IN)  :: taub_acx(:,:)          ! Basal friction (staggered x)
@@ -380,11 +380,19 @@ contains
         real(prec), allocatable :: Qb_acx(:,:)
         real(prec), allocatable :: Qb_acy(:,:)
 
+        real(prec), allocatable :: Qb_prev(:,:)
+        real(prec), parameter   :: rel = 0.7 
+        
         nx = size(Q_b,1)
         ny = size(Q_b,2)
 
         allocate(Qb_acx(nx,ny))
         allocate(Qb_acy(nx,ny))
+
+        allocate(Qb_prev(nx,ny))
+
+        ! Store previous Qb value 
+        Qb_prev = Q_b 
 
         ! Determine basal frictional heating values (staggered acx/acy nodes)
         Qb_acx = abs(ux_b*taub_acx)   ! [Pa m a-1] == [J a-1 m-2]
@@ -395,13 +403,16 @@ contains
         ! Get basal frictional heating on centered nodes (aa-grid)          
         do j = 2, ny-1
         do i = 2, nx-1
-            
+
             ! Average from ac-nodes to aa-node
             Q_b(i,j) = 0.25*(Qb_acx(i,j)+Qb_acx(i-1,j)+Qb_acy(i,j)+Qb_acy(i,j-1))
  
         end do 
         end do 
- 
+    
+        ! Relax new Q_b with previous solution 
+        Q_b = rel*Q_b + (1.0-rel)*Qb_prev
+
         return 
  
     end subroutine calc_basal_heating

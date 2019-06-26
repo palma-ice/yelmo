@@ -3,7 +3,7 @@ module yelmo_thermodynamics
 
     use nml 
     use yelmo_defs 
-    use yelmo_tools, only : smooth_gauss_2D, smooth_gauss_3D
+    use yelmo_tools, only : smooth_gauss_2D, smooth_gauss_3D, gauss_values
     
     use thermodynamics 
     use icetemp  
@@ -100,14 +100,14 @@ contains
 
             select case(trim(thrm%par%method))
 
-                case("active") 
+                case("enth","temp") 
                     ! Perform temperature solving via advection-diffusion equation
                     
-                    call calc_icetemp_3D(thrm%now%T_ice,thrm%now%bmb_grnd,thrm%now%dTdz_b,thrm%now%T_pmp, &
-                                        thrm%now%cp,thrm%now%kt,dyn%now%ux,dyn%now%uy,dyn%now%uz,thrm%now%Q_strn, &
-                                        thrm%now%Q_b,bnd%Q_geo,bnd%T_srf,tpo%now%H_ice,bnd%H_w,tpo%now%H_grnd,tpo%now%f_grnd, &
-                                        thrm%par%zeta_aa,thrm%par%zeta_ac,thrm%par%dzeta_a,thrm%par%dzeta_b,dt,thrm%par%dx)
-                
+                    call calc_ytherm_enthalpy_3D(thrm%now%enth,thrm%now%T_ice,thrm%now%omega,thrm%now%bmb_grnd,thrm%now%Q_ice_b, &
+                                thrm%now%H_cts,thrm%now%T_pmp,thrm%now%cp,thrm%now%kt,dyn%now%ux,dyn%now%uy,dyn%now%uz,thrm%now%Q_strn, &
+                                thrm%now%Q_b,bnd%Q_geo,bnd%T_srf,tpo%now%H_ice,bnd%H_w,tpo%now%H_grnd,tpo%now%f_grnd,thrm%par%zeta_aa, &
+                                thrm%par%zeta_ac,thrm%par%dzeta_a,thrm%par%dzeta_b,thrm%par%enth_cr,dt,thrm%par%dx,thrm%par%method)
+                    
                 case("robin")
                     ! Use Robin solution for ice temperature 
 
@@ -160,6 +160,161 @@ contains
 
     end subroutine calc_ytherm
 
+    subroutine calc_ytherm_enthalpy_3D(enth,T_ice,omega,bmb_grnd,Q_ice_b,H_cts,T_pmp,cp,kt,ux,uy,uz,Q_strn,Q_b,Q_geo, &
+                            T_srf,H_ice,H_w,H_grnd,f_grnd,zeta_aa,zeta_ac,dzeta_a,dzeta_b,cr,dt,dx,solver)
+        ! This wrapper subroutine breaks the thermodynamics problem into individual columns,
+        ! which are solved independently by calling calc_enth_column
+
+        ! Note zeta=height, k=1 base, k=nz surface 
+        
+        implicit none 
+
+        real(prec), intent(INOUT) :: enth(:,:,:)    ! [J m-3] Ice enthalpy
+        real(prec), intent(INOUT) :: T_ice(:,:,:)   ! [K] Ice column temperature
+        real(prec), intent(INOUT) :: omega(:,:,:)   ! [--] Ice water content
+        real(prec), intent(INOUT) :: bmb_grnd(:,:)  ! [m a-1] Basal mass balance (melting is negative)
+        real(prec), intent(OUT)   :: Q_ice_b(:,:)   ! [J a-1 m-2] Basal ice heat flux 
+        real(prec), intent(OUT)   :: H_cts(:,:)     ! [m] Height of the cold-temperate transition surface (CTS)
+        real(prec), intent(IN)    :: T_pmp(:,:,:)   ! [K] Pressure melting point temp.
+        real(prec), intent(IN)    :: cp(:,:,:)      ! [J kg-1 K-1] Specific heat capacity
+        real(prec), intent(IN)    :: kt(:,:,:)      ! [J a-1 m-1 K-1] Heat conductivity 
+        real(prec), intent(IN)    :: ux(:,:,:)      ! [m a-1] Horizontal x-velocity 
+        real(prec), intent(IN)    :: uy(:,:,:)      ! [m a-1] Horizontal y-velocity 
+        real(prec), intent(IN)    :: uz(:,:,:)      ! [m a-1] Vertical velocity 
+        real(prec), intent(IN)    :: Q_strn(:,:,:)  ! [K a-1] Internal strain heat production in ice
+        real(prec), intent(IN)    :: Q_b(:,:)       ! [J a-1 m-2] Basal frictional heat production 
+        real(prec), intent(IN)    :: Q_geo(:,:)     ! [mW m-2] Geothermal heat flux 
+        real(prec), intent(IN)    :: T_srf(:,:)     ! [K] Surface temperature 
+        real(prec), intent(IN)    :: H_ice(:,:)     ! [m] Ice thickness 
+        real(prec), intent(IN)    :: H_w(:,:)       ! [m] Basal water layer thickness 
+        real(prec), intent(IN)    :: H_grnd(:,:)    ! [--] Ice thickness above flotation 
+        real(prec), intent(IN)    :: f_grnd(:,:)    ! [--] Grounded fraction
+        real(prec), intent(IN)    :: zeta_aa(:)     ! [--] Vertical sigma coordinates (zeta==height), aa-nodes
+        real(prec), intent(IN)    :: zeta_ac(:)     ! [--] Vertical sigma coordinates (zeta==height), ac-nodes
+        real(prec), intent(IN)    :: dzeta_a(:)     ! d Vertical height axis (0:1) 
+        real(prec), intent(IN)    :: dzeta_b(:)     ! d Vertical height axis (0:1) 
+        real(prec), intent(IN)    :: cr             ! [--] Conductivity ratio for temperate ice (kappa_temp = enth_cr*kappa_cold)
+        real(prec), intent(IN)    :: dt             ! [a] Time step 
+        real(prec), intent(IN)    :: dx             ! [a] Horizontal grid step 
+        character(len=56), intent(IN) :: solver     ! "enth" or "temp" 
+
+        ! Local variables
+        integer :: i, j, k, nx, ny, nz_aa, nz_ac  
+        real(prec), allocatable  :: advecxy(:)   ! [K a-1 m-2] Horizontal heat advection 
+        real(prec) :: T_shlf, H_grnd_lim, f_scalar, T_base  
+        real(prec) :: H_ice_now 
+
+        real(prec), allocatable :: T_ice_old(:,:,:) 
+        real(prec) :: filter0(3,3), filter(3,3) 
+
+        real(prec), parameter :: H_ice_thin = 15.0   ! [m] Threshold to define 'thin' ice
+
+        nx    = size(T_ice,1)
+        ny    = size(T_ice,2)
+        nz_aa = size(zeta_aa,1)
+        nz_ac = size(zeta_ac,1)
+
+        allocate(advecxy(nz_aa))
+        allocate(T_ice_old(nx,ny,nz_aa))
+
+        ! Store original ice temperature field here for input to horizontal advection
+        ! calculations 
+        T_ice_old = T_ice 
+
+        ! Initialize gaussian filter kernel 
+        filter0 = gauss_values(dx,dx,sigma=2.0*dx,n=size(filter,1))
+
+        do j = 3, ny-2
+        do i = 3, nx-2 
+            
+            ! For floating points, calculate the approximate marine-shelf temperature 
+            ! ajr, later this should come from an external model, and T_shlf would
+            ! be the boundary variable directly
+            if (f_grnd(i,j) .lt. 1.0) then 
+
+                ! Calculate approximate marine freezing temp, limited to pressure melting point 
+                T_shlf = calc_T_base_shlf_approx(H_ice(i,j),T_pmp(i,j,1),H_grnd(i,j))
+
+            else 
+                ! Assigned for safety 
+
+                T_shlf   = T_pmp(i,j,1)
+
+            end if 
+
+            if (H_ice(i,j) .le. H_ice_thin) then 
+                ! Ice is too thin or zero: prescribe linear temperature profile
+                ! between temperate ice at base and surface temperature 
+                ! (accounting for floating/grounded nature via T_base)
+
+                if (f_grnd(i,j) .lt. 1.0) then 
+                    ! Impose T_shlf for the basal temperature
+                    T_base = T_shlf 
+                else 
+                    ! Impose the pressure melting point of grounded ice 
+                    T_base = T_pmp(i,j,1) 
+                end if 
+
+                T_ice(i,j,:) = calc_temp_linear_column(T_srf(i,j),T_base,T_pmp(i,j,nz_aa),zeta_aa)
+
+            else 
+                ! Thick ice exists, call thermodynamic solver for the column
+
+                ! No filtering of H_ice, take actual value
+!                 H_ice_now = H_ice(i,j) 
+                
+                ! Filter everywhere
+!                 filter = filter0
+!                 H_ice_now = sum(H_ice(i-1:i+1,j-1:j+1)*filter)
+
+                ! Filter everywhere there is ice 
+                ! filter = filter0 
+                ! where (H_ice(i-1:i+1,j-1:j+1) .eq. 0.0) filter = 0.0 
+                ! filter = filter/sum(filter)
+                ! H_ice_now = sum(H_ice(i-1:i+1,j-1:j+1)*filter)
+                
+                ! Filter at the margin only 
+                if (count(H_ice(i-1:i+1,j-1:j+1) .eq. 0.0) .ge. 2) then
+                    filter = filter0 
+                    where (H_ice(i-1:i+1,j-1:j+1) .eq. 0.0) filter = 0.0 
+                    filter = filter/sum(filter)
+                    H_ice_now = sum(H_ice(i-1:i+1,j-1:j+1)*filter)
+                else 
+                    H_ice_now = H_ice(i,j) 
+                end if 
+                
+                ! Pre-calculate the contribution of horizontal advection to column solution
+                ! (use unmodified T_ice_old field as input, to avoid mixing with new solution)
+                !call calc_advec_horizontal_column(advecxy,T_ice_old,H_ice,ux,uy,dx,i,j)
+                call calc_advec_horizontal_column(advecxy,T_ice_old,H_ice,ux,uy,dx,i,j)
+                
+!                 call calc_temp_column(T_ice(i,j,:),bmb_grnd(i,j),dTdz_b(i,j),T_pmp(i,j,:),cp(i,j,:),ct(i,j,:), &
+!                             uz(i,j,:),Q_strn(i,j,:),advecxy,Q_b(i,j),Q_geo(i,j),T_srf(i,j),T_shlf,H_ice_now, &
+!                             H_w(i,j),f_grnd(i,j),zeta_aa,zeta_ac,dzeta_a,dzeta_b,dt)
+                
+!                 call calc_enth_column(enth,T_ice,omega,bmb_grnd,Q_ice_b,H_cts,T_pmp,cp,kt,advecxy,uz,Q_strn,Q_b,Q_geo, &
+!                     T_srf,T_shlf,H_ice,H_w,f_grnd,zeta_aa,zeta_ac,dzeta_a,dzeta_b,cr,T0,dt,solver)
+
+            end if 
+
+        end do 
+        end do 
+
+        ! Fill in borders 
+        T_ice(2,:,:)    = T_ice(3,:,:) 
+        T_ice(1,:,:)    = T_ice(3,:,:) 
+        T_ice(nx-1,:,:) = T_ice(nx-2,:,:) 
+        T_ice(nx,:,:)   = T_ice(nx-2,:,:) 
+        
+        T_ice(:,2,:)    = T_ice(:,3,:) 
+        T_ice(:,1,:)    = T_ice(:,3,:) 
+        T_ice(:,ny-1,:) = T_ice(:,ny-2,:) 
+        T_ice(:,ny,:)   = T_ice(:,ny-2,:) 
+        
+        return 
+
+    end subroutine calc_ytherm_enthalpy_3D
+
     subroutine ytherm_par_load(par,filename,zeta_aa,zeta_ac,nx,ny,dx,init)
 
         type(ytherm_param_class), intent(OUT) :: par
@@ -179,11 +334,7 @@ contains
  
         ! Store local parameter values in output object
         call nml_read(filename,"ytherm","method",         par%method,           init=init_pars)
-        call nml_read(filename,"ytherm","cond_bed",       par%cond_bed,         init=init_pars)
         call nml_read(filename,"ytherm","gamma",          par%gamma,            init=init_pars)
-        call nml_read(filename,"ytherm","nzr",            par%nzr,              init=init_pars)
-        call nml_read(filename,"ytherm","H_rock",         par%H_rock,           init=init_pars)
-        
         call nml_read(filename,"ytherm","use_strain_sia", par%use_strain_sia,   init=init_pars)
         call nml_read(filename,"ytherm","n_sm_qstrn",     par%n_sm_qstrn,       init=init_pars)
         call nml_read(filename,"ytherm","n_sm_qb",        par%n_sm_qb,          init=init_pars)
@@ -191,10 +342,7 @@ contains
         call nml_read(filename,"ytherm","const_cp",       par%const_cp,         init=init_pars)
         call nml_read(filename,"ytherm","use_const_kt",   par%use_const_kt,     init=init_pars)
         call nml_read(filename,"ytherm","const_kt",       par%const_kt,         init=init_pars)
-        
-        call nml_read(filename,"ytherm","kt_m",           par%kt_m,             init=init_pars)
-        call nml_read(filename,"ytherm","cp_m",           par%cp_m,             init=init_pars)
-        call nml_read(filename,"ytherm","rho_m",          par%rho_m,            init=init_pars)
+        call nml_read(filename,"ytherm","enth_cr",        par%enth_cr,          init=init_pars)
         
         ! Set internal parameters
         par%nx  = nx
@@ -212,19 +360,6 @@ contains
         allocate(par%zeta_ac(par%nz_ac))
         par%zeta_ac = zeta_ac 
         
-        if (allocated(par%zetar)) deallocate(par%zetar)
-        allocate(par%zetar(par%nzr))
-        
-        ! Bottom = 0.0, Bedrock surface = 1.0
-        ! par%zetar(par%nzr) = 1.0 is the same as bottom of ice layer, 
-        ! ie par%zetar(par%nzr)==par%zeta_aa(1) represent the same location
-        ! Test, have zetar end at less than 1.0, so that the surface of hte rock is separate
-        ! from the ice 
-        do k = 1, par%nzr 
-            par%zetar(k) = 0.0 + 1.0*(k-1)/(par%nzr-1)
-!             par%zetar(k) = 0.0 + 1.0*(k-1)/(par%nzr)
-        end do 
-
         if (allocated(par%dzeta_a)) deallocate(par%dzeta_a)
         allocate(par%dzeta_a(par%nz_aa))
         if (allocated(par%dzeta_b)) deallocate(par%dzeta_b)
@@ -252,48 +387,34 @@ contains
 
         call ytherm_dealloc(now)
 
+        allocate(now%enth(nx,ny,nz_aa))
         allocate(now%T_ice(nx,ny,nz_aa))
+        allocate(now%omega(nx,ny,nz_aa))
         allocate(now%T_pmp(nx,ny,nz_aa))
-        
-        allocate(now%cp(nx,ny,nz_aa))
-        allocate(now%kt(nx,ny,nz_aa))
-        allocate(now%Q_strn(nx,ny,nz_aa))
-        
-        allocate(now%enth_ice(nx,ny,nz_aa))
-        allocate(now%omega_ice(nx,ny,nz_aa))
-
-        allocate(now%phid(nx,ny))
         allocate(now%bmb_grnd(nx,ny))
         allocate(now%f_pmp(nx,ny))
+        allocate(now%Q_strn(nx,ny,nz_aa))
         allocate(now%Q_b(nx,ny))
-        
-        allocate(now%T_rock(nx,ny,nzr))
-        
-        allocate(now%dTdz_b(nx,ny))
-        allocate(now%dTrdz_b(nx,ny))
+        allocate(now%Q_ice_b(nx,ny))
+        allocate(now%cp(nx,ny,nz_aa))
+        allocate(now%kt(nx,ny,nz_aa))
+        allocate(now%H_cts(nx,ny))
         allocate(now%T_prime_b(nx,ny))
-        allocate(now%cts(nx,ny))
-        allocate(now%T_all(nx,ny,nzr+nz_aa))
-
+        
+        now%enth      = 0.0
         now%T_ice     = 0.0
-        now%enth_ice  = 0.0
-        now%omega_ice = 0.0  
+        now%omega     = 0.0  
         now%T_pmp     = 0.0
-        now%phid      = 0.0   
         now%bmb_grnd  = 0.0 
         now%f_pmp     = 0.0 
         now%Q_strn    = 0.0 
         now%Q_b       = 0.0 
+        now%Q_ice_b   = 0.0 
         now%cp        = 0.0 
         now%kt        = 0.0 
-        now%T_rock    = 0.0
-        
-        now%dTdz_b    = 0.0 
-        now%dTrdz_b   = 0.0 
+        now%H_cts     = 0.0 
         now%T_prime_b = 0.0 
-        now%cts       = 0.0 
-        now%T_all     = 0.0 
-
+        
         return 
     end subroutine ytherm_alloc 
 
@@ -303,22 +424,19 @@ contains
 
         type(ytherm_state_class), intent(INOUT) :: now
 
+        if (allocated(now%enth))      deallocate(now%enth)
         if (allocated(now%T_ice))     deallocate(now%T_ice)
+        if (allocated(now%omega))     deallocate(now%omega)
         if (allocated(now%T_pmp))     deallocate(now%T_pmp)
         if (allocated(now%bmb_grnd))  deallocate(now%bmb_grnd)
         if (allocated(now%f_pmp))     deallocate(now%f_pmp)
         if (allocated(now%Q_strn))    deallocate(now%Q_strn)
         if (allocated(now%Q_b))       deallocate(now%Q_b)
+        if (allocated(now%Q_ice_b))   deallocate(now%Q_ice_b)
         if (allocated(now%cp))        deallocate(now%cp)
         if (allocated(now%kt))        deallocate(now%kt)
-        
-        if (allocated(now%T_rock))    deallocate(now%T_rock)
-        
-        if (allocated(now%dTdz_b))    deallocate(now%dTdz_b)
-        if (allocated(now%dTrdz_b))   deallocate(now%dTrdz_b)
+        if (allocated(now%H_cts))     deallocate(now%H_cts)
         if (allocated(now%T_prime_b)) deallocate(now%T_prime_b)
-        
-        if (allocated(now%T_all))     deallocate(now%T_all)
         
         return 
 

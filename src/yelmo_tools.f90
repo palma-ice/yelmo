@@ -29,6 +29,7 @@ module yelmo_tools
     
     public :: smooth_gauss_2D
     public :: smooth_gauss_3D
+    public :: gauss_values
     
     ! Integration functions
     public :: test_integration

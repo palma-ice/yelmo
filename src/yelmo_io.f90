@@ -144,12 +144,10 @@ contains
         ! == ytherm variables ===
         call nc_write(filename,"T_ice",     dom%thrm%now%T_ice,     units="",dim1="xc",dim2="yc",dim3="zeta",ncid=ncid)
         call nc_write(filename,"T_pmp",     dom%thrm%now%T_pmp,     units="",dim1="xc",dim2="yc",dim3="zeta",ncid=ncid)
-        call nc_write(filename,"phid",      dom%thrm%now%phid,      units="",dim1="xc",dim2="yc",ncid=ncid)
         call nc_write(filename,"f_pmp",     dom%thrm%now%f_pmp,     units="",dim1="xc",dim2="yc",ncid=ncid)
         call nc_write(filename,"bmb_grnd",  dom%thrm%now%bmb_grnd,  units="",dim1="xc",dim2="yc",ncid=ncid)
         call nc_write(filename,"Q_b",       dom%thrm%now%Q_b,       units="",dim1="xc",dim2="yc",ncid=ncid)
         call nc_write(filename,"Q_strn",    dom%thrm%now%Q_strn,    units="",dim1="xc",dim2="yc",dim3="zeta", ncid=ncid)
-        call nc_write(filename,"T_rock",    dom%thrm%now%T_rock,    units="",dim1="xc",dim2="yc",dim3="sr",ncid=ncid)
         
         ! == ybound variables ===
         call nc_write(filename,"z_bed",   dom%bnd%z_bed,   units="m",    dim1="xc",dim2="yc",ncid=ncid)
@@ -311,12 +309,10 @@ contains
         ! == ytherm variables ===
         call nc_read(filename,"T_ice",     dom%thrm%now%T_ice,        ncid=ncid)
         call nc_read(filename,"T_pmp",     dom%thrm%now%T_pmp,        ncid=ncid)
-        call nc_read(filename,"phid",      dom%thrm%now%phid,         ncid=ncid)
         call nc_read(filename,"f_pmp",     dom%thrm%now%f_pmp,        ncid=ncid)
         call nc_read(filename,"bmb_grnd",  dom%thrm%now%bmb_grnd,     ncid=ncid)
         call nc_read(filename,"Q_b",       dom%thrm%now%Q_b,          ncid=ncid)
         call nc_read(filename,"Q_strn",    dom%thrm%now%Q_strn,       ncid=ncid)
-        call nc_read(filename,"T_rock",    dom%thrm%now%T_rock,       ncid=ncid)
         
         ! == ybound variables ===
         call nc_read(filename,"z_bed",   dom%bnd%z_bed,               ncid=ncid)

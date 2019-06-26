@@ -24,8 +24,9 @@ module thermodynamics
     public :: calc_f_pmp
     public :: calc_T_base_shlf_approx
     public :: define_temp_linear_3D
-    public :: calc_temp_linear_column
     public :: define_temp_robin_3D
+    public :: calc_temp_linear_column
+    public :: calc_temp_robin_column
     
 contains
 

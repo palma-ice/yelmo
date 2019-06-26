@@ -377,17 +377,13 @@ module yelmo_defs
     
     !ytherm parameters 
     type ytherm_param_class
-        character(len=256)  :: method 
-        logical             :: cond_bed 
+        character(len=256)  :: method  
         integer             :: nx, ny 
         real(prec)          :: dx, dy  
         integer             :: nz_aa     ! Number of vertical points in ice (layer centers, plus base and surface)
         integer             :: nz_ac     ! Number of vertical points in ice (layer boundaries)
         integer             :: nzr       ! Number of vertical points in bedrock 
         real(prec)          :: gamma  
-        real(prec)          :: dzr       ! Vertical resolution in bedrock [m]
-        real(prec)          :: H_rock    ! Total bedrock thickness [m] - determined as (nzr-1)*dzr 
-        
         logical             :: use_strain_sia 
         integer             :: n_sm_qstrn    ! Standard deviation (in points) for Gaussian smoothing of strain heating
         integer             :: n_sm_qb       ! Standard deviation (in points) for Gaussian smoothing of basal heating
@@ -395,13 +391,10 @@ module yelmo_defs
         real(prec)          :: const_cp 
         logical             :: use_const_kt 
         real(prec)          :: const_kt 
-        real(prec)          :: kt_m        ! Thermal conductivity of mantle [J a-1 m-1 K-1]    
-        real(prec)          :: cp_m        ! Specific heat capacity of mantle [J Kg-1 K-1]
-        real(prec)          :: rho_m       ! Density of the mantle [kg m-3]
+        real(prec)          :: enth_cr  
 
         real(prec), allocatable :: zeta_aa(:)   ! Layer centers (aa-nodes), plus base and surface: nz_aa points 
         real(prec), allocatable :: zeta_ac(:)   ! Layer borders (ac-nodes), plus base and surface: nz_ac == nz_aa-1 points
-        real(prec), allocatable :: zetar(:) 
 
         real(prec), allocatable :: dzeta_a(:)
         real(prec), allocatable :: dzeta_b(:)
@@ -412,25 +405,20 @@ module yelmo_defs
 
     ! ytherm state variables
     type ytherm_state_class
-        real(prec), allocatable :: T_ice(:,:,:)     ! Ice temp. 
-        real(prec), allocatable :: enth_ice(:,:,:)  ! Ice enthalpy 
-        real(prec), allocatable :: omega_ice(:,:,:) ! Ice water content
+        real(prec), allocatable :: enth(:,:,:)      ! [J m-3] Ice enthalpy 
+        real(prec), allocatable :: T_ice(:,:,:)     ! [K]     Ice temp. 
+        real(prec), allocatable :: omega(:,:,:)     ! [--]    Ice water content
         real(prec), allocatable :: T_pmp(:,:,:)     ! Pressure-corrected melting point
-        real(prec), allocatable :: phid(:,:)        ! Heat flow related to deformation and basal slip (from grisli)
         real(prec), allocatable :: f_pmp(:,:)       ! fraction of cell at pressure melting point
         real(prec), allocatable :: bmb_grnd(:,:)    ! Grounded basal mass balance 
         real(prec), allocatable :: Q_strn(:,:,:)    ! Internal heat production 
         real(prec), allocatable :: Q_b(:,:)         ! Basal friction heat production
+        real(prec), allocatable :: Q_ice_b(:,:)     ! Basal ice heat flux 
         real(prec), allocatable :: cp(:,:,:)        ! Specific heat capacity  
         real(prec), allocatable :: kt(:,:,:)        ! Heat conductivity  
-        
-        real(prec), allocatable :: T_rock(:,:,:)    ! Bedrock temp.
-        real(prec), allocatable :: dTdz_b(:,:)      ! Temp. gradient in ice at base (positive up)
-        real(prec), allocatable :: dTrdz_b(:,:)     ! Temp. gradient in rock at base (positive up)
+        real(prec), allocatable :: H_cts(:,:)       ! Height of the cts
         real(prec), allocatable :: T_prime_b(:,:)   ! Homologous temperature at the base 
-        real(prec), allocatable :: cts(:,:)         ! Height of the cts
-        real(prec), allocatable :: T_all(:,:,:) 
-        
+
     end type
 
     ! ytherm class

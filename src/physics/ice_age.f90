@@ -1,7 +1,7 @@
-module iceage
+module ice_age
     ! Module to treat online age calculations 
 
-    use yelmo_defs, only : prec, pi, g, sec_year, T0, rho_ice, rho_sw, rho_w, L_ice  
+    use yelmo_defs, only : prec
     use solver_tridiagonal, only : solve_tridiag 
     
     implicit none
@@ -9,6 +9,8 @@ module iceage
 
     private 
     public :: calc_tracer_3D
+    public :: calc_tracer_column
+    public :: calc_tracer_column_expl 
 
 contains
 
@@ -93,11 +95,11 @@ contains
 
                             ! Only calculate for summit
                             if (i .eq. 15 .and. j .eq. 15) then 
-                                call calc_tracer_column_expl(X_ice(i,j,:),uz_test,advecxy*0.0,X_srf,X_base,H_ice(i,j),zeta_aa,dt)
+                                call calc_tracer_column_expl(X_ice(i,j,:),uz_test,advecxy*0.0,X_srf,X_base,H_ice(i,j),zeta_aa,zeta_ac,dt)
                             end if 
 
                         else 
-                            call calc_tracer_column_expl(X_ice(i,j,:),uz(i,j,:),advecxy,X_srf,X_base,H_ice(i,j),zeta_aa,dt)
+                            call calc_tracer_column_expl(X_ice(i,j,:),uz(i,j,:),advecxy,X_srf,X_base,H_ice(i,j),zeta_aa,zeta_ac,dt)
 
                         end if 
 
@@ -151,7 +153,7 @@ contains
 
     end subroutine calc_tracer_3D
 
-    subroutine calc_tracer_column(X_ice,uz,advecxy,X_srf,X_base,H_ice,zeta_aa,zeta_ac,dzeta_a,dzeta_b,kappa,dt)
+    subroutine calc_tracer_column(X_ice,uz,advecxy,X_srf,bmb,H_ice,zeta_aa,zeta_ac,dzeta_a,dzeta_b,kappa,dt)
         ! Tracer solver for a given column of ice 
         ! Note zeta=height, k=1 base, k=nz surface 
         ! Note: nz = number of vertical boundaries (including zeta=0.0 and zeta=1.0), 
@@ -166,7 +168,7 @@ contains
         real(prec), intent(IN)    :: uz(:)        ! nz_ac [m a-1] Vertical velocity 
         real(prec), intent(IN)    :: advecxy(:)   ! nz_aa [K a-1] Horizontal heat advection 
         real(prec), intent(IN)    :: X_srf        ! [units] Surface value
-        real(prec), intent(IN)    :: X_base       ! [units] Basal value
+        real(prec), intent(IN)    :: bmb          ! [m a-1] Basal mass balance
         real(prec), intent(IN)    :: H_ice        ! [m] Ice thickness 
         real(prec), intent(IN)    :: zeta_aa(:)   ! nz_aa [--] Vertical sigma coordinates (zeta==height), layer centered aa-nodes
         real(prec), intent(IN)    :: zeta_ac(:)   ! nz_ac [--] Vertical height axis temperature (0:1), layer edges ac-nodes
@@ -186,16 +188,36 @@ contains
         real(prec), allocatable :: supd(:)     ! nz_aa 
         real(prec), allocatable :: rhs(:)      ! nz_aa 
         real(prec), allocatable :: solution(:) ! nz_aa
-        real(prec) :: T_base, fac, fac_a, fac_b, uz_aa, dz  
+        real(prec) :: T_base, fac, fac_a, fac_b, uz_aa, dz
+        real(prec) :: kappa_a, kappa_b, dz1, dz2   
+        real(prec) :: X_base, bmb_tot 
+
+        real(prec), allocatable :: kappa_aa(:) 
+
+        real(prec), parameter :: bmb_thinning = -1e-3   ! [m a-1]
 
         nz_aa = size(zeta_aa,1)
         nz_ac = size(zeta_ac,1)
+
+        allocate(kappa_aa(nz_aa))
+
+!         kappa_aa(1)     = 1e-4
+!         kappa_aa(nz_aa) = 1.5e0 
+
+!         do k = 2, nz_aa-1 
+!             kappa_aa(k) = kappa_aa(1) + zeta_aa(k)*(kappa_aa(nz_aa)-kappa_aa(1))
+!         end do 
+        
+        kappa_aa = kappa 
 
         allocate(subd(nz_aa))
         allocate(diag(nz_aa))
         allocate(supd(nz_aa))
         allocate(rhs(nz_aa))
         allocate(solution(nz_aa))
+
+        ! Calculate basal mass balance including additional thinning term
+        call calc_X_base(X_base,X_ice,H_ice,bmb,bmb_thinning,zeta_aa,dt)
 
         ! Step 1: apply vertical advection (for explicit testing)
         if (test_expl_advecz) then 
@@ -225,13 +247,34 @@ contains
                 uz_aa   = 0.5*(uz(k-1)+uz(k))   ! ac => aa nodes
             end if 
 
-            dz      =  H_ice*(zeta_ac(k)-zeta_ac(k-1))
-            
-            fac     = dt * kappa / H_ice**2
-            fac_a   = -fac*dzeta_a(k)
-            fac_b   = -fac*dzeta_b(k)
-            subd(k) = fac_a - uz_aa*dt / (2.0*dz)
-            supd(k) = fac_b + uz_aa*dt / (2.0*dz)
+            ! Stagger kappa to the lower and upper ac-nodes
+
+            ! ac-node between k-1 and k 
+            if (k .eq. 2) then 
+                ! Bottom layer, kappa is kappa for now (later with bedrock kappa?)
+                kappa_a = kappa_aa(1)
+            else 
+                ! Weighted average between lower half and upper half of point k-1 to k 
+                dz1 = zeta_ac(k-1)-zeta_aa(k-1)
+                dz2 = zeta_aa(k)-zeta_ac(k-1)
+                kappa_a = (dz1*kappa_aa(k-1) + dz2*kappa_aa(k))/(dz1+dz2)
+            end if 
+
+            ! ac-node between k and k+1 
+
+            ! Weighted average between lower half and upper half of point k to k+1
+            dz1 = zeta_ac(k+1)-zeta_aa(k)
+            dz2 = zeta_aa(k+1)-zeta_ac(k+1)
+            kappa_b = (dz1*kappa_aa(k) + dz2*kappa_aa(k+1))/(dz1+dz2)
+
+            ! Vertical distance for centered difference scheme
+            dz      =  H_ice*(zeta_aa(k+1)-zeta_aa(k-1))
+
+            fac_a   = -kappa_a*dzeta_a(k)*dt/H_ice**2
+            fac_b   = -kappa_b*dzeta_b(k)*dt/H_ice**2
+
+            subd(k) = fac_a - uz_aa * dt/dz
+            supd(k) = fac_b + uz_aa * dt/dz
             diag(k) = 1.0_prec - fac_a - fac_b
             rhs(k)  = X_ice(k) - dt*advecxy(k) 
 
@@ -253,7 +296,7 @@ contains
 
     end subroutine calc_tracer_column
 
-    subroutine calc_tracer_column_expl(X_ice,uz,advecxy,X_srf,X_base,H_ice,zeta_aa,dt)
+    subroutine calc_tracer_column_expl(X_ice,uz,advecxy,X_srf,bmb,H_ice,zeta_aa,zeta_ac,dt)
         ! Tracer solver for a given column of ice 
         ! Note zeta=height, k=1 base, k=nz surface 
         ! Note: nz = number of vertical boundaries (including zeta=0.0 and zeta=1.0), 
@@ -268,26 +311,34 @@ contains
         real(prec), intent(IN)    :: uz(:)        ! nz_ac [m a-1] Vertical velocity 
         real(prec), intent(IN)    :: advecxy(:)   ! nz_aa [K a-1] Horizontal heat advection 
         real(prec), intent(IN)    :: X_srf        ! [units] Surface value
-        real(prec), intent(IN)    :: X_base       ! [units] Basal value
+        real(prec), intent(IN)    :: bmb          ! [m a-1] Basal mass balance value
         real(prec), intent(IN)    :: H_ice        ! [m] Ice thickness 
         real(prec), intent(IN)    :: zeta_aa(:)   ! nz_aa [--] Vertical sigma coordinates (zeta==height), layer centered aa-nodes
+        real(prec), intent(IN)    :: zeta_ac(:)   ! nz_ac [--] Vertical sigma coordinates (zeta==height), layer boundary ac-nodes
         real(prec), intent(IN)    :: dt           ! [a] Time step 
 
         ! Local variables 
         integer :: k, nz_aa
+        real(prec) :: X_base 
         real(prec), allocatable :: advecz(:)   ! nz_aa, for explicit vertical advection solving
+
+        real(prec), parameter :: bmb_thinning = 1e-3   ! [m a-1]
 
         nz_aa = size(zeta_aa,1)
         
         allocate(advecz(nz_aa))
+
+        ! Calculate basal mass balance including additional thinning term
+        call calc_X_base(X_base,X_ice,H_ice,bmb,bmb_thinning,zeta_aa,dt)
 
         ! Update base and surface values
         X_ice(1)     = X_base 
         X_ice(nz_aa) = X_srf 
 
         ! Calculate vertical advection 
-!         call calc_advec_vertical_column_upwind1(advecz,X_ice,uz,H_ice,zeta_aa)
-        call calc_advec_vertical_column_upwind2(advecz,X_ice,uz,H_ice,zeta_aa)
+        call calc_advec_vertical_column_upwind1(advecz,X_ice,uz,H_ice,zeta_aa)
+!         call calc_advec_vertical_column_upwind2(advecz,X_ice,uz,H_ice,zeta_aa)
+!         call calc_advec_vertical_column_new2(advecz,X_ice,uz,H_ice,zeta_aa,zeta_ac,dt)
 
         ! Use advection terms to advance column tracer value 
         X_ice = X_ice - dt*advecz - dt*advecxy 
@@ -381,9 +432,19 @@ contains
                     z1   = H_ice*zeta_aa(k+1)
                     z2   = H_ice*zeta_aa(k+2)
                     zout = H_ice*zeta_aa(k+1)+dz 
-                    Q2   = interp_linear_pt([z1,z2],[Q(k+1),Q(k+2)],zout)
 
-                    advecz(k) = uz(k)*((4.0*Q1-Q2-3.0*Q0))/(2.0*dz)
+                    !write(*,*) k, z1, z2, zout, dz 
+
+                    if (zout .le. z2) then 
+                        Q2   = interp_linear_pt([z1,z2],[Q(k+1),Q(k+2)],zout)
+
+                        advecz(k) = uz(k)*((4.0*Q1-Q2-3.0*Q0))/(2.0*dz)
+
+                    else 
+                        ! 1st order 
+                        advecz(k) = uz(k)*(Q(k+1)-Q(k))/dz 
+                    end if 
+
                 else
                     ! 1st order 
                     advecz(k) = uz(k)*(Q(k+1)-Q(k))/dz 
@@ -420,6 +481,167 @@ contains
         return 
 
     end subroutine calc_advec_vertical_column_upwind2
+
+    subroutine calc_advec_vertical_column_new2(advecz,Q,uz,H_ice,zeta_aa,zeta_ac,dt)
+        ! Calculate vertical advection term advecz, which enters
+        ! advection equation as
+        ! Q_new = Q - dt*advecz = Q - dt*u*dQ/dx
+        ! 2nd order upwind scheme 
+
+        implicit none 
+
+        real(prec), intent(OUT)   :: advecz(:)      ! nz_aa: bottom, cell centers, top 
+        real(prec), intent(INOUT) :: Q(:)           ! nz_aa: bottom, cell centers, top 
+        real(prec), intent(IN)    :: uz(:)          ! nz_ac: cell boundaries
+        real(prec), intent(IN)    :: H_ice          ! Ice thickness 
+        real(prec), intent(IN)    :: zeta_aa(:)     ! nz_aa, cell centers
+        real(prec), intent(IN)    :: zeta_ac(:)     ! nz_ac, cell edges
+        real(prec), intent(IN)    :: dt             ! [a] Timestep 
+
+        ! Local variables
+        integer :: k, nz_aa   
+        real(prec) :: u_aa, dz  
+        real(prec) :: Q0, Q1, Q2 
+        real(prec) :: z1, z2, zout 
+        real(prec) :: Q_ac_up, Q_ac_dwn, Q_aa 
+        real(prec) :: uz_ac_up, uz_ac_dwn 
+        real(prec) :: Q_up, Q_dwn, Gdc, Gcu, Gc 
+        real(prec) :: x_ac_dwn, x_ac_up
+
+        real(prec) :: dx0, dx1, dQdz  
+        real(prec) :: dim2, dim1, dip1, alpha1, beta1, gamma1 
+
+        real(prec), parameter :: eps = 1e-6 
+
+        nz_aa = size(zeta_aa,1)
+
+        advecz = 0.0 
+
+        ! Loop over internal cell centers and perform upwind advection 
+        do k = 1, nz_aa-1 
+            
+            if (k .ge. 2) then 
+                
+                dz = H_ice*(zeta_ac(k)-zeta_ac(k-1))
+
+                uz_ac_up  = uz(k)
+                uz_ac_dwn = uz(k-1) 
+
+                Q_up     = Q(k+1)
+                Q_ac_up  = 0.5*(Q(k)+Q(k+1))
+                Q_aa     = Q(k) 
+                Q_ac_dwn = 0.5*(Q(k)+Q(k-1))
+                Q_dwn    = Q(k-1) 
+
+                ! UNO2+ (Li, 2008)
+                ! Gradient at midpoint 
+                Gdc = (Q_dwn - Q_aa) / (H_ice*(zeta_aa(k-1)-zeta_aa(k)))
+                Gcu = (Q_aa  - Q_up) / (H_ice*(zeta_aa(k)-zeta_aa(k+1)))
+                Gc = sign(1.0,Gdc)*2.0*abs(Gdc*Gcu)/(abs(Gdc)+abs(Gcu) + eps)
+
+                Q_ac_dwn = Q_aa + sign(1.0,Q_dwn-Q_aa)*(dz - abs(uz_ac_dwn)*dt)*abs(Gdc*Gcu)/(abs(Gdc)+abs(Gcu) + eps)
+                Q_ac_up  = Q_aa + sign(1.0,Q_aa -Q_up)*(abs(uz_ac_up) *dt - dz)*abs(Gdc*Gcu)/(abs(Gdc)+abs(Gcu) + eps)
+                
+                ! Get staggered upstream and downstream values 
+                x_ac_dwn = zeta_aa(k) + sign(1.0,uz_ac_dwn)*(dz-abs(uz_ac_dwn)*dt)/2.0 
+                x_ac_up  = zeta_aa(k) + sign(1.0,uz_ac_up) *(dz-abs(uz_ac_up) *dt)/2.0 
+                
+                advecz(k) = (uz_ac_dwn*Q_ac_dwn - uz_ac_up*Q_ac_up)/dz
+!                 advecz(k) = (uz_ac_up*Q_ac_up - uz_ac_dwn*Q_ac_dwn)/dz
+
+            else
+                ! 1st order upstream
+                dz        = H_ice*(zeta_aa(k+1)-zeta_aa(k))
+                advecz(k) = uz(k)*(Q(k+1)-Q(k))/dz 
+
+            end if 
+
+!             if (k .ge. 3) then 
+
+!                 u_aa = 0.5_prec*(uz(k-1)+uz(k))
+                
+!                 dim2 = H_ice*(zeta_aa(k) - zeta_aa(k-2))
+!                 dim1 = H_ice*(zeta_aa(k) - zeta_aa(k-1))
+!                 dip1 = H_ice*(zeta_aa(k+1) - zeta_aa(k))
+
+!                 alpha1 =  (dim1*dip1)/(dim2*(dim2+dip1)*(dim2-dim1))
+!                 beta1  = -(dim2*dip1)/(dim1*(dim2-dim1)*(dim1+dip1))
+!                 gamma1 =  (dim2*dim1)/(dip1*(dim1+dip1)*(dim2+dip1))
+
+!                 dQdz = alpha1*Q(k-2) + beta1*Q(k-1) - (alpha1+beta1+gamma1)*Q(k) + gamma1*Q(k+1)
+
+!                 advecz(k) = u_aa*dQdz
+
+!             else
+!                 ! 1st order upstream
+!                 dz        = H_ice*(zeta_aa(k+1)-zeta_aa(k))
+!                 advecz(k) = uz(k)*(Q(k+1)-Q(k))/dz 
+
+!             end if 
+
+!             if (k .gt. 1) then 
+!                 ! 2nd order 
+                
+!                 dx0 = H_ice*(zeta_aa(k)-zeta_aa(k-1))
+!                 dx1 = H_ice*(zeta_aa(k+1)-zeta_aa(k)) 
+
+!                 dQdz =        -dx1/(dx0*(dx1+dx0))*Q(k-1) &
+!                        + (dx1-dx0)/(dx1*dx0)      *Q(k)   & 
+!                              + dx0/(dx1*(dx1+dx0))*Q(k+1)
+
+!                 advecz(k) = u_aa*dQdz 
+
+!             else
+!                 ! 1st order upstream
+!                 dz        = H_ice*(zeta_aa(k+1)-zeta_aa(k))
+!                 advecz(k) = uz(k)*(Q(k+1)-Q(k))/dz 
+
+!             end if 
+
+        end do 
+
+        return 
+
+    end subroutine calc_advec_vertical_column_new2
+
+    subroutine calc_X_base(X_base,X_ice,H_ice,bmb,bmb_thinning,zeta_aa,dt)
+        ! Calculate the basal boundary value of tracer 
+
+        implicit none 
+
+        real(prec), intent(OUT)   :: X_base
+        real(prec), intent(IN)    :: X_ice(:)  
+        real(prec), intent(IN)    :: H_ice
+        real(prec), intent(IN)    :: bmb 
+        real(prec), intent(IN)    :: bmb_thinning
+        real(prec), intent(IN)    :: zeta_aa(:) 
+        real(prec), intent(IN)    :: dt 
+
+        ! Local variables 
+        real(prec) :: bmb_tot 
+        real(prec) :: dz 
+
+        ! Calculate basal mass balance including additional thinning term
+        bmb_tot = bmb + bmb_thinning 
+
+        ! Step 0: Apply basal boundary condition
+        if (bmb_tot .le. 0.0) then 
+            ! Modify basal value explicitly for basal melting
+            ! using boundary condition of Rybak and Huybrechts (2003), Eq. 3
+            ! No horizontal advection of the basal value since it has no thickness 
+
+            dz = H_ice*(zeta_aa(2) - zeta_aa(1)) 
+            X_base = X_ice(1) - dt*bmb_tot*(X_ice(2)-X_ice(1))/dz 
+
+        else
+            ! Leave basal value unchanged 
+            X_base = X_ice(1)
+
+        end if 
+
+        return 
+
+    end subroutine calc_X_base 
 
     subroutine calc_advec_horizontal_column(advecxy,var_ice,ux,uy,dx,i,j)
         ! Newly implemented advection algorithms (ajr)
@@ -546,5 +768,5 @@ contains
 
     end function interp_linear_pt 
 
-end module iceage 
+end module ice_age 
 

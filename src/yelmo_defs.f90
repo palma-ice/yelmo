@@ -43,14 +43,15 @@ module yelmo_defs
 
     ! Physical constants 
     real(prec) :: sec_year       ! [s] seconds per year 
-    real(prec) :: g              ! Gravitational accel.  [m s-2]
-    real(prec) :: T0             ! Reference freezing temperature [K] 
-    real(prec) :: rho_ice        ! Density ice           [kg m-3] 
-    real(prec) :: rho_w          ! Density water         [kg m-3] 
-    real(prec) :: rho_sw         ! Density seawater      [kg m-3] 
-    real(prec) :: rho_a          ! Density asthenosphere [kg m-3] 
-    real(prec) :: rho_m          ! Density mantle (lith) [kg m-3]
-    real(prec) :: L_ice          ! Latent heat           [J kg-1]
+    real(prec) :: g              ! [m s-2] Gravitational accel.  
+    real(prec) :: T0             ! [K] Reference freezing temperature  
+    real(prec) :: rho_ice        ! [kg m-3] Density ice           
+    real(prec) :: rho_w          ! [kg m-3] Density water          
+    real(prec) :: rho_sw         ! [kg m-3] Density seawater      
+    real(prec) :: rho_a          ! [kg m-3] Density asthenosphere  
+    real(prec) :: rho_m          ! [kg m-3] Density mantle (lith) 
+    real(prec) :: L_ice          ! [J kg-1] Latent heat           
+    real(prec) :: T_pmp_beta     ! [K Pa-1] Melt point pressure slope
 
     ! Internal parameters 
     real(prec) :: conv_we_ie        ! Conversion water equiv. => m/a ice equiv. 
@@ -684,21 +685,23 @@ contains
         call nml_read(filename,"yelmo_constants","rho_a",       rho_a,      init=init_pars)
         call nml_read(filename,"yelmo_constants","rho_m",       rho_m,      init=init_pars)
         call nml_read(filename,"yelmo_constants","L_ice",       L_ice,      init=init_pars)
+        call nml_read(filename,"yelmo_constants","T_pmp_beta",  T_pmp_beta, init=init_pars)
         
         if (yelmo_write_log) then 
             write(*,*) "yelmo:: configuration:"
-            write(*,*) "    write_log = ", yelmo_write_log
+            write(*,*) "    write_log  = ", yelmo_write_log
 
             write(*,*) "yelmo:: loaded global constants:"
-            write(*,*) "    sec_year  = ", sec_year 
-            write(*,*) "    g         = ", g 
-            write(*,*) "    T0        = ", T0 
-            write(*,*) "    rho_ice   = ", rho_ice 
-            write(*,*) "    rho_w     = ", rho_w 
-            write(*,*) "    rho_sw    = ", rho_sw 
-            write(*,*) "    rho_a     = ", rho_a 
-            write(*,*) "    rho_m     = ", rho_m 
-            write(*,*) "    L_ice     = ", L_ice 
+            write(*,*) "    sec_year   = ", sec_year 
+            write(*,*) "    g          = ", g 
+            write(*,*) "    T0         = ", T0 
+            write(*,*) "    rho_ice    = ", rho_ice 
+            write(*,*) "    rho_w      = ", rho_w 
+            write(*,*) "    rho_sw     = ", rho_sw 
+            write(*,*) "    rho_a      = ", rho_a 
+            write(*,*) "    rho_m      = ", rho_m 
+            write(*,*) "    L_ice      = ", L_ice 
+            write(*,*) "    T_pmp_beta = ", T_pmp_beta 
             
         end if 
 

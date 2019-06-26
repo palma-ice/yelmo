@@ -7,7 +7,7 @@ module yelmo_material
     use yelmo_tools, only : calc_vertical_integrated_2D, calc_vertical_integrated_3D
     
     use deformation
-    use iceage 
+    use ice_age  
 
     ! Note: 3D arrays defined such that first index (k=1) == base, and max index (k=nk) == surface 
     

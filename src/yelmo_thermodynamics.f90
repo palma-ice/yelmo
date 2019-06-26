@@ -6,8 +6,7 @@ module yelmo_thermodynamics
     use yelmo_tools, only : smooth_gauss_2D, smooth_gauss_3D, gauss_values
     
     use thermodynamics 
-    use icetemp  
-    use enthalpy 
+    use ice_enthalpy
     
     implicit none
     
@@ -62,7 +61,7 @@ contains
 
         ! Calculate the pressure-corrected melting point (in Kelvin)
         do k = 1, thrm%par%nz_aa
-            thrm%now%T_pmp(:,:,k) = calc_T_pmp(tpo%now%H_ice,thrm%par%zeta_aa(k),T0)
+            thrm%now%T_pmp(:,:,k) = calc_T_pmp(tpo%now%H_ice,thrm%par%zeta_aa(k),T0,T_pmp_beta)
         end do 
 
         ! Calculate internal strain heating
@@ -370,10 +369,7 @@ contains
 
         ! Define current time as unrealistic value
         par%time = 1000000000   ! [a] 1 billion years in the future
-
-        ! Initialize enthalpy tables
-        call enthalpy_init_tables() 
-
+        
         return
 
     end subroutine ytherm_par_load

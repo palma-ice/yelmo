@@ -4,15 +4,14 @@ module thermodynamics
     ! Note: once icetemp is working well, this module could be 
     ! remerged into icetemp as one module. 
 
-    use yelmo_defs, only : prec, dp, sec_year, pi, T0, g, rho_ice, rho_sw, rho_w
+    use yelmo_defs, only : prec, sec_year, pi, T0, g, rho_ice, rho_sw, rho_w, L_ice, T_pmp_beta 
 
     implicit none 
-
-    real(prec), parameter :: L_ice = 3.35e5       ! Specific latent heat of fusion of ice [J Kg-1]
 
     private  
 
     public :: calc_bmb_grounded
+    public :: calc_bmb_grounded_enth
     public :: calc_advec_vertical_column
     public :: calc_advec_horizontal_column
     public :: calc_strain_heating
@@ -30,8 +29,7 @@ module thermodynamics
     
 contains
 
-    elemental subroutine calc_bmb_grounded(bmb_grnd,T_prime_b,dTdz_b,kt_b,rho_ice, &
-                                                 Q_b,Q_geo_now,f_grnd)
+    elemental subroutine calc_bmb_grounded(bmb_grnd,T_prime_b,Q_ice_b,Q_b,Q_geo_now,f_grnd,rho_ice)
         ! Calculate everywhere there is at least some grounded ice 
         ! (centered aa node calculation)
 
@@ -43,14 +41,12 @@ contains
         
         real(prec), intent(OUT) :: bmb_grnd          ! [m/a ice equiv.] Basal mass balance, grounded
         real(prec), intent(IN)  :: T_prime_b         ! [K] Basal ice temp relative to pressure melting point (ie T_prime_b=0 K == temperate)
-        real(prec), intent(IN)  :: dTdz_b            ! [K/m] Gradient of temperature in ice, basal layer
-        real(prec), intent(IN)  :: kt_b              ! [J a-1 m-1 K-1] Heat conductivity in ice, basal layer 
-        real(prec), intent(IN)  :: rho_ice           ! [kg m-3] Ice density 
+        real(prec), intent(IN)  :: Q_ice_b           ! [J a-1 m-2] Ice basal heat flux (positive up)
         real(prec), intent(IN)  :: Q_b               ! [J a-1 m-2] Basal heat production from friction and strain heating
         real(prec), intent(IN)  :: Q_geo_now         ! [J a-1 m-2] Geothermal heat flux 
         real(prec), intent(IN)  :: f_grnd            ! [--] Grounded fraction (centered aa node)                 
-        !real(prec), intent(IN)  :: kt_m              ! [J a-1 m-1 K-1] Heat conductivity in mantle (lithosphere) 
-
+        real(prec), intent(IN)  :: rho_ice           ! [kg m-3] Ice density 
+        
         ! Local variables
         real(prec) :: coeff 
         real(prec), parameter :: tol = 1e-10  
@@ -63,22 +59,8 @@ contains
         if ( f_grnd .gt. 0.0 .and. T_prime_b .eq. 0.0_prec) then 
             ! Bed is grounded and temperate, calculate basal mass balance  
 
-!                 if (cond_bed) then 
-!                     ! Following grisli formulation: 
-                    
-!                     bmb_grnd = -1.0_prec/(rho_ice*L_ice)* ( Q_b + kt_b*dTdz_b - kt_m*dTrdz_b ) 
-
-!                 else
-!                     ! Classic Cuffey and Patterson (2010) formula 
-
-!                     bmb_grnd = -1.0_prec/(rho_ice*L_ice)* ( Q_b + kt_b*dTdz_b + (Q_geo_now) ) 
-
-!                 end if 
-            
-!             bmb_grnd = -1.0_prec/(rho_ice*L_ice)* ( Q_b + kt_b*dTdz_b - kt_m*dTrdz_b )
-            
             ! Classic Cuffey and Patterson (2010) formula
-            bmb_grnd = -1.0_prec/(rho_ice*L_ice)* ( Q_b + kt_b*dTdz_b + Q_geo_now )
+            bmb_grnd = -1.0_prec/(rho_ice*L_ice)* ( Q_b + Q_ice_b + Q_geo_now )
 
         else 
             ! No basal mass change possible if bed is not temperate 
@@ -93,6 +75,55 @@ contains
         return 
 
     end subroutine calc_bmb_grounded 
+
+    elemental subroutine calc_bmb_grounded_enth(bmb_grnd,enth_b,enth_pmp_b,Q_ice_b,Q_b,Q_geo_now,f_grnd,rho_ice)
+        ! Calculate everywhere there is at least some grounded ice 
+        ! (centered aa node calculation)
+
+        ! Note: calculated bmb_grounded here as if the ice point is fully grounded, 
+        ! bmb_grnd and bmb_shlf will then be weighted average using f_grnd externally
+        ! (to allow ice topography to evolve with different time steps)
+
+        implicit none 
+        
+        real(prec), intent(OUT) :: bmb_grnd          ! [m/a ice equiv.] Basal mass balance, grounded
+        real(prec), intent(IN)  :: enth_b            ! [J m-3] Basal ice enthalpy
+        real(prec), intent(IN)  :: enth_pmp_b        ! [J m-3] Basal enthalpy at pressure melting point 
+        real(prec), intent(IN)  :: Q_ice_b           ! [J a-1 m-2] Conductive heat flux to the base (positive down)
+        real(prec), intent(IN)  :: Q_b               ! [J a-1 m-2] Basal heat production from friction and strain heating (postive up)
+        real(prec), intent(IN)  :: Q_geo_now         ! [J a-1 m-2] Geothermal heat flux (positive up)
+        real(prec), intent(IN)  :: f_grnd            ! [--] Grounded fraction (centered aa node)                 
+        real(prec), intent(IN)  :: rho_ice           ! [kg m-3] Ice density 
+        
+        ! Local variables
+        real(prec) :: net_enth
+        real(prec) :: Q_net  
+        real(prec), parameter :: tol = 1e-5  
+        
+        if (f_grnd .gt. 0.0) then 
+            ! Grounded point 
+
+            ! Calculate enthalpy at the base relative to pressure melting point 
+            net_enth = enth_b - enth_pmp_b  
+
+            ! Calculate net energy flux at the base [J a-1 m-2]
+            Q_net = Q_b + Q_ice_b + Q_geo_now
+            
+            bmb_grnd = - Q_net /(rho_ice*L_ice - net_enth)
+
+        else 
+            ! Floating point, no grounded bmb 
+
+            bmb_grnd = 0.0_prec 
+
+        end if 
+
+        ! Limit small values to avoid underflow errors 
+        if (abs(bmb_grnd) .lt. tol) bmb_grnd = 0.0_prec 
+
+        return 
+
+    end subroutine calc_bmb_grounded_enth 
 
     subroutine calc_advec_vertical_column(advecz,Q,uz,H_ice,zeta_aa)
         ! Calculate vertical advection term advecz, which enters
@@ -484,7 +515,7 @@ contains
 
     end function calc_thermal_conductivity
     
-    elemental function calc_T_pmp(H_ice,zeta,T0) result(T_pmp)
+    elemental function calc_T_pmp(H_ice,zeta,T0,beta) result(T_pmp)
         ! Greve and Blatter (Chpt 4, pg 54), Eq. 4.13
         ! This gives the pressure-corrected melting point of ice
         ! where H_ice*(1-zeta) is the thickness of ice overlying the current point 
@@ -493,21 +524,22 @@ contains
 
         real(prec), intent(IN) :: H_ice  ! [m] Total ice thickness of this point
         real(prec), intent(IN) :: zeta   ! [-] Fractional height of this point within the ice
-        real(prec), intent(IN) :: T0     ! [K] Reference freezing point of water (273.15 K)
+        real(prec), intent(IN) :: T0     ! [K] Reference freezing point of water (e.g., 273.15 K or 0 C)
+        real(prec), intent(IN) :: beta   ! [K Pa^-1] Melting point gradient with pressure
         real(prec) :: T_pmp              ! [K] Pressure corrected melting point
 
         ! Local variables
-        real(prec) :: depth   
-        real(prec), parameter :: beta1 = 8.74e-4    ! [K m^-1]   beta1 = (beta*rho*g), beta=9.8e-8 [K Pa^-1]
-        !real(prec), parameter :: beta1 = 8.66e-4    ! [K m^-1]   EISMINT2 value
-        
+        real(prec) :: depth
+
+!         real(prec), parameter :: beta = 9.8e-8 [K Pa^-1]      ! Greve and Blatter (2009) 
+!         real(prec), parameter :: beta = 9.7e-8 [K Pa^-1]      ! EISMINT2 value (beta1 = 8.66e-4 [K m^-1])
+!         real(prec), parameter :: beta = 7.9e-8 [K Pa^-1]      ! Kleiner et al. (2015)
+
         ! Get thickness of ice above current point
         depth = H_ice*(1.0-zeta)
 
         ! Calculate the pressure-corrected melting point
-        T_pmp = T0 - beta1*depth
-
-        ! ajr: note: should we account here for whether ice is floating or not, changing the pressure? 
+        T_pmp = T0 - (beta*rho_ice*g)*depth
         
         return 
 
@@ -620,7 +652,7 @@ contains
             if (H_ice(i,j) .gt. 0.0) then
                 ! Ice is present, define linear temperature profile with frozen bed (-10 degC)
                  
-                T_base       = calc_T_pmp(H_ice(i,j),zeta_aa(1),T0) - 10.0 
+                T_base       = calc_T_pmp(H_ice(i,j),zeta_aa(1),T0,T_pmp_beta) - 10.0 
                 T_ice(i,j,:) = calc_temp_linear_column(T_srf(i,j),T_base,T0,zeta_aa)
 
             else 
@@ -632,7 +664,7 @@ contains
             ! Calculate enthalpy as well for all layers 
             ! TO DO !
             !do k = 1, nz_aa
-            !    T_pmp = calc_T_pmp(H_ice(i,j),zeta_aa(k),T0)
+            !    T_pmp = calc_T_pmp(H_ice(i,j),zeta_aa(k),T0,T_pmp_beta)
             !    enth_ice(i,j,k) = enth_fct_temp_omega(T_ice(i,j,k)-T_pmp, 0.0_prec)   ! Assume zero water content
             !end do 
 

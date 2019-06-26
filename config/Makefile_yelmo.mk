@@ -34,16 +34,13 @@ $(objdir)/calving.o: $(srcdir)/physics/calving.f90 $(objdir)/yelmo_defs.o
 $(objdir)/deformation.o: $(srcdir)/physics/deformation.f90 $(objdir)/yelmo_defs.o
 	$(FC) $(DFLAGS) $(FFLAGS) -c -o $@ $<
 
-$(objdir)/enthalpy.o : $(srcdir)/physics/enthalpy.f90 $(objdir)/yelmo_defs.o
-	$(FC) $(DFLAGS) $(FFLAGS) -c -o $@ $<
-
 $(objdir)/thermodynamics.o : $(srcdir)/physics/thermodynamics.f90 $(objdir)/yelmo_defs.o $(objdir)/gaussian_filter.o
 	$(FC) $(DFLAGS) $(FFLAGS) -c -o $@ $<
 
-$(objdir)/iceage.o : $(srcdir)/physics/iceage.f90 $(objdir)/yelmo_defs.o $(objdir)/solver_tridiagonal.o
+$(objdir)/ice_age.o : $(srcdir)/physics/ice_age.f90 $(objdir)/yelmo_defs.o $(objdir)/solver_tridiagonal.o
 	$(FC) $(DFLAGS) $(FFLAGS) -c -o $@ $<
 
-$(objdir)/icetemp.o : $(srcdir)/physics/icetemp.f90 $(objdir)/yelmo_defs.o \
+$(objdir)/ice_enthalpy.o : $(srcdir)/physics/ice_enthalpy.f90 $(objdir)/yelmo_defs.o \
 					  $(objdir)/solver_tridiagonal.o $(objdir)/thermodynamics.o
 	$(FC) $(DFLAGS) $(FFLAGS) -c -o $@ $<
 
@@ -104,13 +101,11 @@ $(objdir)/yelmo_dynamics.o: $(srcdir)/yelmo_dynamics.f90 $(objdir)/yelmo_defs.o 
 	$(FC) $(DFLAGS) $(FFLAGS) -c -o $@ $<
 
 $(objdir)/yelmo_material.o: $(srcdir)/yelmo_material.f90 $(objdir)/yelmo_defs.o $(objdir)/deformation.o \
-							$(objdir)/iceage.o 
+							$(objdir)/ice_age.o 
 	$(FC) $(DFLAGS) $(FFLAGS) -c -o $@ $<
 
 $(objdir)/yelmo_thermodynamics.o: $(srcdir)/yelmo_thermodynamics.f90 $(objdir)/yelmo_defs.o \
-								  $(objdir)/icetemp.o \
-								  $(objdir)/thermodynamics.o \
-								  $(objdir)/enthalpy.o
+								  $(objdir)/ice_enthalpy.o $(objdir)/thermodynamics.o
 	$(FC) $(DFLAGS) $(FFLAGS) -c -o $@ $<
 
 $(objdir)/yelmo_boundaries.o: $(srcdir)/yelmo_boundaries.f90 $(objdir)/yelmo_defs.o $(objdir)/ncio.o
@@ -168,10 +163,9 @@ yelmo_physics =  	   $(objdir)/basal_dragging.o \
 					   $(objdir)/grounding_line_flux.o \
 					   $(objdir)/calving.o \
 					   $(objdir)/deformation.o \
-					   $(objdir)/enthalpy.o \
 					   $(objdir)/thermodynamics.o \
-					   $(objdir)/iceage.o \
-					   $(objdir)/icetemp.o \
+					   $(objdir)/ice_age.o \
+					   $(objdir)/ice_enthalpy.o \
 					   $(objdir)/mass_conservation.o \
 					   $(objdir)/mass_conservation_impl_sico.o \
 					   $(objdir)/solver_ssa_sico5.o \
@@ -202,7 +196,6 @@ yelmo_tests = 		   $(objdir)/ice_benchmarks.o \
 yelmo_thermo =         $(objdir)/yelmo_defs.o \
 					   $(objdir)/yelmo_grid.o \
 	                   $(objdir)/yelmo_tools.o \
-			 		   $(objdir)/enthalpy.o \
-					   $(objdir)/thermodynamics.o \
-					   $(objdir)/icetemp.o
+			 		   $(objdir)/thermodynamics.o \
+					   $(objdir)/ice_enthalpy.o
 

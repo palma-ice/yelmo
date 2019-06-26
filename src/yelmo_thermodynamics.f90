@@ -3,7 +3,7 @@ module yelmo_thermodynamics
 
     use nml 
     use yelmo_defs 
-    use yelmo_tools, only : smooth_gauss_2D, smooth_gauss_3D, gauss_values
+    use yelmo_tools, only : smooth_gauss_2D, smooth_gauss_3D, gauss_values, fill_borders_3D
     
     use thermodynamics 
     use ice_enthalpy
@@ -100,7 +100,7 @@ contains
             select case(trim(thrm%par%method))
 
                 case("enth","temp") 
-                    ! Perform temperature solving via advection-diffusion equation
+                    ! Perform enthalpy/temperature solving via advection-diffusion equation
                     
                     call calc_ytherm_enthalpy_3D(thrm%now%enth,thrm%now%T_ice,thrm%now%omega,thrm%now%bmb_grnd,thrm%now%Q_ice_b, &
                                 thrm%now%H_cts,thrm%now%T_pmp,thrm%now%cp,thrm%now%kt,dyn%now%ux,dyn%now%uy,dyn%now%uz,thrm%now%Q_strn, &
@@ -114,6 +114,10 @@ contains
                                        bnd%Q_geo,bnd%T_srf,tpo%now%H_ice,bnd%H_w,bnd%smb, &
                                        thrm%now%bmb_grnd,tpo%now%f_grnd,thrm%par%zeta_aa,cold=.FALSE.)
 
+                    ! Also populate enthalpy 
+                    call convert_to_enthalpy(thrm%now%enth,thrm%now%T_ice,thrm%now%omega,thrm%now%T_pmp, &
+                                            thrm%now%cp,rho_ice,rho_w,L_ice)
+
                 case("robin-cold")
                     ! Use Robin solution for ice temperature averaged with cold linear profile
                     ! to ensure cold ice at the base
@@ -122,11 +126,19 @@ contains
                                        bnd%Q_geo,bnd%T_srf,tpo%now%H_ice,bnd%H_w,bnd%smb, &
                                        thrm%now%bmb_grnd,tpo%now%f_grnd,thrm%par%zeta_aa,cold=.TRUE.)
 
+                    ! Also populate enthalpy 
+                    call convert_to_enthalpy(thrm%now%enth,thrm%now%T_ice,thrm%now%omega,thrm%now%T_pmp, &
+                                            thrm%now%cp,rho_ice,rho_w,L_ice)
+
                 case("linear")
                     ! Use linear solution for ice temperature
 
                     ! Calculate the ice temperature (eventually water content and enthalpy too)
                     call define_temp_linear_3D(thrm%now%T_ice,thrm%par%zeta_aa,tpo%now%H_ice,bnd%T_srf)
+
+                    ! Also populate enthalpy 
+                    call convert_to_enthalpy(thrm%now%enth,thrm%now%T_ice,thrm%now%omega,thrm%now%T_pmp, &
+                                            thrm%now%cp,rho_ice,rho_w,L_ice)
 
                 case("fixed") 
                     ! Pass - do nothing, use the temperature field as it is defined
@@ -195,7 +207,7 @@ contains
         real(prec), intent(IN)    :: cr             ! [--] Conductivity ratio for temperate ice (kappa_temp = enth_cr*kappa_cold)
         real(prec), intent(IN)    :: dt             ! [a] Time step 
         real(prec), intent(IN)    :: dx             ! [a] Horizontal grid step 
-        character(len=56), intent(IN) :: solver     ! "enth" or "temp" 
+        character(len=*), intent(IN) :: solver      ! "enth" or "temp" 
 
         ! Local variables
         integer :: i, j, k, nx, ny, nz_aa, nz_ac  
@@ -287,29 +299,20 @@ contains
                 !call calc_advec_horizontal_column(advecxy,T_ice_old,H_ice,ux,uy,dx,i,j)
                 call calc_advec_horizontal_column(advecxy,T_ice_old,H_ice,ux,uy,dx,i,j)
                 
-!                 call calc_temp_column(T_ice(i,j,:),bmb_grnd(i,j),dTdz_b(i,j),T_pmp(i,j,:),cp(i,j,:),ct(i,j,:), &
-!                             uz(i,j,:),Q_strn(i,j,:),advecxy,Q_b(i,j),Q_geo(i,j),T_srf(i,j),T_shlf,H_ice_now, &
-!                             H_w(i,j),f_grnd(i,j),zeta_aa,zeta_ac,dzeta_a,dzeta_b,dt)
+                call calc_enth_column(enth(i,j,:),T_ice(i,j,:),omega(i,j,:),bmb_grnd(i,j),Q_ice_b(i,j),H_cts(i,j), &
+                        T_pmp(i,j,:),cp(i,j,:),kt(i,j,:),advecxy,uz(i,j,:),Q_strn(i,j,:),Q_b(i,j),Q_geo(i,j),T_srf(i,j), &
+                        T_shlf,H_ice_now,H_w(i,j),f_grnd(i,j),zeta_aa,zeta_ac,dzeta_a,dzeta_b,cr,T0,dt,trim(solver))
                 
-!                 call calc_enth_column(enth,T_ice,omega,bmb_grnd,Q_ice_b,H_cts,T_pmp,cp,kt,advecxy,uz,Q_strn,Q_b,Q_geo, &
-!                     T_srf,T_shlf,H_ice,H_w,f_grnd,zeta_aa,zeta_ac,dzeta_a,dzeta_b,cr,T0,dt,solver)
-
             end if 
 
         end do 
         end do 
 
         ! Fill in borders 
-        T_ice(2,:,:)    = T_ice(3,:,:) 
-        T_ice(1,:,:)    = T_ice(3,:,:) 
-        T_ice(nx-1,:,:) = T_ice(nx-2,:,:) 
-        T_ice(nx,:,:)   = T_ice(nx-2,:,:) 
-        
-        T_ice(:,2,:)    = T_ice(:,3,:) 
-        T_ice(:,1,:)    = T_ice(:,3,:) 
-        T_ice(:,ny-1,:) = T_ice(:,ny-2,:) 
-        T_ice(:,ny,:)   = T_ice(:,ny-2,:) 
-        
+        call fill_borders_3D(enth,nfill=1)
+        call fill_borders_3D(T_ice,nfill=1)
+        call fill_borders_3D(omega,nfill=1)
+
         return 
 
     end subroutine calc_ytherm_enthalpy_3D
@@ -369,7 +372,7 @@ contains
 
         ! Define current time as unrealistic value
         par%time = 1000000000   ! [a] 1 billion years in the future
-        
+
         return
 
     end subroutine ytherm_par_load

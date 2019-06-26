@@ -25,12 +25,13 @@ module yelmo_tools
 
     public :: mean_mask
     public :: minmax
-    public :: fill_borders 
+    public :: fill_borders_2D
+    public :: fill_borders_3D 
     
     public :: smooth_gauss_2D
     public :: smooth_gauss_3D
     public :: gauss_values
-    
+
     ! Integration functions
     public :: test_integration
     public :: integrate_trapezoid1D_pt
@@ -632,7 +633,7 @@ contains
 
     end subroutine minmax 
 
-    subroutine fill_borders(var,nfill)
+    subroutine fill_borders_2D(var,nfill)
 
         implicit none 
 
@@ -655,7 +656,33 @@ contains
 
         return 
 
-    end subroutine fill_borders
+    end subroutine fill_borders_2D
+
+    subroutine fill_borders_3D(var,nfill)
+        ! 3rd dimension is not filled (should be vertical dimension)
+
+        implicit none 
+
+        real(prec), intent(INOUT) :: var(:,:,:) 
+        integer,    intent(IN)    :: nfill        ! How many neighbors to fill in 
+
+        ! Local variables 
+        integer :: i, j, nx, ny, q 
+        
+        nx = size(var,1)
+        ny = size(var,2)
+
+        do q = 1, nfill 
+            var(q,:,:)      = var(nfill+1,:,:)      
+            var(nx-q+1,:,:) = var(nx-nfill,:,:)   
+            
+            var(:,q,:)      = var(:,nfill+1,:)     
+            var(:,ny-q+1,:) = var(:,ny-nfill,:)  
+        end do 
+
+        return 
+
+    end subroutine fill_borders_3D
 
     subroutine smooth_gauss_3D(var,mask_apply,dx,n_smooth,mask_use)
 

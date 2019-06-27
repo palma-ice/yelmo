@@ -1171,6 +1171,7 @@ contains
 
 
                     if (dyn%now%C_bed(i,j).lt.dyn%par%C_bed_min) dyn%now%C_bed(i,j) = dyn%par%C_bed_min
+		
   
                 end do 
                 end do 

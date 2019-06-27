@@ -1,3 +1,4 @@
+
 module yelmo_defs
     
     use nml 
@@ -16,6 +17,7 @@ module yelmo_defs
 
     ! Choose the precision of the library (sp,dp)
     integer,  parameter :: prec = sp 
+!mmr    integer,  parameter :: prec = dp 
 
     ! Missing value and aliases
     real(prec), parameter :: MISSING_VALUE_DEFAULT = real(-9999.0,prec)
@@ -757,6 +759,7 @@ contains
         ! Local variables
         integer    :: ntot, n 
         real(4)    :: cpu_time1      ! [sec]
+!mmr        real(prec)    :: cpu_time1      ! [sec]
         real(prec) :: rate_now 
 
         ! Get current time 

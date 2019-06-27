@@ -42,6 +42,7 @@ contains
         integer    :: ntt
         logical    :: iter_exit 
         real(4)    :: cpu_start_time 
+ !mmr       real(prec)    :: cpu_start_time 
 
         real(prec), parameter :: time_tol = 1e-5
 
@@ -287,7 +288,7 @@ contains
         dom%par%dt_diff  = 0.0 
         dom%par%dt_adv3D = 0.0 
 
-        write(*,*) "yelmo_init:: yelmo intialized."
+        write(*,*) "yelmo_init:: yelmo initialized."
         
         ! == topography ==
 
@@ -439,12 +440,21 @@ contains
             ! Update regional calculations (for now entire domain with ice)
             call calc_yregions(dom%reg,dom%tpo,dom%dyn,dom%thrm,dom%mat,dom%bnd,mask=dom%bnd%ice_allowed)
 
+!mmr
+           print*,'hola init topo '
+!mmr
+
+
         else 
             ! Add code to load previously stopped run
 
-            stop "Restart files not yet tested!" 
+!mmr            stop "Restart files not yet tested!" 
             
             call yelmo_restart_read_1(dom,trim(dom%par%restart),time)  ! ## TO DO ##
+
+!mmr
+           print*,'hola restart read_1'
+!mmr
 
         end if 
 
@@ -507,14 +517,23 @@ contains
             call calc_ydyn(dom%dyn,dom%tpo,dom%mat,dom%thrm,dom%bnd,time)
 
             ! Calculate material information again with updated dynamics
+        
             call calc_ymat(dom%mat,dom%tpo,dom%dyn,dom%thrm,dom%bnd,time)
+
+!mmr
+           print*,'hola init state '
+!mmr
             
+
         else 
             ! Add code to load previously stopped run
 
-            stop "Restart files not yet tested!" 
+!mmr             stop "Restart files not yet tested!" 
             
             call yelmo_restart_read_2(dom,trim(dom%par%restart),time)  ! ## TO DO ##
+!mmr
+           print*,'hola restart read_2'
+!mmr
 
         end if 
 

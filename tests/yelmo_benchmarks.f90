@@ -16,8 +16,10 @@ program yelmo_benchmarks
 
     type(bueler_test_type) :: buel 
     
-    character(len=56)  :: domain 
-    character(len=256) :: outfldr, file2D, file1D, file_compare
+    character(len=56)  :: domain    
+!mmr  character(len=256) :: outfldr, file2D, file1D, file_compare
+    character(len=256) :: outfldr, file2D, file1D, file_compare, file_restart
+!mmr
     character(len=512) :: path_par, path_const 
     character(len=56)  :: experiment
     logical            :: with_ssa  
@@ -48,6 +50,9 @@ program yelmo_benchmarks
     file1D       = trim(outfldr)//"yelmo1D.nc"
     file2D       = trim(outfldr)//"yelmo2D.nc"
     file_compare = trim(outfldr)//"yelmo_compare.nc"
+! mmr
+    file_restart = trim(outfldr)//"yelmo_restart.nc"  
+! mmr 
     
     ! Define the domain, grid and experiment from parameter file
     call nml_read(path_par,"eismint","domain",       domain)        ! EISMINT1, EISMINT2
@@ -109,15 +114,30 @@ program yelmo_benchmarks
     ! Next define grid 
     call yelmo_init_grid(yelmo1%grd,grid_name,units="km",dx=dx,nx=nx,dy=dx,ny=nx)
 
+
+!mmr
+    print*,'hola into init'
+!mmr
+
     ! Initialize data objects (without loading topography, which will be defined inline below)
     call yelmo_init(yelmo1,filename=path_par,grid_def="none",time=time_init,load_topo=.FALSE.,domain=domain,grid_name=grid_name)
     
+!mmr
+    print*,'hola out of ini', yelmo1%tpo%now%H_ice
+    print*,'hola kk'
+!mmr
+
     ! Update parameter values with EISMINT choices 
     yelmo1%dyn%par%use_ssa    = with_ssa 
     yelmo1%tpo%par%topo_fixed = topo_fixed 
 
+
+    print*,'hola bueler'
+
     ! Initialize Bueler test type 
     call bueler_init(buel,yelmo1%grd%nx,yelmo1%grd%ny)
+
+    print*,'hola adios bueler'
 
     ! === Define initial topography =====
 
@@ -135,8 +155,9 @@ program yelmo_benchmarks
         case DEFAULT 
             ! EISMINT1, EISMINT2, BUELER 
 
-            yelmo1%bnd%z_bed      = 0.0 
-            yelmo1%tpo%now%H_ice  = 0.0
+!mmr            yelmo1%bnd%z_bed      = 0.0 
+!mmr            yelmo1%tpo%now%H_ice  = 0.0
+	print*,'hereiam'
             yelmo1%tpo%now%z_srf  = yelmo1%bnd%z_bed + yelmo1%tpo%now%H_ice 
             
     end select 
@@ -191,6 +212,7 @@ program yelmo_benchmarks
             ! Initialize BUELER-B 
             call bueler_test_BC(buel%H_ice,buel%mbal,buel%u_b,yelmo1%grd%x,yelmo1%grd%y, &
                         time=0.0,R0=750.0_prec,H0=3600.0_prec,lambda=0.0_prec,n=3.0_prec,A=1e-16_prec,rho_ice=rho_ice,g=g)
+!mmr                        time=0.0_prec,R0=750.0_prec,H0=3600.0_prec,lambda=0.0_prec,n=3.0_prec,A=1e-16_prec,rho_ice=rho_ice,g=g)
 
             yelmo1%bnd%T_srf = 223.15 
             yelmo1%bnd%Q_geo = 42.0 
@@ -208,6 +230,7 @@ program yelmo_benchmarks
             ! Initialize BUELER-B (but with HALFAR conditions)
             call bueler_test_BC(buel%H_ice,buel%mbal,buel%u_b,yelmo1%grd%x,yelmo1%grd%y, &
                         time=0.0,R0=21.2132_prec,H0=707.1_prec,lambda=0.0_prec,n=3.0_prec,A=1e-16_prec,rho_ice=rho_ice,g=g)
+!mmr                        time=0.0_prec,R0=21.2132_prec,H0=707.1_prec,lambda=0.0_prec,n=3.0_prec,A=1e-16_prec,rho_ice=rho_ice,g=g)
 
             yelmo1%bnd%T_srf = 223.15 
             yelmo1%bnd%Q_geo = 42.0 
@@ -225,6 +248,7 @@ program yelmo_benchmarks
             ! Initialize BUELER-B (but with conditions between Bueler-B and HALFAR - not too big, not too small)
             call bueler_test_BC(buel%H_ice,buel%mbal,buel%u_b,yelmo1%grd%x,yelmo1%grd%y, &
                         time=0.0,R0=200.0_prec,H0=3000.0_prec,lambda=0.0_prec,n=3.0_prec,A=1e-16_prec,rho_ice=rho_ice,g=g)
+!mmr                        time=0.0_prec,R0=200.0_prec,H0=3000.0_prec,lambda=0.0_prec,n=3.0_prec,A=1e-16_prec,rho_ice=rho_ice,g=g)
 
             yelmo1%bnd%T_srf = 223.15 
             yelmo1%bnd%Q_geo = 42.0 
@@ -270,6 +294,10 @@ program yelmo_benchmarks
     ! Initialize state variables (dyn,therm,mat)
     call yelmo_init_state(yelmo1,path_par,time=time_init,thrm_method="robin")
 
+!mmr
+!mmr    print*,'hola H_ice' !, yelmo1%tpo%now%H_ice
+!mmr
+
     ! == Write initial state ==
      
     ! 2D file 
@@ -288,6 +316,11 @@ program yelmo_benchmarks
         ! Set yelmo parameter to fix dynamics
         yelmo1%dyn%par%solver = "fixed"
     end if 
+
+
+!mmr
+!mmr    print*,'hola H_ice' !, yelmo1%tpo%now%H_ice
+!mmr
 
 
     ! Advance timesteps
@@ -357,6 +390,9 @@ program yelmo_benchmarks
 
     end do 
 
+
+
+
     ! Write summary 
     write(*,*) "====== "//trim(domain)//"-"//trim(experiment)//" ======="
     write(*,*) "nz_aa, H0 = ", yelmo1%par%nz_aa, maxval(yelmo1%tpo%now%H_ice)
@@ -371,6 +407,12 @@ program yelmo_benchmarks
         case DEFAULT 
         ! Pass- not a bueler test... 
     end select 
+
+
+! mmr
+    ! Write restart file 
+    call yelmo_restart_write(yelmo1,file_restart,time=time)
+! mmr
 
     ! Finalize program
     call yelmo_end(yelmo1,time=time)
@@ -512,6 +554,7 @@ contains
         
         call nc_write(filename,"Q_strn",ylmo%thrm%now%Q_strn/(rho_ice*ylmo%thrm%now%cp),units="K a-1",long_name="Strain heating", &
                       dim1="xc",dim2="yc",dim3="zeta",dim4="time",start=[1,1,1,n],ncid=ncid)
+
         call nc_write(filename,"Q_b",ylmo%thrm%now%Q_b,units="J a-1 m-2",long_name="Basal frictional heating", &
                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
 

@@ -54,7 +54,7 @@ contains
         real(prec), intent(IN)    :: cr             ! [--] Conductivity ratio (kappa_water / kappa_ice)
         real(prec), intent(IN)    :: T0             ! [K or degreesCelcius] Reference melting temperature  
         real(prec), intent(IN)    :: dt             ! [a] Time step 
-        character(len=12), intent(IN) :: solver     ! "enth" or "temp" 
+        character(len=*), intent(IN) :: solver     ! "enth" or "temp" 
         
         ! Local variables 
         integer    :: k, nz_aa, nz_ac

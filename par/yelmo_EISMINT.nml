@@ -115,8 +115,9 @@
 &ymat
     flow_law                = "glen"
     rf_method               = 0         ! -1: set externally; 0: rf_const everywhere; 1: standard function 
-    rf_const                = 1e-16     ! [Pa^-3 a^-1]
-    rf_use_eismint2         = True      ! Only applied for rf_method=1
+    rf_const                = 1e-16     ! [Pa^-3 a^-1] Constant value for rf when rf_method=0
+    rf_use_eismint2         = True      ! Only applied for rf_method=1, use EISMINT2 rf constants
+    rf_with_water           = False     ! Only applied for rf_method=1, scale rf by water content?
     n_glen                  = 3.0 
     visc_min                = 1e3 
     use_2D_enh              = False 
@@ -130,7 +131,7 @@
 /
 
 &ytherm
-    method         = "temp"             ! "fixed", "robin", "temp", "enth"
+    method         = "enth"             ! "fixed", "robin", "temp", "enth"
     gamma          = 1.0                ! [K] Scalar for the pressure melting point decay function 
     use_strain_sia = False              ! True: calculate strain heating from SIA approx.
     n_sm_qstrn     = 0                  ! [-] Standard deviation in gridpoints for Gaussian smoothing of strain heating (0==no smoothing)

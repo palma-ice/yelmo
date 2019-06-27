@@ -21,6 +21,7 @@ module deformation
     public :: calc_viscosity_glen_2D
     public :: calc_rate_factor
     public :: calc_rate_factor_eismint
+    public :: scale_rate_factor_water
     public :: calc_rate_factor_inverted
     public :: calc_rate_factor_integrated
     public :: calc_strain_rate_2D
@@ -219,7 +220,7 @@ contains
 
         real(prec), intent(IN) :: T_ice     ! [K]  Ice temperature
         real(prec), intent(IN) :: T_pmp     ! [K]  Pressure-corrected melting point
-        real(prec), intent(IN) :: enh       !  [--] Enhancement factor 
+        real(prec), intent(IN) :: enh       ! [--] Enhancement factor 
         real(prec) :: ATT                   ! [a^-1 Pa^-3]
 
         ! Local variables
@@ -244,6 +245,25 @@ contains
 
     end function calc_rate_factor_eismint 
     
+    elemental subroutine scale_rate_factor_water(ATT,omega)
+        ! This routine scales the rate factor when 
+        ! water content (omega) is present, ie, when
+        ! the rate factor is for T_pmp 
+        ! Parameterization following Greve and Blatter (2016) Eq. 14,
+        ! following Lliboutry and Duval (1985):
+        ! A = A(melting_temp)*(1.18125*omega*100)
+
+        implicit none 
+
+        real(prec), intent(INOUT) :: ATT        ! [a^-1 Pa^-3] Rate factor
+        real(prec), intent(IN)    :: omega      ! [--] Water content fraction
+
+        if (omega .gt. 0.0) ATT = ATT * (1.0+181.25*omega)
+
+        return 
+
+    end subroutine scale_rate_factor_water
+
     elemental function calc_rate_factor_inverted(ATT,n_glen) result(BTT)
         ! BTT  => from Greve and Blatter (2009), Eq. 4.35 (written as `B(T_prime)`)
         ! ajr, currently not used, instead ATT**(1/n_glen) is used directly in subroutines 

@@ -117,7 +117,8 @@
     flow_law                = "glen"
     rf_method               = 1         ! -1: set externally; 0: rf_const everywhere; 1: standard function 
     rf_const                = 1e-16     ! [Pa^-3 a^-1]
-    rf_use_eismint2         = True      ! Only applied for rf_method=1
+    rf_use_eismint2         = True      ! Only applied for rf_method=1, use EISMINT2 rf constants
+    rf_with_water           = False     ! Only applied for rf_method=1, scale rf by water content?
     n_glen                  = 3.0 
     visc_min                = 1e3 
     use_2D_enh              = False 

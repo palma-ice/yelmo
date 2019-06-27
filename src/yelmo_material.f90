@@ -124,7 +124,7 @@ contains
                 mat%now%ATT_bar = mat%par%rf_const 
 
             case (1) 
-                ! Calculate rate factor from ice temp. and enhancement factor 
+                ! Calculate rate factor from ice temp., enhancement factor and water content 
 
                 if (mat%par%rf_use_eismint2) then 
                     ! Use EISMINT2 (Payne et al, 2000) constants
@@ -132,6 +132,11 @@ contains
                 else 
                     ! Use Greve and Blatter (2009) constants 
                     mat%now%ATT = calc_rate_factor(thrm%now%T_ice,thrm%now%T_pmp,mat%now%enh)
+                end if 
+
+                ! Scale rate factor by water content if desired 
+                if (mat%par%rf_with_water) then 
+                    call scale_rate_factor_water(mat%now%ATT,thrm%now%omega)
                 end if 
 
                 ! Get vertically averaged value 
@@ -192,6 +197,7 @@ contains
         call nml_read(filename,"ymat","rf_method",              par%rf_method,              init=init_pars)
         call nml_read(filename,"ymat","rf_const",               par%rf_const,               init=init_pars)
         call nml_read(filename,"ymat","rf_use_eismint2",        par%rf_use_eismint2,        init=init_pars)
+        call nml_read(filename,"ymat","rf_with_water",          par%rf_with_water,          init=init_pars)
         call nml_read(filename,"ymat","n_glen",                 par%n_glen,                 init=init_pars)
         call nml_read(filename,"ymat","visc_min",               par%visc_min,               init=init_pars)
         call nml_read(filename,"ymat","use_2D_enh",             par%use_2D_enh,             init=init_pars)

@@ -325,6 +325,7 @@ module yelmo_defs
         integer    :: rf_method 
         real(prec) :: rf_const
         logical    :: rf_use_eismint2
+        logical    :: rf_with_water 
         real(prec) :: n_glen                     ! Flow law exponent (n_glen=3)
         real(prec) :: visc_min  
         logical    :: use_2D_enh

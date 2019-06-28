@@ -142,7 +142,7 @@
     use_const_kt   = True               ! Use specified constant value of heat conductivity?
     const_kt       = 6.62e7             ! [J a-1 m-1 K-1] Thermal conductivity [W m-1 K-1 * sec_year] => [J a-1 m-1 K-1]
     enth_cr        = 1e-2               ! [--] Conductivity ratio for temperate ice (kappa_temp = enth_cr*kappa_cold)
-
+    omega_max      = 0.02               ! [--] Maximum allowed water content fraction 
 /
 
 &yelmo_masks

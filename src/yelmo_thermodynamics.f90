@@ -105,7 +105,8 @@ contains
                     call calc_ytherm_enthalpy_3D(thrm%now%enth,thrm%now%T_ice,thrm%now%omega,thrm%now%bmb_grnd,thrm%now%Q_ice_b, &
                                 thrm%now%H_cts,thrm%now%T_pmp,thrm%now%cp,thrm%now%kt,dyn%now%ux,dyn%now%uy,dyn%now%uz,thrm%now%Q_strn, &
                                 thrm%now%Q_b,bnd%Q_geo,bnd%T_srf,tpo%now%H_ice,bnd%H_w,tpo%now%H_grnd,tpo%now%f_grnd,thrm%par%zeta_aa, &
-                                thrm%par%zeta_ac,thrm%par%dzeta_a,thrm%par%dzeta_b,thrm%par%enth_cr,dt,thrm%par%dx,thrm%par%method)
+                                thrm%par%zeta_ac,thrm%par%dzeta_a,thrm%par%dzeta_b,thrm%par%enth_cr,thrm%par%omega_max, &
+                                dt,thrm%par%dx,thrm%par%method)
                     
                 case("robin")
                     ! Use Robin solution for ice temperature 
@@ -116,7 +117,7 @@ contains
 
                     ! Also populate enthalpy 
                     call convert_to_enthalpy(thrm%now%enth,thrm%now%T_ice,thrm%now%omega,thrm%now%T_pmp, &
-                                            thrm%now%cp,rho_ice,rho_w,L_ice)
+                                            thrm%now%cp,L_ice)
 
                 case("robin-cold")
                     ! Use Robin solution for ice temperature averaged with cold linear profile
@@ -128,7 +129,7 @@ contains
 
                     ! Also populate enthalpy 
                     call convert_to_enthalpy(thrm%now%enth,thrm%now%T_ice,thrm%now%omega,thrm%now%T_pmp, &
-                                            thrm%now%cp,rho_ice,rho_w,L_ice)
+                                            thrm%now%cp,L_ice)
 
                 case("linear")
                     ! Use linear solution for ice temperature
@@ -138,7 +139,7 @@ contains
 
                     ! Also populate enthalpy 
                     call convert_to_enthalpy(thrm%now%enth,thrm%now%T_ice,thrm%now%omega,thrm%now%T_pmp, &
-                                            thrm%now%cp,rho_ice,rho_w,L_ice)
+                                            thrm%now%cp,L_ice)
 
                 case("fixed") 
                     ! Pass - do nothing, use the temperature field as it is defined
@@ -172,7 +173,7 @@ contains
     end subroutine calc_ytherm
 
     subroutine calc_ytherm_enthalpy_3D(enth,T_ice,omega,bmb_grnd,Q_ice_b,H_cts,T_pmp,cp,kt,ux,uy,uz,Q_strn,Q_b,Q_geo, &
-                            T_srf,H_ice,H_w,H_grnd,f_grnd,zeta_aa,zeta_ac,dzeta_a,dzeta_b,cr,dt,dx,solver)
+                            T_srf,H_ice,H_w,H_grnd,f_grnd,zeta_aa,zeta_ac,dzeta_a,dzeta_b,cr,omega_max,dt,dx,solver)
         ! This wrapper subroutine breaks the thermodynamics problem into individual columns,
         ! which are solved independently by calling calc_enth_column
 
@@ -205,6 +206,7 @@ contains
         real(prec), intent(IN)    :: dzeta_a(:)     ! d Vertical height axis (0:1) 
         real(prec), intent(IN)    :: dzeta_b(:)     ! d Vertical height axis (0:1) 
         real(prec), intent(IN)    :: cr             ! [--] Conductivity ratio for temperate ice (kappa_temp = enth_cr*kappa_cold)
+        real(prec), intent(IN)    :: omega_max      ! [--] Maximum allowed water content fraction 
         real(prec), intent(IN)    :: dt             ! [a] Time step 
         real(prec), intent(IN)    :: dx             ! [a] Horizontal grid step 
         character(len=*), intent(IN) :: solver      ! "enth" or "temp" 
@@ -301,7 +303,7 @@ contains
                 
                 call calc_enth_column(enth(i,j,:),T_ice(i,j,:),omega(i,j,:),bmb_grnd(i,j),Q_ice_b(i,j),H_cts(i,j), &
                         T_pmp(i,j,:),cp(i,j,:),kt(i,j,:),advecxy,uz(i,j,:),Q_strn(i,j,:),Q_b(i,j),Q_geo(i,j),T_srf(i,j), &
-                        T_shlf,H_ice_now,H_w(i,j),f_grnd(i,j),zeta_aa,zeta_ac,dzeta_a,dzeta_b,cr,T0,dt,trim(solver))
+                        T_shlf,H_ice_now,H_w(i,j),f_grnd(i,j),zeta_aa,zeta_ac,dzeta_a,dzeta_b,cr,omega_max,T0,dt,trim(solver))
                 
             end if 
 
@@ -345,6 +347,7 @@ contains
         call nml_read(filename,"ytherm","use_const_kt",   par%use_const_kt,     init=init_pars)
         call nml_read(filename,"ytherm","const_kt",       par%const_kt,         init=init_pars)
         call nml_read(filename,"ytherm","enth_cr",        par%enth_cr,          init=init_pars)
+        call nml_read(filename,"ytherm","omega_max",      par%omega_max,        init=init_pars)
         
         ! Set internal parameters
         par%nx  = nx

@@ -394,7 +394,8 @@ module yelmo_defs
         logical             :: use_const_kt 
         real(prec)          :: const_kt 
         real(prec)          :: enth_cr  
-
+        real(prec)          :: omega_max 
+        
         real(prec), allocatable :: zeta_aa(:)   ! Layer centers (aa-nodes), plus base and surface: nz_aa points 
         real(prec), allocatable :: zeta_ac(:)   ! Layer borders (ac-nodes), plus base and surface: nz_ac == nz_aa-1 points
 

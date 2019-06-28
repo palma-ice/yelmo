@@ -2,17 +2,17 @@
 
     domain       = "EISMINT"             ! "EISMINT"
     experiment   = "EXPA"                ! "fixed", "moving", "mismip", "EXPA", "EXPB", "EXPF","BUELER-A", "BUELER-B", "HALFAR", "HALFAR-MED"
-    dx           = 25.0                  ! [km] Grid resolution (EISMINT1 = 50km, EISMINT2 = 25km)
-    with_ssa     = True                  ! Include ssa in experiment?
+    dx           = 10.0                  ! [km] Grid resolution (EISMINT1 = 50km, EISMINT2 = 25km)
+    with_ssa     = False                 ! Include ssa in experiment?
     topo_fixed   = False                 ! Calculate the topography, or use Heiko's topo file.  
     dyn_fixed    = False                 ! Fix dynamics after first calculation? 
     topo_fixed_file = /Users/robinson/models/EURICE/yelmo/tests/heiko_imau-ice_help_fields_eismint_M_200kyr.nc
 
     ! Timing parameters 
     time_init    = 0.0                  ! [yr] Starting time 
-    time_end     = 30000.0             ! [yr] Ending time 
-    dtt          = 1.0                  ! [yr] Main loop timestep 
-    dt2D_out     = 100.0               ! [yr] Frequency of writing 2D output files 
+    time_end     = 200000.0             ! [yr] Ending time 
+    dtt          = 2.0                  ! [yr] Main loop timestep 
+    dt2D_out     = 1000.0               ! [yr] Frequency of writing 2D output files 
 
     ! Settings for transient EISMINT1 experiments 
     period       = 0.0                  ! [yr] for transient experiments (normally 0.0 yr or 20e3 yr)
@@ -118,7 +118,7 @@
     rf_method               = 1         ! -1: set externally; 0: rf_const everywhere; 1: standard function 
     rf_const                = 1e-16     ! [Pa^-3 a^-1]
     rf_use_eismint2         = True      ! Only applied for rf_method=1, use EISMINT2 rf constants
-    rf_with_water           = False     ! Only applied for rf_method=1, scale rf by water content?
+    rf_with_water           = True      ! Only applied for rf_method=1, scale rf by water content?
     n_glen                  = 3.0 
     visc_min                = 1e3 
     use_2D_enh              = False 
@@ -141,8 +141,8 @@
     const_cp       = 2009.0             ! [J kg-1 K-1] Specific heat capacity 
     use_const_kt   = True               ! Use specified constant value of heat conductivity?
     const_kt       = 6.62e7             ! [J a-1 m-1 K-1] Thermal conductivity [W m-1 K-1 * sec_year] => [J a-1 m-1 K-1]
-    enth_cr        = 1e-2               ! [--] Conductivity ratio for temperate ice (kappa_temp = enth_cr*kappa_cold)
-    omega_max      = 0.02               ! [--] Maximum allowed water content fraction 
+    enth_cr        = 1e-3               ! [--] Conductivity ratio for temperate ice (kappa_temp = enth_cr*kappa_cold)
+    omega_max      = 0.01               ! [--] Maximum allowed water content fraction 
 /
 
 &yelmo_masks

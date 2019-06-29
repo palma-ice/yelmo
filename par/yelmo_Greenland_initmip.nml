@@ -1,12 +1,11 @@
-&control
-    
-    ! Timing parameters 
-    time_init    = 0.0                  ! [yr] Starting time 
-    time_end     = 50e3                 ! [yr] Ending time
-    time_equil   = 10.0                ! [yr] Equilibration time 
-    dtt          = 0.5                  ! [yr] Main loop timestep 
-    dt1D_out     = 100.0                ! [yr] Frequency of writing 1D output files 
-    dt2D_out     = 100.0                ! [yr] Frequency of writing 2D output files 
+&control    
+    time_init       = 0.0            ! [yr] Starting time 
+    time_end        = 50e3           ! [yr] Ending time
+    time_equil      = 10.0           ! [yr] Equilibration time 
+    dtt             = 0.5            ! [yr] Main loop timestep 
+    dt1D_out        = 100.0          ! [yr] Frequency of writing 1D output files 
+    dt2D_out        = 100.0          ! [yr] Frequency of writing 2D output files 
+    bmb_shlf_const  = -10.0          ! [m/a] Basal mass balance of ice shelves
 /
 
 &yelmo

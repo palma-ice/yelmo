@@ -14,7 +14,8 @@ program yelmo_test
 
     character(len=256) :: outfldr, file1D, file2D, file_restart, domain 
     character(len=512) :: path_par, path_const  
-    real(prec) :: time_init, time_end, time_equil, time, dtt, dt1D_out, dt2D_out   
+    real(prec) :: time_init, time_end, time_equil, time, dtt, dt1D_out, dt2D_out 
+    real(prec) :: bmb_shlf_const  
     integer    :: n
     real(4) :: cpu_start_time, cpu_end_time 
 
@@ -28,12 +29,13 @@ program yelmo_test
     call yelmo_load_command_line_args(path_par)
 
     ! Timing and other parameters 
-    call nml_read(path_par,"control","time_init",    time_init)                 ! [yr] Starting time
-    call nml_read(path_par,"control","time_end",     time_end)                  ! [yr] Ending time
-    call nml_read(path_par,"control","time_equil",   time_equil)                ! [yr] Years to equilibrate first
-    call nml_read(path_par,"control","dtt",          dtt)                       ! [yr] Main loop time step 
-    call nml_read(path_par,"control","dt1D_out",     dt1D_out)                  ! [yr] Frequency of 1D output 
-    call nml_read(path_par,"control","dt2D_out",     dt2D_out)                  ! [yr] Frequency of 2D output 
+    call nml_read(path_par,"control","time_init",       time_init)                 ! [yr] Starting time
+    call nml_read(path_par,"control","time_end",        time_end)                  ! [yr] Ending time
+    call nml_read(path_par,"control","time_equil",      time_equil)                ! [yr] Years to equilibrate first
+    call nml_read(path_par,"control","dtt",             dtt)                       ! [yr] Main loop time step 
+    call nml_read(path_par,"control","dt1D_out",        dt1D_out)                  ! [yr] Frequency of 1D output 
+    call nml_read(path_par,"control","dt2D_out",        dt2D_out)                  ! [yr] Frequency of 2D output 
+    call nml_read(path_par,"control","bmb_shlf_const",  bmb_shlf_const)            ! [yr] Frequency of 2D output 
 
     ! Assume program is running from the output folder
     outfldr = "./"
@@ -58,13 +60,13 @@ program yelmo_test
     ! === Set initial boundary conditions for current time and yelmo state =====
     ! ybound: z_bed, z_sl, H_sed, H_w, smb, T_srf, bmb_shlf , Q_geo
 
-    yelmo1%bnd%z_sl     = 0.0           ! [m]
-    yelmo1%bnd%H_sed    = 0.0           ! [m]
-    yelmo1%bnd%H_w      = hyd1%now%H_w  ! [m]
-    yelmo1%bnd%Q_geo    = 50.0          ! [mW/m2]
+    yelmo1%bnd%z_sl     = 0.0               ! [m]
+    yelmo1%bnd%H_sed    = 0.0               ! [m]
+    yelmo1%bnd%H_w      = hyd1%now%H_w      ! [m]
+    yelmo1%bnd%Q_geo    = 50.0              ! [mW/m2]
     
-    yelmo1%bnd%bmb_shlf = -10.0         ! [m.i.e./a]
-    yelmo1%bnd%T_shlf   = T0            ! [K]   
+    yelmo1%bnd%bmb_shlf = bmb_shlf_const    ! [m.i.e./a]
+    yelmo1%bnd%T_shlf   = T0                ! [K]   
 
     ! Impose present-day surface mass balance and present-day temperature field
     yelmo1%bnd%smb      = yelmo1%dta%pd%smb        ! [m.i.e./a]
@@ -84,7 +86,11 @@ program yelmo_test
     where(yelmo1%dta%pd%H_ice .le. 0.0) mask_noice = .TRUE. 
 
     ! Impose additional negative mass balance to no ice points of 2 [m.i.e./a] melting
-    where(mask_noice) yelmo1%bnd%smb = yelmo1%dta%pd%smb - 2.0 
+    if (trim(yelmo1%par%domain) .eq. "Greenland") then 
+        where(mask_noice) yelmo1%bnd%smb = yelmo1%dta%pd%smb - 2.0 
+    else ! Antarctica
+        !where(mask_noice) yelmo1%bnd%bmb_shlf = yelmo1%dta%pd%bmb_shlf - 2.0 
+    end if 
 
     ! Impose a colder boundary temperature for equilibration step 
     ! -5 [K] for mimicking glacial times

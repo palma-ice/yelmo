@@ -137,9 +137,12 @@ contains
         ! ===== Calculate driving stress ==============================
 
         ! Calculate driving stress 
-        call calc_driving_stress_ac(dyn%now%taud_acx,dyn%now%taud_acy,tpo%now%H_ice,tpo%now%z_srf,bnd%z_bed,bnd%z_sl, &
-                 tpo%now%H_grnd,tpo%now%f_grnd,tpo%now%f_grnd_acx,tpo%now%f_grnd_acy,dyn%par%dx, &
-                 method=dyn%par%taud_gl_method,beta_gl_stag=dyn%par%beta_gl_stag)
+        call calc_driving_stress_ac(dyn%now%taud_acx,dyn%now%taud_acy,tpo%now%H_ice,tpo%now%dzsdx,tpo%now%dzsdy,dyn%par%dx)
+
+!         ! Additionally treat the driving stress at the grounding line 
+!         call calc_driving_stress_gl_ac(dyn%now%taud_acx,dyn%now%taud_acy,tpo%now%H_ice,tpo%now%z_srf,bnd%z_bed,bnd%z_sl, &
+!                  tpo%now%H_grnd,tpo%now%f_grnd,tpo%now%f_grnd_acx,tpo%now%f_grnd_acy,dyn%par%dx, &
+!                  method=dyn%par%taud_gl_method,beta_gl_stag=dyn%par%beta_gl_stag)
 
         ! ===== Calculate effective pressure ==============================
 
@@ -443,10 +446,13 @@ contains
         ! Update bed roughness coefficient C_bed (which is independent of velocity)
         call calc_ydyn_cbed(dyn,tpo,thrm,bnd)
         
-        ! Calculate driving stress 
-        call calc_driving_stress_ac(dyn%now%taud_acx,dyn%now%taud_acy,tpo%now%H_ice,tpo%now%z_srf,bnd%z_bed,bnd%z_sl, &
-                 tpo%now%H_grnd,tpo%now%f_grnd,tpo%now%f_grnd_acx,tpo%now%f_grnd_acy,dyn%par%dx, &
-                 method=dyn%par%taud_gl_method,beta_gl_stag=dyn%par%beta_gl_stag)
+        ! Calculate driving stress
+        call calc_driving_stress_ac(dyn%now%taud_acx,dyn%now%taud_acy,tpo%now%H_ice,tpo%now%dzsdx,tpo%now%dzsdy,dyn%par%dx)
+    
+!         ! Additionally calculate driving stress at the grounding line
+!         call calc_driving_stress_gl_ac(dyn%now%taud_acx,dyn%now%taud_acy,tpo%now%H_ice,tpo%now%z_srf,bnd%z_bed,bnd%z_sl, &
+!                  tpo%now%H_grnd,tpo%now%f_grnd,tpo%now%f_grnd_acx,tpo%now%f_grnd_acy,dyn%par%dx, &
+!                  method=dyn%par%taud_gl_method,beta_gl_stag=dyn%par%beta_gl_stag)
 
         ! Calculate 2D diffusivity too (for timestepping and diagnostics)
 !         call calc_diffusivity_2D(dyn%now%dd_ab_bar,tpo%now%H_ice,tpo%now%dzsdx,tpo%now%dzsdy, &

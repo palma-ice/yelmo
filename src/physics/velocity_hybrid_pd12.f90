@@ -17,6 +17,7 @@ module velocity_hybrid_pd12
     public :: calc_ice_flux
     public :: calc_basal_stress
     public :: calc_driving_stress_ac 
+    public :: calc_driving_stress_gl_ac
     public :: calc_visc_eff
     public :: calc_stress_eff_horizontal_squared
     public :: calc_vel_ratio
@@ -783,7 +784,77 @@ contains
 
     end subroutine calc_basal_stress
 
-    subroutine calc_driving_stress_ac(taud_acx,taud_acy,H_ice,z_srf,z_bed,z_sl,H_grnd, &
+    subroutine calc_driving_stress_ac(taud_acx,taud_acy,H_ice,dzsdx,dzsdy,dx)
+        ! taud = rho_ice*g*H_ice
+        ! Calculate driving stress on staggered grid points, with 
+        ! special treatment of the grounding line 
+        ! Units: taud [Pa] == [kg m-1 s-2]
+        
+        ! Note: interpolation to Ab nodes no longer used here.
+
+        implicit none 
+
+        real(prec), intent(OUT) :: taud_acx(:,:)
+        real(prec), intent(OUT) :: taud_acy(:,:) 
+        real(prec), intent(IN)  :: H_ice(:,:)
+        real(prec), intent(IN)  :: dzsdx(:,:)
+        real(prec), intent(IN)  :: dzsdy(:,:)
+        real(prec), intent(IN)  :: dx 
+
+        ! Local variables 
+        integer :: i, j, nx, ny 
+        real(prec) :: dy, rhog 
+        real(prec) :: H_mid
+
+        real(prec), allocatable :: Hi_ab(:,:) 
+
+        nx = size(H_ice,1)
+        ny = size(H_ice,2) 
+
+        ! Allocate Hi_ab
+        allocate(Hi_ab(nx,ny))
+
+        ! Stagger H_ice to Ab nodes:
+        ! This will be used to calculate H_mid on the acx/acy nodes,
+        ! but it should come from ab-nodes instead of ac-nodes for stability 
+        ! Note: this is disabled, as it seemed not to affect results
+!         Hi_ab = stagger_aa_ab_ice(H_ice,H_ice)
+        
+        ! Define shortcut parameter 
+        rhog = rho_ice * g 
+
+        ! Assume grid resolution is symmetrical 
+        dy = dx 
+
+        ! x-direction
+        taud_acx = 0.0_prec  
+        do j = 2, ny 
+        do i = 1, nx-1 
+!             H_mid         = 0.5_prec * (Hi_ab(i,j)+Hi_ab(i,j-1))
+            H_mid         = 0.5_prec*(H_ice(i,j)+H_ice(i+1,j)) 
+            taud_acx(i,j) = rhog * H_mid * dzsdx(i,j) 
+        end do 
+        end do 
+        taud_acx(nx,:) = taud_acx(nx-1,:) 
+        taud_acx(:,1)  = taud_acx(:,2) 
+
+        ! y-direction
+        taud_acy = 0.0_prec  
+        do j = 1, ny-1 
+        do i = 2, nx 
+!             H_mid         = 0.5_prec * (Hi_ab(i,j)+Hi_ab(i-1,j))
+            H_mid         = 0.5_prec*(H_ice(i,j)+H_ice(i,j+1))
+            taud_acy(i,j) = rhog * H_mid * dzsdy(i,j) 
+        end do 
+        end do   
+        taud_acy(:,ny) = taud_acy(:,ny-1)  
+        taud_acy(1,:)  = taud_acy(2,:)
+
+        return 
+
+    end subroutine calc_driving_stress_ac 
+
+    subroutine calc_driving_stress_gl_ac(taud_acx,taud_acy,H_ice,z_srf,z_bed,z_sl,H_grnd, &
                                       f_grnd,f_grnd_acx,f_grnd_acy,dx,method,beta_gl_stag)
         ! taud = rho_ice*g*H_ice
         ! Calculate driving stress on staggered grid points, with 
@@ -818,60 +889,16 @@ contains
         real(prec) :: H_1, H_2  
         real(prec) :: taud_old, fac_gl   
 
-        real(prec), allocatable :: Hi_ab(:,:) 
-
         real(prec), parameter :: slope_max = 0.05   ! Very high limit == 0.05, low limit < 0.01 
 
         nx = size(H_ice,1)
         ny = size(H_ice,2) 
 
-        ! Allocate Hi_ab
-        allocate(Hi_ab(nx,ny))
-
-        ! Stagger H_ice to Ab nodes:
-        ! This will be used to calculate H_mid on the acx/acy nodes,
-        ! but it should come from ab-nodes instead of ac-nodes for stability 
-        ! Note: this is disabled, as it seemed not to affect results
-        Hi_ab = stagger_aa_ab_ice(H_ice,H_ice)
-        !Hi_ab = stagger_aa_ab(H_ice)
-        
         ! Define shortcut parameter 
         rhog = rho_ice * g 
 
         ! Assume grid resolution is symmetrical 
         dy = dx 
-
-        ! === No subgrid treatment === 
-
-        ! First calculate the driving stress everywhere with no subgrid treatment
-
-        ! x-direction
-        taud_acx = 0.0_prec  
-        do j = 2, ny 
-        do i = 1, nx-1 
-!             H_mid         = 0.5_prec * (Hi_ab(i,j)+Hi_ab(i,j-1))
-            H_mid         = 0.5_prec*(H_ice(i,j)+H_ice(i+1,j))
-            dzsdx         = (z_srf(i+1,j)-z_srf(i,j)) / dx
-            call minmax(dzsdx,slope_max)  
-            taud_acx(i,j) = rhog * H_mid * dzsdx 
-        end do 
-        end do 
-        taud_acx(nx,:) = taud_acx(nx-1,:) 
-        taud_acx(:,1)  = taud_acx(:,2) 
-
-        ! y-direction
-        taud_acy = 0.0_prec  
-        do j = 1, ny-1 
-        do i = 2, nx 
-!             H_mid         = 0.5_prec * (Hi_ab(i,j)+Hi_ab(i-1,j))
-            H_mid         = 0.5_prec*(H_ice(i,j)+H_ice(i,j+1))
-            dzsdy         = (z_srf(i,j+1)-z_srf(i,j)) / dy
-            call minmax(dzsdy,slope_max)   
-            taud_acy(i,j) = rhog * H_mid * dzsdy 
-        end do 
-        end do   
-        taud_acy(:,ny) = taud_acy(:,ny-1)  
-        taud_acy(1,:)  = taud_acy(2,:)
 
         ! === Subgrid treatment === 
         
@@ -946,7 +973,7 @@ end if
 
                 else 
 
-                    write(*,*) "calc_driving_stress_ac:: Error: Wrong choice of beta_gl_stag for this method."
+                    write(*,*) "calc_driving_stress_gl_ac:: Error: Wrong choice of beta_gl_stag for this method."
                     stop 
 
                 end if 
@@ -1136,7 +1163,7 @@ end if
 
         return 
 
-    end subroutine calc_driving_stress_ac 
+    end subroutine calc_driving_stress_gl_ac 
 
     function integrate_gl_driving_stress_linear(H_ice,H_ice1,z_bed,z_bed1,z_sl,z_sl1,dx) result(taud)
         ! Compute the driving stress for the grounding line more precisely (subgrid)

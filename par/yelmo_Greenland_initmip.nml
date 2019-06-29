@@ -112,6 +112,7 @@
     rf_method               = 1         ! -1: set externally; 0: rf_const everywhere; 1: standard function 
     rf_const                = 1e-18     ! [Pa^-3 a^-1]
     rf_use_eismint2         = False     ! Only applied for rf_method=1
+    rf_with_water           = False     ! Only applied for rf_method=1, scale rf by water content?
     n_glen                  = 3 
     visc_min                = 1e3 
     use_2D_enh              = False 
@@ -125,11 +126,8 @@
 /
 
 &ytherm
-    method         = "active"           ! "fixed", "robin", "active"
-    cond_bed       = False              ! True for active conductive bedrock (ie, Q_geo)
+    method         = "enth"             ! "fixed", "robin", "temp", "enth"
     gamma          = 1.0                ! [K] Scalar for the pressure melting point decay function 
-    nzr            = 11                 ! [-] Number of vertical grid points in bedrock 
-    H_rock         = 6000.0             ! [m] Vertical grid step in bedrock 
     use_strain_sia = False              ! True: calculate strain heating from SIA approx.
     n_sm_qstrn     = 0                  ! [-] Standard deviation in gridpoints for Gaussian smoothing of strain heating (0==no smoothing)
     n_sm_qb        = 0                  ! [-] Standard deviation in gridpoints for Gaussian smoothing of basal heating (0==no smoothing)
@@ -137,10 +135,8 @@
     const_cp       = 2009.0             ! [J kg-1 K-1] Specific heat capacity 
     use_const_kt   = False              ! Use specified constant value of heat conductivity?
     const_kt       = 6.62e7             ! [J a-1 m-1 K-1] Thermal conductivity [W m-1 K-1 * sec_year] => [J a-1 m-1 K-1]
-    kt_m           = 1.0e8              ! [J a-1 m-1 K-1] Thermal conductivity of the mantle (lithosphere)
-    cp_m           = 1000.0             ! [J kg-1 K-1] Specific heat capacity of the mantle (lithosphere)
-    rho_m          = 2000.0             ! [kg m-3] Density of the mantle (lithosphere)
-
+    enth_cr        = 1e-2               ! [--] Conductivity ratio for temperate ice (kappa_temp = enth_cr*kappa_cold)
+    omega_max      = 0.02               ! [--] Maximum allowed water content fraction 
 /
 
 &yelmo_masks

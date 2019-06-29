@@ -171,7 +171,7 @@
     pd_smb_name       = "smb"                        ! Surface mass balance 
     pd_smb_monthly    = False 
     pd_vel_load       = True 
-    pd_vel_path       = "input/{domain}/{grid_name}/{grid_name}_VEL-R11.nc"
+    pd_vel_path       = "input/{domain}/{grid_name}/{grid_name}_VEL-R11-2.nc"
     pd_vel_names      = "ux_srf" "uy_srf"            ! Surface velocity 
 
 /

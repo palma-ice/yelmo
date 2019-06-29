@@ -18,7 +18,7 @@
     zeta_exp        = 2.0  
     nz_aa           = 21                ! Vertical resolution in ice
     dtmin           = 0.01              ! [a] Minimum timestep 
-    dtmax           = 0.5               ! [a] Maximum timestep
+    dtmax           = 2.0               ! [a] Maximum timestep
     ntt             = 1                 ! [--] Thermodynamics call frequency (how many dynamic timesteps to skip)
     cfl_max         = 1.0               ! Maximum value is 1.0, lower will be more stable
     cfl_diff_max    = 0.12              ! Bueler et al (2007), Eq. 25 

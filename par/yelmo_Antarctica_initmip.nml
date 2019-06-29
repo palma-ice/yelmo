@@ -10,8 +10,8 @@
 /
 
 &yelmo
-    domain          = "Greenland"
-    grid_name       = "GRL-16KM"
+    domain          = "Antarctica"
+    grid_name       = "ANT-32KM"
     grid_path       = "input/{domain}/{grid_name}/{grid_name}_REGIONS.nc"
     experiment      = "None"       
     restart         = "no"

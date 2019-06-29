@@ -164,7 +164,7 @@
     pd_topo_names     = "H_ice" "z_srf" "z_bed"      ! Ice thickness, Surface elevation, Bedrock elevation
     pd_tsrf_load      = True 
     pd_tsrf_path      = "input/{domain}/{grid_name}/{grid_name}_RACMO23-ERAINT-HYBRID_1981-2010.nc"
-    pd_tsrf_name      = "T_srf"                      ! Surface temperature (or near-surface temperature)
+    pd_tsrf_name      = "t2m"                        ! Surface temperature (or near-surface temperature)
     pd_tsrf_monthly   = False
     pd_smb_load       = True 
     pd_smb_path       = "input/{domain}/{grid_name}/{grid_name}_RACMO23-ERA-INTERIM_monthly_1981-2010.nc"

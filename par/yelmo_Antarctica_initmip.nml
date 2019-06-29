@@ -56,9 +56,9 @@
     sia_solver          = "vel"           ! "vel", "shear", "none"
     mix_method          = 1               ! -2: sia, -1: ssa, 0: sia|ssa, 1: sia+ssa 2: ssa vel. fraction
     calc_diffusivity    = False           ! Calculate 2D diffusivity term for diagnostics
-    beta_method         = 4               ! 0: constant beta; 1: linear law; 2: power law; 3: regularized Coulomb law, 4: pism power law
+    beta_method         = 1               ! 0: constant beta; 1: linear law; 2: power law; 3: regularized Coulomb law, 4: pism power law
     beta_with_neff      = True            ! Additionally scale beta by effective pressure? (beta=Neff*[beta_default])
-    m_drag              = 0.5             ! Dragging law exponent 
+    m_drag              = 1.0             ! Dragging law exponent 
     u_0                 = 100.0           ! [m/a] Regularization term for regularized Coulomb law (beta_method=3)
     beta_const          = 1e3             ! [Pa a m−1] Constant value of basal friction coefficient to be used
     beta_gl_sep         = 0               !  -1: Apply subgrid treatment on ac-nodes (beta_gl_stag=3) 0: No subgrid treatment, 1: beta*f_grnd_aa        
@@ -66,15 +66,15 @@
     beta_gl_stag        = 0               !  0: simple staggering, 1: Upstream beta at gl, 2: downstream, 3: f_grnd_ac scaling 
     beta_gl_f           = 1.0             ! [-] Scaling of beta at the grounding line (for beta_gl_method=1)
     taud_gl_method      = 0               !  0: binary, no subgrid, 1: Two-sided gradient
-    C_bed_method        = 3               ! -1: set externally; 0: cf_stream everywhere; 1: cf_stream/cf_frozen; 2: cf_stream*fexp_zbed; 3: till strength, 4: cf_stream*flin_zbed 
-    C_bed_z0            = -700.0          ! [m] Bedrock elevation at which scaling goes to f_scale=e(-1)
-    C_bed_z1            =  700.0          ! [m] Bedrock elevation above which scaling goes to f_scale=1
-    C_bed_min           = 1e-4            ! [Pa a m-1] Minimum allowed value for C_bed for C_bed_method=[2,4]
-    C_bed_max           = 500.0           ! [Pa a m-1] Maximum allowed value for C_bed for C_bed_method=[2,4]
+    C_bed_method        = 2               ! -1: set externally; 0: cf_stream everywhere; 1: cf_stream/cf_frozen; 2: cf_stream*fexp_zbed; 3: till strength, 4: cf_stream*flin_zbed 
+    C_bed_z0            = -200.0          ! [m] Bedrock elevation at which scaling goes to f_scale=e(-1) (bed method 2) or at which C_bed = C_bed_min (bed method 4)
+    C_bed_z1            = 0.0             ! [m] Bedrock elevation above which scaling goes to f_scale=1  (bed_method 2) or at which C_bed = C_bed_max (bed method 4)
+    C_bed_min           = 1e-5            ! [a m-1] Bed roughness at bedrock elevation C_bed_z0 or below (used for having a lower limit in cbedmethod2 (exp) and C_bed_method = 4)
+    C_bed_max           = 50e-5           ! [a m-1] Bed roughness at bedrock elevation C_bed_z1 or above (only used for C_bed_method = 4)
     H_grnd_lim          = 500.0           ! [m] For beta_sep_method=2, reduce beta linearly between H_grnd=0 and H_grnd_lim 
     H_sed_sat           = 250.0           ! [m] Sediment thickness at which sediment effect is saturated
-    cf_frozen           = 1.0             ! [a m-1] Bed roughness coefficient, frozen 
-    cf_stream           = 1.0             ! [a m-1] Bed roughness coefficient, stream  
+    cf_frozen           = 200e-5          ! [a m-1] Bed roughness coefficient, frozen (not used in cbed_method 4)
+    cf_stream           = 200e-5          ! [a m-1] Bed roughness coefficient, stream  (not used in cbed_method 4)
     cf_fac_sed          = 1.0             ! [-] Scaling of roughness for sediments 
     cf_sia              = 0.0             ! [m a-1 Pa-1] Bed roughness coefficient for SIA sliding
     streaming_margin    = True            ! Impose cf_stream at the margin and grline independent of f_pmp
@@ -89,7 +89,7 @@
 /
 
 &ydyn_neff 
-    neff_method     = 2                 ! -1: external N_eff, 0: overburden pressure, 1: Leguy param., 2: Till pressure
+    neff_method     = 1                 ! -1: external N_eff, 0: overburden pressure, 1: Leguy param., 2: Till pressure
     neff_p          = 1.0               ! *neff_method=1* marine connectivity exponent (0: none, 1: full)
     neff_use_water  = True              ! *neff_method=2* Use H_w field? If not, parameterize it.
     neff_w_max      = 2.0               ! [m]  *neff_method=2* Maximum allowed water layer thickness for Till pressure 

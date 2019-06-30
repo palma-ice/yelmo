@@ -30,7 +30,7 @@
     init              = "presentday"    ! "icefree", "presentday"
     solver            = "impl-upwind"   ! "expl", "impl-upwind"
     margin2nd         = False           ! Apply second-order upwind approximation to gradients at the margin
-    calv_method       = "flux"          ! "zero", "simple", "flux", "kill"
+    calv_method       = "simple"        ! "zero", "simple", "flux", "kill"
     surf_gl_method    = 0               ! 0: binary (max grnd/flt elevation), 1: subgrid average elevation
     use_bmb           = True
     use_calv_subgrid  = False 
@@ -40,7 +40,8 @@
     topo_fixed_dt     = -1              ! <= 0 for always fixed, positive value to 'unfix' topo after interval
     calv_H_lim        = 200.0           ! [m] Calving limit in ice thickness (thinner ice calves)
     calv_tau          = 1.0             ! [a] Characteristic calving time
-    H_min             = 5.0             ! [m] Minimum ice thickness at grounded margin (thinner ice is ablated) - helps with stability
+    H_min_grnd        = 5.0             ! [m] Minimum ice thickness at grounded margin (thinner ice is ablated) - helps with stability
+    H_min_flt         = 75.0            ! [m] Minimum ice thickness at floating margin (thinner ice is ablated) - helps with stability
     sd_min            = 100.0           ! [m] calv_grnd(z_bed_sd <= sd_min) = 0.0 
     sd_max            = 500.0           ! [m] calv_grnd(z_bed_sd >= sd_max) = calv_max  
     calv_max          = 10.0            ! [m/a] Maximum grounded calving rate from high stdev(z_bed)

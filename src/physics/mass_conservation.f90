@@ -53,9 +53,6 @@ contains
 
         ! 1. Apply mass conservation =================
 
-        ! First apply calving, since it is accurate for the current configuration 
-        H_ice = H_ice - calv*dt 
-
         ! First, only resolve the dynamic part (ice advection)
         select case(trim(solver))
             ! Choose solver to use 
@@ -125,15 +122,11 @@ if (.FALSE.) then
         call limit_grounded_margin_thickness_flux(H_ice,mb_applied,f_grnd,mbal,ux,uy,dx,dt,H_min)
 
 end if 
-
-
+        
         ! Also ensure tiny numeric ice thicknesses are removed
         where (H_ice .lt. 1e-5) H_ice = 0.0 
 
-        ! Finally, treat calving at the floating ice margin 
-!         where (calv .gt. 0.0) H_ice = max(0.0,H_ice-calv*dt)
-!         where (calv .gt. 0.0) H_ice = 0.0
-        
+
         ! Artificially delete ice from locations that are not allowed
         ! according to boundary mask (ie, EISMINT, BUELER-A, open ocean)
         where (.not. ice_allowed) H_ice = 0.0 

@@ -81,7 +81,8 @@ module yelmo_defs
         real(prec) :: topo_relax_dt, topo_fixed_dt
         real(prec) :: calv_H_lim
         real(prec) :: calv_tau  
-        real(prec) :: H_min
+        real(prec) :: H_min_grnd
+        real(prec) :: H_min_flt 
         real(prec) :: sd_min 
         real(prec) :: sd_max 
         real(prec) :: calv_max  

@@ -93,6 +93,15 @@ contains
                 mbal = bnd%smb 
             end if 
 
+            ! 1. Calculate the ice thickness conservation and apply bedrock uplift -----
+            call calc_ice_thickness(tpo%now%H_ice,tpo%now%H_margin,tpo%now%f_ice,tpo%now%mb_applied, &
+                                    tpo%now%f_grnd,bnd%z_sl-bnd%z_bed,dyn%now%ux_bar,dyn%now%uy_bar, &
+                                    mbal=mbal,calv=tpo%now%calv,z_bed_sd=bnd%z_bed_sd,dx=tpo%par%dx,dt=dt, &
+                                    solver=trim(tpo%par%solver),boundaries=trim(tpo%par%boundaries), &
+                                    ice_allowed=bnd%ice_allowed,H_min=tpo%par%H_min_grnd, &
+                                    sd_min=tpo%par%sd_min,sd_max=tpo%par%sd_max,calv_max=tpo%par%calv_max)
+            
+
             ! ====== CALVING ======
 
             ! Diagnose calving rate [m/a]
@@ -104,7 +113,7 @@ contains
 
                 case("simple") 
                     ! Use simple threshold method
-                    
+
                     call calc_calving_rate_simple(tpo%now%calv,tpo%now%H_ice,tpo%now%f_grnd, &
                                                     tpo%par%calv_H_lim,tpo%par%calv_tau)
                 
@@ -125,23 +134,13 @@ contains
                     stop 
 
             end select
-
-
-            ! 1. Calculate the ice thickness conservation and apply bedrock uplift -----
-            call calc_ice_thickness(tpo%now%H_ice,tpo%now%H_margin,tpo%now%f_ice,tpo%now%mb_applied, &
-                                    tpo%now%f_grnd,bnd%z_sl-bnd%z_bed, &
-                                    dyn%now%ux_bar,dyn%now%uy_bar, &
-                                    mbal=mbal,calv=tpo%now%calv,z_bed_sd=bnd%z_bed_sd,dx=tpo%par%dx,dt=dt, &
-                                    solver=trim(tpo%par%solver),boundaries=trim(tpo%par%boundaries), &
-                                    ice_allowed=bnd%ice_allowed,H_min=tpo%par%H_min, &
-                                    sd_min=tpo%par%sd_min,sd_max=tpo%par%sd_max,calv_max=tpo%par%calv_max)
             
-            ! Additionally apply a simple calving threshold to eliminate very thin floating margin
-            ! To do...
+            ! Apply calving
+            call apply_calving(tpo%now%H_ice,tpo%now%calv,tpo%now%f_grnd,tpo%par%H_min_flt,dt)
 
             ! Additionally apply calving to H_margin points (when isolated)
             call apply_calving_ice_margin(tpo%now%calv,tpo%now%H_margin,tpo%now%H_ice,dt)
-
+        
             ! Apply special case for symmetric EISMINT domain when basal sliding is active
             ! (ensure summit thickness does not grow disproportionately)
             if (trim(tpo%par%boundaries) .eq. "EISMINT" .and. maxval(dyn%now%uxy_b) .gt. 0.0) then 
@@ -150,7 +149,7 @@ contains
                 tpo%now%H_ice(i,j) = (tpo%now%H_ice(i-1,j)+tpo%now%H_ice(i+1,j) &
                                         +tpo%now%H_ice(i,j-1)+tpo%now%H_ice(i,j+1)) / 4.0 
             end if  
-
+             
             ! Determine the rate of change of ice thickness [m/a]
             tpo%now%dHicedt = (tpo%now%H_ice - tpo%now%dHicedt)/dt
 
@@ -323,7 +322,8 @@ contains
         call nml_read(filename,"ytopo","topo_fixed_dt",     par%topo_fixed_dt,    init=init_pars)
         call nml_read(filename,"ytopo","calv_H_lim",        par%calv_H_lim,       init=init_pars)
         call nml_read(filename,"ytopo","calv_tau",          par%calv_tau,         init=init_pars)
-        call nml_read(filename,"ytopo","H_min",             par%H_min,            init=init_pars)
+        call nml_read(filename,"ytopo","H_min_grnd",        par%H_min_grnd,       init=init_pars)
+        call nml_read(filename,"ytopo","H_min_flt",         par%H_min_flt,        init=init_pars)
         call nml_read(filename,"ytopo","sd_min",            par%sd_min,           init=init_pars)
         call nml_read(filename,"ytopo","sd_max",            par%sd_max,           init=init_pars)
         call nml_read(filename,"ytopo","calv_max",          par%calv_max,         init=init_pars)

@@ -1,7 +1,7 @@
 module mass_conservation
 
     use yelmo_defs !, only :: sp, dp, prec 
-    use yelmo_tools, only : stagger_aa_ab
+    use yelmo_tools, only : stagger_aa_ab, fill_borders_2D
     use mass_conservation_impl_sico, only : calc_adv2D_expl_sico, calc_adv2D_impl_sico
 
     implicit none 
@@ -52,6 +52,9 @@ contains
         calv_grnd = 0.0 
 
         ! 1. Apply mass conservation =================
+
+        ! First apply calving, since it is accurate for the current configuration 
+        H_ice = H_ice - calv*dt 
 
         ! First, only resolve the dynamic part (ice advection)
         select case(trim(solver))
@@ -111,7 +114,7 @@ if (.FALSE.) then
     ! ajr: disable these for now to test new margin scheme!!
 
         ! Determine grounded calving 
-        calv_grnd = calc_calving_rate_grounded(H_ice,f_grnd,z_bed_sd,sd_min,sd_max,calv_max,dt)
+        call calc_calving_rate_grounded(calv_grnd,H_ice,f_grnd,z_bed_sd,sd_min,sd_max,calv_max,dt)
 
         ! Limit grounded ice thickness to below maximum threshold value
         ! based on shear stress limit 
@@ -166,9 +169,7 @@ end if
             case("infinite")
                 ! ajr: we should check setting border H values equal to inner neighbors
                 
-                write(*,*) "calc_ice_thickness:: error: boundary method not implemented yet: "//trim(boundaries)
-                write(*,*) "TO DO!"
-                stop 
+                call fill_borders_2D(H_ice,nfill=1)
 
             case DEFAULT 
 
@@ -573,19 +574,18 @@ end if
         real(prec) :: eps_xx, eps_yy  
         logical :: test_mij, test_pij, test_imj, test_ipj
         logical :: is_margin, positive_mb 
-        real(prec), allocatable :: dHdt(:,:), Hdiff(:,:) 
+        real(prec), allocatable :: dHdt(:,:), H_diff(:,:) 
         real(prec), allocatable :: H_ice_0(:,:) 
-        integer :: n_free
 
         nx = size(H_ice,1)
         ny = size(H_ice,2)
 
         allocate(dHdt(nx,ny))
-        allocate(Hdiff(nx,ny))
+        allocate(H_diff(nx,ny))
         allocate(H_ice_0(nx,ny))
         
         ! Ice thickness above threshold
-        Hdiff = H_ice - H_min
+        H_diff = H_ice - H_min
 
         ! Diagnosed lagrangian rate of change
         dHdt = 0.0 
@@ -615,43 +615,28 @@ end if
             is_margin = (H_ice_0(i,j) .gt. 0.0 .and. f_grnd(i,j) .gt. 0.0 &
                 .and. minval([H_ice_0(i-1,j),H_ice_0(i+1,j),H_ice_0(i,j-1),H_ice_0(i,j+1)]) .eq. 0.0)
 
-            if (f_grnd(i,j) .gt. 0.0 .and. H_ice(i,j) .gt. 0.0) then
-                ! Grounded ice-covered point
-
-                n_free = count([H_ice(i-1,j).eq.0.0, &
-                                H_ice(i+1,j).eq.0.0, &
-                                H_ice(i,j-1).eq.0.0, &
-                                H_ice(i,j+1).eq.0.0])
-
-            else
-                ! No ice-free points bordering point 
-
-                n_free = 0 
-
-            end if
-
-            if (n_free .gt. 0 .and. Hdiff(i,j).le.0.0) then 
+            if (is_margin .and. H_diff(i,j).lt.0.0) then 
                 ! Check if current point is at the margin,
                 ! and has thickness less than threshold, or if
                 ! ice below H_min limit, accounting for mass flux from inland
 
                 positive_mb = (mbal(i,j).gt.0.0)
 
-                test_mij = ( ((Hdiff(i-1,j).gt.0.0).and.(ux(i,j).ge.0.0)  &  ! neighbor (i-1,j) total > H_min
-                    .and.  (dHdt(i-1,j).gt.(-Hdiff(i-1,j)*abs(ux(i-1,j)/dx)))) & 
-                    .or.(f_grnd(i-1,j).gt.0.0.and.positive_mb) ) !
+                test_mij = ( ((H_diff(i-1,j).gt.0.0).and.(ux(i-1,j).gt.0.0)  &  ! neighbor (i-1,j) total > H_calv
+                    .and.  (dHdt(i-1,j).gt.(-H_diff(i-1,j)*abs(ux(i-1,j)/dx)))) & 
+                    .or.(f_grnd(i-1,j).gt.0.0.and.positive_mb ))
 
-                test_pij = ( ((Hdiff(i+1,j).gt.0.0).and.(ux(i,j).le.0.0) & ! neighbor (i+1,j) total > H_min
-                    .and.(dHdt(i+1,j).gt.(-Hdiff(i+1,j)*abs(ux(i,j)/dx)))) &
-                    .or.(f_grnd(i+1,j).gt.0.0.and.positive_mb) ) !
+                test_pij = ( ((H_diff(i+1,j).gt.0.0).and.(ux(i,j).lt.0.0) & ! neighbor (i+1,j) total > H_calv
+                    .and.(dHdt(i+1,j).gt.(-H_diff(i+1,j)*abs(ux(i,j)/dx)))) &
+                    .or.(f_grnd(i+1,j).gt.0.0.and.positive_mb ))
 
-                test_imj = ( ((Hdiff(i,j-1).gt.0.0).and.(uy(i,j).ge.0.0)  &  ! neighbor (i,j-1) total > H_min
-                    .and.(dHdt(i,j-1).gt.(-Hdiff(i,j-1)*abs(uy(i,j-1)/dx))))&
-                    .or.(f_grnd(i,j-1).gt.0.0.and.positive_mb) ) !
+                test_imj = ( ((H_diff(i,j-1).gt.0.0).and.(uy(i,j-1).gt.0.0)  &  ! neighbor (i,j-1) total > H_calv
+                    .and.(dHdt(i,j-1).gt.(-H_diff(i,j-1)*abs(uy(i,j-1)/dx))))&
+                    .or.(f_grnd(i,j-1).gt.0.0.and.positive_mb ))
 
-                test_ipj = ( ((Hdiff(i,j+1).gt.0.0).and.(uy(i,j).le.0.0) & ! neighbor (i,j+1) total > H_min
-                    .and.(dHdt(i,j+1).gt.(-Hdiff(i,j+1)*abs(uy(i,j)/dx))))&
-                    .or.(f_grnd(i,j+1).gt.0.0.and.positive_mb) ) !
+                test_ipj = ( ((H_diff(i,j+1).gt.0.0).and.(uy(i,j).lt.0.0) & ! neighbor (i,j+1) total > H_calv
+                    .and.(dHdt(i,j+1).gt.(-H_diff(i,j+1)*abs(uy(i,j)/dx))))&
+                    .or.(f_grnd(i,j+1).gt.0.0.and.positive_mb ))
 
                 if ((.not.(test_mij.or.test_pij.or.test_imj.or.test_ipj))) then
                     mb_applied(i,j) = mb_applied(i,j) - H_ice_0(i,j) / dt    
@@ -743,7 +728,7 @@ end if
 
     end subroutine limit_grounded_margin_thickness_stress
     
-    function calc_calving_rate_grounded(H_ice,f_grnd,z_bed_sd,sd_min,sd_max,calv_max,dt) result(calv)
+    subroutine calc_calving_rate_grounded(calv,H_ice,f_grnd,z_bed_sd,sd_min,sd_max,calv_max,dt)
         ! Parameterize grounded ice-margin calving as a function of 
         ! standard deviation of bedrock at each grid point.
         ! Assumes that higher variability in subgrid implies cliffs
@@ -751,14 +736,14 @@ end if
 
         implicit none 
 
-        real(prec), intent(IN) :: H_ice(:,:)                ! [m] Ice thickness 
-        real(prec), intent(IN) :: f_grnd(:,:)               ! [-] Grounded fraction
-        real(prec), intent(IN) :: z_bed_sd(:,:)             ! [m] Standard deviation of bedrock topography
-        real(prec), intent(IN) :: sd_min                    ! [m] stdev(z_bed) at/below which calv=0
-        real(prec), intent(IN) :: sd_max                    ! [m] stdev(z_bed) at/above which calv=calv_max 
-        real(prec), intent(IN) :: calv_max                  ! [m/a] Maximum allowed calving rate
-        real(prec), intent(IN) :: dt 
-        real(prec) :: calv(size(H_ice,1),size(H_ice,2))     ! [m/a] Calculated calving rate 
+        real(prec), intent(OUT) :: calv(:,:)                ! [m/a] Calculated calving rate 
+        real(prec), intent(IN)  :: H_ice(:,:)               ! [m] Ice thickness 
+        real(prec), intent(IN)  :: f_grnd(:,:)              ! [-] Grounded fraction
+        real(prec), intent(IN)  :: z_bed_sd(:,:)            ! [m] Standard deviation of bedrock topography
+        real(prec), intent(IN)  :: sd_min                   ! [m] stdev(z_bed) at/below which calv=0
+        real(prec), intent(IN)  :: sd_max                   ! [m] stdev(z_bed) at/above which calv=calv_max 
+        real(prec), intent(IN)  :: calv_max                 ! [m/a] Maximum allowed calving rate
+        real(prec), intent(IN)  :: dt      
 
         ! Local variables
         integer :: i, j, nx, ny  
@@ -800,7 +785,7 @@ end if
 
         return 
 
-    end function calc_calving_rate_grounded
+    end subroutine calc_calving_rate_grounded
 
     subroutine calc_ice_margin(H_ice,H_margin,f_ice,f_grnd)
         ! Determine the area fraction of a grid cell

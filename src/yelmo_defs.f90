@@ -79,8 +79,8 @@ module yelmo_defs
         logical    :: grline_fixed 
         logical    :: topo_fixed
         real(prec) :: topo_relax_dt, topo_fixed_dt
-        real(prec) :: calv_dt 
-        real(prec) :: H_calv 
+        real(prec) :: calv_H_lim
+        real(prec) :: calv_tau  
         real(prec) :: H_min
         real(prec) :: sd_min 
         real(prec) :: sd_max 

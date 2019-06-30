@@ -38,8 +38,8 @@
     topo_fixed        = False
     topo_relax_dt     = 2000
     topo_fixed_dt     = -1              ! <= 0 for always fixed, positive value to 'unfix' topo after interval
-    calv_dt           = 1e-5            ! [a] Calving frequency 
-    H_calv            = 200.0 
+    calv_H_lim        = 200.0           ! [m] Calving limit in ice thickness (thinner ice calves)
+    calv_tau          = 1.0             ! [a] Characteristic calving time
     H_min             = 5.0             ! [m] Minimum ice thickness at grounded margin (thinner ice is ablated) - helps with stability
     sd_min            = 100.0           ! [m] calv_grnd(z_bed_sd <= sd_min) = 0.0 
     sd_max            = 500.0           ! [m] calv_grnd(z_bed_sd >= sd_max) = calv_max  

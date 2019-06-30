@@ -51,7 +51,7 @@ contains
         logical,            intent(IN)    :: topo_fixed 
 
         ! Local variables 
-        real(prec) :: dx, dt, dt_calv    
+        real(prec) :: dx, dt   
         integer :: i, j, nx, ny  
         real(prec), allocatable :: mbal(:,:) 
         
@@ -66,10 +66,8 @@ contains
             tpo%par%time_calv = time 
         end if 
 
-        ! Get time steps
+        ! Get time step
         dt                = time - tpo%par%time 
-        dt_calv           = time - tpo%par%time_calv
-        
 
         
         ! Combine basal mass balance into one field accounting for 
@@ -95,60 +93,51 @@ contains
                 mbal = bnd%smb 
             end if 
 
+            ! ====== CALVING ======
+
+            ! Diagnose calving rate [m/a]
+            select case(trim(tpo%par%calv_method))
+
+                case("zero")
+
+                    tpo%now%calv = 0.0 
+
+                case("simple") 
+                    ! Use simple threshold method
+                    
+                    call calc_calving_rate_simple(tpo%now%calv,tpo%now%H_ice,tpo%now%f_grnd, &
+                                                    tpo%par%calv_H_lim,tpo%par%calv_tau)
+                
+                case("flux") 
+                    ! Use threshold+flux method from GRISLI 
+
+                    call calc_calving_rate_flux(tpo%now%calv,tpo%now%H_ice,tpo%now%f_grnd,mbal,dyn%now%ux_bar, &
+                                                dyn%now%uy_bar,tpo%par%dx,tpo%par%calv_H_lim,tpo%par%calv_tau)
+                
+                case("kill") 
+                    ! Delete all floating ice (using characteristic time parameter)
+                    call calc_calving_rate_kill(tpo%now%calv,tpo%now%H_ice,tpo%now%f_grnd,tpo%par%calv_tau)
+
+                case DEFAULT 
+
+                    write(*,*) "calc_ytopo:: Error: calving method not recognized."
+                    write(*,*) "calv_method = ", trim(tpo%par%calv_method)
+                    stop 
+
+            end select
+
+
             ! 1. Calculate the ice thickness conservation and apply bedrock uplift -----
             call calc_ice_thickness(tpo%now%H_ice,tpo%now%H_margin,tpo%now%f_ice,tpo%now%mb_applied, &
                                     tpo%now%f_grnd,bnd%z_sl-bnd%z_bed, &
                                     dyn%now%ux_bar,dyn%now%uy_bar, &
-                                    mbal=mbal,calv=tpo%now%calv*0.0,z_bed_sd=bnd%z_bed_sd,dx=tpo%par%dx,dt=dt, &
+                                    mbal=mbal,calv=tpo%now%calv,z_bed_sd=bnd%z_bed_sd,dx=tpo%par%dx,dt=dt, &
                                     solver=trim(tpo%par%solver),boundaries=trim(tpo%par%boundaries), &
                                     ice_allowed=bnd%ice_allowed,H_min=tpo%par%H_min, &
                                     sd_min=tpo%par%sd_min,sd_max=tpo%par%sd_max,calv_max=tpo%par%calv_max)
             
-            ! ====== CALVING ======
-            if (dt_calv .ge. tpo%par%calv_dt) then 
-                ! Diagnose calving rate at desired timestep frequency [m/a]
-
-                select case(trim(tpo%par%calv_method))
-
-                    case("zero")
-
-                        tpo%now%calv = 0.0 
-
-                    case("simple") 
-                        ! Use simple threshold method
-
-                        tpo%now%calv  = calc_calving_rate_simple(tpo%now%H_ice,tpo%now%f_grnd,dt_calv,tpo%par%H_calv)
-                    
-                    case("flux") 
-                        ! Use threshold+flux method from GRISLI 
-
-                        tpo%now%calv  = calc_calving_rate_flux(tpo%now%H_ice,tpo%now%f_grnd, &
-                                               mbal,dyn%now%ux_bar,dyn%now%uy_bar,tpo%par%dx,dt_calv,tpo%par%H_calv)
-                    
-                    case("kill") 
-                        ! Delete all floating ice 
-                        tpo%now%calv = calc_calving_rate_kill(tpo%now%H_ice,tpo%now%f_grnd,dt_calv)
-
-                    case DEFAULT 
-
-                        write(*,*) "calc_ytopo:: Error: calving method not recognized."
-                        write(*,*) "calv_method = ", trim(tpo%par%calv_method)
-                        stop 
-
-                end select
-
-                ! Apply calving rate, ensure only available ice is deleted 
-                call apply_calving(tpo%now%H_ice,tpo%now%calv,tpo%now%f_grnd,dt_calv)
-                
-                ! Updating current calving time 
-                tpo%par%time_calv = time 
-
-                
-            else 
-                ! dt too small, set calving to zero 
-                tpo%now%calv = 0.0 
-
-            end if 
+            ! Additionally apply a simple calving threshold to eliminate very thin floating margin
+            ! To do...
 
             ! Additionally apply calving to H_margin points (when isolated)
             call apply_calving_ice_margin(tpo%now%calv,tpo%now%H_margin,tpo%now%H_ice,dt)
@@ -332,8 +321,8 @@ contains
         call nml_read(filename,"ytopo","topo_fixed",        par%topo_fixed,       init=init_pars)
         call nml_read(filename,"ytopo","topo_relax_dt",     par%topo_relax_dt,    init=init_pars)
         call nml_read(filename,"ytopo","topo_fixed_dt",     par%topo_fixed_dt,    init=init_pars)
-        call nml_read(filename,"ytopo","calv_dt",           par%calv_dt,          init=init_pars)
-        call nml_read(filename,"ytopo","H_calv",            par%H_calv,           init=init_pars)
+        call nml_read(filename,"ytopo","calv_H_lim",        par%calv_H_lim,       init=init_pars)
+        call nml_read(filename,"ytopo","calv_tau",          par%calv_tau,         init=init_pars)
         call nml_read(filename,"ytopo","H_min",             par%H_min,            init=init_pars)
         call nml_read(filename,"ytopo","sd_min",            par%sd_min,           init=init_pars)
         call nml_read(filename,"ytopo","sd_max",            par%sd_max,           init=init_pars)

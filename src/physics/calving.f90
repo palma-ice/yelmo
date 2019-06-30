@@ -38,17 +38,17 @@ contains
         
     end subroutine apply_calving
 
-    function calc_calving_rate_simple(H_ice,f_grnd,dt,H_calv) result(calv)
+    subroutine calc_calving_rate_simple(calv,H_ice,f_grnd,H_calv,tau)
         ! Calculate the calving rate [m/a] based on a simple threshold rule
         ! H_ice < H_calv
 
         implicit none 
 
-        real(prec), intent(IN) :: H_ice(:,:)                ! [m] Ice thickness 
-        real(prec), intent(IN) :: f_grnd(:,:)               ! [-] Grounded fraction
-        real(prec), intent(IN) :: dt 
-        real(prec), intent(IN) :: H_calv 
-        real(prec) :: calv(size(H_ice,1),size(H_ice,2)) 
+        real(prec), intent(OUT) :: calv(:,:)
+        real(prec), intent(IN)  :: H_ice(:,:)                ! [m] Ice thickness 
+        real(prec), intent(IN)  :: f_grnd(:,:)               ! [-] Grounded fraction
+        real(prec), intent(IN)  :: H_calv 
+        real(prec), intent(IN)  :: tau                       ! [a] Calving timescale, ~ 1yr
 
         ! Local variables 
         integer :: i, j, nx, ny
@@ -66,33 +66,18 @@ contains
         do j=2,ny-1
         do i=2,nx-1
 
-            ! Determine ice-shelf front as how many ocean points are bordering it
-
-            if (f_grnd(i,j) .eq. 0.0 .and. H_ice(i,j) .gt. 0.0) then
-                ! Ice shelf point
-
-                n_ocean = count([f_grnd(i-1,j) .eq. 0.0 .and. H_ice(i-1,j).eq.0.0, &
-                                 f_grnd(i+1,j) .eq. 0.0 .and. H_ice(i+1,j).eq.0.0, &
-                                 f_grnd(i,j-1) .eq. 0.0 .and. H_ice(i,j-1).eq.0.0, &
-                                 f_grnd(i,j+1) .eq. 0.0 .and. H_ice(i,j+1).eq.0.0])
-
-            else
-                ! No ocean points bordering point 
-
-                n_ocean = 0 
-
-            end if
-            
-            if (n_ocean .gt. 0) then 
+            if ( (f_grnd(i,j) .eq. 0.0 .and. H_ice(i,j) .gt. 0.0) .and. &
+                   ( (f_grnd(i-1,j) .eq. 0.0 .and. H_ice(i-1,j).eq.0.0) .or. &
+                     (f_grnd(i+1,j) .eq. 0.0 .and. H_ice(i+1,j).eq.0.0) .or. &
+                     (f_grnd(i,j-1) .eq. 0.0 .and. H_ice(i,j-1).eq.0.0) .or. &
+                     (f_grnd(i,j+1) .eq. 0.0 .and. H_ice(i,j+1).eq.0.0) ) ) then 
+                ! Ice-shelf floating margin: floating ice point with open ocean neighbor 
                 ! If this point is an ice front, check for calving
 
-                ! Determine margin ice thickness
-                H_mrgn = H_ice(i,j)
-
-                if (n_ocean .gt. 0 .and. H_mrgn .le. H_calv) then 
+                if (H_ice(i,j) .lt. H_calv) then 
                     ! Apply calving at front, delete all ice in point (H_ice) 
 
-                    calv(i,j) = H_ice(i,j) / dt 
+                    calv(i,j) = (H_calv-H_ice(i,j)) / tau 
 
                 end if 
 
@@ -103,30 +88,30 @@ contains
 
         return 
 
-    end function calc_calving_rate_simple
+    end subroutine calc_calving_rate_simple
     
-    function calc_calving_rate_flux(H_ice,f_grnd,mbal,ux,uy,dx,dt,H_calv) result(calv)
+    subroutine calc_calving_rate_flux(calv,H_ice,f_grnd,mbal,ux,uy,dx,H_calv,tau)
         ! Calculate the calving rate [m/a] based on a simple threshold rule
         ! H_ice < H_calv
 
         implicit none 
 
-        real(prec), intent(IN) :: H_ice(:,:)                ! [m] Ice thickness 
-        real(prec), intent(IN) :: f_grnd(:,:)               ! [-] Grounded fraction
-        real(prec), intent(IN) :: mbal(:,:)                 ! [m/a] Net mass balance 
-        real(prec), intent(IN) :: ux(:,:)               ! [m/a] velocity, x-direction (ac-nodes)
-        real(prec), intent(IN) :: uy(:,:)               ! [m/a] velocity, y-direction (ac-nodes)
-        real(prec), intent(IN) :: dx, dt 
-        real(prec), intent(IN) :: H_calv                    ! [m] Threshold for calving
-        real(prec) :: calv(size(H_ice,1),size(H_ice,2)) 
+        real(prec), intent(OUT) :: calv(:,:)
+        real(prec), intent(IN)  :: H_ice(:,:)                ! [m] Ice thickness 
+        real(prec), intent(IN)  :: f_grnd(:,:)               ! [-] Grounded fraction
+        real(prec), intent(IN)  :: mbal(:,:)                 ! [m/a] Net mass balance 
+        real(prec), intent(IN)  :: ux(:,:)                   ! [m/a] velocity, x-direction (ac-nodes)
+        real(prec), intent(IN)  :: uy(:,:)                   ! [m/a] velocity, y-direction (ac-nodes)
+        real(prec), intent(IN)  :: dx 
+        real(prec), intent(IN)  :: H_calv                    ! [m] Threshold for calving
+        real(prec), intent(IN)  :: tau                       ! [a] Calving timescale, ~ 1yr
 
         ! Local variables 
         integer :: i, j, nx, ny
         real(prec) :: eps_xx, eps_yy  
         logical :: test_mij, test_pij, test_imj, test_ipj
         logical :: positive_mb 
-        real(prec), allocatable :: dHdt(:,:), H_diff(:,:) 
-        integer :: n_ocean 
+        real(prec), allocatable :: dHdt(:,:), H_diff(:,:)  
 
         nx = size(H_ice,1)
         ny = size(H_ice,2)
@@ -143,7 +128,7 @@ contains
         do j = 2, ny
         do i = 2, nx
         
-                ! Calculate strain rate locally (Aa node)
+                ! Calculate strain rate locally (aa-node)
                 eps_xx = (ux(i,j) - ux(i-1,j))/dx
                 eps_yy = (uy(i,j) - uy(i,j-1))/dx
 
@@ -160,48 +145,37 @@ contains
         do j = 2, ny-1
         do i = 2, nx-1
 
-            ! Determine ice-shelf front as how many ocean points are bordering it
-
-            if (f_grnd(i,j) .eq. 0.0 .and. H_ice(i,j) .gt. 0.0) then
-                ! Ice shelf point
-
-                n_ocean = count([f_grnd(i-1,j) .eq. 0.0 .and. H_ice(i-1,j).eq.0.0, &
-                                 f_grnd(i+1,j) .eq. 0.0 .and. H_ice(i+1,j).eq.0.0, &
-                                 f_grnd(i,j-1) .eq. 0.0 .and. H_ice(i,j-1).eq.0.0, &
-                                 f_grnd(i,j+1) .eq. 0.0 .and. H_ice(i,j+1).eq.0.0])
-
-            else
-                ! No ocean points bordering point 
-
-                n_ocean = 0 
-
-            end if
-            
-            if (n_ocean .gt. 0 .and. H_diff(i,j).le.0.0) then 
+            if ( (f_grnd(i,j) .eq. 0.0 .and. H_ice(i,j) .gt. 0.0 .and. H_diff(i,j).lt.0.0) .and. &
+                   ( (f_grnd(i-1,j) .eq. 0.0 .and. H_ice(i-1,j).eq.0.0) .or. &
+                     (f_grnd(i+1,j) .eq. 0.0 .and. H_ice(i+1,j).eq.0.0) .or. &
+                     (f_grnd(i,j-1) .eq. 0.0 .and. H_ice(i,j-1).eq.0.0) .or. &
+                     (f_grnd(i,j+1) .eq. 0.0 .and. H_ice(i,j+1).eq.0.0) ) ) then 
+                ! Ice-shelf floating margin: floating ice point with open ocean neighbor 
+                 
                 ! Check if current point is at the floating ice front,
                 ! and has thickness less than threshold, or if
                 ! ice below H_calv limit, accounting for mass flux from inland
 
                 positive_mb = (mbal(i,j).gt.0.0)
 
-                test_mij = ( ((H_diff(i-1,j).gt.0.0).and.(ux(i,j).ge.0.0)  &  ! neighbor (i-1,j) total > hcoup
+                test_mij = ( ((H_diff(i-1,j).gt.0.0).and.(ux(i-1,j).gt.0.0)  &  ! neighbor (i-1,j) total > H_calv
                     .and.  (dHdt(i-1,j).gt.(-H_diff(i-1,j)*abs(ux(i-1,j)/dx)))) & 
-                    .or.(f_grnd(i-1,j).gt.0.0.and.positive_mb )) !
+                    .or.(f_grnd(i-1,j).gt.0.0.and.positive_mb ))
 
-                test_pij = ( ((H_diff(i+1,j).gt.0.0).and.(ux(i,j).le.0.0) & ! neighbor (i+1,j) total > hcoup
+                test_pij = ( ((H_diff(i+1,j).gt.0.0).and.(ux(i,j).lt.0.0) & ! neighbor (i+1,j) total > H_calv
                     .and.(dHdt(i+1,j).gt.(-H_diff(i+1,j)*abs(ux(i,j)/dx)))) &
-                    .or.(f_grnd(i+1,j).gt.0.0.and.positive_mb) ) !
+                    .or.(f_grnd(i+1,j).gt.0.0.and.positive_mb ))
 
-                test_imj = ( ((H_diff(i,j-1).gt.0.0).and.(uy(i,j).ge.0.0)  &  ! neighbor (i,j-1) total > hcoup
+                test_imj = ( ((H_diff(i,j-1).gt.0.0).and.(uy(i,j-1).gt.0.0)  &  ! neighbor (i,j-1) total > H_calv
                     .and.(dHdt(i,j-1).gt.(-H_diff(i,j-1)*abs(uy(i,j-1)/dx))))&
-                    .or.(f_grnd(i,j-1).gt.0.0.and.positive_mb ) ) !
+                    .or.(f_grnd(i,j-1).gt.0.0.and.positive_mb ))
 
-                test_ipj = ( ((H_diff(i,j+1).gt.0.0).and.(uy(i,j).le.0.0) & ! neighbor (i,j+1) total > hcoup
+                test_ipj = ( ((H_diff(i,j+1).gt.0.0).and.(uy(i,j).lt.0.0) & ! neighbor (i,j+1) total > H_calv
                     .and.(dHdt(i,j+1).gt.(-H_diff(i,j+1)*abs(uy(i,j)/dx))))&
-                    .or.(f_grnd(i,j+1).gt.0.0.and.positive_mb ) ) !
+                    .or.(f_grnd(i,j+1).gt.0.0.and.positive_mb ))
 
                 if ((.not.(test_mij.or.test_pij.or.test_imj.or.test_ipj))) then
-                    calv(i,j) = H_ice(i,j) / dt             
+                    calv(i,j) = (H_calv - H_ice(i,j)) / tau             
                 end if  
 
             end if
@@ -211,21 +185,21 @@ contains
 
         return 
 
-    end function calc_calving_rate_flux
+    end subroutine calc_calving_rate_flux
     
-    function calc_calving_rate_eigen(H_ice,is_float,ux_bar,uy_bar,dx,dy,dt,H_calv,k_calv) result(calv)
+    subroutine calc_calving_rate_eigen(calv,H_ice,f_grnd,ux_bar,uy_bar,dx,dy,H_calv,k_calv)
         ! Calculate the calving rate [m/a] based on the "eigencalving" law
         ! from Levermann et al. (2012)
 
         implicit none 
 
-        real(prec), intent(IN) :: H_ice(:,:)
-        logical,    intent(IN) :: is_float(:,:)  
-        real(prec), intent(IN) :: ux_bar(:,:), uy_bar(:,:)
-        real(prec), intent(IN) :: dx, dy, dt 
-        real(prec), intent(IN) :: H_calv 
-        real(prec), intent(IN) :: k_calv
-        real(prec) :: calv(size(H_ice,1),size(H_ice,2)) 
+        real(prec), intent(OUT) :: calv(:,:)
+        real(prec), intent(IN)  :: H_ice(:,:)
+        real(prec), intent(IN)  :: f_grnd(:,:)  
+        real(prec), intent(IN)  :: ux_bar(:,:), uy_bar(:,:)
+        real(prec), intent(IN)  :: dx, dy 
+        real(prec), intent(IN)  :: H_calv 
+        real(prec), intent(IN)  :: k_calv
 
         ! Local variables 
         integer :: i, j, nx, ny
@@ -243,68 +217,59 @@ contains
         allocate(spr(nx,ny),eps_xx(nx,ny),eps_yy(nx,ny))
         allocate(is_front(nx,ny))
 
-        ! Determine grid points with shelf ice that are bordered by ice-free points
-        is_front = .FALSE.
-        do i=2,nx-1
-        do j=2,ny-1
+        do j = 1, ny
+        do i = 1, nx
+            ! Calculate strain rate locally (Aa node)
+            eps_xx(i,j) = (ux_bar(i,j) - ux_bar(i-1,j))/dx
+            eps_yy(i,j) = (uy_bar(i,j) - uy_bar(i,j-1))/dy            
+        end do
+        end do
+        
 
-            if (is_float(i,j) .and. H_ice(i,j) .gt. 0.0) then
+        calv = 0.0
 
-                n_ocean = count([is_float(i-1,j) .and. H_ice(i-1,j).eq.0.0, &
-                                 is_float(i+1,j) .and. H_ice(i+1,j).eq.0.0, &
-                                 is_float(i,j-1) .and. H_ice(i,j-1).eq.0.0, &
-                                 is_float(i,j+1) .and. H_ice(i,j+1).eq.0.0])
+        do j = 2, ny-1
+        do i = 2, nx-1  
+            
+            if ( (f_grnd(i,j) .eq. 0.0 .and. H_ice(i,j) .gt. 0.0) .and. &
+                   ( (f_grnd(i-1,j) .eq. 0.0 .and. H_ice(i-1,j).eq.0.0) .or. &
+                     (f_grnd(i+1,j) .eq. 0.0 .and. H_ice(i+1,j).eq.0.0) .or. &
+                     (f_grnd(i,j-1) .eq. 0.0 .and. H_ice(i,j-1).eq.0.0) .or. &
+                     (f_grnd(i,j+1) .eq. 0.0 .and. H_ice(i,j+1).eq.0.0) ) ) then 
+                ! Ice-shelf floating margin: floating ice point with open ocean neighbor 
+                ! If this point is an ice front, check for calving
 
-                is_front(i,j) = (n_ocean .gt. 0)
+                if ((eps_xx(i,j).gt.0.0).and.(eps_yy(i,j).gt.0.0)) then                   
+                    ! Divergence in both directions, apply calving law 
+                    ! Flux condition + calving rate with spreading:       
+
+                    calv(i,j) = k_calv * eps_xx(i,j)*eps_yy(i,j)                                       
+                
+                end if
+
             end if
 
         end do
         end do
 
-        do j = 1, ny
-            do i = 1, nx
-                ! Calculate strain rate locally (Aa node)
-                eps_xx(i,j) = (ux_bar(i,j) - ux_bar(i-1,j))/dx
-                eps_yy(i,j) = (uy_bar(i,j) - uy_bar(i,j-1))/dy            
-            end do
-        end do
-        
-        ! PISM-like flux condition + calving rate with spreading:       
-        calv = 0.0 
-        do j = 2, ny-1
-            do i = 2, nx-1  
-                
-                if( is_front(i,j) ) then                  ! Check if current point is floating, at the ice front                      
-
-                    if ((eps_xx(i,j).gt.0.0).and.(eps_yy(i,j).gt.0.0)) then     ! divergence in both directions               
-                        calv(i,j) = k_calv * eps_xx(i,j) * eps_yy(i,j) / dt     ! calving law                                        
-                    else
-                        calv(i,j) = 0.0                                         ! no calving because of no divergence
-                    end if
-
-                end if
-
-            end do
-        end do
-
         return 
 
-    end function calc_calving_rate_eigen
+    end subroutine calc_calving_rate_eigen
 
-    function calc_calving_rate_kill(H_ice,f_grnd,dt) result(calv)
+    subroutine calc_calving_rate_kill(calv,H_ice,f_grnd,tau)
 
         implicit none 
 
-        real(prec), intent(IN) :: H_ice(:,:)
-        real(prec), intent(IN) :: f_grnd(:,:) 
-        real(prec), intent(IN) :: dt 
-        real(prec) :: calv(size(H_ice,1),size(H_ice,2)) 
+        real(prec), intent(OUT) :: calv(:,:)
+        real(prec), intent(IN)  :: H_ice(:,:)
+        real(prec), intent(IN)  :: f_grnd(:,:) 
+        real(prec), intent(IN)  :: tau 
 
-        ! Kill all floating ice, including partially grounded ice
-        where (f_grnd .eq. 0.0) calv = H_ice / dt 
+        ! Kill all floating ice using a characteristic timescale tau
+        where (f_grnd .eq. 0.0) calv = H_ice / tau 
 
         return 
 
-    end function calc_calving_rate_kill
+    end subroutine calc_calving_rate_kill
 
 end module calving 

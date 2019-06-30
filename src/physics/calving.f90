@@ -19,7 +19,7 @@ contains
     subroutine apply_calving(H_ice,calv,f_grnd,H_min_flt,dt)
         ! Given a diagnosed calving rate, make additional modifications
         ! as needed and apply the calving rate to the ice thickness for this timestep
-        
+
         implicit none 
 
         real(prec), intent(INOUT) :: H_ice(:,:) 
@@ -32,30 +32,39 @@ contains
         integer :: i, j, nx, ny 
         integer :: n_mrgn 
 
+        real(prec), parameter :: tau_mrgn = 5.0         ! [a] Time scale for calving of points with many ice-free neighbors
         nx = size(H_ice,1)
         ny = size(H_ice,2) 
 
         do j = 1, ny 
         do i = 1, nx 
 
-            if (calv(i,j) .gt. 0.0) then 
-                ! For calving points, check how many neighbors are ocean:
-                ! Increase calving rate for more exposed sides 
+            if (f_grnd(i,j) .eq. 0.0 .and. H_ice(i,j) .gt. 0.0) then 
+                ! Floating point, diagnose number of ice-free neighbors 
 
                 n_mrgn = count([H_ice(i-1,j),H_ice(i+1,j),H_ice(i,j-1),H_ice(i,j+1)].eq.0.0 )
 
-                ! Multiply calving rate by number of sides 
-                if (n_mrgn .gt. 1) calv(i,j) = calv(i,j) * n_mrgn 
+            else 
+
+                n_mrgn = 0 
 
             end if 
 
-            ! Additionally modify calving to remove any ice (margin or not) less than H_min_flt 
-            if (f_grnd(i,j) .eq. 0.0 .and. H_ice(i,j) .lt. H_min_flt) calv(i,j) = H_ice(i,j)/dt
+            if (n_mrgn .gt. 2) then 
+                ! For points with more than two ice-free neighbors, increase calving rate 
+                ! (this is designed to handle rare, ice peninsulas that can protrude
+                !  from the main ice body)
+                
+                calv(i,j) = calv(i,j) + max(1000.0-H_ice(i,j),0.0)/tau_mrgn 
+
+            end if 
+
+            ! Additionally modify calving to remove any margin ice less than H_min_flt 
+            if (n_mrgn .gt. 0 .and. H_ice(i,j) .lt. H_min_flt) calv(i,j) = H_ice(i,j)/dt
             
             ! Ensure calving is limited to amount of available ice to calve  
             if(f_grnd(i,j) .eq. 0.0 .and. (H_ice(i,j)-dt*calv(i,j)) .lt. 0.0) calv(i,j) = H_ice(i,j)/dt
-
-                
+            
             ! Apply modified mass balance to update the ice thickness 
             H_ice(i,j) = H_ice(i,j) - dt*calv(i,j)
             

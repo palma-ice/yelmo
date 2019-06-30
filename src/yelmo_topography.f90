@@ -116,13 +116,13 @@ contains
 
                     call calc_calving_rate_simple(tpo%now%calv,tpo%now%H_ice,tpo%now%f_grnd, &
                                                     tpo%par%calv_H_lim,tpo%par%calv_tau)
-                
+                    
                 case("flux") 
                     ! Use threshold+flux method from GRISLI 
 
                     call calc_calving_rate_flux(tpo%now%calv,tpo%now%H_ice,tpo%now%f_grnd,mbal,dyn%now%ux_bar, &
                                                 dyn%now%uy_bar,tpo%par%dx,tpo%par%calv_H_lim,tpo%par%calv_tau)
-                
+                    
                 case("kill") 
                     ! Delete all floating ice (using characteristic time parameter)
                     call calc_calving_rate_kill(tpo%now%calv,tpo%now%H_ice,tpo%now%f_grnd,tpo%par%calv_tau)

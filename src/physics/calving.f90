@@ -26,13 +26,38 @@ contains
         real(prec), intent(IN)    :: H_min_flt
         real(prec), intent(IN)    :: dt  
         
-        ! Ensure calving is limited to amount of available ice to calve  
-        where(f_grnd .eq. 0.0 .and. (H_ice-dt*calv) .lt. 0.0) calv = H_ice/dt
+        ! Local variables 
+        integer :: i, j, nx, ny 
+        integer :: n_mrgn 
 
-        ! Additionally modify calving to remove any ice (margin or not)
-        ! less than H_min_flt 
-        where (f_grnd .eq. 0.0 .and. H_ice .lt. H_min_flt) calv = H_ice/dt
-        
+        nx = size(H_ice,1)
+        ny = size(H_ice,2) 
+
+        do j = 1, ny 
+        do i = 1, nx 
+
+            if (calv(i,j) .gt. 0.0) then 
+                ! For calving points, check how many neighbors are ocean:
+                ! Increase calving rate for more exposed sides 
+
+                n_mrgn = count([H_ice(i-1,j),H_ice(i+1,j),H_ice(i,j-1),H_ice(i,j+1)].eq.0.0 )
+
+                ! Multiply calving rate by number of sides 
+                if (n_mrgn .gt. 1) calv(i,j) = calv(i,j) * n_mrgn 
+
+            end if 
+
+            ! Ensure calving is limited to amount of available ice to calve  
+            if(f_grnd(i,j) .eq. 0.0 .and. (H_ice(i,j)-dt*calv(i,j)) .lt. 0.0) calv(i,j) = H_ice(i,j)/dt
+
+            ! Additionally modify calving to remove any ice (margin or not)
+            ! less than H_min_flt 
+            if (f_grnd(i,j) .eq. 0.0 .and. H_ice(i,j) .lt. H_min_flt) calv(i,j) = H_ice(i,j)/dt
+
+
+        end do 
+        end do 
+
         ! Apply modified mass balance to update the ice thickness 
         H_ice = H_ice - dt*calv
         

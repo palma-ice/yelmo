@@ -17,7 +17,9 @@ module calving
 contains 
 
     subroutine apply_calving(H_ice,calv,f_grnd,H_min_flt,dt)
-
+        ! Given a diagnosed calving rate, make additional modifications
+        ! as needed and apply the calving rate to the ice thickness for this timestep
+        
         implicit none 
 
         real(prec), intent(INOUT) :: H_ice(:,:) 
@@ -47,23 +49,22 @@ contains
 
             end if 
 
+            ! Additionally modify calving to remove any ice (margin or not) less than H_min_flt 
+            if (f_grnd(i,j) .eq. 0.0 .and. H_ice(i,j) .lt. H_min_flt) calv(i,j) = H_ice(i,j)/dt
+            
             ! Ensure calving is limited to amount of available ice to calve  
             if(f_grnd(i,j) .eq. 0.0 .and. (H_ice(i,j)-dt*calv(i,j)) .lt. 0.0) calv(i,j) = H_ice(i,j)/dt
 
-            ! Additionally modify calving to remove any ice (margin or not)
-            ! less than H_min_flt 
-            if (f_grnd(i,j) .eq. 0.0 .and. H_ice(i,j) .lt. H_min_flt) calv(i,j) = H_ice(i,j)/dt
-
-
+                
+            ! Apply modified mass balance to update the ice thickness 
+            H_ice(i,j) = H_ice(i,j) - dt*calv(i,j)
+            
         end do 
         end do 
 
-        ! Apply modified mass balance to update the ice thickness 
-        H_ice = H_ice - dt*calv
-        
         ! Also ensure tiny numeric ice thicknesses are removed
         where (f_grnd .eq. 0.0 .and. H_ice .lt. 1e-5) H_ice = 0.0 
-        
+            
         return 
         
     end subroutine apply_calving

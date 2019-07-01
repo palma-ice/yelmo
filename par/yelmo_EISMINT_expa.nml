@@ -25,9 +25,9 @@
     grid_path       = "none"
     experiment      = "EISMINT"         ! "None", "EISMINT", "MISMIP3D", "BUELER"  to apply special boundary conditions   
     restart         = "no"
-    zeta_scale      = "tanh"            ! "linear", "exp", "tanh"
+    zeta_scale      = "linear"            ! "linear", "exp", "tanh"
     zeta_exp        = 2.0  
-    nz_aa           = 31                ! Vertical resolution in ice
+    nz_aa           = 81                ! Vertical resolution in ice
     dtmin           = 0.001             ! [a] Minimum timestep 
     dtmax           = 5.0               ! [a] Maximum timestep
     ntt             = 1                 ! [--] Thermodynamics call frequency (how many dynamic timesteps to skip)

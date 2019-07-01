@@ -1,10 +1,10 @@
 &control    
     time_init       = 0.0            ! [yr] Starting time 
-    time_end        = 50e3           ! [yr] Ending time
+    time_end        = 100.0          ! [yr] Ending time
     time_equil      = 10.0           ! [yr] Equilibration time 
     dtt             = 2.0            ! [yr] Main loop timestep 
     dt1D_out        = 100.0          ! [yr] Frequency of writing 1D output files 
-    dt2D_out        = 100.0          ! [yr] Frequency of writing 2D output files 
+    dt2D_out        = 2.0            ! [yr] Frequency of writing 2D output files 
     bmb_shlf_const  = -0.1           ! [m/a] Basal mass balance of ice shelves
 /
 
@@ -60,7 +60,6 @@
     beta_with_neff      = True            ! Additionally scale beta by effective pressure? (beta=Neff*[beta_default])
     m_drag              = 1.0             ! Dragging law exponent 
     u_0                 = 100.0           ! [m/a] Regularization term for regularized Coulomb law (beta_method=3)
-    beta_const          = 1e3             ! [Pa a m−1] Constant value of basal friction coefficient to be used
     beta_gl_sep         = 0               !  -1: Apply subgrid treatment on ac-nodes (beta_gl_stag=3) 0: No subgrid treatment, 1: beta*f_grnd_aa        
     beta_gl_scale       = 0               !  0: beta*beta_gl_f, 1: H_grnd linear scaling, 2: Zstar scaling 
     beta_gl_stag        = 0               !  0: simple staggering, 1: Upstream beta at gl, 2: downstream, 3: f_grnd_ac scaling 
@@ -71,6 +70,7 @@
     C_bed_z1            = 0.0             ! [m] Bedrock elevation above which scaling goes to f_scale=1  (bed_method 2) or at which C_bed = C_bed_max (bed method 4)
     C_bed_min           = 1e-5            ! [a m-1] Bed roughness at bedrock elevation C_bed_z0 or below (used for having a lower limit in cbedmethod2 (exp) and C_bed_method = 4)
     C_bed_max           = 50e-5           ! [a m-1] Bed roughness at bedrock elevation C_bed_z1 or above (only used for C_bed_method = 4)
+    beta_const          = 1e3             ! [Pa a m−1] Constant value of basal friction coefficient to be used
     H_grnd_lim          = 500.0           ! [m] For beta_sep_method=2, reduce beta linearly between H_grnd=0 and H_grnd_lim 
     H_sed_sat           = 250.0           ! [m] Sediment thickness at which sediment effect is saturated
     cf_frozen           = 200e-5          ! [a m-1] Bed roughness coefficient, frozen (not used in cbed_method 4)

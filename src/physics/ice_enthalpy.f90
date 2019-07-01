@@ -234,17 +234,12 @@ contains
             ! Note: this is important to avoid mixing of kappa at the 
             ! CTS height (kappa_lower = kappa_temperate; kappa_upper = kappa_cold)
             ! See Blatter and Greve, 2015, Eq. 25. 
-            !kappa_a = kappa_aa(k)
-            !kappa_b = kappa_aa(k+1) 
+            kappa_a = kappa_aa(k)
+            kappa_b = kappa_aa(k+1) 
 
             ! Harmonic average: doesn't work well for the CTS
-            !kappa_a = 2.0_prec / (1.0_prec/kappa_aa(k-1) + 1.0_prec/kappa_aa(k))
-            !kappa_b = 2.0_prec / (1.0_prec/kappa_aa(k+1) + 1.0_prec/kappa_aa(k))
-            !write(*,*) k, kappa_a, kappa_aa(k), kappa_b 
-
-            ! Harmonic average: doesn't work well for the CTS
-            kappa_a = 2.0_prec / (1.0_prec/kappa_aa(k) + 1.0_prec/kappa_aa(k-1))
-            kappa_b = 2.0_prec / (1.0_prec/kappa_aa(k) + 1.0_prec/kappa_aa(k+1))
+            !kappa_a = 2.0_prec / (1.0_prec/kappa_aa(k) + 1.0_prec/kappa_aa(k-1))
+            !kappa_b = 2.0_prec / (1.0_prec/kappa_aa(k) + 1.0_prec/kappa_aa(k+1))
 
             ! Vertical distance for centered difference advection scheme
             dz      =  H_ice*(zeta_aa(k+1)-zeta_aa(k-1))

@@ -28,9 +28,10 @@
     topo_fixed        = False
     topo_relax_dt     = 2000
     topo_fixed_dt     = -1              ! <= 0 for always fixed, positive value to 'unfix' topo after interval
-    calv_dt           = 1e-5            ! [a] Calving frequency 
-    H_calv            = 200.0 
-    H_min             = 5.0             ! [m] Minimum ice thickness at grounded margin (thinner ice is ablated) - helps with stability
+    calv_H_lim        = 200.0           ! [m] Calving limit in ice thickness (thinner ice calves)
+    calv_tau          = 1.0             ! [a] Characteristic calving time
+    H_min_grnd        = 5.0             ! [m] Minimum ice thickness at grounded margin (thinner ice is ablated) - helps with stability
+    H_min_flt         = 75.0            ! [m] Minimum ice thickness at floating margin (thinner ice is ablated) - helps with stability
     sd_min            = 100.0           ! [m] calv_grnd(z_bed_sd <= sd_min) = 0.0 
     sd_max            = 500.0           ! [m] calv_grnd(z_bed_sd >= sd_max) = calv_max  
     calv_max          = 10.0            ! [m/a] Maximum grounded calving rate from high stdev(z_bed)
@@ -49,7 +50,6 @@
     beta_with_neff      = False           ! Additionally scale beta by effective pressure? (beta=Neff*[beta_default])
     m_drag              = 1.0             ! Dragging law exponent 
     u_0                 = 100.0           ! [m/a] Regularization term for regularized Coulomb law (beta_method=3)
-    beta_const          = 1e3             ! [Pa a m−1] Constant value of basal friction coefficient to be used
     beta_gl_sep         = 0               !  -1: Apply subgrid treatment on ac-nodes (beta_gl_stag=3) 0: No subgrid treatment, 1: beta*f_grnd_aa        
     beta_gl_scale       = 0               !  0: beta*beta_gl_f, 1: H_grnd linear scaling, 2: Zstar scaling 
     beta_gl_stag        = 0               !  0: simple staggering, 1: Upstream beta at gl, 2: downstream, 3: f_grnd_ac scaling 
@@ -60,10 +60,11 @@
     C_bed_z1            =  200.0          ! [m] Bedrock elevation above which scaling goes to f_scale=1
     C_bed_min           = 1e-4            ! [Pa a m-1] Minimum allowed value for C_bed for C_bed_method=[2,4]
     C_bed_max           = 500.0           ! [Pa a m-1] Maximum allowed value for C_bed for C_bed_method=[2,4]
+    beta_const          = 1e3             ! [Pa a m−1] Constant value of basal friction coefficient to be used
     H_grnd_lim          = 500.0           ! [m] For beta_sep_method=2, reduce beta linearly between H_grnd=0 and H_grnd_lim 
     H_sed_sat           = 250.0           ! [m] Sediment thickness at which sediment effect is saturated
-    cf_frozen           = 1.0             ! [a m-1] Bed roughness coefficient, frozen 
-    cf_stream           = 1e6             ! [a m-1] Bed roughness coefficient, stream  
+    cf_frozen           = 20e-5           ! [a m-1] Bed roughness coefficient, frozen 
+    cf_stream           = 20e-5           ! [a m-1] Bed roughness coefficient, stream  
     cf_fac_sed          = 1.0             ! [-] Scaling of roughness for sediments 
     cf_sia              = 0.0             ! [m a-1 Pa-1] Bed roughness coefficient for SIA sliding
     streaming_margin    = True            ! Impose cf_stream at the margin and grline independent of f_pmp
@@ -101,44 +102,39 @@
     rf_method               = 1         ! -1: set externally; 0: rf_const everywhere; 1: standard function 
     rf_const                = 1e-18     ! [Pa^-3 a^-1]
     rf_use_eismint2         = False     ! Only applied for rf_method=1
+    rf_with_water           = False     ! Only applied for rf_method=1, scale rf by water content?
     n_glen                  = 3 
     visc_min                = 1e3 
     use_2D_enh              = False 
     enh_shear               = 2.0
     enh_stream              = 2.0
     enh_shlf                = 0.7
-
     age_method              = "None"    ! "None", "expl", "impl"
     age_impl_kappa          = 1.5       ! [m2 a-1] Artificial diffusion term for implicit age solving 
 
 /
 
 &ytherm
-    method         = "active"           ! "fixed", "robin", "active"
-    cond_bed       = False              ! True for active conductive bedrock (ie, Q_geo)
-    gamma          = 1.0                ! [K] Scalar for the pressure melting point decay function 
-    nzr            = 11                 ! [-] Number of vertical grid points in bedrock 
-    H_rock         = 6000.0             ! [m] Vertical grid step in bedrock 
-    use_strain_sia = False              ! True: calculate strain heating from SIA approx.
-    n_sm_qstrn     = 0                  ! [-] Standard deviation in gridpoints for Gaussian smoothing of strain heating (0==no smoothing)
-    n_sm_qb        = 0                  ! [-] Standard deviation in gridpoints for Gaussian smoothing of basal heating (0==no smoothing)
-    use_const_cp   = False              ! Use specified constant value of heat capacity?
-    const_cp       = 2009.0             ! [J kg-1 K-1] Specific heat capacity 
-    use_const_kt   = False              ! Use specified constant value of heat conductivity?
-    const_kt       = 6.62e7             ! [J a-1 m-1 K-1] Thermal conductivity [W m-1 K-1 * sec_year] => [J a-1 m-1 K-1]
-    kt_m           = 1.0e8              ! [J a-1 m-1 K-1] Thermal conductivity of the mantle (lithosphere)
-    cp_m           = 1000.0             ! [J kg-1 K-1] Specific heat capacity of the mantle (lithosphere)
-    rho_m          = 2000.0             ! [kg m-3] Density of the mantle (lithosphere)
-
+    method          = "temp"            ! "fixed", "robin", "temp", "enth"
+    gamma           = 1.0               ! [K] Scalar for the pressure melting point decay function 
+    use_strain_sia  = False             ! True: calculate strain heating from SIA approx.
+    n_sm_qstrn      = 0                 ! [-] Standard deviation in gridpoints for Gaussian smoothing of strain heating (0==no smoothing)
+    n_sm_qb         = 0                 ! [-] Standard deviation in gridpoints for Gaussian smoothing of basal heating (0==no smoothing)
+    use_const_cp    = False             ! Use specified constant value of heat capacity?
+    const_cp        = 2009.0            ! [J kg-1 K-1] Specific heat capacity 
+    use_const_kt    = False             ! Use specified constant value of heat conductivity?
+    const_kt        = 6.62e7            ! [J a-1 m-1 K-1] Thermal conductivity [W m-1 K-1 * sec_year] => [J a-1 m-1 K-1]
+    enth_cr         = 1e-2              ! [--] Conductivity ratio for temperate ice (kappa_temp     = enth_cr*kappa_cold)
+    omega_max       = 0.02              ! [--] Maximum allowed water content fraction 
 /
 
 &yelmo_masks
-    basins_load   = True 
-    basins_path   = "input/{domain}/{grid_name}/{grid_name}_BASINS-nasa.nc" 
-    basins_nms    = "basin" "basin_mask"
-    regions_load  = True 
-    regions_path  = "input/{domain}/{grid_name}/{grid_name}_REGIONS.nc"
-    regions_nms   = "mask" "None"
+    basins_load     = True 
+    basins_path     = "input/{domain}/{grid_name}/{grid_name}_BASINS-nasa.nc" 
+    basins_nms      = "basin" "basin_mask"
+    regions_load    = True 
+    regions_path    = "input/{domain}/{grid_name}/{grid_name}_REGIONS.nc"
+    regions_nms     = "mask" "None"
 /
 
 &yelmo_init_topo

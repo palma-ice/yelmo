@@ -1,11 +1,11 @@
 &control    
-    time_init       = 0.0            ! [yr] Starting time 
-    time_end        = 100.0          ! [yr] Ending time
-    time_equil      = 10.0           ! [yr] Equilibration time 
-    dtt             = 2.0            ! [yr] Main loop timestep 
-    dt1D_out        = 100.0          ! [yr] Frequency of writing 1D output files 
-    dt2D_out        = 2.0            ! [yr] Frequency of writing 2D output files 
-    bmb_shlf_const  = -0.1           ! [m/a] Basal mass balance of ice shelves
+    time_init       = 0.0               ! [yr] Starting time 
+    time_end        = 100.0             ! [yr] Ending time
+    time_equil      = 10.0              ! [yr] Equilibration time 
+    dtt             = 2.0               ! [yr] Main loop timestep 
+    dt1D_out        = 100.0             ! [yr] Frequency of writing 1D output files 
+    dt2D_out        = 2.0               ! [yr] Frequency of writing 2D output files 
+    bmb_shlf_const  = -0.1              ! [m/a] Basal mass balance of ice shelves
 /
 
 &yelmo
@@ -119,33 +119,32 @@
     enh_shear               = 2.0
     enh_stream              = 2.0
     enh_shlf                = 0.7
-
     age_method              = "None"    ! "None", "expl", "impl"
     age_impl_kappa          = 1.5       ! [m2 a-1] Artificial diffusion term for implicit age solving 
 
 /
 
 &ytherm
-    method         = "temp"             ! "fixed", "robin", "temp", "enth"
-    gamma          = 1.0                ! [K] Scalar for the pressure melting point decay function 
-    use_strain_sia = False              ! True: calculate strain heating from SIA approx.
-    n_sm_qstrn     = 0                  ! [-] Standard deviation in gridpoints for Gaussian smoothing of strain heating (0==no smoothing)
-    n_sm_qb        = 0                  ! [-] Standard deviation in gridpoints for Gaussian smoothing of basal heating (0==no smoothing)
-    use_const_cp   = False              ! Use specified constant value of heat capacity?
-    const_cp       = 2009.0             ! [J kg-1 K-1] Specific heat capacity 
-    use_const_kt   = False              ! Use specified constant value of heat conductivity?
-    const_kt       = 6.62e7             ! [J a-1 m-1 K-1] Thermal conductivity [W m-1 K-1 * sec_year] => [J a-1 m-1 K-1]
-    enth_cr        = 1e-2               ! [--] Conductivity ratio for temperate ice (kappa_temp = enth_cr*kappa_cold)
-    omega_max      = 0.02               ! [--] Maximum allowed water content fraction 
+    method          = "temp"            ! "fixed", "robin", "temp", "enth"
+    gamma           = 1.0               ! [K] Scalar for the pressure melting point decay function 
+    use_strain_sia  = False             ! True: calculate strain heating from SIA approx.
+    n_sm_qstrn      = 0                 ! [-] Standard deviation in gridpoints for Gaussian smoothing of strain heating (0==no smoothing)
+    n_sm_qb         = 0                 ! [-] Standard deviation in gridpoints for Gaussian smoothing of basal heating (0==no smoothing)
+    use_const_cp    = False             ! Use specified constant value of heat capacity?
+    const_cp        = 2009.0            ! [J kg-1 K-1] Specific heat capacity 
+    use_const_kt    = False             ! Use specified constant value of heat conductivity?
+    const_kt        = 6.62e7            ! [J a-1 m-1 K-1] Thermal conductivity [W m-1 K-1 * sec_year] => [J a-1 m-1 K-1]
+    enth_cr         = 1e-2              ! [--] Conductivity ratio for temperate ice (kappa_temp     = enth_cr*kappa_cold)
+    omega_max       = 0.02              ! [--] Maximum allowed water content fraction 
 /
 
 &yelmo_masks
-    basins_load   = True 
-    basins_path   = "input/{domain}/{grid_name}/{grid_name}_BASINS-nasa.nc" 
-    basins_nms    = "basin" "basin_mask"
-    regions_load  = True 
-    regions_path  = "input/{domain}/{grid_name}/{grid_name}_REGIONS.nc"
-    regions_nms   = "mask" "None"
+    basins_load     = True 
+    basins_path     = "input/{domain}/{grid_name}/{grid_name}_BASINS-nasa.nc" 
+    basins_nms      = "basin" "basin_mask"
+    regions_load    = True 
+    regions_path    = "input/{domain}/{grid_name}/{grid_name}_REGIONS.nc"
+    regions_nms     = "mask" "None"
 /
 
 &yelmo_init_topo

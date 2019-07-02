@@ -311,9 +311,9 @@ contains
         end do 
 
         ! Fill in borders 
-        call fill_borders_3D(enth,nfill=1)
-        call fill_borders_3D(T_ice,nfill=1)
-        call fill_borders_3D(omega,nfill=1)
+        call fill_borders_3D(enth,nfill=2)
+        call fill_borders_3D(T_ice,nfill=2)
+        call fill_borders_3D(omega,nfill=2)
 
         return 
 

@@ -64,7 +64,7 @@ contains
             
             ! Ensure calving is limited to amount of available ice to calve  
             if(f_grnd(i,j) .eq. 0.0 .and. (H_ice(i,j)-dt*calv(i,j)) .lt. 0.0) calv(i,j) = H_ice(i,j)/dt
-            
+
             ! Apply modified mass balance to update the ice thickness 
             H_ice(i,j) = H_ice(i,j) - dt*calv(i,j)
             
@@ -117,7 +117,7 @@ contains
                 if (H_ice(i,j) .lt. H_calv) then 
                     ! Apply calving at front, delete all ice in point (H_ice) 
 
-                    calv(i,j) = (H_calv-H_ice(i,j)) / tau 
+                    calv(i,j) = max(H_calv-H_ice(i,j),0.0) / tau 
 
                 end if 
 
@@ -215,7 +215,7 @@ contains
                     .or.(f_grnd(i,j+1).gt.0.0.and.positive_mb ))
 
                 if ((.not.(test_mij.or.test_pij.or.test_imj.or.test_ipj))) then
-                    calv(i,j) = (H_calv - H_ice(i,j)) / tau             
+                    calv(i,j) = max(H_calv - H_ice(i,j),0.0) / tau             
                 end if  
 
             end if
@@ -259,7 +259,7 @@ contains
 
         do j = 1, ny
         do i = 1, nx
-            ! Calculate strain rate locally (Aa node)
+            ! Calculate strain rate locally (aa-node)
             eps_xx(i,j) = (ux_bar(i,j) - ux_bar(i-1,j))/dx
             eps_yy(i,j) = (uy_bar(i,j) - uy_bar(i,j-1))/dy            
         end do

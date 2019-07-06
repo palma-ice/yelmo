@@ -965,13 +965,6 @@ end if
 
         end select 
 
-        if (dyn%par%beta_with_neff) then 
-            ! Additionally scale by N_eff (beta = beta*N_eff)
-
-            call scale_beta_aa_Neff(dyn%now%beta,dyn%now%N_eff)
-
-        end if 
-
         ! 2. Apply grounding-line sub-element parameterization (sep, ie, subgrid method)
         select case(dyn%par%beta_gl_sep)
 
@@ -1111,7 +1104,7 @@ end if
     end subroutine calc_ydyn_beta 
 
     subroutine calc_ydyn_cbed(dyn,tpo,thrm,bnd)
-        ! Update C_bed based on parameter choices
+        ! Update C_bed [Pa] based on parameter choices
 
         implicit none
         
@@ -1127,22 +1120,22 @@ end if
         nx = size(dyn%now%C_bed,1)
         ny = size(dyn%now%C_bed,2)
         
-        select case(dyn%par%C_bed_method)
+        select case(dyn%par%cb_method)
 
             case(-1)
                 ! C_bed has been defined externally - do nothing
 
             case(0)
-                ! Constant C_bed everywhere based on cf_stream
+                ! Constant C_bed everywhere based on cb_stream
 
-                dyn%now%C_bed = dyn%par%cf_stream
+                dyn%now%C_bed = dyn%par%cb_stream
 
             case(1)
                 ! Set C_bed according to temperate character of base
 
                 ! Smooth transition between temperate and frozen C_bed
-                dyn%now%C_bed = (thrm%now%f_pmp)*dyn%par%cf_stream &
-                            + (1.0_prec - thrm%now%f_pmp)*dyn%par%cf_frozen 
+                dyn%now%C_bed = (thrm%now%f_pmp)*dyn%par%cb_stream &
+                            + (1.0_prec - thrm%now%f_pmp)*dyn%par%cb_frozen 
 
 
                 if (dyn%par%streaming_margin) then 
@@ -1166,7 +1159,7 @@ end if
                              tpo%now%H_ice(i,j1) .le. 0.0 .or. &
                              tpo%now%H_ice(i,j2) .le. 0.0)) then 
 
-                            dyn%now%C_bed(i,j) = dyn%par%cf_stream
+                            dyn%now%C_bed(i,j) = dyn%par%cb_stream
 
                         end if 
 
@@ -1174,17 +1167,17 @@ end if
                     end do 
 
                     ! Also ensure that grounding line is also considered streaming
-                    where(tpo%now%is_grline) dyn%now%C_bed = dyn%par%cf_stream
+                    where(tpo%now%is_grline) dyn%now%C_bed = dyn%par%cb_stream
 
                 end if
 
             case(2)
                 ! Set C_bed according to bed elevation and or temperate, etc. (experimental)
 
-                ! First set C_bed == cf_stream everywhere 
-                !dyn%now%C_bed = dyn%par%cf_stream 
-                dyn%now%C_bed = (thrm%now%f_pmp)*dyn%par%cf_stream &
-                            + (1.0_prec - thrm%now%f_pmp)*dyn%par%cf_frozen
+                ! First set C_bed == cb_stream everywhere 
+                !dyn%now%C_bed = dyn%par%cb_stream 
+                dyn%now%C_bed = (thrm%now%f_pmp)*dyn%par%cb_stream &
+                            + (1.0_prec - thrm%now%f_pmp)*dyn%par%cb_frozen
 
                 
                 ! Next, apply lambda functions [0:1] to reduce friction
@@ -1194,12 +1187,12 @@ end if
                 do i = 1, nx 
 
                     ! Scale C_bed as a function bedrock elevation relative to sea level
-                    f_scale = exp( (bnd%z_bed(i,j) - dyn%par%C_bed_z1) / (dyn%par%C_bed_z1 - dyn%par%C_bed_z0) )
+                    f_scale = exp( (bnd%z_bed(i,j) - dyn%par%cb_z1) / (dyn%par%cb_z1 - dyn%par%cb_z0) )
                     if (f_scale .gt. 1.0) f_scale = 1.0
                     dyn%now%C_bed(i,j) = dyn%now%C_bed(i,j) * f_scale 
 
 
-                    if (dyn%now%C_bed(i,j).lt.dyn%par%C_bed_min) dyn%now%C_bed(i,j) = dyn%par%C_bed_min
+                    if (dyn%now%C_bed(i,j).lt.dyn%par%cb_min) dyn%now%C_bed(i,j) = dyn%par%cb_min
   
                 end do 
                 end do 
@@ -1223,11 +1216,11 @@ end if
             case(4)
                     ! Set C_bed according to bed elevation (but linearly, no as in case 2)
 
-                ! First set C_bed == cf_stream everywhere or mix of cf_stream/cf_frozen 
+                ! First set C_bed == cb_stream everywhere or mix of cb_stream/cb_frozen 
 
-                !dyn%now%C_bed = dyn%par%cf_stream 
-                dyn%now%C_bed = (thrm%now%f_pmp)*dyn%par%cf_stream &
-                            + (1.0_prec - thrm%now%f_pmp)*dyn%par%cf_frozen
+                !dyn%now%C_bed = dyn%par%cb_stream 
+                dyn%now%C_bed = (thrm%now%f_pmp)*dyn%par%cb_stream &
+                            + (1.0_prec - thrm%now%f_pmp)*dyn%par%cb_frozen
 
 
                 ! Next, apply a linear  functions [0:1] to reduce friction
@@ -1237,20 +1230,10 @@ end if
                 do i = 1, nx
 
                     ! Scale C_bed as a function bedrock elevation relative to sea level
-                    f_scale = (bnd%z_bed(i,j) - dyn%par%C_bed_z0) / (dyn%par%C_bed_z1 - dyn%par%C_bed_z0)
+                    f_scale = (bnd%z_bed(i,j) - dyn%par%cb_z0) / (dyn%par%cb_z1 - dyn%par%cb_z0)
                     if (f_scale .lt. 0.0) f_scale = 0.0 
                     if (f_scale .gt. 1.0) f_scale = 1.0
                     dyn%now%C_bed(i,j) = dyn%now%C_bed(i,j) * f_scale 
-
-!                     ! Scale C_bed as a function bedrock elevation relative to sea level
-!                     ! The equations is Cbed = ((Cmax - Cmin)/(z1 -z0)) * (z - z0) + Cmin 
-                    
-!                     dyn%now%C_bed(i,j) =(dyn%par%C_bed_max - dyn%par%C_bed_min) * (bnd%z_bed(i,j) - dyn%par%C_bed_z0)
-!                     dyn%now%C_bed(i,j) = dyn%now%C_bed(i,j) / (dyn%par%C_bed_z1 - dyn%par%C_bed_z0) 
-!                     dyn%now%C_bed(i,j) = dyn%now%C_bed(i,j) + dyn%par%C_bed_min 
-
-!                     if (bnd%z_bed(i,j) .gt. dyn%par%C_bed_z1) dyn%now%C_bed(i,j) = dyn%par%C_bed_max
-!                     if (bnd%z_bed(i,j) .lt. dyn%par%C_bed_z0) dyn%now%C_bed(i,j) = dyn%par%C_bed_min
 
                 end do
                 end do
@@ -1259,14 +1242,21 @@ end if
             case DEFAULT 
                 ! Not recognized 
 
-                write(*,*) "calc_ydyn_cbed:: Error: C_bed_method not recognized."
-                write(*,*) "C_bed_method = ", dyn%par%C_bed_method
+                write(*,*) "calc_ydyn_cbed:: Error: cb_method not recognized."
+                write(*,*) "C_bed_method = ", dyn%par%cb_method
                 stop 
                 
         end select 
 
+        if (dyn%par%cb_with_neff) then 
+            ! Additionally scale by N_eff (C_bed = C_bed*N_eff)
+
+            call scale_cbed_aa_Neff(dyn%now%c_bed,dyn%now%N_eff)
+
+        end if 
+
         ! Ensure C_bed is not below lower limit 
-        where (dyn%now%C_bed .lt. dyn%par%C_bed_min) dyn%now%C_bed = dyn%par%C_bed_min 
+        where (dyn%now%C_bed .lt. dyn%par%cb_min) dyn%now%C_bed = dyn%par%cb_min 
 
         return 
 
@@ -1352,7 +1342,6 @@ end if
         call nml_read(filename,"ydyn","mix_method",         par%mix_method,         init=init_pars)
         call nml_read(filename,"ydyn","calc_diffusivity",   par%calc_diffusivity,   init=init_pars)
         call nml_read(filename,"ydyn","beta_method",        par%beta_method,        init=init_pars)
-        call nml_read(filename,"ydyn","beta_with_neff",     par%beta_with_neff,     init=init_pars)
         call nml_read(filename,"ydyn","m_drag",             par%m_drag,             init=init_pars)
         call nml_read(filename,"ydyn","u_0",                par%u_0,                init=init_pars)
         call nml_read(filename,"ydyn","beta_const",         par%beta_const,         init=init_pars)
@@ -1363,13 +1352,13 @@ end if
         call nml_read(filename,"ydyn","taud_gl_method",     par%taud_gl_method,     init=init_pars)
         call nml_read(filename,"ydyn","H_grnd_lim",         par%H_grnd_lim,         init=init_pars)
         call nml_read(filename,"ydyn","H_sed_sat",          par%H_sed_sat,          init=init_pars)
-        call nml_read(filename,"ydyn","C_bed_method",       par%C_bed_method,       init=init_pars)
-        call nml_read(filename,"ydyn","C_bed_z0",           par%C_bed_z0,           init=init_pars)
-        call nml_read(filename,"ydyn","C_bed_z1",           par%C_bed_z1,           init=init_pars)
-        call nml_read(filename,"ydyn","C_bed_min",          par%C_bed_min,          init=init_pars)
-        call nml_read(filename,"ydyn","C_bed_max",          par%C_bed_max,          init=init_pars)        
-        call nml_read(filename,"ydyn","cf_frozen",          par%cf_frozen,          init=init_pars)
-        call nml_read(filename,"ydyn","cf_stream",          par%cf_stream,          init=init_pars)
+        call nml_read(filename,"ydyn","cb_method",          par%cb_method,          init=init_pars)
+        call nml_read(filename,"ydyn","cb_with_neff",       par%cb_with_neff,       init=init_pars)
+        call nml_read(filename,"ydyn","cb_z0",              par%cb_z0,              init=init_pars)
+        call nml_read(filename,"ydyn","cb_z1",              par%cb_z1,              init=init_pars)
+        call nml_read(filename,"ydyn","cb_min",             par%cb_min,             init=init_pars)
+        call nml_read(filename,"ydyn","cb_frozen",          par%cb_frozen,          init=init_pars)
+        call nml_read(filename,"ydyn","cb_stream",          par%cb_stream,          init=init_pars)
         call nml_read(filename,"ydyn","cf_fac_sed",         par%cf_fac_sed,         init=init_pars)
         call nml_read(filename,"ydyn","cf_sia",             par%cf_sia,             init=init_pars)
         call nml_read(filename,"ydyn","streaming_margin",   par%streaming_margin,   init=init_pars)

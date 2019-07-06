@@ -160,7 +160,6 @@ module yelmo_defs
         integer    :: mix_method            ! Method for mixing sia and ssa velocity solutions
         logical    :: calc_diffusivity      ! Calculate diagnostic diffusivity field
         integer    :: beta_method
-        logical    :: beta_with_neff 
         real(prec) :: m_drag                ! Sliding law exponent (m==1: plastic)
         real(prec) :: u_0                   ! [m/a] Regularized coulomb friction velocity 
         real(prec) :: beta_const
@@ -171,13 +170,14 @@ module yelmo_defs
         integer    :: taud_gl_method        ! Driving stress grounding line treatment 
         real(prec) :: H_grnd_lim 
         real(prec) :: H_sed_sat
-        integer    :: C_bed_method 
-        real(prec) :: C_bed_z0  
-        real(prec) :: C_bed_z1
-        real(prec) :: C_bed_min
-        real(prec) :: C_bed_max       
-        real(prec) :: cf_stream
-        real(prec) :: cf_frozen
+        integer    :: cb_method 
+        logical    :: cb_with_neff 
+        real(prec) :: cb_z0  
+        real(prec) :: cb_z1
+        real(prec) :: cb_min
+        real(prec) :: cb_max       
+        real(prec) :: cb_stream
+        real(prec) :: cb_frozen
         real(prec) :: cf_fac_sed
         real(prec) :: cf_sia
         logical    :: streaming_margin      ! Ensure margin and grline are considered streaming?

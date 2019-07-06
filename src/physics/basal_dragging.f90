@@ -34,8 +34,8 @@ module basal_dragging
     public :: calc_beta_aa_coulomb
     public :: calc_beta_aa_power_pism
     
-    ! Beta scaling functions (aa-nodes)
-    public :: scale_beta_aa_Neff
+    ! C_bed / Beta scaling functions (aa-nodes)
+    public :: scale_cbed_aa_Neff
     public :: scale_beta_aa_grline
     public :: scale_beta_aa_Hgrnd 
     public :: scale_beta_aa_zstar
@@ -415,20 +415,20 @@ contains
     !
     ! ================================================================================
 
-    subroutine scale_beta_aa_Neff(beta,N_eff)
+    subroutine scale_cbed_aa_Neff(C_bed,N_eff)
         ! Calculate scalar between 0 and 1 to modify basal friction coefficient
         ! as ice approaches and achieves floatation, and apply.
         
         implicit none
             
-        real(prec), intent(INOUT) :: beta(:,:)        ! aa-nodes
-        real(prec), intent(IN)    :: N_eff(:,:)       ! aa-nodes, [bar]     
+        real(prec), intent(INOUT) :: C_bed(:,:)         ! [Pa] aa-nodes, unitless in, [Pa] out.
+        real(prec), intent(IN)    :: N_eff(:,:)         ! [Pa] aa-nodes    
 
-        beta = N_eff * beta 
+        C_bed = N_eff * C_bed 
 
         return
         
-    end subroutine scale_beta_aa_Neff
+    end subroutine scale_cbed_aa_Neff
     
     subroutine scale_beta_aa_grline(beta,f_grnd,f_beta_gl)
         ! Applyt scalar between 0 and 1 to modify basal friction coefficient

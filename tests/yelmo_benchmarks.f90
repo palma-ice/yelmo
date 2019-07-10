@@ -115,29 +115,20 @@ program yelmo_benchmarks
     call yelmo_init_grid(yelmo1%grd,grid_name,units="km",dx=dx,nx=nx,dy=dx,ny=nx)
 
 
-!mmr
-    print*,'hola into init'
-!mmr
 
     ! Initialize data objects (without loading topography, which will be defined inline below)
     call yelmo_init(yelmo1,filename=path_par,grid_def="none",time=time_init,load_topo=.FALSE.,domain=domain,grid_name=grid_name)
     
-!mmr
-    print*,'hola out of ini', yelmo1%tpo%now%H_ice
-    print*,'hola kk'
-!mmr
 
     ! Update parameter values with EISMINT choices 
     yelmo1%dyn%par%use_ssa    = with_ssa 
     yelmo1%tpo%par%topo_fixed = topo_fixed 
 
 
-    print*,'hola bueler'
 
     ! Initialize Bueler test type 
     call bueler_init(buel,yelmo1%grd%nx,yelmo1%grd%ny)
 
-    print*,'hola adios bueler'
 
     ! === Define initial topography =====
 
@@ -157,7 +148,6 @@ program yelmo_benchmarks
 
 !mmr            yelmo1%bnd%z_bed      = 0.0 
 !mmr            yelmo1%tpo%now%H_ice  = 0.0
-	print*,'hereiam'
             yelmo1%tpo%now%z_srf  = yelmo1%bnd%z_bed + yelmo1%tpo%now%H_ice 
             
     end select 
@@ -294,9 +284,6 @@ program yelmo_benchmarks
     ! Initialize state variables (dyn,therm,mat)
     call yelmo_init_state(yelmo1,path_par,time=time_init,thrm_method="robin")
 
-!mmr
-!mmr    print*,'hola H_ice' !, yelmo1%tpo%now%H_ice
-!mmr
 
     ! == Write initial state ==
      
@@ -318,9 +305,6 @@ program yelmo_benchmarks
     end if 
 
 
-!mmr
-!mmr    print*,'hola H_ice' !, yelmo1%tpo%now%H_ice
-!mmr
 
 
     ! Advance timesteps

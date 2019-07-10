@@ -130,6 +130,11 @@ contains
         H_ice_acx = stagger_aa_acx(tpo%now%H_ice)
         H_ice_acy = stagger_aa_acy(tpo%now%H_ice)
 
+
+!mmr
+!        write_ssa_diagnostics = .FALSE. 
+!mmr
+
         ! ===== Calculate driving stress ==============================
 
         ! Calculate driving stress 
@@ -300,6 +305,10 @@ contains
             dyn%now%uy_b = 0.0 
 
         end if 
+
+!mmr
+!        print*,'hola write_ssa_diag', write_ssa_diagnostics
+!mmr
 
         if (write_ssa_diagnostics) then 
             stop 

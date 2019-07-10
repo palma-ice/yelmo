@@ -215,7 +215,6 @@ contains
 
         ! Initialize vertical velocity to zero 
         uz = 0.0 
-
         ! Next, calculate velocity 
         do j = 2, ny-1
         do i = 2, nx-1
@@ -250,6 +249,9 @@ contains
                     ! Testing wider stencil for stability (no effect so far)
 !                     duxdx_aa  = 0.5*((ux(i,j+1,k) - ux(i-1,j+1,k))/dx + (ux(i,j-1,k) - ux(i-1,j-1,k))/dx)
 !                     duydy_aa  = 0.5*((uy(i+1,j,k)   - uy(i+1,j-1,k)  )/dy + (uy(i-1,j,k)   - uy(i-1,j-1,k)  )/dy)
+
+
+                    print*,'hola', i,j, uz(i,j,k),uz(i,j,k-1), H_ij,(zeta_ac(k)-zeta_ac(k-1)),(duxdx_aa+duydy_aa)
 
                     uz(i,j,k) = uz(i,j,k-1) & 
                         - H_ij*(zeta_ac(k)-zeta_ac(k-1))*(duxdx_aa+duydy_aa)

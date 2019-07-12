@@ -251,7 +251,7 @@ contains
 !                     duydy_aa  = 0.5*((uy(i+1,j,k)   - uy(i+1,j-1,k)  )/dy + (uy(i-1,j,k)   - uy(i-1,j-1,k)  )/dy)
 
 
-                    print*,'hola', i,j, uz(i,j,k),uz(i,j,k-1), H_ij,(zeta_ac(k)-zeta_ac(k-1)),(duxdx_aa+duydy_aa)
+!mmr old                    print*,'hola', i,j, uz(i,j,k),uz(i,j,k-1), H_ij,(zeta_ac(k)-zeta_ac(k-1)),(duxdx_aa+duydy_aa)
 
                     uz(i,j,k) = uz(i,j,k-1) & 
                         - H_ij*(zeta_ac(k)-zeta_ac(k-1))*(duxdx_aa+duydy_aa)

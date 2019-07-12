@@ -48,6 +48,9 @@ contains
 
         ! Get time step
         dt = time - dyn%par%time 
+!mmr
+        print*,'hola time dyn', time, dyn%par%time, dt
+!mmr
 
         ! ===== Calculate the horizontal velocity components =====
         ! These calculations are done assuming that the final
@@ -64,6 +67,9 @@ contains
                 ! Classic mix methods
 
                 call calc_ydyn_adhoc(dyn,tpo,mat,thrm,bnd,dt)
+!mmr
+                print*,'hola ydyn_adhoc'
+!mmr
 
             case("hybrid-pd12")
                 ! Variational approach of Pollard and de Conto (2012)

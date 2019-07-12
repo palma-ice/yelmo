@@ -414,6 +414,10 @@ contains
                 ! Geothermal heat flux 
 
                 ghf = 42.0   ! [mW/m2]
+
+!mmr
+                print*,'hola eismint bound'
+                !mmr
             
             case DEFAULT 
 

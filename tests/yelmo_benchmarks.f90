@@ -148,8 +148,10 @@ program yelmo_benchmarks
 
 !mmr            yelmo1%bnd%z_bed      = 0.0 
 !mmr            yelmo1%tpo%now%H_ice  = 0.0
-            yelmo1%tpo%now%z_srf  = yelmo1%bnd%z_bed + yelmo1%tpo%now%H_ice 
-            
+!mmr            yelmo1%tpo%now%z_srf  = yelmo1%bnd%z_bed + yelmo1%tpo%now%H_ice 
+!mmr    
+           print*,'hola default'
+!mmr
     end select 
 
     ! ==== READ STEADY-STATE TOPOGRAPHY FROM HEIKO'S RUN
@@ -178,6 +180,9 @@ program yelmo_benchmarks
     yelmo1%bnd%H_sed    = 0.0 
     yelmo1%bnd%H_w      = 0.0
 
+!
+    print*,'hola hereiam'
+!
     select case(trim(experiment))
 
         case("BUELER-A")
@@ -259,6 +264,13 @@ program yelmo_benchmarks
                                     yelmo1%grd%x,yelmo1%grd%y,yelmo1%tpo%now%H_ice, &
                                     experiment=experiment,time=0.0_prec,period=period,dT_test=dT_test)
 
+
+
+!mmr
+            yelmo1%tpo%now%z_srf  = yelmo1%bnd%z_bed + yelmo1%tpo%now%H_ice
+            print*,'hola eismint init'
+!mmr
+
     end select 
 
     ! Call bueler_compare once to initialize comparison fields (even though it is not currently used for EISMINT sims)
@@ -268,6 +280,11 @@ program yelmo_benchmarks
     ! Set ice thickness to a circle of low ice thickness to start
     ! (for testing only)
     if (.FALSE.) then
+
+!mmr
+       print*,'hola false'
+!mmr
+
 
         yelmo1%tpo%now%H_ice  = 0.0
         where(yelmo1%bnd%smb .gt. 0.0) 
@@ -305,6 +322,10 @@ program yelmo_benchmarks
     end if 
 
 
+!mmr
+!mmr    call abort() -up to here identical fields
+    print*,'hola period', period
+!mmr
 
 
     ! Advance timesteps

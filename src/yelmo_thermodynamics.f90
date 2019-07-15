@@ -34,10 +34,6 @@ contains
         nx = thrm%par%nx
         ny = thrm%par%ny
 
-!mmr
-        print*,'hola thrm time', thrm%par%time, time
-!mmr
-
         ! Initialize time if necessary 
         if (thrm%par%time .gt. time) then 
             thrm%par%time = time
@@ -45,13 +41,7 @@ contains
 
         ! Get time step and advance current time 
         dt            = time - thrm%par%time 
-!mmr        dt            = 1.0 ! mmr quick and dirty trick!!!! time - thrm%par%time 
-
         thrm%par%time = time 
-
-!mmr
-        print*,'hola', time, thrm%par%time
-!mmr
         
         ! === Determine some thermal properties === 
 
@@ -97,8 +87,7 @@ contains
         ! Calculate the basal frictional heating 
         call calc_basal_heating(thrm%now%Q_b,dyn%now%ux_b,dyn%now%uy_b,dyn%now%taub_acx,dyn%now%taub_acy)
 
-        if ( dt .gt. 0.0 ) then    
-!mmr not orig        if ( dt .ge. 0.0 ) then     
+        if ( dt .gt. 0.0 ) then     
             ! Ice thermodynamics should evolve, perform calculations 
 
             select case(trim(thrm%par%method))
@@ -150,15 +139,10 @@ contains
         ! Calculate gridpoint fraction at the pressure melting point
         thrm%now%f_pmp = calc_f_pmp(thrm%now%T_ice(:,:,1),thrm%now%T_pmp(:,:,1),thrm%par%gamma,tpo%now%f_grnd)
 
-!mmr
-        print*,'hola yelmo_write_log'
-        yelmo_write_log = .TRUE.
-!mmr
         if (yelmo_write_log) then 
             if (count(tpo%now%H_ice.gt.0.0) .gt. 0) then 
                 write(*,"(a,f14.4,f10.4,f10.2)") "calc_ytherm:: time = ", thrm%par%time, dt, &
-!mmr                    sum(thrm%now%T_ice(:,:,thrm%par%nz_aa),mask=tpo%now%H_ice.gt.0.0)/real(count(tpo%now%H_ice.gt.0.0))
-                    sum(thrm%now%T_ice(:,:,1),mask=tpo%now%H_ice.gt.0.0)/real(count(tpo%now%H_ice.gt.0.0))
+                    sum(thrm%now%T_ice(:,:,thrm%par%nz_aa),mask=tpo%now%H_ice.gt.0.0)/real(count(tpo%now%H_ice.gt.0.0))
             else 
                 write(*,"(a,f14.4,f10.4,f10.2)") "calc_ytherm:: time = ", thrm%par%time, dt, 0.0 
             end if 

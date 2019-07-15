@@ -17,9 +17,8 @@ program yelmo_benchmarks
     type(bueler_test_type) :: buel 
     
     character(len=56)  :: domain    
-!mmr  character(len=256) :: outfldr, file2D, file1D, file_compare
-    character(len=256) :: outfldr, file2D, file1D, file_compare, file_restart
-!mmr
+    character(len=256) :: outfldr, file2D, file1D, file_compare
+    character(len=256) :: file_restart                 !mmr (restart stuff)
     character(len=512) :: path_par, path_const 
     character(len=56)  :: experiment
     logical            :: with_ssa  
@@ -50,9 +49,8 @@ program yelmo_benchmarks
     file1D       = trim(outfldr)//"yelmo1D.nc"
     file2D       = trim(outfldr)//"yelmo2D.nc"
     file_compare = trim(outfldr)//"yelmo_compare.nc"
-! mmr
-    file_restart = trim(outfldr)//"yelmo_restart.nc"  
-! mmr 
+    file_restart = trim(outfldr)//"yelmo_restart.nc"    !mmr (restart stuff)
+
     
     ! Define the domain, grid and experiment from parameter file
     call nml_read(path_par,"eismint","domain",       domain)        ! EISMINT1, EISMINT2
@@ -146,12 +144,10 @@ program yelmo_benchmarks
         case DEFAULT 
             ! EISMINT1, EISMINT2, BUELER 
 
-!mmr            yelmo1%bnd%z_bed      = 0.0 
-!mmr            yelmo1%tpo%now%H_ice  = 0.0
-!mmr            yelmo1%tpo%now%z_srf  = yelmo1%bnd%z_bed + yelmo1%tpo%now%H_ice 
-!mmr    
-           print*,'hola default'
-!mmr
+!mmr (restart stuff)           yelmo1%bnd%z_bed      = 0.0 
+!mmr (restart stuff)           yelmo1%tpo%now%H_ice  = 0.0
+            yelmo1%tpo%now%z_srf  = yelmo1%bnd%z_bed + yelmo1%tpo%now%H_ice 
+
     end select 
 
     ! ==== READ STEADY-STATE TOPOGRAPHY FROM HEIKO'S RUN
@@ -207,7 +203,6 @@ program yelmo_benchmarks
             ! Initialize BUELER-B 
             call bueler_test_BC(buel%H_ice,buel%mbal,buel%u_b,yelmo1%grd%x,yelmo1%grd%y, &
                         time=0.0,R0=750.0_prec,H0=3600.0_prec,lambda=0.0_prec,n=3.0_prec,A=1e-16_prec,rho_ice=rho_ice,g=g)
-!mmr                        time=0.0_prec,R0=750.0_prec,H0=3600.0_prec,lambda=0.0_prec,n=3.0_prec,A=1e-16_prec,rho_ice=rho_ice,g=g)
 
             yelmo1%bnd%T_srf = 223.15 
             yelmo1%bnd%Q_geo = 42.0 
@@ -225,7 +220,6 @@ program yelmo_benchmarks
             ! Initialize BUELER-B (but with HALFAR conditions)
             call bueler_test_BC(buel%H_ice,buel%mbal,buel%u_b,yelmo1%grd%x,yelmo1%grd%y, &
                         time=0.0,R0=21.2132_prec,H0=707.1_prec,lambda=0.0_prec,n=3.0_prec,A=1e-16_prec,rho_ice=rho_ice,g=g)
-!mmr                        time=0.0_prec,R0=21.2132_prec,H0=707.1_prec,lambda=0.0_prec,n=3.0_prec,A=1e-16_prec,rho_ice=rho_ice,g=g)
 
             yelmo1%bnd%T_srf = 223.15 
             yelmo1%bnd%Q_geo = 42.0 
@@ -243,7 +237,6 @@ program yelmo_benchmarks
             ! Initialize BUELER-B (but with conditions between Bueler-B and HALFAR - not too big, not too small)
             call bueler_test_BC(buel%H_ice,buel%mbal,buel%u_b,yelmo1%grd%x,yelmo1%grd%y, &
                         time=0.0,R0=200.0_prec,H0=3000.0_prec,lambda=0.0_prec,n=3.0_prec,A=1e-16_prec,rho_ice=rho_ice,g=g)
-!mmr                        time=0.0_prec,R0=200.0_prec,H0=3000.0_prec,lambda=0.0_prec,n=3.0_prec,A=1e-16_prec,rho_ice=rho_ice,g=g)
 
             yelmo1%bnd%T_srf = 223.15 
             yelmo1%bnd%Q_geo = 42.0 
@@ -265,12 +258,6 @@ program yelmo_benchmarks
                                     experiment=experiment,time=0.0_prec,period=period,dT_test=dT_test)
 
 
-
-!mmr
-            yelmo1%tpo%now%z_srf  = yelmo1%bnd%z_bed + yelmo1%tpo%now%H_ice
-            print*,'hola eismint init'
-!mmr
-
     end select 
 
     ! Call bueler_compare once to initialize comparison fields (even though it is not currently used for EISMINT sims)
@@ -280,11 +267,6 @@ program yelmo_benchmarks
     ! Set ice thickness to a circle of low ice thickness to start
     ! (for testing only)
     if (.FALSE.) then
-
-!mmr
-       print*,'hola false'
-!mmr
-
 
         yelmo1%tpo%now%H_ice  = 0.0
         where(yelmo1%bnd%smb .gt. 0.0) 
@@ -321,11 +303,6 @@ program yelmo_benchmarks
         yelmo1%dyn%par%solver = "fixed"
     end if 
 
-
-!mmr
-!mmr    call abort() -up to here identical fields
-    print*,'hola period', period
-!mmr
 
 
     ! Advance timesteps
@@ -414,10 +391,8 @@ program yelmo_benchmarks
     end select 
 
 
-! mmr
-    ! Write restart file 
-    call yelmo_restart_write(yelmo1,file_restart,time=time)
-! mmr
+    !mmr (restart stuff) Write restart file 
+    call yelmo_restart_write(yelmo1,file_restart,time=time) !mmr (restart stuff)
 
     ! Finalize program
     call yelmo_end(yelmo1,time=time)

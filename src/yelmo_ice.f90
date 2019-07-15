@@ -442,7 +442,7 @@ contains
         else 
             ! Add code to load previously stopped run
 
-!mmr            stop "Restart files not yet tested!" 
+!mmr (restart stuff)           stop "Restart files not yet tested!" 
             
             call yelmo_restart_read_1(dom,trim(dom%par%restart),time)  ! ## TO DO ##
 
@@ -513,7 +513,7 @@ contains
         else 
             ! Add code to load previously stopped run
 
-!mmr             stop "Restart files not yet tested!" 
+!mmr (restart stuff)            stop "Restart files not yet tested!" 
             
             call yelmo_restart_read_2(dom,trim(dom%par%restart),time)  ! ## TO DO ##
 

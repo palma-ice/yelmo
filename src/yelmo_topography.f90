@@ -60,10 +60,6 @@ contains
 
         allocate(mbal(nx,ny))
 
- !mmr
-        print*,'hola topo time', tpo%par%time, time
-!mmr
-
         ! Initialize time if necessary 
         if (tpo%par%time .gt. time) then 
             tpo%par%time      = time

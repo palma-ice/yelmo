@@ -44,9 +44,14 @@ contains
         end if 
 
         ! Get time step and advance current time 
-!mmr        dt            = time - thrm%par%time 
-        dt            = 1.0 ! mmr trick!!!! time - thrm%par%time 
+        dt            = time - thrm%par%time 
+!mmr        dt            = 1.0 ! mmr quick and dirty trick!!!! time - thrm%par%time 
+
         thrm%par%time = time 
+
+!mmr
+        print*,'hola', time, thrm%par%time
+!mmr
         
         ! === Determine some thermal properties === 
 

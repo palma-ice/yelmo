@@ -412,10 +412,15 @@ contains
         ! Close the netcdf file
         call nc_close(ncid)
 
+!mmr
+        dom%tpo%par%time = time
+        dom%dyn%par%time = time 
+!mmr
 
         ! Write summary 
         write(*,*) 
-        write(*,*) "time = ", time, " : loaded restart file: ", trim(filename)
+!mmr         write(*,*) "time = ", time, " : loaded restart file: ", trim(filename)
+        write(*,*) "time = ", time, dom%tpo%par%time, dom%dyn%par%time, " : loaded restart file: ", trim(filename)
         write(*,*) 
         
         return 
@@ -651,8 +656,15 @@ contains
         call nc_close(ncid)
 
         ! Write summary 
+
+!mmr
+        dom%thrm%par%time = time
+        dom%mat%par%time = time
+!mmr
+
         write(*,*) 
-        write(*,*) "time = ", time, " : loaded restart file: ", trim(filename)
+!mmr        write(*,*) "time = ", time, " : loaded restart file: ", trim(filename)
+        write(*,*) "time = ", time, dom%thrm%par%time, dom%mat%par%time, " : loaded restart file: ", trim(filename)
         write(*,*) 
         
         return 

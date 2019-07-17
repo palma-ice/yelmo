@@ -70,13 +70,17 @@ contains
         dt                = time - tpo%par%time 
         dt_calv           = time - tpo%par%time_calv
         
-
+!mmr
+        print*,'holatime', dt,dt_calv, time, tpo%par%time, tpo%par%time_calv
+!mmr
         
         ! Combine basal mass balance into one field accounting for 
         ! grounded/floating fraction of grid cells 
         call calc_bmb_total(tpo%now%bmb,thrm%now%bmb_grnd,bnd%bmb_shlf,tpo%now%f_grnd,tpo%par%diffuse_bmb_shlf)
         
-
+!mmr hereiam - sum(bnd%bmb_shlf) CHECK!!
+        print*,'holabmb', time, sum(tpo%now%bmb),  sum(thrm%now%bmb_grnd),  sum(bnd%bmb_shlf) !, sum(tpo%now%f_grnd) !mmr,sum(tpo%par%diffuse_bmb_shlf)
+!mmr
 
         ! Perform topography calculations 
         if ( .not. topo_fixed .and. dt .gt. 0.0 ) then 
@@ -87,18 +91,39 @@ contains
             ! Define temporary variable for total column mass balance 
            
             mbal = bnd%smb + tpo%now%bmb           
+
+!mmr
+!mmr        print*,'holambal', time, sum(bnd%smb), sum(tpo%now%bmb)
+!mmr
             
             if (.not. tpo%par%use_bmb) then
                 ! WHEN RUNNING EISMINT1 ensure bmb is not accounted for here !!!
                 mbal = bnd%smb 
+!mmr
+!mmr                print*,'hola'
+!mmr                call abort()
+!mmr
             end if 
 
             ! 1. Calculate the ice thickness conservation and apply bedrock uplift -----
+
+!mmr
+!mmr            print*,'holaice in', time, sum(tpo%now%H_ice),  sum(tpo%now%mb_applied), &
+!mmr                                    sum(tpo%now%f_grnd),sum(dyn%now%ux_bar),sum(dyn%now%uy_bar), sum(mbal) ! mmr - check mbal
+!mmr
+
             call calc_ice_thickness(tpo%now%H_ice,tpo%now%mb_applied, &
                                     tpo%now%f_grnd,dyn%now%ux_bar,dyn%now%uy_bar, &
                                     mbal=mbal,calv=tpo%now%calv*0.0,dx=tpo%par%dx,dt=dt, &
                                     solver=trim(tpo%par%solver),boundaries=trim(tpo%par%boundaries), &
                                     ice_allowed=bnd%ice_allowed,H_min=tpo%par%H_min)
+
+
+
+!mmr
+!            print*,'holaice out', time, sum(tpo%now%H_ice),  sum(tpo%now%mb_applied), &
+!                                    sum(tpo%now%f_grnd),sum(dyn%now%ux_bar),sum(dyn%now%uy_bar), sum(mbal)
+!mmr
             
             ! ====== CALVING ======
             if (dt_calv .ge. tpo%par%calv_dt) then 
@@ -242,6 +267,9 @@ contains
             if (count(tpo%now%H_ice.gt.0.0) .gt. 0) then 
                 write(*,"(a,f14.4,f10.4,f10.2)") "calc_ytopo::  time = ", tpo%par%time, dt, &
                     sum(tpo%now%H_ice,mask=tpo%now%H_ice.gt.0.0)/real(count(tpo%now%H_ice.gt.0.0))
+!mmr
+                print*,'holalog', tpo%par%time, sum(tpo%now%H_ice), sum(tpo%now%H_ice,mask=tpo%now%H_ice.gt.0.0), real(count(tpo%now%H_ice.gt.0.0))
+!mmr
             else 
                 write(*,"(a,f14.4,f10.4,f10.2)") "calc_ytopo::  time = ", tpo%par%time, dt, 0.0
             end if 

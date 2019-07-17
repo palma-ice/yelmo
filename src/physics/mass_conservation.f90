@@ -136,6 +136,12 @@ contains
 
         end select 
         
+!mmr
+!mmr        print*,'holaicecalc',sum(H_ice), dt, sum(mb_applied)
+!mmr            print*,'holamb', sum(mb_applied), sum(mbal), sum(ux), sum(uy), sum(H_ice)
+!mmr
+
+
         return 
 
     end subroutine calc_ice_thickness

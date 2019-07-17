@@ -73,6 +73,10 @@ contains
         ! == ytopo variables ===
          call nc_write(filename,"H_ice",       dom%tpo%now%H_ice,      units="m",  dim1="xc",dim2="yc",ncid=ncid)
          call nc_write(filename,"z_srf",       dom%tpo%now%z_srf,      units="m",  dim1="xc",dim2="yc",ncid=ncid)
+!mmr
+         print*,'hola z_srf written', sum( dom%tpo%now%z_srf)
+!mmr
+
          call nc_write(filename,"dzsrfdt",     dom%tpo%now%dzsrfdt,    units="m/a",dim1="xc",dim2="yc",ncid=ncid)
          call nc_write(filename,"dHicedt",     dom%tpo%now%dHicedt,    units="m/a",dim1="xc",dim2="yc",ncid=ncid)
          call nc_write(filename,"bmb",         dom%tpo%now%bmb,        units="m/a",dim1="xc",dim2="yc",ncid=ncid)
@@ -86,8 +90,8 @@ contains
          call nc_write(filename,"dHicedy",     dom%tpo%now%dHicedy,    units="m/m",  dim1="xc",dim2="yc",ncid=ncid)
          call nc_write(filename,"H_grnd",      dom%tpo%now%H_grnd,     units="b",dim1="xc",dim2="yc",ncid=ncid)
          call nc_write(filename,"f_grnd",      dom%tpo%now%f_grnd,     units="1",dim1="xc",dim2="yc",ncid=ncid) !mmr (restart stuff) 
-         call nc_write(filename,"f_grnd_acx",  dom%tpo%now%f_grnd,     units="1",dim1="xc",dim2="yc",ncid=ncid)
-         call nc_write(filename,"f_grnd_acy",  dom%tpo%now%f_grnd,     units="1",dim1="xc",dim2="yc",ncid=ncid)
+         call nc_write(filename,"f_grnd_acx",  dom%tpo%now%f_grnd_acx,     units="1",dim1="xc",dim2="yc",ncid=ncid)
+         call nc_write(filename,"f_grnd_acy",  dom%tpo%now%f_grnd_acy,     units="1",dim1="xc",dim2="yc",ncid=ncid)
          call nc_write(filename,"f_ice",       dom%tpo%now%f_ice,      units="1",dim1="xc",dim2="yc",ncid=ncid) !mmr (restart stuff) 
          call nc_write(filename,"dist_margin", dom%tpo%now%dist_margin, units=" ",dim1="xc",dim2="yc",ncid=ncid)
          call nc_write(filename,"dist_grline", dom%tpo%now%dist_grline, units=" ",dim1="xc",dim2="yc",ncid=ncid)
@@ -120,6 +124,21 @@ contains
         
 ! mmr (restart stuff) !         call nc_write(filename,"tau_b",  dom%dyn%now%tau_b,  units="?",dim1="xc",dim2="yc",ncid=ncid)
 
+!mmr - hereiam - and insert in read too!
+
+        call nc_write(filename,"ux",          dom%dyn%now%ux,     units="m/a",dim1="xc",dim2="yc",dim3="zeta",ncid=ncid) ! mmr (restart stuff)
+        call nc_write(filename,"uy",          dom%dyn%now%uy,     units="m/a",dim1="xc",dim2="yc",dim3="zeta",ncid=ncid) ! mmr (restart stuff)
+        call nc_write(filename,"uxy",         dom%dyn%now%uxy,    units="m/a",dim1="xc",dim2="yc",dim3="zeta",ncid=ncid) ! mmr (restart stuff)
+        call nc_write(filename,"uz",          dom%dyn%now%uz,      units="m/a",dim1="xc",dim2="yc",dim3="zeta",ncid=ncid) ! mmr (restart stuff)
+      
+        call nc_write(filename,"ux_bar",      dom%dyn%now%ux_bar, units="m/a",dim1="xc",dim2="yc",ncid=ncid) ! mmr (restart stuff)
+        call nc_write(filename,"uy_bar",      dom%dyn%now%uy_bar, units="m/a",dim1="xc",dim2="yc",ncid=ncid) ! mmr (restart stuff)
+        call nc_write(filename,"uxy_bar",     dom%dyn%now%uxy_bar,units="m/a",dim1="xc",dim2="yc",ncid=ncid) ! mmr (restart stuff)
+
+        call nc_write(filename,"ux_b",      dom%dyn%now%ux_b, units="m/a",dim1="xc",dim2="yc",ncid=ncid) ! mmr (restart stuff)
+        call nc_write(filename,"uy_b",      dom%dyn%now%uy_b, units="m/a",dim1="xc",dim2="yc",ncid=ncid) ! mmr (restart stuff)
+        call nc_write(filename,"uxy_b",     dom%dyn%now%uxy_b,units="m/a",dim1="xc",dim2="yc",ncid=ncid) ! mmr (restart stuff)
+!mmr
         call nc_write(filename,"ux_s",          dom%dyn%now%ux_s,     units="m/a",dim1="xc",dim2="yc",ncid=ncid) ! mmr (restart stuff)
         call nc_write(filename,"uy_s",          dom%dyn%now%uy_s,     units="m/a",dim1="xc",dim2="yc",ncid=ncid) ! mmr (restart stuff)
         call nc_write(filename,"uxy_s",         dom%dyn%now%uxy_s,    units="m/a",dim1="xc",dim2="yc",ncid=ncid) ! mmr (restart stuff)
@@ -163,7 +182,7 @@ contains
         call nc_write(filename,"beta_acy",      dom%dyn%now%beta_acy, units="",dim1="xc",dim2="yc",ncid=ncid) ! mmr (restart stuff)
         call nc_write(filename,"beta",          dom%dyn%now%beta,     units="",dim1="xc",dim2="yc",ncid=ncid) ! mmr (restart stuff)
 
-        call nc_write(filename,"g_vbvs",        dom%dyn%now%f_vbvs,   units="",dim1="xc",dim2="yc",ncid=ncid) ! mmr (restart stuff)
+        call nc_write(filename,"f_vbvs",        dom%dyn%now%f_vbvs,   units="",dim1="xc",dim2="yc",ncid=ncid) ! mmr (restart stuff)
 
         call nc_write(filename,"ssa_mask_acx",  dom%dyn%now%ssa_mask_acx, units="",dim1="xc",dim2="yc",ncid=ncid) ! mmr (restart stuff)
         call nc_write(filename,"ssa_mask_acy",  dom%dyn%now%ssa_mask_acy, units="",dim1="xc",dim2="yc",ncid=ncid) ! mmr (restart stuff)
@@ -253,7 +272,7 @@ contains
         call nc_write(filename,"T_prime_b",   dom%thrm%now%T_prime_b,  units="",dim1="xc",dim2="yc",ncid=ncid) ! mmr (restart stuff)   
         call nc_write(filename,"cts",         dom%thrm%now%cts,        units="",dim1="xc",dim2="yc",ncid=ncid) ! mmr (restart stuff)     
  
-! mmr (restart stuff)        call nc_write(filename,"T_all",       dom%thrm%now%T_all,      units="",dim1="xc",dim2="yc",dim3="zeta",ncid=ncid)
+!mmr        call nc_write(filename,"T_all",       dom%thrm%now%T_all,      units="",dim1="xc",dim2="yc",dim3="zeta_ac",ncid=ncid)
 
         ! == ybound variables ===
 
@@ -359,6 +378,9 @@ contains
 
          call nc_read(filename,"H_ice",       dom%tpo%now%H_ice)
          call nc_read(filename,"z_srf",       dom%tpo%now%z_srf)
+!mmr
+         print*,'hola z_srf reading', sum( dom%tpo%now%z_srf)
+!mmr
          call nc_read(filename,"dzsrfdt",     dom%tpo%now%dzsrfdt)
          call nc_read(filename,"dHicedt",     dom%tpo%now%dHicedt)
          call nc_read(filename,"bmb",         dom%tpo%now%bmb)
@@ -371,9 +393,10 @@ contains
          call nc_read(filename,"dHicedx",     dom%tpo%now%dHicedx)
          call nc_read(filename,"dHicedy",     dom%tpo%now%dHicedy)
          call nc_read(filename,"H_grnd",      dom%tpo%now%H_grnd)
+!mmr 
          call nc_read(filename,"f_grnd",      dom%tpo%now%f_grnd) ! mmr (restart stuff) 
-         call nc_read(filename,"f_grnd_acx",  dom%tpo%now%f_grnd) ! mmr (restart stuff)
-         call nc_read(filename,"f_grnd_acy",  dom%tpo%now%f_grnd) ! mmr (restart stuff)
+         call nc_read(filename,"f_grnd_acx",  dom%tpo%now%f_grnd_acx) ! mmr (restart stuff)
+         call nc_read(filename,"f_grnd_acy",  dom%tpo%now%f_grnd_acy) ! mmr (restart stuff)
          call nc_read(filename,"f_ice",       dom%tpo%now%f_ice)  ! mmr (restart stuff)
          call nc_read(filename,"dist_margin", dom%tpo%now%dist_margin) ! mmr (restart stuff)
          call nc_read(filename,"dist_grline", dom%tpo%now%dist_grline) ! mmr (restart stuff)
@@ -500,6 +523,19 @@ contains
 
        ! == ydyn variables ===
 
+        call nc_read(filename,"ux",          dom%dyn%now%ux) ! mmr (restart stuff)
+        call nc_read(filename,"uy",          dom%dyn%now%uy) ! mmr (restart stuff)
+        call nc_read(filename,"uxy",         dom%dyn%now%uxy) ! mmr (restart stuff)
+        call nc_read(filename,"uz",          dom%dyn%now%uz) ! mmr (restart stuff)
+      
+        call nc_read(filename,"ux_bar",      dom%dyn%now%ux_bar) ! mmr (restart stuff)
+        call nc_read(filename,"uy_bar",      dom%dyn%now%uy_bar) ! mmr (restart stuff)
+        call nc_read(filename,"uxy_bar",     dom%dyn%now%uxy_bar) ! mmr (restart stuff)
+
+        call nc_read(filename,"ux_b",      dom%dyn%now%ux_b) ! mmr (restart stuff)
+        call nc_read(filename,"uy_b",      dom%dyn%now%uy_b) ! mmr (restart stuff)
+        call nc_read(filename,"uxy_b",     dom%dyn%now%uxy_b) ! mmr (restart stuff)
+
         call nc_read(filename,"ux_s",          dom%dyn%now%ux_s) !mmr (restart stuff)
         call nc_read(filename,"uy_s",          dom%dyn%now%uy_s) !mmr (restart stuff)
         call nc_read(filename,"uxy_s",         dom%dyn%now%uxy_s) !mmr (restart stuff)
@@ -543,7 +579,7 @@ contains
         call nc_read(filename,"beta_acy",      dom%dyn%now%beta_acy) !mmr (restart stuff)
         call nc_read(filename,"beta",          dom%dyn%now%beta) !mmr (restart stuff)
 
-        call nc_read(filename,"g_vbvs",        dom%dyn%now%f_vbvs) !mmr (restart stuff)
+        call nc_read(filename,"f_vbvs",        dom%dyn%now%f_vbvs) !mmr (restart stuff)
 
         call nc_read(filename,"ssa_mask_acx",  dom%dyn%now%ssa_mask_acx) !mmr (restart stuff)
         call nc_read(filename,"ssa_mask_acy",  dom%dyn%now%ssa_mask_acy) !mmr (restart stuff)
@@ -598,7 +634,8 @@ contains
         call nc_read(filename,"dTrdz_b",     dom%thrm%now%dTrdz_b) !mmr (restart stuff)   
         call nc_read(filename,"T_prime_b",   dom%thrm%now%T_prime_b) !mmr (restart stuff) 
         call nc_read(filename,"cts",         dom%thrm%now%cts) !mmr (restart stuff)      
-!mmr (restart stuff)       call nc_read(filename,"T_all",       dom%thrm%now%T_all) 
+
+!mmr        call nc_read(filename,"T_all",       dom%thrm%now%T_all) !mmr (restart stuff)      
 
         
         ! == ybound variables === ! mmr (restart stuff)

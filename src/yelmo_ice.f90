@@ -536,7 +536,7 @@ contains
 
         ! Re-run topo again to make sure all fields are synchronized (masks, etc)
 !mmr
-!mmr	print*,'hola here calc_topo'
+	print*,'hola here calc_topo', time !, sum(dom%bnd)
 !mmr
         call calc_ytopo(dom%tpo,dom%dyn,dom%thrm,dom%bnd,time,topo_fixed=.TRUE.)
         

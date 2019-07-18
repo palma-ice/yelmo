@@ -144,6 +144,10 @@ contains
         end do 
         end do 
 
+!mmr
+	print*,'holacol', sum(bmb_grnd), sum (T_ice), sum(T_pmp),sum(dTdz_b),sum(ct),sum(Q_b),sum(Q_geo), sum(f_grnd)
+!mmr
+
         ! Fill in borders 
         T_ice(2,:,:)    = T_ice(3,:,:) 
         T_ice(1,:,:)    = T_ice(3,:,:) 
@@ -427,8 +431,16 @@ contains
         end if 
         
         ! Calculate basal mass balance (valid for grounded ice only)
+
+!mmr
+!mmr        print*,'holagrnd in',sum(bmb_grnd)
+!mmr
+
         call calc_bmb_grounded(bmb_grnd,T_ice(1)-T_pmp(1),dTdz_b,ct(1),rho_ice,Q_b,Q_geo_now,f_grnd)
 
+!mmr
+!mmr	print*,'holagrnd out',sum(bmb_grnd)
+!mmr
         ! Include internal melting in bmb_grnd 
         bmb_grnd = bmb_grnd - melt_internal 
 

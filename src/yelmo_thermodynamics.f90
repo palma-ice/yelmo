@@ -100,14 +100,18 @@ contains
                     ! Perform temperature solving via advection-diffusion equation
                     
 !mmr
-	print*,'hola3d in', sum(thrm%now%bmb_grnd)  !hereiam
+! hereiam - what differshere of what goes in?
+	print*,'hola3d in', sum(bnd%H_w), sum(thrm%now%T_ice), sum(thrm%now%bmb_grnd), sum(thrm%now%dTdz_b),sum(thrm%now%T_pmp), &
+                                        sum(thrm%now%cp),sum(thrm%now%kt),sum(dyn%now%ux),sum(dyn%now%uy),sum(dyn%now%uz),sum(thrm%now%Q_strn), &
+                                        sum(thrm%now%Q_b),sum(bnd%Q_geo),sum(bnd%T_srf),sum(tpo%now%H_ice),sum(bnd%H_w),sum(tpo%now%H_grnd),sum(tpo%now%f_grnd), &
+                                        sum(thrm%par%zeta_aa),sum(thrm%par%zeta_ac),sum(thrm%par%dzeta_a),sum(thrm%par%dzeta_b),dt,thrm%par%dx
 !mmr
                     call calc_icetemp_3D(thrm%now%T_ice,thrm%now%bmb_grnd,thrm%now%dTdz_b,thrm%now%T_pmp, &
                                         thrm%now%cp,thrm%now%kt,dyn%now%ux,dyn%now%uy,dyn%now%uz,thrm%now%Q_strn, &
                                         thrm%now%Q_b,bnd%Q_geo,bnd%T_srf,tpo%now%H_ice,bnd%H_w,tpo%now%H_grnd,tpo%now%f_grnd, &
                                         thrm%par%zeta_aa,thrm%par%zeta_ac,thrm%par%dzeta_a,thrm%par%dzeta_b,dt,thrm%par%dx)
 !mmr
-        print*,'hola3d out', sum(thrm%now%bmb_grnd)
+        print*,'hola3d out', sum(thrm%now%T_ice), sum(thrm%now%bmb_grnd)
 !mmr
 
                 

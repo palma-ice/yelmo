@@ -144,10 +144,6 @@ contains
         end do 
         end do 
 
-!mmr
-	print*,'holacol', sum(bmb_grnd), sum (T_ice), sum(T_pmp),sum(dTdz_b),sum(ct),sum(Q_b),sum(Q_geo), sum(f_grnd)
-!mmr
-
         ! Fill in borders 
         T_ice(2,:,:)    = T_ice(3,:,:) 
         T_ice(1,:,:)    = T_ice(3,:,:) 
@@ -158,6 +154,11 @@ contains
         T_ice(:,1,:)    = T_ice(:,3,:) 
         T_ice(:,ny-1,:) = T_ice(:,ny-2,:) 
         T_ice(:,ny,:)   = T_ice(:,ny-2,:) 
+
+!mmr
+        print*,'holacol', sum(bmb_grnd), sum (T_ice), sum(H_ice), sum(dTdz_b)
+!mmr
+
         
         return 
 

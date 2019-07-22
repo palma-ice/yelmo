@@ -657,6 +657,7 @@ contains
 
         call nc_read(filename,"ice_allowed", dom%bnd%ice_allowed) !mmr (restart stuff)
    
+
 !        ! Close the netcdf file
         call nc_close(ncid)
 

@@ -534,6 +534,7 @@ contains
 
         end if 
 
+
         ! Re-run topo again to make sure all fields are synchronized (masks, etc)
 !mmr
 	print*,'hola here calc_topo', time !, sum(dom%bnd)

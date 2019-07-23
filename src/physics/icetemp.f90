@@ -154,11 +154,6 @@ contains
         T_ice(:,1,:)    = T_ice(:,3,:) 
         T_ice(:,ny-1,:) = T_ice(:,ny-2,:) 
         T_ice(:,ny,:)   = T_ice(:,ny-2,:) 
-
-!mmr
-        print*,'holacol', sum(bmb_grnd), sum (T_ice), sum(H_ice), sum(dTdz_b)
-!mmr
-
         
         return 
 
@@ -432,16 +427,8 @@ contains
         end if 
         
         ! Calculate basal mass balance (valid for grounded ice only)
-
-!mmr
-!mmr        print*,'holagrnd in',sum(bmb_grnd)
-!mmr
-
         call calc_bmb_grounded(bmb_grnd,T_ice(1)-T_pmp(1),dTdz_b,ct(1),rho_ice,Q_b,Q_geo_now,f_grnd)
 
-!mmr
-!mmr	print*,'holagrnd out',sum(bmb_grnd)
-!mmr
         ! Include internal melting in bmb_grnd 
         bmb_grnd = bmb_grnd - melt_internal 
 

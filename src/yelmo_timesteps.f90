@@ -49,9 +49,6 @@ contains
         ! (adapted from Bueler et al., 2007)
 
         dt_adv   = calc_adv2D_timestep1(ux_bar,uy_bar,dx,dx,cfl_max)
-!mmr
-!mmr	print*,'hola dtadv', dt_adv
-!mmr
         dt_diff  = calc_diff2D_timestep(D2D,dx,dx,cfl_diff_max) 
 
 !         dt_adv3D = calc_adv3D_timestep1(ux,uy,uz,dx,dx,H_ice,zeta_ac,cfl_max)
@@ -156,10 +153,6 @@ contains
 
             dt(i,j) = cfl_max * 1.0 / max(abs(ux(i-1,j))/dx + abs(ux(i,j))/dx &
                                         + abs(uy(i,j-1))/dy + abs(uy(i,j))/dy,1e-3)
-
-!mmr
-!mmr	print*,'hola', i,j, ux(i,j),uy(i,j), dt(i,j)
-!mmr
             
         end do 
         end do 

@@ -73,9 +73,6 @@ contains
         ! == ytopo variables ===
          call nc_write(filename,"H_ice",       dom%tpo%now%H_ice,      units="m",  dim1="xc",dim2="yc",ncid=ncid)
          call nc_write(filename,"z_srf",       dom%tpo%now%z_srf,      units="m",  dim1="xc",dim2="yc",ncid=ncid)
-!mmr
-         print*,'hola z_srf written', sum( dom%tpo%now%z_srf)
-!mmr
 
          call nc_write(filename,"dzsrfdt",     dom%tpo%now%dzsrfdt,    units="m/a",dim1="xc",dim2="yc",ncid=ncid)
          call nc_write(filename,"dHicedt",     dom%tpo%now%dHicedt,    units="m/a",dim1="xc",dim2="yc",ncid=ncid)
@@ -124,7 +121,6 @@ contains
         
 ! mmr (restart stuff) !         call nc_write(filename,"tau_b",  dom%dyn%now%tau_b,  units="?",dim1="xc",dim2="yc",ncid=ncid)
 
-!mmr - hereiam - and insert in read too!
 
         call nc_write(filename,"ux",          dom%dyn%now%ux,     units="m/a",dim1="xc",dim2="yc",dim3="zeta",ncid=ncid) ! mmr (restart stuff)
         call nc_write(filename,"uy",          dom%dyn%now%uy,     units="m/a",dim1="xc",dim2="yc",dim3="zeta",ncid=ncid) ! mmr (restart stuff)
@@ -138,7 +134,7 @@ contains
         call nc_write(filename,"ux_b",      dom%dyn%now%ux_b, units="m/a",dim1="xc",dim2="yc",ncid=ncid) ! mmr (restart stuff)
         call nc_write(filename,"uy_b",      dom%dyn%now%uy_b, units="m/a",dim1="xc",dim2="yc",ncid=ncid) ! mmr (restart stuff)
         call nc_write(filename,"uxy_b",     dom%dyn%now%uxy_b,units="m/a",dim1="xc",dim2="yc",ncid=ncid) ! mmr (restart stuff)
-!mmr
+
         call nc_write(filename,"ux_s",          dom%dyn%now%ux_s,     units="m/a",dim1="xc",dim2="yc",ncid=ncid) ! mmr (restart stuff)
         call nc_write(filename,"uy_s",          dom%dyn%now%uy_s,     units="m/a",dim1="xc",dim2="yc",ncid=ncid) ! mmr (restart stuff)
         call nc_write(filename,"uxy_s",         dom%dyn%now%uxy_s,    units="m/a",dim1="xc",dim2="yc",ncid=ncid) ! mmr (restart stuff)
@@ -378,9 +374,6 @@ contains
 
          call nc_read(filename,"H_ice",       dom%tpo%now%H_ice)
          call nc_read(filename,"z_srf",       dom%tpo%now%z_srf)
-!mmr
-         print*,'hola z_srf reading', sum( dom%tpo%now%z_srf)
-!mmr
          call nc_read(filename,"dzsrfdt",     dom%tpo%now%dzsrfdt)
          call nc_read(filename,"dHicedt",     dom%tpo%now%dHicedt)
          call nc_read(filename,"bmb",         dom%tpo%now%bmb)

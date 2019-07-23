@@ -65,9 +65,6 @@ contains
                 ! No topo calcs, so nstep=1
                 dt_now = time-dom%tpo%par%time
             else
-!mmr
-!mmr	print*,'hola topo not fix'
-!mmr
                 ! Use adaptive time step
                 call set_adaptive_timestep(dt_now,dom%par%dt_adv,dom%par%dt_diff,dom%par%dt_adv3D,time,time_now, &
                                         dom%dyn%now%ux,dom%dyn%now%uy,dom%dyn%now%uz,dom%dyn%now%ux_bar, &
@@ -98,11 +95,6 @@ contains
             ! Advance thermodynamics timestep counter 
             ntt = ntt + 1
 
-!mmr
-!mmr            print*,'hola', ntt, dom%par%ntt
-!mmr
-
-            
             if (ntt .ge. dom%par%ntt .or. iter_exit) then 
                 ! Call thermodynamics every ntt iteration, and for the last adaptive timestep 
 
@@ -454,9 +446,6 @@ contains
             
             call yelmo_restart_read_1(dom,trim(dom%par%restart),time)  ! ## TO DO ##
 
-!mmr
-!mmr            print*,'hola reading restart 1'
-!mmr
         end if 
 
         return 
@@ -528,17 +517,11 @@ contains
             
             call yelmo_restart_read_2(dom,trim(dom%par%restart),time)  ! ## TO DO ##
 
-!mmr
-!mmr            print*,'hola reading restart 2'
-!mmr
 
         end if 
 
 
         ! Re-run topo again to make sure all fields are synchronized (masks, etc)
-!mmr
-	print*,'hola here calc_topo', time !, sum(dom%bnd)
-!mmr
         call calc_ytopo(dom%tpo,dom%dyn,dom%thrm,dom%bnd,time,topo_fixed=.TRUE.)
         
         ! Update regional calculations (for now entire domain with ice)

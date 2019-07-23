@@ -92,9 +92,6 @@ contains
         ! Limit small values to avoid underflow errors 
         if (abs(bmb_grnd) .lt. tol) bmb_grnd = 0.0_prec 
 
-!mmr
-!mmr	print*,'holagrnd', sum(bmb_grnd)
-!mmr
         return 
 
     end subroutine calc_bmb_grounded 

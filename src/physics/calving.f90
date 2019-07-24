@@ -36,8 +36,8 @@ contains
         nx = size(H_ice,1)
         ny = size(H_ice,2) 
 
-        do j = 1, ny 
-        do i = 1, nx 
+        do j = 2, ny-1 
+        do i = 2, nx-1
 
             if (f_grnd(i,j) .eq. 0.0 .and. H_ice(i,j) .gt. 0.0) then 
                 ! Floating point, diagnose number of ice-free neighbors 

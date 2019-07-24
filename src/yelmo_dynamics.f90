@@ -1213,7 +1213,7 @@ end if
             ! Step 3: calculate C_bed [Pa]
             
             dyn%now%C_bed = (cf_ref*lambda_bed)*dyn%now%N_eff
-
+            
             ! =============================================================================
             ! Step 4: Ensure C_bed is not below lower limit 
             
@@ -1348,6 +1348,7 @@ end if
         call nml_read(filename,"ydyn_till","till_phi_zmax", par%till_phi_zmax,      init=init_pars)
         
         call nml_read(filename,"ydyn_neff","neff_method",   par%neff_method,        init=init_pars)
+        call nml_read(filename,"ydyn_neff","neff_const",    par%neff_const,         init=init_pars)
         call nml_read(filename,"ydyn_neff","neff_p",        par%neff_p,             init=init_pars)
         call nml_read(filename,"ydyn_neff","neff_set_water",par%neff_set_water,     init=init_pars)
         call nml_read(filename,"ydyn_neff","neff_w_max",    par%neff_w_max,         init=init_pars)

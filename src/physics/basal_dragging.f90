@@ -260,7 +260,7 @@ contains
         real(prec), intent(OUT) :: beta(:,:)        ! aa-nodes
         real(prec), intent(IN)  :: ux_b(:,:)        ! ac-nodes
         real(prec), intent(IN)  :: uy_b(:,:)        ! ac-nodes
-        real(prec), intent(IN)  :: C_bed(:,:)       ! Aa nodes
+        real(prec), intent(IN)  :: C_bed(:,:)       ! aa-nodes
         real(prec), intent(IN)  :: q
         real(prec), intent(IN)  :: u_0              ! [m/a] 
 
@@ -323,7 +323,7 @@ contains
         real(prec), intent(OUT) :: beta(:,:)        ! aa-nodes
         real(prec), intent(IN)  :: ux_b(:,:)        ! ac-nodes
         real(prec), intent(IN)  :: uy_b(:,:)        ! ac-nodes
-        real(prec), intent(IN)  :: C_bed(:,:)       ! Aa nodes
+        real(prec), intent(IN)  :: C_bed(:,:)       ! aa-nodes
         real(prec), intent(IN)  :: q
         real(prec), intent(IN)  :: u_0              ! [m/a] 
 
@@ -366,7 +366,7 @@ contains
     ! Scaling functions 
     !
     ! ================================================================================
-    
+
     subroutine scale_beta_aa_grline(beta,f_grnd,f_beta_gl)
         ! Applyt scalar between 0 and 1 to modify basal friction coefficient
         ! at the grounding line.

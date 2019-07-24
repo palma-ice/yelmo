@@ -184,7 +184,7 @@ program yelmo_mismip
 
         if (trim(experiment) .eq. "P75S") then 
             ! Set C_bed externally and perturb it following P75S scaling (Pattyn et al, 2012)
-            yelmo1%dyn%par%C_bed_method = -1 
+            yelmo1%dyn%par%Cb_method = -1 
             yelmo1%dyn%now%C_bed = yelmo1%dyn%par%cf_stream 
             call perturb_C_bed(yelmo1%dyn%now%C_bed,yelmo1%grd%x*1e-3,yelmo1%grd%y*1e-3,x_gl=x_gl_stnd)
         end if

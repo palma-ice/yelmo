@@ -25,23 +25,22 @@ module basal_dragging
     public :: calc_effective_pressure_till
 
     ! C_bed functions
-    public :: calc_C_bed_till_const
-    public :: calc_C_bed_till_linear
+    public :: calc_lambda_bed_lin
+    public :: calc_lambda_bed_exp
+    public :: calc_lambda_till_const
+    public :: calc_lambda_till_linear
 
     ! Beta functions (aa-nodes)
-    public :: calc_beta_aa_linear
-    public :: calc_beta_aa_power
-    public :: calc_beta_aa_coulomb
-    public :: calc_beta_aa_power_pism
-    
+    public :: calc_beta_aa_power_plastic
+    public :: calc_beta_aa_reg_coulomb
+
     ! C_bed / Beta scaling functions (aa-nodes)
-    public :: scale_cbed_aa_Neff
     public :: scale_beta_aa_grline
     public :: scale_beta_aa_Hgrnd 
     public :: scale_beta_aa_zstar
     
     ! Beta staggering functions (aa- to ac-nodes)
-    public :: stagger_beta_aa_simple
+    public :: stagger_beta_aa_mean
     public :: stagger_beta_aa_upstream
     public :: stagger_beta_aa_downstream    
     public :: stagger_beta_aa_subgrid
@@ -157,23 +156,59 @@ contains
 
     end function calc_effective_pressure_till
 
-    elemental function calc_C_bed_till_const(phi) result(C_bed)
-        ! Calculate the effective pressure of the till
-        ! following van Pelt and Bueler (2015), Eq. 23.
+    elemental function calc_lambda_bed_lin(z_bed,z0,z1) result(lambda)
+        ! Calculate scaling function: linear 
+        
+        implicit none 
+        
+        real(prec), intent(IN)    :: z_bed  
+        real(prec), intent(IN)    :: z0
+        real(prec), intent(IN)    :: z1
+        real(prec)                :: lambda 
+
+        lambda = (z_bed - z0) / (z1 - z0)
+        
+        if (lambda .lt. 0.0) lambda = 0.0 
+        if (lambda .gt. 1.0) lambda = 1.0
+        
+        return 
+
+    end function calc_lambda_bed_lin
+
+    elemental function calc_lambda_bed_exp(z_bed,z0,z1) result(lambda)
+        ! Calculate scaling function: exponential 
+
+        implicit none 
+        
+        real(prec), intent(IN)    :: z_bed  
+        real(prec), intent(IN)    :: z0
+        real(prec), intent(IN)    :: z1
+        real(prec)                :: lambda 
+
+        lambda = exp( (z_bed - z1) / (z1 - z0) )
+                
+        if (lambda .gt. 1.0) lambda = 1.0
+        
+        return 
+
+    end function calc_lambda_bed_exp
+    
+    elemental function calc_lambda_till_const(phi) result(lambda)
+        ! Calculate scaling function: till friction angle 
         
         implicit none 
         
         real(prec), intent(IN)    :: phi                ! [deg] Constant till angle  
-        real(prec)                :: C_bed 
+        real(prec)                :: lambda 
 
         ! Calculate bed friction coefficient as the tangent
-        C_bed = tan(phi*pi/180.0)
+        lambda = tan(phi*pi/180.0)
 
         return 
 
-    end function calc_C_bed_till_const
+    end function calc_lambda_till_const
 
-    elemental function calc_C_bed_till_linear(z_bed,z_sl,phi_min,phi_max,phi_zmin,phi_zmax) result(C_bed)
+    elemental function calc_lambda_till_linear(z_bed,z_sl,phi_min,phi_max,phi_zmin,phi_zmax) result(lambda)
         ! Calculate the effective pressure of the till
         ! following van Pelt and Bueler (2015), Eq. 23.
         
@@ -185,7 +220,7 @@ contains
         real(prec), intent(IN)    :: phi_max            ! [deg] Maximum till angle 
         real(prec), intent(IN)    :: phi_zmin           ! [m] C[z=zmin] = tan(phi_min)
         real(prec), intent(IN)    :: phi_zmax           ! [m] C[z=zmax] = tan(phi_max) 
-        real(prec)                :: C_bed 
+        real(prec)                :: lambda 
 
         ! Local variables 
         real(prec) :: phi, f_scale, z_rel  
@@ -203,11 +238,11 @@ contains
         phi = phi_min + f_scale*(phi_max-phi_min)
 
         ! Calculate bed friction coefficient as the tangent
-        C_bed = tan(phi*pi/180.0)
+        lambda = tan(phi*pi/180.0)
 
         return 
 
-    end function calc_C_bed_till_linear
+    end function calc_lambda_till_linear
 
     ! ================================================================================
     !
@@ -215,148 +250,7 @@ contains
     !
     ! ================================================================================
 
-    subroutine calc_beta_aa_linear(beta,C_bed)
-        ! Calculate basal friction coefficient (beta) that
-        ! enters the SSA solver as a function of basal velocity
-        ! Pollard and de Conto (2012), inverse of Eq. 10, given following Eq. 7
-        ! Note: Calculated on ac-nodes
-        ! Note: beta should be calculated for bed everywhere, 
-        ! independent of floatation, which is accounted for later
-        
-        implicit none
-        
-        real(prec), intent(OUT) :: beta(:,:)    ! aa-nodes
-        real(prec), intent(IN)  :: C_bed(:,:)   ! aa-nodes
-        
-        beta = C_bed
-
-        return
-        
-    end subroutine calc_beta_aa_linear
-    
-    subroutine calc_beta_aa_power(beta,ux_b,uy_b,C_bed,m_drag)
-        ! Calculate basal friction coefficient (beta) that
-        ! enters the SSA solver as a function of basal velocity
-        ! Pollard and de Conto (2012), inverse of Eq. 10, given in text
-        ! following Eq. 7: beta = c_b**(-1/m)*|u_b|**((1-m)/m)
-        ! Note: Calculated on ac-nodes
-        ! Note: beta should be calculated for bed everywhere, 
-        ! independent of floatation, which is accounted for later
-        
-        implicit none
-        
-        real(prec), intent(OUT) :: beta(:,:)        ! aa-nodes
-        real(prec), intent(IN)  :: ux_b(:,:)        ! ac-nodes
-        real(prec), intent(IN)  :: uy_b(:,:)        ! ac-nodes
-        real(prec), intent(IN)  :: C_bed(:,:)       ! Aa nodes
-        real(prec), intent(IN)  :: m_drag
-        
-        ! Local variables
-        integer    :: i, j, nx, ny
-        integer    :: i1, i2, j1, j2 
-        real(prec) :: ux_b_mid, uy_b_mid, uxy_b
-        real(prec) :: exp1
-        real(prec) :: C_bed_ac 
-
-        real(prec), parameter :: u_b_min    = 1e-3_prec  ! [m/a] Minimum velocity is positive small value to avoid divide by zero
-
-        nx = size(beta,1)
-        ny = size(beta,2)
-        
-        ! Pre-define exponents
-        exp1 = (1.0_prec/m_drag - 1.0_prec) 
-        
-        ! Initially set friction to zero everywhere
-        beta = 0.0_prec 
-
-        ! x-direction 
-        do j = 1, ny
-        do i = 1, nx
-
-            i1 = max(i-1,1)
-            j1 = max(j-1,1) 
-            
-            ! Calculate magnitude of basal velocity on aa-node 
-            ux_b_mid  = 0.5_prec*(ux_b(i1,j)+ux_b(i,j))
-            uy_b_mid  = 0.5_prec*(uy_b(i,j1)+uy_b(i,j))
-            uxy_b     = (ux_b_mid**2 + uy_b_mid**2 + u_b_min**2)**0.5_prec
-
-            ! Nonlinear beta as a function of basal velocity (unless m==1) 
-            if (m_drag .eq. 1.0_prec) then 
-                beta(i,j) = C_bed(i,j) 
-            else 
-                beta(i,j) = C_bed(i,j) * uxy_b**exp1
-            end if 
-
-        end do
-        end do
-        
-        return
-        
-    end subroutine calc_beta_aa_power
-    
-    subroutine calc_beta_aa_coulomb(beta,ux_b,uy_b,C_bed,m_drag,u_0)
-        ! Calculate basal friction coefficient (beta) that
-        ! enters the SSA solver as a function of basal velocity
-        ! using a regularized Coulomb friction law following
-        ! Joughin et al (2019), GRL, Eqs. 2a/2b
-        ! Note: Calculated on aa-nodes
-        ! Note: beta should be calculated for bed everywhere, 
-        ! independent of floatation, which is accounted for later
-        
-        implicit none
-        
-        real(prec), intent(OUT) :: beta(:,:)        ! aa-nodes
-        real(prec), intent(IN)  :: ux_b(:,:)        ! ac-nodes
-        real(prec), intent(IN)  :: uy_b(:,:)        ! ac-nodes
-        real(prec), intent(IN)  :: C_bed(:,:)       ! Aa nodes
-        real(prec), intent(IN)  :: m_drag
-        real(prec), intent(IN)  :: u_0              ! [m/a] 
-
-        ! Local variables
-        integer    :: i, j, nx, ny
-        integer    :: i1, i2, j1, j2 
-        real(prec) :: ux_b_mid, uy_b_mid, uxy_b
-        real(prec) :: exp1, exp2
-        real(prec) :: C_bed_ac 
-
-        real(prec), parameter :: u_b_min    = 1e-1_prec  ! [m/a] Minimum velocity is positive small value to avoid divide by zero
-
-        nx = size(beta,1)
-        ny = size(beta,2)
-        
-        ! Pre-define exponents
-        exp1 = 1.0_prec/m_drag
-        
-        ! Initially set friction to zero everywhere
-        beta = 0.0_prec 
-
-        ! x-direction 
-        do j = 1, ny
-        do i = 1, nx
-
-            i1 = max(i-1,1)
-            j1 = max(j-1,1) 
-            
-            ! Calculate magnitude of basal velocity on aa-node 
-            ux_b_mid  = 0.5_prec*(ux_b(i1,j)+ux_b(i,j))
-            uy_b_mid  = 0.5_prec*(uy_b(i,j1)+uy_b(i,j))
-            uxy_b     = (ux_b_mid**2 + uy_b_mid**2)**0.5_prec
-
-            ! Ensure velocity is not zero (to avoid really high values of beta)
-            uxy_b     = max(uxy_b,u_b_min)
-
-            ! Nonlinear beta as a function of basal velocity (unless m==1)
-            beta(i,j) = C_bed(i,j) * (uxy_b / (uxy_b+u_0))**exp1 * uxy_b**(-1.0_prec)
-
-        end do
-        end do
-        
-        return
-        
-    end subroutine calc_beta_aa_coulomb
-
-    subroutine calc_beta_aa_power_pism(beta,ux_b,uy_b,C_bed,q,u_0)
+    subroutine calc_beta_aa_power_plastic(beta,ux_b,uy_b,C_bed,q,u_0)
         ! Calculate basal friction coefficient (beta) that
         ! enters the SSA solver as a function of basal velocity
         ! using a power-law form following Bueler and van Pelt (2015)
@@ -372,11 +266,10 @@ contains
 
         ! Local variables
         integer    :: i, j, nx, ny
-        integer    :: i1, i2, j1, j2 
-        real(prec) :: ux_b_mid, uy_b_mid, uxy_b
-        real(prec) :: C_bed_ac 
+        integer    :: i1, j1 
+        real(prec) :: ux_b_mid, uy_b_mid, uxy_b  
 
-        real(prec), parameter :: u_b_min    = 1e-1_prec  ! [m/a] Minimum velocity is positive small value to avoid divide by zero
+        real(prec), parameter :: ub_sq_min = (1e-1_prec)**2  ! [m/a] Minimum velocity is positive small value to avoid divide by zero
 
         nx = size(beta,1)
         ny = size(beta,2)
@@ -384,7 +277,69 @@ contains
         ! Initially set friction to zero everywhere
         beta = 0.0_prec 
 
-        ! x-direction 
+        if (q .eq. 1.0) then 
+            ! q==1: linear law, no loops needed 
+
+            beta = C_bed * (1.0_prec / u_0)
+
+        else 
+            ! q/=1: Nonlinear law, loops needed 
+
+            ! x-direction 
+            do j = 1, ny
+            do i = 1, nx
+
+                i1 = max(i-1,1)
+                j1 = max(j-1,1) 
+                
+                ! Calculate magnitude of basal velocity on aa-node 
+                ux_b_mid  = 0.5_prec*(ux_b(i1,j)+ux_b(i,j))
+                uy_b_mid  = 0.5_prec*(uy_b(i,j1)+uy_b(i,j))
+                uxy_b     = (ux_b_mid**2 + uy_b_mid**2 + ub_sq_min)**0.5_prec
+
+                ! Nonlinear beta as a function of basal velocity
+                beta(i,j) = C_bed(i,j) * (uxy_b / u_0)**q * (1.0_prec / uxy_b)
+
+            end do
+            end do
+
+        end if 
+            
+        return
+        
+    end subroutine calc_beta_aa_power_plastic
+
+    subroutine calc_beta_aa_reg_coulomb(beta,ux_b,uy_b,C_bed,q,u_0)
+        ! Calculate basal friction coefficient (beta) that
+        ! enters the SSA solver as a function of basal velocity
+        ! using a regularized Coulomb friction law following
+        ! Joughin et al (2019), GRL, Eqs. 2a/2b
+        ! Note: Calculated on aa-nodes
+        ! Note: beta should be calculated for bed everywhere, 
+        ! independent of floatation, which is accounted for later
+        
+        implicit none
+        
+        real(prec), intent(OUT) :: beta(:,:)        ! aa-nodes
+        real(prec), intent(IN)  :: ux_b(:,:)        ! ac-nodes
+        real(prec), intent(IN)  :: uy_b(:,:)        ! ac-nodes
+        real(prec), intent(IN)  :: C_bed(:,:)       ! Aa nodes
+        real(prec), intent(IN)  :: q
+        real(prec), intent(IN)  :: u_0              ! [m/a] 
+
+        ! Local variables
+        integer    :: i, j, nx, ny
+        integer    :: i1, j1 
+        real(prec) :: ux_b_mid, uy_b_mid, uxy_b  
+
+        real(prec), parameter :: ub_sq_min = (1e-1_prec)**2  ! [m/a] Minimum velocity is positive small value to avoid divide by zero
+
+        nx = size(beta,1)
+        ny = size(beta,2)
+        
+        ! Initially set friction to zero everywhere
+        beta = 0.0_prec 
+
         do j = 1, ny
         do i = 1, nx
 
@@ -394,41 +349,23 @@ contains
             ! Calculate magnitude of basal velocity on aa-node 
             ux_b_mid  = 0.5_prec*(ux_b(i1,j)+ux_b(i,j))
             uy_b_mid  = 0.5_prec*(uy_b(i,j1)+uy_b(i,j))
-            uxy_b     = (ux_b_mid**2 + uy_b_mid**2)**0.5_prec
+            uxy_b     = (ux_b_mid**2 + uy_b_mid**2 + ub_sq_min)**0.5_prec
 
-            ! Ensure velocity is not zero (to avoid really high values of beta)
-            uxy_b     = max(uxy_b,u_b_min)
-
-            ! Nonlinear beta as a function of basal velocity (unless m==1)
-            beta(i,j) = C_bed(i,j) * 1.0_prec / (uxy_b**(1.0-q) * u_0**q)
+            ! Nonlinear beta as a function of basal velocity
+            beta(i,j) = C_bed(i,j) * (uxy_b / (uxy_b+u_0))**q * (1.0_prec / uxy_b)
 
         end do
-        end do
-        
+        end do 
+            
         return
         
-    end subroutine calc_beta_aa_power_pism
+    end subroutine calc_beta_aa_reg_coulomb
 
     ! ================================================================================
     !
     ! Scaling functions 
     !
     ! ================================================================================
-
-    subroutine scale_cbed_aa_Neff(C_bed,N_eff)
-        ! Calculate scalar between 0 and 1 to modify basal friction coefficient
-        ! as ice approaches and achieves floatation, and apply.
-        
-        implicit none
-            
-        real(prec), intent(INOUT) :: C_bed(:,:)         ! [Pa] aa-nodes, unitless in, [Pa] out.
-        real(prec), intent(IN)    :: N_eff(:,:)         ! [Pa] aa-nodes    
-
-        C_bed = N_eff * C_bed 
-
-        return
-        
-    end subroutine scale_cbed_aa_Neff
     
     subroutine scale_beta_aa_grline(beta,f_grnd,f_beta_gl)
         ! Applyt scalar between 0 and 1 to modify basal friction coefficient
@@ -569,7 +506,7 @@ contains
     !
     ! ================================================================================
 
-    subroutine stagger_beta_aa_simple(beta_acx,beta_acy,beta)
+    subroutine stagger_beta_aa_mean(beta_acx,beta_acy,beta)
         ! Stagger beta from aa-nodes to ac-nodes
         ! using simple staggering method, independent
         ! of any information about flotation, etc. 
@@ -606,7 +543,7 @@ contains
         
         return
         
-    end subroutine stagger_beta_aa_simple
+    end subroutine stagger_beta_aa_mean
     
     subroutine stagger_beta_aa_upstream(beta_acx,beta_acy,beta,f_grnd)
         ! Modify basal friction coefficient by grounded/floating binary mask

@@ -282,10 +282,7 @@ contains
 
         ! Artificially delete ice from locations that are not allowed
         where (.not. ice_allowed) tpo%now%H_ice = 0.0 
-            
-        ! Reset H_ice to zero if initialization parameter is set to "icefree"
-        if (trim(tpo%par%init) == "icefree") tpo%now%H_ice = 0.d0
-
+        
         write(*,*) "ytopo_load_H_ice:: range(H_ice):  ", minval(tpo%now%H_ice),  maxval(tpo%now%H_ice)
 
         return 
@@ -308,7 +305,6 @@ contains
  
         ! Store parameter values in output object
         call nml_read(filename,"ytopo","method",            par%method,            init=init_pars)
-        call nml_read(filename,"ytopo","init",              par%init,              init=init_pars)
         call nml_read(filename,"ytopo","solver",            par%solver,            init=init_pars)
         call nml_read(filename,"ytopo","margin2nd",         par%margin2nd,         init=init_pars)
         call nml_read(filename,"ytopo","surf_gl_method",    par%surf_gl_method,    init=init_pars)

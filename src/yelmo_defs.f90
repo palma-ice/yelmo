@@ -66,7 +66,7 @@ module yelmo_defs
     
     ! ytopo parameters
     type ytopo_param_class
-        character(len=256) :: name, method, init, solver
+        character(len=256) :: name, method, solver
         logical            :: margin2nd 
         integer            :: surf_gl_method 
         character(len=256) :: calv_method  
@@ -160,9 +160,9 @@ module yelmo_defs
         integer    :: mix_method            ! Method for mixing sia and ssa velocity solutions
         logical    :: calc_diffusivity      ! Calculate diagnostic diffusivity field
         integer    :: beta_method
-        real(prec) :: m_drag                ! Sliding law exponent (m==1: plastic)
-        real(prec) :: u_0                   ! [m/a] Regularized coulomb friction velocity 
         real(prec) :: beta_const
+        real(prec) :: beta_q                ! Friction law exponent
+        real(prec) :: beta_u0               ! [m/a] Friction law velocity threshold 
         integer    :: beta_gl_sep           ! Beta grounding-line subelement (subgrid) parameterization
         integer    :: beta_gl_scale         ! Beta grounding-line scaling method (beta => 0 at gl?)
         integer    :: beta_gl_stag          ! Beta grounding-line staggering method 
@@ -170,17 +170,15 @@ module yelmo_defs
         integer    :: taud_gl_method        ! Driving stress grounding line treatment 
         real(prec) :: H_grnd_lim 
         real(prec) :: H_sed_sat
-        integer    :: cb_method 
-        logical    :: cb_with_neff 
+        integer    :: cb_method
+        logical    :: cb_with_pmp           ! Scale friction coefficient between frozen and streaming values?
+        logical    :: cb_margin_pmp         ! Ensure margin and grline are considered streaming?
+        character(len=256) :: cb_scale      ! Method for scaling cb with elevation
         real(prec) :: cb_z0  
         real(prec) :: cb_z1
-        real(prec) :: cb_min
-        real(prec) :: cb_max       
-        real(prec) :: cb_stream
-        real(prec) :: cb_frozen
-        real(prec) :: cf_fac_sed
-        real(prec) :: cf_sia
-        logical    :: streaming_margin      ! Ensure margin and grline are considered streaming?
+        real(prec) :: cb_min      
+        real(prec) :: cf_frozen
+        real(prec) :: cf_stream
         integer    :: n_sm_beta 
         real(prec) :: beta_min              ! Minimum allowed value of beta
         real(prec) :: ssa_beta_max          ! Maximum value of beta for which ssa should be calculated
@@ -188,17 +186,19 @@ module yelmo_defs
         integer    :: ssa_iter_max 
         real(prec) :: ssa_iter_rel 
         real(prec) :: ssa_iter_conv 
-
+        real(prec) :: cb_sia
+        
         integer    :: neff_method
+        real(prec) :: neff_const
         real(prec) :: neff_p 
-        logical    :: neff_use_water 
+        logical    :: neff_set_water 
         real(prec) :: neff_w_max
         real(prec) :: neff_N0
         real(prec) :: neff_delta 
         real(prec) :: neff_e0 
         real(prec) :: neff_Cc 
 
-        integer    :: till_method 
+        real(prec) :: till_phi_const 
         real(prec) :: till_phi_min 
         real(prec) :: till_phi_max 
         real(prec) :: till_phi_zmin 

@@ -278,11 +278,11 @@ contains
                 ! Purely sia model
                 ! (correspondingly, floating ice is killed in yelmo_topography)
                 
-                if (dyn%par%cf_sia .gt. 0.0) then 
+                if (dyn%par%cb_sia .gt. 0.0) then 
                     ! Calculate basal velocity from Weertman sliding law (Greve 1997)
                     
                     call calc_uxy_b_sia(dyn%now%ux_b,dyn%now%uy_b,tpo%now%H_ice,tpo%now%dzsdx,tpo%now%dzsdy, &
-                                thrm%now%f_pmp,dyn%par%zeta_aa,dyn%par%dx,dyn%par%cf_sia,rho_ice,g)
+                                thrm%now%f_pmp,dyn%par%zeta_aa,dyn%par%dx,dyn%par%cb_sia,rho_ice,g)
                 
                 else 
                     ! Otherwise no basal sliding in SIA-only mode
@@ -830,7 +830,7 @@ if (.FALSE.) then
             ! Calculate the analytical grounding-line flux 
             call calc_grounding_line_flux(dyn%now%qq_gl_acx,dyn%now%qq_gl_acy,tpo%now%H_ice,mat%now%ATT_bar, &
                         dyn%now%C_bed,dyn%now%ux_b,dyn%now%uy_b,tpo%now%f_grnd,tpo%now%f_grnd_acx,tpo%now%f_grnd_acy, &
-                        mat%par%n_glen,dyn%par%m_drag,Q0=0.61_prec,f_drag=0.6_prec,gl_flux_method="coulomb")
+                        mat%par%n_glen,dyn%par%beta_q,Q0=0.61_prec,f_drag=0.6_prec,gl_flux_method="coulomb")
 
             ! Where qq_gl is present, prescribe velocity and set mask to -1
 
@@ -934,28 +934,21 @@ end if
 
                 dyn%now%beta = dyn%par%beta_const 
 
-            case(1) 
-                ! Calculate beta from a linear law (beta = c_b)
-                ! (equivalent to power law with m_drag=1.0)
+            case(1)
+                ! Calculate beta from a linear law (simply set beta=C_bed)
 
-                call calc_beta_aa_linear(dyn%now%beta,dyn%now%C_bed)
+                dyn%now%beta = dyn%now%C_bed 
 
-            case(2) 
-                ! Calculate beta from power-law function (eg, MISMIP3D style)
-                ! beta = c_b*|u_b|**((1-m)/m)
+            case(2)
+                ! Calculate beta from the quasi-plastic power-law as defined by Bueler and van Pelt (2015)
 
-                call calc_beta_aa_power(dyn%now%beta,dyn%now%ux_b,dyn%now%uy_b,dyn%now%C_bed,dyn%par%m_drag)
+                call calc_beta_aa_power_plastic(dyn%now%beta,dyn%now%ux_b,dyn%now%uy_b,dyn%now%C_bed,dyn%par%beta_q,dyn%par%beta_u0)
                 
             case(3)
                 ! Calculate beta from regularized Coulomb law (Joughin et al., GRL, 2019)
 
-                call calc_beta_aa_coulomb(dyn%now%beta,dyn%now%ux_b,dyn%now%uy_b,dyn%now%C_bed,dyn%par%m_drag,dyn%par%u_0)
+                call calc_beta_aa_reg_coulomb(dyn%now%beta,dyn%now%ux_b,dyn%now%uy_b,dyn%now%C_bed,dyn%par%beta_q,dyn%par%beta_u0)
                 
-            case(4)
-                ! Calculate beta from the power-law as defined by Bueler and van Pelt (2015)
-
-                call calc_beta_aa_power_pism(dyn%now%beta,dyn%now%ux_b,dyn%now%uy_b,dyn%now%C_bed,dyn%par%m_drag,dyn%par%u_0)
-
             case DEFAULT 
                 ! Not recognized 
 
@@ -1068,7 +1061,7 @@ end if
             case(0) 
                 ! Apply pure staggering everywhere (ac(i) = 0.5*(aa(i)+aa(i+1))
                 
-                call stagger_beta_aa_simple(dyn%now%beta_acx,dyn%now%beta_acy,dyn%now%beta)
+                call stagger_beta_aa_mean(dyn%now%beta_acx,dyn%now%beta_acy,dyn%now%beta)
 
             case(1) 
                 ! Apply upstream beta_aa value at ac-node with at least one neighbor H_grnd_aa > 0
@@ -1116,147 +1109,117 @@ end if
         integer :: i, j, nx, ny 
         integer :: i1, i2, j1, j2 
         real(prec) :: f_scale 
-
+        real(prec), allocatable :: cf_ref(:,:) 
+        real(prec), allocatable :: lambda_bed(:,:)  
+        
         nx = size(dyn%now%C_bed,1)
         ny = size(dyn%now%C_bed,2)
         
-        select case(dyn%par%cb_method)
+        allocate(cf_ref(nx,ny))
+        allocate(lambda_bed(nx,ny))
+        
+        if (dyn%par%cb_method .eq. -1) then 
+            ! Do nothing - C_bed defined externally
 
-            case(-1)
-                ! C_bed has been defined externally - do nothing
+        else 
+            ! Calculate C_bed following parameter choices 
 
-            case(0)
-                ! Constant C_bed everywhere based on cb_stream
+            ! =============================================================================
+            ! Step 1: calculate the C_bed field only determined by 
+            ! cf_frozen, cf_stream and temperate character of the bed 
 
-                dyn%now%C_bed = dyn%par%cb_stream
-
-            case(1)
-                ! Set C_bed according to temperate character of base
-
+            if (dyn%par%cb_with_pmp) then 
                 ! Smooth transition between temperate and frozen C_bed
-                dyn%now%C_bed = (thrm%now%f_pmp)*dyn%par%cb_stream &
-                            + (1.0_prec - thrm%now%f_pmp)*dyn%par%cb_frozen 
 
+                cf_ref = (thrm%now%f_pmp)*dyn%par%cf_stream &
+                           + (1.0_prec - thrm%now%f_pmp)*dyn%par%cf_frozen 
 
-                if (dyn%par%streaming_margin) then 
-                    ! Ensure that both the margin points and the grounding line
-                    ! are always considered streaming, independent of their
-                    ! thermodynamic character (as sometimes these can incorrectly become frozen)
+            else 
+                ! Only use cf_stream everywhere
 
-                
-                    ! Ensure any marginal point is also treated as streaming 
-                    do j = 1, ny 
-                    do i = 1, nx 
+                cf_ref = dyn%par%cf_stream
 
-                        i1 = max(i-1,1)
-                        i2 = min(i+1,nx)
-                        j1 = max(j-1,1)
-                        j2 = min(j+1,ny)
+            end if 
 
-                        if (tpo%now%H_ice(i,j) .gt. 0.0 .and. &
-                            (tpo%now%H_ice(i1,j) .le. 0.0 .or. &
-                             tpo%now%H_ice(i2,j) .le. 0.0 .or. &
-                             tpo%now%H_ice(i,j1) .le. 0.0 .or. &
-                             tpo%now%H_ice(i,j2) .le. 0.0)) then 
+            if (dyn%par%cb_with_pmp .and. dyn%par%cb_margin_pmp) then 
+                ! Ensure that both the margin points and the grounding line
+                ! are always considered streaming, independent of their
+                ! thermodynamic character (as sometimes these can incorrectly become frozen)
 
-                            dyn%now%C_bed(i,j) = dyn%par%cb_stream
-
-                        end if 
-
-                    end do 
-                    end do 
-
-                    ! Also ensure that grounding line is also considered streaming
-                    where(tpo%now%is_grline) dyn%now%C_bed = dyn%par%cb_stream
-
-                end if
-
-            case(2)
-                ! Set C_bed according to bed elevation and or temperate, etc. (experimental)
-
-                ! First set C_bed == cb_stream everywhere 
-                !dyn%now%C_bed = dyn%par%cb_stream 
-                dyn%now%C_bed = (thrm%now%f_pmp)*dyn%par%cb_stream &
-                            + (1.0_prec - thrm%now%f_pmp)*dyn%par%cb_frozen
-
-                
-                ! Next, apply lambda functions [0:1] to reduce friction
-                !  where appropriate 
-
+            
+                ! Ensure any marginal point is also treated as streaming 
                 do j = 1, ny 
                 do i = 1, nx 
 
-                    ! Scale C_bed as a function bedrock elevation relative to sea level
-                    f_scale = exp( (bnd%z_bed(i,j) - dyn%par%cb_z1) / (dyn%par%cb_z1 - dyn%par%cb_z0) )
-                    if (f_scale .gt. 1.0) f_scale = 1.0
-                    dyn%now%C_bed(i,j) = dyn%now%C_bed(i,j) * f_scale 
+                    i1 = max(i-1,1)
+                    i2 = min(i+1,nx)
+                    j1 = max(j-1,1)
+                    j2 = min(j+1,ny)
 
+                    if (tpo%now%H_ice(i,j) .gt. 0.0 .and. &
+                        (tpo%now%H_ice(i1,j) .le. 0.0 .or. &
+                         tpo%now%H_ice(i2,j) .le. 0.0 .or. &
+                         tpo%now%H_ice(i,j1) .le. 0.0 .or. &
+                         tpo%now%H_ice(i,j2) .le. 0.0)) then 
 
-                    if (dyn%now%C_bed(i,j).lt.dyn%par%cb_min) dyn%now%C_bed(i,j) = dyn%par%cb_min
-  
+                        cf_ref(i,j) = dyn%par%cf_stream
+
+                    end if 
+
                 end do 
                 end do 
 
+                ! Also ensure that grounding line is also considered streaming
+                ! Note: this was related to cold ocean temps at floating-grounded interface,
+                ! which is likely solved. Left here for safety. ajr, 2019-07-24
+                where(tpo%now%is_grline) cf_ref = dyn%par%cf_stream
 
-            case(3)
-                ! Set C_bed following tan(phi), and linear ramp between phi_min to phi_max with elevation
+            end if
 
-                if (dyn%par%till_method .eq. 0) then 
-                    ! Constant till friction angle 
-                    dyn%now%C_bed = calc_C_bed_till_const(dyn%par%till_phi_min)
+            ! =============================================================================
+            ! Step 2: calculate lambda functions to scale C_bed from default value 
+            
+            select case(trim(dyn%par%cb_scale))
 
-                else 
+                case("lin_zb")
+                    ! Linear scaling function with bedrock elevation
+                    
+                    lambda_bed = calc_lambda_bed_lin(bnd%z_bed,dyn%par%cb_z0,dyn%par%cb_z1)
+
+                case("exp_zb")
+                    ! Exponential scaling function with bedrock elevation
+                    
+                    lambda_bed = calc_lambda_bed_exp(bnd%z_bed,dyn%par%cb_z0,dyn%par%cb_z1)
+
+                case("till_const")
+                    ! Constant till friction angle
+
+                    lambda_bed = calc_lambda_till_const(dyn%par%till_phi_const)
+
+                case("till_zb")
                     ! Linear till friction angle versus elevation
-                    dyn%now%C_bed = calc_C_bed_till_linear(bnd%z_bed,bnd%z_sl,dyn%par%till_phi_min,dyn%par%till_phi_max, &
+
+                    lambda_bed = calc_lambda_till_linear(bnd%z_bed,bnd%z_sl,dyn%par%till_phi_min,dyn%par%till_phi_max, &
                                                             dyn%par%till_phi_zmin,dyn%par%till_phi_zmax)
 
-                end if 
+                case DEFAULT
+                    ! No scaling
 
+                    lambda_bed = 1.0
 
-            case(4)
-                    ! Set C_bed according to bed elevation (but linearly, no as in case 2)
+            end select 
+            
+            ! =============================================================================
+            ! Step 3: calculate C_bed [Pa]
+            
+            dyn%now%C_bed = (cf_ref*lambda_bed)*dyn%now%N_eff
 
-                ! First set C_bed == cb_stream everywhere or mix of cb_stream/cb_frozen 
-
-                !dyn%now%C_bed = dyn%par%cb_stream 
-                dyn%now%C_bed = (thrm%now%f_pmp)*dyn%par%cb_stream &
-                            + (1.0_prec - thrm%now%f_pmp)*dyn%par%cb_frozen
-
-
-                ! Next, apply a linear  functions [0:1] to reduce friction
-                !  where appropriate 
-
-                do j = 1, ny
-                do i = 1, nx
-
-                    ! Scale C_bed as a function bedrock elevation relative to sea level
-                    f_scale = (bnd%z_bed(i,j) - dyn%par%cb_z0) / (dyn%par%cb_z1 - dyn%par%cb_z0)
-                    if (f_scale .lt. 0.0) f_scale = 0.0 
-                    if (f_scale .gt. 1.0) f_scale = 1.0
-                    dyn%now%C_bed(i,j) = dyn%now%C_bed(i,j) * f_scale 
-
-                end do
-                end do
-
-
-            case DEFAULT 
-                ! Not recognized 
-
-                write(*,*) "calc_ydyn_cbed:: Error: cb_method not recognized."
-                write(*,*) "C_bed_method = ", dyn%par%cb_method
-                stop 
-                
-        end select 
-
-        if (dyn%par%cb_with_neff) then 
-            ! Additionally scale by N_eff (C_bed = C_bed*N_eff)
-
-            call scale_cbed_aa_Neff(dyn%now%c_bed,dyn%now%N_eff)
+            ! =============================================================================
+            ! Step 4: Ensure C_bed is not below lower limit 
+            
+            where (dyn%now%C_bed .lt. dyn%par%cb_min) dyn%now%C_bed = dyn%par%cb_min 
 
         end if 
-
-        ! Ensure C_bed is not below lower limit 
-        where (dyn%now%C_bed .lt. dyn%par%cb_min) dyn%now%C_bed = dyn%par%cb_min 
 
         return 
 
@@ -1278,39 +1241,47 @@ end if
         ! Allocate local H_w variable to represent water layer thickness if not available
         allocate(H_w(dyn%par%nx,dyn%par%ny)) 
 
-        ! Calculate effective pressure [bar = 1e-5 Pa == 1e-5 kg m^-1 s^-2]
+        ! Determine whether to use actual water layer thickness or parameterized layer thickness
+        if (dyn%par%neff_set_water) then
+            ! Set water to maximum thickness for temperate ice
+            H_w = dyn%par%neff_w_max * thrm%now%f_pmp  
+        else 
+            ! Use boundary water thickness field
+            H_w = bnd%H_w 
+        end if 
+
+        ! Calculate effective pressure N_eff [Pa]
         select case(dyn%par%neff_method)
 
             case(-1) 
                 ! Do nothing, effective pressure is calculated externally 
 
             case(0)
+                ! Constant value (to scale friction coefficients)
+
+                dyn%now%N_eff = dyn%par%neff_const 
+
+            case(1)
                 ! Effective pressure == overburden pressure 
+
                 dyn%now%N_eff = calc_effective_pressure_overburden(tpo%now%H_ice,tpo%now%f_grnd.lt.1.0)
 
-            case(1) 
+            case(2) 
                 ! Effective pressure diminishes with marine character
                 ! following Leguy et al. (2014) 
 
-                dyn%now%N_eff = calc_effective_pressure_marine(tpo%now%H_ice,bnd%z_bed,bnd%z_sl,bnd%H_w,p=dyn%par%neff_p)
+                dyn%now%N_eff = calc_effective_pressure_marine(tpo%now%H_ice,bnd%z_bed,bnd%z_sl,H_w,p=dyn%par%neff_p)
 
-            case(2)
+            case(3)
                 ! Effective pressure as basal till pressure
                 ! following van Pelt and Bueler (2015)
-
-                ! Determine whether to use actual water layer thickness or parameterized layer thickness
-                if (dyn%par%neff_use_water) then 
-                    H_w = bnd%H_w 
-                else 
-                    H_w = dyn%par%neff_w_max * thrm%now%f_pmp  
-                end if 
 
                 dyn%now%N_eff = calc_effective_pressure_till(H_w,tpo%now%H_ice,tpo%now%f_grnd.lt.1.0,dyn%par%neff_w_max, &
                                             dyn%par%neff_N0,dyn%par%neff_delta,dyn%par%neff_e0,dyn%par%neff_Cc) 
 
             case DEFAULT 
 
-                write(*,*) "ydyn_calc_Neff:: Error: neff_method not recognized, must be one of [-1,0,1,2]."
+                write(*,*) "ydyn_calc_Neff:: Error: neff_method not recognized, must be one of [-1,0,1,2,3]."
                 write(*,*) "neff_method = ", dyn%par%neff_method 
                 stop 
 
@@ -1342,9 +1313,9 @@ end if
         call nml_read(filename,"ydyn","mix_method",         par%mix_method,         init=init_pars)
         call nml_read(filename,"ydyn","calc_diffusivity",   par%calc_diffusivity,   init=init_pars)
         call nml_read(filename,"ydyn","beta_method",        par%beta_method,        init=init_pars)
-        call nml_read(filename,"ydyn","m_drag",             par%m_drag,             init=init_pars)
-        call nml_read(filename,"ydyn","u_0",                par%u_0,                init=init_pars)
         call nml_read(filename,"ydyn","beta_const",         par%beta_const,         init=init_pars)
+        call nml_read(filename,"ydyn","beta_q",             par%beta_q,             init=init_pars)
+        call nml_read(filename,"ydyn","beta_u0",            par%beta_u0,            init=init_pars)
         call nml_read(filename,"ydyn","beta_gl_sep",        par%beta_gl_sep,        init=init_pars)
         call nml_read(filename,"ydyn","beta_gl_scale",      par%beta_gl_scale,      init=init_pars)
         call nml_read(filename,"ydyn","beta_gl_stag",       par%beta_gl_stag,       init=init_pars)
@@ -1353,15 +1324,14 @@ end if
         call nml_read(filename,"ydyn","H_grnd_lim",         par%H_grnd_lim,         init=init_pars)
         call nml_read(filename,"ydyn","H_sed_sat",          par%H_sed_sat,          init=init_pars)
         call nml_read(filename,"ydyn","cb_method",          par%cb_method,          init=init_pars)
-        call nml_read(filename,"ydyn","cb_with_neff",       par%cb_with_neff,       init=init_pars)
+        call nml_read(filename,"ydyn","cb_with_pmp",        par%cb_with_pmp,        init=init_pars)
+        call nml_read(filename,"ydyn","cb_margin_pmp",      par%cb_margin_pmp,      init=init_pars)
+        call nml_read(filename,"ydyn","cb_scale",           par%cb_scale,           init=init_pars)
         call nml_read(filename,"ydyn","cb_z0",              par%cb_z0,              init=init_pars)
         call nml_read(filename,"ydyn","cb_z1",              par%cb_z1,              init=init_pars)
         call nml_read(filename,"ydyn","cb_min",             par%cb_min,             init=init_pars)
-        call nml_read(filename,"ydyn","cb_frozen",          par%cb_frozen,          init=init_pars)
-        call nml_read(filename,"ydyn","cb_stream",          par%cb_stream,          init=init_pars)
-        call nml_read(filename,"ydyn","cf_fac_sed",         par%cf_fac_sed,         init=init_pars)
-        call nml_read(filename,"ydyn","cf_sia",             par%cf_sia,             init=init_pars)
-        call nml_read(filename,"ydyn","streaming_margin",   par%streaming_margin,   init=init_pars)
+        call nml_read(filename,"ydyn","cf_frozen",          par%cf_frozen,          init=init_pars)
+        call nml_read(filename,"ydyn","cf_stream",          par%cf_stream,          init=init_pars)
         call nml_read(filename,"ydyn","n_sm_beta",          par%n_sm_beta,          init=init_pars)
         call nml_read(filename,"ydyn","beta_min",           par%beta_min,           init=init_pars)
         call nml_read(filename,"ydyn","ssa_beta_max",       par%ssa_beta_max,       init=init_pars)
@@ -1369,8 +1339,9 @@ end if
         call nml_read(filename,"ydyn","ssa_iter_max",       par%ssa_iter_max,       init=init_pars)
         call nml_read(filename,"ydyn","ssa_iter_rel",       par%ssa_iter_rel,       init=init_pars)
         call nml_read(filename,"ydyn","ssa_iter_conv",      par%ssa_iter_conv,      init=init_pars)
-
-        call nml_read(filename,"ydyn_till","till_method",   par%till_method,        init=init_pars)
+        call nml_read(filename,"ydyn","cb_sia",             par%cb_sia,             init=init_pars)
+        
+        call nml_read(filename,"ydyn_till","till_phi_const",par%till_phi_const,     init=init_pars)
         call nml_read(filename,"ydyn_till","till_phi_min",  par%till_phi_min,       init=init_pars)
         call nml_read(filename,"ydyn_till","till_phi_max",  par%till_phi_max,       init=init_pars)
         call nml_read(filename,"ydyn_till","till_phi_zmin", par%till_phi_zmin,      init=init_pars)
@@ -1378,19 +1349,12 @@ end if
         
         call nml_read(filename,"ydyn_neff","neff_method",   par%neff_method,        init=init_pars)
         call nml_read(filename,"ydyn_neff","neff_p",        par%neff_p,             init=init_pars)
-        call nml_read(filename,"ydyn_neff","neff_use_water",par%neff_use_water,     init=init_pars)
+        call nml_read(filename,"ydyn_neff","neff_set_water",par%neff_set_water,     init=init_pars)
         call nml_read(filename,"ydyn_neff","neff_w_max",    par%neff_w_max,         init=init_pars)
         call nml_read(filename,"ydyn_neff","neff_N0",       par%neff_N0,            init=init_pars)
         call nml_read(filename,"ydyn_neff","neff_delta",    par%neff_delta,         init=init_pars)
         call nml_read(filename,"ydyn_neff","neff_e0",       par%neff_e0,            init=init_pars)
         call nml_read(filename,"ydyn_neff","neff_Cc",       par%neff_Cc,            init=init_pars)
-
-        ! Perform parameter consistency checks 
-        if ( par%cf_fac_sed .gt. 1.0 ) then 
-            write(*,*) "bdrag_par_load:: error: cf_fac_sed must be less than or equal to 1.0."
-            write(*,*) "cf_fac_sed = ", par%cf_fac_sed
-            stop 
-        end if 
 
         ! === Set internal parameters ======
 

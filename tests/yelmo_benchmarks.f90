@@ -176,9 +176,6 @@ program yelmo_benchmarks
     yelmo1%bnd%H_sed    = 0.0 
     yelmo1%bnd%H_w      = 0.0
 
-!
-    print*,'hola hereiam'
-!
     select case(trim(experiment))
 
         case("BUELER-A")

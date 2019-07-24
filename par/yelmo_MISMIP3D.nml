@@ -50,7 +50,7 @@
     grad_lim          = 0.1             ! [m/m] Maximum allowed sloped in gradient calculations (dz/dx,dH/dx)
     gl_sep            = 1               ! 1: Linear f_grnd_acx/acy and binary f_grnd, 2: area f_grnd, average to acx/acy
     gl_sep_nx         = 15              ! [-] Number of interpolation points (nx*nx) to calculate grounded area at grounding line
-    neff_p            = 0.0             ! Effective pressure: connectivity to the ocean (0: none, 1: full)
+
 /
 
 &ydyn

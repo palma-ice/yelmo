@@ -104,8 +104,14 @@ contains
         ! Apply modified mass balance to update the ice thickness 
         H_ice = H_ice + dt*mb_applied
 
+if (.FALSE.) then
         ! Determine how much ice goes into the margin buffer 
         call calc_ice_margin(H_ice,H_margin,f_ice,f_grnd)
+else 
+        f_ice = 0.0 
+        where (H_ice .gt. 0.0) f_ice = 1.0
+        H_margin = 0.0 
+end if 
 
 if (.FALSE.) then 
     ! ajr: disable these for now to test new margin scheme!!

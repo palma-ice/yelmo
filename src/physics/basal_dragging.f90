@@ -276,7 +276,7 @@ contains
         
         ! Initially set friction to zero everywhere
         beta = 0.0_prec 
-
+        
         if (q .eq. 1.0) then 
             ! q==1: linear law, no loops needed 
 

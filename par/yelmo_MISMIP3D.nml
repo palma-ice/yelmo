@@ -60,7 +60,7 @@
     calc_diffusivity    = False           ! Calculate 2D diffusivity term for diagnostics
     beta_method         = 2               ! 0: constant beta; 1: linear (beta=cb); 2: psuedo-plastic-power; 3: Regularized Coulomb
     beta_const          = 1e3             ! [Pa a m−1] Constant value of basal friction coefficient to be used
-    beta_q              = 1.0/3.0         ! Dragging law exponent 
+    beta_q              = 0.3333333       ! Dragging law exponent 
     beta_u0             = 1.0             ! [m/a] Regularization term for regularized Coulomb law (beta_method=3)
     beta_gl_sep         = 0               !  -1: Apply subgrid treatment on ac-nodes (beta_gl_stag=3) 0: No subgrid treatment, 1: beta*f_grnd_aa        
     beta_gl_scale       = 0               !  0: No scaling, 1: beta*f_beta_gl, 2: H_grnd linear scaling, 3: Zstar scaling 
@@ -76,8 +76,8 @@
     cb_z0               = -200.0          ! [m] Bedrock elevation at which scaling goes to f_scale=e(-1)
     cb_z1               = 200.0           ! [m] Bedrock elevation above which scaling goes to f_scale=1
     cb_min              = 0.0             ! [Pa] Minimum allowed value of cb for grounded ice
-    cf_frozen           = 3.165176e4      ! [--] Bed critical stress, frozen 
-    cf_stream           = 3.165176e4      ! [--] Bed critical stress, stream  
+    cf_frozen           = 3.165176e4      ! [--] Bed critical stress factor, frozen 
+    cf_stream           = 3.165176e4      ! [--] Bed critical stress factor, stream  
     n_sm_beta           = 0               ! [-] Standard deviation in gridpoints for Gaussian smoothing of beta (0==no smoothing)
     beta_min            = 0.0             ! [Pa a m-1] Minimum value of beta allowed for grounded ice (for stability)
     ssa_beta_max        = 1e20            ! [Pa a m-1] Maximum value of beta for which ssa should be calculated 

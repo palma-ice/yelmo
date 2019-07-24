@@ -148,10 +148,10 @@ contains
         real(prec) :: yc 
         real(prec) :: y_gl, a_ref  
         
-! 1e7 [Pa^1/3 m^-1/3 s^1/3] *[a/sec_year]^1/3 = 31651.76 [Pa^1/3 m^-1/3 a^1/3]**3 = 3.170981e+13 [Pa^1 m^-1 a^1]
-!         real(prec), parameter :: C_bed_ref = 31651.76**3    ! [Pa (m/a)^-1] == 1e7 [Pa^1/3 (m/s)^-1/3]
-        !real(prec), parameter :: C_bed_ref = 3.170981e13    ! [Pa (m/a)^-1] == 1e7 [Pa^1/3 (m/s)^-1/3]
-        real(prec), parameter :: C_bed_ref = 31651.76
+        ! For Stnd experiment: C_bed_ref = 1e7     [Pa m^-1/3 s^1/3] / (1/sec_year)^1/3 = 3.165176e4
+        ! For RF experiment:   C_bed_ref = 7.624e6 [Pa m^-1/3 s^1/3] / (1/sec_year)^1/3 = 2.412596e4
+        real(prec), parameter :: C_bed_ref = 3.165176e4
+        !real(prec), parameter :: C_bed_ref = 2.412596e4
 
         ! Set bed friction coefficient
         xc    = 150.0 

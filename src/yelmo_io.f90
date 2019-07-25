@@ -82,6 +82,8 @@ contains
         call nc_write(filename,"bmb",         dom%tpo%now%bmb,        units="m/a",dim1="xc",dim2="yc",ncid=ncid)
         call nc_write(filename,"mb_applied",  dom%tpo%now%mb_applied, units="m/a",dim1="xc",dim2="yc",ncid=ncid)
         call nc_write(filename,"calv",        dom%tpo%now%calv,       units="m/a",dim1="xc",dim2="yc",ncid=ncid)
+        call nc_write(filename,"calv_grnd",   dom%tpo%now%calv_grnd,  units="m/a",dim1="xc",dim2="yc",ncid=ncid)
+        call nc_write(filename,"H_margin",    dom%tpo%now%H_margin,   units="m/a",dim1="xc",dim2="yc",ncid=ncid)
         call nc_write(filename,"dzsdx",       dom%tpo%now%dzsdx,      units="m/m",  dim1="xc",dim2="yc",ncid=ncid)  
         call nc_write(filename,"dzsdy",       dom%tpo%now%dzsdy,      units="m/m",  dim1="xc",dim2="yc",ncid=ncid)  
         call nc_write(filename,"dHicedx",     dom%tpo%now%dHicedx,    units="m/m",  dim1="xc",dim2="yc",ncid=ncid)
@@ -184,26 +186,26 @@ contains
 
         call nc_write(filename,"dep_time",    dom%mat%now%dep_time,      units="",dim1="xc",dim2="yc",dim3="zeta",ncid=ncid)     
 
-
-
         ! == ytherm variables ===
-        call nc_write(filename,"T_ice",       dom%thrm%now%T_ice,      units="",dim1="xc",dim2="yc",dim3="zeta",ncid=ncid)      
+
         call nc_write(filename,"enth",        dom%thrm%now%enth,       units="",dim1="xc",dim2="yc",dim3="zeta",ncid=ncid)      
+        call nc_write(filename,"T_ice",       dom%thrm%now%T_ice,      units="",dim1="xc",dim2="yc",dim3="zeta",ncid=ncid)      
         call nc_write(filename,"omega",       dom%thrm%now%omega,      units="",dim1="xc",dim2="yc",dim3="zeta",ncid=ncid)      
         call nc_write(filename,"T_pmp",       dom%thrm%now%T_pmp,      units="",dim1="xc",dim2="yc",dim3="zeta",ncid=ncid)      
         call nc_write(filename,"f_pmp",       dom%thrm%now%f_pmp,      units="",dim1="xc",dim2="yc",ncid=ncid)        
         call nc_write(filename,"bmb_grnd",    dom%thrm%now%bmb_grnd,   units="",dim1="xc",dim2="yc",ncid=ncid)     
         call nc_write(filename,"Q_strn",      dom%thrm%now%Q_strn,     units="",dim1="xc",dim2="yc",dim3="zeta",ncid=ncid)     
         call nc_write(filename,"Q_b",         dom%thrm%now%Q_b,        units="",dim1="xc",dim2="yc",ncid=ncid)          
+        call nc_write(filename,"Q_ice_b",     dom%thrm%now%Q_ice_b,    units="",dim1="xc",dim2="yc",ncid=ncid)          
         call nc_write(filename,"cp",          dom%thrm%now%cp,         units="",dim1="xc",dim2="yc",dim3="zeta",ncid=ncid)         
         call nc_write(filename,"kt",          dom%thrm%now%kt,         units="",dim1="xc",dim2="yc",dim3="zeta",ncid=ncid)         
-
-        call nc_write(filename,"T_prime_b",   dom%thrm%now%T_prime_b,  units="",dim1="xc",dim2="yc",ncid=ncid)    
         call nc_write(filename,"H_cts",       dom%thrm%now%H_cts,      units="",dim1="xc",dim2="yc",ncid=ncid)      
+        call nc_write(filename,"T_prime_b",   dom%thrm%now%T_prime_b,  units="",dim1="xc",dim2="yc",ncid=ncid)    
         
         ! == ybound variables ===
 
         call nc_write(filename,"z_bed",       dom%bnd%z_bed,       units="",dim1="xc",dim2="yc",ncid=ncid)
+        call nc_write(filename,"z_bed_sd",    dom%bnd%z_bed_sd,    units="",dim1="xc",dim2="yc",ncid=ncid)
         call nc_write(filename,"z_sl",        dom%bnd%z_sl,        units="",dim1="xc",dim2="yc",ncid=ncid)
         call nc_write(filename,"H_sed",       dom%bnd%H_sed,       units="",dim1="xc",dim2="yc",ncid=ncid)
         call nc_write(filename,"H_w",         dom%bnd%H_w,         units="",dim1="xc",dim2="yc",ncid=ncid)
@@ -249,7 +251,8 @@ contains
         
         ! Local variables
         integer :: ncid
-        
+        real(prec) :: time_of_restart_file 
+
         ! Read all yelmo data from file,
         ! in order to restart a simulation.
         
@@ -257,12 +260,20 @@ contains
 
         call nc_open(filename,ncid,writable=.FALSE.)
 
-        call nc_read(filename,"xc",ncid)      
-        call nc_read(filename,"yc",ncid)      
-        call nc_read(filename,"zeta",ncid)    
-        call nc_read(filename,"zeta_ac",ncid) 
-        call nc_read(filename,"time",ncid)    
+        if (.FALSE.) then 
+            ! No need to read in the dimension information,
+            ! this will be initialized by Yelmo itself
 
+            call nc_read(filename,"xc",dom%grd%xc,ncid=ncid)
+            dom%grd%xc = dom%grd%xc*1e3      
+            call nc_read(filename,"yc",dom%grd%yc,ncid=ncid)   
+            dom%grd%yc = dom%grd%yc*1e3   
+            call nc_read(filename,"zeta",dom%par%zeta_aa,ncid=ncid)   
+            call nc_read(filename,"zeta_ac",dom%par%zeta_ac,ncid=ncid) 
+            call nc_read(filename,"time",time_of_restart_file,ncid=ncid)    
+
+        end if 
+        
         ! == ytopo variables ===
 
         call nc_read(filename,"H_ice",       dom%tpo%now%H_ice,ncid=ncid)
@@ -272,6 +283,8 @@ contains
         call nc_read(filename,"bmb",         dom%tpo%now%bmb,ncid=ncid)
         call nc_read(filename,"mb_applied",  dom%tpo%now%mb_applied,ncid=ncid)
         call nc_read(filename,"calv",        dom%tpo%now%calv,ncid=ncid)
+        call nc_read(filename,"calv_grnd",   dom%tpo%now%calv_grnd,ncid=ncid)
+        call nc_read(filename,"H_margin",    dom%tpo%now%H_margin,ncid=ncid)
         call nc_read(filename,"dzsdx",       dom%tpo%now%dzsdx,ncid=ncid)  
         call nc_read(filename,"dzsdy",       dom%tpo%now%dzsdy,ncid=ncid)  
         call nc_read(filename,"dHicedx",     dom%tpo%now%dHicedx,ncid=ncid)
@@ -383,6 +396,8 @@ contains
         call nc_read(filename,"ssa_mask_acx",  dom%dyn%now%ssa_mask_acx,ncid=ncid) 
         call nc_read(filename,"ssa_mask_acy",  dom%dyn%now%ssa_mask_acy,ncid=ncid) 
 
+        ! == ymat variables ===
+
         call nc_read(filename,"strn2D_dxx", dom%mat%now%strn2D%dxx,ncid=ncid) 
         call nc_read(filename,"strn2D_dyy", dom%mat%now%strn2D%dyy,ncid=ncid) 
         call nc_read(filename,"strn2D_dxy", dom%mat%now%strn2D%dxy,ncid=ncid) 
@@ -409,23 +424,24 @@ contains
 
         ! == ytherm variables ===
 
-        call nc_read(filename,"T_ice",       dom%thrm%now%T_ice,ncid=ncid)    
         call nc_read(filename,"enth",        dom%thrm%now%enth,ncid=ncid)   
+        call nc_read(filename,"T_ice",       dom%thrm%now%T_ice,ncid=ncid)    
         call nc_read(filename,"omega",       dom%thrm%now%omega,ncid=ncid) 
         call nc_read(filename,"T_pmp",       dom%thrm%now%T_pmp,ncid=ncid) 
         call nc_read(filename,"f_pmp",       dom%thrm%now%f_pmp,ncid=ncid) 
         call nc_read(filename,"bmb_grnd",    dom%thrm%now%bmb_grnd,ncid=ncid)    
         call nc_read(filename,"Q_strn",      dom%thrm%now%Q_strn,ncid=ncid)      
         call nc_read(filename,"Q_b",         dom%thrm%now%Q_b,ncid=ncid)         
+        call nc_read(filename,"Q_ice_b",     dom%thrm%now%Q_ice_b,ncid=ncid)         
         call nc_read(filename,"cp",          dom%thrm%now%cp,ncid=ncid) 
         call nc_read(filename,"kt",          dom%thrm%now%kt,ncid=ncid)      
-
-        call nc_read(filename,"T_prime_b",   dom%thrm%now%T_prime_b,ncid=ncid)  
         call nc_read(filename,"H_cts",       dom%thrm%now%H_cts,ncid=ncid)       
+        call nc_read(filename,"T_prime_b",   dom%thrm%now%T_prime_b,ncid=ncid)  
         
         ! == ybound variables ===
 
         call nc_read(filename,"z_bed",       dom%bnd%z_bed,ncid=ncid) 
+        call nc_read(filename,"z_bed_sd",    dom%bnd%z_bed_sd,ncid=ncid) 
         call nc_read(filename,"z_sl",        dom%bnd%z_sl,ncid=ncid) 
         call nc_read(filename,"H_sed",       dom%bnd%H_sed,ncid=ncid) 
         call nc_read(filename,"H_w",         dom%bnd%H_w,ncid=ncid) 
@@ -442,44 +458,13 @@ contains
 
         call nc_read(filename,"ice_allowed", dom%bnd%ice_allowed,ncid=ncid) 
         
-        call nc_read(filename,"enh",      dom%mat%now%enh,            ncid=ncid)
-        call nc_read(filename,"enh_bar",  dom%mat%now%enh_bar,        ncid=ncid)
-        call nc_read(filename,"ATT",      dom%mat%now%ATT,            ncid=ncid)
-        call nc_read(filename,"ATT_bar",  dom%mat%now%ATT_bar,        ncid=ncid)
-        call nc_read(filename,"visc",     dom%mat%now%visc,           ncid=ncid)
-        call nc_read(filename,"visc_int", dom%mat%now%visc_int,       ncid=ncid)
-        
-        ! == ytherm variables ===
-        call nc_read(filename,"T_ice",     dom%thrm%now%T_ice,        ncid=ncid)
-        call nc_read(filename,"T_pmp",     dom%thrm%now%T_pmp,        ncid=ncid)
-        call nc_read(filename,"f_pmp",     dom%thrm%now%f_pmp,        ncid=ncid)
-        call nc_read(filename,"bmb_grnd",  dom%thrm%now%bmb_grnd,     ncid=ncid)
-        call nc_read(filename,"Q_b",       dom%thrm%now%Q_b,          ncid=ncid)
-        call nc_read(filename,"Q_strn",    dom%thrm%now%Q_strn,       ncid=ncid)
-
-        ! == ybound variables ===
-        call nc_read(filename,"z_bed",   dom%bnd%z_bed,               ncid=ncid)
-        call nc_read(filename,"z_sl",    dom%bnd%z_sl,                ncid=ncid)
-        call nc_read(filename,"H_sed",   dom%bnd%H_sed,               ncid=ncid)
-        call nc_read(filename,"H_w",     dom%bnd%H_w,                 ncid=ncid)
-        call nc_read(filename,"smb",     dom%bnd%smb,                 ncid=ncid)
-        call nc_read(filename,"T_srf",   dom%bnd%T_srf,               ncid=ncid)
-        call nc_read(filename,"bmb_shlf",dom%bnd%bmb_shlf,            ncid=ncid)
-        call nc_read(filename,"T_shlf",  dom%bnd%T_shlf,              ncid=ncid)
-        call nc_read(filename,"Q_geo",   dom%bnd%Q_geo,               ncid=ncid)
-
-        call nc_read(filename,"basins",     dom%bnd%basins,           ncid=ncid)
-        call nc_read(filename,"basin_mask", dom%bnd%basin_mask,       ncid=ncid)
-        call nc_read(filename,"regions",    dom%bnd%regions,          ncid=ncid)
-        call nc_read(filename,"region_mask",dom%bnd%region_mask,      ncid=ncid)
-
         ! Close the netcdf file
         call nc_close(ncid)
 
         ! Write summary 
 
         dom%thrm%par%time = time
-        dom%mat%par%time = time 
+        dom%mat%par%time  = time 
 
         write(*,*) 
         write(*,*) "time = ", time, " : loaded restart file: ", trim(filename)

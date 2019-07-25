@@ -103,14 +103,20 @@ contains
 
         ! Apply modified mass balance to update the ice thickness 
         H_ice = H_ice + dt*mb_applied
+        
+if (trim(boundaries) .eq. "MISMIP3D") then 
+    ! Do not use H_margin treatment for MISMIP3D, it is problematic
+    ! at the domain boundaries.
 
-if (.FALSE.) then
-        ! Determine how much ice goes into the margin buffer 
-        call calc_ice_margin(H_ice,H_margin,f_ice,f_grnd)
-else 
         f_ice = 0.0 
         where (H_ice .gt. 0.0) f_ice = 1.0
         H_margin = 0.0 
+
+else 
+    ! Transfer ice into the margin buffer, and determine f_ice
+
+    call calc_ice_margin(H_ice,H_margin,f_ice,f_grnd)
+
 end if 
 
 if (.FALSE.) then 
@@ -799,7 +805,7 @@ end if
         real(prec), intent(IN)    :: f_grnd(:,:)            ! [--] Grounded fraction (aa-nodes)
 
         ! Local variables 
-        integer :: i, j, nx, ny, i1, j1  
+        integer :: i, j, nx, ny, i1, i2, j1, j2  
         real(prec) :: H_neighb(4)
         logical :: mask_neighb(4)
         real(prec) :: H_ref  
@@ -820,11 +826,16 @@ end if
 
         H_ice_0 = H_ice 
 
-        do j = 2, ny-1
-        do i = 2, nx-1 
+        do j = 1, ny
+        do i = 1, nx 
+
+            i1 = max(i-1,1)
+            j1 = max(j-1,1)
+            i2 = min(i+1,nx)
+            j2 = min(j+1,ny)
 
             ! Store neighbor heights 
-            H_neighb = [H_ice_0(i-1,j),H_ice_0(i+1,j),H_ice_0(i,j-1),H_ice_0(i,j+1)]
+            H_neighb = [H_ice_0(i1,j),H_ice_0(i2,j),H_ice_0(i,j1),H_ice_0(i,j2)]
             
             if (H_ice(i,j) .gt. 0.0 .and. minval(H_neighb) .eq. 0.0) then 
                 ! This point is at the ice margin

@@ -134,16 +134,12 @@ contains
                     stop 
 
             end select
-
-if (.FALSE.) then
-! Testing no calving at all
-
+ 
             ! Apply calving
             call apply_calving(tpo%now%H_ice,tpo%now%calv,tpo%now%f_grnd,tpo%par%H_min_flt,dt)
 
             ! Additionally apply calving to H_margin points (when isolated)
-            call apply_calving_ice_margin(tpo%now%calv,tpo%now%H_margin,tpo%now%H_ice,dt)
-end if 
+            call apply_calving_ice_margin(tpo%now%calv,tpo%now%H_margin,tpo%now%H_ice,dt)  
 
             ! Apply special case for symmetric EISMINT domain when basal sliding is active
             ! (ensure summit thickness does not grow disproportionately)

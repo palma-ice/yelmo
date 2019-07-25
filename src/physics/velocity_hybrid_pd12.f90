@@ -812,7 +812,7 @@ contains
         ny = size(H_ice,2) 
 
         ! Allocate Hi_ab
-        allocate(Hi_ab(nx,ny))
+!         allocate(Hi_ab(nx,ny))
 
         ! Stagger H_ice to Ab nodes:
         ! This will be used to calculate H_mid on the acx/acy nodes,

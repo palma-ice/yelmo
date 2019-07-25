@@ -216,7 +216,7 @@ do n=1, nmax-1, 2
 
         lgs_b_value(nr) = vx_m(i,j)
         lgs_x_value(nr) = vx_m(i,j)
-      
+        
       ! === Proceed with normal ssa checks =================
       
       else if (ssa_mask_acx(i,j) .gt. 0) then 

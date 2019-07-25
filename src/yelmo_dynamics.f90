@@ -1054,7 +1054,7 @@ end if
         ! Note: At this point the beta_aa field is available with beta=0 
         ! for floating points and beta > 0 for non-floating points
         ! ================================================================
-
+        
         ! 4. Apply staggering method with particular care for the grounding line 
         select case(dyn%par%beta_gl_stag) 
 

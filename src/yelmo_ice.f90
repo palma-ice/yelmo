@@ -415,9 +415,14 @@ contains
         ! Local variables 
         logical :: load_topo_from_par 
 
-        ! Initialize variables 
-        if (trim(dom%par%restart) .eq. "no") then 
-            
+        ! Initialize variables
+         
+        if (dom%par%use_restart) then 
+            ! Load variables from a restart file
+
+            call yelmo_restart_read_1(dom,trim(dom%par%restart),time)
+
+        else
             ! Determine whether topography has already been defined externally or
             ! to load initial topography data from file based on parameter choices 
             load_topo_from_par = .TRUE. 
@@ -440,12 +445,6 @@ contains
 
             ! Update regional calculations (for now entire domain with ice)
             call calc_yregions(dom%reg,dom%tpo,dom%dyn,dom%thrm,dom%mat,dom%bnd,mask=dom%bnd%ice_allowed)
-
-
-        else 
-            ! Add code to load previously stopped run
-
-            call yelmo_restart_read_1(dom,trim(dom%par%restart),time)
 
         end if 
 
@@ -478,9 +477,14 @@ contains
         ! Impose initialization choices 
         dom%thrm%par%method = thrm_method 
          
+        ! Initialize variables
 
-        ! Initialize variables 
-        if (trim(dom%par%restart) .eq. "no") then 
+        if (dom%par%use_restart) then 
+            ! Load variables from a restart file 
+
+            call yelmo_restart_read_2(dom,trim(dom%par%restart),time)
+
+        else 
 
             ! Consistency check 
             if (trim(thrm_method) .ne. "linear" .and. trim(thrm_method) .ne. "robin" &
@@ -510,12 +514,6 @@ contains
             ! Calculate material information again with updated dynamics
         
             call calc_ymat(dom%mat,dom%tpo,dom%dyn,dom%thrm,dom%bnd,time)
-
-        else 
-            ! Add code to load previously stopped run
-
-            call yelmo_restart_read_2(dom,trim(dom%par%restart),time)
-
 
         end if 
 
@@ -577,6 +575,13 @@ contains
 
         ! Ensure ntt is at least 1 
         if (par%ntt .lt. 1) par%ntt = 1 
+
+        ! Set restart flag based on 'restart' parameter 
+        if (trim(par%restart) .eq. "no") then 
+            par%use_restart = .FALSE. 
+        else 
+            par%use_restart = .TRUE. 
+        end if 
 
         return
 

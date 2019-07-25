@@ -614,7 +614,8 @@ module yelmo_defs
         real(prec), allocatable :: dt_adv(:,:) 
         real(prec), allocatable :: dt_diff(:,:) 
         real(prec), allocatable :: dt_adv3D(:,:,:)
-
+        logical :: use_restart 
+        
         ! Timing information 
         real(prec) :: model_speed 
         real(prec) :: model_speeds(10)    ! Use 10 timesteps for running mean  

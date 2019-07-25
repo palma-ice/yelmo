@@ -17,8 +17,9 @@ program yelmo_benchmarks
 
     type(bueler_test_type) :: buel 
     
-    character(len=56)  :: domain 
+    character(len=56)  :: domain    
     character(len=256) :: outfldr, file2D, file1D, file_compare
+    character(len=256) :: file_restart
     character(len=512) :: path_par, path_const 
     character(len=56)  :: experiment
     logical            :: with_ssa  
@@ -49,6 +50,8 @@ program yelmo_benchmarks
     file1D       = trim(outfldr)//"yelmo1D.nc"
     file2D       = trim(outfldr)//"yelmo2D.nc"
     file_compare = trim(outfldr)//"yelmo_compare.nc"
+    file_restart = trim(outfldr)//"yelmo_restart.nc"
+
     
     ! Define the domain, grid and experiment from parameter file
     call nml_read(path_par,"eismint","domain",       domain)        ! EISMINT1, EISMINT2
@@ -110,15 +113,21 @@ program yelmo_benchmarks
     ! Next define grid 
     call yelmo_init_grid(yelmo1%grd,grid_name,units="km",dx=dx,nx=nx,dy=dx,ny=nx)
 
+
+
     ! Initialize data objects (without loading topography, which will be defined inline below)
     call yelmo_init(yelmo1,filename=path_par,grid_def="none",time=time_init,load_topo=.FALSE.,domain=domain,grid_name=grid_name)
     
+
     ! Update parameter values with EISMINT choices 
     yelmo1%dyn%par%use_ssa    = with_ssa 
     yelmo1%tpo%par%topo_fixed = topo_fixed 
 
+
+
     ! Initialize Bueler test type 
     call bueler_init(buel,yelmo1%grd%nx,yelmo1%grd%ny)
+
 
     ! === Define initial topography =====
 
@@ -136,10 +145,8 @@ program yelmo_benchmarks
         case DEFAULT 
             ! EISMINT1, EISMINT2, BUELER 
 
-            yelmo1%bnd%z_bed      = 0.0 
-            yelmo1%tpo%now%H_ice  = 0.0
             yelmo1%tpo%now%z_srf  = yelmo1%bnd%z_bed + yelmo1%tpo%now%H_ice 
-            
+
     end select 
 
     ! ==== READ STEADY-STATE TOPOGRAPHY FROM HEIKO'S RUN
@@ -251,6 +258,7 @@ program yelmo_benchmarks
                                     yelmo1%grd%x,yelmo1%grd%y,yelmo1%tpo%now%H_ice, &
                                     experiment=experiment,time=0.0_prec,period=period,dT_test=dT_test)
 
+
     end select 
 
     ! Call bueler_compare once to initialize comparison fields (even though it is not currently used for EISMINT sims)
@@ -276,6 +284,7 @@ program yelmo_benchmarks
     ! Initialize state variables (dyn,therm,mat)
     call yelmo_init_state(yelmo1,path_par,time=time_init,thrm_method="robin")
 
+
     ! == Write initial state ==
      
     ! 2D file 
@@ -294,6 +303,7 @@ program yelmo_benchmarks
         ! Set yelmo parameter to fix dynamics
         yelmo1%dyn%par%solver = "fixed"
     end if 
+
 
 
     ! Advance timesteps
@@ -368,6 +378,9 @@ program yelmo_benchmarks
 
     end do 
 
+
+
+
     ! Write summary 
     write(*,*) "====== "//trim(domain)//"-"//trim(experiment)//" ======="
     write(*,*) "nz_aa, H0 = ", yelmo1%par%nz_aa, maxval(yelmo1%tpo%now%H_ice)
@@ -382,6 +395,10 @@ program yelmo_benchmarks
         case DEFAULT 
         ! Pass- not a bueler test... 
     end select 
+
+
+    ! Write a restart file too
+    call yelmo_restart_write(yelmo1,file_restart,time=time)
 
     ! Finalize program
     call yelmo_end(yelmo1,time=time)
@@ -487,6 +504,7 @@ contains
                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
         call nc_write(filename,"Q_strn",ylmo%thrm%now%Q_strn/(rho_ice*ylmo%thrm%now%cp),units="K a-1",long_name="Strain heating", &
                       dim1="xc",dim2="yc",dim3="zeta",dim4="time",start=[1,1,1,n],ncid=ncid)
+
         call nc_write(filename,"Q_b",ylmo%thrm%now%Q_b,units="J a-1 m-2",long_name="Basal frictional heating", &
                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
         

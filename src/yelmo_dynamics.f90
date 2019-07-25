@@ -1161,7 +1161,7 @@ end if
                          tpo%now%H_ice(i2,j) .le. 0.0 .or. &
                          tpo%now%H_ice(i,j1) .le. 0.0 .or. &
                          tpo%now%H_ice(i,j2) .le. 0.0)) then 
-
+                        
                         cf_ref(i,j) = dyn%par%cf_stream
 
                     end if 

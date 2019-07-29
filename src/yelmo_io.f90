@@ -12,8 +12,8 @@ module yelmo_io
     private 
     public :: yelmo_write_init
     public :: yelmo_restart_write
-    public :: yelmo_restart_read_1
-    public :: yelmo_restart_read_2
+    public :: yelmo_restart_read_topo
+    public :: yelmo_restart_read
 
 
 contains
@@ -239,9 +239,9 @@ contains
 
     end subroutine yelmo_restart_write 
 
-    subroutine yelmo_restart_read_1(dom,filename,time)  
+    subroutine yelmo_restart_read_topo(dom,filename,time)  
         ! Load yelmo variables from restart file: [tpo] 
-        ! [dyn,therm,mat] variables loaded using yelmo_restart_read_2
+        ! [dyn,therm,mat] variables loaded using yelmo_restart_read
         
         implicit none 
 
@@ -311,12 +311,12 @@ contains
         
         return 
 
-    end subroutine yelmo_restart_read_1 
+    end subroutine yelmo_restart_read_topo 
 
 
-    subroutine yelmo_restart_read_2(dom,filename,time)
+    subroutine yelmo_restart_read(dom,filename,time)
         ! Load yelmo variables from restart file: [dyn,therm,mat] 
-        ! [tpo] variables loaded using yelmo_restart_read_1
+        ! [tpo] variables loaded using yelmo_restart_read_topo
 
         implicit none 
 
@@ -472,7 +472,7 @@ contains
         
         return 
 
-    end subroutine yelmo_restart_read_2 
+    end subroutine yelmo_restart_read 
     
 
 end module yelmo_io 

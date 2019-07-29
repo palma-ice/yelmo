@@ -203,9 +203,7 @@ contains
         end if 
 
         ! Reset model time back to input time 
-        dom%tpo%par%time      = time 
-        dom%tpo%par%time_calv = time
-        dom%thrm%par%time     = time 
+        call yelmo_set_time(dom,time)
 
         return
 
@@ -420,7 +418,7 @@ contains
         if (dom%par%use_restart) then 
             ! Load variables from a restart file
 
-            call yelmo_restart_read_1(dom,trim(dom%par%restart),time)
+            call yelmo_restart_read_topo(dom,trim(dom%par%restart),time)
 
         else
             ! Determine whether topography has already been defined externally or
@@ -482,7 +480,7 @@ contains
         if (dom%par%use_restart) then 
             ! Load variables from a restart file 
 
-            call yelmo_restart_read_2(dom,trim(dom%par%restart),time)
+            call yelmo_restart_read(dom,trim(dom%par%restart),time)
 
         else 
 
@@ -641,9 +639,10 @@ contains
         real(prec), intent(IN) :: time
         
         dom%tpo%par%time      = time 
-        dom%tpo%par%time_calv = time 
+        dom%dyn%par%time      = time 
+        dom%mat%par%time      = time 
         dom%thrm%par%time     = time 
-
+        
         return 
 
     end subroutine yelmo_set_time 

@@ -62,12 +62,11 @@ contains
 
         ! Initialize time if necessary 
         if (tpo%par%time .gt. time) then 
-            tpo%par%time      = time
-            tpo%par%time_calv = time 
+            tpo%par%time = time 
         end if 
 
         ! Get time step
-        dt                = time - tpo%par%time 
+        dt = time - tpo%par%time 
 
         
         ! Combine basal mass balance into one field accounting for 
@@ -75,9 +74,6 @@ contains
         call calc_bmb_total(tpo%now%bmb,thrm%now%bmb_grnd,bnd%bmb_shlf,tpo%now%f_grnd,tpo%par%diffuse_bmb_shlf)
         
         
-        ! Diagnose the calving rate 
-
-
         ! Perform topography calculations 
         if ( .not. topo_fixed .and. dt .gt. 0.0 ) then 
 
@@ -341,8 +337,7 @@ contains
         par%boundaries = "zeros" 
         
         ! Define current time as unrealistic value
-        par%time = 1000000000   ! [a] 1 billion years in the future
-        par%time_calv = par%time 
+        par%time = 1000000000   ! [a] 1 billion years in the future 
 
         return
 

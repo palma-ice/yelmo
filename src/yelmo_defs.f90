@@ -94,7 +94,6 @@ module yelmo_defs
 
         ! Internal parameters 
         real(prec) :: time 
-        real(prec) :: time_calv 
         
     end type
 

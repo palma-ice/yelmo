@@ -1,8 +1,8 @@
 &eismint
 
     domain       = "EISMINT"             ! "EISMINT"
-    experiment   = "moving"              ! "fixed", "moving", "mismip", "EXPA", "EXPB", "EXPF","BUELER-A", "BUELER-B", "HALFAR", "HALFAR-MED"
-    dx           = 50.0                  ! [km] Grid resolution (EISMINT1 = 50km, EISMINT2 = 25km)
+    experiment   = "HALFAR-MED"          ! "fixed", "moving", "mismip", "EXPA", "EXPB", "EXPF","BUELER-A", "BUELER-B", "HALFAR", "HALFAR-MED"
+    dx           = 5.0                   ! [km] Grid resolution (EISMINT1 = 50km, EISMINT2 = 25km)
     with_ssa     = False                 ! Include ssa in experiment?
     topo_fixed   = False                 ! Calculate the topography, or use Heiko's topo file.  
     dyn_fixed    = False                 ! Fix dynamics after first calculation? 
@@ -10,9 +10,9 @@
 
     ! Timing parameters 
     time_init    = 0.0                  ! [yr] Starting time 
-    time_end     = 100e3                ! [yr] Ending time 
+    time_end     = 2000.0               ! [yr] Ending time 
     dtt          = 5.0                  ! [yr] Main loop timestep 
-    dt2D_out     = 1000.0                ! [yr] Frequency of writing 2D output files 
+    dt2D_out     = 100.0                ! [yr] Frequency of writing 2D output files 
 
     ! Settings for transient EISMINT1 experiments 
     period       = 0.0                  ! [yr] for transient experiments (normally 0.0 yr or 20e3 yr)
@@ -135,7 +135,7 @@
 /
 
 &ytherm
-    method          = "enth"            ! "fixed", "robin", "temp", "enth"
+    method          = "temp"            ! "fixed", "robin", "temp", "enth"
     gamma           = 1.0               ! [K] Scalar for the pressure melting point decay function 
     use_strain_sia  = False             ! True: calculate strain heating from SIA approx.
     n_sm_qstrn      = 0                 ! [-] Standard deviation in gridpoints for Gaussian smoothing of strain heating (0==no smoothing)

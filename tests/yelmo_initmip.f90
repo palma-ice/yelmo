@@ -15,7 +15,7 @@ program yelmo_test
     character(len=256) :: outfldr, file1D, file2D, file_restart, domain 
     character(len=512) :: path_par, path_const  
     real(prec) :: time_init, time_end, time_equil, time, dtt, dt1D_out, dt2D_out 
-    real(prec) :: bmb_shlf_const  
+    real(prec) :: bmb_shlf_const, dT_ann   
     integer    :: n
     real(4) :: cpu_start_time, cpu_end_time 
 
@@ -35,7 +35,8 @@ program yelmo_test
     call nml_read(path_par,"control","dtt",             dtt)                       ! [yr] Main loop time step 
     call nml_read(path_par,"control","dt1D_out",        dt1D_out)                  ! [yr] Frequency of 1D output 
     call nml_read(path_par,"control","dt2D_out",        dt2D_out)                  ! [yr] Frequency of 2D output 
-    call nml_read(path_par,"control","bmb_shlf_const",  bmb_shlf_const)            ! [yr] Frequency of 2D output 
+    call nml_read(path_par,"control","bmb_shlf_const",  bmb_shlf_const)            ! [yr] Constant imposed bmb_shlf value
+    call nml_read(path_par,"control","dT_ann",          dT_ann)                    ! [K] Temperature anomaly (atm)
 
     ! Assume program is running from the output folder
     outfldr = "./"
@@ -68,9 +69,9 @@ program yelmo_test
     yelmo1%bnd%bmb_shlf = bmb_shlf_const    ! [m.i.e./a]
     yelmo1%bnd%T_shlf   = T0                ! [K]   
 
-    ! Impose present-day surface mass balance and present-day temperature field
-    yelmo1%bnd%smb      = yelmo1%dta%pd%smb        ! [m.i.e./a]
-    yelmo1%bnd%T_srf    = yelmo1%dta%pd%T_srf      ! [K]
+    ! Impose present-day surface mass balance and present-day temperature field plus any anomaly
+    yelmo1%bnd%smb      = yelmo1%dta%pd%smb             ! [m.i.e./a]
+    yelmo1%bnd%T_srf    = yelmo1%dta%pd%T_srf + dT_ann  ! [K]
     
     call yelmo_print_bound(yelmo1%bnd)
 

@@ -43,11 +43,6 @@ contains
         real(prec), allocatable  :: advecxy(:)   ! [X a-1 m-2] Horizontal advection  
         real(prec) :: dz  
 
-        ! Testing Rybak and Huybrechts (2003) analytical case at dome
-        logical,    parameter    :: use_rh2003_profile = .FALSE. 
-        real(prec), parameter    :: smb_test = 0.1     ! [m a-1] 
-        real(prec), allocatable  :: uz_test(:)
-
         nx    = size(X_ice,1)
         ny    = size(X_ice,2)
         nz_aa = size(zeta_aa,1)
@@ -55,10 +50,7 @@ contains
 
         allocate(advecxy(nz_aa))
         advecxy = 0.0 
-
-        allocate(uz_test(nz_aa))
-        uz_test = zeta_aa*(-smb_test) 
-
+        
         do j = 3, ny-2
         do i = 3, nx-2 
             
@@ -90,35 +82,14 @@ contains
 
                     case("expl")
                         ! Explicit, upwind solver 
-                        
-                        if (use_rh2003_profile) then 
-
-                            ! Only calculate for summit
-                            if (i .eq. 15 .and. j .eq. 15) then 
-                                call calc_tracer_column_expl(X_ice(i,j,:),uz_test,advecxy*0.0,X_srf,X_base,H_ice(i,j),zeta_aa,zeta_ac,dt)
-                            end if 
-
-                        else 
-                            call calc_tracer_column_expl(X_ice(i,j,:),uz(i,j,:),advecxy,X_srf,X_base,H_ice(i,j),zeta_aa,zeta_ac,dt)
-
-                        end if 
+ 
+                        call calc_tracer_column_expl(X_ice(i,j,:),uz(i,j,:),advecxy,X_srf,X_base,H_ice(i,j),zeta_aa,zeta_ac,dt)
 
                     case("impl")
                         ! Implicit solver vertically, upwind horizontally 
                         
-                        if (use_rh2003_profile) then 
-
-                            ! Only calculate for summit
-                            if (i .eq. 15 .and. j .eq. 15) then 
-                                call calc_tracer_column(X_ice(i,j,:),uz_test,advecxy*0.0,X_srf,X_base,H_ice(i,j),zeta_aa,zeta_ac, &
-                                                                                                    dzeta_a,dzeta_b,impl_kappa,dt)
-                            end if 
-
-                        else 
-                            call calc_tracer_column(X_ice(i,j,:),uz(i,j,:),advecxy,X_srf,X_base,H_ice(i,j),zeta_aa,zeta_ac, &
-                                                                                                dzeta_a,dzeta_b,impl_kappa,dt)
-                    
-                        end if 
+                        call calc_tracer_column(X_ice(i,j,:),uz(i,j,:),advecxy,X_srf,X_base,H_ice(i,j),zeta_aa,zeta_ac, &
+                                                                                                dzeta_a,dzeta_b,impl_kappa,dt) 
 
                     case DEFAULT 
 

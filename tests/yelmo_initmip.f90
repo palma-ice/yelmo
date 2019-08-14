@@ -15,7 +15,7 @@ program yelmo_test
     character(len=256) :: outfldr, file1D, file2D, file_restart, domain 
     character(len=512) :: path_par, path_const  
     real(prec) :: time_init, time_end, time_equil, time, dtt, dt1D_out, dt2D_out 
-    real(prec) :: bmb_shlf_const, dT_ann   
+    real(prec) :: bmb_shlf_const, dT_ann, z_sl    
     integer    :: n
     real(4) :: cpu_start_time, cpu_end_time 
 
@@ -37,6 +37,7 @@ program yelmo_test
     call nml_read(path_par,"control","dt2D_out",        dt2D_out)                  ! [yr] Frequency of 2D output 
     call nml_read(path_par,"control","bmb_shlf_const",  bmb_shlf_const)            ! [yr] Constant imposed bmb_shlf value
     call nml_read(path_par,"control","dT_ann",          dT_ann)                    ! [K] Temperature anomaly (atm)
+    call nml_read(path_par,"control","z_sl",            z_sl)                      ! [m] Sea level relative to present-day
 
     ! Assume program is running from the output folder
     outfldr = "./"
@@ -61,17 +62,19 @@ program yelmo_test
     ! === Set initial boundary conditions for current time and yelmo state =====
     ! ybound: z_bed, z_sl, H_sed, H_w, smb, T_srf, bmb_shlf , Q_geo
 
-    yelmo1%bnd%z_sl     = 0.0               ! [m]
+    yelmo1%bnd%z_sl     = z_sl              ! [m]
     yelmo1%bnd%H_sed    = 0.0               ! [m]
     yelmo1%bnd%H_w      = hyd1%now%H_w      ! [m]
     yelmo1%bnd%Q_geo    = 50.0              ! [mW/m2]
     
-    yelmo1%bnd%bmb_shlf = bmb_shlf_const    ! [m.i.e./a]
-    yelmo1%bnd%T_shlf   = T0                ! [K]   
-
     ! Impose present-day surface mass balance and present-day temperature field plus any anomaly
     yelmo1%bnd%smb      = yelmo1%dta%pd%smb             ! [m.i.e./a]
     yelmo1%bnd%T_srf    = yelmo1%dta%pd%T_srf + dT_ann  ! [K]
+    
+    yelmo1%bnd%bmb_shlf = bmb_shlf_const    ! [m.i.e./a]
+    yelmo1%bnd%T_shlf   = T0                ! [K]   
+
+    if (dT_ann .lt. 0.0) yelmo1%bnd%T_shlf   = T0 + dT_ann*0.25_prec  ! [K] Oceanic temp anomaly
     
     call yelmo_print_bound(yelmo1%bnd)
 

@@ -17,7 +17,8 @@ program yelmo_test
 
     character(len=256) :: outfldr, file1D, file2D, file_restart, domain 
     character(len=512) :: path_par, path_const  
-    real(prec) :: time_init, time_end, time_equil, time, dtt, dt1D_out, dt2D_out   
+    real(prec) :: time_init, time_end, time_equil, time_extend, time, dtt, dt1D_out, dt2D_out
+    integer    :: n_init, n_end    
     integer    :: n
     real(4) :: cpu_start_time, cpu_end_time 
 
@@ -26,6 +27,7 @@ program yelmo_test
     integer    :: q, qmax, qmax_topo_fixed, qmax_iter_length_1, qmax_iter_length_2  
     logical    :: topo_fixed 
     real(prec) :: phi_min, phi_max  
+    real(prec) :: cb_max 
 
     real(prec), allocatable :: dCbed(:,:) 
     real(prec), allocatable :: phi(:,:) 
@@ -61,7 +63,8 @@ program yelmo_test
 
     ! Simulation parameters
     time_init           = 0.0       ! [yr] Starting time
-    time_iter           = 500.0     ! [yr] Simulation time for each iteration
+    time_iter           = 50.0      ! [yr] Simulation time for each iteration
+    time_extend         = 200.0     ! [yr] 
     qmax                = 51        ! Total number of iterations
     qmax_topo_fixed     = 0         ! Number of initial iterations that should use topo_fixed=.TRUE. 
     qmax_iter_length_1  = 10        ! 1st number of iterations at which iteration length should increase
@@ -69,12 +72,8 @@ program yelmo_test
     phi_min             =  5.0      ! Minimum allowed friction angle
     phi_max             = 70.0      ! Maximum allowed friction angle 
 
-    ! Prescribe key parameters here that should be set for beta optimization exercise 
-    yelmo1%dyn%par%C_bed_method      = -1       ! C_Bed is set external to yelmo calculations
-    yelmo1%mat%par%rf_method         = 1        ! Constant rate factor (no thermodynamics)
-    yelmo1%mat%par%rf_const          = 1e-17    ! [Pa^-3 a^-1]
-!     yelmo1%thrm%par%method           = "fixed"  ! No thermodynamics calculations 
-    
+    cb_max              = 1e6       ! [Pa yr m-1]
+
     ! === Set initial boundary conditions for current time and yelmo state =====
     ! ybound: z_bed, z_sl, H_sed, H_w, smb, T_srf, bmb_shlf , Q_geo
 
@@ -101,7 +100,9 @@ program yelmo_test
     dCbed = 0.0 
 
     ! Set initial guess of C_bed as a function of present-day velocity 
-    call guess_C_bed(yelmo1%dyn%now%C_bed,phi,yelmo1%dta%pd%uxy_s,phi_min,phi_max,yelmo1%dyn%par%cf_stream)
+    !call guess_C_bed(yelmo1%dyn%now%C_bed,phi,yelmo1%dta%pd%uxy_s,phi_min,phi_max,yelmo1%dyn%par%cf_stream)
+
+    yelmo1%dyn%now%C_bed = 0.5*(cb_max + yelmo1%dyn%par%cb_min)
 
     ! Initialize state variables (dyn,therm,mat)
     ! (initialize temps with robin method with a cold base)
@@ -122,7 +123,7 @@ program yelmo_test
     ! Step 1: Relaxtion step: run SIA model for 100 years to smooth out the input
     ! topography that will be used as a target. 
 
-    call yelmo_update_equil(yelmo1,time,time_tot=100.0,topo_fixed=.FALSE.,dt=1.0,ssa_vel_max=0.0)
+    call yelmo_update_equil(yelmo1,time,time_tot=10.0,topo_fixed=.FALSE.,dt=1.0,ssa_vel_max=0.0)
     
     ! Define present topo as present-day dataset for comparison 
     yelmo1%dta%pd%H_ice = yelmo1%tpo%now%H_ice 
@@ -134,7 +135,7 @@ program yelmo_test
     ! Store the reference state for future use.
     ! Note: using yelmo_update_equil_external allows for running with interactive hydrology via hyd1 object
 
-    call yelmo_update_equil_external(yelmo1,hyd1,time,time_tot=20e3,topo_fixed=.TRUE.,dt=5.0,ssa_vel_max=0.0)
+    !call yelmo_update_equil_external(yelmo1,hyd1,time,time_tot=20e3,topo_fixed=.TRUE.,dt=5.0,ssa_vel_max=0.0)
 
     ! Store the reference state
     yelmo_ref = yelmo1 
@@ -150,50 +151,97 @@ program yelmo_test
 
     ! Initially assume we are working with topo_fixed... (only for optimizing velocity)
     topo_fixed = .TRUE. 
-    
-    ! Perform loops over beta:
-    ! update beta, calculate topography and velocity for 100 years, get error, try again
+     
+    n_init = 1 
+
     do q = 1, qmax 
 
-        ! Determine whether this iteration maintains topo_fixed conditions (only for optimizing velocity)
-        if (q .gt. qmax_topo_fixed) topo_fixed = .FALSE. 
+        n_end = int(time_iter) 
 
-        ! Increase iteration time after several iterations to ensure convergence on
-        ! a beta that performs well towards equilibration
-        if (q .gt. qmax_iter_length_1) time_iter = 1000.0 
-        if (q .gt. qmax_iter_length_2) time_iter = 2000.0 
+        do n = n_init, n_end-1 
         
-        if (q .lt. qmax) then
-            ! Update C_bed based on error correction
-            call update_C_bed_thickness(yelmo1%dyn%now%C_bed,dCbed,phi,yelmo1%dta%pd%err_z_srf,yelmo1%tpo%now%H_ice, &
-                        yelmo1%bnd%z_bed,yelmo1%dyn%now%ux_bar,yelmo1%dyn%now%uy_bar,yelmo1%tpo%par%dx,phi_min,phi_max, &
-                        yelmo1%dyn%par%cf_stream,yelmo1%dyn%par%C_bed_z0,yelmo1%dyn%par%C_bed_z1,yelmo1%dyn%par%C_bed_min)
-        else
-            ! Now run to steady-state
-            write(*,*) "Now run with fixed C_bed to equilibrate ice sheet."
-            time_iter = 10000.0 
-        end if 
+            time = real(n) 
 
-        ! Reset model to the initial state (including H_w), with updated C_bed field 
-        yelmo_ref%dyn%now%C_bed = yelmo1%dyn%now%C_bed 
-        yelmo1 = yelmo_ref 
-        hyd1   = hyd_ref 
-        
-        call yelmo_update_equil_external(yelmo1,hyd1,time,time_tot=time_iter,topo_fixed=topo_fixed,dt=0.5,ssa_vel_max=5000.0)
+            call update_C_bed_thickness_ratio(yelmo1%dyn%now%C_bed,dCbed,yelmo1%tpo%now%H_ice, &
+                                yelmo1%bnd%z_bed,yelmo1%dyn%now%ux_bar,yelmo1%dyn%now%uy_bar, &
+                                yelmo1%dyn%now%uxy_i_bar,yelmo1%dyn%now%uxy_b,yelmo1%dta%pd%H_ice, &
+                                yelmo1%tpo%par%dx,yelmo1%dyn%par%cb_min,cb_max=cb_max)
+            
+            ! Update ice sheet 
+            call yelmo_update(yelmo1,time)
 
-!         ! Run model for time_iter yrs with this C_bed configuration (no change in boundaries)
-!         call yelmo_update_equil(yelmo1,time,time_tot=time_iter,topo_fixed=topo_fixed,dt=0.5,ssa_vel_max=5000.0)
-        
-        ! == MODEL OUTPUT =======================================================
+        end do 
 
-        time = real(q,prec)
-        
+        n_init = n + 1  
+        n_end  = int(time_extend) 
+
+        do n = n_init, n_end-1 
+
+            time = real(n) 
+
+            ! Update ice sheet (no C_bed changes)
+            call yelmo_update(yelmo1,time)
+
+        end do 
+
+        ! Write the current solution 
         call write_step_2D_opt(yelmo1,file2D,time=time,dCbed=dCbed,phi=phi)
         
-        ! Summary 
-        write(*,*) "q= ", q, maxval(abs(yelmo1%dta%pd%err_z_srf))
-
+        ! Update the loop starting time for the next iteration   
+        n_init = n + 1 
+        
     end do 
+
+!     ! Perform loops over beta:
+!     ! update beta, calculate topography and velocity for 100 years, get error, try again
+!     do q = 1, qmax 
+
+!         ! Determine whether this iteration maintains topo_fixed conditions (only for optimizing velocity)
+!         if (q .gt. qmax_topo_fixed) topo_fixed = .FALSE. 
+
+!         ! Increase iteration time after several iterations to ensure convergence on
+!         ! a beta that performs well towards equilibration
+! !         if (q .gt. qmax_iter_length_1) time_iter = 1000.0 
+! !         if (q .gt. qmax_iter_length_2) time_iter = 2000.0 
+        
+!         if (q .lt. qmax) then
+!             ! Update C_bed based on error correction
+! !             call update_C_bed_thickness(yelmo1%dyn%now%C_bed,dCbed,phi,yelmo1%dta%pd%err_z_srf,yelmo1%tpo%now%H_ice, &
+! !                         yelmo1%bnd%z_bed,yelmo1%dyn%now%ux_bar,yelmo1%dyn%now%uy_bar,yelmo1%tpo%par%dx,phi_min,phi_max, &
+! !                         yelmo1%dyn%par%cf_stream,yelmo1%dyn%par%cb_z0,yelmo1%dyn%par%cb_z1,yelmo1%dyn%par%cb_min)
+            
+!             call update_C_bed_thickness_ratio(yelmo1%dyn%now%C_bed,dCbed,yelmo1%tpo%now%H_ice, &
+!                         yelmo1%bnd%z_bed,yelmo1%dyn%now%ux_bar,yelmo1%dyn%now%uy_bar, &
+!                         yelmo1%dyn%now%uxy_i_bar,yelmo1%dyn%now%uxy_b,yelmo1%dta%pd%H_ice, &
+!                         yelmo1%tpo%par%dx,yelmo1%dyn%par%cb_min,cb_max=cb_max)
+        
+!         else
+!             ! Now run to steady-state
+!             write(*,*) "Now run with fixed C_bed to equilibrate ice sheet."
+! !             time_iter = 10000.0 
+!             time_iter = 1000.0
+!         end if 
+
+!         ! Reset model to the initial state (including H_w), with updated C_bed field 
+!         yelmo_ref%dyn%now%C_bed = yelmo1%dyn%now%C_bed 
+!         yelmo1 = yelmo_ref 
+!         hyd1   = hyd_ref 
+        
+!         call yelmo_update_equil_external(yelmo1,hyd1,time,time_tot=time_iter,topo_fixed=topo_fixed,dt=0.5,ssa_vel_max=5000.0)
+
+! !         ! Run model for time_iter yrs with this C_bed configuration (no change in boundaries)
+! !         call yelmo_update_equil(yelmo1,time,time_tot=time_iter,topo_fixed=topo_fixed,dt=0.5,ssa_vel_max=5000.0)
+        
+!         ! == MODEL OUTPUT =======================================================
+
+!         time = real(q,prec)
+        
+!         call write_step_2D_opt(yelmo1,file2D,time=time,dCbed=dCbed,phi=phi)
+        
+!         ! Summary 
+!         write(*,*) "q= ", q, maxval(abs(yelmo1%dta%pd%err_z_srf))
+
+!     end do 
 
     ! Finalize program
     call yelmo_end(yelmo1,time=time)
@@ -537,6 +585,109 @@ end if
 
     end subroutine update_C_bed_thickness
 
+    subroutine update_C_bed_thickness_ratio(C_bed,dCbed,H_ice,z_bed,ux,uy,uxy_i,uxy_b,H_obs,dx,cb_min,cb_max)
+
+        implicit none 
+
+        real(prec), intent(INOUT) :: C_bed(:,:) 
+        real(prec), intent(INOUT) :: dCbed(:,:) 
+        real(prec), intent(IN)    :: H_ice(:,:) 
+        real(prec), intent(IN)    :: z_bed(:,:) 
+        real(prec), intent(IN)    :: ux(:,:)        ! Depth-averaged velocity (ux_bar)
+        real(prec), intent(IN)    :: uy(:,:)        ! Depth-averaged velocity (uy_bar)
+        real(prec), intent(IN)    :: uxy_i(:,:)     ! Internal shear velocity magnitude 
+        real(prec), intent(IN)    :: uxy_b(:,:)     ! Basal sliding velocity magnitude 
+        real(prec), intent(IN)    :: H_obs(:,:) 
+        real(prec), intent(IN)    :: dx 
+        real(prec), intent(IN)    :: cb_min 
+        real(prec), intent(IN)    :: cb_max
+
+        ! Local variables 
+        integer :: i, j, nx, ny, i1, j1  
+        real(prec) :: f_err, f_vel, f_corr, dx_km 
+        real(prec) :: ux_aa, uy_aa 
+
+        real(prec), allocatable   :: C_bed_prev(:,:) 
+
+        real(prec) :: dphi_min  
+        real(prec) :: dphi_max 
+        real(prec) :: err_z_fac 
+
+        nx = size(C_bed,1)
+        ny = size(C_bed,2) 
+
+        allocate(C_bed_prev(nx,ny))
+
+        ! Store initial C_bed solution 
+        C_bed_prev = C_bed 
+
+        do j = 3, ny-2 
+        do i = 3, nx-2 
+
+            if ( abs(H_ice(i,j) - H_obs(i,j)) .ne. 0.0) then 
+                ! Update where thickness error exists
+
+                ! Determine downstream point to apply changes
+
+                ux_aa = 0.5*(ux(i,j)+ux(i+1,j))
+                uy_aa = 0.5*(uy(i,j)+uy(i,j+1))
+                
+                if ( abs(ux_aa) .gt. abs(uy_aa) ) then 
+                    ! Downstream in x-direction 
+                    j1 = j 
+                    if (ux_aa .lt. 0.0) then 
+                        i1 = i-1 
+                    else
+                        i1 = i+1
+                    end if 
+
+                else 
+                    ! Downstream in y-direction 
+                    i1 = i 
+                    if (uy_aa .lt. 0.0) then 
+                        j1 = j-1
+                    else
+                        j1 = j+1
+                    end if 
+
+                end if 
+
+                ! Calculate thickness error ratio 
+                f_err = H_ice(i,j) / max(H_obs(i,j),1e-1)
+                
+                ! Calculate ratio of deformational velocity to sliding velocity
+
+                f_vel = uxy_i(i,j) / max(uxy_b(i,j),1e-1) 
+
+                ! Calculate correction factor (beta_old / beta_new)
+
+                f_corr = max( f_err + f_vel*(f_err-1.0_prec), 1e-1)
+
+                C_bed(i1,j1) = C_bed_prev(i1,j1) * f_corr**(-1.0)
+
+            end if 
+
+        end do 
+        end do 
+
+        ! Ensure C_bed is not below lower or upper limit 
+        where (C_bed .lt. cb_min) C_bed = cb_min 
+        where (C_bed .gt. cb_max) C_bed = cb_max 
+
+        ! Also where no ice exists, set C_bed = cb_min 
+        where(H_obs .eq. 0.0) C_bed = cb_min 
+
+        ! Additionally, apply a Gaussian filter to C_bed to ensure smooth transitions
+!         dx_km = dx*1e-3  
+!         call filter_gaussian(var=C_bed,sigma=64.0,dx=dx_km)     !,mask=err_z_srf .ne. 0.0)
+        
+        ! Diagnose current rate of change of C_bed 
+        dCbed = C_bed - C_bed_prev
+
+        return 
+
+    end subroutine update_C_bed_thickness_ratio
+
     subroutine yelmo_update_equil_external(dom,hyd,time,time_tot,dt,topo_fixed,ssa_vel_max)
         ! Iterate yelmo solutions to equilibrate without updating boundary conditions
 
@@ -612,7 +763,6 @@ end if
 
         ! Reset model time back to input time 
         dom%tpo%par%time      = time 
-        dom%tpo%par%time_calv = time
         dom%thrm%par%time     = time 
 
         hyd%now%time          = time 
@@ -651,7 +801,7 @@ end if
         dyn%now%C_bed = (thrm%now%f_pmp)*dyn%par%cf_stream &
                     + (1.0_prec - thrm%now%f_pmp)*dyn%par%cf_frozen 
 
-        if (dyn%par%streaming_margin) then 
+        if (dyn%par%cb_margin_pmp) then 
             ! Ensure that both the margin points and the grounding line
             ! are always considered streaming, independent of their
             ! thermodynamic character (as sometimes these can incorrectly become frozen)
@@ -684,7 +834,7 @@ end if
 
         end if 
 
-        ! == Until here, C_bed is defined as normally with C_bed_method=1,
+        ! == Until here, C_bed is defined as normally with cb_method=1,
         !    now refine to increase only marginal velocities 
 
         ! Reduce C_bed further for low elevation points

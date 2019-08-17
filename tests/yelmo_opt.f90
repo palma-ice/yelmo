@@ -63,7 +63,7 @@ program yelmo_test
 
     ! Simulation parameters
     time_init           = 0.0       ! [yr] Starting time
-    time_iter           = 50.0      ! [yr] Simulation time for each iteration
+    time_iter           = 20.0      ! [yr] Simulation time for each iteration
     time_extend         = 200.0     ! [yr] 
     qmax                = 51        ! Total number of iterations
     qmax_topo_fixed     = 0         ! Number of initial iterations that should use topo_fixed=.TRUE. 
@@ -151,16 +151,14 @@ program yelmo_test
 
     ! Initially assume we are working with topo_fixed... (only for optimizing velocity)
     topo_fixed = .TRUE. 
-     
-    n_init = 1 
+    
+    time = 0.0 
 
     do q = 1, qmax 
 
-        n_end = int(time_iter) 
-
-        do n = n_init, n_end-1 
+        do n = 1, int(time_iter)
         
-            time = real(n) 
+            time = time + 1.0
 
             call update_C_bed_thickness_ratio(yelmo1%dyn%now%C_bed,dCbed,yelmo1%tpo%now%H_ice, &
                                 yelmo1%bnd%z_bed,yelmo1%dyn%now%ux_bar,yelmo1%dyn%now%uy_bar, &
@@ -172,12 +170,9 @@ program yelmo_test
 
         end do 
 
-        n_init = n + 1  
-        n_end  = int(time_extend) 
+        do n = 1, int(time_extend) 
 
-        do n = n_init, n_end-1 
-
-            time = real(n) 
+            time = time + 1.0
 
             ! Update ice sheet (no C_bed changes)
             call yelmo_update(yelmo1,time)
@@ -186,9 +181,6 @@ program yelmo_test
 
         ! Write the current solution 
         call write_step_2D_opt(yelmo1,file2D,time=time,dCbed=dCbed,phi=phi)
-        
-        ! Update the loop starting time for the next iteration   
-        n_init = n + 1 
         
     end do 
 

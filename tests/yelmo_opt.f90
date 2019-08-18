@@ -62,12 +62,12 @@ program yelmo_test
 
     ! Simulation parameters
     time_init           = 0.0       ! [yr] Starting time
-    time_iter_0         = 20.0      ! [yr] 
-    time_iter_1         = 100.0     ! [yr] 
+    time_iter_0         =   5.0     ! [yr] 
+    time_iter_1         =  50.0     ! [yr] 
     time_iter_2         = 200.0     ! [yr] 
-    qmax                = 51        ! Total number of iterations
-    qmax_iter_length_1  = 10        ! 1st number of iterations at which iteration length should increase
-    qmax_iter_length_2  = 20        ! 2nd number of iterations at which iteration length should increase
+    qmax_iter_length_1  = 50        ! 1st number of iterations at which iteration length should increase
+    qmax_iter_length_2  = 80        ! 2nd number of iterations at which iteration length should increase
+    qmax                = 100       ! Total number of iterations
     phi_min             =  5.0      ! Minimum allowed friction angle
     phi_max             = 70.0      ! Maximum allowed friction angle 
 

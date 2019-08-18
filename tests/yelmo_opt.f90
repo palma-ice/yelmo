@@ -23,7 +23,9 @@ program yelmo_test
 
     ! Optimization variables 
     real(prec) :: time_iter, time_iter_0, time_iter_1, time_iter_2
-    integer    :: q, qmax, qmax_topo_fixed, qmax_iter_length_1, qmax_iter_length_2  
+    integer    :: q, qmax, qmax_topo_fixed, qmax_iter_length_1, qmax_iter_length_2
+    real(prec) :: time_tune, time_tune_0, time_tune_1, time_tune_2  
+    integer    :: qmax_tune_length_1, qmax_tune_length_2
     logical    :: topo_fixed 
     real(prec) :: phi_min, phi_max  
     real(prec) :: cb_max 
@@ -62,19 +64,22 @@ program yelmo_test
 
     ! Simulation parameters
     time_init           = 0.0       ! [yr] Starting time
-    time_iter_0         =  20.0     ! [yr] 
-    time_iter_1         =  50.0     ! [yr] 
-    time_iter_2         = 200.0     ! [yr] 
-    qmax_iter_length_1  = 20        ! 1st number of iterations at which iteration length should increase
-    qmax_iter_length_2  = 50        ! 2nd number of iterations at which iteration length should increase
+    time_tune           = 20.0      ! [yr]
+    time_iter           = 200.0     ! [yr] 
     qmax                = 100       ! Total number of iterations
+    
     phi_min             =  5.0      ! Minimum allowed friction angle
     phi_max             = 70.0      ! Maximum allowed friction angle 
 
     cb_max              = 1e6       ! [Pa yr m-1]
 
-    ! Not used anymore:
+    ! Not used right now:
     qmax_topo_fixed     = 0         ! Number of initial iterations that should use topo_fixed=.TRUE. 
+    time_iter_0         =  20.0     ! [yr] 
+    time_iter_1         =  50.0     ! [yr] 
+    time_iter_2         = 200.0     ! [yr] 
+    qmax_iter_length_1  = 20        ! 1st number of iterations at which iteration length should increase
+    qmax_iter_length_2  = 50        ! 2nd number of iterations at which iteration length should increase
     
     ! === Set initial boundary conditions for current time and yelmo state =====
     ! ybound: z_bed, z_sl, H_sed, H_w, smb, T_srf, bmb_shlf , Q_geo
@@ -156,26 +161,28 @@ program yelmo_test
     
     do q = 1, qmax 
 
-        ! Update C_bed based on error metric(s) 
-        call update_C_bed_thickness_ratio(yelmo1%dyn%now%C_bed,dCbed,yelmo1%tpo%now%H_ice, &
-                        yelmo1%bnd%z_bed,yelmo1%dyn%now%ux_bar,yelmo1%dyn%now%uy_bar, &
-                        yelmo1%dyn%now%uxy_i_bar,yelmo1%dyn%now%uxy_b,yelmo1%dta%pd%H_ice, &
-                        yelmo1%tpo%par%dx,yelmo1%dyn%par%cb_min,cb_max=cb_max)
-        
-
-        ! Increase iteration time after several iterations to ensure convergence on
-        ! a beta that performs well towards equilibration
-        time_iter = time_iter_0 
-        if (q .gt. qmax_iter_length_1) time_iter = time_iter_1 
-        if (q .gt. qmax_iter_length_2) time_iter = time_iter_2 
-        
         ! Reset model to the initial state (including H_w) and time, with updated C_bed field 
         yelmo_ref%dyn%now%C_bed = yelmo1%dyn%now%C_bed 
         yelmo1 = yelmo_ref 
         hyd1   = hyd_ref 
-    
-        time = 0.0 
+        time   = 0.0 
         call yelmo_set_time(yelmo1,time) 
+        
+        ! Perform C_bed tuning step 
+        do n = 1, int(time_tune)
+        
+            time = time + 1.0
+
+            ! Update ice sheet 
+            call yelmo_update(yelmo1,time)
+
+            ! Update C_bed based on error metric(s) 
+            call update_C_bed_thickness_ratio(yelmo1%dyn%now%C_bed,dCbed,yelmo1%tpo%now%H_ice, &
+                            yelmo1%bnd%z_bed,yelmo1%dyn%now%ux_bar,yelmo1%dyn%now%uy_bar, &
+                            yelmo1%dyn%now%uxy_i_bar,yelmo1%dyn%now%uxy_b,yelmo1%dta%pd%H_ice, &
+                            yelmo1%tpo%par%dx,yelmo1%dyn%par%cb_min,cb_max=cb_max)
+
+        end do 
 
         ! Perform iteration loop to diagnose error for modifying C_bed 
         do n = 1, int(time_iter)
@@ -188,7 +195,7 @@ program yelmo_test
         end do 
 
         ! Write the current solution 
-        call write_step_2D_opt(yelmo1,file2D,time=real(q),dCbed=dCbed,phi=phi,time_iter=time_iter)
+        call write_step_2D_opt(yelmo1,file2D,time=real(q),dCbed=dCbed,phi=phi,time_iter=time_tune+time_iter)
         
     end do 
 

@@ -152,9 +152,15 @@ program yelmo_test
     ! Initially assume we are working with topo_fixed... (only for optimizing velocity)
     topo_fixed = .TRUE. 
     
-    time = 0.0 
-
     do q = 1, qmax 
+
+        ! Reset model to the initial state (including H_w), with updated C_bed field 
+        yelmo_ref%dyn%now%C_bed = yelmo1%dyn%now%C_bed 
+        yelmo1 = yelmo_ref 
+        hyd1   = hyd_ref 
+            
+        time = 0.0 
+        call yelmo_set_time(yelmo1,time)
 
         do n = 1, int(time_iter)
         
@@ -180,7 +186,7 @@ program yelmo_test
         end do 
 
         ! Write the current solution 
-        call write_step_2D_opt(yelmo1,file2D,time=time,dCbed=dCbed,phi=phi)
+        call write_step_2D_opt(yelmo1,file2D,time=real(q),dCbed=dCbed,phi=phi)
         
     end do 
 

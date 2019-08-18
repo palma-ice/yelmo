@@ -17,13 +17,12 @@ program yelmo_test
 
     character(len=256) :: outfldr, file1D, file2D, file_restart, domain 
     character(len=512) :: path_par, path_const  
-    real(prec) :: time_init, time_end, time_equil, time_extend, time, dtt, dt1D_out, dt2D_out
-    integer    :: n_init, n_end    
+    real(prec) :: time_init, time_end, time_equil, time, dtt, dt1D_out, dt2D_out
     integer    :: n
-    real(4) :: cpu_start_time, cpu_end_time 
+    real(4)    :: cpu_start_time, cpu_end_time 
 
     ! Optimization variables 
-    real(prec) :: time_iter
+    real(prec) :: time_iter, time_iter_0, time_iter_1, time_iter_2
     integer    :: q, qmax, qmax_topo_fixed, qmax_iter_length_1, qmax_iter_length_2  
     logical    :: topo_fixed 
     real(prec) :: phi_min, phi_max  
@@ -63,17 +62,20 @@ program yelmo_test
 
     ! Simulation parameters
     time_init           = 0.0       ! [yr] Starting time
-    time_iter           = 20.0      ! [yr] Simulation time for each iteration
-    time_extend         = 200.0     ! [yr] 
+    time_iter_0         = 20.0      ! [yr] 
+    time_iter_1         = 100.0     ! [yr] 
+    time_iter_2         = 200.0     ! [yr] 
     qmax                = 51        ! Total number of iterations
-    qmax_topo_fixed     = 0         ! Number of initial iterations that should use topo_fixed=.TRUE. 
     qmax_iter_length_1  = 10        ! 1st number of iterations at which iteration length should increase
-    qmax_iter_length_2  = 30        ! 2nd number of iterations at which iteration length should increase
+    qmax_iter_length_2  = 20        ! 2nd number of iterations at which iteration length should increase
     phi_min             =  5.0      ! Minimum allowed friction angle
     phi_max             = 70.0      ! Maximum allowed friction angle 
 
     cb_max              = 1e6       ! [Pa yr m-1]
 
+    ! Not used anymore:
+    qmax_topo_fixed     = 0         ! Number of initial iterations that should use topo_fixed=.TRUE. 
+    
     ! === Set initial boundary conditions for current time and yelmo state =====
     ! ybound: z_bed, z_sl, H_sed, H_w, smb, T_srf, bmb_shlf , Q_geo
 
@@ -143,7 +145,7 @@ program yelmo_test
 
     ! Initialize the 2D output file and write the initial model state 
     call yelmo_write_init(yelmo1,file2D,time_init=0.0,units="years")  
-    call write_step_2D_opt(yelmo1,file2D,time=0.0,dCbed=dCbed,phi=phi)  
+    call write_step_2D_opt(yelmo1,file2D,time=0.0,dCbed=dCbed,phi=phi,time_iter=0.0)  
 
 !     call yelmo_update_equil(yelmo_ref,time,time_tot=500.0,topo_fixed=.FALSE.,dt=0.5,ssa_vel_max=500.0)
 !     call write_step_2D_opt(yelmo_ref,file2D,time=1.0,dCbed=dCbed,phi=phi)  
@@ -154,43 +156,39 @@ program yelmo_test
     
     do q = 1, qmax 
 
-        if (q .le. 20) then 
-            ! Reset model to the initial state (including H_w), with updated C_bed field 
-            
-            yelmo_ref%dyn%now%C_bed = yelmo1%dyn%now%C_bed 
-            yelmo1 = yelmo_ref 
-            hyd1   = hyd_ref 
-            
-            time = 0.0 
-            call yelmo_set_time(yelmo1,time)
-
-        end if 
+        ! Update C_bed based on error metric(s) 
+        call update_C_bed_thickness_ratio(yelmo1%dyn%now%C_bed,dCbed,yelmo1%tpo%now%H_ice, &
+                        yelmo1%bnd%z_bed,yelmo1%dyn%now%ux_bar,yelmo1%dyn%now%uy_bar, &
+                        yelmo1%dyn%now%uxy_i_bar,yelmo1%dyn%now%uxy_b,yelmo1%dta%pd%H_ice, &
+                        yelmo1%tpo%par%dx,yelmo1%dyn%par%cb_min,cb_max=cb_max)
         
+
+        ! Increase iteration time after several iterations to ensure convergence on
+        ! a beta that performs well towards equilibration
+        time_iter = time_iter_0 
+        if (q .gt. qmax_iter_length_1) time_iter = time_iter_1 
+        if (q .gt. qmax_iter_length_2) time_iter = time_iter_2 
+        
+        ! Reset model to the initial state (including H_w) and time, with updated C_bed field 
+        yelmo_ref%dyn%now%C_bed = yelmo1%dyn%now%C_bed 
+        yelmo1 = yelmo_ref 
+        hyd1   = hyd_ref 
+        
+        time = 0.0 
+        call yelmo_set_time(yelmo1,time) 
+
+        ! Perform iteration loop to diagnose error for modifying C_bed 
         do n = 1, int(time_iter)
         
             time = time + 1.0
 
-            call update_C_bed_thickness_ratio(yelmo1%dyn%now%C_bed,dCbed,yelmo1%tpo%now%H_ice, &
-                                yelmo1%bnd%z_bed,yelmo1%dyn%now%ux_bar,yelmo1%dyn%now%uy_bar, &
-                                yelmo1%dyn%now%uxy_i_bar,yelmo1%dyn%now%uxy_b,yelmo1%dta%pd%H_ice, &
-                                yelmo1%tpo%par%dx,yelmo1%dyn%par%cb_min,cb_max=cb_max)
-            
             ! Update ice sheet 
             call yelmo_update(yelmo1,time)
 
         end do 
 
-        do n = 1, int(time_extend) 
-
-            time = time + 1.0
-
-            ! Update ice sheet (no C_bed changes)
-            call yelmo_update(yelmo1,time)
-
-        end do 
-
         ! Write the current solution 
-        call write_step_2D_opt(yelmo1,file2D,time=real(q),dCbed=dCbed,phi=phi)
+        call write_step_2D_opt(yelmo1,file2D,time=real(q),dCbed=dCbed,phi=phi,time_iter=time_iter)
         
     end do 
 
@@ -256,7 +254,7 @@ program yelmo_test
 
 contains
 
-    subroutine write_step_2D_opt(ylmo,filename,time,dCbed,phi)
+    subroutine write_step_2D_opt(ylmo,filename,time,dCbed,phi,time_iter)
 
         implicit none 
         
@@ -265,6 +263,7 @@ contains
         real(prec), intent(IN) :: time
         real(prec), intent(IN) :: dCbed(:,:) 
         real(prec), intent(IN) :: phi(:,:)
+        real(prec), intent(IN) :: time_iter 
 
         ! Local variables
         integer    :: ncid, n
@@ -293,6 +292,9 @@ contains
         call nc_write(filename,"speed",ylmo%par%model_speed,units="kyr/hr",long_name="Model speed (Yelmo only)", &
                       dim1="time",start=[n],count=[1],ncid=ncid)
         
+        ! Write the number of iterations for this solution
+        call nc_write(filename,"time_iter",time_iter,dim1="time",start=[n],count=[1],ncid=ncid)
+
         ! 1D variables 
         call nc_write(filename,"V_ice",ylmo%reg%V_ice,units="km3",long_name="Ice volume", &
                               dim1="time",start=[n],count=[1],ncid=ncid)
@@ -615,9 +617,10 @@ end if
         real(prec), intent(IN)    :: cb_max
 
         ! Local variables 
-        integer :: i, j, nx, ny, i1, j1  
+        integer :: i, j, nx, ny, i1, j1, n 
         real(prec) :: f_err, f_vel, f_corr, dx_km 
         real(prec) :: ux_aa, uy_aa 
+        real(prec) :: H_ice_now, H_obs_now 
 
         real(prec), allocatable   :: C_bed_prev(:,:) 
 
@@ -665,16 +668,31 @@ end if
                 end if 
 
                 ! Calculate thickness error ratio 
-                f_err = H_ice(i,j) / max(H_obs(i,j),1e-1)
+!                 f_err = H_ice(i,j) / max(H_obs(i,j),1e-1)
+                
+                n = count(H_ice(i-1:i+1,j-1:j+1).gt.0.0)
+                if (n .gt. 0) then
+                    H_ice_now = sum(H_ice(i-1:i+1,j-1:j+1),mask=H_ice(i-1:i+1,j-1:j+1).gt.0.0) / real(n,prec)
+                else 
+                    H_ice_now = 0.0 
+                end if 
+
+                n = count(H_obs(i-1:i+1,j-1:j+1).gt.0.0)
+                if (n .gt. 0) then
+                    H_obs_now = sum(H_obs(i-1:i+1,j-1:j+1),mask=H_obs(i-1:i+1,j-1:j+1).gt.0.0) / real(n,prec)
+                else 
+                    H_obs_now = 0.0 
+                end if 
+                
+                f_err = H_ice_now / max(H_obs_now,1e-1)
                 
                 ! Calculate ratio of deformational velocity to sliding velocity
-
                 f_vel = uxy_i(i,j) / max(uxy_b(i,j),1e-1) 
 
                 ! Calculate correction factor (beta_old / beta_new)
+                f_corr = max( f_err + f_vel*(f_err-1.0_prec), 1e-1) 
 
-                f_corr = max( f_err + f_vel*(f_err-1.0_prec), 1e-1)
-
+                ! Apply correction to update C_bed
                 C_bed(i1,j1) = C_bed_prev(i1,j1) * f_corr**(-1.0)
 
             end if 

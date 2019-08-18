@@ -62,11 +62,11 @@ program yelmo_test
 
     ! Simulation parameters
     time_init           = 0.0       ! [yr] Starting time
-    time_iter_0         =   5.0     ! [yr] 
+    time_iter_0         =  20.0     ! [yr] 
     time_iter_1         =  50.0     ! [yr] 
     time_iter_2         = 200.0     ! [yr] 
-    qmax_iter_length_1  = 50        ! 1st number of iterations at which iteration length should increase
-    qmax_iter_length_2  = 80        ! 2nd number of iterations at which iteration length should increase
+    qmax_iter_length_1  = 20        ! 1st number of iterations at which iteration length should increase
+    qmax_iter_length_2  = 50        ! 2nd number of iterations at which iteration length should increase
     qmax                = 100       ! Total number of iterations
     phi_min             =  5.0      ! Minimum allowed friction angle
     phi_max             = 70.0      ! Maximum allowed friction angle 
@@ -104,7 +104,7 @@ program yelmo_test
     ! Set initial guess of C_bed as a function of present-day velocity 
     !call guess_C_bed(yelmo1%dyn%now%C_bed,phi,yelmo1%dta%pd%uxy_s,phi_min,phi_max,yelmo1%dyn%par%cf_stream)
 
-    yelmo1%dyn%now%C_bed = 0.5*(cb_max + yelmo1%dyn%par%cb_min)
+    yelmo1%dyn%now%C_bed = 1e4
 
     ! Initialize state variables (dyn,therm,mat)
     ! (initialize temps with robin method with a cold base)
@@ -173,7 +173,7 @@ program yelmo_test
         yelmo_ref%dyn%now%C_bed = yelmo1%dyn%now%C_bed 
         yelmo1 = yelmo_ref 
         hyd1   = hyd_ref 
-        
+    
         time = 0.0 
         call yelmo_set_time(yelmo1,time) 
 

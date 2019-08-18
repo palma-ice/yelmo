@@ -154,14 +154,18 @@ program yelmo_test
     
     do q = 1, qmax 
 
-        ! Reset model to the initial state (including H_w), with updated C_bed field 
-        yelmo_ref%dyn%now%C_bed = yelmo1%dyn%now%C_bed 
-        yelmo1 = yelmo_ref 
-        hyd1   = hyd_ref 
+        if (q .le. 20) then 
+            ! Reset model to the initial state (including H_w), with updated C_bed field 
             
-        time = 0.0 
-        call yelmo_set_time(yelmo1,time)
+            yelmo_ref%dyn%now%C_bed = yelmo1%dyn%now%C_bed 
+            yelmo1 = yelmo_ref 
+            hyd1   = hyd_ref 
+            
+            time = 0.0 
+            call yelmo_set_time(yelmo1,time)
 
+        end if 
+        
         do n = 1, int(time_iter)
         
             time = time + 1.0
@@ -289,6 +293,14 @@ contains
         call nc_write(filename,"speed",ylmo%par%model_speed,units="kyr/hr",long_name="Model speed (Yelmo only)", &
                       dim1="time",start=[n],count=[1],ncid=ncid)
         
+        ! 1D variables 
+        call nc_write(filename,"V_ice",ylmo%reg%V_ice,units="km3",long_name="Ice volume", &
+                              dim1="time",start=[n],count=[1],ncid=ncid)
+        call nc_write(filename,"A_ice",ylmo%reg%A_ice,units="km2",long_name="Ice area", &
+                              dim1="time",start=[n],count=[1],ncid=ncid)
+        call nc_write(filename,"dVicedt",ylmo%reg%dVicedt,units="km3 yr-1",long_name="Rate of volume change", &
+                      dim1="time",start=[n],count=[1],ncid=ncid)
+        
         ! Variables
         call nc_write(filename,"H_ice",ylmo%tpo%now%H_ice,units="m",long_name="Ice thickness", &
                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
@@ -335,6 +347,8 @@ contains
         ! Target data (not time dependent)
         if (n .eq. 1) then 
             call nc_write(filename,"pd_z_srf",ylmo%dta%pd%z_srf,units="m",long_name="Observed surface elevation (present day)", &
+                          dim1="xc",dim2="yc",ncid=ncid)
+            call nc_write(filename,"pd_H_ice",ylmo%dta%pd%H_ice,units="m",long_name="Observed ice thickness (present day)", &
                           dim1="xc",dim2="yc",ncid=ncid)
             call nc_write(filename,"pd_uxy_s",ylmo%dta%pd%uxy_s,units="m",long_name="Observed surface velocity (present day)", &
                           dim1="xc",dim2="yc",ncid=ncid)

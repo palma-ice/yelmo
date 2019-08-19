@@ -4,7 +4,8 @@ program yelmo_test
 
     use ncio 
     use yelmo 
-    
+    use yelmo_tools, only : gauss_values
+
     use gaussian_filter 
     use basal_hydro_simple 
 
@@ -630,17 +631,23 @@ end if
         real(prec) :: H_ice_now, H_obs_now 
 
         real(prec), allocatable   :: C_bed_prev(:,:) 
+        real(prec) :: wts0(3,3), wts(3,3) 
 
         real(prec) :: dphi_min  
         real(prec) :: dphi_max 
         real(prec) :: err_z_fac 
 
-        real(prec),parameter :: exp1 = 1.0
+        real(prec),parameter :: exp1 = 2.0
 
         nx = size(C_bed,1)
         ny = size(C_bed,2) 
 
+        dx_km = dx*1e-3  
+        
         allocate(C_bed_prev(nx,ny))
+
+        ! Get Gaussian weights 
+        wts0 = gauss_values(dx_km,dx_km,sigma=dx_km,n=3)
 
         ! Store initial C_bed solution 
         C_bed_prev = C_bed 
@@ -679,19 +686,27 @@ end if
                 ! Calculate thickness error ratio 
 !                 f_err = H_ice(i,j) / max(H_obs(i,j),1e-1)
                 
-                n = count(H_ice(i-1:i+1,j-1:j+1).gt.0.0)
-                if (n .gt. 0) then
-                    H_ice_now = sum(H_ice(i-1:i+1,j-1:j+1),mask=H_ice(i-1:i+1,j-1:j+1).gt.0.0) / real(n,prec)
-                else 
-                    H_ice_now = 0.0 
-                end if 
+                wts = wts0 
+                where( H_ice(i-1:i+1,j-1:j+1) .eq. 0.0) wts = 0.0 
+                call wtd_mean(H_ice_now,H_ice(i-1:i+1,j-1:j+1),wts) 
 
-                n = count(H_obs(i-1:i+1,j-1:j+1).gt.0.0)
-                if (n .gt. 0) then
-                    H_obs_now = sum(H_obs(i-1:i+1,j-1:j+1),mask=H_obs(i-1:i+1,j-1:j+1).gt.0.0) / real(n,prec)
-                else 
-                    H_obs_now = 0.0 
-                end if 
+                wts = wts0 
+                where( H_obs(i-1:i+1,j-1:j+1) .eq. 0.0) wts = 0.0 
+                call wtd_mean(H_obs_now,H_obs(i-1:i+1,j-1:j+1),wts) 
+                
+!                 n = count(H_ice(i-1:i+1,j-1:j+1).gt.0.0)
+!                 if (n .gt. 0) then
+!                     H_ice_now = sum(H_ice(i-1:i+1,j-1:j+1),mask=H_ice(i-1:i+1,j-1:j+1).gt.0.0) / real(n,prec)
+!                 else 
+!                     H_ice_now = 0.0 
+!                 end if 
+
+!                 n = count(H_obs(i-1:i+1,j-1:j+1).gt.0.0)
+!                 if (n .gt. 0) then
+!                     H_obs_now = sum(H_obs(i-1:i+1,j-1:j+1),mask=H_obs(i-1:i+1,j-1:j+1).gt.0.0) / real(n,prec)
+!                 else 
+!                     H_obs_now = 0.0 
+!                 end if 
                 
                 f_err = ( H_ice_now / max(H_obs_now,1e-1) )**exp1
                 
@@ -713,12 +728,11 @@ end if
         where (C_bed .lt. cb_min) C_bed = cb_min 
         where (C_bed .gt. cb_max) C_bed = cb_max 
 
+        ! Additionally, apply a Gaussian filter to C_bed to ensure smooth transitions
+        call filter_gaussian(var=C_bed,sigma=dx_km*1.5,dx=dx_km)     !,mask=err_z_srf .ne. 0.0)
+        
         ! Also where no ice exists, set C_bed = cb_min 
         where(H_obs .eq. 0.0) C_bed = cb_min 
-
-        ! Additionally, apply a Gaussian filter to C_bed to ensure smooth transitions
-!         dx_km = dx*1e-3  
-!         call filter_gaussian(var=C_bed,sigma=64.0,dx=dx_km)     !,mask=err_z_srf .ne. 0.0)
         
         ! Diagnose current rate of change of C_bed 
         dCbed = C_bed - C_bed_prev
@@ -810,6 +824,33 @@ end if
 
     end subroutine yelmo_update_equil_external
     
+
+    subroutine wtd_mean(var_ave,var,wts)
+        ! wts == gauss_values(dx,dy,sigma,n)
+
+        implicit none
+
+        real(prec), intent(OUT) :: var_ave 
+        real(prec), intent(IN)  :: var(:,:) 
+        real(prec), intent(IN)  :: wts(:,:) 
+
+        ! Local variables 
+        real(prec) :: wts_tot 
+        real(prec) :: wts_norm(size(wts,1),size(wts,2))
+
+        wts_tot = sum(wts) 
+        if (wts_tot .gt. 0.0) then 
+            wts_norm = wts / wts_tot 
+        else 
+            wts_norm = 0.0 
+        end if 
+
+        var_ave = sum(var*wts_norm) 
+
+        return 
+
+    end subroutine wtd_mean
+
     ! Extra...
 
     subroutine calc_ydyn_cbed_external(dyn,tpo,thrm,bnd,channels)

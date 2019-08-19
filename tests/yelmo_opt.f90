@@ -66,12 +66,12 @@ program yelmo_test
     time_init           = 0.0       ! [yr] Starting time
     time_tune           = 20.0      ! [yr]
     time_iter           = 200.0     ! [yr] 
-    qmax                = 100       ! Total number of iterations
+    qmax                = 200       ! Total number of iterations
     
     phi_min             =  5.0      ! Minimum allowed friction angle
     phi_max             = 70.0      ! Maximum allowed friction angle 
 
-    cb_max              = 1e6       ! [Pa yr m-1]
+    cb_max              = 5e5       ! [Pa yr m-1]
 
     ! Not used right now:
     qmax_topo_fixed     = 0         ! Number of initial iterations that should use topo_fixed=.TRUE. 
@@ -109,7 +109,7 @@ program yelmo_test
     ! Set initial guess of C_bed as a function of present-day velocity 
     !call guess_C_bed(yelmo1%dyn%now%C_bed,phi,yelmo1%dta%pd%uxy_s,phi_min,phi_max,yelmo1%dyn%par%cf_stream)
 
-    yelmo1%dyn%now%C_bed = 5e5
+    yelmo1%dyn%now%C_bed = 2e5
 
     ! Initialize state variables (dyn,therm,mat)
     ! (initialize temps with robin method with a cold base)
@@ -121,7 +121,7 @@ program yelmo_test
     where(yelmo1%dta%pd%H_ice .le. 0.0) mask_noice = .TRUE. 
 
     ! Impose additional negative mass balance to no ice points of 2 [m.i.e./a] melting
-    where(mask_noice) yelmo1%bnd%smb = yelmo1%dta%pd%smb - 2.0 
+    where(mask_noice) yelmo1%bnd%smb = yelmo1%dta%pd%smb - 0.5 
 
     ! Saturate maximum smb to 1.5 m/a 
     !where(yelmo1%bnd%smb .gt. 1.5) yelmo1%bnd%smb = 1.5 
@@ -635,6 +635,8 @@ end if
         real(prec) :: dphi_max 
         real(prec) :: err_z_fac 
 
+        real(prec),parameter :: exp1 = 1.0
+
         nx = size(C_bed,1)
         ny = size(C_bed,2) 
 
@@ -691,7 +693,7 @@ end if
                     H_obs_now = 0.0 
                 end if 
                 
-                f_err = H_ice_now / max(H_obs_now,1e-1)
+                f_err = ( H_ice_now / max(H_obs_now,1e-1) )**exp1
                 
                 ! Calculate ratio of deformational velocity to sliding velocity
                 f_vel = uxy_i(i,j) / max(uxy_b(i,j),1e-1) 

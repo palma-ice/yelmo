@@ -65,7 +65,7 @@ program yelmo_test
     call hydro_init_state(hyd1,yelmo1%tpo%now%H_ice,yelmo1%tpo%now%f_grnd,time)
 
     ! Choose optimization method (1: error method, 2: ratio method) 
-    opt_method = 1 
+    opt_method = 2 
 
     ! Simulation parameters
     time_init           = 0.0       ! [yr] Starting time
@@ -847,7 +847,7 @@ end if
         where (C_bed .gt. cb_max) C_bed = cb_max 
 
         ! Additionally, apply a Gaussian filter to C_bed to ensure smooth transitions
-!         call filter_gaussian(var=C_bed,sigma=dx_km*0.5,dx=dx_km)     !,mask=err_z_srf .ne. 0.0)
+        call filter_gaussian(var=C_bed,sigma=dx_km*0.5,dx=dx_km)     !,mask=err_z_srf .ne. 0.0)
         
         ! Also where no ice exists, set C_bed = cb_min 
         where(H_obs .eq. 0.0) C_bed = cb_min 

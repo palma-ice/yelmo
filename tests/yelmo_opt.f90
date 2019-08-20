@@ -65,7 +65,13 @@ program yelmo_test
 
     ! Simulation parameters
     time_init           = 0.0       ! [yr] Starting time
+    
+    ! Ratio method 
     time_tune           = 20.0      ! [yr]
+    time_iter           = 200.0     ! [yr] 
+    qmax                = 100       ! Total number of iterations
+    
+    ! Error method 
     time_iter           = 500.0     ! [yr] 
     qmax                = 200       ! Total number of iterations
     
@@ -122,7 +128,7 @@ program yelmo_test
     where(yelmo1%dta%pd%H_ice .le. 0.0) mask_noice = .TRUE. 
 
     ! Impose additional negative mass balance to no ice points of 2 [m.i.e./a] melting
-    where(mask_noice) yelmo1%bnd%smb = yelmo1%dta%pd%smb - 0.5 
+    where(mask_noice) yelmo1%bnd%smb = yelmo1%dta%pd%smb - 2.0 
 
     ! Saturate maximum smb to 1.5 m/a 
     !where(yelmo1%bnd%smb .gt. 1.5) yelmo1%bnd%smb = 1.5 
@@ -160,7 +166,7 @@ program yelmo_test
     ! Initially assume we are working with topo_fixed... (only for optimizing velocity)
     topo_fixed = .TRUE. 
     
-if (.FALSE.) then 
+if (.TRUE.) then 
     ! Ratio method (Le clec’h et al, 2019)
 
     do q = 1, qmax 

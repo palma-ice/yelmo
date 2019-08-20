@@ -631,7 +631,7 @@ end if
         real(prec) :: H_ice_now, H_obs_now 
 
         real(prec), allocatable   :: C_bed_prev(:,:) 
-        real(prec) :: wts0(3,3), wts(3,3) 
+        real(prec) :: wts0(5,5), wts(5,5) 
 
         real(prec) :: dphi_min  
         real(prec) :: dphi_max 
@@ -647,7 +647,12 @@ end if
         allocate(C_bed_prev(nx,ny))
 
         ! Get Gaussian weights 
-        wts0 = gauss_values(dx_km,dx_km,sigma=dx_km,n=3)
+        wts0 = gauss_values(dx_km,dx_km,sigma=dx_km*1.5,n=5)
+
+!         do i = 1, 5 
+!         write(*,*) wts0(i,:) 
+!         end do 
+!         stop 
 
         ! Store initial C_bed solution 
         C_bed_prev = C_bed 
@@ -687,12 +692,12 @@ end if
 !                 f_err = H_ice(i,j) / max(H_obs(i,j),1e-1)
                 
                 wts = wts0 
-                where( H_ice(i-1:i+1,j-1:j+1) .eq. 0.0) wts = 0.0 
-                call wtd_mean(H_ice_now,H_ice(i-1:i+1,j-1:j+1),wts) 
+                where( H_ice(i-2:i+2,j-2:j+2) .eq. 0.0) wts = 0.0 
+                call wtd_mean(H_ice_now,H_ice(i-2:i+2,j-2:j+2),wts) 
 
                 wts = wts0 
-                where( H_obs(i-1:i+1,j-1:j+1) .eq. 0.0) wts = 0.0 
-                call wtd_mean(H_obs_now,H_obs(i-1:i+1,j-1:j+1),wts) 
+                where( H_obs(i-2:i+2,j-2:j+2) .eq. 0.0) wts = 0.0 
+                call wtd_mean(H_obs_now,H_obs(i-2:i+2,j-2:j+2),wts) 
                 
 !                 n = count(H_ice(i-1:i+1,j-1:j+1).gt.0.0)
 !                 if (n .gt. 0) then
@@ -729,11 +734,11 @@ end if
         where (C_bed .gt. cb_max) C_bed = cb_max 
 
         ! Additionally, apply a Gaussian filter to C_bed to ensure smooth transitions
-        call filter_gaussian(var=C_bed,sigma=dx_km*1.5,dx=dx_km)     !,mask=err_z_srf .ne. 0.0)
+!         call filter_gaussian(var=C_bed,sigma=dx_km*0.5,dx=dx_km)     !,mask=err_z_srf .ne. 0.0)
         
         ! Also where no ice exists, set C_bed = cb_min 
         where(H_obs .eq. 0.0) C_bed = cb_min 
-        
+
         ! Diagnose current rate of change of C_bed 
         dCbed = C_bed - C_bed_prev
 

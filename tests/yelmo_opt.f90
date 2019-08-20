@@ -204,16 +204,18 @@ if (opt_method .eq. 1) then
                         yelmo1%bnd%z_bed,yelmo1%dyn%now%ux_bar,yelmo1%dyn%now%uy_bar, &
                         yelmo1%dta%pd%H_ice,yelmo1%tpo%par%dx,yelmo1%dyn%par%cb_min,cb_max=cb_max)
 
-        ! Reset model to the initial state (including H_w) and time, with updated C_bed field 
-        yelmo_ref%dyn%now%C_bed = yelmo1%dyn%now%C_bed 
-        yelmo1 = yelmo_ref 
-        hyd1   = hyd_ref 
-        time   = 0.0 
-        call yelmo_set_time(yelmo1,time) 
+        if (q .le. qmax_iter_length_2) then 
+            ! Reset model to the initial state (including H_w) and time, with updated C_bed field 
+            yelmo_ref%dyn%now%C_bed = yelmo1%dyn%now%C_bed 
+            yelmo1 = yelmo_ref 
+            hyd1   = hyd_ref 
+            time   = 0.0 
+            call yelmo_set_time(yelmo1,time) 
+        end if 
         
         ! Update time_iter
         if (q .gt. qmax_iter_length_1) time_iter = time_iter_1
-        if (q .gt. qmax_iter_length_2) time_iter = time_iter_2
+!         if (q .gt. qmax_iter_length_2) time_iter = time_iter_2
         
         ! Perform iteration loop to diagnose error for modifying C_bed 
         do n = 1, int(time_iter)

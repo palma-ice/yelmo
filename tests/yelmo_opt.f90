@@ -66,7 +66,7 @@ program yelmo_test
     ! Simulation parameters
     time_init           = 0.0       ! [yr] Starting time
     time_tune           = 20.0      ! [yr]
-    time_iter           = 200.0     ! [yr] 
+    time_iter           = 500.0     ! [yr] 
     qmax                = 200       ! Total number of iterations
     
     phi_min             =  5.0      ! Minimum allowed friction angle
@@ -76,10 +76,10 @@ program yelmo_test
 
     ! Not used right now:
     qmax_topo_fixed     = 0         ! Number of initial iterations that should use topo_fixed=.TRUE. 
-    time_iter_0         =  20.0     ! [yr] 
-    time_iter_1         =  50.0     ! [yr] 
-    time_iter_2         = 200.0     ! [yr] 
-    qmax_iter_length_1  = 20        ! 1st number of iterations at which iteration length should increase
+    time_iter_0         =  50.0     ! [yr] 
+    time_iter_1         = 200.0     ! [yr] 
+    time_iter_2         = 500.0     ! [yr] 
+    qmax_iter_length_1  = 10        ! 1st number of iterations at which iteration length should increase
     qmax_iter_length_2  = 50        ! 2nd number of iterations at which iteration length should increase
     
     ! === Set initial boundary conditions for current time and yelmo state =====
@@ -160,6 +160,9 @@ program yelmo_test
     ! Initially assume we are working with topo_fixed... (only for optimizing velocity)
     topo_fixed = .TRUE. 
     
+if (.FALSE.) then 
+    ! Ratio method (Le clec’h et al, 2019)
+
     do q = 1, qmax 
 
         ! Reset model to the initial state (including H_w) and time, with updated C_bed field 
@@ -200,56 +203,43 @@ program yelmo_test
         
     end do 
 
-!     ! Perform loops over beta:
-!     ! update beta, calculate topography and velocity for 100 years, get error, try again
-!     do q = 1, qmax 
+else 
+    ! Error method (Pollard and De Conto, 2012)
 
-!         ! Determine whether this iteration maintains topo_fixed conditions (only for optimizing velocity)
-!         if (q .gt. qmax_topo_fixed) topo_fixed = .FALSE. 
+    do q = 1, qmax 
 
-!         ! Increase iteration time after several iterations to ensure convergence on
-!         ! a beta that performs well towards equilibration
-! !         if (q .gt. qmax_iter_length_1) time_iter = 1000.0 
-! !         if (q .gt. qmax_iter_length_2) time_iter = 2000.0 
-        
-!         if (q .lt. qmax) then
-!             ! Update C_bed based on error correction
-! !             call update_C_bed_thickness(yelmo1%dyn%now%C_bed,dCbed,phi,yelmo1%dta%pd%err_z_srf,yelmo1%tpo%now%H_ice, &
-! !                         yelmo1%bnd%z_bed,yelmo1%dyn%now%ux_bar,yelmo1%dyn%now%uy_bar,yelmo1%tpo%par%dx,phi_min,phi_max, &
-! !                         yelmo1%dyn%par%cf_stream,yelmo1%dyn%par%cb_z0,yelmo1%dyn%par%cb_z1,yelmo1%dyn%par%cb_min)
-            
-!             call update_C_bed_thickness_ratio(yelmo1%dyn%now%C_bed,dCbed,yelmo1%tpo%now%H_ice, &
-!                         yelmo1%bnd%z_bed,yelmo1%dyn%now%ux_bar,yelmo1%dyn%now%uy_bar, &
-!                         yelmo1%dyn%now%uxy_i_bar,yelmo1%dyn%now%uxy_b,yelmo1%dta%pd%H_ice, &
-!                         yelmo1%tpo%par%dx,yelmo1%dyn%par%cb_min,cb_max=cb_max)
-        
-!         else
-!             ! Now run to steady-state
-!             write(*,*) "Now run with fixed C_bed to equilibrate ice sheet."
-! !             time_iter = 10000.0 
-!             time_iter = 1000.0
-!         end if 
+        ! Update C_bed based on error metric(s) 
+        call update_C_bed_thickness_simple(yelmo1%dyn%now%C_bed,dCbed,yelmo1%tpo%now%H_ice, &
+                        yelmo1%bnd%z_bed,yelmo1%dyn%now%ux_bar,yelmo1%dyn%now%uy_bar, &
+                        yelmo1%dta%pd%H_ice,yelmo1%tpo%par%dx,yelmo1%dyn%par%cb_min,cb_max=cb_max)
 
-!         ! Reset model to the initial state (including H_w), with updated C_bed field 
-!         yelmo_ref%dyn%now%C_bed = yelmo1%dyn%now%C_bed 
-!         yelmo1 = yelmo_ref 
-!         hyd1   = hyd_ref 
+        ! Reset model to the initial state (including H_w) and time, with updated C_bed field 
+        yelmo_ref%dyn%now%C_bed = yelmo1%dyn%now%C_bed 
+        yelmo1 = yelmo_ref 
+        hyd1   = hyd_ref 
+        time   = 0.0 
+        call yelmo_set_time(yelmo1,time) 
         
+        ! Perform iteration loop to diagnose error for modifying C_bed 
+        do n = 1, int(time_iter)
+        
+            time = time + 1.0
+
+            ! Update ice sheet 
+            call yelmo_update(yelmo1,time)
+
+        end do 
+
+        ! Write the current solution 
+        call write_step_2D_opt(yelmo1,file2D,time=real(q),dCbed=dCbed,phi=phi,time_iter=time_iter)
+        
+    end do 
+
+
+end if 
+
 !         call yelmo_update_equil_external(yelmo1,hyd1,time,time_tot=time_iter,topo_fixed=topo_fixed,dt=0.5,ssa_vel_max=5000.0)
 
-! !         ! Run model for time_iter yrs with this C_bed configuration (no change in boundaries)
-! !         call yelmo_update_equil(yelmo1,time,time_tot=time_iter,topo_fixed=topo_fixed,dt=0.5,ssa_vel_max=5000.0)
-        
-!         ! == MODEL OUTPUT =======================================================
-
-!         time = real(q,prec)
-        
-!         call write_step_2D_opt(yelmo1,file2D,time=time,dCbed=dCbed,phi=phi)
-        
-!         ! Summary 
-!         write(*,*) "q= ", q, maxval(abs(yelmo1%dta%pd%err_z_srf))
-
-!     end do 
 
     ! Finalize program
     call yelmo_end(yelmo1,time=time)
@@ -477,7 +467,7 @@ contains
     end subroutine guess_C_bed
 
     subroutine update_C_bed_thickness(C_bed,dCbed,phi,err_z_srf,H_ice,z_bed,ux,uy,dx,phi_min,phi_max, &
-                        cf_stream,C_bed_z0,C_bed_z1,C_bed_min)
+                        cf_stream,cb_z0,cb_z1,cb_min)
 
         implicit none 
 
@@ -493,9 +483,9 @@ contains
         real(prec), intent(IN)    :: phi_min 
         real(prec), intent(IN)    :: phi_max 
         real(prec), intent(IN)    :: cf_stream 
-        real(prec), intent(IN)    :: C_bed_z0
-        real(prec), intent(IN)    :: C_bed_z1 
-        real(prec), intent(IN)    :: C_bed_min 
+        real(prec), intent(IN)    :: cb_z0
+        real(prec), intent(IN)    :: cb_z1 
+        real(prec), intent(IN)    :: cb_min 
 
         ! Local variables 
         integer :: i, j, nx, ny, i1, j1  
@@ -594,7 +584,7 @@ end if
         end do 
 
         ! Ensure C_bed is not below lower limit 
-        where (C_bed .lt. C_bed_min) C_bed = C_bed_min 
+        where (C_bed .lt. cb_min) C_bed = cb_min 
 
         ! Additionally, apply a Gaussian filter to C_bed to ensure smooth transitions
 !         dx_km = dx*1e-3  
@@ -606,6 +596,118 @@ end if
         return 
 
     end subroutine update_C_bed_thickness
+
+    subroutine update_C_bed_thickness_simple(C_bed,dCbed,H_ice,z_bed,ux,uy,H_obs,dx,cb_min,cb_max)
+
+        implicit none 
+
+        real(prec), intent(INOUT) :: C_bed(:,:) 
+        real(prec), intent(INOUT) :: dCbed(:,:) 
+        real(prec), intent(IN)    :: H_ice(:,:) 
+        real(prec), intent(IN)    :: z_bed(:,:) 
+        real(prec), intent(IN)    :: ux(:,:) 
+        real(prec), intent(IN)    :: uy(:,:) 
+        real(prec), intent(IN)    :: H_obs(:,:) 
+        real(prec), intent(IN)    :: dx 
+        real(prec), intent(IN)    :: cb_min 
+        real(prec), intent(IN)    :: cb_max
+
+        ! Local variables 
+        integer :: i, j, nx, ny, i1, j1  
+        real(prec) :: dx_km, f_dz, f_dz_lim, H_scale, f_scale   
+        real(prec) :: ux_aa, uy_aa
+        real(prec) :: H_ice_now, H_obs_now 
+
+        real(prec), allocatable   :: C_bed_prev(:,:) 
+        real(prec) :: wts0(5,5), wts(5,5) 
+
+        nx = size(C_bed,1)
+        ny = size(C_bed,2) 
+
+        allocate(C_bed_prev(nx,ny))
+
+        ! Optimization parameters 
+        H_scale  = 1000.0           ! [m] 
+        f_dz_lim = 1.5              ! [--] 
+
+        ! Get Gaussian weights 
+        wts0 = gauss_values(dx_km,dx_km,sigma=dx_km*1.5,n=5)
+
+        ! Store initial C_bed solution 
+        C_bed_prev = C_bed 
+
+        do j = 3, ny-2 
+        do i = 3, nx-2 
+
+            if ( abs(H_ice(i,j) - H_obs(i,j)) .ne. 0.0) then 
+                ! Update where thickness error exists
+
+                ! Determine downstream node
+
+                ux_aa = 0.5*(ux(i,j)+ux(i+1,j))
+                uy_aa = 0.5*(uy(i,j)+uy(i,j+1))
+                
+                if ( abs(ux_aa) .gt. abs(uy_aa) ) then 
+                    ! Downstream in x-direction 
+                    j1 = j 
+                    if (ux_aa .lt. 0.0) then 
+                        i1 = i-1 
+                    else
+                        i1 = i+1
+                    end if 
+
+                else 
+                    ! Downstream in y-direction 
+                    i1 = i 
+                    if (uy_aa .lt. 0.0) then 
+                        j1 = j-1
+                    else
+                        j1 = j+1
+                    end if 
+
+                end if 
+
+                ! Get current ice thickness and obs ice thickness (smoothed)
+
+                wts = wts0 
+                where( H_ice(i-2:i+2,j-2:j+2) .eq. 0.0) wts = 0.0 
+                call wtd_mean(H_ice_now,H_ice(i-2:i+2,j-2:j+2),wts) 
+
+                wts = wts0 
+                where( H_obs(i-2:i+2,j-2:j+2) .eq. 0.0) wts = 0.0 
+                call wtd_mean(H_obs_now,H_obs(i-2:i+2,j-2:j+2),wts) 
+                
+
+                ! Get adjustment rate given error in z_srf
+                f_dz = (H_ice_now - H_obs_now) / H_scale
+                f_dz = max(f_dz,-f_dz_lim)
+                f_dz = min(f_dz,f_dz_lim)
+                
+                f_scale = 10.0**f_dz 
+
+                C_bed(i1,j1) = C_bed_prev(i1,j1)*f_scale
+
+            end if 
+
+        end do 
+        end do 
+
+        ! Ensure C_bed is not below lower or upper limit 
+        where (C_bed .lt. cb_min) C_bed = cb_min 
+        where (C_bed .gt. cb_max) C_bed = cb_max 
+
+        ! Additionally, apply a Gaussian filter to C_bed to ensure smooth transitions
+!         call filter_gaussian(var=C_bed,sigma=dx_km*0.5,dx=dx_km)     !,mask=err_z_srf .ne. 0.0)
+        
+        ! Also where no ice exists, set C_bed = cb_min 
+        where(H_obs .eq. 0.0) C_bed = cb_min 
+
+        ! Diagnose current rate of change of C_bed 
+        dCbed = C_bed - C_bed_prev
+
+        return 
+
+    end subroutine update_C_bed_thickness_simple
 
     subroutine update_C_bed_thickness_ratio(C_bed,dCbed,H_ice,z_bed,ux,uy,uxy_i,uxy_b,H_obs,dx,cb_min,cb_max)
 

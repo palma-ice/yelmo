@@ -805,11 +805,11 @@ end if
 !                 f_err = H_ice(i,j) / max(H_obs(i,j),1e-1)
                 
                 wts = wts0 
-                where( H_ice(i-2:i+2,j-2:j+2) .eq. 0.0) wts = 0.0 
+                !where( H_ice(i-2:i+2,j-2:j+2) .eq. 0.0) wts = 0.0 
                 call wtd_mean(H_ice_now,H_ice(i-2:i+2,j-2:j+2),wts) 
 
                 wts = wts0 
-                where( H_obs(i-2:i+2,j-2:j+2) .eq. 0.0) wts = 0.0 
+                !where( H_obs(i-2:i+2,j-2:j+2) .eq. 0.0) wts = 0.0 
                 call wtd_mean(H_obs_now,H_obs(i-2:i+2,j-2:j+2),wts) 
                 
 !                 n = count(H_ice(i-1:i+1,j-1:j+1).gt.0.0)
@@ -850,7 +850,7 @@ end if
         call filter_gaussian(var=C_bed,sigma=dx_km*0.25,dx=dx_km)     !,mask=err_z_srf .ne. 0.0)
         
         ! Also where no ice exists, set C_bed = cb_min 
-        where(H_obs .eq. 0.0) C_bed = cb_min 
+        where(H_ice .eq. 0.0) C_bed = cb_min 
 
         ! Diagnose current rate of change of C_bed 
         dCbed = C_bed - C_bed_prev

@@ -65,7 +65,7 @@ program yelmo_test
     call hydro_init_state(hyd1,yelmo1%tpo%now%H_ice,yelmo1%tpo%now%f_grnd,time)
 
     ! Choose optimization method (1: error method, 2: ratio method) 
-    opt_method = 2 
+    opt_method = 1 
 
     ! Simulation parameters
     time_init           = 0.0       ! [yr] Starting time
@@ -123,6 +123,7 @@ program yelmo_test
     !call guess_C_bed(yelmo1%dyn%now%C_bed,phi,yelmo1%dta%pd%uxy_s,phi_min,phi_max,yelmo1%dyn%par%cf_stream)
 
     yelmo1%dyn%now%C_bed = 2e5
+    where(yelmo1%tpo%now%H_ice .eq. 0.0) yelmo1%dyn%now%C_bed = yelmo1%dyn%par%cb_min
 
     ! Initialize state variables (dyn,therm,mat)
     ! (initialize temps with robin method with a cold base)
@@ -635,6 +636,8 @@ end if
         nx = size(C_bed,1)
         ny = size(C_bed,2) 
 
+        dx_km = dx*1e-3  
+        
         allocate(C_bed_prev(nx,ny))
 
         ! Optimization parameters 
@@ -688,13 +691,12 @@ end if
                 where( H_obs(i-2:i+2,j-2:j+2) .eq. 0.0) wts = 0.0 
                 call wtd_mean(H_obs_now,H_obs(i-2:i+2,j-2:j+2),wts) 
                 
-
                 ! Get adjustment rate given error in z_srf
                 f_dz = (H_ice_now - H_obs_now) / H_scale
                 f_dz = max(f_dz,-f_dz_lim)
                 f_dz = min(f_dz,f_dz_lim)
                 
-                f_scale = 10.0**(f_dz) 
+                f_scale = 10.0**(-f_dz) 
 
                 C_bed(i1,j1) = C_bed_prev(i1,j1)*f_scale
 
@@ -708,7 +710,7 @@ end if
         where (C_bed .gt. cb_max) C_bed = cb_max 
 
         ! Additionally, apply a Gaussian filter to C_bed to ensure smooth transitions
-!         call filter_gaussian(var=C_bed,sigma=dx_km*0.5,dx=dx_km)     !,mask=err_z_srf .ne. 0.0)
+!         call filter_gaussian(var=C_bed,sigma=dx_km*0.25,dx=dx_km)     !,mask=err_z_srf .ne. 0.0)
         
         ! Also where no ice exists, set C_bed = cb_min 
         where(H_obs .eq. 0.0) C_bed = cb_min 

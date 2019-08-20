@@ -683,7 +683,7 @@ end if
                 f_dz = max(f_dz,-f_dz_lim)
                 f_dz = min(f_dz,f_dz_lim)
                 
-                f_scale = 10.0**f_dz 
+                f_scale = 10.0**(-f_dz) 
 
                 C_bed(i1,j1) = C_bed_prev(i1,j1)*f_scale
 

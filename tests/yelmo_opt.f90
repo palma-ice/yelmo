@@ -30,6 +30,7 @@ program yelmo_test
     logical    :: topo_fixed 
     real(prec) :: phi_min, phi_max  
     real(prec) :: cb_max 
+    integer    :: opt_method 
 
     real(prec), allocatable :: dCbed(:,:) 
     real(prec), allocatable :: phi(:,:) 
@@ -63,18 +64,23 @@ program yelmo_test
     call hydro_init(hyd1,filename=path_par,nx=yelmo1%grd%nx,ny=yelmo1%grd%ny)
     call hydro_init_state(hyd1,yelmo1%tpo%now%H_ice,yelmo1%tpo%now%f_grnd,time)
 
+    ! Choose optimization method (1: error method, 2: ratio method) 
+    opt_method = 1 
+
     ! Simulation parameters
     time_init           = 0.0       ! [yr] Starting time
-    
-    ! Ratio method 
-    time_tune           = 20.0      ! [yr]
-    time_iter           = 200.0     ! [yr] 
-    qmax                = 100       ! Total number of iterations
-    
-    ! Error method 
-!     time_iter           = 500.0     ! [yr] 
-!     qmax                = 200       ! Total number of iterations
-    
+
+    if (opt_method .eq. 1) then 
+        ! Error method 
+        time_iter           = 500.0     ! [yr] 
+        qmax                = 200       ! Total number of iterations
+    else 
+        ! Ratio method 
+        time_tune           = 20.0      ! [yr]
+        time_iter           = 200.0     ! [yr] 
+        qmax                = 100       ! Total number of iterations
+    end if 
+
     phi_min             =  5.0      ! Minimum allowed friction angle
     phi_max             = 70.0      ! Maximum allowed friction angle 
 
@@ -165,8 +171,40 @@ program yelmo_test
 
     ! Initially assume we are working with topo_fixed... (only for optimizing velocity)
     topo_fixed = .TRUE. 
-    
-if (.TRUE.) then 
+
+if (opt_method .eq. 1) then 
+    ! Error method (Pollard and De Conto, 2012)
+
+    do q = 1, qmax 
+
+        ! Update C_bed based on error metric(s) 
+        call update_C_bed_thickness_simple(yelmo1%dyn%now%C_bed,dCbed,yelmo1%tpo%now%H_ice, &
+                        yelmo1%bnd%z_bed,yelmo1%dyn%now%ux_bar,yelmo1%dyn%now%uy_bar, &
+                        yelmo1%dta%pd%H_ice,yelmo1%tpo%par%dx,yelmo1%dyn%par%cb_min,cb_max=cb_max)
+
+        ! Reset model to the initial state (including H_w) and time, with updated C_bed field 
+        yelmo_ref%dyn%now%C_bed = yelmo1%dyn%now%C_bed 
+        yelmo1 = yelmo_ref 
+        hyd1   = hyd_ref 
+        time   = 0.0 
+        call yelmo_set_time(yelmo1,time) 
+        
+        ! Perform iteration loop to diagnose error for modifying C_bed 
+        do n = 1, int(time_iter)
+        
+            time = time + 1.0
+
+            ! Update ice sheet 
+            call yelmo_update(yelmo1,time)
+
+        end do 
+
+        ! Write the current solution 
+        call write_step_2D_opt(yelmo1,file2D,time=real(q),dCbed=dCbed,phi=phi,time_iter=time_iter)
+        
+    end do 
+
+else 
     ! Ratio method (Le clec’h et al, 2019)
 
     do q = 1, qmax 
@@ -208,39 +246,6 @@ if (.TRUE.) then
         call write_step_2D_opt(yelmo1,file2D,time=real(q),dCbed=dCbed,phi=phi,time_iter=time_tune+time_iter)
         
     end do 
-
-else 
-    ! Error method (Pollard and De Conto, 2012)
-
-    do q = 1, qmax 
-
-        ! Update C_bed based on error metric(s) 
-        call update_C_bed_thickness_simple(yelmo1%dyn%now%C_bed,dCbed,yelmo1%tpo%now%H_ice, &
-                        yelmo1%bnd%z_bed,yelmo1%dyn%now%ux_bar,yelmo1%dyn%now%uy_bar, &
-                        yelmo1%dta%pd%H_ice,yelmo1%tpo%par%dx,yelmo1%dyn%par%cb_min,cb_max=cb_max)
-
-        ! Reset model to the initial state (including H_w) and time, with updated C_bed field 
-        yelmo_ref%dyn%now%C_bed = yelmo1%dyn%now%C_bed 
-        yelmo1 = yelmo_ref 
-        hyd1   = hyd_ref 
-        time   = 0.0 
-        call yelmo_set_time(yelmo1,time) 
-        
-        ! Perform iteration loop to diagnose error for modifying C_bed 
-        do n = 1, int(time_iter)
-        
-            time = time + 1.0
-
-            ! Update ice sheet 
-            call yelmo_update(yelmo1,time)
-
-        end do 
-
-        ! Write the current solution 
-        call write_step_2D_opt(yelmo1,file2D,time=real(q),dCbed=dCbed,phi=phi,time_iter=time_iter)
-        
-    end do 
-
 
 end if 
 
@@ -689,7 +694,7 @@ end if
                 f_dz = max(f_dz,-f_dz_lim)
                 f_dz = min(f_dz,f_dz_lim)
                 
-                f_scale = 10.0**(-f_dz) 
+                f_scale = 10.0**(f_dz) 
 
                 C_bed(i1,j1) = C_bed_prev(i1,j1)*f_scale
 

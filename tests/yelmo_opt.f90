@@ -72,13 +72,18 @@ program yelmo_test
 
     if (opt_method .eq. 1) then 
         ! Error method 
-        time_iter           = 500.0     ! [yr] 
         qmax                = 200       ! Total number of iterations
+        time_iter           = 500.0     ! [yr] 
+
+        qmax_iter_length_1  = 10        ! 1st number of iterations at which iteration length should increase
+        time_iter_1         = 1000.0    ! [yr] 
+        
     else 
         ! Ratio method 
+        qmax                = 100       ! Total number of iterations
         time_tune           = 20.0      ! [yr]
         time_iter           = 200.0     ! [yr] 
-        qmax                = 100       ! Total number of iterations
+        
     end if 
 
     phi_min             =  5.0      ! Minimum allowed friction angle
@@ -87,12 +92,12 @@ program yelmo_test
     cb_max              = 5e5       ! [Pa yr m-1]
 
     ! Not used right now:
-    qmax_topo_fixed     = 0         ! Number of initial iterations that should use topo_fixed=.TRUE. 
-    time_iter_0         =  50.0     ! [yr] 
-    time_iter_1         = 200.0     ! [yr] 
-    time_iter_2         = 500.0     ! [yr] 
-    qmax_iter_length_1  = 10        ! 1st number of iterations at which iteration length should increase
-    qmax_iter_length_2  = 50        ! 2nd number of iterations at which iteration length should increase
+!     qmax_topo_fixed     = 0         ! Number of initial iterations that should use topo_fixed=.TRUE. 
+!     time_iter_0         =  50.0     ! [yr] 
+!     time_iter_1         = 200.0     ! [yr] 
+!     time_iter_2         = 500.0     ! [yr] 
+!     qmax_iter_length_1  = 10        ! 1st number of iterations at which iteration length should increase
+!     qmax_iter_length_2  = 50        ! 2nd number of iterations at which iteration length should increase
     
     ! === Set initial boundary conditions for current time and yelmo state =====
     ! ybound: z_bed, z_sl, H_sed, H_w, smb, T_srf, bmb_shlf , Q_geo
@@ -190,6 +195,9 @@ if (opt_method .eq. 1) then
         time   = 0.0 
         call yelmo_set_time(yelmo1,time) 
         
+        ! Update time_iter
+        if (q .gt. qmax_iter_length_1) time_iter = time_iter_1
+
         ! Perform iteration loop to diagnose error for modifying C_bed 
         do n = 1, int(time_iter)
         
@@ -710,7 +718,7 @@ end if
         where (C_bed .gt. cb_max) C_bed = cb_max 
 
         ! Additionally, apply a Gaussian filter to C_bed to ensure smooth transitions
-!         call filter_gaussian(var=C_bed,sigma=dx_km*0.25,dx=dx_km)     !,mask=err_z_srf .ne. 0.0)
+        call filter_gaussian(var=C_bed,sigma=dx_km*0.1,dx=dx_km)     !,mask=err_z_srf .ne. 0.0)
         
         ! Also where no ice exists, set C_bed = cb_min 
         where(H_obs .eq. 0.0) C_bed = cb_min 

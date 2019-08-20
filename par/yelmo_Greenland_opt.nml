@@ -1,3 +1,9 @@
+&control    
+    bmb_shlf_const  = -10.0             ! [m/a] Basal mass balance of ice shelves
+    dT_ann          = 0.0               ! [K]  Temperature anomaly (atm)
+    z_sl            = 0.0               ! [m] Sea level relative to present-day 
+/
+
 &yelmo
     domain          = "Greenland"
     grid_name       = "GRL-16KM"

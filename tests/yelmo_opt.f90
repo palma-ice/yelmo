@@ -22,6 +22,9 @@ program yelmo_test
     integer    :: n
     real(4)    :: cpu_start_time, cpu_end_time 
 
+    ! Parameters 
+    real(prec) :: bmb_shlf_const, dT_ann, z_sl  
+
     ! Optimization variables 
     real(prec) :: time_iter, time_iter_0, time_iter_1, time_iter_2
     integer    :: q, qmax, qmax_topo_fixed, qmax_iter_length_1, qmax_iter_length_2
@@ -44,6 +47,10 @@ program yelmo_test
     ! Determine the parameter file from the command line 
     call yelmo_load_command_line_args(path_par)
 
+    call nml_read(path_par,"control","bmb_shlf_const",  bmb_shlf_const)            ! [yr] Constant imposed bmb_shlf value
+    call nml_read(path_par,"control","dT_ann",          dT_ann)                    ! [K] Temperature anomaly (atm)
+    call nml_read(path_par,"control","z_sl",            z_sl)                      ! [m] Sea level relative to present-day
+    
     ! Assume program is running from the output folder
     outfldr = "./"
 
@@ -102,17 +109,19 @@ program yelmo_test
     ! === Set initial boundary conditions for current time and yelmo state =====
     ! ybound: z_bed, z_sl, H_sed, H_w, smb, T_srf, bmb_shlf , Q_geo
 
-    yelmo1%bnd%z_sl     = 0.0           ! [m]
-    yelmo1%bnd%H_sed    = 0.0           ! [m]
-    yelmo1%bnd%H_w      = hyd1%now%H_w  ! [m]
-    yelmo1%bnd%Q_geo    = 50.0          ! [mW/m2]
+    yelmo1%bnd%z_sl     = 0.0               ! [m]
+    yelmo1%bnd%H_sed    = 0.0               ! [m]
+    yelmo1%bnd%H_w      = hyd1%now%H_w      ! [m]
+    yelmo1%bnd%Q_geo    = 50.0              ! [mW/m2]
     
-    yelmo1%bnd%bmb_shlf = -10.0         ! [m.i.e./a]
-    yelmo1%bnd%T_shlf   = T0            ! [K]   
+    yelmo1%bnd%bmb_shlf = bmb_shlf_const    ! [m.i.e./a]
+    yelmo1%bnd%T_shlf   = T0                ! [K]   
 
+    if (dT_ann .lt. 0.0) yelmo1%bnd%T_shlf   = T0 + dT_ann*0.25_prec  ! [K] Oceanic temp anomaly
+    
     ! Impose present-day surface mass balance and present-day temperature field
-    yelmo1%bnd%smb      = yelmo1%dta%pd%smb        ! [m.i.e./a]
-    yelmo1%bnd%T_srf    = yelmo1%dta%pd%T_srf      ! [K]
+    yelmo1%bnd%smb      = yelmo1%dta%pd%smb             ! [m.i.e./a]
+    yelmo1%bnd%T_srf    = yelmo1%dta%pd%T_srf + dT_ann  ! [K]
     
     call yelmo_print_bound(yelmo1%bnd)
 
@@ -140,8 +149,12 @@ program yelmo_test
     where(yelmo1%dta%pd%H_ice .le. 0.0) mask_noice = .TRUE. 
 
     ! Impose additional negative mass balance to no ice points of 2 [m.i.e./a] melting
-    where(mask_noice) yelmo1%bnd%smb = yelmo1%dta%pd%smb - 2.0 
-
+    if (trim(yelmo1%par%domain) .eq. "Greenland") then 
+        where(mask_noice) yelmo1%bnd%smb = yelmo1%dta%pd%smb - 2.0 
+    else ! Antarctica
+        !where(mask_noice) yelmo1%bnd%bmb_shlf = yelmo1%dta%pd%bmb_shlf - 2.0 
+    end if 
+    
     ! Saturate maximum smb to 1.5 m/a 
     !where(yelmo1%bnd%smb .gt. 1.5) yelmo1%bnd%smb = 1.5 
 

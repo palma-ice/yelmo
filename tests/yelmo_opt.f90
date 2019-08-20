@@ -72,8 +72,8 @@ program yelmo_test
     qmax                = 100       ! Total number of iterations
     
     ! Error method 
-    time_iter           = 500.0     ! [yr] 
-    qmax                = 200       ! Total number of iterations
+!     time_iter           = 500.0     ! [yr] 
+!     qmax                = 200       ! Total number of iterations
     
     phi_min             =  5.0      ! Minimum allowed friction angle
     phi_max             = 70.0      ! Maximum allowed friction angle 

@@ -713,13 +713,13 @@ end if
 !                     H_obs_now = 0.0 
 !                 end if 
                 
-                f_err = ( H_ice_now / max(H_obs_now,1e-1) )**exp1
+                f_err = ( H_ice_now / max(H_obs_now,1e-1) )
                 
                 ! Calculate ratio of deformational velocity to sliding velocity
                 f_vel = uxy_i(i,j) / max(uxy_b(i,j),1e-1) 
 
                 ! Calculate correction factor (beta_old / beta_new)
-                f_corr = max( f_err + f_vel*(f_err-1.0_prec), 1e-1) 
+                f_corr = ( max( f_err + f_vel*(f_err-1.0_prec), 1e-1) )**exp1
 
                 ! Apply correction to update C_bed
                 C_bed(i1,j1) = C_bed_prev(i1,j1) * f_corr**(-1.0)

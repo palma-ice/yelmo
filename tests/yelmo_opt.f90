@@ -85,6 +85,9 @@ program yelmo_test
         qmax_iter_length_1  = 10        ! 1st number of iterations at which iteration length should increase
         time_iter_1         = 1000.0    ! [yr] 
         
+        qmax_iter_length_2  = 20        ! 1st number of iterations at which iteration length should increase
+        time_iter_2         = 2000.0    ! [yr] 
+        
     else 
         ! Ratio method 
         qmax                = 100       ! Total number of iterations
@@ -210,7 +213,8 @@ if (opt_method .eq. 1) then
         
         ! Update time_iter
         if (q .gt. qmax_iter_length_1) time_iter = time_iter_1
-
+        if (q .gt. qmax_iter_length_2) time_iter = time_iter_2
+        
         ! Perform iteration loop to diagnose error for modifying C_bed 
         do n = 1, int(time_iter)
         
@@ -731,7 +735,7 @@ end if
         where (C_bed .gt. cb_max) C_bed = cb_max 
 
         ! Additionally, apply a Gaussian filter to C_bed to ensure smooth transitions
-        call filter_gaussian(var=C_bed,sigma=dx_km*0.1,dx=dx_km)     !,mask=err_z_srf .ne. 0.0)
+        call filter_gaussian(var=C_bed,sigma=dx_km*0.2,dx=dx_km)     !,mask=err_z_srf .ne. 0.0)
         
         ! Also where no ice exists, set C_bed = cb_min 
         where(H_obs .eq. 0.0) C_bed = cb_min 

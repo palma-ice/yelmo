@@ -93,16 +93,22 @@ program yelmo_mismip
 !         allocate(ATT_values(n_att))
 !         ATT_values = sec_year*1e-26*[464.16,215.44,100.00,46.416,21.544,10.0,4.6416,2.1544,1.0, &
 !                                      2.1544,4.6416,10.0,21.544,46.416,100.00,215.44,464.16]
+        
+        ! Alex's mismip steps
+        n_att = 13
+        allocate(ATT_values(n_att))
+        ATT_values = [1e-16,3.162278e-17,1e-17,3.162278e-18,1e-18,3.162278e-19,1e-19, &
+                      3.162278e-19,1e-18,3.162278e-18,1e-17,3.162278e-17,1e-16]
 
-!     ! Shorter experiment (Pattyn, 2017)
-!     n_att      = 7
-!     allocate(ATT_values(n_att))
-!     ATT_values = [1e-16,1e-17,1e-18,1e-19,1e-18,1e-17,1e-16]
+        ! Shorter experiment (Pattyn, 2017)
+!         n_att      = 7
+!         allocate(ATT_values(n_att))
+!         ATT_values = [1e-16,1e-17,1e-18,1e-19,1e-18,1e-17,1e-16]
             
         ! Shorter experiment 2 (Pattyn, 2017)
-        n_att      = 3
-        allocate(ATT_values(n_att))
-        ATT_values = [1e-16,1e-17,1e-16]
+!         n_att      = 3
+!         allocate(ATT_values(n_att))
+!         ATT_values = [1e-16,1e-17,1e-16]
     
 
         ATT_time   = 15e3
@@ -127,9 +133,6 @@ program yelmo_mismip
     ymax =  50.0
     ymin = -50.0
     call yelmo_init_grid(yelmo1%grd,grid_name,units="km",x0=0.0,dx=dx,nx=int(xmax/dx)+1,y0=ymin,dy=dx,ny=int((ymax-ymin)/dx)+1)
-
-!     call grid_init(grid1,name="MISMIP3D",mtype="cartesian",units="kilometers", &
-!                    x0=0.d0,dx=dx,nx=int(xmax/dx)+1,y0=dble(ymin),dy=dx,ny=int((ymax-ymin)/dx)+1)
 
     ! === Initialize ice sheet model =====
 
@@ -194,7 +197,7 @@ program yelmo_mismip
         ! == Yelmo ice sheet ===================================================
         call yelmo_update(yelmo1,time)
 
-        x_gl      = find_x_gl(yelmo1%grd%x*1e-3,yelmo1%grd%y*1e-3,yelmo1%tpo%now%H_grnd)
+        x_gl = find_x_gl(yelmo1%grd%x*1e-3,yelmo1%grd%y*1e-3,yelmo1%tpo%now%H_grnd)
         
         ! == Update boundaries 
             

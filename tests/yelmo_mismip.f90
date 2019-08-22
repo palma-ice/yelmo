@@ -95,15 +95,15 @@ program yelmo_mismip
 !                                      2.1544,4.6416,10.0,21.544,46.416,100.00,215.44,464.16]
         
         ! Alex's mismip steps
-        n_att = 13
-        allocate(ATT_values(n_att))
-        ATT_values = [1e-16,3.162278e-17,1e-17,3.162278e-18,1e-18,3.162278e-19,1e-19, &
-                      3.162278e-19,1e-18,3.162278e-18,1e-17,3.162278e-17,1e-16]
+!         n_att = 13
+!         allocate(ATT_values(n_att))
+!         ATT_values = [1e-16,3.162278e-17,1e-17,3.162278e-18,1e-18,3.162278e-19,1e-19, &
+!                       3.162278e-19,1e-18,3.162278e-18,1e-17,3.162278e-17,1e-16]
 
         ! Shorter experiment (Pattyn, 2017)
-!         n_att      = 7
-!         allocate(ATT_values(n_att))
-!         ATT_values = [1e-16,1e-17,1e-18,1e-19,1e-18,1e-17,1e-16]
+        n_att      = 7
+        allocate(ATT_values(n_att))
+        ATT_values = [1e-16,1e-17,1e-18,1e-19,1e-18,1e-17,1e-16]
             
         ! Shorter experiment 2 (Pattyn, 2017)
 !         n_att      = 3
@@ -112,8 +112,8 @@ program yelmo_mismip
     
 
         ATT_time   = 15e3
-        ATT_dt     =  5e3 
-        time_end   = ATT_time + n_att*ATT_dt + 100e3
+        ATT_dt     = 10e3 
+        time_end   = ATT_time + n_att*ATT_dt !+ 100e3
         dt2D_out   = 500.0 
         
         write(*,*) "time_init = ", time_init 
@@ -209,6 +209,9 @@ program yelmo_mismip
             err = sqrt(sum(yelmo1%tpo%now%dHicedt**2)/yelmo1%grd%npts)
             if (err .lt. 1e-2) is_converged =.TRUE. 
 
+if (.FALSE.) then 
+    ! Apply convergence criteria to step rate factor 
+
             if (time .gt. ATT_time+ATT_dt) then 
                 ! Ensure minimum time per step has been reached before checking convergence
 
@@ -227,6 +230,17 @@ program yelmo_mismip
                 end if   
 
             end if 
+
+else
+    ! Simply step rate factor every ATT_dt amount of time 
+
+            if (time .gt. ATT_time+ATT_dt) then
+                q_att = min(q_att+1,n_att)
+                yelmo1%mat%par%rf_const = ATT_values(q_att)
+                ATT_time = time
+            end if 
+
+end if 
 
         else ! Stnd + P75S 
             exp_now = trim(experiment)

@@ -76,7 +76,7 @@ contains
                 end if 
 
                 ! Pre-calculate the contribution of horizontal advection to column solution
-                call calc_advec_horizontal_column(advecxy,X_ice,ux,uy,dx,i,j)
+                call calc_advec_horizontal_column(advecxy,X_ice,ux,uy,dx,i,j,ulim=1000.0_prec)
                 
                 select case(trim(solver))
 
@@ -614,7 +614,7 @@ contains
 
     end subroutine calc_X_base 
 
-    subroutine calc_advec_horizontal_column(advecxy,var_ice,ux,uy,dx,i,j)
+    subroutine calc_advec_horizontal_column(advecxy,var_ice,ux,uy,dx,i,j,ulim)
         ! Newly implemented advection algorithms (ajr)
         ! Output: [K a-1]
 
@@ -628,10 +628,11 @@ contains
         real(prec), intent(IN)  :: uy(:,:,:)        ! nx,ny,nz
         real(prec), intent(IN)  :: dx  
         integer,    intent(IN)  :: i, j 
+        real(prec), intent(IN)  :: ulim             ! [m/a] Maximum allowed velocity to apply
 
         ! Local variables 
         integer :: k, nx, ny, nz_aa 
-        real(prec) :: ux_aa, uy_aa 
+        real(prec) :: ux_aa, uy_aa, u_now  
         real(prec) :: dx_inv, dx_inv2
         real(prec) :: advecx, advecy 
 
@@ -662,7 +663,8 @@ contains
                 ! 2nd order
                 !advecx = dx_inv2 * 0.5*(ux(i-1,j,k)+ux(i-1,j,k-1))*(-(4.0*var_ice(i-1,j,k)-var_ice(i-2,j,k)-3.0*var_ice(i,j,k)))
                 ! ux/uy on zeta_aa nodes:
-                advecx = dx_inv2 * ux(i-1,j,k)*(-(4.0*var_ice(i-1,j,k)-var_ice(i-2,j,k)-3.0*var_ice(i,j,k)))
+                u_now = sign(min(abs(ux(i-1,j,k)),ulim),ux(i-1,j,k))
+                advecx = dx_inv2 * u_now*(-(4.0*var_ice(i-1,j,k)-var_ice(i-2,j,k)-3.0*var_ice(i,j,k)))
                 
             else if (ux_aa .lt. 0.0 .and. i .le. nx-2) then 
                 ! Flow to the left
@@ -672,7 +674,8 @@ contains
                 ! 2nd order
 !                 advecx = dx_inv2 * 0.5*(ux(i,j,k)+ux(i,j,k-1))*((4.0*var_ice(i+1,j,k)-var_ice(i+2,j,k)-3.0*var_ice(i,j,k)))
                 ! ux/uy on zeta_aa nodes:
-                advecx = dx_inv2 * ux(i,j,k)*((4.0*var_ice(i+1,j,k)-var_ice(i+2,j,k)-3.0*var_ice(i,j,k)))
+                u_now = sign(min(abs(ux(i,j,k)),ulim),ux(i,j,k))
+                advecx = dx_inv2 * u_now*((4.0*var_ice(i+1,j,k)-var_ice(i+2,j,k)-3.0*var_ice(i,j,k)))
                 
             else 
                 ! No flow 
@@ -688,7 +691,8 @@ contains
                 ! 2nd order
 !                 advecy = dx_inv2 * 0.5*(uy(i,j-1,k)+uy(i,j-1,k-1))*(-(4.0*var_ice(i,j-1,k)-var_ice(i,j-2,k)-3.0*var_ice(i,j,k)))
                 ! ux/uy on zeta_aa nodes:
-                advecy = dx_inv2 * uy(i,j-1,k)*(-(4.0*var_ice(i,j-1,k)-var_ice(i,j-2,k)-3.0*var_ice(i,j,k)))
+                u_now = sign(min(abs(uy(i,j-1,k)),ulim),uy(i,j-1,k))
+                advecy = dx_inv2 * u_now*(-(4.0*var_ice(i,j-1,k)-var_ice(i,j-2,k)-3.0*var_ice(i,j,k)))
                 
             else if (uy_aa .lt. 0.0 .and. j .le. ny-2) then 
                 ! Flow to the left
@@ -698,7 +702,8 @@ contains
                 ! 2nd order
 !                 advecy = dx_inv2 * 0.5*(uy(i,j,k)+uy(i,j,k-1))*((4.0*var_ice(i,j+1,k)-var_ice(i,j+2,k)-3.0*var_ice(i,j,k)))
                 ! ux/uy on zeta_aa nodes:
-                advecy = dx_inv2 * uy(i,j,k)*((4.0*var_ice(i,j+1,k)-var_ice(i,j+2,k)-3.0*var_ice(i,j,k)))
+                u_now = sign(min(abs(uy(i,j,k)),ulim),uy(i,j,k))
+                advecy = dx_inv2 * u_now*((4.0*var_ice(i,j+1,k)-var_ice(i,j+2,k)-3.0*var_ice(i,j,k)))
                 
             else
                 ! No flow 

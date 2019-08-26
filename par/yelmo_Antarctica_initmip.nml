@@ -1,13 +1,13 @@
 &control    
     time_init       = 0.0               ! [yr] Starting time 
-    time_end        = 50e3              ! [yr] Ending time
+    time_end        = 20e3              ! [yr] Ending time
     time_equil      = 10.0              ! [yr] Equilibration time 
     dtt             = 2.0               ! [yr] Main loop timestep 
     dt1D_out        = 100.0             ! [yr] Frequency of writing 1D output files 
     dt2D_out        = 500.0             ! [yr] Frequency of writing 2D output files 
-    bmb_shlf_const  = 0.0               ! [m/a] Basal mass balance of ice shelves
-    dT_ann          = -10.0             ! [K] Temperature anomaly (atm)
-    z_sl            = -120.0            ! [m] Sea level relative to present-day 
+    bmb_shlf_const  = -0.2              ! [m/a] Basal mass balance of ice shelves
+    dT_ann          = 0.0               ! [K] Temperature anomaly (atm)
+    z_sl            = 0.0               ! [m] Sea level relative to present-day 
 /
 
 &yelmo
@@ -41,7 +41,7 @@
     topo_relax_dt     = 2000
     topo_fixed_dt     = -1              ! <= 0 for always fixed, positive value to 'unfix' topo after interval
     calv_H_lim        = 200.0           ! [m] Calving limit in ice thickness (thinner ice calves)
-    calv_tau          = 1.0             ! [a] Characteristic calving time
+    calv_tau          = 5.0             ! [a] Characteristic calving time
     H_min_grnd        = 5.0             ! [m] Minimum ice thickness at grounded margin (thinner ice is ablated) - helps with stability
     H_min_flt         = 0.0             ! [m] Minimum ice thickness at floating margin (thinner ice is ablated) - helps with stability
     sd_min            = 100.0           ! [m] calv_grnd(z_bed_sd <= sd_min) = 0.0 
@@ -62,9 +62,9 @@
     beta_const          = 1e3             ! [Pa a m−1] Constant value of basal friction coefficient to be used
     beta_q              = 1.0             ! Dragging law exponent 
     beta_u0             = 0.0             ! [m/a] Regularization term for regularized Coulomb law (beta_method=3)
-    beta_gl_sep         = 0               !  -1: Apply subgrid treatment on ac-nodes (beta_gl_stag=3) 0: No subgrid treatment, 1: beta*f_grnd_aa        
+    beta_gl_sep         = -1              !  -1: Apply subgrid treatment on ac-nodes (beta_gl_stag=3) 0: No subgrid treatment, 1: beta*f_grnd_aa        
     beta_gl_scale       = 0               !  0: beta*beta_gl_f, 2: H_grnd linear scaling, 3: Zstar scaling 
-    beta_gl_stag        = 1               !  0: simple staggering, 1: Upstream beta at gl, 2: downstream, 3: f_grnd_ac scaling 
+    beta_gl_stag        = 3               !  0: simple staggering, 1: Upstream beta at gl, 2: downstream, 3: f_grnd_ac scaling 
     beta_gl_f           = 1.0             ! [-] Scaling of beta at the grounding line (for beta_gl_scale=0)
     taud_gl_method      = 0               !  0: binary, no subgrid, 1: Two-sided gradient
     H_grnd_lim          = 500.0           ! [m] For beta_sep_method=2, reduce beta linearly between H_grnd=0 and H_grnd_lim 
@@ -74,10 +74,10 @@
     cb_margin_pmp       = True            ! If using cb_with_pmp, additionally impose cb_stream at ice margins 
     cb_scale            = "exp_zb"        ! "none", "lin_zb", "exp_zb", "till_const", "till_zb", scaling of cb spatially
     cb_z0               = -200.0          ! [m] Bedrock elevation at which scaling goes to f_scale=e(-1)
-    cb_z1               = 200.0           ! [m] Bedrock elevation above which scaling goes to f_scale=1
+    cb_z1               = 0.0             ! [m] Bedrock elevation above which scaling goes to f_scale=1
     cb_min              = 10.0            ! [Pa] Minimum allowed value of cb for grounded ice
     cf_frozen           = 100e-5          ! [--] Bed critical stress factor, frozen 
-    cf_stream           =  20e-5          ! [--] Bed critical stress factor, stream  
+    cf_stream           = 200e-5          ! [--] Bed critical stress factor, stream  
     n_sm_beta           = 0               ! [-] Standard deviation in gridpoints for Gaussian smoothing of beta (0==no smoothing)
     beta_min            = 100.0           ! [Pa a m-1] Minimum value of beta allowed for grounded ice (for stability)
     ssa_beta_max        = 1e20            ! [Pa a m-1] Maximum value of beta for which ssa should be calculated 

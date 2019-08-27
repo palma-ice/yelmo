@@ -99,6 +99,9 @@ program yelmo_test
     ! Update the basin mask for Antarctica if necessary 
     if (trim(yelmo1%par%domain) .eq. "Antarctica") then 
         where(yelmo1%grd%lat .lt. -83.0) yelmo1%bnd%regions = 99.0 
+        where(yelmo1%grd%lat .lt. -74.0 .and. &
+              yelmo1%grd%lon .lt. 180.0 .and. &
+              yelmo1%grd%lon .gt. 130.0) yelmo1%bnd%regions = 99.0 
     end if 
 
     ! Impose a colder boundary temperature for equilibration step 

@@ -38,7 +38,7 @@ program yelmo_test
     call nml_read(path_par,"control","bmb_shlf_const",  bmb_shlf_const)            ! [yr] Constant imposed bmb_shlf value
     call nml_read(path_par,"control","dT_ann",          dT_ann)                    ! [K] Temperature anomaly (atm)
     call nml_read(path_par,"control","z_sl",            z_sl)                      ! [m] Sea level relative to present-day
-    
+
     ! Assume program is running from the output folder
     outfldr = "./"
 
@@ -93,9 +93,14 @@ program yelmo_test
     if (trim(yelmo1%par%domain) .eq. "Greenland") then 
         where(mask_noice) yelmo1%bnd%smb = yelmo1%dta%pd%smb - 2.0 
     else ! Antarctica
-        !where(mask_noice) yelmo1%bnd%bmb_shlf = yelmo1%dta%pd%bmb_shlf - 2.0 
+!         where(mask_noice) yelmo1%bnd%bmb_shlf = yelmo1%dta%pd%bmb_shlf - 1.0 
     end if 
-    
+
+    ! Update the basin mask for Antarctica if necessary 
+    if (trim(yelmo1%par%domain) .eq. "Antarctica") then 
+        where(yelmo1%grd%lat .gt. 83.0) yelmo1%bnd%regions = 99.0 
+    end if 
+
     ! Impose a colder boundary temperature for equilibration step 
     ! -5 [K] for mimicking glacial times
 !     yelmo1%bnd%T_srf = yelmo1%dta%pd%T_srf - 10.0  

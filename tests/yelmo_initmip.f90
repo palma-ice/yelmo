@@ -98,10 +98,24 @@ program yelmo_test
 
     ! Update the basin mask for Antarctica if necessary 
     if (trim(yelmo1%par%domain) .eq. "Antarctica") then 
+        
+        ! === Lower friction areas =====
         where(yelmo1%grd%lat .lt. -83.0) yelmo1%bnd%regions = 99.0 
+        
         where(yelmo1%grd%lat .lt. -74.0 .and. &
               yelmo1%grd%lon .lt. 180.0 .and. &
               yelmo1%grd%lon .gt. 130.0) yelmo1%bnd%regions = 99.0 
+
+        where(yelmo1%grd%x .gt. 1400.0 .and. yelmo1%grd%x .lt. 1900.0 .and. &
+              yelmo1%grd%y .gt.  500.0 .and. yelmo1%grd%y .lt.  800.0) yelmo1%bnd%regions = 99.0 
+
+        where(yelmo1%grd%x .gt.  -700.0 .and. yelmo1%grd%x .lt.    0.0 .and. &
+              yelmo1%grd%y .gt. -1300.0 .and. yelmo1%grd%y .lt. -300.0) yelmo1%bnd%regions = 99.0 
+        
+        ! === Higher friction areas =====
+        where(yelmo1%grd%x .gt. -1000.0 .and. yelmo1%grd%x .lt. -500.0 .and. &
+              yelmo1%grd%y .gt.  -150.0 .and. yelmo1%grd%y .lt.  150.0) yelmo1%bnd%regions = 98.0 
+        
     end if 
 
     ! Impose a colder boundary temperature for equilibration step 

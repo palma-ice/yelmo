@@ -1211,7 +1211,7 @@ end if
             
             ! Additional reduction of C_bed where regions==99.0
             where (bnd%regions .eq. 99.0_prec) lambda_bed = 0.25_prec*lambda_bed 
-            where (bnd%regions .eq. 98.0_prec) lambda_bed = 5.00_prec*lambda_bed
+            where (bnd%regions .eq. 98.0_prec) lambda_bed = 2.00_prec*lambda_bed
             
             ! =============================================================================
             ! Step 3: calculate C_bed [Pa]

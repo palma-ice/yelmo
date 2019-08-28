@@ -116,7 +116,7 @@ program yelmo_test
               yelmo1%grd%y*1e-3 .gt.   200.0 .and. yelmo1%grd%y*1e-3 .lt.  1800.0) yelmo1%bnd%regions = 99.0 
         
         ! === Higher friction areas =====
-        where(yelmo1%grd%x*1e-3 .gt. -1100.0 .and. yelmo1%grd%x*1e-3 .lt. -400.0 .and. &
+        where(yelmo1%grd%x*1e-3 .gt. -1000.0 .and. yelmo1%grd%x*1e-3 .lt. -200.0 .and. &
               yelmo1%grd%y*1e-3 .gt.  -300.0 .and. yelmo1%grd%y*1e-3 .lt.  300.0) yelmo1%bnd%regions = 98.0 
         
         where(yelmo1%grd%x*1e-3 .gt.   700.0 .and. yelmo1%grd%x*1e-3 .lt. 1600.0 .and. &

@@ -1,11 +1,11 @@
 &control    
     time_init       = 0.0               ! [yr] Starting time 
-    time_end        = 20e3              ! [yr] Ending time
+    time_end        = 30e3              ! [yr] Ending time
     time_equil      = 10.0              ! [yr] Equilibration time 
     dtt             = 2.0               ! [yr] Main loop timestep 
     dt1D_out        = 100.0             ! [yr] Frequency of writing 1D output files 
     dt2D_out        = 500.0             ! [yr] Frequency of writing 2D output files 
-    bmb_shlf_const  = -0.1              ! [m/a] Basal mass balance of ice shelves
+    bmb_shlf_const  = -0.2              ! [m/a] Basal mass balance of ice shelves
     dT_ann          = 0.0               ! [K] Temperature anomaly (atm)
     z_sl            = 0.0               ! [m] Sea level relative to present-day 
 /
@@ -43,7 +43,7 @@
     calv_H_lim        = 200.0           ! [m] Calving limit in ice thickness (thinner ice calves)
     calv_tau          = 10.0            ! [a] Characteristic calving time
     H_min_grnd        = 5.0             ! [m] Minimum ice thickness at grounded margin (thinner ice is ablated) - helps with stability
-    H_min_flt         = 10.0            ! [m] Minimum ice thickness at floating margin (thinner ice is ablated) - helps with stability
+    H_min_flt         = 5.0             ! [m] Minimum ice thickness at floating margin (thinner ice is ablated) - helps with stability
     sd_min            = 100.0           ! [m] calv_grnd(z_bed_sd <= sd_min) = 0.0 
     sd_max            = 500.0           ! [m] calv_grnd(z_bed_sd >= sd_max) = calv_max  
     calv_max          = 10.0            ! [m/a] Maximum grounded calving rate from high stdev(z_bed)

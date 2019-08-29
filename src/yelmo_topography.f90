@@ -222,10 +222,15 @@ contains
         call calc_gradient_ac_ice(tpo%now%dzsdx,tpo%now%dzsdy,tpo%now%z_srf,tpo%now%H_ice,tpo%par%dx,tpo%par%margin2nd,tpo%par%grad_lim)
         call calc_gradient_ac_ice(tpo%now%dHicedx,tpo%now%dHicedy,tpo%now%H_ice,tpo%now%H_ice,tpo%par%dx,tpo%par%margin2nd,tpo%par%grad_lim)
         
-        ! Calculate distance to ice margin 
+        ! ajr: experimental, doesn't seem to work properly yet! ===>
+        ! Modify surface slope gradient at the grounding line if desired 
+!         call calc_gradient_ac_gl(tpo%now%dzsdx,tpo%now%dzsdy,tpo%now%z_srf,tpo%now%H_ice, &
+!                                       tpo%now%f_grnd_acx,tpo%now%f_grnd_acy,tpo%par%dx,method=2,grad_lim=tpo%par%grad_lim)
+
+        ! Calculate distance to ice margin (really slow if always on)
         !tpo%now%dist_margin = distance_to_margin(tpo%now%H_ice,tpo%par%dx)
 
-        ! Calculate distance to grounding line 
+        ! Calculate distance to grounding line (really slow if always on)
         !tpo%now%dist_grline = distance_to_grline(tpo%now%is_grline,tpo%now%f_grnd,tpo%par%dx)
 
         ! Advance ytopo timestep 

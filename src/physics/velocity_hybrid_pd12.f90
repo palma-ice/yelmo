@@ -1030,12 +1030,12 @@ end if
                         ! then assume slope is the weighted average of the two 
                         dzsdx_1 = (z_srf(i,j+1)-z_srf(i,j)) / dx 
                         dzsdx_2 = 0.0 !(H_ice(i,j+1)-H_ice(i,j)) / dx 
-                        dzsdx   = f_grnd_acy(i,j)*dzsdx_1 + (1.0-f_grnd_acy(i,j))*dzsdx_2  
+                        dzsdy   = f_grnd_acy(i,j)*dzsdx_1 + (1.0-f_grnd_acy(i,j))*dzsdx_2  
                         
-                        call minmax(dzsdx,slope_max)  
+                        call minmax(dzsdy,slope_max)  
 
                         ! Get the driving stress
-                        taud_acy(i,j) = rhog * H_gl * dzsdx
+                        taud_acy(i,j) = rhog * H_gl * dzsdy
                         
                     end if 
 

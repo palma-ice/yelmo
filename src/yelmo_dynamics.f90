@@ -139,10 +139,15 @@ contains
         ! Calculate driving stress 
         call calc_driving_stress_ac(dyn%now%taud_acx,dyn%now%taud_acy,tpo%now%H_ice,tpo%now%dzsdx,tpo%now%dzsdy,dyn%par%dx)
 
-!         ! Additionally treat the driving stress at the grounding line 
-!         call calc_driving_stress_gl_ac(dyn%now%taud_acx,dyn%now%taud_acy,tpo%now%H_ice,tpo%now%z_srf,bnd%z_bed,bnd%z_sl, &
-!                  tpo%now%H_grnd,tpo%now%f_grnd,tpo%now%f_grnd_acx,tpo%now%f_grnd_acy,dyn%par%dx, &
-!                  method=dyn%par%taud_gl_method,beta_gl_stag=dyn%par%beta_gl_stag)
+        
+!         if (dyn%par%tau_gl_method .ne. 0) then
+!             ! Additionally treat the driving stress at the grounding line
+            
+!             call calc_driving_stress_gl_ac(dyn%now%taud_acx,dyn%now%taud_acy,tpo%now%H_ice,tpo%now%z_srf,bnd%z_bed,bnd%z_sl, &
+!                     tpo%now%H_grnd,tpo%now%f_grnd,tpo%now%f_grnd_acx,tpo%now%f_grnd_acy,dyn%par%dx, &
+!                     method=dyn%par%taud_gl_method,beta_gl_stag=dyn%par%beta_gl_stag)
+        
+!         end if 
 
         ! ===== Calculate effective pressure ==============================
 

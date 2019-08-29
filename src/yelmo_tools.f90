@@ -22,6 +22,7 @@ module yelmo_tools
     public :: stagger_ab_acy 
     public :: calc_gradient_ac
     public :: calc_gradient_ac_ice
+    public :: calc_gradient_ac_gl
 
     public :: mean_mask
     public :: minmax
@@ -586,15 +587,155 @@ contains
         end if 
 
         ! Finally, ensure that gradient is beneath desired limit 
-        where (dvardx .gt. grad_lim)  dvardx =  grad_lim 
-        where (dvardy .gt. grad_lim)  dvardy =  grad_lim 
-        where (dvardx .lt. -grad_lim) dvardx = -grad_lim 
-        where (dvardy .lt. -grad_lim) dvardy = -grad_lim 
-        
+        call minmax(dvardx,grad_lim)
+        call minmax(dvardy,grad_lim)
+
         return 
 
     end subroutine calc_gradient_ac_ice
     
+    subroutine calc_gradient_ac_gl(dvardx,dvardy,var,H_ice, &
+                                      f_grnd_acx,f_grnd_acy,dx,method,grad_lim)
+
+        implicit none 
+
+        real(prec), intent(OUT) :: dvardx(:,:)
+        real(prec), intent(OUT) :: dvardy(:,:) 
+        real(prec), intent(IN)  :: var(:,:) 
+        real(prec), intent(IN)  :: H_ice(:,:)
+        real(prec), intent(IN)  :: f_grnd_acx(:,:)
+        real(prec), intent(IN)  :: f_grnd_acy(:,:)
+        real(prec), intent(IN)  :: dx 
+        integer,    intent(IN)  :: method           ! Which gl gradient calculation to use
+        real(prec), intent(IN)  :: grad_lim         ! Very high limit == 0.05, low limit < 0.01 
+
+        ! Local variables 
+        integer :: i, j, nx, ny 
+        real(prec) :: dy
+        real(prec) :: dvardx_1, dvardx_2 
+
+        nx = size(H_ice,1)
+        ny = size(H_ice,2) 
+
+        dy = dx 
+
+        select case(method)
+
+            case(0)  
+                ! Do nothing, use the standard no-subgrid treatment 
+
+            case(1)
+                ! Weighted average using the grounded fraction (ac-nodes)
+                ! or one-sided choice
+                ! between surface slope and virtual slope of 
+                ! floating ice (using ice thickness)
+
+                ! x-direction 
+                do j = 1, ny 
+                do i = 1, nx-1 
+
+                    if ( f_grnd_acx(i,j) .gt. 0.0 .and. f_grnd_acx(i,j) .lt. 1.0) then 
+                        ! Grounding line point (ac-node)
+
+                        ! Get slope of grounded point and virtual floating point (using H_ice),
+                        ! then assume slope is the weighted average of the two 
+                        dvardx_1    = (var(i+1,j)-var(i,j)) / dx 
+                        dvardx_2    = 0.0 !(H_ice(i+1,j)-H_ice(i,j)) / dx 
+                        dvardx(i,j) = f_grnd_acx(i,j)*dvardx_1 + (1.0-f_grnd_acx(i,j))*dvardx_2  
+                        
+                        ! Limit the slope 
+                        call minmax(dvardx(i,j),grad_lim)  
+                                   
+                    end if 
+
+                end do 
+                end do 
+
+                ! y-direction 
+                do j = 1, ny-1 
+                do i = 1, nx 
+
+                    if ( f_grnd_acy(i,j) .gt. 0.0 .and. f_grnd_acy(i,j) .lt. 1.0) then 
+                        ! Grounding line point (ac-node)
+
+                        ! Get slope of grounded point and virtual floating point (using H_ice),
+                        ! then assume slope is the weighted average of the two 
+                        dvardx_1    = (var(i,j+1)-var(i,j)) / dx 
+                        dvardx_2    = 0.0 !(H_ice(i,j+1)-H_ice(i,j)) / dx 
+                        dvardy(i,j) = f_grnd_acy(i,j)*dvardx_1 + (1.0-f_grnd_acy(i,j))*dvardx_2  
+                        
+                        ! Limit the slope 
+                        call minmax(dvardy(i,j),grad_lim)  
+                         
+                    end if 
+
+                end do 
+                end do 
+
+            case(2)
+                ! One-sided differences upstream and downstream of the grounding line
+                ! analgous to Feldmann et al. (2014, JG)
+
+                ! x-direction 
+                do j = 1, ny 
+                do i = 1, nx-1 
+
+                    if ( f_grnd_acx(i,j) .gt. 0.0 .and. f_grnd_acx(i,j) .lt. 1.0) then 
+                        ! Grounding line point (ac-node)
+
+                        if (f_grnd_acx(i,j) .gt. 0.5) then 
+                            ! Consider grounded 
+                            dvardx(i,j) = (var(i+1,j)-var(i,j)) / dx 
+                        else 
+                            ! Consider floating 
+                            !dvardx(i,j) = (H_ice(i+1,j)-H_ice(i,j)) / dx
+                            dvardx(i,j) = 0.0 
+                        end if 
+
+                        ! Limit the slope 
+                        call minmax(dvardx(i,j),grad_lim)  
+
+                    end if 
+
+                end do 
+                end do 
+
+                ! y-direction 
+                do j = 1, ny-1 
+                do i = 1, nx 
+
+                    if ( f_grnd_acy(i,j) .gt. 0.0 .and. f_grnd_acy(i,j) .lt. 1.0) then 
+                        ! Grounding line point (ac-node)
+
+                        if (f_grnd_acy(i,j) .gt. 0.5) then 
+                            ! Consider grounded 
+                            dvardy(i,j) = (var(i,j+1)-var(i,j)) / dy 
+                        else 
+                            ! Consider floating 
+!                             dvardy(i,j) = (H_ice(i,j+1)-H_ice(i,j)) / dy
+                            dvardy(i,j) = 0.0 
+                        end if 
+                        
+                        ! Limit the slope 
+                        call minmax(dvardy(i,j),grad_lim)  
+
+                    end if 
+
+                end do 
+                end do 
+
+            case DEFAULT  
+                
+                write(*,*) "calc_gradient_ac_gl:: Error: grad_gl_method not recognized."
+                write(*,*) "grad_gl_method = ", method 
+                stop 
+
+        end select
+
+        return 
+
+    end subroutine calc_gradient_ac_gl
+
     function mean_mask(var,mask) result(ave)
 
         implicit none 

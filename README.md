@@ -19,3 +19,9 @@ https://palma-ice.github.io/yelmo-docs
 
 See:
 https://palma-ice.github.io/yelmo-docs/dependencies/
+
+## Test cases
+
+The published model description includes several test simulations for validation
+of the model's performance. 
+

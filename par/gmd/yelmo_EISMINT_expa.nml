@@ -2,7 +2,7 @@
 
     domain       = "EISMINT"             ! "EISMINT"
     experiment   = "EXPA"                ! "fixed", "moving", "mismip", "EXPA", "EXPB", "EXPF","BUELER-A", "BUELER-B", "HALFAR", "HALFAR-MED"
-    dx           = 50.0                  ! [km] Grid resolution (EISMINT1 = 50km, EISMINT2 = 25km)
+    dx           = 25.0                  ! [km] Grid resolution (EISMINT1 = 50km, EISMINT2 = 25km)
     with_ssa     = False                 ! Include ssa in experiment?
     topo_fixed   = False                 ! Calculate the topography, or use Heiko's topo file.  
     dyn_fixed    = False                 ! Fix dynamics after first calculation? 
@@ -10,9 +10,9 @@
 
     ! Timing parameters 
     time_init    = 0.0                  ! [yr] Starting time 
-    time_end     = 20000.0              ! [yr] Ending time 
+    time_end     = 200000.0             ! [yr] Ending time 
     dtt          = 100.0                ! [yr] Main loop timestep 
-    dt2D_out     = 500.0                ! [yr] Frequency of writing 2D output files 
+    dt2D_out     = 1000.0               ! [yr] Frequency of writing 2D output files 
 
     ! Settings for transient EISMINT1 experiments 
     period       = 0.0                  ! [yr] for transient experiments (normally 0.0 yr or 20e3 yr)
@@ -63,7 +63,7 @@
 &ydyn
     solver              = "hybrid-adhoc"  ! "fixed", "hybrid-adhoc", "hybrid-pd12"    
     sia_solver          = "vel"           ! "vel", "shear", "none"
-    mix_method          = 1               ! -2: sia, -1: ssa, 0: sia|ssa, 1: sia+ssa 2: ssa vel. fraction
+    mix_method          = -2              ! -2: sia, -1: ssa, 0: sia|ssa, 1: sia+ssa 2: ssa vel. fraction
     calc_diffusivity    = False           ! Calculate 2D diffusivity term for diagnostics
     beta_method         = 1               ! 0: constant beta; 1: linear (beta=cb); 2: psuedo-plastic-power; 3: Regularized Coulomb
     beta_const          = 1e3             ! [Pa a m−1] Constant value of basal friction coefficient to be used

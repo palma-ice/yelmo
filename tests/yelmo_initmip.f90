@@ -89,39 +89,33 @@ program yelmo_test
     mask_noice = .FALSE. 
     where(yelmo1%dta%pd%H_ice .le. 0.0) mask_noice = .TRUE. 
 
-    ! Impose additional negative mass balance to no ice points of 2 [m.i.e./a] melting
+    ! Special treatment for Greenland
     if (trim(yelmo1%par%domain) .eq. "Greenland") then 
+        
+        ! Impose additional negative mass balance to no ice points of 2 [m.i.e./a] melting
         where(mask_noice) yelmo1%bnd%smb = yelmo1%dta%pd%smb - 2.0 
-    else ! Antarctica
-!         where(mask_noice) yelmo1%bnd%bmb_shlf = yelmo1%dta%pd%bmb_shlf - 1.0 
+    
     end if 
 
-    ! Update the basin mask for Antarctica if necessary 
+    ! Special treatment for Antarctica
     if (trim(yelmo1%par%domain) .eq. "Antarctica") then 
         
-        ! === Lower friction areas =====
-        where(yelmo1%grd%lat .lt. -83.0) yelmo1%bnd%regions = 99.0 
+        ! Update the regions mask 
+        call set_regions_antarctica(yelmo1%bnd%regions,yelmo1%grd%lon,yelmo1%grd%lat,yelmo1%grd%x,yelmo1%grd%y)
         
-        where(yelmo1%grd%lat .lt. -74.0 .and. &
-              yelmo1%grd%lon .lt. 180.0 .and. &
-              yelmo1%grd%lon .gt. 130.0) yelmo1%bnd%regions = 99.0 
+        ! Present-day
+        if (dT_ann .ge. 0.0) then 
+            where(mask_noice) yelmo1%bnd%bmb_shlf = -2.0    ! [m/a]
+        end if 
 
-        where(yelmo1%grd%x*1e-3 .gt. 1200.0 .and. yelmo1%grd%x*1e-3 .lt. 1900.0 .and. &
-              yelmo1%grd%y*1e-3 .gt.  300.0 .and. yelmo1%grd%y*1e-3 .lt. 1000.0) yelmo1%bnd%regions = 99.0 
+        ! LGM
+        if (dT_ann .lt. 0.0) then 
+            where(yelmo1%bnd%smb .le. 0.0) yelmo1%bnd%smb = 0.0         ! [m/a]
+        end if 
 
-        where(yelmo1%grd%x*1e-3 .gt.  -700.0 .and. yelmo1%grd%x*1e-3 .lt.   50.0 .and. &
-              yelmo1%grd%y*1e-3 .gt. -1300.0 .and. yelmo1%grd%y*1e-3 .lt. -300.0) yelmo1%bnd%regions = 99.0 
-        
-        where(yelmo1%grd%x*1e-3 .gt. -2500.0 .and. yelmo1%grd%x*1e-3 .lt. -1500.0 .and. &
-              yelmo1%grd%y*1e-3 .gt.   200.0 .and. yelmo1%grd%y*1e-3 .lt.  1800.0) yelmo1%bnd%regions = 99.0 
-        
-        ! === Higher friction areas =====
-        where(yelmo1%grd%x*1e-3 .gt. -1000.0 .and. yelmo1%grd%x*1e-3 .lt. -200.0 .and. &
-              yelmo1%grd%y*1e-3 .gt.  -300.0 .and. yelmo1%grd%y*1e-3 .lt.  300.0) yelmo1%bnd%regions = 98.0 
-        
-        where(yelmo1%grd%x*1e-3 .gt.   700.0 .and. yelmo1%grd%x*1e-3 .lt. 1600.0 .and. &
-              yelmo1%grd%y*1e-3 .gt. -1900.0 .and. yelmo1%grd%y*1e-3 .lt. -800.0) yelmo1%bnd%regions = 98.0 
-        
+        ! Present-day and LGM 
+        where(yelmo1%bnd%regions .eq. 2.0) yelmo1%bnd%bmb_shlf = -2.0   ! [m/a]
+
     end if 
 
     ! Impose a colder boundary temperature for equilibration step 
@@ -381,6 +375,46 @@ contains
         return 
 
     end subroutine write_step_2D
+
+    subroutine set_regions_antarctica(regions,lon,lat,x,y)
+        ! regions == 99 (reduced friction to 0.25*C_bed)
+        ! regions == 98 (increased friction to 2.0*C_bed)
+        
+        implicit none 
+
+        real(prec), intent(INOUT) :: regions(:,:) 
+        real(prec), intent(IN)    :: lon(:,:) 
+        real(prec), intent(IN)    :: lat(:,:) 
+        real(prec), intent(IN)    :: x(:,:) 
+        real(prec), intent(IN)    :: y(:,:) 
+        
+
+        ! === Lower friction areas =====
+        where(lat .lt. -83.0) regions = 99.0 
+        
+        where(lat .lt. -74.0 .and. &
+              lon .lt. 180.0 .and. &
+              lon .gt. 130.0) regions = 99.0 
+
+        where(x*1e-3 .gt. 1200.0 .and. x*1e-3 .lt. 1900.0 .and. &
+              y*1e-3 .gt.  300.0 .and. y*1e-3 .lt. 1000.0)      regions = 99.0 
+
+        where(x*1e-3 .gt.  -700.0 .and. x*1e-3 .lt.   50.0 .and. &
+              y*1e-3 .gt. -1300.0 .and. y*1e-3 .lt. -300.0)     regions = 99.0 
+        
+        where(x*1e-3 .gt. -2500.0 .and. x*1e-3 .lt. -1500.0 .and. &
+              y*1e-3 .gt.   200.0 .and. y*1e-3 .lt.  1800.0)    regions = 99.0 
+        
+        ! === Higher friction areas =====
+        where(x*1e-3 .gt. -1000.0 .and. x*1e-3 .lt. -200.0 .and. &
+              y*1e-3 .gt.  -300.0 .and. y*1e-3 .lt.  300.0)     regions = 98.0 
+        
+        where(x*1e-3 .gt.   700.0 .and. x*1e-3 .lt. 1600.0 .and. &
+              y*1e-3 .gt. -1900.0 .and. y*1e-3 .lt. -800.0)     regions = 98.0 
+        
+        return 
+
+    end subroutine set_regions_antarctica
 
 end program yelmo_test 
 

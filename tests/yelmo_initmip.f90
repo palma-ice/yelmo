@@ -6,7 +6,9 @@ program yelmo_test
     use yelmo 
     
     use basal_hydro_simple 
-
+    use basal_dragging 
+    use yelmo_tools, only : gauss_values
+    
     implicit none 
 
     type(yelmo_class)      :: yelmo1
@@ -101,7 +103,7 @@ program yelmo_test
     if (trim(yelmo1%par%domain) .eq. "Antarctica") then 
         
         ! Update the regions mask 
-        call set_regions_antarctica(yelmo1%bnd%regions,yelmo1%grd%lon,yelmo1%grd%lat,yelmo1%grd%x,yelmo1%grd%y)
+!         call set_regions_antarctica(yelmo1%bnd%regions,yelmo1%grd%lon,yelmo1%grd%lat,yelmo1%grd%x,yelmo1%grd%y)
         
         ! Present-day
         if (dT_ann .ge. 0.0) then 
@@ -118,10 +120,13 @@ program yelmo_test
 
     end if 
 
+    ! Define C_bed initially
+    call calc_ydyn_cbed_external(yelmo1%dyn,yelmo1%tpo,yelmo1%thrm,yelmo1%bnd,yelmo1%grd,yelmo1%par%domain)
+
     ! Impose a colder boundary temperature for equilibration step 
     ! -5 [K] for mimicking glacial times
 !     yelmo1%bnd%T_srf = yelmo1%dta%pd%T_srf - 10.0  
-
+    
     ! Run yelmo for several years with constant boundary conditions and topo
     ! to equilibrate thermodynamics and dynamics
     call yelmo_update_equil(yelmo1,time,time_tot=time_equil,topo_fixed=.FALSE.,dt=0.5,ssa_vel_max=500.0)
@@ -376,6 +381,176 @@ contains
 
     end subroutine write_step_2D
 
+    subroutine calc_ydyn_cbed_external(dyn,tpo,thrm,bnd,grd,domain)
+        ! Update C_bed [Pa] based on parameter choices
+
+        implicit none
+        
+        type(ydyn_class),   intent(INOUT) :: dyn
+        type(ytopo_class),  intent(IN)    :: tpo 
+        type(ytherm_class), intent(IN)    :: thrm
+        type(ybound_class), intent(IN)    :: bnd  
+        type(ygrid_class),  intent(IN)    :: grd
+        character(len=*),   intent(IN)    :: domain 
+
+        integer :: i, j, nx, ny 
+        integer :: i1, i2, j1, j2 
+        real(prec) :: f_scale 
+        real(prec), allocatable :: cf_ref(:,:) 
+        real(prec), allocatable :: lambda_bed(:,:)  
+        
+        nx = size(dyn%now%C_bed,1)
+        ny = size(dyn%now%C_bed,2)
+        
+        allocate(cf_ref(nx,ny))
+        allocate(lambda_bed(nx,ny))
+         
+            ! Calculate C_bed following parameter choices 
+
+            ! =============================================================================
+            ! Step 1: calculate the C_bed field only determined by 
+            ! cf_frozen, cf_stream and temperate character of the bed 
+
+            if (dyn%par%cb_with_pmp) then 
+                ! Smooth transition between temperate and frozen C_bed
+
+                cf_ref = (thrm%now%f_pmp)*dyn%par%cf_stream &
+                           + (1.0_prec - thrm%now%f_pmp)*dyn%par%cf_frozen 
+
+            else 
+                ! Only use cf_stream everywhere
+
+                cf_ref = dyn%par%cf_stream
+
+            end if 
+
+            if (dyn%par%cb_with_pmp .and. dyn%par%cb_margin_pmp) then 
+                ! Ensure that both the margin points and the grounding line
+                ! are always considered streaming, independent of their
+                ! thermodynamic character (as sometimes these can incorrectly become frozen)
+
+            
+                ! Ensure any marginal point is also treated as streaming 
+                do j = 1, ny 
+                do i = 1, nx 
+
+                    i1 = max(i-1,1)
+                    i2 = min(i+1,nx)
+                    j1 = max(j-1,1)
+                    j2 = min(j+1,ny)
+
+                    if (tpo%now%H_ice(i,j) .gt. 0.0 .and. &
+                        (tpo%now%H_ice(i1,j) .le. 0.0 .or. &
+                         tpo%now%H_ice(i2,j) .le. 0.0 .or. &
+                         tpo%now%H_ice(i,j1) .le. 0.0 .or. &
+                         tpo%now%H_ice(i,j2) .le. 0.0)) then 
+                        
+                        cf_ref(i,j) = dyn%par%cf_stream
+
+                    end if 
+
+                end do 
+                end do 
+
+                ! Also ensure that grounding line is also considered streaming
+                ! Note: this was related to cold ocean temps at floating-grounded interface,
+                ! which is likely solved. Left here for safety. ajr, 2019-07-24
+                where(tpo%now%is_grline) cf_ref = dyn%par%cf_stream
+
+            end if
+
+            ! =============================================================================
+            ! Step 2: calculate lambda functions to scale C_bed from default value 
+            
+            select case(trim(dyn%par%cb_scale))
+
+                case("lin_zb")
+                    ! Linear scaling function with bedrock elevation
+                    
+                    lambda_bed = calc_lambda_bed_lin(bnd%z_bed,dyn%par%cb_z0,dyn%par%cb_z1)
+
+                case("exp_zb")
+                    ! Exponential scaling function with bedrock elevation
+                    
+                    lambda_bed = calc_lambda_bed_exp(bnd%z_bed,dyn%par%cb_z0,dyn%par%cb_z1)
+
+                case("till_const")
+                    ! Constant till friction angle
+
+                    lambda_bed = calc_lambda_till_const(dyn%par%till_phi_const)
+
+                case("till_zb")
+                    ! Linear till friction angle versus elevation
+
+                    lambda_bed = calc_lambda_till_linear(bnd%z_bed,bnd%z_sl,dyn%par%till_phi_min,dyn%par%till_phi_max, &
+                                                            dyn%par%till_phi_zmin,dyn%par%till_phi_zmax)
+
+                case DEFAULT
+                    ! No scaling
+
+                    lambda_bed = 1.0
+
+            end select 
+            
+!             ! Additional reduction of C_bed where regions==99.0
+!             where (bnd%regions .eq. 99.0_prec) lambda_bed = 0.25_prec*lambda_bed 
+!             where (bnd%regions .eq. 98.0_prec) lambda_bed = 2.00_prec*lambda_bed
+            
+            ! Additionally modify cf_ref
+            if (trim(domain) .eq. "Antarctica") then 
+                call scale_cb_gaussian(cf_ref,dyn%par%cf_stream*0.25,x0=1500.0, y0= 650.0, sigma=300.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
+                call scale_cb_gaussian(cf_ref,dyn%par%cf_stream*0.25,x0=-350.0, y0=-600.0, sigma=200.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
+                call scale_cb_gaussian(cf_ref,dyn%par%cf_stream*0.25,x0=-2000.0,y0=1000.0, sigma=300.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
+                call scale_cb_gaussian(cf_ref,dyn%par%cf_stream*2.00,x0=-600.0, y0=0.0,    sigma=200.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
+                call scale_cb_gaussian(cf_ref,dyn%par%cf_stream*2.00,x0=1200.0, y0=-1200.0,sigma=300.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
+            end if 
+
+            ! =============================================================================
+            ! Step 3: calculate C_bed [Pa]
+            
+            dyn%now%C_bed = (cf_ref*lambda_bed)*dyn%now%N_eff 
+
+            ! =============================================================================
+            ! Step 4: Ensure C_bed is not below lower limit 
+            
+            where (dyn%now%C_bed .lt. dyn%par%cb_min) dyn%now%C_bed = dyn%par%cb_min 
+
+        return 
+
+    end subroutine calc_ydyn_cbed_external
+
+    subroutine scale_cb_gaussian(C_bed,cb_new,x0,y0,sigma,xx,yy)
+
+        implicit none 
+
+        real(prec), intent(INOUT) :: C_bed(:,:)
+        real(prec), intent(IN) :: cb_new
+        real(prec), intent(IN) :: x0
+        real(prec), intent(IN) :: y0
+        real(prec), intent(IN) :: sigma
+        real(prec), intent(IN) :: xx(:,:)
+        real(prec), intent(IN) :: yy(:,:)
+
+        ! Local variables 
+        integer :: nx, ny 
+        real(prec), allocatable :: wts(:,:)
+        
+        nx = size(C_bed,1)
+        ny = size(C_bed,2)
+
+        allocate(wts(nx,ny))
+
+        ! Get Gaussian weights 
+        wts = 1.0/(2.0*pi*sigma**2)*exp(-((xx-x0)**2+(yy-y0)**2)/(2*sigma**2))
+        wts = wts / maxval(wts)
+
+        ! Scale C_bed
+        C_bed = C_bed*(1.0-wts) + cb_new*wts
+
+        return 
+
+    end subroutine scale_cb_gaussian
+
     subroutine set_regions_antarctica(regions,lon,lat,x,y)
         ! regions == 99 (reduced friction to 0.25*C_bed)
         ! regions == 98 (increased friction to 2.0*C_bed)
@@ -388,7 +563,6 @@ contains
         real(prec), intent(IN)    :: x(:,:) 
         real(prec), intent(IN)    :: y(:,:) 
         
-
         ! === Lower friction areas =====
         where(lat .lt. -83.0) regions = 99.0 
         

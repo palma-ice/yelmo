@@ -21,6 +21,8 @@ program yelmo_test
     integer    :: n
     real(4) :: cpu_start_time, cpu_end_time 
 
+    real(prec), allocatable :: cf_ref(:,:) 
+
     ! No-ice mask (to impose additional melting)
     logical, allocatable :: mask_noice(:,:)  
 
@@ -117,8 +119,11 @@ program yelmo_test
 
     end if 
 
+    allocate(cf_ref(yelmo1%grd%nx,yelmo1%grd%ny))
+    cf_ref = 0.0 
+
     ! Define C_bed initially
-    call calc_ydyn_cbed_external(yelmo1%dyn,yelmo1%tpo,yelmo1%thrm,yelmo1%bnd,yelmo1%grd,yelmo1%par%domain)
+    call calc_ydyn_cbed_external(yelmo1%dyn,yelmo1%tpo,yelmo1%thrm,yelmo1%bnd,yelmo1%grd,yelmo1%par%domain,cf_ref)
 
     ! Impose a colder boundary temperature for equilibration step 
     ! -5 [K] for mimicking glacial times
@@ -130,12 +135,14 @@ program yelmo_test
     
     ! 2D file 
     call yelmo_write_init(yelmo1,file2D,time_init=time,units="years")  
-    call write_step_2D(yelmo1,file2D,time=time)
+    call write_step_2D(yelmo1,file2D,time=time,cf_ref=cf_ref)
     
     ! 1D file 
     call write_yreg_init(yelmo1,file1D,time_init=time_init,units="years",mask=yelmo1%bnd%ice_allowed)
     call write_yreg_step(yelmo1%reg,file1D,time=time) 
 
+    stop 
+    
     ! Advance timesteps
     do n = 1, ceiling((time_end-time_init)/dtt)
 
@@ -169,7 +176,7 @@ program yelmo_test
         ! == MODEL OUTPUT =======================================================
 
         if (mod(nint(time*100),nint(dt2D_out*100))==0) then
-            call write_step_2D(yelmo1,file2D,time=time)
+            call write_step_2D(yelmo1,file2D,time=time,cf_ref=cf_ref)
         end if 
 
         if (mod(nint(time*100),nint(dt1D_out*100))==0) then 
@@ -196,13 +203,14 @@ program yelmo_test
 
 contains
 
-    subroutine write_step_2D(ylmo,filename,time)
+    subroutine write_step_2D(ylmo,filename,time,cf_ref)
 
         implicit none 
         
         type(yelmo_class), intent(IN) :: ylmo
         character(len=*),  intent(IN) :: filename
         real(prec), intent(IN) :: time
+        real(prec), intent(IN) :: cf_ref(:,:) 
 
         ! Local variables
         integer    :: ncid, n
@@ -371,6 +379,12 @@ contains
                        dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
         
 
+        ! Write cf_ref if it's the first timestep
+        if (n .eq. 1) then  
+            call nc_write(filename,"cf_ref",cf_ref,units="",long_name="Dragging constant coefficient", &
+                          dim1="xc",dim2="yc",start=[1,1],ncid=ncid)
+        end if 
+
         ! Close the netcdf file
         call nc_close(ncid)
 
@@ -378,7 +392,7 @@ contains
 
     end subroutine write_step_2D
 
-    subroutine calc_ydyn_cbed_external(dyn,tpo,thrm,bnd,grd,domain)
+    subroutine calc_ydyn_cbed_external(dyn,tpo,thrm,bnd,grd,domain,cf_ref)
         ! Update C_bed [Pa] based on parameter choices
 
         implicit none
@@ -389,18 +403,18 @@ contains
         type(ybound_class), intent(IN)    :: bnd  
         type(ygrid_class),  intent(IN)    :: grd
         character(len=*),   intent(IN)    :: domain 
+        real(prec),         intent(INOUT) :: cf_ref(:,:) 
 
         integer :: i, j, nx, ny 
         integer :: i1, i2, j1, j2 
         real(prec) :: f_scale 
-        real(prec), allocatable :: cf_ref(:,:) 
+        
         real(prec), allocatable :: lambda_bed(:,:)  
         real(prec), allocatable :: lambda_bed_0(:,:) 
 
         nx = size(dyn%now%C_bed,1)
         ny = size(dyn%now%C_bed,2)
         
-        allocate(cf_ref(nx,ny))
         allocate(lambda_bed(nx,ny))
         allocate(lambda_bed_0(nx,ny))
         

@@ -102,9 +102,6 @@ program yelmo_test
     ! Special treatment for Antarctica
     if (trim(yelmo1%par%domain) .eq. "Antarctica") then 
         
-        ! Update the regions mask 
-!         call set_regions_antarctica(yelmo1%bnd%regions,yelmo1%grd%lon,yelmo1%grd%lat,yelmo1%grd%x,yelmo1%grd%y)
-        
         ! Present-day
         if (dT_ann .ge. 0.0) then 
             where(mask_noice) yelmo1%bnd%bmb_shlf = -2.0    ! [m/a]
@@ -398,13 +395,15 @@ contains
         real(prec) :: f_scale 
         real(prec), allocatable :: cf_ref(:,:) 
         real(prec), allocatable :: lambda_bed(:,:)  
-        
+        real(prec), allocatable :: lambda_bed_0(:,:) 
+
         nx = size(dyn%now%C_bed,1)
         ny = size(dyn%now%C_bed,2)
         
         allocate(cf_ref(nx,ny))
         allocate(lambda_bed(nx,ny))
-         
+        allocate(lambda_bed_0(nx,ny))
+        
             ! Calculate C_bed following parameter choices 
 
             ! =============================================================================
@@ -472,7 +471,21 @@ contains
                 case("exp_zb")
                     ! Exponential scaling function with bedrock elevation
                     
+                    ! Default
                     lambda_bed = calc_lambda_bed_exp(bnd%z_bed,dyn%par%cb_z0,dyn%par%cb_z1)
+                    
+!                     ! Modifications
+!                     if (trim(domain) .eq. "Antarctica") then
+
+!                         ! South 
+!                         lambda_bed_0 = calc_lambda_bed_exp(bnd%z_bed,-300.0,dyn%par%cb_z1)
+!                         where(grd%lon .lt. 180.0 .and. grd%lon .gt. 45.0) lambda_bed = lambda_bed_0 
+
+!                         ! Northwest 
+!                         lambda_bed_0 = calc_lambda_bed_exp(bnd%z_bed,-400.0,dyn%par%cb_z1)
+!                         where(grd%lon .lt. 180.0 .and. grd%lon .gt. 45.0) lambda_bed = lambda_bed_0 
+
+!                     end if
 
                 case("till_const")
                     ! Constant till friction angle
@@ -492,19 +505,16 @@ contains
 
             end select 
             
-!             ! Additional reduction of C_bed where regions==99.0
-!             where (bnd%regions .eq. 99.0_prec) lambda_bed = 0.25_prec*lambda_bed 
-!             where (bnd%regions .eq. 98.0_prec) lambda_bed = 2.00_prec*lambda_bed
-            
             ! Additionally modify cf_ref
             if (trim(domain) .eq. "Antarctica") then 
                 call scale_cb_gaussian(cf_ref,dyn%par%cf_stream*0.25,x0=1500.0, y0= 650.0, sigma=300.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
-                call scale_cb_gaussian(cf_ref,dyn%par%cf_stream*0.20,x0=-600.0, y0=-600.0, sigma=200.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
+                call scale_cb_gaussian(cf_ref,dyn%par%cf_stream*0.10,x0=-600.0, y0=-600.0, sigma=200.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
+                call scale_cb_gaussian(cf_ref,dyn%par%cf_stream*0.10,x0=-250.0, y0=-500.0, sigma=100.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
                 call scale_cb_gaussian(cf_ref,dyn%par%cf_stream*0.10,x0=-190.0, y0=-320.0, sigma= 50.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
                 call scale_cb_gaussian(cf_ref,dyn%par%cf_stream*0.10,x0= 130.0, y0=-550.0, sigma= 50.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
                 call scale_cb_gaussian(cf_ref,dyn%par%cf_stream*0.10,x0= 280.0, y0=-760.0, sigma= 50.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
                 call scale_cb_gaussian(cf_ref,dyn%par%cf_stream*0.25,x0=-2000.0,y0=1000.0, sigma=300.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
-                call scale_cb_gaussian(cf_ref,dyn%par%cf_stream*3.00,x0=-600.0, y0=0.0,    sigma=200.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
+                call scale_cb_gaussian(cf_ref,dyn%par%cf_stream*4.00,x0=-600.0, y0=0.0,    sigma=200.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
                 call scale_cb_gaussian(cf_ref,dyn%par%cf_stream*2.00,x0=1200.0, y0=-1200.0,sigma=300.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
             end if 
 
@@ -553,45 +563,6 @@ contains
         return 
 
     end subroutine scale_cb_gaussian
-
-    subroutine set_regions_antarctica(regions,lon,lat,x,y)
-        ! regions == 99 (reduced friction to 0.25*C_bed)
-        ! regions == 98 (increased friction to 2.0*C_bed)
-        
-        implicit none 
-
-        real(prec), intent(INOUT) :: regions(:,:) 
-        real(prec), intent(IN)    :: lon(:,:) 
-        real(prec), intent(IN)    :: lat(:,:) 
-        real(prec), intent(IN)    :: x(:,:) 
-        real(prec), intent(IN)    :: y(:,:) 
-        
-        ! === Lower friction areas =====
-        where(lat .lt. -83.0) regions = 99.0 
-        
-        where(lat .lt. -74.0 .and. &
-              lon .lt. 180.0 .and. &
-              lon .gt. 130.0) regions = 99.0 
-
-        where(x*1e-3 .gt. 1200.0 .and. x*1e-3 .lt. 1900.0 .and. &
-              y*1e-3 .gt.  300.0 .and. y*1e-3 .lt. 1000.0)      regions = 99.0 
-
-        where(x*1e-3 .gt.  -700.0 .and. x*1e-3 .lt.   50.0 .and. &
-              y*1e-3 .gt. -1300.0 .and. y*1e-3 .lt. -300.0)     regions = 99.0 
-        
-        where(x*1e-3 .gt. -2500.0 .and. x*1e-3 .lt. -1500.0 .and. &
-              y*1e-3 .gt.   200.0 .and. y*1e-3 .lt.  1800.0)    regions = 99.0 
-        
-        ! === Higher friction areas =====
-        where(x*1e-3 .gt. -1000.0 .and. x*1e-3 .lt. -200.0 .and. &
-              y*1e-3 .gt.  -300.0 .and. y*1e-3 .lt.  300.0)     regions = 98.0 
-        
-        where(x*1e-3 .gt.   700.0 .and. x*1e-3 .lt. 1600.0 .and. &
-              y*1e-3 .gt. -1900.0 .and. y*1e-3 .lt. -800.0)     regions = 98.0 
-        
-        return 
-
-    end subroutine set_regions_antarctica
 
 end program yelmo_test 
 

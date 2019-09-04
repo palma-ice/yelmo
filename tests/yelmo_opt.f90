@@ -5,7 +5,7 @@ program yelmo_test
     use ncio 
     use yelmo 
     use yelmo_tools, only : gauss_values
-
+    
     use gaussian_filter 
     use basal_hydro_simple 
 
@@ -673,7 +673,7 @@ end if
 
         ! Get Gaussian weights 
         wts0 = gauss_values(dx_km,dx_km,sigma=dx_km*1.5,n=5)
-
+        
         ! Store initial C_bed solution 
         C_bed_prev = C_bed 
 

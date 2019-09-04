@@ -506,16 +506,24 @@ contains
             end select 
             
             ! Additionally modify cf_ref
-            if (trim(domain) .eq. "Antarctica") then 
-                call scale_cb_gaussian(cf_ref,dyn%par%cf_stream*0.25,x0=1500.0, y0= 650.0, sigma=300.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
+            if (trim(domain) .eq. "Antarctica") then
+
+                ! Reduction 
+                call scale_cb_gaussian(cf_ref,dyn%par%cf_stream*0.25,x0=-2000.0,y0=1000.0, sigma=300.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
                 call scale_cb_gaussian(cf_ref,dyn%par%cf_stream*0.10,x0=-600.0, y0=-600.0, sigma=200.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
                 call scale_cb_gaussian(cf_ref,dyn%par%cf_stream*0.10,x0=-250.0, y0=-500.0, sigma=100.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
                 call scale_cb_gaussian(cf_ref,dyn%par%cf_stream*0.10,x0=-190.0, y0=-320.0, sigma= 50.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
+                call scale_cb_gaussian(cf_ref,dyn%par%cf_stream*0.10,x0=-100.0, y0=-600.0, sigma=300.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
+                call scale_cb_gaussian(cf_ref,dyn%par%cf_stream*0.20,x0=   0.0, y0=   0.0, sigma=300.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
                 call scale_cb_gaussian(cf_ref,dyn%par%cf_stream*0.10,x0= 130.0, y0=-550.0, sigma= 50.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
                 call scale_cb_gaussian(cf_ref,dyn%par%cf_stream*0.10,x0= 280.0, y0=-760.0, sigma= 50.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
-                call scale_cb_gaussian(cf_ref,dyn%par%cf_stream*0.25,x0=-2000.0,y0=1000.0, sigma=300.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
-                call scale_cb_gaussian(cf_ref,dyn%par%cf_stream*4.00,x0=-600.0, y0=0.0,    sigma=200.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
+                call scale_cb_gaussian(cf_ref,dyn%par%cf_stream*0.10,x0= 380.0, y0=-960.0, sigma= 50.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
+                call scale_cb_gaussian(cf_ref,dyn%par%cf_stream*0.25,x0=1500.0, y0= 650.0, sigma=300.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
+                
+                ! Increase
+                call scale_cb_gaussian(cf_ref,dyn%par%cf_stream*4.00,x0=-600.0, y0=    0.0,sigma=200.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
                 call scale_cb_gaussian(cf_ref,dyn%par%cf_stream*2.00,x0=1200.0, y0=-1200.0,sigma=300.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
+            
             end if 
 
             ! =============================================================================

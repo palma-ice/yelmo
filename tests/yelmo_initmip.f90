@@ -509,8 +509,9 @@ contains
             if (trim(domain) .eq. "Antarctica") then
 
                 ! Reduction 
-                call scale_cb_gaussian(cf_ref,dyn%par%cf_stream*0.25,x0=-2000.0,y0=1000.0, sigma=300.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
-                call scale_cb_gaussian(cf_ref,dyn%par%cf_stream*0.10,x0=-600.0, y0=-600.0, sigma=200.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
+                call scale_cb_gaussian(cf_ref,dyn%par%cf_stream*0.25,x0=-2000.0,y0=1000.0, sigma=100.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
+                call scale_cb_gaussian(cf_ref,dyn%par%cf_stream*0.05,x0=-750.0, y0=-900.0, sigma=300.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
+                call scale_cb_gaussian(cf_ref,dyn%par%cf_stream*0.05,x0=-600.0, y0=-600.0, sigma=300.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
                 call scale_cb_gaussian(cf_ref,dyn%par%cf_stream*0.10,x0=-250.0, y0=-500.0, sigma=100.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
                 call scale_cb_gaussian(cf_ref,dyn%par%cf_stream*0.10,x0=-190.0, y0=-320.0, sigma= 50.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
                 call scale_cb_gaussian(cf_ref,dyn%par%cf_stream*0.10,x0=-100.0, y0=-600.0, sigma=300.0,xx=grd%x*1e-3,yy=grd%y*1e-3)

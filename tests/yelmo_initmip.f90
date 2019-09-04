@@ -138,7 +138,7 @@ program yelmo_test
     ! 1D file 
     call write_yreg_init(yelmo1,file1D,time_init=time_init,units="years",mask=yelmo1%bnd%ice_allowed)
     call write_yreg_step(yelmo1%reg,file1D,time=time) 
-    
+
     ! Advance timesteps
     do n = 1, ceiling((time_end-time_init)/dtt)
 
@@ -499,9 +499,12 @@ contains
             ! Additionally modify cf_ref
             if (trim(domain) .eq. "Antarctica") then 
                 call scale_cb_gaussian(cf_ref,dyn%par%cf_stream*0.25,x0=1500.0, y0= 650.0, sigma=300.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
-                call scale_cb_gaussian(cf_ref,dyn%par%cf_stream*0.25,x0=-350.0, y0=-600.0, sigma=200.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
+                call scale_cb_gaussian(cf_ref,dyn%par%cf_stream*0.20,x0=-600.0, y0=-600.0, sigma=200.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
+                call scale_cb_gaussian(cf_ref,dyn%par%cf_stream*0.10,x0=-190.0, y0=-320.0, sigma= 50.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
+                call scale_cb_gaussian(cf_ref,dyn%par%cf_stream*0.10,x0= 130.0, y0=-550.0, sigma= 50.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
+                call scale_cb_gaussian(cf_ref,dyn%par%cf_stream*0.10,x0= 280.0, y0=-760.0, sigma= 50.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
                 call scale_cb_gaussian(cf_ref,dyn%par%cf_stream*0.25,x0=-2000.0,y0=1000.0, sigma=300.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
-                call scale_cb_gaussian(cf_ref,dyn%par%cf_stream*2.00,x0=-600.0, y0=0.0,    sigma=200.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
+                call scale_cb_gaussian(cf_ref,dyn%par%cf_stream*3.00,x0=-600.0, y0=0.0,    sigma=200.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
                 call scale_cb_gaussian(cf_ref,dyn%par%cf_stream*2.00,x0=1200.0, y0=-1200.0,sigma=300.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
             end if 
 

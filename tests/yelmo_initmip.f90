@@ -139,10 +139,8 @@ program yelmo_test
     
     ! 1D file 
     call write_yreg_init(yelmo1,file1D,time_init=time_init,units="years",mask=yelmo1%bnd%ice_allowed)
-    call write_yreg_step(yelmo1%reg,file1D,time=time) 
+    call write_yreg_step(yelmo1%reg,file1D,time=time)  
 
-    stop 
-    
     ! Advance timesteps
     do n = 1, ceiling((time_end-time_init)/dtt)
 

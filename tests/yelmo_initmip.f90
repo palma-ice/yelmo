@@ -107,6 +107,9 @@ program yelmo_test
         ! Present-day
         if (dT_ann .ge. 0.0) then 
             where(mask_noice) yelmo1%bnd%bmb_shlf = -2.0    ! [m/a]
+            where(yelmo1%bnd%basins .ge. 23.0 .and. & 
+                  yelmo1%bnd%basins .le. 26.0) yelmo1%bnd%bmb_shlf = -1.0   ! [m/a]
+        
         end if 
 
         ! LGM
@@ -490,6 +493,10 @@ contains
                     ! Modifications 
                     where (bnd%basins .eq. 1) lambda_bed = calc_lambda_bed_exp(bnd%z_bed,-500.0,dyn%par%cb_z1)
                     where (bnd%basins .eq. 2) lambda_bed = calc_lambda_bed_exp(bnd%z_bed,-300.0,dyn%par%cb_z1)
+                    
+                    where (bnd%basins .ge. 18 .and. &
+                           bnd%basins .le. 21) lambda_bed = calc_lambda_bed_exp(bnd%z_bed,-300.0,dyn%par%cb_z1)
+                    where (bnd%basins .eq. 22) lambda_bed = calc_lambda_bed_exp(bnd%z_bed,-500.0,dyn%par%cb_z1)
                     
                 case("till_const")
                     ! Constant till friction angle

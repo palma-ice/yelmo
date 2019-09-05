@@ -109,6 +109,8 @@ program yelmo_test
             where(mask_noice) yelmo1%bnd%bmb_shlf = -2.0    ! [m/a]
             where(yelmo1%bnd%basins .ge. 23.0 .and. & 
                   yelmo1%bnd%basins .le. 26.0) yelmo1%bnd%bmb_shlf = -1.0   ! [m/a]
+            where(yelmo1%bnd%basins .ge.  9.0 .and. & 
+                  yelmo1%bnd%basins .le. 11.0) yelmo1%bnd%bmb_shlf = -1.0   ! [m/a]
         
         end if 
 

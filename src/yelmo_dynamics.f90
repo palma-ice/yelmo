@@ -142,7 +142,7 @@ contains
         
 !         if (dyn%par%tau_gl_method .ne. 0) then
 !             ! Additionally treat the driving stress at the grounding line
-            
+
 !             call calc_driving_stress_gl_ac(dyn%now%taud_acx,dyn%now%taud_acy,tpo%now%H_ice,tpo%now%z_srf,bnd%z_bed,bnd%z_sl, &
 !                     tpo%now%H_grnd,tpo%now%f_grnd,tpo%now%f_grnd_acx,tpo%now%f_grnd_acy,dyn%par%dx, &
 !                     method=dyn%par%taud_gl_method,beta_gl_stag=dyn%par%beta_gl_stag)
@@ -1213,10 +1213,6 @@ end if
                     lambda_bed = 1.0
 
             end select 
-            
-            ! Additional reduction of C_bed where regions==99.0
-            where (bnd%regions .eq. 99.0_prec) lambda_bed = 0.25_prec*lambda_bed 
-            where (bnd%regions .eq. 98.0_prec) lambda_bed = 2.00_prec*lambda_bed
             
             ! =============================================================================
             ! Step 3: calculate C_bed [Pa]

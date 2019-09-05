@@ -116,7 +116,8 @@ program yelmo_test
 
         ! Present-day and LGM 
         where(yelmo1%bnd%regions .eq. 2.0) yelmo1%bnd%bmb_shlf = -2.0   ! [m/a]
-
+        where(yelmo1%bnd%regions .eq. 2.1) yelmo1%bnd%bmb_shlf = -2.0   ! [m/a]
+        
     end if 
 
     allocate(cf_ref(yelmo1%grd%nx,yelmo1%grd%ny))

@@ -111,7 +111,7 @@ program yelmo_test
 
         ! LGM
         if (dT_ann .lt. 0.0) then 
-            where(yelmo1%bnd%smb .le. 0.0) yelmo1%bnd%smb = 0.0         ! [m/a]
+            where(yelmo1%bnd%smb .le. 0.1) yelmo1%bnd%smb = 0.1         ! [m/a]
         end if 
 
         ! Present-day and LGM 

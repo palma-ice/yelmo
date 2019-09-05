@@ -486,19 +486,10 @@ contains
                     ! Default
                     lambda_bed = calc_lambda_bed_exp(bnd%z_bed,dyn%par%cb_z0,dyn%par%cb_z1)
                     
-!                     ! Modifications
-!                     if (trim(domain) .eq. "Antarctica") then
-
-!                         ! South 
-!                         lambda_bed_0 = calc_lambda_bed_exp(bnd%z_bed,-300.0,dyn%par%cb_z1)
-!                         where(grd%lon .lt. 180.0 .and. grd%lon .gt. 45.0) lambda_bed = lambda_bed_0 
-
-!                         ! Northwest 
-!                         lambda_bed_0 = calc_lambda_bed_exp(bnd%z_bed,-400.0,dyn%par%cb_z1)
-!                         where(grd%lon .lt. 180.0 .and. grd%lon .gt. 45.0) lambda_bed = lambda_bed_0 
-
-!                     end if
-
+                    ! Modifications 
+                    where (bnd%basins .eq. 1) lambda_bed = calc_lambda_bed_exp(bnd%z_bed,-500.0,dyn%par%cb_z1)
+                    where (bnd%basins .eq. 2) lambda_bed = calc_lambda_bed_exp(bnd%z_bed,-300.0,dyn%par%cb_z1)
+                    
                 case("till_const")
                     ! Constant till friction angle
 

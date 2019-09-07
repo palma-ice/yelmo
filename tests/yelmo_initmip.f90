@@ -121,7 +121,7 @@ program yelmo_test
 
         ! Present-day and LGM 
         where(yelmo1%bnd%regions .eq. 2.0) yelmo1%bnd%smb = -10.0   ! [m/a]
-        where(yelmo1%bnd%regions .eq. 2.1) yelmo1%bnd%smb =  -0.5   ! [m/a]
+        where(yelmo1%bnd%regions .eq. 2.1) yelmo1%bnd%smb =  -5.0   ! [m/a]
         
     end if 
 

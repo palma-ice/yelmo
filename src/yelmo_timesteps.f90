@@ -105,9 +105,9 @@ contains
 
                 dt = dt_half_lim*dtmax
 
-                ! Cut-off extra digits 
-                dt = floor(dt*10**n_decimal)*10**(-n_decimal)
-                
+                ! Round-off extra digits 
+                dt = nint(dt*10**n_decimal)*10**(-n_decimal)
+
             end if 
 
         end if 

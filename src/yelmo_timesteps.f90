@@ -38,13 +38,15 @@ contains
         real(prec), intent(IN)  :: cfl_diff_max
         
         ! Local variables 
-        real(prec) :: dt_adv_min, dt_diff_min 
+        real(prec) :: dt_adv_min, dt_diff_min, dt_time_max 
         real(prec) :: x 
         logical    :: is_unstable
         real(prec), parameter :: dtmax_cfl   = 20.0_prec 
         real(prec), parameter :: exp_cfl     =  2.0_prec 
         real(prec), parameter :: n_decimal   = 2          ! Maximum decimals to treat for timestep
+        real(prec), parameter :: rate_lim    = 10.0_prec  ! Reduction in timestep for instability 
         real(prec), parameter :: rate_scalar = 0.2_prec   ! Reduction in timestep for instability 
+        real(prec), parameter :: dt_half_lim = 0.6_prec   ! Should be 0.5 or greater to make sense
 
         ! Timestep limits determined from CFL conditions for general advective
         ! velocity, as well as diagnosed diffusive magnitude
@@ -70,9 +72,6 @@ contains
         !dt = min(dt_adv_min,dt_diff_min)
         dt = dt_adv_min 
 
-        ! Test grisli timestep (does not solve issues yet)
-        !dt = calc_dt_max_grisli(ux_bar,uy_bar,dx,dtmin,dtmax)
-
         ! Apply additional reduction in timestep as it gets smaller
         if (.FALSE.) then 
             dt = max(dtmin,dt)          ! dt >= dtmin
@@ -85,17 +84,30 @@ contains
         !dt = floor(dt*10**n_decimal)*10**(-n_decimal)
 
         ! Check if additional timestep reduction is necessary,
-        ! due to checkerboard patterning related to mass conservation 
-        call check_checkerboard(is_unstable,dHicedt,lim=5.0)
-
-        if (is_unstable) then 
-            ! Reduce timestep further 
-            dt = rate_scalar*dt 
-        end if 
+        ! due to checkerboard patterning related to mass conservation.
+        ! Reduce if necessary 
+        call check_checkerboard(is_unstable,dHicedt,rate_lim)
+        if (is_unstable) dt = rate_scalar*dt
 
         ! Ensure timestep is also within parameter limits 
         dt = max(dtmin,dt)  ! dt >= dtmin
         dt = min(dtmax,dt)  ! dt <= dtmax
+
+        ! Check to avoid lopsided timesteps (1 big, 1 tiny) to arrive at time_max 
+        dt_time_max = time_max - time 
+        if (dt_time_max .gt. 0.0) then 
+
+            if (dt/dtmax .gt. dt_half_lim .and. dt .lt. dt_time_max) then 
+                ! Current adaptive timestep is greater than ~0.5 of the total
+                ! expected timestep, and another timestep will be needed to
+                ! reach time_max. Therefore, set this timestep to a smaller
+                ! value, ie, dt = dt_half_lim. 
+
+                dt = dt_half_lim
+
+            end if 
+
+        end if 
 
         ! Finally, make sure adaptive time step synchronizes with larger time step 
         if (time + dt .gt. time_max) then 
@@ -106,49 +118,6 @@ contains
 
     end subroutine set_adaptive_timestep
     
-    subroutine check_checkerboard(is_unstable,dHdt,lim)
-
-        implicit none 
-
-        logical,    intent(OUT) :: is_unstable
-        real(prec), intent(IN)  :: dHdt(:,:) 
-        real(prec), intent(IN)  :: lim 
-
-        ! Local variables 
-        integer :: i, j, nx, ny 
-
-        nx = size(dHdt,1)
-        ny = size(dHdt,2) 
-
-        ! First assume everything is stable 
-        is_unstable = .FALSE. 
-
-        do j = 2, ny-1
-        do i = 2, nx-1 
- 
-            if (abs(dHdt(i,j)) .ge. lim) then
-                ! Check for checkerboard pattern with dHdt > lim
-
-                if ( (dHdt(i,j)*dHdt(i-1,j) .lt. 0.0 .and. & 
-                      dHdt(i,j)*dHdt(i+1,j) .lt. 0.0) .or. & 
-                     (dHdt(i,j)*dHdt(i,j-1) .lt. 0.0 .and. & 
-                      dHdt(i,j)*dHdt(i,j+1) .lt. 0.0) ) then 
-                    ! Point has two neighbors with dHdt of opposite sign 
-
-                    is_unstable = .TRUE. 
-                    exit
-
-                end if 
-
-            end if 
-
-        end do 
-        end do  
-
-        return 
-
-    end subroutine check_checkerboard
-
     elemental function calc_diff2D_timestep(D,dx,dy,cfl_diff_max) result(dt)
         ! Calculate maximum diffusion time step based
         ! on Courant–Friedrichs–Lewy condition
@@ -461,104 +430,47 @@ contains
 
     end function calc_adv3D_timestep 
     
-    ! =======================================================================================
-    !
-    ! Unused below ...
-    !
-    ! =======================================================================================
-    
-    function set_adaptive_timestep_grisli(time,ux_bar,uy_bar,dx,dtmin,dtmax,dtt) result(dt)
-        ! Determine value of adaptive timestep for topo+dyn, to be 
-        ! consistent with larger timestep dtt for therm
+    subroutine check_checkerboard(is_unstable,dHdt,lim)
 
         implicit none 
 
-        real(prec), intent(IN) :: time  
-        real(prec), intent(IN) :: ux_bar(:,:), uy_bar(:,:)  
-        real(prec), intent(IN) :: dx, dtmin, dtmax, dtt 
-        real(prec) :: dt
-
-        ! Local variables
-        real(prec) :: time_max
-        real(prec) :: dtt_loc
-
-        ! Determine maximum time to advance model to (to synchronize with big timestep)
-        time_max = time + dtt 
-
-        ! Determine maximum allowed adaptive timestep based on velocity and parameter options 
-        dt = calc_dt_max_grisli(ux_bar,uy_bar,dx,dtmin,dtmax)
-            
-        ! Make sure adaptive time step synchronizes with larger time step 
-        if (time + dt .gt. time_max) then 
-            dt = time_max - time 
-        end if 
-    
-        return 
-
-    end function set_adaptive_timestep_grisli
-    
-    function calc_dt_max_grisli(ux_bar,uy_bar,dx,dtmin,dtmax) result(dt)
-        ! Determine the maximum adaptive timestep to be consistent 
-        ! with the dominant diagonal of the advective matrix
-
-        implicit none
-        
-        real(prec), intent(IN) :: ux_bar(:,:)
-        real(prec), intent(IN) :: uy_bar(:,:)
-        real(prec), intent(IN) :: dx, dtmin, dtmax  
-        real(prec) :: dt
+        logical,    intent(OUT) :: is_unstable
+        real(prec), intent(IN)  :: dHdt(:,:) 
+        real(prec), intent(IN)  :: lim 
 
         ! Local variables 
         integer :: i, j, nx, ny 
-        real(prec) :: dx_inv, max_dia, aux 
 
-        real(prec), parameter :: testdiag  =   0.025_prec  ! 0.016 
-                ! testdiag, pour le pas de temps dynamique dt
-                ! ordres de grandeur (a moduler selon dx) : 
-                ! 40 km dtmin=2.e-2, dtmax=1.0, dtt=5.0, tesdiag=0.02
-         
-        nx = size(ux_bar,1)
-        ny = size(uy_bar,2)
+        nx = size(dHdt,1)
+        ny = size(dHdt,2) 
 
-        dx_inv  =  1.0_prec/dx
-        max_dia = -1.0_prec
+        ! First assume everything is stable 
+        is_unstable = .FALSE. 
 
-        do i=2,nx-1
-        do j=2,ny-1
-            aux = (abs(ux_bar(i,j)) + abs(ux_bar(i+1,j))) &
-                + (abs(uy_bar(i,j)) + abs(uy_bar(i,j+1)))
-            aux = aux*dx_inv*0.5_prec
+        do j = 2, ny-1
+        do i = 2, nx-1 
+ 
+            if (abs(dHdt(i,j)) .ge. lim) then
+                ! Check for checkerboard pattern with dHdt > lim
 
-            if (aux.gt.max_dia) max_dia = aux
+                if ( (dHdt(i,j)*dHdt(i-1,j) .lt. 0.0 .and. & 
+                      dHdt(i,j)*dHdt(i+1,j) .lt. 0.0) .or. & 
+                     (dHdt(i,j)*dHdt(i,j-1) .lt. 0.0 .and. & 
+                      dHdt(i,j)*dHdt(i,j+1) .lt. 0.0) ) then 
+                    ! Point has two neighbors with dHdt of opposite sign 
 
-        end do
-        end do
+                    is_unstable = .TRUE. 
+                    exit
 
-        if (max_dia.ge.(testdiag/dtmax)) then
-            dt = testdiag/max_dia
-            dt = max(dt,dtmin)
-        else
-            dt = dtmax
-        end if
+                end if 
 
-        ! New calculation of dt (ajr: necessary??)
-        ! Note: this previously accounted for separation of timestep into diffusive and advective terms
-        ! now we assume only advective terms exist, so maybe this redundant. Kept for consistency for now.
-        aux = maxval( (abs(ux_bar)+abs(uy_bar))/dx )
+            end if 
 
-        if (aux.gt.1.e-20) then
-            if (testdiag/aux.lt.dt) then
-!                 time = time - dt
-                dt   = testdiag/aux*4.0_prec
-            end if
-        end if
+        end do 
+        end do  
 
-        ! Ensure final timestep is within parameter limits 
-        dt = max(dtmin,dt)  ! dt >= dtmin
-        dt = min(dtmax,dt)  ! dt <= dtmax
+        return 
 
-        return
-        
-    end function calc_dt_max_grisli
+    end subroutine check_checkerboard
 
 end module yelmo_timesteps 

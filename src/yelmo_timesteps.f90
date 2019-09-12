@@ -101,10 +101,13 @@ contains
                 ! Current adaptive timestep is greater than ~0.5 of the total
                 ! expected timestep, and another timestep will be needed to
                 ! reach time_max. Therefore, set this timestep to a smaller
-                ! value, ie, dt = dt_half_lim. 
+                ! value, ie, dt = dt_half_lim*dtmax. 
 
-                dt = dt_half_lim
+                dt = dt_half_lim*dtmax
 
+                ! Cut-off extra digits 
+                dt = floor(dt*10**n_decimal)*10**(-n_decimal)
+                
             end if 
 
         end if 

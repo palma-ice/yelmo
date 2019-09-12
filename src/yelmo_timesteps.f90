@@ -129,14 +129,15 @@ contains
             if (abs(dHdt(i,j)) .ge. lim) then
                 ! Check for checkerboard pattern with dHdt > lim
 
-                if (dHdt(i,j)*dHdt(i-1,j) .lt. 0.0 .or. & 
-                    dHdt(i,j)*dHdt(i+1,j) .lt. 0.0 .or. & 
-                    dHdt(i,j)*dHdt(i,j-1) .lt. 0.0 .or. & 
-                    dHdt(i,j)*dHdt(i,j+1) .lt. 0.0) then 
-                    ! Point has a neighbor with dHdt of opposite sign 
+                if ( (dHdt(i,j)*dHdt(i-1,j) .lt. 0.0 .and. & 
+                      dHdt(i,j)*dHdt(i+1,j) .lt. 0.0) .or. & 
+                     (dHdt(i,j)*dHdt(i,j-1) .lt. 0.0 .and. & 
+                      dHdt(i,j)*dHdt(i,j+1) .lt. 0.0) ) then 
+                    ! Point has two neighbors with dHdt of opposite sign 
 
                     is_unstable = .TRUE. 
-                    exit 
+                    exit
+                     
                 end if 
 
             end if 

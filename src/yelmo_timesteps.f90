@@ -86,7 +86,7 @@ contains
 
         ! Check if additional timestep reduction is necessary,
         ! due to checkerboard patterning related to mass conservation 
-        call check_checkerboard(is_unstable,dHicedt,lim=1.0)
+        call check_checkerboard(is_unstable,dHicedt,lim=5.0)
 
         if (is_unstable) then 
             ! Reduce timestep further 
@@ -137,7 +137,7 @@ contains
 
                     is_unstable = .TRUE. 
                     exit
-                     
+
                 end if 
 
             end if 

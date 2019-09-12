@@ -179,8 +179,16 @@ program yelmo_test
 
         ! == MODEL OUTPUT =======================================================
 
-        if (mod(nint(time*100),nint(dt2D_out*100))==0) then
+        if (time .lt. 10690.0) then 
+        
+            if (mod(nint(time*100),nint(dt2D_out*100))==0) then
+                call write_step_2D(yelmo1,file2D,time=time,cf_ref=cf_ref)
+            end if 
+
+        else 
+            ! Output every timestep 
             call write_step_2D(yelmo1,file2D,time=time,cf_ref=cf_ref)
+            
         end if 
 
         if (mod(nint(time*100),nint(dt1D_out*100))==0) then 

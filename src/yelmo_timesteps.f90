@@ -10,7 +10,7 @@ module yelmo_timesteps
 contains
 
     subroutine set_adaptive_timestep(dt,dt_adv,dt_diff,dt_adv3D,time_max,time, &
-                        ux,uy,uz,ux_bar,uy_bar,D2D,H_ice,zeta_ac, &
+                        ux,uy,uz,ux_bar,uy_bar,D2D,H_ice,dHicedt,zeta_ac, &
                         dx,dtmin,dtmax,cfl_max,cfl_diff_max)
         ! Determine value of adaptive timestep to be consistent with 
         ! min/max timestep range and maximum allowed step of model 
@@ -31,6 +31,7 @@ contains
         real(prec), intent(IN)  :: uy_bar(:,:)     ! [m a-1]
         real(prec), intent(IN)  :: D2D(:,:)        ! [m2 a-1]
         real(prec), intent(IN)  :: H_ice(:,:)      ! [m]
+        real(prec), intent(IN)  :: dHicedt(:,:)    ! [m a-1]
         real(prec), intent(IN)  :: zeta_ac(:)      ! [--] 
         real(prec), intent(IN)  :: dx, dtmin, dtmax ! [a]
         real(prec), intent(IN)  :: cfl_max
@@ -39,10 +40,11 @@ contains
         ! Local variables 
         real(prec) :: dt_adv_min, dt_diff_min 
         real(prec) :: x 
-        real(prec), parameter :: dtmax_cfl  = 20.0 
-        real(prec), parameter :: exp_cfl    =  2.0 
-
-        real(prec), parameter :: n_decimal  = 2    ! Maximum decimals to treat for timestep
+        logical    :: is_unstable
+        real(prec), parameter :: dtmax_cfl   = 20.0_prec 
+        real(prec), parameter :: exp_cfl     =  2.0_prec 
+        real(prec), parameter :: n_decimal   = 2          ! Maximum decimals to treat for timestep
+        real(prec), parameter :: rate_scalar = 0.2_prec   ! Reduction in timestep for instability 
 
         ! Timestep limits determined from CFL conditions for general advective
         ! velocity, as well as diagnosed diffusive magnitude
@@ -82,6 +84,15 @@ contains
         ! Cut-off extra digits (ajr: is this helping?)
         !dt = floor(dt*10**n_decimal)*10**(-n_decimal)
 
+        ! Check if additional timestep reduction is necessary,
+        ! due to checkerboard patterning related to mass conservation 
+        call check_checkerboard(is_unstable,dHicedt,lim=1.0)
+
+        if (is_unstable) then 
+            ! Reduce timestep further 
+            dt = rate_scalar*dt 
+        end if 
+
         ! Ensure timestep is also within parameter limits 
         dt = max(dtmin,dt)  ! dt >= dtmin
         dt = min(dtmax,dt)  ! dt <= dtmax
@@ -95,6 +106,48 @@ contains
 
     end subroutine set_adaptive_timestep
     
+    subroutine check_checkerboard(is_unstable,dHdt,lim)
+
+        implicit none 
+
+        logical,    intent(OUT) :: is_unstable
+        real(prec), intent(IN)  :: dHdt(:,:) 
+        real(prec), intent(IN)  :: lim 
+
+        ! Local variables 
+        integer :: i, j, nx, ny 
+
+        nx = size(dHdt,1)
+        ny = size(dHdt,2) 
+
+        ! First assume everything is stable 
+        is_unstable = .FALSE. 
+
+        do j = 2, ny-1
+        do i = 2, nx-1 
+ 
+            if (abs(dHdt(i,j)) .ge. lim) then
+                ! Check for checkerboard pattern with dHdt > lim
+
+                if (dHdt(i,j)*dHdt(i-1,j) .lt. 0.0 .or. & 
+                    dHdt(i,j)*dHdt(i+1,j) .lt. 0.0 .or. & 
+                    dHdt(i,j)*dHdt(i,j-1) .lt. 0.0 .or. & 
+                    dHdt(i,j)*dHdt(i,j+1) .lt. 0.0) then 
+                    ! Point has a neighbor with dHdt of opposite sign 
+
+                    is_unstable = .TRUE. 
+                    exit 
+                end if 
+
+            end if 
+
+        end do 
+        end do  
+
+        return 
+
+    end subroutine check_checkerboard
+
     elemental function calc_diff2D_timestep(D,dx,dy,cfl_diff_max) result(dt)
         ! Calculate maximum diffusion time step based
         ! on Courant–Friedrichs–Lewy condition

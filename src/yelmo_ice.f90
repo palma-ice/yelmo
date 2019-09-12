@@ -67,9 +67,9 @@ contains
             else
                 ! Use adaptive time step
                 call set_adaptive_timestep(dt_now,dom%par%dt_adv,dom%par%dt_diff,dom%par%dt_adv3D,time,time_now, &
-                                        dom%dyn%now%ux,dom%dyn%now%uy,dom%dyn%now%uz,dom%dyn%now%ux_bar, &
-                                        dom%dyn%now%uy_bar,dom%dyn%now%dd_ab_bar,dom%tpo%now%H_ice,dom%par%zeta_ac, &
-                                        dom%tpo%par%dx,dom%par%dtmin,dom%par%dtmax,dom%par%cfl_max,dom%par%cfl_diff_max) 
+                                    dom%dyn%now%ux,dom%dyn%now%uy,dom%dyn%now%uz,dom%dyn%now%ux_bar,dom%dyn%now%uy_bar, &
+                                    dom%dyn%now%dd_ab_bar,dom%tpo%now%H_ice,dom%tpo%now%dHicedt,dom%par%zeta_ac, &
+                                    dom%tpo%par%dx,dom%par%dtmin,dom%par%dtmax,dom%par%cfl_max,dom%par%cfl_diff_max) 
                 
             end if 
 

@@ -46,7 +46,7 @@ contains
         real(prec), parameter :: n_decimal   = 2          ! Maximum decimals to treat for timestep
         real(prec), parameter :: rate_lim    = 10.0_prec  ! Reduction in timestep for instability 
         real(prec), parameter :: rate_scalar = 0.2_prec   ! Reduction in timestep for instability 
-        real(prec), parameter :: dt_half_lim = 0.6_prec   ! Should be 0.5 or greater to make sense
+        real(prec), parameter :: dt_half_lim = 0.5_prec   ! Should be 0.5 or greater to make sense
 
         ! Timestep limits determined from CFL conditions for general advective
         ! velocity, as well as diagnosed diffusive magnitude
@@ -106,7 +106,7 @@ contains
                 dt = dt_half_lim*dtmax
 
                 ! Round-off extra digits 
-                dt = nint(dt*10**n_decimal)*10**(-n_decimal)
+                dt = real( nint(dt*10.0_prec**n_decimal)*10.0_prec**(-n_decimal), prec)
 
             end if 
 

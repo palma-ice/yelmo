@@ -107,10 +107,10 @@ program yelmo_test
         ! Present-day
         if (dT_ann .ge. 0.0) then 
             where(mask_noice) yelmo1%bnd%bmb_shlf = -2.0    ! [m/a]
-            where(yelmo1%bnd%basins .ge. 23.0 .and. & 
-                  yelmo1%bnd%basins .le. 26.0) yelmo1%bnd%bmb_shlf = -2.0   ! [m/a]
-            where(yelmo1%bnd%basins .ge.  9.0 .and. & 
-                  yelmo1%bnd%basins .le. 11.0) yelmo1%bnd%bmb_shlf = -1.0   ! [m/a]
+!             where(yelmo1%bnd%basins .ge. 23.0 .and. & 
+!                   yelmo1%bnd%basins .le. 26.0) yelmo1%bnd%bmb_shlf = -2.0   ! [m/a]
+!             where(yelmo1%bnd%basins .ge.  9.0 .and. & 
+!                   yelmo1%bnd%basins .le. 11.0) yelmo1%bnd%bmb_shlf = -1.0   ! [m/a]
         
         end if 
 
@@ -121,7 +121,6 @@ program yelmo_test
 
         ! Present-day and LGM 
         where(yelmo1%bnd%regions .eq. 2.0) yelmo1%bnd%smb = -1.0    ! [m/a]
-        !where(yelmo1%bnd%regions .eq. 2.1) yelmo1%bnd%smb =  -5.0   ! [m/a]
         
     end if 
 
@@ -178,7 +177,7 @@ program yelmo_test
         yelmo1%bnd%H_w = hyd1%now%H_w 
 
         ! == MODEL OUTPUT =======================================================
-        
+
         if (mod(nint(time*100),nint(dt2D_out*100))==0) then
             call write_step_2D(yelmo1,file2D,time=time,cf_ref=cf_ref)
         end if 

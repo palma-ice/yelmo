@@ -829,19 +829,21 @@ contains
                                              tpo%now%H_ice,mat%now%ATT,dyn%par%zeta_aa,dyn%par%dx,dyn%par%dy,mat%par%n_glen)
             
             !   X. Prescribe grounding-line flux 
-if (.FALSE.) then
+if (.TRUE.) then
             ! Testing prescribed grounding-line flux/vel - experimental!!!
 
             ! Calculate the analytical grounding-line flux 
             call calc_grounding_line_flux(dyn%now%qq_gl_acx,dyn%now%qq_gl_acy,tpo%now%H_ice,mat%now%ATT_bar, &
                         dyn%now%C_bed,dyn%now%ux_b,dyn%now%uy_b,tpo%now%f_grnd,tpo%now%f_grnd_acx,tpo%now%f_grnd_acy, &
-                        mat%par%n_glen,dyn%par%beta_q,Q0=0.61_prec,f_drag=0.6_prec,gl_flux_method="coulomb")
+                        mat%par%n_glen,dyn%par%beta_q,Q0=0.61_prec,f_drag=0.6_prec,gl_flux_method="power")
 
             ! Where qq_gl is present, prescribe velocity and set mask to -1
 
             ! Restore original ssa mask (without grounding line flags)
             dyn%now%ssa_mask_acx = ssa_mask_acx
             dyn%now%ssa_mask_acy = ssa_mask_acy
+            
+            write(*,*) "glf"
             
             ! acx nodes 
             do j = 1, ny 
@@ -853,11 +855,11 @@ if (.FALSE.) then
                     ! Prescribe velocity at this point 
 
                     if (j == 3) then 
-                        write(*,*) "glf", dyn%now%qq_gl_acx(i,j), dyn%now%ux_b(i,j), dyn%now%qq_gl_acx(i,j) / H_mid
+                        write(*,*) "glf", i, dyn%now%ux_b(i,j), dyn%now%qq_gl_acx(i,j) / H_mid
                     end if 
                     
-                    dyn%now%ux_b(i,j) = dyn%now%qq_gl_acx(i,j) / H_mid 
-                    dyn%now%ssa_mask_acx(i,j) = -1
+!                     dyn%now%ux_b(i,j) = dyn%now%qq_gl_acx(i,j) / H_mid 
+!                     dyn%now%ssa_mask_acx(i,j) = -1
 
                 end if 
 

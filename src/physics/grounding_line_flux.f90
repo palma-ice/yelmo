@@ -86,11 +86,8 @@ contains
                 select case(trim(gl_flux_method))
 
                     case("power")
-                        ! Calculate magnitude of flux given a Coulomb friction relation, following Tsai et al. (2015)
+                        ! Calculate magnitude of flux given a Coulomb friction relation, following Schoof (2007)
                         
-                        !write(*,*) "calc_grounding_line_flux:: Error: gl_flux with 'power' method explodes - check m_drag."
-                        !stop 
-
                         qq_gl = calc_gl_flux_power(H_gl,A_gl,C_bed_gl,n_glen,m_drag)
 
                     case("coulomb")
@@ -185,7 +182,7 @@ contains
 
     elemental function calc_gl_flux_power(H_gl,A_gl,C_bed,n_glen,m_drag) result(qq_gl)
         ! Calculate the analytical grounding-line flux solution
-        ! following Schoof (2007)
+        ! following Schoof (2007) 
         
         implicit none 
 
@@ -196,15 +193,10 @@ contains
         real(prec), intent(IN)  :: m_drag               ! [--] Power-law dragging exponent
         real(prec) :: qq_gl                             ! [m2 / a] Grounding-line flux 
         
-        ! Local variables 
-        real(prec) :: m_inv 
-
-        ! Invert m_drag to be consistent with the Schoof (2007) formulation 
-        m_inv = 1.0 / m_drag 
-
-        ! Calculate grounding line flux following Tsai et al. (2015), Eq. 38
-        qq_gl = ( A_gl * (rho_ice*g)**(n_glen+1.0) * (1.0 - rho_ice/rho_sw)**n_glen / ((4.0**n_glen)*C_bed) ) **(1.0/(m_inv+1.0)) & 
-                                 * H_gl**( (m_inv+n_glen+3.0)/(m_inv+1.0) )
+        ! Calculate grounding line flux following Schoof (2007), Eq. 20
+        ! Note: m_drag = 1/3 in the original Schoof formula
+        qq_gl = ( A_gl * (rho_ice*g)**(n_glen+1.0) * (1.0 - rho_ice/rho_sw)**n_glen / ((4.0**n_glen)*C_bed) ) **(1.0/(m_drag+1.0)) & 
+                                 * H_gl**( (m_drag+n_glen+3.0)/(m_drag+1.0) )
 
         return 
 

@@ -829,7 +829,7 @@ contains
                                              tpo%now%H_ice,mat%now%ATT,dyn%par%zeta_aa,dyn%par%dx,dyn%par%dy,mat%par%n_glen)
             
             !   X. Prescribe grounding-line flux 
-if (.TRUE.) then
+if (.FALSE.) then
             ! Testing prescribed grounding-line flux/vel - experimental!!!
 
             ! Calculate the analytical grounding-line flux 
@@ -844,7 +844,7 @@ if (.TRUE.) then
             dyn%now%ssa_mask_acy = ssa_mask_acy
             
             write(*,*) "glf"
-            
+
             ! acx nodes 
             do j = 1, ny 
             do i = 1, nx-1

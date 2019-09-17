@@ -55,9 +55,6 @@ python run_yelmo.py -r -e benchmarks output/test-expf par/gmd/yelmo_EISMINT_expf
 4. MISMIP RF
 To perform the MISMIP rate factor experiment, compile the mismip executable
 and call it with the MISMIP parameter file:
-2. EISMINT2 EXPA
-To perform Experiment A from the EISMINT2 benchmarks, compile the benchmarks
-executable and call it with the EXPA parameter file:
 ```
 make mismip
 python run_yelmo.py -r -e mismip output/test-mismip par/gmd/yelmo_MISMIP3D.nml

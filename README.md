@@ -59,17 +59,30 @@ and call it with the MISMIP parameter file:
 make mismip
 python run_yelmo.py -r -e mismip output/test-mismip par/gmd/yelmo_MISMIP3D.nml
 ```
+To perform the different permutations, it is necessary to change the resolution
+`&mismip::dx` in the parameter file (reducing the timestep `&mismip::dtt` for higher resolutions).
+By default, no subgrid grounding line treatment or scaling is applied. To add subgrid treatment,
+set the following parameters:
+```
+&ydyn
+    beta_gl_sep         = -1
+    beta_gl_stag        =  3
+/
+```
+Meanwhile, to apply linear scaling to basal friction as it approaches the grounding line,
+set `&ydyn::beta_gl_scale = 2`. 
 
 5. Age profile experiments
 To perform the age profile experiments, compile the Fortran program `tests/test_icetemp.f90`
-and run it. To perform the different permutations, it is necessary to recompile for
-single or double precision after changing the precision parameter `prec` in the file
-`src/yelmo_defs.f90`. The number of vertical grid points can be specified in the main
-program file, as well as the output filename.
+and run it:
 ```
 make icetemp
 ./libyelmo/bin/test_icetemp.x
 ```
+To perform the different permutations, it is necessary to recompile for
+single or double precision after changing the precision parameter `prec` in the file
+`src/yelmo_defs.f90`. The number of vertical grid points can be specified in the main
+program file, as well as the output filename.
 
 6. Antarctica present-day and glacial simulations
 To perform the Antarctica simulations as presented in the paper, it is necessary

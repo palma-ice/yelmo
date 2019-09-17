@@ -71,6 +71,13 @@ mismip : yelmo-static
 		@echo "    yelmo_mismip.x is ready."
 		@echo " "
 
+icetemp : yelmo-static
+		$(FC) $(DFLAGS) $(FFLAGS) $(INC_LIS) -o $(bindir)/test_icetemp.x tests/test_icetemp.f90 \
+			-L${CURDIR}/libyelmo/include -lyelmo $(LFLAGS) $(objdir)/nml.o
+		@echo " "
+		@echo "    test_icetemp.x is ready."
+		@echo " "
+
 mismip1 : yelmo-static
 		$(FC) $(DFLAGS) $(FFLAGS) $(INC_LIS) -o $(bindir)/yelmo_mismip.x tests/yelmo_mismip_new.f90 \
 			-L${CURDIR}/libyelmo/include -lyelmo $(LFLAGS) $(objdir)/nml.o

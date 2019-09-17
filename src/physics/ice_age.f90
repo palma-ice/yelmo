@@ -314,6 +314,9 @@ contains
         ! Use advection terms to advance column tracer value 
         X_ice = X_ice - dt*advecz - dt*advecxy 
 
+        ! Ensure tiny values are removed to avoid underflow errors 
+        where (abs(X_ice) .lt. 1e-5) X_ice = 0.0_prec 
+
         return 
 
     end subroutine calc_tracer_column_expl
@@ -486,7 +489,7 @@ contains
 
         nz_aa = size(zeta_aa,1)
 
-        advecz = 0.0 
+        advecz = 0.0_prec 
 
         ! Loop over internal cell centers and perform upwind advection 
         do k = 1, nz_aa-1 
@@ -499,23 +502,23 @@ contains
                 uz_ac_dwn = uz(k-1) 
 
                 Q_up     = Q(k+1)
-                Q_ac_up  = 0.5*(Q(k)+Q(k+1))
+                Q_ac_up  = 0.5_prec*(Q(k)+Q(k+1))
                 Q_aa     = Q(k) 
-                Q_ac_dwn = 0.5*(Q(k)+Q(k-1))
+                Q_ac_dwn = 0.5_prec*(Q(k)+Q(k-1))
                 Q_dwn    = Q(k-1) 
 
                 ! UNO2+ (Li, 2008)
                 ! Gradient at midpoint 
                 Gdc = (Q_dwn - Q_aa) / (H_ice*(zeta_aa(k-1)-zeta_aa(k)))
                 Gcu = (Q_aa  - Q_up) / (H_ice*(zeta_aa(k)-zeta_aa(k+1)))
-                Gc = sign(1.0,Gdc)*2.0*abs(Gdc*Gcu)/(abs(Gdc)+abs(Gcu) + eps)
+                Gc = sign(1.0_prec,Gdc)*2.0*abs(Gdc*Gcu)/(abs(Gdc)+abs(Gcu) + eps)
 
-                Q_ac_dwn = Q_aa + sign(1.0,Q_dwn-Q_aa)*(dz - abs(uz_ac_dwn)*dt)*abs(Gdc*Gcu)/(abs(Gdc)+abs(Gcu) + eps)
-                Q_ac_up  = Q_aa + sign(1.0,Q_aa -Q_up)*(abs(uz_ac_up) *dt - dz)*abs(Gdc*Gcu)/(abs(Gdc)+abs(Gcu) + eps)
+                Q_ac_dwn = Q_aa + sign(1.0_prec,Q_dwn-Q_aa)*(dz - abs(uz_ac_dwn)*dt)*abs(Gdc*Gcu)/(abs(Gdc)+abs(Gcu) + eps)
+                Q_ac_up  = Q_aa + sign(1.0_prec,Q_aa -Q_up)*(abs(uz_ac_up) *dt - dz)*abs(Gdc*Gcu)/(abs(Gdc)+abs(Gcu) + eps)
                 
                 ! Get staggered upstream and downstream values 
-                x_ac_dwn = zeta_aa(k) + sign(1.0,uz_ac_dwn)*(dz-abs(uz_ac_dwn)*dt)/2.0 
-                x_ac_up  = zeta_aa(k) + sign(1.0,uz_ac_up) *(dz-abs(uz_ac_up) *dt)/2.0 
+                x_ac_dwn = zeta_aa(k) + sign(1.0_prec,uz_ac_dwn)*(dz-abs(uz_ac_dwn)*dt)/2.0_prec 
+                x_ac_up  = zeta_aa(k) + sign(1.0_prec,uz_ac_up) *(dz-abs(uz_ac_up) *dt)/2.0_prec 
                 
                 advecz(k) = (uz_ac_dwn*Q_ac_dwn - uz_ac_up*Q_ac_up)/dz
 !                 advecz(k) = (uz_ac_up*Q_ac_up - uz_ac_dwn*Q_ac_dwn)/dz

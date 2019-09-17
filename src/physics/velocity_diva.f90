@@ -34,15 +34,15 @@ contains
 
         ! Determine the minimum value of Fint, to assign when H_ice == 0,
         ! since Fint should be nonzero everywhere for numerics
-        Fint_min = integrate_trapezoid1D_pt((1.0/visc_min)*(1.0-zeta_aa)**n,zeta_aa)
+        Fint_min = integrate_trapezoid1D_pt((1.0_prec/visc_min)*(1.0_prec-zeta_aa)**n,zeta_aa)
 
         ! Vertically integrate at each point
         do j = 1, ny 
         do i = 1, nx 
-            if (H_ice(i,j) .gt. 0.0) then 
+            if (H_ice(i,j) .gt. 0.0_prec) then 
                 ! Viscosity should be nonzero here, perform integration 
 
-                Fint(i,j) = integrate_trapezoid1D_pt((1.0/visc(i,j,:))*(1.0-zeta_aa)**n,zeta_aa)
+                Fint(i,j) = integrate_trapezoid1D_pt((1.0_prec/visc(i,j,:))*(1.0_prec-zeta_aa)**n,zeta_aa)
 
             else 
 
@@ -81,7 +81,7 @@ contains
         allocate(F2(nx,ny))
 
         ! First, calculate F-integeral F2 on aa-nodes 
-        F2 = calc_F_integral(visc,H_ice,zeta_aa,n=2.0)
+        F2 = calc_F_integral(visc,H_ice,zeta_aa,n=2.0_prec)
 
         do j = 1, ny 
         do i = 1, nx 

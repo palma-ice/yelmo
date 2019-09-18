@@ -1,18 +1,25 @@
 # Yelmo
 
-This is the code repository for the ice sheet model Yelmo.
-While the model has been designed to be easy to use, there
-are many parameters that require knowledge of ice-sheet
-physics and numerous parameterizations. The (growing) model documentation
-is provided to provide help with proper use of the model, and can be found here:
-https://palma-ice.github.io/yelmo-docs
-
-Quick-start instructions for using the model can be found below in the section "Usage".
-
+This is the code repository for Yelmo, a 3D ice-sheet-shelf model solving
+for the coupled dynamics and thermodynamics of the ice sheet system. Yelmo
+can be used for idealized simulations, stand-alone ice sheet simulations
+and fully coupled ice-sheet and climate simulations.
 The physics and design of the model are described in the following article:
 Robinson et al., in prep.
-The test cases shown in the article can be reproduced following the instructions
-below in the section "Test cases".
+
+The (growing) model documentation is provided help with proper use of the model,
+and can be found at [yelmo-docs](https://palma-ice.github.io/yelmo-docs).
+While the model has been designed to be easy to use, there
+are many parameters that require knowledge of ice-sheet
+physics and numerous parameterizations. It is not recommended to use the ice
+sheet model as a black box without understanding of the key parameters that
+affect its performance.
+
+To get started with comping and running the model, see the quick-start
+instructions below in the section "Usage".
+
+The test cases shown by Robinson et al. (in prep) can be reproduced following the
+instructions below in the section "Test cases".
 
 ## Dependencies
 

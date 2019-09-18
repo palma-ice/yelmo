@@ -152,7 +152,7 @@ tests using the same model version documented in the article. From this point,
 it is assumed that the user has already configured the model for their system
 (see https://palma-ice.github.io/yelmo-docs) and is ready to compile the mode.
 
-1. EISMINT1 moving margin experiment
+### 1. EISMINT1 moving margin experiment
 To perform the moving margin experiment, compile the benchmarks
 executable and call it with the EISMINT parameter file:
 ```
@@ -160,7 +160,7 @@ make benchmarks
 python run_yelmo.py -r -e benchmarks output/test-moving par/gmd/yelmo_EISMINT_moving.nml
 ```
 
-2. EISMINT2 EXPA
+### 2. EISMINT2 EXPA
 To perform Experiment A from the EISMINT2 benchmarks, compile the benchmarks
 executable and call it with the EXPA parameter file:
 ```
@@ -168,7 +168,7 @@ make benchmarks
 python run_yelmo.py -r -e benchmarks output/test-expa par/gmd/yelmo_EISMINT_expa.nml
 ```
 
-3. EISMINT2 EXPF
+### 3. EISMINT2 EXPF
 To perform Experiment F from the EISMINT2 benchmarks, compile the benchmarks
 executable and call it with the EXPF parameter file:
 ```
@@ -176,7 +176,7 @@ make benchmarks
 python run_yelmo.py -r -e benchmarks output/test-expf par/gmd/yelmo_EISMINT_expf.nml
 ```
 
-4. MISMIP RF
+### 4. MISMIP RF
 To perform the MISMIP rate factor experiment, compile the mismip executable
 and call it with the MISMIP parameter file:
 ```
@@ -196,7 +196,7 @@ set the following parameters:
 Meanwhile, to apply linear scaling to basal friction as it approaches the grounding line,
 set `&ydyn::beta_gl_scale = 2`.
 
-5. Age profile experiments
+### 5. Age profile experiments
 To perform the age profile experiments, compile the Fortran program `tests/test_icetemp.f90`
 and run it:
 ```
@@ -208,7 +208,7 @@ single or double precision after changing the precision parameter `prec` in the 
 `src/yelmo_defs.f90`. The number of vertical grid points can be specified in the main
 program file, as well as the output filename.
 
-6. Antarctica present-day and glacial simulations
+### 6. Antarctica present-day and glacial simulations
 To perform the Antarctica simulations as presented in the paper, it is necessary
 to compile the `initmip` executable and run with the present-day (pd) and
 glacial (lgm) parameter files:

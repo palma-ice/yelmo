@@ -42,6 +42,9 @@ opt = libyelmo/bin/yelmo_opt.x
     parser.add_argument('-x',action="store_true",
         help='Use this argument if run_yelmo.py is being called by job run')
 
+    parser.add_argument('-g',action="store_true",
+        help='Use this argument to test specific section of run_yelmo.py')
+
     # Add arguments
     parser.add_argument('rundir',metavar='RUNDIR', type=str,
          help='Path where yelmo simulation will run and store output.')
@@ -62,11 +65,22 @@ opt = libyelmo/bin/yelmo_opt.x
     useremail   = args.email 
     usergroup   = args.group
     with_runner = args.x  
+    testing     = args.g 
 
     # Arguments
     rundir      = args.rundir 
     par_path    = args.par_path  # Path relative to current working directory (cwd)
     
+    ######## TESTING ##########
+    if testing: 
+        print("run_yelmo.py:: testing.")
+        if os.path.isdir(".git"):
+            cmd = "git rev-parse HEAD"
+            proc = subp.Popen(cmd,shell=True,stdin=None,stdout=None,stderr=None,close_fds=True)
+            pid  = 0
+            print("This is a git repository, HEAD = "+head)
+
+        sys.exit() 
 
     # Additional options, consistency checks
 

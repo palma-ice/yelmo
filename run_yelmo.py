@@ -42,9 +42,6 @@ opt = libyelmo/bin/yelmo_opt.x
     parser.add_argument('-x',action="store_true",
         help='Use this argument if run_yelmo.py is being called by job run')
 
-    parser.add_argument('-g',action="store_true",
-        help='Use this argument to test specific section of run_yelmo.py')
-
     # Add arguments
     parser.add_argument('rundir',metavar='RUNDIR', type=str,
          help='Path where yelmo simulation will run and store output.')
@@ -64,23 +61,12 @@ opt = libyelmo/bin/yelmo_opt.x
     wtime       = args.wall 
     useremail   = args.email 
     usergroup   = args.group
-    with_runner = args.x  
-    testing     = args.g 
+    with_runner = args.x   
 
     # Arguments
     rundir      = args.rundir 
     par_path    = args.par_path  # Path relative to current working directory (cwd)
     
-    ######## TESTING ##########
-    if testing: 
-        print("run_yelmo.py:: testing.")
-        if os.path.isdir(".git"):
-            cmd = "git rev-parse HEAD"
-            proc = subp.Popen(cmd,shell=True,stdin=None,stdout=None,stderr=None,close_fds=True)
-            pid  = 0
-            print("This is a git repository, HEAD = "+head)
-
-        sys.exit() 
 
     # Additional options, consistency checks
 
@@ -176,6 +162,11 @@ opt = libyelmo/bin/yelmo_opt.x
     else:
         print("Warning: path does not exist {}".format(srcname))
 
+    # Write the current git revision information to output directory 
+    if os.path.isdir(".git"):
+        head       = get_git_revision_hash()
+        yelmo_info = open(os.path.join(rundir,"yelmo_git_revision"),'w').write(head)
+        
     # 2. Run the job
 
     # Generate the appropriate executable command to run job
@@ -330,6 +321,11 @@ def autofolder(params,outfldr0):
     outfldr  = outfldr0 + autofldr + '/'
 
     return outfldr
+
+def get_git_revision_hash():
+    #githash = subp.check_output(['git', 'describe', '--always', '--long', 'HEAD']).strip()
+    githash = subp.check_output(['git', 'rev-parse', 'HEAD']).strip()
+    return githash.decode("ascii") 
 
 def jobscript_slurm(cmd,rundir,username,usergroup,qos,wtime,useremail):
     '''Definition of the job script'''

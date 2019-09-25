@@ -1145,7 +1145,7 @@ end if
                         end if
 
                     else 
-                        ! 4-neighbors method 
+                        ! 5-neighbors method 
 
                         n_float = count([f_grnd(i-1,j),f_grnd(i+1,j),f_grnd(i,j-1),f_grnd(i,j+1)].lt. 1.0)
 

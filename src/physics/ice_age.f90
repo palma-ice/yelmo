@@ -43,6 +43,8 @@ contains
         real(prec), allocatable  :: advecxy(:)   ! [X a-1 m-2] Horizontal advection  
         real(prec) :: dz  
 
+        real(prec), parameter :: H_ice_lim = 100.0      ! [m] Minimum ice thickness to calculate ages
+
         nx    = size(X_ice,1)
         ny    = size(X_ice,2)
         nz_aa = size(zeta_aa,1)
@@ -54,41 +56,27 @@ contains
         do j = 3, ny-2
         do i = 3, nx-2 
             
-            if (H_ice(i,j) .gt. 10.0) then 
-                ! Thick ice exists, call thermodynamic solver for the column
+            if (H_ice(i,j) .gt. H_ice_lim .and. uz(i,j,nz_aa) .lt. 0.0_prec) then 
+                ! Thick ice exists and vertical velocity points downwards, 
+                ! so call thermodynamic solver for the column
 
                 ! Set surface value to current time 
                 X_srf = time 
 
-                ! Apply basal boundary condition
-                if (bmb(i,j) .lt. 0.0) then 
-                    ! Modify basal value explicitly for basal melting
-                    ! using boundary condition of Rybak and Huybrechts (2003), Eq. 3
-                    ! No horizontal advection of the basal value since it has no thickness 
-
-                    dz = H_ice(i,j)*(zeta_aa(2) - zeta_aa(1)) 
-                    X_base = X_ice(i,j,1) - dt*bmb(i,j)*(X_ice(i,j,2)-X_ice(i,j,1))/dz 
-
-                else
-                    ! Leave basal value unchanged 
-                    X_base = X_ice(i,j,1)
-
-                end if 
-
                 ! Pre-calculate the contribution of horizontal advection to column solution
-                call calc_advec_horizontal_column(advecxy,X_ice,ux,uy,dx,i,j,ulim=1000.0_prec)
+                call calc_advec_horizontal_column(advecxy,X_ice,ux,uy,dx,i,j,ulim=5000.0_prec)
                 
                 select case(trim(solver))
 
                     case("expl")
                         ! Explicit, upwind solver 
  
-                        call calc_tracer_column_expl(X_ice(i,j,:),uz(i,j,:),advecxy,X_srf,X_base,H_ice(i,j),zeta_aa,zeta_ac,dt)
+                        call calc_tracer_column_expl(X_ice(i,j,:),uz(i,j,:),advecxy,X_srf,bmb(i,j),H_ice(i,j),zeta_aa,zeta_ac,dt)
 
                     case("impl")
                         ! Implicit solver vertically, upwind horizontally 
                         
-                        call calc_tracer_column(X_ice(i,j,:),uz(i,j,:),advecxy,X_srf,X_base,H_ice(i,j),zeta_aa,zeta_ac, &
+                        call calc_tracer_column(X_ice(i,j,:),uz(i,j,:),advecxy,X_srf,bmb(i,j),H_ice(i,j),zeta_aa,zeta_ac, &
                                                                                                 dzeta_a,dzeta_b,impl_kappa,dt) 
 
                     case DEFAULT 
@@ -99,7 +87,7 @@ contains
 
                 end select 
 
-            else ! H_ice(i,j) .le. 10.0
+            else ! H_ice(i,j) .le. H_ice_lim
                 ! Ice is too thin or zero, no tracing
 
                 X_ice(i,j,:) = time 
@@ -312,7 +300,7 @@ contains
 !         call calc_advec_vertical_column_new2(advecz,X_ice,uz,H_ice,zeta_aa,zeta_ac,dt)
 
         ! Use advection terms to advance column tracer value 
-        X_ice = X_ice - dt*advecz - dt*advecxy 
+        X_ice = X_ice - dt*advecxy - dt*advecz
 
         ! Ensure tiny values are removed to avoid underflow errors 
         where (abs(X_ice) .lt. 1e-5) X_ice = 0.0_prec 
@@ -661,25 +649,27 @@ contains
             if (ux_aa .gt. 0.0 .and. i .ge. 3) then  
                 ! Flow to the right 
 
+                ! Velocity on horizontal ac-node, vertical aa-node, limited to ulim 
+                u_now = ux(i-1,j,k)
+                u_now = sign(min(abs(u_now),ulim),u_now)
+
                 ! 1st order
-!                 advecx = dx_inv * 0.5*(ux(i-1,j,k)+ux(i-1,j,k-1))*(var_ice(i,j,k)-var_ice(i-1,j,k))
+!                 advecx = dx_inv * u_now *(var_ice(i,j,k)-var_ice(i-1,j,k))
                 ! 2nd order
-                !advecx = dx_inv2 * 0.5*(ux(i-1,j,k)+ux(i-1,j,k-1))*(-(4.0*var_ice(i-1,j,k)-var_ice(i-2,j,k)-3.0*var_ice(i,j,k)))
-                ! ux/uy on zeta_aa nodes:
-                u_now = sign(min(abs(ux(i-1,j,k)),ulim),ux(i-1,j,k))
-                advecx = dx_inv2 * u_now*(-(4.0*var_ice(i-1,j,k)-var_ice(i-2,j,k)-3.0*var_ice(i,j,k)))
-                
+                advecx = dx_inv2 * u_now *(-(4.0*var_ice(i-1,j,k)-var_ice(i-2,j,k)-3.0*var_ice(i,j,k)))
+
             else if (ux_aa .lt. 0.0 .and. i .le. nx-2) then 
                 ! Flow to the left
 
+                ! Velocity on horizontal ac-node, vertical aa-node, limited to ulim
+                u_now = ux(i,j,k)
+                u_now = sign(min(abs(u_now),ulim),u_now)
+
                 ! 1st order 
-!                 advecx = dx_inv * 0.5*(ux(i,j,k)+ux(i,j,k-1))*(var_ice(i+1,j,k)-var_ice(i,j,k))
+!                 advecx = dx_inv * u_now *(var_ice(i+1,j,k)-var_ice(i,j,k))
                 ! 2nd order
-!                 advecx = dx_inv2 * 0.5*(ux(i,j,k)+ux(i,j,k-1))*((4.0*var_ice(i+1,j,k)-var_ice(i+2,j,k)-3.0*var_ice(i,j,k)))
-                ! ux/uy on zeta_aa nodes:
-                u_now = sign(min(abs(ux(i,j,k)),ulim),ux(i,j,k))
-                advecx = dx_inv2 * u_now*((4.0*var_ice(i+1,j,k)-var_ice(i+2,j,k)-3.0*var_ice(i,j,k)))
-                
+                advecx = dx_inv2 * u_now *((4.0*var_ice(i+1,j,k)-var_ice(i+2,j,k)-3.0*var_ice(i,j,k)))
+
             else 
                 ! No flow 
                 advecx = 0.0
@@ -689,25 +679,27 @@ contains
             if (uy_aa .gt. 0.0 .and. j .ge. 3) then   
                 ! Flow to the right 
 
+                ! Velocity on horizontal ac-node, vertical aa-node, limited to ulim
+                u_now = uy(i,j-1,k)
+                u_now = sign(min(abs(u_now),ulim),u_now)
+
                 ! 1st order
-!                 advecy = dx_inv * 0.5*(uy(i,j-1,k)+uy(i,j-1,k-1))*(var_ice(i,j,k)-var_ice(i,j-1,k))
+!                 advecy = dx_inv * u_now*(var_ice(i,j,k)-var_ice(i,j-1,k))
                 ! 2nd order
-!                 advecy = dx_inv2 * 0.5*(uy(i,j-1,k)+uy(i,j-1,k-1))*(-(4.0*var_ice(i,j-1,k)-var_ice(i,j-2,k)-3.0*var_ice(i,j,k)))
-                ! ux/uy on zeta_aa nodes:
-                u_now = sign(min(abs(uy(i,j-1,k)),ulim),uy(i,j-1,k))
-                advecy = dx_inv2 * u_now*(-(4.0*var_ice(i,j-1,k)-var_ice(i,j-2,k)-3.0*var_ice(i,j,k)))
-                
+                advecy = dx_inv2 * u_now *(-(4.0*var_ice(i,j-1,k)-var_ice(i,j-2,k)-3.0*var_ice(i,j,k)))
+
             else if (uy_aa .lt. 0.0 .and. j .le. ny-2) then 
                 ! Flow to the left
 
+                ! Velocity on horizontal ac-node, vertical aa-node, limited to ulim
+                u_now = uy(i,j,k)
+                u_now = sign(min(abs(u_now),ulim),u_now)
+
                 ! 1st order 
-!                 advecy = dx_inv * 0.5*(uy(i,j,k)+uy(i,j,k-1))*(var_ice(i,j+1,k)-var_ice(i,j,k))
+!                 advecy = dx_inv * u_now *(var_ice(i,j+1,k)-var_ice(i,j,k))
                 ! 2nd order
-!                 advecy = dx_inv2 * 0.5*(uy(i,j,k)+uy(i,j,k-1))*((4.0*var_ice(i,j+1,k)-var_ice(i,j+2,k)-3.0*var_ice(i,j,k)))
-                ! ux/uy on zeta_aa nodes:
-                u_now = sign(min(abs(uy(i,j,k)),ulim),uy(i,j,k))
-                advecy = dx_inv2 * u_now*((4.0*var_ice(i,j+1,k)-var_ice(i,j+2,k)-3.0*var_ice(i,j,k)))
-                
+                advecy = dx_inv2 * u_now *((4.0*var_ice(i,j+1,k)-var_ice(i,j+2,k)-3.0*var_ice(i,j,k)))
+
             else
                 ! No flow 
                 advecy = 0.0 

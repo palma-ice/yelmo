@@ -522,6 +522,9 @@ end if
 
             end select 
             
+            ! Ensure lambda_bed is not below lower limit [default range 0:1] 
+            where (lambda_bed .lt. dyn%par%cb_min) lambda_bed = dyn%par%cb_min
+
             ! Additionally modify cf_ref
             if (trim(domain) .eq. "Antarctica") then
 
@@ -555,12 +558,7 @@ end if
             ! Step 3: calculate C_bed [Pa]
             
             dyn%now%C_bed = (cf_ref*lambda_bed)*dyn%now%N_eff 
-
-            ! =============================================================================
-            ! Step 4: Ensure C_bed is not below lower limit 
             
-            where (dyn%now%C_bed .lt. dyn%par%cb_min) dyn%now%C_bed = dyn%par%cb_min 
-
         return 
 
     end subroutine calc_ydyn_cbed_external

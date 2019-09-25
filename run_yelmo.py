@@ -205,20 +205,16 @@ def runjob(rundir,executable,par_path):
     print("Running job in background: {}".format(cmd))
 
     #os.system(cmd)
-    proc = subp.Popen(cmd,shell=True,stdin=None,stdout=None,stderr=None,close_fds=True)
+    #proc = subp.Popen(cmd,shell=True,stdin=None,stdout=None,stderr=None,close_fds=True)
     #pid  = proc.pid+1   # This is not necessarily accurate - do not use for anything
-    pid = 0
+    #pid = 0
 
-    # Alternative below is supposed to be more safe,
-    # and provide the proper pid of the process itself,
-    # but doesn't appear to actually work...
-    # cmd = ['cd',rundir,'&&','exec',executable,par_path,'>','out.out &']
-    # print " ".join(cmd)
-    # proc = subp.Popen(cmd,shell=True,stdin=None,stdout=None,stderr=None,close_fds=True)
-    # pid  = proc.pid
-    #print "pid = {}".format(pid)
+    # Run the command (ie, change to output directory and submit job)
+    # Note: the argument `shell=True` can be a security hazard, but should
+    # be ok in this context, see https://docs.python.org/2/library/subprocess.html#frequently-used-arguments
+    jobstatus = subp.check_call(cmd,shell=True)
 
-    return pid 
+    return jobstatus
 
 def submitjob(rundir,executable,par_path,qos,wtime,usergroup,useremail):
     '''Submit a job to a HPC queue (qsub,sbatch)'''
@@ -245,12 +241,11 @@ def submitjob(rundir,executable,par_path,qos,wtime,usergroup,useremail):
         cmd_job = "cd {} && sbatch {}".format(rundir,nm_jobscript)
     
     # Run the command (ie, change to output directory and submit job)
-    #os.system(cmd_job)
-    proc = subp.Popen(cmd_job,shell=True,stdin=None,stdout=None,stderr=None,close_fds=True)
-    #pid  = proc.pid+1   # This is not necessarily accurate - do not use for anything
-    pid = 0
+    # Note: the argument `shell=True` can be a security hazard, but should
+    # be ok in this context, see https://docs.python.org/2/library/subprocess.html#frequently-used-arguments
+    jobstatus = subp.check_call(cmd_job,shell=True)
 
-    return pid 
+    return jobstatus 
 
 def runner_param_write(par_path,rundir):
     '''Wrapper to perform parameter updates according to runner.json file 

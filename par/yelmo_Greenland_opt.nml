@@ -64,12 +64,12 @@
     H_grnd_lim          = 500.0           ! [m] For beta_sep_method=2, reduce beta linearly between H_grnd=0 and H_grnd_lim 
     H_sed_sat           = 250.0           ! [m] Sediment thickness at which sediment effect is saturated
     cb_method           = -1              ! -1: set externally; 1: calculate cb online  
-    cb_with_pmp         = False           ! Weighted cb_frozen/cb_stream as a function of f_pmp 
-    cb_margin_pmp       = False           ! If using cb_with_pmp, additionally impose cb_stream at ice margins 
+    cb_with_pmp         = False           ! Weighted cf_frozen/cf_stream as a function of f_pmp 
+    cb_margin_pmp       = False           ! If using cb_with_pmp, additionally impose cf_stream at ice margins 
     cb_scale            = "till_zb"       ! "none", "lin_zb", "exp_zb", "till_const", "till_zb", scaling of cb spatially
     cb_z0               = -200.0          ! [m] Bedrock elevation at which scaling goes to f_scale=e(-1)
     cb_z1               = 200.0           ! [m] Bedrock elevation above which scaling goes to f_scale=1
-    cb_min              = 100.0           ! [Pa] Minimum allowed value of cb for grounded ice
+    cb_min              = 0.0             ! [--] Minimum allowed value of cb for grounded ice
     cf_frozen           = 1.0             ! [--] Bed critical stress factor, frozen 
     cf_stream           = 1.0             ! [--] Bed critical stress factor, stream  
     n_sm_beta           = 0               ! [-] Standard deviation in gridpoints for Gaussian smoothing of beta (0==no smoothing)

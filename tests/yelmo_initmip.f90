@@ -494,6 +494,10 @@ contains
                     ! Default
                     lambda_bed = calc_lambda_bed_exp(bnd%z_bed,dyn%par%cb_z0,dyn%par%cb_z1)
 
+                    ! Modifications - increased friction in Wilkes Land (South)
+                    where (bnd%basins .ge. 14 .and. &
+                           bnd%basins .le. 17) lambda_bed = calc_lambda_bed_exp(bnd%z_bed,-400.0,dyn%par%cb_z1)
+
 if (.FALSE.) then                     
                     ! Modifications 
                     where (bnd%basins .eq. 1) lambda_bed = calc_lambda_bed_exp(bnd%z_bed,-500.0,dyn%par%cb_z1)
@@ -531,6 +535,21 @@ end if
             ! Additionally modify cf_ref
             if (trim(domain) .eq. "Antarctica") then
 
+                ! Reduction - Amery ice shelf
+                call scale_cb_gaussian(cf_ref,dyn%par%cf_stream*0.10,x0=1500.0, y0= 650.0, sigma=300.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
+                
+                ! Reduction - feeding the Ross ice shelf from the North
+                call scale_cb_gaussian(cf_ref,dyn%par%cf_stream*0.20,x0=-600.0, y0=-600.0, sigma=300.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
+
+                ! Reduction - feeding the Ross ice shelf from the East
+                call scale_cb_gaussian(cf_ref,dyn%par%cf_stream*0.20,x0= 130.0, y0=-550.0, sigma= 50.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
+                call scale_cb_gaussian(cf_ref,dyn%par%cf_stream*0.20,x0= 280.0, y0=-760.0, sigma= 50.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
+                call scale_cb_gaussian(cf_ref,dyn%par%cf_stream*0.20,x0= 380.0, y0=-960.0, sigma= 50.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
+                call scale_cb_gaussian(cf_ref,dyn%par%cf_stream*0.20,x0= 400.0, y0=-1150.0,sigma= 50.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
+                
+                ! Increase - feeding the Ronne ice shelf from the North
+                call scale_cb_gaussian(cf_ref,dyn%par%cf_stream*4.00,x0=-700.0, y0=    0.0,sigma=200.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
+                
 if (.FALSE.) then
                 ! Reduction 
                 call scale_cb_gaussian(cf_ref,dyn%par%cf_stream*0.25,x0=-2000.0,y0=1000.0, sigma=100.0,xx=grd%x*1e-3,yy=grd%y*1e-3)

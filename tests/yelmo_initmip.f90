@@ -176,6 +176,9 @@ program yelmo_test
         ! Pass updated boundary variables to yelmo 
         yelmo1%bnd%H_w = hyd1%now%H_w 
 
+        ! Update C_bed (due to effective pressure)
+        call calc_ydyn_cbed_external(yelmo1%dyn,yelmo1%tpo,yelmo1%thrm,yelmo1%bnd,yelmo1%grd,yelmo1%par%domain,cf_ref)
+
         ! == MODEL OUTPUT =======================================================
 
         if (mod(nint(time*100),nint(dt2D_out*100))==0) then
@@ -558,7 +561,7 @@ end if
             ! Step 3: calculate C_bed [Pa]
             
             dyn%now%C_bed = (cf_ref*lambda_bed)*dyn%now%N_eff 
-            
+
         return 
 
     end subroutine calc_ydyn_cbed_external

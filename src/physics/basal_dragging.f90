@@ -30,15 +30,15 @@ module basal_dragging
     public :: calc_lambda_till_const
     public :: calc_lambda_till_linear
 
+    ! C_bed gl functions 
+    public :: scale_beta_gl_fraction 
+    public :: scale_beta_gl_Hgrnd
+    public :: scale_beta_gl_zstar
+    
     ! Beta functions (aa-nodes)
     public :: calc_beta_aa_power_plastic
     public :: calc_beta_aa_reg_coulomb
 
-    ! C_bed / Beta scaling functions (aa-nodes)
-    public :: scale_beta_aa_grline
-    public :: scale_beta_aa_Hgrnd 
-    public :: scale_beta_aa_zstar
-    
     ! Beta staggering functions (aa- to ac-nodes)
     public :: stagger_beta_aa_mean
     public :: stagger_beta_aa_upstream
@@ -367,16 +367,16 @@ contains
     !
     ! ================================================================================
 
-    subroutine scale_beta_aa_grline(beta,f_grnd,f_beta_gl)
+    subroutine scale_beta_gl_fraction(beta,f_grnd,f_gl)
         ! Applyt scalar between 0 and 1 to modify basal friction coefficient
         ! at the grounding line.
         
         implicit none
         
-        real(prec), intent(INOUT) :: beta(:,:)    ! aa-nodes
-        real(prec), intent(IN)    :: f_grnd(:,:)  ! aa-nodes
-        real(prec), intent(IN)    :: f_beta_gl    ! Fraction parameter      
-
+        real(prec), intent(INOUT) :: beta(:,:)     ! aa-nodes
+        real(prec), intent(IN)    :: f_grnd(:,:)   ! aa-nodes
+        real(prec), intent(IN)    :: f_gl          ! Fraction parameter      
+        
         ! Local variables
         integer    :: i, j, nx, ny
         integer    :: im1, ip1, jm1, jp1 
@@ -385,12 +385,12 @@ contains
         ny = size(f_grnd,2) 
 
         ! Consistency check 
-        if (f_beta_gl .lt. 0.0 .or. f_beta_gl .gt. 1.0) then 
-            write(*,*) "scale_beta_aa_grline:: Error: f_beta_gl must be between 0 and 1."
-            write(*,*) "f_beta_gl = ", f_beta_gl
+        if (f_gl .lt. 0.0 .or. f_gl .gt. 1.0) then 
+            write(*,*) "scale_beta_gl_fraction:: Error: f_gl must be between 0 and 1."
+            write(*,*) "f_gl = ", f_gl
             stop 
         end if 
-         
+        
         do j = 1, ny 
         do i = 1, nx-1
 
@@ -405,8 +405,8 @@ contains
                 (f_grnd(im1,j) .eq. 0.0 .or. f_grnd(ip1,j) .eq. 0.0 .or. &
                  f_grnd(i,jm1) .eq. 0.0 .or. f_grnd(i,jp1) .eq. 0.0) ) then 
 
-                ! Apply grounding-line beta scaling 
-                beta(i,j) = f_beta_gl * beta(i,j) 
+                ! Set desired grounding-line fraction
+                beta(i,j) = beta(i,j) * f_gl 
 
             end if 
 
@@ -415,15 +415,15 @@ contains
 
         return
         
-    end subroutine scale_beta_aa_grline
+    end subroutine scale_beta_gl_fraction
     
-    subroutine scale_beta_aa_Hgrnd(beta,H_grnd,H_grnd_lim)
+    subroutine scale_beta_gl_Hgrnd(beta,H_grnd,H_grnd_lim)
         ! Calculate scalar between 0 and 1 to modify basal friction coefficient
         ! as ice approaches and achieves floatation, and apply.
         
         implicit none
         
-        real(prec), intent(INOUT) :: beta(:,:)    ! aa-nodes
+        real(prec), intent(INOUT) :: beta(:,:)     ! aa-nodes
         real(prec), intent(IN)    :: H_grnd(:,:)  ! aa-nodes
         real(prec), intent(IN)    :: H_grnd_lim       
 
@@ -444,24 +444,25 @@ contains
         do j = 1, ny 
         do i = 1, nx
 
-            f_scale   = max( min(H_grnd(i,j),H_grnd_lim)/H_grnd_lim, 0.0) 
-            beta(i,j) = f_scale * beta(i,j) 
+            f_scale = max( min(H_grnd(i,j),H_grnd_lim)/H_grnd_lim, 0.0) 
+
+            beta(i,j) = beta(i,j) * f_scale 
 
         end do 
         end do  
 
         return
         
-    end subroutine scale_beta_aa_Hgrnd
+    end subroutine scale_beta_gl_Hgrnd
     
-    subroutine scale_beta_aa_zstar(beta,H_ice,z_bed,z_sl,norm)
+    subroutine scale_beta_gl_zstar(beta,H_ice,z_bed,z_sl,norm)
         ! Calculate scalar between 0 and 1 to modify basal friction coefficient
         ! as ice approaches and achieves floatation, and apply.
         ! Following "Zstar" approach of Gladstone et al. (2017) 
         
         implicit none
         
-        real(prec), intent(INOUT) :: beta(:,:)      ! aa-nodes
+        real(prec), intent(INOUT) :: beta(:,:)     ! aa-nodes
         real(prec), intent(IN)    :: H_ice(:,:)     ! aa-nodes
         real(prec), intent(IN)    :: z_bed(:,:)     ! aa-nodes        
         real(prec), intent(IN)    :: z_sl(:,:)      ! aa-nodes        
@@ -469,8 +470,8 @@ contains
 
         ! Local variables
         integer    :: i, j, nx, ny
-        real(prec) :: f_scale 
         real(prec) :: rho_sw_ice 
+        real(prec) :: f_scale 
 
         rho_sw_ice = rho_sw / rho_ice 
 
@@ -491,14 +492,14 @@ contains
 
             if (norm .and. H_ice(i,j) .gt. 0.0) f_scale = f_scale / H_ice(i,j) 
 
-            beta(i,j) = f_scale * beta(i,j) 
-
+            beta(i,j) = beta(i,j) * f_scale 
+            
         end do 
         end do  
 
         return
         
-    end subroutine scale_beta_aa_zstar
+    end subroutine scale_beta_gl_zstar
 
     ! ================================================================================
     !

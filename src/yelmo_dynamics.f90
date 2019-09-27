@@ -942,9 +942,9 @@ end if
                 dyn%now%beta = dyn%par%beta_const 
 
             case(1)
-                ! Calculate beta from a linear law (simply set beta=C_bed)
+                ! Calculate beta from a linear law (simply set beta=C_bed/u0)
 
-                dyn%now%beta = dyn%now%C_bed 
+                dyn%now%beta = dyn%now%C_bed * (1.0_prec / dyn%par%beta_u0)
 
             case(2)
                 ! Calculate beta from the quasi-plastic power-law as defined by Bueler and van Pelt (2015)
@@ -965,7 +965,36 @@ end if
 
         end select 
 
-        ! 2. Apply grounding-line sub-element parameterization (sep, ie, subgrid method)
+        ! 2. Scale beta as it approaches grounding line 
+        select case(dyn%par%beta_gl_scale) 
+
+            case(0) 
+                ! Apply fractional parameter at grounding line, no scaling when beta_gl_f=1.0
+
+                call scale_beta_gl_fraction(dyn%now%beta,tpo%now%f_grnd,dyn%par%beta_gl_f)
+
+            case(1) 
+                ! Apply H_grnd scaling, reducing beta linearly towards zero at the grounding line 
+
+                call scale_beta_gl_Hgrnd(dyn%now%beta,tpo%now%H_grnd,dyn%par%H_grnd_lim)
+
+            case(2) 
+                ! Apply scaling according to thickness above flotation (Zstar approach of Gladstone et al., 2017)
+                ! norm==.TRUE., so that zstar-scaling is bounded between 0 and 1, and thus won't affect 
+                ! choice of C_bed value that is independent of this scaling. 
+                
+                call scale_beta_gl_zstar(dyn%now%beta,tpo%now%H_ice,bnd%z_bed,bnd%z_sl,norm=.TRUE.)
+
+            case DEFAULT 
+                ! No scaling
+
+                write(*,*) "calc_ydyn_beta:: Error: beta_gl_scale not recognized."
+                write(*,*) "beta_gl_scale = ", dyn%par%beta_gl_scale
+                stop 
+
+        end select 
+
+        ! 3. Apply grounding-line sub-element parameterization (sep, ie, subgrid method)
         select case(dyn%par%beta_gl_sep)
 
             case(-1) 
@@ -1000,41 +1029,13 @@ end if
 
             case DEFAULT 
 
-                write(*,*) "calc_ydyn_beta_aa:: Error: beta_gl_sep not recognized."
+                write(*,*) "calc_ydyn_beta:: Error: beta_gl_sep not recognized."
                 write(*,*) "beta_gl_sep = ", dyn%par%beta_gl_sep
                 stop 
 
         end select 
 
-        ! 2. Apply beta-scaling method at/near the grounding line (beta=0 for floating ice, etc)
-
-        select case(dyn%par%beta_gl_scale) 
-
-            case(0) 
-                ! Apply fractional parameter at grounding line, no scaling when beta_gl_f=1.0
-
-                call scale_beta_aa_grline(dyn%now%beta,tpo%now%f_grnd,dyn%par%beta_gl_f)
-
-            case(1) 
-                ! Apply H_grnd scaling, reducing beta linearly towards zero at the grounding line 
-
-                call scale_beta_aa_Hgrnd(dyn%now%beta,tpo%now%H_grnd,dyn%par%H_grnd_lim)
-
-            case(2) 
-                ! Apply scaling according to thickness above flotation (Zstar approach of Gladstone et al., 2017)
-                ! norm==.TRUE., so that zstar-scaling is bounded between 0 and 1, and thus won't affect 
-                ! choice of C_bed value that is independent of this scaling. 
-                call scale_beta_aa_zstar(dyn%now%beta,tpo%now%H_ice,bnd%z_bed,bnd%z_sl,norm=.TRUE.)
-
-            case DEFAULT 
-
-                write(*,*) "calc_ydyn_beta_aa:: Error: beta_gl_scale not recognized."
-                write(*,*) "beta_gl_scale = ", dyn%par%beta_gl_scale
-                stop 
-
-        end select 
-
-        ! 3. Apply smoothing if desired (only for points with beta > 0)
+        ! 4. Apply smoothing if desired (only for points with beta > 0)
         if (dyn%par%n_sm_beta .gt. 0) then 
             call smooth_gauss_2D(dyn%now%beta,dyn%now%beta.gt.0.0,dyn%par%dx,dyn%par%n_sm_beta,dyn%now%beta.gt.0.0)
 
@@ -1062,7 +1063,7 @@ end if
         ! for floating points and beta > 0 for non-floating points
         ! ================================================================
         
-        ! 4. Apply staggering method with particular care for the grounding line 
+        ! 5. Apply staggering method with particular care for the grounding line 
         select case(dyn%par%beta_gl_stag) 
 
             case(0) 
@@ -1093,7 +1094,7 @@ end if
                 
             case DEFAULT 
 
-                write(*,*) "calc_ydyn_beta_aa:: Error: beta_gl_stag not recognized."
+                write(*,*) "calc_ydyn_beta:: Error: beta_gl_stag not recognized."
                 write(*,*) "beta_gl_stag = ", dyn%par%beta_gl_stag
                 stop 
 
@@ -1118,7 +1119,7 @@ end if
         real(prec) :: f_scale 
         real(prec), allocatable :: cf_ref(:,:) 
         real(prec), allocatable :: lambda_bed(:,:)  
-        
+
         nx = size(dyn%now%C_bed,1)
         ny = size(dyn%now%C_bed,2)
         
@@ -1186,6 +1187,9 @@ end if
             ! =============================================================================
             ! Step 2: calculate lambda functions to scale C_bed from default value 
             
+            !------------------------------------------------------------------------------
+            ! lambda_bed: scaling as a function of bedrock elevation
+
             select case(trim(dyn%par%cb_scale))
 
                 case("lin_zb")
@@ -1212,12 +1216,13 @@ end if
                 case DEFAULT
                     ! No scaling
 
-                    lambda_bed = 1.0
+                    lambda_bed = 1.0_prec
 
             end select 
             
             ! Ensure lambda_bed is not below lower limit [default range 0:1] 
             where (lambda_bed .lt. dyn%par%cb_min) lambda_bed = dyn%par%cb_min
+
 
             ! =============================================================================
             ! Step 3: calculate C_bed [Pa]
@@ -1321,8 +1326,8 @@ end if
         call nml_read(filename,"ydyn","beta_const",         par%beta_const,         init=init_pars)
         call nml_read(filename,"ydyn","beta_q",             par%beta_q,             init=init_pars)
         call nml_read(filename,"ydyn","beta_u0",            par%beta_u0,            init=init_pars)
-        call nml_read(filename,"ydyn","beta_gl_sep",        par%beta_gl_sep,        init=init_pars)
         call nml_read(filename,"ydyn","beta_gl_scale",      par%beta_gl_scale,      init=init_pars)
+        call nml_read(filename,"ydyn","beta_gl_sep",        par%beta_gl_sep,        init=init_pars)
         call nml_read(filename,"ydyn","beta_gl_stag",       par%beta_gl_stag,       init=init_pars)
         call nml_read(filename,"ydyn","beta_gl_f",          par%beta_gl_f,          init=init_pars)
         call nml_read(filename,"ydyn","taud_gl_method",     par%taud_gl_method,     init=init_pars)
@@ -1768,7 +1773,7 @@ end if
         call nc_write(filename,"ssa_mask_acy",dyn%now%ssa_mask_acy,units="1",long_name="SSA mask (acy)", &
                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
 
-        call nc_write(filename,"C_bed",dyn%now%C_bed,units="",long_name="Dragging constant", &
+        call nc_write(filename,"C_bed",dyn%now%C_bed,units="Pa",long_name="Dragging coefficient", &
                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
         call nc_write(filename,"N_eff",dyn%now%N_eff,units="Pa",long_name="Effective pressure", &
                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)

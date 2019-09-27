@@ -91,7 +91,10 @@ program yelmo_test
     ! Define no-ice mask from present-day data
     allocate(mask_noice(yelmo1%grd%nx,yelmo1%grd%ny))
     mask_noice = .FALSE. 
-    where(yelmo1%dta%pd%H_ice .le. 0.0) mask_noice = .TRUE. 
+    ! Present-day
+    if (dT_ann .ge. 0.0) then
+        where(yelmo1%dta%pd%H_ice .le. 0.0) mask_noice = .TRUE. 
+    end if 
 
     ! Special treatment for Greenland
     if (trim(yelmo1%par%domain) .eq. "Greenland") then 
@@ -120,7 +123,7 @@ program yelmo_test
         end if 
 
         ! Present-day and LGM 
-        where(yelmo1%bnd%regions .eq. 2.0) yelmo1%bnd%smb = -1.0    ! [m/a]
+        where(yelmo1%bnd%regions .eq. 2.0) yelmo1%bnd%smb = -1.0        ! [m/a]
 
     end if 
 
@@ -128,7 +131,8 @@ program yelmo_test
     cf_ref = 0.0 
 
     ! Define C_bed initially
-    call calc_ydyn_cbed_external(yelmo1%dyn,yelmo1%tpo,yelmo1%thrm,yelmo1%bnd,yelmo1%grd,yelmo1%par%domain,cf_ref)
+    call calc_ydyn_cbed_external(yelmo1%dyn,yelmo1%tpo,yelmo1%thrm,yelmo1%bnd,yelmo1%grd,yelmo1%par%domain, &
+                                    mask_noice,cf_ref)
 
     ! Impose a colder boundary temperature for equilibration step 
     ! -5 [K] for mimicking glacial times
@@ -177,7 +181,8 @@ program yelmo_test
         yelmo1%bnd%H_w = hyd1%now%H_w 
 
         ! Update C_bed (due to effective pressure)
-        call calc_ydyn_cbed_external(yelmo1%dyn,yelmo1%tpo,yelmo1%thrm,yelmo1%bnd,yelmo1%grd,yelmo1%par%domain,cf_ref)
+        call calc_ydyn_cbed_external(yelmo1%dyn,yelmo1%tpo,yelmo1%thrm,yelmo1%bnd,yelmo1%grd,yelmo1%par%domain, &
+                                        mask_noice,cf_ref)
 
         ! == MODEL OUTPUT =======================================================
 
@@ -398,7 +403,7 @@ contains
 
     end subroutine write_step_2D
 
-    subroutine calc_ydyn_cbed_external(dyn,tpo,thrm,bnd,grd,domain,cf_ref)
+    subroutine calc_ydyn_cbed_external(dyn,tpo,thrm,bnd,grd,domain,mask_noice,cf_ref)
         ! Update C_bed [Pa] based on parameter choices
 
         implicit none
@@ -409,6 +414,7 @@ contains
         type(ybound_class), intent(IN)    :: bnd  
         type(ygrid_class),  intent(IN)    :: grd
         character(len=*),   intent(IN)    :: domain 
+        logical,            intent(IN)    :: mask_noice(:,:) 
         real(prec),         intent(INOUT) :: cf_ref(:,:) 
 
         integer :: i, j, nx, ny 
@@ -416,14 +422,12 @@ contains
         real(prec) :: f_scale 
         
         real(prec), allocatable :: lambda_bed(:,:)  
-        real(prec), allocatable :: lambda_bed_0(:,:) 
 
         nx = size(dyn%now%C_bed,1)
         ny = size(dyn%now%C_bed,2)
         
         allocate(lambda_bed(nx,ny))
-        allocate(lambda_bed_0(nx,ny))
-        
+
             ! Calculate C_bed following parameter choices 
 
             ! =============================================================================
@@ -528,6 +532,9 @@ end if
                     lambda_bed = 1.0
 
             end select 
+
+            ! Set lambda_bed to lower limit for regions of noice 
+            where (mask_noice) lambda_bed = dyn%par%cb_min 
             
             ! Ensure lambda_bed is not below lower limit [default range 0:1] 
             where (lambda_bed .lt. dyn%par%cb_min) lambda_bed = dyn%par%cb_min

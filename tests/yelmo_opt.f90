@@ -155,7 +155,7 @@ program yelmo_test
     if (trim(yelmo1%par%domain) .eq. "Greenland") then 
         where(mask_noice) yelmo1%bnd%smb = yelmo1%dta%pd%smb - 2.0 
     else ! Antarctica
-        !where(mask_noice) yelmo1%bnd%bmb_shlf = yelmo1%dta%pd%bmb_shlf - 2.0 
+        where(mask_noice) yelmo1%bnd%bmb_shlf = yelmo1%bnd%bmb_shlf - 2.0 
     end if 
     
     ! Saturate maximum smb to 1.5 m/a 

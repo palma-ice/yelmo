@@ -546,13 +546,13 @@ end if
                 call scale_cb_gaussian(cf_ref,dyn%par%cf_stream*4.00,x0=-700.0, y0=    0.0,sigma=200.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
                 
                 ! Reduction - South pole 
-                call scale_cb_gaussian(cf_ref,dyn%par%cf_stream*0.20,x0=   0.0, y0=   0.0, sigma=300.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
+                call scale_cb_gaussian(cf_ref,dyn%par%cf_stream*0.10,x0=   0.0, y0=   0.0, sigma=400.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
                 
                 ! Reduction - Amery ice shelf
                 call scale_cb_gaussian(cf_ref,dyn%par%cf_stream*0.05,x0=1500.0, y0= 650.0, sigma=300.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
                 
                 ! Reduction - feeding the Ross ice shelf from the North
-                call scale_cb_gaussian(cf_ref,dyn%par%cf_stream*0.05,x0=-600.0, y0=-600.0, sigma=300.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
+                !call scale_cb_gaussian(cf_ref,dyn%par%cf_stream*0.05,x0=-600.0, y0=-600.0, sigma=300.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
 
                 ! Reduction - feeding the Ross ice shelf from the East
                 call scale_cb_gaussian(cf_ref,dyn%par%cf_stream*0.05,x0= 130.0, y0=-550.0, sigma= 50.0,xx=grd%x*1e-3,yy=grd%y*1e-3)

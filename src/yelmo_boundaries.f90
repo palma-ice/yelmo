@@ -257,23 +257,27 @@ contains
         
         allocate(now%ice_allowed(nx,ny))
         
-        now%z_bed       = 0.0 
-        now%z_bed_sd    = 0.0
-        now%z_sl        = 0.0 
-        now%H_sed       = 0.0 
-        now%H_w         = 0.0 
-        now%smb         = 0.0 
-        now%T_srf       = 0.0 
-        now%bmb_shlf    = 0.0 
-        now%T_shlf      = 0.0 
-        now%Q_geo       = 0.0 
+        allocate(now%H_ice_ref(nx,ny))
+        
+        now%z_bed       = 0.0_prec 
+        now%z_bed_sd    = 0.0_prec
+        now%z_sl        = 0.0_prec 
+        now%H_sed       = 0.0_prec 
+        now%H_w         = 0.0_prec 
+        now%smb         = 0.0_prec 
+        now%T_srf       = 0.0_prec 
+        now%bmb_shlf    = 0.0_prec 
+        now%T_shlf      = 0.0_prec 
+        now%Q_geo       = 0.0_prec 
 
-        now%basins      = 0.0 
-        now%basin_mask  = 0.0 
-        now%regions     = 0.0 
-        now%region_mask = 0.0 
+        now%basins      = 0.0_prec 
+        now%basin_mask  = 0.0_prec 
+        now%regions     = 0.0_prec 
+        now%region_mask = 0.0_prec 
         
         now%ice_allowed = .TRUE.  ! By default allow ice everywhere 
+
+        now%H_ice_ref   = 0.0_prec 
 
         return 
     end subroutine ybound_alloc 
@@ -301,6 +305,8 @@ contains
         if (allocated(now%region_mask)) deallocate(now%region_mask)
         
         if (allocated(now%ice_allowed)) deallocate(now%ice_allowed)
+        
+        if (allocated(now%H_ice_ref))   deallocate(now%H_ice_ref)
         
         return 
 

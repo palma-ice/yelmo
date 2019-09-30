@@ -387,6 +387,9 @@ contains
         write(*,*) "yelmo_init:: topo intialized (loaded data if desired)."
         
 
+        ! Set bnd%H_ice_ref to present-day ice thickness by default 
+        dom%bnd%H_ice_ref = dom%dta%pd%H_ice 
+        
         write(*,*) 
         write(*,*) "yelmo_init:: Initialization complete for domain: "// &
                    trim(dom%par%domain) 

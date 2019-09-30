@@ -67,33 +67,31 @@ module yelmo_defs
     
     ! ytopo parameters
     type ytopo_param_class
-        character(len=256) :: name, method, solver
-        logical            :: margin2nd 
-        integer            :: surf_gl_method 
+        character(len=256) :: solver
         character(len=256) :: calv_method  
-        character(len=256) :: boundaries 
-        integer            :: nx, ny
-        real(prec)         :: dx, dy
-        
-        logical    :: use_bmb  
-        logical    :: use_calv_subgrid 
-        logical    :: grline_fixed 
-        logical    :: topo_fixed
-        real(prec) :: topo_relax_dt, topo_fixed_dt
-        real(prec) :: calv_H_lim
-        real(prec) :: calv_tau  
-        real(prec) :: H_min_grnd
-        real(prec) :: H_min_flt 
-        real(prec) :: sd_min 
-        real(prec) :: sd_max 
-        real(prec) :: calv_max  
-        real(prec) :: grad_lim 
-        integer    :: gl_sep 
-        integer    :: gl_sep_nx 
-        logical    :: diffuse_bmb_shlf 
+        integer            :: surf_gl_method 
+        logical            :: margin2nd 
+        logical            :: use_bmb  
+        logical            :: topo_fixed
+        integer            :: topo_rel
+        real(prec)         :: topo_rel_tau 
+        real(prec)         :: calv_H_lim
+        real(prec)         :: calv_tau  
+        real(prec)         :: H_min_grnd
+        real(prec)         :: H_min_flt 
+        real(prec)         :: sd_min 
+        real(prec)         :: sd_max 
+        real(prec)         :: calv_max  
+        real(prec)         :: grad_lim 
+        integer            :: gl_sep 
+        integer            :: gl_sep_nx 
+        logical            :: diffuse_bmb_shlf 
 
         ! Internal parameters 
-        real(prec) :: time 
+        real(prec)         :: time 
+        integer            :: nx, ny
+        real(prec)         :: dx, dy
+        character(len=256) :: boundaries 
         
     end type
 
@@ -465,7 +463,9 @@ module yelmo_defs
         real(prec), allocatable :: regions(:,:) 
         real(prec), allocatable :: region_mask(:,:) 
 
-        logical, allocatable    :: ice_allowed(:,:)    ! Locations where ice thickness can be greater than zero 
+        logical,    allocatable :: ice_allowed(:,:)    ! Locations where ice thickness can be greater than zero 
+
+        real(prec), allocatable :: H_ice_ref(:,:)       ! Reference ice thickness, may be used for relaxation routines
 
         ! Other external variables that can be useful, ie maybe with tracers
         ! to do 

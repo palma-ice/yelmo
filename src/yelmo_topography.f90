@@ -89,7 +89,7 @@ contains
                 mbal = bnd%smb 
             end if 
 
-            ! 1. Calculate the ice thickness conservation and apply bedrock uplift -----
+            ! 1. Calculate the ice thickness conservation -----
             call calc_ice_thickness(tpo%now%H_ice,tpo%now%H_margin,tpo%now%f_ice,tpo%now%mb_applied, &
                                     tpo%now%f_grnd,bnd%z_sl-bnd%z_bed,dyn%now%ux_bar,dyn%now%uy_bar, &
                                     mbal=mbal,calv=tpo%now%calv,z_bed_sd=bnd%z_bed_sd,dx=tpo%par%dx,dt=dt, &
@@ -305,18 +305,14 @@ contains
         if (present(init)) init_pars = .TRUE. 
  
         ! Store parameter values in output object
-        call nml_read(filename,"ytopo","method",            par%method,            init=init_pars)
-        call nml_read(filename,"ytopo","solver",            par%solver,            init=init_pars)
-        call nml_read(filename,"ytopo","margin2nd",         par%margin2nd,         init=init_pars)
-        call nml_read(filename,"ytopo","surf_gl_method",    par%surf_gl_method,    init=init_pars)
-        call nml_read(filename,"ytopo","calv_method",       par%calv_method,       init=init_pars)
-        
+        call nml_read(filename,"ytopo","solver",            par%solver,           init=init_pars)
+        call nml_read(filename,"ytopo","surf_gl_method",    par%surf_gl_method,   init=init_pars)
+        call nml_read(filename,"ytopo","calv_method",       par%calv_method,      init=init_pars)
+        call nml_read(filename,"ytopo","margin2nd",         par%margin2nd,        init=init_pars)
         call nml_read(filename,"ytopo","use_bmb",           par%use_bmb,          init=init_pars)
-        call nml_read(filename,"ytopo","use_calv_subgrid",  par%use_calv_subgrid, init=init_pars)
-        call nml_read(filename,"ytopo","grline_fixed",      par%grline_fixed,     init=init_pars)
         call nml_read(filename,"ytopo","topo_fixed",        par%topo_fixed,       init=init_pars)
-        call nml_read(filename,"ytopo","topo_relax_dt",     par%topo_relax_dt,    init=init_pars)
-        call nml_read(filename,"ytopo","topo_fixed_dt",     par%topo_fixed_dt,    init=init_pars)
+        call nml_read(filename,"ytopo","topo_rel",          par%topo_rel,         init=init_pars)
+        call nml_read(filename,"ytopo","topo_rel_tau",      par%topo_rel_tau,     init=init_pars)
         call nml_read(filename,"ytopo","calv_H_lim",        par%calv_H_lim,       init=init_pars)
         call nml_read(filename,"ytopo","calv_tau",          par%calv_tau,         init=init_pars)
         call nml_read(filename,"ytopo","H_min_grnd",        par%H_min_grnd,       init=init_pars)

@@ -9,6 +9,7 @@ module mass_conservation
     private
     public :: calc_ice_thickness
     public :: apply_calving_ice_margin
+    public :: relax_ice_thickness
 
 contains 
 
@@ -940,4 +941,66 @@ end if
 
     end subroutine apply_calving_ice_margin
     
+    subroutine relax_ice_thickness(H_ice,f_grnd,H_ref,topo_rel,tau,dt)
+        ! This routines allows ice within a given mask to be
+        ! relaxed to a reference state with certain timescale tau 
+        ! (if tau=0), then H_ice = H_ice_ref directly 
+
+        implicit none 
+
+        real(prec), intent(INOUT) :: H_ice(:,:) 
+        real(prec), intent(IN)    :: f_grnd(:,:)  
+        real(prec), intent(IN)    :: H_ref(:,:) 
+        integer,    intent(IN)    :: topo_rel 
+        real(prec), intent(IN)    :: tau
+        real(prec), intent(IN)    :: dt 
+
+        ! Local variables 
+        integer    :: i, j, nx, ny 
+        logical    :: apply_relax 
+        real(prec) :: dHdt 
+
+        nx = size(H_ice,1)
+        ny = size(H_ice,2) 
+
+        do j = 2, ny-1 
+            do i = 2, nx-1 
+
+                ! Determine whether to apply relaxation here
+                apply_relax = .FALSE. 
+
+                ! Shelf (floating) ice:
+                if (f_grnd(i,j) .eq. 0.0) apply_relax = .TRUE. 
+                
+                ! Grounding line ice: 
+                if (topo_rel .eq. 2 .and. f_grnd(i,j) .gt. 0.0 .and. &
+                     (f_grnd(i-1,j) .eq. 0.0 .or. f_grnd(i+1,j) .eq. 0.0 &
+                        .or. f_grnd(i,j-1) .eq. 0.0 .or. f_grnd(i,j+1) .eq. 0.0)) apply_relax = .TRUE. 
+
+                if (apply_relax) then 
+
+                    if (tau .eq. 0.0) then
+                        ! Impose ice thickness 
+
+                        H_ice(i,j) = H_ref(i,j) 
+
+                    else
+                        ! Apply relaxation to reference state 
+
+                        dHdt = (H_ref(i,j) - H_ice(i,j)) / tau 
+
+                        H_ice(i,j) = H_ice(i,j) + dHdt*dt 
+
+                    end if 
+                end if 
+
+            end do 
+        end do 
+
+
+        return 
+
+    end subroutine relax_ice_thickness 
+
+
 end module mass_conservation

@@ -97,6 +97,14 @@ contains
                                     ice_allowed=bnd%ice_allowed,H_min=tpo%par%H_min_grnd, &
                                     sd_min=tpo%par%sd_min,sd_max=tpo%par%sd_max,calv_max=tpo%par%calv_max)
             
+            ! If desired, relax solution to reference state
+            if (tpo%par%topo_rel .ne. 0) then 
+
+                call relax_ice_thickness(tpo%now%H_ice,tpo%now%f_grnd,bnd%H_ice_ref, &
+                                            tpo%par%topo_rel,tpo%par%topo_rel_tau,dt)
+                
+            end if 
+
 
             ! ====== CALVING ======
 

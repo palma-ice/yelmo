@@ -26,8 +26,8 @@ module yelmo_defs
     ! Error distance (very large), error index, and smallest number epsilon 
     real(prec), parameter :: ERR_DIST = real(1E8,prec) 
     integer,    parameter :: ERR_IND  = -1 
-    real(prec), parameter :: eps      = real(1E-8,prec) 
-    
+    real(prec), parameter :: tol_underflow = real(1E-10,prec)
+
     ! Mathematical constants
     real(prec), parameter :: pi  = real(2._dp*acos(0.0_dp),prec)
     real(prec), parameter :: degrees_to_radians = real(pi / 180._dp,prec)  ! Conversion factor between radians and degrees
@@ -784,10 +784,13 @@ contains
         rates    = cshift(rates,1)
         rates(n) = rate_now 
 
+        ! Avoid underflows
+        where(rates .lt. tol_underflow) rates = 0.0_prec
+        
         ! Calculate running average rate 
         n    = count(rates .gt. 0.0)
         if (n .gt. 0) then 
-            rate = sum(rates,mask=rates .gt. 0.0) / real(n,prec) 
+            rate = sum(rates,mask=rates .gt. 0.0) / real(n,prec)
         else 
             rate = 0.0 
         end if 

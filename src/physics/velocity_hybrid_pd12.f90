@@ -1,7 +1,7 @@
 module velocity_hybrid_pd12
 
     use nml 
-    use yelmo_defs ,only  : sp, dp, prec, rho_ice, rho_sw, rho_w, g
+    use yelmo_defs ,only  : sp, dp, prec, tol_underflow, rho_ice, rho_sw, rho_w, g
     use yelmo_tools, only : stagger_aa_ab, stagger_aa_ab_ice, &
                     integrate_trapezoid1D_1D, integrate_trapezoid1D_pt, minmax
 
@@ -740,6 +740,12 @@ contains
             ! 2. Calculate the total effective strain rate
             ! from Pollard and de Conto (2012), Eq. 6
             ! (Note: equation in text seems to have typo concerning cross terms)
+
+            ! Avoid underflows 
+            if (abs(dudx) .lt. tol_underflow) dudx = 0.0 
+            if (abs(dvdy) .lt. tol_underflow) dvdy = 0.0 
+            if (abs(dudy) .lt. tol_underflow) dudy = 0.0 
+            if (abs(dvdx) .lt. tol_underflow) dvdx = 0.0 
 
             eps_sq = dudx**2 + dvdy**2 + dudx*dvdy + 0.25*(dudy+dvdx)**2 + epsilon_sq_0
             

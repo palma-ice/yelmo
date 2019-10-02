@@ -9,7 +9,7 @@ module deformation
 
     ! Note: 3D arrays defined such that first index (k=1) == base, and max index (k=nk) == surface 
 
-    use yelmo_defs,  only : sp, dp, prec, T0, strain_2D_class, strain_3D_class
+    use yelmo_defs,  only : sp, dp, prec, tol_underflow, T0, strain_2D_class, strain_3D_class
     use yelmo_tools, only : calc_vertical_integrated_2D, integrate_trapezoid1D_1D   
 
     implicit none 
@@ -511,6 +511,10 @@ contains
                     strn%dxx(i,j,k) = (vx(i,j,k)-vx(im1,j,k))*fact_x(i,j)
                     strn%dyy(i,j,k) = (vy(i,j,k)-vy(i,jm1,k))*fact_y(i,j)
 
+                    ! Avoid underflows 
+                    if (abs(strn%dxx(i,j,k)) .lt. tol_underflow) strn%dxx(i,j,k) = 0.0 
+                    if (abs(strn%dyy(i,j,k)) .lt. tol_underflow) strn%dyy(i,j,k) = 0.0 
+                    
                     lxy(k) = (  (vx(i,jp1,k)+vx(im1,jp1,k))   &
                               - (vx(i,jm1,k)+vx(im1,jm1,k)) ) &
                              *0.25*fact_y(i,j)
@@ -589,6 +593,11 @@ contains
                 strn%dxz(i,j,:) = 0.5*(lxz+lzx)
                 strn%dyz(i,j,:) = 0.5*(lyz+lzy)
 
+                ! Avoid underflows 
+                where (abs(strn%dxy(i,j,:)) .lt. tol_underflow) strn%dxy(i,j,:) = 0.0 
+                where (abs(strn%dxz(i,j,:)) .lt. tol_underflow) strn%dxz(i,j,:) = 0.0 
+                where (abs(strn%dyz(i,j,:)) .lt. tol_underflow) strn%dyz(i,j,:) = 0.0 
+    
                 ! ====== Finished calculating individual strain rate terms ====== 
                 
                 ! Calculate the shear-based strain, stretching and the shear-fraction

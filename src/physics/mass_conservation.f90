@@ -1,6 +1,6 @@
 module mass_conservation
 
-    use yelmo_defs !, only :: sp, dp, prec 
+    use yelmo_defs, only : sp, dp, prec, tol_underflow, g, rho_ice, rho_sw  
     use yelmo_tools, only : stagger_aa_ab, fill_borders_2D
     use mass_conservation_impl_sico, only : calc_adv2D_expl_sico, calc_adv2D_impl_sico
 
@@ -51,15 +51,7 @@ contains
 
         allocate(calv_grnd(nx,ny))
         calv_grnd = 0.0 
-
-        ! Check inputs
-        write(*,*) "********"
-        write(*,*) "H_ice:  ", minval(H_ice), maxval(H_ice)
-        write(*,*) "ux:     ", minval(ux), maxval(ux)
-        write(*,*) "uy:     ", minval(uy), maxval(uy)
-        write(*,*) "dx, dt: ", dx, dt 
-        flush(6) 
-
+        
         ! 1. Apply mass conservation =================
 
         ! First, only resolve the dynamic part (ice advection)
@@ -320,7 +312,7 @@ end if
         integer    :: i, j, nx, ny
         integer    :: iter, ierr 
         real(prec) :: dtdx, dtdx2
-        real(prec) :: reste, delh
+        real(prec) :: reste, delh, tmp 
         real(prec), allocatable :: crelax(:,:)      ! diagnonale de M
         real(prec), allocatable :: arelax(:,:)      ! sous diagonale selon x
         real(prec), allocatable :: brelax(:,:)      ! sur  diagonale selon x
@@ -483,13 +475,8 @@ end if
             H = H - deltaH
 
             ! Check stopping criterion (something like rmse of remaining change in H)
-            delh = 0
-            do j=2,ny-1
-            do i=2,nx-1
-                delh = delh + deltaH(i,j)**2
-            end do
-            end do
-            delh = sqrt(delh)/((nx-2)*(ny-2))
+            where(deltaH .lt. tol_underflow) deltaH = 0.0_prec      ! Avoid underflows
+            delh = sqrt(sum(deltaH**2)) / ((nx-2)*(ny-2))
             
             ! Use simple stopping criterion: maximum remaining change in H
             ! Note: this is less likely to converge given the same stopping

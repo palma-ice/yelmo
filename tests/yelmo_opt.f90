@@ -32,7 +32,7 @@ program yelmo_test
     real(prec) :: time_tune, time_tune_0, time_tune_1, time_tune_2  
     integer    :: qmax_tune_length_1, qmax_tune_length_2
     logical    :: topo_fixed  
-    real(prec) :: cf_min, cf_max 
+    real(prec) :: cf_min, cf_max, cf_init  
     integer    :: opt_method 
 
     real(prec), allocatable :: cf_ref(:,:) 
@@ -58,7 +58,7 @@ program yelmo_test
     time_init           = 0.0       ! [yr] Starting time
     dtt                 = 2.0       ! [yr] Time step for time loop 
     dt2D_out            = 10.0      ! [yr] 2D output writing 
-    
+
     if (opt_method .eq. 1) then 
         ! Error method 
         qmax                = 200       ! Total number of iterations
@@ -78,6 +78,7 @@ program yelmo_test
         
     end if 
 
+    cf_init    = 0.2                    ! [--]
     cf_min     = 0.001                  ! [--] 
     cf_max     = 2.0                    ! [--]
 
@@ -145,18 +146,11 @@ program yelmo_test
     allocate(cf_ref_dot(yelmo1%grd%nx,yelmo1%grd%ny))
     allocate(cf_ref(yelmo1%grd%nx,yelmo1%grd%ny))
     cf_ref_dot = 0.0 
-    cf_ref     = 0.2
+    cf_ref     = cf_init 
     
-    yelmo1%dyn%now%N_eff = rho_ice*g*yelmo1%tpo%now%H_ice 
-
-    ! Update C_bed
-    call calc_ydyn_cbed_external(yelmo1%dyn,yelmo1%tpo,yelmo1%thrm,yelmo1%bnd,yelmo1%grd, &
-                                                                        domain,mask_noice,cf_ref)
-
     ! Initialize state variables (dyn,therm,mat)
     ! (initialize temps with robin method with a cold base)
     call yelmo_init_state(yelmo1,path_par,time=time_init,thrm_method="robin-cold")
-
 
     ! Note: From now on, using yelmo_update_equil_external allows for running with 
     ! interactive hydrology via hyd1 object and for passing cf_ref to be able
@@ -213,9 +207,11 @@ if (opt_method .eq. 1) then
             call calc_ydyn_cbed_external(yelmo1%dyn,yelmo1%tpo,yelmo1%thrm,yelmo1%bnd,yelmo1%grd, &
                                                                         domain,mask_noice,cf_ref)
 
-            if (mod(nint(time*100),nint(dt2D_out*100))==0) then
-                call write_step_2D_opt(yelmo1,file2D,time,cf_ref,cf_ref_dot,mask_noice)
-            end if 
+            cf_ref_dot = 0.0_prec 
+            
+!             if (mod(nint(time*100),nint(dt2D_out*100))==0) then
+!                 call write_step_2D_opt(yelmo1,file2D,time,cf_ref,cf_ref_dot,mask_noice)
+!             end if 
 
         end do 
 
@@ -239,7 +235,7 @@ if (opt_method .eq. 1) then
         
         
         ! Write the current solution 
-!         call write_step_2D_opt(yelmo1,file2D,time,cf_ref,cf_ref_dot,mask_noice)
+        call write_step_2D_opt(yelmo1,file2D,time,cf_ref,cf_ref_dot,mask_noice)
         
     end do 
 

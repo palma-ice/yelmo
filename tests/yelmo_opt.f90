@@ -57,7 +57,8 @@ program yelmo_test
     ! Simulation parameters
     time_init           = 0.0       ! [yr] Starting time
     dtt                 = 2.0       ! [yr] Time step for time loop 
-
+    dt2D_out            = 10.0      ! [yr] 2D output writing 
+    
     if (opt_method .eq. 1) then 
         ! Error method 
         qmax                = 200       ! Total number of iterations
@@ -212,7 +213,7 @@ if (opt_method .eq. 1) then
             call calc_ydyn_cbed_external(yelmo1%dyn,yelmo1%tpo,yelmo1%thrm,yelmo1%bnd,yelmo1%grd, &
                                                                         domain,mask_noice,cf_ref)
 
-            if (mod(nint(time*10),nint(dt2D_out*10))==0) then
+            if (mod(nint(time*100),nint(dt2D_out*100))==0) then
                 call write_step_2D_opt(yelmo1,file2D,time,cf_ref,cf_ref_dot,mask_noice)
             end if 
 

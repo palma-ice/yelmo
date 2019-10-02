@@ -212,6 +212,10 @@ if (opt_method .eq. 1) then
             call calc_ydyn_cbed_external(yelmo1%dyn,yelmo1%tpo,yelmo1%thrm,yelmo1%bnd,yelmo1%grd, &
                                                                         domain,mask_noice,cf_ref)
 
+            if (mod(nint(time*10),nint(dt2D_out*10))==0) then
+                call write_step_2D_opt(yelmo1,file2D,time,cf_ref,cf_ref_dot,mask_noice)
+            end if 
+
         end do 
 
         ! Update cf_ref based on error metric(s) 
@@ -234,7 +238,7 @@ if (opt_method .eq. 1) then
         
         
         ! Write the current solution 
-        call write_step_2D_opt(yelmo1,file2D,time,cf_ref,cf_ref_dot,mask_noice)
+!         call write_step_2D_opt(yelmo1,file2D,time,cf_ref,cf_ref_dot,mask_noice)
         
     end do 
 

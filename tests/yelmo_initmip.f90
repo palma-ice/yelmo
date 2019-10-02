@@ -84,10 +84,6 @@ program yelmo_test
 
     time = time_init 
 
-    ! Initialize state variables (dyn,therm,mat)
-    ! (initialize temps with robin method with a cold base)
-    call yelmo_init_state(yelmo1,path_par,time=time_init,thrm_method="robin-cold")
-
     ! Define no-ice mask from present-day data
     allocate(mask_noice(yelmo1%grd%nx,yelmo1%grd%ny))
     mask_noice = .FALSE. 
@@ -127,6 +123,10 @@ program yelmo_test
 
     end if 
 
+    ! Initialize state variables (dyn,therm,mat)
+    ! (initialize temps with robin method with a cold base)
+    call yelmo_init_state(yelmo1,path_par,time=time_init,thrm_method="robin-cold")
+
     allocate(cf_ref(yelmo1%grd%nx,yelmo1%grd%ny))
     cf_ref = 0.0 
 
@@ -149,7 +149,7 @@ program yelmo_test
     ! 1D file 
     call write_yreg_init(yelmo1,file1D,time_init=time_init,units="years",mask=yelmo1%bnd%ice_allowed)
     call write_yreg_step(yelmo1%reg,file1D,time=time)  
-
+    
     ! Advance timesteps
     do n = 1, ceiling((time_end-time_init)/dtt)
 
@@ -623,7 +623,7 @@ end if
         allocate(wts(nx,ny))
 
         ! Get Gaussian weights 
-        wts = 1.0/(2.0*pi*sigma**2)*exp(-((xx-x0)**2+(yy-y0)**2)/(2*sigma**2))
+        wts = 1.0/(2.0*pi*sigma**2)*exp(-((xx-x0)**2+(yy-y0)**2)/(2.0*sigma**2))
         wts = wts / maxval(wts)
 
         ! Scale C_bed

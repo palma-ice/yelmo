@@ -118,7 +118,7 @@ contains
         if ( count(beta_acx .gt. 0.0 .and. H_grnd .gt. 0.0) .eq. 0 ) then 
             ! No points found with a non-zero beta for grounded ice,
             ! something was not well-defined/well-initialized
-            
+
             write(*,*) 
             write(*,*) "calc_vxy_ssa_matrix:: Error: beta appears to be zero everywhere for grounded ice."
             write(*,*) "range(beta_acx): ", minval(beta_acx), maxval(beta_acx)
@@ -1023,7 +1023,7 @@ end subroutine calc_vxy_ssa_matrix
         real(prec), intent(INOUT) :: u  
         real(prec), intent(IN)    :: u_lim
 
-        real(prec), parameter :: tol = 1e-10 
+        real(prec), parameter :: tol = 1e-5
 
         u = min(u, u_lim)
         u = max(u,-u_lim)

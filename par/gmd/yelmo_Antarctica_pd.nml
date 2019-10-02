@@ -1,10 +1,10 @@
 &control    
     time_init       = 0.0               ! [yr] Starting time 
-    time_end        = 50e3              ! [yr] Ending time
+    time_end        = 1e3               ! [yr] Ending time
     time_equil      = 10.0              ! [yr] Equilibration time 
     dtt             = 2.0               ! [yr] Main loop timestep 
     dt1D_out        = 100.0             ! [yr] Frequency of writing 1D output files 
-    dt2D_out        = 500.0             ! [yr] Frequency of writing 2D output files 
+    dt2D_out        = 100.0             ! [yr] Frequency of writing 2D output files 
     bmb_shlf_const  = -0.2              ! [m/a] Basal mass balance of ice shelves
     dT_ann          = 0.0               ! [K] Temperature anomaly (atm)
     z_sl            = 0.0               ! [m] Sea level relative to present-day 
@@ -72,8 +72,8 @@
     cb_z0               = -200.0          ! [m] Bedrock elevation at which scaling goes to f_scale=e(-1)
     cb_z1               = 0.0             ! [m] Bedrock elevation above which scaling goes to f_scale=1
     cb_min              = 0.01            ! [--] Minimum allowed value of f_scale for grounded ice
-    cf_frozen           = 100e-3          ! [--] Bed critical stress factor, frozen 
-    cf_stream           = 200e-3          ! [--] Bed critical stress factor, stream  
+    cf_frozen           = 1.0             ! [--] Bed critical stress factor, frozen 
+    cf_stream           = 0.2             ! [--] Bed critical stress factor, stream  
     n_sm_beta           = 0               ! [-] Standard deviation in gridpoints for Gaussian smoothing of beta (0==no smoothing)
     beta_min            = 100.0           ! [Pa a m-1] Minimum value of beta allowed for grounded ice (for stability)
     ssa_beta_max        = 1e20            ! [Pa a m-1] Maximum value of beta for which ssa should be calculated 

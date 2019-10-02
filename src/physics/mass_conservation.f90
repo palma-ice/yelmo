@@ -51,7 +51,7 @@ contains
 
         allocate(calv_grnd(nx,ny))
         calv_grnd = 0.0 
-        
+
         ! 1. Apply mass conservation =================
 
         ! First, only resolve the dynamic part (ice advection)
@@ -449,6 +449,12 @@ end if
         end do
         end do
 
+        ! Avoid underflows 
+        where (abs(arelax) .lt. tol_underflow) arelax = 0.0_prec 
+        where (abs(brelax) .lt. tol_underflow) brelax = 0.0_prec 
+        where (abs(drelax) .lt. tol_underflow) drelax = 0.0_prec 
+        where (abs(erelax) .lt. tol_underflow) erelax = 0.0_prec 
+        
         ! Initialize new H solution to zero (to get zeros at boundaries)
         H  = 0.0
 
@@ -475,7 +481,7 @@ end if
             H = H - deltaH
 
             ! Check stopping criterion (something like rmse of remaining change in H)
-            where(deltaH .lt. tol_underflow) deltaH = 0.0_prec      ! Avoid underflows
+            where(abs(deltaH) .lt. tol_underflow) deltaH = 0.0_prec      ! Avoid underflows
             delh = sqrt(sum(deltaH**2)) / ((nx-2)*(ny-2))
             
             ! Use simple stopping criterion: maximum remaining change in H

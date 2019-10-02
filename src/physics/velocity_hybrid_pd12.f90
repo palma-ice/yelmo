@@ -641,16 +641,25 @@ contains
             dudx = (ux(i,j) - ux(im1,j))/dx
             dvdy = (uy(i,j) - uy(i,jm1))/dy
 
-            ! Calculation of cross terms on central Aa nodes (symmetrical results)
+            ! Calculation of cross terms on central aa-nodes (symmetrical results)
             dudy = ((ux(i,jp1)   - ux(i,jm1))    &
                   + (ux(im1,jp1) - ux(im1,jm1))) * inv_4dx 
             dvdx = ((uy(ip1,j)   - uy(im1,j))    &
                   + (uy(ip1,jm1) - uy(im1,jm1))) * inv_4dy 
 
-            ! 2. Un-stagger shear terms to central Aa nodes
+            ! 2. Un-stagger shear terms to central aa-nodes
 
             duxdz_aa = 0.5_prec*(duxdz(i,j) + duxdz(im1,j))
             duydz_aa = 0.5_prec*(duydz(i,j) + duydz(im1,j))
+            
+            ! Avoid underflows 
+            if (abs(dudx) .lt. tol_underflow) dudx = 0.0 
+            if (abs(dvdy) .lt. tol_underflow) dvdy = 0.0 
+            if (abs(dudy) .lt. tol_underflow) dudy = 0.0 
+            if (abs(dvdx) .lt. tol_underflow) dvdx = 0.0 
+
+            if (abs(duxdz_aa) .lt. tol_underflow) duxdz_aa = 0.0 
+            if (abs(duydz_aa) .lt. tol_underflow) duydz_aa = 0.0 
             
             ! 3. Calculate the total effective strain rate
             ! from Pollard and de Conto (2012), Eq. 6
@@ -782,10 +791,16 @@ contains
         real(prec), intent(IN)  :: ux_b(:,:)       ! [m a-1] Basal velocity (acx nodes)
         real(prec), intent(IN)  :: uy_b(:,:)       ! [m a-1] Basal velocity (acy nodes)
         
+        real(prec), parameter :: tol = 1e-3_prec 
+
         ! Calculate basal stress 
         taub_acx = -beta_acx * ux_b 
         taub_acy = -beta_acy * uy_b 
 
+        ! Avoid underflows
+        where(abs(taub_acx) .lt. tol) taub_acx = 0.0_prec 
+        where(abs(taub_acy) .lt. tol) taub_acy = 0.0_prec 
+        
         return 
 
     end subroutine calc_basal_stress

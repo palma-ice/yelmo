@@ -26,7 +26,7 @@ module yelmo_defs
     ! Error distance (very large), error index, and smallest number epsilon 
     real(prec), parameter :: ERR_DIST = real(1E8,prec) 
     integer,    parameter :: ERR_IND  = -1 
-    real(prec), parameter :: tol_underflow = real(1E-10,prec)
+    real(prec), parameter :: tol_underflow = real(1E-15,prec)
 
     ! Mathematical constants
     real(prec), parameter :: pi  = real(2._dp*acos(0.0_dp),prec)
@@ -785,7 +785,7 @@ contains
         rates(n) = rate_now 
 
         ! Avoid underflows
-        where(rates .lt. tol_underflow) rates = 0.0_prec
+        where(abs(rates) .lt. tol_underflow) rates = 0.0_prec
         
         ! Calculate running average rate 
         n    = count(rates .gt. 0.0)

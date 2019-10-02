@@ -2,7 +2,7 @@ module yelmo_tools
     ! Generic functions and subroutines that could be used in many contexts:
     ! math, vectors, sorting, etc. 
 
-    use yelmo_defs, only : sp, dp, prec, pi
+    use yelmo_defs, only : sp, dp, prec, tol_underflow, pi
     
     implicit none 
 
@@ -117,6 +117,7 @@ contains
 
             if (f1+f2 .gt. 0.0) then 
                 unow = (f1*u(i-1,j) + f2*u(i,j)) / (f1+f2)
+                if (abs(unow) .lt. tol_underflow) unow = 0.0_prec 
             else 
                 unow = 0.0 
             end if 
@@ -131,6 +132,7 @@ contains
 
             if (f1+f2 .gt. 0.0) then 
                 vnow = (f1*v(i,j-1) + f2*v(i,j)) / (f1+f2)
+                if (abs(vnow) .lt. tol_underflow) vnow = 0.0_prec 
             else 
                 vnow = 0.0 
             end if 

@@ -184,7 +184,7 @@ program yelmo_test
 
     ! Initialize the 2D output file and write the initial model state 
     call yelmo_write_init(yelmo1,file2D,time_init,units="years")  
-    call write_step_2D_opt(yelmo1,file2D,time_init,cf_ref,cf_ref_dot,mask_noice,time_iter=0.0)  
+    call write_step_2D_opt(yelmo1,file2D,time_init,cf_ref,cf_ref_dot,mask_noice)  
     
     ! Initialize time variable 
     time = time_init 
@@ -192,26 +192,9 @@ program yelmo_test
 if (opt_method .eq. 1) then 
     ! Error method (Pollard and De Conto, 2012)
 
+
     do q = 1, qmax 
 
-        ! Update cf_ref based on error metric(s) 
-        call update_cf_ref_thickness_simple(cf_ref,cf_ref_dot,yelmo1%tpo%now%H_ice, &
-                        yelmo1%bnd%z_bed,yelmo1%dyn%now%ux_bar,yelmo1%dyn%now%uy_bar, &
-                        yelmo1%dta%pd%H_ice,yelmo1%tpo%par%dx,cf_min,cf_max)
-
-        ! Update C_bed 
-        call calc_ydyn_cbed_external(yelmo1%dyn,yelmo1%tpo,yelmo1%thrm,yelmo1%bnd,yelmo1%grd, &
-                                                                        domain,mask_noice,cf_ref)
-
-        if (q .le. qmax_iter_length_2) then 
-            ! Reset model to the initial state (including H_w) and time, with updated C_bed field 
-            yelmo_ref%dyn%now%C_bed = yelmo1%dyn%now%C_bed 
-            yelmo1 = yelmo_ref 
-            hyd1   = hyd_ref 
-            time   = 0.0 
-            call yelmo_set_time(yelmo1,time) 
-        end if 
-        
         ! Update time_iter
         if (q .gt. qmax_iter_length_1) time_iter = time_iter_1
 !         if (q .gt. qmax_iter_length_2) time_iter = time_iter_2
@@ -225,9 +208,29 @@ if (opt_method .eq. 1) then
             call yelmo_update(yelmo1,time)
 
         end do 
+
+        ! Update cf_ref based on error metric(s) 
+        call update_cf_ref_thickness_simple(cf_ref,cf_ref_dot,yelmo1%tpo%now%H_ice, &
+                        yelmo1%bnd%z_bed,yelmo1%dyn%now%ux_bar,yelmo1%dyn%now%uy_bar, &
+                        yelmo1%dta%pd%H_ice,yelmo1%tpo%par%dx,cf_min,cf_max)
+
+        ! Update C_bed 
+        call calc_ydyn_cbed_external(yelmo1%dyn,yelmo1%tpo,yelmo1%thrm,yelmo1%bnd,yelmo1%grd, &
+                                                                        domain,mask_noice,cf_ref)
+
+
+!         if (q .le. qmax_iter_length_2) then 
+!             ! Reset model to the initial state (including H_w) and time, with updated C_bed field 
+!             yelmo_ref%dyn%now%C_bed = yelmo1%dyn%now%C_bed 
+!             yelmo1 = yelmo_ref 
+!             hyd1   = hyd_ref 
+!             time   = 0.0 
+!             call yelmo_set_time(yelmo1,time) 
+!         end if 
+        
         
         ! Write the current solution 
-        call write_step_2D_opt(yelmo1,file2D,real(q),cf_ref,cf_ref_dot,mask_noice,time_iter=time_iter)
+        call write_step_2D_opt(yelmo1,file2D,time,cf_ref,cf_ref_dot,mask_noice)
         
     end do 
 
@@ -274,7 +277,7 @@ else
         end do 
 
         ! Write the current solution 
-        call write_step_2D_opt(yelmo1,file2D,real(q),cf_ref,cf_ref_dot,mask_noice,time_iter=time_tune+time_iter)
+        call write_step_2D_opt(yelmo1,file2D,time,cf_ref,cf_ref_dot,mask_noice)
         
     end do 
 
@@ -294,7 +297,7 @@ end if
 
 contains
 
-    subroutine write_step_2D_opt(ylmo,filename,time,cf_ref,cf_ref_dot,mask_noice,time_iter)
+    subroutine write_step_2D_opt(ylmo,filename,time,cf_ref,cf_ref_dot,mask_noice)
 
         implicit none 
         
@@ -304,7 +307,6 @@ contains
         real(prec), intent(IN) :: cf_ref(:,:) 
         real(prec), intent(IN) :: cf_ref_dot(:,:)
         logical,    intent(IN) :: mask_noice(:,:) 
-        real(prec), intent(IN) :: time_iter 
 
         ! Local variables
         integer    :: ncid, n
@@ -333,9 +335,6 @@ contains
         call nc_write(filename,"speed",ylmo%par%model_speed,units="kyr/hr",long_name="Model speed (Yelmo only)", &
                       dim1="time",start=[n],count=[1],ncid=ncid)
         
-        ! Write the number of iterations for this solution
-        call nc_write(filename,"time_iter",time_iter,dim1="time",start=[n],count=[1],ncid=ncid)
-
         ! 1D variables 
         call nc_write(filename,"V_ice",ylmo%reg%V_ice,units="km3",long_name="Ice volume", &
                               dim1="time",start=[n],count=[1],ncid=ncid)

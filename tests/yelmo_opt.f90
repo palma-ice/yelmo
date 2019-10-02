@@ -56,6 +56,7 @@ program yelmo_test
 
     ! Simulation parameters
     time_init           = 0.0       ! [yr] Starting time
+    dtt                 = 2.0       ! [yr] Time step for time loop 
 
     if (opt_method .eq. 1) then 
         ! Error method 
@@ -200,9 +201,9 @@ if (opt_method .eq. 1) then
 !         if (q .gt. qmax_iter_length_2) time_iter = time_iter_2
         
         ! Perform iteration loop to diagnose error for modifying C_bed 
-        do n = 1, int(time_iter)
+        do n = 1, int(time_iter/dtt)
         
-            time = time + 1.0
+            time = time + dtt 
 
             ! Update ice sheet 
             call yelmo_update(yelmo1,time)

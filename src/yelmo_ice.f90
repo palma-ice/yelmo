@@ -179,6 +179,9 @@ contains
             dom%par%ntt             = 1 
             dom%dyn%par%ssa_vel_max = ssa_vel_max
 
+            ! Set model time to input time 
+            call yelmo_set_time(dom,time)
+
             write(*,*) 
             write(*,*) "Starting equilibration steps, time to run [yrs]: ", time_tot 
 
@@ -389,7 +392,7 @@ contains
 
         ! Set bnd%H_ice_ref to present-day ice thickness by default 
         dom%bnd%H_ice_ref = dom%dta%pd%H_ice 
-        
+
         write(*,*) 
         write(*,*) "yelmo_init:: Initialization complete for domain: "// &
                    trim(dom%par%domain) 

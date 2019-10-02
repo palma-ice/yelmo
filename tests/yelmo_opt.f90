@@ -8,6 +8,7 @@ program yelmo_test
 
     use gaussian_filter 
     use basal_hydro_simple 
+    use basal_dragging
 
     implicit none 
 
@@ -30,13 +31,12 @@ program yelmo_test
     integer    :: q, qmax, qmax_topo_fixed, qmax_iter_length_1, qmax_iter_length_2
     real(prec) :: time_tune, time_tune_0, time_tune_1, time_tune_2  
     integer    :: qmax_tune_length_1, qmax_tune_length_2
-    logical    :: topo_fixed 
-    real(prec) :: phi_min, phi_max  
-    real(prec) :: cb_max 
+    logical    :: topo_fixed  
+    real(prec) :: cf_min, cf_max 
     integer    :: opt_method 
 
-    real(prec), allocatable :: dCbed(:,:) 
-    real(prec), allocatable :: phi(:,:) 
+    real(prec), allocatable :: cf_ref(:,:) 
+    real(prec), allocatable :: cf_ref_dot(:,:) 
 
     ! No-ice mask (to impose additional melting)
     logical, allocatable :: mask_noice(:,:)  
@@ -51,26 +51,6 @@ program yelmo_test
     call nml_read(path_par,"control","dT_ann",          dT_ann)                    ! [K] Temperature anomaly (atm)
     call nml_read(path_par,"control","z_sl",            z_sl)                      ! [m] Sea level relative to present-day
     
-    ! Assume program is running from the output folder
-    outfldr = "./"
-
-    ! Define input and output locations 
-    path_const = trim(outfldr)//"yelmo_const_Earth.nml"
-    file1D     = trim(outfldr)//"yelmo1D.nc"
-    file2D     = trim(outfldr)//"yelmo2D.nc"
-
-    ! === Initialize ice sheet model =====
-
-    ! General initialization of yelmo constants (used globally)
-    call yelmo_global_init(path_const)
-
-    ! Initialize data objects and load initial topography
-    call yelmo_init(yelmo1,filename=path_par,grid_def="file",time=time_init)
-
-    ! Also intialize simple basal hydrology object
-    call hydro_init(hyd1,filename=path_par,nx=yelmo1%grd%nx,ny=yelmo1%grd%ny)
-    call hydro_init_state(hyd1,yelmo1%tpo%now%H_ice,yelmo1%tpo%now%f_grnd,time)
-
     ! Choose optimization method (1: error method, 2: ratio method) 
     opt_method = 1 
 
@@ -96,10 +76,8 @@ program yelmo_test
         
     end if 
 
-    phi_min             =  5.0      ! Minimum allowed friction angle
-    phi_max             = 70.0      ! Maximum allowed friction angle 
-
-    cb_max              = 5e5       ! [Pa yr m-1]
+    cf_min     = 0.001                  ! [--] 
+    cf_max     = 2.0                    ! [--]
 
     ! Not used right now:
 !     qmax_topo_fixed     = 0         ! Number of initial iterations that should use topo_fixed=.TRUE. 
@@ -109,6 +87,26 @@ program yelmo_test
 !     qmax_iter_length_1  = 10        ! 1st number of iterations at which iteration length should increase
 !     qmax_iter_length_2  = 50        ! 2nd number of iterations at which iteration length should increase
     
+    ! Assume program is running from the output folder
+    outfldr = "./"
+
+    ! Define input and output locations 
+    path_const = trim(outfldr)//"yelmo_const_Earth.nml"
+    file1D     = trim(outfldr)//"yelmo1D.nc"
+    file2D     = trim(outfldr)//"yelmo2D.nc"
+
+    ! === Initialize ice sheet model =====
+
+    ! General initialization of yelmo constants (used globally)
+    call yelmo_global_init(path_const)
+
+    ! Initialize data objects and load initial topography
+    call yelmo_init(yelmo1,filename=path_par,grid_def="file",time=time_init)
+
+    ! Also intialize simple basal hydrology object
+    call hydro_init(hyd1,filename=path_par,nx=yelmo1%grd%nx,ny=yelmo1%grd%ny)
+    call hydro_init_state(hyd1,yelmo1%tpo%now%H_ice,yelmo1%tpo%now%f_grnd,time)
+
     ! === Set initial boundary conditions for current time and yelmo state =====
     ! ybound: z_bed, z_sl, H_sed, H_w, smb, T_srf, bmb_shlf , Q_geo
 
@@ -128,24 +126,6 @@ program yelmo_test
     
     call yelmo_print_bound(yelmo1%bnd)
 
-    time = time_init 
-
-    ! Allocate rate of change of C_bed
-    allocate(phi(yelmo1%grd%nx,yelmo1%grd%ny))
-    allocate(dCbed(yelmo1%grd%nx,yelmo1%grd%ny))
-    phi   = 0.0 
-    dCbed = 0.0 
-
-    ! Set initial guess of C_bed as a function of present-day velocity 
-    !call guess_C_bed(yelmo1%dyn%now%C_bed,phi,yelmo1%dta%pd%uxy_s,phi_min,phi_max,yelmo1%dyn%par%cf_stream)
-
-    yelmo1%dyn%now%C_bed = 2e5
-    where(yelmo1%tpo%now%H_ice .eq. 0.0) yelmo1%dyn%now%C_bed = yelmo1%dyn%par%cb_min
-
-    ! Initialize state variables (dyn,therm,mat)
-    ! (initialize temps with robin method with a cold base)
-    call yelmo_init_state(yelmo1,path_par,time=time_init,thrm_method="robin-cold")
-
     ! Define no-ice mask from present-day data
     allocate(mask_noice(yelmo1%grd%nx,yelmo1%grd%ny))
     mask_noice = .FALSE. 
@@ -158,51 +138,86 @@ program yelmo_test
         where(mask_noice) yelmo1%bnd%bmb_shlf = yelmo1%bnd%bmb_shlf - 2.0 
     end if 
     
-    ! Saturate maximum smb to 1.5 m/a 
-    !where(yelmo1%bnd%smb .gt. 1.5) yelmo1%bnd%smb = 1.5 
+    ! Initialize cf_ref and calculate initial guess of C_bed 
+    ! (requires ad-hoc initialization of N_eff too)
+    allocate(cf_ref_dot(yelmo1%grd%nx,yelmo1%grd%ny))
+    allocate(cf_ref(yelmo1%grd%nx,yelmo1%grd%ny))
+    cf_ref_dot = 0.0 
+    cf_ref     = 0.2
+    
+    yelmo1%dyn%now%N_eff = rho_ice*g*yelmo1%tpo%now%H_ice 
+
+    ! Update C_bed
+    call calc_ydyn_cbed_external(yelmo1%dyn,yelmo1%tpo,yelmo1%thrm,yelmo1%bnd,yelmo1%grd, &
+                                                                        domain,mask_noice,cf_ref)
+
+    ! Initialize state variables (dyn,therm,mat)
+    ! (initialize temps with robin method with a cold base)
+    call yelmo_init_state(yelmo1,path_par,time=time_init,thrm_method="robin-cold")
+
+    ! Initialize the 2D output file and write the initial model state 
+    call yelmo_write_init(yelmo1,file2D,time_init,units="years")  
+    call write_step_2D_opt(yelmo1,file2D,time_init,cf_ref,cf_ref_dot,mask_noice,time_iter=0.0)  
+
+    flush(6)
+    
+    ! Note: Below, using yelmo_update_equil_external allows for running with 
+    ! interactive hydrology via hyd1 object and for passing cf_ref to be able
+    ! to update C_bed as a function of N_eff interactively.
 
     ! ============================================================================================
     ! Step 1: Relaxtion step: run SIA model for 100 years to smooth out the input
     ! topography that will be used as a target. 
 
-    call yelmo_update_equil(yelmo1,time,time_tot=10.0,topo_fixed=.FALSE.,dt=1.0,ssa_vel_max=0.0)
+    call yelmo_update_equil_external(yelmo1,hyd1,cf_ref,time_init,time_tot=50.0,topo_fixed=.FALSE.,dt=1.0,ssa_vel_max=0.0)
+!     call yelmo_update_equil(yelmo1,time_init,time_tot=50.0,topo_fixed=.FALSE.,dt=1.0,ssa_vel_max=0.0)
+    
+    flush(6)
+
+    call write_step_2D_opt(yelmo1,file2D,time_init+1.0,cf_ref,cf_ref_dot,mask_noice,time_iter=0.0)  
+    stop 
     
     ! Define present topo as present-day dataset for comparison 
     yelmo1%dta%pd%H_ice = yelmo1%tpo%now%H_ice 
     yelmo1%dta%pd%z_srf = yelmo1%tpo%now%z_srf 
 
     ! ============================================================================================
-    ! Step 2: Run the model for several ka in SIA mode with topo_fixed to
+    ! Step 2: Run the model for several ka in hybrid mode with topo_fixed to
     ! spin up the thermodynamics and have a reference state to reset.
     ! Store the reference state for future use.
-    ! Note: using yelmo_update_equil_external allows for running with interactive hydrology via hyd1 object
-
-    call yelmo_update_equil_external(yelmo1,hyd1,time,time_tot=10.0,topo_fixed=.TRUE.,dt=5.0,ssa_vel_max=0.0)
+    
+    call yelmo_update_equil_external(yelmo1,hyd1,cf_ref,time_init,time_tot=100.0,topo_fixed=.TRUE.,dt=5.0,ssa_vel_max=0.0)
+    !call yelmo_update_equil_external(yelmo1,hyd1,cf_ref,time_init,time_tot=1e3,topo_fixed=.TRUE.,dt=1.0,ssa_vel_max=1000.0)
 
     ! Store the reference state
     yelmo_ref = yelmo1 
     hyd_ref   = hyd1 
 
-    ! Initialize the 2D output file and write the initial model state 
-    call yelmo_write_init(yelmo1,file2D,time_init=0.0,units="years")  
-    call write_step_2D_opt(yelmo1,file2D,time=0.0,dCbed=dCbed,phi=phi,time_iter=0.0)  
 
-!     call yelmo_update_equil(yelmo_ref,time,time_tot=500.0,topo_fixed=.FALSE.,dt=0.5,ssa_vel_max=500.0)
-!     call write_step_2D_opt(yelmo_ref,file2D,time=1.0,dCbed=dCbed,phi=phi)  
-!     stop "Done."
+    !call yelmo_update_equil_external(yelmo1,hyd1,cf_ref,time_init,time_tot=100.0,topo_fixed=.TRUE.,dt=0.5,ssa_vel_max=1000.0)
+    call write_step_2D_opt(yelmo1,file2D,time_init+2.0,cf_ref,cf_ref_dot,mask_noice,time_iter=0.0)  
+
+    stop "Done."
 
     ! Initially assume we are working with topo_fixed... (only for optimizing velocity)
     topo_fixed = .TRUE. 
+
+    ! Initialize time variable 
+    time = time_init 
 
 if (opt_method .eq. 1) then 
     ! Error method (Pollard and De Conto, 2012)
 
     do q = 1, qmax 
 
-        ! Update C_bed based on error metric(s) 
-        call update_C_bed_thickness_simple(yelmo1%dyn%now%C_bed,dCbed,yelmo1%tpo%now%H_ice, &
+        ! Update cf_ref based on error metric(s) 
+        call update_cf_ref_thickness_simple(cf_ref,cf_ref_dot,yelmo1%tpo%now%H_ice, &
                         yelmo1%bnd%z_bed,yelmo1%dyn%now%ux_bar,yelmo1%dyn%now%uy_bar, &
-                        yelmo1%dta%pd%H_ice,yelmo1%tpo%par%dx,yelmo1%dyn%par%cb_min,cb_max=cb_max)
+                        yelmo1%dta%pd%H_ice,yelmo1%tpo%par%dx,cf_min,cf_max)
+
+        ! Update C_bed 
+        call calc_ydyn_cbed_external(yelmo1%dyn,yelmo1%tpo,yelmo1%thrm,yelmo1%bnd,yelmo1%grd, &
+                                                                        domain,mask_noice,cf_ref)
 
         if (q .le. qmax_iter_length_2) then 
             ! Reset model to the initial state (including H_w) and time, with updated C_bed field 
@@ -228,7 +243,7 @@ if (opt_method .eq. 1) then
         end do 
 
         ! Write the current solution 
-        call write_step_2D_opt(yelmo1,file2D,time=real(q),dCbed=dCbed,phi=phi,time_iter=time_iter)
+        call write_step_2D_opt(yelmo1,file2D,real(q),cf_ref,cf_ref_dot,mask_noice,time_iter=time_iter)
         
     end do 
 
@@ -253,10 +268,14 @@ else
             call yelmo_update(yelmo1,time)
 
             ! Update C_bed based on error metric(s) 
-            call update_C_bed_thickness_ratio(yelmo1%dyn%now%C_bed,dCbed,yelmo1%tpo%now%H_ice, &
+            call update_cf_ref_thickness_ratio(cf_ref,cf_ref_dot,yelmo1%tpo%now%H_ice, &
                             yelmo1%bnd%z_bed,yelmo1%dyn%now%ux_bar,yelmo1%dyn%now%uy_bar, &
                             yelmo1%dyn%now%uxy_i_bar,yelmo1%dyn%now%uxy_b,yelmo1%dta%pd%H_ice, &
-                            yelmo1%tpo%par%dx,yelmo1%dyn%par%cb_min,cb_max=cb_max)
+                            yelmo1%tpo%par%dx,cf_min,cf_max=cf_max)
+
+            ! Update C_bed 
+            call calc_ydyn_cbed_external(yelmo1%dyn,yelmo1%tpo,yelmo1%thrm,yelmo1%bnd,yelmo1%grd, &
+                                                                        domain,mask_noice,cf_ref)
 
         end do 
 
@@ -271,13 +290,13 @@ else
         end do 
 
         ! Write the current solution 
-        call write_step_2D_opt(yelmo1,file2D,time=real(q),dCbed=dCbed,phi=phi,time_iter=time_tune+time_iter)
+        call write_step_2D_opt(yelmo1,file2D,real(q),cf_ref,cf_ref_dot,mask_noice,time_iter=time_tune+time_iter)
         
     end do 
 
 end if 
 
-!         call yelmo_update_equil_external(yelmo1,hyd1,time,time_tot=time_iter,topo_fixed=topo_fixed,dt=0.5,ssa_vel_max=5000.0)
+!         call yelmo_update_equil_external(yelmo1,hyd1,cf_ref,time,time_tot=time_iter,topo_fixed=topo_fixed,dt=0.5,ssa_vel_max=5000.0)
 
 
     ! Finalize program
@@ -291,15 +310,16 @@ end if
 
 contains
 
-    subroutine write_step_2D_opt(ylmo,filename,time,dCbed,phi,time_iter)
+    subroutine write_step_2D_opt(ylmo,filename,time,cf_ref,cf_ref_dot,mask_noice,time_iter)
 
         implicit none 
         
         type(yelmo_class), intent(IN) :: ylmo
         character(len=*),  intent(IN) :: filename
         real(prec), intent(IN) :: time
-        real(prec), intent(IN) :: dCbed(:,:) 
-        real(prec), intent(IN) :: phi(:,:)
+        real(prec), intent(IN) :: cf_ref(:,:) 
+        real(prec), intent(IN) :: cf_ref_dot(:,:)
+        logical,    intent(IN) :: mask_noice(:,:) 
         real(prec), intent(IN) :: time_iter 
 
         ! Local variables
@@ -340,6 +360,10 @@ contains
         call nc_write(filename,"dVicedt",ylmo%reg%dVicedt,units="km3 yr-1",long_name="Rate of volume change", &
                       dim1="time",start=[n],count=[1],ncid=ncid)
         
+        ! Ice limiting mask
+        call nc_write(filename,"mask_noice",mask_noice,units="",long_name="No-ice mask", &
+                      dim1="xc",dim2="yc",ncid=ncid)
+        
         ! Variables
         call nc_write(filename,"H_ice",ylmo%tpo%now%H_ice,units="m",long_name="Ice thickness", &
                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
@@ -353,16 +377,17 @@ contains
         
         call nc_write(filename,"C_bed",ylmo%dyn%now%C_bed,units="Pa",long_name="Bed friction coefficient", &
                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-        call nc_write(filename,"dCbed",dCbed,units="-",long_name="Bed coefficient change", &
-                      dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-        call nc_write(filename,"phi",phi,units="degrees",long_name="Till friction angle", &
-                      dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
         
+        call nc_write(filename,"cf_ref",cf_ref,units="",long_name="Bed friction scalar", &
+                      dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
+        call nc_write(filename,"cf_ref_dot",cf_ref_dot,units="1/a",long_name="Bed friction scalar rate of change", &
+                      dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
+
         call nc_write(filename,"N_eff",ylmo%dyn%now%N_eff,units="Pa",long_name="Effective pressure", &
                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
         call nc_write(filename,"beta",ylmo%dyn%now%beta,units="Pa a m-1",long_name="Basal friction coefficient", &
                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-        call nc_write(filename,"visc_eff",ylmo%dyn%now%visc_eff,units="1",long_name="Effective viscosity (SSA)", &
+        call nc_write(filename,"visc_eff",ylmo%dyn%now%visc_eff,units="Pa a m",long_name="Effective viscosity (SSA)", &
                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
 
         call nc_write(filename,"uxy_s",ylmo%dyn%now%uxy_s,units="m/a",long_name="Surface velocity magnitude", &
@@ -372,6 +397,12 @@ contains
 
         call nc_write(filename,"f_pmp",ylmo%thrm%now%f_pmp,units="",long_name="Basal temperate fraction", &
                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
+        
+        call nc_write(filename,"T_prime",ylmo%thrm%now%T_ice-ylmo%thrm%now%T_pmp,units="deg C",long_name="Homologous ice temperature", &
+                      dim1="xc",dim2="yc",dim3="zeta",dim4="time",start=[1,1,1,n],ncid=ncid)
+        
+        call nc_write(filename,"ATT",ylmo%mat%now%ATT,units="a^-1 Pa^-3",long_name="Rate factor", &
+                      dim1="xc",dim2="yc",dim3="zeta",dim4="time",start=[1,1,1,n],ncid=ncid)
         
         ! Boundary variables (forcing)
         call nc_write(filename,"z_bed",ylmo%bnd%z_bed,units="m",long_name="Bedrock elevation", &
@@ -441,13 +472,13 @@ contains
         end if 
         
         call nc_write(filename,"rmse_H",H_rmse,units="m",long_name="RMSE - Ice thickness", &
-                      dim1="time",start=[n],count=[1],ncid=ncid)
+                      dim1="time",start=[n],count=[1],ncid=ncid,missing_value=mv)
         call nc_write(filename,"rmse_zsrf",zsrf_rmse,units="m",long_name="RMSE - Surface elevation", &
-                      dim1="time",start=[n],count=[1],ncid=ncid)
+                      dim1="time",start=[n],count=[1],ncid=ncid,missing_value=mv)
         call nc_write(filename,"rmse_uxy",uxy_rmse,units="m/a",long_name="RMSE - Surface velocity", &
-                      dim1="time",start=[n],count=[1],ncid=ncid)
+                      dim1="time",start=[n],count=[1],ncid=ncid,missing_value=mv)
         call nc_write(filename,"rmse_uxy_log",loguxy_rmse,units="log(m/a)",long_name="RMSE - Log surface velocity", &
-                      dim1="time",start=[n],count=[1],ncid=ncid)
+                      dim1="time",start=[n],count=[1],ncid=ncid,missing_value=mv)
         
         ! Close the netcdf file
         call nc_close(ncid)
@@ -456,54 +487,450 @@ contains
 
     end subroutine write_step_2D_opt
 
-    subroutine guess_C_bed(C_bed,phi,uxy_s,phi_min,phi_max,cf_stream)
+    subroutine update_cf_ref_thickness_simple(cf_ref,cf_ref_dot,H_ice,z_bed,ux,uy,H_obs,dx,cf_min,cf_max)
 
         implicit none 
 
-        real(prec), intent(INOUT) :: C_bed(:,:) 
-        real(prec), intent(INOUT) :: phi(:,:) 
-        real(prec), intent(IN)    :: uxy_s(:,:) 
-        real(prec), intent(IN)    :: phi_min
-        real(prec), intent(IN)    :: phi_max
-        real(prec), intent(IN)    :: cf_stream 
+        real(prec), intent(INOUT) :: cf_ref(:,:) 
+        real(prec), intent(INOUT) :: cf_ref_dot(:,:) 
+        real(prec), intent(IN)    :: H_ice(:,:) 
+        real(prec), intent(IN)    :: z_bed(:,:) 
+        real(prec), intent(IN)    :: ux(:,:) 
+        real(prec), intent(IN)    :: uy(:,:) 
+        real(prec), intent(IN)    :: H_obs(:,:) 
+        real(prec), intent(IN)    :: dx 
+        real(prec), intent(IN)    :: cf_min 
+        real(prec), intent(IN)    :: cf_max
 
         ! Local variables 
-        integer :: i, j, nx, ny 
-        real(prec) :: logvel, logvel_max, f_scale    
+        integer :: i, j, nx, ny, i1, j1  
+        real(prec) :: dx_km, f_dz, f_dz_lim, H_scale, f_scale   
+        real(prec) :: ux_aa, uy_aa
+        real(prec) :: H_ice_now, H_obs_now 
 
-        nx = size(C_bed,1)
-        ny = size(C_bed,2)
+        real(prec), allocatable   :: cf_prev(:,:) 
+        real(prec) :: wts0(5,5), wts(5,5) 
 
-        !logvel_max = log(maxval(uxy_s))
-        logvel_max = log(100.0) 
+        nx = size(cf_ref,1)
+        ny = size(cf_ref,2) 
 
-        do j = 1, ny 
-        do i = 1, nx 
+        dx_km = dx*1e-3  
+        
+        allocate(cf_prev(nx,ny))
 
-            if (uxy_s(i,j) .gt. 0.0) then 
-                ! Calculate expected till angle versus velocity 
+        ! Optimization parameters 
+        H_scale  = 1000.0           ! [m] 
+        f_dz_lim = 1.5              ! [--] 
 
-                logvel   = max(0.0,log(uxy_s(i,j)))
-                f_scale  = logvel / logvel_max
-                if (f_scale .gt. 1.0) f_scale = 1.0 
-                phi(i,j) = 0.5*phi_max - f_scale*(0.5*phi_max-2.0*phi_min)
+        ! Get Gaussian weights 
+        wts0 = gauss_values(dx_km,dx_km,sigma=dx_km*1.5,n=5)
 
-            else 
-                ! Set phi to the minimum 
+        ! Store initial cf_ref solution 
+        cf_prev = cf_ref 
 
-                phi(i,j) = phi_min 
+        do j = 3, ny-2 
+        do i = 3, nx-2 
+
+            if ( abs(H_ice(i,j) - H_obs(i,j)) .ne. 0.0) then 
+                ! Update where thickness error exists
+
+                ! Determine downstream node
+
+                ux_aa = 0.5*(ux(i,j)+ux(i+1,j))
+                uy_aa = 0.5*(uy(i,j)+uy(i,j+1))
+                
+                if ( abs(ux_aa) .gt. abs(uy_aa) ) then 
+                    ! Downstream in x-direction 
+                    j1 = j 
+                    if (ux_aa .lt. 0.0) then 
+                        i1 = i-1 
+                    else
+                        i1 = i+1
+                    end if 
+
+                else 
+                    ! Downstream in y-direction 
+                    i1 = i 
+                    if (uy_aa .lt. 0.0) then 
+                        j1 = j-1
+                    else
+                        j1 = j+1
+                    end if 
+
+                end if 
+
+                ! Get current ice thickness and obs ice thickness (smoothed)
+
+                wts = wts0 
+                where( H_ice(i-2:i+2,j-2:j+2) .eq. 0.0) wts = 0.0 
+                call wtd_mean(H_ice_now,H_ice(i-2:i+2,j-2:j+2),wts) 
+
+                wts = wts0 
+                where( H_obs(i-2:i+2,j-2:j+2) .eq. 0.0) wts = 0.0 
+                call wtd_mean(H_obs_now,H_obs(i-2:i+2,j-2:j+2),wts) 
+                
+                ! Get adjustment rate given error in z_srf
+                f_dz = (H_ice_now - H_obs_now) / H_scale
+                f_dz = max(f_dz,-f_dz_lim)
+                f_dz = min(f_dz,f_dz_lim)
+                
+                f_scale = 10.0**(-f_dz) 
+
+                cf_ref(i1,j1) = cf_prev(i1,j1)*f_scale
 
             end if 
 
-            ! Calculate C_bed following till friction approach (Bueler and van Pelt, 2015)
-            C_bed(i,j) = cf_stream*tan(phi(i,j)*pi/180)
-
         end do 
-        end do
+        end do 
+
+        ! Ensure cf_ref is not below lower or upper limit 
+        where (cf_ref .lt. cf_min) cf_ref = cf_min 
+        where (cf_ref .gt. cf_max) cf_ref = cf_max 
+
+        ! Additionally, apply a Gaussian filter to cf_ref to ensure smooth transitions
+        call filter_gaussian(var=cf_ref,sigma=dx_km*0.2,dx=dx_km)     !,mask=err_z_srf .ne. 0.0)
+        
+        ! Also where no ice exists, set cf_ref = cf_min 
+        where(H_obs .eq. 0.0) cf_ref = cf_min 
+
+        ! Diagnose current rate of change of C_bed 
+        cf_ref_dot = cf_ref - cf_prev
 
         return 
 
-    end subroutine guess_C_bed
+    end subroutine update_cf_ref_thickness_simple
+
+    subroutine update_cf_ref_thickness_ratio(cf_ref,cf_ref_dot,H_ice,z_bed,ux,uy,uxy_i,uxy_b,H_obs,dx,cf_min,cf_max)
+
+        implicit none 
+
+        real(prec), intent(INOUT) :: cf_ref(:,:) 
+        real(prec), intent(INOUT) :: cf_ref_dot(:,:) 
+        real(prec), intent(IN)    :: H_ice(:,:) 
+        real(prec), intent(IN)    :: z_bed(:,:) 
+        real(prec), intent(IN)    :: ux(:,:)        ! Depth-averaged velocity (ux_bar)
+        real(prec), intent(IN)    :: uy(:,:)        ! Depth-averaged velocity (uy_bar)
+        real(prec), intent(IN)    :: uxy_i(:,:)     ! Internal shear velocity magnitude 
+        real(prec), intent(IN)    :: uxy_b(:,:)     ! Basal sliding velocity magnitude 
+        real(prec), intent(IN)    :: H_obs(:,:) 
+        real(prec), intent(IN)    :: dx 
+        real(prec), intent(IN)    :: cf_min 
+        real(prec), intent(IN)    :: cf_max
+
+        ! Local variables 
+        integer :: i, j, nx, ny, i1, j1, n 
+        real(prec) :: f_err, f_vel, f_corr, dx_km 
+        real(prec) :: ux_aa, uy_aa 
+        real(prec) :: H_ice_now, H_obs_now 
+
+        real(prec), allocatable   :: cf_prev(:,:) 
+        real(prec) :: wts0(5,5), wts(5,5) 
+
+        real(prec),parameter :: exp1 = 2.0
+
+        nx = size(cf_ref,1)
+        ny = size(cf_ref,2) 
+
+        dx_km = dx*1e-3  
+        
+        allocate(cf_prev(nx,ny))
+
+        ! Get Gaussian weights 
+        wts0 = gauss_values(dx_km,dx_km,sigma=dx_km*1.5,n=5)
+
+!         do i = 1, 5 
+!         write(*,*) wts0(i,:) 
+!         end do 
+!         stop 
+
+        ! Store initial cf_ref solution 
+        cf_prev = cf_ref 
+
+        do j = 3, ny-2 
+        do i = 3, nx-2 
+
+            if ( abs(H_ice(i,j) - H_obs(i,j)) .ne. 0.0) then 
+                ! Update where thickness error exists
+
+                ! Determine downstream point to apply changes
+
+                ux_aa = 0.5*(ux(i,j)+ux(i+1,j))
+                uy_aa = 0.5*(uy(i,j)+uy(i,j+1))
+                
+                if ( abs(ux_aa) .gt. abs(uy_aa) ) then 
+                    ! Downstream in x-direction 
+                    j1 = j 
+                    if (ux_aa .lt. 0.0) then 
+                        i1 = i-1 
+                    else
+                        i1 = i+1
+                    end if 
+
+                else 
+                    ! Downstream in y-direction 
+                    i1 = i 
+                    if (uy_aa .lt. 0.0) then 
+                        j1 = j-1
+                    else
+                        j1 = j+1
+                    end if 
+
+                end if 
+
+                ! Calculate thickness error ratio 
+!                 f_err = H_ice(i,j) / max(H_obs(i,j),1e-1)
+                
+                wts = wts0 
+                !where( H_ice(i-2:i+2,j-2:j+2) .eq. 0.0) wts = 0.0 
+                call wtd_mean(H_ice_now,H_ice(i-2:i+2,j-2:j+2),wts) 
+
+                wts = wts0 
+                !where( H_obs(i-2:i+2,j-2:j+2) .eq. 0.0) wts = 0.0 
+                call wtd_mean(H_obs_now,H_obs(i-2:i+2,j-2:j+2),wts) 
+                
+!                 n = count(H_ice(i-1:i+1,j-1:j+1).gt.0.0)
+!                 if (n .gt. 0) then
+!                     H_ice_now = sum(H_ice(i-1:i+1,j-1:j+1),mask=H_ice(i-1:i+1,j-1:j+1).gt.0.0) / real(n,prec)
+!                 else 
+!                     H_ice_now = 0.0 
+!                 end if 
+
+!                 n = count(H_obs(i-1:i+1,j-1:j+1).gt.0.0)
+!                 if (n .gt. 0) then
+!                     H_obs_now = sum(H_obs(i-1:i+1,j-1:j+1),mask=H_obs(i-1:i+1,j-1:j+1).gt.0.0) / real(n,prec)
+!                 else 
+!                     H_obs_now = 0.0 
+!                 end if 
+                
+                f_err = ( H_ice_now / max(H_obs_now,1e-1) )
+                
+                ! Calculate ratio of deformational velocity to sliding velocity
+                f_vel = uxy_i(i,j) / max(uxy_b(i,j),1e-1) 
+
+                ! Calculate correction factor (beta_old / beta_new)
+                f_corr = ( max( f_err + f_vel*(f_err-1.0_prec), 1e-1) )**exp1
+
+                ! Apply correction to update cf_ref
+                cf_ref(i1,j1) = cf_prev(i1,j1) * f_corr**(-1.0)
+
+            end if 
+
+        end do 
+        end do 
+
+        ! Ensure cf_ref is not below lower or upper limit 
+        where (cf_ref .lt. cf_min) cf_ref = cf_min 
+        where (cf_ref .gt. cf_max) cf_ref = cf_max 
+
+        ! Additionally, apply a Gaussian filter to cf_ref to ensure smooth transitions
+        call filter_gaussian(var=cf_ref,sigma=dx_km*0.25,dx=dx_km)     !,mask=err_z_srf .ne. 0.0)
+        
+        ! Also where no ice exists, set cf_ref = cf_min 
+        where(H_ice .eq. 0.0) cf_ref = cf_min 
+
+        ! Diagnose current rate of change of cf_ref 
+        cf_ref_dot = cf_ref - cf_prev
+
+        return 
+
+    end subroutine update_cf_ref_thickness_ratio
+
+    subroutine calc_ydyn_cbed_external(dyn,tpo,thrm,bnd,grd,domain,mask_noice,cf_ref)
+        ! Update C_bed [Pa] based on parameter choices
+
+        implicit none
+        
+        type(ydyn_class),   intent(INOUT) :: dyn
+        type(ytopo_class),  intent(IN)    :: tpo 
+        type(ytherm_class), intent(IN)    :: thrm
+        type(ybound_class), intent(IN)    :: bnd  
+        type(ygrid_class),  intent(IN)    :: grd
+        character(len=*),   intent(IN)    :: domain 
+        logical,            intent(IN)    :: mask_noice(:,:) 
+        real(prec),         intent(IN)    :: cf_ref(:,:) 
+
+        integer :: i, j, nx, ny 
+        integer :: i1, i2, j1, j2 
+        real(prec) :: f_scale 
+        
+        real(prec), allocatable :: lambda_bed(:,:)  
+
+        nx = size(dyn%now%C_bed,1)
+        ny = size(dyn%now%C_bed,2)
+        
+        allocate(lambda_bed(nx,ny))
+
+            ! cf_ref [unitless] is obtained as input to this routine from optimization 
+
+            ! =============================================================================
+            ! Step 2: calculate lambda functions to scale C_bed from default value 
+            
+            select case(trim(dyn%par%cb_scale))
+
+                case("lin_zb")
+                    ! Linear scaling function with bedrock elevation
+                    
+                    lambda_bed = calc_lambda_bed_lin(bnd%z_bed,dyn%par%cb_z0,dyn%par%cb_z1)
+
+                case("exp_zb")
+                    ! Exponential scaling function with bedrock elevation
+                    
+                    ! Default
+                    lambda_bed = calc_lambda_bed_exp(bnd%z_bed,dyn%par%cb_z0,dyn%par%cb_z1)
+
+                    ! Modifications - increased friction in Wilkes Land (South)
+                    where (bnd%basins .ge. 12 .and. &
+                           bnd%basins .le. 17) lambda_bed = calc_lambda_bed_exp(bnd%z_bed,-400.0,dyn%par%cb_z1)
+
+                case("till_const")
+                    ! Constant till friction angle
+
+                    lambda_bed = calc_lambda_till_const(dyn%par%till_phi_const)
+
+                case("till_zb")
+                    ! Linear till friction angle versus elevation
+
+                    lambda_bed = calc_lambda_till_linear(bnd%z_bed,bnd%z_sl,dyn%par%till_phi_min,dyn%par%till_phi_max, &
+                                                            dyn%par%till_phi_zmin,dyn%par%till_phi_zmax)
+
+                case DEFAULT
+                    ! No scaling
+
+                    lambda_bed = 1.0
+
+            end select 
+
+            ! Set lambda_bed to lower limit for regions of noice 
+            where (mask_noice) lambda_bed = dyn%par%cb_min 
+            
+            ! Ensure lambda_bed is not below lower limit [default range 0:1] 
+            where (lambda_bed .lt. dyn%par%cb_min) lambda_bed = dyn%par%cb_min
+
+            ! =============================================================================
+            ! Step 3: calculate C_bed [Pa]
+            
+            dyn%now%C_bed = (cf_ref*lambda_bed)*dyn%now%N_eff 
+
+        return 
+
+    end subroutine calc_ydyn_cbed_external
+
+    subroutine yelmo_update_equil_external(dom,hyd,cf_ref,time,time_tot,dt,topo_fixed,ssa_vel_max)
+        ! Iterate yelmo solutions to equilibrate without updating boundary conditions
+
+        type(yelmo_class), intent(INOUT) :: dom
+        type(hydro_class), intent(INOUT) :: hyd 
+        real(prec), intent(IN) :: cf_ref(:,:) 
+        real(prec), intent(IN) :: time            ! [yr] Current time
+        real(prec), intent(IN) :: time_tot        ! [yr] Equilibration time 
+        real(prec), intent(IN) :: dt              ! Local dt to be used for all modules
+        logical,    intent(IN) :: topo_fixed      ! Should topography be fixed? 
+        real(prec), intent(IN) :: ssa_vel_max     ! Local vel limit to be used, if == 0.0, no ssa used
+
+        ! Local variables 
+        real(prec) :: time_now  
+        integer    :: n, nstep 
+        logical    :: use_ssa         ! Should ssa be active?  
+        logical    :: dom_topo_fixed
+        logical    :: dom_use_ssa 
+        real(prec) :: dom_dtmax 
+        integer    :: dom_ntt 
+        real(prec) :: dom_ssa_vel_max 
+
+        ! Only run equilibration if time_tot > 0 
+
+        if (time_tot .gt. 0.0) then 
+
+            ! Consistency check
+            use_ssa = .FALSE. 
+            if (ssa_vel_max .gt. 0.0) use_ssa = .TRUE. 
+
+            ! Save original model choices 
+            dom_topo_fixed  = dom%tpo%par%topo_fixed 
+            dom_use_ssa     = dom%dyn%par%use_ssa 
+            dom_dtmax       = dom%par%dtmax
+            dom_ntt         = dom%par%ntt 
+            dom_ssa_vel_max = dom%dyn%par%ssa_vel_max
+
+            ! Set model choices equal to equilibration choices 
+            dom%tpo%par%topo_fixed  = topo_fixed 
+            dom%dyn%par%use_ssa     = use_ssa 
+            dom%par%dtmax           = dt 
+            dom%par%ntt             = 1 
+            dom%dyn%par%ssa_vel_max = ssa_vel_max
+
+            write(*,*) 
+            write(*,*) "Starting equilibration steps, time to run [yrs]: ", time_tot 
+
+            do n = 1, ceiling(time_tot/dt)
+
+                time_now = time + n*dt
+                call yelmo_update(dom,time_now)
+
+                ! Update basal hydrology 
+                call hydro_update(hyd,dom%tpo%now%H_ice,dom%tpo%now%f_grnd, &
+                            -dom%thrm%now%bmb_grnd*rho_ice/rho_w,time_now)
+
+                ! Pass updated hydrology variable to Yelmo boundary field
+                dom%bnd%H_w = hyd%now%H_w 
+
+                ! Update C_bed
+                call calc_ydyn_cbed_external(yelmo1%dyn,yelmo1%tpo,yelmo1%thrm,yelmo1%bnd,yelmo1%grd, &
+                                                                                domain,mask_noice,cf_ref)
+
+            end do
+
+            ! Restore original model choices 
+            dom%tpo%par%topo_fixed  = dom_topo_fixed 
+            dom%dyn%par%use_ssa     = dom_use_ssa 
+            dom%par%dtmax           = dom_dtmax 
+            dom%par%ntt             = dom_ntt 
+            dom%dyn%par%ssa_vel_max = dom_ssa_vel_max
+
+            write(*,*) 
+            write(*,*) "Equilibration complete."
+            write(*,*) 
+
+        end if 
+
+        ! Reset model time back to input time 
+        dom%tpo%par%time      = time 
+        dom%thrm%par%time     = time 
+
+        hyd%now%time          = time 
+
+        return
+
+    end subroutine yelmo_update_equil_external
+    
+
+    subroutine wtd_mean(var_ave,var,wts)
+        ! wts == gauss_values(dx,dy,sigma,n)
+
+        implicit none
+
+        real(prec), intent(OUT) :: var_ave 
+        real(prec), intent(IN)  :: var(:,:) 
+        real(prec), intent(IN)  :: wts(:,:) 
+
+        ! Local variables 
+        real(prec) :: wts_tot 
+        real(prec) :: wts_norm(size(wts,1),size(wts,2))
+
+        wts_tot = sum(wts) 
+        if (wts_tot .gt. 0.0) then 
+            wts_norm = wts / wts_tot 
+        else 
+            wts_norm = 0.0 
+        end if 
+
+        var_ave = sum(var*wts_norm) 
+
+        return 
+
+    end subroutine wtd_mean
+
+    ! Extra...
 
     subroutine update_C_bed_thickness(C_bed,dCbed,phi,err_z_srf,H_ice,z_bed,ux,uy,dx,phi_min,phi_max, &
                         cf_stream,cb_z0,cb_z1,cb_min)
@@ -636,369 +1063,54 @@ end if
 
     end subroutine update_C_bed_thickness
 
-    subroutine update_C_bed_thickness_simple(C_bed,dCbed,H_ice,z_bed,ux,uy,H_obs,dx,cb_min,cb_max)
+    subroutine guess_C_bed(C_bed,phi,uxy_s,phi_min,phi_max,cf_stream)
 
         implicit none 
 
         real(prec), intent(INOUT) :: C_bed(:,:) 
-        real(prec), intent(INOUT) :: dCbed(:,:) 
-        real(prec), intent(IN)    :: H_ice(:,:) 
-        real(prec), intent(IN)    :: z_bed(:,:) 
-        real(prec), intent(IN)    :: ux(:,:) 
-        real(prec), intent(IN)    :: uy(:,:) 
-        real(prec), intent(IN)    :: H_obs(:,:) 
-        real(prec), intent(IN)    :: dx 
-        real(prec), intent(IN)    :: cb_min 
-        real(prec), intent(IN)    :: cb_max
+        real(prec), intent(INOUT) :: phi(:,:) 
+        real(prec), intent(IN)    :: uxy_s(:,:) 
+        real(prec), intent(IN)    :: phi_min
+        real(prec), intent(IN)    :: phi_max
+        real(prec), intent(IN)    :: cf_stream 
 
         ! Local variables 
-        integer :: i, j, nx, ny, i1, j1  
-        real(prec) :: dx_km, f_dz, f_dz_lim, H_scale, f_scale   
-        real(prec) :: ux_aa, uy_aa
-        real(prec) :: H_ice_now, H_obs_now 
-
-        real(prec), allocatable   :: C_bed_prev(:,:) 
-        real(prec) :: wts0(5,5), wts(5,5) 
+        integer :: i, j, nx, ny 
+        real(prec) :: logvel, logvel_max, f_scale    
 
         nx = size(C_bed,1)
-        ny = size(C_bed,2) 
+        ny = size(C_bed,2)
 
-        dx_km = dx*1e-3  
-        
-        allocate(C_bed_prev(nx,ny))
+        !logvel_max = log(maxval(uxy_s))
+        logvel_max = log(100.0) 
 
-        ! Optimization parameters 
-        H_scale  = 1000.0           ! [m] 
-        f_dz_lim = 1.5              ! [--] 
+        do j = 1, ny 
+        do i = 1, nx 
 
-        ! Get Gaussian weights 
-        wts0 = gauss_values(dx_km,dx_km,sigma=dx_km*1.5,n=5)
+            if (uxy_s(i,j) .gt. 0.0) then 
+                ! Calculate expected till angle versus velocity 
 
-        ! Store initial C_bed solution 
-        C_bed_prev = C_bed 
+                logvel   = max(0.0,log(uxy_s(i,j)))
+                f_scale  = logvel / logvel_max
+                if (f_scale .gt. 1.0) f_scale = 1.0 
+                phi(i,j) = 0.5*phi_max - f_scale*(0.5*phi_max-2.0*phi_min)
 
-        do j = 3, ny-2 
-        do i = 3, nx-2 
+            else 
+                ! Set phi to the minimum 
 
-            if ( abs(H_ice(i,j) - H_obs(i,j)) .ne. 0.0) then 
-                ! Update where thickness error exists
-
-                ! Determine downstream node
-
-                ux_aa = 0.5*(ux(i,j)+ux(i+1,j))
-                uy_aa = 0.5*(uy(i,j)+uy(i,j+1))
-                
-                if ( abs(ux_aa) .gt. abs(uy_aa) ) then 
-                    ! Downstream in x-direction 
-                    j1 = j 
-                    if (ux_aa .lt. 0.0) then 
-                        i1 = i-1 
-                    else
-                        i1 = i+1
-                    end if 
-
-                else 
-                    ! Downstream in y-direction 
-                    i1 = i 
-                    if (uy_aa .lt. 0.0) then 
-                        j1 = j-1
-                    else
-                        j1 = j+1
-                    end if 
-
-                end if 
-
-                ! Get current ice thickness and obs ice thickness (smoothed)
-
-                wts = wts0 
-                where( H_ice(i-2:i+2,j-2:j+2) .eq. 0.0) wts = 0.0 
-                call wtd_mean(H_ice_now,H_ice(i-2:i+2,j-2:j+2),wts) 
-
-                wts = wts0 
-                where( H_obs(i-2:i+2,j-2:j+2) .eq. 0.0) wts = 0.0 
-                call wtd_mean(H_obs_now,H_obs(i-2:i+2,j-2:j+2),wts) 
-                
-                ! Get adjustment rate given error in z_srf
-                f_dz = (H_ice_now - H_obs_now) / H_scale
-                f_dz = max(f_dz,-f_dz_lim)
-                f_dz = min(f_dz,f_dz_lim)
-                
-                f_scale = 10.0**(-f_dz) 
-
-                C_bed(i1,j1) = C_bed_prev(i1,j1)*f_scale
+                phi(i,j) = phi_min 
 
             end if 
 
+            ! Calculate C_bed following till friction approach (Bueler and van Pelt, 2015)
+            C_bed(i,j) = cf_stream*tan(phi(i,j)*pi/180)
+
         end do 
-        end do 
-
-        ! Ensure C_bed is not below lower or upper limit 
-        where (C_bed .lt. cb_min) C_bed = cb_min 
-        where (C_bed .gt. cb_max) C_bed = cb_max 
-
-        ! Additionally, apply a Gaussian filter to C_bed to ensure smooth transitions
-        call filter_gaussian(var=C_bed,sigma=dx_km*0.2,dx=dx_km)     !,mask=err_z_srf .ne. 0.0)
-        
-        ! Also where no ice exists, set C_bed = cb_min 
-        where(H_obs .eq. 0.0) C_bed = cb_min 
-
-        ! Diagnose current rate of change of C_bed 
-        dCbed = C_bed - C_bed_prev
+        end do
 
         return 
 
-    end subroutine update_C_bed_thickness_simple
-
-    subroutine update_C_bed_thickness_ratio(C_bed,dCbed,H_ice,z_bed,ux,uy,uxy_i,uxy_b,H_obs,dx,cb_min,cb_max)
-
-        implicit none 
-
-        real(prec), intent(INOUT) :: C_bed(:,:) 
-        real(prec), intent(INOUT) :: dCbed(:,:) 
-        real(prec), intent(IN)    :: H_ice(:,:) 
-        real(prec), intent(IN)    :: z_bed(:,:) 
-        real(prec), intent(IN)    :: ux(:,:)        ! Depth-averaged velocity (ux_bar)
-        real(prec), intent(IN)    :: uy(:,:)        ! Depth-averaged velocity (uy_bar)
-        real(prec), intent(IN)    :: uxy_i(:,:)     ! Internal shear velocity magnitude 
-        real(prec), intent(IN)    :: uxy_b(:,:)     ! Basal sliding velocity magnitude 
-        real(prec), intent(IN)    :: H_obs(:,:) 
-        real(prec), intent(IN)    :: dx 
-        real(prec), intent(IN)    :: cb_min 
-        real(prec), intent(IN)    :: cb_max
-
-        ! Local variables 
-        integer :: i, j, nx, ny, i1, j1, n 
-        real(prec) :: f_err, f_vel, f_corr, dx_km 
-        real(prec) :: ux_aa, uy_aa 
-        real(prec) :: H_ice_now, H_obs_now 
-
-        real(prec), allocatable   :: C_bed_prev(:,:) 
-        real(prec) :: wts0(5,5), wts(5,5) 
-
-        real(prec) :: dphi_min  
-        real(prec) :: dphi_max 
-        real(prec) :: err_z_fac 
-
-        real(prec),parameter :: exp1 = 2.0
-
-        nx = size(C_bed,1)
-        ny = size(C_bed,2) 
-
-        dx_km = dx*1e-3  
-        
-        allocate(C_bed_prev(nx,ny))
-
-        ! Get Gaussian weights 
-        wts0 = gauss_values(dx_km,dx_km,sigma=dx_km*1.5,n=5)
-
-!         do i = 1, 5 
-!         write(*,*) wts0(i,:) 
-!         end do 
-!         stop 
-
-        ! Store initial C_bed solution 
-        C_bed_prev = C_bed 
-
-        do j = 3, ny-2 
-        do i = 3, nx-2 
-
-            if ( abs(H_ice(i,j) - H_obs(i,j)) .ne. 0.0) then 
-                ! Update where thickness error exists
-
-                ! Determine downstream point to apply changes
-
-                ux_aa = 0.5*(ux(i,j)+ux(i+1,j))
-                uy_aa = 0.5*(uy(i,j)+uy(i,j+1))
-                
-                if ( abs(ux_aa) .gt. abs(uy_aa) ) then 
-                    ! Downstream in x-direction 
-                    j1 = j 
-                    if (ux_aa .lt. 0.0) then 
-                        i1 = i-1 
-                    else
-                        i1 = i+1
-                    end if 
-
-                else 
-                    ! Downstream in y-direction 
-                    i1 = i 
-                    if (uy_aa .lt. 0.0) then 
-                        j1 = j-1
-                    else
-                        j1 = j+1
-                    end if 
-
-                end if 
-
-                ! Calculate thickness error ratio 
-!                 f_err = H_ice(i,j) / max(H_obs(i,j),1e-1)
-                
-                wts = wts0 
-                !where( H_ice(i-2:i+2,j-2:j+2) .eq. 0.0) wts = 0.0 
-                call wtd_mean(H_ice_now,H_ice(i-2:i+2,j-2:j+2),wts) 
-
-                wts = wts0 
-                !where( H_obs(i-2:i+2,j-2:j+2) .eq. 0.0) wts = 0.0 
-                call wtd_mean(H_obs_now,H_obs(i-2:i+2,j-2:j+2),wts) 
-                
-!                 n = count(H_ice(i-1:i+1,j-1:j+1).gt.0.0)
-!                 if (n .gt. 0) then
-!                     H_ice_now = sum(H_ice(i-1:i+1,j-1:j+1),mask=H_ice(i-1:i+1,j-1:j+1).gt.0.0) / real(n,prec)
-!                 else 
-!                     H_ice_now = 0.0 
-!                 end if 
-
-!                 n = count(H_obs(i-1:i+1,j-1:j+1).gt.0.0)
-!                 if (n .gt. 0) then
-!                     H_obs_now = sum(H_obs(i-1:i+1,j-1:j+1),mask=H_obs(i-1:i+1,j-1:j+1).gt.0.0) / real(n,prec)
-!                 else 
-!                     H_obs_now = 0.0 
-!                 end if 
-                
-                f_err = ( H_ice_now / max(H_obs_now,1e-1) )
-                
-                ! Calculate ratio of deformational velocity to sliding velocity
-                f_vel = uxy_i(i,j) / max(uxy_b(i,j),1e-1) 
-
-                ! Calculate correction factor (beta_old / beta_new)
-                f_corr = ( max( f_err + f_vel*(f_err-1.0_prec), 1e-1) )**exp1
-
-                ! Apply correction to update C_bed
-                C_bed(i1,j1) = C_bed_prev(i1,j1) * f_corr**(-1.0)
-
-            end if 
-
-        end do 
-        end do 
-
-        ! Ensure C_bed is not below lower or upper limit 
-        where (C_bed .lt. cb_min) C_bed = cb_min 
-        where (C_bed .gt. cb_max) C_bed = cb_max 
-
-        ! Additionally, apply a Gaussian filter to C_bed to ensure smooth transitions
-        call filter_gaussian(var=C_bed,sigma=dx_km*0.25,dx=dx_km)     !,mask=err_z_srf .ne. 0.0)
-        
-        ! Also where no ice exists, set C_bed = cb_min 
-        where(H_ice .eq. 0.0) C_bed = cb_min 
-
-        ! Diagnose current rate of change of C_bed 
-        dCbed = C_bed - C_bed_prev
-
-        return 
-
-    end subroutine update_C_bed_thickness_ratio
-
-    subroutine yelmo_update_equil_external(dom,hyd,time,time_tot,dt,topo_fixed,ssa_vel_max)
-        ! Iterate yelmo solutions to equilibrate without updating boundary conditions
-
-        type(yelmo_class), intent(INOUT) :: dom
-        type(hydro_class), intent(INOUT) :: hyd 
-        real(prec), intent(IN) :: time            ! [yr] Current time
-        real(prec), intent(IN) :: time_tot        ! [yr] Equilibration time 
-        real(prec), intent(IN) :: dt              ! Local dt to be used for all modules
-        logical,    intent(IN) :: topo_fixed      ! Should topography be fixed? 
-        real(prec), intent(IN) :: ssa_vel_max     ! Local vel limit to be used, if == 0.0, no ssa used
-
-        ! Local variables 
-        real(prec) :: time_now  
-        integer    :: n, nstep 
-        logical    :: use_ssa         ! Should ssa be active?  
-        logical    :: dom_topo_fixed
-        logical    :: dom_use_ssa 
-        real(prec) :: dom_dtmax 
-        integer    :: dom_ntt 
-        real(prec) :: dom_ssa_vel_max 
-
-        ! Only run equilibration if time_tot > 0 
-
-        if (time_tot .gt. 0.0) then 
-
-            ! Consistency check
-            use_ssa = .FALSE. 
-            if (ssa_vel_max .gt. 0.0) use_ssa = .TRUE. 
-
-            ! Save original model choices 
-            dom_topo_fixed  = dom%tpo%par%topo_fixed 
-            dom_use_ssa     = dom%dyn%par%use_ssa 
-            dom_dtmax       = dom%par%dtmax
-            dom_ntt         = dom%par%ntt 
-            dom_ssa_vel_max = dom%dyn%par%ssa_vel_max
-
-            ! Set model choices equal to equilibration choices 
-            dom%tpo%par%topo_fixed  = topo_fixed 
-            dom%dyn%par%use_ssa     = use_ssa 
-            dom%par%dtmax           = dt 
-            dom%par%ntt             = 1 
-            dom%dyn%par%ssa_vel_max = ssa_vel_max
-
-            write(*,*) 
-            write(*,*) "Starting equilibration steps, time to run [yrs]: ", time_tot 
-
-            do n = 1, ceiling(time_tot/dt)
-
-                time_now = time + n*dt
-                call yelmo_update(dom,time_now)
-
-                ! Update basal hydrology 
-                call hydro_update(hyd,dom%tpo%now%H_ice,dom%tpo%now%f_grnd, &
-                            -dom%thrm%now%bmb_grnd*rho_ice/rho_w,time_now)
-
-                ! Pass updated hydrology variable to Yelmo boundary field
-                dom%bnd%H_w = hyd%now%H_w 
-
-            end do
-
-            ! Restore original model choices 
-            dom%tpo%par%topo_fixed  = dom_topo_fixed 
-            dom%dyn%par%use_ssa     = dom_use_ssa 
-            dom%par%dtmax           = dom_dtmax 
-            dom%par%ntt             = dom_ntt 
-            dom%dyn%par%ssa_vel_max = dom_ssa_vel_max
-
-            write(*,*) 
-            write(*,*) "Equilibration complete."
-            write(*,*) 
-
-        end if 
-
-        ! Reset model time back to input time 
-        dom%tpo%par%time      = time 
-        dom%thrm%par%time     = time 
-
-        hyd%now%time          = time 
-
-        return
-
-    end subroutine yelmo_update_equil_external
-    
-
-    subroutine wtd_mean(var_ave,var,wts)
-        ! wts == gauss_values(dx,dy,sigma,n)
-
-        implicit none
-
-        real(prec), intent(OUT) :: var_ave 
-        real(prec), intent(IN)  :: var(:,:) 
-        real(prec), intent(IN)  :: wts(:,:) 
-
-        ! Local variables 
-        real(prec) :: wts_tot 
-        real(prec) :: wts_norm(size(wts,1),size(wts,2))
-
-        wts_tot = sum(wts) 
-        if (wts_tot .gt. 0.0) then 
-            wts_norm = wts / wts_tot 
-        else 
-            wts_norm = 0.0 
-        end if 
-
-        var_ave = sum(var*wts_norm) 
-
-        return 
-
-    end subroutine wtd_mean
-
-    ! Extra...
+    end subroutine guess_C_bed
 
     subroutine calc_ydyn_cbed_external_channels(dyn,tpo,thrm,bnd,channels)
         ! Update C_bed based on parameter choices

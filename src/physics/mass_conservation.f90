@@ -52,6 +52,14 @@ contains
         allocate(calv_grnd(nx,ny))
         calv_grnd = 0.0 
 
+        ! Check inputs
+        write(*,*) "********"
+        write(*,*) "H_ice:  ", minval(H_ice), maxval(H_ice)
+        write(*,*) "ux:     ", minval(ux), maxval(ux)
+        write(*,*) "uy:     ", minval(uy), maxval(uy)
+        write(*,*) "dx, dt: ", dx, dt 
+        flush(6) 
+
         ! 1. Apply mass conservation =================
 
         ! First, only resolve the dynamic part (ice advection)
@@ -969,13 +977,23 @@ end if
                 ! Determine whether to apply relaxation here
                 apply_relax = .FALSE. 
 
-                ! Shelf (floating) ice:
-                if (f_grnd(i,j) .eq. 0.0) apply_relax = .TRUE. 
+                ! Shelf (floating) ice or ice-free points:
+                if (f_grnd(i,j) .eq. 0.0 .or. H_ref(i,j) .eq. 0.0) apply_relax = .TRUE. 
                 
-                ! Grounding line ice: 
-                if (topo_rel .eq. 2 .and. f_grnd(i,j) .gt. 0.0 .and. &
+                if (topo_rel .eq. 2) then 
+                    ! Relax grounding-line ice too:
+                    
+                    if (f_grnd(i,j) .gt. 0.0 .and. &
                      (f_grnd(i-1,j) .eq. 0.0 .or. f_grnd(i+1,j) .eq. 0.0 &
                         .or. f_grnd(i,j-1) .eq. 0.0 .or. f_grnd(i,j+1) .eq. 0.0)) apply_relax = .TRUE. 
+                
+                else if (topo_rel .eq. 3) then 
+                    ! Relax all grounded ice too:
+
+                    apply_relax = .TRUE. 
+                
+                end if 
+                
 
                 if (apply_relax) then 
 

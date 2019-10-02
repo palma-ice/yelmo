@@ -22,6 +22,7 @@ module yelmo_dynamics
 
     public :: ydyn_par_load, ydyn_alloc, ydyn_dealloc
     public :: calc_ydyn
+    public :: calc_ydyn_neff, calc_ydyn_cbed, calc_ydyn_beta
     public :: check_vel_convergence
     
 contains
@@ -1004,14 +1005,14 @@ end if
                 where (tpo%now%f_grnd .eq. 0.0) dyn%now%beta = 0.0 
                 
                 if (dyn%par%beta_gl_stag .ne. 3) then 
-                    write(*,*) "calc_ydyn_beta_aa:: Error: beta_gl_stag must equal 3 for beta_gl_sep=-1."
+                    write(*,*) "calc_ydyn_beta:: Error: beta_gl_stag must equal 3 for beta_gl_sep=-1."
                     write(*,*) "beta_gl_sep  = ", dyn%par%beta_gl_sep
                     write(*,*) "beta_gl_stag = ", dyn%par%beta_gl_stag
                     stop 
                 end if 
 
                 if (tpo%par%gl_sep .ne. 1) then 
-                    write(*,*) "calc_ydyn_beta_aa:: Error: gl_sep must equal 1 for beta_gl_sep=-1."
+                    write(*,*) "calc_ydyn_beta:: Error: gl_sep must equal 1 for beta_gl_sep=-1."
                     write(*,*) "beta_gl_sep  = ", dyn%par%beta_gl_sep
                     write(*,*) "gl_sep       = ", tpo%par%gl_sep
                     stop 

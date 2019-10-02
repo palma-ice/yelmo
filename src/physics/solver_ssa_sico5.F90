@@ -63,6 +63,7 @@ contains
         real(prec), allocatable :: vis_int_sgxy(:,:) 
         real(prec), allocatable :: H_ice_1(:,:) 
         logical :: is_mismip 
+        integer :: n_check 
 
 ! Include header for lis solver fortran interface
 #include "lisf.h"
@@ -110,6 +111,24 @@ contains
         vis_int_g    = visc_eff 
 
         rho_sw_ice   = rho_sw/rho_ice ! Ratio of density of seawater to ice [--]
+
+        ! ===== Consistency checks ==========================
+
+        ! Ensure beta is defined well 
+        if ( count(beta_acx .gt. 0.0 .and. H_grnd .gt. 0.0) .eq. 0 ) then 
+            ! No points found with a non-zero beta for grounded ice,
+            ! something was not well-defined/well-initialized
+            
+            write(*,*) 
+            write(*,*) "calc_vxy_ssa_matrix:: Error: beta appears to be zero everywhere for grounded ice."
+            write(*,*) "range(beta_acx): ", minval(beta_acx), maxval(beta_acx)
+            write(*,*) "range(beta_acy): ", minval(beta_acy), maxval(beta_acy)
+            write(*,*) "range(H_grnd):   ", minval(H_grnd), maxval(H_grnd)
+            write(*,*) "Stopping."
+            write(*,*) 
+            stop 
+
+        end if 
 
         ! Set ice thickness for use internally
         ! Limit to at least H_ice=1.0m where ice is present,

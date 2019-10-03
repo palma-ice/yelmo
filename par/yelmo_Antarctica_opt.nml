@@ -9,7 +9,7 @@
     grid_name       = "ANT-32KM"
     grid_path       = "input/{domain}/{grid_name}/{grid_name}_REGIONS.nc"
     experiment      = "None"       
-    restart         = "/home/robinson/yelmo_gmd/output/gmd7/ant-pd-opt-0/yelmo_restart.nc"
+    restart         = "input/yelmo_restart.nc"
     zeta_scale      = "exp"             ! "linear", "exp", "tanh"
     zeta_exp        = 2.0  
     nz_aa           = 10                ! Vertical resolution in ice

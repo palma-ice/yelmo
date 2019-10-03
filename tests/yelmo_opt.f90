@@ -92,7 +92,7 @@ program yelmo_test
 !         time_iter           = 200.0     ! [yr] 
         
 !     end if 
-    
+
     ! Not used right now:
 !     qmax_topo_fixed     = 0         ! Number of initial iterations that should use topo_fixed=.TRUE. 
 !     time_iter_0         =  50.0     ! [yr] 
@@ -164,7 +164,7 @@ program yelmo_test
     ! (initialize temps with robin method with a cold base),
     ! or from restart file, if specified 
     call yelmo_init_state(yelmo1,path_par,time=time_init,thrm_method="robin-cold")
-
+     
     if (.not. yelmo1%par%use_restart) then 
         ! Run initialization steps 
 
@@ -194,10 +194,6 @@ program yelmo_test
         yelmo_ref = yelmo1 
         hyd_ref   = hyd1 
 
-        ! Initialize the 2D output file and write the initial model state 
-        call yelmo_write_init(yelmo1,file2D,time_init,units="years")  
-        call write_step_2D_opt(yelmo1,file2D,time_init,cf_ref,cf_ref_dot,mask_noice)  
-        
         ! Initialize time variable 
         time = time_init 
 
@@ -207,6 +203,10 @@ program yelmo_test
 
     end if 
 
+    ! Initialize the 2D output file and write the initial model state 
+    call yelmo_write_init(yelmo1,file2D,time_init,units="years")  
+    call write_step_2D_opt(yelmo1,file2D,time_init,cf_ref,cf_ref_dot,mask_noice)  
+    
     write(*,*) "Starting optimization..."
 
 if (opt_method .eq. 1) then 

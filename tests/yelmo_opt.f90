@@ -202,11 +202,8 @@ program yelmo_test
         yelmo_ref = yelmo1 
         hyd_ref   = hyd1 
 
-        ! Initialize time variable 
-        time = time_init 
-
         ! Write a restart file 
-        call yelmo_restart_write(yelmo1,file_restart,time)
+        call yelmo_restart_write(yelmo1,file_restart,time_init)
         stop "**** Done ****"
 
     end if 
@@ -220,6 +217,8 @@ program yelmo_test
 if (opt_method .eq. 1) then 
     ! Error method (Pollard and De Conto, 2012)
 
+    ! Initialize timing variables 
+    time = time_init 
     n_now = 1 
 
     do q = 1, qmax 
@@ -295,6 +294,9 @@ if (opt_method .eq. 1) then
 else 
     ! Ratio method (Le clec’h et al, 2019)
 
+    ! Initialize timing variables 
+    time = time_init 
+    
     do q = 1, qmax 
 
         ! Reset model to the initial state (including H_w) and time, with updated C_bed field 

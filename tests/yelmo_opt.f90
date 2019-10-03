@@ -39,6 +39,10 @@ program yelmo_test
     integer    :: topo_rel_iter(2)
     real(prec) :: topo_rel_taus(2)
 
+    real(prec) :: time_iter_iter(2)
+    real(prec) :: time_iters(2) 
+    real(prec) :: time_iter_steady
+    
     real(prec), allocatable :: cf_ref(:,:) 
     real(prec), allocatable :: cf_ref_dot(:,:) 
 
@@ -67,12 +71,16 @@ program yelmo_test
     topo_rel_iter       = [5,10]
     topo_rel_taus       = [10.0,50.0]
 
+    qmax                = 41            ! Total number of iterations
+    time_iter_iter      = [30,40]
+    time_iters          = [500.0,1000.0]
+    time_iter_steady    = 10e3          ! [yr] Final timestep, no optimization, run to steady-state
+
     cf_init    = 0.2                    ! [--]
-    cf_min     = 0.001                  ! [--] 
+    cf_min     = 0.005                  ! [--] 
     cf_max     = 2.0                    ! [--]
 
-    qmax                = 200           ! Total number of iterations
-    time_iter           = 500.0         ! [yr] 
+!     time_iter           = 500.0         ! [yr] 
 
 !     if (opt_method .eq. 1) then 
 !         ! Error method 
@@ -216,6 +224,7 @@ if (opt_method .eq. 1) then
 
     do q = 1, qmax 
 
+        ! === Update relaxation parameters =========
         if (q .gt. topo_rel_iter(n_now)) then 
             ! Update relaxation parameters 
             n_now = n_now + 1 
@@ -228,6 +237,11 @@ if (opt_method .eq. 1) then
 
             write(*,*) "relaxation: ", q, n_now, yelmo1%tpo%par%topo_rel, yelmo1%tpo%par%topo_rel_tau
         end if 
+
+        ! === Update iterations ====================
+        time_iter = time_iters(1) 
+        if (q .gt. time_iter_iter(2)) time_iter = time_iters(2)
+        if (q .eq. qmax)              time_iter = time_iter_steady
 
         ! Perform iteration loop to diagnose error for modifying C_bed 
         do n = 1, int(time_iter/dtt)
@@ -249,14 +263,19 @@ if (opt_method .eq. 1) then
 
         end do 
 
-        ! Update cf_ref based on error metric(s) 
-        call update_cf_ref_thickness_simple(cf_ref,cf_ref_dot,yelmo1%tpo%now%H_ice, &
-                        yelmo1%bnd%z_bed,yelmo1%dyn%now%ux_bar,yelmo1%dyn%now%uy_bar, &
-                        yelmo1%dta%pd%H_ice,yelmo1%tpo%par%dx,cf_min,cf_max)
+        if (q .lt. qmax) then
+            ! Perform optimization except for last timestep
 
-        ! Update C_bed 
-        call calc_ydyn_cbed_external(yelmo1%dyn,yelmo1%tpo,yelmo1%thrm,yelmo1%bnd,yelmo1%grd, &
-                                                                        domain,mask_noice,cf_ref)
+            ! Update cf_ref based on error metric(s) 
+            call update_cf_ref_thickness_simple(cf_ref,cf_ref_dot,yelmo1%tpo%now%H_ice, &
+                            yelmo1%bnd%z_bed,yelmo1%dyn%now%ux_bar,yelmo1%dyn%now%uy_bar, &
+                            yelmo1%dta%pd%H_ice,yelmo1%tpo%par%dx,cf_min,cf_max)
+
+            ! Update C_bed 
+            call calc_ydyn_cbed_external(yelmo1%dyn,yelmo1%tpo,yelmo1%thrm,yelmo1%bnd,yelmo1%grd, &
+                                                                            domain,mask_noice,cf_ref)
+
+        end if 
 
 !         if (q .le. qmax_iter_length_2) then 
 !             ! Reset model to the initial state (including H_w) and time, with updated C_bed field 
@@ -324,6 +343,8 @@ end if
 
 !         call yelmo_update_equil_external(yelmo1,hyd1,cf_ref,time,time_tot=time_iter,topo_fixed=topo_fixed,dt=0.5,ssa_vel_max=5000.0)
 
+    ! Write a final restart file 
+    call yelmo_restart_write(yelmo1,file_restart,time)
 
     ! Finalize program
     call yelmo_end(yelmo1,time=time)

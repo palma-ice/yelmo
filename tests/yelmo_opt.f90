@@ -71,8 +71,8 @@ program yelmo_test
     cf_min     = 0.001                  ! [--] 
     cf_max     = 2.0                    ! [--]
 
-    qmax                = 200       ! Total number of iterations
-    time_iter           = 10.0      ! [yr] 
+    qmax                = 200           ! Total number of iterations
+    time_iter           = 500.0         ! [yr] 
 
 !     if (opt_method .eq. 1) then 
 !         ! Error method 

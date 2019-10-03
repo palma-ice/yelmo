@@ -35,6 +35,10 @@ program yelmo_test
     real(prec) :: cf_min, cf_max, cf_init  
     integer    :: opt_method 
 
+    integer    :: topo_rel_n, n_now  
+    integer    :: topo_rel_iter(2)
+    real(prec) :: topo_rel_taus(2)
+
     real(prec), allocatable :: cf_ref(:,:) 
     real(prec), allocatable :: cf_ref_dot(:,:) 
 
@@ -59,29 +63,36 @@ program yelmo_test
     dtt                 = 2.0       ! [yr] Time step for time loop 
     dt2D_out            = 10.0      ! [yr] 2D output writing 
 
-    if (opt_method .eq. 1) then 
-        ! Error method 
-        qmax                = 200       ! Total number of iterations
-        time_iter           = 500.0     ! [yr] 
-
-        qmax_iter_length_1  = 10        ! 1st number of iterations at which iteration length should increase
-        time_iter_1         = 1000.0    ! [yr] 
-        
-        qmax_iter_length_2  = 20        ! 1st number of iterations at which iteration length should increase
-        time_iter_2         = 2000.0    ! [yr] 
-        
-    else 
-        ! Ratio method 
-        qmax                = 100       ! Total number of iterations
-        time_tune           = 20.0      ! [yr]
-        time_iter           = 200.0     ! [yr] 
-        
-    end if 
+    topo_rel_n          = 2
+    topo_rel_iter       = [5,10]
+    topo_rel_taus       = [10.0,50.0]
 
     cf_init    = 0.2                    ! [--]
     cf_min     = 0.001                  ! [--] 
     cf_max     = 2.0                    ! [--]
 
+    qmax                = 200       ! Total number of iterations
+    time_iter           = 10.0      ! [yr] 
+
+!     if (opt_method .eq. 1) then 
+!         ! Error method 
+!         qmax                = 200       ! Total number of iterations
+!         time_iter           = 500.0     ! [yr] 
+
+!         qmax_iter_length_1  = 10        ! 1st number of iterations at which iteration length should increase
+!         time_iter_1         = 1000.0    ! [yr] 
+        
+!         qmax_iter_length_2  = 20        ! 1st number of iterations at which iteration length should increase
+!         time_iter_2         = 2000.0    ! [yr] 
+        
+!     else 
+!         ! Ratio method 
+!         qmax                = 100       ! Total number of iterations
+!         time_tune           = 20.0      ! [yr]
+!         time_iter           = 200.0     ! [yr] 
+        
+!     end if 
+    
     ! Not used right now:
 !     qmax_topo_fixed     = 0         ! Number of initial iterations that should use topo_fixed=.TRUE. 
 !     time_iter_0         =  50.0     ! [yr] 
@@ -196,16 +207,28 @@ program yelmo_test
 
     end if 
 
+    write(*,*) "Starting optimization..."
+
 if (opt_method .eq. 1) then 
     ! Error method (Pollard and De Conto, 2012)
 
+    n_now = 1 
 
     do q = 1, qmax 
 
-        ! Update time_iter
-        if (q .gt. qmax_iter_length_1) time_iter = time_iter_1
-!         if (q .gt. qmax_iter_length_2) time_iter = time_iter_2
-        
+        if (q .gt. topo_rel_iter(n_now)) then 
+            ! Update relaxation parameters 
+            n_now = n_now + 1 
+            if (n_now .gt. topo_rel_n) then 
+                ! Disable relaxation 
+                yelmo1%tpo%par%topo_rel = 0 
+            else
+                yelmo1%tpo%par%topo_rel_tau = topo_rel_taus(n_now)
+            end if 
+
+            write(*,*) "relaxation: ", q, n_now, yelmo1%tpo%par%topo_rel, yelmo1%tpo%par%topo_rel_tau
+        end if 
+
         ! Perform iteration loop to diagnose error for modifying C_bed 
         do n = 1, int(time_iter/dtt)
         

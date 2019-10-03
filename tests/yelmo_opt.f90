@@ -94,9 +94,10 @@ program yelmo_test
     outfldr = "./"
 
     ! Define input and output locations 
-    path_const = trim(outfldr)//"yelmo_const_Earth.nml"
-    file1D     = trim(outfldr)//"yelmo1D.nc"
-    file2D     = trim(outfldr)//"yelmo2D.nc"
+    path_const   = trim(outfldr)//"yelmo_const_Earth.nml"
+    file1D       = trim(outfldr)//"yelmo1D.nc"
+    file2D       = trim(outfldr)//"yelmo2D.nc"
+    file_restart = trim(outfldr)//"yelmo_restart.nc"
 
     ! === Initialize ice sheet model =====
 
@@ -149,41 +150,51 @@ program yelmo_test
     cf_ref     = cf_init 
     
     ! Initialize state variables (dyn,therm,mat)
-    ! (initialize temps with robin method with a cold base)
+    ! (initialize temps with robin method with a cold base),
+    ! or from restart file, if specified 
     call yelmo_init_state(yelmo1,path_par,time=time_init,thrm_method="robin-cold")
 
-    ! Note: From now on, using yelmo_update_equil_external allows for running with 
-    ! interactive hydrology via hyd1 object and for passing cf_ref to be able
-    ! to update C_bed as a function of N_eff interactively.
+    if (.not. yelmo1%par%use_restart) then 
+        ! Run initialization steps 
 
-    ! ============================================================================================
-    ! Step 1: Relaxtion step: run SIA model for 100 years to smooth out the input
-    ! topography that will be used as a target. 
+        ! Note: From now on, using yelmo_update_equil_external allows for running with 
+        ! interactive hydrology via hyd1 object and for passing cf_ref to be able
+        ! to update C_bed as a function of N_eff interactively.
 
-    call yelmo_update_equil_external(yelmo1,hyd1,cf_ref,time_init,time_tot=50.0,topo_fixed=.FALSE.,dt=1.0,ssa_vel_max=0.0)
+        ! ============================================================================================
+        ! Step 1: Relaxtion step: run SIA model for 100 years to smooth out the input
+        ! topography that will be used as a target. 
 
-    ! Define present topo as present-day dataset for comparison 
-    yelmo1%dta%pd%H_ice = yelmo1%tpo%now%H_ice 
-    yelmo1%dta%pd%z_srf = yelmo1%tpo%now%z_srf 
+        call yelmo_update_equil_external(yelmo1,hyd1,cf_ref,time_init,time_tot=50.0,topo_fixed=.FALSE.,dt=1.0,ssa_vel_max=0.0)
 
-    ! ============================================================================================
-    ! Step 2: Run the model for several ka in hybrid mode with topo_fixed to
-    ! spin up the thermodynamics and have a reference state to reset.
-    ! Store the reference state for future use.
-    
-    call yelmo_update_equil_external(yelmo1,hyd1,cf_ref,time_init,time_tot=10e3,topo_fixed=.TRUE.,dt=5.0,ssa_vel_max=0.0)
-    call yelmo_update_equil_external(yelmo1,hyd1,cf_ref,time_init,time_tot=1e3, topo_fixed=.TRUE.,dt=1.0,ssa_vel_max=5000.0)
+        ! Define present topo as present-day dataset for comparison 
+        yelmo1%dta%pd%H_ice = yelmo1%tpo%now%H_ice 
+        yelmo1%dta%pd%z_srf = yelmo1%tpo%now%z_srf 
 
-    ! Store the reference state
-    yelmo_ref = yelmo1 
-    hyd_ref   = hyd1 
+        ! ============================================================================================
+        ! Step 2: Run the model for several ka in hybrid mode with topo_fixed to
+        ! spin up the thermodynamics and have a reference state to reset.
+        ! Store the reference state for future use.
+        
+        call yelmo_update_equil_external(yelmo1,hyd1,cf_ref,time_init,time_tot=20e3,topo_fixed=.TRUE.,dt=5.0,ssa_vel_max=0.0)
+        call yelmo_update_equil_external(yelmo1,hyd1,cf_ref,time_init,time_tot=10e3, topo_fixed=.TRUE.,dt=1.0,ssa_vel_max=5000.0)
 
-    ! Initialize the 2D output file and write the initial model state 
-    call yelmo_write_init(yelmo1,file2D,time_init,units="years")  
-    call write_step_2D_opt(yelmo1,file2D,time_init,cf_ref,cf_ref_dot,mask_noice)  
-    
-    ! Initialize time variable 
-    time = time_init 
+        ! Store the reference state
+        yelmo_ref = yelmo1 
+        hyd_ref   = hyd1 
+
+        ! Initialize the 2D output file and write the initial model state 
+        call yelmo_write_init(yelmo1,file2D,time_init,units="years")  
+        call write_step_2D_opt(yelmo1,file2D,time_init,cf_ref,cf_ref_dot,mask_noice)  
+        
+        ! Initialize time variable 
+        time = time_init 
+
+        ! Write a restart file 
+        call yelmo_restart_write(yelmo1,file_restart,time)
+        stop "**** Done ****"
+
+    end if 
 
 if (opt_method .eq. 1) then 
     ! Error method (Pollard and De Conto, 2012)
@@ -208,7 +219,7 @@ if (opt_method .eq. 1) then
                                                                         domain,mask_noice,cf_ref)
 
             cf_ref_dot = 0.0_prec 
-            
+
 !             if (mod(nint(time*100),nint(dt2D_out*100))==0) then
 !                 call write_step_2D_opt(yelmo1,file2D,time,cf_ref,cf_ref_dot,mask_noice)
 !             end if 

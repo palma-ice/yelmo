@@ -37,7 +37,7 @@
     margin2nd         = False           ! Apply second-order upwind approximation to gradients at the margin
     use_bmb           = True            ! Use basal mass balance in mass conservation equation
     topo_fixed        = False           ! Keep ice thickness fixed, perform other ytopo calculations
-    topo_rel          = 1               ! 0: No relaxation; 1: relax shelf; 2: relax shelf + gl; 3: all points 
+    topo_rel          = 0               ! 0: No relaxation; 1: relax shelf; 2: relax shelf + gl; 3: all points 
     topo_rel_tau      = 10.0            ! [a] Time scale for relaxation 
     calv_H_lim        = 200.0           ! [m] Calving limit in ice thickness (thinner ice calves)
     calv_tau          = 10.0            ! [a] Characteristic calving time

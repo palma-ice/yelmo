@@ -499,7 +499,7 @@ module yelmo_defs
 
     type ydata_pd_class   ! pd = present-day
         ! Variables that contain observations / reconstructions for comparison/inversion
-        real(prec), allocatable :: H_ice(:,:), z_srf(:,:), z_bed(:,:)
+        real(prec), allocatable :: H_ice(:,:), z_srf(:,:), z_bed(:,:), H_grnd(:,:)
         real(prec), allocatable :: ux_s(:,:), uy_s(:,:), uxy_s(:,:) 
         real(prec), allocatable :: T_srf(:,:), smb(:,:) 
         ! Comparison metrics 

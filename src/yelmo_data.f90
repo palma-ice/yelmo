@@ -69,6 +69,10 @@ contains
                 dta%pd%z_srf = max(dta%pd%z_bed,0.0)
             end where 
             
+            ! Calculate H_grnd (ice thickness overburden)
+            ! (extracted from `calc_H_grnd` in yelmo_topography)
+            dta%pd%H_grnd = dta%pd%H_ice - (rho_sw/rho_ice)*(0.0_prec-dta%pd%z_bed)
+
         end if 
 
         if (dta%par%pd_tsrf_load) then 
@@ -219,6 +223,7 @@ contains
         allocate(pd%H_ice(nx,ny))
         allocate(pd%z_srf(nx,ny))
         allocate(pd%z_bed(nx,ny))
+        allocate(pd%H_grnd(nx,ny))
         
         allocate(pd%T_srf(nx,ny))
         allocate(pd%smb(nx,ny))
@@ -236,6 +241,7 @@ contains
         pd%H_ice        = 0.0 
         pd%z_srf        = 0.0 
         pd%z_bed        = 0.0 
+        pd%H_grnd       = 0.0 
         
         pd%T_srf        = 0.0 
         pd%smb          = 0.0 
@@ -262,6 +268,7 @@ contains
         if (allocated(pd%H_ice))        deallocate(pd%H_ice)
         if (allocated(pd%z_srf))        deallocate(pd%z_srf)
         if (allocated(pd%z_bed))        deallocate(pd%z_bed)
+        if (allocated(pd%H_grnd))       deallocate(pd%H_grnd)
         
         if (allocated(pd%T_srf))        deallocate(pd%T_srf)
         if (allocated(pd%smb))          deallocate(pd%smb)

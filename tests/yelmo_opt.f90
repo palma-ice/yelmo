@@ -65,20 +65,20 @@ program yelmo_test
     ! Simulation parameters
     time_init           = 0.0       ! [yr] Starting time
     dtt                 = 2.0       ! [yr] Time step for time loop 
-    dt2D_out            = 10.0      ! [yr] 2D output writing 
+    dt2D_out            = 500.0     ! [yr] 2D output writing 
 
     topo_rel_n          = 2
-    topo_rel_iter       = [5,10]
-    topo_rel_taus       = [10.0,50.0]
+    topo_rel_iter       = [4,10]
+    topo_rel_taus       = [10.0,1000.0]
 
-    qmax                = 41            ! Total number of iterations
-    time_iter_iter      = [30,40]
+    qmax                = 21                ! Total number of iterations
+    time_iter_iter      = [15,20]
     time_iters          = [500.0,1000.0]
-    time_iter_steady    = 10e3          ! [yr] Final timestep, no optimization, run to steady-state
+    time_iter_steady    = 10e3              ! [yr] Steady-state iterations, no optimization, run to steady-state
 
-    cf_init    = 0.2                    ! [--]
-    cf_min     = 0.005                  ! [--] 
-    cf_max     = 2.0                    ! [--]
+    cf_init    = 0.2                        ! [--]
+    cf_min     = 0.005                      ! [--] 
+    cf_max     = 1.0                        ! [--]
 
 !     time_iter           = 500.0         ! [yr] 
 
@@ -256,9 +256,9 @@ if (opt_method .eq. 1) then
 
             cf_ref_dot = 0.0_prec 
 
-!             if (mod(nint(time*100),nint(dt2D_out*100))==0) then
-!                 call write_step_2D_opt(yelmo1,file2D,time,cf_ref,cf_ref_dot,mask_noice)
-!             end if 
+            if (mod(nint(time*100),nint(dt2D_out*100))==0) then
+                call write_step_2D_opt(yelmo1,file2D,time,cf_ref,cf_ref_dot,mask_noice)
+            end if 
 
         end do 
 
@@ -268,7 +268,7 @@ if (opt_method .eq. 1) then
             ! Update cf_ref based on error metric(s) 
             call update_cf_ref_thickness_simple(cf_ref,cf_ref_dot,yelmo1%tpo%now%H_ice, &
                             yelmo1%bnd%z_bed,yelmo1%dyn%now%ux_bar,yelmo1%dyn%now%uy_bar, &
-                            yelmo1%dta%pd%H_ice,yelmo1%tpo%par%dx,cf_min,cf_max)
+                            yelmo1%dta%pd%H_ice,yelmo1%dta%pd%H_grnd.le.0.0_prec,yelmo1%tpo%par%dx,cf_min,cf_max)
 
             ! Update C_bed 
             call calc_ydyn_cbed_external(yelmo1%dyn,yelmo1%tpo,yelmo1%thrm,yelmo1%bnd,yelmo1%grd, &
@@ -286,8 +286,8 @@ if (opt_method .eq. 1) then
 !         end if 
         
         
-        ! Write the current solution 
-        call write_step_2D_opt(yelmo1,file2D,time,cf_ref,cf_ref_dot,mask_noice)
+!         ! Write the current solution 
+!         call write_step_2D_opt(yelmo1,file2D,time,cf_ref,cf_ref_dot,mask_noice)
         
     end do 
 
@@ -355,7 +355,7 @@ end if
     call cpu_time(cpu_end_time)
 
     write(*,"(a,f12.3,a)") "Time  = ",(cpu_end_time-cpu_start_time)/60.0 ," min"
-    write(*,"(a,f12.1,a)") "Speed = ",(1e-3*(time_end-time_init))/((cpu_end_time-cpu_start_time)/3600.0), " kiloyears / hr"
+    write(*,"(a,f12.1,a)") "Speed = ",(1e-3*(time-time_init))/((cpu_end_time-cpu_start_time)/3600.0), " kiloyears / hr"
 
 contains
 
@@ -532,7 +532,7 @@ contains
 
     end subroutine write_step_2D_opt
 
-    subroutine update_cf_ref_thickness_simple(cf_ref,cf_ref_dot,H_ice,z_bed,ux,uy,H_obs,dx,cf_min,cf_max)
+    subroutine update_cf_ref_thickness_simple(cf_ref,cf_ref_dot,H_ice,z_bed,ux,uy,H_obs,is_float_obs,dx,cf_min,cf_max)
 
         implicit none 
 
@@ -543,6 +543,7 @@ contains
         real(prec), intent(IN)    :: ux(:,:) 
         real(prec), intent(IN)    :: uy(:,:) 
         real(prec), intent(IN)    :: H_obs(:,:) 
+        logical,    intent(IN)    :: is_float_obs(:,:) 
         real(prec), intent(IN)    :: dx 
         real(prec), intent(IN)    :: cf_min 
         real(prec), intent(IN)    :: cf_max
@@ -635,6 +636,9 @@ contains
         ! Additionally, apply a Gaussian filter to cf_ref to ensure smooth transitions
         call filter_gaussian(var=cf_ref,sigma=dx_km*0.2,dx=dx_km)     !,mask=err_z_srf .ne. 0.0)
         
+        ! Ensure where obs are floating, set cf_ref = cf_min 
+        where(is_float_obs) cf_ref =cf_min 
+
         ! Also where no ice exists, set cf_ref = cf_min 
         where(H_obs .eq. 0.0) cf_ref = cf_min 
 

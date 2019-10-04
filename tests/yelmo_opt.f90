@@ -20,29 +20,29 @@ program yelmo_test
     character(len=256) :: outfldr, file1D, file2D, file_restart, domain 
     character(len=512) :: path_par, path_const  
     real(prec) :: time_init, time_end, time_equil, time, dtt, dt1D_out, dt2D_out
-    integer    :: n
+    integer    :: n, q, n_now
     real(4)    :: cpu_start_time, cpu_end_time 
 
     ! Parameters 
     real(prec) :: bmb_shlf_const, dT_ann, z_sl  
 
-    ! Optimization variables 
-    real(prec) :: time_iter, time_iter_0, time_iter_1, time_iter_2
-    integer    :: q, qmax, qmax_topo_fixed, qmax_iter_length_1, qmax_iter_length_2
-    real(prec) :: time_tune, time_tune_0, time_tune_1, time_tune_2  
-    integer    :: qmax_tune_length_1, qmax_tune_length_2
-    logical    :: topo_fixed  
-    real(prec) :: cf_min, cf_max, cf_init  
+    ! Optimization variables  
     integer    :: opt_method 
-
-    integer    :: topo_rel_n, n_now  
+    real(prec) :: cf_min, cf_max, cf_init  
+    
+    integer    :: qmax 
+    real(prec) :: time_iter
+    real(prec) :: time_steady
+    real(prec) :: time_tune 
+    
+    integer    :: topo_rel_n  
     integer    :: topo_rel_iter(2)
     real(prec) :: topo_rel_taus(2)
 
-    real(prec) :: time_iter_iter(2)
-    real(prec) :: time_iters(2) 
-    real(prec) :: time_iter_steady
-    
+    real(prec) :: H_scale_iter(2) 
+    real(prec) :: H_scales(2) 
+    real(prec) :: H_scale 
+
     real(prec), allocatable :: cf_ref(:,:) 
     real(prec), allocatable :: cf_ref_dot(:,:) 
 
@@ -67,20 +67,20 @@ program yelmo_test
     dtt                 = 2.0       ! [yr] Time step for time loop 
     dt2D_out            = 500.0     ! [yr] 2D output writing 
 
+    qmax                = 21                ! Total number of iterations
+    time_iter           = 500.0             ! [yr] Time for each iteration 
+    time_steady         = 10e3              ! [yr] Time to run to steady state at the end without further optimization
+
     topo_rel_n          = 2
     topo_rel_iter       = [4,10]
     topo_rel_taus       = [10.0,1000.0]
 
-    qmax                = 21                ! Total number of iterations
-    time_iter_iter      = [15,20]
-    time_iters          = [500.0,1000.0]
-    time_iter_steady    = 10e3              ! [yr] Steady-state iterations, no optimization, run to steady-state
+    H_scale_iter        = [15,20]
+    H_scales            = [1000.0,1500.0] 
 
     cf_init    = 0.2                        ! [--]
     cf_min     = 0.005                      ! [--] 
     cf_max     = 1.0                        ! [--]
-
-!     time_iter           = 500.0         ! [yr] 
 
 !     if (opt_method .eq. 1) then 
 !         ! Error method 
@@ -234,16 +234,21 @@ if (opt_method .eq. 1) then
                 yelmo1%tpo%par%topo_rel_tau = topo_rel_taus(n_now)
             end if 
 
-            write(*,*) "relaxation: ", q, n_now, yelmo1%tpo%par%topo_rel, yelmo1%tpo%par%topo_rel_tau
+            
         end if 
 
-        ! === Update iterations ====================
-        time_iter = time_iters(1) 
-        if (q .gt. time_iter_iter(2)) time_iter = time_iters(2)
-        if (q .eq. qmax)              time_iter = time_iter_steady
+        ! === Update H_scale ====================
+        H_scale = H_scales(1) 
+        if (q .gt. H_scale_iter(1)) H_scale = H_scales(2) 
+
+        ! === Update time_iter ==================
+        time_end = time_iter
+        if (q .eq. qmax) time_end = time_steady
+
+        write(*,*) "iter_par: ", q, n_now, yelmo1%tpo%par%topo_rel, yelmo1%tpo%par%topo_rel_tau, H_scale, time_end
 
         ! Perform iteration loop to diagnose error for modifying C_bed 
-        do n = 1, int(time_iter/dtt)
+        do n = 1, int(time_end/dtt)
         
             time = time + dtt 
 
@@ -268,7 +273,8 @@ if (opt_method .eq. 1) then
             ! Update cf_ref based on error metric(s) 
             call update_cf_ref_thickness_simple(cf_ref,cf_ref_dot,yelmo1%tpo%now%H_ice, &
                             yelmo1%bnd%z_bed,yelmo1%dyn%now%ux_bar,yelmo1%dyn%now%uy_bar, &
-                            yelmo1%dta%pd%H_ice,yelmo1%dta%pd%H_grnd.le.0.0_prec,yelmo1%tpo%par%dx,cf_min,cf_max)
+                            yelmo1%dta%pd%H_ice,yelmo1%dta%pd%H_grnd.le.0.0_prec,yelmo1%tpo%par%dx, &
+                            cf_min,cf_max,H_scale)
 
             ! Update C_bed 
             call calc_ydyn_cbed_external(yelmo1%dyn,yelmo1%tpo,yelmo1%thrm,yelmo1%bnd,yelmo1%grd, &
@@ -532,7 +538,7 @@ contains
 
     end subroutine write_step_2D_opt
 
-    subroutine update_cf_ref_thickness_simple(cf_ref,cf_ref_dot,H_ice,z_bed,ux,uy,H_obs,is_float_obs,dx,cf_min,cf_max)
+    subroutine update_cf_ref_thickness_simple(cf_ref,cf_ref_dot,H_ice,z_bed,ux,uy,H_obs,is_float_obs,dx,cf_min,cf_max,H_scale)
 
         implicit none 
 
@@ -547,10 +553,11 @@ contains
         real(prec), intent(IN)    :: dx 
         real(prec), intent(IN)    :: cf_min 
         real(prec), intent(IN)    :: cf_max
+        real(prec), intent(IN)    :: H_scale            ! [m] H_scale = 1000.0 m by default
 
         ! Local variables 
         integer :: i, j, nx, ny, i1, j1  
-        real(prec) :: dx_km, f_dz, f_dz_lim, H_scale, f_scale   
+        real(prec) :: dx_km, f_dz, f_dz_lim, f_scale   
         real(prec) :: ux_aa, uy_aa
         real(prec) :: H_ice_now, H_obs_now 
 
@@ -565,7 +572,7 @@ contains
         allocate(cf_prev(nx,ny))
 
         ! Optimization parameters 
-        H_scale  = 1000.0           ! [m] 
+        !H_scale  = 1000.0           ! [m]   **Now an input parameter to change with time 
         f_dz_lim = 1.5              ! [--] 
 
         ! Get Gaussian weights 

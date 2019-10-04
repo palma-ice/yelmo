@@ -10,7 +10,7 @@
     z_sl            = 0.0               ! [m] Sea level relative to present-day 
 
     load_cf_ref     = True              ! Load cf_ref from file? Otherwise define from cf_stream + inline tuning
-    file_cf_ref     = "input/ant-pd-opt-3/cf_ref_opt.nc"  ! Filename holding cf_ref to load 
+    file_cf_ref     = "input/{domain}/{grid_name}/{grid_name}_cf_ref_opt.nc"  ! Filename holding cf_ref to load 
 /
 
 &yelmo

@@ -200,16 +200,13 @@ if (opt_method .eq. 1) then
     do q = 1, qmax 
 
         ! === Optimization parameters =========
-        if (q .gt. iter_steps(n_now)) then 
-            ! If iteration step reached, update optimization parameters 
-            
-            n_now = min(n_now+1,size(iter_steps,1))
-            
-            yelmo1%tpo%par%topo_rel     = topo_rels(n_now)
-            yelmo1%tpo%par%topo_rel_tau = topo_rel_taus(n_now)
-            H_scale                     = H_scales(n_now) 
-
-        end if 
+        
+        ! If iteration step reached, update optimization parameters 
+        if (q .gt. iter_steps(n_now)) n_now = min(n_now+1,size(iter_steps,1))
+        
+        yelmo1%tpo%par%topo_rel     = topo_rels(n_now)
+        yelmo1%tpo%par%topo_rel_tau = topo_rel_taus(n_now)
+        H_scale                     = H_scales(n_now) 
 
         ! === Update time_iter ==================
         time_end = time_iter

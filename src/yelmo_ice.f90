@@ -568,8 +568,9 @@ contains
         if (present(domain))     par%domain    = trim(domain)
         if (present(grid_name))  par%grid_name = trim(grid_name)
         
-        ! Parse filename with grid information
+        ! Parse filenames with grid information
         call yelmo_parse_path(par%grid_path,par%domain,par%grid_name)
+        call yelmo_parse_path(par%restart,par%domain,par%grid_name)
 
         ! dtmin must be greater than zero 
         if (par%dtmin .eq. 0.0) then 

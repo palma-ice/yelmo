@@ -34,13 +34,11 @@ program yelmo_test
     real(prec) :: time_iter
     real(prec) :: time_steady
     real(prec) :: time_tune 
-    
-    integer    :: topo_rel_n  
-    integer    :: topo_rel_iter(2)
-    real(prec) :: topo_rel_taus(2)
 
-    real(prec) :: H_scale_iter(2) 
-    real(prec) :: H_scales(2) 
+    integer    :: iter_steps(4) 
+    integer    :: topo_rels(4) 
+    real(prec) :: topo_rel_taus(4)
+    real(prec) :: H_scales(4) 
     real(prec) :: H_scale 
 
     real(prec), allocatable :: cf_ref(:,:) 
@@ -71,44 +69,22 @@ program yelmo_test
     time_iter           = 500.0             ! [yr] Time for each iteration 
     time_steady         = 10e3              ! [yr] Time to run to steady state at the end without further optimization
 
-    topo_rel_n          = 2
-    topo_rel_iter       = [4,10]
-    topo_rel_taus       = [10.0,1000.0]
-
-    H_scale_iter        = [15,20]
-    H_scales            = [1000.0,1500.0] 
+    iter_steps          = [4,10,15,20]
+    topo_rels           = [1,1,0,0]
+    topo_rel_taus       = [10.0,1000.0,0.0,0.0]
+    H_scales            = [800.0,800.0,800.0,1500.0] 
 
     cf_init    = 0.2                        ! [--]
     cf_min     = 0.005                      ! [--] 
     cf_max     = 1.0                        ! [--]
 
-!     if (opt_method .eq. 1) then 
-!         ! Error method 
-!         qmax                = 200       ! Total number of iterations
-!         time_iter           = 500.0     ! [yr] 
 
-!         qmax_iter_length_1  = 10        ! 1st number of iterations at which iteration length should increase
-!         time_iter_1         = 1000.0    ! [yr] 
-        
-!         qmax_iter_length_2  = 20        ! 1st number of iterations at which iteration length should increase
-!         time_iter_2         = 2000.0    ! [yr] 
-        
-!     else 
+! Not used:
 !         ! Ratio method 
 !         qmax                = 100       ! Total number of iterations
 !         time_tune           = 20.0      ! [yr]
 !         time_iter           = 200.0     ! [yr] 
         
-!     end if 
-
-    ! Not used right now:
-!     qmax_topo_fixed     = 0         ! Number of initial iterations that should use topo_fixed=.TRUE. 
-!     time_iter_0         =  50.0     ! [yr] 
-!     time_iter_1         = 200.0     ! [yr] 
-!     time_iter_2         = 500.0     ! [yr] 
-!     qmax_iter_length_1  = 10        ! 1st number of iterations at which iteration length should increase
-!     qmax_iter_length_2  = 50        ! 2nd number of iterations at which iteration length should increase
-    
     ! Assume program is running from the output folder
     outfldr = "./"
 
@@ -223,29 +199,24 @@ if (opt_method .eq. 1) then
 
     do q = 1, qmax 
 
-        ! === Update relaxation parameters =========
-        if (q .gt. topo_rel_iter(n_now)) then 
-            ! Update relaxation parameters 
-            n_now = n_now + 1 
-            if (n_now .gt. topo_rel_n) then 
-                ! Disable relaxation 
-                yelmo1%tpo%par%topo_rel = 0 
-            else
-                yelmo1%tpo%par%topo_rel_tau = topo_rel_taus(n_now)
-            end if 
-
+        ! === Optimization parameters =========
+        if (q .gt. iter_steps(n_now)) then 
+            ! If iteration step reached, update optimization parameters 
             
-        end if 
+            n_now = min(n_now+1,size(iter_steps,1))
+            
+            yelmo1%tpo%par%topo_rel     = topo_rels(n_now)
+            yelmo1%tpo%par%topo_rel_tau = topo_rel_taus(n_now)
+            H_scale                     = H_scales(n_now) 
 
-        ! === Update H_scale ====================
-        H_scale = H_scales(1) 
-        if (q .gt. H_scale_iter(1)) H_scale = H_scales(2) 
+        end if 
 
         ! === Update time_iter ==================
         time_end = time_iter
         if (q .eq. qmax) time_end = time_steady
 
-        write(*,*) "iter_par: ", q, n_now, yelmo1%tpo%par%topo_rel, yelmo1%tpo%par%topo_rel_tau, H_scale, time_end
+        write(*,"(a,i4,f10.1,i4,i4,f10.1,f12.1,f10.1)") "iter_par: ", q, time, n_now, &
+                            yelmo1%tpo%par%topo_rel, yelmo1%tpo%par%topo_rel_tau, H_scale, time_end
 
         ! Perform iteration loop to diagnose error for modifying C_bed 
         do n = 1, int(time_end/dtt)
@@ -258,8 +229,6 @@ if (opt_method .eq. 1) then
             ! Update C_bed 
             call calc_ydyn_cbed_external(yelmo1%dyn,yelmo1%tpo,yelmo1%thrm,yelmo1%bnd,yelmo1%grd, &
                                                                         domain,mask_noice,cf_ref)
-
-            cf_ref_dot = 0.0_prec 
 
             if (mod(nint(time*100),nint(dt2D_out*100))==0) then
                 call write_step_2D_opt(yelmo1,file2D,time,cf_ref,cf_ref_dot,mask_noice)
@@ -290,10 +259,6 @@ if (opt_method .eq. 1) then
 !             time   = 0.0 
 !             call yelmo_set_time(yelmo1,time) 
 !         end if 
-        
-        
-!         ! Write the current solution 
-!         call write_step_2D_opt(yelmo1,file2D,time,cf_ref,cf_ref_dot,mask_noice)
         
     end do 
 

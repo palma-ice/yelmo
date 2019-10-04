@@ -65,14 +65,14 @@ program yelmo_test
     dtt                 = 2.0       ! [yr] Time step for time loop 
     dt2D_out            = 500.0     ! [yr] 2D output writing 
 
-    qmax                = 21                ! Total number of iterations
+    qmax                = 31                ! Total number of iterations
     time_iter           = 500.0             ! [yr] Time for each iteration 
-    time_steady         = 10e3              ! [yr] Time to run to steady state at the end without further optimization
+    time_steady         = 20e3              ! [yr] Time to run to steady state at the end without further optimization
 
-    iter_steps          = [4,10,15,20]
+    iter_steps          = [6,14,20,30]
     topo_rels           = [1,1,0,0]
     topo_rel_taus       = [10.0,1000.0,0.0,0.0]
-    H_scales            = [800.0,800.0,800.0,1500.0] 
+    H_scales            = [1000.0,1000.0,1000.0,2000.0] 
 
     cf_init    = 0.2                        ! [--]
     cf_min     = 0.005                      ! [--] 
@@ -203,7 +203,7 @@ if (opt_method .eq. 1) then
         
         ! If iteration step reached, update optimization parameters 
         if (q .gt. iter_steps(n_now)) n_now = min(n_now+1,size(iter_steps,1))
-        
+
         yelmo1%tpo%par%topo_rel     = topo_rels(n_now)
         yelmo1%tpo%par%topo_rel_tau = topo_rel_taus(n_now)
         H_scale                     = H_scales(n_now) 

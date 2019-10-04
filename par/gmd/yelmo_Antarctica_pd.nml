@@ -1,13 +1,16 @@
 &control    
     time_init       = 0.0               ! [yr] Starting time 
-    time_end        = 1e3               ! [yr] Ending time
+    time_end        = 50e3              ! [yr] Ending time
     time_equil      = 100.0             ! [yr] Equilibration time 
     dtt             = 2.0               ! [yr] Main loop timestep 
     dt1D_out        = 100.0             ! [yr] Frequency of writing 1D output files 
-    dt2D_out        = 200.0             ! [yr] Frequency of writing 2D output files 
+    dt2D_out        = 500.0             ! [yr] Frequency of writing 2D output files 
     bmb_shlf_const  = -0.2              ! [m/a] Basal mass balance of ice shelves
     dT_ann          = 0.0               ! [K] Temperature anomaly (atm)
     z_sl            = 0.0               ! [m] Sea level relative to present-day 
+
+    load_cf_ref     = True              ! Load cf_ref from file? Otherwise define from cf_stream + inline tuning
+    file_cf_ref     = "input/ant-pd-opt-3/cf_ref_opt.nc"  ! Filename holding cf_ref to load 
 /
 
 &yelmo
@@ -78,7 +81,7 @@
     beta_min            = 100.0           ! [Pa a m-1] Minimum value of beta allowed for grounded ice (for stability)
     ssa_beta_max        = 1e20            ! [Pa a m-1] Maximum value of beta for which ssa should be calculated 
     ssa_vel_max         = 5000.0          ! [m a-1] SSA velocity limit to avoid spurious results 
-    ssa_iter_max        = 20              ! Number of maximum allowed iterations over ssa to converge on vel. solution
+    ssa_iter_max        = 2               ! Number of maximum allowed iterations over ssa to converge on vel. solution
     ssa_iter_rel        = 0.7             ! [--] Relaxation fraction [0:1] to stabilize ssa iterations
     ssa_iter_conv       = 1e-2            ! [--] L2 relative error convergence limit to exit ssa iterations
     cb_sia              = 0.0             ! [m a-1 Pa-1] Bed roughness coefficient for SIA sliding

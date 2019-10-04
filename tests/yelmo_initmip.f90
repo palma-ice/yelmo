@@ -26,6 +26,10 @@ program yelmo_test
     ! No-ice mask (to impose additional melting)
     logical, allocatable :: mask_noice(:,:)  
 
+    ! cf_ref 
+    logical :: load_cf_ref
+    character(len=256) :: file_cf_ref 
+
     ! Start timing 
     call cpu_time(cpu_start_time)
 
@@ -42,6 +46,9 @@ program yelmo_test
     call nml_read(path_par,"control","bmb_shlf_const",  bmb_shlf_const)            ! [yr] Constant imposed bmb_shlf value
     call nml_read(path_par,"control","dT_ann",          dT_ann)                    ! [K] Temperature anomaly (atm)
     call nml_read(path_par,"control","z_sl",            z_sl)                      ! [m] Sea level relative to present-day
+
+    call nml_read(path_par,"control","load_cf_ref",     load_cf_ref)               ! Load cf_ref from file? Otherwise define from cf_stream + inline tuning
+    call nml_read(path_par,"control","file_cf_ref",     file_cf_ref)               ! Filename holding cf_ref to load 
 
     ! Assume program is running from the output folder
     outfldr = "./"
@@ -127,8 +134,32 @@ program yelmo_test
     ! (initialize temps with robin method with a cold base)
     call yelmo_init_state(yelmo1,path_par,time=time_init,thrm_method="robin-cold")
 
+    ! ============================================================
+    ! Load or define cf_ref 
+
+    ! Allocate cf_ref and set it to cf_stream by default 
     allocate(cf_ref(yelmo1%grd%nx,yelmo1%grd%ny))
-    cf_ref = 0.0 
+    cf_ref = yelmo1%dyn%par%cf_stream  
+
+    if (load_cf_ref) then 
+        ! Load cf_ref from specified file 
+        call nc_read(file_cf_ref,"cf_ref",cf_ref)
+
+        ! Make sure that present-day shelves have minimal cf_ref values 
+        where(yelmo1%tpo%now%f_grnd .eq. 0.0) cf_ref = 0.05 
+        
+    else
+        ! Define cf_ref inline 
+
+        cf_ref = yelmo1%dyn%par%cf_stream  
+
+        ! Use location-specific tuning functions to modify cf_ref 
+        call modify_cf_ref(yelmo1%dyn,yelmo1%tpo,yelmo1%thrm,yelmo1%bnd,yelmo1%grd,yelmo1%par%domain,cf_ref)
+
+    end if 
+
+    ! ============================================================
+
 
     ! Define C_bed initially
     call calc_ydyn_cbed_external(yelmo1%dyn,yelmo1%tpo,yelmo1%thrm,yelmo1%bnd,yelmo1%grd,yelmo1%par%domain, &
@@ -415,7 +446,7 @@ contains
         type(ygrid_class),  intent(IN)    :: grd
         character(len=*),   intent(IN)    :: domain 
         logical,            intent(IN)    :: mask_noice(:,:) 
-        real(prec),         intent(INOUT) :: cf_ref(:,:) 
+        real(prec),         intent(IN)    :: cf_ref(:,:) 
 
         integer :: i, j, nx, ny 
         integer :: i1, i2, j1, j2 
@@ -428,59 +459,7 @@ contains
         
         allocate(lambda_bed(nx,ny))
 
-            ! Calculate C_bed following parameter choices 
-
-            ! =============================================================================
-            ! Step 1: calculate the C_bed field only determined by 
-            ! cf_frozen, cf_stream and temperate character of the bed 
-
-            if (dyn%par%cb_with_pmp) then 
-                ! Smooth transition between temperate and frozen C_bed
-
-                cf_ref = (thrm%now%f_pmp)*dyn%par%cf_stream &
-                           + (1.0_prec - thrm%now%f_pmp)*dyn%par%cf_frozen 
-
-            else 
-                ! Only use cf_stream everywhere
-
-                cf_ref = dyn%par%cf_stream
-
-            end if 
-
-            if (dyn%par%cb_with_pmp .and. dyn%par%cb_margin_pmp) then 
-                ! Ensure that both the margin points and the grounding line
-                ! are always considered streaming, independent of their
-                ! thermodynamic character (as sometimes these can incorrectly become frozen)
-
-            
-                ! Ensure any marginal point is also treated as streaming 
-                do j = 1, ny 
-                do i = 1, nx 
-
-                    i1 = max(i-1,1)
-                    i2 = min(i+1,nx)
-                    j1 = max(j-1,1)
-                    j2 = min(j+1,ny)
-
-                    if (tpo%now%H_ice(i,j) .gt. 0.0 .and. &
-                        (tpo%now%H_ice(i1,j) .le. 0.0 .or. &
-                         tpo%now%H_ice(i2,j) .le. 0.0 .or. &
-                         tpo%now%H_ice(i,j1) .le. 0.0 .or. &
-                         tpo%now%H_ice(i,j2) .le. 0.0)) then 
-                        
-                        cf_ref(i,j) = dyn%par%cf_stream
-
-                    end if 
-
-                end do 
-                end do 
-
-                ! Also ensure that grounding line is also considered streaming
-                ! Note: this was related to cold ocean temps at floating-grounded interface,
-                ! which is likely solved. Left here for safety. ajr, 2019-07-24
-                where(tpo%now%is_grline) cf_ref = dyn%par%cf_stream
-
-            end if
+            ! cf_ref [unitless] is obtained as input to this routine from optimization or elsewhere
 
             ! =============================================================================
             ! Step 2: calculate lambda functions to scale C_bed from default value 
@@ -499,21 +478,8 @@ contains
                     lambda_bed = calc_lambda_bed_exp(bnd%z_bed,dyn%par%cb_z0,dyn%par%cb_z1)
 
                     ! Modifications - increased friction in Wilkes Land (South)
-                    where (bnd%basins .ge. 14 .and. &
-                           bnd%basins .le. 17) lambda_bed = calc_lambda_bed_exp(bnd%z_bed,-400.0,dyn%par%cb_z1)
-
-if (.FALSE.) then                     
-                    ! Modifications 
-                    where (bnd%basins .eq. 1) lambda_bed = calc_lambda_bed_exp(bnd%z_bed,-500.0,dyn%par%cb_z1)
-                    where (bnd%basins .eq. 2) lambda_bed = calc_lambda_bed_exp(bnd%z_bed,-300.0,dyn%par%cb_z1)
-                    
-                    where (bnd%basins .ge. 18 .and. &
-                           bnd%basins .le. 21) lambda_bed = calc_lambda_bed_exp(bnd%z_bed,-300.0,dyn%par%cb_z1)
-                    where (bnd%basins .eq. 22) lambda_bed = calc_lambda_bed_exp(bnd%z_bed,-500.0,dyn%par%cb_z1)
-                    
                     where (bnd%basins .ge. 12 .and. &
-                           bnd%basins .le. 17) lambda_bed = calc_lambda_bed_exp(bnd%z_bed,-500.0,dyn%par%cb_z1)
-end if 
+                           bnd%basins .le. 17) lambda_bed = calc_lambda_bed_exp(bnd%z_bed,-400.0,dyn%par%cb_z1)
 
                 case("till_const")
                     ! Constant till friction angle
@@ -539,6 +505,32 @@ end if
             ! Ensure lambda_bed is not below lower limit [default range 0:1] 
             where (lambda_bed .lt. dyn%par%cb_min) lambda_bed = dyn%par%cb_min
 
+            ! =============================================================================
+            ! Step 3: calculate C_bed [Pa]
+            
+            dyn%now%C_bed = (cf_ref*lambda_bed)*dyn%now%N_eff 
+
+        return 
+
+    end subroutine calc_ydyn_cbed_external
+
+    subroutine modify_cf_ref(dyn,tpo,thrm,bnd,grd,domain,cf_ref)
+        ! Modify cf_ref [unitless] with location specific tuning 
+
+        implicit none
+        
+        type(ydyn_class),   intent(INOUT) :: dyn
+        type(ytopo_class),  intent(IN)    :: tpo 
+        type(ytherm_class), intent(IN)    :: thrm
+        type(ybound_class), intent(IN)    :: bnd  
+        type(ygrid_class),  intent(IN)    :: grd
+        character(len=*),   intent(IN)    :: domain 
+        real(prec),         intent(INOUT) :: cf_ref(:,:) 
+
+        integer :: i, j, nx, ny 
+        integer :: i1, i2, j1, j2 
+        real(prec) :: f_scale 
+            
             ! Additionally modify cf_ref
             if (trim(domain) .eq. "Antarctica") then
 
@@ -592,14 +584,9 @@ end if
 
             end if 
 
-            ! =============================================================================
-            ! Step 3: calculate C_bed [Pa]
-            
-            dyn%now%C_bed = (cf_ref*lambda_bed)*dyn%now%N_eff 
-
         return 
 
-    end subroutine calc_ydyn_cbed_external
+    end subroutine modify_cf_ref
 
     subroutine scale_cb_gaussian(C_bed,cb_new,x0,y0,sigma,xx,yy)
 

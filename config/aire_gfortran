@@ -1,7 +1,8 @@
 FC = gfortran
 
 INC_NC  = -I/opt/local/include
-LIB_NC  = -L/opt/local/lib -lnetcdff -lnetcdf
+#LIB_NC  = -L/opt/local/lib -lnetcdff -lnetcdf
+LIB_NC  = -L/opt/local/lib -lnetcdff -L/opt/local/lib -Wl,-headerpad_max_install_names -Wl,-syslibroot,/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX10.14.sdk -arch x86_64 -lnetcdf -lnetcdf
 
 LISROOT = /Users/robinson/apps/lis/lis
 INC_LIS = -I${LISROOT}/include 

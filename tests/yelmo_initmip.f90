@@ -142,12 +142,16 @@ program yelmo_test
     cf_ref = yelmo1%dyn%par%cf_stream  
 
     if (load_cf_ref) then 
+
+        ! Parse filename with grid information
+        call yelmo_parse_path(file_cf_ref,yelmo1%par%domain,yelmo1%par%grid_name)
+
         ! Load cf_ref from specified file 
         call nc_read(file_cf_ref,"cf_ref",cf_ref)
 
         ! Make sure that present-day shelves have minimal cf_ref values 
         where(yelmo1%tpo%now%f_grnd .eq. 0.0) cf_ref = 0.05 
-        
+
     else
         ! Define cf_ref inline 
 

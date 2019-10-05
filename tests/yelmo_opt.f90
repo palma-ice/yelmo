@@ -213,20 +213,6 @@ program yelmo_test
     
     write(*,*) "Starting optimization..."
 
-
-    ! Checking 
-    do q = 1, qmax 
-
-        time = time_init + (q-1)*time_iter 
-
-        tau     = get_opt_param(time,time1=rel_time1,time2=rel_time2,p1=rel_tau1,p2=rel_tau2)
-        H_scale = get_opt_param(time,time1=scale_time1,time2=scale_time2,p1=scale_H1,p2=scale_H2)
-        
-        write(*,*) time, tau, H_scale 
-    
-    end do 
-
-    stop 
 if (opt_method .eq. 1) then 
     ! Error method (Pollard and De Conto, 2012)
 
@@ -248,7 +234,6 @@ if (opt_method .eq. 1) then
         tau     = get_opt_param(time,time1=rel_time1,time2=rel_time2,p1=rel_tau1,p2=rel_tau2)
         H_scale = get_opt_param(time,time1=scale_time1,time2=scale_time2,p1=scale_H1,p2=scale_H2)
         
-
         ! Set model tau, and set yelmo relaxation switch (1: shelves relaxing; 0: no relaxation)
         yelmo1%tpo%par%topo_rel_tau = tau 
         yelmo1%tpo%par%topo_rel = 1 
@@ -258,7 +243,9 @@ if (opt_method .eq. 1) then
         time_end = time_iter
         if (q .eq. qmax) time_end = time_steady
 
-        write(*,"(a,i4,f10.1,i4,i4,f10.1,f12.1,f10.1)") "iter_par: ", q, time, n_now, &
+!         write(*,"(a,i4,f10.1,i4,i4,f10.1,f12.1,f10.1)") "iter_par: ", q, time, n_now, &
+!                             yelmo1%tpo%par%topo_rel, tau, H_scale, time_end
+        write(*,"(a,i4,f10.1,i4,f10.1,f12.1,f10.1)") "iter_par: ", q, time, &
                             yelmo1%tpo%par%topo_rel, tau, H_scale, time_end
 
         ! Perform iteration loop to diagnose error for modifying C_bed 

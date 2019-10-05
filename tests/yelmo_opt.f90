@@ -39,7 +39,11 @@ program yelmo_test
     integer    :: topo_rels(5) 
     real(prec) :: topo_rel_taus(5)
     real(prec) :: H_scales(5) 
-    real(prec) :: H_scale 
+
+    real(prec) :: rel_time1, rel_time2, rel_tau1, rel_tau2 
+    real(prec) :: scale_time1, scale_time2, scale_H1, scale_H2 
+
+    real(prec) :: tau, H_scale 
 
     real(prec), allocatable :: cf_ref(:,:) 
     real(prec), allocatable :: cf_ref_dot(:,:) 
@@ -69,10 +73,22 @@ program yelmo_test
     time_iter           = 500.0             ! [yr] Time for each iteration 
     time_steady         = 50e3              ! [yr] Time to run to steady state at the end without further optimization
 
-    iter_steps          = [12,16,20,25,35]
-    topo_rels           = [1,1,0,0,0]
-    topo_rel_taus       = [10.0,100.0,1000.0,0.0,0.0]
-    H_scales            = [1000.0,1000.0,1000.0,2000.0,2000.0] 
+    ! Optimization parameters 
+    rel_time1           = 10e3      ! [yr] Time to begin reducing tau from tau1 to tau2 
+    rel_time2           = 20e3      ! [yr] Time to reach tau2, and to disable relaxation 
+    rel_tau1            = 10.0      ! [yr] Initial relaxation tau, fixed until rel_time1 
+    rel_tau2            = 1000.0    ! [yr] Final tau, reached at rel_time2, when relaxation disabled 
+
+    scale_time1         = 15e3      ! [yr] Time to begin increasing H_scale from scale_H1 to scale_H2 
+    scale_time2         = 30e3      ! [yr] Time to reach scale_H2 
+    scale_H1            = 1000.0    ! [m]  Initial value for H_scale parameter in cf_ref optimization 
+    scale_H2            = 2000.0    ! [m]  Final value for H_scale parameter reached at scale_time2 
+
+
+!     iter_steps          = [12,16,20,25,35]
+!     topo_rels           = [1,1,0,0,0]
+!     topo_rel_taus       = [10.0,100.0,1000.0,0.0,0.0]
+!     H_scales            = [1000.0,1000.0,1000.0,2000.0,2000.0] 
 
     cf_init    = 0.2                        ! [--]
     cf_min     = 0.005                      ! [--] 
@@ -84,7 +100,14 @@ program yelmo_test
 !         qmax                = 100       ! Total number of iterations
 !         time_tune           = 20.0      ! [yr]
 !         time_iter           = 200.0     ! [yr] 
-        
+    
+    ! Consistency checks 
+    if (rel_time2 .ge. qmax*time_iter) then 
+        write(*,*) "Error: tau_time2 >= total time. tau_time2 must be less than the total simulation &
+                    &years, so that relaxation is disabled at the end of the simulation."
+        stop 
+    end if 
+
     ! Assume program is running from the output folder
     outfldr = "./"
 
@@ -190,6 +213,20 @@ program yelmo_test
     
     write(*,*) "Starting optimization..."
 
+
+    ! Checking 
+    do q = 1, qmax 
+
+        time = time_init + (q-1)*time_iter 
+
+        tau     = get_opt_param(time,time1=rel_time1,time2=rel_time2,p1=rel_tau1,p2=rel_tau2)
+        H_scale = get_opt_param(time,time1=scale_time1,time2=scale_time2,p1=scale_H1,p2=scale_H2)
+        
+        write(*,*) time, tau, H_scale 
+    
+    end do 
+
+    stop 
 if (opt_method .eq. 1) then 
     ! Error method (Pollard and De Conto, 2012)
 
@@ -201,19 +238,28 @@ if (opt_method .eq. 1) then
 
         ! === Optimization parameters =========
         
-        ! If iteration step reached, update optimization parameters 
-        if (q .gt. iter_steps(n_now)) n_now = min(n_now+1,size(iter_steps,1))
+!         ! If iteration step reached, update optimization parameters 
+!         if (q .gt. iter_steps(n_now)) n_now = min(n_now+1,size(iter_steps,1))
 
-        yelmo1%tpo%par%topo_rel     = topo_rels(n_now)
-        yelmo1%tpo%par%topo_rel_tau = topo_rel_taus(n_now)
-        H_scale                     = H_scales(n_now) 
+!         yelmo1%tpo%par%topo_rel     = topo_rels(n_now)
+!         yelmo1%tpo%par%topo_rel_tau = topo_rel_taus(n_now)
+!         H_scale                     = H_scales(n_now) 
+
+        tau     = get_opt_param(time,time1=rel_time1,time2=rel_time2,p1=rel_tau1,p2=rel_tau2)
+        H_scale = get_opt_param(time,time1=scale_time1,time2=scale_time2,p1=scale_H1,p2=scale_H2)
+        
+
+        ! Set model tau, and set yelmo relaxation switch (1: shelves relaxing; 0: no relaxation)
+        yelmo1%tpo%par%topo_rel_tau = tau 
+        yelmo1%tpo%par%topo_rel = 1 
+        if (time .gt. rel_time2) yelmo1%tpo%par%topo_rel = 0 
 
         ! === Update time_iter ==================
         time_end = time_iter
         if (q .eq. qmax) time_end = time_steady
 
         write(*,"(a,i4,f10.1,i4,i4,f10.1,f12.1,f10.1)") "iter_par: ", q, time, n_now, &
-                            yelmo1%tpo%par%topo_rel, yelmo1%tpo%par%topo_rel_tau, H_scale, time_end
+                            yelmo1%tpo%par%topo_rel, tau, H_scale, time_end
 
         ! Perform iteration loop to diagnose error for modifying C_bed 
         do n = 1, int(time_end/dtt)
@@ -955,6 +1001,31 @@ contains
         return 
 
     end subroutine wtd_mean
+
+    function get_opt_param(time,time1,time2,p1,p2) result(p) 
+        ! Determine value of parameter as a function of time 
+
+        implicit none 
+
+        real(prec), intent(IN) :: time 
+        real(prec), intent(IN) :: time1 
+        real(prec), intent(IN) :: time2
+        real(prec), intent(IN) :: p1
+        real(prec), intent(IN) :: p2
+        real(prec) :: p 
+
+        if (time .le. time1) then 
+            p = p1 
+        else if (time .ge. time2) then 
+            p = p2 
+        else 
+            ! Linear interpolation 
+            p = (p2-p1)*(time-time1)/(time2-time1)
+        end if  
+
+        return 
+
+    end function get_opt_param 
 
     ! Extra...
 

@@ -197,10 +197,6 @@ program yelmo_test
         call yelmo_update_equil_external(yelmo1,hyd1,cf_ref,time_init,time_tot=20e3,topo_fixed=.TRUE.,dt=5.0,ssa_vel_max=0.0)
         call yelmo_update_equil_external(yelmo1,hyd1,cf_ref,time_init,time_tot=10e3, topo_fixed=.TRUE.,dt=1.0,ssa_vel_max=5000.0)
 
-        ! Store the reference state
-        yelmo_ref = yelmo1 
-        hyd_ref   = hyd1 
-
         ! Write a restart file 
         call yelmo_restart_write(yelmo1,file_restart,time_init)
         stop "**** Done ****"
@@ -211,6 +207,11 @@ program yelmo_test
     call yelmo_write_init(yelmo1,file2D,time_init,units="years")  
     call write_step_2D_opt(yelmo1,file2D,time_init,cf_ref,cf_ref_dot,mask_noice)  
     
+    ! Store the reference state
+    yelmo_ref    = yelmo1
+    hyd1%now%H_w = yelmo1%bnd%H_w  
+    hyd_ref      = hyd1 
+
     write(*,*) "Starting optimization..."
 
 if (opt_method .eq. 1) then 
@@ -314,6 +315,13 @@ else
 
             ! Update ice sheet 
             call yelmo_update(yelmo1,time)
+
+            ! Update basal hydrology 
+            call hydro_update(hyd1,yelmo1%tpo%now%H_ice,yelmo1%tpo%now%f_grnd, &
+                        -yelmo1%thrm%now%bmb_grnd*rho_ice/rho_w,time)
+
+            ! Pass updated hydrology variable to Yelmo boundary field
+            yelmo1%bnd%H_w = hyd1%now%H_w 
 
             ! Update C_bed based on error metric(s) 
             call update_cf_ref_thickness_ratio(cf_ref,cf_ref_dot,yelmo1%tpo%now%H_ice, &

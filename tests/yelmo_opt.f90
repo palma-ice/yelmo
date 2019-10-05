@@ -69,7 +69,7 @@ program yelmo_test
     dtt                 = 2.0       ! [yr] Time step for time loop 
     dt2D_out            = 500.0     ! [yr] 2D output writing 
 
-    qmax                = 36                ! Total number of iterations
+    qmax                = 51                ! Total number of iterations
     time_iter           = 500.0             ! [yr] Time for each iteration 
     time_steady         = 50e3              ! [yr] Time to run to steady state at the end without further optimization
 
@@ -80,7 +80,7 @@ program yelmo_test
     rel_tau2            = 1000.0    ! [yr] Final tau, reached at rel_time2, when relaxation disabled 
 
     scale_time1         = 15e3      ! [yr] Time to begin increasing H_scale from scale_H1 to scale_H2 
-    scale_time2         = 30e3      ! [yr] Time to reach scale_H2 
+    scale_time2         = 25e3      ! [yr] Time to reach scale_H2 
     scale_H1            = 1000.0    ! [m]  Initial value for H_scale parameter in cf_ref optimization 
     scale_H2            = 2000.0    ! [m]  Final value for H_scale parameter reached at scale_time2 
 

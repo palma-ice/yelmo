@@ -35,10 +35,10 @@ program yelmo_test
     real(prec) :: time_steady
     real(prec) :: time_tune 
 
-    integer    :: iter_steps(4) 
-    integer    :: topo_rels(4) 
-    real(prec) :: topo_rel_taus(4)
-    real(prec) :: H_scales(4) 
+    integer    :: iter_steps(5) 
+    integer    :: topo_rels(5) 
+    real(prec) :: topo_rel_taus(5)
+    real(prec) :: H_scales(5) 
     real(prec) :: H_scale 
 
     real(prec), allocatable :: cf_ref(:,:) 
@@ -65,14 +65,14 @@ program yelmo_test
     dtt                 = 2.0       ! [yr] Time step for time loop 
     dt2D_out            = 500.0     ! [yr] 2D output writing 
 
-    qmax                = 31                ! Total number of iterations
+    qmax                = 36                ! Total number of iterations
     time_iter           = 500.0             ! [yr] Time for each iteration 
-    time_steady         = 20e3              ! [yr] Time to run to steady state at the end without further optimization
+    time_steady         = 50e3              ! [yr] Time to run to steady state at the end without further optimization
 
-    iter_steps          = [6,14,20,30]
-    topo_rels           = [1,1,0,0]
-    topo_rel_taus       = [10.0,1000.0,0.0,0.0]
-    H_scales            = [1000.0,1000.0,1000.0,2000.0] 
+    iter_steps          = [12,16,20,25,35]
+    topo_rels           = [1,1,0,0,0]
+    topo_rel_taus       = [10.0,100.0,1000.0,0.0,0.0]
+    H_scales            = [1000.0,1000.0,1000.0,2000.0,2000.0] 
 
     cf_init    = 0.2                        ! [--]
     cf_min     = 0.005                      ! [--] 

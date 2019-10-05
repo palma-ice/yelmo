@@ -257,6 +257,13 @@ if (opt_method .eq. 1) then
             ! Update ice sheet 
             call yelmo_update(yelmo1,time)
 
+            ! Update basal hydrology 
+            call hydro_update(hyd1,yelmo1%tpo%now%H_ice,yelmo1%tpo%now%f_grnd, &
+                        -yelmo1%thrm%now%bmb_grnd*rho_ice/rho_w,time)
+
+            ! Pass updated hydrology variable to Yelmo boundary field
+            yelmo1%bnd%H_w = hyd1%now%H_w 
+            
             ! Update C_bed 
             call calc_ydyn_cbed_external(yelmo1%dyn,yelmo1%tpo,yelmo1%thrm,yelmo1%bnd,yelmo1%grd, &
                                                                         domain,mask_noice,cf_ref)

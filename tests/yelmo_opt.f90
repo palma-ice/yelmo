@@ -77,7 +77,7 @@ program yelmo_test
     rel_time1           = 10e3      ! [yr] Time to begin reducing tau from tau1 to tau2 
     rel_time2           = 20e3      ! [yr] Time to reach tau2, and to disable relaxation 
     rel_tau1            = 10.0      ! [yr] Initial relaxation tau, fixed until rel_time1 
-    rel_tau2            = 1000.0    ! [yr] Final tau, reached at rel_time2, when relaxation disabled 
+    rel_tau2            = 500.0     ! [yr] Final tau, reached at rel_time2, when relaxation disabled 
 
     scale_time1         = 15e3      ! [yr] Time to begin increasing H_scale from scale_H1 to scale_H2 
     scale_time2         = 25e3      ! [yr] Time to reach scale_H2 
@@ -1020,7 +1020,7 @@ contains
             p = p2 
         else 
             ! Linear interpolation 
-            p = (p2-p1)*(time-time1)/(time2-time1)
+            p = p1 + (p2-p1)*(time-time1)/(time2-time1)
         end if  
 
         return 

@@ -79,7 +79,7 @@ program yelmo_test
     rel_tau1            = 10.0      ! [yr] Initial relaxation tau, fixed until rel_time1 
     rel_tau2            = 500.0     ! [yr] Final tau, reached at rel_time2, when relaxation disabled 
     rel_q               = 2.0       ! [--] Non-linear exponent to scale interpolation between time1 and time2 
-    
+
     scale_time1         = 15e3      ! [yr] Time to begin increasing H_scale from scale_H1 to scale_H2 
     scale_time2         = 25e3      ! [yr] Time to reach scale_H2 
     scale_H1            = 1000.0    ! [m]  Initial value for H_scale parameter in cf_ref optimization 
@@ -196,7 +196,7 @@ program yelmo_test
         ! Store the reference state for future use.
         
         call yelmo_update_equil_external(yelmo1,hyd1,cf_ref,time_init,time_tot=20e3,topo_fixed=.TRUE.,dt=5.0,ssa_vel_max=0.0)
-        call yelmo_update_equil_external(yelmo1,hyd1,cf_ref,time_init,time_tot=10e3, topo_fixed=.TRUE.,dt=1.0,ssa_vel_max=5000.0)
+        call yelmo_update_equil_external(yelmo1,hyd1,cf_ref,time_init,time_tot=20e3, topo_fixed=.TRUE.,dt=2.0,ssa_vel_max=2000.0)
 
         ! Write a restart file 
         call yelmo_restart_write(yelmo1,file_restart,time_init)

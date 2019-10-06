@@ -589,7 +589,9 @@ contains
         if (par%ntt .lt. 1) par%ntt = 1 
 
         ! Set restart flag based on 'restart' parameter 
-        if (trim(par%restart) .eq. "no") then 
+        if (trim(par%restart) .eq. "None" .or. &
+            trim(par%restart) .eq. "none" .or. &
+            trim(par%restart) .eq. "no") then 
             par%use_restart = .FALSE. 
         else 
             par%use_restart = .TRUE. 

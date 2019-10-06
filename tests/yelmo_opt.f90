@@ -175,7 +175,7 @@ program yelmo_test
      
     if (.not. yelmo1%par%use_restart) then 
         ! Run initialization steps 
-
+        
         ! Note: From now on, using yelmo_update_equil_external allows for running with 
         ! interactive hydrology via hyd1 object and for passing cf_ref to be able
         ! to update C_bed as a function of N_eff interactively.

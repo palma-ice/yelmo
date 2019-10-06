@@ -196,7 +196,8 @@ program yelmo_test
         ! Store the reference state for future use.
         
         call yelmo_update_equil_external(yelmo1,hyd1,cf_ref,time_init,time_tot=20e3,topo_fixed=.TRUE.,dt=5.0,ssa_vel_max=0.0)
-        call yelmo_update_equil_external(yelmo1,hyd1,cf_ref,time_init,time_tot=20e3, topo_fixed=.TRUE.,dt=2.0,ssa_vel_max=2000.0)
+        call yelmo_update_equil_external(yelmo1,hyd1,cf_ref,time_init,time_tot=20e3,topo_fixed=.TRUE.,dt=2.0,ssa_vel_max=2000.0)
+        call yelmo_update_equil_external(yelmo1,hyd1,cf_ref,time_init,time_tot=1e3, topo_fixed=.TRUE.,dt=2.0,ssa_vel_max=5000.0)
 
         ! Write a restart file 
         call yelmo_restart_write(yelmo1,file_restart,time_init)

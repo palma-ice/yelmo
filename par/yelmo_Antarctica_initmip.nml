@@ -4,12 +4,12 @@
     time_equil      = 100.0             ! [yr] Equilibration time 
     dtt             = 2.0               ! [yr] Main loop timestep 
     dt1D_out        = 100.0             ! [yr] Frequency of writing 1D output files 
-    dt2D_out        = 500.0             ! [yr] Frequency of writing 2D output files 
+    dt2D_out        = 100.0             ! [yr] Frequency of writing 2D output files 
     bmb_shlf_const  = -0.2              ! [m/a] Basal mass balance of ice shelves
     dT_ann          = 0.0               ! [K] Temperature anomaly (atm)
     z_sl            = 0.0               ! [m] Sea level relative to present-day 
 
-    load_cf_ref     = True              ! Load cf_ref from file? Otherwise define from cf_stream + inline tuning
+    load_cf_ref     = False             ! Load cf_ref from file? Otherwise define from cf_stream + inline tuning
     file_cf_ref     = "input/{domain}/{grid_name}/{grid_name}_cf_ref_opt.nc"  ! Filename holding cf_ref to load 
 /
 

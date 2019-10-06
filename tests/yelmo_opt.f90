@@ -40,7 +40,7 @@ program yelmo_test
     real(prec) :: topo_rel_taus(5)
     real(prec) :: H_scales(5) 
 
-    real(prec) :: rel_time1, rel_time2, rel_tau1, rel_tau2 
+    real(prec) :: rel_time1, rel_time2, rel_tau1, rel_tau2, rel_q  
     real(prec) :: scale_time1, scale_time2, scale_H1, scale_H2 
 
     real(prec) :: tau, H_scale 
@@ -78,7 +78,8 @@ program yelmo_test
     rel_time2           = 20e3      ! [yr] Time to reach tau2, and to disable relaxation 
     rel_tau1            = 10.0      ! [yr] Initial relaxation tau, fixed until rel_time1 
     rel_tau2            = 500.0     ! [yr] Final tau, reached at rel_time2, when relaxation disabled 
-
+    rel_q               = 2.0       ! [--] Non-linear exponent to scale interpolation between time1 and time2 
+    
     scale_time1         = 15e3      ! [yr] Time to begin increasing H_scale from scale_H1 to scale_H2 
     scale_time2         = 25e3      ! [yr] Time to reach scale_H2 
     scale_H1            = 1000.0    ! [m]  Initial value for H_scale parameter in cf_ref optimization 
@@ -232,8 +233,8 @@ if (opt_method .eq. 1) then
 !         yelmo1%tpo%par%topo_rel_tau = topo_rel_taus(n_now)
 !         H_scale                     = H_scales(n_now) 
 
-        tau     = get_opt_param(time,time1=rel_time1,time2=rel_time2,p1=rel_tau1,p2=rel_tau2)
-        H_scale = get_opt_param(time,time1=scale_time1,time2=scale_time2,p1=scale_H1,p2=scale_H2)
+        tau     = get_opt_param(time,time1=rel_time1,time2=rel_time2,p1=rel_tau1,p2=rel_tau2,q=rel_q)
+        H_scale = get_opt_param(time,time1=scale_time1,time2=scale_time2,p1=scale_H1,p2=scale_H2,q=1.0)
         
         ! Set model tau, and set yelmo relaxation switch (1: shelves relaxing; 0: no relaxation)
         yelmo1%tpo%par%topo_rel_tau = tau 
@@ -263,7 +264,7 @@ if (opt_method .eq. 1) then
 
             ! Pass updated hydrology variable to Yelmo boundary field
             yelmo1%bnd%H_w = hyd1%now%H_w 
-            
+
             ! Update C_bed 
             call calc_ydyn_cbed_external(yelmo1%dyn,yelmo1%tpo,yelmo1%thrm,yelmo1%bnd,yelmo1%grd, &
                                                                         domain,mask_noice,cf_ref)
@@ -1004,7 +1005,7 @@ contains
 
     end subroutine wtd_mean
 
-    function get_opt_param(time,time1,time2,p1,p2) result(p) 
+    function get_opt_param(time,time1,time2,p1,p2,q) result(p) 
         ! Determine value of parameter as a function of time 
 
         implicit none 
@@ -1014,6 +1015,7 @@ contains
         real(prec), intent(IN) :: time2
         real(prec), intent(IN) :: p1
         real(prec), intent(IN) :: p2
+        real(prec), intent(IN) :: q         ! Non-linear exponent (q=1.0 or higher)
         real(prec) :: p 
 
         if (time .le. time1) then 
@@ -1022,7 +1024,7 @@ contains
             p = p2 
         else 
             ! Linear interpolation 
-            p = p1 + (p2-p1)*(time-time1)/(time2-time1)
+            p = p1 + (p2-p1)* ((time-time1)/(time2-time1))**q 
         end if  
 
         return 

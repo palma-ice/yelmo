@@ -229,8 +229,8 @@ program yelmo_test
             call write_yreg_step(yelmo1%reg,file1D,time=time) 
         end if 
 
-        if (mod(time,10.0)==0) then
-            write(*,"(a,f14.4)") "yelmo::       time = ", time
+        if (mod(time,10.0)==0 .and. (.not. yelmo_write_log)) then
+            write(*,"(a,f14.4)") "yelmo:: time = ", time
         end if 
 
     end do 

@@ -163,7 +163,7 @@ contains
 
             ! Consistency check
             use_ssa = .FALSE. 
-            if (ssa_vel_max .gt. 0.0) use_ssa = .TRUE. 
+            if (ssa_vel_max .gt. 0.0 .and. dom%dyn%par%mix_method .ne. -2) use_ssa = .TRUE. 
 
             ! Save original model choices 
             dom_topo_fixed  = dom%tpo%par%topo_fixed 

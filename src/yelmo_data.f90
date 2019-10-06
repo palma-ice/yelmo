@@ -5,6 +5,8 @@ module yelmo_data
     use ncio 
     use yelmo_defs 
 
+    use topography 
+    
     implicit none
     
     private

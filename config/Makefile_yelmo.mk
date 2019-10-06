@@ -58,6 +58,9 @@ $(objdir)/solver_ssa_sico5.o: $(srcdir)/physics/solver_ssa_sico5.F90 $(objdir)/y
 $(objdir)/solver_tridiagonal.o: $(srcdir)/physics/solver_tridiagonal.f90 $(objdir)/yelmo_defs.o
 	$(FC) $(DFLAGS) $(FFLAGS) -c -o $@ $<
 
+$(objdir)/topography.o: $(srcdir)/physics/topography.f90 $(objdir)/yelmo_defs.o
+	$(FC) $(DFLAGS) $(FFLAGS) -c -o $@ $<
+
 $(objdir)/velocity_hybrid_pd12.o: $(srcdir)/physics/velocity_hybrid_pd12.f90 \
 						  	$(objdir)/yelmo_defs.o $(objdir)/yelmo_tools.o
 	$(FC) $(DFLAGS) $(FFLAGS) -c -o $@ $<
@@ -85,11 +88,9 @@ $(objdir)/yelmo_timesteps.o : $(srcdir)/yelmo_timesteps.f90 $(objdir)/yelmo_defs
 	$(FC) $(DFLAGS) $(FFLAGS) $(INC_LIS) -c -o $@ $<
 
 $(objdir)/yelmo_topography.o: $(srcdir)/yelmo_topography.f90 $(objdir)/yelmo_defs.o \
-							  $(objdir)/yelmo_grid.o \
- 							  $(objdir)/yelmo_tools.o $(objdir)/mass_conservation.o \
- 							  $(objdir)/mass_conservation_impl_sico.o \
- 							  $(objdir)/basal_dragging.o \
- 							  $(objdir)/calving.o
+							  $(objdir)/yelmo_grid.o $(objdir)/yelmo_tools.o  \
+ 							  $(objdir)/mass_conservation.o $(objdir)/calving.o \
+ 							  $(objdir)/topography.o
 	$(FC) $(DFLAGS) $(FFLAGS) -c -o $@ $<
 
 $(objdir)/yelmo_dynamics.o: $(srcdir)/yelmo_dynamics.f90 $(objdir)/yelmo_defs.o \
@@ -111,7 +112,8 @@ $(objdir)/yelmo_thermodynamics.o: $(srcdir)/yelmo_thermodynamics.f90 $(objdir)/y
 $(objdir)/yelmo_boundaries.o: $(srcdir)/yelmo_boundaries.f90 $(objdir)/yelmo_defs.o $(objdir)/ncio.o
 	$(FC) $(DFLAGS) $(FFLAGS) -c -o $@ $<
 
-$(objdir)/yelmo_data.o: $(srcdir)/yelmo_data.f90 $(objdir)/yelmo_defs.o $(objdir)/nml.o $(objdir)/ncio.o
+$(objdir)/yelmo_data.o: $(srcdir)/yelmo_data.f90 $(objdir)/yelmo_defs.o $(objdir)/nml.o $(objdir)/ncio.o \
+						$(objdir)/topography.o
 	$(FC) $(DFLAGS) $(FFLAGS) -c -o $@ $<
 
 $(objdir)/yelmo_regions.o: $(srcdir)/yelmo_regions.f90 $(objdir)/ncio.o $(objdir)/yelmo_defs.o
@@ -170,6 +172,7 @@ yelmo_physics =  	   $(objdir)/basal_dragging.o \
 					   $(objdir)/mass_conservation_impl_sico.o \
 					   $(objdir)/solver_ssa_sico5.o \
 					   $(objdir)/solver_tridiagonal.o \
+					   $(objdir)/topography.o \
 					   $(objdir)/velocity_hybrid_pd12.o \
 					   $(objdir)/velocity_diva.o \
 					   $(objdir)/velocity_sia.o

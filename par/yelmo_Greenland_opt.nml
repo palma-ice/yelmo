@@ -14,7 +14,7 @@
     zeta_exp        = 2.0  
     nz_aa           = 10                ! Vertical resolution in ice
     dtmin           = 0.01              ! [a] Minimum timestep 
-    dtmax           = 1.0               ! [a] Maximum timestep
+    dtmax           = 2.0               ! [a] Maximum timestep
     ntt             = 1                 ! [--] Thermodynamics call frequency (how many dynamic timesteps to skip)
     cfl_max         = 1.0               ! Maximum value is 1.0, lower will be more stable
     cfl_diff_max    = 0.12              ! Bueler et al (2007), Eq. 25 
@@ -64,7 +64,7 @@
     cb_margin_pmp       = True            ! If using cb_with_pmp, additionally impose cf_stream at ice margins 
     cb_scale            = "exp_zb"        ! "none", "lin_zb", "exp_zb", "till_const", "till_zb", scaling of cb spatially
     cb_z0               = -200.0          ! [m] Bedrock elevation at which scaling goes to f_scale=e(-1)
-    cb_z1               = 200.0           ! [m] Bedrock elevation above which scaling goes to f_scale=1
+    cb_z1               = 0.0             ! [m] Bedrock elevation above which scaling goes to f_scale=1
     cb_min              = 0.0             ! [--] Minimum allowed value of f_scale for grounded ice
     cf_frozen           = 1.0             ! [--] Bed critical stress factor, frozen 
     cf_stream           = 0.2             ! [--] Bed critical stress factor, stream  

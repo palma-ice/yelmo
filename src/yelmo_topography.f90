@@ -245,16 +245,16 @@ contains
         ! Advance ytopo timestep 
         tpo%par%time = time
 
-        if (yelmo_write_log) then 
+!         if (yelmo_write_log) then 
 
-            if (count(tpo%now%H_ice.gt.0.0) .gt. 0) then 
-                write(*,"(a,f14.4,f10.4,f10.2)") "calc_ytopo::  time = ", tpo%par%time, dt, &
-                    sum(tpo%now%H_ice,mask=tpo%now%H_ice.gt.0.0)/real(count(tpo%now%H_ice.gt.0.0))
-            else 
-                write(*,"(a,f14.4,f10.4,f10.2)") "calc_ytopo::  time = ", tpo%par%time, dt, 0.0
-            end if 
+!             if (count(tpo%now%H_ice.gt.0.0) .gt. 0) then 
+!                 write(*,"(a,f14.4,f10.4,f10.2)") "calc_ytopo::  time = ", tpo%par%time, dt, &
+!                     sum(tpo%now%H_ice,mask=tpo%now%H_ice.gt.0.0)/real(count(tpo%now%H_ice.gt.0.0))
+!             else 
+!                 write(*,"(a,f14.4,f10.4,f10.2)") "calc_ytopo::  time = ", tpo%par%time, dt, 0.0
+!             end if 
 
-        end if 
+!         end if 
 
         return 
 

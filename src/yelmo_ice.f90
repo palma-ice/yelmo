@@ -44,6 +44,9 @@ contains
         real(4)    :: cpu_start_time 
         real(prec), parameter :: time_tol = 1e-5
 
+        real(prec) :: H_mean, T_mean 
+        real(prec) :: dt_save(100) 
+
         ! Load last model time (from dom%tpo, should be equal to dom%thrm)
         time_now = dom%tpo%par%time
 
@@ -56,6 +59,8 @@ contains
 
         ! Reset number of thermodynamics timestep skips
         ntt = 0 
+
+        dt_save = missing_value 
 
         ! Iterate of topo dynamics updates
         do n = 1, nstep
@@ -72,6 +77,8 @@ contains
                                     dom%tpo%par%dx,dom%par%dtmin,dom%par%dtmax,dom%par%cfl_max,dom%par%cfl_diff_max) 
                 
             end if 
+
+            dt_save(n) = dt_now 
 
             ! Advance the local time variable
             time_now = time_now + dt_now
@@ -127,11 +134,23 @@ contains
         call yelmo_calc_speed(dom%par%model_speed,dom%par%model_speeds,time_start,time_now,real(cpu_start_time,prec))
 
         ! Write some diagnostics to make sure something useful is happening 
-        if (yelmo_write_log) then 
-            write(*,"(a,f14.4,f12.1)") "yelmo::        time [speed] = ", time_now, dom%par%model_speed
+        if (yelmo_write_log) then
+
+            n = count(dom%tpo%now%H_ice.gt.0.0)
+            if (n .gt. 0.0) then 
+                H_mean = sum(dom%tpo%now%H_ice,mask=dom%tpo%now%H_ice.gt.0.0)/real(n)
+                T_mean = sum(dom%thrm%now%T_ice(:,:,dom%thrm%par%nz_aa),mask=dom%tpo%now%H_ice.gt.0.0)/real(n)
+            else 
+                H_mean = 0.0_prec 
+                T_mean = 0.0_prec
+            end if 
+
+            n = count(dt_save .ne. missing_value)
+
+            write(*,"(a,f14.4,3f12.1,20f12.3)") "yelmo:: [time,speed,H,T,dt]:", time_now, dom%par%model_speed, &
+                                H_mean, T_mean, dt_save(1:n)
+            
         end if 
-
-
 
         return
 

@@ -147,7 +147,7 @@ contains
 
             n = count(dt_save .ne. missing_value)
 
-            write(*,"(a,f12.2,3f10.1,20f12.3)") "yelmo:: [time,speed,H,T,dt]:", time_now, dom%par%model_speed, &
+            write(*,"(a,f12.2,f8.1,2f10.1,20f7.2)") "yelmo:: [time,speed,H,T,dt]:", time_now, dom%par%model_speed, &
                                 H_mean, T_mean, dt_save(1:n)
             
         end if 

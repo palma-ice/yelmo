@@ -80,9 +80,6 @@ contains
             dt = dtmin + (dtmax-dtmin)*x
         end if 
 
-        ! Cut-off extra digits (ajr: is this helping?)
-        !dt = floor(dt*10**n_decimal)*10**(-n_decimal)
-
         ! Check if additional timestep reduction is necessary,
         ! due to checkerboard patterning related to mass conservation.
         ! Reduce if necessary 
@@ -111,6 +108,10 @@ contains
             end if 
 
         end if 
+
+        ! Round-off extra digits for neatness
+        !dt = real( nint(dt*10.0_prec**n_decimal)*10.0_prec**(-n_decimal), prec)
+        dt = real(floor(dt*10.0_prec**n_decimal)*10.0_prec**(-n_decimal), prec)
 
         ! Finally, make sure adaptive time step synchronizes with larger time step 
         if (time + dt .gt. time_max) then 

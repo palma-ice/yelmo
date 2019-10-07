@@ -62,7 +62,7 @@
     cb_method           = -1              ! -1: set externally; 1: calculate cb online  
     cb_with_pmp         = False           ! Weighted cf_frozen/cf_stream as a function of f_pmp 
     cb_margin_pmp       = True            ! If using cb_with_pmp, additionally impose cf_stream at ice margins 
-    cb_scale            = "exp_zb"        ! "none", "lin_zb", "exp_zb", "till_const", "till_zb", scaling of cb spatially
+    cb_scale            = "none"        ! "none", "lin_zb", "exp_zb", "till_const", "till_zb", scaling of cb spatially
     cb_z0               = -200.0          ! [m] Bedrock elevation at which scaling goes to f_scale=e(-1)
     cb_z1               = 0.0             ! [m] Bedrock elevation above which scaling goes to f_scale=1
     cb_min              = 0.0             ! [--] Minimum allowed value of f_scale for grounded ice

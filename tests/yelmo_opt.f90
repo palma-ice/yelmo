@@ -177,6 +177,9 @@ program yelmo_test
     call guess_cf_ref(cf_ref,yelmo1%dyn%now%taud,yelmo1%dta%pd%uxy_s, &
                         yelmo1%dta%pd%H_ice,yelmo1%dta%pd%H_grnd,yelmo1%dyn%par%beta_u0,cf_min,cf_max)
 
+    ! Update ice sheet to get everything in sync
+    call yelmo_update_equil_external(yelmo1,hyd1,cf_ref,time_init,time_tot=1.0,topo_fixed=.TRUE.,dt=1.0,ssa_vel_max=5e3)
+
     if (.not. yelmo1%par%use_restart) then 
         ! Run initialization steps 
 
@@ -200,8 +203,8 @@ program yelmo_test
         ! Store the reference state for future use.
         
         call yelmo_update_equil_external(yelmo1,hyd1,cf_ref,time_init,time_tot=20e3,topo_fixed=.TRUE.,dt=5.0,ssa_vel_max=0.0)
-        call yelmo_update_equil_external(yelmo1,hyd1,cf_ref,time_init,time_tot=20e3,topo_fixed=.TRUE.,dt=2.0,ssa_vel_max=2000.0)
-        call yelmo_update_equil_external(yelmo1,hyd1,cf_ref,time_init,time_tot=1e3, topo_fixed=.TRUE.,dt=2.0,ssa_vel_max=5000.0)
+        call yelmo_update_equil_external(yelmo1,hyd1,cf_ref,time_init,time_tot=20e3,topo_fixed=.TRUE.,dt=2.0,ssa_vel_max=2e3)
+        call yelmo_update_equil_external(yelmo1,hyd1,cf_ref,time_init,time_tot=1e3, topo_fixed=.TRUE.,dt=2.0,ssa_vel_max=5e3)
 
         ! Write a restart file 
         call yelmo_restart_write(yelmo1,file_restart,time_init)
@@ -222,8 +225,6 @@ program yelmo_test
     call yelmo_write_init(yelmo1,file2D,time_init,units="years")  
     call write_step_2D_opt(yelmo1,file2D,time_init,cf_ref,cf_ref_dot,mask_noice,tau,H_scale)  
     
-    stop 
-
     write(*,*) "Starting optimization..."
 
 if (opt_method .eq. 1) then 

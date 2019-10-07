@@ -18,7 +18,7 @@ program yelmo_trough
     character(len=256) :: outfldr, file2D, file1D, file_restart
     character(len=512) :: path_par, path_const 
     character(len=56)  :: experiment, res  
-    real(prec) :: time_init, time_end, time, dtt, dt2D_out   
+    real(prec) :: time_init, time_end, time, dtt, dt1D_out, dt2D_out   
     integer    :: n  
 
     ! Control parameters 
@@ -59,6 +59,7 @@ program yelmo_trough
     call nml_read(path_par,"control","time_init",    time_init)     ! [yr] Starting time
     call nml_read(path_par,"control","time_end",     time_end)      ! [yr] Ending time
     call nml_read(path_par,"control","dtt",          dtt)           ! [yr] Main loop time step 
+    call nml_read(path_par,"control","dt1D_out",     dt1D_out)      ! [yr] Frequency of 1D output 
     call nml_read(path_par,"control","dt2D_out",     dt2D_out)      ! [yr] Frequency of 2D output 
 
     ! Define default grid name for completeness 
@@ -105,14 +106,19 @@ program yelmo_trough
     call trough_f17_topo_init(yelmo1%bnd%z_bed,yelmo1%tpo%now%H_ice,yelmo1%tpo%now%z_srf, &
                             yelmo1%grd%xc*1e-3,yelmo1%grd%yc*1e-3,fc,dc,wc,x_cf)
     
-    time     = time_init 
-    yelmo1%dyn%par%use_ssa = .TRUE. 
+    ! Define calving front 
+    yelmo1%bnd%calv_mask = .TRUE. 
+    where (yelmo1%grd%x*1e-3 .ge. x_cf) yelmo1%bnd%calv_mask = .FALSE. 
 
     ! Initialize the yelmo state (dyn,therm,mat)
-    !call yelmo_init_state(yelmo1,path_par,time=time_init,thrm_method="robin")
+    call yelmo_init_state(yelmo1,path_par,time=time_init,thrm_method="robin")
 
     ! Write initial state 
-    call write_step_2D(yelmo1,file2D,time=time) 
+    call write_step_2D(yelmo1,file2D,time=time_init) 
+
+    ! 1D file 
+    call write_yreg_init(yelmo1,file1D,time_init=time_init,units="years",mask=yelmo1%bnd%ice_allowed)
+    call write_yreg_step(yelmo1%reg,file1D,time=time)  
     
     ! Advance timesteps
     do n = 1, ceiling((time_end-time_init)/dtt)
@@ -135,15 +141,18 @@ program yelmo_trough
             call write_step_2D(yelmo1,file2D,time=time)    
         end if 
 
-        if (mod(nint(time*100),nint((5.0*dtt)*100))==0) then
-            write(*,"(a,2f14.4,a10,g14.3,f10.2)") "time = ",  &
-                time, maxval(yelmo1%tpo%now%H_ice)
-        end if 
+        if (mod(nint(time*100),nint(dt1D_out*100))==0) then 
+            call write_yreg_step(yelmo1%reg,file1D,time=time) 
+        end if
+
+        if (mod(time,10.0)==0 .and. (.not. yelmo_write_log)) then
+            write(*,"(a,f14.4)") "yelmo:: time = ", time
+        end if  
 
     end do 
 
     ! Write summary 
-    write(*,*) "====== "//trim(domain)//"-"//trim(experiment)//" ======="
+    write(*,*) "====== "//trim(domain)//" ======="
     write(*,*) "nz, H0 = ", yelmo1%par%nz_aa, maxval(yelmo1%tpo%now%H_ice)
 
     ! Finalize program
@@ -201,7 +210,7 @@ contains
         end do  
 
         ! == Ice thickness == 
-        H_ice = 1000.0_prec 
+        H_ice = 200.0_prec 
         do j = 1, ny 
             where(xc .gt. x_cf) H_ice(:,j) = 0.0 
         end do 
@@ -263,9 +272,9 @@ contains
         call nc_write(filename,"H_grnd",ylmo%tpo%now%H_grnd,units="m",long_name="Ice thickness overburden", &
                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
         
-        call nc_write(filename,"dist_grline",ylmo%tpo%now%dist_grline,units="km", &
-                      long_name="Distance to nearest grounding-line point", &
-                      dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
+!         call nc_write(filename,"dist_grline",ylmo%tpo%now%dist_grline,units="km", &
+!                       long_name="Distance to nearest grounding-line point", &
+!                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
         
         call nc_write(filename,"is_grline",ylmo%tpo%now%is_grline,units="--",long_name="Grounding-line point", &
                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
@@ -281,16 +290,16 @@ contains
         call nc_write(filename,"f_ice",ylmo%tpo%now%f_ice,units="1",long_name="Ice-covered fraction", &
                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
 
-!         call nc_write(filename,"calv",ylmo%tpo%now%calv,units="m/a",long_name="Calving rate", &
-!                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
+        call nc_write(filename,"calv",ylmo%tpo%now%calv,units="m/a",long_name="Calving rate", &
+                      dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
 
         ! == yelmo_thermodynamics ==
-!         call nc_write(filename,"T_ice",ylmo%thrm%now%T_ice,units="K",long_name="Ice temperature", &
-!                       dim1="xc",dim2="yc",dim3="zeta",dim4="time",start=[1,1,1,n],ncid=ncid)
-!         call nc_write(filename,"T_prime",ylmo%thrm%now%T_ice-ylmo%thrm%now%T_pmp,units="deg C",long_name="Homologous ice temperature", &
-!                       dim1="xc",dim2="yc",dim3="zeta",dim4="time",start=[1,1,1,n],ncid=ncid)
-!         call nc_write(filename,"f_pmp",ylmo%thrm%now%f_pmp,units="1",long_name="Fraction of grid point at pmp", &
-!                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
+        call nc_write(filename,"T_ice",ylmo%thrm%now%T_ice,units="K",long_name="Ice temperature", &
+                      dim1="xc",dim2="yc",dim3="zeta",dim4="time",start=[1,1,1,n],ncid=ncid)
+        call nc_write(filename,"T_prime",ylmo%thrm%now%T_ice-ylmo%thrm%now%T_pmp,units="deg C",long_name="Homologous ice temperature", &
+                      dim1="xc",dim2="yc",dim3="zeta",dim4="time",start=[1,1,1,n],ncid=ncid)
+        call nc_write(filename,"f_pmp",ylmo%thrm%now%f_pmp,units="1",long_name="Fraction of grid point at pmp", &
+                      dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
 
         ! == yelmo_material ==
         call nc_write(filename,"visc_int",ylmo%mat%now%visc_int,units="Pa a m",long_name="Vertically integrated viscosity", &
@@ -304,19 +313,19 @@ contains
 
         ! == yelmo_dynamics ==
 
-        call nc_write(filename,"ssa_mask_acx",ylmo%dyn%now%ssa_mask_acx,units="1",long_name="SSA mask (acx)", &
-                      dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-        call nc_write(filename,"ssa_mask_acy",ylmo%dyn%now%ssa_mask_acy,units="1",long_name="SSA mask (acy)", &
-                      dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
+!         call nc_write(filename,"ssa_mask_acx",ylmo%dyn%now%ssa_mask_acx,units="1",long_name="SSA mask (acx)", &
+!                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
+!         call nc_write(filename,"ssa_mask_acy",ylmo%dyn%now%ssa_mask_acy,units="1",long_name="SSA mask (acy)", &
+!                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
 
         call nc_write(filename,"C_bed",ylmo%dyn%now%C_bed,units="Pa",long_name="Bed friction coefficient", &
                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
         call nc_write(filename,"beta",ylmo%dyn%now%beta,units="Pa a m-1",long_name="Basal friction coefficient", &
                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-        call nc_write(filename,"beta_acx",ylmo%dyn%now%beta_acx,units="Pa a m-1",long_name="Basal friction coefficient (acx)", &
-                      dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-        call nc_write(filename,"beta_acy",ylmo%dyn%now%beta_acy,units="Pa a m-1",long_name="Basal friction coefficient (acy)", &
-                      dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
+!         call nc_write(filename,"beta_acx",ylmo%dyn%now%beta_acx,units="Pa a m-1",long_name="Basal friction coefficient (acx)", &
+!                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
+!         call nc_write(filename,"beta_acy",ylmo%dyn%now%beta_acy,units="Pa a m-1",long_name="Basal friction coefficient (acy)", &
+!                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
         call nc_write(filename,"visc_eff",ylmo%dyn%now%visc_eff,units="Pa a m",long_name="Effective viscosity (SSA)", &
                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
 
@@ -398,16 +407,16 @@ contains
 !         call nc_write(filename,"H_sed",ylmo%bnd%H_sed,units="m",long_name="Sediment thickness", &
 !                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
         
-!         call nc_write(filename,"H_w",ylmo%bnd%H_w,units="m",long_name="Basal water pressure", &
-!                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
+        call nc_write(filename,"H_w",ylmo%bnd%H_w,units="m",long_name="Basal water layer", &
+                      dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
         
         call nc_write(filename,"smb",ylmo%bnd%smb,units="m/a",long_name="Surface mass balance", &
                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
         call nc_write(filename,"T_srf",ylmo%bnd%T_srf,units="K",long_name="Surface temperature", &
                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
      
-!         call nc_write(filename,"bmb",ylmo%tpo%now%bmb,units="m/a",long_name="Basal mass balance", &
-!                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
+        call nc_write(filename,"bmb",ylmo%tpo%now%bmb,units="m/a",long_name="Basal mass balance", &
+                      dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
 !         call nc_write(filename,"bmb_shlf",ylmo%bnd%bmb_shlf,units="m/a",long_name="Basal mass balance (shelf)", &
 !                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
         

@@ -127,7 +127,6 @@ contains
             write(*,*) "Stopping."
             write(*,*) 
             stop 
-
         end if 
 
         ! Set ice thickness for use internally

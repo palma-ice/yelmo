@@ -122,6 +122,9 @@ contains
         ! Initially set ice_allowed to true everywhere 
         bnd%ice_allowed = .TRUE. 
 
+        ! Also set calv_mask true everywhere (no imposed calving front)
+        bnd%calv_mask   = .TRUE. 
+        
         ! Determine allowed regions based on domain
         select case(trim(domain))
 
@@ -257,6 +260,7 @@ contains
         allocate(now%region_mask(nx,ny))
         
         allocate(now%ice_allowed(nx,ny))
+        allocate(now%calv_mask(nx,ny))
         
         allocate(now%H_ice_ref(nx,ny))
         
@@ -277,6 +281,7 @@ contains
         now%region_mask = 0.0_prec 
         
         now%ice_allowed = .TRUE.  ! By default allow ice everywhere 
+        now%calv_mask   = .TRUE.  ! By default now 
 
         now%H_ice_ref   = 0.0_prec 
 
@@ -306,6 +311,7 @@ contains
         if (allocated(now%region_mask)) deallocate(now%region_mask)
         
         if (allocated(now%ice_allowed)) deallocate(now%ice_allowed)
+        if (allocated(now%calv_mask))   deallocate(now%calv_mask)
         
         if (allocated(now%H_ice_ref))   deallocate(now%H_ice_ref)
         

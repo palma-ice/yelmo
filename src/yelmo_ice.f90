@@ -518,6 +518,9 @@ contains
                 stop 
             end if
 
+            ! Run topo to make sure all fields are synchronized (masks, etc)
+            call calc_ytopo(dom%tpo,dom%dyn,dom%thrm,dom%bnd,time,topo_fixed=.TRUE.)
+        
             ! Calculate initial thermodynamic information
             dom%thrm%par%time = time - dom%par%dtmax
             call calc_ytherm(dom%thrm,dom%tpo,dom%dyn,dom%mat,dom%bnd,time)
@@ -537,7 +540,7 @@ contains
             ! This will be overwritten when C_bed/beta are calculated internally
             dom%dyn%now%C_bed = 1e5
             dom%dyn%now%beta  = 1e5 
-
+            
             ! Call dynamics 
             call calc_ydyn(dom%dyn,dom%tpo,dom%mat,dom%thrm,dom%bnd,time)
 

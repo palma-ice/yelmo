@@ -1,8 +1,14 @@
-&mismip
+&control
 
-    domain       = "MISMIP3D"           ! "MISMIP3D"
-    experiment   = "RF"                 ! "Stnd", "RF"
-    dx           =  20.0                ! [km] Grid resolution (EISMINT1 = 50km, EISMINT2 = 25km)
+    domain       = "TROUGH-F17"         ! "TROUGH-F17"
+    dx           =  5.0                 ! [km] Grid resolution
+
+    lx           = 700.0                ! [km] Grid length, x-direction 
+    ly           = 160.0                ! [km] Grid width,  y-direction 
+    fc           = 16.0                 ! [km] Characteristic width of channel side walls
+    dc           = 500.0                ! [m] Depth of bed trough compared with side walls
+    wc           = 24.0                 ! [km] Half-width of bed trough
+    x_cf         = 640.0                ! [km] Position of fixed calving front in right-hand half of domain 
 
     ! Timing parameters 
     time_init    = 0.0                  ! [yr] Starting time 
@@ -13,13 +19,13 @@
 /
 
 &yelmo
-    domain          = "MISMIP3D"
-    grid_name       = "MISMIP3D"
-    experiment      = "MISMIP3D"        ! "None", "EISMINT", "MISMIP3D", "BUELER"  to apply special boundary conditions   
+    domain          = "TROUGH-F17"
+    grid_name       = "TROUGH-F17"
+    experiment      = "TROUGH-F17"
     restart         = "no"
     zeta_scale      = "tanh"            ! "linear", "exp", "tanh"
     zeta_exp        = 2.0  
-    nz_aa           = 5                 ! Vertical resolution in ice
+    nz_aa           = 10                ! Vertical resolution in ice
     dtmin           = 0.01              ! [a] Minimum timestep 
     dtmax           = 2.0               ! [a] Maximum timestep
     ntt             = 2                 ! [--] Thermodynamics call frequency (how many dynamic timesteps to skip)
@@ -33,9 +39,9 @@
     calv_method       = "zero"          ! "zero", "simple", "flux", "kill"
     surf_gl_method    = 0               ! 0: binary (max grnd/flt elevation), 1: subgrid average elevation
     margin2nd         = False           ! Apply second-order upwind approximation to gradients at the margin
-    use_bmb           = False           ! Use basal mass balance in mass conservation equation
+    use_bmb           = True            ! Use basal mass balance in mass conservation equation
     topo_fixed        = False           ! Keep ice thickness fixed, perform other ytopo calculations
-    topo_rel          = 1               ! 0: No relaxation; 1: relax shelf; 2: relax shelf + gl; 3: all points 
+    topo_rel          = 0               ! 0: No relaxation; 1: relax shelf; 2: relax shelf + gl; 3: all points 
     topo_rel_tau      = 10.0            ! [a] Time scale for relaxation 
     calv_H_lim        = 200.0           ! [m] Calving limit in ice thickness (thinner ice calves)
     calv_tau          = 1.0             ! [a] Characteristic calving time
@@ -69,12 +75,12 @@
     cb_method           = 1               ! -1: set externally; 1: calculate cb online  
     cb_with_pmp         = False           ! Weighted cf_frozen/cf_stream as a function of f_pmp 
     cb_margin_pmp       = False           ! If using cb_with_pmp, additionally impose cf_stream at ice margins 
-    cb_scale            = "none"          ! "none", "lin_zb", "exp_zb", "till_const", "till_zb", scaling of cb spatially
+    cb_scale            = "till_const"    ! "none", "lin_zb", "exp_zb", "till_const", "till_zb", scaling of cb spatially
     cb_z0               = -200.0          ! [m] Bedrock elevation at which scaling goes to f_scale=e(-1)
     cb_z1               = 200.0           ! [m] Bedrock elevation above which scaling goes to f_scale=1
     cb_min              = 0.0             ! [--] Minimum allowed value of f_scale for grounded ice
-    cf_frozen           = 3.165176e4      ! [--] Bed critical stress factor, frozen 
-    cf_stream           = 3.165176e4      ! [--] Bed critical stress factor, stream  
+    cf_frozen           = 1.0             ! [--] Bed critical stress factor, frozen 
+    cf_stream           = 1.0             ! [--] Bed critical stress factor, stream  
     n_sm_beta           = 0               ! [-] Standard deviation in gridpoints for Gaussian smoothing of beta (0==no smoothing)
     beta_min            = 0.0             ! [Pa a m-1] Minimum value of beta allowed for grounded ice (for stability)
     ssa_beta_max        = 1e20            ! [Pa a m-1] Maximum value of beta for which ssa should be calculated 
@@ -87,13 +93,13 @@
 /
 
 &ydyn_neff 
-    neff_method     = 0                 ! -1: external N_eff, 0: neff_const, 1: overburden pressure, 2: Leguy param., 3: Till pressure
+    neff_method     = 3                 ! -1: external N_eff, 0: neff_const, 1: overburden pressure, 2: Leguy param., 3: Till pressure
     neff_const      = 1.0               ! == rho_ice*g*(eg 1000 m ice thickness)
     neff_p          = 0.0               ! *neff_method=2* marine connectivity exponent (0: none, 1: full)
     neff_set_water  = False             ! *neff_method=3* Prescribe H_w = H_w_max for temperate ice instead of using H_w field?
     neff_w_max      = 2.0               ! [m]  *neff_method=3* Maximum allowed water layer thickness for Till pressure 
     neff_N0         = 1000.0            ! [Pa] *neff_method=3* Reference effective pressure 
-    neff_delta      = 0.04              ! [--] *neff_method=3* Fraction of overburden pressure for saturated till
+    neff_delta      = 0.02              ! [--] *neff_method=3* Fraction of overburden pressure for saturated till
     neff_e0         = 0.69              ! [--] *neff_method=3* Reference void ratio at N0 
     neff_Cc         = 0.12              ! [--] *neff_method=3* Till compressibility    
 /
@@ -108,7 +114,7 @@
 
 &ymat
     flow_law                = "glen"
-    rf_method               = 0             ! -1: set externally; 0: rf_const everywhere; 1: standard function 
+    rf_method               = 1             ! -1: set externally; 0: rf_const everywhere; 1: standard function 
     rf_const                = 3.1536e-18    ! 1e-25 [Pa^-3 s^-1] ==> 3.1536e-18 [Pa^-3 a^-1]
     rf_use_eismint2         = False         ! Only applied for rf_method=1 
     rf_with_water           = False         ! Only applied for rf_method=1, scale rf by water content?
@@ -173,5 +179,13 @@
     pd_vel_path       = "none"
     pd_vel_names      = "ux_srf" "uy_srf"            ! Surface velocity 
 
+/
+
+&basal_hydro_simple
+    init_method       = 0             ! 0: no water; 1: constant value
+    method            = 1             ! 0: constant; 1: local bucket method
+    H_w_init          = 0.0           ! [m] Initial water layer thickness (init_method=1)
+    H_w_max           = 2.0           ! [m] Maximum allowed water thickness under ice sheet
+    till_rate         = 1e-3          ! [m/a] Till infiltration (drainage) rate 
 /
 

@@ -92,7 +92,7 @@ program yelmo_test
 !     H_scales            = [1000.0,1000.0,1000.0,2000.0,2000.0] 
 
     cf_init    = 0.2                        ! [--]
-    cf_min     = 0.00001                    ! [--] 
+    cf_min     = 1e-5                       ! [--] 
     cf_max     = 1.0                        ! [--]
 
 
@@ -172,13 +172,15 @@ program yelmo_test
     ! (initialize temps with robin method with a cold base),
     ! or from restart file, if specified 
     call yelmo_init_state(yelmo1,path_par,time=time_init,thrm_method="robin-cold")
-    
+
+if (.FALSE.) then 
     ! Calculate new initial guess of cf_ref using info from dyn
     call guess_cf_ref(cf_ref,yelmo1%dyn%now%taud,yelmo1%dta%pd%uxy_s, &
                         yelmo1%dta%pd%H_ice,yelmo1%dta%pd%H_grnd,yelmo1%dyn%par%beta_u0,cf_min,cf_max)
 
     ! Update ice sheet to get everything in sync
     call yelmo_update_equil_external(yelmo1,hyd1,cf_ref,time_init,time_tot=1.0,topo_fixed=.TRUE.,dt=1.0,ssa_vel_max=5e3)
+end if 
 
     if (.not. yelmo1%par%use_restart) then 
         ! Run initialization steps 

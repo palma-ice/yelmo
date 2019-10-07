@@ -28,18 +28,14 @@
 /
 
 &ytopo
-    method            = "dynamic"       ! "fixed", "relax", "dynamic"
-    init              = "presentday"    ! "icefree", "presentday"
     solver            = "impl-upwind"   ! "expl", "impl-upwind"
-    margin2nd         = False           ! Apply second-order upwind approximation to gradients at the margin
     calv_method       = "flux"          ! "zero", "simple", "flux", "kill"
     surf_gl_method    = 0               ! 0: binary (max grnd/flt elevation), 1: subgrid average elevation
-    use_bmb           = True
-    use_calv_subgrid  = False 
-    grline_fixed      = False 
-    topo_fixed        = False
-    topo_relax_dt     = 2000
-    topo_fixed_dt     = -1              ! <= 0 for always fixed, positive value to 'unfix' topo after interval
+    margin2nd         = False           ! Apply second-order upwind approximation to gradients at the margin
+    use_bmb           = True            ! Use basal mass balance in mass conservation equation
+    topo_fixed        = False           ! Keep ice thickness fixed, perform other ytopo calculations
+    topo_rel          = 0               ! 0: No relaxation; 1: relax shelf; 2: relax shelf + gl; 3: all points 
+    topo_rel_tau      = 10.0            ! [a] Time scale for relaxation 
     calv_H_lim        = 200.0           ! [m] Calving limit in ice thickness (thinner ice calves)
     calv_tau          = 10.0            ! [a] Characteristic calving time
     H_min_grnd        = 5.0             ! [m] Minimum ice thickness at grounded margin (thinner ice is ablated) - helps with stability

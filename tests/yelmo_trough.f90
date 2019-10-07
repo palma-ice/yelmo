@@ -38,13 +38,13 @@ program yelmo_trough
     outfldr = "./"
 
     ! Define input and output locations 
-    path_const = trim(outfldr)//"yelmo_const_MISMIP3D.nml"
+    path_const = trim(outfldr)//"yelmo_const_TROUGH.nml"
     path_par   = trim(outfldr)//"yelmo_TROUGH-F17.nml" 
     file2D     = trim(outfldr)//"yelmo2D.nc"
     file1D     = trim(outfldr)//"yelmo1D.nc"
     
     ! Define the domain, grid and experiment from parameter file
-    call nml_read(path_par,"control","domain",       domain)        ! MISMIP3D
+    call nml_read(path_par,"control","domain",       domain)        ! TROUGH
     call nml_read(path_par,"control","experiment",   experiment)    ! "Std", "RF"
     call nml_read(path_par,"control","dx",           dx)            ! [km] Grid resolution ! must be multiple of xmax and ymax!!
 
@@ -68,8 +68,9 @@ program yelmo_trough
     call yelmo_global_init(path_const)
 
     ! Define the domain and grid
-    ymax =  50.0
-    ymin = -50.0
+    xmax = 800.0
+    ymax =  80.0
+    ymin = -80.0
     call yelmo_init_grid(yelmo1%grd,grid_name,units="km",x0=0.0,dx=dx,nx=int(xmax/dx)+1,y0=ymin,dy=dx,ny=int((ymax-ymin)/dx)+1)
 
     ! === Initialize ice sheet model =====
@@ -101,17 +102,19 @@ program yelmo_trough
     call yelmo_write_init(yelmo1,file2D,time_init=time_init,units="years")
     
     ! Intialize topography 
-!     call trough_f17_topo_init(yelmo1%bnd%z_bed,yelmo1%tpo%now%H_ice,yelmo1%tpo%now%z_srf, &
-!                             yelmo1%grd%xc*1e-3,yelmo1%grd%yc*1e-3,experiment)
+    call trough_f17_topo_init(yelmo1%bnd%z_bed,yelmo1%tpo%now%H_ice,yelmo1%tpo%now%z_srf, &
+                            yelmo1%grd%xc*1e-3,yelmo1%grd%yc*1e-3,ly,fc,dc,wc,x_cf)
     
     time     = time_init 
     yelmo1%dyn%par%use_ssa = .TRUE. 
 
     ! Initialize the yelmo state (dyn,therm,mat)
-    call yelmo_init_state(yelmo1,path_par,time=time_init,thrm_method="robin")
+    !call yelmo_init_state(yelmo1,path_par,time=time_init,thrm_method="robin")
 
     ! Write initial state 
     call write_step_2D(yelmo1,file2D,time=time) 
+
+    stop 
 
     ! Advance timesteps
     do n = 1, ceiling((time_end-time_init)/dtt)
@@ -154,6 +157,64 @@ program yelmo_trough
     print '("Time = ",f12.3," min.")', (finish-start)/60.0 
 
 contains
+
+    subroutine trough_f17_topo_init(z_bed,H_ice,z_srf,xc,yc,ly,fc,dc,wc,x_cf)
+
+        implicit none 
+
+        real(prec), intent(OUT) :: z_bed(:,:) 
+        real(prec), intent(OUT) :: H_ice(:,:) 
+        real(prec), intent(OUT) :: z_srf(:,:) 
+        real(prec), intent(IN)  :: xc(:) 
+        real(prec), intent(IN)  :: yc(:) 
+        real(prec), intent(IN)  :: ly 
+        real(prec), intent(IN)  :: fc 
+        real(prec), intent(IN)  :: dc 
+        real(prec), intent(IN)  :: wc 
+        real(prec), intent(IN)  :: x_cf 
+
+        ! Local variables 
+        integer :: i, j, nx, ny 
+        real(prec) :: zb_x, zb_y 
+        real(prec) :: e1, e2 
+
+        real(prec), parameter :: zb_deep = -720.0_prec 
+
+        nx = size(z_bed,1) 
+        ny = size(z_bed,2) 
+
+        write(*,*) "params: ", ly,fc,dc,wc,x_cf
+        
+        ! == Bedrock elevation == 
+        do j = 1, ny
+        do i = 1, nx 
+            
+            ! x-direction 
+            zb_x = -150.0_prec - 0.84e-3*xc(i) 
+
+            ! y-direction 
+            e1 = -2.0*(yc(j)-ly/2.0-wc)/fc 
+            e2 =  2.0*(yc(j)-ly/2.0+wc)/fc 
+            zb_y = ( dc / (1.0+exp(e1)) ) + ( dc / (1.0+exp(e2)) ) 
+
+            ! Convolution 
+            z_bed(i,j) = max(zb_x + zb_y, zb_deep)
+
+        end do
+        end do  
+
+        ! == Ice thickness == 
+        H_ice = 1000.0_prec 
+        do j = 1, ny 
+            where(xc .gt. x_cf) H_ice(:,j) = 0.0 
+        end do 
+
+        ! == Surface elevation == 
+        z_srf = z_bed + H_ice 
+
+        return 
+
+    end subroutine trough_f17_topo_init 
 
     subroutine write_step_2D(ylmo,filename,time)
 

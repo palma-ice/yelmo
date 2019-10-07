@@ -34,28 +34,25 @@
 /
 
 &ytopo
-    method            = "dynamic"       ! "fixed", "relax", "dynamic"
     solver            = "impl-upwind"   ! "expl", "impl-upwind"
-    margin2nd         = False           ! Apply second-order upwind approximation to gradients at the margin
-    surf_gl_method    = 0               ! 0: binary (max grnd/flt elevation), 1: subgrid average elevation
     calv_method       = "flux"          ! "zero", "simple", "flux", "kill"
-    use_bmb           = False 
-    use_calv_subgrid  = False 
-    grline_fixed      = False 
-    topo_fixed        = False
-    topo_relax_dt     = 2000
-    topo_fixed_dt     = -1              ! <= 0 for always fixed, positive value to 'unfix' topo after interval
+    surf_gl_method    = 0               ! 0: binary (max grnd/flt elevation), 1: subgrid average elevation
+    margin2nd         = False           ! Apply second-order upwind approximation to gradients at the margin
+    use_bmb           = False           ! Use basal mass balance in mass conservation equation
+    topo_fixed        = False           ! Keep ice thickness fixed, perform other ytopo calculations
+    topo_rel          = 0               ! 0: No relaxation; 1: relax shelf; 2: relax shelf + gl; 3: all points 
+    topo_rel_tau      = 10.0            ! [a] Time scale for relaxation 
     calv_H_lim        = 200.0           ! [m] Calving limit in ice thickness (thinner ice calves)
-    calv_tau          = 1.0             ! [a] Characteristic calving time
+    calv_tau          = 10.0            ! [a] Characteristic calving time
     H_min_grnd        = 5.0             ! [m] Minimum ice thickness at grounded margin (thinner ice is ablated) - helps with stability
-    H_min_flt         = 75.0            ! [m] Minimum ice thickness at floating margin (thinner ice is ablated) - helps with stability
+    H_min_flt         = 5.0             ! [m] Minimum ice thickness at floating margin (thinner ice is ablated) - helps with stability
     sd_min            = 100.0           ! [m] calv_grnd(z_bed_sd <= sd_min) = 0.0 
     sd_max            = 500.0           ! [m] calv_grnd(z_bed_sd >= sd_max) = calv_max  
     calv_max          = 10.0            ! [m/a] Maximum grounded calving rate from high stdev(z_bed)
     grad_lim          = 0.1             ! [m/m] Maximum allowed sloped in gradient calculations (dz/dx,dH/dx)
     gl_sep            = 1               ! 1: Linear f_grnd_acx/acy and binary f_grnd, 2: area f_grnd, average to acx/acy
     gl_sep_nx         = 15              ! [-] Number of interpolation points (nx*nx) to calculate grounded area at grounding line
-
+    diffuse_bmb_shlf  = False           ! Allow bmb_shlf to permeate inland at the grounding line 
 /
 
 &ydyn

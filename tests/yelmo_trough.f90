@@ -103,7 +103,7 @@ program yelmo_trough
     
     ! Intialize topography 
     call trough_f17_topo_init(yelmo1%bnd%z_bed,yelmo1%tpo%now%H_ice,yelmo1%tpo%now%z_srf, &
-                            yelmo1%grd%xc*1e-3,yelmo1%grd%yc*1e-3,ly,fc,dc,wc,x_cf)
+                            yelmo1%grd%xc*1e-3,yelmo1%grd%yc*1e-3,fc,dc,wc,x_cf)
     
     time     = time_init 
     yelmo1%dyn%par%use_ssa = .TRUE. 
@@ -113,9 +113,7 @@ program yelmo_trough
 
     ! Write initial state 
     call write_step_2D(yelmo1,file2D,time=time) 
-
-    stop 
-
+    
     ! Advance timesteps
     do n = 1, ceiling((time_end-time_init)/dtt)
 
@@ -158,7 +156,7 @@ program yelmo_trough
 
 contains
 
-    subroutine trough_f17_topo_init(z_bed,H_ice,z_srf,xc,yc,ly,fc,dc,wc,x_cf)
+    subroutine trough_f17_topo_init(z_bed,H_ice,z_srf,xc,yc,fc,dc,wc,x_cf)
 
         implicit none 
 
@@ -166,8 +164,7 @@ contains
         real(prec), intent(OUT) :: H_ice(:,:) 
         real(prec), intent(OUT) :: z_srf(:,:) 
         real(prec), intent(IN)  :: xc(:) 
-        real(prec), intent(IN)  :: yc(:) 
-        real(prec), intent(IN)  :: ly 
+        real(prec), intent(IN)  :: yc(:)  
         real(prec), intent(IN)  :: fc 
         real(prec), intent(IN)  :: dc 
         real(prec), intent(IN)  :: wc 
@@ -184,17 +181,17 @@ contains
         ny = size(z_bed,2) 
 
         write(*,*) "params: ", ly,fc,dc,wc,x_cf
-        
+
         ! == Bedrock elevation == 
         do j = 1, ny
         do i = 1, nx 
             
             ! x-direction 
-            zb_x = -150.0_prec - 0.84e-3*xc(i) 
+            zb_x = -150.0_prec - 0.84*xc(i) 
 
             ! y-direction 
-            e1 = -2.0*(yc(j)-ly/2.0-wc)/fc 
-            e2 =  2.0*(yc(j)-ly/2.0+wc)/fc 
+            e1 = -2.0*(yc(j)-wc)/fc 
+            e2 =  2.0*(yc(j)+wc)/fc 
             zb_y = ( dc / (1.0+exp(e1)) ) + ( dc / (1.0+exp(e2)) ) 
 
             ! Convolution 
@@ -210,7 +207,9 @@ contains
         end do 
 
         ! == Surface elevation == 
-        z_srf = z_bed + H_ice 
+        z_srf = z_bed + H_ice
+
+        where(z_srf .lt. 0.0) z_srf = 0.0 
 
         return 
 

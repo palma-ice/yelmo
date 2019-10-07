@@ -25,7 +25,8 @@ def run_yelmo():
 benchmarks = libyelmo/bin/yelmo_benchmarks.x;
 mismip = libyelmo/bin/yelmo_mismip.x;
 initmip = libyelmo/bin/yelmo_initmip.x;
-opt = libyelmo/bin/yelmo_opt.x
+opt = libyelmo/bin/yelmo_opt.x;
+trough = libyelmo/bin/yelmo_trough.x
 ''')
     parser.add_argument('-r','--run',action="store_true",
         help='Run the executable after preparing the job?')
@@ -90,6 +91,8 @@ opt = libyelmo/bin/yelmo_opt.x
         exe_path = "libyelmo/bin/yelmo_initmip.x" 
     elif exe_path == "opt":
         exe_path = "libyelmo/bin/yelmo_opt.x" 
+    elif exe_path == "trough":
+        exe_path = "libyelmo/bin/yelmo_trough.x" 
     
     # Also extract executable and path filenames 
     exe_fname = os.path.basename(exe_path)
@@ -102,6 +105,8 @@ opt = libyelmo/bin/yelmo_opt.x
         const_path = "par/yelmo_const_EISMINT.nml"
     elif "MISMIP3D" in par_fname:
         const_path = "par/yelmo_const_MISMIP3D.nml"
+    elif "TROUGH" in par_fname:
+        const_path = "par/yelmo_const_TROUGH.nml"
     else:
         const_path = "par/yelmo_const_Earth.nml"
 

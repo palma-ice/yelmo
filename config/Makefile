@@ -92,6 +92,13 @@ opt : yelmo-static
 		@echo "    yelmo_opt.x is ready."
 		@echo " "
 
+trough : yelmo-static
+		$(FC) $(DFLAGS) $(FFLAGS) $(INC_LIS) -o $(bindir)/yelmo_trough.x tests/yelmo_trough.f90 \
+			-L${CURDIR}/libyelmo/include -lyelmo $(LFLAGS) $(objdir)/nml.o
+		@echo " "
+		@echo "    yelmo_trough.x is ready."
+		@echo " "
+
 .PHONY : usage
 usage:
 	@echo ""
@@ -101,6 +108,7 @@ usage:
 	@echo " make benchmarks : compiles yelmo_benchmarks.x, for running various EISMINT domain experiments.""
 	@echo " make mismip     : compiles yelmo_mismip.x, for running various MISMIP domain experiments.""
 	@echo " make opt        : compiles yelmo_opt.x, for running various MISMIP domain experiments.""
+	@echo " make trough     : compiles yelmo_trough.x, for running trough domain experiments.""
 	@echo " make clean      : cleans object files"
 	@echo ""
 

@@ -172,7 +172,11 @@ program yelmo_test
     ! (initialize temps with robin method with a cold base),
     ! or from restart file, if specified 
     call yelmo_init_state(yelmo1,path_par,time=time_init,thrm_method="robin-cold")
-     
+    
+    ! Calculate new initial guess of cf_ref using info from dyn
+    call guess_cf_ref(cf_ref,yelmo1%dyn%now%taud,yelmo1%dta%pd%uxy_s, &
+                        yelmo1%dta%pd%H_ice,yelmo1%dta%pd%H_grnd,yelmo1%dyn%par%beta_u0,cf_min,cf_max)
+
     if (.not. yelmo1%par%use_restart) then 
         ! Run initialization steps 
 
@@ -218,6 +222,8 @@ program yelmo_test
     call yelmo_write_init(yelmo1,file2D,time_init,units="years")  
     call write_step_2D_opt(yelmo1,file2D,time_init,cf_ref,cf_ref_dot,mask_noice,tau,H_scale)  
     
+    stop 
+
     write(*,*) "Starting optimization..."
 
 if (opt_method .eq. 1) then 
@@ -560,6 +566,47 @@ contains
         return 
 
     end subroutine write_step_2D_opt
+
+    subroutine guess_cf_ref(cf_ref,tau_d,uxy_obs,H_obs,H_grnd,u0,cf_min,cf_max)
+        ! Use suggestion by Morlighem et al. (2013) to guess friction
+        ! assuming tau_b ~ tau_d, and u_b = u_obs:
+        !
+        ! For a linear law, tau_b = beta * u_b, so 
+        ! beta = tau_b / u_b = tau_d / (u_obs+ebs), ebs=0.1 to avoid divide by zero 
+        ! beta = cf_ref/u0 * N_eff, so:
+        ! cf_ref = (tau_d/(u_obs+ebs)) * (u0/N_eff)
+
+        implicit none 
+
+        real(prec), intent(OUT) :: cf_ref(:,:) 
+        real(prec), intent(IN)  :: tau_d(:,:) 
+        real(prec), intent(IN)  :: uxy_obs(:,:) 
+        real(prec), intent(IN)  :: H_obs(:,:)
+        real(prec), intent(IN)  :: H_grnd(:,:)
+        real(prec), intent(IN)  :: u0 
+        real(prec), intent(IN)  :: cf_min 
+        real(prec), intent(IN)  :: cf_max  
+
+        ! Local variables 
+        real(prec), parameter :: ebs = 0.1          ! [m/yr] To avoid divide by zero 
+
+        where (H_obs .eq. 0.0_prec .or. H_grnd .eq. 0.0_prec) 
+            ! Set floating or ice-free points to minimum 
+            cf_ref = cf_min 
+
+        elsewhere 
+            ! Apply equation 
+
+            ! Linear law: 
+            cf_ref = (tau_d / (uxy_obs + ebs)) * (u0 / (rho_ice*g*H_obs + 1.0_prec))
+
+        end where 
+
+        where (cf_ref .gt. cf_max) cf_ref = cf_max 
+
+        return 
+
+    end subroutine guess_cf_ref 
 
     subroutine update_cf_ref_thickness_simple(cf_ref,cf_ref_dot,H_ice,z_bed,ux,uy,H_obs,is_float_obs,dx,cf_min,cf_max,H_scale)
 

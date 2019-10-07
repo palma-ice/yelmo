@@ -175,7 +175,7 @@ program yelmo_test
      
     if (.not. yelmo1%par%use_restart) then 
         ! Run initialization steps 
-        
+
         ! Note: From now on, using yelmo_update_equil_external allows for running with 
         ! interactive hydrology via hyd1 object and for passing cf_ref to be able
         ! to update C_bed as a function of N_eff interactively.
@@ -205,15 +205,19 @@ program yelmo_test
 
     end if 
 
-    ! Initialize the 2D output file and write the initial model state 
-    call yelmo_write_init(yelmo1,file2D,time_init,units="years")  
-    call write_step_2D_opt(yelmo1,file2D,time_init,cf_ref,cf_ref_dot,mask_noice)  
-    
     ! Store the reference state
     yelmo_ref    = yelmo1
     hyd1%now%H_w = yelmo1%bnd%H_w  
     hyd_ref      = hyd1 
 
+    ! Store initial optimization parameter choices 
+    tau     = rel_tau1 
+    H_scale = scale_H1 
+
+    ! Initialize the 2D output file and write the initial model state 
+    call yelmo_write_init(yelmo1,file2D,time_init,units="years")  
+    call write_step_2D_opt(yelmo1,file2D,time_init,cf_ref,cf_ref_dot,mask_noice,tau,H_scale)  
+    
     write(*,*) "Starting optimization..."
 
 if (opt_method .eq. 1) then 
@@ -271,7 +275,7 @@ if (opt_method .eq. 1) then
                                                                         domain,mask_noice,cf_ref)
 
             if (mod(nint(time*100),nint(dt2D_out*100))==0) then
-                call write_step_2D_opt(yelmo1,file2D,time,cf_ref,cf_ref_dot,mask_noice)
+                call write_step_2D_opt(yelmo1,file2D,time,cf_ref,cf_ref_dot,mask_noice,tau,H_scale)
             end if 
 
         end do 
@@ -303,7 +307,7 @@ if (opt_method .eq. 1) then
     end do 
 
 else 
-    ! Ratio method (Le clec’h et al, 2019)
+    ! Ratio method (Le clec’h et al, 2019) - needs revising
 
     ! Initialize timing variables 
     time = time_init 
@@ -355,7 +359,7 @@ else
         end do 
 
         ! Write the current solution 
-        call write_step_2D_opt(yelmo1,file2D,time,cf_ref,cf_ref_dot,mask_noice)
+        call write_step_2D_opt(yelmo1,file2D,time,cf_ref,cf_ref_dot,mask_noice,tau,H_scale)
         
     end do 
 
@@ -377,7 +381,7 @@ end if
 
 contains
 
-    subroutine write_step_2D_opt(ylmo,filename,time,cf_ref,cf_ref_dot,mask_noice)
+    subroutine write_step_2D_opt(ylmo,filename,time,cf_ref,cf_ref_dot,mask_noice,tau,H_scale)
 
         implicit none 
         
@@ -387,6 +391,8 @@ contains
         real(prec), intent(IN) :: cf_ref(:,:) 
         real(prec), intent(IN) :: cf_ref_dot(:,:)
         logical,    intent(IN) :: mask_noice(:,:) 
+        real(prec), intent(IN) :: tau 
+        real(prec), intent(IN) :: H_scale 
 
         ! Local variables
         integer    :: ncid, n
@@ -421,6 +427,11 @@ contains
         call nc_write(filename,"A_ice",ylmo%reg%A_ice,units="km2",long_name="Ice area", &
                               dim1="time",start=[n],count=[1],ncid=ncid)
         call nc_write(filename,"dVicedt",ylmo%reg%dVicedt,units="km3 yr-1",long_name="Rate of volume change", &
+                      dim1="time",start=[n],count=[1],ncid=ncid)
+        
+        call nc_write(filename,"opt_tau",tau,units="yr",long_name="Relaxation time scale (ice shelves)", &
+                      dim1="time",start=[n],count=[1],ncid=ncid)
+        call nc_write(filename,"opt_H_scale",H_scale,units="m",long_name="Error scaling constant", &
                       dim1="time",start=[n],count=[1],ncid=ncid)
         
         ! Ice limiting mask
@@ -853,9 +864,14 @@ contains
                         where (bnd%basins .ge. 12 .and. &
                                bnd%basins .le. 17) lambda_bed = calc_lambda_bed_exp(bnd%z_bed,-400.0,dyn%par%cb_z1)
 
-                        ! Increased friction in WAIS dome area
-                        where (bnd%basins .ge. 21 .and. &
-                               bnd%basins .le. 22) lambda_bed = calc_lambda_bed_exp(bnd%z_bed,-1500.0,dyn%par%cb_z1)
+!                         ! Increased friction in WAIS dome area
+!                         where (bnd%basins .ge. 21 .and. &
+!                                bnd%basins .le. 22) lambda_bed = calc_lambda_bed_exp(bnd%z_bed,-1500.0,dyn%par%cb_z1)
+                        
+                        ! Increased friction in WAIS dome area and Ross ice shelf / Siple Coast
+                        where (bnd%basins .ge. 18 .and. &
+                               bnd%basins .le. 22) lambda_bed = 1.0_prec 
+                    
                     end if 
 
                 case("till_const")

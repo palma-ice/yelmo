@@ -481,9 +481,15 @@ contains
                     ! Default
                     lambda_bed = calc_lambda_bed_exp(bnd%z_bed,dyn%par%cb_z0,dyn%par%cb_z1)
 
-                    ! Modifications - increased friction in Wilkes Land (South)
-                    where (bnd%basins .ge. 12 .and. &
-                           bnd%basins .le. 17) lambda_bed = calc_lambda_bed_exp(bnd%z_bed,-400.0,dyn%par%cb_z1)
+                    if (trim(domain) .eq. "Antarctica") then 
+                        ! Domain-specific modifications to lambda function
+
+                        ! Increased friction in Wilkes Land (South - Southeast)
+                        where (bnd%basins .ge. 12 .and. &
+                               bnd%basins .le. 17) lambda_bed = calc_lambda_bed_exp(bnd%z_bed,-400.0,dyn%par%cb_z1)
+
+
+                    end if 
 
                 case("till_const")
                     ! Constant till friction angle

@@ -210,9 +210,10 @@ contains
             call nml_read(nml_path,nml_group,"z_bed_nm",  vname)
             call nc_read(filename,vname,bnd%z_bed)
 
+            vname = ""
             call nml_read(nml_path,nml_group,"z_bed_sd_nm",  vname)
             
-            if (trim(vname) .ne. "") then 
+            if (trim(vname) .ne. "" .or. trim(vname) .ne. "none" .or. trim(vname) .ne. "None") then 
                 call nc_read(filename,vname,bnd%z_bed_sd)
             else
                 bnd%z_bed_sd = 0.0 

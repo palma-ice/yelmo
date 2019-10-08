@@ -75,7 +75,7 @@ program test_icetemp
     ! ===============================================================
     ! User options 
 
-    experiment     = "eismint"      ! "eismint", "k15expa", "k15expb"
+    experiment     = "k15expa"      ! "eismint", "k15expa", "k15expb"
     
     ! General options
     zeta_scale      = "tanh"        ! "linear", "exp", "tanh"

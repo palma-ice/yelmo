@@ -210,7 +210,7 @@ contains
         end do  
 
         ! == Ice thickness == 
-        H_ice = 200.0_prec 
+        H_ice = 50.0_prec 
         do j = 1, ny 
             where(xc .gt. x_cf) H_ice(:,j) = 0.0 
         end do 

@@ -155,7 +155,7 @@
     z_bed_load      = True 
     z_bed_path      = "input/{domain}/{grid_name}/{grid_name}_TOPO-RTOPO-2.0.1.nc"
     z_bed_nm        = "z_bed"               ! [m] Bedrock elevation 
-    z_bed_sd_nm     = ""            ! [m] Bedrock elevation standard deviation (if available) 
+    z_bed_sd_nm     = "z_bed_sd"            ! [m] Bedrock elevation standard deviation (if available) 
 /
 
 &yelmo_data 

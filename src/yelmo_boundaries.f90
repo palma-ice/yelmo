@@ -122,8 +122,8 @@ contains
         ! Initially set ice_allowed to true everywhere 
         bnd%ice_allowed = .TRUE. 
 
-        ! Also set calv_mask true everywhere (no imposed calving front)
-        bnd%calv_mask   = .TRUE. 
+        ! Also set calv_mask false everywhere (no imposed calving front)
+        bnd%calv_mask   = .FALSE. 
         
         ! Determine allowed regions based on domain
         select case(trim(domain))
@@ -281,7 +281,7 @@ contains
         now%region_mask = 0.0_prec 
         
         now%ice_allowed = .TRUE.  ! By default allow ice everywhere 
-        now%calv_mask   = .TRUE.  ! By default now 
+        now%calv_mask   = .FALSE. ! By default no, no calving mask 
 
         now%H_ice_ref   = 0.0_prec 
 

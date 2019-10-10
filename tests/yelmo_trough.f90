@@ -114,8 +114,8 @@ program yelmo_trough
                             yelmo1%grd%xc*1e-3,yelmo1%grd%yc*1e-3,fc,dc,wc,x_cf)
     
     ! Define calving front 
-    yelmo1%bnd%calv_mask = .TRUE. 
-    where (yelmo1%grd%x*1e-3 .ge. x_cf) yelmo1%bnd%calv_mask = .FALSE. 
+    yelmo1%bnd%calv_mask = .FALSE. 
+    where (yelmo1%grd%x*1e-3 .ge. x_cf) yelmo1%bnd%calv_mask = .TRUE. 
 
     ! Initialize the yelmo state (dyn,therm,mat)
     call yelmo_init_state(yelmo1,path_par,time=time_init,thrm_method="robin")

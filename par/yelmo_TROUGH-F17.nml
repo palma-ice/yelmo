@@ -20,7 +20,7 @@
 
     ! Simulation parameters
     Tsrf_const   = -20.0                ! [degC]  Surface temperature 
-    smb_const    = 0.1                  ! [m/yr]  Surface mass balance 
+    smb_const    = 0.3                  ! [m/yr]  Surface mass balance 
     Qgeo_const   = 70.0                 ! [mW/m2] Geothermal heat flux 
 
 /

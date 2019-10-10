@@ -135,7 +135,7 @@ contains
                 case("kill-pos")
                     ! Delete all floating ice beyond a given location 
                     tpo%now%calv = 0.0_prec 
-                    where(.not. bnd%calv_mask .and. tpo%now%H_ice .gt. 0.0_prec &
+                    where(bnd%calv_mask .and. tpo%now%H_ice .gt. 0.0_prec &
                             .and. tpo%now%f_grnd .eq. 0.0_prec) tpo%now%calv = tpo%now%H_ice / dt
 
                 case DEFAULT 

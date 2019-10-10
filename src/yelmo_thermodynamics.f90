@@ -234,7 +234,7 @@ contains
 
         ! First perform horizontal advection (this doesn't work properly, 
         ! use column-based upwind horizontal advection below)
-        call calc_enth_horizontal_advection_3D(T_ice,ux,uy,H_ice,dx,dt,solver_advec)
+        !call calc_enth_horizontal_advection_3D(T_ice,ux,uy,H_ice,dx,dt,solver_advec)
 
         ! Store original ice temperature field here for input to horizontal advection
         ! calculations 
@@ -304,11 +304,11 @@ contains
                 
                 ! Pre-calculate the contribution of horizontal advection to column solution
                 ! (use unmodified T_ice_old field as input, to avoid mixing with new solution)
-                !call calc_advec_horizontal_column(advecxy,T_ice_old,H_ice,ux,uy,dx,i,j)
-                do k = 1, nz_aa
-                    call calc_adv2D_expl_rate(advecxy(k),T_ice_old(:,:,k),ux(:,:,k),uy(:,:,k),dx,dx,i,j)
-                end do 
-                !advecxy = 0.0_prec 
+                call calc_advec_horizontal_column(advecxy,T_ice_old,H_ice,ux,uy,dx,i,j)
+!                 do k = 1, nz_aa
+!                     call calc_adv2D_expl_rate(advecxy(k),T_ice_old(:,:,k),ux(:,:,k),uy(:,:,k),dx,dx,i,j)
+!                 end do 
+!                 !advecxy = 0.0_prec 
 
                 call calc_enth_column(enth(i,j,:),T_ice(i,j,:),omega(i,j,:),bmb_grnd(i,j),Q_ice_b(i,j),H_cts(i,j), &
                         T_pmp(i,j,:),cp(i,j,:),kt(i,j,:),advecxy,uz(i,j,:),Q_strn(i,j,:),Q_b(i,j),Q_geo(i,j),T_srf(i,j), &

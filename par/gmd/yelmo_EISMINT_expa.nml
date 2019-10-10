@@ -11,7 +11,7 @@
     ! Timing parameters 
     time_init    = 0.0                  ! [yr] Starting time 
     time_end     = 150000.0             ! [yr] Ending time 
-    dtt          = 100.0                ! [yr] Main loop timestep 
+    dtt          = 5.0                  ! [yr] Main loop timestep 
     dt2D_out     = 5000.0               ! [yr] Frequency of writing 2D output files 
 
     ! Settings for transient EISMINT1 experiments 
@@ -81,13 +81,13 @@
     cb_z0               = -200.0          ! [m] Bedrock elevation at which scaling goes to f_scale=e(-1)
     cb_z1               = 200.0           ! [m] Bedrock elevation above which scaling goes to f_scale=1
     cb_min              = 0.0             ! [--] Minimum allowed value of f_scale for grounded ice
-    cf_frozen           = 100e-3          ! [--] Bed critical stress, frozen 
-    cf_stream           =  10e-3          ! [--] Bed critical stress, stream  
+    cf_frozen           = 0.1             ! [--] Bed critical stress, frozen 
+    cf_stream           = 0.01            ! [--] Bed critical stress, stream  
     n_sm_beta           = 0               ! [-] Standard deviation in gridpoints for Gaussian smoothing of beta (0==no smoothing)
     beta_min            = 0.0             ! [Pa a m-1] Minimum value of beta allowed for grounded ice (for stability)
     ssa_beta_max        = 1e20            ! [Pa a m-1] Maximum value of beta for which ssa should be calculated 
     ssa_vel_max         = 5000.0          ! [m a-1] SSA velocity limit to avoid spurious results 
-    ssa_iter_max        = 20              ! Number of maximum allowed iterations over ssa to converge on vel. solution
+    ssa_iter_max        = 2               ! Number of maximum allowed iterations over ssa to converge on vel. solution
     ssa_iter_rel        = 0.7             ! [--] Relaxation fraction [0:1] to stabilize ssa iterations
     ssa_iter_conv       = 1e-2            ! [--] L2 relative error convergence limit to exit ssa iterations
     cb_sia              = 0.0             ! [m a-1 Pa-1] Bed roughness coefficient for SIA sliding
@@ -133,6 +133,7 @@
 
 &ytherm
     method          = "temp"            ! "fixed", "robin", "temp", "enth"
+    solver_advec    = "impl-upwind"     ! "expl", "impl-upwind"
     gamma           = 1.0               ! [K] Scalar for the pressure melting point decay function 
     use_strain_sia  = False             ! True: calculate strain heating from SIA approx.
     n_sm_qstrn      = 0                 ! [-] Standard deviation in gridpoints for Gaussian smoothing of strain heating (0==no smoothing)

@@ -234,7 +234,7 @@ contains
 
         ! First perform horizontal advection (this doesn't work properly, 
         ! use column-based upwind horizontal advection below)
-        !call calc_enth_horizontal_advection_3D(T_ice,ux,uy,dx,dt,solver_advec)
+        call calc_enth_horizontal_advection_3D(T_ice,ux,uy,H_ice,dx,dt,solver_advec)
 
         ! Store original ice temperature field here for input to horizontal advection
         ! calculations 
@@ -304,7 +304,10 @@ contains
                 
                 ! Pre-calculate the contribution of horizontal advection to column solution
                 ! (use unmodified T_ice_old field as input, to avoid mixing with new solution)
-                call calc_advec_horizontal_column(advecxy,T_ice_old,H_ice,ux,uy,dx,i,j)
+                !call calc_advec_horizontal_column(advecxy,T_ice_old,H_ice,ux,uy,dx,i,j)
+                do k = 1, nz_aa
+                    call calc_adv2D_expl_rate(advecxy(k),T_ice_old(:,:,k),ux(:,:,k),uy(:,:,k),dx,dx,i,j)
+                end do 
                 !advecxy = 0.0_prec 
 
                 call calc_enth_column(enth(i,j,:),T_ice(i,j,:),omega(i,j,:),bmb_grnd(i,j),Q_ice_b(i,j),H_cts(i,j), &
@@ -325,19 +328,20 @@ contains
 
     end subroutine calc_ytherm_enthalpy_3D
 
-    subroutine calc_enth_horizontal_advection_3D(T_ice,ux,uy,dx,dt,solver)
+    subroutine calc_enth_horizontal_advection_3D(T_ice,ux,uy,H_ice,dx,dt,solver)
 
         implicit none 
 
         real(prec),       intent(INOUT) :: T_ice(:,:,:)         ! [K]   Ice temperature/enthalpy, aa-nodes  
         real(prec),       intent(IN)    :: ux(:,:,:)            ! [m/a] 2D velocity, x-direction (ac-nodes)
         real(prec),       intent(IN)    :: uy(:,:,:)            ! [m/a] 2D velocity, y-direction (ac-nodes)
+        real(prec),       intent(IN)    :: H_ice(:,:)           ! [m]   Ice thickness 
         real(prec),       intent(IN)    :: dx                   ! [m]   Horizontal resolution
         real(prec),       intent(IN)    :: dt                   ! [a]   Timestep 
         character(len=*), intent(IN)    :: solver               ! Solver to use for the ice thickness advection equation
 
         ! Local variables 
-        integer :: i, j, k, nx, ny, nz 
+        integer :: i, j, k, n, nx, ny, nz 
         real(prec), allocatable :: T_dot(:,:) 
 
         nx = size(T_ice,1)
@@ -346,6 +350,51 @@ contains
 
         allocate(T_dot(nx,ny)) 
         T_dot = 0.0_prec 
+
+        ! First populate boundary values so that T_ice next to ice sheet is equal to 
+        ! ice sheet. 
+        do j = 2, ny-1 
+        do i = 2, nx-1 
+
+            if (H_ice(i,j) .eq. 0.0 .and. &
+                count([H_ice(i-1,j),H_ice(i+1,j),H_ice(i,j-1),H_ice(i,j+1)] .gt. 0.0) .gt. 0) then 
+                ! Apply to ice-free points with ice-neighbors only 
+
+                T_ice(i,j,:) = 0.0_prec 
+                n = 0 
+
+                if (H_ice(i-1,j) .gt. 0.0) then 
+                    T_ice(i,j,:) = T_ice(i,j,:) + T_ice(i-1,j,:)
+                    n = n+1 
+                end if 
+                
+                if (H_ice(i+1,j) .gt. 0.0) then 
+                    T_ice(i,j,:) = T_ice(i,j,:) + T_ice(i+1,j,:)
+                    n = n+1 
+                end if 
+                
+                if (H_ice(i,j-1) .gt. 0.0) then 
+                    T_ice(i,j,:) = T_ice(i,j,:) + T_ice(i,j-1,:)
+                    n = n+1 
+                end if 
+                
+                if (H_ice(i,j+1) .gt. 0.0) then 
+                    T_ice(i,j,:) = T_ice(i,j,:) + T_ice(i,j+1,:)
+                    n = n+1 
+                end if 
+                
+                if (n .gt. 0) then 
+                    ! Get average 
+                    T_ice(i,j,:) = T_ice(i,j,:) / real(n,prec) 
+                else 
+                    write(*,*) "calc_enth_horizontal_advection_3D:: error: something went wrong!"
+                    stop 
+                end if 
+
+            end if 
+
+        end do 
+        end do 
 
         ! Resolve horizontal advection layer by layer 
 
@@ -358,6 +407,46 @@ contains
         return 
 
     end subroutine calc_enth_horizontal_advection_3D
+
+    subroutine calc_adv2D_expl_rate(dHdt, H_ice, ux, uy, dx, dy, i, j)
+        ! Solve 2D advection equation for ice sheet thickness via explicit flux divergence:
+        ! d[H]/dt = -grad[H*(ux,uy)] 
+        !
+        ! ajr: adapted from IMAU-ICE code from Heiko Goelzer (h.goelzer@uu.nl) 2016
+        ! Note: original algorithm called for interpolation of H_ice to ab-nodes explicitly. 
+        ! It also works using the ac-nodes directly, but is less stable. This can be chosen via the parameter
+        ! use_ab_expl. 
+
+        implicit none 
+
+        real(prec), intent(OUT)   :: dHdt                   ! [m/yr] aa-nodes, Ice thickness 
+        real(prec), intent(IN)    :: H_ice(:,:)             ! [m] aa-nodes, Ice thickness 
+        real(prec), intent(IN)    :: ux(:,:)                ! [m a^-1] ac-nodes, Horizontal velocity, x-direction
+        real(prec), intent(IN)    :: uy(:,:)                ! [m a^-1] ac-nodes, Horizontal velocity, y-direction
+        real(prec), intent(IN)    :: dx                     ! [m] Horizontal grid spacing, x-direction
+        real(prec), intent(IN)    :: dy                     ! [m] Horizontal grid spacing, y-direction
+        integer,    intent(IN)    :: i, j 
+
+        ! Local variables:
+        integer                 :: nx, ny 
+
+        real(prec) :: flux_xr                  ! [m^2 a^-1] ac-nodes, Flux in the x-direction to the right
+        real(prec) :: flux_xl                  ! [m^2 a^-1] ac-nodes, Flux in the x-direction to the left
+        real(prec) :: flux_yu                  ! [m^2 a^-1] ac-nodes, Flux in the y-direction upwards
+        real(prec) :: flux_yd                  ! [m^2 a^-1] ac-nodes, Flux in the y-direction downwards
+
+        ! Calculate the flux across each boundary [m^2 a^-1]
+        flux_xr = ux(i  ,j  ) * 0.5 * (H_ice(i  ,j  ) + H_ice(i+1,j  ))
+        flux_xl = ux(i-1,j  ) * 0.5 * (H_ice(i-1,j  ) + H_ice(i  ,j  ))
+        flux_yu = uy(i  ,j  ) * 0.5 * (H_ice(i  ,j  ) + H_ice(i  ,j+1))
+        flux_yd = uy(i  ,j-1) * 0.5 * (H_ice(i  ,j-1) + H_ice(i  ,j  ))
+
+        ! Calculate flux divergence on aa-node 
+        dHdt = (1.0 / dx) * (flux_xl - flux_xr) + (1.0 / dy) * (flux_yd - flux_yu)
+        
+        return 
+
+    end subroutine calc_adv2D_expl_rate
 
     subroutine ytherm_par_load(par,filename,zeta_aa,zeta_ac,nx,ny,dx,init)
 

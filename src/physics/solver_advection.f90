@@ -54,7 +54,7 @@ contains
 
             case DEFAULT 
 
-                write(*,*) "calc_ice_thickness:: Error: solver not recognized."
+                write(*,*) "calc_advec2D:: Error: solver not recognized."
                 write(*,*) "solver = ", trim(solver)
                 stop 
 

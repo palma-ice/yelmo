@@ -25,6 +25,7 @@ program yelmo_trough
     real(prec) :: dx 
     real(prec) :: lx, ly, fc, dc, wc
     real(prec) :: x_cf 
+    real(prec) :: Tsrf_const, smb_const, Qgeo_const  
 
     real(prec) :: xmax, ymin, ymax 
     integer    :: i, j, nx, ny 
@@ -45,16 +46,7 @@ program yelmo_trough
     
     ! Define the domain, grid and experiment from parameter file
     call nml_read(path_par,"control","domain",       domain)        ! TROUGH
-    call nml_read(path_par,"control","experiment",   experiment)    ! "Std", "RF"
-    call nml_read(path_par,"control","dx",           dx)            ! [km] Grid resolution ! must be multiple of xmax and ymax!!
 
-    call nml_read(path_par,"control","lx",           lx)            ! [km] Trough parameter
-    call nml_read(path_par,"control","ly",           ly)            ! [km] Trough parameter
-    call nml_read(path_par,"control","fc",           fc)            ! [km] Trough parameter
-    call nml_read(path_par,"control","dc",           dc)            ! [km] Trough parameter
-    call nml_read(path_par,"control","wc",           wc)            ! [km] Trough parameter
-    call nml_read(path_par,"control","x_cf",         x_cf)          ! [km] Trough parameter
-    
     ! Timing parameters 
     call nml_read(path_par,"control","time_init",    time_init)     ! [yr] Starting time
     call nml_read(path_par,"control","time_end",     time_end)      ! [yr] Ending time
@@ -62,6 +54,21 @@ program yelmo_trough
     call nml_read(path_par,"control","dt1D_out",     dt1D_out)      ! [yr] Frequency of 1D output 
     call nml_read(path_par,"control","dt2D_out",     dt2D_out)      ! [yr] Frequency of 2D output 
 
+    ! Domain parameters
+    call nml_read(path_par,"control","dx",           dx)            ! [km] Grid resolution ! must be multiple of xmax and ymax!!
+    call nml_read(path_par,"control","lx",           lx)            ! [km] Trough parameter
+    call nml_read(path_par,"control","ly",           ly)            ! [km] Trough parameter
+    call nml_read(path_par,"control","fc",           fc)            ! [km] Trough parameter
+    call nml_read(path_par,"control","dc",           dc)            ! [km] Trough parameter
+    call nml_read(path_par,"control","wc",           wc)            ! [km] Trough parameter
+    call nml_read(path_par,"control","x_cf",         x_cf)          ! [km] Trough parameter
+    
+    ! Simulation parameters 
+    call nml_read(path_par,"control","Tsrf_const",   Tsrf_const)    ! [degC]  Surface temperature
+    call nml_read(path_par,"control","smb_const",    smb_const)     ! [m/yr]  Surface mass balance
+    call nml_read(path_par,"control","Qgeo_const",   Qgeo_const)    ! [mW/m2] Geothermal heat flux
+    
+    
     ! Define default grid name for completeness 
     grid_name = "TROUGH-F17" 
 
@@ -69,7 +76,7 @@ program yelmo_trough
     call yelmo_global_init(path_const)
 
     ! Define the domain and grid
-    xmax = 800.0
+    xmax = 700.0
     ymax =  80.0
     ymin = -80.0
     call yelmo_init_grid(yelmo1%grd,grid_name,units="km",x0=0.0,dx=dx,nx=int(xmax/dx)+1,y0=ymin,dy=dx,ny=int((ymax-ymin)/dx)+1)
@@ -92,9 +99,9 @@ program yelmo_trough
     yelmo1%bnd%H_sed    = 0.0 
     yelmo1%bnd%H_w      = hyd1%now%H_w      ! [m]
     
-    yelmo1%bnd%T_srf    = T0 - 20.0_prec    ! [K] 
-    yelmo1%bnd%smb      =  0.3_prec         ! [m/yr]
-    yelmo1%bnd%Q_geo    = 70.0_prec         ! [mW/m2] 
+    yelmo1%bnd%T_srf    = T0 - Tsrf_const   ! [K] 
+    yelmo1%bnd%smb      = smb_const         ! [m/yr]
+    yelmo1%bnd%Q_geo    = Qgeo_const        ! [mW/m2] 
 
     ! Check boundary values 
     call yelmo_print_bound(yelmo1%bnd)

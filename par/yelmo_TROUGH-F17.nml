@@ -1,8 +1,16 @@
 &control
 
     domain       = "TROUGH-F17"         ! "TROUGH-F17"
-    dx           =  10.0                ! [km] Grid resolution
+    
+    ! Timing parameters 
+    time_init    = 0.0                  ! [yr] Starting time 
+    time_end     = 50e3                 ! [yr] Ending time 
+    dtt          = 0.2                  ! [yr] Main loop timestep 
+    dt1D_out     = 100.0                ! [yr] Frequency of writing 1D output files 
+    dt2D_out     = 200.0                ! [yr] Frequency of writing 2D output files 
 
+    ! Domain parameters 
+    dx           =  10.0                ! [km] Grid resolution
     lx           = 700.0                ! [km] Grid length, x-direction 
     ly           = 160.0                ! [km] Grid width,  y-direction 
     fc           = 16.0                 ! [km] Characteristic width of channel side walls
@@ -10,12 +18,10 @@
     wc           = 24.0                 ! [km] Half-width of bed trough
     x_cf         = 640.0                ! [km] Position of fixed calving front in right-hand half of domain 
 
-    ! Timing parameters 
-    time_init    = 0.0                  ! [yr] Starting time 
-    time_end     = 10e3                 ! [yr] Ending time 
-    dtt          = 0.5                  ! [yr] Main loop timestep 
-    dt1D_out     = 100.0                ! [yr] Frequency of writing 1D output files 
-    dt2D_out     = 200.0                ! [yr] Frequency of writing 2D output files 
+    ! Simulation parameters
+    Tsrf_const   = -20.0                ! [degC]  Surface temperature 
+    smb_const    = 0.1                  ! [m/yr]  Surface mass balance 
+    Qgeo_const   = 70.0                 ! [mW/m2] Geothermal heat flux 
 
 /
 
@@ -26,9 +32,9 @@
     restart         = "no"
     zeta_scale      = "tanh"            ! "linear", "exp", "tanh"
     zeta_exp        = 2.0  
-    nz_aa           = 10                ! Vertical resolution in ice
+    nz_aa           = 30                ! Vertical resolution in ice
     dtmin           = 0.01              ! [a] Minimum timestep 
-    dtmax           = 1.0               ! [a] Maximum timestep
+    dtmax           = 0.2               ! [a] Maximum timestep
     ntt             = 1                 ! [--] Thermodynamics call frequency (how many dynamic timesteps to skip)
     cfl_max         = 0.5               ! Maximum value is 1.0, lower will be more stable
     cfl_diff_max    = 0.12              ! Bueler et al (2007), Eq. 25  
@@ -96,7 +102,7 @@
 &ydyn_neff 
     neff_method     = 3                 ! -1: external N_eff, 0: neff_const, 1: overburden pressure, 2: Leguy param., 3: Till pressure
     neff_const      = 1.0               ! == rho_ice*g*(eg 1000 m ice thickness)
-    neff_p          = 0.0               ! *neff_method=2* marine connectivity exponent (0: none, 1: full)
+    neff_p          = 1.0               ! *neff_method=2* marine connectivity exponent (0: none, 1: full)
     neff_set_water  = False             ! *neff_method=3* Prescribe H_w = H_w_max for temperate ice instead of using H_w field?
     neff_w_max      = 2.0               ! [m]  *neff_method=3* Maximum allowed water layer thickness for Till pressure 
     neff_N0         = 1000.0            ! [Pa] *neff_method=3* Reference effective pressure 
@@ -136,9 +142,9 @@
     use_strain_sia  = False             ! True: calculate strain heating from SIA approx.
     n_sm_qstrn      = 0                 ! [-] Standard deviation in gridpoints for Gaussian smoothing of strain heating (0==no smoothing)
     n_sm_qb         = 0                 ! [-] Standard deviation in gridpoints for Gaussian smoothing of basal heating (0==no smoothing)
-    use_const_cp    = True              ! Use specified constant value of heat capacity?
+    use_const_cp    = False             ! Use specified constant value of heat capacity?
     const_cp        = 2009.0            ! [J kg-1 K-1] Specific heat capacity 
-    use_const_kt    = True              ! Use specified constant value of heat conductivity?
+    use_const_kt    = False             ! Use specified constant value of heat conductivity?
     const_kt        = 6.62e7            ! [J a-1 m-1 K-1] Thermal conductivity [W m-1 K-1 * sec_year] => [J a-1 m-1 K-1]
     enth_cr         = 1e-2              ! [--] Conductivity ratio for temperate ice (kappa_temp     = enth_cr*kappa_cold)
     omega_max       = 0.02              ! [--] Maximum allowed water content fraction 

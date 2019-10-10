@@ -232,15 +232,16 @@ contains
         allocate(advecxy(nz_aa))
         allocate(T_ice_old(nx,ny,nz_aa))
 
+        ! First perform horizontal advection (this doesn't work properly, 
+        ! use column-based upwind horizontal advection below)
+        !call calc_enth_horizontal_advection_3D(T_ice,ux,uy,dx,dt,solver_advec)
+
         ! Store original ice temperature field here for input to horizontal advection
         ! calculations 
         T_ice_old = T_ice 
 
         ! Initialize gaussian filter kernel 
         filter0 = gauss_values(dx,dx,sigma=2.0*dx,n=size(filter,1))
-
-        ! First perform horizontal advection 
-        !call calc_enth_horizontal_advection_3D(T_ice,ux,uy,dx,dt,solver_advec)
 
         do j = 3, ny-2
         do i = 3, nx-2 
@@ -328,7 +329,7 @@ contains
 
         implicit none 
 
-        real(prec),       intent(INOUT) :: T_ice(:,:,:)         ! [K]   Ice temperature/enthalpy 
+        real(prec),       intent(INOUT) :: T_ice(:,:,:)         ! [K]   Ice temperature/enthalpy, aa-nodes  
         real(prec),       intent(IN)    :: ux(:,:,:)            ! [m/a] 2D velocity, x-direction (ac-nodes)
         real(prec),       intent(IN)    :: uy(:,:,:)            ! [m/a] 2D velocity, y-direction (ac-nodes)
         real(prec),       intent(IN)    :: dx                   ! [m]   Horizontal resolution

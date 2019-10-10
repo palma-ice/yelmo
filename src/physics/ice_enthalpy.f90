@@ -183,6 +183,7 @@ contains
                 ! Hold basal temperature at pressure melting point
 
                 if (use_enth .and. T_ice(2) .ge. T_pmp(2)) then 
+!                 if (T_ice(2) .ge. T_pmp(2)) then 
                     ! Layer above base is also temperate (with water likely present in the ice),
                     ! set K0 dE/dz = 0. To do so, set basal enthalpy equal to enthalpy above
                     ! (following MALIv6 implementation)
@@ -280,7 +281,7 @@ contains
                 ! Temperate layer exists, interpolate enthalpy at the base. 
                 enth(1) = enth(2) - (enth(3)-enth(2))/(zeta_aa(3)-zeta_aa(2)) * (zeta_aa(2)-zeta_aa(1))
             end if 
-
+            
             ! Get temperature and water content 
             call convert_from_enthalpy_column(enth,T_ice,omega,T_pmp,cp,L_ice)
             

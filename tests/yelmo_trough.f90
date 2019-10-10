@@ -118,7 +118,7 @@ program yelmo_trough
     where (yelmo1%grd%x*1e-3 .ge. x_cf) yelmo1%bnd%calv_mask = .TRUE. 
 
     ! Initialize the yelmo state (dyn,therm,mat)
-    call yelmo_init_state(yelmo1,path_par,time=time_init,thrm_method="robin")
+    call yelmo_init_state(yelmo1,path_par,time=time_init,thrm_method="robin-cold")
 
     ! Write initial state 
     call write_step_2D(yelmo1,file2D,time=time_init) 

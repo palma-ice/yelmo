@@ -75,17 +75,17 @@ program test_icetemp
     ! ===============================================================
     ! User options 
 
-    experiment     = "eismint"      ! "eismint", "k15expa", "k15expb"
+    experiment     = "k15expb"      ! "eismint", "k15expa", "k15expb"
     
     ! General options
     zeta_scale      = "tanh"        ! "linear", "exp", "tanh"
-    nz              = 30            ! [--] Number of ice sheet points (aa-nodes + base + surface)
+    nz              = 22            ! [--] Number of ice sheet points (aa-nodes + base + surface)
     is_celcius      = .FALSE. 
 
     age_method      = "expl"        ! "expl" or "impl"
     age_impl_kappa  = 1.5           ! [m2 a-1] Artificial diffusion for age tracing
 
-    enth_solver     = "temp"        ! "enth" or "temp" 
+    enth_solver     = "enth"        ! "enth" or "temp" 
     omega_max       = 0.03          ! Maximum allowed water content (fraction)
     enth_cr         = 1e-3          ! Enthalpy solver: conductivity ratio kappa_water / kappa_ice 
 

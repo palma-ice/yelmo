@@ -379,6 +379,7 @@ module yelmo_defs
     !ytherm parameters 
     type ytherm_param_class
         character(len=256)  :: method  
+        character(len=256)  :: solver_advec 
         integer             :: nx, ny 
         real(prec)          :: dx, dy  
         integer             :: nz_aa     ! Number of vertical points in ice (layer centers, plus base and surface)

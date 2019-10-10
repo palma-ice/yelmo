@@ -7,7 +7,8 @@ module yelmo_thermodynamics
     
     use thermodynamics 
     use ice_enthalpy
-    
+    use solver_advection, only : calc_advec2D  
+
     implicit none
     
     private
@@ -106,7 +107,7 @@ contains
                                 thrm%now%H_cts,thrm%now%T_pmp,thrm%now%cp,thrm%now%kt,dyn%now%ux,dyn%now%uy,dyn%now%uz,thrm%now%Q_strn, &
                                 thrm%now%Q_b,bnd%Q_geo,bnd%T_srf,tpo%now%H_ice,bnd%H_w,tpo%now%H_grnd,tpo%now%f_grnd,thrm%par%zeta_aa, &
                                 thrm%par%zeta_ac,thrm%par%dzeta_a,thrm%par%dzeta_b,thrm%par%enth_cr,thrm%par%omega_max, &
-                                dt,thrm%par%dx,thrm%par%method)
+                                dt,thrm%par%dx,thrm%par%method,thrm%par%solver_advec)
                     
                 case("robin")
                     ! Use Robin solution for ice temperature 
@@ -173,7 +174,7 @@ contains
     end subroutine calc_ytherm
 
     subroutine calc_ytherm_enthalpy_3D(enth,T_ice,omega,bmb_grnd,Q_ice_b,H_cts,T_pmp,cp,kt,ux,uy,uz,Q_strn,Q_b,Q_geo, &
-                            T_srf,H_ice,H_w,H_grnd,f_grnd,zeta_aa,zeta_ac,dzeta_a,dzeta_b,cr,omega_max,dt,dx,solver)
+                            T_srf,H_ice,H_w,H_grnd,f_grnd,zeta_aa,zeta_ac,dzeta_a,dzeta_b,cr,omega_max,dt,dx,solver,solver_advec)
         ! This wrapper subroutine breaks the thermodynamics problem into individual columns,
         ! which are solved independently by calling calc_enth_column
 
@@ -210,6 +211,7 @@ contains
         real(prec), intent(IN)    :: dt             ! [a] Time step 
         real(prec), intent(IN)    :: dx             ! [a] Horizontal grid step 
         character(len=*), intent(IN) :: solver      ! "enth" or "temp" 
+        character(len=*), intent(IN) :: solver_advec    ! "expl" or "impl-upwind"
 
         ! Local variables
         integer :: i, j, k, nx, ny, nz_aa, nz_ac  
@@ -236,6 +238,9 @@ contains
 
         ! Initialize gaussian filter kernel 
         filter0 = gauss_values(dx,dx,sigma=2.0*dx,n=size(filter,1))
+
+        ! First perform horizontal advection 
+        !call calc_enth_horizontal_advection_3D(T_ice,ux,uy,dx,dt,solver_advec)
 
         do j = 3, ny-2
         do i = 3, nx-2 
@@ -298,9 +303,9 @@ contains
                 
                 ! Pre-calculate the contribution of horizontal advection to column solution
                 ! (use unmodified T_ice_old field as input, to avoid mixing with new solution)
-                !call calc_advec_horizontal_column(advecxy,T_ice_old,H_ice,ux,uy,dx,i,j)
                 call calc_advec_horizontal_column(advecxy,T_ice_old,H_ice,ux,uy,dx,i,j)
-                
+                !advecxy = 0.0_prec 
+
                 call calc_enth_column(enth(i,j,:),T_ice(i,j,:),omega(i,j,:),bmb_grnd(i,j),Q_ice_b(i,j),H_cts(i,j), &
                         T_pmp(i,j,:),cp(i,j,:),kt(i,j,:),advecxy,uz(i,j,:),Q_strn(i,j,:),Q_b(i,j),Q_geo(i,j),T_srf(i,j), &
                         T_shlf,H_ice_now,H_w(i,j),f_grnd(i,j),zeta_aa,zeta_ac,dzeta_a,dzeta_b,cr,omega_max,T0,dt,trim(solver))
@@ -318,6 +323,40 @@ contains
         return 
 
     end subroutine calc_ytherm_enthalpy_3D
+
+    subroutine calc_enth_horizontal_advection_3D(T_ice,ux,uy,dx,dt,solver)
+
+        implicit none 
+
+        real(prec),       intent(INOUT) :: T_ice(:,:,:)         ! [K]   Ice temperature/enthalpy 
+        real(prec),       intent(IN)    :: ux(:,:,:)            ! [m/a] 2D velocity, x-direction (ac-nodes)
+        real(prec),       intent(IN)    :: uy(:,:,:)            ! [m/a] 2D velocity, y-direction (ac-nodes)
+        real(prec),       intent(IN)    :: dx                   ! [m]   Horizontal resolution
+        real(prec),       intent(IN)    :: dt                   ! [a]   Timestep 
+        character(len=*), intent(IN)    :: solver               ! Solver to use for the ice thickness advection equation
+
+        ! Local variables 
+        integer :: i, j, k, nx, ny, nz 
+        real(prec), allocatable :: T_dot(:,:) 
+
+        nx = size(T_ice,1)
+        ny = size(T_ice,2)
+        nz = size(T_ice,3) 
+
+        allocate(T_dot(nx,ny)) 
+        T_dot = 0.0_prec 
+
+        ! Resolve horizontal advection layer by layer 
+
+        do k = 2, nz-1    
+            call calc_advec2D(T_ice(:,:,k),ux(:,:,k),uy(:,:,k),T_dot,dx,dx,dt,solver)
+        end do 
+
+        call fill_borders_3D(T_ice,nfill=2)
+        
+        return 
+
+    end subroutine calc_enth_horizontal_advection_3D
 
     subroutine ytherm_par_load(par,filename,zeta_aa,zeta_ac,nx,ny,dx,init)
 
@@ -338,6 +377,7 @@ contains
  
         ! Store local parameter values in output object
         call nml_read(filename,"ytherm","method",         par%method,           init=init_pars)
+        call nml_read(filename,"ytherm","solver_advec",   par%solver_advec,     init=init_pars)
         call nml_read(filename,"ytherm","gamma",          par%gamma,            init=init_pars)
         call nml_read(filename,"ytherm","use_strain_sia", par%use_strain_sia,   init=init_pars)
         call nml_read(filename,"ytherm","n_sm_qstrn",     par%n_sm_qstrn,       init=init_pars)

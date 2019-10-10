@@ -45,11 +45,8 @@ $(objdir)/ice_enthalpy.o : $(srcdir)/physics/ice_enthalpy.f90 $(objdir)/yelmo_de
 	$(FC) $(DFLAGS) $(FFLAGS) -c -o $@ $<
 
 $(objdir)/mass_conservation.o : $(srcdir)/physics/mass_conservation.f90 $(objdir)/yelmo_defs.o \
-								$(objdir)/mass_conservation_impl_sico.o
+								$(objdir)/solver_advection.o $(objdir)/solver_advection_sico.o
 	$(FC) $(DFLAGS) $(FFLAGS) -c -o $@ $<
-
-$(objdir)/mass_conservation_impl_sico.o : $(srcdir)/physics/mass_conservation_impl_sico.F90 $(objdir)/yelmo_defs.o
-	$(FC) $(DFLAGS) $(FFLAGS) $(INC_LIS) -c -o $@ $<
 
 $(objdir)/solver_ssa_sico5.o: $(srcdir)/physics/solver_ssa_sico5.F90 $(objdir)/yelmo_defs.o \
 							$(objdir)/yelmo_tools.o
@@ -57,6 +54,13 @@ $(objdir)/solver_ssa_sico5.o: $(srcdir)/physics/solver_ssa_sico5.F90 $(objdir)/y
 
 $(objdir)/solver_tridiagonal.o: $(srcdir)/physics/solver_tridiagonal.f90 $(objdir)/yelmo_defs.o
 	$(FC) $(DFLAGS) $(FFLAGS) -c -o $@ $<
+
+$(objdir)/solver_advection.o: $(srcdir)/physics/solver_advection.f90 $(objdir)/yelmo_defs.o \
+								$(objdir)/yelmo_tools.o $(objdir)/solver_advection_sico.o
+	$(FC) $(DFLAGS) $(FFLAGS) -c -o $@ $<
+
+$(objdir)/solver_advection_sico.o : $(srcdir)/physics/solver_advection_sico.F90 $(objdir)/yelmo_defs.o
+	$(FC) $(DFLAGS) $(FFLAGS) $(INC_LIS) -c -o $@ $<
 
 $(objdir)/topography.o: $(srcdir)/physics/topography.f90 $(objdir)/yelmo_defs.o
 	$(FC) $(DFLAGS) $(FFLAGS) -c -o $@ $<
@@ -106,7 +110,8 @@ $(objdir)/yelmo_material.o: $(srcdir)/yelmo_material.f90 $(objdir)/yelmo_defs.o 
 	$(FC) $(DFLAGS) $(FFLAGS) -c -o $@ $<
 
 $(objdir)/yelmo_thermodynamics.o: $(srcdir)/yelmo_thermodynamics.f90 $(objdir)/yelmo_defs.o \
-								  $(objdir)/ice_enthalpy.o $(objdir)/thermodynamics.o
+								  $(objdir)/ice_enthalpy.o $(objdir)/thermodynamics.o \
+								  $(objdir)/solver_advection.o
 	$(FC) $(DFLAGS) $(FFLAGS) -c -o $@ $<
 
 $(objdir)/yelmo_boundaries.o: $(srcdir)/yelmo_boundaries.f90 $(objdir)/yelmo_defs.o $(objdir)/ncio.o
@@ -169,9 +174,10 @@ yelmo_physics =  	   $(objdir)/basal_dragging.o \
 					   $(objdir)/ice_age.o \
 					   $(objdir)/ice_enthalpy.o \
 					   $(objdir)/mass_conservation.o \
-					   $(objdir)/mass_conservation_impl_sico.o \
 					   $(objdir)/solver_ssa_sico5.o \
 					   $(objdir)/solver_tridiagonal.o \
+					   $(objdir)/solver_advection.o \
+					   $(objdir)/solver_advection_sico.o \
 					   $(objdir)/topography.o \
 					   $(objdir)/velocity_hybrid_pd12.o \
 					   $(objdir)/velocity_diva.o \

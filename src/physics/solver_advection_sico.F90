@@ -1,4 +1,4 @@
-module mass_conservation_impl_sico
+module solver_advection_sico
 
     use yelmo_defs, only : sp, dp, prec 
 
@@ -507,5 +507,5 @@ contains
 
     end subroutine sor_sprs
 
-end module mass_conservation_impl_sico 
+end module solver_advection_sico 
 

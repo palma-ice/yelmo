@@ -7,6 +7,7 @@ module solver_advection_sico
     private
     public :: calc_adv2D_expl_sico
     public :: calc_adv2D_impl_sico 
+    public :: calc_advec_horizontal_point_expl
 
 contains 
 

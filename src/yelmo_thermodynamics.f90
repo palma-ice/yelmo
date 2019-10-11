@@ -8,7 +8,7 @@ module yelmo_thermodynamics
     use thermodynamics 
     use ice_enthalpy
     use solver_advection, only : calc_advec2D  
-
+    
     implicit none
     
     private
@@ -319,7 +319,6 @@ contains
                 !advecxy = advecxy3D(i,j,:)
                 !advecxy = 0.0_prec 
 !                 write(*,*) "advecxy: ", i,j, maxval(abs(advecxy3D(i,j,:)-advecxy))
-
                 call calc_enth_column(enth(i,j,:),T_ice(i,j,:),omega(i,j,:),bmb_grnd(i,j),Q_ice_b(i,j),H_cts(i,j), &
                         T_pmp(i,j,:),cp(i,j,:),kt(i,j,:),advecxy,uz(i,j,:),Q_strn(i,j,:),Q_b(i,j),Q_geo(i,j),T_srf(i,j), &
                         T_shlf,H_ice_now,H_w(i,j),f_grnd(i,j),zeta_aa,zeta_ac,dzeta_a,dzeta_b,cr,omega_max,T0,dt,trim(solver))

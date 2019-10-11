@@ -220,6 +220,7 @@ contains
         real(prec) :: H_ice_now 
 
         real(prec), allocatable :: T_ice_old(:,:,:) 
+        real(prec), allocatable :: advecxy3D(:,:,:)
         real(prec) :: filter0(3,3), filter(3,3) 
 
         real(prec), parameter :: H_ice_thin = 15.0   ! [m] Threshold to define 'thin' ice
@@ -231,10 +232,17 @@ contains
 
         allocate(advecxy(nz_aa))
         allocate(T_ice_old(nx,ny,nz_aa))
-
+        allocate(advecxy3D(nx,ny,nz_aa))
+        
         ! First perform horizontal advection (this doesn't work properly, 
         ! use column-based upwind horizontal advection below)
         !call calc_enth_horizontal_advection_3D(T_ice,ux,uy,H_ice,dx,dt,solver_advec)
+        
+        ! Diagnose horizontal advection 
+        advecxy3D = 0.0 
+!         do k = 2, nz_aa-1
+!             call calc_adv2D_impl_upwind_rate(advecxy3D(:,:,k),T_ice(:,:,k),ux(:,:,k),uy(:,:,k),H_ice*0.0,dx,dx,dt,f_upwind=1.0)
+!         end do 
 
         ! Store original ice temperature field here for input to horizontal advection
         ! calculations 
@@ -308,7 +316,9 @@ contains
 !                 do k = 1, nz_aa
 !                     call calc_adv2D_expl_rate(advecxy(k),T_ice_old(:,:,k),ux(:,:,k),uy(:,:,k),dx,dx,i,j)
 !                 end do 
-!                 !advecxy = 0.0_prec 
+                !advecxy = advecxy3D(i,j,:)
+                !advecxy = 0.0_prec 
+!                 write(*,*) "advecxy: ", i,j, maxval(abs(advecxy3D(i,j,:)-advecxy))
 
                 call calc_enth_column(enth(i,j,:),T_ice(i,j,:),omega(i,j,:),bmb_grnd(i,j),Q_ice_b(i,j),H_cts(i,j), &
                         T_pmp(i,j,:),cp(i,j,:),kt(i,j,:),advecxy,uz(i,j,:),Q_strn(i,j,:),Q_b(i,j),Q_geo(i,j),T_srf(i,j), &
@@ -447,6 +457,231 @@ contains
         return 
 
     end subroutine calc_adv2D_expl_rate
+
+    subroutine  calc_adv2D_impl_upwind_rate(dHdt,H_prev,ux,uy,mdot,dx,dy,dt,f_upwind)
+        ! To solve the 2D adevection equation:
+        ! dH/dt =
+        ! M H = Frelax
+        ! ajr: adapted from GRISLI (Ritz et al., 1997)
+
+        implicit none
+
+        real(prec), intent(OUT)   :: dHdt(:,:)      ! Variable rate of change (aa-node)
+        real(prec), intent(IN)    :: H_prev(:,:)    ! Variable (aa-node)
+        real(prec), intent(IN)    :: ux(:,:)        ! Depth-averaged velocity - x direction (ac-node)
+        real(prec), intent(IN)    :: uy(:,:)        ! Depth-averaged velocity - y direction (ac-node)
+        real(prec), intent(IN)    :: mdot(:,:)      ! Total column mass balance (aa-node)
+        real(prec), intent(IN)    :: dx             ! [m] x-resolution
+        real(prec), intent(IN)    :: dy             ! [m] y-resolution
+        real(prec), intent(IN)    :: dt             ! [a] Timestep (assumes dx=dy)
+        real(prec), intent(IN)    :: f_upwind       ! [-] Fraction of "upwind-ness" to apply (ajr: experimental!) - between 0.5 and 1.0, default f_upwind=1.0
+        ! Local variables
+        integer    :: i, j, nx, ny
+        integer    :: iter, ierr 
+        real(prec) :: dtdx, dtdx2
+        real(prec) :: reste, delh, tmp 
+        real(prec), allocatable :: crelax(:,:)      ! diagnonale de M
+        real(prec), allocatable :: arelax(:,:)      ! sous diagonale selon x
+        real(prec), allocatable :: brelax(:,:)      ! sur  diagonale selon x
+        real(prec), allocatable :: drelax(:,:)      ! sous diagonale selon y
+        real(prec), allocatable :: erelax(:,:)      ! sur  diagonale selon y
+        real(prec), allocatable :: frelax(:,:)      ! vecteur
+        real(prec), allocatable :: c_west(:,:)      ! sur demi mailles Ux
+        real(prec), allocatable :: c_east(:,:)      ! sur demi mailles Ux
+        real(prec), allocatable :: c_north(:,:)     ! sur demi mailles Uy
+        real(prec), allocatable :: c_south(:,:)     ! sur demi mailles Uy
+        real(prec), allocatable :: deltaH(:,:)      ! Change in H
+
+        real(prec), allocatable :: H(:,:)
+        
+        logical,    parameter :: use_upwind = .TRUE.  ! Apply upwind advection scheme or central scheme?   
+                                                      ! (now this is redundant with f_upwind parameter) 
+        
+        ! Note: f_upwind=0.6 gives good agreement with EISMINT1 summit elevation
+        ! for the moving and fixed margin experiments, when using the calc_shear_3D approach.
+        ! (f_upwind=0.5, ie central method, works well when using the velocity_sia approach)
+
+        ! Note: it may be that f_upwind>0.5 is more stable for real dynamic simulations
+
+        ! Determine array size
+        nx = size(H,1)
+        ny = size(H,2)
+
+        ! Allocate local arrays
+        allocate(crelax(nx,ny))
+        allocate(arelax(nx,ny))
+        allocate(brelax(nx,ny))
+        allocate(drelax(nx,ny))
+        allocate(erelax(nx,ny))
+        allocate(frelax(nx,ny))
+        allocate(c_west(nx,ny))
+        allocate(c_east(nx,ny))
+        allocate(c_north(nx,ny))
+        allocate(c_south(nx,ny))
+
+        allocate(deltaH(nx,ny))
+
+        allocate(H(nx,ny))
+        
+        ! Define some helpful values
+        dtdx2 = dt/(dx**2)
+        dtdx  = dt/dx
+
+        ! Initialize relaxation arrays
+        arelax = 0.0
+        brelax = 0.0
+        drelax = 0.0
+        erelax = 0.0
+        crelax = 1.0
+        frelax = 0.0
+        deltaH = 0.0
+
+        H = H_prev  
+
+        ! Modify coefficients depending on method (upwind, central)
+        if (use_upwind) then
+            ! Upwind method
+
+            if (f_upwind .eq. 1.0) then
+                ! Apply normal upwind scheme
+
+                where (ux.ge.0.0)
+                    c_west = 1.0
+                    c_east = 0.0
+                elsewhere
+                    c_west = 0.0
+                    c_east = 1.0
+                end where
+
+                where (uy.ge.0.0)
+                    c_south = 1.0
+                    c_north = 0.0
+                elsewhere
+                    c_south = 0.0
+                    c_north = 1.0
+                end where
+
+            else 
+                ! Apply fractional upwind scheme to reduce numerical diffusion,
+                ! but benefit from upwind stability (ajr: experimental!)
+                ! f_upwind = 0.5 => central difference, f_upwind = 1.0 => full upwind 
+
+                where (ux.ge.0.0)
+                    c_west = f_upwind
+                    c_east = 1.0 - f_upwind
+                elsewhere
+                    c_west = 1.0 - f_upwind
+                    c_east = f_upwind
+                end where
+
+                where (uy.ge.0.0)
+                    c_south = f_upwind
+                    c_north = 1.0 - f_upwind
+                elsewhere
+                    c_south = 1.0 - f_upwind
+                    c_north = f_upwind
+                end where
+
+            end if 
+
+        else
+            ! Central method
+
+            c_west  = 0.5
+            c_east  = 0.5
+            c_south = 0.5
+            c_north = 0.5
+
+        end if
+
+        ! Populate diagonals
+        do j=2,ny-1
+        do i=2,nx-1
+
+            !  sous diagonale en x
+            arelax(i,j) = -dtdx*c_west(i-1,j)*ux(i-1,j)    ! partie advective en x
+
+            !  sur diagonale en x
+            brelax(i,j) = +dtdx*c_east(i,j)*ux(i,j)        ! partie advective
+
+            !  sous diagonale en y
+            drelax(i,j) = -dtdx*c_south(i,j-1)*uy(i,j-1)   ! partie advective en y
+
+            !  sur diagonale en y
+            erelax(i,j) = +dtdx*c_north(i,j)*uy(i,j)       ! partie advective
+
+
+            ! diagonale
+            crelax(i,j) = 1.0 + dtdx* &
+                       ((c_west(i,j)*ux(i,j) - c_east(i-1,j)*ux(i-1,j)) &
+                      +(c_south(i,j)*uy(i,j) - c_north(i,j-1)*uy(i,j-1)))
+
+            ! Combine all terms
+            frelax(i,j) = H(i,j) + dt*mdot(i,j)
+
+        end do
+        end do
+
+        ! Avoid underflows 
+        where (abs(arelax) .lt. tol_underflow) arelax = 0.0_prec 
+        where (abs(brelax) .lt. tol_underflow) brelax = 0.0_prec 
+        where (abs(drelax) .lt. tol_underflow) drelax = 0.0_prec 
+        where (abs(erelax) .lt. tol_underflow) erelax = 0.0_prec 
+        
+        ! Initialize new H solution to zero (to get zeros at boundaries)
+        H  = 0.0
+
+        ! Initially assume convergence criterion is not satisfied 
+        ierr = -1   ! convergence criterion not fulfilled
+        
+        do iter = 1, 1000 
+            ! Relaxation loop 
+
+            ! Calculate change in H
+            do j=2,ny-1
+            do i=2,nx-1
+
+                reste = (((arelax(i,j)*H(i-1,j) + drelax(i,j)*H(i,j-1)) &
+                        + (brelax(i,j)*H(i+1,j) + erelax(i,j)*H(i,j+1))) &
+                        +  crelax(i,j)*H(i,j))  - frelax(i,j)
+
+                deltaH(i,j) = reste/crelax(i,j)
+
+            end do
+            end do
+
+            ! Adjust H to new value
+            H = H - deltaH
+
+            ! Check stopping criterion (something like rmse of remaining change in H)
+            where(abs(deltaH) .lt. tol_underflow) deltaH = 0.0_prec      ! Avoid underflows
+            delh = sqrt(sum(deltaH**2)) / ((nx-2)*(ny-2))
+            
+            ! Use simple stopping criterion: maximum remaining change in H
+            ! Note: this is less likely to converge given the same stopping
+            ! criterion.
+!             delh = maxval(abs(deltaH))
+            
+            if ( delh .lt. 1e-4) then
+                ! Solution has converged, exit  
+                ierr = 0 
+                exit 
+            end if 
+
+        end do ! End of relaxation loop
+
+        if (ierr .eq. -1) then 
+            write(*,*) "calc_adv2D_impl_upwind_rate:: Error: advection did not converge."
+            write(*,"(a,i10,g12.3)") "iter, delh = ", iter, delh 
+            stop 
+        end if 
+
+        ! Calculate rate of change 
+        dHdt = (H - H_prev) / dt 
+
+        return
+
+    end subroutine calc_adv2D_impl_upwind_rate
 
     subroutine ytherm_par_load(par,filename,zeta_aa,zeta_ac,nx,ny,dx,init)
 

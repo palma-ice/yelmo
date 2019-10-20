@@ -3,12 +3,13 @@ module yelmo_thermodynamics
 
     use nml 
     use yelmo_defs 
-    use yelmo_tools, only : smooth_gauss_2D, smooth_gauss_3D, gauss_values, fill_borders_3D
+    use yelmo_tools, only : smooth_gauss_2D, smooth_gauss_3D, gauss_values, fill_borders_3D, &
+            stagger_aa_ab
     
     use thermodynamics 
     use ice_enthalpy
     use solver_advection, only : calc_advec2D  
-    
+
     implicit none
     
     private
@@ -417,19 +418,19 @@ contains
 
     end subroutine calc_enth_horizontal_advection_3D
 
-    subroutine calc_adv2D_expl_rate(dHdt, H_ice, ux, uy, dx, dy, i, j)
+    subroutine calc_adv2D_expl_rate(dvardt,var,ux,uy,dx,dy,i,j)
         ! Solve 2D advection equation for ice sheet thickness via explicit flux divergence:
         ! d[H]/dt = -grad[H*(ux,uy)] 
         !
         ! ajr: adapted from IMAU-ICE code from Heiko Goelzer (h.goelzer@uu.nl) 2016
-        ! Note: original algorithm called for interpolation of H_ice to ab-nodes explicitly. 
+        ! Note: original algorithm called for interpolation of var to ab-nodes explicitly. 
         ! It also works using the ac-nodes directly, but is less stable. This can be chosen via the parameter
         ! use_ab_expl. 
 
         implicit none 
 
-        real(prec), intent(OUT)   :: dHdt                   ! [m/yr] aa-nodes, Ice thickness 
-        real(prec), intent(IN)    :: H_ice(:,:)             ! [m] aa-nodes, Ice thickness 
+        real(prec), intent(OUT)   :: dvardt                 ! [m/yr] aa-nodes, Ice thickness 
+        real(prec), intent(IN)    :: var(:,:)               ! [m] aa-nodes, Ice thickness 
         real(prec), intent(IN)    :: ux(:,:)                ! [m a^-1] ac-nodes, Horizontal velocity, x-direction
         real(prec), intent(IN)    :: uy(:,:)                ! [m a^-1] ac-nodes, Horizontal velocity, y-direction
         real(prec), intent(IN)    :: dx                     ! [m] Horizontal grid spacing, x-direction
@@ -445,13 +446,13 @@ contains
         real(prec) :: flux_yd                  ! [m^2 a^-1] ac-nodes, Flux in the y-direction downwards
 
         ! Calculate the flux across each boundary [m^2 a^-1]
-        flux_xr = ux(i  ,j  ) * 0.5 * (H_ice(i  ,j  ) + H_ice(i+1,j  ))
-        flux_xl = ux(i-1,j  ) * 0.5 * (H_ice(i-1,j  ) + H_ice(i  ,j  ))
-        flux_yu = uy(i  ,j  ) * 0.5 * (H_ice(i  ,j  ) + H_ice(i  ,j+1))
-        flux_yd = uy(i  ,j-1) * 0.5 * (H_ice(i  ,j-1) + H_ice(i  ,j  ))
+        flux_xr = ux(i  ,j  ) * 0.5 * (var(i  ,j  ) + var(i+1,j  ))
+        flux_xl = ux(i-1,j  ) * 0.5 * (var(i-1,j  ) + var(i  ,j  ))
+        flux_yu = uy(i  ,j  ) * 0.5 * (var(i  ,j  ) + var(i  ,j+1))
+        flux_yd = uy(i  ,j-1) * 0.5 * (var(i  ,j-1) + var(i  ,j  ))
 
         ! Calculate flux divergence on aa-node 
-        dHdt = (1.0 / dx) * (flux_xl - flux_xr) + (1.0 / dy) * (flux_yd - flux_yu)
+        dvardt = (1.0 / dx) * (flux_xl - flux_xr) + (1.0 / dy) * (flux_yd - flux_yu)
         
         return 
 

@@ -45,7 +45,8 @@ $(objdir)/ice_enthalpy.o : $(srcdir)/physics/ice_enthalpy.f90 $(objdir)/yelmo_de
 	$(FC) $(DFLAGS) $(FFLAGS) -c -o $@ $<
 
 $(objdir)/mass_conservation.o : $(srcdir)/physics/mass_conservation.f90 $(objdir)/yelmo_defs.o \
-								$(objdir)/solver_advection.o $(objdir)/solver_advection_sico.o
+								$(objdir)/solver_advection.o $(objdir)/solver_advection_sico.o \
+								$(objdir)/solver_advection_new.o
 	$(FC) $(DFLAGS) $(FFLAGS) -c -o $@ $<
 
 $(objdir)/solver_ssa_sico5.o: $(srcdir)/physics/solver_ssa_sico5.F90 $(objdir)/yelmo_defs.o \
@@ -61,6 +62,10 @@ $(objdir)/solver_advection.o: $(srcdir)/physics/solver_advection.f90 $(objdir)/y
 
 $(objdir)/solver_advection_sico.o : $(srcdir)/physics/solver_advection_sico.F90 $(objdir)/yelmo_defs.o
 	$(FC) $(DFLAGS) $(FFLAGS) $(INC_LIS) -c -o $@ $<
+
+$(objdir)/solver_advection_new.o: $(srcdir)/physics/solver_advection_new.f90 $(objdir)/yelmo_defs.o \
+								$(objdir)/yelmo_tools.o
+	$(FC) $(DFLAGS) $(FFLAGS) -c -o $@ $<
 
 $(objdir)/topography.o: $(srcdir)/physics/topography.f90 $(objdir)/yelmo_defs.o
 	$(FC) $(DFLAGS) $(FFLAGS) -c -o $@ $<
@@ -178,6 +183,7 @@ yelmo_physics =  	   $(objdir)/basal_dragging.o \
 					   $(objdir)/solver_tridiagonal.o \
 					   $(objdir)/solver_advection.o \
 					   $(objdir)/solver_advection_sico.o \
+					   $(objdir)/solver_advection_new.o \
 					   $(objdir)/topography.o \
 					   $(objdir)/velocity_hybrid_pd12.o \
 					   $(objdir)/velocity_diva.o \

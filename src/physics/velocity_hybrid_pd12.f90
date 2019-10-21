@@ -611,7 +611,7 @@ contains
         real(prec), allocatable :: visc1D(:) 
         
         real(prec), parameter :: visc_min     = 1e3_prec 
-        real(prec), parameter :: epsilon_sq_0 = 1e-8_prec 
+        real(prec), parameter :: epsilon_sq_0 = 1e-6_prec   ! [a^-1] Bueler and Brown (2009), Eq. 26
         
         nx    = size(ux,1)
         ny    = size(ux,2)
@@ -713,7 +713,7 @@ contains
         real(prec) :: duxdz_aa, duydz_aa
         real(prec) :: eps_sq, mu  
 
-        real(prec), parameter :: epsilon_sq_0 = 1e-8_prec 
+        real(prec), parameter :: epsilon_sq_0 = 1e-6_prec   ! [a^-1] Bueler and Brown (2009), Eq. 26
         
         nx    = size(ux,1)
         ny    = size(ux,2)

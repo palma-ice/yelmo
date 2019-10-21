@@ -117,7 +117,7 @@ contains
         ! Local variables
         integer :: k, nz  
         real(prec) :: exp1, exp2  
-        real(prec), parameter :: de_0 = 1.0e-4    ! [a^-1]
+        real(prec), parameter :: de_0 = 1.0e-6    ! [a^-1] Bueler and Brown (2009), Eq. 26
 
         nz = size(visc,3)
 
@@ -159,7 +159,7 @@ contains
         ! Local variables
         integer :: k, nz_aa  
         real(prec) :: exp1, exp2  
-        real(prec), parameter :: de_0 = 1.0e-4    ! [a^-1]
+        real(prec), parameter :: de_0 = 1.0e-6    ! [a^-1] Bueler and Brown (2009), Eq. 26
         
         nz_aa = size(visc,3)
 

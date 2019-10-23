@@ -477,4 +477,45 @@ contains
 
     end subroutine check_checkerboard
 
+
+
+! ===============================================================
+! New timestep routines following Cheng et al (2017, GMD)
+! ===============================================================
+
+
+    subroutine set_timestep_fe_sbe(dt,eta,dt_n,eta_n,var_corr,var_pred,ebs)
+        ! Calculate the timestep following algorithm for 
+        ! Forward Euler (FE) predictor step and Semi-implicit
+        ! Backward Euler (SBE) corrector step. 
+
+        implicit none 
+
+        real(prec), intent(OUT) :: dt               ! [yr]   Timestep 
+        real(prec), intent(OUT) :: eta              ! [X/yr] Maximum truncation error 
+        real(prec), intent(IN)  :: dt_n             ! [yr]   Previous timestep 
+        real(prec), intent(IN)  :: eta_n            ! [X/yr] Maximum truncation error, previous timestep 
+        real(prec), intent(IN)  :: var_corr(:,:)    ! [X]    Corrected variable at time=n+1 
+        real(prec), intent(IN)  :: var_pred(:,:)    ! [X]    Predicted variable at time=n+1 
+        real(prec), intent(IN)  :: ebs              ! [--]   Tolerance value (eg, ebs=1e-4)
+        
+        ! Local variables 
+        real(prec), parameter :: beta_1 =  3.0_prec / 10.0_prec      ! Cheng et al., 2017, Eq. 32
+        real(prec), parameter :: beta_2 = -1.0_prec / 10.0_prec      ! Cheng et al., 2017, Eq. 32
+        
+        ! Step 1: calculate maximum value of truncation error (eta,n+1)
+        ! Truncation error: tau = 1/2*dt_n * (var - var_pred)
+        ! Maximum value: eta = maxval(tau) 
+
+        eta = maxval( (1.0_prec / (2.0_prec*dt_n)) * (var_corr - var_pred) )
+
+        ! Step 2: calculate the next time timestep (dt,n+1)
+        dt = (ebs/eta)**beta_1 * (ebs/eta_n)**beta_2 
+
+        return 
+
+    end subroutine set_timestep_fe_sbe
+
+
+
 end module yelmo_timesteps 

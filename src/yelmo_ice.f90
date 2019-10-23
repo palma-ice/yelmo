@@ -7,7 +7,7 @@ module yelmo_ice
     
     use yelmo_defs
     use yelmo_grid, only : yelmo_init_grid
-    use yelmo_timesteps, only : set_adaptive_timestep
+    use yelmo_timesteps, only : set_adaptive_timestep, set_adaptive_timestep_fe_sbe
     use yelmo_io 
 
     use yelmo_topography
@@ -36,6 +36,8 @@ contains
 
         type(yelmo_class), intent(INOUT) :: dom
         real(prec), intent(IN) :: time
+
+        type(ytopo_class) :: tpo1 
 
         ! Local variables 
         real(prec) :: dt_now 
@@ -78,6 +80,8 @@ contains
                                     dom%dyn%now%dd_ab_bar,dom%tpo%now%H_ice,dom%tpo%now%dHicedt,dom%par%zeta_ac, &
                                     dom%tpo%par%dx,dom%par%dtmin,dom%par%dtmax,dom%par%cfl_max,dom%par%cfl_diff_max) 
                 
+                call set_adaptive_timestep_fe_sbe(dom%par%pc_dt,dom%par%pc_eta,tpo1%now%H_ice,dom%tpo%now%H_ice, &
+                                                    dom%par%pc_ebs,time_now,time,dom%par%dtmin,dom%par%dtmax)
             end if 
 
             dt_save(n) = dt_now 
@@ -717,6 +721,7 @@ contains
         call nml_read(filename,"yelmo","ntt",           par%ntt)
         call nml_read(filename,"yelmo","cfl_max",       par%cfl_max)
         call nml_read(filename,"yelmo","cfl_diff_max",  par%cfl_diff_max)
+        call nml_read(filename,"yelmo","pc_ebs",        par%pc_ebs)
 
         ! Overwrite parameter values with argument definitions if available
         if (present(domain))     par%domain    = trim(domain)

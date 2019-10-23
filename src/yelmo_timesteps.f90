@@ -484,7 +484,7 @@ contains
 ! ===============================================================
 
 
-    subroutine set_timestep_fe_sbe(dt,eta,dt_n,eta_n,var_corr,var_pred,ebs)
+    subroutine set_timestep_fe_sbe(dt,eta,var_corr,var_pred,ebs)
         ! Calculate the timestep following algorithm for 
         ! Forward Euler (FE) predictor step and Semi-implicit
         ! Backward Euler (SBE) corrector step. 
@@ -493,16 +493,21 @@ contains
 
         real(prec), intent(OUT) :: dt               ! [yr]   Timestep 
         real(prec), intent(OUT) :: eta              ! [X/yr] Maximum truncation error 
-        real(prec), intent(IN)  :: dt_n             ! [yr]   Previous timestep 
-        real(prec), intent(IN)  :: eta_n            ! [X/yr] Maximum truncation error, previous timestep 
         real(prec), intent(IN)  :: var_corr(:,:)    ! [X]    Corrected variable at time=n+1 
         real(prec), intent(IN)  :: var_pred(:,:)    ! [X]    Predicted variable at time=n+1 
         real(prec), intent(IN)  :: ebs              ! [--]   Tolerance value (eg, ebs=1e-4)
         
         ! Local variables 
+        real(prec) :: dt_n                          ! [yr]   Timestep (previous)
+        real(prec) :: eta_n                         ! [X/yr] Maximum truncation error (previous)
+
         real(prec), parameter :: beta_1 =  3.0_prec / 10.0_prec      ! Cheng et al., 2017, Eq. 32
         real(prec), parameter :: beta_2 = -1.0_prec / 10.0_prec      ! Cheng et al., 2017, Eq. 32
         
+        ! Step 0: save dt and eta from previous timestep 
+        dt_n  = dt 
+        eta_n = eta 
+
         ! Step 1: calculate maximum value of truncation error (eta,n+1)
         ! Truncation error: tau = 1/2*dt_n * (var - var_pred)
         ! Maximum value: eta = maxval(tau) 

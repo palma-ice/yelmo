@@ -616,6 +616,10 @@ module yelmo_defs
         real(prec), allocatable :: dt_adv3D(:,:,:)
         logical :: use_restart 
         
+        ! Time step parameters for predictor-corrector (PC) method (Cheng et al, 2017)
+        real(prec) :: pc_dt 
+        real(prec) :: pc_eta 
+        
         ! Timing information 
         real(prec) :: model_speed 
         real(prec) :: model_speeds(10)    ! Use 10 timesteps for running mean  

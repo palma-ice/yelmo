@@ -24,10 +24,139 @@ module yelmo_ice
 
     private
     public :: yelmo_init, yelmo_init_topo, yelmo_init_state
+    public :: yelmo_update_pc 
     public :: yelmo_update, yelmo_update_equil, yelmo_end 
     public :: yelmo_print_bound, yelmo_set_time
 
 contains
+
+    subroutine yelmo_update_pc(dom,time)
+        ! Advance yelmo by calling yelmo_step N times until new time is reached,
+        ! using the predictor-corrector method (Cheng et al., 2017) 
+
+        type(yelmo_class), intent(INOUT) :: dom
+        real(prec), intent(IN) :: time
+
+        ! Local variables 
+        real(prec) :: dt_now 
+        real(prec) :: time_now, time_start 
+        integer    :: n, nstep   
+        integer    :: ntt
+        logical    :: iter_exit 
+        real(4)    :: cpu_start_time 
+        real(prec), parameter :: time_tol = 1e-5
+
+        real(prec) :: H_mean, T_mean 
+        real(prec) :: dt_save(100) 
+
+        ! Load last model time (from dom%tpo, should be equal to dom%thrm)
+        time_now = dom%tpo%par%time
+
+        ! Initialize cpu timing 
+        call cpu_time(cpu_start_time) 
+        time_start = time_now 
+        
+        ! Determine maximum number of time steps to be iterated through   
+        nstep  = (time-time_now) / dom%par%dtmin 
+
+        ! Reset number of thermodynamics timestep skips
+        ntt = 0 
+
+        dt_save = missing_value 
+
+        ! Iterate of topo dynamics updates
+        do n = 1, nstep
+
+            ! Determine current time step 
+            if (dom%tpo%par%topo_fixed) then 
+                ! No topo calcs, so nstep=1
+                dt_now = time-dom%tpo%par%time
+            else
+                ! Use adaptive time step
+                call set_adaptive_timestep(dt_now,dom%par%dt_adv,dom%par%dt_diff,dom%par%dt_adv3D,time,time_now, &
+                                    dom%dyn%now%ux,dom%dyn%now%uy,dom%dyn%now%uz,dom%dyn%now%ux_bar,dom%dyn%now%uy_bar, &
+                                    dom%dyn%now%dd_ab_bar,dom%tpo%now%H_ice,dom%tpo%now%dHicedt,dom%par%zeta_ac, &
+                                    dom%tpo%par%dx,dom%par%dtmin,dom%par%dtmax,dom%par%cfl_max,dom%par%cfl_diff_max) 
+                
+            end if 
+
+            dt_save(n) = dt_now 
+
+            ! Advance the local time variable
+            time_now = time_now + dt_now
+            if (time-time_now .lt. time_tol) time_now = time 
+            
+!             if (yelmo_write_log) then 
+!                 write(*,"(a,1f14.4,3g14.4)") "timestepping: ", time_now, dt_now, minval(dom%par%dt_adv), minval(dom%par%dt_diff)
+!             end if 
+            
+            ! Calculate topography (elevation, ice thickness, calving, etc.)
+            call calc_ytopo(dom%tpo,dom%dyn,dom%thrm,dom%bnd,time_now,topo_fixed=dom%tpo%par%topo_fixed)
+
+            ! Calculate dynamics (velocities and stresses)
+            call calc_ydyn(dom%dyn,dom%tpo,dom%mat,dom%thrm,dom%bnd,time_now)
+            
+            ! Check if it is time to exit adaptive iterations
+            ! (if current outer time step has been reached)
+            iter_exit = .FALSE. 
+            if (abs(time_now - time) .lt. time_tol) iter_exit = .TRUE. 
+
+            ! Advance thermodynamics timestep counter 
+            ntt = ntt + 1
+
+            if (ntt .ge. dom%par%ntt .or. iter_exit) then 
+                ! Call thermodynamics every ntt iteration, and for the last adaptive timestep 
+
+                ! Calculate material (ice properties, viscosity, etc.)
+                call calc_ymat(dom%mat,dom%tpo,dom%dyn,dom%thrm,dom%bnd,time_now)
+
+                ! Calculate thermodynamics (temperatures and enthalpy)
+                call calc_ytherm(dom%thrm,dom%tpo,dom%dyn,dom%mat,dom%bnd,time_now)
+                
+                ! Reset thermodynamics timestep counter back to zero
+                ntt = 0 
+
+            end if 
+
+            ! Make sure model is still running well
+            call yelmo_check_kill(dom,time_now)
+
+            ! If current time step has been reached, exit loop 
+            if (iter_exit) exit
+
+        end do 
+
+        ! Update regional calculations (for now entire domain with ice)
+        call calc_yregions(dom%reg,dom%tpo,dom%dyn,dom%thrm,dom%mat,dom%bnd,mask=dom%bnd%ice_allowed)
+
+        ! Compare with data 
+        call ydata_compare(dom%dta,dom%tpo,dom%dyn,dom%thrm,dom%bnd)
+
+        ! Calculate model speed [model-kyr / hr]
+        call yelmo_calc_speed(dom%par%model_speed,dom%par%model_speeds,time_start,time_now,real(cpu_start_time,prec))
+
+        ! Write some diagnostics to make sure something useful is happening 
+        if (yelmo_write_log) then
+
+            n = count(dom%tpo%now%H_ice.gt.0.0)
+            if (n .gt. 0.0) then 
+                H_mean = sum(dom%tpo%now%H_ice,mask=dom%tpo%now%H_ice.gt.0.0)/real(n)
+                T_mean = sum(dom%thrm%now%T_ice(:,:,dom%thrm%par%nz_aa),mask=dom%tpo%now%H_ice.gt.0.0)/real(n)
+            else 
+                H_mean = 0.0_prec 
+                T_mean = 0.0_prec
+            end if 
+
+            n = count(dt_save .ne. missing_value)
+
+            write(*,"(a,f12.2,f8.1,2f10.1,20f7.2)") "yelmo:: [time,speed,H,T,dt]:", time_now, dom%par%model_speed, &
+                                H_mean, T_mean, dt_save(1:n)
+            
+        end if 
+
+        return
+
+    end subroutine yelmo_update_pc
 
     subroutine yelmo_update(dom,time)
         ! Advance yelmo by calling yelmo_step N times until new time is reached 
@@ -308,6 +437,9 @@ contains
         dom%par%dt_adv   = 0.0 
         dom%par%dt_diff  = 0.0 
         dom%par%dt_adv3D = 0.0 
+
+        dom%par%pc_dt    = 0.0 
+        dom%par%pc_eta   = 1.0 
 
         write(*,*) "yelmo_init:: yelmo initialized."
         

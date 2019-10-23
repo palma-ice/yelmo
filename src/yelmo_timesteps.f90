@@ -6,8 +6,53 @@ module yelmo_timesteps
 
     private
     public :: set_adaptive_timestep 
+    public :: set_adaptive_timestep_fe_sbe 
 
 contains
+
+    subroutine set_adaptive_timestep_fe_sbe(dt,eta,var_corr,var_pred,ebs,time,time_max,dtmin,dtmax)
+        ! Calculate the timestep following algorithm for 
+        ! Forward Euler (FE) predictor step and Semi-implicit
+        ! Backward Euler (SBE) corrector step. 
+        ! Implemented followig Cheng et al (2017, GMD)
+        implicit none 
+
+        real(prec), intent(OUT) :: dt               ! [yr]   Timestep 
+        real(prec), intent(OUT) :: eta              ! [X/yr] Maximum truncation error 
+        real(prec), intent(IN)  :: var_corr(:,:)    ! [X]    Corrected variable at time=n+1 
+        real(prec), intent(IN)  :: var_pred(:,:)    ! [X]    Predicted variable at time=n+1 
+        real(prec), intent(IN)  :: ebs              ! [--]   Tolerance value (eg, ebs=1e-4)
+        real(prec), intent(IN)  :: time             ! [yr]   Current model time  
+        real(prec), intent(IN)  :: time_max         ! [yr]   Time the model can evolve to
+        real(prec), intent(IN)  :: dtmin            ! [yr]   Minimum allowed timestep
+        real(prec), intent(IN)  :: dtmax            ! [yr]   Maximum allowed timestep 
+
+        ! Local variables 
+        real(prec) :: dt_n                          ! [yr]   Timestep (previous)
+        real(prec) :: eta_n                         ! [X/yr] Maximum truncation error (previous)
+
+        real(prec), parameter :: beta_1 =  3.0_prec / 10.0_prec      ! Cheng et al., 2017, Eq. 32
+        real(prec), parameter :: beta_2 = -1.0_prec / 10.0_prec      ! Cheng et al., 2017, Eq. 32
+        
+        ! Step 0: save dt and eta from previous timestep 
+        dt_n  = dt 
+        eta_n = eta 
+
+        ! Step 1: calculate maximum value of truncation error (eta,n+1)
+        ! Truncation error: tau = 1/2*dt_n * (var - var_pred)
+        ! Maximum value: eta = maxval(tau) 
+
+        eta = maxval( (1.0_prec / (2.0_prec*dt_n)) * (var_corr - var_pred) )
+
+        ! Step 2: calculate the next time timestep (dt,n+1)
+        dt = (ebs/eta)**beta_1 * (ebs/eta_n)**beta_2 
+
+        ! Finally, ensure timestep is within prescribed limits
+        call limit_adaptive_timestep(dt,time,time_max,dtmin,dtmax)
+
+        return 
+
+    end subroutine set_adaptive_timestep_fe_sbe
 
     subroutine set_adaptive_timestep(dt,dt_adv,dt_diff,dt_adv3D,time_max,time, &
                         ux,uy,uz,ux_bar,uy_bar,D2D,H_ice,dHicedt,zeta_ac, &
@@ -43,10 +88,8 @@ contains
         logical    :: is_unstable
         real(prec), parameter :: dtmax_cfl   = 20.0_prec 
         real(prec), parameter :: exp_cfl     =  2.0_prec 
-        real(prec), parameter :: n_decimal   = 2          ! Maximum decimals to treat for timestep
         real(prec), parameter :: rate_lim    = 10.0_prec  ! Reduction in timestep for instability 
         real(prec), parameter :: rate_scalar = 0.2_prec   ! Reduction in timestep for instability 
-        real(prec), parameter :: dt_half_lim = 0.5_prec   ! Should be 0.5 or greater to make sense
 
         ! Timestep limits determined from CFL conditions for general advective
         ! velocity, as well as diagnosed diffusive magnitude
@@ -86,6 +129,30 @@ contains
         call check_checkerboard(is_unstable,dHicedt,rate_lim)
         if (is_unstable) dt = rate_scalar*dt
 
+        ! Finally, ensure timestep is within prescribed limits
+        call limit_adaptive_timestep(dt,time,time_max,dtmin,dtmax)
+
+        return 
+
+    end subroutine set_adaptive_timestep
+    
+    subroutine limit_adaptive_timestep(dt,time,time_max,dtmin,dtmax)
+        ! Make sure that adaptive timestep is in range of dtmin < dt < dtmax 
+        ! and time + dt <= time_max 
+
+        implicit none
+
+        real(prec), intent(INOUT) :: dt               ! [a] Current timestep 
+        real(prec), intent(IN)    :: time             ! [a] Current model time  
+        real(prec), intent(IN)    :: time_max         ! [a] Time the model can evolve to
+        real(prec), intent(IN)    :: dtmin            ! [a] Minimum allowed timestep
+        real(prec), intent(IN)    :: dtmax            ! [a] Maximum allowed timestep 
+
+        ! Local variables 
+        real(prec) :: dt_time_max 
+        real(prec), parameter :: n_decimal   = 2          ! Maximum decimals to treat for timestep
+        real(prec), parameter :: dt_half_lim = 0.5_prec   ! Should be 0.5 or greater to make sense
+
         ! Ensure timestep is also within parameter limits 
         dt = max(dtmin,dt)  ! dt >= dtmin
         dt = min(dtmax,dt)  ! dt <= dtmax
@@ -117,11 +184,11 @@ contains
         if (time + dt .gt. time_max) then 
             dt = time_max - time 
         end if 
-        
+
         return 
 
-    end subroutine set_adaptive_timestep
-    
+    end subroutine limit_adaptive_timestep
+
     elemental function calc_diff2D_timestep(D,dx,dy,cfl_diff_max) result(dt)
         ! Calculate maximum diffusion time step based
         ! on Courant–Friedrichs–Lewy condition
@@ -476,51 +543,5 @@ contains
         return 
 
     end subroutine check_checkerboard
-
-
-
-! ===============================================================
-! New timestep routines following Cheng et al (2017, GMD)
-! ===============================================================
-
-
-    subroutine set_timestep_fe_sbe(dt,eta,var_corr,var_pred,ebs)
-        ! Calculate the timestep following algorithm for 
-        ! Forward Euler (FE) predictor step and Semi-implicit
-        ! Backward Euler (SBE) corrector step. 
-
-        implicit none 
-
-        real(prec), intent(OUT) :: dt               ! [yr]   Timestep 
-        real(prec), intent(OUT) :: eta              ! [X/yr] Maximum truncation error 
-        real(prec), intent(IN)  :: var_corr(:,:)    ! [X]    Corrected variable at time=n+1 
-        real(prec), intent(IN)  :: var_pred(:,:)    ! [X]    Predicted variable at time=n+1 
-        real(prec), intent(IN)  :: ebs              ! [--]   Tolerance value (eg, ebs=1e-4)
-        
-        ! Local variables 
-        real(prec) :: dt_n                          ! [yr]   Timestep (previous)
-        real(prec) :: eta_n                         ! [X/yr] Maximum truncation error (previous)
-
-        real(prec), parameter :: beta_1 =  3.0_prec / 10.0_prec      ! Cheng et al., 2017, Eq. 32
-        real(prec), parameter :: beta_2 = -1.0_prec / 10.0_prec      ! Cheng et al., 2017, Eq. 32
-        
-        ! Step 0: save dt and eta from previous timestep 
-        dt_n  = dt 
-        eta_n = eta 
-
-        ! Step 1: calculate maximum value of truncation error (eta,n+1)
-        ! Truncation error: tau = 1/2*dt_n * (var - var_pred)
-        ! Maximum value: eta = maxval(tau) 
-
-        eta = maxval( (1.0_prec / (2.0_prec*dt_n)) * (var_corr - var_pred) )
-
-        ! Step 2: calculate the next time timestep (dt,n+1)
-        dt = (ebs/eta)**beta_1 * (ebs/eta_n)**beta_2 
-
-        return 
-
-    end subroutine set_timestep_fe_sbe
-
-
 
 end module yelmo_timesteps 

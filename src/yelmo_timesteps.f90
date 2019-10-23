@@ -35,14 +35,14 @@ contains
         real(prec), parameter :: beta_2 = -1.0_prec / 10.0_prec      ! Cheng et al., 2017, Eq. 32
         
         ! Step 0: save dt and eta from previous timestep 
-        dt_n  = dt 
+        dt_n  = max(dt,dtmin) 
         eta_n = eta 
 
         ! Step 1: calculate maximum value of truncation error (eta,n+1)
         ! Truncation error: tau = 1/2*dt_n * (var - var_pred)
         ! Maximum value: eta = maxval(tau) 
-
         eta = maxval( (1.0_prec / (2.0_prec*dt_n)) * (var_corr - var_pred) )
+        eta = max(eta,1e-5)
 
         ! Step 2: calculate the next time timestep (dt,n+1)
         dt = (ebs/eta)**beta_1 * (ebs/eta_n)**beta_2 
@@ -54,7 +54,7 @@ contains
 
     end subroutine set_adaptive_timestep_fe_sbe
 
-    subroutine set_adaptive_timestep(dt,dt_adv,dt_diff,dt_adv3D,time_max,time, &
+    subroutine set_adaptive_timestep(dt,dt_adv,dt_diff,dt_adv3D,time,time_max, &
                         ux,uy,uz,ux_bar,uy_bar,D2D,H_ice,dHicedt,zeta_ac, &
                         dx,dtmin,dtmax,cfl_max,cfl_diff_max)
         ! Determine value of adaptive timestep to be consistent with 
@@ -67,8 +67,8 @@ contains
         real(prec), intent(OUT) :: dt_adv(:,:)     ! [a] Diagnosed maximum advective timestep (vertical ave)
         real(prec), intent(OUT) :: dt_diff(:,:)    ! [a] Diagnosed maximum diffusive timestep (vertical ave) 
         real(prec), intent(OUT) :: dt_adv3D(:,:,:) ! [a] Diagnosed maximum advective timestep (3D) 
-        real(prec), intent(IN)  :: time_max        ! [a] Time the model can evolve to
         real(prec), intent(IN)  :: time            ! [a] Current model time  
+        real(prec), intent(IN)  :: time_max        ! [a] Time the model can evolve to
         real(prec), intent(IN)  :: ux(:,:,:)       ! [m a-1]
         real(prec), intent(IN)  :: uy(:,:,:)       ! [m a-1]
         real(prec), intent(IN)  :: uz(:,:,:)       ! [m a-1]

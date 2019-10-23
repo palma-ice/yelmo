@@ -54,7 +54,7 @@ contains
         calv_grnd = 0.0 
 
         ! 1. Apply mass conservation =================
-
+        
         ! First, only resolve the dynamic part (ice advection)
         call calc_advec2D(H_ice,ux,uy,mbal*0.0,dx,dx,dt,solver)
 

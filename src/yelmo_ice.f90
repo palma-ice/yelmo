@@ -24,13 +24,12 @@ module yelmo_ice
 
     private
     public :: yelmo_init, yelmo_init_topo, yelmo_init_state
-    public :: yelmo_update_pc 
     public :: yelmo_update, yelmo_update_equil, yelmo_end 
     public :: yelmo_print_bound, yelmo_set_time
 
 contains
 
-    subroutine yelmo_update_pc(dom,time)
+    subroutine yelmo_update(dom,time)
         ! Advance yelmo by calling yelmo_step N times until new time is reached,
         ! using the predictor-corrector method (Cheng et al., 2017) 
 
@@ -43,7 +42,6 @@ contains
         real(prec) :: dt_now 
         real(prec) :: time_now, time_start 
         integer    :: n, nstep   
-        integer    :: ntt
         logical    :: iter_exit 
         real(4)    :: cpu_start_time 
         real(prec), parameter :: time_tol = 1e-5
@@ -61,10 +59,11 @@ contains
         ! Determine maximum number of time steps to be iterated through   
         nstep  = (time-time_now) / dom%par%dtmin 
 
-        ! Reset number of thermodynamics timestep skips
-        ntt = 0 
-
         dt_save = missing_value 
+
+
+        ! Store local copy of ytopo object to use for predictor step 
+        tpo1 = dom%tpo 
 
         ! Iterate of topo dynamics updates
         do n = 1, nstep
@@ -74,14 +73,8 @@ contains
                 ! No topo calcs, so nstep=1
                 dt_now = time-dom%tpo%par%time
             else
-                ! Use adaptive time step
-                call set_adaptive_timestep(dt_now,dom%par%dt_adv,dom%par%dt_diff,dom%par%dt_adv3D,time,time_now, &
-                                    dom%dyn%now%ux,dom%dyn%now%uy,dom%dyn%now%uz,dom%dyn%now%ux_bar,dom%dyn%now%uy_bar, &
-                                    dom%dyn%now%dd_ab_bar,dom%tpo%now%H_ice,dom%tpo%now%dHicedt,dom%par%zeta_ac, &
-                                    dom%tpo%par%dx,dom%par%dtmin,dom%par%dtmax,dom%par%cfl_max,dom%par%cfl_diff_max) 
-                
-                call set_adaptive_timestep_fe_sbe(dom%par%pc_dt,dom%par%pc_eta,tpo1%now%H_ice,dom%tpo%now%H_ice, &
-                                                    dom%par%pc_ebs,time_now,time,dom%par%dtmin,dom%par%dtmax)
+                ! Use last calculated adaptive timestep 
+                dt_now = dom%par%pc_dt 
             end if 
 
             dt_save(n) = dt_now 
@@ -94,36 +87,38 @@ contains
 !                 write(*,"(a,1f14.4,3g14.4)") "timestepping: ", time_now, dt_now, minval(dom%par%dt_adv), minval(dom%par%dt_diff)
 !             end if 
             
+            ! Step 1: Perform predictor step with temporary topography object 
+            ! Calculate topography (elevation, ice thickness, calving, etc.)
+            call calc_ytopo(tpo1,dom%dyn,dom%thrm,dom%bnd,time_now,topo_fixed=dom%tpo%par%topo_fixed)
+
+
+            ! Step 2: Update other variables using predicted ice thickness 
+            ! Calculate dynamics (velocities and stresses)
+            call calc_ydyn(dom%dyn,tpo1,dom%mat,dom%thrm,dom%bnd,time_now)
+            
+            ! Calculate material (ice properties, viscosity, etc.)
+            call calc_ymat(dom%mat,tpo1,dom%dyn,dom%thrm,dom%bnd,time_now)
+
+            ! Calculate thermodynamics (temperatures and enthalpy)
+            call calc_ytherm(dom%thrm,tpo1,dom%dyn,dom%mat,dom%bnd,time_now)
+            
+
+            ! Step 3: Finally, calculate corrector step with actual topography object 
             ! Calculate topography (elevation, ice thickness, calving, etc.)
             call calc_ytopo(dom%tpo,dom%dyn,dom%thrm,dom%bnd,time_now,topo_fixed=dom%tpo%par%topo_fixed)
 
-            ! Calculate dynamics (velocities and stresses)
-            call calc_ydyn(dom%dyn,dom%tpo,dom%mat,dom%thrm,dom%bnd,time_now)
+
+            ! Calculate new adaptive timestep from predicted and corrected ice thicknesses 
+            call set_adaptive_timestep_fe_sbe(dom%par%pc_dt,dom%par%pc_eta,tpo1%now%H_ice,dom%tpo%now%H_ice, &
+                                                    dom%par%pc_ebs,time_now,time,dom%par%dtmin,dom%par%dtmax)
             
+            ! Make sure model is still running well
+            call yelmo_check_kill(dom,time_now)
+
             ! Check if it is time to exit adaptive iterations
             ! (if current outer time step has been reached)
             iter_exit = .FALSE. 
             if (abs(time_now - time) .lt. time_tol) iter_exit = .TRUE. 
-
-            ! Advance thermodynamics timestep counter 
-            ntt = ntt + 1
-
-            if (ntt .ge. dom%par%ntt .or. iter_exit) then 
-                ! Call thermodynamics every ntt iteration, and for the last adaptive timestep 
-
-                ! Calculate material (ice properties, viscosity, etc.)
-                call calc_ymat(dom%mat,dom%tpo,dom%dyn,dom%thrm,dom%bnd,time_now)
-
-                ! Calculate thermodynamics (temperatures and enthalpy)
-                call calc_ytherm(dom%thrm,dom%tpo,dom%dyn,dom%mat,dom%bnd,time_now)
-                
-                ! Reset thermodynamics timestep counter back to zero
-                ntt = 0 
-
-            end if 
-
-            ! Make sure model is still running well
-            call yelmo_check_kill(dom,time_now)
 
             ! If current time step has been reached, exit loop 
             if (iter_exit) exit
@@ -160,9 +155,9 @@ contains
 
         return
 
-    end subroutine yelmo_update_pc
+    end subroutine yelmo_update
 
-    subroutine yelmo_update(dom,time)
+    subroutine yelmo_update_original(dom,time)
         ! Advance yelmo by calling yelmo_step N times until new time is reached 
 
         type(yelmo_class), intent(INOUT) :: dom
@@ -204,7 +199,7 @@ contains
                 dt_now = time-dom%tpo%par%time
             else
                 ! Use adaptive time step
-                call set_adaptive_timestep(dt_now,dom%par%dt_adv,dom%par%dt_diff,dom%par%dt_adv3D,time,time_now, &
+                call set_adaptive_timestep(dt_now,dom%par%dt_adv,dom%par%dt_diff,dom%par%dt_adv3D,time_now,time, &
                                     dom%dyn%now%ux,dom%dyn%now%uy,dom%dyn%now%uz,dom%dyn%now%ux_bar,dom%dyn%now%uy_bar, &
                                     dom%dyn%now%dd_ab_bar,dom%tpo%now%H_ice,dom%tpo%now%dHicedt,dom%par%zeta_ac, &
                                     dom%tpo%par%dx,dom%par%dtmin,dom%par%dtmax,dom%par%cfl_max,dom%par%cfl_diff_max) 
@@ -287,7 +282,7 @@ contains
 
         return
 
-    end subroutine yelmo_update
+    end subroutine yelmo_update_original
 
     subroutine yelmo_update_equil(dom,time,time_tot,dt,topo_fixed,ssa_vel_max)
         ! Iterate yelmo solutions to equilibrate without updating boundary conditions
@@ -442,7 +437,7 @@ contains
         dom%par%dt_diff  = 0.0 
         dom%par%dt_adv3D = 0.0 
 
-        dom%par%pc_dt    = 0.0 
+        dom%par%pc_dt    = dom%par%dtmin  
         dom%par%pc_eta   = 1.0 
 
         write(*,*) "yelmo_init:: yelmo initialized."

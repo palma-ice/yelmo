@@ -588,7 +588,7 @@ contains
 
             ! Check convergence of ssa solution 
             is_converged = check_vel_convergence(dyn%now%ux_bar,dyn%now%uy_bar,ux_bar_prev,uy_bar_prev, &
-                                        dyn%par%ssa_iter_conv,iter,yelmo_write_log)
+                                        dyn%par%ssa_iter_conv,iter,dyn%par%ssa_iter_max,yelmo_write_log)
 
             if (write_ssa_diagnostics) then  
                 call write_step_2D_ssa(tpo,dyn,"yelmo_ssa.nc",ux_bar_prev,uy_bar_prev,time=real(iter,prec))    
@@ -663,7 +663,7 @@ contains
 
     end subroutine calc_ydyn_pd12
 
-    function check_vel_convergence(ux,uy,ux_prev,uy_prev,ssa_resid_tol,iter,log) result(is_converged)
+    function check_vel_convergence(ux,uy,ux_prev,uy_prev,ssa_resid_tol,iter,iter_max,log) result(is_converged)
 
         implicit none 
 
@@ -673,6 +673,7 @@ contains
         real(prec), intent(IN) :: uy_prev(:,:)  
         real(prec), intent(IN) :: ssa_resid_tol 
         integer,    intent(IN) :: iter 
+        integer,    intent(IN) :: iter_max 
         logical,    intent(IN) :: log 
         logical :: is_converged
 
@@ -711,7 +712,10 @@ contains
         if (resid .le. ssa_resid_tol) then 
             is_converged = .TRUE. 
             converged_txt = "C"
-        else
+        else if (iter .eq. iter_max) then 
+            is_converged = .TRUE. 
+            converged_txt = "X" 
+        else 
             is_converged = .FALSE. 
             converged_txt = ""
         end if 
@@ -898,7 +902,7 @@ end if
 
             ! Check for convergence
             is_converged = check_vel_convergence(dyn%now%ux_b,dyn%now%uy_b,ux_b_prev,uy_b_prev, &
-                                        dyn%par%ssa_iter_conv,iter,yelmo_write_log)
+                                        dyn%par%ssa_iter_conv,iter,dyn%par%ssa_iter_max,yelmo_write_log)
 
             if (write_ssa_diagnostics) then  
                 call write_step_2D_ssa(tpo,dyn,"yelmo_ssa.nc",ux_b_prev,uy_b_prev,time=real(iter,prec))    

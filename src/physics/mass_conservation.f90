@@ -61,7 +61,7 @@ contains
 
         ! Then, add ice in the margin buffer to current ice thickness,
         ! set the buffer to zero  
-        H_ice    = H_ice + H_margin 
+!         H_ice    = H_ice + H_margin 
         H_margin = 0.0 
 
         ! Next, handle mass balance in order to be able to diagnose
@@ -88,7 +88,7 @@ contains
         else 
             ! Transfer ice into the margin buffer, and determine f_ice
 
-            call calc_ice_margin(H_ice,H_margin,f_ice,f_grnd)
+!             call calc_ice_margin(H_ice,H_margin,f_ice,f_grnd)
 
         end if 
 

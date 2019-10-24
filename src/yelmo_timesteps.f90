@@ -7,6 +7,7 @@ module yelmo_timesteps
     private
     public :: set_adaptive_timestep 
     public :: set_adaptive_timestep_fe_sbe 
+    public :: limit_adaptive_timestep
 
 contains
 
@@ -47,8 +48,10 @@ contains
         ! Step 2: calculate the next time timestep (dt,n+1)
         dt = (ebs/eta)**beta_1 * (ebs/eta_n)**beta_2 
 
+        !write(*,*) time, dt, eta, dt_n, eta_n 
+
         ! Finally, ensure timestep is within prescribed limits
-        call limit_adaptive_timestep(dt,time,time_max,dtmin,dtmax)
+        !call limit_adaptive_timestep(dt,time,time_max,dtmin,dtmax)
 
         return 
 
@@ -150,13 +153,14 @@ contains
 
         ! Local variables 
         real(prec) :: dt_time_max 
-        real(prec), parameter :: n_decimal   = 2          ! Maximum decimals to treat for timestep
+        real(prec), parameter :: n_decimal   = 4          ! Maximum decimals to treat for timestep
         real(prec), parameter :: dt_half_lim = 0.5_prec   ! Should be 0.5 or greater to make sense
 
         ! Ensure timestep is also within parameter limits 
         dt = max(dtmin,dt)  ! dt >= dtmin
         dt = min(dtmax,dt)  ! dt <= dtmax
 
+if (.FALSE.) then 
         ! Check to avoid lopsided timesteps (1 big, 1 tiny) to arrive at time_max 
         dt_time_max = time_max - time 
         if (dt_time_max .gt. 0.0) then 
@@ -175,6 +179,7 @@ contains
             end if 
 
         end if 
+end if 
 
         ! Round-off extra digits for neatness
         !dt = real( nint(dt*10.0_prec**n_decimal)*10.0_prec**(-n_decimal), prec)

@@ -7,7 +7,7 @@ module yelmo_ice
     
     use yelmo_defs
     use yelmo_grid, only : yelmo_init_grid
-    use yelmo_timesteps, only : set_adaptive_timestep, set_adaptive_timestep_fe_sbe
+    use yelmo_timesteps, only : set_adaptive_timestep, set_adaptive_timestep_fe_sbe, limit_adaptive_timestep
     use yelmo_io 
 
     use yelmo_topography
@@ -68,6 +68,8 @@ contains
         ! Iterate of topo dynamics updates
         do n = 1, nstep
 
+            !write(*,*) "xx1", time, time_now, dom%par%pc_dt, dom%par%pc_eta 
+
             ! Determine current time step 
             if (dom%tpo%par%topo_fixed) then 
                 ! No topo calcs, so nstep=1
@@ -75,6 +77,10 @@ contains
             else
                 ! Use last calculated adaptive timestep 
                 dt_now = dom%par%pc_dt 
+
+                ! Finally, ensure timestep is within prescribed limits
+                call limit_adaptive_timestep(dt_now,time_now,time,dom%par%dtmin,dom%par%dtmax)
+
             end if 
 
             dt_save(n) = dt_now 
@@ -93,8 +99,6 @@ contains
 
 
             ! Step 2: Update other variables using predicted ice thickness 
-            ! Calculate dynamics (velocities and stresses)
-            call calc_ydyn(dom%dyn,tpo1,dom%mat,dom%thrm,dom%bnd,time_now)
             
             ! Calculate material (ice properties, viscosity, etc.)
             call calc_ymat(dom%mat,tpo1,dom%dyn,dom%thrm,dom%bnd,time_now)
@@ -102,11 +106,12 @@ contains
             ! Calculate thermodynamics (temperatures and enthalpy)
             call calc_ytherm(dom%thrm,tpo1,dom%dyn,dom%mat,dom%bnd,time_now)
             
-
+            ! Calculate dynamics (velocities and stresses)
+            call calc_ydyn(dom%dyn,tpo1,dom%mat,dom%thrm,dom%bnd,time_now)
+            
             ! Step 3: Finally, calculate corrector step with actual topography object 
             ! Calculate topography (elevation, ice thickness, calving, etc.)
             call calc_ytopo(dom%tpo,dom%dyn,dom%thrm,dom%bnd,time_now,topo_fixed=dom%tpo%par%topo_fixed)
-
 
             ! Calculate new adaptive timestep from predicted and corrected ice thicknesses 
             call set_adaptive_timestep_fe_sbe(dom%par%pc_dt,dom%par%pc_eta,tpo1%now%H_ice,dom%tpo%now%H_ice, &
@@ -147,6 +152,8 @@ contains
             end if 
 
             n = count(dt_save .ne. missing_value)
+
+            !write(*,*) "xx2", time, time_now, dom%par%pc_dt, dom%par%pc_eta 
 
             write(*,"(a,f12.2,f8.1,2f10.1,20f7.2)") "yelmo:: [time,speed,H,T,dt]:", time_now, dom%par%model_speed, &
                                 H_mean, T_mean, dt_save(1:n)

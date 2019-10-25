@@ -29,7 +29,7 @@ module yelmo_ice
 
 contains
 
-    subroutine yelmo_update(dom,time)
+    subroutine yelmo_update_new(dom,time)
         ! Advance yelmo by calling yelmo_step N times until new time is reached,
         ! using the predictor-corrector method (Cheng et al., 2017) 
 
@@ -162,9 +162,9 @@ contains
 
         return
 
-    end subroutine yelmo_update
+    end subroutine yelmo_update_new
 
-    subroutine yelmo_update_original(dom,time)
+    subroutine yelmo_update(dom,time)
         ! Advance yelmo by calling yelmo_step N times until new time is reached 
 
         type(yelmo_class), intent(INOUT) :: dom
@@ -289,7 +289,7 @@ contains
 
         return
 
-    end subroutine yelmo_update_original
+    end subroutine yelmo_update
 
     subroutine yelmo_update_equil(dom,time,time_tot,dt,topo_fixed,ssa_vel_max)
         ! Iterate yelmo solutions to equilibrate without updating boundary conditions

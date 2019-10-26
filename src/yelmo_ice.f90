@@ -7,7 +7,8 @@ module yelmo_ice
     
     use yelmo_defs
     use yelmo_grid, only : yelmo_init_grid
-    use yelmo_timesteps, only : set_adaptive_timestep, set_adaptive_timestep_fe_sbe, limit_adaptive_timestep
+    use yelmo_timesteps, only : set_adaptive_timestep, set_adaptive_timestep_fe_sbe, limit_adaptive_timestep, &
+            yelmo_timestep_write_init, yelmo_timestep_write
     use yelmo_io 
 
     use yelmo_topography
@@ -69,6 +70,11 @@ contains
         do n = 1, nstep
 
             !write(*,*) "xx1", time, time_now, dom%par%pc_dt, dom%par%pc_eta 
+
+            if (write_timestep_log) then 
+                ! Timestep file 
+                call yelmo_timestep_write(write_timestep_log_file,time_now,dom%par%pc_dt,dom%par%pc_eta)
+            end if 
 
             ! Determine current time step 
             if (dom%tpo%par%topo_fixed) then 
@@ -553,6 +559,12 @@ contains
         write(*,*) 
         write(*,*) "yelmo_init:: Initialization complete for domain: "// &
                    trim(dom%par%domain) 
+
+        if (write_timestep_log) then 
+            ! Timestep file 
+            call yelmo_timestep_write_init(write_timestep_log_file,time,dom%par%pc_ebs)
+            call yelmo_timestep_write(write_timestep_log_file,time,dom%par%pc_dt,dom%par%pc_eta)
+        end if 
 
         return
 

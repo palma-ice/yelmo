@@ -377,7 +377,7 @@ program yelmo_benchmarks
         if (mod(time,10.0)==0 .and. (.not. yelmo_write_log)) then
             write(*,"(a,f14.4)") "yelmo:: time = ", time
         end if 
-        
+
     end do 
 
 

@@ -1,6 +1,7 @@
 module yelmo_timesteps
 
     use yelmo_defs, only : sp, dp, prec  
+    use ncio 
 
     implicit none 
 
@@ -8,6 +9,9 @@ module yelmo_timesteps
     public :: set_adaptive_timestep 
     public :: set_adaptive_timestep_fe_sbe 
     public :: limit_adaptive_timestep
+
+    public :: yelmo_timestep_write_init
+    public :: yelmo_timestep_write
 
 contains
 
@@ -548,5 +552,58 @@ end if
         return 
 
     end subroutine check_checkerboard
+
+    subroutine yelmo_timestep_write_init(filename,time,pc_ebs)
+
+        implicit none 
+
+        character(len=*),  intent(IN) :: filename
+        real(prec), intent(IN) :: time 
+        real(prec), intent(IN) :: pc_ebs
+
+        call nc_create(filename)
+        
+        call nc_write_dim(filename,"pt",x=1,dx=1,nx=1,units="point")
+        call nc_write_dim(filename,"time",x=time,dx=1.0_prec,nx=1,units="years",unlimited=.TRUE.)
+
+        call nc_write(filename,"pc_ebs",pc_ebs,dim1="pt")
+
+        return 
+
+    end subroutine yelmo_timestep_write_init 
+
+    subroutine yelmo_timestep_write(filename,time,dt,eta)
+
+        implicit none 
+
+        character(len=*),  intent(IN) :: filename
+        real(prec), intent(IN) :: time 
+        real(prec), intent(IN) :: dt 
+        real(prec), intent(IN) :: eta 
+        
+        ! Local variables
+        integer    :: ncid, n
+        real(prec) :: time_prev 
+
+        ! Open the file for writing
+        call nc_open(filename,ncid,writable=.TRUE.)
+
+        ! Determine current writing time step 
+        n = nc_size(filename,"time",ncid)
+        call nc_read(filename,"time",time_prev,start=[n],count=[1],ncid=ncid) 
+        if (abs(time-time_prev).gt.1e-5) n = n+1 
+
+        ! Update the time step
+        call nc_write(filename,"time",time,dim1="time",start=[n],count=[1],ncid=ncid)
+
+        call nc_write(filename, "dt", dt,dim1="time",start=[n],count=[1],ncid=ncid)
+        call nc_write(filename,"eta",eta,dim1="time",start=[n],count=[1],ncid=ncid)
+
+        ! Close the netcdf file
+        call nc_close(ncid)
+
+        return 
+
+    end subroutine yelmo_timestep_write 
 
 end module yelmo_timesteps 

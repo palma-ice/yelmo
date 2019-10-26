@@ -42,6 +42,9 @@ module yelmo_defs
     ! Yelmo configuration options 
     logical :: yelmo_write_log
 
+    logical, parameter :: write_timestep_log = .TRUE. 
+    character(len=256), parameter :: write_timestep_log_file = "timesteps.nc" 
+
     ! Physical constants 
     real(prec) :: sec_year       ! [s] seconds per year 
     real(prec) :: g              ! [m s-2] Gravitational accel.  
@@ -606,7 +609,7 @@ module yelmo_defs
         real(prec)          :: cfl_max 
         real(prec)          :: cfl_diff_max 
         real(prec)          :: pc_ebs 
-        
+
         ! Sigma coordinates (internal parameter)
         real(prec), allocatable :: zeta_aa(:)   ! Layer centers (aa-nodes), plus base and surface: nz_aa points 
         real(prec), allocatable :: zeta_ac(:)   ! Layer borders (ac-nodes), plus base and surface: nz_ac == nz_aa-1 points

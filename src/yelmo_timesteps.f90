@@ -47,7 +47,7 @@ contains
         ! Truncation error: tau = 1/2*dt_n * (var - var_pred)
         ! Maximum value: eta = maxval(tau) 
         eta = maxval( (1.0_prec / (2.0_prec*dt_n)) * (var_corr - var_pred) )
-        eta = max(eta,1e-5)
+        eta = max(eta,1e-10)
 
         ! Step 2: calculate the next time timestep (dt,n+1)
         dt = (ebs/eta)**beta_1 * (ebs/eta_n)**beta_2 
@@ -580,7 +580,7 @@ end if
         real(prec), intent(IN) :: time 
         real(prec), intent(IN) :: dt 
         real(prec), intent(IN) :: eta 
-        
+
         ! Local variables
         integer    :: ncid, n
         real(prec) :: time_prev 

@@ -38,6 +38,8 @@ contains
         real(prec), intent(IN) :: time
 
         type(ytopo_class) :: tpo1 
+        real(prec), allocatable :: H_ice_prev(:,:) 
+        real(prec), allocatable :: dHdt_prev(:,:) 
 
         ! Local variables 
         real(prec) :: dt_now 

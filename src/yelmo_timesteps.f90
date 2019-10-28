@@ -39,6 +39,10 @@ contains
         real(prec), parameter :: beta_1 =  3.0_prec / 10.0_prec      ! Cheng et al., 2017, Eq. 32
         real(prec), parameter :: beta_2 = -1.0_prec / 10.0_prec      ! Cheng et al., 2017, Eq. 32
         
+        ! Also, advective timestep limitations 
+        real(prec), allocatable :: dt_adv(:,:)      ! [yr] Diagnosed maximum advective timestep (vertical ave)
+        real(prec) :: dt_adv_min 
+
         ! Step 0: save dt and eta from previous timestep 
         dt_n  = max(dt,dtmin) 
         eta_n = eta 
@@ -50,7 +54,13 @@ contains
         eta = max(eta,1e-10)
 
         ! Step 2: calculate the next time timestep (dt,n+1)
-        dt = (ebs/eta)**beta_1 * (ebs/eta_n)**beta_2 
+        dt = (ebs/eta)**beta_1 * (ebs/eta_n)**beta_2 * dt_n 
+
+        ! Step 3: calculate advective timestep limit 
+        !dt_adv   = calc_adv2D_timestep1(ux_bar,uy_bar,dx,dx,cfl_max)
+        
+        ! Step 3: limit to dtmax 
+        dt = min(dt,dtmax) 
 
         !write(*,*) time, dt, eta, dt_n, eta_n 
 

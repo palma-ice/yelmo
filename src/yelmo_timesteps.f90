@@ -15,7 +15,8 @@ module yelmo_timesteps
 
 contains
 
-    subroutine set_adaptive_timestep_fe_sbe(dt,eta,var_corr,var_pred,ebs,time,time_max,dtmin,dtmax)
+    subroutine set_adaptive_timestep_fe_sbe(dt,eta,var_corr,var_pred,ebs,time,time_max,dtmin,dtmax, &
+                                        ux_bar,uy_bar,dx,cfl_max)
         ! Calculate the timestep following algorithm for 
         ! Forward Euler (FE) predictor step and Semi-implicit
         ! Backward Euler (SBE) corrector step. 
@@ -32,6 +33,11 @@ contains
         real(prec), intent(IN)  :: dtmin            ! [yr]   Minimum allowed timestep
         real(prec), intent(IN)  :: dtmax            ! [yr]   Maximum allowed timestep 
 
+        real(prec), intent(IN)  :: ux_bar(:,:)     ! [m a-1]
+        real(prec), intent(IN)  :: uy_bar(:,:)     ! [m a-1]
+        real(prec), intent(IN)  :: dx
+        real(prec), intent(IN)  :: cfl_max
+        
         ! Local variables 
         real(prec) :: dt_n                          ! [yr]   Timestep (previous)
         real(prec) :: eta_n                         ! [X/yr] Maximum truncation error (previous)
@@ -57,8 +63,10 @@ contains
         dt = (ebs/eta)**beta_1 * (ebs/eta_n)**beta_2 * dt_n 
 
         ! Step 3: calculate advective timestep limit 
-        !dt_adv   = calc_adv2D_timestep1(ux_bar,uy_bar,dx,dx,cfl_max)
-        
+!         dt_adv   = calc_adv2D_timestep1(ux_bar,uy_bar,dx,dx,cfl_max)
+!         dt_adv_min = minval(dt_adv)
+!         dt = min(dt,dt_adv_min) 
+
         ! Step 3: limit to dtmax 
         dt = min(dt,dtmax) 
 
@@ -258,16 +266,16 @@ end if
         do j = 2, ny-1 
         do i = 2, nx-1 
 
-!             ux_now = abs( 0.5*(ux(i-1,j)+ux(i,j)) )
-!             uy_now = abs( 0.5*(uy(i,j-1)+uy(i,j)) )
+            ux_now = abs( 0.5*(ux(i-1,j)+ux(i,j)) )
+            uy_now = abs( 0.5*(uy(i,j-1)+uy(i,j)) )
 
             !ux_now = max(abs(ux(i-1,j)),abs(ux(i,j)))
             !uy_now = max(abs(uy(i,j-1)),abs(uy(i,j)))
             
-            !dt(i,j) = cfl_max * 1.0 / max(ux_now/dx + uy_now/dy,1e-3)
+            dt(i,j) = cfl_max * 1.0 / max(ux_now/dx + uy_now/dy,1e-3)
 
-            dt(i,j) = cfl_max * 1.0 / (abs(ux(i-1,j))/dx + abs(ux(i,j))/dx &
-                                       + abs(uy(i,j-1))/dy + abs(uy(i,j))/dy + eps/(dx+dy))
+!             dt(i,j) = cfl_max * 1.0 / (abs(ux(i-1,j))/dx + abs(ux(i,j))/dx &
+!                                        + abs(uy(i,j-1))/dy + abs(uy(i,j))/dy + eps/(dx+dy))
             
         end do 
         end do 

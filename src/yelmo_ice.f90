@@ -51,6 +51,7 @@ contains
 
         real(prec) :: H_mean, T_mean 
         real(prec) :: dt_save(100) 
+        real(prec) :: dt_adv 
 
         ! Load last model time (from dom%tpo, should be equal to dom%thrm)
         time_now = dom%tpo%par%time
@@ -122,9 +123,13 @@ contains
             call calc_ytopo(dom%tpo,dom%dyn,dom%thrm,dom%bnd,time_now,topo_fixed=dom%tpo%par%topo_fixed)
 
             ! Calculate new adaptive timestep from predicted and corrected ice thicknesses 
+!             call set_adaptive_timestep_fe_sbe(dom%par%pc_dt,dom%par%pc_eta,tpo1%now%H_ice,dom%tpo%now%H_ice, &
+!                                                     dom%par%pc_ebs,time_now,time,dom%par%dtmin,dom%par%dtmax)
+
             call set_adaptive_timestep_fe_sbe(dom%par%pc_dt,dom%par%pc_eta,tpo1%now%H_ice,dom%tpo%now%H_ice, &
-                                                    dom%par%pc_ebs,time_now,time,dom%par%dtmin,dom%par%dtmax)
-            
+                                                    dom%par%pc_ebs,time_now,time,dom%par%dtmin,dom%par%dtmax, &
+                                                    dom%dyn%now%ux_bar,dom%dyn%now%uy_bar,dom%tpo%par%dx,dom%par%cfl_max)
+
             ! Make sure model is still running well
             call yelmo_check_kill(dom,time_now)
 

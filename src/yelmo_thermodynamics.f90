@@ -314,6 +314,7 @@ contains
                 ! Pre-calculate the contribution of horizontal advection to column solution
                 ! (use unmodified T_ice_old field as input, to avoid mixing with new solution)
                 call calc_advec_horizontal_column(advecxy,T_ice_old,H_ice,ux,uy,dx,i,j)
+!                 call calc_advec_horizontal_column_quick(advecxy,T_ice_old,H_ice,ux,uy,dx,i,j)
 !                 do k = 1, nz_aa
 !                     call calc_adv2D_expl_rate(advecxy(k),T_ice_old(:,:,k),ux(:,:,k),uy(:,:,k),dx,dx,i,j)
 !                 end do 
@@ -452,8 +453,8 @@ contains
         flux_yd = uy(i  ,j-1) * 0.5 * (var(i  ,j-1) + var(i  ,j  ))
 
         ! Calculate flux divergence on aa-node 
-        dvardt = (1.0 / dx) * (flux_xl - flux_xr) + (1.0 / dy) * (flux_yd - flux_yu)
-        
+        dvardt = (1.0 / dx) * (flux_xl - flux_xr) + (1.0 / dy) * (flux_yd - flux_yu) 
+
         return 
 
     end subroutine calc_adv2D_expl_rate

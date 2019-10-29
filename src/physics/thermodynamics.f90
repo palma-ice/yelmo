@@ -14,6 +14,7 @@ module thermodynamics
     public :: calc_bmb_grounded_enth
     public :: calc_advec_vertical_column
     public :: calc_advec_horizontal_column
+    public :: calc_advec_horizontal_column_quick
     public :: calc_strain_heating
     public :: calc_strain_heating_sia
     public :: calc_basal_heating
@@ -167,6 +168,127 @@ contains
 
     end subroutine calc_advec_vertical_column
 
+    subroutine calc_advec_horizontal_column_quick(advecxy,var_ice,H_ice,ux,uy,dx,i,j)
+        ! Newly implemented advection algorithms (ajr)
+        ! Output: [K a-1]
+
+        ! [m-1] * [m a-1] * [K] = [K a-1]
+
+        implicit none
+
+        real(prec), intent(OUT) :: advecxy(:)       ! nz_aa 
+        real(prec), intent(IN)  :: var_ice(:,:,:)   ! nx,ny,nz_aa  Enth, T, age, etc...
+        real(prec), intent(IN)  :: H_ice(:,:)       ! nx,ny 
+        real(prec), intent(IN)  :: ux(:,:,:)        ! nx,ny,nz
+        real(prec), intent(IN)  :: uy(:,:,:)        ! nx,ny,nz
+        real(prec), intent(IN)  :: dx  
+        integer,    intent(IN)  :: i, j 
+
+        ! Local variables 
+        integer :: k, nx, ny, nz_aa 
+        real(prec) :: ux_aa, uy_aa 
+        real(prec) :: dx_inv, dx_inv2
+        real(prec) :: advecx, advecy 
+
+        real(prec) :: var_w, var_e, var_s, var_n 
+
+        ! Define some constants 
+        dx_inv  = 1.0_prec / dx 
+        dx_inv2 = 1.0_prec / (2.0_prec*dx)
+
+        nx  = size(var_ice,1)
+        ny  = size(var_ice,2)
+        nz_aa = size(var_ice,3) 
+
+        advecx  = 0.0 
+        advecy  = 0.0 
+        advecxy = 0.0 
+
+        ! Loop over each point in the column
+        do k = 1, nz_aa 
+
+            ! Estimate direction of current flow into cell (x and y), centered in vertical layer and grid point
+            ux_aa = 0.5_prec*(ux(i,j,k)+ux(i-1,j,k))
+            uy_aa = 0.5_prec*(uy(i,j,k)+uy(i,j-1,k))
+            
+            ! Explicit form (to test different order approximations)
+            if (ux(i,j,k) .gt. 0.0 .and. ux(i-1,j,k) .gt. 0.0 .and. i .ge. 3 .and. i .le. nx-1) then  
+                ! Flow to the right 
+
+                ! QUICK scheme 
+                var_w =       (6.0/8.0)*var_ice(i-1,j,k)  &
+                            + (3.0/8.0)*var_ice(i,j,k)    &
+                            - (1.0/8.0)*var_ice(i-2,j,k)
+
+                var_e =       (6.0/8.0)*var_ice(i,j,k)  &
+                            + (3.0/8.0)*var_ice(i+1,j,k)    &
+                            - (1.0/8.0)*var_ice(i-1,j,k)
+
+                advecx = dx_inv * (var_e*ux(i,j,k) - var_w*ux(i-1,j,k)) 
+
+            else if (ux(i,j,k) .lt. 0.0 .and. ux(i-1,j,k) .lt. 0.0 .and. i .le. nx-2 .and. i .ge. 2) then 
+                ! Flow to the left
+
+                ! QUICK scheme 
+                var_w =       (6.0/8.0)*var_ice(i,j,k)  &
+                            + (3.0/8.0)*var_ice(i-1,j,k)    &
+                            - (1.0/8.0)*var_ice(i+1,j,k)
+
+                var_e =       (6.0/8.0)*var_ice(i+1,j,k)  &
+                            + (3.0/8.0)*var_ice(i,j,k)    &
+                            - (1.0/8.0)*var_ice(i+2,j,k)
+
+                advecx = dx_inv * (var_e*ux(i,j,k) - var_w*ux(i-1,j,k)) 
+
+            else 
+                ! No flow 
+                advecx = 0.0
+
+            end if 
+
+            if (uy(i,j,k) .gt. 0.0 .and. uy(i,j-1,k) .gt. 0.0 .and. j .ge. 3 .and. j .le. ny-1) then   
+                ! Flow to the right 
+
+                ! QUICK scheme 
+                var_s =       (6.0/8.0)*var_ice(i,j-1,k)  &
+                            + (3.0/8.0)*var_ice(i,j,k)    &
+                            - (1.0/8.0)*var_ice(i,j-2,k)
+
+                var_n =       (6.0/8.0)*var_ice(i,j,k)  &
+                            + (3.0/8.0)*var_ice(i,j+1,k)    &
+                            - (1.0/8.0)*var_ice(i,j-1,k)
+
+                advecy = dx_inv * (var_n*uy(i,j,k) - var_s*uy(i,j-1,k)) 
+
+            else if (uy(i,j,k) .lt. 0.0 .and. uy(i,j-1,k) .lt. 0.0 .and. j .le. ny-2 .and. j .ge. 2) then 
+                ! Flow to the left
+
+                ! QUICK scheme 
+                var_s =       (6.0/8.0)*var_ice(i,j,k)  &
+                            + (3.0/8.0)*var_ice(i,j-1,k)    &
+                            - (1.0/8.0)*var_ice(i,j+1,k)
+
+                var_n =       (6.0/8.0)*var_ice(i,j+1,k)  &
+                            + (3.0/8.0)*var_ice(i,j,k)    &
+                            - (1.0/8.0)*var_ice(i,j+2,k)
+
+                advecy = dx_inv * (var_n*uy(i,j,k) - var_s*uy(i,j-1,k)) 
+
+            else
+                ! No flow 
+                advecy = 0.0 
+
+            end if 
+                    
+            ! Combine advection terms for total contribution 
+            advecxy(k) = (advecx+advecy)
+
+        end do 
+
+        return 
+
+    end subroutine calc_advec_horizontal_column_quick
+    
     subroutine calc_advec_horizontal_column(advecxy,var_ice,H_ice,ux,uy,dx,i,j)
         ! Newly implemented advection algorithms (ajr)
         ! Output: [K a-1]

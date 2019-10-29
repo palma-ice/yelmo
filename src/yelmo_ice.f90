@@ -108,9 +108,9 @@ contains
 !                 write(*,"(a,1f14.4,3g14.4)") "timestepping: ", time_now, dt_now, minval(dom%par%dt_adv), minval(dom%par%dt_diff)
 !             end if 
             
-            ! Step 0: Advance thermodynamics half timestep
-            ! Calculate thermodynamics (temperatures and enthalpy)
-            call calc_ytherm(dom%thrm,tpo1,dom%dyn,dom%mat,dom%bnd,time_now_half)
+!             ! Step 0: Advance thermodynamics half timestep
+!             ! Calculate thermodynamics (temperatures and enthalpy)
+!             call calc_ytherm(dom%thrm,tpo1,dom%dyn,dom%mat,dom%bnd,time_now_half)
             
             ! Step 1: Perform predictor step with temporary topography object 
             ! Calculate topography (elevation, ice thickness, calving, etc.)

@@ -8,7 +8,7 @@ module yelmo_ice
     use yelmo_defs
     use yelmo_grid, only : yelmo_init_grid
     use yelmo_timesteps, only : set_adaptive_timestep, set_adaptive_timestep_fe_sbe, limit_adaptive_timestep, &
-            yelmo_timestep_write_init, yelmo_timestep_write
+            yelmo_timestep_write_init, yelmo_timestep_write, calc_adv3D_timestep1
     use yelmo_io 
 
     use yelmo_topography
@@ -51,7 +51,7 @@ contains
 
         real(prec) :: H_mean, T_mean 
         real(prec) :: dt_save(100) 
-        real(prec) :: dt_adv 
+        real(prec) :: dt_adv_min
 
         ! Load last model time (from dom%tpo, should be equal to dom%thrm)
         time_now = dom%tpo%par%time
@@ -72,13 +72,11 @@ contains
         ! Iterate of topo dynamics updates
         do n = 1, nstep
 
-            !write(*,*) "xx1", time, time_now, dom%par%pc_dt, dom%par%pc_eta 
-
-            if (write_timestep_log) then 
-                ! Timestep file 
-                call yelmo_timestep_write(write_timestep_log_file,time_now,dom%par%pc_dt,dom%par%pc_eta)
-            end if 
-
+            ! Diagnose advective timestep limit 
+            dom%par%dt_adv3D = calc_adv3D_timestep1(dom%dyn%now%ux,dom%dyn%now%uy,dom%dyn%now%uz,dom%dyn%par%dx,dom%dyn%par%dx, &
+                                            dom%tpo%now%H_ice,dom%par%zeta_ac,dom%par%cfl_max)
+            dt_adv_min = minval(dom%par%dt_adv3D) 
+            
             ! Determine current time step 
             if (dom%tpo%par%topo_fixed) then 
                 ! No topo calcs, so nstep=1
@@ -86,6 +84,7 @@ contains
             else
                 ! Use last calculated adaptive timestep 
                 dt_now = dom%par%pc_dt 
+!                 dt_now = min(dt_adv_min,dom%par%pc_dt)
 
                 ! Finally, ensure timestep is within prescribed limits
                 call limit_adaptive_timestep(dt_now,time_now,time,dom%par%dtmin,dom%par%dtmax)
@@ -93,6 +92,11 @@ contains
             end if 
 
             dt_save(n) = dt_now 
+
+            if (write_timestep_log) then 
+                ! Timestep file 
+                call yelmo_timestep_write(write_timestep_log_file,time_now,dt_now,dt_adv_min,dom%par%pc_dt,dom%par%pc_eta)
+            end if 
 
             ! Advance the local time variable
             time_now = time_now + dt_now
@@ -123,12 +127,8 @@ contains
             call calc_ytopo(dom%tpo,dom%dyn,dom%thrm,dom%bnd,time_now,topo_fixed=dom%tpo%par%topo_fixed)
 
             ! Calculate new adaptive timestep from predicted and corrected ice thicknesses 
-!             call set_adaptive_timestep_fe_sbe(dom%par%pc_dt,dom%par%pc_eta,tpo1%now%H_ice,dom%tpo%now%H_ice, &
-!                                                     dom%par%pc_ebs,time_now,time,dom%par%dtmin,dom%par%dtmax)
-
             call set_adaptive_timestep_fe_sbe(dom%par%pc_dt,dom%par%pc_eta,tpo1%now%H_ice,dom%tpo%now%H_ice, &
-                                                    dom%par%pc_ebs,time_now,time,dom%par%dtmin,dom%par%dtmax, &
-                                                    dom%dyn%now%ux_bar,dom%dyn%now%uy_bar,dom%tpo%par%dx,dom%par%cfl_max)
+                                                    dom%par%pc_ebs,dom%par%dt_ref)
 
             ! Make sure model is still running well
             call yelmo_check_kill(dom,time_now)
@@ -570,7 +570,7 @@ contains
         if (write_timestep_log) then 
             ! Timestep file 
             call yelmo_timestep_write_init(write_timestep_log_file,time,dom%par%pc_ebs)
-            call yelmo_timestep_write(write_timestep_log_file,time,dom%par%pc_dt,dom%par%pc_eta)
+            !call yelmo_timestep_write(write_timestep_log_file,time,dom%par%pc_dt,dom%par%pc_eta)
         end if 
 
         return
@@ -739,6 +739,7 @@ contains
         call nml_read(filename,"yelmo","nz_aa",         par%nz_aa)
         call nml_read(filename,"yelmo","dtmin",         par%dtmin)
         call nml_read(filename,"yelmo","dtmax",         par%dtmax)
+        call nml_read(filename,"yelmo","dt_ref",        par%dt_ref)
         call nml_read(filename,"yelmo","ntt",           par%ntt)
         call nml_read(filename,"yelmo","cfl_max",       par%cfl_max)
         call nml_read(filename,"yelmo","cfl_diff_max",  par%cfl_diff_max)

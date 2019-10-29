@@ -11,7 +11,7 @@
     ! Timing parameters 
     time_init    = 0.0                   ! [yr] Starting time 
     time_end     = 30000.0               ! [yr] Ending time 
-    dtt          = 10.0                  ! [yr] Main loop timestep 
+    dtt          = 20.0                  ! [yr] Main loop timestep 
     dt2D_out     = 500.0                 ! [yr] Frequency of writing 2D output files 
 
     ! Settings for transient EISMINT1 experiments 
@@ -27,13 +27,14 @@
     restart         = "no"
     zeta_scale      = "tanh"            ! "linear", "exp", "tanh"
     zeta_exp        = 2.0  
-    nz_aa           = 21                ! Vertical resolution in ice
+    nz_aa           = 20                ! Vertical resolution in ice
     dtmin           = 0.01              ! [a] Minimum timestep 
-    dtmax           = 10.0              ! [a] Maximum timestep
+    dtmax           = 20.0              ! [a] Maximum timestep
+    dt_ref          = 10.0              ! [a] Reference timestep 
     ntt             = 1                 ! [--] Thermodynamics call frequency (how many dynamic timesteps to skip)
     cfl_max         = 1.0               ! Maximum value is 1.0, lower will be more stable
     cfl_diff_max    = 0.12              ! Bueler et al (2007), Eq. 25  
-    pc_ebs          = 1e-2              ! Predictor-corrector tolerance 
+    pc_ebs          = 1e-3              ! Predictor-corrector tolerance 
 
 /
 

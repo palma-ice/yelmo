@@ -449,6 +449,9 @@ contains
         call nc_write(filename,"dt_diff",ylmo%par%dt_diff,units="a",long_name="Diffusive timestep", &
                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
         
+        call nc_write(filename,"dt_adv3D",ylmo%par%dt_adv3D,units="a",long_name="Advective timestep", &
+                      dim1="xc",dim2="yc",dim3="zeta",dim4="time",start=[1,1,1,n],ncid=ncid)
+
         ! == yelmo_topography ==
         call nc_write(filename,"H_ice",ylmo%tpo%now%H_ice,units="m",long_name="Ice thickness", &
                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)

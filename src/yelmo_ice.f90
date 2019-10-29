@@ -43,7 +43,7 @@ contains
 
         ! Local variables 
         real(prec) :: dt_now 
-        real(prec) :: time_now, time_start 
+        real(prec) :: time_now, time_start, time_now_half  
         integer    :: n, nstep   
         logical    :: iter_exit 
         real(4)    :: cpu_start_time 
@@ -99,12 +99,18 @@ contains
             end if 
 
             ! Advance the local time variable
-            time_now = time_now + dt_now
+            time_now      = time_now + dt_now
+            time_now_half = time_now + dt_now*0.5_prec 
+
             if (time-time_now .lt. time_tol) time_now = time 
             
 !             if (yelmo_write_log) then 
 !                 write(*,"(a,1f14.4,3g14.4)") "timestepping: ", time_now, dt_now, minval(dom%par%dt_adv), minval(dom%par%dt_diff)
 !             end if 
+            
+            ! Step 0: Advance thermodynamics half timestep
+            ! Calculate thermodynamics (temperatures and enthalpy)
+            call calc_ytherm(dom%thrm,tpo1,dom%dyn,dom%mat,dom%bnd,time_now_half)
             
             ! Step 1: Perform predictor step with temporary topography object 
             ! Calculate topography (elevation, ice thickness, calving, etc.)

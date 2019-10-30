@@ -1,9 +1,10 @@
 &yelmo_config 
-    write_log = True 
+    yelmo_log          = True 
+    yelmo_log_timestep = True  
 /
 
 &yelmo_constants 
-    sec_year   = 31556926.0     ! [s] EISMINT value
+    sec_year   = 31556926.0     ! [s/a] EISMINT value
     g          = 9.81           ! [m s-2] Gravitational accel.
     T0         = 273.15         ! [K] Reference freezing temperature 
     rho_ice    =  910.0         ! [kg m-3] Density ice            

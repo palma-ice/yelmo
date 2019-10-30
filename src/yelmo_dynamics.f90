@@ -588,7 +588,7 @@ contains
 
             ! Check convergence of ssa solution 
             is_converged = check_vel_convergence(dyn%now%ux_bar,dyn%now%uy_bar,ux_bar_prev,uy_bar_prev, &
-                                        dyn%par%ssa_iter_conv,iter,dyn%par%ssa_iter_max,yelmo_write_log)
+                                        dyn%par%ssa_iter_conv,iter,dyn%par%ssa_iter_max,yelmo_log)
 
             if (write_ssa_diagnostics) then  
                 call write_step_2D_ssa(tpo,dyn,"yelmo_ssa.nc",ux_bar_prev,uy_bar_prev,time=real(iter,prec))    
@@ -902,7 +902,7 @@ end if
 
             ! Check for convergence
             is_converged = check_vel_convergence(dyn%now%ux_b,dyn%now%uy_b,ux_b_prev,uy_b_prev, &
-                                        dyn%par%ssa_iter_conv,iter,dyn%par%ssa_iter_max,yelmo_write_log)
+                                        dyn%par%ssa_iter_conv,iter,dyn%par%ssa_iter_max,yelmo_log)
 
             if (write_ssa_diagnostics) then  
                 call write_step_2D_ssa(tpo,dyn,"yelmo_ssa.nc",ux_b_prev,uy_b_prev,time=real(iter,prec))    

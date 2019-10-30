@@ -251,7 +251,7 @@ contains
         ! Advance ytopo timestep 
         tpo%par%time = time
 
-!         if (yelmo_write_log) then 
+!         if (yelmo_log) then 
 
 !             if (count(tpo%now%H_ice.gt.0.0) .gt. 0) then 
 !                 write(*,"(a,f14.4,f10.4,f10.2)") "calc_ytopo::  time = ", tpo%par%time, dt, &

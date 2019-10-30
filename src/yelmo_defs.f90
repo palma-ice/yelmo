@@ -40,10 +40,9 @@ module yelmo_defs
     ! being run in the same program. 
 
     ! Yelmo configuration options 
-    logical :: yelmo_write_log
-
-    logical, parameter :: write_timestep_log = .TRUE. 
-    character(len=256), parameter :: write_timestep_log_file = "timesteps.nc" 
+    logical :: yelmo_log
+    logical :: yelmo_log_timestep 
+    character(len=256), parameter :: yelmo_log_timestep_file = "timesteps.nc" 
 
     ! Physical constants 
     real(prec) :: sec_year       ! [s] seconds per year 
@@ -610,6 +609,7 @@ module yelmo_defs
         real(prec)          :: cfl_max 
         real(prec)          :: cfl_diff_max 
         real(prec)          :: pc_ebs 
+        real(prec)          :: pc1_ebs 
 
         ! Sigma coordinates (internal parameter)
         real(prec), allocatable :: zeta_aa(:)   ! Layer centers (aa-nodes), plus base and surface: nz_aa points 
@@ -624,6 +624,8 @@ module yelmo_defs
         ! Time step parameters for predictor-corrector (PC) method (Cheng et al, 2017)
         real(prec) :: pc_dt 
         real(prec) :: pc_eta 
+        real(prec) :: pc1_dt
+        real(prec) :: pc1_eta 
 
         ! Timing information 
         real(prec) :: model_speed 
@@ -687,7 +689,8 @@ contains
         
         ! Load parameter values 
 
-        call nml_read(filename,"yelmo_config","write_log",yelmo_write_log,  init=init_pars)
+        call nml_read(filename,"yelmo_config","yelmo_log",yelmo_log,init=init_pars)
+        call nml_read(filename,"yelmo_config","yelmo_log_timestep",yelmo_log_timestep,init=init_pars)
         
         call nml_read(filename,"yelmo_constants","sec_year",    sec_year,   init=init_pars)
         call nml_read(filename,"yelmo_constants","g",           g,          init=init_pars)
@@ -701,9 +704,10 @@ contains
         call nml_read(filename,"yelmo_constants","L_ice",       L_ice,      init=init_pars)
         call nml_read(filename,"yelmo_constants","T_pmp_beta",  T_pmp_beta, init=init_pars)
         
-        if (yelmo_write_log) then 
+        if (yelmo_log) then 
             write(*,*) "yelmo:: configuration:"
-            write(*,*) "    write_log  = ", yelmo_write_log
+            write(*,*) "    yelmo_log          = ", yelmo_log
+            write(*,*) "    yelmo_log_timestep = ", yelmo_log_timestep 
 
             write(*,*) "yelmo:: loaded global constants:"
             write(*,*) "    sec_year   = ", sec_year 
@@ -718,7 +722,7 @@ contains
             write(*,*) "    T_pmp_beta = ", T_pmp_beta 
             
         end if 
-
+        
         ! Define conversion factors too
 
         conv_we_ie  = rho_w/rho_ice

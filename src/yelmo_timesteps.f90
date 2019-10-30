@@ -17,20 +17,24 @@ module yelmo_timesteps
 
 contains
 
-    subroutine set_adaptive_timestep_fe_sbe(dt,eta,var_corr,var_pred,ebs,dt_ref)
+    subroutine set_adaptive_timestep_fe_sbe(dt,eta,var_corr,var_pred,ebs,dt_ref,dtmin,dtmax,time,time_max)
         ! Calculate the timestep following algorithm for 
         ! Forward Euler (FE) predictor step and Semi-implicit
         ! Backward Euler (SBE) corrector step. 
         ! Implemented followig Cheng et al (2017, GMD)
         implicit none 
 
-        real(prec), intent(OUT) :: dt               ! [yr]   Timestep 
-        real(prec), intent(OUT) :: eta              ! [X/yr] Maximum truncation error 
+        real(prec), intent(INOUT) :: dt               ! [yr]   Timestep 
+        real(prec), intent(INOUT) :: eta              ! [X/yr] Maximum truncation error 
         real(prec), intent(IN)  :: var_corr(:,:)    ! [X]    Corrected variable at time=n+1 
         real(prec), intent(IN)  :: var_pred(:,:)    ! [X]    Predicted variable at time=n+1 
         real(prec), intent(IN)  :: ebs              ! [--]   Tolerance value (eg, ebs=1e-4)
         real(prec), intent(IN)  :: dt_ref           ! [yr]   Reference dt to osicillate around, if not dt_ref=0
-        
+        real(prec), intent(IN)  :: dtmin            ! [yr]   Minimum allowed timestep
+        real(prec), intent(IN)  :: dtmax            ! [yr]   Maximum allowed timestep
+        real(prec), intent(IN)  :: time 
+        real(prec), intent(IN)  :: time_max 
+
         ! Local variables 
         real(prec) :: dt_n                          ! [yr]   Timestep (previous)
         real(prec) :: eta_n                         ! [X/yr] Maximum truncation error (previous)
@@ -40,13 +44,13 @@ contains
         real(prec), parameter :: beta_2 = -1.0_prec / 10.0_prec      ! Cheng et al., 2017, Eq. 32
         
         ! Step 0: save dt and eta from previous timestep 
-        dt_n  = max(dt,1e-5) 
+        dt_n  = max(dt,dtmin) 
         eta_n = eta 
 
         ! Step 1: calculate maximum value of truncation error (eta,n+1)
         ! Truncation error: tau = 1/2*dt_n * (var - var_pred)
         ! Maximum value: eta = maxval(tau) 
-        eta = maxval( (1.0_prec / (2.0_prec*dt_n)) * (var_corr - var_pred) )
+        eta = maxval( (1.0_prec / (2.0_prec*dt_n)) * abs(var_corr - var_pred) )
         eta = max(eta,1e-10)
 
         ! Step 2: calculate scaling for the next timestep (dt,n+1)
@@ -58,8 +62,17 @@ contains
             dt = f_scale * dt_n
         else 
             ! Scale the reference timestep 
-            dt = f_scale * dt_ref 
+!             dt = f_scale * (0.3*dt_ref + 0.7*dt_n)
+            dt = f_scale * dt_ref
+            dt = f_scale * (0.5_prec*dtmax)
         end if 
+        
+        dt = min(dt,dtmax)
+
+!         ! Finally, make sure adaptive time step synchronizes with larger time step 
+!         if (time + dt .gt. time_max) then 
+!             dt = time_max - time 
+!         end if 
 
         return 
 
@@ -313,6 +326,8 @@ end if
         do j = 2, ny-1 
         do i = 2, nx-1 
 
+            if (H_ice(i,j) .gt. 0.0) then 
+
 !             ux_now = abs( 0.5*(ux(i-1,j)+ux(i,j)) )
 !             uy_now = abs( 0.5*(uy(i,j-1)+uy(i,j)) )
 
@@ -324,17 +339,19 @@ end if
 !             dt(i,j) = cfl_max * 1.0 / max(abs(ux(i-1,j))/dx + abs(ux(i,j))/dx &
 !                                         + abs(uy(i,j-1))/dy + abs(uy(i,j))/dy,1e-3)
             
-            do k = 2, nz_aa 
+                do k = 2, nz_aa-1 
 
-                dz = H_ice(i,j) * (zeta_ac(k)-zeta_ac(k-1))
+                    dz = H_ice(i,j) * (zeta_ac(k)-zeta_ac(k-1))
 
-                dt(i,j,k) = cfl_max * 1.0 / max(abs(ux(i-1,j,k))/(2.0*dx) + abs(ux(i,j,k))/(2.0*dx) &
-                                        + abs(uy(i,j-1,k))/(2.0*dy) + abs(uy(i,j,k))/(2.0*dy), &
-                                        + abs(uz(i,j,k-1))/(2.0*dz) + abs(uz(i,j,k))/(2.0*dz), 1e-3)
-!                 dt(i,j,k) = cfl_max * 1.0 / max(abs(ux(i-1,j,k))/(2.0*dx) + abs(ux(i,j,k))/(2.0*dx) &
-!                                         + abs(uy(i,j-1,k))/(2.0*dy) + abs(uy(i,j,k))/(2.0*dy), 1e-3)
-            
-            end do 
+                    dt(i,j,k) = cfl_max * 1.0 / max(abs(ux(i-1,j,k))/(2.0*dx) + abs(ux(i,j,k))/(2.0*dx) &
+                                            + abs(uy(i,j-1,k))/(2.0*dy) + abs(uy(i,j,k))/(2.0*dy), &
+                                            + abs(uz(i,j,k-1))/(2.0*dz) + abs(uz(i,j,k))/(2.0*dz), 1e-3)
+    !                 dt(i,j,k) = cfl_max * 1.0 / max(abs(ux(i-1,j,k))/(2.0*dx) + abs(ux(i,j,k))/(2.0*dx) &
+    !                                         + abs(uy(i,j-1,k))/(2.0*dy) + abs(uy(i,j,k))/(2.0*dy), 1e-3)
+                
+                end do 
+
+            end if 
 
         end do 
         end do 
@@ -557,26 +574,28 @@ end if
 
     end subroutine check_checkerboard
 
-    subroutine yelmo_timestep_write_init(filename,time,pc_ebs)
+    subroutine yelmo_timestep_write_init(filename,time,pc_ebs,pc1_ebs)
 
         implicit none 
 
         character(len=*),  intent(IN) :: filename
         real(prec), intent(IN) :: time 
         real(prec), intent(IN) :: pc_ebs
+        real(prec), intent(IN) :: pc1_ebs
 
         call nc_create(filename)
         
         call nc_write_dim(filename,"pt",x=1,dx=1,nx=1,units="point")
         call nc_write_dim(filename,"time",x=time,dx=1.0_prec,nx=1,units="years",unlimited=.TRUE.)
 
-        call nc_write(filename,"pc_ebs",pc_ebs,dim1="pt")
+        call nc_write(filename, "pc_ebs", pc_ebs,dim1="pt")
+        call nc_write(filename,"pc1_ebs",pc1_ebs,dim1="pt")
 
         return 
 
     end subroutine yelmo_timestep_write_init 
 
-    subroutine yelmo_timestep_write(filename,time,dt_now,dt_adv,pc_dt,pc_eta)
+    subroutine yelmo_timestep_write(filename,time,dt_now,dt_adv,pc_dt,pc_eta,pc1_dt,pc1_eta)
 
         implicit none 
 
@@ -586,6 +605,8 @@ end if
         real(prec), intent(IN) :: dt_adv
         real(prec), intent(IN) :: pc_dt 
         real(prec), intent(IN) :: pc_eta 
+        real(prec), intent(IN) :: pc1_dt 
+        real(prec), intent(IN) :: pc1_eta 
 
         ! Local variables
         integer    :: ncid, n
@@ -606,6 +627,9 @@ end if
         call nc_write(filename, "dt_adv",dt_adv,dim1="time",start=[n],count=[1],ncid=ncid)
         call nc_write(filename,  "pc_dt", pc_dt,dim1="time",start=[n],count=[1],ncid=ncid)
         call nc_write(filename, "pc_eta",pc_eta,dim1="time",start=[n],count=[1],ncid=ncid)
+
+        call nc_write(filename,  "pc1_dt", pc1_dt,dim1="time",start=[n],count=[1],ncid=ncid)
+        call nc_write(filename, "pc1_eta",pc1_eta,dim1="time",start=[n],count=[1],ncid=ncid)
 
         ! Close the netcdf file
         call nc_close(ncid)

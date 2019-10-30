@@ -382,7 +382,8 @@ end if
         real(prec) :: dom_dtmax 
         integer    :: dom_ntt 
         real(prec) :: dom_ssa_vel_max 
-
+        logical    :: yelmo_log_timestep 
+        
         ! Only run equilibration if time_tot > 0 
 
         if (time_tot .gt. 0.0) then 

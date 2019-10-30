@@ -42,7 +42,7 @@ contains
 
         ! Local variables 
         real(prec) :: dt_now 
-        real(prec) :: time_now, time_start  
+        real(prec) :: time_now, time_start, time_now_1, dt_now_1
         integer    :: n, nstep, n1
         logical    :: iter_exit 
         real(4)    :: cpu_start_time 
@@ -104,7 +104,9 @@ contains
             ! Advance the local time variable
             time_now      = time_now + dt_now
 
-            if (time-time_now .lt. time_tol) time_now = time 
+            if (abs(time-time_now) .lt. time_tol) time_now = time 
+            
+            time_now_1    = time_now 
             
 !             if (yelmo_log) then 
 !                 write(*,"(a,1f14.4,3g14.4)") "timestepping: ", time_now, dt_now, minval(dom%par%dt_adv), minval(dom%par%dt_diff)
@@ -119,33 +121,64 @@ contains
             call calc_ytopo(tpo1,dom%dyn,dom%thrm,dom%bnd,time_now,topo_fixed=dom%tpo%par%topo_fixed)
 
 
+if (.TRUE.) then 
+
             ! Step 2: Update other variables using predicted ice thickness 
+
+            ! Calculate dynamics (velocities and stresses)
+            call calc_ydyn(dom%dyn,tpo1,dom%mat,dom%thrm,dom%bnd,time_now)
             
-!             do n1 = 1, nstep 
-
-            ! === Inner predictor-corrector step for temperature ===
-
-            ! Step 2a: calculate predictor version of ytherm 
-            call calc_ytherm(thrm1,tpo1,dom%dyn,dom%mat,dom%bnd,time_now)
+            ! Calculate thermodynamics (temperatures and enthalpy)
+            call calc_ytherm(thrm1,tpo1,dom%dyn,dom%mat,dom%bnd,time_now)            
             
             ! Calculate material (ice properties, viscosity, etc.)
             call calc_ymat(dom%mat,tpo1,dom%dyn,thrm1,dom%bnd,time_now)
 
-            ! Calculate dynamics (velocities and stresses)
-            call calc_ydyn(dom%dyn,tpo1,dom%mat,thrm1,dom%bnd,time_now)
-            
-            ! Re-calculate material (ice properties, viscosity, etc.)
-            call calc_ymat(dom%mat,tpo1,dom%dyn,thrm1,dom%bnd,time_now)
-
+            ! Calculate thermodynamics (temperatures and enthalpy)
+            call calc_ytherm(dom%thrm,tpo1,dom%dyn,dom%mat,dom%bnd,time_now)            
+               
             ! Calculate adaptive timestep from predicted and corrected temperatures
             call set_adaptive_timestep_fe_sbe(dom%par%pc1_dt,dom%par%pc1_eta,dom%thrm%now%T_prime_b, &
                                                     thrm1%now%T_prime_b,dom%par%pc1_ebs,dom%par%dt_ref, &
-                                                    dom%par%dtmin,dt_now,time_now,time)
+                                                    dom%par%dtmin,dom%par%dtmax,time_now,time)
 
-            ! Step 2b: corrector step: Calculate thermodynamics (temperatures and enthalpy)
-            call calc_ytherm(dom%thrm,tpo1,dom%dyn,dom%mat,dom%bnd,time_now)
+else 
+            ! Step 2: Update other variables using predicted ice thickness 
             
+            ! === Inner predictor-corrector step for temperature ===
+            do n1 = 1, nstep 
+
+                dt_now_1 = dom%par%pc1_dt 
+                call limit_adaptive_timestep(dt_now_1,time_now_1,time_now,dom%par%dtmin,dt_now)
+
+                time_now_1 = time_now_1 + dt_now_1
+                if (abs(time_now-time_now_1) .lt. time_tol) time_now_1 = time_now 
+
+                ! Step 2a: calculate predictor version of ytherm 
+                call calc_ytherm(thrm1,tpo1,dom%dyn,dom%mat,dom%bnd,time_now_1)
+                
+                ! Calculate material (ice properties, viscosity, etc.)
+                call calc_ymat(dom%mat,tpo1,dom%dyn,thrm1,dom%bnd,time_now_1)
+
+                ! Calculate dynamics (velocities and stresses)
+                call calc_ydyn(dom%dyn,tpo1,dom%mat,thrm1,dom%bnd,time_now_1)
+                
+                ! Re-calculate material (ice properties, viscosity, etc.)
+                call calc_ymat(dom%mat,tpo1,dom%dyn,thrm1,dom%bnd,time_now_1)
+
+                ! Calculate adaptive timestep from predicted and corrected temperatures
+                call set_adaptive_timestep_fe_sbe(dom%par%pc1_dt,dom%par%pc1_eta,dom%thrm%now%T_prime_b, &
+                                                        thrm1%now%T_prime_b,dom%par%pc1_ebs,dom%par%dt_ref, &
+                                                        dom%par%dtmin,dt_now,time_now_1,time_now)
+
+                ! Step 2b: corrector step: Calculate thermodynamics (temperatures and enthalpy)
+                call calc_ytherm(dom%thrm,tpo1,dom%dyn,dom%mat,dom%bnd,time_now_1)
+                
+                if (abs(time_now_1 - time_now) .lt. time_tol) exit 
+
+            end do 
             ! === END inner predictor-corrector step for temperature ===
+end if 
 
             ! Step 3: Finally, calculate corrector step with actual topography object 
             ! Calculate topography (elevation, ice thickness, calving, etc.)

@@ -7,8 +7,8 @@ module yelmo_ice
     
     use yelmo_defs
     use yelmo_grid, only : yelmo_init_grid
-    use yelmo_timesteps, only : set_adaptive_timestep, set_adaptive_timestep_fe_sbe, limit_adaptive_timestep, &
-            yelmo_timestep_write_init, yelmo_timestep_write, calc_adv3D_timestep1
+    use yelmo_timesteps, only : set_adaptive_timestep, set_adaptive_timestep_pc, calc_pc_tau_fe_sbe, &
+             limit_adaptive_timestep,yelmo_timestep_write_init, yelmo_timestep_write, calc_adv3D_timestep1
     use yelmo_io 
 
     use yelmo_topography
@@ -82,9 +82,8 @@ contains
     
 
             ! Calculate new adaptive timestep using predictor-corrector algorithm 
-            call set_adaptive_timestep_fe_sbe(dom%par%pc_dt,dom%par%pc_eta,dom%par%pc_tau, &
-                                                    dom%par%pc_ebs,dom%par%dt_ref,dom%par%dtmin,dom%par%dtmax, &
-                                                    time_now,time)
+            call set_adaptive_timestep_pc(dom%par%pc_dt,dom%par%pc_eta,dom%par%pc_tau,dom%par%pc_ebs, &
+                                                dom%par%dt_ref,dom%par%dtmin,dom%par%dtmax,time_now,time)
 
             ! Determine current time step 
             if (dom%tpo%par%topo_fixed) then 
@@ -128,7 +127,7 @@ if (.TRUE.) then
             ! Step 2: Update other variables using predicted ice thickness 
 
             ! Calculate adaptive timestep from predicted and corrected temperatures
-            call set_adaptive_timestep_fe_sbe(dom%par%pc1_dt,dom%par%pc1_eta,dom%par%pc1_tau,dom%par%pc1_ebs, &
+            call set_adaptive_timestep_pc(dom%par%pc1_dt,dom%par%pc1_eta,dom%par%pc1_tau,dom%par%pc1_ebs, &
                                         dom%par%dt_ref,dom%par%dtmin,dt_now,time_now_1,time_now)
 
             ! Calculate dynamics (velocities and stresses)
@@ -144,7 +143,7 @@ if (.TRUE.) then
             call calc_ytherm(dom%thrm,tpo1,dom%dyn,dom%mat,dom%bnd,time_now)            
             
             ! Determine truncation error 
-            dom%par%pc1_tau = dom%thrm%now%T_prime_b - thrm1%now%T_prime_b 
+            call calc_pc_tau_fe_sbe(dom%par%pc1_tau,dom%thrm%now%T_prime_b,thrm1%now%T_prime_b,dom%par%pc1_dt,dom%par%dtmin)
 
 else 
             ! Step 2: Update other variables using predicted ice thickness 
@@ -153,7 +152,7 @@ else
             do n1 = 1, nstep 
 
                 ! Calculate adaptive timestep from predicted and corrected temperatures
-                call set_adaptive_timestep_fe_sbe(dom%par%pc1_dt,dom%par%pc1_eta,dom%par%pc1_tau,dom%par%pc1_ebs, &
+                call set_adaptive_timestep_pc(dom%par%pc1_dt,dom%par%pc1_eta,dom%par%pc1_tau,dom%par%pc1_ebs, &
                                             dom%par%dt_ref,dom%par%dtmin,dt_now,time_now_1,time_now)
 
                 dt_now_1 = dom%par%pc1_dt 
@@ -178,7 +177,7 @@ else
                 call calc_ytherm(dom%thrm,tpo1,dom%dyn,dom%mat,dom%bnd,time_now_1)
                 
                 ! Determine truncation error 
-                dom%par%pc1_tau = dom%thrm%now%T_prime_b - thrm1%now%T_prime_b 
+                call calc_pc_tau_fe_sbe(dom%par%pc1_tau,dom%thrm%now%T_prime_b,thrm1%now%T_prime_b,dom%par%pc1_dt,dom%par%dtmin)
 
                 if (abs(time_now_1 - time_now) .lt. time_tol) exit 
 
@@ -191,7 +190,8 @@ end if
             call calc_ytopo(dom%tpo,dom%dyn,dom%thrm,dom%bnd,time_now,topo_fixed=dom%tpo%par%topo_fixed)
 
             ! Determine truncation error 
-            dom%par%pc_tau = dom%tpo%now%H_ice - tpo1%now%H_ice 
+            call calc_pc_tau_fe_sbe(dom%par%pc_tau,dom%tpo%now%H_ice,tpo1%now%H_ice,dom%par%pc_dt,dom%par%dtmin)
+
 
             if (yelmo_log_timestep) then 
                 ! Write timestep file if desired
@@ -539,9 +539,8 @@ end if
         
         ! Allocate truncation error array 
         if (allocated(dom%par%pc_tau))   deallocate(dom%par%pc_tau)
-        allocate(dom%par%pc_tau(dom%grd%nx,dom%grd%ny))
-
         if (allocated(dom%par%pc1_tau))   deallocate(dom%par%pc1_tau)
+        allocate(dom%par%pc_tau(dom%grd%nx,dom%grd%ny))
         allocate(dom%par%pc1_tau(dom%grd%nx,dom%grd%ny))
 
         dom%par%pc_tau   = 0.0_prec 
@@ -658,6 +657,8 @@ end if
             ! Timestep file 
             call yelmo_timestep_write_init(yelmo_log_timestep_file,time,dom%grd%xc,dom%grd%yc, &
                                                                     dom%par%pc_ebs,dom%par%pc1_ebs)
+            call yelmo_timestep_write(yelmo_log_timestep_file,time,0.0_prec,0.0_prec, &
+                            dom%par%pc_dt,dom%par%pc_eta,dom%par%pc1_dt,dom%par%pc1_eta,dom%par%pc_tau)
         end if 
 
         return

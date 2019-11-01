@@ -6,8 +6,11 @@ module yelmo_timesteps
     implicit none 
 
     private
+
+    public :: calc_pc_tau_fe_sbe
+    public :: set_adaptive_timestep_pc
+
     public :: set_adaptive_timestep 
-    public :: set_adaptive_timestep_fe_sbe 
     public :: limit_adaptive_timestep
 
     public :: yelmo_timestep_write_init
@@ -17,16 +20,42 @@ module yelmo_timesteps
 
 contains
 
-    subroutine set_adaptive_timestep_fe_sbe(dt,eta,var_tau,ebs,dt_ref,dtmin,dtmax,time,time_max)
-        ! Calculate the timestep following algorithm for 
+    elemental subroutine calc_pc_tau_fe_sbe(tau,var_corr,var_pred,dt_n,dtmin)
+        ! Calculate truncation error for the FE-SBE timestepping method
         ! Forward Euler (FE) predictor step and Semi-implicit
         ! Backward Euler (SBE) corrector step. 
         ! Implemented followig Cheng et al (2017, GMD)
+        ! Truncation error: tau = 1/2*dt_n * (var - var_pred)
+
+        implicit none 
+
+        real(prec), intent(OUT) :: tau
+        real(prec), intent(IN)  :: var_corr
+        real(prec), intent(IN)  :: var_pred
+        real(prec), intent(IN)  :: dt_n 
+        real(prec), intent(IN)  :: dtmin 
+
+        ! Local variables 
+        real(prec) :: dt_now 
+
+        dt_now = max(dt_n,dtmin)
+
+        tau = (1.0_prec / (2.0_prec*dt_now)) * (var_corr - var_pred)
+
+        return 
+
+    end subroutine calc_pc_tau_fe_sbe
+
+    subroutine set_adaptive_timestep_pc(dt,eta,tau,ebs,dt_ref,dtmin,dtmax,time,time_max)
+        ! Calculate the timestep following algorithm for 
+        ! a general predictor-corrector (pc) method.
+        ! Implemented followig Cheng et al (2017, GMD)
+
         implicit none 
 
         real(prec), intent(INOUT) :: dt                 ! [yr]   Timestep 
         real(prec), intent(INOUT) :: eta                ! [X/yr] Maximum truncation error 
-        real(prec), intent(IN)  :: var_tau(:,:)         ! [X]    Truncation error 
+        real(prec), intent(IN)  :: tau(:,:)             ! [X/yr] Truncation error 
         real(prec), intent(IN)  :: ebs                  ! [--]   Tolerance value (eg, ebs=1e-4)
         real(prec), intent(IN)  :: dt_ref               ! [yr]   Reference dt to osicillate around, if not dt_ref=0
         real(prec), intent(IN)  :: dtmin                ! [yr]   Minimum allowed timestep
@@ -46,10 +75,8 @@ contains
         dt_n  = max(dt,dtmin) 
         eta_n = eta 
 
-        ! Step 1: calculate maximum value of truncation error (eta,n+1)
-        ! Truncation error: tau = 1/2*dt_n * (var - var_pred)
-        ! Maximum value: eta = maxval(tau) 
-        eta = maxval( (1.0_prec / (2.0_prec*dt_n)) * abs(var_tau) )
+        ! Step 1: calculate maximum value of truncation error (eta,n+1) = maxval(tau) 
+        eta = maxval(abs(tau))
         eta = max(eta,1e-10)
 
         ! Step 2: calculate scaling for the next timestep (dt,n+1)
@@ -75,7 +102,7 @@ contains
 
         return 
 
-    end subroutine set_adaptive_timestep_fe_sbe
+    end subroutine set_adaptive_timestep_pc
 
     subroutine set_adaptive_timestep(dt,dt_adv,dt_diff,dt_adv3D,time,time_max, &
                         ux,uy,uz,ux_bar,uy_bar,D2D,H_ice,dHicedt,zeta_ac, &

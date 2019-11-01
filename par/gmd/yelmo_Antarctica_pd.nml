@@ -1,10 +1,10 @@
 &control    
     time_init       = 0.0               ! [yr] Starting time 
-    time_end        = 50e3              ! [yr] Ending time
-    time_equil      = 100.0             ! [yr] Equilibration time 
-    dtt             = 5.0               ! [yr] Main loop timestep 
+    time_end        = 100.0              ! [yr] Ending time
+    time_equil      = 0.0             ! [yr] Equilibration time 
+    dtt             = 1.0               ! [yr] Main loop timestep 
     dt1D_out        = 100.0             ! [yr] Frequency of writing 1D output files 
-    dt2D_out        = 500.0             ! [yr] Frequency of writing 2D output files 
+    dt2D_out        = 5.0             ! [yr] Frequency of writing 2D output files 
     bmb_shlf_const  = -0.2              ! [m/a] Basal mass balance of ice shelves
     dT_ann          = 0.0               ! [K] Temperature anomaly (atm)
     z_sl            = 0.0               ! [m] Sea level relative to present-day 
@@ -23,7 +23,8 @@
     zeta_exp        = 2.0  
     nz_aa           = 10                ! Vertical resolution in ice
     dtmin           = 0.01              ! [a] Minimum timestep 
-    dtmax           = 5.0               ! [a] Maximum timestep
+    dtmax           = 1.0               ! [a] Maximum timestep
+    dt_ref          = 1.0 
     ntt             = 1                 ! [--] Thermodynamics call frequency (how many dynamic timesteps to skip)
     cfl_max         = 1.0               ! Maximum value is 1.0, lower will be more stable
     cfl_diff_max    = 0.12              ! Bueler et al (2007), Eq. 25 

@@ -128,7 +128,7 @@ if (.TRUE.) then
 
             ! Calculate adaptive timestep from predicted and corrected temperatures
             call set_adaptive_timestep_pc(dom%par%pc1_dt,dom%par%pc1_eta,dom%par%pc1_tau,dom%par%pc1_ebs, &
-                                        dom%par%dt_ref,dom%par%dtmin,dt_now,time_now_1,time_now)
+                                        dom%par%dt_ref,dom%par%dtmin,dt_now,time_now,time)
 
             ! Calculate dynamics (velocities and stresses)
             call calc_ydyn(dom%dyn,tpo1,dom%mat,dom%thrm,dom%bnd,time_now)

@@ -25,6 +25,7 @@ contains
         type(yelmo_class), intent(IN) :: ylmo 
         character(len=*),  intent(IN) :: filename, units 
         real(prec),        intent(IN) :: time_init
+        
         ! Initialize file by writing grid info
         call yelmo_grid_write(ylmo%grd,filename,create=.TRUE.)
 

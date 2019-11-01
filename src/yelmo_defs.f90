@@ -626,6 +626,8 @@ module yelmo_defs
         real(prec) :: pc_eta 
         real(prec) :: pc1_dt
         real(prec) :: pc1_eta 
+        real(prec), allocatable :: pc_tau(:,:)
+        real(prec), allocatable :: pc1_tau(:,:)
 
         ! Timing information 
         real(prec) :: model_speed 
@@ -722,7 +724,7 @@ contains
             write(*,*) "    T_pmp_beta = ", T_pmp_beta 
             
         end if 
-        
+
         ! Define conversion factors too
 
         conv_we_ie  = rho_w/rho_ice

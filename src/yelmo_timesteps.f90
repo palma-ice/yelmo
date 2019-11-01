@@ -17,21 +17,20 @@ module yelmo_timesteps
 
 contains
 
-    subroutine set_adaptive_timestep_fe_sbe(dt,eta,var_corr,var_pred,ebs,dt_ref,dtmin,dtmax,time,time_max)
+    subroutine set_adaptive_timestep_fe_sbe(dt,eta,var_tau,ebs,dt_ref,dtmin,dtmax,time,time_max)
         ! Calculate the timestep following algorithm for 
         ! Forward Euler (FE) predictor step and Semi-implicit
         ! Backward Euler (SBE) corrector step. 
         ! Implemented followig Cheng et al (2017, GMD)
         implicit none 
 
-        real(prec), intent(INOUT) :: dt               ! [yr]   Timestep 
-        real(prec), intent(INOUT) :: eta              ! [X/yr] Maximum truncation error 
-        real(prec), intent(IN)  :: var_corr(:,:)    ! [X]    Corrected variable at time=n+1 
-        real(prec), intent(IN)  :: var_pred(:,:)    ! [X]    Predicted variable at time=n+1 
-        real(prec), intent(IN)  :: ebs              ! [--]   Tolerance value (eg, ebs=1e-4)
-        real(prec), intent(IN)  :: dt_ref           ! [yr]   Reference dt to osicillate around, if not dt_ref=0
-        real(prec), intent(IN)  :: dtmin            ! [yr]   Minimum allowed timestep
-        real(prec), intent(IN)  :: dtmax            ! [yr]   Maximum allowed timestep
+        real(prec), intent(INOUT) :: dt                 ! [yr]   Timestep 
+        real(prec), intent(INOUT) :: eta                ! [X/yr] Maximum truncation error 
+        real(prec), intent(IN)  :: var_tau(:,:)         ! [X]    Truncation error 
+        real(prec), intent(IN)  :: ebs                  ! [--]   Tolerance value (eg, ebs=1e-4)
+        real(prec), intent(IN)  :: dt_ref               ! [yr]   Reference dt to osicillate around, if not dt_ref=0
+        real(prec), intent(IN)  :: dtmin                ! [yr]   Minimum allowed timestep
+        real(prec), intent(IN)  :: dtmax                ! [yr]   Maximum allowed timestep
         real(prec), intent(IN)  :: time 
         real(prec), intent(IN)  :: time_max 
 
@@ -50,7 +49,7 @@ contains
         ! Step 1: calculate maximum value of truncation error (eta,n+1)
         ! Truncation error: tau = 1/2*dt_n * (var - var_pred)
         ! Maximum value: eta = maxval(tau) 
-        eta = maxval( (1.0_prec / (2.0_prec*dt_n)) * abs(var_corr - var_pred) )
+        eta = maxval( (1.0_prec / (2.0_prec*dt_n)) * abs(var_tau) )
         eta = max(eta,1e-10)
 
         ! Step 2: calculate scaling for the next timestep (dt,n+1)
@@ -63,16 +62,16 @@ contains
         else 
             ! Scale the reference timestep 
 !             dt = f_scale * (0.3*dt_ref + 0.7*dt_n)
-            dt = f_scale * dt_ref
+!             dt = f_scale * dt_ref
             dt = f_scale * (0.5_prec*dtmax)
         end if 
         
         dt = min(dt,dtmax)
 
-!         ! Finally, make sure adaptive time step synchronizes with larger time step 
-!         if (time + dt .gt. time_max) then 
-!             dt = time_max - time 
-!         end if 
+        ! Finally, make sure adaptive time step synchronizes with larger time step 
+        if (time + dt .gt. time_max) then 
+            dt = time_max - time 
+        end if 
 
         return 
 
@@ -574,18 +573,35 @@ end if
 
     end subroutine check_checkerboard
 
-    subroutine yelmo_timestep_write_init(filename,time,pc_ebs,pc1_ebs)
+    subroutine yelmo_timestep_write_init(filename,time,xc,yc,pc_ebs,pc1_ebs)
 
         implicit none 
 
         character(len=*),  intent(IN) :: filename
-        real(prec), intent(IN) :: time 
+        real(prec), intent(IN) :: time
+        real(prec), intent(IN) :: xc(:) 
+        real(prec), intent(IN) :: yc(:)  
         real(prec), intent(IN) :: pc_ebs
         real(prec), intent(IN) :: pc1_ebs
+
+        ! Local variables 
+        character(len=16) :: xnm 
+        character(len=16) :: ynm 
+        
+        xnm = "xc"
+        ynm = "yc" 
 
         call nc_create(filename)
         
         call nc_write_dim(filename,"pt",x=1,dx=1,nx=1,units="point")
+
+        ! Add grid axis variables to netcdf file
+        call nc_write_dim(filename,xnm,x=xc*1e-3,units="kilometers")
+        call nc_write_attr(filename,xnm,"_CoordinateAxisType","GeoX")
+
+        call nc_write_dim(filename,ynm,x=yc*1e-3,units="kilometers")
+        call nc_write_attr(filename,ynm,"_CoordinateAxisType","GeoY")
+        
         call nc_write_dim(filename,"time",x=time,dx=1.0_prec,nx=1,units="years",unlimited=.TRUE.)
 
         call nc_write(filename, "pc_ebs", pc_ebs,dim1="pt")
@@ -595,7 +611,7 @@ end if
 
     end subroutine yelmo_timestep_write_init 
 
-    subroutine yelmo_timestep_write(filename,time,dt_now,dt_adv,pc_dt,pc_eta,pc1_dt,pc1_eta)
+    subroutine yelmo_timestep_write(filename,time,dt_now,dt_adv,pc_dt,pc_eta,pc1_dt,pc1_eta,pc_tau)
 
         implicit none 
 
@@ -607,10 +623,14 @@ end if
         real(prec), intent(IN) :: pc_eta 
         real(prec), intent(IN) :: pc1_dt 
         real(prec), intent(IN) :: pc1_eta 
+        real(prec), intent(IN) :: pc_tau(:,:) 
 
         ! Local variables
-        integer    :: ncid, n
+        integer    :: ncid, n, nx, ny 
         real(prec) :: time_prev 
+
+        nx = size(pc_tau,1)
+        ny = size(pc_tau,2) 
 
         ! Open the file for writing
         call nc_open(filename,ncid,writable=.TRUE.)
@@ -630,6 +650,8 @@ end if
 
         call nc_write(filename,  "pc1_dt", pc1_dt,dim1="time",start=[n],count=[1],ncid=ncid)
         call nc_write(filename, "pc1_eta",pc1_eta,dim1="time",start=[n],count=[1],ncid=ncid)
+
+        call nc_write(filename, "pc_tau",pc_tau,dim1="xc",dim2="yc",dim3="time",start=[1,1,n],count=[nx,ny,1],ncid=ncid)
 
         ! Close the netcdf file
         call nc_close(ncid)

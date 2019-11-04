@@ -94,8 +94,8 @@ contains
             else
                 
                 ! Use last calculated adaptive timestep 
-                dt_now = min(dom%par%pc_dt,dom%par%pc1_dt)
-                !dt_now = dt_adv_min 
+                !dt_now = min(dom%par%pc_dt,dom%par%pc1_dt)
+                dt_now = dt_adv_min 
 
                 ! Finally, ensure timestep is within prescribed limits
                 !call limit_adaptive_timestep(dt_now,time_now,time,dom%par%dtmin,dtmax)

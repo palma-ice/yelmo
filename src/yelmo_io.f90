@@ -151,7 +151,8 @@ contains
         call nc_write(filename,"visc_eff",      dom%dyn%now%visc_eff,units="",dim1="xc",dim2="yc",ncid=ncid) 
 
         call nc_write(filename,"N_eff",         dom%dyn%now%N_eff,    units="",dim1="xc",dim2="yc",ncid=ncid)        
-        call nc_write(filename,"C_bed",         dom%dyn%now%C_bed,    units="",dim1="xc",dim2="yc",ncid=ncid) 
+        call nc_write(filename,"cf_ref",        dom%dyn%now%cf_ref,   units="",dim1="xc",dim2="yc",ncid=ncid) 
+        call nc_write(filename,"c_bed",         dom%dyn%now%c_bed,    units="",dim1="xc",dim2="yc",ncid=ncid) 
         call nc_write(filename,"beta_acx",      dom%dyn%now%beta_acx, units="",dim1="xc",dim2="yc",ncid=ncid) 
         call nc_write(filename,"beta_acy",      dom%dyn%now%beta_acy, units="",dim1="xc",dim2="yc",ncid=ncid) 
         call nc_write(filename,"beta",          dom%dyn%now%beta,     units="",dim1="xc",dim2="yc",ncid=ncid) 
@@ -387,7 +388,8 @@ contains
         call nc_read(filename,"visc_eff",      dom%dyn%now%visc_eff,ncid=ncid) 
 
         call nc_read(filename,"N_eff",         dom%dyn%now%N_eff,ncid=ncid)        
-        call nc_read(filename,"C_bed",         dom%dyn%now%C_bed,ncid=ncid) 
+        call nc_read(filename,"cf_ref",        dom%dyn%now%cf_ref,ncid=ncid) 
+        call nc_read(filename,"c_bed",         dom%dyn%now%c_bed,ncid=ncid) 
         call nc_read(filename,"beta_acx",      dom%dyn%now%beta_acx,ncid=ncid) 
         call nc_read(filename,"beta_acy",      dom%dyn%now%beta_acy,ncid=ncid) 
         call nc_read(filename,"beta",          dom%dyn%now%beta,ncid=ncid) 

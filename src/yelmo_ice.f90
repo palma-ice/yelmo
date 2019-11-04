@@ -39,10 +39,11 @@ contains
 
         type(ytopo_class)  :: tpo1 
         type(ytherm_class) :: thrm1
+        type(ytherm_class) :: thrm0
 
         ! Local variables 
         real(prec) :: dt_now 
-        real(prec) :: time_now, time_start, time_now_1, dt_now_1
+        real(prec) :: time_now, time_start, time_now_1, dt_now_1, time_now_half 
         integer    :: n, nstep, n1
         logical    :: iter_exit 
         real(4)    :: cpu_start_time 
@@ -65,10 +66,8 @@ contains
         allocate(dt_save(nstep))
         dt_save = missing_value 
 
-
-        ! Store local copy of ytopo and ytherm objects to use for predictor steps
-        tpo1  = dom%tpo 
-        thrm1 = dom%thrm 
+        ! Set H_w equal to boundary value 
+        dom%thrm%now%H_w = dom%bnd%H_w 
 
         ! Iterate of topo dynamics updates
         do n = 1, nstep
@@ -85,6 +84,10 @@ contains
             call set_adaptive_timestep_pc(dom%par%pc_dt,dom%par%pc_eta,dom%par%pc_tau,dom%par%pc_ebs, &
                                                 dom%par%dt_ref,dom%par%dtmin,dom%par%dtmax,time_now,time)
 
+            ! Calculate adaptive timestep from predicted and corrected temperatures
+            call set_adaptive_timestep_pc(dom%par%pc1_dt,dom%par%pc1_eta,dom%par%pc1_tau,dom%par%pc1_ebs, &
+                                        dom%par%dt_ref,dom%par%dtmin,dom%par%dtmax,time_now,time)
+
             ! Determine current time step 
             if (dom%tpo%par%topo_fixed) then 
                 ! No topo calcs, so nstep=1
@@ -93,7 +96,7 @@ contains
                 
 
                 ! Use last calculated adaptive timestep 
-                dt_now = dom%par%pc_dt 
+                dt_now = min(dom%par%pc_dt,dom%par%pc1_dt)
 
                 ! Finally, ensure timestep is within prescribed limits
                 call limit_adaptive_timestep(dt_now,time_now,time,dom%par%dtmin,dom%par%dtmax)
@@ -103,6 +106,7 @@ contains
             dt_save(n) = dt_now 
 
             ! Advance the local time variable
+            time_now_half = time_now + 0.5_prec*dt_now 
             time_now      = time_now + dt_now
 
             if (abs(time-time_now) .lt. time_tol) time_now = time 
@@ -113,28 +117,35 @@ contains
 !                 write(*,"(a,1f14.4,3g14.4)") "timestepping: ", time_now, dt_now, minval(dom%par%dt_adv), minval(dom%par%dt_diff)
 !             end if 
             
-!             ! Step 0: Advance thermodynamics half timestep
+            ! Store local copy of ytopo and ytherm objects to use for predictor step
+            tpo1  = dom%tpo 
+            thrm1 = dom%thrm 
+            thrm0 = dom%thrm 
+
+!             ! Step 0: Advance temporary thermodynamics half timestep
 !             ! Calculate thermodynamics (temperatures and enthalpy)
-!             call calc_ytherm(dom%thrm,tpo1,dom%dyn,dom%mat,dom%bnd,time_now_half)
+!             call calc_ytherm(thrm0,dom%tpo,dom%dyn,dom%mat,dom%bnd,time_now)
+!             call calc_ytherm(thrm1,dom%tpo,dom%dyn,dom%mat,dom%bnd,time_now_half)
             
             ! Step 1: Perform predictor step with temporary topography object 
             ! Calculate topography (elevation, ice thickness, calving, etc.)
-            call calc_ytopo(tpo1,dom%dyn,dom%thrm,dom%bnd,time_now,topo_fixed=dom%tpo%par%topo_fixed)
-
-
-if (.TRUE.) then 
+            call calc_ytopo(tpo1,dom%dyn,thrm1,dom%bnd,time_now,topo_fixed=dom%tpo%par%topo_fixed)
+            call calc_ytopo_masks(tpo1,dom%dyn,thrm1,dom%bnd)
 
             ! Step 2: Update other variables using predicted ice thickness 
 
-            ! Calculate adaptive timestep from predicted and corrected temperatures
-            call set_adaptive_timestep_pc(dom%par%pc1_dt,dom%par%pc1_eta,dom%par%pc1_tau,dom%par%pc1_ebs, &
-                                        dom%par%dt_ref,dom%par%dtmin,dt_now,time_now,time)
+!             ! Calculate adaptive timestep from predicted and corrected temperatures
+!             call set_adaptive_timestep_pc(dom%par%pc1_dt,dom%par%pc1_eta,dom%par%pc1_tau,dom%par%pc1_ebs, &
+!                                         dom%par%dt_ref,dom%par%dtmin,dt_now,time_now,time)
 
-            ! Calculate dynamics (velocities and stresses)
-            call calc_ydyn(dom%dyn,tpo1,dom%mat,dom%thrm,dom%bnd,time_now)
-            
             ! Calculate thermodynamics (temperatures and enthalpy)
             call calc_ytherm(thrm1,tpo1,dom%dyn,dom%mat,dom%bnd,time_now)            
+            
+            ! Calculate material (ice properties, viscosity, etc.)
+            call calc_ymat(dom%mat,tpo1,dom%dyn,thrm1,dom%bnd,time_now)
+            
+            ! Calculate dynamics (velocities and stresses)
+            call calc_ydyn(dom%dyn,tpo1,dom%mat,thrm1,dom%bnd,time_now)
             
             ! Calculate material (ice properties, viscosity, etc.)
             call calc_ymat(dom%mat,tpo1,dom%dyn,thrm1,dom%bnd,time_now)
@@ -145,49 +156,11 @@ if (.TRUE.) then
             ! Determine truncation error 
             call calc_pc_tau_fe_sbe(dom%par%pc1_tau,dom%thrm%now%T_prime_b,thrm1%now%T_prime_b,dom%par%pc1_dt,dom%par%dtmin)
 
-else 
-            ! Step 2: Update other variables using predicted ice thickness 
-            
-            ! === Inner predictor-corrector step for temperature ===
-            do n1 = 1, nstep 
-
-                ! Calculate adaptive timestep from predicted and corrected temperatures
-                call set_adaptive_timestep_pc(dom%par%pc1_dt,dom%par%pc1_eta,dom%par%pc1_tau,dom%par%pc1_ebs, &
-                                            dom%par%dt_ref,dom%par%dtmin,dt_now,time_now_1,time_now)
-
-                dt_now_1 = dom%par%pc1_dt 
-                call limit_adaptive_timestep(dt_now_1,time_now_1,time_now,dom%par%dtmin,dt_now)
-
-                time_now_1 = time_now_1 + dt_now_1
-                if (abs(time_now-time_now_1) .lt. time_tol) time_now_1 = time_now 
-
-                ! Step 2a: calculate predictor version of ytherm 
-                call calc_ytherm(thrm1,tpo1,dom%dyn,dom%mat,dom%bnd,time_now_1)
-                
-                ! Calculate material (ice properties, viscosity, etc.)
-                call calc_ymat(dom%mat,tpo1,dom%dyn,thrm1,dom%bnd,time_now_1)
-
-                ! Calculate dynamics (velocities and stresses)
-                call calc_ydyn(dom%dyn,tpo1,dom%mat,thrm1,dom%bnd,time_now_1)
-                
-                ! Re-calculate material (ice properties, viscosity, etc.)
-                call calc_ymat(dom%mat,tpo1,dom%dyn,thrm1,dom%bnd,time_now_1)
-
-                ! Step 2b: corrector step: Calculate thermodynamics (temperatures and enthalpy)
-                call calc_ytherm(dom%thrm,tpo1,dom%dyn,dom%mat,dom%bnd,time_now_1)
-                
-                ! Determine truncation error 
-                call calc_pc_tau_fe_sbe(dom%par%pc1_tau,dom%thrm%now%T_prime_b,thrm1%now%T_prime_b,dom%par%pc1_dt,dom%par%dtmin)
-
-                if (abs(time_now_1 - time_now) .lt. time_tol) exit 
-
-            end do 
-            ! === END inner predictor-corrector step for temperature ===
-end if 
 
             ! Step 3: Finally, calculate corrector step with actual topography object 
             ! Calculate topography (elevation, ice thickness, calving, etc.)
-            call calc_ytopo(dom%tpo,dom%dyn,dom%thrm,dom%bnd,time_now,topo_fixed=dom%tpo%par%topo_fixed)
+            call calc_ytopo(dom%tpo,dom%dyn,dom%thrm,dom%bnd,time_now,topo_fixed=dom%tpo%par%topo_fixed)    
+            call calc_ytopo_masks(dom%tpo,dom%dyn,dom%thrm,dom%bnd)
 
             ! Determine truncation error 
             call calc_pc_tau_fe_sbe(dom%par%pc_tau,dom%tpo%now%H_ice,tpo1%now%H_ice,dom%par%pc_dt,dom%par%dtmin)
@@ -195,8 +168,8 @@ end if
 
             if (yelmo_log_timestep) then 
                 ! Write timestep file if desired
-                call yelmo_timestep_write(yelmo_log_timestep_file,time_now,dt_now,dt_adv_min, &
-                            dom%par%pc_dt,dom%par%pc_eta,dom%par%pc1_dt,dom%par%pc1_eta,dom%par%pc_tau)
+                call yelmo_timestep_write(yelmo_log_timestep_file,time_now,dt_now,dt_adv_min,dom%par%pc_dt, &
+                            dom%par%pc_eta,dom%par%pc_tau,dom%par%pc1_dt,dom%par%pc1_eta,dom%par%pc1_tau)
             end if 
 
             ! Make sure model is still running well
@@ -211,6 +184,9 @@ end if
             if (iter_exit) exit
 
         end do 
+
+        ! Set boundary H_w equal to H_w 
+        dom%bnd%H_w = dom%thrm%now%H_w
 
         ! Update regional calculations (for now entire domain with ice)
         call calc_yregions(dom%reg,dom%tpo,dom%dyn,dom%thrm,dom%mat,dom%bnd,mask=dom%bnd%ice_allowed)
@@ -307,7 +283,8 @@ end if
             
             ! Calculate topography (elevation, ice thickness, calving, etc.)
             call calc_ytopo(dom%tpo,dom%dyn,dom%thrm,dom%bnd,time_now,topo_fixed=dom%tpo%par%topo_fixed)
-
+            call calc_ytopo_masks(dom%tpo,dom%dyn,dom%thrm,dom%bnd)
+            
             ! Calculate dynamics (velocities and stresses)
             call calc_ydyn(dom%dyn,dom%tpo,dom%mat,dom%thrm,dom%bnd,time_now)
             
@@ -657,8 +634,8 @@ end if
             ! Timestep file 
             call yelmo_timestep_write_init(yelmo_log_timestep_file,time,dom%grd%xc,dom%grd%yc, &
                                                                     dom%par%pc_ebs,dom%par%pc1_ebs)
-            call yelmo_timestep_write(yelmo_log_timestep_file,time,0.0_prec,0.0_prec, &
-                            dom%par%pc_dt,dom%par%pc_eta,dom%par%pc1_dt,dom%par%pc1_eta,dom%par%pc_tau)
+            call yelmo_timestep_write(yelmo_log_timestep_file,time,0.0_prec,0.0_prec,dom%par%pc_dt, &
+                            dom%par%pc_eta,dom%par%pc_tau,dom%par%pc1_dt,dom%par%pc1_eta,dom%par%pc1_tau)
         end if 
 
         return
@@ -710,7 +687,8 @@ end if
 
             ! Calculate topographic information (masks, etc)
             call calc_ytopo(dom%tpo,dom%dyn,dom%thrm,dom%bnd,time,topo_fixed=.TRUE.)
-
+            call calc_ytopo_masks(dom%tpo,dom%dyn,dom%thrm,dom%bnd)
+            
             ! Update regional calculations (for now entire domain with ice)
             call calc_yregions(dom%reg,dom%tpo,dom%dyn,dom%thrm,dom%mat,dom%bnd,mask=dom%bnd%ice_allowed)
 
@@ -765,7 +743,8 @@ end if
 
             ! Run topo to make sure all fields are synchronized (masks, etc)
             call calc_ytopo(dom%tpo,dom%dyn,dom%thrm,dom%bnd,time,topo_fixed=.TRUE.)
-        
+            call calc_ytopo_masks(dom%tpo,dom%dyn,dom%thrm,dom%bnd)
+            
             ! Calculate initial thermodynamic information
             dom%thrm%par%time = time - dom%par%dtmax
             call calc_ytherm(dom%thrm,dom%tpo,dom%dyn,dom%mat,dom%bnd,time)
@@ -782,9 +761,9 @@ end if
             ! thus here it is called after initializing ytherm and ymat variables)
 
             ! Impose [high] beta value in case it hasn't been initialized (in the case of cb_method=-1/beta_method=-1)
-            ! This will be overwritten when C_bed/beta are calculated internally
-            dom%dyn%now%C_bed = 1e5
-            dom%dyn%now%beta  = 1e5 
+            ! This will be overwritten when cf_ref/beta are calculated internally
+            dom%dyn%now%cf_ref = 1e5
+            dom%dyn%now%beta   = 1e5 
             
             ! Call dynamics 
             call calc_ydyn(dom%dyn,dom%tpo,dom%mat,dom%thrm,dom%bnd,time)
@@ -798,6 +777,7 @@ end if
 
         ! Re-run topo again to make sure all fields are synchronized (masks, etc)
         call calc_ytopo(dom%tpo,dom%dyn,dom%thrm,dom%bnd,time,topo_fixed=.TRUE.)
+        call calc_ytopo_masks(dom%tpo,dom%dyn,dom%thrm,dom%bnd)
         
         ! Update regional calculations (for now entire domain with ice)
         call calc_yregions(dom%reg,dom%tpo,dom%dyn,dom%thrm,dom%mat,dom%bnd,mask=dom%bnd%ice_allowed)

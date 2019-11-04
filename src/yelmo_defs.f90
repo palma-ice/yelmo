@@ -276,7 +276,8 @@ module yelmo_defs
         real(prec), allocatable :: visc_eff(:,:)
 
         real(prec), allocatable :: N_eff(:,:)       ! Effective pressure
-        real(prec), allocatable :: C_bed(:,:)  
+        real(prec), allocatable :: cf_ref(:,:)
+        real(prec), allocatable :: c_bed(:,:)  
         real(prec), allocatable :: beta_acx(:,:) 
         real(prec), allocatable :: beta_acy(:,:) 
         real(prec), allocatable :: beta(:,:) 
@@ -423,7 +424,7 @@ module yelmo_defs
         real(prec), allocatable :: kt(:,:,:)        ! Heat conductivity  
         real(prec), allocatable :: H_cts(:,:)       ! Height of the cts
         real(prec), allocatable :: T_prime_b(:,:)   ! Homologous temperature at the base 
-
+        real(prec), allocatable :: H_w(:,:)         ! [m] Basal water layer thickness 
     end type
 
     ! ytherm class

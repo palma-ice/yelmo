@@ -106,7 +106,7 @@ contains
                     
                     call calc_ytherm_enthalpy_3D(thrm%now%enth,thrm%now%T_ice,thrm%now%omega,thrm%now%bmb_grnd,thrm%now%Q_ice_b, &
                                 thrm%now%H_cts,thrm%now%T_pmp,thrm%now%cp,thrm%now%kt,dyn%now%ux,dyn%now%uy,dyn%now%uz,thrm%now%Q_strn, &
-                                thrm%now%Q_b,bnd%Q_geo,bnd%T_srf,tpo%now%H_ice,bnd%H_w,tpo%now%H_grnd,tpo%now%f_grnd,thrm%par%zeta_aa, &
+                                thrm%now%Q_b,bnd%Q_geo,bnd%T_srf,tpo%now%H_ice,thrm%now%H_w,tpo%now%H_grnd,tpo%now%f_grnd,thrm%par%zeta_aa, &
                                 thrm%par%zeta_ac,thrm%par%dzeta_a,thrm%par%dzeta_b,thrm%par%enth_cr,thrm%par%omega_max, &
                                 dt,thrm%par%dx,thrm%par%method,thrm%par%solver_advec)
                     
@@ -114,7 +114,7 @@ contains
                     ! Use Robin solution for ice temperature 
 
                     call define_temp_robin_3D(thrm%now%T_ice,thrm%now%T_pmp,thrm%now%cp,thrm%now%kt, &
-                                       bnd%Q_geo,bnd%T_srf,tpo%now%H_ice,bnd%H_w,bnd%smb, &
+                                       bnd%Q_geo,bnd%T_srf,tpo%now%H_ice,thrm%now%H_w,bnd%smb, &
                                        thrm%now%bmb_grnd,tpo%now%f_grnd,thrm%par%zeta_aa,cold=.FALSE.)
 
                     ! Also populate enthalpy 
@@ -126,7 +126,7 @@ contains
                     ! to ensure cold ice at the base
 
                     call define_temp_robin_3D(thrm%now%T_ice,thrm%now%T_pmp,thrm%now%cp,thrm%now%kt, &
-                                       bnd%Q_geo,bnd%T_srf,tpo%now%H_ice,bnd%H_w,bnd%smb, &
+                                       bnd%Q_geo,bnd%T_srf,tpo%now%H_ice,thrm%now%H_w,bnd%smb, &
                                        thrm%now%bmb_grnd,tpo%now%f_grnd,thrm%par%zeta_aa,cold=.TRUE.)
 
                     ! Also populate enthalpy 
@@ -153,6 +153,10 @@ contains
 
             end select 
 
+            ! Update basal water layer thickness 
+            thrm%now%H_w = thrm%now%H_w - thrm%now%bmb_grnd*(rho_ice/rho_w)
+            where(thrm%now%H_w .lt. 0.0_prec) thrm%now%H_w = 0.0 
+            
         end if 
 
         ! Calculate homologous temperature at the base 
@@ -161,6 +165,7 @@ contains
         ! Calculate gridpoint fraction at the pressure melting point
         thrm%now%f_pmp = calc_f_pmp(thrm%now%T_ice(:,:,1),thrm%now%T_pmp(:,:,1),thrm%par%gamma,tpo%now%f_grnd)
 
+            
 !         if (yelmo_log) then 
 !             if (count(tpo%now%H_ice.gt.0.0) .gt. 0) then 
 !                 write(*,"(a,f14.4,f10.4,f10.2)") "calc_ytherm:: time = ", thrm%par%time, dt, &
@@ -768,7 +773,8 @@ contains
         allocate(now%kt(nx,ny,nz_aa))
         allocate(now%H_cts(nx,ny))
         allocate(now%T_prime_b(nx,ny))
-        
+        allocate(now%H_w(nx,ny))
+
         now%enth      = 0.0
         now%T_ice     = 0.0
         now%omega     = 0.0  
@@ -782,7 +788,8 @@ contains
         now%kt        = 0.0 
         now%H_cts     = 0.0 
         now%T_prime_b = 0.0 
-        
+        now%H_w       = 0.0 
+
         return 
     end subroutine ytherm_alloc 
 
@@ -805,6 +812,7 @@ contains
         if (allocated(now%kt))        deallocate(now%kt)
         if (allocated(now%H_cts))     deallocate(now%H_cts)
         if (allocated(now%T_prime_b)) deallocate(now%T_prime_b)
+        if (allocated(now%H_w))       deallocate(now%H_w)
         
         return 
 

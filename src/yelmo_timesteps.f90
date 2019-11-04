@@ -638,7 +638,7 @@ end if
 
     end subroutine yelmo_timestep_write_init 
 
-    subroutine yelmo_timestep_write(filename,time,dt_now,dt_adv,pc_dt,pc_eta,pc1_dt,pc1_eta,pc_tau)
+    subroutine yelmo_timestep_write(filename,time,dt_now,dt_adv,pc_dt,pc_eta,pc_tau,pc1_dt,pc1_eta,pc1_tau)
 
         implicit none 
 
@@ -648,9 +648,10 @@ end if
         real(prec), intent(IN) :: dt_adv
         real(prec), intent(IN) :: pc_dt 
         real(prec), intent(IN) :: pc_eta 
+        real(prec), intent(IN) :: pc_tau(:,:) 
         real(prec), intent(IN) :: pc1_dt 
         real(prec), intent(IN) :: pc1_eta 
-        real(prec), intent(IN) :: pc_tau(:,:) 
+        real(prec), intent(IN) :: pc1_tau(:,:)
 
         ! Local variables
         integer    :: ncid, n, nx, ny 
@@ -672,14 +673,16 @@ end if
 
         call nc_write(filename, "dt_now",dt_now,dim1="time",start=[n],count=[1],ncid=ncid)
         call nc_write(filename, "dt_adv",dt_adv,dim1="time",start=[n],count=[1],ncid=ncid)
+        
         call nc_write(filename,  "pc_dt", pc_dt,dim1="time",start=[n],count=[1],ncid=ncid)
         call nc_write(filename, "pc_eta",pc_eta,dim1="time",start=[n],count=[1],ncid=ncid)
+        call nc_write(filename, "pc_tau",pc_tau,dim1="xc",dim2="yc",dim3="time",start=[1,1,n],count=[nx,ny,1],ncid=ncid)
 
         call nc_write(filename,  "pc1_dt", pc1_dt,dim1="time",start=[n],count=[1],ncid=ncid)
         call nc_write(filename, "pc1_eta",pc1_eta,dim1="time",start=[n],count=[1],ncid=ncid)
+        call nc_write(filename, "pc1_tau",pc1_tau,dim1="xc",dim2="yc",dim3="time",start=[1,1,n],count=[nx,ny,1],ncid=ncid)
 
-        call nc_write(filename, "pc_tau",pc_tau,dim1="xc",dim2="yc",dim3="time",start=[1,1,n],count=[nx,ny,1],ncid=ncid)
-
+        
         ! Close the netcdf file
         call nc_close(ncid)
 

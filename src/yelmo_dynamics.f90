@@ -22,7 +22,7 @@ module yelmo_dynamics
 
     public :: ydyn_par_load, ydyn_alloc, ydyn_dealloc
     public :: calc_ydyn
-    public :: calc_ydyn_neff, calc_ydyn_cbed, calc_ydyn_beta
+    public :: calc_ydyn_neff, calc_ydyn_cfref, calc_ydyn_beta
     public :: check_vel_convergence
     
 contains
@@ -248,8 +248,8 @@ contains
 
         ! ===== Calculate sliding velocity solution ===================
 
-        ! Update bed roughness coefficient C_bed (which is independent of velocity)
-        call calc_ydyn_cbed(dyn,tpo,thrm,bnd)
+        ! Update bed roughness coefficient c_bed (which is independent of velocity)
+        call calc_ydyn_cfref(dyn,tpo,thrm,bnd)
 
         ! Define grid points with ssa active (uses beta from previous timestep)
         call set_ssa_masks(dyn%now%ssa_mask_acx,dyn%now%ssa_mask_acy,dyn%now%beta_acx,dyn%now%beta_acy, &
@@ -449,8 +449,8 @@ contains
         H_ice_acx = stagger_aa_acx(tpo%now%H_ice)
         H_ice_acy = stagger_aa_acy(tpo%now%H_ice)
 
-        ! Update bed roughness coefficient C_bed (which is independent of velocity)
-        call calc_ydyn_cbed(dyn,tpo,thrm,bnd)
+        ! Update bed roughness coefficient c_bed (which is independent of velocity)
+        call calc_ydyn_cfref(dyn,tpo,thrm,bnd)
         
         ! Calculate driving stress
         call calc_driving_stress_ac(dyn%now%taud_acx,dyn%now%taud_acy,tpo%now%H_ice,tpo%now%dzsdx,tpo%now%dzsdy,dyn%par%dx)
@@ -839,7 +839,7 @@ if (.FALSE.) then
 
             ! Calculate the analytical grounding-line flux 
             call calc_grounding_line_flux(dyn%now%qq_gl_acx,dyn%now%qq_gl_acy,tpo%now%H_ice,mat%now%ATT_bar, &
-                        dyn%now%C_bed,dyn%now%ux_b,dyn%now%uy_b,tpo%now%f_grnd,tpo%now%f_grnd_acx,tpo%now%f_grnd_acy, &
+                        dyn%now%c_bed,dyn%now%ux_b,dyn%now%uy_b,tpo%now%f_grnd,tpo%now%f_grnd_acx,tpo%now%f_grnd_acy, &
                         mat%par%n_glen,dyn%par%beta_q,Q0=0.61_prec,f_drag=0.6_prec,gl_flux_method="power")
 
             ! Where qq_gl is present, prescribe velocity and set mask to -1
@@ -935,6 +935,9 @@ end if
         ! Local variables 
         integer :: i, j 
 
+        ! 0. Calculate C_bed [Pa]
+        dyn%now%c_bed = dyn%now%cf_ref * dyn%now%N_eff 
+
         ! 1. Apply beta method of choice 
         select case(dyn%par%beta_method)
 
@@ -947,19 +950,19 @@ end if
                 dyn%now%beta = dyn%par%beta_const 
 
             case(1)
-                ! Calculate beta from a linear law (simply set beta=C_bed/u0)
+                ! Calculate beta from a linear law (simply set beta=c_bed/u0)
 
-                dyn%now%beta = dyn%now%C_bed * (1.0_prec / dyn%par%beta_u0)
+                dyn%now%beta = dyn%now%c_bed * (1.0_prec / dyn%par%beta_u0)
 
             case(2)
                 ! Calculate beta from the quasi-plastic power-law as defined by Bueler and van Pelt (2015)
 
-                call calc_beta_aa_power_plastic(dyn%now%beta,dyn%now%ux_b,dyn%now%uy_b,dyn%now%C_bed,dyn%par%beta_q,dyn%par%beta_u0)
+                call calc_beta_aa_power_plastic(dyn%now%beta,dyn%now%ux_b,dyn%now%uy_b,dyn%now%c_bed,dyn%par%beta_q,dyn%par%beta_u0)
                 
             case(3)
                 ! Calculate beta from regularized Coulomb law (Joughin et al., GRL, 2019)
 
-                call calc_beta_aa_reg_coulomb(dyn%now%beta,dyn%now%ux_b,dyn%now%uy_b,dyn%now%C_bed,dyn%par%beta_q,dyn%par%beta_u0)
+                call calc_beta_aa_reg_coulomb(dyn%now%beta,dyn%now%ux_b,dyn%now%uy_b,dyn%now%c_bed,dyn%par%beta_q,dyn%par%beta_u0)
                 
             case DEFAULT 
                 ! Not recognized 
@@ -986,7 +989,7 @@ end if
             case(2) 
                 ! Apply scaling according to thickness above flotation (Zstar approach of Gladstone et al., 2017)
                 ! norm==.TRUE., so that zstar-scaling is bounded between 0 and 1, and thus won't affect 
-                ! choice of C_bed value that is independent of this scaling. 
+                ! choice of c_bed value that is independent of this scaling. 
                 
                 call scale_beta_gl_zstar(dyn%now%beta,tpo%now%H_ice,bnd%z_bed,bnd%z_sl,norm=.TRUE.)
 
@@ -1109,8 +1112,8 @@ end if
 
     end subroutine calc_ydyn_beta 
 
-    subroutine calc_ydyn_cbed(dyn,tpo,thrm,bnd)
-        ! Update C_bed [Pa] based on parameter choices
+    subroutine calc_ydyn_cfref(dyn,tpo,thrm,bnd)
+        ! Update cf_ref [--] based on parameter choices
 
         implicit none
         
@@ -1125,24 +1128,24 @@ end if
         real(prec), allocatable :: cf_ref(:,:) 
         real(prec), allocatable :: lambda_bed(:,:)  
 
-        nx = size(dyn%now%C_bed,1)
-        ny = size(dyn%now%C_bed,2)
+        nx = size(dyn%now%cf_ref,1)
+        ny = size(dyn%now%cf_ref,2)
         
         allocate(cf_ref(nx,ny))
         allocate(lambda_bed(nx,ny))
         
         if (dyn%par%cb_method .eq. -1) then 
-            ! Do nothing - C_bed defined externally
+            ! Do nothing - cf_ref defined externally
 
         else 
-            ! Calculate C_bed following parameter choices 
+            ! Calculate cf_ref following parameter choices 
 
             ! =============================================================================
-            ! Step 1: calculate the C_bed field only determined by 
+            ! Step 1: calculate the cf_ref field only determined by 
             ! cf_frozen, cf_stream and temperate character of the bed 
 
             if (dyn%par%cb_with_pmp) then 
-                ! Smooth transition between temperate and frozen C_bed
+                ! Smooth transition between temperate and frozen cf_ref
 
                 cf_ref = (thrm%now%f_pmp)*dyn%par%cf_stream &
                            + (1.0_prec - thrm%now%f_pmp)*dyn%par%cf_frozen 
@@ -1190,7 +1193,7 @@ end if
             end if
 
             ! =============================================================================
-            ! Step 2: calculate lambda functions to scale C_bed from default value 
+            ! Step 2: calculate lambda functions to scale cf_ref from default value 
             
             !------------------------------------------------------------------------------
             ! lambda_bed: scaling as a function of bedrock elevation
@@ -1230,15 +1233,15 @@ end if
 
 
             ! =============================================================================
-            ! Step 3: calculate C_bed [Pa]
+            ! Step 3: calculate cf_ref [Pa]
             
-            dyn%now%C_bed = (cf_ref*lambda_bed)*dyn%now%N_eff
+            dyn%now%cf_ref = (cf_ref*lambda_bed)
             
         end if 
 
         return 
 
-    end subroutine calc_ydyn_cbed
+    end subroutine calc_ydyn_cfref
 
     subroutine calc_ydyn_neff(dyn,tpo,thrm,bnd)
         ! Update N_eff based on parameter choices
@@ -1262,7 +1265,7 @@ end if
             H_w = dyn%par%neff_w_max * thrm%now%f_pmp  
         else 
             ! Use boundary water thickness field
-            H_w = bnd%H_w 
+            H_w = thrm%now%H_w 
         end if 
 
         ! Calculate effective pressure N_eff [Pa]
@@ -1473,7 +1476,8 @@ end if
 
         allocate(now%visc_eff(nx,ny))  
         
-        allocate(now%C_bed(nx,ny)) 
+        allocate(now%cf_ref(nx,ny))
+        allocate(now%c_bed(nx,ny)) 
         
         allocate(now%N_eff(nx,ny))
 
@@ -1540,7 +1544,8 @@ end if
         
         now%visc_eff          = 0.0  
         
-        now%C_bed             = 0.0 
+        now%cf_ref            = 0.0
+        now%c_bed             = 0.0 
         
         now%N_eff             = 0.0 
 
@@ -1617,7 +1622,8 @@ end if
         
         if (allocated(now%visc_eff))        deallocate(now%visc_eff) 
         
-        if (allocated(now%C_bed))           deallocate(now%C_bed) 
+        if (allocated(now%cf_ref))          deallocate(now%cf_ref) 
+        if (allocated(now%c_bed))           deallocate(now%c_bed) 
         
         if (allocated(now%N_eff))           deallocate(now%N_eff)
         
@@ -1778,7 +1784,7 @@ end if
         call nc_write(filename,"ssa_mask_acy",dyn%now%ssa_mask_acy,units="1",long_name="SSA mask (acy)", &
                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
 
-        call nc_write(filename,"C_bed",dyn%now%C_bed,units="Pa",long_name="Dragging coefficient", &
+        call nc_write(filename,"c_bed",dyn%now%c_bed,units="Pa",long_name="Dragging coefficient", &
                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
         call nc_write(filename,"N_eff",dyn%now%N_eff,units="Pa",long_name="Effective pressure", &
                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)

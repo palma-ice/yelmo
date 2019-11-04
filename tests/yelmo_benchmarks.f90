@@ -391,7 +391,7 @@ program yelmo_benchmarks
     select case(trim(experiment))
         case("BUELER-A","BUELER-B","HALFAR","HALFAR-MED")
 
-            write(*,"(a,3f10.2,10g12.3)") trim(experiment), time, yelmo1%par%dtmax, yelmo1%grd%dx*1e-3, &
+            write(*,"(a,3f10.2,10g12.3)") trim(experiment), time, dtt, yelmo1%grd%dx*1e-3, &
                                             buel%rmse_H_ice, buel%err_H0, buel%err_max_H_ice, buel%err_V_ice
 
         case DEFAULT 

@@ -603,10 +603,7 @@ module yelmo_defs
 
         ! Yelmo timesteps 
         real(prec)          :: dtmin
-        real(prec)          :: dtmax
-        real(prec)          :: dt_ref 
-        integer             :: ntt
-        real(prec)          :: dttmax 
+        real(prec)          :: dtref 
         real(prec)          :: cfl_max 
         real(prec)          :: cfl_diff_max 
         real(prec)          :: pc_ebs 

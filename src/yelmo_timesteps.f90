@@ -95,10 +95,13 @@ contains
         
         dt = min(dt,dtmax)
 
-        ! Finally, make sure adaptive time step synchronizes with larger time step 
-        if (time + dt .gt. time_max) then 
-            dt = time_max - time 
-        end if 
+        ! Finally, ensure timestep is within prescribed limits
+        call limit_adaptive_timestep(dt,time,time_max,dtmin,dtmax)
+
+!         ! Finally, make sure adaptive time step synchronizes with larger time step 
+!         if (time + dt .gt. time_max) then 
+!             dt = time_max - time 
+!         end if 
 
         return 
 
@@ -207,7 +210,7 @@ contains
         dt = max(dtmin,dt)  ! dt >= dtmin
         dt = min(dtmax,dt)  ! dt <= dtmax
 
-if (.FALSE.) then 
+if (.TRUE.) then 
         ! Check to avoid lopsided timesteps (1 big, 1 tiny) to arrive at time_max 
         dt_time_max = time_max - time 
         if (dt_time_max .gt. 0.0) then 
@@ -297,11 +300,8 @@ end if
             !ux_now = max(abs(ux(i-1,j)),abs(ux(i,j)))
             !uy_now = max(abs(uy(i,j-1)),abs(uy(i,j)))
             
-            dt(i,j) = cfl_max * 1.0 / max(ux_now/dx + uy_now/dy,1e-3)
+            dt(i,j) = cfl_max * 1.0 / (ux_now/dx + uy_now/dy + eps/dx)
 
-!             dt(i,j) = cfl_max * 1.0 / (abs(ux(i-1,j))/dx + abs(ux(i,j))/dx &
-!                                        + abs(uy(i,j-1))/dy + abs(uy(i,j))/dy + eps/(dx+dy))
-            
         end do 
         end do 
 

@@ -744,7 +744,7 @@ contains
 
             call nc_write_dim(fnm,ynm,x=grid%yc*1e-3,units="kilometers")
             call nc_write_attr(fnm,ynm,"_CoordinateAxisType","GeoY")
-
+            
         end if 
 
         ! Add projection information if needed

@@ -22,10 +22,8 @@
     zeta_scale      = "tanh"            ! "linear", "exp", "tanh"
     zeta_exp        = 2.0  
     nz_aa           = 10                ! Vertical resolution in ice
-    dtmin           = 0.2               ! [a] Minimum timestep 
-    dtmax           = 0.2               ! [a] Maximum timestep
-    dt_ref          = 1.0 
-    ntt             = 1                 ! [--] Thermodynamics call frequency (how many dynamic timesteps to skip)
+    dtmin           = 0.1               ! [a] Minimum timestep 
+    dtref           = 1.0 
     cfl_max         = 1.0               ! Maximum value is 1.0, lower will be more stable
     cfl_diff_max    = 0.12              ! Bueler et al (2007), Eq. 25 
     pc_ebs          = 1e-2              ! Predictor-corrector tolerance 

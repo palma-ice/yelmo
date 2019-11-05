@@ -602,8 +602,9 @@ module yelmo_defs
         integer             :: nz_aa 
 
         ! Yelmo timesteps 
-        real(prec)          :: dtmin
-        real(prec)          :: dtref 
+        integer             :: dt_method 
+        real(prec)          :: dt_min
+        real(prec)          :: dt_ref 
         real(prec)          :: cfl_max 
         real(prec)          :: cfl_diff_max 
         real(prec)          :: pc_ebs 

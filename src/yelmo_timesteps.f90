@@ -46,7 +46,7 @@ contains
 
     end subroutine calc_pc_tau_fe_sbe
 
-    subroutine set_adaptive_timestep_pc(dt,eta,tau,ebs,dt_ref,dtmin,dtmax,time,time_max)
+    subroutine set_adaptive_timestep_pc(dt,eta,tau,ebs,dt_ref,dtmin,dtmax)
         ! Calculate the timestep following algorithm for 
         ! a general predictor-corrector (pc) method.
         ! Implemented followig Cheng et al (2017, GMD)
@@ -60,8 +60,6 @@ contains
         real(prec), intent(IN)  :: dt_ref               ! [yr]   Reference dt to osicillate around, if not dt_ref=0
         real(prec), intent(IN)  :: dtmin                ! [yr]   Minimum allowed timestep
         real(prec), intent(IN)  :: dtmax                ! [yr]   Maximum allowed timestep
-        real(prec), intent(IN)  :: time 
-        real(prec), intent(IN)  :: time_max 
 
         ! Local variables 
         real(prec) :: dt_n                          ! [yr]   Timestep (previous)
@@ -93,21 +91,14 @@ contains
             dt = f_scale * (0.5_prec*dtmax)
         end if 
         
-        dt = min(dt,dtmax)
-
         ! Finally, ensure timestep is within prescribed limits
-        call limit_adaptive_timestep(dt,time,time_max,dtmin,dtmax)
-
-!         ! Finally, make sure adaptive time step synchronizes with larger time step 
-!         if (time + dt .gt. time_max) then 
-!             dt = time_max - time 
-!         end if 
+        call limit_adaptive_timestep(dt,dtmin,dtmax)
 
         return 
 
     end subroutine set_adaptive_timestep_pc
 
-    subroutine set_adaptive_timestep(dt,dt_adv,dt_diff,dt_adv3D,time,time_max, &
+    subroutine set_adaptive_timestep(dt,dt_adv,dt_diff,dt_adv3D, &
                         ux,uy,uz,ux_bar,uy_bar,D2D,H_ice,dHicedt,zeta_ac, &
                         dx,dtmin,dtmax,cfl_max,cfl_diff_max)
         ! Determine value of adaptive timestep to be consistent with 
@@ -120,8 +111,6 @@ contains
         real(prec), intent(OUT) :: dt_adv(:,:)     ! [a] Diagnosed maximum advective timestep (vertical ave)
         real(prec), intent(OUT) :: dt_diff(:,:)    ! [a] Diagnosed maximum diffusive timestep (vertical ave) 
         real(prec), intent(OUT) :: dt_adv3D(:,:,:) ! [a] Diagnosed maximum advective timestep (3D) 
-        real(prec), intent(IN)  :: time            ! [a] Current model time  
-        real(prec), intent(IN)  :: time_max        ! [a] Time the model can evolve to
         real(prec), intent(IN)  :: ux(:,:,:)       ! [m a-1]
         real(prec), intent(IN)  :: uy(:,:,:)       ! [m a-1]
         real(prec), intent(IN)  :: uz(:,:,:)       ! [m a-1]
@@ -136,7 +125,7 @@ contains
         real(prec), intent(IN)  :: cfl_diff_max
         
         ! Local variables 
-        real(prec) :: dt_adv_min, dt_diff_min, dt_time_max 
+        real(prec) :: dt_adv_min, dt_diff_min 
         real(prec) :: x 
         logical    :: is_unstable
         real(prec), parameter :: dtmax_cfl   = 20.0_prec 
@@ -183,39 +172,34 @@ contains
         if (is_unstable) dt = rate_scalar*dt
 
         ! Finally, ensure timestep is within prescribed limits
-        call limit_adaptive_timestep(dt,time,time_max,dtmin,dtmax)
+        call limit_adaptive_timestep(dt,dtmin,dtmax)
 
         return 
 
     end subroutine set_adaptive_timestep
     
-    subroutine limit_adaptive_timestep(dt,time,time_max,dtmin,dtmax)
+    subroutine limit_adaptive_timestep(dt,dtmin,dtmax)
         ! Make sure that adaptive timestep is in range of dtmin < dt < dtmax 
-        ! and time + dt <= time_max 
+        ! where dtmax is evolving to arrive at final timestep, eg time + dtmax = time_max 
 
         implicit none
 
         real(prec), intent(INOUT) :: dt               ! [a] Current timestep 
-        real(prec), intent(IN)    :: time             ! [a] Current model time  
-        real(prec), intent(IN)    :: time_max         ! [a] Time the model can evolve to
         real(prec), intent(IN)    :: dtmin            ! [a] Minimum allowed timestep
         real(prec), intent(IN)    :: dtmax            ! [a] Maximum allowed timestep 
 
-        ! Local variables 
-        real(prec) :: dt_time_max 
+        ! Local variables  
         real(prec), parameter :: n_decimal   = 4          ! Maximum decimals to treat for timestep
         real(prec), parameter :: dt_half_lim = 0.5_prec   ! Should be 0.5 or greater to make sense
 
         ! Ensure timestep is also within parameter limits 
         dt = max(dtmin,dt)  ! dt >= dtmin
         dt = min(dtmax,dt)  ! dt <= dtmax
+        
+        ! Check to avoid lopsided timesteps (1 big, 1 tiny) to arrive at time_max  
+        if (dtmax .gt. 0.0) then 
 
-if (.TRUE.) then 
-        ! Check to avoid lopsided timesteps (1 big, 1 tiny) to arrive at time_max 
-        dt_time_max = time_max - time 
-        if (dt_time_max .gt. 0.0) then 
-
-            if (dt/dtmax .gt. dt_half_lim .and. dt .lt. dt_time_max) then 
+            if (dt/dtmax .gt. dt_half_lim .and. dt .lt. dtmax) then 
                 ! Current adaptive timestep is greater than ~0.5 of the total
                 ! expected timestep, and another timestep will be needed to
                 ! reach time_max. Therefore, set this timestep to a smaller
@@ -223,21 +207,13 @@ if (.TRUE.) then
 
                 dt = dt_half_lim*dtmax
 
-                ! Round-off extra digits 
-                dt = real( nint(dt*10.0_prec**n_decimal)*10.0_prec**(-n_decimal), prec)
+            else if (dt/dtmax .lt. dt_half_lim) then 
+                ! Round-off extra digits for neatness
 
+                dt = real(floor(dt*10.0_prec**n_decimal)*10.0_prec**(-n_decimal), prec)
+                
             end if 
 
-        end if 
-end if 
-
-        ! Round-off extra digits for neatness
-        !dt = real( nint(dt*10.0_prec**n_decimal)*10.0_prec**(-n_decimal), prec)
-        dt = real(floor(dt*10.0_prec**n_decimal)*10.0_prec**(-n_decimal), prec)
-
-        ! Finally, make sure adaptive time step synchronizes with larger time step 
-        if (time + dt .gt. time_max) then 
-            dt = time_max - time 
         end if 
 
         return 

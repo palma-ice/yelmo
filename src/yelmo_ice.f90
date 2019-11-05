@@ -41,7 +41,7 @@ contains
         type(ytherm_class) :: thrm1
 
         ! Local variables 
-        real(prec) :: dt_now, dtmax  
+        real(prec) :: dt_now, dt_max  
         real(prec) :: time_now, time_start 
         integer    :: n, nstep
         real(4)    :: cpu_start_time 
@@ -58,11 +58,8 @@ contains
         call cpu_time(cpu_start_time) 
         time_start = time_now 
         
-        ! Set dtmax as a function of the total timestep 
-        dtmax = max(time-time_now,0.0_prec)
-
         ! Determine maximum number of time steps to be iterated through   
-        nstep  = (time-time_now) / dom%par%dtmin 
+        nstep  = (time-time_now) / dom%par%dt_min 
 
         allocate(dt_save(nstep))
         dt_save = missing_value 
@@ -73,35 +70,57 @@ contains
         ! Iterate of topo dynamics updates
         do n = 1, nstep
 
-            ! Diagnose adaptive time step from advection CFL constraints 
-            call set_adaptive_timestep(dt_adv_min,dom%par%dt_adv,dom%par%dt_diff,dom%par%dt_adv3D,time_now,time, &
+            ! Update dt_max as a function of the total timestep 
+            dt_max = max(time-time_now,0.0_prec)
+
+            ! === Diagnose different adaptive timestep limits ===
+
+            ! Diagnose adaptive time step from CFL constraints 
+            call set_adaptive_timestep(dt_adv_min,dom%par%dt_adv,dom%par%dt_diff,dom%par%dt_adv3D, &
                                 dom%dyn%now%ux,dom%dyn%now%uy,dom%dyn%now%uz,dom%dyn%now%ux_bar,dom%dyn%now%uy_bar, &
                                 dom%dyn%now%dd_ab_bar,dom%tpo%now%H_ice,dom%tpo%now%dHicedt,dom%par%zeta_ac, &
-                                dom%tpo%par%dx,dom%par%dtmin,dtmax,dom%par%cfl_max,dom%par%cfl_diff_max) 
+                                dom%tpo%par%dx,dom%par%dt_min,dt_max,dom%par%cfl_max,dom%par%cfl_diff_max) 
             
             ! Calculate new adaptive timestep using predictor-corrector algorithm for ice thickness
             call set_adaptive_timestep_pc(dom%par%pc_dt,dom%par%pc_eta,dom%par%pc_tau,dom%par%pc_ebs, &
-                                                dom%par%dtref,dom%par%dtmin,dtmax,time_now,time)
+                                                dom%par%dt_ref,dom%par%dt_min,dt_max)
 
             ! Calculate adaptive timestep  using predictor-corrector algorithm for basal temperatures
             call set_adaptive_timestep_pc(dom%par%pc1_dt,dom%par%pc1_eta,dom%par%pc1_tau,dom%par%pc1_ebs, &
-                                        dom%par%dtref,dom%par%dtmin,dtmax,time_now,time)
+                                        dom%par%dt_ref,dom%par%dt_min,dt_max)
 
-            ! Determine current time step 
-            if (dom%tpo%par%topo_fixed) then 
-                ! No topo calcs, so nstep=1
-                dt_now = time-dom%tpo%par%time
-            else
-                
-                ! Use last calculated adaptive timestep 
-                !dt_now = min(dom%par%pc_dt,dom%par%pc1_dt)
-                dt_now = dt_adv_min 
+            ! Determine current time step based on method of choice 
+            select case(dom%par%dt_method) 
 
-                ! Finally, ensure timestep is within prescribed limits
-                !call limit_adaptive_timestep(dt_now,time_now,time,dom%par%dtmin,dtmax)
+                case(0) 
+                    ! No internal timestep, so nstep=1 
+                    
+                    dt_now = dt_max 
 
-            end if 
-            
+                case(1) 
+                    ! Use CFL timestep limit method
+
+                    dt_now = dt_adv_min 
+
+                case(2) 
+                    ! Use predictor-corrector adaptive timestep
+
+                    dt_now = dom%par%pc_dt                      ! Based on ice thickness 
+                    dt_now = dom%par%pc1_dt                     ! Based on basal temperature 
+                    dt_now = min(dom%par%pc_dt,dom%par%pc1_dt)  ! Minimum between ice thickness and basal temperature
+
+                case DEFAULT 
+
+                    write(*,*) "yelmo_update:: Error: dt_method not recognized."
+                    write(*,*) "dt_method = ", dom%par%dt_method 
+                    stop 
+
+            end select 
+
+            ! Finally, ensure timestep is within prescribed limits (already managed internally)
+            !call limit_adaptive_timestep(dt_now,dom%par%dt_min,dt_max)
+
+            ! Save the current timestep for log 
             dt_save(n) = dt_now 
 
             ! Advance the local time variable
@@ -137,18 +156,18 @@ contains
 
             ! Calculate thermodynamics (temperatures and enthalpy), corrected
             call calc_ytherm(dom%thrm,tpo1,dom%dyn,dom%mat,dom%bnd,time_now)            
-            
-            ! Determine truncation error for temperature
-            call calc_pc_tau_fe_sbe(dom%par%pc1_tau,dom%thrm%now%T_prime_b,thrm1%now%T_prime_b,dom%par%pc1_dt,dom%par%dtmin)
-
 
             ! Step 3: Finally, calculate corrector step with actual topography object 
             ! Calculate topography (elevation, ice thickness, calving, etc.), corrected
             call calc_ytopo(dom%tpo,dom%dyn,dom%thrm,dom%bnd,time_now,topo_fixed=dom%tpo%par%topo_fixed)    
             call calc_ytopo_masks(dom%tpo,dom%dyn,dom%thrm,dom%bnd)
 
+
             ! Determine truncation error for ice thickness 
-            call calc_pc_tau_fe_sbe(dom%par%pc_tau,dom%tpo%now%H_ice,tpo1%now%H_ice,dom%par%pc_dt,dom%par%dtmin)
+            call calc_pc_tau_fe_sbe(dom%par%pc_tau,dom%tpo%now%H_ice,tpo1%now%H_ice,dom%par%pc_dt,dom%par%dt_min)
+
+            ! Determine truncation error for temperature
+            call calc_pc_tau_fe_sbe(dom%par%pc1_tau,dom%thrm%now%T_prime_b,thrm1%now%T_prime_b,dom%par%pc1_dt,dom%par%dt_min)
 
 
             if (yelmo_log_timestep) then 
@@ -191,8 +210,6 @@ contains
             end if 
 
             n = count(dt_save .ne. missing_value)
-
-            !write(*,*) "xx2", time, time_now, dom%par%pc_dt, dom%par%pc_eta 
 
             write(*,"(a,f12.2,f8.1,2f10.1,20f7.2)") "yelmo:: [time,speed,H,T,dt]:", time_now, dom%par%model_speed, &
                                 H_mean, T_mean, dt_save(1:n)
@@ -354,9 +371,9 @@ contains
         dom%par%dt_diff  = 0.0 
         dom%par%dt_adv3D = 0.0 
 
-        dom%par%pc_dt    = dom%par%dtmin  
+        dom%par%pc_dt    = dom%par%dt_min  
         dom%par%pc_eta   = dom%par%pc_ebs  
-        dom%par%pc1_dt   = dom%par%dtmin  
+        dom%par%pc1_dt   = dom%par%dt_min  
         dom%par%pc1_eta  = dom%par%pc1_ebs  
         
         ! Allocate truncation error array 
@@ -591,12 +608,12 @@ contains
             call calc_ytopo_masks(dom%tpo,dom%dyn,dom%thrm,dom%bnd)
             
             ! Calculate initial thermodynamic information
-            dom%thrm%par%time = time - dom%par%dtmin
+            dom%thrm%par%time = time - dom%par%dt_min
             call calc_ytherm(dom%thrm,dom%tpo,dom%dyn,dom%mat,dom%bnd,time)
 
             ! Calculate material information (with no dynamics), and set initial ice dep_time values
             
-            dom%mat%par%time     = time - dom%par%dtmin
+            dom%mat%par%time     = time - dom%par%dt_min
             dom%mat%now%dep_time = dom%mat%par%time
 
             call calc_ymat(dom%mat,dom%tpo,dom%dyn,dom%thrm,dom%bnd,time)
@@ -650,8 +667,9 @@ contains
         call nml_read(filename,"yelmo","zeta_scale",    par%zeta_scale)
         call nml_read(filename,"yelmo","zeta_exp",      par%zeta_exp)
         call nml_read(filename,"yelmo","nz_aa",         par%nz_aa)
-        call nml_read(filename,"yelmo","dtmin",         par%dtmin)
-        call nml_read(filename,"yelmo","dtref",        par%dtref)
+        call nml_read(filename,"yelmo","dt_method",     par%dt_method)
+        call nml_read(filename,"yelmo","dt_min",        par%dt_min)
+        call nml_read(filename,"yelmo","dt_ref",        par%dt_ref)
         call nml_read(filename,"yelmo","cfl_max",       par%cfl_max)
         call nml_read(filename,"yelmo","cfl_diff_max",  par%cfl_diff_max)
         call nml_read(filename,"yelmo","pc_ebs",        par%pc_ebs)
@@ -665,10 +683,10 @@ contains
         call yelmo_parse_path(par%grid_path,par%domain,par%grid_name)
         call yelmo_parse_path(par%restart,par%domain,par%grid_name)
 
-        ! dtmin must be greater than zero 
-        if (par%dtmin .eq. 0.0) then 
-            write(*,*) "yelmo_par_load:: dtmin must be greater than zero."
-            write(*,*) "dtmin = ", par%dtmin 
+        ! dt_min must be greater than zero 
+        if (par%dt_min .eq. 0.0) then 
+            write(*,*) "yelmo_par_load:: dt_min must be greater than zero."
+            write(*,*) "dt_min = ", par%dt_min 
             stop 
         end if 
 

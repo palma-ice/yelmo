@@ -77,7 +77,6 @@ contains
             ! Calculate strain heating from strain rate tensor and viscosity (general approach)
             
             call calc_strain_heating(thrm%now%Q_strn,mat%now%strn%de,mat%now%visc,thrm%now%cp,rho_ice)
-!             call calc_strain_heating_smooth(thrm%now%Q_strn,mat%now%strn%de,mat%now%visc,thrm%now%cp,rho_ice)
 
         end if 
         
@@ -88,7 +87,8 @@ contains
         end if 
         
         ! Calculate the basal frictional heating 
-        call calc_basal_heating(thrm%now%Q_b,dyn%now%ux_b,dyn%now%uy_b,dyn%now%taub_acx,dyn%now%taub_acy)
+        call calc_basal_heating(thrm%now%Q_b,dyn%now%ux_b,dyn%now%uy_b,dyn%now%taub_acx,dyn%now%taub_acy, &
+                                thrm%now%T_prime_b,gamma=2.0_prec)
 
         ! Smooth basal frictional heating 
         if (thrm%par%n_sm_qb .gt. 0) then 
@@ -156,7 +156,7 @@ contains
             ! Update basal water layer thickness 
             thrm%now%H_w = thrm%now%H_w - thrm%now%bmb_grnd*(rho_ice/rho_w)
             where(thrm%now%H_w .lt. 0.0_prec) thrm%now%H_w = 0.0 
-            
+
         end if 
 
         ! Calculate homologous temperature at the base 

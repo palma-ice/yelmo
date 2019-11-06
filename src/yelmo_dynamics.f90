@@ -1009,7 +1009,13 @@ end if
         type(ybound_class), intent(IN)    :: bnd   
 
         ! Local variables 
-        integer :: i, j 
+        integer :: i, j, nx, ny 
+        real(prec), allocatable :: logbeta(:,:) 
+
+        nx = size(dyn%now%beta,1)
+        ny = size(dyn%now%beta,2)
+        allocate(logbeta(nx,ny))
+        logbeta = 0.0_prec 
 
         ! 0. Calculate C_bed [Pa]
         dyn%now%c_bed = dyn%now%cf_ref * dyn%now%N_eff 
@@ -1120,9 +1126,11 @@ end if
         end select 
 
         ! 4. Apply smoothing if desired (only for points with beta > 0)
-        if (dyn%par%n_sm_beta .gt. 0) then 
-            call smooth_gauss_2D(dyn%now%beta,dyn%now%beta.gt.0.0,dyn%par%dx,dyn%par%n_sm_beta,dyn%now%beta.gt.0.0)
-
+        if (dyn%par%n_sm_beta .gt. 0) then
+            logbeta = 0.0_prec  
+            where(dyn%now%beta.gt.0.0_prec) logbeta = log10(dyn%now%beta)
+            call smooth_gauss_2D(logbeta,logbeta.gt.0.0,dyn%par%dx,dyn%par%n_sm_beta,logbeta.gt.0.0)
+            where(dyn%now%beta.gt.0.0_prec) dyn%now%beta = 10.0_prec**logbeta
         end if 
 
         ! Apply additional condition for particular experiments

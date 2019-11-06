@@ -263,7 +263,7 @@ contains
             ! == Iterate over strain rate, viscosity and ssa velocity solutions until convergence ==
             ! Note: ssa solution is defined for ux_b/uy_b fields here, not ux_bar/uy_bar as in PD12
               
-            call calc_ydyn_ssa(dyn,tpo,mat,bnd)
+            call calc_ydyn_ssa(dyn,tpo,thrm,mat,bnd)
             
         else 
             ! No ssa calculations performed, set basal velocity fields to zeor 
@@ -771,7 +771,7 @@ contains
 
     end subroutine relax_ssa
 
-    subroutine calc_ydyn_ssa(dyn,tpo,mat,bnd)
+    subroutine calc_ydyn_ssa(dyn,tpo,thrm,mat,bnd)
         ! Calculate the ssa solution via a linearized Picard iteration
         ! over beta, visc and velocity
 
@@ -779,6 +779,7 @@ contains
         
         type(ydyn_class),   intent(INOUT) :: dyn
         type(ytopo_class),  intent(IN)    :: tpo 
+        type(ytherm_class), intent(IN)    :: thrm 
         type(ymat_class),   intent(IN)    :: mat 
         type(ybound_class), intent(IN)    :: bnd   
 
@@ -821,6 +822,81 @@ contains
             ux_b_prev = dyn%now%ux_b 
             uy_b_prev = dyn%now%uy_b 
 
+            !   0. Mix velocities to get ux_bar/uy_bar 
+
+
+        ! ===== Combine sliding and shear into hybrid fields ==========
+
+        select case(dyn%par%mix_method)
+            ! Determine how to mix shearing (ux_i/uy_i) and sliding (ux_b/uy_b)
+            ! Generally purely floating ice is only given by the SSA solution;
+            ! Grounded or partially grounded ice is given by the hybrid solution 
+
+            case(-2)
+                ! Purely sia model
+                ! (correspondingly, floating ice is killed in yelmo_topography)
+                
+                if (dyn%par%cb_sia .gt. 0.0) then 
+                    ! Calculate basal velocity from Weertman sliding law (Greve 1997)
+                    
+                    call calc_uxy_b_sia(dyn%now%ux_b,dyn%now%uy_b,tpo%now%H_ice,tpo%now%dzsdx,tpo%now%dzsdy, &
+                                thrm%now%f_pmp,dyn%par%zeta_aa,dyn%par%dx,dyn%par%cb_sia,rho_ice,g)
+                
+                else 
+                    ! Otherwise no basal sliding in SIA-only mode
+                
+                    dyn%now%ux_b   = 0.0_prec 
+                    dyn%now%uy_b   = 0.0_prec
+                    
+                end if 
+
+                ! SIA solution everywhere, potentially with additional parameterized basal sliding
+                dyn%now%ux_bar = dyn%now%ux_i_bar + dyn%now%ux_b 
+                dyn%now%uy_bar = dyn%now%uy_i_bar + dyn%now%uy_b 
+
+            case(-1)
+                ! Purely ssa model
+
+                dyn%now%ux_i     = 0.0_prec 
+                dyn%now%uy_i     = 0.0_prec 
+                dyn%now%ux_i_bar = 0.0_prec 
+                dyn%now%uy_i_bar = 0.0_prec 
+                
+                dyn%now%ux_bar = dyn%now%ux_b 
+                dyn%now%uy_bar = dyn%now%uy_b 
+
+            case(0)
+                ! Binary mixing (either shearing or sliding)
+
+                ! TO DO 
+
+                write(*,*) "mix_method=0 not implemented yet."
+                stop 
+
+            case(1)
+                ! Shear when not sliding, otherwise shear+sliding 
+                ! (ie, sia or sia+ssa)
+
+                ! Hybrid solution everywhere 
+                dyn%now%ux_bar = dyn%now%ux_i_bar + dyn%now%ux_b 
+                dyn%now%uy_bar = dyn%now%uy_i_bar + dyn%now%uy_b 
+
+            case(2)
+                ! Weighted mixing 
+
+                ! TO DO 
+
+                write(*,*) "mix_method=2 not implemented yet."
+                stop 
+
+            case DEFAULT
+
+                write(*,*) "mix_method not recognized."
+                write(*,*) "mix_method = ", dyn%par%mix_method
+                stop 
+
+        end select
+
             !   1. Calculate basal drag coefficient beta (beta, beta_acx, beta_acy) 
 
             call calc_ydyn_beta(dyn,tpo,mat,bnd)
@@ -830,7 +906,7 @@ contains
             ! Use 3D rate factor, but 2D shear:
             ! Note: disable shear contribution to viscosity for this solver, for mixed terms use hybrid-pd12 option.
             ! Note: Here visc_eff is calculated using ux_b and uy_b (ssa velocity), not ux_bar/uy_bar as in hybrid-pd12. 
-            dyn%now%visc_eff = calc_visc_eff(dyn%now%ux_b,dyn%now%uy_b,dyn%now%duxdz_bar*0.0,dyn%now%duydz_bar*0.0, &
+            dyn%now%visc_eff = calc_visc_eff(dyn%now%ux_bar,dyn%now%uy_bar,dyn%now%duxdz_bar*0.0,dyn%now%duydz_bar*0.0, &
                                              tpo%now%H_ice,mat%now%ATT,dyn%par%zeta_aa,dyn%par%dx,dyn%par%dy,mat%par%n_glen)
             
             !   X. Prescribe grounding-line flux 
@@ -1902,7 +1978,7 @@ end module yelmo_dynamics
 !                      tpo%now%H_grnd,tpo%now%f_grnd,tpo%now%f_grnd_acx,tpo%now%f_grnd_acy,dyn1%par%dx, &
 !                      method=dyn1%par%taud_gl_method,beta_gl_stag=dyn1%par%beta_gl_stag)
 
-!             call calc_ydyn_ssa(dyn1,tpo,mat,bnd)
+!             call calc_ydyn_ssa(dyn1,tpo,thrm,mat,bnd)
 
 !             ! Set dyn2 equal to previous solution 
 !             !dyn2 = dyn 
@@ -1918,7 +1994,7 @@ end module yelmo_dynamics
 !                      tpo%now%H_grnd,tpo%now%f_grnd,tpo%now%f_grnd_acx,tpo%now%f_grnd_acy,dyn2%par%dx, &
 !                      method=dyn2%par%taud_gl_method,beta_gl_stag=dyn2%par%beta_gl_stag)
 
-!             call calc_ydyn_ssa(dyn2,tpo,mat,bnd)
+!             call calc_ydyn_ssa(dyn2,tpo,thrm,mat,bnd)
             
 !             ! Get weighted-average of the two solutions 
 

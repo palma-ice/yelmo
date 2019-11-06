@@ -20,7 +20,7 @@ module yelmo_timesteps
 
 contains
 
-    elemental subroutine calc_pc_tau_fe_sbe(tau,var_corr,var_pred,dt_n,dtmin)
+    elemental subroutine calc_pc_tau_fe_sbe(tau,var_corr,var_pred,dt_n)
         ! Calculate truncation error for the FE-SBE timestepping method
         ! Forward Euler (FE) predictor step and Semi-implicit
         ! Backward Euler (SBE) corrector step. 
@@ -33,14 +33,12 @@ contains
         real(prec), intent(IN)  :: var_corr
         real(prec), intent(IN)  :: var_pred
         real(prec), intent(IN)  :: dt_n 
-        real(prec), intent(IN)  :: dtmin 
-
-        ! Local variables 
-        real(prec) :: dt_now 
-
-        dt_now = max(dt_n,dtmin)
-
-        tau = (1.0_prec / (2.0_prec*dt_now)) * (var_corr - var_pred)
+        
+        if (dt_n .eq. 0.0_prec) then 
+            tau = 0.0_prec 
+        else 
+            tau = (1.0_prec / (2.0_prec*dt_n)) * (var_corr - var_pred)
+        end if 
 
         return 
 
@@ -195,7 +193,7 @@ contains
         ! Ensure timestep is also within parameter limits 
         dt = max(dtmin,dt)  ! dt >= dtmin
         dt = min(dtmax,dt)  ! dt <= dtmax
-        
+
         ! Check to avoid lopsided timesteps (1 big, 1 tiny) to arrive at time_max  
         if (dtmax .gt. 0.0) then 
 
@@ -270,14 +268,19 @@ contains
         do j = 2, ny-1 
         do i = 2, nx-1 
 
-            ux_now = abs( 0.5*(ux(i-1,j)+ux(i,j)) )
-            uy_now = abs( 0.5*(uy(i,j-1)+uy(i,j)) )
+!             ux_now = abs( 0.5*(ux(i-1,j)+ux(i,j)) )
+!             uy_now = abs( 0.5*(uy(i,j-1)+uy(i,j)) )
 
             !ux_now = max(abs(ux(i-1,j)),abs(ux(i,j)))
             !uy_now = max(abs(uy(i,j-1)),abs(uy(i,j)))
             
-            dt(i,j) = cfl_max * 1.0 / (ux_now/dx + uy_now/dy + eps/dx)
+!             ux_now = abs(ux(i,j) - ux(i-1,j))
+!             uy_now = abs(uy(i,j) - uy(i,j-1))
 
+!             dt(i,j) = cfl_max * 1.0 / (ux_now/dx + uy_now/dy + eps/dx)
+
+            dt(i,j) = cfl_max * 1.0 / (abs(ux(i-1,j))/dx + abs(ux(i,j))/dx &
+                                       + abs(uy(i,j-1))/dy + abs(uy(i,j))/dy + eps/(dx+dy))
         end do 
         end do 
 

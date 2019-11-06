@@ -39,6 +39,7 @@ contains
 
         type(ytopo_class)  :: tpo1 
         type(ytherm_class) :: thrm1
+        type(ytherm_class) :: thrm0
 
         ! Local variables 
         real(prec) :: dt_now, dt_max  
@@ -50,6 +51,8 @@ contains
         real(prec) :: H_mean, T_mean 
         real(prec), allocatable :: dt_save(:) 
         real(prec) :: dt_adv_min
+
+        integer :: n2, nstep2 
 
         ! Load last model time (from dom%tpo, should be equal to dom%thrm)
         time_now = dom%tpo%par%time
@@ -134,6 +137,7 @@ contains
             ! Store local copy of ytopo and ytherm objects to use for predictor step
             tpo1  = dom%tpo 
             thrm1 = dom%thrm 
+            thrm0 = dom%thrm 
 
             ! Step 1: Perform predictor step with temporary topography object 
             ! Calculate topography (elevation, ice thickness, calving, etc.)
@@ -141,10 +145,22 @@ contains
             call calc_ytopo_masks(tpo1,dom%dyn,thrm1,dom%bnd)
 
             ! Step 2: Update other variables using predicted ice thickness 
-
-            ! Calculate thermodynamics (temperatures and enthalpy), predicted
-            call calc_ytherm(thrm1,tpo1,dom%dyn,dom%mat,dom%bnd,time_now)            
             
+!             nstep2 = 5
+!             do n2 = 1, nstep2
+
+!             dom%thrm = thrm0 
+
+!             if (n2 .eq. 1) then 
+!                 ! Calculate thermodynamics (temperatures and enthalpy), predicted
+!                 call calc_ytherm(thrm1,tpo1,dom%dyn,dom%mat,dom%bnd,time_now)            
+!             else 
+!                 thrm1 = thrm0
+!             end if 
+            
+            ! Calculate thermodynamics (temperatures and enthalpy), predicted
+            call calc_ytherm(thrm1,tpo1,dom%dyn,dom%mat,dom%bnd,time_now) 
+
             ! Calculate material (ice properties, viscosity, etc.)
             call calc_ymat(dom%mat,tpo1,dom%dyn,thrm1,dom%bnd,time_now)
             
@@ -157,6 +173,15 @@ contains
             ! Calculate thermodynamics (temperatures and enthalpy), corrected
             call calc_ytherm(dom%thrm,tpo1,dom%dyn,dom%mat,dom%bnd,time_now)            
 
+!             ! Determine truncation error for temperature
+!             call calc_pc_tau_fe_sbe(dom%par%pc1_tau,dom%thrm%now%T_prime_b,thrm1%now%T_prime_b,dom%par%pc1_dt)
+
+!             write(*,*) "n2", time_now, n2, dom%par%pc1_eta 
+
+!             if (dom%par%pc1_eta .lt. 1e-3) exit 
+
+!             end do 
+            
             ! Step 3: Finally, calculate corrector step with actual topography object 
             ! Calculate topography (elevation, ice thickness, calving, etc.), corrected
             call calc_ytopo(dom%tpo,dom%dyn,dom%thrm,dom%bnd,time_now,topo_fixed=dom%tpo%par%topo_fixed)    
@@ -164,10 +189,10 @@ contains
 
 
             ! Determine truncation error for ice thickness 
-            call calc_pc_tau_fe_sbe(dom%par%pc_tau,dom%tpo%now%H_ice,tpo1%now%H_ice,dom%par%pc_dt,dom%par%dt_min)
+            call calc_pc_tau_fe_sbe(dom%par%pc_tau,dom%tpo%now%H_ice,tpo1%now%H_ice,dom%par%pc_dt)
 
             ! Determine truncation error for temperature
-            call calc_pc_tau_fe_sbe(dom%par%pc1_tau,dom%thrm%now%T_prime_b,thrm1%now%T_prime_b,dom%par%pc1_dt,dom%par%dt_min)
+            call calc_pc_tau_fe_sbe(dom%par%pc1_tau,dom%thrm%now%T_prime_b,thrm1%now%T_prime_b,dom%par%pc1_dt)
 
 
             if (yelmo_log_timestep) then 

@@ -557,6 +557,10 @@ contains
             
             ! Average over neighborhood from ac-nodes to aa-node 
             ! (spreading Q_b improves stability) 
+            Q_b(i,j) = 0.5*Q_b(i,j) + 0.5*( 0.125*(Qb_acx(i-1,j-1) + Qb_acx(i-1,j+1) + &
+                                                   Qb_acx(i,j-1)   + Qb_acx(i,j+1)   + &
+                                                   Qb_acy(i-1,j-1) + Qb_acy(i+1,j-1) + & 
+                                                   Qb_acy(i-1,j)   + Qb_acy(i+1,j))  )
 
             ! Reduction of Q_b with T_prime_b (apply decay function)
             if (gamma .gt. 0.0) then 

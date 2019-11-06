@@ -311,12 +311,6 @@ program yelmo_benchmarks
 
         ! Get current time 
         time = time_init + n*dtt
-
-
-        ! Update data ouput dt 
-        dt2D_out = 1000.0 
-        if (time .gt. 6400.0) dt2D_out = 10.0 
-        if (time .gt. 6500.0) dt2D_out = dtt 
         
         ! == Yelmo ice sheet ===================================================
         call yelmo_update(yelmo1,time)

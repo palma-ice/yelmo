@@ -4,7 +4,7 @@ module yelmo_material
     use nml 
 
     use yelmo_defs
-    use yelmo_tools, only : calc_vertical_integrated_2D, calc_vertical_integrated_3D
+    use yelmo_tools, only : calc_vertical_integrated_2D, calc_vertical_integrated_3D, regularize2D
     
     use deformation
     use ice_age  
@@ -143,7 +143,7 @@ contains
                 do k = 1, nz_aa
                     call regularize2D(mat%now%ATT(:,:,k),tpo%now%H_ice)
                 end do 
-                
+
                 ! Get vertically averaged value 
                 mat%now%ATT_bar = calc_vertical_integrated_2D(mat%now%ATT,mat%par%zeta_aa)
             

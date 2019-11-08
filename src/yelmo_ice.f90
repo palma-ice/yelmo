@@ -55,7 +55,7 @@ contains
         time_start = time_now 
         
         ! Determine maximum number of time steps to be iterated through   
-        nstep  = (time-time_now) / dom%par%dtmin 
+        nstep = ceiling((time-time_now)/dom%par%dtmin)   !mmr (avoids skipping timesteps due to roundoff errors)  nstep  = (time-time_now) / dom%par%dtmin 
 
         ! Reset number of thermodynamics timestep skips
         ntt = 0 
@@ -396,7 +396,7 @@ contains
         call ydata_par_load(dom%dta%par,filename,dom%par%domain,dom%par%grid_name,init=.TRUE.)
         call ydata_alloc(dom%dta%pd,dom%grd%nx,dom%grd%ny,dom%par%nz_aa)
 
-        ! Load data objects 
+        ! Load data objects   
         call ydata_load(dom%dta,dom%bnd%ice_allowed)
 
         write(*,*) "yelmo_init:: data intialized (loaded data if desired)."
@@ -411,6 +411,9 @@ contains
 
         ! Set bnd%H_ice_ref to present-day ice thickness by default 
         dom%bnd%H_ice_ref = dom%dta%pd%H_ice 
+!mmr        ! Set bnd%z_bed_ref to present-day ice thickness by default 
+        dom%bnd%z_bed_ref = dom%dta%pd%z_bed       !mmr
+!mmr
 
         write(*,*) 
         write(*,*) "yelmo_init:: Initialization complete for domain: "// &

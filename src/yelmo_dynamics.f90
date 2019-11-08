@@ -6,7 +6,8 @@ module yelmo_dynamics
 
     use yelmo_defs
     use yelmo_tools, only : stagger_aa_acx, stagger_aa_acy, stagger_ac_aa, &
-        calc_magnitude_from_staggered_ice, calc_vertical_integrated_2D, smooth_gauss_2D
+        calc_magnitude_from_staggered_ice, calc_vertical_integrated_2D, smooth_gauss_2D, &
+        regularize2D
 
     use velocity_hybrid_pd12 
     use velocity_sia 
@@ -552,6 +553,9 @@ contains
             dyn%now%visc_eff = calc_visc_eff(dyn%now%ux_bar,dyn%now%uy_bar,dyn%now%duxdz_bar*0.0,dyn%now%duydz_bar*0.0, &
                                              tpo%now%H_ice,mat%now%ATT,dyn%par%zeta_aa,dyn%par%dx,dyn%par%dy,mat%par%n_glen)
             
+            ! Ensure viscosity is relatively smooth
+            call regularize2D(dyn%now%visc_eff,tpo%now%H_ice)
+
             ! ---------------------------------------------------------------------
             
             ! 6. Calculate basal drag coefficient beta (beta, beta_acx, beta_acy) 
@@ -1056,7 +1060,7 @@ end if
         end select 
 
         ! 1a. Ensure beta is relatively smooth 
-        call regularize_beta(dyn%now%beta,tpo%now%H_ice)
+        call regularize2D(dyn%now%beta,tpo%now%H_ice)
 
         ! 2. Scale beta as it approaches grounding line 
         select case(dyn%par%beta_gl_scale) 

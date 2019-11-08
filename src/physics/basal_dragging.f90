@@ -10,7 +10,7 @@ module basal_dragging
     ! particularly at the grounding line, beta should be defined
     ! directly on the ac nodes (acx,acy). 
 
-    use yelmo_defs, only : sp, dp, prec, missing_value, pi, g, rho_sw, rho_ice, rho_w  
+    use yelmo_defs, only : sp, dp, prec, pi, g, rho_sw, rho_ice, rho_w  
 
     use yelmo_tools, only : stagger_aa_acx, stagger_aa_acy
 
@@ -38,9 +38,6 @@ module basal_dragging
     ! Beta functions (aa-nodes)
     public :: calc_beta_aa_power_plastic
     public :: calc_beta_aa_reg_coulomb
-
-    ! Beta regularizing functions (aa-nodes)
-    public :: regularize_beta 
 
     ! Beta staggering functions (aa- to ac-nodes)
     public :: stagger_beta_aa_mean
@@ -363,78 +360,6 @@ contains
         return
         
     end subroutine calc_beta_aa_reg_coulomb
-
-    ! ================================================================================
-    !
-    ! Regularizing/smoothing functions 
-    !
-    ! ================================================================================
-
-    subroutine regularize_beta(beta,H_ice)
-
-        implicit none 
-
-        real(prec), intent(INOUT) :: beta(:,:)      ! aa-nodes
-        real(prec), intent(IN)    :: H_ice(:,:)     ! aa-nodes
-        
-        ! Local variables
-        integer    :: i, j, nx, ny, nlow,  nhi, n   
-        integer    :: im1, ip1, jm1, jp1 
-        real(prec), allocatable :: beta0(:,:) 
-        real(prec) :: betax(2), betay(2), beta9(3,3)
-        logical    :: check_x, check_y 
-        
-        nx = size(beta,1)
-        ny = size(beta,2) 
-
-        allocate(beta0(nx,ny))
-        beta0 = beta 
-
-        do j = 2, ny-1 
-        do i = 2, nx-1
-
-            if (H_ice(i,j) .gt. 0.0) then 
-                ! Only apply to ice-covered points 
-
-                im1 = max(1, i-1)
-                ip1 = min(nx,i+1)
-                
-                jm1 = max(1, j-1)
-                jp1 = min(ny,j+1)
-
-                betax = [beta0(im1,j),beta0(ip1,j)]
-                where([H_ice(im1,j),H_ice(ip1,j)] .eq. 0.0_prec) betax = missing_value 
-
-                betay = [beta0(i,jm1),beta0(i,jp1)]
-                where([H_ice(i,jm1),H_ice(i,jp1)] .eq. 0.0_prec) betay = missing_value 
-                
-                ! Check if checkerboard exists in each direction 
-                check_x = (count(betax .gt. beta0(i,j) .and. betax.ne.missing_value) .eq. 2 .or. &
-                           count(betax .lt. beta0(i,j) .and. betax.ne.missing_value) .eq. 2) 
-
-                check_y = (count(betay .gt. beta0(i,j) .and. betay.ne.missing_value) .eq. 2 .or. &
-                           count(betay .lt. beta0(i,j) .and. betay.ne.missing_value) .eq. 2) 
-                
-                if (check_x .or. check_y) then 
-                    ! Checkerboard exists, apply 9-point neighborhood average
-
-                    beta9 = beta0(i-1:i+1,j-1:j+1)
-                    where(H_ice(i-1:i+1,j-1:j+1) .eq. 0.0_prec) beta9 = missing_value 
-
-                    n = count(beta9 .ne. missing_value) 
-
-                    beta(i,j) = sum(beta9,mask=beta9.ne.missing_value) / real(n,prec)
-
-                end if 
-
-            end if 
-
-        end do 
-        end do 
-
-        return 
-
-    end subroutine regularize_beta 
 
     ! ================================================================================
     !

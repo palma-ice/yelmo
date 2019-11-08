@@ -2,7 +2,7 @@ module yelmo_tools
     ! Generic functions and subroutines that could be used in many contexts:
     ! math, vectors, sorting, etc. 
 
-    use yelmo_defs, only : sp, dp, prec, tol_underflow, pi
+    use yelmo_defs, only : sp, dp, prec, missing_value, tol_underflow, pi
     
     implicit none 
 
@@ -32,6 +32,8 @@ module yelmo_tools
     public :: smooth_gauss_2D
     public :: smooth_gauss_3D
     public :: gauss_values
+
+    public :: regularize2D 
 
     ! Integration functions
     public :: test_integration
@@ -966,6 +968,79 @@ contains
         return 
 
     end function gauss_values
+
+    ! ================================================================================
+    !
+    ! Regularizing/smoothing functions 
+    !
+    ! ================================================================================
+
+    subroutine regularize2D(var,H_ice)
+        ! Ensure smoothness in 2D fields (ie, no checkerboard patterns)
+
+        implicit none 
+
+        real(prec), intent(INOUT) :: var(:,:)      ! aa-nodes
+        real(prec), intent(IN)    :: H_ice(:,:)     ! aa-nodes
+        
+        ! Local variables
+        integer    :: i, j, nx, ny, nlow,  nhi, n   
+        integer    :: im1, ip1, jm1, jp1 
+        real(prec), allocatable :: var0(:,:) 
+        real(prec) :: varx(2), vary(2), var9(3,3)
+        logical    :: check_x, check_y 
+        
+        nx = size(var,1)
+        ny = size(var,2) 
+
+        allocate(var0(nx,ny))
+        var0 = var 
+
+        do j = 2, ny-1 
+        do i = 2, nx-1
+
+            if (H_ice(i,j) .gt. 0.0) then 
+                ! Only apply to ice-covered points 
+
+                im1 = max(1, i-1)
+                ip1 = min(nx,i+1)
+                
+                jm1 = max(1, j-1)
+                jp1 = min(ny,j+1)
+
+                varx = [var0(im1,j),var0(ip1,j)]
+                where([H_ice(im1,j),H_ice(ip1,j)] .eq. 0.0_prec) varx = missing_value 
+
+                vary = [var0(i,jm1),var0(i,jp1)]
+                where([H_ice(i,jm1),H_ice(i,jp1)] .eq. 0.0_prec) vary = missing_value 
+                
+                ! Check if checkerboard exists in each direction 
+                check_x = (count(varx .gt. var0(i,j) .and. varx.ne.missing_value) .eq. 2 .or. &
+                           count(varx .lt. var0(i,j) .and. varx.ne.missing_value) .eq. 2) 
+
+                check_y = (count(vary .gt. var0(i,j) .and. vary.ne.missing_value) .eq. 2 .or. &
+                           count(vary .lt. var0(i,j) .and. vary.ne.missing_value) .eq. 2) 
+                
+                if (check_x .or. check_y) then 
+                    ! Checkerboard exists, apply 9-point neighborhood average
+
+                    var9 = var0(i-1:i+1,j-1:j+1)
+                    where(H_ice(i-1:i+1,j-1:j+1) .eq. 0.0_prec) var9 = missing_value 
+
+                    n = count(var9 .ne. missing_value) 
+
+                    var(i,j) = sum(var9,mask=var9.ne.missing_value) / real(n,prec)
+
+                end if 
+
+            end if 
+
+        end do 
+        end do 
+
+        return 
+
+    end subroutine regularize2D 
 
     ! === Generic integration functions ============
 

@@ -139,6 +139,11 @@ contains
                     call scale_rate_factor_water(mat%now%ATT,thrm%now%omega)
                 end if 
 
+                ! Ensure rate factor is relatively smooth
+                do k = 1, nz_aa
+                    call regularize2D(mat%now%ATT(:,:,k),tpo%now%H_ice)
+                end do 
+                
                 ! Get vertically averaged value 
                 mat%now%ATT_bar = calc_vertical_integrated_2D(mat%now%ATT,mat%par%zeta_aa)
             

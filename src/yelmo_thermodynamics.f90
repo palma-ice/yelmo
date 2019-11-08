@@ -4,7 +4,7 @@ module yelmo_thermodynamics
     use nml 
     use yelmo_defs 
     use yelmo_tools, only : smooth_gauss_2D, smooth_gauss_3D, gauss_values, fill_borders_3D, &
-            stagger_aa_ab
+            stagger_aa_ab, regularize2D
     
     use thermodynamics 
     use ice_enthalpy
@@ -90,6 +90,9 @@ contains
         call calc_basal_heating(thrm%now%Q_b,dyn%now%ux_b,dyn%now%uy_b,dyn%now%taub_acx,dyn%now%taub_acy, &
                                 tpo%now%H_ice,thrm%now%T_prime_b,gamma=2.0_prec)
 
+        ! Ensure basal frictional heating is relatively smooth
+        call regularize2D(thrm%now%Q_b,tpo%now%H_ice)
+            
         ! Smooth basal frictional heating 
         if (thrm%par%n_sm_qb .gt. 0) then 
             call smooth_gauss_2D(thrm%now%Q_b,tpo%now%H_ice.gt.0.0,thrm%par%dx,thrm%par%n_sm_qb, &

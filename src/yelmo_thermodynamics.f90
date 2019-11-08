@@ -91,7 +91,7 @@ contains
                                 tpo%now%H_ice,thrm%now%T_prime_b,gamma=2.0_prec)
 
         ! Ensure basal frictional heating is relatively smooth
-        call regularize2D(thrm%now%Q_b,tpo%now%H_ice)
+        call regularize2D(thrm%now%Q_b,tpo%now%H_ice,tpo%par%dx)
             
         ! Smooth basal frictional heating 
         if (thrm%par%n_sm_qb .gt. 0) then 

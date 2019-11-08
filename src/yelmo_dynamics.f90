@@ -554,7 +554,7 @@ contains
                                              tpo%now%H_ice,mat%now%ATT,dyn%par%zeta_aa,dyn%par%dx,dyn%par%dy,mat%par%n_glen)
             
             ! Ensure viscosity is relatively smooth
-            call regularize2D(dyn%now%visc_eff,tpo%now%H_ice)
+            call regularize2D(dyn%now%visc_eff,tpo%now%H_ice,tpo%par%dx)
 
             ! ---------------------------------------------------------------------
             
@@ -914,8 +914,8 @@ contains
                                              tpo%now%H_ice,mat%now%ATT,dyn%par%zeta_aa,dyn%par%dx,dyn%par%dy,mat%par%n_glen)
             
             ! Ensure viscosity is relatively smooth
-            call regularize2D(dyn%now%visc_eff,tpo%now%H_ice)
-            
+            call regularize2D(dyn%now%visc_eff,tpo%now%H_ice,tpo%par%dx)
+
             !   X. Prescribe grounding-line flux 
 if (.FALSE.) then
             ! Testing prescribed grounding-line flux/vel - experimental!!!
@@ -1063,7 +1063,7 @@ end if
         end select 
 
         ! 1a. Ensure beta is relatively smooth 
-        call regularize2D(dyn%now%beta,tpo%now%H_ice)
+        call regularize2D(dyn%now%beta,tpo%now%H_ice,tpo%par%dx)
 
         ! 2. Scale beta as it approaches grounding line 
         select case(dyn%par%beta_gl_scale) 

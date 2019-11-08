@@ -141,7 +141,7 @@ contains
 
                 ! Ensure rate factor is relatively smooth
                 do k = 1, nz_aa
-                    call regularize2D(mat%now%ATT(:,:,k),tpo%now%H_ice)
+                    call regularize2D(mat%now%ATT(:,:,k),tpo%now%H_ice,tpo%par%dx)
                 end do 
 
                 ! Get vertically averaged value 
@@ -164,7 +164,7 @@ contains
         
         ! Ensure viscosity is relatively smooth
         do k = 1, nz_aa
-            call regularize2D(mat%now%visc(:,:,k),tpo%now%H_ice)
+            call regularize2D(mat%now%visc(:,:,k),tpo%now%H_ice,tpo%par%dx)
         end do 
 
         ! Calculate visc_int (vertically integrated visc) as diagnostic quantity

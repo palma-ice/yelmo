@@ -876,7 +876,7 @@ contains
 
         nx    = size(var,1)
         ny    = size(var,2)
-        n     = 5 
+        n     = 7 
         n2    = (n-1)/2 
 
         sigma = dx*n_smooth 
@@ -975,7 +975,73 @@ contains
     !
     ! ================================================================================
 
-    subroutine regularize2D(var,H_ice)
+    subroutine regularize2D(var,H_ice,dx)
+        ! Ensure smoothness in 2D fields (ie, no checkerboard patterns)
+
+        implicit none 
+
+        real(prec), intent(INOUT) :: var(:,:)      ! aa-nodes
+        real(prec), intent(IN)    :: H_ice(:,:)     ! aa-nodes
+        real(prec), intent(IN)    :: dx 
+
+        ! Local variables
+        integer    :: i, j, nx, ny  
+        integer    :: im1, ip1, jm1, jp1 
+        real(prec) :: varx(2), vary(2)
+        logical    :: check_x, check_y 
+        
+        logical, allocatable :: bad_pts(:,:) 
+
+        nx = size(var,1)
+        ny = size(var,2) 
+
+        allocate(bad_pts(nx,ny)) 
+
+        ! All points are good initially 
+        bad_pts = .FALSE. 
+
+        do j = 1, ny 
+        do i = 1, nx
+
+            if (H_ice(i,j) .gt. 0.0) then 
+                ! Only check ice-covered points 
+
+                im1 = max(1, i-1)
+                ip1 = min(nx,i+1)
+                
+                jm1 = max(1, j-1)
+                jp1 = min(ny,j+1)
+
+                varx = [var(im1,j),var(ip1,j)]
+                where([H_ice(im1,j),H_ice(ip1,j)] .eq. 0.0_prec) varx = missing_value 
+
+                vary = [var(i,jm1),var(i,jp1)]
+                where([H_ice(i,jm1),H_ice(i,jp1)] .eq. 0.0_prec) vary = missing_value 
+                
+                ! Check if checkerboard exists in each direction 
+                check_x = (count(varx .gt. var(i,j) .and. varx.ne.missing_value) .eq. 2 .or. &
+                           count(varx .lt. var(i,j) .and. varx.ne.missing_value) .eq. 2) 
+
+                check_y = (count(vary .gt. var(i,j) .and. vary.ne.missing_value) .eq. 2 .or. &
+                           count(vary .lt. var(i,j) .and. vary.ne.missing_value) .eq. 2) 
+                
+                ! If check is true, mark point for later treatment 
+                if (check_x .or. check_y) bad_pts(i,j) = .TRUE.  
+
+            end if 
+
+        end do 
+        end do 
+
+        ! Now apply Gaussian smoothing to bad points, with a wide radius 
+        call smooth_gauss_2D(var,mask_apply=bad_pts,dx=dx,n_smooth=5, &
+                                mask_use=H_ice.gt.0.0_prec .and. (.not. bad_pts))
+
+        return 
+
+    end subroutine regularize2D 
+
+    subroutine regularize2D_iter(var,H_ice)
         ! Ensure smoothness in 2D fields (ie, no checkerboard patterns)
 
         implicit none 
@@ -984,7 +1050,7 @@ contains
         real(prec), intent(IN)    :: H_ice(:,:)     ! aa-nodes
         
         ! Local variables
-        integer    :: i, j, nx, ny, nlow,  nhi, n   
+        integer    :: i, j, nx, ny, n   
         integer    :: im1, ip1, jm1, jp1 
         real(prec), allocatable :: var0(:,:) 
         real(prec) :: varx(2), vary(2), var9(3,3)
@@ -1052,7 +1118,7 @@ contains
 
         return 
 
-    end subroutine regularize2D 
+    end subroutine regularize2D_iter 
 
     ! === Generic integration functions ============
 

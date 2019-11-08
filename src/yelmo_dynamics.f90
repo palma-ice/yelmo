@@ -1055,6 +1055,9 @@ end if
 
         end select 
 
+        ! 1a. Ensure beta is relatively smooth 
+        call regularize_beta(dyn%now%beta,tpo%now%H_ice)
+
         ! 2. Scale beta as it approaches grounding line 
         select case(dyn%par%beta_gl_scale) 
 

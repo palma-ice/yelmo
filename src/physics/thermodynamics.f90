@@ -612,11 +612,11 @@ contains
 !                                                    Qb_acy(i-1,j-1) + Qb_acy(i+1,j-1) + & 
 !                                                    Qb_acy(i-1,j)   + Qb_acy(i+1,j))  )
 
-            ! Reduction of Q_b with T_prime_b (apply decay function)
-            if (gamma .gt. 0.0) then 
-                f_pmp    = min(1.0, exp((T_prime_b(i,j))/gamma) )
-                Q_b(i,j) = Q_b(i,j)*f_pmp  
-            end if 
+!             ! Reduction of Q_b with T_prime_b (apply decay function)
+!             if (gamma .gt. 0.0) then 
+!                 f_pmp    = min(1.0, exp((T_prime_b(i,j))/gamma) )
+!                 Q_b(i,j) = Q_b(i,j)*f_pmp  
+!             end if 
 
         end do 
         end do 

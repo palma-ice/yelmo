@@ -10,7 +10,7 @@ module basal_dragging
     ! particularly at the grounding line, beta should be defined
     ! directly on the ac nodes (acx,acy). 
 
-    use yelmo_defs, only : sp, dp, prec, pi, g, rho_sw, rho_ice, rho_w  
+    use yelmo_defs, only : sp, dp, prec, missing_value, pi, g, rho_sw, rho_ice, rho_w  
 
     use yelmo_tools, only : stagger_aa_acx, stagger_aa_acy
 
@@ -24,20 +24,23 @@ module basal_dragging
     public :: calc_effective_pressure_marine
     public :: calc_effective_pressure_till
 
-    ! C_bed functions
+    ! c_bed functions
     public :: calc_lambda_bed_lin
     public :: calc_lambda_bed_exp
     public :: calc_lambda_till_const
     public :: calc_lambda_till_linear
 
-    ! C_bed gl functions 
+    ! beta gl functions 
     public :: scale_beta_gl_fraction 
     public :: scale_beta_gl_Hgrnd
     public :: scale_beta_gl_zstar
-    
+        
     ! Beta functions (aa-nodes)
     public :: calc_beta_aa_power_plastic
     public :: calc_beta_aa_reg_coulomb
+
+    ! Beta regularizing functions (aa-nodes)
+    public :: regularize_beta 
 
     ! Beta staggering functions (aa- to ac-nodes)
     public :: stagger_beta_aa_mean
@@ -360,6 +363,77 @@ contains
         return
         
     end subroutine calc_beta_aa_reg_coulomb
+
+    ! ================================================================================
+    !
+    ! Regularizing/smoothing functions 
+    !
+    ! ================================================================================
+
+    subroutine regularize_beta(beta,H_ice)
+
+        implicit none 
+
+        real(prec), intent(INOUT) :: beta(:,:)      ! aa-nodes
+        real(prec), intent(IN)    :: H_ice(:,:)     ! aa-nodes
+        
+        ! Local variables
+        integer    :: i, j, nx, ny, nlow,  nhi, n   
+        integer    :: im1, ip1, jm1, jp1 
+        real(prec), allocatable :: beta0(:,:) 
+        real(prec) :: betax(2), betay(2)
+        logical    :: check_x, check_y 
+        
+        nx = size(beta,1)
+        ny = size(beta,2) 
+
+        allocate(beta0(nx,ny))
+        beta0 = beta 
+
+        do j = 1, ny 
+        do i = 1, nx
+
+            if (H_ice(i,j) .gt. 0.0) then 
+                ! Only apply to ice-covered points 
+
+                im1 = max(1, i-1)
+                ip1 = min(nx,i+1)
+                
+                jm1 = max(1, j-1)
+                jp1 = min(ny,j+1)
+
+                betax = [beta0(im1,j),beta0(ip1,j)]
+                where([H_ice(im1,j),H_ice(ip1,j)] .eq. 0.0_prec) betax = missing_value 
+
+                betay = [beta0(i,jm1),beta0(i,jp1)]
+                where([H_ice(i,jm1),H_ice(i,jp1)] .eq. 0.0_prec) betay = missing_value 
+                
+                ! Check if checkerboard exists in each direction 
+                check_x = (count(betax .gt. beta0(i,j) .and. betax.ne.missing_value) .eq. 2 .or. &
+                           count(betax .lt. beta0(i,j) .and. betax.ne.missing_value) .eq. 2) 
+
+                check_y = (count(betay .gt. beta0(i,j) .and. betay.ne.missing_value) .eq. 2 .or. &
+                           count(betay .lt. beta0(i,j) .and. betay.ne.missing_value) .eq. 2) 
+                
+                if (check_x .or. check_y) then 
+                    ! Checkerboard exists, apply neighborhood averaging 
+
+                    n = count([betax,betay] .ne. missing_value) 
+
+                    beta(i,j) = (sum(betax,mask=betax.ne.missing_value) + &
+                                 sum(betay,mask=betay.ne.missing_value) + &
+                                                   beta0(i,j)) / real(n+1,prec)
+
+                end if 
+
+            end if 
+
+        end do 
+        end do 
+
+        return 
+
+    end subroutine regularize_beta 
 
     ! ================================================================================
     !

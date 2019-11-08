@@ -906,7 +906,7 @@ contains
             ! Use 3D rate factor, but 2D shear:
             ! Note: disable shear contribution to viscosity for this solver, for mixed terms use hybrid-pd12 option.
             ! Note: Here visc_eff is calculated using ux_b and uy_b (ssa velocity), not ux_bar/uy_bar as in hybrid-pd12. 
-            dyn%now%visc_eff = calc_visc_eff(dyn%now%ux_bar,dyn%now%uy_bar,dyn%now%duxdz_bar*0.0,dyn%now%duydz_bar*0.0, &
+            dyn%now%visc_eff = calc_visc_eff(dyn%now%ux_b,dyn%now%uy_b,dyn%now%duxdz_bar*0.0,dyn%now%duydz_bar*0.0, &
                                              tpo%now%H_ice,mat%now%ATT,dyn%par%zeta_aa,dyn%par%dx,dyn%par%dy,mat%par%n_glen)
             
             !   X. Prescribe grounding-line flux 

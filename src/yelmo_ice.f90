@@ -70,7 +70,7 @@ contains
         ! Set H_w equal to boundary value 
         dom%thrm%now%H_w = dom%bnd%H_w 
 
-        ! Iterate of topo dynamics updates
+        ! Iteration of yelmo component updates until external timestep is reached
         do n = 1, nstep
 
             ! Update dt_max as a function of the total timestep 
@@ -109,8 +109,8 @@ contains
                     ! Use predictor-corrector adaptive timestep
 
                     dt_now = dom%par%pc_dt                      ! Based on ice thickness 
-                    dt_now = dom%par%pc1_dt                     ! Based on basal temperature 
-                    dt_now = min(dom%par%pc_dt,dom%par%pc1_dt)  ! Minimum between ice thickness and basal temperature
+!                     dt_now = dom%par%pc1_dt                     ! Based on basal temperature 
+!                     dt_now = min(dom%par%pc_dt,dom%par%pc1_dt)  ! Minimum between ice thickness and basal temperature
 
                 case DEFAULT 
 
@@ -137,26 +137,13 @@ contains
             ! Store local copy of ytopo and ytherm objects to use for predictor step
             tpo1  = dom%tpo 
             thrm1 = dom%thrm 
-            thrm0 = dom%thrm 
 
             ! Step 1: Perform predictor step with temporary topography object 
             ! Calculate topography (elevation, ice thickness, calving, etc.)
-            call calc_ytopo(tpo1,dom%dyn,thrm1,dom%bnd,time_now,topo_fixed=dom%tpo%par%topo_fixed)
-            call calc_ytopo_masks(tpo1,dom%dyn,thrm1,dom%bnd)
+            call calc_ytopo(tpo1,dom%dyn,dom%thrm,dom%bnd,time_now,topo_fixed=dom%tpo%par%topo_fixed)
+            call calc_ytopo_masks(tpo1,dom%dyn,dom%thrm,dom%bnd)
 
             ! Step 2: Update other variables using predicted ice thickness 
-            
-!             nstep2 = 5
-!             do n2 = 1, nstep2
-
-!             dom%thrm = thrm0 
-
-!             if (n2 .eq. 1) then 
-!                 ! Calculate thermodynamics (temperatures and enthalpy), predicted
-!                 call calc_ytherm(thrm1,tpo1,dom%dyn,dom%mat,dom%bnd,time_now)            
-!             else 
-!                 thrm1 = thrm0
-!             end if 
             
             ! Calculate thermodynamics (temperatures and enthalpy), predicted
             call calc_ytherm(thrm1,tpo1,dom%dyn,dom%mat,dom%bnd,time_now) 
@@ -173,15 +160,6 @@ contains
             ! Calculate thermodynamics (temperatures and enthalpy), corrected
             call calc_ytherm(dom%thrm,tpo1,dom%dyn,dom%mat,dom%bnd,time_now)            
 
-!             ! Determine truncation error for temperature
-!             call calc_pc_tau_fe_sbe(dom%par%pc1_tau,dom%thrm%now%T_prime_b,thrm1%now%T_prime_b,dom%par%pc1_dt)
-
-!             write(*,*) "n2", time_now, n2, dom%par%pc1_eta 
-
-!             if (dom%par%pc1_eta .lt. 1e-3) exit 
-
-!             end do 
-            
             ! Step 3: Finally, calculate corrector step with actual topography object 
             ! Calculate topography (elevation, ice thickness, calving, etc.), corrected
             call calc_ytopo(dom%tpo,dom%dyn,dom%thrm,dom%bnd,time_now,topo_fixed=dom%tpo%par%topo_fixed)    

@@ -381,7 +381,7 @@ contains
         integer    :: i, j, nx, ny, nlow,  nhi, n   
         integer    :: im1, ip1, jm1, jp1 
         real(prec), allocatable :: beta0(:,:) 
-        real(prec) :: betax(2), betay(2)
+        real(prec) :: betax(2), betay(2), beta9(3,3)
         logical    :: check_x, check_y 
         
         nx = size(beta,1)
@@ -390,8 +390,8 @@ contains
         allocate(beta0(nx,ny))
         beta0 = beta 
 
-        do j = 1, ny 
-        do i = 1, nx
+        do j = 2, ny-1 
+        do i = 2, nx-1
 
             if (H_ice(i,j) .gt. 0.0) then 
                 ! Only apply to ice-covered points 
@@ -416,13 +416,14 @@ contains
                            count(betay .lt. beta0(i,j) .and. betay.ne.missing_value) .eq. 2) 
                 
                 if (check_x .or. check_y) then 
-                    ! Checkerboard exists, apply neighborhood averaging 
+                    ! Checkerboard exists, apply 9-point neighborhood average
 
-                    n = count([betax,betay] .ne. missing_value) 
+                    beta9 = beta0(i-1:i+1,j-1:j+1)
+                    where(H_ice(i-1:i+1,j-1:j+1) .eq. 0.0_prec) beta9 = missing_value 
 
-                    beta(i,j) = (sum(betax,mask=betax.ne.missing_value) + &
-                                 sum(betay,mask=betay.ne.missing_value) + &
-                                                   beta0(i,j)) / real(n+1,prec)
+                    n = count(beta9 .ne. missing_value) 
+
+                    beta(i,j) = sum(beta9,mask=beta9.ne.missing_value) / real(n,prec)
 
                 end if 
 

@@ -517,23 +517,25 @@ contains
 
     end subroutine calc_strain_heating_sia
 
-    subroutine calc_basal_heating(Q_b,ux_b,uy_b,taub_acx,taub_acy,T_prime_b,gamma)
+    subroutine calc_basal_heating(Q_b,ux_b,uy_b,taub_acx,taub_acy,H_ice,T_prime_b,gamma)
          ! Qb [J a-1 m-2] == [m a-1] * [J m-3]
          ! Note: grounded ice fraction f_grnd_acx/y not used here, because taub_acx/y already accounts
          ! for the grounded fraction via beta_acx/y: Q_b = tau_b*u = -beta*u*u.
 
-        real(prec), intent(INOUT) :: Q_b(:,:)               ! [J a-1 K-1] Basal heat production (friction)
-        real(prec), intent(IN)  :: ux_b(:,:)              ! Basal velocity, x-component (staggered x)
-        real(prec), intent(IN)  :: uy_b(:,:)              ! Basal velocity, y-compenent (staggered y)
-        real(prec), intent(IN)  :: taub_acx(:,:)          ! Basal friction (staggered x)
-        real(prec), intent(IN)  :: taub_acy(:,:)          ! Basal friction (staggered y) 
-        real(prec), intent(IN)  :: T_prime_b(:,:) 
+        real(prec), intent(INOUT) :: Q_b(:,:)               ! [J a-1 K-1] Basal heat production (friction), aa-nodes
+        real(prec), intent(IN)  :: ux_b(:,:)                ! Basal velocity, x-component (acx)
+        real(prec), intent(IN)  :: uy_b(:,:)                ! Basal velocity, y-compenent (acy)
+        real(prec), intent(IN)  :: taub_acx(:,:)            ! Basal friction (acx)
+        real(prec), intent(IN)  :: taub_acy(:,:)            ! Basal friction (acy) 
+        real(prec), intent(IN)  :: T_prime_b(:,:)           ! [degC] Basal homologous temperature (aa-nodes)
+        real(prec), intent(IN)  :: H_ice(:,:)               ! [m] Ice thickness 
         real(prec), intent(IN)  :: gamma 
 
         ! Local variables
-        integer    :: i, j, nx, ny 
+        integer    :: i, j, nx, ny, n 
         real(prec), allocatable :: Qb_acx(:,:)
         real(prec), allocatable :: Qb_acy(:,:)
+        real(prec) :: Qb_tmp 
         real(prec) :: f_pmp 
 
         nx = size(Q_b,1)
@@ -548,19 +550,67 @@ contains
 
         Q_b = 0.0  
  
-        ! Get basal frictional heating on centered nodes (aa-grid)          
+        ! Get basal frictional heating on centered nodes (aa-nodes)          
         do j = 2, ny-1
         do i = 2, nx-1
 
             ! Average from ac-nodes to aa-node
             Q_b(i,j) = 0.25*(Qb_acx(i,j)+Qb_acx(i-1,j)+Qb_acy(i,j)+Qb_acy(i,j-1))
             
-            ! Average over neighborhood from ac-nodes to aa-node 
-            ! (spreading Q_b improves stability) 
-            Q_b(i,j) = 0.5*Q_b(i,j) + 0.5*( 0.125*(Qb_acx(i-1,j-1) + Qb_acx(i-1,j+1) + &
-                                                   Qb_acx(i,j-1)   + Qb_acx(i,j+1)   + &
-                                                   Qb_acy(i-1,j-1) + Qb_acy(i+1,j-1) + & 
-                                                   Qb_acy(i-1,j)   + Qb_acy(i+1,j))  )
+            Qb_tmp = 0.0_prec 
+            n      = 0 
+
+            if (H_ice(i-1,j-1) .gt. 0.0) then 
+                Qb_tmp = Qb_tmp + Qb_acx(i-1,j-1)
+                n      = n+1 
+            end if 
+
+            if (H_ice(i-1,j+1) .gt. 0.0) then 
+                Qb_tmp = Qb_tmp + Qb_acx(i-1,j+1)
+                n      = n+1 
+            end if 
+            
+            if (H_ice(i,j-1) .gt. 0.0) then 
+                Qb_tmp = Qb_tmp + Qb_acx(i,j-1)
+                n      = n+1 
+            end if 
+            
+            if (H_ice(i,j+1) .gt. 0.0) then 
+                Qb_tmp = Qb_tmp + Qb_acx(i,j+1)
+                n      = n+1 
+            end if 
+            
+            if (H_ice(i-1,j-1) .gt. 0.0) then 
+                Qb_tmp = Qb_tmp + Qb_acy(i-1,j-1)
+                n      = n+1 
+            end if 
+            
+            if (H_ice(i+1,j-1) .gt. 0.0) then 
+                Qb_tmp = Qb_tmp + Qb_acy(i+1,j-1)
+                n      = n+1 
+            end if 
+            
+            if (H_ice(i-1,j) .gt. 0.0) then 
+                Qb_tmp = Qb_tmp + Qb_acy(i-1,j)
+                n      = n+1 
+            end if 
+            
+            if (H_ice(i+1,j) .gt. 0.0) then 
+                Qb_tmp = Qb_tmp + Qb_acy(i+1,j)
+                n      = n+1 
+            end if 
+            
+            if (n .gt. 0) Qb_tmp = Qb_tmp / real(n,prec)
+
+            ! Average over neighborhood
+            Q_b(i,j) = 0.5*Q_b(i,j) + 0.5*Qb_tmp 
+
+!             ! Average over neighborhood from ac-nodes to aa-node 
+!             ! (spreading Q_b improves stability) 
+!             Q_b(i,j) = 0.5*Q_b(i,j) + 0.5*( 0.125*(Qb_acx(i-1,j-1) + Qb_acx(i-1,j+1) + &
+!                                                    Qb_acx(i,j-1)   + Qb_acx(i,j+1)   + &
+!                                                    Qb_acy(i-1,j-1) + Qb_acy(i+1,j-1) + & 
+!                                                    Qb_acy(i-1,j)   + Qb_acy(i+1,j))  )
 
             ! Reduction of Q_b with T_prime_b (apply decay function)
             if (gamma .gt. 0.0) then 

@@ -88,7 +88,7 @@ contains
         
         ! Calculate the basal frictional heating 
         call calc_basal_heating(thrm%now%Q_b,dyn%now%ux_b,dyn%now%uy_b,dyn%now%taub_acx,dyn%now%taub_acy, &
-                                thrm%now%T_prime_b,gamma=2.0_prec)
+                                tpo%now%H_ice,thrm%now%T_prime_b,gamma=2.0_prec)
 
         ! Smooth basal frictional heating 
         if (thrm%par%n_sm_qb .gt. 0) then 

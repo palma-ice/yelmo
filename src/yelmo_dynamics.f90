@@ -913,6 +913,9 @@ contains
             dyn%now%visc_eff = calc_visc_eff(dyn%now%ux_b,dyn%now%uy_b,dyn%now%duxdz_bar*0.0,dyn%now%duydz_bar*0.0, &
                                              tpo%now%H_ice,mat%now%ATT,dyn%par%zeta_aa,dyn%par%dx,dyn%par%dy,mat%par%n_glen)
             
+            ! Ensure viscosity is relatively smooth
+            call regularize2D(dyn%now%visc_eff,tpo%now%H_ice)
+            
             !   X. Prescribe grounding-line flux 
 if (.FALSE.) then
             ! Testing prescribed grounding-line flux/vel - experimental!!!

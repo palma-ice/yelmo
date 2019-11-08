@@ -162,6 +162,11 @@ contains
         
         mat%now%visc = calc_viscosity_glen(mat%now%strn%de,mat%now%ATT,mat%par%n_glen,mat%par%visc_min)
         
+        ! Ensure viscosity is relatively smooth
+        do k = 1, nz_aa
+            call regularize2D(mat%now%visc(:,:,k),tpo%now%H_ice)
+        end do 
+
         ! Calculate visc_int (vertically integrated visc) as diagnostic quantity
         mat%now%visc_int = calc_vertical_integrated_2D(mat%now%visc,mat%par%zeta_aa)
         where(tpo%now%H_ice .gt. 0.0) mat%now%visc_int = mat%now%visc_int*tpo%now%H_ice 

@@ -990,11 +990,19 @@ contains
         real(prec) :: varx(2), vary(2), var9(3,3)
         logical    :: check_x, check_y 
         
+        integer    :: q, qmax, npts
+
+        qmax = 5
+
         nx = size(var,1)
         ny = size(var,2) 
 
         allocate(var0(nx,ny))
-        var0 = var 
+
+        do q = 1, qmax
+
+            var0 = var 
+            npts = 0
 
         do j = 2, ny-1 
         do i = 2, nx-1
@@ -1030,12 +1038,16 @@ contains
                     n = count(var9 .ne. missing_value) 
 
                     var(i,j) = sum(var9,mask=var9.ne.missing_value) / real(n,prec)
-
+                    npts     = npts + 1
                 end if 
 
             end if 
 
         end do 
+        end do 
+
+        if (npts .eq. 0) exit 
+
         end do 
 
         return 

@@ -975,8 +975,9 @@ contains
     !
     ! ================================================================================
 
-    subroutine regularize2D(var,H_ice,dx)
+    subroutine regularize2D_gauss(var,H_ice,dx)
         ! Ensure smoothness in 2D fields (ie, no checkerboard patterns)
+        ! ajr: doesnt work!
 
         implicit none 
 
@@ -1039,16 +1040,17 @@ contains
 
         return 
 
-    end subroutine regularize2D 
+    end subroutine regularize2D_gauss 
 
-    subroutine regularize2D_iter(var,H_ice)
+    subroutine regularize2D(var,H_ice,dx)
         ! Ensure smoothness in 2D fields (ie, no checkerboard patterns)
 
         implicit none 
 
         real(prec), intent(INOUT) :: var(:,:)      ! aa-nodes
         real(prec), intent(IN)    :: H_ice(:,:)     ! aa-nodes
-        
+        real(prec), intent(IN)    :: dx 
+
         ! Local variables
         integer    :: i, j, nx, ny, n   
         integer    :: im1, ip1, jm1, jp1 
@@ -1058,7 +1060,7 @@ contains
         
         integer    :: q, qmax, npts
 
-        qmax = 5
+        qmax = 10
 
         nx = size(var,1)
         ny = size(var,2) 
@@ -1118,7 +1120,7 @@ contains
 
         return 
 
-    end subroutine regularize2D_iter 
+    end subroutine regularize2D 
 
     ! === Generic integration functions ============
 

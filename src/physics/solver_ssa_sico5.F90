@@ -797,8 +797,10 @@ call lis_matrix_assemble(lgs_a, ierr)
 
 call lis_solver_create(solver, ierr)
 
+! ch_solver_set_option = '-i bicgsafe -p jacobi '// &
+!                         '-maxiter 100 -tol 1.0e-4 -initx_zeros false'
 ch_solver_set_option = '-i bicgsafe -p jacobi '// &
-                        '-maxiter 100 -tol 1.0e-4 -initx_zeros false'
+                        '-maxiter 200 -tol 1.0e-5 -initx_zeros false'
 
 call lis_solver_set_option(trim(ch_solver_set_option), solver, ierr)
 call CHKERR(ierr)

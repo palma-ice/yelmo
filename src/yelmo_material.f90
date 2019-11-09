@@ -140,9 +140,9 @@ contains
                 end if 
 
                 ! Ensure rate factor is relatively smooth
-                do k = 1, nz_aa
-                    call regularize2D(mat%now%ATT(:,:,k),tpo%now%H_ice,tpo%par%dx)
-                end do 
+!                 do k = 1, nz_aa
+!                     call regularize2D(mat%now%ATT(:,:,k),tpo%now%H_ice,tpo%par%dx)
+!                 end do 
 
                 ! Get vertically averaged value 
                 mat%now%ATT_bar = calc_vertical_integrated_2D(mat%now%ATT,mat%par%zeta_aa)
@@ -163,9 +163,9 @@ contains
         mat%now%visc = calc_viscosity_glen(mat%now%strn%de,mat%now%ATT,mat%par%n_glen,mat%par%visc_min)
         
         ! Ensure viscosity is relatively smooth
-        do k = 1, nz_aa
-            call regularize2D(mat%now%visc(:,:,k),tpo%now%H_ice,tpo%par%dx)
-        end do 
+!         do k = 1, nz_aa
+!             call regularize2D(mat%now%visc(:,:,k),tpo%now%H_ice,tpo%par%dx)
+!         end do 
 
         ! Calculate visc_int (vertically integrated visc) as diagnostic quantity
         mat%now%visc_int = calc_vertical_integrated_2D(mat%now%visc,mat%par%zeta_aa)

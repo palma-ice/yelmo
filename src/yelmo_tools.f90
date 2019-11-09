@@ -981,7 +981,7 @@ contains
 
         implicit none 
 
-        real(prec), intent(INOUT) :: var(:,:)      ! aa-nodes
+        real(prec), intent(INOUT) :: var(:,:)       ! aa-nodes
         real(prec), intent(IN)    :: H_ice(:,:)     ! aa-nodes
         real(prec), intent(IN)    :: dx 
 
@@ -1047,7 +1047,7 @@ contains
 
         implicit none 
 
-        real(prec), intent(INOUT) :: var(:,:)      ! aa-nodes
+        real(prec), intent(INOUT) :: var(:,:)       ! aa-nodes
         real(prec), intent(IN)    :: H_ice(:,:)     ! aa-nodes
         real(prec), intent(IN)    :: dx 
 

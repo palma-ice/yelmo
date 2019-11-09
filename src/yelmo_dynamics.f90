@@ -7,7 +7,7 @@ module yelmo_dynamics
     use yelmo_defs
     use yelmo_tools, only : stagger_aa_acx, stagger_aa_acy, stagger_ac_aa, &
         calc_magnitude_from_staggered_ice, calc_vertical_integrated_2D, smooth_gauss_2D, &
-        regularize2D
+        regularize2D !, limit_gradient
 
     use velocity_hybrid_pd12 
     use velocity_sia 
@@ -554,7 +554,7 @@ contains
                                              tpo%now%H_ice,mat%now%ATT,dyn%par%zeta_aa,dyn%par%dx,dyn%par%dy,mat%par%n_glen)
             
             ! Ensure viscosity is relatively smooth
-            call regularize2D(dyn%now%visc_eff,tpo%now%H_ice,tpo%par%dx)
+!             call regularize2D(dyn%now%visc_eff,tpo%now%H_ice,tpo%par%dx)
 
             ! ---------------------------------------------------------------------
             
@@ -914,7 +914,7 @@ contains
                                              tpo%now%H_ice,mat%now%ATT,dyn%par%zeta_aa,dyn%par%dx,dyn%par%dy,mat%par%n_glen)
             
             ! Ensure viscosity is relatively smooth
-            call regularize2D(dyn%now%visc_eff,tpo%now%H_ice,tpo%par%dx)
+!             call regularize2D(dyn%now%visc_eff,tpo%now%H_ice,tpo%par%dx)
 
             !   X. Prescribe grounding-line flux 
 if (.FALSE.) then
@@ -1063,7 +1063,8 @@ end if
         end select 
 
         ! 1a. Ensure beta is relatively smooth 
-        call regularize2D(dyn%now%beta,tpo%now%H_ice,tpo%par%dx)
+!         call regularize2D(dyn%now%beta,tpo%now%H_ice,tpo%par%dx)
+!         call limit_gradient(dyn%now%beta,tpo%now%H_ice,tpo%par%dx,log=.TRUE.)
 
         ! 2. Scale beta as it approaches grounding line 
         select case(dyn%par%beta_gl_scale) 

@@ -921,7 +921,7 @@ end subroutine calc_vxy_ssa_matrix
         integer    :: i1, i2, j1, j2 
         logical    :: is_float 
         
-        logical, parameter :: disable_grounded_fronts = .TRUE. 
+        logical, parameter :: disable_grounded_fronts = .FALSE. 
 
         nx = size(maske,1)
         ny = size(maske,2)

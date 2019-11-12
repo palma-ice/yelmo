@@ -163,7 +163,7 @@ contains
             
             ! Update basal water layer thickness
             call calc_basal_water_local(thrm%now%H_w,tpo%now%H_ice,-thrm%now%bmb_grnd*(rho_ice/rho_w), &
-                                    tpo%now%f_grnd,dt,till_rate=1e-3,H_w_max=2.0)
+                                    tpo%now%f_grnd,dt,till_rate=0.0,H_w_max=2.0)
 
         end if 
 

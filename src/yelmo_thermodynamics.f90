@@ -9,6 +9,7 @@ module yelmo_thermodynamics
     use thermodynamics 
     use ice_enthalpy
     use solver_advection, only : calc_advec2D  
+    use basal_hydro_simple 
 
     implicit none
     
@@ -156,9 +157,13 @@ contains
 
             end select 
 
-            ! Update basal water layer thickness 
-            thrm%now%H_w = thrm%now%H_w - thrm%now%bmb_grnd*(rho_ice/rho_w)
-            where(thrm%now%H_w .lt. 0.0_prec) thrm%now%H_w = 0.0 
+!             ! Update basal water layer thickness 
+!             thrm%now%H_w = thrm%now%H_w - thrm%now%bmb_grnd*(rho_ice/rho_w)
+!             where(thrm%now%H_w .lt. 0.0_prec) thrm%now%H_w = 0.0 
+            
+            ! Update basal water layer thickness
+            call calc_basal_water_local(thrm%now%H_w,tpo%now%H_ice,-thrm%now%bmb_grnd*(rho_ice/rho_w), &
+                                    tpo%now%f_grnd,dt,till_rate=1e-3,H_w_max=2.0)
 
         end if 
 

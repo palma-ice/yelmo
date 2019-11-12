@@ -57,6 +57,8 @@ module basal_hydro_simple
     public :: hydro_update
 !     public :: hydro_end
 
+    public :: calc_basal_water_local
+
 contains 
 
     subroutine hydro_update(hyd,H_ice,f_grnd,bmb_w,time)

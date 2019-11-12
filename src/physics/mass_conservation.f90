@@ -54,7 +54,7 @@ contains
         calv_grnd = 0.0 
 
         ! 1. Apply mass conservation =================
-        
+
         ! First, only resolve the dynamic part (ice advection)
         call calc_advec2D(H_ice,ux,uy,mbal*0.0,dx,dx,dt,solver)
 
@@ -496,8 +496,8 @@ end if
             ! Store neighbor heights 
             H_neighb = [H_ice_0(i1,j),H_ice_0(i2,j),H_ice_0(i,j1),H_ice_0(i,j2)]
             
-            if (H_ice(i,j) .gt. 0.0 .and. minval(H_neighb) .eq. 0.0) then 
-                ! This point is at the ice margin
+            if (H_ice(i,j) .gt. 0.0 .and. minval(H_neighb) .eq. 0.0 .and. f_grnd(i,j) .eq. 0.0) then 
+                ! This point is at the floating ice margin
 
                 ! Store mask of neighbors with ice 
                 mask_neighb = (H_neighb .gt. 0.0)

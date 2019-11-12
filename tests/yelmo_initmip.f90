@@ -208,7 +208,7 @@ program yelmo_test
         ! Update ice sheet 
         call yelmo_update(yelmo1,time)
 
-if (.TRUE.) then 
+if (.FALSE.) then 
         ! Update basal hydrology 
         call hydro_update(hyd1,yelmo1%tpo%now%H_ice,yelmo1%tpo%now%f_grnd, &
                     -yelmo1%thrm%now%bmb_grnd*rho_ice/rho_w,time)

@@ -156,9 +156,9 @@ contains
 
             end select 
 
-!             ! Update basal water layer thickness 
-!             thrm%now%H_w = thrm%now%H_w - thrm%now%bmb_grnd*(rho_ice/rho_w)
-!             where(thrm%now%H_w .lt. 0.0_prec) thrm%now%H_w = 0.0 
+            ! Update basal water layer thickness 
+            thrm%now%H_w = thrm%now%H_w - thrm%now%bmb_grnd*(rho_ice/rho_w)
+            where(thrm%now%H_w .lt. 0.0_prec) thrm%now%H_w = 0.0 
 
         end if 
 

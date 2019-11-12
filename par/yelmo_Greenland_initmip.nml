@@ -20,6 +20,7 @@
     grid_path       = "input/{domain}/{grid_name}/{grid_name}_REGIONS.nc"
     experiment      = "None"       
     restart         = "None"
+    log_timestep    = False 
     zeta_scale      = "tanh"            ! "linear", "exp", "tanh"
     zeta_exp        = 2.0  
     nz_aa           = 21                ! Vertical resolution in ice

@@ -1,6 +1,5 @@
 &yelmo_config 
     yelmo_log          = True 
-    yelmo_log_timestep = False  
 /
 
 &yelmo_constants 

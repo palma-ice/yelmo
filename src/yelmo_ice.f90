@@ -173,9 +173,9 @@ contains
             call calc_pc_tau_fe_sbe(dom%par%pc1_tau,dom%thrm%now%T_prime_b,thrm1%now%T_prime_b,dom%par%pc1_dt)
 
 
-            if (yelmo_log_timestep) then 
+            if (dom%par%log_timestep) then 
                 ! Write timestep file if desired
-                call yelmo_timestep_write(yelmo_log_timestep_file,time_now,dt_now,dt_adv_min,dom%par%pc_dt, &
+                call yelmo_timestep_write(dom%par%log_timestep_file,time_now,dt_now,dt_adv_min,dom%par%pc_dt, &
                             dom%par%pc_eta,dom%par%pc_tau,dom%par%pc1_dt,dom%par%pc1_eta,dom%par%pc1_tau)
             end if 
 
@@ -240,7 +240,7 @@ contains
         logical    :: dom_topo_fixed
         logical    :: dom_use_ssa  
         real(prec) :: dom_ssa_vel_max 
-        logical    :: dom_yelmo_log_timestep 
+        logical    :: dom_log_timestep 
 
         ! Only run equilibration if time_tot > 0 
 
@@ -255,14 +255,14 @@ contains
             dom_use_ssa     = dom%dyn%par%use_ssa 
             dom_ssa_vel_max = dom%dyn%par%ssa_vel_max
 
-            dom_yelmo_log_timestep = yelmo_log_timestep
+            dom_log_timestep = dom%par%log_timestep
 
             ! Set model choices equal to equilibration choices 
             dom%tpo%par%topo_fixed  = topo_fixed 
             dom%dyn%par%use_ssa     = use_ssa 
             dom%dyn%par%ssa_vel_max = ssa_vel_max
 
-            yelmo_log_timestep      = .FALSE. 
+            dom%par%log_timestep    = .FALSE. 
 
             ! Set model time to input time 
             call yelmo_set_time(dom,time)
@@ -281,7 +281,7 @@ contains
             dom%tpo%par%topo_fixed  = dom_topo_fixed 
             dom%dyn%par%use_ssa     = dom_use_ssa 
             dom%dyn%par%ssa_vel_max = dom_ssa_vel_max
-            yelmo_log_timestep      = dom_yelmo_log_timestep
+            dom%par%log_timestep    = dom_log_timestep
 
             write(*,*) 
             write(*,*) "Equilibration complete."
@@ -495,11 +495,11 @@ contains
         write(*,*) "yelmo_init:: Initialization complete for domain: "// &
                    trim(dom%par%domain) 
 
-        if (yelmo_log_timestep) then 
+        if (dom%par%log_timestep) then 
             ! Timestep file 
-            call yelmo_timestep_write_init(yelmo_log_timestep_file,time,dom%grd%xc,dom%grd%yc, &
+            call yelmo_timestep_write_init(dom%par%log_timestep_file,time,dom%grd%xc,dom%grd%yc, &
                                                                     dom%par%pc_ebs,dom%par%pc1_ebs)
-            call yelmo_timestep_write(yelmo_log_timestep_file,time,0.0_prec,0.0_prec,dom%par%pc_dt, &
+            call yelmo_timestep_write(dom%par%log_timestep_file,time,0.0_prec,0.0_prec,dom%par%pc_dt, &
                             dom%par%pc_eta,dom%par%pc_tau,dom%par%pc1_dt,dom%par%pc1_eta,dom%par%pc1_tau)
         end if 
 
@@ -667,6 +667,7 @@ contains
         call nml_read(filename,"yelmo","grid_path",     par%grid_path)
         call nml_read(filename,"yelmo","experiment",    par%experiment)
         call nml_read(filename,"yelmo","restart",       par%restart)
+        call nml_read(filename,"yelmo","log_timestep",  par%log_timestep)
         call nml_read(filename,"yelmo","zeta_scale",    par%zeta_scale)
         call nml_read(filename,"yelmo","zeta_exp",      par%zeta_exp)
         call nml_read(filename,"yelmo","nz_aa",         par%nz_aa)
@@ -701,6 +702,8 @@ contains
         else 
             par%use_restart = .TRUE. 
         end if 
+
+        par%log_timestep_file = "timesteps_"//trim(grid_name)//".nc" 
 
         return
 

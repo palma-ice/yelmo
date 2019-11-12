@@ -41,9 +41,7 @@ module yelmo_defs
 
     ! Yelmo configuration options 
     logical :: yelmo_log
-    logical :: yelmo_log_timestep 
-    character(len=256), parameter :: yelmo_log_timestep_file = "timesteps.nc" 
-
+    
     ! Physical constants 
     real(prec) :: sec_year       ! [s] seconds per year 
     real(prec) :: g              ! [m s-2] Gravitational accel.  
@@ -595,6 +593,9 @@ module yelmo_defs
         character (len=256) :: experiment
         character (len=512) :: restart
 
+        ! Data logging 
+        logical             :: log_timestep 
+
         ! Vertical dimension definition
         character (len=56)  :: zeta_scale 
         real(prec)          :: zeta_exp 
@@ -631,6 +632,8 @@ module yelmo_defs
         ! Timing information 
         real(prec) :: model_speed 
         real(prec) :: model_speeds(10)    ! Use 10 timesteps for running mean  
+
+        character(len=512)   :: log_timestep_file 
 
     end type
 
@@ -691,8 +694,7 @@ contains
         ! Load parameter values 
 
         call nml_read(filename,"yelmo_config","yelmo_log",yelmo_log,init=init_pars)
-        call nml_read(filename,"yelmo_config","yelmo_log_timestep",yelmo_log_timestep,init=init_pars)
-        
+
         call nml_read(filename,"yelmo_constants","sec_year",    sec_year,   init=init_pars)
         call nml_read(filename,"yelmo_constants","g",           g,          init=init_pars)
         call nml_read(filename,"yelmo_constants","T0",          T0,         init=init_pars)
@@ -708,8 +710,7 @@ contains
         if (yelmo_log) then 
             write(*,*) "yelmo:: configuration:"
             write(*,*) "    yelmo_log          = ", yelmo_log
-            write(*,*) "    yelmo_log_timestep = ", yelmo_log_timestep 
-
+            
             write(*,*) "yelmo:: loaded global constants:"
             write(*,*) "    sec_year   = ", sec_year 
             write(*,*) "    g          = ", g 

@@ -208,18 +208,13 @@ program yelmo_test
         ! Update ice sheet 
         call yelmo_update(yelmo1,time)
 
-if (.FALSE.) then 
+if (.TRUE.) then 
         ! Update basal hydrology 
         call hydro_update(hyd1,yelmo1%tpo%now%H_ice,yelmo1%tpo%now%f_grnd, &
-                    -yelmo1%thrm%now%bmb_grnd*rho_ice/rho_w  *0.0_prec   ,time)
+                    -yelmo1%thrm%now%bmb_grnd*rho_ice/rho_w,time)
 
         ! Pass updated boundary variables to yelmo 
         yelmo1%bnd%H_w = hyd1%now%H_w 
- 
-
-        ! Update cf_ref (not necessary since C_bed is now always calculated internally
-        call calc_ydyn_cfref_external(yelmo1%dyn,yelmo1%tpo,yelmo1%thrm,yelmo1%bnd,yelmo1%grd,yelmo1%par%domain, &
-                                        mask_noice,cf_ref)
 
 end if
         ! == MODEL OUTPUT =======================================================

@@ -188,8 +188,8 @@ contains
 
         end do 
 
-        ! Set boundary H_w equal to H_w 
-        dom%bnd%H_w = dom%thrm%now%H_w
+!         ! Set boundary H_w equal to H_w 
+!         dom%bnd%H_w = dom%thrm%now%H_w
 
         ! Update regional calculations (for now entire domain with ice)
         call calc_yregions(dom%reg,dom%tpo,dom%dyn,dom%thrm,dom%mat,dom%bnd,mask=dom%bnd%ice_allowed)

@@ -41,7 +41,7 @@ module yelmo_defs
 
     ! Yelmo configuration options 
     logical :: yelmo_log
-    
+
     ! Physical constants 
     real(prec) :: sec_year       ! [s] seconds per year 
     real(prec) :: g              ! [m s-2] Gravitational accel.  
@@ -423,6 +423,7 @@ module yelmo_defs
         real(prec), allocatable :: H_cts(:,:)       ! Height of the cts
         real(prec), allocatable :: T_prime_b(:,:)   ! Homologous temperature at the base 
         real(prec), allocatable :: H_w(:,:)         ! [m] Basal water layer thickness 
+        real(prec), allocatable :: dHwdt(:,:)       ! [m/a] Basal water layer thickness rate of change
     end type
 
     ! ytherm class

@@ -102,7 +102,7 @@ contains
                 case(1)
                     ! Local mass balance of H_w 
 
-                    call calc_basal_water_local(hyd%now%H_w,H_ice,bmb_w,f_grnd, &
+                    call calc_basal_water_local(hyd%now%H_w,hyd%now%dHwdt,H_ice,bmb_w,f_grnd, &
                                                     hyd%now%dt,hyd%par%till_rate,hyd%par%H_w_max)
 
                 case DEFAULT 
@@ -296,12 +296,13 @@ contains
 
     ! ==== BASAL HYDROLOGY PHYSICS ===============================
 
-    subroutine calc_basal_water_local(H_w,H_ice,bmb_w,f_grnd,dt,till_rate,H_w_max)
+    subroutine calc_basal_water_local(H_w,dHwdt,H_ice,bmb_w,f_grnd,dt,till_rate,H_w_max)
         ! Calculate the basal water layer thickness based on a simple local 
         ! water balance: dHw/dt = bmb_w - 
         implicit none 
          
         real(prec), intent(INOUT) :: H_w(:,:)         ! [m] Water layer thickness
+        real(prec), intent(INOUT) :: dHwdt(:,:)       ! [m/a] Water layer thickness change
         real(prec), intent(IN)    :: H_ice(:,:)       ! [m] Ice thickness 
         real(prec), intent(IN)    :: bmb_w(:,:)       ! [m/a] Basal water mass balance
         real(prec), intent(IN)    :: f_grnd(:,:)      ! [-] Grounded fraction
@@ -315,6 +316,9 @@ contains
 
         nx = size(H_ice,1)
         ny = size(H_ice,2)
+
+        ! Store initial H_w field 
+        dHwdt = H_w 
 
         where (f_grnd .gt. 0.0 .and. H_ice .gt. 0.0)
             ! Grounded ice point
@@ -360,6 +364,13 @@ contains
 
         end do 
         end do  
+
+        ! Determine rate of change 
+        if (dt .ne. 0.0_prec) then 
+            dHwdt = (dHwdt - H_w) / dt 
+        else 
+            dHwdt = 0.0_prec 
+        end if 
 
         return 
 

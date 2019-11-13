@@ -103,6 +103,10 @@ contains
         if ( dt .gt. 0.0 ) then     
             ! Ice thermodynamics should evolve, perform calculations 
 
+            ! Update basal water layer thickness for first half-timestep
+            call calc_basal_water_local(thrm%now%H_w,thrm%now%dHwdt,tpo%now%H_ice,-thrm%now%bmb_grnd*(rho_ice/rho_w), &
+                                    tpo%now%f_grnd,dt*0.5_prec,till_rate=1e-3,H_w_max=2.0)
+            
             select case(trim(thrm%par%method))
 
                 case("enth","temp") 
@@ -157,13 +161,9 @@ contains
 
             end select 
 
-!             ! Update basal water layer thickness 
-!             thrm%now%H_w = thrm%now%H_w - thrm%now%bmb_grnd*(rho_ice/rho_w)
-!             where(thrm%now%H_w .lt. 0.0_prec) thrm%now%H_w = 0.0 
-            
-            ! Update basal water layer thickness
+            ! Update basal water layer thickness for remaining half-timestep
             call calc_basal_water_local(thrm%now%H_w,thrm%now%dHwdt,tpo%now%H_ice,-thrm%now%bmb_grnd*(rho_ice/rho_w), &
-                                    tpo%now%f_grnd,dt,till_rate=1e-3,H_w_max=2.0)
+                                    tpo%now%f_grnd,dt*0.5_prec,till_rate=1e-3,H_w_max=2.0)
             
         end if 
 

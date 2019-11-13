@@ -103,10 +103,6 @@ contains
         if ( dt .gt. 0.0 ) then     
             ! Ice thermodynamics should evolve, perform calculations 
 
-            ! Update basal water layer thickness for first half-timestep
-            call calc_basal_water_local(thrm%now%H_w,thrm%now%dHwdt,tpo%now%H_ice,-thrm%now%bmb_grnd*(rho_ice/rho_w), &
-                                    tpo%now%f_grnd,dt*0.5_prec,till_rate=1e-3,H_w_max=2.0)
-            
             select case(trim(thrm%par%method))
 
                 case("enth","temp") 
@@ -114,7 +110,8 @@ contains
                     
                     call calc_ytherm_enthalpy_3D(thrm%now%enth,thrm%now%T_ice,thrm%now%omega,thrm%now%bmb_grnd,thrm%now%Q_ice_b, &
                                 thrm%now%H_cts,thrm%now%T_pmp,thrm%now%cp,thrm%now%kt,dyn%now%ux,dyn%now%uy,dyn%now%uz,thrm%now%Q_strn, &
-                                thrm%now%Q_b,bnd%Q_geo,bnd%T_srf,tpo%now%H_ice,thrm%now%H_w,thrm%now%dHwdt,tpo%now%H_grnd,tpo%now%f_grnd, &
+                                thrm%now%Q_b,bnd%Q_geo,bnd%T_srf,tpo%now%H_ice,thrm%now%H_w,-thrm%now%bmb_grnd*(rho_ice/rho_w)-1e-3,  &!thrm%now%dHwdt,
+                                tpo%now%H_grnd,tpo%now%f_grnd, &
                                 thrm%par%zeta_aa,thrm%par%zeta_ac,thrm%par%dzeta_a,thrm%par%dzeta_b,thrm%par%enth_cr,thrm%par%omega_max, &
                                 dt,thrm%par%dx,thrm%par%method,thrm%par%solver_advec)
                     
@@ -161,9 +158,9 @@ contains
 
             end select 
 
-            ! Update basal water layer thickness for remaining half-timestep
+            ! Update basal water layer thickness
             call calc_basal_water_local(thrm%now%H_w,thrm%now%dHwdt,tpo%now%H_ice,-thrm%now%bmb_grnd*(rho_ice/rho_w), &
-                                    tpo%now%f_grnd,dt*0.5_prec,till_rate=1e-3,H_w_max=2.0)
+                                    tpo%now%f_grnd,dt,till_rate=1e-3,H_w_max=2.0)
             
         end if 
 

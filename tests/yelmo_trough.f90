@@ -136,12 +136,14 @@ program yelmo_trough
         ! == Yelmo ice sheet ===================================================
         call yelmo_update(yelmo1,time)
 
+if (.FALSE.) then 
         ! Update basal hydrology 
         call hydro_update(hyd1,yelmo1%tpo%now%H_ice,yelmo1%tpo%now%f_grnd, &
                     -yelmo1%thrm%now%bmb_grnd*rho_ice/rho_w,time)
 
         ! Pass updated boundary variables to yelmo 
         yelmo1%bnd%H_w = hyd1%now%H_w 
+end if 
 
         ! == MODEL OUTPUT =======================================================
         if (mod(nint(time*100),nint(dt2D_out*100))==0) then  
@@ -152,7 +154,7 @@ program yelmo_trough
             call write_yreg_step(yelmo1%reg,file1D,time=time) 
         end if
 
-        if (mod(time,10.0)==0 .and. (.not. yelmo_write_log)) then
+        if (mod(time,10.0)==0 .and. (.not. yelmo_log)) then
             write(*,"(a,f14.4)") "yelmo:: time = ", time
         end if  
 

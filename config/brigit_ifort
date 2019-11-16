@@ -1,0 +1,15 @@
+FC  = ifort
+
+INC_NC  = -I/opt/ohpc/pub/libs/intel/impi/netcdf-fortran/4.4.5/include
+LIB_NC  = -L/opt/ohpc/pub/libs/intel/impi/netcdf-fortran/4.4.5/lib -lnetcdff -L/opt/ohpc/pub/libs/intel/impi/hdf5/1.10.5/lib -L/opt/ohpc/pub/libs/intel/impi/netcdf/4.6.3/lib -lnetcdf -lnetcdf -lhdf5_hl -lhdf5 -lz -lm
+
+LISROOT = ${HOME}/apps/lis/lis
+INC_LIS = -I${LISROOT}/include 
+LIB_LIS = -L${LISROOT}/lib/ -llis
+
+FFLAGS  = -module $(objdir) -L$(objdir)
+LFLAGS  = $(LIB_NC) $(LIB_LIS) -Wl,-zmuldefs
+
+DFLAGS_NODEBUG = -O2 -fp-model precise
+DFLAGS_DEBUG   = -C -traceback -ftrapuv -fpe0 -check all -fp-model precise
+DFLAGS_PROFILE = -O2 -fp-model precise -pg

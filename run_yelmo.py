@@ -101,7 +101,7 @@ trough = libyelmo/bin/yelmo_trough.x
     # Get path of constants parameter file based on parameter name
     # (EISMINT,MISMIP3D are special cases, otherwise use Earth constants)
 
-    if "EISMINT" in par_fname:
+    if "EISMINT" in par_fname or "HALFAR" in par_fname:
         const_path = "par/yelmo_const_EISMINT.nml"
     elif "MISMIP3D" in par_fname:
         const_path = "par/yelmo_const_MISMIP3D.nml"

@@ -154,7 +154,7 @@ program yelmo_benchmarks
 
         ! Consistency check 
         if (trim(experiment) .ne. "moving") then 
-            write(*,*) "yelmo_benchmarks:: Error: topo_fixe=True can only be used&
+            write(*,*) "yelmo_benchmarks:: Error: topo_fixed=True can only be used&
             & for the EISMINT1 'moving' experiment."
             write(*,*) "experiment = ", trim(experiment)
             stop 
@@ -173,7 +173,7 @@ program yelmo_benchmarks
     yelmo1%bnd%bmb_shlf = 0.0  
     yelmo1%bnd%T_shlf   = T0  
     yelmo1%bnd%H_sed    = 0.0 
-    
+
     select case(trim(experiment))
 
         case("BUELER-A")
@@ -231,7 +231,7 @@ program yelmo_benchmarks
 
             ! Initialize BUELER-B (but with conditions between Bueler-B and HALFAR - not too big, not too small)
             call bueler_test_BC(buel%H_ice,buel%mbal,buel%u_b,yelmo1%grd%x,yelmo1%grd%y, &
-                        time=0.0_prec,R0=200.0_prec,H0=3000.0_prec,lambda=0.0_prec,n=3.0_prec,A=1e-16_prec,rho_ice=rho_ice,g=g)
+                        time=0.0_prec,R0=200.0_prec,H0=1600.0_prec,lambda=0.0_prec,n=3.0_prec,A=1e-16_prec,rho_ice=rho_ice,g=g)
 
             yelmo1%bnd%T_srf = 223.15 
             yelmo1%bnd%Q_geo = 42.0 
@@ -338,7 +338,7 @@ program yelmo_benchmarks
 
                 ! Initialize BUELER-B (but with conditions between Bueler-B and HALFAR - not too big, not too small)
                 call bueler_test_BC(buel%H_ice,buel%mbal,buel%u_b,yelmo1%grd%x,yelmo1%grd%y, &
-                            time=time,R0=200.0_prec,H0=3000.0_prec,lambda=0.0_prec,n=3.0_prec,A=1e-16_prec,rho_ice=rho_ice,g=g)
+                            time=time,R0=200.0_prec,H0=1600.0_prec,lambda=0.0_prec,n=3.0_prec,A=1e-16_prec,rho_ice=rho_ice,g=g)
             
             case("mismip") 
 

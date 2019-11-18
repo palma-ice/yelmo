@@ -66,7 +66,7 @@ contains
 
         allocate(dt_save(nstep))
         dt_save = missing_value 
-        
+
         ! Iteration of yelmo component updates until external timestep is reached
         do n = 1, nstep
 

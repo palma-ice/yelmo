@@ -6,7 +6,7 @@
     with_ssa     = False                 ! Include ssa in experiment?
     topo_fixed   = False                 ! Calculate the topography, or use Heiko's topo file.  
     dyn_fixed    = False                 ! Fix dynamics after first calculation? 
-    topo_fixed_file = /Users/robinson/models/EURICE/yelmo/tests/heiko_imau-ice_help_fields_eismint_M_200kyr.nc
+    topo_fixed_file = "/Users/robinson/models/EURICE/yelmo/tests/heiko_imau-ice_help_fields_eismint_M_200kyr.nc"
 
     ! Timing parameters 
     time_init    = 0.0                  ! [yr] Starting time 

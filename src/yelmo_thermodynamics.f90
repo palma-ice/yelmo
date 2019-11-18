@@ -158,7 +158,7 @@ contains
 
             ! Update basal water layer thickness
             call calc_basal_water_local(thrm%now%H_w,thrm%now%dHwdt,tpo%now%H_ice,-thrm%now%bmb_grnd*(rho_ice/rho_w), &
-                                    tpo%now%f_grnd,dt,till_rate=1e-3,H_w_max=2.0)
+                                    tpo%now%f_grnd,dt,thrm%par%till_rate,thrm%par%H_w_max)
             
         end if 
 
@@ -723,6 +723,8 @@ contains
         call nml_read(filename,"ytherm","const_kt",       par%const_kt,         init=init_pars)
         call nml_read(filename,"ytherm","enth_cr",        par%enth_cr,          init=init_pars)
         call nml_read(filename,"ytherm","omega_max",      par%omega_max,        init=init_pars)
+        call nml_read(filename,"ytherm","till_rate",      par%till_rate,        init=init_pars)
+        call nml_read(filename,"ytherm","H_w_max",        par%H_w_max,          init=init_pars)
         
         ! Set internal parameters
         par%nx  = nx

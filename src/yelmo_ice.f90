@@ -66,10 +66,7 @@ contains
 
         allocate(dt_save(nstep))
         dt_save = missing_value 
-
-        ! Set H_w equal to boundary value 
-        dom%thrm%now%H_w = dom%bnd%H_w 
-
+        
         ! Iteration of yelmo component updates until external timestep is reached
         do n = 1, nstep
 
@@ -187,9 +184,6 @@ contains
             if (abs(time_now - time) .lt. time_tol) exit 
 
         end do 
-
-        ! Set boundary H_w equal to H_w 
-        dom%bnd%H_w = dom%thrm%now%H_w
 
         ! Update regional calculations (for now entire domain with ice)
         call calc_yregions(dom%reg,dom%tpo,dom%dyn,dom%thrm,dom%mat,dom%bnd,mask=dom%bnd%ice_allowed)
@@ -744,7 +738,6 @@ contains
         write(*,*) "ybound:: z_bed:  ",   minval(bnd%z_bed),    maxval(bnd%z_bed)
         write(*,*) "ybound:: z_sl:  ",    minval(bnd%z_sl),     maxval(bnd%z_sl)
         write(*,*) "ybound:: H_sed: ",    minval(bnd%H_sed),    maxval(bnd%H_sed)
-        write(*,*) "ybound:: H_w: ",      minval(bnd%H_w),      maxval(bnd%H_w)
         write(*,*) "ybound:: smb: ",      minval(bnd%smb),      maxval(bnd%smb)
         write(*,*) "ybound:: T_srf: ",    minval(bnd%T_srf),    maxval(bnd%T_srf)
         write(*,*) "ybound:: T_shlf: ",   minval(bnd%T_shlf),   maxval(bnd%T_shlf)

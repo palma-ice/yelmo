@@ -9,7 +9,6 @@ module yelmo_thermodynamics
     use thermodynamics 
     use ice_enthalpy
     use solver_advection, only : calc_advec2D  
-    use basal_hydro_simple 
 
     implicit none
     

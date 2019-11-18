@@ -5,14 +5,12 @@ program yelmo_test
     use ncio 
     use yelmo 
     
-    use basal_hydro_simple 
     use basal_dragging 
     use yelmo_tools, only : gauss_values
     
     implicit none 
 
-    type(yelmo_class)      :: yelmo1
-    type(hydro_class)      :: hyd1 
+    type(yelmo_class)      :: yelmo1 
 
     character(len=256) :: outfldr, file1D, file2D, file_restart, domain 
     character(len=512) :: path_par, path_const  
@@ -66,16 +64,11 @@ program yelmo_test
     ! Initialize data objects and load initial topography
     call yelmo_init(yelmo1,filename=path_par,grid_def="file",time=time_init)
 
-    ! Also intialize simple basal hydrology object
-    call hydro_init(hyd1,filename=path_par,nx=yelmo1%grd%nx,ny=yelmo1%grd%ny)
-    call hydro_init_state(hyd1,yelmo1%tpo%now%H_ice,yelmo1%tpo%now%f_grnd,time)
-
     ! === Set initial boundary conditions for current time and yelmo state =====
-    ! ybound: z_bed, z_sl, H_sed, H_w, smb, T_srf, bmb_shlf , Q_geo
+    ! ybound: z_bed, z_sl, H_sed, smb, T_srf, bmb_shlf , Q_geo
 
     yelmo1%bnd%z_sl     = z_sl              ! [m]
     yelmo1%bnd%H_sed    = 0.0               ! [m]
-    yelmo1%bnd%H_w      = hyd1%now%H_w      ! [m]
     yelmo1%bnd%Q_geo    = 50.0              ! [mW/m2]
     
     ! Impose present-day surface mass balance and present-day temperature field plus any anomaly
@@ -208,15 +201,6 @@ program yelmo_test
         ! Update ice sheet 
         call yelmo_update(yelmo1,time)
 
-if (.FALSE.) then 
-        ! Update basal hydrology 
-        call hydro_update(hyd1,yelmo1%tpo%now%H_ice,yelmo1%tpo%now%f_grnd, &
-                    -yelmo1%thrm%now%bmb_grnd*rho_ice/rho_w,time)
-
-        ! Pass updated boundary variables to yelmo 
-        yelmo1%bnd%H_w = hyd1%now%H_w 
-
-end if
         ! == MODEL OUTPUT =======================================================
 
         if (mod(nint(time*100),nint(dt2D_out*100))==0) then
@@ -408,8 +392,7 @@ contains
                       dim1="xc",dim2="yc",dim3="zeta",dim4="time",start=[1,1,1,n],ncid=ncid)
         call nc_write(filename,"f_pmp",ylmo%thrm%now%f_pmp,units="1",long_name="Fraction of grid point at pmp", &
                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-
-        call nc_write(filename,"H_w",ylmo%bnd%H_w,units="m water equiv.",long_name="Basal water layer thickness", &
+        call nc_write(filename,"H_w",ylmo%thrm%now%H_w,units="m water equiv.",long_name="Basal water layer thickness", &
                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
         
         ! Ice thickness comparison with present-day 

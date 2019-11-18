@@ -453,7 +453,6 @@ module yelmo_defs
         real(prec), allocatable :: z_bed_sd(:,:) 
         real(prec), allocatable :: z_sl(:,:)
         real(prec), allocatable :: H_sed(:,:)
-        real(prec), allocatable :: H_w(:,:)
         real(prec), allocatable :: smb(:,:)
         real(prec), allocatable :: T_srf(:,:)
         real(prec), allocatable :: bmb_shlf(:,:)

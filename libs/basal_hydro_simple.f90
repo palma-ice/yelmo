@@ -298,7 +298,7 @@ contains
 
     subroutine calc_basal_water_local(H_w,dHwdt,H_ice,bmb_w,f_grnd,dt,till_rate,H_w_max)
         ! Calculate the basal water layer thickness based on a simple local 
-        ! water balance: dHw/dt = bmb_w - 
+        ! water balance: dHw/dt = bmb_w - till_rate
         implicit none 
          
         real(prec), intent(INOUT) :: H_w(:,:)         ! [m] Water layer thickness

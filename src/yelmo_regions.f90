@@ -144,11 +144,9 @@ contains
             
             ! ythrm variables 
             reg%f_pmp        = sum(thrm%now%f_pmp,mask=mask_grnd)/npts_grnd       ! [fraction]
-
-            ! Boundary variables
-            reg%H_w          = sum(bnd%H_w,mask=mask_grnd)/npts_grnd
+            reg%H_w          = sum(thrm%now%H_w,mask=mask_grnd)/npts_grnd
             reg%bmb_g        = sum(tpo%now%bmb,mask=mask_grnd)/npts_grnd
-
+            
         else 
 
             ! ytopo variables 
@@ -165,8 +163,6 @@ contains
             
             ! ythrm variables 
             reg%f_pmp        = 0.0_prec 
-
-            ! Boundary variables
             reg%H_w          = 0.0_prec 
             reg%bmb_g        = 0.0_prec 
             

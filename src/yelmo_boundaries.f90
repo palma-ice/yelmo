@@ -247,7 +247,6 @@ contains
         allocate(now%z_bed_sd(nx,ny))
         allocate(now%z_sl(nx,ny))
         allocate(now%H_sed(nx,ny))
-        allocate(now%H_w(nx,ny))
         allocate(now%smb(nx,ny))
         allocate(now%T_srf(nx,ny))
         allocate(now%bmb_shlf(nx,ny))
@@ -268,7 +267,6 @@ contains
         now%z_bed_sd    = 0.0_prec
         now%z_sl        = 0.0_prec 
         now%H_sed       = 0.0_prec 
-        now%H_w         = 0.0_prec 
         now%smb         = 0.0_prec 
         now%T_srf       = 0.0_prec 
         now%bmb_shlf    = 0.0_prec 
@@ -298,7 +296,6 @@ contains
         if (allocated(now%z_bed_sd))    deallocate(now%z_bed_sd)
         if (allocated(now%z_sl))        deallocate(now%z_sl)
         if (allocated(now%H_sed))       deallocate(now%H_sed)
-        if (allocated(now%H_w))         deallocate(now%H_w)
         if (allocated(now%smb))         deallocate(now%smb)
         if (allocated(now%T_srf))       deallocate(now%T_srf)
         if (allocated(now%bmb_shlf))    deallocate(now%bmb_shlf)
@@ -352,17 +349,6 @@ contains
             call nc_read(filename,vname,bnd%H_sed)
         else 
             bnd%H_sed = mv 
-        end if 
-        
-        ! == H_w =====
-        call nml_read(nml_path,nml_group,"H_w_load",load_var)
-        if (load_var) then 
-            call nml_read(nml_path,nml_group,"H_w_path",filename)
-            call yelmo_parse_path(filename,domain,grid_name)
-            call nml_read(nml_path,nml_group,"H_w_nm",  vname)
-            call nc_read(filename,vname,bnd%H_w)
-        else 
-            bnd%H_w = mv 
         end if 
         
         ! == smb =====

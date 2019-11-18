@@ -28,6 +28,8 @@ module thermodynamics
     public :: calc_temp_linear_column
     public :: calc_temp_robin_column
     
+    public :: calc_basal_water_local
+
 contains
 
     elemental subroutine calc_bmb_grounded(bmb_grnd,T_prime_b,Q_ice_b,Q_b,Q_geo_now,f_grnd,rho_ice)
@@ -1032,5 +1034,87 @@ end if
         return
 
     end function error_function
+
+    ! ==== BASAL HYDROLOGY PHYSICS ===============================
+
+    subroutine calc_basal_water_local(H_w,dHwdt,H_ice,bmb_w,f_grnd,dt,till_rate,H_w_max)
+        ! Calculate the basal water layer thickness based on a simple local 
+        ! water balance: dHw/dt = bmb_w - till_rate
+        implicit none 
+         
+        real(prec), intent(INOUT) :: H_w(:,:)         ! [m] Water layer thickness
+        real(prec), intent(INOUT) :: dHwdt(:,:)       ! [m/a] Water layer thickness change
+        real(prec), intent(IN)    :: H_ice(:,:)       ! [m] Ice thickness 
+        real(prec), intent(IN)    :: bmb_w(:,:)       ! [m/a] Basal water mass balance
+        real(prec), intent(IN)    :: f_grnd(:,:)      ! [-] Grounded fraction
+        real(prec), intent(IN)    :: dt               ! [a] Timestep 
+        real(prec), intent(IN)    :: till_rate        ! [m/a] Till drainage rate 
+        real(prec), intent(IN)    :: H_w_max          ! [m] Maximum allowed water depth 
+
+        ! Local variables 
+        integer :: i, j, nx, ny 
+        integer :: im1, ip1, jm1, jp1 
+
+        nx = size(H_ice,1)
+        ny = size(H_ice,2)
+
+        ! Store initial H_w field 
+        dHwdt = H_w 
+
+        where (f_grnd .gt. 0.0 .and. H_ice .gt. 0.0)
+            ! Grounded ice point
+
+            ! Update mass balance of H_w
+            H_w = H_w + dt*bmb_w - dt*till_rate
+
+            ! Restrict H_w to values within limits
+            H_w = max(H_w,0.0)
+            H_w = min(H_w,H_w_max)
+
+        else where (f_grnd .gt. 0.0) 
+            ! Ice-free land above sea level 
+
+            H_w = 0.0 
+
+        elsewhere
+            ! Set water layer thickness to maximum layer thickness
+
+            H_w = H_w_max 
+
+        end where 
+
+        ! Additionally set points at the grounding line to
+        ! the maximum water thickness 
+        do j = 1, ny 
+        do i = 1, nx
+
+            im1 = max(1, i-1)
+            ip1 = min(nx,i+1)
+            
+            jm1 = max(1, j-1)
+            jp1 = min(ny,j+1)
+
+            ! Grounded point or partially floating point with floating neighbors
+            if (H_ice(i,j) .gt. 0.0 .and. f_grnd(i,j) .gt. 0.0 .and. &
+                (f_grnd(im1,j) .eq. 0.0 .or. f_grnd(ip1,j) .eq. 0.0 .or. &
+                 f_grnd(i,jm1) .eq. 0.0 .or. f_grnd(i,jp1) .eq. 0.0) ) then 
+                
+                H_w(i,j) = H_w_max
+
+            end if 
+
+        end do 
+        end do  
+
+        ! Determine rate of change 
+        if (dt .ne. 0.0_prec) then 
+            dHwdt = (dHwdt - H_w) / dt 
+        else 
+            dHwdt = 0.0_prec 
+        end if 
+
+        return 
+
+    end subroutine calc_basal_water_local
 
 end module thermodynamics 

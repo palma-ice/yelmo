@@ -262,6 +262,9 @@ contains
         allocate(now%calv_mask(nx,ny))
         
         allocate(now%H_ice_ref(nx,ny))
+!mmr
+        allocate(now%z_bed_ref(nx,ny)) !mmr 
+!mmr
         
         now%z_bed       = 0.0_prec 
         now%z_bed_sd    = 0.0_prec
@@ -282,7 +285,9 @@ contains
         now%calv_mask   = .FALSE. ! By default no, no calving mask 
 
         now%H_ice_ref   = 0.0_prec 
-
+!mmr
+        now%z_bed_ref = 0.0_prec !mmr
+!mr
         return 
     end subroutine ybound_alloc 
 
@@ -311,7 +316,9 @@ contains
         if (allocated(now%calv_mask))   deallocate(now%calv_mask)
         
         if (allocated(now%H_ice_ref))   deallocate(now%H_ice_ref)
-        
+!mmr 
+       if (allocated(now%z_bed_ref))   deallocate(now%z_bed_ref) !mmr
+!mmr        
         return 
 
     end subroutine ybound_dealloc 

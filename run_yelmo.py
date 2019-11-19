@@ -345,7 +345,37 @@ def get_git_revision_hash():
     githash = subp.check_output(['git', 'rev-parse', 'HEAD']).strip()
     return githash.decode("ascii") 
 
-def jobscript_slurm(cmd,rundir,username,usergroup,qos,wtime,useremail):
+def jobscript_slurm_brigit(cmd,rundir,username,usergroup,qos,wtime,useremail):
+    '''Definition of the job script'''
+
+    jobname = "yelmo" 
+
+    # Check that wtime is consistent with qos
+    if qos == "short" and wtime > 24*7:
+        print("Error in wtime for '{}'' queue, wtime = {}".format(qos,wtime))
+        sys.exit()
+            
+    script = """#! /bin/bash
+#SBATCH -p {}
+#SBATCH --time={}:00:00
+#SBATCH --job-name={}
+###SBATCH --account={}
+#SBATCH --mem=0 
+#SBATCH --mail-user={}
+#SBATCH --mail-type=END
+#SBATCH --mail-type=FAIL
+#SBATCH --mail-type=REQUEUE
+#SBATCH --output=./out.out
+#SBATCH --error=./out.err
+
+# Run the job
+{} 
+
+""".format(qos,wtime,jobname,usergroup,useremail,cmd)
+
+    return script
+
+def jobscript_slurm_pik(cmd,rundir,username,usergroup,qos,wtime,useremail):
     '''Definition of the job script'''
 
     jobname = "yelmo" 

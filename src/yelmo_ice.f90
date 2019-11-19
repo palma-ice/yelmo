@@ -62,20 +62,8 @@ contains
         time_start = time_now 
         
         ! Determine maximum number of time steps to be iterated through   
-<<<<<<< HEAD
-        nstep  = (time-time_now) / dom%par%dt_min 
-||||||| merged common ancestors
-        nstep  = (time-time_now) / dom%par%dtmin 
-
-        ! Reset number of thermodynamics timestep skips
-        ntt = 0 
-=======
-        nstep = ceiling((time-time_now)/dom%par%dtmin)   !mmr (avoids skipping timesteps due to roundoff errors)  nstep  = (time-time_now) / dom%par%dtmin 
-
-        ! Reset number of thermodynamics timestep skips
-        ntt = 0 
->>>>>>> b24d2084ffb75fcdd4de893f701a14673012036b
-
+        nstep  = ceiling( (time-time_now) / dom%par%dt_min )
+        
         allocate(dt_save(nstep))
         dt_save = missing_value 
 

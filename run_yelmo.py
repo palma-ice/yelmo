@@ -6,7 +6,7 @@ Example command to run an ensemble using 'job run' via the runner module:
 job run --shell -f -o output/run -p eismint.dx=30.0,50.0 -- python run_yelmo.py -x -r -e benchmarks {} par/gmd/yelmo_HALFAR.nml
 '''
 import subprocess as subp 
-import sys, os, argparse, shutil, glob, datetime, json
+import sys, os, socket, argparse, shutil, glob, datetime, json
 
 try:
     from runner.ext.namelist import Namelist
@@ -236,7 +236,8 @@ def submitjob(rundir,executable,par_path,qos,wtime,usergroup,useremail):
 
     # Get info about current system
     username  = os.environ.get('USER')
-    hostname  = os.environ.get('HOSTNAME')
+    #hostname  = os.environ.get('HOSTNAME')
+    hostname  = socket.getfqdn()             # Returns full domain name
 
     # Command to be called 
     cmd = "{} {}".format(executable,par_path) 

@@ -1,7 +1,7 @@
 # Running ensemble simulations
 
 The script run_yelmo.py is designed to prepare and run one
-Yelmo simulation with parameter loaded from a specified 
+Yelmo simulation with parameters loaded from a specified 
 parameter file. To perform an ensemble of Yelmo simulations
 with various combinations of parameter values, run_yelmo.py 
 can be called via the [Python `runner` module](https://github.com/perrette/runner).

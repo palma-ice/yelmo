@@ -3,7 +3,7 @@
 '''
 Script to run one yelmo simulation.
 Example command to run an ensemble using 'job run' via the runner module:
-job run -f -o output/run -p eismint.dx=30.0,50.0 -- python run_yelmo.py -x -r -e benchmarks {} par/gmd/yelmo_HALFAR.nml
+job run --shell -f -o output/run -p eismint.dx=30.0,50.0 -- python run_yelmo.py -x -r -e benchmarks {} par/gmd/yelmo_HALFAR.nml
 '''
 import subprocess as subp 
 import sys, os, argparse, shutil, glob, datetime, json

@@ -156,9 +156,9 @@ contains
 
             end select 
 
-            ! Update basal water layer thickness
-            call calc_basal_water_local(thrm%now%H_w,thrm%now%dHwdt,tpo%now%H_ice,-thrm%now%bmb_grnd*(rho_ice/rho_w), &
-                                    tpo%now%f_grnd,dt,thrm%par%till_rate,thrm%par%H_w_max)
+!             ! Update basal water layer thickness
+!             call calc_basal_water_local(thrm%now%H_w,thrm%now%dHwdt,tpo%now%H_ice,-thrm%now%bmb_grnd*(rho_ice/rho_w), &
+!                                     tpo%now%f_grnd,dt,thrm%par%till_rate,thrm%par%H_w_max)
             
         end if 
 
@@ -208,8 +208,8 @@ contains
         real(prec), intent(IN)    :: Q_geo(:,:)     ! [mW m-2] Geothermal heat flux 
         real(prec), intent(IN)    :: T_srf(:,:)     ! [K] Surface temperature 
         real(prec), intent(IN)    :: H_ice(:,:)     ! [m] Ice thickness 
-        real(prec), intent(IN)    :: H_w(:,:)       ! [m] Basal water layer thickness 
-        real(prec), intent(IN)    :: dHwdt(:,:)     ! [m/a] Basal water layer thickness change
+        real(prec), intent(INOUT) :: H_w(:,:)       ! [m] Basal water layer thickness 
+        real(prec), intent(INOUT) :: dHwdt(:,:)     ! [m/a] Basal water layer thickness change
         real(prec), intent(IN)    :: H_grnd(:,:)    ! [--] Ice thickness above flotation 
         real(prec), intent(IN)    :: f_grnd(:,:)    ! [--] Grounded fraction
         real(prec), intent(IN)    :: zeta_aa(:)     ! [--] Vertical sigma coordinates (zeta==height), aa-nodes
@@ -234,6 +234,10 @@ contains
         real(prec) :: filter0(3,3), filter(3,3) 
 
         real(prec), parameter :: H_ice_thin = 15.0   ! [m] Threshold to define 'thin' ice
+
+        integer, parameter :: n_iter = 2
+        integer :: q 
+        real(prec) :: dt_now 
 
         nx    = size(T_ice,1)
         ny    = size(T_ice,2)
@@ -260,6 +264,10 @@ contains
 
         ! Initialize gaussian filter kernel 
         filter0 = gauss_values(dx,dx,sigma=2.0*dx,n=size(filter,1))
+
+        dt_now = dt / real(n_iter,prec)
+
+        do q = 1, n_iter 
 
         do j = 3, ny-2
         do i = 3, nx-2 
@@ -332,11 +340,17 @@ contains
 !                 write(*,*) "advecxy: ", i,j, maxval(abs(advecxy3D(i,j,:)-advecxy))
                 call calc_enth_column(enth(i,j,:),T_ice(i,j,:),omega(i,j,:),bmb_grnd(i,j),Q_ice_b(i,j),H_cts(i,j), &
                         T_pmp(i,j,:),cp(i,j,:),kt(i,j,:),advecxy,uz(i,j,:),Q_strn(i,j,:),Q_b(i,j),Q_geo(i,j),T_srf(i,j), &
-                        T_shlf,H_ice_now,H_w(i,j),dHwdt(i,j),f_grnd(i,j),zeta_aa,zeta_ac,dzeta_a,dzeta_b,cr,omega_max,T0,dt,trim(solver))
+                        T_shlf,H_ice_now,H_w(i,j),dHwdt(i,j),f_grnd(i,j),zeta_aa,zeta_ac,dzeta_a,dzeta_b,cr,omega_max,T0,dt_now,trim(solver))
                 
             end if 
 
         end do 
+        end do 
+
+        ! Update basal water layer thickness
+        call calc_basal_water_local(H_w,dHwdt,H_ice,-bmb_grnd*(rho_ice/rho_w), &
+                                f_grnd,dt_now,till_rate=1e-3,H_w_max=2.0_prec)
+        
         end do 
 
         ! Fill in borders 

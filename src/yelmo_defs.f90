@@ -613,8 +613,7 @@ module yelmo_defs
         real(prec)          :: dt_ref 
         real(prec)          :: cfl_max 
         real(prec)          :: cfl_diff_max 
-        real(prec)          :: pc_ebs 
-        real(prec)          :: pc1_ebs 
+        real(prec)          :: pc_ebs  
 
         ! Sigma coordinates (internal parameter)
         real(prec), allocatable :: zeta_aa(:)   ! Layer centers (aa-nodes), plus base and surface: nz_aa points 
@@ -629,10 +628,7 @@ module yelmo_defs
         ! Time step parameters for predictor-corrector (PC) method (Cheng et al, 2017)
         real(prec) :: pc_dt 
         real(prec) :: pc_eta 
-        real(prec) :: pc1_dt
-        real(prec) :: pc1_eta 
         real(prec), allocatable :: pc_tau(:,:)
-        real(prec), allocatable :: pc1_tau(:,:)
 
         ! Timing information 
         real(prec) :: model_speed 

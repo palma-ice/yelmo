@@ -579,7 +579,7 @@ contains
 
     end subroutine check_checkerboard
 
-    subroutine yelmo_timestep_write_init(filename,time,xc,yc,pc_ebs,pc1_ebs)
+    subroutine yelmo_timestep_write_init(filename,time,xc,yc,pc_ebs)
 
         implicit none 
 
@@ -588,7 +588,6 @@ contains
         real(prec), intent(IN) :: xc(:) 
         real(prec), intent(IN) :: yc(:)  
         real(prec), intent(IN) :: pc_ebs
-        real(prec), intent(IN) :: pc1_ebs
 
         ! Local variables 
         character(len=16) :: xnm 
@@ -611,13 +610,12 @@ contains
         call nc_write_dim(filename,"time",x=time,dx=1.0_prec,nx=1,units="years",unlimited=.TRUE.)
 
         call nc_write(filename, "pc_ebs", pc_ebs,dim1="pt")
-        call nc_write(filename,"pc1_ebs",pc1_ebs,dim1="pt")
-
+        
         return 
 
     end subroutine yelmo_timestep_write_init 
 
-    subroutine yelmo_timestep_write(filename,time,dt_now,dt_adv,pc_dt,pc_eta,pc_tau,pc1_dt,pc1_eta,pc1_tau)
+    subroutine yelmo_timestep_write(filename,time,dt_now,dt_adv,pc_dt,pc_eta,pc_tau)
 
         implicit none 
 
@@ -628,9 +626,6 @@ contains
         real(prec), intent(IN) :: pc_dt 
         real(prec), intent(IN) :: pc_eta 
         real(prec), intent(IN) :: pc_tau(:,:) 
-        real(prec), intent(IN) :: pc1_dt 
-        real(prec), intent(IN) :: pc1_eta 
-        real(prec), intent(IN) :: pc1_tau(:,:)
 
         ! Local variables
         integer    :: ncid, n, nx, ny 
@@ -656,11 +651,6 @@ contains
         call nc_write(filename,  "pc_dt", pc_dt,dim1="time",start=[n],count=[1],ncid=ncid)
         call nc_write(filename, "pc_eta",pc_eta,dim1="time",start=[n],count=[1],ncid=ncid)
         call nc_write(filename, "pc_tau",pc_tau,dim1="xc",dim2="yc",dim3="time",start=[1,1,n],count=[nx,ny,1],ncid=ncid)
-
-        call nc_write(filename,  "pc1_dt", pc1_dt,dim1="time",start=[n],count=[1],ncid=ncid)
-        call nc_write(filename, "pc1_eta",pc1_eta,dim1="time",start=[n],count=[1],ncid=ncid)
-        call nc_write(filename, "pc1_tau",pc1_tau,dim1="xc",dim2="yc",dim3="time",start=[1,1,n],count=[nx,ny,1],ncid=ncid)
-
         
         ! Close the netcdf file
         call nc_close(ncid)

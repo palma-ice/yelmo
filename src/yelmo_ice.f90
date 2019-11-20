@@ -85,10 +85,6 @@ contains
             call set_adaptive_timestep_pc(dom%par%pc_dt,dom%par%pc_eta,dom%par%pc_tau,dom%par%pc_ebs, &
                                                 dom%par%dt_ref,dom%par%dt_min,dt_max)
 
-            ! Calculate adaptive timestep  using predictor-corrector algorithm for basal temperatures
-            call set_adaptive_timestep_pc(dom%par%pc1_dt,dom%par%pc1_eta,dom%par%pc1_tau,dom%par%pc1_ebs, &
-                                        dom%par%dt_ref,dom%par%dt_min,dt_max)
-
             ! Determine current time step based on method of choice 
             select case(dom%par%dt_method) 
 
@@ -106,9 +102,7 @@ contains
                     ! Use predictor-corrector adaptive timestep
 
                     dt_now = dom%par%pc_dt                      ! Based on ice thickness 
-!                     dt_now = dom%par%pc1_dt                     ! Based on basal temperature 
-!                     dt_now = min(dom%par%pc_dt,dom%par%pc1_dt)  ! Minimum between ice thickness and basal temperature
-
+                    
                 case DEFAULT 
 
                     write(*,*) "yelmo_update:: Error: dt_method not recognized."
@@ -133,7 +127,6 @@ contains
             
             ! Store local copy of ytopo and ytherm objects to use for predictor step
             tpo1  = dom%tpo 
-            thrm1 = dom%thrm 
 
             ! Step 1: Perform predictor step with temporary topography object 
             ! Calculate topography (elevation, ice thickness, calving, etc.)
@@ -142,17 +135,11 @@ contains
 
             ! Step 2: Update other variables using predicted ice thickness 
             
-            ! Calculate thermodynamics (temperatures and enthalpy), predicted
-            call calc_ytherm(thrm1,tpo1,dom%dyn,dom%mat,dom%bnd,time_now) 
-
-            ! Calculate material (ice properties, viscosity, etc.)
-            call calc_ymat(dom%mat,tpo1,dom%dyn,thrm1,dom%bnd,time_now)
-            
             ! Calculate dynamics (velocities and stresses)
-            call calc_ydyn(dom%dyn,tpo1,dom%mat,thrm1,dom%bnd,time_now)
+            call calc_ydyn(dom%dyn,tpo1,dom%mat,dom%thrm,dom%bnd,time_now)
             
             ! Calculate material (ice properties, viscosity, etc.)
-            call calc_ymat(dom%mat,tpo1,dom%dyn,thrm1,dom%bnd,time_now)
+            call calc_ymat(dom%mat,tpo1,dom%dyn,dom%thrm,dom%bnd,time_now)
 
             ! Calculate thermodynamics (temperatures and enthalpy), corrected
             call calc_ytherm(dom%thrm,tpo1,dom%dyn,dom%mat,dom%bnd,time_now)            
@@ -166,14 +153,10 @@ contains
             ! Determine truncation error for ice thickness 
             call calc_pc_tau_fe_sbe(dom%par%pc_tau,dom%tpo%now%H_ice,tpo1%now%H_ice,dom%par%pc_dt)
 
-            ! Determine truncation error for temperature
-            call calc_pc_tau_fe_sbe(dom%par%pc1_tau,dom%thrm%now%T_prime_b,thrm1%now%T_prime_b,dom%par%pc1_dt)
-
-
             if (dom%par%log_timestep) then 
                 ! Write timestep file if desired
                 call yelmo_timestep_write(dom%par%log_timestep_file,time_now,dt_now,dt_adv_min,dom%par%pc_dt, &
-                            dom%par%pc_eta,dom%par%pc_tau,dom%par%pc1_dt,dom%par%pc1_eta,dom%par%pc1_tau)
+                            dom%par%pc_eta,dom%par%pc_tau)
             end if 
 
             ! Make sure model is still running well
@@ -370,18 +353,13 @@ contains
 
         dom%par%pc_dt    = dom%par%dt_min  
         dom%par%pc_eta   = dom%par%pc_ebs  
-        dom%par%pc1_dt   = dom%par%dt_min  
-        dom%par%pc1_eta  = dom%par%pc1_ebs  
-        
+
         ! Allocate truncation error array 
         if (allocated(dom%par%pc_tau))   deallocate(dom%par%pc_tau)
-        if (allocated(dom%par%pc1_tau))   deallocate(dom%par%pc1_tau)
         allocate(dom%par%pc_tau(dom%grd%nx,dom%grd%ny))
-        allocate(dom%par%pc1_tau(dom%grd%nx,dom%grd%ny))
-
+        
         dom%par%pc_tau   = 0.0_prec 
-        dom%par%pc1_tau  = 0.0_prec 
-
+        
         write(*,*) "yelmo_init:: yelmo initialized."
         
         ! == topography ==
@@ -494,10 +472,9 @@ contains
 
         if (dom%par%log_timestep) then 
             ! Timestep file 
-            call yelmo_timestep_write_init(dom%par%log_timestep_file,time,dom%grd%xc,dom%grd%yc, &
-                                                                    dom%par%pc_ebs,dom%par%pc1_ebs)
+            call yelmo_timestep_write_init(dom%par%log_timestep_file,time,dom%grd%xc,dom%grd%yc,dom%par%pc_ebs)
             call yelmo_timestep_write(dom%par%log_timestep_file,time,0.0_prec,0.0_prec,dom%par%pc_dt, &
-                            dom%par%pc_eta,dom%par%pc_tau,dom%par%pc1_dt,dom%par%pc1_eta,dom%par%pc1_tau)
+                            dom%par%pc_eta,dom%par%pc_tau)
         end if 
 
         return
@@ -674,7 +651,6 @@ contains
         call nml_read(filename,"yelmo","cfl_max",       par%cfl_max)
         call nml_read(filename,"yelmo","cfl_diff_max",  par%cfl_diff_max)
         call nml_read(filename,"yelmo","pc_ebs",        par%pc_ebs)
-        call nml_read(filename,"yelmo","pc1_ebs",       par%pc1_ebs)
 
         ! Overwrite parameter values with argument definitions if available
         if (present(domain))     par%domain    = trim(domain)

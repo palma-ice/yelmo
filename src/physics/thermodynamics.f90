@@ -559,7 +559,7 @@ contains
             ! Average from ac-nodes to aa-node
             Q_b(i,j) = 0.25*(Qb_acx(i,j)+Qb_acx(i-1,j)+Qb_acy(i,j)+Qb_acy(i,j-1))
 
-if (.FALSE.) then 
+if (.TRUE.) then 
             Qb_tmp = 0.0_prec 
             n      = 0 
 

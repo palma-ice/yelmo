@@ -559,7 +559,7 @@ contains
             ! Average from ac-nodes to aa-node
             Q_b(i,j) = 0.25*(Qb_acx(i,j)+Qb_acx(i-1,j)+Qb_acy(i,j)+Qb_acy(i,j-1))
 
-if (.TRUE.) then 
+if (.FALSE.) then 
             Qb_tmp = 0.0_prec 
             n      = 0 
 
@@ -610,11 +610,13 @@ if (.TRUE.) then
 
 end if 
 
-!             ! Reduction of Q_b with T_prime_b (apply decay function)
-!             if (gamma .gt. 0.0) then 
-!                 f_pmp    = min(1.0, exp((T_prime_b(i,j))/gamma) )
-!                 Q_b(i,j) = Q_b(i,j)*f_pmp  
-!             end if 
+if (.TRUE.) then 
+            ! Reduction of Q_b with T_prime_b (apply decay function)
+            if (gamma .gt. 0.0) then 
+                f_pmp    = min(1.0, exp((T_prime_b(i,j))/gamma) )
+                Q_b(i,j) = Q_b(i,j)*f_pmp  
+            end if 
+end if 
 
         end do 
         end do 

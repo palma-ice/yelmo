@@ -1,7 +1,7 @@
 &control    
     time_init       = 0.0               ! [yr] Starting time 
-    time_end        = 5e3               ! [yr] Ending time
-    time_equil      = 1e3               ! [yr] Equilibration time 
+    time_end        = 1e3               ! [yr] Ending time
+    time_equil      = 100.0             ! [yr] Equilibration time 
     dtt             = 2.0               ! [yr] Main loop timestep 
     dt1D_out        = 100.0             ! [yr] Frequency of writing 1D output files 
     dt2D_out        = 100.0             ! [yr] Frequency of writing 2D output files 
@@ -182,12 +182,3 @@
     pd_vel_names      = "ux_srf" "uy_srf"            ! Surface velocity 
 
 /
-
-&basal_hydro_simple
-    init_method       = 0             ! 0: no water; 1: constant value
-    method            = 1             ! 0: constant; 1: local bucket method
-    H_w_init          = 0.0           ! [m] Initial water layer thickness (init_method=1)
-    H_w_max           = 2.0           ! [m] Maximum allowed water thickness under ice sheet
-    till_rate         = 1e-3          ! [m/a] Till infiltration (drainage) rate 
-/
-

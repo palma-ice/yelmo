@@ -35,8 +35,7 @@
     cfl_max         = 0.01              ! Maximum value is 1.0, lower will be more stable
     cfl_diff_max    = 0.12              ! Bueler et al (2007), Eq. 25  
     pc_ebs          = 1e-2              ! Predictor-corrector tolerance 
-    pc1_ebs         = 1e-2              ! Predictor-corrector tolerance 
-
+    
 /
 
 &ytopo

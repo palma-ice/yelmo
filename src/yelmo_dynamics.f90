@@ -795,6 +795,9 @@ contains
         integer,    allocatable :: ssa_mask_acx(:,:) 
         integer,    allocatable :: ssa_mask_acy(:,:) 
 
+        real(prec), allocatable :: beta_acx_prev(:,:) 
+        real(prec), allocatable :: beta_acy_prev(:,:) 
+
         logical :: is_converged
         logical :: write_ssa_diagnostics
 
@@ -809,6 +812,12 @@ contains
         
         allocate(ssa_mask_acx(nx,ny))
         allocate(ssa_mask_acy(nx,ny))
+
+        allocate(beta_acx_prev(nx,ny))
+        allocate(beta_acy_prev(nx,ny))
+        
+        beta_acx_prev = dyn%now%beta_acx 
+        beta_acy_prev = dyn%now%beta_acy 
 
 !             if (tpo%now%f_grnd(18,3) .gt. 0.0) then 
 !                 write_ssa_diagnostics = .TRUE.
@@ -826,85 +835,14 @@ contains
             ux_b_prev = dyn%now%ux_b 
             uy_b_prev = dyn%now%uy_b 
 
-            !   0. Mix velocities to get ux_bar/uy_bar 
-
-
-        ! ===== Combine sliding and shear into hybrid fields ==========
-
-        select case(dyn%par%mix_method)
-            ! Determine how to mix shearing (ux_i/uy_i) and sliding (ux_b/uy_b)
-            ! Generally purely floating ice is only given by the SSA solution;
-            ! Grounded or partially grounded ice is given by the hybrid solution 
-
-            case(-2)
-                ! Purely sia model
-                ! (correspondingly, floating ice is killed in yelmo_topography)
-                
-                if (dyn%par%cb_sia .gt. 0.0) then 
-                    ! Calculate basal velocity from Weertman sliding law (Greve 1997)
-                    
-                    call calc_uxy_b_sia(dyn%now%ux_b,dyn%now%uy_b,tpo%now%H_ice,tpo%now%dzsdx,tpo%now%dzsdy, &
-                                thrm%now%f_pmp,dyn%par%zeta_aa,dyn%par%dx,dyn%par%cb_sia,rho_ice,g)
-                
-                else 
-                    ! Otherwise no basal sliding in SIA-only mode
-                
-                    dyn%now%ux_b   = 0.0_prec 
-                    dyn%now%uy_b   = 0.0_prec
-                    
-                end if 
-
-                ! SIA solution everywhere, potentially with additional parameterized basal sliding
-                dyn%now%ux_bar = dyn%now%ux_i_bar + dyn%now%ux_b 
-                dyn%now%uy_bar = dyn%now%uy_i_bar + dyn%now%uy_b 
-
-            case(-1)
-                ! Purely ssa model
-
-                dyn%now%ux_i     = 0.0_prec 
-                dyn%now%uy_i     = 0.0_prec 
-                dyn%now%ux_i_bar = 0.0_prec 
-                dyn%now%uy_i_bar = 0.0_prec 
-                
-                dyn%now%ux_bar = dyn%now%ux_b 
-                dyn%now%uy_bar = dyn%now%uy_b 
-
-            case(0)
-                ! Binary mixing (either shearing or sliding)
-
-                ! TO DO 
-
-                write(*,*) "mix_method=0 not implemented yet."
-                stop 
-
-            case(1)
-                ! Shear when not sliding, otherwise shear+sliding 
-                ! (ie, sia or sia+ssa)
-
-                ! Hybrid solution everywhere 
-                dyn%now%ux_bar = dyn%now%ux_i_bar + dyn%now%ux_b 
-                dyn%now%uy_bar = dyn%now%uy_i_bar + dyn%now%uy_b 
-
-            case(2)
-                ! Weighted mixing 
-
-                ! TO DO 
-
-                write(*,*) "mix_method=2 not implemented yet."
-                stop 
-
-            case DEFAULT
-
-                write(*,*) "mix_method not recognized."
-                write(*,*) "mix_method = ", dyn%par%mix_method
-                stop 
-
-        end select
-
             !   1. Calculate basal drag coefficient beta (beta, beta_acx, beta_acy) 
 
             call calc_ydyn_beta(dyn,tpo,mat,bnd)
 
+            ! Relax with beta from previous timestep 
+            dyn%now%beta_acx = 0.7_prec*dyn%now%beta_acx + 0.3_prec*beta_acx_prev
+            dyn%now%beta_acy = 0.7_prec*dyn%now%beta_acy + 0.3_prec*beta_acy_prev
+            
             !   2. Calculate effective viscosity
             
             ! Use 3D rate factor, but 2D shear:
@@ -1018,7 +956,7 @@ end if
         ! Local variables 
         integer :: i, j, nx, ny 
         real(prec), allocatable :: logbeta(:,:) 
-
+        
         nx = size(dyn%now%beta,1)
         ny = size(dyn%now%beta,2)
         allocate(logbeta(nx,ny))

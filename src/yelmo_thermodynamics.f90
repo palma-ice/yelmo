@@ -156,10 +156,15 @@ contains
 
             end select 
 
-            ! Update basal water layer thickness
-            call calc_basal_water_local(thrm%now%H_w,thrm%now%dHwdt,tpo%now%H_ice,-thrm%now%bmb_grnd*(rho_ice/rho_w), &
-                                    tpo%now%f_grnd,dt,thrm%par%till_rate,thrm%par%H_w_max)
+!             if (trim(thrm%par%basal_water_method) .eq. "local") then 
+!                 ! If updating basal water calculate it here...
+                
+                ! Update basal water layer thickness
+                call calc_basal_water_local(thrm%now%H_w,thrm%now%dHwdt,tpo%now%H_ice,-thrm%now%bmb_grnd*(rho_ice/rho_w), &
+                                        tpo%now%f_grnd,dt,thrm%par%till_rate,thrm%par%H_w_max)
             
+!             end if 
+
         end if 
 
         ! Calculate homologous temperature at the base 

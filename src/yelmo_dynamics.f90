@@ -839,9 +839,9 @@ contains
 
             call calc_ydyn_beta(dyn,tpo,mat,bnd)
 
-            ! Relax with beta from previous timestep 
-            dyn%now%beta_acx = 0.7_prec*dyn%now%beta_acx + 0.3_prec*beta_acx_prev
-            dyn%now%beta_acy = 0.7_prec*dyn%now%beta_acy + 0.3_prec*beta_acy_prev
+!             ! Relax with beta from previous timestep 
+!             dyn%now%beta_acx = 0.7_prec*dyn%now%beta_acx + 0.3_prec*beta_acx_prev
+!             dyn%now%beta_acy = 0.7_prec*dyn%now%beta_acy + 0.3_prec*beta_acy_prev
             
             !   2. Calculate effective viscosity
             

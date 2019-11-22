@@ -71,8 +71,6 @@ contains
         LIS_SOLVER  :: solver
 
         LIS_INTEGER :: nmax, n_sprs 
-!         LIS_INTEGER, parameter                 :: nmax   =  2*size(H_ice,1)*size(H_ice,2)
-!         LIS_INTEGER, parameter                 :: n_sprs = 20*size(H_ice,1)*size(H_ice,2)
         LIS_INTEGER, allocatable, dimension(:) :: lgs_a_ptr, lgs_a_index
         LIS_SCALAR,  allocatable, dimension(:) :: lgs_a_value, lgs_b_value, lgs_x_value
 

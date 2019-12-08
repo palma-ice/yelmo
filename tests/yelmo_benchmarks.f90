@@ -95,7 +95,7 @@ program yelmo_benchmarks
         case("HALFAR-MED")
 
             grid_name = "HALFAR-MED"
-            nx = (600.0 / dx) + 1        ! Domain width is 600 km total (-300 to 300 km)
+            nx = (300.0 / dx) + 1        ! Domain width is 300 km total (-150 to 150 km)
 
         case DEFAULT 
             ! EISMINT1, EISMINT2 and Bueler test grid setup 
@@ -231,7 +231,7 @@ program yelmo_benchmarks
 
             ! Initialize BUELER-B (but with conditions between Bueler-B and HALFAR - not too big, not too small)
             call bueler_test_BC(buel%H_ice,buel%mbal,buel%u_b,yelmo1%grd%x,yelmo1%grd%y, &
-                        time=0.0_prec,R0=200.0_prec,H0=1600.0_prec,lambda=0.0_prec,n=3.0_prec,A=1e-16_prec,rho_ice=rho_ice,g=g)
+                        time=0.0_prec,R0=100.0_prec,H0=800.0_prec,lambda=0.0_prec,n=3.0_prec,A=1e-16_prec,rho_ice=rho_ice,g=g)
 
             yelmo1%bnd%T_srf = 223.15 
             yelmo1%bnd%Q_geo = 42.0 
@@ -338,7 +338,7 @@ program yelmo_benchmarks
 
                 ! Initialize BUELER-B (but with conditions between Bueler-B and HALFAR - not too big, not too small)
                 call bueler_test_BC(buel%H_ice,buel%mbal,buel%u_b,yelmo1%grd%x,yelmo1%grd%y, &
-                            time=time,R0=200.0_prec,H0=1600.0_prec,lambda=0.0_prec,n=3.0_prec,A=1e-16_prec,rho_ice=rho_ice,g=g)
+                            time=time,R0=100.0_prec,H0=800.0_prec,lambda=0.0_prec,n=3.0_prec,A=1e-16_prec,rho_ice=rho_ice,g=g)
             
             case("mismip") 
 

@@ -26,9 +26,9 @@
     experiment      = "EISMINT"         ! "None", "EISMINT", "MISMIP3D", "BUELER"  to apply special boundary conditions   
     restart         = "no"
     log_timestep    = False 
-    zeta_scale      = "linear"            ! "linear", "exp", "tanh"
+    zeta_scale      = "tanh"            ! "linear", "exp", "tanh"
     zeta_exp        = 2.0  
-    nz_aa           = 81                ! Vertical resolution in ice
+    nz_aa           = 22                ! Vertical resolution in ice
     dt_method       = 1                 ! 0: no internal timestep, 1: adaptive, cfl, 2: adaptive, pc
     dt_min          = 0.1               ! [a] Minimum timestep 
     dt_ref          = 5.0               ! [a] Reference timestep 
@@ -146,7 +146,7 @@
     const_kt        = 6.62e7            ! [J a-1 m-1 K-1] Thermal conductivity [W m-1 K-1 * sec_year] => [J a-1 m-1 K-1]
     enth_cr         = 1e-2              ! [--] Conductivity ratio for temperate ice (kappa_temp     = enth_cr*kappa_cold)
     omega_max       = 0.02              ! [--] Maximum allowed water content fraction 
-    till_rate       = 1e-3              ! [m/a] Basal water till drainage rate (water equiv.)
+    till_rate       = 0.0               ! [m/a] Basal water till drainage rate (water equiv.)
     H_w_max         = 2.0               ! [m] Maximum limit to basal water layer thickness (water equiv.)
 /
 

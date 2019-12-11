@@ -16,7 +16,7 @@ module ice_enthalpy
 contains 
 
     subroutine calc_enth_column(enth,T_ice,omega,bmb_grnd,Q_ice_b,H_cts,T_pmp,cp,kt,advecxy,uz, &
-                                Q_strn,Q_b,Q_geo,T_srf,T_shlf,H_ice,H_w,dHwdt,f_grnd,zeta_aa,zeta_ac, &
+                                Q_strn,Q_b,Q_geo,T_srf,T_shlf,H_ice,H_w,f_grnd,zeta_aa,zeta_ac, &
                                 dzeta_a,dzeta_b,cr,omega_max,T0,dt,solver)
         ! Thermodynamics solver for a given column of ice 
         ! Note zeta=height, k=1 base, k=nz surface 
@@ -46,7 +46,6 @@ contains
         real(prec), intent(IN)    :: T_shlf         ! [K] Marine-shelf interface temperature
         real(prec), intent(IN)    :: H_ice          ! [m] Ice thickness 
         real(prec), intent(IN)    :: H_w            ! [m] Basal water layer thickness 
-        real(prec), intent(IN)    :: dHwdt          ! [m/a] Basal water layer thickness change
         real(prec), intent(IN)    :: f_grnd         ! [--] Grounded fraction
         real(prec), intent(IN)    :: zeta_aa(:)     ! nz_aa [--] Vertical sigma coordinates (zeta==height), layer centered aa-nodes
         real(prec), intent(IN)    :: zeta_ac(:)     ! nz_ac [--] Vertical height axis temperature (0:1), layer edges ac-nodes
@@ -161,8 +160,8 @@ contains
 
             ! Determine expected basal water thickness [m] for this timestep,
             ! using basal mass balance from previous time step (good guess)
-            !H_w_predicted = H_w - (bmb_grnd*(rho_w/rho_ice))*dt 
-            H_w_predicted = H_w + dHwdt*dt 
+            H_w_predicted = H_w - (bmb_grnd*(rho_w/rho_ice))*dt 
+            !H_w_predicted = H_w + dHwdt*dt 
 
             ! == Assign grounded basal boundary conditions ==
 
@@ -699,7 +698,9 @@ contains
             f_lin = (enth_pmp(k0)-enth(k0)) / ( (enth(k)-enth(k0)) - (enth_pmp(k)-enth_pmp(k0)) )
             if (f_lin .lt. 1e-2) f_lin = 0.0 
 
-            H_cts = H_ice * (zeta(k0) + f_lin*(zeta(k)-zeta(k0)))
+            !H_cts = H_ice * (zeta(k0) + f_lin*(zeta(k)-zeta(k0)))
+
+            H_cts = H_ice * zeta(k0)
 
         end if 
 

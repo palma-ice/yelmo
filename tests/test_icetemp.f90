@@ -75,11 +75,11 @@ program test_icetemp
     ! ===============================================================
     ! User options 
 
-    experiment     = "k15expb"      ! "eismint", "k15expa", "k15expb"
+    experiment     = "bg15a"        ! "eismint", "k15expa", "k15expb", "bg15a"
     
     ! General options
-    zeta_scale      = "tanh"        ! "linear", "exp", "tanh"
-    nz              = 22            ! [--] Number of ice sheet points (aa-nodes + base + surface)
+    zeta_scale      = "linear"        ! "linear", "exp", "tanh"
+    nz              = 402           ! [--] Number of ice sheet points (aa-nodes + base + surface)
     is_celcius      = .FALSE. 
 
     age_method      = "expl"        ! "expl" or "impl"
@@ -89,8 +89,9 @@ program test_icetemp
     omega_max       = 0.03          ! Maximum allowed water content (fraction)
     enth_cr         = 1e-3          ! Enthalpy solver: conductivity ratio kappa_water / kappa_ice 
 
-    file1D          = "output/test_"//trim(experiment)//"_nz30_sp.nc" 
-    
+    !file1D          = "output/test_"//trim(experiment)//"_nz30_sp.nc" 
+    file1D          = "output/test_"//trim(experiment)//".nc"
+
     ! Overwrite options for nz and enth_cr if available from arguments
     narg = command_argument_count() 
     if (narg .gt. 0) then 
@@ -137,6 +138,18 @@ program test_icetemp
             T_pmp_beta = 0.0            ! [K Pa^-1] Kleiner et al. (2015), expb
             
             call init_k15expb(ice1,smb=0.2_prec,T_srf=-3.0_prec)
+
+        case("bg15a")
+
+            t_start = -1e3      ! [yr]
+            t_end   =  1e3      ! [yr]
+            dt      = 0.5       ! [yr]
+            dt_out  =  5.0      ! [yr] 
+
+            T_pmp_beta = 0.0            ! [K Pa^-1] Blatter and Greve (2015), expa
+            
+            call init_bg15a(ice1,smb=0.2_prec,T_srf=-4.0_prec)
+
 
         case DEFAULT 
             ! EISMINT 
@@ -201,6 +214,15 @@ program test_icetemp
             else   ! time .gt. 150e3
                 ice1%T_srf = T0_ref - 30.0
             end if  
+        end if 
+
+        if (trim(experiment) .eq. "bg15a") then 
+            if (time .le. 50.0) then 
+                ice1%T_srf = T0_ref - 4.0_prec 
+            else 
+                ice1%T_srf = T0_ref - 2.0_prec 
+            end if 
+
         end if 
 
         call calc_enth_column(ice1%vec%enth,ice1%vec%T_ice,ice1%vec%omega,ice1%bmb,ice1%Q_ice_b,ice1%H_cts,ice1%vec%T_pmp, &
@@ -436,6 +458,85 @@ contains
         return 
 
     end subroutine init_k15expb 
+    
+    subroutine init_bg15a(ice,smb,T_srf)
+
+        implicit none 
+
+        type(icesheet), intent(INOUT) :: ice
+        real(prec),     intent(IN)    :: smb 
+        real(prec),     intent(IN)    :: T_srf ! [degrees Celcius]
+            
+        ! Local variables 
+        integer :: k, nz 
+        real(prec) :: ATT, gamma, T_init    
+        real(prec), allocatable :: ux(:)
+        real(prec), allocatable :: uy(:)   
+
+        nz    = size(ice%vec%zeta)
+
+        ! Assign point values
+        ice%T_srf    = T_srf + T0       ! [K]
+        ice%T_shlf   = T0               ! [K] T_shlf not used in this idealized setup, set to T0  
+        ice%smb      = smb              ! [m/a]
+        ice%bmb      = 0.0              ! [m/a]
+        ice%Q_geo    = 0.0              ! [mW/m2]
+        ice%H_ice    = 200.0            ! [m] Ice thickness
+        ice%H_w      = 0.0              ! [m] No basal water
+        ice%Q_b      = 0.0              ! [] No basal frictional heating 
+        ice%f_grnd   = 1.0              ! Grounded point 
+
+        ! EISMINT1
+        ice%vec%cp      = 2009.0        ! [J kg-1 K-1]
+        ice%vec%kt      = 6.6269e7      ! [J a-1 m-1 K-1]   == 2.1*sec_year  [J s-1 m-1 K-1] => J a-1 m-1 K-1]
+        
+
+        ATT             = 5.3e-24*sec_year      ! Rate factor
+        gamma           = 4.0                   ! [degrees] Bed slope 
+        T_init          = T0 - 1.5 
+
+        allocate(ux(nz))
+        allocate(uy(nz))
+
+        ux = 0.0
+        uy = 0.0 
+
+        ! [J a-1 m-3] Prescribed strain heating 
+        ice%vec%Q_strn  = (2.0*ATT)*(rho_ice*g*sin(gamma*pi/180.0))**4.0 &
+                                * (ice%H_ice*(1.0-ice%vec%zeta))**4.0
+        
+        ice%vec%advecxy = 0.0                                       ! [] No horizontal advection (assume constant)
+
+        ! Write strain heating to compare basal value of ~2.6e-3 W/m-3
+        do k = nz, 1, -1 
+            write(*,*) ice%vec%zeta(k), ice%vec%Q_strn(k)/sec_year 
+        end do 
+
+        ! Calculate pressure melting point 
+        ice%vec%T_pmp = calc_T_pmp(ice%H_ice,ice%vec%zeta,T0,T_pmp_beta) 
+
+        if (is_celcius) then 
+            ice%T_srf     = ice%T_srf     - T0
+            ice%T_shlf    = ice%T_shlf    - T0
+            ice%vec%T_pmp = ice%vec%T_pmp - T0 
+        end if 
+
+        ! Define initial temperature profile
+        ! (constant equal to surface temp)
+        ice%vec%T_ice(nz) = T_init
+        ice%vec%T_ice(1)  = T_init 
+
+        ! Intermediate layers are linearly interpolated 
+        do k = 2, nz-1 
+            ice%vec%T_ice(k) = ice%vec%T_ice(1)+ice%vec%zeta(k)*(ice%vec%T_ice(nz)-ice%vec%T_ice(1))
+        end do 
+
+        ! Define constant vertical velocity profile
+        ice%vec%uz = -ice%smb
+
+        return 
+
+    end subroutine init_bg15a 
     
     subroutine icesheet_allocate(ice,nz,zeta_scale)
         ! Allocate the ice sheet object 

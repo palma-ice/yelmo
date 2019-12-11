@@ -17,7 +17,7 @@ contains
 
     subroutine calc_enth_column(enth,T_ice,omega,bmb_grnd,Q_ice_b,H_cts,T_pmp,cp,kt,advecxy,uz, &
                                 Q_strn,Q_b,Q_geo,T_srf,T_shlf,H_ice,H_w,f_grnd,zeta_aa,zeta_ac, &
-                                dzeta_a,dzeta_b,cr,omega_max,T0,dt,solver)
+                                dzeta_a,dzeta_b,cr,omega_max,T0,dt)
         ! Thermodynamics solver for a given column of ice 
         ! Note zeta=height, k=1 base, k=nz surface 
         ! Note: nz = number of vertical boundaries (including zeta=0.0 and zeta=1.0), 
@@ -55,8 +55,7 @@ contains
         real(prec), intent(IN)    :: omega_max      ! [-] Maximum allowed water fraction inside ice, typically omega_max=0.02 
         real(prec), intent(IN)    :: T0             ! [K or degreesCelcius] Reference melting temperature  
         real(prec), intent(IN)    :: dt             ! [a] Time step 
-        character(len=*), intent(IN) :: solver      ! "enth" or "temp" 
-
+        
         ! Local variables 
         integer    :: k, nz_aa, nz_ac
         real(prec) :: Q_geo_now, ghf_conv 
@@ -67,9 +66,6 @@ contains
         real(prec) :: enth_b, enth_pmp_b 
         real(prec) :: omega_excess
 
-        logical, parameter      :: test_expl_advecz = .FALSE. 
-        real(prec), allocatable :: advecz(:)   ! nz_aa, for explicit vertical advection solving
-        
         real(prec), allocatable :: fac_enth(:)  ! aa-nodes 
         real(prec), allocatable :: var(:)       ! aa-nodes 
         real(prec), allocatable :: kappa_aa(:)  ! aa-nodes
@@ -96,51 +92,19 @@ contains
         allocate(rhs(nz_aa))
         allocate(solution(nz_aa))
 
-        ! Determine which solver to use: enth or temp 
-        use_enth = .TRUE. 
-        if (trim(solver) .eq. "temp") use_enth = .FALSE. 
-
         ! Get geothermal heat flux in proper units 
         Q_geo_now = Q_geo*1e-3*sec_year   ! [mW m-2] => [J m-2 a-1]
-
-        ! Get enthalpy to have enth, omega and T_ice all defined and consistent initially
-        ! Note: in principle, these quantities should all be available and consistent
-        ! when entering the routine, but it ensures that enthalpy is defined if only 
-        ! T_ice and omega are known initially.
-        !call convert_to_enthalpy(enth,T_ice,omega,T_pmp,cp,L_ice)
 
         ! Step 0: Calculate diffusivity, set prognostic variable (T_ice or enth),
         ! and corresponding scaling factor (fac_enth)
 
-        if (use_enth) then 
-            ! Use enthalpy as prognostic variable 
+        ! Calculate diffusivity on cell centers (aa-nodes)
+        call calc_enth_diffusivity(kappa_aa,T_ice,omega,enth,T_pmp,cp,kt,rho_ice,rho_w,L_ice,cr)
 
-            ! Calculate diffusivity on cell centers (aa-nodes)
-            call calc_enth_diffusivity(kappa_aa,T_ice,omega,enth,T_pmp,cp,kt,rho_ice,rho_w,L_ice,cr)
+        fac_enth = cp               ! To scale to units of [J kg]
+        var      = enth             ! [J kg]
 
-            fac_enth = cp               ! To scale to units of [J kg]
-            var      = enth             ! [J kg]
-
-        else 
-            ! Use temperature as prognostic variable  
-
-            ! Calculate diffusivity on cell centers (aa-nodes)
-            kappa_aa = kt / (rho_ice*cp)
-        
-            fac_enth = 1.0              ! Keep units of [K]
-            var      = T_ice            ! [K]
-
-        end if 
-
-        ! Step 1: Apply vertical advection (for explicit testing)
-        if (test_expl_advecz) then 
-            allocate(advecz(nz_aa))
-            advecz = 0.0
-            call calc_advec_vertical_column(advecz,var,uz,H_ice,zeta_aa)
-            var = var - dt*advecz 
-        end if 
-
-        ! Step 2: Apply vertical implicit diffusion-advection (or diffusion only if test_expl_advecz=True)
+        ! Step 1: Apply vertical implicit diffusion-advection
         
         ! == Ice base ==
 
@@ -160,8 +124,7 @@ contains
 
             ! Determine expected basal water thickness [m] for this timestep,
             ! using basal mass balance from previous time step (good guess)
-            H_w_predicted = H_w - (bmb_grnd*(rho_w/rho_ice))*dt 
-            !H_w_predicted = H_w + dHwdt*dt 
+            H_w_predicted = H_w - (bmb_grnd*(rho_w/rho_ice))*dt  
 
             ! == Assign grounded basal boundary conditions ==
 
@@ -183,8 +146,7 @@ contains
                 ! Temperate at bed 
                 ! Hold basal temperature at pressure melting point
 
-                if (use_enth .and. T_ice(2) .ge. T_pmp(2)) then 
-!                 if (T_ice(2) .ge. T_pmp(2)) then 
+                if (T_ice(2) .ge. T_pmp(2)) then 
                     ! Layer above base is also temperate (with water likely present in the ice),
                     ! set K0 dE/dz = 0. To do so, set basal enthalpy equal to enthalpy above
                     ! (following MALIv6 implementation)
@@ -219,15 +181,8 @@ contains
 
         do k = 2, nz_aa-1
 
-            if (test_expl_advecz) then 
-                ! No implicit vertical advection (diffusion only)
-                uz_aa = 0.0 
-
-            else
-                ! With implicit vertical advection (diffusion + advection)
-                uz_aa   = 0.5*(uz(k-1)+uz(k))   ! ac => aa nodes
-
-            end if 
+            ! Implicit vertical advection term on aa-node
+            uz_aa   = 0.5*(uz(k-1)+uz(k))   ! ac => aa nodes
 
             ! Convert units of Q_strn [J a-1 m-3] => [K a-1]
             Q_strn_now = Q_strn(k)/(rho_ice*cp(k))
@@ -238,10 +193,6 @@ contains
             ! See Blatter and Greve, 2015, Eq. 25. 
             kappa_a = kappa_aa(k)
             kappa_b = kappa_aa(k+1) 
-
-            ! Harmonic average: doesn't work well for the CTS
-            !kappa_a = 2.0_prec / (1.0_prec/kappa_aa(k) + 1.0_prec/kappa_aa(k-1))
-            !kappa_b = 2.0_prec / (1.0_prec/kappa_aa(k) + 1.0_prec/kappa_aa(k+1))
 
             ! Vertical distance for centered difference advection scheme
             dz      =  H_ice*(zeta_aa(k+1)-zeta_aa(k-1))
@@ -267,110 +218,60 @@ contains
 
         call solve_tridiag(subd,diag,supd,rhs,solution)
 
-
-        ! == Get variables back in consistent form (enth,T_ice,omega)
-
-        if (use_enth) then 
-            ! Copy the solution into the enthalpy variable,
-            ! recalculate enthalpy, temperature and water content 
-            
-            enth  = solution
-
-            ! Modify enthalpy at the base in the case that a temperate layer is present above the base
-            ! (water content should increase towards the base)
-            if (enth(2) .ge. T_pmp(2)*cp(2)) then 
-                ! Temperate layer exists, interpolate enthalpy at the base. 
-                enth(1) = enth(2) - (enth(3)-enth(2))/(zeta_aa(3)-zeta_aa(2)) * (zeta_aa(2)-zeta_aa(1))
-            end if 
-            
-            ! Get temperature and water content 
-            call convert_from_enthalpy_column(enth,T_ice,omega,T_pmp,cp,L_ice)
-            
-            ! Set internal melt to zero 
-            melt_internal = 0.0 
-
-            do k = nz_aa-1, 2, -1 
-                ! Descend from surface to base layer (center of layer)
-
-                ! Store excess water above maximum allowed limit
-                omega_excess = max(omega(k)-omega_max,0.0)
-
-                ! Calculate internal melt as sum of all excess water produced in the column 
-                if (omega_excess .gt. 0.0) then 
-                    dz = H_ice*(zeta_ac(k)-zeta_ac(k-1))
-                    melt_internal = melt_internal + (omega_excess*dz) / dt 
-                    omega(k)      = omega_max 
-                end if 
-
-            end do 
-
-            ! Also limit basal omega to omega_max (even though it doesn't have thickness)
-            if (omega(1) .gt. omega_max) omega(1) = omega_max 
-
-            ! Finally, get enthalpy again too (to be consistent with new omega) 
-            call convert_to_enthalpy(enth,T_ice,omega,T_pmp,cp,L_ice)
-
-            ! Calculate heat flux at ice base as enthalpy gradient * rho_ice * diffusivity [J a-1 m-2]
-            if (H_ice .gt. 0.0_prec) then 
-                dz = H_ice * (zeta_aa(2)-zeta_aa(1))
-                Q_ice_b = kappa_aa(1) * rho_ice * (enth(2) - enth(1)) / dz
-            else
-                Q_ice_b = 0.0 
-            end if 
-
-            ! Calculate basal mass balance 
-            enth_b     = enth(1)
-            enth_pmp_b = T_pmp(1) * fac_enth(1)
-            call calc_bmb_grounded_enth(bmb_grnd,enth_b,enth_pmp_b,Q_ice_b,Q_b,Q_geo_now,f_grnd,rho_ice)
-            
-        else 
-            ! Copy the solution into the temperature variable,
-            ! recalculate enthalpy  
-
-            T_ice = solution 
-
-            ! Now calculate internal melt (only allow melting, no accretion)
         
-            melt_internal = 0.0 
+        ! Copy the solution into the enthalpy variable,
+        ! recalculate enthalpy, temperature and water content 
+        
+        enth  = solution
 
-            do k = nz_aa-1, 2, -1 
-                ! Descend from surface to base layer (center of layer)
-
-                ! Store temperature difference above pressure melting point (excess energy)
-                T_excess = max(T_ice(k)-T_pmp(k),0.0)
-
-                ! Calculate basal mass balance as sum of all water produced in column,
-                ! reset temperature to pmp  
-                if (T_excess .gt. 0.0) then 
-                    melt_internal = melt_internal + T_excess * H_ice*(zeta_ac(k)-zeta_ac(k-1))*cp(k) / (L_ice * dt) 
-                    T_ice(k)      = T_pmp(k)
-                end if 
-                
-            end do 
-
-            ! Make sure base is below pmp too (mass/energy balance handled via bmb_grnd calculation externally)
-            if (T_ice(1) .gt. T_pmp(1)) T_ice(1) = T_pmp(1)
-
-            ! Also set omega to constant value where ice is temperate just for some consistency 
-            omega = 0.0 
-!             where (T_ice .ge. T_pmp) omega = omega_max 
-
-            ! Finally, get enthalpy too 
-            call convert_to_enthalpy(enth,T_ice,omega,T_pmp,cp,L_ice)
-
-            ! Calculate heat flux at ice base as temperature gradient * conductivity [J a-1 m-2]
-            if (H_ice .gt. 0.0_prec) then 
-                dz = H_ice * (zeta_aa(2)-zeta_aa(1))
-                Q_ice_b = kt(1) * (T_ice(2) - T_ice(1)) / dz 
-            else 
-                Q_ice_b = 0.0  
-            end if 
-            
-            ! Calculate basal mass balance (valid for grounded ice only)
-            call calc_bmb_grounded(bmb_grnd,T_ice(1)-T_pmp(1),Q_ice_b,Q_b,Q_geo_now,f_grnd,rho_ice)
-            
+        ! Modify enthalpy at the base in the case that a temperate layer is present above the base
+        ! (water content should increase towards the base)
+        if (enth(2) .ge. T_pmp(2)*cp(2)) then 
+            ! Temperate layer exists, interpolate enthalpy at the base. 
+            enth(1) = enth(2) - (enth(3)-enth(2))/(zeta_aa(3)-zeta_aa(2)) * (zeta_aa(2)-zeta_aa(1))
         end if 
         
+        ! Get temperature and water content 
+        call convert_from_enthalpy_column(enth,T_ice,omega,T_pmp,cp,L_ice)
+        
+        ! Set internal melt to zero 
+        melt_internal = 0.0 
+
+        do k = nz_aa-1, 2, -1 
+            ! Descend from surface to base layer (center of layer)
+
+            ! Store excess water above maximum allowed limit
+            omega_excess = max(omega(k)-omega_max,0.0)
+
+            ! Calculate internal melt as sum of all excess water produced in the column 
+            if (omega_excess .gt. 0.0) then 
+                dz = H_ice*(zeta_ac(k)-zeta_ac(k-1))
+                melt_internal = melt_internal + (omega_excess*dz) / dt 
+                omega(k)      = omega_max 
+            end if 
+
+        end do 
+
+        ! Also limit basal omega to omega_max (even though it doesn't have thickness)
+        if (omega(1) .gt. omega_max) omega(1) = omega_max 
+
+        ! Finally, get enthalpy again too (to be consistent with new omega) 
+        call convert_to_enthalpy(enth,T_ice,omega,T_pmp,cp,L_ice)
+
+        ! Calculate heat flux at ice base as enthalpy gradient * rho_ice * diffusivity [J a-1 m-2]
+        if (H_ice .gt. 0.0_prec) then 
+            dz = H_ice * (zeta_aa(2)-zeta_aa(1))
+            Q_ice_b = kappa_aa(1) * rho_ice * (enth(2) - enth(1)) / dz
+        else
+            Q_ice_b = 0.0 
+        end if 
+
+        ! Calculate basal mass balance 
+        enth_b     = enth(1)
+        enth_pmp_b = T_pmp(1) * fac_enth(1)
+        call calc_bmb_grounded_enth(bmb_grnd,enth_b,enth_pmp_b,Q_ice_b,Q_b,Q_geo_now,f_grnd,rho_ice)
+            
+
         ! Include internal melting in bmb_grnd 
         bmb_grnd = bmb_grnd - melt_internal 
 

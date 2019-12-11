@@ -228,7 +228,7 @@ program test_icetemp
         call calc_enth_column(ice1%vec%enth,ice1%vec%T_ice,ice1%vec%omega,ice1%bmb,ice1%Q_ice_b,ice1%H_cts,ice1%vec%T_pmp, &
                 ice1%vec%cp,ice1%vec%kt,ice1%vec%advecxy,ice1%vec%uz,ice1%vec%Q_strn,ice1%Q_b,ice1%Q_geo,ice1%T_srf,ice1%T_shlf, &
                 ice1%H_ice,ice1%H_w,ice1%f_grnd,ice1%vec%zeta,ice1%vec%zeta_ac,ice1%vec%dzeta_a,ice1%vec%dzeta_b, &
-                enth_cr,omega_max,T0_ref,dt,enth_solver)
+                enth_cr,omega_max,T0_ref,dt)
 
         ! Update basal water thickness [m/a i.e.] => [m/a w.e.]
         ice1%H_w = ice1%H_w - (ice1%bmb*rho_ice/rho_w)*dt 

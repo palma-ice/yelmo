@@ -99,21 +99,16 @@ contains
         real(prec), intent(IN)  :: rho_ice           ! [kg m-3] Ice density 
         
         ! Local variables
-        real(prec) :: net_enth
         real(prec) :: Q_net  
         real(prec), parameter :: tol = 1e-5  
         
         if (f_grnd .gt. 0.0) then 
             ! Grounded point 
 
-            ! Calculate enthalpy at the base relative to pressure melting point 
-            net_enth = enth_b - enth_pmp_b  
-            if (abs(net_enth) .lt. tol) net_enth = 0.0_prec 
-            
             ! Calculate net energy flux at the base [J a-1 m-2]
             Q_net = Q_b + Q_ice_b + Q_geo_now
             
-            bmb_grnd = - Q_net /(rho_ice*L_ice - net_enth)
+            bmb_grnd = -Q_net /(rho_ice*L_ice)
 
         else 
             ! Floating point, no grounded bmb 

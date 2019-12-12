@@ -150,7 +150,6 @@ contains
                 if (T_ice(2) .ge. T_pmp(2)) then 
                     ! Layer above base is also temperate (with water likely present in the ice),
                     ! set K0 dE/dz = 0. To do so, set basal enthalpy equal to enthalpy above
-                    ! (following MALIv6 implementation)
 
                     subd(1) =  0.0_prec
                     diag(1) =  1.0_prec
@@ -158,7 +157,7 @@ contains
                     rhs(1)  =  0.0_prec
     
                     ! Testing implementation of second-order upwind derivative,
-                    ! using var(3) value from previous timestep (doesn't work)
+                    ! using var(3) value from previous timestep (similar result)
 !                     subd(1) =  0.0_prec
 !                     diag(1) = -3.0_prec
 !                     supd(1) =  4.0_prec
@@ -240,10 +239,10 @@ contains
 
         ! Modify enthalpy at the base in the case that a temperate layer is present above the base
         ! (water content should increase towards the base)
-        if (enth(2) .ge. T_pmp(2)*cp(2)) then 
-            ! Temperate layer exists, interpolate enthalpy at the base. 
-            enth(1) = enth(2) - (enth(3)-enth(2))/(zeta_aa(3)-zeta_aa(2)) * (zeta_aa(2)-zeta_aa(1))
-        end if 
+!         if (enth(2) .ge. T_pmp(2)*cp(2)) then 
+!             ! Temperate layer exists, interpolate enthalpy at the base. 
+!             enth(1) = enth(2) - (enth(3)-enth(2))/(zeta_aa(3)-zeta_aa(2)) * (zeta_aa(2)-zeta_aa(1))
+!         end if 
         
         ! Get temperature and water content 
         call convert_from_enthalpy_column(enth,T_ice,omega,T_pmp,cp,L_ice)

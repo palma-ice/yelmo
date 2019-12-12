@@ -57,7 +57,7 @@ contains
         real(prec), intent(IN)    :: dt             ! [a] Time step 
         
         ! Local variables 
-        integer    :: k, nz_aa, nz_ac
+        integer    :: k, nz_aa, nz_ac, k0
         real(prec) :: Q_geo_now, ghf_conv 
         real(prec) :: Q_strn_now
         real(prec) :: H_w_predicted
@@ -75,6 +75,7 @@ contains
         real(prec), allocatable :: supd(:)      ! nz_aa 
         real(prec), allocatable :: rhs(:)       ! nz_aa 
         real(prec), allocatable :: solution(:)  ! nz_aa
+
         real(prec) :: fac, fac_a, fac_b, uz_aa, dzeta, dz
         real(prec) :: kappa_a, kappa_b 
         logical    :: use_enth  
@@ -99,7 +100,7 @@ contains
         ! and corresponding scaling factor (fac_enth)
 
         ! Calculate diffusivity on cell centers (aa-nodes)
-        call calc_enth_diffusivity(kappa_aa,T_ice,omega,enth,T_pmp,cp,kt,rho_ice,rho_w,L_ice,cr)
+        call calc_enth_diffusivity(kappa_aa,enth,T_ice,omega,T_pmp,cp,kt,rho_ice,rho_w,L_ice,cr)
 
         fac_enth = cp               ! To scale to units of [J kg]
         var      = enth             ! [J kg]
@@ -191,8 +192,8 @@ contains
             ! Note: this is important to avoid mixing of kappa at the 
             ! CTS height (kappa_lower = kappa_temperate; kappa_upper = kappa_cold)
             ! See Blatter and Greve, 2015, Eq. 25. 
-            kappa_a = kappa_aa(k)
-            kappa_b = kappa_aa(k+1) 
+            kappa_a = kappa_aa(k-1)
+            kappa_b = kappa_aa(k) 
 
             ! Vertical distance for centered difference advection scheme
             dz      =  H_ice*(zeta_aa(k+1)-zeta_aa(k-1))
@@ -218,11 +219,24 @@ contains
 
         call solve_tridiag(subd,diag,supd,rhs,solution)
 
-        
+
         ! Copy the solution into the enthalpy variable,
         ! recalculate enthalpy, temperature and water content 
         
         enth  = solution
+
+        ! Find height of temperate layer
+        k0 = 0 
+        do k = 1, nz_aa-1 
+            if (enth(k) .ge. T_pmp(k)*cp(k)) then
+                k0 = k 
+            else 
+                exit 
+            end if 
+        end do 
+        
+!         ! Ensure zero water content in last layer 
+!         enth(k0) = T_pmp(k0)*cp(k0)
 
         ! Modify enthalpy at the base in the case that a temperate layer is present above the base
         ! (water content should increase towards the base)
@@ -274,6 +288,108 @@ contains
 
         ! Include internal melting in bmb_grnd 
         bmb_grnd = bmb_grnd - melt_internal 
+
+
+
+
+! ======================= Corrector step for cold ice ==========================
+if (.FALSE.) then 
+
+        ! Find height of cold layer just above temperate layer 
+        k0 = 0 
+        do k = 1, nz_aa-1 
+            if (enth(k) .ge. T_pmp(k)*cp(k)) then
+                k0 = k 
+            else 
+                exit 
+            end if 
+        end do 
+        !k0 = k0 + 1
+
+        if (k0 .ge. 2) then
+            ! Temperate ice exists above the base, recalculate cold layers 
+
+            ! Recalculate diffusivity (only relevant for cold points)
+            call calc_enth_diffusivity(kappa_aa,enth,T_ice,omega,T_pmp,cp,kt,rho_ice,rho_w,L_ice,cr)
+            !kappa_aa = kt / (rho_ice*cp)
+
+            ! Lower boundary condition for cold ice dE/dz = 0.0 
+
+            subd(k0) = 0.0_prec
+            diag(k0) = 1.0_prec
+            supd(k0) = 0.0_prec
+            rhs(k0)  = T_pmp(k)*cp(k) !enth(k0)
+
+            subd(k0+1) =  1.0_prec
+            diag(k0+1) = -1.0_prec
+            supd(k0+1) =  0.0_prec
+            rhs(k0+1)  =  0.0_prec
+    
+            ! == Cold ice interior layers k0:nz_aa-1 ==
+
+            do k = k0+2, nz_aa-1
+
+                ! Implicit vertical advection term on aa-node
+                uz_aa   = 0.5*(uz(k-1)+uz(k))   ! ac => aa nodes
+
+                ! Convert units of Q_strn [J a-1 m-3] => [K a-1]
+                Q_strn_now = Q_strn(k)/(rho_ice*cp(k))
+
+                ! Get kappa for the lower and upper ac-nodes 
+                ! Note: this is important to avoid mixing of kappa at the 
+                ! CTS height (kappa_lower = kappa_temperate; kappa_upper = kappa_cold)
+                ! See Blatter and Greve, 2015, Eq. 25. 
+                kappa_a = kappa_aa(k)
+                kappa_b = kappa_aa(k+1) 
+
+                ! Vertical distance for centered difference advection scheme
+                dz      =  H_ice*(zeta_aa(k+1)-zeta_aa(k-1))
+                
+                fac_a   = -kappa_a*dzeta_a(k)*dt/H_ice**2
+                fac_b   = -kappa_b*dzeta_b(k)*dt/H_ice**2
+
+!                 if (k .eq. k0+1) then 
+!                 subd(k) = 0.0_prec - uz_aa * dt/dz !fac_a - uz_aa * dt/dz
+!                 supd(k) = fac_b    + uz_aa * dt/dz
+!                 diag(k) = 1.0_prec - fac_b
+!                 rhs(k)  = var(k) - dt*advecxy(k) + dt*Q_strn_now*fac_enth(k)
+!                 else 
+!                 subd(k) = fac_a - uz_aa * dt/dz
+!                 supd(k) = fac_b + uz_aa * dt/dz
+!                 diag(k) = 1.0_prec - fac_a - fac_b
+!                 rhs(k)  = var(k) - dt*advecxy(k) + dt*Q_strn_now*fac_enth(k)
+!                 end if 
+
+                subd(k) = fac_a - uz_aa * dt/dz
+                supd(k) = fac_b + uz_aa * dt/dz
+                diag(k) = 1.0_prec - fac_a - fac_b
+                rhs(k)  = var(k) - dt*advecxy(k) + dt*Q_strn_now*fac_enth(k)
+                
+            end do 
+
+            ! == Ice surface ==
+
+            subd(nz_aa) = 0.0_prec
+            diag(nz_aa) = 1.0_prec
+            supd(nz_aa) = 0.0_prec
+            rhs(nz_aa)  = min(T_srf,T0) * fac_enth(nz_aa)
+
+            ! == Call solver ==
+
+            call solve_tridiag(subd(k0:nz_aa),diag(k0:nz_aa),supd(k0:nz_aa), &
+                                        rhs(k0:nz_aa),solution(k0:nz_aa))
+
+            enth(k0+1:nz_aa) = solution(k0+1:nz_aa) 
+            
+            ! Get temperature and water content 
+            call convert_from_enthalpy_column(enth,T_ice,omega,T_pmp,cp,L_ice)
+        
+        end if  
+
+end if 
+! ==============================================================================
+
+
 
 
         ! Finally, calculate the CTS height 
@@ -366,16 +482,16 @@ contains
 
     end subroutine convert_from_enthalpy_column
 
-    subroutine calc_enth_diffusivity(kappa,T_ice,omega,enth,T_pmp,cp,kt,rho_ice,rho_w,L_ice,cr)
+    subroutine calc_enth_diffusivity(kappa,enth,T_ice,omega,T_pmp,cp,kt,rho_ice,rho_w,L_ice,cr)
         ! Calculate the enthalpy vertical diffusivity for use with the diffusion solver:
         ! When water is present in the layer, set kappa=kappa_therm, else kappa=kappa_cold 
 
         implicit none 
 
         real(prec), intent(OUT) :: kappa(:)         ! [nz_aa]
+        real(prec), intent(IN)  :: enth(:)          ! [nz_aa]
         real(prec), intent(IN)  :: T_ice(:)         ! [nz_aa]
         real(prec), intent(IN)  :: omega(:)         ! [nz_aa]
-        real(prec), intent(IN)  :: enth(:)          ! [nz_aa]
         real(prec), intent(IN)  :: T_pmp(:)         ! [nz_aa]
         real(prec), intent(IN)  :: cp(:)
         real(prec), intent(IN)  :: kt(:)  
@@ -385,24 +501,12 @@ contains
         real(prec), intent(IN)  :: cr 
 
         ! Local variables
-        integer     :: k, nz_aa  
-        real(prec)  :: denth, denth_temp 
-        real(prec)  :: f_avg 
+        integer     :: k, nz_aa   
+        real(prec)  :: enth_pmp
         real(prec)  :: kappa_cold       ! Cold diffusivity 
         real(prec)  :: kappa_temp       ! Temperate diffusivity 
-        real(prec), allocatable :: enth_temp(:) 
         
         nz_aa = size(enth)
-
-        allocate(enth_temp(nz_aa))
-
-        ! First, define enthalpy associated with temperature only for the whole column 
-        ! (for cold ice enth = enth_temp, while for temperate ice enth > enth_temp) 
-        !enth_temp = (1.0_prec-omega)*rho_ice*cp*T_ice
-        enth_temp = (1.0_prec-omega)*cp*T_ice
-         
-        ! Compute factors relating the temperature gradient to the total enthalpy gradient.
-        ! Use these factors to average the diffusivity between the cold and temperate kappa values.
 
         kappa = 0.0 
 
@@ -412,7 +516,10 @@ contains
             kappa_cold = kt(k) / (rho_ice*cp(k))
             kappa_temp = cr * kappa_cold 
 
+            enth_pmp = T_pmp(k)*cp(k)
+
             if (omega(k) .gt. 0.0) then 
+!             if (enth(k) .ge. enth_pmp) then
                 kappa(k) = kappa_temp 
             else 
                 kappa(k) = kappa_cold 

@@ -75,11 +75,11 @@ program test_icetemp
     ! ===============================================================
     ! User options 
 
-    experiment     = "bg15a"        ! "eismint", "k15expa", "k15expb", "bg15a"
+    experiment     = "k15expb"        ! "eismint", "k15expa", "k15expb", "bg15a"
     
     ! General options
-    zeta_scale      = "linear"        ! "linear", "exp", "tanh"
-    nz              = 402           ! [--] Number of ice sheet points (aa-nodes + base + surface)
+    zeta_scale      = "linear"      ! "linear", "exp", "tanh"
+    nz              = 22            ! [--] Number of ice sheet points (aa-nodes + base + surface)
     is_celcius      = .FALSE. 
 
     age_method      = "expl"        ! "expl" or "impl"
@@ -508,9 +508,9 @@ contains
         ice%vec%advecxy = 0.0                                       ! [] No horizontal advection (assume constant)
 
         ! Write strain heating to compare basal value of ~2.6e-3 W/m-3
-        do k = nz, 1, -1 
-            write(*,*) ice%vec%zeta(k), ice%vec%Q_strn(k)/sec_year 
-        end do 
+!         do k = nz, 1, -1 
+!             write(*,*) ice%vec%zeta(k), ice%vec%Q_strn(k)/sec_year 
+!         end do 
 
         ! Calculate pressure melting point 
         ice%vec%T_pmp = calc_T_pmp(ice%H_ice,ice%vec%zeta,T0,T_pmp_beta) 

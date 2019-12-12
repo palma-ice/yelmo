@@ -239,10 +239,10 @@ contains
 
         ! Modify enthalpy at the base in the case that a temperate layer is present above the base
         ! (water content should increase towards the base)
-!         if (enth(2) .ge. T_pmp(2)*cp(2)) then 
-!             ! Temperate layer exists, interpolate enthalpy at the base. 
-!             enth(1) = enth(2) - (enth(3)-enth(2))/(zeta_aa(3)-zeta_aa(2)) * (zeta_aa(2)-zeta_aa(1))
-!         end if 
+        if (enth(2) .ge. T_pmp(2)*cp(2)) then 
+            ! Temperate layer exists, interpolate enthalpy at the base. 
+            enth(1) = enth(2) - (enth(3)-enth(2))/(zeta_aa(3)-zeta_aa(2)) * (zeta_aa(2)-zeta_aa(1))
+        end if 
         
         ! Get temperature and water content 
         call convert_from_enthalpy_column(enth,T_ice,omega,T_pmp,cp,L_ice)

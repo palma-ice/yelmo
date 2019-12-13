@@ -79,7 +79,7 @@ program test_icetemp
     
     ! General options
     zeta_scale      = "linear"      ! "linear", "exp", "tanh"
-    nz              = 22            ! [--] Number of ice sheet points (aa-nodes + base + surface)
+    nz              = 22           ! [--] Number of ice sheet points (aa-nodes + base + surface)
     is_celcius      = .FALSE. 
 
     age_method      = "expl"        ! "expl" or "impl"
@@ -141,7 +141,7 @@ program test_icetemp
 
         case("bg15a")
 
-            t_start = -1e3      ! [yr]
+            t_start = -0.5e3    ! [yr]
             t_end   =  1e3      ! [yr]
             dt      = 0.5       ! [yr]
             dt_out  =  5.0      ! [yr] 
@@ -223,6 +223,11 @@ program test_icetemp
                 ice1%T_srf = T0_ref - 2.0_prec 
             end if 
 
+!             if (time .le. 0.0) then 
+!                 ice1%T_srf = T0_ref - 2.0_prec 
+!             else 
+!                 ice1%T_srf = T0_ref - 2.0_prec + 1.0_prec*sin(2.0*pi*time/100.0_prec)
+!             end if 
         end if 
 
         call calc_enth_column(ice1%vec%enth,ice1%vec%T_ice,ice1%vec%omega,ice1%bmb,ice1%Q_ice_b,ice1%H_cts,ice1%vec%T_pmp, &

@@ -151,10 +151,10 @@ contains
                     ! Layer above base is also temperate (with water likely present in the ice),
                     ! set K0 dE/dz = 0. To do so, set basal enthalpy equal to enthalpy above
 
-                    subd(1) =  0.0_prec
-                    diag(1) =  1.0_prec
-                    supd(1) = -1.0_prec
-                    rhs(1)  =  0.0_prec
+!                     subd(1) =  0.0_prec
+!                     diag(1) =  1.0_prec
+!                     supd(1) = -1.0_prec
+!                     rhs(1)  =  0.0_prec
     
                     ! Testing implementation of second-order upwind derivative,
                     ! using var(3) value from previous timestep (similar result)
@@ -162,6 +162,14 @@ contains
 !                     diag(1) = -3.0_prec
 !                     supd(1) =  4.0_prec
 !                     rhs(1)  =  var(3)
+                    
+                    kappa_b = kappa_aa(1) 
+                    fac_b   = -kappa_b*dt/H_ice**2  * 1.0/(zeta_aa(2) - zeta_aa(1))**2
+
+                    subd(1) = 0.0_prec
+                    diag(1) = 1.0_prec - fac_b
+                    supd(1) = fac_b    
+                    rhs(1)  = var(1)
 
                 else 
                     ! Set enthalpy/temp equal to pressure melting point value 
@@ -201,8 +209,8 @@ contains
             fac_b   = -kappa_b*dzeta_b(k)*dt/H_ice**2
 
             subd(k) = fac_a - uz_aa * dt/dz
-            supd(k) = fac_b + uz_aa * dt/dz
             diag(k) = 1.0_prec - fac_a - fac_b
+            supd(k) = fac_b + uz_aa * dt/dz
             rhs(k)  = var(k) - dt*advecxy(k) + dt*Q_strn_now*fac_enth(k)
             
         end do 
@@ -239,10 +247,10 @@ contains
 
         ! Modify enthalpy at the base in the case that a temperate layer is present above the base
         ! (water content should increase towards the base)
-        if (enth(2) .ge. T_pmp(2)*cp(2)) then 
-            ! Temperate layer exists, interpolate enthalpy at the base. 
-            enth(1) = enth(2) - (enth(3)-enth(2))/(zeta_aa(3)-zeta_aa(2)) * (zeta_aa(2)-zeta_aa(1))
-        end if 
+!         if (enth(2) .ge. T_pmp(2)*cp(2)) then 
+!             ! Temperate layer exists, interpolate enthalpy at the base. 
+!             enth(1) = enth(2) - (enth(3)-enth(2))/(zeta_aa(3)-zeta_aa(2)) * (zeta_aa(2)-zeta_aa(1))
+!         end if 
         
         ! Get temperature and water content 
         call convert_from_enthalpy_column(enth,T_ice,omega,T_pmp,cp,L_ice)
@@ -577,9 +585,9 @@ end if
             f_lin = (enth_pmp(k0)-enth(k0)) / ( (enth(k)-enth(k0)) - (enth_pmp(k)-enth_pmp(k0)) )
             if (f_lin .lt. 1e-2) f_lin = 0.0 
 
-            !H_cts = H_ice * (zeta(k0) + f_lin*(zeta(k)-zeta(k0)))
+            H_cts = H_ice * (zeta(k0) + f_lin*(zeta(k)-zeta(k0)))
 
-            H_cts = H_ice * zeta(k0)
+            !H_cts = H_ice * zeta(k0)
 
         end if 
 

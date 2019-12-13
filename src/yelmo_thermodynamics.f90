@@ -235,6 +235,7 @@ contains
         real(prec) :: H_ice_now 
 
         real(prec), allocatable :: T_ice_old(:,:,:) 
+        real(prec), allocatable :: enth_old(:,:,:) 
         real(prec), allocatable :: advecxy3D(:,:,:)
         real(prec) :: filter0(3,3), filter(3,3) 
 
@@ -247,6 +248,7 @@ contains
 
         allocate(advecxy(nz_aa))
         allocate(T_ice_old(nx,ny,nz_aa))
+        allocate(enth_old(nx,ny,nz_aa))
         allocate(advecxy3D(nx,ny,nz_aa))
         
         ! First perform horizontal advection (this doesn't work properly, 
@@ -262,6 +264,7 @@ contains
         ! Store original ice temperature field here for input to horizontal advection
         ! calculations 
         T_ice_old = T_ice 
+        enth_old  = enth 
 
         ! Initialize gaussian filter kernel 
         filter0 = gauss_values(dx,dx,sigma=2.0*dx,n=size(filter,1))
@@ -335,6 +338,10 @@ contains
                 !advecxy = advecxy3D(i,j,:)
                 !advecxy = 0.0_prec 
 !                 write(*,*) "advecxy: ", i,j, maxval(abs(advecxy3D(i,j,:)-advecxy))
+
+                
+                call calc_advec_horizontal_column(advecxy,enth_old,H_ice,ux,uy,dx,i,j)
+
                 call calc_enth_column(enth(i,j,:),T_ice(i,j,:),omega(i,j,:),bmb_grnd(i,j),Q_ice_b(i,j),H_cts(i,j), &
                         T_pmp(i,j,:),cp(i,j,:),kt(i,j,:),advecxy,uz(i,j,:),Q_strn(i,j,:),Q_b(i,j),Q_geo(i,j),T_srf(i,j), &
                         T_shlf,H_ice_now,H_w(i,j),f_grnd(i,j),zeta_aa,zeta_ac,dzeta_a,dzeta_b,cr,omega_max,T0,dt)

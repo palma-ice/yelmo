@@ -79,7 +79,7 @@ program test_icetemp
     
     ! General options
     zeta_scale      = "linear"      ! "linear", "exp", "tanh"
-    nz              = 22           ! [--] Number of ice sheet points (aa-nodes + base + surface)
+    nz              = 22            ! [--] Number of ice sheet points (aa-nodes + base + surface)
     is_celcius      = .FALSE. 
 
     age_method      = "expl"        ! "expl" or "impl"

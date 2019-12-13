@@ -138,7 +138,7 @@ contains
                 ! Note: zeta_aa(1) == zeta_ac(1) == bottom boundary 
                 dzeta = zeta_aa(2) - zeta_aa(1)
 
-                ! backward Euler flux basal boundary condition
+                ! Backward Euler flux basal boundary condition
                 subd(1) =  0.0_prec
                 diag(1) =  1.0_prec
                 supd(1) = -1.0_prec
@@ -245,7 +245,7 @@ contains
             dedz    = (enth(3)-enth(2))/(zeta_aa(3)-zeta_aa(2))
             !write(*,*) dedz, (enth(3)-enth(2))/(zeta_aa(3)-zeta_aa(2))
 
-            !enth(1) = enth(2) + dedz*(zeta_aa(1)-zeta_aa(2))
+!             enth(1) = enth(2) + dedz*(zeta_aa(1)-zeta_aa(2))
 
         end if 
         
@@ -292,12 +292,9 @@ contains
 
         ! Include internal melting in bmb_grnd 
         bmb_grnd = bmb_grnd - melt_internal 
-
-
-
-
+        
 ! ======================= Corrector step for cold ice ==========================
-if (.FALSE.) then 
+if (.TRUE.) then 
 
         ! Find height of cold layer just above temperate layer 
         k0 = 0 
@@ -343,8 +340,8 @@ if (.FALSE.) then
                 ! Note: this is important to avoid mixing of kappa at the 
                 ! CTS height (kappa_lower = kappa_temperate; kappa_upper = kappa_cold)
                 ! See Blatter and Greve, 2015, Eq. 25. 
-                kappa_a = kappa_aa(k)
-                kappa_b = kappa_aa(k+1) 
+                kappa_a = kappa_aa(k-1)
+                kappa_b = kappa_aa(k) 
 
                 ! Vertical distance for centered difference advection scheme
                 dz      =  H_ice*(zeta_aa(k+1)-zeta_aa(k-1))

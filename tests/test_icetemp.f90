@@ -75,11 +75,11 @@ program test_icetemp
     ! ===============================================================
     ! User options 
 
-    experiment     = "bg15a"        ! "eismint", "k15expa", "k15expb", "bg15a"
+    experiment     = "k15expb"        ! "eismint", "k15expa", "k15expb", "bg15a"
     
     ! General options
     zeta_scale      = "linear"      ! "linear", "exp", "tanh"
-    nz              = 402           ! [--] Number of ice sheet points (aa-nodes + base + surface)
+    nz              = 22           ! [--] Number of ice sheet points (aa-nodes + base + surface)
     is_celcius      = .FALSE. 
 
     age_method      = "expl"        ! "expl" or "impl"

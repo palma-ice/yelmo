@@ -64,6 +64,7 @@ contains
         real(prec) :: T_excess
         real(prec) :: melt_internal   
         real(prec) :: enth_b, enth_pmp_b 
+        real(prec) :: dedz 
         real(prec) :: omega_excess
 
         real(prec), allocatable :: fac_enth(:)  ! aa-nodes 
@@ -249,7 +250,18 @@ contains
         ! (water content should increase towards the base)
         if (enth(2) .ge. T_pmp(2)*cp(2)) then 
             ! Temperate layer exists, interpolate enthalpy at the base. 
-            enth(1) = enth(2) - (enth(3)-enth(2))/(zeta_aa(3)-zeta_aa(2)) * (zeta_aa(2)-zeta_aa(1))
+
+            ! Get slope at k=2 
+            k = 2
+            dedz = (zeta_aa(k)-zeta_aa(k+1))/((zeta_aa(k+1)-zeta_aa(k+2))*(zeta_aa(k)-zeta_aa(k+2)))*enth(k+2) &
+                 + (zeta_aa(k+2)-zeta_aa(k))/((zeta_aa(k)-zeta_aa(k+1))*(zeta_aa(k+1)-zeta_aa(k+2)))*enth(k+1) &
+                 + (2.0*zeta_aa(k)-zeta_aa(k+1)-zeta_aa(k+2))/((zeta_aa(k)-zeta_aa(k+1))*(zeta_aa(k)-zeta_aa(k+2)))*enth(k)
+
+            !dedz    = (enth(3)-enth(2))/(zeta_aa(3)-zeta_aa(2))
+            !write(*,*) dedz, (enth(3)-enth(2))/(zeta_aa(3)-zeta_aa(2))
+
+            enth(1) = enth(2) + dedz*(zeta_aa(1)-zeta_aa(2))
+
         end if 
         
         ! Get temperature and water content 

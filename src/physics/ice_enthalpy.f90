@@ -151,10 +151,10 @@ contains
                     ! Layer above base is also temperate (with water likely present in the ice),
                     ! set K0 dE/dz = 0. To do so, set basal enthalpy equal to enthalpy above
 
-!                     subd(1) =  0.0_prec
-!                     diag(1) =  1.0_prec
-!                     supd(1) = -1.0_prec
-!                     rhs(1)  =  0.0_prec
+                    subd(1) =  0.0_prec
+                    diag(1) =  1.0_prec
+                    supd(1) = -1.0_prec
+                    rhs(1)  =  0.0_prec
     
                     ! Testing implementation of second-order upwind derivative,
                     ! using var(3) value from previous timestep (similar result)
@@ -163,13 +163,13 @@ contains
 !                     supd(1) =  4.0_prec
 !                     rhs(1)  =  var(3)
                     
-                    kappa_b = kappa_aa(1) 
-                    fac_b   = -kappa_b*dt/H_ice**2  * 1.0/(zeta_aa(2) - zeta_aa(1))**2
+!                     kappa_b = kappa_aa(1) 
+!                     fac_b   = -kappa_b*dt/H_ice**2  * 1.0/(zeta_aa(2) - zeta_aa(1))**2
 
-                    subd(1) = 0.0_prec
-                    diag(1) = 1.0_prec - fac_b
-                    supd(1) = fac_b    
-                    rhs(1)  = var(1)
+!                     subd(1) = 0.0_prec
+!                     diag(1) = 1.0_prec - fac_b
+!                     supd(1) = fac_b    
+!                     rhs(1)  = var(1)
 
                 else 
                     ! Set enthalpy/temp equal to pressure melting point value 

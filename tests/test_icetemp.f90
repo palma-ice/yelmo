@@ -75,11 +75,11 @@ program test_icetemp
     ! ===============================================================
     ! User options 
 
-    experiment     = "k15expb"        ! "eismint", "k15expa", "k15expb", "bg15a"
+    experiment     = "bg15a"        ! "eismint", "k15expa", "k15expb", "bg15a"
     
     ! General options
     zeta_scale      = "linear"      ! "linear", "exp", "tanh"
-    nz              = 22           ! [--] Number of ice sheet points (aa-nodes + base + surface)
+    nz              = 402           ! [--] Number of ice sheet points (aa-nodes + base + surface)
     is_celcius      = .FALSE. 
 
     age_method      = "expl"        ! "expl" or "impl"
@@ -217,12 +217,22 @@ program test_icetemp
         end if 
 
         if (trim(experiment) .eq. "bg15a") then 
+
+            ! === MELTING === 
             if (time .le. 50.0) then 
                 ice1%T_srf = T0_ref - 4.0_prec 
             else 
                 ice1%T_srf = T0_ref - 2.0_prec 
             end if 
-
+            
+            ! === FREEZING === 
+!             if (time .le. 50.0) then 
+!                 ice1%T_srf = T0_ref - 10.0_prec 
+!             else 
+!                 ice1%T_srf = T0_ref - 6.0_prec 
+!             end if
+            
+            ! === MELTING SIN WAVE ===
 !             if (time .le. 0.0) then 
 !                 ice1%T_srf = T0_ref - 2.0_prec 
 !             else 

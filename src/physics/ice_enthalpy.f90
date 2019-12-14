@@ -247,7 +247,8 @@ contains
             !write(*,*) dedz, (enth(3)-enth(2))/(zeta_aa(3)-zeta_aa(2))
 
 !             enth(1) = enth(2) + dedz*(zeta_aa(1)-zeta_aa(2))
-
+            
+            enth(1) = enth(2) 
         end if 
         
         ! Get temperature and water content 
@@ -295,7 +296,7 @@ contains
         bmb_grnd = bmb_grnd - melt_internal 
 
 ! ======================= Corrector step for cold ice ==========================
-if (.TRUE.) then 
+if (.FALSE.) then 
 
         ! Find height of cold layer just above temperate layer 
         k0 = 0 

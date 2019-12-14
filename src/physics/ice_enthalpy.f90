@@ -217,7 +217,7 @@ contains
         ! recalculate enthalpy, temperature and water content 
         
         enth  = solution
-        
+
         ! Modify enthalpy at the base in the case that a temperate layer is present above the base
         ! (water content should increase towards the base)
         if (enth(2) .ge. T_pmp(2)*cp(2)) then 
@@ -535,33 +535,58 @@ end if
         ! Get enthalpy at the pressure melting point (no water content)
         enth_pmp = T_pmp * cp
 
-        ! Determine index of the first layer that has enthalpy below enth_pmp 
-        do k = 1, nz 
-            if (enth(k) .lt. enth_pmp(k)) exit 
+        ! Determine height of CTS as heighest temperate layer 
+        k0 = 0 
+        do k = 1, nz-1 
+            if (enth(k) .ge. T_pmp(k)*cp(k)) then
+                k0 = k 
+            else 
+                exit 
+            end if 
         end do 
-        
-        ! Perform linear interpolation 
-        if (k .gt. nz) then 
+
+        if (k0 .eq. 0) then 
+            ! No temperate ice 
+            H_cts = 0.0_prec 
+
+        else if (k0 .eq. nz) then 
             ! Whole column is temperate
             H_cts = H_ice
-        else if (k .le. 1) then 
-            ! Whole column is cold 
-            H_cts = 0.0 
+
         else 
-            ! Perform interpolation
-            k0 = k-1 
+            ! Perform linear interpolation 
 
-            ! Get linear weight for where E(f_lin) = Epmp(f_lin)
-            ! E(k0) + dE*f_lin = Epmp(k0) + dEpmp*f_lin 
-            ! f_lin = (Epmp(k0)-E(k0)) / (dE - dEpmp)
-            f_lin = (enth_pmp(k0)-enth(k0)) / ( (enth(k)-enth(k0)) - (enth_pmp(k)-enth_pmp(k0)) )
-            if (f_lin .lt. 1e-2) f_lin = 0.0 
-
-            H_cts = H_ice * (zeta(k0) + f_lin*(zeta(k)-zeta(k0)))
-
-            !H_cts = H_ice * zeta(k0)
+            H_cts = H_ice * zeta(k0) 
 
         end if 
+
+!         ! Determine index of the first layer that has enthalpy below enth_pmp 
+!         do k = 1, nz 
+!             if (enth(k) .lt. enth_pmp(k)) exit 
+!         end do 
+        
+!         ! Perform linear interpolation 
+!         if (k .gt. nz) then 
+!             ! Whole column is temperate
+!             H_cts = H_ice
+!         else if (k .le. 1) then 
+!             ! Whole column is cold 
+!             H_cts = 0.0 
+!         else 
+!             ! Perform interpolation
+!             k0 = k-1 
+
+!             ! Get linear weight for where E(f_lin) = Epmp(f_lin)
+!             ! E(k0) + dE*f_lin = Epmp(k0) + dEpmp*f_lin 
+!             ! f_lin = (Epmp(k0)-E(k0)) / (dE - dEpmp)
+!             f_lin = (enth_pmp(k0)-enth(k0)) / ( (enth(k)-enth(k0)) - (enth_pmp(k)-enth_pmp(k0)) )
+!             if (f_lin .lt. 1e-2) f_lin = 0.0 
+
+!             H_cts = H_ice * (zeta(k0) + f_lin*(zeta(k)-zeta(k0)))
+
+!             !H_cts = H_ice * zeta(k0)
+
+!         end if 
 
         return 
 

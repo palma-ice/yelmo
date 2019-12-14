@@ -296,7 +296,7 @@ contains
         bmb_grnd = bmb_grnd - melt_internal 
 
 ! ======================= Corrector step for cold ice ==========================
-if (.FALSE.) then 
+if (.TRUE.) then 
 
         ! Find height of cold layer just above temperate layer 
         k0 = 0 

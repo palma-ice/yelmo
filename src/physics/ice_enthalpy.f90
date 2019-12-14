@@ -217,21 +217,7 @@ contains
         ! recalculate enthalpy, temperature and water content 
         
         enth  = solution
-
-        ! Find height of temperate layer
-        k0 = 0 
-        do k = 1, nz_aa-1 
-            if (enth(k) .ge. T_pmp(k)*cp(k)) then
-                k0 = k 
-            else 
-                exit 
-            end if 
-        end do 
         
-        ! Ensure zero water content in boundary temperate layer (CTS)
-        ! Note: this is necessary to properly perform cold-layer correction step below
-!         enth(k0) = T_pmp(k0)*cp(k0)
-
         ! Modify enthalpy at the base in the case that a temperate layer is present above the base
         ! (water content should increase towards the base)
         if (enth(2) .ge. T_pmp(2)*cp(2)) then 
@@ -248,7 +234,7 @@ contains
 
 !             enth(1) = enth(2) + dedz*(zeta_aa(1)-zeta_aa(2))
             
-            enth(1) = enth(2) 
+            enth(1) = enth(2)
         end if 
         
         ! Get temperature and water content 
@@ -321,7 +307,7 @@ if (.TRUE.) then
             subd(k0) = 0.0_prec
             diag(k0) = 1.0_prec
             supd(k0) = 0.0_prec
-            rhs(k0)  = enth(k0)     !T_pmp(k0)*cp(k0) !
+            rhs(k0)  = enth(k0+1)
 
 !             subd(k0+1) =  1.0_prec
 !             diag(k0+1) = -1.0_prec
@@ -345,28 +331,18 @@ if (.TRUE.) then
                 kappa_a = kappa_aa(k-1)
                 kappa_b = kappa_aa(k) 
 
+                if (k .eq. k0+1) kappa_a = 0.0_prec 
+
                 ! Vertical distance for centered difference advection scheme
                 dz      =  H_ice*(zeta_aa(k+1)-zeta_aa(k-1))
                 
                 fac_a   = -kappa_a*dzeta_a(k)*dt/H_ice**2
                 fac_b   = -kappa_b*dzeta_b(k)*dt/H_ice**2
 
-                if (k .eq. k0+1) then 
-                subd(k) = 0.0_prec - uz_aa * dt/dz !fac_a - uz_aa * dt/dz
-                supd(k) = fac_b    + uz_aa * dt/dz
-                diag(k) = 1.0_prec - fac_b
-                rhs(k)  = var(k) - dt*advecxy(k) + dt*Q_strn_now*fac_enth(k)
-                else 
                 subd(k) = fac_a - uz_aa * dt/dz
                 supd(k) = fac_b + uz_aa * dt/dz
                 diag(k) = 1.0_prec - fac_a - fac_b
                 rhs(k)  = var(k) - dt*advecxy(k) + dt*Q_strn_now*fac_enth(k)
-                end if 
-
-!                 subd(k) = fac_a - uz_aa * dt/dz
-!                 supd(k) = fac_b + uz_aa * dt/dz
-!                 diag(k) = 1.0_prec - fac_a - fac_b
-!                 rhs(k)  = var(k) - dt*advecxy(k) + dt*Q_strn_now*fac_enth(k)
                 
             end do 
 

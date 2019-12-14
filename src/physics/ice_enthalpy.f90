@@ -228,7 +228,8 @@ contains
             end if 
         end do 
         
-!         ! Ensure zero water content in last layer 
+        ! Ensure zero water content in boundary temperate layer (CTS)
+        ! Note: this is necessary to properly perform cold-layer correction step below
 !         enth(k0) = T_pmp(k0)*cp(k0)
 
         ! Modify enthalpy at the base in the case that a temperate layer is present above the base
@@ -292,7 +293,7 @@ contains
 
         ! Include internal melting in bmb_grnd 
         bmb_grnd = bmb_grnd - melt_internal 
-        
+
 ! ======================= Corrector step for cold ice ==========================
 if (.TRUE.) then 
 
@@ -319,16 +320,16 @@ if (.TRUE.) then
             subd(k0) = 0.0_prec
             diag(k0) = 1.0_prec
             supd(k0) = 0.0_prec
-            rhs(k0)  = T_pmp(k)*cp(k) !enth(k0)
+            rhs(k0)  = enth(k0)     !T_pmp(k0)*cp(k0) !
 
-            subd(k0+1) =  1.0_prec
-            diag(k0+1) = -1.0_prec
-            supd(k0+1) =  0.0_prec
-            rhs(k0+1)  =  0.0_prec
+!             subd(k0+1) =  1.0_prec
+!             diag(k0+1) = -1.0_prec
+!             supd(k0+1) =  0.0_prec
+!             rhs(k0+1)  =  0.0_prec
     
             ! == Cold ice interior layers k0:nz_aa-1 ==
 
-            do k = k0+2, nz_aa-1
+            do k = k0+1, nz_aa-1
 
                 ! Implicit vertical advection term on aa-node
                 uz_aa   = 0.5*(uz(k-1)+uz(k))   ! ac => aa nodes
@@ -349,22 +350,22 @@ if (.TRUE.) then
                 fac_a   = -kappa_a*dzeta_a(k)*dt/H_ice**2
                 fac_b   = -kappa_b*dzeta_b(k)*dt/H_ice**2
 
-!                 if (k .eq. k0+1) then 
-!                 subd(k) = 0.0_prec - uz_aa * dt/dz !fac_a - uz_aa * dt/dz
-!                 supd(k) = fac_b    + uz_aa * dt/dz
-!                 diag(k) = 1.0_prec - fac_b
-!                 rhs(k)  = var(k) - dt*advecxy(k) + dt*Q_strn_now*fac_enth(k)
-!                 else 
-!                 subd(k) = fac_a - uz_aa * dt/dz
-!                 supd(k) = fac_b + uz_aa * dt/dz
-!                 diag(k) = 1.0_prec - fac_a - fac_b
-!                 rhs(k)  = var(k) - dt*advecxy(k) + dt*Q_strn_now*fac_enth(k)
-!                 end if 
-
+                if (k .eq. k0+1) then 
+                subd(k) = 0.0_prec - uz_aa * dt/dz !fac_a - uz_aa * dt/dz
+                supd(k) = fac_b    + uz_aa * dt/dz
+                diag(k) = 1.0_prec - fac_b
+                rhs(k)  = var(k) - dt*advecxy(k) + dt*Q_strn_now*fac_enth(k)
+                else 
                 subd(k) = fac_a - uz_aa * dt/dz
                 supd(k) = fac_b + uz_aa * dt/dz
                 diag(k) = 1.0_prec - fac_a - fac_b
                 rhs(k)  = var(k) - dt*advecxy(k) + dt*Q_strn_now*fac_enth(k)
+                end if 
+
+!                 subd(k) = fac_a - uz_aa * dt/dz
+!                 supd(k) = fac_b + uz_aa * dt/dz
+!                 diag(k) = 1.0_prec - fac_a - fac_b
+!                 rhs(k)  = var(k) - dt*advecxy(k) + dt*Q_strn_now*fac_enth(k)
                 
             end do 
 

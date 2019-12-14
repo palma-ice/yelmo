@@ -284,7 +284,7 @@ contains
 ! ======================= Corrector step for cold ice ==========================
 if (.TRUE.) then 
 
-        ! Find height of cold layer just above temperate layer 
+        ! Find height of CTS - heighest temperate layer 
         k0 = 0 
         do k = 1, nz_aa-1 
             if (enth(k) .ge. T_pmp(k)*cp(k)) then
@@ -292,15 +292,13 @@ if (.TRUE.) then
             else 
                 exit 
             end if 
-        end do 
-        !k0 = k0 + 1
+        end do
 
         if (k0 .ge. 2) then
             ! Temperate ice exists above the base, recalculate cold layers 
 
             ! Recalculate diffusivity (only relevant for cold points)
             call calc_enth_diffusivity(kappa_aa,enth,T_ice,omega,T_pmp,cp,kt,rho_ice,rho_w,L_ice,cr)
-            !kappa_aa = kt / (rho_ice*cp)
 
             ! Lower boundary condition for cold ice dE/dz = 0.0 
 
@@ -372,7 +370,7 @@ end if
 
 
         ! Finally, calculate the CTS height 
-        H_cts = calc_cts_height(enth,T_pmp,cp,H_ice,zeta_aa)
+        H_cts = calc_cts_height(enth,T_ice,omega,T_pmp,cp,H_ice,zeta_aa)
 
         return 
 
@@ -510,13 +508,15 @@ end if
 
     end subroutine calc_enth_diffusivity
     
-    function calc_cts_height(enth,T_pmp,cp,H_ice,zeta) result(H_cts)
+    function calc_cts_height(enth,T_ice,omega,T_pmp,cp,H_ice,zeta) result(H_cts)
         ! Calculate the height of the cold-temperate transition surface (m)
         ! within the ice sheet. 
 
         implicit none 
 
         real(prec), intent(IN) :: enth(:) 
+        real(prec), intent(IN) :: T_ice(:) 
+        real(prec), intent(IN) :: omega(:) 
         real(prec), intent(IN) :: T_pmp(:) 
         real(prec), intent(IN) :: cp(:)
         real(prec), intent(IN) :: H_ice  
@@ -537,8 +537,9 @@ end if
 
         ! Determine height of CTS as heighest temperate layer 
         k0 = 0 
-        do k = 1, nz-1 
-            if (enth(k) .ge. T_pmp(k)*cp(k)) then
+        do k = 1, nz 
+            !if (enth(k) .ge. T_pmp(k)*cp(k)) then
+            if (T_ice(k) .ge. T_pmp(k)) then 
                 k0 = k 
             else 
                 exit 
@@ -555,6 +556,11 @@ end if
 
         else 
             ! Perform linear interpolation 
+
+!             if (T_ice(k0)-T_pmp(k0) .lt. 0.0_prec) then 
+!                 write(*,*) "CTS: ", enth(k0)/cp(k0), T_ice(k0)-T_pmp(k0), H_cts
+!                 stop 
+!             end if 
 
             H_cts = H_ice * zeta(k0) 
 

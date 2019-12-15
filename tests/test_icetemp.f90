@@ -78,7 +78,7 @@ program test_icetemp
     experiment     = "k15expb"        ! "eismint", "k15expa", "k15expb", "bg15a"
     
     ! General options
-    zeta_scale      = "exp"      ! "linear", "exp", "tanh"
+    zeta_scale      = "linear"      ! "linear", "exp", "tanh"
     nz              = 22            ! [--] Number of ice sheet points (aa-nodes + base + surface)
     is_celcius      = .FALSE. 
 

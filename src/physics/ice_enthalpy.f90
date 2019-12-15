@@ -254,7 +254,15 @@ contains
 
 !             enth(1) = enth(2) + dedz*(zeta_aa(1)-zeta_aa(2))
             
-            enth(1) = enth(2)
+!             enth(1) = enth(2)
+        end if 
+        
+        ! Calculate heat flux at ice base as enthalpy gradient * rho_ice * diffusivity [J a-1 m-2]
+        if (H_ice .gt. 0.0_prec) then 
+            dz = H_ice * (zeta_aa(2)-zeta_aa(1))
+            Q_ice_b = kappa_aa(1) * rho_ice * (enth(2) - enth(1)) / dz
+        else
+            Q_ice_b = 0.0 
         end if 
         
         ! Get temperature and water content 
@@ -284,13 +292,13 @@ contains
         ! Finally, get enthalpy again too (to be consistent with new omega) 
         call convert_to_enthalpy(enth,T_ice,omega,T_pmp,cp,L_ice)
 
-        ! Calculate heat flux at ice base as enthalpy gradient * rho_ice * diffusivity [J a-1 m-2]
-        if (H_ice .gt. 0.0_prec) then 
-            dz = H_ice * (zeta_aa(2)-zeta_aa(1))
-            Q_ice_b = kappa_aa(1) * rho_ice * (enth(2) - enth(1)) / dz
-        else
-            Q_ice_b = 0.0 
-        end if 
+!         ! Calculate heat flux at ice base as enthalpy gradient * rho_ice * diffusivity [J a-1 m-2]
+!         if (H_ice .gt. 0.0_prec) then 
+!             dz = H_ice * (zeta_aa(2)-zeta_aa(1))
+!             Q_ice_b = kappa_aa(1) * rho_ice * (enth(2) - enth(1)) / dz
+!         else
+!             Q_ice_b = 0.0 
+!         end if 
 
         ! Calculate basal mass balance 
         enth_b     = enth(1)

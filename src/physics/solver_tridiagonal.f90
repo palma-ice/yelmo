@@ -58,7 +58,7 @@ contains
 
     end subroutine solve_tridiag
 
-    subroutine tridiag_solver(a,b,c,x,y)
+    subroutine tridiag_solver(a,b,c,y,x)
         !|||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||
         !
         !  !  routine tridiag_solver

@@ -259,12 +259,12 @@ contains
         
         ! Calculate heat flux at ice base as enthalpy gradient * rho_ice * diffusivity [J a-1 m-2]
         if (H_ice .gt. 0.0_prec) then 
-            dz = H_ice * (zeta_aa(2)-zeta_aa(1))
-            Q_ice_b = kappa_aa(1) * rho_ice * (enth(2) - enth(1)) / dz
+            dz = H_ice * (zeta_aa(3)-zeta_aa(2))
+            Q_ice_b = kappa_aa(1) * rho_ice * (enth(3) - enth(2)) / dz
         else
             Q_ice_b = 0.0 
         end if 
-        
+
         ! Get temperature and water content 
         call convert_from_enthalpy_column(enth,T_ice,omega,T_pmp,cp,L_ice)
         

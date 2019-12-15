@@ -339,8 +339,11 @@ contains
                 !advecxy = 0.0_prec 
 !                 write(*,*) "advecxy: ", i,j, maxval(abs(advecxy3D(i,j,:)-advecxy))
 
-                
-                call calc_advec_horizontal_column(advecxy,enth_old,H_ice,ux,uy,dx,i,j)
+                !call calc_advec_horizontal_column(advecxy,enth_old,H_ice,ux,uy,dx,i,j)
+
+                do k = 1, nz_aa
+                    call calc_adv2D_expl_rate(advecxy(k),enth_old(:,:,k),ux(:,:,k),uy(:,:,k),dx,dx,i,j)
+                end do 
 
                 call calc_enth_column(enth(i,j,:),T_ice(i,j,:),omega(i,j,:),bmb_grnd(i,j),Q_ice_b(i,j),H_cts(i,j), &
                         T_pmp(i,j,:),cp(i,j,:),kt(i,j,:),advecxy,uz(i,j,:),Q_strn(i,j,:),Q_b(i,j),Q_geo(i,j),T_srf(i,j), &

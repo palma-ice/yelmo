@@ -57,7 +57,7 @@ contains
         real(prec), intent(IN)    :: dt             ! [a] Time step 
         
         ! Local variables 
-        integer    :: k, nz_aa, nz_ac, k0
+        integer    :: k, nz_aa, nz_ac, k_cts
         real(prec) :: Q_geo_now, ghf_conv 
         real(prec) :: Q_strn_now
         real(prec) :: H_w_predicted
@@ -77,7 +77,7 @@ contains
         real(prec), allocatable :: rhs(:)       ! nz_aa 
         real(prec), allocatable :: solution(:)  ! nz_aa
 
-        real(prec) :: fac, fac_a, fac_b, uz_aa, dzeta, dz
+        real(prec) :: fac, fac_a, fac_b, uz_aa, dzeta, dz, dz1, dz2 
         real(prec) :: kappa_a, kappa_b 
         logical    :: use_enth  
 
@@ -173,6 +173,16 @@ contains
 
         ! == Ice interior layers 2:nz_aa-1 ==
 
+        ! Find height of CTS - heighest temperate layer 
+        k_cts = 0 
+        do k = 1, nz_aa-1 
+            if (enth(k) .ge. T_pmp(k)*cp(k)) then
+                k_cts = k 
+            else 
+                exit 
+            end if 
+        end do
+
         do k = 2, nz_aa-1
 
             ! Implicit vertical advection term on aa-node
@@ -185,8 +195,18 @@ contains
             ! Note: this is important to avoid mixing of kappa at the 
             ! CTS height (kappa_lower = kappa_temperate; kappa_upper = kappa_cold)
             ! See Blatter and Greve, 2015, Eq. 25. 
-            kappa_a = kappa_aa(k-1)
-            kappa_b = kappa_aa(k) 
+            !kappa_a = 0.5_prec*(kappa_aa(k-1) + kappa_aa(k))
+            !kappa_b = 0.5_prec*(kappa_aa(k)   + kappa_aa(k+1))
+
+            dz1 = zeta_ac(k-1)-zeta_aa(k-1)
+            dz2 = zeta_aa(k)-zeta_ac(k-1)
+            call calc_wtd_harmonic_mean(kappa_a,kappa_aa(k-1),kappa_aa(k),dz1,dz2)
+
+            dz1 = zeta_ac(k)-zeta_aa(k)
+            dz2 = zeta_aa(k+1)-zeta_ac(k)
+            call calc_wtd_harmonic_mean(kappa_b,kappa_aa(k),kappa_aa(k+1),dz1,dz2)
+
+            if (k .eq. k_cts+1) kappa_a = kappa_aa(k-1)
 
             ! Vertical distance for centered difference advection scheme
             dz      =  H_ice*(zeta_aa(k+1)-zeta_aa(k-1))
@@ -282,19 +302,19 @@ contains
         bmb_grnd = bmb_grnd - melt_internal 
 
 ! ======================= Corrector step for cold ice ==========================
-if (.TRUE.) then 
+if (.FALSE.) then 
 
         ! Find height of CTS - heighest temperate layer 
-        k0 = 0 
+        k_cts = 0 
         do k = 1, nz_aa-1 
             if (enth(k) .ge. T_pmp(k)*cp(k)) then
-                k0 = k 
+                k_cts = k 
             else 
                 exit 
             end if 
         end do
 
-        if (k0 .ge. 2) then
+        if (k_cts .ge. 2) then
             ! Temperate ice exists above the base, recalculate cold layers 
 
             ! Recalculate diffusivity (only relevant for cold points)
@@ -302,19 +322,19 @@ if (.TRUE.) then
 
             ! Lower boundary condition for cold ice dE/dz = 0.0 
 
-            subd(k0) = 0.0_prec
-            diag(k0) = 1.0_prec
-            supd(k0) = 0.0_prec
-            rhs(k0)  = enth(k0+1)
+            subd(k_cts) = 0.0_prec
+            diag(k_cts) = 1.0_prec
+            supd(k_cts) = 0.0_prec
+            rhs(k_cts)  = enth(k_cts+1)
 
-!             subd(k0+1) =  1.0_prec
-!             diag(k0+1) = -1.0_prec
-!             supd(k0+1) =  0.0_prec
-!             rhs(k0+1)  =  0.0_prec
+!             subd(k_cts+1) =  1.0_prec
+!             diag(k_cts+1) = -1.0_prec
+!             supd(k_cts+1) =  0.0_prec
+!             rhs(k_cts+1)  =  0.0_prec
     
-            ! == Cold ice interior layers k0:nz_aa-1 ==
+            ! == Cold ice interior layers k_cts:nz_aa-1 ==
 
-            do k = k0+1, nz_aa-1
+            do k = k_cts+1, nz_aa-1
 
                 ! Implicit vertical advection term on aa-node
                 uz_aa   = 0.5*(uz(k-1)+uz(k))   ! ac => aa nodes
@@ -326,10 +346,19 @@ if (.TRUE.) then
                 ! Note: this is important to avoid mixing of kappa at the 
                 ! CTS height (kappa_lower = kappa_temperate; kappa_upper = kappa_cold)
                 ! See Blatter and Greve, 2015, Eq. 25. 
-                kappa_a = kappa_aa(k-1)
-                kappa_b = kappa_aa(k) 
+                !kappa_a = kappa_aa(k-1)
+                !kappa_b = kappa_aa(k) 
 
-                if (k .eq. k0+1) kappa_a = 0.0_prec 
+                dz1 = zeta_ac(k-1)-zeta_aa(k-1)
+                dz2 = zeta_aa(k)-zeta_ac(k-1)
+                call calc_wtd_harmonic_mean(kappa_a,kappa_aa(k-1),kappa_aa(k),dz1,dz2)
+
+                dz1 = zeta_ac(k)-zeta_aa(k)
+                dz2 = zeta_aa(k+1)-zeta_ac(k)
+                call calc_wtd_harmonic_mean(kappa_b,kappa_aa(k),kappa_aa(k+1),dz1,dz2)
+
+                !if (k .eq. k_cts+1) kappa_a = kappa_aa(k-1)
+                if (k .eq. k_cts+1) kappa_a = 0.0_prec 
 
                 ! Vertical distance for centered difference advection scheme
                 dz      =  H_ice*(zeta_aa(k+1)-zeta_aa(k-1))
@@ -353,10 +382,10 @@ if (.TRUE.) then
 
             ! == Call solver ==
 
-            call solve_tridiag(subd(k0:nz_aa),diag(k0:nz_aa),supd(k0:nz_aa), &
-                                        rhs(k0:nz_aa),solution(k0:nz_aa))
+            call solve_tridiag(subd(k_cts:nz_aa),diag(k_cts:nz_aa),supd(k_cts:nz_aa), &
+                                        rhs(k_cts:nz_aa),solution(k_cts:nz_aa))
 
-            enth(k0+1:nz_aa) = solution(k0+1:nz_aa) 
+            enth(k_cts+1:nz_aa) = solution(k_cts+1:nz_aa) 
             
             ! Get temperature and water content 
             call convert_from_enthalpy_column(enth,T_ice,omega,T_pmp,cp,L_ice)
@@ -524,7 +553,7 @@ end if
         real(prec) :: H_cts 
 
         ! Local variables 
-        integer :: k, k0, nz 
+        integer :: k, k_cts, nz 
         real(prec) :: f_lin 
         real(prec), allocatable :: enth_pmp(:) 
 
@@ -536,33 +565,33 @@ end if
         enth_pmp = T_pmp * cp
 
         ! Determine height of CTS as heighest temperate layer 
-        k0 = 0 
+        k_cts = 0 
         do k = 1, nz 
             !if (enth(k) .ge. T_pmp(k)*cp(k)) then
             if (T_ice(k) .ge. T_pmp(k)) then 
-                k0 = k 
+                k_cts = k 
             else 
                 exit 
             end if 
         end do 
 
-        if (k0 .eq. 0) then 
+        if (k_cts .eq. 0) then 
             ! No temperate ice 
             H_cts = 0.0_prec 
 
-        else if (k0 .eq. nz) then 
+        else if (k_cts .eq. nz) then 
             ! Whole column is temperate
             H_cts = H_ice
 
         else 
             ! Perform linear interpolation 
 
-!             if (T_ice(k0)-T_pmp(k0) .lt. 0.0_prec) then 
-!                 write(*,*) "CTS: ", enth(k0)/cp(k0), T_ice(k0)-T_pmp(k0), H_cts
+!             if (T_ice(k_cts)-T_pmp(k_cts) .lt. 0.0_prec) then 
+!                 write(*,*) "CTS: ", enth(k_cts)/cp(k_cts), T_ice(k_cts)-T_pmp(k_cts), H_cts
 !                 stop 
 !             end if 
 
-            H_cts = H_ice * zeta(k0) 
+            H_cts = H_ice * zeta(k_cts) 
 
         end if 
 
@@ -580,17 +609,17 @@ end if
 !             H_cts = 0.0 
 !         else 
 !             ! Perform interpolation
-!             k0 = k-1 
+!             k_cts = k-1 
 
 !             ! Get linear weight for where E(f_lin) = Epmp(f_lin)
-!             ! E(k0) + dE*f_lin = Epmp(k0) + dEpmp*f_lin 
-!             ! f_lin = (Epmp(k0)-E(k0)) / (dE - dEpmp)
-!             f_lin = (enth_pmp(k0)-enth(k0)) / ( (enth(k)-enth(k0)) - (enth_pmp(k)-enth_pmp(k0)) )
+!             ! E(k_cts) + dE*f_lin = Epmp(k_cts) + dEpmp*f_lin 
+!             ! f_lin = (Epmp(k_cts)-E(k_cts)) / (dE - dEpmp)
+!             f_lin = (enth_pmp(k_cts)-enth(k_cts)) / ( (enth(k)-enth(k_cts)) - (enth_pmp(k)-enth_pmp(k_cts)) )
 !             if (f_lin .lt. 1e-2) f_lin = 0.0 
 
-!             H_cts = H_ice * (zeta(k0) + f_lin*(zeta(k)-zeta(k0)))
+!             H_cts = H_ice * (zeta(k_cts) + f_lin*(zeta(k)-zeta(k_cts)))
 
-!             !H_cts = H_ice * zeta(k0)
+!             !H_cts = H_ice * zeta(k_cts)
 
 !         end if 
 
@@ -632,6 +661,26 @@ end if
         return 
 
     end subroutine calc_dzeta_terms
+
+    subroutine calc_wtd_harmonic_mean(var_ave,var1,var2,wt1,wt2)
+
+        implicit none 
+
+        real(prec), intent(OUT) :: var_ave 
+        real(prec), intent(IN)  :: var1 
+        real(prec), intent(IN)  :: var2 
+        real(prec), intent(IN)  :: wt1 
+        real(prec), intent(IN)  :: wt2 
+        
+        ! Local variables 
+        real(prec), parameter   :: tol = 1e-5 
+
+        !var_ave = ( wt1*(var1+tol)**(-1.0) + wt2*(var2+tol)**(-1.0) )**(-1.0)
+        var_ave = ( (wt1*(var1)**(-1.0) + wt2*(var2)**(-1.0)) / (wt1+wt2) )**(-1.0)
+
+        return 
+
+    end subroutine calc_wtd_harmonic_mean
 
 end module ice_enthalpy
 

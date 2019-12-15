@@ -81,6 +81,9 @@ contains
         real(prec) :: kappa_a, kappa_b 
         logical    :: use_enth  
 
+        logical, parameter :: test_expl_advecz = .TRUE. 
+        real(prec), allocatable :: advecz(:) 
+
         nz_aa = size(zeta_aa,1)
         nz_ac = size(zeta_ac,1)
 
@@ -100,7 +103,6 @@ contains
         ! Step 0: Calculate diffusivity, set prognostic variable (T_ice or enth),
         ! and corresponding scaling factor (fac_enth)
 
-        ! Calculate diffusivity on cell centers (aa-nodes)
         call calc_enth_diffusivity(kappa_aa,enth,T_ice,omega,T_pmp,cp,kt,rho_ice,rho_w,L_ice,cr)
 
         fac_enth = cp               ! To scale to units of [J kg]
@@ -108,6 +110,14 @@ contains
 
         ! Step 1: Apply vertical implicit diffusion-advection
         
+        ! Step 1: Apply vertical advection (for explicit testing)
+        if (test_expl_advecz) then
+            allocate(advecz(nz_aa))
+            advecz = 0.0
+            call calc_advec_vertical_column(advecz,var,uz,H_ice,zeta_aa)
+            var = var - dt*advecz
+        end if
+
         ! == Ice base ==
 
         if (f_grnd .lt. 1.0) then
@@ -185,8 +195,16 @@ contains
 
         do k = 2, nz_aa-1
 
-            ! Implicit vertical advection term on aa-node
-            uz_aa   = 0.5*(uz(k-1)+uz(k))   ! ac => aa nodes
+            if (test_expl_advecz) then 
+            
+                uz_aa = 0.0_prec 
+
+            else 
+                ! Implicit vertical advection term on aa-node
+                
+                uz_aa   = 0.5_prec*(uz(k-1)+uz(k))   ! ac => aa nodes
+            
+            end if 
 
             ! Convert units of Q_strn [J a-1 m-3] => [K a-1]
             Q_strn_now = Q_strn(k)/(rho_ice*cp(k))
@@ -207,6 +225,7 @@ contains
             call calc_wtd_harmonic_mean(kappa_b,kappa_aa(k),kappa_aa(k+1),dz1,dz2)
 
             if (k .eq. k_cts+1) kappa_a = kappa_aa(k-1)
+            !if (k .eq. k_cts)   kappa_b = kappa_aa(k+1) 
 
             ! Vertical distance for centered difference advection scheme
             dz      =  H_ice*(zeta_aa(k+1)-zeta_aa(k-1))
@@ -259,8 +278,8 @@ contains
         
         ! Calculate heat flux at ice base as enthalpy gradient * rho_ice * diffusivity [J a-1 m-2]
         if (H_ice .gt. 0.0_prec) then 
-            dz = H_ice * (zeta_aa(3)-zeta_aa(2))
-            Q_ice_b = kappa_aa(1) * rho_ice * (enth(3) - enth(2)) / dz
+            dz = H_ice * (zeta_aa(2)-zeta_aa(1))
+            Q_ice_b = kappa_aa(1) * rho_ice * (enth(2) - enth(1)) / dz
         else
             Q_ice_b = 0.0 
         end if 
@@ -301,11 +320,8 @@ contains
 !         end if 
 
         ! Calculate basal mass balance 
-        enth_b     = enth(1)
-        enth_pmp_b = T_pmp(1) * fac_enth(1)
-        call calc_bmb_grounded_enth(bmb_grnd,enth_b,enth_pmp_b,Q_ice_b,Q_b,Q_geo_now,f_grnd,rho_ice)
-            
-
+        call calc_bmb_grounded_enth(bmb_grnd,Q_ice_b,Q_b,Q_geo_now,f_grnd,rho_ice)
+        
         ! Include internal melting in bmb_grnd 
         bmb_grnd = bmb_grnd - melt_internal 
 

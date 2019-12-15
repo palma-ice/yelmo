@@ -79,7 +79,7 @@ contains
 
     end subroutine calc_bmb_grounded 
 
-    elemental subroutine calc_bmb_grounded_enth(bmb_grnd,enth_b,enth_pmp_b,Q_ice_b,Q_b,Q_geo_now,f_grnd,rho_ice)
+    elemental subroutine calc_bmb_grounded_enth(bmb_grnd,Q_ice_b,Q_b,Q_geo_now,f_grnd,rho_ice)
         ! Calculate everywhere there is at least some grounded ice 
         ! (centered aa node calculation)
 
@@ -90,8 +90,6 @@ contains
         implicit none 
         
         real(prec), intent(OUT) :: bmb_grnd          ! [m/a ice equiv.] Basal mass balance, grounded
-        real(prec), intent(IN)  :: enth_b            ! [J m-3] Basal ice enthalpy
-        real(prec), intent(IN)  :: enth_pmp_b        ! [J m-3] Basal enthalpy at pressure melting point 
         real(prec), intent(IN)  :: Q_ice_b           ! [J a-1 m-2] Conductive heat flux to the base (positive down)
         real(prec), intent(IN)  :: Q_b               ! [J a-1 m-2] Basal heat production from friction and strain heating (postive up)
         real(prec), intent(IN)  :: Q_geo_now         ! [J a-1 m-2] Geothermal heat flux (positive up)

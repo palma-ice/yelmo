@@ -81,7 +81,7 @@ contains
         real(prec) :: kappa_a, kappa_b 
         logical    :: use_enth  
 
-        logical, parameter :: test_expl_advecz = .TRUE. 
+        logical, parameter :: test_expl_advecz = .FALSE. 
         real(prec), allocatable :: advecz(:) 
 
         nz_aa = size(zeta_aa,1)
@@ -183,7 +183,7 @@ contains
 
         ! == Ice interior layers 2:nz_aa-1 ==
 
-        ! Find height of CTS - heighest temperate layer 
+        ! Find height of CTS - highest temperate layer 
         k_cts = 0 
         do k = 1, nz_aa-1 
             if (enth(k) .ge. T_pmp(k)*cp(k)) then
@@ -224,8 +224,8 @@ contains
             dz2 = zeta_aa(k+1)-zeta_ac(k)
             call calc_wtd_harmonic_mean(kappa_b,kappa_aa(k),kappa_aa(k+1),dz1,dz2)
 
-            if (k .eq. k_cts+1) kappa_a = kappa_aa(k-1)
-            !if (k .eq. k_cts)   kappa_b = kappa_aa(k+1) 
+            if (k .eq. k_cts+1) kappa_a = 0.0_prec !kappa_aa(k-1)
+            if (k .eq. k_cts)   kappa_b = kappa_aa(k+1) 
 
             ! Vertical distance for centered difference advection scheme
             dz      =  H_ice*(zeta_aa(k+1)-zeta_aa(k-1))

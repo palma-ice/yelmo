@@ -224,8 +224,8 @@ contains
             dz2 = zeta_aa(k+1)-zeta_ac(k)
             call calc_wtd_harmonic_mean(kappa_b,kappa_aa(k),kappa_aa(k+1),dz1,dz2)
 
-            if (k .eq. k_cts+1) kappa_a = 0.0_prec !kappa_aa(k-1)
-            if (k .eq. k_cts)   kappa_b = kappa_aa(k+1) 
+            if (k .eq. k_cts+1) kappa_a = kappa_aa(k-1)
+            !if (k .eq. k_cts)   kappa_b = kappa_aa(k+1) 
 
             ! Vertical distance for centered difference advection scheme
             dz      =  H_ice*(zeta_aa(k+1)-zeta_aa(k-1))

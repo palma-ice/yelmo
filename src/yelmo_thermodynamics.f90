@@ -109,9 +109,9 @@ contains
                     
                     call calc_ytherm_enthalpy_3D(thrm%now%enth,thrm%now%T_ice,thrm%now%omega,thrm%now%bmb_grnd,thrm%now%Q_ice_b, &
                                 thrm%now%H_cts,thrm%now%T_pmp,thrm%now%cp,thrm%now%kt,dyn%now%ux,dyn%now%uy,dyn%now%uz,thrm%now%Q_strn, &
-                                thrm%now%Q_b,bnd%Q_geo,bnd%T_srf,tpo%now%H_ice,thrm%now%H_w,thrm%now%dHwdt,tpo%now%H_grnd,tpo%now%f_grnd, &
-                                thrm%par%zeta_aa,thrm%par%zeta_ac,thrm%par%dzeta_a,thrm%par%dzeta_b,thrm%par%enth_cr,thrm%par%omega_max, &
-                                dt,thrm%par%dx,thrm%par%method,thrm%par%solver_advec)
+                                thrm%now%Q_b,bnd%Q_geo,bnd%T_srf,tpo%now%H_ice,tpo%now%z_srf,thrm%now%H_w,thrm%now%dHwdt,tpo%now%H_grnd, &
+                                tpo%now%f_grnd,thrm%par%zeta_aa,thrm%par%zeta_ac,thrm%par%dzeta_a,thrm%par%dzeta_b,thrm%par%enth_cr, &
+                                thrm%par%omega_max,dt,thrm%par%dx,thrm%par%method,thrm%par%solver_advec)
                     
                 case("robin")
                     ! Use Robin solution for ice temperature 
@@ -188,7 +188,8 @@ contains
     end subroutine calc_ytherm
 
     subroutine calc_ytherm_enthalpy_3D(enth,T_ice,omega,bmb_grnd,Q_ice_b,H_cts,T_pmp,cp,kt,ux,uy,uz,Q_strn,Q_b,Q_geo, &
-                            T_srf,H_ice,H_w,dHwdt,H_grnd,f_grnd,zeta_aa,zeta_ac,dzeta_a,dzeta_b,cr,omega_max,dt,dx,solver,solver_advec)
+                            T_srf,H_ice,z_srf,H_w,dHwdt,H_grnd,f_grnd,zeta_aa,zeta_ac,dzeta_a,dzeta_b, &
+                            cr,omega_max,dt,dx,solver,solver_advec)
         ! This wrapper subroutine breaks the thermodynamics problem into individual columns,
         ! which are solved independently by calling calc_enth_column
 
@@ -213,6 +214,7 @@ contains
         real(prec), intent(IN)    :: Q_geo(:,:)     ! [mW m-2] Geothermal heat flux 
         real(prec), intent(IN)    :: T_srf(:,:)     ! [K] Surface temperature 
         real(prec), intent(IN)    :: H_ice(:,:)     ! [m] Ice thickness 
+        real(prec), intent(IN)    :: z_srf(:,:)     ! [m] Surface elevation 
         real(prec), intent(IN)    :: H_w(:,:)       ! [m] Basal water layer thickness 
         real(prec), intent(IN)    :: dHwdt(:,:)     ! [m/a] Basal water layer thickness change
         real(prec), intent(IN)    :: H_grnd(:,:)    ! [--] Ice thickness above flotation 
@@ -339,7 +341,7 @@ contains
                 !advecxy = 0.0_prec 
 !                 write(*,*) "advecxy: ", i,j, maxval(abs(advecxy3D(i,j,:)-advecxy))
 
-                call calc_advec_horizontal_column(advecxy,enth_old,H_ice,ux,uy,dx,i,j)
+                call calc_advec_horizontal_column(advecxy,enth_old,H_ice,z_srf,ux,uy,zeta_aa,dx,i,j)
 
 !                 do k = 1, nz_aa
 !                     call calc_adv2D_expl_rate(advecxy(k),enth_old(:,:,k),ux(:,:,k),uy(:,:,k),dx,dx,i,j)

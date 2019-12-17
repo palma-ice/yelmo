@@ -285,7 +285,7 @@ contains
 
     end subroutine calc_advec_horizontal_column_quick
     
-    subroutine calc_advec_horizontal_column(advecxy,var_ice,H_ice,ux,uy,dx,i,j)
+    subroutine calc_advec_horizontal_column(advecxy,var_ice,H_ice,z_srf,ux,uy,zeta,dx,i,j)
         ! Newly implemented advection algorithms (ajr)
         ! Output: [K a-1]
 
@@ -296,8 +296,10 @@ contains
         real(prec), intent(OUT) :: advecxy(:)       ! nz_aa 
         real(prec), intent(IN)  :: var_ice(:,:,:)   ! nx,ny,nz_aa  Enth, T, age, etc...
         real(prec), intent(IN)  :: H_ice(:,:)       ! nx,ny 
-        real(prec), intent(IN)  :: ux(:,:,:)        ! nx,ny,nz
-        real(prec), intent(IN)  :: uy(:,:,:)        ! nx,ny,nz
+        real(prec), intent(IN)  :: z_srf(:,:)       ! nx,ny 
+        real(prec), intent(IN)  :: ux(:,:,:)        ! nx,ny,nz_aa
+        real(prec), intent(IN)  :: uy(:,:,:)        ! nx,ny,nz_aa
+        real(prec), intent(IN)  :: zeta(:)          ! nz_aa 
         real(prec), intent(IN)  :: dx  
         integer,    intent(IN)  :: i, j 
 
@@ -306,6 +308,8 @@ contains
         real(prec) :: ux_aa, uy_aa 
         real(prec) :: dx_inv, dx_inv2
         real(prec) :: advecx, advecy 
+
+        real(prec) :: c_x, c_y, dvardz 
 
         ! Define some constants 
         dx_inv  = 1.0_prec / dx 
@@ -370,9 +374,23 @@ contains
                 advecy = 0.0 
 
             end if 
-                    
+            
             ! Combine advection terms for total contribution 
             advecxy(k) = (advecx+advecy)
+
+
+            ! Get horizontal scaling correction terms 
+            c_x = (1.0_prec-zeta(k))*(H_ice(i+1,j)-H_ice(i-1,j))/dx_inv2 - (z_srf(i+1,j)-z_srf(i-1,j))/dx_inv2
+            c_y = (1.0_prec-zeta(k))*(H_ice(i,j+1)-H_ice(i,j-1))/dx_inv2 - (z_srf(i,j+1)-z_srf(i,j-1))/dx_inv2
+            
+            ! Get vertical gradient of variable 
+            if (k .lt. nz_aa) then 
+                dvardz = (var_ice(i,j,k+1)-var_ice(i,j,k))/((zeta(k+1)-zeta(k))*H_ice(i,j))
+            else 
+                dvardz = (var_ice(i,j,k)-var_ice(i,j,k-1))/((zeta(k)-zeta(k-1))*H_ice(i,j))
+            end if 
+
+            advecxy(k) = (advecx + c_x*dvardz) + (advecy + c_y*dvardz)
 
         end do 
 

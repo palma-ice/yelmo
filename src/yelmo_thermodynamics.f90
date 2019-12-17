@@ -233,6 +233,7 @@ contains
         ! Local variables
         integer :: i, j, k, nx, ny, nz_aa, nz_ac  
         real(prec), allocatable  :: advecxy(:)   ! [K a-1 m-2] Horizontal heat advection 
+        real(prec), allocatable  :: uz_corr(:)   ! [m a-1] Corrected vertical velocity 
         real(prec) :: T_shlf, H_grnd_lim, f_scalar, T_base  
         real(prec) :: H_ice_now 
 
@@ -253,6 +254,8 @@ contains
         allocate(enth_old(nx,ny,nz_aa))
         allocate(advecxy3D(nx,ny,nz_aa))
         
+        allocate(uz_corr(nz_ac))
+
         ! First perform horizontal advection (this doesn't work properly, 
         ! use column-based upwind horizontal advection below)
         !call calc_enth_horizontal_advection_3D(T_ice,ux,uy,H_ice,dx,dt,solver_advec)
@@ -343,12 +346,15 @@ contains
 
                 call calc_advec_horizontal_column(advecxy,enth_old,H_ice,z_srf,ux,uy,zeta_aa,dx,i,j)
 
+
+                call calc_advec_vertical_column_correction(uz_corr,H_ice,z_srf,ux,uy,uz,zeta_ac,dx,i,j)
+
 !                 do k = 1, nz_aa
 !                     call calc_adv2D_expl_rate(advecxy(k),enth_old(:,:,k),ux(:,:,k),uy(:,:,k),dx,dx,i,j)
 !                 end do 
 
                 call calc_enth_column(enth(i,j,:),T_ice(i,j,:),omega(i,j,:),bmb_grnd(i,j),Q_ice_b(i,j),H_cts(i,j), &
-                        T_pmp(i,j,:),cp(i,j,:),kt(i,j,:),advecxy,uz(i,j,:),Q_strn(i,j,:),Q_b(i,j),Q_geo(i,j),T_srf(i,j), &
+                        T_pmp(i,j,:),cp(i,j,:),kt(i,j,:),advecxy,uz_corr,Q_strn(i,j,:),Q_b(i,j),Q_geo(i,j),T_srf(i,j), &
                         T_shlf,H_ice_now,H_w(i,j),f_grnd(i,j),zeta_aa,zeta_ac,dzeta_a,dzeta_b,cr,omega_max,T0,dt)
                 
             end if 

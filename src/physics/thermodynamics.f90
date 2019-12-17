@@ -15,6 +15,7 @@ module thermodynamics
     public :: calc_advec_vertical_column
     public :: calc_advec_horizontal_column
     public :: calc_advec_horizontal_column_quick
+    public :: calc_advec_vertical_column_correction
     public :: calc_strain_heating
     public :: calc_strain_heating_sia
     public :: calc_basal_heating
@@ -379,18 +380,18 @@ contains
             advecxy(k) = (advecx+advecy)
 
 
-            ! Get horizontal scaling correction terms 
-            c_x = (1.0_prec-zeta(k))*(H_ice(i+1,j)-H_ice(i-1,j))*dx_inv2 - (z_srf(i+1,j)-z_srf(i-1,j))*dx_inv2
-            c_y = (1.0_prec-zeta(k))*(H_ice(i,j+1)-H_ice(i,j-1))*dx_inv2 - (z_srf(i,j+1)-z_srf(i,j-1))*dx_inv2
+!             ! Get horizontal scaling correction terms 
+!             c_x = (1.0_prec-zeta(k))*(H_ice(i+1,j)-H_ice(i-1,j))*dx_inv2 - (z_srf(i+1,j)-z_srf(i-1,j))*dx_inv2
+!             c_y = (1.0_prec-zeta(k))*(H_ice(i,j+1)-H_ice(i,j-1))*dx_inv2 - (z_srf(i,j+1)-z_srf(i,j-1))*dx_inv2
             
-            ! Get vertical gradient of variable 
-            if (k .lt. nz_aa) then 
-                dvardz = (var_ice(i,j,k+1)-var_ice(i,j,k))/((zeta(k+1)-zeta(k))*H_ice(i,j))
-            else 
-                dvardz = (var_ice(i,j,k)-var_ice(i,j,k-1))/((zeta(k)-zeta(k-1))*H_ice(i,j))
-            end if 
+!             ! Get vertical gradient of variable 
+!             if (k .lt. nz_aa) then 
+!                 dvardz = (var_ice(i,j,k+1)-var_ice(i,j,k))/((zeta(k+1)-zeta(k))*H_ice(i,j))
+!             else 
+!                 dvardz = (var_ice(i,j,k)-var_ice(i,j,k-1))/((zeta(k)-zeta(k-1))*H_ice(i,j))
+!             end if 
 
-            advecxy(k) = (advecx + ux_aa*c_x*dvardz) + (advecy + uy_aa*c_y*dvardz)
+!             advecxy(k) = (advecx + ux_aa*c_x*dvardz) + (advecy + uy_aa*c_y*dvardz)
 
         end do 
 
@@ -398,39 +399,65 @@ contains
 
     end subroutine calc_advec_horizontal_column
     
-    subroutine calc_advec_vertical_column_correction(uz_corr,H_ice,z_srf,ux,uy,uz,zeta,dx,i,j)
+    subroutine calc_advec_vertical_column_correction(uz_corr,H_ice,z_srf,ux,uy,uz,zeta_ac,dx,i,j)
 
         implicit none 
 
-        real(prec), intent(OUT) :: uz_corr(:)       ! [m/a] nz_aa 
+        real(prec), intent(OUT) :: uz_corr(:)       ! [m/a] nz_ac 
         real(prec), intent(IN)  :: H_ice(:,:)       ! nx,ny 
         real(prec), intent(IN)  :: z_srf(:,:)       ! nx,ny 
         real(prec), intent(IN)  :: ux(:,:,:)        ! nx,ny,nz_aa
         real(prec), intent(IN)  :: uy(:,:,:)        ! nx,ny,nz_aa
-        real(prec), intent(IN)  :: uz(:,:,:)        ! nx,ny,nz_aa
-        real(prec), intent(IN)  :: zeta(:)          ! nz_aa 
+        real(prec), intent(IN)  :: uz(:,:,:)        ! nx,ny,nz_ac
+        real(prec), intent(IN)  :: zeta_ac(:)       ! nz_ac
         real(prec), intent(IN)  :: dx  
         integer,    intent(IN)  :: i, j 
 
         ! Local variables 
-        integer :: k, nx, ny, nz_aa 
+        integer :: k, nx, ny, nz_ac 
         real(prec) :: ux_aa, uy_aa 
         real(prec) :: dx_inv, dx_inv2
 
-        real(prec) :: c_x, c_y, dvardz 
+        real(prec) :: c_x, c_y 
+
+        nx    = size(H_ice,1)
+        ny    = size(H_ice,2)
+        nz_ac = size(zeta_ac,1) 
 
         ! Define some constants 
         dx_inv  = 1.0_prec / dx 
         dx_inv2 = 1.0_prec / (2.0_prec*dx)
 
-!         nx  = size(var_ice,1)
-!         ny  = size(var_ice,2)
-!         nz_aa = size(var_ice,3) 
+        if (i .ge. 2 .and. i .le. nx-1 .and. j .ge. 2 .and. j .le. ny-1) then 
 
-        ! Get horizontal scaling correction terms 
-        c_x = (1.0_prec-zeta(k))*(H_ice(i+1,j)-H_ice(i-1,j))*dx_inv2 - (z_srf(i+1,j)-z_srf(i-1,j))*dx_inv2
-        c_y = (1.0_prec-zeta(k))*(H_ice(i,j+1)-H_ice(i,j-1))*dx_inv2 - (z_srf(i,j+1)-z_srf(i,j-1))*dx_inv2
-        
+            do k = 1, nz_ac 
+
+                ! Estimate direction of current flow into cell (x and y), centered horizontally in grid point
+                ! and averaged to staggered cell edges where uz is defined.
+                if (k .eq. 1) then 
+                    ux_aa = 0.5_prec*(ux(i,j,k)+ux(i-1,j,k))
+                    uy_aa = 0.5_prec*(uy(i,j,k)+uy(i,j-1,k))
+                else if (k .eq. nz_ac) then 
+                    ux_aa = 0.5_prec*(ux(i,j,k)+ux(i-1,j,k+1))
+                    uy_aa = 0.5_prec*(uy(i,j,k)+uy(i,j-1,k+1))
+                else 
+                    ux_aa = 0.25_prec*(ux(i,j,k)+ux(i-1,j,k) + ux(i,j,k+1)+ux(i-1,j,k+1))
+                    uy_aa = 0.25_prec*(uy(i,j,k)+uy(i,j-1,k) + uy(i,j,k+1)+uy(i,j-1,k+1))
+                end if 
+
+                ! Get horizontal scaling correction terms 
+                c_x = (1.0_prec-zeta_ac(k))*(H_ice(i+1,j)-H_ice(i-1,j))*dx_inv2 - (z_srf(i+1,j)-z_srf(i-1,j))*dx_inv2
+                c_y = (1.0_prec-zeta_ac(k))*(H_ice(i,j+1)-H_ice(i,j-1))*dx_inv2 - (z_srf(i,j+1)-z_srf(i,j-1))*dx_inv2
+                
+                uz_corr(k) = uz(i,j,k) + ux_aa*c_x + uy_aa*c_y 
+
+            end do         
+
+        else 
+
+            uz_corr = 0.0_prec 
+
+        end if 
 
         return 
 

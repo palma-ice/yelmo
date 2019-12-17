@@ -262,18 +262,10 @@ contains
         if (enth(2) .ge. T_pmp(2)*cp(2)) then 
             ! Temperate layer exists, interpolate enthalpy at the base. 
 
-!             ! Get slope at k=2 
-!             k = 2
-!             dedz = (zeta_aa(k)-zeta_aa(k+1))/((zeta_aa(k+1)-zeta_aa(k+2))*(zeta_aa(k)-zeta_aa(k+2)))*enth(k+2) &
-!                  + (zeta_aa(k+2)-zeta_aa(k))/((zeta_aa(k)-zeta_aa(k+1))*(zeta_aa(k+1)-zeta_aa(k+2)))*enth(k+1) &
-!                  + (2.0*zeta_aa(k)-zeta_aa(k+1)-zeta_aa(k+2))/((zeta_aa(k)-zeta_aa(k+1))*(zeta_aa(k)-zeta_aa(k+2)))*enth(k)
-
-            dedz    = (enth(3)-enth(2))/(zeta_aa(3)-zeta_aa(2))
-            !write(*,*) dedz, (enth(3)-enth(2))/(zeta_aa(3)-zeta_aa(2))
-
+!             dedz    = (enth(3)-enth(2))/(zeta_aa(3)-zeta_aa(2))
 !             enth(1) = enth(2) + dedz*(zeta_aa(1)-zeta_aa(2))
             
-!             enth(1) = enth(2)
+            enth(1) = enth(2)
         end if 
         
         ! Calculate heat flux at ice base as enthalpy gradient * rho_ice * diffusivity [J a-1 m-2]

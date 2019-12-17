@@ -390,7 +390,7 @@ contains
                 dvardz = (var_ice(i,j,k)-var_ice(i,j,k-1))/((zeta(k)-zeta(k-1))*H_ice(i,j))
             end if 
 
-            advecxy(k) = (advecx + c_x*dvardz) + (advecy + c_y*dvardz)
+            advecxy(k) = (advecx + ux_aa*c_x*dvardz) + (advecy + uy_aa*c_y*dvardz)
 
         end do 
 
@@ -398,6 +398,44 @@ contains
 
     end subroutine calc_advec_horizontal_column
     
+    subroutine calc_advec_vertical_column_correction(uz_corr,H_ice,z_srf,ux,uy,uz,zeta,dx,i,j)
+
+        implicit none 
+
+        real(prec), intent(OUT) :: uz_corr(:)       ! [m/a] nz_aa 
+        real(prec), intent(IN)  :: H_ice(:,:)       ! nx,ny 
+        real(prec), intent(IN)  :: z_srf(:,:)       ! nx,ny 
+        real(prec), intent(IN)  :: ux(:,:,:)        ! nx,ny,nz_aa
+        real(prec), intent(IN)  :: uy(:,:,:)        ! nx,ny,nz_aa
+        real(prec), intent(IN)  :: uz(:,:,:)        ! nx,ny,nz_aa
+        real(prec), intent(IN)  :: zeta(:)          ! nz_aa 
+        real(prec), intent(IN)  :: dx  
+        integer,    intent(IN)  :: i, j 
+
+        ! Local variables 
+        integer :: k, nx, ny, nz_aa 
+        real(prec) :: ux_aa, uy_aa 
+        real(prec) :: dx_inv, dx_inv2
+
+        real(prec) :: c_x, c_y, dvardz 
+
+        ! Define some constants 
+        dx_inv  = 1.0_prec / dx 
+        dx_inv2 = 1.0_prec / (2.0_prec*dx)
+
+!         nx  = size(var_ice,1)
+!         ny  = size(var_ice,2)
+!         nz_aa = size(var_ice,3) 
+
+        ! Get horizontal scaling correction terms 
+        c_x = (1.0_prec-zeta(k))*(H_ice(i+1,j)-H_ice(i-1,j))*dx_inv2 - (z_srf(i+1,j)-z_srf(i-1,j))*dx_inv2
+        c_y = (1.0_prec-zeta(k))*(H_ice(i,j+1)-H_ice(i,j-1))*dx_inv2 - (z_srf(i,j+1)-z_srf(i,j-1))*dx_inv2
+        
+
+        return 
+
+    end subroutine calc_advec_vertical_column_correction
+
     subroutine calc_strain_heating(Q_strn,de,visc,cp,rho_ice)
         ! Calculate the general 3D internal strain heating
         ! as sum(D_ij*tau_ij)  (strain*stress)

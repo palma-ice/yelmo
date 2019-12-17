@@ -380,8 +380,8 @@ contains
 
 
             ! Get horizontal scaling correction terms 
-            c_x = (1.0_prec-zeta(k))*(H_ice(i+1,j)-H_ice(i-1,j))/dx_inv2 - (z_srf(i+1,j)-z_srf(i-1,j))/dx_inv2
-            c_y = (1.0_prec-zeta(k))*(H_ice(i,j+1)-H_ice(i,j-1))/dx_inv2 - (z_srf(i,j+1)-z_srf(i,j-1))/dx_inv2
+            c_x = (1.0_prec-zeta(k))*(H_ice(i+1,j)-H_ice(i-1,j))*dx_inv2 - (z_srf(i+1,j)-z_srf(i-1,j))*dx_inv2
+            c_y = (1.0_prec-zeta(k))*(H_ice(i,j+1)-H_ice(i,j-1))*dx_inv2 - (z_srf(i,j+1)-z_srf(i,j-1))*dx_inv2
             
             ! Get vertical gradient of variable 
             if (k .lt. nz_aa) then 

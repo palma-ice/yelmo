@@ -311,7 +311,7 @@ contains
                 ! Thick ice exists, call thermodynamic solver for the column
 
                 ! No filtering of H_ice, take actual value
-!                 H_ice_now = H_ice(i,j) 
+                H_ice_now = H_ice(i,j) 
                 
                 ! Filter everywhere
 !                 filter = filter0
@@ -334,6 +334,7 @@ if (.FALSE.) then
                     H_ice_now = H_ice(i,j) 
                 end if 
 end if 
+                
                 ! Pre-calculate the contribution of horizontal advection to column solution
                 ! (use unmodified T_ice_old field as input, to avoid mixing with new solution)
 !                 call calc_advec_horizontal_column(advecxy,T_ice_old,H_ice,z_srf,ux,uy,zeta_aa,dx,i,j)

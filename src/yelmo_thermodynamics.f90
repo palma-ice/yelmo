@@ -235,11 +235,11 @@ contains
         real(prec), allocatable  :: advecxy(:)   ! [K a-1 m-2] Horizontal heat advection 
         real(prec), allocatable  :: uz_now(:)   ! [m a-1] Corrected vertical velocity 
         real(prec) :: T_shlf, H_grnd_lim, f_scalar, T_base  
-        real(prec) :: H_ice_now 
+        !real(prec) :: H_ice_now 
 
-        real(prec), allocatable :: T_ice_old(:,:,:) 
         real(prec), allocatable :: enth_old(:,:,:) 
         real(prec), allocatable :: advecxy3D(:,:,:)
+        real(prec), allocatable :: H_ice_now(:,:) 
         real(prec) :: filter0(3,3), filter(3,3) 
 
         real(prec), parameter :: H_ice_thin = 15.0   ! [m] Threshold to define 'thin' ice
@@ -250,10 +250,9 @@ contains
         nz_ac = size(zeta_ac,1)
 
         allocate(advecxy(nz_aa))
-        allocate(T_ice_old(nx,ny,nz_aa))
         allocate(enth_old(nx,ny,nz_aa))
         allocate(advecxy3D(nx,ny,nz_aa))
-        
+        allocate(H_ice_now(nx,ny))
         allocate(uz_now(nz_ac))
 
         ! First perform horizontal advection (this doesn't work properly, 
@@ -266,13 +265,35 @@ contains
 !             call calc_adv2D_impl_upwind_rate(advecxy3D(:,:,k),T_ice(:,:,k),ux(:,:,k),uy(:,:,k),H_ice*0.0,dx,dx,dt,f_upwind=1.0)
 !         end do 
 
-        ! Store original ice temperature field here for input to horizontal advection
+        ! Store original ice enthalpy field here for input to horizontal advection
         ! calculations 
-        T_ice_old = T_ice 
         enth_old  = enth 
 
+        ! === Get H_ice_now (with thicker margin points) ===
+        
         ! Initialize gaussian filter kernel 
         filter0 = gauss_values(dx,dx,sigma=2.0*dx,n=size(filter,1))
+
+        ! Store input ice thickness in local array 
+        H_ice_now = H_ice 
+ 
+if (.FALSE.) then        
+        do j = 2, ny-1
+        do i = 2, nx-1 
+            
+            ! Filter at the margin only 
+            if (count(H_ice(i-1:i+1,j-1:j+1) .eq. 0.0) .ge. 2) then
+                filter = filter0 
+                where (H_ice(i-1:i+1,j-1:j+1) .eq. 0.0) filter = 0.0 
+                filter = filter/sum(filter)
+                H_ice_now(i,j) = sum(H_ice(i-1:i+1,j-1:j+1)*filter)
+            end if
+     
+        end do 
+        end do
+end if 
+
+        ! ===================================================
 
         do j = 3, ny-2
         do i = 3, nx-2 
@@ -283,7 +304,7 @@ contains
             if (f_grnd(i,j) .lt. 1.0) then 
 
                 ! Calculate approximate marine freezing temp, limited to pressure melting point 
-                T_shlf = calc_T_base_shlf_approx(H_ice(i,j),T_pmp(i,j,1),H_grnd(i,j))
+                T_shlf = calc_T_base_shlf_approx(H_ice_now(i,j),T_pmp(i,j,1),H_grnd(i,j))
 
             else 
                 ! Assigned for safety 
@@ -292,7 +313,7 @@ contains
 
             end if 
 
-            if (H_ice(i,j) .le. H_ice_thin) then 
+            if (H_ice_now(i,j) .le. H_ice_thin) then 
                 ! Ice is too thin or zero: prescribe linear temperature profile
                 ! between temperate ice at base and surface temperature 
                 ! (accounting for floating/grounded nature via T_base)
@@ -310,53 +331,23 @@ contains
             else 
                 ! Thick ice exists, call thermodynamic solver for the column
 
-                ! No filtering of H_ice, take actual value
-                H_ice_now = H_ice(i,j) 
-                
-                ! Filter everywhere
-!                 filter = filter0
-!                 H_ice_now = sum(H_ice(i-1:i+1,j-1:j+1)*filter)
-
-                ! Filter everywhere there is ice 
-                ! filter = filter0 
-                ! where (H_ice(i-1:i+1,j-1:j+1) .eq. 0.0) filter = 0.0 
-                ! filter = filter/sum(filter)
-                ! H_ice_now = sum(H_ice(i-1:i+1,j-1:j+1)*filter)
-                
-                ! Filter at the margin only 
-if (.FALSE.) then 
-                if (count(H_ice(i-1:i+1,j-1:j+1) .eq. 0.0) .ge. 2) then
-                    filter = filter0 
-                    where (H_ice(i-1:i+1,j-1:j+1) .eq. 0.0) filter = 0.0 
-                    filter = filter/sum(filter)
-                    H_ice_now = sum(H_ice(i-1:i+1,j-1:j+1)*filter)
-                else 
-                    H_ice_now = H_ice(i,j) 
-                end if 
-end if 
-                
                 ! Pre-calculate the contribution of horizontal advection to column solution
-                ! (use unmodified T_ice_old field as input, to avoid mixing with new solution)
-!                 call calc_advec_horizontal_column(advecxy,T_ice_old,H_ice,z_srf,ux,uy,zeta_aa,dx,i,j)
-!                 call calc_advec_horizontal_column_quick(advecxy,T_ice_old,H_ice,ux,uy,dx,i,j)
+                ! (use unmodified enth_old field as input, to avoid mixing with new solution)
+                call calc_advec_horizontal_column(advecxy,enth_old,H_ice_now,z_srf,ux,uy,zeta_aa,dx,i,j)
+!                 call calc_advec_horizontal_column_quick(advecxy,enth_old,H_ice_now,ux,uy,dx,i,j)
 !                 do k = 1, nz_aa
-!                     call calc_adv2D_expl_rate(advecxy(k),T_ice_old(:,:,k),ux(:,:,k),uy(:,:,k),dx,dx,i,j)
+!                     call calc_adv2D_expl_rate(advecxy(k),enth_old(:,:,k),ux(:,:,k),uy(:,:,k),dx,dx,i,j)
 !                 end do 
                 !advecxy = advecxy3D(i,j,:)
                 !advecxy = 0.0_prec 
 !                 write(*,*) "advecxy: ", i,j, maxval(abs(advecxy3D(i,j,:)-advecxy))
-
-                call calc_advec_horizontal_column(advecxy,enth_old,H_ice,z_srf,ux,uy,zeta_aa,dx,i,j)
-
-                call calc_advec_vertical_column_correction(uz_now,H_ice,z_srf,ux,uy,uz,zeta_ac,dx,i,j)
-
-!                 do k = 1, nz_aa
-!                     call calc_adv2D_expl_rate(advecxy(k),enth_old(:,:,k),ux(:,:,k),uy(:,:,k),dx,dx,i,j)
-!                 end do 
+                
+                ! Calculate correction to vertical velocity due to horizontal gradient on vertical sigma-coordinate grid
+                call calc_advec_vertical_column_correction(uz_now,H_ice_now,z_srf,ux,uy,uz,zeta_ac,dx,i,j)
 
                 call calc_enth_column(enth(i,j,:),T_ice(i,j,:),omega(i,j,:),bmb_grnd(i,j),Q_ice_b(i,j),H_cts(i,j), &
                         T_pmp(i,j,:),cp(i,j,:),kt(i,j,:),advecxy,uz_now,Q_strn(i,j,:),Q_b(i,j),Q_geo(i,j),T_srf(i,j), &
-                        T_shlf,H_ice_now,H_w(i,j),f_grnd(i,j),zeta_aa,zeta_ac,dzeta_a,dzeta_b,cr,omega_max,T0,dt)
+                        T_shlf,H_ice_now(i,j),H_w(i,j),f_grnd(i,j),zeta_aa,zeta_ac,dzeta_a,dzeta_b,cr,omega_max,T0,dt)
                 
             end if 
 

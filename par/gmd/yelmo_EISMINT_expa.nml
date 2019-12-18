@@ -28,7 +28,7 @@
     log_timestep    = False 
     zeta_scale      = "exp"             ! "linear", "exp", "tanh"
     zeta_exp        = 2.0  
-    nz_aa           = 82                ! Vertical resolution in ice
+    nz_aa           = 42                ! Vertical resolution in ice
     dt_method       = 1                 ! 0: no internal timestep, 1: adaptive, cfl, 2: adaptive, pc
     dt_min          = 0.1               ! [a] Minimum timestep 
     dt_ref          = 5.0               ! [a] Reference timestep 
@@ -121,7 +121,7 @@
     rf_method               = 1         ! -1: set externally; 0: rf_const everywhere; 1: standard function 
     rf_const                = 1e-16     ! [Pa^-3 a^-1]
     rf_use_eismint2         = True      ! Only applied for rf_method=1, use EISMINT2 rf constants
-    rf_with_water           = False     ! Only applied for rf_method=1, scale rf by water content?
+    rf_with_water           = True      ! Only applied for rf_method=1, scale rf by water content?
     n_glen                  = 3.0 
     visc_min                = 1e3 
     use_2D_enh              = False 
@@ -145,7 +145,7 @@
     use_const_kt    = True              ! Use specified constant value of heat conductivity?
     const_kt        = 6.62e7            ! [J a-1 m-1 K-1] Thermal conductivity [W m-1 K-1 * sec_year] => [J a-1 m-1 K-1]
     enth_cr         = 1e-3              ! [--] Conductivity ratio for temperate ice (kappa_temp     = enth_cr*kappa_cold)
-    omega_max       = 0.03              ! [--] Maximum allowed water content fraction 
+    omega_max       = 0.01              ! [--] Maximum allowed water content fraction 
     till_rate       = 0.0               ! [m/a] Basal water till drainage rate (water equiv.)
     H_w_max         = 2.0               ! [m] Maximum limit to basal water layer thickness (water equiv.)
 /

@@ -335,7 +335,7 @@ contains
                 
                 ! Pre-calculate the contribution of horizontal advection to column solution
                 ! (use unmodified T_ice_old field as input, to avoid mixing with new solution)
-!                 call calc_advec_horizontal_column(advecxy,T_ice_old,H_ice,ux,uy,dx,i,j)
+                call calc_advec_horizontal_column(advecxy,T_ice_old,H_ice,z_srf,ux,uy,zeta_aa,dx,i,j)
 !                 call calc_advec_horizontal_column_quick(advecxy,T_ice_old,H_ice,ux,uy,dx,i,j)
 !                 do k = 1, nz_aa
 !                     call calc_adv2D_expl_rate(advecxy(k),T_ice_old(:,:,k),ux(:,:,k),uy(:,:,k),dx,dx,i,j)
@@ -344,7 +344,7 @@ contains
                 !advecxy = 0.0_prec 
 !                 write(*,*) "advecxy: ", i,j, maxval(abs(advecxy3D(i,j,:)-advecxy))
 
-                call calc_advec_horizontal_column(advecxy,enth_old,H_ice,z_srf,ux,uy,zeta_aa,dx,i,j)
+!                 call calc_advec_horizontal_column(advecxy,enth_old,H_ice,z_srf,ux,uy,zeta_aa,dx,i,j)
 
 
                 call calc_advec_vertical_column_correction(uz_corr,H_ice,z_srf,ux,uy,uz,zeta_ac,dx,i,j)

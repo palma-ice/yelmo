@@ -277,12 +277,12 @@ contains
         ! Store input ice thickness in local array 
         H_ice_now = H_ice 
  
-if (.FALSE.) then        
+if (.TRUE.) then        
         do j = 2, ny-1
         do i = 2, nx-1 
             
             ! Filter at the margin only 
-            if (count(H_ice(i-1:i+1,j-1:j+1) .eq. 0.0) .ge. 2) then
+            if (H_ice(i,j) .gt. 0.0 .and. count(H_ice(i-1:i+1,j-1:j+1) .eq. 0.0) .ge. 2) then
                 filter = filter0 
                 where (H_ice(i-1:i+1,j-1:j+1) .eq. 0.0) filter = 0.0 
                 filter = filter/sum(filter)

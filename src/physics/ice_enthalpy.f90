@@ -15,9 +15,8 @@ module ice_enthalpy
 
 contains 
 
-    subroutine calc_enth_column(enth,T_ice,omega,bmb_grnd,Q_ice_b,H_cts,T_pmp,cp,kt,advecxy,uz, &
-                                Q_strn,Q_b,Q_geo,T_srf,T_shlf,H_ice,H_w,f_grnd,zeta_aa,zeta_ac, &
-                                dzeta_a,dzeta_b,cr,omega_max,T0,dt)
+    subroutine calc_enth_column(enth,T_ice,omega,bmb_grnd,Q_ice_b,H_cts,T_pmp,cp,kt,advecxy,uz,Q_strn,Q_b, &
+                                Q_geo,T_srf,T_shlf,H_ice,H_w,f_grnd,zeta_aa,zeta_ac,cr,omega_max,T0,dt)
         ! Thermodynamics solver for a given column of ice 
         ! Note zeta=height, k=1 base, k=nz surface 
         ! Note: nz = number of vertical boundaries (including zeta=0.0 and zeta=1.0), 
@@ -48,9 +47,7 @@ contains
         real(prec), intent(IN)    :: H_w            ! [m] Basal water layer thickness 
         real(prec), intent(IN)    :: f_grnd         ! [--] Grounded fraction
         real(prec), intent(IN)    :: zeta_aa(:)     ! nz_aa [--] Vertical sigma coordinates (zeta==height), layer centered aa-nodes
-        real(prec), intent(IN)    :: zeta_ac(:)     ! nz_ac [--] Vertical height axis temperature (0:1), layer edges ac-nodes
-        real(prec), intent(IN)    :: dzeta_a(:)     ! nz_aa [--] Solver discretization helper variable ak
-        real(prec), intent(IN)    :: dzeta_b(:)     ! nz_aa [--] Solver discretization helper variable bk
+        real(prec), intent(IN)    :: zeta_ac(:)     ! nz_ac [--] Vertical height axis temperature (0:1), layer edges ac-nodes    
         real(prec), intent(IN)    :: cr             ! [--] Conductivity ratio (kappa_water / kappa_ice)
         real(prec), intent(IN)    :: omega_max      ! [-] Maximum allowed water fraction inside ice, typically omega_max=0.02 
         real(prec), intent(IN)    :: T0             ! [K or degreesCelcius] Reference melting temperature  
@@ -66,6 +63,9 @@ contains
         real(prec) :: enth_b, enth_pmp_b 
         real(prec) :: dedz 
         real(prec) :: omega_excess
+
+        real(prec), allocatable :: dzeta_a(:)   ! nz_aa [--] Solver discretization helper variable ak
+        real(prec), allocatable :: dzeta_b(:)   ! nz_aa [--] Solver discretization helper variable bk
 
         real(prec), allocatable :: fac_enth(:)  ! aa-nodes 
         real(prec), allocatable :: var(:)       ! aa-nodes 
@@ -87,6 +87,9 @@ contains
         nz_aa = size(zeta_aa,1)
         nz_ac = size(zeta_ac,1)
 
+        allocate(dzeta_a(nz_aa))
+        allocate(dzeta_b(nz_aa))
+
         allocate(kappa_aa(nz_aa))
         allocate(fac_enth(nz_aa))
         allocate(var(nz_aa))
@@ -96,6 +99,12 @@ contains
         allocate(supd(nz_aa))
         allocate(rhs(nz_aa))
         allocate(solution(nz_aa))
+
+        ! Define dzeta terms for this column
+        ! Note: for constant zeta axis, this can be done once outside
+        ! instead of for each column. However, it is done here to allow
+        ! use of adaptive vertical axis.
+        call calc_dzeta_terms(dzeta_a,dzeta_b,zeta_aa,zeta_ac)
 
         ! Get geothermal heat flux in proper units 
         Q_geo_now = Q_geo*1e-3*sec_year   ! [mW m-2] => [J m-2 a-1]

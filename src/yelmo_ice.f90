@@ -287,10 +287,6 @@ contains
         character(len=*),  intent(IN), optional :: domain
         character(len=*),  intent(IN), optional :: grid_name 
 
-        ! Local variables  
-        integer :: i, nz1, nz2 
-        integer :: k 
-
         ! == yelmo == 
 
         ! Load the default yelmo parameters, then the domain specific parameters
@@ -338,6 +334,7 @@ contains
 
         ! Calculate zeta_aa and zeta_ac 
         call calc_zeta(dom%par%zeta_aa,dom%par%zeta_ac,dom%par%zeta_scale,dom%par%zeta_exp)
+
 
         ! Allocate timestep arrays 
         if (allocated(dom%par%dt_adv))   deallocate(dom%par%dt_adv)
@@ -392,6 +389,9 @@ contains
 
         call ytherm_alloc(dom%thrm%now,dom%thrm%par%nx,dom%thrm%par%ny,dom%thrm%par%nz_aa,dom%thrm%par%nz_ac,dom%thrm%par%nzr)
         
+        call ytherm_poly_init(dom%thrm%poly,dom%grd%nx,dom%grd%ny,dom%thrm%par%nz_pt,dom%thrm%par%nz_pc, &
+                                                                dom%thrm%par%zeta_scale,dom%thrm%par%zeta_exp)
+
         write(*,*) "yelmo_init:: thermodynamics initialized."
         
         ! === Ensure consistency with specific parameters ===

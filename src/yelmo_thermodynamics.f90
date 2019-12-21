@@ -15,7 +15,8 @@ module yelmo_thermodynamics
     private
     public :: calc_ytherm 
     public :: ytherm_par_load, ytherm_alloc, ytherm_dealloc
-    
+    public :: ytherm_poly_init 
+
 contains
 
     subroutine calc_ytherm(thrm,tpo,dyn,mat,bnd,time)
@@ -347,7 +348,7 @@ end if
 
                 call calc_enth_column(enth(i,j,:),T_ice(i,j,:),omega(i,j,:),bmb_grnd(i,j),Q_ice_b(i,j),H_cts(i,j), &
                         T_pmp(i,j,:),cp(i,j,:),kt(i,j,:),advecxy,uz_now,Q_strn(i,j,:),Q_b(i,j),Q_geo(i,j),T_srf(i,j), &
-                        T_shlf,H_ice_now(i,j),H_w(i,j),f_grnd(i,j),zeta_aa,zeta_ac,dzeta_a,dzeta_b,cr,omega_max,T0,dt)
+                        T_shlf,H_ice_now(i,j),H_w(i,j),f_grnd(i,j),zeta_aa,zeta_ac,cr,omega_max,T0,dt)
                 
             end if 
 
@@ -741,6 +742,12 @@ end if
         call nml_read(filename,"ytherm","till_rate",      par%till_rate,        init=init_pars)
         call nml_read(filename,"ytherm","H_w_max",        par%H_w_max,          init=init_pars)
         
+        call nml_read(filename,"ytherm","adaptive_zeta",  par%adaptive_zeta,    init=init_pars)
+        call nml_read(filename,"ytherm","nz_pt",          par%nz_pt,            init=init_pars)
+        call nml_read(filename,"ytherm","nz_pc",          par%nz_pc,            init=init_pars)
+        call nml_read(filename,"ytherm","zeta_scale",     par%zeta_scale,       init=init_pars)
+        call nml_read(filename,"ytherm","zeta_exp",       par%zeta_exp,         init=init_pars)
+        
         ! Set internal parameters
         par%nx  = nx
         par%ny  = ny 
@@ -842,5 +849,181 @@ end if
         return 
 
     end subroutine ytherm_dealloc 
+
+    subroutine ytherm_poly_init(poly,nx,ny,nz_pt,nz_pc,zeta_scale,zeta_exp)
+
+        implicit none 
+
+        type(ytherm_poly_state_class), intent(INOUT) :: poly 
+        integer,      intent(IN) :: nz_pt 
+        integer,      intent(IN) :: nz_pc 
+        integer,      intent(IN) :: nx 
+        integer,      intent(IN) :: ny 
+        character(*), intent(IN) :: zeta_scale 
+        real(prec),   intent(IN) :: zeta_exp 
+        
+        ! Local variables 
+        integer    :: k 
+        real(prec) :: f_cts 
+
+
+        poly%nz_pt = nz_pt
+        poly%nz_pc = nz_pc
+        poly%nz_aa = poly%nz_pt + poly%nz_pc -1 
+        poly%nz_ac = poly%nz_aa - 1 
+
+        ! 1D axis vectors (separate temperate and cold axes)
+        allocate(poly%zeta_pt(poly%nz_pt)) 
+        allocate(poly%zeta_pc(poly%nz_pc)) 
+
+        ! 3D axis arrays (combined polythermal axis, different for each column)
+        allocate(poly%zeta_aa(nx,ny,poly%nz_aa)) 
+        allocate(poly%zeta_ac(nx,ny,poly%nz_ac)) 
+        
+
+        ! Calculate the temperate and cold vertical axes 
+        call calc_zeta_twolayers(poly%zeta_pt,poly%zeta_pc,zeta_scale,zeta_exp)
+
+
+        ! Test routine to make combined axis::
+!         f_cts = 0.5
+!         call calc_zeta_combined(poly%zeta_aa(1,1,:),poly%zeta_ac(1,1,:),poly%zeta_pt,poly%zeta_pc,f_cts)
+
+!         do k = 1, poly%nz_aa
+!             write(*,*) k, poly%zeta_aa(1,1,k) 
+!         end do 
+
+!         stop 
+
+        return 
+
+    end subroutine ytherm_poly_init 
+
+    subroutine calc_zeta_twolayers(zeta_pt,zeta_pc,zeta_scale,zeta_exp)
+        ! Calculate the vertical layer-edge axis (vertical ac-nodes)
+        ! and the vertical cell-center axis (vertical aa-nodes),
+        ! including an extra zero-thickness aa-node at the base and surface
+
+        ! This is built in two-steps, first for the basal temperate layer
+        ! and second for the overlying cold layer. The height of the border
+        ! is the CTS height, which will be defined for each column. The temperate layer is populated with an 
+        ! evenly-spaced (linear) axis up to upper boundary, while the cold layer follows the 
+        ! parameter options zeta_scale and zeta_exp. 
+
+        implicit none 
+
+        real(prec),   intent(INOUT) :: zeta_pt(:) 
+        real(prec),   intent(INOUT) :: zeta_pc(:) 
+        character(*), intent(IN)    :: zeta_scale 
+        real(prec),   intent(IN)    :: zeta_exp 
+
+        ! Local variables
+        integer :: k, nz_pt, nz_pc 
+
+        integer :: nz_ac 
+        real(prec), allocatable :: zeta_ac(:) 
+
+        nz_pt  = size(zeta_pt) 
+        nz_pc  = size(zeta_pc) 
+
+        ! ===== Temperate layer ===================================
+
+        nz_ac = nz_pt - 1
+        allocate(zeta_ac(nz_ac))
+
+        ! Linear scale for cell boundaries
+        do k = 1, nz_ac
+            zeta_ac(k) = 0.0 + 1.0*(k-1)/real(nz_ac-1)
+        end do 
+
+        ! Get zeta_aa (between zeta_ac values, as well as at the base and surface)
+        zeta_pt(1) = 0.0 
+        do k = 2, nz_pt-1
+            zeta_pt(k) = 0.5 * (zeta_ac(k-1)+zeta_ac(k))
+        end do 
+        zeta_pt(nz_pt) = 1.0 
+
+        ! ===== Cold layer ========================================
+
+        nz_ac = nz_pc - 1
+        deallocate(zeta_ac)
+        allocate(zeta_ac(nz_ac))
+
+        ! Linear scale for cell boundaries
+        do k = 1, nz_ac
+            zeta_ac(k) = 0.0 + 1.0*(k-1)/real(nz_ac-1)
+        end do 
+
+        ! Scale zeta to produce different resolution through column if desired
+        ! zeta_scale = ["linear","exp","wave"]
+        select case(trim(zeta_scale))
+            
+            case("exp")
+                ! Increase resolution at the base 
+                zeta_ac = zeta_ac**(zeta_exp) 
+
+            case("tanh")
+                ! Increase resolution at base and surface 
+
+                zeta_ac = tanh(1.0*pi*(zeta_ac-0.5))
+                zeta_ac = zeta_ac - minval(zeta_ac)
+                zeta_ac = zeta_ac / maxval(zeta_ac)
+
+            case DEFAULT
+            ! Do nothing, scale should be linear as defined above
+        
+        end select  
+        
+        ! Get zeta_aa (between zeta_ac values, as well as at the base and surface)
+        zeta_pc(1) = 0.0 
+        do k = 2, nz_pc-1
+            zeta_pc(k) = 0.5 * (zeta_ac(k-1)+zeta_ac(k))
+        end do 
+        zeta_pc(nz_pc) = 1.0 
+
+        return 
+
+    end subroutine calc_zeta_twolayers
+    
+    subroutine calc_zeta_combined(zeta_aa,zeta_ac,zeta_pt,zeta_pc,f_cts)
+        ! Take two-layer axis and combine into one axis based on relative CTS height
+        ! f_cts = H_cts / H_ice 
+
+        implicit none 
+
+        real(prec),   intent(INOUT) :: zeta_aa(:) 
+        real(prec),   intent(INOUT) :: zeta_ac(:) 
+        real(prec),   intent(INOUT) :: zeta_pt(:) 
+        real(prec),   intent(INOUT) :: zeta_pc(:) 
+        real(prec),   intent(IN)    :: f_cts 
+
+        ! Local variables 
+        integer :: k 
+        integer :: nzt, nzc, nz_aa, nz_ac  
+
+        nz_aa = size(zeta_aa,1)
+        nz_ac = size(zeta_ac,1)  ! == nz_aa-1
+        nzt   = size(zeta_pt,1)
+        nzc   = size(zeta_pc,1) 
+
+        if (nzt+nzc -1 .ne. nz_aa) then 
+            write(*,*) "calc_zeta_combined:: Error: Two-layer axis length does not match combined axis length."
+            write(*,*) "nzt, nzc-1, nz_aa: ", nzt, nzc-1, nz_aa 
+            stop 
+        end if 
+
+        zeta_aa(1:nzt) = zeta_pt(1:nzt)*f_cts 
+        zeta_aa(nzt+1:nz_aa) = f_cts + (1.0-f_cts)*zeta_pc(2:nzc)
+
+        ! Get zeta_ac again (boundaries between zeta_aa values, as well as at the base and surface)
+        zeta_ac(1) = 0.0_prec 
+        do k = 2, nz_ac-1
+            zeta_ac(k) = 0.5_prec * (zeta_aa(k)+zeta_aa(k+1))
+        end do 
+        zeta_ac(nz_ac) = 1.0_prec 
+
+        return 
+
+    end subroutine calc_zeta_combined
 
 end module yelmo_thermodynamics

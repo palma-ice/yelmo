@@ -12,8 +12,6 @@ program test_icetemp
     type icesheet_vectors
         real(prec), allocatable :: zeta(:)    ! [-] Sigma coordinates from 0:1 (either height or depth)
         real(prec), allocatable :: zeta_ac(:) ! nz-1 [-] sigma coordinates for internal ice layer edges
-        real(prec), allocatable :: dzeta_a(:) ! nz [-] sigma coord helper for internal ice layer midpoints
-        real(prec), allocatable :: dzeta_b(:) ! nz [-] sigma coord helper for internal ice layer midpoints
         real(prec), allocatable :: T_ice(:)   ! [K] Ice temperature 
         real(prec), allocatable :: T_pmp(:)   ! [K] Ice pressure melting point 
         real(prec), allocatable :: cp(:)      ! [] Ice heat capacity 
@@ -24,6 +22,31 @@ program test_icetemp
         real(prec), allocatable :: t_dep(:)   ! [a] Deposition time 
         real(prec), allocatable :: enth(:)    ! [J kg-1] Ice enthalpy
         real(prec), allocatable :: omega(:)   ! [-] Ice water content (fraction)
+    end type 
+
+    type poly_state_class 
+
+        integer :: nz_pt, nz_pc, nz_aa, nz_ac 
+
+        real(prec), allocatable :: zeta_pt(:)       ! zeta_aa for polythermal temperate (pt) zone only 
+        real(prec), allocatable :: zeta_pc(:)       ! zeta_aa for polythermal cold (pc) zone only 
+        
+        real(prec), allocatable :: zeta_aa(:)   ! Layer centers (aa-nodes), plus base and surface: nz_aa points 
+        real(prec), allocatable :: zeta_ac(:)   ! Layer borders (ac-nodes), plus base and surface: nz_ac == nz_aa-1 points
+
+        real(prec), allocatable :: enth(:)      ! [J m-3] Ice enthalpy 
+        real(prec), allocatable :: T_ice(:)     ! [K]     Ice temp. 
+        real(prec), allocatable :: omega(:)     ! [--]    Ice water content
+        real(prec), allocatable :: T_pmp(:)     ! Pressure-corrected melting point
+        
+        real(prec), allocatable :: cp(:)        ! Specific heat capacity  
+        real(prec), allocatable :: kt(:)        ! Heat conductivity  
+
+        real(prec), allocatable :: advecxy(:) 
+        real(prec), allocatable :: uz(:) 
+        real(prec), allocatable :: Q_strn(:)    ! Internal heat production 
+        
+
     end type 
 
     type icesheet 
@@ -41,7 +64,7 @@ program test_icetemp
         character(len=56) :: age_method ! Method to use for age calculation 
         real(prec) :: age_impl_kappa    ! [m2 a-1] Artificial diffusion term for implicit age solving 
         type(icesheet_vectors) :: vec   ! For height coordinate systems with k=1 base and k=nz surface
-
+        type(poly_state_class) :: poly  ! For two-layered calculations
     end type 
 
     ! Define different icesheet objects for use in proram
@@ -79,7 +102,7 @@ program test_icetemp
     
     ! General options
     zeta_scale      = "linear"      ! "linear", "exp", "tanh"
-    nz              = 402            ! [--] Number of ice sheet points (aa-nodes + base + surface)
+    nz              = 42            ! [--] Number of ice sheet points (aa-nodes + base + surface)
     is_celcius      = .FALSE. 
 
     age_method      = "expl"        ! "expl" or "impl"
@@ -166,6 +189,19 @@ program test_icetemp
 
     end select 
 
+    ! Initialize polythermal data structure too 
+    call poly_init(ice1%poly,nz_pt=11,nz_pc=32,zeta_scale=zeta_scale,zeta_exp=2.0_prec)
+
+    ! Calculate the poly vertical axis at each grid points 
+!     call calc_zeta_combined(ice1%poly%zeta_aa,ice1%poly%zeta_ac,ice1%H_cts,ice1%H_ice,ice1%poly%zeta_pt,ice1%poly%zeta_pc)
+    
+    ! Simply set them equal for now
+    ice1%poly%zeta_aa = ice1%vec%zeta
+    ice1%poly%zeta_ac = ice1%vec%zeta_ac
+    
+    ice1%poly%cp = ice1%vec%cp 
+    ice1%poly%kt = ice1%vec%kt 
+    
     ! Initialize time and calculate number of time steps to iterate and 
     time = t_start 
     ntot = (t_end-t_start)/dt 
@@ -242,7 +278,7 @@ program test_icetemp
 
         call calc_enth_column(ice1%vec%enth,ice1%vec%T_ice,ice1%vec%omega,ice1%bmb,ice1%Q_ice_b,ice1%H_cts,ice1%vec%T_pmp, &
                 ice1%vec%cp,ice1%vec%kt,ice1%vec%advecxy,ice1%vec%uz,ice1%vec%Q_strn,ice1%Q_b,ice1%Q_geo,ice1%T_srf,ice1%T_shlf, &
-                ice1%H_ice,ice1%H_w,ice1%f_grnd,ice1%vec%zeta,ice1%vec%zeta_ac,ice1%vec%dzeta_a,ice1%vec%dzeta_b, &
+                ice1%H_ice,ice1%H_w,ice1%f_grnd,ice1%vec%zeta,ice1%vec%zeta_ac, &
                 enth_cr,omega_max,T0_ref,dt)
 
         ! Update basal water thickness [m/a i.e.] => [m/a w.e.]
@@ -250,7 +286,7 @@ program test_icetemp
 
         if (trim(age_method) .eq. "impl") then 
             call calc_tracer_column(ice1%vec%t_dep,ice1%vec%uz,ice1%vec%advecxy*0.0,time,ice1%bmb, &
-                                    ice1%H_ice,ice1%vec%zeta,ice1%vec%zeta_ac,ice1%vec%dzeta_a,ice1%vec%dzeta_b, &
+                                    ice1%H_ice,ice1%vec%zeta,ice1%vec%zeta_ac, &
                                     ice1%age_impl_kappa,dt)
         else 
             call calc_tracer_column_expl(ice1%vec%t_dep,ice1%vec%uz,ice1%vec%advecxy*0.0,time,ice1%bmb,ice1%H_ice,ice1%vec%zeta,ice1%vec%zeta_ac,dt)
@@ -572,8 +608,6 @@ contains
         ! Make sure all vectors are deallocated
         if (allocated(ice%vec%zeta))     deallocate(ice%vec%zeta)
         if (allocated(ice%vec%zeta_ac))  deallocate(ice%vec%zeta_ac)
-        if (allocated(ice%vec%dzeta_a))  deallocate(ice%vec%dzeta_a)
-        if (allocated(ice%vec%dzeta_b))  deallocate(ice%vec%dzeta_b)
         
         if (allocated(ice%vec%T_ice))   deallocate(ice%vec%T_ice)
         if (allocated(ice%vec%T_pmp))   deallocate(ice%vec%T_pmp)
@@ -590,8 +624,6 @@ contains
         ! Allocate vectors with desired lengths
         allocate(ice%vec%zeta(nz))
         allocate(ice%vec%zeta_ac(nz_ac))
-        allocate(ice%vec%dzeta_a(nz))
-        allocate(ice%vec%dzeta_b(nz))
         
         allocate(ice%vec%T_ice(nz))
         allocate(ice%vec%T_pmp(nz))
@@ -607,21 +639,6 @@ contains
         ! Initialize zeta 
         call calc_zeta(ice%vec%zeta,ice%vec%zeta_ac,zeta_scale,zeta_exp=2.0_prec) 
 
-        ! Define thermodynamic zeta helper derivative variables dzeta_a/dzeta_b
-        call calc_dzeta_terms(ice%vec%dzeta_a,ice%vec%dzeta_b,ice%vec%zeta,ice%vec%zeta_ac)
-
-!         do k = 1, nz 
-!             write(*,*) ice%vec%zeta(k), ice%vec%dzeta_a(k), ice%vec%dzeta_b(k) 
-!         end do 
-
-!         write(*,*) "-----"
-
-!         do k = 1, nz-1 
-!             write(*,*) ice%vec%zeta_ac(k)
-!         end do 
-
-!         stop 
-        
         ! Initialize remaining vectors to zero 
         ice%vec%T_ice   = 0.0 
         ice%vec%T_pmp   = 0.0 
@@ -640,6 +657,61 @@ contains
 
     end subroutine icesheet_allocate 
 
+    subroutine poly_init(poly,nz_pt,nz_pc,zeta_scale,zeta_exp)
+
+        implicit none 
+
+        type(poly_state_class), intent(INOUT) :: poly 
+        integer,      intent(IN) :: nz_pt 
+        integer,      intent(IN) :: nz_pc  
+        character(*), intent(IN) :: zeta_scale 
+        real(prec),   intent(IN) :: zeta_exp 
+        
+        ! Local variables 
+        integer    :: k  
+
+        poly%nz_pt = nz_pt
+        poly%nz_pc = nz_pc
+        poly%nz_aa = poly%nz_pt + poly%nz_pc -1 
+        poly%nz_ac = poly%nz_aa - 1 
+
+        ! 1D axis vectors (separate temperate and cold axes)
+        allocate(poly%zeta_pt(poly%nz_pt)) 
+        allocate(poly%zeta_pc(poly%nz_pc)) 
+
+        ! 3D axis arrays (combined polythermal axis, different for each column)
+        allocate(poly%zeta_aa(poly%nz_aa)) 
+        allocate(poly%zeta_ac(poly%nz_ac)) 
+        
+        ! Variables 
+        allocate(poly%enth(poly%nz_aa))
+        allocate(poly%T_ice(poly%nz_aa))
+        allocate(poly%omega(poly%nz_aa))
+        allocate(poly%T_pmp(poly%nz_aa))
+        allocate(poly%cp(poly%nz_aa))
+        allocate(poly%kt(poly%nz_aa))
+        
+        allocate(poly%advecxy(poly%nz_aa))
+        allocate(poly%Q_strn(poly%nz_aa))
+        allocate(poly%uz(poly%nz_ac))
+        
+        ! Calculate the temperate and cold vertical axes 
+        call calc_zeta_twolayers(poly%zeta_pt,poly%zeta_pc,zeta_scale,zeta_exp)
+
+
+        ! Test routine to make combined axis::
+!         call calc_zeta_combined(poly%zeta_aa(1,1,:),poly%zeta_ac(1,1,:),100.0,200.0,poly%zeta_pt,poly%zeta_pc)
+
+!         do k = 1, poly%nz_aa
+!             write(*,*) k, poly%zeta_aa(1,1,k) 
+!         end do 
+
+!         stop 
+
+        return 
+
+    end subroutine poly_init 
+    
     subroutine write_init(ice,filename,zeta,zeta_ac,time_init)
 
         implicit none 

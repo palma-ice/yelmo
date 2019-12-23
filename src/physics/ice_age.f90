@@ -15,7 +15,7 @@ module ice_age
 contains
 
 
-    subroutine calc_tracer_3D(X_ice,ux,uy,uz,H_ice,bmb,zeta_aa,zeta_ac,dzeta_a,dzeta_b,solver,impl_kappa,dt,dx,time)
+    subroutine calc_tracer_3D(X_ice,ux,uy,uz,H_ice,bmb,zeta_aa,zeta_ac,solver,impl_kappa,dt,dx,time)
         ! Solver for the age of the ice 
         ! Note zeta=height, k=1 base, k=nz surface 
 
@@ -29,8 +29,6 @@ contains
         real(prec), intent(IN)    :: bmb(:,:)       ! [m a-1] Basal mass balance (melting is negative)
         real(prec), intent(IN)    :: zeta_aa(:)     ! [--] Vertical sigma coordinates (zeta==height), aa-nodes
         real(prec), intent(IN)    :: zeta_ac(:)     ! [--] Vertical sigma coordinates (zeta==height), ac-nodes
-        real(prec), intent(IN)    :: dzeta_a(:)     ! d Vertical height axis (0:1) 
-        real(prec), intent(IN)    :: dzeta_b(:)     ! d Vertical height axis (0:1)
         character(len=*), intent(IN) :: solver      ! Solver choice ("impl","expl")
         real(prec), intent(IN)    :: impl_kappa     ! [m2 a-1] Artificial diffusivity
         real(prec), intent(IN)    :: dt             ! [a] Time step 
@@ -40,6 +38,7 @@ contains
         ! Local variables
         integer :: i, j, k, nx, ny, nz_aa, nz_ac  
         real(prec) :: X_srf, X_base 
+
         real(prec), allocatable  :: advecxy(:)   ! [X a-1 m-2] Horizontal advection  
         real(prec) :: dz  
 
@@ -77,7 +76,7 @@ contains
                         ! Implicit solver vertically, upwind horizontally 
                         
                         call calc_tracer_column(X_ice(i,j,:),uz(i,j,:),advecxy,X_srf,bmb(i,j),H_ice(i,j),zeta_aa,zeta_ac, &
-                                                                                                dzeta_a,dzeta_b,impl_kappa,dt) 
+                                                                                                                impl_kappa,dt) 
 
                     case DEFAULT 
 
@@ -112,7 +111,7 @@ contains
 
     end subroutine calc_tracer_3D
 
-    subroutine calc_tracer_column(X_ice,uz,advecxy,X_srf,bmb,H_ice,zeta_aa,zeta_ac,dzeta_a,dzeta_b,kappa,dt)
+    subroutine calc_tracer_column(X_ice,uz,advecxy,X_srf,bmb,H_ice,zeta_aa,zeta_ac,kappa,dt)
         ! Tracer solver for a given column of ice 
         ! Note zeta=height, k=1 base, k=nz surface 
         ! Note: nz = number of vertical boundaries (including zeta=0.0 and zeta=1.0), 
@@ -131,13 +130,14 @@ contains
         real(prec), intent(IN)    :: H_ice        ! [m] Ice thickness 
         real(prec), intent(IN)    :: zeta_aa(:)   ! nz_aa [--] Vertical sigma coordinates (zeta==height), layer centered aa-nodes
         real(prec), intent(IN)    :: zeta_ac(:)   ! nz_ac [--] Vertical height axis temperature (0:1), layer edges ac-nodes
-        real(prec), intent(IN)    :: dzeta_a(:)   ! nz_aa [--] Solver discretization helper variable ak
-        real(prec), intent(IN)    :: dzeta_b(:)   ! nz_aa [--] Solver discretization helper variable bk
         real(prec), intent(IN)    :: kappa        ! [m2 a-1] Diffusivity 
         real(prec), intent(IN)    :: dt           ! [a] Time step 
 
         ! Local variables 
         integer :: k, nz_aa, nz_ac
+
+        real(prec), allocatable :: dzeta_a(:)   ! nz_aa [--] Solver discretization helper variable ak
+        real(prec), allocatable :: dzeta_b(:)   ! nz_aa [--] Solver discretization helper variable bk
 
         real(prec), allocatable :: advecz(:)   ! nz_aa, for explicit vertical advection solving
         logical, parameter      :: test_expl_advecz = .FALSE. 
@@ -158,8 +158,17 @@ contains
         nz_aa = size(zeta_aa,1)
         nz_ac = size(zeta_ac,1)
 
+        allocate(dzeta_a(nz_aa))
+        allocate(dzeta_b(nz_aa))
+
         allocate(kappa_aa(nz_aa))
 
+        ! Define dzeta terms for this column
+        ! Note: for constant zeta axis, this can be done once outside
+        ! instead of for each column. However, it is done here to allow
+        ! use of adaptive vertical axis.
+        call calc_dzeta_terms(dzeta_a,dzeta_b,zeta_aa,zeta_ac)
+        
 !         kappa_aa(1)     = 1e-4
 !         kappa_aa(nz_aa) = 1.5e0 
 
@@ -738,6 +747,40 @@ contains
         return
 
     end function interp_linear_pt 
+
+    subroutine calc_dzeta_terms(dzeta_a,dzeta_b,zeta_aa,zeta_ac)
+        ! zeta_aa  = depth axis at layer centers (plus base and surface values)
+        ! zeta_ac  = depth axis (1: base, nz: surface), at layer boundaries
+        ! Calculate ak, bk terms as defined in Hoffmann et al (2018)
+        implicit none 
+
+        real(prec), intent(INOUT) :: dzeta_a(:)    ! nz_aa
+        real(prec), intent(INOUT) :: dzeta_b(:)    ! nz_aa
+        real(prec), intent(IN)    :: zeta_aa(:)    ! nz_aa 
+        real(prec), intent(IN)    :: zeta_ac(:)    ! nz_ac == nz_aa-1 
+
+        ! Local variables 
+        integer :: k, nz_layers, nz_aa    
+
+        nz_aa = size(zeta_aa)
+
+        ! Note: zeta_aa is calculated outside in the main program 
+
+        ! Initialize dzeta_a/dzeta_b to zero, first and last indices will not be used (end points)
+        dzeta_a = 0.0 
+        dzeta_b = 0.0 
+        
+        do k = 2, nz_aa-1 
+            dzeta_a(k) = 1.0/ ( (zeta_ac(k) - zeta_ac(k-1)) * (zeta_aa(k) - zeta_aa(k-1)) )
+        enddo
+
+        do k = 2, nz_aa-1
+            dzeta_b(k) = 1.0/ ( (zeta_ac(k) - zeta_ac(k-1)) * (zeta_aa(k+1) - zeta_aa(k)) )
+        end do
+
+        return 
+
+    end subroutine calc_dzeta_terms
 
 end module ice_age 
 

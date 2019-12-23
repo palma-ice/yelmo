@@ -175,7 +175,7 @@ contains
             ! Perform calculations of age tracer: dep_time (deposition time)
 
             call calc_tracer_3D(mat%now%dep_time,dyn%now%ux,dyn%now%uy,dyn%now%uz,tpo%now%H_ice, &
-                tpo%now%bmb,mat%par%zeta_aa,mat%par%zeta_ac,thrm%par%dzeta_a,thrm%par%dzeta_b, &
+                tpo%now%bmb,mat%par%zeta_aa,mat%par%zeta_ac, &
                 mat%par%age_method,mat%par%age_impl_kappa,dt,thrm%par%dx,time)
 
         end if 

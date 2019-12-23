@@ -13,6 +13,7 @@ module thermodynamics
     public :: calc_bmb_grounded
     public :: calc_bmb_grounded_enth
     public :: calc_advec_vertical_column
+    public :: calc_advec_horizontal_3D
     public :: calc_advec_horizontal_column
     public :: calc_advec_horizontal_column_quick
     public :: calc_advec_vertical_column_correction
@@ -399,6 +400,36 @@ contains
 
     end subroutine calc_advec_horizontal_column
     
+    subroutine calc_advec_horizontal_3D(advecxy,var,H_ice,z_srf,ux,uy,zeta_aa,dx)
+
+        implicit none 
+
+        real(prec), intent(OUT) :: advecxy(:,:,:)   ! nz_aa 
+        real(prec), intent(IN)  :: var(:,:,:)       ! nx,ny,nz_aa  Enth, T, age, etc...
+        real(prec), intent(IN)  :: H_ice(:,:)       ! nx,ny 
+        real(prec), intent(IN)  :: z_srf(:,:)       ! nx,ny 
+        real(prec), intent(IN)  :: ux(:,:,:)        ! nx,ny,nz_aa
+        real(prec), intent(IN)  :: uy(:,:,:)        ! nx,ny,nz_aa
+        real(prec), intent(IN)  :: zeta_aa(:)       ! nz_aa 
+        real(prec), intent(IN)  :: dx  
+
+        ! Local variables 
+        integer :: i, j 
+        integer :: nx, ny 
+
+        nx = size(H_ice,1)
+        ny = size(H_ice,2) 
+
+        do j = 2, ny-1
+        do i = 2, nx-1 
+            call calc_advec_horizontal_column(advecxy(i,j,:),var,H_ice,z_srf,ux,uy,zeta_aa,dx,i,j)
+        end do 
+        end do 
+
+        return 
+
+    end subroutine calc_advec_horizontal_3D
+
     subroutine calc_advec_vertical_column_correction(uz_corr,H_ice,z_srf,ux,uy,uz,zeta_ac,dx,i,j)
 
         implicit none 

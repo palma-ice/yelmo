@@ -422,17 +422,20 @@ module yelmo_defs
         real(prec), allocatable :: T_ice(:,:,:)     ! [K]     Ice temp. 
         real(prec), allocatable :: omega(:,:,:)     ! [--]    Ice water content
         real(prec), allocatable :: T_pmp(:,:,:)     ! Pressure-corrected melting point
+        
         real(prec), allocatable :: f_pmp(:,:)       ! fraction of cell at pressure melting point
         real(prec), allocatable :: bmb_grnd(:,:)    ! Grounded basal mass balance 
         real(prec), allocatable :: Q_strn(:,:,:)    ! Internal heat production 
         real(prec), allocatable :: Q_b(:,:)         ! Basal friction heat production
         real(prec), allocatable :: Q_ice_b(:,:)     ! Basal ice heat flux 
-        real(prec), allocatable :: cp(:,:,:)        ! Specific heat capacity  
-        real(prec), allocatable :: kt(:,:,:)        ! Heat conductivity  
-        real(prec), allocatable :: H_cts(:,:)       ! Height of the cts
         real(prec), allocatable :: T_prime_b(:,:)   ! Homologous temperature at the base 
         real(prec), allocatable :: H_w(:,:)         ! [m] Basal water layer thickness 
         real(prec), allocatable :: dHwdt(:,:)       ! [m/a] Basal water layer thickness rate of change
+        
+        real(prec), allocatable :: cp(:,:,:)        ! Specific heat capacity  
+        real(prec), allocatable :: kt(:,:,:)        ! Heat conductivity  
+        real(prec), allocatable :: H_cts(:,:)       ! Height of the cts
+        
     end type
 
     type ytherm_poly_state_class 
@@ -452,8 +455,12 @@ module yelmo_defs
         
         real(prec), allocatable :: cp(:,:,:)        ! Specific heat capacity  
         real(prec), allocatable :: kt(:,:,:)        ! Heat conductivity  
-        real(prec), allocatable :: H_cts(:,:)       ! Height of the cts
+
+        real(prec), allocatable :: advecxy(:,:,:) 
+        real(prec), allocatable :: uz(:,:,:) 
+        real(prec), allocatable :: Q_strn(:,:,:)    ! Internal heat production 
         
+
     end type 
 
     ! ytherm class

@@ -54,21 +54,21 @@ contains
         ! === Define combined poly vertical grid ===
 
 if (trim(thrm%par%method) .eq. "poly") then 
-        !call calc_zeta_combined(zeta_aa,zeta_ac,zeta_pt,zeta_pc,f_cts)
+        ! Calculate the poly vertical axis at each grid points 
 
         do j = 1, ny 
         do i = 1, nx 
 
+!             call calc_zeta_combined(thrm%poly%zeta_aa(i,j,:),thrm%poly%zeta_ac(i,j,:),thrm%now%H_cts(i,j), &
+!                                                     tpo%now%H_ice(i,j),thrm%poly%zeta_pt,thrm%poly%zeta_pc)
+
+            ! Simply set them equal for now
             thrm%poly%zeta_aa(i,j,:) = thrm%par%zeta_aa 
             thrm%poly%zeta_ac(i,j,:) = thrm%par%zeta_ac 
             
         end do 
         end do  
 
-        ! Get variables on poly grid to start... 
-        thrm%poly%enth  = thrm%now%enth 
-        thrm%poly%T_ice = thrm%now%T_ice 
-        thrm%poly%omega = thrm%now%omega 
 end if 
         ! === END Define combined poly vertical grid ===
         
@@ -1123,9 +1123,7 @@ end if
         real(prec),   intent(IN) :: zeta_exp 
         
         ! Local variables 
-        integer    :: k 
-        real(prec) :: f_cts 
-
+        integer    :: k  
 
         poly%nz_pt = nz_pt
         poly%nz_pc = nz_pc
@@ -1157,8 +1155,7 @@ end if
 
 
         ! Test routine to make combined axis::
-!         f_cts = 0.5
-!         call calc_zeta_combined(poly%zeta_aa(1,1,:),poly%zeta_ac(1,1,:),poly%zeta_pt,poly%zeta_pc,f_cts)
+!         call calc_zeta_combined(poly%zeta_aa(1,1,:),poly%zeta_ac(1,1,:),100.0,200.0,poly%zeta_pt,poly%zeta_pc)
 
 !         do k = 1, poly%nz_aa
 !             write(*,*) k, poly%zeta_aa(1,1,k) 
@@ -1256,7 +1253,7 @@ end if
 
     end subroutine calc_zeta_twolayers
     
-    subroutine calc_zeta_combined(zeta_aa,zeta_ac,zeta_pt,zeta_pc,f_cts)
+    subroutine calc_zeta_combined(zeta_aa,zeta_ac,H_cts,H_ice,zeta_pt,zeta_pc)
         ! Take two-layer axis and combine into one axis based on relative CTS height
         ! f_cts = H_cts / H_ice 
 
@@ -1264,13 +1261,15 @@ end if
 
         real(prec),   intent(INOUT) :: zeta_aa(:) 
         real(prec),   intent(INOUT) :: zeta_ac(:) 
+        real(prec),   intent(IN)    :: H_cts 
+        real(prec),   intent(IN)    :: H_ice 
         real(prec),   intent(INOUT) :: zeta_pt(:) 
         real(prec),   intent(INOUT) :: zeta_pc(:) 
-        real(prec),   intent(IN)    :: f_cts 
-
+        
         ! Local variables 
-        integer :: k 
-        integer :: nzt, nzc, nz_aa, nz_ac  
+        integer    :: k 
+        integer    :: nzt, nzc, nz_aa, nz_ac  
+        real(prec) :: f_cts 
 
         nz_aa = size(zeta_aa,1)
         nz_ac = size(zeta_ac,1)  ! == nz_aa-1
@@ -1281,6 +1280,13 @@ end if
             write(*,*) "calc_zeta_combined:: Error: Two-layer axis length does not match combined axis length."
             write(*,*) "nzt, nzc-1, nz_aa: ", nzt, nzc-1, nz_aa 
             stop 
+        end if 
+
+        ! Get f_cts 
+        if (H_ice .gt. 0.0) then 
+            f_cts = H_cts / H_ice 
+        else 
+            f_cts = 0.0 
         end if 
 
         zeta_aa(1:nzt) = zeta_pt(1:nzt)*f_cts 

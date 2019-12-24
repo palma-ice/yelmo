@@ -102,7 +102,7 @@ program test_icetemp
     
     ! General options
     zeta_scale      = "linear"      ! "linear", "exp", "tanh"
-    nz              = 42            ! [--] Number of ice sheet points (aa-nodes + base + surface)
+    nz              = 402           ! [--] Number of ice sheet points (aa-nodes + base + surface)
     is_celcius      = .FALSE. 
 
     age_method      = "expl"        ! "expl" or "impl"
@@ -190,7 +190,7 @@ program test_icetemp
     end select 
 
     ! Initialize polythermal data structure too 
-    call poly_init(ice1%poly,nz_pt=11,nz_pc=32,zeta_scale=zeta_scale,zeta_exp=2.0_prec)
+    call poly_init(ice1%poly,nz_pt=11,nz_pc=392,zeta_scale=zeta_scale,zeta_exp=2.0_prec)
 
     ! Calculate the poly vertical axis at each grid points 
 !     call calc_zeta_combined(ice1%poly%zeta_aa,ice1%poly%zeta_ac,ice1%H_cts,ice1%H_ice,ice1%poly%zeta_pt,ice1%poly%zeta_pc)
@@ -199,8 +199,17 @@ program test_icetemp
     ice1%poly%zeta_aa = ice1%vec%zeta
     ice1%poly%zeta_ac = ice1%vec%zeta_ac
     
-    ice1%poly%cp = ice1%vec%cp 
-    ice1%poly%kt = ice1%vec%kt 
+    ice1%poly%cp      = ice1%vec%cp 
+    ice1%poly%kt      = ice1%vec%kt 
+    
+    ice1%poly%enth    = ice1%vec%enth  
+    ice1%poly%T_ice   = ice1%vec%T_ice 
+    ice1%poly%omega   = ice1%vec%omega 
+    ice1%poly%T_pmp   = ice1%vec%T_pmp 
+    
+    ice1%poly%advecxy = ice1%vec%advecxy 
+    ice1%poly%Q_strn  = ice1%vec%Q_strn 
+    ice1%poly%uz      = ice1%vec%uz 
     
     ! Initialize time and calculate number of time steps to iterate and 
     time = t_start 
@@ -217,6 +226,7 @@ program test_icetemp
 
     ! Calculate initial enthalpy (ice1)
     call convert_to_enthalpy(ice1%vec%enth,ice1%vec%T_ice,ice1%vec%omega,ice1%vec%T_pmp,ice1%vec%cp,L_ice)
+    call convert_to_enthalpy(ice1%poly%enth,ice1%poly%T_ice,ice1%poly%omega,ice1%poly%T_pmp,ice1%poly%cp,L_ice)
 
     ! Calculate initial enthalpy (robin)
     call convert_to_enthalpy(robin%vec%enth,robin%vec%T_ice,robin%vec%omega,robin%vec%T_pmp,robin%vec%cp,L_ice)
@@ -276,10 +286,19 @@ program test_icetemp
             end if 
         end if 
 
-        call calc_enth_column(ice1%vec%enth,ice1%vec%T_ice,ice1%vec%omega,ice1%bmb,ice1%Q_ice_b,ice1%H_cts,ice1%vec%T_pmp, &
-                ice1%vec%cp,ice1%vec%kt,ice1%vec%advecxy,ice1%vec%uz,ice1%vec%Q_strn,ice1%Q_b,ice1%Q_geo,ice1%T_srf,ice1%T_shlf, &
-                ice1%H_ice,ice1%H_w,ice1%f_grnd,ice1%vec%zeta,ice1%vec%zeta_ac, &
+        call calc_enth_column(ice1%poly%enth,ice1%poly%T_ice,ice1%poly%omega,ice1%bmb,ice1%Q_ice_b,ice1%H_cts,ice1%poly%T_pmp, &
+                ice1%poly%cp,ice1%poly%kt,ice1%poly%advecxy,ice1%poly%uz,ice1%poly%Q_strn,ice1%Q_b,ice1%Q_geo,ice1%T_srf,ice1%T_shlf, &
+                ice1%H_ice,ice1%H_w,ice1%f_grnd,ice1%poly%zeta_aa,ice1%poly%zeta_ac, &
                 enth_cr,omega_max,T0_ref,dt)
+
+!         call calc_enth_column(ice1%vec%enth,ice1%vec%T_ice,ice1%vec%omega,ice1%bmb,ice1%Q_ice_b,ice1%H_cts,ice1%vec%T_pmp, &
+!                 ice1%vec%cp,ice1%vec%kt,ice1%vec%advecxy,ice1%vec%uz,ice1%vec%Q_strn,ice1%Q_b,ice1%Q_geo,ice1%T_srf,ice1%T_shlf, &
+!                 ice1%H_ice,ice1%H_w,ice1%f_grnd,ice1%vec%zeta,ice1%vec%zeta_ac, &
+!                 enth_cr,omega_max,T0_ref,dt)
+        
+        ice1%vec%enth  = ice1%poly%enth 
+        ice1%vec%T_ice = ice1%poly%T_ice 
+        ice1%vec%omega = ice1%poly%omega 
 
         ! Update basal water thickness [m/a i.e.] => [m/a w.e.]
         ice1%H_w = ice1%H_w - (ice1%bmb*rho_ice/rho_w)*dt 

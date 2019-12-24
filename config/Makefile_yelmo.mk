@@ -15,6 +15,9 @@ $(objdir)/nml.o: $(libdir)/nml.f90
 $(objdir)/gaussian_filter.o: $(libdir)/gaussian_filter.f90
 	$(FC) $(DFLAGS) $(FFLAGS) -c -o $@ $<
 
+$(objdir)/interp1D.o: $(libdir)/interp1D.f90 $(objdir)/yelmo_defs.o
+	$(FC) $(DFLAGS) $(FFLAGS) -c -o $@ $<
+
 ## INTERNAL PHYSICS LIBRARIES ###############################
 
 $(objdir)/basal_dragging.o: $(srcdir)/physics/basal_dragging.f90 $(objdir)/yelmo_defs.o \
@@ -164,6 +167,7 @@ $(objdir)/mismip3D.o: $(testdir)/mismip3D.f90 $(objdir)/ncio.o $(objdir)/yelmo_d
 #############################################################
 
 yelmo_libs = 		   $(objdir)/gaussian_filter.o \
+					   $(objdir)/interp1D.o \
 					   $(objdir)/nml.o \
 			 		   $(objdir)/ncio.o
 
@@ -207,6 +211,7 @@ yelmo_tests = 		   $(objdir)/ice_benchmarks.o \
 yelmo_thermo =         $(objdir)/yelmo_defs.o \
 					   $(objdir)/yelmo_grid.o \
 	                   $(objdir)/yelmo_tools.o \
+	                   $(objdir)/interp1D.o \
 			 		   $(objdir)/thermodynamics.o \
 					   $(objdir)/ice_enthalpy.o
 

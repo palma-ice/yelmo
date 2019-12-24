@@ -7,6 +7,8 @@ program test_icetemp
     use ice_enthalpy  
     use ice_age 
 
+    use interp1D 
+    
     implicit none 
 
     type icesheet_vectors

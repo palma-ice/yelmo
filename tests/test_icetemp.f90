@@ -95,6 +95,7 @@ program test_icetemp
     character(len=12)  :: arg_nz, arg_cr 
 
     logical, parameter :: testing_poly = .TRUE.
+    real(prec)         :: H_cts_prev 
 
     ! General initialization of yelmo constants (used globally)
     call yelmo_global_init("par/yelmo_const_EISMINT.nml")
@@ -106,7 +107,7 @@ program test_icetemp
     
     ! General options
     zeta_scale      = "linear"      ! "linear", "exp", "tanh"
-    nz              = 402           ! [--] Number of ice sheet points (aa-nodes + base + surface)
+    nz              = 22            ! [--] Number of ice sheet points (aa-nodes + base + surface)
     is_celcius      = .FALSE. 
 
     age_method      = "expl"        ! "expl" or "impl"
@@ -211,7 +212,7 @@ if (testing_poly) then
     ice1%poly%T_pmp = interp_linear(ice1%vec%zeta,ice1%vec%T_pmp,ice1%poly%zeta_aa)
 
     call update_poly(ice1%poly,ice1%vec%advecxy,ice1%vec%Q_strn,ice1%vec%uz,ice1%vec%zeta, &
-                                                                ice1%vec%zeta_ac,ice1%H_cts,ice1%H_ice)
+                                                    ice1%vec%zeta_ac,ice1%H_cts,ice1%H_ice,ice1%H_cts)
 
 else
 
@@ -268,6 +269,7 @@ end if
 
     ! Assume H_cts is also zero to start
     ice1%H_cts = 0.0 
+    H_cts_prev = ice1%H_cts
 
     ! Loop over time steps and perform thermodynamic calculations
     do n = 1, ntot 
@@ -312,7 +314,9 @@ end if
 if (testing_poly) then
 
         call update_poly(ice1%poly,ice1%vec%advecxy,ice1%vec%Q_strn,ice1%vec%uz,ice1%vec%zeta, &
-                                                                ice1%vec%zeta_ac,ice1%H_cts,ice1%H_ice)
+                                                            ice1%vec%zeta_ac,ice1%H_cts,ice1%H_ice,H_cts_prev)
+
+        H_cts_prev = ice1%H_cts 
 
 end if 
 
@@ -369,7 +373,7 @@ end if
 
 contains 
 
-    subroutine update_poly(poly,advecxy,Q_strn,uz,zeta_aa,zeta_ac,H_cts,H_ice)
+    subroutine update_poly(poly,advecxy,Q_strn,uz,zeta_aa,zeta_ac,H_cts,H_ice,H_cts_prev)
 
         implicit none
 
@@ -381,15 +385,23 @@ contains
         real(prec), intent(IN) :: zeta_ac(:) 
         real(prec), intent(IN) :: H_cts 
         real(prec), intent(IN) :: H_ice 
-        
+        real(prec), intent(IN) :: H_cts_prev 
+
         ! Local variables 
+        real(prec) :: H_cts_now 
+
         real(prec), allocatable :: p_zeta0(:) 
         real(prec), allocatable :: p_enth0(:) 
 
         allocate(p_enth0(size(poly%enth,1)))
 
+        H_cts_now = 0.7*H_cts_prev + 0.3*H_cts 
+        H_cts_now = max(H_cts_now,1.0_prec)
+
+        H_cts_now = 20.0
+
         ! Update poly zeta axis 
-        call calc_zeta_combined(poly%zeta_aa,poly%zeta_ac,max(H_cts,1.0_prec),H_ice,poly%zeta_pt,poly%zeta_pc)
+        call calc_zeta_combined(poly%zeta_aa,poly%zeta_ac,H_cts_now,H_ice,poly%zeta_pt,poly%zeta_pc)
 
         ! Store original enth value and axis
         p_zeta0 = poly%zeta_aa  

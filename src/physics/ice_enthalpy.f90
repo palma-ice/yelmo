@@ -5,6 +5,8 @@ module ice_enthalpy
     use solver_tridiagonal, only : solve_tridiag 
     use thermodynamics, only : calc_bmb_grounded, calc_bmb_grounded_enth, calc_advec_vertical_column
 
+    use interp1D 
+
     implicit none
     
     private
@@ -584,6 +586,10 @@ end if
         real(prec) :: f_lin 
         real(prec), allocatable :: enth_pmp(:) 
 
+        integer :: i, n_iter, n_prime
+        real(prec), allocatable :: zeta_prime(:) 
+        real(prec), allocatable :: enth_prime(:) 
+        
         nz = size(enth,1) 
 
         allocate(enth_pmp(nz))
@@ -618,36 +624,29 @@ end if
             H_cts = H_ice * (zeta(k_cts) + f_lin*(zeta(k)-zeta(k_cts)))
 
 !             H_cts = H_ice * zeta(k_cts) 
+            
+!             ! Further iterate to improve estimate of H_cts 
+!             n_iter = 3
+!             do i = 1, n_iter 
+
+!             end do 
+            
+            n_prime = 10 
+
+            allocate(zeta_prime(n_prime))
+            allocate(enth_prime(n_prime))
+            
+            do i = 1, n_prime
+                zeta_prime(i) = ((i-1)/(n_prime-1))*(zeta(k_cts+1)-zeta(k_cts)) + zeta(k_cts)
+            end do 
+
+            enth_prime = interp_spline(zeta,enth-enth_pmp,zeta_prime)
+
+            i = minloc(abs(enth_prime),1)
+
+            H_cts = H_ice*zeta_prime(i) 
 
         end if 
-
-!         ! Determine index of the first layer that has enthalpy below enth_pmp 
-!         do k = 1, nz 
-!             if (enth(k) .lt. enth_pmp(k)) exit 
-!         end do 
-        
-!         ! Perform linear interpolation 
-!         if (k .gt. nz) then 
-!             ! Whole column is temperate
-!             H_cts = H_ice
-!         else if (k .le. 1) then 
-!             ! Whole column is cold 
-!             H_cts = 0.0 
-!         else 
-!             ! Perform interpolation
-!             k_cts = k-1 
-
-!             ! Get linear weight for where E(f_lin) = Epmp(f_lin)
-!             ! E(k_cts) + dE*f_lin = Epmp(k_cts) + dEpmp*f_lin 
-!             ! f_lin = (Epmp(k_cts)-E(k_cts)) / (dE - dEpmp)
-!             f_lin = (enth_pmp(k_cts)-enth(k_cts)) / ( (enth(k)-enth(k_cts)) - (enth_pmp(k)-enth_pmp(k_cts)) )
-!             if (f_lin .lt. 1e-2) f_lin = 0.0 
-
-!             H_cts = H_ice * (zeta(k_cts) + f_lin*(zeta(k)-zeta(k_cts)))
-
-!             !H_cts = H_ice * zeta(k_cts)
-
-!         end if 
 
         return 
 

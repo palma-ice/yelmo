@@ -8,7 +8,7 @@ program test_icetemp
     use ice_age 
 
     use interp1D 
-    
+
     implicit none 
 
     type icesheet_vectors
@@ -93,6 +93,8 @@ program test_icetemp
 
     integer            :: narg 
     character(len=12)  :: arg_nz, arg_cr 
+
+    logical, parameter :: testing_poly = .TRUE.
 
     ! General initialization of yelmo constants (used globally)
     call yelmo_global_init("par/yelmo_const_EISMINT.nml")
@@ -192,11 +194,27 @@ program test_icetemp
     end select 
 
     ! Initialize polythermal data structure too 
-    call poly_init(ice1%poly,nz_pt=11,nz_pc=392,zeta_scale=zeta_scale,zeta_exp=2.0_prec)
+    !call poly_init(ice1%poly,nz_pt=11,nz_pc=392,zeta_scale=zeta_scale,zeta_exp=2.0_prec)
+    call poly_init(ice1%poly,nz_pt=11,nz_pc=32,zeta_scale=zeta_scale,zeta_exp=2.0_prec)
 
-    ! Calculate the poly vertical axis at each grid points 
-!     call calc_zeta_combined(ice1%poly%zeta_aa,ice1%poly%zeta_ac,ice1%H_cts,ice1%H_ice,ice1%poly%zeta_pt,ice1%poly%zeta_pc)
+if (testing_poly) then
+
+    ! Calculate the poly vertical axis at each grid point
+    call calc_zeta_combined(ice1%poly%zeta_aa,ice1%poly%zeta_ac,ice1%H_cts,ice1%H_ice,ice1%poly%zeta_pt,ice1%poly%zeta_pc)
     
+    ice1%poly%cp = interp_linear(ice1%vec%zeta,ice1%vec%cp,ice1%poly%zeta_aa)
+    ice1%poly%kt = interp_linear(ice1%vec%zeta,ice1%vec%kt,ice1%poly%zeta_aa)
+    
+    ice1%poly%enth  = interp_linear(ice1%vec%zeta,ice1%vec%enth,ice1%poly%zeta_aa)
+    ice1%poly%T_ice = interp_linear(ice1%vec%zeta,ice1%vec%T_ice,ice1%poly%zeta_aa)
+    ice1%poly%omega = interp_linear(ice1%vec%zeta,ice1%vec%omega,ice1%poly%zeta_aa)
+    ice1%poly%T_pmp = interp_linear(ice1%vec%zeta,ice1%vec%T_pmp,ice1%poly%zeta_aa)
+
+    call update_poly(ice1%poly,ice1%vec%advecxy,ice1%vec%Q_strn,ice1%vec%uz,ice1%vec%zeta, &
+                                                                ice1%vec%zeta_ac,ice1%H_cts,ice1%H_ice)
+
+else
+
     ! Simply set them equal for now
     ice1%poly%zeta_aa = ice1%vec%zeta
     ice1%poly%zeta_ac = ice1%vec%zeta_ac
@@ -212,7 +230,9 @@ program test_icetemp
     ice1%poly%advecxy = ice1%vec%advecxy 
     ice1%poly%Q_strn  = ice1%vec%Q_strn 
     ice1%poly%uz      = ice1%vec%uz 
-    
+
+end if 
+
     ! Initialize time and calculate number of time steps to iterate and 
     time = t_start 
     ntot = (t_end-t_start)/dt 
@@ -239,8 +259,9 @@ program test_icetemp
 !     call write_step(robin,robin%vec,filename=file1D,time=time)
 
     ! Initialize output file for model and write intial conditions 
-    call write_init(ice1,filename=file1D,zeta=ice1%vec%zeta,zeta_ac=ice1%vec%zeta_ac,time_init=time)
-    call write_step(ice1,ice1%vec,filename=file1D,time=time)
+    call write_init(ice1,filename=file1D,zeta=ice1%vec%zeta,zeta_ac=ice1%vec%zeta_ac, &
+                        zeta_pt=ice1%poly%zeta_pt,zeta_pc=ice1%poly%zeta_pc,time_init=time)
+    call write_step(ice1,ice1%vec,ice1%poly,filename=file1D,time=time)
 
     ! Ensure zero basal water thickness to start 
     ice1%H_w = 0.0 
@@ -288,6 +309,13 @@ program test_icetemp
             end if 
         end if 
 
+if (testing_poly) then
+
+        call update_poly(ice1%poly,ice1%vec%advecxy,ice1%vec%Q_strn,ice1%vec%uz,ice1%vec%zeta, &
+                                                                ice1%vec%zeta_ac,ice1%H_cts,ice1%H_ice)
+
+end if 
+
         call calc_enth_column(ice1%poly%enth,ice1%poly%T_ice,ice1%poly%omega,ice1%bmb,ice1%Q_ice_b,ice1%H_cts,ice1%poly%T_pmp, &
                 ice1%poly%cp,ice1%poly%kt,ice1%poly%advecxy,ice1%poly%uz,ice1%poly%Q_strn,ice1%Q_b,ice1%Q_geo,ice1%T_srf,ice1%T_shlf, &
                 ice1%H_ice,ice1%H_w,ice1%f_grnd,ice1%poly%zeta_aa,ice1%poly%zeta_ac, &
@@ -297,10 +325,17 @@ program test_icetemp
 !                 ice1%vec%cp,ice1%vec%kt,ice1%vec%advecxy,ice1%vec%uz,ice1%vec%Q_strn,ice1%Q_b,ice1%Q_geo,ice1%T_srf,ice1%T_shlf, &
 !                 ice1%H_ice,ice1%H_w,ice1%f_grnd,ice1%vec%zeta,ice1%vec%zeta_ac, &
 !                 enth_cr,omega_max,T0_ref,dt)
-        
+
+if (testing_poly) then 
+
+        call update_enth_1layer(ice1%vec%enth,ice1%vec%T_ice,ice1%vec%omega,ice1%vec%zeta,ice1%vec%zeta_ac,ice1%poly)
+else
+
         ice1%vec%enth  = ice1%poly%enth 
         ice1%vec%T_ice = ice1%poly%T_ice 
         ice1%vec%omega = ice1%poly%omega 
+
+end if 
 
         ! Update basal water thickness [m/a i.e.] => [m/a w.e.]
         ice1%H_w = ice1%H_w - (ice1%bmb*rho_ice/rho_w)*dt 
@@ -314,7 +349,7 @@ program test_icetemp
         end if 
 
         if (mod(time,dt_out)==0) then 
-            call write_step(ice1,ice1%vec,filename=file1D,time=time,T_robin=robin%vec%T_ice)
+            call write_step(ice1,ice1%vec,ice1%poly,filename=file1D,time=time,T_robin=robin%vec%T_ice)
         end if 
 
         if (mod(time,50.0)==0) then
@@ -332,6 +367,70 @@ program test_icetemp
     write(*,*)
 
 contains 
+
+    subroutine update_poly(poly,advecxy,Q_strn,uz,zeta_aa,zeta_ac,H_cts,H_ice)
+
+        implicit none
+
+        type(poly_state_class), intent(INOUT) :: poly 
+        real(prec), intent(IN) :: advecxy(:) 
+        real(prec), intent(IN) :: Q_strn(:) 
+        real(prec), intent(IN) :: uz(:) 
+        real(prec), intent(IN) :: zeta_aa(:) 
+        real(prec), intent(IN) :: zeta_ac(:) 
+        real(prec), intent(IN) :: H_cts 
+        real(prec), intent(IN) :: H_ice 
+        
+        ! Local variables 
+        real(prec), allocatable :: p_zeta0(:) 
+        real(prec), allocatable :: p_enth0(:) 
+
+        allocate(p_enth0(size(poly%enth,1)))
+
+        ! Update poly zeta axis 
+        call calc_zeta_combined(poly%zeta_aa,poly%zeta_ac,max(H_cts,1.0_prec),H_ice,poly%zeta_pt,poly%zeta_pc)
+
+        ! Store original enth value and axis
+        p_zeta0 = poly%zeta_aa  
+        p_enth0 = poly%enth 
+
+        ! Update enth 
+        poly%enth = interp_linear(p_zeta0,p_enth0,poly%zeta_aa)
+
+        ! Update external variables 
+        poly%advecxy = interp_linear(zeta_aa,advecxy,poly%zeta_aa)
+        poly%Q_strn  = interp_linear(zeta_aa,Q_strn,poly%zeta_aa)
+        poly%uz      = interp_linear(zeta_ac,uz,poly%zeta_ac)
+
+!         write(*,*) "zeta_ac:   ", minval(zeta_ac), maxval(zeta_ac)
+!         write(*,*) "p_zeta_ac: ", minval(poly%zeta_ac), maxval(poly%zeta_ac)
+!         write(*,*) "uz:        ", minval(uz), maxval(uz)
+!         write(*,*) "p_uz:      ", minval(poly%uz), maxval(poly%uz)
+        
+!         stop 
+
+        return 
+
+    end subroutine update_poly
+
+        subroutine update_enth_1layer(enth,T_ice,omega,zeta_aa,zeta_ac,poly)
+
+        implicit none
+
+        real(prec), intent(INOUT) :: enth(:) 
+        real(prec), intent(INOUT) :: T_ice(:) 
+        real(prec), intent(INOUT) :: omega(:) 
+        real(prec), intent(IN) :: zeta_aa(:) 
+        real(prec), intent(IN) :: zeta_ac(:) 
+        type(poly_state_class), intent(IN) :: poly 
+        
+        enth  = interp_linear(poly%zeta_aa,poly%enth,zeta_aa)
+        omega = interp_linear(poly%zeta_aa,poly%omega,zeta_aa)
+        T_ice = interp_linear(poly%zeta_aa,poly%T_ice,zeta_aa)
+                
+        return 
+
+    end subroutine update_enth_1layer
 
 
     subroutine init_eismint_summit(ice,smb)
@@ -733,7 +832,7 @@ contains
 
     end subroutine poly_init 
     
-    subroutine write_init(ice,filename,zeta,zeta_ac,time_init)
+    subroutine write_init(ice,filename,zeta,zeta_ac,zeta_pt,zeta_pc,time_init)
 
         implicit none 
 
@@ -741,14 +840,26 @@ contains
         character(len=*), intent(IN) :: filename 
         real(prec),       intent(IN) :: zeta(:)  
         real(prec),       intent(IN) :: zeta_ac(:) 
+        real(prec),       intent(IN) :: zeta_pt(:) 
+        real(prec),       intent(IN) :: zeta_pc(:)  
         real(prec),       intent(IN) :: time_init
+
+        ! Local variables
+        integer :: npt_poly 
 
         ! Initialize netcdf file and dimensions
         call nc_create(filename)
         call nc_write_dim(filename,"zeta",    x=zeta,    units="1")
         call nc_write_dim(filename,"zeta_ac", x=zeta_ac, units="1")
+        call nc_write_dim(filename,"zeta_pt", x=zeta_pt, units="1")
+        call nc_write_dim(filename,"zeta_pc", x=zeta_pc, units="1")
         call nc_write_dim(filename,"time",  x=time_init,dx=1.0_prec,nx=1,units="years",unlimited=.TRUE.)
         call nc_write_dim(filename,"pt",    x=1.0,    units="1")
+
+        ! Write the number of poly points 
+        npt_poly = size(zeta_pt,1) + size(zeta_pc,1) - 1 
+        call nc_write_dim(filename,"zeta_px_aa",x=1,nx=npt_poly,dx=1,units="1")
+        call nc_write_dim(filename,"zeta_px_ac",x=1,nx=npt_poly-1,dx=1,units="1")
 
         ! Write some constants 
         call nc_write(filename,"enth_cr",enth_cr,dim1="pt")
@@ -757,12 +868,13 @@ contains
 
     end subroutine write_init 
     
-    subroutine write_step(ice,vecs,filename,time,T_robin)
+    subroutine write_step(ice,vecs,poly,filename,time,T_robin)
 
         implicit none 
         
         type(icesheet),         intent(IN) :: ice
         type(icesheet_vectors), intent(IN) :: vecs
+        type(poly_state_class), intent(IN) :: poly
         character(len=*),       intent(IN) :: filename
         real(prec),             intent(IN) :: time
         real(prec), optional,   intent(IN) :: T_robin(:) 
@@ -771,6 +883,7 @@ contains
         integer    :: ncid, n
         real(prec) :: time_prev 
         character(len=12), parameter :: vert_dim = "zeta"
+        character(len=12), parameter :: vert_dim_poly = "zeta_px_aa"
 
         ! Open the file for writing
         call nc_open(filename,ncid,writable=.TRUE.)
@@ -783,10 +896,26 @@ contains
         ! Update the time step
         call nc_write(filename,"time",time,dim1="time",start=[n],count=[1],ncid=ncid)
 
+        ! Update poly variables 
+        call nc_write(filename,"pp_zeta",   poly%zeta_aa,units="J kg-1",    long_name="Vertical axis",                dim1=vert_dim_poly,dim2="time",start=[1,n],ncid=ncid)
+        call nc_write(filename,"pp_enth",   poly%enth,   units="J kg-1",    long_name="Ice enthalpy",                 dim1=vert_dim_poly,dim2="time",start=[1,n],ncid=ncid)
+        call nc_write(filename,"pp_T_ice",  poly%T_ice,  units="K",         long_name="Ice temperature",              dim1=vert_dim_poly,dim2="time",start=[1,n],ncid=ncid)
+        call nc_write(filename,"pp_omega",  poly%omega,  units="",          long_name="Ice water content (fraction)", dim1=vert_dim_poly,dim2="time",start=[1,n],ncid=ncid)
+        call nc_write(filename,"pp_T_pmp",  poly%T_pmp,  units="",          long_name="Ice pressure melting point",   dim1=vert_dim_poly,dim2="time",start=[1,n],ncid=ncid)
+        call nc_write(filename,"pp_T_prime",poly%T_ice-poly%T_pmp,units="K",long_name="Ice temperature",              dim1=vert_dim_poly,dim2="time",start=[1,n],ncid=ncid)
+        
+        call nc_write(filename,"pp_cp",     poly%cp,     units="J kg-1 K-1",   long_name="Ice heat capacity",       dim1=vert_dim_poly,dim2="time",start=[1,n],ncid=ncid)
+        call nc_write(filename,"pp_kt",     poly%kt,     units="J a-1 m-1 K-1",long_name="Ice thermal conductivity",dim1=vert_dim_poly,dim2="time",start=[1,n],ncid=ncid)
+        call nc_write(filename,"pp_uz",     poly%uz,     units="m a**-1",  long_name="Ice vertical velocity",   dim1="zeta_px_ac",dim2="time",start=[1,n],ncid=ncid)
+        call nc_write(filename,"pp_advecxy",poly%advecxy,units="",         long_name="Ice horizontal advection",dim1=vert_dim_poly,dim2="time",start=[1,n],ncid=ncid)
+        call nc_write(filename,"pp_Q_strn", poly%Q_strn, units="J a-1 m-3",long_name="Ice strain heating",      dim1=vert_dim_poly,dim2="time",start=[1,n],ncid=ncid)
+        
         ! Update variables (vectors) 
-        call nc_write(filename,"T_ice",  vecs%T_ice,  units="K",   long_name="Ice temperature",           dim1=vert_dim,dim2="time",start=[1,n],ncid=ncid)
-        call nc_write(filename,"T_pmp",  vecs%T_pmp,  units="",    long_name="Ice pressure melting point",dim1=vert_dim,dim2="time",start=[1,n],ncid=ncid)
-        call nc_write(filename,"T_prime",vecs%T_ice-vecs%T_pmp,units="K",long_name="Ice temperature",     dim1=vert_dim,dim2="time",start=[1,n],ncid=ncid)
+        call nc_write(filename,"enth",   vecs%enth,  units="J kg-1",    long_name="Ice enthalpy",               dim1=vert_dim,dim2="time",start=[1,n],ncid=ncid)
+        call nc_write(filename,"T_ice",  vecs%T_ice,  units="K",        long_name="Ice temperature",            dim1=vert_dim,dim2="time",start=[1,n],ncid=ncid)
+        call nc_write(filename,"omega",  vecs%omega, units="",          long_name="Ice water content (fraction)", dim1=vert_dim,dim2="time",start=[1,n],ncid=ncid)
+        call nc_write(filename,"T_pmp",  vecs%T_pmp,  units="",         long_name="Ice pressure melting point", dim1=vert_dim,dim2="time",start=[1,n],ncid=ncid)
+        call nc_write(filename,"T_prime",vecs%T_ice-vecs%T_pmp,units="K",long_name="Ice temperature",           dim1=vert_dim,dim2="time",start=[1,n],ncid=ncid)
         
         call nc_write(filename,"cp",     vecs%cp,     units="J kg-1 K-1",   long_name="Ice heat capacity",       dim1=vert_dim,dim2="time",start=[1,n],ncid=ncid)
         call nc_write(filename,"kt",     vecs%kt,     units="J a-1 m-1 K-1",long_name="Ice thermal conductivity",dim1=vert_dim,dim2="time",start=[1,n],ncid=ncid)
@@ -796,8 +925,6 @@ contains
         
         call nc_write(filename,"t_dep", vecs%t_dep, units="a",long_name="Deposition time",      dim1=vert_dim,dim2="time",start=[1,n],ncid=ncid)
         
-        call nc_write(filename,"enth",  vecs%enth,  units="J kg-1",   long_name="Ice enthalpy",           dim1=vert_dim,dim2="time",start=[1,n],ncid=ncid)
-        call nc_write(filename,"omega", vecs%omega, units="",   long_name="Ice water content (fraction)", dim1=vert_dim,dim2="time",start=[1,n],ncid=ncid)
         call nc_write(filename,"H_cts",  ice%H_cts, units="m",long_name="CTS height",dim1="time",start=[n],ncid=ncid)
         
         ! Update variables (points) 
@@ -810,6 +937,8 @@ contains
         call nc_write(filename,"H_w",     ice%H_w,units="m",long_name="Basal water thickness",dim1="time",start=[n],ncid=ncid)
         call nc_write(filename,"f_grnd",  ice%f_grnd,units="1",long_name="Grounded fraction",dim1="time",start=[n],ncid=ncid)
         
+
+
         ! If available, compare with Robin analytical solution 
         if (present(T_robin)) then
             call nc_write(filename,"T_robin",  T_robin,  units="K", &

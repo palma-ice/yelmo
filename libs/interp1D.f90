@@ -21,11 +21,11 @@ contains
         ! times to within a certain tolerance
         implicit none 
  
-        double precision, dimension(:), intent(IN) :: x, y
-        double precision, dimension(:), intent(IN) :: xout
-        double precision, intent(IN), optional :: missing_value, tol 
-        double precision, dimension(size(xout)) :: yout
-        double precision :: tolerance 
+        real(prec), dimension(:), intent(IN) :: x, y
+        real(prec), dimension(:), intent(IN) :: xout
+        real(prec), intent(IN), optional :: missing_value, tol 
+        real(prec), dimension(size(xout)) :: yout
+        real(prec) :: tolerance 
         integer :: i, n, nout 
 
         ! Length of output vector
@@ -54,9 +54,9 @@ contains
 
         implicit none 
  
-        double precision, dimension(:), intent(IN) :: x, y
-        double precision, intent(IN) :: xout
-        double precision :: yout 
+        real(prec), dimension(:), intent(IN) :: x, y
+        real(prec), intent(IN) :: xout
+        real(prec) :: yout 
         integer :: i, j, n, nout 
 
         n    = size(x) 
@@ -88,9 +88,9 @@ contains
 
         implicit none 
  
-        double precision, dimension(:), intent(IN) :: x, y
-        double precision, dimension(:), intent(IN) :: xout
-        double precision, dimension(size(xout)) :: yout 
+        real(prec), dimension(:), intent(IN) :: x, y
+        real(prec), dimension(:), intent(IN) :: xout
+        real(prec), dimension(size(xout)) :: yout 
         integer :: i, j, n, nout 
 
         n    = size(x) 
@@ -137,9 +137,9 @@ contains
 
         implicit none
 
-        real(dp), intent(IN)  :: x(2), y(2), xout
-        real(dp) :: yout
-        real(dp) :: alph
+        real(prec), intent(IN)  :: x(2), y(2), xout
+        real(prec) :: yout
+        real(prec) :: alph
 
         if ( xout .lt. x(1) .or. xout .gt. x(2) ) then
             write(*,*) "interp1: xout < x0 or xout > x1 !"
@@ -160,11 +160,11 @@ contains
 
         implicit none 
  
-        double precision, dimension(:), intent(IN) :: x, y
-        double precision, dimension(:), intent(IN) :: xout
-        double precision, dimension(size(xout)) :: yout 
-        double precision, dimension(:), allocatable :: b, c, d 
-        double precision :: uh, dx, yh  
+        real(prec), dimension(:), intent(IN) :: x, y
+        real(prec), dimension(:), intent(IN) :: xout
+        real(prec), dimension(size(xout)) :: yout 
+        real(prec), dimension(:), allocatable :: b, c, d 
+        real(prec) :: uh, dx, yh  
         integer :: i, n, nout 
 
         n    = size(x) 
@@ -217,10 +217,10 @@ subroutine spline (x, y, b, c, d, n)
 !======================================================================
 implicit none
 integer n
-double precision, dimension(:) :: x, y, b, c, d 
-!double precision x(n), y(n), b(n), c(n), d(n)
+real(prec), dimension(:) :: x, y, b, c, d 
+!real(prec) x(n), y(n), b(n), c(n), d(n)
 integer i, j, gap
-double precision h
+real(prec) h
 
 gap = n-1
 ! check input
@@ -303,13 +303,13 @@ function ispline(u, x, y, b, c, d, n)
 ! ispline = interpolated value at point u
 !=======================================================================
 implicit none
-double precision ispline
+real(prec) ispline
 integer n
-! double precision  u, x(n), y(n), b(n), c(n), d(n)
-double precision :: u 
-double precision, dimension(:) :: x, y, b, c, d 
+! real(prec)  u, x(n), y(n), b(n), c(n), d(n)
+real(prec) :: u 
+real(prec), dimension(:) :: x, y, b, c, d 
 integer i, j, k
-double precision dx
+real(prec) dx
 
 ! if u is ouside the x() interval take a boundary value (left or right)
 if(u <= x(1)) then
@@ -351,13 +351,13 @@ end module interp1D
 
 !     implicit none 
 
-!     double precision, parameter :: pi = 2.d0*acos(0.d0)
+!     real(prec), parameter :: pi = 2.d0*acos(0.d0)
 
 !     integer, parameter :: n    = 12
 !     integer, parameter :: nout = 360
     
-!     double precision, dimension(n)    :: x, y
-!     double precision, dimension(nout) :: xout, yout
+!     real(prec), dimension(n)    :: x, y
+!     real(prec), dimension(nout) :: xout, yout
 
 !     integer :: k, q 
 

@@ -14,7 +14,7 @@ module ice_enthalpy
     public :: calc_dzeta_terms
     public :: calc_zeta_twolayers
     public :: calc_zeta_combined
-    
+
 contains 
 
     subroutine calc_enth_column(enth,T_ice,omega,bmb_grnd,Q_ice_b,H_cts,T_pmp,cp,kt,advecxy,uz,Q_strn,Q_b, &
@@ -613,12 +613,11 @@ end if
         else 
             ! Perform linear interpolation 
 
-!             if (T_ice(k_cts)-T_pmp(k_cts) .lt. 0.0_prec) then 
-!                 write(*,*) "CTS: ", enth(k_cts)/cp(k_cts), T_ice(k_cts)-T_pmp(k_cts), H_cts
-!                 stop 
-!             end if 
+            f_lin = (enth_pmp(k_cts)-enth(k_cts)) / ( (enth(k_cts+1)-enth(k_cts)) - (enth_pmp(k_cts+1)-enth_pmp(k_cts)) )
+            if (f_lin .lt. 1e-2) f_lin = 0.0 
+            H_cts = H_ice * (zeta(k_cts) + f_lin*(zeta(k)-zeta(k_cts)))
 
-            H_cts = H_ice * zeta(k_cts) 
+!             H_cts = H_ice * zeta(k_cts) 
 
         end if 
 

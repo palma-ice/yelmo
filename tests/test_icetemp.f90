@@ -102,7 +102,7 @@ program test_icetemp
     ! ===============================================================
     ! User options 
 
-    experiment     = "bg15a"        ! "eismint", "k15expa", "k15expb", "bg15a"
+    experiment     = "k15expb"        ! "eismint", "k15expa", "k15expb", "bg15a"
     
     ! General options
     zeta_scale      = "linear"      ! "linear", "exp", "tanh"
@@ -328,7 +328,8 @@ end if
 
 if (testing_poly) then 
 
-        call update_enth_1layer(ice1%vec%enth,ice1%vec%T_ice,ice1%vec%omega,ice1%vec%zeta,ice1%vec%zeta_ac,ice1%poly)
+        call update_enth_1layer(ice1%vec%enth,ice1%vec%T_ice,ice1%vec%omega,ice1%vec%T_pmp,ice1%vec%cp, &
+                                                ice1%vec%zeta,ice1%vec%zeta_ac,ice1%poly,L_ice)
 else
 
         ice1%vec%enth  = ice1%poly%enth 
@@ -413,21 +414,25 @@ contains
 
     end subroutine update_poly
 
-        subroutine update_enth_1layer(enth,T_ice,omega,zeta_aa,zeta_ac,poly)
+        subroutine update_enth_1layer(enth,T_ice,omega,T_pmp,cp,zeta_aa,zeta_ac,poly,L_ice)
 
         implicit none
 
         real(prec), intent(INOUT) :: enth(:) 
         real(prec), intent(INOUT) :: T_ice(:) 
         real(prec), intent(INOUT) :: omega(:) 
+        real(prec), intent(INOUT) :: T_pmp(:)
+        real(prec), intent(INOUT) :: cp(:)
         real(prec), intent(IN) :: zeta_aa(:) 
         real(prec), intent(IN) :: zeta_ac(:) 
         type(poly_state_class), intent(IN) :: poly 
+        real(prec), intent(INOUT) :: L_ice
         
         enth  = interp_linear(poly%zeta_aa,poly%enth,zeta_aa)
-        omega = interp_linear(poly%zeta_aa,poly%omega,zeta_aa)
-        T_ice = interp_linear(poly%zeta_aa,poly%T_ice,zeta_aa)
-                
+
+        ! Get temperature and water content too
+        call convert_from_enthalpy_column(enth,T_ice,omega,T_pmp,cp,L_ice)
+         
         return 
 
     end subroutine update_enth_1layer

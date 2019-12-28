@@ -388,6 +388,7 @@ contains
         real(prec), intent(IN) :: H_cts_prev 
 
         ! Local variables 
+        integer    :: k, k_cts, nz  
         real(prec) :: H_cts_now 
 
         real(prec), allocatable :: p_zeta0(:) 
@@ -395,11 +396,12 @@ contains
 
         allocate(p_enth0(size(poly%enth,1)))
 
-        H_cts_now = 0.7*H_cts_prev + 0.3*H_cts 
+        H_cts_now = H_cts 
+        !H_cts_now = 0.7*H_cts_prev + 0.3*H_cts 
+        !H_cts_now = 20.0
+        
         H_cts_now = max(H_cts_now,1.0_prec)
-
-        H_cts_now = 20.0
-
+        
         ! Update poly zeta axis 
         call calc_zeta_combined(poly%zeta_aa,poly%zeta_ac,H_cts_now,H_ice,poly%zeta_pt,poly%zeta_pc)
 
@@ -407,6 +409,16 @@ contains
         p_zeta0 = poly%zeta_aa  
         p_enth0 = poly%enth 
 
+        ! Determine height of CTS as heighest temperate layer 
+        k_cts = 0 
+        do k = 1, poly%nz_aa 
+            if (poly%enth(k) .ge. poly%T_pmp(k)*poly%cp(k)) then 
+                k_cts = k 
+            else 
+                exit 
+            end if 
+        end do 
+        
         ! Update enth 
         poly%enth = interp_linear(p_zeta0,p_enth0,poly%zeta_aa)
 

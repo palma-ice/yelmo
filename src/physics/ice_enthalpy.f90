@@ -583,7 +583,7 @@ end if
 
         ! Local variables 
         integer :: k, k_cts, nz 
-        real(prec) :: f_lin 
+        real(prec) :: f_lin, dedz0, dedz1, zeta_cts 
         real(prec), allocatable :: enth_pmp(:) 
 
         integer :: i, n_iter, n_prime
@@ -618,10 +618,27 @@ end if
 
         else 
             ! Perform linear interpolation 
-
             f_lin = (enth_pmp(k_cts)-enth(k_cts)) / ( (enth(k_cts+1)-enth(k_cts)) - (enth_pmp(k_cts+1)-enth_pmp(k_cts)) )
             if (f_lin .lt. 1e-2) f_lin = 0.0 
-            H_cts = H_ice * (zeta(k_cts) + f_lin*(zeta(k)-zeta(k_cts)))
+            zeta_cts = zeta(k_cts) + f_lin*(zeta(k)-zeta(k_cts))
+
+!             dedz0 = (enth(k_cts)-enth(k_cts-1))/(zeta(k_cts)-zeta(k_cts-1))
+!             if (abs(dedz1).lt.1e-5) dedz1 = 1e-5 
+            
+!             dedz1 = (enth(k_cts+2)-enth(k_cts+1))/(zeta(k_cts+2)-zeta(k_cts+1))
+!             if (abs(dedz1).lt.1e-5) dedz1 = 1e-5 
+
+            ! Only extrapolate from cold layer above CTS
+            !zeta_cts = (zeta(k_cts+1) - (1.0_prec/dedz1)*(enth(k_cts+1)-enth_pmp(k_cts)))
+
+            ! Find intersection extrapolating from cold layer above CTS 
+            ! and warm layer below CTS
+!             zeta_cts = -(1.0_prec/(dedz0-dedz1))*(enth(k_cts+1)-enth(k_cts) &
+!                                                  - dedz1*zeta(k_cts+1) - dedz0*zeta(k_cts))
+
+
+            !zeta_cts = max(zeta_cts,zeta(k_cts))
+            H_cts    = H_ice*zeta_cts 
 
 !             H_cts = H_ice * zeta(k_cts) 
             
@@ -631,20 +648,20 @@ end if
 
 !             end do 
             
-            n_prime = 10 
+!             n_prime = 10 
 
-            allocate(zeta_prime(n_prime))
-            allocate(enth_prime(n_prime))
+!             allocate(zeta_prime(n_prime))
+!             allocate(enth_prime(n_prime))
             
-            do i = 1, n_prime
-                zeta_prime(i) = ((i-1)/(n_prime-1))*(zeta(k_cts+1)-zeta(k_cts)) + zeta(k_cts)
-            end do 
+!             do i = 1, n_prime
+!                 zeta_prime(i) = ((i-1)/(n_prime-1))*(zeta(k_cts+1)-zeta(k_cts)) + zeta(k_cts)
+!             end do 
 
-            enth_prime = interp_spline(zeta,enth-enth_pmp,zeta_prime)
+!             enth_prime = interp_spline(zeta,enth-enth_pmp,zeta_prime)
 
-            i = minloc(abs(enth_prime),1)
+!             i = minloc(abs(enth_prime),1)
 
-            H_cts = H_ice*zeta_prime(i) 
+!             H_cts = H_ice*zeta_prime(i) 
 
         end if 
 

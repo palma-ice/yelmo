@@ -618,6 +618,9 @@ end if
 
         else 
 
+!             ! Assume H_cts lies at center of last temperate cell (aa-node)
+!             zeta_cts = zeta(k_cts)
+
 !             ! Assume H_cts lies on ac-node between temperate and cold layers 
 !             zeta_cts = 0.5_prec*(zeta(k_cts)+zeta(k_cts+1))
 
@@ -642,7 +645,7 @@ end if
 
 
             !zeta_cts = max(zeta_cts,zeta(k_cts))
-            H_cts    = H_ice*zeta_cts 
+            H_cts    = nint(H_ice*zeta_cts)
 
 !             H_cts = H_ice * zeta(k_cts) 
             

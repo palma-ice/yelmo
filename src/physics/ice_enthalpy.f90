@@ -597,7 +597,7 @@ end if
         ! Get enthalpy at the pressure melting point (no water content)
         enth_pmp = T_pmp * cp
 
-        ! Determine height of CTS as heighest temperate layer 
+        ! Determine height of CTS as highest temperate layer 
         k_cts = 0 
         do k = 1, nz 
             !if (enth(k) .ge. T_pmp(k)*cp(k)) then
@@ -617,19 +617,23 @@ end if
             H_cts = H_ice
 
         else 
+            
+!             ! Assume H_cts lies on ac-node between temperate and cold layers 
+!             zeta_cts = 0.5_prec*(zeta(k_cts)+zeta(k_cts+1))
+
             ! Perform linear interpolation 
             f_lin = (enth_pmp(k_cts)-enth(k_cts)) / ( (enth(k_cts+1)-enth(k_cts)) - (enth_pmp(k_cts+1)-enth_pmp(k_cts)) )
             if (f_lin .lt. 1e-2) f_lin = 0.0 
             zeta_cts = zeta(k_cts) + f_lin*(zeta(k)-zeta(k_cts))
 
 !             dedz0 = (enth(k_cts)-enth(k_cts-1))/(zeta(k_cts)-zeta(k_cts-1))
-!             if (abs(dedz1).lt.1e-5) dedz1 = 1e-5 
+!             if (abs(dedz0).lt.1e-5) dedz0 = 1e-5 
             
 !             dedz1 = (enth(k_cts+2)-enth(k_cts+1))/(zeta(k_cts+2)-zeta(k_cts+1))
 !             if (abs(dedz1).lt.1e-5) dedz1 = 1e-5 
 
-            ! Only extrapolate from cold layer above CTS
-            !zeta_cts = (zeta(k_cts+1) - (1.0_prec/dedz1)*(enth(k_cts+1)-enth_pmp(k_cts)))
+!             ! Only extrapolate from cold layer above CTS
+!             zeta_cts = (zeta(k_cts+1) - (1.0_prec/dedz1)*(enth(k_cts+1)-enth_pmp(k_cts)))
 
             ! Find intersection extrapolating from cold layer above CTS 
             ! and warm layer below CTS
@@ -833,9 +837,9 @@ end if
         nzt   = size(zeta_pt,1)
         nzc   = size(zeta_pc,1) 
 
-        if (nzt+nzc -1 .ne. nz_aa) then 
+        if (nzt+nzc - 2 .ne. nz_aa) then 
             write(*,*) "calc_zeta_combined:: Error: Two-layer axis length does not match combined axis length."
-            write(*,*) "nzt, nzc-1, nz_aa: ", nzt, nzc-1, nz_aa 
+            write(*,*) "nzt-1, nzc-1, nz_aa: ", nzt-1, nzc-1, nz_aa 
             stop 
         end if 
 
@@ -846,8 +850,8 @@ end if
             f_cts = 0.0 
         end if 
 
-        zeta_aa(1:nzt) = zeta_pt(1:nzt)*f_cts 
-        zeta_aa(nzt+1:nz_aa) = f_cts + (1.0-f_cts)*zeta_pc(2:nzc)
+        zeta_aa(1:nzt-1) = zeta_pt(1:nzt-1)*f_cts 
+        zeta_aa(nzt:nz_aa) = f_cts + (1.0-f_cts)*zeta_pc(2:nzc)
 
         ! Get zeta_ac again (boundaries between zeta_aa values, as well as at the base and surface)
         zeta_ac(1) = 0.0_prec 

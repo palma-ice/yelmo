@@ -97,6 +97,9 @@ program test_icetemp
     logical, parameter :: testing_poly = .TRUE.
     real(prec)         :: H_cts_prev 
 
+    type(poly_state_class) :: poly  ! For two-layered calculations
+    integer :: iter, n_iter 
+
     ! General initialization of yelmo constants (used globally)
     call yelmo_global_init("par/yelmo_const_EISMINT.nml")
     
@@ -214,6 +217,8 @@ if (testing_poly) then
     call update_poly(ice1%poly,ice1%vec%advecxy,ice1%vec%Q_strn,ice1%vec%uz,ice1%vec%zeta, &
                                                     ice1%vec%zeta_ac,ice1%H_cts,ice1%H_ice,ice1%H_cts)
 
+    poly = ice1%poly 
+
 else
 
     ! Simply set them equal for now
@@ -232,6 +237,8 @@ else
     ice1%poly%Q_strn  = ice1%vec%Q_strn 
     ice1%poly%uz      = ice1%vec%uz 
 
+    poly = ice1%poly 
+    
 end if 
 
     ! Initialize time and calculate number of time steps to iterate and 
@@ -313,10 +320,23 @@ end if
 
 if (testing_poly) then
 
+        poly = ice1%poly 
+        
+        do iter = 1, 5
+        
+        call calc_enth_column(poly%enth,poly%T_ice,poly%omega,ice1%bmb,ice1%Q_ice_b,ice1%H_cts,poly%T_pmp, &
+                poly%cp,poly%kt,poly%advecxy,poly%uz,poly%Q_strn,ice1%Q_b,ice1%Q_geo,ice1%T_srf,ice1%T_shlf, &
+                ice1%H_ice,ice1%H_w,ice1%f_grnd,poly%zeta_aa,poly%zeta_ac, &
+                enth_cr,omega_max,T0_ref,dt)
+
+        !write(*,*) iter, ice1%H_cts, H_cts_prev 
+
         call update_poly(ice1%poly,ice1%vec%advecxy,ice1%vec%Q_strn,ice1%vec%uz,ice1%vec%zeta, &
                                                             ice1%vec%zeta_ac,ice1%H_cts,ice1%H_ice,H_cts_prev)
 
         H_cts_prev = ice1%H_cts 
+
+        end do  
 
 end if 
 
@@ -393,9 +413,12 @@ contains
 
         real(prec), allocatable :: p_zeta0(:) 
         real(prec), allocatable :: p_enth0(:) 
-
+        real(prec), allocatable :: p_enth_pmp0(:) 
+        
+        allocate(p_zeta0(size(poly%enth,1)))
         allocate(p_enth0(size(poly%enth,1)))
-
+        allocate(p_enth_pmp0(size(poly%enth,1)))
+        
         H_cts_now = H_cts 
         !H_cts_now = 0.7*H_cts_prev + 0.3*H_cts 
         !H_cts_now = 20.0
@@ -406,9 +429,10 @@ contains
         call calc_zeta_combined(poly%zeta_aa,poly%zeta_ac,H_cts_now,H_ice,poly%zeta_pt,poly%zeta_pc)
 
         ! Store original enth value and axis
-        p_zeta0 = poly%zeta_aa  
-        p_enth0 = poly%enth 
-
+        p_zeta0     = poly%zeta_aa  
+        p_enth0     = poly%enth 
+        p_enth_pmp0 = poly%T_pmp * poly%cp 
+        
         ! Determine height of CTS as heighest temperate layer 
         k_cts = 0 
         do k = 1, poly%nz_aa 
@@ -420,7 +444,9 @@ contains
         end do 
         
         ! Update enth 
-        poly%enth = interp_linear(p_zeta0,p_enth0,poly%zeta_aa)
+        !poly%enth = interp_linear(p_zeta0,p_enth0,poly%zeta_aa)
+        !call interp_enth_column(poly%enth,poly%zeta_aa,p_enth0,p_zeta0,p_enth_pmp0,H_cts_now,H_ice)
+        call interp1D_bins(poly%enth,poly%zeta_aa,p_enth0,p_zeta0)
 
         ! Update external variables 
         poly%advecxy = interp_linear(zeta_aa,advecxy,poly%zeta_aa)
@@ -452,7 +478,8 @@ contains
         type(poly_state_class), intent(IN) :: poly 
         real(prec), intent(INOUT) :: L_ice
         
-        enth  = interp_linear(poly%zeta_aa,poly%enth,zeta_aa)
+        !enth  = interp_linear(poly%zeta_aa,poly%enth,zeta_aa)
+        call interp1D_bins(enth,zeta_aa,poly%enth,poly%zeta_aa)
 
         ! Get temperature and water content too
         call convert_from_enthalpy_column(enth,T_ice,omega,T_pmp,cp,L_ice)
@@ -1041,4 +1068,102 @@ contains
 
     end subroutine calc_zeta
     
+    subroutine interp_enth_column(enth,zeta,enth0,zeta0,enth_pmp0,H_cts,H_ice)
+
+        implicit none 
+
+        real(prec), intent(OUT) :: enth(:)          ! New vertical axis (aa-nodes)
+        real(prec), intent(IN)  :: zeta(:)          ! New vertical axis (aa-nodes)
+        real(prec), intent(IN)  :: enth0(:)         ! Old vertical axis (aa-nodes)
+        real(prec), intent(IN)  :: zeta0(:)         ! Old vertical axis (aa-nodes)
+        real(prec), intent(IN)  :: enth_pmp0(:)     ! Old vertical axis (aa-nodes)
+        real(prec), intent(IN)  :: H_cts 
+        real(prec), intent(IN)  :: H_ice
+
+        ! Local variables
+        integer :: k, k0, k1, nz0, nz 
+        real(prec) :: f_cts, enth_pmp_cts, f_lin 
+
+        real(prec), parameter :: missing_value = -9999.0_prec 
+
+        nz  = size(enth,1)
+        nz0 = size(enth0,1) 
+
+        f_cts = H_cts / max(H_ice,1e-5)
+        if (H_ice .eq. 0.0) f_cts = 0.0 
+
+        ! First set output enth to missing values 
+        enth = missing_value 
+
+        enth(1)  = enth0(1)
+        enth(nz) = enth0(nz0)
+        
+        ! Loop over new vertical axis and interpolate points 
+        do k = 2, nz-1 
+
+            ! Find first index above current point, and index at or below current point
+            do k1 = 2, nz0
+                if (zeta0(k1) .gt. zeta(k)) exit 
+            end do
+            k0 = k1-1 
+
+            if (enth0(k0) .ge. enth_pmp0(k0) .and. enth0(k1) .ge. enth_pmp0(k1)) then 
+                ! Purely temperate, linear interpolation 
+
+                enth(k) = interp_linear_internal(zeta0(k0:k1),enth0(k0:k1),zeta(k))
+
+            else if (enth0(k0) .lt. enth_pmp0(k0) .and. enth0(k1) .lt. enth_pmp0(k1)) then
+                ! Purely cold, linear interpolation 
+
+                enth(k) = interp_linear_internal(zeta0(k0:k1),enth0(k0:k1),zeta(k))
+                
+            else 
+
+                enth(k) = interp_linear_internal(zeta0(k0:k1),enth0(k0:k1),zeta(k))
+                
+                !enth_pmp_cts = interp_linear_internal(zeta0(k0:k1),enth_pmp0(k0:k1),f_cts)
+
+!                 f_lin = (enth_pmp0(k0)-enth0(k0)) / ( (enth0(k1)-enth0(k0)) - (enth_pmp0(k1)-enth_pmp0(k0)) )
+!                 if (f_lin .lt. 1e-2) f_lin = 0.0 
+!                 f_cts = zeta0(k0) + f_lin*(zeta0(k)-zeta0(k0))
+                
+!                 write(*,*) k, zeta0(k0:k1),enth0(k0:k1),enth_pmp_cts,f_cts 
+                
+!                 if (zeta(k) .lt. f_cts) then 
+!                     enth(k) = interp_linear_internal([zeta0(k0),f_cts],[enth0(k0),enth_pmp_cts],zeta(k))
+!                 else 
+!                     enth(k) = interp_linear_internal([f_cts,zeta0(k1)],[enth_pmp_cts,enth0(k1)],zeta(k))
+!                 end if 
+
+            end if 
+
+        end do
+        
+        return 
+
+    end subroutine interp_enth_column
+
+    function interp_linear_internal(x,y,xout) result(yout)
+
+        implicit none
+
+        real(prec), intent(IN)  :: x(2), y(2), xout
+        real(prec) :: yout
+        real(prec) :: alph
+
+        if ( xout .lt. x(1) .or. xout .gt. x(2) ) then
+            write(*,*) "interp1: xout < x0 or xout > x1 !"
+            write(*,*) "xout = ",xout
+            write(*,*) "x0   = ",x(1)
+            write(*,*) "x1   = ",x(2)
+            stop
+        end if
+
+        alph = (xout - x(1)) / (x(2) - x(1))
+        yout = y(1) + alph*(y(2) - y(1))
+
+        return
+
+    end function interp_linear_internal 
+
 end program test_icetemp 

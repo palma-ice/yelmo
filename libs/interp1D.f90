@@ -10,10 +10,11 @@ module interp1D
     end interface 
 
     private
-    public :: interp_linear
-    public :: interp_spline
     public :: interp_align 
-
+    public :: interp_linear
+    public :: interp1D_bins
+    public :: interp_spline
+    
 contains
 
     function interp_align(x,y,xout,missing_value,tol) result(yout)
@@ -155,6 +156,117 @@ contains
         return
 
     end function interp_linear_internal 
+
+
+    subroutine interp1D_bins(y,x,y0,x0)
+
+        implicit none 
+        
+        real(prec), intent(OUT) :: y(:)
+        real(prec), intent(IN)  :: x(:)
+        real(prec), intent(IN)  :: y0(:)
+        real(prec), intent(IN)  :: x0(:)
+        
+        ! Local variables
+        integer :: k, k0, k1
+        integer :: nx, nx0
+        real(prec) :: dx, dx0, xl0, xr0, xl, xr
+        real(prec) :: dx_now, wt_now
+        
+        real(prec), allocatable :: wts(:)
+        
+        nx  = size(x,1)
+        nx0 = size(x0,1)
+        
+        ! Consistency check 
+        if (x(1) .ne. x0(1) .or. x(nx) .ne. x0(nx0)) then 
+            write(*,*) "interp1D_bins:: Error: for this routine, boundary values of axes must be the same."
+            stop
+        end if 
+
+        allocate(wts(nx))
+        
+        ! Initially set target vector and weights to zero
+        y   = 0.0_prec
+        wts = 0.0_prec
+        
+        ! Store boundary values, which
+        ! do not require interpolation
+        y(1)  = y0(1)
+        y(nx) = y0(nx0)
+        
+        wts(1)  = 1.0_prec
+        wts(nx) = 1.0_prec
+        
+        ! Loop over internal values of 
+        ! original vector and
+        ! distribute contributions to each
+        ! bin in target vector
+        do k0 = 2, nx0-1
+            
+            ! Define left and right boundaries 
+            ! of current original cells
+            if (k0 .eq. 2) then
+                xl0 = x0(1)
+            else
+                xl0 = 0.5_prec*(x0(k0-1)+x0(k0))
+            end if
+            
+            if (k0 .eq. nx0-1) then
+                xr0 = x0(nx0)
+            else 
+                xr0 = 0.5_prec*(x0(k0)+x0(k0+1))
+            end if
+            
+            ! Add contribution if any from
+            ! current original cell to any
+            ! target cells. 
+            
+            do k = 2, nx-1
+                
+                ! Define left and right boundaries 
+                ! of target cell
+                if (k .eq. 2) then
+                    xl = x(1)
+                else
+                    xl = 0.5_prec*(x(k-1)+x(k))
+                end if
+                
+                if (k .eq. nx-1) then
+                    xr = x(nx)
+                else 
+                    xr = 0.5_prec*(x(k)+x(k+1))
+                end if
+                
+                ! Total target cell width
+                dx = xr-xl
+                
+                if (xl0 .ge. xr .or. xr0 .le. xl) then 
+                    ! No part of original cell appears in target cell, set
+                    ! weight to zero 
+                    dx_now = 0.0_prec 
+                else    
+                    ! Determine width of original cell that appears in target cell
+                    dx_now = min(xr,xr0) - max(xl,xl0)
+                end if 
+
+                wt_now = dx_now / dx 
+
+                y(k)   = y(k) + wt_now*y0(k0)
+                
+                wts(k) = wts(k) + wt_now
+                
+            end do 
+            
+        end do 
+        
+!         do k = 1, nx
+!             write(*,*) k, wts(k)
+!         end do
+            
+        return
+        
+    end subroutine interp1D_bins
 
     function interp_spline(x,y,xout) result(yout)
 

@@ -913,7 +913,7 @@ contains
         call nc_write_dim(filename,"pt",    x=1.0,    units="1")
 
         ! Write the number of poly points 
-        npt_poly = size(zeta_pt,1) + size(zeta_pc,1) - 1 
+        npt_poly = size(zeta_pt,1) + size(zeta_pc,1) - 2 
         call nc_write_dim(filename,"zeta_px_aa",x=1,nx=npt_poly,dx=1,units="1")
         call nc_write_dim(filename,"zeta_px_ac",x=1,nx=npt_poly-1,dx=1,units="1")
 

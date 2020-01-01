@@ -199,7 +199,7 @@ program test_icetemp
 
     ! Initialize polythermal data structure too 
     !call poly_init(ice1%poly,nz_pt=11,nz_pc=392,zeta_scale=zeta_scale,zeta_exp=2.0_prec)
-    call poly_init(ice1%poly,nz_pt=10,nz_pc=32,zeta_scale=zeta_scale,zeta_exp=2.0_prec)
+    call poly_init(ice1%poly,nz_pt=11,nz_pc=32,zeta_scale=zeta_scale,zeta_exp=2.0_prec)
 
 if (testing_poly) then
 
@@ -848,7 +848,7 @@ contains
 
         poly%nz_pt = nz_pt
         poly%nz_pc = nz_pc
-        poly%nz_aa = poly%nz_pt + poly%nz_pc - 2 
+        poly%nz_aa = poly%nz_pt + poly%nz_pc - 1 
         poly%nz_ac = poly%nz_aa - 1 
 
         ! 1D axis vectors (separate temperate and cold axes)
@@ -913,7 +913,7 @@ contains
         call nc_write_dim(filename,"pt",    x=1.0,    units="1")
 
         ! Write the number of poly points 
-        npt_poly = size(zeta_pt,1) + size(zeta_pc,1) - 2 
+        npt_poly = size(zeta_pt,1) + size(zeta_pc,1) - 1 
         call nc_write_dim(filename,"zeta_px_aa",x=1,nx=npt_poly,dx=1,units="1")
         call nc_write_dim(filename,"zeta_px_ac",x=1,nx=npt_poly-1,dx=1,units="1")
 

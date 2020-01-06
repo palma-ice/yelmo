@@ -16,6 +16,7 @@ module ice_enthalpy
     public :: calc_dzeta_terms
     public :: calc_zeta_twolayers
     public :: calc_zeta_combined
+    public :: get_cts_index
 
 contains 
 
@@ -197,14 +198,7 @@ contains
         ! == Ice interior layers 2:nz_aa-1 ==
 
         ! Find height of CTS - highest temperate layer 
-        k_cts = 0 
-        do k = 1, nz_aa-1 
-            if (enth(k) .ge. T_pmp(k)*cp(k)) then
-                k_cts = k 
-            else 
-                exit 
-            end if 
-        end do
+        k_cts = get_cts_index(enth,T_pmp*cp)
 
         do k = 2, nz_aa-1
 
@@ -334,14 +328,7 @@ contains
 if (.FALSE.) then 
 
         ! Find height of CTS - heighest temperate layer 
-        k_cts = 0 
-        do k = 1, nz_aa-1 
-            if (enth(k) .ge. T_pmp(k)*cp(k)) then
-                k_cts = k 
-            else 
-                exit 
-            end if 
-        end do
+        k_cts = get_cts_index(enth,T_pmp*cp)
 
         if (k_cts .ge. 2) then
             ! Temperate ice exists above the base, recalculate cold layers 
@@ -433,6 +420,152 @@ end if
         return 
 
     end subroutine calc_enth_column
+
+    subroutine calc_enth_column_zoom(enth,T_ice,omega,H_cts,T_pmp,cp,kt,advecxy,uz,Q_strn, &
+                                                                H_ice,zeta_aa,zeta_ac,cr,T0,dt)
+        ! Thermodynamics solver for a given column of ice 
+        ! Note zeta=height, k=1 base, k=nz surface 
+        ! Note: nz = number of vertical boundaries (including zeta=0.0 and zeta=1.0), 
+        ! temperature is defined for cell centers, plus a value at the surface and the base
+        ! so nz_ac = nz_aa - 1 
+
+        ! For notes on implicit form of advection terms, see eg http://farside.ph.utexas.edu/teaching/329/lectures/node90.html
+        
+        implicit none 
+
+        real(prec), intent(INOUT) :: enth(:)        ! nz_aa [J kg] Ice column enthalpy
+        real(prec), intent(INOUT) :: T_ice(:)       ! nz_aa [K] Ice column temperature
+        real(prec), intent(INOUT) :: omega(:)       ! nz_aa [-] Ice column water content fraction
+        real(prec), intent(OUT)   :: H_cts          ! [m] cold-temperate transition surface (CTS) height
+        real(prec), intent(IN)    :: T_pmp(:)       ! nz_aa [K] Pressure melting point temp.
+        real(prec), intent(IN)    :: cp(:)          ! nz_aa [J kg-1 K-1] Specific heat capacity
+        real(prec), intent(IN)    :: kt(:)          ! nz_aa [J a-1 m-1 K-1] Heat conductivity 
+        real(prec), intent(IN)    :: advecxy(:)     ! nz_aa [K a-1] Horizontal heat advection 
+        real(prec), intent(IN)    :: uz(:)          ! nz_ac [m a-1] Vertical velocity 
+        real(prec), intent(IN)    :: Q_strn(:)      ! nz_aa [J a-1 m-3] Internal strain heat production in ice
+        real(prec), intent(IN)    :: H_ice          ! [m] Ice thickness 
+        real(prec), intent(IN)    :: zeta_aa(:)     ! nz_aa [--] Vertical sigma coordinates (zeta==height), layer centered aa-nodes
+        real(prec), intent(IN)    :: zeta_ac(:)     ! nz_ac [--] Vertical height axis temperature (0:1), layer edges ac-nodes    
+        real(prec), intent(IN)    :: cr             ! [--] Conductivity ratio (kappa_water / kappa_ice)
+        real(prec), intent(IN)    :: T0             ! [K or degreesCelcius] Reference melting temperature  
+        real(prec), intent(IN)    :: dt             ! [a] Time step 
+        
+        ! Local variables 
+        integer    :: k, nz_aa, nz_ac, k_cts
+        real(prec) :: Q_strn_now
+
+        real(prec), allocatable :: dzeta_a(:)   ! nz_aa [--] Solver discretization helper variable ak
+        real(prec), allocatable :: dzeta_b(:)   ! nz_aa [--] Solver discretization helper variable bk
+
+        real(prec), allocatable :: kappa_aa(:)  ! aa-nodes
+
+        real(prec), allocatable :: subd(:)      ! nz_aa 
+        real(prec), allocatable :: diag(:)      ! nz_aa  
+        real(prec), allocatable :: supd(:)      ! nz_aa 
+        real(prec), allocatable :: rhs(:)       ! nz_aa 
+        real(prec), allocatable :: solution(:)  ! nz_aa
+
+        real(prec) :: fac, fac_a, fac_b, uz_aa, dzeta, dz, dz1, dz2 
+        real(prec) :: kappa_a, kappa_b 
+
+        nz_aa = size(zeta_aa,1)
+        nz_ac = size(zeta_ac,1)
+
+        allocate(dzeta_a(nz_aa))
+        allocate(dzeta_b(nz_aa))
+
+        allocate(kappa_aa(nz_aa))
+
+        allocate(subd(nz_aa))
+        allocate(diag(nz_aa))
+        allocate(supd(nz_aa))
+        allocate(rhs(nz_aa))
+        allocate(solution(nz_aa))
+
+        ! Define dzeta terms for this column
+        ! Note: for constant zeta axis, this can be done once outside
+        ! instead of for each column. However, it is done here to allow
+        ! use of adaptive vertical axis.
+        call calc_dzeta_terms(dzeta_a,dzeta_b,zeta_aa,zeta_ac)
+
+        call calc_enth_diffusivity(kappa_aa,enth,T_ice,omega,T_pmp,cp,kt,rho_ice,rho_w,L_ice,cr)
+
+        ! == Base of zoom region ==
+
+        subd(1) = 0.0_prec
+        diag(1) = 1.0_prec
+        supd(1) = 0.0_prec
+        rhs(1)  = enth(1)
+
+        ! == Ice interior layers 2:nz_aa-1 ==
+
+        ! Find height of CTS - highest temperate layer 
+        k_cts = get_cts_index(enth,T_pmp*cp)
+
+        do k = 2, nz_aa-1
+ 
+            ! Implicit vertical advection term on aa-node
+            uz_aa   = 0.5_prec*(uz(k-1)+uz(k))   ! ac => aa-nodes
+            
+            ! Convert units of Q_strn [J a-1 m-3] => [K a-1]
+            Q_strn_now = Q_strn(k)/(rho_ice*cp(k))
+
+            ! Get kappa for the lower and upper ac-nodes 
+            ! Note: this is important to avoid mixing of kappa at the 
+            ! CTS height (kappa_lower = kappa_temperate; kappa_upper = kappa_cold)
+            ! See Blatter and Greve, 2015, Eq. 25. 
+            !kappa_a = 0.5_prec*(kappa_aa(k-1) + kappa_aa(k))
+            !kappa_b = 0.5_prec*(kappa_aa(k)   + kappa_aa(k+1))
+
+            dz1 = zeta_ac(k-1)-zeta_aa(k-1)
+            dz2 = zeta_aa(k)-zeta_ac(k-1)
+            call calc_wtd_harmonic_mean(kappa_a,kappa_aa(k-1),kappa_aa(k),dz1,dz2)
+
+            dz1 = zeta_ac(k)-zeta_aa(k)
+            dz2 = zeta_aa(k+1)-zeta_ac(k)
+            call calc_wtd_harmonic_mean(kappa_b,kappa_aa(k),kappa_aa(k+1),dz1,dz2)
+
+            if (k .eq. k_cts+1) kappa_a = kappa_aa(k-1)
+
+            ! Vertical distance for centered difference advection scheme
+            dz      =  H_ice*(zeta_aa(k+1)-zeta_aa(k-1))
+            
+            fac_a   = -kappa_a*dzeta_a(k)*dt/H_ice**2
+            fac_b   = -kappa_b*dzeta_b(k)*dt/H_ice**2
+
+            subd(k) = fac_a - uz_aa * dt/dz
+            diag(k) = 1.0_prec - fac_a - fac_b
+            supd(k) = fac_b + uz_aa * dt/dz
+            rhs(k)  = enth(k) - dt*advecxy(k) + dt*Q_strn_now*cp(k)
+            
+        end do 
+
+        ! == Surface of zoom region ==
+
+        subd(nz_aa) = 0.0_prec
+        diag(nz_aa) = 1.0_prec
+        supd(nz_aa) = 0.0_prec
+        rhs(nz_aa)  = enth(nz_aa)
+
+        ! == Call solver ==
+
+        call solve_tridiag(subd,diag,supd,rhs,solution)
+
+
+        ! Copy the solution into the enthalpy variable,
+        ! recalculate enthalpy, temperature and water content 
+        
+        enth  = solution
+
+        ! Get temperature and water content 
+        call convert_from_enthalpy_column(enth,T_ice,omega,T_pmp,cp,L_ice)
+        
+        ! Finally, calculate the CTS height 
+        H_cts = calc_cts_height(enth,T_ice,omega,T_pmp,cp,H_ice,zeta_aa)
+
+        return 
+
+    end subroutine calc_enth_column_zoom 
 
     ! ========== ENTHALPY ==========================================
 
@@ -583,7 +716,7 @@ end if
 
         ! Local variables 
         integer :: k, k_cts, nz 
-        real(prec) :: f_lin, dedz0, dedz1, zeta_cts 
+        real(prec) :: f_lin, f_lin_0, dedz0, dedz1, zeta_cts 
         real(prec), allocatable :: enth_pmp(:) 
 
         integer :: i, n_iter, n_prime
@@ -593,20 +726,15 @@ end if
         nz = size(enth,1) 
 
         allocate(enth_pmp(nz))
+        allocate(enth_prime(nz)) 
 
         ! Get enthalpy at the pressure melting point (no water content)
         enth_pmp = T_pmp * cp
 
-        ! Determine height of CTS as highest temperate layer 
-        k_cts = 0 
-        do k = 1, nz 
-            !if (enth(k) .ge. T_pmp(k)*cp(k)) then
-            if (T_ice(k) .ge. T_pmp(k)) then 
-                k_cts = k 
-            else 
-                exit 
-            end if 
-        end do 
+        enth_prime = enth - enth_pmp 
+
+        ! Determine height of CTS as highest temperate layer
+        k_cts = get_cts_index(enth,enth_pmp)  
 
         if (k_cts .eq. 0) then 
             ! No temperate ice 
@@ -618,57 +746,66 @@ end if
 
         else 
 
-!             ! Assume H_cts lies at center of last temperate cell (aa-node)
+            ! Assume H_cts lies at center of last temperate cell (aa-node)
 !             zeta_cts = zeta(k_cts)
 
 !             ! Assume H_cts lies on ac-node between temperate and cold layers 
 !             zeta_cts = 0.5_prec*(zeta(k_cts)+zeta(k_cts+1))
 
-            ! Perform linear interpolation 
-            f_lin = (enth_pmp(k_cts)-enth(k_cts)) / ( (enth(k_cts+1)-enth(k_cts)) - (enth_pmp(k_cts+1)-enth_pmp(k_cts)) )
-            if (f_lin .lt. 1e-2) f_lin = 0.0 
-            zeta_cts = zeta(k_cts) + f_lin*(zeta(k)-zeta(k_cts))
+            ! Perform linear interpolation between enth(k_cts) and enth(k_cts+1) to find 
+            ! where enth==enth_pmp.
+            f_lin_0 = ( (enth(k_cts+1)-enth(k_cts)) - (enth_pmp(k_cts+1)-enth_pmp(k_cts)) )
+            if (f_lin_0 .ne. 0.0) then 
+                f_lin = (enth_pmp(k_cts)-enth(k_cts)) / f_lin_0
+                if (f_lin .lt. 1e-2) f_lin = 0.0 
+            else 
+                f_lin = 1.0
+            end if 
 
-!             dedz0 = (enth(k_cts)-enth(k_cts-1))/(zeta(k_cts)-zeta(k_cts-1))
-!             if (abs(dedz0).lt.1e-5) dedz0 = 1e-5 
+            zeta_cts = zeta(k_cts) + f_lin*(zeta(k_cts+1)-zeta(k_cts))
             
-!             dedz1 = (enth(k_cts+2)-enth(k_cts+1))/(zeta(k_cts+2)-zeta(k_cts+1))
-!             if (abs(dedz1).lt.1e-5) dedz1 = 1e-5 
-
-!             ! Only extrapolate from cold layer above CTS
-!             zeta_cts = (zeta(k_cts+1) - (1.0_prec/dedz1)*(enth(k_cts+1)-enth_pmp(k_cts)))
-
-            ! Find intersection extrapolating from cold layer above CTS 
-            ! and warm layer below CTS
-!             zeta_cts = -(1.0_prec/(dedz0-dedz1))*(enth(k_cts+1)-enth(k_cts) &
-!                                                  - dedz1*zeta(k_cts+1) - dedz0*zeta(k_cts))
-
-
-            !zeta_cts = max(zeta_cts,zeta(k_cts))
-            H_cts    = nint(H_ice*zeta_cts)
-
-!             H_cts = H_ice * zeta(k_cts) 
+!             ec = (zc-z0)/(z1-z0)*(e1-e0) + e0 
+!              0 = (zc-z0)/(z1-z0)*(e1-e0) + e0 
+!            -e0 = (zc-z0)/(z1-z0)*(e1-e0)
+!            -e0*(z1-z0)/(e1-e0) = zc-z0
+           
+!            zc = z0 - e0*(z1-z0)/(e1-e0)
             
+!             if (abs(enth_prime(k_cts)-enth_prime(k_cts+1)) .lt. 1e-3) then 
+!                 zeta_cts = zeta(k_cts+1)
+!             else 
+!                 zeta_cts = zeta(k_cts) - enth_prime(k_cts)*(zeta(k_cts+1)-zeta(k_cts))/(enth_prime(k_cts+1)-enth_prime(k_cts))
+!             end if 
+
 !             ! Further iterate to improve estimate of H_cts 
 !             n_iter = 3
 !             do i = 1, n_iter 
 
 !             end do 
             
-!             n_prime = 10 
+!             n_prime = 11 
 
 !             allocate(zeta_prime(n_prime))
 !             allocate(enth_prime(n_prime))
             
-!             do i = 1, n_prime
-!                 zeta_prime(i) = ((i-1)/(n_prime-1))*(zeta(k_cts+1)-zeta(k_cts)) + zeta(k_cts)
+!             zeta_prime(1)       = zeta(k_cts-1)
+!             zeta_prime(n_prime) = zeta(k_cts+1)
+
+!             do i = 2, n_prime-1
+!                 zeta_prime(i) = ((i-2)/(n_prime-3))*(zeta(k_cts+1)-zeta(k_cts)) + zeta(k_cts)
 !             end do 
 
 !             enth_prime = interp_spline(zeta,enth-enth_pmp,zeta_prime)
 
 !             i = minloc(abs(enth_prime),1)
+!             zeta_cts = zeta_prime(i) 
 
-!             H_cts = H_ice*zeta_prime(i) 
+! !             i = maxloc(abs(enth_prime),1,mask=enth_prime .lt. 0.0_prec)
+! !             f_lin = (zeta_prime(i+1)-zeta_prime(i)) / (enth_prime(i+1)-enth_prime(i))
+! !             if (abs(f_lin) .lt. 1e-3) f_lin = 0.0_prec 
+! !             zeta_cts = (1.0_prec-f_lin)*zeta_prime(i) 
+    
+            H_cts    = H_ice*zeta_cts
 
         end if 
 
@@ -744,7 +881,7 @@ end if
 
         implicit none 
 
-        real(prec),   intent(INOUT) :: zeta_pt(:) 
+        real(prec),   intent(INOUT) :: zeta_pt(:)
         real(prec),   intent(INOUT) :: zeta_pc(:) 
         character(*), intent(IN)    :: zeta_scale 
         real(prec),   intent(IN)    :: zeta_exp 
@@ -755,7 +892,7 @@ end if
         integer :: nz_ac 
         real(prec), allocatable :: zeta_ac(:) 
 
-        nz_pt  = size(zeta_pt) 
+        nz_pt  = size(zeta_pt)
         nz_pc  = size(zeta_pc) 
 
         ! ===== Temperate layer ===================================
@@ -817,7 +954,7 @@ end if
 
     end subroutine calc_zeta_twolayers
     
-    subroutine calc_zeta_combined(zeta_aa,zeta_ac,H_cts,H_ice,zeta_pt,zeta_pc)
+    subroutine calc_zeta_combined(zeta_aa,zeta_ac,zeta_pt,zeta_pc,H_cts,H_ice)
         ! Take two-layer axis and combine into one axis based on relative CTS height
         ! f_cts = H_cts / H_ice 
 
@@ -825,22 +962,22 @@ end if
 
         real(prec),   intent(INOUT) :: zeta_aa(:) 
         real(prec),   intent(INOUT) :: zeta_ac(:) 
+        real(prec),   intent(IN)    :: zeta_pt(:) 
+        real(prec),   intent(IN)    :: zeta_pc(:) 
         real(prec),   intent(IN)    :: H_cts 
         real(prec),   intent(IN)    :: H_ice 
-        real(prec),   intent(INOUT) :: zeta_pt(:) 
-        real(prec),   intent(INOUT) :: zeta_pc(:) 
-        
+
         ! Local variables 
         integer    :: k 
-        integer    :: nzt, nzc, nz_aa, nz_ac  
-        real(prec) :: f_cts 
+        integer    :: nzt, nztc, nzc, nz_aa, nz_ac  
+        real(prec) :: f_cts
 
         nz_aa = size(zeta_aa,1)
         nz_ac = size(zeta_ac,1)  ! == nz_aa-1
         nzt   = size(zeta_pt,1)
         nzc   = size(zeta_pc,1) 
 
-        if (nzt+nzc - 1 .ne. nz_aa) then 
+        if (nzt+(nzc-1)  .ne. nz_aa) then 
             write(*,*) "calc_zeta_combined:: Error: Two-layer axis length does not match combined axis length."
             write(*,*) "nzt, nzc-1, nz_aa: ", nzt, nzc-1, nz_aa 
             stop 
@@ -848,14 +985,14 @@ end if
 
         ! Get f_cts 
         if (H_ice .gt. 0.0) then 
-            f_cts = H_cts / H_ice 
+            f_cts = max(H_cts / H_ice,0.01)
         else 
-            f_cts = 0.0 
+            f_cts = 0.01 
         end if 
 
-        zeta_aa(1:nzt) = zeta_pt(1:nzt)*f_cts 
-        zeta_aa(nzt+1:nz_aa) = f_cts + (1.0-f_cts)*zeta_pc(2:nzc)
-
+        zeta_aa(1:nzt) = zeta_pt(1:nzt)*f_cts
+        zeta_aa(nzt+1:nzt+nzc) = f_cts + zeta_pc(2:nzc)*(1.0-f_cts)
+        
         ! Get zeta_ac again (boundaries between zeta_aa values, as well as at the base and surface)
         zeta_ac(1) = 0.0_prec 
         do k = 2, nz_ac-1
@@ -866,6 +1003,32 @@ end if
         return 
 
     end subroutine calc_zeta_combined
+
+    function get_cts_index(enth,enth_pmp) result(k_cts)
+
+        implicit none 
+
+        real(prec), intent(IN) :: enth(:) 
+        real(prec), intent(IN) :: enth_pmp(:) 
+        integer :: k_cts 
+
+        ! Local variables 
+        integer :: k, nz 
+
+        nz = size(enth,1) 
+
+        k_cts = 1 
+        do k = 1, nz 
+            if (enth(k) .ge. enth_pmp(k)) then 
+                k_cts = k 
+            else 
+                exit 
+            end if 
+        end do 
+            
+        return 
+
+    end function get_cts_index 
 
 end module ice_enthalpy
 

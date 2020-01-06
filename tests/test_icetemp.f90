@@ -28,7 +28,9 @@ program test_icetemp
 
     type poly_state_class 
 
-        integer :: nz_pt, nz_pc, nz_aa, nz_ac 
+        integer :: nz_pt, nz_pc
+        integer :: nz_aa, nz_ac 
+        real(prec) :: H_cts
 
         real(prec), allocatable :: zeta_pt(:)       ! zeta_aa for polythermal temperate (pt) zone only 
         real(prec), allocatable :: zeta_pc(:)       ! zeta_aa for polythermal cold (pc) zone only 
@@ -95,7 +97,8 @@ program test_icetemp
     character(len=12)  :: arg_nz, arg_cr 
 
     logical, parameter :: testing_poly = .TRUE.
-    real(prec)         :: H_cts_prev 
+    real(prec)         :: H_cts_prev, H_cts_ref, H_cts_now, E0, E1, dEdz 
+    integer            :: k_cts, k 
 
     type(poly_state_class) :: poly  ! For two-layered calculations
     integer :: iter, n_iter 
@@ -106,7 +109,7 @@ program test_icetemp
     ! ===============================================================
     ! User options 
 
-    experiment     = "k15expb"        ! "eismint", "k15expa", "k15expb", "bg15a"
+    experiment     = "bg15a"        ! "eismint", "k15expa", "k15expb", "bg15a"
     
     ! General options
     zeta_scale      = "linear"      ! "linear", "exp", "tanh"
@@ -204,10 +207,11 @@ program test_icetemp
 if (testing_poly) then
 
     ! Calculate the poly vertical axis at each grid point
-    call calc_zeta_combined(ice1%poly%zeta_aa,ice1%poly%zeta_ac,ice1%H_cts,ice1%H_ice,ice1%poly%zeta_pt,ice1%poly%zeta_pc)
+    call calc_zeta_combined(ice1%poly%zeta_aa,ice1%poly%zeta_ac,ice1%poly%zeta_pt,ice1%poly%zeta_pc, &
+                                                                        ice1%H_cts,ice1%H_ice)
     
-    ice1%poly%cp = interp_linear(ice1%vec%zeta,ice1%vec%cp,ice1%poly%zeta_aa)
-    ice1%poly%kt = interp_linear(ice1%vec%zeta,ice1%vec%kt,ice1%poly%zeta_aa)
+    ice1%poly%cp    = interp_linear(ice1%vec%zeta,ice1%vec%cp,ice1%poly%zeta_aa)
+    ice1%poly%kt    = interp_linear(ice1%vec%zeta,ice1%vec%kt,ice1%poly%zeta_aa)
     
     ice1%poly%enth  = interp_linear(ice1%vec%zeta,ice1%vec%enth,ice1%poly%zeta_aa)
     ice1%poly%T_ice = interp_linear(ice1%vec%zeta,ice1%vec%T_ice,ice1%poly%zeta_aa)
@@ -215,9 +219,7 @@ if (testing_poly) then
     ice1%poly%T_pmp = interp_linear(ice1%vec%zeta,ice1%vec%T_pmp,ice1%poly%zeta_aa)
 
     call update_poly(ice1%poly,ice1%vec%advecxy,ice1%vec%Q_strn,ice1%vec%uz,ice1%vec%zeta, &
-                                                    ice1%vec%zeta_ac,ice1%H_cts,ice1%H_ice,ice1%H_cts)
-
-    poly = ice1%poly 
+                                                    ice1%vec%zeta_ac,ice1%H_cts,ice1%H_ice)
 
 else
 
@@ -237,8 +239,6 @@ else
     ice1%poly%Q_strn  = ice1%vec%Q_strn 
     ice1%poly%uz      = ice1%vec%uz 
 
-    poly = ice1%poly 
-    
 end if 
 
     ! Initialize time and calculate number of time steps to iterate and 
@@ -267,8 +267,8 @@ end if
 !     call write_step(robin,robin%vec,filename=file1D,time=time)
 
     ! Initialize output file for model and write intial conditions 
-    call write_init(ice1,filename=file1D,zeta=ice1%vec%zeta,zeta_ac=ice1%vec%zeta_ac, &
-                        zeta_pt=ice1%poly%zeta_pt,zeta_pc=ice1%poly%zeta_pc,time_init=time)
+    call write_init(ice1,filename=file1D,zeta=ice1%vec%zeta,zeta_ac=ice1%vec%zeta_ac,zeta_pt=ice1%poly%zeta_pt, &
+                        zeta_pc=ice1%poly%zeta_pc,time_init=time)
     call write_step(ice1,ice1%vec,ice1%poly,filename=file1D,time=time)
 
     ! Ensure zero basal water thickness to start 
@@ -320,23 +320,71 @@ end if
 
 if (testing_poly) then
 
+    ! Store H_cts from previous timestep 
+    H_cts_prev = ice1%H_cts 
+
+    ! Find height of CTS index - highest temperate layer 
+    k_cts     = get_cts_index(ice1%poly%enth,ice1%poly%T_pmp*ice1%poly%cp)
+    H_cts_ref = ice1%poly%zeta_aa(k_cts)*ice1%H_ice 
+
+if (.TRUE.) then 
+    ! Perform iterations to improve guess of H_cts 
+
+        do iter = 1, 10
+            
+            ! Reset to original configuration
+            poly = ice1%poly 
+
+            !H_cts_now = ice1%H_cts
+            H_cts_now = H_cts_ref + (iter)*0.5 
+             
+            call update_poly(poly,ice1%vec%advecxy,ice1%vec%Q_strn,ice1%vec%uz,ice1%vec%zeta, &
+                                                                ice1%vec%zeta_ac,ice1%H_cts,ice1%H_ice)
+            
+            call calc_enth_column(poly%enth,poly%T_ice,poly%omega,ice1%bmb,ice1%Q_ice_b,ice1%H_cts,poly%T_pmp, &
+                    poly%cp,poly%kt,poly%advecxy,poly%uz,poly%Q_strn,ice1%Q_b,ice1%Q_geo,ice1%T_srf,ice1%T_shlf, &
+                    ice1%H_ice,ice1%H_w,ice1%f_grnd,poly%zeta_aa,poly%zeta_ac, &
+                    enth_cr,omega_max,T0_ref,dt)
+
+            ! Find height of CTS index - highest temperate layer 
+            k_cts = get_cts_index(poly%enth,poly%T_pmp*poly%cp)
+            
+            dEdz = (poly%enth(k_cts+2)-poly%enth(k_cts+1)) / (poly%zeta_aa(k_cts+2)-poly%zeta_aa(k_cts+1))
+            E0   = poly%enth(k_cts)-poly%T_pmp(k_cts)*poly%cp(k_cts)
+            E1   = poly%enth(k_cts+1)-poly%T_pmp(k_cts+1)*poly%cp(k_cts+1)
+
+            write(*,"(i10,3f10.4,3g12.5)") iter, H_cts_prev, H_cts_now, ice1%H_cts, dEdz, E0, E1 
+            
+        end do  
+
+        ice1%H_cts = H_cts_prev
         poly = ice1%poly 
-        
+            
         do iter = 1, 5
+            
+            H_cts_now = ice1%H_cts
+            !H_cts_now = H_cts_prev + (iter)*0.5   
+            call update_poly(poly,ice1%vec%advecxy,ice1%vec%Q_strn,ice1%vec%uz,ice1%vec%zeta, &
+                                                                ice1%vec%zeta_ac,H_cts_now,ice1%H_ice)
+            
+            call calc_enth_column(poly%enth,poly%T_ice,poly%omega,ice1%bmb,ice1%Q_ice_b,ice1%H_cts,poly%T_pmp, &
+                    poly%cp,poly%kt,poly%advecxy,poly%uz,poly%Q_strn,ice1%Q_b,ice1%Q_geo,ice1%T_srf,ice1%T_shlf, &
+                    ice1%H_ice,ice1%H_w,ice1%f_grnd,poly%zeta_aa,poly%zeta_ac, &
+                    enth_cr,omega_max,T0_ref,dt)
+
+        end do 
+
+else 
+        H_cts_now = H_cts_prev 
+        !H_cts_now = ice1%H_cts
+
+end if 
+    
         
-        call calc_enth_column(poly%enth,poly%T_ice,poly%omega,ice1%bmb,ice1%Q_ice_b,ice1%H_cts,poly%T_pmp, &
-                poly%cp,poly%kt,poly%advecxy,poly%uz,poly%Q_strn,ice1%Q_b,ice1%Q_geo,ice1%T_srf,ice1%T_shlf, &
-                ice1%H_ice,ice1%H_w,ice1%f_grnd,poly%zeta_aa,poly%zeta_ac, &
-                enth_cr,omega_max,T0_ref,dt)
-
-        !write(*,*) iter, ice1%H_cts, H_cts_prev 
-
         call update_poly(ice1%poly,ice1%vec%advecxy,ice1%vec%Q_strn,ice1%vec%uz,ice1%vec%zeta, &
-                                                            ice1%vec%zeta_ac,ice1%H_cts,ice1%H_ice,H_cts_prev)
+                                                            ice1%vec%zeta_ac,H_cts_now,ice1%H_ice)
 
         H_cts_prev = ice1%H_cts 
-
-        end do  
 
 end if 
 
@@ -393,7 +441,7 @@ end if
 
 contains 
 
-    subroutine update_poly(poly,advecxy,Q_strn,uz,zeta_aa,zeta_ac,H_cts,H_ice,H_cts_prev)
+    subroutine update_poly(poly,advecxy,Q_strn,uz,zeta_aa,zeta_ac,H_cts,H_ice)
 
         implicit none
 
@@ -404,8 +452,7 @@ contains
         real(prec), intent(IN) :: zeta_aa(:) 
         real(prec), intent(IN) :: zeta_ac(:) 
         real(prec), intent(IN) :: H_cts 
-        real(prec), intent(IN) :: H_ice 
-        real(prec), intent(IN) :: H_cts_prev 
+        real(prec), intent(IN) :: H_ice
 
         ! Local variables 
         integer    :: k, k_cts, nz  
@@ -419,29 +466,22 @@ contains
         allocate(p_enth0(size(poly%enth,1)))
         allocate(p_enth_pmp0(size(poly%enth,1)))
         
-        H_cts_now = H_cts 
-        !H_cts_now = 0.7*H_cts_prev + 0.3*H_cts 
-        !H_cts_now = 20.0
+        H_cts_now = H_cts
+        !H_cts_now = floor(1e1*H_cts)*1e-1
+        !H_cts_now = 32.0
         
         H_cts_now = max(H_cts_now,1.0_prec)
         
         ! Update poly zeta axis 
-        call calc_zeta_combined(poly%zeta_aa,poly%zeta_ac,H_cts_now,H_ice,poly%zeta_pt,poly%zeta_pc)
+        call calc_zeta_combined(poly%zeta_aa,poly%zeta_ac,poly%zeta_pt,poly%zeta_pc,H_cts_now,H_ice)
 
         ! Store original enth value and axis
         p_zeta0     = poly%zeta_aa  
         p_enth0     = poly%enth 
         p_enth_pmp0 = poly%T_pmp * poly%cp 
         
-        ! Determine height of CTS as heighest temperate layer 
-        k_cts = 0 
-        do k = 1, poly%nz_aa 
-            if (poly%enth(k) .ge. poly%T_pmp(k)*poly%cp(k)) then 
-                k_cts = k 
-            else 
-                exit 
-            end if 
-        end do 
+        ! Find height of CTS index - highest temperate layer 
+        k_cts = get_cts_index(poly%enth,poly%T_pmp*poly%cp)
         
         ! Update enth 
         !poly%enth = interp_linear(p_zeta0,p_enth0,poly%zeta_aa)
@@ -838,18 +878,18 @@ contains
         implicit none 
 
         type(poly_state_class), intent(INOUT) :: poly 
-        integer,      intent(IN) :: nz_pt 
+        integer,      intent(IN) :: nz_pt
         integer,      intent(IN) :: nz_pc  
         character(*), intent(IN) :: zeta_scale 
         real(prec),   intent(IN) :: zeta_exp 
-        
+
         ! Local variables 
         integer    :: k  
 
-        poly%nz_pt = nz_pt
-        poly%nz_pc = nz_pc
-        poly%nz_aa = poly%nz_pt + poly%nz_pc - 1 
-        poly%nz_ac = poly%nz_aa - 1 
+        poly%nz_pt  = nz_pt
+        poly%nz_pc  = nz_pc
+        poly%nz_aa  = poly%nz_pt + (poly%nz_pc-1) 
+        poly%nz_ac  = poly%nz_aa - 1  
 
         ! 1D axis vectors (separate temperate and cold axes)
         allocate(poly%zeta_pt(poly%nz_pt)) 
@@ -876,13 +916,7 @@ contains
 
 
         ! Test routine to make combined axis::
-!         call calc_zeta_combined(poly%zeta_aa(1,1,:),poly%zeta_ac(1,1,:),100.0,200.0,poly%zeta_pt,poly%zeta_pc)
-
-!         do k = 1, poly%nz_aa
-!             write(*,*) k, poly%zeta_aa(1,1,k) 
-!         end do 
-
-!         stop 
+!         call calc_zeta_combined(poly%zeta_aa,poly%zeta_ac,poly%zeta_pt,poly%zeta_pc,H_cts=20.0,H_ice=200.0)
 
         return 
 
@@ -896,7 +930,7 @@ contains
         character(len=*), intent(IN) :: filename 
         real(prec),       intent(IN) :: zeta(:)  
         real(prec),       intent(IN) :: zeta_ac(:) 
-        real(prec),       intent(IN) :: zeta_pt(:) 
+        real(prec),       intent(IN) :: zeta_pt(:)
         real(prec),       intent(IN) :: zeta_pc(:)  
         real(prec),       intent(IN) :: time_init
 
@@ -913,7 +947,7 @@ contains
         call nc_write_dim(filename,"pt",    x=1.0,    units="1")
 
         ! Write the number of poly points 
-        npt_poly = size(zeta_pt,1) + size(zeta_pc,1) - 1 
+        npt_poly = size(zeta_pt,1) + (size(zeta_pc,1)-1) 
         call nc_write_dim(filename,"zeta_px_aa",x=1,nx=npt_poly,dx=1,units="1")
         call nc_write_dim(filename,"zeta_px_ac",x=1,nx=npt_poly-1,dx=1,units="1")
 

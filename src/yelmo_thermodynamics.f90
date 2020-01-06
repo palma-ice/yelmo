@@ -1151,7 +1151,7 @@ end if
         allocate(poly%uz(nx,ny,poly%nz_ac))
         
         ! Calculate the temperate and cold vertical axes 
-        call calc_zeta_twolayers(poly%zeta_pt,poly%zeta_pc,zeta_scale,zeta_exp)
+        !call calc_zeta_twolayers(poly%zeta_pt,poly%zeta_pc,zeta_scale,zeta_exp)
 
 
         ! Test routine to make combined axis::
@@ -1166,5 +1166,5 @@ end if
         return 
 
     end subroutine ytherm_poly_init 
-    
+
 end module yelmo_thermodynamics

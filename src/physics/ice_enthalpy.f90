@@ -74,6 +74,7 @@ contains
 
         real(prec), allocatable :: fac_enth(:)  ! aa-nodes 
         real(prec), allocatable :: var(:)       ! aa-nodes 
+        real(prec), allocatable :: enth_pmp(:)  ! aa-nodes
         real(prec), allocatable :: kappa_aa(:)  ! aa-nodes
 
         real(prec), allocatable :: subd(:)      ! nz_aa 
@@ -98,6 +99,7 @@ contains
         allocate(kappa_aa(nz_aa))
         allocate(fac_enth(nz_aa))
         allocate(var(nz_aa))
+        allocate(enth_pmp(nz_aa))
 
         allocate(subd(nz_aa))
         allocate(diag(nz_aa))
@@ -117,10 +119,12 @@ contains
         ! Step 0: Calculate diffusivity, set prognostic variable (T_ice or enth),
         ! and corresponding scaling factor (fac_enth)
 
-        call calc_enth_diffusivity(kappa_aa,enth,T_ice,omega,T_pmp,cp,kt,rho_ice,rho_w,L_ice,cr)
-
         fac_enth = cp               ! To scale to units of [J kg]
         var      = enth             ! [J kg]
+
+        enth_pmp = T_pmp*fac_enth 
+
+        call calc_enth_diffusivity(kappa_aa,enth,enth_pmp,cp,kt,cr,rho_ice)
 
         ! Step 1: Apply vertical implicit diffusion-advection
         
@@ -334,7 +338,7 @@ if (.FALSE.) then
             ! Temperate ice exists above the base, recalculate cold layers 
 
             ! Recalculate diffusivity (only relevant for cold points)
-            call calc_enth_diffusivity(kappa_aa,enth,T_ice,omega,T_pmp,cp,kt,rho_ice,rho_w,L_ice,cr)
+            call calc_enth_diffusivity(kappa_aa,enth,enth_pmp,cp,kt,cr,rho_ice)
 
             ! Lower boundary condition for cold ice dE/dz = 0.0 
 
@@ -421,8 +425,8 @@ end if
 
     end subroutine calc_enth_column
 
-    subroutine calc_enth_column_zoom(enth,T_ice,omega,H_cts,T_pmp,cp,kt,advecxy,uz,Q_strn, &
-                                                                H_ice,zeta_aa,zeta_ac,cr,T0,dt)
+    subroutine calc_enth_column_cold(enth,enth_pmp,cp,kt,advecxy,uz,Q_strn, &
+                                                            zeta_aa,zeta_ac,H_now,rho_ice,dt)
         ! Thermodynamics solver for a given column of ice 
         ! Note zeta=height, k=1 base, k=nz surface 
         ! Note: nz = number of vertical boundaries (including zeta=0.0 and zeta=1.0), 
@@ -434,24 +438,20 @@ end if
         implicit none 
 
         real(prec), intent(INOUT) :: enth(:)        ! nz_aa [J kg] Ice column enthalpy
-        real(prec), intent(INOUT) :: T_ice(:)       ! nz_aa [K] Ice column temperature
-        real(prec), intent(INOUT) :: omega(:)       ! nz_aa [-] Ice column water content fraction
-        real(prec), intent(OUT)   :: H_cts          ! [m] cold-temperate transition surface (CTS) height
-        real(prec), intent(IN)    :: T_pmp(:)       ! nz_aa [K] Pressure melting point temp.
+        real(prec), intent(IN)    :: enth_pmp(:)    ! nz_aa [K] Pressure melting point temp.
         real(prec), intent(IN)    :: cp(:)          ! nz_aa [J kg-1 K-1] Specific heat capacity
         real(prec), intent(IN)    :: kt(:)          ! nz_aa [J a-1 m-1 K-1] Heat conductivity 
         real(prec), intent(IN)    :: advecxy(:)     ! nz_aa [K a-1] Horizontal heat advection 
         real(prec), intent(IN)    :: uz(:)          ! nz_ac [m a-1] Vertical velocity 
         real(prec), intent(IN)    :: Q_strn(:)      ! nz_aa [J a-1 m-3] Internal strain heat production in ice
-        real(prec), intent(IN)    :: H_ice          ! [m] Ice thickness 
         real(prec), intent(IN)    :: zeta_aa(:)     ! nz_aa [--] Vertical sigma coordinates (zeta==height), layer centered aa-nodes
         real(prec), intent(IN)    :: zeta_ac(:)     ! nz_ac [--] Vertical height axis temperature (0:1), layer edges ac-nodes    
-        real(prec), intent(IN)    :: cr             ! [--] Conductivity ratio (kappa_water / kappa_ice)
-        real(prec), intent(IN)    :: T0             ! [K or degreesCelcius] Reference melting temperature  
+        real(prec), intent(IN)    :: H_now          ! [m] Ice thickness of column
+        real(prec), intent(IN)    :: rho_ice        ! [kg m-3] Ice density   
         real(prec), intent(IN)    :: dt             ! [a] Time step 
         
         ! Local variables 
-        integer    :: k, nz_aa, nz_ac, k_cts
+        integer    :: k, nz_aa
         real(prec) :: Q_strn_now
 
         real(prec), allocatable :: dzeta_a(:)   ! nz_aa [--] Solver discretization helper variable ak
@@ -469,7 +469,6 @@ end if
         real(prec) :: kappa_a, kappa_b 
 
         nz_aa = size(zeta_aa,1)
-        nz_ac = size(zeta_ac,1)
 
         allocate(dzeta_a(nz_aa))
         allocate(dzeta_b(nz_aa))
@@ -488,19 +487,16 @@ end if
         ! use of adaptive vertical axis.
         call calc_dzeta_terms(dzeta_a,dzeta_b,zeta_aa,zeta_ac)
 
-        call calc_enth_diffusivity(kappa_aa,enth,T_ice,omega,T_pmp,cp,kt,rho_ice,rho_w,L_ice,cr)
+        call calc_enth_diffusivity(kappa_aa,enth,enth_pmp,cp,kt,cr=0.0_prec,rho_ice=rho_ice)
 
-        ! == Base of zoom region ==
+        ! == Base of cold region - prescribe enthalpy of the pressure melting point ==
 
         subd(1) = 0.0_prec
         diag(1) = 1.0_prec
         supd(1) = 0.0_prec
-        rhs(1)  = enth(1)
+        rhs(1)  = enth_pmp(1)
 
         ! == Ice interior layers 2:nz_aa-1 ==
-
-        ! Find height of CTS - highest temperate layer 
-        k_cts = get_cts_index(enth,T_pmp*cp)
 
         do k = 2, nz_aa-1
  
@@ -525,13 +521,140 @@ end if
             dz2 = zeta_aa(k+1)-zeta_ac(k)
             call calc_wtd_harmonic_mean(kappa_b,kappa_aa(k),kappa_aa(k+1),dz1,dz2)
 
-            if (k .eq. k_cts+1) kappa_a = kappa_aa(k-1)
+            ! Vertical distance for centered difference advection scheme
+            dz      =  H_now*(zeta_aa(k+1)-zeta_aa(k-1))
+            
+            fac_a   = -kappa_a*dzeta_a(k)*dt/H_now**2
+            fac_b   = -kappa_b*dzeta_b(k)*dt/H_now**2
+
+            subd(k) = fac_a - uz_aa * dt/dz
+            diag(k) = 1.0_prec - fac_a - fac_b
+            supd(k) = fac_b + uz_aa * dt/dz
+            rhs(k)  = enth(k) - dt*advecxy(k) + dt*Q_strn_now*cp(k)
+            
+        end do 
+
+        ! == Surface of cold region (ice surface) ==
+
+        subd(nz_aa) = 0.0_prec
+        diag(nz_aa) = 1.0_prec
+        supd(nz_aa) = 0.0_prec
+        rhs(nz_aa)  = min(enth(nz_aa),enth_pmp(nz_aa))
+
+        ! == Call solver ==
+
+        call solve_tridiag(subd,diag,supd,rhs,solution)
+
+        ! Copy the solution into the enthalpy variable for output
+        
+        enth  = solution
+
+        return 
+
+    end subroutine calc_enth_column_cold 
+
+    subroutine calc_enth_column_zoom(enth,enth_pmp,cp,kt,advecxy,uz,Q_strn, &
+                                                            zeta_aa,zeta_ac,cr,H_now,rho_ice,dt)
+        ! Thermodynamics solver for a given column of ice 
+        ! Note zeta=height, k=1 base, k=nz surface 
+        ! Note: nz = number of vertical boundaries (including zeta=0.0 and zeta=1.0), 
+        ! temperature is defined for cell centers, plus a value at the surface and the base
+        ! so nz_ac = nz_aa - 1 
+
+        ! For notes on implicit form of advection terms, see eg http://farside.ph.utexas.edu/teaching/329/lectures/node90.html
+        
+        implicit none 
+
+        real(prec), intent(INOUT) :: enth(:)        ! nz_aa [J kg] Ice column enthalpy
+        real(prec), intent(IN)    :: enth_pmp(:)    ! nz_aa [K] Pressure melting point temp.
+        real(prec), intent(IN)    :: cp(:)          ! nz_aa [J kg-1 K-1] Specific heat capacity
+        real(prec), intent(IN)    :: kt(:)          ! nz_aa [J a-1 m-1 K-1] Heat conductivity 
+        real(prec), intent(IN)    :: advecxy(:)     ! nz_aa [K a-1] Horizontal heat advection 
+        real(prec), intent(IN)    :: uz(:)          ! nz_ac [m a-1] Vertical velocity 
+        real(prec), intent(IN)    :: Q_strn(:)      ! nz_aa [J a-1 m-3] Internal strain heat production in ice
+        real(prec), intent(IN)    :: zeta_aa(:)     ! nz_aa [--] Vertical sigma coordinates (zeta==height), layer centered aa-nodes
+        real(prec), intent(IN)    :: zeta_ac(:)     ! nz_ac [--] Vertical height axis temperature (0:1), layer edges ac-nodes    
+        real(prec), intent(IN)    :: cr 
+        real(prec), intent(IN)    :: H_now          ! [m] Ice thickness of column
+        real(prec), intent(IN)    :: rho_ice        ! [kg m-3] Ice density   
+        real(prec), intent(IN)    :: dt             ! [a] Time step 
+        
+        ! Local variables 
+        integer    :: k, nz_aa
+        real(prec) :: Q_strn_now
+
+        real(prec), allocatable :: dzeta_a(:)   ! nz_aa [--] Solver discretization helper variable ak
+        real(prec), allocatable :: dzeta_b(:)   ! nz_aa [--] Solver discretization helper variable bk
+
+        real(prec), allocatable :: kappa_aa(:)  ! aa-nodes
+
+        real(prec), allocatable :: subd(:)      ! nz_aa 
+        real(prec), allocatable :: diag(:)      ! nz_aa  
+        real(prec), allocatable :: supd(:)      ! nz_aa 
+        real(prec), allocatable :: rhs(:)       ! nz_aa 
+        real(prec), allocatable :: solution(:)  ! nz_aa
+
+        real(prec) :: fac, fac_a, fac_b, uz_aa, dzeta, dz, dz1, dz2 
+        real(prec) :: kappa_a, kappa_b 
+
+        nz_aa = size(zeta_aa,1)
+
+        allocate(dzeta_a(nz_aa))
+        allocate(dzeta_b(nz_aa))
+
+        allocate(kappa_aa(nz_aa))
+
+        allocate(subd(nz_aa))
+        allocate(diag(nz_aa))
+        allocate(supd(nz_aa))
+        allocate(rhs(nz_aa))
+        allocate(solution(nz_aa))
+
+        ! Define dzeta terms for this column
+        ! Note: for constant zeta axis, this can be done once outside
+        ! instead of for each column. However, it is done here to allow
+        ! use of adaptive vertical axis.
+        call calc_dzeta_terms(dzeta_a,dzeta_b,zeta_aa,zeta_ac)
+
+        call calc_enth_diffusivity(kappa_aa,enth,enth_pmp,cp,kt,cr,rho_ice)
+
+        ! == Base of zoom region ==
+
+        subd(1) = 0.0_prec
+        diag(1) = 1.0_prec
+        supd(1) = 0.0_prec
+        rhs(1)  = enth(1)
+
+        ! == Ice interior layers 2:nz_aa-1 ==
+
+        do k = 2, nz_aa-1
+ 
+            ! Implicit vertical advection term on aa-node
+            uz_aa   = 0.5_prec*(uz(k-1)+uz(k))   ! ac => aa-nodes
+            
+            ! Convert units of Q_strn [J a-1 m-3] => [K a-1]
+            Q_strn_now = Q_strn(k)/(rho_ice*cp(k))
+
+            ! Get kappa for the lower and upper ac-nodes 
+            ! Note: this is important to avoid mixing of kappa at the 
+            ! CTS height (kappa_lower = kappa_temperate; kappa_upper = kappa_cold)
+            ! See Blatter and Greve, 2015, Eq. 25. 
+            !kappa_a = 0.5_prec*(kappa_aa(k-1) + kappa_aa(k))
+            !kappa_b = 0.5_prec*(kappa_aa(k)   + kappa_aa(k+1))
+
+            dz1 = zeta_ac(k-1)-zeta_aa(k-1)
+            dz2 = zeta_aa(k)-zeta_ac(k-1)
+            call calc_wtd_harmonic_mean(kappa_a,kappa_aa(k-1),kappa_aa(k),dz1,dz2)
+
+            dz1 = zeta_ac(k)-zeta_aa(k)
+            dz2 = zeta_aa(k+1)-zeta_ac(k)
+            call calc_wtd_harmonic_mean(kappa_b,kappa_aa(k),kappa_aa(k+1),dz1,dz2)
 
             ! Vertical distance for centered difference advection scheme
-            dz      =  H_ice*(zeta_aa(k+1)-zeta_aa(k-1))
+            dz      =  H_now*(zeta_aa(k+1)-zeta_aa(k-1))
             
-            fac_a   = -kappa_a*dzeta_a(k)*dt/H_ice**2
-            fac_b   = -kappa_b*dzeta_b(k)*dt/H_ice**2
+            fac_a   = -kappa_a*dzeta_a(k)*dt/H_now**2
+            fac_b   = -kappa_b*dzeta_b(k)*dt/H_now**2
 
             subd(k) = fac_a - uz_aa * dt/dz
             diag(k) = 1.0_prec - fac_a - fac_b
@@ -551,17 +674,9 @@ end if
 
         call solve_tridiag(subd,diag,supd,rhs,solution)
 
-
-        ! Copy the solution into the enthalpy variable,
-        ! recalculate enthalpy, temperature and water content 
+        ! Copy the solution into the enthalpy variable for output
         
         enth  = solution
-
-        ! Get temperature and water content 
-        call convert_from_enthalpy_column(enth,T_ice,omega,T_pmp,cp,L_ice)
-        
-        ! Finally, calculate the CTS height 
-        H_cts = calc_cts_height(enth,T_ice,omega,T_pmp,cp,H_ice,zeta_aa)
 
         return 
 
@@ -650,7 +765,7 @@ end if
 
     end subroutine convert_from_enthalpy_column
 
-    subroutine calc_enth_diffusivity(kappa,enth,T_ice,omega,T_pmp,cp,kt,rho_ice,rho_w,L_ice,cr)
+    subroutine calc_enth_diffusivity(kappa,enth,enth_pmp,cp,kt,cr,rho_ice)
         ! Calculate the enthalpy vertical diffusivity for use with the diffusion solver:
         ! When water is present in the layer, set kappa=kappa_therm, else kappa=kappa_cold 
 
@@ -658,36 +773,28 @@ end if
 
         real(prec), intent(OUT) :: kappa(:)         ! [nz_aa]
         real(prec), intent(IN)  :: enth(:)          ! [nz_aa]
-        real(prec), intent(IN)  :: T_ice(:)         ! [nz_aa]
-        real(prec), intent(IN)  :: omega(:)         ! [nz_aa]
-        real(prec), intent(IN)  :: T_pmp(:)         ! [nz_aa]
+        real(prec), intent(IN)  :: enth_pmp(:)      ! [nz_aa]
         real(prec), intent(IN)  :: cp(:)
         real(prec), intent(IN)  :: kt(:)  
-        real(prec), intent(IN)  :: rho_ice
-        real(prec), intent(IN)  :: rho_w
-        real(prec), intent(IN)  :: L_ice
         real(prec), intent(IN)  :: cr 
-
+        real(prec), intent(IN)  :: rho_ice
+        
         ! Local variables
-        integer     :: k, nz_aa   
-        real(prec)  :: enth_pmp
+        integer     :: k, nz
         real(prec)  :: kappa_cold       ! Cold diffusivity 
         real(prec)  :: kappa_temp       ! Temperate diffusivity 
         
-        nz_aa = size(enth)
+        nz = size(enth)
 
         kappa = 0.0 
 
-        do k = 1, nz_aa
+        do k = 1, nz
 
             ! Determine kappa_cold and kappa_temp for this level 
             kappa_cold = kt(k) / (rho_ice*cp(k))
             kappa_temp = cr * kappa_cold 
 
-            enth_pmp = T_pmp(k)*cp(k)
-
-            if (omega(k) .gt. 0.0) then 
-!             if (enth(k) .ge. enth_pmp) then
+            if (enth(k) .ge. enth_pmp(k)) then
                 kappa(k) = kappa_temp 
             else 
                 kappa(k) = kappa_cold 
@@ -992,7 +1099,7 @@ end if
 
         zeta_aa(1:nzt) = zeta_pt(1:nzt)*f_cts
         zeta_aa(nzt+1:nzt+nzc) = f_cts + zeta_pc(2:nzc)*(1.0-f_cts)
-        
+
         ! Get zeta_ac again (boundaries between zeta_aa values, as well as at the base and surface)
         zeta_ac(1) = 0.0_prec 
         do k = 2, nz_ac-1

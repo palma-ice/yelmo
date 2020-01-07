@@ -330,32 +330,32 @@ if (testing_poly) then
 if (.TRUE.) then 
     ! Perform iterations to improve guess of H_cts 
 
-        do iter = 1, 10
+!         do iter = 1, 10
             
-            ! Reset to original configuration
-            poly = ice1%poly 
+!             ! Reset to original configuration
+!             poly = ice1%poly 
 
-            !H_cts_now = ice1%H_cts
-            H_cts_now = H_cts_ref + (iter)*0.5 
+!             !H_cts_now = ice1%H_cts
+!             H_cts_now = H_cts_ref + (iter)*0.5 
              
-            call update_poly(poly,ice1%vec%advecxy,ice1%vec%Q_strn,ice1%vec%uz,ice1%vec%zeta, &
-                                                                ice1%vec%zeta_ac,ice1%H_cts,ice1%H_ice)
+!             call update_poly(poly,ice1%vec%advecxy,ice1%vec%Q_strn,ice1%vec%uz,ice1%vec%zeta, &
+!                                                                 ice1%vec%zeta_ac,ice1%H_cts,ice1%H_ice)
             
-            call calc_enth_column(poly%enth,poly%T_ice,poly%omega,ice1%bmb,ice1%Q_ice_b,ice1%H_cts,poly%T_pmp, &
-                    poly%cp,poly%kt,poly%advecxy,poly%uz,poly%Q_strn,ice1%Q_b,ice1%Q_geo,ice1%T_srf,ice1%T_shlf, &
-                    ice1%H_ice,ice1%H_w,ice1%f_grnd,poly%zeta_aa,poly%zeta_ac, &
-                    enth_cr,omega_max,T0_ref,dt)
+!             call calc_enth_column(poly%enth,poly%T_ice,poly%omega,ice1%bmb,ice1%Q_ice_b,ice1%H_cts,poly%T_pmp, &
+!                     poly%cp,poly%kt,poly%advecxy,poly%uz,poly%Q_strn,ice1%Q_b,ice1%Q_geo,ice1%T_srf,ice1%T_shlf, &
+!                     ice1%H_ice,ice1%H_w,ice1%f_grnd,poly%zeta_aa,poly%zeta_ac, &
+!                     enth_cr,omega_max,T0_ref,dt)
 
-            ! Find height of CTS index - highest temperate layer 
-            k_cts = get_cts_index(poly%enth,poly%T_pmp*poly%cp)
+!             ! Find height of CTS index - highest temperate layer 
+!             k_cts = get_cts_index(poly%enth,poly%T_pmp*poly%cp)
             
-            dEdz = (poly%enth(k_cts+2)-poly%enth(k_cts+1)) / (poly%zeta_aa(k_cts+2)-poly%zeta_aa(k_cts+1))
-            E0   = poly%enth(k_cts)-poly%T_pmp(k_cts)*poly%cp(k_cts)
-            E1   = poly%enth(k_cts+1)-poly%T_pmp(k_cts+1)*poly%cp(k_cts+1)
+!             dEdz = (poly%enth(k_cts+2)-poly%enth(k_cts+1)) / (poly%zeta_aa(k_cts+2)-poly%zeta_aa(k_cts+1))
+!             E0   = poly%enth(k_cts)-poly%T_pmp(k_cts)*poly%cp(k_cts)
+!             E1   = poly%enth(k_cts+1)-poly%T_pmp(k_cts+1)*poly%cp(k_cts+1)
 
-            write(*,"(i10,3f10.4,3g12.5)") iter, H_cts_prev, H_cts_now, ice1%H_cts, dEdz, E0, E1 
+!             write(*,"(i10,3f10.4,3g12.5)") iter, H_cts_prev, H_cts_now, ice1%H_cts, dEdz, E0, E1 
             
-        end do  
+!         end do  
 
         ice1%H_cts = H_cts_prev
         poly = ice1%poly 

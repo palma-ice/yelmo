@@ -185,7 +185,7 @@ end if
                     ! Perform enthalpy/temperature solving via advection-diffusion equation
                     ! Note: method==temp performs the same calculations as for method==enth, 
                     ! except enth_cr=1.0 and omega_max=0.0 as prescribed in par_load(). 
-                    
+
                     call calc_ytherm_enthalpy_3D(thrm%poly%enth,thrm%poly%T_ice,thrm%poly%omega,thrm%now%bmb_grnd,thrm%now%Q_ice_b, &
                                 thrm%now%H_cts,thrm%poly%T_pmp,thrm%poly%cp,thrm%poly%kt,advecxy,thrm%poly%uz,thrm%poly%Q_strn, &
                                 thrm%now%Q_b,bnd%Q_geo,bnd%T_srf,tpo%now%H_ice,tpo%now%z_srf,thrm%now%H_w,thrm%now%dHwdt,tpo%now%H_grnd, &
@@ -616,10 +616,20 @@ end if
                 !call calc_advec_vertical_column_correction(uz_now,H_ice_now,z_srf,ux,uy,uz,zeta_ac,dx,i,j)
                 uz_now = uz(i,j,:) 
 
-                call calc_enth_column(enth(i,j,:),T_ice(i,j,:),omega(i,j,:),bmb_grnd(i,j),Q_ice_b(i,j),H_cts(i,j), &
+                if (trim(solver) .eq. "enth") then 
+
+                    call calc_enth_column(enth(i,j,:),T_ice(i,j,:),omega(i,j,:),bmb_grnd(i,j),Q_ice_b(i,j),H_cts(i,j), &
+                            T_pmp(i,j,:),cp(i,j,:),kt(i,j,:),advecxy(i,j,:),uz_now,Q_strn(i,j,:),Q_b(i,j),Q_geo(i,j),T_srf(i,j), &
+                            T_shlf,H_ice_now(i,j),H_w(i,j),f_grnd(i,j),zeta_aa,zeta_ac,cr,omega_max,T0,dt)
+                
+                else 
+
+                    call calc_temp_column(enth(i,j,:),T_ice(i,j,:),omega(i,j,:),bmb_grnd(i,j),Q_ice_b(i,j),H_cts(i,j), &
                         T_pmp(i,j,:),cp(i,j,:),kt(i,j,:),advecxy(i,j,:),uz_now,Q_strn(i,j,:),Q_b(i,j),Q_geo(i,j),T_srf(i,j), &
                         T_shlf,H_ice_now(i,j),H_w(i,j),f_grnd(i,j),zeta_aa,zeta_ac,cr,omega_max,T0,dt)
                 
+                end if 
+
             end if 
 
         end do 

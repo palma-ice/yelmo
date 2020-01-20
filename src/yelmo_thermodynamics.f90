@@ -183,6 +183,8 @@ end if
                     
                 case("enth","temp") 
                     ! Perform enthalpy/temperature solving via advection-diffusion equation
+                    ! Note: method==temp performs the same calculations as for method==enth, 
+                    ! except enth_cr=1.0 and omega_max=0.0 as prescribed in par_load(). 
                     
                     call calc_ytherm_enthalpy_3D(thrm%poly%enth,thrm%poly%T_ice,thrm%poly%omega,thrm%now%bmb_grnd,thrm%now%Q_ice_b, &
                                 thrm%now%H_cts,thrm%poly%T_pmp,thrm%poly%cp,thrm%poly%kt,advecxy,thrm%poly%uz,thrm%poly%Q_strn, &
@@ -1016,6 +1018,12 @@ end if
         call nml_read(filename,"ytherm","zeta_scale",     par%zeta_scale,       init=init_pars)
         call nml_read(filename,"ytherm","zeta_exp",       par%zeta_exp,         init=init_pars)
         
+        ! In case of method=="temp", prescribe some parameters
+        if (trim(par%method) .eq. "temp") then  
+            par%enth_cr   = 1.0_prec 
+            par%omega_max = 0.0_prec 
+        end if 
+
         ! Set internal parameters
         par%nx  = nx
         par%ny  = ny 

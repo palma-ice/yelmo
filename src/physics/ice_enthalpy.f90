@@ -425,6 +425,37 @@ end if
 
     end subroutine calc_enth_column
 
+    subroutine calc_enth_column_poly(enth,enth_pmp,cp,kt,advecxy,uz,Q_strn, &
+                                                            zeta_aa,zeta_ac,H_now,rho_ice,dt)
+        ! Thermodynamics solver for a given column of ice 
+        ! Note zeta=height, k=1 base, k=nz surface 
+        ! Note: nz = number of vertical boundaries (including zeta=0.0 and zeta=1.0), 
+        ! temperature is defined for cell centers, plus a value at the surface and the base
+        ! so nz_ac = nz_aa - 1 
+
+        ! For notes on implicit form of advection terms, see eg http://farside.ph.utexas.edu/teaching/329/lectures/node90.html
+        
+        implicit none 
+
+        real(prec), intent(INOUT) :: enth(:)        ! nz_aa [J kg] Ice column enthalpy
+        real(prec), intent(IN)    :: enth_pmp(:)    ! nz_aa [K] Pressure melting point temp.
+        real(prec), intent(IN)    :: cp(:)          ! nz_aa [J kg-1 K-1] Specific heat capacity
+        real(prec), intent(IN)    :: kt(:)          ! nz_aa [J a-1 m-1 K-1] Heat conductivity 
+        real(prec), intent(IN)    :: advecxy(:)     ! nz_aa [K a-1] Horizontal heat advection 
+        real(prec), intent(IN)    :: uz(:)          ! nz_ac [m a-1] Vertical velocity 
+        real(prec), intent(IN)    :: Q_strn(:)      ! nz_aa [J a-1 m-3] Internal strain heat production in ice
+        real(prec), intent(IN)    :: zeta_aa(:)     ! nz_aa [--] Vertical sigma coordinates (zeta==height), layer centered aa-nodes
+        real(prec), intent(IN)    :: zeta_ac(:)     ! nz_ac [--] Vertical height axis temperature (0:1), layer edges ac-nodes    
+        real(prec), intent(IN)    :: H_now          ! [m] Ice thickness of column
+        real(prec), intent(IN)    :: rho_ice        ! [kg m-3] Ice density   
+        real(prec), intent(IN)    :: dt             ! [a] Time step 
+        
+
+
+        return 
+
+    end subroutine calc_enth_column_poly 
+
     subroutine calc_enth_column_cold(enth,enth_pmp,cp,kt,advecxy,uz,Q_strn, &
                                                             zeta_aa,zeta_ac,H_now,rho_ice,dt)
         ! Thermodynamics solver for a given column of ice 
@@ -552,6 +583,158 @@ end if
         return 
 
     end subroutine calc_enth_column_cold 
+
+    subroutine calc_enth_column_temperate(enth,enth_pmp,cp,kt,advecxy,uz,Q_strn, &
+                                                            zeta_aa,zeta_ac,H_now,rho_ice,dt)
+        ! Thermodynamics solver for a given column of ice 
+        ! Note zeta=height, k=1 base, k=nz surface 
+        ! Note: nz = number of vertical boundaries (including zeta=0.0 and zeta=1.0), 
+        ! temperature is defined for cell centers, plus a value at the surface and the base
+        ! so nz_ac = nz_aa - 1 
+
+        ! For notes on implicit form of advection terms, see eg http://farside.ph.utexas.edu/teaching/329/lectures/node90.html
+        
+        implicit none 
+
+        real(prec), intent(INOUT) :: enth(:)        ! nz_aa [J kg] Ice column enthalpy
+        real(prec), intent(IN)    :: enth_pmp(:)    ! nz_aa [K] Pressure melting point temp.
+        real(prec), intent(IN)    :: cp(:)          ! nz_aa [J kg-1 K-1] Specific heat capacity
+        real(prec), intent(IN)    :: kt(:)          ! nz_aa [J a-1 m-1 K-1] Heat conductivity 
+        real(prec), intent(IN)    :: advecxy(:)     ! nz_aa [K a-1] Horizontal heat advection 
+        real(prec), intent(IN)    :: uz(:)          ! nz_ac [m a-1] Vertical velocity 
+        real(prec), intent(IN)    :: Q_strn(:)      ! nz_aa [J a-1 m-3] Internal strain heat production in ice
+        real(prec), intent(IN)    :: zeta_aa(:)     ! nz_aa [--] Vertical sigma coordinates (zeta==height), layer centered aa-nodes
+        real(prec), intent(IN)    :: zeta_ac(:)     ! nz_ac [--] Vertical height axis temperature (0:1), layer edges ac-nodes    
+        real(prec), intent(IN)    :: H_now          ! [m] Ice thickness of column
+        real(prec), intent(IN)    :: rho_ice        ! [kg m-3] Ice density   
+        real(prec), intent(IN)    :: dt             ! [a] Time step 
+        
+        ! Local variables 
+        integer    :: k, nz_aa
+        real(prec) :: Q_strn_now
+
+        real(prec), allocatable :: dzeta_a(:)   ! nz_aa [--] Solver discretization helper variable ak
+        real(prec), allocatable :: dzeta_b(:)   ! nz_aa [--] Solver discretization helper variable bk
+
+        real(prec), allocatable :: kappa_aa(:)  ! aa-nodes
+
+        real(prec), allocatable :: subd(:)      ! nz_aa 
+        real(prec), allocatable :: diag(:)      ! nz_aa  
+        real(prec), allocatable :: supd(:)      ! nz_aa 
+        real(prec), allocatable :: rhs(:)       ! nz_aa 
+        real(prec), allocatable :: solution(:)  ! nz_aa
+
+        real(prec) :: fac, fac_a, fac_b, uz_aa, dzeta, dz, dz1, dz2 
+        real(prec) :: kappa_a, kappa_b 
+
+        nz_aa = size(zeta_aa,1)
+
+        allocate(dzeta_a(nz_aa))
+        allocate(dzeta_b(nz_aa))
+
+        allocate(kappa_aa(nz_aa))
+
+        allocate(subd(nz_aa))
+        allocate(diag(nz_aa))
+        allocate(supd(nz_aa))
+        allocate(rhs(nz_aa))
+        allocate(solution(nz_aa))
+
+        ! Define dzeta terms for this column
+        ! Note: for constant zeta axis, this can be done once outside
+        ! instead of for each column. However, it is done here to allow
+        ! use of adaptive vertical axis.
+        call calc_dzeta_terms(dzeta_a,dzeta_b,zeta_aa,zeta_ac)
+
+        call calc_enth_diffusivity(kappa_aa,enth,enth_pmp,cp,kt,cr=0.0_prec,rho_ice=rho_ice)
+
+        ! == Ice base ==
+
+        ! Temperate at bed 
+        ! Hold basal temperature at pressure melting point
+
+        if (enth(2) .ge. enth_pmp(2)) then 
+            ! Layer above base is also temperate (with water likely present in the ice),
+            ! set K0 dE/dz = 0. To do so, set basal enthalpy equal to enthalpy above
+
+            subd(1) =  0.0_prec
+            diag(1) =  1.0_prec
+            supd(1) = -1.0_prec
+            rhs(1)  =  0.0_prec
+            
+        else 
+            ! Set enthalpy equal to pressure melting point value 
+
+            subd(1) = 0.0_prec
+            diag(1) = 1.0_prec
+            supd(1) = 0.0_prec
+            rhs(1)  = enth_pmp(1)
+
+        end if 
+
+        ! == Ice interior layers 2:nz_aa-1 ==
+
+        do k = 2, nz_aa-1
+ 
+            ! Implicit vertical advection term on aa-node    
+            uz_aa   = 0.5_prec*(uz(k-1)+uz(k))   ! ac => aa nodes
+            
+            ! Convert units of Q_strn [J a-1 m-3] => [K a-1]
+            Q_strn_now = Q_strn(k)/(rho_ice*cp(k))
+
+            ! Get kappa for the lower and upper ac-nodes 
+            ! Note: this is important to avoid mixing of kappa at the 
+            ! CTS height (kappa_lower = kappa_temperate; kappa_upper = kappa_cold)
+            ! See Blatter and Greve, 2015, Eq. 25. 
+            !kappa_a = 0.5_prec*(kappa_aa(k-1) + kappa_aa(k))
+            !kappa_b = 0.5_prec*(kappa_aa(k)   + kappa_aa(k+1))
+
+            dz1 = zeta_ac(k-1)-zeta_aa(k-1)
+            dz2 = zeta_aa(k)-zeta_ac(k-1)
+            call calc_wtd_harmonic_mean(kappa_a,kappa_aa(k-1),kappa_aa(k),dz1,dz2)
+
+            dz1 = zeta_ac(k)-zeta_aa(k)
+            dz2 = zeta_aa(k+1)-zeta_ac(k)
+            call calc_wtd_harmonic_mean(kappa_b,kappa_aa(k),kappa_aa(k+1),dz1,dz2)
+
+            ! Vertical distance for centered difference advection scheme
+            dz      =  H_now*(zeta_aa(k+1)-zeta_aa(k-1))
+            
+            fac_a   = -kappa_a*dzeta_a(k)*dt/H_now**2
+            fac_b   = -kappa_b*dzeta_b(k)*dt/H_now**2
+
+            subd(k) = fac_a - uz_aa * dt/dz
+            diag(k) = 1.0_prec - fac_a - fac_b
+            supd(k) = fac_b + uz_aa * dt/dz
+            rhs(k)  = enth(k) - dt*advecxy(k) + dt*Q_strn_now*cp(k)
+            
+        end do 
+
+        ! == Ice surface, temperate layer ==
+
+        subd(nz_aa) = 0.0_prec
+        diag(nz_aa) = 1.0_prec
+        supd(nz_aa) = 0.0_prec
+        rhs(nz_aa)  = enth_pmp(nz_aa)
+
+        ! == Call solver ==
+
+        call solve_tridiag(subd,diag,supd,rhs,solution)
+
+
+        ! Copy the solution into the enthalpy variable
+        
+        enth  = solution
+
+        ! If temperate layer exists, ensure basal boundary condition 
+        ! holds dE/dz = 0 == E(1) = E(2);
+        ! This is only for extra security w.r.t. the solver stability
+        
+        if (enth(2) .ge. enth_pmp(2)) enth(1) = enth(2)
+        
+        return 
+
+    end subroutine calc_enth_column_temperate 
 
     subroutine calc_enth_column_zoom(enth,enth_pmp,cp,kt,advecxy,uz,Q_strn, &
                                                             zeta_aa,zeta_ac,cr,H_now,rho_ice,dt)

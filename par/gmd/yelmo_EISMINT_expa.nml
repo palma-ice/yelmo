@@ -121,7 +121,7 @@
     rf_method               = 1         ! -1: set externally; 0: rf_const everywhere; 1: standard function 
     rf_const                = 1e-16     ! [Pa^-3 a^-1]
     rf_use_eismint2         = True      ! Only applied for rf_method=1, use EISMINT2 rf constants
-    rf_with_water           = True      ! Only applied for rf_method=1, scale rf by water content?
+    rf_with_water           = False     ! Only applied for rf_method=1, scale rf by water content?
     n_glen                  = 3.0 
     visc_min                = 1e3 
     use_2D_enh              = False 
@@ -148,7 +148,7 @@
     omega_max       = 0.01              ! [--] Maximum allowed water content fraction 
     till_rate       = 0.0               ! [m/a] Basal water till drainage rate (water equiv.)
     H_w_max         = 2.0               ! [m] Maximum limit to basal water layer thickness (water equiv.)
-    adaptive_zeta   = True              ! True: use adaptive two-layer vertical axis; False=use Yelmo vertical axis
+    adaptive_zeta   = False             ! True: use adaptive two-layer vertical axis; False=use Yelmo vertical axis
     nz_pt           = 11                ! [-] Number of temperate points in zeta axis
     nz_pc           = 32                ! [-] Number of cold points in zeta axis 
     zeta_scale      = "tanh"            ! "linear", "exp", "tanh"

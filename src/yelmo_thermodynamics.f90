@@ -140,10 +140,20 @@ end if
                                     tpo%now%H_ice.gt.0.0)
         end if 
         
-        ! Calculate the explicit horizontal advection term using enthalpy from previous timestep
-        call calc_advec_horizontal_3D(advecxy,thrm%now%enth,tpo%now%H_ice,tpo%now%z_srf, &
-                                            dyn%now%ux,dyn%now%uy,thrm%par%zeta_aa,thrm%par%dx)
+        if (trim(thrm%par%method) .eq. "enth") then 
+
+            ! Calculate the explicit horizontal advection term using enthalpy from previous timestep
+            call calc_advec_horizontal_3D(advecxy,thrm%now%enth,tpo%now%H_ice,tpo%now%z_srf, &
+                                                dyn%now%ux,dyn%now%uy,thrm%par%zeta_aa,thrm%par%dx)
         
+        else 
+
+            ! Calculate the explicit horizontal advection term using temperature from previous timestep
+            call calc_advec_horizontal_3D(advecxy,thrm%now%T_ice,tpo%now%H_ice,tpo%now%z_srf, &
+                                                dyn%now%ux,dyn%now%uy,thrm%par%zeta_aa,thrm%par%dx)
+        
+        end if 
+
         ! =================================================================================
         ! Yelmo => poly vertical grid transformation 
 

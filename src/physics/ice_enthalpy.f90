@@ -262,8 +262,8 @@ contains
         call convert_to_enthalpy(enth,T_ice,omega,T_pmp,cp,L_ice)
 
         ! Calculate basal mass balance 
-        !call calc_bmb_grounded_enth(bmb_grnd,Q_ice_b,Q_b,Q_geo_now,f_grnd,rho_ice)
-        call calc_bmb_grounded(bmb_grnd,T_ice(1)-T_pmp(1),Q_ice_b,Q_b,Q_geo_now,f_grnd,rho_ice)
+        call calc_bmb_grounded_enth(bmb_grnd,Q_ice_b,Q_b,Q_geo_now,f_grnd,rho_ice)
+        !call calc_bmb_grounded(bmb_grnd,T_ice(1)-T_pmp(1),Q_ice_b,Q_b,Q_geo_now,f_grnd,rho_ice)
 
         ! Include internal melting in bmb_grnd 
         bmb_grnd = bmb_grnd - melt_internal 

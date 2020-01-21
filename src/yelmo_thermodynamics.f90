@@ -199,7 +199,7 @@ end if
                     call calc_ytherm_enthalpy_3D(thrm%poly%enth,thrm%poly%T_ice,thrm%poly%omega,thrm%now%bmb_grnd,thrm%now%Q_ice_b, &
                                 thrm%now%H_cts,thrm%poly%T_pmp,thrm%poly%cp,thrm%poly%kt,advecxy,thrm%poly%uz,thrm%poly%Q_strn, &
                                 thrm%now%Q_b,bnd%Q_geo,bnd%T_srf,tpo%now%H_ice,tpo%now%z_srf,thrm%now%H_w,thrm%now%dHwdt,tpo%now%H_grnd, &
-                                tpo%now%f_grnd,thrm%par%zeta_aa,thrm%par%zeta_ac,thrm%par%enth_cr, &
+                                tpo%now%f_grnd,thrm%par%zeta_aa,thrm%par%zeta_ac,thrm%par%dzeta_a,thrm%par%dzeta_b,thrm%par%enth_cr, &
                                 thrm%par%omega_max,dt,thrm%par%dx,thrm%par%method,thrm%par%solver_advec)
                     
                 case("robin")
@@ -475,7 +475,7 @@ end if
     end subroutine calc_ytherm_poly_3D
 
     subroutine calc_ytherm_enthalpy_3D(enth,T_ice,omega,bmb_grnd,Q_ice_b,H_cts,T_pmp,cp,kt,advecxy,uz,Q_strn,Q_b,Q_geo, &
-                                        T_srf,H_ice,z_srf,H_w,dHwdt,H_grnd,f_grnd,zeta_aa,zeta_ac, &
+                                        T_srf,H_ice,z_srf,H_w,dHwdt,H_grnd,f_grnd,zeta_aa,zeta_ac,dzeta_a,dzeta_b, &
                                         cr,omega_max,dt,dx,solver,solver_advec)
         ! This wrapper subroutine breaks the thermodynamics problem into individual columns,
         ! which are solved independently by calling calc_enth_column
@@ -509,6 +509,8 @@ end if
         real(prec), intent(IN)    :: f_grnd(:,:)    ! [--] Grounded fraction
         real(prec), intent(IN)    :: zeta_aa(:)     ! [--] Vertical sigma coordinates (zeta==height), aa-nodes
         real(prec), intent(IN)    :: zeta_ac(:)     ! [--] Vertical sigma coordinates (zeta==height), ac-nodes
+        real(prec), intent(IN)    :: dzeta_a(:)     ! nz_aa [--] Solver discretization helper variable ak
+        real(prec), intent(IN)    :: dzeta_b(:)     ! nz_aa [--] Solver discretization helper variable bk
         real(prec), intent(IN)    :: cr             ! [--] Conductivity ratio for temperate ice (kappa_temp = enth_cr*kappa_cold)
         real(prec), intent(IN)    :: omega_max      ! [--] Maximum allowed water content fraction 
         real(prec), intent(IN)    :: dt             ! [a] Time step 
@@ -634,9 +636,9 @@ end if
                 
                 else 
 
-                    call calc_temp_column0(enth(i,j,:),T_ice(i,j,:),omega(i,j,:),bmb_grnd(i,j),Q_ice_b(i,j),H_cts(i,j), &
+                    call calc_temp_column(enth(i,j,:),T_ice(i,j,:),omega(i,j,:),bmb_grnd(i,j),Q_ice_b(i,j),H_cts(i,j), &
                         T_pmp(i,j,:),cp(i,j,:),kt(i,j,:),advecxy(i,j,:),uz_now,Q_strn(i,j,:),Q_b(i,j),Q_geo(i,j),T_srf(i,j), &
-                        T_shlf,H_ice_now(i,j),H_w(i,j),f_grnd(i,j),zeta_aa,zeta_ac,cr,omega_max,T0,dt)
+                        T_shlf,H_ice_now(i,j),H_w(i,j),f_grnd(i,j),zeta_aa,zeta_ac,dzeta_a,dzeta_b,omega_max,T0,dt)
                 
                 end if 
 
@@ -1060,6 +1062,14 @@ end if
         allocate(par%zeta_ac(par%nz_ac))
         par%zeta_ac = zeta_ac 
         
+        ! Calculate domain-level dzeta terms too 
+        if (allocated(par%dzeta_a)) deallocate(par%dzeta_a)
+        if (allocated(par%dzeta_b)) deallocate(par%dzeta_b)
+        allocate(par%dzeta_a(par%nz_aa))
+        allocate(par%dzeta_b(par%nz_aa))
+        
+        call calc_dzeta_terms(par%dzeta_a,par%dzeta_b,par%zeta_aa,par%zeta_ac)
+
         ! Define current time as unrealistic value
         par%time = 1000000000   ! [a] 1 billion years in the future
 

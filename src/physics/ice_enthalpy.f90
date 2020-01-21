@@ -109,7 +109,7 @@ contains
         ! Step 0: Calculate diffusivity
 
         kappa_aa = kt / (rho_ice*cp)
-        
+
         ! Step 1: Apply vertical implicit diffusion-advection
         
         ! Step 1: Apply vertical advection (for explicit testing)
@@ -229,7 +229,7 @@ contains
         ! Calculate heat flux at ice base as enthalpy gradient * rho_ice * diffusivity [J a-1 m-2]
         if (H_ice .gt. 0.0_prec) then 
             dz = H_ice * (zeta_aa(2)-zeta_aa(1))
-            Q_ice_b = kappa_aa(1) * rho_ice * (T_ice(2) - T_ice(1)) / dz
+            Q_ice_b = kappa_aa(1) * rho_ice * cp(1) * (T_ice(2) - T_ice(1)) / dz
         else
             Q_ice_b = 0.0 
         end if 

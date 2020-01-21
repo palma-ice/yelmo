@@ -166,7 +166,7 @@ contains
 
         do j = 2, ny-1 
         do i = 2, nx-1 
-            umag(i,j) = 0.25_prec*(u(i,j)+u(i-1,j)+v(i,j)+v(i,j-1))
+            umag(i,j) = 0.25_prec*((u(i,j)+u(i-1,j))+(v(i,j)+v(i,j-1)))
         end do 
         end do 
 
@@ -193,7 +193,7 @@ contains
 
         do j = 1, ny-1 
         do i = 1, nx-1
-            ustag(i,j) = 0.25_prec*(u(i+1,j+1)+u(i+1,j)+u(i,j+1)+u(i,j))
+            ustag(i,j) = 0.25_prec*((u(i+1,j+1)+u(i+1,j))+(u(i,j+1)+u(i,j)))
         end do 
         end do 
 
@@ -212,39 +212,46 @@ contains
         real(prec) :: ustag(size(u,1),size(u,2)) 
 
         ! Local variables 
-        integer :: i, j, nx, ny, k   
+        integer    :: i, j, nx, ny, k   
+        real(prec) :: u00, u10, u01, u11
 
         nx = size(u,1)
         ny = size(u,2) 
 
         ustag = 0.0_prec 
-
+        
         do j = 1, ny-1 
         do i = 1, nx-1
+            
             k = 0 
-            ustag(i,j) = 0.0 
-            if (H_ice(i,j) .gt. 0.0) then 
-                ustag(i,j) = ustag(i,j) + u(i,j) 
+            
+            u00   = 0.0_prec 
+            u10   = 0.0_prec 
+            u01   = 0.0_prec 
+            u11   = 0.0_prec 
+            
+            if (H_ice(i,j) .gt. 0.0) then  
+                u00 = u(i,j) 
                 k = k+1
             end if 
 
             if (H_ice(i+1,j) .gt. 0.0) then 
-                ustag(i,j) = ustag(i,j) + u(i+1,j) 
+                u10 = u(i+1,j)
                 k = k+1 
             end if 
             
             if (H_ice(i,j+1) .gt. 0.0) then 
-                ustag(i,j) = ustag(i,j) + u(i,j+1) 
+                u01 = u(i,j+1)
                 k = k+1 
             end if 
             
             if (H_ice(i+1,j+1) .gt. 0.0) then 
-                ustag(i,j) = ustag(i,j) + u(i+1,j+1) 
+                u11 = u(i+1,j+1)
                 k = k+1 
             end if 
             
             if (k .gt. 0) then 
-                ustag(i,j) = ustag(i,j) / real(k,prec)
+                ustag(i,j) = ((u00+u11) + (u10+u01)) / real(k,prec)
             end if 
 
             !ustag(i,j) = 0.25_prec*(u(i+1,j+1)+u(i+1,j)+u(i,j+1)+u(i,j))
@@ -274,7 +281,7 @@ contains
 
         do j = 2, ny 
         do i = 2, nx
-            ustag(i,j) = 0.25_prec*(u(i,j)+u(i-1,j)+u(i,j-1)+u(i-1,j-1))
+            ustag(i,j) = 0.25_prec*((u(i,j)+u(i-1,j))+(u(i,j-1)+u(i-1,j-1)))
         end do 
         end do 
 

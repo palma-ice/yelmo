@@ -354,7 +354,7 @@ contains
             strn2D%dxy(i,j) = 0.5*(dudy+dvdx)
 
             ! Calculate the effective strain rate from the trace 
-            strn2D%de(i,j) = strn2D%dxx(i,j)**2+strn2D%dyy(i,j)**2+strn2D%dxx(i,j)*strn2D%dyy(i,j)+strn2D%dxy(i,j)**2
+            strn2D%de(i,j) = (strn2D%dxx(i,j)**2+strn2D%dyy(i,j)**2)+strn2D%dxx(i,j)*strn2D%dyy(i,j)+strn2D%dxy(i,j)**2
             strn2D%de(i,j) = strn2D%de(i,j)**0.5
             
         end do
@@ -606,10 +606,10 @@ contains
                     shear_squared(k) =   strn%dxz(i,j,k)*strn%dxz(i,j,k) &
                                        + strn%dyz(i,j,k)*strn%dyz(i,j,k)
 
-                    strn%de(i,j,k)    =  sqrt(   strn%dxx(i,j,k)*strn%dxx(i,j,k) &
-                                               + strn%dyy(i,j,k)*strn%dyy(i,j,k) &
-                                               + strn%dxx(i,j,k)*strn%dyy(i,j,k) &
-                                               + strn%dxy(i,j,k)*strn%dxy(i,j,k) &
+                    strn%de(i,j,k)    =  sqrt(  (strn%dxx(i,j,k)*strn%dxx(i,j,k)  &
+                                               + strn%dyy(i,j,k)*strn%dyy(i,j,k)) &
+                                               + strn%dxx(i,j,k)*strn%dyy(i,j,k)  &
+                                               + strn%dxy(i,j,k)*strn%dxy(i,j,k)  &
                                                + shear_squared(k) )
                         
                     if (strn%de(i,j,k) .gt. de_max) strn%de(i,j,k) = de_max 

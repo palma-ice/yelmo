@@ -637,7 +637,7 @@ contains
 
         do j = 1, ny-1 
         do i = 1, nx-1
-            ustag(i,j) = 0.25_prec*(u(i+1,j+1)+u(i+1,j)+u(i,j+1)+u(i,j))
+            ustag(i,j) = 0.25_prec*((u(i+1,j+1)+u(i+1,j))+(u(i,j+1)+u(i,j)))
         end do 
         end do 
 

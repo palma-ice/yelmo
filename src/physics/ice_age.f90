@@ -651,8 +651,8 @@ contains
         do k = 2, nz_aa-1 
 
             ! Estimate direction of current flow into cell (x and y), centered in vertical layer and grid point
-            ux_aa = 0.25_prec*(ux(i,j,k)+ux(i-1,j,k)+ux(i,j,k-1)+ux(i-1,j,k-1))
-            uy_aa = 0.25_prec*(uy(i,j,k)+uy(i,j-1,k)+uy(i,j,k-1)+uy(i,j-1,k-1))
+            ux_aa = 0.25_prec*((ux(i,j,k)+ux(i-1,j,k))+(ux(i,j,k-1)+ux(i-1,j,k-1)))
+            uy_aa = 0.25_prec*((uy(i,j,k)+uy(i,j-1,k))+(uy(i,j,k-1)+uy(i,j-1,k-1)))
 
             ! Explicit form (to test different order approximations)
             if (ux_aa .gt. 0.0 .and. i .ge. 3) then  

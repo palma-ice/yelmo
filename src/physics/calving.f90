@@ -283,7 +283,7 @@ contains
                     ! Divergence in both directions, apply calving law 
                     ! Flux condition + calving rate with spreading:       
 
-                    calv(i,j) = k_calv * eps_xx(i,j)*eps_yy(i,j)                                       
+                    calv(i,j) = k_calv * (eps_xx(i,j)*eps_yy(i,j))                                     
                 
                 end if
 

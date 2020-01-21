@@ -206,6 +206,7 @@ contains
         real(prec) :: dzbdy_ac
         real(prec) :: duxdx_aa
         real(prec) :: duydy_aa
+        real(prec) :: dzbdx_aa, dzbdy_aa, ux_aa, uy_aa 
 
         real(prec), parameter :: dzbdt = 0.0   ! For posterity, keep dzbdt variable, but set to zero 
 
@@ -229,16 +230,24 @@ contains
 
                 H_ij = H_ice(i,j) 
 
-                ! Get the staggered bedrock gradient 
-                dzbdx_Ac = (z_bed(i+1,j)-z_bed(i,j))/dx
-                dzbdy_Ac = (z_bed(i,j+1)-z_bed(i,j))/dy
+!                 ! Get the staggered bedrock gradient 
+!                 dzbdx_ac = (z_bed(i+1,j)-z_bed(i,j))/dx
+!                 dzbdy_ac = (z_bed(i,j+1)-z_bed(i,j))/dy
+                
+                ! Get the centered bedrock gradient 
+                dzbdx_aa = (z_bed(i+1,j)-z_bed(i-1,j))/(2.0_prec*dx)
+                dzbdy_aa = (z_bed(i,j+1)-z_bed(i,j-1))/(2.0_prec*dy)
                 
                 ! ===================================================================
                 ! Greve and Blatter (2009) style:
 
                 ! Determine basal vertical velocity for this grid point 
                 ! Following Eq. 5.31 of Greve and Blatter (2009)
-                uz(i,j,1) = dzbdt + bmb(i,j) + ux(i,j,1)*dzbdx_Ac + uy(i,j,1)*dzbdy_Ac
+                !uz(i,j,1) = dzbdt + bmb(i,j) + (ux(i,j,1)*dzbdx_Ac + uy(i,j,1)*dzbdy_Ac)
+
+                ux_aa = (ux(i-1,j,1) + ux(i,j,1))
+                uy_aa = (uy(i,j-1,1) + uy(i,j,1))
+                uz(i,j,1) = dzbdt + bmb(i,j) + (ux_aa*dzbdx_aa + uy_aa*dzbdy_aa)
 
                 ! Integrate upward to each point above base until surface is reached 
                 do k = 2, nz_ac 
@@ -354,11 +363,11 @@ contains
             duydy = (uy_b(i,j)-uy_b(i,j-1))/dy 
 
             ! Cross terms on aa nodes 
-            duxdy  = ( 0.25_prec*(ux_b(i,j)+ux_b(i-1,j)+ux_b(i,j+1)+ux_b(i-1,j+1)) &
-                      -0.25_prec*(ux_b(i,j)+ux_b(i-1,j)+ux_b(i,j-1)+ux_b(i-1,j-1))) /dy 
+            duxdy  = ( 0.25_prec*((ux_b(i,j)+ux_b(i-1,j))+(ux_b(i,j+1)+ux_b(i-1,j+1))) &
+                      -0.25_prec*((ux_b(i,j)+ux_b(i-1,j))+(ux_b(i,j-1)+ux_b(i-1,j-1))) ) /dy 
 
-            duydx  = ( 0.25_prec*(uy_b(i,j)+uy_b(i,j-1)+uy_b(i+1,j)+uy_b(i+1,j-1)) &
-                      -0.25_prec*(uy_b(i,j)+uy_b(i,j-1)+uy_b(i-1,j)+uy_b(i-1,j-1))) /dx  
+            duydx  = ( 0.25_prec*((uy_b(i,j)+uy_b(i,j-1))+(uy_b(i+1,j)+uy_b(i+1,j-1))) &
+                      -0.25_prec*((uy_b(i,j)+uy_b(i,j-1))+(uy_b(i-1,j)+uy_b(i-1,j-1))) ) /dx  
 
             ! Intermediate terms on aa nodes - x-direction  
             varx1_aa(i,j) = 2.0_prec*visc_eff(i,j)*(2.0_prec*duxdx+duydy)
@@ -377,8 +386,8 @@ contains
 
             ! On acx nodes 
             duxdx = (varx1_aa(i+1,j)-varx1_aa(i,j))/dx 
-            duxdy = ( 0.25_prec*(vary1_aa(i,j)+vary1_aa(i+1,j)+vary1_aa(i,j+1)+vary1_aa(i+1,j+1)) &
-                     -0.25_prec*(vary1_aa(i,j)+vary1_aa(i+1,j)+vary1_aa(i,j-1)+vary1_aa(i+1,j-1))) /dy
+            duxdy = ( 0.25_prec*((vary1_aa(i,j)+vary1_aa(i+1,j))+(vary1_aa(i,j+1)+vary1_aa(i+1,j+1))) &
+                     -0.25_prec*((vary1_aa(i,j)+vary1_aa(i+1,j))+(vary1_aa(i,j-1)+vary1_aa(i+1,j-1))) ) /dy
 
             lhs_x(i,j) = duxdx + duydy 
 
@@ -392,8 +401,8 @@ contains
             ! On acy nodes 
             duydy = (vary2_aa(i,j+1)-vary2_aa(i,j))/dy 
 
-            duydx = ( 0.25_prec*(varx2_aa(i,j)+varx2_aa(i+1,j)+varx2_aa(i,j+1)+varx2_aa(i+1,j+1)) &
-                     -0.25_prec*(varx2_aa(i,j)+varx2_aa(i,j+1)+varx2_aa(i-1,j)+varx2_aa(i-1,j+1))) /dx
+            duydx = ( 0.25_prec*((varx2_aa(i,j)+varx2_aa(i+1,j))+(varx2_aa(i,j+1)+varx2_aa(i+1,j+1))) &
+                     -0.25_prec*((varx2_aa(i,j)+varx2_aa(i,j+1))+(varx2_aa(i-1,j)+varx2_aa(i-1,j+1))) ) /dx
 
             lhs_y(i,j) = duydy + duydx 
 
@@ -503,7 +512,7 @@ contains
 
             ! Get total sigma terms squared (input to Eq. 1a/1b) on ab-nodes
             ! with stress from horizontal stretching `sigma_horiz_sq`
-            sigma_tot_sq_ab = sigma_xz_ab**2 + sigma_yz_ab**2 + sigma_horiz_sq_ab
+            sigma_tot_sq_ab = (sigma_xz_ab**2 + sigma_yz_ab**2) + sigma_horiz_sq_ab
             
             ! Determine the diffusivity for current layer on Ab nodes
             ! Pollard and de Conto (2012), Eq. 1a/dd 
@@ -511,7 +520,7 @@ contains
             do i = 1, nx-1 
 
                 ! Stagger rate factor: Aa => Ab nodes
-                ATT_ab       = 0.25_prec * (ATT(i,j,k)+ATT(i+1,j,k)+ATT(i,j+1,k)+ATT(i+1,j+1,k))
+                ATT_ab       = 0.25_prec * ((ATT(i,j,k)+ATT(i+1,j,k))+(ATT(i,j+1,k)+ATT(i+1,j+1,k)))
 
                 ! Calculate diffusivity on Ab nodes
                 dd_ab(i,j,k) = 2.0_prec*ATT_ab*(sigma_tot_sq_ab(i,j)**exp1)
@@ -665,8 +674,8 @@ contains
             ! from Pollard and de Conto (2012), Eq. 6
             ! (Note: equation in text seems to have typo concerning cross terms)
 
-            eps_sq = dudx**2 + dvdy**2 + dudx*dvdy + 0.25*(dudy+dvdx)**2 &
-                          + 0.25_prec*duxdz_aa**2 + 0.25_prec*duydz_aa**2 &
+            eps_sq = (dudx**2 + dvdy**2) + dudx*dvdy + 0.25*(dudy+dvdx)**2  &
+                          + (0.25_prec*duxdz_aa**2 + 0.25_prec*duydz_aa**2) &
                           + epsilon_sq_0
             
             ! 4. Calculate the effective visocity (`eta` in Greve and Blatter, 2009)
@@ -756,7 +765,7 @@ contains
             if (abs(dudy) .lt. tol_underflow) dudy = 0.0 
             if (abs(dvdx) .lt. tol_underflow) dvdx = 0.0 
 
-            eps_sq = dudx**2 + dvdy**2 + dudx*dvdy + 0.25*(dudy+dvdx)**2 + epsilon_sq_0
+            eps_sq = (dudx**2 + dvdy**2) + dudx*dvdy + 0.25*(dudy+dvdx)**2 + epsilon_sq_0
             
             ! 3. Calculate the effective visocity (`eta` in Greve and Blatter, 2009)
             ! Pollard and de Conto (2012), Eqs. 2a/b and Eq. 4 (`visc=A**(-1/n)*mu*H_ice`)

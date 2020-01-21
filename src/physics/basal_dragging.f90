@@ -295,7 +295,7 @@ contains
                 ! Calculate magnitude of basal velocity on aa-node 
                 ux_b_mid  = 0.5_prec*(ux_b(i1,j)+ux_b(i,j))
                 uy_b_mid  = 0.5_prec*(uy_b(i,j1)+uy_b(i,j))
-                uxy_b     = (ux_b_mid**2 + uy_b_mid**2 + ub_sq_min)**0.5_prec
+                uxy_b     = ( (ux_b_mid**2 + uy_b_mid**2) + ub_sq_min)**0.5_prec
 
                 ! Nonlinear beta as a function of basal velocity
                 beta(i,j) = C_bed(i,j) * (uxy_b / u_0)**q * (1.0_prec / uxy_b)
@@ -349,7 +349,7 @@ contains
             ! Calculate magnitude of basal velocity on aa-node 
             ux_b_mid  = 0.5_prec*(ux_b(i1,j)+ux_b(i,j))
             uy_b_mid  = 0.5_prec*(uy_b(i,j1)+uy_b(i,j))
-            uxy_b     = (ux_b_mid**2 + uy_b_mid**2 + ub_sq_min)**0.5_prec
+            uxy_b     = ( (ux_b_mid**2 + uy_b_mid**2) + ub_sq_min)**0.5_prec
 
             ! Nonlinear beta as a function of basal velocity
             beta(i,j) = C_bed(i,j) * (uxy_b / (uxy_b+u_0))**q * (1.0_prec / uxy_b)

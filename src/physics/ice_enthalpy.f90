@@ -76,8 +76,6 @@ contains
         logical, parameter      :: test_expl_advecz = .FALSE. 
         real(prec), allocatable :: advecz(:)   ! nz_aa, for explicit vertical advection solving
         
-        real(prec), allocatable :: fac_enth(:)  ! aa-nodes 
-        real(prec), allocatable :: var(:)       ! aa-nodes 
         real(prec), allocatable :: kappa_aa(:)  ! aa-nodes
 
         real(prec), allocatable :: subd(:)      ! nz_aa 
@@ -86,7 +84,7 @@ contains
         real(prec), allocatable :: rhs(:)       ! nz_aa 
         real(prec), allocatable :: solution(:)  ! nz_aa
         real(prec) :: fac, fac_a, fac_b, uz_aa, dzeta, dz
-        real(prec) :: kappa_a, kappa_b 
+        real(prec) :: kappa_a, kappa_b, dz1, dz2 
 
         real(prec), allocatable :: dzeta_a(:)   ! nz_aa [--] Solver discretization helper variable ak
         real(prec), allocatable :: dzeta_b(:)   ! nz_aa [--] Solver discretization helper variable bk
@@ -95,8 +93,6 @@ contains
         nz_ac = size(zeta_ac,1)
 
         allocate(kappa_aa(nz_aa))
-        allocate(fac_enth(nz_aa))
-        allocate(var(nz_aa))
 
         allocate(subd(nz_aa))
         allocate(diag(nz_aa))
@@ -116,27 +112,16 @@ contains
         ! Get geothermal heat flux in proper units 
         Q_geo_now = Q_geo*1e-3*sec_year   ! [mW m-2] => [J m-2 a-1]
 
-        ! Get enthalpy to have enth, omega and T_ice all defined and consistent initially
-        ! Note: in principle, these quantities should all be available and consistent
-        ! when entering the routine, but it ensures that enthalpy is defined if only 
-        ! T_ice and omega are known initially.
-        !call convert_to_enthalpy(enth,T_ice,omega,T_pmp,cp,L_ice)
+        ! Step 0: Calculate diffusivity on cell centers (aa-nodes)
 
-        ! Step 0: Calculate diffusivity, set prognostic variable (T_ice or enth),
-        ! and corresponding scaling factor (fac_enth)
-
-        ! Calculate diffusivity on cell centers (aa-nodes)
         kappa_aa = kt / (rho_ice*cp)
-    
-        fac_enth = 1.0              ! Keep units of [K]
-        var      = T_ice            ! [K]
-
+        
         ! Step 1: Apply vertical advection (for explicit testing)
         if (test_expl_advecz) then 
             allocate(advecz(nz_aa))
             advecz = 0.0
-            call calc_advec_vertical_column(advecz,var,uz,H_ice,zeta_aa)
-            var = var - dt*advecz 
+            call calc_advec_vertical_column(advecz,T_ice,uz,H_ice,zeta_aa)
+            T_ice = T_ice - dt*advecz 
         end if 
 
         ! Step 2: Apply vertical implicit diffusion-advection (or diffusion only if test_expl_advecz=True)
@@ -152,7 +137,7 @@ contains
             subd(1) = 0.0_prec
             diag(1) = 1.0_prec
             supd(1) = 0.0_prec
-            rhs(1)  = (f_grnd*T_pmp(1) + (1.0-f_grnd)*T_shlf) * fac_enth(1)
+            rhs(1)  = (f_grnd*T_pmp(1) + (1.0-f_grnd)*T_shlf)
 
         else 
             ! Grounded ice 
@@ -176,7 +161,7 @@ contains
                 subd(1) =  0.0_prec
                 diag(1) =  1.0_prec
                 supd(1) = -1.0_prec
-                rhs(1)  = ((Q_b + Q_geo_now) * dzeta*H_ice / kt(1)) * fac_enth(1)
+                rhs(1)  = ((Q_b + Q_geo_now) * dzeta*H_ice / kt(1))
                 
             else 
                 ! Temperate at bed 
@@ -185,7 +170,7 @@ contains
                 subd(1) = 0.0_prec
                 diag(1) = 1.0_prec
                 supd(1) = 0.0_prec
-                rhs(1)  = T_pmp(1) * fac_enth(1)
+                rhs(1)  = T_pmp(1)
 
             end if   ! melting or frozen
 
@@ -208,12 +193,15 @@ contains
             ! Convert units of Q_strn [J a-1 m-3] => [K a-1]
             Q_strn_now = Q_strn(k)/(rho_ice*cp(k))
 
-            ! Get kappa for the lower and upper ac-nodes 
-            ! Note: this is important to avoid mixing of kappa at the 
-            ! CTS height (kappa_lower = kappa_temperate; kappa_upper = kappa_cold)
-            ! See Blatter and Greve, 2015, Eq. 25. 
-            kappa_a = kappa_aa(k)
-            kappa_b = kappa_aa(k+1) 
+            ! Get kappa for the lower and upper ac-nodes using harmonic mean from aa-nodes
+            
+            dz1 = zeta_ac(k-1)-zeta_aa(k-1)
+            dz2 = zeta_aa(k)-zeta_ac(k-1)
+            call calc_wtd_harmonic_mean(kappa_a,kappa_aa(k-1),kappa_aa(k),dz1,dz2)
+
+            dz1 = zeta_ac(k)-zeta_aa(k)
+            dz2 = zeta_aa(k+1)-zeta_ac(k)
+            call calc_wtd_harmonic_mean(kappa_b,kappa_aa(k),kappa_aa(k+1),dz1,dz2)
 
             ! Vertical distance for centered difference advection scheme
             dz      =  H_ice*(zeta_aa(k+1)-zeta_aa(k-1))
@@ -224,7 +212,7 @@ contains
             subd(k) = fac_a - uz_aa * dt/dz
             supd(k) = fac_b + uz_aa * dt/dz
             diag(k) = 1.0_prec - fac_a - fac_b
-            rhs(k)  = var(k) - dt*advecxy(k) + dt*Q_strn_now*fac_enth(k)
+            rhs(k)  = T_ice(k) - dt*advecxy(k) + dt*Q_strn_now
             
         end do 
 
@@ -233,7 +221,7 @@ contains
         subd(nz_aa) = 0.0_prec
         diag(nz_aa) = 1.0_prec
         supd(nz_aa) = 0.0_prec
-        rhs(nz_aa)  = min(T_srf,T0) * fac_enth(nz_aa)
+        rhs(nz_aa)  = min(T_srf,T0)
 
         ! == Call solver ==
 

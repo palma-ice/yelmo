@@ -148,11 +148,6 @@
     omega_max       = 0.01              ! [--] Maximum allowed water content fraction 
     till_rate       = 0.0               ! [m/a] Basal water till drainage rate (water equiv.)
     H_w_max         = 2.0               ! [m] Maximum limit to basal water layer thickness (water equiv.)
-    adaptive_zeta   = False             ! True: use adaptive two-layer vertical axis; False=use Yelmo vertical axis
-    nz_pt           = 11                ! [-] Number of temperate points in zeta axis
-    nz_pc           = 32                ! [-] Number of cold points in zeta axis 
-    zeta_scale      = "tanh"            ! "linear", "exp", "tanh"
-    zeta_exp        = 2.0  
 /
 
 &yelmo_masks

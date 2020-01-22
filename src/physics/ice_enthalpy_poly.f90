@@ -1,4 +1,10 @@
 
+    adaptive_zeta   = False             ! True: use adaptive two-layer vertical axis; False=use Yelmo vertical axis
+    nz_pt           = 11                ! [-] Number of temperate points in zeta axis
+    nz_pc           = 32                ! [-] Number of cold points in zeta axis 
+    zeta_scale      = "tanh"            ! "linear", "exp", "tanh"
+    zeta_exp        = 2.0  
+
         ! Vertical dimension definition
         logical             :: adaptive_zeta    ! If True, use nz_pt/nz_pc to define two-layer axis. Else use Yelmo axis.
         integer             :: nz_pt

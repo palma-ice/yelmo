@@ -11,8 +11,8 @@
     ! Timing parameters 
     time_init    = 0.0                  ! [yr] Starting time 
     time_end     = 50000.0              ! [yr] Ending time 
-    dtt          = 2.0                  ! [yr] Main loop timestep 
-    dt2D_out     = 1000.0               ! [yr] Frequency of writing 2D output files 
+    dtt          = 5.0                  ! [yr] Main loop timestep 
+    dt2D_out     = 2000.0               ! [yr] Frequency of writing 2D output files 
 
     ! Settings for transient EISMINT1 experiments 
     period       = 0.0                  ! [yr] for transient experiments (normally 0.0 yr or 20e3 yr)
@@ -28,7 +28,7 @@
     log_timestep    = False 
     zeta_scale      = "exp"             ! "linear", "exp", "tanh"
     zeta_exp        = 2.0  
-    nz_aa           = 42                ! Vertical resolution in ice
+    nz_aa           = 22                ! Vertical resolution in ice
     dt_method       = 1                 ! 0: no internal timestep, 1: adaptive, cfl, 2: adaptive, pc
     dt_min          = 0.1               ! [a] Minimum timestep 
     dt_ref          = 5.0               ! [a] Reference timestep 
@@ -134,7 +134,7 @@
 /
 
 &ytherm
-    method          = "enth"            ! "fixed", "robin", "temp", "enth"
+    method          = "temp"            ! "fixed", "robin", "temp", "enth"
     solver_advec    = "impl-upwind"     ! "expl", "impl-upwind"
     gamma           = 1.0               ! [K] Scalar for the pressure melting point decay function 
     use_strain_sia  = False             ! True: calculate strain heating from SIA approx.

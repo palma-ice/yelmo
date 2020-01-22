@@ -389,9 +389,6 @@ contains
 
         call ytherm_alloc(dom%thrm%now,dom%thrm%par%nx,dom%thrm%par%ny,dom%thrm%par%nz_aa,dom%thrm%par%nz_ac,dom%thrm%par%nzr)
         
-        call ytherm_poly_init(dom%thrm%poly,dom%grd%nx,dom%grd%ny,dom%thrm%par%nz_pt,dom%thrm%par%nz_pc, &
-                                                                dom%thrm%par%zeta_scale,dom%thrm%par%zeta_exp)
-        
         write(*,*) "yelmo_init:: thermodynamics initialized."
         
         ! === Ensure consistency with specific parameters ===

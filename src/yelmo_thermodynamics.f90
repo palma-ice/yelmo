@@ -14,8 +14,7 @@ module yelmo_thermodynamics
     
     private
     public :: calc_ytherm 
-    public :: ytherm_par_load, ytherm_alloc, ytherm_dealloc
-    public :: ytherm_poly_init 
+    public :: ytherm_par_load, ytherm_alloc, ytherm_dealloc 
 
 contains
 
@@ -51,56 +50,23 @@ contains
         dt            = time - thrm%par%time 
         thrm%par%time = time 
         
-        ! === Define combined poly vertical grid ===
-
-if (trim(thrm%par%method) .eq. "poly") then 
-        ! Calculate the poly vertical axis at each grid points 
-
-        do j = 1, ny 
-        do i = 1, nx 
-
-!             call calc_zeta_combined(thrm%poly%zeta_aa(i,j,:),thrm%poly%zeta_ac(i,j,:),thrm%now%H_cts(i,j), &
-!                                                     tpo%now%H_ice(i,j),thrm%poly%zeta_pt,thrm%poly%zeta_pc)
-
-            ! Simply set them equal for now
-            thrm%poly%zeta_aa(i,j,:) = thrm%par%zeta_aa 
-            thrm%poly%zeta_ac(i,j,:) = thrm%par%zeta_ac 
-            
-        end do 
-        end do  
-
-end if 
-        ! === END Define combined poly vertical grid ===
-        
-
-        ! === Determine some thermal properties (Yelmo + poly vertical grid) === 
+        ! === Determine some thermal properties === 
 
         ! Calculate the specific heat capacity of the ice
         if (thrm%par%use_const_cp) then 
             thrm%now%cp  = thrm%par%const_cp
-            thrm%poly%cp = thrm%par%const_cp 
         else  
             thrm%now%cp  = calc_specific_heat_capacity(thrm%now%T_ice)
-            thrm%poly%cp = calc_specific_heat_capacity(thrm%poly%T_ice)
         end if 
         
         ! Calculate the heat conductivity of the ice
         if (thrm%par%use_const_kt) then 
             thrm%now%kt  = thrm%par%const_kt
-            thrm%poly%kt = thrm%par%const_kt 
         else  
             thrm%now%kt  = calc_thermal_conductivity(thrm%now%T_ice)
-            thrm%poly%kt = calc_thermal_conductivity(thrm%poly%T_ice)
         end if 
 
-        ! Calculate the pressure-corrected melting point (in Kelvin) - poly grid
-        do j = 1, ny 
-        do i = 1, nx 
-            thrm%poly%T_pmp(i,j,:) = calc_T_pmp(tpo%now%H_ice(i,j),thrm%poly%zeta_aa(i,j,:),T0,T_pmp_beta)
-        end do 
-        end do 
-
-        ! Also calculate it for Yelmo grid 
+        ! Calculate the pressure-corrected melting point (in Kelvin)
         do k = 1, thrm%par%nz_aa  
             thrm%now%T_pmp(:,:,k) = calc_T_pmp(tpo%now%H_ice,thrm%par%zeta_aa(k),T0,T_pmp_beta)
         end do 
@@ -154,50 +120,19 @@ end if
         
         end if 
 
-        ! =================================================================================
-        ! Yelmo => poly vertical grid transformation 
-
-if (trim(thrm%par%method) .eq. "poly") then 
-    ! Perform linear interpolation onto poly vertical grid at each point 
-
-        ! dyn%now%uz      => poly%uz
-        ! advecxy         => poly%advecxy 
-        ! thrm%now%Q_strn => poly%Q_strn 
-
-else 
-    ! poly vertical grid == Yelmo grid, simply set quantities equal to each other 
-
-        thrm%poly%uz      = dyn%now%uz 
-        thrm%poly%advecxy = advecxy 
-        thrm%poly%Q_strn  = thrm%now%Q_strn 
-
-end if 
-
-        ! =================================================================================
-        
 
         if ( dt .gt. 0.0 ) then     
             ! Ice thermodynamics should evolve, perform calculations 
 
             select case(trim(thrm%par%method))
 
-                case("poly") 
-                    ! Perform enthalpy/temperature solving via advection-diffusion equation
-                    ! using polythermal 2-layer grid
-                    
-                    call calc_ytherm_poly_3D(thrm%poly%enth,thrm%poly%T_ice,thrm%poly%omega,thrm%now%bmb_grnd,thrm%now%Q_ice_b, &
-                                thrm%now%H_cts,thrm%poly%T_pmp,thrm%poly%cp,thrm%poly%kt,advecxy,thrm%poly%uz,thrm%poly%Q_strn, &
-                                thrm%now%Q_b,bnd%Q_geo,bnd%T_srf,tpo%now%H_ice,tpo%now%z_srf,thrm%now%H_w,thrm%now%dHwdt,tpo%now%H_grnd, &
-                                tpo%now%f_grnd,thrm%poly%zeta_aa,thrm%poly%zeta_ac,thrm%par%enth_cr, &
-                                thrm%par%omega_max,dt,thrm%par%dx,thrm%par%method,thrm%par%solver_advec)
-                    
                 case("enth","temp") 
                     ! Perform enthalpy/temperature solving via advection-diffusion equation
                     ! Note: method==temp performs the same calculations as for method==enth, 
                     ! except enth_cr=1.0 and omega_max=0.0 as prescribed in par_load(). 
 
-                    call calc_ytherm_enthalpy_3D(thrm%poly%enth,thrm%poly%T_ice,thrm%poly%omega,thrm%now%bmb_grnd,thrm%now%Q_ice_b, &
-                                thrm%now%H_cts,thrm%poly%T_pmp,thrm%poly%cp,thrm%poly%kt,advecxy,thrm%poly%uz,thrm%poly%Q_strn, &
+                    call calc_ytherm_enthalpy_3D(thrm%now%enth,thrm%now%T_ice,thrm%now%omega,thrm%now%bmb_grnd,thrm%now%Q_ice_b, &
+                                thrm%now%H_cts,thrm%now%T_pmp,thrm%now%cp,thrm%now%kt,advecxy,dyn%now%uz,thrm%now%Q_strn, &
                                 thrm%now%Q_b,bnd%Q_geo,bnd%T_srf,tpo%now%H_ice,tpo%now%z_srf,thrm%now%H_w,thrm%now%dHwdt,tpo%now%H_grnd, &
                                 tpo%now%f_grnd,thrm%par%zeta_aa,thrm%par%zeta_ac,thrm%par%dzeta_a,thrm%par%dzeta_b,thrm%par%enth_cr, &
                                 thrm%par%omega_max,dt,thrm%par%dx,thrm%par%method,thrm%par%solver_advec)
@@ -205,41 +140,41 @@ end if
                 case("robin")
                     ! Use Robin solution for ice temperature 
 
-                    call define_temp_robin_3D(thrm%poly%T_ice,thrm%poly%T_pmp,thrm%poly%cp,thrm%poly%kt, &
+                    call define_temp_robin_3D(thrm%now%T_ice,thrm%now%T_pmp,thrm%now%cp,thrm%now%kt, &
                                        bnd%Q_geo,bnd%T_srf,tpo%now%H_ice,thrm%now%H_w,bnd%smb, &
                                        thrm%now%bmb_grnd,tpo%now%f_grnd,thrm%par%zeta_aa,cold=.FALSE.)
 
                     ! Also populate enthalpy 
-                    call convert_to_enthalpy(thrm%poly%enth,thrm%poly%T_ice,thrm%poly%omega,thrm%poly%T_pmp, &
-                                            thrm%poly%cp,L_ice)
+                    call convert_to_enthalpy(thrm%now%enth,thrm%now%T_ice,thrm%now%omega,thrm%now%T_pmp, &
+                                            thrm%now%cp,L_ice)
 
                 case("robin-cold")
                     ! Use Robin solution for ice temperature averaged with cold linear profile
                     ! to ensure cold ice at the base
 
-                    call define_temp_robin_3D(thrm%poly%T_ice,thrm%poly%T_pmp,thrm%poly%cp,thrm%poly%kt, &
+                    call define_temp_robin_3D(thrm%now%T_ice,thrm%now%T_pmp,thrm%now%cp,thrm%now%kt, &
                                        bnd%Q_geo,bnd%T_srf,tpo%now%H_ice,thrm%now%H_w,bnd%smb, &
                                        thrm%now%bmb_grnd,tpo%now%f_grnd,thrm%par%zeta_aa,cold=.TRUE.)
 
                     ! Set water content to zero 
-                    thrm%poly%omega = 0.0_prec 
+                    thrm%now%omega = 0.0_prec 
                     
                     ! Also populate enthalpy 
-                    call convert_to_enthalpy(thrm%poly%enth,thrm%poly%T_ice,thrm%poly%omega,thrm%poly%T_pmp, &
-                                            thrm%poly%cp,L_ice)
+                    call convert_to_enthalpy(thrm%now%enth,thrm%now%T_ice,thrm%now%omega,thrm%now%T_pmp, &
+                                            thrm%now%cp,L_ice)
 
                 case("linear")
                     ! Use linear solution for ice temperature
 
                     ! Calculate the ice temperature (eventually water content and enthalpy too)
-                    call define_temp_linear_3D(thrm%poly%T_ice,thrm%par%zeta_aa,tpo%now%H_ice,bnd%T_srf)
+                    call define_temp_linear_3D(thrm%now%T_ice,thrm%par%zeta_aa,tpo%now%H_ice,bnd%T_srf)
 
                     ! Set water content to zero 
-                    thrm%poly%omega = 0.0_prec 
+                    thrm%now%omega = 0.0_prec 
 
                     ! Also populate enthalpy 
-                    call convert_to_enthalpy(thrm%poly%enth,thrm%poly%T_ice,thrm%poly%omega,thrm%poly%T_pmp, &
-                                            thrm%poly%cp,L_ice)
+                    call convert_to_enthalpy(thrm%now%enth,thrm%now%T_ice,thrm%now%omega,thrm%now%T_pmp, &
+                                            thrm%now%cp,L_ice)
 
                 case("fixed") 
                     ! Pass - do nothing, use the temperature field as it is defined
@@ -263,33 +198,10 @@ end if
         end if 
 
         ! Calculate homologous temperature at the base 
-        thrm%now%T_prime_b = thrm%poly%T_ice(:,:,1) - thrm%poly%T_pmp(:,:,1) 
+        thrm%now%T_prime_b = thrm%now%T_ice(:,:,1) - thrm%now%T_pmp(:,:,1) 
         
         ! Calculate gridpoint fraction at the pressure melting point
-        thrm%now%f_pmp = calc_f_pmp(thrm%poly%T_ice(:,:,1),thrm%poly%T_pmp(:,:,1),thrm%par%gamma,tpo%now%f_grnd)
-
-        
-        ! =================================================================================
-        ! poly => Yelmo vertical grid transformation 
-
-if (trim(thrm%par%method) .eq. "poly") then 
-    ! Perform linear interpolation from poly vertical grid at each point 
-    ! to homogenous Yelmo vertical grid 
-
-        ! poly%T_ice => thrm%now%T_ice
-        ! poly%omega => thrm%now%omega
-        ! poly%enth  => thrm%now%enth
-
-else 
-    ! poly vertical grid == Yelmo grid, simply set quantities equal to each other 
-
-        thrm%now%enth  = thrm%poly%enth 
-        thrm%now%T_ice = thrm%poly%T_ice 
-        thrm%now%omega = thrm%poly%omega 
-
-end if 
-        ! =================================================================================
-        
+        thrm%now%f_pmp = calc_f_pmp(thrm%now%T_ice(:,:,1),thrm%now%T_pmp(:,:,1),thrm%par%gamma,tpo%now%f_grnd)
 
 !         if (yelmo_log) then 
 !             if (count(tpo%now%H_ice.gt.0.0) .gt. 0) then 
@@ -303,176 +215,6 @@ end if
         return
 
     end subroutine calc_ytherm
-
-    subroutine calc_ytherm_poly_3D(enth,T_ice,omega,bmb_grnd,Q_ice_b,H_cts,T_pmp,cp,kt,advecxy,uz,Q_strn,Q_b,Q_geo, &
-                                        T_srf,H_ice,z_srf,H_w,dHwdt,H_grnd,f_grnd,zeta_aa,zeta_ac, &
-                                        cr,omega_max,dt,dx,solver,solver_advec)
-        ! This wrapper subroutine breaks the thermodynamics problem into individual columns,
-        ! which are solved independently by calling calc_enth_column
-
-        ! Note zeta=height, k=1 base, k=nz surface 
-        
-        implicit none 
-
-        real(prec), intent(INOUT) :: enth(:,:,:)    ! [J m-3] Ice enthalpy
-        real(prec), intent(INOUT) :: T_ice(:,:,:)   ! [K] Ice column temperature
-        real(prec), intent(INOUT) :: omega(:,:,:)   ! [--] Ice water content
-        real(prec), intent(INOUT) :: bmb_grnd(:,:)  ! [m a-1] Basal mass balance (melting is negative)
-        real(prec), intent(OUT)   :: Q_ice_b(:,:)   ! [J a-1 m-2] Basal ice heat flux 
-        real(prec), intent(OUT)   :: H_cts(:,:)     ! [m] Height of the cold-temperate transition surface (CTS)
-        real(prec), intent(IN)    :: T_pmp(:,:,:)   ! [K] Pressure melting point temp.
-        real(prec), intent(IN)    :: cp(:,:,:)      ! [J kg-1 K-1] Specific heat capacity
-        real(prec), intent(IN)    :: kt(:,:,:)      ! [J a-1 m-1 K-1] Heat conductivity 
-        real(prec), intent(IN)    :: advecxy(:,:,:) ! [m a-1] Horizontal x-velocity 
-!         real(prec), intent(IN)    :: ux(:,:,:)      ! [m a-1] Horizontal x-velocity 
-!         real(prec), intent(IN)    :: uy(:,:,:)      ! [m a-1] Horizontal y-velocity 
-        real(prec), intent(IN)    :: uz(:,:,:)      ! [m a-1] Vertical velocity 
-        real(prec), intent(IN)    :: Q_strn(:,:,:)  ! [K a-1] Internal strain heat production in ice
-        real(prec), intent(IN)    :: Q_b(:,:)       ! [J a-1 m-2] Basal frictional heat production 
-        real(prec), intent(IN)    :: Q_geo(:,:)     ! [mW m-2] Geothermal heat flux 
-        real(prec), intent(IN)    :: T_srf(:,:)     ! [K] Surface temperature 
-        real(prec), intent(IN)    :: H_ice(:,:)     ! [m] Ice thickness 
-        real(prec), intent(IN)    :: z_srf(:,:)     ! [m] Surface elevation 
-        real(prec), intent(IN)    :: H_w(:,:)       ! [m] Basal water layer thickness 
-        real(prec), intent(IN)    :: dHwdt(:,:)     ! [m/a] Basal water layer thickness change
-        real(prec), intent(IN)    :: H_grnd(:,:)    ! [--] Ice thickness above flotation 
-        real(prec), intent(IN)    :: f_grnd(:,:)    ! [--] Grounded fraction
-        real(prec), intent(IN)    :: zeta_aa(:,:,:) ! [--] Vertical sigma coordinates (zeta==height), aa-nodes
-        real(prec), intent(IN)    :: zeta_ac(:,:,:) ! [--] Vertical sigma coordinates (zeta==height), ac-nodes
-        real(prec), intent(IN)    :: cr             ! [--] Conductivity ratio for temperate ice (kappa_temp = enth_cr*kappa_cold)
-        real(prec), intent(IN)    :: omega_max      ! [--] Maximum allowed water content fraction 
-        real(prec), intent(IN)    :: dt             ! [a] Time step 
-        real(prec), intent(IN)    :: dx             ! [a] Horizontal grid step 
-        character(len=*), intent(IN) :: solver      ! "enth" or "temp" 
-        character(len=*), intent(IN) :: solver_advec    ! "expl" or "impl-upwind"
-
-        ! Local variables
-        integer :: i, j, k, nx, ny, nz_aa, nz_ac  
-        real(prec), allocatable  :: uz_now(:)   ! [m a-1] Corrected vertical velocity 
-        real(prec) :: T_shlf, H_grnd_lim, f_scalar, T_base  
-        !real(prec) :: H_ice_now 
-
-        real(prec), allocatable :: H_ice_now(:,:) 
-        real(prec) :: filter0(3,3), filter(3,3) 
-
-        real(prec), parameter :: H_ice_thin = 15.0   ! [m] Threshold to define 'thin' ice
-
-        nx    = size(T_ice,1)
-        ny    = size(T_ice,2)
-        nz_aa = size(zeta_aa,3)
-        nz_ac = size(zeta_ac,3)
-
-        allocate(H_ice_now(nx,ny))
-        allocate(uz_now(nz_ac))
-
-        ! First perform horizontal advection (this doesn't work properly, 
-        ! use column-based upwind horizontal advection below)
-        !call calc_enth_horizontal_advection_3D(T_ice,ux,uy,H_ice,dx,dt,solver_advec)
-        
-        ! Diagnose horizontal advection 
-!         advecxy3D = 0.0 
-!         do k = 2, nz_aa-1
-!             call calc_adv2D_impl_upwind_rate(advecxy3D(:,:,k),T_ice(:,:,k),ux(:,:,k),uy(:,:,k),H_ice*0.0,dx,dx,dt,f_upwind=1.0)
-!         end do 
-
-        ! Store original ice enthalpy field here for input to horizontal advection
-        ! calculations 
-!         enth_old  = enth 
-
-        ! === Get H_ice_now (with thicker margin points) ===
-        
-        ! Initialize gaussian filter kernel 
-        filter0 = gauss_values(dx,dx,sigma=2.0*dx,n=size(filter,1))
-
-        ! Store input ice thickness in local array 
-        H_ice_now = H_ice 
- 
-if (.TRUE.) then        
-        do j = 2, ny-1
-        do i = 2, nx-1 
-            
-            ! Filter at the margin only 
-            if (H_ice(i,j) .gt. 0.0 .and. count(H_ice(i-1:i+1,j-1:j+1) .eq. 0.0) .ge. 2) then
-                filter = filter0 
-                where (H_ice(i-1:i+1,j-1:j+1) .eq. 0.0) filter = 0.0 
-                filter = filter/sum(filter)
-                H_ice_now(i,j) = sum(H_ice(i-1:i+1,j-1:j+1)*filter)
-            end if
-     
-        end do 
-        end do
-end if 
-
-        ! ===================================================
-
-        do j = 3, ny-2
-        do i = 3, nx-2 
-            
-            ! For floating points, calculate the approximate marine-shelf temperature 
-            ! ajr, later this should come from an external model, and T_shlf would
-            ! be the boundary variable directly
-            if (f_grnd(i,j) .lt. 1.0) then 
-
-                ! Calculate approximate marine freezing temp, limited to pressure melting point 
-                T_shlf = calc_T_base_shlf_approx(H_ice_now(i,j),T_pmp(i,j,1),H_grnd(i,j))
-
-            else 
-                ! Assigned for safety 
-
-                T_shlf   = T_pmp(i,j,1)
-
-            end if 
-
-            if (H_ice_now(i,j) .le. H_ice_thin) then 
-                ! Ice is too thin or zero: prescribe linear temperature profile
-                ! between temperate ice at base and surface temperature 
-                ! (accounting for floating/grounded nature via T_base)
-
-                if (f_grnd(i,j) .lt. 1.0) then 
-                    ! Impose T_shlf for the basal temperature
-                    T_base = T_shlf 
-                else 
-                    ! Impose the pressure melting point of grounded ice 
-                    T_base = T_pmp(i,j,1) 
-                end if 
-
-                T_ice(i,j,:) = calc_temp_linear_column(T_srf(i,j),T_base,T_pmp(i,j,nz_aa),zeta_aa(i,j,:))
-
-            else 
-                ! Thick ice exists, call thermodynamic solver for the column
-
-                ! Pre-calculate the contribution of horizontal advection to column solution
-                ! (use unmodified enth_old field as input, to avoid mixing with new solution)
-!                 call calc_advec_horizontal_column(advecxy,enth_old,H_ice_now,z_srf,ux,uy,zeta_aa(i,j,:),dx,i,j)
-!                 call calc_advec_horizontal_column_quick(advecxy,enth_old,H_ice_now,ux,uy,dx,i,j)
-!                 do k = 1, nz_aa
-!                     call calc_adv2D_expl_rate(advecxy(k),enth_old(:,:,k),ux(:,:,k),uy(:,:,k),dx,dx,i,j)
-!                 end do 
-                !advecxy = advecxy3D(i,j,:)
-                !advecxy = 0.0_prec 
-!                 write(*,*) "advecxy: ", i,j, maxval(abs(advecxy3D(i,j,:)-advecxy))
-                
-                ! Calculate correction to vertical velocity due to horizontal gradient on vertical sigma-coordinate grid
-                !call calc_advec_vertical_column_correction(uz_now,H_ice_now,z_srf,ux,uy,uz,zeta_ac,dx,i,j)
-                uz_now = uz(i,j,:) 
-
-                call calc_enth_column(enth(i,j,:),T_ice(i,j,:),omega(i,j,:),bmb_grnd(i,j),Q_ice_b(i,j),H_cts(i,j), &
-                        T_pmp(i,j,:),cp(i,j,:),kt(i,j,:),advecxy(i,j,:),uz_now,Q_strn(i,j,:),Q_b(i,j),Q_geo(i,j),T_srf(i,j), &
-                        T_shlf,H_ice_now(i,j),H_w(i,j),f_grnd(i,j),zeta_aa(i,j,:),zeta_ac(i,j,:),cr,omega_max,T0,dt)
-                
-            end if 
-
-        end do 
-        end do 
-
-        ! Fill in borders 
-        call fill_borders_3D(enth,nfill=2)
-        call fill_borders_3D(T_ice,nfill=2)
-        call fill_borders_3D(omega,nfill=2)
-
-        return 
-
-    end subroutine calc_ytherm_poly_3D
 
     subroutine calc_ytherm_enthalpy_3D(enth,T_ice,omega,bmb_grnd,Q_ice_b,H_cts,T_pmp,cp,kt,advecxy,uz,Q_strn,Q_b,Q_geo, &
                                         T_srf,H_ice,z_srf,H_w,dHwdt,H_grnd,f_grnd,zeta_aa,zeta_ac,dzeta_a,dzeta_b, &
@@ -1034,12 +776,6 @@ end if
         call nml_read(filename,"ytherm","till_rate",      par%till_rate,        init=init_pars)
         call nml_read(filename,"ytherm","H_w_max",        par%H_w_max,          init=init_pars)
         
-        call nml_read(filename,"ytherm","adaptive_zeta",  par%adaptive_zeta,    init=init_pars)
-        call nml_read(filename,"ytherm","nz_pt",          par%nz_pt,            init=init_pars)
-        call nml_read(filename,"ytherm","nz_pc",          par%nz_pc,            init=init_pars)
-        call nml_read(filename,"ytherm","zeta_scale",     par%zeta_scale,       init=init_pars)
-        call nml_read(filename,"ytherm","zeta_exp",       par%zeta_exp,         init=init_pars)
-        
         ! In case of method=="temp", prescribe some parameters
         if (trim(par%method) .eq. "temp") then  
             par%enth_cr   = 1.0_prec 
@@ -1147,62 +883,5 @@ end if
         return 
 
     end subroutine ytherm_dealloc 
-
-    subroutine ytherm_poly_init(poly,nx,ny,nz_pt,nz_pc,zeta_scale,zeta_exp)
-
-        implicit none 
-
-        type(ytherm_poly_state_class), intent(INOUT) :: poly 
-        integer,      intent(IN) :: nz_pt 
-        integer,      intent(IN) :: nz_pc 
-        integer,      intent(IN) :: nx 
-        integer,      intent(IN) :: ny 
-        character(*), intent(IN) :: zeta_scale 
-        real(prec),   intent(IN) :: zeta_exp 
-        
-        ! Local variables 
-        integer    :: k  
-
-        poly%nz_pt = nz_pt
-        poly%nz_pc = nz_pc
-        poly%nz_aa = poly%nz_pt + poly%nz_pc -1 
-        poly%nz_ac = poly%nz_aa - 1 
-
-        ! 1D axis vectors (separate temperate and cold axes)
-        allocate(poly%zeta_pt(poly%nz_pt)) 
-        allocate(poly%zeta_pc(poly%nz_pc)) 
-
-        ! 3D axis arrays (combined polythermal axis, different for each column)
-        allocate(poly%zeta_aa(nx,ny,poly%nz_aa)) 
-        allocate(poly%zeta_ac(nx,ny,poly%nz_ac)) 
-        
-        ! Variables 
-        allocate(poly%enth(nx,ny,poly%nz_aa))
-        allocate(poly%T_ice(nx,ny,poly%nz_aa))
-        allocate(poly%omega(nx,ny,poly%nz_aa))
-        allocate(poly%T_pmp(nx,ny,poly%nz_aa))
-        allocate(poly%cp(nx,ny,poly%nz_aa))
-        allocate(poly%kt(nx,ny,poly%nz_aa))
-        
-        allocate(poly%advecxy(nx,ny,poly%nz_aa))
-        allocate(poly%Q_strn(nx,ny,poly%nz_aa))
-        allocate(poly%uz(nx,ny,poly%nz_ac))
-        
-        ! Calculate the temperate and cold vertical axes 
-        !call calc_zeta_twolayers(poly%zeta_pt,poly%zeta_pc,zeta_scale,zeta_exp)
-
-
-        ! Test routine to make combined axis::
-!         call calc_zeta_combined(poly%zeta_aa(1,1,:),poly%zeta_ac(1,1,:),100.0,200.0,poly%zeta_pt,poly%zeta_pc)
-
-!         do k = 1, poly%nz_aa
-!             write(*,*) k, poly%zeta_aa(1,1,k) 
-!         end do 
-
-!         stop 
-
-        return 
-
-    end subroutine ytherm_poly_init 
 
 end module yelmo_thermodynamics

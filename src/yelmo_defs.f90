@@ -399,13 +399,6 @@ module yelmo_defs
         real(prec)          :: till_rate 
         real(prec)          :: H_w_max 
         
-        ! Vertical dimension definition
-        logical             :: adaptive_zeta    ! If True, use nz_pt/nz_pc to define two-layer axis. Else use Yelmo axis.
-        integer             :: nz_pt
-        integer             :: nz_pc 
-        character (len=56)  :: zeta_scale 
-        real(prec)          :: zeta_exp 
-        
         real(prec), allocatable :: zeta_aa(:)   ! Layer centers (aa-nodes), plus base and surface: nz_aa points 
         real(prec), allocatable :: zeta_ac(:)   ! Layer borders (ac-nodes), plus base and surface: nz_ac == nz_aa-1 points
 
@@ -438,37 +431,12 @@ module yelmo_defs
         
     end type
 
-    type ytherm_poly_state_class 
-
-        integer :: nz_pt, nz_pc, nz_aa, nz_ac 
-
-        real(prec), allocatable :: zeta_pt(:)       ! zeta_aa for polythermal temperate (pt) zone only 
-        real(prec), allocatable :: zeta_pc(:)       ! zeta_aa for polythermal cold (pc) zone only 
-        
-        real(prec), allocatable :: zeta_aa(:,:,:)   ! Layer centers (aa-nodes), plus base and surface: nz_aa points 
-        real(prec), allocatable :: zeta_ac(:,:,:)   ! Layer borders (ac-nodes), plus base and surface: nz_ac == nz_aa-1 points
-
-        real(prec), allocatable :: enth(:,:,:)      ! [J m-3] Ice enthalpy 
-        real(prec), allocatable :: T_ice(:,:,:)     ! [K]     Ice temp. 
-        real(prec), allocatable :: omega(:,:,:)     ! [--]    Ice water content
-        real(prec), allocatable :: T_pmp(:,:,:)     ! Pressure-corrected melting point
-        
-        real(prec), allocatable :: cp(:,:,:)        ! Specific heat capacity  
-        real(prec), allocatable :: kt(:,:,:)        ! Heat conductivity  
-
-        real(prec), allocatable :: advecxy(:,:,:) 
-        real(prec), allocatable :: uz(:,:,:) 
-        real(prec), allocatable :: Q_strn(:,:,:)    ! Internal heat production 
-        
-
-    end type 
-
     ! ytherm class
     type ytherm_class
 
         type(ytherm_param_class)   :: par        ! physical parameters
         type(ytherm_state_class)   :: now
-        type(ytherm_poly_state_class) :: poly 
+            
     end type
 
     ! =========================================================================

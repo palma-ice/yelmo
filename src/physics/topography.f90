@@ -788,32 +788,19 @@ end if
         ! Local variables 
         real(prec) :: x0, x1, y0, y1 
         real(prec) :: alpha1, alpha2, p0, p1 
-        real(prec) :: beta1, beta2 
 
         x0 = 0.0 
         x1 = 1.0 
         y0 = 0.0 
         y1 = 1.0 
 
-!         alpha1  = (xout - x0) / (x1-x0)
-!         p0      = z3 + alpha1*(z4-z3)
-!         p1      = z2 + alpha1*(z1-z2)
-            
-!         alpha2  = (yout - y0) / (y1-y0)
-!         zout    = p0 + alpha2*(p1-p0)
-
-        ! Following method should result in improved precision retention
-        ! (following suggestion by F. Saito, 2019) 
-        
         alpha1  = (xout - x0) / (x1-x0)
+        p0      = z3 + alpha1*(z4-z3)
+        p1      = z2 + alpha1*(z1-z2)
+            
         alpha2  = (yout - y0) / (y1-y0)
-        
-        beta1   = (xout - x1) / (x0-x1)   ! 1-alpha1
-        beta2   = (yout - y1) / (y0-y1)   ! 1-alpha2
+        zout    = p0 + alpha2*(p1-p0)
 
-        zout =   ((alpha2 * alpha1) * z1 + (beta2 * beta1)  * z3) &
-               + ((alpha2 * beta1)  * z2 + (beta2 * alpha1) * z4)
-        
         return 
 
     end function interp_bilin_pt

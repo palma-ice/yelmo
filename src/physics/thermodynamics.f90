@@ -594,11 +594,11 @@ contains
                 do k = 2, nz_aa-1 
                     ! Loop over the vertical column of ice 
 
-                    ux_aa_up  = 0.25*((ux(i-1,j,k)+ux(i,j,k))+(ux(i-1,j,k+1)+ux(i,j,k+1)))
-                    ux_aa_dwn = 0.25*((ux(i-1,j,k)+ux(i,j,k))+(ux(i-1,j,k-1)+ux(i,j,k-1)))
+                    ux_aa_up  = 0.25*(ux(i-1,j,k)+ux(i,j,k)+ux(i-1,j,k+1)+ux(i,j,k+1))
+                    ux_aa_dwn = 0.25*(ux(i-1,j,k)+ux(i,j,k)+ux(i-1,j,k-1)+ux(i,j,k-1))
                     
-                    uy_aa_up  = 0.25*((uy(i,j-1,k)+uy(i,j,k))+(uy(i,j-1,k+1)+uy(i,j,k+1)))
-                    uy_aa_dwn = 0.25*((uy(i,j-1,k)+uy(i,j,k))+(uy(i,j-1,k-1)+uy(i,j,k-1)))
+                    uy_aa_up  = 0.25*(uy(i,j-1,k)+uy(i,j,k)+uy(i,j-1,k+1)+uy(i,j,k+1))
+                    uy_aa_dwn = 0.25*(uy(i,j-1,k)+uy(i,j,k)+uy(i,j-1,k-1)+uy(i,j,k-1))
                     
                     dz = H_ice(i,j)*(zeta_ac(k) - zeta_ac(k-1)) 
 
@@ -665,7 +665,7 @@ contains
         do i = 2, nx-1
 
             ! Average from ac-nodes to aa-node
-            Q_b(i,j) = 0.25*((Qb_acx(i,j)+Qb_acx(i-1,j))+(Qb_acy(i,j)+Qb_acy(i,j-1)))
+            Q_b(i,j) = 0.25*(Qb_acx(i,j)+Qb_acx(i-1,j)+Qb_acy(i,j)+Qb_acy(i,j-1))
 
 if (.FALSE.) then 
             Qb_tmp = 0.0_prec 

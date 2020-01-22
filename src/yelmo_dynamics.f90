@@ -1088,8 +1088,8 @@ end if
             ! in symmetric EISMINT experiments with sliding active
             i = (dyn%par%nx-1)/2 
             j = (dyn%par%ny-1)/2
-            dyn%now%beta(i,j) = ((dyn%now%beta(i-1,j)+dyn%now%beta(i+1,j)) &
-                                    + (dyn%now%beta(i,j-1)+dyn%now%beta(i,j+1))) / 4.0_prec  
+            dyn%now%beta(i,j) = (dyn%now%beta(i-1,j)+dyn%now%beta(i+1,j) &
+                                    +dyn%now%beta(i,j-1)+dyn%now%beta(i,j+1)) / 4.0 
         else if (trim(dyn%par%boundaries) .eq. "MISMIP3D") then 
             ! Redefine beta at the summit to reduce singularity
             ! in MISMIP symmetric experiments

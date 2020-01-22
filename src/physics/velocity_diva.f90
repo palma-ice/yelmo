@@ -585,7 +585,7 @@ contains
 
             ! Get total sigma terms squared (input to Eq. 1a/1b) on ab-nodes
             ! with stress from horizontal stretching `sigma_horiz_sq`
-            sigma_tot_sq_ab = (sigma_xz_ab**2 + sigma_yz_ab**2) + sigma_horiz_sq_ab
+            sigma_tot_sq_ab = sigma_xz_ab**2 + sigma_yz_ab**2 + sigma_horiz_sq_ab
             
             ! Determine the diffusivity for current layer on Ab nodes
             ! Pollard and de Conto (2012), Eq. 1a/dd 
@@ -823,7 +823,7 @@ contains
             ! from Pollard and de Conto (2012), Eq. 6
             ! (Note: equation in text seems to have typo concerning cross terms)
 
-            eps_sq = (dudx**2 + dvdy**2) + dudx*dvdy + 0.25*(dudy+dvdx)**2 + epsilon_sq_0
+            eps_sq = dudx**2 + dvdy**2 + dudx*dvdy + 0.25*(dudy+dvdx)**2 + epsilon_sq_0
             
             ! 3. Calculate the effective visocity (`eta` in Greve and Blatter, 2009)
             ! Pollard and de Conto (2012), Eqs. 2a/b and Eq. 4 (`visc=A**(-1/n)*mu*H_ice`)

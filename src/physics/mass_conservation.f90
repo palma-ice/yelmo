@@ -47,22 +47,48 @@ contains
         integer :: n 
         real(prec), allocatable :: calv_grnd(:,:) 
 
+        real(prec), allocatable :: ux_tmp(:,:) 
+        real(prec), allocatable :: uy_tmp(:,:) 
+
         nx = size(H_ice,1)
         ny = size(H_ice,2)
 
         allocate(calv_grnd(nx,ny))
-        calv_grnd = 0.0 
+        calv_grnd = 0.0_prec 
+
+        allocate(ux_tmp(nx,ny))
+        allocate(uy_tmp(nx,ny))
+        ux_tmp = 0.0_prec 
+        uy_tmp = 0.0_prec 
 
         ! 1. Apply mass conservation =================
 
+        ! Ensure that no velocity is defined outside ice margins
+        ux_tmp = ux 
+        do j = 1, ny 
+        do i = 1, nx-1 
+            if (H_margin(i,j) .gt. 0.0_prec .and. H_ice(i+1,j) .eq. 0.0_prec)    ux_tmp(i,j) = 0.0_prec 
+            if (H_ice(i,j)    .eq. 0.0_prec .and. H_margin(i+1,j) .gt. 0.0_prec) ux_tmp(i,j) = 0.0_prec 
+        end do 
+        end do  
+
+        uy_tmp = uy 
+        do j = 1, ny-1 
+        do i = 1, nx  
+            if (H_margin(i,j) .gt. 0.0_prec .and. H_ice(i,j+1) .eq. 0.0_prec)    uy_tmp(i,j) = 0.0_prec 
+            if (H_ice(i,j)    .eq. 0.0_prec .and. H_margin(i,j+1) .gt. 0.0_prec) uy_tmp(i,j) = 0.0_prec 
+        end do 
+        end do  
+
+        ! (ie, ice cannot flow )
         ! First, only resolve the dynamic part (ice advection)
-        call calc_advec2D(H_ice,ux,uy,mbal*0.0,dx,dx,dt,solver)
+        call calc_advec2D(H_ice,ux_tmp,uy_tmp,mbal*0.0,dx,dx,dt,solver)
 
 
         ! Then, add ice in the margin buffer to current ice thickness,
         ! set the buffer to zero  
 !         H_ice    = H_ice + H_margin 
-        H_margin = 0.0 
+!         H_margin = 0.0 
 
         ! Next, handle mass balance in order to be able to diagnose
         ! precisely how much mass was lost/gained 
@@ -88,7 +114,7 @@ contains
         else 
             ! Transfer ice into the margin buffer, and determine f_ice
 
-!             call calc_ice_margin(H_ice,H_margin,f_ice,f_grnd)
+            call calc_ice_margin(H_ice,H_margin,f_ice,f_grnd)
 
         end if 
 
@@ -496,8 +522,10 @@ end if
             ! Store neighbor heights 
             H_neighb = [H_ice_0(i1,j),H_ice_0(i2,j),H_ice_0(i,j1),H_ice_0(i,j2)]
             
-            if (H_ice(i,j) .gt. 0.0 .and. minval(H_neighb) .eq. 0.0 .and. f_grnd(i,j) .eq. 0.0) then 
-                ! This point is at the floating ice margin
+!             if (H_ice(i,j) .gt. 0.0 .and. minval(H_neighb) .eq. 0.0 .and. f_grnd(i,j) .eq. 0.0) then 
+!                 ! This point is at the floating ice margin
+            if (H_ice(i,j) .gt. 0.0 .and. minval(H_neighb) .eq. 0.0) then 
+                ! This point is at the ice margin
 
                 ! Store mask of neighbors with ice 
                 mask_neighb = (H_neighb .gt. 0.0)
@@ -548,7 +576,7 @@ end if
                     ! move ice to the buffer 
 
                     H_margin(i,j) = H_ice(i,j)
-                    H_ice(i,j)    = 0.0 
+                    !H_ice(i,j)    = 0.0 
 
                 end if 
 

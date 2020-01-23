@@ -63,7 +63,7 @@ contains
 
         ! 1. Apply mass conservation =================
 
-        ! Ensure that no velocity is defined outside ice margins
+        ! Ensure that no velocity is defined for outer boundaries of margin points
         ux_tmp = ux 
         do j = 1, ny 
         do i = 1, nx-1 
@@ -80,7 +80,7 @@ contains
         end do 
         end do  
 
-        ! (ie, ice cannot flow )
+        
         ! First, only resolve the dynamic part (ice advection)
         call calc_advec2D(H_ice,ux_tmp,uy_tmp,mbal*0.0,dx,dx,dt,solver)
 
@@ -522,10 +522,10 @@ end if
             ! Store neighbor heights 
             H_neighb = [H_ice_0(i1,j),H_ice_0(i2,j),H_ice_0(i,j1),H_ice_0(i,j2)]
             
-!             if (H_ice(i,j) .gt. 0.0 .and. minval(H_neighb) .eq. 0.0 .and. f_grnd(i,j) .eq. 0.0) then 
-!                 ! This point is at the floating ice margin
-            if (H_ice(i,j) .gt. 0.0 .and. minval(H_neighb) .eq. 0.0) then 
-                ! This point is at the ice margin
+            if (H_ice(i,j) .gt. 0.0 .and. minval(H_neighb) .eq. 0.0 .and. f_grnd(i,j) .eq. 0.0) then 
+                ! This point is at the floating ice margin
+!             if (H_ice(i,j) .gt. 0.0 .and. minval(H_neighb) .eq. 0.0) then 
+!                 ! This point is at the ice margin
 
                 ! Store mask of neighbors with ice 
                 mask_neighb = (H_neighb .gt. 0.0)

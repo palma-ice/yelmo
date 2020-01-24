@@ -54,14 +54,10 @@ contains
         
         ! Local variables
         real(prec) :: coeff 
-        real(prec), parameter :: tol = 1e-10  
+        real(prec), parameter :: tol = 1e-5  
 
         ! Calculate the grounded basal mass balance following 
         ! Cuffey and Patterson (2010), Eq. 9.38 (Page 420)
-        ! with an addition  of the term Q_strn_b 
-        ! Note: formula only applies when base is temperate, ie
-        ! when f_pmp > 0.0 
-        !if ( f_grnd .gt. 0.0 .and. T_prime_b .eq. 0.0_prec) then 
         if ( f_grnd .gt. 0.0) then 
             ! Bed is grounded and temperate, calculate basal mass balance  
 

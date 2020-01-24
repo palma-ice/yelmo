@@ -417,12 +417,35 @@ contains
         nx = size(H_ice,1)
         ny = size(H_ice,2) 
 
+        advecxy = 0.0_prec 
+
         do j = 2, ny-1
         do i = 2, nx-1 
             call calc_advec_horizontal_column(advecxy(i,j,:),var,H_ice,z_srf,ux,uy,zeta_aa,dx,i,j)
         end do 
         end do 
 
+        ! Fill in boundaries 
+        j = 1 
+        do i = 2, nx-1 
+            if(H_ice(i,j) .gt. 0.0_prec) advecxy(i,j,:) = advecxy(i,j+1,:) 
+        end do 
+
+        j = ny 
+        do i = 2, nx-1 
+            if(H_ice(i,j) .gt. 0.0_prec) advecxy(i,j,:) = advecxy(i,j-1,:) 
+        end do 
+        
+        i = 1 
+        do j = 2, ny-1 
+            if(H_ice(i,j) .gt. 0.0_prec) advecxy(i,j,:) = advecxy(i+1,j,:) 
+        end do 
+
+        i = nx 
+        do j = 2, ny-1 
+            if(H_ice(i,j) .gt. 0.0_prec) advecxy(i,j,:) = advecxy(i-1,j,:) 
+        end do 
+        
         return 
 
     end subroutine calc_advec_horizontal_3D

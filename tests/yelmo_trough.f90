@@ -91,7 +91,7 @@ program yelmo_trough
     yelmo1%bnd%T_shlf   = T0  
     yelmo1%bnd%H_sed    = 0.0 
 
-    yelmo1%bnd%T_srf    = T0 - Tsrf_const   ! [K] 
+    yelmo1%bnd%T_srf    = T0 + Tsrf_const   ! [K] 
     yelmo1%bnd%smb      = smb_const         ! [m/yr]
     yelmo1%bnd%Q_geo    = Qgeo_const        ! [mW/m2] 
 

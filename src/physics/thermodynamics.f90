@@ -61,7 +61,8 @@ contains
         ! with an addition  of the term Q_strn_b 
         ! Note: formula only applies when base is temperate, ie
         ! when f_pmp > 0.0 
-        if ( f_grnd .gt. 0.0 .and. T_prime_b .eq. 0.0_prec) then 
+        !if ( f_grnd .gt. 0.0 .and. T_prime_b .eq. 0.0_prec) then 
+        if ( f_grnd .gt. 0.0) then 
             ! Bed is grounded and temperate, calculate basal mass balance  
 
             ! Classic Cuffey and Patterson (2010) formula

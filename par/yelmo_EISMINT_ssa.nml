@@ -26,17 +26,16 @@
     experiment      = "EISMINT"         ! "None", "EISMINT", "MISMIP3D", "BUELER"  to apply special boundary conditions   
     restart         = "no"
     log_timestep    = True 
-    zeta_scale      = "tanh"            ! "linear", "exp", "tanh"
+    zeta_scale      = "exp"             ! "linear", "exp", "tanh"
     zeta_exp        = 2.0  
     nz_aa           = 20                ! Vertical resolution in ice
-    dt_method       = 2                 ! 0: no internal timestep, 1: adaptive, cfl, 2: adaptive, pc
+    dt_method       = 1                 ! 0: no internal timestep, 1: adaptive, cfl, 2: adaptive, pc
     dt_min          = 0.1               ! [a] Minimum timestep 
-    dt_ref          = 1.0               ! [a] Reference timestep 
+    dt_ref          = 5.0               ! [a] Reference timestep 
     cfl_max         = 0.01              ! Maximum value is 1.0, lower will be more stable
     cfl_diff_max    = 0.12              ! Bueler et al (2007), Eq. 25  
     pc_ebs          = 1e-2              ! Predictor-corrector tolerance 
-    pc1_ebs         = 1e-2              ! Predictor-corrector tolerance 
-
+    
 /
 
 &ytopo
@@ -77,7 +76,7 @@
     taud_gl_method      = 0               !  0: binary, no subgrid, 1: Two-sided gradient
     H_grnd_lim          = 500.0           ! [m] For beta_sep_method=2, reduce beta linearly between H_grnd=0 and H_grnd_lim 
     H_sed_sat           = 250.0           ! [m] Sediment thickness at which sediment effect is saturated
-    cb_method           = 1               ! -1: set externally; 0: cf_stream everywhere; 1: cf_stream/cf_frozen 
+    cb_method           = 1               ! -1: set externally; 1: calculate cb online  
     cb_with_pmp         = True            ! Weighted cf_frozen/cf_stream as a function of f_pmp 
     cb_margin_pmp       = False           ! If using cb_with_pmp, additionally impose cf_stream at ice margins 
     cb_scale            = "none"          ! "none", "lin_zb", "exp_zb", "till_const", "till_zb", scaling of cb spatially
@@ -145,8 +144,10 @@
     const_cp        = 2009.0            ! [J kg-1 K-1] Specific heat capacity 
     use_const_kt    = True              ! Use specified constant value of heat conductivity?
     const_kt        = 6.62e7            ! [J a-1 m-1 K-1] Thermal conductivity [W m-1 K-1 * sec_year] => [J a-1 m-1 K-1]
-    enth_cr         = 1e-2              ! [--] Conductivity ratio for temperate ice (kappa_temp     = enth_cr*kappa_cold)
-    omega_max       = 0.02              ! [--] Maximum allowed water content fraction 
+    enth_cr         = 1e-3              ! [--] Conductivity ratio for temperate ice (kappa_temp     = enth_cr*kappa_cold)
+    omega_max       = 0.01              ! [--] Maximum allowed water content fraction 
+    till_rate       = 0.0               ! [m/a] Basal water till drainage rate (water equiv.)
+    H_w_max         = 2.0               ! [m] Maximum limit to basal water layer thickness (water equiv.)
 /
 
 &yelmo_masks

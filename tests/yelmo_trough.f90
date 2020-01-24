@@ -7,12 +7,9 @@ program yelmo_trough
     use yelmo_dynamics, only: check_vel_convergence
     use deformation 
 
-    use basal_hydro_simple 
-
     implicit none 
 
     type(yelmo_class)     :: yelmo1
-    type(hydro_class)     :: hyd1 
 
     character(len=56)  :: domain, grid_name  
     character(len=256) :: outfldr, file2D, file1D, file_restart
@@ -87,18 +84,13 @@ program yelmo_trough
     call yelmo_init(yelmo1,filename=path_par,grid_def="none",time=time_init,load_topo=.FALSE., &
                         domain=domain,grid_name=grid_name)
 
-    ! Also intialize simple basal hydrology object
-    call hydro_init(hyd1,filename=path_par,nx=yelmo1%grd%nx,ny=yelmo1%grd%ny)
-    call hydro_init_state(hyd1,yelmo1%tpo%now%H_ice,yelmo1%tpo%now%f_grnd,time)
-
     ! Load boundary values
 
     yelmo1%bnd%z_sl     = 0.0
     yelmo1%bnd%bmb_shlf = 0.0 
     yelmo1%bnd%T_shlf   = T0  
     yelmo1%bnd%H_sed    = 0.0 
-    yelmo1%bnd%H_w      = hyd1%now%H_w      ! [m]
-    
+
     yelmo1%bnd%T_srf    = T0 - Tsrf_const   ! [K] 
     yelmo1%bnd%smb      = smb_const         ! [m/yr]
     yelmo1%bnd%Q_geo    = Qgeo_const        ! [mW/m2] 
@@ -136,14 +128,6 @@ program yelmo_trough
         ! == Yelmo ice sheet ===================================================
         call yelmo_update(yelmo1,time)
 
-if (.FALSE.) then 
-        ! Update basal hydrology 
-        call hydro_update(hyd1,yelmo1%tpo%now%H_ice,yelmo1%tpo%now%f_grnd, &
-                    -yelmo1%thrm%now%bmb_grnd*rho_ice/rho_w,time)
-
-        ! Pass updated boundary variables to yelmo 
-        yelmo1%bnd%H_w = hyd1%now%H_w 
-end if 
 
         ! == MODEL OUTPUT =======================================================
         if (mod(nint(time*100),nint(dt2D_out*100))==0) then  
@@ -416,7 +400,7 @@ contains
 !         call nc_write(filename,"H_sed",ylmo%bnd%H_sed,units="m",long_name="Sediment thickness", &
 !                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
         
-        call nc_write(filename,"H_w",ylmo%bnd%H_w,units="m",long_name="Basal water layer", &
+        call nc_write(filename,"H_w",ylmo%thrm%now%H_w,units="m",long_name="Basal water layer", &
                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
         
         call nc_write(filename,"smb",ylmo%bnd%smb,units="m/a",long_name="Surface mass balance", &

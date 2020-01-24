@@ -63,24 +63,27 @@ contains
 
         ! 1. Apply mass conservation =================
 
-        ! Ensure that no velocity is defined for outer boundaries of margin points
-        ux_tmp = ux 
-        do j = 1, ny 
-        do i = 1, nx-1 
-            if (H_margin(i,j) .gt. 0.0_prec .and. H_ice(i+1,j) .eq. 0.0_prec)    ux_tmp(i,j) = 0.0_prec 
-            if (H_ice(i,j)    .eq. 0.0_prec .and. H_margin(i+1,j) .gt. 0.0_prec) ux_tmp(i,j) = 0.0_prec 
-        end do 
-        end do  
+!         ! Ensure that no velocity is defined for outer boundaries of margin points
+!         ux_tmp = ux 
+!         do j = 1, ny 
+!         do i = 1, nx-1 
+!             if (H_margin(i,j) .gt. 0.0_prec .and. H_ice(i+1,j) .eq. 0.0_prec)    ux_tmp(i,j) = 0.0_prec 
+!             if (H_ice(i,j)    .eq. 0.0_prec .and. H_margin(i+1,j) .gt. 0.0_prec) ux_tmp(i,j) = 0.0_prec 
+!         end do 
+!         end do  
 
+!         uy_tmp = uy 
+!         do j = 1, ny-1 
+!         do i = 1, nx  
+!             if (H_margin(i,j) .gt. 0.0_prec .and. H_ice(i,j+1) .eq. 0.0_prec)    uy_tmp(i,j) = 0.0_prec 
+!             if (H_ice(i,j)    .eq. 0.0_prec .and. H_margin(i,j+1) .gt. 0.0_prec) uy_tmp(i,j) = 0.0_prec 
+!         end do 
+!         end do  
+    
+        ! No margin treatment 
+        ux_tmp = ux
         uy_tmp = uy 
-        do j = 1, ny-1 
-        do i = 1, nx  
-            if (H_margin(i,j) .gt. 0.0_prec .and. H_ice(i,j+1) .eq. 0.0_prec)    uy_tmp(i,j) = 0.0_prec 
-            if (H_ice(i,j)    .eq. 0.0_prec .and. H_margin(i,j+1) .gt. 0.0_prec) uy_tmp(i,j) = 0.0_prec 
-        end do 
-        end do  
 
-        
         ! First, only resolve the dynamic part (ice advection)
         call calc_advec2D(H_ice,ux_tmp,uy_tmp,mbal*0.0,dx,dx,dt,solver)
 
@@ -112,7 +115,7 @@ contains
                 H_margin = 0.0 
 
         else 
-            ! Transfer ice into the margin buffer, and determine f_ice
+            ! Diagnose margin ice and determine f_ice
 
             call calc_ice_margin(H_ice,H_margin,f_ice,f_grnd)
 

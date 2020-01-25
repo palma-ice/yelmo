@@ -21,7 +21,8 @@ module ice_enthalpy
 
 contains 
 
-        subroutine calc_temp_column(enth,T_ice,omega,bmb_grnd,Q_ice_b,H_cts,T_pmp,cp,kt,advecxy,uz, &
+
+    subroutine calc_temp_column(enth,T_ice,omega,bmb_grnd,Q_ice_b,H_cts,T_pmp,cp,kt,advecxy,uz, &
                                 Q_strn,Q_b,Q_geo,T_srf,T_shlf,H_ice,H_w,f_grnd,zeta_aa,zeta_ac, &
                                 dzeta_a,dzeta_b,omega_max,T0,dt)
         ! Thermodynamics solver for a given column of ice 
@@ -272,6 +273,126 @@ contains
         return 
 
     end subroutine calc_temp_column
+
+    subroutine calc_temp_column_internal(T_ice,kappa,uz,advecxy,Q_strn,val_base,val_srf, &
+                                                H_ice,zeta_aa,zeta_ac,dzeta_a,dzeta_b,T0,dt,is_basal_flux)
+        ! Thermodynamics solver for a given column of ice 
+        ! Note zeta=height, k=1 base, k=nz surface 
+        ! Note: nz = number of vertical boundaries (including zeta=0.0 and zeta=1.0), 
+        ! temperature is defined for cell centers, plus a value at the surface and the base
+        ! so nz_ac = nz_aa - 1 
+
+        ! For notes on implicit form of advection terms, see eg http://farside.ph.utexas.edu/teaching/329/lectures/node90.html
+        
+        implicit none 
+
+        real(prec), intent(INOUT) :: T_ice(:)       ! nz_aa [K] Ice column temperature
+        real(prec), intent(IN)    :: kappa(:)       ! nz_aa [] Diffusivity
+        real(prec), intent(IN)    :: uz(:)          ! nz_ac [m a-1] Vertical velocity 
+        real(prec), intent(IN)    :: advecxy(:)     ! nz_aa [K a-1] Horizontal heat advection 
+        real(prec), intent(IN)    :: Q_strn(:)      ! nz_aa [K a-1] Internal strain heat production in ice
+        real(prec), intent(IN)    :: val_base       ! [K or flux] Basal boundary condition
+        real(prec), intent(IN)    :: val_srf        ! [K] Surface temperature 
+        real(prec), intent(IN)    :: H_ice          ! [m] Ice thickness 
+        real(prec), intent(IN)    :: zeta_aa(:)     ! nz_aa [--] Vertical sigma coordinates (zeta==height), layer centered aa-nodes
+        real(prec), intent(IN)    :: zeta_ac(:)     ! nz_ac [--] Vertical height axis temperature (0:1), layer edges ac-nodes
+        real(prec), intent(IN)    :: dzeta_a(:)     ! nz_aa [--] Solver discretization helper variable ak
+        real(prec), intent(IN)    :: dzeta_b(:)     ! nz_aa [--] Solver discretization helper variable bk
+        real(prec), intent(IN)    :: T0             ! [K or degreesCelcius] Reference melting temperature  
+        real(prec), intent(IN)    :: dt             ! [a] Time step 
+        logical,    intent(IN)    :: is_basal_flux  ! Is basal condition flux condition (True) or Neumann (False)
+        ! Local variables 
+        integer    :: k, nz_aa
+        real(prec) :: fac, fac_a, fac_b, uz_aa, dz
+        real(prec) :: kappa_a, kappa_b, dz1, dz2 
+        real(prec), allocatable :: subd(:)      ! nz_aa 
+        real(prec), allocatable :: diag(:)      ! nz_aa  
+        real(prec), allocatable :: supd(:)      ! nz_aa 
+        real(prec), allocatable :: rhs(:)       ! nz_aa 
+        real(prec), allocatable :: solution(:)  ! nz_aa
+        
+        nz_aa = size(zeta_aa,1)
+
+        allocate(subd(nz_aa))
+        allocate(diag(nz_aa))
+        allocate(supd(nz_aa))
+        allocate(rhs(nz_aa))
+        allocate(solution(nz_aa))
+
+        ! == Ice base ==
+
+        if (is_basal_flux) then 
+            ! Impose basal flux (Dirichlet condition)
+
+            ! Calculate dz for the bottom layer between the basal boundary
+            ! (ac-node) and the centered (aa-node) temperature point above
+            ! Note: zeta_aa(1) == zeta_ac(1) == bottom boundary 
+            dz = H_ice * (zeta_aa(2) - zeta_aa(1))
+
+            ! backward Euler flux basal boundary condition
+            subd(1) =  0.0_prec
+            diag(1) =  1.0_prec
+            supd(1) = -1.0_prec
+            rhs(1)  = val_base * dz
+                
+        else 
+            ! Impose basal temperature (Neumann condition) 
+
+            subd(1) = 0.0_prec
+            diag(1) = 1.0_prec
+            supd(1) = 0.0_prec
+            rhs(1)  = val_base
+
+        end if 
+
+        ! == Ice interior layers 2:nz_aa-1 ==
+
+        do k = 2, nz_aa-1
+
+            ! Get implicit vertical advection term, ac => aa nodes
+            uz_aa   = 0.5*(uz(k-1)+uz(k))
+
+            ! Get kappa for the lower and upper ac-nodes using harmonic mean from aa-nodes
+            
+            dz1 = zeta_ac(k-1)-zeta_aa(k-1)
+            dz2 = zeta_aa(k)-zeta_ac(k-1)
+            call calc_wtd_harmonic_mean(kappa_a,kappa(k-1),kappa(k),dz1,dz2)
+
+            dz1 = zeta_ac(k)-zeta_aa(k)
+            dz2 = zeta_aa(k+1)-zeta_ac(k)
+            call calc_wtd_harmonic_mean(kappa_b,kappa(k),kappa(k+1),dz1,dz2)
+
+            ! Vertical distance for centered difference advection scheme
+            dz      =  H_ice*(zeta_aa(k+1)-zeta_aa(k-1))
+            
+            fac_a   = -kappa_a*dzeta_a(k)*dt/H_ice**2
+            fac_b   = -kappa_b*dzeta_b(k)*dt/H_ice**2
+
+            subd(k) = fac_a - uz_aa * dt/dz
+            supd(k) = fac_b + uz_aa * dt/dz
+            diag(k) = 1.0_prec - fac_a - fac_b
+            rhs(k)  = T_ice(k) - dt*advecxy(k) + dt*Q_strn(k)
+            
+        end do 
+
+        ! == Ice surface ==
+
+        subd(nz_aa) = 0.0_prec
+        diag(nz_aa) = 1.0_prec
+        supd(nz_aa) = 0.0_prec
+        rhs(nz_aa)  = val_srf
+
+        ! == Call solver ==
+
+        call solve_tridiag(subd,diag,supd,rhs,solution)
+
+        ! Copy the solution into the temperature variable
+
+        T_ice = solution 
+
+        return 
+
+    end subroutine calc_temp_column_internal
 
     subroutine calc_enth_column(enth,T_ice,omega,bmb_grnd,Q_ice_b,H_cts,T_pmp,cp,kt,advecxy,uz,Q_strn,Q_b, &
                                 Q_geo,T_srf,T_shlf,H_ice,H_w,f_grnd,zeta_aa,zeta_ac,cr,omega_max,T0,dt)

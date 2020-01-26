@@ -10,6 +10,7 @@ module ice_enthalpy
     implicit none
     
     private
+    public :: calc_temp_column0
     public :: calc_temp_column
     public :: calc_enth_column 
     public :: convert_to_enthalpy
@@ -22,7 +23,7 @@ module ice_enthalpy
 contains 
 
 
-    subroutine calc_temp_column(enth,T_ice,omega,bmb_grnd,Q_ice_b,H_cts,T_pmp,cp,kt,advecxy,uz, &
+    subroutine calc_temp_column0(enth,T_ice,omega,bmb_grnd,Q_ice_b,H_cts,T_pmp,cp,kt,advecxy,uz, &
                                 Q_strn,Q_b,Q_geo,T_srf,T_shlf,H_ice,H_w,f_grnd,zeta_aa,zeta_ac, &
                                 dzeta_a,dzeta_b,omega_max,T0,dt)
         ! Thermodynamics solver for a given column of ice 
@@ -136,8 +137,9 @@ contains
 
             ! == Assign grounded basal boundary conditions ==
 
-            if ( (T_ice(1) .lt. T_pmp(1) .and. H_w_predicted .le. 0.0_prec) &
-                .or. H_w_predicted .lt. 0.0_prec) then   
+            if ( T_ice(1) .lt. T_pmp(1) .or. H_w_predicted .lt. 0.0_prec) then
+!             if ( (T_ice(1) .lt. T_pmp(1) .and. H_w_predicted .le. 0.0_prec) &
+!                 .or. H_w_predicted .lt. 0.0_prec) then   
                 ! Frozen at bed, or about to become frozen 
 
                 ! Calculate dzeta for the bottom layer between the basal boundary
@@ -272,10 +274,188 @@ contains
 
         return 
 
+    end subroutine calc_temp_column0
+
+    subroutine calc_temp_column(enth,T_ice,omega,bmb_grnd,Q_ice_b,H_cts,T_pmp,cp,kt,advecxy,uz, &
+                                Q_strn,Q_b,Q_geo,T_srf,T_shlf,H_ice,H_w,f_grnd,zeta_aa,zeta_ac, &
+                                dzeta_a,dzeta_b,omega_max,T0,dt)
+        ! Thermodynamics solver for a given column of ice 
+        ! Note zeta=height, k=1 base, k=nz surface 
+        ! Note: nz = number of vertical boundaries (including zeta=0.0 and zeta=1.0), 
+        ! temperature is defined for cell centers, plus a value at the surface and the base
+        ! so nz_ac = nz_aa - 1 
+
+        ! For notes on implicit form of advection terms, see eg http://farside.ph.utexas.edu/teaching/329/lectures/node90.html
+        
+        implicit none 
+
+        real(prec), intent(INOUT) :: enth(:)        ! nz_aa [J kg] Ice column enthalpy
+        real(prec), intent(INOUT) :: T_ice(:)       ! nz_aa [K] Ice column temperature
+        real(prec), intent(INOUT) :: omega(:)       ! nz_aa [-] Ice column water content fraction
+        real(prec), intent(INOUT) :: bmb_grnd       ! [m a-1] Basal mass balance (melting is negative)
+        real(prec), intent(OUT)   :: Q_ice_b        ! [J a-1 m-2] Ice basal heat flux (positive up)
+        real(prec), intent(OUT)   :: H_cts          ! [m] cold-temperate transition surface (CTS) height
+        real(prec), intent(IN)    :: T_pmp(:)       ! nz_aa [K] Pressure melting point temp.
+        real(prec), intent(IN)    :: cp(:)          ! nz_aa [J kg-1 K-1] Specific heat capacity
+        real(prec), intent(IN)    :: kt(:)          ! nz_aa [J a-1 m-1 K-1] Heat conductivity 
+        real(prec), intent(IN)    :: advecxy(:)     ! nz_aa [K a-1] Horizontal heat advection 
+        real(prec), intent(IN)    :: uz(:)          ! nz_ac [m a-1] Vertical velocity 
+        real(prec), intent(IN)    :: Q_strn(:)      ! nz_aa [J a-1 m-3] Internal strain heat production in ice
+        real(prec), intent(IN)    :: Q_b            ! [J a-1 m-2] Basal frictional heat production
+        real(prec), intent(IN)    :: Q_geo          ! [mW m-2] Geothermal heat flux (positive up)
+        real(prec), intent(IN)    :: T_srf          ! [K] Surface temperature 
+        real(prec), intent(IN)    :: T_shlf         ! [K] Marine-shelf interface temperature
+        real(prec), intent(IN)    :: H_ice          ! [m] Ice thickness 
+        real(prec), intent(IN)    :: H_w            ! [m] Basal water layer thickness 
+        real(prec), intent(IN)    :: f_grnd         ! [--] Grounded fraction
+        real(prec), intent(IN)    :: zeta_aa(:)     ! nz_aa [--] Vertical sigma coordinates (zeta==height), layer centered aa-nodes
+        real(prec), intent(IN)    :: zeta_ac(:)     ! nz_ac [--] Vertical height axis temperature (0:1), layer edges ac-nodes
+        real(prec), intent(IN)    :: dzeta_a(:)     ! nz_aa [--] Solver discretization helper variable ak
+        real(prec), intent(IN)    :: dzeta_b(:)     ! nz_aa [--] Solver discretization helper variable bk
+        real(prec), intent(IN)    :: omega_max      ! [-] Maximum allowed water fraction inside ice, typically omega_max=0.02 
+        real(prec), intent(IN)    :: T0             ! [K or degreesCelcius] Reference melting temperature  
+        real(prec), intent(IN)    :: dt             ! [a] Time step 
+        
+        ! Local variables 
+        integer    :: k, nz_aa, nz_ac
+        real(prec) :: Q_geo_now, ghf_conv 
+        real(prec) :: H_w_predicted
+        real(prec) :: dz 
+        real(prec) :: T_excess
+        real(prec) :: melt_internal   
+        real(prec) :: enth_b, enth_pmp_b 
+        real(prec) :: omega_excess
+
+        real(prec) :: val_base, val_srf 
+        logical    :: is_basal_flux 
+        
+        real(prec), allocatable :: kappa_aa(:)    ! aa-nodes
+        real(prec), allocatable :: Q_strn_now(:)  ! aa-nodes
+
+        real(prec), parameter   :: T_ref = 273.15_prec   
+
+
+        nz_aa = size(zeta_aa,1)
+
+        allocate(kappa_aa(nz_aa))
+        allocate(Q_strn_now(nz_aa))
+
+        ! Get geothermal heat flux in proper units 
+        Q_geo_now = Q_geo*1e-3*sec_year   ! [mW m-2] => [J m-2 a-1]
+
+        ! Step 0: Calculate diffusivity on cell centers (aa-nodes)
+
+        kappa_aa = kt / (rho_ice*cp)
+        
+        ! Convert units of Q_strn [J a-1 m-3] => [K a-1]
+        Q_strn_now = Q_strn/(rho_ice*cp)
+
+        ! === Basal boundary condition =====================
+
+        if (f_grnd .lt. 1.0) then
+            ! Floating or partially floating ice - set temperature equal 
+            ! to basal temperature at pressure melting point, or marine freezing temp,
+            ! or weighted average between the two.
+            
+            val_base = (f_grnd*T_pmp(1) + (1.0-f_grnd)*T_shlf)
+            is_basal_flux = .FALSE. 
+
+        else 
+            ! Grounded ice 
+
+            ! Determine expected basal water thickness [m] for this timestep,
+            ! using basal mass balance from previous time step (good guess)
+            H_w_predicted = H_w - (bmb_grnd*(rho_w/rho_ice))*dt 
+            
+            ! == Assign grounded basal boundary conditions ==
+
+            if ( T_ice(1) .lt. T_pmp(1) .or. H_w_predicted .lt. 0.0_prec) then
+!             if ( (T_ice(1) .lt. T_pmp(1) .and. H_w_predicted .le. 0.0_prec) &
+!                 .or. H_w_predicted .lt. 0.0_prec) then   
+                ! Frozen at bed, or about to become frozen 
+
+                ! backward Euler flux basal boundary condition
+                val_base = (Q_b + Q_geo_now) / kt(1)
+                is_basal_flux = .TRUE. 
+
+            else 
+                ! Temperate at bed 
+                ! Hold basal temperature at pressure melting point
+
+                val_base = T_pmp(1)
+                is_basal_flux = .FALSE. 
+
+            end if   ! melting or frozen
+
+        end if  ! floating or grounded 
+
+
+        ! === Surface boundary condition =====================
+
+        val_srf =  min(T_srf,T0)    
+
+
+        ! === Solver =============================
+
+        call calc_temp_column_internal(T_ice,kappa_aa,uz,advecxy,Q_strn_now,val_base,val_srf,H_ice, &
+                                                zeta_aa,zeta_ac,dzeta_a,dzeta_b,T_ref,dt,is_basal_flux)
+
+
+
+
+        ! Now calculate internal melt (only allow melting, no accretion)
+    
+        melt_internal = 0.0 
+
+        do k = nz_aa-1, 2, -1 
+            ! Descend from surface to base layer (center of layer)
+
+            ! Store temperature difference above pressure melting point (excess energy)
+            T_excess = max(T_ice(k)-T_pmp(k),0.0)
+
+            ! Calculate basal mass balance as sum of all water produced in column,
+            ! reset temperature to pmp  
+            if (T_excess .gt. 0.0) then 
+                melt_internal = melt_internal + T_excess * H_ice*(zeta_ac(k)-zeta_ac(k-1))*cp(k) / (L_ice * dt) 
+                T_ice(k)      = T_pmp(k)
+            end if 
+            
+        end do 
+
+        ! Make sure base is below pmp too (mass/energy balance handled via bmb_grnd calculation externally)
+        if (T_ice(1) .gt. T_pmp(1)) T_ice(1) = T_pmp(1)
+
+        ! Also set omega to constant value where ice is temperate just for some consistency 
+        omega = 0.0 
+!             where (T_ice .ge. T_pmp) omega = omega_max 
+
+        ! Finally, get enthalpy too 
+        call convert_to_enthalpy(enth,T_ice,omega,T_pmp,cp,L_ice)
+
+        ! Calculate heat flux at ice base as temperature gradient * conductivity [J a-1 m-2]
+        if (H_ice .gt. 0.0_prec) then 
+            dz = H_ice * (zeta_aa(2)-zeta_aa(1))
+            Q_ice_b = kt(1) * (T_ice(2) - T_ice(1)) / dz 
+        else 
+            Q_ice_b = 0.0  
+        end if 
+        
+        ! Calculate basal mass balance (valid for grounded ice only)
+        call calc_bmb_grounded(bmb_grnd,T_ice(1)-T_pmp(1),Q_ice_b,Q_b,Q_geo_now,f_grnd,rho_ice)
+        
+        ! Include internal melting in bmb_grnd 
+        bmb_grnd = bmb_grnd - melt_internal 
+
+
+        ! Finally, calculate the CTS height 
+        H_cts = calc_cts_height(enth,T_ice,omega,T_pmp,cp,H_ice,zeta_aa)
+
+        return 
+
     end subroutine calc_temp_column
 
-    subroutine calc_temp_column_internal(T_ice,kappa,uz,advecxy,Q_strn,val_base,val_srf, &
-                                                H_ice,zeta_aa,zeta_ac,dzeta_a,dzeta_b,T0,dt,is_basal_flux)
+    subroutine calc_temp_column_internal(T_ice,kappa,uz,advecxy,Q_strn,val_base,val_srf,H_ice, &
+                                                zeta_aa,zeta_ac,dzeta_a,dzeta_b,T_ref,dt,is_basal_flux)
         ! Thermodynamics solver for a given column of ice 
         ! Note zeta=height, k=1 base, k=nz surface 
         ! Note: nz = number of vertical boundaries (including zeta=0.0 and zeta=1.0), 
@@ -298,7 +478,7 @@ contains
         real(prec), intent(IN)    :: zeta_ac(:)     ! nz_ac [--] Vertical height axis temperature (0:1), layer edges ac-nodes
         real(prec), intent(IN)    :: dzeta_a(:)     ! nz_aa [--] Solver discretization helper variable ak
         real(prec), intent(IN)    :: dzeta_b(:)     ! nz_aa [--] Solver discretization helper variable bk
-        real(prec), intent(IN)    :: T0             ! [K or degreesCelcius] Reference melting temperature  
+        real(prec), intent(IN)    :: T_ref          ! [K] Reference temperature to scale calculation
         real(prec), intent(IN)    :: dt             ! [a] Time step 
         logical,    intent(IN)    :: is_basal_flux  ! Is basal condition flux condition (True) or Neumann (False)
         ! Local variables 
@@ -341,7 +521,7 @@ contains
             subd(1) = 0.0_prec
             diag(1) = 1.0_prec
             supd(1) = 0.0_prec
-            rhs(1)  = val_base
+            rhs(1)  = (val_base - T_ref)
 
         end if 
 
@@ -371,7 +551,7 @@ contains
             subd(k) = fac_a - uz_aa * dt/dz
             supd(k) = fac_b + uz_aa * dt/dz
             diag(k) = 1.0_prec - fac_a - fac_b
-            rhs(k)  = T_ice(k) - dt*advecxy(k) + dt*Q_strn(k)
+            rhs(k)  = (T_ice(k)-T_ref) - dt*advecxy(k) + dt*Q_strn(k)
             
         end do 
 
@@ -380,7 +560,7 @@ contains
         subd(nz_aa) = 0.0_prec
         diag(nz_aa) = 1.0_prec
         supd(nz_aa) = 0.0_prec
-        rhs(nz_aa)  = val_srf
+        rhs(nz_aa)  = (val_srf-T_ref)
 
         ! == Call solver ==
 
@@ -388,7 +568,7 @@ contains
 
         ! Copy the solution into the temperature variable
 
-        T_ice = solution 
+        T_ice = solution + T_ref 
 
         return 
 

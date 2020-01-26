@@ -14,6 +14,8 @@ program test_icetemp
     type icesheet_vectors
         real(prec), allocatable :: zeta(:)    ! [-] Sigma coordinates from 0:1 (either height or depth)
         real(prec), allocatable :: zeta_ac(:) ! nz-1 [-] sigma coordinates for internal ice layer edges
+        real(prec), allocatable :: dzeta_a(:) ! [-] Sigma coordinates derivative term
+        real(prec), allocatable :: dzeta_b(:) ! [-] Sigma coordinates derivative term
         real(prec), allocatable :: T_ice(:)   ! [K] Ice temperature 
         real(prec), allocatable :: T_pmp(:)   ! [K] Ice pressure melting point 
         real(prec), allocatable :: cp(:)      ! [] Ice heat capacity 
@@ -96,7 +98,7 @@ program test_icetemp
     integer            :: narg 
     character(len=12)  :: arg_nz, arg_cr 
 
-    logical, parameter :: testing_poly = .TRUE.
+    logical, parameter :: testing_poly = .FALSE.
     real(prec)         :: H_cts_prev, H_cts_ref, H_cts_now, E0, E1, dEdz 
     integer            :: k_cts, k 
 
@@ -109,17 +111,17 @@ program test_icetemp
     ! ===============================================================
     ! User options 
 
-    experiment     = "bg15a"        ! "eismint", "k15expa", "k15expb", "bg15a"
+    experiment     = "eismint"        ! "eismint", "k15expa", "k15expb", "bg15a"
     
     ! General options
-    zeta_scale      = "linear"      ! "linear", "exp", "tanh"
+    zeta_scale      = "exp"      ! "linear", "exp", "tanh"
     nz              = 22            ! [--] Number of ice sheet points (aa-nodes + base + surface)
     is_celcius      = .FALSE. 
 
     age_method      = "expl"        ! "expl" or "impl"
     age_impl_kappa  = 1.5           ! [m2 a-1] Artificial diffusion for age tracing
 
-    enth_solver     = "enth"        ! "enth" or "temp" 
+    enth_solver     = "temp"        ! "enth" or "temp" 
     omega_max       = 0.03          ! Maximum allowed water content (fraction)
     enth_cr         = 1e-3          ! Enthalpy solver: conductivity ratio kappa_water / kappa_ice 
 
@@ -189,14 +191,14 @@ program test_icetemp
             ! EISMINT 
 
             t_start = 0.0       ! [yr]
-            t_end   = 300e3     ! [yr]
+            t_end   = 100e3     ! [yr]
             dt      = 0.5_prec  ! [yr]
             dt_out  = 1000.0    ! [yr] 
 
             !T_pmp_beta = 9.8e-8         ! [K Pa^-1] Greve and Blatter (2009) 
             T_pmp_beta = 9.7e-8         ! [K Pa^-1] EISMINT2 value (beta1 = 8.66e-4 [K m^-1])
 
-            call init_eismint_summit(ice1,smb=0.1_prec)
+            call init_eismint_summit(ice1,smb=0.3_prec)
 
     end select 
 
@@ -387,11 +389,15 @@ end if
         H_cts_prev = ice1%H_cts 
 
 end if 
-
-        call calc_enth_column(ice1%poly%enth,ice1%poly%T_ice,ice1%poly%omega,ice1%bmb,ice1%Q_ice_b,ice1%H_cts,ice1%poly%T_pmp, &
-                ice1%poly%cp,ice1%poly%kt,ice1%poly%advecxy,ice1%poly%uz,ice1%poly%Q_strn,ice1%Q_b,ice1%Q_geo,ice1%T_srf,ice1%T_shlf, &
-                ice1%H_ice,ice1%H_w,ice1%f_grnd,ice1%poly%zeta_aa,ice1%poly%zeta_ac, &
-                enth_cr,omega_max,T0_ref,dt)
+        
+!         call calc_enth_column(ice1%poly%enth,ice1%poly%T_ice,ice1%poly%omega,ice1%bmb,ice1%Q_ice_b,ice1%H_cts,ice1%poly%T_pmp, &
+!                 ice1%poly%cp,ice1%poly%kt,ice1%poly%advecxy,ice1%poly%uz,ice1%poly%Q_strn,ice1%Q_b,ice1%Q_geo,ice1%T_srf,ice1%T_shlf, &
+!                 ice1%H_ice,ice1%H_w,ice1%f_grnd,ice1%poly%zeta_aa,ice1%poly%zeta_ac, &
+!                 enth_cr,omega_max,T0_ref,dt)
+    
+        call calc_temp_column(ice1%vec%enth,ice1%vec%T_ice,ice1%vec%omega,ice1%bmb,ice1%Q_ice_b,ice1%H_cts,ice1%vec%T_pmp, &
+                ice1%vec%cp,ice1%vec%kt,ice1%vec%advecxy,ice1%vec%uz,ice1%vec%Q_strn,ice1%Q_b,ice1%Q_geo,ice1%T_srf,ice1%T_shlf, &
+                ice1%H_ice,ice1%H_w,ice1%f_grnd,ice1%vec%zeta,ice1%vec%zeta_ac,ice1%vec%dzeta_a,ice1%vec%dzeta_b,omega_max,T0_ref,dt)
 
 !         call calc_enth_column(ice1%vec%enth,ice1%vec%T_ice,ice1%vec%omega,ice1%bmb,ice1%Q_ice_b,ice1%H_cts,ice1%vec%T_pmp, &
 !                 ice1%vec%cp,ice1%vec%kt,ice1%vec%advecxy,ice1%vec%uz,ice1%vec%Q_strn,ice1%Q_b,ice1%Q_geo,ice1%T_srf,ice1%T_shlf, &
@@ -404,9 +410,9 @@ if (testing_poly) then
                                                 ice1%vec%zeta,ice1%vec%zeta_ac,ice1%poly,L_ice)
 else
 
-        ice1%vec%enth  = ice1%poly%enth 
-        ice1%vec%T_ice = ice1%poly%T_ice 
-        ice1%vec%omega = ice1%poly%omega 
+!         ice1%vec%enth  = ice1%poly%enth 
+!         ice1%vec%T_ice = ice1%poly%T_ice 
+!         ice1%vec%omega = ice1%poly%omega 
 
 end if 
 
@@ -824,6 +830,8 @@ contains
         ! Make sure all vectors are deallocated
         if (allocated(ice%vec%zeta))     deallocate(ice%vec%zeta)
         if (allocated(ice%vec%zeta_ac))  deallocate(ice%vec%zeta_ac)
+        if (allocated(ice%vec%dzeta_a))  deallocate(ice%vec%dzeta_a)
+        if (allocated(ice%vec%dzeta_b))  deallocate(ice%vec%dzeta_b)
         
         if (allocated(ice%vec%T_ice))   deallocate(ice%vec%T_ice)
         if (allocated(ice%vec%T_pmp))   deallocate(ice%vec%T_pmp)
@@ -840,7 +848,9 @@ contains
         ! Allocate vectors with desired lengths
         allocate(ice%vec%zeta(nz))
         allocate(ice%vec%zeta_ac(nz_ac))
-        
+        allocate(ice%vec%dzeta_a(nz))
+        allocate(ice%vec%dzeta_b(nz))
+
         allocate(ice%vec%T_ice(nz))
         allocate(ice%vec%T_pmp(nz))
         allocate(ice%vec%cp(nz))
@@ -854,6 +864,9 @@ contains
 
         ! Initialize zeta 
         call calc_zeta(ice%vec%zeta,ice%vec%zeta_ac,zeta_scale,zeta_exp=2.0_prec) 
+
+        ! Calculate derivative terms 
+        call calc_dzeta_terms(ice%vec%dzeta_a,ice%vec%dzeta_b,ice%vec%zeta,ice%vec%zeta_ac) 
 
         ! Initialize remaining vectors to zero 
         ice%vec%T_ice   = 0.0 

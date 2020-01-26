@@ -369,9 +369,7 @@ contains
             
             ! == Assign grounded basal boundary conditions ==
 
-            if ( T_ice(1) .lt. T_pmp(1) .or. H_w_predicted .lt. 0.0_prec) then
-!             if ( (T_ice(1) .lt. T_pmp(1) .and. H_w_predicted .le. 0.0_prec) &
-!                 .or. H_w_predicted .lt. 0.0_prec) then   
+            if ( T_ice(1) .lt. T_pmp(1) .or. H_w_predicted .lt. 0.0_prec) then   
                 ! Frozen at bed, or about to become frozen 
 
                 ! backward Euler flux basal boundary condition

@@ -379,22 +379,7 @@ contains
             H_w_predicted = H_w - (bmb_grnd*(rho_w/rho_ice))*dt 
             
             ! == Assign grounded basal boundary conditions ==
-
-!             if ( T_ice(1)-T_pmp(1) .gt. -0.001_prec ) then
-!                 ! Temperate 
-
-!                 val_base = T_pmp(1)
-!                 is_basal_flux = .FALSE. 
-
-!             else 
-!                 ! Frozen 
-
-!                 ! backward Euler flux basal boundary condition
-!                 val_base = (Q_b + Q_geo_now) / kt(1)
-!                 is_basal_flux = .TRUE. 
-
-!             end if 
-
+            
             if ( (T_ice(1) .lt. T_pmp(1) .and. H_w .eq. 0.0_prec) .or. H_w_predicted .lt. 0.0_prec ) then    
                 ! Frozen at bed, or about to become frozen 
 
@@ -414,7 +399,7 @@ contains
         end if  ! floating or grounded 
 
         if (ii .eq. 31 .and. jj .eq. 31) then 
-            write(*,*) T_ice(1)-T_pmp(1), H_w, H_w_predicted, bmb_grnd, is_basal_flux
+            write(*,*) "check", T_ice(1)-T_pmp(1), H_w, H_w_predicted, bmb_grnd, is_basal_flux
         end if 
 
         ! === Solver =============================

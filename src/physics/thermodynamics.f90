@@ -470,8 +470,9 @@ contains
         integer :: k, nx, ny, nz_ac 
         real(prec) :: ux_aa, uy_aa 
         real(prec) :: dx_inv, dx_inv2
-
         real(prec) :: c_x, c_y, c_t 
+
+        real(prec), parameter :: tol = 1e-4 
 
         nx    = size(H_ice,1)
         ny    = size(H_ice,2)
@@ -507,6 +508,8 @@ contains
 
                 uz_corr(k) = uz(i,j,k) + ux_aa*c_x + uy_aa*c_y + c_t 
 
+                if (abs(uz_corr(k)) .le. tol) uz_corr(k) = 0.0_prec 
+                
             end do         
 
         else 

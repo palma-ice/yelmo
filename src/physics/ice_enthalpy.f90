@@ -370,6 +370,10 @@ contains
             val_base = (f_grnd*T_pmp(1) + (1.0-f_grnd)*T_shlf)
             is_basal_flux = .FALSE. 
 
+!             T_ice = T_ice_prev 
+!             call calc_temp_column_internal(T_ice,kappa_aa,uz,advecxy,Q_strn_now,val_base,val_srf,H_ice, &
+!                                                 zeta_aa,zeta_ac,dzeta_a,dzeta_b,T_ref,dt,is_basal_flux)
+
         else 
             ! Grounded ice 
 
@@ -380,14 +384,29 @@ contains
             ! == Assign grounded basal boundary conditions ==
 
 !             if ( (T_ice(1) .lt. T_pmp(1) .and. H_w .eq. 0.0_prec) .or. H_w_predicted .lt. 0.0_prec ) then  
-!             if ( (T_ice(1) .lt. T_pmp(1) .and. H_w .eq. 0.0_prec) .or. &
-!                  (H_w .eq. 0.0_prec .and. bmb_grnd .gt. 0.0_prec) ) then  
-            if ( (T_ice(1) .lt. T_pmp(1) .and. H_w .eq. 0.0_prec) ) then
+            if ( (T_ice(1) .lt. T_pmp(1) .and. H_w .eq. 0.0_prec) .or. &
+                 (H_w .eq. 0.0_prec .and. bmb_grnd .gt. 0.0_prec) ) then  
                 ! Frozen at bed, or about to become frozen 
 
                 ! backward Euler flux basal boundary condition
                 val_base = (Q_b + Q_geo_now) / kt(1)
                 is_basal_flux = .TRUE. 
+
+!                 T_ice = T_ice_prev 
+!                 call calc_temp_column_internal(T_ice,kappa_aa,uz,advecxy,Q_strn_now,val_base,val_srf,H_ice, &
+!                                                 zeta_aa,zeta_ac,dzeta_a,dzeta_b,T_ref,dt,is_basal_flux)
+
+!                 if (T_ice(1) .eq. T_pmp(1)) then 
+!                     ! Became temperate 
+
+!                     val_base = T_pmp(1)
+!                     is_basal_flux = .FALSE. 
+
+!                     T_ice = T_ice_prev 
+!                     call calc_temp_column_internal(T_ice,kappa_aa,uz,advecxy,Q_strn_now,val_base,val_srf,H_ice, &
+!                                                 zeta_aa,zeta_ac,dzeta_a,dzeta_b,T_ref,dt,is_basal_flux)
+
+!                 end if 
 
             else 
                 ! Temperate at bed 
@@ -396,6 +415,20 @@ contains
                 val_base = T_pmp(1)
                 is_basal_flux = .FALSE. 
 
+!                 if ( (T_ice(1) .lt. T_pmp(1) .and. H_w .eq. 0.0_prec) .or. &
+!                  (H_w .eq. 0.0_prec .and. bmb_grnd .gt. 0.0_prec) ) then  
+!                     ! Frozen at bed, or about to become frozen 
+
+!                     ! backward Euler flux basal boundary condition
+!                     val_base = (Q_b + Q_geo_now) / kt(1)
+!                     is_basal_flux = .TRUE. 
+
+!                     T_ice = T_ice_prev 
+!                     call calc_temp_column_internal(T_ice,kappa_aa,uz,advecxy,Q_strn_now,val_base,val_srf,H_ice, &
+!                                                 zeta_aa,zeta_ac,dzeta_a,dzeta_b,T_ref,dt,is_basal_flux)
+
+!                 end if 
+                
             end if   ! melting or frozen
 
         end if  ! floating or grounded 

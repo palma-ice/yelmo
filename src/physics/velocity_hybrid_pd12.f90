@@ -265,13 +265,13 @@ contains
 
                 ! Determine basal vertical velocity for this grid point 
                 ! Following Eq. 5.31 of Greve and Blatter (2009)
-                uz(i,j,1) = dzbdt +uz_grid + bmb(i,j) + ux_aa*dzbdx_aa + uy_aa*dzbdy_aa
+                uz(i,j,1) = dzbdt + uz_grid + bmb(i,j) + ux_aa*dzbdx_aa + uy_aa*dzbdy_aa
 
                 if (abs(uz(i,j,1)) .le. tol) uz(i,j,1) = 0.0_prec 
                 
                 ! Determine surface vertical velocity following kinematic boundary condition 
                 ! Glimmer, Eq. 3.10 [or Folwer, Chpt 10, Eq. 10.8]
-                uz_srf = dzsdt(i,j) + ux_aa*dzsdx_aa + uy_aa*dzsdy_aa - smb(i,j) 
+                !uz_srf = dzsdt(i,j) + ux_aa*dzsdx_aa + uy_aa*dzsdy_aa - smb(i,j) 
                 
                 ! Integrate upward to each point above base until surface is reached 
                 do k = 2, nz_ac 
@@ -289,7 +289,7 @@ contains
                         - H_ij*(zeta_ac(k)-zeta_ac(k-1))*(duxdx_aa+duydy_aa)
 
                     ! Apply correction to match kinematic boundary condition at surface 
-                    uz(i,j,k) = uz(i,j,k) - zeta_ac(k)*(uz(i,j,k)-uz_srf)
+                    !uz(i,j,k) = uz(i,j,k) - zeta_ac(k)*(uz(i,j,k)-uz_srf)
 
                     if (abs(uz(i,j,k)) .le. tol) uz(i,j,k) = 0.0_prec 
                     

@@ -385,7 +385,7 @@ contains
                 val_base = T_pmp(1)
                 is_basal_flux = .FALSE. 
 
-            else if ( T_ice(1) .lt. T_pmp(1) ) then 
+            else if ( T_ice(1) .lt. T_pmp(1)  .or. H_w_predicted .lt. 0.0_prec ) then 
                 ! Frozen bed 
 
                 ! backward Euler flux basal boundary condition
@@ -399,7 +399,7 @@ contains
                 is_basal_flux = .FALSE. 
 
             end if 
-            
+
 !             if ( T_ice(1) .lt. T_pmp(1) .or. H_w_predicted .lt. 0.0_prec) then   
 !                 ! Frozen at bed, or about to become frozen 
 

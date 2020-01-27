@@ -271,7 +271,7 @@ contains
         real(prec), allocatable :: H_ice_now(:,:) 
         real(prec) :: filter0(3,3), filter(3,3) 
 
-        real(prec), parameter :: H_ice_thin = 15.0   ! [m] Threshold to define 'thin' ice
+        real(prec), parameter :: H_ice_thin = 10.0   ! [m] Threshold to define 'thin' ice
 
         nx    = size(T_ice,1)
         ny    = size(T_ice,2)
@@ -349,7 +349,7 @@ end if
                     T_base = T_shlf 
                 else 
                     ! Impose temperature below the pressure melting point of grounded ice 
-                    T_base = T_pmp(i,j,1) - 10.0_prec 
+                    T_base = T_pmp(i,j,1) !- 10.0_prec 
                 end if 
 
                 T_ice(i,j,:) = calc_temp_linear_column(T_srf(i,j),T_base,T_pmp(i,j,nz_aa),zeta_aa)

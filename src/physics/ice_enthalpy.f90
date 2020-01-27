@@ -278,7 +278,7 @@ contains
 
     subroutine calc_temp_column(enth,T_ice,omega,bmb_grnd,Q_ice_b,H_cts,T_pmp,cp,kt,advecxy,uz, &
                                 Q_strn,Q_b,Q_geo,T_srf,T_shlf,H_ice,H_w,f_grnd,zeta_aa,zeta_ac, &
-                                dzeta_a,dzeta_b,omega_max,T0,dt,ii,jj)
+                                dzeta_a,dzeta_b,omega_max,T0,dt)
         ! Thermodynamics solver for a given column of ice 
         ! Note zeta=height, k=1 base, k=nz surface 
         ! Note: nz = number of vertical boundaries (including zeta=0.0 and zeta=1.0), 
@@ -315,7 +315,6 @@ contains
         real(prec), intent(IN)    :: omega_max      ! [-] Maximum allowed water fraction inside ice, typically omega_max=0.02 
         real(prec), intent(IN)    :: T0             ! [K or degreesCelcius] Reference melting temperature  
         real(prec), intent(IN)    :: dt             ! [a] Time step 
-        integer,    intent(IN)    :: ii, jj 
 
         ! Local variables 
         integer    :: k, nz_aa, nz_ac
@@ -379,7 +378,7 @@ contains
             H_w_predicted = H_w - (bmb_grnd*(rho_w/rho_ice))*dt 
             
             ! == Assign grounded basal boundary conditions ==
-            
+
             if ( (T_ice(1) .lt. T_pmp(1) .and. H_w .eq. 0.0_prec) .or. H_w_predicted .lt. 0.0_prec ) then    
                 ! Frozen at bed, or about to become frozen 
 
@@ -397,10 +396,6 @@ contains
             end if   ! melting or frozen
 
         end if  ! floating or grounded 
-
-        if (ii .eq. 31 .and. jj .eq. 31) then 
-            write(*,*) "check", T_ice(1)-T_pmp(1), H_w, H_w_predicted, bmb_grnd, is_basal_flux
-        end if 
 
         ! === Solver =============================
 

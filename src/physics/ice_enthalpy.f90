@@ -379,24 +379,39 @@ contains
             
             ! == Assign grounded basal boundary conditions ==
 
-            if ( (T_ice(1) .lt. T_pmp(1) .and. H_w .eq. 0.0_prec) .or. H_w_predicted .lt. 0.0_prec) then   
-                ! Frozen at bed, or about to become frozen 
+            if ( T_ice(1)-T_pmp(1) .gt. -0.001_prec ) then
+                ! Temperate 
+
+                val_base = T_pmp(1)
+                is_basal_flux = .FALSE. 
+
+            else 
+                ! Frozen 
 
                 ! backward Euler flux basal boundary condition
                 val_base = (Q_b + Q_geo_now) / kt(1)
                 is_basal_flux = .TRUE. 
 
-            else 
-                ! Temperate at bed 
-                ! Hold basal temperature at pressure melting point
+            end if 
 
-                val_base = T_pmp(1)
-                is_basal_flux = .FALSE. 
+!             if ( T_ice(1) .lt. T_pmp(1) .or. H_w_predicted .lt. 0.0_prec) then    
+!                 ! Frozen at bed, or about to become frozen 
 
-            end if   ! melting or frozen
+!                 ! backward Euler flux basal boundary condition
+!                 val_base = (Q_b + Q_geo_now) / kt(1)
+!                 is_basal_flux = .TRUE. 
+
+!             else 
+!                 ! Temperate at bed 
+!                 ! Hold basal temperature at pressure melting point
+
+!                 val_base = T_pmp(1)
+!                 is_basal_flux = .FALSE. 
+
+!             end if   ! melting or frozen
 
         end if  ! floating or grounded 
-        
+
 
         ! === Solver =============================
 

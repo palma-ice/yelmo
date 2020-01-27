@@ -379,18 +379,24 @@ contains
             
             ! == Assign grounded basal boundary conditions ==
 
-            if ( T_ice(1) .ge. T_pmp(1) .or. H_w .gt. 0.0_prec) then 
+            if (H_w_predicted .gt. 0.0_prec) then 
                 ! Temperate bed 
 
                 val_base = T_pmp(1)
                 is_basal_flux = .FALSE. 
 
-            else 
+            else if ( T_ice(1) .lt. T_pmp(1) ) then 
                 ! Frozen bed 
 
                 ! backward Euler flux basal boundary condition
                 val_base = (Q_b + Q_geo_now) / kt(1)
                 is_basal_flux = .TRUE. 
+
+            else 
+                ! Temperate bed 
+
+                val_base = T_pmp(1)
+                is_basal_flux = .FALSE. 
 
             end if 
             

@@ -331,7 +331,8 @@ contains
         
         real(prec), allocatable :: kappa_aa(:)    ! aa-nodes
         real(prec), allocatable :: Q_strn_now(:)  ! aa-nodes
-
+        real(prec), allocatable :: T_ice_prev(:)  ! aa-nodes
+        
         real(prec), parameter   :: T_ref = 273.15_prec   
 
 
@@ -339,6 +340,7 @@ contains
 
         allocate(kappa_aa(nz_aa))
         allocate(Q_strn_now(nz_aa))
+        allocate(T_ice_prev(nz_aa))
 
         ! Get geothermal heat flux in proper units 
         Q_geo_now = Q_geo*1e-3*sec_year   ! [mW m-2] => [J m-2 a-1]
@@ -349,6 +351,14 @@ contains
         
         ! Convert units of Q_strn [J a-1 m-3] => [K a-1]
         Q_strn_now = Q_strn/(rho_ice*cp)
+
+        ! Store initial column 
+        T_ice_prev = T_ice 
+
+        ! === Surface boundary condition =====================
+
+        val_srf =  min(T_srf,T0)    
+
 
         ! === Basal boundary condition =====================
 
@@ -369,32 +379,45 @@ contains
             
             ! == Assign grounded basal boundary conditions ==
 
-            if ( T_ice(1) .lt. T_pmp(1) .or. H_w_predicted .lt. 0.0_prec) then   
-                ! Frozen at bed, or about to become frozen 
+            if ( T_ice(1) .ge. T_pmp(1) .or. H_w .gt. 0.0_prec) then 
+                ! Temperate bed 
+
+                val_base = T_pmp(1)
+                is_basal_flux = .FALSE. 
+
+            else 
+                ! Frozen bed 
 
                 ! backward Euler flux basal boundary condition
                 val_base = (Q_b + Q_geo_now) / kt(1)
                 is_basal_flux = .TRUE. 
 
-            else 
-                ! Temperate at bed 
-                ! Hold basal temperature at pressure melting point
+            end if 
+            
+!             if ( T_ice(1) .lt. T_pmp(1) .or. H_w_predicted .lt. 0.0_prec) then   
+!                 ! Frozen at bed, or about to become frozen 
 
-                val_base = T_pmp(1)
-                is_basal_flux = .FALSE. 
+!                 ! backward Euler flux basal boundary condition
+!                 val_base = (Q_b + Q_geo_now) / kt(1)
+!                 is_basal_flux = .TRUE. 
 
-            end if   ! melting or frozen
+!             else 
+!                 ! Temperate at bed 
+!                 ! Hold basal temperature at pressure melting point
+
+!                 val_base = T_pmp(1)
+!                 is_basal_flux = .FALSE. 
+
+!             end if   ! melting or frozen
 
         end if  ! floating or grounded 
 
 
-        ! === Surface boundary condition =====================
-
-        val_srf =  min(T_srf,T0)    
-
+        
 
         ! === Solver =============================
 
+        T_ice = T_ice_prev 
         call calc_temp_column_internal(T_ice,kappa_aa,uz,advecxy,Q_strn_now,val_base,val_srf,H_ice, &
                                                 zeta_aa,zeta_ac,dzeta_a,dzeta_b,T_ref,dt,is_basal_flux)
 

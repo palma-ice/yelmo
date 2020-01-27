@@ -132,9 +132,9 @@ contains
                     ! except enth_cr=1.0 and omega_max=0.0 as prescribed in par_load(). 
 
                     call calc_ytherm_enthalpy_3D(thrm%now%enth,thrm%now%T_ice,thrm%now%omega,thrm%now%bmb_grnd,thrm%now%Q_ice_b, &
-                                thrm%now%H_cts,thrm%now%T_pmp,thrm%now%cp,thrm%now%kt,advecxy,dyn%now%uz,thrm%now%Q_strn, &
+                                thrm%now%H_cts,thrm%now%T_pmp,thrm%now%cp,thrm%now%kt,advecxy,dyn%now%ux,dyn%now%uy,dyn%now%uz,thrm%now%Q_strn, &
                                 thrm%now%Q_b,bnd%Q_geo,bnd%T_srf,tpo%now%H_ice,tpo%now%z_srf,thrm%now%H_w,thrm%now%dHwdt,tpo%now%H_grnd, &
-                                tpo%now%f_grnd,thrm%par%zeta_aa,thrm%par%zeta_ac,thrm%par%dzeta_a,thrm%par%dzeta_b,thrm%par%enth_cr, &
+                                tpo%now%f_grnd,tpo%now%dHicedt,tpo%now%dzsrfdt,thrm%par%zeta_aa,thrm%par%zeta_ac,thrm%par%dzeta_a,thrm%par%dzeta_b,thrm%par%enth_cr, &
                                 thrm%par%omega_max,dt,thrm%par%dx,thrm%par%method,thrm%par%solver_advec)
                     
                 case("robin")
@@ -216,8 +216,8 @@ contains
 
     end subroutine calc_ytherm
 
-    subroutine calc_ytherm_enthalpy_3D(enth,T_ice,omega,bmb_grnd,Q_ice_b,H_cts,T_pmp,cp,kt,advecxy,uz,Q_strn,Q_b,Q_geo, &
-                                        T_srf,H_ice,z_srf,H_w,dHwdt,H_grnd,f_grnd,zeta_aa,zeta_ac,dzeta_a,dzeta_b, &
+    subroutine calc_ytherm_enthalpy_3D(enth,T_ice,omega,bmb_grnd,Q_ice_b,H_cts,T_pmp,cp,kt,advecxy,ux,uy,uz,Q_strn,Q_b,Q_geo, &
+                                        T_srf,H_ice,z_srf,H_w,dHwdt,H_grnd,f_grnd,dHdt,dzsdt,zeta_aa,zeta_ac,dzeta_a,dzeta_b, &
                                         cr,omega_max,dt,dx,solver,solver_advec)
         ! This wrapper subroutine breaks the thermodynamics problem into individual columns,
         ! which are solved independently by calling calc_enth_column
@@ -236,8 +236,8 @@ contains
         real(prec), intent(IN)    :: cp(:,:,:)      ! [J kg-1 K-1] Specific heat capacity
         real(prec), intent(IN)    :: kt(:,:,:)      ! [J a-1 m-1 K-1] Heat conductivity 
         real(prec), intent(IN)    :: advecxy(:,:,:) ! [m a-1] Horizontal x-velocity 
-!         real(prec), intent(IN)    :: ux(:,:,:)      ! [m a-1] Horizontal x-velocity 
-!         real(prec), intent(IN)    :: uy(:,:,:)      ! [m a-1] Horizontal y-velocity 
+        real(prec), intent(IN)    :: ux(:,:,:)      ! [m a-1] Horizontal x-velocity 
+        real(prec), intent(IN)    :: uy(:,:,:)      ! [m a-1] Horizontal y-velocity 
         real(prec), intent(IN)    :: uz(:,:,:)      ! [m a-1] Vertical velocity 
         real(prec), intent(IN)    :: Q_strn(:,:,:)  ! [K a-1] Internal strain heat production in ice
         real(prec), intent(IN)    :: Q_b(:,:)       ! [J a-1 m-2] Basal frictional heat production 
@@ -249,6 +249,8 @@ contains
         real(prec), intent(IN)    :: dHwdt(:,:)     ! [m/a] Basal water layer thickness change
         real(prec), intent(IN)    :: H_grnd(:,:)    ! [--] Ice thickness above flotation 
         real(prec), intent(IN)    :: f_grnd(:,:)    ! [--] Grounded fraction
+        real(prec), intent(IN)    :: dHdt(:,:)      ! [m/a] Ice thickness change
+        real(prec), intent(IN)    :: dzsdt(:,:)     ! [m/a] Ice surface change
         real(prec), intent(IN)    :: zeta_aa(:)     ! [--] Vertical sigma coordinates (zeta==height), aa-nodes
         real(prec), intent(IN)    :: zeta_ac(:)     ! [--] Vertical sigma coordinates (zeta==height), ac-nodes
         real(prec), intent(IN)    :: dzeta_a(:)     ! nz_aa [--] Solver discretization helper variable ak
@@ -367,8 +369,8 @@ end if
 !                 write(*,*) "advecxy: ", i,j, maxval(abs(advecxy3D(i,j,:)-advecxy))
                 
                 ! Calculate correction to vertical velocity due to horizontal gradient on vertical sigma-coordinate grid
-                !call calc_advec_vertical_column_correction(uz_now,H_ice_now,z_srf,ux,uy,uz,zeta_ac,dx,i,j)
-                uz_now = uz(i,j,:) 
+                call calc_advec_vertical_column_correction(uz_now,H_ice_now,z_srf,dHdt,dzsdt,ux,uy,uz,zeta_ac,dx,i,j)
+!                 uz_now = uz(i,j,:) 
 
                 if (trim(solver) .eq. "enth") then 
 

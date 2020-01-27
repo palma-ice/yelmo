@@ -445,18 +445,20 @@ contains
         do j = 2, ny-1 
             if(H_ice(i,j) .gt. 0.0_prec) advecxy(i,j,:) = advecxy(i-1,j,:) 
         end do 
-        
+
         return 
 
     end subroutine calc_advec_horizontal_3D
 
-    subroutine calc_advec_vertical_column_correction(uz_corr,H_ice,z_srf,ux,uy,uz,zeta_ac,dx,i,j)
+    subroutine calc_advec_vertical_column_correction(uz_corr,H_ice,z_srf,dHdt,dzsdt,ux,uy,uz,zeta_ac,dx,i,j)
 
         implicit none 
 
         real(prec), intent(OUT) :: uz_corr(:)       ! [m/a] nz_ac 
         real(prec), intent(IN)  :: H_ice(:,:)       ! nx,ny 
         real(prec), intent(IN)  :: z_srf(:,:)       ! nx,ny 
+        real(prec), intent(IN)  :: dHdt(:,:)        ! nx,ny 
+        real(prec), intent(IN)  :: dzsdt(:,:)       ! nx,ny 
         real(prec), intent(IN)  :: ux(:,:,:)        ! nx,ny,nz_aa
         real(prec), intent(IN)  :: uy(:,:,:)        ! nx,ny,nz_aa
         real(prec), intent(IN)  :: uz(:,:,:)        ! nx,ny,nz_ac
@@ -469,7 +471,7 @@ contains
         real(prec) :: ux_aa, uy_aa 
         real(prec) :: dx_inv, dx_inv2
 
-        real(prec) :: c_x, c_y 
+        real(prec) :: c_x, c_y, c_t 
 
         nx    = size(H_ice,1)
         ny    = size(H_ice,2)
@@ -500,7 +502,10 @@ contains
                 c_x = (1.0_prec-zeta_ac(k))*(H_ice(i+1,j)-H_ice(i-1,j))*dx_inv2 - (z_srf(i+1,j)-z_srf(i-1,j))*dx_inv2
                 c_y = (1.0_prec-zeta_ac(k))*(H_ice(i,j+1)-H_ice(i,j-1))*dx_inv2 - (z_srf(i,j+1)-z_srf(i,j-1))*dx_inv2
                 
-                uz_corr(k) = uz(i,j,k) + ux_aa*c_x + uy_aa*c_y 
+                ! Get grid velocity term 
+                c_t = H_ice(i,j)*(1.0_prec-zeta_ac(k))*dHdt(i,j) - dzsdt(i,j) 
+
+                uz_corr(k) = uz(i,j,k) + ux_aa*c_x + uy_aa*c_y + c_t 
 
             end do         
 

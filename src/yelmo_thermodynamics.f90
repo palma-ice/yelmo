@@ -347,9 +347,9 @@ end if
                 if (f_grnd(i,j) .lt. 1.0) then 
                     ! Impose T_shlf for the basal temperature
                     T_base = T_shlf 
-                else 
-                    ! Impose temperature below the pressure melting point of grounded ice 
-                    T_base = T_pmp(i,j,1) !- 10.0_prec 
+                else
+                    ! Impose temperature at the pressure melting point of grounded ice 
+                    T_base = T_pmp(i,j,1) 
                 end if 
 
                 T_ice(i,j,:) = calc_temp_linear_column(T_srf(i,j),T_base,T_pmp(i,j,nz_aa),zeta_aa)

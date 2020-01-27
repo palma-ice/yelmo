@@ -111,7 +111,7 @@ program test_icetemp
     ! ===============================================================
     ! User options 
 
-    experiment     = "eismint"        ! "eismint", "k15expa", "k15expb", "bg15a"
+    experiment     = "k15expa"        ! "eismint", "k15expa", "k15expb", "bg15a"
     
     ! General options
     zeta_scale      = "exp"      ! "linear", "exp", "tanh"
@@ -417,7 +417,7 @@ else
 end if 
 
         ! Update basal water thickness [m/a i.e.] => [m/a w.e.]
-        ice1%H_w = ice1%H_w - (ice1%bmb*rho_ice/rho_w)*dt 
+        ice1%H_w = max(ice1%H_w - (ice1%bmb*rho_ice/rho_w)*dt, 0.0_prec)
 
         if (trim(age_method) .eq. "impl") then 
             call calc_tracer_column(ice1%vec%t_dep,ice1%vec%uz,ice1%vec%advecxy*0.0,time,ice1%bmb, &

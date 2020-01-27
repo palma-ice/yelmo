@@ -64,10 +64,10 @@ contains
             ! Classic Cuffey and Patterson (2010) formula
             bmb_grnd = -1.0_prec/(rho_ice*L_ice)* ( Q_b + Q_ice_b + Q_geo_now )
 
-            if (T_prime_b .ne. 0.0_prec .and. bmb_grnd .lt. 0.0_prec) then 
-                ! Only allow melting for a temperate base 
-                bmb_grnd = 0.0_prec 
-            end if 
+!             if (T_prime_b .lt. 0.0_prec .and. bmb_grnd .lt. 0.0_prec) then 
+!                 ! Only allow melting for a temperate base 
+!                 bmb_grnd = 0.0_prec 
+!             end if 
 
         else 
             ! No basal mass change possible if bed is not temperate 

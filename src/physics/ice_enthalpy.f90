@@ -389,20 +389,9 @@ contains
                 T_ice = T_ice_prev 
                 call calc_temp_column_internal(T_ice,kappa_aa,uz,advecxy,Q_strn_now,val_base,val_srf,H_ice, &
                                                         zeta_aa,zeta_ac,dzeta_a,dzeta_b,T_ref,dt,is_basal_flux)
-
-            else if ( T_ice(1) .lt. (T_pmp(1)-0.1_prec) ) then 
-                ! (Very) frozen bed 
-
-                ! backward Euler flux basal boundary condition
-                val_base = (Q_b + Q_geo_now) / kt(1)
-                is_basal_flux = .TRUE. 
-
-                T_ice = T_ice_prev 
-                call calc_temp_column_internal(T_ice,kappa_aa,uz,advecxy,Q_strn_now,val_base,val_srf,H_ice, &
-                                                        zeta_aa,zeta_ac,dzeta_a,dzeta_b,T_ref,dt,is_basal_flux)
-
+                
             else if ( T_ice(1) .lt. T_pmp(1) ) then 
-                ! Frozen bed, but near melting temperature 
+                ! Frozen bed
 
                 ! backward Euler flux basal boundary condition
                 val_base = (Q_b + Q_geo_now) / kt(1)

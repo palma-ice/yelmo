@@ -362,8 +362,8 @@ contains
             bmb = 0.0 
         end if 
 
-        call calc_uz_3D(dyn%now%uz,dyn%now%ux,dyn%now%uy,tpo%now%H_ice,bnd%z_bed, &
-                        bnd%smb,bmb,dyn%par%zeta_aa,dyn%par%zeta_ac,dyn%par%dx,dyn%par%dy)
+        call calc_uz_3D(dyn%now%uz,dyn%now%ux,dyn%now%uy,tpo%now%H_ice,bnd%z_bed,tpo%now%z_srf, &
+                        bnd%smb,bmb,tpo%now%dHicedt,tpo%now%dzsrfdt,dyn%par%zeta_aa,dyn%par%zeta_ac,dyn%par%dx,dyn%par%dy)
         
         ! ===== Additional diagnostic variables =======================
 
@@ -628,10 +628,10 @@ contains
         else 
             bmb = 0.0 
         end if 
-
-        call calc_uz_3D(dyn%now%uz,dyn%now%ux,dyn%now%uy,tpo%now%H_ice,bnd%z_bed, &
-                        bnd%smb,bmb,dyn%par%zeta_aa,dyn%par%zeta_ac,dyn%par%dx,dyn%par%dy)
-
+        
+        call calc_uz_3D(dyn%now%uz,dyn%now%ux,dyn%now%uy,tpo%now%H_ice,bnd%z_bed,tpo%now%z_srf, &
+                        bnd%smb,bmb,tpo%now%dHicedt,tpo%now%dzsrfdt,dyn%par%zeta_aa,dyn%par%zeta_ac,dyn%par%dx,dyn%par%dy)
+        
         ! ===== Additional diagnostic variables ==========
 
         ! Calculate basal stress (input to thermodynamics)

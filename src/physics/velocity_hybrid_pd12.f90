@@ -178,7 +178,7 @@ contains
         
     end subroutine calc_vel_basal
 
-    subroutine calc_uz_3D(uz,ux,uy,H_ice,z_bed,smb,bmb,zeta_aa,zeta_ac,dx,dy)
+    subroutine calc_uz_3D(uz,ux,uy,H_ice,z_bed,z_srf,smb,bmb,dHdt,dzsdt,zeta_aa,zeta_ac,dx,dy)
         ! Following algorithm outlined by the Glimmer ice sheet model:
         ! https://www.geos.ed.ac.uk/~mhagdorn/glide/glide-doc/glimmer_htmlse9.html#x17-660003.1.5
 
@@ -192,8 +192,11 @@ contains
         real(prec), intent(IN)  :: uy(:,:,:)        ! nx,ny,nz_aa
         real(prec), intent(IN)  :: H_ice(:,:)
         real(prec), intent(IN)  :: z_bed(:,:) 
+        real(prec), intent(IN)  :: z_srf(:,:) 
         real(prec), intent(IN)  :: smb(:,:) 
         real(prec), intent(IN)  :: bmb(:,:) 
+        real(prec), intent(IN)  :: dHdt(:,:) 
+        real(prec), intent(IN)  :: dzsdt(:,:) 
         real(prec), intent(IN)  :: zeta_aa(:)    ! z-coordinate, aa-nodes 
         real(prec), intent(IN)  :: zeta_ac(:)    ! z-coordinate, ac-nodes  
         real(prec), intent(IN)  :: dx 
@@ -201,11 +204,14 @@ contains
 
         ! Local variables 
         integer :: i, j, k, nx, ny, nz_aa, nz_ac   
-        real(prec) :: H_ij 
-        real(prec) :: dzbdx_ac
-        real(prec) :: dzbdy_ac
+        real(prec) :: H_ij, dHdx_aa, dHdy_aa, dzsdx_aa, dzsdy_aa 
+        real(prec) :: dzbdx_aa
+        real(prec) :: dzbdy_aa
         real(prec) :: duxdx_aa
         real(prec) :: duydy_aa
+        real(prec) :: ux_aa 
+        real(prec) :: uy_aa 
+        real(prec) :: uz_grid 
 
         real(prec), parameter :: dzbdt = 0.0   ! For posterity, keep dzbdt variable, but set to zero 
 
@@ -229,17 +235,41 @@ contains
 
                 H_ij = H_ice(i,j) 
 
-                ! Get the staggered bedrock gradient 
-                dzbdx_Ac = (z_bed(i+1,j)-z_bed(i,j))/dx
-                dzbdy_Ac = (z_bed(i,j+1)-z_bed(i,j))/dy
+                ! Get the centered bedrock gradient 
+                dzbdx_aa = (z_bed(i+1,j)-z_bed(i-1,j))/(2.0_prec*dx)
+                dzbdy_aa = (z_bed(i,j+1)-z_bed(i,j-1))/(2.0_prec*dy)
                 
+                ! Get the centered horizontal velocity at the base
+                ux_aa = 0.5_prec* (ux(i-1,j,1) + ux(i,j,1))
+                uy_aa = 0.5_prec* (uy(i,j-1,1) + uy(i,j,1))
+                
+                ! Get the centered surface gradient 
+                dzsdx_aa = (z_srf(i+1,j)-z_srf(i-1,j))/(2.0_prec*dx)
+                dzsdy_aa = (z_srf(i,j+1)-z_srf(i,j-1))/(2.0_prec*dy)
+                
+                ! Get the centered ice thickness gradient 
+                dHdx_aa = (H_ice(i+1,j)-H_ice(i-1,j))/(2.0_prec*dx)
+                dHdy_aa = (H_ice(i,j+1)-H_ice(i,j-1))/(2.0_prec*dy)
+                
+                ! Determine grid vertical velocity at the base due to sigma-coordinates 
+                ! Glimmer, Eq. 3.35 
+                ! ajr, 2020-01-27, untested:::
+!                 uz_grid = dzsdt(i,j) + (ux_aa*dzsdx_aa + uy_aa*dzsdy_aa) &
+!                             - ( (1.0_prec-zeta_ac(1))*dHdt(i,j) + ux_aa*dHdx_aa + uy_aa*dHdy_aa )
+                uz_grid = 0.0_prec 
+
                 ! ===================================================================
                 ! Greve and Blatter (2009) style:
 
                 ! Determine basal vertical velocity for this grid point 
                 ! Following Eq. 5.31 of Greve and Blatter (2009)
-                uz(i,j,1) = dzbdt + bmb(i,j) + ux(i,j,1)*dzbdx_Ac + uy(i,j,1)*dzbdy_Ac
+                uz(i,j,1) = dzbdt +uz_grid + bmb(i,j) + ux_aa*dzbdx_aa + uy_aa*dzbdy_aa
 
+
+                ! Determine surface vertical velocity following kinematic boundary condition 
+                ! Glimmer, Eq. 3.10 
+                ! To do
+                
                 ! Integrate upward to each point above base until surface is reached 
                 do k = 2, nz_ac 
 

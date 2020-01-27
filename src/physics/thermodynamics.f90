@@ -503,7 +503,7 @@ contains
                 c_y = (1.0_prec-zeta_ac(k))*(H_ice(i,j+1)-H_ice(i,j-1))*dx_inv2 - (z_srf(i,j+1)-z_srf(i,j-1))*dx_inv2
                 
                 ! Get grid velocity term 
-                c_t = H_ice(i,j)*(1.0_prec-zeta_ac(k))*dHdt(i,j) - dzsdt(i,j) 
+                c_t = (1.0_prec-zeta_ac(k))*dHdt(i,j) - dzsdt(i,j) 
 
                 uz_corr(k) = uz(i,j,k) + ux_aa*c_x + uy_aa*c_y + c_t 
 

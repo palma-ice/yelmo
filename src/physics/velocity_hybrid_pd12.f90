@@ -212,6 +212,7 @@ contains
         real(prec) :: ux_aa 
         real(prec) :: uy_aa 
         real(prec) :: uz_grid 
+        real(prec) :: uz_srf 
 
         real(prec), parameter :: dzbdt = 0.0   ! For posterity, keep dzbdt variable, but set to zero 
 
@@ -267,8 +268,8 @@ contains
 
 
                 ! Determine surface vertical velocity following kinematic boundary condition 
-                ! Glimmer, Eq. 3.10 
-                ! To do
+                ! Glimmer, Eq. 3.10 [or Folwer, Chpt 10, Eq. 10.8]
+                uz_srf = dzsdt(i,j) + ux_aa*dzsdx_aa + uy_aa*dzsdy_aa - smb(i,j) 
                 
                 ! Integrate upward to each point above base until surface is reached 
                 do k = 2, nz_ac 
@@ -284,6 +285,9 @@ contains
 
                     uz(i,j,k) = uz(i,j,k-1) & 
                         - H_ij*(zeta_ac(k)-zeta_ac(k-1))*(duxdx_aa+duydy_aa)
+
+                    ! Apply correction to match kinematic boundary condition at surface 
+                    uz(i,j,k) = uz(i,j,k) - zeta_ac(k)*(uz(i,j,k)-uz_srf)
 
                 end do 
                 

@@ -67,10 +67,13 @@ contains
             
             bmb_grnd = -Q_net /(rho_ice*L_ice)
 
-!             if (T_prime_b .lt. 0.0_prec .and. bmb_grnd .lt. 0.0_prec) then 
-!                 ! Only allow melting for a temperate base 
-!                 bmb_grnd = 0.0_prec 
-!             end if 
+            if (T_prime_b .lt. -1.0_prec .and. bmb_grnd .lt. 0.0_prec) then 
+                ! Only allow melting for a near-temperate base 
+                ! This is a safety-check to prevent strange things from
+                ! happening, mainly during initialization when temperatures
+                ! are not well defined.
+                bmb_grnd = 0.0_prec 
+            end if 
 
         else 
             ! No basal mass change possible if bed is not temperate 

@@ -114,8 +114,8 @@ program test_icetemp
     experiment     = "k15expa"        ! "eismint", "k15expa", "k15expb", "bg15a"
     
     ! General options
-    zeta_scale      = "exp"      ! "linear", "exp", "tanh"
-    nz              = 22            ! [--] Number of ice sheet points (aa-nodes + base + surface)
+    zeta_scale      = "linear"      ! "linear", "exp", "tanh"
+    nz              = 402            ! [--] Number of ice sheet points (aa-nodes + base + surface)
     is_celcius      = .FALSE. 
 
     age_method      = "expl"        ! "expl" or "impl"
@@ -138,10 +138,10 @@ program test_icetemp
         read(arg_cr,*)  enth_cr
     end if 
 
-    if (trim(experiment) .eq. "k15expa" .or. trim(experiment) .eq. "k15expb") then 
-        ! Use a more precise filename to specify cr value and dz
-        write(file1D,"(a,e8.2,a,e8.2,a)") "output/test_"//trim(experiment)//"_dz", (200.0/(nz-2)), "_cr", enth_cr, ".nc"
-    end if 
+!     if (trim(experiment) .eq. "k15expa" .or. trim(experiment) .eq. "k15expb") then 
+!         ! Use a more precise filename to specify cr value and dz
+!         write(file1D,"(a,e8.2,a,e8.2,a)") "output/test_"//trim(experiment)//"_dz", (200.0/(nz-2)), "_cr", enth_cr, ".nc"
+!     end if 
 
     ! ===============================================================
 
@@ -204,7 +204,7 @@ program test_icetemp
 
     ! Initialize polythermal data structure too 
     !call poly_init(ice1%poly,nz_pt=11,nz_pc=392,zeta_scale=zeta_scale,zeta_exp=2.0_prec)
-    call poly_init(ice1%poly,nz_pt=11,nz_pc=32,zeta_scale=zeta_scale,zeta_exp=2.0_prec)
+    call poly_init(ice1%poly,nz_pt=11,nz_pc=nz-10,zeta_scale=zeta_scale,zeta_exp=2.0_prec)
 
 if (testing_poly) then
 
@@ -369,10 +369,10 @@ if (.TRUE.) then
             call update_poly(poly,ice1%vec%advecxy,ice1%vec%Q_strn,ice1%vec%uz,ice1%vec%zeta, &
                                                                 ice1%vec%zeta_ac,H_cts_now,ice1%H_ice)
             
-            call calc_enth_column(poly%enth,poly%T_ice,poly%omega,ice1%bmb,ice1%Q_ice_b,ice1%H_cts,poly%T_pmp, &
-                    poly%cp,poly%kt,poly%advecxy,poly%uz,poly%Q_strn,ice1%Q_b,ice1%Q_geo,ice1%T_srf,ice1%T_shlf, &
-                    ice1%H_ice,ice1%H_w,ice1%f_grnd,poly%zeta_aa,poly%zeta_ac, &
-                    enth_cr,omega_max,T0_ref,dt)
+!             call calc_enth_column(poly%enth,poly%T_ice,poly%omega,ice1%bmb,ice1%Q_ice_b,ice1%H_cts,poly%T_pmp, &
+!                     poly%cp,poly%kt,poly%advecxy,poly%uz,poly%Q_strn,ice1%Q_b,ice1%Q_geo,ice1%T_srf,ice1%T_shlf, &
+!                     ice1%H_ice,ice1%H_w,ice1%f_grnd,poly%zeta_aa,poly%zeta_ac, &
+!                     enth_cr,omega_max,T0_ref,dt)
 
         end do 
 
@@ -395,14 +395,14 @@ end if
 !                 ice1%H_ice,ice1%H_w,ice1%f_grnd,ice1%poly%zeta_aa,ice1%poly%zeta_ac, &
 !                 enth_cr,omega_max,T0_ref,dt)
     
-        call calc_temp_column(ice1%vec%enth,ice1%vec%T_ice,ice1%vec%omega,ice1%bmb,ice1%Q_ice_b,ice1%H_cts,ice1%vec%T_pmp, &
-                ice1%vec%cp,ice1%vec%kt,ice1%vec%advecxy,ice1%vec%uz,ice1%vec%Q_strn,ice1%Q_b,ice1%Q_geo,ice1%T_srf,ice1%T_shlf, &
-                ice1%H_ice,ice1%H_w,ice1%f_grnd,ice1%vec%zeta,ice1%vec%zeta_ac,ice1%vec%dzeta_a,ice1%vec%dzeta_b,omega_max,T0_ref,dt)
-
-!         call calc_enth_column(ice1%vec%enth,ice1%vec%T_ice,ice1%vec%omega,ice1%bmb,ice1%Q_ice_b,ice1%H_cts,ice1%vec%T_pmp, &
+!         call calc_temp_column(ice1%vec%enth,ice1%vec%T_ice,ice1%vec%omega,ice1%bmb,ice1%Q_ice_b,ice1%H_cts,ice1%vec%T_pmp, &
 !                 ice1%vec%cp,ice1%vec%kt,ice1%vec%advecxy,ice1%vec%uz,ice1%vec%Q_strn,ice1%Q_b,ice1%Q_geo,ice1%T_srf,ice1%T_shlf, &
-!                 ice1%H_ice,ice1%H_w,ice1%f_grnd,ice1%vec%zeta,ice1%vec%zeta_ac, &
-!                 enth_cr,omega_max,T0_ref,dt)
+!                 ice1%H_ice,ice1%H_w,ice1%f_grnd,ice1%vec%zeta,ice1%vec%zeta_ac,ice1%vec%dzeta_a,ice1%vec%dzeta_b,omega_max,T0_ref,dt)
+
+        call calc_enth_column(ice1%vec%enth,ice1%vec%T_ice,ice1%vec%omega,ice1%bmb,ice1%Q_ice_b,ice1%H_cts,ice1%vec%T_pmp, &
+                ice1%vec%cp,ice1%vec%kt,ice1%vec%advecxy,ice1%vec%uz,ice1%vec%Q_strn,ice1%Q_b,ice1%Q_geo,ice1%T_srf,ice1%T_shlf, &
+                ice1%H_ice,ice1%H_w,ice1%f_grnd,ice1%vec%zeta,ice1%vec%zeta_ac,ice1%vec%dzeta_a,ice1%vec%dzeta_b, &
+                enth_cr,omega_max,T0_ref,dt)
 
 if (testing_poly) then 
 

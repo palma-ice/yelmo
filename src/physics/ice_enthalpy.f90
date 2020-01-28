@@ -122,6 +122,7 @@ contains
                 is_basal_flux = .FALSE.
 
             else if ( T_ice(1) .lt. T_pmp(1) .or. H_w_predicted .lt. 0.0_prec ) then
+!             if ( T_ice(1) .lt. T_pmp(1) .or. H_w_predicted .lt. 0.0_prec ) then
                 ! Frozen at bed, or about to become frozen 
 
                 ! backward Euler flux basal boundary condition
@@ -315,7 +316,6 @@ contains
 
     end subroutine calc_temp_column_internal
 
-
     subroutine calc_enth_column(enth,T_ice,omega,bmb_grnd,Q_ice_b,H_cts,T_pmp,cp,kt,advecxy,uz, &
                                 Q_strn,Q_b,Q_geo,T_srf,T_shlf,H_ice,H_w,f_grnd,zeta_aa,zeta_ac, &
                                 dzeta_a,dzeta_b,cr,omega_max,T0,dt)
@@ -484,14 +484,15 @@ contains
         ! Calculate heat flux at ice base as enthalpy gradient * rho_ice * diffusivity [J a-1 m-2]
         if (H_ice .gt. 0.0_prec) then 
             dz = H_ice * (zeta_aa(2)-zeta_aa(1))
-            Q_ice_b = kappa_aa(1) * rho_ice * ( enth(2) - enth(1) ) / dz
+!             Q_ice_b = kappa_aa(1) * rho_ice * (enth(2) - enth(1)) / dz    ! <== Problematic
+            Q_ice_b = kt(1) * ( T_ice(2) - T_ice(1) ) / dz
         else
-            Q_ice_b = 0.0 
+            Q_ice_b = 0.0_prec 
         end if 
 
         ! Calculate basal mass balance 
-        call calc_bmb_grounded(bmb_grnd,T_ice(1)-T_pmp(1),Q_ice_b,Q_b,Q_geo_now,f_grnd,rho_ice)
-!         call calc_bmb_grounded_enth(bmb_grnd,Q_ice_b,Q_b,Q_geo_now,f_grnd,rho_ice)
+        call calc_bmb_grounded(bmb_grnd,T_ice(1)-T_pmp(1),Q_ice_b,Q_b,Q_geo_now,f_grnd,rho_ice) 
+!         call calc_bmb_grounded_enth(bmb_grnd,T_ice(1)-T_pmp(1),omega(1),Q_ice_b,Q_b,Q_geo_now,f_grnd,rho_ice) 
         
         ! Include internal melting in bmb_grnd 
         bmb_grnd = bmb_grnd - melt_internal 
@@ -942,7 +943,7 @@ contains
 !         end if 
 
         ! Calculate basal mass balance 
-        call calc_bmb_grounded_enth(bmb_grnd,Q_ice_b,Q_b,Q_geo_now,f_grnd,rho_ice)
+        call calc_bmb_grounded_enth(bmb_grnd,T_ice(1)-T_pmp(1),omega(1),Q_ice_b,Q_b,Q_geo_now,f_grnd,rho_ice)
         
         ! Include internal melting in bmb_grnd 
         bmb_grnd = bmb_grnd - melt_internal 

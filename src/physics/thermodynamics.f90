@@ -34,7 +34,7 @@ module thermodynamics
 
 contains
 
-    elemental subroutine calc_bmb_grounded(bmb_grnd,T_prime_b,Q_ice_b,Q_b,Q_geo_now,f_grnd,rho_ice)
+    subroutine calc_bmb_grounded(bmb_grnd,T_prime_b,Q_ice_b,Q_b,Q_geo_now,f_grnd,rho_ice)
         ! Calculate everywhere there is at least some grounded ice 
         ! (centered aa node calculation)
 
@@ -53,16 +53,19 @@ contains
         real(prec), intent(IN)  :: rho_ice           ! [kg m-3] Ice density 
         
         ! Local variables
-        real(prec) :: coeff 
+        real(prec) :: Q_net  
         real(prec), parameter :: tol = 1e-5  
 
         ! Calculate the grounded basal mass balance following 
         ! Cuffey and Patterson (2010), Eq. 9.38 (Page 420)
         if ( f_grnd .gt. 0.0) then 
             ! Bed is grounded and temperate, calculate basal mass balance  
-
             ! Classic Cuffey and Patterson (2010) formula
-            bmb_grnd = -1.0_prec/(rho_ice*L_ice)* ( Q_b + Q_ice_b + Q_geo_now )
+            
+            ! Calculate net energy flux at the base [J a-1 m-2]
+            Q_net = Q_b + Q_ice_b + Q_geo_now
+            
+            bmb_grnd = -Q_net /(rho_ice*L_ice)
 
 !             if (T_prime_b .lt. 0.0_prec .and. bmb_grnd .lt. 0.0_prec) then 
 !                 ! Only allow melting for a temperate base 
@@ -83,7 +86,7 @@ contains
 
     end subroutine calc_bmb_grounded 
 
-    elemental subroutine calc_bmb_grounded_enth(bmb_grnd,Q_ice_b,Q_b,Q_geo_now,f_grnd,rho_ice)
+    elemental subroutine calc_bmb_grounded_enth(bmb_grnd,T_prime_b,omega,Q_ice_b,Q_b,Q_geo_now,f_grnd,rho_ice)
         ! Calculate everywhere there is at least some grounded ice 
         ! (centered aa node calculation)
 
@@ -94,6 +97,8 @@ contains
         implicit none 
         
         real(prec), intent(OUT) :: bmb_grnd          ! [m/a ice equiv.] Basal mass balance, grounded
+        real(prec), intent(IN)  :: T_prime_b         ! [K] Basal ice temp relative to pressure melting point (ie T_prime_b=0 K == temperate)
+        real(prec), intent(IN)  :: omega 
         real(prec), intent(IN)  :: Q_ice_b           ! [J a-1 m-2] Conductive heat flux to the base (positive down)
         real(prec), intent(IN)  :: Q_b               ! [J a-1 m-2] Basal heat production from friction and strain heating (postive up)
         real(prec), intent(IN)  :: Q_geo_now         ! [J a-1 m-2] Geothermal heat flux (positive up)
@@ -110,7 +115,7 @@ contains
             ! Calculate net energy flux at the base [J a-1 m-2]
             Q_net = Q_b + Q_ice_b + Q_geo_now
             
-            bmb_grnd = -Q_net /(rho_ice*L_ice)
+            bmb_grnd = -Q_net / (rho_ice*L_ice)
 
         else 
             ! Floating point, no grounded bmb 

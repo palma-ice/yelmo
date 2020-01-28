@@ -204,7 +204,8 @@ contains
 
         ! Local variables 
         integer :: i, j, k, nx, ny, nz_aa, nz_ac   
-        real(prec) :: H_ij, dHdx_aa, dHdy_aa, dzsdx_aa, dzsdy_aa 
+        real(prec) :: H_ij
+        !real(prec) :: dHdx_aa, dHdy_aa, dzsdx_aa, dzsdy_aa 
         real(prec) :: dzbdx_aa
         real(prec) :: dzbdy_aa
         real(prec) :: duxdx_aa
@@ -245,13 +246,13 @@ contains
                 ux_aa = 0.5_prec* (ux(i-1,j,1) + ux(i,j,1))
                 uy_aa = 0.5_prec* (uy(i,j-1,1) + uy(i,j,1))
                 
-                ! Get the centered surface gradient 
-                dzsdx_aa = (z_srf(i+1,j)-z_srf(i-1,j))/(2.0_prec*dx)
-                dzsdy_aa = (z_srf(i,j+1)-z_srf(i,j-1))/(2.0_prec*dy)
+!                 ! Get the centered surface gradient 
+!                 dzsdx_aa = (z_srf(i+1,j)-z_srf(i-1,j))/(2.0_prec*dx)
+!                 dzsdy_aa = (z_srf(i,j+1)-z_srf(i,j-1))/(2.0_prec*dy)
                 
-                ! Get the centered ice thickness gradient 
-                dHdx_aa = (H_ice(i+1,j)-H_ice(i-1,j))/(2.0_prec*dx)
-                dHdy_aa = (H_ice(i,j+1)-H_ice(i,j-1))/(2.0_prec*dy)
+!                 ! Get the centered ice thickness gradient 
+!                 dHdx_aa = (H_ice(i+1,j)-H_ice(i-1,j))/(2.0_prec*dx)
+!                 dHdy_aa = (H_ice(i,j+1)-H_ice(i,j-1))/(2.0_prec*dy)
                 
                 ! Determine grid vertical velocity at the base due to sigma-coordinates 
                 ! Glimmer, Eq. 3.35 

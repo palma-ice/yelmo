@@ -155,7 +155,19 @@ contains
         return 
 
     end function calc_effective_pressure_till
-    
+
+    subroutine modify_effective_pressure(N_eff,f_pmp) 
+        ! Modify effective pressure in the neighborhood 
+
+        implicit none 
+
+        real(prec), intent(INOUT) :: N_eff 
+        real(prec), intent(IN)    :: f_pmp 
+        
+        return 
+
+    end subroutine modify_effective_pressure
+
     elemental function calc_lambda_bed_lin(z_bed,z0,z1) result(lambda)
         ! Calculate scaling function: linear 
         

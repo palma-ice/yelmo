@@ -155,7 +155,7 @@ contains
         return 
 
     end function calc_effective_pressure_till
-
+    
     elemental function calc_lambda_bed_lin(z_bed,z0,z1) result(lambda)
         ! Calculate scaling function: linear 
         

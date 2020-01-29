@@ -32,18 +32,16 @@ contains
         ! Local variables 
         integer :: i, j, k, nx, ny  
         real(prec) :: dt 
-        real(prec), allocatable :: H_w_now(:,:)
-        real(prec), allocatable :: bmb_now(:,:)
         real(prec), allocatable :: advecxy(:,:,:) 
-
+        real(prec), allocatable :: H_w_now(:,:)
+        
         nx = thrm%par%nx
         ny = thrm%par%ny
 
         allocate(advecxy(nx,ny,thrm%par%nz_aa))
-        advecxy = 0.0_prec 
-        
         allocate(H_w_now(nx,ny))
-        allocate(bmb_now(nx,ny))
+        advecxy = 0.0_prec 
+        H_w_now = 0.0_prec 
 
         ! Initialize time if necessary 
         if (thrm%par%time .gt. time) then 
@@ -128,8 +126,8 @@ contains
         if ( dt .gt. 0.0 ) then     
             ! Ice thermodynamics should evolve, perform calculations 
 
+            ! Store initial value of H_w 
             H_w_now = thrm%now%H_w 
-            bmb_now = thrm%now%bmb_grnd 
 
             ! Update basal water layer thickness for half timestep (Runge Kutta, step 1)
             call calc_basal_water_local(thrm%now%H_w,thrm%now%dHwdt,tpo%now%H_ice,-thrm%now%bmb_grnd*(rho_ice/rho_w), &

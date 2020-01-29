@@ -127,19 +127,23 @@ contains
             
             ! Store local copy of ytopo and ytherm objects to use for predictor step
             tpo1  = dom%tpo 
+            thrm1 = dom%thrm 
 
             ! Step 1: Perform predictor step with temporary topography object 
             ! Calculate topography (elevation, ice thickness, calving, etc.)
             call calc_ytopo(tpo1,dom%dyn,dom%thrm,dom%bnd,time_now,topo_fixed=dom%tpo%par%topo_fixed)
             call calc_ytopo_masks(tpo1,dom%dyn,dom%thrm,dom%bnd)
 
+            ! Step 1a: Update thermodynamics with temporary object 
+            call calc_ytherm(thrm1,tpo1,dom%dyn,dom%mat,dom%bnd,time_now)            
+
             ! Step 2: Update other variables using predicted ice thickness 
             
             ! Calculate dynamics (velocities and stresses)
-            call calc_ydyn(dom%dyn,tpo1,dom%mat,dom%thrm,dom%bnd,time_now)
+            call calc_ydyn(dom%dyn,tpo1,dom%mat,thrm1,dom%bnd,time_now)
             
             ! Calculate material (ice properties, viscosity, etc.)
-            call calc_ymat(dom%mat,tpo1,dom%dyn,dom%thrm,dom%bnd,time_now)
+            call calc_ymat(dom%mat,tpo1,dom%dyn,thrm1,dom%bnd,time_now)
 
             ! Calculate thermodynamics (temperatures and enthalpy), corrected
             call calc_ytherm(dom%thrm,tpo1,dom%dyn,dom%mat,dom%bnd,time_now)            

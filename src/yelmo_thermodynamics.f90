@@ -32,7 +32,8 @@ contains
         ! Local variables 
         integer :: i, j, k, nx, ny  
         real(prec) :: dt 
-
+        real(prec), allocatable :: H_w_now(:,:)
+        real(prec), allocatable :: bmb_now(:,:)
         real(prec), allocatable :: advecxy(:,:,:) 
 
         nx = thrm%par%nx
@@ -41,6 +42,9 @@ contains
         allocate(advecxy(nx,ny,thrm%par%nz_aa))
         advecxy = 0.0_prec 
         
+        allocate(H_w_now(nx,ny))
+        allocate(bmb_now(nx,ny))
+
         ! Initialize time if necessary 
         if (thrm%par%time .gt. time) then 
             thrm%par%time = time
@@ -124,6 +128,13 @@ contains
         if ( dt .gt. 0.0 ) then     
             ! Ice thermodynamics should evolve, perform calculations 
 
+            H_w_now = thrm%now%H_w 
+            bmb_now = thrm%now%bmb_grnd 
+
+            ! Update basal water layer thickness
+            call calc_basal_water_local(thrm%now%H_w,thrm%now%dHwdt,tpo%now%H_ice,-thrm%now%bmb_grnd*(rho_ice/rho_w), &
+                                    tpo%now%f_grnd,dt*0.5_prec,thrm%par%till_rate,thrm%par%H_w_max)
+            
             select case(trim(thrm%par%method))
 
                 case("enth","temp") 
@@ -191,8 +202,12 @@ contains
                 
                 ! Update basal water layer thickness
                 call calc_basal_water_local(thrm%now%H_w,thrm%now%dHwdt,tpo%now%H_ice,-thrm%now%bmb_grnd*(rho_ice/rho_w), &
-                                        tpo%now%f_grnd,dt,thrm%par%till_rate,thrm%par%H_w_max)
-            
+                                        tpo%now%f_grnd,dt*0.5_prec,thrm%par%till_rate,thrm%par%H_w_max)
+                
+                ! Now update H_w runge kutta
+                thrm%now%H_w = max(H_w_now + dt*thrm%now%dHwdt,0.0_prec)
+
+
 !             end if 
 
         end if 

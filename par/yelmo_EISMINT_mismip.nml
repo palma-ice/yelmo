@@ -25,7 +25,8 @@
     log_timestep    = False 
     zeta_scale      = "tanh"            ! "linear", "exp", "tanh"
     zeta_exp        = 2.0  
-    nz_aa           = 21                ! Vertical resolution in ice
+    nz_aa           = 10                ! Vertical resolution in ice
+    use_pc_thrm     = False             ! Use predictor step with thermodynamics too 
     dtmin           = 0.001             ! [a] Minimum timestep 
     dtmax           = 5.0               ! [a] Maximum timestep
     ntt             = 1                 ! [--] Thermodynamics call frequency (how many dynamic timesteps to skip)

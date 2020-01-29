@@ -131,9 +131,9 @@ contains
             H_w_now = thrm%now%H_w 
             bmb_now = thrm%now%bmb_grnd 
 
-!             ! Update basal water layer thickness
-!             call calc_basal_water_local(thrm%now%H_w,thrm%now%dHwdt,tpo%now%H_ice,-thrm%now%bmb_grnd*(rho_ice/rho_w), &
-!                                     tpo%now%f_grnd,dt*0.5_prec,thrm%par%till_rate,thrm%par%H_w_max)
+            ! Update basal water layer thickness for half timestep (Runge Kutta, step 1)
+            call calc_basal_water_local(thrm%now%H_w,thrm%now%dHwdt,tpo%now%H_ice,-thrm%now%bmb_grnd*(rho_ice/rho_w), &
+                                    tpo%now%f_grnd,dt*0.5_prec,thrm%par%till_rate,thrm%par%H_w_max)
             
             select case(trim(thrm%par%method))
 
@@ -197,15 +197,10 @@ contains
 
             end select 
 
-!             if (trim(thrm%par%basal_water_method) .eq. "local") then 
-!                 ! If updating basal water calculate it here...
-                
-                ! Update basal water layer thickness
-                thrm%now%H_w = H_w_now 
-                call calc_basal_water_local(thrm%now%H_w,thrm%now%dHwdt,tpo%now%H_ice,-thrm%now%bmb_grnd*(rho_ice/rho_w), &
-                                        tpo%now%f_grnd,dt,thrm%par%till_rate,thrm%par%H_w_max)
-
-!             end if 
+            ! Update basal water layer thickness for full timestep with corrected rate (Runge Kutta, step 2)
+            thrm%now%H_w = H_w_now 
+            call calc_basal_water_local(thrm%now%H_w,thrm%now%dHwdt,tpo%now%H_ice,-thrm%now%bmb_grnd*(rho_ice/rho_w), &
+                                    tpo%now%f_grnd,dt,thrm%par%till_rate,thrm%par%H_w_max)
 
         end if 
 
@@ -394,7 +389,7 @@ end if
 
                     call calc_temp_column(enth(i,j,:),T_ice(i,j,:),omega(i,j,:),bmb_grnd(i,j),Q_ice_b(i,j),H_cts(i,j), &
                         T_pmp(i,j,:),cp(i,j,:),kt(i,j,:),advecxy(i,j,:),uz_now,Q_strn(i,j,:),Q_b(i,j),Q_geo(i,j),T_srf(i,j), &
-                        T_shlf,H_ice_now(i,j),H_w(i,j),dHwdt(i,j),f_grnd(i,j),zeta_aa,zeta_ac,dzeta_a,dzeta_b,omega_max,T0,dt)
+                        T_shlf,H_ice_now(i,j),H_w(i,j),f_grnd(i,j),zeta_aa,zeta_ac,dzeta_a,dzeta_b,omega_max,T0,dt)
                 
                 end if 
 

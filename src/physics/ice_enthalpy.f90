@@ -23,7 +23,7 @@ module ice_enthalpy
 contains 
 
     subroutine calc_temp_column(enth,T_ice,omega,bmb_grnd,Q_ice_b,H_cts,T_pmp,cp,kt,advecxy,uz, &
-                                Q_strn,Q_b,Q_geo,T_srf,T_shlf,H_ice,H_w,dHwdt,f_grnd,zeta_aa,zeta_ac, &
+                                Q_strn,Q_b,Q_geo,T_srf,T_shlf,H_ice,H_w,f_grnd,zeta_aa,zeta_ac, &
                                 dzeta_a,dzeta_b,omega_max,T0,dt)
         ! Thermodynamics solver for a given column of ice 
         ! Note zeta=height, k=1 base, k=nz surface 
@@ -53,7 +53,6 @@ contains
         real(prec), intent(IN)    :: T_shlf         ! [K] Marine-shelf interface temperature
         real(prec), intent(IN)    :: H_ice          ! [m] Ice thickness 
         real(prec), intent(IN)    :: H_w            ! [m] Basal water layer thickness 
-        real(prec), intent(IN)    :: dHwdt          ! [m a-1] Basal water layer thickness 
         real(prec), intent(IN)    :: f_grnd         ! [--] Grounded fraction
         real(prec), intent(IN)    :: zeta_aa(:)     ! nz_aa [--] Vertical sigma coordinates (zeta==height), layer centered aa-nodes
         real(prec), intent(IN)    :: zeta_ac(:)     ! nz_ac [--] Vertical height axis temperature (0:1), layer edges ac-nodes
@@ -113,9 +112,8 @@ contains
 
             ! Determine expected basal water thickness [m] for this timestep,
             ! using basal mass balance from previous time step (good guess)
-            !H_w_predicted = H_w - (bmb_grnd*(rho_w/rho_ice))*dt*0.5_prec
-            H_w_predicted = H_w + dHwdt*dt*0.5_prec 
-
+            H_w_predicted = H_w - (bmb_grnd*(rho_w/rho_ice))*dt
+            
             ! == Assign grounded basal boundary conditions ==
 
             if (H_w_predicted .gt. 0.0_prec) then 

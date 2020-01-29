@@ -134,8 +134,13 @@ contains
             call calc_ytopo(tpo1,dom%dyn,dom%thrm,dom%bnd,time_now,topo_fixed=dom%tpo%par%topo_fixed)
             call calc_ytopo_masks(tpo1,dom%dyn,dom%thrm,dom%bnd)
 
-            ! Step 1a: Update thermodynamics with temporary object 
-            call calc_ytherm(thrm1,tpo1,dom%dyn,dom%mat,dom%bnd,time_now)            
+            if (dom%par%use_pc_thrm) then 
+                ! Perform predictor step with temporary thermodynamics object 
+                
+                ! Calculate thermodynamics (temperatures and enthalpy), corrected 
+                call calc_ytherm(thrm1,tpo1,dom%dyn,dom%mat,dom%bnd,time_now)            
+
+            end if 
 
             ! Step 2: Update other variables using predicted ice thickness 
             
@@ -646,6 +651,7 @@ contains
         call nml_read(filename,"yelmo","zeta_scale",    par%zeta_scale)
         call nml_read(filename,"yelmo","zeta_exp",      par%zeta_exp)
         call nml_read(filename,"yelmo","nz_aa",         par%nz_aa)
+        call nml_read(filename,"yelmo","use_pc_thrm",   par%use_pc_thrm)
         call nml_read(filename,"yelmo","dt_method",     par%dt_method)
         call nml_read(filename,"yelmo","dt_min",        par%dt_min)
         call nml_read(filename,"yelmo","dt_ref",        par%dt_ref)

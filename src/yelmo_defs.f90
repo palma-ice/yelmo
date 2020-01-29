@@ -436,7 +436,7 @@ module yelmo_defs
 
         type(ytherm_param_class)   :: par        ! physical parameters
         type(ytherm_state_class)   :: now
-            
+
     end type
 
     ! =========================================================================
@@ -611,6 +611,7 @@ module yelmo_defs
         integer             :: nz_aa 
 
         ! Yelmo timesteps 
+        logical             :: use_pc_thrm 
         integer             :: dt_method 
         real(prec)          :: dt_min
         real(prec)          :: dt_ref 

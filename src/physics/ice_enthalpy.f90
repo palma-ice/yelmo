@@ -112,17 +112,18 @@ contains
 
             ! Determine expected basal water thickness [m] for this timestep,
             ! using basal mass balance from previous time step (good guess)
-            H_w_predicted = H_w - (bmb_grnd*(rho_w/rho_ice))*dt 
+            H_w_predicted = H_w - (bmb_grnd*(rho_w/rho_ice))*dt*0.5_prec
             
             ! == Assign grounded basal boundary conditions ==
 
             if (H_w_predicted .gt. 0.0_prec) then 
+                ! Temperate at bed 
+                ! Hold basal temperature at pressure melting point
 
                 val_base = T_pmp(1)
                 is_basal_flux = .FALSE.
 
             else if ( T_ice(1) .lt. T_pmp(1) .or. H_w_predicted .lt. 0.0_prec ) then
-!             if ( T_ice(1) .lt. T_pmp(1) .or. H_w_predicted .lt. 0.0_prec ) then
                 ! Frozen at bed, or about to become frozen 
 
                 ! backward Euler flux basal boundary condition

@@ -131,9 +131,9 @@ contains
             H_w_now = thrm%now%H_w 
             bmb_now = thrm%now%bmb_grnd 
 
-            ! Update basal water layer thickness
-            call calc_basal_water_local(thrm%now%H_w,thrm%now%dHwdt,tpo%now%H_ice,-thrm%now%bmb_grnd*(rho_ice/rho_w), &
-                                    tpo%now%f_grnd,dt*0.5_prec,thrm%par%till_rate,thrm%par%H_w_max)
+!             ! Update basal water layer thickness
+!             call calc_basal_water_local(thrm%now%H_w,thrm%now%dHwdt,tpo%now%H_ice,-thrm%now%bmb_grnd*(rho_ice/rho_w), &
+!                                     tpo%now%f_grnd,dt*0.5_prec,thrm%par%till_rate,thrm%par%H_w_max)
             
             select case(trim(thrm%par%method))
 

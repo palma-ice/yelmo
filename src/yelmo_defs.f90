@@ -184,6 +184,7 @@ module yelmo_defs
         integer    :: ssa_iter_max 
         real(prec) :: ssa_iter_rel 
         real(prec) :: ssa_iter_conv 
+        real(prec) :: taud_lim 
         real(prec) :: cb_sia
         
         integer    :: neff_method

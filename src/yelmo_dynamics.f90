@@ -139,7 +139,8 @@ contains
         ! ===== Calculate driving stress ==============================
 
         ! Calculate driving stress 
-        call calc_driving_stress_ac(dyn%now%taud_acx,dyn%now%taud_acy,tpo%now%H_ice,tpo%now%dzsdx,tpo%now%dzsdy,dyn%par%dx)
+        call calc_driving_stress_ac(dyn%now%taud_acx,dyn%now%taud_acy,tpo%now%H_ice,tpo%now%dzsdx,tpo%now%dzsdy, &
+                                                                                            dyn%par%dx,dyn%par%taud_lim)
 
         
 !         if (dyn%par%tau_gl_method .ne. 0) then
@@ -454,7 +455,8 @@ contains
         call calc_ydyn_cfref(dyn,tpo,thrm,bnd)
         
         ! Calculate driving stress
-        call calc_driving_stress_ac(dyn%now%taud_acx,dyn%now%taud_acy,tpo%now%H_ice,tpo%now%dzsdx,tpo%now%dzsdy,dyn%par%dx)
+        call calc_driving_stress_ac(dyn%now%taud_acx,dyn%now%taud_acy,tpo%now%H_ice,tpo%now%dzsdx,tpo%now%dzsdy, &
+                                                                                            dyn%par%dx,dyn%par%taud_lim)
     
 !         ! Additionally calculate driving stress at the grounding line
 !         call calc_driving_stress_gl_ac(dyn%now%taud_acx,dyn%now%taud_acy,tpo%now%H_ice,tpo%now%z_srf,bnd%z_bed,bnd%z_sl, &
@@ -628,7 +630,7 @@ contains
         else 
             bmb = 0.0 
         end if 
-        
+
         call calc_uz_3D(dyn%now%uz,dyn%now%ux,dyn%now%uy,tpo%now%H_ice,bnd%z_bed,tpo%now%z_srf, &
                         bnd%smb,bmb,tpo%now%dHicedt,tpo%now%dzsrfdt,dyn%par%zeta_aa,dyn%par%zeta_ac,dyn%par%dx,dyn%par%dy)
         
@@ -1390,6 +1392,7 @@ end if
         call nml_read(filename,"ydyn","ssa_iter_max",       par%ssa_iter_max,       init=init_pars)
         call nml_read(filename,"ydyn","ssa_iter_rel",       par%ssa_iter_rel,       init=init_pars)
         call nml_read(filename,"ydyn","ssa_iter_conv",      par%ssa_iter_conv,      init=init_pars)
+        call nml_read(filename,"ydyn","taud_lim",           par%taud_lim,           init=init_pars)
         call nml_read(filename,"ydyn","cb_sia",             par%cb_sia,             init=init_pars)
         
         call nml_read(filename,"ydyn_till","till_phi_const",par%till_phi_const,     init=init_pars)
@@ -1932,7 +1935,7 @@ end module yelmo_dynamics
 
 !             ! Calculate driving stress 
 !             call calc_driving_stress_ac(dyn1%now%taud_acx,dyn1%now%taud_acy,tpo%now%H_ice,tpo%now%z_srf,bnd%z_bed,bnd%z_sl, &
-!                      tpo%now%H_grnd,tpo%now%f_grnd,tpo%now%f_grnd_acx,tpo%now%f_grnd_acy,dyn1%par%dx, &
+!                      tpo%now%H_grnd,tpo%now%f_grnd,tpo%now%f_grnd_acx,tpo%now%f_grnd_acy,dyn1%par%dx,dyn1%par%taud_lim, &
 !                      method=dyn1%par%taud_gl_method,beta_gl_stag=dyn1%par%beta_gl_stag)
 
 !             call calc_ydyn_ssa(dyn1,tpo,thrm,mat,bnd)
@@ -1948,7 +1951,7 @@ end module yelmo_dynamics
             
 !             ! Calculate driving stress 
 !             call calc_driving_stress_ac(dyn2%now%taud_acx,dyn2%now%taud_acy,tpo%now%H_ice,tpo%now%z_srf,bnd%z_bed,bnd%z_sl, &
-!                      tpo%now%H_grnd,tpo%now%f_grnd,tpo%now%f_grnd_acx,tpo%now%f_grnd_acy,dyn2%par%dx, &
+!                      tpo%now%H_grnd,tpo%now%f_grnd,tpo%now%f_grnd_acx,tpo%now%f_grnd_acy,dyn2%par%dx,dyn1%par%taud_lim, &
 !                      method=dyn2%par%taud_gl_method,beta_gl_stag=dyn2%par%beta_gl_stag)
 
 !             call calc_ydyn_ssa(dyn2,tpo,thrm,mat,bnd)

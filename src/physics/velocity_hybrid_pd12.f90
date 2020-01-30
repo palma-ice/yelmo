@@ -267,7 +267,7 @@ contains
                 ! Determine basal vertical velocity for this grid point 
                 ! Following Eq. 5.31 of Greve and Blatter (2009)
                 uz(i,j,1) = dzbdt + uz_grid + bmb(i,j) + ux_aa*dzbdx_aa + uy_aa*dzbdy_aa
-                
+
                 if (abs(uz(i,j,1)) .le. tol) uz(i,j,1) = 0.0_prec 
                 
                 ! Determine surface vertical velocity following kinematic boundary condition 
@@ -847,7 +847,7 @@ contains
 
     end subroutine calc_basal_stress
 
-    subroutine calc_driving_stress_ac(taud_acx,taud_acy,H_ice,dzsdx,dzsdy,dx)
+    subroutine calc_driving_stress_ac(taud_acx,taud_acy,H_ice,dzsdx,dzsdy,dx,taud_lim)
         ! taud = rho_ice*g*H_ice
         ! Calculate driving stress on staggered grid points, with 
         ! special treatment of the grounding line 
@@ -855,14 +855,20 @@ contains
         
         ! Note: interpolation to Ab nodes no longer used here.
 
+        ! Note: use parameter taud_lim to limit maximum allowed driving stress magnitude applied in the model.
+        ! Should be an extreme value. eg, if dzdx = taud_lim / (rho*g*H), 
+        ! then for taud_lim=5e5 and H=3000m, dzdx = 2e5 / (910*9.81*3000) = 0.02, 
+        ! which is a rather steep slope for a shallow-ice model.
+
         implicit none 
 
-        real(prec), intent(OUT) :: taud_acx(:,:)
-        real(prec), intent(OUT) :: taud_acy(:,:) 
-        real(prec), intent(IN)  :: H_ice(:,:)
-        real(prec), intent(IN)  :: dzsdx(:,:)
-        real(prec), intent(IN)  :: dzsdy(:,:)
-        real(prec), intent(IN)  :: dx 
+        real(prec), intent(OUT) :: taud_acx(:,:)    ! [Pa]
+        real(prec), intent(OUT) :: taud_acy(:,:)    ! [Pa]
+        real(prec), intent(IN)  :: H_ice(:,:)       ! [m]
+        real(prec), intent(IN)  :: dzsdx(:,:)       ! [--]
+        real(prec), intent(IN)  :: dzsdy(:,:)       ! [--]
+        real(prec), intent(IN)  :: dx               ! [m] 
+        real(prec), intent(IN)  :: taud_lim         ! [Pa]
 
         ! Local variables 
         integer :: i, j, nx, ny 
@@ -870,7 +876,7 @@ contains
         real(prec) :: H_mid
 
         real(prec), allocatable :: Hi_ab(:,:) 
-
+        
         nx = size(H_ice,1)
         ny = size(H_ice,2) 
 
@@ -913,6 +919,10 @@ contains
         taud_acy(:,ny) = taud_acy(:,ny-1)  
         taud_acy(1,:)  = taud_acy(2,:)
 
+        ! Apply limit 
+        where(abs(taud_acx) .gt. taud_lim) taud_acx = sign(taud_lim,taud_acx)
+        where(abs(taud_acy) .gt. taud_lim) taud_acy = sign(taud_lim,taud_acy)
+        
         return 
 
     end subroutine calc_driving_stress_ac 

@@ -464,7 +464,12 @@ contains
     end subroutine calc_advec_horizontal_3D
 
     subroutine calc_advec_vertical_column_correction(uz_corr,H_ice,z_srf,dHdt,dzsdt,ux,uy,uz,zeta_ac,dx,i,j)
-
+        ! Calculate the corrected vertical velocity, accounting for stretching of 
+        ! the vertical axis between grid cells due to the use of sigma-coordinates. 
+        
+        ! Note: parameter max_corr may be necessary for very steep topography that violates 
+        ! shallow-model assumptions. Imposing this limit ensures the model can continue. 
+        
         implicit none 
 
         real(prec), intent(OUT) :: uz_corr(:)       ! [m/a] nz_ac 
@@ -484,8 +489,10 @@ contains
         real(prec) :: ux_aa, uy_aa 
         real(prec) :: dx_inv, dx_inv2
         real(prec) :: c_x, c_y, c_t 
+        real(prec) :: corr 
 
         real(prec), parameter :: tol = 1e-4 
+        real(prec), parameter :: max_corr = 0.1_prec   ! Maximum allowed deviation from original uz (eg 10%)
 
         nx    = size(H_ice,1)
         ny    = size(H_ice,2)
@@ -519,8 +526,14 @@ contains
                 ! Get grid velocity term 
                 c_t = (1.0_prec-zeta_ac(k))*dHdt(i,j) - dzsdt(i,j) 
 
-                uz_corr(k) = uz(i,j,k) + ux_aa*c_x + uy_aa*c_y + c_t 
+                ! Calculate total correction term, and limit it to within max_corr 
+                corr = ux_aa*c_x + uy_aa*c_y + c_t  
+                corr = sign(min(abs(corr),abs(max_corr*uz(i,j,k))),corr)
 
+                ! Apply correction 
+                uz_corr(k) = uz(i,j,k) + corr 
+
+                ! Limit new velocity to avoid underflow errors 
                 if (abs(uz_corr(k)) .le. tol) uz_corr(k) = 0.0_prec 
 
             end do         

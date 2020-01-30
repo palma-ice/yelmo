@@ -1,10 +1,10 @@
 &control    
     time_init       = 0.0               ! [yr] Starting time 
-    time_end        = 10e3              ! [yr] Ending time
+    time_end        = 50e3              ! [yr] Ending time
     time_equil      = 1e3               ! [yr] Equilibration time 
-    dtt             = 2.0               ! [yr] Main loop timestep 
+    dtt             = 5.0               ! [yr] Main loop timestep 
     dt1D_out        = 100.0             ! [yr] Frequency of writing 1D output files 
-    dt2D_out        = 100.0             ! [yr] Frequency of writing 2D output files 
+    dt2D_out        = 200.0             ! [yr] Frequency of writing 2D output files 
     bmb_shlf_const  = -10.0             ! [m/a] Basal mass balance of ice shelves
     dT_ann          = 0.0               ! [K]  Temperature anomaly (atm)
     z_sl            = 0.0               ! [m] Sea level relative to present-day 
@@ -88,6 +88,7 @@
     ssa_iter_max        = 2               ! Number of maximum allowed iterations over ssa to converge on vel. solution
     ssa_iter_rel        = 0.7             ! [--] Relaxation fraction [0:1] to stabilize ssa iterations
     ssa_iter_conv       = 1e-2            ! [--] L2 relative error convergence limit to exit ssa iterations
+    taud_lim            = 2e5             ! [Pa] Maximum allowed driving stress 
     cb_sia              = 0.0             ! [m a-1 Pa-1] Bed roughness coefficient for SIA sliding
     
 /

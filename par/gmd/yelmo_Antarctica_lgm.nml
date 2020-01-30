@@ -23,7 +23,7 @@
     zeta_scale      = "tanh"            ! "linear", "exp", "tanh"
     zeta_exp        = 2.0  
     nz_aa           = 10                ! Vertical resolution in ice
-    use_pc_thrm     = True              ! Use predictor step with thermodynamics too 
+    use_pc_thrm     = False             ! Use predictor step with thermodynamics too 
     dt_method       = 1                 ! 0: no internal timestep, 1: adaptive, cfl, 2: adaptive, pc
     dt_min          = 0.1               ! [a] Minimum timestep 
     dt_ref          = 5.0               ! [a] Reference timestep 

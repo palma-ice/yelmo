@@ -357,7 +357,12 @@ end if
                     T_base = T_pmp(i,j,1) 
                 end if 
 
-                T_ice(i,j,:) = calc_temp_linear_column(T_srf(i,j),T_base,T_pmp(i,j,nz_aa),zeta_aa)
+                T_ice(i,j,:)  = calc_temp_linear_column(T_srf(i,j),T_base,T_pmp(i,j,nz_aa),zeta_aa)
+                omega(i,j,:)  = 0.0_prec 
+                call convert_to_enthalpy(enth(i,j,:),T_ice(i,j,:),omega(i,j,:),T_pmp(i,j,:),cp(i,j,:),L_ice)
+                bmb_grnd(i,j) = 0.0_prec
+                Q_ice_b(i,j)  = 0.0_prec 
+                H_cts(i,j)    = 0.0_prec
 
             else 
                 ! Thick ice exists, call thermodynamic solver for the column
@@ -374,8 +379,8 @@ end if
 !                 write(*,*) "advecxy: ", i,j, maxval(abs(advecxy3D(i,j,:)-advecxy))
                 
                 ! Calculate correction to vertical velocity due to horizontal gradient on vertical sigma-coordinate grid
-                call calc_advec_vertical_column_correction(uz_now,H_ice_now,z_srf,dHdt,dzsdt,ux,uy,uz,zeta_ac,dx,i,j)
-!                 uz_now = uz(i,j,:) 
+!                 call calc_advec_vertical_column_correction(uz_now,H_ice_now,z_srf,dHdt,dzsdt,ux,uy,uz,zeta_ac,dx,i,j)
+                uz_now = uz(i,j,:) 
 
                 if (trim(solver) .eq. "enth") then 
 

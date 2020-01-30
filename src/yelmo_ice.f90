@@ -226,6 +226,7 @@ contains
         logical    :: dom_topo_fixed
         logical    :: dom_use_ssa  
         real(prec) :: dom_ssa_vel_max 
+        integer    :: dom_ssa_iter_max 
         logical    :: dom_log_timestep 
 
         ! Only run equilibration if time_tot > 0 
@@ -237,18 +238,19 @@ contains
             if (ssa_vel_max .gt. 0.0 .and. dom%dyn%par%mix_method .ne. -2) use_ssa = .TRUE. 
 
             ! Save original model choices 
-            dom_topo_fixed  = dom%tpo%par%topo_fixed 
-            dom_use_ssa     = dom%dyn%par%use_ssa 
-            dom_ssa_vel_max = dom%dyn%par%ssa_vel_max
+            dom_topo_fixed   = dom%tpo%par%topo_fixed 
+            dom_use_ssa      = dom%dyn%par%use_ssa 
+            dom_ssa_vel_max  = dom%dyn%par%ssa_vel_max
+            dom_ssa_iter_max = dom%dyn%par%ssa_iter_max 
 
             dom_log_timestep = dom%par%log_timestep
 
             ! Set model choices equal to equilibration choices 
-            dom%tpo%par%topo_fixed  = topo_fixed 
-            dom%dyn%par%use_ssa     = use_ssa 
-            dom%dyn%par%ssa_vel_max = ssa_vel_max
-
-            dom%par%log_timestep    = .FALSE. 
+            dom%tpo%par%topo_fixed   = topo_fixed 
+            dom%dyn%par%use_ssa      = use_ssa 
+            dom%dyn%par%ssa_vel_max  = ssa_vel_max
+            dom%dyn%par%ssa_iter_max = max(dom%dyn%par%ssa_iter_max,5)
+            dom%par%log_timestep     = .FALSE. 
 
             ! Set model time to input time 
             call yelmo_set_time(dom,time)
@@ -264,10 +266,11 @@ contains
             end do
 
             ! Restore original model choices 
-            dom%tpo%par%topo_fixed  = dom_topo_fixed 
-            dom%dyn%par%use_ssa     = dom_use_ssa 
-            dom%dyn%par%ssa_vel_max = dom_ssa_vel_max
-            dom%par%log_timestep    = dom_log_timestep
+            dom%tpo%par%topo_fixed   = dom_topo_fixed 
+            dom%dyn%par%use_ssa      = dom_use_ssa 
+            dom%dyn%par%ssa_vel_max  = dom_ssa_vel_max
+            dom%dyn%par%ssa_iter_max = dom_ssa_iter_max
+            dom%par%log_timestep     = dom_log_timestep
 
             write(*,*) 
             write(*,*) "Equilibration complete."

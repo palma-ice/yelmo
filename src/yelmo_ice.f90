@@ -817,8 +817,8 @@ contains
         
         ! Local variables 
         logical :: kill_it  
-        real(prec), parameter :: H_lim = 1e5   ! [m] 
-        real(prec), parameter :: u_lim = 1e5   ! [m/a]
+        real(prec), parameter :: H_lim = 1e4   ! [m] 
+        real(prec), parameter :: u_lim = 1e4   ! [m/a]
 
         kill_it = .FALSE. 
 
@@ -837,6 +837,11 @@ contains
             write(*,"(a16,2g14.4)") "range(H_ice):   ", minval(dom%tpo%now%H_ice), maxval(dom%tpo%now%H_ice)
             write(*,"(a16,2g14.4)") "range(uxy_bar): ", minval(dom%dyn%now%uxy_bar), maxval(dom%dyn%now%uxy_bar)
             write(*,*) 
+            write(*,*) "Writing restart file: "//"yelmo_killed.nc"
+            write(*,*) 
+
+            call yelmo_restart_write(dom,"yelmo_killed.nc",time=time) 
+
             write(*,*) 
             write(*,*) "Stopping model."
             write(*,*) 

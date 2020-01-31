@@ -118,7 +118,7 @@ contains
             dt_save(n) = dt_now 
 
             ! Advance the local time variable
-            time_now      = time_now + dt_now
+            time_now   = time_now + dt_now
             if (abs(time-time_now) .lt. time_tol) time_now = time 
             
 !             if (yelmo_log) then 
@@ -200,7 +200,7 @@ contains
 
             n = count(dt_save .ne. missing_value)
 
-            write(*,"(a,f12.2,f8.1,2f10.1,20f7.2)") "yelmo:: [time,speed,H,T,dt]:", time_now, dom%par%model_speed, &
+            write(*,"(a,f12.2,f8.1,2f10.1,50f7.2)") "yelmo:: [time,speed,H,T,dt]:", time_now, dom%par%model_speed, &
                                 H_mean, T_mean, dt_save(1:n)
             
         end if 

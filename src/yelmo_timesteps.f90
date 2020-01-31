@@ -128,8 +128,8 @@ contains
         logical    :: is_unstable
         real(prec), parameter :: dtmax_cfl   = 20.0_prec 
         real(prec), parameter :: exp_cfl     =  2.0_prec 
-        real(prec), parameter :: rate_lim    = 5.0_prec   ! Reduction in timestep for instability 
-        real(prec), parameter :: rate_scalar = 0.2_prec   ! Reduction in timestep for instability 
+        real(prec), parameter :: rate_lim    = 2.0_prec   ! Reduction in timestep for instability 
+        real(prec), parameter :: rate_scalar = 0.05_prec  ! Reduction in timestep for instability 
 
         ! Timestep limits determined from CFL conditions for general advective
         ! velocity, as well as diagnosed diffusive magnitude

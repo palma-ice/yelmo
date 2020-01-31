@@ -830,6 +830,8 @@ contains
         if (kill_it) then 
             ! Model has probably crashed, kill it. 
 
+            call yelmo_restart_write(dom,"yelmo_killed.nc",time=time) 
+
             write(*,*) 
             write(*,*) 
             write(*,"(a)") "yelmo_check_kill:: Error: model has likely crashed, very high value of H_ice or uxy_bar found."
@@ -837,11 +839,7 @@ contains
             write(*,"(a16,2g14.4)") "range(H_ice):   ", minval(dom%tpo%now%H_ice), maxval(dom%tpo%now%H_ice)
             write(*,"(a16,2g14.4)") "range(uxy_bar): ", minval(dom%dyn%now%uxy_bar), maxval(dom%dyn%now%uxy_bar)
             write(*,*) 
-            write(*,*) "Writing restart file: "//"yelmo_killed.nc"
-            write(*,*) 
-
-            call yelmo_restart_write(dom,"yelmo_killed.nc",time=time) 
-
+            write(*,*) "Restart file written: "//"yelmo_killed.nc"
             write(*,*) 
             write(*,*) "Stopping model."
             write(*,*) 

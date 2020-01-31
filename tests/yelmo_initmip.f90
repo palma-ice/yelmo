@@ -373,6 +373,9 @@ contains
         call nc_write(filename,"uxy_bar",ylmo%dyn%now%uxy_bar,units="m/a",long_name="Vertically averaged velocity magnitude", &
                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)  
         
+        call nc_write(filename,"duxydt",ylmo%dyn%now%duxydt,units="m a-2",long_name="Vertically averaged acceleration magnitude", &
+                      dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)  
+        
         call nc_write(filename,"mb_applied",ylmo%tpo%now%mb_applied,units="m",long_name="Applied net mass balance", &
                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
         call nc_write(filename,"bmb_grnd",ylmo%thrm%now%bmb_grnd,units="m/a ice equiv.",long_name="Basal mass balance (grounded)", &

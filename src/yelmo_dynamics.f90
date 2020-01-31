@@ -110,6 +110,8 @@ contains
         real(prec), allocatable :: ux_b_prev(:,:) 
         real(prec), allocatable :: uy_b_prev(:,:) 
 
+        real(prec), allocatable :: uxy_prev(:,:) 
+
         ! For vertical velocity calculation 
         real(prec), allocatable :: bmb(:,:)
 
@@ -132,6 +134,11 @@ contains
         allocate(ux_b_prev(nx,ny))
         allocate(uy_b_prev(nx,ny))
         
+        allocate(uxy_prev(nx,ny)) 
+
+        ! Store initial uxy_bar solution 
+        uxy_prev = dyn%now%uxy_bar 
+
         ! Stagger the ice thickness, aa=>ac nodes
         H_ice_acx = stagger_aa_acx(tpo%now%H_ice)
         H_ice_acy = stagger_aa_acy(tpo%now%H_ice)
@@ -404,6 +411,13 @@ contains
         ! Determine ratio of basal to surface velocity
         dyn%now%f_vbvs = calc_vel_ratio(uxy_base=dyn%now%uxy_b,uxy_srf=dyn%now%uxy_s)
 
+        ! Finally, determine rate of velocity change 
+        if (dt .ne. 0.0_prec) then 
+            dyn%now%duxydt = (dyn%now%uxy_bar - uxy_prev) / dt 
+        else 
+            dyn%now%duxydt = 0.0_prec 
+        end if 
+        
         return
 
     end subroutine calc_ydyn_adhoc
@@ -1482,6 +1496,8 @@ end if
         allocate(now%uy_i_bar(nx,ny))
         allocate(now%uxy_i_bar(nx,ny))
 
+        allocate(now%duxydt(nx,ny))
+
         allocate(now%dd_ab(nx,ny,nz_aa))
         allocate(now%dd_ab_bar(nx,ny))
 
@@ -1550,6 +1566,8 @@ end if
         now%uy_i_bar          = 0.0
         now%uxy_i_bar         = 0.0
         
+        now%duxydt            = 0.0
+
         now%dd_ab             = 0.0
         now%dd_ab_bar         = 0.0
         
@@ -1628,8 +1646,10 @@ end if
         if (allocated(now%uy_i_bar))        deallocate(now%uy_i_bar)
         if (allocated(now%uxy_i_bar))       deallocate(now%uxy_i_bar)
         
+        if (allocated(now%duxydt ))         deallocate(now%duxydt)
+        
         if (allocated(now%dd_ab))           deallocate(now%dd_ab)
-        if (allocated(now%dd_ab_bar))         deallocate(now%dd_ab_bar)
+        if (allocated(now%dd_ab_bar))       deallocate(now%dd_ab_bar)
         
         if (allocated(now%sigma_horiz_sq))  deallocate(now%sigma_horiz_sq)
         if (allocated(now%lhs_x))           deallocate(now%lhs_x) 

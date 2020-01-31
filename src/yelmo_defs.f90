@@ -244,6 +244,8 @@ module yelmo_defs
         real(prec), allocatable :: uy_i_bar(:,:)
         real(prec), allocatable :: uxy_i_bar(:,:) 
         
+        real(prec), allocatable :: duxydt(:,:) 
+
         real(prec), allocatable :: dd_ab(:,:,:)  
         real(prec), allocatable :: dd_ab_bar(:,:)  
         

@@ -326,8 +326,8 @@ end if
 
         ! ===================================================
 
-        do j = 1, ny
-        do i = 1, nx 
+        do j = 2, ny-1
+        do i = 2, nx-1 
             
             ! For floating points, calculate the approximate marine-shelf temperature 
             ! ajr, later this should come from an external model, and T_shlf would
@@ -401,11 +401,11 @@ end if
         end do 
         end do 
 
-!         ! Fill in borders 
-!         call fill_borders_3D(enth,nfill=1)
-!         call fill_borders_3D(T_ice,nfill=1)
-!         call fill_borders_3D(omega,nfill=1)
-!         call fill_borders_2D(bmb_grnd,nfill=1)
+        ! Fill in borders 
+        call fill_borders_3D(enth,nfill=1)
+        call fill_borders_3D(T_ice,nfill=1)
+        call fill_borders_3D(omega,nfill=1)
+        call fill_borders_2D(bmb_grnd,nfill=1)
         
         return 
 

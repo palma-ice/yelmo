@@ -168,6 +168,8 @@ contains
                             dom%par%pc_eta,dom%par%pc_tau)
             end if 
 
+            write(*,*) "vel: ", time_now, maxval(dom%dyn%now%duxydt,mask=dom%tpo%now%f_grnd.eq.1.0_prec)
+
             ! Make sure model is still running well
             call yelmo_check_kill(dom,time_now)
 
@@ -203,8 +205,6 @@ contains
             write(*,"(a,f12.2,f8.1,2f10.1,50f7.2)") "yelmo:: [time,speed,H,T,dt]:", time_now, dom%par%model_speed, &
                                 H_mean, T_mean, dt_save(1:n)
             
-            write(*,*) "vel: ", time_now, maxval(dom%dyn%now%duxydt)
-
         end if 
 
         return

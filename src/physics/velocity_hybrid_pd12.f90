@@ -309,6 +309,43 @@ contains
         end do 
         end do 
 
+        ! Fill in boundaries 
+        j = 1 
+        do i = 2, nx-1 
+            if(H_ice(i,j) .gt. 0.0_prec) uz(i,j,:) = uz(i,j+1,:) 
+        end do 
+
+        j = ny 
+        do i = 2, nx-1 
+            if(H_ice(i,j) .gt. 0.0_prec) uz(i,j,:) = uz(i,j-1,:) 
+        end do 
+        
+        i = 1 
+        do j = 2, ny-1 
+            if(H_ice(i,j) .gt. 0.0_prec) uz(i,j,:) = uz(i+1,j,:) 
+        end do 
+
+        i = nx 
+        do j = 2, ny-1 
+            if(H_ice(i,j) .gt. 0.0_prec) uz(i,j,:) = uz(i-1,j,:) 
+        end do 
+
+        i = 1
+        j = 1 
+        if(H_ice(i,j) .gt. 0.0_prec) uz(i,j,:) = 0.5_prec*(uz(i+1,j,:)+uz(i,j+1,:))
+
+        i = nx
+        j = 1 
+        if(H_ice(i,j) .gt. 0.0_prec) uz(i,j,:) = 0.5_prec*(uz(i-1,j,:)+uz(i,j+1,:))
+
+        i = nx
+        j = ny
+        if(H_ice(i,j) .gt. 0.0_prec) uz(i,j,:) = 0.5_prec*(uz(i-1,j,:)+uz(i,j-1,:))
+
+        i = 1
+        j = ny
+        if(H_ice(i,j) .gt. 0.0_prec) uz(i,j,:) = 0.5_prec*(uz(i+1,j,:)+uz(i,j-1,:))
+        
         return 
 
     end subroutine calc_uz_3D 
@@ -876,7 +913,7 @@ contains
         real(prec) :: H_mid
 
         real(prec), allocatable :: Hi_ab(:,:) 
-        
+
         nx = size(H_ice,1)
         ny = size(H_ice,2) 
 

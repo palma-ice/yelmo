@@ -319,7 +319,7 @@ contains
         integer :: k, nx, ny, nz_aa 
         real(prec) :: ux_aa, uy_aa 
         real(prec) :: dx_inv, dx_inv2
-        real(prec) :: advecx, advecy 
+        real(prec) :: advecx, advecy, advec_rev 
 
         real(prec) :: c_x, c_y, dvardz 
 
@@ -343,44 +343,77 @@ contains
             uy_aa = 0.5_prec*(uy(i,j,k)+uy(i,j-1,k))
             
             ! Explicit form (to test different order approximations)
-            if (ux_aa .gt. 0.0 .and. i .ge. 3) then  
-                ! Flow to the right 
+            if (ux(i-1,j,k) .gt. 0.0_prec .and. ux(i,j,k) .lt. 0.0_prec .and. i .ge. 3 .and. i .le. nx-2) then 
+                ! Convergent flow - take the sum 
 
-                ! 1st order
-                !advecx = dx_inv * ux(i-1,j,k)*(-(var_ice(i-1,j,k)-var_ice(i,j,k)))
+                advecx    = dx_inv2 * ux(i-1,j,k)*(-(4.0*var_ice(i-1,j,k)-var_ice(i-2,j,k)-3.0*var_ice(i,j,k)))
+                advec_rev = dx_inv2 * ux(i,j,k)*((4.0*var_ice(i+1,j,k)-var_ice(i+2,j,k)-3.0*var_ice(i,j,k)))
+
+                advecx    = (advecx + advec_rev) 
+
+            else if (ux_aa .gt. 0.0 .and. i .ge. 3) then  
+                ! Flow to the right - inner points
+
                 ! 2nd order
                 advecx = dx_inv2 * ux(i-1,j,k)*(-(4.0*var_ice(i-1,j,k)-var_ice(i-2,j,k)-3.0*var_ice(i,j,k)))
 
+            else if (ux_aa .gt. 0.0 .and. i .eq. 2) then  
+                ! Flow to the right - border points
+
+                ! 1st order
+                advecx = dx_inv * ux(i-1,j,k)*(-(var_ice(i-1,j,k)-var_ice(i,j,k)))
+                
             else if (ux_aa .lt. 0.0 .and. i .le. nx-2) then 
                 ! Flow to the left
 
-                ! 1st order 
-                !advecx = dx_inv * ux(i,j,k)*((var_ice(i+1,j,k)-var_ice(i,j,k)))
                 ! 2nd order
                 advecx = dx_inv2 * ux(i,j,k)*((4.0*var_ice(i+1,j,k)-var_ice(i+2,j,k)-3.0*var_ice(i,j,k)))
 
+            else if (ux_aa .lt. 0.0 .and. i .eq. nx-1) then 
+                ! Flow to the left
+
+                ! 1st order 
+                advecx = dx_inv * ux(i,j,k)*((var_ice(i+1,j,k)-var_ice(i,j,k)))
+                
             else 
-                ! No flow 
+                ! No flow or divergent 
+
                 advecx = 0.0
 
             end if 
 
-            if (uy_aa .gt. 0.0 .and. j .ge. 3) then   
-                ! Flow to the right 
+            if (uy(i,j-1,k) .gt. 0.0_prec .and. uy(i,j,k) .lt. 0.0_prec .and. j .ge. 3 .and. j .le. ny-2) then 
+                ! Convergent flow - take the sum 
 
-                ! 1st order
-                !advecy = dx_inv * uy(i,j-1,k)*(-(var_ice(i,j-1,k)-var_ice(i,j,k)))
+                advecy    = dx_inv2 * uy(i,j-1,k)*(-(4.0*var_ice(i,j-1,k)-var_ice(i,j-2,k)-3.0*var_ice(i,j,k)))
+                advec_rev = dx_inv2 * uy(i,j,k)*((4.0*var_ice(i,j+1,k)-var_ice(i,j+2,k)-3.0*var_ice(i,j,k)))
+                
+                advecy    = (advecy + advec_rev) 
+
+            else if (uy_aa .gt. 0.0 .and. j .ge. 3) then   
+                ! Flow to the right  - inner points
+
                 ! 2nd order
                 advecy = dx_inv2 * uy(i,j-1,k)*(-(4.0*var_ice(i,j-1,k)-var_ice(i,j-2,k)-3.0*var_ice(i,j,k)))
 
+            else if (uy_aa .gt. 0.0 .and. j .eq. 2) then   
+                ! Flow to the right - border points
+
+                ! 1st order
+                advecy = dx_inv * uy(i,j-1,k)*(-(var_ice(i,j-1,k)-var_ice(i,j,k)))
+                
             else if (uy_aa .lt. 0.0 .and. j .le. ny-2) then 
                 ! Flow to the left
 
-                ! 1st order
-                !advecy = dx_inv * uy(i,j,k)*((var_ice(i,j+1,k)-var_ice(i,j,k)))
                 ! 2nd order
                 advecy = dx_inv2 * uy(i,j,k)*((4.0*var_ice(i,j+1,k)-var_ice(i,j+2,k)-3.0*var_ice(i,j,k)))
-                
+            
+            else if (uy_aa .lt. 0.0 .and. j .eq. ny-1) then 
+                ! Flow to the left
+
+                ! 1st order
+                advecy = dx_inv * uy(i,j,k)*((var_ice(i,j+1,k)-var_ice(i,j,k)))
+                  
             else
                 ! No flow 
                 advecy = 0.0 
@@ -389,20 +422,6 @@ contains
             
             ! Combine advection terms for total contribution 
             advecxy(k) = (advecx+advecy)
-
-
-!             ! Get horizontal scaling correction terms 
-!             c_x = (1.0_prec-zeta(k))*(H_ice(i+1,j)-H_ice(i-1,j))*dx_inv2 - (z_srf(i+1,j)-z_srf(i-1,j))*dx_inv2
-!             c_y = (1.0_prec-zeta(k))*(H_ice(i,j+1)-H_ice(i,j-1))*dx_inv2 - (z_srf(i,j+1)-z_srf(i,j-1))*dx_inv2
-            
-!             ! Get vertical gradient of variable 
-!             if (k .lt. nz_aa) then 
-!                 dvardz = (var_ice(i,j,k+1)-var_ice(i,j,k))/((zeta(k+1)-zeta(k))*H_ice(i,j))
-!             else 
-!                 dvardz = (var_ice(i,j,k)-var_ice(i,j,k-1))/((zeta(k)-zeta(k-1))*H_ice(i,j))
-!             end if 
-
-!             advecxy(k) = (advecx + ux_aa*c_x*dvardz) + (advecy + uy_aa*c_y*dvardz)
 
         end do 
 
@@ -459,6 +478,22 @@ contains
             if(H_ice(i,j) .gt. 0.0_prec) advecxy(i,j,:) = advecxy(i-1,j,:) 
         end do 
 
+        i = 1
+        j = 1 
+        if(H_ice(i,j) .gt. 0.0_prec) advecxy(i,j,:) = 0.5_prec*(advecxy(i+1,j,:)+advecxy(i,j+1,:))
+
+        i = nx
+        j = 1 
+        if(H_ice(i,j) .gt. 0.0_prec) advecxy(i,j,:) = 0.5_prec*(advecxy(i-1,j,:)+advecxy(i,j+1,:))
+
+        i = nx
+        j = ny
+        if(H_ice(i,j) .gt. 0.0_prec) advecxy(i,j,:) = 0.5_prec*(advecxy(i-1,j,:)+advecxy(i,j-1,:))
+
+        i = 1
+        j = ny
+        if(H_ice(i,j) .gt. 0.0_prec) advecxy(i,j,:) = 0.5_prec*(advecxy(i+1,j,:)+advecxy(i,j-1,:))
+        
         return 
 
     end subroutine calc_advec_horizontal_3D
@@ -466,7 +501,7 @@ contains
     subroutine calc_advec_vertical_column_correction(uz_corr,H_ice,z_srf,dHdt,dzsdt,ux,uy,uz,zeta_ac,dx,i,j)
         ! Calculate the corrected vertical velocity, accounting for stretching of 
         ! the vertical axis between grid cells due to the use of sigma-coordinates. 
-        
+
         ! Note: parameter max_corr may be necessary for very steep topography that violates 
         ! shallow-model assumptions. Imposing this limit ensures the model can continue. 
         

@@ -3,7 +3,7 @@ module yelmo_thermodynamics
 
     use nml 
     use yelmo_defs 
-    use yelmo_tools, only : smooth_gauss_2D, smooth_gauss_3D, gauss_values, fill_borders_3D, &
+    use yelmo_tools, only : smooth_gauss_2D, smooth_gauss_3D, gauss_values, fill_borders_2D, fill_borders_3D, &
             stagger_aa_ab, regularize2D
     
     use thermodynamics 
@@ -402,10 +402,11 @@ end if
         end do 
 
 !         ! Fill in borders 
-!         call fill_borders_3D(enth,nfill=2)
-!         call fill_borders_3D(T_ice,nfill=2)
-!         call fill_borders_3D(omega,nfill=2)
-
+!         call fill_borders_3D(enth,nfill=1)
+!         call fill_borders_3D(T_ice,nfill=1)
+!         call fill_borders_3D(omega,nfill=1)
+!         call fill_borders_2D(bmb_grnd,nfill=1)
+        
         return 
 
     end subroutine calc_ytherm_enthalpy_3D

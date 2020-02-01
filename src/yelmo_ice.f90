@@ -168,7 +168,7 @@ contains
                             dom%par%pc_eta,dom%par%pc_tau)
             end if 
 
-            write(*,*) "vel: ", time_now, maxval(dom%dyn%now%duxydt,mask=dom%tpo%now%f_grnd.eq.1.0_prec)
+            write(*,*) "vel: ", time_now, dt_now, maxval(dom%dyn%now%duxydt,mask=dom%tpo%now%f_grnd.eq.1.0_prec)
 
             ! Make sure model is still running well
             call yelmo_check_kill(dom,time_now)

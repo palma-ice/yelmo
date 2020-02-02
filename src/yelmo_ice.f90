@@ -113,7 +113,8 @@ contains
 
             ! Save the current timestep for log and for running mean 
             dt_save(n) = dt_now 
-            call yelmo_calc_mean_dt(dom%par%mean_dt,dom%par%mean_dts,dt_now)
+            call yelmo_calc_running_mean(dom%par%dt_avg,dom%par%dts,dt_now)
+            call yelmo_calc_running_mean(dom%par%eta_avg,dom%par%etas,dom%par%pc_eta)
 
             ! Advance the local time variable
             time_now   = time_now + dt_now
@@ -688,8 +689,9 @@ contains
         par%log_timestep_file = "timesteps.nc" 
         
         par%model_speeds = 0.0_prec 
-        par%mean_dt      = 0.0_prec 
-
+        par%dt_avg       = 0.0_prec 
+        par%eta_avg      = 0.0_prec 
+        
         return
 
     end subroutine yelmo_par_load

@@ -640,9 +640,11 @@ module yelmo_defs
         ! Timing information 
         real(prec) :: model_speed 
         real(prec) :: model_speeds(100)     ! Use 100 timesteps for running mean  
-        real(prec) :: mean_dt 
-        real(prec) :: mean_dts(100)         ! Use 100 timesteps for running mean 
-
+        real(prec) :: dt_avg 
+        real(prec) :: dts(100)              ! Use 100 timesteps for running mean 
+        real(prec) :: eta_avg 
+        real(prec) :: etas(100)             ! Use 100 timesteps for running mean 
+        
         character(len=512)   :: log_timestep_file 
 
     end type
@@ -827,33 +829,33 @@ contains
 
     end subroutine yelmo_calc_speed 
     
-    subroutine yelmo_calc_mean_dt(mean_dt,dts,dt_now)
+    subroutine yelmo_calc_running_mean(val_avg,vals,val_now)
 
         implicit none 
 
-        real(prec), intent(OUT)   :: mean_dt 
-        real(prec), intent(INOUT) :: dts(:) 
-        real(prec), intent(IN)    :: dt_now 
+        real(prec), intent(OUT)   :: val_avg 
+        real(prec), intent(INOUT) :: vals(:) 
+        real(prec), intent(IN)    :: val_now 
 
         ! Local variables 
         integer :: n 
 
         ! Shift rates vector to eliminate oldest entry, and add current entry
-        n = size(dts) 
-        dts    = cshift(dts,1)
-        dts(n) = dt_now  
+        n = size(vals) 
+        vals    = cshift(vals,1)
+        vals(n) = val_now  
 
-        ! Calculate running average dt 
-        n    = count(dts .ne. 0.0_prec)
+        ! Calculate running average value 
+        n    = count(vals .ne. 0.0_prec)
         if (n .gt. 0) then 
-            mean_dt = sum(dts,mask=dts .ne. 0.0_prec) / real(n,prec)
+            val_avg = sum(vals,mask=vals .ne. 0.0_prec) / real(n,prec)
         else 
-            mean_dt = 0.0_prec 
+            val_avg = 0.0_prec 
         end if 
 
         return 
 
-    end subroutine yelmo_calc_mean_dt
+    end subroutine yelmo_calc_running_mean
 
 end module yelmo_defs
 

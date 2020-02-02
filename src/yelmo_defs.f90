@@ -639,7 +639,9 @@ module yelmo_defs
 
         ! Timing information 
         real(prec) :: model_speed 
-        real(prec) :: model_speeds(10)    ! Use 10 timesteps for running mean  
+        real(prec) :: model_speeds(100)     ! Use 100 timesteps for running mean  
+        real(prec) :: mean_dt 
+        real(prec) :: mean_dts(100)         ! Use 100 timesteps for running mean 
 
         character(len=512)   :: log_timestep_file 
 
@@ -799,6 +801,8 @@ contains
             ! Convert to more useful rate [model-kyr / hr]
             rate_now = rate_now*1e-3*3600.0 
 
+            if (abs(rate_now) .lt. tol_underflow) rate_now = 0.0_prec 
+
         else 
             rate_now = 0.0 
         end if 
@@ -809,19 +813,47 @@ contains
         rates(n) = rate_now 
 
         ! Avoid underflows
-        where(abs(rates) .lt. tol_underflow) rates = 0.0_prec
+        !where(abs(rates) .lt. tol_underflow) rates = 0.0_prec
         
         ! Calculate running average rate 
-        n    = count(rates .gt. 0.0)
+        n    = count(rates .gt. 0.0_prec)
         if (n .gt. 0) then 
-            rate = sum(rates,mask=rates .gt. 0.0) / real(n,prec)
+            rate = sum(rates,mask=rates .gt. 0.0_prec) / real(n,prec)
         else 
-            rate = 0.0 
+            rate = 0.0_prec 
         end if 
 
         return 
 
     end subroutine yelmo_calc_speed 
     
+    subroutine yelmo_calc_mean_dt(mean_dt,dts,dt_now)
+
+        implicit none 
+
+        real(prec), intent(OUT)   :: mean_dt 
+        real(prec), intent(INOUT) :: dts(:) 
+        real(prec), intent(IN)    :: dt_now 
+
+        ! Local variables 
+        integer :: n 
+
+        ! Shift rates vector to eliminate oldest entry, and add current entry
+        n = size(dts) 
+        dts    = cshift(dts,1)
+        dts(n) = dt_now  
+
+        ! Calculate running average dt 
+        n    = count(dts .ne. 0.0_prec)
+        if (n .gt. 0) then 
+            mean_dt = sum(dts,mask=dts .ne. 0.0_prec) / real(n,prec)
+        else 
+            mean_dt = 0.0_prec 
+        end if 
+
+        return 
+
+    end subroutine yelmo_calc_mean_dt
+
 end module yelmo_defs
 

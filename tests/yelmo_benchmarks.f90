@@ -441,6 +441,8 @@ contains
         ! Write model speed 
         call nc_write(filename,"speed",ylmo%par%model_speed,units="kyr/hr",long_name="Model speed (Yelmo only)", &
                       dim1="time",start=[n],count=[1],ncid=ncid)
+        call nc_write(filename,"mean_dt",ylmo%par%mean_dt,units="yr",long_name="Average timestep", &
+                      dim1="time",start=[n],count=[1],ncid=ncid)
         
         ! Time step limits 
         call nc_write(filename,"dt_adv",ylmo%par%dt_adv,units="a",long_name="Advective timestep", &

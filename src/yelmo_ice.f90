@@ -111,11 +111,9 @@ contains
 
             end select 
 
-            ! Finally, ensure timestep is within prescribed limits (already managed internally)
-            !call limit_adaptive_timestep(dt_now,dom%par%dt_min,dt_max)
-
-            ! Save the current timestep for log 
+            ! Save the current timestep for log and for running mean 
             dt_save(n) = dt_now 
+            call yelmo_calc_mean_dt(dom%par%mean_dt,dom%par%mean_dts,dt_now)
 
             ! Advance the local time variable
             time_now   = time_now + dt_now
@@ -167,8 +165,6 @@ contains
                 call yelmo_timestep_write(dom%par%log_timestep_file,time_now,dt_now,dt_adv_min,dom%par%pc_dt, &
                             dom%par%pc_eta,dom%par%pc_tau)
             end if 
-
-            write(*,*) "vel: ", time_now, dt_now, maxval(dom%dyn%now%duxydt,mask=dom%tpo%now%f_grnd.eq.1.0_prec)
 
             ! Make sure model is still running well
             call yelmo_check_kill(dom,time_now)
@@ -688,7 +684,11 @@ contains
             par%use_restart = .TRUE. 
         end if 
 
-        par%log_timestep_file = "timesteps_"//trim(grid_name)//".nc" 
+        !par%log_timestep_file = "timesteps_"//trim(par%grid_name)//".nc" 
+        par%log_timestep_file = "timesteps.nc" 
+        
+        par%model_speeds = 0.0_prec 
+        par%mean_dt      = 0.0_prec 
 
         return
 

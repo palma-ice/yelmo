@@ -67,6 +67,7 @@ contains
         real(prec) :: Q_geo_now, ghf_conv 
         real(prec) :: H_w_predicted
         real(prec) :: dz, dz1, dz2, d2Tdz2 
+        real(prec) :: T00, T01, T02, zeta2  
         real(prec) :: T_excess
         real(prec) :: melt_internal
         real(prec) :: val_base, val_srf 
@@ -177,17 +178,26 @@ contains
 
         ! Calculate heat flux at ice base as temperature gradient * conductivity [J a-1 m-2]
         if (H_ice .gt. 0.0_prec) then 
+
+            ! Works, but can cause oscillations in H_w 
 !             dz = H_ice * (zeta_aa(2)-zeta_aa(1))
 !             Q_ice_b = kt(1) * (T_ice(2) - T_ice(1)) / dz 
+            
+            ! Seems more stable, but causes noise on EISMINT sims
+!             dz  = H_ice*(zeta_ac(3)-zeta_ac(2))
+!             dz1 = H_ice*(zeta_aa(2)-zeta_aa(1))
+!             dz2 = H_ice*(zeta_aa(3)-zeta_aa(2)) 
+!             d2Tdz2 = ( ((T_ice(3)-T_ice(2))/dz2) - ((T_ice(2)-T_ice(1))/dz1) ) / dz 
+!             dz = H_ice * (zeta_aa(2)-zeta_aa(1))
+!             Q_ice_b = kt(1) * (T_ice(2) - T_ice(1) - (0.5_prec*dz*dz*d2Tdz2)) / dz 
 
-            dz  = H_ice*(zeta_ac(3)-zeta_ac(2))
-            dz1 = H_ice*(zeta_aa(2)-zeta_aa(1))
-            dz2 = H_ice*(zeta_aa(3)-zeta_aa(2)) 
-            d2Tdz2 = ( ((T_ice(3)-T_ice(2))/dz2) - ((T_ice(2)-T_ice(1))/dz1) ) / dz 
 
-            dz = H_ice * (zeta_aa(2)-zeta_aa(1))
-
-            Q_ice_b = kt(1) * (T_ice(2) - T_ice(1) - (0.5_prec*dz*dz*d2Tdz2)) / dz 
+            dz    = H_ice*(zeta_aa(2)-zeta_aa(1))
+            zeta2 = zeta_aa(2) + (zeta_aa(2)-zeta_aa(1))
+            T02   = interp_linear(zeta_aa,T_ice,zeta2)
+            T01   = T_ice(2)
+            T00   = T_ice(1) 
+            Q_ice_b = kt(1) * (-1.5_prec*T00 + 2.0_prec*T01 - 0.5_prec*T02) / dz 
 
         else 
             Q_ice_b = 0.0  

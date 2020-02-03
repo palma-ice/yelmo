@@ -66,7 +66,7 @@ contains
         integer    :: k, nz_aa, nz_ac
         real(prec) :: Q_geo_now, ghf_conv 
         real(prec) :: H_w_predicted
-        real(prec) :: dz 
+        real(prec) :: dz, dz1, dz2, d2Tdz2 
         real(prec) :: T_excess
         real(prec) :: melt_internal
         real(prec) :: val_base, val_srf 
@@ -177,8 +177,18 @@ contains
 
         ! Calculate heat flux at ice base as temperature gradient * conductivity [J a-1 m-2]
         if (H_ice .gt. 0.0_prec) then 
+!             dz = H_ice * (zeta_aa(2)-zeta_aa(1))
+!             Q_ice_b = kt(1) * (T_ice(2) - T_ice(1)) / dz 
+
+            dz  = H_ice*(zeta_ac(3)-zeta_ac(2))
+            dz1 = H_ice*(zeta_aa(2)-zeta_aa(1))
+            dz2 = H_ice*(zeta_aa(3)-zeta_aa(2)) 
+            d2Tdz2 = ( ((T_ice(3)-T_ice(2))/dz2) - ((T_ice(2)-T_ice(1))/dz1) ) / dz 
+
             dz = H_ice * (zeta_aa(2)-zeta_aa(1))
-            Q_ice_b = kt(1) * (T_ice(2) - T_ice(1)) / dz 
+
+            Q_ice_b = kt(1) * (T_ice(2) - T_ice(1) - (0.5_prec*dz*d2Tdz2)) / dz 
+
         else 
             Q_ice_b = 0.0  
         end if 

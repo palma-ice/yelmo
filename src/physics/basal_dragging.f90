@@ -121,7 +121,7 @@ contains
 
     end function calc_effective_pressure_marine
 
-    elemental function calc_effective_pressure_till(H_w,H_ice,is_float,H_w_max,N0,delta,e0,Cc) result(N_eff)
+    elemental function calc_effective_pressure_till(H_w,H_ice,is_float,f_pmp,H_w_max,N0,delta,e0,Cc) result(N_eff)
         ! Calculate the effective pressure of the till
         ! following van Pelt and Bueler (2015), Eq. 23.
         
@@ -130,6 +130,7 @@ contains
         real(prec), intent(IN)    :: H_w
         real(prec), intent(IN)    :: H_ice
         logical,    intent(IN)    :: is_float  
+        real(prec), intent(IN)    :: f_pmp 
         real(prec), intent(IN)    :: H_w_max            ! [m] Maximum allowed water depth 
         real(prec), intent(IN)    :: N0                 ! [Pa] Reference effective pressure 
         real(prec), intent(IN)    :: delta              ! [--] Fraction of overburden pressure for saturated till
@@ -139,18 +140,36 @@ contains
         
         ! Local variables 
         real(prec) :: P0, s 
+        real(prec) :: N_eff_maxHw
 
-        ! Get overburden pressure 
-        P0 = rho_ice*g*H_ice
+        if (is_float) then 
+            ! No effective pressure at base for floating ice
+        
+            N_eff = 0.0_prec 
 
-        ! Get ratio of water layer thickness to maximum
-        s  = min(H_w/H_w_max,1.0)  
+        else 
 
-        ! Calculate the effective pressure in the till [Pa] (van Pelt and Bueler, 2015, Eq. 23-24)
-        N_eff = min( N0*(delta*P0/N0)**s * 10**((e0/Cc)*(1-s)), P0 ) 
+            ! Get overburden pressure 
+            P0 = rho_ice*g*H_ice
 
-        ! No remaining pressure at base for floating ice
-        if (is_float) N_eff = 0.0 
+            ! Get ratio of water layer thickness to maximum
+            s  = min(H_w/H_w_max,1.0)  
+
+            ! Calculate the effective pressure in the till [Pa] (van Pelt and Bueler, 2015, Eq. 23-24)
+            N_eff = min( N0*(delta*P0/N0)**s * 10**((e0/Cc)*(1-s)), P0 ) 
+
+            if (H_w .eq. 0.0_prec .and. f_pmp .gt. 0.0_prec .and. f_pmp .lt. 1.0_prec) then 
+                ! This point is not temperate, but it is starting to be, scale effective pressure 
+                ! by the maximum water layer pressure. 
+
+                s  = 1.0_prec  ! Full water layer at base
+                N_eff_maxHw = min( N0*(delta*P0/N0)**s * 10**((e0/Cc)*(1-s)), P0 ) 
+
+                N_eff = f_pmp*N_eff_maxHw + (1.0_prec-f_pmp)*N_eff 
+
+            end if 
+            
+        end if  
 
         return 
 

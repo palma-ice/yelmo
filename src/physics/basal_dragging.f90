@@ -48,20 +48,17 @@ module basal_dragging
     
 contains 
 
-    elemental function calc_effective_pressure_overburden(H_ice,is_float) result(N_eff)
+    elemental function calc_effective_pressure_overburden(H_ice,f_grnd) result(N_eff)
         ! Effective pressure as overburden pressure N_eff = rho*g*H_ice 
 
         implicit none 
 
         real(prec), intent(IN) :: H_ice 
-        logical,    intent(IN) :: is_float 
+        real(prec), intent(IN) :: f_grnd 
         real(prec) :: N_eff                 ! [Pa]
 
         ! Calculate effective pressure [Pa] (overburden pressure)
-        N_eff = (rho_ice*g*H_ice)
-
-        ! No remaining pressure at base for floating ice
-        if (is_float) N_eff = 0.0 
+        N_eff = f_grnd * (rho_ice*g*H_ice)
 
         return 
 
@@ -155,29 +152,14 @@ contains
             s  = min(H_w/H_w_max,1.0)  
 
             ! Calculate the effective pressure in the till [Pa] (van Pelt and Bueler, 2015, Eq. 23-24)
-            N_eff = min( N0*(delta*P0/N0)**s * 10**((e0/Cc)*(1-s)), P0 ) 
-
-            ! Scale by f_grnd 
-            N_eff = f_grnd * N_eff 
+            N_eff = f_grnd * min( N0*(delta*P0/N0)**s * 10**((e0/Cc)*(1-s)), P0 ) 
 
         end if  
 
         return 
 
     end function calc_effective_pressure_till
-
-    subroutine modify_effective_pressure(N_eff,f_pmp) 
-        ! Modify effective pressure in the neighborhood 
-
-        implicit none 
-
-        real(prec), intent(INOUT) :: N_eff 
-        real(prec), intent(IN)    :: f_pmp 
-        
-        return 
-
-    end subroutine modify_effective_pressure
-
+    
     elemental function calc_lambda_bed_lin(z_bed,z0,z1) result(lambda)
         ! Calculate scaling function: linear 
         

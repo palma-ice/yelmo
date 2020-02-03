@@ -1331,7 +1331,7 @@ end if
             case(1)
                 ! Effective pressure == overburden pressure 
 
-                dyn%now%N_eff = calc_effective_pressure_overburden(tpo%now%H_ice,tpo%now%f_grnd.lt.1.0)
+                dyn%now%N_eff = calc_effective_pressure_overburden(tpo%now%H_ice,tpo%now%f_grnd)
 
             case(2) 
                 ! Effective pressure diminishes with marine character

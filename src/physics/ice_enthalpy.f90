@@ -187,7 +187,7 @@ contains
 
             dz = H_ice * (zeta_aa(2)-zeta_aa(1))
 
-            Q_ice_b = kt(1) * (T_ice(2) - T_ice(1) - (0.5_prec*dz*d2Tdz2)) / dz 
+            Q_ice_b = kt(1) * (T_ice(2) - T_ice(1) - (0.5_prec*dz*dz*d2Tdz2)) / dz 
 
         else 
             Q_ice_b = 0.0  

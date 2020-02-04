@@ -5,7 +5,7 @@ module ice_enthalpy
     use solver_tridiagonal, only : solve_tridiag 
     use thermodynamics, only : calc_bmb_grounded, calc_bmb_grounded_enth, calc_advec_vertical_column
 
-    use interp1D 
+    !use interp1D 
 
     implicit none
     
@@ -67,7 +67,7 @@ contains
         real(prec) :: Q_geo_now, ghf_conv 
         real(prec) :: H_w_predicted
         real(prec) :: dz, dz1, dz2, d2Tdz2 
-        real(prec) :: T00, T01, T02, zeta2  
+        real(prec) :: T00, T01, T02, zeta_now  
         real(prec) :: T_excess
         real(prec) :: melt_internal
         real(prec) :: val_base, val_srf 
@@ -179,25 +179,31 @@ contains
         ! Calculate heat flux at ice base as temperature gradient * conductivity [J a-1 m-2]
         if (H_ice .gt. 0.0_prec) then 
 
+if (.FALSE.) then 
+            ! 1st order, upwind gradient dTdz 
             ! Works, but can cause oscillations in H_w 
-!             dz = H_ice * (zeta_aa(2)-zeta_aa(1))
-!             Q_ice_b = kt(1) * (T_ice(2) - T_ice(1)) / dz 
-            
-            ! Seems more stable, but causes noise on EISMINT sims
+            dz = H_ice * (zeta_aa(2)-zeta_aa(1))
+            Q_ice_b = kt(1) * (T_ice(2) - T_ice(1)) / dz 
+
+else
+            ! Seems more stable on grl sim, but causes noise on EISMINT sims
 !             dz  = H_ice*(zeta_ac(3)-zeta_ac(2))
 !             dz1 = H_ice*(zeta_aa(2)-zeta_aa(1))
 !             dz2 = H_ice*(zeta_aa(3)-zeta_aa(2)) 
 !             d2Tdz2 = ( ((T_ice(3)-T_ice(2))/dz2) - ((T_ice(2)-T_ice(1))/dz1) ) / dz 
 !             dz = H_ice * (zeta_aa(2)-zeta_aa(1))
 !             Q_ice_b = kt(1) * (T_ice(2) - T_ice(1) - (0.5_prec*dz*dz*d2Tdz2)) / dz 
+            
+            ! 2nd order, upwind gradient dTdz
+            ! Causes slight noise on EISMINT sims, but seems stable also on grl sim.
+            dz       = H_ice*(zeta_aa(2)-zeta_aa(1))
+            zeta_now = zeta_aa(2) + (zeta_aa(2)-zeta_aa(1))
+            T02      = interp_linear_point(zeta_aa(2),zeta_aa(3),T_ice(2),T_ice(3),zeta_now)
+            T01      = T_ice(2)
+            T00      = T_ice(1) 
+            Q_ice_b  = kt(1) * (-1.5_prec*T00 + 2.0_prec*T01 - 0.5_prec*T02) / dz 
 
-
-            dz    = H_ice*(zeta_aa(2)-zeta_aa(1))
-            zeta2 = zeta_aa(2) + (zeta_aa(2)-zeta_aa(1))
-            T02   = interp_linear(zeta_aa,T_ice,zeta2)
-            T01   = T_ice(2)
-            T00   = T_ice(1) 
-            Q_ice_b = kt(1) * (-1.5_prec*T00 + 2.0_prec*T01 - 0.5_prec*T02) / dz 
+end if 
 
         else 
             Q_ice_b = 0.0  
@@ -1960,6 +1966,30 @@ end if
         return 
 
     end function get_cts_index 
+
+    function interp_linear_point(x0,x1,y0,y1,xout) result(yout)
+        ! Interpolates for the y value at the desired x value, 
+        ! given x and y values around the desired point.
+        ! Solution outside of range x0 < x < x1 bounded by y0 < y < y1 
+
+        implicit none
+
+        real(prec), intent(IN)  :: x0,x1,y0,y1, xout
+        real(prec) :: yout
+        real(prec) :: alph
+
+        if (xout .le. x0) then 
+            yout = y0 
+        else if (xout .ge. x1) then 
+            yout = y1 
+        else 
+            alph = (xout - x0) / (x1 - x0)
+            yout = y0 + alph*(y1 - y0)
+        end if 
+
+        return
+
+    end function interp_linear_point 
 
 end module ice_enthalpy
 

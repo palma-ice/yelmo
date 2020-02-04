@@ -343,16 +343,15 @@ contains
             uy_aa = 0.5_prec*(uy(i,j,k)+uy(i,j-1,k))
             
             ! Explicit form (to test different order approximations)
-!             if (ux(i-1,j,k) .gt. 0.0_prec .and. ux(i,j,k) .lt. 0.0_prec .and. i .ge. 3 .and. i .le. nx-2) then 
-!                 ! Convergent flow - take the sum 
+            if (ux(i-1,j,k) .gt. 0.0_prec .and. ux(i,j,k) .lt. 0.0_prec .and. i .ge. 3 .and. i .le. nx-2) then 
+                ! Convergent flow - take the sum 
 
-!                 advecx    = dx_inv2 * ux(i-1,j,k)*(-(4.0*var_ice(i-1,j,k)-var_ice(i-2,j,k)-3.0*var_ice(i,j,k)))
-!                 advec_rev = dx_inv2 * ux(i,j,k)*((4.0*var_ice(i+1,j,k)-var_ice(i+2,j,k)-3.0*var_ice(i,j,k)))
+                advecx    = dx_inv2 * ux(i-1,j,k)*(-(4.0*var_ice(i-1,j,k)-var_ice(i-2,j,k)-3.0*var_ice(i,j,k)))
+                advec_rev = dx_inv2 * ux(i,j,k)*((4.0*var_ice(i+1,j,k)-var_ice(i+2,j,k)-3.0*var_ice(i,j,k)))
 
-!                 advecx    = (advecx + advec_rev) 
+                advecx    = (advecx + advec_rev) 
 
-!             else if (ux_aa .gt. 0.0 .and. i .ge. 3) then  
-            if (ux_aa .gt. 0.0 .and. i .ge. 3) then  
+            else if (ux_aa .gt. 0.0 .and. i .ge. 3) then  
                 ! Flow to the right - inner points
 
                 ! 2nd order
@@ -383,16 +382,15 @@ contains
 
             end if 
 
-!             if (uy(i,j-1,k) .gt. 0.0_prec .and. uy(i,j,k) .lt. 0.0_prec .and. j .ge. 3 .and. j .le. ny-2) then 
-!                 ! Convergent flow - take the sum 
+            if (uy(i,j-1,k) .gt. 0.0_prec .and. uy(i,j,k) .lt. 0.0_prec .and. j .ge. 3 .and. j .le. ny-2) then 
+                ! Convergent flow - take the sum 
 
-!                 advecy    = dx_inv2 * uy(i,j-1,k)*(-(4.0*var_ice(i,j-1,k)-var_ice(i,j-2,k)-3.0*var_ice(i,j,k)))
-!                 advec_rev = dx_inv2 * uy(i,j,k)*((4.0*var_ice(i,j+1,k)-var_ice(i,j+2,k)-3.0*var_ice(i,j,k)))
+                advecy    = dx_inv2 * uy(i,j-1,k)*(-(4.0*var_ice(i,j-1,k)-var_ice(i,j-2,k)-3.0*var_ice(i,j,k)))
+                advec_rev = dx_inv2 * uy(i,j,k)*((4.0*var_ice(i,j+1,k)-var_ice(i,j+2,k)-3.0*var_ice(i,j,k)))
                 
-!                 advecy    = (advecy + advec_rev) 
+                advecy    = (advecy + advec_rev) 
 
-!             else if (uy_aa .gt. 0.0 .and. j .ge. 3) then 
-            if (uy_aa .gt. 0.0 .and. j .ge. 3) then  
+            else if (uy_aa .gt. 0.0 .and. j .ge. 3) then   
                 ! Flow to the right  - inner points
 
                 ! 2nd order
@@ -529,7 +527,7 @@ contains
         real(prec) :: corr 
 
         real(prec), parameter :: tol = 1e-4 
-        real(prec), parameter :: max_corr = 0.1_prec   ! Maximum allowed deviation from original uz (eg 10%)
+        real(prec), parameter :: max_corr = 1.0_prec   ! Maximum allowed deviation from original uz (eg 10%)
 
         nx    = size(H_ice,1)
         ny    = size(H_ice,2)

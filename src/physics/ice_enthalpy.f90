@@ -179,7 +179,7 @@ contains
         ! Calculate heat flux at ice base as temperature gradient * conductivity [J a-1 m-2]
         if (H_ice .gt. 0.0_prec) then 
 
-if (.FALSE.) then 
+if (.TRUE.) then 
             ! 1st order, upwind gradient dTdz 
             ! Works, but can cause oscillations in H_w 
             dz = H_ice * (zeta_aa(2)-zeta_aa(1))
@@ -207,7 +207,7 @@ else
                 T00      = T_ice(1) 
                 Q_ice_b  = kt(1) * (-1.5_prec*T00 + 2.0_prec*T01 - 0.5_prec*T02) / dz 
             end if 
-            
+
 end if 
 
         else 

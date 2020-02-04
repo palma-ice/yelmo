@@ -194,14 +194,21 @@ else
 !             dz = H_ice * (zeta_aa(2)-zeta_aa(1))
 !             Q_ice_b = kt(1) * (T_ice(2) - T_ice(1) - (0.5_prec*dz*dz*d2Tdz2)) / dz 
             
+            dz  = H_ice*(zeta_aa(2)-zeta_aa(1))
+            dz1 = H_ice*(zeta_aa(2)-zeta_aa(1))
+            dz2 = H_ice*(zeta_aa(3)-zeta_aa(1)) 
+            d2Tdz2 = ( ((T_ice(3)-T_ice(1))/dz2) - ((T_ice(2)-T_ice(1))/dz1) ) / dz 
+            dz = H_ice * (zeta_aa(2)-zeta_aa(1))
+            Q_ice_b = kt(1) * (T_ice(2) - T_ice(1) - (0.5_prec*dz*dz*d2Tdz2)) / dz 
+            
             ! 2nd order, upwind gradient dTdz
             ! Causes slight noise on EISMINT sims, but seems stable also on grl sim.
-            dz       = H_ice*(zeta_aa(2)-zeta_aa(1))
-            zeta_now = zeta_aa(2) + (zeta_aa(2)-zeta_aa(1))
-            T02      = interp_linear_point(zeta_aa(2),zeta_aa(3),T_ice(2),T_ice(3),zeta_now)
-            T01      = T_ice(2)
-            T00      = T_ice(1) 
-            Q_ice_b  = kt(1) * (-1.5_prec*T00 + 2.0_prec*T01 - 0.5_prec*T02) / dz 
+!             dz       = H_ice*(zeta_aa(2)-zeta_aa(1))
+!             zeta_now = zeta_aa(2) + (zeta_aa(2)-zeta_aa(1))
+!             T02      = interp_linear_point(zeta_aa(2),zeta_aa(3),T_ice(2),T_ice(3),zeta_now)
+!             T01      = T_ice(2)
+!             T00      = T_ice(1) 
+!             Q_ice_b  = kt(1) * (-1.5_prec*T00 + 2.0_prec*T01 - 0.5_prec*T02) / dz 
 
 end if 
 

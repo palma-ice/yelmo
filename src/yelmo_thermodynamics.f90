@@ -130,7 +130,7 @@ contains
             H_w_now = thrm%now%H_w 
 
             ! Update basal water layer thickness for half timestep (Runge Kutta, step 1)
-            call calc_basal_water_local(thrm%now%H_w,thrm%now%dHwdt,tpo%now%H_ice,-thrm%now%bmb_grnd*(rho_ice/rho_w), &
+            call calc_basal_water_local(thrm%now%H_w,thrm%now%dHwdt,thrm%now%d2Hwdt2,tpo%now%H_ice,-thrm%now%bmb_grnd*(rho_ice/rho_w), &
                                     tpo%now%f_grnd,dt*0.5_prec,thrm%par%till_rate,thrm%par%H_w_max)
             
             select case(trim(thrm%par%method))
@@ -197,7 +197,7 @@ contains
 
             ! Update basal water layer thickness for full timestep with corrected rate (Runge Kutta, step 2)
             thrm%now%H_w = H_w_now 
-            call calc_basal_water_local(thrm%now%H_w,thrm%now%dHwdt,tpo%now%H_ice,-thrm%now%bmb_grnd*(rho_ice/rho_w), &
+            call calc_basal_water_local(thrm%now%H_w,thrm%now%dHwdt,thrm%now%d2Hwdt2,tpo%now%H_ice,-thrm%now%bmb_grnd*(rho_ice/rho_w), &
                                     tpo%now%f_grnd,dt,thrm%par%till_rate,thrm%par%H_w_max)
 
         end if 
@@ -850,6 +850,7 @@ end if
         allocate(now%T_prime_b(nx,ny))
         allocate(now%H_w(nx,ny))
         allocate(now%dHwdt(nx,ny))
+        allocate(now%d2Hwdt2(nx,ny))
 
         now%enth      = 0.0
         now%T_ice     = 0.0
@@ -866,6 +867,7 @@ end if
         now%T_prime_b = 0.0 
         now%H_w       = 0.0 
         now%dHwdt     = 0.0 
+        now%d2Hwdt2   = 0.0 
 
         return
 
@@ -892,6 +894,7 @@ end if
         if (allocated(now%T_prime_b)) deallocate(now%T_prime_b)
         if (allocated(now%H_w))       deallocate(now%H_w)
         if (allocated(now%dHwdt))     deallocate(now%dHwdt)
+        if (allocated(now%d2Hwdt2))   deallocate(now%d2Hwdt2)
         
         return 
 

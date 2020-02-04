@@ -427,6 +427,7 @@ module yelmo_defs
         real(prec), allocatable :: T_prime_b(:,:)   ! Homologous temperature at the base 
         real(prec), allocatable :: H_w(:,:)         ! [m] Basal water layer thickness 
         real(prec), allocatable :: dHwdt(:,:)       ! [m/a] Basal water layer thickness rate of change
+        real(prec), allocatable :: d2Hwdt2(:,:)     ! [m/a^2] Basal water layer thickness rate of acceleration
         
         real(prec), allocatable :: cp(:,:,:)        ! Specific heat capacity  
         real(prec), allocatable :: kt(:,:,:)        ! Heat conductivity  

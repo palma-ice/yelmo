@@ -1236,13 +1236,14 @@ end if
 
     ! ==== BASAL HYDROLOGY PHYSICS ===============================
 
-    subroutine calc_basal_water_local(H_w,dHwdt,H_ice,bmb_w,f_grnd,dt,till_rate,H_w_max)
+    subroutine calc_basal_water_local(H_w,dHwdt,d2Hwdt2,H_ice,bmb_w,f_grnd,dt,till_rate,H_w_max)
         ! Calculate the basal water layer thickness based on a simple local 
         ! water balance: dHw/dt = bmb_w - till_rate
         implicit none 
          
         real(prec), intent(INOUT) :: H_w(:,:)         ! [m] Water layer thickness
         real(prec), intent(INOUT) :: dHwdt(:,:)       ! [m/a] Water layer thickness change
+        real(prec), intent(INOUT) :: d2Hwdt2(:,:)     ! [m/a^2] Water layer thickness acceleration
         real(prec), intent(IN)    :: H_ice(:,:)       ! [m] Ice thickness 
         real(prec), intent(IN)    :: bmb_w(:,:)       ! [m/a] Basal water mass balance
         real(prec), intent(IN)    :: f_grnd(:,:)      ! [-] Grounded fraction
@@ -1253,18 +1254,22 @@ end if
         ! Local variables 
         integer :: i, j, nx, ny 
         integer :: im1, ip1, jm1, jp1 
+        real(prec), allocatable :: dHwdt0(:,:) 
 
         nx = size(H_ice,1)
         ny = size(H_ice,2)
 
+        allocate(dHwdt0(nx,ny))
+
         ! Store initial H_w field 
-        dHwdt = H_w 
+        dHwdt0  = dHwdt 
+        dHwdt   = H_w 
 
         where (f_grnd .gt. 0.0 .and. H_ice .gt. 0.0)
             ! Grounded ice point
 
             ! Update mass balance of H_w
-            H_w = H_w + dt*bmb_w - dt*till_rate
+            H_w = H_w + dt*(bmb_w-till_rate) + 0.5_prec*dt*dt*d2Hwdt2
 
             ! Restrict H_w to values within limits
             H_w = max(H_w,0.0)
@@ -1307,9 +1312,11 @@ end if
 
         ! Determine rate of change 
         if (dt .ne. 0.0_prec) then 
-            dHwdt = (dHwdt - H_w) / dt 
+            dHwdt   = (dHwdt - H_w) / dt 
+            d2Hwdt2 = (dHwdt-dHwdt0) / dt 
         else 
-            dHwdt = 0.0_prec 
+            dHwdt   = 0.0_prec 
+            d2Hwdt2 = 0.0_prec
         end if 
 
         return 

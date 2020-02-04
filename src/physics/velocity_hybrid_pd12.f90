@@ -233,10 +233,10 @@ contains
             if (H_ice(i,j) .gt. 0.0) then
 
                 ! Get weighted ice thickness for stability
-!                 H_ij = (4.0*H_ice(i,j) + 2.0*(H_ice(i-1,j)+H_ice(i+1,j)+H_ice(i,j-1)+H_ice(i,j+1))) / 16.0 &
-!                       + (H_ice(i-1,j-1)+H_ice(i+1,j-1)+H_ice(i+1,j+1)+H_ice(i-1,j+1)) / 16.0 
+                H_ij = (4.0*H_ice(i,j) + 2.0*(H_ice(i-1,j)+H_ice(i+1,j)+H_ice(i,j-1)+H_ice(i,j+1))) / 16.0 &
+                      + (H_ice(i-1,j-1)+H_ice(i+1,j-1)+H_ice(i+1,j+1)+H_ice(i-1,j+1)) / 16.0 
 
-                H_ij = H_ice(i,j) 
+!                 H_ij = H_ice(i,j) 
 
                 ! Get the centered bedrock gradient 
                 dzbdx_aa = (z_bed(i+1,j)-z_bed(i-1,j))/(2.0_prec*dx)

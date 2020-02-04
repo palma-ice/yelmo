@@ -423,9 +423,12 @@ contains
         ! Local variables
         integer    :: ncid, n, i, j, nx, ny  
         real(prec) :: time_prev 
+        real(prec), allocatable :: sym(:,:) 
 
         nx = ylmo%tpo%par%nx 
         ny = ylmo%tpo%par%ny 
+
+        allocate(sym(nx,ny)) 
 
         ! Open the file for writing
         call nc_open(filename,ncid,writable=.TRUE.)
@@ -505,6 +508,13 @@ contains
 !         call nc_write(filename,"T_pmp",ylmo%thrm%now%T_pmp,units="K",long_name="Ice pressure melting point (pmp)", &
 !                       dim1="xc",dim2="yc",dim3="zeta",dim4="time",start=[1,1,1,n],ncid=ncid)
         
+        call nc_write(filename,"T_prime_b",ylmo%thrm%now%T_prime_b,units="deg C",long_name="Homologous basal ice temperature", &
+                      dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
+
+        sym = ylmo%thrm%now%T_prime_b(nx:1:-1,:) - ylmo%thrm%now%T_prime_b
+        call nc_write(filename,"T_prime_b_sym",sym,units="deg C",long_name="Homologous basal ice temperature symmetry check", &
+                      dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
+
         call nc_write(filename,"f_pmp",ylmo%thrm%now%f_pmp,units="1",long_name="Fraction of grid point at pmp", &
                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
         

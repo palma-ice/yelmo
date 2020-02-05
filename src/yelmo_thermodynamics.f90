@@ -129,9 +129,9 @@ contains
             ! Store initial value of H_w 
             H_w_now = thrm%now%H_w 
 
-            ! Update basal water layer thickness for half timestep (Runge Kutta, step 1)
-            call calc_basal_water_local(thrm%now%H_w,thrm%now%dHwdt,tpo%now%H_ice,-thrm%now%bmb_grnd*(rho_ice/rho_w), &
-                                    tpo%now%f_grnd,dt*0.5_prec,thrm%par%till_rate,thrm%par%H_w_max)
+!             ! Update basal water layer thickness for half timestep (Runge Kutta, step 1)
+!             call calc_basal_water_local(thrm%now%H_w,thrm%now%dHwdt,tpo%now%H_ice,-thrm%now%bmb_grnd*(rho_ice/rho_w), &
+!                                     tpo%now%f_grnd,dt*0.5_prec,thrm%par%till_rate,thrm%par%H_w_max)
             
             select case(trim(thrm%par%method))
 

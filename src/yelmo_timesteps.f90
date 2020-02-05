@@ -44,7 +44,7 @@ contains
 
     end subroutine calc_pc_tau_fe_sbe
 
-    subroutine set_adaptive_timestep_pc(dt,eta,tau,ebs,dt_ref,dtmin,dtmax)
+    subroutine set_adaptive_timestep_pc(dt,eta,tau,ebs,dt_ref,dtmin,dtmax,mask)
         ! Calculate the timestep following algorithm for 
         ! a general predictor-corrector (pc) method.
         ! Implemented followig Cheng et al (2017, GMD)
@@ -58,6 +58,7 @@ contains
         real(prec), intent(IN)  :: dt_ref               ! [yr]   Reference dt to osicillate around, if not dt_ref=0
         real(prec), intent(IN)  :: dtmin                ! [yr]   Minimum allowed timestep
         real(prec), intent(IN)  :: dtmax                ! [yr]   Maximum allowed timestep
+        logical,    intent(IN)  :: mask(:,:)            ! Where to calculate tau 
 
         ! Local variables 
         real(prec) :: dt_n                          ! [yr]   Timestep (previous)
@@ -72,7 +73,7 @@ contains
         eta_n = eta 
 
         ! Step 1: calculate maximum value of truncation error (eta,n+1) = maxval(tau) 
-        eta = maxval(abs(tau))
+        eta = maxval(abs(tau),mask=mask)
         eta = max(eta,1e-10)
 
         ! Step 2: calculate scaling for the next timestep (dt,n+1)

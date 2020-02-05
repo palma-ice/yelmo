@@ -16,6 +16,7 @@ module yelmo_timesteps
     public :: yelmo_timestep_write_init
     public :: yelmo_timestep_write
 
+    public :: calc_adv2D_timestep1
     public :: calc_adv3D_timestep1 
 
 contains
@@ -44,7 +45,8 @@ contains
 
     end subroutine calc_pc_tau_fe_sbe
 
-    subroutine set_adaptive_timestep_pc(dt,eta,tau,ebs,dt_ref,dtmin,dtmax,mask)
+    subroutine set_adaptive_timestep_pc(dt,eta,tau,ebs,dt_ref,dtmin,dtmax,mask, &
+                                ux_bar,uy_bar,dx)
         ! Calculate the timestep following algorithm for 
         ! a general predictor-corrector (pc) method.
         ! Implemented followig Cheng et al (2017, GMD)
@@ -59,11 +61,17 @@ contains
         real(prec), intent(IN)  :: dtmin                ! [yr]   Minimum allowed timestep
         real(prec), intent(IN)  :: dtmax                ! [yr]   Maximum allowed timestep
         logical,    intent(IN)  :: mask(:,:)            ! Where to calculate tau 
-
+        real(prec), intent(IN)  :: ux_bar(:,:)          ! [m/yr]
+        real(prec), intent(IN)  :: uy_bar(:,:)          ! [m/yr]
+        real(prec), intent(IN)  :: dx                   ! [m]
+        
         ! Local variables 
         real(prec) :: dt_n                          ! [yr]   Timestep (previous)
         real(prec) :: eta_n                         ! [X/yr] Maximum truncation error (previous)
         real(prec) :: f_scale 
+
+        real(prec) :: dt_adv 
+        real(prec) :: dtmax_now
 
         real(prec), parameter :: beta_1 =  3.0_prec / 10.0_prec      ! Cheng et al., 2017, Eq. 32
         real(prec), parameter :: beta_2 = -1.0_prec / 10.0_prec      ! Cheng et al., 2017, Eq. 32
@@ -90,8 +98,12 @@ contains
             dt = f_scale * (0.5_prec*dtmax)
         end if 
         
+        ! Calculate CFL advection limit too, and limit maximum allowed timestep
+        dt_adv = minval( calc_adv2D_timestep1(ux_bar,uy_bar,dx,dx,cfl_max=1.0_prec) ) 
+        dtmax_now = min(dtmax,dt_adv) 
+
         ! Finally, ensure timestep is within prescribed limits
-        call limit_adaptive_timestep(dt,dtmin,dtmax)
+        call limit_adaptive_timestep(dt,dtmin,dtmax_now)
 
         return 
 

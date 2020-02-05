@@ -83,7 +83,8 @@ contains
             
             ! Calculate new adaptive timestep using predictor-corrector algorithm for ice thickness
             call set_adaptive_timestep_pc(dom%par%pc_dt,dom%par%pc_eta,dom%par%pc_tau,dom%par%pc_ebs, &
-                                                dom%par%dt_ref,dom%par%dt_min,dt_max,mask=dom%tpo%now%f_grnd.eq.1.0_prec)
+                                        dom%par%dt_ref,dom%par%dt_min,dt_max,dom%tpo%now%f_grnd.eq.1.0_prec, &
+                                        dom%dyn%now%ux_bar,dom%dyn%now%uy_bar,dom%tpo%par%dx)
 
             ! Determine current time step based on method of choice 
             select case(dom%par%dt_method) 

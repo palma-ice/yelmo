@@ -126,12 +126,12 @@ contains
         if ( dt .gt. 0.0 ) then     
             ! Ice thermodynamics should evolve, perform calculations 
 
-!             ! Store initial value of H_w 
-!             H_w_now = thrm%now%H_w 
+            ! Store initial value of H_w 
+            H_w_now = thrm%now%H_w 
 
-!             ! Update basal water layer thickness for half timestep (Runge Kutta, step 1)
-!             call calc_basal_water_local(thrm%now%H_w,thrm%now%dHwdt,tpo%now%H_ice,-thrm%now%bmb_grnd*(rho_ice/rho_w), &
-!                                     tpo%now%f_grnd,dt*0.5_prec,thrm%par%till_rate,thrm%par%H_w_max)
+            ! Update basal water layer thickness for half timestep (Runge Kutta, step 1)
+            call calc_basal_water_local(thrm%now%H_w,thrm%now%dHwdt,tpo%now%H_ice,-thrm%now%bmb_grnd*(rho_ice/rho_w), &
+                                    tpo%now%f_grnd,dt*0.5_prec,thrm%par%till_rate,thrm%par%H_w_max)
             
             select case(trim(thrm%par%method))
 
@@ -196,7 +196,7 @@ contains
             end select 
 
             ! Update basal water layer thickness for full timestep with corrected rate (Runge Kutta, step 2)
-            !thrm%now%H_w = H_w_now 
+            thrm%now%H_w = H_w_now 
             call calc_basal_water_local(thrm%now%H_w,thrm%now%dHwdt,tpo%now%H_ice,-thrm%now%bmb_grnd*(rho_ice/rho_w), &
                                     tpo%now%f_grnd,dt,thrm%par%till_rate,thrm%par%H_w_max)
 

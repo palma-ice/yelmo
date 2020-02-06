@@ -162,7 +162,7 @@ contains
         ! ===== Calculate effective pressure ==============================
 
         ! Calculate effective pressure 
-        call calc_ydyn_neff(dyn,tpo,thrm,bnd)
+        call calc_ydyn_neff(dyn,tpo,thrm,bnd,dt)
 
         ! ===== Calculate shear (ie, SIA) velocity solution ===========
 
@@ -1292,7 +1292,7 @@ end if
 
     end subroutine calc_ydyn_cfref
 
-    subroutine calc_ydyn_neff(dyn,tpo,thrm,bnd)
+    subroutine calc_ydyn_neff(dyn,tpo,thrm,bnd,dt)
         ! Update N_eff based on parameter choices
 
         implicit none
@@ -1301,7 +1301,8 @@ end if
         type(ytopo_class),  intent(IN)    :: tpo 
         type(ytherm_class), intent(IN)    :: thrm
         type(ybound_class), intent(IN)    :: bnd  
-
+        real(prec),         intent(IN)    :: dt 
+        
         ! Local variables 
         real(prec), allocatable :: H_w(:,:) 
 
@@ -1314,7 +1315,7 @@ end if
             H_w = dyn%par%neff_w_max * thrm%now%f_pmp  
         else 
             ! Use boundary water thickness field
-            H_w = thrm%now%H_w 
+            H_w = thrm%now%H_w + 0.5_prec*dt*thrm%now%dHwdt 
         end if 
 
         ! Calculate effective pressure N_eff [Pa]

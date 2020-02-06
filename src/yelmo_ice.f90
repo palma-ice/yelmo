@@ -132,7 +132,7 @@ contains
             ! Step 1: Perform predictor step with temporary topography object 
             ! Calculate topography (elevation, ice thickness, calving, etc.)
             call calc_ytopo(tpo1,dom%dyn,dom%thrm,dom%bnd,time_now,topo_fixed=dom%tpo%par%topo_fixed)
-!             call calc_ytopo_masks(tpo1,dom%dyn,dom%thrm,dom%bnd)
+            call calc_ytopo_masks(tpo1,dom%dyn,dom%thrm,dom%bnd)
 
             if (dom%par%use_pc_thrm) then 
                 ! Perform predictor step with temporary thermodynamics object 

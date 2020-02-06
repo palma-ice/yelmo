@@ -69,9 +69,14 @@ contains
                 call calc_ydyn_adhoc(dyn,tpo,mat,thrm,bnd,dt)
 
             case("hybrid-pd12")
-                ! Variational approach of Pollard and de Conto (2012)
+                ! Variational approach of Pollard and de Conto (2012) - in progress!
 
                 call calc_ydyn_pd12(dyn,tpo,mat,thrm,bnd)
+
+            case("diva") 
+                ! Depth-integrated variational approximation (DIVA) - Goldberg (2011); Lipscomb et al. (2019)
+                ! To do! 
+
 
             case DEFAULT 
 
@@ -158,11 +163,13 @@ contains
 !                     method=dyn%par%taud_gl_method,beta_gl_stag=dyn%par%beta_gl_stag)
         
 !         end if 
+        
 
         ! ===== Calculate effective pressure ==============================
 
         ! Calculate effective pressure 
         call calc_ydyn_neff(dyn,tpo,thrm,bnd)
+
 
         ! ===== Calculate shear (ie, SIA) velocity solution ===========
 
@@ -247,7 +254,10 @@ contains
                 dyn%now%lhs_x          = 0.0 
                 dyn%now%lhs_y          = 0.0 
                 dyn%now%sigma_horiz_sq = 0.0 
-                
+            
+            case("fixed") 
+                ! Pass - do nothing with SIA, use whatever solution is available in the fields
+
             case DEFAULT 
 
                 write(*,*) "calc_ydyn_adhoc:: Error: sia solver not recognized: ", trim(dyn%par%sia_solver)

@@ -35,6 +35,9 @@ contains
         real(prec), allocatable :: advecxy(:,:,:) 
         real(prec), allocatable :: H_w_now(:,:)
         
+        real(prec) :: dt_now 
+        integer    :: n_iter 
+
         nx = thrm%par%nx
         ny = thrm%par%ny
 
@@ -107,31 +110,21 @@ contains
             call smooth_gauss_3D(thrm%now%Q_strn,tpo%now%H_ice.gt.0.0,thrm%par%dx,thrm%par%n_sm_qstrn, &
                                     tpo%now%H_ice.gt.0.0)
         end if 
-        
-        if (trim(thrm%par%method) .eq. "enth") then 
-
-            ! Calculate the explicit horizontal advection term using enthalpy from previous timestep
-            call calc_advec_horizontal_3D(advecxy,thrm%now%enth,tpo%now%H_ice,tpo%now%z_srf, &
-                                                dyn%now%ux,dyn%now%uy,thrm%par%zeta_aa,thrm%par%dx)
-        
-        else 
-
-            ! Calculate the explicit horizontal advection term using temperature from previous timestep
-            call calc_advec_horizontal_3D(advecxy,thrm%now%T_ice,tpo%now%H_ice,tpo%now%z_srf, &
-                                                dyn%now%ux,dyn%now%uy,thrm%par%zeta_aa,thrm%par%dx)
-        
-        end if 
-
 
         if ( dt .gt. 0.0 ) then     
             ! Ice thermodynamics should evolve, perform calculations 
 
+            n_iter = 5 
+            dt_now = dt / real(n_iter,prec) 
+
+            do k = 1, n_iter 
+
             ! Store initial value of H_w 
             H_w_now = thrm%now%H_w 
 
-!             ! Update basal water layer thickness for half timestep (Runge Kutta, step 1)
-!             call calc_basal_water_local(thrm%now%H_w,thrm%now%dHwdt,tpo%now%H_ice,-thrm%now%bmb_grnd*(rho_ice/rho_w), &
-!                                     tpo%now%f_grnd,dt*0.5_prec,thrm%par%till_rate,thrm%par%H_w_max)
+            ! Update basal water layer thickness for half timestep (Runge Kutta, step 1)
+            call calc_basal_water_local(thrm%now%H_w,thrm%now%dHwdt,tpo%now%H_ice,-thrm%now%bmb_grnd*(rho_ice/rho_w), &
+                                    tpo%now%f_grnd,dt_now*0.5_prec,thrm%par%till_rate,thrm%par%H_w_max)
             
             select case(trim(thrm%par%method))
 
@@ -140,11 +133,25 @@ contains
                     ! Note: method==temp performs the same calculations as for method==enth, 
                     ! except enth_cr=1.0 and omega_max=0.0 as prescribed in par_load(). 
 
+                    if (trim(thrm%par%method) .eq. "enth") then 
+
+                        ! Calculate the explicit horizontal advection term using enthalpy from previous timestep
+                        call calc_advec_horizontal_3D(advecxy,thrm%now%enth,tpo%now%H_ice,tpo%now%z_srf, &
+                                                            dyn%now%ux,dyn%now%uy,thrm%par%zeta_aa,thrm%par%dx)
+                    
+                    else 
+
+                        ! Calculate the explicit horizontal advection term using temperature from previous timestep
+                        call calc_advec_horizontal_3D(advecxy,thrm%now%T_ice,tpo%now%H_ice,tpo%now%z_srf, &
+                                                            dyn%now%ux,dyn%now%uy,thrm%par%zeta_aa,thrm%par%dx)
+                    
+                    end if 
+
                     call calc_ytherm_enthalpy_3D(thrm%now%enth,thrm%now%T_ice,thrm%now%omega,thrm%now%bmb_grnd,thrm%now%Q_ice_b, &
                                 thrm%now%H_cts,thrm%now%T_pmp,thrm%now%cp,thrm%now%kt,advecxy,dyn%now%ux,dyn%now%uy,dyn%now%uz,thrm%now%Q_strn, &
                                 thrm%now%Q_b,bnd%Q_geo,bnd%T_srf,tpo%now%H_ice,tpo%now%z_srf,thrm%now%H_w,thrm%now%dHwdt,tpo%now%H_grnd, &
                                 tpo%now%f_grnd,tpo%now%dHicedt,tpo%now%dzsrfdt,thrm%par%zeta_aa,thrm%par%zeta_ac,thrm%par%dzeta_a,thrm%par%dzeta_b,thrm%par%enth_cr, &
-                                thrm%par%omega_max,dt,thrm%par%dx,thrm%par%method,thrm%par%solver_advec)
+                                thrm%par%omega_max,dt_now,thrm%par%dx,thrm%par%method,thrm%par%solver_advec)
                     
                 case("robin")
                     ! Use Robin solution for ice temperature 
@@ -198,7 +205,9 @@ contains
             ! Update basal water layer thickness for full timestep with corrected rate (Runge Kutta, step 2)
             thrm%now%H_w = H_w_now 
             call calc_basal_water_local(thrm%now%H_w,thrm%now%dHwdt,tpo%now%H_ice,-thrm%now%bmb_grnd*(rho_ice/rho_w), &
-                                    tpo%now%f_grnd,dt,thrm%par%till_rate,thrm%par%H_w_max)
+                                    tpo%now%f_grnd,dt_now,thrm%par%till_rate,thrm%par%H_w_max)
+
+            end do  ! end iterations 
 
         end if 
 

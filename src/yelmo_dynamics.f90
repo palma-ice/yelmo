@@ -630,9 +630,9 @@ contains
         end do 
         ! == END iterations ==
 
-        if (write_ssa_diagnostics) then 
-            stop 
-        end if 
+!         if (write_ssa_diagnostics) then 
+!             stop 
+!         end if 
 
         ! ===== Calculate 3D velocity fields ====== 
 
@@ -692,6 +692,68 @@ contains
         return
 
     end subroutine calc_ydyn_pd12
+
+    subroutine update_ssa_mask_convergence(ssa_mask_acx,ssa_mask_acy,err_x,err_y,err_lim)
+
+        implicit none 
+
+        integer, intent(INOUT) :: ssa_mask_acx(:,:) 
+        integer, intent(INOUT) :: ssa_mask_acy(:,:) 
+        real(prec), intent(IN) :: err_x(:,:) 
+        real(prec), intent(IN) :: err_y(:,:) 
+        real(prec), intent(IN) :: err_lim 
+
+        ! Local variables 
+        integer :: i, j, nx, ny 
+
+        nx = size(ssa_mask_acx,1)
+        ny = size(ssa_mask_acx,2) 
+
+        where (ssa_mask_acx .gt. 0 .and. err_x .lt. err_lim)
+            ssa_mask_acx = -1 
+        end where 
+
+        where (ssa_mask_acy .gt. 0 .and. err_y .lt. err_lim)
+            ssa_mask_acy = -1 
+        end where 
+        
+        return 
+
+    end subroutine update_ssa_mask_convergence
+
+    subroutine check_vel_convergence_matrix(err_x,err_y,ux,uy,ux_prev,uy_prev)
+
+        implicit none 
+
+        real(prec), intent(OUT) :: err_x(:,:)
+        real(prec), intent(OUT) :: err_y(:,:)
+        real(prec), intent(IN)  :: ux(:,:) 
+        real(prec), intent(IN)  :: uy(:,:) 
+        real(prec), intent(IN)  :: ux_prev(:,:) 
+        real(prec), intent(IN)  :: uy_prev(:,:)  
+
+        ! Local variables
+
+        real(prec), parameter :: ssa_vel_tolerance = 1e-2   ! [m/a] only consider points with velocity above this tolerance limit
+        real(prec), parameter :: tol = 1e-5 
+
+        ! Error in x-direction
+        where (abs(ux) .gt. ssa_vel_tolerance) 
+            err_x = 2.0_prec * abs(ux - ux_prev) / abs(ux + ux_prev + tol)
+        elsewhere 
+            err_x = 0.0_prec
+        end where 
+
+        ! Error in y-direction 
+        where (abs(uy) .gt. ssa_vel_tolerance) 
+            err_y = 2.0_prec * abs(uy - uy_prev) / abs(uy + uy_prev + tol)
+        elsewhere 
+            err_y = 0.0_prec
+        end where 
+
+        return 
+
+    end subroutine check_vel_convergence_matrix
 
     function check_vel_convergence(ux,uy,ux_prev,uy_prev,ssa_resid_tol,iter,iter_max,log) result(is_converged)
 
@@ -850,11 +912,19 @@ contains
 
 !                 call yelmo_write_init_ssa("yelmo_ssa.nc",time_init=1.0) 
 !             end if 
-    
+        
+        if (write_ssa_diagnostics) then 
+            call yelmo_write_init_ssa("yelmo_ssa.nc",nx,ny,time_init=1.0)
+        end if 
+
         ! Store original ssa mask 
         ssa_mask_acx = dyn%now%ssa_mask_acx
         ssa_mask_acy = dyn%now%ssa_mask_acy
         
+        ! Initially set error very high 
+        dyn%now%ssa_err_acx = 1.0_prec 
+        dyn%now%ssa_err_acy = 1.0_prec 
+
         do iter = 1, dyn%par%ssa_iter_max
 
             ! Store previous solution 
@@ -865,10 +935,6 @@ contains
 
             call calc_ydyn_beta(dyn,tpo,mat,bnd)
 
-!             ! Relax with beta from previous timestep 
-!             dyn%now%beta_acx = 0.7_prec*dyn%now%beta_acx + 0.3_prec*beta_acx_prev
-!             dyn%now%beta_acy = 0.7_prec*dyn%now%beta_acy + 0.3_prec*beta_acy_prev
-            
             !   2. Calculate effective viscosity
             
             ! Use 3D rate factor, but 2D shear:
@@ -938,6 +1004,14 @@ end if
 
             !   3. Calculate SSA solution
 
+if (.FALSE.) then 
+            if (iter .gt. 1) then
+                ! Update ssa mask based on convergence with previous step to reduce calls 
+                call update_ssa_mask_convergence(dyn%now%ssa_mask_acx,dyn%now%ssa_mask_acy, &
+                                                    dyn%now%ssa_err_acx,dyn%now%ssa_err_acy,err_lim=1e-3) 
+            end if 
+end if 
+
             ! Call ssa solver to determine ux_b/uy_b, where ssa_mask_acx/y are > 0
             call calc_vxy_ssa_matrix(dyn%now%ux_b,dyn%now%uy_b,dyn%now%beta_acx,dyn%now%beta_acy,dyn%now%visc_eff, &
                                      dyn%now%ssa_mask_acx,dyn%now%ssa_mask_acy,tpo%now%H_ice, &
@@ -951,6 +1025,11 @@ end if
             is_converged = check_vel_convergence(dyn%now%ux_b,dyn%now%uy_b,ux_b_prev,uy_b_prev, &
                                         dyn%par%ssa_iter_conv,iter,dyn%par%ssa_iter_max,yelmo_log)
 
+            ! Calculate an L1 error metric over matrix for diagnostics
+            call check_vel_convergence_matrix(dyn%now%ssa_err_acx,dyn%now%ssa_err_acy,dyn%now%ux_b,dyn%now%uy_b, &
+                                                                                            ux_b_prev,uy_b_prev)
+
+            
             if (write_ssa_diagnostics) then  
                 call write_step_2D_ssa(tpo,dyn,"yelmo_ssa.nc",ux_b_prev,uy_b_prev,time=real(iter,prec))    
             end if 
@@ -961,9 +1040,9 @@ end if
         end do 
         ! == END iterations ==
 
-        if (write_ssa_diagnostics) then 
-            stop 
-        end if 
+!         if (write_ssa_diagnostics) then 
+!             stop 
+!         end if 
 
         return 
 
@@ -1551,6 +1630,8 @@ end if
         
         allocate(now%ssa_mask_acx(nx,ny)) 
         allocate(now%ssa_mask_acy(nx,ny)) 
+        allocate(now%ssa_err_acx(nx,ny)) 
+        allocate(now%ssa_err_acy(nx,ny)) 
         
         ! Set all variables to zero intially
         now%ux                = 0.0 
@@ -1621,6 +1702,8 @@ end if
 
         now%ssa_mask_acx      = 0.0 
         now%ssa_mask_acy      = 0.0 
+        now%ssa_err_acx       = 0.0 
+        now%ssa_err_acy       = 0.0 
 
         return 
 
@@ -1701,6 +1784,8 @@ end if
 
         if (allocated(now%ssa_mask_acx))    deallocate(now%ssa_mask_acx) 
         if (allocated(now%ssa_mask_acy))    deallocate(now%ssa_mask_acy) 
+        if (allocated(now%ssa_err_acx))     deallocate(now%ssa_err_acx) 
+        if (allocated(now%ssa_err_acy))     deallocate(now%ssa_err_acy) 
 
         return 
 
@@ -1769,17 +1854,19 @@ end if
 
     end subroutine ydyn_set_borders 
 
-    subroutine yelmo_write_init_ssa(filename,time_init)
+    subroutine yelmo_write_init_ssa(filename,nx,ny,time_init)
 
         implicit none 
 
         character(len=*),  intent(IN) :: filename 
+        integer,           intent(IN) :: nx 
+        integer,           intent(IN) :: ny
         real(prec),        intent(IN) :: time_init
 
         ! Initialize netcdf file and dimensions
         call nc_create(filename)
-        call nc_write_dim(filename,"xc",     x=0.0,dx=20.0,nx=41,         units="kilometers")
-        call nc_write_dim(filename,"yc",     x=-50.0,dx=20.0,nx=6,        units="kilometers")
+        call nc_write_dim(filename,"xc",     x=0.0_prec,dx=1.0_prec,nx=nx,units="gridpoints")
+        call nc_write_dim(filename,"yc",     x=0.0_prec,dx=1.0_prec,nx=ny,units="gridpoints")
         call nc_write_dim(filename,"time",   x=time_init,dx=1.0_prec,nx=1,units="iter",unlimited=.TRUE.)
 
         return
@@ -1894,6 +1981,11 @@ end if
         call nc_write(filename,"ux_b_diff",dyn%now%ux_b-ux_b_prev,units="m/a",long_name="Basal sliding velocity difference (x)", &
                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
         call nc_write(filename,"uy_b_diff",dyn%now%uy_b-uy_b_prev,units="m/a",long_name="Basal sliding velocity difference (y)", &
+                      dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
+        
+        call nc_write(filename,"ssa_err_acx",dyn%now%ssa_err_acx,units="1",long_name="SSA L1 error metric (x)", &
+                      dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
+        call nc_write(filename,"ssa_err_acy",dyn%now%ssa_err_acy,units="1",long_name="SSA L1 error metric (y)", &
                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
         
 !         call nc_write(filename,"ux",dyn%now%ux,units="m/a",long_name="Horizontal velocity (x)", &

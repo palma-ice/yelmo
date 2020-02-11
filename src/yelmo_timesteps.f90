@@ -46,7 +46,7 @@ contains
     end subroutine calc_pc_tau_fe_sbe
 
     subroutine set_adaptive_timestep_pc(dt,eta,tau,ebs,dt_ref,dtmin,dtmax,mask, &
-                                ux_bar,uy_bar,dx)
+                                ux_bar,uy_bar,dHicedt,dx)
         ! Calculate the timestep following algorithm for 
         ! a general predictor-corrector (pc) method.
         ! Implemented followig Cheng et al (2017, GMD)
@@ -63,6 +63,7 @@ contains
         logical,    intent(IN)  :: mask(:,:)            ! Where to calculate tau 
         real(prec), intent(IN)  :: ux_bar(:,:)          ! [m/yr]
         real(prec), intent(IN)  :: uy_bar(:,:)          ! [m/yr]
+        real(prec), intent(IN)  :: dHicedt(:,:)         ! [m a-1]
         real(prec), intent(IN)  :: dx                   ! [m]
         
         ! Local variables 
@@ -73,9 +74,14 @@ contains
         real(prec) :: dt_adv 
         real(prec) :: dtmax_now
 
+        logical    :: is_unstable
+
         real(prec), parameter :: beta_1 =  3.0_prec / 10.0_prec      ! Cheng et al., 2017, Eq. 32
         real(prec), parameter :: beta_2 = -1.0_prec / 10.0_prec      ! Cheng et al., 2017, Eq. 32
         
+        real(prec), parameter :: rate_lim    = 1.0_prec   ! Reduction in timestep for instability 
+        real(prec), parameter :: rate_scalar = 0.05_prec  ! Reduction in timestep for instability 
+
         ! Step 0: save dt and eta from previous timestep 
         dt_n  = max(dt,dtmin) 
         eta_n = eta 
@@ -98,14 +104,21 @@ contains
             dt = f_scale * (0.5_prec*dtmax)
         end if 
         
-        ! Overwrite choice if error is getting really high - impose minimum dt 
-        if (eta .gt. 10.0_prec*ebs) then 
-            dt = dtmin 
-        end if 
-        
+!         ! Overwrite choice if error is getting really high - impose minimum dt 
+!         if (eta .gt. 10.0_prec*ebs) then 
+!             dt = dtmin 
+!         end if 
+
         ! Calculate CFL advection limit too, and limit maximum allowed timestep
         dt_adv = minval( calc_adv2D_timestep1(ux_bar,uy_bar,dx,dx,cfl_max=1.0_prec) ) 
         dtmax_now = min(dtmax,dt_adv) 
+
+        ! Check stability 
+        ! Check if additional timestep reduction is necessary,
+        ! due to checkerboard patterning related to mass conservation.
+        ! Reduce if necessary 
+        call check_checkerboard(is_unstable,dHicedt,rate_lim)
+        if (is_unstable) dt = rate_scalar*dt
 
         ! Finally, ensure timestep is within prescribed limits
         call limit_adaptive_timestep(dt,dtmin,dtmax_now)
@@ -146,7 +159,7 @@ contains
         logical    :: is_unstable
         real(prec), parameter :: dtmax_cfl   = 20.0_prec 
         real(prec), parameter :: exp_cfl     =  2.0_prec 
-        real(prec), parameter :: rate_lim    = 2.0_prec   ! Reduction in timestep for instability 
+        real(prec), parameter :: rate_lim    = 1.0_prec   ! Reduction in timestep for instability 
         real(prec), parameter :: rate_scalar = 0.05_prec  ! Reduction in timestep for instability 
 
         ! Timestep limits determined from CFL conditions for general advective
@@ -571,16 +584,42 @@ contains
         ! First assume everything is stable 
         is_unstable = .FALSE. 
 
-        do j = 2, ny-1
-        do i = 2, nx-1 
+!         do j = 2, ny-1
+!         do i = 2, nx-1 
+ 
+!             if (abs(dHdt(i,j)) .ge. lim) then
+!                 ! Check for checkerboard pattern with dHdt > lim
+
+!                 if ( (dHdt(i,j)*dHdt(i-1,j) .lt. 0.0 .and. & 
+!                       dHdt(i,j)*dHdt(i+1,j) .lt. 0.0) .or. & 
+!                      (dHdt(i,j)*dHdt(i,j-1) .lt. 0.0 .and. & 
+!                       dHdt(i,j)*dHdt(i,j+1) .lt. 0.0) ) then 
+!                     ! Point has two neighbors with dHdt of opposite sign 
+
+!                     is_unstable = .TRUE. 
+!                     exit
+
+!                 end if 
+
+!             end if 
+
+!         end do 
+!         end do  
+
+        do j = 3, ny-2
+        do i = 3, nx-2 
  
             if (abs(dHdt(i,j)) .ge. lim) then
                 ! Check for checkerboard pattern with dHdt > lim
 
                 if ( (dHdt(i,j)*dHdt(i-1,j) .lt. 0.0 .and. & 
-                      dHdt(i,j)*dHdt(i+1,j) .lt. 0.0) .or. & 
+                      dHdt(i,j)*dHdt(i+1,j) .lt. 0.0 .and. & 
+                      dHdt(i,j)*dHdt(i-2,j) .gt. 0.0 .and. & 
+                      dHdt(i,j)*dHdt(i+2,j) .gt. 0.0) .or. & 
                      (dHdt(i,j)*dHdt(i,j-1) .lt. 0.0 .and. & 
-                      dHdt(i,j)*dHdt(i,j+1) .lt. 0.0) ) then 
+                      dHdt(i,j)*dHdt(i,j+1) .lt. 0.0 .and. &
+                      dHdt(i,j)*dHdt(i,j-2) .gt. 0.0 .and. & 
+                      dHdt(i,j)*dHdt(i,j+2) .gt. 0.0) ) then 
                     ! Point has two neighbors with dHdt of opposite sign 
 
                     is_unstable = .TRUE. 

@@ -80,8 +80,8 @@ contains
         real(prec), parameter :: beta_1 =  3.0_prec / 10.0_prec      ! Cheng et al., 2017, Eq. 32
         real(prec), parameter :: beta_2 = -1.0_prec / 10.0_prec      ! Cheng et al., 2017, Eq. 32
         
-        real(prec), parameter :: rate_lim    = 1.0_prec   ! Reduction in timestep for instability 
-        real(prec), parameter :: ebs_scalar  = 0.5_prec 
+        real(prec), parameter :: rate_lim    = 0.8_prec   ! Reduction in timestep for instability 
+        real(prec), parameter :: ebs_scalar  = 0.4_prec 
 
         ! Step 0: save dt and eta from previous timestep 
         dt_n    = max(dt,dtmin) 

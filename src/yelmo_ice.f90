@@ -146,13 +146,6 @@ contains
             
             ! Calculate dynamics (velocities and stresses)
             call calc_ydyn(dom%dyn,tpo1,dom%mat,thrm1,dom%bnd,time_now)
-    
-!             nstep2 = 5
-!             do n2 = 1, nstep2 
-!                 thrm1 = dom%thrm 
-!                 call calc_ydyn(dom%dyn,tpo1,dom%mat,thrm1,dom%bnd,time_now)
-!                 call calc_ytherm(thrm1,tpo1,dom%dyn,dom%mat,dom%bnd,time_now)            
-!             end do 
             
             ! Calculate material (ice properties, viscosity, etc.)
             call calc_ymat(dom%mat,tpo1,dom%dyn,thrm1,dom%bnd,time_now)

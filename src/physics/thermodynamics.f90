@@ -527,7 +527,7 @@ contains
         real(prec) :: corr 
 
         real(prec), parameter :: tol = 1e-4 
-        real(prec), parameter :: max_corr = 2.0_prec   ! Maximum allowed deviation from original uz (eg 200%)
+        real(prec), parameter :: max_corr = 1.0_prec   ! Maximum allowed deviation from original uz (eg 200%)
 
         nx    = size(H_ice,1)
         ny    = size(H_ice,2)

@@ -81,7 +81,6 @@ contains
         real(prec), parameter :: beta_2 = -1.0_prec / 10.0_prec      ! Cheng et al., 2017, Eq. 32
         
         real(prec), parameter :: rate_lim    = 1.0_prec   ! Reduction in timestep for instability 
-        real(prec), parameter :: rate_scalar = 0.05_prec  ! Reduction in timestep for instability 
         real(prec), parameter :: ebs_scalar  = 0.5_prec 
 
         ! Step 0: save dt and eta from previous timestep 
@@ -587,42 +586,16 @@ contains
         ! First assume everything is stable 
         is_unstable = .FALSE. 
 
-!         do j = 2, ny-1
-!         do i = 2, nx-1 
- 
-!             if (abs(dHdt(i,j)) .ge. lim) then
-!                 ! Check for checkerboard pattern with dHdt > lim
-
-!                 if ( (dHdt(i,j)*dHdt(i-1,j) .lt. 0.0 .and. & 
-!                       dHdt(i,j)*dHdt(i+1,j) .lt. 0.0) .or. & 
-!                      (dHdt(i,j)*dHdt(i,j-1) .lt. 0.0 .and. & 
-!                       dHdt(i,j)*dHdt(i,j+1) .lt. 0.0) ) then 
-!                     ! Point has checkerboard pattern in at least one direction
-
-!                     is_unstable = .TRUE. 
-!                     exit
-
-!                 end if 
-
-!             end if 
-
-!         end do 
-!         end do  
-
-        do j = 3, ny-2
-        do i = 3, nx-2 
+        do j = 2, ny-1
+        do i = 2, nx-1 
  
             if (abs(dHdt(i,j)) .ge. lim) then
                 ! Check for checkerboard pattern with dHdt > lim
 
                 if ( (dHdt(i,j)*dHdt(i-1,j) .lt. 0.0 .and. & 
-                      dHdt(i,j)*dHdt(i+1,j) .lt. 0.0 .and. & 
-                      dHdt(i,j)*dHdt(i-2,j) .gt. 0.0 .and. & 
-                      dHdt(i,j)*dHdt(i+2,j) .gt. 0.0) .or. & 
+                      dHdt(i,j)*dHdt(i+1,j) .lt. 0.0) .or. & 
                      (dHdt(i,j)*dHdt(i,j-1) .lt. 0.0 .and. & 
-                      dHdt(i,j)*dHdt(i,j+1) .lt. 0.0 .and. &
-                      dHdt(i,j)*dHdt(i,j-2) .gt. 0.0 .and. & 
-                      dHdt(i,j)*dHdt(i,j+2) .gt. 0.0) ) then 
+                      dHdt(i,j)*dHdt(i,j+1) .lt. 0.0) ) then 
                     ! Point has checkerboard pattern in at least one direction
 
                     is_unstable = .TRUE. 
@@ -634,6 +607,32 @@ contains
 
         end do 
         end do  
+
+!         do j = 3, ny-2
+!         do i = 3, nx-2 
+ 
+!             if (abs(dHdt(i,j)) .ge. lim) then
+!                 ! Check for checkerboard pattern with dHdt > lim
+
+!                 if ( (dHdt(i,j)*dHdt(i-1,j) .lt. 0.0 .and. & 
+!                       dHdt(i,j)*dHdt(i+1,j) .lt. 0.0 .and. & 
+!                       dHdt(i,j)*dHdt(i-2,j) .gt. 0.0 .and. & 
+!                       dHdt(i,j)*dHdt(i+2,j) .gt. 0.0) .or. & 
+!                      (dHdt(i,j)*dHdt(i,j-1) .lt. 0.0 .and. & 
+!                       dHdt(i,j)*dHdt(i,j+1) .lt. 0.0 .and. &
+!                       dHdt(i,j)*dHdt(i,j-2) .gt. 0.0 .and. & 
+!                       dHdt(i,j)*dHdt(i,j+2) .gt. 0.0) ) then 
+!                     ! Point has checkerboard pattern in at least one direction
+
+!                     is_unstable = .TRUE. 
+!                     exit
+
+!                 end if 
+
+!             end if 
+
+!         end do 
+!         end do  
 
         return 
 

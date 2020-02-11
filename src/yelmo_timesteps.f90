@@ -98,6 +98,11 @@ contains
             dt = f_scale * (0.5_prec*dtmax)
         end if 
         
+        ! Overwrite choice if error is getting really high - impose minimum dt 
+        if (eta .gt. 10.0_prec*ebs) then 
+            dt = dtmin 
+        end if 
+        
         ! Calculate CFL advection limit too, and limit maximum allowed timestep
         dt_adv = minval( calc_adv2D_timestep1(ux_bar,uy_bar,dx,dx,cfl_max=1.0_prec) ) 
         dtmax_now = min(dtmax,dt_adv) 

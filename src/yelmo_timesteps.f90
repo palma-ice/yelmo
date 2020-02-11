@@ -73,6 +73,7 @@ contains
 
         real(prec) :: dt_adv 
         real(prec) :: dtmax_now
+        real(prec) :: ebs_now 
 
         logical    :: is_unstable
 
@@ -81,24 +82,33 @@ contains
         
         real(prec), parameter :: rate_lim    = 1.0_prec   ! Reduction in timestep for instability 
         real(prec), parameter :: rate_scalar = 0.05_prec  ! Reduction in timestep for instability 
+        real(prec), parameter :: ebs_scalar  = 0.5_prec 
 
         ! Step 0: save dt and eta from previous timestep 
-        dt_n  = max(dt,dtmin) 
-        eta_n = eta 
+        dt_n    = max(dt,dtmin) 
+        eta_n   = eta 
+        ebs_now = ebs 
+
+        ! Check stability 
+        ! Check if additional timestep reduction is necessary,
+        ! due to checkerboard patterning related to mass conservation.
+        ! Reduce if necessary 
+        call check_checkerboard(is_unstable,dHicedt,rate_lim)
+        if (is_unstable) ebs_now = ebs*ebs_scalar 
 
         ! Step 1: calculate maximum value of truncation error (eta,n+1) = maxval(tau) 
         eta = maxval(abs(tau),mask=mask)
         eta = max(eta,1e-10)
 
         ! Step 2: calculate scaling for the next timestep (dt,n+1)
-        f_scale = (ebs/eta)**beta_1 * (ebs/eta_n)**beta_2
+        f_scale = (ebs_now/eta)**beta_1 * (ebs_now/eta_n)**beta_2
 
         ! Step 2: calculate the next time timestep (dt,n+1)
         if (dt_ref .eq. 0.0_prec) then 
             ! Scale the previous timestep
             dt = f_scale * dt_n
         else 
-            ! Scale the reference timestep 
+            ! Scale the reference timestep - experimental
 !             dt = f_scale * (0.3*dt_ref + 0.7*dt_n)
 !             dt = f_scale * dt_ref
             dt = f_scale * (0.5_prec*dtmax)
@@ -112,13 +122,6 @@ contains
         ! Calculate CFL advection limit too, and limit maximum allowed timestep
         dt_adv = minval( calc_adv2D_timestep1(ux_bar,uy_bar,dx,dx,cfl_max=1.0_prec) ) 
         dtmax_now = min(dtmax,dt_adv) 
-
-        ! Check stability 
-        ! Check if additional timestep reduction is necessary,
-        ! due to checkerboard patterning related to mass conservation.
-        ! Reduce if necessary 
-        call check_checkerboard(is_unstable,dHicedt,rate_lim)
-        if (is_unstable) dt = rate_scalar*dt
 
         ! Finally, ensure timestep is within prescribed limits
         call limit_adaptive_timestep(dt,dtmin,dtmax_now)
@@ -594,7 +597,7 @@ contains
 !                       dHdt(i,j)*dHdt(i+1,j) .lt. 0.0) .or. & 
 !                      (dHdt(i,j)*dHdt(i,j-1) .lt. 0.0 .and. & 
 !                       dHdt(i,j)*dHdt(i,j+1) .lt. 0.0) ) then 
-!                     ! Point has two neighbors with dHdt of opposite sign 
+!                     ! Point has checkerboard pattern in at least one direction
 
 !                     is_unstable = .TRUE. 
 !                     exit
@@ -620,7 +623,7 @@ contains
                       dHdt(i,j)*dHdt(i,j+1) .lt. 0.0 .and. &
                       dHdt(i,j)*dHdt(i,j-2) .gt. 0.0 .and. & 
                       dHdt(i,j)*dHdt(i,j+2) .gt. 0.0) ) then 
-                    ! Point has two neighbors with dHdt of opposite sign 
+                    ! Point has checkerboard pattern in at least one direction
 
                     is_unstable = .TRUE. 
                     exit

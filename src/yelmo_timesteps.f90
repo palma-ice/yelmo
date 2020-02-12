@@ -81,8 +81,8 @@ contains
         real(prec), parameter :: beta_2 = -1.0_prec / 10.0_prec      ! Cheng et al., 2017, Eq. 32
         
         ! Parameters controlling checkerboard stability check
-        real(prec), parameter :: rate_lim    = 0.8_prec    ! [m/a] Maximum allowed checkerboard rate
-        real(prec), parameter :: ebs_scalar  = 0.4_prec    ! [--]  Reduction in ebs for instable timestep
+        real(prec), parameter :: rate_lim    = 0.5_prec    ! [m/a] Maximum allowed checkerboard rate
+        real(prec), parameter :: ebs_scalar  = 0.1_prec    ! [--]  Reduction in ebs for instable timestep
         
         ! Step 0: save dt and eta from previous timestep 
         dt_n    = max(dt,dtmin) 

@@ -9,8 +9,8 @@ python run_yelmo.py -s -e benchmarks ${fldr}/expssa par/yelmo_EISMINT_ssa.nml
 job run --shell -f -o ${fldr}/halfar -p eismint.dx=0.5,1.0,2.0,3.0,4.0,5.0,8.0,10.0 -- python run_yelmo.py -x -s -e benchmarks {} par/gmd/yelmo_HALFAR.nml
 
 make initmip
-python run_yelmo.py -r -e initmip ${fldr}/ant-pd par/gmd/yelmo_Antarctica_pd.nml
-python run_yelmo.py -r -e initmip ${fldr}/ant-lgm par/gmd/yelmo_Antarctica_lgm.nml
+python run_yelmo.py -s -e initmip ${fldr}/ant-pd par/gmd/yelmo_Antarctica_pd.nml
+python run_yelmo.py -s -e initmip ${fldr}/ant-lgm par/gmd/yelmo_Antarctica_lgm.nml
 python run_yelmo.py -s -e initmip ${fldr}/grl par/yelmo_Greenland_initmip.nml
 
 make mismip

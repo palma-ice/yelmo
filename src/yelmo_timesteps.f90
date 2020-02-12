@@ -81,7 +81,7 @@ contains
         real(prec), parameter :: beta_2 = -1.0_prec / 10.0_prec      ! Cheng et al., 2017, Eq. 32
         
         ! Parameters controlling checkerboard stability check
-        real(prec), parameter :: rate_lim    = 0.5_prec    ! [m/a] Maximum allowed checkerboard rate
+        real(prec), parameter :: rate_lim    = 1.0_prec    ! [m/a] Maximum allowed checkerboard rate
         real(prec), parameter :: ebs_scalar  = 0.1_prec    ! [--]  Reduction in ebs for instable timestep
         
         ! Step 0: save dt and eta from previous timestep 
@@ -93,8 +93,8 @@ contains
         ! Check if additional timestep reduction is necessary,
         ! due to checkerboard patterning related to mass conservation.
         ! Reduce if necessary 
-        call check_checkerboard(is_unstable,dHicedt,rate_lim)
-        if (is_unstable) ebs_now = ebs*ebs_scalar 
+!         call check_checkerboard(is_unstable,dHicedt,rate_lim)
+!         if (is_unstable) ebs_now = ebs*ebs_scalar 
 
         ! Step 1: calculate maximum value of truncation error (eta,n+1) = maxval(tau) 
         eta = maxval(abs(tau),mask=mask)
@@ -118,6 +118,8 @@ contains
 !         if (eta .gt. 10.0_prec*ebs) then 
 !             dt = dtmin 
 !         end if 
+        call check_checkerboard(is_unstable,tau,lim=1.0_prec)
+        if (is_unstable) dt = dtmin 
 
         ! Calculate CFL advection limit too, and limit maximum allowed timestep
         dt_adv = minval( calc_adv2D_timestep1(ux_bar,uy_bar,dx,dx,cfl_max=1.0_prec) ) 
@@ -570,19 +572,19 @@ contains
 
     end function calc_adv3D_timestep 
     
-    subroutine check_checkerboard(is_unstable,dHdt,lim)
+    subroutine check_checkerboard(is_unstable,var,lim)
 
         implicit none 
 
         logical,    intent(OUT) :: is_unstable
-        real(prec), intent(IN)  :: dHdt(:,:) 
+        real(prec), intent(IN)  :: var(:,:) 
         real(prec), intent(IN)  :: lim 
 
         ! Local variables 
         integer :: i, j, nx, ny 
 
-        nx = size(dHdt,1)
-        ny = size(dHdt,2) 
+        nx = size(var,1)
+        ny = size(var,2) 
 
         ! First assume everything is stable 
         is_unstable = .FALSE. 
@@ -590,13 +592,13 @@ contains
         do j = 2, ny-1
         do i = 2, nx-1 
  
-            if (abs(dHdt(i,j)) .ge. lim) then
-                ! Check for checkerboard pattern with dHdt > lim
+            if (abs(var(i,j)) .ge. lim) then
+                ! Check for checkerboard pattern with var > lim
 
-                if ( (dHdt(i,j)*dHdt(i-1,j) .lt. 0.0 .and. & 
-                      dHdt(i,j)*dHdt(i+1,j) .lt. 0.0) .or. & 
-                     (dHdt(i,j)*dHdt(i,j-1) .lt. 0.0 .and. & 
-                      dHdt(i,j)*dHdt(i,j+1) .lt. 0.0) ) then 
+                if ( (var(i,j)*var(i-1,j) .lt. 0.0 .and. & 
+                      var(i,j)*var(i+1,j) .lt. 0.0) .or. & 
+                     (var(i,j)*var(i,j-1) .lt. 0.0 .and. & 
+                      var(i,j)*var(i,j+1) .lt. 0.0) ) then 
                     ! Point has checkerboard pattern in at least one direction
 
                     is_unstable = .TRUE. 
@@ -608,32 +610,6 @@ contains
 
         end do 
         end do  
-
-!         do j = 3, ny-2
-!         do i = 3, nx-2 
- 
-!             if (abs(dHdt(i,j)) .ge. lim) then
-!                 ! Check for checkerboard pattern with dHdt > lim
-
-!                 if ( (dHdt(i,j)*dHdt(i-1,j) .lt. 0.0 .and. & 
-!                       dHdt(i,j)*dHdt(i+1,j) .lt. 0.0 .and. & 
-!                       dHdt(i,j)*dHdt(i-2,j) .gt. 0.0 .and. & 
-!                       dHdt(i,j)*dHdt(i+2,j) .gt. 0.0) .or. & 
-!                      (dHdt(i,j)*dHdt(i,j-1) .lt. 0.0 .and. & 
-!                       dHdt(i,j)*dHdt(i,j+1) .lt. 0.0 .and. &
-!                       dHdt(i,j)*dHdt(i,j-2) .gt. 0.0 .and. & 
-!                       dHdt(i,j)*dHdt(i,j+2) .gt. 0.0) ) then 
-!                     ! Point has checkerboard pattern in at least one direction
-
-!                     is_unstable = .TRUE. 
-!                     exit
-
-!                 end if 
-
-!             end if 
-
-!         end do 
-!         end do  
 
         return 
 

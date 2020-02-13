@@ -37,10 +37,9 @@
     use_pc_thrm     = False             ! Use predictor step with thermodynamics too 
     dt_method       = 2                 ! 0: no internal timestep, 1: adaptive, cfl, 2: adaptive, pc
     dt_min          = 0.1               ! [a] Minimum timestep 
-    dt_ref          = 0.0               ! [a] Reference timestep 
     cfl_max         = 0.1               ! Maximum value is 1.0, lower will be more stable
     cfl_diff_max    = 0.12              ! Bueler et al (2007), Eq. 25  
-    pc_ebs          = 1e-1              ! Predictor-corrector tolerance 
+    pc_eps          = 1e-1              ! Predictor-corrector tolerance 
     
 /
 

@@ -45,8 +45,7 @@ contains
 
     end subroutine calc_pc_tau_fe_sbe
 
-    subroutine set_adaptive_timestep_pc(dt,eta,tau,ebs,dt_ref,dtmin,dtmax,mask, &
-                                ux_bar,uy_bar,dx)
+    subroutine set_adaptive_timestep_pc(dt,eta,tau,eps,dtmin,dtmax,mask,ux_bar,uy_bar,dx)
         ! Calculate the timestep following algorithm for 
         ! a general predictor-corrector (pc) method.
         ! Implemented followig Cheng et al (2017, GMD)
@@ -56,8 +55,7 @@ contains
         real(prec), intent(INOUT) :: dt                 ! [yr]   Timestep 
         real(prec), intent(INOUT) :: eta                ! [X/yr] Maximum truncation error 
         real(prec), intent(IN)  :: tau(:,:)             ! [X/yr] Truncation error 
-        real(prec), intent(IN)  :: ebs                  ! [--]   Tolerance value (eg, ebs=1e-4)
-        real(prec), intent(IN)  :: dt_ref               ! [yr]   Reference dt to osicillate around, if not dt_ref=0
+        real(prec), intent(IN)  :: eps                  ! [--]   Tolerance value (eg, eps=1e-4)
         real(prec), intent(IN)  :: dtmin                ! [yr]   Minimum allowed timestep
         real(prec), intent(IN)  :: dtmax                ! [yr]   Maximum allowed timestep
         logical,    intent(IN)  :: mask(:,:)            ! Where to calculate tau 
@@ -90,23 +88,12 @@ contains
         eta = max(eta,1e-10)
 
         ! Step 2: calculate scaling for the next timestep (dt,n+1)
-        f_scale = (ebs/eta)**beta_1 * (ebs/eta_n)**beta_2
+        f_scale = (eps/eta)**beta_1 * (eps/eta_n)**beta_2
 
         ! Step 2: calculate the next time timestep (dt,n+1)
-        if (dt_ref .eq. 0.0_prec) then 
-            ! Scale the previous timestep
-            dt = f_scale * dt_n
-        else 
-            ! Scale the reference timestep - experimental
-!             dt = f_scale * (0.3*dt_ref + 0.7*dt_n)
-!             dt = f_scale * dt_ref
-            dt = f_scale * (0.5_prec*dtmax)
-        end if 
-        
-!         ! Overwrite choice if error is getting really high - impose minimum dt 
-!         if (eta .gt. 10.0_prec*ebs) then 
-!             dt = dtmin 
-!         end if 
+        dt = f_scale * dt_n
+
+        ! Check for checkerboard in tau field, impose minimum dt if unstable 
         call check_checkerboard(is_unstable,tau,lim=tau_lim)
         if (is_unstable) dt = dtmin 
 
@@ -604,7 +591,7 @@ contains
 
     end subroutine check_checkerboard
 
-    subroutine yelmo_timestep_write_init(filename,time,xc,yc,pc_ebs)
+    subroutine yelmo_timestep_write_init(filename,time,xc,yc,pc_eps)
 
         implicit none 
 
@@ -612,7 +599,7 @@ contains
         real(prec), intent(IN) :: time
         real(prec), intent(IN) :: xc(:) 
         real(prec), intent(IN) :: yc(:)  
-        real(prec), intent(IN) :: pc_ebs
+        real(prec), intent(IN) :: pc_eps
 
         ! Local variables 
         character(len=16) :: xnm 
@@ -634,7 +621,7 @@ contains
         
         call nc_write_dim(filename,"time",x=time,dx=1.0_prec,nx=1,units="years",unlimited=.TRUE.)
 
-        call nc_write(filename, "pc_ebs", pc_ebs,dim1="pt")
+        call nc_write(filename, "pc_eps", pc_eps,dim1="pt")
         
         return 
 

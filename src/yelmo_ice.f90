@@ -82,8 +82,8 @@ contains
                                 dom%tpo%par%dx,dom%par%dt_min,dt_max,dom%par%cfl_max,dom%par%cfl_diff_max) 
             
             ! Calculate new adaptive timestep using predictor-corrector algorithm for ice thickness
-            call set_adaptive_timestep_pc(dom%par%pc_dt,dom%par%pc_eta,dom%par%pc_tau,dom%par%pc_ebs, &
-                                        dom%par%dt_ref,dom%par%dt_min,dt_max,dom%tpo%now%f_grnd.eq.1.0_prec, &
+            call set_adaptive_timestep_pc(dom%par%pc_dt,dom%par%pc_eta,dom%par%pc_tau,dom%par%pc_eps, &
+                                        dom%par%dt_min,dt_max,dom%tpo%now%f_grnd.eq.1.0_prec, &
                                         dom%dyn%now%ux_bar,dom%dyn%now%uy_bar,dom%tpo%par%dx)
 
             ! Determine current time step based on method of choice 
@@ -361,7 +361,7 @@ contains
         dom%par%dt_adv3D = 0.0 
 
         dom%par%pc_dt    = dom%par%dt_min  
-        dom%par%pc_eta   = dom%par%pc_ebs  
+        dom%par%pc_eta   = dom%par%pc_eps  
 
         ! Allocate truncation error array 
         if (allocated(dom%par%pc_tau))   deallocate(dom%par%pc_tau)
@@ -481,7 +481,7 @@ contains
 
         if (dom%par%log_timestep) then 
             ! Timestep file 
-            call yelmo_timestep_write_init(dom%par%log_timestep_file,time,dom%grd%xc,dom%grd%yc,dom%par%pc_ebs)
+            call yelmo_timestep_write_init(dom%par%log_timestep_file,time,dom%grd%xc,dom%grd%yc,dom%par%pc_eps)
             call yelmo_timestep_write(dom%par%log_timestep_file,time,0.0_prec,0.0_prec,dom%par%pc_dt, &
                             dom%par%pc_eta,dom%par%pc_tau)
         end if 
@@ -657,10 +657,9 @@ contains
         call nml_read(filename,"yelmo","use_pc_thrm",   par%use_pc_thrm)
         call nml_read(filename,"yelmo","dt_method",     par%dt_method)
         call nml_read(filename,"yelmo","dt_min",        par%dt_min)
-        call nml_read(filename,"yelmo","dt_ref",        par%dt_ref)
         call nml_read(filename,"yelmo","cfl_max",       par%cfl_max)
         call nml_read(filename,"yelmo","cfl_diff_max",  par%cfl_diff_max)
-        call nml_read(filename,"yelmo","pc_ebs",        par%pc_ebs)
+        call nml_read(filename,"yelmo","pc_eps",        par%pc_eps)
 
         ! Overwrite parameter values with argument definitions if available
         if (present(domain))     par%domain    = trim(domain)

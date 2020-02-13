@@ -46,7 +46,7 @@ contains
     end subroutine calc_pc_tau_fe_sbe
 
     subroutine set_adaptive_timestep_pc(dt,eta,tau,ebs,dt_ref,dtmin,dtmax,mask, &
-                                ux_bar,uy_bar,dHicedt,dx)
+                                ux_bar,uy_bar,dx)
         ! Calculate the timestep following algorithm for 
         ! a general predictor-corrector (pc) method.
         ! Implemented followig Cheng et al (2017, GMD)
@@ -63,7 +63,6 @@ contains
         logical,    intent(IN)  :: mask(:,:)            ! Where to calculate tau 
         real(prec), intent(IN)  :: ux_bar(:,:)          ! [m/yr]
         real(prec), intent(IN)  :: uy_bar(:,:)          ! [m/yr]
-        real(prec), intent(IN)  :: dHicedt(:,:)         ! [m a-1]
         real(prec), intent(IN)  :: dx                   ! [m]
         
         ! Local variables 
@@ -73,7 +72,6 @@ contains
 
         real(prec) :: dt_adv 
         real(prec) :: dtmax_now
-        real(prec) :: ebs_now 
 
         logical    :: is_unstable
 
@@ -81,27 +79,18 @@ contains
         real(prec), parameter :: beta_2 = -1.0_prec / 10.0_prec      ! Cheng et al., 2017, Eq. 32
         
         ! Parameters controlling checkerboard stability check
-        real(prec), parameter :: rate_lim    = 1.0_prec    ! [m/a] Maximum allowed checkerboard rate
-        real(prec), parameter :: ebs_scalar  = 0.1_prec    ! [--]  Reduction in ebs for instable timestep
-        
+        real(prec), parameter :: tau_lim = 5.0_prec    ! [m/a] Maximum allowed tau for checkerboard
+
         ! Step 0: save dt and eta from previous timestep 
         dt_n    = max(dt,dtmin) 
         eta_n   = eta 
-        ebs_now = ebs 
-
-        ! Check stability 
-        ! Check if additional timestep reduction is necessary,
-        ! due to checkerboard patterning related to mass conservation.
-        ! Reduce if necessary 
-!         call check_checkerboard(is_unstable,dHicedt,rate_lim)
-!         if (is_unstable) ebs_now = ebs*ebs_scalar 
 
         ! Step 1: calculate maximum value of truncation error (eta,n+1) = maxval(tau) 
         eta = maxval(abs(tau),mask=mask)
         eta = max(eta,1e-10)
 
         ! Step 2: calculate scaling for the next timestep (dt,n+1)
-        f_scale = (ebs_now/eta)**beta_1 * (ebs_now/eta_n)**beta_2
+        f_scale = (ebs/eta)**beta_1 * (ebs/eta_n)**beta_2
 
         ! Step 2: calculate the next time timestep (dt,n+1)
         if (dt_ref .eq. 0.0_prec) then 
@@ -118,7 +107,7 @@ contains
 !         if (eta .gt. 10.0_prec*ebs) then 
 !             dt = dtmin 
 !         end if 
-        call check_checkerboard(is_unstable,tau,lim=1.0_prec)
+        call check_checkerboard(is_unstable,tau,lim=tau_lim)
         if (is_unstable) dt = dtmin 
 
         ! Calculate CFL advection limit too, and limit maximum allowed timestep

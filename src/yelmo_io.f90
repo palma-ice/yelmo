@@ -78,25 +78,28 @@ contains
         call nc_write(filename,"H_ice",       dom%tpo%now%H_ice,      units="m",  dim1="xc",dim2="yc",ncid=ncid)
         call nc_write(filename,"z_srf",       dom%tpo%now%z_srf,      units="m",  dim1="xc",dim2="yc",ncid=ncid)
 
-        call nc_write(filename,"dzsrfdt",     dom%tpo%now%dzsrfdt,    units="m/a",dim1="xc",dim2="yc",ncid=ncid)
-        call nc_write(filename,"dHicedt",     dom%tpo%now%dHicedt,    units="m/a",dim1="xc",dim2="yc",ncid=ncid)
-        call nc_write(filename,"bmb",         dom%tpo%now%bmb,        units="m/a",dim1="xc",dim2="yc",ncid=ncid)
-        call nc_write(filename,"mb_applied",  dom%tpo%now%mb_applied, units="m/a",dim1="xc",dim2="yc",ncid=ncid)
-        call nc_write(filename,"calv",        dom%tpo%now%calv,       units="m/a",dim1="xc",dim2="yc",ncid=ncid)
-        call nc_write(filename,"calv_grnd",   dom%tpo%now%calv_grnd,  units="m/a",dim1="xc",dim2="yc",ncid=ncid)
-        call nc_write(filename,"H_margin",    dom%tpo%now%H_margin,   units="m/a",dim1="xc",dim2="yc",ncid=ncid)
-        call nc_write(filename,"dzsdx",       dom%tpo%now%dzsdx,      units="m/m",  dim1="xc",dim2="yc",ncid=ncid)  
-        call nc_write(filename,"dzsdy",       dom%tpo%now%dzsdy,      units="m/m",  dim1="xc",dim2="yc",ncid=ncid)  
-        call nc_write(filename,"dHicedx",     dom%tpo%now%dHicedx,    units="m/m",  dim1="xc",dim2="yc",ncid=ncid)
-        call nc_write(filename,"dHicedy",     dom%tpo%now%dHicedy,    units="m/m",  dim1="xc",dim2="yc",ncid=ncid)
-        call nc_write(filename,"H_grnd",      dom%tpo%now%H_grnd,     units="b",dim1="xc",dim2="yc",ncid=ncid)
-        call nc_write(filename,"f_grnd",      dom%tpo%now%f_grnd,     units="1",dim1="xc",dim2="yc",ncid=ncid)  
-        call nc_write(filename,"f_grnd_acx",  dom%tpo%now%f_grnd_acx,     units="1",dim1="xc",dim2="yc",ncid=ncid)
-        call nc_write(filename,"f_grnd_acy",  dom%tpo%now%f_grnd_acy,     units="1",dim1="xc",dim2="yc",ncid=ncid)
-        call nc_write(filename,"f_ice",       dom%tpo%now%f_ice,      units="1",dim1="xc",dim2="yc",ncid=ncid)  
-        call nc_write(filename,"dist_margin", dom%tpo%now%dist_margin, units=" ",dim1="xc",dim2="yc",ncid=ncid)
-        call nc_write(filename,"dist_grline", dom%tpo%now%dist_grline, units=" ",dim1="xc",dim2="yc",ncid=ncid)
-        call nc_write(filename,"mask_bed",    dom%tpo%now%mask_bed,    units="1",dim1="xc",dim2="yc",ncid=ncid)  
+        call nc_write(filename,"dzsrfdt",     dom%tpo%now%dzsrfdt,     units="m/a",dim1="xc",dim2="yc",ncid=ncid)
+        call nc_write(filename,"dHicedt",     dom%tpo%now%dHicedt,     units="m/a",dim1="xc",dim2="yc",ncid=ncid)
+        call nc_write(filename,"bmb",         dom%tpo%now%bmb,         units="m/a",dim1="xc",dim2="yc",ncid=ncid)
+        call nc_write(filename,"mb_applied",  dom%tpo%now%mb_applied,  units="m/a",dim1="xc",dim2="yc",ncid=ncid)
+        call nc_write(filename,"calv_grnd",   dom%tpo%now%calv_grnd,   units="m/a",dim1="xc",dim2="yc",ncid=ncid)
+        call nc_write(filename,"calv",        dom%tpo%now%calv,        units="m/a",dim1="xc",dim2="yc",ncid=ncid)
+        call nc_write(filename,"H_margin",    dom%tpo%now%H_margin,    units="m/a",dim1="xc",dim2="yc",ncid=ncid)
+        call nc_write(filename,"dzsdx",       dom%tpo%now%dzsdx,       units="m/m",dim1="xc",dim2="yc",ncid=ncid)  
+        call nc_write(filename,"dzsdy",       dom%tpo%now%dzsdy,       units="m/m",dim1="xc",dim2="yc",ncid=ncid)  
+        call nc_write(filename,"dHicedx",     dom%tpo%now%dHicedx,     units="m/m",dim1="xc",dim2="yc",ncid=ncid)
+        call nc_write(filename,"dHicedy",     dom%tpo%now%dHicedy,     units="m/m",dim1="xc",dim2="yc",ncid=ncid)
+        call nc_write(filename,"H_grnd",      dom%tpo%now%H_grnd,      units="b",  dim1="xc",dim2="yc",ncid=ncid)
+        call nc_write(filename,"f_grnd",      dom%tpo%now%f_grnd,      units="1",  dim1="xc",dim2="yc",ncid=ncid)  
+        call nc_write(filename,"f_grnd_acx",  dom%tpo%now%f_grnd_acx,  units="1",  dim1="xc",dim2="yc",ncid=ncid)
+        call nc_write(filename,"f_grnd_acy",  dom%tpo%now%f_grnd_acy,  units="1",  dim1="xc",dim2="yc",ncid=ncid)
+        call nc_write(filename,"f_ice",       dom%tpo%now%f_ice,       units="1",  dim1="xc",dim2="yc",ncid=ncid)  
+        call nc_write(filename,"dist_margin", dom%tpo%now%dist_margin, units=" ",  dim1="xc",dim2="yc",ncid=ncid)
+        call nc_write(filename,"dist_grline", dom%tpo%now%dist_grline, units=" ",  dim1="xc",dim2="yc",ncid=ncid)
+        call nc_write(filename,"mask_bed",    dom%tpo%now%mask_bed,    units="1",  dim1="xc",dim2="yc",ncid=ncid)  
+        call nc_write(filename,"is_float",    dom%tpo%now%is_float,    units="1",  dim1="xc",dim2="yc",ncid=ncid)  
+        call nc_write(filename,"is_grline",   dom%tpo%now%is_grline,   units="1",  dim1="xc",dim2="yc",ncid=ncid)  
+        call nc_write(filename,"is_grz",      dom%tpo%now%is_grz,      units="1",  dim1="xc",dim2="yc",ncid=ncid)  
 
         ! == ydyn variables ===
 
@@ -123,6 +126,8 @@ contains
         call nc_write(filename,"uy_i_bar",      dom%dyn%now%uy_i_bar, units="m/a",dim1="xc",dim2="yc",ncid=ncid) 
         call nc_write(filename,"uxy_i_bar",     dom%dyn%now%uxy_i_bar,units="m/a",dim1="xc",dim2="yc",ncid=ncid) 
 
+        call nc_write(filename,"duxydt",        dom%dyn%now%duxydt,units="m/a^2",dim1="xc",dim2="yc",ncid=ncid) 
+
         call nc_write(filename,"dd_ab",         dom%dyn%now%dd_ab,    units="",dim1="xc",dim2="yc",dim3="zeta",ncid=ncid) 
         call nc_write(filename,"dd_ab_bar",     dom%dyn%now%dd_ab_bar,units="",dim1="xc",dim2="yc",ncid=ncid) 
 
@@ -144,6 +149,9 @@ contains
         call nc_write(filename,"taub_acy",      dom%dyn%now%taub_acy, units="",dim1="xc",dim2="yc",ncid=ncid) 
         call nc_write(filename,"taub",          dom%dyn%now%taub,     units="",dim1="xc",dim2="yc",ncid=ncid) 
 
+        call nc_write(filename,"qq_gl_acx",     dom%dyn%now%qq_gl_acx,units="",dim1="xc",dim2="yc",ncid=ncid) 
+        call nc_write(filename,"qq_gl_acy",     dom%dyn%now%qq_gl_acy,units="",dim1="xc",dim2="yc",ncid=ncid) 
+        
         call nc_write(filename,"qq_acx",        dom%dyn%now%qq_acx,   units="",dim1="xc",dim2="yc",ncid=ncid) 
         call nc_write(filename,"qq_acy",        dom%dyn%now%qq_acy,   units="",dim1="xc",dim2="yc",ncid=ncid) 
         call nc_write(filename,"qq",            dom%dyn%now%qq,       units="",dim1="xc",dim2="yc",ncid=ncid) 
@@ -161,6 +169,8 @@ contains
 
         call nc_write(filename,"ssa_mask_acx",  dom%dyn%now%ssa_mask_acx, units="",dim1="xc",dim2="yc",ncid=ncid) 
         call nc_write(filename,"ssa_mask_acy",  dom%dyn%now%ssa_mask_acy, units="",dim1="xc",dim2="yc",ncid=ncid) 
+        call nc_write(filename,"ssa_err_acx",   dom%dyn%now%ssa_err_acx,  units="",dim1="xc",dim2="yc",ncid=ncid) 
+        call nc_write(filename,"ssa_err_acy",   dom%dyn%now%ssa_err_acy,  units="",dim1="xc",dim2="yc",ncid=ncid) 
 
         ! == ymat variables === 
 
@@ -194,16 +204,19 @@ contains
         call nc_write(filename,"T_ice",       dom%thrm%now%T_ice,      units="",dim1="xc",dim2="yc",dim3="zeta",ncid=ncid)      
         call nc_write(filename,"omega",       dom%thrm%now%omega,      units="",dim1="xc",dim2="yc",dim3="zeta",ncid=ncid)      
         call nc_write(filename,"T_pmp",       dom%thrm%now%T_pmp,      units="",dim1="xc",dim2="yc",dim3="zeta",ncid=ncid)      
+        
         call nc_write(filename,"f_pmp",       dom%thrm%now%f_pmp,      units="",dim1="xc",dim2="yc",ncid=ncid)        
         call nc_write(filename,"bmb_grnd",    dom%thrm%now%bmb_grnd,   units="",dim1="xc",dim2="yc",ncid=ncid)     
-        call nc_write(filename,"H_w",         dom%thrm%now%H_w,        units="",dim1="xc",dim2="yc",ncid=ncid)
         call nc_write(filename,"Q_strn",      dom%thrm%now%Q_strn,     units="",dim1="xc",dim2="yc",dim3="zeta",ncid=ncid)     
         call nc_write(filename,"Q_b",         dom%thrm%now%Q_b,        units="",dim1="xc",dim2="yc",ncid=ncid)          
         call nc_write(filename,"Q_ice_b",     dom%thrm%now%Q_ice_b,    units="",dim1="xc",dim2="yc",ncid=ncid)          
+        call nc_write(filename,"T_prime_b",   dom%thrm%now%T_prime_b,  units="",dim1="xc",dim2="yc",ncid=ncid)    
+        call nc_write(filename,"H_w",         dom%thrm%now%H_w,        units="",dim1="xc",dim2="yc",ncid=ncid)
+        call nc_write(filename,"dHwdt",       dom%thrm%now%dHwdt,      units="",dim1="xc",dim2="yc",ncid=ncid)
+        
         call nc_write(filename,"cp",          dom%thrm%now%cp,         units="",dim1="xc",dim2="yc",dim3="zeta",ncid=ncid)         
         call nc_write(filename,"kt",          dom%thrm%now%kt,         units="",dim1="xc",dim2="yc",dim3="zeta",ncid=ncid)         
         call nc_write(filename,"H_cts",       dom%thrm%now%H_cts,      units="",dim1="xc",dim2="yc",ncid=ncid)      
-        call nc_write(filename,"T_prime_b",   dom%thrm%now%T_prime_b,  units="",dim1="xc",dim2="yc",ncid=ncid)    
         
         ! == ybound variables ===
 
@@ -223,7 +236,9 @@ contains
         call nc_write(filename,"region_mask", dom%bnd%region_mask, units="",dim1="xc",dim2="yc",ncid=ncid)
 
         call nc_write(filename,"ice_allowed", dom%bnd%ice_allowed, units="",dim1="xc",dim2="yc",ncid=ncid)
-
+        call nc_write(filename,"calv_mask",   dom%bnd%calv_mask,   units="",dim1="xc",dim2="yc",ncid=ncid)
+        call nc_write(filename,"H_ice_ref",   dom%bnd%H_ice_ref,   units="",dim1="xc",dim2="yc",ncid=ncid)
+        call nc_write(filename,"z_bed_ref",   dom%bnd%z_bed_ref,   units="",dim1="xc",dim2="yc",ncid=ncid)
 
         ! == ydata variables ===
 
@@ -284,8 +299,8 @@ contains
         call nc_read(filename,"dHicedt",     dom%tpo%now%dHicedt,ncid=ncid)
         call nc_read(filename,"bmb",         dom%tpo%now%bmb,ncid=ncid)
         call nc_read(filename,"mb_applied",  dom%tpo%now%mb_applied,ncid=ncid)
-        call nc_read(filename,"calv",        dom%tpo%now%calv,ncid=ncid)
         call nc_read(filename,"calv_grnd",   dom%tpo%now%calv_grnd,ncid=ncid)
+        call nc_read(filename,"calv",        dom%tpo%now%calv,ncid=ncid)
         call nc_read(filename,"H_margin",    dom%tpo%now%H_margin,ncid=ncid)
         call nc_read(filename,"dzsdx",       dom%tpo%now%dzsdx,ncid=ncid)  
         call nc_read(filename,"dzsdy",       dom%tpo%now%dzsdy,ncid=ncid)  
@@ -299,6 +314,9 @@ contains
         call nc_read(filename,"dist_margin", dom%tpo%now%dist_margin,ncid=ncid) 
         call nc_read(filename,"dist_grline", dom%tpo%now%dist_grline,ncid=ncid) 
         call nc_read(filename,"mask_bed",    dom%tpo%now%mask_bed,ncid=ncid)
+        call nc_read(filename,"is_float",    dom%tpo%now%is_float,ncid=ncid)
+        call nc_read(filename,"is_grline",   dom%tpo%now%is_grline,ncid=ncid)
+        call nc_read(filename,"is_grz",      dom%tpo%now%is_grz,ncid=ncid)
         
         ! Close the netcdf file
         call nc_close(ncid)
@@ -337,18 +355,18 @@ contains
         
         ! == ydyn variables ===
 
-        call nc_read(filename,"ux",          dom%dyn%now%ux,ncid=ncid) 
-        call nc_read(filename,"uy",          dom%dyn%now%uy,ncid=ncid) 
-        call nc_read(filename,"uxy",         dom%dyn%now%uxy,ncid=ncid) 
-        call nc_read(filename,"uz",          dom%dyn%now%uz,ncid=ncid) 
+        call nc_read(filename,"ux",            dom%dyn%now%ux,ncid=ncid) 
+        call nc_read(filename,"uy",            dom%dyn%now%uy,ncid=ncid) 
+        call nc_read(filename,"uxy",           dom%dyn%now%uxy,ncid=ncid) 
+        call nc_read(filename,"uz",            dom%dyn%now%uz,ncid=ncid) 
       
-        call nc_read(filename,"ux_bar",      dom%dyn%now%ux_bar,ncid=ncid) 
-        call nc_read(filename,"uy_bar",      dom%dyn%now%uy_bar,ncid=ncid) 
-        call nc_read(filename,"uxy_bar",     dom%dyn%now%uxy_bar,ncid=ncid) 
+        call nc_read(filename,"ux_bar",        dom%dyn%now%ux_bar,ncid=ncid) 
+        call nc_read(filename,"uy_bar",        dom%dyn%now%uy_bar,ncid=ncid) 
+        call nc_read(filename,"uxy_bar",       dom%dyn%now%uxy_bar,ncid=ncid) 
 
-        call nc_read(filename,"ux_b",      dom%dyn%now%ux_b,ncid=ncid) 
-        call nc_read(filename,"uy_b",      dom%dyn%now%uy_b,ncid=ncid) 
-        call nc_read(filename,"uxy_b",     dom%dyn%now%uxy_b,ncid=ncid) 
+        call nc_read(filename,"ux_b",          dom%dyn%now%ux_b,ncid=ncid) 
+        call nc_read(filename,"uy_b",          dom%dyn%now%uy_b,ncid=ncid) 
+        call nc_read(filename,"uxy_b",         dom%dyn%now%uxy_b,ncid=ncid) 
 
         call nc_read(filename,"ux_s",          dom%dyn%now%ux_s,ncid=ncid) 
         call nc_read(filename,"uy_s",          dom%dyn%now%uy_s,ncid=ncid) 
@@ -359,6 +377,8 @@ contains
         call nc_read(filename,"ux_i_bar",      dom%dyn%now%ux_i_bar,ncid=ncid) 
         call nc_read(filename,"uy_i_bar",      dom%dyn%now%uy_i_bar,ncid=ncid) 
         call nc_read(filename,"uxy_i_bar",     dom%dyn%now%uxy_i_bar,ncid=ncid) 
+
+        call nc_read(filename,"duxydt",        dom%dyn%now%duxydt,ncid=ncid) 
 
         call nc_read(filename,"dd_ab",         dom%dyn%now%dd_ab,ncid=ncid) 
         call nc_read(filename,"dd_ab_bar",     dom%dyn%now%dd_ab_bar,ncid=ncid) 
@@ -381,6 +401,9 @@ contains
         call nc_read(filename,"taub_acy",      dom%dyn%now%taub_acy,ncid=ncid) 
         call nc_read(filename,"taub",          dom%dyn%now%taub,ncid=ncid) 
 
+        call nc_read(filename,"qq_gl_acx",     dom%dyn%now%qq_gl_acx,ncid=ncid) 
+        call nc_read(filename,"qq_gl_acy",     dom%dyn%now%qq_gl_acy,ncid=ncid) 
+        
         call nc_read(filename,"qq_acx",        dom%dyn%now%qq_acx,ncid=ncid) 
         call nc_read(filename,"qq_acy",        dom%dyn%now%qq_acy,ncid=ncid) 
         call nc_read(filename,"qq",            dom%dyn%now%qq,ncid=ncid) 
@@ -398,6 +421,8 @@ contains
 
         call nc_read(filename,"ssa_mask_acx",  dom%dyn%now%ssa_mask_acx,ncid=ncid) 
         call nc_read(filename,"ssa_mask_acy",  dom%dyn%now%ssa_mask_acy,ncid=ncid) 
+        call nc_read(filename,"ssa_err_acx",   dom%dyn%now%ssa_err_acx,ncid=ncid) 
+        call nc_read(filename,"ssa_err_acy",   dom%dyn%now%ssa_err_acy,ncid=ncid) 
 
         ! == ymat variables ===
 
@@ -431,16 +456,19 @@ contains
         call nc_read(filename,"T_ice",       dom%thrm%now%T_ice,ncid=ncid)    
         call nc_read(filename,"omega",       dom%thrm%now%omega,ncid=ncid) 
         call nc_read(filename,"T_pmp",       dom%thrm%now%T_pmp,ncid=ncid) 
+        
         call nc_read(filename,"f_pmp",       dom%thrm%now%f_pmp,ncid=ncid) 
         call nc_read(filename,"bmb_grnd",    dom%thrm%now%bmb_grnd,ncid=ncid)    
-        call nc_read(filename,"H_w",         dom%thrm%now%H_w,ncid=ncid) 
         call nc_read(filename,"Q_strn",      dom%thrm%now%Q_strn,ncid=ncid)      
         call nc_read(filename,"Q_b",         dom%thrm%now%Q_b,ncid=ncid)         
         call nc_read(filename,"Q_ice_b",     dom%thrm%now%Q_ice_b,ncid=ncid)         
+        call nc_read(filename,"T_prime_b",   dom%thrm%now%T_prime_b,ncid=ncid)  
+        call nc_read(filename,"H_w",         dom%thrm%now%H_w,ncid=ncid) 
+        call nc_read(filename,"dHwdt",       dom%thrm%now%dHwdt,ncid=ncid) 
+        
         call nc_read(filename,"cp",          dom%thrm%now%cp,ncid=ncid) 
         call nc_read(filename,"kt",          dom%thrm%now%kt,ncid=ncid)      
         call nc_read(filename,"H_cts",       dom%thrm%now%H_cts,ncid=ncid)       
-        call nc_read(filename,"T_prime_b",   dom%thrm%now%T_prime_b,ncid=ncid)  
         
         ! == ybound variables ===
 
@@ -460,6 +488,9 @@ contains
         call nc_read(filename,"region_mask", dom%bnd%region_mask,ncid=ncid) 
 
         call nc_read(filename,"ice_allowed", dom%bnd%ice_allowed,ncid=ncid) 
+        call nc_read(filename,"calv_mask",   dom%bnd%calv_mask,ncid=ncid) 
+        call nc_read(filename,"H_ice_ref",   dom%bnd%H_ice_ref,ncid=ncid) 
+        call nc_read(filename,"z_bed_ref",   dom%bnd%z_bed_ref,ncid=ncid) 
         
         ! Close the netcdf file
         call nc_close(ncid)

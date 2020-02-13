@@ -107,9 +107,7 @@ module yelmo_defs
         real(prec), allocatable :: mb_applied(:,:) ! Actual mass balance applied [m/a], for mass balance accounting
         real(prec), allocatable :: calv_grnd(:,:)  ! Grounded calving [m/a]
         real(prec), allocatable :: calv(:,:)       ! Calving [m/a]
-        real(prec), allocatable :: calv_mean(:,:)  ! Calving [m/a]
-        real(prec), allocatable :: calv_times(:)   ! Calving
-
+        
         real(prec), allocatable :: H_margin(:,:)   ! [m] Margin ice thickness in partially filled cells 
 
         real(prec), allocatable :: dzsdx(:,:)      ! Surface elevation slope [m m-1], Ac x nodes

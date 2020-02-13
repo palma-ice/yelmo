@@ -1120,7 +1120,7 @@ end subroutine calc_vxy_ssa_matrix
             end if 
 
             ! Write summary to log
-            write(*,"(a,i4,2i5,3g12.4,a2)") &
+            write(*,"(a,i4,2i8,3g12.4,a2)") &
                 "ssa: ", iter, nx_check, ny_check, resid, ux_resid_max, uy_resid_max, trim(converged_txt)
 
         end if 

@@ -1059,7 +1059,8 @@ end subroutine calc_vxy_ssa_matrix
         ! Local variables 
         real(prec) :: ux_resid_max 
         real(prec) :: uy_resid_max 
-        real(prec) :: res1, res2, resid 
+        real(prec) :: res1, res2, resid
+        integer    :: nx_check, ny_check  
         character(len=1) :: converged_txt 
 
         real(prec), parameter :: ssa_vel_tolerance = 1e-2   ! [m/a] only consider points with velocity above this tolerance limit
@@ -1067,8 +1068,11 @@ end subroutine calc_vxy_ssa_matrix
         ! Calculate residual acoording to the L2 relative error norm
         ! (as Eq. 65 in Gagliardini et al., GMD, 2013)
 
-        if (count(abs(ux) .gt. ssa_vel_tolerance .and. mask_acx) .gt. 0 .or. &
-            count(abs(uy) .gt. ssa_vel_tolerance .and. mask_acy) .gt. 0) then
+        ! Count how many points should be checked for convergence
+        nx_check = count(abs(ux).gt.ssa_vel_tolerance .and. mask_acx)
+        ny_check = count(abs(uy).gt.ssa_vel_tolerance .and. mask_acy)
+
+        if (nx_check .gt. 0 .or. ny_check .gt. 0) then
 
             res1 = sqrt( sum((ux-ux_prev)*(ux-ux_prev),mask=abs(ux).gt.ssa_vel_tolerance .and. mask_acx) &
                        + sum((uy-uy_prev)*(uy-uy_prev),mask=abs(uy).gt.ssa_vel_tolerance .and. mask_acx) )
@@ -1077,12 +1081,12 @@ end subroutine calc_vxy_ssa_matrix
                        + sum((uy+uy_prev)*(uy+uy_prev),mask=abs(uy).gt.ssa_vel_tolerance .and. mask_acy) )
             res2 = max(res2,1e-5)
 
-            resid = 2.0*res1/res2 
+            resid = 2.0_prec*res1/res2 
 
         else 
             ! No points available for comparison, set residual equal to zero 
 
-            resid = 0.0 
+            resid = 0.0_prec 
 
         end if 
 
@@ -1116,8 +1120,8 @@ end subroutine calc_vxy_ssa_matrix
             end if 
 
             ! Write summary to log
-            write(*,"(a,i4,3g12.4,a2)") &
-                "ssa: ", iter, resid, ux_resid_max, uy_resid_max, trim(converged_txt)
+            write(*,"(a,i4,2i5,3g12.4,a2)") &
+                "ssa: ", iter, nx_check, ny_check, resid, ux_resid_max, uy_resid_max, trim(converged_txt)
 
         end if 
         

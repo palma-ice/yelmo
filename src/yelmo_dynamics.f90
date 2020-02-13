@@ -615,9 +615,9 @@ contains
             ! Apply relaxation to keep things stable
             call relax_ssa(dyn%now%ux_bar,dyn%now%uy_bar,ux_bar_prev,uy_bar_prev,rel=dyn%par%ssa_iter_rel)
 
-            ! Check convergence of ssa solution 
-            is_converged = check_vel_convergence(dyn%now%ux_bar,dyn%now%uy_bar,ux_bar_prev,uy_bar_prev, &
-                                        dyn%par%ssa_iter_conv,iter,dyn%par%ssa_iter_max,yelmo_log)
+!             ! Check convergence of ssa solution 
+!             is_converged = check_vel_convergence(dyn%now%ux_bar,dyn%now%uy_bar,ux_bar_prev,uy_bar_prev, &
+!                                         dyn%par%ssa_iter_conv,iter,dyn%par%ssa_iter_max,yelmo_log)
 
             if (write_ssa_diagnostics) then  
                 call write_step_2D_ssa(tpo,dyn,"yelmo_ssa.nc",ux_bar_prev,uy_bar_prev,time=real(iter,prec))    
@@ -719,7 +719,7 @@ contains
         logical :: write_ssa_diagnostics
 
         is_converged          = .FALSE. 
-        write_ssa_diagnostics = .FALSE. 
+        write_ssa_diagnostics = .TRUE. 
 
         nx    = dyn%par%nx 
         ny    = dyn%par%ny
@@ -837,7 +837,7 @@ if (.TRUE.) then
             if (iter .gt. 1) then
                 ! Update ssa mask based on convergence with previous step to reduce calls 
                 call update_ssa_mask_convergence(dyn%now%ssa_mask_acx,dyn%now%ssa_mask_acy, &
-                                                    dyn%now%ssa_err_acx,dyn%now%ssa_err_acy,err_lim=1e-3) 
+                                                dyn%now%ssa_err_acx,dyn%now%ssa_err_acy,err_lim=1e-3) 
             end if 
 end if 
 
@@ -851,11 +851,12 @@ end if
             call relax_ssa(dyn%now%ux_b,dyn%now%uy_b,ux_b_prev,uy_b_prev,rel=dyn%par%ssa_iter_rel)
 
             ! Check for convergence
-            is_converged = check_vel_convergence(dyn%now%ux_b,dyn%now%uy_b,ux_b_prev,uy_b_prev, &
-                                        dyn%par%ssa_iter_conv,iter,dyn%par%ssa_iter_max,yelmo_log)
+            is_converged = check_vel_convergence_l2rel(dyn%now%ux_b,dyn%now%uy_b,ux_b_prev,uy_b_prev, &
+                                            dyn%now%ssa_mask_acx.gt.0.0_prec,dyn%now%ssa_mask_acy.gt.0.0_prec, &
+                                            dyn%par%ssa_iter_conv,iter,dyn%par%ssa_iter_max,yelmo_log)
 
             ! Calculate an L1 error metric over matrix for diagnostics
-            call check_vel_convergence_matrix(dyn%now%ssa_err_acx,dyn%now%ssa_err_acy,dyn%now%ux_b,dyn%now%uy_b, &
+            call check_vel_convergence_l1rel_matrix(dyn%now%ssa_err_acx,dyn%now%ssa_err_acy,dyn%now%ux_b,dyn%now%uy_b, &
                                                                                             ux_b_prev,uy_b_prev)
 
             

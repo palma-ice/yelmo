@@ -9,8 +9,8 @@ module solver_ssa_sico5
     public :: calc_vxy_ssa_matrix 
     public :: set_ssa_masks
     public :: update_ssa_mask_convergence
-    public :: check_vel_convergence_matrix
-    public :: check_vel_convergence
+    public :: check_vel_convergence_l1rel_matrix
+    public :: check_vel_convergence_l2rel
     public :: relax_ssa
     
 contains 
@@ -1006,7 +1006,7 @@ end subroutine calc_vxy_ssa_matrix
 
     end subroutine update_ssa_mask_convergence
 
-    subroutine check_vel_convergence_matrix(err_x,err_y,ux,uy,ux_prev,uy_prev)
+    subroutine check_vel_convergence_l1rel_matrix(err_x,err_y,ux,uy,ux_prev,uy_prev)
 
         implicit none 
 
@@ -1038,9 +1038,9 @@ end subroutine calc_vxy_ssa_matrix
 
         return 
 
-    end subroutine check_vel_convergence_matrix
+    end subroutine check_vel_convergence_l1rel_matrix
 
-    function check_vel_convergence(ux,uy,ux_prev,uy_prev,ssa_resid_tol,iter,iter_max,log) result(is_converged)
+    function check_vel_convergence_l2rel(ux,uy,ux_prev,uy_prev,mask_acx,mask_acy,ssa_resid_tol,iter,iter_max,log) result(is_converged)
 
         implicit none 
 
@@ -1048,6 +1048,8 @@ end subroutine calc_vxy_ssa_matrix
         real(prec), intent(IN) :: uy(:,:) 
         real(prec), intent(IN) :: ux_prev(:,:) 
         real(prec), intent(IN) :: uy_prev(:,:)  
+        logical,    intent(IN) :: mask_acx(:,:) 
+        logical,    intent(IN) :: mask_acy(:,:) 
         real(prec), intent(IN) :: ssa_resid_tol 
         integer,    intent(IN) :: iter 
         integer,    intent(IN) :: iter_max 
@@ -1065,14 +1067,14 @@ end subroutine calc_vxy_ssa_matrix
         ! Calculate residual acoording to the L2 relative error norm
         ! (as Eq. 65 in Gagliardini et al., GMD, 2013)
 
-        if (count(abs(ux) .gt. ssa_vel_tolerance) .gt. 0 .or. &
-            count(abs(uy) .gt. ssa_vel_tolerance) .gt. 0) then
+        if (count(abs(ux) .gt. ssa_vel_tolerance .and. mask_acx) .gt. 0 .or. &
+            count(abs(uy) .gt. ssa_vel_tolerance .and. mask_acy) .gt. 0) then
 
-            res1 = sqrt( sum((ux-ux_prev)*(ux-ux_prev),mask=abs(ux).gt.ssa_vel_tolerance) &
-                       + sum((uy-uy_prev)*(uy-uy_prev),mask=abs(uy).gt.ssa_vel_tolerance) )
+            res1 = sqrt( sum((ux-ux_prev)*(ux-ux_prev),mask=abs(ux).gt.ssa_vel_tolerance .and. mask_acx) &
+                       + sum((uy-uy_prev)*(uy-uy_prev),mask=abs(uy).gt.ssa_vel_tolerance .and. mask_acx) )
 
-            res2 = sqrt( sum((ux+ux_prev)*(ux+ux_prev),mask=abs(ux).gt.ssa_vel_tolerance) &
-                       + sum((uy+uy_prev)*(uy+uy_prev),mask=abs(uy).gt.ssa_vel_tolerance) )
+            res2 = sqrt( sum((ux+ux_prev)*(ux+ux_prev),mask=abs(ux).gt.ssa_vel_tolerance .and. mask_acy) &
+                       + sum((uy+uy_prev)*(uy+uy_prev),mask=abs(uy).gt.ssa_vel_tolerance .and. mask_acy) )
             res2 = max(res2,1e-5)
 
             resid = 2.0*res1/res2 
@@ -1102,13 +1104,13 @@ end subroutine calc_vxy_ssa_matrix
 
             ! Also calculate maximum error magnitude for perspective
             if (count(abs(ux) .gt. ssa_vel_tolerance) .gt. 0) then 
-                ux_resid_max = maxval(abs(ux-ux_prev),mask=abs(ux).gt.ssa_vel_tolerance)
+                ux_resid_max = maxval(abs(ux-ux_prev),mask=abs(ux).gt.ssa_vel_tolerance .and. mask_acx)
             else 
                 ux_resid_max = 0.0 
             end if 
 
             if (count(abs(uy) .gt. ssa_vel_tolerance) .gt. 0) then 
-                uy_resid_max = maxval(abs(uy - uy_prev),mask=abs(uy).gt.ssa_vel_tolerance)
+                uy_resid_max = maxval(abs(uy - uy_prev),mask=abs(uy).gt.ssa_vel_tolerance .and. mask_acy)
             else 
                 uy_resid_max = 0.0 
             end if 
@@ -1121,7 +1123,7 @@ end subroutine calc_vxy_ssa_matrix
         
         return 
 
-    end function check_vel_convergence
+    end function check_vel_convergence_l2rel
 
     elemental subroutine relax_ssa(ux,uy,ux_prev,uy_prev,rel)
         ! Relax velocity solution with previous iteration 

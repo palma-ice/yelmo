@@ -719,7 +719,7 @@ contains
         logical :: write_ssa_diagnostics
 
         is_converged          = .FALSE. 
-        write_ssa_diagnostics = .TRUE. 
+        write_ssa_diagnostics = .FALSE. 
 
         nx    = dyn%par%nx 
         ny    = dyn%par%ny

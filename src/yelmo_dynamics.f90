@@ -24,7 +24,6 @@ module yelmo_dynamics
     public :: ydyn_par_load, ydyn_alloc, ydyn_dealloc
     public :: calc_ydyn
     public :: calc_ydyn_neff, calc_ydyn_cfref, calc_ydyn_beta
-    public :: check_vel_convergence
     
 contains
 
@@ -693,176 +692,6 @@ contains
 
     end subroutine calc_ydyn_pd12
 
-    subroutine update_ssa_mask_convergence(ssa_mask_acx,ssa_mask_acy,err_x,err_y,err_lim)
-
-        implicit none 
-
-        integer, intent(INOUT) :: ssa_mask_acx(:,:) 
-        integer, intent(INOUT) :: ssa_mask_acy(:,:) 
-        real(prec), intent(IN) :: err_x(:,:) 
-        real(prec), intent(IN) :: err_y(:,:) 
-        real(prec), intent(IN) :: err_lim 
-
-        ! Local variables 
-        integer :: i, j, nx, ny 
-
-        nx = size(ssa_mask_acx,1)
-        ny = size(ssa_mask_acx,2) 
-
-        where (ssa_mask_acx .gt. 0 .and. err_x .lt. err_lim)
-            ssa_mask_acx = -1 
-        end where 
-
-        where (ssa_mask_acy .gt. 0 .and. err_y .lt. err_lim)
-            ssa_mask_acy = -1 
-        end where 
-        
-        return 
-
-    end subroutine update_ssa_mask_convergence
-
-    subroutine check_vel_convergence_matrix(err_x,err_y,ux,uy,ux_prev,uy_prev)
-
-        implicit none 
-
-        real(prec), intent(OUT) :: err_x(:,:)
-        real(prec), intent(OUT) :: err_y(:,:)
-        real(prec), intent(IN)  :: ux(:,:) 
-        real(prec), intent(IN)  :: uy(:,:) 
-        real(prec), intent(IN)  :: ux_prev(:,:) 
-        real(prec), intent(IN)  :: uy_prev(:,:)  
-
-        ! Local variables
-
-        real(prec), parameter :: ssa_vel_tolerance = 1e-2   ! [m/a] only consider points with velocity above this tolerance limit
-        real(prec), parameter :: tol = 1e-5 
-
-        ! Error in x-direction
-        where (abs(ux) .gt. ssa_vel_tolerance) 
-            err_x = 2.0_prec * abs(ux - ux_prev) / abs(ux + ux_prev + tol)
-        elsewhere 
-            err_x = 0.0_prec
-        end where 
-
-        ! Error in y-direction 
-        where (abs(uy) .gt. ssa_vel_tolerance) 
-            err_y = 2.0_prec * abs(uy - uy_prev) / abs(uy + uy_prev + tol)
-        elsewhere 
-            err_y = 0.0_prec
-        end where 
-
-        return 
-
-    end subroutine check_vel_convergence_matrix
-
-    function check_vel_convergence(ux,uy,ux_prev,uy_prev,ssa_resid_tol,iter,iter_max,log) result(is_converged)
-
-        implicit none 
-
-        real(prec), intent(IN) :: ux(:,:) 
-        real(prec), intent(IN) :: uy(:,:) 
-        real(prec), intent(IN) :: ux_prev(:,:) 
-        real(prec), intent(IN) :: uy_prev(:,:)  
-        real(prec), intent(IN) :: ssa_resid_tol 
-        integer,    intent(IN) :: iter 
-        integer,    intent(IN) :: iter_max 
-        logical,    intent(IN) :: log 
-        logical :: is_converged
-
-        ! Local variables 
-        real(prec) :: ux_resid_max 
-        real(prec) :: uy_resid_max 
-        real(prec) :: res1, res2, resid 
-        character(len=1) :: converged_txt 
-
-        real(prec), parameter :: ssa_vel_tolerance = 1e-2   ! [m/a] only consider points with velocity above this tolerance limit
-        
-        ! Calculate residual acoording to the L2 relative error norm
-        ! (as Eq. 65 in Gagliardini et al., GMD, 2013)
-
-        if (count(abs(ux) .gt. ssa_vel_tolerance) .gt. 0 .or. &
-            count(abs(uy) .gt. ssa_vel_tolerance) .gt. 0) then
-
-            res1 = sqrt( sum((ux-ux_prev)*(ux-ux_prev),mask=abs(ux).gt.ssa_vel_tolerance) &
-                       + sum((uy-uy_prev)*(uy-uy_prev),mask=abs(uy).gt.ssa_vel_tolerance) )
-
-            res2 = sqrt( sum((ux+ux_prev)*(ux+ux_prev),mask=abs(ux).gt.ssa_vel_tolerance) &
-                       + sum((uy+uy_prev)*(uy+uy_prev),mask=abs(uy).gt.ssa_vel_tolerance) )
-            res2 = max(res2,1e-5)
-
-            resid = 2.0*res1/res2 
-
-        else 
-            ! No points available for comparison, set residual equal to zero 
-
-            resid = 0.0 
-
-        end if 
-
-        ! Check for convergence
-!         if (max(ux_resid_max,uy_resid_max) .le. ssa_resid_tol) then
-        if (resid .le. ssa_resid_tol) then 
-            is_converged = .TRUE. 
-            converged_txt = "C"
-        else if (iter .eq. iter_max) then 
-            is_converged = .TRUE. 
-            converged_txt = "X" 
-        else 
-            is_converged = .FALSE. 
-            converged_txt = ""
-        end if 
-
-        if (log .and. is_converged) then
-            ! Write summary to log if desired 
-
-            ! Also calculate maximum error magnitude for perspective
-            if (count(abs(ux) .gt. ssa_vel_tolerance) .gt. 0) then 
-                ux_resid_max = maxval(abs(ux-ux_prev),mask=abs(ux).gt.ssa_vel_tolerance)
-            else 
-                ux_resid_max = 0.0 
-            end if 
-
-            if (count(abs(uy) .gt. ssa_vel_tolerance) .gt. 0) then 
-                uy_resid_max = maxval(abs(uy - uy_prev),mask=abs(uy).gt.ssa_vel_tolerance)
-            else 
-                uy_resid_max = 0.0 
-            end if 
-
-            ! Write summary to log
-            write(*,"(a,i4,3g12.4,a2)") &
-                "ssa: ", iter, resid, ux_resid_max, uy_resid_max, trim(converged_txt)
-
-        end if 
-        
-        return 
-
-    end function check_vel_convergence
-
-    elemental subroutine relax_ssa(ux,uy,ux_prev,uy_prev,rel)
-        ! Relax velocity solution with previous iteration 
-
-        implicit none 
-
-        real(prec), intent(INOUT) :: ux
-        real(prec), intent(INOUT) :: uy
-        real(prec), intent(IN)    :: ux_prev
-        real(prec), intent(IN)    :: uy_prev
-        real(prec), intent(IN)    :: rel
-
-        !real(prec), parameter :: du_max = 100.0 
-
-        ! Apply relaxation 
-        ux = rel*ux + (1.0-rel)*ux_prev 
-        uy = rel*uy + (1.0-rel)*uy_prev
-
-        ! Additionally avoid really abrupt changes 
-        !if (abs(ux-ux_prev) .gt. du_max) ux = ux_prev + sign(du_max,ux-ux_prev)
-        !if (abs(uy-uy_prev) .gt. du_max) uy = uy_prev + sign(du_max,uy-uy_prev)
-        
-        return 
-
-    end subroutine relax_ssa
-
     subroutine calc_ydyn_ssa(dyn,tpo,thrm,mat,bnd)
         ! Calculate the ssa solution via a linearized Picard iteration
         ! over beta, visc and velocity
@@ -1004,7 +833,7 @@ end if
 
             !   3. Calculate SSA solution
 
-if (.FALSE.) then 
+if (.TRUE.) then 
             if (iter .gt. 1) then
                 ! Update ssa mask based on convergence with previous step to reduce calls 
                 call update_ssa_mask_convergence(dyn%now%ssa_mask_acx,dyn%now%ssa_mask_acy, &

@@ -8,7 +8,7 @@ module velocity_hybrid_pd12
     implicit none 
 
     private 
-    public :: set_ssa_masks 
+    
     public :: calc_vel_basal
     public :: calc_uz_3D
     public :: calc_vertical_integrated_3D_ice
@@ -24,128 +24,6 @@ module velocity_hybrid_pd12
 
 contains 
 
-    subroutine set_ssa_masks(ssa_mask_acx,ssa_mask_acy,beta_acx,beta_acy,H_ice,f_grnd_acx,f_grnd_acy,beta_max,use_ssa)
-        ! Define where ssa calculations should be performed
-        ! Note: could be binary, but perhaps also distinguish 
-        ! grounding line/zone to use this mask for later gl flux corrections
-        ! mask = 0: no ssa calculated
-        ! mask = 1: shelfy-stream ssa calculated 
-        ! mask = 2: shelf ssa calculated 
-
-        implicit none 
-        
-        integer,    intent(OUT) :: ssa_mask_acx(:,:) 
-        integer,    intent(OUT) :: ssa_mask_acy(:,:)
-        real(prec), intent(IN)  :: beta_acx(:,:)
-        real(prec), intent(IN)  :: beta_acy(:,:)
-        real(prec), intent(IN)  :: H_ice(:,:)
-        real(prec), intent(IN)  :: f_grnd_acx(:,:)
-        real(prec), intent(IN)  :: f_grnd_acy(:,:)
-        real(prec), intent(IN)  :: beta_max
-        logical,    intent(IN)  :: use_ssa       ! SSA is actually active now? 
-
-        ! Local variables
-        integer    :: i, j, nx, ny
-        real(prec) :: H_acx, H_acy
-        
-        nx = size(H_ice,1)
-        ny = size(H_ice,2)
-        
-        ! Initially no active ssa points
-        ssa_mask_acx = 0
-        ssa_mask_acy = 0
-        
-        if (use_ssa) then 
-
-            ! x-direction
-            do j = 1, ny
-            do i = 1, nx-1
-
-                if (H_ice(i,j) .gt. 0.0 .or. H_ice(i+1,j) .gt. 0.0) then 
-                    ! Ice is present on ac-node
-                    
-                    if (f_grnd_acx(i,j) .gt. 0.0) then 
-                        ! Grounded ice or grounding line (ie, shelfy-stream)
-                        ssa_mask_acx(i,j) = 1
-                    else 
-                        ! Shelf ice 
-                        ssa_mask_acx(i,j) = 2
-                    end if 
-
-                    ! Deactivate if dragging is to high and away from grounding line
-                    if ( beta_acx(i,j) .ge. beta_max .and. f_grnd_acx(i,j) .eq. 1.0 ) ssa_mask_acx(i,j) = 0 
-                    
-                end if
-
-            end do 
-            end do
-
-            ! y-direction
-            do j = 1, ny-1
-            do i = 1, nx
-
-                if (H_ice(i,j) .gt. 0.0 .or. H_ice(i,j+1) .gt. 0.0) then 
-                    ! Ice is present on ac-node
-                    
-                    if (f_grnd_acy(i,j) .gt. 0.0) then 
-                        ! Grounded ice or grounding line (ie, shelfy-stream)
-                        ssa_mask_acy(i,j) = 1
-                    else 
-                        ! Shelf ice 
-                        ssa_mask_acy(i,j) = 2
-                    end if 
-
-                    ! Deactivate if dragging is to high and away from grounding line
-                    if ( beta_acy(i,j) .ge. beta_max .and. f_grnd_acy(i,j) .eq. 1.0 ) ssa_mask_acy(i,j) = 0 
-                    
-                end if
-                 
-            end do 
-            end do
-
-            ! Final check on both masks to avoid isolated non-ssa points
-            do j = 2, ny-1
-            do i = 2, nx-1
-
-                ! acx-nodes 
-                if (  ssa_mask_acx(i,j) .eq. 0 .and. &
-                    ssa_mask_acx(i+1,j) .gt. 0 .and. ssa_mask_acx(i-1,j) .gt. 0 .and.  &
-                    ssa_mask_acx(i,j+1) .gt. 0 .and. ssa_mask_acx(i,j-1) .gt. 0 ) then 
-
-                    if (f_grnd_acx(i,j) .gt. 0.0) then 
-                        ! Grounded ice or grounding line (ie, shelfy-stream)
-                        ssa_mask_acx(i,j) = 1
-                    else 
-                        ! Shelf ice 
-                        ssa_mask_acx(i,j) = 2
-                    end if 
-
-                end if 
-
-                ! acy-nodes 
-                if (  ssa_mask_acy(i,j) .eq. 0 .and. &
-                    ssa_mask_acy(i+1,j) .gt. 0 .and. ssa_mask_acy(i-1,j) .gt. 0 .and.  &
-                    ssa_mask_acy(i,j+1) .gt. 0 .and. ssa_mask_acy(i,j-1) .gt. 0 ) then 
-
-                    if (f_grnd_acy(i,j) .gt. 0.0) then 
-                        ! Shelfy stream 
-                        ssa_mask_acy(i,j) = 1
-                    else 
-                        ! Shelf 
-                        ssa_mask_acy(i,j) = 2
-                    end if 
-
-                end if 
-
-            end do 
-            end do
-
-        end if 
-
-        return
-        
-    end subroutine set_ssa_masks 
-    
     subroutine calc_vel_basal(ux_b,uy_b,ux_bar,uy_bar,ux_i,uy_i)
         ! Calculate basal sliding from the difference of
         ! vertical mean velocity and vertical mean internal shear velocity

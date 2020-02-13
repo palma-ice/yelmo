@@ -7,7 +7,12 @@ module solver_ssa_sico5
 
     private 
     public :: calc_vxy_ssa_matrix 
-
+    public :: set_ssa_masks
+    public :: update_ssa_mask_convergence
+    public :: check_vel_convergence_matrix
+    public :: check_vel_convergence
+    public :: relax_ssa
+    
 contains 
 
     subroutine calc_vxy_ssa_matrix(vx_m,vy_m,beta_acx,beta_acy,visc_eff, &
@@ -825,6 +830,327 @@ call limit_vel(vy_m,ulim)
 return 
 
 end subroutine calc_vxy_ssa_matrix
+
+
+    subroutine set_ssa_masks(ssa_mask_acx,ssa_mask_acy,beta_acx,beta_acy,H_ice,f_grnd_acx,f_grnd_acy,beta_max,use_ssa)
+        ! Define where ssa calculations should be performed
+        ! Note: could be binary, but perhaps also distinguish 
+        ! grounding line/zone to use this mask for later gl flux corrections
+        ! mask = 0: no ssa calculated
+        ! mask = 1: shelfy-stream ssa calculated 
+        ! mask = 2: shelf ssa calculated 
+
+        implicit none 
+        
+        integer,    intent(OUT) :: ssa_mask_acx(:,:) 
+        integer,    intent(OUT) :: ssa_mask_acy(:,:)
+        real(prec), intent(IN)  :: beta_acx(:,:)
+        real(prec), intent(IN)  :: beta_acy(:,:)
+        real(prec), intent(IN)  :: H_ice(:,:)
+        real(prec), intent(IN)  :: f_grnd_acx(:,:)
+        real(prec), intent(IN)  :: f_grnd_acy(:,:)
+        real(prec), intent(IN)  :: beta_max
+        logical,    intent(IN)  :: use_ssa       ! SSA is actually active now? 
+
+        ! Local variables
+        integer    :: i, j, nx, ny
+        real(prec) :: H_acx, H_acy
+        
+        nx = size(H_ice,1)
+        ny = size(H_ice,2)
+        
+        ! Initially no active ssa points
+        ssa_mask_acx = 0
+        ssa_mask_acy = 0
+        
+        if (use_ssa) then 
+
+            ! x-direction
+            do j = 1, ny
+            do i = 1, nx-1
+
+                if (H_ice(i,j) .gt. 0.0 .or. H_ice(i+1,j) .gt. 0.0) then 
+                    ! Ice is present on ac-node
+                    
+                    if (f_grnd_acx(i,j) .gt. 0.0) then 
+                        ! Grounded ice or grounding line (ie, shelfy-stream)
+                        ssa_mask_acx(i,j) = 1
+                    else 
+                        ! Shelf ice 
+                        ssa_mask_acx(i,j) = 2
+                    end if 
+
+                    ! Deactivate if dragging is to high and away from grounding line
+                    if ( beta_acx(i,j) .ge. beta_max .and. f_grnd_acx(i,j) .eq. 1.0 ) ssa_mask_acx(i,j) = 0 
+                    
+                end if
+
+            end do 
+            end do
+
+            ! y-direction
+            do j = 1, ny-1
+            do i = 1, nx
+
+                if (H_ice(i,j) .gt. 0.0 .or. H_ice(i,j+1) .gt. 0.0) then 
+                    ! Ice is present on ac-node
+                    
+                    if (f_grnd_acy(i,j) .gt. 0.0) then 
+                        ! Grounded ice or grounding line (ie, shelfy-stream)
+                        ssa_mask_acy(i,j) = 1
+                    else 
+                        ! Shelf ice 
+                        ssa_mask_acy(i,j) = 2
+                    end if 
+
+                    ! Deactivate if dragging is to high and away from grounding line
+                    if ( beta_acy(i,j) .ge. beta_max .and. f_grnd_acy(i,j) .eq. 1.0 ) ssa_mask_acy(i,j) = 0 
+                    
+                end if
+                 
+            end do 
+            end do
+
+            ! Final check on both masks to avoid isolated non-ssa points
+            do j = 2, ny-1
+            do i = 2, nx-1
+
+                ! acx-nodes 
+                if (  ssa_mask_acx(i,j) .eq. 0 .and. &
+                    ssa_mask_acx(i+1,j) .gt. 0 .and. ssa_mask_acx(i-1,j) .gt. 0 .and.  &
+                    ssa_mask_acx(i,j+1) .gt. 0 .and. ssa_mask_acx(i,j-1) .gt. 0 ) then 
+
+                    if (f_grnd_acx(i,j) .gt. 0.0) then 
+                        ! Grounded ice or grounding line (ie, shelfy-stream)
+                        ssa_mask_acx(i,j) = 1
+                    else 
+                        ! Shelf ice 
+                        ssa_mask_acx(i,j) = 2
+                    end if 
+
+                end if 
+
+                ! acy-nodes 
+                if (  ssa_mask_acy(i,j) .eq. 0 .and. &
+                    ssa_mask_acy(i+1,j) .gt. 0 .and. ssa_mask_acy(i-1,j) .gt. 0 .and.  &
+                    ssa_mask_acy(i,j+1) .gt. 0 .and. ssa_mask_acy(i,j-1) .gt. 0 ) then 
+
+                    if (f_grnd_acy(i,j) .gt. 0.0) then 
+                        ! Shelfy stream 
+                        ssa_mask_acy(i,j) = 1
+                    else 
+                        ! Shelf 
+                        ssa_mask_acy(i,j) = 2
+                    end if 
+
+                end if 
+
+            end do 
+            end do
+
+        end if 
+
+        return
+        
+    end subroutine set_ssa_masks 
+    
+    subroutine update_ssa_mask_convergence(ssa_mask_acx,ssa_mask_acy,err_x,err_y,err_lim)
+        ! Update grounded ice ssa_masks, by prescribing vel at points that have
+        ! already converged well.
+
+        implicit none 
+
+        integer, intent(INOUT) :: ssa_mask_acx(:,:) 
+        integer, intent(INOUT) :: ssa_mask_acy(:,:) 
+        real(prec), intent(IN) :: err_x(:,:) 
+        real(prec), intent(IN) :: err_y(:,:) 
+        real(prec), intent(IN) :: err_lim 
+
+        ! Local variables 
+        integer :: i, j, nx, ny 
+
+        nx = size(ssa_mask_acx,1)
+        ny = size(ssa_mask_acx,2) 
+
+        ! Initially set candidate 'converged' points to -2
+        where (ssa_mask_acx .eq. 1 .and. err_x .lt. err_lim)
+            ssa_mask_acx = -2 
+        end where 
+
+        where (ssa_mask_acy .eq. 1 .and. err_y .lt. err_lim)
+            ssa_mask_acy = -2 
+        end where 
+        
+        ! Fill in neighbors of points that are still ssa (mask=1) to keep things clean 
+        do j = 2, ny-1 
+        do i = 2, nx-1 
+            
+            ! acx
+            if (ssa_mask_acx(i,j) .eq. 1) then
+                where (ssa_mask_acx(i-1:i+1,j-1:j+1) .eq. -2) ssa_mask_acx(i-1:i+1,j-1:j+1) = 1
+            end if 
+
+            ! acy 
+            if (ssa_mask_acy(i,j) .eq. 1) then
+                where (ssa_mask_acy(i-1:i+1,j-1:j+1) .eq. -2) ssa_mask_acy(i-1:i+1,j-1:j+1) = 1
+            end if 
+            
+        end do 
+        end do 
+
+        ! Finally, replace temporary -2 values with -1 to prescribe ssa vel here 
+        where (ssa_mask_acx .eq. -2) ssa_mask_acx = -1 
+        where (ssa_mask_acy .eq. -2) ssa_mask_acy = -1 
+        
+        return 
+
+    end subroutine update_ssa_mask_convergence
+
+    subroutine check_vel_convergence_matrix(err_x,err_y,ux,uy,ux_prev,uy_prev)
+
+        implicit none 
+
+        real(prec), intent(OUT) :: err_x(:,:)
+        real(prec), intent(OUT) :: err_y(:,:)
+        real(prec), intent(IN)  :: ux(:,:) 
+        real(prec), intent(IN)  :: uy(:,:) 
+        real(prec), intent(IN)  :: ux_prev(:,:) 
+        real(prec), intent(IN)  :: uy_prev(:,:)  
+
+        ! Local variables
+
+        real(prec), parameter :: ssa_vel_tolerance = 1e-2   ! [m/a] only consider points with velocity above this tolerance limit
+        real(prec), parameter :: tol = 1e-5 
+
+        ! Error in x-direction
+        where (abs(ux) .gt. ssa_vel_tolerance) 
+            err_x = 2.0_prec * abs(ux - ux_prev) / abs(ux + ux_prev + tol)
+        elsewhere 
+            err_x = 0.0_prec
+        end where 
+
+        ! Error in y-direction 
+        where (abs(uy) .gt. ssa_vel_tolerance) 
+            err_y = 2.0_prec * abs(uy - uy_prev) / abs(uy + uy_prev + tol)
+        elsewhere 
+            err_y = 0.0_prec
+        end where 
+
+        return 
+
+    end subroutine check_vel_convergence_matrix
+
+    function check_vel_convergence(ux,uy,ux_prev,uy_prev,ssa_resid_tol,iter,iter_max,log) result(is_converged)
+
+        implicit none 
+
+        real(prec), intent(IN) :: ux(:,:) 
+        real(prec), intent(IN) :: uy(:,:) 
+        real(prec), intent(IN) :: ux_prev(:,:) 
+        real(prec), intent(IN) :: uy_prev(:,:)  
+        real(prec), intent(IN) :: ssa_resid_tol 
+        integer,    intent(IN) :: iter 
+        integer,    intent(IN) :: iter_max 
+        logical,    intent(IN) :: log 
+        logical :: is_converged
+
+        ! Local variables 
+        real(prec) :: ux_resid_max 
+        real(prec) :: uy_resid_max 
+        real(prec) :: res1, res2, resid 
+        character(len=1) :: converged_txt 
+
+        real(prec), parameter :: ssa_vel_tolerance = 1e-2   ! [m/a] only consider points with velocity above this tolerance limit
+        
+        ! Calculate residual acoording to the L2 relative error norm
+        ! (as Eq. 65 in Gagliardini et al., GMD, 2013)
+
+        if (count(abs(ux) .gt. ssa_vel_tolerance) .gt. 0 .or. &
+            count(abs(uy) .gt. ssa_vel_tolerance) .gt. 0) then
+
+            res1 = sqrt( sum((ux-ux_prev)*(ux-ux_prev),mask=abs(ux).gt.ssa_vel_tolerance) &
+                       + sum((uy-uy_prev)*(uy-uy_prev),mask=abs(uy).gt.ssa_vel_tolerance) )
+
+            res2 = sqrt( sum((ux+ux_prev)*(ux+ux_prev),mask=abs(ux).gt.ssa_vel_tolerance) &
+                       + sum((uy+uy_prev)*(uy+uy_prev),mask=abs(uy).gt.ssa_vel_tolerance) )
+            res2 = max(res2,1e-5)
+
+            resid = 2.0*res1/res2 
+
+        else 
+            ! No points available for comparison, set residual equal to zero 
+
+            resid = 0.0 
+
+        end if 
+
+        ! Check for convergence
+!         if (max(ux_resid_max,uy_resid_max) .le. ssa_resid_tol) then
+        if (resid .le. ssa_resid_tol) then 
+            is_converged = .TRUE. 
+            converged_txt = "C"
+        else if (iter .eq. iter_max) then 
+            is_converged = .TRUE. 
+            converged_txt = "X" 
+        else 
+            is_converged = .FALSE. 
+            converged_txt = ""
+        end if 
+
+        if (log .and. is_converged) then
+            ! Write summary to log if desired 
+
+            ! Also calculate maximum error magnitude for perspective
+            if (count(abs(ux) .gt. ssa_vel_tolerance) .gt. 0) then 
+                ux_resid_max = maxval(abs(ux-ux_prev),mask=abs(ux).gt.ssa_vel_tolerance)
+            else 
+                ux_resid_max = 0.0 
+            end if 
+
+            if (count(abs(uy) .gt. ssa_vel_tolerance) .gt. 0) then 
+                uy_resid_max = maxval(abs(uy - uy_prev),mask=abs(uy).gt.ssa_vel_tolerance)
+            else 
+                uy_resid_max = 0.0 
+            end if 
+
+            ! Write summary to log
+            write(*,"(a,i4,3g12.4,a2)") &
+                "ssa: ", iter, resid, ux_resid_max, uy_resid_max, trim(converged_txt)
+
+        end if 
+        
+        return 
+
+    end function check_vel_convergence
+
+    elemental subroutine relax_ssa(ux,uy,ux_prev,uy_prev,rel)
+        ! Relax velocity solution with previous iteration 
+
+        implicit none 
+
+        real(prec), intent(INOUT) :: ux
+        real(prec), intent(INOUT) :: uy
+        real(prec), intent(IN)    :: ux_prev
+        real(prec), intent(IN)    :: uy_prev
+        real(prec), intent(IN)    :: rel
+
+        !real(prec), parameter :: du_max = 100.0 
+
+        ! Apply relaxation 
+        ux = rel*ux + (1.0-rel)*ux_prev 
+        uy = rel*uy + (1.0-rel)*uy_prev
+
+        ! Additionally avoid really abrupt changes 
+        !if (abs(ux-ux_prev) .gt. du_max) ux = ux_prev + sign(du_max,ux-ux_prev)
+        !if (abs(uy-uy_prev) .gt. du_max) uy = uy_prev + sign(du_max,uy-uy_prev)
+        
+        return 
+
+    end subroutine relax_ssa
+
+
+
+! === INTERNAL ROUTINES ==== 
 
     subroutine stagger_visc_aa_ab(visc_ab,visc,H_ice)
 

@@ -743,7 +743,7 @@ contains
 !             end if 
         
         if (write_ssa_diagnostics) then 
-            call yelmo_write_init_ssa("yelmo_ssa.nc",nx,ny,time_init=1.0)
+            call yelmo_write_init_ssa("yelmo_ssa.nc",nx,ny,time_init=1.0_prec)
         end if 
 
         ! Store original ssa mask 
@@ -837,7 +837,7 @@ if (.TRUE.) then
             if (iter .gt. 1) then
                 ! Update ssa mask based on convergence with previous step to reduce calls 
                 call update_ssa_mask_convergence(dyn%now%ssa_mask_acx,dyn%now%ssa_mask_acy, &
-                                                dyn%now%ssa_err_acx,dyn%now%ssa_err_acy,err_lim=1e-3) 
+                                                dyn%now%ssa_err_acx,dyn%now%ssa_err_acy,err_lim=real(1e-3,prec)) 
             end if 
 end if 
 

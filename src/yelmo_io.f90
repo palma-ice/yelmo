@@ -97,7 +97,6 @@ contains
         call nc_write(filename,"dist_margin", dom%tpo%now%dist_margin, units=" ",  dim1="xc",dim2="yc",ncid=ncid)
         call nc_write(filename,"dist_grline", dom%tpo%now%dist_grline, units=" ",  dim1="xc",dim2="yc",ncid=ncid)
         call nc_write(filename,"mask_bed",    dom%tpo%now%mask_bed,    units="1",  dim1="xc",dim2="yc",ncid=ncid)  
-        call nc_write(filename,"is_float",    dom%tpo%now%is_float,    units="1",  dim1="xc",dim2="yc",ncid=ncid)  
         call nc_write(filename,"is_grline",   dom%tpo%now%is_grline,   units="1",  dim1="xc",dim2="yc",ncid=ncid)  
         call nc_write(filename,"is_grz",      dom%tpo%now%is_grz,      units="1",  dim1="xc",dim2="yc",ncid=ncid)  
 
@@ -314,7 +313,6 @@ contains
         call nc_read(filename,"dist_margin", dom%tpo%now%dist_margin,ncid=ncid) 
         call nc_read(filename,"dist_grline", dom%tpo%now%dist_grline,ncid=ncid) 
         call nc_read(filename,"mask_bed",    dom%tpo%now%mask_bed,ncid=ncid)
-        call nc_read(filename,"is_float",    dom%tpo%now%is_float,ncid=ncid)
         call nc_read(filename,"is_grline",   dom%tpo%now%is_grline,ncid=ncid)
         call nc_read(filename,"is_grz",      dom%tpo%now%is_grz,ncid=ncid)
         

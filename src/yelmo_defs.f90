@@ -128,7 +128,6 @@ module yelmo_defs
         
         ! Additional masks 
         integer,    allocatable :: mask_bed(:,:)    ! Multi-valued bed mask
-        logical,    allocatable :: is_float(:,:)    ! Fully floating grid points
         logical,    allocatable :: is_grline(:,:)   ! Grounding line points
         logical,    allocatable :: is_grz(:,:)      ! Grounding line plus grounded neighbors
         

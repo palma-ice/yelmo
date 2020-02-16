@@ -1,7 +1,7 @@
 &eismint
 
     domain       = "EISMINT"             ! "EISMINT"
-    experiment   = "HALFAR-MED"          ! "fixed", "moving", "mismip", "EXPA", "EXPB", "EXPF","BUELER-A", "BUELER-B", "HALFAR", "HALFAR-MED"
+    experiment   = "HALFAR"              ! "fixed", "moving", "mismip", "EXPA", "EXPB", "EXPF","BUELER-A", "BUELER-B", "HALFAR", "HALFAR-MED"
     dx           = 8.0                   ! [km] Grid resolution (EISMINT1 = 50km, EISMINT2 = 25km)
     with_ssa     = False                 ! Include ssa in experiment?
     topo_fixed   = False                 ! Calculate the topography, or use Heiko's topo file.  
@@ -42,7 +42,7 @@
     solver            = "expl-sico"     ! "expl", "impl-upwind"
     calv_method       = "zero"          ! "zero", "simple", "flux", "kill"
     surf_gl_method    = 0               ! 0: binary (max grnd/flt elevation), 1: subgrid average elevation
-    margin2nd         = True            ! Apply second-order upwind approximation to gradients at the margin
+    margin2nd         = False           ! Apply second-order upwind approximation to gradients at the margin
     use_bmb           = False           ! Use basal mass balance in mass conservation equation
     topo_fixed        = False           ! Keep ice thickness fixed, perform other ytopo calculations
     topo_rel          = 0               ! 0: No relaxation; 1: relax shelf; 2: relax shelf + gl; 3: all points 

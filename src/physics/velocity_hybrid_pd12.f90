@@ -431,7 +431,7 @@ contains
             ! Determine current depth fraction
             depth = (1.0_prec-zeta_aa(k))
 
-            ! Determine the vertical shear for current layer (Ac nodes)
+            ! Determine the vertical shear for current layer (ac-nodes)
             ! Pollard and de Conto (2012), Eq. 3 
             ! ajr: note, initial negative sign moved to be explicit
             ! in the final calculation of dux/dz duy/dz, so that 
@@ -789,21 +789,10 @@ contains
         integer :: i, j, nx, ny 
         real(prec) :: dy, rhog 
         real(prec) :: H_mid
-
-        real(prec), allocatable :: Hi_ab(:,:) 
-
+        
         nx = size(H_ice,1)
         ny = size(H_ice,2) 
 
-        ! Allocate Hi_ab
-!         allocate(Hi_ab(nx,ny))
-
-        ! Stagger H_ice to Ab nodes:
-        ! This will be used to calculate H_mid on the acx/acy nodes,
-        ! but it should come from ab-nodes instead of ac-nodes for stability 
-        ! Note: this is disabled, as it seemed not to affect results
-!         Hi_ab = stagger_aa_ab_ice(H_ice,H_ice)
-        
         ! Define shortcut parameter 
         rhog = rho_ice * g 
 
@@ -814,7 +803,6 @@ contains
         taud_acx = 0.0_prec  
         do j = 2, ny 
         do i = 1, nx-1 
-!             H_mid         = 0.5_prec * (Hi_ab(i,j)+Hi_ab(i,j-1))
             H_mid         = 0.5_prec*(H_ice(i,j)+H_ice(i+1,j)) 
             taud_acx(i,j) = rhog * H_mid * dzsdx(i,j) 
         end do 
@@ -826,7 +814,6 @@ contains
         taud_acy = 0.0_prec  
         do j = 1, ny-1 
         do i = 2, nx 
-!             H_mid         = 0.5_prec * (Hi_ab(i,j)+Hi_ab(i-1,j))
             H_mid         = 0.5_prec*(H_ice(i,j)+H_ice(i,j+1))
             taud_acy(i,j) = rhog * H_mid * dzsdy(i,j) 
         end do 

@@ -178,7 +178,9 @@ contains
                 ! Use classic-style SIA solver (solve directly for velocity)
 
                 ! Calculate the 3D horizontal shear velocity fields
-                call calc_uxy_sia_3D(dyn%now%ux_i,dyn%now%uy_i,tpo%now%H_ice,tpo%now%dzsdx,tpo%now%dzsdy, &
+!                 call calc_uxy_sia_3D_00(dyn%now%ux_i,dyn%now%uy_i,tpo%now%H_ice,tpo%now%dzsdx,tpo%now%dzsdy, &
+!                                      mat%now%ATT,dyn%par%zeta_aa,dyn%par%dx,mat%par%n_glen,rho_ice,g)
+                call calc_uxy_sia_3D(dyn%now%ux_i,dyn%now%uy_i,tpo%now%H_ice,dyn%now%taud_acx,dyn%now%taud_acy, &
                                      mat%now%ATT,dyn%par%zeta_aa,dyn%par%dx,mat%par%n_glen,rho_ice,g)
                 
                 ! Then simply integrate from 3D velocity field (faster than 2D solver below)

@@ -92,7 +92,7 @@ contains
 
         buel%err_H_ice     = H_ice - buel%H_ice 
         buel%err_H0        = maxval(H_ice) - maxval(buel%H_ice)
-        buel%err_max_H_ice = maxval(buel%err_H_ice)
+        buel%err_max_H_ice = maxval(abs(buel%err_H_ice))
 
         if (count(msk) .gt. 0) then 
             buel%rmse_H_ice    = sqrt(sum(buel%err_H_ice**2,mask=msk) / real(count(msk)))
@@ -215,7 +215,7 @@ contains
         ! Calculate the Halfar similarity solution profile (Eq. 10-11 in Bueler et al, 2005)
         H_ice = 0.0
         !where (r .le. R0_meters) & 
-        where ( (1.0 - (((time1/t0)**(-beta))*r/R0_meters)**((n+1.0)/n)) .gt. 0.0) &
+        where ( (1.0 - (((time1/t0)**(-beta))*r/R0_meters)**((n+1.0)/n)) .gt. 0.0_prec) &
         H_ice = H0 * (time1/t0)**(-alpha) * (1.0 - (((time1/t0)**(-beta))*r/R0_meters)**((n+1.0)/n))**(n/(2.0*n+1.0))
 
         ! Now calculate implied mass balance
@@ -239,7 +239,7 @@ contains
         real(prec), intent(IN) :: g 
         real(prec) :: gamma 
 
-        gamma = 2.0 * A * (rho_ice*g)**n / (n+2.0)
+        gamma = 2.0_prec * A * (rho_ice*g)**n / (n+2.0_prec)
 
         return 
 

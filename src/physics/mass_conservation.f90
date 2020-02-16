@@ -63,35 +63,30 @@ contains
 
         ! 1. Apply mass conservation =================
 
-!         ! Ensure that no velocity is defined for outer boundaries of margin points
-!         ux_tmp = ux 
-!         do j = 1, ny 
-!         do i = 1, nx-1 
-!             if (H_margin(i,j) .gt. 0.0_prec .and. H_ice(i+1,j) .eq. 0.0_prec)    ux_tmp(i,j) = 0.0_prec 
-!             if (H_ice(i,j)    .eq. 0.0_prec .and. H_margin(i+1,j) .gt. 0.0_prec) ux_tmp(i,j) = 0.0_prec 
-!         end do 
-!         end do  
+        ! Ensure that no velocity is defined for outer boundaries of margin points
+        ux_tmp = ux 
+        do j = 1, ny 
+        do i = 1, nx-1 
+            if (H_margin(i,j) .gt. 0.0_prec .and. H_ice(i+1,j) .eq. 0.0_prec)    ux_tmp(i,j) = 0.0_prec 
+            if (H_ice(i,j)    .eq. 0.0_prec .and. H_margin(i+1,j) .gt. 0.0_prec) ux_tmp(i,j) = 0.0_prec 
+        end do 
+        end do  
 
-!         uy_tmp = uy 
-!         do j = 1, ny-1 
-!         do i = 1, nx  
-!             if (H_margin(i,j) .gt. 0.0_prec .and. H_ice(i,j+1) .eq. 0.0_prec)    uy_tmp(i,j) = 0.0_prec 
-!             if (H_ice(i,j)    .eq. 0.0_prec .and. H_margin(i,j+1) .gt. 0.0_prec) uy_tmp(i,j) = 0.0_prec 
-!         end do 
-!         end do  
-    
-        ! No margin treatment 
-        ux_tmp = ux
         uy_tmp = uy 
+        do j = 1, ny-1 
+        do i = 1, nx  
+            if (H_margin(i,j) .gt. 0.0_prec .and. H_ice(i,j+1) .eq. 0.0_prec)    uy_tmp(i,j) = 0.0_prec 
+            if (H_ice(i,j)    .eq. 0.0_prec .and. H_margin(i,j+1) .gt. 0.0_prec) uy_tmp(i,j) = 0.0_prec 
+        end do 
+        end do  
+    
+!         ! No margin treatment 
+!         ux_tmp = ux
+!         uy_tmp = uy 
 
         ! First, only resolve the dynamic part (ice advection)
         call calc_advec2D(H_ice,ux_tmp,uy_tmp,mbal*0.0,dx,dx,dt,solver)
 
-
-        ! Then, add ice in the margin buffer to current ice thickness,
-        ! set the buffer to zero  
-!         H_ice    = H_ice + H_margin 
-!         H_margin = 0.0 
 
         ! Next, handle mass balance in order to be able to diagnose
         ! precisely how much mass was lost/gained 
@@ -131,12 +126,12 @@ if (.FALSE.) then
         ! based on shear stress limit 
         call limit_grounded_margin_thickness_stress(H_ice,mb_applied,f_grnd,H_ocn,dt)
 
+end if 
+
         ! Limit grounded ice thickess to above minimum and below inland neighbor at the margin
 !         call limit_grounded_margin_thickness(H_ice,mb_applied,f_grnd,H_min,dt) 
-        call limit_grounded_margin_thickness_flux(H_ice,mb_applied,f_grnd,mbal,ux,uy,dx,dt,H_min)
-
-end if 
-        
+        call limit_grounded_margin_thickness_flux(H_ice,mb_applied,f_grnd,mbal,ux_tmp,uy_tmp,dx,dt,H_min)
+            
         ! Also ensure tiny numeric ice thicknesses are removed
         where (H_ice .lt. 1e-5) H_ice = 0.0 
 
@@ -506,13 +501,16 @@ end if
 
         ! Initially set fraction to one everywhere there is ice 
         ! and zero everywhere there is no ice
-        f_ice = 0.0  
-        where (H_ice .gt. 0.0) f_ice = 1.0
+        f_ice = 0.0_prec  
+        where (H_ice .gt. 0.0) f_ice = 1.0_prec
 
         ! For ice-covered points with ice-free neighbors (ie, at the floating or grounded margin),
         ! determine the fraction of grid point that should be ice covered. 
 
         H_ice_0 = H_ice 
+
+        ! Reset H_margin to zero, will be diagnosed below 
+        H_margin = 0.0_prec
 
         do j = 1, ny
         do i = 1, nx 
@@ -575,11 +573,10 @@ end if
 
                 ! Now determine if ice should be in buffer (with f_ice < 1.0)
                 if (f_ice(i,j) .gt. 0.0 .and. f_ice(i,j) .lt. 1.0) then 
-                    ! Ice exists, but does not fill the entire cell, therefore
-                    ! move ice to the buffer 
+                    ! Ice exists, but does not fill the entire cell,
+                    ! define it in H_margin
 
                     H_margin(i,j) = H_ice(i,j)
-                    !H_ice(i,j)    = 0.0 
 
                 end if 
 

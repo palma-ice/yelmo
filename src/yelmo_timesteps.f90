@@ -85,13 +85,15 @@ contains
 
         ! Step 1: calculate maximum value of truncation error (eta,n+1) = maxval(tau) 
         eta = maxval(abs(tau),mask=mask)
-        eta = max(eta,1e-10)
+        eta = max(eta,eps*1e-2)
 
         ! Step 2: calculate scaling for the next timestep (dt,n+1)
         f_scale = (eps/eta)**beta_1 * (eps/eta_n)**beta_2
 
         ! Step 2: calculate the next time timestep (dt,n+1)
         dt = f_scale * dt_n
+
+        !write(*,*) "pc: ", dt_n, dt, eta, f_scale
 
         ! Check for checkerboard in tau field, impose minimum dt if unstable 
         call check_checkerboard(is_unstable,tau,lim=tau_lim)

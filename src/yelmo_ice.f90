@@ -82,9 +82,9 @@ contains
                                 dom%tpo%par%dx,dom%par%dt_min,dt_max,dom%par%cfl_max,dom%par%cfl_diff_max) 
             
             ! Calculate new adaptive timestep using predictor-corrector algorithm for ice thickness
-            call set_adaptive_timestep_pc(dom%par%pc_dt,dom%par%pc_eta,dom%par%pc_tau,dom%par%pc_eps, &
-                                        dom%par%dt_min,dt_max,dom%tpo%now%f_grnd.eq.1.0_prec, &
-                                        dom%dyn%now%ux_bar,dom%dyn%now%uy_bar,dom%tpo%par%dx)
+            call set_adaptive_timestep_pc(dom%par%pc_dt,dom%par%pc_dtm1,dom%par%pc_eta,dom%par%pc_tau, &
+                                          dom%par%pc_eps,dom%par%dt_min,dt_max,dom%tpo%now%f_grnd.eq.1.0_prec, &
+                                                dom%dyn%now%ux_bar,dom%dyn%now%uy_bar,dom%tpo%par%dx)
 
             ! Determine current time step based on method of choice 
             select case(dom%par%dt_method) 
@@ -200,8 +200,11 @@ contains
 
             n = count(dt_save .ne. missing_value)
 
-            write(*,"(a,f12.2,f8.1,2f10.1,50f7.2)") "yelmo:: [time,speed,H,T,dt]:", time_now, dom%par%model_speed, &
-                                H_mean, T_mean, dt_save(1:n)
+            write(*,"(a,f13.2,f9.1,f10.1,f8.1,2f7.2,1i6)") &
+                        !"yelmo:: [time,speed,H,T,max(dt),min(dt),n(dt==dt_min)]:", &
+                        "yelmo:: timelog:", &
+                            time_now, dom%par%model_speed, H_mean, T_mean, maxval(dt_save(1:n)), &
+                                            minval(dt_save(1:n)), count(dt_save(1:n).eq.dom%par%dt_min)
             
         end if 
 
@@ -361,6 +364,7 @@ contains
         dom%par%dt_adv3D = 0.0 
 
         dom%par%pc_dt    = dom%par%dt_min  
+        dom%par%pc_dtm1  = dom%par%dt_min  
         dom%par%pc_eta   = dom%par%pc_eps  
         
         ! Allocate truncation error array 

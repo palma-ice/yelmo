@@ -631,7 +631,8 @@ module yelmo_defs
         logical :: use_restart 
         
         ! Time step parameters for predictor-corrector (PC) method (Cheng et al, 2017)
-        real(prec) :: pc_dt 
+        real(prec) :: pc_dt
+        real(prec) :: pc_dtm1 
         real(prec) :: pc_eta 
         real(prec), allocatable :: pc_tau(:,:)
 

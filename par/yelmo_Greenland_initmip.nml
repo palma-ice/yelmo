@@ -1,6 +1,6 @@
 &control    
     time_init       = 0.0               ! [yr] Starting time 
-    time_end        = 50e3              ! [yr] Ending time
+    time_end        = 5e3               ! [yr] Ending time
     time_equil      = 100.0             ! [yr] Equilibration time 
     dtt             = 2.0               ! [yr] Main loop timestep 
     dt1D_out        = 100.0             ! [yr] Frequency of writing 1D output files 
@@ -20,7 +20,7 @@
     grid_path       = "input/{domain}/{grid_name}/{grid_name}_REGIONS.nc"
     experiment      = "None"       
     restart         = "None"
-    log_timestep    = False 
+    log_timestep    = True 
     zeta_scale      = "tanh"            ! "linear", "exp", "tanh"
     zeta_exp        = 2.0  
     nz_aa           = 21                ! Vertical resolution in ice

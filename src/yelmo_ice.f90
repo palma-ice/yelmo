@@ -362,7 +362,7 @@ contains
 
         dom%par%pc_dt    = dom%par%dt_min  
         dom%par%pc_eta   = dom%par%pc_eps  
-
+        
         ! Allocate truncation error array 
         if (allocated(dom%par%pc_tau))   deallocate(dom%par%pc_tau)
         allocate(dom%par%pc_tau(dom%grd%nx,dom%grd%ny))

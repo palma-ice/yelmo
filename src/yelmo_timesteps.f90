@@ -74,17 +74,21 @@ contains
 
         logical    :: is_unstable
         
+        real(prec), parameter :: pc_k    = 2.0_prec 
+
         ! Cheng et al. (2017) method
-        real(prec), parameter :: beta_1  =  3.0_prec / 10.0_prec              ! Cheng et al., 2017, Eq. 32
-        real(prec), parameter :: beta_2  = -1.0_prec / 10.0_prec              ! Cheng et al., 2017, Eq. 32
+        real(prec), parameter :: beta_1  =  3.0_prec / (pc_k*5.0_prec)              ! Cheng et al., 2017, Eq. 32
+        real(prec), parameter :: beta_2  = -1.0_prec / (pc_k*5.0_prec)              ! Cheng et al., 2017, Eq. 32
         real(prec), parameter :: alpha_2 =  0.8_prec                         ! Söderlind and Wang, 2006, Eq. 4 
         
         ! Söderlind and Wang (2006) method 
-!         real(prec), parameter :: beta_1  =  1.0_prec / 4.0_prec             ! Söderlind and Wang, 2006, Eq. 4
-!         real(prec), parameter :: beta_2  =  1.0_prec / 4.0_prec             ! Söderlind and Wang, 2006, Eq. 4
-!         real(prec), parameter :: alpha_2 =  1.0_prec / 4.0_prec             ! Söderlind and Wang, 2006, Eq. 4 
+!         real(prec), parameter :: pc_b    =  4.0_prec 
+!         real(prec), parameter :: beta_1  =  1.0_prec / (pc_k*pc_b)             ! Söderlind and Wang, 2006, Eq. 4
+!         real(prec), parameter :: beta_2  =  1.0_prec / (pc_k*pc_b)             ! Söderlind and Wang, 2006, Eq. 4
+!         real(prec), parameter :: alpha_2 =  1.0_prec / (pc_b)                  ! Söderlind and Wang, 2006, Eq. 4 
         
         ! Smoothing parameter; Söderlind and Wang (2006) method, Eq. 10
+        ! Values on the order of [0.7,2.0] are reasonable. Higher kappa slows variation in dt
         real(prec), parameter :: kappa   =  2.0_prec 
         
         ! Parameters controlling checkerboard stability check
@@ -99,16 +103,16 @@ contains
         rho_nm1 = (dt_n / dt_nm1) 
 
         ! Step 1: calculate maximum value of truncation error (eta,n+1) = maxval(tau) 
+        ! Note: Limiting minimum to above eg 1e-10 is very important for reducing fluctuations in dt
         eta = maxval(abs(tau),mask=mask)
-        eta = max(eta,1e-15,eps*1e-1)
+        eta = max(eta,1e-10)
 
         ! Step 2: calculate scaling for the next timestep (dt,n+1)
         rho_n = (eps/eta)**beta_1 * (eps/eta_n)**beta_2 * rho_nm1**(-alpha_2)
 
-        !rhohat_n = min(rho_n,1.1)
-
         ! Scale rho_n for smoothness 
-        rhohat_n = 1.0_prec + kappa * atan((rho_n-1.0_prec)/kappa)
+        !rhohat_n = min(rho_n,1.1)
+        rhohat_n = 1.0_prec + kappa * atan((rho_n-1.0_prec)/kappa) ! Söderlind and Wang, 2006, Eq. 10
 
         ! Step 2: calculate the next time timestep (dt,n+1)
         dt = rhohat_n * dt_n
@@ -132,7 +136,7 @@ contains
         return 
 
     end subroutine set_adaptive_timestep_pc
-    
+
     subroutine set_adaptive_timestep(dt,dt_adv,dt_diff,dt_adv3D, &
                         ux,uy,uz,ux_bar,uy_bar,D2D,H_ice,dHicedt,zeta_ac, &
                         dx,dtmin,dtmax,cfl_max,cfl_diff_max)

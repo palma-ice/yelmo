@@ -9,6 +9,7 @@ module yelmo_timesteps
 
     public :: calc_pc_tau_fe_sbe
     public :: set_adaptive_timestep_pc
+    public :: set_pc_mask
 
     public :: set_adaptive_timestep 
     public :: limit_adaptive_timestep
@@ -136,6 +137,40 @@ contains
         return 
 
     end subroutine set_adaptive_timestep_pc
+
+    subroutine set_pc_mask(mask,H_ice,f_grnd)
+
+        implicit none 
+
+        logical, intent(OUT) :: mask(:,:) 
+        real(prec), intent(IN) :: H_ice(:,:) 
+        real(prec), intent(IN) :: f_grnd(:,:) 
+
+        ! Local variables 
+        integer :: i, j, nx, ny 
+
+        nx = size(mask,1)
+        ny = size(mask,2) 
+
+        mask = .FALSE. 
+
+        ! Limit to ice-covered, grounded points 
+        where (H_ice .gt. 0.0_prec .and. f_grnd .eq. 1.0_prec) mask = .TRUE. 
+
+        ! Set mask to false for ice margin points as well 
+        do j = 2, ny-1 
+        do i = 2, nx-1 
+            if (mask(i,j)) then 
+                if (count(H_ice(i-1:i+1,j-1:j+1).eq.0.0_prec) .gt. 0) then 
+                    mask(i,j) = .FALSE.
+                end if 
+            end if 
+        end do 
+        end do
+
+        return 
+
+    end subroutine set_pc_mask
 
     subroutine set_adaptive_timestep(dt,dt_adv,dt_diff,dt_adv3D, &
                         ux,uy,uz,ux_bar,uy_bar,D2D,H_ice,dHicedt,zeta_ac, &

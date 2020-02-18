@@ -7,7 +7,7 @@ module yelmo_ice
     
     use yelmo_defs
     use yelmo_grid, only : yelmo_init_grid
-    use yelmo_timesteps, only : set_adaptive_timestep, set_adaptive_timestep_pc, calc_pc_tau_fe_sbe, &
+    use yelmo_timesteps, only : set_adaptive_timestep, set_adaptive_timestep_pc, set_pc_mask, calc_pc_tau_fe_sbe, &
              limit_adaptive_timestep,yelmo_timestep_write_init, yelmo_timestep_write, calc_adv3D_timestep1
     use yelmo_io 
 
@@ -54,6 +54,8 @@ contains
 
         integer :: n2, nstep2 
 
+        logical, allocatable :: pc_mask(:,:) 
+
         ! Load last model time (from dom%tpo, should be equal to dom%thrm)
         time_now = dom%tpo%par%time
 
@@ -66,6 +68,8 @@ contains
         
         allocate(dt_save(nstep))
         dt_save = missing_value 
+
+        allocate(pc_mask(dom%grd%nx,dom%grd%ny))
 
         ! Iteration of yelmo component updates until external timestep is reached
         do n = 1, nstep
@@ -82,8 +86,10 @@ contains
                                 dom%tpo%par%dx,dom%par%dt_min,dt_max,dom%par%cfl_max,dom%par%cfl_diff_max) 
             
             ! Calculate new adaptive timestep using predictor-corrector algorithm for ice thickness
+
+            call set_pc_mask(pc_mask,dom%tpo%now%H_ice,dom%tpo%now%f_grnd)
             call set_adaptive_timestep_pc(dom%par%pc_dt,dom%par%pc_dtm1,dom%par%pc_eta,dom%par%pc_tau, &
-                                          dom%par%pc_eps,dom%par%dt_min,dt_max,dom%tpo%now%f_grnd.eq.1.0_prec, &
+                                          dom%par%pc_eps,dom%par%dt_min,dt_max,pc_mask, &
                                                 dom%dyn%now%ux_bar,dom%dyn%now%uy_bar,dom%tpo%par%dx)
 
             ! Determine current time step based on method of choice 

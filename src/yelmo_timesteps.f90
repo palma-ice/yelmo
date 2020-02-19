@@ -74,7 +74,9 @@ contains
         real(prec) :: dtmax_now
 
         logical    :: is_unstable
-        
+        real(prec), allocatable :: tau_check(:,:) 
+        real(prec) :: eta_check 
+
         real(prec), parameter :: pc_k    = 2.0_prec 
 
         ! Cheng et al. (2017) method
@@ -94,14 +96,17 @@ contains
         
         ! Parameters controlling checkerboard stability check
         real(prec), parameter :: tau_lim = 5.0_prec    ! [m/a] Maximum allowed tau for checkerboard
+        real(prec), parameter :: gamma_1 = 1.0_prec    ! Exponent 
+
+        ! Calculate checkerboard stability metric
+        allocate(tau_check(size(tau,1),size(tau,2)))
+        call calc_checkerboard(tau_check,tau,mask)
+        eta_check = maxval(abs(tau_check))
 
         ! Step 0: save dt and eta from previous timestep 
         dt_n    = max(dt,dtmin) 
-        eta_n   = eta 
-
         dt_nm1  = max(dtm1,dtmin) 
-
-        rho_nm1 = (dt_n / dt_nm1) 
+        eta_n   = eta 
 
         ! Step 1: calculate maximum value of truncation error (eta,n+1) = maxval(tau) 
         ! Note: Limiting minimum to above eg 1e-10 is very important for reducing fluctuations in dt
@@ -109,8 +114,12 @@ contains
         eta = max(eta,1e-10)
 
         ! Step 2: calculate scaling for the next timestep (dt,n+1)
-        rho_n = (eps/eta)**beta_1 * (eps/eta_n)**beta_2 * rho_nm1**(-alpha_2)
+        rho_nm1 = (dt_n / dt_nm1) 
+        rho_n   = (eps/eta)**beta_1 * (eps/eta_n)**beta_2  &
+                        * rho_nm1**(-alpha_2) * (1.0_prec+eta_check)**(-gamma_1)
 
+!         write(*,*) "check", eta_check, (1.0_prec+eta_check)**(-gamma_1)
+        
         ! Scale rho_n for smoothness 
         !rhohat_n = min(rho_n,1.1)
         rhohat_n = 1.0_prec + kappa * atan((rho_n-1.0_prec)/kappa) ! Söderlind and Wang, 2006, Eq. 10
@@ -121,8 +130,8 @@ contains
         !write(*,*) "pc: ", dt_n, dt, eta, rho_n, rhohat_n
 
         ! Check for checkerboard in tau field, impose minimum dt if unstable 
-        call check_checkerboard(is_unstable,tau,lim=tau_lim)
-        if (is_unstable) dt = dtmin 
+!         call check_checkerboard(is_unstable,tau,lim=tau_lim)
+!         if (is_unstable) dt = dtmin 
 
         ! Calculate CFL advection limit too, and limit maximum allowed timestep
         dt_adv = minval( calc_adv2D_timestep1(ux_bar,uy_bar,dx,dx,cfl_max=1.0_prec) ) 
@@ -612,6 +621,48 @@ contains
 
     end function calc_adv3D_timestep 
     
+    subroutine calc_checkerboard(var_check,var,mask)
+
+        implicit none 
+
+        real(prec), intent(OUT) :: var_check(:,:) 
+        real(prec), intent(IN)  :: var(:,:) 
+        logical,    intent(IN)  :: mask(:,:)  
+
+        ! Local variables 
+        integer :: i, j, nx, ny 
+
+        nx = size(var,1)
+        ny = size(var,2) 
+
+        ! First assume everything is stable 
+        var_check = 0.0_prec 
+
+        do j = 2, ny-1
+        do i = 2, nx-1 
+            
+            if (mask(i,j)) then 
+                ! For points of interest, check for checkerboard pattern in var 
+
+                if ( (var(i,j)*var(i-1,j) .lt. 0.0 .and. & 
+                      var(i,j)*var(i+1,j) .lt. 0.0) .or. & 
+                     (var(i,j)*var(i,j-1) .lt. 0.0 .and. & 
+                      var(i,j)*var(i,j+1) .lt. 0.0) ) then 
+                    ! Point has checkerboard pattern in at least one direction
+
+                    var_check = var 
+
+                end if 
+
+            end if 
+
+        end do 
+        end do  
+
+        return 
+
+    end subroutine calc_checkerboard
+
     subroutine check_checkerboard(is_unstable,var,lim)
 
         implicit none 

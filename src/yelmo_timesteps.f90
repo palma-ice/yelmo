@@ -122,7 +122,7 @@ contains
         eta_nm2 = max(eta(2),1e-8)
 
         ! Step 1: calculate maximum value of truncation error (eta,n+1) = maxval(tau) 
-        ! Note: Limiting minimum to above eg 1e-10 is very important for reducing fluctuations in dt
+        ! Note: Limiting minimum to above eg 1e-8 is very important for reducing fluctuations in dt
         
 
         ! Step 2: calculate scaling for the next timestep (dt,n+1)
@@ -130,7 +130,7 @@ contains
         rho_n   = (eps/eta_n)**beta_1 * (eps/eta_nm1)**beta_2  &
                         * rho_nm1**(-alpha_2) !* (1.0_prec+eta_check)**(-gamma_1)
 
-        ! Söderlind (2003) H312PD:  
+        ! Söderlind (2003) H312PD, Eq. 38:  
 !         rho_n   = (eps/eta_n)**k_i_1 * (eps/eta_nm1)**k_i_1 * (eps/eta_nm2)**k_i_1
 
         ! Scale rho_n for smoothness 
@@ -143,12 +143,8 @@ contains
 
         !write(*,*) "pc: ", dt_n, dt, eta, rho_n, rhohat_n
 
-        ! Check for checkerboard in tau field, impose minimum dt if unstable 
-!         call check_checkerboard(is_unstable,tau,lim=tau_lim)
-!         if (is_unstable) dt = dtmin 
-
         ! Calculate CFL advection limit too, and limit maximum allowed timestep
-        dt_adv = minval( calc_adv2D_timestep1(ux_bar,uy_bar,dx,dx,cfl_max=1.0_prec) ) 
+        dt_adv    = minval( calc_adv2D_timestep1(ux_bar,uy_bar,dx,dx,cfl_max=1.0_prec) ) 
         dtmax_now = min(dtmax,dt_adv) 
 
         ! Finally, ensure timestep is within prescribed limits

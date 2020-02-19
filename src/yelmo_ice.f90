@@ -55,7 +55,8 @@ contains
         integer :: n2, nstep2 
 
         logical, allocatable :: pc_mask(:,:) 
-        logical :: pc_redo 
+        logical :: dt_redo 
+        real(prec), parameter :: pc_tol = 5.0_prec   ! [m/a] Tolerance threshold to redo timestep
 
         ! Load last model time (from dom%tpo, should be equal to dom%thrm)
         time_now = dom%tpo%par%time
@@ -67,7 +68,7 @@ contains
         ! Determine maximum number of time steps to be iterated through   
         nstep   = ceiling( (time-time_now) / dom%par%dt_min )
         n_now   = 0  ! Number of timesteps saved 
-        pc_redo = .FALSE. 
+        dt_redo = .FALSE. 
 
         allocate(dt_save(nstep))
         dt_save = missing_value 
@@ -80,8 +81,10 @@ contains
             ! Store initial state of yelmo object 
             dom0 = dom 
 
-if (.not. pc_redo) then 
-
+if (.not. dt_redo) then 
+    ! This is a normal timestep, so determine dt naturally as below.
+    ! Otherwise, assume dt_now is known from modification of dt_n-1
+    
             ! Update dt_max as a function of the total timestep 
             dt_max = max(time-time_now,0.0_prec)
 
@@ -184,20 +187,23 @@ end if
             call set_pc_mask(pc_mask,dom%tpo%now%H_ice,dom%tpo%now%f_grnd)
             eta_tmp = maxval(abs(dom%par%pc_tau),mask=pc_mask)
 
-            if (.not. pc_redo .and. eta_tmp .gt. 5.0) then
-                rho_tmp = 0.8_prec
-                !rho_tmp = (2.0_prec+(eta_tmp-10.0_prec)/1.0_prec)**(-1.0_prec) 
+            if (.not. dt_redo .and. eta_tmp .ge. pc_tol .and. dt_now .gt. dom%par%dt_min) then
+                !rho_tmp = 0.7_prec
+                rho_tmp = 0.7_prec*(1.0_prec+(eta_tmp-pc_tol)/10.0_prec)**(-1.0_prec) 
 
-                write(*,*) "pcredo 1: ", time_now, dt_now, eta_tmp, rho_tmp
+               ! write(*,*) "pcredo: ", time_now, dt_now, eta_tmp, rho_tmp
+                
                 dom = dom0 
                 time_now = dom0%tpo%par%time
                 n_now = n_now - 1 
                 dt_now = max(dt_now*rho_tmp,dom%par%dt_min)
                 dom%par%pc_dt(1) = dt_now 
-                pc_redo = .TRUE. 
-            else 
-                !write(*,*) "pcredo 2: ", time_now, dt_now, eta_tmp
-                pc_redo = .FALSE. 
+                dt_redo = .TRUE.
+
+            else
+
+                dt_redo = .FALSE. 
+            
             end if 
 
             if (dom%par%log_timestep) then 

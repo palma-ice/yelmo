@@ -38,10 +38,9 @@ contains
         real(prec), intent(IN) :: time
 
         ! Local variables 
-        type(ytopo_class)  :: tpo1 
-        type(ytherm_class) :: thrm1
         type(yelmo_class)  :: dom0 
-
+        type(ytopo_class)  :: tpo1 
+        
         real(prec) :: dt_now, dt_max  
         real(prec) :: time_now, time_start 
         integer    :: n, nstep, n_now
@@ -56,8 +55,7 @@ contains
 
         logical, allocatable :: pc_mask(:,:) 
         logical :: dt_redo 
-        real(prec), parameter :: pc_tol = 5.0_prec   ! [m/a] Tolerance threshold to redo timestep
-
+        
         ! Load last model time (from dom%tpo, should be equal to dom%thrm)
         time_now = dom%tpo%par%time
 
@@ -66,8 +64,8 @@ contains
         time_start = time_now 
         
         ! Determine maximum number of time steps to be iterated through
-        ! (plus 20% more to handle repeat timesteps)   
-        nstep   = ceiling( 1.20_prec * (time-time_now) / dom%par%dt_min )
+        ! (plus 30% more to handle repeat timesteps)   
+        nstep   = ceiling( 1.30_prec * (time-time_now) / dom%par%dt_min )
         n_now   = 0  ! Number of timesteps saved 
         dt_redo = .FALSE. 
 
@@ -145,30 +143,21 @@ end if
 !                 write(*,"(a,1f14.4,3g14.4)") "timestepping: ", time_now, dt_now, minval(dom%par%dt_adv), minval(dom%par%dt_diff)
 !             end if 
             
-            ! Store local copy of ytopo and ytherm objects to use for predictor step
+            ! Store local copy of ytopo object to use for predictor step
             tpo1  = dom%tpo 
-            thrm1 = dom%thrm 
-
+            
             ! Step 1: Perform predictor step with temporary topography object 
             ! Calculate topography (elevation, ice thickness, calving, etc.)
             call calc_ytopo(tpo1,dom%dyn,dom%thrm,dom%bnd,time_now,topo_fixed=dom%tpo%par%topo_fixed)
             call calc_ytopo_masks(tpo1,dom%dyn,dom%thrm,dom%bnd)
 
-            if (dom%par%use_pc_thrm) then 
-                ! Perform predictor step with temporary thermodynamics object 
-                
-                ! Calculate thermodynamics (temperatures and enthalpy), corrected 
-                call calc_ytherm(thrm1,tpo1,dom%dyn,dom%mat,dom%bnd,time_now)            
-
-            end if 
-
             ! Step 2: Update other variables using predicted ice thickness 
             
             ! Calculate dynamics (velocities and stresses)
-            call calc_ydyn(dom%dyn,tpo1,dom%mat,thrm1,dom%bnd,time_now)
+            call calc_ydyn(dom%dyn,tpo1,dom%mat,dom%thrm,dom%bnd,time_now)
             
             ! Calculate material (ice properties, viscosity, etc.)
-            call calc_ymat(dom%mat,tpo1,dom%dyn,thrm1,dom%bnd,time_now)
+            call calc_ymat(dom%mat,tpo1,dom%dyn,dom%thrm,dom%bnd,time_now)
 
             ! Calculate thermodynamics (temperatures and enthalpy), corrected
             call calc_ytherm(dom%thrm,tpo1,dom%dyn,dom%mat,dom%bnd,time_now)            
@@ -188,9 +177,9 @@ end if
             call set_pc_mask(pc_mask,dom%tpo%now%H_ice,dom%tpo%now%f_grnd)
             eta_tmp = maxval(abs(dom%par%pc_tau),mask=pc_mask)
 
-            if (.not. dt_redo .and. eta_tmp .ge. pc_tol .and. dt_now .gt. dom%par%dt_min) then
+            if (.not. dt_redo .and. eta_tmp .ge. dom%par%pc_tol .and. dt_now .gt. dom%par%dt_min) then
                 !rho_tmp = 0.7_prec
-                rho_tmp = 0.7_prec*(1.0_prec+(eta_tmp-pc_tol)/10.0_prec)**(-1.0_prec) 
+                rho_tmp = 0.7_prec*(1.0_prec+(eta_tmp-dom%par%pc_tol)/10.0_prec)**(-1.0_prec) 
 
                ! write(*,*) "pcredo: ", time_now, dt_now, eta_tmp, rho_tmp
                 
@@ -408,7 +397,7 @@ end if
         dom%par%dt_diff  = 0.0 
         dom%par%dt_adv3D = 0.0 
 
-        dom%par%pc_dt(:) = dom%par%dt_min  
+        dom%par%pc_dt(:)  = dom%par%dt_min  
         dom%par%pc_eta(:) = dom%par%pc_eps
 
         ! Allocate truncation error array 
@@ -702,11 +691,11 @@ end if
         call nml_read(filename,"yelmo","zeta_scale",    par%zeta_scale)
         call nml_read(filename,"yelmo","zeta_exp",      par%zeta_exp)
         call nml_read(filename,"yelmo","nz_aa",         par%nz_aa)
-        call nml_read(filename,"yelmo","use_pc_thrm",   par%use_pc_thrm)
         call nml_read(filename,"yelmo","dt_method",     par%dt_method)
         call nml_read(filename,"yelmo","dt_min",        par%dt_min)
         call nml_read(filename,"yelmo","cfl_max",       par%cfl_max)
         call nml_read(filename,"yelmo","cfl_diff_max",  par%cfl_diff_max)
+        call nml_read(filename,"yelmo","pc_tol",        par%pc_tol)
         call nml_read(filename,"yelmo","pc_eps",        par%pc_eps)
 
         ! Overwrite parameter values with argument definitions if available
@@ -733,7 +722,12 @@ end if
             par%use_restart = .TRUE. 
         end if 
 
-        !par%log_timestep_file = "timesteps_"//trim(par%grid_name)//".nc" 
+        if (par%pc_eps .gt. par%pc_tol) then 
+            write(*,*) "yelmo_par_load:: error: pc_eps must be greater than pc_tol."
+            write(*,*) "pc_eps, pc_tol: ", par%pc_eps, par%pc_tol 
+            stop 
+        end if
+
         par%log_timestep_file = "timesteps.nc" 
         
         par%model_speeds = 0.0_prec 

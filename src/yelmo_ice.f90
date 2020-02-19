@@ -44,17 +44,18 @@ contains
 
         real(prec) :: dt_now, dt_max  
         real(prec) :: time_now, time_start 
-        integer    :: n, nstep
+        integer    :: n, nstep, n_now
         real(4)    :: cpu_start_time 
         real(prec), parameter :: time_tol = 1e-5
 
         real(prec) :: H_mean, T_mean 
         real(prec), allocatable :: dt_save(:) 
         real(prec) :: dt_adv_min
-
+        real(prec) :: eta_tmp, rho_tmp 
         integer :: n2, nstep2 
 
         logical, allocatable :: pc_mask(:,:) 
+        logical :: pc_redo 
 
         ! Load last model time (from dom%tpo, should be equal to dom%thrm)
         time_now = dom%tpo%par%time
@@ -64,8 +65,10 @@ contains
         time_start = time_now 
         
         ! Determine maximum number of time steps to be iterated through   
-        nstep  = ceiling( (time-time_now) / dom%par%dt_min )
-        
+        nstep   = ceiling( (time-time_now) / dom%par%dt_min )
+        n_now   = 0  ! Number of timesteps saved 
+        pc_redo = .FALSE. 
+
         allocate(dt_save(nstep))
         dt_save = missing_value 
 
@@ -73,6 +76,11 @@ contains
 
         ! Iteration of yelmo component updates until external timestep is reached
         do n = 1, nstep
+
+            ! Store initial state of yelmo object 
+            dom0 = dom 
+
+if (.not. pc_redo) then 
 
             ! Update dt_max as a function of the total timestep 
             dt_max = max(time-time_now,0.0_prec)
@@ -117,8 +125,11 @@ contains
 
             end select 
 
+end if 
+
             ! Save the current timestep for log and for running mean 
-            dt_save(n) = dt_now 
+            n_now = n_now + 1 
+            dt_save(n_now) = dt_now 
             call yelmo_calc_running_mean(dom%par%dt_avg,dom%par%dts,dt_now)
             call yelmo_calc_running_mean(dom%par%eta_avg,dom%par%etas,dom%par%pc_eta(1))
 
@@ -168,11 +179,26 @@ contains
             call calc_pc_tau_fe_sbe(dom%par%pc_tau,dom%tpo%now%H_ice,tpo1%now%H_ice,dom%par%pc_dt(1))
 
 
-!             ! Check if this timestep should be rejected
-!             if () then 
-!                 dom = dom0 
-!                 time_now = dom0%tpo%par%time
-!             end if 
+            ! Check if this timestep should be rejected
+            
+            call set_pc_mask(pc_mask,dom%tpo%now%H_ice,dom%tpo%now%f_grnd)
+            eta_tmp = maxval(abs(dom%par%pc_tau),mask=pc_mask)
+
+            if (.not. pc_redo .and. eta_tmp .gt. 5.0) then
+                rho_tmp = 0.8_prec
+                !rho_tmp = (2.0_prec+(eta_tmp-10.0_prec)/1.0_prec)**(-1.0_prec) 
+
+                write(*,*) "pcredo 1: ", time_now, dt_now, eta_tmp, rho_tmp
+                dom = dom0 
+                time_now = dom0%tpo%par%time
+                n_now = n_now - 1 
+                dt_now = max(dt_now*rho_tmp,dom%par%dt_min)
+                dom%par%pc_dt(1) = dt_now 
+                pc_redo = .TRUE. 
+            else 
+                !write(*,*) "pcredo 2: ", time_now, dt_now, eta_tmp
+                pc_redo = .FALSE. 
+            end if 
 
             if (dom%par%log_timestep) then 
                 ! Write timestep file if desired

@@ -79,15 +79,15 @@ contains
         real(prec), parameter :: pc_k    = 2.0_prec 
 
         ! Cheng et al. (2017) method
-!         real(prec), parameter :: beta_1  =  3.0_prec / (pc_k*5.0_prec)              ! Cheng et al., 2017, Eq. 32
-!         real(prec), parameter :: beta_2  = -1.0_prec / (pc_k*5.0_prec)              ! Cheng et al., 2017, Eq. 32
-!         real(prec), parameter :: alpha_2 =  0.8_prec                         ! Söderlind and Wang, 2006, Eq. 4 
+        real(prec), parameter :: beta_1  =  3.0_prec / (pc_k*5.0_prec)              ! Cheng et al., 2017, Eq. 32
+        real(prec), parameter :: beta_2  = -1.0_prec / (pc_k*5.0_prec)              ! Cheng et al., 2017, Eq. 32
+        real(prec), parameter :: alpha_2 =  0.0_prec                         ! Söderlind and Wang, 2006, Eq. 4 
         
         ! Söderlind and Wang (2006) method 
-        real(prec), parameter :: pc_b    =  2.0_prec 
-        real(prec), parameter :: beta_1  =  1.0_prec / (pc_k*pc_b)             ! Söderlind and Wang, 2006, Eq. 4
-        real(prec), parameter :: beta_2  =  1.0_prec / (pc_k*pc_b)             ! Söderlind and Wang, 2006, Eq. 4
-        real(prec), parameter :: alpha_2 =  1.0_prec / (pc_b)                  ! Söderlind and Wang, 2006, Eq. 4 
+!         real(prec), parameter :: pc_b    =  2.0_prec 
+!         real(prec), parameter :: beta_1  =  1.0_prec / (pc_k*pc_b)             ! Söderlind and Wang, 2006, Eq. 4
+!         real(prec), parameter :: beta_2  =  1.0_prec / (pc_k*pc_b)             ! Söderlind and Wang, 2006, Eq. 4
+!         real(prec), parameter :: alpha_2 =  1.0_prec / (pc_b)                  ! Söderlind and Wang, 2006, Eq. 4 
         
         ! Smoothing parameter; Söderlind and Wang (2006) method, Eq. 10
         ! Values on the order of [0.7,2.0] are reasonable. Higher kappa slows variation in dt
@@ -126,12 +126,12 @@ contains
         
 
         ! Step 2: calculate scaling for the next timestep (dt,n+1)
-!         rho_nm1 = (dt_n / dt_nm1) 
-!         rho_n   = (eps/eta_n)**beta_1 * (eps/eta_nm1)**beta_2  &
-!                         * rho_nm1**(-alpha_2) !* (1.0_prec+eta_check)**(-gamma_1)
+        rho_nm1 = (dt_n / dt_nm1) 
+        rho_n   = (eps/eta_n)**beta_1 * (eps/eta_nm1)**beta_2  &
+                        * rho_nm1**(-alpha_2) !* (1.0_prec+eta_check)**(-gamma_1)
 
         ! Söderlind (2003) H312PD:  
-        rho_n   = (eps/eta_n)**k_i_1 * (eps/eta_nm1)**k_i_1 * (eps/eta_nm2)**k_i_1
+!         rho_n   = (eps/eta_n)**k_i_1 * (eps/eta_nm1)**k_i_1 * (eps/eta_nm2)**k_i_1
 
         ! Scale rho_n for smoothness 
         rhohat_n = rho_n 

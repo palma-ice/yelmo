@@ -65,8 +65,9 @@ contains
         call cpu_time(cpu_start_time) 
         time_start = time_now 
         
-        ! Determine maximum number of time steps to be iterated through   
-        nstep   = ceiling( (time-time_now) / dom%par%dt_min )
+        ! Determine maximum number of time steps to be iterated through
+        ! (plus 20% more to handle repeat timesteps)   
+        nstep   = ceiling( 1.20_prec * (time-time_now) / dom%par%dt_min )
         n_now   = 0  ! Number of timesteps saved 
         dt_redo = .FALSE. 
 
@@ -84,7 +85,7 @@ contains
 if (.not. dt_redo) then 
     ! This is a normal timestep, so determine dt naturally as below.
     ! Otherwise, assume dt_now is known from modification of dt_n-1
-    
+
             ! Update dt_max as a function of the total timestep 
             dt_max = max(time-time_now,0.0_prec)
 

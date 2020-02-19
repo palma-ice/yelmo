@@ -96,12 +96,15 @@ contains
         
         ! Parameters controlling checkerboard stability check
         real(prec), parameter :: tau_lim = 5.0_prec    ! [m/a] Maximum allowed tau for checkerboard
-        real(prec), parameter :: gamma_1 = 1.0_prec    ! Exponent 
+        real(prec), parameter :: gamma_1 = 1.0_prec    ! Exponent for checkerboard scaling
 
         ! Calculate checkerboard stability metric
-        allocate(tau_check(size(tau,1),size(tau,2)))
-        call calc_checkerboard(tau_check,tau,mask)
-        eta_check = maxval(abs(tau_check))
+!         allocate(tau_check(size(tau,1),size(tau,2)))
+!         call calc_checkerboard(tau_check,tau,mask)
+!         eta_check = maxval(abs(tau_check))
+
+        ! Disabled checkerboard check for now, as it seems to be unnecessary
+        eta_check = 0.0_prec  
 
         ! Step 0: save dt and eta from previous timestep 
         dt_n    = max(dt,dtmin) 
@@ -116,10 +119,8 @@ contains
         ! Step 2: calculate scaling for the next timestep (dt,n+1)
         rho_nm1 = (dt_n / dt_nm1) 
         rho_n   = (eps/eta)**beta_1 * (eps/eta_n)**beta_2  &
-                        * rho_nm1**(-alpha_2) * (1.0_prec+eta_check)**(-gamma_1)
+                        * rho_nm1**(-alpha_2) !* (1.0_prec+eta_check)**(-gamma_1)
 
-!         write(*,*) "check", eta_check, (1.0_prec+eta_check)**(-gamma_1)
-        
         ! Scale rho_n for smoothness 
         !rhohat_n = min(rho_n,1.1)
         rhohat_n = 1.0_prec + kappa * atan((rho_n-1.0_prec)/kappa) ! Söderlind and Wang, 2006, Eq. 10

@@ -37,11 +37,11 @@ contains
         type(yelmo_class), intent(INOUT) :: dom
         real(prec), intent(IN) :: time
 
+        ! Local variables 
         type(ytopo_class)  :: tpo1 
         type(ytherm_class) :: thrm1
-        type(ytherm_class) :: thrm0
+        type(yelmo_class)  :: dom0 
 
-        ! Local variables 
         real(prec) :: dt_now, dt_max  
         real(prec) :: time_now, time_start 
         integer    :: n, nstep
@@ -88,9 +88,8 @@ contains
             ! Calculate new adaptive timestep using predictor-corrector algorithm for ice thickness
 
             call set_pc_mask(pc_mask,dom%tpo%now%H_ice,dom%tpo%now%f_grnd)
-            call set_adaptive_timestep_pc(dom%par%pc_dt,dom%par%pc_dtm1,dom%par%pc_eta,dom%par%pc_tau, &
-                                          dom%par%pc_eps,dom%par%dt_min,dt_max,pc_mask, &
-                                                dom%dyn%now%ux_bar,dom%dyn%now%uy_bar,dom%tpo%par%dx)
+            call set_adaptive_timestep_pc(dom%par%pc_dt,dom%par%pc_eta,dom%par%pc_tau,dom%par%pc_eps,dom%par%dt_min, &
+                                                dt_max,pc_mask,dom%dyn%now%ux_bar,dom%dyn%now%uy_bar,dom%tpo%par%dx)
 
             ! Determine current time step based on method of choice 
             select case(dom%par%dt_method) 
@@ -108,7 +107,7 @@ contains
                 case(2) 
                     ! Use predictor-corrector adaptive timestep
 
-                    dt_now = dom%par%pc_dt                      ! Based on ice thickness 
+                    dt_now = dom%par%pc_dt(1)                      ! Based on ice thickness 
                     
                 case DEFAULT 
 
@@ -121,7 +120,7 @@ contains
             ! Save the current timestep for log and for running mean 
             dt_save(n) = dt_now 
             call yelmo_calc_running_mean(dom%par%dt_avg,dom%par%dts,dt_now)
-            call yelmo_calc_running_mean(dom%par%eta_avg,dom%par%etas,dom%par%pc_eta)
+            call yelmo_calc_running_mean(dom%par%eta_avg,dom%par%etas,dom%par%pc_eta(1))
 
             ! Advance the local time variable
             time_now   = time_now + dt_now
@@ -166,12 +165,19 @@ contains
 
 
             ! Determine truncation error for ice thickness 
-            call calc_pc_tau_fe_sbe(dom%par%pc_tau,dom%tpo%now%H_ice,tpo1%now%H_ice,dom%par%pc_dt)
+            call calc_pc_tau_fe_sbe(dom%par%pc_tau,dom%tpo%now%H_ice,tpo1%now%H_ice,dom%par%pc_dt(1))
+
+
+!             ! Check if this timestep should be rejected
+!             if () then 
+!                 dom = dom0 
+!                 time_now = dom0%tpo%par%time
+!             end if 
 
             if (dom%par%log_timestep) then 
                 ! Write timestep file if desired
-                call yelmo_timestep_write(dom%par%log_timestep_file,time_now,dt_now,dt_adv_min,dom%par%pc_dt, &
-                            dom%par%pc_eta,dom%par%pc_tau)
+                call yelmo_timestep_write(dom%par%log_timestep_file,time_now,dt_now,dt_adv_min,dom%par%pc_dt(1), &
+                            dom%par%pc_eta(1),dom%par%pc_tau)
             end if 
 
             ! Make sure model is still running well
@@ -369,10 +375,9 @@ contains
         dom%par%dt_diff  = 0.0 
         dom%par%dt_adv3D = 0.0 
 
-        dom%par%pc_dt    = dom%par%dt_min  
-        dom%par%pc_dtm1  = dom%par%dt_min  
-        dom%par%pc_eta   = dom%par%pc_eps  
-        
+        dom%par%pc_dt(:) = dom%par%dt_min  
+        dom%par%pc_eta(:) = dom%par%pc_eps
+
         ! Allocate truncation error array 
         if (allocated(dom%par%pc_tau))   deallocate(dom%par%pc_tau)
         allocate(dom%par%pc_tau(dom%grd%nx,dom%grd%ny))
@@ -492,8 +497,8 @@ contains
         if (dom%par%log_timestep) then 
             ! Timestep file 
             call yelmo_timestep_write_init(dom%par%log_timestep_file,time,dom%grd%xc,dom%grd%yc,dom%par%pc_eps)
-            call yelmo_timestep_write(dom%par%log_timestep_file,time,0.0_prec,0.0_prec,dom%par%pc_dt, &
-                            dom%par%pc_eta,dom%par%pc_tau)
+            call yelmo_timestep_write(dom%par%log_timestep_file,time,0.0_prec,0.0_prec,dom%par%pc_dt(1), &
+                            dom%par%pc_eta(1),dom%par%pc_tau)
         end if 
 
         return

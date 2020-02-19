@@ -46,16 +46,15 @@ contains
 
     end subroutine calc_pc_tau_fe_sbe
 
-    subroutine set_adaptive_timestep_pc(dt,dtm1,eta,tau,eps,dtmin,dtmax,mask,ux_bar,uy_bar,dx)
+    subroutine set_adaptive_timestep_pc(dt,eta,tau,eps,dtmin,dtmax,mask,ux_bar,uy_bar,dx)
         ! Calculate the timestep following algorithm for 
         ! a general predictor-corrector (pc) method.
         ! Implemented followig Cheng et al (2017, GMD)
 
         implicit none 
 
-        real(prec), intent(INOUT) :: dt                 ! [yr]   Timestep 
-        real(prec), intent(INOUT) :: dtm1               ! [yr]   Previous timestep (dt_{n-1})
-        real(prec), intent(INOUT) :: eta                ! [X/yr] Maximum truncation error 
+        real(prec), intent(INOUT) :: dt(:)              ! [yr]   Timesteps (n:n-2)
+        real(prec), intent(INOUT) :: eta(:)             ! [X/yr] Maximum truncation error (n:n-2)
         real(prec), intent(IN)  :: tau(:,:)             ! [X/yr] Truncation error 
         real(prec), intent(IN)  :: eps                  ! [--]   Tolerance value (eg, eps=1e-4)
         real(prec), intent(IN)  :: dtmin                ! [yr]   Minimum allowed timestep
@@ -65,10 +64,10 @@ contains
         real(prec), intent(IN)  :: uy_bar(:,:)          ! [m/yr]
         real(prec), intent(IN)  :: dx                   ! [m]
         
-        ! Local variables 
-        real(prec) :: dt_n                          ! [yr]   Timestep (previous)
-        real(prec) :: dt_nm1                        ! [yr]   Timestep (previous minus one)
-        real(prec) :: eta_n                         ! [X/yr] Maximum truncation error (previous) 
+        ! Local variables
+        real(prec) :: dt_new, eta_new  
+        real(prec) :: dt_n, dt_nm1, dt_nm2          ! [yr]   Timesteps (n:n-2)
+        real(prec) :: eta_n, eta_nm1, eta_nm2       ! [X/yr] Maximum truncation error (n:n-2)
         real(prec) :: rho_n, rho_nm1, rhohat_n 
         real(prec) :: dt_adv 
         real(prec) :: dtmax_now
@@ -80,15 +79,15 @@ contains
         real(prec), parameter :: pc_k    = 2.0_prec 
 
         ! Cheng et al. (2017) method
-        real(prec), parameter :: beta_1  =  3.0_prec / (pc_k*5.0_prec)              ! Cheng et al., 2017, Eq. 32
-        real(prec), parameter :: beta_2  = -1.0_prec / (pc_k*5.0_prec)              ! Cheng et al., 2017, Eq. 32
-        real(prec), parameter :: alpha_2 =  0.8_prec                         ! Söderlind and Wang, 2006, Eq. 4 
+!         real(prec), parameter :: beta_1  =  3.0_prec / (pc_k*5.0_prec)              ! Cheng et al., 2017, Eq. 32
+!         real(prec), parameter :: beta_2  = -1.0_prec / (pc_k*5.0_prec)              ! Cheng et al., 2017, Eq. 32
+!         real(prec), parameter :: alpha_2 =  0.8_prec                         ! Söderlind and Wang, 2006, Eq. 4 
         
         ! Söderlind and Wang (2006) method 
-!         real(prec), parameter :: pc_b    =  4.0_prec 
-!         real(prec), parameter :: beta_1  =  1.0_prec / (pc_k*pc_b)             ! Söderlind and Wang, 2006, Eq. 4
-!         real(prec), parameter :: beta_2  =  1.0_prec / (pc_k*pc_b)             ! Söderlind and Wang, 2006, Eq. 4
-!         real(prec), parameter :: alpha_2 =  1.0_prec / (pc_b)                  ! Söderlind and Wang, 2006, Eq. 4 
+        real(prec), parameter :: pc_b    =  2.0_prec 
+        real(prec), parameter :: beta_1  =  1.0_prec / (pc_k*pc_b)             ! Söderlind and Wang, 2006, Eq. 4
+        real(prec), parameter :: beta_2  =  1.0_prec / (pc_k*pc_b)             ! Söderlind and Wang, 2006, Eq. 4
+        real(prec), parameter :: alpha_2 =  1.0_prec / (pc_b)                  ! Söderlind and Wang, 2006, Eq. 4 
         
         ! Smoothing parameter; Söderlind and Wang (2006) method, Eq. 10
         ! Values on the order of [0.7,2.0] are reasonable. Higher kappa slows variation in dt
@@ -98,6 +97,12 @@ contains
         real(prec), parameter :: tau_lim = 5.0_prec    ! [m/a] Maximum allowed tau for checkerboard
         real(prec), parameter :: gamma_1 = 1.0_prec    ! Exponent for checkerboard scaling
 
+        ! Söderlind (2003), Eq. 38 parameters 
+        real(prec), parameter :: k_i     = (2.0_prec / 9.0_prec) * 1.0_prec/pc_k 
+        real(prec), parameter :: k_i_1   = k_i / 4.0_prec 
+        real(prec), parameter :: k_i_2   = k_i / 2.0_prec 
+        real(prec), parameter :: k_i_3   = k_i / 4.0_prec 
+        
         ! Calculate checkerboard stability metric
 !         allocate(tau_check(size(tau,1),size(tau,2)))
 !         call calc_checkerboard(tau_check,tau,mask)
@@ -107,26 +112,34 @@ contains
         eta_check = 0.0_prec  
 
         ! Step 0: save dt and eta from previous timestep 
-        dt_n    = max(dt,dtmin) 
-        dt_nm1  = max(dtm1,dtmin) 
-        eta_n   = eta 
+        dt_n    = max(dt(1),dtmin) 
+        dt_nm1  = max(dt(2),dtmin) 
+        dt_nm2  = max(dt(3),dtmin)
+
+        eta_n   = maxval(abs(tau),mask=mask)
+        eta_n   = max(eta_n,1e-8)
+        eta_nm1 = max(eta(1),1e-8)
+        eta_nm2 = max(eta(2),1e-8)
 
         ! Step 1: calculate maximum value of truncation error (eta,n+1) = maxval(tau) 
         ! Note: Limiting minimum to above eg 1e-10 is very important for reducing fluctuations in dt
-        eta = maxval(abs(tau),mask=mask)
-        eta = max(eta,1e-10)
+        
 
         ! Step 2: calculate scaling for the next timestep (dt,n+1)
-        rho_nm1 = (dt_n / dt_nm1) 
-        rho_n   = (eps/eta)**beta_1 * (eps/eta_n)**beta_2  &
-                        * rho_nm1**(-alpha_2) !* (1.0_prec+eta_check)**(-gamma_1)
+!         rho_nm1 = (dt_n / dt_nm1) 
+!         rho_n   = (eps/eta_n)**beta_1 * (eps/eta_nm1)**beta_2  &
+!                         * rho_nm1**(-alpha_2) !* (1.0_prec+eta_check)**(-gamma_1)
+
+        ! Söderlind (2003) H312PD:  
+        rho_n   = (eps/eta_n)**k_i_1 * (eps/eta_nm1)**k_i_1 * (eps/eta_nm2)**k_i_1
 
         ! Scale rho_n for smoothness 
+        rhohat_n = rho_n 
         !rhohat_n = min(rho_n,1.1)
-        rhohat_n = 1.0_prec + kappa * atan((rho_n-1.0_prec)/kappa) ! Söderlind and Wang, 2006, Eq. 10
-
+        !rhohat_n = 1.0_prec + kappa * atan((rho_n-1.0_prec)/kappa) ! Söderlind and Wang, 2006, Eq. 10
+        
         ! Step 2: calculate the next time timestep (dt,n+1)
-        dt = rhohat_n * dt_n
+        dt_new = rhohat_n * dt_n
 
         !write(*,*) "pc: ", dt_n, dt, eta, rho_n, rhohat_n
 
@@ -139,11 +152,15 @@ contains
         dtmax_now = min(dtmax,dt_adv) 
 
         ! Finally, ensure timestep is within prescribed limits
-        call limit_adaptive_timestep(dt,dtmin,dtmax_now)
+        call limit_adaptive_timestep(dt_new,dtmin,dtmax_now)
 
-        ! Store previous timestep for later
-        dtm1 = dt_n 
+        ! Update dt and eta arrays 
+        dt = cshift(dt,shift=-1)
+        dt(1) = dt_new 
 
+        eta = cshift(eta,shift=-1)
+        eta(1) = eta_n 
+        
         return 
 
     end subroutine set_adaptive_timestep_pc

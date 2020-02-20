@@ -99,53 +99,22 @@ contains
         real(prec) :: dt_adv 
         real(prec) :: dtmax_now
 
-        logical    :: is_unstable
-        real(prec), allocatable :: tau_check(:,:) 
-        real(prec) :: eta_check 
+        real(prec) :: k_i 
 
-        real(prec), parameter :: pc_k    = 2.0_prec 
+        ! Choose adaptive controller algorithm for updating timestep 
+        ! PI42, H312b, H312PID
+        character(len=56), parameter :: pc_adapt_method = "H312PID"
 
-        ! Cheng et al. (2017) method
-        real(prec), parameter :: beta_1  =  3.0_prec / (pc_k*5.0_prec)          ! Cheng et al., 2017, Eq. 32
-        real(prec), parameter :: beta_2  = -1.0_prec / (pc_k*5.0_prec)          ! Cheng et al., 2017, Eq. 32
-        real(prec), parameter :: alpha_2 =  0.0_prec                            ! Söderlind and Wang, 2006, Eq. 4 
-        
-        ! Söderlind and Wang (2006) method 
-!         real(prec), parameter :: pc_b    =  2.0_prec 
-!         real(prec), parameter :: beta_1  =  1.0_prec / (pc_k*pc_b)            ! Söderlind and Wang, 2006, Eq. 4
-!         real(prec), parameter :: beta_2  =  1.0_prec / (pc_k*pc_b)            ! Söderlind and Wang, 2006, Eq. 4
-!         real(prec), parameter :: alpha_2 = -1.0_prec / (pc_b)                 ! Söderlind and Wang, 2006, Eq. 4 
-        
+        ! pc_k gives the order of the timestepping scheme (pc_k=2 for FE-SBE, pc_k=3 for AB-SAM)
+        real(prec), parameter :: pc_k    = 3.0_prec 
+
         ! Smoothing parameter; Söderlind and Wang (2006) method, Eq. 10
         ! Values on the order of [0.7,2.0] are reasonable. Higher kappa slows variation in dt
         real(prec), parameter :: kappa   =  2.0_prec 
         
-        ! Parameters controlling checkerboard stability check
-        real(prec), parameter :: tau_lim = 5.0_prec    ! [m/a] Maximum allowed tau for checkerboard
-        
-        ! Söderlind (2003), Eq. 38 parameters 
-        real(prec), parameter :: k_i     = (2.0_prec / 9.0_prec) * 1.0_prec/pc_k 
-        real(prec), parameter :: k_i_1   = k_i / 4.0_prec 
-        real(prec), parameter :: k_i_2   = k_i / 2.0_prec 
-        real(prec), parameter :: k_i_3   = k_i / 4.0_prec 
-        
-!         ! Söderlind (2003), Eq. 31+ parameters (H312b)
-!         real(prec), parameter :: pc_b    =  8.0_prec 
-!         real(prec), parameter :: beta_1  =  1.0_prec / (pc_k*pc_b)
-!         real(prec), parameter :: beta_2  =  2.0_prec / (pc_k*pc_b)
-!         real(prec), parameter :: beta_3  =  1.0_prec / (pc_k*pc_b)
-!         real(prec), parameter :: alpha_2 = -3.0_prec / (pc_b)      
-!         real(prec), parameter :: alpha_3 = -1.0_prec / (pc_b)      
+        ! Step 1: Save information needed for adapative controller algorithms 
 
-        ! Calculate checkerboard stability metric
-!         allocate(tau_check(size(tau,1),size(tau,2)))
-!         call calc_checkerboard(tau_check,tau,mask)
-!         eta_check = maxval(abs(tau_check))
-
-        ! Disabled checkerboard check for now, as it seems to be unnecessary
-        eta_check = 0.0_prec  
-
-        ! Step 0: save dt and eta from previous timesteps, calculate rho
+        ! save dt from previous timesteps
         dt_n    = max(dt(1),dtmin) 
         dt_nm1  = max(dt(2),dtmin) 
         dt_nm2  = max(dt(3),dtmin)
@@ -157,31 +126,55 @@ contains
         eta_nm1 = max(eta(1),1e-8)
         eta_nm2 = max(eta(2),1e-8)
 
+        ! Calculate rho from previous timesteps 
         rho_nm1 = (dt_n / dt_nm1) 
         rho_nm2 = (dt_nm1 / dt_nm2) 
 
          
         ! Step 2: calculate scaling for the next timestep (dt,n+1)
-        
-        ! Söderlind and Wang, 2006; Cheng et al., 2017
-        rho_n   = (eps/eta_n)**beta_1 * (eps/eta_nm1)**beta_2 * rho_nm1**alpha_2
+        select case(trim(pc_adapt_method))
 
-        ! Söderlind (2003) H312b/H312, Eq. 31+ (unlabeled) 
-!         rho_n   = (eps/eta_n)**beta_1 * (eps/eta_nm1)**beta_2 * (eps/eta_nm2)**beta_3 &
-!                         * rho_nm1**alpha_2 * rho_nm2**alpha_3
+            case("PI42")
+                ! Söderlind and Wang, 2006; Cheng et al., 2017
+                
+                rho_n = calc_pi_rho_pi42(eta_n,eta_nm1,rho_nm1,eps, &
+                                            beta_1  =  3.0_prec / (pc_k*5.0_prec),  &
+                                            beta_2  = -1.0_prec / (pc_k*5.0_prec), &
+                                            alpha_2 =  0.0_prec )
 
-        ! Söderlind (2003) H312PD, Eq. 38:  
-!         rho_n   = (eps/eta_n)**k_i_1 * (eps/eta_nm1)**k_i_1 * (eps/eta_nm2)**k_i_1
+
+            case("H312b") 
+                ! Söderlind (2003) H312b, Eq. 31+ (unlabeled) 
+                
+                rho_n = calc_pi_rho_H312b(eta_n,eta_nm1,eta_nm2,rho_nm1,rho_nm2,eps,k=pc_k,b=8.0_prec)
+
+            case("H312PID") 
+                ! Söderlind (2003) H312PD, Eq. 38
+                ! Note: Suggested k_i =(2/9)*1/pc_k, but lower value gives more stable solution
+
+                !k_i = (2.0_prec/9.0_prec)*1.0_prec/pc_k
+                k_i = 0.05_prec*1.0_prec/pc_k
+
+                rho_n = calc_pi_rho_H312PID(eta_n,eta_nm1,eta_nm2,eps,k_i)
+
+
+            case DEFAULT 
+
+                write(*,*) "set_adaptive_timestep_pc:: Error: pc_adapt_method not recognized."
+                write(*,*) "pc_adapt_method = ", trim(pc_adapt_method) 
+                stop 
+
+        end select 
 
         ! Scale rho_n for smoothness 
-        rhohat_n = rho_n 
-        !rhohat_n = min(rho_n,1.05)
+        rhohat_n = rho_n
+        !rhohat_n = min(rho_n,1.1)
         !rhohat_n = 1.0_prec + kappa * atan((rho_n-1.0_prec)/kappa) ! Söderlind and Wang, 2006, Eq. 10
         
-        ! Step 2: calculate the next time timestep (dt,n+1)
+        ! Step 3: calculate the next time timestep (dt,n+1)
         dt_new = rhohat_n * dt_n
 
-        !write(*,*) "pc: ", dt_n, dt, eta, rho_n, rhohat_n
+        ! Step 4: Modify timestep to fit within prescribed limits 
 
         ! Calculate CFL advection limit too, and limit maximum allowed timestep
         dt_adv    = minval( calc_adv2D_timestep1(ux_bar,uy_bar,dx,dx,cfl_max=1.0_prec) ) 
@@ -200,6 +193,83 @@ contains
         return 
 
     end subroutine set_adaptive_timestep_pc
+
+    function calc_pi_rho_pi42(eta_n,eta_nm1,rho_nm1,eps,beta_1,beta_2,alpha_2) result(rho_n)
+
+        implicit none 
+
+        real(prec), intent(IN) :: eta_n 
+        real(prec), intent(IN) :: eta_nm1 
+        real(prec), intent(IN) :: rho_nm1 
+        real(prec), intent(IN) :: eps 
+        real(prec), intent(IN) :: beta_1 
+        real(prec), intent(IN) :: beta_2
+        real(prec), intent(IN) :: alpha_2 
+        real(prec) :: rho_n 
+
+        ! Söderlind and Wang, 2006; Cheng et al., 2017
+        rho_n   = (eps/eta_n)**beta_1 * (eps/eta_nm1)**beta_2 * rho_nm1**alpha_2
+
+        return 
+
+    end function calc_pi_rho_pi42 
+
+    function calc_pi_rho_H312b(eta_n,eta_nm1,eta_nm2,rho_nm1,rho_nm2,eps,k,b) result(rho_n)
+
+        implicit none 
+
+        real(prec), intent(IN) :: eta_n 
+        real(prec), intent(IN) :: eta_nm1 
+        real(prec), intent(IN) :: eta_nm2 
+        real(prec), intent(IN) :: rho_nm1
+        real(prec), intent(IN) :: rho_nm2
+        real(prec), intent(IN) :: eps 
+        real(prec), intent(IN) :: k 
+        real(prec), intent(IN) :: b 
+        real(prec) :: rho_n 
+
+        ! Local variables 
+        real(prec) :: beta_1, beta_2, beta_3 
+        real(prec) :: alpha_2, alpha_3 
+
+        beta_1  =  1.0_prec / (k*b)
+        beta_2  =  2.0_prec / (k*b)
+        beta_3  =  1.0_prec / (k*b)
+        alpha_2 = -3.0_prec / b 
+        alpha_3 = -1.0_prec / b 
+
+        ! Söderlind (2003) H312b, Eq. 31+ (unlabeled) 
+        rho_n   = (eps/eta_n)**beta_1 * (eps/eta_nm1)**beta_2 * (eps/eta_nm2)**beta_3 &
+                            * rho_nm1**alpha_2 * rho_nm2**alpha_3 
+
+        return 
+
+    end function calc_pi_rho_H312b 
+
+    function calc_pi_rho_H312PID(eta_n,eta_nm1,eta_nm2,eps,k_i) result(rho_n)
+
+        implicit none 
+
+        real(prec), intent(IN) :: eta_n 
+        real(prec), intent(IN) :: eta_nm1 
+        real(prec), intent(IN) :: eta_nm2 
+        real(prec), intent(IN) :: eps 
+        real(prec), intent(IN) :: k_i  
+        real(prec) :: rho_n 
+
+        ! Local variables 
+        real(prec) :: k_i_1, k_i_2, k_i_3
+
+        k_i_1   = k_i / 4.0_prec 
+        k_i_2   = k_i / 2.0_prec 
+        k_i_3   = k_i / 4.0_prec 
+
+        ! Söderlind (2003) H312PID, Eq. 38
+        rho_n   = (eps/eta_n)**k_i_1 * (eps/eta_nm1)**k_i_2 * (eps/eta_nm2)**k_i_3
+
+        return 
+
+    end function calc_pi_rho_H312PID 
 
     subroutine set_pc_mask(mask,H_ice,f_grnd)
 

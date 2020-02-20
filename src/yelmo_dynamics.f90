@@ -51,6 +51,11 @@ contains
         ! Get time step
         dt = time - dyn%par%time 
 
+        ! Store previous (n-1) depth-averaged horizontal velocity components
+        ! (for use with higher-order ice thickness timestepping) 
+        dyn%now%ux_bar_nm1 = dyn%now%ux_bar 
+        dyn%now%uy_bar_nm1 = dyn%now%uy_bar 
+        
         ! ===== Calculate the horizontal velocity components =====
         ! These calculations are done assuming that the final
         ! 3D horizontal velocity fields (ux/uy) will be comprised
@@ -1403,6 +1408,9 @@ end if
         allocate(now%uy_bar(nx,ny))
         allocate(now%uxy_bar(nx,ny))
         
+        allocate(now%ux_bar_nm1(nx,ny)) 
+        allocate(now%uy_bar_nm1(nx,ny))
+
         allocate(now%ux_b(nx,ny)) 
         allocate(now%uy_b(nx,ny))
         allocate(now%uxy_b(nx,ny))
@@ -1475,6 +1483,9 @@ end if
         now%uy_bar            = 0.0
         now%uxy_bar           = 0.0
 
+        now%ux_bar_nm1        = 0.0 
+        now%uy_bar_nm1        = 0.0
+        
         now%ux_b              = 0.0 
         now%uy_b              = 0.0
         now%uxy_b             = 0.0
@@ -1555,6 +1566,9 @@ end if
         if (allocated(now%ux_bar))          deallocate(now%ux_bar) 
         if (allocated(now%uy_bar))          deallocate(now%uy_bar)
         if (allocated(now%uxy_bar))         deallocate(now%uxy_bar)
+        
+        if (allocated(now%ux_bar_nm1))      deallocate(now%ux_bar_nm1) 
+        if (allocated(now%uy_bar_nm1))      deallocate(now%uy_bar_nm1)
         
         if (allocated(now%ux_b))            deallocate(now%ux_b) 
         if (allocated(now%uy_b))            deallocate(now%uy_b)

@@ -229,6 +229,9 @@ module yelmo_defs
         real(prec), allocatable :: uy_b(:,:)
         real(prec), allocatable :: uxy_b(:,:)
 
+        real(prec), allocatable :: ux_bar_nm1(:,:) 
+        real(prec), allocatable :: uy_bar_nm1(:,:)
+
         ! Surface velocity: eventually these could be pointers since it is simply
         ! the top layer in ux(:,:,:), etc. and only used, not calculated.
         real(prec), allocatable :: ux_s(:,:) 
@@ -654,7 +657,6 @@ module yelmo_defs
         type(ygrid_class)       :: grd      ! Grid definition
         type(ytopo_class)       :: tpo      ! Topography variables
         type(ydyn_class)        :: dyn      ! Dynamics variables
-        type(ydyn_class)        :: dyn_m1   ! Dynamics variables
         type(ymat_class)        :: mat      ! Material variables
         type(ytherm_class)      :: thrm     ! Thermodynamics variables
         type(ybound_class)      :: bnd      ! Boundary variables to drive model

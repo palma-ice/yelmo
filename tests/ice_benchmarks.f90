@@ -180,13 +180,15 @@ contains
         real(prec), intent(IN)  :: g   
          
         ! Local variables 
-        integer    :: i, j, nx, ny 
+        integer    :: i, j, k, nx, ny 
         real(prec) :: r_now  
         real(prec) :: R0_meters
         real(prec) :: alpha, beta, gamma, t0, time1  
         
+        real(prec) :: dx
+        real(prec) :: xl, xr, yd, yu 
         real(prec) :: xx1(11), yy1(11), H1(11,11)
-
+        
         real(prec), parameter :: f = 0.0        ! isostasy fraction 
 
         nx = size(H_ice,1)
@@ -204,8 +206,17 @@ contains
 
         H_ice = 0.0_prec 
 
+        dx = xx(2,1) - xx(1,1) 
+
         do j = 2, ny-1
         do i = 2, nx-1 
+
+            ! Get edges of current cell 
+            xl = xx(i,j)-0.5*dx 
+            xr = xx(i,j)+0.5*dx 
+            yd = yy(i,j)-0.5*dx 
+            yu = yy(i,j)+0.5*dx 
+
 
             ! Calculate the radius value as a function of xx and yy [m]
             r_now = sqrt(xx(i,j)**2 + yy(i,j)**2)

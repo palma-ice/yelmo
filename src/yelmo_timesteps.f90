@@ -68,7 +68,8 @@ contains
         real(prec) :: dt_new, eta_new  
         real(prec) :: dt_n, dt_nm1, dt_nm2          ! [yr]   Timesteps (n:n-2)
         real(prec) :: eta_n, eta_nm1, eta_nm2       ! [X/yr] Maximum truncation error (n:n-2)
-        real(prec) :: rho_n, rho_nm1, rhohat_n 
+        real(prec) :: rho_n, rho_nm1, rho_nm2
+        real(prec) :: rhohat_n 
         real(prec) :: dt_adv 
         real(prec) :: dtmax_now
 
@@ -79,15 +80,15 @@ contains
         real(prec), parameter :: pc_k    = 2.0_prec 
 
         ! Cheng et al. (2017) method
-        real(prec), parameter :: beta_1  =  3.0_prec / (pc_k*5.0_prec)              ! Cheng et al., 2017, Eq. 32
-        real(prec), parameter :: beta_2  = -1.0_prec / (pc_k*5.0_prec)              ! Cheng et al., 2017, Eq. 32
-        real(prec), parameter :: alpha_2 =  0.0_prec                         ! Söderlind and Wang, 2006, Eq. 4 
+        real(prec), parameter :: beta_1  =  3.0_prec / (pc_k*5.0_prec)          ! Cheng et al., 2017, Eq. 32
+        real(prec), parameter :: beta_2  = -1.0_prec / (pc_k*5.0_prec)          ! Cheng et al., 2017, Eq. 32
+        real(prec), parameter :: alpha_2 =  0.0_prec                            ! Söderlind and Wang, 2006, Eq. 4 
         
         ! Söderlind and Wang (2006) method 
 !         real(prec), parameter :: pc_b    =  2.0_prec 
-!         real(prec), parameter :: beta_1  =  1.0_prec / (pc_k*pc_b)             ! Söderlind and Wang, 2006, Eq. 4
-!         real(prec), parameter :: beta_2  =  1.0_prec / (pc_k*pc_b)             ! Söderlind and Wang, 2006, Eq. 4
-!         real(prec), parameter :: alpha_2 =  1.0_prec / (pc_b)                  ! Söderlind and Wang, 2006, Eq. 4 
+!         real(prec), parameter :: beta_1  =  1.0_prec / (pc_k*pc_b)            ! Söderlind and Wang, 2006, Eq. 4
+!         real(prec), parameter :: beta_2  =  1.0_prec / (pc_k*pc_b)            ! Söderlind and Wang, 2006, Eq. 4
+!         real(prec), parameter :: alpha_2 = -1.0_prec / (pc_b)                 ! Söderlind and Wang, 2006, Eq. 4 
         
         ! Smoothing parameter; Söderlind and Wang (2006) method, Eq. 10
         ! Values on the order of [0.7,2.0] are reasonable. Higher kappa slows variation in dt
@@ -95,14 +96,21 @@ contains
         
         ! Parameters controlling checkerboard stability check
         real(prec), parameter :: tau_lim = 5.0_prec    ! [m/a] Maximum allowed tau for checkerboard
-        real(prec), parameter :: gamma_1 = 1.0_prec    ! Exponent for checkerboard scaling
-
+        
         ! Söderlind (2003), Eq. 38 parameters 
         real(prec), parameter :: k_i     = (2.0_prec / 9.0_prec) * 1.0_prec/pc_k 
         real(prec), parameter :: k_i_1   = k_i / 4.0_prec 
         real(prec), parameter :: k_i_2   = k_i / 2.0_prec 
         real(prec), parameter :: k_i_3   = k_i / 4.0_prec 
         
+!         ! Söderlind (2003), Eq. 31+ parameters (H312b)
+!         real(prec), parameter :: pc_b    =  8.0_prec 
+!         real(prec), parameter :: beta_1  =  1.0_prec / (pc_k*pc_b)
+!         real(prec), parameter :: beta_2  =  2.0_prec / (pc_k*pc_b)
+!         real(prec), parameter :: beta_3  =  1.0_prec / (pc_k*pc_b)
+!         real(prec), parameter :: alpha_2 = -3.0_prec / (pc_b)      
+!         real(prec), parameter :: alpha_3 = -1.0_prec / (pc_b)      
+
         ! Calculate checkerboard stability metric
 !         allocate(tau_check(size(tau,1),size(tau,2)))
 !         call calc_checkerboard(tau_check,tau,mask)
@@ -111,31 +119,37 @@ contains
         ! Disabled checkerboard check for now, as it seems to be unnecessary
         eta_check = 0.0_prec  
 
-        ! Step 0: save dt and eta from previous timestep 
+        ! Step 0: save dt and eta from previous timesteps, calculate rho
         dt_n    = max(dt(1),dtmin) 
         dt_nm1  = max(dt(2),dtmin) 
         dt_nm2  = max(dt(3),dtmin)
 
+        ! Calculate maximum value of truncation error (eta,n) = maxval(tau) 
+        ! Note: Limiting minimum to above eg 1e-8 is very important for reducing fluctuations in dt
         eta_n   = maxval(abs(tau),mask=mask)
         eta_n   = max(eta_n,1e-8)
         eta_nm1 = max(eta(1),1e-8)
         eta_nm2 = max(eta(2),1e-8)
 
-        ! Step 1: calculate maximum value of truncation error (eta,n+1) = maxval(tau) 
-        ! Note: Limiting minimum to above eg 1e-8 is very important for reducing fluctuations in dt
-        
-
-        ! Step 2: calculate scaling for the next timestep (dt,n+1)
         rho_nm1 = (dt_n / dt_nm1) 
-        rho_n   = (eps/eta_n)**beta_1 * (eps/eta_nm1)**beta_2  &
-                        * rho_nm1**(-alpha_2) !* (1.0_prec+eta_check)**(-gamma_1)
+        rho_nm2 = (dt_nm1 / dt_nm2) 
+
+         
+        ! Step 2: calculate scaling for the next timestep (dt,n+1)
+        
+        ! Söderlind and Wang, 2006; Cheng et al., 2017
+        rho_n   = (eps/eta_n)**beta_1 * (eps/eta_nm1)**beta_2 * rho_nm1**alpha_2
+
+        ! Söderlind (2003) H312b/H312, Eq. 31+ (unlabeled) 
+!         rho_n   = (eps/eta_n)**beta_1 * (eps/eta_nm1)**beta_2 * (eps/eta_nm2)**beta_3 &
+!                         * rho_nm1**alpha_2 * rho_nm2**alpha_3
 
         ! Söderlind (2003) H312PD, Eq. 38:  
 !         rho_n   = (eps/eta_n)**k_i_1 * (eps/eta_nm1)**k_i_1 * (eps/eta_nm2)**k_i_1
 
         ! Scale rho_n for smoothness 
-        rhohat_n = rho_n 
-        !rhohat_n = min(rho_n,1.1)
+        !rhohat_n = rho_n 
+        rhohat_n = min(rho_n,1.05)
         !rhohat_n = 1.0_prec + kappa * atan((rho_n-1.0_prec)/kappa) ! Söderlind and Wang, 2006, Eq. 10
         
         ! Step 2: calculate the next time timestep (dt,n+1)

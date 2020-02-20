@@ -180,48 +180,47 @@ contains
         real(prec), intent(IN)  :: g   
          
         ! Local variables 
-        integer :: nx, ny 
-        real(prec), allocatable :: r(:,:)  
-        real(prec)  :: R0_meters
-        real(prec)  :: alpha, beta, gamma, t0, time1  
+        integer    :: i, j, nx, ny 
+        real(prec) :: r_now  
+        real(prec) :: R0_meters
+        real(prec) :: alpha, beta, gamma, t0, time1  
         
+        real(prec) :: xx1(11), yy1(11), H1(11,11)
+
         real(prec), parameter :: f = 0.0        ! isostasy fraction 
 
         nx = size(H_ice,1)
         ny = size(H_ice,2) 
-
-        allocate(r(nx,ny))
-
-        ! Calculate the radius value as a function of xx and yy [m]
-        r = sqrt(xx**2 + yy**2)
 
         ! Get parameter R0 in meters [km] => [m]
         R0_meters = R0 * 1e3 
 
         ! Calculate alpha, beta, t0 and absolute time
         alpha = (2.0 - (n+1.0)*lambda)/(5.0*n+3.0)
-
         beta  = (1.0 + (2.0*n+1.0)*lambda) / (5.0*n+3.0)
-
         gamma = bueler_gamma(A,n,rho_ice,g)
-
         t0    = (beta/gamma) * ((2.0*n+1.0)/(n+1.0))**n * (R0_meters**(n+1)/H0**(2.0*n+1.0))
-
         time1 = time + t0 
 
-        !write(*,*) gamma, t0  
-        !stop 
+        H_ice = 0.0_prec 
 
-        ! Calculate the Halfar similarity solution profile (Eq. 10-11 in Bueler et al, 2005)
-        H_ice = 0.0
-        !where (r .le. R0_meters) & 
-        where ( (1.0 - (((time1/t0)**(-beta))*r/R0_meters)**((n+1.0)/n)) .gt. 0.0_prec) &
-        H_ice = H0 * (time1/t0)**(-alpha) * (1.0 - (((time1/t0)**(-beta))*r/R0_meters)**((n+1.0)/n))**(n/(2.0*n+1.0))
+        do j = 2, ny-1
+        do i = 2, nx-1 
 
-        ! Now calculate implied mass balance
-        mbal  = (lambda/time1)*H_ice  
+            ! Calculate the radius value as a function of xx and yy [m]
+            r_now = sqrt(xx(i,j)**2 + yy(i,j)**2)
 
-        ! Set the basal velocity to zero 
+            ! Calculate the Halfar similarity solution profile (Eq. 10-11 in Bueler et al, 2005)
+            if ( (1.0 - (((time1/t0)**(-beta))*r_now/R0_meters)**((n+1.0)/n)) .gt. 0.0_prec) &
+            H_ice(i,j) = H0 * (time1/t0)**(-alpha) * (1.0 - (((time1/t0)**(-beta))*r_now/R0_meters)**((n+1.0)/n))**(n/(2.0*n+1.0))
+
+            ! Now calculate implied mass balance
+            mbal(i,j)  = (lambda/time1)*H_ice(i,j)  
+
+        end do 
+        end do 
+
+        ! Set the basal velocity to zero everywhere
         u_b = 0.0 
 
         return 

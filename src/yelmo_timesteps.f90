@@ -8,6 +8,7 @@ module yelmo_timesteps
     private
 
     public :: calc_pc_tau_fe_sbe
+    public :: calc_pc_tau_ab_sam
     public :: set_adaptive_timestep_pc
     public :: set_pc_mask
 
@@ -45,6 +46,31 @@ contains
         return 
 
     end subroutine calc_pc_tau_fe_sbe
+
+    elemental subroutine calc_pc_tau_ab_sam(tau,var_corr,var_pred,dt_n,zeta)
+        ! Calculate truncation error for the FE-SBE timestepping method
+        ! Forward Euler (FE) predictor step and Semi-implicit
+        ! Backward Euler (SBE) corrector step. 
+        ! Implemented followig Cheng et al (2017, GMD)
+        ! Truncation error: tau = 1/2*dt_n * (var - var_pred)
+
+        implicit none 
+
+        real(prec), intent(OUT) :: tau
+        real(prec), intent(IN)  :: var_corr
+        real(prec), intent(IN)  :: var_pred
+        real(prec), intent(IN)  :: dt_n 
+        real(prec), intent(IN)  :: zeta 
+
+        if (dt_n .eq. 0.0_prec) then 
+            tau = 0.0_prec 
+        else 
+            tau = zeta * (var_corr - var_pred) / ((3.0_prec*zeta + 3.0_prec)*dt_n)
+        end if 
+
+        return 
+
+    end subroutine calc_pc_tau_ab_sam
 
     subroutine set_adaptive_timestep_pc(dt,eta,tau,eps,dtmin,dtmax,mask,ux_bar,uy_bar,dx)
         ! Calculate the timestep following algorithm for 
@@ -148,8 +174,8 @@ contains
 !         rho_n   = (eps/eta_n)**k_i_1 * (eps/eta_nm1)**k_i_1 * (eps/eta_nm2)**k_i_1
 
         ! Scale rho_n for smoothness 
-        !rhohat_n = rho_n 
-        rhohat_n = min(rho_n,1.05)
+        rhohat_n = rho_n 
+        !rhohat_n = min(rho_n,1.05)
         !rhohat_n = 1.0_prec + kappa * atan((rho_n-1.0_prec)/kappa) ! Söderlind and Wang, 2006, Eq. 10
         
         ! Step 2: calculate the next time timestep (dt,n+1)

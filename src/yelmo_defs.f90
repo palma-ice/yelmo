@@ -654,6 +654,7 @@ module yelmo_defs
         type(ygrid_class)       :: grd      ! Grid definition
         type(ytopo_class)       :: tpo      ! Topography variables
         type(ydyn_class)        :: dyn      ! Dynamics variables
+        type(ydyn_class)        :: dyn_m1   ! Dynamics variables
         type(ymat_class)        :: mat      ! Material variables
         type(ytherm_class)      :: thrm     ! Thermodynamics variables
         type(ybound_class)      :: bnd      ! Boundary variables to drive model

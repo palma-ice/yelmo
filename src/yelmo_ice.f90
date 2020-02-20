@@ -8,7 +8,7 @@ module yelmo_ice
     use yelmo_defs
     use yelmo_grid, only : yelmo_init_grid
     use yelmo_timesteps, only : set_adaptive_timestep, set_adaptive_timestep_pc, set_pc_mask, calc_pc_tau_fe_sbe, &
-             limit_adaptive_timestep,yelmo_timestep_write_init, yelmo_timestep_write, calc_adv3D_timestep1
+             calc_pc_tau_ab_sam, limit_adaptive_timestep,yelmo_timestep_write_init, yelmo_timestep_write, calc_adv3D_timestep1
     use yelmo_io 
 
     use yelmo_topography
@@ -39,8 +39,9 @@ contains
 
         ! Local variables 
         type(yelmo_class)  :: dom0 
-        type(ytopo_class)  :: tpo1 
-        
+        type(ytopo_class)  :: tpo1, tpo2
+        type(ydyn_class)   :: dyn_now
+
         real(prec) :: dt_now, dt_max  
         real(prec) :: time_now, time_start 
         integer    :: n, nstep, n_now
@@ -56,6 +57,8 @@ contains
         logical, allocatable :: pc_mask(:,:) 
         logical :: dt_redo 
         
+        real(prec) :: ab_beta1, ab_beta2, ab_zeta 
+
         ! Load last model time (from dom%tpo, should be equal to dom%thrm)
         time_now = dom%tpo%par%time
 
@@ -146,16 +149,32 @@ end if
             ! Store local copy of ytopo object to use for predictor step
             tpo1  = dom%tpo 
             
+            ab_zeta  = dom%par%pc_dt(1) / dom%par%pc_dt(2) 
+            ab_beta1 = 1.0_prec + ab_zeta/2.0_prec 
+            ab_beta2 = -ab_zeta/2.0_prec 
+
+            dyn_now = dom%dyn 
+            dyn_now%now%ux_bar = ab_beta1*dom%dyn%now%ux_bar + ab_beta2*dom%dyn_m1%now%ux_bar
+            dyn_now%now%uy_bar = ab_beta1*dom%dyn%now%uy_bar + ab_beta2*dom%dyn_m1%now%uy_bar
+
             ! Step 1: Perform predictor step with temporary topography object 
             ! Calculate topography (elevation, ice thickness, calving, etc.)
-            call calc_ytopo(tpo1,dom%dyn,dom%thrm,dom%bnd,time_now,topo_fixed=dom%tpo%par%topo_fixed)
+            call calc_ytopo(tpo1,dyn_now,dom%thrm,dom%bnd,time_now,topo_fixed=dom%tpo%par%topo_fixed)
             call calc_ytopo_masks(tpo1,dom%dyn,dom%thrm,dom%bnd)
 
             ! Step 2: Update other variables using predicted ice thickness 
             
             ! Calculate dynamics (velocities and stresses)
+            dom%dyn_m1 = dom%dyn 
             call calc_ydyn(dom%dyn,tpo1,dom%mat,dom%thrm,dom%bnd,time_now)
             
+            dyn_now = dom%dyn
+            dyn_now%now%ux_bar = 0.5_prec*dom%dyn%now%ux_bar + 0.5_prec*dom%dyn_m1%now%ux_bar
+            dyn_now%now%uy_bar = 0.5_prec*dom%dyn%now%uy_bar + 0.5_prec*dom%dyn_m1%now%uy_bar
+
+            ! Update dyn 
+            dom%dyn = dyn_now 
+
             ! Calculate material (ice properties, viscosity, etc.)
             call calc_ymat(dom%mat,tpo1,dom%dyn,dom%thrm,dom%bnd,time_now)
 
@@ -169,7 +188,8 @@ end if
 
 
             ! Determine truncation error for ice thickness 
-            call calc_pc_tau_fe_sbe(dom%par%pc_tau,dom%tpo%now%H_ice,tpo1%now%H_ice,dom%par%pc_dt(1))
+            !call calc_pc_tau_fe_sbe(dom%par%pc_tau,dom%tpo%now%H_ice,tpo1%now%H_ice,dom%par%pc_dt(1))
+            call calc_pc_tau_ab_sam(dom%par%pc_tau,dom%tpo%now%H_ice,tpo1%now%H_ice,dom%par%pc_dt(1),ab_zeta)
 
 
             ! Check if this timestep should be rejected
@@ -421,6 +441,7 @@ end if
         call ydyn_par_load(dom%dyn%par,filename,dom%par%zeta_aa,dom%par%zeta_ac,dom%grd%nx,dom%grd%ny,dom%grd%dx,init=.TRUE.)
 
         call ydyn_alloc(dom%dyn%now,dom%dyn%par%nx,dom%dyn%par%ny,dom%dyn%par%nz_aa,dom%dyn%par%nz_ac)
+        call ydyn_alloc(dom%dyn_m1%now,dom%dyn_m1%par%nx,dom%dyn_m1%par%ny,dom%dyn_m1%par%nz_aa,dom%dyn_m1%par%nz_ac)
         
         write(*,*) "yelmo_init:: dynamics initialized."
         
@@ -652,7 +673,8 @@ end if
             
             ! Call dynamics 
             call calc_ydyn(dom%dyn,dom%tpo,dom%mat,dom%thrm,dom%bnd,time)
-
+            dom%dyn_m1 = dom%dyn 
+            
             ! Calculate material information again with updated dynamics
         
             call calc_ymat(dom%mat,dom%tpo,dom%dyn,dom%thrm,dom%bnd,time)

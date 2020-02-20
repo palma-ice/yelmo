@@ -620,6 +620,7 @@ module yelmo_defs
         real(prec)          :: dt_min
         real(prec)          :: cfl_max 
         real(prec)          :: cfl_diff_max 
+        character (len=56)  :: pc_method
         real(prec)          :: pc_tol 
         real(prec)          :: pc_eps  
 

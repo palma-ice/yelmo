@@ -105,11 +105,11 @@ contains
     end subroutine calc_pc_tau_fe_sbe
 
     elemental subroutine calc_pc_tau_ab_sam(tau,var_corr,var_pred,dt_n,zeta)
-        ! Calculate truncation error for the FE-SBE timestepping method
-        ! Forward Euler (FE) predictor step and Semi-implicit
-        ! Backward Euler (SBE) corrector step. 
+        ! Calculate truncation error for the AB-SAM timestepping method
+        ! Adams-Bashforth (AB) predictor step and Semi-implicit
+        ! Adams–Moulton (SAM) corrector step. 
         ! Implemented followig Cheng et al (2017, GMD)
-        ! Truncation error: tau = 1/2*dt_n * (var - var_pred)
+        ! Truncation error: tau = zeta * (var - var_pred) / ((3zeta + 3)*dt)
 
         implicit none 
 
@@ -129,16 +129,16 @@ contains
 
     end subroutine calc_pc_tau_ab_sam
 
-    subroutine set_adaptive_timestep_pc(dt,eta,tau,eps,dtmin,dtmax,mask,ux_bar,uy_bar,dx)
+    subroutine set_adaptive_timestep_pc(dt_new,dt,eta,eps,dtmin,dtmax,mask,ux_bar,uy_bar,dx,pc_k)
         ! Calculate the timestep following algorithm for 
         ! a general predictor-corrector (pc) method.
         ! Implemented followig Cheng et al (2017, GMD)
 
         implicit none 
 
-        real(prec), intent(INOUT) :: dt(:)              ! [yr]   Timesteps (n:n-2)
-        real(prec), intent(INOUT) :: eta(:)             ! [X/yr] Maximum truncation error (n:n-2)
-        real(prec), intent(IN)  :: tau(:,:)             ! [X/yr] Truncation error 
+        real(prec), intent(OUT) :: dt_new               ! [yr]   Timestep (n+1)
+        real(prec), intent(IN)  :: dt(:)                ! [yr]   Timesteps (n:n-2)
+        real(prec), intent(IN)  :: eta(:)               ! [X/yr] Maximum truncation error (n:n-2)
         real(prec), intent(IN)  :: eps                  ! [--]   Tolerance value (eg, eps=1e-4)
         real(prec), intent(IN)  :: dtmin                ! [yr]   Minimum allowed timestep
         real(prec), intent(IN)  :: dtmax                ! [yr]   Maximum allowed timestep
@@ -146,9 +146,9 @@ contains
         real(prec), intent(IN)  :: ux_bar(:,:)          ! [m/yr]
         real(prec), intent(IN)  :: uy_bar(:,:)          ! [m/yr]
         real(prec), intent(IN)  :: dx                   ! [m]
-        
+        integer,    intent(IN)  :: pc_k                 ! pc_k gives the order of the timestepping scheme (pc_k=2 for FE-SBE, pc_k=3 for AB-SAM)
+
         ! Local variables
-        real(prec) :: dt_new, eta_new  
         real(prec) :: dt_n, dt_nm1, dt_nm2          ! [yr]   Timesteps (n:n-2)
         real(prec) :: eta_n, eta_nm1, eta_nm2       ! [X/yr] Maximum truncation error (n:n-2)
         real(prec) :: rho_n, rho_nm1, rho_nm2
@@ -162,31 +162,26 @@ contains
         ! PI42, H312b, H312PID
         character(len=56), parameter :: pc_adapt_method = "H312PID"
 
-        ! pc_k gives the order of the timestepping scheme (pc_k=2 for FE-SBE, pc_k=3 for AB-SAM)
-        real(prec), parameter :: pc_k    = 3.0_prec 
-
         ! Smoothing parameter; Söderlind and Wang (2006) method, Eq. 10
         ! Values on the order of [0.7,2.0] are reasonable. Higher kappa slows variation in dt
-        real(prec), parameter :: kappa   =  2.0_prec 
+        real(prec), parameter :: kappa = 2.0_prec 
         
         ! Step 1: Save information needed for adapative controller algorithms 
 
-        ! save dt from previous timesteps
+        ! Save dt from several timesteps
         dt_n    = max(dt(1),dtmin) 
         dt_nm1  = max(dt(2),dtmin) 
         dt_nm2  = max(dt(3),dtmin)
 
-        ! Calculate maximum value of truncation error (eta,n) = maxval(tau) 
-        ! and store previous values 
-        eta_n   = calc_pc_eta(tau,mask)
-        eta_nm1 = eta(1)
-        eta_nm2 = eta(2)
+        ! Save eta from several timestep
+        eta_n   = eta(1)
+        eta_nm1 = eta(2)
+        eta_nm2 = eta(3)
 
         ! Calculate rho from previous timesteps 
         rho_nm1 = (dt_n / dt_nm1) 
         rho_nm2 = (dt_nm1 / dt_nm2) 
 
-         
         ! Step 2: calculate scaling for the next timestep (dt,n+1)
         select case(trim(pc_adapt_method))
 
@@ -202,14 +197,14 @@ contains
             case("H312b") 
                 ! Söderlind (2003) H312b, Eq. 31+ (unlabeled) 
                 
-                rho_n = calc_pi_rho_H312b(eta_n,eta_nm1,eta_nm2,rho_nm1,rho_nm2,eps,k=pc_k,b=8.0_prec)
+                rho_n = calc_pi_rho_H312b(eta_n,eta_nm1,eta_nm2,rho_nm1,rho_nm2,eps,k=real(pc_k,prec),b=8.0_prec)
 
             case("H312PID") 
                 ! Söderlind (2003) H312PD, Eq. 38
                 ! Note: Suggested k_i =(2/9)*1/pc_k, but lower value gives more stable solution
 
-                !k_i = (2.0_prec/9.0_prec)*1.0_prec/pc_k
-                k_i = 0.1_prec*1.0_prec/pc_k
+                !k_i = (2.0_prec/9.0_prec)*1.0_prec/real(pc_k,prec)
+                k_i = 0.1_prec*1.0_prec/real(pc_k,prec)
 
                 rho_n = calc_pi_rho_H312PID(eta_n,eta_nm1,eta_nm2,eps,k_i)
 
@@ -239,13 +234,6 @@ contains
         ! Finally, ensure timestep is within prescribed limits
         call limit_adaptive_timestep(dt_new,dtmin,dtmax_now)
 
-        ! Update dt and eta arrays 
-        dt = cshift(dt,shift=-1)
-        dt(1) = dt_new 
-
-        eta = cshift(eta,shift=-1)
-        eta(1) = eta_n 
-        
         return 
 
     end subroutine set_adaptive_timestep_pc
@@ -888,7 +876,7 @@ contains
 
     end subroutine yelmo_timestep_write_init 
 
-    subroutine yelmo_timestep_write(filename,time,dt_now,dt_adv,pc_dt,pc_eta,pc_tau)
+    subroutine yelmo_timestep_write(filename,time,dt_now,dt_adv,dt_pi,pc_eta,pc_tau)
 
         implicit none 
 
@@ -896,7 +884,7 @@ contains
         real(prec), intent(IN) :: time 
         real(prec), intent(IN) :: dt_now 
         real(prec), intent(IN) :: dt_adv
-        real(prec), intent(IN) :: pc_dt 
+        real(prec), intent(IN) :: dt_pi 
         real(prec), intent(IN) :: pc_eta 
         real(prec), intent(IN) :: pc_tau(:,:) 
 
@@ -921,7 +909,7 @@ contains
         call nc_write(filename, "dt_now",dt_now,dim1="time",start=[n],count=[1],ncid=ncid)
         call nc_write(filename, "dt_adv",dt_adv,dim1="time",start=[n],count=[1],ncid=ncid)
         
-        call nc_write(filename,  "pc_dt", pc_dt,dim1="time",start=[n],count=[1],ncid=ncid)
+        call nc_write(filename,  "dt_pi", dt_pi,dim1="time",start=[n],count=[1],ncid=ncid)
         call nc_write(filename, "pc_eta",pc_eta,dim1="time",start=[n],count=[1],ncid=ncid)
         call nc_write(filename, "pc_tau",pc_tau,dim1="xc",dim2="yc",dim3="time",start=[1,1,n],count=[nx,ny,1],ncid=ncid)
         

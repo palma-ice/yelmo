@@ -7,7 +7,7 @@ module yelmo_ice
     
     use yelmo_defs
     use yelmo_grid, only : yelmo_init_grid
-    use yelmo_timesteps, only : set_adaptive_timestep, set_adaptive_timestep_pc, set_pc_mask, calc_pc_tau_fe_sbe, &
+    use yelmo_timesteps, only : set_adaptive_timestep, set_adaptive_timestep_pc, set_pc_mask, calc_pc_eta, calc_pc_tau_fe_sbe, &
              calc_pc_tau_ab_sam, limit_adaptive_timestep,yelmo_timestep_write_init, yelmo_timestep_write, calc_adv3D_timestep1
     use yelmo_io 
 
@@ -176,8 +176,8 @@ contains
 
 
                 ! Determine truncation error for ice thickness 
-                !call calc_pc_tau_fe_sbe(dom%par%pc_tau,dom%tpo%now%H_ice,tpo1%now%H_ice,dom%par%pc_dt(1))
-                call calc_pc_tau_ab_sam(dom%par%pc_tau,dom%tpo%now%H_ice,tpo1%now%H_ice,dom%par%pc_dt(1),ab_zeta)
+                !call calc_pc_tau_fe_sbe(dom%par%pc_tau,dom%tpo%now%H_ice,tpo1%now%H_ice,dt_now)
+                call calc_pc_tau_ab_sam(dom%par%pc_tau,dom%tpo%now%H_ice,tpo1%now%H_ice,dt_now,ab_zeta)
 
                 
                 call set_pc_mask(pc_mask,dom%tpo%now%H_ice,dom%tpo%now%f_grnd)

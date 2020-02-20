@@ -7,11 +7,12 @@ module yelmo_timesteps
 
     private
 
+    public :: set_pc_mask
+    public :: calc_pc_eta
     public :: calc_pc_tau_fe_sbe
     public :: calc_pc_tau_ab_sam
     public :: set_adaptive_timestep_pc
-    public :: set_pc_mask
-
+    
     public :: set_adaptive_timestep 
     public :: limit_adaptive_timestep
 
@@ -22,6 +23,62 @@ module yelmo_timesteps
     public :: calc_adv3D_timestep1 
 
 contains
+
+    subroutine set_pc_mask(mask,H_ice,f_grnd)
+
+        implicit none 
+
+        logical, intent(OUT) :: mask(:,:) 
+        real(prec), intent(IN) :: H_ice(:,:) 
+        real(prec), intent(IN) :: f_grnd(:,:) 
+
+        ! Local variables 
+        integer :: i, j, nx, ny 
+
+        nx = size(mask,1)
+        ny = size(mask,2) 
+
+        mask = .FALSE. 
+
+        ! Limit to ice-covered, grounded points 
+        where (H_ice .gt. 0.0_prec .and. f_grnd .eq. 1.0_prec) mask = .TRUE. 
+
+        ! Set mask to false for ice margin points as well 
+        do j = 2, ny-1 
+        do i = 2, nx-1 
+            if (mask(i,j)) then 
+                if (count(H_ice(i-1:i+1,j-1:j+1).eq.0.0_prec) .gt. 0) then 
+                    mask(i,j) = .FALSE.
+                end if 
+            end if 
+        end do 
+        end do
+
+        return 
+
+    end subroutine set_pc_mask
+
+    function calc_pc_eta(tau,mask) result(eta)
+
+        implicit none 
+
+        real(prec), intent(IN) :: tau(:,:) 
+        logical,    intent(IN) :: mask(:,:) 
+        real(prec) :: eta 
+
+        real(prec), parameter :: eta_tol = 1e-8 
+
+        ! Calculate eta 
+        eta = maxval(abs(tau),mask=mask)
+
+        ! Limit to non-zero value
+        ! Note: Limiting minimum to above eg 1e-8 is very 
+        ! important for reducing fluctuations in dt 
+        eta = max(eta,eta_tol)
+
+        return 
+
+    end function calc_pc_eta 
 
     elemental subroutine calc_pc_tau_fe_sbe(tau,var_corr,var_pred,dt_n)
         ! Calculate truncation error for the FE-SBE timestepping method
@@ -120,11 +177,10 @@ contains
         dt_nm2  = max(dt(3),dtmin)
 
         ! Calculate maximum value of truncation error (eta,n) = maxval(tau) 
-        ! Note: Limiting minimum to above eg 1e-8 is very important for reducing fluctuations in dt
-        eta_n   = maxval(abs(tau),mask=mask)
-        eta_n   = max(eta_n,1e-8)
-        eta_nm1 = max(eta(1),1e-8)
-        eta_nm2 = max(eta(2),1e-8)
+        ! and store previous values 
+        eta_n   = calc_pc_eta(tau,mask)
+        eta_nm1 = eta(1)
+        eta_nm2 = eta(2)
 
         ! Calculate rho from previous timesteps 
         rho_nm1 = (dt_n / dt_nm1) 
@@ -153,7 +209,7 @@ contains
                 ! Note: Suggested k_i =(2/9)*1/pc_k, but lower value gives more stable solution
 
                 !k_i = (2.0_prec/9.0_prec)*1.0_prec/pc_k
-                k_i = 0.05_prec*1.0_prec/pc_k
+                k_i = 0.1_prec*1.0_prec/pc_k
 
                 rho_n = calc_pi_rho_H312PID(eta_n,eta_nm1,eta_nm2,eps,k_i)
 
@@ -270,40 +326,6 @@ contains
         return 
 
     end function calc_pi_rho_H312PID 
-
-    subroutine set_pc_mask(mask,H_ice,f_grnd)
-
-        implicit none 
-
-        logical, intent(OUT) :: mask(:,:) 
-        real(prec), intent(IN) :: H_ice(:,:) 
-        real(prec), intent(IN) :: f_grnd(:,:) 
-
-        ! Local variables 
-        integer :: i, j, nx, ny 
-
-        nx = size(mask,1)
-        ny = size(mask,2) 
-
-        mask = .FALSE. 
-
-        ! Limit to ice-covered, grounded points 
-        where (H_ice .gt. 0.0_prec .and. f_grnd .eq. 1.0_prec) mask = .TRUE. 
-
-        ! Set mask to false for ice margin points as well 
-        do j = 2, ny-1 
-        do i = 2, nx-1 
-            if (mask(i,j)) then 
-                if (count(H_ice(i-1:i+1,j-1:j+1).eq.0.0_prec) .gt. 0) then 
-                    mask(i,j) = .FALSE.
-                end if 
-            end if 
-        end do 
-        end do
-
-        return 
-
-    end subroutine set_pc_mask
 
     subroutine set_adaptive_timestep(dt,dt_adv,dt_diff,dt_adv3D, &
                         ux,uy,uz,ux_bar,uy_bar,D2D,H_ice,dHicedt,zeta_ac, &

@@ -19,8 +19,6 @@ module yelmo_ice
     use yelmo_data 
     use yelmo_regions 
 
-    use velocity_hybrid_pd12 
-
     implicit none 
 
     private
@@ -57,9 +55,12 @@ contains
 
         logical, allocatable :: pc_mask(:,:) 
         
-
+        ! Number of iterations to repeat a timestep if the error tolerance is exceeded.
+        ! n_iter_redo=5 is rarely met, so it is a good choice - no need for a parameter.
         integer, parameter :: n_iter_redo = 5 
 
+
+        ! Determine which predictor-corrector (pc) method we are using for timestepping 
         select case(trim(dom%par%pc_method))
 
             case("FE-SBE")
@@ -91,9 +92,8 @@ contains
         call cpu_time(cpu_start_time) 
         time_start = time_now 
         
-        ! Determine maximum number of time steps to be iterated through
-        ! (plus 30% more to handle repeat timesteps)   
-        nstep   = ceiling( 1.30_prec * (time-time_now) / dom%par%dt_min )
+        ! Determine maximum number of time steps to be iterated through   
+        nstep   = ceiling( (time-time_now) / dom%par%dt_min )
         n_now   = 0  ! Number of timesteps saved 
 
         allocate(dt_save(nstep))
@@ -139,7 +139,7 @@ contains
                 case(2) 
                     ! Use PI adaptive timestep
 
-                    dt_now = dt_pi                      ! Based on ice thickness 
+                    dt_now = dt_pi
                     
                 case DEFAULT 
 
@@ -221,11 +221,11 @@ contains
                 ! Check if this timestep should be rejected
                 if (eta_now .gt. dom%par%pc_tol .and. dt_now .gt. dom%par%dt_min) then
 
+                    ! Calculate timestep reduction to apply
                     !rho_now = 0.7_prec
                     rho_now = 0.7_prec*(1.0_prec+(eta_now-dom%par%pc_tol)/10.0_prec)**(-1.0_prec) 
 
-                   ! write(*,*) "pcredo: ", time_now, dt_now, eta_now, rho_now
-                    
+                    ! Reset yelmo and time variables to beginning of timestep
                     dom      = dom0 
                     time_now = dom0%tpo%par%time
                     dt_now   = max(dt_now*rho_now,dom%par%dt_min)
@@ -238,6 +238,7 @@ contains
                 end if 
 
             end do   ! End iteration loop 
+            
 
             ! Update dt and eta vectors for last 3 timesteps 
             dom%par%pc_dt = cshift(dom%par%pc_dt,shift=-1)

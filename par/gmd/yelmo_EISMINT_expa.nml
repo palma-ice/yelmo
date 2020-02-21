@@ -11,7 +11,7 @@
     ! Timing parameters 
     time_init    = 0.0                  ! [yr] Starting time 
     time_end     = 100e3                ! [yr] Ending time 
-    dtt          = 5.0                  ! [yr] Main loop timestep 
+    dtt          = 20.0                 ! [yr] Main loop timestep 
     dt2D_out     = 2000.0               ! [yr] Frequency of writing 2D output files 
 
     ! Settings for transient EISMINT1 experiments 
@@ -35,7 +35,7 @@
     cfl_diff_max    = 0.12              ! Bueler et al (2007), Eq. 25  
     pc_method       = "AB-SAM"          ! "FE-SBE" or "AB-SAM"
     pc_tol          = 1.5               ! [m/a] Tolerance threshold to redo timestep
-    pc_eps          = 1e-2              ! Predictor-corrector tolerance 
+    pc_eps          = 1e-3              ! Predictor-corrector tolerance 
     
 /
 

@@ -4,7 +4,6 @@ program yelmo_trough
     use ncio 
     use yelmo 
     use yelmo_tools, only : stagger_aa_acx, stagger_aa_acy
-    use yelmo_dynamics, only: check_vel_convergence
     use deformation 
 
     implicit none 

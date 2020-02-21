@@ -173,12 +173,12 @@ contains
         dt_nm1  = max(dt(2),dtmin) 
         dt_nm2  = max(dt(3),dtmin)
 
-        ! Save eta from several timestep
+        ! Save eta from several timesteps
         eta_n   = eta(1)
         eta_nm1 = eta(2)
         eta_nm2 = eta(3)
 
-        ! Calculate rho from previous timesteps 
+        ! Calculate rho from several timesteps 
         rho_nm1 = (dt_n / dt_nm1) 
         rho_nm2 = (dt_nm1 / dt_nm2) 
 
@@ -204,7 +204,7 @@ contains
                 ! Note: Suggested k_i =(2/9)*1/pc_k, but lower value gives more stable solution
 
                 !k_i = (2.0_prec/9.0_prec)*1.0_prec/real(pc_k,prec)
-                k_i = 0.1_prec*1.0_prec/real(pc_k,prec)
+                k_i = 0.08_prec/real(pc_k,prec)
 
                 rho_n = calc_pi_rho_H312PID(eta_n,eta_nm1,eta_nm2,eps,k_i)
 

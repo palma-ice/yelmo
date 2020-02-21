@@ -58,7 +58,7 @@ contains
         logical, allocatable :: pc_mask(:,:) 
         
 
-        integer, parameter :: n_iter_redo = 3 
+        integer, parameter :: n_iter_redo = 5 
 
         select case(trim(dom%par%pc_method))
 
@@ -166,7 +166,7 @@ contains
                 if (use_absam) then
                     ! AB-SAM: update velocities for calculation of predicted ice thickness
 
-                    ab_zeta  = dom%par%pc_dt(1) / dom%par%pc_dt(2) 
+                    ab_zeta  = dt_now / dom%par%pc_dt(1) 
                     ab_beta1 = 1.0_prec + ab_zeta/2.0_prec 
                     ab_beta2 = -ab_zeta/2.0_prec 
                      
@@ -219,7 +219,7 @@ contains
                 eta_now = calc_pc_eta(dom%par%pc_tau,mask=pc_mask)
 
                 ! Check if this timestep should be rejected
-                if (eta_now .ge. dom%par%pc_tol .and. dt_now .gt. dom%par%dt_min) then
+                if (eta_now .gt. dom%par%pc_tol .and. dt_now .gt. dom%par%dt_min) then
 
                     !rho_now = 0.7_prec
                     rho_now = 0.7_prec*(1.0_prec+(eta_now-dom%par%pc_tol)/10.0_prec)**(-1.0_prec) 

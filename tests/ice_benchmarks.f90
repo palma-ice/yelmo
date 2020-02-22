@@ -184,11 +184,7 @@ contains
         real(prec) :: r_now  
         real(prec) :: R0_meters
         real(prec) :: alpha, beta, gamma, t0, time1  
-        
-        integer    :: i1, j1, nx1, ny1
-        real(prec) :: dx, dx1
-        real(prec) :: xl, xr, yd, yu 
-        real(prec), allocatable :: xx1(:,:), yy1(:,:), H1(:,:)
+        real(prec) :: fac 
         
         real(prec), parameter :: f = 0.0        ! isostasy fraction 
 
@@ -207,60 +203,15 @@ contains
 
         H_ice = 0.0_prec 
 
-        dx  = xx(2,1) - xx(1,1) 
-        dx1 = 100.0                 ! [m]
-
-        nx1 = ceiling(dx/dx1)
-        ny1 = ceiling(dx/dx1)
-
-        allocate(xx1(nx1,ny1))
-        allocate(yy1(nx1,ny1))
-        allocate(H1(nx1,ny1))
-        
         do j = 2, ny-1
         do i = 2, nx-1 
-
-if (.FALSE.) then 
-
-            ! Get edges of current cell 
-            xl = xx(i,j)-0.5*dx 
-            xr = xx(i,j)+0.5*dx 
-            yd = yy(i,j)-0.5*dx 
-            yu = yy(i,j)+0.5*dx 
-
-            do i1 = 1, nx1 
-                xx1(i1,:) = xl + dx1*(i1-1)
-            end do 
-
-            do j1 = 1, ny1 
-                yy1(:,j1) = yd + dx1*(j1-1)
-            end do 
-
-            H1 = 0.0_prec 
-            do j1 = 1, ny1 
-            do i1 = 1, nx1 
-                ! Calculate the radius value as a function of xx and yy [m]
-                r_now = sqrt(xx1(i1,j1)**2 + yy1(i1,j1)**2)
-
-                ! Calculate the Halfar similarity solution profile (Eq. 10-11 in Bueler et al, 2005)
-                if ( (1.0 - (((time1/t0)**(-beta))*r_now/R0_meters)**((n+1.0)/n)) .gt. 0.0_prec) &
-                H1(i1,j1) = H0 * (time1/t0)**(-alpha) * (1.0 - (((time1/t0)**(-beta))*r_now/R0_meters)**((n+1.0)/n))**(n/(2.0*n+1.0))
-
-            end do 
-            end do 
-
-            H_ice(i,j) = sum(H1) / real(nx1*ny1,prec)
-
-else 
 
             ! Calculate the radius value as a function of xx and yy [m]
             r_now = sqrt(xx(i,j)**2 + yy(i,j)**2)
 
             ! Calculate the Halfar similarity solution profile (Eq. 10-11 in Bueler et al, 2005)
-            if ( (1.0 - (((time1/t0)**(-beta))*r_now/R0_meters)**((n+1.0)/n)) .gt. 0.0_prec) &
-            H_ice(i,j) = H0 * (time1/t0)**(-alpha) * (1.0 - (((time1/t0)**(-beta))*r_now/R0_meters)**((n+1.0)/n))**(n/(2.0*n+1.0))
-
-end if 
+            fac = max(0.0, 1.0 - (((time1/t0)**(-beta))*r_now/R0_meters)**((n+1.0)/n) )
+            H_ice(i,j) = H0 * (time1/t0)**(-alpha) * fac**(n/(2.0*n+1.0))
 
             ! Now calculate implied mass balance
             mbal(i,j)  = (lambda/time1)*H_ice(i,j)  

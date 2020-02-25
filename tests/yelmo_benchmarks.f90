@@ -30,7 +30,7 @@ program yelmo_benchmarks
     integer    :: n  
 
     character(len=56) :: grid_name
-    real(prec) :: dx 
+    real(prec) :: dx, x0  
     integer    :: nx  
 
     real(4) :: start, finish
@@ -91,7 +91,7 @@ program yelmo_benchmarks
 
             grid_name = "HALFAR"
             nx = (60.0 / dx) + 1        ! Domain width is 60 km total (-30 to 30 km)
-
+            
         case("HALFAR-MED")
 
             grid_name = "HALFAR-MED"
@@ -105,6 +105,9 @@ program yelmo_benchmarks
 
     end select 
 
+    ! Make sure that nx is odd, so that we get one grid point right at dome x=0,y=0
+    if (mod(nx,2).eq.0) nx=nx+1
+    
     ! === Initialize ice sheet model =====
 
     ! General initialization of yelmo constants (used globally)

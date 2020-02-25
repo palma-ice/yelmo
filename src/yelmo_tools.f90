@@ -523,32 +523,25 @@ contains
 
             ! Slope in x-direction
             do j = 1, ny 
-            do i = 3, nx-3
+            do i = 2, nx-3
 
                 if (H_ice(i,j) .gt. 0.0 .and. H_ice(i+1,j) .eq. 0.0) then 
                     ! Margin point (ice-free to the right)
 
-                    H0 = var(i+1,j) 
-                    H1 = var(i,j)
-                    H2 = var(i-1,j)
+                    H0 = var(i,j) 
+                    H1 = var(i-1,j)
 
-                    if (H_ice(i-1,j) .gt. 0.0 .and. H_ice(i-2,j) .gt. 0.0) then 
-                        ! Second-order upwind if possible 
-                        dvardx(i,j) = (3.0*H0 - 4.0*H1 + H2) / (2.0*dx)
-                    end if 
+                    ! Second-order upwind
+                    dvardx(i,j) = -(1.0/(3.0*dx))*(H0+H1)
 
-                else if (H_ice(i+1,j) .gt. 0.0 .and. H_ice(i,j) .eq. 0.0) then
+                else if (H_ice(i,j) .eq. 0.0 .and. H_ice(i+1,j) .gt. 0.0) then
                     ! Margin point (ice-free to the left)
 
-                    H0 = var(i,j) 
-                    H1 = var(i+1,j)
-                    H2 = var(i+2,j)
+                    H0 = var(i+1,j) 
+                    H1 = var(i+2,j)
 
-                    if (H_ice(i+2,j) .gt. 0.0 .and. H_ice(i+3,j) .gt. 0.0) then 
-                        ! Second-order upwind if possible
-                        dvardx(i,j) = -(3.0*H0 - 4.0*H1 + H2) / (2.0*dx) 
-                    end if 
-
+                    ! Second-order upwind
+                    dvardx(i,j) = (1.0/(3.0*dx))*(H0+H1)
 
                 end if 
 
@@ -556,33 +549,27 @@ contains
             end do 
             
             ! Slope in y-direction
-            do j = 3, ny-3 
+            do j = 2, ny-3 
             do i = 1, nx
 
                 if (H_ice(i,j) .gt. 0.0 .and. H_ice(i,j+1) .eq. 0.0) then 
-                    ! Margin point (ice-free to the top)
-
-                    H0 = var(i,j+1) 
-                    H1 = var(i,j)
-                    H2 = var(i,j-1)
-
-                    if (H_ice(i,j-1) .gt. 0.0 .and. H_ice(i,j-2) .gt. 0.0) then 
-                        ! Second-order upwind if possible
-                        dvardy(i,j) = (3.0*H0 - 4.0*H1 + H2) / (2.0*dy)
-                    end if 
-
-                else if (H_ice(i,j+1) .gt. 0.0 .and. H_ice(i,j) .eq. 0.0) then
-                    ! Margin point (ice-free to the bottom)
+                    ! Margin point (ice-free above)
 
                     H0 = var(i,j) 
-                    H1 = var(i,j+1)
-                    H2 = var(i,j+2)
+                    H1 = var(i,j-1)
 
-                    if (H_ice(i,j+2) .gt. 0.0 .and. H_ice(i,j+3) .gt. 0.0) then 
-                        ! Second-order upwind if possible
-                        dvardy(i,j) = -(3.0*H0 - 4.0*H1 + H2) / (2.0*dy)
-                    end if 
-                    
+                    ! Second-order upwind
+                    dvardy(i,j) = -(1.0/(3.0*dy))*(H0+H1)
+
+                else if (H_ice(i,j) .eq. 0.0 .and. H_ice(i,j+1) .gt. 0.0) then
+                    ! Margin point (ice-free below)
+
+                    H0 = var(i,j+1) 
+                    H1 = var(i,j+2)
+
+                    ! Second-order upwind
+                    dvardy(i,j) = (1.0/(3.0*dy))*(H0+H1)
+
                 end if 
 
             end do 

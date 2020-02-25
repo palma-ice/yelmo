@@ -182,25 +182,24 @@ contains
             case("vel") 
                 ! Use classic-style SIA solver (solve directly for velocity)
 
-                ! Calculate the 3D horizontal shear velocity fields
-!                 call calc_uxy_sia_3D_00(dyn%now%ux_i,dyn%now%uy_i,tpo%now%H_ice,tpo%now%dzsdx,tpo%now%dzsdy, &
-!                                      mat%now%ATT,dyn%par%zeta_aa,dyn%par%dx,mat%par%n_glen,rho_ice,g)
-                call calc_uxy_sia_3D(dyn%now%ux_i,dyn%now%uy_i,tpo%now%H_ice,dyn%now%taud_acx,dyn%now%taud_acy, &
-                                     mat%now%ATT,dyn%par%zeta_aa,dyn%par%dx,mat%par%n_glen,rho_ice,g)
-                
-                ! Then simply integrate from 3D velocity field (faster than 2D solver below)
-                dyn%now%ux_i_bar = calc_vertical_integrated_2D(dyn%now%ux_i,dyn%par%zeta_aa)
-                dyn%now%uy_i_bar = calc_vertical_integrated_2D(dyn%now%uy_i,dyn%par%zeta_aa)
-                
-                ! Internal method to SIA module (slower than vertical integration above) - use for testing only
-                !call calc_uxy_sia_2D(dyn%now%ux_i_bar,dyn%now%uy_i_bar,tpo%now%H_ice,tpo%now%dzsdx,tpo%now%dzsdy, &
-                !                     mat%now%ATT,dyn%par%zeta_aa,dyn%par%dx,mat%par%n_glen,rho_ice,g)
-                
-                ! Calculate 2D diffusivity too (for timestepping and diagnostics)
-                ! (mainly interesting for benchmark experiments EISMINT, Bueler, etc)
-                call calc_diffusivity_2D(dyn%now%dd_ab_bar,tpo%now%H_ice,tpo%now%dzsdx,tpo%now%dzsdy, &
+                ! Calculate diffusivity constant on ab-nodes
+                call calc_dd_ab_3D(dyn%now%dd_ab,tpo%now%H_ice,dyn%now%taud_acx,dyn%now%taud_acy, &
                                         mat%now%ATT,dyn%par%zeta_aa,dyn%par%dx,mat%par%n_glen,rho_ice,g)
+                dyn%now%dd_ab_bar = calc_vertical_integrated_2D(dyn%now%dd_ab,dyn%par%zeta_aa)
+                
 
+                ! Calculate the 3D horizontal shear velocity fields
+                call calc_uxy_sia_3D(dyn%now%ux_i,dyn%now%uy_i,dyn%now%dd_ab, &
+                                        dyn%now%taud_acx,dyn%now%taud_acy)
+                
+                ! Calculate the depth-averaged horizontal shear velocity fields too
+                call calc_uxy_sia_2D(dyn%now%ux_i_bar,dyn%now%uy_i_bar,dyn%now%dd_ab, &
+                                        dyn%now%taud_acx,dyn%now%taud_acy,dyn%par%zeta_aa)
+
+                ! Or, simply integrate from 3D velocity field to get depth-averaged field
+!                 dyn%now%ux_i_bar = calc_vertical_integrated_2D(dyn%now%ux_i,dyn%par%zeta_aa)
+!                 dyn%now%uy_i_bar = calc_vertical_integrated_2D(dyn%now%uy_i,dyn%par%zeta_aa)
+                
                 ! Set terms from shear solver to zero that are not calculated here
                 dyn%now%duxdz     = 0.0 
                 dyn%now%duydz     = 0.0 
@@ -235,11 +234,9 @@ contains
                 dyn%now%ux_i_bar  = calc_vertical_integrated_2D(dyn%now%ux_i,dyn%par%zeta_aa) 
                 dyn%now%uy_i_bar  = calc_vertical_integrated_2D(dyn%now%uy_i,dyn%par%zeta_aa) 
 
-                ! Calculate diagnostic diffusivity field 
-                ! ajr: this value is not correct, use the direct diffusivity calculation
-                !dyn%now%dd_ab_bar  = calc_vertical_integrated_2D(dyn%now%dd_ab,dyn%par%zeta_aa) 
-                call calc_diffusivity_2D(dyn%now%dd_ab_bar,tpo%now%H_ice,tpo%now%dzsdx,tpo%now%dzsdy, &
-                                        mat%now%ATT,dyn%par%zeta_aa,dyn%par%dx,mat%par%n_glen,rho_ice,g)
+                ! Diagnostic diffusivity field not available
+                dyn%now%dd_ab     = 0.0_prec
+                dyn%now%dd_ab_bar = 0.0_prec 
 
             case("none")
 

@@ -911,7 +911,7 @@ contains
         
         call nc_write(filename,  "dt_pi", dt_pi,dim1="time",start=[n],count=[1],ncid=ncid)
         call nc_write(filename, "pc_eta",pc_eta,dim1="time",start=[n],count=[1],ncid=ncid)
-        call nc_write(filename, "pc_tau",pc_tau,dim1="xc",dim2="yc",dim3="time",start=[1,1,n],count=[nx,ny,1],ncid=ncid)
+        !call nc_write(filename, "pc_tau",pc_tau,dim1="xc",dim2="yc",dim3="time",start=[1,1,n],count=[nx,ny,1],ncid=ncid)
         
         ! Close the netcdf file
         call nc_close(ncid)

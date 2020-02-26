@@ -152,6 +152,7 @@ module yelmo_defs
 
         character(len=256) :: solver 
         character(len=256) :: sia_solver 
+        character(len=256) :: ssa_solver_opt 
         integer    :: mix_method            ! Method for mixing sia and ssa velocity solutions
         logical    :: calc_diffusivity      ! Calculate diagnostic diffusivity field
         integer    :: beta_method

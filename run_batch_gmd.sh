@@ -47,3 +47,28 @@ job run --shell -f -o ${fldr}/mismip/scaling -p ydyn.beta_gl_scale=2 ydyn.beta_g
 make trough
 
 python run_yelmo.py -s -e trough ${fldr}/trough par/yelmo_TROUGH-F17.nml
+
+### AGE TESTS ###
+
+# In test_icetemp.f90, set experiment="eismint", and check that the following values are set:
+    # t_start = 0.0       ! [yr]
+    # t_end   = 300e3     ! [yr]
+    # dt      = 0.5_prec  ! [yr]
+    # dt_out  = 1000.0    ! [yr] 
+
+    # T_pmp_beta = 9.7e-8         ! [K Pa^-1] EISMINT2 value (beta1 = 8.66e-4 [K m^-1])
+
+    # call init_eismint_summit(ice1,smb=0.1_prec)
+# Next, set prec=dp in yelmo_defs.f90 
+# Compile and run 3 experiments (nz=12,32,52), corresponding to 10,30 and 50 internal ice points
+make clean
+make icetemp 
+./libyelmo/bin/test_icetemp.x 12 
+./libyelmo/bin/test_icetemp.x 32 
+./libyelmo/bin/test_icetemp.x 52 
+# Also set prec=sp in yelmo_defs.f90, and run the nz=32 case again.
+make clean 
+make icetemp 
+./libyelmo/bin/test_icetemp.x 32
+
+

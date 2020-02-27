@@ -68,7 +68,8 @@ program test_icetemp
     real(prec)         :: T0_ref 
 
     integer            :: narg 
-    character(len=12)  :: arg_nz, arg_cr 
+    character(len=12)  :: arg_nz, arg_cr
+    character(len=32)  :: nz_str, cr_str, prec_str 
 
     integer :: iter, n_iter 
 
@@ -78,11 +79,11 @@ program test_icetemp
     ! ===============================================================
     ! User options 
 
-    experiment     = "k15expa"        ! "eismint", "k15expa", "k15expb", "bg15a"
+    experiment     = "k15expb"      ! "eismint", "k15expa", "k15expb", "bg15a"
     
     ! General options
     zeta_scale      = "linear"      ! "linear", "exp", "tanh"
-    nz              = 42            ! [--] Number of ice sheet points (aa-nodes + base + surface)
+    nz              = 22            ! [--] Number of ice sheet points (aa-nodes + base + surface)
     is_celcius      = .FALSE. 
 
     age_method      = "expl"        ! "expl" or "impl"
@@ -92,24 +93,34 @@ program test_icetemp
     omega_max       = 0.03          ! Maximum allowed water content (fraction)
     enth_cr         = 1e-3          ! Enthalpy solver: conductivity ratio kappa_water / kappa_ice 
 
-    !file1D          = "output/test_"//trim(experiment)//"_nz30_sp.nc" 
-    file1D          = "output/test_"//trim(experiment)//".nc"
-
     ! Overwrite options for nz and enth_cr if available from arguments
     narg = command_argument_count() 
     if (narg .gt. 0) then 
         call get_command_argument(1,arg_nz)
-        call get_command_argument(2,arg_cr)
-
         read(arg_nz,*)  nz
+    end if 
+
+    if (narg .gt. 1) then 
+        call get_command_argument(2,arg_cr)
         read(arg_cr,*)  enth_cr
     end if 
 
-!     if (trim(experiment) .eq. "k15expa" .or. trim(experiment) .eq. "k15expb") then 
-!         ! Use a more precise filename to specify cr value and dz
-!         write(file1D,"(a,e8.2,a,e8.2,a)") "output/test_"//trim(experiment)//"_dz", (200.0/(nz-2)), "_cr", enth_cr, ".nc"
-!     end if 
+    ! ## Save simulation parameters as strings ##
+    write(nz_str,*) nz 
+    if (trim(zeta_scale) .ne. "linear") write(nz_str,*) trim(nz_str)//trim(zeta_scale)
+    nz_str =  adjustl(nz_str)
 
+    write(cr_str,"(e8.2)") enth_cr
+    cr_str =  adjustl(cr_str)   
+
+    prec_str = "sp" 
+    if (prec .eq. dp) prec_str = "dp" 
+
+    ! Use a more precise filename to specify cr value and dz
+    !file1D = "output/test_"//trim(experiment)//".nc"
+    write(file1D,*) "output/test_"//trim(experiment)//"_nz",trim(nz_str),   &
+                                        "_cr",trim(cr_str),"_",trim(prec_str),".nc"
+    
     ! ===============================================================
 
     T0_ref = T0 
@@ -158,14 +169,14 @@ program test_icetemp
             ! EISMINT 
 
             t_start = 0.0       ! [yr]
-            t_end   = 100e3     ! [yr]
+            t_end   = 300e3     ! [yr]
             dt      = 0.5_prec  ! [yr]
             dt_out  = 1000.0    ! [yr] 
 
             !T_pmp_beta = 9.8e-8         ! [K Pa^-1] Greve and Blatter (2009) 
             T_pmp_beta = 9.7e-8         ! [K Pa^-1] EISMINT2 value (beta1 = 8.66e-4 [K m^-1])
 
-            call init_eismint_summit(ice1,smb=0.3_prec)
+            call init_eismint_summit(ice1,smb=0.1_prec)
 
     end select 
 
@@ -189,7 +200,7 @@ program test_icetemp
     call convert_to_enthalpy(robin%vec%enth,robin%vec%T_ice,robin%vec%omega,robin%vec%T_pmp,robin%vec%cp,L_ice)
 
     ! Ensure zero basal water thickness to start 
-    ice1%H_w = 10.0 
+    ice1%H_w = 0.0 
 
     ! Assume H_cts is also zero to start
     ice1%H_cts = 0.0 
@@ -284,6 +295,8 @@ program test_icetemp
     write(*,*) "========================="
     write(*,*) 
     write(*,*) "Program finished."
+    write(*,*)
+    write(*,*) "Output filename: ", trim(file1D)
     write(*,*)
     write(*,*) "========================="
     write(*,*)
@@ -457,9 +470,9 @@ contains
         ice%vec%advecxy = 0.0                                       ! [] No horizontal advection (assume constant)
 
         ! Write strain heating to compare basal value of ~2.6e-3 W/m-3
-        do k = nz, 1, -1 
-            write(*,*) ice%vec%zeta(k), ice%vec%Q_strn(k)/sec_year 
-        end do 
+        !do k = nz, 1, -1 
+        !    write(*,*) ice%vec%zeta(k), ice%vec%Q_strn(k)/sec_year 
+        !end do 
 
         ! Calculate pressure melting point 
         ice%vec%T_pmp = calc_T_pmp(ice%H_ice,ice%vec%zeta,T0,T_pmp_beta) 

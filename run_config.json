@@ -1,0 +1,20 @@
+{
+    "exe_shortcuts" : 
+        {   "benchmarks" : "libyelmo/bin/yelmo_benchmarks.x",
+            "mismip"     : "libyelmo/bin/yelmo_mismip.x",
+            "initmip"    : "libyelmo/bin/yelmo_initmip.x",
+            "opt"        : "libyelmo/bin/yelmo_opt.x",
+            "trough"     : "libyelmo/bin/yelmo_trough.x" 
+        },
+
+    "const_paths" : 
+        {   "EISMINT"  : "par/yelmo_const_EISMINT.nml",
+            "HALFAR"   : "par/yelmo_const_EISMINT.nml",
+            "MISMIP3D" : "par/yelmo_const_MISMIP3D.nml",
+            "TROUGH"   : "par/yelmo_const_TROUGH.nml" 
+        },
+
+    "const_path_default" : "par/yelmo_const_Earth.nml",
+
+    "links" : ["input","ice_data"]
+}

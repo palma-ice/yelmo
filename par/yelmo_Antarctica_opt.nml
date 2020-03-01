@@ -9,7 +9,7 @@
     grid_name       = "ANT-32KM"
     grid_path       = "input/{domain}/{grid_name}/{grid_name}_REGIONS.nc"
     experiment      = "None"       
-    restart         = "input/{domain}/{grid_name}/{grid_name}_yelmo_restart-opt-0-1.nc"
+    restart         = "None"   !"input/{domain}/{grid_name}/{grid_name}_yelmo_restart-opt-0-1.nc"
     log_timestep    = False 
     zeta_scale      = "exp"             ! "linear", "exp", "tanh"
     zeta_exp        = 2.0  

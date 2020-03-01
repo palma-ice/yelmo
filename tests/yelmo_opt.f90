@@ -7,15 +7,12 @@ program yelmo_test
     use yelmo_tools, only : gauss_values
 
     use gaussian_filter 
-    use basal_hydro_simple 
     use basal_dragging
 
     implicit none 
 
     type(yelmo_class)      :: yelmo1
     type(yelmo_class)      :: yelmo_ref 
-    type(hydro_class)      :: hyd1 
-    type(hydro_class)      :: hyd_ref 
 
     character(len=256) :: outfldr, file1D, file2D, file_restart, domain 
     character(len=512) :: path_par, path_const  
@@ -126,16 +123,11 @@ program yelmo_test
     ! Initialize data objects and load initial topography
     call yelmo_init(yelmo1,filename=path_par,grid_def="file",time=time_init)
 
-    ! Also intialize simple basal hydrology object
-    call hydro_init(hyd1,filename=path_par,nx=yelmo1%grd%nx,ny=yelmo1%grd%ny)
-    call hydro_init_state(hyd1,yelmo1%tpo%now%H_ice,yelmo1%tpo%now%f_grnd,time_init)
-
     ! === Set initial boundary conditions for current time and yelmo state =====
     ! ybound: z_bed, z_sl, H_sed, H_w, smb, T_srf, bmb_shlf , Q_geo
 
     yelmo1%bnd%z_sl     = 0.0               ! [m]
     yelmo1%bnd%H_sed    = 0.0               ! [m]
-    yelmo1%bnd%H_w      = hyd1%now%H_w      ! [m]
     yelmo1%bnd%Q_geo    = 50.0              ! [mW/m2]
     
     yelmo1%bnd%bmb_shlf = bmb_shlf_const    ! [m.i.e./a]
@@ -179,21 +171,20 @@ if (.FALSE.) then
                         yelmo1%dta%pd%H_ice,yelmo1%dta%pd%H_grnd,yelmo1%dyn%par%beta_u0,cf_min,cf_max)
 
     ! Update ice sheet to get everything in sync
-    call yelmo_update_equil_external(yelmo1,hyd1,cf_ref,time_init,time_tot=1.0,topo_fixed=.TRUE.,dt=1.0,ssa_vel_max=5e3)
+    call yelmo_update_equil_external(yelmo1,cf_ref,time_init,time_tot=1.0,topo_fixed=.TRUE.,dt=1.0,ssa_vel_max=5e3)
 end if 
 
     if (.not. yelmo1%par%use_restart) then 
         ! Run initialization steps 
 
-        ! Note: From now on, using yelmo_update_equil_external allows for running with 
-        ! interactive hydrology via hyd1 object and for passing cf_ref to be able
-        ! to update C_bed as a function of N_eff interactively.
+        ! Note: From now on, using yelmo_update_equil_external allows for passing 
+        ! cf_ref to be able to update C_bed as a function of N_eff interactively.
 
         ! ============================================================================================
         ! Step 1: Relaxtion step: run SIA model for 100 years to smooth out the input
         ! topography that will be used as a target. 
 
-        call yelmo_update_equil_external(yelmo1,hyd1,cf_ref,time_init,time_tot=50.0,topo_fixed=.FALSE.,dt=1.0,ssa_vel_max=0.0)
+        call yelmo_update_equil_external(yelmo1,cf_ref,time_init,time_tot=50.0,topo_fixed=.FALSE.,dt=1.0,ssa_vel_max=0.0)
 
         ! Define present topo as present-day dataset for comparison 
         yelmo1%dta%pd%H_ice = yelmo1%tpo%now%H_ice 
@@ -204,9 +195,9 @@ end if
         ! spin up the thermodynamics and have a reference state to reset.
         ! Store the reference state for future use.
         
-        call yelmo_update_equil_external(yelmo1,hyd1,cf_ref,time_init,time_tot=20e3,topo_fixed=.TRUE.,dt=5.0,ssa_vel_max=0.0)
-        call yelmo_update_equil_external(yelmo1,hyd1,cf_ref,time_init,time_tot=20e3,topo_fixed=.TRUE.,dt=2.0,ssa_vel_max=2e3)
-        call yelmo_update_equil_external(yelmo1,hyd1,cf_ref,time_init,time_tot=1e3, topo_fixed=.TRUE.,dt=2.0,ssa_vel_max=5e3)
+        call yelmo_update_equil_external(yelmo1,cf_ref,time_init,time_tot=20e3,topo_fixed=.TRUE.,dt=5.0,ssa_vel_max=0.0)
+        call yelmo_update_equil_external(yelmo1,cf_ref,time_init,time_tot=20e3,topo_fixed=.TRUE.,dt=2.0,ssa_vel_max=2e3)
+        call yelmo_update_equil_external(yelmo1,cf_ref,time_init,time_tot=1e3, topo_fixed=.TRUE.,dt=2.0,ssa_vel_max=5e3)
 
         ! Write a restart file 
         call yelmo_restart_write(yelmo1,file_restart,time_init)
@@ -216,9 +207,7 @@ end if
 
     ! Store the reference state
     yelmo_ref    = yelmo1
-    hyd1%now%H_w = yelmo1%bnd%H_w  
-    hyd_ref      = hyd1 
-
+    
     ! Store initial optimization parameter choices 
     tau     = rel_tau1 
     H_scale = scale_H1 
@@ -272,13 +261,6 @@ if (opt_method .eq. 1) then
             ! Update ice sheet 
             call yelmo_update(yelmo1,time)
 
-            ! Update basal hydrology 
-            call hydro_update(hyd1,yelmo1%tpo%now%H_ice,yelmo1%tpo%now%f_grnd, &
-                        -yelmo1%thrm%now%bmb_grnd*rho_ice/rho_w,time)
-
-            ! Pass updated hydrology variable to Yelmo boundary field
-            yelmo1%bnd%H_w = hyd1%now%H_w 
-
             ! Update C_bed 
             call calc_ydyn_cbed_external(yelmo1%dyn,yelmo1%tpo,yelmo1%thrm,yelmo1%bnd,yelmo1%grd, &
                                                                         domain,mask_noice,cf_ref)
@@ -307,8 +289,7 @@ if (opt_method .eq. 1) then
 !         if (q .le. qmax_iter_length_2) then 
 !             ! Reset model to the initial state (including H_w) and time, with updated C_bed field 
 !             yelmo_ref%dyn%now%C_bed = yelmo1%dyn%now%C_bed 
-!             yelmo1 = yelmo_ref 
-!             hyd1   = hyd_ref 
+!             yelmo1 = yelmo_ref  
 !             time   = 0.0 
 !             call yelmo_set_time(yelmo1,time) 
 !         end if 
@@ -326,7 +307,6 @@ else
         ! Reset model to the initial state (including H_w) and time, with updated C_bed field 
         yelmo_ref%dyn%now%C_bed = yelmo1%dyn%now%C_bed 
         yelmo1 = yelmo_ref 
-        hyd1   = hyd_ref 
         time   = 0.0 
         call yelmo_set_time(yelmo1,time) 
         
@@ -337,13 +317,6 @@ else
 
             ! Update ice sheet 
             call yelmo_update(yelmo1,time)
-
-            ! Update basal hydrology 
-            call hydro_update(hyd1,yelmo1%tpo%now%H_ice,yelmo1%tpo%now%f_grnd, &
-                        -yelmo1%thrm%now%bmb_grnd*rho_ice/rho_w,time)
-
-            ! Pass updated hydrology variable to Yelmo boundary field
-            yelmo1%bnd%H_w = hyd1%now%H_w 
 
             ! Update C_bed based on error metric(s) 
             call update_cf_ref_thickness_ratio(cf_ref,cf_ref_dot,yelmo1%tpo%now%H_ice, &
@@ -374,7 +347,7 @@ else
 
 end if 
 
-!         call yelmo_update_equil_external(yelmo1,hyd1,cf_ref,time,time_tot=time_iter,topo_fixed=topo_fixed,dt=0.5,ssa_vel_max=5000.0)
+!         call yelmo_update_equil_external(yelmo1,cf_ref,time,time_tot=time_iter,topo_fixed=topo_fixed,dt=0.5,ssa_vel_max=5000.0)
 
     ! Write a final restart file 
     call yelmo_restart_write(yelmo1,file_restart,time)
@@ -487,6 +460,11 @@ contains
         call nc_write(filename,"ATT",ylmo%mat%now%ATT,units="a^-1 Pa^-3",long_name="Rate factor", &
                       dim1="xc",dim2="yc",dim3="zeta",dim4="time",start=[1,1,1,n],ncid=ncid)
         
+        call nc_write(filename,"H_w",ylmo%thrm%now%H_w,units="m",long_name="Basal water layer", &
+                      dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
+        call nc_write(filename,"T_prime_b",ylmo%thrm%now%T_prime_b,units="m",long_name="Basal homologous ice temperature", &
+                      dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
+
         ! Boundary variables (forcing)
         call nc_write(filename,"z_bed",ylmo%bnd%z_bed,units="m",long_name="Bedrock elevation", &
                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
@@ -494,9 +472,7 @@ contains
                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
         call nc_write(filename,"T_srf",ylmo%bnd%T_srf,units="K",long_name="Surface temperature", &
                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-        call nc_write(filename,"H_w",ylmo%bnd%H_w,units="m",long_name="Basal water layer", &
-                      dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-
+        
         ! Target data (not time dependent)
         if (n .eq. 1) then 
             call nc_write(filename,"pd_z_srf",ylmo%dta%pd%z_srf,units="m",long_name="Observed surface elevation (present day)", &
@@ -957,11 +933,10 @@ contains
 
     end subroutine calc_ydyn_cbed_external
 
-    subroutine yelmo_update_equil_external(dom,hyd,cf_ref,time,time_tot,dt,topo_fixed,ssa_vel_max)
+    subroutine yelmo_update_equil_external(dom,cf_ref,time,time_tot,dt,topo_fixed,ssa_vel_max)
         ! Iterate yelmo solutions to equilibrate without updating boundary conditions
 
-        type(yelmo_class), intent(INOUT) :: dom
-        type(hydro_class), intent(INOUT) :: hyd 
+        type(yelmo_class), intent(INOUT) :: dom 
         real(prec), intent(IN) :: cf_ref(:,:) 
         real(prec), intent(IN) :: time            ! [yr] Current time
         real(prec), intent(IN) :: time_tot        ! [yr] Equilibration time 
@@ -974,9 +949,7 @@ contains
         integer    :: n, nstep 
         logical    :: use_ssa         ! Should ssa be active?  
         logical    :: dom_topo_fixed
-        logical    :: dom_use_ssa 
-        real(prec) :: dom_dtmax 
-        integer    :: dom_ntt 
+        logical    :: dom_use_ssa  
         real(prec) :: dom_ssa_vel_max 
 
         ! Only run equilibration if time_tot > 0 
@@ -990,15 +963,11 @@ contains
             ! Save original model choices 
             dom_topo_fixed  = dom%tpo%par%topo_fixed 
             dom_use_ssa     = dom%dyn%par%use_ssa 
-            dom_dtmax       = dom%par%dtmax
-            dom_ntt         = dom%par%ntt 
             dom_ssa_vel_max = dom%dyn%par%ssa_vel_max
 
             ! Set model choices equal to equilibration choices 
             dom%tpo%par%topo_fixed  = topo_fixed 
             dom%dyn%par%use_ssa     = use_ssa 
-            dom%par%dtmax           = dt 
-            dom%par%ntt             = 1 
             dom%dyn%par%ssa_vel_max = ssa_vel_max
 
             write(*,*) 
@@ -1009,13 +978,6 @@ contains
                 time_now = time + n*dt
                 call yelmo_update(dom,time_now)
 
-                ! Update basal hydrology 
-                call hydro_update(hyd,dom%tpo%now%H_ice,dom%tpo%now%f_grnd, &
-                            -dom%thrm%now%bmb_grnd*rho_ice/rho_w,time_now)
-
-                ! Pass updated hydrology variable to Yelmo boundary field
-                dom%bnd%H_w = hyd%now%H_w 
-
                 ! Update C_bed
                 call calc_ydyn_cbed_external(yelmo1%dyn,yelmo1%tpo,yelmo1%thrm,yelmo1%bnd,yelmo1%grd, &
                                                                                 domain,mask_noice,cf_ref)
@@ -1025,8 +987,6 @@ contains
             ! Restore original model choices 
             dom%tpo%par%topo_fixed  = dom_topo_fixed 
             dom%dyn%par%use_ssa     = dom_use_ssa 
-            dom%par%dtmax           = dom_dtmax 
-            dom%par%ntt             = dom_ntt 
             dom%dyn%par%ssa_vel_max = dom_ssa_vel_max
 
             write(*,*) 
@@ -1038,8 +998,6 @@ contains
         ! Reset model time back to input time 
         dom%tpo%par%time      = time 
         dom%thrm%par%time     = time 
-
-        hyd%now%time          = time 
 
         return
 

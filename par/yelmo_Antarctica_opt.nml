@@ -79,6 +79,7 @@
     ssa_iter_max        = 2               ! Number of maximum allowed iterations over ssa to converge on vel. solution
     ssa_iter_rel        = 0.7             ! [--] Relaxation fraction [0:1] to stabilize ssa iterations
     ssa_iter_conv       = 1e-2            ! [--] L2 relative error convergence limit to exit ssa iterations
+    taud_lim            = 2e5             ! [Pa] Maximum allowed driving stress 
     cb_sia              = 0.0             ! [m a-1 Pa-1] Bed roughness coefficient for SIA sliding
     
 /
@@ -131,8 +132,10 @@
     const_cp        = 2009.0            ! [J kg-1 K-1] Specific heat capacity 
     use_const_kt    = False             ! Use specified constant value of heat conductivity?
     const_kt        = 6.62e7            ! [J a-1 m-1 K-1] Thermal conductivity [W m-1 K-1 * sec_year] => [J a-1 m-1 K-1]
-    enth_cr         = 1e-2              ! [--] Conductivity ratio for temperate ice (kappa_temp     = enth_cr*kappa_cold)
-    omega_max       = 0.02              ! [--] Maximum allowed water content fraction 
+    enth_cr         = 1e-3              ! [--] Conductivity ratio for temperate ice (kappa_temp     = enth_cr*kappa_cold)
+    omega_max       = 0.01              ! [--] Maximum allowed water content fraction 
+    till_rate       = 0.001             ! [m/a] Basal water till drainage rate (water equiv.)
+    H_w_max         = 2.0               ! [m] Maximum limit to basal water layer thickness (water equiv.)
 /
 
 &yelmo_masks

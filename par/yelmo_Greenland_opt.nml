@@ -1,6 +1,6 @@
 &control    
     bmb_shlf_const  = -10.0             ! [m/a] Basal mass balance of ice shelves
-    dT_ann          = 0.0               ! [K]  Temperature anomaly (atm)
+    dT_ann          = -1.0              ! [K]  Temperature anomaly (atm)
     z_sl            = 0.0               ! [m] Sea level relative to present-day 
 /
 
@@ -9,7 +9,7 @@
     grid_name       = "GRL-16KM"
     grid_path       = "input/{domain}/{grid_name}/{grid_name}_REGIONS.nc"
     experiment      = "None"       
-    restart         = "input/{domain}/{grid_name}/{grid_name}_yelmo_restart-opt-1.nc"
+    restart         = "None"     ! "input/{domain}/{grid_name}/{grid_name}_yelmo_restart-opt-1.nc"
     log_timestep    = False 
     zeta_scale      = "exp"             ! "linear", "exp", "tanh"
     zeta_exp        = 2.0  

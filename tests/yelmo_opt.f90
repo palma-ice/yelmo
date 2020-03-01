@@ -62,7 +62,7 @@ program yelmo_test
 
     ! Simulation parameters
     time_init           = 0.0       ! [yr] Starting time
-    dtt                 = 2.0       ! [yr] Time step for time loop 
+    dtt                 = 5.0       ! [yr] Time step for time loop 
     dt2D_out            = 500.0     ! [yr] 2D output writing 
 
     qmax                = 51                ! Total number of iterations
@@ -179,7 +179,7 @@ end if
         ! Step 1: Relaxtion step: run SIA model for 100 years to smooth out the input
         ! topography that will be used as a target. 
 
-        call yelmo_update_equil(yelmo1,time_init,time_tot=50.0,topo_fixed=.FALSE.,dt=1.0,ssa_vel_max=0.0)
+        call yelmo_update_equil(yelmo1,time_init,time_tot=20.0,topo_fixed=.FALSE.,dt=1.0,ssa_vel_max=0.0)
 
         ! Define present topo as present-day dataset for comparison 
         yelmo1%dta%pd%H_ice = yelmo1%tpo%now%H_ice 
@@ -190,13 +190,13 @@ end if
         ! spin up the thermodynamics and have a reference state to reset.
         ! Store the reference state for future use.
         
-        call yelmo_update_equil(yelmo1,time_init,time_tot=20e3,topo_fixed=.TRUE.,dt=5.0,ssa_vel_max=0.0)
-        call yelmo_update_equil(yelmo1,time_init,time_tot=20e3,topo_fixed=.TRUE.,dt=2.0,ssa_vel_max=2e3)
-        call yelmo_update_equil(yelmo1,time_init,time_tot=1e3, topo_fixed=.TRUE.,dt=2.0,ssa_vel_max=5e3)
+!         call yelmo_update_equil(yelmo1,time_init,time_tot=20e3,topo_fixed=.TRUE.,dt=5.0,ssa_vel_max=0.0)
+!         call yelmo_update_equil(yelmo1,time_init,time_tot=20e3,topo_fixed=.TRUE.,dt=2.0,ssa_vel_max=2e3)
+        call yelmo_update_equil(yelmo1,time_init,time_tot=20e3,topo_fixed=.TRUE.,dt=5.0,ssa_vel_max=5e3)
 
         ! Write a restart file 
         call yelmo_restart_write(yelmo1,file_restart,time_init)
-        stop "**** Done ****"
+        !stop "**** Done ****"
 
     end if 
 

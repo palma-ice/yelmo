@@ -704,7 +704,7 @@ contains
 
             ! Impose [high] beta value in case it hasn't been initialized (in the case of cb_method=-1/beta_method=-1)
             ! This will be overwritten when cf_ref/beta are calculated internally
-            dom%dyn%now%cf_ref = 1e5
+            dom%dyn%now%cf_ref = 1.0
             dom%dyn%now%beta   = 1e5 
             
             ! Call dynamics 

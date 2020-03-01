@@ -158,7 +158,6 @@ program yelmo_test
     ! (requires ad-hoc initialization of N_eff too)
     allocate(cf_ref_dot(yelmo1%grd%nx,yelmo1%grd%ny))
     cf_ref_dot = 0.0 
-    yelmo1%dyn%now%cf_ref = cf_init 
     
     ! Initialize state variables (dyn,therm,mat)
     ! (initialize temps with robin method with a cold base),
@@ -172,6 +171,11 @@ if (.FALSE.) then
 
     ! Update ice sheet to get everything in sync
     call yelmo_update_equil(yelmo1,time_init,time_tot=1.0,topo_fixed=.TRUE.,dt=1.0,ssa_vel_max=5e3)
+
+else 
+
+    yelmo1%dyn%now%cf_ref = cf_init 
+    
 end if 
 
     if (.not. yelmo1%par%use_restart) then 
@@ -198,7 +202,7 @@ end if
 
         ! Write a restart file 
         call yelmo_restart_write(yelmo1,file_restart_init,time_init)
-        !stop "**** Done ****"
+!         stop "**** Done ****"
 
     end if 
 

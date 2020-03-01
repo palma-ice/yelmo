@@ -195,9 +195,13 @@ end if
         ! spin up the thermodynamics and have a reference state to reset.
         ! Store the reference state for future use.
         
-        call yelmo_update_equil_external(yelmo1,cf_ref,time_init,time_tot=20e3,topo_fixed=.TRUE.,dt=5.0,ssa_vel_max=0.0)
-        call yelmo_update_equil_external(yelmo1,cf_ref,time_init,time_tot=20e3,topo_fixed=.TRUE.,dt=2.0,ssa_vel_max=2e3)
-        call yelmo_update_equil_external(yelmo1,cf_ref,time_init,time_tot=1e3, topo_fixed=.TRUE.,dt=2.0,ssa_vel_max=5e3)
+!         call yelmo_update_equil_external(yelmo1,cf_ref,time_init,time_tot=20e3,topo_fixed=.TRUE.,dt=5.0,ssa_vel_max=0.0)
+!         call yelmo_update_equil_external(yelmo1,cf_ref,time_init,time_tot=20e3,topo_fixed=.TRUE.,dt=2.0,ssa_vel_max=2e3)
+!         call yelmo_update_equil_external(yelmo1,cf_ref,time_init,time_tot=1e3, topo_fixed=.TRUE.,dt=2.0,ssa_vel_max=5e3)
+
+        call yelmo_update_equil(yelmo1,time_init,time_tot=20e3,topo_fixed=.TRUE.,dt=5.0,ssa_vel_max=0.0)
+        call yelmo_update_equil(yelmo1,time_init,time_tot=20e3,topo_fixed=.TRUE.,dt=2.0,ssa_vel_max=2e3)
+        call yelmo_update_equil(yelmo1,time_init,time_tot=1e3, topo_fixed=.TRUE.,dt=2.0,ssa_vel_max=5e3)
 
         ! Write a restart file 
         call yelmo_restart_write(yelmo1,file_restart,time_init)
@@ -261,9 +265,9 @@ if (opt_method .eq. 1) then
             ! Update ice sheet 
             call yelmo_update(yelmo1,time)
 
-            ! Update C_bed 
-            call calc_ydyn_cbed_external(yelmo1%dyn,yelmo1%tpo,yelmo1%thrm,yelmo1%bnd,yelmo1%grd, &
-                                                                        domain,mask_noice,cf_ref)
+!             ! Update C_bed 
+!             call calc_ydyn_cbed_external(yelmo1%dyn,yelmo1%tpo,yelmo1%thrm,yelmo1%bnd,yelmo1%grd, &
+!                                                                         domain,mask_noice,cf_ref)
 
             if (mod(nint(time*100),nint(dt2D_out*100))==0) then
                 call write_step_2D_opt(yelmo1,file2D,time,cf_ref,cf_ref_dot,mask_noice,tau,H_scale)
@@ -280,9 +284,9 @@ if (opt_method .eq. 1) then
                             yelmo1%dta%pd%H_ice,yelmo1%dta%pd%H_grnd.le.0.0_prec,yelmo1%tpo%par%dx, &
                             cf_min,cf_max,H_scale)
 
-            ! Update C_bed 
-            call calc_ydyn_cbed_external(yelmo1%dyn,yelmo1%tpo,yelmo1%thrm,yelmo1%bnd,yelmo1%grd, &
-                                                                            domain,mask_noice,cf_ref)
+!             ! Update C_bed 
+!             call calc_ydyn_cbed_external(yelmo1%dyn,yelmo1%tpo,yelmo1%thrm,yelmo1%bnd,yelmo1%grd, &
+!                                                                             domain,mask_noice,cf_ref)
 
         end if 
 

@@ -9,7 +9,7 @@
     grid_name       = "ANT-32KM"
     grid_path       = "input/{domain}/{grid_name}/{grid_name}_REGIONS.nc"
     experiment      = "None"       
-    restart         = "None"   !"input/{domain}/{grid_name}/{grid_name}_yelmo_restart-opt-0-1.nc"
+    restart         = "input/{domain}/{grid_name}/{grid_name}_yelmo_restart-opt-1.nc"
     log_timestep    = False 
     zeta_scale      = "exp"             ! "linear", "exp", "tanh"
     zeta_exp        = 2.0  
@@ -76,7 +76,7 @@
     beta_min            = 10.0            ! [Pa a m-1] Minimum value of beta allowed for grounded ice (for stability)
     ssa_beta_max        = 1e20            ! [Pa a m-1] Maximum value of beta for which ssa should be calculated 
     ssa_vel_max         = 5000.0          ! [m a-1] SSA velocity limit to avoid spurious results 
-    ssa_iter_max        = 2               ! Number of maximum allowed iterations over ssa to converge on vel. solution
+    ssa_iter_max        = 20              ! Number of maximum allowed iterations over ssa to converge on vel. solution
     ssa_iter_rel        = 0.7             ! [--] Relaxation fraction [0:1] to stabilize ssa iterations
     ssa_iter_conv       = 1e-2            ! [--] L2 relative error convergence limit to exit ssa iterations
     taud_lim            = 2e5             ! [Pa] Maximum allowed driving stress 
@@ -110,7 +110,7 @@
     rf_const                = 1e-18     ! [Pa^-3 a^-1]
     rf_use_eismint2         = False     ! Only applied for rf_method=1
     rf_with_water           = False     ! Only applied for rf_method=1, scale rf by water content?
-    n_glen                  = 3 
+    n_glen                  = 3.0 
     visc_min                = 1e3 
     use_2D_enh              = False 
     enh_shear               = 1.0

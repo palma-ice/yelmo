@@ -14,7 +14,7 @@ program yelmo_test
     type(yelmo_class)      :: yelmo1
     type(yelmo_class)      :: yelmo_ref 
 
-    character(len=256) :: outfldr, file1D, file2D, file_restart, domain 
+    character(len=256) :: outfldr, file1D, file2D, file_restart_init, file_restart, domain 
     character(len=512) :: path_par, path_const  
     real(prec) :: time_init, time_end, time_equil, time, dtt, dt1D_out, dt2D_out
     integer    :: n, q, n_now
@@ -112,7 +112,9 @@ program yelmo_test
     path_const   = trim(outfldr)//"yelmo_const_Earth.nml"
     file1D       = trim(outfldr)//"yelmo1D.nc"
     file2D       = trim(outfldr)//"yelmo2D.nc"
-    file_restart = trim(outfldr)//"yelmo_restart.nc"
+    
+    file_restart_init = trim(outfldr)//"yelmo_restart_init.nc"
+    file_restart      = trim(outfldr)//"yelmo_restart.nc"
 
     ! === Initialize ice sheet model =====
 
@@ -195,7 +197,7 @@ end if
         call yelmo_update_equil(yelmo1,time_init,time_tot=20e3,topo_fixed=.TRUE.,dt=5.0,ssa_vel_max=5e3)
 
         ! Write a restart file 
-        call yelmo_restart_write(yelmo1,file_restart,time_init)
+        call yelmo_restart_write(yelmo1,file_restart_init,time_init)
         !stop "**** Done ****"
 
     end if 

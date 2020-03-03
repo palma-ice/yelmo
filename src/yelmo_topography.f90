@@ -119,24 +119,26 @@ contains
                 case("simple") 
                     ! Use simple threshold method
 
-                    call calc_calving_rate_simple(tpo%now%calv,tpo%now%H_ice,tpo%now%f_grnd, &
+                    call calc_calving_rate_simple(tpo%now%calv,tpo%now%H_ice,tpo%now%f_grnd,tpo%now%f_ice, &
                                                     tpo%par%calv_H_lim,tpo%par%calv_tau)
                     
                 case("flux") 
                     ! Use threshold+flux method from GRISLI 
 
-                    call calc_calving_rate_flux(tpo%now%calv,tpo%now%H_ice,tpo%now%f_grnd,mbal,dyn%now%ux_bar, &
+                    call calc_calving_rate_flux(tpo%now%calv,tpo%now%H_ice,tpo%now%f_grnd,tpo%now%f_ice,mbal,dyn%now%ux_bar, &
                                                 dyn%now%uy_bar,tpo%par%dx,tpo%par%calv_H_lim,tpo%par%calv_tau)
                     
                 case("kill") 
                     ! Delete all floating ice (using characteristic time parameter)
-                    call calc_calving_rate_kill(tpo%now%calv,tpo%now%H_ice,tpo%now%f_grnd,tpo%par%calv_tau)
+                    call calc_calving_rate_kill(tpo%now%calv,tpo%now%H_ice,tpo%now%f_grnd.eq.0.0_prec,tpo%par%calv_tau)
 
                 case("kill-pos")
-                    ! Delete all floating ice beyond a given location 
-                    tpo%now%calv = 0.0_prec 
-                    where(bnd%calv_mask .and. tpo%now%H_ice .gt. 0.0_prec &
-                            .and. tpo%now%f_grnd .eq. 0.0_prec) tpo%now%calv = tpo%now%H_ice / dt
+                    ! Delete all floating ice beyond a given location (using characteristic time parameter)
+
+                    call calc_calving_rate_kill(tpo%now%calv,tpo%now%H_ice, &
+                                                    ( tpo%now%f_grnd .eq. 0.0_prec .and. &
+                                                      tpo%now%H_ice  .gt. 0.0_prec .and. &
+                                                      bnd%calv_mask ), tpo%par%calv_tau)
 
                 case DEFAULT 
 

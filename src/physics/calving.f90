@@ -78,7 +78,7 @@ contains
         
     end subroutine apply_calving
 
-    subroutine calc_calving_rate_simple(calv,H_ice,f_grnd,H_calv,tau)
+    subroutine calc_calving_rate_simple(calv,H_ice,f_grnd,f_ice,H_calv,tau)
         ! Calculate the calving rate [m/a] based on a simple threshold rule
         ! H_ice < H_calv
 
@@ -87,6 +87,7 @@ contains
         real(prec), intent(OUT) :: calv(:,:)
         real(prec), intent(IN)  :: H_ice(:,:)                ! [m] Ice thickness 
         real(prec), intent(IN)  :: f_grnd(:,:)               ! [-] Grounded fraction
+        real(prec), intent(IN)  :: f_ice(:,:)
         real(prec), intent(IN)  :: H_calv 
         real(prec), intent(IN)  :: tau                       ! [a] Calving timescale, ~ 1yr
 
@@ -114,10 +115,18 @@ contains
                 ! Ice-shelf floating margin: floating ice point with open ocean neighbor 
                 ! If this point is an ice front, check for calving
 
-                if (H_ice(i,j) .lt. H_calv) then 
+                ! Calculate current ice thickness (H_ref = H_ice/f_ice)
+                ! Check f_ice==0 for safety, but this should never happen for an ice-covered point
+                if (f_ice(i,j) .gt. 0.0_prec) then 
+                    H_mrgn = H_ice(i,j) / f_ice(i,j) 
+                else
+                    H_mrgn = H_ice(i,j) 
+                end if 
+
+                if (H_mrgn .lt. H_calv) then 
                     ! Apply calving at front, delete all ice in point (H_ice) 
 
-                    calv(i,j) = max(H_calv-H_ice(i,j),0.0) / tau 
+                    calv(i,j) = max(H_calv-H_mrgn,0.0) / tau 
 
                 end if 
 
@@ -130,7 +139,7 @@ contains
 
     end subroutine calc_calving_rate_simple
     
-    subroutine calc_calving_rate_flux(calv,H_ice,f_grnd,mbal,ux,uy,dx,H_calv,tau)
+    subroutine calc_calving_rate_flux(calv,H_ice,f_grnd,f_ice,mbal,ux,uy,dx,H_calv,tau)
         ! Calculate the calving rate [m/a] based on a simple threshold rule
         ! H_ice < H_calv
 
@@ -139,6 +148,7 @@ contains
         real(prec), intent(OUT) :: calv(:,:)
         real(prec), intent(IN)  :: H_ice(:,:)                ! [m] Ice thickness 
         real(prec), intent(IN)  :: f_grnd(:,:)               ! [-] Grounded fraction
+        real(prec), intent(IN)  :: f_ice(:,:)
         real(prec), intent(IN)  :: mbal(:,:)                 ! [m/a] Net mass balance 
         real(prec), intent(IN)  :: ux(:,:)                   ! [m/a] velocity, x-direction (ac-nodes)
         real(prec), intent(IN)  :: uy(:,:)                   ! [m/a] velocity, y-direction (ac-nodes)
@@ -152,15 +162,24 @@ contains
         logical :: test_mij, test_pij, test_imj, test_ipj
         logical :: positive_mb 
         real(prec), allocatable :: dHdt(:,:), H_diff(:,:)  
+        real(prec), allocatable :: H_mrgn(:,:) 
 
         nx = size(H_ice,1)
         ny = size(H_ice,2)
 
         allocate(dHdt(nx,ny))
         allocate(H_diff(nx,ny))
+        allocate(H_mrgn(nx,ny))
 
         ! Ice thickness above threshold
-        H_diff = H_ice - H_calv
+        where(f_ice .gt. 0.0_prec) 
+            H_mrgn = H_ice/f_ice
+        elsewhere 
+            H_mrgn = H_ice 
+        end where 
+
+        ! Ice thickness above threshold
+        H_diff = H_mrgn - H_calv
 
         ! Diagnosed lagrangian rate of change
         dHdt = 0.0 
@@ -173,7 +192,7 @@ contains
                 eps_yy = (uy(i,j) - uy(i,j-1))/dx
 
                 ! Calculate thickness change via conservation
-                dHdt(i,j) = mbal(i,j) - H_ice(i,j)*(eps_xx+eps_yy)
+                dHdt(i,j) = mbal(i,j) - H_mrgn(i,j)*(eps_xx+eps_yy)
 
         end do 
         end do
@@ -215,7 +234,10 @@ contains
                     .or.(f_grnd(i,j+1).gt.0.0.and.positive_mb ))
 
                 if ((.not.(test_mij.or.test_pij.or.test_imj.or.test_ipj))) then
-                    calv(i,j) = max(H_calv - H_ice(i,j),0.0) / tau             
+                    ! This point does not pass the test, determine calving rate 
+
+                    calv(i,j) = max(H_calv - H_mrgn(i,j),0.0) / tau
+
                 end if  
 
             end if
@@ -227,7 +249,7 @@ contains
 
     end subroutine calc_calving_rate_flux
     
-    subroutine calc_calving_rate_eigen(calv,H_ice,f_grnd,ux_bar,uy_bar,dx,dy,H_calv,k_calv)
+    subroutine calc_calving_rate_eigen(calv,H_ice,f_grnd,f_ice,ux_bar,uy_bar,dx,dy,H_calv,k_calv)
         ! Calculate the calving rate [m/a] based on the "eigencalving" law
         ! from Levermann et al. (2012)
 
@@ -236,7 +258,9 @@ contains
         real(prec), intent(OUT) :: calv(:,:)
         real(prec), intent(IN)  :: H_ice(:,:)
         real(prec), intent(IN)  :: f_grnd(:,:)  
-        real(prec), intent(IN)  :: ux_bar(:,:), uy_bar(:,:)
+        real(prec), intent(IN)  :: f_ice(:,:)
+        real(prec), intent(IN)  :: ux_bar(:,:)
+        real(prec), intent(IN)  :: uy_bar(:,:)
         real(prec), intent(IN)  :: dx, dy 
         real(prec), intent(IN)  :: H_calv 
         real(prec), intent(IN)  :: k_calv
@@ -296,17 +320,17 @@ contains
 
     end subroutine calc_calving_rate_eigen
 
-    subroutine calc_calving_rate_kill(calv,H_ice,f_grnd,tau)
+    subroutine calc_calving_rate_kill(calv,H_ice,mask,tau)
+        ! Kill all ice in a given mask using a characteristic timescale tau
 
         implicit none 
 
         real(prec), intent(OUT) :: calv(:,:)
         real(prec), intent(IN)  :: H_ice(:,:)
-        real(prec), intent(IN)  :: f_grnd(:,:) 
+        logical,    intent(IN)  :: mask(:,:) 
         real(prec), intent(IN)  :: tau 
 
-        ! Kill all floating ice using a characteristic timescale tau
-        where (f_grnd .eq. 0.0) calv = H_ice / tau 
+        where (mask) calv = H_ice / tau 
 
         return 
 

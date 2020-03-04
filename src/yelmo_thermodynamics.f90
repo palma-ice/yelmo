@@ -378,8 +378,8 @@ end if
 !                 write(*,*) "advecxy: ", i,j, maxval(abs(advecxy3D(i,j,:)-advecxy))
                 
                 ! Calculate correction to vertical velocity due to horizontal gradient on vertical sigma-coordinate grid
-                call calc_advec_vertical_column_correction(uz_now,H_ice_now,z_srf,dHdt,dzsdt,ux,uy,uz,zeta_ac,dx,i,j)
-!                 uz_now = uz(i,j,:) 
+!                 call calc_advec_vertical_column_correction(uz_now,H_ice_now,z_srf,dHdt,dzsdt,ux,uy,uz,zeta_ac,dx,i,j)
+                uz_now = uz(i,j,:) 
 
                 if (trim(solver) .eq. "enth") then 
 

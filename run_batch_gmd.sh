@@ -61,6 +61,7 @@ python run_yelmo.py -s -e trough ${fldr}/trough par/yelmo_TROUGH-F17.nml
     # call init_eismint_summit(ice1,smb=0.1_prec)
 # Next, set prec=dp in yelmo_defs.f90 
 # Compile and run 3 experiments (nz=12,32,52), corresponding to 10,30 and 50 internal ice points
+# All output go to nc files in the folder "output/"
 make clean
 make icetemp 
 ./libyelmo/bin/test_icetemp.x 12 

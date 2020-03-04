@@ -8,7 +8,7 @@ fldr = 'output/test'
 make benchmarks
 
 # EISMINT1 moving margin, EXPA and EXPF
-python run_yelmo.py -s -e benchmarks ${fldr}/expa par/gmd/yelmo_EISMINT_moving.nml
+python run_yelmo.py -s -e benchmarks ${fldr}/moving par/gmd/yelmo_EISMINT_moving.nml
 python run_yelmo.py -s -e benchmarks ${fldr}/expa par/gmd/yelmo_EISMINT_expa.nml
 python run_yelmo.py -s -e benchmarks ${fldr}/expf par/gmd/yelmo_EISMINT_expf.nml
 

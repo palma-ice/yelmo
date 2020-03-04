@@ -338,6 +338,9 @@ contains
         call nc_write(filename,"H_grnd",ylmo%tpo%now%H_grnd,units="m",long_name="Ice thickness overburden", &
                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
         
+!         call nc_write(filename,"bmb",ylmo%tpo%now%bmb,units="m/a",long_name="Basal mass balance", &
+!                       dim1="xc",dim2="yc",start=[1,1],ncid=ncid)
+
 !         call nc_write(filename,"dist_grline",ylmo%tpo%now%dist_grline,units="km", &
 !                       long_name="Distance to nearest grounding-line point", &
 !                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
@@ -478,9 +481,7 @@ contains
                       dim1="xc",dim2="yc",start=[1,1],ncid=ncid)
         call nc_write(filename,"T_srf",ylmo%bnd%T_srf,units="K",long_name="Surface temperature", &
                       dim1="xc",dim2="yc",start=[1,1],ncid=ncid)
-     
-!         call nc_write(filename,"bmb",ylmo%tpo%now%bmb,units="m/a",long_name="Basal mass balance", &
-!                       dim1="xc",dim2="yc",start=[1,1],ncid=ncid)
+        
 !         call nc_write(filename,"bmb_shlf",ylmo%bnd%bmb_shlf,units="m/a",long_name="Basal mass balance (shelf)", &
 !                       dim1="xc",dim2="yc",start=[1,1],ncid=ncid)
         

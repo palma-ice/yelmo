@@ -171,10 +171,6 @@ contains
                     ! Apply correction to match kinematic boundary condition at surface 
                     !uz(i,j,k) = uz(i,j,k) - zeta_ac(k)*(uz(i,j,k)-uz_srf)
 
-                    ! Calculate and apply correction for sigma-coordinate stretching 
-                    call calc_advec_vertical_column_correction(corr,uz,ux,uy,H_ice,z_srf,dHdt,dzsdt,zeta_ac,dx,i,j,k)
-                    uz(i,j,k) = uz(i,j,k) + corr 
-
                     if (abs(uz(i,j,k)) .le. tol) uz(i,j,k) = 0.0_prec 
                     
                 end do 
@@ -191,6 +187,9 @@ contains
 
         end do 
         end do 
+
+        ! Calculate and apply correction for sigma-coordinate stretching 
+        call calc_advec_vertical_column_correction(uz,ux,uy,H_ice,z_srf,dHdt,dzsdt,zeta_ac,dx)
 
         ! Fill in boundaries 
         j = 1 
@@ -233,7 +232,7 @@ contains
 
     end subroutine calc_uz_3D 
 
-    subroutine calc_advec_vertical_column_correction(corr,uz,ux,uy,H_ice,z_srf,dHdt,dzsdt,zeta_ac,dx,i,j,k)
+    subroutine calc_advec_vertical_column_correction(uz,ux,uy,H_ice,z_srf,dHdt,dzsdt,zeta_ac,dx)
         ! Calculate the corrected vertical velocity, accounting for stretching of 
         ! the vertical axis between grid cells due to the use of sigma-coordinates. 
 
@@ -242,7 +241,6 @@ contains
         
         implicit none 
 
-        real(prec), intent(OUT)   :: corr
         real(prec), intent(INOUT) :: uz(:,:,:)        ! nx,ny,nz_ac
         real(prec), intent(IN)    :: ux(:,:,:)        ! nx,ny,nz_aa
         real(prec), intent(IN)    :: uy(:,:,:)        ! nx,ny,nz_aa
@@ -252,14 +250,15 @@ contains
         real(prec), intent(IN)    :: dzsdt(:,:)       ! nx,ny 
         real(prec), intent(IN)    :: zeta_ac(:)       ! nz_ac
         real(prec), intent(IN)    :: dx   
-        integer,    intent(IN)    :: i, j, k 
 
         ! Local variables 
-        integer :: nx, ny, nz_ac 
+        integer :: i, j, k, nx, ny, nz_ac 
         real(prec) :: ux_aa, uy_aa 
         real(prec) :: dx_inv, dx_inv2
-        real(prec) :: c_x, c_y, c_t  
-
+        real(prec) :: c_x, c_y, c_t 
+        real(prec) :: corr 
+        real(prec), allocatable :: uz_corr(:)       ! [m/a] nz_ac 
+        
         real(prec), parameter :: tol = 1e-4 
         real(prec), parameter :: max_corr = 1.0_prec   ! Maximum allowed deviation from original uz (eg 200%)
 
@@ -267,41 +266,54 @@ contains
         ny    = size(H_ice,2)
         nz_ac = size(zeta_ac,1) 
 
+        allocate(uz_corr(nz_ac))
+
         ! Define some constants 
         dx_inv  = 1.0_prec / dx 
         dx_inv2 = 1.0_prec / (2.0_prec*dx)
 
-        if (i .gt. 1 .and. j .gt. 1 .and. i .lt. nx .and. j .lt. ny) then 
+        do j = 2, ny-1 
+        do i = 2, nx-1 
 
-            ! Estimate direction of current flow into cell (x and y), centered horizontally in grid point
-            ! and averaged to staggered cell edges where uz is defined.
-            if (k .eq. 1) then 
-                ux_aa = 0.5_prec*(ux(i,j,k)+ux(i-1,j,k))
-                uy_aa = 0.5_prec*(uy(i,j,k)+uy(i,j-1,k))
-            else if (k .eq. nz_ac) then 
-                ux_aa = 0.5_prec*(ux(i,j,k)+ux(i-1,j,k+1))
-                uy_aa = 0.5_prec*(uy(i,j,k)+uy(i,j-1,k+1))
-            else 
-                ux_aa = 0.25_prec*(ux(i,j,k)+ux(i-1,j,k) + ux(i,j,k+1)+ux(i-1,j,k+1))
-                uy_aa = 0.25_prec*(uy(i,j,k)+uy(i,j-1,k) + uy(i,j,k+1)+uy(i,j-1,k+1))
-            end if 
+            do k = 1, nz_ac 
 
-            ! Get horizontal scaling correction terms 
-            c_x = (1.0_prec-zeta_ac(k))*(H_ice(i+1,j)-H_ice(i-1,j))*dx_inv2 - (z_srf(i+1,j)-z_srf(i-1,j))*dx_inv2
-            c_y = (1.0_prec-zeta_ac(k))*(H_ice(i,j+1)-H_ice(i,j-1))*dx_inv2 - (z_srf(i,j+1)-z_srf(i,j-1))*dx_inv2
-            
-            ! Get grid velocity term 
-            c_t = (1.0_prec-zeta_ac(k))*dHdt(i,j) - dzsdt(i,j) 
+                ! Estimate direction of current flow into cell (x and y), centered horizontally in grid point
+                ! and averaged to staggered cell edges where uz is defined.
+                if (k .eq. 1) then 
+                    ux_aa = 0.5_prec*(ux(i,j,k)+ux(i-1,j,k))
+                    uy_aa = 0.5_prec*(uy(i,j,k)+uy(i,j-1,k))
+                else if (k .eq. nz_ac) then 
+                    ux_aa = 0.5_prec*(ux(i,j,k)+ux(i-1,j,k+1))
+                    uy_aa = 0.5_prec*(uy(i,j,k)+uy(i,j-1,k+1))
+                else 
+                    ux_aa = 0.25_prec*(ux(i,j,k)+ux(i-1,j,k) + ux(i,j,k+1)+ux(i-1,j,k+1))
+                    uy_aa = 0.25_prec*(uy(i,j,k)+uy(i,j-1,k) + uy(i,j,k+1)+uy(i,j-1,k+1))
+                end if 
 
-            ! Calculate total correction term, and limit it to within max_corr 
-            corr = ux_aa*c_x + uy_aa*c_y + c_t  
-            corr = sign(min(abs(corr),abs(max_corr*uz(i,j,k))),corr)
+                ! Get horizontal scaling correction terms 
+                c_x = (1.0_prec-zeta_ac(k))*(H_ice(i+1,j)-H_ice(i-1,j))*dx_inv2 - (z_srf(i+1,j)-z_srf(i-1,j))*dx_inv2
+                c_y = (1.0_prec-zeta_ac(k))*(H_ice(i,j+1)-H_ice(i,j-1))*dx_inv2 - (z_srf(i,j+1)-z_srf(i,j-1))*dx_inv2
+                
+                ! Get grid velocity term 
+                c_t = (1.0_prec-zeta_ac(k))*dHdt(i,j) - dzsdt(i,j) 
 
-        else 
+                ! Calculate total correction term, and limit it to within max_corr 
+                corr = ux_aa*c_x + uy_aa*c_y + c_t  
+                corr = sign(min(abs(corr),abs(max_corr*uz(i,j,k))),corr)
 
-            corr = 0.0_prec 
+                ! Apply correction 
+                uz_corr(k) = uz(i,j,k) + corr 
 
-        end if
+                ! Limit new velocity to avoid underflow errors 
+                if (abs(uz_corr(k)) .le. tol) uz_corr(k) = 0.0_prec 
+
+            end do         
+
+            ! Set uz equal to new corrected uz 
+            uz(i,j,:) = uz_corr 
+
+        end do 
+        end do 
 
         return 
 

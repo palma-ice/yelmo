@@ -131,7 +131,7 @@
     enh_shear               = 1.0
     enh_stream              = 1.0
     enh_shlf                = 1.0
-    age_method              = "None"    ! "None", "expl", "impl"
+    age_method              = "expl"    ! "None", "expl", "impl"
     age_impl_kappa          = 1.5       ! [m2 a-1] Artificial diffusion term for implicit age solving 
 
 /

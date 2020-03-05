@@ -64,20 +64,21 @@ contains
         allocate(uz_now(nz_ac)) 
         
 
-        ! Set up iterations 
-        dt_now   = min(dt,dt_tracer)
-        iter_tot = ceiling(dt/dt_now)
-        time_now = time 
-        dt_tot   = 0.0 
+!         ! Set up iterations 
+!         dt_now   = min(dt,dt_tracer)
+!         iter_tot = ceiling(dt/dt_now)
+!         time_now = time 
+!         dt_tot   = 0.0 
 
-        do iter = 1, iter_tot 
+!         do iter = 1, iter_tot 
 
-            if (dt-dt_tot .lt. dt_now) dt_now = dt-dt_tot 
-            time_now = time_now + dt_now 
+!             if (dt-dt_tot .lt. dt_now) dt_now = dt-dt_tot 
+!             time_now = time_now + dt_now 
                 
+        dt_now = dt 
 
-            advecxy = 0.0 
-            uz_now = 0.0_prec 
+            advecxy = 0.0_prec 
+            uz_now  = 0.0_prec 
 
             do j = 3, ny-2
             do i = 3, nx-2 
@@ -114,13 +115,13 @@ contains
                         case("expl")
                             ! Explicit, upwind solver 
                             
-                            call calc_tracer_column_expl(X_ice(i,j,:),uz_now,advecxy,X_srf,bmb_now,H_ice(i,j),zeta_aa,zeta_ac,dt)
+                            call calc_tracer_column_expl(X_ice(i,j,:),uz_now,advecxy,X_srf,bmb_now,H_ice(i,j),zeta_aa,zeta_ac,dt_now)
 
                         case("impl")
                             ! Implicit solver vertically, upwind horizontally 
                             
                             call calc_tracer_column(X_ice(i,j,:),uz_now,advecxy,X_srf,bmb_now,H_ice(i,j),zeta_aa,zeta_ac, &
-                                                                                                                    impl_kappa,dt) 
+                                                                                                                    impl_kappa,dt_now) 
 
                         case DEFAULT 
 
@@ -145,10 +146,10 @@ contains
             end do 
             end do 
 
-            dt_tot = dt_tot + dt_now 
-            if (abs(dt-dt_tot).lt. 1e-5) exit 
+!             dt_tot = dt_tot + dt_now 
+!             if (abs(dt-dt_tot).lt. 1e-5) exit 
 
-        end do 
+!         end do 
 
         ! Fill in borders 
         X_ice(2,:,:)    = X_ice(3,:,:) 

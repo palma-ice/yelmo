@@ -366,13 +366,10 @@ contains
         integer    :: ncid, n
         real(prec) :: time_prev 
 
-        real(prec) :: uxy_rmse, H_rmse, zsrf_rmse, loguxy_rmse 
         real(prec) :: rmse, err  
         real(prec), allocatable :: tmp(:,:) 
-        real(prec), allocatable :: tmp1(:,:) 
         
         allocate(tmp(ylmo%grd%nx,ylmo%grd%ny))
-        allocate(tmp1(ylmo%grd%nx,ylmo%grd%ny))
 
         ! Open the file for writing
         call nc_open(filename,ncid,writable=.TRUE.)
@@ -385,9 +382,11 @@ contains
         ! Update the time step
         call nc_write(filename,"time",time,dim1="time",start=[n],count=[1],ncid=ncid)
 
-        ! Write model speed 
-        call nc_write(filename,"speed",ylmo%par%model_speed,units="kyr/hr",long_name="Model speed (Yelmo only)", &
-                      dim1="time",start=[n],count=[1],ncid=ncid)
+        ! Write model metrics (model speed, dt, eta)
+        call yelmo_write_step_model_metrics(filename,ylmo,n,ncid)
+
+        ! Write present-day data metrics (rmse[H],etc)
+        call yelmo_write_step_pd_metrics(filename,ylmo,n,ncid)
         
         ! 1D variables 
         call nc_write(filename,"V_ice",ylmo%reg%V_ice,units="km3",long_name="Ice volume", &
@@ -481,49 +480,6 @@ contains
         
         call nc_write(filename,"pd_err_z_srf_sm",tmp,units="m",long_name="Smooth surface elevation error (present day)", &
                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-        
-        ! initmip specific error metrics 
-        tmp = ylmo%dta%pd%err_H_ice
-        if (n .gt. 1 .or. count(tmp .ne. 0.0) .gt. 0) then 
-            H_rmse = sqrt(sum(tmp**2)/count(tmp .ne. 0.0))
-        else 
-            H_rmse = mv 
-        end if 
-
-        ! surface elevation too 
-        tmp = ylmo%dta%pd%err_z_srf
-        if (n .gt. 1 .or. count(tmp .ne. 0.0) .gt. 0) then 
-            zsrf_rmse = sqrt(sum(tmp**2)/count(tmp .ne. 0.0))
-        else 
-            zsrf_rmse = mv 
-        end if 
-
-        tmp = ylmo%dta%pd%err_uxy_s
-        if (n .gt. 1 .or. count(tmp .ne. 0.0) .gt. 0) then 
-            uxy_rmse = sqrt(sum(tmp**2)/count(tmp .ne. 0.0))
-        else
-            uxy_rmse = mv
-        end if 
-
-        tmp = ylmo%dta%pd%uxy_s 
-        where(ylmo%dta%pd%uxy_s .gt. 0.0) tmp = log(tmp)
-        tmp1 = ylmo%dyn%now%uxy_s 
-        where(ylmo%dyn%now%uxy_s .gt. 0.0) tmp1 = log(tmp1)
-        
-        if (n .gt. 1 .or. count(tmp1-tmp .ne. 0.0) .gt. 0) then 
-            loguxy_rmse = sqrt(sum((tmp1-tmp)**2)/count(tmp1-tmp .ne. 0.0))
-        else
-            loguxy_rmse = mv
-        end if 
-        
-        call nc_write(filename,"rmse_H",H_rmse,units="m",long_name="RMSE - Ice thickness", &
-                      dim1="time",start=[n],count=[1],ncid=ncid,missing_value=mv)
-        call nc_write(filename,"rmse_zsrf",zsrf_rmse,units="m",long_name="RMSE - Surface elevation", &
-                      dim1="time",start=[n],count=[1],ncid=ncid,missing_value=mv)
-        call nc_write(filename,"rmse_uxy",uxy_rmse,units="m/a",long_name="RMSE - Surface velocity", &
-                      dim1="time",start=[n],count=[1],ncid=ncid,missing_value=mv)
-        call nc_write(filename,"rmse_uxy_log",loguxy_rmse,units="log(m/a)",long_name="RMSE - Log surface velocity", &
-                      dim1="time",start=[n],count=[1],ncid=ncid,missing_value=mv)
         
         ! Close the netcdf file
         call nc_close(ncid)

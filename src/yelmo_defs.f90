@@ -522,6 +522,12 @@ module yelmo_defs
         real(prec), allocatable :: err_H_ice(:,:), err_z_srf(:,:), err_z_bed(:,:)
         real(prec), allocatable :: err_uxy_s(:,:)
         
+        real(prec) :: rmse_H 
+        real(prec) :: rmse_zsrf
+        real(prec) :: rmse_uxy 
+        real(prec) :: rmse_loguxy 
+             
+    
     end type
 
     type ydata_class 

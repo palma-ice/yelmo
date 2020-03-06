@@ -11,6 +11,8 @@ module yelmo_io
 
     private 
     public :: yelmo_write_init
+    public :: yelmo_write_step_model_metrics
+    public :: yelmo_write_step_pd_metrics
     public :: yelmo_restart_write
     public :: yelmo_restart_read_topo
     public :: yelmo_restart_read
@@ -45,6 +47,51 @@ contains
         return
 
     end subroutine yelmo_write_init 
+
+    subroutine yelmo_write_step_model_metrics(filename,ylmo,n,ncid)
+        ! Write model performance metrics (speed, dt, eta) 
+
+        implicit none 
+
+        character(len=*),  intent(IN) :: filename 
+        type(yelmo_class), intent(IN) :: ylmo 
+        integer                       :: n 
+        integer, optional             :: ncid 
+        
+        ! Write model speed 
+        call nc_write(filename,"speed",ylmo%par%model_speed,units="kyr/hr",long_name="Model speed (Yelmo only)", &
+                      dim1="time",start=[n],count=[1],ncid=ncid)
+        call nc_write(filename,"dt_avg",ylmo%par%dt_avg,units="yr",long_name="Average timestep", &
+                      dim1="time",start=[n],count=[1],ncid=ncid)
+        call nc_write(filename,"eta_avg",ylmo%par%eta_avg,units="m a-1",long_name="Average eta (maximum PC truncation error)", &
+                      dim1="time",start=[n],count=[1],ncid=ncid)
+
+        return 
+
+    end subroutine yelmo_write_step_model_metrics
+
+    subroutine yelmo_write_step_pd_metrics(filename,ylmo,n,ncid)
+        ! Write present-day data comparison metrics (rmse[H],etc)
+
+        implicit none 
+
+        character(len=*),  intent(IN) :: filename 
+        type(yelmo_class), intent(IN) :: ylmo 
+        integer                       :: n 
+        integer, optional             :: ncid 
+        
+        call nc_write(filename,"rmse_H",ylmo%dta%pd%rmse_H,units="m",long_name="RMSE - Ice thickness", &
+                      dim1="time",start=[n],count=[1],ncid=ncid)
+        call nc_write(filename,"rmse_zsrf",ylmo%dta%pd%rmse_zsrf,units="m",long_name="RMSE - Surface elevation", &
+                      dim1="time",start=[n],count=[1],ncid=ncid)
+        call nc_write(filename,"rmse_uxy",ylmo%dta%pd%rmse_uxy,units="m/a",long_name="RMSE - Surface velocity", &
+                      dim1="time",start=[n],count=[1],ncid=ncid)
+        call nc_write(filename,"rmse_uxy_log",ylmo%dta%pd%rmse_loguxy,units="log(m/a)",long_name="RMSE - Log surface velocity", &
+                      dim1="time",start=[n],count=[1],ncid=ncid)
+        
+        return 
+
+    end subroutine yelmo_write_step_pd_metrics
 
     subroutine yelmo_restart_write(dom,filename,time)
 

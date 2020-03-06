@@ -245,13 +245,6 @@ contains
         integer    :: ncid, n
         real(prec) :: time_prev 
 
-        real(prec) :: uxy_rmse, H_rmse, zsrf_rmse, loguxy_rmse 
-        real(prec), allocatable :: tmp(:,:) 
-        real(prec), allocatable :: tmp1(:,:) 
-        
-        allocate(tmp(ylmo%grd%nx,ylmo%grd%ny))
-        allocate(tmp1(ylmo%grd%nx,ylmo%grd%ny))
-
         ! Open the file for writing
         call nc_open(filename,ncid,writable=.TRUE.)
 
@@ -263,56 +256,11 @@ contains
         ! Update the time step
         call nc_write(filename,"time",time,dim1="time",start=[n],count=[1],ncid=ncid)
 
-        ! Write model speed 
-        call nc_write(filename,"speed",ylmo%par%model_speed,units="kyr/hr",long_name="Model speed (Yelmo only)", &
-                      dim1="time",start=[n],count=[1],ncid=ncid)
-        call nc_write(filename,"dt_avg",ylmo%par%dt_avg,units="yr",long_name="Average timestep", &
-                      dim1="time",start=[n],count=[1],ncid=ncid)
-        call nc_write(filename,"eta_avg",ylmo%par%eta_avg,units="m a-1",long_name="Average eta (maximum PC truncation error)", &
-                      dim1="time",start=[n],count=[1],ncid=ncid)
-        
-        ! initmip specific error metrics 
-        tmp = ylmo%tpo%now%H_ice-ylmo%dta%pd%H_ice
-        if (n .gt. 1 .or. count(tmp .ne. 0.0) .gt. 0) then 
-            H_rmse = sqrt(sum(tmp**2)/count(tmp .ne. 0.0))
-        else 
-            H_rmse = mv 
-        end if 
+        ! Write model metrics (model speed, dt, eta)
+        call yelmo_write_step_model_metrics(filename,ylmo,n,ncid)
 
-        ! surface elevation too 
-        tmp = ylmo%dta%pd%err_z_srf
-        if (n .gt. 1 .or. count(tmp .ne. 0.0) .gt. 0) then 
-            zsrf_rmse = sqrt(sum(tmp**2)/count(tmp .ne. 0.0))
-        else 
-            zsrf_rmse = mv 
-        end if 
-
-        tmp = ylmo%dta%pd%err_uxy_s
-        if (n .gt. 1 .or. count(tmp .ne. 0.0) .gt. 0) then 
-            uxy_rmse = sqrt(sum(tmp**2)/count(tmp .ne. 0.0))
-        else
-            uxy_rmse = mv
-        end if 
-
-        tmp = ylmo%dta%pd%uxy_s 
-        where(ylmo%dta%pd%uxy_s .gt. 0.0) tmp = log(tmp)
-        tmp1 = ylmo%dyn%now%uxy_s 
-        where(ylmo%dyn%now%uxy_s .gt. 0.0) tmp1 = log(tmp1)
-        
-        if (n .gt. 1 .or. count(tmp1-tmp .ne. 0.0) .gt. 0) then 
-            loguxy_rmse = sqrt(sum((tmp1-tmp)**2)/count(tmp1-tmp .ne. 0.0))
-        else
-            loguxy_rmse = mv
-        end if 
-        
-        call nc_write(filename,"rmse_H",H_rmse,units="m",long_name="RMSE - Ice thickness", &
-                      dim1="time",start=[n],count=[1],ncid=ncid)
-        call nc_write(filename,"rmse_zsrf",zsrf_rmse,units="m",long_name="RMSE - Surface elevation", &
-                      dim1="time",start=[n],count=[1],ncid=ncid)
-        call nc_write(filename,"rmse_uxy",uxy_rmse,units="m/a",long_name="RMSE - Surface velocity", &
-                      dim1="time",start=[n],count=[1],ncid=ncid)
-        call nc_write(filename,"rmse_uxy_log",loguxy_rmse,units="log(m/a)",long_name="RMSE - Log surface velocity", &
-                      dim1="time",start=[n],count=[1],ncid=ncid)
+        ! Write present-day data metrics (rmse[H],etc)
+        call yelmo_write_step_pd_metrics(filename,ylmo,n,ncid)
         
         ! == ISMIP6 specific variables 
         ! http://www.climate-cryosphere.org/wiki/index.php?title=InitMIP-Greenland#Appendix_2_.E2.80.93_Naming_conventions.2C_upload_and_model_output_data.

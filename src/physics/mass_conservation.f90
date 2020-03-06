@@ -116,17 +116,13 @@ contains
 
         end if 
 
-if (.TRUE.) then 
-    ! Grounded calving routines 
-    
         ! Determine grounded calving from highly variable terrain  
         call calc_calving_rate_grounded(calv_grnd,H_ice,f_grnd,z_bed_sd,sd_min,sd_max,calv_max,dt)
 
         ! Limit grounded ice thickness to below maximum threshold value
         ! based on shear stress limit 
-        call limit_grounded_margin_thickness_stress(H_ice,mb_applied,f_grnd,H_ocn,dt)
-
-end if 
+        ! ajr: not ready yet, experimetal!!
+        !call limit_grounded_margin_thickness_stress(H_ice,mb_applied,f_grnd,H_ocn,dt)
 
         ! Limit grounded ice thickess to above minimum and below inland neighbor at the margin
 !         call limit_grounded_margin_thickness(H_ice,mb_applied,f_grnd,H_min,dt) 

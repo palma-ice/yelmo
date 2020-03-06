@@ -116,10 +116,10 @@ contains
 
         end if 
 
-if (.FALSE.) then 
-    ! ajr: disable these for now to test new margin scheme!!
-
-        ! Determine grounded calving 
+if (.TRUE.) then 
+    ! Grounded calving routines 
+    
+        ! Determine grounded calving from highly variable terrain  
         call calc_calving_rate_grounded(calv_grnd,H_ice,f_grnd,z_bed_sd,sd_min,sd_max,calv_max,dt)
 
         ! Limit grounded ice thickness to below maximum threshold value

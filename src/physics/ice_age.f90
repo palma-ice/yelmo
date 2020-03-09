@@ -74,8 +74,9 @@ contains
 
 !             if (dt-dt_tot .lt. dt_now) dt_now = dt-dt_tot 
 !             time_now = time_now + dt_now 
-                
-        dt_now = dt 
+        
+        time_now = time 
+        dt_now   = dt 
 
             advecxy = 0.0_prec 
             uz_now  = 0.0_prec 

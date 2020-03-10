@@ -495,9 +495,9 @@ contains
 
 
                 ! Increase - feeding the Ronne ice shelf from the South
-                call scale_cf_gaussian(cf_ref,dyn%par%cf_stream*10.0,x0=-760.0, y0=  32.0,sigma=200.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
+                call scale_cf_gaussian(cf_ref,dyn%par%cf_stream*2.0,x0=-800.0, y0= 100.0,sigma=400.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
                 
-                call scale_cf_gaussian(cf_ref,dyn%par%cf_stream*5.0, x0=-980.0, y0=-400.0,sigma=200.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
+                call scale_cf_gaussian(cf_ref,dyn%par%cf_stream*2.0, x0=-980.0, y0=-400.0,sigma=200.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
                 
                 ! Reduction - feeding the Ross ice shelf from the East
                 call scale_cf_gaussian(cf_ref,dyn%par%cf_stream*0.05,x0= 130.0, y0=-550.0, sigma=100.0,xx=grd%x*1e-3,yy=grd%y*1e-3)

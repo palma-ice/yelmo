@@ -310,7 +310,7 @@ contains
             end do         
 
             ! Set uz equal to new corrected uz 
-            uz(i,j,:) = uz_corr 
+            uz(i,j,:) = uz_corr(:)  
 
         end do 
         end do 

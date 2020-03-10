@@ -151,7 +151,7 @@ program yelmo_test
         cf_ref = yelmo1%dyn%par%cf_stream  
 
         ! Use location-specific tuning functions to modify cf_ref 
-        call modify_cf_ref(yelmo1%dyn,yelmo1%tpo,yelmo1%thrm,yelmo1%bnd,yelmo1%grd,yelmo1%par%domain,cf_ref)
+        !call modify_cf_ref(yelmo1%dyn,yelmo1%tpo,yelmo1%thrm,yelmo1%bnd,yelmo1%grd,yelmo1%par%domain,cf_ref)
 
     end if 
 

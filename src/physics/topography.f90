@@ -201,6 +201,8 @@ contains
         ! When H_grnd >= 0, grounded, when H_grnd < 0, floating 
         ! Also calculate rate of change for diagnostic related to grounding line 
 
+        ! Note that thickness above flotation H_sl is therefore max(H_grnd,0)
+        
         implicit none 
 
         real(prec), intent(INOUT) :: H_grnd

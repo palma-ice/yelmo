@@ -547,7 +547,7 @@ module yelmo_defs
 
         ! ===== Total ice variables =====
         real(prec) :: H_ice, z_srf, dHicedt, H_ice_max, dzsrfdt
-        real(prec) :: V_ice, A_ice, dVicedt, fwf
+        real(prec) :: V_ice, A_ice, dVicedt, fwf, V_sl 
         real(prec) :: uxy_bar, uxy_s, uxy_b, z_bed, smb, T_srf, bmb
 
         ! ===== Grounded ice variables =====

@@ -9,7 +9,7 @@
     dT_ann          = 0.0               ! [K] Temperature anomaly (atm)
     z_sl            = 0.0               ! [m] Sea level relative to present-day 
 
-    load_cf_ref     = True              ! Load cf_ref from file? Otherwise define from cf_stream + inline tuning
+    load_cf_ref     = False             ! Load cf_ref from file? Otherwise define from cf_stream + inline tuning
     file_cf_ref     = "input/{domain}/{grid_name}/{grid_name}_cf_ref_opt.nc"  ! Filename holding cf_ref to load 
 /
 
@@ -42,8 +42,8 @@
     topo_fixed        = False           ! Keep ice thickness fixed, perform other ytopo calculations
     topo_rel          = 0               ! 0: No relaxation; 1: relax shelf; 2: relax shelf + gl; 3: all points 
     topo_rel_tau      = 10.0            ! [a] Time scale for relaxation 
-    calv_H_lim        = 200.0           ! [m] Calving limit in ice thickness (thinner ice calves)
-    calv_tau          = 10.0            ! [a] Characteristic calving time
+    calv_H_lim        = 175.0           ! [m] Calving limit in ice thickness (thinner ice calves)
+    calv_tau          = 1.0             ! [a] Characteristic calving time
     H_min_grnd        = 5.0             ! [m] Minimum ice thickness at grounded margin (thinner ice is ablated) - helps with stability
     H_min_flt         = 5.0             ! [m] Minimum ice thickness at floating margin (thinner ice is ablated) - helps with stability
     sd_min            = 100.0           ! [m] calv_grnd(z_bed_sd <= sd_min) = 0.0 
@@ -72,17 +72,17 @@
     taud_gl_method      = 0               !  0: binary, no subgrid, 1: Two-sided gradient
     H_grnd_lim          = 500.0           ! [m] For beta_sep_method=2, reduce beta linearly between H_grnd=0 and H_grnd_lim 
     H_sed_sat           = 250.0           ! [m] Sediment thickness at which sediment effect is saturated
-    cb_method           = -1              ! -1: set externally; 1: calculate cb online  
+    cb_method           = 1               ! -1: set externally; 1: calculate cb online  
     cb_with_pmp         = False           ! Weighted cf_frozen/cf_stream as a function of f_pmp 
     cb_margin_pmp       = True            ! If using cb_with_pmp, additionally impose cf_stream at ice margins 
     cb_scale            = "exp_zb"        ! "none", "lin_zb", "exp_zb", "till_const", "till_zb", scaling of cb spatially
     cb_z0               = -200.0          ! [m] Bedrock elevation at which scaling goes to f_scale=e(-1)
-    cb_z1               = 0.0             ! [m] Bedrock elevation above which scaling goes to f_scale=1
+    cb_z1               =  250.0          ! [m] Bedrock elevation above which scaling goes to f_scale=1
     cb_min              = 0.01            ! [--] Minimum allowed value of f_scale for grounded ice
-    cf_frozen           = 1.0             ! [--] Bed critical stress factor, frozen 
-    cf_stream           = 0.2             ! [--] Bed critical stress factor, stream  
+    cf_frozen           = 0.1             ! [--] Bed critical stress factor, frozen 
+    cf_stream           = 0.1             ! [--] Bed critical stress factor, stream  
     n_sm_beta           = 0               ! [-] Standard deviation in gridpoints for Gaussian smoothing of beta (0==no smoothing)
-    beta_min            = 100.0           ! [Pa a m-1] Minimum value of beta allowed for grounded ice (for stability)
+    beta_min            = 10.0            ! [Pa a m-1] Minimum value of beta allowed for grounded ice (for stability)
     ssa_beta_max        = 1e20            ! [Pa a m-1] Maximum value of beta for which ssa should be calculated 
     ssa_vel_max         = 5000.0          ! [m a-1] SSA velocity limit to avoid spurious results 
     ssa_iter_max        = 20              ! Number of maximum allowed iterations over ssa to converge on vel. solution
@@ -94,7 +94,7 @@
 /
 
 &ydyn_neff 
-    neff_method     = 1                 ! -1: external N_eff, 0: neff_const, 1: overburden pressure, 2: Leguy param., 3: Till pressure
+    neff_method     = 2                 ! -1: external N_eff, 0: neff_const, 1: overburden pressure, 2: Leguy param., 3: Till pressure
     neff_const      = 1e7               ! == rho_ice*g*(eg 1000 m ice thickness)
     neff_p          = 1.0               ! *neff_method=2* marine connectivity exponent (0: none, 1: full)
     neff_set_water  = False             ! *neff_method=3* Prescribe H_w = H_w_max for temperate ice instead of using H_w field?
@@ -122,8 +122,8 @@
     n_glen                  = 3.0 
     visc_min                = 1e3 
     use_2D_enh              = False 
-    enh_shear               = 2.0
-    enh_stream              = 2.0
+    enh_shear               = 3.0
+    enh_stream              = 1.0
     enh_shlf                = 0.7
     age_method              = "None"    ! "None", "expl", "impl"
     age_impl_kappa          = 1.5       ! [m2 a-1] Artificial diffusion term for implicit age solving 

@@ -17,12 +17,12 @@ python run_yelmo.py -s -e benchmarks ${fldr}/expssa par/yelmo_EISMINT_ssa.nml
 
 # Ensemble of HALFAR simulations with various values of 
 # dx to test numerical convergence with analytical solution
-job run --shell -f -o ${fldr}/halfar -p eismint.dx=0.5,1.0,2.0,3.0,4.0,5.0,8.0,10.0 -- python run_yelmo.py -x -s -e benchmarks {} par/gmd/yelmo_HALFAR.nml
+job run --shell -f -o ${fldr}/halfar -p eismint.dx=1.0,2.0,3.0,4.0,5.0,8.0,10.0 -- python run_yelmo.py -x -s -e benchmarks {} par/gmd/yelmo_HALFAR.nml
 
 # Ensemble of EISMINT1-moving simulations with various values of 
 # dx and pc_eps to test adaptive timestepping
 # Note: make sure to specify: eismint.time_end=25e3 yelmo.log_timestep=True ytherm.method='fixed'
-job run --shell -f -o tmp/moving_dts -a -p eismint.dx=10.0,25.0,50.0 yelmo.pc_eps=1e-2,1e-1,1e0 -- python run_yelmo.py -x -s -e benchmarks {} par/gmd/yelmo_EISMINT_moving.nml
+job run --shell -f -o ${fldr}/moving_dts -p eismint.time_end=25e3 yelmo.log_timestep=True ytherm.method='fixed' eismint.dx=10.0,25.0,50.0 yelmo.pc_eps=1e-2,1e-1,1e0 -- python run_yelmo.py -x -s -e benchmarks {} par/gmd/yelmo_EISMINT_moving.nml
 
 
 ### INITMIP TESTS ### 

@@ -12,296 +12,18 @@ module velocity_sia
 !     integer,  parameter :: prec = sp 
 
     private
-    public :: calc_diffusivity_2D
+    public :: calc_dd_ab_3D
     public :: calc_uxy_sia_2D
     public :: calc_uxy_sia_3D 
     public :: calc_uxy_b_sia 
 
 contains 
 
-    subroutine calc_diffusivity_2D(dd_ab,H_ice,dzsdx,dzsdy,ATT,zeta_aa,dx,n_glen,rho_ice,g)
-        ! Calculate the depth-averaged horizontal diffusivity (ab-nodes)
-        ! using the SIA approximation
-        
-        ! H_ice, ATT are on aa-nodes
-        ! ux, uy, dzsdx, dzsdy are on ac-nodes 
-        ! Intermediate values: Diffusivity calculated on B nodes
-        ! Outputs are staggered (defined at boundaries of cell, ARAWAKA-C grid)
-
-        ! Note: These routines would be faster if ATT_int were
-        ! passed as an argument (and only calculated when ATT is updated rather
-        ! than each dynamic timestep). However, for completeness, here the 
-        ! subroutine takes ATT as an argument, and ATT_int is calculated internally
-        ! below. 
-        
-        ! ajr: Note: this produces the correct value of diffusivity, needs checking though. 
-
-        implicit none
-
-        real(prec), intent(OUT) :: dd_ab(:,:)           ! [m^2/a] SIA diffusivity, ab-nodes
-        real(prec), intent(IN)  :: H_ice(:,:)           ! [m]   Ice thickness
-        real(prec), intent(IN)  :: dzsdx(:,:)           ! [m/m] Surface gradient x-direction 
-        real(prec), intent(IN)  :: dzsdy(:,:)           ! [m/m] Surface gradient y-direction
-        real(prec), intent(IN)  :: ATT(:,:,:)           ! nx,ny,nz_aa [a-1 Pa-3] Rate factor
-        real(prec), intent(IN)  :: zeta_aa(:)           ! [--]  Height vector 0:1 
-        real(prec), intent(IN)  :: dx                   ! [m]
-        real(prec), intent(IN)  :: n_glen
-        real(prec), intent(IN)  :: rho_ice              ! [kg m-3] Ice density 
-        real(prec), intent(IN)  :: g                    ! [m s-2]  Gravity acceleration  
-
-        ! Local variables
-        integer :: i, j, k, nx, ny, nz_aa 
-        real(prec), allocatable :: H_ice_ab(:,:) 
-        real(prec), allocatable :: ATT_ab(:,:,:)
-        real(prec), allocatable :: ATT_int_ab(:,:)
-        real(prec), allocatable :: slope_ab(:,:) 
-        
-        nx    = size(H_ice,1)
-        ny    = size(H_ice,2)
-        nz_aa = size(zeta_aa,1) 
-
-        allocate(H_ice_ab(nx,ny))
-        allocate(ATT_ab(nx,ny,nz_aa))
-        allocate(ATT_int_ab(nx,ny))
-        allocate(slope_ab(nx,ny))
-
-        ! Calculate the ice thickness onto the ab-nodes 
-        H_ice_ab = stagger_aa_ab(H_ice)
-
-        H_ice_ab(nx,:) = H_ice_ab(nx-1,:) 
-        H_ice_ab(:,ny) = H_ice_ab(:,ny-1)
-        
-        ! Stagger the rate factor onto the ab-nodes 
-        do k = 1, nz_aa 
-            ATT_ab(:,:,k) = stagger_aa_ab(ATT(:,:,k))
-        end do 
-
-        ATT_ab(nx,:,:) = ATT_ab(nx-1,:,:) 
-        ATT_ab(:,ny,:) = ATT_ab(:,ny-1,:)
-        
-        ! Calculate vertically integrated rate factor
-        do j = 1, ny
-        do i = 1, nx
-            ATT_int_ab(i,j) = integrate_trapezoid1D_pt(ATT_ab(i,j,:)*(H_ice(i,j)*(1.0-zeta_aa))**(n_glen+1),zeta_aa)
-        end do
-        end do
-        
-        ! Get magnitude of slope on ab-nodes
-        slope_ab = 0.0 
-        do j=1,ny-1
-        do i=1,nx-1
-            slope_ab(i,j) = sqrt( (0.5*(dzsdx(i,j)+dzsdx(i,j+1)))**2 &
-                                + (0.5*(dzsdy(i,j)+dzsdy(i+1,j)))**2 )
-        end do 
-        end do 
-        slope_ab(nx,:) = slope_ab(nx-1,:) 
-        slope_ab(:,ny) = slope_ab(:,ny-1)
-        
-        ! Calculate diffusivity constant
-        dd_ab = 2.0 * (rho_ice*g)**n_glen * slope_ab**(n_glen-1.0) * ATT_int_ab
-
-        return 
-
-    end subroutine calc_diffusivity_2D 
-
-    subroutine calc_diffusivity_2D_helper(dd_ab,H_ice,dzsdx,dzsdy,ATT,zeta_aa,dx,n_glen,rho_ice,g)
-        ! Calculate the depth-averaged horizontal diffusivity (Ab nodes)
-        ! using the SIA approximation
-        
-        ! H_ice, ATT are on aa-nodes
-        ! ux, uy, dzsdx, dzsdy are on ac-nodes 
-        ! Intermediate values: Diffusivity calculated on B nodes
-        ! Outputs are staggered (defined at boundaries of cell, ARAWAKA-C grid)
-
-        ! Note: These routines would be faster if ATT_int were
-        ! passed as an argument (and only calculated when ATT is updated rather
-        ! than each dynamic timestep). However, for completeness, here the 
-        ! subroutine takes ATT as an argument, and ATT_int is calculated internally
-        ! below. 
-        
-        ! ajr: note this produces a useful value for the SIA solver, but it is not 2D diffusivity.
-
-        implicit none
-
-        real(prec), intent(OUT) :: dd_ab(:,:)           ! [m^2/a] SIA diffusivity, ab-nodes
-        real(prec), intent(IN)  :: H_ice(:,:)           ! [m]   Ice thickness
-        real(prec), intent(IN)  :: dzsdx(:,:)           ! [m/m] Surface gradient x-direction 
-        real(prec), intent(IN)  :: dzsdy(:,:)           ! [m/m] Surface gradient y-direction
-        real(prec), intent(IN)  :: ATT(:,:,:)           ! nx,ny,nz_aa [a-1 Pa-3] Rate factor
-        real(prec), intent(IN)  :: zeta_aa(:)           ! [--]  Height vector 0:1 
-        real(prec), intent(IN)  :: dx                   ! [m]
-        real(prec), intent(IN)  :: n_glen
-        real(prec), intent(IN)  :: rho_ice              ! [kg m-3] Ice density 
-        real(prec), intent(IN)  :: g                    ! [m s-2]  Gravity acceleration  
-
-        ! Local variables
-        integer :: i, j, k, nx, ny, nz_aa 
-        real(prec), allocatable :: H_ice_ab(:,:) 
-        real(prec), allocatable :: ATT_ab(:,:,:)
-        real(prec), allocatable :: ATT_int_ab(:,:,:)
-        real(prec), allocatable :: ATT_int_ab_mean(:,:)
-        real(prec), allocatable :: slope_ab(:,:) 
-        
-        nx    = size(H_ice,1)
-        ny    = size(H_ice,2)
-        nz_aa = size(zeta_aa,1) 
-
-        allocate(H_ice_ab(nx,ny))
-        allocate(ATT_ab(nx,ny,nz_aa))
-        allocate(ATT_int_ab(nx,ny,nz_aa))
-        allocate(ATT_int_ab_mean(nx,ny))
-        allocate(slope_ab(nx,ny))
-
-        ! Calculate the ice thickness onto the ab-nodes 
-        H_ice_ab = stagger_aa_ab(H_ice)
-
-        H_ice_ab(nx,:) = H_ice_ab(nx-1,:) 
-        H_ice_ab(:,ny) = H_ice_ab(:,ny-1)
-        
-        ! Stagger the rate factor onto the ab-nodes 
-        do k = 1, nz_aa 
-            ATT_ab(:,:,k) = stagger_aa_ab(ATT(:,:,k))
-        end do 
-
-        ATT_ab(nx,:,:) = ATT_ab(nx-1,:,:) 
-        ATT_ab(:,ny,:) = ATT_ab(:,ny-1,:)
-        
-        ! Calculate vertically integrated rate factor
-        ATT_int_ab      = calc_rate_factor_integrated(ATT_ab,zeta_aa)
-        ATT_int_ab_mean = calc_vertical_integrated_2D(ATT_int_ab,zeta_aa)
-        
-        ! Get magnitude of slope on ab-nodes
-        slope_ab = 0.0 
-        do j=1,ny-1
-        do i=1,nx-1
-            slope_ab(i,j) = sqrt( (0.5*(dzsdx(i,j)+dzsdx(i,j+1)))**2 &
-                                + (0.5*(dzsdy(i,j)+dzsdy(i+1,j)))**2 )
-        end do 
-        end do 
-        slope_ab(nx,:) = slope_ab(nx-1,:) 
-        slope_ab(:,ny) = slope_ab(:,ny-1)
-        
-        ! Calculate diffusivity constant
-        dd_ab = 2.0 * (rho_ice*g)**n_glen * H_ice_ab**(n_glen+1.0) &
-                    * slope_ab**(n_glen-1.0) * ATT_int_ab_mean
-
-        return 
-
-    end subroutine calc_diffusivity_2D_helper 
-
-    subroutine calc_uxy_sia_2D(ux,uy,H_ice,dzsdx,dzsdy,ATT,zeta_aa,dx,n_glen,rho_ice,g)
-        ! Calculate the depth-averaged horizontal velocity field
-        ! and intermediate variables using the SIA approximation
-        
-        ! H_ice, ATT are on aa-nodes
-        ! ux, uy, dzsdx, dzsdy are on ac-nodes 
-        ! Intermediate values: Diffusivity calculated on B nodes
-        ! Outputs are staggered (defined at boundaries of cell, ARAWAKA-C grid)
-
-        ! Note: These routines would be faster if ATT_int were
-        ! passed as an argument (and only calculated when ATT is updated rather
-        ! than each dynamic timestep). However, for completeness, here the 
-        ! subroutine takes ATT as an argument, and ATT_int is calculated internally
-        ! below. 
-        
-        implicit none
-
-        real(prec), intent(OUT) :: ux(:,:)              ! [m/a] SIA velocity x-direction, acx-nodes
-        real(prec), intent(OUT) :: uy(:,:)              ! [m/a] SIA velocity y-direction, acy-nodes
-        real(prec), intent(IN)  :: H_ice(:,:)           ! [m]   Ice thickness
-        real(prec), intent(IN)  :: dzsdx(:,:)           ! [m/m] Surface gradient x-direction 
-        real(prec), intent(IN)  :: dzsdy(:,:)           ! [m/m] Surface gradient y-direction
-        real(prec), intent(IN)  :: ATT(:,:,:)           ! nx,ny,nz_aa [a-1 Pa-3] Rate factor
-        real(prec), intent(IN)  :: zeta_aa(:)          ! [--]  Height vector 0:1 
-        real(prec), intent(IN)  :: dx                   ! [m]
-        real(prec), intent(IN)  :: n_glen
-        real(prec), intent(IN)  :: rho_ice              ! [kg m-3] Ice density 
-        real(prec), intent(IN)  :: g                    ! [m s-2]  Gravity acceleration  
-
-        ! Local variables
-        integer :: i, j, k, nx, ny, nz_aa 
-        real(prec) :: dd_acx, dd_acy 
-        real(prec), allocatable :: H_ice_ab(:,:) 
-        real(prec), allocatable :: ATT_ab(:,:,:)
-        real(prec), allocatable :: ATT_int_ab(:,:,:)
-        real(prec), allocatable :: ATT_int_ab_mean(:,:) 
-        real(prec), allocatable :: slope_ab(:,:) 
-        real(prec), allocatable :: dd_ab(:,:)           ! [m^2/a] SIA diffusivity, ab-nodes
-        real(prec) :: H_ac 
-
-        nx    = size(H_ice,1)
-        ny    = size(H_ice,2)
-        nz_aa = size(zeta_aa,1) 
-
-        allocate(H_ice_ab(nx,ny))
-        allocate(ATT_ab(nx,ny,nz_aa))
-        allocate(ATT_int_ab(nx,ny,nz_aa))
-        allocate(ATT_int_ab_mean(nx,ny))
-        allocate(slope_ab(nx,ny))
-        allocate(dd_ab(nx,ny))
-
-        ! Calculate the ice thickness onto the ab-nodes 
-        H_ice_ab = stagger_aa_ab(H_ice)
-
-        H_ice_ab(nx,:) = H_ice_ab(nx-1,:) 
-        H_ice_ab(:,ny) = H_ice_ab(:,ny-1)
-        
-        ! Stagger the rate factor onto the ab-nodes 
-        do k = 1, nz_aa 
-            ATT_ab(:,:,k) = stagger_aa_ab(ATT(:,:,k))
-        end do 
-
-        ATT_ab(nx,:,:) = ATT_ab(nx-1,:,:) 
-        ATT_ab(:,ny,:) = ATT_ab(:,ny-1,:)
-        
-        ! Calculate vertically integrated rate factor
-        ATT_int_ab      = calc_rate_factor_integrated(ATT_ab,zeta_aa)
-        ATT_int_ab_mean = calc_vertical_integrated_2D(ATT_int_ab,zeta_aa)
-        
-        ! Get magnitude of slope on ab-nodes
-        slope_ab = 0.0 
-        do j=1,ny-1
-        do i=1,nx-1
-            slope_ab(i,j) = sqrt( (0.5*(dzsdx(i,j)+dzsdx(i,j+1)))**2 &
-                                + (0.5*(dzsdy(i,j)+dzsdy(i+1,j)))**2 )
-        end do 
-        end do 
-        slope_ab(nx,:) = slope_ab(nx-1,:) 
-        slope_ab(:,ny) = slope_ab(:,ny-1)
-        
-        ! Calculate diffusivity constant
-        dd_ab = 2.0 * (rho_ice*g)**n_glen * H_ice_ab**(n_glen+1.0) &
-                    * slope_ab**(n_glen-1.0) * ATT_int_ab_mean
-
-        ! Stagger diffusivity constant back from ab- to ac-nodes
-        ! and calculate velocity components on ac-nodes 
-        ux = 0.0 
-        do j=2,ny
-        do i=1,nx
-            dd_acx  = 0.5*(dd_ab(i,j-1)+dd_ab(i,j))
-            ux(i,j) = -dd_acx*dzsdx(i,j)
-        end do
-        end do
-        ux(:,1) = ux(:,2)
-
-        uy = 0.0 
-        do j=1,ny
-        do i=2,nx
-            dd_acy  = 0.5*(dd_ab(i-1,j)+dd_ab(i,j))
-            uy(i,j) = -dd_acy*dzsdy(i,j)
-        end do
-        end do
-        uy(1,:) = uy(2,:) 
-
-        return
-        
-    end subroutine calc_uxy_sia_2D
-
-    subroutine calc_uxy_sia_3D(ux,uy,H_ice,dzsdx,dzsdy,ATT,zeta_aa,dx,n_glen,rho_ice,g)
+    subroutine calc_dd_ab_3D(dd_ab_3D,H_ice,taud_acx,taud_acy,ATT,zeta_aa,dx,n_glen,rho_ice,g)
         ! Calculate the 3D horizontal velocity field
         ! using sia, ssa or hybrid method
 
-        ! Note: These routines would be faster if ATT_int were
+        ! Note: These routines would be faster if ATT_int_ab were
         ! passed as an argument (and only calculated when ATT is updated rather
         ! than each dynamic timestep). However, for completeness, here the 
         ! subroutine takes ATT as an argument, and ATT_int is calculated internally
@@ -309,13 +31,12 @@ contains
 
         implicit none
         
-        real(prec), intent(OUT) :: ux(:,:,:)        ! nx,ny,nz_aa [m/a] SIA velocity x-direction, acx-nodes
-        real(prec), intent(OUT) :: uy(:,:,:)        ! nx,ny,nz_aa [m/a] SIA velocity y-direction, acy-nodes
+        real(prec), intent(OUT) :: dd_ab_3D(:,:,:)  ! nx,ny,nz_aa [m/a] Diffusivity helper, ab-nodes
         real(prec), intent(IN)  :: H_ice(:,:)       ! [m]   Ice thickness 
-        real(prec), intent(IN)  :: dzsdx(:,:)       ! [m/m] Surface gradient x-direction 
-        real(prec), intent(IN)  :: dzsdy(:,:)       ! [m/m] Surface gradient y-direction 
+        real(prec), intent(IN)  :: taud_acx(:,:)    ! [Pa] Driving stress x-direction 
+        real(prec), intent(IN)  :: taud_acy(:,:)    ! [Pa] Driving stress y-direction 
         real(prec), intent(IN)  :: ATT(:,:,:)       ! nx,ny,nz_aa [a-1 Pa-3] Rate factor
-        real(prec), intent(IN)  :: zeta_aa(:)      ! [--]  Height axis 0:1, layer centers (aa-nodes)
+        real(prec), intent(IN)  :: zeta_aa(:)       ! [--]  Height axis 0:1, layer centers (aa-nodes)
         real(prec), intent(IN)  :: dx               ! [m]   Horizontal resolution 
         real(prec), intent(IN)  :: n_glen
         real(prec), intent(IN)  :: rho_ice          ! [kg m-3] Ice density 
@@ -323,22 +44,23 @@ contains
 
         ! Local variables
         integer :: i, j, k, nx, ny, nz_aa
-        real(prec) :: dd_acx, dd_acy  
         real(prec), allocatable :: H_ice_ab(:,:) 
         real(prec), allocatable :: ATT_ab(:,:,:)
         real(prec), allocatable :: ATT_int_ab(:,:,:) 
         real(prec), allocatable :: slope_ab(:,:) 
-        real(prec), allocatable :: dd_ab(:,:) 
 
-        nx    = size(ux,1)
-        ny    = size(ux,2)
+        real(prec), allocatable :: sigma_tot_ab(:,:) 
+
+        nx    = size(H_ice,1)
+        ny    = size(H_ice,2)
         nz_aa = size(zeta_aa,1)
 
         allocate(H_ice_ab(nx,ny))
         allocate(ATT_ab(nx,ny,nz_aa))
         allocate(ATT_int_ab(nx,ny,nz_aa))
         allocate(slope_ab(nx,ny))
-        allocate(dd_ab(nx,ny))
+
+        allocate(sigma_tot_ab(nx,ny))
 
         ! Calculate the ice thickness onto the ab-nodes 
         H_ice_ab   = stagger_aa_ab(H_ice)
@@ -357,16 +79,101 @@ contains
         ! Integrate up to each layer 
         ATT_int_ab = calc_rate_factor_integrated(ATT_ab,zeta_aa)
 
-        ! Get magnitude of slope on ab-nodes
-        slope_ab = 0.0 
+        ! Get magnitude of driving stress 
+        sigma_tot_ab = 0.0 
         do j=1,ny-1
         do i=1,nx-1
-            slope_ab(i,j) = sqrt( (0.5*(dzsdx(i,j)+dzsdx(i,j+1)))**2 &
-                                + (0.5*(dzsdy(i,j)+dzsdy(i+1,j)))**2 )
+            sigma_tot_ab(i,j) = sqrt( (0.5*(taud_acx(i,j)+taud_acx(i,j+1)))**2 &
+                                    + (0.5*(taud_acy(i,j)+taud_acy(i+1,j)))**2 )
         end do 
         end do 
-        slope_ab(nx,:) = slope_ab(nx-1,:) 
-        slope_ab(:,ny) = slope_ab(:,ny-1)
+        sigma_tot_ab(nx,:) = sigma_tot_ab(nx-1,:) 
+        sigma_tot_ab(:,ny) = sigma_tot_ab(:,ny-1)
+
+        ! Reset dd_ab_3D
+        dd_ab_3D = 0.0 
+
+        ! Loop over each vertical layer 
+        do k = 1, nz_aa 
+
+            ! Calculate quasi-diffusivity for this layer
+            dd_ab_3D(:,:,k) = 2.0 * H_ice_ab * ATT_int_ab(:,:,k) * sigma_tot_ab**(n_glen-1.0) 
+
+        end do 
+
+        return
+        
+    end subroutine calc_dd_ab_3D
+
+    subroutine calc_uxy_sia_2D(ux,uy,dd_ab_3D,taud_acx,taud_acy,zeta_aa)
+        ! Calculate the 2D horizontal velocity field using SIA
+
+        implicit none
+
+        real(prec), intent(OUT) :: ux(:,:)              ! [m/a] SIA velocity x-direction, acx-nodes
+        real(prec), intent(OUT) :: uy(:,:)              ! [m/a] SIA velocity y-direction, acy-nodes
+        real(prec), intent(IN)  :: dd_ab_3D(:,:,:)      ! Diffusivity constant 
+        real(prec), intent(IN)  :: taud_acx(:,:)        ! [Pa] Driving stress x-direction 
+        real(prec), intent(IN)  :: taud_acy(:,:)        ! [Pa] Driving stress y-direction
+        real(prec), intent(IN)  :: zeta_aa(:)           ! [--]  Height vector 0:1 
+
+        ! Local variables
+        integer :: i, j, k, nx, ny
+        real(prec) :: dd_acx, dd_acy 
+        real(prec), allocatable :: dd_ab(:,:)           ! [m^2/a] SIA diffusivity, ab-nodes
+
+        nx    = size(ux,1)
+        ny    = size(ux,2)
+
+        allocate(dd_ab(nx,ny))
+
+        dd_ab = calc_vertical_integrated_2D(dd_ab_3D,zeta_aa)
+
+        ! Stagger diffusivity constant back from ab- to ac-nodes
+        ! and calculate velocity components on ac-nodes 
+        ux = 0.0 
+        do j=2,ny
+        do i=1,nx
+            dd_acx  = 0.5*(dd_ab(i,j-1)+dd_ab(i,j))
+            ux(i,j) = -dd_acx*taud_acx(i,j)
+        end do
+        end do
+        ux(:,1) = ux(:,2)
+
+        uy = 0.0 
+        do j=1,ny
+        do i=2,nx
+            dd_acy  = 0.5*(dd_ab(i-1,j)+dd_ab(i,j))
+            uy(i,j) = -dd_acy*taud_acy(i,j)
+        end do
+        end do
+        uy(1,:) = uy(2,:) 
+
+        return
+        
+    end subroutine calc_uxy_sia_2D
+
+    subroutine calc_uxy_sia_3D(ux,uy,dd_ab_3D,taud_acx,taud_acy)
+        ! Calculate the 3D horizontal velocity field using SIA
+
+        implicit none
+        
+        real(prec), intent(OUT) :: ux(:,:,:)        ! nx,ny,nz_aa [m/a] SIA velocity x-direction, acx-nodes
+        real(prec), intent(OUT) :: uy(:,:,:)        ! nx,ny,nz_aa [m/a] SIA velocity y-direction, acy-nodes
+        real(prec), intent(OUT) :: dd_ab_3D(:,:,:)  ! Diffusivity constant
+        real(prec), intent(IN)  :: taud_acx(:,:)    ! [Pa] Driving stress x-direction 
+        real(prec), intent(IN)  :: taud_acy(:,:)    ! [Pa] Driving stress y-direction
+        
+        ! Local variables
+        integer :: i, j, k, nx, ny, nz_aa
+        real(prec) :: dd_acx, dd_acy  
+        real(prec), allocatable :: dd_ab(:,:) 
+
+        nx    = size(ux,1)
+        ny    = size(ux,2)
+        nz_aa = size(ux,3) 
+
+        allocate(dd_ab(nx,ny)) 
 
         ! Reset velocity solution to zero everywhere 
         ux = 0.0 
@@ -375,16 +182,14 @@ contains
         ! Loop over each vertical layer 
         do k = 1, nz_aa 
 
-            ! Calculate diffusivity for this layer
-            dd_ab = 2.0 * (rho_ice*g)**n_glen * H_ice_ab**(n_glen+1.0)  &
-                        * slope_ab**(n_glen-1.0) * ATT_int_ab(:,:,k)
+            dd_ab = dd_ab_3D(:,:,k) 
 
             ! Stagger diffusivity back from Ab to Ac nodes
             ! and calculate velocity components on ac-nodes 
             do j=2,ny
             do i=1,nx
                 dd_acx    = 0.5*(dd_ab(i,j-1)+dd_ab(i,j))
-                ux(i,j,k) = -dd_acx*dzsdx(i,j)
+                ux(i,j,k) = -dd_acx*taud_acx(i,j)
             end do
             end do
             ux(:,1,k) = ux(:,2,k)
@@ -392,7 +197,7 @@ contains
             do j=1,ny
             do i=2,nx
                 dd_acy    = 0.5*(dd_ab(i-1,j)+dd_ab(i,j))
-                uy(i,j,k) = -dd_acy*dzsdy(i,j)
+                uy(i,j,k) = -dd_acy*taud_acy(i,j)
             end do
             end do
             uy(1,:,k) = uy(2,:,k)
@@ -412,11 +217,8 @@ contains
         ! Intermediate values: Diffusivity calculated on B nodes
         ! Outputs are staggered (defined at boundaries of cell, ARAWAKA-C grid)
 
-        ! Note: These routines would be faster if ATT_int were
-        ! passed as an argument (and only calculated when ATT is updated rather
-        ! than each dynamic timestep). However, for completeness, here the 
-        ! subroutine takes ATT as an argument, and ATT_int is calculated internally
-        ! below. 
+        ! Note: This routine works, but is outdated. It should use taud_acx/acy 
+        ! instead of dzsdx/dy, as with calc_uxy_sia_2D/3D.
         
         implicit none
 
@@ -644,5 +446,59 @@ contains
         return
 
     end function stagger_aa_ab 
+    
+    function stagger_aa_ab_ice(u,H_ice) result(ustag)
+        ! Stagger from Aa => Ab
+        ! Four point average from corner Aa nodes to central Ab node 
+
+        implicit none 
+
+        real(prec), intent(IN)  :: u(:,:) 
+        real(prec), intent(IN)  :: H_ice(:,:) 
+        real(prec) :: ustag(size(u,1),size(u,2)) 
+
+        ! Local variables 
+        integer :: i, j, nx, ny, k   
+
+        nx = size(u,1)
+        ny = size(u,2) 
+
+        ustag = 0.0_prec 
+
+        do j = 1, ny-1 
+        do i = 1, nx-1
+            k = 0 
+            ustag(i,j) = 0.0 
+            if (H_ice(i,j) .gt. 0.0) then 
+                ustag(i,j) = ustag(i,j) + u(i,j) 
+                k = k+1
+            end if 
+
+            if (H_ice(i+1,j) .gt. 0.0) then 
+                ustag(i,j) = ustag(i,j) + u(i+1,j) 
+                k = k+1 
+            end if 
+            
+            if (H_ice(i,j+1) .gt. 0.0) then 
+                ustag(i,j) = ustag(i,j) + u(i,j+1) 
+                k = k+1 
+            end if 
+            
+            if (H_ice(i+1,j+1) .gt. 0.0) then 
+                ustag(i,j) = ustag(i,j) + u(i+1,j+1) 
+                k = k+1 
+            end if 
+            
+            if (k .gt. 0) then 
+                ustag(i,j) = ustag(i,j) / real(k,prec)
+            end if 
+
+            !ustag(i,j) = 0.25_prec*(u(i+1,j+1)+u(i+1,j)+u(i,j+1)+u(i,j))
+        end do 
+        end do 
+
+        return
+
+    end function stagger_aa_ab_ice 
     
 end module velocity_sia 

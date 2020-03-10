@@ -128,7 +128,6 @@ module yelmo_defs
         
         ! Additional masks 
         integer,    allocatable :: mask_bed(:,:)    ! Multi-valued bed mask
-        logical,    allocatable :: is_float(:,:)    ! Fully floating grid points
         logical,    allocatable :: is_grline(:,:)   ! Grounding line points
         logical,    allocatable :: is_grz(:,:)      ! Grounding line plus grounded neighbors
         
@@ -153,6 +152,7 @@ module yelmo_defs
 
         character(len=256) :: solver 
         character(len=256) :: sia_solver 
+        character(len=256) :: ssa_solver_opt 
         integer    :: mix_method            ! Method for mixing sia and ssa velocity solutions
         logical    :: calc_diffusivity      ! Calculate diagnostic diffusivity field
         integer    :: beta_method
@@ -229,6 +229,9 @@ module yelmo_defs
         real(prec), allocatable :: ux_b(:,:) 
         real(prec), allocatable :: uy_b(:,:)
         real(prec), allocatable :: uxy_b(:,:)
+
+        real(prec), allocatable :: ux_bar_nm1(:,:) 
+        real(prec), allocatable :: uy_bar_nm1(:,:)
 
         ! Surface velocity: eventually these could be pointers since it is simply
         ! the top layer in ux(:,:,:), etc. and only used, not calculated.
@@ -519,6 +522,12 @@ module yelmo_defs
         real(prec), allocatable :: err_H_ice(:,:), err_z_srf(:,:), err_z_bed(:,:)
         real(prec), allocatable :: err_uxy_s(:,:)
         
+        real(prec) :: rmse_H 
+        real(prec) :: rmse_zsrf
+        real(prec) :: rmse_uxy 
+        real(prec) :: rmse_loguxy 
+             
+    
     end type
 
     type ydata_class 
@@ -538,7 +547,7 @@ module yelmo_defs
 
         ! ===== Total ice variables =====
         real(prec) :: H_ice, z_srf, dHicedt, H_ice_max, dzsrfdt
-        real(prec) :: V_ice, A_ice, dVicedt, fwf
+        real(prec) :: V_ice, A_ice, dVicedt, fwf, V_sl 
         real(prec) :: uxy_bar, uxy_s, uxy_b, z_bed, smb, T_srf, bmb
 
         ! ===== Grounded ice variables =====
@@ -614,11 +623,12 @@ module yelmo_defs
         integer             :: nz_aa 
 
         ! Yelmo timesteps 
-        logical             :: use_pc_thrm 
         integer             :: dt_method 
         real(prec)          :: dt_min
         real(prec)          :: cfl_max 
         real(prec)          :: cfl_diff_max 
+        character (len=56)  :: pc_method
+        real(prec)          :: pc_tol 
         real(prec)          :: pc_eps  
 
         ! Sigma coordinates (internal parameter)
@@ -632,8 +642,8 @@ module yelmo_defs
         logical :: use_restart 
         
         ! Time step parameters for predictor-corrector (PC) method (Cheng et al, 2017)
-        real(prec) :: pc_dt 
-        real(prec) :: pc_eta 
+        real(prec) :: pc_dt(3)
+        real(prec) :: pc_eta(3)
         real(prec), allocatable :: pc_tau(:,:)
 
         ! Timing information 

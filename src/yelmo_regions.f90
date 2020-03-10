@@ -88,6 +88,9 @@ contains
             reg%dVicedt    = sum(tpo%now%dHicedt,mask=mask_tot)*tpo%par%dx*tpo%par%dy*m3_km3           ! [km^3/a]
             reg%fwf        = -reg%dVicedt*conv_km3a_Sv   ! [Sv]
 
+            ! Volume above sea level
+            reg%V_sl       = sum(tpo%now%H_grnd,mask=tpo%now%H_grnd.gt.0.0_prec)*tpo%par%dx*tpo%par%dy*m3_km3   ! [km^3]
+            
             ! ydyn variables 
             reg%uxy_bar    = sum(dyn%now%uxy_bar,mask=mask_tot)/npts_tot      ! [m/a]
             reg%uxy_s      = sum(dyn%now%uxy_s,mask=mask_tot)/npts_tot        ! [m/a]
@@ -112,7 +115,8 @@ contains
             reg%A_ice      = 0.0_prec 
             reg%dVicedt    = 0.0_prec 
             reg%fwf        = 0.0_prec 
-            
+            reg%V_sl       = 0.0_prec 
+
             ! ydyn variables 
             reg%uxy_bar    = 0.0_prec 
             reg%uxy_s      = 0.0_prec 
@@ -277,6 +281,8 @@ contains
         call nc_write(filename,"dVicedt",reg%dVicedt,units="km^3/a",long_name="Rate volume change", &
                       dim1="time",start=[n],ncid=ncid)
         call nc_write(filename,"fwf",reg%fwf,units="Sv",long_name="Rate volume change", &
+                      dim1="time",start=[n],ncid=ncid)
+        call nc_write(filename,"V_sl",reg%V_sl*1e-6,units="1e6 km^3",long_name="Ice volume above flotation", &
                       dim1="time",start=[n],ncid=ncid)
 
         call nc_write(filename,"uxy_bar",reg%uxy_bar,units="m/a",long_name="Mean depth-ave velocity", &

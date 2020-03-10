@@ -92,6 +92,7 @@ contains
         real(prec) :: uy_aa 
         real(prec) :: uz_grid 
         real(prec) :: uz_srf 
+        real(prec) :: corr 
 
         real(prec), parameter :: dzbdt = 0.0   ! For posterity, keep dzbdt variable, but set to zero 
         real(prec), parameter :: tol   = 1e-4 
@@ -187,6 +188,9 @@ contains
         end do 
         end do 
 
+        ! Calculate and apply correction for sigma-coordinate stretching 
+        call calc_advec_vertical_column_correction(uz,ux,uy,H_ice,z_srf,dHdt,dzsdt,zeta_ac,dx)
+
         ! Fill in boundaries 
         j = 1 
         do i = 2, nx-1 
@@ -227,6 +231,93 @@ contains
         return 
 
     end subroutine calc_uz_3D 
+
+    subroutine calc_advec_vertical_column_correction(uz,ux,uy,H_ice,z_srf,dHdt,dzsdt,zeta_ac,dx)
+        ! Calculate the corrected vertical velocity, accounting for stretching of 
+        ! the vertical axis between grid cells due to the use of sigma-coordinates. 
+
+        ! Note: parameter max_corr may be necessary for very steep topography that violates 
+        ! shallow-model assumptions. Imposing this limit ensures the model can continue. 
+        
+        implicit none 
+
+        real(prec), intent(INOUT) :: uz(:,:,:)        ! nx,ny,nz_ac
+        real(prec), intent(IN)    :: ux(:,:,:)        ! nx,ny,nz_aa
+        real(prec), intent(IN)    :: uy(:,:,:)        ! nx,ny,nz_aa
+        real(prec), intent(IN)    :: H_ice(:,:)       ! nx,ny 
+        real(prec), intent(IN)    :: z_srf(:,:)       ! nx,ny 
+        real(prec), intent(IN)    :: dHdt(:,:)        ! nx,ny 
+        real(prec), intent(IN)    :: dzsdt(:,:)       ! nx,ny 
+        real(prec), intent(IN)    :: zeta_ac(:)       ! nz_ac
+        real(prec), intent(IN)    :: dx   
+
+        ! Local variables 
+        integer :: i, j, k, nx, ny, nz_ac 
+        real(prec) :: ux_aa, uy_aa 
+        real(prec) :: dx_inv, dx_inv2
+        real(prec) :: c_x, c_y, c_t 
+        real(prec) :: corr 
+        real(prec), allocatable :: uz_corr(:)       ! [m/a] nz_ac 
+        
+        real(prec), parameter :: tol = 1e-4 
+        real(prec), parameter :: max_corr = 1.0_prec   ! Maximum allowed deviation from original uz (eg 200%)
+
+        nx    = size(H_ice,1)
+        ny    = size(H_ice,2)
+        nz_ac = size(zeta_ac,1) 
+
+        allocate(uz_corr(nz_ac))
+
+        ! Define some constants 
+        dx_inv  = 1.0_prec / dx 
+        dx_inv2 = 1.0_prec / (2.0_prec*dx)
+
+        do j = 2, ny-1 
+        do i = 2, nx-1 
+
+            do k = 1, nz_ac 
+
+                ! Estimate direction of current flow into cell (x and y), centered horizontally in grid point
+                ! and averaged to staggered cell edges where uz is defined.
+                if (k .eq. 1) then 
+                    ux_aa = 0.5_prec*(ux(i,j,k)+ux(i-1,j,k))
+                    uy_aa = 0.5_prec*(uy(i,j,k)+uy(i,j-1,k))
+                else if (k .eq. nz_ac) then 
+                    ux_aa = 0.5_prec*(ux(i,j,k)+ux(i-1,j,k+1))
+                    uy_aa = 0.5_prec*(uy(i,j,k)+uy(i,j-1,k+1))
+                else 
+                    ux_aa = 0.25_prec*(ux(i,j,k)+ux(i-1,j,k) + ux(i,j,k+1)+ux(i-1,j,k+1))
+                    uy_aa = 0.25_prec*(uy(i,j,k)+uy(i,j-1,k) + uy(i,j,k+1)+uy(i,j-1,k+1))
+                end if 
+
+                ! Get horizontal scaling correction terms 
+                c_x = (1.0_prec-zeta_ac(k))*(H_ice(i+1,j)-H_ice(i-1,j))*dx_inv2 - (z_srf(i+1,j)-z_srf(i-1,j))*dx_inv2
+                c_y = (1.0_prec-zeta_ac(k))*(H_ice(i,j+1)-H_ice(i,j-1))*dx_inv2 - (z_srf(i,j+1)-z_srf(i,j-1))*dx_inv2
+                
+                ! Get grid velocity term 
+                c_t = (1.0_prec-zeta_ac(k))*dHdt(i,j) - dzsdt(i,j) 
+
+                ! Calculate total correction term, and limit it to within max_corr 
+                corr = ux_aa*c_x + uy_aa*c_y + c_t  
+                corr = sign(min(abs(corr),abs(max_corr*uz(i,j,k))),corr)
+
+                ! Apply correction 
+                uz_corr(k) = uz(i,j,k) + corr 
+
+                ! Limit new velocity to avoid underflow errors 
+                if (abs(uz_corr(k)) .le. tol) uz_corr(k) = 0.0_prec 
+
+            end do         
+
+            ! Set uz equal to new corrected uz 
+            uz(i,j,:) = uz_corr(:)  
+
+        end do 
+        end do 
+
+        return 
+
+    end subroutine calc_advec_vertical_column_correction
 
     function calc_vertical_integrated_3D_ice(var,H_ice,sigma) result(var_int)
         ! Vertically integrate a field 3D field (nx,ny,nz)
@@ -431,7 +522,7 @@ contains
             ! Determine current depth fraction
             depth = (1.0_prec-zeta_aa(k))
 
-            ! Determine the vertical shear for current layer (Ac nodes)
+            ! Determine the vertical shear for current layer (ac-nodes)
             ! Pollard and de Conto (2012), Eq. 3 
             ! ajr: note, initial negative sign moved to be explicit
             ! in the final calculation of dux/dz duy/dz, so that 
@@ -789,21 +880,10 @@ contains
         integer :: i, j, nx, ny 
         real(prec) :: dy, rhog 
         real(prec) :: H_mid
-
-        real(prec), allocatable :: Hi_ab(:,:) 
-
+        
         nx = size(H_ice,1)
         ny = size(H_ice,2) 
 
-        ! Allocate Hi_ab
-!         allocate(Hi_ab(nx,ny))
-
-        ! Stagger H_ice to Ab nodes:
-        ! This will be used to calculate H_mid on the acx/acy nodes,
-        ! but it should come from ab-nodes instead of ac-nodes for stability 
-        ! Note: this is disabled, as it seemed not to affect results
-!         Hi_ab = stagger_aa_ab_ice(H_ice,H_ice)
-        
         ! Define shortcut parameter 
         rhog = rho_ice * g 
 
@@ -814,7 +894,6 @@ contains
         taud_acx = 0.0_prec  
         do j = 2, ny 
         do i = 1, nx-1 
-!             H_mid         = 0.5_prec * (Hi_ab(i,j)+Hi_ab(i,j-1))
             H_mid         = 0.5_prec*(H_ice(i,j)+H_ice(i+1,j)) 
             taud_acx(i,j) = rhog * H_mid * dzsdx(i,j) 
         end do 
@@ -826,7 +905,6 @@ contains
         taud_acy = 0.0_prec  
         do j = 1, ny-1 
         do i = 2, nx 
-!             H_mid         = 0.5_prec * (Hi_ab(i,j)+Hi_ab(i-1,j))
             H_mid         = 0.5_prec*(H_ice(i,j)+H_ice(i,j+1))
             taud_acy(i,j) = rhog * H_mid * dzsdy(i,j) 
         end do 

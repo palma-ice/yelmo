@@ -51,6 +51,11 @@ contains
         ! Get time step
         dt = time - dyn%par%time 
 
+        ! Store previous (n-1) depth-averaged horizontal velocity components
+        ! (for use with higher-order ice thickness timestepping) 
+        dyn%now%ux_bar_nm1 = dyn%now%ux_bar 
+        dyn%now%uy_bar_nm1 = dyn%now%uy_bar 
+        
         ! ===== Calculate the horizontal velocity components =====
         ! These calculations are done assuming that the final
         ! 3D horizontal velocity fields (ux/uy) will be comprised
@@ -177,23 +182,24 @@ contains
             case("vel") 
                 ! Use classic-style SIA solver (solve directly for velocity)
 
-                ! Calculate the 3D horizontal shear velocity fields
-                call calc_uxy_sia_3D(dyn%now%ux_i,dyn%now%uy_i,tpo%now%H_ice,tpo%now%dzsdx,tpo%now%dzsdy, &
-                                     mat%now%ATT,dyn%par%zeta_aa,dyn%par%dx,mat%par%n_glen,rho_ice,g)
-                
-                ! Then simply integrate from 3D velocity field (faster than 2D solver below)
-                dyn%now%ux_i_bar = calc_vertical_integrated_2D(dyn%now%ux_i,dyn%par%zeta_aa)
-                dyn%now%uy_i_bar = calc_vertical_integrated_2D(dyn%now%uy_i,dyn%par%zeta_aa)
-                
-                ! Internal method to SIA module (slower than vertical integration above) - use for testing only
-                !call calc_uxy_sia_2D(dyn%now%ux_i_bar,dyn%now%uy_i_bar,tpo%now%H_ice,tpo%now%dzsdx,tpo%now%dzsdy, &
-                !                     mat%now%ATT,dyn%par%zeta_aa,dyn%par%dx,mat%par%n_glen,rho_ice,g)
-                
-                ! Calculate 2D diffusivity too (for timestepping and diagnostics)
-                ! (mainly interesting for benchmark experiments EISMINT, Bueler, etc)
-                call calc_diffusivity_2D(dyn%now%dd_ab_bar,tpo%now%H_ice,tpo%now%dzsdx,tpo%now%dzsdy, &
+                ! Calculate diffusivity constant on ab-nodes
+                call calc_dd_ab_3D(dyn%now%dd_ab,tpo%now%H_ice,dyn%now%taud_acx,dyn%now%taud_acy, &
                                         mat%now%ATT,dyn%par%zeta_aa,dyn%par%dx,mat%par%n_glen,rho_ice,g)
+                dyn%now%dd_ab_bar = calc_vertical_integrated_2D(dyn%now%dd_ab,dyn%par%zeta_aa)
+                
 
+                ! Calculate the 3D horizontal shear velocity fields
+                call calc_uxy_sia_3D(dyn%now%ux_i,dyn%now%uy_i,dyn%now%dd_ab, &
+                                        dyn%now%taud_acx,dyn%now%taud_acy)
+                
+                ! Calculate the depth-averaged horizontal shear velocity fields too
+                call calc_uxy_sia_2D(dyn%now%ux_i_bar,dyn%now%uy_i_bar,dyn%now%dd_ab, &
+                                        dyn%now%taud_acx,dyn%now%taud_acy,dyn%par%zeta_aa)
+
+                ! Or, simply integrate from 3D velocity field to get depth-averaged field
+!                 dyn%now%ux_i_bar = calc_vertical_integrated_2D(dyn%now%ux_i,dyn%par%zeta_aa)
+!                 dyn%now%uy_i_bar = calc_vertical_integrated_2D(dyn%now%uy_i,dyn%par%zeta_aa)
+                
                 ! Set terms from shear solver to zero that are not calculated here
                 dyn%now%duxdz     = 0.0 
                 dyn%now%duydz     = 0.0 
@@ -228,11 +234,9 @@ contains
                 dyn%now%ux_i_bar  = calc_vertical_integrated_2D(dyn%now%ux_i,dyn%par%zeta_aa) 
                 dyn%now%uy_i_bar  = calc_vertical_integrated_2D(dyn%now%uy_i,dyn%par%zeta_aa) 
 
-                ! Calculate diagnostic diffusivity field 
-                ! ajr: this value is not correct, use the direct diffusivity calculation
-                !dyn%now%dd_ab_bar  = calc_vertical_integrated_2D(dyn%now%dd_ab,dyn%par%zeta_aa) 
-                call calc_diffusivity_2D(dyn%now%dd_ab_bar,tpo%now%H_ice,tpo%now%dzsdx,tpo%now%dzsdy, &
-                                        mat%now%ATT,dyn%par%zeta_aa,dyn%par%dx,mat%par%n_glen,rho_ice,g)
+                ! Diagnostic diffusivity field not available
+                dyn%now%dd_ab     = 0.0_prec
+                dyn%now%dd_ab_bar = 0.0_prec 
 
             case("none")
 
@@ -601,9 +605,9 @@ contains
                 ! Call ssa solver to determine ux_bar/uy_bar, where ssa_mask_acx/y are > 0
                 
                 call calc_vxy_ssa_matrix(dyn%now%ux_bar,dyn%now%uy_bar,dyn%now%beta_acx,dyn%now%beta_acy,dyn%now%visc_eff, &
-                                     dyn%now%ssa_mask_acx,dyn%now%ssa_mask_acy,tpo%now%H_ice, &
-                                     dyn%now%taud_acx,dyn%now%taud_acy,tpo%now%H_grnd,bnd%z_sl,bnd%z_bed, &
-                                     dyn%par%dx,dyn%par%dy,dyn%par%ssa_vel_max,dyn%par%boundaries)
+                                     dyn%now%ssa_mask_acx,dyn%now%ssa_mask_acy,tpo%now%H_ice,dyn%now%taud_acx, &
+                                     dyn%now%taud_acy,tpo%now%H_grnd,bnd%z_sl,bnd%z_bed,dyn%par%dx,dyn%par%dy, &
+                                     dyn%par%ssa_vel_max,dyn%par%boundaries,dyn%par%ssa_solver_opt)
 
             end if 
              
@@ -743,7 +747,7 @@ contains
 !             end if 
         
         if (write_ssa_diagnostics) then 
-            call yelmo_write_init_ssa("yelmo_ssa.nc",nx,ny,time_init=1.0)
+            call yelmo_write_init_ssa("yelmo_ssa.nc",nx,ny,time_init=1.0_prec)
         end if 
 
         ! Store original ssa mask 
@@ -837,15 +841,15 @@ if (.TRUE.) then
             if (iter .gt. 1) then
                 ! Update ssa mask based on convergence with previous step to reduce calls 
                 call update_ssa_mask_convergence(dyn%now%ssa_mask_acx,dyn%now%ssa_mask_acy, &
-                                                dyn%now%ssa_err_acx,dyn%now%ssa_err_acy,err_lim=1e-3) 
+                                                dyn%now%ssa_err_acx,dyn%now%ssa_err_acy,err_lim=real(1e-3,prec)) 
             end if 
 end if 
 
             ! Call ssa solver to determine ux_b/uy_b, where ssa_mask_acx/y are > 0
             call calc_vxy_ssa_matrix(dyn%now%ux_b,dyn%now%uy_b,dyn%now%beta_acx,dyn%now%beta_acy,dyn%now%visc_eff, &
-                                     dyn%now%ssa_mask_acx,dyn%now%ssa_mask_acy,tpo%now%H_ice, &
-                                     dyn%now%taud_acx,dyn%now%taud_acy,tpo%now%H_grnd,bnd%z_sl,bnd%z_bed, &
-                                     dyn%par%dx,dyn%par%dy,dyn%par%ssa_vel_max,dyn%par%boundaries)
+                                     dyn%now%ssa_mask_acx,dyn%now%ssa_mask_acy,tpo%now%H_ice,dyn%now%taud_acx, &
+                                     dyn%now%taud_acy,tpo%now%H_grnd,bnd%z_sl,bnd%z_bed,dyn%par%dx,dyn%par%dy, &
+                                     dyn%par%ssa_vel_max,dyn%par%boundaries,dyn%par%ssa_solver_opt)
 
             ! Apply relaxation to keep things stable
             call relax_ssa(dyn%now%ux_b,dyn%now%uy_b,ux_b_prev,uy_b_prev,rel=dyn%par%ssa_iter_rel)
@@ -1296,6 +1300,7 @@ end if
         
         call nml_read(filename,"ydyn","solver",             par%solver,             init=init_pars)
         call nml_read(filename,"ydyn","sia_solver",         par%sia_solver,         init=init_pars)
+        call nml_read(filename,"ydyn","ssa_solver_opt",     par%ssa_solver_opt,     init=init_pars)
         call nml_read(filename,"ydyn","mix_method",         par%mix_method,         init=init_pars)
         call nml_read(filename,"ydyn","calc_diffusivity",   par%calc_diffusivity,   init=init_pars)
         call nml_read(filename,"ydyn","beta_method",        par%beta_method,        init=init_pars)
@@ -1401,6 +1406,9 @@ end if
         allocate(now%uy_bar(nx,ny))
         allocate(now%uxy_bar(nx,ny))
         
+        allocate(now%ux_bar_nm1(nx,ny)) 
+        allocate(now%uy_bar_nm1(nx,ny))
+
         allocate(now%ux_b(nx,ny)) 
         allocate(now%uy_b(nx,ny))
         allocate(now%uxy_b(nx,ny))
@@ -1473,6 +1481,9 @@ end if
         now%uy_bar            = 0.0
         now%uxy_bar           = 0.0
 
+        now%ux_bar_nm1        = 0.0 
+        now%uy_bar_nm1        = 0.0
+        
         now%ux_b              = 0.0 
         now%uy_b              = 0.0
         now%uxy_b             = 0.0
@@ -1553,6 +1564,9 @@ end if
         if (allocated(now%ux_bar))          deallocate(now%ux_bar) 
         if (allocated(now%uy_bar))          deallocate(now%uy_bar)
         if (allocated(now%uxy_bar))         deallocate(now%uxy_bar)
+        
+        if (allocated(now%ux_bar_nm1))      deallocate(now%ux_bar_nm1) 
+        if (allocated(now%uy_bar_nm1))      deallocate(now%uy_bar_nm1)
         
         if (allocated(now%ux_b))            deallocate(now%ux_b) 
         if (allocated(now%uy_b))            deallocate(now%uy_b)

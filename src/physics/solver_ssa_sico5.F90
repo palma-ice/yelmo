@@ -17,7 +17,7 @@ contains
 
     subroutine calc_vxy_ssa_matrix(vx_m,vy_m,beta_acx,beta_acy,visc_eff, &
                     ssa_mask_acx,ssa_mask_acy,H_ice,taud_acx,taud_acy,H_grnd,z_sl,z_bed, &
-                    dx,dy,ulim,boundaries)
+                    dx,dy,ulim,boundaries,lis_settings)
         ! Solution of the system of linear equations for the horizontal velocities
         ! vx_m, vy_m in the shallow shelf approximation.
         ! Adapted from sicopolis version 5-dev (svn revision 1421)
@@ -41,7 +41,8 @@ contains
         real(prec), intent(IN)    :: dx, dy
         real(prec), intent(IN)    :: ulim 
         character(len=*), intent(IN) :: boundaries 
-        
+        character(len=*), intent(IN) :: lis_settings
+
         ! Local variables
         integer    :: nx, ny
         real(prec) :: dxi, deta
@@ -50,7 +51,6 @@ contains
         real(prec) :: inv_dxi, inv_deta, inv_dxi_deta, inv_dxi2, inv_deta2
         real(prec) :: factor_rhs_2, factor_rhs_3a, factor_rhs_3b
         real(prec) :: rho_sw_ice, H_ice_now, beta_now, taud_now, H_ocn_now    
-        character(len=256) :: ch_solver_set_option
         integer    :: IMAX, JMAX 
 
         integer, allocatable    :: n2i(:), n2j(:)
@@ -786,9 +786,9 @@ call lis_matrix_assemble(lgs_a, ierr)
 
 call lis_solver_create(solver, ierr)
 
-ch_solver_set_option = '-i bicgsafe -p jacobi '// &
-                        '-maxiter 100 -tol 1.0e-4 -initx_zeros false'
-call lis_solver_set_option(trim(ch_solver_set_option), solver, ierr)
+! ch_solver_set_option = '-i bicgsafe -p jacobi '// &
+!                         '-maxiter 100 -tol 1.0e-4 -initx_zeros false'
+call lis_solver_set_option(trim(lis_settings), solver, ierr)
 call CHKERR(ierr)
 
 call lis_solve(lgs_a, lgs_b, lgs_x, solver, ierr)

@@ -35,6 +35,7 @@ contains
         integer    :: k, nz_aa
         real(prec) :: dt
 
+        
         nz_aa = mat%par%nz_aa
 
         ! Initialize time if necessary 

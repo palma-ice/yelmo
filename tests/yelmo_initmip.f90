@@ -168,7 +168,8 @@ program yelmo_test
     
     ! Run yelmo for several years with constant boundary conditions and topo
     ! to equilibrate thermodynamics and dynamics
-    call yelmo_update_equil(yelmo1,time,time_tot=time_equil,topo_fixed=.FALSE.,dt=1.0,ssa_vel_max=500.0)
+    call yelmo_update_equil(yelmo1,time,time_tot=10.0_prec,topo_fixed=.FALSE.,dt=1.0,ssa_vel_max=5000.0)
+    call yelmo_update_equil(yelmo1,time,time_tot=time_equil,topo_fixed=.TRUE.,dt=1.0,ssa_vel_max=5000.0)
     
     ! 2D file 
     call yelmo_write_init(yelmo1,file2D,time_init=time,units="years")  
@@ -244,13 +245,6 @@ contains
         integer    :: ncid, n
         real(prec) :: time_prev 
 
-        real(prec) :: uxy_rmse, H_rmse, zsrf_rmse, loguxy_rmse 
-        real(prec), allocatable :: tmp(:,:) 
-        real(prec), allocatable :: tmp1(:,:) 
-        
-        allocate(tmp(ylmo%grd%nx,ylmo%grd%ny))
-        allocate(tmp1(ylmo%grd%nx,ylmo%grd%ny))
-
         ! Open the file for writing
         call nc_open(filename,ncid,writable=.TRUE.)
 
@@ -262,56 +256,11 @@ contains
         ! Update the time step
         call nc_write(filename,"time",time,dim1="time",start=[n],count=[1],ncid=ncid)
 
-        ! Write model speed 
-        call nc_write(filename,"speed",ylmo%par%model_speed,units="kyr/hr",long_name="Model speed (Yelmo only)", &
-                      dim1="time",start=[n],count=[1],ncid=ncid)
-        call nc_write(filename,"dt_avg",ylmo%par%dt_avg,units="yr",long_name="Average timestep", &
-                      dim1="time",start=[n],count=[1],ncid=ncid)
-        call nc_write(filename,"eta_avg",ylmo%par%eta_avg,units="m a-1",long_name="Average eta (maximum PC truncation error)", &
-                      dim1="time",start=[n],count=[1],ncid=ncid)
-        
-        ! initmip specific error metrics 
-        tmp = ylmo%tpo%now%H_ice-ylmo%dta%pd%H_ice
-        if (n .gt. 1 .or. count(tmp .ne. 0.0) .gt. 0) then 
-            H_rmse = sqrt(sum(tmp**2)/count(tmp .ne. 0.0))
-        else 
-            H_rmse = mv 
-        end if 
+        ! Write model metrics (model speed, dt, eta)
+        call yelmo_write_step_model_metrics(filename,ylmo,n,ncid)
 
-        ! surface elevation too 
-        tmp = ylmo%dta%pd%err_z_srf
-        if (n .gt. 1 .or. count(tmp .ne. 0.0) .gt. 0) then 
-            zsrf_rmse = sqrt(sum(tmp**2)/count(tmp .ne. 0.0))
-        else 
-            zsrf_rmse = mv 
-        end if 
-
-        tmp = ylmo%dta%pd%err_uxy_s
-        if (n .gt. 1 .or. count(tmp .ne. 0.0) .gt. 0) then 
-            uxy_rmse = sqrt(sum(tmp**2)/count(tmp .ne. 0.0))
-        else
-            uxy_rmse = mv
-        end if 
-
-        tmp = ylmo%dta%pd%uxy_s 
-        where(ylmo%dta%pd%uxy_s .gt. 0.0) tmp = log(tmp)
-        tmp1 = ylmo%dyn%now%uxy_s 
-        where(ylmo%dyn%now%uxy_s .gt. 0.0) tmp1 = log(tmp1)
-        
-        if (n .gt. 1 .or. count(tmp1-tmp .ne. 0.0) .gt. 0) then 
-            loguxy_rmse = sqrt(sum((tmp1-tmp)**2)/count(tmp1-tmp .ne. 0.0))
-        else
-            loguxy_rmse = mv
-        end if 
-        
-        call nc_write(filename,"rmse_H",H_rmse,units="m",long_name="RMSE - Ice thickness", &
-                      dim1="time",start=[n],count=[1],ncid=ncid)
-        call nc_write(filename,"rmse_zsrf",zsrf_rmse,units="m",long_name="RMSE - Surface elevation", &
-                      dim1="time",start=[n],count=[1],ncid=ncid)
-        call nc_write(filename,"rmse_uxy",uxy_rmse,units="m/a",long_name="RMSE - Surface velocity", &
-                      dim1="time",start=[n],count=[1],ncid=ncid)
-        call nc_write(filename,"rmse_uxy_log",loguxy_rmse,units="log(m/a)",long_name="RMSE - Log surface velocity", &
-                      dim1="time",start=[n],count=[1],ncid=ncid)
+        ! Write present-day data metrics (rmse[H],etc)
+        call yelmo_write_step_pd_metrics(filename,ylmo,n,ncid)
         
         ! == ISMIP6 specific variables 
         ! http://www.climate-cryosphere.org/wiki/index.php?title=InitMIP-Greenland#Appendix_2_.E2.80.93_Naming_conventions.2C_upload_and_model_output_data.
@@ -399,6 +348,10 @@ contains
         call nc_write(filename,"visc_eff",ylmo%dyn%now%visc_eff,units="Pa a m",long_name="Effective viscosity (SSA)", &
                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
 
+        call nc_write(filename,"dep_time",ylmo%mat%now%dep_time,units="yr",long_name="Deposition time", &
+                      dim1="xc",dim2="yc",dim3="zeta",dim4="time",start=[1,1,1,n],ncid=ncid)
+        call nc_write(filename,"uz",ylmo%dyn%now%uz,units="m/a",long_name="Surface velocity (z)", &
+                       dim1="xc",dim2="yc",dim3="zeta_ac",dim4="time",start=[1,1,1,n],ncid=ncid)
         call nc_write(filename,"T_prime",ylmo%thrm%now%T_ice-ylmo%thrm%now%T_pmp,units="deg C",long_name="Homologous ice temperature", &
                       dim1="xc",dim2="yc",dim3="zeta",dim4="time",start=[1,1,1,n],ncid=ncid)
         call nc_write(filename,"T_prime_b",ylmo%thrm%now%T_prime_b,units="K",long_name="Basal homologous ice temperature", &
@@ -408,10 +361,12 @@ contains
         call nc_write(filename,"H_w",ylmo%thrm%now%H_w,units="m water equiv.",long_name="Basal water layer thickness", &
                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
         
-        ! Ice thickness comparison with present-day 
-        call nc_write(filename,"pd_err_z_srf",ylmo%dta%pd%err_z_srf,units="m",long_name="Surface elevation error (present day)", &
+        ! Comparison with present-day 
+        call nc_write(filename,"H_ice_pd_err",ylmo%dta%pd%err_H_ice,units="m",long_name="Ice thickness error wrt present day", &
                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-        call nc_write(filename,"pd_err_uxy_s",ylmo%dta%pd%err_uxy_s,units="m",long_name="Surface velocity error (present day)", &
+        call nc_write(filename,"z_srf_pd_err",ylmo%dta%pd%err_z_srf,units="m",long_name="Surface elevation error wrt present day", &
+                      dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
+        call nc_write(filename,"uxy_s_pd_err",ylmo%dta%pd%err_uxy_s,units="m/a",long_name="Surface velocity error wrt present day", &
                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
         
         ! Diagnostics 
@@ -420,13 +375,6 @@ contains
         call nc_write(filename,"taud_acy",ylmo%dyn%now%taud_acy,units="Pa",long_name="Driving stress (y)", &
                        dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
         
-
-        ! Write cf_ref if it's the first timestep
-        if (n .eq. 1) then  
-            call nc_write(filename,"cf_ref",cf_ref,units="",long_name="Dragging constant coefficient", &
-                          dim1="xc",dim2="yc",start=[1,1],ncid=ncid)
-        end if 
-
         ! Close the netcdf file
         call nc_close(ncid)
 

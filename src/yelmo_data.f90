@@ -26,10 +26,70 @@ contains
         type(ytherm_class), intent(IN)    :: thrm
         type(ybound_class), intent(IN)    :: bnd
         
+        ! Local variables 
+        integer :: nx, ny 
+        real(prec), allocatable :: tmp(:,:) 
+        real(prec), allocatable :: tmp1(:,:) 
+        
+        nx = size(tpo%now%H_ice,1)
+        ny = size(tpo%now%H_ice,2)
+        
+        ! ======================================================
         ! Calculate errors
+
         dta%pd%err_H_ice   = tpo%now%H_ice - dta%pd%H_ice 
         dta%pd%err_z_srf   = tpo%now%z_srf - dta%pd%z_srf 
         dta%pd%err_uxy_s   = dyn%now%uxy_s - dta%pd%uxy_s 
+        
+        ! ======================================================
+        ! Whole ice sheet error metrics (rmse)
+
+        allocate(tmp(nx,ny))
+        allocate(tmp1(nx,ny))
+
+        ! == rmse[Ice thickness] ===================
+        tmp = tpo%now%H_ice-dta%pd%H_ice
+        if (count(tmp .ne. 0.0) .gt. 0) then 
+            dta%pd%rmse_H = sqrt(sum(tmp**2)/count(tmp .ne. 0.0))
+        else 
+            dta%pd%rmse_H = mv 
+        end if 
+
+        if (dta%pd%rmse_H .eq. 0.0_prec) dta%pd%rmse_H = mv 
+
+        ! == rmse[Surface elevation] =================== 
+        tmp = dta%pd%err_z_srf
+        if (count(tmp .ne. 0.0) .gt. 0) then 
+            dta%pd%rmse_zsrf = sqrt(sum(tmp**2)/count(tmp .ne. 0.0))
+        else 
+            dta%pd%rmse_zsrf = mv 
+        end if 
+
+        if (dta%pd%rmse_zsrf .eq. 0.0_prec) dta%pd%rmse_zsrf = mv 
+        
+        ! == rmse[Surface velocity] ===================
+        tmp = dta%pd%err_uxy_s
+        if (count(tmp .ne. 0.0) .gt. 0) then 
+            dta%pd%rmse_uxy = sqrt(sum(tmp**2)/count(tmp .ne. 0.0))
+        else
+            dta%pd%rmse_uxy = mv
+        end if 
+
+        if (dta%pd%rmse_uxy .eq. 0.0_prec) dta%pd%rmse_uxy = mv 
+        
+        ! == rmse[log(Surface velocity)] ===================
+        tmp = dta%pd%uxy_s 
+        where(dta%pd%uxy_s .gt. 0.0) tmp = log(tmp)
+        tmp1 = dyn%now%uxy_s 
+        where(dyn%now%uxy_s .gt. 0.0) tmp1 = log(tmp1)
+        
+        if (count(tmp1-tmp .ne. 0.0) .gt. 0) then 
+            dta%pd%rmse_loguxy = sqrt(sum((tmp1-tmp)**2)/count(tmp1-tmp .ne. 0.0))
+        else
+            dta%pd%rmse_loguxy = mv
+        end if 
+        
+        if (dta%pd%rmse_loguxy .eq. 0.0_prec) dta%pd%rmse_loguxy = mv 
         
         return 
 

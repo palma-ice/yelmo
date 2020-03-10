@@ -7,8 +7,8 @@ module yelmo_ice
     
     use yelmo_defs
     use yelmo_grid, only : yelmo_init_grid
-    use yelmo_timesteps, only : set_adaptive_timestep, set_adaptive_timestep_pc, calc_pc_tau_fe_sbe, &
-             limit_adaptive_timestep,yelmo_timestep_write_init, yelmo_timestep_write, calc_adv3D_timestep1
+    use yelmo_timesteps, only : set_adaptive_timestep, set_adaptive_timestep_pc, set_pc_mask, calc_pc_eta, calc_pc_tau_fe_sbe, &
+             calc_pc_tau_ab_sam, limit_adaptive_timestep,yelmo_timestep_write_init, yelmo_timestep_write, calc_adv3D_timestep1
     use yelmo_io 
 
     use yelmo_topography
@@ -18,8 +18,6 @@ module yelmo_ice
     use yelmo_boundaries
     use yelmo_data 
     use yelmo_regions 
-
-    use velocity_hybrid_pd12 
 
     implicit none 
 
@@ -37,22 +35,55 @@ contains
         type(yelmo_class), intent(INOUT) :: dom
         real(prec), intent(IN) :: time
 
-        type(ytopo_class)  :: tpo1 
-        type(ytherm_class) :: thrm1
-        type(ytherm_class) :: thrm0
-
         ! Local variables 
+        type(yelmo_class)  :: dom0 
+        type(ytopo_class)  :: tpo1
+
         real(prec) :: dt_now, dt_max  
         real(prec) :: time_now, time_start 
-        integer    :: n, nstep
+        integer    :: n, nstep, n_now
         real(4)    :: cpu_start_time 
         real(prec), parameter :: time_tol = 1e-5
 
         real(prec) :: H_mean, T_mean 
         real(prec), allocatable :: dt_save(:) 
-        real(prec) :: dt_adv_min
+        real(prec) :: dt_adv_min, dt_pi
+        real(prec) :: eta_now, rho_now 
+        integer    :: iter_redo, pc_k 
+        real(prec) :: ab_beta1, ab_beta2, ab_zeta 
+        logical    :: use_absam 
 
-        integer :: n2, nstep2 
+        logical, allocatable :: pc_mask(:,:) 
+        
+        ! Number of iterations to repeat a timestep if the error tolerance is exceeded.
+        ! n_iter_redo=5 is rarely met, so it is a good choice - no need for a parameter.
+        integer, parameter :: n_iter_redo = 5 
+
+
+        ! Determine which predictor-corrector (pc) method we are using for timestepping 
+        select case(trim(dom%par%pc_method))
+
+            case("FE-SBE")
+                ! Forward-Euler predictor; Semi-implicit Backwards Euler corrector 
+                ! (second-order error term)
+
+                pc_k = 2 
+                use_absam = .FALSE. 
+
+            case("AB-SAM")
+                ! Adams-Bashforth predictor; Semi-implicit Adams–Moulton corrector
+                ! (third-order error term) 
+
+                pc_k = 3 
+                use_absam = .TRUE. 
+
+            case DEFAULT 
+
+                write(*,*) "yelmo_udpate:: Error: pc_method not recognized."
+                write(*,*) "pc_method = ", trim(dom%par%pc_method)
+                stop 
+
+        end select 
 
         ! Load last model time (from dom%tpo, should be equal to dom%thrm)
         time_now = dom%tpo%par%time
@@ -62,31 +93,37 @@ contains
         time_start = time_now 
         
         ! Determine maximum number of time steps to be iterated through   
-        nstep  = ceiling( (time-time_now) / dom%par%dt_min )
-        
+        nstep   = ceiling( (time-time_now) / dom%par%dt_min )
+        n_now   = 0  ! Number of timesteps saved 
+
         allocate(dt_save(nstep))
         dt_save = missing_value 
 
+        allocate(pc_mask(dom%grd%nx,dom%grd%ny))
+
         ! Iteration of yelmo component updates until external timestep is reached
         do n = 1, nstep
+
+            ! Store initial state of yelmo object 
+            dom0 = dom 
 
             ! Update dt_max as a function of the total timestep 
             dt_max = max(time-time_now,0.0_prec)
 
             ! === Diagnose different adaptive timestep limits ===
 
-            ! Diagnose adaptive time step from CFL constraints 
+            ! Calculate adaptive time step from CFL constraints 
             call set_adaptive_timestep(dt_adv_min,dom%par%dt_adv,dom%par%dt_diff,dom%par%dt_adv3D, &
                                 dom%dyn%now%ux,dom%dyn%now%uy,dom%dyn%now%uz,dom%dyn%now%ux_bar,dom%dyn%now%uy_bar, &
                                 dom%dyn%now%dd_ab_bar,dom%tpo%now%H_ice,dom%tpo%now%dHicedt,dom%par%zeta_ac, &
                                 dom%tpo%par%dx,dom%par%dt_min,dt_max,dom%par%cfl_max,dom%par%cfl_diff_max) 
             
-            ! Calculate new adaptive timestep using predictor-corrector algorithm for ice thickness
-            call set_adaptive_timestep_pc(dom%par%pc_dt,dom%par%pc_eta,dom%par%pc_tau,dom%par%pc_eps, &
-                                        dom%par%dt_min,dt_max,dom%tpo%now%f_grnd.eq.1.0_prec, &
-                                        dom%dyn%now%ux_bar,dom%dyn%now%uy_bar,dom%tpo%par%dx)
+            ! Calculate adaptive timestep using proportional-integral (PI) methods
+            call set_pc_mask(pc_mask,dom%tpo%now%H_ice,dom%tpo%now%f_grnd)
+            call set_adaptive_timestep_pc(dt_pi,dom%par%pc_dt,dom%par%pc_eta,dom%par%pc_eps,dom%par%dt_min,dt_max, &
+                                         pc_mask,dom%dyn%now%ux_bar,dom%dyn%now%uy_bar,dom%tpo%par%dx,pc_k)
 
-            ! Determine current time step based on method of choice 
+            ! Determine current time step to be used based on method of choice 
             select case(dom%par%dt_method) 
 
                 case(0) 
@@ -95,14 +132,14 @@ contains
                     dt_now = dt_max 
 
                 case(1) 
-                    ! Use CFL timestep limit method
+                    ! Use CFL-based adaptive timestep
 
                     dt_now = dt_adv_min 
 
                 case(2) 
-                    ! Use predictor-corrector adaptive timestep
+                    ! Use PI adaptive timestep
 
-                    dt_now = dom%par%pc_dt                      ! Based on ice thickness 
+                    dt_now = dt_pi
                     
                 case DEFAULT 
 
@@ -112,60 +149,114 @@ contains
 
             end select 
 
-            ! Save the current timestep for log and for running mean 
-            dt_save(n) = dt_now 
-            call yelmo_calc_running_mean(dom%par%dt_avg,dom%par%dts,dt_now)
-            call yelmo_calc_running_mean(dom%par%eta_avg,dom%par%etas,dom%par%pc_eta)
 
-            ! Advance the local time variable
-            time_now   = time_now + dt_now
-            if (abs(time-time_now) .lt. time_tol) time_now = time 
-            
-!             if (yelmo_log) then 
-!                 write(*,"(a,1f14.4,3g14.4)") "timestepping: ", time_now, dt_now, minval(dom%par%dt_adv), minval(dom%par%dt_diff)
-!             end if 
-            
-            ! Store local copy of ytopo and ytherm objects to use for predictor step
-            tpo1  = dom%tpo 
-            thrm1 = dom%thrm 
+            do iter_redo=1, n_iter_redo 
+                ! Prepare to potentially perform several iterations of the same timestep.
+                ! If at the end of one iteration, the truncation error is too high, then 
+                ! redo the timestep with a lower dt. 
+                ! Repeat n_iter_redo times or until error is reduced. 
 
-            ! Step 1: Perform predictor step with temporary topography object 
-            ! Calculate topography (elevation, ice thickness, calving, etc.)
-            call calc_ytopo(tpo1,dom%dyn,dom%thrm,dom%bnd,time_now,topo_fixed=dom%tpo%par%topo_fixed)
-            call calc_ytopo_masks(tpo1,dom%dyn,dom%thrm,dom%bnd)
-
-            if (dom%par%use_pc_thrm) then 
-                ! Perform predictor step with temporary thermodynamics object 
+                ! Advance the local time variable
+                time_now   = time_now + dt_now
+                if (abs(time-time_now) .lt. time_tol) time_now = time 
                 
-                ! Calculate thermodynamics (temperatures and enthalpy), corrected 
-                call calc_ytherm(thrm1,tpo1,dom%dyn,dom%mat,dom%bnd,time_now)            
+                ! Store local copy of ytopo object to use for predictor step
+                tpo1  = dom%tpo 
+                
+                if (use_absam) then
+                    ! AB-SAM: update velocities for calculation of predicted ice thickness
 
-            end if 
+                    ab_zeta  = dt_now / dom%par%pc_dt(1) 
+                    ab_beta1 = 1.0_prec + ab_zeta/2.0_prec 
+                    ab_beta2 = -ab_zeta/2.0_prec 
+                     
+                    dom%dyn%now%ux_bar = ab_beta1*dom%dyn%now%ux_bar + ab_beta2*dom%dyn%now%ux_bar_nm1
+                    dom%dyn%now%uy_bar = ab_beta1*dom%dyn%now%uy_bar + ab_beta2*dom%dyn%now%uy_bar_nm1
 
-            ! Step 2: Update other variables using predicted ice thickness 
+                end if 
+
+                ! Step 1: Perform predictor step with temporary topography object 
+                ! Calculate topography (elevation, ice thickness, calving, etc.)
+                call calc_ytopo(tpo1,dom%dyn,dom%thrm,dom%bnd,time_now,topo_fixed=dom%tpo%par%topo_fixed)
+                call calc_ytopo_masks(tpo1,dom%dyn,dom%thrm,dom%bnd)
+
+                ! Step 2: Update other variables using predicted ice thickness 
+                
+                ! Calculate dynamics (velocities and stresses) 
+                call calc_ydyn(dom%dyn,tpo1,dom%mat,dom%thrm,dom%bnd,time_now)
+                
+                if (use_absam) then
+                    ! AB-SAM: update velocities for calculation of corrected ice thickness
+                     
+                    dom%dyn%now%ux_bar = 0.5_prec * (dom%dyn%now%ux_bar + dom%dyn%now%ux_bar_nm1)
+                    dom%dyn%now%uy_bar = 0.5_prec * (dom%dyn%now%uy_bar + dom%dyn%now%uy_bar_nm1)
+
+                end if 
+
+                ! Calculate material (ice properties, viscosity, etc.)
+                call calc_ymat(dom%mat,tpo1,dom%dyn,dom%thrm,dom%bnd,time_now)
+
+                ! Calculate thermodynamics (temperatures and enthalpy), corrected
+                call calc_ytherm(dom%thrm,tpo1,dom%dyn,dom%mat,dom%bnd,time_now)            
+
+                ! Step 3: Finally, calculate corrector step with actual topography object 
+                ! Calculate topography (elevation, ice thickness, calving, etc.), corrected
+                call calc_ytopo(dom%tpo,dom%dyn,dom%thrm,dom%bnd,time_now,topo_fixed=dom%tpo%par%topo_fixed)    
+                call calc_ytopo_masks(dom%tpo,dom%dyn,dom%thrm,dom%bnd)
+
+
+                ! Determine truncation error for ice thickness 
+                if (use_absam) then 
+                    ! AB-SAM truncation error 
+                    call calc_pc_tau_ab_sam(dom%par%pc_tau,dom%tpo%now%H_ice,tpo1%now%H_ice,dt_now,ab_zeta)
+                else 
+                    ! FE-SBE truncation error 
+                    call calc_pc_tau_fe_sbe(dom%par%pc_tau,dom%tpo%now%H_ice,tpo1%now%H_ice,dt_now)
+                end if 
+
+                ! Calculate eta for this timestep 
+                call set_pc_mask(pc_mask,dom%tpo%now%H_ice,dom%tpo%now%f_grnd)
+                eta_now = calc_pc_eta(dom%par%pc_tau,mask=pc_mask)
+
+                ! Check if this timestep should be rejected
+                if (eta_now .gt. dom%par%pc_tol .and. dt_now .gt. dom%par%dt_min) then
+
+                    ! Calculate timestep reduction to apply
+                    !rho_now = 0.7_prec
+                    rho_now = 0.7_prec*(1.0_prec+(eta_now-dom%par%pc_tol)/10.0_prec)**(-1.0_prec) 
+
+                    ! Reset yelmo and time variables to beginning of timestep
+                    dom      = dom0 
+                    time_now = dom0%tpo%par%time
+                    dt_now   = max(dt_now*rho_now,dom%par%dt_min)
+                    
+                else
+                    ! Timestep converged properly, exit the iteration loop for this timestep 
+
+                    exit 
+                
+                end if 
+
+            end do   ! End iteration loop 
             
-            ! Calculate dynamics (velocities and stresses)
-            call calc_ydyn(dom%dyn,tpo1,dom%mat,thrm1,dom%bnd,time_now)
-            
-            ! Calculate material (ice properties, viscosity, etc.)
-            call calc_ymat(dom%mat,tpo1,dom%dyn,thrm1,dom%bnd,time_now)
 
-            ! Calculate thermodynamics (temperatures and enthalpy), corrected
-            call calc_ytherm(dom%thrm,tpo1,dom%dyn,dom%mat,dom%bnd,time_now)            
+            ! Update dt and eta vectors for last 3 timesteps 
+            dom%par%pc_dt = cshift(dom%par%pc_dt,shift=-1)
+            dom%par%pc_dt(1) = dt_now 
 
-            ! Step 3: Finally, calculate corrector step with actual topography object 
-            ! Calculate topography (elevation, ice thickness, calving, etc.), corrected
-            call calc_ytopo(dom%tpo,dom%dyn,dom%thrm,dom%bnd,time_now,topo_fixed=dom%tpo%par%topo_fixed)    
-            call calc_ytopo_masks(dom%tpo,dom%dyn,dom%thrm,dom%bnd)
-
-
-            ! Determine truncation error for ice thickness 
-            call calc_pc_tau_fe_sbe(dom%par%pc_tau,dom%tpo%now%H_ice,tpo1%now%H_ice,dom%par%pc_dt)
+            dom%par%pc_eta = cshift(dom%par%pc_eta,shift=-1)
+            dom%par%pc_eta(1) = eta_now
+        
+            ! Save the current timestep for log and for running mean 
+            n_now = n_now + 1 
+            dt_save(n_now) = dt_now 
+            call yelmo_calc_running_mean(dom%par%dt_avg,dom%par%dts,dt_now)
+            call yelmo_calc_running_mean(dom%par%eta_avg,dom%par%etas,dom%par%pc_eta(1))
 
             if (dom%par%log_timestep) then 
                 ! Write timestep file if desired
-                call yelmo_timestep_write(dom%par%log_timestep_file,time_now,dt_now,dt_adv_min,dom%par%pc_dt, &
-                            dom%par%pc_eta,dom%par%pc_tau)
+                call yelmo_timestep_write(dom%par%log_timestep_file,time_now,dt_now,dt_adv_min,dt_pi, &
+                            dom%par%pc_eta(1),dom%par%pc_tau)
             end if 
 
             ! Make sure model is still running well
@@ -200,8 +291,11 @@ contains
 
             n = count(dt_save .ne. missing_value)
 
-            write(*,"(a,f12.2,f8.1,2f10.1,50f7.2)") "yelmo:: [time,speed,H,T,dt]:", time_now, dom%par%model_speed, &
-                                H_mean, T_mean, dt_save(1:n)
+            write(*,"(a,f13.2,f9.1,f10.1,f8.1,2f7.2,1i6)") &
+                        !"yelmo:: [time,speed,H,T,max(dt),min(dt),n(dt==dt_min)]:", &
+                        "yelmo:: timelog:", &
+                            time_now, dom%par%model_speed, H_mean, T_mean, maxval(dt_save(1:n)), &
+                                            minval(dt_save(1:n)), count(dt_save(1:n).eq.dom%par%dt_min)
             
         end if 
 
@@ -360,8 +454,8 @@ contains
         dom%par%dt_diff  = 0.0 
         dom%par%dt_adv3D = 0.0 
 
-        dom%par%pc_dt    = dom%par%dt_min  
-        dom%par%pc_eta   = dom%par%pc_eps  
+        dom%par%pc_dt(:)  = dom%par%dt_min  
+        dom%par%pc_eta(:) = dom%par%pc_eps
 
         ! Allocate truncation error array 
         if (allocated(dom%par%pc_tau))   deallocate(dom%par%pc_tau)
@@ -482,8 +576,8 @@ contains
         if (dom%par%log_timestep) then 
             ! Timestep file 
             call yelmo_timestep_write_init(dom%par%log_timestep_file,time,dom%grd%xc,dom%grd%yc,dom%par%pc_eps)
-            call yelmo_timestep_write(dom%par%log_timestep_file,time,0.0_prec,0.0_prec,dom%par%pc_dt, &
-                            dom%par%pc_eta,dom%par%pc_tau)
+            call yelmo_timestep_write(dom%par%log_timestep_file,time,0.0_prec,0.0_prec,dom%par%pc_dt(1), &
+                            dom%par%pc_eta(1),dom%par%pc_tau)
         end if 
 
         return
@@ -610,12 +704,12 @@ contains
 
             ! Impose [high] beta value in case it hasn't been initialized (in the case of cb_method=-1/beta_method=-1)
             ! This will be overwritten when cf_ref/beta are calculated internally
-            dom%dyn%now%cf_ref = 1e5
+            dom%dyn%now%cf_ref = 1.0
             dom%dyn%now%beta   = 1e5 
             
             ! Call dynamics 
             call calc_ydyn(dom%dyn,dom%tpo,dom%mat,dom%thrm,dom%bnd,time)
-
+            
             ! Calculate material information again with updated dynamics
         
             call calc_ymat(dom%mat,dom%tpo,dom%dyn,dom%thrm,dom%bnd,time)
@@ -654,11 +748,12 @@ contains
         call nml_read(filename,"yelmo","zeta_scale",    par%zeta_scale)
         call nml_read(filename,"yelmo","zeta_exp",      par%zeta_exp)
         call nml_read(filename,"yelmo","nz_aa",         par%nz_aa)
-        call nml_read(filename,"yelmo","use_pc_thrm",   par%use_pc_thrm)
         call nml_read(filename,"yelmo","dt_method",     par%dt_method)
         call nml_read(filename,"yelmo","dt_min",        par%dt_min)
         call nml_read(filename,"yelmo","cfl_max",       par%cfl_max)
         call nml_read(filename,"yelmo","cfl_diff_max",  par%cfl_diff_max)
+        call nml_read(filename,"yelmo","pc_method",     par%pc_method)
+        call nml_read(filename,"yelmo","pc_tol",        par%pc_tol)
         call nml_read(filename,"yelmo","pc_eps",        par%pc_eps)
 
         ! Overwrite parameter values with argument definitions if available
@@ -685,7 +780,12 @@ contains
             par%use_restart = .TRUE. 
         end if 
 
-        !par%log_timestep_file = "timesteps_"//trim(par%grid_name)//".nc" 
+        if (par%pc_eps .gt. par%pc_tol) then 
+            write(*,*) "yelmo_par_load:: error: pc_eps must be greater than pc_tol."
+            write(*,*) "pc_eps, pc_tol: ", par%pc_eps, par%pc_tol 
+            stop 
+        end if
+
         par%log_timestep_file = "timesteps.nc" 
         
         par%model_speeds = 0.0_prec 

@@ -92,7 +92,7 @@ contains
 
         buel%err_H_ice     = H_ice - buel%H_ice 
         buel%err_H0        = maxval(H_ice) - maxval(buel%H_ice)
-        buel%err_max_H_ice = maxval(buel%err_H_ice)
+        buel%err_max_H_ice = maxval(abs(buel%err_H_ice))
 
         if (count(msk) .gt. 0) then 
             buel%rmse_H_ice    = sqrt(sum(buel%err_H_ice**2,mask=msk) / real(count(msk)))
@@ -180,48 +180,46 @@ contains
         real(prec), intent(IN)  :: g   
          
         ! Local variables 
-        integer :: nx, ny 
-        real(prec), allocatable :: r(:,:)  
-        real(prec)  :: R0_meters
-        real(prec)  :: alpha, beta, gamma, t0, time1  
+        integer    :: i, j, k, nx, ny 
+        real(prec) :: r_now  
+        real(prec) :: R0_meters
+        real(prec) :: alpha, beta, gamma, t0, time1  
+        real(prec) :: fac 
         
         real(prec), parameter :: f = 0.0        ! isostasy fraction 
 
         nx = size(H_ice,1)
         ny = size(H_ice,2) 
 
-        allocate(r(nx,ny))
-
-        ! Calculate the radius value as a function of xx and yy [m]
-        r = sqrt(xx**2 + yy**2)
-
         ! Get parameter R0 in meters [km] => [m]
         R0_meters = R0 * 1e3 
 
         ! Calculate alpha, beta, t0 and absolute time
         alpha = (2.0 - (n+1.0)*lambda)/(5.0*n+3.0)
-
         beta  = (1.0 + (2.0*n+1.0)*lambda) / (5.0*n+3.0)
-
         gamma = bueler_gamma(A,n,rho_ice,g)
-
         t0    = (beta/gamma) * ((2.0*n+1.0)/(n+1.0))**n * (R0_meters**(n+1)/H0**(2.0*n+1.0))
-
         time1 = time + t0 
 
-        !write(*,*) gamma, t0  
-        !stop 
+        H_ice = 0.0_prec 
 
-        ! Calculate the Halfar similarity solution profile (Eq. 10-11 in Bueler et al, 2005)
-        H_ice = 0.0
-        !where (r .le. R0_meters) & 
-        where ( (1.0 - (((time1/t0)**(-beta))*r/R0_meters)**((n+1.0)/n)) .gt. 0.0) &
-        H_ice = H0 * (time1/t0)**(-alpha) * (1.0 - (((time1/t0)**(-beta))*r/R0_meters)**((n+1.0)/n))**(n/(2.0*n+1.0))
+        do j = 2, ny-1
+        do i = 2, nx-1 
 
-        ! Now calculate implied mass balance
-        mbal  = (lambda/time1)*H_ice  
+            ! Calculate the radius value as a function of xx and yy [m]
+            r_now = sqrt(xx(i,j)**2 + yy(i,j)**2)
 
-        ! Set the basal velocity to zero 
+            ! Calculate the Halfar similarity solution profile (Eq. 10-11 in Bueler et al, 2005)
+            fac = max(0.0, 1.0 - (((time1/t0)**(-beta))*r_now/R0_meters)**((n+1.0)/n) )
+            H_ice(i,j) = H0 * (time1/t0)**(-alpha) * fac**(n/(2.0*n+1.0))
+
+            ! Now calculate implied mass balance
+            mbal(i,j)  = (lambda/time1)*H_ice(i,j)  
+
+        end do 
+        end do 
+
+        ! Set the basal velocity to zero everywhere
         u_b = 0.0 
 
         return 
@@ -239,7 +237,7 @@ contains
         real(prec), intent(IN) :: g 
         real(prec) :: gamma 
 
-        gamma = 2.0 * A * (rho_ice*g)**n / (n+2.0)
+        gamma = 2.0_prec * A * (rho_ice*g)**n / (n+2.0_prec)
 
         return 
 

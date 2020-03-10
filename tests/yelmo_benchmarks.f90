@@ -30,7 +30,7 @@ program yelmo_benchmarks
     integer    :: n  
 
     character(len=56) :: grid_name
-    real(prec) :: dx 
+    real(prec) :: dx, x0  
     integer    :: nx  
 
     real(4) :: start, finish
@@ -91,7 +91,7 @@ program yelmo_benchmarks
 
             grid_name = "HALFAR"
             nx = (60.0 / dx) + 1        ! Domain width is 60 km total (-30 to 30 km)
-
+            
         case("HALFAR-MED")
 
             grid_name = "HALFAR-MED"
@@ -105,6 +105,9 @@ program yelmo_benchmarks
 
     end select 
 
+    ! Make sure that nx is odd, so that we get one grid point right at dome x=0,y=0
+    if (mod(nx,2).eq.0) nx=nx+1
+    
     ! === Initialize ice sheet model =====
 
     ! General initialization of yelmo constants (used globally)
@@ -441,14 +444,9 @@ contains
         ! Update the time step
         call nc_write(filename,"time",time,dim1="time",start=[n],count=[1],ncid=ncid)
 
-        ! Write model speed 
-        call nc_write(filename,"speed",ylmo%par%model_speed,units="kyr/hr",long_name="Model speed (Yelmo only)", &
-                      dim1="time",start=[n],count=[1],ncid=ncid)
-        call nc_write(filename,"dt_avg",ylmo%par%dt_avg,units="yr",long_name="Average timestep", &
-                      dim1="time",start=[n],count=[1],ncid=ncid)
-        call nc_write(filename,"eta_avg",ylmo%par%eta_avg,units="m a-1",long_name="Average eta (maximum PC truncation error)", &
-                      dim1="time",start=[n],count=[1],ncid=ncid)
-        
+        ! Write model metrics (model speed, dt, eta)
+        call yelmo_write_step_model_metrics(filename,ylmo,n,ncid)
+
         ! Time step limits 
         call nc_write(filename,"dt_adv",ylmo%par%dt_adv,units="a",long_name="Advective timestep", &
                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
@@ -583,8 +581,8 @@ contains
 !                        dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
 !         call nc_write(filename,"uy_i_bar",ylmo%dyn%now%uy_i_bar,units="m/a",long_name="Internal shear velocity (y)", &
 !                        dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-        call nc_write(filename,"uxy_i_bar",ylmo%dyn%now%uxy_i_bar,units="m/a",long_name="Internal shear velocity magnitude", &
-                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
+!         call nc_write(filename,"uxy_i_bar",ylmo%dyn%now%uxy_i_bar,units="m/a",long_name="Internal shear velocity magnitude", &
+!                        dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
 
         call nc_write(filename,"ux_b",ylmo%dyn%now%ux_b,units="m/a",long_name="Basal sliding velocity (x)", &
                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
@@ -593,11 +591,18 @@ contains
         call nc_write(filename,"uxy_b",ylmo%dyn%now%uxy_b,units="m/a",long_name="Basal sliding velocity magnitude", &
                      dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
         
-        call nc_write(filename,"ux_bar",ylmo%dyn%now%ux_bar,units="m/a",long_name="Vertically integrated velocity (x)", &
+        call nc_write(filename,"ux_bar",ylmo%dyn%now%ux_bar,units="m/a",long_name="Vertically averaged velocity (x)", &
                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-        call nc_write(filename,"uy_bar",ylmo%dyn%now%uy_bar,units="m/a",long_name="Vertically integrated velocity (y)", &
+        call nc_write(filename,"uy_bar",ylmo%dyn%now%uy_bar,units="m/a",long_name="Vertically averaged velocity (y)", &
                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-        call nc_write(filename,"uxy_bar",ylmo%dyn%now%uxy_bar,units="m/a",long_name="Vertically integrated velocity magnitude", &
+        call nc_write(filename,"uxy_bar",ylmo%dyn%now%uxy_bar,units="m/a",long_name="Vertically averaged velocity magnitude", &
+                      dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
+        
+        call nc_write(filename,"ux_s",ylmo%dyn%now%ux_s,units="m/a",long_name="Surface velocity (x)", &
+                      dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
+        call nc_write(filename,"uy_s",ylmo%dyn%now%uy_s,units="m/a",long_name="Surface velocity (y)", &
+                      dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
+        call nc_write(filename,"uxy_s",ylmo%dyn%now%uxy_s,units="m/a",long_name="Surface velocity magnitude", &
                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
         
         sym = ylmo%dyn%now%uxy_bar(nx:1:-1,:) - ylmo%dyn%now%uxy_bar

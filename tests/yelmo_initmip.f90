@@ -493,6 +493,20 @@ contains
             ! Additionally modify cf_ref
             if (trim(domain) .eq. "Antarctica") then
 
+
+                ! Increase - feeding the Ronne ice shelf from the South
+                call scale_cf_gaussian(cf_ref,dyn%par%cf_stream*10.0,x0=-760.0, y0=  32.0,sigma=200.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
+                
+                call scale_cf_gaussian(cf_ref,dyn%par%cf_stream*5.0, x0=-980.0, y0=-400.0,sigma=200.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
+                
+                ! Reduction - feeding the Ross ice shelf from the East
+                call scale_cf_gaussian(cf_ref,dyn%par%cf_stream*0.05,x0= 130.0, y0=-550.0, sigma=100.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
+                call scale_cf_gaussian(cf_ref,dyn%par%cf_stream*0.05,x0= 280.0, y0=-760.0, sigma=100.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
+                call scale_cf_gaussian(cf_ref,dyn%par%cf_stream*0.05,x0= 380.0, y0=-960.0, sigma=100.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
+                call scale_cf_gaussian(cf_ref,dyn%par%cf_stream*0.05,x0= 400.0, y0=-1150.0,sigma=100.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
+
+
+if (.FALSE.) then 
                 ! Increase - feeding the Ronne ice shelf from the North
                 call scale_cf_gaussian(cf_ref,dyn%par%cf_stream*4.00,x0=-700.0, y0=    0.0,sigma=200.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
                 
@@ -516,7 +530,9 @@ contains
                 call scale_cf_gaussian(cf_ref,dyn%par%cf_stream*0.05,x0= 280.0, y0=-760.0, sigma=100.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
                 call scale_cf_gaussian(cf_ref,dyn%par%cf_stream*0.05,x0= 380.0, y0=-960.0, sigma=100.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
                 call scale_cf_gaussian(cf_ref,dyn%par%cf_stream*0.05,x0= 400.0, y0=-1150.0,sigma=100.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
-                
+
+end if 
+
 if (.FALSE.) then
                 ! Reduction 
                 call scale_cf_gaussian(cf_ref,dyn%par%cf_stream*0.25,x0=-2000.0,y0=1000.0, sigma=100.0,xx=grd%x*1e-3,yy=grd%y*1e-3)

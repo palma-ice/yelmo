@@ -460,25 +460,27 @@ contains
         
         ! Target data (not time dependent)
         if (n .eq. 1) then 
-            call nc_write(filename,"pd_z_srf",ylmo%dta%pd%z_srf,units="m",long_name="Observed surface elevation (present day)", &
+            call nc_write(filename,"z_srf_pd",ylmo%dta%pd%z_srf,units="m",long_name="Observed surface elevation (present day)", &
                           dim1="xc",dim2="yc",ncid=ncid)
-            call nc_write(filename,"pd_H_ice",ylmo%dta%pd%H_ice,units="m",long_name="Observed ice thickness (present day)", &
+            call nc_write(filename,"H_ice_pd",ylmo%dta%pd%H_ice,units="m",long_name="Observed ice thickness (present day)", &
                           dim1="xc",dim2="yc",ncid=ncid)
-            call nc_write(filename,"pd_uxy_s",ylmo%dta%pd%uxy_s,units="m",long_name="Observed surface velocity (present day)", &
+            call nc_write(filename,"uxy_s_pd",ylmo%dta%pd%uxy_s,units="m",long_name="Observed surface velocity (present day)", &
                           dim1="xc",dim2="yc",ncid=ncid)
         end if 
 
-        ! Error fields compared to targets
-        call nc_write(filename,"pd_err_z_srf",ylmo%dta%pd%err_z_srf,units="m",long_name="Surface elevation error (present day)", &
+        ! Comparison with present-day 
+        call nc_write(filename,"H_ice_pd_err",ylmo%dta%pd%err_H_ice,units="m",long_name="Ice thickness error wrt present day", &
                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-        call nc_write(filename,"pd_err_uxy_s",ylmo%dta%pd%err_uxy_s,units="m",long_name="Surface velocity error (present day)", &
+        call nc_write(filename,"z_srf_pd_err",ylmo%dta%pd%err_z_srf,units="m",long_name="Surface elevation error wrt present day", &
+                      dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
+        call nc_write(filename,"uxy_s_pd_err",ylmo%dta%pd%err_uxy_s,units="m/a",long_name="Surface velocity error wrt present day", &
                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
         
         tmp = ylmo%dta%pd%err_z_srf
         call filter_gaussian(var=tmp,sigma=2.0*ylmo%tpo%par%dx,dx=ylmo%tpo%par%dx, &
                                 mask=ylmo%dta%pd%err_z_srf .ne. 0.0)
         
-        call nc_write(filename,"pd_err_z_srf_sm",tmp,units="m",long_name="Smooth surface elevation error (present day)", &
+        call nc_write(filename,"z_srf_sm_pd_err",tmp,units="m",long_name="Smooth surface elevation error wrt present day", &
                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
         
         ! Close the netcdf file

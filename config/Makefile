@@ -99,6 +99,13 @@ trough : yelmo-static
 		@echo "    yelmo_trough.x is ready."
 		@echo " "
 
+check_sim : $(objdir)/ncio.o
+		$(FC) $(DFLAGS) $(FFLAGS) -o ./check_sim.x check_sim.f90 \
+			$(LFLAGS) $(objdir)/ncio.o
+		@echo " "
+		@echo "    check_sim.x is ready."
+		@echo " "
+
 .PHONY : usage
 usage:
 	@echo ""

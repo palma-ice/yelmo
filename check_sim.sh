@@ -15,8 +15,10 @@ for D in ${fldr}/*
 do
     if [[ -d "$D" ]]
     then
-        echo $D 
-        ./check_sim.x $D >> ${file_out}
+        #./check_sim.x $D >> ${file_out}
+        out=`./check_sim.x $D` 
+        echo $out 
+        echo "$out" >> ${file_out}
     fi
 done 
 

@@ -150,9 +150,6 @@ program yelmo_test
 
         cf_ref = yelmo1%dyn%par%cf_stream  
 
-        ! Use location-specific tuning functions to modify cf_ref 
-        call modify_cf_ref(yelmo1%dyn,yelmo1%tpo,yelmo1%thrm,yelmo1%bnd,yelmo1%grd,yelmo1%par%domain,cf_ref)
-
     end if 
 
     ! ============================================================
@@ -399,7 +396,7 @@ contains
         type(ygrid_class),  intent(IN)    :: grd
         character(len=*),   intent(IN)    :: domain 
         logical,            intent(IN)    :: mask_noice(:,:) 
-        real(prec),         intent(IN)    :: cf_ref(:,:) 
+        real(prec),         intent(INOUT) :: cf_ref(:,:) 
 
         integer :: i, j, nx, ny 
         integer :: i1, i2, j1, j2 
@@ -467,7 +464,13 @@ contains
             ! =============================================================================
             ! Step 3: calculate cf_ref [--]
             
-            dyn%now%cf_ref = (cf_ref*lambda_bed)
+            cf_ref = (cf_ref*lambda_bed)
+
+            ! Use location-specific tuning functions to modify cf_ref 
+            call modify_cf_ref(dyn,tpo,thrm,bnd,grd,domain,cf_ref)
+            
+            ! Finally store in dyn object for output
+            dyn%now%cf_ref = cf_ref 
 
         return 
 
@@ -494,12 +497,11 @@ contains
             if (trim(domain) .eq. "Antarctica") then
 
 
-                ! Increase - feeding the Ronne ice shelf from the South
+                ! Increase friction - feeding the Ronne ice shelf from the South
                 call scale_cf_gaussian(cf_ref,dyn%par%cf_stream*2.0,x0=-800.0, y0= 100.0,sigma=400.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
+                call scale_cf_gaussian(cf_ref,dyn%par%cf_stream*2.0,x0=-980.0, y0=-400.0,sigma=200.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
                 
-                call scale_cf_gaussian(cf_ref,dyn%par%cf_stream*2.0, x0=-980.0, y0=-400.0,sigma=200.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
-                
-                ! Reduction - feeding the Ross ice shelf from the East
+                ! Reduction friction - feeding the Ross ice shelf from the East
                 call scale_cf_gaussian(cf_ref,dyn%par%cf_stream*0.05,x0= 130.0, y0=-550.0, sigma=100.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
                 call scale_cf_gaussian(cf_ref,dyn%par%cf_stream*0.05,x0= 280.0, y0=-760.0, sigma=100.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
                 call scale_cf_gaussian(cf_ref,dyn%par%cf_stream*0.05,x0= 380.0, y0=-960.0, sigma=100.0,xx=grd%x*1e-3,yy=grd%y*1e-3)

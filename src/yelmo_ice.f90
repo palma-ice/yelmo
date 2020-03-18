@@ -548,7 +548,7 @@ contains
         write(*,*) "yelmo_init:: boundary intialized (loaded masks)."
         
         call ydata_par_load(dom%dta%par,filename,dom%par%domain,dom%par%grid_name,init=.TRUE.)
-        call ydata_alloc(dom%dta%pd,dom%grd%nx,dom%grd%ny,dom%par%nz_aa)
+        call ydata_alloc(dom%dta%pd,dom%grd%nx,dom%grd%ny,dom%par%nz_aa,dom%dta%par%pd_age_n_iso)
 
         ! Load data objects   
         call ydata_load(dom%dta,dom%bnd%ice_allowed)

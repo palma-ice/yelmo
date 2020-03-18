@@ -217,16 +217,32 @@ contains
 
         end if 
 
+        if (dta%par%pd_age_load) then 
+            ! Load present-day data for isochrones (ice ages) 
+
+            ! =========================================
+            ! Load vel data from netcdf file 
+            filename = dta%par%pd_age_path
+            nms(1:2) = dta%par%pd_age_names
+
+            call nc_read(filename,nms(1), dta%pd%age_iso,   missing_value=mv)
+            call nc_read(filename,nms(2), dta%pd%depth_iso, missing_value=mv)
+
+        end if 
+
         ! Summarize data loading 
-        write(*,*) "ydata_load:: range(H_ice): ", minval(dta%pd%H_ice),   maxval(dta%pd%H_ice)
-        write(*,*) "ydata_load:: range(z_srf): ", minval(dta%pd%z_srf),   maxval(dta%pd%z_srf)
-        write(*,*) "ydata_load:: range(z_bed): ", minval(dta%pd%z_bed),   maxval(dta%pd%z_bed)
-        write(*,*) "ydata_load:: range(T_srf): ", minval(dta%pd%T_srf), maxval(dta%pd%T_srf)
-        write(*,*) "ydata_load:: range(smb):   ", minval(dta%pd%smb,dta%pd%smb .ne. mv), &
-                                                  maxval(dta%pd%smb,dta%pd%smb .ne. mv)
-        write(*,*) "ydata_load:: range(uxy_s): ", minval(dta%pd%uxy_s,dta%pd%uxy_s .ne. mv), &
-                                                  maxval(dta%pd%uxy_s,dta%pd%uxy_s .ne. mv)
-            
+        write(*,*) "ydata_load:: range(H_ice):     ",   minval(dta%pd%H_ice),   maxval(dta%pd%H_ice)
+        write(*,*) "ydata_load:: range(z_srf):     ",   minval(dta%pd%z_srf),   maxval(dta%pd%z_srf)
+        write(*,*) "ydata_load:: range(z_bed):     ",   minval(dta%pd%z_bed),   maxval(dta%pd%z_bed)
+        write(*,*) "ydata_load:: range(T_srf):     ",   minval(dta%pd%T_srf),   maxval(dta%pd%T_srf)
+        write(*,*) "ydata_load:: range(smb):       ",   minval(dta%pd%smb,dta%pd%smb .ne. mv), &
+                                                        maxval(dta%pd%smb,dta%pd%smb .ne. mv)
+        write(*,*) "ydata_load:: range(uxy_s):     ",   minval(dta%pd%uxy_s,dta%pd%uxy_s .ne. mv), &
+                                                        maxval(dta%pd%uxy_s,dta%pd%uxy_s .ne. mv)
+        write(*,*) "ydata_load:: range(age_iso):   ",   minval(dta%pd%age_iso), maxval(dta%pd%age_iso)
+        write(*,*) "ydata_load:: range(depth_iso): ",   minval(dta%pd%depth_iso,dta%pd%depth_iso .ne. mv), &
+                                                        maxval(dta%pd%depth_iso,dta%pd%depth_iso .ne. mv)
+                
 
         return 
 
@@ -259,26 +275,37 @@ contains
         call nml_read(filename,"yelmo_data","pd_vel_load",     par%pd_vel_load,     init=init_pars)
         call nml_read(filename,"yelmo_data","pd_vel_path",     par%pd_vel_path,     init=init_pars)
         call nml_read(filename,"yelmo_data","pd_vel_names",    par%pd_vel_names,    init=init_pars)
+        call nml_read(filename,"yelmo_data","pd_age_load",     par%pd_age_load,     init=init_pars)
+        call nml_read(filename,"yelmo_data","pd_age_path",     par%pd_age_path,     init=init_pars)
+        call nml_read(filename,"yelmo_data","pd_age_names",    par%pd_age_names,    init=init_pars)
         
         ! Subsitute domain/grid_name
         call yelmo_parse_path(par%pd_topo_path,domain,grid_name)
         call yelmo_parse_path(par%pd_tsrf_path,domain,grid_name)
         call yelmo_parse_path(par%pd_smb_path, domain,grid_name)
         call yelmo_parse_path(par%pd_vel_path, domain,grid_name)
+        call yelmo_parse_path(par%pd_age_path, domain,grid_name)
 
         ! Internal parameters 
         par%domain = trim(domain) 
-         
+        
+        ! Get number of isochrone layers to load 
+        if (par%pd_age_load) then 
+            par%pd_age_n_iso = nc_size(par%pd_age_path,par%pd_age_names(1))
+        else 
+            par%pd_age_n_iso = 1        ! To avoid allocation errors  
+        end if 
+
         return
 
     end subroutine ydata_par_load
 
-    subroutine ydata_alloc(pd,nx,ny,nz)
+    subroutine ydata_alloc(pd,nx,ny,nz,n_iso)
 
         implicit none 
 
         type(ydata_pd_class) :: pd 
-        integer :: nx, ny, nz  
+        integer :: nx, ny, nz, n_iso  
 
         call ydata_dealloc(pd)
         
@@ -290,7 +317,7 @@ contains
         allocate(pd%T_srf(nx,ny))
         allocate(pd%smb(nx,ny))
         
-        allocate(pd%depth_iso(nx,ny,4))
+        allocate(pd%depth_iso(nx,ny,n_iso))
 
         allocate(pd%ux_s(nx,ny))
         allocate(pd%uy_s(nx,ny))

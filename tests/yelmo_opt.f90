@@ -573,10 +573,18 @@ contains
                 ux_aa = 0.5*(ux(i,j)+ux(i+1,j))
                 uy_aa = 0.5*(uy(i,j)+uy(i,j+1))
                 
+!                 if ( ux(i,j)*ux(i+1,j) .lt. 0.0 .or. uy(i,j)*uy(i,j+1) .lt. 0.0) then 
+!                     ! On a ridge, modify coefficient at this point 
+!                     i1 = i 
+!                     j1 = j 
+
                 if ( abs(ux_aa) .gt. abs(uy_aa) ) then 
                     ! Downstream in x-direction 
                     j1 = j 
-                    if (ux_aa .lt. 0.0) then 
+                    if (abs(ux_aa) .lt. 1.0) then 
+                        ! Near ice-divide 
+                        i1 = i 
+                    else if (ux_aa .lt. 0.0) then 
                         i1 = i-1 
                     else
                         i1 = i+1
@@ -584,8 +592,11 @@ contains
 
                 else 
                     ! Downstream in y-direction 
-                    i1 = i 
-                    if (uy_aa .lt. 0.0) then 
+                    i1 = i
+                    if (abs(uy_aa) .lt. 1.0) then 
+                        ! Near ice-divide 
+                        j1 = i  
+                    else if (uy_aa .lt. 0.0) then 
                         j1 = j-1
                     else
                         j1 = j+1

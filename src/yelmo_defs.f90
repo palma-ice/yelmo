@@ -513,7 +513,8 @@ module yelmo_defs
         logical             :: pd_age_load 
         character(len=1028) :: pd_age_path 
         character(len=56)   :: pd_age_names(2) 
-        
+        integer             :: pd_age_n_iso 
+
         character(len=56)   :: domain 
     end type 
 
@@ -527,6 +528,9 @@ module yelmo_defs
         real(prec), allocatable :: err_H_ice(:,:), err_z_srf(:,:), err_z_bed(:,:)
         real(prec), allocatable :: err_uxy_s(:,:)
         real(prec), allocatable :: err_depth_iso(:,:,:) 
+
+        ! Axis 
+        real(prec), allocatable :: age_iso(:) 
 
         real(prec) :: rmse_H 
         real(prec) :: rmse_zsrf

@@ -599,7 +599,7 @@ contains
                         ! Near ice-divide 
                         i1 = i 
                     else if (ux_aa .lt. 0.0) then 
-                        i1 = i 
+                        i1 = i-1 
                     else
                         i1 = i+1
                     end if 
@@ -611,7 +611,7 @@ contains
                         ! Near ice-divide 
                         j1 = j  
                     else if (uy_aa .lt. 0.0) then 
-                        j1 = j
+                        j1 = j-1
                     else
                         j1 = j+1
                     end if 
@@ -620,6 +620,10 @@ contains
 
                 ! Apply coefficent scaling at correct node
                 cf_ref(i1,j1) = cf_prev(i1,j1)*f_scale
+
+                ! Also apply locally with diminished strength 
+                ! (helps avoid points in regions of fast-flow that aren't modified)
+                cf_ref(i,j) = cf_prev(i,j)* ( 0.2*(f_scale-1.0)+1.0 )
 
             end if 
 
@@ -631,7 +635,7 @@ contains
         where (cf_ref .gt. cf_max) cf_ref = cf_max 
 
         ! Additionally, apply a Gaussian filter to cf_ref to ensure smooth transitions
-        call filter_gaussian(var=cf_ref,sigma=dx_km*0.2,dx=dx_km)     !,mask=err_z_srf .ne. 0.0)
+        !call filter_gaussian(var=cf_ref,sigma=dx_km*0.2,dx=dx_km)     !,mask=err_z_srf .ne. 0.0)
         
         ! Ensure where obs are floating, set cf_ref = cf_min 
         where(is_float_obs) cf_ref =cf_min 

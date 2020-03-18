@@ -317,6 +317,7 @@ contains
         allocate(pd%T_srf(nx,ny))
         allocate(pd%smb(nx,ny))
         
+        allocate(pd%age_iso(n_iso))
         allocate(pd%depth_iso(nx,ny,n_iso))
 
         allocate(pd%ux_s(nx,ny))
@@ -337,6 +338,7 @@ contains
         pd%T_srf        = 0.0 
         pd%smb          = 0.0 
 
+        pd%age_iso      = 0.0 
         pd%depth_iso    = 0.0 
 
         pd%ux_s         = 0.0 

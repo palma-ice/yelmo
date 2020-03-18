@@ -542,6 +542,8 @@ contains
         real(prec) :: ux_aa, uy_aa
         real(prec) :: H_ice_now, H_obs_now 
 
+        real(prec) :: angle 
+
         real(prec), allocatable   :: cf_prev(:,:) 
         real(prec) :: wts0(5,5), wts(5,5) 
 
@@ -587,43 +589,52 @@ contains
                 
                 f_scale = 10.0**(-f_dz) 
 
-                ! Apply to downstream node
+                ! Apply to current and downstream node(s) =========
 
-                ux_aa = 0.5*(ux(i,j)+ux(i+1,j))
-                uy_aa = 0.5*(uy(i,j)+uy(i,j+1))
+!                 ux_aa = 0.5*(ux(i,j)+ux(i+1,j))
+!                 uy_aa = 0.5*(uy(i,j)+uy(i,j+1))
                 
-                if ( abs(ux_aa) .gt. abs(uy_aa) ) then 
-                    ! Downstream in x-direction 
-                    j1 = j 
-                    if (abs(ux_aa) .lt. ulim_divide) then 
-                        ! Near ice-divide 
-                        i1 = i 
-                    else if (ux_aa .lt. 0.0) then 
-                        i1 = i-1 
-                    else
-                        i1 = i+1
-                    end if 
+!                 angle = atan2(uy_aa,ux_aa)
 
-                else 
-                    ! Downstream in y-direction 
-                    i1 = i
-                    if (abs(uy_aa) .lt. ulim_divide) then 
-                        ! Near ice-divide 
-                        j1 = j  
-                    else if (uy_aa .lt. 0.0) then 
-                        j1 = j-1
-                    else
-                        j1 = j+1
-                    end if 
 
-                end if 
+!                 ! First apply locally. This will be overwritten
+!                 ! if point is downstream of another node.  
+!                 if (i1 .ne. i .or. j1 .ne. j) then 
+!                     cf_ref(i,j) = cf_prev(i,j)* ( 0.2*(f_scale-1.0)+1.0 )
+!                 end if 
 
-                ! Apply coefficent scaling at correct node
-                cf_ref(i1,j1) = cf_prev(i1,j1)*f_scale
+!                 if ( abs(ux_aa) .gt. abs(uy_aa) ) then 
+!                     ! Downstream in x-direction 
+!                     j1 = j 
+!                     if (abs(ux_aa) .lt. ulim_divide) then 
+!                         ! Near ice-divide 
+!                         i1 = i 
+!                     else if (ux_aa .lt. 0.0) then 
+!                         i1 = i-1 
+!                     else
+!                         i1 = i+1
+!                     end if 
 
-                ! Also apply locally with diminished strength 
-                ! (helps avoid points in regions of fast-flow that aren't modified)
-                cf_ref(i,j) = cf_prev(i,j)* ( 0.2*(f_scale-1.0)+1.0 )
+!                 else 
+!                     ! Downstream in y-direction 
+!                     i1 = i
+!                     if (abs(uy_aa) .lt. ulim_divide) then 
+!                         ! Near ice-divide 
+!                         j1 = j  
+!                     else if (uy_aa .lt. 0.0) then 
+!                         j1 = j-1
+!                     else
+!                         j1 = j+1
+!                     end if 
+
+!                 end if 
+
+!                 ! Apply coefficent scaling at correct node
+!                 cf_ref(i1,j1) = cf_prev(i1,j1)*f_scale
+
+                
+                ! Apply to current node 
+                cf_ref(i,j) = cf_prev(i,j)*f_scale 
 
             end if 
 

@@ -595,7 +595,7 @@ contains
                     i1 = i
                     if (abs(uy_aa) .lt. 1.0) then 
                         ! Near ice-divide 
-                        j1 = i  
+                        j1 = j  
                     else if (uy_aa .lt. 0.0) then 
                         j1 = j-1
                     else

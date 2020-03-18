@@ -539,11 +539,13 @@ contains
         ! Local variables 
         integer :: i, j, nx, ny, i1, j1  
         real(prec) :: dx_km, f_dz, f_dz_lim, f_scale   
-        real(prec) :: ux_aa, uy_aa
-        real(prec) :: H_ice_now, H_obs_now 
+        real(prec) :: ux_aa, uy_aa, uxy_aa 
+        real(prec) :: H_ice_now, H_obs_now
+        real(prec) :: H_err_now  
 
         real(prec) :: xwt, ywt, xywt   
 
+        real(prec), allocatable   :: H_err(:,:) 
         real(prec), allocatable   :: cf_prev(:,:) 
         real(prec) :: wts0(5,5), wts(5,5) 
 
@@ -554,6 +556,7 @@ contains
 
         dx_km = dx*1e-3  
         
+        allocate(H_err(nx,ny))
         allocate(cf_prev(nx,ny))
 
         ! Optimization parameters 
@@ -566,34 +569,38 @@ contains
         ! Store initial cf_ref solution 
         cf_prev = cf_ref 
 
+        ! Calculate ice thickness error 
+        H_err = H_ice - H_obs 
+
+        ! Additionally, apply a Gaussian filter to H_err to ensure smooth transitions
+        !call filter_gaussian(var=H_err,sigma=dx_km*1.5,dx=dx_km)
+        
         do j = 3, ny-2 
         do i = 3, nx-2 
 
-            if ( H_ice(i,j) .ne. 0.0 .or. H_obs(i,j) .ne. 0.0) then 
-                ! Update coefficient where ice or ice_obs exists
+            ux_aa = 0.5*(ux(i,j)+ux(i+1,j))
+            uy_aa = 0.5*(uy(i,j)+uy(i,j+1))
+            
+            uxy_aa = sqrt(ux_aa**2+uy_aa**2)
 
-                ! Get current ice thickness and obs ice thickness (smoothed)
+            if ( uxy_aa .ne. 0.0) then 
+                ! Update coefficient where velocity exists
 
-                wts = wts0 
-                where( H_ice(i-2:i+2,j-2:j+2) .eq. 0.0) wts = 0.0 
-                call wtd_mean(H_ice_now,H_ice(i-2:i+2,j-2:j+2),wts) 
+                ! Determine upstream node(s) 
 
-                wts = wts0 
-                where( H_obs(i-2:i+2,j-2:j+2) .eq. 0.0) wts = 0.0 
-                call wtd_mean(H_obs_now,H_obs(i-2:i+2,j-2:j+2),wts) 
+                if (ux_aa .ge. 0.0) then 
+                    i1 = i-1 
+                else 
+                    i1 = i+1 
+                end if 
+
+                if (uy_aa .ge. 0.0) then 
+                    j1 = j-1 
+                else 
+                    j1 = j+1 
+                end if 
                 
-                ! Get adjustment rate given error in z_srf
-                f_dz = (H_ice_now - H_obs_now) / H_scale
-                f_dz = max(f_dz,-f_dz_lim)
-                f_dz = min(f_dz,f_dz_lim)
-                
-                f_scale = 10.0**(-f_dz) 
-
-                ! Apply to current and downstream node(s) =========
-
-                ux_aa = 0.5*(ux(i,j)+ux(i+1,j))
-                uy_aa = 0.5*(uy(i,j)+uy(i,j+1))
-                
+                ! Get weighted error 
                 xwt   = 0.5 
                 ywt   = 0.5
                 xywt  = abs(ux_aa)+abs(uy_aa)
@@ -603,25 +610,34 @@ contains
                     ywt = abs(uy_aa) / xywt 
                 end if 
 
-                if (ux_aa .ge. 0.0) then 
-                    i1 = i+1 
-                else 
-                    i1 = i-1 
-                end if 
+                H_err_now = xwt*H_err(i1,j) + ywt*H_err(i,j1) 
 
-                if (uy_aa .ge. 0.0) then 
-                    j1 = j+1 
-                else 
-                    j1 = j-1 
-                end if 
+!                 ! Get current ice thickness and obs ice thickness (smoothed)
+
+!                 wts = wts0 
+!                 where( H_ice(i-2:i+2,j-2:j+2) .eq. 0.0) wts = 0.0 
+!                 call wtd_mean(H_ice_now,H_ice(i-2:i+2,j-2:j+2),wts) 
+
+!                 wts = wts0 
+!                 where( H_obs(i-2:i+2,j-2:j+2) .eq. 0.0) wts = 0.0 
+!                 call wtd_mean(H_obs_now,H_obs(i-2:i+2,j-2:j+2),wts) 
                 
-                ! First apply locally. This will be compounded with 
-                ! any calculation from upstream node.
+!                 H_err_now = H_ice_now - H_obs_now 
+                
+                ! Get adjustment rate given error in ice thickness 
+                f_dz = H_err_now / H_scale
+                f_dz = max(f_dz,-f_dz_lim)
+                f_dz = min(f_dz,f_dz_lim)
+                
+                f_scale = 10.0**(-f_dz) 
+
+                ! Apply correction to current node =========
+
                 cf_ref(i,j) = f_scale * cf_ref(i,j) 
 
-                ! Also apply weighted downstream as necessary 
-                if (ux_aa .ne. 0.0) cf_ref(i1,j) = (xwt*(f_scale-1.0)+1.0) * cf_ref(i1,j) 
-                if (uy_aa .ne. 0.0) cf_ref(i,j1) = (ywt*(f_scale-1.0)+1.0) * cf_ref(i,j1) 
+!                 ! Also apply weighted downstream as necessary 
+!                 if (ux_aa .ne. 0.0) cf_ref(i1,j) = (xwt*(f_scale-1.0)+1.0) * cf_ref(i1,j) 
+!                 if (uy_aa .ne. 0.0) cf_ref(i,j1) = (ywt*(f_scale-1.0)+1.0) * cf_ref(i,j1) 
 
 !                 if ( abs(ux_aa) .gt. abs(uy_aa) ) then 
 !                     ! Downstream in x-direction 
@@ -667,7 +683,7 @@ contains
         !call filter_gaussian(var=cf_ref,sigma=dx_km*0.2,dx=dx_km)     !,mask=err_z_srf .ne. 0.0)
         
         ! Ensure where obs are floating, set cf_ref = cf_min 
-        where(is_float_obs) cf_ref =cf_min 
+        where(is_float_obs) cf_ref = cf_min 
 
         ! Also where no ice exists, set cf_ref = cf_min 
         where(H_obs .eq. 0.0) cf_ref = cf_min 

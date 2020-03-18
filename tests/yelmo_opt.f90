@@ -615,13 +615,13 @@ contains
                     j1 = j-1 
                 end if 
                 
-                ! First apply locally. This will be overwritten
-                ! if point is downstream of another node.  
-                cf_ref(i,j) = f_scale * cf_prev(i,j) 
+                ! First apply locally. This will be compounded with 
+                ! any calculation from upstream node.
+                cf_ref(i,j) = f_scale * cf_ref(i,j) 
 
                 ! Also apply weighted downstream as necessary 
-                !if (ux_aa .ne. 0.0) cf_ref(i1,j) = (xwt*(f_scale-1.0)+1.0) * cf_prev(i1,j) 
-                !if (uy_aa .ne. 0.0) cf_ref(i,j1) = (ywt*(f_scale-1.0)+1.0) * cf_prev(i,j1) 
+                if (ux_aa .ne. 0.0) cf_ref(i1,j) = (xwt*(f_scale-1.0)+1.0) * cf_ref(i1,j) 
+                if (uy_aa .ne. 0.0) cf_ref(i,j1) = (ywt*(f_scale-1.0)+1.0) * cf_ref(i,j1) 
 
 !                 if ( abs(ux_aa) .gt. abs(uy_aa) ) then 
 !                     ! Downstream in x-direction 

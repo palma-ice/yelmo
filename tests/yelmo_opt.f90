@@ -542,7 +542,7 @@ contains
         real(prec) :: ux_aa, uy_aa
         real(prec) :: H_ice_now, H_obs_now 
 
-        real(prec) :: angle 
+        real(prec) :: xwt, ywt, xywt   
 
         real(prec), allocatable   :: cf_prev(:,:) 
         real(prec) :: wts0(5,5), wts(5,5) 
@@ -591,17 +591,37 @@ contains
 
                 ! Apply to current and downstream node(s) =========
 
-!                 ux_aa = 0.5*(ux(i,j)+ux(i+1,j))
-!                 uy_aa = 0.5*(uy(i,j)+uy(i,j+1))
+                ux_aa = 0.5*(ux(i,j)+ux(i+1,j))
+                uy_aa = 0.5*(uy(i,j)+uy(i,j+1))
                 
-!                 angle = atan2(uy_aa,ux_aa)
+                xwt   = 0.5 
+                ywt   = 0.5
+                xywt  = abs(ux_aa)+abs(uy_aa)
 
+                if (xywt .gt. 0.0) then 
+                    xwt = abs(ux_aa) / xywt 
+                    ywt = abs(uy_aa) / xywt 
+                end if 
 
-!                 ! First apply locally. This will be overwritten
-!                 ! if point is downstream of another node.  
-!                 if (i1 .ne. i .or. j1 .ne. j) then 
-!                     cf_ref(i,j) = cf_prev(i,j)* ( 0.2*(f_scale-1.0)+1.0 )
-!                 end if 
+                if (ux_aa .ge. 0.0) then 
+                    i1 = i+1 
+                else 
+                    i1 = i-1 
+                end if 
+
+                if (uy_aa .ge. 0.0) then 
+                    j1 = j+1 
+                else 
+                    j1 = j-1 
+                end if 
+                
+                ! First apply locally. This will be overwritten
+                ! if point is downstream of another node.  
+                cf_ref(i,j) = f_scale * cf_prev(i,j) 
+
+                ! Also apply weighted downstream as necessary 
+                if (ux_aa .ne. 0.0) cf_ref(i1,j) = (xwt*(f_scale-1.0)+1.0) * cf_prev(i1,j) 
+                if (uy_aa .ne. 0.0) cf_ref(i,j1) = (ywt*(f_scale-1.0)+1.0) * cf_prev(i,j1) 
 
 !                 if ( abs(ux_aa) .gt. abs(uy_aa) ) then 
 !                     ! Downstream in x-direction 
@@ -633,8 +653,6 @@ contains
 !                 cf_ref(i1,j1) = cf_prev(i1,j1)*f_scale
 
                 
-                ! Apply to current node 
-                cf_ref(i,j) = cf_prev(i,j)*f_scale 
 
             end if 
 

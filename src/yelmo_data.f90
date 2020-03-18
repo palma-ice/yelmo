@@ -290,6 +290,8 @@ contains
         allocate(pd%T_srf(nx,ny))
         allocate(pd%smb(nx,ny))
         
+        allocate(pd%depth_iso(nx,ny,4))
+
         allocate(pd%ux_s(nx,ny))
         allocate(pd%uy_s(nx,ny))
         allocate(pd%uxy_s(nx,ny))
@@ -307,6 +309,8 @@ contains
         
         pd%T_srf        = 0.0 
         pd%smb          = 0.0 
+
+        pd%depth_iso    = 0.0 
 
         pd%ux_s         = 0.0 
         pd%uy_s         = 0.0 
@@ -334,6 +338,8 @@ contains
         
         if (allocated(pd%T_srf))        deallocate(pd%T_srf)
         if (allocated(pd%smb))          deallocate(pd%smb)
+        
+        if (allocated(pd%depth_iso))    deallocate(pd%depth_iso)
         
         if (allocated(pd%ux_s))         deallocate(pd%ux_s)
         if (allocated(pd%uy_s))         deallocate(pd%uy_s)

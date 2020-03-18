@@ -6,7 +6,7 @@
 
 &yelmo
     domain          = "Greenland"
-    grid_name       = "GRL-16KM"
+    grid_name       = "GRL-32KM"
     grid_path       = "input/{domain}/{grid_name}/{grid_name}_REGIONS.nc"
     experiment      = "None"       
     restart         = "None"     ! "input/{domain}/{grid_name}/{grid_name}_yelmo_restart-opt-1.nc"

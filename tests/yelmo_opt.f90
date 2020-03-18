@@ -100,7 +100,7 @@ program yelmo_test
     
     ! Consistency checks 
     if (rel_time2 .ge. qmax*time_iter) then 
-        write(*,*) "Error: tau_time2 >= total time. tau_time2 must be less than the total simulation &
+        write(*,*) "Error: rel_time2 >= total time. rel_time2 must be less than the total simulation &
                     &years, so that relaxation is disabled at the end of the simulation."
         stop 
     end if 
@@ -182,7 +182,7 @@ end if
         ! Run initialization steps 
 
         ! ============================================================================================
-        ! Step 1: Relaxtion step: run SIA model for 100 years to smooth out the input
+        ! Step 1: Relaxtion step: run SIA model for a short time to smooth out the input
         ! topography that will be used as a target. 
 
         call yelmo_update_equil(yelmo1,time_init,time_tot=20.0,topo_fixed=.FALSE.,dt=1.0,ssa_vel_max=0.0)
@@ -196,8 +196,6 @@ end if
         ! spin up the thermodynamics and have a reference state to reset.
         ! Store the reference state for future use.
         
-!         call yelmo_update_equil(yelmo1,time_init,time_tot=20e3,topo_fixed=.TRUE.,dt=5.0,ssa_vel_max=0.0)
-!         call yelmo_update_equil(yelmo1,time_init,time_tot=20e3,topo_fixed=.TRUE.,dt=2.0,ssa_vel_max=2e3)
         call yelmo_update_equil(yelmo1,time_init,time_tot=20e3,topo_fixed=.TRUE.,dt=5.0,ssa_vel_max=5e3)
 
         ! Write a restart file 
@@ -230,13 +228,6 @@ if (opt_method .eq. 1) then
 
         ! === Optimization parameters =========
         
-!         ! If iteration step reached, update optimization parameters 
-!         if (q .gt. iter_steps(n_now)) n_now = min(n_now+1,size(iter_steps,1))
-
-!         yelmo1%tpo%par%topo_rel     = topo_rels(n_now)
-!         yelmo1%tpo%par%topo_rel_tau = topo_rel_taus(n_now)
-!         H_scale                     = H_scales(n_now) 
-
         tau     = get_opt_param(time,time1=rel_time1,time2=rel_time2,p1=rel_tau1,p2=rel_tau2,q=rel_q)
         H_scale = get_opt_param(time,time1=scale_time1,time2=scale_time2,p1=scale_H1,p2=scale_H2,q=1.0)
         
@@ -245,12 +236,28 @@ if (opt_method .eq. 1) then
         yelmo1%tpo%par%topo_rel = 1 
         if (time .gt. rel_time2) yelmo1%tpo%par%topo_rel = 0 
 
+        ! === Update cf_ref and reset model ===================
+
+        if (q .gt. 1) then
+            ! Perform optimization after first iteration
+
+            ! Update cf_ref based on error metric(s) 
+            call update_cf_ref_thickness_simple(yelmo1%dyn%now%cf_ref,cf_ref_dot,yelmo1%tpo%now%H_ice, &
+                            yelmo1%bnd%z_bed,yelmo1%dyn%now%ux_bar,yelmo1%dyn%now%uy_bar, &
+                            yelmo1%dta%pd%H_ice,yelmo1%dta%pd%H_grnd.le.0.0_prec,yelmo1%tpo%par%dx, &
+                            cf_min,cf_max,H_scale)
+
+        end if 
+        
+        ! Reset model to the initial state, but with updated cf_ref field and model time
+        yelmo_ref%dyn%now%cf_ref = yelmo1%dyn%now%cf_ref 
+        yelmo1 = yelmo_ref  
+        call yelmo_set_time(yelmo1,time) 
+
         ! === Update time_iter ==================
         time_end = time_iter
         if (q .eq. qmax) time_end = time_steady
 
-!         write(*,"(a,i4,f10.1,i4,i4,f10.1,f12.1,f10.1)") "iter_par: ", q, time, n_now, &
-!                             yelmo1%tpo%par%topo_rel, tau, H_scale, time_end
         write(*,"(a,i4,f10.1,i4,f10.1,f12.1,f10.1)") "iter_par: ", q, time, &
                             yelmo1%tpo%par%topo_rel, tau, H_scale, time_end
 
@@ -268,25 +275,6 @@ if (opt_method .eq. 1) then
 
         end do 
 
-        if (q .lt. qmax) then
-            ! Perform optimization except for last timestep
-
-            ! Update cf_ref based on error metric(s) 
-            call update_cf_ref_thickness_simple(yelmo1%dyn%now%cf_ref,cf_ref_dot,yelmo1%tpo%now%H_ice, &
-                            yelmo1%bnd%z_bed,yelmo1%dyn%now%ux_bar,yelmo1%dyn%now%uy_bar, &
-                            yelmo1%dta%pd%H_ice,yelmo1%dta%pd%H_grnd.le.0.0_prec,yelmo1%tpo%par%dx, &
-                            cf_min,cf_max,H_scale)
-
-        end if 
-
-!         if (q .le. qmax_iter_length_2) then 
-!             ! Reset model to the initial state (including H_w) and time, with updated C_bed field 
-!             yelmo_ref%dyn%now%C_bed = yelmo1%dyn%now%C_bed 
-!             yelmo1 = yelmo_ref  
-!             time   = 0.0 
-!             call yelmo_set_time(yelmo1,time) 
-!         end if 
-        
     end do 
 
 else 

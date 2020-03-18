@@ -348,6 +348,7 @@ module yelmo_defs
         logical    :: calc_age
         real(prec) :: dx, dy  
         integer    :: nx, ny, nz_aa, nz_ac  
+        integer    :: n_iso 
 
         real(prec), allocatable :: zeta_aa(:)   ! Layer centers (aa-nodes), plus base and surface: nz_aa points 
         real(prec), allocatable :: zeta_ac(:)   ! Layer borders (ac-nodes), plus base and surface: nz_ac == nz_aa-1 points
@@ -509,6 +510,9 @@ module yelmo_defs
         logical             :: pd_vel_load  
         character(len=1028) :: pd_vel_path 
         character(len=56)   :: pd_vel_names(2) 
+        logical             :: pd_age_load 
+        character(len=1028) :: pd_age_path 
+        character(len=56)   :: pd_age_names(2) 
         
         character(len=56)   :: domain 
     end type 
@@ -517,11 +521,13 @@ module yelmo_defs
         ! Variables that contain observations / reconstructions for comparison/inversion
         real(prec), allocatable :: H_ice(:,:), z_srf(:,:), z_bed(:,:), H_grnd(:,:)
         real(prec), allocatable :: ux_s(:,:), uy_s(:,:), uxy_s(:,:) 
-        real(prec), allocatable :: T_srf(:,:), smb(:,:) 
+        real(prec), allocatable :: T_srf(:,:), smb(:,:)
+        real(prec), allocatable :: depth_iso(:,:,:)  
         ! Comparison metrics 
         real(prec), allocatable :: err_H_ice(:,:), err_z_srf(:,:), err_z_bed(:,:)
         real(prec), allocatable :: err_uxy_s(:,:)
-        
+        real(prec), allocatable :: err_depth_iso(:,:,:) 
+
         real(prec) :: rmse_H 
         real(prec) :: rmse_zsrf
         real(prec) :: rmse_uxy 

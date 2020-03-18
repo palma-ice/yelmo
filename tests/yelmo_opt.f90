@@ -545,6 +545,8 @@ contains
         real(prec), allocatable   :: cf_prev(:,:) 
         real(prec) :: wts0(5,5), wts(5,5) 
 
+        real(prec), parameter :: ulim_divide = 5.0      ! [m/a] Limit to consider we are near ice divide 
+        
         nx = size(cf_ref,1)
         ny = size(cf_ref,2) 
 
@@ -581,7 +583,7 @@ contains
                 if ( abs(ux_aa) .gt. abs(uy_aa) ) then 
                     ! Downstream in x-direction 
                     j1 = j 
-                    if (abs(ux_aa) .lt. 1.0) then 
+                    if (abs(ux_aa) .lt. ulim_divide) then 
                         ! Near ice-divide 
                         i1 = i 
                     else if (ux_aa .lt. 0.0) then 
@@ -593,7 +595,7 @@ contains
                 else 
                     ! Downstream in y-direction 
                     i1 = i
-                    if (abs(uy_aa) .lt. 1.0) then 
+                    if (abs(uy_aa) .lt. ulim_divide) then 
                         ! Near ice-divide 
                         j1 = j  
                     else if (uy_aa .lt. 0.0) then 

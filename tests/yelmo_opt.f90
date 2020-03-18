@@ -546,7 +546,7 @@ contains
         real(prec) :: wts0(5,5), wts(5,5) 
 
         real(prec), parameter :: ulim_divide = 5.0      ! [m/a] Limit to consider we are near ice divide 
-        
+
         nx = size(cf_ref,1)
         ny = size(cf_ref,2) 
 
@@ -567,44 +567,8 @@ contains
         do j = 3, ny-2 
         do i = 3, nx-2 
 
-            if ( abs(H_ice(i,j) - H_obs(i,j)) .ne. 0.0) then 
-                ! Update where thickness error exists
-
-                ! Determine downstream node
-
-                ux_aa = 0.5*(ux(i,j)+ux(i+1,j))
-                uy_aa = 0.5*(uy(i,j)+uy(i,j+1))
-                
-!                 if ( ux(i,j)*ux(i+1,j) .lt. 0.0 .or. uy(i,j)*uy(i,j+1) .lt. 0.0) then 
-!                     ! On a ridge, modify coefficient at this point 
-!                     i1 = i 
-!                     j1 = j 
-
-                if ( abs(ux_aa) .gt. abs(uy_aa) ) then 
-                    ! Downstream in x-direction 
-                    j1 = j 
-                    if (abs(ux_aa) .lt. ulim_divide) then 
-                        ! Near ice-divide 
-                        i1 = i 
-                    else if (ux_aa .lt. 0.0) then 
-                        i1 = i-1 
-                    else
-                        i1 = i+1
-                    end if 
-
-                else 
-                    ! Downstream in y-direction 
-                    i1 = i
-                    if (abs(uy_aa) .lt. ulim_divide) then 
-                        ! Near ice-divide 
-                        j1 = j  
-                    else if (uy_aa .lt. 0.0) then 
-                        j1 = j-1
-                    else
-                        j1 = j+1
-                    end if 
-
-                end if 
+            if ( H_ice(i,j) .ne. 0.0 .or. H_obs(i,j) .ne. 0.0) then 
+                ! Update coefficient where ice or ice_obs exists
 
                 ! Get current ice thickness and obs ice thickness (smoothed)
 
@@ -623,6 +587,38 @@ contains
                 
                 f_scale = 10.0**(-f_dz) 
 
+                ! Apply to downstream node
+
+                ux_aa = 0.5*(ux(i,j)+ux(i+1,j))
+                uy_aa = 0.5*(uy(i,j)+uy(i,j+1))
+                
+                if ( abs(ux_aa) .gt. abs(uy_aa) ) then 
+                    ! Downstream in x-direction 
+                    j1 = j 
+                    if (abs(ux_aa) .lt. ulim_divide) then 
+                        ! Near ice-divide 
+                        i1 = i 
+                    else if (ux_aa .lt. 0.0) then 
+                        i1 = i 
+                    else
+                        i1 = i+1
+                    end if 
+
+                else 
+                    ! Downstream in y-direction 
+                    i1 = i
+                    if (abs(uy_aa) .lt. ulim_divide) then 
+                        ! Near ice-divide 
+                        j1 = j  
+                    else if (uy_aa .lt. 0.0) then 
+                        j1 = j
+                    else
+                        j1 = j+1
+                    end if 
+
+                end if 
+
+                ! Apply coefficent scaling at correct node
                 cf_ref(i1,j1) = cf_prev(i1,j1)*f_scale
 
             end if 

@@ -39,6 +39,7 @@ program yelmo_test
 
     real(prec) :: rel_time1, rel_time2, rel_tau1, rel_tau2, rel_q  
     real(prec) :: scale_time1, scale_time2, scale_H1, scale_H2 
+    real(prec) :: sigma_err 
 
     real(prec) :: tau, H_scale 
 
@@ -81,6 +82,7 @@ program yelmo_test
     scale_H1            = 1000.0    ! [m]  Initial value for H_scale parameter in cf_ref optimization 
     scale_H2            = 2000.0    ! [m]  Final value for H_scale parameter reached at scale_time2 
 
+    sigma_err           = 1.0       ! [--] Smoothing radius for error to calculate correction in cf_ref (in multiples of dx)
 
 !     iter_steps          = [12,16,20,25,35]
 !     topo_rels           = [1,1,0,0,0]
@@ -245,7 +247,7 @@ if (opt_method .eq. 1) then
             call update_cf_ref_thickness_simple(yelmo1%dyn%now%cf_ref,cf_ref_dot,yelmo1%tpo%now%H_ice, &
                             yelmo1%bnd%z_bed,yelmo1%dyn%now%ux_bar,yelmo1%dyn%now%uy_bar, &
                             yelmo1%dta%pd%H_ice,yelmo1%dta%pd%H_grnd.le.0.0_prec,yelmo1%tpo%par%dx, &
-                            cf_min,cf_max,H_scale)
+                            cf_min,cf_max,sigma_err,H_scale)
 
         end if 
         
@@ -519,7 +521,8 @@ contains
 
     end subroutine guess_cf_ref 
 
-    subroutine update_cf_ref_thickness_simple(cf_ref,cf_ref_dot,H_ice,z_bed,ux,uy,H_obs,is_float_obs,dx,cf_min,cf_max,H_scale)
+    subroutine update_cf_ref_thickness_simple(cf_ref,cf_ref_dot,H_ice,z_bed,ux,uy,H_obs, &
+                                                is_float_obs,dx,cf_min,cf_max,sigma_err,H_scale)
 
         implicit none 
 
@@ -534,23 +537,20 @@ contains
         real(prec), intent(IN)    :: dx 
         real(prec), intent(IN)    :: cf_min 
         real(prec), intent(IN)    :: cf_max
+        real(prec), intent(IN)    :: sigma_err 
         real(prec), intent(IN)    :: H_scale            ! [m] H_scale = 1000.0 m by default
 
         ! Local variables 
         integer :: i, j, nx, ny, i1, j1  
         real(prec) :: dx_km, f_dz, f_dz_lim, f_scale   
-        real(prec) :: ux_aa, uy_aa, uxy_aa 
-        real(prec) :: H_ice_now, H_obs_now
+        real(prec) :: ux_aa, uy_aa, uxy_aa
         real(prec) :: H_err_now  
 
         real(prec) :: xwt, ywt, xywt   
 
         real(prec), allocatable   :: H_err(:,:) 
         real(prec), allocatable   :: cf_prev(:,:) 
-        real(prec) :: wts0(5,5), wts(5,5) 
-
-        real(prec), parameter :: ulim_divide = 5.0      ! [m/a] Limit to consider we are near ice divide 
-
+        
         nx = size(cf_ref,1)
         ny = size(cf_ref,2) 
 
@@ -563,9 +563,6 @@ contains
         !H_scale  = 1000.0           ! [m]   **Now an input parameter to change with time 
         f_dz_lim = 1.5              ! [--] 
 
-        ! Get Gaussian weights 
-        wts0 = gauss_values(dx_km,dx_km,sigma=dx_km*1.5,n=5)
-
         ! Store initial cf_ref solution 
         cf_prev = cf_ref 
 
@@ -573,10 +570,12 @@ contains
         H_err = H_ice - H_obs 
 
         ! Additionally, apply a Gaussian filter to H_err to ensure smooth transitions
-        !call filter_gaussian(var=H_err,sigma=dx_km*1.5,dx=dx_km)
-        
-        do j = 3, ny-2 
-        do i = 3, nx-2 
+        if (sigma_err .gt. 0.0) then 
+            call filter_gaussian(var=H_err,sigma=dx_km*sigma_err,dx=dx_km)
+        end if 
+
+        do j = 2, ny-1 
+        do i = 2, nx-1 
 
             ux_aa = 0.5*(ux(i,j)+ux(i+1,j))
             uy_aa = 0.5*(uy(i,j)+uy(i,j+1))
@@ -600,7 +599,8 @@ contains
                     j1 = j+1 
                 end if 
                 
-                ! Get weighted error 
+                ! Get weighted error  =========
+
                 xwt   = 0.5 
                 ywt   = 0.5
                 xywt  = abs(ux_aa)+abs(uy_aa)
@@ -612,19 +612,8 @@ contains
 
                 H_err_now = xwt*H_err(i1,j) + ywt*H_err(i,j1) 
 
-!                 ! Get current ice thickness and obs ice thickness (smoothed)
+                ! Get adjustment rate given error in ice thickness  =========
 
-!                 wts = wts0 
-!                 where( H_ice(i-2:i+2,j-2:j+2) .eq. 0.0) wts = 0.0 
-!                 call wtd_mean(H_ice_now,H_ice(i-2:i+2,j-2:j+2),wts) 
-
-!                 wts = wts0 
-!                 where( H_obs(i-2:i+2,j-2:j+2) .eq. 0.0) wts = 0.0 
-!                 call wtd_mean(H_obs_now,H_obs(i-2:i+2,j-2:j+2),wts) 
-                
-!                 H_err_now = H_ice_now - H_obs_now 
-                
-                ! Get adjustment rate given error in ice thickness 
                 f_dz = H_err_now / H_scale
                 f_dz = max(f_dz,-f_dz_lim)
                 f_dz = min(f_dz,f_dz_lim)
@@ -633,42 +622,7 @@ contains
 
                 ! Apply correction to current node =========
 
-                cf_ref(i,j) = f_scale * cf_ref(i,j) 
-
-!                 ! Also apply weighted downstream as necessary 
-!                 if (ux_aa .ne. 0.0) cf_ref(i1,j) = (xwt*(f_scale-1.0)+1.0) * cf_ref(i1,j) 
-!                 if (uy_aa .ne. 0.0) cf_ref(i,j1) = (ywt*(f_scale-1.0)+1.0) * cf_ref(i,j1) 
-
-!                 if ( abs(ux_aa) .gt. abs(uy_aa) ) then 
-!                     ! Downstream in x-direction 
-!                     j1 = j 
-!                     if (abs(ux_aa) .lt. ulim_divide) then 
-!                         ! Near ice-divide 
-!                         i1 = i 
-!                     else if (ux_aa .lt. 0.0) then 
-!                         i1 = i-1 
-!                     else
-!                         i1 = i+1
-!                     end if 
-
-!                 else 
-!                     ! Downstream in y-direction 
-!                     i1 = i
-!                     if (abs(uy_aa) .lt. ulim_divide) then 
-!                         ! Near ice-divide 
-!                         j1 = j  
-!                     else if (uy_aa .lt. 0.0) then 
-!                         j1 = j-1
-!                     else
-!                         j1 = j+1
-!                     end if 
-
-!                 end if 
-
-!                 ! Apply coefficent scaling at correct node
-!                 cf_ref(i1,j1) = cf_prev(i1,j1)*f_scale
-
-                
+                cf_ref(i,j) = f_scale * cf_prev(i,j) 
 
             end if 
 

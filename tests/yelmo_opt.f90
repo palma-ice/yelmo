@@ -639,7 +639,7 @@ contains
                     ! Define error for surface velocity 
 
                     err_now = xwt*(0.5*(uxy_err(i1,j)+uxy_err(i2,j))) + ywt*(0.5*(uxy_err(i,j1)+uxy_err(i,j2)))
-
+                    err_now = -err_now  ! Make negative to invert relationship (higher vel, higher friction)
                 end if 
 
                 ! Get adjustment rate given error in ice thickness  =========

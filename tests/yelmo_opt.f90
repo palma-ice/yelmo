@@ -4,7 +4,7 @@ program yelmo_test
 
     use ncio 
     use yelmo 
-    use yelmo_tools, only : gauss_values
+    use yelmo_tools, only : gauss_values, calc_magnitude_from_staggered_ice
 
     use gaussian_filter 
     use basal_dragging
@@ -33,10 +33,12 @@ program yelmo_test
     real(prec) :: time_tune 
 
     real(prec) :: rel_time1, rel_time2, rel_tau1, rel_tau2, rel_q  
-    real(prec) :: scale_time1, scale_time2, scale_H1, scale_H2 
+    real(prec) :: scale_time1, scale_time2, scale_err1, scale_err2 
     real(prec) :: sigma_err 
 
-    real(prec) :: tau, H_scale 
+    real(prec) :: tau, err_scale 
+
+    character(len=12) :: optvar 
 
     real(prec), allocatable :: cf_ref_dot(:,:) 
 
@@ -53,7 +55,7 @@ program yelmo_test
     call nml_read(path_par,"ctrl","dT_ann",          dT_ann)                 ! [K] Temperature anomaly (atm)
     call nml_read(path_par,"ctrl","z_sl",            z_sl)                   ! [m] Sea level relative to present-day
     
-
+    call nml_read(path_par,"ctrl","optvar",          optvar)                 ! "ice" or "vel" 
     call nml_read(path_par,"ctrl","sigma_err",       sigma_err)              ! [--] Smoothing radius for error to calculate correction in cf_ref (in multiples of dx)
     call nml_read(path_par,"ctrl","cf_min",          cf_min)                 ! [--] Minimum allowed cf value 
 
@@ -77,10 +79,16 @@ program yelmo_test
     rel_tau2            = 800.0     ! [yr] Final tau, reached at rel_time2, when relaxation disabled 
     rel_q               = 2.0       ! [--] Non-linear exponent to scale interpolation between time1 and time2 
 
-    scale_time1         = 15e3      ! [yr] Time to begin increasing H_scale from scale_H1 to scale_H2 
+    scale_time1         = 15e3      ! [yr] Time to begin increasing err_scale from scale_err1 to scale_err2 
     scale_time2         = 25e3      ! [yr] Time to reach scale_H2 
-    scale_H1            =  500.0    ! [m]  Initial value for H_scale parameter in cf_ref optimization 
-    scale_H2            = 2000.0    ! [m]  Final value for H_scale parameter reached at scale_time2 
+
+if (trim(optvar) .eq. "ice") then 
+    scale_err1          =  500.0    ! [m]  Initial value for err_scale parameter in cf_ref optimization 
+    scale_err2          = 2000.0    ! [m]  Final value for err_scale parameter reached at scale_time2 
+else ! "vel":
+    scale_err1          =  10.0     ! [m/a]  Initial value for err_scale parameter in cf_ref optimization 
+    scale_err2          = 100.0     ! [m/a]  Final value for err_scale parameter reached at scale_time2 
+end if 
 
     cf_init             = 0.2       ! [--] Initial cf value everywhere
     cf_max              = 1.0       ! [--] Maximum allowed cf_value 
@@ -201,12 +209,12 @@ end if
     yelmo_ref    = yelmo1
     
     ! Store initial optimization parameter choices 
-    tau     = rel_tau1 
-    H_scale = scale_H1 
+    tau       = rel_tau1 
+    err_scale = scale_err1 
 
     ! Initialize the 2D output file and write the initial model state 
     call yelmo_write_init(yelmo1,file2D,time_init,units="years")  
-    call write_step_2D_opt(yelmo1,file2D,time_init,cf_ref_dot,mask_noice,tau,H_scale)  
+    call write_step_2D_opt(yelmo1,file2D,time_init,cf_ref_dot,mask_noice,tau,err_scale)  
     
     write(*,*) "Starting optimization..."
 
@@ -222,7 +230,7 @@ if (opt_method .eq. 1) then
         ! === Optimization parameters =========
         
         tau     = get_opt_param(time,time1=rel_time1,time2=rel_time2,p1=rel_tau1,p2=rel_tau2,q=rel_q)
-        H_scale = get_opt_param(time,time1=scale_time1,time2=scale_time2,p1=scale_H1,p2=scale_H2,q=1.0)
+        err_scale = get_opt_param(time,time1=scale_time1,time2=scale_time2,p1=scale_err1,p2=scale_err2,q=1.0)
         
         ! Set model tau, and set yelmo relaxation switch (1: shelves relaxing; 0: no relaxation)
         yelmo1%tpo%par%topo_rel_tau = tau 
@@ -235,10 +243,10 @@ if (opt_method .eq. 1) then
             ! Perform optimization after first iteration
 
             ! Update cf_ref based on error metric(s) 
-            call update_cf_ref_thickness_simple(yelmo1%dyn%now%cf_ref,cf_ref_dot,yelmo1%tpo%now%H_ice, &
-                            yelmo1%bnd%z_bed,yelmo1%dyn%now%ux_bar,yelmo1%dyn%now%uy_bar, &
-                            yelmo1%dta%pd%H_ice,yelmo1%dta%pd%H_grnd.le.0.0_prec,yelmo1%tpo%par%dx, &
-                            cf_min,cf_max,sigma_err,H_scale)
+            call update_cf_ref_errscaling(yelmo1%dyn%now%cf_ref,cf_ref_dot,yelmo1%tpo%now%H_ice, &
+                                yelmo1%bnd%z_bed,yelmo1%dyn%now%ux_s,yelmo1%dyn%now%uy_s, &
+                                yelmo1%dta%pd%H_ice,yelmo1%dta%pd%uxy_s,yelmo1%dta%pd%H_grnd.le.0.0_prec, &
+                                yelmo1%tpo%par%dx,cf_min,cf_max,sigma_err,err_scale,optvar)
 
         end if 
         
@@ -257,7 +265,7 @@ if (opt_method .eq. 1) then
         if (q .eq. qmax) time_end = time_steady
 
         write(*,"(a,i4,f10.1,i4,f10.1,f12.1,f10.1)") "iter_par: ", q, time, &
-                            yelmo1%tpo%par%topo_rel, tau, H_scale, time_end
+                            yelmo1%tpo%par%topo_rel, tau, err_scale, time_end
 
         ! Perform iteration loop to diagnose error for modifying C_bed 
         do n = 1, int(time_end/dtt)
@@ -268,7 +276,7 @@ if (opt_method .eq. 1) then
             call yelmo_update(yelmo1,time)
 
             if (mod(nint(time*100),nint(dt2D_out*100))==0) then
-                call write_step_2D_opt(yelmo1,file2D,time,cf_ref_dot,mask_noice,tau,H_scale)
+                call write_step_2D_opt(yelmo1,file2D,time,cf_ref_dot,mask_noice,tau,err_scale)
             end if 
 
         end do 
@@ -316,7 +324,7 @@ else
         end do 
 
         ! Write the current solution 
-        call write_step_2D_opt(yelmo1,file2D,time,cf_ref_dot,mask_noice,tau,H_scale)
+        call write_step_2D_opt(yelmo1,file2D,time,cf_ref_dot,mask_noice,tau,err_scale)
         
     end do 
 
@@ -336,7 +344,7 @@ end if
 
 contains
 
-    subroutine write_step_2D_opt(ylmo,filename,time,cf_ref_dot,mask_noice,tau,H_scale)
+    subroutine write_step_2D_opt(ylmo,filename,time,cf_ref_dot,mask_noice,tau,err_scale)
 
         implicit none 
         
@@ -346,7 +354,7 @@ contains
         real(prec), intent(IN) :: cf_ref_dot(:,:)
         logical,    intent(IN) :: mask_noice(:,:) 
         real(prec), intent(IN) :: tau 
-        real(prec), intent(IN) :: H_scale 
+        real(prec), intent(IN) :: err_scale 
 
         ! Local variables
         integer    :: ncid, n
@@ -384,7 +392,7 @@ contains
         
         call nc_write(filename,"opt_tau",tau,units="yr",long_name="Relaxation time scale (ice shelves)", &
                       dim1="time",start=[n],count=[1],ncid=ncid)
-        call nc_write(filename,"opt_H_scale",H_scale,units="m",long_name="Error scaling constant", &
+        call nc_write(filename,"opt_err_scale",err_scale,units="m",long_name="Error scaling constant", &
                       dim1="time",start=[n],count=[1],ncid=ncid)
         
         ! Ice limiting mask
@@ -517,8 +525,8 @@ contains
 
     end subroutine guess_cf_ref 
 
-    subroutine update_cf_ref_thickness_simple(cf_ref,cf_ref_dot,H_ice,z_bed,ux,uy,H_obs, &
-                                                is_float_obs,dx,cf_min,cf_max,sigma_err,H_scale)
+    subroutine update_cf_ref_errscaling(cf_ref,cf_ref_dot,H_ice,z_bed,ux,uy,H_obs,uxy_obs, &
+                                        is_float_obs,dx,cf_min,cf_max,sigma_err,err_scale,optvar)
 
         implicit none 
 
@@ -529,22 +537,26 @@ contains
         real(prec), intent(IN)    :: ux(:,:) 
         real(prec), intent(IN)    :: uy(:,:) 
         real(prec), intent(IN)    :: H_obs(:,:) 
+        real(prec), intent(IN)    :: uxy_obs(:,:) 
         logical,    intent(IN)    :: is_float_obs(:,:) 
         real(prec), intent(IN)    :: dx 
         real(prec), intent(IN)    :: cf_min 
         real(prec), intent(IN)    :: cf_max
         real(prec), intent(IN)    :: sigma_err 
-        real(prec), intent(IN)    :: H_scale            ! [m] H_scale = 1000.0 m by default
+        real(prec), intent(IN)    :: err_scale            ! [m] or [m/a]
+        character(len=*), intent(IN) :: optvar
 
         ! Local variables 
         integer :: i, j, nx, ny, i1, j1, i2, j2  
-        real(prec) :: dx_km, f_dz, f_dz_lim, f_scale   
+        real(prec) :: dx_km, f_err, f_err_lim, f_scale   
         real(prec) :: ux_aa, uy_aa, uxy_aa
-        real(prec) :: H_err_now  
+        real(prec) :: err_now  
 
         real(prec) :: xwt, ywt, xywt   
 
-        real(prec), allocatable   :: H_err(:,:) 
+        real(prec), allocatable   :: H_err(:,:)
+        real(prec), allocatable   :: uxy(:,:)
+        real(prec), allocatable   :: uxy_err(:,:)
         real(prec), allocatable   :: cf_prev(:,:) 
 
         nx = size(cf_ref,1)
@@ -553,17 +565,24 @@ contains
         dx_km = dx*1e-3  
         
         allocate(H_err(nx,ny))
+        allocate(uxy(nx,ny))
+        allocate(uxy_err(nx,ny))
         allocate(cf_prev(nx,ny))
 
         ! Optimization parameters 
-        !H_scale  = 1000.0           ! [m]   **Now an input parameter to change with time 
-        f_dz_lim = 1.5              ! [--] 
+        f_err_lim = 1.5              ! [--] 
 
         ! Store initial cf_ref solution 
         cf_prev = cf_ref 
 
         ! Calculate ice thickness error 
         H_err = H_ice - H_obs 
+
+        ! Calculate velocity magnitude and velocity error 
+        uxy     = calc_magnitude_from_staggered_ice(ux,uy,H_ice)
+         
+        uxy_err = MV 
+        where(uxy_obs .ne. MV .and. uxy_obs .ne. 0.0) uxy_err = (uxy - uxy_obs)
 
         ! Additionally, apply a Gaussian filter to H_err to ensure smooth transitions
         if (sigma_err .gt. 0.0) then 
@@ -578,7 +597,7 @@ contains
             
             uxy_aa = sqrt(ux_aa**2+uy_aa**2)
 
-            if ( uxy_aa .ne. 0.0) then 
+            if ( uxy_aa .ne. 0.0 .and. uxy_err(i,j) .ne. MV ) then 
                 ! Update coefficient where velocity exists
 
                 ! Determine upstream node(s) 
@@ -610,16 +629,26 @@ contains
                     ywt = abs(uy_aa) / xywt 
                 end if 
 
-                !H_err_now = xwt*H_err(i1,j) + ywt*H_err(i,j1) 
-                H_err_now = xwt*(0.5*(H_err(i1,j)+H_err(i2,j))) + ywt*(0.5*(H_err(i,j1)+H_err(i,j2)))
+                if (trim(optvar) .eq. "ice") then
+                    ! Define error for ice thickness 
+
+                    !err_now = xwt*H_err(i1,j) + ywt*H_err(i,j1) 
+                    err_now = xwt*(0.5*(H_err(i1,j)+H_err(i2,j))) + ywt*(0.5*(H_err(i,j1)+H_err(i,j2)))
                 
+                else 
+                    ! Define error for surface velocity 
+
+                    err_now = xwt*(0.5*(uxy_err(i1,j)+uxy_err(i2,j))) + ywt*(0.5*(uxy_err(i,j1)+uxy_err(i,j2)))
+
+                end if 
+
                 ! Get adjustment rate given error in ice thickness  =========
 
-                f_dz = H_err_now / H_scale
-                f_dz = max(f_dz,-f_dz_lim)
-                f_dz = min(f_dz,f_dz_lim)
+                f_err = err_now / err_scale
+                f_err = max(f_err,-f_err_lim)
+                f_err = min(f_err, f_err_lim)
                 
-                f_scale = 10.0**(-f_dz) 
+                f_scale = 10.0**(-f_err) 
 
                 ! Apply correction to current node =========
 
@@ -648,7 +677,7 @@ contains
 
         return 
 
-    end subroutine update_cf_ref_thickness_simple
+    end subroutine update_cf_ref_errscaling
 
     subroutine update_cf_ref_thickness_ratio(cf_ref,cf_ref_dot,H_ice,z_bed,ux,uy,uxy_i,uxy_b,H_obs,dx,cf_min,cf_max)
 

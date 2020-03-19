@@ -5,7 +5,6 @@
 
     sigma_err       = 1.0               ! [--] Smoothing radius for error to calculate correction in cf_ref (in multiples of dx)
     cf_min          = 1e-4              ! [--] Minimum allowed cf value
-
 /
 
 &yelmo

@@ -251,11 +251,16 @@ if (opt_method .eq. 1) then
 
         end if 
         
-        ! Reset model to the initial state, but with updated cf_ref field and model time
+        ! Update the cf_ref and model time in the reference state
         yelmo_ref%dyn%now%cf_ref = yelmo1%dyn%now%cf_ref 
-        yelmo1 = yelmo_ref  
-        call yelmo_set_time(yelmo1,time) 
+        call yelmo_set_time(yelmo_ref,time) 
+        
+        ! Update thermodynamics in reference state without advancing ice thickness 
+        call yelmo_update_equil(yelmo_ref,time,time_tot=1e3,topo_fixed=.TRUE.,dt=5.0,ssa_vel_max=5e3)
 
+        ! Reset model to the reference state
+        yelmo1 = yelmo_ref  
+        
         ! === Update time_iter ==================
         time_end = time_iter
         if (q .eq. qmax) time_end = time_steady

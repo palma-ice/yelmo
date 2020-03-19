@@ -205,6 +205,16 @@ end if
 
     end if 
 
+    ! Update no-ice mask 
+    where(yelmo1%dta%pd%H_ice .le. 0.0) mask_noice = .TRUE. 
+
+    ! Impose additional negative mass balance to no ice points of 2 [m.i.e./a] melting
+    if (trim(yelmo1%par%domain) .eq. "Greenland") then 
+        where(mask_noice) yelmo1%bnd%smb = yelmo1%dta%pd%smb - 2.0 
+    else ! Antarctica
+        where(mask_noice) yelmo1%bnd%bmb_shlf = yelmo1%bnd%bmb_shlf - 2.0 
+    end if 
+    
     ! Store the reference state
     yelmo_ref    = yelmo1
     

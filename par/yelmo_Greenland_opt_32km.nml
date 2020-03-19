@@ -3,7 +3,7 @@
     dT_ann          = -1.0              ! [K]  Temperature anomaly (atm)
     z_sl            = 0.0               ! [m] Sea level relative to present-day 
 
-    optvar          = "vel"             ! "ice" or "vel" - optimization variable to use 
+    optvar          = "ice"             ! "ice" or "vel" - optimization variable to use 
     sigma_err       = 1.0               ! [--] Smoothing radius for error to calculate correction in cf_ref (in multiples of dx)
     cf_min          = 1e-4              ! [--] Minimum allowed cf value
 /
@@ -14,7 +14,7 @@
 /
 
 &optvel
-    scale_err1          = 100.0         ! [m/a] Initial value for err_scale parameter in cf_ref optimization 
+    scale_err1          = 200.0         ! [m/a] Initial value for err_scale parameter in cf_ref optimization 
     scale_err2          = 500.0         ! [m/a] Final value for err_scale parameter reached at scale_time2 
 /
 

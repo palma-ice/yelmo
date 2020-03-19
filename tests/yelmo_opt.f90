@@ -74,7 +74,7 @@ program yelmo_test
     rel_time1           = 10e3      ! [yr] Time to begin reducing tau from tau1 to tau2 
     rel_time2           = 20e3      ! [yr] Time to reach tau2, and to disable relaxation 
     rel_tau1            = 10.0      ! [yr] Initial relaxation tau, fixed until rel_time1 
-    rel_tau2            = 1000.0    ! [yr] Final tau, reached at rel_time2, when relaxation disabled 
+    rel_tau2            = 800.0     ! [yr] Final tau, reached at rel_time2, when relaxation disabled 
     rel_q               = 2.0       ! [--] Non-linear exponent to scale interpolation between time1 and time2 
 
     scale_time1         = 15e3      ! [yr] Time to begin increasing H_scale from scale_H1 to scale_H2 
@@ -537,7 +537,7 @@ contains
         real(prec), intent(IN)    :: H_scale            ! [m] H_scale = 1000.0 m by default
 
         ! Local variables 
-        integer :: i, j, nx, ny, i1, j1  
+        integer :: i, j, nx, ny, i1, j1, i2, j2  
         real(prec) :: dx_km, f_dz, f_dz_lim, f_scale   
         real(prec) :: ux_aa, uy_aa, uxy_aa
         real(prec) :: H_err_now  
@@ -570,8 +570,8 @@ contains
             call filter_gaussian(var=H_err,sigma=dx_km*sigma_err,dx=dx_km)
         end if 
 
-        do j = 2, ny-1 
-        do i = 2, nx-1 
+        do j = 3, ny-2 
+        do i = 3, nx-2 
 
             ux_aa = 0.5*(ux(i,j)+ux(i+1,j))
             uy_aa = 0.5*(uy(i,j)+uy(i,j+1))
@@ -585,14 +585,18 @@ contains
 
                 if (ux_aa .ge. 0.0) then 
                     i1 = i-1 
+                    i2 = i-2
                 else 
-                    i1 = i+1 
+                    i1 = i+1
+                    i2 = i+2 
                 end if 
 
                 if (uy_aa .ge. 0.0) then 
-                    j1 = j-1 
+                    j1 = j-1
+                    j2 = j-2 
                 else 
-                    j1 = j+1 
+                    j1 = j+1
+                    j2 = j+2  
                 end if 
                 
                 ! Get weighted error  =========
@@ -606,8 +610,9 @@ contains
                     ywt = abs(uy_aa) / xywt 
                 end if 
 
-                H_err_now = xwt*H_err(i1,j) + ywt*H_err(i,j1) 
-
+                !H_err_now = xwt*H_err(i1,j) + ywt*H_err(i,j1) 
+                H_err_now = xwt*(0.5*(H_err(i1,j)+H_err(i2,j))) + ywt*(0.5*(H_err(i,j1)+H_err(i,j2)))
+                
                 ! Get adjustment rate given error in ice thickness  =========
 
                 f_dz = H_err_now / H_scale
@@ -833,186 +838,6 @@ contains
     end function get_opt_param 
 
     ! Extra...
-
-    subroutine update_C_bed_thickness(C_bed,dCbed,phi,err_z_srf,H_ice,z_bed,ux,uy,dx,phi_min,phi_max, &
-                        cf_stream,cb_z0,cb_z1,cb_min)
-
-        implicit none 
-
-        real(prec), intent(INOUT) :: C_bed(:,:) 
-        real(prec), intent(INOUT) :: dCbed(:,:) 
-        real(prec), intent(INOUT) :: phi(:,:) 
-        real(prec), intent(IN)    :: err_z_srf(:,:) 
-        real(prec), intent(IN)    :: H_ice(:,:) 
-        real(prec), intent(IN)    :: z_bed(:,:) 
-        real(prec), intent(IN)    :: ux(:,:) 
-        real(prec), intent(IN)    :: uy(:,:) 
-        real(prec), intent(IN)    :: dx 
-        real(prec), intent(IN)    :: phi_min 
-        real(prec), intent(IN)    :: phi_max 
-        real(prec), intent(IN)    :: cf_stream 
-        real(prec), intent(IN)    :: cb_z0
-        real(prec), intent(IN)    :: cb_z1 
-        real(prec), intent(IN)    :: cb_min 
-
-        ! Local variables 
-        integer :: i, j, nx, ny, i1, j1  
-        real(prec) :: dphi, dx_km, f_dz 
-        real(prec) :: ux_aa, uy_aa 
-        real(prec) :: zsrf_rmse 
-
-        real(prec), allocatable   :: C_bed_prev(:,:) 
-
-        real(prec) :: dphi_min  
-        real(prec) :: dphi_max 
-        real(prec) :: err_z_fac 
-
-        nx = size(C_bed,1)
-        ny = size(C_bed,2) 
-
-        allocate(C_bed_prev(nx,ny))
-
-        ! Optimization parameters 
-        dphi_min  = -0.5       ! [degrees] maximum rate of change (negative)
-        dphi_max  =  1.0       ! [degrees] maximum rate of change (positive)
-        
-        ! Store initial C_bed solution 
-        C_bed_prev = C_bed 
-
-        ! Calculate global rmse error 
-        if (count(err_z_srf .ne. 0.0) .gt. 0) then 
-            zsrf_rmse = sqrt(sum(err_z_srf**2)/count(err_z_srf .ne. 0.0))
-        else 
-            zsrf_rmse = 0.0 
-        end if 
-
-        if (zsrf_rmse .gt. 90.0) then
-            ! Maintain a faster scale
-            err_z_fac = 100.0      ! [m]       Elevation-error scale for maximum
-        else
-            ! Slow down the optimization to reduce waves, if we are near the solution
-            err_z_fac = 200.0 
-        end if 
-
-        do j = 3, ny-2 
-        do i = 3, nx-2 
-
-            if (err_z_srf(i,j) .ne. 0.0) then 
-                ! Update where elevation error exists
-
-                ! Get adjustment rate given error in z_srf 
-                f_dz = -err_z_srf(i,j) / err_z_fac 
-                f_dz = max(f_dz, dphi_min)
-                f_dz = min(f_dz, dphi_max)
-                dphi = f_dz 
-                
-                ! 1. Apply change at current point 
-if (.FALSE.) then 
-                phi(i,j)  = phi(i,j) + dphi 
-                phi(i,j)  = max(phi(i,j),phi_min)
-                phi(i,j)  = min(phi(i,j),phi_max)
-
-                C_bed(i,j) = cf_stream*tan(phi(i,j)*pi/180.0)
-end if 
-
-                ! 2. Apply change downstream (this may overlap with other changes)
-
-                ux_aa = 0.5*(ux(i,j)+ux(i+1,j))
-                uy_aa = 0.5*(uy(i,j)+uy(i,j+1))
-                
-                if ( abs(ux_aa) .gt. abs(uy_aa) ) then 
-                    ! Downstream in x-direction 
-                    j1 = j 
-                    if (ux_aa .lt. 0.0) then 
-                        i1 = i-1 
-                    else
-                        i1 = i+1
-                    end if 
-
-                else 
-                    ! Downstream in y-direction 
-                    i1 = i 
-                    if (uy_aa .lt. 0.0) then 
-                        j1 = j-1
-                    else
-                        j1 = j+1
-                    end if 
-
-                end if 
-
-                phi(i1,j1)  = phi(i1,j1) + dphi 
-                phi(i1,j1)  = max(phi(i1,j1),phi_min)
-                phi(i1,j1)  = min(phi(i1,j1),phi_max)
-
-                C_bed(i1,j1) = cf_stream*tan(phi(i1,j1)*pi/180.0)
-
-            end if 
-
-        end do 
-        end do 
-
-        ! Ensure C_bed is not below lower limit 
-        where (C_bed .lt. cb_min) C_bed = cb_min 
-
-        ! Additionally, apply a Gaussian filter to C_bed to ensure smooth transitions
-!         dx_km = dx*1e-3  
-!         call filter_gaussian(var=C_bed,sigma=64.0,dx=dx_km)     !,mask=err_z_srf .ne. 0.0)
-        
-        ! Diagnose current rate of change of C_bed 
-        dCbed = C_bed - C_bed_prev
-
-        return 
-
-    end subroutine update_C_bed_thickness
-
-    subroutine guess_C_bed(C_bed,phi,uxy_s,phi_min,phi_max,cf_stream)
-
-        implicit none 
-
-        real(prec), intent(INOUT) :: C_bed(:,:) 
-        real(prec), intent(INOUT) :: phi(:,:) 
-        real(prec), intent(IN)    :: uxy_s(:,:) 
-        real(prec), intent(IN)    :: phi_min
-        real(prec), intent(IN)    :: phi_max
-        real(prec), intent(IN)    :: cf_stream 
-
-        ! Local variables 
-        integer :: i, j, nx, ny 
-        real(prec) :: logvel, logvel_max, f_scale    
-
-        nx = size(C_bed,1)
-        ny = size(C_bed,2)
-
-        !logvel_max = log(maxval(uxy_s))
-        logvel_max = log(100.0) 
-
-        do j = 1, ny 
-        do i = 1, nx 
-
-            if (uxy_s(i,j) .gt. 0.0) then 
-                ! Calculate expected till angle versus velocity 
-
-                logvel   = max(0.0,log(uxy_s(i,j)))
-                f_scale  = logvel / logvel_max
-                if (f_scale .gt. 1.0) f_scale = 1.0 
-                phi(i,j) = 0.5*phi_max - f_scale*(0.5*phi_max-2.0*phi_min)
-
-            else 
-                ! Set phi to the minimum 
-
-                phi(i,j) = phi_min 
-
-            end if 
-
-            ! Calculate C_bed following till friction approach (Bueler and van Pelt, 2015)
-            C_bed(i,j) = cf_stream*tan(phi(i,j)*pi/180)
-
-        end do 
-        end do
-
-        return 
-
-    end subroutine guess_C_bed
 
     subroutine calc_ydyn_cbed_external_channels(dyn,tpo,thrm,bnd,channels)
         ! Update C_bed based on parameter choices

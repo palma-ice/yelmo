@@ -4,7 +4,7 @@
     z_sl            = 0.0               ! [m] Sea level relative to present-day 
 
     sigma_err       = 1.0               ! [--] Smoothing radius for error to calculate correction in cf_ref (in multiples of dx)
-    cf_min          = 1e-3              ! [--] Minimum allowed cf value
+    cf_min          = 1e-4              ! [--] Minimum allowed cf value
 /
 
 &yelmo

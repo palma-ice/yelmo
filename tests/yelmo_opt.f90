@@ -32,11 +32,6 @@ program yelmo_test
     real(prec) :: time_steady
     real(prec) :: time_tune 
 
-    integer    :: iter_steps(5) 
-    integer    :: topo_rels(5) 
-    real(prec) :: topo_rel_taus(5)
-    real(prec) :: H_scales(5) 
-
     real(prec) :: rel_time1, rel_time2, rel_tau1, rel_tau2, rel_q  
     real(prec) :: scale_time1, scale_time2, scale_H1, scale_H2 
     real(prec) :: sigma_err 
@@ -54,27 +49,32 @@ program yelmo_test
     ! Determine the parameter file from the command line 
     call yelmo_load_command_line_args(path_par)
 
-    call nml_read(path_par,"control","bmb_shlf_const",  bmb_shlf_const)            ! [yr] Constant imposed bmb_shlf value
-    call nml_read(path_par,"control","dT_ann",          dT_ann)                    ! [K] Temperature anomaly (atm)
-    call nml_read(path_par,"control","z_sl",            z_sl)                      ! [m] Sea level relative to present-day
+    call nml_read(path_par,"ctrl","bmb_shlf_const",  bmb_shlf_const)         ! [yr] Constant imposed bmb_shlf value
+    call nml_read(path_par,"ctrl","dT_ann",          dT_ann)                 ! [K] Temperature anomaly (atm)
+    call nml_read(path_par,"ctrl","z_sl",            z_sl)                   ! [m] Sea level relative to present-day
     
+
+    call nml_read(path_par,"ctrl","sigma_err",       sigma_err)              ! [--] Smoothing radius for error to calculate correction in cf_ref (in multiples of dx)
+    call nml_read(path_par,"ctrl","cf_min",          cf_min)                 ! [--] Minimum allowed cf value 
+
+
     ! Choose optimization method (1: error method, 2: ratio method) 
     opt_method = 1 
 
     ! Simulation parameters
-    time_init           = 0.0       ! [yr] Starting time
-    dtt                 = 5.0       ! [yr] Time step for time loop 
-    dt2D_out            = 500.0     ! [yr] 2D output writing 
-
     qmax                = 51                ! Total number of iterations
     time_iter           = 500.0             ! [yr] Time for each iteration 
-    time_steady         = 50e3              ! [yr] Time to run to steady state at the end without further optimization
+    time_steady         = 10e3              ! [yr] Time to run to steady state at the end without further optimization
+
+    time_init           = 0.0       ! [yr] Starting time
+    dtt                 = 5.0       ! [yr] Time step for time loop 
+    dt2D_out            = time_iter ! [yr] 2D output writing 
 
     ! Optimization parameters 
     rel_time1           = 10e3      ! [yr] Time to begin reducing tau from tau1 to tau2 
     rel_time2           = 20e3      ! [yr] Time to reach tau2, and to disable relaxation 
     rel_tau1            = 10.0      ! [yr] Initial relaxation tau, fixed until rel_time1 
-    rel_tau2            = 500.0     ! [yr] Final tau, reached at rel_time2, when relaxation disabled 
+    rel_tau2            = 1000.0    ! [yr] Final tau, reached at rel_time2, when relaxation disabled 
     rel_q               = 2.0       ! [--] Non-linear exponent to scale interpolation between time1 and time2 
 
     scale_time1         = 15e3      ! [yr] Time to begin increasing H_scale from scale_H1 to scale_H2 
@@ -82,17 +82,8 @@ program yelmo_test
     scale_H1            =  500.0    ! [m]  Initial value for H_scale parameter in cf_ref optimization 
     scale_H2            = 2000.0    ! [m]  Final value for H_scale parameter reached at scale_time2 
 
-    sigma_err           = 1.0       ! [--] Smoothing radius for error to calculate correction in cf_ref (in multiples of dx)
-
-!     iter_steps          = [12,16,20,25,35]
-!     topo_rels           = [1,1,0,0,0]
-!     topo_rel_taus       = [10.0,100.0,1000.0,0.0,0.0]
-!     H_scales            = [1000.0,1000.0,1000.0,2000.0,2000.0] 
-
-    cf_init    = 0.2                        ! [--]
-    cf_min     = 1e-2                       ! [--] 
-    cf_max     = 1.0                        ! [--]
-
+    cf_init             = 0.2       ! [--] Initial cf value everywhere
+    cf_max              = 1.0       ! [--] Maximum allowed cf_value 
 
 ! Not used:
 !         ! Ratio method 

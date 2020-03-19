@@ -79,7 +79,7 @@ program yelmo_test
 
     scale_time1         = 15e3      ! [yr] Time to begin increasing H_scale from scale_H1 to scale_H2 
     scale_time2         = 25e3      ! [yr] Time to reach scale_H2 
-    scale_H1            = 1000.0    ! [m]  Initial value for H_scale parameter in cf_ref optimization 
+    scale_H1            =  500.0    ! [m]  Initial value for H_scale parameter in cf_ref optimization 
     scale_H2            = 2000.0    ! [m]  Final value for H_scale parameter reached at scale_time2 
 
     sigma_err           = 1.0       ! [--] Smoothing radius for error to calculate correction in cf_ref (in multiples of dx)
@@ -90,7 +90,7 @@ program yelmo_test
 !     H_scales            = [1000.0,1000.0,1000.0,2000.0,2000.0] 
 
     cf_init    = 0.2                        ! [--]
-    cf_min     = 1e-5                       ! [--] 
+    cf_min     = 1e-2                       ! [--] 
     cf_max     = 1.0                        ! [--]
 
 
@@ -550,7 +550,7 @@ contains
 
         real(prec), allocatable   :: H_err(:,:) 
         real(prec), allocatable   :: cf_prev(:,:) 
-        
+
         nx = size(cf_ref,1)
         ny = size(cf_ref,2) 
 

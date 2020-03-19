@@ -82,12 +82,12 @@ program yelmo_test
     scale_time1         = 15e3      ! [yr] Time to begin increasing err_scale from scale_err1 to scale_err2 
     scale_time2         = 25e3      ! [yr] Time to reach scale_H2 
 
-if (trim(optvar) .eq. "ice") then 
-    scale_err1          =  500.0    ! [m]  Initial value for err_scale parameter in cf_ref optimization 
-    scale_err2          = 2000.0    ! [m]  Final value for err_scale parameter reached at scale_time2 
+if (trim(optvar) .eq. "ice") then
+    call nml_read(path_par,"optice","scale_err1",  scale_err1)  ! [m]  Initial value for err_scale parameter in cf_ref optimization 
+    call nml_read(path_par,"optice","scale_err2",  scale_err2)  ! [m]  Final value for err_scale parameter reached at scale_time2   
 else ! "vel":
-    scale_err1          =  10.0     ! [m/a]  Initial value for err_scale parameter in cf_ref optimization 
-    scale_err2          = 100.0     ! [m/a]  Final value for err_scale parameter reached at scale_time2 
+    call nml_read(path_par,"optvel","scale_err1",  scale_err1)  ! [m/a] Initial value for err_scale parameter in cf_ref optimization  
+    call nml_read(path_par,"optvel","scale_err2",  scale_err2)  ! [m/a] Final value for err_scale parameter reached at scale_time2  
 end if 
 
     cf_init             = 0.2       ! [--] Initial cf value everywhere

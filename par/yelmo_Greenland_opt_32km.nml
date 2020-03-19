@@ -8,6 +8,16 @@
     cf_min          = 1e-4              ! [--] Minimum allowed cf value
 /
 
+&optice 
+    scale_err1          =  500.0        ! [m]  Initial value for err_scale parameter in cf_ref optimization 
+    scale_err2          = 2000.0        ! [m]  Final value for err_scale parameter reached at scale_time2 
+/
+
+&optvel
+    scale_err1          = 100.0         ! [m/a] Initial value for err_scale parameter in cf_ref optimization 
+    scale_err2          = 500.0         ! [m/a] Final value for err_scale parameter reached at scale_time2 
+/
+
 &yelmo
     domain          = "Greenland"
     grid_name       = "GRL-32KM"

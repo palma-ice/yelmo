@@ -40,6 +40,7 @@ program yelmo_test
 
     character(len=12) :: optvar 
 
+    real(prec), allocatable :: mb_corr(:,:) 
     real(prec), allocatable :: cf_ref_dot(:,:) 
 
     ! No-ice mask (to impose additional melting)
@@ -75,17 +76,19 @@ program yelmo_test
     ! Optimization parameters 
     rel_time1           = 10e3      ! [yr] Time to begin reducing tau from tau1 to tau2 
     rel_time2           = 20e3      ! [yr] Time to reach tau2, and to disable relaxation 
-    rel_tau1            = 10.0      ! [yr] Initial relaxation tau, fixed until rel_time1 
-    rel_tau2            = 800.0     ! [yr] Final tau, reached at rel_time2, when relaxation disabled 
     rel_q               = 2.0       ! [--] Non-linear exponent to scale interpolation between time1 and time2 
 
     scale_time1         = 15e3      ! [yr] Time to begin increasing err_scale from scale_err1 to scale_err2 
     scale_time2         = 25e3      ! [yr] Time to reach scale_H2 
 
-if (trim(optvar) .eq. "ice") then
+if (trim(optvar) .eq. "ice") then     
+    call nml_read(path_par,"optice","rel_tau1",    rel_tau1)    ! [yr] Initial relaxation tau, fixed until rel_time1 
+    call nml_read(path_par,"optice","rel_tau2",    rel_tau2)    ! [yr] Final tau, reached at rel_time2, when relaxation disabled 
     call nml_read(path_par,"optice","scale_err1",  scale_err1)  ! [m]  Initial value for err_scale parameter in cf_ref optimization 
     call nml_read(path_par,"optice","scale_err2",  scale_err2)  ! [m]  Final value for err_scale parameter reached at scale_time2   
 else ! "vel":
+    call nml_read(path_par,"optice","rel_tau1",    rel_tau1)    ! [yr] Initial relaxation tau, fixed until rel_time1 
+    call nml_read(path_par,"optice","rel_tau2",    rel_tau2)    ! [yr] Final tau, reached at rel_time2
     call nml_read(path_par,"optvel","scale_err1",  scale_err1)  ! [m/a] Initial value for err_scale parameter in cf_ref optimization  
     call nml_read(path_par,"optvel","scale_err2",  scale_err2)  ! [m/a] Final value for err_scale parameter reached at scale_time2  
 end if 
@@ -142,6 +145,10 @@ end if
     yelmo1%bnd%T_srf    = yelmo1%dta%pd%T_srf + dT_ann  ! [K]
     
     call yelmo_print_bound(yelmo1%bnd)
+
+    ! Initialize mass balance correction matrix 
+    allocate(mb_corr(yelmo1%grd%nx,yelmo1%grd%ny))
+    mb_corr = 0.0_prec 
 
     ! Define no-ice mask from present-day data
     allocate(mask_noice(yelmo1%grd%nx,yelmo1%grd%ny))
@@ -224,7 +231,7 @@ end if
 
     ! Initialize the 2D output file and write the initial model state 
     call yelmo_write_init(yelmo1,file2D,time_init,units="years")  
-    call write_step_2D_opt(yelmo1,file2D,time_init,cf_ref_dot,mask_noice,tau,err_scale)  
+    call write_step_2D_opt(yelmo1,file2D,time_init,cf_ref_dot,mb_corr,mask_noice,tau,err_scale)  
     
     write(*,*) "Starting optimization..."
 
@@ -239,13 +246,24 @@ if (opt_method .eq. 1) then
 
         ! === Optimization parameters =========
         
-        tau     = get_opt_param(time,time1=rel_time1,time2=rel_time2,p1=rel_tau1,p2=rel_tau2,q=rel_q)
+        tau       = get_opt_param(time,time1=rel_time1,time2=rel_time2,p1=rel_tau1,p2=rel_tau2,q=rel_q)
         err_scale = get_opt_param(time,time1=scale_time1,time2=scale_time2,p1=scale_err1,p2=scale_err2,q=1.0)
         
         ! Set model tau, and set yelmo relaxation switch (1: shelves relaxing; 0: no relaxation)
         yelmo1%tpo%par%topo_rel_tau = tau 
         yelmo1%tpo%par%topo_rel = 1 
         if (time .gt. rel_time2) yelmo1%tpo%par%topo_rel = 0 
+
+        if (trim(optvar) .eq. "vel") then 
+            ! If using 'vel' method, disabled relaxation, and instead apply 
+            ! mass balance correction term 
+
+            yelmo1%tpo%par%topo_rel = 0 
+            call update_mb_corr(mb_corr,yelmo1%tpo%now%H_ice,yelmo1%dta%pd%H_ice,tau)
+
+            yelmo1%bnd%smb = yelmo1%dta%pd%smb + mb_corr             ! [m.i.e./a]
+    
+        end if 
 
         ! === Update cf_ref and reset model ===================
 
@@ -286,7 +304,7 @@ if (opt_method .eq. 1) then
             call yelmo_update(yelmo1,time)
 
             if (mod(nint(time*100),nint(dt2D_out*100))==0) then
-                call write_step_2D_opt(yelmo1,file2D,time,cf_ref_dot,mask_noice,tau,err_scale)
+                call write_step_2D_opt(yelmo1,file2D,time,cf_ref_dot,mb_corr,mask_noice,tau,err_scale)
             end if 
 
         end do 
@@ -334,7 +352,7 @@ else
         end do 
 
         ! Write the current solution 
-        call write_step_2D_opt(yelmo1,file2D,time,cf_ref_dot,mask_noice,tau,err_scale)
+        call write_step_2D_opt(yelmo1,file2D,time,cf_ref_dot,mb_corr,mask_noice,tau,err_scale)
         
     end do 
 
@@ -354,7 +372,7 @@ end if
 
 contains
 
-    subroutine write_step_2D_opt(ylmo,filename,time,cf_ref_dot,mask_noice,tau,err_scale)
+    subroutine write_step_2D_opt(ylmo,filename,time,cf_ref_dot,mb_corr,mask_noice,tau,err_scale)
 
         implicit none 
         
@@ -362,6 +380,7 @@ contains
         character(len=*),  intent(IN) :: filename
         real(prec), intent(IN) :: time
         real(prec), intent(IN) :: cf_ref_dot(:,:)
+        real(prec), intent(IN) :: mb_corr(:,:)
         logical,    intent(IN) :: mask_noice(:,:) 
         real(prec), intent(IN) :: tau 
         real(prec), intent(IN) :: err_scale 
@@ -462,6 +481,9 @@ contains
         call nc_write(filename,"T_srf",ylmo%bnd%T_srf,units="K",long_name="Surface temperature", &
                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
         
+        call nc_write(filename,"mb_corr",mb_corr,units="m/a",long_name="SMB correction term", &
+                      dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
+
         ! Target data (not time dependent)
         if (n .eq. 1) then 
             call nc_write(filename,"z_srf_pd",ylmo%dta%pd%z_srf,units="m",long_name="Observed surface elevation (present day)", &
@@ -823,6 +845,21 @@ contains
         return 
 
     end subroutine update_cf_ref_thickness_ratio
+
+    subroutine update_mb_corr(mb_corr,H_ice,H_obs,tau)
+
+        implicit none 
+
+        real(prec), intent(OUT) :: mb_corr(:,:)     ! [m/a] Mass balance correction term 
+        real(prec), intent(IN)  :: H_ice(:,:)       ! [m] Simulated ice thickness
+        real(prec), intent(IN)  :: H_obs(:,:)       ! [m] Target observed ice thickness
+        real(prec), intent(IN)  :: tau              ! [a] Relaxation time constant 
+
+        mb_corr = -(H_ice - H_obs) / tau 
+
+        return 
+
+    end subroutine update_mb_corr 
 
     subroutine wtd_mean(var_ave,var,wts)
         ! wts == gauss_values(dx,dy,sigma,n)

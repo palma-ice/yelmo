@@ -34,7 +34,7 @@ program yelmo_test
 
     real(prec) :: rel_time1, rel_time2, rel_tau1, rel_tau2, rel_q  
     real(prec) :: scale_time1, scale_time2, scale_err1, scale_err2 
-    real(prec) :: sigma_time1, sigma_err 
+    real(prec) :: sigma_err, sigma_vel 
 
     real(prec) :: tau, err_scale 
 
@@ -81,7 +81,7 @@ program yelmo_test
     scale_time1         = 15e3      ! [yr] Time to begin increasing err_scale from scale_err1 to scale_err2 
     scale_time2         = 25e3      ! [yr] Time to reach scale_H2 
 
-    sigma_time1         = 5e3       ! [yr] Time at which to remove smoothing radius for cf_ref 
+    sigma_vel           = 200.0     ! [m/yr] Ice vel. at which Gaussian smoothing diminished to zero 
 
 if (trim(optvar) .eq. "ice") then     
     call nml_read(path_par,"optice","rel_tau1",    rel_tau1)    ! [yr] Initial relaxation tau, fixed until rel_time1 
@@ -252,8 +252,6 @@ if (opt_method .eq. 1) then
         tau       = get_opt_param(time,time1=rel_time1,time2=rel_time2,p1=rel_tau1,p2=rel_tau2,q=rel_q)
         err_scale = get_opt_param(time,time1=scale_time1,time2=scale_time2,p1=scale_err1,p2=scale_err2,q=1.0)
         
-        if (time .ge. sigma_time1) sigma_err = 0.0_prec 
-
         ! Set model tau, and set yelmo relaxation switch (1: shelves relaxing; 0: no relaxation)
         yelmo1%tpo%par%topo_rel_tau = tau 
         yelmo1%tpo%par%topo_rel = 1 
@@ -279,7 +277,7 @@ if (opt_method .eq. 1) then
             call update_cf_ref_errscaling(yelmo1%dyn%now%cf_ref,cf_ref_dot,yelmo1%tpo%now%H_ice, &
                                 yelmo1%bnd%z_bed,yelmo1%dyn%now%ux_s,yelmo1%dyn%now%uy_s, &
                                 yelmo1%dta%pd%H_ice,yelmo1%dta%pd%uxy_s,yelmo1%dta%pd%H_grnd.le.0.0_prec, &
-                                yelmo1%tpo%par%dx,cf_min,cf_max,sigma_err,err_scale,optvar)
+                                yelmo1%tpo%par%dx,cf_min,cf_max,sigma_err,sigma_vel,err_scale,optvar)
 
         end if 
         
@@ -562,8 +560,8 @@ contains
 
     end subroutine guess_cf_ref 
 
-    subroutine update_cf_ref_errscaling(cf_ref,cf_ref_dot,H_ice,z_bed,ux,uy,H_obs,uxy_obs, &
-                                        is_float_obs,dx,cf_min,cf_max,sigma_err,err_scale,optvar)
+    subroutine update_cf_ref_errscaling(cf_ref,cf_ref_dot,H_ice,z_bed,ux,uy,H_obs,uxy_obs,is_float_obs, &
+                                        dx,cf_min,cf_max,sigma_err,sigma_vel,err_scale,optvar)
 
         implicit none 
 
@@ -580,6 +578,7 @@ contains
         real(prec), intent(IN)    :: cf_min 
         real(prec), intent(IN)    :: cf_max
         real(prec), intent(IN)    :: sigma_err 
+        real(prec), intent(IN)    :: sigma_vel
         real(prec), intent(IN)    :: err_scale            ! [m] or [m/a]
         character(len=*), intent(IN) :: optvar
 
@@ -591,6 +590,7 @@ contains
 
         real(prec) :: xwt, ywt, xywt   
 
+        real(prec), allocatable   :: H_err_sm(:,:)
         real(prec), allocatable   :: H_err(:,:)
         real(prec), allocatable   :: uxy(:,:)
         real(prec), allocatable   :: uxy_err(:,:)
@@ -601,6 +601,7 @@ contains
 
         dx_km = dx*1e-3  
         
+        allocate(H_err_sm(nx,ny))
         allocate(H_err(nx,ny))
         allocate(uxy(nx,ny))
         allocate(uxy_err(nx,ny))
@@ -622,8 +623,19 @@ contains
         where(uxy_obs .ne. MV .and. uxy_obs .ne. 0.0) uxy_err = (uxy - uxy_obs)
 
         ! Additionally, apply a Gaussian filter to H_err to ensure smooth transitions
-        if (sigma_err .gt. 0.0) then 
-            call filter_gaussian(var=H_err,sigma=dx_km*sigma_err,dx=dx_km)
+        ! Apply a weighted average between smoothed and original H_err, where 
+        ! slow regions get more smoothed, and fast regions use more local error 
+        if (sigma_err .gt. 0.0) then
+            H_err_sm = H_err  
+            call filter_gaussian(var=H_err_sm,sigma=dx_km*sigma_err,dx=dx_km)
+
+            do j = 1, ny 
+            do i = 1, nx 
+                f_vel = min( uxy(i,j)/sigma_vel, 1.0 )
+                H_err(i,j) = (1.0-f_vel)*H_err_sm(i,j) + f_vel*H_err(i,j)  
+            end do 
+            end do  
+
         end if 
 
         ! Initially set cf to missing value for now where no correction possible
@@ -673,8 +685,9 @@ contains
                 err_now_vel = -err_now_vel  ! Make negative to invert relationship (higher vel, higher friction)
                 
                 if (trim(optvar) .eq. "vel") then
-                    
-                
+                    ! If using the velocity method, then set error to velocity error 
+
+                    err_now = err_now_vel 
                     
                 end if 
 
@@ -685,6 +698,9 @@ contains
                 f_err   = min(f_err, f_err_lim)
                 f_scale = 10.0**(-f_err) 
 
+if (.FALSE.) then 
+    ! Add contribution from velocity (experimental - not working)
+
                 err_scale_vel = 200.0 
                 f_vel         = 0.20     ! 20% velocity contribution 
 
@@ -694,6 +710,7 @@ contains
                 f_scale_vel = 10.0**(-f_err_vel) 
 
                 f_scale = (1.0-f_vel)*f_scale + f_vel*f_scale_vel 
+end if 
 
                 ! Apply correction to current node =========
 

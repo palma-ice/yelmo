@@ -253,10 +253,10 @@ if (opt_method .eq. 1) then
         
         ! Set model tau, and set yelmo relaxation switch (1: shelves relaxing; 0: no relaxation)
         yelmo1%tpo%par%topo_rel_tau = tau 
-        yelmo1%tpo%par%topo_rel     = 2 
+        yelmo1%tpo%par%topo_rel     = 1
         if (time .gt. rel_time2) yelmo1%tpo%par%topo_rel = 0 
 
-        ! Update relaxation for reference model too 
+        ! Update relaxation parameters for reference model too 
         yelmo_ref%tpo%par%topo_rel_tau = yelmo1%tpo%par%topo_rel_tau
         yelmo_ref%tpo%par%topo_rel     = yelmo1%tpo%par%topo_rel
 

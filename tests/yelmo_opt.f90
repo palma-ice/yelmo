@@ -611,7 +611,7 @@ contains
         H_err = H_ice - H_obs 
 
         ! Calculate velocity magnitude and velocity error 
-        uxy     = calc_magnitude_from_staggered_ice(ux,uy,H_ice)
+        uxy = calc_magnitude_from_staggered_ice(ux,uy,H_ice)
          
         uxy_err = MV 
         where(uxy_obs .ne. MV .and. uxy_obs .ne. 0.0) uxy_err = (uxy - uxy_obs)
@@ -621,6 +621,9 @@ contains
             call filter_gaussian(var=H_err,sigma=dx_km*sigma_err,dx=dx_km)
         end if 
 
+        ! Initially set cf to missing value for now where no correction possible
+        cf_ref = MV 
+
         do j = 3, ny-2 
         do i = 3, nx-2 
 
@@ -629,7 +632,7 @@ contains
             
             uxy_aa = sqrt(ux_aa**2+uy_aa**2)
 
-            if ( uxy_aa .ne. 0.0 .and. uxy_err(i,j) .ne. MV ) then 
+            if ( uxy(i,j) .ne. 0.0 .and. uxy_err(i,j) .ne. MV ) then 
                 ! Update coefficient where velocity exists
 
                 ! Determine upstream node(s) 
@@ -654,11 +657,11 @@ contains
 
                 xwt   = 0.5 
                 ywt   = 0.5
-                xywt  = abs(ux_aa)+abs(uy_aa)
+                xywt  = abs(ux(i1,j))+abs(uy(i,j1))
 
                 if (xywt .gt. 0.0) then 
-                    xwt = abs(ux_aa) / xywt 
-                    ywt = abs(uy_aa) / xywt 
+                    xwt = abs(ux(i1,j)) / xywt 
+                    ywt = abs(uy(i,j1)) / xywt 
                 end if 
 
                 if (trim(optvar) .eq. "ice") then
@@ -691,6 +694,9 @@ contains
         end do 
         end do 
 
+        ! Fill in missing values with nearest neighbor 
+        call fill_nearest(cf_ref,missing_value=MV)
+
         ! Ensure cf_ref is not below lower or upper limit 
         where (cf_ref .lt. cf_min) cf_ref = cf_min 
         where (cf_ref .gt. cf_max) cf_ref = cf_max 
@@ -699,10 +705,10 @@ contains
         !call filter_gaussian(var=cf_ref,sigma=dx_km*0.2,dx=dx_km)     !,mask=err_z_srf .ne. 0.0)
         
         ! Ensure where obs are floating, set cf_ref = cf_min 
-        where(is_float_obs) cf_ref = cf_min 
+        !where(is_float_obs) cf_ref = cf_min 
 
         ! Also where no ice exists, set cf_ref = cf_min 
-        where(H_obs .eq. 0.0) cf_ref = cf_min 
+        !where(H_obs .eq. 0.0) cf_ref = cf_min 
 
         ! Diagnose current rate of change of C_bed 
         cf_ref_dot = cf_ref - cf_prev
@@ -710,6 +716,64 @@ contains
         return 
 
     end subroutine update_cf_ref_errscaling
+
+    subroutine fill_nearest(var,missing_value)
+
+        implicit none 
+
+        real(prec), intent(INOUT) :: var(:,:)
+        real(prec), intent(IN)    :: missing_value
+
+        ! Local variables 
+        integer :: i, j, nx, ny, i1, j1, ij(2) 
+        integer :: ntot 
+        real(prec) :: dist_max 
+
+
+        real(prec), allocatable :: var0(:,:) 
+        real(prec), allocatable :: dist(:,:) 
+
+        
+        nx = size(var,1)
+        ny = size(var,2) 
+
+        allocate(var0(nx,ny)) 
+        allocate(dist(nx,ny)) 
+
+        ! Store initial field 
+        var0 = var 
+
+        ntot = 0 
+
+        ! Loop over missing values, look for nearest non-missing neighbor
+        do j = 1, ny 
+        do i = 1, nx 
+
+            if (var(i,j) .eq. missing_value) then 
+                ! Find a neighbor value in var0 
+
+                ! Populate distance matrix
+                dist = MV 
+                do j1 = 1, ny 
+                do i1 = 1, nx 
+                    dist(i1,j1) = sqrt( (real(i1-i))**2 + (real(j1-j))**2 )
+                end do 
+                end do 
+
+                ! Find minimum populated neighbor 
+                ij = minloc(dist,mask=dist.ne.MV .and. var0.ne.MV)
+
+                ! Populate with neighbor value 
+                var(i,j) = var0(ij(1),ij(2))
+                ntot     = ntot + 1 
+            end if 
+
+        end do
+        end do 
+
+        return 
+
+    end subroutine fill_nearest 
 
     subroutine update_cf_ref_thickness_ratio(cf_ref,cf_ref_dot,H_ice,z_bed,ux,uy,uxy_i,uxy_b,H_obs,dx,cf_min,cf_max)
 

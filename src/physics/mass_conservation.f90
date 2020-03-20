@@ -648,6 +648,9 @@ contains
         do j = 2, ny-1 
             do i = 2, nx-1 
 
+                ! No relaxation to start
+                apply_relax = .FALSE.
+
                 select case(topo_rel)
 
                     case(1) 

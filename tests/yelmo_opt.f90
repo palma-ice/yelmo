@@ -585,9 +585,9 @@ contains
 
         ! Local variables 
         integer :: i, j, nx, ny, i1, j1  
-        real(prec) :: dx_km, f_err, f_err_lim, f_scale   
+        real(prec) :: dx_km, f_err, f_err_lim, f_scale, f_scale_vel   
         real(prec) :: ux_aa, uy_aa, uxy_aa
-        real(prec) :: err_now  
+        real(prec) :: err_now, err_now_vel, err_scale_vel, f_err_vel, f_vel   
 
         real(prec) :: xwt, ywt, xywt   
 
@@ -665,26 +665,35 @@ contains
                     ywt = abs(uy(i,j1)) / xywt 
                 end if 
 
-                if (trim(optvar) .eq. "ice") then
-                    ! Define error for ice thickness 
-
-                    err_now = xwt*H_err(i1,j) + ywt*H_err(i,j1) 
+                ! Define error for ice thickness 
+                err_now = xwt*H_err(i1,j) + ywt*H_err(i,j1) 
                 
-                else 
-                    ! Define error for surface velocity 
-
-                    err_now = xwt*uxy_err(i1,j) + ywt*uxy_err(i,j1)
-                    err_now = -err_now  ! Make negative to invert relationship (higher vel, higher friction)
+                ! Define error for surface velocity 
+                err_now_vel = xwt*uxy_err(i1,j) + ywt*uxy_err(i,j1)
+                err_now_vel = -err_now_vel  ! Make negative to invert relationship (higher vel, higher friction)
                 
+                if (trim(optvar) .eq. "vel") then
+                    
+                
+                    
                 end if 
 
                 ! Get adjustment rate given error in ice thickness  =========
 
-                f_err = err_now / err_scale
-                f_err = max(f_err,-f_err_lim)
-                f_err = min(f_err, f_err_lim)
-                
+                f_err   = err_now / err_scale
+                f_err   = max(f_err,-f_err_lim)
+                f_err   = min(f_err, f_err_lim)
                 f_scale = 10.0**(-f_err) 
+
+                err_scale_vel = 200.0 
+                f_vel         = 0.20     ! 20% velocity contribution 
+
+                f_err_vel   = err_now_vel / err_scale_vel
+                f_err_vel   = max(f_err_vel,-f_err_lim)
+                f_err_vel   = min(f_err_vel, f_err_lim)
+                f_scale_vel = 10.0**(-f_err_vel) 
+
+                f_scale = (1.0-f_vel)*f_scale + f_vel*f_scale_vel 
 
                 ! Apply correction to current node =========
 
@@ -696,7 +705,7 @@ contains
         end do 
 
         ! Fill in missing values with nearest neighbor or cf_min when none available
-        call fill_nearest(cf_ref,missing_value=MV,fill_value=cf_min,fill_dist=3,n=5)
+        call fill_nearest(cf_ref,missing_value=MV,fill_value=cf_min,fill_dist=80.0,n=5,dx=yelmo1%grd%dx)
 
         ! Ensure cf_ref is not below lower or upper limit 
         where (cf_ref .lt. cf_min) cf_ref = cf_min 
@@ -718,31 +727,34 @@ contains
 
     end subroutine update_cf_ref_errscaling
 
-    subroutine fill_nearest(var,missing_value,fill_value,fill_dist,n)
+    subroutine fill_nearest(var,missing_value,fill_value,fill_dist,n,dx)
 
         implicit none 
 
         real(prec), intent(INOUT) :: var(:,:)
         real(prec), intent(IN)    :: missing_value
         real(prec), intent(IN)    :: fill_value 
-        integer,    intent(IN)    :: fill_dist
-        integer,    intent(IN)    :: n               ! Average of n neighbors 
+        real(prec), intent(IN)    :: fill_dist          ! [km]
+        integer,    intent(IN)    :: n                  ! Average of n neighbors 
+        real(prec), intent(IN)    :: dx                 ! [m] 
 
         ! Local variables 
         integer :: i, j, nx, ny, i1, j1, q, n_now, ij(2) 
         integer :: ntot 
+        real(prec) :: dx_km 
         real(prec) :: dist_now, f_d 
-
 
         real(prec), allocatable :: var0(:,:) 
         real(prec), allocatable :: dist(:,:) 
 
-        
         nx = size(var,1)
         ny = size(var,2) 
 
         allocate(var0(nx,ny)) 
         allocate(dist(nx,ny)) 
+
+        ! Define resolution in km 
+        dx_km = dx*1e-3 
 
         ! Store initial field 
         var0 = var 
@@ -761,7 +773,7 @@ contains
                 do j1 = 1, ny 
                 do i1 = 1, nx 
                     if (var0(i1,j1) .ne. MV) then 
-                        dist(i1,j1) = sqrt( (real(i1-i))**2 + (real(j1-j))**2 )
+                        dist(i1,j1) = sqrt( real( (i1-i)**2 + (j1-j)**2 ) ) * dx_km 
                     end if 
                 end do 
                 end do 
@@ -796,7 +808,7 @@ contains
                     
                     ! Determine mean distance to neighbors and weighting function versus distance
                     dist_now = dist_now / real(n_now,prec) 
-                    f_d      = 1.0 - min( dist_now/real(fill_dist,prec), 1.0 )
+                    f_d      = 1.0 - min( dist_now/fill_dist, 1.0 )
 
                     ! Apply weighted average of mean neighbor value and fill value 
                     var(i,j) = f_d * (var(i,j) / real(n_now,prec)) + (1.0-f_d)*fill_value

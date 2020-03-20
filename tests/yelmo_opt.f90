@@ -694,8 +694,8 @@ contains
         end do 
         end do 
 
-        ! Fill in missing values with nearest neighbor 
-        call fill_nearest(cf_ref,missing_value=MV)
+        ! Fill in missing values with nearest neighbor or cf_min when none available
+        call fill_nearest(cf_ref,missing_value=MV,fill_value=cf_min,n=5)
 
         ! Ensure cf_ref is not below lower or upper limit 
         where (cf_ref .lt. cf_min) cf_ref = cf_min 
@@ -717,15 +717,17 @@ contains
 
     end subroutine update_cf_ref_errscaling
 
-    subroutine fill_nearest(var,missing_value)
+    subroutine fill_nearest(var,missing_value,fill_value,n)
 
         implicit none 
 
         real(prec), intent(INOUT) :: var(:,:)
         real(prec), intent(IN)    :: missing_value
+        real(prec), intent(IN)    :: fill_value 
+        integer,    intent(IN)    :: n               ! Average of n neighbors 
 
         ! Local variables 
-        integer :: i, j, nx, ny, i1, j1, ij(2) 
+        integer :: i, j, nx, ny, i1, j1, q, n_now, ij(2) 
         integer :: ntot 
         real(prec) :: dist_max 
 
@@ -752,20 +754,44 @@ contains
             if (var(i,j) .eq. missing_value) then 
                 ! Find a neighbor value in var0 
 
-                ! Populate distance matrix
+                ! Populate distance matrix where necessary 
                 dist = MV 
                 do j1 = 1, ny 
                 do i1 = 1, nx 
-                    dist(i1,j1) = sqrt( (real(i1-i))**2 + (real(j1-j))**2 )
+                    if (var0(i1,j1) .ne. MV) then 
+                        dist(i1,j1) = sqrt( (real(i1-i))**2 + (real(j1-j))**2 )
+                    end if 
                 end do 
                 end do 
 
-                ! Find minimum populated neighbor 
-                ij = minloc(dist,mask=dist.ne.MV .and. var0.ne.MV)
+                n_now    = 0 
+                var(i,j) = 0.0
 
-                ! Populate with neighbor value 
-                var(i,j) = var0(ij(1),ij(2))
-                ntot     = ntot + 1 
+                do q = 1, n 
+                    ! Loop over nearest neighbors to get average 
+
+                    ! Find minimum populated neighbor 
+                    ij = minloc(dist,mask=dist.ne.MV .and. var0.ne.MV)
+
+                    ! Check if no neighbors found 
+                    if (ij(1) .eq. 0) exit 
+
+                    ! Populate with neighbor value 
+                    var(i,j) = var(i,j) + var0(ij(1),ij(2))
+                    n_now = n_now + 1 
+
+                    ! Reset distance of neighbor to zero so it cannot be used again
+                    dist(ij(1),ij(2)) = MV 
+                end do 
+
+                ! If no neighbors found, use fill value 
+                if (n_now .eq. 0) var(i,j) = fill_value 
+
+                ! Take average if multiple points used 
+                if (n_now .gt. 1) var(i,j) = var(i,j) / real(n_now,prec) 
+                    
+                ! Add this missing point to total for diagnostics 
+                ntot = ntot + 1 
             end if 
 
         end do

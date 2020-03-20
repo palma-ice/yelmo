@@ -290,7 +290,7 @@ if (opt_method .eq. 1) then
         call yelmo_set_time(yelmo_ref,time) 
         
         ! Update thermodynamics in reference state without advancing ice thickness 
-        call yelmo_update_equil(yelmo_ref,time,time_tot=1e3,topo_fixed=.TRUE.,dt=5.0,ssa_vel_max=5e3)
+        call yelmo_update_equil(yelmo_ref,time,time_tot=2e3,topo_fixed=.TRUE.,dt=5.0,ssa_vel_max=5e3)
 
         ! Reset model to the reference state
         yelmo1 = yelmo_ref  

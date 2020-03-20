@@ -253,17 +253,22 @@ if (opt_method .eq. 1) then
         
         ! Set model tau, and set yelmo relaxation switch (1: shelves relaxing; 0: no relaxation)
         yelmo1%tpo%par%topo_rel_tau = tau 
-        yelmo1%tpo%par%topo_rel     = 2 
+        yelmo1%tpo%par%topo_rel     = 3 
         if (time .gt. rel_time2) yelmo1%tpo%par%topo_rel = 0 
 
+        ! Update relaxation for reference model too 
+        yelmo_ref%tpo%par%topo_rel_tau = yelmo1%tpo%par%topo_rel_tau
+        yelmo_ref%tpo%par%topo_rel     = yelmo1%tpo%par%topo_rel
+
+        ! Diagnose mass balance correction term 
+        call update_mb_corr(mb_corr,yelmo1%tpo%now%H_ice,yelmo1%dta%pd%H_ice,tau)
+        
         if (trim(optvar) .eq. "vel") then 
             ! If using 'vel' method, disabled relaxation, and instead apply 
             ! mass balance correction term 
 
             yelmo1%tpo%par%topo_rel = 0 
-            call update_mb_corr(mb_corr,yelmo1%tpo%now%H_ice,yelmo1%dta%pd%H_ice,tau)
-
-            yelmo1%bnd%smb = yelmo1%dta%pd%smb + mb_corr             ! [m.i.e./a]
+            yelmo1%bnd%smb          = yelmo1%dta%pd%smb + mb_corr           ! [m.i.e./a]
     
         end if 
 

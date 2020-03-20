@@ -670,7 +670,7 @@ contains
                 
                     case(3)
                         ! Relax all points
-
+                        
                         apply_relax = .TRUE. 
                 
                     case DEFAULT

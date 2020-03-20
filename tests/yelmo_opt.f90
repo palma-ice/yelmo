@@ -81,7 +81,7 @@ program yelmo_test
 
     scale_time1         = 15e3      ! [yr] Time to begin increasing err_scale from scale_err1 to scale_err2 
     scale_time2         = 25e3      ! [yr] Time to reach scale_H2 
-    
+
 if (trim(optvar) .eq. "ice") then     
     call nml_read(path_par,"optice","rel_tau1",    rel_tau1)    ! [yr] Initial relaxation tau, fixed until rel_time1 
     call nml_read(path_par,"optice","rel_tau2",    rel_tau2)    ! [yr] Final tau, reached at rel_time2, when relaxation disabled 
@@ -253,7 +253,7 @@ if (opt_method .eq. 1) then
         
         ! Set model tau, and set yelmo relaxation switch (1: shelves relaxing; 0: no relaxation)
         yelmo1%tpo%par%topo_rel_tau = tau 
-        yelmo1%tpo%par%topo_rel = 1 
+        yelmo1%tpo%par%topo_rel = 2 
         if (time .gt. rel_time2) yelmo1%tpo%par%topo_rel = 0 
 
         if (trim(optvar) .eq. "vel") then 

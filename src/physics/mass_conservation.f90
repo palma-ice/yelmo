@@ -648,25 +648,34 @@ contains
         do j = 2, ny-1 
             do i = 2, nx-1 
 
-                ! Determine whether to apply relaxation here
-                apply_relax = .FALSE. 
+                select case(topo_rel)
 
-                ! Shelf (floating) ice or ice-free points:
-                if (f_grnd(i,j) .eq. 0.0 .or. H_ref(i,j) .eq. 0.0) apply_relax = .TRUE. 
-                
-                if (topo_rel .eq. 2) then 
-                    ! Relax grounding-line ice too:
+                    case(1) 
+                        ! Relax the shelf (floating) ice and ice-free points
                     
-                    if (f_grnd(i,j) .gt. 0.0 .and. &
-                     (f_grnd(i-1,j) .eq. 0.0 .or. f_grnd(i+1,j) .eq. 0.0 &
-                        .or. f_grnd(i,j-1) .eq. 0.0 .or. f_grnd(i,j+1) .eq. 0.0)) apply_relax = .TRUE. 
+                        if (f_grnd(i,j) .eq. 0.0 .or. H_ref(i,j) .eq. 0.0) apply_relax = .TRUE. 
                 
-                else if (topo_rel .eq. 3) then 
-                    ! Relax all grounded ice too:
+                    case(2) 
+                        ! Relax the shelf (floating) ice and ice-free points
+                        ! and the grounding-line ice too
+                        
+                        if (f_grnd(i,j) .eq. 0.0 .or. H_ref(i,j) .eq. 0.0) apply_relax = .TRUE. 
+                        
+                        if (f_grnd(i,j) .gt. 0.0 .and. &
+                         (f_grnd(i-1,j) .eq. 0.0 .or. f_grnd(i+1,j) .eq. 0.0 &
+                            .or. f_grnd(i,j-1) .eq. 0.0 .or. f_grnd(i,j+1) .eq. 0.0)) apply_relax = .TRUE. 
+                
+                    case(3)
+                        ! Relax all points
 
-                    apply_relax = .TRUE. 
+                        apply_relax = .TRUE. 
                 
-                end if 
+                    case DEFAULT
+                        ! No relaxation
+
+                        apply_relax = .FALSE.
+
+                end select
                 
 
                 if (apply_relax) then 

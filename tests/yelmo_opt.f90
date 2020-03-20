@@ -34,7 +34,7 @@ program yelmo_test
 
     real(prec) :: rel_time1, rel_time2, rel_tau1, rel_tau2, rel_q  
     real(prec) :: scale_time1, scale_time2, scale_err1, scale_err2 
-    real(prec) :: sigma_err 
+    real(prec) :: sigma_time1, sigma_err 
 
     real(prec) :: tau, err_scale 
 
@@ -80,6 +80,8 @@ program yelmo_test
 
     scale_time1         = 15e3      ! [yr] Time to begin increasing err_scale from scale_err1 to scale_err2 
     scale_time2         = 25e3      ! [yr] Time to reach scale_H2 
+
+    sigma_time1         = 5e3       ! [yr] Time at which to remove smoothing radius for cf_ref 
 
 if (trim(optvar) .eq. "ice") then     
     call nml_read(path_par,"optice","rel_tau1",    rel_tau1)    ! [yr] Initial relaxation tau, fixed until rel_time1 
@@ -250,6 +252,8 @@ if (opt_method .eq. 1) then
         tau       = get_opt_param(time,time1=rel_time1,time2=rel_time2,p1=rel_tau1,p2=rel_tau2,q=rel_q)
         err_scale = get_opt_param(time,time1=scale_time1,time2=scale_time2,p1=scale_err1,p2=scale_err2,q=1.0)
         
+        if (time .ge. sigma_time1) sigma_err = 0.0_prec 
+
         ! Set model tau, and set yelmo relaxation switch (1: shelves relaxing; 0: no relaxation)
         yelmo1%tpo%par%topo_rel_tau = tau 
         yelmo1%tpo%par%topo_rel = 1 
@@ -580,7 +584,7 @@ contains
         character(len=*), intent(IN) :: optvar
 
         ! Local variables 
-        integer :: i, j, nx, ny, i1, j1, i2, j2  
+        integer :: i, j, nx, ny, i1, j1  
         real(prec) :: dx_km, f_err, f_err_lim, f_scale   
         real(prec) :: ux_aa, uy_aa, uxy_aa
         real(prec) :: err_now  
@@ -640,18 +644,14 @@ contains
 
                 if (ux_aa .ge. 0.0) then 
                     i1 = i-1 
-                    i2 = i-2
                 else 
-                    i1 = i+1
-                    i2 = i+2 
+                    i1 = i+1 
                 end if 
 
                 if (uy_aa .ge. 0.0) then 
                     j1 = j-1
-                    j2 = j-2 
                 else 
-                    j1 = j+1
-                    j2 = j+2  
+                    j1 = j+1  
                 end if 
                 
                 ! Get weighted error  =========
@@ -668,14 +668,14 @@ contains
                 if (trim(optvar) .eq. "ice") then
                     ! Define error for ice thickness 
 
-                    !err_now = xwt*H_err(i1,j) + ywt*H_err(i,j1) 
-                    err_now = xwt*(0.5*(H_err(i1,j)+H_err(i2,j))) + ywt*(0.5*(H_err(i,j1)+H_err(i,j2)))
+                    err_now = xwt*H_err(i1,j) + ywt*H_err(i,j1) 
                 
                 else 
                     ! Define error for surface velocity 
 
-                    err_now = xwt*(0.5*(uxy_err(i1,j)+uxy_err(i2,j))) + ywt*(0.5*(uxy_err(i,j1)+uxy_err(i,j2)))
+                    err_now = xwt*uxy_err(i1,j) + ywt*uxy_err(i,j1)
                     err_now = -err_now  ! Make negative to invert relationship (higher vel, higher friction)
+                
                 end if 
 
                 ! Get adjustment rate given error in ice thickness  =========
@@ -696,7 +696,7 @@ contains
         end do 
 
         ! Fill in missing values with nearest neighbor or cf_min when none available
-        call fill_nearest(cf_ref,missing_value=MV,fill_value=cf_min,n=5)
+        call fill_nearest(cf_ref,missing_value=MV,fill_value=cf_min,fill_dist=3,n=5)
 
         ! Ensure cf_ref is not below lower or upper limit 
         where (cf_ref .lt. cf_min) cf_ref = cf_min 
@@ -718,19 +718,20 @@ contains
 
     end subroutine update_cf_ref_errscaling
 
-    subroutine fill_nearest(var,missing_value,fill_value,n)
+    subroutine fill_nearest(var,missing_value,fill_value,fill_dist,n)
 
         implicit none 
 
         real(prec), intent(INOUT) :: var(:,:)
         real(prec), intent(IN)    :: missing_value
         real(prec), intent(IN)    :: fill_value 
+        integer,    intent(IN)    :: fill_dist
         integer,    intent(IN)    :: n               ! Average of n neighbors 
 
         ! Local variables 
         integer :: i, j, nx, ny, i1, j1, q, n_now, ij(2) 
         integer :: ntot 
-        real(prec) :: dist_max 
+        real(prec) :: dist_now, f_d 
 
 
         real(prec), allocatable :: var0(:,:) 
@@ -767,6 +768,7 @@ contains
 
                 n_now    = 0 
                 var(i,j) = 0.0
+                dist_now = 0.0 
 
                 do q = 1, n 
                     ! Loop over nearest neighbors to get average 
@@ -779,6 +781,7 @@ contains
 
                     ! Populate with neighbor value 
                     var(i,j) = var(i,j) + var0(ij(1),ij(2))
+                    dist_now = dist_now + dist(ij(1),ij(2))
                     n_now = n_now + 1 
 
                     ! Reset distance of neighbor to zero so it cannot be used again
@@ -789,8 +792,17 @@ contains
                 if (n_now .eq. 0) var(i,j) = fill_value 
 
                 ! Take average if multiple points used 
-                if (n_now .gt. 1) var(i,j) = var(i,j) / real(n_now,prec) 
+                if (n_now .gt. 1) then 
                     
+                    ! Determine mean distance to neighbors and weighting function versus distance
+                    dist_now = dist_now / real(n_now,prec) 
+                    f_d      = 1.0 - min( dist_now/real(fill_dist,prec), 1.0 )
+
+                    ! Apply weighted average of mean neighbor value and fill value 
+                    var(i,j) = f_d * (var(i,j) / real(n_now,prec)) + (1.0-f_d)*fill_value
+                    
+                end if 
+
                 ! Add this missing point to total for diagnostics 
                 ntot = ntot + 1 
             end if 

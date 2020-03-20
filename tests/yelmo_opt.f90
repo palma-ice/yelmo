@@ -153,7 +153,7 @@ end if
     ! Define no-ice mask from present-day data
     allocate(mask_noice(yelmo1%grd%nx,yelmo1%grd%ny))
     mask_noice = .FALSE. 
-    where(yelmo1%dta%pd%H_ice .le. 0.0) mask_noice = .TRUE. 
+    !where(yelmo1%dta%pd%H_ice .le. 0.0) mask_noice = .TRUE. 
 
     ! Impose additional negative mass balance to no ice points of 2 [m.i.e./a] melting
     if (trim(yelmo1%par%domain) .eq. "Greenland") then 
@@ -212,8 +212,9 @@ end if
 
     end if 
 
-    ! Update no-ice mask 
-    where(yelmo1%dta%pd%H_ice .le. 0.0) mask_noice = .TRUE. 
+    ! Update no-ice mask
+    mask_noice = .FALSE.
+    !where(yelmo1%dta%pd%H_ice .le. 0.0) mask_noice = .TRUE. 
 
     ! Impose additional negative mass balance to no ice points of 2 [m.i.e./a] melting
     if (trim(yelmo1%par%domain) .eq. "Greenland") then 

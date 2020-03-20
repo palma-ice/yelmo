@@ -58,6 +58,7 @@ program yelmo_test
     
     call nml_read(path_par,"ctrl","optvar",          optvar)                 ! "ice" or "vel" 
     call nml_read(path_par,"ctrl","sigma_err",       sigma_err)              ! [--] Smoothing radius for error to calculate correction in cf_ref (in multiples of dx)
+    call nml_read(path_par,"ctrl","sigma_vel",       sigma_vel)              ! [m/a] Speed at which smoothing diminishes to zero
     call nml_read(path_par,"ctrl","cf_min",          cf_min)                 ! [--] Minimum allowed cf value 
 
 
@@ -80,9 +81,7 @@ program yelmo_test
 
     scale_time1         = 15e3      ! [yr] Time to begin increasing err_scale from scale_err1 to scale_err2 
     scale_time2         = 25e3      ! [yr] Time to reach scale_H2 
-
-    sigma_vel           = 200.0     ! [m/yr] Ice vel. at which Gaussian smoothing diminished to zero 
-
+    
 if (trim(optvar) .eq. "ice") then     
     call nml_read(path_par,"optice","rel_tau1",    rel_tau1)    ! [yr] Initial relaxation tau, fixed until rel_time1 
     call nml_read(path_par,"optice","rel_tau2",    rel_tau2)    ! [yr] Final tau, reached at rel_time2, when relaxation disabled 

@@ -30,8 +30,9 @@ program yelmo_test
     integer    :: qmax 
     real(prec) :: time_iter
     real(prec) :: time_steady
+    real(prec) :: time_steady_end
     real(prec) :: time_tune 
-
+    
     real(prec) :: rel_time1, rel_time2, rel_tau1, rel_tau2, rel_q  
     real(prec) :: scale_time1, scale_time2, scale_err1, scale_err2 
     real(prec) :: sigma_err, sigma_vel 
@@ -68,7 +69,8 @@ program yelmo_test
     ! Simulation parameters
     qmax                = 51                ! Total number of iterations
     time_iter           = 500.0             ! [yr] Time for each iteration 
-    time_steady         = 10e3              ! [yr] Time to run to steady state at the end without further optimization
+    time_steady         = 15e3              ! [yr] Time at which to stop resetting topography
+    time_steady_end     = 10e3              ! [yr] Time to run to steady state at the end without further optimization
 
     time_init           = 0.0       ! [yr] Starting time
     dtt                 = 5.0       ! [yr] Time step for time loop 
@@ -285,19 +287,24 @@ if (opt_method .eq. 1) then
 
         end if 
         
-        ! Update the cf_ref and model time in the reference state
-        yelmo_ref%dyn%now%cf_ref = yelmo1%dyn%now%cf_ref 
-        call yelmo_set_time(yelmo_ref,time) 
-        
-        ! Update thermodynamics in reference state without advancing ice thickness 
-        call yelmo_update_equil(yelmo_ref,time,time_tot=2e3,topo_fixed=.TRUE.,dt=5.0,ssa_vel_max=5e3)
+        if (time .lt. time_steady) then 
+            ! Perform steps to reset the model to initial reference state 
 
-        ! Reset model to the reference state
-        yelmo1 = yelmo_ref  
+            ! Update the cf_ref and model time in the reference state
+            yelmo_ref%dyn%now%cf_ref = yelmo1%dyn%now%cf_ref 
+            call yelmo_set_time(yelmo_ref,time) 
+            
+            ! Update thermodynamics in reference state without advancing ice thickness 
+            call yelmo_update_equil(yelmo_ref,time,time_tot=1e3,topo_fixed=.TRUE.,dt=5.0,ssa_vel_max=5e3)
+
+            ! Reset model to the reference state
+            yelmo1 = yelmo_ref  
         
+        end if 
+
         ! === Update time_iter ==================
         time_end = time_iter
-        if (q .eq. qmax) time_end = time_steady
+        if (q .eq. qmax) time_end = time_steady_end 
 
         write(*,"(a,i4,f10.1,i4,f10.1,f12.1,f10.1)") "iter_par: ", q, time, &
                             yelmo1%tpo%par%topo_rel, tau, err_scale, time_end

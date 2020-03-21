@@ -39,6 +39,8 @@ program yelmo_test
     real(prec) :: tau, err_scale 
 
     character(len=12) :: optvar 
+    logical           :: reset_model
+    character(len=56) :: cf_ref_init_method
 
     real(prec), allocatable :: mb_corr(:,:) 
     real(prec), allocatable :: cf_ref_dot(:,:) 
@@ -57,6 +59,8 @@ program yelmo_test
     call nml_read(path_par,"ctrl","z_sl",            z_sl)                   ! [m] Sea level relative to present-day
     
     call nml_read(path_par,"ctrl","optvar",          optvar)                 ! "ice" or "vel" 
+    call nml_read(path_par,"ctrl","reset_model",     reset_model)            ! Reset model to reference state between iterations?
+    call nml_read(path_par,"ctrl","cf_ref_init_method", cf_ref_init_method)  ! How should cf_ref be initialized
     call nml_read(path_par,"ctrl","sigma_err",       sigma_err)              ! [--] Smoothing radius for error to calculate correction in cf_ref (in multiples of dx)
     call nml_read(path_par,"ctrl","sigma_vel",       sigma_vel)              ! [m/a] Speed at which smoothing diminishes to zero
     call nml_read(path_par,"ctrl","cf_min",          cf_min)                 ! [--] Minimum allowed cf value 
@@ -174,19 +178,31 @@ end if
     call yelmo_init_state(yelmo1,path_par,time=time_init,thrm_method="robin-cold")
 
 
-if (.FALSE.) then 
-    ! Calculate new initial guess of cf_ref using info from dyn
-    call guess_cf_ref(yelmo1%dyn%now%cf_ref,yelmo1%dyn%now%taud,yelmo1%dta%pd%uxy_s, &
-                        yelmo1%dta%pd%H_ice,yelmo1%dta%pd%H_grnd,yelmo1%dyn%par%beta_u0,cf_min,cf_max)
+    select case(trim(cf_ref_init_method))
 
-    ! Update ice sheet to get everything in sync
-    call yelmo_update_equil(yelmo1,time_init,time_tot=1.0,topo_fixed=.TRUE.,dt=1.0,ssa_vel_max=5e3)
+        case("guess")
 
-else 
+            ! Calculate new initial guess of cf_ref using info from dyn
+            call guess_cf_ref(yelmo1%dyn%now%cf_ref,yelmo1%dyn%now%taud,yelmo1%dta%pd%uxy_s, &
+                                yelmo1%dta%pd%H_ice,yelmo1%dta%pd%H_grnd,yelmo1%dyn%par%beta_u0,cf_min,cf_max)
 
-    yelmo1%dyn%now%cf_ref = cf_init 
+            ! Update ice sheet to get everything in sync
+            call yelmo_update_equil(yelmo1,time_init,time_tot=1.0,topo_fixed=.TRUE.,dt=1.0,ssa_vel_max=5e3)
+
+        case("restart")
+
+            ! Pass, cf_ref obtained from restart file 
+            if (.not. yelmo1%par%use_restart) then 
+                write(*,*) "yelmo_opt:: Error: cf_ref_init_method='restart' can only be used &
+                &in conjunction with a restart file being loaded."
+                stop 
+            end if 
+
+        case DEFAULT
+
+            yelmo1%dyn%now%cf_ref = cf_init 
     
-end if 
+    end select  
 
     if (.not. yelmo1%par%use_restart) then 
         ! Run initialization steps 
@@ -304,6 +320,16 @@ if (opt_method .eq. 1) then
 
         end if 
         
+        if (reset_model) then
+            ! Reset model to reference state with updated cf_ref 
+
+            yelmo_ref%dyn%now%cf_ref = yelmo1%dyn%now%cf_ref
+            call yelmo_set_time(yelmo_ref,time)
+
+            yelmo1 = yelmo_ref 
+
+        end if 
+
         ! === Update time_iter ==================
         time_end = time_iter
         if (q .eq. qmax) time_end = time_steady_end 

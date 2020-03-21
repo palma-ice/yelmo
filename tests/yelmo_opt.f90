@@ -129,23 +129,6 @@ end if
     ! Initialize data objects and load initial topography
     call yelmo_init(yelmo1,filename=path_par,grid_def="file",time=time_init)
 
-    ! === Set initial boundary conditions for current time and yelmo state =====
-    ! ybound: z_bed, z_sl, H_sed, H_w, smb, T_srf, bmb_shlf , Q_geo
-
-    yelmo1%bnd%z_sl     = 0.0               ! [m]
-    yelmo1%bnd%H_sed    = 0.0               ! [m]
-    yelmo1%bnd%Q_geo    = 50.0              ! [mW/m2]
-    
-    yelmo1%bnd%bmb_shlf = bmb_shlf_const    ! [m.i.e./a]
-    yelmo1%bnd%T_shlf   = T0                ! [K]   
-
-    if (dT_ann .lt. 0.0) yelmo1%bnd%T_shlf   = T0 + dT_ann*0.25_prec  ! [K] Oceanic temp anomaly
-    
-    ! Impose present-day surface mass balance and present-day temperature field
-    yelmo1%bnd%smb      = yelmo1%dta%pd%smb             ! [m.i.e./a]
-    yelmo1%bnd%T_srf    = yelmo1%dta%pd%T_srf + dT_ann  ! [K]
-    
-    call yelmo_print_bound(yelmo1%bnd)
 
     ! Initialize mass balance correction matrix 
     allocate(mb_corr(yelmo1%grd%nx,yelmo1%grd%ny))
@@ -156,6 +139,25 @@ end if
     mask_noice = .FALSE. 
     !where(yelmo1%dta%pd%H_ice .le. 0.0) mask_noice = .TRUE. 
 
+    ! Define cf_ref_dot for later use 
+    allocate(cf_ref_dot(yelmo1%grd%nx,yelmo1%grd%ny))
+    cf_ref_dot = 0.0 
+    
+
+    ! === Set initial boundary conditions for current time and yelmo state =====
+    ! ybound: z_bed, z_sl, H_sed, H_w, smb, T_srf, bmb_shlf , Q_geo
+
+    yelmo1%bnd%z_sl     = 0.0                   ! [m]
+    yelmo1%bnd%H_sed    = 0.0                   ! [m]
+    yelmo1%bnd%Q_geo    = 50.0                  ! [mW/m2]
+    
+    yelmo1%bnd%bmb_shlf = bmb_shlf_const        ! [m.i.e./a]
+    yelmo1%bnd%T_shlf   = T0 + dT_ann*0.25_prec ! [K]   
+
+    ! Impose present-day surface temperature and surface mass balance fields
+    yelmo1%bnd%T_srf    = yelmo1%dta%pd%T_srf + dT_ann  ! [K]
+    yelmo1%bnd%smb      = yelmo1%dta%pd%smb             ! [m.i.e./a]
+        
     ! Impose additional negative mass balance to no ice points of 2 [m.i.e./a] melting
     if (trim(yelmo1%par%domain) .eq. "Greenland") then 
         where(mask_noice) yelmo1%bnd%smb = yelmo1%dta%pd%smb - 2.0 
@@ -163,15 +165,14 @@ end if
         where(mask_noice) yelmo1%bnd%bmb_shlf = yelmo1%bnd%bmb_shlf - 2.0 
     end if 
     
-    ! Initialize cf_ref and calculate initial guess of C_bed 
-    ! (requires ad-hoc initialization of N_eff too)
-    allocate(cf_ref_dot(yelmo1%grd%nx,yelmo1%grd%ny))
-    cf_ref_dot = 0.0 
+    call yelmo_print_bound(yelmo1%bnd)
+
     
     ! Initialize state variables (dyn,therm,mat)
     ! (initialize temps with robin method with a cold base),
     ! or from restart file, if specified 
     call yelmo_init_state(yelmo1,path_par,time=time_init,thrm_method="robin-cold")
+
 
 if (.FALSE.) then 
     ! Calculate new initial guess of cf_ref using info from dyn
@@ -211,18 +212,36 @@ end if
         call yelmo_restart_write(yelmo1,file_restart_init,time_init)
 !         stop "**** Done ****"
 
+
+    else 
+        ! If restart file was used, redefine boundary conditions here since they 
+        ! may have been overwritten with other information.
+
+        ! === Set initial boundary conditions for current time and yelmo state =====
+        ! ybound: z_bed, z_sl, H_sed, H_w, smb, T_srf, bmb_shlf , Q_geo
+
+        yelmo1%bnd%z_sl     = 0.0                   ! [m]
+        yelmo1%bnd%H_sed    = 0.0                   ! [m]
+        yelmo1%bnd%Q_geo    = 50.0                  ! [mW/m2]
+        
+        yelmo1%bnd%bmb_shlf = bmb_shlf_const        ! [m.i.e./a]
+        yelmo1%bnd%T_shlf   = T0 + dT_ann*0.25_prec ! [K]   
+
+        ! Impose present-day surface temperature and surface mass balance fields
+        yelmo1%bnd%T_srf    = yelmo1%dta%pd%T_srf + dT_ann  ! [K]
+        yelmo1%bnd%smb      = yelmo1%dta%pd%smb             ! [m.i.e./a]
+        
+        ! Impose additional negative mass balance to no ice points of 2 [m.i.e./a] melting
+        if (trim(yelmo1%par%domain) .eq. "Greenland") then 
+            where(mask_noice) yelmo1%bnd%smb = yelmo1%dta%pd%smb - 2.0 
+        else ! Antarctica
+            where(mask_noice) yelmo1%bnd%bmb_shlf = yelmo1%bnd%bmb_shlf - 2.0 
+        end if 
+        
+        call yelmo_print_bound(yelmo1%bnd)
+
     end if 
 
-    ! Update no-ice mask
-    mask_noice = .FALSE.
-    !where(yelmo1%dta%pd%H_ice .le. 0.0) mask_noice = .TRUE. 
-
-    ! Impose additional negative mass balance to no ice points of 2 [m.i.e./a] melting
-    if (trim(yelmo1%par%domain) .eq. "Greenland") then 
-        where(mask_noice) yelmo1%bnd%smb = yelmo1%dta%pd%smb - 2.0 
-    else ! Antarctica
-        where(mask_noice) yelmo1%bnd%bmb_shlf = yelmo1%bnd%bmb_shlf - 2.0 
-    end if 
     
     ! Store the reference state
     yelmo_ref    = yelmo1

@@ -329,6 +329,22 @@ if (opt_method .eq. 1) then
 
         end if 
 
+        if (.TRUE.) then 
+            ! Update thermodynamics intermediately without advancing topography
+
+            if (reset_model) then 
+
+                call yelmo_update_equil(yelmo_ref,time,time_tot=1e3,topo_fixed=.TRUE.,dt=5.0,ssa_vel_max=5e3)
+                yelmo1 = yelmo_ref 
+                
+            else 
+
+                call yelmo_update_equil(yelmo1,time,time_tot=1e3,topo_fixed=.TRUE.,dt=5.0,ssa_vel_max=5e3)
+
+            end if 
+            
+        end if 
+
         ! === Update time_iter ==================
         time_end = time_iter
         if (q .eq. n_iter) time_end = time_steady_end 

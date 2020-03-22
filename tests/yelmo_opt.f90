@@ -4,12 +4,9 @@ program yelmo_test
 
     use ncio 
     use yelmo 
-    use yelmo_tools, only : gauss_values, calc_magnitude_from_staggered_ice
-
-    use gaussian_filter 
-    use basal_dragging
-    use ice_optimization 
     
+    use ice_optimization 
+
     implicit none 
 
     type(yelmo_class)      :: yelmo1
@@ -557,13 +554,6 @@ contains
         call nc_write(filename,"z_srf_pd_err",ylmo%dta%pd%err_z_srf,units="m",long_name="Surface elevation error wrt present day", &
                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
         call nc_write(filename,"uxy_s_pd_err",ylmo%dta%pd%err_uxy_s,units="m/a",long_name="Surface velocity error wrt present day", &
-                      dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-        
-        tmp = ylmo%dta%pd%err_z_srf
-        call filter_gaussian(var=tmp,sigma=2.0*ylmo%tpo%par%dx,dx=ylmo%tpo%par%dx, &
-                                mask=ylmo%dta%pd%err_z_srf .ne. 0.0)
-        
-        call nc_write(filename,"z_srf_sm_pd_err",tmp,units="m",long_name="Smooth surface elevation error wrt present day", &
                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
         
         ! Close the netcdf file

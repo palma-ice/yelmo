@@ -1,9 +1,9 @@
 &ctrl    
     ! Simulation parameters
-    n_iter          = 31                ! Total number of iterations     
+    n_iter          = 51                ! Total number of iterations     
     time_iter       = 500.0             ! [yr] Time for each iteration 
-    time_iter_therm = 1e3               ! [yr] Time to run thermodynamics for each iteration 
-    time_steady_end = 5e3               ! [yr] Time to run to steady state at the end without further optimization
+    time_iter_therm = 0.0               ! [yr] Time to run thermodynamics for each iteration 
+    time_steady_end = 10e3              ! [yr] Time to run to steady state at the end without further optimization
 
     optvar          = "ice"             ! "ice" or "vel" - optimization variable to use 
     reset_model     = False             ! Reset model to reference state between iterations?

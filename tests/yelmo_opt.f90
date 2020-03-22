@@ -296,9 +296,9 @@ if (opt_method .eq. 1) then
         tau       = get_opt_param(time,time1=rel_time1,time2=rel_time2,p1=rel_tau1,p2=rel_tau2,m=rel_m)
         err_scale = get_opt_param(time,time1=scale_time1,time2=scale_time2,p1=scale_err1,p2=scale_err2,m=1.0)
         
-        ! Set model tau, and set yelmo relaxation switch (1: shelves relaxing; 0: no relaxation)
+        ! Set model tau, and set yelmo relaxation switch (2: gl-line and shelves relaxing; 0: no relaxation)
         yelmo1%tpo%par%topo_rel_tau = tau 
-        yelmo1%tpo%par%topo_rel     = 1
+        yelmo1%tpo%par%topo_rel     = 2
         if (time .gt. rel_time2) yelmo1%tpo%par%topo_rel = 0 
 
         ! Update relaxation parameters for reference model too 

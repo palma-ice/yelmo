@@ -212,11 +212,6 @@ program yelmo_test
         if (mod(time,10.0)==0 .and. (.not. yelmo_log)) then
             write(*,"(a,f14.4)") "yelmo:: time = ", time
         end if 
-
-        if (abs(time).lt.1e-5) then 
-            ! At year==0, write some statistics 
-            write(*,*) "PDstats:", yelmo1%dta%pd%rmse_H, yelmo1%dta%pd%rmse_uxy, yelmo1%dta%pd%rmse_loguxy 
-        end if 
         
     end do 
     ! == Finished time loop == 

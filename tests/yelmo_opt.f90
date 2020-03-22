@@ -27,12 +27,13 @@ program yelmo_test
     integer    :: opt_method 
     real(prec) :: cf_min, cf_max, cf_init  
     
-    integer    :: qmax 
+    integer    :: n_iter 
     real(prec) :: time_iter
     real(prec) :: time_steady_end
     real(prec) :: time_tune 
+    real(prec) :: time_iter_tot 
 
-    real(prec) :: rel_time1, rel_time2, rel_tau1, rel_tau2, rel_q  
+    real(prec) :: rel_time1, rel_time2, rel_tau1, rel_tau2, rel_m  
     real(prec) :: scale_time1, scale_time2, scale_err1, scale_err2 
     real(prec) :: sigma_err, sigma_vel 
 
@@ -54,65 +55,70 @@ program yelmo_test
     ! Determine the parameter file from the command line 
     call yelmo_load_command_line_args(path_par)
 
-    call nml_read(path_par,"ctrl","bmb_shlf_const",  bmb_shlf_const)         ! [yr] Constant imposed bmb_shlf value
-    call nml_read(path_par,"ctrl","dT_ann",          dT_ann)                 ! [K] Temperature anomaly (atm)
-    call nml_read(path_par,"ctrl","z_sl",            z_sl)                   ! [m] Sea level relative to present-day
-    
+    call nml_read(path_par,"ctrl","n_iter",          n_iter)                 ! Total number of iterations
+    call nml_read(path_par,"ctrl","time_iter",       time_iter)              ! [yr] Time for each iteration
+    call nml_read(path_par,"ctrl","time_steady_end", time_steady_end)        ! [yr] Time for each iteration
+
     call nml_read(path_par,"ctrl","optvar",          optvar)                 ! "ice" or "vel" 
     call nml_read(path_par,"ctrl","reset_model",     reset_model)            ! Reset model to reference state between iterations?
     call nml_read(path_par,"ctrl","cf_ref_init_method", cf_ref_init_method)  ! How should cf_ref be initialized
     call nml_read(path_par,"ctrl","sigma_err",       sigma_err)              ! [--] Smoothing radius for error to calculate correction in cf_ref (in multiples of dx)
     call nml_read(path_par,"ctrl","sigma_vel",       sigma_vel)              ! [m/a] Speed at which smoothing diminishes to zero
     call nml_read(path_par,"ctrl","cf_min",          cf_min)                 ! [--] Minimum allowed cf value 
+    call nml_read(path_par,"ctrl","cf_max",          cf_max)                 ! [--] Maximum allowed cf value 
+    
+    call nml_read(path_par,"ctrl","bmb_shlf_const",  bmb_shlf_const)         ! [yr] Constant imposed bmb_shlf value
+    call nml_read(path_par,"ctrl","dT_ann",          dT_ann)                 ! [K] Temperature anomaly (atm)
+    call nml_read(path_par,"ctrl","z_sl",            z_sl)                   ! [m] Sea level relative to present-day
 
+    if (trim(optvar) .eq. "vel") then
+        call nml_read(path_par,"optvel","rel_tau1",    rel_tau1)             ! [yr] Initial relaxation tau, fixed until rel_time1 
+        call nml_read(path_par,"optvel","rel_tau2",    rel_tau2)             ! [yr] Final tau, reached at rel_time2
+        call nml_read(path_par,"optvel","scale_err1",  scale_err1)           ! [m/a] Initial value for err_scale parameter in cf_ref optimization  
+        call nml_read(path_par,"optvel","scale_err2",  scale_err2)           ! [m/a] Final value for err_scale parameter reached at scale_time2       
+    else ! "ice":
+        call nml_read(path_par,"optice","rel_tau1",    rel_tau1)             ! [yr] Initial relaxation tau, fixed until rel_time1 
+        call nml_read(path_par,"optice","rel_tau2",    rel_tau2)             ! [yr] Final tau, reached at rel_time2, when relaxation disabled 
+        call nml_read(path_par,"optice","scale_err1",  scale_err1)           ! [m]  Initial value for err_scale parameter in cf_ref optimization 
+        call nml_read(path_par,"optice","scale_err2",  scale_err2)           ! [m]  Final value for err_scale parameter reached at scale_time2   
+    end if 
+
+    ! Determine total iteration time 
+    time_iter_tot = time_iter*(n_iter-1)
 
     ! Choose optimization method (1: error method, 2: ratio method) 
+    ! ajr: opt_method=2 is currently inactive and outdated.
     opt_method = 1 
 
-    ! Simulation parameters
-    qmax                = 51                ! Total number of iterations
-    time_iter           = 500.0             ! [yr] Time for each iteration 
-    time_steady_end     = 10e3              ! [yr] Time to run to steady state at the end without further optimization
-
-    time_init           = 0.0       ! [yr] Starting time
-    dtt                 = 5.0       ! [yr] Time step for time loop 
-    dt2D_out            = time_iter ! [yr] 2D output writing 
+    time_init           = 0.0               ! [yr] Starting time
+    dtt                 = 5.0               ! [yr] Time step for time loop 
+    dt2D_out            = time_iter         ! [yr] 2D output writing 
 
     ! Optimization parameters 
-    rel_time1           = 10e3      ! [yr] Time to begin reducing tau from tau1 to tau2 
-    rel_time2           = 20e3      ! [yr] Time to reach tau2, and to disable relaxation 
-    rel_q               = 2.0       ! [--] Non-linear exponent to scale interpolation between time1 and time2 
+    rel_time1           = time_iter_tot*0.4 ! [yr] Time to begin reducing tau from tau1 to tau2 
+    rel_time2           = time_iter_tot*0.8 ! [yr] Time to reach tau2, and to disable relaxation 
+    rel_m               = 2.0               ! [--] Non-linear exponent to scale interpolation between time1 and time2 
 
-    scale_time1         = 15e3      ! [yr] Time to begin increasing err_scale from scale_err1 to scale_err2 
-    scale_time2         = 25e3      ! [yr] Time to reach scale_H2 
+    scale_time1         = time_iter_tot*0.6 ! [yr] Time to begin increasing err_scale from scale_err1 to scale_err2 
+    scale_time2         = time_iter_tot*1.0 ! [yr] Time to reach scale_H2 
 
-if (trim(optvar) .eq. "ice") then     
-    call nml_read(path_par,"optice","rel_tau1",    rel_tau1)    ! [yr] Initial relaxation tau, fixed until rel_time1 
-    call nml_read(path_par,"optice","rel_tau2",    rel_tau2)    ! [yr] Final tau, reached at rel_time2, when relaxation disabled 
-    call nml_read(path_par,"optice","scale_err1",  scale_err1)  ! [m]  Initial value for err_scale parameter in cf_ref optimization 
-    call nml_read(path_par,"optice","scale_err2",  scale_err2)  ! [m]  Final value for err_scale parameter reached at scale_time2   
-else ! "vel":
-    call nml_read(path_par,"optice","rel_tau1",    rel_tau1)    ! [yr] Initial relaxation tau, fixed until rel_time1 
-    call nml_read(path_par,"optice","rel_tau2",    rel_tau2)    ! [yr] Final tau, reached at rel_time2
-    call nml_read(path_par,"optvel","scale_err1",  scale_err1)  ! [m/a] Initial value for err_scale parameter in cf_ref optimization  
-    call nml_read(path_par,"optvel","scale_err2",  scale_err2)  ! [m/a] Final value for err_scale parameter reached at scale_time2  
-end if 
-
-    cf_init             = 0.2       ! [--] Initial cf value everywhere
-    cf_max              = 1.0       ! [--] Maximum allowed cf_value 
+    cf_init             = 0.2               ! [--] Initial cf value everywhere (not too important)
 
 ! Not used:
 !         ! Ratio method 
-!         qmax                = 100       ! Total number of iterations
+!         n_iter                = 100       ! Total number of iterations
 !         time_tune           = 20.0      ! [yr]
 !         time_iter           = 200.0     ! [yr] 
     
-    ! Consistency checks 
-    if (rel_time2 .ge. qmax*time_iter) then 
-        write(*,*) "Error: rel_time2 >= total time. rel_time2 must be less than the total simulation &
-                    &years, so that relaxation is disabled at the end of the simulation."
-        stop 
-    end if 
+    ! === Consistency checks =============================
+    
+    ! Ensure error scaling only increases with time
+    scale_err2 = max(scale_err1,scale_err2)
+    
+    ! Ensure relaxation constant only increases with time 
+    rel_tau2 = max(rel_tau1,rel_tau2)
+    
+    ! ====================================================
 
     ! Assume program is running from the output folder
     outfldr = "./"
@@ -279,12 +285,12 @@ if (opt_method .eq. 1) then
     time = time_init 
     n_now = 1 
 
-    do q = 1, qmax 
+    do q = 1, n_iter 
 
         ! === Optimization parameters =========
         
-        tau       = get_opt_param(time,time1=rel_time1,time2=rel_time2,p1=rel_tau1,p2=rel_tau2,q=rel_q)
-        err_scale = get_opt_param(time,time1=scale_time1,time2=scale_time2,p1=scale_err1,p2=scale_err2,q=1.0)
+        tau       = get_opt_param(time,time1=rel_time1,time2=rel_time2,p1=rel_tau1,p2=rel_tau2,m=rel_m)
+        err_scale = get_opt_param(time,time1=scale_time1,time2=scale_time2,p1=scale_err1,p2=scale_err2,m=1.0)
         
         ! Set model tau, and set yelmo relaxation switch (1: shelves relaxing; 0: no relaxation)
         yelmo1%tpo%par%topo_rel_tau = tau 
@@ -298,15 +304,6 @@ if (opt_method .eq. 1) then
         ! Diagnose mass balance correction term 
         call update_mb_corr(mb_corr,yelmo1%tpo%now%H_ice,yelmo1%dta%pd%H_ice,tau)
         
-        if (trim(optvar) .eq. "vel") then 
-            ! If using 'vel' method, disabled relaxation, and instead apply 
-            ! mass balance correction term 
-
-            yelmo1%tpo%par%topo_rel = 0 
-            yelmo1%bnd%smb          = yelmo1%dta%pd%smb + mb_corr           ! [m.i.e./a]
-    
-        end if 
-
         ! === Update cf_ref and reset model ===================
 
         if (q .gt. 1) then
@@ -332,7 +329,7 @@ if (opt_method .eq. 1) then
 
         ! === Update time_iter ==================
         time_end = time_iter
-        if (q .eq. qmax) time_end = time_steady_end 
+        if (q .eq. n_iter) time_end = time_steady_end 
 
         write(*,"(a,i4,f10.1,i4,f10.1,f12.1,f10.1)") "iter_par: ", q, time, &
                             yelmo1%tpo%par%topo_rel, tau, err_scale, time_end
@@ -359,7 +356,7 @@ else
     ! Initialize timing variables 
     time = time_init 
     
-    do q = 1, qmax 
+    do q = 1, n_iter 
 
         ! Reset model to the initial state (including H_w) and time, with updated C_bed field 
         yelmo_ref%dyn%now%C_bed = yelmo1%dyn%now%C_bed 
@@ -1058,7 +1055,7 @@ end if
 
     end subroutine wtd_mean
 
-    function get_opt_param(time,time1,time2,p1,p2,q) result(p) 
+    function get_opt_param(time,time1,time2,p1,p2,m) result(p) 
         ! Determine value of parameter as a function of time 
 
         implicit none 
@@ -1068,7 +1065,7 @@ end if
         real(prec), intent(IN) :: time2
         real(prec), intent(IN) :: p1
         real(prec), intent(IN) :: p2
-        real(prec), intent(IN) :: q         ! Non-linear exponent (q=1.0 or higher)
+        real(prec), intent(IN) :: m         ! Non-linear exponent (m=1.0 or higher)
         real(prec) :: p 
 
         if (time .le. time1) then 
@@ -1076,8 +1073,8 @@ end if
         else if (time .ge. time2) then 
             p = p2 
         else 
-            ! Linear interpolation 
-            p = p1 + (p2-p1)* ((time-time1)/(time2-time1))**q 
+            ! Linear interpolation with non-linear factor m if desired
+            p = p1 + (p2-p1)* ((time-time1)/(time2-time1))**m 
         end if  
 
         return 

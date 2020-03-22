@@ -1,7 +1,8 @@
 &ctrl    
-    bmb_shlf_const  = -10.0             ! [m/a] Basal mass balance of ice shelves
-    dT_ann          = -1.0              ! [K]  Temperature anomaly (atm)
-    z_sl            = 0.0               ! [m] Sea level relative to present-day 
+    ! Simulation parameters
+    n_iter          = 31                ! Total number of iterations     
+    time_iter       = 500.0             ! [yr] Time for each iteration 
+    time_steady_end = 5e3               ! [yr] Time to run to steady state at the end without further optimization
 
     optvar          = "ice"             ! "ice" or "vel" - optimization variable to use 
     reset_model     = True              ! Reset model to reference state between iterations?
@@ -9,6 +10,11 @@
     sigma_err       = 1.5               ! [--] Smoothing radius for error to calculate correction in cf_ref (in multiples of dx)
     sigma_vel       = 200.0             ! [m/a] Speed at which smoothing diminishes to zero
     cf_min          = 1e-4              ! [--] Minimum allowed cf value
+    cf_max          = 1.0               ! [--] Maximum allowed cf value
+    
+    bmb_shlf_const  = -10.0             ! [m/a] Basal mass balance of ice shelves
+    dT_ann          = -1.0              ! [K]  Temperature anomaly (atm)
+    z_sl            = 0.0               ! [m] Sea level relative to present-day 
 
 /
 

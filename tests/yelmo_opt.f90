@@ -34,7 +34,7 @@ program yelmo_test
     real(prec) :: time_iter_tot 
 
     real(prec) :: rel_time1, rel_time2, rel_tau1, rel_tau2, rel_m  
-    real(prec) :: scale_time1, scale_time2, scale_err1, scale_err2 
+    real(prec) :: scale_ftime, scale_time1, scale_time2, scale_err1, scale_err2 
     real(prec) :: sigma_err, sigma_vel 
 
     real(prec) :: tau, err_scale 
@@ -74,11 +74,13 @@ program yelmo_test
     if (trim(optvar) .eq. "vel") then
         call nml_read(path_par,"optvel","rel_tau1",    rel_tau1)             ! [yr] Initial relaxation tau, fixed until rel_time1 
         call nml_read(path_par,"optvel","rel_tau2",    rel_tau2)             ! [yr] Final tau, reached at rel_time2
+        call nml_read(path_par,"optice","scale_ftime", scale_ftime)          ! [-]  Fraction of time_iter_tot at which to start transition from scale_err1 to scale_err2
         call nml_read(path_par,"optvel","scale_err1",  scale_err1)           ! [m/a] Initial value for err_scale parameter in cf_ref optimization  
         call nml_read(path_par,"optvel","scale_err2",  scale_err2)           ! [m/a] Final value for err_scale parameter reached at scale_time2       
     else ! "ice":
         call nml_read(path_par,"optice","rel_tau1",    rel_tau1)             ! [yr] Initial relaxation tau, fixed until rel_time1 
         call nml_read(path_par,"optice","rel_tau2",    rel_tau2)             ! [yr] Final tau, reached at rel_time2, when relaxation disabled 
+        call nml_read(path_par,"optice","scale_ftime", scale_ftime)          ! [-]  Fraction of time_iter_tot at which to start transition from scale_err1 to scale_err2
         call nml_read(path_par,"optice","scale_err1",  scale_err1)           ! [m]  Initial value for err_scale parameter in cf_ref optimization 
         call nml_read(path_par,"optice","scale_err2",  scale_err2)           ! [m]  Final value for err_scale parameter reached at scale_time2   
     end if 
@@ -99,8 +101,8 @@ program yelmo_test
     rel_time2           = time_iter_tot*0.8 ! [yr] Time to reach tau2, and to disable relaxation 
     rel_m               = 2.0               ! [--] Non-linear exponent to scale interpolation between time1 and time2 
 
-    scale_time1         = time_iter_tot*0.6 ! [yr] Time to begin increasing err_scale from scale_err1 to scale_err2 
-    scale_time2         = time_iter_tot*1.0 ! [yr] Time to reach scale_H2 
+    scale_time1         = time_iter_tot*scale_ftime ! [yr] Time to begin increasing err_scale from scale_err1 to scale_err2 
+    scale_time2         = time_iter_tot*1.0         ! [yr] Time to reach scale_H2 
 
     cf_init             = 0.2               ! [--] Initial cf value everywhere (not too important)
 

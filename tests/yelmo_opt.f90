@@ -29,6 +29,7 @@ program yelmo_test
     
     integer    :: n_iter 
     real(prec) :: time_iter
+    real(prec) :: time_iter_therm 
     real(prec) :: time_steady_end
     real(prec) :: time_tune 
     real(prec) :: time_iter_tot 
@@ -57,6 +58,7 @@ program yelmo_test
 
     call nml_read(path_par,"ctrl","n_iter",          n_iter)                 ! Total number of iterations
     call nml_read(path_par,"ctrl","time_iter",       time_iter)              ! [yr] Time for each iteration
+    call nml_read(path_par,"ctrl","time_iter_therm", time_iter_therm)        ! [yr] Time to run thermodynamics for each iteration
     call nml_read(path_par,"ctrl","time_steady_end", time_steady_end)        ! [yr] Time for each iteration
 
     call nml_read(path_par,"ctrl","optvar",          optvar)                 ! "ice" or "vel" 
@@ -325,24 +327,21 @@ if (opt_method .eq. 1) then
             yelmo_ref%dyn%now%cf_ref = yelmo1%dyn%now%cf_ref
             call yelmo_set_time(yelmo_ref,time)
 
+            if (time_iter_therm .gt. 0.0) then
+                ! Run thermodynamics without updating topography 
+                call yelmo_update_equil(yelmo_ref,time,time_tot=time_iter_therm,topo_fixed=.TRUE.,dt=5.0,ssa_vel_max=5e3)
+            end if 
+
             yelmo1 = yelmo_ref 
 
-        end if 
+        else 
+            ! Continue with the model as it is
 
-        if (.TRUE.) then 
-            ! Update thermodynamics intermediately without advancing topography
-
-            if (reset_model) then 
-
-                call yelmo_update_equil(yelmo_ref,time,time_tot=1e3,topo_fixed=.TRUE.,dt=5.0,ssa_vel_max=5e3)
-                yelmo1 = yelmo_ref 
-                
-            else 
-
-                call yelmo_update_equil(yelmo1,time,time_tot=1e3,topo_fixed=.TRUE.,dt=5.0,ssa_vel_max=5e3)
-
+            if (time_iter_therm .gt. 0.0) then
+                ! Run thermodynamics without updating topography  
+                call yelmo_update_equil(yelmo1,time,time_tot=time_iter_therm,topo_fixed=.TRUE.,dt=5.0,ssa_vel_max=5e3)
             end if 
-            
+             
         end if 
 
         ! === Update time_iter ==================

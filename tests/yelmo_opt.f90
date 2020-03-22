@@ -61,7 +61,7 @@ program yelmo_test
 
     call nml_read(path_par,"ctrl","optvar",          optvar)                 ! "ice" or "vel" 
     call nml_read(path_par,"ctrl","reset_model",     reset_model)            ! Reset model to reference state between iterations?
-    call nml_read(path_par,"ctrl","cf_ref_init_method", cf_ref_init_method)  ! How should cf_ref be initialized
+    call nml_read(path_par,"ctrl","cf_ref_init_method", cf_ref_init_method)  ! How should cf_ref be initialized (guess, restart, none)
     call nml_read(path_par,"ctrl","sigma_err",       sigma_err)              ! [--] Smoothing radius for error to calculate correction in cf_ref (in multiples of dx)
     call nml_read(path_par,"ctrl","sigma_vel",       sigma_vel)              ! [m/a] Speed at which smoothing diminishes to zero
     call nml_read(path_par,"ctrl","cf_min",          cf_min)                 ! [--] Minimum allowed cf value 
@@ -204,7 +204,7 @@ program yelmo_test
                 stop 
             end if 
 
-        case DEFAULT
+        case DEFAULT  ! "none"
 
             yelmo1%dyn%now%cf_ref = cf_init 
     

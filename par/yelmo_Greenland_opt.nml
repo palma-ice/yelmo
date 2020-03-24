@@ -19,6 +19,22 @@
 
 /
 
+&optice 
+    rel_tau1            = 10.0          ! [yr] Initial relaxation tau, fixed until rel_time1 
+    rel_tau2            = 1000.0        ! [yr] Final tau, reached at rel_time2, when relaxation disabled 
+    scale_ftime         = 0.6           ! [-]  Fraction of time_iter_tot at which to start transition from scale_err1 to scale_err2
+    scale_err1          =  500.0        ! [m]  Initial value for err_scale parameter in cf_ref optimization 
+    scale_err2          = 2000.0        ! [m]  Final value for err_scale parameter reached at scale_time2 
+/
+
+&optvel
+    rel_tau1            = 10.0          ! [yr] Initial relaxation tau, fixed until rel_time1 
+    rel_tau2            = 100.0         ! [yr] Final tau, reached at rel_time2
+    scale_ftime         = 0.6           ! [-]  Fraction of time_iter_tot at which to start transition from scale_err1 to scale_err2
+    scale_err1          = 200.0         ! [m/a] Initial value for err_scale parameter in cf_ref optimization 
+    scale_err2          = 500.0         ! [m/a] Final value for err_scale parameter reached at scale_time2 
+/
+
 &yelmo
     domain          = "Greenland"
     grid_name       = "GRL-16KM"

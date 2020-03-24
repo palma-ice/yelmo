@@ -4,7 +4,7 @@ program yelmo_test
 
     use ncio 
     use yelmo 
-    
+
     use ice_optimization 
 
     implicit none 
@@ -140,8 +140,7 @@ program yelmo_test
 
     ! Initialize data objects and load initial topography
     call yelmo_init(yelmo1,filename=path_par,grid_def="file",time=time_init)
-
-
+    
     ! Initialize mass balance correction matrix 
     allocate(mb_corr(yelmo1%grd%nx,yelmo1%grd%ny))
     mb_corr = 0.0_prec 

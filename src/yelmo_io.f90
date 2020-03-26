@@ -82,13 +82,13 @@ contains
         integer, optional             :: ncid 
         
         call nc_write(filename,"rmse_H",ylmo%dta%pd%rmse_H,units="m",long_name="RMSE - Ice thickness", &
-                      dim1="time",start=[n],count=[1],ncid=ncid)
+                      dim1="time",start=[n],ncid=ncid)
         call nc_write(filename,"rmse_zsrf",ylmo%dta%pd%rmse_zsrf,units="m",long_name="RMSE - Surface elevation", &
-                      dim1="time",start=[n],count=[1],ncid=ncid)
+                      dim1="time",start=[n],ncid=ncid)
         call nc_write(filename,"rmse_uxy",ylmo%dta%pd%rmse_uxy,units="m/a",long_name="RMSE - Surface velocity", &
-                      dim1="time",start=[n],count=[1],ncid=ncid)
+                      dim1="time",start=[n],ncid=ncid)
         call nc_write(filename,"rmse_uxy_log",ylmo%dta%pd%rmse_loguxy,units="log(m/a)",long_name="RMSE - Log surface velocity", &
-                      dim1="time",start=[n],count=[1],ncid=ncid)
+                      dim1="time",start=[n],ncid=ncid)
         
         ! If calculating ages and isochronal layer depths exist and isochronal observations exist, then write rmse as well
         if (ylmo%mat%par%calc_age .and. &
@@ -96,8 +96,7 @@ contains
             count(ylmo%dta%pd%age_iso  .eq. 0.0) .ne. ylmo%dta%par%pd_age_n_iso) then
 
             call nc_write(filename,"rmse_iso",ylmo%dta%pd%rmse_iso,units="m",long_name="RMSE - isochronal layer depths", &
-                      dim1="age_iso",dim2="time",start=[1,n],count=[size(ylmo%mat%par%age_iso,1),1], &
-                      missing_value=mv,ncid=ncid)
+                      dim1="age_iso",dim2="time",start=[1,n],missing_value=mv,ncid=ncid)
         
         end if 
 

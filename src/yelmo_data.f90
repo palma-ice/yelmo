@@ -50,25 +50,24 @@ contains
         ! Isochronal layer error 
         dta%pd%err_depth_iso = mv
 
-        do q = 1, mat%par%n_iso
+        do q = 1, dta%par%pd_age_n_iso
+            ! Loop over observed isochronal layer depths 
 
-            if (mat%par%age_iso(q) .ne. 0.0) then 
-                ! Isochronal layer exists 
+            do q1 = 1, mat%par%n_iso
+                ! Loop over isochronal layer depths in Yelmo 
 
-                do q1 = 1, dta%par%pd_age_n_iso
-                    ! Loop over observed isochronal layer depths 
+                if (abs(mat%par%age_iso(q1)-dta%pd%age_iso(q)) .lt. tol) then 
+                    ! Isochronal layer in data matches this one 
 
-                    if (abs(dta%pd%age_iso(q1)-mat%par%age_iso(q)) .lt. tol) then 
-                        ! Isochronal layer in data matches this one 
+                    where(dta%pd%depth_iso(:,:,q) .ne. mv) 
+                        dta%pd%err_depth_iso(:,:,q) = mat%now%depth_iso(:,:,q1) - dta%pd%depth_iso(:,:,q)
+                    elsewhere 
+                        dta%pd%err_depth_iso(:,:,q) = mv 
+                    end where 
 
-                        where(dta%pd%depth_iso(:,:,q1) .ne. mv) 
-                            dta%pd%err_depth_iso(:,:,q1) = mat%now%depth_iso(:,:,q) - dta%pd%depth_iso(:,:,q1)
-                        end where 
+                end if
 
-                    end if 
-                end do 
-
-            end if 
+            end do 
 
         end do 
 

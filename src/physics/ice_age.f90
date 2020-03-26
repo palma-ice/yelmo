@@ -1,7 +1,7 @@
 module ice_age
     ! Module to treat online age calculations 
 
-    use yelmo_defs, only : prec
+    use yelmo_defs, only : prec, mv 
     use solver_tridiagonal, only : solve_tridiag 
     
     implicit none
@@ -11,6 +11,7 @@ module ice_age
     public :: calc_tracer_3D
     public :: calc_tracer_column
     public :: calc_tracer_column_expl 
+    public :: calc_isochrones
 
 contains
 
@@ -837,6 +838,89 @@ contains
         return 
 
     end subroutine calc_dzeta_terms
+
+
+    subroutine calc_isochrones(depth_iso,dep_time,H_ice,age_iso,zeta,time)
+        ! Calculate specific isochronal layers (depth_iso) at specified ages (age_iso)
+        ! from info about the deposition time of each ice layer (dep_time)
+
+        ! Note: to maintain generality, calculate everything based on dep_time, rather
+        ! than age (ie, convert the age of each layer to a deposition time) 
+
+        implicit none 
+
+        real(prec), intent(OUT) :: depth_iso(:,:,:)     ! [m]   Depth of isochronal layer
+        real(prec), intent(IN)  :: dep_time(:,:,:)      ! [a]   Deposition time of ice layer
+        real(prec), intent(IN)  :: H_ice(:,:)           ! [m]   Ice thickness 
+        real(prec), intent(IN)  :: age_iso(:)           ! [kyr] Isochronal layer ages
+        real(prec), intent(IN)  :: zeta(:)              ! [-]   Vertical sigma coordinates
+        real(prec), intent(IN)  :: time                 ! [a]   Current time 
+
+        ! Local variables 
+        integer :: i, j, k, k0, k1, q, nx, ny, nz, n_iso 
+        real(prec) :: dep_time_iso, zeta_iso  
+
+        nx    = size(H_ice,1)
+        ny    = size(H_ice,2) 
+        nz    = size(zeta) 
+        n_iso = size(age_iso) 
+
+        ! Initially set depth of isochrones to zero 
+        depth_iso = 0.0 
+
+        ! Calculate each isochrone at each location separately 
+                
+        do q = 1, n_iso 
+
+            ! Get isochronal age in terms of deposition time 
+            dep_time_iso = 0.0 - age_iso(q) 
+
+            if (dep_time_iso .lt. time) then 
+                ! This layer should exist, perform interpolation at each point 
+
+                do j = 1, ny 
+                do i = 1, nx 
+
+                    if (H_ice(i,j) .gt. 0.0) then 
+                        ! Ice exists here, get isochronal depth 
+
+                        k1 = mv 
+
+                        do k = 1, nz
+                            if (dep_time(i,j,k) .gt. dep_time_iso) then 
+                                k1 = k 
+                                exit 
+                            end if 
+                        end do 
+
+                        if (k1 .eq. 1) then 
+                            ! All ice is younger than current isochronal deposition time
+                            depth_iso(i,j,q) = (1.0-zeta(1))*H_ice(i,j) 
+
+                        else if (k1 .eq. mv) then 
+                            ! All ice is older than current isochronal deposition time
+                            depth_iso(i,j,q) = 0.0 
+
+                        else 
+                            ! Isochronal deposition time is inside column 
+                            k0 = k1 - 1 
+                            zeta_iso = interp_linear_pt(dep_time(i,j,k0:k1),zeta(k0:k1),xout=dep_time_iso)
+                            depth_iso(i,j,q) = (1.0-zeta_iso)*H_ice(i,j) 
+
+                        end if 
+
+                    end if 
+
+                end do 
+                end do 
+
+            end if 
+
+        end do 
+              
+        return 
+
+    end subroutine calc_isochrones
 
 end module ice_age 
 

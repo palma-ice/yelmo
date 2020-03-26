@@ -16,24 +16,30 @@ module yelmo_data
 
 contains
 
-    subroutine ydata_compare(dta,tpo,dyn,thrm,bnd)
+    subroutine ydata_compare(dta,tpo,dyn,mat,thrm,bnd)
 
         implicit none 
 
         type(ydata_class),  intent(INOUT) :: dta
         type(ytopo_class),  intent(IN)    :: tpo 
         type(ydyn_class),   intent(IN)    :: dyn 
+        type(ymat_class),   intent(IN)    :: mat
         type(ytherm_class), intent(IN)    :: thrm
         type(ybound_class), intent(IN)    :: bnd
         
         ! Local variables 
-        integer :: nx, ny 
+        integer :: q, q1, nx, ny 
         real(prec), allocatable :: tmp(:,:) 
         real(prec), allocatable :: tmp1(:,:) 
-        
+        logical,    allocatable :: mask(:,:)
+
+        real(prec), parameter :: tol = 1e-3 
+
         nx = size(tpo%now%H_ice,1)
         ny = size(tpo%now%H_ice,2)
         
+        allocate(mask(nx,ny))
+
         ! ======================================================
         ! Calculate errors
 
@@ -41,6 +47,31 @@ contains
         dta%pd%err_z_srf   = tpo%now%z_srf - dta%pd%z_srf 
         dta%pd%err_uxy_s   = dyn%now%uxy_s - dta%pd%uxy_s 
         
+        ! Isochronal layer error 
+        dta%pd%err_depth_iso = mv
+
+        do q = 1, mat%par%n_iso
+
+            if (mat%par%age_iso(q) .ne. 0.0) then 
+                ! Isochronal layer exists 
+
+                do q1 = 1, dta%par%pd_age_n_iso
+                    ! Loop over observed isochronal layer depths 
+
+                    if (abs(dta%pd%age_iso(q1)-mat%par%age_iso(q)) .lt. tol) then 
+                        ! Isochronal layer in data matches this one 
+
+                        where(dta%pd%depth_iso(:,:,q1) .ne. mv) 
+                            dta%pd%err_depth_iso(:,:,q1) = mat%now%depth_iso(:,:,q) - dta%pd%depth_iso(:,:,q1)
+                        end where 
+
+                    end if 
+                end do 
+
+            end if 
+
+        end do 
+
         ! ======================================================
         ! Whole ice sheet error metrics (rmse)
 
@@ -91,6 +122,17 @@ contains
         
         if (dta%pd%rmse_loguxy .eq. 0.0_prec) dta%pd%rmse_loguxy = mv 
         
+        ! == rmse[isochronal layer depth] ============
+
+        do q1 = 1, dta%par%pd_age_n_iso
+            mask = dta%pd%err_depth_iso(:,:,q1) .ne. mv
+            if (count(mask) .gt. 0) then 
+                dta%pd%rmse_iso(q1) = sqrt( sum(dta%pd%err_depth_iso(:,:,q1)**2,mask=mask) / count(mask) )
+            else 
+                dta%pd%rmse_iso(q1) = mv 
+            end if 
+        end do 
+
         return 
 
     end subroutine ydata_compare 
@@ -327,8 +369,9 @@ contains
         allocate(pd%err_H_ice(nx,ny))
         allocate(pd%err_z_srf(nx,ny))
         allocate(pd%err_z_bed(nx,ny))
-        
         allocate(pd%err_uxy_s(nx,ny))
+
+        allocate(pd%rmse_iso(n_iso))
         
         pd%H_ice        = 0.0 
         pd%z_srf        = 0.0 
@@ -348,9 +391,10 @@ contains
         pd%err_H_ice    = 0.0 
         pd%err_z_srf    = 0.0 
         pd%err_z_bed    = 0.0 
+        pd%err_uxy_s    = 0.0 
         
-        pd%err_uxy_s = 0.0 
-        
+        pd%rmse_iso     = mv 
+
         return 
     end subroutine ydata_alloc 
 
@@ -379,6 +423,8 @@ contains
         if (allocated(pd%err_z_bed))    deallocate(pd%err_z_bed)
         
         if (allocated(pd%err_uxy_s))    deallocate(pd%err_uxy_s)
+        
+        if (allocated(pd%rmse_iso))     deallocate(pd%rmse_iso)
         
         return 
 

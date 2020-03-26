@@ -353,6 +353,8 @@ module yelmo_defs
         real(prec), allocatable :: zeta_aa(:)   ! Layer centers (aa-nodes), plus base and surface: nz_aa points 
         real(prec), allocatable :: zeta_ac(:)   ! Layer borders (ac-nodes), plus base and surface: nz_ac == nz_aa-1 points
         
+        real(prec), allocatable :: age_iso(:)
+
     end type 
 
     type ymat_state_class 
@@ -370,7 +372,7 @@ module yelmo_defs
         real(prec), allocatable :: f_shear_bar(:,:) 
         
         real(prec), allocatable :: dep_time(:,:,:)    ! Ice deposition time (for online age tracing)
-
+        real(prec), allocatable :: depth_iso(:,:,:)   ! Depth of specific isochronal layers
     end type 
 
     type ymat_class
@@ -524,6 +526,7 @@ module yelmo_defs
         real(prec), allocatable :: ux_s(:,:), uy_s(:,:), uxy_s(:,:) 
         real(prec), allocatable :: T_srf(:,:), smb(:,:)
         real(prec), allocatable :: depth_iso(:,:,:)  
+        
         ! Comparison metrics 
         real(prec), allocatable :: err_H_ice(:,:), err_z_srf(:,:), err_z_bed(:,:)
         real(prec), allocatable :: err_uxy_s(:,:)
@@ -536,7 +539,7 @@ module yelmo_defs
         real(prec) :: rmse_zsrf
         real(prec) :: rmse_uxy 
         real(prec) :: rmse_loguxy 
-             
+        real(prec), allocatable :: rmse_iso(:) 
     
     end type
 

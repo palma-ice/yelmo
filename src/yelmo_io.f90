@@ -35,6 +35,7 @@ contains
         call nc_write_dim(filename,"month",  x=1,dx=1,nx=12,         units="month")
         call nc_write_dim(filename,"zeta",   x=ylmo%par%zeta_aa,     units="1")
         call nc_write_dim(filename,"zeta_ac",x=ylmo%par%zeta_ac,     units="1")
+        call nc_write_dim(filename,"age_iso",x=ylmo%mat%par%age_iso, units="kyr")
         call nc_write_dim(filename,"time",   x=time_init,dx=1.0_prec,nx=1,units=trim(units),unlimited=.TRUE.)
 
         ! Static information
@@ -89,6 +90,17 @@ contains
         call nc_write(filename,"rmse_uxy_log",ylmo%dta%pd%rmse_loguxy,units="log(m/a)",long_name="RMSE - Log surface velocity", &
                       dim1="time",start=[n],count=[1],ncid=ncid)
         
+        ! If calculating ages and isochronal layer depths exist and isochronal observations exist, then write rmse as well
+        if (ylmo%mat%par%calc_age .and. &
+            count(ylmo%mat%par%age_iso .eq. 0.0) .ne. ylmo%mat%par%n_iso .and. &
+            count(ylmo%dta%pd%age_iso  .eq. 0.0) .ne. ylmo%dta%par%pd_age_n_iso) then
+
+            call nc_write(filename,"rmse_iso",ylmo%dta%pd%rmse_iso,units="m",long_name="RMSE - isochronal layer depths", &
+                      dim1="age_iso",dim2="time",start=[1,n],count=[size(ylmo%mat%par%age_iso,1),1], &
+                      missing_value=mv,ncid=ncid)
+        
+        end if 
+
         return 
 
     end subroutine yelmo_write_step_pd_metrics

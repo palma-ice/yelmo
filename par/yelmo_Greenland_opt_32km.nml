@@ -149,7 +149,7 @@
     enh_shlf                = 0.7
     age_method              = "None"    ! "None", "expl", "impl"
     age_impl_kappa          = 1.5       ! [m2 a-1] Artificial diffusion term for implicit age solving 
-
+    age_iso                 = 11.7, 29.0, 57.0, 115.0
 /
 
 &ytherm

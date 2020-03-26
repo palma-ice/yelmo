@@ -47,6 +47,20 @@ contains
         dt            = time - mat%par%time 
         mat%par%time  = time 
         
+        ! 00. First update ice age if possible, which can be used for enhancement factors
+        if (mat%par%calc_age .and. dt .gt. 0.0) then 
+            ! Perform calculations of age tracer: dep_time (deposition time)
+
+            call calc_tracer_3D(mat%now%dep_time,dyn%now%ux,dyn%now%uy,dyn%now%uz,tpo%now%H_ice, &
+                tpo%now%bmb,mat%par%zeta_aa,mat%par%zeta_ac, &
+                mat%par%age_method,mat%par%age_impl_kappa,dt,thrm%par%dx,time)
+
+            ! Calculate isochrones too
+            call calc_isochrones(mat%now%depth_iso,mat%now%dep_time,tpo%now%H_ice,mat%par%age_iso, &
+                                                                                mat%par%zeta_aa,time)
+
+        end if 
+
         ! 0. Update strain rate 
         ! Note: this calculation of strain rate is particular to the material module, and 
         ! may differ from the strain rate calculated locally in the dynamics module
@@ -172,15 +186,6 @@ contains
         mat%now%visc_int = calc_vertical_integrated_2D(mat%now%visc,mat%par%zeta_aa)
         where(tpo%now%H_ice .gt. 0.0) mat%now%visc_int = mat%now%visc_int*tpo%now%H_ice 
         
-        if (mat%par%calc_age .and. dt .gt. 0.0) then 
-            ! Perform calculations of age tracer: dep_time (deposition time)
-
-            call calc_tracer_3D(mat%now%dep_time,dyn%now%ux,dyn%now%uy,dyn%now%uz,tpo%now%H_ice, &
-                tpo%now%bmb,mat%par%zeta_aa,mat%par%zeta_ac, &
-                mat%par%age_method,mat%par%age_impl_kappa,dt,thrm%par%dx,time)
-
-        end if 
-
         return
         
     end subroutine calc_ymat
@@ -199,6 +204,9 @@ contains
 
         ! Local variables 
         logical :: init_pars 
+        real(prec) :: age_iso(100) 
+
+        age_iso = 0.0 
 
         init_pars = .FALSE.
         if (present(init)) init_pars = .TRUE. 
@@ -218,6 +226,7 @@ contains
         
         call nml_read(filename,"ymat","age_method",             par%age_method,             init=init_pars)
         call nml_read(filename,"ymat","age_impl_kappa",         par%age_impl_kappa,         init=init_pars)
+        call nml_read(filename,"ymat","age_iso",                age_iso,                    init=init_pars)
         
         ! Set internal parameters
         par%nx    = nx 
@@ -226,7 +235,7 @@ contains
         par%dy    = dx  
         par%nz_aa = size(zeta_aa,1)  
         par%nz_ac = size(zeta_ac,1)
-
+        
         if (allocated(par%zeta_aa)) deallocate(par%zeta_aa)
         allocate(par%zeta_aa(par%nz_aa))
         par%zeta_aa = zeta_aa 
@@ -235,6 +244,18 @@ contains
         allocate(par%zeta_ac(par%nz_ac))
         par%zeta_ac = zeta_ac 
         
+        if (count(age_iso .eq. 0.0) .eq. size(age_iso)) then 
+            ! No isochrones to be calculated, fill with one layer for present day (age=0)
+            par%n_iso = 1 
+        else 
+            ! Assume all isochrone ages are not equal to present day
+            par%n_iso = count(age_iso .ne. 0.0) 
+        end if 
+
+        if (allocated(par%age_iso)) deallocate(par%age_iso)
+        allocate(par%age_iso(par%n_iso))
+        par%age_iso = age_iso(1:par%n_iso)
+
         ! Define current time as unrealistic value
         par%time = 1000000000   ! [a] 1 billion years in the future
 
@@ -246,12 +267,12 @@ contains
 
     end subroutine ymat_par_load
 
-    subroutine ymat_alloc(now,nx,ny,nz_aa,nz_ac)
+    subroutine ymat_alloc(now,nx,ny,nz_aa,nz_ac,n_iso)
 
         implicit none 
 
         type(ymat_state_class), intent(INOUT) :: now 
-        integer :: nx, ny, nz_aa, nz_ac  
+        integer :: nx, ny, nz_aa, nz_ac, n_iso   
 
         ! First make sure fields are deallocated
         call ymat_dealloc(now)
@@ -282,6 +303,7 @@ contains
         allocate(now%f_shear_bar(nx,ny)) 
 
         allocate(now%dep_time(nx,ny,nz_aa)) 
+        allocate(now%depth_iso(nx,ny,n_iso)) 
 
         now%strn2D%dxx   = 0.0 
         now%strn2D%dyy   = 0.0 
@@ -307,7 +329,8 @@ contains
         now%f_shear_bar  = 0.0 
 
         now%dep_time     = 0.0 
-
+        now%depth_iso    = 0.0 
+        
         return 
 
     end subroutine ymat_alloc 
@@ -318,30 +341,31 @@ contains
 
         type(ymat_state_class), intent(INOUT) :: now 
 
-        if (allocated(now%strn2D%dxx))  deallocate(now%strn2D%dxx)
-        if (allocated(now%strn2D%dyy))  deallocate(now%strn2D%dyy)
-        if (allocated(now%strn2D%dxy))  deallocate(now%strn2D%dxy)
-        if (allocated(now%strn2D%de))   deallocate(now%strn2D%de)
+        if (allocated(now%strn2D%dxx))      deallocate(now%strn2D%dxx)
+        if (allocated(now%strn2D%dyy))      deallocate(now%strn2D%dyy)
+        if (allocated(now%strn2D%dxy))      deallocate(now%strn2D%dxy)
+        if (allocated(now%strn2D%de))       deallocate(now%strn2D%de)
         
-        if (allocated(now%strn%dxx))      deallocate(now%strn%dxx)
-        if (allocated(now%strn%dyy))      deallocate(now%strn%dyy)
-        if (allocated(now%strn%dxy))      deallocate(now%strn%dxy)
-        if (allocated(now%strn%dxz))      deallocate(now%strn%dxz)
-        if (allocated(now%strn%dyz))      deallocate(now%strn%dyz)
-        if (allocated(now%strn%de))       deallocate(now%strn%de)
-        if (allocated(now%strn%f_shear))  deallocate(now%strn%f_shear)
+        if (allocated(now%strn%dxx))        deallocate(now%strn%dxx)
+        if (allocated(now%strn%dyy))        deallocate(now%strn%dyy)
+        if (allocated(now%strn%dxy))        deallocate(now%strn%dxy)
+        if (allocated(now%strn%dxz))        deallocate(now%strn%dxz)
+        if (allocated(now%strn%dyz))        deallocate(now%strn%dyz)
+        if (allocated(now%strn%de))         deallocate(now%strn%de)
+        if (allocated(now%strn%f_shear))    deallocate(now%strn%f_shear)
         
-        if (allocated(now%enh))         deallocate(now%enh)
-        if (allocated(now%enh_bar))     deallocate(now%enh_bar)
-        if (allocated(now%ATT))         deallocate(now%ATT)
-        if (allocated(now%ATT_bar))     deallocate(now%ATT_bar)
+        if (allocated(now%enh))             deallocate(now%enh)
+        if (allocated(now%enh_bar))         deallocate(now%enh_bar)
+        if (allocated(now%ATT))             deallocate(now%ATT)
+        if (allocated(now%ATT_bar))         deallocate(now%ATT_bar)
 
-        if (allocated(now%visc))        deallocate(now%visc)
-        if (allocated(now%visc_int))    deallocate(now%visc_int)
+        if (allocated(now%visc))            deallocate(now%visc)
+        if (allocated(now%visc_int))        deallocate(now%visc_int)
         
-        if (allocated(now%f_shear_bar)) deallocate(now%f_shear_bar)
+        if (allocated(now%f_shear_bar))     deallocate(now%f_shear_bar)
 
-        if (allocated(now%dep_time))    deallocate(now%dep_time)
+        if (allocated(now%dep_time))        deallocate(now%dep_time)
+        if (allocated(now%depth_iso))       deallocate(now%depth_iso)
         
         return 
 

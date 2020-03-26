@@ -872,8 +872,8 @@ contains
                 
         do q = 1, n_iso 
 
-            ! Get isochronal age in terms of deposition time 
-            dep_time_iso = 0.0 - age_iso(q) 
+            ! Get isochronal age in terms of deposition time [kyr] => [yr]
+            dep_time_iso = 0.0 - (age_iso(q)*1e-3) 
 
             if (dep_time_iso .lt. time) then 
                 ! This layer should exist, perform interpolation at each point 

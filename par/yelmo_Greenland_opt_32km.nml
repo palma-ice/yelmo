@@ -40,7 +40,7 @@
     grid_name       = "GRL-32KM"
     grid_path       = "ice_data/{domain}/{grid_name}/{grid_name}_REGIONS.nc"
     experiment      = "None"       
-    restart         = "input/{domain}/{grid_name}/{grid_name}_yelmo_opt_restart_init.nc"
+    restart         = "None" !"input/{domain}/{grid_name}/{grid_name}_yelmo_opt_restart_init.nc"
     log_timestep    = False 
     zeta_scale      = "exp"             ! "linear", "exp", "tanh"
     zeta_exp        = 2.0  

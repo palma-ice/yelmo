@@ -369,30 +369,32 @@ contains
         allocate(pd%err_z_srf(nx,ny))
         allocate(pd%err_z_bed(nx,ny))
         allocate(pd%err_uxy_s(nx,ny))
+        allocate(pd%err_depth_iso(nx,ny,n_iso))
 
         allocate(pd%rmse_iso(n_iso))
         
-        pd%H_ice        = 0.0 
-        pd%z_srf        = 0.0 
-        pd%z_bed        = 0.0 
-        pd%H_grnd       = 0.0 
+        pd%H_ice         = 0.0 
+        pd%z_srf         = 0.0 
+        pd%z_bed         = 0.0 
+        pd%H_grnd        = 0.0 
         
-        pd%T_srf        = 0.0 
-        pd%smb          = 0.0 
+        pd%T_srf         = 0.0 
+        pd%smb           = 0.0 
 
-        pd%age_iso      = 0.0 
-        pd%depth_iso    = 0.0 
+        pd%age_iso       = 0.0 
+        pd%depth_iso     = 0.0 
 
-        pd%ux_s         = 0.0 
-        pd%uy_s         = 0.0 
-        pd%uxy_s        = 0.0 
+        pd%ux_s          = 0.0 
+        pd%uy_s          = 0.0 
+        pd%uxy_s         = 0.0 
         
-        pd%err_H_ice    = 0.0 
-        pd%err_z_srf    = 0.0 
-        pd%err_z_bed    = 0.0 
-        pd%err_uxy_s    = 0.0 
+        pd%err_H_ice     = 0.0 
+        pd%err_z_srf     = 0.0 
+        pd%err_z_bed     = 0.0 
+        pd%err_uxy_s     = 0.0 
+        pd%err_depth_iso = 0.0 
         
-        pd%rmse_iso     = mv 
+        pd%rmse_iso      = mv 
 
         return 
     end subroutine ydata_alloc 
@@ -403,27 +405,27 @@ contains
 
         type(ydata_pd_class) :: pd
 
-        if (allocated(pd%H_ice))        deallocate(pd%H_ice)
-        if (allocated(pd%z_srf))        deallocate(pd%z_srf)
-        if (allocated(pd%z_bed))        deallocate(pd%z_bed)
-        if (allocated(pd%H_grnd))       deallocate(pd%H_grnd)
+        if (allocated(pd%H_ice))            deallocate(pd%H_ice)
+        if (allocated(pd%z_srf))            deallocate(pd%z_srf)
+        if (allocated(pd%z_bed))            deallocate(pd%z_bed)
+        if (allocated(pd%H_grnd))           deallocate(pd%H_grnd)
         
-        if (allocated(pd%T_srf))        deallocate(pd%T_srf)
-        if (allocated(pd%smb))          deallocate(pd%smb)
+        if (allocated(pd%T_srf))            deallocate(pd%T_srf)
+        if (allocated(pd%smb))              deallocate(pd%smb)
         
-        if (allocated(pd%depth_iso))    deallocate(pd%depth_iso)
+        if (allocated(pd%depth_iso))        deallocate(pd%depth_iso)
         
-        if (allocated(pd%ux_s))         deallocate(pd%ux_s)
-        if (allocated(pd%uy_s))         deallocate(pd%uy_s)
-        if (allocated(pd%uxy_s))        deallocate(pd%uxy_s)
+        if (allocated(pd%ux_s))             deallocate(pd%ux_s)
+        if (allocated(pd%uy_s))             deallocate(pd%uy_s)
+        if (allocated(pd%uxy_s))            deallocate(pd%uxy_s)
         
-        if (allocated(pd%err_H_ice))    deallocate(pd%err_H_ice)
-        if (allocated(pd%err_z_srf))    deallocate(pd%err_z_srf)
-        if (allocated(pd%err_z_bed))    deallocate(pd%err_z_bed)
+        if (allocated(pd%err_H_ice))        deallocate(pd%err_H_ice)
+        if (allocated(pd%err_z_srf))        deallocate(pd%err_z_srf)
+        if (allocated(pd%err_z_bed))        deallocate(pd%err_z_bed)
+        if (allocated(pd%err_uxy_s))        deallocate(pd%err_uxy_s)
+        if (allocated(pd%err_depth_iso))    deallocate(pd%err_depth_iso)
         
-        if (allocated(pd%err_uxy_s))    deallocate(pd%err_uxy_s)
-        
-        if (allocated(pd%rmse_iso))     deallocate(pd%rmse_iso)
+        if (allocated(pd%rmse_iso))         deallocate(pd%rmse_iso)
         
         return 
 

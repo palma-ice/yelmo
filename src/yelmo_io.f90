@@ -125,6 +125,7 @@ contains
         call nc_write_dim(filename,"yc",       x=dom%grd%yc*1e-3,       units="kilometers")
         call nc_write_dim(filename,"zeta",     x=dom%par%zeta_aa,       units="1")
         call nc_write_dim(filename,"zeta_ac",  x=dom%par%zeta_ac,       units="1")
+        call nc_write_dim(filename,"age_iso",  x=dom%mat%par%age_iso,   units="kyr")
         call nc_write_dim(filename,"time",     x=time,dx=1.0_prec,nx=1, units="years ago")
  
         ! == Begin writing data ==============================================
@@ -254,7 +255,8 @@ contains
         call nc_write(filename,"f_shear_bar", dom%mat%now%f_shear_bar,   units="",dim1="xc",dim2="yc",ncid=ncid) 
 
         call nc_write(filename,"dep_time",    dom%mat%now%dep_time,      units="",dim1="xc",dim2="yc",dim3="zeta",ncid=ncid)     
-
+        call nc_write(filename,"depth_iso",   dom%mat%now%depth_iso,     units="",dim1="xc",dim2="yc",dim3="age_iso",ncid=ncid)     
+        
         ! == ytherm variables ===
 
         call nc_write(filename,"enth",        dom%thrm%now%enth,       units="",dim1="xc",dim2="yc",dim3="zeta",ncid=ncid)      
@@ -505,7 +507,8 @@ contains
         call nc_read(filename,"f_shear_bar", dom%mat%now%f_shear_bar,ncid=ncid) 
 
         call nc_read(filename,"dep_time",    dom%mat%now%dep_time,ncid=ncid) 
-
+        call nc_read(filename,"depth_iso",   dom%mat%now%depth_iso,ncid=ncid) 
+        
         ! == ytherm variables ===
 
         call nc_read(filename,"enth",        dom%thrm%now%enth,ncid=ncid)   

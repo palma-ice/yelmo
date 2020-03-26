@@ -852,7 +852,7 @@ contains
         real(prec), intent(OUT) :: depth_iso(:,:,:)     ! [m]   Depth of isochronal layer
         real(prec), intent(IN)  :: dep_time(:,:,:)      ! [a]   Deposition time of ice layer
         real(prec), intent(IN)  :: H_ice(:,:)           ! [m]   Ice thickness 
-        real(prec), intent(IN)  :: age_iso(:)           ! [kyr] Isochronal layer ages
+        real(prec), intent(IN)  :: age_iso(:)           ! [ka]  Isochronal layer ages
         real(prec), intent(IN)  :: zeta(:)              ! [-]   Vertical sigma coordinates
         real(prec), intent(IN)  :: time                 ! [a]   Current time 
 
@@ -872,8 +872,8 @@ contains
                 
         do q = 1, n_iso 
 
-            ! Get isochronal age in terms of deposition time [kyr] => [yr]
-            dep_time_iso = 0.0 - (age_iso(q)*1e-3) 
+            ! Get isochronal age in terms of deposition time [ka] => [a]
+            dep_time_iso = 0.0 - (age_iso(q)*1e3) 
 
             if (dep_time_iso .lt. time) then 
                 ! This layer should exist, perform interpolation at each point 
@@ -913,7 +913,7 @@ contains
 
                 end do 
                 end do 
-
+                
             end if 
 
         end do 

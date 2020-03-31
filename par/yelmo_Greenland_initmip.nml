@@ -122,6 +122,7 @@
     n_glen                  = 3.0 
     visc_min                = 1e3 
     use_enh_2D              = False     ! Calculate enhancement factor as a 2D field
+    use_enh_stream          = True      ! Use enh_shear and enh_stream?
     enh_shear               = 2.0
     enh_stream              = 2.0
     enh_shlf                = 0.7
@@ -130,6 +131,7 @@
     calc_enh_bnd            = True      ! Calculate enh tracer field? 
     calc_age                = False     ! Calculate age tracer field?
     age_iso                 = 0.0       ! [kyr] Define isochronal age layers of interest to calculate
+
 /
 
 &ytherm

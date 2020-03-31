@@ -127,12 +127,16 @@
     rf_with_water           = False     ! Only applied for rf_method=1, scale rf by water content?
     n_glen                  = 3.0 
     visc_min                = 1e3 
-    use_2D_enh              = False 
+    use_enh_2D              = False     ! Calculate enhancement factor as a 2D field
+    use_enh_stream          = True      ! Use enh_shear and enh_stream?
     enh_shear               = 1.0
     enh_stream              = 1.0
     enh_shlf                = 1.0
-    age_method              = "None"    ! "None", "expl", "impl"
-    age_impl_kappa          = 1.5       ! [m2 a-1] Artificial diffusion term for implicit age solving 
+    tracer_method           = "expl"    ! "expl", "impl"
+    tracer_impl_kappa       = 1.5       ! [m2 a-1] Artificial diffusion term for implicit tracer solving 
+    calc_enh_bnd            = False     ! Calculate enh tracer field? 
+    calc_age                = False     ! Calculate age tracer field?
+    age_iso                 = 0.0       ! [kyr] Define isochronal age layers of interest to calculate
 
 /
 

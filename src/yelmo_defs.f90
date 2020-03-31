@@ -327,25 +327,25 @@ module yelmo_defs
     
     type ymat_param_class
         
-        character(len=56) :: flow_law
-        integer    :: rf_method 
-        real(prec) :: rf_const
-        logical    :: rf_use_eismint2
-        logical    :: rf_with_water 
-        real(prec) :: n_glen                     ! Flow law exponent (n_glen=3)
-        real(prec) :: visc_min  
-        logical    :: use_2D_enh
-        real(prec) :: enh_shear
-        real(prec) :: enh_stream
-        real(prec) :: enh_shlf
+        character(len=56)   :: flow_law
+        integer             :: rf_method 
+        real(prec)          :: rf_const
+        logical             :: rf_use_eismint2
+        logical             :: rf_with_water 
+        real(prec)          :: n_glen                       ! Flow law exponent (n_glen=3)
+        real(prec)          :: visc_min  
+        logical             :: use_enh_2D
+        logical             :: use_enh_stream 
+        real(prec)          :: enh_shear
+        real(prec)          :: enh_stream
+        real(prec)          :: enh_shlf
+        character(len=56)   :: tracer_method  
+        real(prec)          :: tracer_impl_kappa
+        logical             :: calc_enh_bnd 
+        logical             :: calc_age
         
-        
-        character(len=56) :: age_method  
-        real(prec)        :: age_impl_kappa
-
         ! Internal parameters
         real(prec) :: time 
-        logical    :: calc_age
         real(prec) :: dx, dy  
         integer    :: nx, ny, nz_aa, nz_ac  
         integer    :: n_iso 
@@ -371,8 +371,10 @@ module yelmo_defs
 
         real(prec), allocatable :: f_shear_bar(:,:) 
         
-        real(prec), allocatable :: dep_time(:,:,:)    ! Ice deposition time (for online age tracing)
-        real(prec), allocatable :: depth_iso(:,:,:)   ! Depth of specific isochronal layers
+        real(prec), allocatable :: dep_time(:,:,:)      ! Ice deposition time (for online age tracing)
+        real(prec), allocatable :: depth_iso(:,:,:)     ! Depth of specific isochronal layers
+
+        real(prec), allocatable :: enh_bnd(:,:,:)       ! Boundary anisotropic enhancement factor 
     end type 
 
     type ymat_class
@@ -472,6 +474,8 @@ module yelmo_defs
         real(prec), allocatable :: bmb_shlf(:,:)
         real(prec), allocatable :: T_shlf(:,:)
         real(prec), allocatable :: Q_geo(:,:)
+
+        real(prec), allocatable :: enh(:,:)
 
         ! Useful masks
         real(prec), allocatable :: basins(:,:) 

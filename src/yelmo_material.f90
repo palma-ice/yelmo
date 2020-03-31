@@ -7,7 +7,7 @@ module yelmo_material
     use yelmo_tools, only : calc_vertical_integrated_2D, calc_vertical_integrated_3D, regularize2D
     
     use deformation
-    use ice_age  
+    use ice_tracer  
 
     ! Note: 3D arrays defined such that first index (k=1) == base, and max index (k=nk) == surface 
     
@@ -35,8 +35,12 @@ contains
         integer    :: k, nz_aa
         real(prec) :: dt
 
-        
+        real(prec), allocatable :: X_srf(:,:) 
+
         nz_aa = mat%par%nz_aa
+
+        ! Allocate array to use for tracer surface boundary conditon 
+        allocate(X_srf(mat%par%nx,mat%par%ny))
 
         ! Initialize time if necessary 
         if (mat%par%time .gt. time) then 
@@ -51,13 +55,30 @@ contains
         if (mat%par%calc_age .and. dt .gt. 0.0) then 
             ! Perform calculations of age tracer: dep_time (deposition time)
 
-            call calc_tracer_3D(mat%now%dep_time,dyn%now%ux,dyn%now%uy,dyn%now%uz,tpo%now%H_ice, &
-                tpo%now%bmb,mat%par%zeta_aa,mat%par%zeta_ac, &
-                mat%par%age_method,mat%par%age_impl_kappa,dt,thrm%par%dx,time)
+            ! Set surface boundary condition to current time 
+            X_srf = time 
+
+            call calc_tracer_3D(mat%now%dep_time,X_srf,dyn%now%ux,dyn%now%uy,dyn%now%uz,tpo%now%H_ice,tpo%now%bmb, &
+                mat%par%zeta_aa,mat%par%zeta_ac,mat%par%tracer_method,mat%par%tracer_impl_kappa,dt,thrm%par%dx,time)
 
             ! Calculate isochrones too
             call calc_isochrones(mat%now%depth_iso,mat%now%dep_time,tpo%now%H_ice,mat%par%age_iso, &
                                                                                 mat%par%zeta_aa,time)
+
+        end if 
+
+        ! 00b. Update anisotropic enhancement factor tracer field 
+        if (mat%par%calc_enh_bnd .and. dt .gt. 0.0) then 
+            ! Perform calculations of enhancement factor tracer: enh_bnd (anisotropic enhancement factor)
+
+            ! Set surface boundary condition to boundary enh field
+            X_srf = bnd%enh  
+
+            call calc_tracer_3D(mat%now%enh_bnd,X_srf,dyn%now%ux,dyn%now%uy,dyn%now%uz,tpo%now%H_ice,tpo%now%bmb, &
+                mat%par%zeta_aa,mat%par%zeta_ac,mat%par%tracer_method,mat%par%tracer_impl_kappa,dt,thrm%par%dx,time)
+
+            ! Ensure enh_bnd is non-zero, set to small value (eg 0.1)
+            where (mat%now%enh_bnd .eq. 0.0_prec) mat%now%enh_bnd = 0.1_prec
 
         end if 
 
@@ -101,29 +122,36 @@ contains
 
         ! 1. Update enhancement factor ======================
 
-        if (mat%par%use_2D_enh) then 
+        if (mat%par%use_enh_2D) then 
             ! Calculate 2D enhancement factor 
 
-            ! Next, define spatially varying enhancement factor (2D only)
-            mat%now%enh_bar = define_enhancement_factor_2D(tpo%now%f_grnd,mat%now%f_shear_bar,dyn%now%uxy(:,:,nz_aa), &
+            ! Next, define spatially varying enhancement factor (2D only),
+            ! first only for lowest layer of 3D enh field
+            mat%now%enh(:,:,1) = define_enhancement_factor_2D(tpo%now%f_grnd,mat%now%f_shear_bar,dyn%now%uxy(:,:,nz_aa), &
                                                            mat%par%enh_shear,mat%par%enh_stream,mat%par%enh_shlf)
             
-            ! Fill in 3D enh field too 
-            do k = 1, nz_aa
-                mat%now%enh(:,:,k) = mat%now%enh_bar
+            ! Fill in the remaining 3D enh field layers too 
+            do k = 2, nz_aa
+                mat%now%enh(:,:,k) = mat%now%enh(:,:,1)
             end do 
 
         else 
-            ! Calculate 3D enhancement factor 
+            ! Calculate 3D enhancement factor directly
 
             ! Next, define spatially varying enhancement factor
             mat%now%enh = define_enhancement_factor(mat%now%strn%f_shear,tpo%now%f_grnd,dyn%now%uxy(:,:,nz_aa), &
                                                     mat%par%enh_shear,mat%par%enh_stream,mat%par%enh_shlf)
 
-            ! And get the vertical average
-            mat%now%enh_bar     = calc_vertical_integrated_2D(mat%now%enh,mat%par%zeta_aa)
- 
+        
         end if 
+
+        ! Additionally scale 3D enh field by enh_bnd if it is being calculated 
+        if (mat%par%calc_enh_bnd) then 
+            mat%now%enh = mat%now%enh*mat%now%enh_bnd 
+        end if
+
+        ! And get the vertical average
+        mat%now%enh_bar = calc_vertical_integrated_2D(mat%now%enh,mat%par%zeta_aa)
 
         ! 2. Update rate factor ==========================
 
@@ -219,13 +247,17 @@ contains
         call nml_read(filename,"ymat","rf_with_water",          par%rf_with_water,          init=init_pars)
         call nml_read(filename,"ymat","n_glen",                 par%n_glen,                 init=init_pars)
         call nml_read(filename,"ymat","visc_min",               par%visc_min,               init=init_pars)
-        call nml_read(filename,"ymat","use_2D_enh",             par%use_2D_enh,             init=init_pars)
+        call nml_read(filename,"ymat","use_enh_2D",             par%use_enh_2D,             init=init_pars)
+        call nml_read(filename,"ymat","use_enh_stream",         par%use_enh_stream,         init=init_pars)
         call nml_read(filename,"ymat","enh_shear",              par%enh_shear,              init=init_pars)
         call nml_read(filename,"ymat","enh_stream",             par%enh_stream,             init=init_pars)
         call nml_read(filename,"ymat","enh_shlf",               par%enh_shlf,               init=init_pars)
         
-        call nml_read(filename,"ymat","age_method",             par%age_method,             init=init_pars)
-        call nml_read(filename,"ymat","age_impl_kappa",         par%age_impl_kappa,         init=init_pars)
+        call nml_read(filename,"ymat","tracer_method",          par%tracer_method,          init=init_pars)
+        call nml_read(filename,"ymat","tracer_impl_kappa",      par%tracer_impl_kappa,      init=init_pars)
+        
+        call nml_read(filename,"ymat","calc_enh_bnd",           par%calc_enh_bnd,           init=init_pars)
+        call nml_read(filename,"ymat","calc_age",               par%calc_age,               init=init_pars)
         call nml_read(filename,"ymat","age_iso",                age_iso,                    init=init_pars)
         
         ! Set internal parameters
@@ -259,9 +291,9 @@ contains
         ! Define current time as unrealistic value
         par%time = 1000000000   ! [a] 1 billion years in the future
 
-        ! Determine whether age is actually being calculated or not 
-        par%calc_age = .TRUE. 
-        if (trim(par%age_method) .eq. "None") par%calc_age = .FALSE. 
+        ! Consistency check: if not using enh_stream,
+        ! then set enh_stream = enh_shear 
+        if (.not. par%use_enh_stream) par%enh_stream = par%enh_shear 
 
         return 
 
@@ -305,6 +337,8 @@ contains
         allocate(now%dep_time(nx,ny,nz_aa)) 
         allocate(now%depth_iso(nx,ny,n_iso)) 
 
+        allocate(now%enh_bnd(nx,ny,nz_aa)) 
+
         now%strn2D%dxx   = 0.0 
         now%strn2D%dyy   = 0.0 
         now%strn2D%dxy   = 0.0
@@ -331,6 +365,9 @@ contains
         now%dep_time     = 0.0 
         now%depth_iso    = 0.0 
         
+        ! Ensure enh_bnd is initialized with a value of 1.0, in case it is not calculated later online.
+        now%enh_bnd      = 1.0 
+
         return 
 
     end subroutine ymat_alloc 
@@ -366,6 +403,8 @@ contains
 
         if (allocated(now%dep_time))        deallocate(now%dep_time)
         if (allocated(now%depth_iso))       deallocate(now%depth_iso)
+        
+        if (allocated(now%enh_bnd))         deallocate(now%enh_bnd)
         
         return 
 

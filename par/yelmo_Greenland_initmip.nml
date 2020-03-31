@@ -59,7 +59,7 @@
     solver              = "hybrid-adhoc"  ! "fixed", "hybrid-adhoc", "hybrid-pd12"    
     sia_solver          = "vel"           ! "vel", "shear", "none"
     ssa_solver_opt      = "-i bicgsafe -p jacobi -maxiter 100 -tol 1.0e-4 -initx_zeros false"  ! See Lis library
-    mix_method          = 1               ! -2: sia, -1: ssa, 0: sia|ssa, 1: sia+ssa 2: ssa vel. fraction
+    mix_method          = -2              ! -2: sia, -1: ssa, 0: sia|ssa, 1: sia+ssa 2: ssa vel. fraction
     calc_diffusivity    = False           ! Calculate 2D diffusivity term for diagnostics
     beta_method         = 1               ! 0: constant beta; 1: linear (beta=cb/u0); 2: psuedo-plastic-power; 3: Regularized Coulomb
     beta_const          = 1e3             ! [Pa a m−1] Constant value of basal friction coefficient to be used
@@ -121,13 +121,15 @@
     rf_with_water           = False     ! Only applied for rf_method=1, scale rf by water content?
     n_glen                  = 3.0 
     visc_min                = 1e3 
-    use_2D_enh              = False 
+    use_enh_2D              = False     ! Calculate enhancement factor as a 2D field
     enh_shear               = 2.0
     enh_stream              = 2.0
     enh_shlf                = 0.7
-    age_method              = "expl"    ! "None", "expl", "impl"
-    age_impl_kappa          = 1.5       ! [m2 a-1] Artificial diffusion term for implicit age solving 
-
+    tracer_method           = "expl"    ! "None", "expl", "impl"
+    tracer_impl_kappa       = 1.5       ! [m2 a-1] Artificial diffusion term for implicit tracer solving 
+    calc_enh_bnd            = True      ! Calculate tracer field enh_bnd from bnd%enh? 
+    calc_age                = False     ! Calculate age tracer field?
+    age_iso                 = 0.0       ! [kyr] Define isochronal age layers of interest to calculate
 /
 
 &ytherm

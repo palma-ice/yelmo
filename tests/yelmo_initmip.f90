@@ -195,6 +195,13 @@ program yelmo_test
 !             ! Entering Holocene, impose present-day temperatures 
 !             yelmo1%bnd%T_srf = yelmo1%dta%pd%T_srf
 !         end if 
+        
+        ! Update bnd%enh to test transition of enhancement layers in time 
+        if (time .lt. 0.5*(time_end-time_init)) then 
+            yelmo1%bnd%enh = 3.0 
+        else 
+            yelmo1%bnd%enh = 1.0 
+        end if 
 
         ! Update ice sheet 
         call yelmo_update(yelmo1,time)
@@ -344,6 +351,11 @@ contains
                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
         call nc_write(filename,"visc_eff",ylmo%dyn%now%visc_eff,units="Pa a m",long_name="Effective viscosity (SSA)", &
                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
+
+        call nc_write(filename,"enh_bnd",ylmo%mat%now%enh_bnd,units="",long_name="Enhancement factor tracer field", &
+                      dim1="xc",dim2="yc",dim3="zeta",dim4="time",start=[1,1,1,n],ncid=ncid)
+        call nc_write(filename,"enh",ylmo%mat%now%enh,units="",long_name="Enhancement factor", &
+                      dim1="xc",dim2="yc",dim3="zeta",dim4="time",start=[1,1,1,n],ncid=ncid)
 
         call nc_write(filename,"dep_time",ylmo%mat%now%dep_time,units="yr",long_name="Deposition time", &
                       dim1="xc",dim2="yc",dim3="zeta",dim4="time",start=[1,1,1,n],ncid=ncid)

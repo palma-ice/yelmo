@@ -43,7 +43,7 @@ $(objdir)/deformation.o: $(srcdir)/physics/deformation.f90 $(objdir)/yelmo_defs.
 $(objdir)/thermodynamics.o : $(srcdir)/physics/thermodynamics.f90 $(objdir)/yelmo_defs.o $(objdir)/gaussian_filter.o
 	$(FC) $(DFLAGS) $(FFLAGS) -c -o $@ $<
 
-$(objdir)/ice_age.o : $(srcdir)/physics/ice_age.f90 $(objdir)/yelmo_defs.o $(objdir)/solver_tridiagonal.o
+$(objdir)/ice_tracer.o : $(srcdir)/physics/ice_tracer.f90 $(objdir)/yelmo_defs.o $(objdir)/solver_tridiagonal.o
 	$(FC) $(DFLAGS) $(FFLAGS) -c -o $@ $<
 
 $(objdir)/ice_enthalpy.o : $(srcdir)/physics/ice_enthalpy.f90 $(objdir)/yelmo_defs.o \
@@ -117,7 +117,7 @@ $(objdir)/yelmo_dynamics.o: $(srcdir)/yelmo_dynamics.f90 $(objdir)/yelmo_defs.o 
 	$(FC) $(DFLAGS) $(FFLAGS) -c -o $@ $<
 
 $(objdir)/yelmo_material.o: $(srcdir)/yelmo_material.f90 $(objdir)/yelmo_defs.o $(objdir)/deformation.o \
-							$(objdir)/ice_age.o 
+							$(objdir)/ice_tracer.o 
 	$(FC) $(DFLAGS) $(FFLAGS) -c -o $@ $<
 
 $(objdir)/yelmo_thermodynamics.o: $(srcdir)/yelmo_thermodynamics.f90 $(objdir)/yelmo_defs.o \
@@ -184,7 +184,7 @@ yelmo_physics =  	   $(objdir)/basal_dragging.o \
 					   $(objdir)/calving.o \
 					   $(objdir)/deformation.o \
 					   $(objdir)/thermodynamics.o \
-					   $(objdir)/ice_age.o \
+					   $(objdir)/ice_tracer.o \
 					   $(objdir)/ice_enthalpy.o \
 					   $(objdir)/mass_conservation.o \
 					   $(objdir)/solver_ssa_sico5.o \

@@ -1,4 +1,4 @@
-module ice_age
+module ice_tracer
     ! Module to treat online age calculations 
 
     use yelmo_defs, only : prec, mv 
@@ -16,13 +16,14 @@ module ice_age
 contains
 
 
-    subroutine calc_tracer_3D(X_ice,ux,uy,uz,H_ice,bmb,zeta_aa,zeta_ac,solver,impl_kappa,dt,dx,time)
+    subroutine calc_tracer_3D(X_ice,X_srf,ux,uy,uz,H_ice,bmb,zeta_aa,zeta_ac,solver,impl_kappa,dt,dx,time)
         ! Solver for the age of the ice 
         ! Note zeta=height, k=1 base, k=nz surface 
 
         implicit none 
 
         real(prec), intent(INOUT) :: X_ice(:,:,:)   ! [units] Ice tracer variable 3D
+        real(prec), intent(IN)    :: X_srf(:,:)     ! [units] Surface boundary variable field
         real(prec), intent(IN)    :: ux(:,:,:)      ! [m a-1] Horizontal x-velocity 
         real(prec), intent(IN)    :: uy(:,:,:)      ! [m a-1] Horizontal y-velocity 
         real(prec), intent(IN)    :: uz(:,:,:)      ! [m a-1] Vertical velocity 
@@ -38,7 +39,7 @@ contains
 
         ! Local variables
         integer    :: i, j, k, nx, ny, nz_aa, nz_ac  
-        real(prec) :: X_srf, X_base 
+        real(prec) :: X_base 
         real(prec) :: bmb_now 
 
         logical    :: is_margin 
@@ -46,12 +47,8 @@ contains
         real(prec), allocatable  :: uz_now(:)    ! [m a-1] Vertical velocity  
         real(prec) :: dz  
 
-        integer    :: iter, iter_tot 
-        real(prec) :: dt_now, dt_tot, time_now 
-        real(prec), parameter :: dt_tracer = 10.0        ! [m a-1] 
-
         ! These limits help with stability and generally would only affect areas
-        ! where the age is not very interesting (ice shelves, ice margin, thin ice)
+        ! where the tracers are not very interesting (ice shelves, ice margin, thin ice)
         real(prec), parameter :: H_ice_min = 100.0      ! [m] Minimum ice thickness to calculate ages
         real(prec), parameter :: bmb_min   =  -1.0      ! [m a-1] Minimum value of bmb considered
         real(prec), parameter :: uz_max    =  10.0      ! [m a-1] Maximum considered positive vertical velocity at surface 
@@ -63,95 +60,72 @@ contains
 
         allocate(advecxy(nz_aa))
         allocate(uz_now(nz_ac)) 
-        
 
-!         ! Set up iterations 
-!         dt_now   = min(dt,dt_tracer)
-!         iter_tot = ceiling(dt/dt_now)
-!         time_now = time 
-!         dt_tot   = 0.0 
+        advecxy = 0.0_prec 
+        uz_now  = 0.0_prec 
 
-!         do iter = 1, iter_tot 
+        do j = 3, ny-2
+        do i = 3, nx-2 
+            
+            if (H_ice(i,j) .gt. 0.0_prec .and. &
+                    count([H_ice(i-1,j),H_ice(i+1,j),H_ice(i,j-1),H_ice(i,j+1)].eq.0.0_prec).gt.0) then 
+                is_margin = .TRUE. 
+            else
+                is_margin = .FALSE. 
+            end if 
 
-!             if (dt-dt_tot .lt. dt_now) dt_now = dt-dt_tot 
-!             time_now = time_now + dt_now 
-        
-        time_now = time 
-        dt_now   = dt 
+            if ( H_ice(i,j) .gt. H_ice_min .and. (.not. is_margin) .and. bmb(i,j) .gt. bmb_min) then 
+                ! Thick ice exists, so call tracer solver for the column
 
-            advecxy = 0.0_prec 
-            uz_now  = 0.0_prec 
+                ! Get current column of uz 
+                uz_now = uz(i,j,:)
 
-            do j = 3, ny-2
-            do i = 3, nx-2 
-                
-                if (H_ice(i,j) .gt. 0.0_prec .and. &
-                        count([H_ice(i-1,j),H_ice(i+1,j),H_ice(i,j-1),H_ice(i,j+1)].eq.0.0_prec).gt.0) then 
-                    is_margin = .TRUE. 
-                else
-                    is_margin = .FALSE. 
-                end if 
-
-                if ( H_ice(i,j) .gt. H_ice_min .and. (.not. is_margin) .and. bmb(i,j) .gt. bmb_min) then 
-                    ! Thick ice exists, so call tracer solver for the column
-
-                    ! Get current column of uz 
-                    uz_now = uz(i,j,:)
-
-                    ! If uz presents very high values, renormalize it to keep things reasonable. 
-                    if (uz_now(nz_ac) .gt. uz_max)  uz_now =  uz_now/uz_now(nz_ac)*uz_max 
-                    if (uz_now(nz_ac) .lt. -uz_max) uz_now = -uz_now/uz_now(nz_ac)*uz_max 
-                        
-                    ! Get current bmb, limited 
-                    !bmb_now = max(bmb(i,j),bmb_min) 
-                    bmb_now = bmb(i,j) 
-
-                    ! Set surface value to current time 
-                    X_srf = time_now 
-
-                    ! Pre-calculate the contribution of horizontal advection to column solution
-                    call calc_advec_horizontal_column(advecxy,X_ice,ux,uy,dx,i,j,ulim=5000.0_prec)
+                ! If uz presents very high values, renormalize it to keep things reasonable. 
+                if (uz_now(nz_ac) .gt. uz_max)  uz_now =  uz_now/uz_now(nz_ac)*uz_max 
+                if (uz_now(nz_ac) .lt. -uz_max) uz_now = -uz_now/uz_now(nz_ac)*uz_max 
                     
-                    select case(trim(solver))
+                ! Get current bmb, limited 
+                !bmb_now = max(bmb(i,j),bmb_min) 
+                bmb_now = bmb(i,j) 
+                
+                ! Pre-calculate the contribution of horizontal advection to column solution
+                call calc_advec_horizontal_column(advecxy,X_ice,ux,uy,dx,i,j,ulim=5000.0_prec)
+                
+                select case(trim(solver))
 
-                        case("expl")
-                            ! Explicit, upwind solver 
-                            
-                            call calc_tracer_column_expl(X_ice(i,j,:),uz_now,advecxy,X_srf,bmb_now,H_ice(i,j),zeta_aa,zeta_ac,dt_now)
+                    case("expl")
+                        ! Explicit, upwind solver 
+                        
+                        call calc_tracer_column_expl(X_ice(i,j,:),uz_now,advecxy,X_srf(i,j),bmb_now,H_ice(i,j),zeta_aa,zeta_ac,dt)
 
-                        case("impl")
-                            ! Implicit solver vertically, upwind horizontally 
-                            
-                            call calc_tracer_column(X_ice(i,j,:),uz_now,advecxy,X_srf,bmb_now,H_ice(i,j),zeta_aa,zeta_ac, &
-                                                                                                                    impl_kappa,dt_now) 
+                    case("impl")
+                        ! Implicit solver vertically, upwind horizontally 
+                        
+                        call calc_tracer_column(X_ice(i,j,:),uz_now,advecxy,X_srf(i,j),bmb_now,H_ice(i,j),zeta_aa,zeta_ac, &
+                                                                                                                impl_kappa,dt) 
 
-                        case DEFAULT 
+                    case DEFAULT 
 
-                            write(*,*) "calc_tracer_3D:: Error: solver choice must be [expl,impl]."
-                            write(*,*) "solver = ", trim(solver)
-                            stop 
+                        write(*,*) "calc_tracer_3D:: Error: solver choice must be [expl,impl]."
+                        write(*,*) "solver = ", trim(solver)
+                        stop 
 
-                    end select 
+                end select 
 
-                else ! H_ice(i,j) .le. H_ice_min
-                    ! Ice is too thin or zero, no tracing
+            else ! H_ice(i,j) .le. H_ice_min
+                ! Ice is too thin or zero, no tracing
 
-                    X_ice(i,j,:) = time_now 
+                X_ice(i,j,:) = time 
 
-                end if 
+            end if 
 
-                ! Reset age to current time if time is too large, or appears problematic 
-                if (maxval(X_ice(i,j,:)) .gt. time_now .or. maxval(abs(X_ice(i,j,:))) .gt. 1e12) then 
-                    X_ice(i,j,:) = time_now 
-                end if 
+            ! Reset age to current time if time is too large, or appears problematic 
+            if (maxval(X_ice(i,j,:)) .gt. time .or. maxval(abs(X_ice(i,j,:))) .gt. 1e12) then 
+                X_ice(i,j,:) = time 
+            end if 
 
-            end do 
-            end do 
-
-!             dt_tot = dt_tot + dt_now 
-!             if (abs(dt-dt_tot).lt. 1e-5) exit 
-
-!         end do 
+        end do 
+        end do 
 
         ! Fill in borders 
         X_ice(2,:,:)    = X_ice(3,:,:) 
@@ -913,7 +887,7 @@ contains
 
                 end do 
                 end do 
-                
+
             end if 
 
         end do 
@@ -922,5 +896,5 @@ contains
 
     end subroutine calc_isochrones
 
-end module ice_age 
+end module ice_tracer 
 

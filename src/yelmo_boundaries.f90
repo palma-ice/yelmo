@@ -253,6 +253,8 @@ contains
         allocate(now%T_shlf(nx,ny))
         allocate(now%Q_geo(nx,ny))
 
+        allocate(now%enh(nx,ny)) 
+
         allocate(now%basins(nx,ny))
         allocate(now%basin_mask(nx,ny))
         allocate(now%regions(nx,ny))
@@ -276,6 +278,8 @@ contains
         now%T_shlf      = 0.0_prec 
         now%Q_geo       = 0.0_prec 
 
+        now%enh         = 1.0_prec 
+        
         now%basins      = 0.0_prec 
         now%basin_mask  = 0.0_prec 
         now%regions     = 0.0_prec 

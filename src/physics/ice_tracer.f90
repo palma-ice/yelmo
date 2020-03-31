@@ -87,7 +87,7 @@ contains
                 ! Get current bmb, limited 
                 !bmb_now = max(bmb(i,j),bmb_min) 
                 bmb_now = bmb(i,j) 
-                
+
                 ! Pre-calculate the contribution of horizontal advection to column solution
                 call calc_advec_horizontal_column(advecxy,X_ice,ux,uy,dx,i,j,ulim=5000.0_prec)
                 
@@ -115,12 +115,13 @@ contains
             else ! H_ice(i,j) .le. H_ice_min
                 ! Ice is too thin or zero, no tracing
 
-                X_ice(i,j,:) = time 
+                X_ice(i,j,:) = X_srf(i,j) 
 
             end if 
 
-            ! Reset age to current time if time is too large, or appears problematic 
-            if (maxval(X_ice(i,j,:)) .gt. time .or. maxval(abs(X_ice(i,j,:))) .gt. 1e12) then 
+            ! Reset tracer to surface value if value is too large, or appears problematic 
+!             if (maxval(X_ice(i,j,:)) .gt. time .or. maxval(abs(X_ice(i,j,:))) .gt. 1e12) then 
+            if (maxval(abs(X_ice(i,j,:))) .gt. 1e12) then 
                 X_ice(i,j,:) = time 
             end if 
 

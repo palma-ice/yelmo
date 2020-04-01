@@ -246,6 +246,8 @@ contains
 
         call nc_write(filename,"f_shear_bar", dom%mat%now%f_shear_bar,   units="",dim1="xc",dim2="yc",ncid=ncid) 
 
+        call nc_write(filename,"enh_bnd",     dom%mat%now%enh_bnd,       units="",dim1="xc",dim2="yc",dim3="zeta",ncid=ncid)     
+        
         call nc_write(filename,"dep_time",    dom%mat%now%dep_time,      units="",dim1="xc",dim2="yc",dim3="zeta",ncid=ncid)     
         call nc_write(filename,"depth_iso",   dom%mat%now%depth_iso,     units="",dim1="xc",dim2="yc",dim3="age_iso",ncid=ncid)     
         
@@ -280,6 +282,8 @@ contains
         call nc_write(filename,"bmb_shlf",    dom%bnd%bmb_shlf,    units="",dim1="xc",dim2="yc",ncid=ncid)
         call nc_write(filename,"T_shlf",      dom%bnd%T_shlf,      units="",dim1="xc",dim2="yc",ncid=ncid)
         call nc_write(filename,"Q_geo",       dom%bnd%Q_geo,       units="",dim1="xc",dim2="yc",ncid=ncid)
+
+        call nc_write(filename,"enh_srf",     dom%bnd%enh_srf,     units="",dim1="xc",dim2="yc",ncid=ncid)
 
         call nc_write(filename,"basins",      dom%bnd%basins,      units="",dim1="xc",dim2="yc",ncid=ncid)
         call nc_write(filename,"basin_mask",  dom%bnd%basin_mask,  units="",dim1="xc",dim2="yc",ncid=ncid)
@@ -498,6 +502,8 @@ contains
 
         call nc_read(filename,"f_shear_bar", dom%mat%now%f_shear_bar,ncid=ncid) 
 
+        call nc_read(filename,"enh_bnd",     dom%mat%now%enh_bnd,ncid=ncid) 
+        
         call nc_read(filename,"dep_time",    dom%mat%now%dep_time,ncid=ncid) 
         call nc_read(filename,"depth_iso",   dom%mat%now%depth_iso,ncid=ncid) 
         
@@ -532,6 +538,8 @@ contains
         call nc_read(filename,"bmb_shlf",    dom%bnd%bmb_shlf,ncid=ncid) 
         call nc_read(filename,"T_shlf",      dom%bnd%T_shlf,ncid=ncid) 
         call nc_read(filename,"Q_geo",       dom%bnd%Q_geo,ncid=ncid) 
+
+        call nc_read(filename,"enh_srf",     dom%bnd%enh_srf,ncid=ncid) 
 
         call nc_read(filename,"basins",      dom%bnd%basins,ncid=ncid) 
         call nc_read(filename,"basin_mask",  dom%bnd%basin_mask,ncid=ncid) 

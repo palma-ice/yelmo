@@ -929,7 +929,8 @@ contains
         if ( maxval(abs(dom%tpo%now%H_ice)) .ge. H_lim .or. &
              maxval(abs(dom%tpo%now%H_ice-dom%tpo%now%H_ice)) .ne. 0.0 ) kill_it = .TRUE. 
 
-        if ( maxval(abs(dom%dyn%now%uxy_bar)) .ge. u_lim ) kill_it = .TRUE. 
+        if ( maxval(abs(dom%dyn%now%uxy_bar)) .ge. u_lim .or. &
+             maxval(abs(dom%dyn%now%uxy_bar-dom%dyn%now%uxy_bar)) .ne. 0.0 ) kill_it = .TRUE. 
 
         if (kill_it) then 
             ! Model has probably crashed, kill it. 

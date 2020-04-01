@@ -72,11 +72,11 @@ contains
             ! Perform calculations of enhancement factor tracer: enh_bnd (anisotropic enhancement factor)
 
             ! Set surface boundary condition to boundary enh field
-            X_srf = bnd%enh  
+            X_srf = bnd%enh_srf  
 
             call calc_tracer_3D(mat%now%enh_bnd,X_srf,dyn%now%ux,dyn%now%uy,dyn%now%uz,tpo%now%H_ice,tpo%now%bmb, &
                 mat%par%zeta_aa,mat%par%zeta_ac,mat%par%tracer_method,mat%par%tracer_impl_kappa,dt,thrm%par%dx,time)
-            
+
             ! Ensure enh_bnd is non-zero, set to small value (eg 0.1)
             where (mat%now%enh_bnd .eq. 0.0_prec) mat%now%enh_bnd = 0.1_prec
 

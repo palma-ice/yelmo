@@ -128,7 +128,7 @@
     enh_shlf                = 0.7
     tracer_method           = "expl"    ! "expl", "impl"
     tracer_impl_kappa       = 1.5       ! [m2 a-1] Artificial diffusion term for implicit tracer solving 
-    calc_enh_bnd            = True      ! Calculate enh tracer field? 
+    calc_enh_bnd            = False     ! Calculate enh tracer field? 
     calc_age                = False     ! Calculate age tracer field?
     age_iso                 = 0.0       ! [kyr] Define isochronal age layers of interest to calculate
 

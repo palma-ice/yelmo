@@ -18,6 +18,9 @@ $(objdir)/gaussian_filter.o: $(libdir)/gaussian_filter.f90
 $(objdir)/climate_adjustments.o: $(libdir)/climate_adjustments.f90 $(objdir)/yelmo_defs.o
 	$(FC) $(DFLAGS) $(FFLAGS) -c -o $@ $<
 
+$(objdir)/ice_enhancement.o: $(libdir)/ice_enhancement.f90 $(objdir)/yelmo_defs.o $(objdir)/nml.o
+	$(FC) $(DFLAGS) $(FFLAGS) -c -o $@ $<
+
 $(objdir)/ice_optimization.o: $(libdir)/ice_optimization.f90 $(objdir)/yelmo_defs.o $(objdir)/gaussian_filter.o
 	$(FC) $(DFLAGS) $(FFLAGS) -c -o $@ $<
 
@@ -174,6 +177,7 @@ $(objdir)/mismip3D.o: $(testdir)/mismip3D.f90 $(objdir)/ncio.o $(objdir)/yelmo_d
 
 yelmo_libs = 		   $(objdir)/gaussian_filter.o \
 					   $(objdir)/climate_adjustments.o \
+					   $(objdir)/ice_enhancement.o \
 					   $(objdir)/ice_optimization.o \
 					   $(objdir)/interp1D.o \
 					   $(objdir)/nml.o \

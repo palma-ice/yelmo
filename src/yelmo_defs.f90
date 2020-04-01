@@ -475,7 +475,7 @@ module yelmo_defs
         real(prec), allocatable :: T_shlf(:,:)
         real(prec), allocatable :: Q_geo(:,:)
 
-        real(prec), allocatable :: enh(:,:)
+        real(prec), allocatable :: enh_srf(:,:)
 
         ! Useful masks
         real(prec), allocatable :: basins(:,:) 

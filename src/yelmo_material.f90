@@ -51,7 +51,7 @@ contains
         dt            = time - mat%par%time 
         mat%par%time  = time 
         
-        ! 00. First update ice age if possible, which can be used for enhancement factors
+        ! 00. First update ice age if possible
         if (mat%par%calc_age .and. dt .gt. 0.0) then 
             ! Perform calculations of age tracer: dep_time (deposition time)
 

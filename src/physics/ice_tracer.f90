@@ -122,7 +122,7 @@ contains
             ! Reset tracer to surface value if value is too large, or appears problematic 
 !             if (maxval(X_ice(i,j,:)) .gt. time .or. maxval(abs(X_ice(i,j,:))) .gt. 1e12) then 
             if (maxval(abs(X_ice(i,j,:))) .gt. 1e12) then 
-                X_ice(i,j,:) = time 
+                X_ice(i,j,:) = X_srf(i,j) 
             end if 
 
         end do 

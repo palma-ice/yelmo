@@ -913,18 +913,23 @@ contains
     end subroutine calc_zeta
     
     subroutine yelmo_check_kill(dom,time)
-        
+            
+        use ieee_arithmetic
+
         implicit none 
 
         type(yelmo_class), intent(IN) :: dom
         real(prec),        intent(IN) :: time
         
         ! Local variables 
-        logical :: kill_it  
+        integer :: i, j 
+        logical :: kill_it, kill_it_nan  
+
         real(prec), parameter :: H_lim = 1e4   ! [m] 
         real(prec), parameter :: u_lim = 1e4   ! [m/a]
 
-        kill_it = .FALSE. 
+        kill_it     = .FALSE. 
+        kill_it_nan = .FALSE. 
 
         if ( maxval(abs(dom%tpo%now%H_ice)) .ge. H_lim .or. &
              maxval(abs(dom%tpo%now%H_ice-dom%tpo%now%H_ice)) .ne. 0.0 ) kill_it = .TRUE. 
@@ -932,7 +937,20 @@ contains
         if ( maxval(abs(dom%dyn%now%uxy_bar)) .ge. u_lim .or. &
              maxval(abs(dom%dyn%now%uxy_bar-dom%dyn%now%uxy_bar)) .ne. 0.0 ) kill_it = .TRUE. 
 
-        if (kill_it) then 
+        write(*,*) "kill: ", time, minval(dom%tpo%now%H_ice), maxval(dom%tpo%now%H_ice), &
+                                        minval(dom%dyn%now%uxy_bar), maxval(dom%dyn%now%uxy_bar)
+
+        ! Additionally check for NANs using intrinsic ieee_arithmetic module 
+        do j = 1, dom%grd%ny 
+        do i = 1, dom%grd%nx 
+            if (ieee_is_nan(dom%dyn%now%uxy_bar(i,j)) .or. ieee_is_nan(dom%tpo%now%H_ice(i,j))) then 
+                kill_it_nan = .TRUE. 
+                exit 
+            end if 
+        end do 
+        end do 
+
+        if (kill_it .or. kill_it_nan) then 
             ! Model has probably crashed, kill it. 
 
             call yelmo_restart_write(dom,"yelmo_killed.nc",time=time) 
@@ -943,6 +961,7 @@ contains
             write(*,"(a11,f15.3)")   "timestep = ", time 
             write(*,"(a16,2g14.4)") "range(H_ice):   ", minval(dom%tpo%now%H_ice), maxval(dom%tpo%now%H_ice)
             write(*,"(a16,2g14.4)") "range(uxy_bar): ", minval(dom%dyn%now%uxy_bar), maxval(dom%dyn%now%uxy_bar)
+            if (kill_it_nan) write(*,*) "** NANs detected **"
             write(*,*) 
             write(*,*) "Restart file written: "//"yelmo_killed.nc"
             write(*,*) 

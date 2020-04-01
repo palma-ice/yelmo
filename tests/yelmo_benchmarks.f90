@@ -314,13 +314,13 @@ program yelmo_benchmarks
         ! Get current time 
         time = time_init + n*dtt
         
-!         ! Update bnd%enh to test transition of enhancement layers in time 
-!         if (time .lt. 0.5*(time_end-time_init)) then 
-!             yelmo1%bnd%enh = 3.0 
-!         else 
-!             yelmo1%bnd%enh = 1.0 
-!         end if 
-        
+        ! Update bnd%enh_srf to test transition of enhancement layers in time 
+        if (time .lt. 0.5*(time_end-time_init)) then 
+            yelmo1%bnd%enh_srf = 3.0 
+        else 
+            yelmo1%bnd%enh_srf = 1.0 
+        end if 
+
         ! == Yelmo ice sheet ===================================================
         call yelmo_update(yelmo1,time)
         
@@ -549,10 +549,10 @@ contains
         call nc_write(filename,"visc",ylmo%mat%now%visc,units="Pa a",long_name="Viscosity", &
                       dim1="xc",dim2="yc",dim3="zeta",dim4="time",start=[1,1,1,n],ncid=ncid)
         
-!         call nc_write(filename,"dep_time",ylmo%mat%now%dep_time,units="a",long_name="Ice deposition time", &
-!                       dim1="xc",dim2="yc",dim3="zeta",dim4="time",start=[1,1,1,n],ncid=ncid)
-        call nc_write(filename,"age",time-ylmo%mat%now%dep_time,units="a",long_name="Ice age", &
+        call nc_write(filename,"dep_time",ylmo%mat%now%dep_time,units="a",long_name="Ice deposition time", &
                       dim1="xc",dim2="yc",dim3="zeta",dim4="time",start=[1,1,1,n],ncid=ncid)
+!         call nc_write(filename,"age",time-ylmo%mat%now%dep_time,units="a",long_name="Ice age", &
+!                       dim1="xc",dim2="yc",dim3="zeta",dim4="time",start=[1,1,1,n],ncid=ncid)
 
         call nc_write(filename,"enh_bnd",ylmo%mat%now%enh_bnd,units="",long_name="Enhancement factor tracer field", &
                       dim1="xc",dim2="yc",dim3="zeta",dim4="time",start=[1,1,1,n],ncid=ncid)

@@ -39,14 +39,14 @@ contains
 
         ! Local variables
         integer    :: i, j, k, nx, ny, nz_aa, nz_ac  
-        
+        real(prec) :: advecxy_base
+        real(prec) :: uxy_aa 
         logical    :: is_margin 
         real(prec), allocatable :: X_base(:,:)  
         real(prec), allocatable :: advecxy(:)   ! [X a-1 m-2] Horizontal advection  
         real(prec), allocatable :: uz_now(:)    ! [m a-1] Vertical velocity 
         real(prec), allocatable :: X_prev(:,:,:) 
-        real(prec) :: dz  
-
+        
         ! These limits help with stability and generally would only affect areas
         ! where the tracers are not very interesting (ice shelves, ice margin, thin ice)
         real(prec), parameter :: H_ice_min = 100.0      ! [m] Minimum ice thickness to calculate ages
@@ -81,22 +81,30 @@ contains
                 is_margin = .FALSE. 
             end if 
 
-            if ( H_ice(i,j) .gt. H_ice_min .and. (.not. is_margin) ) then 
-                ! Thick ice exists, so call tracer solver for the column
+            uxy_aa = sqrt( (0.5_prec*(ux(i,j,nz_aa)+ux(i-1,j,nz_aa)))**2 &
+                          +(0.5_prec*(uy(i,j,nz_aa)+uy(i,j-1,nz_aa)))**2 )
+
+            if ( H_ice(i,j) .gt. H_ice_min  .and. (.not. is_margin) .and. &
+                 abs(uz(i,j,1)) .lt. uz_max  ) then  !.and. uxy_aa .lt. 50.0
+                ! Thick ice exists, not at the margin and not presenting high values
+                ! of vertical velocity at the base, so call tracer solver for the column
 
                 ! Get current column of uz 
                 uz_now = uz(i,j,:)
 
                 ! If uz presents very high values, renormalize it to keep things reasonable. 
-                if (uz_now(nz_ac) .gt. uz_max)  uz_now =  uz_now/uz_now(nz_ac)*uz_max 
-                if (uz_now(nz_ac) .lt. -uz_max) uz_now = -uz_now/uz_now(nz_ac)*uz_max 
+!                 if (uz_now(nz_ac) .gt. uz_max)  uz_now =  uz_now/uz_now(nz_ac)*uz_max 
+!                 if (uz_now(nz_ac) .lt. -uz_max) uz_now = -uz_now/uz_now(nz_ac)*uz_max 
                 
                 ! Pre-calculate the contribution of horizontal advection to column solution
                 call calc_advec_horizontal_column(advecxy,X_ice,ux,uy,dx,i,j,ulim=5000.0_prec)
                 
+                ! Calculate horizontal advection purely at the base 
+                call calc_advec_horizontal_base(advecxy_base,X_ice,ux,uy,dx,i,j,ulim=5000.0_prec)
+
                 ! Calculate the updated basal value of X from 
                 ! basal mass balance including additional thinning term
-                call calc_X_base(X_base(i,j),X_ice(i,j,:),H_ice(i,j),bmb(i,j),bmb_thinning,zeta_aa,dt)
+                call calc_X_base(X_base(i,j),X_ice(i,j,:),H_ice(i,j),advecxy_base,bmb(i,j),bmb_thinning,zeta_aa,dt)
 
                 select case(trim(solver))
 
@@ -130,8 +138,8 @@ contains
         end do 
         end do 
 
-        ! Check for tracer inconsistencies
-        call fix_tracer_violation(X_ice,X_prev,X_base,X_srf)
+        ! Check for tracer inconsistencies (usually for very fast-flowing regions)
+        call fix_tracer_violation(X_ice,X_prev,X_base,X_srf,dt)
 
         ! Fill in borders 
         X_ice(2,:,:)    = X_ice(3,:,:) 
@@ -148,7 +156,7 @@ contains
 
     end subroutine calc_tracer_3D
 
-    subroutine fix_tracer_violation(X_ice,X_prev,X_base,X_srf)
+    subroutine fix_tracer_violation(X_ice,X_prev,X_base,X_srf,dt)
 
         implicit none 
 
@@ -156,11 +164,14 @@ contains
         real(prec), intent(IN)    :: X_prev(:,:,:)      ! [units] Previous values
         real(prec), intent(IN)    :: X_base(:,:)        ! [units] Basal boundary value
         real(prec), intent(IN)    :: X_srf(:,:)         ! [units] Surface boudnary value 
-        
+        real(prec), intent(IN)    :: dt 
+
         ! Local variables
         integer :: i, j, nx, ny, nz   
-        real(prec) :: X_min, X_max               
+        real(prec) :: X_min, X_max, X_mean                
         logical    :: is_active 
+
+        real(prec), parameter :: f_diff = 0.2_prec      ! Fraction difference in X/yr of allowed change in tracer value
 
         nx = size(X_ice,1)
         ny = size(X_ice,2) 
@@ -181,27 +192,23 @@ contains
                 ! Column values cannot be outside of the range of
                 ! previous values or the boundary values. 
 
-                ! Determine minimum/maxium allowed values
-                X_min = minval([X_base(i,j),X_srf(i,j),X_prev(i,j,2:nz-1), &
-                    X_prev(i-1,j,2:nz-1),X_prev(i+1,j,2:nz-1),X_prev(i,j-1,2:nz-1),X_prev(i,j+1,2:nz-1)])
-                X_max = maxval([X_base(i,j),X_srf(i,j),X_prev(i,j,2:nz-1), &
-                    X_prev(i-1,j,2:nz-1),X_prev(i+1,j,2:nz-1),X_prev(i,j-1,2:nz-1),X_prev(i,j+1,2:nz-1)])
+                ! Determine mean value of column for previous timestep 
+                X_mean = abs(sum(X_prev(i,j,:)) / real(nz,prec))
+                X_max  = abs(maxval(X_prev(i,j,:)))
 
-
-                if (minval(X_ice(i,j,:)) .lt. X_min .or. maxval(X_ice(i,j,:)) .gt. X_max) then 
-                    ! Simply maintain solution from previous timestep, but update 
-                    ! surface boundary condition
-                    !X_ice(i,j,:)  = X_prev(i,j,:)
-                    !X_ice(i,j,nz) = X_srf(i,j) 
-
-                    X_ice(i,j,:)  = X_srf(i,j) 
+                ! Limit any value change in X to eg 50% per year if X_mean .ne. 0.0
+                if (X_mean .ne. 0.0_prec) then  
+                    where ( (X_ice(i,j,:)-X_prev(i,j,:))/dt .gt. f_diff*X_mean )
+                        X_ice(i,j,:) = X_prev(i,j,:) + f_diff*X_mean*dt 
+                    else where ( (X_ice(i,j,:)-X_prev(i,j,:))/dt .lt. -f_diff*X_mean )
+                        X_ice(i,j,:) = X_prev(i,j,:) - f_diff*X_mean*dt 
+                    end where
                 end if 
 
                 ! Finally, also reset tracer to previous value if value is too large, or appears problematic 
                 ! (likely redundant with previous check, but kept for safety)
-                if (maxval(abs(X_ice(i,j,:))) .gt. 1e12) then 
+                if (maxval(abs(X_ice(i,j,:))) .gt. 1e10) then 
                     X_ice(i,j,:) = X_srf(i,j) 
-                    !X_ice(i,j,:) = X_prev(i,j,:)
                 end if 
 
             end if 
@@ -672,7 +679,7 @@ contains
 
     end subroutine calc_advec_vertical_column_new2
 
-    subroutine calc_X_base(X_base,X_ice,H_ice,bmb,bmb_thinning,zeta_aa,dt)
+    subroutine calc_X_base(X_base,X_ice,H_ice,advecxy,bmb,bmb_thinning,zeta_aa,dt)
         ! Calculate the basal boundary value of tracer 
 
         implicit none 
@@ -680,13 +687,14 @@ contains
         real(prec), intent(OUT)   :: X_base
         real(prec), intent(IN)    :: X_ice(:)  
         real(prec), intent(IN)    :: H_ice
+        real(prec), intent(IN)    :: advecxy 
         real(prec), intent(IN)    :: bmb 
         real(prec), intent(IN)    :: bmb_thinning
         real(prec), intent(IN)    :: zeta_aa(:) 
         real(prec), intent(IN)    :: dt 
 
         ! Local variables 
-        real(prec) :: bmb_tot 
+        real(prec) :: bmb_tot
         real(prec) :: dz 
         real(prec) :: f_wt 
 
@@ -697,7 +705,6 @@ contains
         if (bmb_tot .le. 0.0) then 
             ! Modify basal value explicitly for basal melting
             ! using boundary condition of Rybak and Huybrechts (2003), Eq. 3
-            ! No horizontal advection of the basal value since it has no thickness 
 
             dz     = H_ice*(zeta_aa(2) - zeta_aa(1)) 
             !X_base = X_ice(1) - dt*bmb_tot*(X_ice(2)-X_ice(1))/dz 
@@ -705,7 +712,7 @@ contains
             ! Calculate equation first as f_wt, to be able to limit it
             ! to a maximum value of 1.0 (ie, avoid extrapolation)
             f_wt   = min(1.0_prec, -dt*bmb_tot/dz)
-            X_base = X_ice(1) + f_wt*(X_ice(2)-X_ice(1))
+            X_base = X_ice(1) + f_wt*(X_ice(2)-X_ice(1)) - dt*advecxy 
 
         else
             ! Leave basal value unchanged 
@@ -826,6 +833,114 @@ contains
         return 
 
     end subroutine calc_advec_horizontal_column
+    
+    subroutine calc_advec_horizontal_base(advecxy,var_ice,ux,uy,dx,i,j,ulim)
+        ! Newly implemented advection algorithms (ajr)
+        ! Output: [K a-1]
+
+        ! [m-1] * [m a-1] * [K] = [K a-1]
+
+        implicit none
+
+        real(prec), intent(OUT) :: advecxy   
+        real(prec), intent(IN)  :: var_ice(:,:,:)   ! nx,ny,nz_aa  Enth, T, age, etc...
+        real(prec), intent(IN)  :: ux(:,:,:)        ! nx,ny,nz
+        real(prec), intent(IN)  :: uy(:,:,:)        ! nx,ny,nz
+        real(prec), intent(IN)  :: dx  
+        integer,    intent(IN)  :: i, j 
+        real(prec), intent(IN)  :: ulim             ! [m/a] Maximum allowed velocity to apply
+
+        ! Local variables 
+        integer :: k, nx, ny, nz_aa 
+        real(prec) :: ux_aa, uy_aa, u_now  
+        real(prec) :: dx_inv, dx_inv2
+        real(prec) :: advecx, advecy 
+
+        ! Define some constants 
+        dx_inv  = 1.0_prec / dx 
+        dx_inv2 = 1.0_prec / (2.0_prec*dx)
+
+        nx  = size(var_ice,1)
+        ny  = size(var_ice,2)
+        nz_aa = size(var_ice,3) 
+
+        advecx = 0.0 
+        advecy = 0.0 
+
+        ! Calculate horizontal advection terms only for the base 
+        k = 1 
+
+        ! Estimate direction of current flow into cell (x and y), centered in grid point
+        ux_aa = 0.5_prec*(ux(i,j,k)+ux(i-1,j,k))
+        uy_aa = 0.5_prec*(uy(i,j,k)+uy(i,j-1,k))
+
+        ! Explicit form (to test different order approximations)
+        if (ux_aa .gt. 0.0 .and. i .ge. 3) then  
+            ! Flow to the right 
+
+            ! Velocity on horizontal ac-node, vertical aa-node, limited to ulim 
+            u_now = ux(i-1,j,k)
+            u_now = sign(min(abs(u_now),ulim),u_now)
+
+            ! 1st order
+!                 advecx = dx_inv * u_now *(var_ice(i,j,k)-var_ice(i-1,j,k))
+            ! 2nd order
+            advecx = dx_inv2 * u_now *(-(4.0*var_ice(i-1,j,k)-var_ice(i-2,j,k)-3.0*var_ice(i,j,k)))
+
+        else if (ux_aa .lt. 0.0 .and. i .le. nx-2) then 
+            ! Flow to the left
+
+            ! Velocity on horizontal ac-node, vertical aa-node, limited to ulim
+            u_now = ux(i,j,k)
+            u_now = sign(min(abs(u_now),ulim),u_now)
+
+            ! 1st order 
+!                 advecx = dx_inv * u_now *(var_ice(i+1,j,k)-var_ice(i,j,k))
+            ! 2nd order
+            advecx = dx_inv2 * u_now *((4.0*var_ice(i+1,j,k)-var_ice(i+2,j,k)-3.0*var_ice(i,j,k)))
+
+        else 
+            ! No flow 
+            advecx = 0.0
+
+        end if 
+
+        if (uy_aa .gt. 0.0 .and. j .ge. 3) then   
+            ! Flow to the right 
+
+            ! Velocity on horizontal ac-node, vertical aa-node, limited to ulim
+            u_now = uy(i,j-1,k)
+            u_now = sign(min(abs(u_now),ulim),u_now)
+
+            ! 1st order
+!                 advecy = dx_inv * u_now*(var_ice(i,j,k)-var_ice(i,j-1,k))
+            ! 2nd order
+            advecy = dx_inv2 * u_now *(-(4.0*var_ice(i,j-1,k)-var_ice(i,j-2,k)-3.0*var_ice(i,j,k)))
+
+        else if (uy_aa .lt. 0.0 .and. j .le. ny-2) then 
+            ! Flow to the left
+
+            ! Velocity on horizontal ac-node, vertical aa-node, limited to ulim
+            u_now = uy(i,j,k)
+            u_now = sign(min(abs(u_now),ulim),u_now)
+
+            ! 1st order 
+!                 advecy = dx_inv * u_now *(var_ice(i,j+1,k)-var_ice(i,j,k))
+            ! 2nd order
+            advecy = dx_inv2 * u_now *((4.0*var_ice(i,j+1,k)-var_ice(i,j+2,k)-3.0*var_ice(i,j,k)))
+
+        else
+            ! No flow 
+            advecy = 0.0 
+
+        end if 
+                
+        ! Combine advection terms for total contribution 
+        advecxy = (advecx+advecy)
+
+        return 
+
+    end subroutine calc_advec_horizontal_base
     
     function interp_linear_pt(x,y,xout) result(yout)
         ! Interpolates for the y value at the desired x value, 

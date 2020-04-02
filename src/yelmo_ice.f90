@@ -937,9 +937,6 @@ contains
         if ( maxval(abs(dom%dyn%now%uxy_bar)) .ge. u_lim .or. &
              maxval(abs(dom%dyn%now%uxy_bar-dom%dyn%now%uxy_bar)) .ne. 0.0 ) kill_it = .TRUE. 
 
-        write(*,*) "kill: ", time, minval(dom%tpo%now%H_ice), maxval(dom%tpo%now%H_ice), &
-                                        minval(dom%dyn%now%uxy_bar), maxval(dom%dyn%now%uxy_bar)
-
         ! Additionally check for NANs using intrinsic ieee_arithmetic module 
         do j = 1, dom%grd%ny 
         do i = 1, dom%grd%nx 
@@ -961,7 +958,7 @@ contains
             write(*,"(a11,f15.3)")   "timestep = ", time 
             write(*,"(a16,2g14.4)") "range(H_ice):   ", minval(dom%tpo%now%H_ice), maxval(dom%tpo%now%H_ice)
             write(*,"(a16,2g14.4)") "range(uxy_bar): ", minval(dom%dyn%now%uxy_bar), maxval(dom%dyn%now%uxy_bar)
-            if (kill_it_nan) write(*,*) "** NANs detected **"
+            if (kill_it_nan) write(*,*) "** NANs detected ** ... i, j: ", i, j 
             write(*,*) 
             write(*,*) "Restart file written: "//"yelmo_killed.nc"
             write(*,*) 

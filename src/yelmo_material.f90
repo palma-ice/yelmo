@@ -36,12 +36,16 @@ contains
         real(prec) :: dt
 
         real(prec), allocatable :: X_srf(:,:) 
+        real(prec), allocatable :: enh_prev(:,:,:) 
 
         nz_aa = mat%par%nz_aa
 
         ! Allocate array to use for tracer surface boundary conditon 
         allocate(X_srf(mat%par%nx,mat%par%ny))
 
+        ! Allocate array to store previous value of enhancement factor 
+        allocate(enh_prev(mat%par%nx,mat%par%ny,nz_aa))
+        
         ! Initialize time if necessary 
         if (mat%par%time .gt. time) then 
             mat%par%time = time

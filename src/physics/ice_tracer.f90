@@ -197,7 +197,7 @@ contains
                     ! Simply maintain solution from previous timestep, but update 
                     ! surface boundary condition
                     X_ice(i,j,:)  = X_prev(i,j,:)
-                    X_ice(i,j,nz) = X_srf 
+                    !X_ice(i,j,nz) = X_srf 
                 end if 
 
                 ! Finally, also reset tracer to previous value if value is too large, or appears problematic 

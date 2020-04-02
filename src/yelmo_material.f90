@@ -45,7 +45,7 @@ contains
 
         ! Allocate array to store previous value of enhancement factor 
         allocate(enh_prev(mat%par%nx,mat%par%ny,nz_aa))
-        
+
         ! Initialize time if necessary 
         if (mat%par%time .gt. time) then 
             mat%par%time = time
@@ -82,7 +82,7 @@ contains
                 mat%par%zeta_aa,mat%par%zeta_ac,mat%par%tracer_method,mat%par%tracer_impl_kappa,dt,thrm%par%dx,time)
 
             ! Ensure enh_bnd is non-zero, set to small value (eg 0.1)
-            where (mat%now%enh_bnd .eq. 0.0_prec) mat%now%enh_bnd = 0.1_prec
+            where (mat%now%enh_bnd .lt. 0.1_prec) mat%now%enh_bnd = 0.1_prec
 
         end if 
 

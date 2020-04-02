@@ -39,28 +39,27 @@ contains
 
         ! Local variables
         integer    :: i, j, k, nx, ny, nz_aa, nz_ac  
-        real(prec) :: X_base 
-        real(prec) :: bmb_now 
-
+        
         logical    :: is_margin 
-        real(prec), allocatable  :: advecxy(:)   ! [X a-1 m-2] Horizontal advection  
-        real(prec), allocatable  :: uz_now(:)    ! [m a-1] Vertical velocity 
+        real(prec), allocatable :: X_base(:,:)  
+        real(prec), allocatable :: advecxy(:)   ! [X a-1 m-2] Horizontal advection  
+        real(prec), allocatable :: uz_now(:)    ! [m a-1] Vertical velocity 
         real(prec), allocatable :: X_prev(:,:,:) 
         real(prec) :: dz  
 
         ! These limits help with stability and generally would only affect areas
         ! where the tracers are not very interesting (ice shelves, ice margin, thin ice)
         real(prec), parameter :: H_ice_min = 100.0      ! [m] Minimum ice thickness to calculate ages
-        real(prec), parameter :: bmb_min   =  -1.0      ! [m a-1] Minimum value of bmb considered
-        real(prec), parameter :: uz_max    =  10.0      ! [m a-1] Maximum considered positive vertical velocity at surface 
+        real(prec), parameter :: uz_max    =   5.0      ! [m a-1] Maximum considered vertical velocity magnitude at surface 
 
-        real(prec), parameter :: bmb_thinning = -1e-3   ! [m a-1]
+        real(prec), parameter :: bmb_thinning = -1e-3   ! [m a-1] To keep solution bounded 
 
         nx    = size(X_ice,1)
         ny    = size(X_ice,2)
         nz_aa = size(zeta_aa,1)
         nz_ac = size(zeta_ac,1)
 
+        allocate(X_base(nx,ny))
         allocate(advecxy(nz_aa))
         allocate(uz_now(nz_ac)) 
         allocate(X_prev(nx,ny,nz_aa))
@@ -70,6 +69,7 @@ contains
 
         ! Store X_ice from previous timestep 
         X_prev = X_ice 
+        X_base = X_ice(:,:,1) 
 
         do j = 3, ny-2
         do i = 3, nx-2 
@@ -81,7 +81,7 @@ contains
                 is_margin = .FALSE. 
             end if 
 
-            if ( H_ice(i,j) .gt. H_ice_min .and. (.not. is_margin) .and. bmb(i,j) .gt. bmb_min) then 
+            if ( H_ice(i,j) .gt. H_ice_min .and. (.not. is_margin) ) then 
                 ! Thick ice exists, so call tracer solver for the column
 
                 ! Get current column of uz 
@@ -90,30 +90,27 @@ contains
                 ! If uz presents very high values, renormalize it to keep things reasonable. 
                 if (uz_now(nz_ac) .gt. uz_max)  uz_now =  uz_now/uz_now(nz_ac)*uz_max 
                 if (uz_now(nz_ac) .lt. -uz_max) uz_now = -uz_now/uz_now(nz_ac)*uz_max 
-                    
-                ! Get current bmb, limited 
-                !bmb_now = max(bmb(i,j),bmb_min) 
-                bmb_now = bmb(i,j) 
-
+                
                 ! Pre-calculate the contribution of horizontal advection to column solution
                 call calc_advec_horizontal_column(advecxy,X_ice,ux,uy,dx,i,j,ulim=5000.0_prec)
                 
                 ! Calculate the updated basal value of X from 
                 ! basal mass balance including additional thinning term
-                call calc_X_base(X_base,X_ice(i,j,:),H_ice(i,j),bmb_now,bmb_thinning,zeta_aa,dt)
+                call calc_X_base(X_base(i,j),X_ice(i,j,:),H_ice(i,j),bmb(i,j),bmb_thinning,zeta_aa,dt)
 
                 select case(trim(solver))
 
                     case("expl")
                         ! Explicit, upwind solver 
                         
-                        call calc_tracer_column_expl(X_ice(i,j,:),uz_now,advecxy,X_srf(i,j),X_base,H_ice(i,j),zeta_aa,zeta_ac,dt)
+                        call calc_tracer_column_expl(X_ice(i,j,:),uz_now,advecxy, &
+                                    X_srf(i,j),X_base(i,j),H_ice(i,j),zeta_aa,zeta_ac,dt)
 
                     case("impl")
                         ! Implicit solver vertically, upwind horizontally 
                         
-                        call calc_tracer_column(X_ice(i,j,:),uz_now,advecxy,X_srf(i,j),X_base,H_ice(i,j),zeta_aa,zeta_ac, &
-                                                                                                                impl_kappa,dt) 
+                        call calc_tracer_column(X_ice(i,j,:),uz_now,advecxy, &
+                                    X_srf(i,j),X_base(i,j),H_ice(i,j),zeta_aa,zeta_ac,impl_kappa,dt) 
 
                     case DEFAULT 
 
@@ -134,7 +131,7 @@ contains
         end do 
 
         ! Check for tracer inconsistencies
-        call fix_tracer_violation(X_ice,X_prev)
+        call fix_tracer_violation(X_ice,X_prev,X_base,X_srf)
 
         ! Fill in borders 
         X_ice(2,:,:)    = X_ice(3,:,:) 
@@ -151,16 +148,18 @@ contains
 
     end subroutine calc_tracer_3D
 
-    subroutine fix_tracer_violation(X_ice,X_prev)
+    subroutine fix_tracer_violation(X_ice,X_prev,X_base,X_srf)
 
         implicit none 
 
         real(prec), intent(INOUT) :: X_ice(:,:,:)       ! [units] Predicted values 
         real(prec), intent(IN)    :: X_prev(:,:,:)      ! [units] Previous values
-
+        real(prec), intent(IN)    :: X_base(:,:)        ! [units] Basal boundary value
+        real(prec), intent(IN)    :: X_srf(:,:)         ! [units] Surface boudnary value 
+        
         ! Local variables
         integer :: i, j, nx, ny, nz   
-        real(prec) :: X_base, X_srf, X_min, X_max               
+        real(prec) :: X_min, X_max               
         logical    :: is_active 
 
         nx = size(X_ice,1)
@@ -170,11 +169,7 @@ contains
         do j = 2, ny-1
         do i = 1, nx-1 
 
-            ! Extract current surface and basal values
-            X_base = X_ice(i,j,1)
-            X_srf  = X_ice(i,j,nz) 
-
-            if (minval(X_ice(i,j,:)) .eq. X_srf .and. maxval(X_ice(i,j,:)) .eq. X_srf) then 
+            if (minval(X_ice(i,j,:)) .eq. X_srf(i,j) .and. maxval(X_ice(i,j,:)) .eq. X_srf(i,j)) then 
                 ! This column had X_srf imposed everywhere, so ignore it.
                 is_active = .FALSE. 
             else 
@@ -187,24 +182,26 @@ contains
                 ! previous values or the boundary values. 
 
                 ! Determine minimum/maxium allowed values
-                X_min = minval([X_base,X_srf,X_prev(i,j,:), &
-                    X_prev(i-1,j,:),X_prev(i+1,j,:),X_prev(i,j-1,:),X_prev(i,j+1,:)])
-                X_max = maxval([X_base,X_srf,X_prev(i,j,:), &
-                    X_prev(i-1,j,:),X_prev(i+1,j,:),X_prev(i,j-1,:),X_prev(i,j+1,:)])
+                X_min = minval([X_base(i,j),X_srf(i,j),X_prev(i,j,2:nz-1), &
+                    X_prev(i-1,j,2:nz-1),X_prev(i+1,j,2:nz-1),X_prev(i,j-1,2:nz-1),X_prev(i,j+1,2:nz-1)])
+                X_max = maxval([X_base(i,j),X_srf(i,j),X_prev(i,j,2:nz-1), &
+                    X_prev(i-1,j,2:nz-1),X_prev(i+1,j,2:nz-1),X_prev(i,j-1,2:nz-1),X_prev(i,j+1,2:nz-1)])
 
 
                 if (minval(X_ice(i,j,:)) .lt. X_min .or. maxval(X_ice(i,j,:)) .gt. X_max) then 
                     ! Simply maintain solution from previous timestep, but update 
                     ! surface boundary condition
-                    X_ice(i,j,:)  = X_prev(i,j,:)
-                    !X_ice(i,j,nz) = X_srf 
+                    !X_ice(i,j,:)  = X_prev(i,j,:)
+                    !X_ice(i,j,nz) = X_srf(i,j) 
+
+                    X_ice(i,j,:)  = X_srf(i,j) 
                 end if 
 
                 ! Finally, also reset tracer to previous value if value is too large, or appears problematic 
                 ! (likely redundant with previous check, but kept for safety)
                 if (maxval(abs(X_ice(i,j,:))) .gt. 1e12) then 
-                    !X_ice(i,j,:) = X_srf(i,j) 
-                    X_ice(i,j,:) = X_prev(i,j,:)
+                    X_ice(i,j,:) = X_srf(i,j) 
+                    !X_ice(i,j,:) = X_prev(i,j,:)
                 end if 
 
             end if 
@@ -691,6 +688,7 @@ contains
         ! Local variables 
         real(prec) :: bmb_tot 
         real(prec) :: dz 
+        real(prec) :: f_wt 
 
         ! Calculate basal mass balance including additional thinning term
         bmb_tot = bmb + bmb_thinning 
@@ -701,8 +699,13 @@ contains
             ! using boundary condition of Rybak and Huybrechts (2003), Eq. 3
             ! No horizontal advection of the basal value since it has no thickness 
 
-            dz = H_ice*(zeta_aa(2) - zeta_aa(1)) 
-            X_base = X_ice(1) - dt*bmb_tot*(X_ice(2)-X_ice(1))/dz 
+            dz     = H_ice*(zeta_aa(2) - zeta_aa(1)) 
+            !X_base = X_ice(1) - dt*bmb_tot*(X_ice(2)-X_ice(1))/dz 
+
+            ! Calculate equation first as f_wt, to be able to limit it
+            ! to a maximum value of 1.0 (ie, avoid extrapolation)
+            f_wt   = min(1.0_prec, -dt*bmb_tot/dz)
+            X_base = X_ice(1) + f_wt*(X_ice(2)-X_ice(1))
 
         else
             ! Leave basal value unchanged 

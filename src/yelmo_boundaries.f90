@@ -148,7 +148,8 @@ contains
 
             case ("Greenland") 
 
-                where (bnd%regions .ne. 1.3) bnd%ice_allowed = .FALSE. 
+                where (bnd%regions .ne. 1.3 .or. bnd%regions .ne. 1.11 &
+                                .or. bnd%regions .ne. 1.0) bnd%ice_allowed = .FALSE. 
                 bnd%ice_allowed(1,:)  = .FALSE. 
                 bnd%ice_allowed(nx,:) = .FALSE. 
                 bnd%ice_allowed(:,1)  = .FALSE. 

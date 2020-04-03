@@ -16,7 +16,7 @@ module yelmo_data
 
 contains
 
-    subroutine ydata_compare(dta,tpo,dyn,mat,thrm,bnd)
+    subroutine ydata_compare(dta,tpo,dyn,mat,thrm,bnd,domain)
 
         implicit none 
 
@@ -26,11 +26,13 @@ contains
         type(ymat_class),   intent(IN)    :: mat
         type(ytherm_class), intent(IN)    :: thrm
         type(ybound_class), intent(IN)    :: bnd
-        
+        character(len=*),   intent(IN)    :: domain 
+
         ! Local variables 
         integer :: q, q1, nx, ny 
         real(prec), allocatable :: tmp(:,:) 
         real(prec), allocatable :: tmp1(:,:) 
+        logical,    allocatable :: mask_region(:,:)
         logical,    allocatable :: mask(:,:)
 
         real(prec), parameter :: tol = 1e-3 
@@ -39,6 +41,7 @@ contains
         ny = size(tpo%now%H_ice,2)
         
         allocate(mask(nx,ny))
+        allocate(mask_region(nx,ny))
 
         ! ======================================================
         ! Calculate errors
@@ -74,23 +77,42 @@ contains
         ! ======================================================
         ! Whole ice sheet error metrics (rmse)
 
+        ! Calculate region over which to calculate metrics 
+
+        ! By default, calculate everywhere 
+        mask_region = .TRUE. 
+
+        ! For Greenland, limit to continental Greenland where data is defined currently
+        if (trim(domain) .eq. "Greenland") then 
+            where (bnd%regions .ne. 1.3) mask_region = .FALSE. 
+        end if 
+
         allocate(tmp(nx,ny))
         allocate(tmp1(nx,ny))
 
         ! == rmse[Ice thickness] ===================
+        
         tmp = tpo%now%H_ice-dta%pd%H_ice
-        if (count(tmp .ne. 0.0) .gt. 0) then 
-            dta%pd%rmse_H = sqrt(sum(tmp**2)/count(tmp .ne. 0.0))
+        
+        ! Define mask over which to perform comparison with data 
+        mask = (tpo%now%H_ice .ne. 0.0 .or. dta%pd%H_ice .ne. 0.0) .and. mask_region 
+        
+        if (count(mask) .gt. 0) then 
+            dta%pd%rmse_H = sqrt(sum(tmp**2)/count(mask))
         else 
             dta%pd%rmse_H = mv 
         end if 
 
         if (dta%pd%rmse_H .eq. 0.0_prec) dta%pd%rmse_H = mv 
 
-        ! == rmse[Surface elevation] =================== 
+        ! == rmse[Surface elevation] ===================
+
         tmp = dta%pd%err_z_srf
-        if (count(tmp .ne. 0.0) .gt. 0) then 
-            dta%pd%rmse_zsrf = sqrt(sum(tmp**2)/count(tmp .ne. 0.0))
+        
+        mask = tmp .ne. 0.0 .and. mask_region 
+         
+        if (count(mask) .gt. 0) then 
+            dta%pd%rmse_zsrf = sqrt(sum(tmp**2)/count(mask))
         else 
             dta%pd%rmse_zsrf = mv 
         end if 
@@ -99,8 +121,11 @@ contains
         
         ! == rmse[Surface velocity] ===================
         tmp = dta%pd%err_uxy_s
-        if (count(tmp .ne. 0.0) .gt. 0) then 
-            dta%pd%rmse_uxy = sqrt(sum(tmp**2)/count(tmp .ne. 0.0))
+
+        mask = tmp .ne. 0.0 .and. mask_region 
+         
+        if (count(mask) .gt. 0) then
+            dta%pd%rmse_uxy = sqrt(sum(tmp**2)/count(mask))
         else
             dta%pd%rmse_uxy = mv
         end if 
@@ -113,8 +138,10 @@ contains
         tmp1 = dyn%now%uxy_s 
         where(dyn%now%uxy_s .gt. 0.0) tmp1 = log(tmp1)
         
-        if (count(tmp1-tmp .ne. 0.0) .gt. 0) then 
-            dta%pd%rmse_loguxy = sqrt(sum((tmp1-tmp)**2)/count(tmp1-tmp .ne. 0.0))
+        mask = (tmp .ne. 0.0 .or. tmp1 .ne. 0.0) .and. mask_region 
+        
+        if (count(mask) .gt. 0) then 
+            dta%pd%rmse_loguxy = sqrt(sum((tmp1-tmp)**2)/count(mask))
         else
             dta%pd%rmse_loguxy = mv
         end if 

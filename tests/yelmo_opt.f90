@@ -140,7 +140,7 @@ program yelmo_test
 
     ! Initialize data objects and load initial topography
     call yelmo_init(yelmo1,filename=path_par,grid_def="file",time=time_init)
-    
+
     ! Initialize mass balance correction matrix 
     allocate(mb_corr(yelmo1%grd%nx,yelmo1%grd%ny))
     mb_corr = 0.0_prec 
@@ -314,7 +314,8 @@ if (opt_method .eq. 1) then
             call update_cf_ref_errscaling(yelmo1%dyn%now%cf_ref,cf_ref_dot,yelmo1%tpo%now%H_ice, &
                                 yelmo1%bnd%z_bed,yelmo1%dyn%now%ux_s,yelmo1%dyn%now%uy_s, &
                                 yelmo1%dta%pd%H_ice,yelmo1%dta%pd%uxy_s,yelmo1%dta%pd%H_grnd.le.0.0_prec, &
-                                yelmo1%tpo%par%dx,cf_min,cf_max,sigma_err,sigma_vel,err_scale,optvar)
+                                yelmo1%tpo%par%dx,cf_min,cf_max,sigma_err,sigma_vel,err_scale, &
+                                fill_dist=80.0_prec,optvar=optvar)
 
         end if 
         

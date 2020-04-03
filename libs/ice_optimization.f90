@@ -18,7 +18,7 @@ module ice_optimization
 contains 
 
     subroutine update_cf_ref_errscaling(cf_ref,cf_ref_dot,H_ice,z_bed,ux,uy,H_obs,uxy_obs,is_float_obs, &
-                                        dx,cf_min,cf_max,sigma_err,sigma_vel,err_scale,optvar)
+                                        dx,cf_min,cf_max,sigma_err,sigma_vel,err_scale,fill_dist,optvar)
 
         implicit none 
 
@@ -36,7 +36,8 @@ contains
         real(prec), intent(IN)    :: cf_max
         real(prec), intent(IN)    :: sigma_err 
         real(prec), intent(IN)    :: sigma_vel
-        real(prec), intent(IN)    :: err_scale            ! [m] or [m/a]
+        real(prec), intent(IN)    :: err_scale              ! [m] or [m/a]
+        real(prec), intent(IN)    :: fill_dist              ! [km] Distance over which to smooth between nearest neighbor and minimum value
         character(len=*), intent(IN) :: optvar
 
         ! Local variables 
@@ -179,7 +180,7 @@ end if
         end do 
 
         ! Fill in missing values with nearest neighbor or cf_min when none available
-        call fill_nearest(cf_ref,missing_value=MV,fill_value=cf_min,fill_dist=80.0,n=5,dx=dx)
+        call fill_nearest(cf_ref,missing_value=MV,fill_value=cf_min,fill_dist=fill_dist,n=5,dx=dx)
 
         ! Ensure cf_ref is not below lower or upper limit 
         where (cf_ref .lt. cf_min) cf_ref = cf_min 

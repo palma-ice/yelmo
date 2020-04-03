@@ -148,13 +148,11 @@ contains
 
             case ("Greenland") 
 
-                where (bnd%regions .ne. 1.3 .or. bnd%regions .ne. 1.11 &
-                                .or. bnd%regions .ne. 1.0) bnd%ice_allowed = .FALSE. 
-                bnd%ice_allowed(1,:)  = .FALSE. 
-                bnd%ice_allowed(nx,:) = .FALSE. 
-                bnd%ice_allowed(:,1)  = .FALSE. 
-                bnd%ice_allowed(:,ny) = .FALSE. 
-
+                bnd%ice_allowed = .FALSE. 
+                where (bnd%regions .eq. 1.3)  bnd%ice_allowed = .TRUE.      ! Main Greenland region
+                where (bnd%regions .eq. 1.11) bnd%ice_allowed = .TRUE.      ! Ellesmere Island
+                where (bnd%regions .eq. 1.0)  bnd%ice_allowed = .TRUE.      ! Open ocean (included some connections between 1.3 and 1.11)
+                
             case ("Antarctica") 
 
                 where (bnd%regions .eq. 2.0) bnd%ice_allowed = .FALSE. 

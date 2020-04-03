@@ -39,8 +39,7 @@ contains
 
         ! Local variables
         integer    :: i, j, k, nx, ny, nz_aa, nz_ac  
-        real(prec) :: advecxy_base
-        real(prec) :: uxy_aa 
+        real(prec) :: advecxy_base, uxy_aa, f_diff  
         logical    :: is_margin 
         real(prec), allocatable :: X_base(:,:)  
         real(prec), allocatable :: advecxy(:)   ! [X a-1 m-2] Horizontal advection  
@@ -73,21 +72,25 @@ contains
 
         do j = 3, ny-2
         do i = 3, nx-2 
-            
+            ! Skip 2 points at grid borders to permit 2nd-order upwind scheme 
+
             if (H_ice(i,j) .gt. 0.0_prec .and. &
-                    count([H_ice(i-1,j),H_ice(i+1,j),H_ice(i,j-1),H_ice(i,j+1)].eq.0.0_prec).gt.0) then 
+                    count(H_ice(i-1:i+1,j-1:j+1).eq.0.0_prec).gt.0) then 
                 is_margin = .TRUE. 
+                f_diff    = 0.05_prec
             else
                 is_margin = .FALSE. 
+                f_diff    = 0.1_prec 
             end if 
+            
+            is_margin = .FALSE.
 
             uxy_aa = sqrt( (0.5_prec*(ux(i,j,nz_aa)+ux(i-1,j,nz_aa)))**2 &
                           +(0.5_prec*(uy(i,j,nz_aa)+uy(i,j-1,nz_aa)))**2 )
 
-            if ( H_ice(i,j) .gt. H_ice_min  .and. (.not. is_margin) .and. &
-                 abs(uz(i,j,1)) .lt. uz_max  ) then  !.and. uxy_aa .lt. 50.0
-                ! Thick ice exists, not at the margin and not presenting high values
-                ! of vertical velocity at the base, so call tracer solver for the column
+            if ( H_ice(i,j) .gt. H_ice_min .and. abs(uz(i,j,1)) .lt. uz_max  ) then  !.and. uxy_aa .lt. 50.0
+                ! Thick ice exists and not presenting high values of basal 
+                ! vertical velocity, so call tracer solver for the column
 
                 ! Get current column of uz 
                 uz_now = uz(i,j,:)
@@ -128,6 +131,9 @@ contains
 
                 end select 
 
+                ! Check for tracer inconsistencies (usually for very fast-flowing regions)
+                call fix_tracer_violation(X_ice(i,j,:),X_prev(i,j,:),X_base(i,j),X_srf(i,j),dt,f_diff)
+
             else ! H_ice(i,j) .le. H_ice_min
                 ! Ice is too thin or zero, no tracing
 
@@ -137,9 +143,6 @@ contains
 
         end do 
         end do 
-
-        ! Check for tracer inconsistencies (usually for very fast-flowing regions)
-        call fix_tracer_violation(X_ice,X_prev,X_base,X_srf,dt)
 
         ! Fill in borders 
         X_ice(2,:,:)    = X_ice(3,:,:) 
@@ -156,65 +159,57 @@ contains
 
     end subroutine calc_tracer_3D
 
-    subroutine fix_tracer_violation(X_ice,X_prev,X_base,X_srf,dt)
+    subroutine fix_tracer_violation(X_ice,X_prev,X_base,X_srf,dt,f_diff)
 
         implicit none 
 
-        real(prec), intent(INOUT) :: X_ice(:,:,:)       ! [units] Predicted values 
-        real(prec), intent(IN)    :: X_prev(:,:,:)      ! [units] Previous values
-        real(prec), intent(IN)    :: X_base(:,:)        ! [units] Basal boundary value
-        real(prec), intent(IN)    :: X_srf(:,:)         ! [units] Surface boudnary value 
-        real(prec), intent(IN)    :: dt 
+        real(prec), intent(INOUT) :: X_ice(:)           ! [units] Predicted values 
+        real(prec), intent(IN)    :: X_prev(:)          ! [units] Previous values
+        real(prec), intent(IN)    :: X_base             ! [units] Basal boundary value
+        real(prec), intent(IN)    :: X_srf              ! [units] Surface boudnary value 
+        real(prec), intent(IN)    :: dt                 ! [yr]    Timestep 
+        real(prec), intent(IN)    :: f_diff             ! Fraction difference in X/yr of allowed change in tracer value
+                                                        ! Typically f_diff = 0.1-0.2
 
         ! Local variables
-        integer :: i, j, nx, ny, nz   
+        integer :: nz   
         real(prec) :: X_min, X_max, X_mean                
         logical    :: is_active 
 
-        real(prec), parameter :: f_diff = 0.2_prec      ! Fraction difference in X/yr of allowed change in tracer value
+        nz = size(X_ice,1) 
 
-        nx = size(X_ice,1)
-        ny = size(X_ice,2) 
-        nz = size(X_ice,3) 
+        if (minval(X_ice) .eq. X_srf .and. maxval(X_ice) .eq. X_srf) then 
+            ! This column had X_srf imposed everywhere, so ignore it.
+            is_active = .FALSE. 
+        else 
+            is_active = .TRUE. 
+        end if 
 
-        do j = 2, ny-1
-        do i = 1, nx-1 
+        if (is_active) then 
+            ! Check this column for errors:
+            ! Column values cannot be outside of the range of
+            ! previous values or the boundary values. 
 
-            if (minval(X_ice(i,j,:)) .eq. X_srf(i,j) .and. maxval(X_ice(i,j,:)) .eq. X_srf(i,j)) then 
-                ! This column had X_srf imposed everywhere, so ignore it.
-                is_active = .FALSE. 
-            else 
-                is_active = .TRUE. 
+            ! Determine mean value of column for previous timestep 
+            X_mean = abs(sum(X_prev) / real(nz,prec))
+            X_max  = abs(maxval(X_prev))
+
+            ! Limit any value change in X to eg 50% per year if X_mean .ne. 0.0
+            if (X_mean .ne. 0.0_prec) then  
+                where ( (X_ice-X_prev)/dt .gt. f_diff*X_mean )
+                    X_ice = X_prev + f_diff*X_mean*dt 
+                else where ( (X_ice-X_prev)/dt .lt. -f_diff*X_mean )
+                    X_ice = X_prev - f_diff*X_mean*dt 
+                end where
             end if 
 
-            if (is_active) then 
-                ! Check this column for errors:
-                ! Column values cannot be outside of the range of
-                ! previous values or the boundary values. 
-
-                ! Determine mean value of column for previous timestep 
-                X_mean = abs(sum(X_prev(i,j,:)) / real(nz,prec))
-                X_max  = abs(maxval(X_prev(i,j,:)))
-
-                ! Limit any value change in X to eg 50% per year if X_mean .ne. 0.0
-                if (X_mean .ne. 0.0_prec) then  
-                    where ( (X_ice(i,j,:)-X_prev(i,j,:))/dt .gt. f_diff*X_mean )
-                        X_ice(i,j,:) = X_prev(i,j,:) + f_diff*X_mean*dt 
-                    else where ( (X_ice(i,j,:)-X_prev(i,j,:))/dt .lt. -f_diff*X_mean )
-                        X_ice(i,j,:) = X_prev(i,j,:) - f_diff*X_mean*dt 
-                    end where
-                end if 
-
-                ! Finally, also reset tracer to previous value if value is too large, or appears problematic 
-                ! (likely redundant with previous check, but kept for safety)
-                if (maxval(abs(X_ice(i,j,:))) .gt. 1e10) then 
-                    X_ice(i,j,:) = X_srf(i,j) 
-                end if 
-
+            ! Finally, also reset tracer to previous value if value is too large, or appears problematic 
+            ! (likely redundant with previous check, but kept for safety)
+            if (maxval(abs(X_ice)) .gt. 1e10) then 
+                X_ice = X_srf 
             end if 
 
-        end do 
-        end do 
+        end if 
 
         return 
 

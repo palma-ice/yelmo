@@ -34,12 +34,12 @@ contains
         ! Local variables
         integer    :: k, nz_aa
         real(prec) :: dt
-        real(prec) :: enh_stream_now 
 
         real(prec), allocatable :: X_srf(:,:) 
         logical,    allocatable :: mask_tracers(:,:) 
 
         real(prec), parameter   :: enh_min = 0.1_prec       ! Minimum allowed enhancement factor value (for enh_method="paleo-shear")
+        real(prec), parameter   :: enh_max = 10.0_prec      ! Maximum allowed enhancement factor value (for enh_method="paleo-shear")
 
         nz_aa = mat%par%nz_aa
 
@@ -121,19 +121,31 @@ contains
 
         select case(trim(mat%par%enh_method))
 
+            case("simple")
+                ! Grounded ice: enh = enh_shear 
+                ! Floating ice: enh = enh_shlf
+
+                ! First define spatially varying enhancement factor (2D only),
+                ! for lowest layer of 3D enh field
+                ! Specify enh_stream = enh_shear 
+                mat%now%enh(:,:,1) = define_enhancement_factor_2D(tpo%now%f_grnd,mat%now%f_shear_bar,dyn%now%uxy(:,:,nz_aa), &
+                                                               mat%par%enh_shear,mat%par%enh_shear,mat%par%enh_shlf)
+            
+                ! Fill in the remaining 3D enh field layers too 
+                do k = 2, nz_aa
+                    mat%now%enh(:,:,k) = mat%now%enh(:,:,1)
+                end do 
+
             case("shear2D")
                 ! Calculate 2D enhancement factor based on depth-averaged
                 ! shear fraction (f_shear_bar)
                 ! enh = enh_shear*f_shear_bar + enh_stream*(1-f_shear_bar)
                 ! Note, floating ice always has enh = enh_shelf 
 
-                enh_stream_now = mat%par%enh_stream 
-                if (.not. mat%par%use_enh_stream) enh_stream_now = mat%par%enh_shear 
-
                 ! First define spatially varying enhancement factor (2D only),
                 ! for lowest layer of 3D enh field
                 mat%now%enh(:,:,1) = define_enhancement_factor_2D(tpo%now%f_grnd,mat%now%f_shear_bar,dyn%now%uxy(:,:,nz_aa), &
-                                                               mat%par%enh_shear,enh_stream_now,mat%par%enh_shlf)
+                                                               mat%par%enh_shear,mat%par%enh_stream,mat%par%enh_shlf)
             
                 ! Fill in the remaining 3D enh field layers too 
                 do k = 2, nz_aa
@@ -145,9 +157,6 @@ contains
                 ! shear fraction field (f_shear)
                 ! enh = enh_shear*f_shear_bar + enh_stream*(1-f_shear_bar)
                 ! Note, floating ice always has enh = enh_shelf 
-                
-                enh_stream_now = mat%par%enh_stream 
-                if (.not. mat%par%use_enh_stream) enh_stream_now = mat%par%enh_shear 
                 
                 ! Define spatially varying enhancement factor
                 mat%now%enh = define_enhancement_factor_3D(mat%now%strn%f_shear,tpo%now%f_grnd,dyn%now%uxy(:,:,nz_aa), &
@@ -180,9 +189,11 @@ contains
 
                 end if 
 
-                ! Ensure enh is always non-zero and positive value (eg, enh >= 0.1)
+                ! Ensure enh is always non-zero and positive value (eg, enh >= 0.1),
+                ! as well as not extremely high (eg enh <= 10)
                 where (mat%now%enh .lt. enh_min) mat%now%enh = enh_min
-
+                where (mat%now%enh .lt. enh_max) mat%now%enh = enh_max
+                
                 ! Additionally update field to impose prescribed values in streaming/floating regimes 
                 call define_enhancement_factor_paleo(mat%now%enh,tpo%now%f_grnd,dyn%now%uxy_bar, &
                                 mat%par%enh_stream,mat%par%enh_shlf,mat%par%enh_umin,mat%par%enh_umax)

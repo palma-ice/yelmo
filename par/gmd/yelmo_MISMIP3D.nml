@@ -119,8 +119,7 @@
     rf_with_water           = False         ! Only applied for rf_method=1, scale rf by water content?
     n_glen                  = 3.0 
     visc_min                = 1e3 
-    enh_method              = "enh3D"       ! "enh2D", "enh3D", "paleo-shear" 
-    use_enh_stream          = True          ! For enh_method=["enh2D","enh3D"], use enh_shear and enh_stream?
+    enh_method              = "shear3D"     ! "simple","shear2D", "shear3D", "paleo-shear" 
     enh_shear               = 1.0
     enh_stream              = 1.0
     enh_shlf                = 1.0

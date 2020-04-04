@@ -34,17 +34,18 @@ contains
         ! Local variables
         integer    :: k, nz_aa
         real(prec) :: dt
+        real(prec) :: enh_stream_now 
 
         real(prec), allocatable :: X_srf(:,:) 
-        real(prec), allocatable :: enh_prev(:,:,:) 
+        logical,    allocatable :: mask_tracers(:,:) 
+
+        real(prec), parameter   :: enh_min = 0.1_prec       ! Minimum allowed enhancement factor value (for enh_method="paleo-shear")
 
         nz_aa = mat%par%nz_aa
 
-        ! Allocate array to use for tracer surface boundary conditon 
+        ! Allocate temporary arrays 
         allocate(X_srf(mat%par%nx,mat%par%ny))
-
-        ! Allocate array to store previous value of enhancement factor 
-        allocate(enh_prev(mat%par%nx,mat%par%ny,nz_aa))
+        allocate(mask_tracers(mat%par%nx,mat%par%ny))
 
         ! Initialize time if necessary 
         if (mat%par%time .gt. time) then 
@@ -62,8 +63,15 @@ contains
             ! Set surface boundary condition to current time 
             X_srf = time 
 
-            call calc_tracer_3D(mat%now%dep_time,X_srf,dyn%now%ux,dyn%now%uy,dyn%now%uz,tpo%now%H_ice,tpo%now%bmb, &
-                mat%par%zeta_aa,mat%par%zeta_ac,mat%par%tracer_method,mat%par%tracer_impl_kappa,dt,thrm%par%dx,time)
+            ! Define limits to where to calculate age tracers
+            ! (avoid very fast-flowing ice, as they are not interesting here)
+            ! Surface value will be imposed in these places 
+            mask_tracers = .TRUE. 
+            where (dyn%now%uxy_bar .gt. 500.0_prec) mask_tracers = .FALSE. 
+
+            call calc_tracer_3D(mat%now%dep_time,X_srf,dyn%now%ux,dyn%now%uy,dyn%now%uz, &
+                tpo%now%H_ice,tpo%now%bmb,mat%par%zeta_aa,mat%par%zeta_ac,mat%par%tracer_method, &
+                mat%par%tracer_impl_kappa,dt,thrm%par%dx,time,mask=mask_tracers)
 
             ! Calculate isochrones too
             call calc_isochrones(mat%now%depth_iso,mat%now%dep_time,tpo%now%H_ice,mat%par%age_iso, &
@@ -71,24 +79,9 @@ contains
 
         end if 
 
-        ! 00b. Update anisotropic enhancement factor tracer field 
-        if (mat%par%calc_enh_bnd .and. dt .gt. 0.0) then 
-            ! Perform calculations of enhancement factor tracer: enh_bnd (anisotropic enhancement factor)
-
-            ! Set surface boundary condition to boundary enh field
-            X_srf = bnd%enh_srf  
-
-            call calc_tracer_3D(mat%now%enh_bnd,X_srf,dyn%now%ux,dyn%now%uy,dyn%now%uz,tpo%now%H_ice,tpo%now%bmb, &
-                mat%par%zeta_aa,mat%par%zeta_ac,mat%par%tracer_method,mat%par%tracer_impl_kappa,dt,thrm%par%dx,time)
-
-            ! Ensure enh_bnd is non-zero, set to small value (eg 0.1)
-            where (mat%now%enh_bnd .lt. 0.1_prec) mat%now%enh_bnd = 0.1_prec
-
-        end if 
-
         ! 0. Update strain rate 
         ! Note: this calculation of strain rate is particular to the material module, and 
-        ! may differ from the strain rate calculated locally in the dynamics module
+        ! may differ from the effective strain rate calculated locally in the dynamics module
 
         ! Calculate the strain rate from the full 3D tensor
 
@@ -126,36 +119,85 @@ contains
 
         ! 1. Update enhancement factor ======================
 
-        if (mat%par%use_enh_2D) then 
-            ! Calculate 2D enhancement factor 
+        select case(trim(mat%par%enh_method))
 
-            ! Next, define spatially varying enhancement factor (2D only),
-            ! first only for lowest layer of 3D enh field
-            mat%now%enh(:,:,1) = define_enhancement_factor_2D(tpo%now%f_grnd,mat%now%f_shear_bar,dyn%now%uxy(:,:,nz_aa), &
-                                                           mat%par%enh_shear,mat%par%enh_stream,mat%par%enh_shlf)
+            case("shear2D")
+                ! Calculate 2D enhancement factor based on depth-averaged
+                ! shear fraction (f_shear_bar)
+                ! enh = enh_shear*f_shear_bar + enh_stream*(1-f_shear_bar)
+                ! Note, floating ice always has enh = enh_shelf 
+
+                enh_stream_now = mat%par%enh_stream 
+                if (.not. mat%par%use_enh_stream) enh_stream_now = mat%par%enh_shear 
+
+                ! First define spatially varying enhancement factor (2D only),
+                ! for lowest layer of 3D enh field
+                mat%now%enh(:,:,1) = define_enhancement_factor_2D(tpo%now%f_grnd,mat%now%f_shear_bar,dyn%now%uxy(:,:,nz_aa), &
+                                                               mat%par%enh_shear,enh_stream_now,mat%par%enh_shlf)
             
-            ! Fill in the remaining 3D enh field layers too 
-            do k = 2, nz_aa
-                mat%now%enh(:,:,k) = mat%now%enh(:,:,1)
-            end do 
+                ! Fill in the remaining 3D enh field layers too 
+                do k = 2, nz_aa
+                    mat%now%enh(:,:,k) = mat%now%enh(:,:,1)
+                end do 
 
-        else 
-            ! Calculate 3D enhancement factor directly
-
-            ! Next, define spatially varying enhancement factor
-            mat%now%enh = define_enhancement_factor(mat%now%strn%f_shear,tpo%now%f_grnd,dyn%now%uxy(:,:,nz_aa), &
-                                                    mat%par%enh_shear,mat%par%enh_stream,mat%par%enh_shlf)
+            case("shear3D") 
+                ! Calculate 3D enhancement factor based on 3D
+                ! shear fraction field (f_shear)
+                ! enh = enh_shear*f_shear_bar + enh_stream*(1-f_shear_bar)
+                ! Note, floating ice always has enh = enh_shelf 
+                
+                enh_stream_now = mat%par%enh_stream 
+                if (.not. mat%par%use_enh_stream) enh_stream_now = mat%par%enh_shear 
+                
+                ! Define spatially varying enhancement factor
+                mat%now%enh = define_enhancement_factor_3D(mat%now%strn%f_shear,tpo%now%f_grnd,dyn%now%uxy(:,:,nz_aa), &
+                                                           mat%par%enh_shear,mat%par%enh_stream,mat%par%enh_shlf)
 
         
-        end if 
+            case("paleo-shear")
+                ! Calculate 3D enhancement factor as the evolution 
+                ! of an imposed enhancement factor at the surface propogating
+                ! as a tracer inside of the ice sheet. Assume that propogation 
+                ! is only valid for slow-flowing (ie, shearing ice), and impose 
+                ! prescribed enh_stream and enh_shelf values for the fast-flowing
+                ! and floating ice, respectively. 
 
-        ! Additionally scale 3D enh field by enh_bnd if it is being calculated 
-        if (mat%par%calc_enh_bnd) then 
-            mat%now%enh = mat%now%enh*mat%now%enh_bnd 
-        end if
+                if (dt .gt. 0.0) then 
+                    ! Update anisotropic enhancement factor tracer field if advancing timestep 
+                    ! (if not, do nothing) 
 
-        ! And get the vertical average
+                    ! Set surface boundary condition to boundary enh field
+                    X_srf = bnd%enh_srf  
+
+                    ! Define limits to where to calculate tracers, 
+                    ! surface value will be imposed in fast regions
+                    mask_tracers = .TRUE. 
+                    where (dyn%now%uxy_bar .gt. mat%par%enh_umax) mask_tracers = .FALSE. 
+
+                    call calc_tracer_3D(mat%now%enh,X_srf,dyn%now%ux,dyn%now%uy,dyn%now%uz,tpo%now%H_ice, &
+                                        tpo%now%bmb,mat%par%zeta_aa,mat%par%zeta_ac,mat%par%tracer_method, &
+                                        mat%par%tracer_impl_kappa,dt,thrm%par%dx,time,mask=mask_tracers)
+
+                end if 
+
+                ! Ensure enh is always non-zero and positive value (eg, enh >= 0.1)
+                where (mat%now%enh .lt. enh_min) mat%now%enh = enh_min
+
+                ! Additionally update field to impose prescribed values in streaming/floating regimes 
+                call define_enhancement_factor_paleo(mat%now%enh,tpo%now%f_grnd,dyn%now%uxy_bar, &
+                                mat%par%enh_stream,mat%par%enh_shlf,mat%par%enh_umin,mat%par%enh_umax)
+
+            case DEFAULT 
+
+                write(*,*) "calc_ymat:: Error: enhancement method not recognized: "//trim(mat%par%enh_method)
+                stop 
+
+        end select 
+
+
+        ! Finally get the vertical average
         mat%now%enh_bar = calc_vertical_integrated_2D(mat%now%enh,mat%par%zeta_aa)
+
 
         ! 2. Update rate factor ==========================
 
@@ -251,18 +293,17 @@ contains
         call nml_read(filename,"ymat","rf_with_water",          par%rf_with_water,          init=init_pars)
         call nml_read(filename,"ymat","n_glen",                 par%n_glen,                 init=init_pars)
         call nml_read(filename,"ymat","visc_min",               par%visc_min,               init=init_pars)
-        call nml_read(filename,"ymat","use_enh_2D",             par%use_enh_2D,             init=init_pars)
+        call nml_read(filename,"ymat","enh_method",             par%enh_method,             init=init_pars)
         call nml_read(filename,"ymat","use_enh_stream",         par%use_enh_stream,         init=init_pars)
         call nml_read(filename,"ymat","enh_shear",              par%enh_shear,              init=init_pars)
         call nml_read(filename,"ymat","enh_stream",             par%enh_stream,             init=init_pars)
         call nml_read(filename,"ymat","enh_shlf",               par%enh_shlf,               init=init_pars)
-        
-        call nml_read(filename,"ymat","tracer_method",          par%tracer_method,          init=init_pars)
-        call nml_read(filename,"ymat","tracer_impl_kappa",      par%tracer_impl_kappa,      init=init_pars)
-        
-        call nml_read(filename,"ymat","calc_enh_bnd",           par%calc_enh_bnd,           init=init_pars)
+        call nml_read(filename,"ymat","enh_umin",               par%enh_umin,               init=init_pars)
+        call nml_read(filename,"ymat","enh_umax",               par%enh_umax,               init=init_pars)
         call nml_read(filename,"ymat","calc_age",               par%calc_age,               init=init_pars)
         call nml_read(filename,"ymat","age_iso",                age_iso,                    init=init_pars)
+        call nml_read(filename,"ymat","tracer_method",          par%tracer_method,          init=init_pars)
+        call nml_read(filename,"ymat","tracer_impl_kappa",      par%tracer_impl_kappa,      init=init_pars)
         
         ! Set internal parameters
         par%nx    = nx 
@@ -341,8 +382,6 @@ contains
         allocate(now%dep_time(nx,ny,nz_aa)) 
         allocate(now%depth_iso(nx,ny,n_iso)) 
 
-        allocate(now%enh_bnd(nx,ny,nz_aa)) 
-
         now%strn2D%dxx   = 0.0 
         now%strn2D%dyy   = 0.0 
         now%strn2D%dxy   = 0.0
@@ -357,7 +396,7 @@ contains
         now%strn%de      = 0.0
         now%strn%f_shear = 0.0 
      
-        now%enh          = 0.0 
+        now%enh          = 1.0 
         now%enh_bar      = 0.0 
         now%ATT          = 0.0 
         now%ATT_bar      = 0.0    
@@ -369,9 +408,6 @@ contains
         now%dep_time     = 0.0 
         now%depth_iso    = 0.0 
         
-        ! Ensure enh_bnd is initialized with a value of 1.0, in case it is not calculated later online.
-        now%enh_bnd      = 1.0 
-
         return 
 
     end subroutine ymat_alloc 
@@ -407,8 +443,6 @@ contains
 
         if (allocated(now%dep_time))        deallocate(now%dep_time)
         if (allocated(now%depth_iso))       deallocate(now%depth_iso)
-        
-        if (allocated(now%enh_bnd))         deallocate(now%enh_bnd)
         
         return 
 

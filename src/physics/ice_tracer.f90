@@ -16,9 +16,14 @@ module ice_tracer
 contains
 
 
-    subroutine calc_tracer_3D(X_ice,X_srf,ux,uy,uz,H_ice,bmb,zeta_aa,zeta_ac,solver,impl_kappa,dt,dx,time)
+    subroutine calc_tracer_3D(X_ice,X_srf,ux,uy,uz,H_ice,bmb,zeta_aa,zeta_ac,solver, &
+                                                                impl_kappa,dt,dx,time,mask)
         ! Solver for the age of the ice 
         ! Note zeta=height, k=1 base, k=nz surface 
+
+        ! H_ice_min and uz_max limits help with stability and generally would only affect areas
+        ! where the tracers are not very interesting (ice shelves, ice margin, thin ice). 
+        ! bmb_thinning parameter ensures that tracer solution remains bounded. 
 
         implicit none 
 
@@ -36,92 +41,74 @@ contains
         real(prec), intent(IN)    :: dt             ! [a] Time step 
         real(prec), intent(IN)    :: dx             ! [a] Horizontal grid step 
         real(prec), intent(IN)    :: time           ! [a] Current time 
+        logical,    intent(IN), optional :: mask(:,:)   ! Where to perform tracing 
 
         ! Local variables
         integer    :: i, j, k, nx, ny, nz_aa, nz_ac  
-        real(prec) :: advecxy_base, uxy_aa, f_diff  
-        logical    :: is_margin 
-        real(prec), allocatable :: X_base(:,:)  
+        real(prec) :: X_base, f_diff    
         real(prec), allocatable :: advecxy(:)   ! [X a-1 m-2] Horizontal advection  
-        real(prec), allocatable :: uz_now(:)    ! [m a-1] Vertical velocity 
         real(prec), allocatable :: X_prev(:,:,:) 
         
-        ! These limits help with stability and generally would only affect areas
-        ! where the tracers are not very interesting (ice shelves, ice margin, thin ice)
-        real(prec), parameter :: H_ice_min = 100.0      ! [m] Minimum ice thickness to calculate ages
-        real(prec), parameter :: uz_max    =   5.0      ! [m a-1] Maximum considered vertical velocity magnitude at surface 
+        logical,    allocatable :: mask_tracers(:,:) 
 
-        real(prec), parameter :: bmb_thinning = -1e-3   ! [m a-1] To keep solution bounded 
+        ! Numerical parameters 
+        real(prec), parameter :: H_ice_min    = 100.0       ! [m] Minimum ice thickness to calculate ages
+        real(prec), parameter :: uz_max       =   5.0       ! [m a-1] Maximum considered vertical velocity magnitude at base 
+        real(prec), parameter :: bmb_thinning = -1e-3       ! [m a-1] Additional basal layer thinning, to keep solution bounded 
 
         nx    = size(X_ice,1)
         ny    = size(X_ice,2)
         nz_aa = size(zeta_aa,1)
         nz_ac = size(zeta_ac,1)
 
-        allocate(X_base(nx,ny))
         allocate(advecxy(nz_aa))
-        allocate(uz_now(nz_ac)) 
         allocate(X_prev(nx,ny,nz_aa))
+        allocate(mask_tracers(nx,ny))
 
-        advecxy = 0.0_prec 
-        uz_now  = 0.0_prec 
+        ! If mask was provided as argument, load it locally, 
+        ! otherwise calculate tracers everywher by default 
+        if (present(mask)) then 
+            mask_tracers = mask
+        else 
+            mask_tracers = .TRUE.
+        end if  
+
+        ! Apply additional restrictions on tracer calculations 
+        ! 1. Do not calculate tracers for very thin ice 
+        ! 2. Do not calculate tracers with high vertical velocity at base
+        where ( H_ice .lt. H_ice_min )          mask_tracers = .FALSE. 
+        where ( abs(uz(:,:,1)) .gt. uz_max )    mask_tracers = .FALSE. 
 
         ! Store X_ice from previous timestep 
         X_prev = X_ice 
-        X_base = X_ice(:,:,1) 
 
         do j = 3, ny-2
         do i = 3, nx-2 
-            ! Skip 2 points at grid borders to permit 2nd-order upwind scheme 
+            ! Skip 2 points at grid borders to permit horizontal 2nd-order upwind scheme 
 
-            if (H_ice(i,j) .gt. 0.0_prec .and. &
-                    count(H_ice(i-1:i+1,j-1:j+1).eq.0.0_prec).gt.0) then 
-                is_margin = .TRUE. 
-                f_diff    = 0.05_prec
-            else
-                is_margin = .FALSE. 
-                f_diff    = 0.1_prec 
-            end if 
-            
-            is_margin = .FALSE.
+            if ( mask_tracers(i,j) ) then
+                ! Tracers should be calculated here (see above)
 
-            uxy_aa = sqrt( (0.5_prec*(ux(i,j,nz_aa)+ux(i-1,j,nz_aa)))**2 &
-                          +(0.5_prec*(uy(i,j,nz_aa)+uy(i,j-1,nz_aa)))**2 )
-
-            if ( H_ice(i,j) .gt. H_ice_min .and. abs(uz(i,j,1)) .lt. uz_max  ) then  !.and. uxy_aa .lt. 50.0
-                ! Thick ice exists and not presenting high values of basal 
-                ! vertical velocity, so call tracer solver for the column
-
-                ! Get current column of uz 
-                uz_now = uz(i,j,:)
-
-                ! If uz presents very high values, renormalize it to keep things reasonable. 
-!                 if (uz_now(nz_ac) .gt. uz_max)  uz_now =  uz_now/uz_now(nz_ac)*uz_max 
-!                 if (uz_now(nz_ac) .lt. -uz_max) uz_now = -uz_now/uz_now(nz_ac)*uz_max 
-                
                 ! Pre-calculate the contribution of horizontal advection to column solution
                 call calc_advec_horizontal_column(advecxy,X_ice,ux,uy,dx,i,j,ulim=5000.0_prec)
                 
-                ! Calculate horizontal advection purely at the base 
-                call calc_advec_horizontal_base(advecxy_base,X_ice,ux,uy,dx,i,j,ulim=5000.0_prec)
-
                 ! Calculate the updated basal value of X from 
                 ! basal mass balance including additional thinning term
-                call calc_X_base(X_base(i,j),X_ice(i,j,:),H_ice(i,j),advecxy_base,bmb(i,j),bmb_thinning,zeta_aa,dt)
+                call calc_X_base(X_base,X_ice(i,j,:),H_ice(i,j),advecxy(1),bmb(i,j),bmb_thinning,zeta_aa,dt)
 
                 select case(trim(solver))
 
                     case("expl")
                         ! Explicit, upwind solver 
                         
-                        call calc_tracer_column_expl(X_ice(i,j,:),uz_now,advecxy, &
-                                    X_srf(i,j),X_base(i,j),H_ice(i,j),zeta_aa,zeta_ac,dt)
+                        call calc_tracer_column_expl(X_ice(i,j,:),uz(i,j,:),advecxy, &
+                                    X_srf(i,j),X_base,H_ice(i,j),zeta_aa,zeta_ac,dt)
 
                     case("impl")
                         ! Implicit solver vertically, upwind horizontally 
                         
-                        call calc_tracer_column(X_ice(i,j,:),uz_now,advecxy, &
-                                    X_srf(i,j),X_base(i,j),H_ice(i,j),zeta_aa,zeta_ac,impl_kappa,dt) 
+                        call calc_tracer_column(X_ice(i,j,:),uz(i,j,:),advecxy, &
+                                    X_srf(i,j),X_base,H_ice(i,j),zeta_aa,zeta_ac,impl_kappa,dt) 
 
                     case DEFAULT 
 
@@ -131,11 +118,21 @@ contains
 
                 end select 
 
+                ! Determine maximum allowed rate of change in tracer values
+                ! for numerical safety. Allowed rate is reduced for margin points. 
+                if (H_ice(i,j) .gt. 0.0_prec .and. count(H_ice(i-1:i+1,j-1:j+1).eq.0.0_prec).gt.0) then 
+                    ! Margin point
+                    f_diff    = 0.05_prec
+                else
+                    f_diff    = 0.1_prec 
+                end if 
+                
                 ! Check for tracer inconsistencies (usually for very fast-flowing regions)
-                call fix_tracer_violation(X_ice(i,j,:),X_prev(i,j,:),X_base(i,j),X_srf(i,j),dt,f_diff)
+                call fix_tracer_violation(X_ice(i,j,:),X_prev(i,j,:),X_base,X_srf(i,j),dt,f_diff)
 
-            else ! H_ice(i,j) .le. H_ice_min
-                ! Ice is too thin or zero, no tracing
+            else
+                ! Conditions not met for tracing, simply set column
+                ! equal to the surface values 
 
                 X_ice(i,j,:) = X_srf(i,j) 
 
@@ -286,9 +283,6 @@ contains
         allocate(rhs(nz_aa))
         allocate(solution(nz_aa))
 
-!         ! Calculate basal mass balance including additional thinning term
-!         call calc_X_base(X_base,X_ice,H_ice,bmb,bmb_thinning,zeta_aa,dt)
-
         ! Step 1: apply vertical advection (for explicit testing)
         if (test_expl_advecz) then 
             allocate(advecz(nz_aa))
@@ -394,9 +388,6 @@ contains
         nz_aa = size(zeta_aa,1)
         
         allocate(advecz(nz_aa))
-
-!         ! Calculate basal mass balance including additional thinning term
-!         call calc_X_base(X_base,X_ice,H_ice,bmb,bmb_thinning,zeta_aa,dt)
 
         ! Update base and surface values
         X_ice(1)     = X_base 
@@ -749,15 +740,23 @@ contains
         ny  = size(var_ice,2)
         nz_aa = size(var_ice,3) 
 
-        advecx = 0.0 
-        advecy = 0.0 
+        advecx  = 0.0_prec 
+        advecy  = 0.0_prec 
+        advecxy = 0.0_prec 
 
         ! Loop over each point in the column
-        do k = 2, nz_aa-1 
+        do k = 1, nz_aa-1 
 
             ! Estimate direction of current flow into cell (x and y), centered in vertical layer and grid point
-            ux_aa = 0.25_prec*(ux(i,j,k)+ux(i-1,j,k)+ux(i,j,k-1)+ux(i-1,j,k-1))
-            uy_aa = 0.25_prec*(uy(i,j,k)+uy(i,j-1,k)+uy(i,j,k-1)+uy(i,j-1,k-1))
+            if (k .eq. 1) then 
+                ! Basal layer, take current k-value 
+                ux_aa = 0.5_prec*(ux(i,j,k)+ux(i-1,j,k))
+                uy_aa = 0.5_prec*(uy(i,j,k)+uy(i,j-1,k))
+            else 
+                ! Internal layer, mean between k and k-1
+                ux_aa = 0.25_prec*(ux(i,j,k)+ux(i-1,j,k)+ux(i,j,k-1)+ux(i-1,j,k-1))
+                uy_aa = 0.25_prec*(uy(i,j,k)+uy(i,j-1,k)+uy(i,j,k-1)+uy(i,j-1,k-1))
+            end if 
 
             ! Explicit form (to test different order approximations)
             if (ux_aa .gt. 0.0 .and. i .ge. 3) then  

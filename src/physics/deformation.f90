@@ -15,7 +15,8 @@ module deformation
     implicit none 
     
     private
-    public :: define_enhancement_factor
+    public :: define_enhancement_factor_paleo 
+    public :: define_enhancement_factor_3D
     public :: define_enhancement_factor_2D
     public :: calc_viscosity_glen
     public :: calc_viscosity_glen_2D
@@ -29,7 +30,61 @@ module deformation
 
 contains 
 
-    function define_enhancement_factor(f_shear,f_grnd,uxy_srf,enh_shear,enh_stream,enh_shlf) result(enh)
+    subroutine define_enhancement_factor_paleo(enh,f_grnd,uxy_bar,enh_stream,enh_shlf,umin,umax)
+        ! enh field is initially obtained from tracer evolution,
+        ! here it is updated to account for streaming and floating regimes 
+
+        implicit none 
+
+        real(prec), intent(INOUT) :: enh(:,:,:)         ! [--] Enhancement factor field
+        real(prec), intent(IN)    :: f_grnd(:,:)        ! [--] Fraction of cell grounded
+        real(prec), intent(IN)    :: uxy_bar(:,:)       ! [m/a] Depth-averaged velocity magnitude 
+        real(prec), intent(IN)    :: enh_stream         ! [--] Enhancement factor for stream regions (SSA grounded)
+        real(prec), intent(IN)    :: enh_shlf           ! [--] Enhancement factor for ice shelf regions (SSA floating)
+        real(prec), intent(IN)    :: umin               ! [m/a] Minimum transition velocity 
+        real(prec), intent(IN)    :: umax               ! [m/a] Maximum transition velocity 
+
+        ! Local variables 
+        integer    :: i, j, k, nx, ny, nz 
+        real(prec) :: f_mix 
+
+        nx = size(enh,1)
+        ny = size(enh,2)
+        nz = size(enh,3) 
+
+        do j = 1, ny 
+        do i = 1, nx 
+
+            if (f_grnd(i,j) .eq. 0.0_prec) then 
+                ! Floating ice, prescribe enh_shlf in column 
+
+                enh(i,j,:) = enh_shlf 
+
+            else 
+                ! Grounded ice, determine mixing between enh_bnd for slow
+                ! (ie, purely shearing) ice and fast-flowing streaming ice 
+
+                ! Determine mixing ratio (f_mix==1 => streaming ice)
+                if (uxy_bar(i,j) .ge. umax) then 
+                    f_mix = 1.0 
+                else if (uxy_bar(i,j) .le. umin) then 
+                    f_mix = 0.0 
+                else 
+                    f_mix = (uxy_bar(i,j)-umin) / (umax-umin)
+                end if 
+
+                enh(i,j,:) = f_mix*enh_stream + (1.0-f_mix)*enh(i,j,:) 
+
+            end if 
+
+        end do 
+        end do 
+
+        return 
+
+    end subroutine define_enhancement_factor_paleo
+
+    function define_enhancement_factor_3D(f_shear,f_grnd,uxy_srf,enh_shear,enh_stream,enh_shlf) result(enh)
         ! Greve and Blatter (2009): Chapter 4, page 54 
 
         implicit none 
@@ -58,13 +113,15 @@ contains
         enh_ssa_tmp = f_grnd*enh_stream + (1.0-f_grnd)*enh_shlf
         
         ! Then mix ssa and sia (shear) inland
+        ! Note that f_shear should be zero for shelves, so there enh=enh_shlf 
+        
         do k = 1, nz_aa 
             enh(:,:,k) = f_shear(:,:,k)*enh_shear   + (1.0-f_shear(:,:,k))*enh_ssa_tmp
         end do 
         
         return 
 
-    end function define_enhancement_factor
+    end function define_enhancement_factor_3D
     
     elemental function define_enhancement_factor_2D(f_grnd,f_shear,uxy_srf,enh_shear,enh_stream,enh_shlf) result(enh)
         ! Greve and Blatter (2009): Chapter 4, page 54 
@@ -85,7 +142,8 @@ contains
 
         ! First calculate an ssa enh factor based on f_grnd, then use this factor 
         ! to further mix with sia (shear) inland.
-        
+        ! Note that f_shear should be zero for shelves, so there enh=enh_shlf 
+
         enh_ssa_tmp = f_grnd*enh_stream + (1.0-f_grnd)*enh_shlf
         enh         = f_shear*enh_shear   + (1.0-f_shear)*enh_ssa_tmp
         

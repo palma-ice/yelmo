@@ -334,15 +334,17 @@ module yelmo_defs
         logical             :: rf_with_water 
         real(prec)          :: n_glen                       ! Flow law exponent (n_glen=3)
         real(prec)          :: visc_min  
-        logical             :: use_enh_2D
+        character(len=56)   :: enh_method 
         logical             :: use_enh_stream 
         real(prec)          :: enh_shear
         real(prec)          :: enh_stream
         real(prec)          :: enh_shlf
+        real(prec)          :: enh_umin 
+        real(prec)          :: enh_umax
+        logical             :: calc_age
+        real(prec), allocatable :: age_iso(:)
         character(len=56)   :: tracer_method  
         real(prec)          :: tracer_impl_kappa
-        logical             :: calc_enh_bnd 
-        logical             :: calc_age
         
         ! Internal parameters
         real(prec) :: time 
@@ -353,8 +355,6 @@ module yelmo_defs
         real(prec), allocatable :: zeta_aa(:)   ! Layer centers (aa-nodes), plus base and surface: nz_aa points 
         real(prec), allocatable :: zeta_ac(:)   ! Layer borders (ac-nodes), plus base and surface: nz_ac == nz_aa-1 points
         
-        real(prec), allocatable :: age_iso(:)
-
     end type 
 
     type ymat_state_class 
@@ -374,7 +374,6 @@ module yelmo_defs
         real(prec), allocatable :: dep_time(:,:,:)      ! Ice deposition time (for online age tracing)
         real(prec), allocatable :: depth_iso(:,:,:)     ! Depth of specific isochronal layers
 
-        real(prec), allocatable :: enh_bnd(:,:,:)       ! Boundary anisotropic enhancement factor 
     end type 
 
     type ymat_class

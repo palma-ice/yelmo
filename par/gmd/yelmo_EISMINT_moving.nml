@@ -120,24 +120,25 @@
 /
 
 &ymat
-    flow_law                = "glen"
-    rf_method               = 0         ! -1: set externally; 0: rf_const everywhere; 1: standard function 
-    rf_const                = 1e-16     ! [Pa^-3 a^-1] Constant value for rf when rf_method=0
-    rf_use_eismint2         = True      ! Only applied for rf_method=1, use EISMINT2 rf constants
-    rf_with_water           = False     ! Only applied for rf_method=1, scale rf by water content?
+    flow_law                = "glen"        ! Only "glen" is possible right now
+    rf_method               = 0             ! -1: set externally; 0: rf_const everywhere; 1: standard function 
+    rf_const                = 1e-16         ! [Pa^-3 a^-1] Constant value for rf when rf_method=0
+    rf_use_eismint2         = False         ! Only applied for rf_method=1
+    rf_with_water           = False         ! Only applied for rf_method=1, scale rf by water content?
     n_glen                  = 3.0 
     visc_min                = 1e3 
-    use_enh_2D              = False     ! Calculate enhancement factor as a 2D field
-    use_enh_stream          = True      ! Use enh_shear and enh_stream?
+    enh_method              = "enh3D"       ! "enh2D", "enh3D", "paleo-shear" 
+    use_enh_stream          = True          ! For enh_method=["enh2D","enh3D"], use enh_shear and enh_stream?
     enh_shear               = 1.0
     enh_stream              = 1.0
     enh_shlf                = 1.0
-    tracer_method           = "expl"    ! "expl", "impl"
-    tracer_impl_kappa       = 1.5       ! [m2 a-1] Artificial diffusion term for implicit tracer solving 
-    calc_enh_bnd            = True      ! Calculate enh tracer field? 
-    calc_age                = True      ! Calculate age tracer field?
-    age_iso                 = 0.0       ! [kyr] Define isochronal age layers of interest to calculate
-
+    enh_umin                = 50.0          ! [m/yr] Minimum transition velocity to enh_stream (enh_method="paleo-shear")
+    enh_umax                = 500.0         ! [m/yr] Maximum transition velocity to enh_stream (enh_method="paleo-shear")
+    calc_age                = False         ! Calculate age tracer field?
+    age_iso                 = 0.0
+    tracer_method           = "expl"        ! "expl", "impl": used for age and 'paleo-shear' enh fields
+    tracer_impl_kappa       = 1.5           ! [m2 a-1] Artificial diffusion term for implicit tracer solving 
+    
 /
 
 &ytherm

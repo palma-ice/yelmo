@@ -15,7 +15,7 @@ module deformation
     implicit none 
     
     private
-    public :: define_enhancement_factor_paleo 
+    public :: modify_enhancement_factor_bnd 
     public :: define_enhancement_factor_3D
     public :: define_enhancement_factor_2D
     public :: calc_viscosity_glen
@@ -30,7 +30,7 @@ module deformation
 
 contains 
 
-    subroutine define_enhancement_factor_paleo(enh,f_grnd,uxy_bar,enh_stream,enh_shlf,umin,umax)
+    subroutine modify_enhancement_factor_bnd(enh,f_grnd,uxy_bar,enh_stream,enh_shlf,umin,umax)
         ! enh field is initially obtained from tracer evolution,
         ! here it is updated to account for streaming and floating regimes 
 
@@ -53,7 +53,7 @@ contains
         nz = size(enh,3) 
 
         if (umax-umin .eq. 0.0_prec) then 
-            write(*,*) "define_enhancement_factor_paleo:: Error: umax cannot equal umin:"
+            write(*,*) "modify_enhancement_factor_bnd:: Error: umax cannot equal umin:"
             write(*,*) "umin = ", umin 
             write(*,*) "umax = ", umax 
             stop 
@@ -85,7 +85,7 @@ contains
 
         return 
 
-    end subroutine define_enhancement_factor_paleo
+    end subroutine modify_enhancement_factor_bnd
 
     function define_enhancement_factor_3D(f_shear,f_grnd,uxy_srf,enh_shear,enh_stream,enh_shlf) result(enh)
         ! Greve and Blatter (2009): Chapter 4, page 54 

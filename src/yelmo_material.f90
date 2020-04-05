@@ -121,7 +121,7 @@ contains
 
         select case(trim(mat%par%enh_method))
 
-            case("simple")
+            case("simple","simple-tracer")
                 ! Grounded ice: enh = enh_shear 
                 ! Floating ice: enh = enh_shlf
 
@@ -136,7 +136,7 @@ contains
                     mat%now%enh(:,:,k) = mat%now%enh(:,:,1)
                 end do 
 
-            case("shear2D")
+            case("shear2D","shear2D-tracer")
                 ! Calculate 2D enhancement factor based on depth-averaged
                 ! shear fraction (f_shear_bar)
                 ! enh = enh_shear*f_shear_bar + enh_stream*(1-f_shear_bar)
@@ -152,7 +152,7 @@ contains
                     mat%now%enh(:,:,k) = mat%now%enh(:,:,1)
                 end do 
 
-            case("shear3D") 
+            case("shear3D","shear3D-tracer") 
                 ! Calculate 3D enhancement factor based on 3D
                 ! shear fraction field (f_shear)
                 ! enh = enh_shear*f_shear_bar + enh_stream*(1-f_shear_bar)
@@ -162,14 +162,23 @@ contains
                 mat%now%enh = define_enhancement_factor_3D(mat%now%strn%f_shear,tpo%now%f_grnd,dyn%now%uxy(:,:,nz_aa), &
                                                            mat%par%enh_shear,mat%par%enh_stream,mat%par%enh_shlf)
 
-        
-            case("paleo-shear")
-                ! Calculate 3D enhancement factor as the evolution 
+            case DEFAULT 
+
+                write(*,*) "calc_ymat:: Error: enhancement method not recognized: "//trim(mat%par%enh_method)
+                stop 
+
+        end select 
+
+        ! If enh_method is one of the "*-tracer" methods, then
+        ! additionally scale enh field by enh_bnd tracer field. 
+        select case(trim(mat%par%enh_method))
+
+            case("simple-tracer","shear2D-tracer","shear3D-tracer")
+                ! Calculate 3D enhancement factor multiplier enh_bnd as the evolution 
                 ! of an imposed enhancement factor at the surface propogating
                 ! as a tracer inside of the ice sheet. Assume that propogation 
                 ! is only valid for slow-flowing (ie, shearing ice), and impose 
-                ! prescribed enh_stream and enh_shelf values for the fast-flowing
-                ! and floating ice, respectively. 
+                ! value of enh_bnd=1.0 for the fast-flowing and floating ice, respectively. 
 
                 if (dt .gt. 0.0) then 
                     ! Update anisotropic enhancement factor tracer field if advancing timestep 
@@ -183,28 +192,31 @@ contains
                     mask_tracers = .TRUE. 
                     where (dyn%now%uxy_bar .gt. mat%par%enh_umax) mask_tracers = .FALSE. 
 
-                    call calc_tracer_3D(mat%now%enh,X_srf,dyn%now%ux,dyn%now%uy,dyn%now%uz,tpo%now%H_ice, &
+                    call calc_tracer_3D(mat%now%enh_bnd,X_srf,dyn%now%ux,dyn%now%uy,dyn%now%uz,tpo%now%H_ice, &
                                         tpo%now%bmb,mat%par%zeta_aa,mat%par%zeta_ac,mat%par%tracer_method, &
                                         mat%par%tracer_impl_kappa,dt,thrm%par%dx,time,mask=mask_tracers)
 
                 end if 
 
-                ! Ensure enh is always non-zero and positive value (eg, enh >= 0.1),
-                ! as well as not extremely high (eg enh <= 10)
+                ! Ensure enh_bnd is always non-zero and positive,
+                ! but also not extremely high (eg 0.1 <= enh <= 10)
+                where (mat%now%enh_bnd .lt. enh_min) mat%now%enh_bnd = enh_min
+                where (mat%now%enh_bnd .gt. enh_max) mat%now%enh_bnd = enh_max
+                
+                ! Additionally update field to impose a value of one in streaming/floating regimes 
+                call modify_enhancement_factor_bnd(mat%now%enh_bnd,tpo%now%f_grnd,dyn%now%uxy_bar,enh_stream=1.0_prec, &
+                                enh_shlf=1.0_prec,umin=mat%par%enh_umin,umax=mat%par%enh_umax)
+
+        
+                ! Finally scale enh by enh_bnd 
+                mat%now%enh = mat%now%enh * mat%now%enh_bnd 
+
+                ! Also ensure enh is always non-zero and positive,
+                ! but also not extremely high (eg 0.1 <= enh <= 10)
                 where (mat%now%enh .lt. enh_min) mat%now%enh = enh_min
                 where (mat%now%enh .gt. enh_max) mat%now%enh = enh_max
                 
-                ! Additionally update field to impose prescribed values in streaming/floating regimes 
-                call define_enhancement_factor_paleo(mat%now%enh,tpo%now%f_grnd,dyn%now%uxy_bar, &
-                                mat%par%enh_stream,mat%par%enh_shlf,mat%par%enh_umin,mat%par%enh_umax)
-
-            case DEFAULT 
-
-                write(*,*) "calc_ymat:: Error: enhancement method not recognized: "//trim(mat%par%enh_method)
-                stop 
-
         end select 
-
 
         ! Finally get the vertical average
         mat%now%enh_bar = calc_vertical_integrated_2D(mat%now%enh,mat%par%zeta_aa)
@@ -345,7 +357,7 @@ contains
 
         ! Define current time as unrealistic value
         par%time = 1000000000   ! [a] 1 billion years in the future
-        
+
         return 
 
     end subroutine ymat_par_load
@@ -376,6 +388,7 @@ contains
         allocate(now%strn%f_shear(nx,ny,nz_aa))
         
         allocate(now%enh(nx,ny,nz_aa))
+        allocate(now%enh_bnd(nx,ny,nz_aa))
         allocate(now%enh_bar(nx,ny))
         allocate(now%ATT(nx,ny,nz_aa))
         allocate(now%ATT_bar(nx,ny))
@@ -403,6 +416,7 @@ contains
         now%strn%f_shear = 0.0 
      
         now%enh          = 1.0 
+        now%enh_bnd      = 1.0 
         now%enh_bar      = 0.0 
         now%ATT          = 0.0 
         now%ATT_bar      = 0.0    
@@ -438,6 +452,7 @@ contains
         if (allocated(now%strn%f_shear))    deallocate(now%strn%f_shear)
         
         if (allocated(now%enh))             deallocate(now%enh)
+        if (allocated(now%enh_bnd))         deallocate(now%enh_bnd)
         if (allocated(now%enh_bar))         deallocate(now%enh_bar)
         if (allocated(now%ATT))             deallocate(now%ATT)
         if (allocated(now%ATT_bar))         deallocate(now%ATT_bar)

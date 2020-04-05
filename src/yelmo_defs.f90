@@ -362,6 +362,7 @@ module yelmo_defs
         type(strain_3D_class)   :: strn 
 
         real(prec), allocatable :: enh(:,:,:)
+        real(prec), allocatable :: enh_bnd(:,:,:)
         real(prec), allocatable :: enh_bar(:,:)
         real(prec), allocatable :: ATT(:,:,:) 
         real(prec), allocatable :: ATT_bar(:,:)

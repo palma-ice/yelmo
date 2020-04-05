@@ -238,6 +238,7 @@ contains
         call nc_write(filename,"strn_f_shear", dom%mat%now%strn%f_shear,    units="",dim1="xc",dim2="yc",dim3="zeta",ncid=ncid) 
 
         call nc_write(filename,"enh",         dom%mat%now%enh,           units="",dim1="xc",dim2="yc",dim3="zeta",ncid=ncid) 
+        call nc_write(filename,"enh_bnd",     dom%mat%now%enh_bnd,       units="",dim1="xc",dim2="yc",dim3="zeta",ncid=ncid) 
         call nc_write(filename,"enh_bar",     dom%mat%now%enh_bar,       units="",dim1="xc",dim2="yc",ncid=ncid) 
         call nc_write(filename,"ATT",         dom%mat%now%ATT,           units="",dim1="xc",dim2="yc",dim3="zeta",ncid=ncid) 
         call nc_write(filename,"ATT_bar",     dom%mat%now%ATT_bar,       units="",dim1="xc",dim2="yc",ncid=ncid) 
@@ -245,7 +246,7 @@ contains
         call nc_write(filename,"visc_int",    dom%mat%now%visc_int,      units="",dim1="xc",dim2="yc",ncid=ncid) 
 
         call nc_write(filename,"f_shear_bar", dom%mat%now%f_shear_bar,   units="",dim1="xc",dim2="yc",ncid=ncid) 
-        
+
         call nc_write(filename,"dep_time",    dom%mat%now%dep_time,      units="",dim1="xc",dim2="yc",dim3="zeta",ncid=ncid)     
         call nc_write(filename,"depth_iso",   dom%mat%now%depth_iso,     units="",dim1="xc",dim2="yc",dim3="age_iso",ncid=ncid)     
         
@@ -492,6 +493,7 @@ contains
         call nc_read(filename,"strn_f_shear", dom%mat%now%strn%f_shear,ncid=ncid) 
 
         call nc_read(filename,"enh",         dom%mat%now%enh,ncid=ncid) 
+        call nc_read(filename,"enh_bnd",     dom%mat%now%enh_bnd,ncid=ncid) 
         call nc_read(filename,"enh_bar",     dom%mat%now%enh_bar,ncid=ncid) 
         call nc_read(filename,"ATT",         dom%mat%now%ATT,ncid=ncid) 
         call nc_read(filename,"ATT_bar",     dom%mat%now%ATT_bar,ncid=ncid) 

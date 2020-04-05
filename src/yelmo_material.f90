@@ -210,11 +210,6 @@ contains
         
                 ! Finally scale enh by enh_bnd 
                 mat%now%enh = mat%now%enh * mat%now%enh_bnd 
-
-                ! Also ensure enh is always non-zero and positive,
-                ! but also not extremely high (eg 0.1 <= enh <= 10)
-                where (mat%now%enh .lt. enh_min) mat%now%enh = enh_min
-                where (mat%now%enh .gt. enh_max) mat%now%enh = enh_max
                 
         end select 
 

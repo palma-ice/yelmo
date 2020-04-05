@@ -334,8 +334,7 @@ module yelmo_defs
         logical             :: rf_with_water 
         real(prec)          :: n_glen                       ! Flow law exponent (n_glen=3)
         real(prec)          :: visc_min  
-        character(len=56)   :: enh_method 
-        logical             :: use_enh_stream 
+        character(len=56)   :: enh_method  
         real(prec)          :: enh_shear
         real(prec)          :: enh_stream
         real(prec)          :: enh_shlf

@@ -305,7 +305,6 @@ contains
         call nml_read(filename,"ymat","n_glen",                 par%n_glen,                 init=init_pars)
         call nml_read(filename,"ymat","visc_min",               par%visc_min,               init=init_pars)
         call nml_read(filename,"ymat","enh_method",             par%enh_method,             init=init_pars)
-        call nml_read(filename,"ymat","use_enh_stream",         par%use_enh_stream,         init=init_pars)
         call nml_read(filename,"ymat","enh_shear",              par%enh_shear,              init=init_pars)
         call nml_read(filename,"ymat","enh_stream",             par%enh_stream,             init=init_pars)
         call nml_read(filename,"ymat","enh_shlf",               par%enh_shlf,               init=init_pars)
@@ -346,11 +345,7 @@ contains
 
         ! Define current time as unrealistic value
         par%time = 1000000000   ! [a] 1 billion years in the future
-
-        ! Consistency check: if not using enh_stream,
-        ! then set enh_stream = enh_shear 
-        if (.not. par%use_enh_stream) par%enh_stream = par%enh_shear 
-
+        
         return 
 
     end subroutine ymat_par_load

@@ -52,6 +52,13 @@ contains
         ny = size(enh,2)
         nz = size(enh,3) 
 
+        if (umax-umin .eq. 0.0_prec) then 
+            write(*,*) "define_enhancement_factor_paleo:: Error: umax cannot equal umin:"
+            write(*,*) "umin = ", umin 
+            write(*,*) "umax = ", umax 
+            stop 
+        end if 
+            
         do j = 1, ny 
         do i = 1, nx 
 
@@ -64,14 +71,10 @@ contains
                 ! Grounded ice, determine mixing between enh_bnd for slow
                 ! (ie, purely shearing) ice and fast-flowing streaming ice 
 
-                ! Determine mixing ratio (f_mix==1 => streaming ice)
-                if (uxy_bar(i,j) .ge. umax) then 
-                    f_mix = 1.0 
-                else if (uxy_bar(i,j) .le. umin) then 
-                    f_mix = 0.0 
-                else 
-                    f_mix = (uxy_bar(i,j)-umin) / (umax-umin)
-                end if 
+                ! Determine mixing ratio (f_mix==1 => streaming ice, f_mix==0 => paleo shearing ice)
+                f_mix = (uxy_bar(i,j)-umin) / (umax-umin)
+                f_mix = min(f_mix,1.0)
+                f_mix = max(f_mix,0.0)
 
                 enh(i,j,:) = f_mix*enh_stream + (1.0-f_mix)*enh(i,j,:) 
 

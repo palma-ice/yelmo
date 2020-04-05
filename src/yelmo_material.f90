@@ -192,7 +192,7 @@ contains
                 ! Ensure enh is always non-zero and positive value (eg, enh >= 0.1),
                 ! as well as not extremely high (eg enh <= 10)
                 where (mat%now%enh .lt. enh_min) mat%now%enh = enh_min
-                where (mat%now%enh .lt. enh_max) mat%now%enh = enh_max
+                where (mat%now%enh .gt. enh_max) mat%now%enh = enh_max
                 
                 ! Additionally update field to impose prescribed values in streaming/floating regimes 
                 call define_enhancement_factor_paleo(mat%now%enh,tpo%now%f_grnd,dyn%now%uxy_bar, &

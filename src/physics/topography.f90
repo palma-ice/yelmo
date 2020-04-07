@@ -212,11 +212,11 @@ contains
 
         ! Local variables   
         real(prec) :: rho_sw_ice 
-
+        
         rho_sw_ice = rho_sw/rho_ice ! Ratio of density of seawater to ice [--]
         
         ! Calculate new H_grnd (ice thickness overburden)
-        H_grnd = H_ice - rho_sw_ice*(z_sl-z_bed)
+        H_grnd = H_ice - rho_sw_ice*max(z_sl-z_bed,0.0_prec)
 
         return 
 

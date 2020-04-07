@@ -17,11 +17,16 @@ program check_sim
     real(wp), parameter :: MISSING_VALUE = MISSING_VALUE_DEFAULT
     real(wp), parameter :: MV = MISSING_VALUE_DEFAULT
     
-    integer :: narg, n
+    integer :: narg, nt, nx, ny, n_iso
     character(len=256) :: fldr_path, file_path  
-    real(wp) :: time, rmse_H, rmse_uxy, rmse_uxy_log 
+    real(wp) :: time, rmse_H, rmse_uxy, rmse_uxy_log, rmse_H2000
+    real(wp), allocatable :: rmse_iso(:) 
     character(len=256) :: fldr_path_root, fldr_sim 
 
+    real(wp), allocatable :: H_ice(:,:) 
+    real(wp), allocatable :: H_ice_pd_err(:,:) 
+    logical,  allocatable :: mask(:,:) 
+    
     ! Get command line arguments 
 
     narg = command_argument_count()
@@ -38,14 +43,33 @@ program check_sim
 
     file_path = trim(fldr_path)//"/yelmo2D.nc" 
 
-    n = nc_size(file_path,"time")
-
-    call nc_read(file_path,"time",        time,        start=[n],count=[1])
-    call nc_read(file_path,"rmse_H",      rmse_H,      start=[n],count=[1])
-    call nc_read(file_path,"rmse_uxy",    rmse_uxy,    start=[n],count=[1])
-    call nc_read(file_path,"rmse_uxy_log",rmse_uxy_log,start=[n],count=[1])
+    nt = nc_size(file_path,"time")
+    nx = nc_size(file_path,"xc")
+    ny = nc_size(file_path,"yc")
     
-    write(*,*) trim(fldr_sim), time, rmse_H, rmse_uxy, rmse_uxy_log 
+    call nc_read(file_path,"time",        time,        start=[nt],count=[1])
+    call nc_read(file_path,"rmse_H",      rmse_H,      start=[nt],count=[1])
+    call nc_read(file_path,"rmse_uxy",    rmse_uxy,    start=[nt],count=[1])
+    call nc_read(file_path,"rmse_uxy_log",rmse_uxy_log,start=[nt],count=[1])
+    
+    ! Allocate variables 
+    allocate(H_ice(nx,ny))
+    allocate(H_ice_pd_err(nx,ny))
+    allocate(mask(nx,ny)) 
+
+    ! Read in H_ice and error at nt 
+    call nc_read(file_path,"H_ice",H_ice,start=[1,1,nt],count=[nx,ny,1])
+    call nc_read(file_path,"H_ice_pd_err",H_ice_pd_err,start=[1,1,nt],count=[nx,ny,1])
+
+    ! Define mask as points with ice thickness above 2000m 
+    mask = H_ice .ge. 2000.0 
+    call calc_rmse(rmse_H2000,H_ice_pd_err,mask,missing_value)
+
+    n_iso = nc_size(file_path,"age_iso") 
+    allocate(rmse_iso(n_iso))
+    call nc_read(file_path,"rmse_iso",rmse_iso,start=[1,nt],count=[n_iso,1])
+
+    write(*,"(a,f10.2,3f8.1,f8.2,50f8.1)") trim(fldr_sim), time, rmse_H, rmse_H2000, rmse_uxy, rmse_uxy_log, rmse_iso 
 
 contains 
 
@@ -73,5 +97,35 @@ contains
         return 
 
     end subroutine split_string
+
+    subroutine calc_rmse(rmse,err,mask,missing_value)
+
+        implicit none 
+
+        real(wp), intent(OUT) :: rmse 
+        real(wp), intent(IN)  :: err(:,:) 
+        logical,  intent(IN)  :: mask(:,:) 
+        real(wp), intent(IN)  :: missing_value
+
+        ! Local variables 
+        integer :: npts 
+
+        npts = count(mask)
+
+        if (npts .eq. 0) then 
+            ! No points found, set missing value 
+
+            rmse = missing_value 
+
+        else 
+            ! Calculate masked rmse 
+
+            rmse = sqrt( sum(err**2,mask=mask) / real(npts,wp) )
+
+        end if 
+
+        return 
+
+    end subroutine calc_rmse 
 
 end program check_sim 

@@ -182,19 +182,19 @@ program yelmo_test
         ! Get current time 
         time = time_init + n*dtt
 
-!         ! Update temperature and smb as needed in time (ISMIP6)
-!         if (time .ge. -10e6 .and. time .lt. -10e3) then 
-!             ! Glacial period, impose cold climate 
-!             yelmo1%bnd%T_srf = yelmo1%dta%pd%T_srf - 10.0 
+        ! Update temperature and smb as needed in time (ISMIP6)
+        if (time .ge. -10e6 .and. time .lt. -10e3) then 
+            ! Glacial period, impose cold climate 
+            yelmo1%bnd%T_srf = yelmo1%dta%pd%T_srf - 10.0 
 
-!         else if (time .ge. -10e3 .and. time .lt. -8e3) then
-!             ! Holocene optimum 
-!             yelmo1%bnd%T_srf = yelmo1%dta%pd%T_srf + 1.0 
+        else if (time .ge. -10e3 .and. time .lt. -8e3) then
+            ! Holocene optimum 
+            yelmo1%bnd%T_srf = yelmo1%dta%pd%T_srf + 1.0 
 
-!         else if (time .ge. -8e3) then 
-!             ! Entering Holocene, impose present-day temperatures 
-!             yelmo1%bnd%T_srf = yelmo1%dta%pd%T_srf
-!         end if 
+        else if (time .ge. -8e3) then 
+            ! Entering Holocene, impose present-day temperatures 
+            yelmo1%bnd%T_srf = yelmo1%dta%pd%T_srf
+        end if 
         
         ! Update ice sheet 
         call yelmo_update(yelmo1,time)

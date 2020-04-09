@@ -154,7 +154,7 @@ contains
         
         real(prec), intent(OUT) :: ux(:,:,:)        ! nx,ny,nz_aa [m/a] SIA velocity x-direction, acx-nodes
         real(prec), intent(OUT) :: uy(:,:,:)        ! nx,ny,nz_aa [m/a] SIA velocity y-direction, acy-nodes
-        real(prec), intent(OUT) :: dd_ab_3D(:,:,:)  ! Diffusivity constant
+        real(prec), intent(IN)  :: dd_ab_3D(:,:,:)  ! Diffusivity constant
         real(prec), intent(IN)  :: taud_acx(:,:)    ! [Pa] Driving stress x-direction 
         real(prec), intent(IN)  :: taud_acy(:,:)    ! [Pa] Driving stress y-direction
         

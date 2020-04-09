@@ -52,9 +52,10 @@ program yelmo_test
     outfldr = "./"
 
     ! Define input and output locations 
-    path_const = trim(outfldr)//"yelmo_const_Earth.nml"
-    file1D     = trim(outfldr)//"yelmo1D.nc"
-    file2D     = trim(outfldr)//"yelmo2D.nc"
+    path_const   = trim(outfldr)//"yelmo_const_Earth.nml"
+    file1D       = trim(outfldr)//"yelmo1D.nc"
+    file2D       = trim(outfldr)//"yelmo2D.nc"
+    file_restart = trim(outfldr)//"yelmo_restart.nc"
 
     ! === Initialize ice sheet model =====
 
@@ -216,6 +217,8 @@ program yelmo_test
     end do 
     ! == Finished time loop == 
 
+    ! Write a final restart file 
+    call yelmo_restart_write(yelmo1,file_restart,time)
 
     ! Finalize program
     call yelmo_end(yelmo1,time=time)

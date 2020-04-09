@@ -20,14 +20,8 @@ module velocity_sia
 contains 
 
     subroutine calc_dd_ab_3D(dd_ab_3D,H_ice,taud_acx,taud_acy,ATT,zeta_aa,dx,n_glen,rho_ice,g)
-        ! Calculate the 3D horizontal velocity field
-        ! using sia, ssa or hybrid method
-
-        ! Note: These routines would be faster if ATT_int_ab were
-        ! passed as an argument (and only calculated when ATT is updated rather
-        ! than each dynamic timestep). However, for completeness, here the 
-        ! subroutine takes ATT as an argument, and ATT_int is calculated internally
-        ! below. 
+        ! Calculate the 3D diffusivity helper field on ab-nodes, as an input 
+        ! to the SIA calculation. 
 
         implicit none
         

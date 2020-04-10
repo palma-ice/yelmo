@@ -11,6 +11,10 @@
 
     load_cf_ref     = False             ! Load cf_ref from file? Otherwise define from cf_stream + inline tuning
     file_cf_ref     = "input/{domain}/{grid_name}/{grid_name}_cf_ref_opt.nc"  ! Filename holding cf_ref to load 
+
+    load_bmelt      = False             ! Load PD bmelt observations from file? Else use bmb_shlf_const 
+    file_bmelt      = "input/{domain}/{grid_name}/{grid_name}_BMELT-R13.nc"
+
 /
 
 &yelmo

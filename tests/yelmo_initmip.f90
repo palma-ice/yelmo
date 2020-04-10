@@ -24,9 +24,10 @@ program yelmo_test
     ! No-ice mask (to impose additional melting)
     logical, allocatable :: mask_noice(:,:)  
 
-    ! cf_ref 
-    logical :: load_cf_ref
+    ! cf_ref, bmelt  
+    logical :: load_cf_ref, load_bmelt
     character(len=256) :: file_cf_ref 
+    character(len=256) :: file_bmelt 
 
     ! Start timing 
     call cpu_time(cpu_start_time)
@@ -47,6 +48,9 @@ program yelmo_test
 
     call nml_read(path_par,"control","load_cf_ref",     load_cf_ref)               ! Load cf_ref from file? Otherwise define from cf_stream + inline tuning
     call nml_read(path_par,"control","file_cf_ref",     file_cf_ref)               ! Filename holding cf_ref to load 
+
+    call nml_read(path_par,"control","load_bmelt",      load_bmelt)                ! Load bmelt from file?
+    call nml_read(path_par,"control","file_bmelt",      file_bmelt)                ! Filename holding bmelt field to load 
 
     ! Assume program is running from the output folder
     outfldr = "./"
@@ -76,7 +80,17 @@ program yelmo_test
     yelmo1%bnd%smb      = yelmo1%dta%pd%smb             ! [m.i.e./a]
     yelmo1%bnd%T_srf    = yelmo1%dta%pd%T_srf + dT_ann  ! [K]
     
-    yelmo1%bnd%bmb_shlf = bmb_shlf_const    ! [m.i.e./a]
+    if (load_bmelt) then
+
+        ! Parse filenames with grid information
+        call yelmo_parse_path(file_bmelt,yelmo1%par%domain,yelmo1%par%grid_name)
+ 
+        call nc_read(file_bmelt,"bm_ac_reese",yelmo1%bnd%bmb_shlf)
+        yelmo1%bnd%bmb_shlf = -yelmo1%bnd%bmb_shlf                  ! Negative because bmb = -bmelt 
+    else 
+        yelmo1%bnd%bmb_shlf = bmb_shlf_const    ! [m.i.e./a]
+    end if 
+
     yelmo1%bnd%T_shlf   = T0                ! [K]   
 
     if (dT_ann .lt. 0.0) yelmo1%bnd%T_shlf   = T0 + dT_ann*0.25_prec  ! [K] Oceanic temp anomaly

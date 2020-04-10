@@ -446,10 +446,15 @@ contains
                         ! Domain-specific modifications to lambda function
 
                         ! Increased friction in Wilkes Land (South - Southeast)
-                        where (bnd%basins .ge. 12 .and. &
-                               bnd%basins .le. 17) lambda_bed = calc_lambda_bed_exp(bnd%z_bed,-400.0,dyn%par%cb_z1)
+                        where (bnd%basins .ge. 12 .and. bnd%basins .le. 17) 
+                            lambda_bed = calc_lambda_bed_exp(bnd%z_bed,-400.0,dyn%par%cb_z1)
+                        end where
 
-
+                        ! Increased friction in WAIS divide area feeding the Ronne
+                        where (bnd%basins .eq.  1 .or. bnd%basins .eq.  2)
+                            lambda_bed = calc_lambda_bed_exp(bnd%z_bed,-2000.0,dyn%par%cb_z1)
+                        end where 
+                        
                     end if 
 
                 case("till_const")
@@ -513,8 +518,8 @@ contains
 
 
                 ! Increase friction - feeding the Ronne ice shelf from the South
-                call scale_cf_gaussian(cf_ref,dyn%par%cf_stream*2.0,x0=-800.0, y0= 100.0,sigma=400.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
-                call scale_cf_gaussian(cf_ref,dyn%par%cf_stream*2.0,x0=-980.0, y0=-400.0,sigma=200.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
+!                 call scale_cf_gaussian(cf_ref,dyn%par%cf_stream*2.0,x0=-800.0, y0= 100.0,sigma=400.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
+!                 call scale_cf_gaussian(cf_ref,dyn%par%cf_stream*2.0,x0=-980.0, y0=-400.0,sigma=200.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
                 
                 ! Reduction friction - feeding the Ross ice shelf from the East
                 call scale_cf_gaussian(cf_ref,dyn%par%cf_stream*0.05,x0= 130.0, y0=-550.0, sigma=100.0,xx=grd%x*1e-3,yy=grd%y*1e-3)

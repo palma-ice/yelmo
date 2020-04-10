@@ -24,7 +24,7 @@
     experiment      = "None"       
     restart         = "None"
     log_timestep    = False 
-    zeta_scale      = "tanh"            ! "linear", "exp", "tanh"
+    zeta_scale      = "exp"             ! "linear", "exp", "tanh"
     zeta_exp        = 2.0  
     nz_aa           = 10                ! Vertical resolution in ice
     dt_method       = 2                 ! 0: no internal timestep, 1: adaptive, cfl, 2: adaptive, pc
@@ -74,7 +74,7 @@
     beta_gl_stag        = 3               !  0: simple staggering, 1: Upstream beta at gl, 2: downstream, 3: f_grnd_ac scaling 
     beta_gl_f           = 1.0             ! [-] Scaling of beta at the grounding line (for beta_gl_scale=0)
     taud_gl_method      = 0               !  0: binary, no subgrid, 1: Two-sided gradient
-    H_grnd_lim          = 500.0           ! [m] For beta_sep_method=2, reduce beta linearly between H_grnd=0 and H_grnd_lim 
+    H_grnd_lim          = 500.0           ! [m] For beta_gl_scale=2, reduce beta linearly between H_grnd=0 and H_grnd_lim 
     H_sed_sat           = 250.0           ! [m] Sediment thickness at which sediment effect is saturated
     cb_method           = -1              ! -1: set externally; 1: calculate cb online  
     cb_with_pmp         = False           ! Weighted cf_frozen/cf_stream as a function of f_pmp 
@@ -84,7 +84,7 @@
     cb_z1               =  250.0          ! [m] Bedrock elevation above which scaling goes to f_scale=1
     cb_min              = 0.01            ! [--] Minimum allowed value of f_scale for grounded ice
     cf_frozen           = 0.1             ! [--] Bed critical stress factor, frozen 
-    cf_stream           = 0.1             ! [--] Bed critical stress factor, stream  
+    cf_stream           = 0.15            ! [--] Bed critical stress factor, stream  
     n_sm_beta           = 0               ! [-] Standard deviation in gridpoints for Gaussian smoothing of beta (0==no smoothing)
     beta_min            = 10.0            ! [Pa a m-1] Minimum value of beta allowed for grounded ice (for stability)
     ssa_beta_max        = 1e20            ! [Pa a m-1] Maximum value of beta for which ssa should be calculated 
@@ -126,9 +126,9 @@
     n_glen                  = 3.0 
     visc_min                = 1e3 
     enh_method              = "shear3D"     ! "simple","shear2D", "shear3D", "paleo-shear" 
-    enh_shear               = 3.0
-    enh_stream              = 1.0
-    enh_shlf                = 0.7
+    enh_shear               = 2.0
+    enh_stream              = 0.7
+    enh_shlf                = 0.5
     enh_umin                = 50.0          ! [m/yr] Minimum transition velocity to enh_stream (enh_method="paleo-shear")
     enh_umax                = 500.0         ! [m/yr] Maximum transition velocity to enh_stream (enh_method="paleo-shear")
     calc_age                = False         ! Calculate age tracer field?

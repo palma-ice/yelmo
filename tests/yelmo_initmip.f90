@@ -455,10 +455,10 @@ contains
                             lambda_bed = calc_lambda_bed_exp(bnd%z_bed,-2000.0,dyn%par%cb_z1)
                         end where 
 
-                        ! Increased friction in WAIS divide area feeding the Ross
-                        where (bnd%basins .eq. 21 .or. bnd%basins .eq. 22)
-                            lambda_bed = calc_lambda_bed_exp(bnd%z_bed,-2000.0,dyn%par%cb_z1)
-                        end where
+!                         ! Increased friction in WAIS divide area feeding the Ross
+!                         where (bnd%basins .eq. 21 .or. bnd%basins .eq. 22)
+!                             lambda_bed = calc_lambda_bed_exp(bnd%z_bed,-2000.0,dyn%par%cb_z1)
+!                         end where
 
                     end if 
 

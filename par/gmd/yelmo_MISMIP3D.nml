@@ -7,7 +7,7 @@
     ! Timing parameters 
     time_init    = 0.0                  ! [yr] Starting time 
     time_end     = 20e3                 ! [yr] Ending time 
-    dtt          = 1.0                  ! [yr] Main loop timestep 
+    dtt          = 2.0                  ! [yr] Main loop timestep 
     dt2D_out     = 100.0                ! [yr] Frequency of writing 2D output files 
 
 /
@@ -22,7 +22,7 @@
     zeta_exp        = 2.0  
     nz_aa           = 5                 ! Vertical resolution in ice
     dt_method       = 2                 ! 0: no internal timestep, 1: adaptive, cfl, 2: adaptive, pc
-    dt_min          = 0.01              ! [a] Minimum timestep 
+    dt_min          = 0.1               ! [a] Minimum timestep 
     cfl_max         = 0.1               ! Maximum value is 1.0, lower will be more stable
     cfl_diff_max    = 0.12              ! Bueler et al (2007), Eq. 25  
     pc_method       = "AB-SAM"          ! "FE-SBE" or "AB-SAM"

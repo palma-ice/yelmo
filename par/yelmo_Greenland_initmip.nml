@@ -11,6 +11,10 @@
 
     load_cf_ref     = False             ! Load cf_ref from file? Otherwise define from cf_stream + inline tuning
     file_cf_ref     = "input/{domain}/{grid_name}/{grid_name}_cf_ref_opt.nc"  ! Filename holding cf_ref to load 
+
+    load_bmelt      = False             ! Load PD bmelt observations from file? Else use bmb_shlf_const 
+    file_bmelt      = "input/{domain}/{grid_name}/{grid_name}_BMELT-R13.nc"
+
 /
 
 &yelmo
@@ -128,7 +132,7 @@
     enh_umin                = 50.0          ! [m/yr] Minimum transition velocity to enh_stream (enh_method="paleo-shear")
     enh_umax                = 500.0         ! [m/yr] Maximum transition velocity to enh_stream (enh_method="paleo-shear")
     calc_age                = False         ! Calculate age tracer field?
-    age_iso                 = 0.0
+    age_iso                 = 11.7, 29.0, 57.0, 115.0
     tracer_method           = "expl"        ! "expl", "impl": used for age and 'paleo-shear' enh fields
     tracer_impl_kappa       = 1.5           ! [m2 a-1] Artificial diffusion term for implicit tracer solving 
     
@@ -185,5 +189,8 @@
     pd_vel_load       = True 
     pd_vel_path       = "input/{domain}/{grid_name}/{grid_name}_VEL-J18.nc"
     pd_vel_names      = "ux_srf" "uy_srf"            ! Surface velocity 
+    pd_age_load       = True 
+    pd_age_path       = "input/{domain}/{grid_name}/{grid_name}_STRAT-M15.nc"
+    pd_age_names      = "age_iso" "depth_iso"        ! ages of isochrones; depth of isochrones 
 
 /

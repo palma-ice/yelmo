@@ -9,7 +9,6 @@ module mass_conservation
 
     private
     public :: calc_ice_thickness
-    public :: apply_calving_ice_margin
     public :: relax_ice_thickness
 
 contains 
@@ -584,44 +583,6 @@ contains
         return 
 
     end subroutine calc_ice_margin
-    
-    subroutine apply_calving_ice_margin(calving,H_margin,H_ice,dt)
-        ! Apply calving to isolated (island) H_margin points
-
-        implicit none 
-
-        real(prec), intent(INOUT) :: calving(:,:)           ! [m/a] Calving rate
-        real(prec), intent(INOUT) :: H_margin(:,:)          ! [m]   Margin ice thickness for partially filled cells, H_margin*1.0 = H_ref*f_ice
-        real(prec), intent(IN)    :: H_ice(:,:)             ! [m]   Ice thickness on standard grid (aa-nodes)
-        real(prec), intent(IN)    :: dt                     ! [a]   Timestep 
-
-        ! Local variables 
-        integer :: i, j, nx, ny 
-        real(prec) :: H_neighb(4)
-
-        nx = size(H_ice,1)
-        ny = size(H_ice,2)
-
-        do j = 2, ny-1
-        do i = 2, nx-1 
-
-            ! Store neighbor heights 
-            H_neighb = [H_ice(i-1,j),H_ice(i+1,j),H_ice(i,j-1),H_ice(i,j+1)]
-            
-            if (H_margin(i,j) .gt. 0.0 .and. maxval(H_neighb) .eq. 0.0) then 
-                ! This point is at the ice margin and has no ice-covered neighbors
-
-                calving(i,j)  = calving(i,j) + H_margin(i,j) / dt 
-                H_margin(i,j) = 0.0 
-
-            end if  
-
-        end do 
-        end do 
-
-        return 
-
-    end subroutine apply_calving_ice_margin
     
     subroutine relax_ice_thickness(H_ice,f_grnd,H_ref,topo_rel,tau,dt)
         ! This routines allows ice within a given mask to be

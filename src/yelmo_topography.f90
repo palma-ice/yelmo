@@ -150,10 +150,7 @@ contains
  
             ! Apply calving
             call apply_calving(tpo%now%H_ice,tpo%now%calv,tpo%now%f_grnd,tpo%par%H_min_flt,dt)
-
-            ! Additionally apply calving to H_margin points (when isolated)
-            call apply_calving_ice_margin(tpo%now%calv,tpo%now%H_margin,tpo%now%H_ice,dt)  
-
+            
             ! Apply special case for symmetric EISMINT domain when basal sliding is active
             ! (ensure summit thickness does not grow disproportionately)
             if (trim(tpo%par%boundaries) .eq. "EISMINT" .and. maxval(dyn%now%uxy_b) .gt. 0.0) then 

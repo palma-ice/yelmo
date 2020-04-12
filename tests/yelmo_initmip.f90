@@ -8,6 +8,8 @@ program yelmo_test
     use basal_dragging 
     use yelmo_tools, only : gauss_values
     
+    use omp_lib
+
     implicit none 
 
     type(yelmo_class)      :: yelmo1 
@@ -28,7 +30,7 @@ program yelmo_test
     logical :: load_cf_ref, load_bmelt
     character(len=256) :: file_cf_ref 
     character(len=256) :: file_bmelt 
-
+    
     ! Start timing 
     call cpu_time(cpu_start_time)
 

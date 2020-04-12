@@ -8,8 +8,8 @@ LISROOT = /Users/robinson/apps/lis/lis
 INC_LIS = -I${LISROOT}/include 
 LIB_LIS = -L${LISROOT}/lib/ -llis
 
-FFLAGS_SERIAL = -m64 -ffree-line-length-none -I$(objdir) -J$(objdir)
-FFLAGS_OPENMP = -m64 -ffree-line-length-none -I$(objdir) -J$(objdir) -fomit-frame-pointer -fopenmp
+FFLAGS_DEFAULT = -m64 -ffree-line-length-none -I$(objdir) -J$(objdir)
+FFLAGS_OPENMP  = $(FFLAGS_DEFAULT) -fomit-frame-pointer -fopenmp
 
 LFLAGS  = $(LIB_NC) $(LIB_LIS)
 

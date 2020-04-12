@@ -29,7 +29,7 @@ ifeq ($(debug), 2)
 endif
 
 # Determine whether to use normal flags or openmp flags 
-FFLAGS = $(FFLAGS_SERIAL)
+FFLAGS = $(FFLAGS_DEFAULT)
 ifeq ($(parallel), 1)
 	FFLAGS = $(FFLAGS_OPENMP)
 endif

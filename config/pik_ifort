@@ -7,6 +7,12 @@ LISROOT = /home/robinson/apps/lis/lis
 INC_LIS = -I${LISROOT}/include 
 LIB_LIS = -L${LISROOT}/lib/ -llis
 
+ifeq ($(parallel), 1)
+    LISROOT = /home/robinson/apps/lis/lis-omp
+    INC_LIS = -I${LISROOT}/include 
+    LIB_LIS = -L${LISROOT}/lib/ -llis
+endif 
+
 FFLAGS_DEFAULT = -module $(objdir) -L$(objdir)
 FFLAGS_OPENMP  = $(FFLAGS_DEFAULT) -qopenmp 
 

@@ -3,7 +3,7 @@ FC = gfortran
 INC_NC  = -I/p/system/packages/netcdf-fortran/4.4.2/gnu/serial/include
 LIB_NC  = -L/p/system/packages/netcdf-fortran/4.4.2/gnu/serial/lib -lnetcdff -lnetcdf
 
-LISROOT = /Users/robinson/apps/lis/lis
+LISROOT = /home/robinson/apps/lis/lis
 INC_LIS = -I${LISROOT}/include 
 LIB_LIS = -L${LISROOT}/lib/ -llis
 

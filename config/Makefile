@@ -9,7 +9,7 @@ libdir = libs
 testdir = tests
 
 # Command-line options at make call
-debug ?= 0
+debug    ?= 0
 parallel ?= 0 
 
 ## COMPILER CONFIGURATION ##
@@ -26,12 +26,6 @@ endif
 # Debugging flags with profiling output enabled
 ifeq ($(debug), 2)
 	DFLAGS = $(DFLAGS_PROFILE)
-endif
-
-# Determine whether to use normal flags or openmp flags 
-FFLAGS = $(FFLAGS_DEFAULT)
-ifeq ($(parallel), 1)
-	FFLAGS = $(FFLAGS_OPENMP)
 endif
 
 ###############################################

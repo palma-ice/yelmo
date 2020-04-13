@@ -60,7 +60,7 @@ $(objdir)/mass_conservation.o : $(srcdir)/physics/mass_conservation.f90 $(objdir
 
 $(objdir)/solver_ssa_sico5.o: $(srcdir)/physics/solver_ssa_sico5.F90 $(objdir)/yelmo_defs.o \
 							$(objdir)/yelmo_tools.o
-	$(FC) $(DFLAGS) $(FFLAGS) $(INC_LIS) -fpp -c -o $@ $<
+	$(FC) $(DFLAGS) $(FFLAGS) $(INC_LIS) -c -o $@ $<
 
 $(objdir)/solver_tridiagonal.o: $(srcdir)/physics/solver_tridiagonal.f90 $(objdir)/yelmo_defs.o
 	$(FC) $(DFLAGS) $(FFLAGS) -c -o $@ $<

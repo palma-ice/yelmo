@@ -7,14 +7,18 @@ LISROOT = /home/robinson/apps/lis/lis
 INC_LIS = -I${LISROOT}/include 
 LIB_LIS = -L${LISROOT}/lib/ -llis
 
+FFLAGS = -module $(objdir) -L$(objdir)
+
 ifeq ($(parallel), 1)
+    # Overwrite default choices with openmp relevant choices 
+
     LISROOT = /home/robinson/apps/lis/lis-omp
     INC_LIS = -I${LISROOT}/include 
     LIB_LIS = -L${LISROOT}/lib/ -llis
-endif 
 
-FFLAGS_DEFAULT = -module $(objdir) -L$(objdir)
-FFLAGS_OPENMP  = $(FFLAGS_DEFAULT) -qopenmp 
+    FFLAGS  = -module $(objdir) -L$(objdir) -fpp -qopenmp 
+
+endif 
 
 LFLAGS  = $(LIB_NC) $(LIB_LIS) -Wl,-zmuldefs
 

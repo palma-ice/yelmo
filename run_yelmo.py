@@ -46,6 +46,8 @@ trough = libyelmo/bin/yelmo_trough.x
         help='Name of the qos the job should be submitted to (priority,short,medium,long)')
     parser.add_argument('-w','--wall', type=int, default=12,
         help='Maximum wall time to allow for job (only for jobs submitted to queue)')
+    parser.add_argument('--omp', type=bool, default=False,
+        help='Switch for whether to submit job using openmp settings or not (Default=False)')
     parser.add_argument('--email', type=str, default='None',
         help='Email address to send job notifications from cluster')
     parser.add_argument('--group', type=str, default='anthroia',
@@ -70,6 +72,7 @@ trough = libyelmo/bin/yelmo_trough.x
     submit      = args.submit 
     qos         = args.qos  
     wtime       = args.wall 
+    omp         = args.omp 
     useremail   = args.email 
     usergroup   = args.group
     with_runner = args.x   
@@ -182,7 +185,7 @@ trough = libyelmo/bin/yelmo_trough.x
 
         if submit:
             # Submit job to queue 
-            pid = submitjob(rundir,executable,par_fname,qos,wtime,usergroup,useremail) 
+            pid = submitjob(rundir,executable,par_fname,qos,wtime,usergroup,useremail,omp) 
 
         else:
             # Run job in background 
@@ -215,7 +218,7 @@ def runjob(rundir,executable,par_path):
 
     return jobstatus
 
-def submitjob(rundir,executable,par_path,qos,wtime,usergroup,useremail):
+def submitjob(rundir,executable,par_path,qos,wtime,usergroup,useremail,omp):
     '''Submit a job to a HPC queue (qsub,sbatch)'''
 
     # Get info about current system
@@ -238,7 +241,7 @@ def submitjob(rundir,executable,par_path,qos,wtime,usergroup,useremail):
             
     else:
         # Host is the PIK 2015 cluster, use the following submit script
-        script  = jobscript_slurm_pik(cmd,rundir,username,usergroup,qos,wtime,useremail)
+        script  = jobscript_slurm_pik(cmd,rundir,username,usergroup,qos,wtime,useremail,omp)
         jobfile = open(path_jobscript,'w').write(script)
         cmd_job = "cd {} && sbatch {}".format(rundir,nm_jobscript)
     

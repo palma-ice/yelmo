@@ -8,7 +8,7 @@ INC_LIS = -I${LISROOT}/include
 LIB_LIS = -L${LISROOT}/lib/ -llis
 
 FFLAGS_DEFAULT = -module $(objdir) -L$(objdir)
-FFLAGS_OPENMP  = $(FFLAGS_DEFAULT) -fpp -qopenmp 
+FFLAGS_OPENMP  = $(FFLAGS_DEFAULT) -qopenmp 
 
 LFLAGS  = $(LIB_NC) $(LIB_LIS) -Wl,-zmuldefs
 

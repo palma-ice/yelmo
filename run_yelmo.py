@@ -360,7 +360,7 @@ def jobscript_slurm_brigit(cmd,rundir,username,usergroup,qos,wtime,useremail):
 
     return script
 
-def jobscript_slurm_pik(cmd,rundir,username,usergroup,qos,wtime,useremail):
+def jobscript_slurm_pik(cmd,rundir,username,usergroup,qos,wtime,useremail,omp):
     '''Definition of the job script'''
 
     jobname = "yelmo" 
@@ -377,7 +377,25 @@ def jobscript_slurm_pik(cmd,rundir,username,usergroup,qos,wtime,useremail):
     if qos == "medium" and wtime > 24*7:
         print("Error in wtime for '{}'' queue, wtime = {}".format(qos,wtime))
         sys.exit()
-            
+    
+    if omp:
+        # Use openmp settings 
+        omp_script = """
+#SBATCH --mem=50000 
+#SBATCH --nodes=1
+#SBATCH --tasks-per-node=1
+#SBATCH --cpus-per-task=4 
+
+export OMP_PROC_BIND=true  # make sure our threads stick to cores
+export OMP_NUM_THREADS=4   # matches how many cpus-per-task we asked for
+export OMP_NESTED=false
+export OMP_STACKSIZE=64M
+"""
+    else: 
+        # No openmp 
+        omp_script = "" 
+
+
     script = """#! /bin/bash
 #SBATCH --qos={}
 #SBATCH --time={}:00:00
@@ -389,11 +407,12 @@ def jobscript_slurm_pik(cmd,rundir,username,usergroup,qos,wtime,useremail):
 #SBATCH --mail-type=REQUEUE
 #SBATCH --output=./out.out
 #SBATCH --error=./out.err
+{}
 
 # Run the job
 {} 
 
-""".format(qos,wtime,jobname,usergroup,useremail,cmd)
+""".format(qos,wtime,jobname,usergroup,useremail,omp_script,cmd)
 
     return script
 

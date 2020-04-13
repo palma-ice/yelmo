@@ -16,7 +16,7 @@ ifeq ($(parallel), 1)
     INC_LIS = -I${LISROOT}/include 
     LIB_LIS = -L${LISROOT}/lib/ -llis
 
-    FFLAGS  = -module $(objdir) -L$(objdir) -fpp -qopenmp 
+    FFLAGS  = -module $(objdir) -L$(objdir) -qopenmp 
 
 endif 
 

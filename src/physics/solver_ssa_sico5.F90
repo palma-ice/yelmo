@@ -70,10 +70,9 @@ contains
         
         LIS_INTEGER :: ierr
         LIS_INTEGER :: nc, nr
-        ! LIS_INTEGER :: iter
-        LIS_MATRIX :: lgs_a
-        LIS_VECTOR :: lgs_b, lgs_x
-        LIS_SOLVER :: solver
+        LIS_MATRIX  :: lgs_a
+        LIS_VECTOR  :: lgs_b, lgs_x
+        LIS_SOLVER  :: solver
 
         LIS_INTEGER :: nmax, n_sprs 
         LIS_INTEGER, allocatable, dimension(:) :: lgs_a_ptr, lgs_a_index
@@ -767,6 +766,8 @@ call lis_matrix_set_size(lgs_a, 0, nmax, ierr)
 call lis_vector_set_size(lgs_b, 0, nmax, ierr)
 call lis_vector_set_size(lgs_x, 0, nmax, ierr)
 
+! === Storage order: compressed sparse row (CSR) ===
+
 do nr=1, nmax
 
    do nc=lgs_a_ptr(nr), lgs_a_ptr(nr+1)-1
@@ -777,9 +778,9 @@ do nr=1, nmax
    call lis_vector_set_value(LIS_INS_VALUE, nr, lgs_b_value(nr), lgs_b, ierr)
    call lis_vector_set_value(LIS_INS_VALUE, nr, lgs_x_value(nr), lgs_x, ierr)
 
-end do
+end do 
 
-!compressed sparse row CSR
+
 call lis_matrix_set_type(lgs_a, LIS_MATRIX_CSR, ierr)
 call lis_matrix_assemble(lgs_a, ierr)
 

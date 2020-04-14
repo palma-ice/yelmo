@@ -817,7 +817,7 @@ contains
         character(len=*), intent(INOUT) :: name, value, comment 
         integer :: linetype
 
-        character(len=1000) :: line1 
+        character(len=1001) :: line1 
         integer :: q, q1, q2
 
         name     = ""

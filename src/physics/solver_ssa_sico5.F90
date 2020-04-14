@@ -71,9 +71,9 @@ contains
         LIS_INTEGER :: ierr
         LIS_INTEGER :: nc, nr
         ! LIS_INTEGER :: iter
-        LIS_MATRIX  :: lgs_a
-        LIS_VECTOR  :: lgs_b, lgs_x
-        LIS_SOLVER  :: solver
+        LIS_MATRIX :: lgs_a
+        LIS_VECTOR :: lgs_b, lgs_x
+        LIS_SOLVER :: solver
 
         LIS_INTEGER :: nmax, n_sprs 
         LIS_INTEGER, allocatable, dimension(:) :: lgs_a_ptr, lgs_a_index
@@ -779,6 +779,7 @@ do nr=1, nmax
 
 end do
 
+!compressed sparse row CSR
 call lis_matrix_set_type(lgs_a, LIS_MATRIX_CSR, ierr)
 call lis_matrix_assemble(lgs_a, ierr)
 

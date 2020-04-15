@@ -758,6 +758,9 @@ end do
 
 !-------- Settings for Lis --------
 
+! For parallel computing environments        
+call lis_initialize(ierr)    
+
 call lis_matrix_create(LIS_COMM_WORLD, lgs_a, ierr)
 call lis_vector_create(LIS_COMM_WORLD, lgs_b, ierr)
 call lis_vector_create(LIS_COMM_WORLD, lgs_x, ierr)
@@ -808,6 +811,9 @@ call lis_matrix_destroy(lgs_a, ierr)
 call lis_vector_destroy(lgs_b, ierr)
 call lis_vector_destroy(lgs_x, ierr)
 call lis_solver_destroy(solver, ierr)
+
+! For parallel computing environments        
+call lis_finalize(ierr)
 
 do n=1, nmax-1, 2
 

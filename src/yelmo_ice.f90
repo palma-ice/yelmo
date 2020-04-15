@@ -42,7 +42,7 @@ contains
         real(prec) :: dt_now, dt_max  
         real(prec) :: time_now, time_start 
         integer    :: n, nstep, n_now
-        real(4)    :: cpu_start_time 
+        real(8)    :: cpu_start_time 
         real(prec), parameter :: time_tol = 1e-5
 
         real(prec) :: H_mean, T_mean 
@@ -89,7 +89,7 @@ contains
         time_now = dom%tpo%par%time
 
         ! Initialize cpu timing 
-        call cpu_time(cpu_start_time) 
+        call yelmo_cpu_time(cpu_start_time) 
         time_start = time_now 
         
         ! Determine maximum number of time steps to be iterated through   
@@ -275,7 +275,7 @@ contains
         call ydata_compare(dom%dta,dom%tpo,dom%dyn,dom%mat,dom%thrm,dom%bnd,dom%par%domain)
 
         ! Calculate model speed [model-kyr / hr]
-        call yelmo_calc_speed(dom%par%model_speed,dom%par%model_speeds,time_start,time_now,real(cpu_start_time,prec))
+        call yelmo_calc_speed(dom%par%model_speed,dom%par%model_speeds,time_start,time_now,cpu_start_time)
 
         ! Write some diagnostics to make sure something useful is happening 
         if (yelmo_log) then

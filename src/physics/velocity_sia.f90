@@ -23,6 +23,8 @@ contains
         ! Calculate the 3D diffusivity helper field on ab-nodes, as an input 
         ! to the SIA calculation. 
 
+        !$ use omp_lib
+
         implicit none
         
         real(prec), intent(OUT) :: dd_ab_3D(:,:,:)  ! nx,ny,nz_aa [m/a] Diffusivity helper, ab-nodes
@@ -71,7 +73,7 @@ contains
         ATT_ab(:,ny,:) = ATT_ab(:,ny-1,:)
         
         ! Integrate up to each layer 
-        ATT_int_ab = calc_rate_factor_integrated(ATT_ab,zeta_aa)
+        ATT_int_ab = calc_rate_factor_integrated(ATT_ab,zeta_aa,n_glen)
 
         ! Get magnitude of driving stress 
         sigma_tot_ab = 0.0 
@@ -297,23 +299,28 @@ contains
         
     end subroutine calc_uxy_b_sia
     
-    function calc_rate_factor_integrated(ATT,zeta) result(ATT_int)
+    function calc_rate_factor_integrated(ATT,zeta,n_glen) result(ATT_int)
         ! Greve and Blatter (2009), Chpt 5, page 82
+
+        !$ use omp_lib
 
         implicit none 
 
         real(prec), intent(IN) :: ATT(:,:,:)
         real(prec), intent(IN) :: zeta(:) 
+        real(prec), intent(IN) :: n_glen 
         real(prec) :: ATT_int(size(ATT,1),size(ATT,2),size(ATT,3))
 
         ! Local variables 
         integer :: i, j, nx, ny
-        real(prec), parameter :: n_glen = 3.0 
 
         nx = size(ATT,1)
         ny = size(ATT,2) 
 
         ! Vertically integrated values of ATT to each vertical level
+
+        !!!!$omp parallel do private(i,j,nx,ny,ATT_int,ATT,zeta,n_glen)
+        
         do j = 1, ny 
         do i = 1, nx 
             ATT_int(i,j,:) = integrate_trapezoid1D_1D(ATT(i,j,:)*(1.0-zeta)**n_glen,zeta)

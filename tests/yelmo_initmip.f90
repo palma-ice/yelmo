@@ -19,7 +19,7 @@ program yelmo_test
     real(prec) :: time_init, time_end, time_equil, time, dtt, dt1D_out, dt2D_out 
     real(prec) :: bmb_shlf_const, dT_ann, z_sl    
     integer    :: n
-    real(4) :: cpu_start_time, cpu_end_time 
+    real(8) :: cpu_start_time, cpu_end_time, cpu_dtime  
 
     real(prec), allocatable :: cf_ref(:,:) 
 
@@ -30,9 +30,9 @@ program yelmo_test
     logical :: load_cf_ref, load_bmelt
     character(len=256) :: file_cf_ref 
     character(len=256) :: file_bmelt 
-    
+
     ! Start timing 
-    call cpu_time(cpu_start_time)
+    call yelmo_cpu_time(cpu_start_time)
 
     ! Determine the parameter file from the command line 
     call yelmo_load_command_line_args(path_par)
@@ -240,11 +240,11 @@ program yelmo_test
     call yelmo_end(yelmo1,time=time)
 
     ! Stop timing 
-    call cpu_time(cpu_end_time)
+    call yelmo_cpu_time(cpu_end_time,cpu_start_time,cpu_dtime)
 
 
-    write(*,"(a,f12.3,a)") "Time  = ",(cpu_end_time-cpu_start_time)/60.0 ," min"
-    write(*,"(a,f12.1,a)") "Speed = ",(1e-3*(time_end-time_init))/((cpu_end_time-cpu_start_time)/3600.0), " kiloyears / hr"
+    write(*,"(a,f12.3,a)") "Time  = ",cpu_dtime/60.0 ," min"
+    write(*,"(a,f12.1,a)") "Speed = ",(1e-3*(time_end-time_init))/(cpu_dtime/3600.0), " kiloyears / hr"
 
 contains
 

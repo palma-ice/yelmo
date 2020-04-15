@@ -797,33 +797,97 @@ contains
 
     end subroutine yelmo_load_command_line_args 
 
-     subroutine yelmo_calc_speed(rate,rates,model_time0,model_time1,cpu_time0)
+    subroutine yelmo_cpu_time(time,time0,dtime)
+        ! Calculate time intervals using system_clock.
+
+        ! Note: for mulithreading, cpu_time() won't work properly.
+        ! Instead, system_clock() should be used as it is here, 
+        ! unless use_cpu_time=.TRUE. 
+
+        use omp_lib
+
+        implicit none 
+
+        real(8), intent(OUT) :: time 
+        real(8), intent(IN),  optional :: time0 
+        real(8), intent(OUT), optional :: dtime 
+
+        ! Local variables
+        integer(4) :: clock 
+        integer(4) :: clock_rate
+        integer(4) :: clock_max 
+        real(8)    :: wtime 
+
+        logical, parameter :: use_cpu_time = .FALSE. 
+
+        if (use_cpu_time) then 
+
+            call cpu_time(time)
+
+        else 
+
+            time = omp_get_wtime()
+
+!             call system_clock(clock,count_rate=clock_rate)
+!             write(*,*) "clock0", clock_rate, real(clock_rate,kind=8)
+!             wtime = ( real(clock,kind=8) / real(clock_rate,kind=8) ) *1d3
+!             time = real(wtime,prec) 
+
+        end if 
+
+        if (present(dtime)) then 
+            ! Calculate time interval 
+
+            if (.not. present(time0)) then  
+                write(*,*) "yelmo_cpu_time:: Error: time0 argument is missing, but necessary."
+                stop
+            end if 
+            
+            ! Calculate the difference between current time and time0 in [s]
+            dtime = time - time0
+
+            ! Limit dtime to non-zero number 
+            if (dtime .eq. 0.0d0) then
+                write(*,*) "yelmo_cpu_time:: Error: dtime cannot equal zero - check precision of timing variables, &
+                            &which should be real(kind=8) to maintain precision."
+                write(*,*) "clock", time, time0, dtime  
+                stop  
+            end if 
+
+        end if 
+
+        return 
+
+    end subroutine yelmo_cpu_time 
+
+    subroutine yelmo_calc_speed(rate,rates,model_time0,model_time1,cpu_time0)
         ! Calculate the model computational speed [model-kyr / hr]
         ! Note: uses a running mean of rates over the last X steps, in order
         ! to provide a smoother estimate of the rate 
 
         implicit none 
 
-        real(prec), intent(OUT)   :: rate        ! [kyr / hr]
-        real(prec), intent(INOUT) :: rates(:)    ! [kyr / hr]
+        real(prec), intent(OUT)   :: rate           ! [kyr / hr]
+        real(prec), intent(INOUT) :: rates(:)       ! [kyr / hr]
 
-        real(prec), intent(IN) :: model_time0    ! [yr]
-        real(prec), intent(IN) :: model_time1    ! [yr]
-        real(prec), intent(IN) :: cpu_time0      ! [sec]
+        real(prec), intent(IN) :: model_time0       ! [yr]
+        real(prec), intent(IN) :: model_time1       ! [yr]
+        real(8),    intent(IN) :: cpu_time0         ! [sec]
         
         ! Local variables
         integer    :: ntot, n 
-        real(4)    :: cpu_time1      ! [sec]
+        real(8)    :: cpu_time1                     ! [sec]
+        real(8)    :: cpu_dtime                     ! [sec]
         real(prec) :: rate_now 
 
         ! Get current time 
-        call cpu_time(cpu_time1)
+        call yelmo_cpu_time(cpu_time1,cpu_time0,cpu_dtime)
 
         if (model_time1 .gt. model_time0) then 
             ! Model has advanced in time, calculate rate 
 
             ! Calculate the model speed [model-yr / sec]
-            rate_now = (model_time1-model_time0) / (cpu_time1-cpu_time0)
+            rate_now = (model_time1-model_time0) / cpu_dtime
 
             ! Convert to more useful rate [model-kyr / hr]
             rate_now = rate_now*1e-3*3600.0 

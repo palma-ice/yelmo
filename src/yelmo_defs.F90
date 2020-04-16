@@ -41,6 +41,7 @@ module yelmo_defs
 
     ! Yelmo configuration options 
     logical :: yelmo_log
+    logical :: yelmo_use_omp 
 
     ! Physical constants 
     real(prec) :: sec_year       ! [s] seconds per year 
@@ -298,7 +299,7 @@ module yelmo_defs
 
         type(ydyn_param_class)    :: par        ! physical parameters
         type(ydyn_state_class)    :: now
-          
+
     end type
 
     ! =========================================================================
@@ -724,10 +725,14 @@ contains
         character(len=*), intent(IN)  :: filename
         
         ! Local variables
-        logical :: init_pars 
+        logical :: init_pars
 
         init_pars = .TRUE. 
         
+        ! Check openmp status 
+        yelmo_use_omp = .FALSE. 
+        !$ yelmo_use_omp = .TRUE.
+
         ! Load parameter values 
 
         call nml_read(filename,"yelmo_config","yelmo_log",yelmo_log,init=init_pars)
@@ -804,7 +809,7 @@ contains
         ! Instead, system_clock() should be used as it is here, 
         ! unless use_cpu_time=.TRUE. 
 
-        use omp_lib
+        !$use omp_lib
 
         implicit none 
 
@@ -818,23 +823,19 @@ contains
         integer(4) :: clock_max 
         real(8)    :: wtime 
 
-        logical, parameter :: use_cpu_time = .FALSE. 
+        ! cpu_time can be used for serial execution to get timing on 1 processor
+        call cpu_time(time)
 
-        if (use_cpu_time) then 
+        ! --------------------------------------
+        ! omp_get_wtime must be used for multithread openmp execution to get timing on master thread 
+        ! The following lines will overwrite time with the result from omp_get_wtime on the master thread 
 
-            call cpu_time(time)
+        !$omp master
+        !$time = omp_get_wtime()
+        !$omp end master
 
-        else 
-
-            time = omp_get_wtime()
-
-!             call system_clock(clock,count_rate=clock_rate)
-!             write(*,*) "clock0", clock_rate, real(clock_rate,kind=8)
-!             wtime = ( real(clock,kind=8) / real(clock_rate,kind=8) ) *1d3
-!             time = real(wtime,prec) 
-
-        end if 
-
+        ! --------------------------------------
+        
         if (present(dtime)) then 
             ! Calculate time interval 
 

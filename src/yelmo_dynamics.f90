@@ -183,8 +183,8 @@ contains
                 ! Use classic-style SIA solver (solve directly for velocity)
 
                 ! Calculate diffusivity constant on ab-nodes
-                call calc_dd_ab_3D(dyn%now%dd_ab,tpo%now%H_ice,dyn%now%taud_acx,dyn%now%taud_acy, &
-                                        mat%now%ATT,dyn%par%zeta_aa,dyn%par%dx,mat%par%n_glen,rho_ice,g)
+                call calc_dd_ab_3D_serial(dyn%now%dd_ab,tpo%now%H_ice,dyn%now%taud_acx,dyn%now%taud_acy, &
+                                          mat%now%ATT,dyn%par%zeta_aa,dyn%par%dx,mat%par%n_glen,rho_ice,g)
                 dyn%now%dd_ab_bar = calc_vertical_integrated_2D(dyn%now%dd_ab,dyn%par%zeta_aa)
                 
 

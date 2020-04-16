@@ -228,6 +228,8 @@ contains
 
         ! Note zeta=height, k=1 base, k=nz surface 
         
+        !$ use omp_lib
+
         implicit none 
 
         real(prec), intent(INOUT) :: enth(:,:,:)    ! [J m-3] Ice enthalpy
@@ -325,6 +327,7 @@ end if
 
         ! ===================================================
 
+        !$omp parallel do
         do j = 2, ny-1
         do i = 2, nx-1 
             
@@ -399,6 +402,7 @@ end if
 
         end do 
         end do 
+        !$omp end parallel do
 
         ! Fill in borders 
         call fill_borders_3D(enth,nfill=1)

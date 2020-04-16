@@ -12,18 +12,85 @@ module velocity_sia
 !     integer,  parameter :: prec = sp 
 
     private
-    public :: calc_dd_ab_3D
+    public :: calc_dd_ab_3D_serial
+    public :: calc_dd_ab_3D_omp 
     public :: calc_uxy_sia_2D
     public :: calc_uxy_sia_3D 
     public :: calc_uxy_b_sia 
 
 contains 
 
-    subroutine calc_dd_ab_3D(dd_ab_3D,H_ice,taud_acx,taud_acy,ATT,zeta_aa,dx,n_glen,rho_ice,g)
+    subroutine calc_dd_ab_3D_omp(dd_ab_3D,H_ice,taud_acx,taud_acy,ATT,zeta_aa,dx,n_glen,rho_ice,g)
         ! Calculate the 3D diffusivity helper field on ab-nodes, as an input 
         ! to the SIA calculation. 
 
         !$ use omp_lib
+
+        implicit none
+        
+        real(prec), intent(OUT) :: dd_ab_3D(:,:,:)  ! nx,ny,nz_aa [m/a] Diffusivity helper, ab-nodes
+        real(prec), intent(IN)  :: H_ice(:,:)       ! [m]   Ice thickness 
+        real(prec), intent(IN)  :: taud_acx(:,:)    ! [Pa] Driving stress x-direction 
+        real(prec), intent(IN)  :: taud_acy(:,:)    ! [Pa] Driving stress y-direction 
+        real(prec), intent(IN)  :: ATT(:,:,:)       ! nx,ny,nz_aa [a-1 Pa-3] Rate factor
+        real(prec), intent(IN)  :: zeta_aa(:)       ! [--]  Height axis 0:1, layer centers (aa-nodes)
+        real(prec), intent(IN)  :: dx               ! [m]   Horizontal resolution 
+        real(prec), intent(IN)  :: n_glen
+        real(prec), intent(IN)  :: rho_ice          ! [kg m-3] Ice density 
+        real(prec), intent(IN)  :: g                ! [m s-2]  Gravitational acceleration
+
+        ! Local variables
+        integer :: i, j, k, nx, ny, nz_aa
+        real(prec), allocatable :: ATT_ab(:)
+        real(prec), allocatable :: ATT_int_ab(:) 
+
+        real(prec) :: H_ice_ab, sigma_tot_ab 
+
+        nx    = size(H_ice,1)
+        ny    = size(H_ice,2)
+        nz_aa = size(zeta_aa,1)
+
+        allocate(ATT_ab(nz_aa))
+        allocate(ATT_int_ab(nz_aa))
+
+        ! Reset dd_ab_3D
+        dd_ab_3D = 0.0 
+
+        !$OMP PARALLEL DO
+        do j = 2, ny-1 
+        do i = 2, nx-1 
+
+            ! Calculate staggered magnitude of driving stress
+            sigma_tot_ab = sqrt( (0.5*(taud_acx(i,j)+taud_acx(i,j+1)))**2 &
+                               + (0.5*(taud_acy(i,j)+taud_acy(i+1,j)))**2 )
+    
+            ! Calculate staggered column of ATT and integrated ATT
+            ATT_ab     = 0.25_prec*(ATT(i+1,j+1,:)+ATT(i+1,j,:)+ATT(i,j+1,:)+ATT(i,j,:))
+            ATT_int_ab = integrate_trapezoid1D_1D(ATT_ab(:)*(1.0-zeta_aa)**n_glen,zeta_aa)
+
+            ! Calculate staggered ice thickness 
+            H_ice_ab   = 0.25_prec*(H_ice(i+1,j+1)+H_ice(i+1,j)+H_ice(i,j+1)+H_ice(i,j))
+
+            ! Calculate quasi-diffusivity for this layer
+            dd_ab_3D(i,j,:) = 2.0 * H_ice_ab * ATT_int_ab(:) * sigma_tot_ab**(n_glen-1.0) 
+        
+        end do 
+        end do 
+        !$OMP END PARALLEL DO
+
+        ! Fill in the borders 
+        dd_ab_3D(1,:,:)  = dd_ab_3D(2,:,:) 
+        dd_ab_3D(nx,:,:) = dd_ab_3D(nx-1,:,:) 
+        dd_ab_3D(:,1,:)  = dd_ab_3D(:,2,:)
+        dd_ab_3D(:,ny,:) = dd_ab_3D(:,ny-1,:)
+
+        return
+        
+    end subroutine calc_dd_ab_3D_omp
+
+    subroutine calc_dd_ab_3D_serial(dd_ab_3D,H_ice,taud_acx,taud_acy,ATT,zeta_aa,dx,n_glen,rho_ice,g)
+        ! Calculate the 3D diffusivity helper field on ab-nodes, as an input 
+        ! to the SIA calculation. 
 
         implicit none
         
@@ -69,9 +136,11 @@ contains
             ATT_ab(:,:,k) = stagger_aa_ab(ATT(:,:,k))
         end do 
 
+        ATT_ab(1,:,:)  = ATT_ab(2,:,:) 
         ATT_ab(nx,:,:) = ATT_ab(nx-1,:,:) 
+        ATT_ab(:,1,:)  = ATT_ab(:,2,:)
         ATT_ab(:,ny,:) = ATT_ab(:,ny-1,:)
-        
+
         ! Integrate up to each layer 
         ATT_int_ab = calc_rate_factor_integrated(ATT_ab,zeta_aa,n_glen)
 
@@ -83,9 +152,11 @@ contains
                                     + (0.5*(taud_acy(i,j)+taud_acy(i+1,j)))**2 )
         end do 
         end do 
+        sigma_tot_ab(1,:)  = sigma_tot_ab(2,:) 
         sigma_tot_ab(nx,:) = sigma_tot_ab(nx-1,:) 
+        sigma_tot_ab(:,1)  = sigma_tot_ab(:,2)
         sigma_tot_ab(:,ny) = sigma_tot_ab(:,ny-1)
-
+        
         ! Reset dd_ab_3D
         dd_ab_3D = 0.0 
 
@@ -99,7 +170,7 @@ contains
 
         return
         
-    end subroutine calc_dd_ab_3D
+    end subroutine calc_dd_ab_3D_serial
 
     subroutine calc_uxy_sia_2D(ux,uy,dd_ab_3D,taud_acx,taud_acy,zeta_aa)
         ! Calculate the 2D horizontal velocity field using SIA
@@ -319,13 +390,14 @@ contains
 
         ! Vertically integrated values of ATT to each vertical level
 
-        !!!!$omp parallel do private(i,j,nx,ny,ATT_int,ATT,zeta,n_glen)
-        
+        !!!$omp parallel do shared(nx,ny,ATT,zeta,n_glen) private(i,j,ATT_int)
+        !!!$omp parallel do 
         do j = 1, ny 
         do i = 1, nx 
             ATT_int(i,j,:) = integrate_trapezoid1D_1D(ATT(i,j,:)*(1.0-zeta)**n_glen,zeta)
         end do 
         end do 
+        !!!$omp end parallel do
 
         return
 

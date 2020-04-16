@@ -540,6 +540,7 @@ contains
 
         !-------- Computation --------
 
+        !$omp parallel do
         do j=1, ny
         do i=1, nx
 
@@ -702,7 +703,8 @@ contains
 
         end do
         end do
-         
+        !$omp end parallel do
+
         return 
 
     end subroutine calc_dxyz

@@ -757,14 +757,17 @@ do n=1, nmax-1, 2
 end do
 
 !-------- Settings for Lis --------
-        
+       
 call lis_initialize(ierr)           ! Important for parallel computing environments   
+call CHKERR(ierr)
 
 call lis_matrix_create(LIS_COMM_WORLD, lgs_a, ierr)
+call CHKERR(ierr)
 call lis_vector_create(LIS_COMM_WORLD, lgs_b, ierr)
 call lis_vector_create(LIS_COMM_WORLD, lgs_x, ierr)
 
 call lis_matrix_set_size(lgs_a, 0, nmax, ierr)
+call CHKERR(ierr)
 call lis_vector_set_size(lgs_b, 0, nmax, ierr)
 call lis_vector_set_size(lgs_x, 0, nmax, ierr)
 
@@ -806,12 +809,18 @@ call CHKERR(ierr)
 
 lgs_x_value = 0.0_prec
 call lis_vector_gather(lgs_x, lgs_x_value, ierr)
+call CHKERR(ierr)
+
 call lis_matrix_destroy(lgs_a, ierr)
+call CHKERR(ierr)
+
 call lis_vector_destroy(lgs_b, ierr)
 call lis_vector_destroy(lgs_x, ierr)
 call lis_solver_destroy(solver, ierr)
-      
+call CHKERR(ierr)
+
 call lis_finalize(ierr)           ! Important for parallel computing environments
+call CHKERR(ierr)
 
 do n=1, nmax-1, 2
 

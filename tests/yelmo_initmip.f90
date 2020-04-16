@@ -238,7 +238,7 @@ program yelmo_test
 
     ! Finalize program
     call yelmo_end(yelmo1,time=time)
-
+    
     ! Stop timing 
     call yelmo_cpu_time(cpu_end_time,cpu_start_time,cpu_dtime)
 

@@ -93,8 +93,8 @@ $(objdir)/velocity_sia.o: $(srcdir)/physics/velocity_sia.f90 \
 
 ## YELMO BASE ###############################################
 
-$(objdir)/yelmo_defs.o: $(srcdir)/yelmo_defs.f90 $(objdir)/nml.o
-	$(FC) $(DFLAGS) $(FFLAGS) -c -o $@ $<
+$(objdir)/yelmo_defs.o: $(srcdir)/yelmo_defs.F90 $(objdir)/nml.o
+	$(FC) $(DFLAGS) $(FFLAGS) $(INC_LIS) -c -o $@ $<
 
 $(objdir)/yelmo_grid.o: $(srcdir)/yelmo_grid.f90 $(objdir)/yelmo_defs.o $(objdir)/nml.o $(objdir)/ncio.o
 	$(FC) $(DFLAGS) $(FFLAGS) -c -o $@ $<

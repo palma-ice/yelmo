@@ -8,7 +8,7 @@ LISROOT = /Users/robinson/apps/lis/lis
 INC_LIS = -I${LISROOT}/include 
 LIB_LIS = -L${LISROOT}/lib/ -llis
 
-FFLAGS = -fopenmp -m64 -ffree-line-length-none -I$(objdir) -J$(objdir)
+FFLAGS = -I$(objdir) -J$(objdir) -m64 -ffree-line-length-none 
 
 ifeq ($(parallel), 1)
     # Overwrite default choices with openmp relevant choices 
@@ -17,7 +17,7 @@ ifeq ($(parallel), 1)
     INC_LIS = -I${LISROOT}/include 
     LIB_LIS = -L${LISROOT}/lib/ -llis
 
-    FFLAGS  = -fopenmp -m64 -ffree-line-length-none -I$(objdir) -J$(objdir) -fomit-frame-pointer
+    FFLAGS  = -I$(objdir) -J$(objdir) -m64 -ffree-line-length-none -fomit-frame-pointer -fopenmp 
 
 endif 
 

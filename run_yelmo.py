@@ -46,7 +46,7 @@ trough = libyelmo/bin/yelmo_trough.x
         help='Name of the qos the job should be submitted to (priority,short,medium,long)')
     parser.add_argument('-w','--wall', type=int, default=12,
         help='Maximum wall time to allow for job (only for jobs submitted to queue)')
-    parser.add_argument('--omp', type=bool, default=0,
+    parser.add_argument('--omp', type=int, default=0,
         help='Specify number of threads for omp job submission (default = 0 implies no omp specification)')
     parser.add_argument('--email', type=str, default='None',
         help='Email address to send job notifications from cluster')
@@ -381,7 +381,7 @@ def jobscript_slurm_pik(cmd,rundir,username,usergroup,qos,wtime,useremail,omp):
         print("Error in wtime for '{}'' queue, wtime = {}".format(qos,wtime))
         sys.exit()
     
-    if omp:
+    if omp > 0:
         # Use openmp settings 
         omp_script = """
 #SBATCH --mem=50000 

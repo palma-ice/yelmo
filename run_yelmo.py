@@ -46,8 +46,8 @@ trough = libyelmo/bin/yelmo_trough.x
         help='Name of the qos the job should be submitted to (priority,short,medium,long)')
     parser.add_argument('-w','--wall', type=int, default=12,
         help='Maximum wall time to allow for job (only for jobs submitted to queue)')
-    parser.add_argument('--omp', type=bool, default=False,
-        help='Switch for whether to submit job using openmp settings or not (Default=False)')
+    parser.add_argument('--omp', type=bool, default=0,
+        help='Specify number of threads for omp job submission (default = 0 implies no omp specification)')
     parser.add_argument('--email', type=str, default='None',
         help='Email address to send job notifications from cluster')
     parser.add_argument('--group', type=str, default='anthroia',
@@ -387,13 +387,14 @@ def jobscript_slurm_pik(cmd,rundir,username,usergroup,qos,wtime,useremail,omp):
 #SBATCH --mem=50000 
 #SBATCH --nodes=1
 #SBATCH --tasks-per-node=1
-#SBATCH --cpus-per-task=4 
+#SBATCH --cpus-per-task={} 
 
 export OMP_PROC_BIND=true  # make sure our threads stick to cores
-export OMP_NUM_THREADS=4   # matches how many cpus-per-task we asked for
+export OMP_NUM_THREADS={}  # matches how many cpus-per-task we asked for
 export OMP_NESTED=false
 export OMP_STACKSIZE=64M
-"""
+""".format(omp,omp)
+
     else: 
         # No openmp 
         omp_script = "" 

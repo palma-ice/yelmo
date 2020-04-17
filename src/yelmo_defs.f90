@@ -729,7 +729,7 @@ contains
 
         init_pars = .TRUE. 
         
-        ! Check openmp status 
+        ! Check openmp status - set global variable to use as a switch 
         yelmo_use_omp = .FALSE. 
         !$ yelmo_use_omp = .TRUE.
 
@@ -827,7 +827,7 @@ contains
             ! --------------------------------------
             ! omp_get_wtime must be used for multithread openmp execution to get timing on master thread 
             ! The following lines will overwrite time with the result from omp_get_wtime on the master thread 
-            
+
             !$ time = omp_get_wtime()
 
             ! --------------------------------------

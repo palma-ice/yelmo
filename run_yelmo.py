@@ -235,7 +235,7 @@ def submitjob(rundir,executable,par_path,qos,wtime,usergroup,useremail,omp):
     
     if "brigit" in hostname:
         # Host is the UCM brigit cluster, use the following submit script
-        script  = jobscript_slurm_brigit(cmd,rundir,username,usergroup,qos,wtime,useremail)
+        script  = jobscript_slurm_brigit(cmd,rundir,username,usergroup,qos,wtime,useremail,omp)
         jobfile = open(path_jobscript,'w').write(script)
         cmd_job = "cd {} && sbatch {}".format(rundir,nm_jobscript)
             
@@ -244,12 +244,6 @@ def submitjob(rundir,executable,par_path,qos,wtime,usergroup,useremail,omp):
         script  = jobscript_slurm_pik(cmd,rundir,username,usergroup,qos,wtime,useremail,omp)
         jobfile = open(path_jobscript,'w').write(script)
         cmd_job = "cd {} && sbatch {}".format(rundir,nm_jobscript)
-    
-    # Unused: host is the obsolete UCM eolo cluster, use the following submit script
-    # if "cei" in hostname:
-    #     script = jobscript_qsub(cmd,rundir,username,usergroup,wtime,useremail)
-    #     jobfile = open(path_jobscript,'w').write(script)
-    #     cmd_job = "cd {} && qsub {}".format(rundir,nm_jobscript)
     
     # Run the command (ie, change to output directory and submit job)
     # Note: the argument `shell=True` can be a security hazard, but should

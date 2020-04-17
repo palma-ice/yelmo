@@ -203,7 +203,7 @@ def runjob(rundir,executable,par_path):
     
     cmd = "cd {} {} && exec {} {} > {} &".format(rundir,env_cmd,executable,par_path,"out.out")
     #cmd = "cd {} {} && mpiexec -n 2 {} {} > {} &".format(rundir,env_cmd,executable,par_path,"out.out")
-
+    
     print("Running job in background: {}".format(cmd))
 
     #os.system(cmd)

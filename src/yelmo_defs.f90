@@ -722,16 +722,42 @@ contains
 
     subroutine yelmo_global_init(filename)
 
+        !$ use omp_lib 
+
+        implicit none 
+
         character(len=*), intent(IN)  :: filename
         
         ! Local variables
         logical :: init_pars
+        integer :: n_threads 
+        character(len=10) :: n_threads_str 
 
         init_pars = .TRUE. 
         
         ! Check openmp status - set global variable to use as a switch 
         yelmo_use_omp = .FALSE. 
         !$ yelmo_use_omp = .TRUE.
+
+        ! Output some information about openmp status 
+        if (yelmo_use_omp) then 
+            
+            n_threads = 1
+            !$ n_threads = omp_get_max_threads() 
+
+            write(n_threads_str,"(i10)") n_threads 
+            n_threads_str = adjustl(n_threads_str)
+
+            write(*,*) "yelmo_global_init:: openmp is active, Yelmo will run on "//trim(n_threads_str)//" thread(s)."
+            
+        else 
+            
+            n_threads = 1
+            write(*,*) "yelmo_global_init:: openmp is not active, Yelmo will run on 1 thread."
+
+        end if 
+
+        stop 
 
         ! Load parameter values 
 

@@ -809,7 +809,7 @@ contains
         ! Instead, system_clock() should be used as it is here, 
         ! unless use_cpu_time=.TRUE. 
 
-        !$use omp_lib
+        !$ use omp_lib
 
         implicit none 
 
@@ -823,19 +823,22 @@ contains
         integer(4) :: clock_max 
         real(8)    :: wtime 
 
-        ! cpu_time can be used for serial execution to get timing on 1 processor
-        call cpu_time(time)
+        if (yelmo_use_omp) then 
+            ! --------------------------------------
+            ! omp_get_wtime must be used for multithread openmp execution to get timing on master thread 
+            ! The following lines will overwrite time with the result from omp_get_wtime on the master thread 
+            
+            !$ time = omp_get_wtime()
 
-        ! --------------------------------------
-        ! omp_get_wtime must be used for multithread openmp execution to get timing on master thread 
-        ! The following lines will overwrite time with the result from omp_get_wtime on the master thread 
+            ! --------------------------------------
+            
+        else 
 
-        !$omp master
-        !$time = omp_get_wtime()
-        !$omp end master
+            ! cpu_time can be used for serial execution to get timing on 1 processor
+            call cpu_time(time)
 
-        ! --------------------------------------
-        
+        end if 
+
         if (present(dtime)) then 
             ! Calculate time interval 
 

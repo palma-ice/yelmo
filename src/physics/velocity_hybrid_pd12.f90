@@ -106,6 +106,8 @@ contains
         uz = 0.0 
 
         ! Next, calculate velocity 
+
+        !$omp parallel do 
         do j = 2, ny-1
         do i = 2, nx-1
 
@@ -187,6 +189,7 @@ contains
 
         end do 
         end do 
+        !$omp end parallel do 
 
         ! Calculate and apply correction for sigma-coordinate stretching 
         call calc_advec_vertical_column_correction(uz,ux,uy,H_ice,z_srf,dHdt,dzsdt,zeta_ac,dx)
@@ -271,7 +274,8 @@ contains
         ! Define some constants 
         dx_inv  = 1.0_prec / dx 
         dx_inv2 = 1.0_prec / (2.0_prec*dx)
-
+        
+        !$omp parallel do 
         do j = 2, ny-1 
         do i = 2, nx-1 
 
@@ -314,6 +318,7 @@ contains
 
         end do 
         end do 
+        !$omp end parallel do 
 
         return 
 
@@ -335,12 +340,12 @@ contains
 
         nx = size(var,1)
         ny = size(var,2)
-
+         
         do j = 1, ny
         do i = 1, nx
             var_int(i,j,:) = integrate_trapezoid1D_1D(var(i,j,:),sigma*H_ice(i,j))
         end do
-        end do
+        end do 
 
         return
 
@@ -517,6 +522,7 @@ contains
 
         ! Calculate shear for each layer of the ice sheet 
         ! with diffusivity on Ab nodes (ie, EISMINT type I)
+
         do k = 1, nz_aa 
 
             ! Determine current depth fraction
@@ -605,7 +611,7 @@ contains
             end do
             
         end do 
-        
+
         if (is_mismip) then 
             ! Fill in boundaries 
             ! ajr, 2018-11-12: mismip is still showing slight assymmetry in the y-direction when 
@@ -674,7 +680,7 @@ contains
         visc = visc_min 
         
         ! Loop over domain to calculate viscosity at each aa-node
-
+         
         do j = 1, ny
         do i = 1, nx
 
@@ -731,7 +737,7 @@ contains
             if (H_ice(i,j) .gt. 1.0_prec) visc(i,j) = visc(i,j) * H_ice(i,j) 
             
         end do 
-        end do  
+        end do 
 
         return
         
@@ -816,7 +822,7 @@ contains
             sigma_sq(i,j) = (2.0_prec*mu * ATT_bar(i,j)**(-1.0_prec/n) )**2 * eps_sq
 
         end do 
-        end do  
+        end do
 
         return
         

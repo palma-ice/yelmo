@@ -449,7 +449,7 @@ contains
         ny = size(H_ice,2) 
 
         advecxy = 0.0_prec 
-
+         
         do j = 2, ny-1
         do i = 2, nx-1 
             call calc_advec_horizontal_column(advecxy(i,j,:),var,H_ice,z_srf,ux,uy,zeta_aa,dx,i,j)

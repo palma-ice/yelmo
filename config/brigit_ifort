@@ -8,6 +8,18 @@ INC_LIS = -I${LISROOT}/include
 LIB_LIS = -L${LISROOT}/lib/ -llis
 
 FFLAGS  = -module $(objdir) -L$(objdir)
+
+ifeq ($(parallel), 1)
+    # Overwrite default choices with openmp relevant choices 
+
+    LISROOT = /home/robinson/apps/lis/lis-omp
+    INC_LIS = -I${LISROOT}/include 
+    LIB_LIS = -L${LISROOT}/lib/ -llis
+
+    FFLAGS  = -module $(objdir) -L$(objdir) -qopenmp 
+
+endif 
+
 LFLAGS  = $(LIB_NC) $(LIB_LIS) -Wl,-zmuldefs
 
 DFLAGS_NODEBUG = -O2 -fp-model precise

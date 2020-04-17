@@ -56,7 +56,7 @@ contains
         ! Reset dd_ab_3D
         dd_ab_3D = 0.0 
 
-        !$OMP PARALLEL DO
+        !$omp parallel do 
         do j = 2, ny-1 
         do i = 2, nx-1 
 
@@ -76,7 +76,7 @@ contains
         
         end do 
         end do 
-        !$OMP END PARALLEL DO
+        !$omp end parallel do 
 
         ! Fill in the borders 
         dd_ab_3D(1,:,:)  = dd_ab_3D(2,:,:) 

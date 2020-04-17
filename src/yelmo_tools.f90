@@ -1127,11 +1127,13 @@ contains
         nx = size(var,1)
         ny = size(var,2)
 
+        !$omp parallel do
         do j = 1, ny
         do i = 1, nx
             var_int(i,j,:) = integrate_trapezoid1D_1D(var(i,j,:),zeta)
         end do
         end do
+        !$omp end parallel do
 
         return
 
@@ -1153,11 +1155,13 @@ contains
         nx = size(var,1)
         ny = size(var,2)
 
+        !$omp parallel do 
         do j = 1, ny
         do i = 1, nx
             var_int(i,j) = integrate_trapezoid1D_pt(var(i,j,:),zeta)
         end do
         end do
+        !$omp end parallel do 
 
         return
 

@@ -244,14 +244,14 @@ contains
         
         implicit none 
 
-        real(prec), intent(INOUT) :: uz(:,:,:)        ! nx,ny,nz_ac
-        real(prec), intent(IN)    :: ux(:,:,:)        ! nx,ny,nz_aa
-        real(prec), intent(IN)    :: uy(:,:,:)        ! nx,ny,nz_aa
-        real(prec), intent(IN)    :: H_ice(:,:)       ! nx,ny 
-        real(prec), intent(IN)    :: z_srf(:,:)       ! nx,ny 
-        real(prec), intent(IN)    :: dHdt(:,:)        ! nx,ny 
-        real(prec), intent(IN)    :: dzsdt(:,:)       ! nx,ny 
-        real(prec), intent(IN)    :: zeta_ac(:)       ! nz_ac
+        real(prec), intent(INOUT) :: uz(:,:,:)          ! nx,ny,nz_ac
+        real(prec), intent(IN)    :: ux(:,:,:)          ! nx,ny,nz_aa
+        real(prec), intent(IN)    :: uy(:,:,:)          ! nx,ny,nz_aa
+        real(prec), intent(IN)    :: H_ice(:,:)         ! nx,ny 
+        real(prec), intent(IN)    :: z_srf(:,:)         ! nx,ny 
+        real(prec), intent(IN)    :: dHdt(:,:)          ! nx,ny 
+        real(prec), intent(IN)    :: dzsdt(:,:)         ! nx,ny 
+        real(prec), intent(IN)    :: zeta_ac(:)         ! nz_ac
         real(prec), intent(IN)    :: dx   
 
         ! Local variables 
@@ -260,16 +260,14 @@ contains
         real(prec) :: dx_inv, dx_inv2
         real(prec) :: c_x, c_y, c_t 
         real(prec) :: corr 
-        real(prec), allocatable :: uz_corr(:)       ! [m/a] nz_ac 
+        real(prec) :: uz_corr                           ! [m/a] nz_ac 
         
         real(prec), parameter :: tol = 1e-4 
-        real(prec), parameter :: max_corr = 1.0_prec   ! Maximum allowed deviation from original uz (eg 200%)
+        real(prec), parameter :: max_corr = 1.0_prec    ! Maximum allowed deviation from original uz (eg 200%)
 
         nx    = size(H_ice,1)
         ny    = size(H_ice,2)
         nz_ac = size(zeta_ac,1) 
-
-        allocate(uz_corr(nz_ac))
 
         ! Define some constants 
         dx_inv  = 1.0_prec / dx 
@@ -306,15 +304,15 @@ contains
                 corr = sign(min(abs(corr),abs(max_corr*uz(i,j,k))),corr)
 
                 ! Apply correction 
-                uz_corr(k) = uz(i,j,k) + corr 
+                uz_corr = uz(i,j,k) + corr 
 
                 ! Limit new velocity to avoid underflow errors 
-                if (abs(uz_corr(k)) .le. tol) uz_corr(k) = 0.0_prec 
+                if (abs(uz_corr) .le. tol) uz_corr = 0.0_prec 
+
+                ! Set uz equal to new corrected uz 
+                uz(i,j,k) = uz_corr  
 
             end do         
-
-            ! Set uz equal to new corrected uz 
-            uz(i,j,:) = uz_corr(:)  
 
         end do 
         end do 

@@ -756,9 +756,7 @@ contains
             write(*,*) "yelmo_global_init:: openmp is not active, Yelmo will run on 1 thread."
 
         end if 
-
-        stop 
-
+        
         ! Load parameter values 
 
         call nml_read(filename,"yelmo_config","yelmo_log",yelmo_log,init=init_pars)

@@ -484,11 +484,12 @@ contains
         real(prec) :: abs_v_ssa_inv, nx1, ny1
         real(prec) :: shear_x_help, shear_y_help
         real(prec) :: f_shear_help
-        real(prec) :: lxy, lyx, lxz, lzx, lyz, lzy 
+        real(prec) :: lxy, lyx, lxz, lzx, lyz, lzy
+        real(prec) :: shear_squared  
         real(prec), allocatable :: fact_x(:,:), fact_y(:,:)
         real(prec), allocatable :: fact_z(:)
         !real(prec), allocatable :: lxy(:), lyx(:), lxz(:), lzx(:), lyz(:), lzy(:)
-        real(prec), allocatable :: shear_squared(:)
+!         real(prec), allocatable :: shear_squared(:)
         
         real(prec), parameter :: epsi   = 1e-5
         real(prec), parameter :: de_max = 0.5    ! [a^-1] 
@@ -508,7 +509,7 @@ contains
 !         allocate(lzx(nz_aa))
 !         allocate(lyz(nz_aa))
 !         allocate(lzy(nz_aa))
-        allocate(shear_squared(nz_aa))
+!         allocate(shear_squared(nz_aa))
 
         ! Change arguments to local (sicopolis) variable names 
         dxi  = dx 
@@ -671,14 +672,14 @@ contains
                     ! ====== Finished calculating individual strain rate terms ====== 
                 
                     ! Calculate the shear-based strain, stretching and the shear-fraction
-                    shear_squared(k)  =   strn%dxz(i,j,k)*strn%dxz(i,j,k) &
-                                        + strn%dyz(i,j,k)*strn%dyz(i,j,k)
+                    shear_squared  =   strn%dxz(i,j,k)*strn%dxz(i,j,k) &
+                                     + strn%dyz(i,j,k)*strn%dyz(i,j,k)
 
-                    strn%de(i,j,k)    =  sqrt(   strn%dxx(i,j,k)*strn%dxx(i,j,k) &
-                                               + strn%dyy(i,j,k)*strn%dyy(i,j,k) &
-                                               + strn%dxx(i,j,k)*strn%dyy(i,j,k) &
-                                               + strn%dxy(i,j,k)*strn%dxy(i,j,k) &
-                                               + shear_squared(k) )
+                    strn%de(i,j,k) =  sqrt( strn%dxx(i,j,k)*strn%dxx(i,j,k) &
+                                           + strn%dyy(i,j,k)*strn%dyy(i,j,k) &
+                                           + strn%dxx(i,j,k)*strn%dyy(i,j,k) &
+                                           + strn%dxy(i,j,k)*strn%dxy(i,j,k) &
+                                           + shear_squared )
                         
                     if (strn%de(i,j,k) .gt. de_max) strn%de(i,j,k) = de_max 
 
@@ -687,7 +688,7 @@ contains
                     !strn%de(i,j,k)    =  sqrt( shear_squared(k) )
 
                     if (strn%de(i,j,k) .gt. 0.0) then 
-                        strn%f_shear(i,j,k) = sqrt(shear_squared(k))/strn%de(i,j,k)
+                        strn%f_shear(i,j,k) = sqrt(shear_squared)/strn%de(i,j,k)
                     else 
                         strn%f_shear(i,j,k) = 1.0   ! Shearing by default for low strain rates
                     end if 
@@ -700,7 +701,7 @@ contains
 
                     !  ------ Constrain the shear fraction to reasonable [0,1] interval
 
-                    strn%f_shear(i,j,:) = min(max(strn%f_shear(i,j,k), 0.0), 1.0)
+                    strn%f_shear(i,j,k) = min(max(strn%f_shear(i,j,k), 0.0), 1.0)
 
                 end do 
 

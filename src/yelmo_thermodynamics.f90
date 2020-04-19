@@ -291,6 +291,8 @@ contains
         do j = 2, ny-1
         do i = 2, nx-1 
             
+            H_ice_now = H_ice(i,j) 
+
 if (.TRUE.) then 
             ! Filter at the margin only 
             if (H_ice(i,j) .gt. 0.0 .and. count(H_ice(i-1:i+1,j-1:j+1) .eq. 0.0) .ge. 2) then
@@ -299,9 +301,6 @@ if (.TRUE.) then
                 filter = filter/sum(filter)
                 H_ice_now = sum(H_ice(i-1:i+1,j-1:j+1)*filter)
             end if
-
-else 
-            H_ice_now = H_ice(i,j) 
 end if 
 
             ! For floating points, calculate the approximate marine-shelf temperature 

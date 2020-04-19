@@ -178,7 +178,7 @@ contains
         ! Local variables
         integer :: k, nz  
         real(prec) :: exp1, exp2  
-        real(prec), parameter :: de_0 = 1.0e-6    ! [a^-1] Bueler and Brown (2009), Eq. 26
+        real(prec), parameter :: de_0 = 1.0e-6      ! [a^-1] Bueler and Brown (2009), Eq. 26
 
         nz = size(visc,3)
 
@@ -464,10 +464,10 @@ contains
 
         implicit none
         
-        type(strain_3D_class), intent(INOUT) :: strn                ! [a^-1] on aa-nodes (3D)
-        real(prec), intent(IN) :: vx(:,:,:)                         ! nx,ny,nz_aa
-        real(prec), intent(IN) :: vy(:,:,:)                         ! nx,ny,nz_aa
-        real(prec), intent(IN) :: vz(:,:,:)                         ! nx,ny,nz_ac
+        type(strain_3D_class), intent(INOUT) :: strn            ! [a^-1] on aa-nodes (3D)
+        real(prec), intent(IN) :: vx(:,:,:)                     ! nx,ny,nz_aa
+        real(prec), intent(IN) :: vy(:,:,:)                     ! nx,ny,nz_aa
+        real(prec), intent(IN) :: vz(:,:,:)                     ! nx,ny,nz_ac
         real(prec), intent(IN) :: H_ice(:,:)
         real(prec), intent(IN) :: f_grnd(:,:)
         real(prec), intent(IN) :: zeta_aa(:) 
@@ -488,11 +488,8 @@ contains
         real(prec) :: shear_squared  
         real(prec), allocatable :: fact_x(:,:), fact_y(:,:)
         real(prec), allocatable :: fact_z(:)
-        !real(prec), allocatable :: lxy(:), lyx(:), lxz(:), lzx(:), lyz(:), lzy(:)
-!         real(prec), allocatable :: shear_squared(:)
-        
-        real(prec), parameter :: epsi   = 1e-5
-        real(prec), parameter :: de_max = 0.5    ! [a^-1] 
+
+        real(prec), parameter :: de_max = 0.5                   ! [a^-1] 
 
         ! Determine sizes and allocate local variables 
         nx    = size(vx,1)
@@ -503,13 +500,6 @@ contains
         allocate(fact_x(nx,ny))
         allocate(fact_y(nx,ny))
         allocate(fact_z(nz_aa))
-!         allocate(lxy(nz_aa))
-!         allocate(lyx(nz_aa))
-!         allocate(lxz(nz_aa))
-!         allocate(lzx(nz_aa))
-!         allocate(lyz(nz_aa))
-!         allocate(lzy(nz_aa))
-!         allocate(shear_squared(nz_aa))
 
         ! Change arguments to local (sicopolis) variable names 
         dxi  = dx 
@@ -546,28 +536,17 @@ contains
         do j=1, ny
         do i=1, nx
 
-            im1 = max(i-1,1) 
-            ip1 = min(i+1,nx) 
-            jm1 = max(j-1,1) 
-            jp1 = min(j+1,ny) 
-            
-            if (H_ice(i,j) .eq. 0.0) then 
-                ! Ice-free, set all strain rate terms to zero 
+            if (H_ice(i,j) .gt. 0.0) then 
+                ! Grounded or floating ice present - calculate strain rate here
 
-                strn%dxx(i,j,:)     = 0.0
-                strn%dyy(i,j,:)     = 0.0
-                strn%dxy(i,j,:)     = 0.0
-                strn%dxz(i,j,:)     = 0.0
-                strn%dyz(i,j,:)     = 0.0
-                strn%dzz(i,j,:)     = 0.0
-                strn%de(i,j,:)      = 0.0
-                strn%f_shear(i,j,:) = 0.0
+                H_ice_inv = 1.0/H_ice(i,j)
 
-            else 
-                ! Grounded or floating ice present
-
-                H_ice_inv = 1.0/(abs(H_ice(i,j))+epsi)
-
+                ! Get neighbor indices
+                im1 = max(i-1,1) 
+                ip1 = min(i+1,nx) 
+                jm1 = max(j-1,1) 
+                jp1 = min(j+1,ny) 
+                
                 ! ====== Loop over each column ====== 
 
                 do k = 1, nz_aa 
@@ -616,8 +595,7 @@ contains
                                 *0.25*fact_y(i,j)
 
                     end if 
-                        
-
+                    
                     ! ====== Shear terms (lxz,lyz) ====== 
 
                     if (k .eq. 1) then 
@@ -675,7 +653,7 @@ contains
                     shear_squared  =   strn%dxz(i,j,k)*strn%dxz(i,j,k) &
                                      + strn%dyz(i,j,k)*strn%dyz(i,j,k)
 
-                    strn%de(i,j,k) =  sqrt( strn%dxx(i,j,k)*strn%dxx(i,j,k) &
+                    strn%de(i,j,k) =  sqrt(  strn%dxx(i,j,k)*strn%dxx(i,j,k) &
                                            + strn%dyy(i,j,k)*strn%dyy(i,j,k) &
                                            + strn%dxx(i,j,k)*strn%dyy(i,j,k) &
                                            + strn%dxy(i,j,k)*strn%dxy(i,j,k) &

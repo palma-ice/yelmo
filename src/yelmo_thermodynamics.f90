@@ -270,11 +270,9 @@ contains
 
         ! Local variables
         integer :: i, j, k, nx, ny, nz_aa, nz_ac  
-        real(prec), allocatable  :: uz_now(:)   ! [m a-1] Corrected vertical velocity 
         real(prec) :: T_shlf, H_grnd_lim, f_scalar, T_base  
-        !real(prec) :: H_ice_now 
+        real(prec) :: H_ice_now 
 
-        real(prec), allocatable :: H_ice_now(:,:) 
         real(prec) :: filter0(3,3), filter(3,3) 
 
         real(prec), parameter :: H_ice_thin = 10.0   ! [m] Threshold to define 'thin' ice
@@ -284,61 +282,35 @@ contains
         nz_aa = size(zeta_aa,1)
         nz_ac = size(zeta_ac,1)
 
-        allocate(H_ice_now(nx,ny))
-        allocate(uz_now(nz_ac))
-
-        ! First perform horizontal advection (this doesn't work properly, 
-        ! use column-based upwind horizontal advection below)
-        !call calc_enth_horizontal_advection_3D(T_ice,ux,uy,H_ice,dx,dt,solver_advec)
-        
-        ! Diagnose horizontal advection 
-!         advecxy3D = 0.0 
-!         do k = 2, nz_aa-1
-!             call calc_adv2D_impl_upwind_rate(advecxy3D(:,:,k),T_ice(:,:,k),ux(:,:,k),uy(:,:,k),H_ice*0.0,dx,dx,dt,f_upwind=1.0)
-!         end do 
-
-        ! Store original ice enthalpy field here for input to horizontal advection
-        ! calculations 
-!         enth_old  = enth 
-
-        ! === Get H_ice_now (with thicker margin points) ===
-        
         ! Initialize gaussian filter kernel 
         filter0 = gauss_values(dx,dx,sigma=2.0*dx,n=size(filter,1))
 
-        ! Store input ice thickness in local array 
-        H_ice_now = H_ice 
- 
-if (.TRUE.) then        
+        ! ===================================================
+
+        !$omp parallel do
         do j = 2, ny-1
         do i = 2, nx-1 
             
+if (.TRUE.) then 
             ! Filter at the margin only 
             if (H_ice(i,j) .gt. 0.0 .and. count(H_ice(i-1:i+1,j-1:j+1) .eq. 0.0) .ge. 2) then
                 filter = filter0 
                 where (H_ice(i-1:i+1,j-1:j+1) .eq. 0.0) filter = 0.0 
                 filter = filter/sum(filter)
-                H_ice_now(i,j) = sum(H_ice(i-1:i+1,j-1:j+1)*filter)
+                H_ice_now = sum(H_ice(i-1:i+1,j-1:j+1)*filter)
             end if
-     
-        end do 
-        end do
+
+else 
+            H_ice_now = H_ice(i,j) 
 end if 
 
-        ! ===================================================
-
-        ! ajr: parallelization here is problematic, disabled for now
-        !!!$omp parallel do
-        do j = 2, ny-1
-        do i = 2, nx-1 
-            
             ! For floating points, calculate the approximate marine-shelf temperature 
             ! ajr, later this should come from an external model, and T_shlf would
             ! be the boundary variable directly
             if (f_grnd(i,j) .lt. 1.0) then 
 
                 ! Calculate approximate marine freezing temp, limited to pressure melting point 
-                T_shlf = calc_T_base_shlf_approx(H_ice_now(i,j),T_pmp(i,j,1),H_grnd(i,j))
+                T_shlf = calc_T_base_shlf_approx(H_ice_now,T_pmp(i,j,1),H_grnd(i,j))
 
             else 
                 ! Assigned for safety 
@@ -347,7 +319,7 @@ end if
 
             end if 
 
-            if (H_ice_now(i,j) .le. H_ice_thin) then 
+            if (H_ice_now .le. H_ice_thin) then 
                 ! Ice is too thin or zero: prescribe linear temperature profile
                 ! between temperate ice at base and surface temperature 
                 ! (accounting for floating/grounded nature via T_base)
@@ -370,32 +342,17 @@ end if
             else 
                 ! Thick ice exists, call thermodynamic solver for the column
 
-                ! Pre-calculate the contribution of horizontal advection to column solution
-                ! (use unmodified enth_old field as input, to avoid mixing with new solution)
-!                 call calc_advec_horizontal_column(advecxy,enth_old,H_ice_now,z_srf,ux,uy,zeta_aa,dx,i,j)
-!                 call calc_advec_horizontal_column_quick(advecxy,enth_old,H_ice_now,ux,uy,dx,i,j)
-!                 do k = 1, nz_aa
-!                     call calc_adv2D_expl_rate(advecxy(k),enth_old(:,:,k),ux(:,:,k),uy(:,:,k),dx,dx,i,j)
-!                 end do 
-                !advecxy = advecxy3D(i,j,:)
-                !advecxy = 0.0_prec 
-!                 write(*,*) "advecxy: ", i,j, maxval(abs(advecxy3D(i,j,:)-advecxy))
-                
-                ! Calculate correction to vertical velocity due to horizontal gradient on vertical sigma-coordinate grid
-!                 call calc_advec_vertical_column_correction(uz_now,H_ice_now,z_srf,dHdt,dzsdt,ux,uy,uz,zeta_ac,dx,i,j)
-                uz_now = uz(i,j,:) 
-
                 if (trim(solver) .eq. "enth") then 
 
                     call calc_enth_column(enth(i,j,:),T_ice(i,j,:),omega(i,j,:),bmb_grnd(i,j),Q_ice_b(i,j),H_cts(i,j), &
-                            T_pmp(i,j,:),cp(i,j,:),kt(i,j,:),advecxy(i,j,:),uz_now,Q_strn(i,j,:),Q_b(i,j),Q_geo(i,j),T_srf(i,j), &
-                            T_shlf,H_ice_now(i,j),H_w(i,j),f_grnd(i,j),zeta_aa,zeta_ac,dzeta_a,dzeta_b,cr,omega_max,T0,dt)
+                            T_pmp(i,j,:),cp(i,j,:),kt(i,j,:),advecxy(i,j,:),uz(i,j,:),Q_strn(i,j,:),Q_b(i,j),Q_geo(i,j),T_srf(i,j), &
+                            T_shlf,H_ice_now,H_w(i,j),f_grnd(i,j),zeta_aa,zeta_ac,dzeta_a,dzeta_b,cr,omega_max,T0,dt)
                 
                 else 
 
                     call calc_temp_column(enth(i,j,:),T_ice(i,j,:),omega(i,j,:),bmb_grnd(i,j),Q_ice_b(i,j),H_cts(i,j), &
-                        T_pmp(i,j,:),cp(i,j,:),kt(i,j,:),advecxy(i,j,:),uz_now,Q_strn(i,j,:),Q_b(i,j),Q_geo(i,j),T_srf(i,j), &
-                        T_shlf,H_ice_now(i,j),H_w(i,j),f_grnd(i,j),zeta_aa,zeta_ac,dzeta_a,dzeta_b,omega_max,T0,dt)
+                        T_pmp(i,j,:),cp(i,j,:),kt(i,j,:),advecxy(i,j,:),uz(i,j,:),Q_strn(i,j,:),Q_b(i,j),Q_geo(i,j),T_srf(i,j), &
+                        T_shlf,H_ice_now,H_w(i,j),f_grnd(i,j),zeta_aa,zeta_ac,dzeta_a,dzeta_b,omega_max,T0,dt)
                 
                 end if 
 
@@ -403,7 +360,7 @@ end if
 
         end do 
         end do 
-        !!!$omp end parallel do
+        !$omp end parallel do
 
         ! Fill in borders 
         call fill_borders_3D(enth,nfill=1)

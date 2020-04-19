@@ -294,7 +294,7 @@ contains
             
             H_ice_now = H_ice(i,j) 
 
-if (.TRUE.) then 
+if (.FALSE.) then 
             ! Filter at the margin only 
             if (H_ice(i,j) .gt. 0.0 .and. count(H_ice(i-1:i+1,j-1:j+1) .eq. 0.0) .ge. 2) then
                 filter = filter0 

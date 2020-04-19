@@ -287,7 +287,8 @@ contains
 
         ! ===================================================
 
-        !$omp parallel do
+        ! ajr: openmp problematic here - leads to NaNs
+        !!!$omp parallel do
         do j = 2, ny-1
         do i = 2, nx-1 
             
@@ -359,7 +360,7 @@ end if
 
         end do 
         end do 
-        !$omp end parallel do
+        !!!$omp end parallel do
 
         ! Fill in borders 
         call fill_borders_3D(enth,nfill=1)

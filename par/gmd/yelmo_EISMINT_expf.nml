@@ -121,7 +121,7 @@
 
 &ymat
     flow_law                = "glen"        ! Only "glen" is possible right now
-    rf_method               = 0             ! -1: set externally; 0: rf_const everywhere; 1: standard function 
+    rf_method               = 1             ! -1: set externally; 0: rf_const everywhere; 1: standard function 
     rf_const                = 1e-16         ! [Pa^-3 a^-1] Constant value for rf when rf_method=0
     rf_use_eismint2         = True          ! Only applied for rf_method=1
     rf_with_water           = False         ! Only applied for rf_method=1, scale rf by water content?

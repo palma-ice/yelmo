@@ -484,9 +484,10 @@ contains
         real(prec) :: abs_v_ssa_inv, nx1, ny1
         real(prec) :: shear_x_help, shear_y_help
         real(prec) :: f_shear_help
+        real(prec) :: lxy, lyx, lxz, lzx, lyz, lzy 
         real(prec), allocatable :: fact_x(:,:), fact_y(:,:)
         real(prec), allocatable :: fact_z(:)
-        real(prec), allocatable :: lxy(:), lyx(:), lxz(:), lzx(:), lyz(:), lzy(:)
+        !real(prec), allocatable :: lxy(:), lyx(:), lxz(:), lzx(:), lyz(:), lzy(:)
         real(prec), allocatable :: shear_squared(:)
         
         real(prec), parameter :: epsi   = 1e-5
@@ -501,12 +502,12 @@ contains
         allocate(fact_x(nx,ny))
         allocate(fact_y(nx,ny))
         allocate(fact_z(nz_aa))
-        allocate(lxy(nz_aa))
-        allocate(lyx(nz_aa))
-        allocate(lxz(nz_aa))
-        allocate(lzx(nz_aa))
-        allocate(lyz(nz_aa))
-        allocate(lzy(nz_aa))
+!         allocate(lxy(nz_aa))
+!         allocate(lyx(nz_aa))
+!         allocate(lxz(nz_aa))
+!         allocate(lzx(nz_aa))
+!         allocate(lyz(nz_aa))
+!         allocate(lzy(nz_aa))
         allocate(shear_squared(nz_aa))
 
         ! Change arguments to local (sicopolis) variable names 
@@ -540,7 +541,7 @@ contains
 
         !-------- Computation --------
 
-        !!!$omp parallel do
+        !$omp parallel do
         do j=1, ny
         do i=1, nx
 
@@ -566,10 +567,13 @@ contains
 
                 H_ice_inv = 1.0/(abs(H_ice(i,j))+epsi)
 
-                ! ====== Horizontal gradients (dxx,dyy,lxy,lyx) ======
+                ! ====== Loop over each column ====== 
 
-                ! Full column from base to surface 
                 do k = 1, nz_aa 
+
+                    ! ====== Horizontal gradients (dxx,dyy,lxy,lyx) ======
+
+                    ! Full column from base to surface  
                     strn%dxx(i,j,k) = (vx(i,j,k)-vx(im1,j,k))*fact_x(i,j)
                     strn%dyy(i,j,k) = (vy(i,j,k)-vy(i,jm1,k))*fact_y(i,j)
 
@@ -577,96 +581,98 @@ contains
                     if (abs(strn%dxx(i,j,k)) .lt. tol_underflow) strn%dxx(i,j,k) = 0.0 
                     if (abs(strn%dyy(i,j,k)) .lt. tol_underflow) strn%dyy(i,j,k) = 0.0 
                     
-                    lxy(k) = (  (vx(i,jp1,k)+vx(im1,jp1,k))   &
-                              - (vx(i,jm1,k)+vx(im1,jm1,k)) ) &
-                             *0.25*fact_y(i,j)
+                    lxy = (  (vx(i,jp1,k)+vx(im1,jp1,k))   &
+                           - (vx(i,jm1,k)+vx(im1,jm1,k)) ) &
+                            *0.25*fact_y(i,j)
 
-                    lyx(k) = (  (vy(ip1,j,k)+vy(ip1,jm1,k))   &
-                              - (vy(im1,j,k)+vy(im1,jm1,k)) ) &
-                             *0.25*fact_x(i,j)
-                end do 
+                    lyx = (  (vy(ip1,j,k)+vy(ip1,jm1,k))   &
+                           - (vy(im1,j,k)+vy(im1,jm1,k)) ) &
+                            *0.25*fact_x(i,j)
 
-                ! ====== Vertical cross terms (lzx,lzy) ====== 
+                    ! ====== Vertical cross terms (lzx,lzy) ====== 
 
-                ! Basal layer
-                k = 1
-                lzx(k) = (vz(ip1,j,k)-vz(im1,j,k))*0.5*fact_x(i,j)
-                lzy(k) = (vz(i,jp1,k)-vz(i,jm1,k))*0.5*fact_y(i,j)
+                    if (k .eq. 1) then
+                        ! Basal layer
 
-                ! Intermediate layers 
-                do k = 2, nz_aa-1
-                    lzx(k) = (  (vz(ip1,j,k)+vz(ip1,j,k-1))   &
-                              - (vz(im1,j,k)+vz(im1,j,k-1)) ) &
-                             *0.25*fact_x(i,j)
+                        lzx = (vz(ip1,j,k)-vz(im1,j,k))*0.5*fact_x(i,j)
+                        lzy = (vz(i,jp1,k)-vz(i,jm1,k))*0.5*fact_y(i,j)
 
-                    lzy(k) = (  (vz(i,jp1,k)+vz(i,jp1,k-1))   &
-                              - (vz(i,jm1,k)+vz(i,jm1,k-1)) ) &
-                             *0.25*fact_y(i,j)
-                end do 
+                    else if (k .eq. nz_aa) then 
+                        ! Surface layer
 
-                ! Surface layer 
-                k = nz_aa
-                lzx(k) = (vz(ip1,j,k-1)-vz(im1,j,k-1))*0.5*fact_x(i,j)
-                lzy(k) = (vz(i,jp1,k-1)-vz(i,jm1,k-1))*0.5*fact_y(i,j)
+                        lzx = (vz(ip1,j,k-1)-vz(im1,j,k-1))*0.5*fact_x(i,j)
+                        lzy = (vz(i,jp1,k-1)-vz(i,jm1,k-1))*0.5*fact_y(i,j)
 
+                    else 
+                        ! Intermediate layers 
 
-                ! ====== Shear terms (lxz,lyz) ====== 
+                        lzx = (  (vz(ip1,j,k)+vz(ip1,j,k-1))   &
+                               - (vz(im1,j,k)+vz(im1,j,k-1)) ) &
+                                *0.25*fact_x(i,j)
 
-                ! Basal layer
-                k = 1
+                        lzy = (  (vz(i,jp1,k)+vz(i,jp1,k-1))   &
+                               - (vz(i,jm1,k)+vz(i,jm1,k-1)) ) &
+                                *0.25*fact_y(i,j)
 
-                ! Gradient from first aa-node above base to base 
-                lxz(k) = (  (vx(i,j,k+1)+vx(im1,j,k+1))   &
-                          - (vx(i,j,  k)+vx(im1,j,  k)) ) &
-                         *0.5*fact_z(k)*H_ice_inv
+                    end if 
+                        
 
-                lyz(k) = (  (vy(i,j,k+1)+vy(i,jm1,k+1))   &
-                          - (vy(i,j,  k)+vy(i,jm1,  k)) ) &
-                         *0.5*fact_z(k)*H_ice_inv
+                    ! ====== Shear terms (lxz,lyz) ====== 
 
-                ! Intermediate layers
-                do k = 2, nz_aa-1
-                     
-                    ! Gradient from aa-node above to aa-node below
-                    lxz(k) = (  (vx(i,j,k+1)+vx(im1,j,k+1))   &
-                              - (vx(i,j,k-1)+vx(im1,j,k-1)) ) &
-                             *0.5*fact_z(k)*H_ice_inv
+                    if (k .eq. 1) then 
+                        ! Basal layer
 
-                    lyz(k) = (  (vy(i,j,k+1)+vy(i,jm1,k+1))   &
-                              - (vy(i,j,k-1)+vy(i,jm1,k-1)) ) &
-                             *0.5*fact_z(k)*H_ice_inv 
+                        ! Gradient from first aa-node above base to base 
+                        lxz = (  (vx(i,j,k+1)+vx(im1,j,k+1))   &
+                               - (vx(i,j,  k)+vx(im1,j,  k)) ) &
+                                *0.5*fact_z(k)*H_ice_inv
 
-                end do
-                
-                ! Surface layer
-                ! Gradient from surface to first aa-node below surface 
-                k = nz_aa
-                lxz(k) = (  (vx(i,j,  k)+vx(im1,j,  k))   &
-                          - (vx(i,j,k-1)+vx(im1,j,k-1)) ) &
-                         *0.5*fact_z(k)*H_ice_inv
+                        lyz = (  (vy(i,j,k+1)+vy(i,jm1,k+1))   &
+                               - (vy(i,j,  k)+vy(i,jm1,  k)) ) &
+                                *0.5*fact_z(k)*H_ice_inv
 
-                lyz(k) = (  (vy(i,j,  k)+vy(i,jm1,  k))   &
-                          - (vy(i,j,k-1)+vy(i,jm1,k-1)) ) &
-                         *0.5*fact_z(k)*H_ice_inv
+                    else if (k .eq. nz_aa) then 
+                        ! Surface layer
 
-                ! ====== Calculate column of cross terms from intermediate values (dxy,dxz,dyz) ====== 
+                        ! Gradient from surface to first aa-node below surface 
+                        lxz = (  (vx(i,j,  k)+vx(im1,j,  k))   &
+                               - (vx(i,j,k-1)+vx(im1,j,k-1)) ) &
+                                *0.5*fact_z(k)*H_ice_inv
 
-                strn%dxy(i,j,:) = 0.5*(lxy+lyx)
-                strn%dxz(i,j,:) = 0.5*(lxz+lzx)
-                strn%dyz(i,j,:) = 0.5*(lyz+lzy)
+                        lyz = (  (vy(i,j,  k)+vy(i,jm1,  k))   &
+                               - (vy(i,j,k-1)+vy(i,jm1,k-1)) ) &
+                                *0.5*fact_z(k)*H_ice_inv
 
-                ! Avoid underflows 
-                where (abs(strn%dxy(i,j,:)) .lt. tol_underflow) strn%dxy(i,j,:) = 0.0 
-                where (abs(strn%dxz(i,j,:)) .lt. tol_underflow) strn%dxz(i,j,:) = 0.0 
-                where (abs(strn%dyz(i,j,:)) .lt. tol_underflow) strn%dyz(i,j,:) = 0.0 
+                    else 
+                        ! Intermediate layers
+
+                        ! Gradient from aa-node above to aa-node below
+                        lxz = (  (vx(i,j,k+1)+vx(im1,j,k+1))   &
+                               - (vx(i,j,k-1)+vx(im1,j,k-1)) ) &
+                                *0.5*fact_z(k)*H_ice_inv
+
+                        lyz = (  (vy(i,j,k+1)+vy(i,jm1,k+1))   &
+                               - (vy(i,j,k-1)+vy(i,jm1,k-1)) ) &
+                                *0.5*fact_z(k)*H_ice_inv 
+
+                    end if 
+
+                    ! ====== Calculate cross terms from intermediate values (dxy,dxz,dyz) ====== 
+
+                    strn%dxy(i,j,k) = 0.5*(lxy+lyx)
+                    strn%dxz(i,j,k) = 0.5*(lxz+lzx)
+                    strn%dyz(i,j,k) = 0.5*(lyz+lzy)
+
+                    ! Avoid underflows 
+                    if (abs(strn%dxy(i,j,k)) .lt. tol_underflow) strn%dxy(i,j,k) = 0.0 
+                    if (abs(strn%dxz(i,j,k)) .lt. tol_underflow) strn%dxz(i,j,k) = 0.0 
+                    if (abs(strn%dyz(i,j,k)) .lt. tol_underflow) strn%dyz(i,j,k) = 0.0 
     
-                ! ====== Finished calculating individual strain rate terms ====== 
+                    ! ====== Finished calculating individual strain rate terms ====== 
                 
-                ! Calculate the shear-based strain, stretching and the shear-fraction
-                do k = 1, nz_aa
-
-                    shear_squared(k) =   strn%dxz(i,j,k)*strn%dxz(i,j,k) &
-                                       + strn%dyz(i,j,k)*strn%dyz(i,j,k)
+                    ! Calculate the shear-based strain, stretching and the shear-fraction
+                    shear_squared(k)  =   strn%dxz(i,j,k)*strn%dxz(i,j,k) &
+                                        + strn%dyz(i,j,k)*strn%dyz(i,j,k)
 
                     strn%de(i,j,k)    =  sqrt(   strn%dxx(i,j,k)*strn%dxx(i,j,k) &
                                                + strn%dyy(i,j,k)*strn%dyy(i,j,k) &
@@ -686,24 +692,23 @@ contains
                         strn%f_shear(i,j,k) = 1.0   ! Shearing by default for low strain rates
                     end if 
 
-                end do
+                    !  ------ Modification of the shear fraction for floating ice (ice shelves)
 
-                !  ------ Modification of the shear fraction for floating ice (ice shelves)
+                    if (f_grnd(i,j) .eq. 0.0) then 
+                        strn%f_shear(i,j,k) = 0.0    ! Assume ice shelf is only stretching, no shear 
+                    end if 
 
-                if (f_grnd(i,j) .eq. 0.0) then 
-                    strn%f_shear(i,j,:) = 0.0    ! Assume ice shelf is only stretching, no shear 
-                end if 
+                    !  ------ Constrain the shear fraction to reasonable [0,1] interval
 
-                !  ------ Constrain the shear fraction to reasonable [0,1] interval
+                    strn%f_shear(i,j,:) = min(max(strn%f_shear(i,j,k), 0.0), 1.0)
 
-                strn%f_shear(i,j,:) = min(max(strn%f_shear(i,j,:), 0.0), 1.0)
-
+                end do 
 
             end if ! ice-free or ice-covered 
 
         end do
         end do
-        !!!$omp end parallel do
+        !$omp end parallel do
 
         return 
 

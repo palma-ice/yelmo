@@ -35,6 +35,10 @@ contains
 
                 call calc_adv2D_expl(var,ux,uy,var_dot,dx,dy,dt)
 
+            case("expl-upwind")
+
+                call calc_adv2D_expl_upwind(var,ux,uy,var_dot,dx,dy,dt)
+
             case("impl-upwind") 
 
                 call calc_adv2D_impl_upwind(var,ux,uy,var_dot,dx,dy,dt,f_upwind=1.0_prec)
@@ -70,8 +74,8 @@ contains
         !
         ! ajr: adapted from IMAU-ICE code from Heiko Goelzer (h.goelzer@uu.nl) 2016
         ! Note: original algorithm called for interpolation of H_ice to ab-nodes explicitly. 
-        ! It also works using the ac-nodes directly, but is less stable. This can be chosen via the parameter
-        ! use_ab_expl. 
+        ! It also works using the ac-nodes directly, but is less stable, particularly
+        ! for EISMINT2-expf. 
 
         implicit none 
 
@@ -92,9 +96,6 @@ contains
         real(prec), allocatable :: dHdt(:,:)                ! [m] aa-nodes, Total change this timestep due to fluxes divergence and mdot 
         real(prec), allocatable :: H_ice_ab(:,:)            ! [m] ab-nodes, Ice thickness on staggered grid ab
 
-        logical, parameter :: use_ab_expl = .FALSE.         ! Explicitly calculate ice thickness on ab nodes?
-                                                            ! (ajr: this may be more stable, follows Macayeal staggering) 
-
         real(prec), parameter :: dHdt_lim = 1e3             ! [m a-1] Maximum rate of change allowed (high value for extreme changes)
 
         nx = size(H_ice,1)
@@ -104,57 +105,30 @@ contains
         allocate(dHdt(nx,ny))
         dHdt = 0.0_prec 
 
-        if (use_ab_expl) then 
-            ! Use explicit calculation of H_ice on ab-nodes 
+        allocate(H_ice_ab(nx,ny))
 
-            allocate(H_ice_ab(nx,ny))
+        ! Stagger ice thickness to ab-nodes 
+        H_ice_ab = stagger_aa_ab(H_ice)
 
-            ! Stagger ice thickness to ab-nodes 
-            H_ice_ab = stagger_aa_ab(H_ice)
+        do i = 2,nx-1
+        do j = 2,ny-1
 
-            do i = 2,nx-1
-            do j = 2,ny-1
+            ! Calculate the flux across each boundary [m^2 a^-1]
+            flux_xr = ux(i  ,j  ) * 0.5 * (H_ice_ab(i  ,j  ) + H_ice_ab(i  ,j-1))
+            flux_xl = ux(i-1,j  ) * 0.5 * (H_ice_ab(i-1,j  ) + H_ice_ab(i-1,j-1))
+            flux_yu = uy(i  ,j  ) * 0.5 * (H_ice_ab(i  ,j  ) + H_ice_ab(i-1,j  ))
+            flux_yd = uy(i  ,j-1) * 0.5 * (H_ice_ab(i  ,j-1) + H_ice_ab(i-1,j-1))
 
-                ! Calculate the flux across each boundary [m^2 a^-1]
-                flux_xr = ux(i  ,j  ) * 0.5 * (H_ice_ab(i  ,j  ) + H_ice_ab(i  ,j-1))
-                flux_xl = ux(i-1,j  ) * 0.5 * (H_ice_ab(i-1,j  ) + H_ice_ab(i-1,j-1))
-                flux_yu = uy(i  ,j  ) * 0.5 * (H_ice_ab(i  ,j  ) + H_ice_ab(i-1,j  ))
-                flux_yd = uy(i  ,j-1) * 0.5 * (H_ice_ab(i  ,j-1) + H_ice_ab(i-1,j-1))
+            ! Calculate flux divergence on aa-nodes 
+            dHdt(i,j) = (1.0 / dx) * (flux_xl - flux_xr) + (1.0 / dy) * (flux_yd - flux_yu)
 
-                ! Calculate flux divergence on aa-nodes 
-                dHdt(i,j) = (1.0 / dx) * (flux_xl - flux_xr) + (1.0 / dy) * (flux_yd - flux_yu)
-
-                ! Limit dHdt for stability 
-                if (dHdt(i,j) .lt. -dHdt_lim) dHdt(i,j) = -dHdt_lim 
-                if (dHdt(i,j) .gt.  dHdt_lim) dHdt(i,j) =  dHdt_lim 
-                
-            end do
-            end do
-
-        else 
-            ! Calculate fluxes on ac-nodes directly 
+            ! Limit dHdt for stability 
+            if (dHdt(i,j) .lt. -dHdt_lim) dHdt(i,j) = -dHdt_lim 
+            if (dHdt(i,j) .gt.  dHdt_lim) dHdt(i,j) =  dHdt_lim 
             
-            do i = 2,nx-1
-            do j = 2,ny-1
+        end do
+        end do
 
-                ! Calculate the flux across each boundary [m^2 a^-1]
-                flux_xr = ux(i  ,j  ) * 0.5 * (H_ice(i  ,j  ) + H_ice(i+1,j  ))
-                flux_xl = ux(i-1,j  ) * 0.5 * (H_ice(i-1,j  ) + H_ice(i  ,j  ))
-                flux_yu = uy(i  ,j  ) * 0.5 * (H_ice(i  ,j  ) + H_ice(i  ,j+1))
-                flux_yd = uy(i  ,j-1) * 0.5 * (H_ice(i  ,j-1) + H_ice(i  ,j  ))
-
-                ! Calculate flux divergence on aa-nodes 
-                dHdt(i,j) = (1.0 / dx) * (flux_xl - flux_xr) + (1.0 / dy) * (flux_yd - flux_yu)
-
-                ! Limit dHdt for stability 
-                if (dHdt(i,j) .lt. -dHdt_lim) dHdt(i,j) = -dHdt_lim 
-                if (dHdt(i,j) .gt.  dHdt_lim) dHdt(i,j) =  dHdt_lim 
-                
-            end do
-            end do
-
-        end if 
-        
         ! Update H_ice:
         H_ice = H_ice + dt*dHdt
 
@@ -171,7 +145,96 @@ contains
         return 
 
     end subroutine calc_adv2D_expl
-    
+
+    subroutine calc_adv2D_expl_upwind(H_ice, ux, uy, mdot, dx, dy, dt)
+        ! Solve 2D advection equation for ice sheet thickness via explicit flux divergence:
+        ! d[H]/dt = -grad[H*(ux,uy)] + mdot 
+
+        ! Second-order upwind routine, see eg, Winkelmann et al (2011), Eq. 18 
+        
+        implicit none 
+
+        real(prec), intent(INOUT) :: H_ice(:,:)             ! [m] aa-nodes, Ice thickness 
+        real(prec), intent(IN)    :: ux(:,:)                ! [m a^-1] ac-nodes, Horizontal velocity, x-direction
+        real(prec), intent(IN)    :: uy(:,:)                ! [m a^-1] ac-nodes, Horizontal velocity, y-direction
+        real(prec), intent(IN)    :: mdot(:,:)              ! [m a^-1] aa-nodes, Source term, net rate of change at top and bottom of cell (no vertical advection) 
+        real(prec), intent(IN)    :: dx                     ! [m] Horizontal grid spacing, x-direction
+        real(prec), intent(IN)    :: dy                     ! [m] Horizontal grid spacing, y-direction
+        real(prec), intent(IN)    :: dt                     ! [a] Timestep 
+
+        ! Local variables:
+        integer    :: i, j, nx, ny 
+        real(prec) :: H_now 
+        real(prec) :: flux_xr                               ! [m^2 a^-1] ac-nodes, Flux in the x-direction to the right
+        real(prec) :: flux_xl                               ! [m^2 a^-1] ac-nodes, Flux in the x-direction to the left
+        real(prec) :: flux_yu                               ! [m^2 a^-1] ac-nodes, Flux in the y-direction upwards
+        real(prec) :: flux_yd                               ! [m^2 a^-1] ac-nodes, Flux in the y-direction downwards
+        real(prec), allocatable :: dHdt(:,:)                ! [m] aa-nodes, Total change this timestep due to fluxes divergence and mdot 
+
+        real(prec), parameter :: dHdt_lim = 1e3             ! [m a-1] Maximum rate of change allowed (high value for extreme changes)
+
+        nx = size(H_ice,1)
+        ny = size(H_ice,2)
+
+        ! Initialize dHdt 
+        allocate(dHdt(nx,ny))
+        dHdt = 0.0_prec 
+
+        do i = 2,nx-1
+        do j = 2,ny-1
+
+            ! Calculate the flux across each boundary [m^2 a^-1]
+            if (ux(i,j) .gt. 0.0) then 
+                flux_xr = ux(i,j)*H_ice(i,j)
+            else
+                flux_xr = ux(i,j)*H_ice(i+1,j) 
+            end if 
+
+            if (ux(i-1,j) .gt. 0.0) then 
+                flux_xl = ux(i-1,j)*H_ice(i-1,j)
+            else
+                flux_xl = ux(i-1,j)*H_ice(i,j) 
+            end if 
+
+            if (uy(i,j) .gt. 0.0) then 
+                flux_yu = uy(i,j)*H_ice(i,j)
+            else
+                flux_yu = uy(i,j)*H_ice(i,j+1) 
+            end if 
+
+            if (uy(i,j-1) .gt. 0.0) then 
+                flux_yd = uy(i,j-1)*H_ice(i,j-1)
+            else
+                flux_yd = uy(i,j-1)*H_ice(i,j) 
+            end if 
+
+            ! Calculate flux divergence on aa-nodes 
+            dHdt(i,j) = (1.0 / dx) * (flux_xl - flux_xr) + (1.0 / dy) * (flux_yd - flux_yu)
+
+            ! Limit dHdt for stability 
+            if (dHdt(i,j) .lt. -dHdt_lim) dHdt(i,j) = -dHdt_lim 
+            if (dHdt(i,j) .gt.  dHdt_lim) dHdt(i,j) =  dHdt_lim 
+            
+        end do
+        end do
+
+        ! Update H_ice:
+        H_ice = H_ice + dt*dHdt
+
+        ! Corners
+        ! BL
+        H_ice(1,1)   = H_ice(2,1)+H_ice(1,2)-H_ice(2,2)
+        ! BR
+        H_ice(nx,1)  = H_ice(nx-1,1)+H_ice(nx,2)-H_ice(nx-1,2)
+        ! TL
+        H_ice(1,ny)  = H_ice(2,ny)+H_ice(1,ny-1)-H_ice(2,ny-1)
+        ! BL
+        H_ice(nx,ny) = H_ice(nx-1,ny)+H_ice(nx,ny-1)-H_ice(nx-1,ny-1)
+
+        return 
+
+    end subroutine calc_adv2D_expl_upwind
+
     subroutine  calc_adv2D_impl_upwind(H,ux,uy,mdot,dx,dy,dt,f_upwind)
         ! To solve the 2D adevection equation:
         ! dH/dt =

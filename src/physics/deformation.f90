@@ -156,7 +156,7 @@ contains
 
     function calc_viscosity_glen(de,ATT,n_glen,visc_min) result(visc)
         ! Calculate viscosity based on Glen's flow law 
-        ! ATT [a^-1 Pa^-3] is the "depth dependent ice stiffness parameter based on
+        ! ATT [a^-1 Pa^-n] is the "depth dependent ice stiffness parameter based on
         !     vertical variations in temperature, chemistry and crystal fabric" (MacAyeal, 1989, JGR)
         ! de [a^-1] is the second-invariant of the strain rate tensor 
         ! visc [Pa a] is the 3D, temperature dependent viscosity field 
@@ -392,7 +392,7 @@ contains
         do j = 2, ny-1
         do i = 2, nx-1
             
-            ! Strain rates should be returned on central Aa nodes
+            ! Strain rates should be returned on central aa-nodes
             
             ! Note: in Grisli-version8-chris, the cross terms dudy/dvdx were
             ! calculated on the 'noeud mineur': Ab nodes. However, this results
@@ -425,7 +425,7 @@ contains
         
     end subroutine calc_strain_rate_2D
     
-    subroutine calc_strain_rate_3D(strn,vx,vy,vz,H_ice,f_grnd,zeta_aa,zeta_ac,dx)
+    subroutine calc_strain_rate_3D(strn,vx,vy,vz,H_ice,f_grnd,zeta_aa,zeta_ac,dx,de_max)
 
         implicit none
          
@@ -438,6 +438,7 @@ contains
         real(prec), intent(IN) :: zeta_aa(:) 
         real(prec), intent(IN) :: zeta_ac(:) 
         real(prec), intent(IN) :: dx 
+        real(prec), intent(IN) :: de_max 
 
         ! Local variables 
         real(prec) :: dy  
@@ -445,13 +446,13 @@ contains
         dy = dx 
 
         ! Calculate 3D strain rate
-        call calc_dxyz(strn,vx,vy,vz,H_ice,f_grnd,zeta_aa,zeta_ac,dx,dy)
+        call calc_dxyz(strn,vx,vy,vz,H_ice,f_grnd,zeta_aa,zeta_ac,dx,dy,de_max)
         
         return 
 
     end subroutine calc_strain_rate_3D
 
-    subroutine calc_dxyz(strn, vx, vy, vz, H_ice, f_grnd, zeta_aa, zeta_ac, dx, dy)
+    subroutine calc_dxyz(strn, vx, vy, vz, H_ice, f_grnd, zeta_aa, zeta_ac, dx, dy, de_max)
         ! -------------------------------------------------------------------------------
         !  Computation of all components of the strain-rate tensor, the full
         !  effective strain rate and the shear fraction.
@@ -472,8 +473,10 @@ contains
         real(prec), intent(IN) :: f_grnd(:,:)
         real(prec), intent(IN) :: zeta_aa(:) 
         real(prec), intent(IN) :: zeta_ac(:) 
-        real(prec), intent(IN) :: dx, dy
-
+        real(prec), intent(IN) :: dx
+        real(prec), intent(IN) :: dy
+        real(prec), intent(IN) :: de_max                        ! [a^-1] Maximum allowed effective strain rate
+        
         ! Local variables 
         integer    :: i, j, k
         integer    :: im1, ip1, jm1, jp1 
@@ -488,8 +491,6 @@ contains
         real(prec) :: shear_squared  
         real(prec), allocatable :: fact_x(:,:), fact_y(:,:)
         real(prec), allocatable :: fact_z(:)
-
-        real(prec), parameter :: de_max = 0.5                   ! [a^-1] 
 
         ! Determine sizes and allocate local variables 
         nx    = size(vx,1)

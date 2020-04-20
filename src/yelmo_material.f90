@@ -89,7 +89,7 @@ contains
             ! 3D strain rate - standard 
 
             call calc_strain_rate_3D(mat%now%strn,dyn%now%ux,dyn%now%uy,dyn%now%uz,tpo%now%H_ice, &
-                                     tpo%now%f_grnd,mat%par%zeta_aa,mat%par%zeta_ac,mat%par%dx)
+                                     tpo%now%f_grnd,mat%par%zeta_aa,mat%par%zeta_ac,mat%par%dx,mat%par%de_max)
 
 
             ! And get the vertical average of shear
@@ -311,6 +311,7 @@ contains
         call nml_read(filename,"ymat","rf_with_water",          par%rf_with_water,          init=init_pars)
         call nml_read(filename,"ymat","n_glen",                 par%n_glen,                 init=init_pars)
         call nml_read(filename,"ymat","visc_min",               par%visc_min,               init=init_pars)
+        call nml_read(filename,"ymat","de_max",                 par%de_max,                 init=init_pars)
         call nml_read(filename,"ymat","enh_method",             par%enh_method,             init=init_pars)
         call nml_read(filename,"ymat","enh_shear",              par%enh_shear,              init=init_pars)
         call nml_read(filename,"ymat","enh_stream",             par%enh_stream,             init=init_pars)

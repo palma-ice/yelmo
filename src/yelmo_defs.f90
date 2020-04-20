@@ -335,6 +335,7 @@ module yelmo_defs
         logical             :: rf_with_water 
         real(prec)          :: n_glen                       ! Flow law exponent (n_glen=3)
         real(prec)          :: visc_min  
+        real(prec)          :: de_max 
         character(len=56)   :: enh_method  
         real(prec)          :: enh_shear
         real(prec)          :: enh_stream
@@ -756,7 +757,7 @@ contains
             write(*,*) "yelmo_global_init:: openmp is not active, Yelmo will run on 1 thread."
 
         end if 
-        
+
         ! Load parameter values 
 
         call nml_read(filename,"yelmo_config","yelmo_log",yelmo_log,init=init_pars)

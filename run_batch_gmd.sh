@@ -1,6 +1,6 @@
 #!/bin/bash
 
-fldr = 'output/test'
+fldr='tmp/yelmo995'
 
 
 ### BENCHMARK TESTS ###

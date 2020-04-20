@@ -40,7 +40,7 @@
 /
 
 &ytopo
-    solver            = "expl-upwind"   ! "expl", "expl-upwind", "impl-upwind"
+    solver            = "expl"          ! "expl", "expl-upwind", "impl-upwind"
     calv_method       = "zero"          ! "zero", "simple", "flux", "kill"
     surf_gl_method    = 0               ! 0: binary (max grnd/flt elevation), 1: subgrid average elevation
     margin2nd         = False           ! Apply second-order upwind approximation to gradients at the margin

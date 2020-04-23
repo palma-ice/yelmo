@@ -294,6 +294,11 @@ contains
         call nc_write(filename,"H_ice_ref",   dom%bnd%H_ice_ref,   units="",dim1="xc",dim2="yc",ncid=ncid)
         call nc_write(filename,"z_bed_ref",   dom%bnd%z_bed_ref,   units="",dim1="xc",dim2="yc",ncid=ncid)
 
+        ! == Predictor-corrector (pc) variables ===
+        ! (these will not be read in by yelmo_restart_read, but can be useful to output for diagnostics)
+
+        call nc_write(filename,"pc_tau",      dom%par%pc_tau,  units="m/yr",dim1="xc",dim2="yc",ncid=ncid)
+        
         ! == ydata variables ===
 
         ! TO DO (not necessary for restart, but let's see...)

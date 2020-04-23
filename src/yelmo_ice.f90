@@ -18,7 +18,7 @@ module yelmo_ice
     use yelmo_boundaries
     use yelmo_data 
     use yelmo_regions 
-    
+
     implicit none 
 
     private
@@ -41,7 +41,7 @@ contains
 
         real(prec) :: dt_now, dt_max  
         real(prec) :: time_now, time_start 
-        integer    :: n, nstep, n_now
+        integer    :: n, nstep, n_now, n_dtmin 
         real(8)    :: cpu_start_time 
         real(prec), parameter :: time_tol = 1e-5
 
@@ -49,12 +49,13 @@ contains
         real(prec), allocatable :: dt_save(:) 
         real(prec) :: dt_adv_min, dt_pi
         real(prec) :: eta_now, rho_now 
-        integer    :: iter_redo, pc_k 
+        integer    :: iter_redo, pc_k, iter_redo_tot 
         real(prec) :: ab_beta1, ab_beta2, ab_zeta 
         logical    :: use_absam 
-
         logical, allocatable :: pc_mask(:,:) 
         
+        character(len=1012) :: kill_txt
+
         ! Number of iterations to repeat a timestep if the error tolerance is exceeded.
         ! n_iter_redo=5 is rarely met, so it is a good choice - no need for a parameter.
         integer, parameter :: n_iter_redo = 5 
@@ -96,6 +97,7 @@ contains
         nstep   = ceiling( (time-time_now) / dom%par%dt_min )
         n_now   = 0  ! Number of timesteps saved 
 
+        iter_redo_tot = 0   ! Number of times total this loop 
         allocate(dt_save(nstep))
         dt_save = missing_value 
 
@@ -238,7 +240,10 @@ contains
                 end if 
 
             end do   ! End iteration loop 
-            
+                
+            ! Collect how many times the redo-iteration loop had to run 
+            ! (not counting the first pass, which is not a redo)
+            iter_redo_tot = iter_redo_tot + (iter_redo-1) 
 
             ! Update dt and eta vectors for last 3 timesteps 
             dom%par%pc_dt = cshift(dom%par%pc_dt,shift=-1)
@@ -289,14 +294,26 @@ contains
                 T_mean = 0.0_prec
             end if 
 
-            n = count(dt_save .ne. missing_value)
+            n       = count(dt_save .ne. missing_value)
+            n_dtmin = count(dt_save(1:n).eq.dom%par%dt_min) 
 
             write(*,"(a,f13.2,f9.1,f10.1,f8.1,2f7.2,1i6)") &
                         !"yelmo:: [time,speed,H,T,max(dt),min(dt),n(dt==dt_min)]:", &
                         "yelmo:: timelog:", &
-                            time_now, dom%par%model_speed, H_mean, T_mean, maxval(dt_save(1:n)), &
-                                            minval(dt_save(1:n)), count(dt_save(1:n).eq.dom%par%dt_min)
+                            time_now, dom%par%model_speed, H_mean, T_mean,  &
+                                            maxval(dt_save(1:n)), minval(dt_save(1:n)), n_dtmin
             
+        end if 
+
+        ! Check if model is becoming unstable via timesteps (eg 80% of timesteps are equal dt_min).
+        ! If so, then write a restart file and kill it. 
+        if ( (real(n_dtmin,prec)/real(n,prec)) .gt. 0.8 ) then 
+
+            write(kill_txt,"(a,i10,a,i10)") "Too many iterations of dt_min called for this timestep.", &
+                                            n_dtmin, " of ", n 
+            
+            call yelmo_check_kill(dom,time_now,kill_request=kill_txt)
+
         end if 
 
         return
@@ -912,7 +929,7 @@ contains
 
     end subroutine calc_zeta
     
-    subroutine yelmo_check_kill(dom,time)
+    subroutine yelmo_check_kill(dom,time,kill_request)
             
         use ieee_arithmetic
 
@@ -920,7 +937,8 @@ contains
 
         type(yelmo_class), intent(IN) :: dom
         real(prec),        intent(IN) :: time
-        
+        character(len=*), optional, intent(IN) :: kill_request 
+
         ! Local variables 
         integer :: i, j 
         logical :: kill_it, kill_it_nan  
@@ -959,6 +977,23 @@ contains
             write(*,"(a16,2g14.4)") "range(H_ice):   ", minval(dom%tpo%now%H_ice), maxval(dom%tpo%now%H_ice)
             write(*,"(a16,2g14.4)") "range(uxy_bar): ", minval(dom%dyn%now%uxy_bar), maxval(dom%dyn%now%uxy_bar)
             if (kill_it_nan) write(*,*) "** NANs detected ** ... i, j: ", i, j 
+            write(*,*) 
+            write(*,*) "Restart file written: "//"yelmo_killed.nc"
+            write(*,*) 
+            write(*,*) "Stopping model."
+            write(*,*) 
+
+            stop "yelmo_check_kill error, see log."
+
+        end if 
+
+        if (present(kill_request)) then 
+
+            call yelmo_restart_write(dom,"yelmo_killed.nc",time=time) 
+     
+            write(*,*) 
+            write(*,*) 
+            write(*,"(a)") "yelmo_check_kill:: kill requested: ",trim(kill_request)
             write(*,*) 
             write(*,*) "Restart file written: "//"yelmo_killed.nc"
             write(*,*) 

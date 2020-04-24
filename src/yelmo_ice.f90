@@ -171,7 +171,8 @@ contains
                     ab_zeta  = dt_now / dom%par%pc_dt(1) 
                     ab_beta1 = 1.0_prec + ab_zeta/2.0_prec 
                     ab_beta2 = -ab_zeta/2.0_prec 
-                     
+                    
+                    ! Determine uxy_bar_prime (pre-predicted ice velocity field)
                     dom%dyn%now%ux_bar = ab_beta1*dom%dyn%now%ux_bar + ab_beta2*dom%dyn%now%ux_bar_nm1
                     dom%dyn%now%uy_bar = ab_beta1*dom%dyn%now%uy_bar + ab_beta2*dom%dyn%now%uy_bar_nm1
 
@@ -185,11 +186,13 @@ contains
                 ! Step 2: Update other variables using predicted ice thickness 
                 
                 ! Calculate dynamics (velocities and stresses) 
+                ! (this is where uxy_bar_predicted is calculated)
                 call calc_ydyn(dom%dyn,tpo1,dom%mat,dom%thrm,dom%bnd,time_now)
                 
                 if (use_absam) then
                     ! AB-SAM: update velocities for calculation of corrected ice thickness
-                     
+                    
+                    ! Determine corrected uxy_bar 
                     dom%dyn%now%ux_bar = 0.5_prec * (dom%dyn%now%ux_bar + dom%dyn%now%ux_bar_nm1)
                     dom%dyn%now%uy_bar = 0.5_prec * (dom%dyn%now%uy_bar + dom%dyn%now%uy_bar_nm1)
 
@@ -311,7 +314,7 @@ contains
 
             write(kill_txt,"(a,i10,a,i10)") "Too many iterations of dt_min called for this timestep.", &
                                             n_dtmin, " of ", n 
-            
+
             call yelmo_check_kill(dom,time_now,kill_request=kill_txt)
 
         end if 
@@ -548,6 +551,13 @@ contains
                     &Please set 'solver=impl-upwind'."
                     stop 
                 end if 
+            
+            case("infinite") 
+                ! Set border points equal to interior neighbors 
+                ! (ajr: not fully implemented yet)
+                
+                dom%tpo%par%boundaries = "infinite"
+                dom%dyn%par%boundaries = "infinite"
                 
         end select 
 

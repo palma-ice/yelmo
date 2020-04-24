@@ -194,12 +194,3 @@
     pd_age_names      = "age_iso" "depth_iso"        ! ages of isochrones; depth of isochrones 
 
 /
-
-&basal_hydro_simple
-    init_method       = 0             ! 0: no water; 1: constant value
-    method            = 1             ! 0: constant; 1: local bucket method
-    H_w_init          = 0.0           ! [m] Initial water layer thickness (init_method=1)
-    H_w_max           = 2.0           ! [m] Maximum allowed water thickness under ice sheet
-    till_rate         = 1e-3          ! [m/a] Till infiltration (drainage) rate 
-/
-

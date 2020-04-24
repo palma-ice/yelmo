@@ -54,6 +54,9 @@ contains
         logical    :: use_absam 
         logical, allocatable :: pc_mask(:,:) 
         
+        real(prec), allocatable :: ux_bar_n(:,:) 
+        real(prec), allocatable :: uy_bar_n(:,:)
+
         character(len=1012) :: kill_txt
 
         ! Number of iterations to repeat a timestep if the error tolerance is exceeded.
@@ -102,6 +105,9 @@ contains
         dt_save = missing_value 
 
         allocate(pc_mask(dom%grd%nx,dom%grd%ny))
+
+        allocate(ux_bar_n(dom%grd%nx,dom%grd%ny))
+        allocate(uy_bar_n(dom%grd%nx,dom%grd%ny))
 
         ! Iteration of yelmo component updates until external timestep is reached
         do n = 1, nstep
@@ -172,6 +178,10 @@ contains
                     ab_beta1 = 1.0_prec + ab_zeta/2.0_prec 
                     ab_beta2 = -ab_zeta/2.0_prec 
                     
+                    ! Save current velocity uxy_bar_n for later use (potentially)
+                    ux_bar_n = dom%dyn%now%ux_bar
+                    uy_bar_n = dom%dyn%now%uy_bar
+                    
                     ! Determine uxy_bar_prime (pre-predicted ice velocity field)
                     dom%dyn%now%ux_bar = ab_beta1*dom%dyn%now%ux_bar + ab_beta2*dom%dyn%now%ux_bar_nm1
                     dom%dyn%now%uy_bar = ab_beta1*dom%dyn%now%uy_bar + ab_beta2*dom%dyn%now%uy_bar_nm1
@@ -192,9 +202,15 @@ contains
                 if (use_absam) then
                     ! AB-SAM: update velocities for calculation of corrected ice thickness
                     
-                    ! Determine corrected uxy_bar 
+                    ! Determine corrected uxy_bar using predicted uxy_bar and pre-predicted uxy_bar
                     dom%dyn%now%ux_bar = 0.5_prec * (dom%dyn%now%ux_bar + dom%dyn%now%ux_bar_nm1)
                     dom%dyn%now%uy_bar = 0.5_prec * (dom%dyn%now%uy_bar + dom%dyn%now%uy_bar_nm1)
+
+                    ! Determine corrected uxy_bar using predicted uxy_bar and uxy_bar_n 
+                    ! ajr: below method seems more directly consistent with SAM method, but
+                    ! using the pre-predicted velocity solution as above seems to work better.
+!                     dom%dyn%now%ux_bar = 0.5_prec * (dom%dyn%now%ux_bar + ux_bar_n)
+!                     dom%dyn%now%uy_bar = 0.5_prec * (dom%dyn%now%uy_bar + uy_bar_n)
 
                 end if 
 
@@ -555,7 +571,7 @@ contains
             case("infinite") 
                 ! Set border points equal to interior neighbors 
                 ! (ajr: not fully implemented yet)
-                
+
                 dom%tpo%par%boundaries = "infinite"
                 dom%dyn%par%boundaries = "infinite"
                 

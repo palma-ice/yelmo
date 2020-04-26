@@ -557,6 +557,9 @@ contains
         ! following Greve and Blatter (2009), Eqs. 4.7 and 5.65
         Q_strn = beta1*(4.0*visc * de**2) + beta2*Q_strn 
         
+        ! Ensure Q_strn is strictly positive 
+        where (Q_strn .lt. 0.0_prec) Q_strn = 0.0_prec 
+
         return 
 
     end subroutine calc_strain_heating
@@ -628,6 +631,9 @@ contains
                     Q_strn_now = (-rho_ice*g*depth) * (duxdz*dzsdx_aa + duydz*dzsdy_aa)
                     Q_strn(i,j,k) = beta1*Q_strn_now + beta2*Q_strn(i,j,k) 
                     
+                    ! Ensure Q_strn is strictly positive 
+                    if (Q_strn(i,j,k) .lt. 0.0_prec) Q_strn(i,j,k) = 0.0_prec 
+                
                 end do 
 
             else 
@@ -695,6 +701,9 @@ end if
             
             Q_b(i,j) = beta1*Q_b_now + beta2*Q_b(i,j) 
 
+            ! Ensure Q_b is strictly positive 
+            if (Q_b(i,j) .lt. 0.0_prec) Q_b(i,j) = 0.0_prec 
+            
         end do 
         end do 
         

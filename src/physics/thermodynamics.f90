@@ -513,7 +513,7 @@ contains
 
     end subroutine calc_advec_horizontal_3D
 
-    subroutine calc_strain_heating(Q_strn,de,visc,cp,rho_ice)
+    subroutine calc_strain_heating(Q_strn,de,visc,cp,rho_ice,beta1,beta2)
         ! Calculate the general 3D internal strain heating
         ! as sum(D_ij*tau_ij)  (strain*stress)
         ! where stress has been calculated as stress_ij = 2*visc*strain
@@ -540,21 +540,22 @@ contains
 
         implicit none
 
-        real(prec),            intent(OUT) :: Q_strn(:,:,:)      ! nx,ny,nz_aa [K a-1] Heat production
-        real(prec),            intent(IN)  :: de(:,:,:)          ! nx,ny,nz_aa [a-1] Effective strain rate 
-        real(prec),            intent(IN)  :: visc(:,:,:)        ! nx,ny,nz_aa [Pa a-1] Viscosity
-        real(prec),            intent(IN)  :: cp(:,:,:)          ! nx,ny,nz_aa [J kg-1 K-1] Specific heat capacity
-        real(prec),            intent(IN)  :: rho_ice            ! [kg m-3] Ice density 
-
+        real(prec), intent(INOUT) :: Q_strn(:,:,:)      ! nx,ny,nz_aa [K a-1] Heat production
+        real(prec), intent(IN)    :: de(:,:,:)          ! nx,ny,nz_aa [a-1] Effective strain rate 
+        real(prec), intent(IN)    :: visc(:,:,:)        ! nx,ny,nz_aa [Pa a-1] Viscosity
+        real(prec), intent(IN)    :: cp(:,:,:)          ! nx,ny,nz_aa [J kg-1 K-1] Specific heat capacity
+        real(prec), intent(IN)    :: rho_ice            ! [kg m-3] Ice density 
+        real(prec), intent(IN)    :: beta1              ! Timestepping weighting parameter
+        real(prec), intent(IN)    :: beta2              ! Timestepping weighting parameter
+        
         ! Local variables
         integer :: nz_aa 
-        !real(prec), parameter :: Q_strn_max = 0.1          ! Q_strn > 0.1 is already high, it's only a safety valve.
 
         nz_aa = size(Q_strn,3)
 
         ! Calculate strain heating 
         ! following Greve and Blatter (2009), Eqs. 4.7 and 5.65
-        Q_strn = 4.0*visc * de**2
+        Q_strn = beta1*(4.0*visc * de**2) + beta2*Q_strn 
         
         ! Limit strain heating to reasonable values 
         !where (Q_strn .gt. Q_strn_max) Q_strn = Q_strn_max

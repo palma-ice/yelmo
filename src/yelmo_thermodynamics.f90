@@ -95,7 +95,8 @@ contains
         else
             ! Calculate strain heating from strain rate tensor and viscosity (general approach)
             
-            call calc_strain_heating(thrm%now%Q_strn,mat%now%strn%de,mat%now%visc,thrm%now%cp,rho_ice)
+            call calc_strain_heating(thrm%now%Q_strn,mat%now%strn%de,mat%now%visc,thrm%now%cp,rho_ice, &
+                                                                        thrm%par%dt_beta1,thrm%par%dt_beta2)
 
         end if 
         

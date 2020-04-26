@@ -161,29 +161,59 @@ contains
                 if (abs(time-time_now) .lt. time_tol) time_now = time 
                 
                 ! Calculate dt_zeta (ratio of current to previous timestep)
-                dom%tpo%now%dt_zeta = dt_now / dom%par%pc_dt(1) 
-                
+                dom%tpo%par%dt_zeta  = dt_now / dom%par%pc_dt(1) 
+                dom%thrm%par%dt_zeta = dom%tpo%par%dt_zeta
+
                 select case(trim(dom%par%pc_method))
                     ! No default case necessary, handled earlier 
 
                     case("FE-SBE")
                         
-                        dom%tpo%now%dt_beta1 = 1.0_prec 
-                        dom%tpo%now%dt_beta2 = 0.0_prec 
+                        dom%tpo%par%dt_beta1 = 1.0_prec 
+                        dom%tpo%par%dt_beta2 = 0.0_prec 
                     
                     case("AB-SAM")
                         
-                        dom%tpo%now%dt_beta1 = 1.0_prec + dom%tpo%now%dt_zeta/2.0_prec 
-                        dom%tpo%now%dt_beta2 = -dom%tpo%now%dt_zeta/2.0_prec 
+                        dom%tpo%par%dt_beta1 = 1.0_prec + dom%tpo%par%dt_zeta/2.0_prec 
+                        dom%tpo%par%dt_beta2 = -dom%tpo%par%dt_zeta/2.0_prec 
+
+                end select 
+
+                ! Calculate timestepping factors for thermodynamics horizontal advection term too 
+                select case(trim(dom%thrm%par%dt_method))
+
+                    case("FE")
+                        ! Forward Euler 
+
+                        dom%thrm%par%dt_beta1 = 1.0 
+                        dom%thrm%par%dt_beta2 = 0.0 
+
+                    case("AB") 
+                        ! Adams-Bashforth  
+
+                        dom%thrm%par%dt_beta1 = 1.0_prec + dom%thrm%par%dt_zeta/2.0_prec 
+                        dom%thrm%par%dt_beta2 = -dom%thrm%par%dt_zeta/2.0_prec 
+
+                    case("SAM") 
+                        ! Semi-implicit Adams–Moulton
+
+                        dom%thrm%par%dt_beta1 = 0.5
+                        dom%thrm%par%dt_beta2 = 0.5 
+
+                    case DEFAULT 
+
+                        write(*,*) "yelmo_udpate:: Error: thermodynamics dt_method does not match available options [FE, SBE, AB, SAM]."
+                        write(*,*) "thrm:: dt_method = ", trim(dom%thrm%par%dt_method)
+                        stop 
 
                 end select 
 
                 ! ajr: Left-over from applying PC method to velocity instead of ice thickness 
                 ! Determine uxy_bar_prime (pre-predicted ice velocity field)
-!                 dom%dyn%now%ux_bar = dom%tpo%now%dt_beta1*dom%dyn%now%ux_bar &
-!                                       + dom%tpo%now%dt_beta2*dom%dyn%now%ux_bar_nm1
-!                 dom%dyn%now%uy_bar = dom%tpo%now%dt_beta1*dom%dyn%now%uy_bar &
-!                                       + dom%tpo%now%dt_beta2*dom%dyn%now%uy_bar_nm1
+!                 dom%dyn%now%ux_bar = dom%tpo%par%dt_beta1*dom%dyn%now%ux_bar &
+!                                       + dom%tpo%par%dt_beta2*dom%dyn%now%ux_bar_nm1
+!                 dom%dyn%now%uy_bar = dom%tpo%par%dt_beta1*dom%dyn%now%uy_bar &
+!                                       + dom%tpo%par%dt_beta2*dom%dyn%now%uy_bar_nm1
 
                 ! Store local copy of ytopo object to use for predictor step
                 tpo1  = dom%tpo 
@@ -204,22 +234,22 @@ contains
 
                     case("FE-SBE")
                         
-                        dom%tpo%now%dt_beta1 = 1.0_prec 
-                        dom%tpo%now%dt_beta2 = 0.0_prec 
+                        dom%tpo%par%dt_beta1 = 1.0_prec 
+                        dom%tpo%par%dt_beta2 = 0.0_prec 
                     
                     case("AB-SAM")
                         
-                        dom%tpo%now%dt_beta1 = 0.5_prec 
-                        dom%tpo%now%dt_beta2 = 0.5_prec 
+                        dom%tpo%par%dt_beta1 = 0.5_prec 
+                        dom%tpo%par%dt_beta2 = 0.5_prec 
                     
                 end select 
 
                 ! ajr: Left-over from applying PC method to velocity instead of ice thickness 
                 ! Determine uxy_bar_prime (pre-predicted ice velocity field)
-!                 dom%dyn%now%ux_bar = dom%tpo%now%dt_beta1*dom%dyn%now%ux_bar &
-!                                       + dom%tpo%now%dt_beta2*dom%dyn%now%ux_bar_nm1
-!                 dom%dyn%now%uy_bar = dom%tpo%now%dt_beta1*dom%dyn%now%uy_bar &
-!                                       + dom%tpo%now%dt_beta2*dom%dyn%now%uy_bar_nm1
+!                 dom%dyn%now%ux_bar = dom%tpo%par%dt_beta1*dom%dyn%now%ux_bar &
+!                                       + dom%tpo%par%dt_beta2*dom%dyn%now%ux_bar_nm1
+!                 dom%dyn%now%uy_bar = dom%tpo%par%dt_beta1*dom%dyn%now%uy_bar &
+!                                       + dom%tpo%par%dt_beta2*dom%dyn%now%uy_bar_nm1
 
                 ! Calculate material (ice properties, viscosity, etc.)
                 call calc_ymat(dom%mat,tpo1,dom%dyn,dom%thrm,dom%bnd,time_now)
@@ -244,7 +274,7 @@ contains
                     case("AB-SAM")
                         
                         ! AB-SAM truncation error 
-                        call calc_pc_tau_ab_sam(dom%par%pc_tau,dom%tpo%now%H_ice,tpo1%now%H_ice,dt_now,dom%tpo%now%dt_zeta)
+                        call calc_pc_tau_ab_sam(dom%par%pc_tau,dom%tpo%now%H_ice,tpo1%now%H_ice,dt_now,dom%tpo%par%dt_zeta)
 
                 end select 
 

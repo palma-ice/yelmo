@@ -270,6 +270,8 @@ contains
         call nc_write(filename,"kt",          dom%thrm%now%kt,         units="",dim1="xc",dim2="yc",dim3="zeta",ncid=ncid)         
         call nc_write(filename,"H_cts",       dom%thrm%now%H_cts,      units="",dim1="xc",dim2="yc",ncid=ncid)      
         
+        call nc_write(filename,"advecxy",     dom%thrm%now%advecxy,    units="",dim1="xc",dim2="yc",dim3="zeta",ncid=ncid)      
+        
         ! == ybound variables ===
 
         call nc_write(filename,"z_bed",       dom%bnd%z_bed,       units="",dim1="xc",dim2="yc",ncid=ncid)
@@ -529,6 +531,8 @@ contains
         call nc_read(filename,"cp",          dom%thrm%now%cp,ncid=ncid) 
         call nc_read(filename,"kt",          dom%thrm%now%kt,ncid=ncid)      
         call nc_read(filename,"H_cts",       dom%thrm%now%H_cts,ncid=ncid)       
+        
+        call nc_read(filename,"advecxy",     dom%thrm%now%advecxy,ncid=ncid)   
         
         ! == ybound variables ===
 

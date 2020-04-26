@@ -32,15 +32,12 @@ contains
         ! Local variables 
         integer :: i, j, k, nx, ny  
         real(prec) :: dt 
-        real(prec), allocatable :: advecxy(:,:,:) 
         real(prec), allocatable :: H_w_now(:,:)
         
         nx = thrm%par%nx
         ny = thrm%par%ny
 
-        allocate(advecxy(nx,ny,thrm%par%nz_aa))
-        allocate(H_w_now(nx,ny))
-        advecxy = 0.0_prec 
+        allocate(H_w_now(nx,ny)) 
         H_w_now = 0.0_prec 
 
         ! Initialize time if necessary 
@@ -128,19 +125,19 @@ contains
                     if (trim(thrm%par%method) .eq. "enth") then 
 
                         ! Calculate the explicit horizontal advection term using enthalpy from previous timestep
-                        call calc_advec_horizontal_3D(advecxy,thrm%now%enth,tpo%now%H_ice,tpo%now%z_srf, &
-                                                            dyn%now%ux,dyn%now%uy,thrm%par%zeta_aa,thrm%par%dx)
+                        call calc_advec_horizontal_3D(thrm%now%advecxy,thrm%now%enth,tpo%now%H_ice,tpo%now%z_srf, &
+                                            dyn%now%ux,dyn%now%uy,thrm%par%zeta_aa,thrm%par%dx,thrm%par%dt_beta1,thrm%par%dt_beta2)
                     
                     else 
 
                         ! Calculate the explicit horizontal advection term using temperature from previous timestep
-                        call calc_advec_horizontal_3D(advecxy,thrm%now%T_ice,tpo%now%H_ice,tpo%now%z_srf, &
-                                                            dyn%now%ux,dyn%now%uy,thrm%par%zeta_aa,thrm%par%dx)
+                        call calc_advec_horizontal_3D(thrm%now%advecxy,thrm%now%T_ice,tpo%now%H_ice,tpo%now%z_srf, &
+                                            dyn%now%ux,dyn%now%uy,thrm%par%zeta_aa,thrm%par%dx,thrm%par%dt_beta1,thrm%par%dt_beta2)
                     
                     end if 
 
                     call calc_ytherm_enthalpy_3D(thrm%now%enth,thrm%now%T_ice,thrm%now%omega,thrm%now%bmb_grnd,thrm%now%Q_ice_b, &
-                                thrm%now%H_cts,thrm%now%T_pmp,thrm%now%cp,thrm%now%kt,advecxy,dyn%now%ux,dyn%now%uy,dyn%now%uz,thrm%now%Q_strn, &
+                                thrm%now%H_cts,thrm%now%T_pmp,thrm%now%cp,thrm%now%kt,thrm%now%advecxy,dyn%now%ux,dyn%now%uy,dyn%now%uz,thrm%now%Q_strn, &
                                 thrm%now%Q_b,bnd%Q_geo,bnd%T_srf,tpo%now%H_ice,tpo%now%z_srf,thrm%now%H_w,thrm%now%dHwdt,tpo%now%H_grnd, &
                                 tpo%now%f_grnd,tpo%now%dHicedt,tpo%now%dzsrfdt,thrm%par%zeta_aa,thrm%par%zeta_ac,thrm%par%dzeta_a,thrm%par%dzeta_b,thrm%par%enth_cr, &
                                 thrm%par%omega_max,dt,thrm%par%dx,thrm%par%method,thrm%par%solver_advec)
@@ -453,7 +450,7 @@ contains
         return 
 
     end subroutine calc_enth_horizontal_advection_3D
-    
+
     subroutine ytherm_par_load(par,filename,zeta_aa,zeta_ac,nx,ny,dx,init)
 
         type(ytherm_param_class), intent(OUT) :: par
@@ -473,6 +470,7 @@ contains
  
         ! Store local parameter values in output object
         call nml_read(filename,"ytherm","method",         par%method,           init=init_pars)
+        call nml_read(filename,"ytherm","dt_method",      par%dt_method,        init=init_pars)
         call nml_read(filename,"ytherm","solver_advec",   par%solver_advec,     init=init_pars)
         call nml_read(filename,"ytherm","gamma",          par%gamma,            init=init_pars)
         call nml_read(filename,"ytherm","use_strain_sia", par%use_strain_sia,   init=init_pars)
@@ -520,6 +518,11 @@ contains
         ! Define current time as unrealistic value
         par%time = 1000000000   ! [a] 1 billion years in the future
 
+        ! Intialize timestepping parameters to Forward Euler (beta2=0: no contribution from previous timestep)
+        par%dt_zeta     = 1.0 
+        par%dt_beta1    = 1.0 
+        par%dt_beta2    = 0.0 
+
         return
 
     end subroutine ytherm_par_load
@@ -549,22 +552,26 @@ contains
         allocate(now%H_w(nx,ny))
         allocate(now%dHwdt(nx,ny))
         
-        now%enth      = 0.0
-        now%T_ice     = 0.0
-        now%omega     = 0.0  
-        now%T_pmp     = 0.0
-        now%bmb_grnd  = 0.0 
-        now%f_pmp     = 0.0 
-        now%Q_strn    = 0.0 
-        now%Q_b       = 0.0 
-        now%Q_ice_b   = 0.0 
-        now%cp        = 0.0 
-        now%kt        = 0.0 
-        now%H_cts     = 0.0 
-        now%T_prime_b = 0.0 
-        now%H_w       = 0.0 
-        now%dHwdt     = 0.0 
+        allocate(now%advecxy(nx,ny,nz_aa))
+
+        now%enth        = 0.0
+        now%T_ice       = 0.0
+        now%omega       = 0.0  
+        now%T_pmp       = 0.0
+        now%bmb_grnd    = 0.0 
+        now%f_pmp       = 0.0 
+        now%Q_strn      = 0.0 
+        now%Q_b         = 0.0 
+        now%Q_ice_b     = 0.0 
+        now%cp          = 0.0 
+        now%kt          = 0.0 
+        now%H_cts       = 0.0 
+        now%T_prime_b   = 0.0 
+        now%H_w         = 0.0 
+        now%dHwdt       = 0.0 
         
+        now%advecxy     = 0.0 
+
         return
 
     end subroutine ytherm_alloc 
@@ -575,21 +582,23 @@ contains
 
         type(ytherm_state_class), intent(INOUT) :: now
 
-        if (allocated(now%enth))      deallocate(now%enth)
-        if (allocated(now%T_ice))     deallocate(now%T_ice)
-        if (allocated(now%omega))     deallocate(now%omega)
-        if (allocated(now%T_pmp))     deallocate(now%T_pmp)
-        if (allocated(now%bmb_grnd))  deallocate(now%bmb_grnd)
-        if (allocated(now%f_pmp))     deallocate(now%f_pmp)
-        if (allocated(now%Q_strn))    deallocate(now%Q_strn)
-        if (allocated(now%Q_b))       deallocate(now%Q_b)
-        if (allocated(now%Q_ice_b))   deallocate(now%Q_ice_b)
-        if (allocated(now%cp))        deallocate(now%cp)
-        if (allocated(now%kt))        deallocate(now%kt)
-        if (allocated(now%H_cts))     deallocate(now%H_cts)
-        if (allocated(now%T_prime_b)) deallocate(now%T_prime_b)
-        if (allocated(now%H_w))       deallocate(now%H_w)
-        if (allocated(now%dHwdt))     deallocate(now%dHwdt)
+        if (allocated(now%enth))        deallocate(now%enth)
+        if (allocated(now%T_ice))       deallocate(now%T_ice)
+        if (allocated(now%omega))       deallocate(now%omega)
+        if (allocated(now%T_pmp))       deallocate(now%T_pmp)
+        if (allocated(now%bmb_grnd))    deallocate(now%bmb_grnd)
+        if (allocated(now%f_pmp))       deallocate(now%f_pmp)
+        if (allocated(now%Q_strn))      deallocate(now%Q_strn)
+        if (allocated(now%Q_b))         deallocate(now%Q_b)
+        if (allocated(now%Q_ice_b))     deallocate(now%Q_ice_b)
+        if (allocated(now%cp))          deallocate(now%cp)
+        if (allocated(now%kt))          deallocate(now%kt)
+        if (allocated(now%H_cts))       deallocate(now%H_cts)
+        if (allocated(now%T_prime_b))   deallocate(now%T_prime_b)
+        if (allocated(now%H_w))         deallocate(now%H_w)
+        if (allocated(now%dHwdt))       deallocate(now%dHwdt)
+        
+        if (allocated(now%advecxy))     deallocate(now%advecxy)
         
         return 
 

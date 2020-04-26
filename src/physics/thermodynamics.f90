@@ -428,26 +428,37 @@ contains
 
     end subroutine calc_advec_horizontal_column
     
-    subroutine calc_advec_horizontal_3D(advecxy,var,H_ice,z_srf,ux,uy,zeta_aa,dx)
+    subroutine calc_advec_horizontal_3D(advecxy,var,H_ice,z_srf,ux,uy,zeta_aa,dx,beta1,beta2)
 
         implicit none 
 
-        real(prec), intent(OUT) :: advecxy(:,:,:)   ! nz_aa 
-        real(prec), intent(IN)  :: var(:,:,:)       ! nx,ny,nz_aa  Enth, T, age, etc...
-        real(prec), intent(IN)  :: H_ice(:,:)       ! nx,ny 
-        real(prec), intent(IN)  :: z_srf(:,:)       ! nx,ny 
-        real(prec), intent(IN)  :: ux(:,:,:)        ! nx,ny,nz_aa
-        real(prec), intent(IN)  :: uy(:,:,:)        ! nx,ny,nz_aa
-        real(prec), intent(IN)  :: zeta_aa(:)       ! nz_aa 
-        real(prec), intent(IN)  :: dx  
+        real(prec), intent(INOUT) :: advecxy(:,:,:)     ! nz_aa 
+        real(prec), intent(IN)    :: var(:,:,:)         ! nx,ny,nz_aa  Enth, T, age, etc...
+        real(prec), intent(IN)    :: H_ice(:,:)         ! nx,ny 
+        real(prec), intent(IN)    :: z_srf(:,:)         ! nx,ny 
+        real(prec), intent(IN)    :: ux(:,:,:)          ! nx,ny,nz_aa
+        real(prec), intent(IN)    :: uy(:,:,:)          ! nx,ny,nz_aa
+        real(prec), intent(IN)    :: zeta_aa(:)         ! nz_aa 
+        real(prec), intent(IN)    :: dx  
+        real(prec), intent(IN)    :: beta1              ! Weighting term for multistep advection scheme
+        real(prec), intent(IN)    :: beta2              ! Weighting term for multistep advection scheme
 
         ! Local variables 
         integer :: i, j 
-        integer :: nx, ny 
+        integer :: nx, ny, nz  
 
-        nx = size(H_ice,1)
-        ny = size(H_ice,2) 
+        real(prec), allocatable   :: advecxy_nm1(:,:,:) ! nz_aa, advective term from previous timestep
 
+        nx = size(advecxy,1)
+        ny = size(advecxy,2) 
+        nz = size(advecxy,3) 
+
+        allocate(advecxy_nm1(nx,ny,nz))
+
+        ! Store previous solution for later use 
+        advecxy_nm1 = advecxy 
+
+        ! Reset current solution to zero 
         advecxy = 0.0_prec 
          
         do j = 2, ny-1
@@ -493,6 +504,11 @@ contains
         j = ny
         if(H_ice(i,j) .gt. 0.0_prec) advecxy(i,j,:) = 0.5_prec*(advecxy(i+1,j,:)+advecxy(i,j-1,:))
         
+
+        ! Calculate weighted average between current and previous solution following 
+        ! timestepping method desired 
+        advecxy = beta1*advecxy + beta2*advecxy_nm1 
+         
         return 
 
     end subroutine calc_advec_horizontal_3D

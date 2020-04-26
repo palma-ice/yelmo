@@ -94,6 +94,8 @@ module yelmo_defs
         real(prec)         :: dx, dy
         character(len=256) :: boundaries 
         
+        real(prec) :: dt_zeta, dt_beta1, dt_beta2 
+
     end type
 
     ! ytopo state variables
@@ -129,8 +131,7 @@ module yelmo_defs
         
         real(prec), allocatable :: dHdt_nm0(:,:)
         real(prec), allocatable :: dHdt_nm1(:,:)
-        real(prec) :: dt_zeta, dt_beta1, dt_beta2 
-
+        
         ! Additional masks 
         integer,    allocatable :: mask_bed(:,:)    ! Multi-valued bed mask
         logical,    allocatable :: is_grline(:,:)   ! Grounding line points
@@ -396,6 +397,7 @@ module yelmo_defs
     !ytherm parameters 
     type ytherm_param_class
         character(len=256)  :: method  
+        character(len=256)  :: dt_method  
         character(len=256)  :: solver_advec 
         integer             :: nx, ny 
         real(prec)          :: dx, dy  
@@ -422,6 +424,7 @@ module yelmo_defs
         real(prec), allocatable :: dzeta_b(:)
         
         real(prec) :: time
+        real(prec) :: dt_zeta, dt_beta1, dt_beta2 
 
     end type
 
@@ -445,6 +448,8 @@ module yelmo_defs
         real(prec), allocatable :: kt(:,:,:)        ! Heat conductivity  
         real(prec), allocatable :: H_cts(:,:)       ! Height of the cts
         
+        real(prec), allocatable :: advecxy(:,:,:)
+
     end type
 
     ! ytherm class

@@ -98,7 +98,7 @@ contains
                                     ice_allowed=bnd%ice_allowed,H_min=tpo%par%H_min_grnd, &
                                     sd_min=tpo%par%sd_min,sd_max=tpo%par%sd_max,calv_max=tpo%par%calv_max, &
                                     dHdt_nm0=tpo%now%dHdt_nm0,dHdt_nm1=tpo%now%dHdt_nm1, &
-                                    dt_beta1=tpo%now%dt_beta1,dt_beta2=tpo%now%dt_beta2)
+                                    dt_beta1=tpo%par%dt_beta1,dt_beta2=tpo%par%dt_beta2)
             
             ! If desired, relax solution to reference state
             if (tpo%par%topo_rel .ne. 0) then 
@@ -447,6 +447,11 @@ contains
         ! Define current time as unrealistic value
         par%time = 1000000000   ! [a] 1 billion years in the future 
 
+        ! Intialize timestepping parameters to Forward Euler (beta2=0: no contribution from previous timestep)
+        par%dt_zeta     = 1.0 
+        par%dt_beta1    = 1.0 
+        par%dt_beta2    = 0.0 
+
         return
 
     end subroutine ytopo_par_load
@@ -518,10 +523,6 @@ contains
         now%dHdt_nm0    = 0.0  
         now%dHdt_nm1    = 0.0  
         
-        now%dt_zeta     = 1.0 
-        now%dt_beta1    = 1.0 
-        now%dt_beta2    = 0.0 
-
         now%mask_bed    = 0.0 
         now%is_grline   = .FALSE. 
         now%is_grz      = .FALSE. 

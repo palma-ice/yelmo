@@ -129,7 +129,7 @@ contains
 
     end subroutine calc_pc_tau_ab_sam
 
-    subroutine set_adaptive_timestep_pc(dt_new,dt,eta,eps,dtmin,dtmax,mask,ux_bar,uy_bar,dx,pc_k)
+    subroutine set_adaptive_timestep_pc(dt_new,dt,eta,eps,dtmin,dtmax,mask,ux_bar,uy_bar,dx,pc_k,controller)
         ! Calculate the timestep following algorithm for 
         ! a general predictor-corrector (pc) method.
         ! Implemented followig Cheng et al (2017, GMD)
@@ -147,6 +147,7 @@ contains
         real(prec), intent(IN)  :: uy_bar(:,:)          ! [m/yr]
         real(prec), intent(IN)  :: dx                   ! [m]
         integer,    intent(IN)  :: pc_k                 ! pc_k gives the order of the timestepping scheme (pc_k=2 for FE-SBE, pc_k=3 for AB-SAM)
+        character(len=*), intent(IN) :: controller      ! Adaptive controller to use [PI42, H312b, H312PID]
 
         ! Local variables
         real(prec) :: dt_n, dt_nm1, dt_nm2          ! [yr]   Timesteps (n:n-2)
@@ -155,12 +156,7 @@ contains
         real(prec) :: rhohat_n 
         real(prec) :: dt_adv 
         real(prec) :: dtmax_now
-
         real(prec) :: k_i 
-
-        ! Choose adaptive controller algorithm for updating timestep 
-        ! PI42, H312b, H312PID
-        character(len=56), parameter :: pc_adapt_method = "H312PID"
 
         ! Smoothing parameter; Söderlind and Wang (2006) method, Eq. 10
         ! Values on the order of [0.7,2.0] are reasonable. Higher kappa slows variation in dt
@@ -183,7 +179,7 @@ contains
         rho_nm2 = (dt_nm1 / dt_nm2) 
 
         ! Step 2: calculate scaling for the next timestep (dt,n+1)
-        select case(trim(pc_adapt_method))
+        select case(trim(controller))
 
             case("PI42")
                 ! Söderlind and Wang, 2006; Cheng et al., 2017
@@ -203,16 +199,16 @@ contains
                 ! Söderlind (2003) H312PD, Eq. 38
                 ! Note: Suggested k_i =(2/9)*1/pc_k, but lower value gives more stable solution
 
-                !k_i = (2.0_prec/9.0_prec)*1.0_prec/real(pc_k,prec)
-                k_i = 0.08_prec/real(pc_k,prec)
+                k_i = (2.0_prec/9.0_prec)*1.0_prec/real(pc_k,prec)
+                !k_i = 0.08_prec/real(pc_k,prec)
 
                 rho_n = calc_pi_rho_H312PID(eta_n,eta_nm1,eta_nm2,eps,k_i)
 
 
             case DEFAULT 
 
-                write(*,*) "set_adaptive_timestep_pc:: Error: pc_adapt_method not recognized."
-                write(*,*) "pc_adapt_method = ", trim(pc_adapt_method) 
+                write(*,*) "set_adaptive_timestep_pc:: Error: controller not recognized."
+                write(*,*) "controller = ", trim(controller) 
                 stop 
 
         end select 

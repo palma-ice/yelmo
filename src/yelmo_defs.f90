@@ -127,6 +127,10 @@ module yelmo_defs
         real(prec), allocatable :: dist_margin(:,:)  ! Distance to nearest margin point 
         real(prec), allocatable :: dist_grline(:,:)  ! Distance to nearest grounding-line point 
         
+        real(prec), allocatable :: dHdt_nm0(:,:)
+        real(prec), allocatable :: dHdt_nm1(:,:)
+        real(prec) :: dt_zeta, dt_beta1, dt_beta2 
+
         ! Additional masks 
         integer,    allocatable :: mask_bed(:,:)    ! Multi-valued bed mask
         logical,    allocatable :: is_grline(:,:)   ! Grounding line points
@@ -646,6 +650,7 @@ module yelmo_defs
         real(prec)          :: cfl_max 
         real(prec)          :: cfl_diff_max 
         character (len=56)  :: pc_method
+        character (len=56)  :: pc_controller
         real(prec)          :: pc_tol 
         real(prec)          :: pc_eps  
 

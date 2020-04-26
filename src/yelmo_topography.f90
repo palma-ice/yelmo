@@ -96,7 +96,9 @@ contains
                                     mbal=mbal,calv=tpo%now%calv,z_bed_sd=bnd%z_bed_sd,dx=tpo%par%dx,dt=dt, &
                                     solver=trim(tpo%par%solver),boundaries=trim(tpo%par%boundaries), &
                                     ice_allowed=bnd%ice_allowed,H_min=tpo%par%H_min_grnd, &
-                                    sd_min=tpo%par%sd_min,sd_max=tpo%par%sd_max,calv_max=tpo%par%calv_max)
+                                    sd_min=tpo%par%sd_min,sd_max=tpo%par%sd_max,calv_max=tpo%par%calv_max, &
+                                    dHdt_nm0=tpo%now%dHdt_nm0,dHdt_nm1=tpo%now%dHdt_nm1, &
+                                    dt_beta1=tpo%now%dt_beta1,dt_beta2=tpo%now%dt_beta2)
             
             ! If desired, relax solution to reference state
             if (tpo%par%topo_rel .ne. 0) then 
@@ -150,7 +152,7 @@ contains
  
             ! Apply calving
             call apply_calving(tpo%now%H_ice,tpo%now%calv,tpo%now%f_grnd,tpo%par%H_min_flt,dt)
-            
+
             ! Apply special case for symmetric EISMINT domain when basal sliding is active
             ! (ensure summit thickness does not grow disproportionately)
             if (trim(tpo%par%boundaries) .eq. "EISMINT" .and. maxval(dyn%now%uxy_b) .gt. 0.0) then 
@@ -477,6 +479,9 @@ contains
         
         allocate(now%H_grnd(nx,ny))
 
+        allocate(now%dHdt_nm0(nx,ny))
+        allocate(now%dHdt_nm1(nx,ny))
+
         ! Masks 
         allocate(now%f_grnd(nx,ny))
         allocate(now%f_grnd_acx(nx,ny))
@@ -490,29 +495,36 @@ contains
         allocate(now%is_grline(nx,ny))
         allocate(now%is_grz(nx,ny))
 
-        now%H_ice      = 0.0 
-        now%z_srf      = 0.0  
-        now%dzsrfdt    = 0.0 
-        now%dHicedt    = 0.0
-        now%bmb        = 0.0  
-        now%mb_applied = 0.0 
-        now%calv_grnd  = 0.0
-        now%calv       = 0.0
-        now%H_margin   = 0.0 
-        now%dzsdx      = 0.0 
-        now%dzsdy      = 0.0 
-        now%dHicedx    = 0.0 
-        now%dHicedy    = 0.0
-        now%H_grnd     = 0.0  
-        now%f_grnd     = 0.0  
-        now%f_grnd_acx = 0.0  
-        now%f_grnd_acy = 0.0  
-        now%f_ice      = 0.0  
+        now%H_ice       = 0.0 
+        now%z_srf       = 0.0  
+        now%dzsrfdt     = 0.0 
+        now%dHicedt     = 0.0
+        now%bmb         = 0.0  
+        now%mb_applied  = 0.0 
+        now%calv_grnd   = 0.0
+        now%calv        = 0.0
+        now%H_margin    = 0.0 
+        now%dzsdx       = 0.0 
+        now%dzsdy       = 0.0 
+        now%dHicedx     = 0.0 
+        now%dHicedy     = 0.0
+        now%H_grnd      = 0.0  
+        now%f_grnd      = 0.0  
+        now%f_grnd_acx  = 0.0  
+        now%f_grnd_acy  = 0.0  
+        now%f_ice       = 0.0  
         now%dist_margin = 0.0
         now%dist_grline = 0.0
-        now%mask_bed   = 0.0 
-        now%is_grline  = .FALSE. 
-        now%is_grz     = .FALSE. 
+        now%dHdt_nm0    = 0.0  
+        now%dHdt_nm1    = 0.0  
+        
+        now%dt_zeta     = 1.0 
+        now%dt_beta1    = 1.0 
+        now%dt_beta2    = 0.0 
+
+        now%mask_bed    = 0.0 
+        now%is_grline   = .FALSE. 
+        now%is_grz      = .FALSE. 
         
         return 
     end subroutine ytopo_alloc 
@@ -542,7 +554,6 @@ contains
         
         if (allocated(now%H_grnd))     deallocate(now%H_grnd)
 
-        ! Masks
         if (allocated(now%f_grnd))     deallocate(now%f_grnd)
         if (allocated(now%f_grnd_acx)) deallocate(now%f_grnd_acx)
         if (allocated(now%f_grnd_acy)) deallocate(now%f_grnd_acy)
@@ -551,6 +562,9 @@ contains
 
         if (allocated(now%dist_margin)) deallocate(now%dist_margin)
         if (allocated(now%dist_grline)) deallocate(now%dist_grline)
+        
+        if (allocated(now%dHdt_nm0))    deallocate(now%dHdt_nm0)
+        if (allocated(now%dHdt_nm1))    deallocate(now%dHdt_nm1)
         
         if (allocated(now%mask_bed))   deallocate(now%mask_bed)
         if (allocated(now%is_grline))  deallocate(now%is_grline)

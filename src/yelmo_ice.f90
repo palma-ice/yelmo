@@ -50,13 +50,9 @@ contains
         real(prec) :: dt_adv_min, dt_pi
         real(prec) :: eta_now, rho_now 
         integer    :: iter_redo, pc_k, iter_redo_tot 
-        real(prec) :: ab_beta1, ab_beta2, ab_zeta 
-        logical    :: use_absam 
+        real(prec) :: ab_zeta 
         logical, allocatable :: pc_mask(:,:) 
         
-        real(prec), allocatable :: ux_bar_n(:,:) 
-        real(prec), allocatable :: uy_bar_n(:,:)
-
         character(len=1012) :: kill_txt
 
         ! Number of iterations to repeat a timestep if the error tolerance is exceeded.
@@ -72,18 +68,16 @@ contains
                 ! (second-order error term)
 
                 pc_k = 2 
-                use_absam = .FALSE. 
 
             case("AB-SAM")
                 ! Adams-Bashforth predictor; Semi-implicit Adams–Moulton corrector
                 ! (third-order error term) 
 
                 pc_k = 3 
-                use_absam = .TRUE. 
 
             case DEFAULT 
 
-                write(*,*) "yelmo_udpate:: Error: pc_method not recognized."
+                write(*,*) "yelmo_udpate:: Error: pc_method does not match available options [FE-SBE, AB-SAM]."
                 write(*,*) "pc_method = ", trim(dom%par%pc_method)
                 stop 
 
@@ -106,9 +100,6 @@ contains
 
         allocate(pc_mask(dom%grd%nx,dom%grd%ny))
 
-        allocate(ux_bar_n(dom%grd%nx,dom%grd%ny))
-        allocate(uy_bar_n(dom%grd%nx,dom%grd%ny))
-
         ! Iteration of yelmo component updates until external timestep is reached
         do n = 1, nstep
 
@@ -129,7 +120,8 @@ contains
             ! Calculate adaptive timestep using proportional-integral (PI) methods
             call set_pc_mask(pc_mask,dom%tpo%now%H_ice,dom%tpo%now%f_grnd)
             call set_adaptive_timestep_pc(dt_pi,dom%par%pc_dt,dom%par%pc_eta,dom%par%pc_eps,dom%par%dt_min,dt_max, &
-                                         pc_mask,dom%dyn%now%ux_bar,dom%dyn%now%uy_bar,dom%tpo%par%dx,pc_k)
+                                         pc_mask,dom%dyn%now%ux_bar,dom%dyn%now%uy_bar,dom%tpo%par%dx,pc_k, &
+                                         dom%par%pc_controller)
 
             ! Determine current time step to be used based on method of choice 
             select case(dom%par%dt_method) 
@@ -168,26 +160,34 @@ contains
                 time_now   = time_now + dt_now
                 if (abs(time-time_now) .lt. time_tol) time_now = time 
                 
+                ! Calculate dt_zeta (ratio of current to previous timestep)
+                dom%tpo%now%dt_zeta = dt_now / dom%par%pc_dt(1) 
+                
+                select case(trim(dom%par%pc_method))
+                    ! No default case necessary, handled earlier 
+
+                    case("FE-SBE")
+                        
+                        dom%tpo%now%dt_beta1 = 1.0_prec 
+                        dom%tpo%now%dt_beta2 = 0.0_prec 
+                    
+                    case("AB-SAM")
+                        
+                        dom%tpo%now%dt_beta1 = 1.0_prec + dom%tpo%now%dt_zeta/2.0_prec 
+                        dom%tpo%now%dt_beta2 = -dom%tpo%now%dt_zeta/2.0_prec 
+
+                end select 
+
+                ! ajr: Left-over from applying PC method to velocity instead of ice thickness 
+                ! Determine uxy_bar_prime (pre-predicted ice velocity field)
+!                 dom%dyn%now%ux_bar = dom%tpo%now%dt_beta1*dom%dyn%now%ux_bar &
+!                                       + dom%tpo%now%dt_beta2*dom%dyn%now%ux_bar_nm1
+!                 dom%dyn%now%uy_bar = dom%tpo%now%dt_beta1*dom%dyn%now%uy_bar &
+!                                       + dom%tpo%now%dt_beta2*dom%dyn%now%uy_bar_nm1
+
                 ! Store local copy of ytopo object to use for predictor step
                 tpo1  = dom%tpo 
                 
-                if (use_absam) then
-                    ! AB-SAM: update velocities for calculation of predicted ice thickness
-
-                    ab_zeta  = dt_now / dom%par%pc_dt(1) 
-                    ab_beta1 = 1.0_prec + ab_zeta/2.0_prec 
-                    ab_beta2 = -ab_zeta/2.0_prec 
-                    
-                    ! Save current velocity uxy_bar_n for later use (potentially)
-                    ux_bar_n = dom%dyn%now%ux_bar
-                    uy_bar_n = dom%dyn%now%uy_bar
-                    
-                    ! Determine uxy_bar_prime (pre-predicted ice velocity field)
-                    dom%dyn%now%ux_bar = ab_beta1*dom%dyn%now%ux_bar + ab_beta2*dom%dyn%now%ux_bar_nm1
-                    dom%dyn%now%uy_bar = ab_beta1*dom%dyn%now%uy_bar + ab_beta2*dom%dyn%now%uy_bar_nm1
-
-                end if 
-
                 ! Step 1: Perform predictor step with temporary topography object 
                 ! Calculate topography (elevation, ice thickness, calving, etc.)
                 call calc_ytopo(tpo1,dom%dyn,dom%thrm,dom%bnd,time_now,topo_fixed=dom%tpo%par%topo_fixed)
@@ -199,20 +199,27 @@ contains
                 ! (this is where uxy_bar_predicted is calculated)
                 call calc_ydyn(dom%dyn,tpo1,dom%mat,dom%thrm,dom%bnd,time_now)
                 
-                if (use_absam) then
-                    ! AB-SAM: update velocities for calculation of corrected ice thickness
+                select case(trim(dom%par%pc_method))
+                    ! No default case necessary, handled earlier 
+
+                    case("FE-SBE")
+                        
+                        dom%tpo%now%dt_beta1 = 1.0_prec 
+                        dom%tpo%now%dt_beta2 = 0.0_prec 
                     
-                    ! Determine corrected uxy_bar using predicted uxy_bar and pre-predicted uxy_bar
-                    dom%dyn%now%ux_bar = 0.5_prec * (dom%dyn%now%ux_bar + dom%dyn%now%ux_bar_nm1)
-                    dom%dyn%now%uy_bar = 0.5_prec * (dom%dyn%now%uy_bar + dom%dyn%now%uy_bar_nm1)
+                    case("AB-SAM")
+                        
+                        dom%tpo%now%dt_beta1 = 0.5_prec 
+                        dom%tpo%now%dt_beta2 = 0.5_prec 
+                    
+                end select 
 
-                    ! Determine corrected uxy_bar using predicted uxy_bar and uxy_bar_n 
-                    ! ajr: below method seems more directly consistent with SAM method, but
-                    ! using the pre-predicted velocity solution as above seems to work better.
-!                     dom%dyn%now%ux_bar = 0.5_prec * (dom%dyn%now%ux_bar + ux_bar_n)
-!                     dom%dyn%now%uy_bar = 0.5_prec * (dom%dyn%now%uy_bar + uy_bar_n)
-
-                end if 
+                ! ajr: Left-over from applying PC method to velocity instead of ice thickness 
+                ! Determine uxy_bar_prime (pre-predicted ice velocity field)
+!                 dom%dyn%now%ux_bar = dom%tpo%now%dt_beta1*dom%dyn%now%ux_bar &
+!                                       + dom%tpo%now%dt_beta2*dom%dyn%now%ux_bar_nm1
+!                 dom%dyn%now%uy_bar = dom%tpo%now%dt_beta1*dom%dyn%now%uy_bar &
+!                                       + dom%tpo%now%dt_beta2*dom%dyn%now%uy_bar_nm1
 
                 ! Calculate material (ice properties, viscosity, etc.)
                 call calc_ymat(dom%mat,tpo1,dom%dyn,dom%thrm,dom%bnd,time_now)
@@ -225,15 +232,21 @@ contains
                 call calc_ytopo(dom%tpo,dom%dyn,dom%thrm,dom%bnd,time_now,topo_fixed=dom%tpo%par%topo_fixed)    
                 call calc_ytopo_masks(dom%tpo,dom%dyn,dom%thrm,dom%bnd)
 
-
                 ! Determine truncation error for ice thickness 
-                if (use_absam) then 
-                    ! AB-SAM truncation error 
-                    call calc_pc_tau_ab_sam(dom%par%pc_tau,dom%tpo%now%H_ice,tpo1%now%H_ice,dt_now,ab_zeta)
-                else 
-                    ! FE-SBE truncation error 
-                    call calc_pc_tau_fe_sbe(dom%par%pc_tau,dom%tpo%now%H_ice,tpo1%now%H_ice,dt_now)
-                end if 
+                select case(trim(dom%par%pc_method))
+                    ! No default case necessary, handled earlier 
+
+                    case("FE-SBE")
+                        
+                        ! FE-SBE truncation error 
+                        call calc_pc_tau_fe_sbe(dom%par%pc_tau,dom%tpo%now%H_ice,tpo1%now%H_ice,dt_now)
+
+                    case("AB-SAM")
+                        
+                        ! AB-SAM truncation error 
+                        call calc_pc_tau_ab_sam(dom%par%pc_tau,dom%tpo%now%H_ice,tpo1%now%H_ice,dt_now,dom%tpo%now%dt_zeta)
+
+                end select 
 
                 ! Calculate eta for this timestep 
                 call set_pc_mask(pc_mask,dom%tpo%now%H_ice,dom%tpo%now%f_grnd)
@@ -796,6 +809,7 @@ contains
         call nml_read(filename,"yelmo","cfl_max",       par%cfl_max)
         call nml_read(filename,"yelmo","cfl_diff_max",  par%cfl_diff_max)
         call nml_read(filename,"yelmo","pc_method",     par%pc_method)
+        call nml_read(filename,"yelmo","pc_controller", par%pc_controller)
         call nml_read(filename,"yelmo","pc_tol",        par%pc_tol)
         call nml_read(filename,"yelmo","pc_eps",        par%pc_eps)
 

@@ -34,6 +34,7 @@
     cfl_max         = 0.1               ! Maximum value is 1.0, lower will be more stable
     cfl_diff_max    = 0.12              ! Bueler et al (2007), Eq. 25  
     pc_method       = "AB-SAM"          ! "FE-SBE" or "AB-SAM"
+    pc_controller   = "PI42"            ! PI42, H312b, H312PID
     pc_tol          = 1.5               ! [m/a] Tolerance threshold to redo timestep
     pc_eps          = 1e-3              ! Predictor-corrector tolerance 
     

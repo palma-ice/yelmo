@@ -14,7 +14,7 @@ module mass_conservation
 contains 
 
     subroutine calc_ice_thickness(H_ice,H_margin,f_ice,mb_applied,f_grnd,H_ocn,ux,uy,mbal,calv,z_bed_sd,dx,dt, &
-                                    solver,boundaries,ice_allowed,H_min,sd_min,sd_max,calv_max)
+                                    solver,boundaries,ice_allowed,H_min,sd_min,sd_max,calv_max,dHdt_nm0,dHdt_nm1,dt_beta1,dt_beta2)
         ! Interface subroutine to update ice thickness through application
         ! of advection, vertical mass balance terms and calving 
 
@@ -40,10 +40,14 @@ contains
         real(prec),       intent(IN)    :: sd_min               ! [m]   Minimum stdev(z_bed) parameter
         real(prec),       intent(IN)    :: sd_max               ! [m]   Maximum stdev(z_bed) parameter
         real(prec),       intent(IN)    :: calv_max             ! [m]   Maximum grounded calving rate parameter
+        real(prec),       intent(INOUT) :: dHdt_nm0(:,:)        ! [m/a] Advective rate of ice thickness change from current timestep
+        real(prec),       intent(INOUT) :: dHdt_nm1(:,:)        ! [m/a] Advective rate of ice thickness change from previous timestep 
+        real(prec),       intent(IN)    :: dt_beta1 
+        real(prec),       intent(IN)    :: dt_beta2 
 
         ! Local variables 
         integer :: i, j, nx, ny 
-        integer :: n 
+        integer :: n  
         real(prec), allocatable :: calv_grnd(:,:) 
 
         real(prec), allocatable :: ux_tmp(:,:) 
@@ -59,8 +63,6 @@ contains
         allocate(uy_tmp(nx,ny))
         ux_tmp = 0.0_prec 
         uy_tmp = 0.0_prec 
-
-        ! 1. Apply mass conservation =================
 
         ! Ensure that no velocity is defined for outer boundaries of margin points
         ux_tmp = ux 
@@ -82,10 +84,21 @@ contains
 !         ! No margin treatment 
 !         ux_tmp = ux
 !         uy_tmp = uy 
+        
+        ! ===================================================================================
+        ! First, only resolve the dynamic part (ice advection) using multistep method
 
-        ! First, only resolve the dynamic part (ice advection)
-        call calc_advec2D(H_ice,ux_tmp,uy_tmp,mbal*0.0,dx,dx,dt,solver)
+        ! Store advective rate of change from previous timestep 
+        dHdt_nm1 = dHdt_nm0 
 
+        ! Determine current advective rate of change 
+        call calc_advec2D(dHdt_nm0,H_ice,ux_tmp,uy_tmp,mbal*0.0,dx,dx,dt,solver)
+
+        ! Update ice thickness using weighted advective rates of change 
+        H_ice = H_ice + (dt_beta1*dt)*dHdt_nm0 + (dt_beta2*dt)*dHdt_nm1 
+
+        ! ===================================================================================
+        
 
         ! Next, handle mass balance in order to be able to diagnose
         ! precisely how much mass was lost/gained 
@@ -135,7 +148,7 @@ contains
         ! according to boundary mask (ie, EISMINT, BUELER-A, open ocean)
         where (.not. ice_allowed) H_ice = 0.0 
 
-        ! 2. Post processing of H_ice ================
+        ! Post processing of H_ice ================
 
         select case(trim(boundaries))
 

@@ -15,11 +15,12 @@ module solver_advection
 
 contains 
 
-    subroutine calc_advec2D(var,ux,uy,var_dot,dx,dy,dt,solver)
+    subroutine calc_advec2D(dvdt,var,ux,uy,var_dot,dx,dy,dt,solver)
         ! General routine to apply 2D advection equation to variable `var` 
         ! with source term `var_dot`. Various solvers are possible
 
-        real(prec),       intent(INOUT) :: var(:,:)             ! [var] Variable to be advected
+        real(prec),       intent(OUT)   :: dvdt(:,:)            ! [dvdt] Variable rate of change
+        real(prec),       intent(IN)    :: var(:,:)             ! [var]  Variable to be advected
         real(prec),       intent(IN)    :: ux(:,:)              ! [m/a] 2D velocity, x-direction (ac-nodes)
         real(prec),       intent(IN)    :: uy(:,:)              ! [m/a] 2D velocity, y-direction (ac-nodes)
         real(prec),       intent(IN)    :: var_dot(:,:)         ! [dvar/dt] Source term for variable
@@ -28,33 +29,41 @@ contains
         real(prec),       intent(IN)    :: dt                   ! [a]   Timestep 
         character(len=*), intent(IN)    :: solver               ! Solver to use for the ice thickness advection equation
 
+        ! Local variables 
+        real(prec), allocatable :: var_now(:,:) 
+
+        allocate(var_now(size(var,1),size(var,2)))
+
+        ! Assign local variable to be modified 
+        var_now = var 
+
         select case(trim(solver))
             ! Choose solver to use 
 
             case("expl")
 
-                call calc_adv2D_expl(var,ux,uy,var_dot,dx,dy,dt)
+                call calc_adv2D_expl(var_now,ux,uy,var_dot,dx,dy,dt)
 
             case("expl-upwind")
 
-                call calc_adv2D_expl_upwind(var,ux,uy,var_dot,dx,dy,dt)
+                call calc_adv2D_expl_upwind(var_now,ux,uy,var_dot,dx,dy,dt)
 
             case("impl-upwind") 
 
-                call calc_adv2D_impl_upwind(var,ux,uy,var_dot,dx,dy,dt,f_upwind=1.0_prec)
+                call calc_adv2D_impl_upwind(var_now,ux,uy,var_dot,dx,dy,dt,f_upwind=1.0_prec)
             
             ! Other solvers below...
             case("expl-sico")
 
-                call calc_adv2D_expl_sico(var,ux,uy,var_dot,dx,dy,dt)
+                call calc_adv2D_expl_sico(var_now,ux,uy,var_dot,dx,dy,dt)
 
             case("impl-sico")
 
-                call calc_adv2D_impl_sico(var,ux,uy,var_dot,dx,dy,dt,use_lis=.FALSE.)
+                call calc_adv2D_impl_sico(var_now,ux,uy,var_dot,dx,dy,dt,use_lis=.FALSE.)
 
             case("impl-sico-lis")
 
-                call calc_adv2D_impl_sico(var,ux,uy,var_dot,dx,dy,dt,use_lis=.TRUE.)
+                call calc_adv2D_impl_sico(var_now,ux,uy,var_dot,dx,dy,dt,use_lis=.TRUE.)
 
             case DEFAULT 
 
@@ -64,6 +73,9 @@ contains
 
         end select 
         
+        ! Determine rate of change 
+        dvdt = (var_now - var) / dt 
+
         return 
 
     end subroutine calc_advec2D
@@ -151,7 +163,7 @@ contains
         ! d[H]/dt = -grad[H*(ux,uy)] + mdot 
 
         ! Second-order upwind routine, see eg, Winkelmann et al (2011), Eq. 18 
-        
+
         implicit none 
 
         real(prec), intent(INOUT) :: H_ice(:,:)             ! [m] aa-nodes, Ice thickness 

@@ -557,14 +557,11 @@ contains
         ! following Greve and Blatter (2009), Eqs. 4.7 and 5.65
         Q_strn = beta1*(4.0*visc * de**2) + beta2*Q_strn 
         
-        ! Limit strain heating to reasonable values 
-        !where (Q_strn .gt. Q_strn_max) Q_strn = Q_strn_max
-
         return 
 
     end subroutine calc_strain_heating
     
-    subroutine calc_strain_heating_sia(Q_strn,ux,uy,dzsdx,dzsdy,cp,H_ice,rho_ice,zeta_aa,zeta_ac)
+    subroutine calc_strain_heating_sia(Q_strn,ux,uy,dzsdx,dzsdy,cp,H_ice,rho_ice,zeta_aa,zeta_ac,beta1,beta2)
 
         ! Calculate the general 3D internal strain heating
         ! as sum(D_ij*tau_ij)  (strain*stress)
@@ -577,17 +574,19 @@ contains
 
         implicit none
 
-        real(prec),            intent(OUT) :: Q_strn(:,:,:)      ! nx,ny,nz_aa  [Pa m a-1 ??] Heat production
-        real(prec),            intent(IN)  :: ux(:,:,:)          ! nx,ny,nz_aa  [m a-1] Velocity x-direction
-        real(prec),            intent(IN)  :: uy(:,:,:)          ! nx,ny,nz_aa  [m a-1] Velocity y-direction
-        real(prec),            intent(IN)  :: dzsdx(:,:)         ! nx,ny        [m m-1] Surface slope x-direction
-        real(prec),            intent(IN)  :: dzsdy(:,:)         ! nx,ny        [m m-1] Surface slope y-direction
-        real(prec),            intent(IN)  :: cp(:,:,:)          ! nx,ny,nz_aa  [J/kg/K] Specific heat capacity
-        real(prec),            intent(IN)  :: H_ice(:,:)         ! nx,ny        [m] Ice thickness
-        real(prec),            intent(IN)  :: rho_ice            ! [kg m-3] Ice density 
-        real(prec),            intent(IN)  :: zeta_aa(:)        ! [-] Height axis, centered aa-nodes 
-        real(prec),            intent(IN)  :: zeta_ac(:)        ! [-] Height axis, boundaries ac-nodes
-
+        real(prec), intent(INOUT) :: Q_strn(:,:,:)    ! nx,ny,nz_aa  [Pa m a-1 ??] Heat production
+        real(prec), intent(IN)    :: ux(:,:,:)        ! nx,ny,nz_aa  [m a-1] Velocity x-direction
+        real(prec), intent(IN)    :: uy(:,:,:)        ! nx,ny,nz_aa  [m a-1] Velocity y-direction
+        real(prec), intent(IN)    :: dzsdx(:,:)       ! nx,ny        [m m-1] Surface slope x-direction
+        real(prec), intent(IN)    :: dzsdy(:,:)       ! nx,ny        [m m-1] Surface slope y-direction
+        real(prec), intent(IN)    :: cp(:,:,:)        ! nx,ny,nz_aa  [J/kg/K] Specific heat capacity
+        real(prec), intent(IN)    :: H_ice(:,:)       ! nx,ny        [m] Ice thickness
+        real(prec), intent(IN)    :: rho_ice          ! [kg m-3] Ice density 
+        real(prec), intent(IN)    :: zeta_aa(:)       ! [-] Height axis, centered aa-nodes 
+        real(prec), intent(IN)    :: zeta_ac(:)       ! [-] Height axis, boundaries ac-nodes
+        real(prec), intent(IN)    :: beta1            ! Timestepping weighting parameter
+        real(prec), intent(IN)    :: beta2            ! Timestepping weighting parameter
+        
         ! Local variables
         integer :: i, j, k, nx, ny, nz_aa 
         real(prec) :: ux_aa_up, ux_aa_dwn
@@ -595,15 +594,11 @@ contains
         real(prec) :: duxdz, duydz
         real(prec) :: dzsdx_aa, dzsdy_aa  
         real(prec) :: dz, depth 
+        real(prec) :: Q_strn_now 
 
-        real(prec), parameter :: Q_strn_max = 0.1          ! Q_strn > 0.1 is already high, it's only a safety valve. 
-        
         nx    = size(Q_strn,1)
         ny    = size(Q_strn,2)
         nz_aa = size(Q_strn,3)
-
-        ! Base and surface Q_strn == 0.0
-        Q_strn = 0.0 
 
         do j = 2, ny 
         do i = 2, nx 
@@ -630,42 +625,46 @@ contains
                     
                     depth = H_ice(i,j)*(1.0-zeta_aa(k))
                     
-                    Q_strn(i,j,k) = (-rho_ice*g*depth) * (duxdz*dzsdx_aa + duydz*dzsdy_aa)
+                    Q_strn_now = (-rho_ice*g*depth) * (duxdz*dzsdx_aa + duydz*dzsdy_aa)
+                    Q_strn(i,j,k) = beta1*Q_strn_now + beta2*Q_strn(i,j,k) 
                     
                 end do 
+
+            else 
+                ! No Q_strn outside of ice sheet 
+                
+                Q_strn(i,j,k) = 0.0_prec 
 
             end if 
 
         end do 
         end do 
 
-        ! [m s-1] [m] 
-        ! Limit strain heating to reasonable values 
-        where (Q_strn .gt. Q_strn_max) Q_strn = Q_strn_max
-
         return 
 
     end subroutine calc_strain_heating_sia
 
-    subroutine calc_basal_heating(Q_b,ux_b,uy_b,taub_acx,taub_acy,H_ice,T_prime_b,gamma)
+    subroutine calc_basal_heating(Q_b,ux_b,uy_b,taub_acx,taub_acy,H_ice,T_prime_b,gamma,beta1,beta2)
          ! Qb [J a-1 m-2] == [m a-1] * [J m-3]
          ! Note: grounded ice fraction f_grnd_acx/y not used here, because taub_acx/y already accounts
          ! for the grounded fraction via beta_acx/y: Q_b = tau_b*u = -beta*u*u.
 
-        real(prec), intent(INOUT) :: Q_b(:,:)               ! [J a-1 K-1] Basal heat production (friction), aa-nodes
-        real(prec), intent(IN)  :: ux_b(:,:)                ! Basal velocity, x-component (acx)
-        real(prec), intent(IN)  :: uy_b(:,:)                ! Basal velocity, y-compenent (acy)
-        real(prec), intent(IN)  :: taub_acx(:,:)            ! Basal friction (acx)
-        real(prec), intent(IN)  :: taub_acy(:,:)            ! Basal friction (acy) 
-        real(prec), intent(IN)  :: T_prime_b(:,:)           ! [degC] Basal homologous temperature (aa-nodes)
-        real(prec), intent(IN)  :: H_ice(:,:)               ! [m] Ice thickness 
-        real(prec), intent(IN)  :: gamma 
-
+        real(prec), intent(INOUT) :: Q_b(:,:)           ! [J a-1 K-1] Basal heat production (friction), aa-nodes
+        real(prec), intent(IN)    :: ux_b(:,:)          ! Basal velocity, x-component (acx)
+        real(prec), intent(IN)    :: uy_b(:,:)          ! Basal velocity, y-compenent (acy)
+        real(prec), intent(IN)    :: taub_acx(:,:)      ! Basal friction (acx)
+        real(prec), intent(IN)    :: taub_acy(:,:)      ! Basal friction (acy) 
+        real(prec), intent(IN)    :: T_prime_b(:,:)     ! [degC] Basal homologous temperature (aa-nodes)
+        real(prec), intent(IN)    :: H_ice(:,:)         ! [m] Ice thickness 
+        real(prec), intent(IN)    :: gamma 
+        real(prec), intent(IN)    :: beta1              ! Timestepping weighting parameter
+        real(prec), intent(IN)    :: beta2              ! Timestepping weighting parameter
+        
         ! Local variables
         integer    :: i, j, nx, ny, n 
         real(prec), allocatable :: Qb_acx(:,:)
         real(prec), allocatable :: Qb_acy(:,:)
-        real(prec) :: Qb_tmp 
+        real(prec) :: Q_b_now 
         real(prec) :: f_pmp 
 
         nx = size(Q_b,1)
@@ -678,73 +677,23 @@ contains
         Qb_acx = abs(ux_b*taub_acx)   ! [Pa m a-1] == [J a-1 m-2]
         Qb_acy = abs(uy_b*taub_acy)   ! [Pa m a-1] == [J a-1 m-2]
 
-        Q_b = 0.0  
- 
+
         ! Get basal frictional heating on centered nodes (aa-nodes)          
         do j = 2, ny-1
         do i = 2, nx-1
 
             ! Average from ac-nodes to aa-node
-            Q_b(i,j) = 0.25*(Qb_acx(i,j)+Qb_acx(i-1,j)+Qb_acy(i,j)+Qb_acy(i,j-1))
-
-if (.FALSE.) then 
-            Qb_tmp = 0.0_prec 
-            n      = 0 
-
-            if (H_ice(i-1,j-1) .gt. 0.0) then 
-                Qb_tmp = Qb_tmp + Qb_acx(i-1,j-1)
-                n      = n+1 
-            end if 
-
-            if (H_ice(i-1,j+1) .gt. 0.0) then 
-                Qb_tmp = Qb_tmp + Qb_acx(i-1,j+1)
-                n      = n+1 
-            end if 
-            
-            if (H_ice(i,j-1) .gt. 0.0) then 
-                Qb_tmp = Qb_tmp + Qb_acx(i,j-1)
-                n      = n+1 
-            end if 
-            
-            if (H_ice(i,j+1) .gt. 0.0) then 
-                Qb_tmp = Qb_tmp + Qb_acx(i,j+1)
-                n      = n+1 
-            end if 
-            
-            if (H_ice(i-1,j-1) .gt. 0.0) then 
-                Qb_tmp = Qb_tmp + Qb_acy(i-1,j-1)
-                n      = n+1 
-            end if 
-            
-            if (H_ice(i+1,j-1) .gt. 0.0) then 
-                Qb_tmp = Qb_tmp + Qb_acy(i+1,j-1)
-                n      = n+1 
-            end if 
-            
-            if (H_ice(i-1,j) .gt. 0.0) then 
-                Qb_tmp = Qb_tmp + Qb_acy(i-1,j)
-                n      = n+1 
-            end if 
-            
-            if (H_ice(i+1,j) .gt. 0.0) then 
-                Qb_tmp = Qb_tmp + Qb_acy(i+1,j)
-                n      = n+1 
-            end if 
-            
-            if (n .gt. 0) Qb_tmp = Qb_tmp / real(n,prec)
-
-            ! Average over neighborhood
-            Q_b(i,j) = 0.5*Q_b(i,j) + 0.5*Qb_tmp 
-
-end if 
+            Q_b_now = 0.25*(Qb_acx(i,j)+Qb_acx(i-1,j)+Qb_acy(i,j)+Qb_acy(i,j-1))
 
 if (.TRUE.) then 
             ! Reduction of Q_b with T_prime_b (apply decay function)
             if (gamma .gt. 0.0) then 
-                f_pmp    = min(1.0, exp((T_prime_b(i,j))/gamma) )
-                Q_b(i,j) = Q_b(i,j)*f_pmp  
+                f_pmp   = min(1.0, exp((T_prime_b(i,j))/gamma) )
+                Q_b_now = Q_b_now*f_pmp  
             end if 
 end if 
+            
+            Q_b(i,j) = beta1*Q_b_now + beta2*Q_b(i,j) 
 
         end do 
         end do 

@@ -74,7 +74,7 @@ contains
 
         ! Calculate the basal frictional heating 
         call calc_basal_heating(thrm%now%Q_b,dyn%now%ux_b,dyn%now%uy_b,dyn%now%taub_acx,dyn%now%taub_acy, &
-                                tpo%now%H_ice,thrm%now%T_prime_b,gamma=2.0_prec)
+                        tpo%now%H_ice,thrm%now%T_prime_b,gamma=2.0_prec,beta1=thrm%par%dt_beta1,beta2=thrm%par%dt_beta2)
 
         ! Ensure basal frictional heating is relatively smooth
         call regularize2D(thrm%now%Q_b,tpo%now%H_ice,tpo%par%dx)
@@ -90,7 +90,8 @@ contains
             ! Calculate strain heating from SIA approximation
 
             call calc_strain_heating_sia(thrm%now%Q_strn,dyn%now%ux,dyn%now%uy,tpo%now%dzsdx,tpo%now%dzsdy, &
-                                      thrm%now%cp,tpo%now%H_ice,rho_ice,thrm%par%zeta_aa,thrm%par%zeta_ac)
+                                      thrm%now%cp,tpo%now%H_ice,rho_ice,thrm%par%zeta_aa,thrm%par%zeta_ac, &
+                                      thrm%par%dt_beta1,thrm%par%dt_beta2)
         
         else
             ! Calculate strain heating from strain rate tensor and viscosity (general approach)

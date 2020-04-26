@@ -153,18 +153,18 @@ contains
 
         ! == ydyn variables ===
 
-        call nc_write(filename,"ux",          dom%dyn%now%ux,     units="m/a",dim1="xc",dim2="yc",dim3="zeta",ncid=ncid) 
-        call nc_write(filename,"uy",          dom%dyn%now%uy,     units="m/a",dim1="xc",dim2="yc",dim3="zeta",ncid=ncid) 
-        call nc_write(filename,"uxy",         dom%dyn%now%uxy,    units="m/a",dim1="xc",dim2="yc",dim3="zeta",ncid=ncid) 
-        call nc_write(filename,"uz",          dom%dyn%now%uz,      units="m/a",dim1="xc",dim2="yc",dim3="zeta",ncid=ncid) 
+        call nc_write(filename,"ux",            dom%dyn%now%ux,     units="m/a",dim1="xc",dim2="yc",dim3="zeta",ncid=ncid) 
+        call nc_write(filename,"uy",            dom%dyn%now%uy,     units="m/a",dim1="xc",dim2="yc",dim3="zeta",ncid=ncid) 
+        call nc_write(filename,"uxy",           dom%dyn%now%uxy,    units="m/a",dim1="xc",dim2="yc",dim3="zeta",ncid=ncid) 
+        call nc_write(filename,"uz",            dom%dyn%now%uz,     units="m/a",dim1="xc",dim2="yc",dim3="zeta_ac",ncid=ncid) 
       
-        call nc_write(filename,"ux_bar",      dom%dyn%now%ux_bar, units="m/a",dim1="xc",dim2="yc",ncid=ncid) 
-        call nc_write(filename,"uy_bar",      dom%dyn%now%uy_bar, units="m/a",dim1="xc",dim2="yc",ncid=ncid) 
-        call nc_write(filename,"uxy_bar",     dom%dyn%now%uxy_bar,units="m/a",dim1="xc",dim2="yc",ncid=ncid) 
+        call nc_write(filename,"ux_bar",        dom%dyn%now%ux_bar, units="m/a",dim1="xc",dim2="yc",ncid=ncid) 
+        call nc_write(filename,"uy_bar",        dom%dyn%now%uy_bar, units="m/a",dim1="xc",dim2="yc",ncid=ncid) 
+        call nc_write(filename,"uxy_bar",       dom%dyn%now%uxy_bar,units="m/a",dim1="xc",dim2="yc",ncid=ncid) 
 
-        call nc_write(filename,"ux_b",      dom%dyn%now%ux_b, units="m/a",dim1="xc",dim2="yc",ncid=ncid) 
-        call nc_write(filename,"uy_b",      dom%dyn%now%uy_b, units="m/a",dim1="xc",dim2="yc",ncid=ncid) 
-        call nc_write(filename,"uxy_b",     dom%dyn%now%uxy_b,units="m/a",dim1="xc",dim2="yc",ncid=ncid) 
+        call nc_write(filename,"ux_b",          dom%dyn%now%ux_b,   units="m/a",dim1="xc",dim2="yc",ncid=ncid) 
+        call nc_write(filename,"uy_b",          dom%dyn%now%uy_b,   units="m/a",dim1="xc",dim2="yc",ncid=ncid) 
+        call nc_write(filename,"uxy_b",         dom%dyn%now%uxy_b,  units="m/a",dim1="xc",dim2="yc",ncid=ncid) 
 
         call nc_write(filename,"ux_s",          dom%dyn%now%ux_s,     units="m/a",dim1="xc",dim2="yc",ncid=ncid) 
         call nc_write(filename,"uy_s",          dom%dyn%now%uy_s,     units="m/a",dim1="xc",dim2="yc",ncid=ncid) 
@@ -176,7 +176,7 @@ contains
         call nc_write(filename,"uy_i_bar",      dom%dyn%now%uy_i_bar, units="m/a",dim1="xc",dim2="yc",ncid=ncid) 
         call nc_write(filename,"uxy_i_bar",     dom%dyn%now%uxy_i_bar,units="m/a",dim1="xc",dim2="yc",ncid=ncid) 
 
-        call nc_write(filename,"duxydt",        dom%dyn%now%duxydt,units="m/a^2",dim1="xc",dim2="yc",ncid=ncid) 
+        call nc_write(filename,"duxydt",        dom%dyn%now%duxydt,   units="m/a^2",dim1="xc",dim2="yc",ncid=ncid) 
 
         call nc_write(filename,"dd_ab",         dom%dyn%now%dd_ab,    units="",dim1="xc",dim2="yc",dim3="zeta",ncid=ncid) 
         call nc_write(filename,"dd_ab_bar",     dom%dyn%now%dd_ab_bar,units="",dim1="xc",dim2="yc",ncid=ncid) 

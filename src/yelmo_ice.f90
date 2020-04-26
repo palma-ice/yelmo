@@ -371,6 +371,8 @@ contains
         ! If so, then write a restart file and kill it. 
         if ( (real(n_dtmin,prec)/real(n,prec)) .gt. 0.8 ) then 
 
+            write(*,*) "pc_eta = ", dom%par%pc_eta
+            
             write(kill_txt,"(a,i10,a,i10)") "Too many iterations of dt_min called for this timestep.", &
                                             n_dtmin, " of ", n 
 

@@ -200,8 +200,7 @@ contains
                 ! Note: Suggested k_i =(2/9)*1/pc_k, but lower value gives more stable solution
 
                 !k_i = (2.0_prec/9.0_prec)*1.0_prec/real(pc_k,prec)
-                !k_i = 0.08_prec/real(pc_k,prec)
-                k_i = 0.10_prec/real(pc_k,prec)
+                k_i = 0.08_prec/real(pc_k,prec)
 
                 rho_n = calc_pi_rho_H312PID(eta_n,eta_nm1,eta_nm2,eps,k_i)
 

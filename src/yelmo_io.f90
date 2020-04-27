@@ -151,6 +151,10 @@ contains
         call nc_write(filename,"is_grline",   dom%tpo%now%is_grline,   units="1",  dim1="xc",dim2="yc",ncid=ncid)  
         call nc_write(filename,"is_grz",      dom%tpo%now%is_grz,      units="1",  dim1="xc",dim2="yc",ncid=ncid)  
 
+        call nc_write(filename,"dHdt_n",      dom%tpo%now%dHdt_n,      units="m/a",dim1="xc",dim2="yc",ncid=ncid)
+        call nc_write(filename,"H_ice_n",     dom%tpo%now%H_ice_n,     units="m",  dim1="xc",dim2="yc",ncid=ncid)
+        call nc_write(filename,"H_ice_pred",  dom%tpo%now%H_ice_pred,  units="m",  dim1="xc",dim2="yc",ncid=ncid)
+        
         ! == ydyn variables ===
 
         call nc_write(filename,"ux",            dom%dyn%now%ux,     units="m/a",dim1="xc",dim2="yc",dim3="zeta",ncid=ncid) 
@@ -162,6 +166,9 @@ contains
         call nc_write(filename,"uy_bar",        dom%dyn%now%uy_bar, units="m/a",dim1="xc",dim2="yc",ncid=ncid) 
         call nc_write(filename,"uxy_bar",       dom%dyn%now%uxy_bar,units="m/a",dim1="xc",dim2="yc",ncid=ncid) 
 
+        call nc_write(filename,"ux_bar_prev",   dom%dyn%now%ux_bar_prev, units="m/a",dim1="xc",dim2="yc",ncid=ncid) 
+        call nc_write(filename,"uy_bar_prev",   dom%dyn%now%uy_bar_prev, units="m/a",dim1="xc",dim2="yc",ncid=ncid) 
+        
         call nc_write(filename,"ux_b",          dom%dyn%now%ux_b,   units="m/a",dim1="xc",dim2="yc",ncid=ncid) 
         call nc_write(filename,"uy_b",          dom%dyn%now%uy_b,   units="m/a",dim1="xc",dim2="yc",ncid=ncid) 
         call nc_write(filename,"uxy_b",         dom%dyn%now%uxy_b,  units="m/a",dim1="xc",dim2="yc",ncid=ncid) 
@@ -378,6 +385,10 @@ contains
         call nc_read(filename,"is_grline",   dom%tpo%now%is_grline,ncid=ncid)
         call nc_read(filename,"is_grz",      dom%tpo%now%is_grz,ncid=ncid)
         
+        call nc_read(filename,"dHdt_n",      dom%tpo%now%dHdt_n,ncid=ncid)
+        call nc_read(filename,"H_ice_n",     dom%tpo%now%H_ice_n,ncid=ncid)
+        call nc_read(filename,"H_ice_pred",  dom%tpo%now%H_ice_pred,ncid=ncid)
+        
         ! Close the netcdf file
         call nc_close(ncid)
 
@@ -424,6 +435,9 @@ contains
         call nc_read(filename,"uy_bar",        dom%dyn%now%uy_bar,ncid=ncid) 
         call nc_read(filename,"uxy_bar",       dom%dyn%now%uxy_bar,ncid=ncid) 
 
+        call nc_read(filename,"ux_bar_prev",   dom%dyn%now%ux_bar_prev,ncid=ncid) 
+        call nc_read(filename,"uy_bar_prev",   dom%dyn%now%uy_bar_prev,ncid=ncid) 
+        
         call nc_read(filename,"ux_b",          dom%dyn%now%ux_b,ncid=ncid) 
         call nc_read(filename,"uy_b",          dom%dyn%now%uy_b,ncid=ncid) 
         call nc_read(filename,"uxy_b",         dom%dyn%now%uxy_b,ncid=ncid) 

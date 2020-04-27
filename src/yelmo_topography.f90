@@ -77,9 +77,6 @@ contains
         
         ! Perform topography calculations 
         if ( .not. topo_fixed .and. dt .gt. 0.0 ) then 
-
-            ! Store previous ice thickness
-            tpo%now%dHicedt = tpo%now%H_ice 
             
             ! Define temporary variable for total column mass balance 
            
@@ -89,16 +86,16 @@ contains
                 ! WHEN RUNNING EISMINT1 ensure bmb is not accounted for here !!!
                 mbal = bnd%smb 
             end if 
-
+            
             ! 1. Calculate the ice thickness conservation -----
             call calc_ice_thickness(tpo%now%H_ice,tpo%now%H_margin,tpo%now%f_ice,tpo%now%mb_applied, &
+                                    tpo%now%dHdt_n,tpo%now%H_ice_n,tpo%now%H_ice_pred, &
                                     tpo%now%f_grnd,bnd%z_sl-bnd%z_bed,dyn%now%ux_bar,dyn%now%uy_bar, &
                                     mbal=mbal,calv=tpo%now%calv,z_bed_sd=bnd%z_bed_sd,dx=tpo%par%dx,dt=dt, &
                                     solver=trim(tpo%par%solver),boundaries=trim(tpo%par%boundaries), &
                                     ice_allowed=bnd%ice_allowed,H_min=tpo%par%H_min_grnd, &
                                     sd_min=tpo%par%sd_min,sd_max=tpo%par%sd_max,calv_max=tpo%par%calv_max, &
-                                    dHdt_nm0=tpo%now%dHdt_nm0,dHdt_nm1=tpo%now%dHdt_nm1, &
-                                    dt_beta1=tpo%par%dt_beta1,dt_beta2=tpo%par%dt_beta2)
+                                    beta1=tpo%par%dt_beta1,beta2=tpo%par%dt_beta2,pc_step=tpo%par%pc_step)
             
             ! If desired, relax solution to reference state
             if (tpo%par%topo_rel .ne. 0) then 
@@ -163,7 +160,7 @@ contains
             end if  
              
             ! Determine the rate of change of ice thickness [m/a]
-            tpo%now%dHicedt = (tpo%now%H_ice - tpo%now%dHicedt)/dt
+            tpo%now%dHicedt = (tpo%now%H_ice - tpo%now%H_ice_n)/dt
 
         else 
 
@@ -484,9 +481,6 @@ contains
         
         allocate(now%H_grnd(nx,ny))
 
-        allocate(now%dHdt_nm0(nx,ny))
-        allocate(now%dHdt_nm1(nx,ny))
-
         ! Masks 
         allocate(now%f_grnd(nx,ny))
         allocate(now%f_grnd_acx(nx,ny))
@@ -500,6 +494,10 @@ contains
         allocate(now%is_grline(nx,ny))
         allocate(now%is_grz(nx,ny))
 
+        allocate(now%dHdt_n(nx,ny))
+        allocate(now%H_ice_n(nx,ny))
+        allocate(now%H_ice_pred(nx,ny))
+        
         now%H_ice       = 0.0 
         now%z_srf       = 0.0  
         now%dzsrfdt     = 0.0 
@@ -519,13 +517,15 @@ contains
         now%f_grnd_acy  = 0.0  
         now%f_ice       = 0.0  
         now%dist_margin = 0.0
-        now%dist_grline = 0.0
-        now%dHdt_nm0    = 0.0  
-        now%dHdt_nm1    = 0.0  
+        now%dist_grline = 0.0 
         
         now%mask_bed    = 0.0 
         now%is_grline   = .FALSE. 
         now%is_grz      = .FALSE. 
+         
+        now%dHdt_n      = 0.0  
+        now%H_ice_n     = 0.0 
+        now%H_ice_pred  = 0.0 
         
         return 
     end subroutine ytopo_alloc 
@@ -536,41 +536,42 @@ contains
 
         type(ytopo_state_class), intent(INOUT) :: now
 
-        if (allocated(now%H_ice))      deallocate(now%H_ice)
-        if (allocated(now%z_srf))      deallocate(now%z_srf)
+        if (allocated(now%H_ice))       deallocate(now%H_ice)
+        if (allocated(now%z_srf))       deallocate(now%z_srf)
         
-        if (allocated(now%dzsrfdt))    deallocate(now%dzsrfdt)
-        if (allocated(now%dHicedt))    deallocate(now%dHicedt)
-        if (allocated(now%bmb))        deallocate(now%bmb)
-        if (allocated(now%mb_applied)) deallocate(now%mb_applied)
-        if (allocated(now%calv_grnd))  deallocate(now%calv_grnd)
-        if (allocated(now%calv))       deallocate(now%calv)
+        if (allocated(now%dzsrfdt))     deallocate(now%dzsrfdt)
+        if (allocated(now%dHicedt))     deallocate(now%dHicedt)
+        if (allocated(now%bmb))         deallocate(now%bmb)
+        if (allocated(now%mb_applied))  deallocate(now%mb_applied)
+        if (allocated(now%calv_grnd))   deallocate(now%calv_grnd)
+        if (allocated(now%calv))        deallocate(now%calv)
 
-        if (allocated(now%H_margin))   deallocate(now%H_margin)
+        if (allocated(now%H_margin))    deallocate(now%H_margin)
         
-        if (allocated(now%dzsdx))      deallocate(now%dzsdx)
-        if (allocated(now%dzsdy))      deallocate(now%dzsdy)
-        if (allocated(now%dHicedx))    deallocate(now%dHicedx)
-        if (allocated(now%dHicedy))    deallocate(now%dHicedy)
+        if (allocated(now%dzsdx))       deallocate(now%dzsdx)
+        if (allocated(now%dzsdy))       deallocate(now%dzsdy)
+        if (allocated(now%dHicedx))     deallocate(now%dHicedx)
+        if (allocated(now%dHicedy))     deallocate(now%dHicedy)
         
-        if (allocated(now%H_grnd))     deallocate(now%H_grnd)
+        if (allocated(now%H_grnd))      deallocate(now%H_grnd)
 
-        if (allocated(now%f_grnd))     deallocate(now%f_grnd)
-        if (allocated(now%f_grnd_acx)) deallocate(now%f_grnd_acx)
-        if (allocated(now%f_grnd_acy)) deallocate(now%f_grnd_acy)
+        if (allocated(now%f_grnd))      deallocate(now%f_grnd)
+        if (allocated(now%f_grnd_acx))  deallocate(now%f_grnd_acx)
+        if (allocated(now%f_grnd_acy))  deallocate(now%f_grnd_acy)
         
-        if (allocated(now%f_ice))      deallocate(now%f_ice)
+        if (allocated(now%f_ice))       deallocate(now%f_ice)
 
         if (allocated(now%dist_margin)) deallocate(now%dist_margin)
         if (allocated(now%dist_grline)) deallocate(now%dist_grline)
         
-        if (allocated(now%dHdt_nm0))    deallocate(now%dHdt_nm0)
-        if (allocated(now%dHdt_nm1))    deallocate(now%dHdt_nm1)
-        
-        if (allocated(now%mask_bed))   deallocate(now%mask_bed)
-        if (allocated(now%is_grline))  deallocate(now%is_grline)
-        if (allocated(now%is_grz))     deallocate(now%is_grz)
+        if (allocated(now%mask_bed))    deallocate(now%mask_bed)
+        if (allocated(now%is_grline))   deallocate(now%is_grline)
+        if (allocated(now%is_grz))      deallocate(now%is_grz)
 
+        if (allocated(now%dHdt_n))      deallocate(now%dHdt_n)
+        if (allocated(now%H_ice_n))     deallocate(now%H_ice_n)
+        if (allocated(now%H_ice_pred))  deallocate(now%H_ice_pred)
+        
         return 
 
     end subroutine ytopo_dealloc 

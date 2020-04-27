@@ -94,6 +94,7 @@ module yelmo_defs
         real(prec)         :: dx, dy
         character(len=256) :: boundaries 
         
+        character(len=256) :: pc_step 
         real(prec) :: dt_zeta, dt_beta1, dt_beta2 
 
     end type
@@ -129,21 +130,22 @@ module yelmo_defs
         real(prec), allocatable :: dist_margin(:,:)  ! Distance to nearest margin point 
         real(prec), allocatable :: dist_grline(:,:)  ! Distance to nearest grounding-line point 
         
-        real(prec), allocatable :: dHdt_nm0(:,:)
-        real(prec), allocatable :: dHdt_nm1(:,:)
-        
         ! Additional masks 
         integer,    allocatable :: mask_bed(:,:)    ! Multi-valued bed mask
         logical,    allocatable :: is_grline(:,:)   ! Grounding line points
         logical,    allocatable :: is_grz(:,:)      ! Grounding line plus grounded neighbors
+        
+        real(prec), allocatable :: dHdt_n(:,:)      ! [m/a] Ice thickness change due to advection only
+        real(prec), allocatable :: H_ice_n(:,:)     ! [m] Ice thickness from the previous timestep 
+        real(prec), allocatable :: H_ice_pred(:,:)  ! [m] Ice thickness from the previous timestep 
         
     end type
 
     ! ytopo class
     type ytopo_class
 
-        type(ytopo_param_class) :: par        ! Parameters
-        type(ytopo_state_class) :: now        ! Variables
+        type(ytopo_param_class) :: par          ! Parameters
+        type(ytopo_state_class) :: now          ! Variables
 
     end type
 
@@ -232,12 +234,12 @@ module yelmo_defs
         real(prec), allocatable :: uy_bar(:,:)
         real(prec), allocatable :: uxy_bar(:,:)
 
+        real(prec), allocatable :: ux_bar_prev(:,:) 
+        real(prec), allocatable :: uy_bar_prev(:,:)
+
         real(prec), allocatable :: ux_b(:,:) 
         real(prec), allocatable :: uy_b(:,:)
         real(prec), allocatable :: uxy_b(:,:)
-
-        real(prec), allocatable :: ux_bar_nm1(:,:) 
-        real(prec), allocatable :: uy_bar_nm1(:,:)
 
         ! Surface velocity: eventually these could be pointers since it is simply
         ! the top layer in ux(:,:,:), etc. and only used, not calculated.

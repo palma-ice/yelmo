@@ -36,8 +36,7 @@ contains
         real(prec), intent(IN) :: time
 
         ! Local variables 
-        type(yelmo_class)  :: dom0 
-        type(ytopo_class)  :: tpo1
+        type(yelmo_class)  :: dom_ref 
 
         real(prec) :: dt_now, dt_max  
         real(prec) :: time_now, time_start 
@@ -104,8 +103,8 @@ contains
         ! Iteration of yelmo component updates until external timestep is reached
         do n = 1, nstep
 
-            ! Store initial state of yelmo object 
-            dom0 = dom 
+            ! Store initial state of yelmo object in case a reset is necessary due to instability
+            dom_ref = dom 
 
             ! Update dt_max as a function of the total timestep 
             dt_max = max(time-time_now,0.0_prec)
@@ -209,32 +208,49 @@ contains
 
                 end select 
 
-if (pc_with_velocity) then 
-                ! ajr: Left-over from applying PC method to velocity instead of ice thickness 
-                ! Determine uxy_bar_prime (pre-predicted ice velocity field)
-                dom%dyn%now%ux_bar = dom%tpo%par%dt_beta1*dom%dyn%now%ux_bar &
-                                      + dom%tpo%par%dt_beta2*dom%dyn%now%ux_bar_nm1
-                dom%dyn%now%uy_bar = dom%tpo%par%dt_beta1*dom%dyn%now%uy_bar &
-                                      + dom%tpo%par%dt_beta2*dom%dyn%now%uy_bar_nm1
+! if (pc_with_velocity) then 
+!                 ! ajr: Applying PC method to velocity instead of ice thickness
+!                 ! Determine uxy_bar_prime (pre-predicted ice velocity field)
+!                 dom%dyn%now%ux_bar = dom%tpo%par%dt_beta1*dom%dyn%now%ux_bar &
+!                                       + dom%tpo%par%dt_beta2*dom%dyn%now%ux_bar_prev
+!                 dom%dyn%now%uy_bar = dom%tpo%par%dt_beta1*dom%dyn%now%uy_bar &
+!                                       + dom%tpo%par%dt_beta2*dom%dyn%now%uy_bar_prev
 
-                ! Restore FE timestepping to topo 
-                dom%thrm%par%dt_beta1 = 1.0 
-                dom%thrm%par%dt_beta2 = 0.0 
-end if 
+!                 ! Restore FE timestepping to topo 
+!                 dom%tpo%par%dt_beta1 = 1.0 
+!                 dom%tpo%par%dt_beta2 = 0.0 
 
-                ! Store local copy of ytopo object to use for predictor step
-                tpo1  = dom%tpo 
+! end if 
                 
-                ! Step 1: Perform predictor step with temporary topography object 
-                ! Calculate topography (elevation, ice thickness, calving, etc.)
-                call calc_ytopo(tpo1,dom%dyn,dom%thrm,dom%bnd,time_now,topo_fixed=dom%tpo%par%topo_fixed)
-                call calc_ytopo_masks(tpo1,dom%dyn,dom%thrm,dom%bnd)
+                dom%tpo%par%pc_step = "predictor" 
+
+                ! Step 1: Perform predictor step for topography
+                ! (Update elevation, ice thickness, calving, etc.)
+                call calc_ytopo(dom%tpo,dom%dyn,dom%thrm,dom%bnd,time_now,topo_fixed=dom%tpo%par%topo_fixed)
+                call calc_ytopo_masks(dom%tpo,dom%dyn,dom%thrm,dom%bnd)
+
+                ! Store predicted ice thickness for later use 
+                ! ajr: do it here to ensure all changes to H_ice are accounted for (mb, calving, etc)
+                dom%tpo%now%H_ice_pred = dom%tpo%now%H_ice 
 
                 ! Step 2: Update other variables using predicted ice thickness 
                 
                 ! Calculate dynamics (velocities and stresses) 
-                ! (this is where uxy_bar_predicted is calculated)
-                call calc_ydyn(dom%dyn,tpo1,dom%mat,dom%thrm,dom%bnd,time_now)
+                call calc_ydyn(dom%dyn,dom%tpo,dom%mat,dom%thrm,dom%bnd,time_now)
+
+                ! Calculate material (ice properties, viscosity, etc.)
+                call calc_ymat(dom%mat,dom%tpo,dom%dyn,dom%thrm,dom%bnd,time_now)
+
+                ! Calculate thermodynamics (temperatures and enthalpy), corrected
+                call calc_ytherm(dom%thrm,dom%tpo,dom%dyn,dom%mat,dom%bnd,time_now)            
+
+! if (pc_with_velocity) then 
+                
+!                 ! Reset topo state to pre-predicted state to be able to 
+!                 ! recalculate it with updated velocity field
+!                 dom%tpo = tpo0 
+
+! end if 
                 
                 select case(trim(dom%par%pc_method))
                     ! No default case necessary, handled earlier 
@@ -251,27 +267,26 @@ end if
                     
                 end select 
 
-if (pc_with_velocity) then 
-                ! ajr: Left-over from applying PC method to velocity instead of ice thickness 
-                ! Determine uxy_bar_prime (pre-predicted ice velocity field)
-                dom%dyn%now%ux_bar = dom%tpo%par%dt_beta1*dom%dyn%now%ux_bar &
-                                      + dom%tpo%par%dt_beta2*dom%dyn%now%ux_bar_nm1
-                dom%dyn%now%uy_bar = dom%tpo%par%dt_beta1*dom%dyn%now%uy_bar &
-                                      + dom%tpo%par%dt_beta2*dom%dyn%now%uy_bar_nm1
+! if (pc_with_velocity) then 
                 
-                ! Restore FE timestepping to topo 
-                dom%thrm%par%dt_beta1 = 1.0 
-                dom%thrm%par%dt_beta2 = 0.0 
-end if 
+!                 ! ajr: Left-over from applying PC method to velocity instead of ice thickness 
+!                 ! Determine uxy_bar_prime (pre-predicted ice velocity field)
+!                 dom%dyn%now%ux_bar = dom%tpo%par%dt_beta1*dom%dyn%now%ux_bar &
+!                                       + dom%tpo%par%dt_beta2*dom%dyn%now%ux_bar_prev
+!                 dom%dyn%now%uy_bar = dom%tpo%par%dt_beta1*dom%dyn%now%uy_bar &
+!                                       + dom%tpo%par%dt_beta2*dom%dyn%now%uy_bar_prev
+                
+!                 ! Restore FE timestepping to topo 
+!                 dom%tpo%par%dt_beta1 = 1.0 
+!                 dom%tpo%par%dt_beta2 = 0.0 
+                 
+! end if 
+                
+                dom%tpo%par%pc_step = "corrector" 
+                dom%tpo%par%time    = dom_ref%tpo%par%time
 
-                ! Calculate material (ice properties, viscosity, etc.)
-                call calc_ymat(dom%mat,tpo1,dom%dyn,dom%thrm,dom%bnd,time_now)
-
-                ! Calculate thermodynamics (temperatures and enthalpy), corrected
-                call calc_ytherm(dom%thrm,tpo1,dom%dyn,dom%mat,dom%bnd,time_now)            
-
-                ! Step 3: Finally, calculate corrector step with actual topography object 
-                ! Calculate topography (elevation, ice thickness, calving, etc.), corrected
+                ! Step 3: Finally, calculate topography corrector step
+                ! (elevation, ice thickness, calving, etc.)
                 call calc_ytopo(dom%tpo,dom%dyn,dom%thrm,dom%bnd,time_now,topo_fixed=dom%tpo%par%topo_fixed)    
                 call calc_ytopo_masks(dom%tpo,dom%dyn,dom%thrm,dom%bnd)
 
@@ -282,12 +297,13 @@ end if
                     case("FE-SBE")
                         
                         ! FE-SBE truncation error 
-                        call calc_pc_tau_fe_sbe(dom%par%pc_tau,dom%tpo%now%H_ice,tpo1%now%H_ice,dt_now)
+                        call calc_pc_tau_fe_sbe(dom%par%pc_tau,dom%tpo%now%H_ice,dom%tpo%now%H_ice_pred,dt_now)
 
                     case("AB-SAM")
                         
                         ! AB-SAM truncation error 
-                        call calc_pc_tau_ab_sam(dom%par%pc_tau,dom%tpo%now%H_ice,tpo1%now%H_ice,dt_now,dom%tpo%par%dt_zeta)
+                        call calc_pc_tau_ab_sam(dom%par%pc_tau,dom%tpo%now%H_ice,dom%tpo%now%H_ice_pred,dt_now, &
+                                                                                                dom%tpo%par%dt_zeta)
 
                 end select 
 
@@ -303,8 +319,8 @@ end if
                     rho_now = 0.7_prec*(1.0_prec+(eta_now-dom%par%pc_tol)/10.0_prec)**(-1.0_prec) 
 
                     ! Reset yelmo and time variables to beginning of timestep
-                    dom      = dom0 
-                    time_now = dom0%tpo%par%time
+                    dom      = dom_ref 
+                    time_now = dom_ref%tpo%par%time
                     dt_now   = max(dt_now*rho_now,dom%par%dt_min)
                     
                 else

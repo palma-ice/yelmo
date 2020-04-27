@@ -208,19 +208,19 @@ contains
 
                 end select 
 
-! if (pc_with_velocity) then 
-!                 ! ajr: Applying PC method to velocity instead of ice thickness
-!                 ! Determine uxy_bar_prime (pre-predicted ice velocity field)
-!                 dom%dyn%now%ux_bar = dom%tpo%par%dt_beta1*dom%dyn%now%ux_bar &
-!                                       + dom%tpo%par%dt_beta2*dom%dyn%now%ux_bar_prev
-!                 dom%dyn%now%uy_bar = dom%tpo%par%dt_beta1*dom%dyn%now%uy_bar &
-!                                       + dom%tpo%par%dt_beta2*dom%dyn%now%uy_bar_prev
+if (pc_with_velocity) then 
+                ! ajr: Applying PC method to velocity instead of ice thickness
+                ! Determine uxy_bar_prime (pre-predicted ice velocity field)
+                dom%dyn%now%ux_bar = dom%tpo%par%dt_beta1*dom%dyn%now%ux_bar &
+                                      + dom%tpo%par%dt_beta2*dom%dyn%now%ux_bar_prev
+                dom%dyn%now%uy_bar = dom%tpo%par%dt_beta1*dom%dyn%now%uy_bar &
+                                      + dom%tpo%par%dt_beta2*dom%dyn%now%uy_bar_prev
 
-!                 ! Restore FE timestepping to topo 
-!                 dom%tpo%par%dt_beta1 = 1.0 
-!                 dom%tpo%par%dt_beta2 = 0.0 
+                ! Restore FE timestepping to topo 
+                dom%tpo%par%dt_beta1 = 1.0 
+                dom%tpo%par%dt_beta2 = 0.0 
 
-! end if 
+end if 
                 
                 dom%tpo%par%pc_step = "predictor" 
 
@@ -241,17 +241,10 @@ contains
                 ! Calculate material (ice properties, viscosity, etc.)
                 call calc_ymat(dom%mat,dom%tpo,dom%dyn,dom%thrm,dom%bnd,time_now)
 
-                ! Calculate thermodynamics (temperatures and enthalpy), corrected
+                ! Calculate thermodynamics (temperatures and enthalpy)
                 call calc_ytherm(dom%thrm,dom%tpo,dom%dyn,dom%mat,dom%bnd,time_now)            
 
-! if (pc_with_velocity) then 
-                
-!                 ! Reset topo state to pre-predicted state to be able to 
-!                 ! recalculate it with updated velocity field
-!                 dom%tpo = tpo0 
-
-! end if 
-                
+                ! Determine timestepping weights for corrector step depending on method
                 select case(trim(dom%par%pc_method))
                     ! No default case necessary, handled earlier 
 
@@ -267,24 +260,28 @@ contains
                     
                 end select 
 
-! if (pc_with_velocity) then 
-                
-!                 ! ajr: Left-over from applying PC method to velocity instead of ice thickness 
-!                 ! Determine uxy_bar_prime (pre-predicted ice velocity field)
-!                 dom%dyn%now%ux_bar = dom%tpo%par%dt_beta1*dom%dyn%now%ux_bar &
-!                                       + dom%tpo%par%dt_beta2*dom%dyn%now%ux_bar_prev
-!                 dom%dyn%now%uy_bar = dom%tpo%par%dt_beta1*dom%dyn%now%uy_bar &
-!                                       + dom%tpo%par%dt_beta2*dom%dyn%now%uy_bar_prev
-                
-!                 ! Restore FE timestepping to topo 
-!                 dom%tpo%par%dt_beta1 = 1.0 
-!                 dom%tpo%par%dt_beta2 = 0.0 
-                 
-! end if 
-                
                 dom%tpo%par%pc_step = "corrector" 
                 dom%tpo%par%time    = dom_ref%tpo%par%time
 
+if (pc_with_velocity) then 
+                
+                ! ajr: Left-over from applying PC method to velocity instead of ice thickness 
+                ! Determine uxy_bar_prime (pre-predicted ice velocity field)
+                dom%dyn%now%ux_bar = dom%tpo%par%dt_beta1*dom%dyn%now%ux_bar &
+                                      + dom%tpo%par%dt_beta2*dom%dyn%now%ux_bar_prev
+                dom%dyn%now%uy_bar = dom%tpo%par%dt_beta1*dom%dyn%now%uy_bar &
+                                      + dom%tpo%par%dt_beta2*dom%dyn%now%uy_bar_prev
+                
+                ! Restore FE timestepping to topo 
+                dom%tpo%par%dt_beta1 = 1.0 
+                dom%tpo%par%dt_beta2 = 0.0 
+                
+                ! Reset to consider this a "predictor" step as well 
+                dom%tpo%par%pc_step = "predictor" 
+                dom%tpo%now%H_ice   = dom%tpo%now%H_ice_n 
+
+end if 
+                
                 ! Step 3: Finally, calculate topography corrector step
                 ! (elevation, ice thickness, calving, etc.)
                 call calc_ytopo(dom%tpo,dom%dyn,dom%thrm,dom%bnd,time_now,topo_fixed=dom%tpo%par%topo_fixed)    

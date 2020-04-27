@@ -59,7 +59,8 @@ contains
         ! n_iter_redo=5 is rarely met, so it is a good choice - no need for a parameter.
         integer, parameter :: n_iter_redo = 5 
 
-
+        logical, parameter :: pc_with_velocity = .TRUE. 
+        
         ! Determine which predictor-corrector (pc) method we are using for timestepping 
         select case(trim(dom%par%pc_method))
 
@@ -208,12 +209,18 @@ contains
 
                 end select 
 
+if (pc_with_velocity) then 
                 ! ajr: Left-over from applying PC method to velocity instead of ice thickness 
                 ! Determine uxy_bar_prime (pre-predicted ice velocity field)
-!                 dom%dyn%now%ux_bar = dom%tpo%par%dt_beta1*dom%dyn%now%ux_bar &
-!                                       + dom%tpo%par%dt_beta2*dom%dyn%now%ux_bar_nm1
-!                 dom%dyn%now%uy_bar = dom%tpo%par%dt_beta1*dom%dyn%now%uy_bar &
-!                                       + dom%tpo%par%dt_beta2*dom%dyn%now%uy_bar_nm1
+                dom%dyn%now%ux_bar = dom%tpo%par%dt_beta1*dom%dyn%now%ux_bar &
+                                      + dom%tpo%par%dt_beta2*dom%dyn%now%ux_bar_nm1
+                dom%dyn%now%uy_bar = dom%tpo%par%dt_beta1*dom%dyn%now%uy_bar &
+                                      + dom%tpo%par%dt_beta2*dom%dyn%now%uy_bar_nm1
+
+                ! Restore FE timestepping to topo 
+                dom%thrm%par%dt_beta1 = 1.0 
+                dom%thrm%par%dt_beta2 = 0.0 
+end if 
 
                 ! Store local copy of ytopo object to use for predictor step
                 tpo1  = dom%tpo 
@@ -244,12 +251,18 @@ contains
                     
                 end select 
 
+if (pc_with_velocity) then 
                 ! ajr: Left-over from applying PC method to velocity instead of ice thickness 
                 ! Determine uxy_bar_prime (pre-predicted ice velocity field)
-!                 dom%dyn%now%ux_bar = dom%tpo%par%dt_beta1*dom%dyn%now%ux_bar &
-!                                       + dom%tpo%par%dt_beta2*dom%dyn%now%ux_bar_nm1
-!                 dom%dyn%now%uy_bar = dom%tpo%par%dt_beta1*dom%dyn%now%uy_bar &
-!                                       + dom%tpo%par%dt_beta2*dom%dyn%now%uy_bar_nm1
+                dom%dyn%now%ux_bar = dom%tpo%par%dt_beta1*dom%dyn%now%ux_bar &
+                                      + dom%tpo%par%dt_beta2*dom%dyn%now%ux_bar_nm1
+                dom%dyn%now%uy_bar = dom%tpo%par%dt_beta1*dom%dyn%now%uy_bar &
+                                      + dom%tpo%par%dt_beta2*dom%dyn%now%uy_bar_nm1
+                
+                ! Restore FE timestepping to topo 
+                dom%thrm%par%dt_beta1 = 1.0 
+                dom%thrm%par%dt_beta2 = 0.0 
+end if 
 
                 ! Calculate material (ice properties, viscosity, etc.)
                 call calc_ymat(dom%mat,tpo1,dom%dyn,dom%thrm,dom%bnd,time_now)
@@ -372,7 +385,7 @@ contains
         if ( (real(n_dtmin,prec)/real(n,prec)) .gt. 0.8 ) then 
 
             write(*,*) "pc_eta = ", dom%par%pc_eta
-            
+
             write(kill_txt,"(a,i10,a,i10)") "Too many iterations of dt_min called for this timestep.", &
                                             n_dtmin, " of ", n 
 

@@ -94,8 +94,13 @@ contains
         ! Determine current advective rate of change 
         call calc_advec2D(dHdt_nm0,H_ice,ux_tmp,uy_tmp,mbal*0.0,dx,dx,dt,solver)
 
-        ! Update ice thickness using weighted advective rates of change 
-        H_ice = H_ice + (dt_beta1*dt)*dHdt_nm0 + (dt_beta2*dt)*dHdt_nm1 
+        ! Update rate of change using weighted advective rates of change 
+        dHdt_nm0 = dt_beta1*dHdt_nm0 + dt_beta2*dHdt_nm1 
+        
+        ! Update ice thickness
+        H_ice = H_ice + dt*dHdt_nm0 
+
+        !H_ice = H_ice + (dt_beta1*dt)*dHdt_nm0 + (dt_beta2*dt)*dHdt_nm1 
 
         ! ===================================================================================
         

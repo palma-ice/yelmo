@@ -59,8 +59,8 @@ contains
         ! n_iter_redo=5 is rarely met, so it is a good choice - no need for a parameter.
         integer, parameter :: n_iter_redo = 5 
 
-        logical, parameter :: pc_with_velocity = .TRUE. 
-        
+        logical, parameter :: pc_with_velocity = .FALSE. 
+
         ! Determine which predictor-corrector (pc) method we are using for timestepping 
         select case(trim(dom%par%pc_method))
 

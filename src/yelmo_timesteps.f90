@@ -157,6 +157,7 @@ contains
         real(prec) :: dt_adv 
         real(prec) :: dtmax_now
         real(prec) :: k_i 
+        real(prec) :: k_p, k_d 
 
         ! Smoothing parameter; Söderlind and Wang (2006) method, Eq. 10
         ! Values on the order of [0.7,2.0] are reasonable. Higher kappa slows variation in dt
@@ -204,7 +205,21 @@ contains
 
                 rho_n = calc_pi_rho_H312PID(eta_n,eta_nm1,eta_nm2,eps,k_i)
 
+            case("H321PID")
 
+                k_i = 0.1  / real(pc_k,prec)
+                k_p = 0.45 / real(pc_k,prec) 
+
+                rho_n = calc_pi_rho_H321PID(eta_n,eta_nm1,eta_nm2,dt_n,dt_nm1,eps,k_i,k_p)
+                
+            case("PID1")
+
+                k_i = 0.175 
+                k_p = 0.075
+                k_d = 0.01 
+
+                rho_n = calc_pi_rho_PID1(eta_n,eta_nm1,eta_nm2,eps,k_i,k_p,k_d)
+                
             case DEFAULT 
 
                 write(*,*) "set_adaptive_timestep_pc:: Error: controller not recognized."
@@ -310,6 +325,55 @@ contains
         return 
 
     end function calc_pi_rho_H312PID 
+
+    function calc_pi_rho_H321PID(eta_n,eta_nm1,eta_nm2,dt_n,dt_nm1,eps,k_i,k_p) result(rho_n)
+
+        implicit none 
+
+        real(prec), intent(IN) :: eta_n 
+        real(prec), intent(IN) :: eta_nm1 
+        real(prec), intent(IN) :: eta_nm2 
+        real(prec), intent(IN) :: dt_n 
+        real(prec), intent(IN) :: dt_nm1 
+        real(prec), intent(IN) :: eps 
+        real(prec), intent(IN) :: k_i  
+        real(prec), intent(IN) :: k_p
+        real(prec) :: rho_n 
+
+        ! Local variables 
+        real(prec) :: k_i_1, k_i_2, k_i_3
+
+        k_i_1   =   0.75_prec*k_i + 0.50_prec*k_p 
+        k_i_2   =   0.50_prec*k_i 
+        k_i_3   = -(0.25_prec*k_i + 0.50_prec*k_p)
+
+        ! Söderlind (2003) H321PID, Eq. 42
+        rho_n   = (eps/eta_n)**k_i_1 * (eps/eta_nm1)**k_i_2 * (eps/eta_nm2)**k_i_3 * (dt_n / dt_nm1)
+
+        return 
+
+    end function calc_pi_rho_H321PID 
+
+    function calc_pi_rho_PID1(eta_n,eta_nm1,eta_nm2,eps,k_i,k_p,k_d) result(rho_n)
+
+        implicit none 
+
+        real(prec), intent(IN) :: eta_n 
+        real(prec), intent(IN) :: eta_nm1 
+        real(prec), intent(IN) :: eta_nm2 
+        real(prec), intent(IN) :: eps 
+        real(prec), intent(IN) :: k_i  
+        real(prec), intent(IN) :: k_p
+        real(prec), intent(IN) :: k_d
+        real(prec) :: rho_n 
+
+        ! https://www.mathematik.uni-dortmund.de/~kuzmin/cfdintro/lecture8.pdf
+        ! Page 20 (theoretical basis unclear/unknown)
+        rho_n   = (eps/eta_n)**k_i * (eta_nm1/eta_n)**k_p * (eta_nm1**2/(eta_n*eta_nm2))**k_d
+
+        return 
+
+    end function calc_pi_rho_PID1 
 
     subroutine set_adaptive_timestep(dt,dt_adv,dt_diff,dt_adv3D, &
                         ux,uy,uz,ux_bar,uy_bar,D2D,H_ice,dHicedt,zeta_ac, &

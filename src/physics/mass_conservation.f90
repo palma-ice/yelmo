@@ -68,7 +68,7 @@ contains
 
         allocate(dHdt_advec(nx,ny))
         dHdt_advec = 0.0_prec 
-        
+
         ! Ensure that no velocity is defined for outer boundaries of margin points
         ux_tmp = ux 
         do j = 1, ny 
@@ -120,6 +120,9 @@ contains
             
             ! Calculate corrected ice thickness (time=n+1)
             H_ice = H_ice_n + dt*dHdt_advec 
+
+            ! Finally, pdate dHdt_n with correct term to use as n-1 on next iteration
+            dHdt_n = dHdt_advec 
 
         end if 
 

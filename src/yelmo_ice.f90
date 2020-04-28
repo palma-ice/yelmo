@@ -313,6 +313,7 @@ end if
 
                     ! Calculate timestep reduction to apply
                     !rho_now = 0.7_prec
+                    !rho_now = (dom%par%pc_tol / eta_now)
                     rho_now = 0.7_prec*(1.0_prec+(eta_now-dom%par%pc_tol)/10.0_prec)**(-1.0_prec) 
 
                     ! Reset yelmo and time variables to beginning of timestep

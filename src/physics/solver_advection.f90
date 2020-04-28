@@ -142,7 +142,7 @@ contains
         end do
 
         ! Update H_ice:
-        H_ice = H_ice + dt*dHdt
+        H_ice = H_ice + dt*dHdt + dt*mdot 
 
         ! Corners
         ! BL
@@ -231,7 +231,7 @@ contains
         end do
 
         ! Update H_ice:
-        H_ice = H_ice + dt*dHdt
+        H_ice = H_ice + dt*dHdt + dt*mdot 
 
         ! Corners
         ! BL

@@ -55,6 +55,8 @@ contains
         real(prec), allocatable :: ux_tmp(:,:) 
         real(prec), allocatable :: uy_tmp(:,:) 
 
+        real(prec), parameter   :: H_pred_tol = 10.0 
+
         nx = size(H_ice,1)
         ny = size(H_ice,2)
 
@@ -97,6 +99,12 @@ contains
         
             case("predictor") 
                 
+                ! Set current ice thickness to predicted value from last timestep, if it exists
+                ! (experimental, but gives incredible results for EISMINT, grl)
+                if (maxval(abs(H_ice-H_ice_pred)) .lt. H_pred_tol) then 
+                    H_ice = H_ice_pred
+                end if 
+
                 ! Store ice thickness from time=n
                 H_ice_n   = H_ice 
 
@@ -105,6 +113,7 @@ contains
 
                 ! Determine current advective rate of change (time=n)
                 call calc_advec2D(dHdt_n,H_ice,ux_tmp,uy_tmp,mbal*0.0,dx,dx,dt,solver)
+!                 call calc_advec2D(dHdt_n,H_ice_pred,ux_tmp,uy_tmp,mbal*0.0,dx,dx,dt,solver)
 
                 ! Calculate rate of change using weighted advective rates of change 
                 dHdt_advec = beta1*dHdt_n + beta2*dHdt_advec 

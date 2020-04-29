@@ -63,7 +63,7 @@ contains
         ! Determine which predictor-corrector (pc) method we are using for timestepping 
         select case(trim(dom%par%pc_method))
 
-            case("FE-SBE")
+            case("FE-SBE","HEUN")
                 ! Forward-Euler predictor; Semi-implicit Backwards Euler corrector 
                 ! (second-order error term)
 
@@ -177,14 +177,10 @@ contains
 !                         dom%tpo%par%dt_beta1 = 1.0_prec + dom%tpo%par%dt_zeta/2.0_prec 
 !                         dom%tpo%par%dt_beta2 = -dom%tpo%par%dt_zeta/2.0_prec 
 
-!                         dom%tpo%par%dt_beta1 = 1.0_prec - min(dom%tpo%par%dt_zeta/2.0_prec,0.5_prec)
-!                         dom%tpo%par%dt_beta2 = 1.0_prec - dom%tpo%par%dt_beta1
+                    case("HEUN")
                         
                         dom%tpo%par%dt_beta1 = 1.0_prec 
                         dom%tpo%par%dt_beta2 = 0.0_prec 
-                        
-!                         dom%tpo%par%dt_beta1 = 1.0_prec - min(dom%tpo%par%dt_zeta/2.0_prec,0.2_prec)
-!                         dom%tpo%par%dt_beta2 = 1.0_prec - dom%tpo%par%dt_beta1
                         
                 end select 
 
@@ -194,8 +190,8 @@ contains
                     case("FE")
                         ! Forward Euler 
 
-                        dom%thrm%par%dt_beta1 = 1.0 
-                        dom%thrm%par%dt_beta2 = 0.0 
+                        dom%thrm%par%dt_beta1 = 1.0_prec  
+                        dom%thrm%par%dt_beta2 = 0.0_prec  
 
                     case("AB") 
                         ! Adams-Bashforth  
@@ -220,20 +216,17 @@ contains
 if (pc_with_velocity) then 
                 ! ajr: Applying PC method to velocity instead of ice thickness
                 ! Determine uxy_bar_prime (pre-predicted ice velocity field)
-                dom%dyn%now%ux_bar = dom%tpo%par%dt_beta1*dom%dyn%now%ux_bar &
-                                      + dom%tpo%par%dt_beta2*dom%dyn%now%ux_bar_prev
-                dom%dyn%now%uy_bar = dom%tpo%par%dt_beta1*dom%dyn%now%uy_bar &
-                                      + dom%tpo%par%dt_beta2*dom%dyn%now%uy_bar_prev
+!                 dom%dyn%now%ux_bar = dom%tpo%par%dt_beta1*dom%dyn%now%ux_bar &
+!                                       + dom%tpo%par%dt_beta2*dom%dyn%now%ux_bar_prev
+!                 dom%dyn%now%uy_bar = dom%tpo%par%dt_beta1*dom%dyn%now%uy_bar &
+!                                       + dom%tpo%par%dt_beta2*dom%dyn%now%uy_bar_prev
 
+                dom%dyn%now%ux_bar = 0.5_prec*dom%dyn%now%ux_bar + 0.5_prec*dom%dyn%now%ux_bar_prev
+                dom%dyn%now%uy_bar = 0.5_prec*dom%dyn%now%uy_bar + 0.5_prec*dom%dyn%now%uy_bar_prev
+                
                 ! Restore FE timestepping to topo 
-                dom%tpo%par%dt_beta1 = 1.0 
-                dom%tpo%par%dt_beta2 = 0.0 
-
-                ! Set current ice thickness to predicted value from last timestep
-                ! (experimental, but gives incredible results for EISMINT)
-                if (maxval(abs(dom%tpo%now%H_ice-dom%tpo%now%H_ice_pred)) .lt. dom%par%pc_tol) then 
-                    dom%tpo%now%H_ice = dom%tpo%now%H_ice_pred
-                end if 
+!                 dom%tpo%par%dt_beta1 = 1.0 
+!                 dom%tpo%par%dt_beta2 = 0.0 
 
 end if 
                 
@@ -273,6 +266,11 @@ end if
                         dom%tpo%par%dt_beta1 = 0.5_prec 
                         dom%tpo%par%dt_beta2 = 0.5_prec 
                     
+                    case("HEUN")
+                        
+                        dom%tpo%par%dt_beta1 = 0.5_prec 
+                        dom%tpo%par%dt_beta2 = 0.5_prec 
+                    
                 end select 
 
                 dom%tpo%par%pc_step = "corrector" 
@@ -282,14 +280,17 @@ if (pc_with_velocity) then
                 
                 ! ajr: Left-over from applying PC method to velocity instead of ice thickness 
                 ! Determine uxy_bar_prime (pre-predicted ice velocity field)
-                dom%dyn%now%ux_bar = dom%tpo%par%dt_beta1*dom%dyn%now%ux_bar &
-                                      + dom%tpo%par%dt_beta2*dom%dyn%now%ux_bar_prev
-                dom%dyn%now%uy_bar = dom%tpo%par%dt_beta1*dom%dyn%now%uy_bar &
-                                      + dom%tpo%par%dt_beta2*dom%dyn%now%uy_bar_prev
+!                 dom%dyn%now%ux_bar = dom%tpo%par%dt_beta1*dom%dyn%now%ux_bar &
+!                                       + dom%tpo%par%dt_beta2*dom%dyn%now%ux_bar_prev
+!                 dom%dyn%now%uy_bar = dom%tpo%par%dt_beta1*dom%dyn%now%uy_bar &
+!                                       + dom%tpo%par%dt_beta2*dom%dyn%now%uy_bar_prev
                 
-                ! Restore FE timestepping to topo 
-                dom%tpo%par%dt_beta1 = 1.0 
-                dom%tpo%par%dt_beta2 = 0.0 
+                dom%dyn%now%ux_bar = 0.5_prec*dom%dyn%now%ux_bar + 0.5_prec*dom%dyn%now%ux_bar_prev
+                dom%dyn%now%uy_bar = 0.5_prec*dom%dyn%now%uy_bar + 0.5_prec*dom%dyn%now%uy_bar_prev
+                
+!                 ! Restore FE timestepping to topo 
+!                 dom%tpo%par%dt_beta1 = 1.0 
+!                 dom%tpo%par%dt_beta2 = 0.0 
                 
 end if 
                 
@@ -312,6 +313,11 @@ end if
                         ! AB-SAM truncation error 
                         call calc_pc_tau_ab_sam(dom%par%pc_tau,dom%tpo%now%H_ice,dom%tpo%now%H_ice_pred,dt_now, &
                                                                                                 dom%tpo%par%dt_zeta)
+
+                    case("HEUN")
+
+                        ! HEUN truncation error (same as FE-SBE)
+                        call calc_pc_tau_fe_sbe(dom%par%pc_tau,dom%tpo%now%H_ice,dom%tpo%now%H_ice_pred,dt_now)
 
                 end select 
 

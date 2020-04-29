@@ -13,7 +13,7 @@ module mass_conservation
 
 contains 
 
-    subroutine calc_ice_thickness(H_ice,H_margin,f_ice,mb_applied,dHdt_n,H_ice_n,H_ice_pred,f_grnd,H_ocn,ux,uy,mbal,calv, &
+    subroutine calc_ice_thickness(H_ice,dHdt_n,H_ice_n,H_ice_pred,H_margin,f_ice,mb_applied,f_grnd,H_ocn,ux,uy,mbal,calv, &
                                     z_bed_sd,dx,dt,solver,boundaries,ice_allowed,H_min,sd_min,sd_max,calv_max,beta1,beta2,pc_step)
         ! Interface subroutine to update ice thickness through application
         ! of advection, vertical mass balance terms and calving 
@@ -21,12 +21,12 @@ contains
         implicit none 
 
         real(prec),       intent(INOUT) :: H_ice(:,:)           ! [m]   Ice thickness 
+        real(prec),       intent(INOUT) :: dHdt_n(:,:)          ! [m/a] Advective rate of ice thickness change from previous=>current timestep 
+        real(prec),       intent(INOUT) :: H_ice_n(:,:)         ! [m]   Ice thickness from previous=>current timestep 
+        real(prec),       intent(INOUT) :: H_ice_pred(:,:)      ! [m]   Ice thickness from predicted timestep 
         real(prec),       intent(INOUT) :: H_margin(:,:)        ! [m]   Margin ice thickness (assuming full area coverage) 
         real(prec),       intent(INOUT) :: f_ice(:,:)           ! [m]   Ice area fraction 
         real(prec),       intent(OUT)   :: mb_applied(:,:)      ! [m/a] Actual mass balance applied to real ice points
-        real(prec),       intent(INOUT) :: dHdt_n(:,:)          ! [m/a] Advective rate of ice thickness change from previous=>current timestep 
-        real(prec),       intent(INOUT) :: H_ice_n(:,:)         ! [m]   Ice thickness from previous=>current timestep 
-        real(prec),       intent(IN)    :: H_ice_pred(:,:)      ! [m]   Ice thickness from predicted timestep 
         real(prec),       intent(IN)    :: f_grnd(:,:)          ! [--]  Grounded fraction 
         real(prec),       intent(IN)    :: H_ocn(:,:)           ! [m]   Ocean thickness (ie, depth)
         real(prec),       intent(IN)    :: ux(:,:)              ! [m/a] Depth-averaged velocity, x-direction (ac-nodes)
@@ -54,9 +54,7 @@ contains
         real(prec), allocatable :: dHdt_advec(:,:) 
         real(prec), allocatable :: ux_tmp(:,:) 
         real(prec), allocatable :: uy_tmp(:,:) 
-
-        real(prec), parameter   :: H_pred_tol = 10.0 
-
+        
         nx = size(H_ice,1)
         ny = size(H_ice,2)
 
@@ -99,12 +97,6 @@ contains
         
             case("predictor") 
                 
-                ! Set current ice thickness to predicted value from last timestep, if it exists
-                ! (experimental, but gives incredible results for EISMINT, grl)
-                if (maxval(abs(H_ice-H_ice_pred)) .lt. H_pred_tol) then 
-                    H_ice = H_ice_pred
-                end if 
-
                 ! Store ice thickness from time=n
                 H_ice_n   = H_ice 
 
@@ -113,7 +105,6 @@ contains
 
                 ! Determine current advective rate of change (time=n)
                 call calc_advec2D(dHdt_n,H_ice,ux_tmp,uy_tmp,mbal*0.0,dx,dx,dt,solver)
-!                 call calc_advec2D(dHdt_n,H_ice_pred,ux_tmp,uy_tmp,mbal*0.0,dx,dx,dt,solver)
 
                 ! Calculate rate of change using weighted advective rates of change 
                 dHdt_advec = beta1*dHdt_n + beta2*dHdt_advec 
@@ -132,7 +123,7 @@ contains
                 ! Calculate corrected ice thickness (time=n+1)
                 H_ice = H_ice_n + dt*dHdt_advec 
 
-                ! Finally, pdate dHdt_n with correct term to use as n-1 on next iteration
+                ! Finally, update dHdt_n with correct term to use as n-1 on next iteration
                 dHdt_n = dHdt_advec 
 
         end select  

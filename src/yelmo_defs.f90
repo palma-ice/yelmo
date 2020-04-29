@@ -137,7 +137,8 @@ module yelmo_defs
         
         real(prec), allocatable :: dHdt_n(:,:)      ! [m/a] Ice thickness change due to advection only
         real(prec), allocatable :: H_ice_n(:,:)     ! [m] Ice thickness from the previous timestep 
-        real(prec), allocatable :: H_ice_pred(:,:)  ! [m] Ice thickness from the previous timestep 
+        real(prec), allocatable :: H_ice_pred(:,:)  ! [m] Ice thickness, predicted, for time=n+1
+        real(prec), allocatable :: H_ice_corr(:,:)  ! [m] Ice thickness, corrected, for time=n+1 
         
     end type
 

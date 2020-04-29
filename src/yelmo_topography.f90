@@ -77,7 +77,7 @@ contains
         
         ! Perform topography calculations 
         if ( .not. topo_fixed .and. dt .gt. 0.0 ) then 
-            
+
             ! Define temporary variable for total column mass balance 
            
             mbal = bnd%smb + tpo%now%bmb           
@@ -88,9 +88,9 @@ contains
             end if 
             
             ! 1. Calculate the ice thickness conservation -----
-            call calc_ice_thickness(tpo%now%H_ice,tpo%now%H_margin,tpo%now%f_ice,tpo%now%mb_applied, &
-                                    tpo%now%dHdt_n,tpo%now%H_ice_n,tpo%now%H_ice_pred, &
-                                    tpo%now%f_grnd,bnd%z_sl-bnd%z_bed,dyn%now%ux_bar,dyn%now%uy_bar, &
+            call calc_ice_thickness(tpo%now%H_ice,tpo%now%dHdt_n,tpo%now%H_ice_n,tpo%now%H_ice_pred, &
+                                    tpo%now%H_margin,tpo%now%f_ice,tpo%now%mb_applied,tpo%now%f_grnd, &
+                                    bnd%z_sl-bnd%z_bed,dyn%now%ux_bar,dyn%now%uy_bar, &
                                     mbal=mbal,calv=tpo%now%calv,z_bed_sd=bnd%z_bed_sd,dx=tpo%par%dx,dt=dt, &
                                     solver=trim(tpo%par%solver),boundaries=trim(tpo%par%boundaries), &
                                     ice_allowed=bnd%ice_allowed,H_min=tpo%par%H_min_grnd, &
@@ -497,6 +497,7 @@ contains
         allocate(now%dHdt_n(nx,ny))
         allocate(now%H_ice_n(nx,ny))
         allocate(now%H_ice_pred(nx,ny))
+        allocate(now%H_ice_corr(nx,ny))
         
         now%H_ice       = 0.0 
         now%z_srf       = 0.0  
@@ -526,6 +527,7 @@ contains
         now%dHdt_n      = 0.0  
         now%H_ice_n     = 0.0 
         now%H_ice_pred  = 0.0 
+        now%H_ice_corr  = 0.0 
         
         return 
     end subroutine ytopo_alloc 
@@ -571,6 +573,7 @@ contains
         if (allocated(now%dHdt_n))      deallocate(now%dHdt_n)
         if (allocated(now%H_ice_n))     deallocate(now%H_ice_n)
         if (allocated(now%H_ice_pred))  deallocate(now%H_ice_pred)
+        if (allocated(now%H_ice_corr))  deallocate(now%H_ice_corr)
         
         return 
 

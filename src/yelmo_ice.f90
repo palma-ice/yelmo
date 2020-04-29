@@ -58,7 +58,7 @@ contains
         ! n_iter_redo=5 is rarely met, so it is a good choice - no need for a parameter.
         integer, parameter :: n_iter_redo = 5 
 
-        logical, parameter :: pc_with_velocity = .FALSE. 
+        logical, parameter :: pc_with_velocity = .TRUE. 
 
         ! Determine which predictor-corrector (pc) method we are using for timestepping 
         select case(trim(dom%par%pc_method))
@@ -171,12 +171,21 @@ contains
                         
                         dom%tpo%par%dt_beta1 = 1.0_prec 
                         dom%tpo%par%dt_beta2 = 0.0_prec 
-                    
+                        
                     case("AB-SAM")
                         
-                        dom%tpo%par%dt_beta1 = 1.0_prec + dom%tpo%par%dt_zeta/2.0_prec 
-                        dom%tpo%par%dt_beta2 = -dom%tpo%par%dt_zeta/2.0_prec 
+!                         dom%tpo%par%dt_beta1 = 1.0_prec + dom%tpo%par%dt_zeta/2.0_prec 
+!                         dom%tpo%par%dt_beta2 = -dom%tpo%par%dt_zeta/2.0_prec 
 
+!                         dom%tpo%par%dt_beta1 = 1.0_prec - min(dom%tpo%par%dt_zeta/2.0_prec,0.5_prec)
+!                         dom%tpo%par%dt_beta2 = 1.0_prec - dom%tpo%par%dt_beta1
+                        
+                        dom%tpo%par%dt_beta1 = 1.0_prec 
+                        dom%tpo%par%dt_beta2 = 0.0_prec 
+                        
+!                         dom%tpo%par%dt_beta1 = 1.0_prec - min(dom%tpo%par%dt_zeta/2.0_prec,0.2_prec)
+!                         dom%tpo%par%dt_beta2 = 1.0_prec - dom%tpo%par%dt_beta1
+                        
                 end select 
 
                 ! Calculate timestepping factors for thermodynamics horizontal advection term too 
@@ -219,6 +228,12 @@ if (pc_with_velocity) then
                 ! Restore FE timestepping to topo 
                 dom%tpo%par%dt_beta1 = 1.0 
                 dom%tpo%par%dt_beta2 = 0.0 
+
+                ! Set current ice thickness to predicted value from last timestep
+                ! (experimental, but gives incredible results for EISMINT)
+                if (maxval(abs(dom%tpo%now%H_ice-dom%tpo%now%H_ice_pred)) .lt. dom%par%pc_tol) then 
+                    dom%tpo%now%H_ice = dom%tpo%now%H_ice_pred
+                end if 
 
 end if 
                 
@@ -276,10 +291,6 @@ if (pc_with_velocity) then
                 dom%tpo%par%dt_beta1 = 1.0 
                 dom%tpo%par%dt_beta2 = 0.0 
                 
-                ! Reset to consider this a "predictor" step as well 
-                dom%tpo%par%pc_step = "predictor" 
-                dom%tpo%now%H_ice   = dom%tpo%now%H_ice_n 
-
 end if 
                 
                 ! Step 3: Finally, calculate topography corrector step

@@ -93,38 +93,40 @@ contains
         ! ===================================================================================
         ! First, only resolve the dynamic part (ice advection) using multistep method
 
-        if (trim(pc_step) .eq. "predictor") then 
+        select case(trim(pc_step))
+        
+            case("predictor") 
+                
+                ! Store ice thickness from time=n
+                H_ice_n   = H_ice 
 
-            ! Store ice thickness from time=n
-            H_ice_n   = H_ice 
+                ! Store advective rate of change from saved from previous timestep (now represents time=n-1)
+                dHdt_advec = dHdt_n 
 
-            ! Store advective rate of change from saved from previous timestep (now represents time=n-1)
-            dHdt_advec = dHdt_n 
+                ! Determine current advective rate of change (time=n)
+                call calc_advec2D(dHdt_n,H_ice,ux_tmp,uy_tmp,mbal*0.0,dx,dx,dt,solver)
 
-            ! Determine current advective rate of change (time=n)
-            call calc_advec2D(dHdt_n,H_ice,ux_tmp,uy_tmp,mbal*0.0,dx,dx,dt,solver)
+                ! Calculate rate of change using weighted advective rates of change 
+                dHdt_advec = beta1*dHdt_n + beta2*dHdt_advec 
+                
+                ! Calculate predicted ice thickness (time=n+1,pred)
+                H_ice = H_ice_n + dt*dHdt_advec 
 
-            ! Calculate rate of change using weighted advective rates of change 
-            dHdt_advec = beta1*dHdt_n + beta2*dHdt_advec 
-            
-            ! Calculate predicted ice thickness (time=n+1,pred)
-            H_ice = H_ice_n + dt*dHdt_advec 
+            case("corrector") ! corrector 
 
-        else ! corrector 
+                ! Determine advective rate of change based on predicted H,ux/y fields (time=n+1,pred)
+                call calc_advec2D(dHdt_advec,H_ice_pred,ux_tmp,uy_tmp,mbal*0.0,dx,dx,dt,solver)
 
-            ! Determine advective rate of change based on predicted H,ux/y fields (time=n+1,pred)
-            call calc_advec2D(dHdt_advec,H_ice_pred,ux_tmp,uy_tmp,mbal*0.0,dx,dx,dt,solver)
+                ! Calculate rate of change using weighted advective rates of change 
+                dHdt_advec = beta1*dHdt_advec + beta2*dHdt_n 
+                
+                ! Calculate corrected ice thickness (time=n+1)
+                H_ice = H_ice_n + dt*dHdt_advec 
 
-            ! Calculate rate of change using weighted advective rates of change 
-            dHdt_advec = beta1*dHdt_advec + beta2*dHdt_n 
-            
-            ! Calculate corrected ice thickness (time=n+1)
-            H_ice = H_ice_n + dt*dHdt_advec 
+                ! Finally, pdate dHdt_n with correct term to use as n-1 on next iteration
+                dHdt_n = dHdt_advec 
 
-            ! Finally, pdate dHdt_n with correct term to use as n-1 on next iteration
-            dHdt_n = dHdt_advec 
-
-        end if 
+        end select  
 
         ! Ensure ice thickness is greater than zero for safety 
         where(H_ice .lt. 0.0_prec) H_ice = 0.0_prec 

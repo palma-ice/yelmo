@@ -58,21 +58,96 @@ contains
         ! n_iter_redo=5 is rarely met, so it is a good choice - no need for a parameter.
         integer, parameter :: n_iter_redo = 5 
 
-        logical, parameter :: pc_with_velocity = .TRUE. 
-        logical, parameter :: pc_use_H_pred    = .TRUE. 
-
-        ! Determine which predictor-corrector (pc) method we are using for timestepping 
+        ! Determine which predictor-corrector (pc) method we are using for timestepping,
+        ! assign scheme order and weights 
         select case(trim(dom%par%pc_method))
 
-            case("FE-SBE","AB-SAM","HEUN")
-                ! Second-order methods
-
+            case("FE-SBE")
+                
+                ! Order of the method 
                 pc_k = 2 
 
+                dom%tpo%par%dt_beta(1) = 1.0_prec 
+                dom%tpo%par%dt_beta(2) = 0.0_prec 
+                
+                dom%tpo%par%dt_beta(3) = 1.0_prec 
+                dom%tpo%par%dt_beta(4) = 0.0_prec 
+            
+            case("AB-SAM")
+                
+                ! Order of the method 
+                pc_k = 2 
+
+                ! Assume ratio zeta=dt_n/dt_nm1=1.0 to start
+                dom%tpo%par%dt_zeta  = 1.0_prec
+                
+                dom%tpo%par%dt_beta(1) = 1.0_prec + dom%tpo%par%dt_zeta/2.0_prec 
+                dom%tpo%par%dt_beta(2) = -dom%tpo%par%dt_zeta/2.0_prec 
+
+                dom%tpo%par%dt_beta(3) = 0.5_prec 
+                dom%tpo%par%dt_beta(4) = 0.5_prec 
+            
+            case("HEUN")
+                
+                ! Order of the method 
+                pc_k = 2 
+
+                dom%tpo%par%dt_beta(1) = 1.0_prec 
+                dom%tpo%par%dt_beta(2) = 0.0_prec 
+                
+                dom%tpo%par%dt_beta(3) = 0.5_prec 
+                dom%tpo%par%dt_beta(4) = 0.5_prec 
+            
+            case("RALSTON")
+                
+                write(*,*) "This method does not work yet - the truncation error is incorrect."
+                stop 
+
+                ! Order of the method 
+                pc_k = 2 
+
+                dom%tpo%par%dt_beta(1) = 2.0_prec / 3.0_prec
+                dom%tpo%par%dt_beta(2) = 0.0_prec 
+                
+                dom%tpo%par%dt_beta(3) = 0.25_prec 
+                dom%tpo%par%dt_beta(4) = 0.75_prec 
+            
             case DEFAULT 
 
                 write(*,*) "yelmo_udpate:: Error: pc_method does not match available options [FE-SBE, AB-SAM, HEUN]."
                 write(*,*) "pc_method = ", trim(dom%par%pc_method)
+                stop 
+
+        end select 
+
+        ! Calculate timestepping factors for thermodynamics horizontal advection term too 
+        select case(trim(dom%thrm%par%dt_method))
+
+            case("FE")
+                ! Forward Euler 
+
+                dom%thrm%par%dt_beta(1) = 1.0_prec  
+                dom%thrm%par%dt_beta(2) = 0.0_prec  
+
+            case("AB") 
+                ! Adams-Bashforth (with default weights assuming dt_n/dt_nm1=1.0)
+
+                ! Assume ratio zeta=dt_n/dt_nm1=1.0 to start
+                dom%thrm%par%dt_zeta = dom%tpo%par%dt_zeta
+
+                dom%thrm%par%dt_beta(1) = 1.0_prec + dom%thrm%par%dt_zeta/2.0_prec 
+                dom%thrm%par%dt_beta(2) = -dom%thrm%par%dt_zeta/2.0_prec 
+
+            case("SAM") 
+                ! Semi-implicit Adams–Moulton
+
+                dom%thrm%par%dt_beta(1) = 0.5
+                dom%thrm%par%dt_beta(2) = 0.5 
+
+            case DEFAULT 
+
+                write(*,*) "yelmo_udpate:: Error: thermodynamics dt_method does not match available options [FE, SBE, AB, SAM]."
+                write(*,*) "thrm:: dt_method = ", trim(dom%thrm%par%dt_method)
                 stop 
 
         end select 
@@ -158,62 +233,29 @@ contains
                 dom%tpo%par%dt_zeta  = dt_now / dom%par%pc_dt(1) 
                 dom%thrm%par%dt_zeta = dom%tpo%par%dt_zeta
 
-                select case(trim(dom%par%pc_method))
-                    ! No default case necessary, handled earlier 
+                if (trim(dom%par%pc_method) .eq. "AB-SAM") then 
+                    ! Update the predictor weights, since they depend on the timestep 
 
-                    case("FE-SBE")
-                        
-                        dom%tpo%par%dt_beta1 = 1.0_prec 
-                        dom%tpo%par%dt_beta2 = 0.0_prec 
-                        
-                    case("AB-SAM")
-                        
-                        dom%tpo%par%dt_beta1 = 1.0_prec + dom%tpo%par%dt_zeta/2.0_prec 
-                        dom%tpo%par%dt_beta2 = -dom%tpo%par%dt_zeta/2.0_prec 
+                    dom%tpo%par%dt_beta(1) = 1.0_prec + dom%tpo%par%dt_zeta/2.0_prec 
+                    dom%tpo%par%dt_beta(2) = -dom%tpo%par%dt_zeta/2.0_prec 
 
-                    case("HEUN")
-                        
-                        dom%tpo%par%dt_beta1 = 1.0_prec 
-                        dom%tpo%par%dt_beta2 = 0.0_prec 
-                        
-                end select 
+                end if 
 
-                ! Calculate timestepping factors for thermodynamics horizontal advection term too 
-                select case(trim(dom%thrm%par%dt_method))
+                if (trim(dom%thrm%par%dt_method) .eq. "AB") then 
+                    ! Update the predictor weights, since they depend on the timestep 
 
-                    case("FE")
-                        ! Forward Euler 
+                    dom%thrm%par%dt_beta(1) = 1.0_prec + dom%thrm%par%dt_zeta/2.0_prec 
+                    dom%thrm%par%dt_beta(2) = -dom%thrm%par%dt_zeta/2.0_prec 
 
-                        dom%thrm%par%dt_beta1 = 1.0_prec  
-                        dom%thrm%par%dt_beta2 = 0.0_prec  
+                end if 
 
-                    case("AB") 
-                        ! Adams-Bashforth  
+                if (dom%par%pc_filter_vel) then 
 
-                        dom%thrm%par%dt_beta1 = 1.0_prec + dom%thrm%par%dt_zeta/2.0_prec 
-                        dom%thrm%par%dt_beta2 = -dom%thrm%par%dt_zeta/2.0_prec 
-
-                    case("SAM") 
-                        ! Semi-implicit Adams–Moulton
-
-                        dom%thrm%par%dt_beta1 = 0.5
-                        dom%thrm%par%dt_beta2 = 0.5 
-
-                    case DEFAULT 
-
-                        write(*,*) "yelmo_udpate:: Error: thermodynamics dt_method does not match available options [FE, SBE, AB, SAM]."
-                        write(*,*) "thrm:: dt_method = ", trim(dom%thrm%par%dt_method)
-                        stop 
-
-                end select 
-
-if (pc_with_velocity) then 
-
-                ! Modify ux/y_bar to use the average between the current and previous velocity solutions
-                dom%dyn%now%ux_bar = 0.5_prec*dom%dyn%now%ux_bar + 0.5_prec*dom%dyn%now%ux_bar_prev
-                dom%dyn%now%uy_bar = 0.5_prec*dom%dyn%now%uy_bar + 0.5_prec*dom%dyn%now%uy_bar_prev
-                
-end if 
+                    ! Modify ux/y_bar to use the average between the current and previous velocity solutions
+                    dom%dyn%now%ux_bar = 0.5_prec*dom%dyn%now%ux_bar + 0.5_prec*dom%dyn%now%ux_bar_prev
+                    dom%dyn%now%uy_bar = 0.5_prec*dom%dyn%now%uy_bar + 0.5_prec*dom%dyn%now%uy_bar_prev
+                    
+                end if 
                 
                 dom%tpo%par%pc_step = "predictor" 
 
@@ -237,37 +279,16 @@ end if
                 ! Calculate thermodynamics (temperatures and enthalpy)
                 call calc_ytherm(dom%thrm,dom%tpo,dom%dyn,dom%mat,dom%bnd,time_now)            
 
-                ! Determine timestepping weights for corrector step depending on method
-                select case(trim(dom%par%pc_method))
-                    ! No default case necessary, handled earlier 
-
-                    case("FE-SBE")
-                        
-                        dom%tpo%par%dt_beta1 = 1.0_prec 
-                        dom%tpo%par%dt_beta2 = 0.0_prec 
-                    
-                    case("AB-SAM")
-                        
-                        dom%tpo%par%dt_beta1 = 0.5_prec 
-                        dom%tpo%par%dt_beta2 = 0.5_prec 
-                    
-                    case("HEUN")
-                        
-                        dom%tpo%par%dt_beta1 = 0.5_prec 
-                        dom%tpo%par%dt_beta2 = 0.5_prec 
-                    
-                end select 
-
                 dom%tpo%par%pc_step = "corrector" 
                 dom%tpo%par%time    = dom_ref%tpo%par%time
 
-if (pc_with_velocity) then 
-                
-                ! Modify ux/y_bar to use the average between the current and previous velocity solutions
-                dom%dyn%now%ux_bar = 0.5_prec*dom%dyn%now%ux_bar + 0.5_prec*dom%dyn%now%ux_bar_prev
-                dom%dyn%now%uy_bar = 0.5_prec*dom%dyn%now%uy_bar + 0.5_prec*dom%dyn%now%uy_bar_prev
-                
-end if 
+                if (dom%par%pc_filter_vel) then 
+                    
+                    ! Modify ux/y_bar to use the average between the current and previous velocity solutions
+                    dom%dyn%now%ux_bar = 0.5_prec*dom%dyn%now%ux_bar + 0.5_prec*dom%dyn%now%ux_bar_prev
+                    dom%dyn%now%uy_bar = 0.5_prec*dom%dyn%now%uy_bar + 0.5_prec*dom%dyn%now%uy_bar_prev
+                    
+                end if 
                 
                 ! Step 3: Finally, calculate topography corrector step
                 ! (elevation, ice thickness, calving, etc.)
@@ -278,15 +299,18 @@ end if
                 ! Do it here to ensure all changes to H_ice are accounted for (mb, calving, etc)
                 dom%tpo%now%H_ice_corr = dom%tpo%now%H_ice 
 
-if (pc_use_H_pred) then 
-                ! Experimental: continue using H_ice_pred as main H_ice variable 
-                ! (ie, only use H_ice_corr to help calculate truncation error) 
-                ! This gives great results for EISMINT, grl, etc.
+                if (dom%par%pc_use_H_pred) then 
+                    ! Experimental: continue using H_ice_pred as main H_ice variable 
+                    ! (ie, only use H_ice_corr to help calculate truncation error) 
+                    ! This gives great results for EISMINT, grl, etc.
 
+                    dom%tpo%now%H_ice = dom%tpo%now%H_ice_pred 
 
-                dom%tpo%now%H_ice = dom%tpo%now%H_ice_pred 
+                    ! Also recalculate z_srf and masks for consistency
+                    call calc_ytopo(dom%tpo,dom%dyn,dom%thrm,dom%bnd,time_now,topo_fixed=.TRUE.)    
+                    call calc_ytopo_masks(dom%tpo,dom%dyn,dom%thrm,dom%bnd)
 
-end if 
+                end if 
 
                 ! Determine truncation error for ice thickness 
                 select case(trim(dom%par%pc_method))
@@ -306,6 +330,10 @@ end if
                     case("HEUN")
 
                         ! HEUN truncation error (same as FE-SBE)
+                        call calc_pc_tau_fe_sbe(dom%par%pc_tau,dom%tpo%now%H_ice_corr,dom%tpo%now%H_ice_pred,dt_now)
+
+                    case("RALSTON")
+
                         call calc_pc_tau_fe_sbe(dom%par%pc_tau,dom%tpo%now%H_ice_corr,dom%tpo%now%H_ice_pred,dt_now)
 
                 end select 
@@ -875,6 +903,8 @@ end if
         call nml_read(filename,"yelmo","cfl_diff_max",  par%cfl_diff_max)
         call nml_read(filename,"yelmo","pc_method",     par%pc_method)
         call nml_read(filename,"yelmo","pc_controller", par%pc_controller)
+        call nml_read(filename,"yelmo","pc_filter_vel", par%pc_filter_vel)
+        call nml_read(filename,"yelmo","pc_use_H_pred", par%pc_use_H_pred)
         call nml_read(filename,"yelmo","pc_tol",        par%pc_tol)
         call nml_read(filename,"yelmo","pc_eps",        par%pc_eps)
 

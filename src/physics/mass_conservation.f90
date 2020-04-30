@@ -14,7 +14,7 @@ module mass_conservation
 contains 
 
     subroutine calc_ice_thickness(H_ice,dHdt_n,H_ice_n,H_ice_pred,H_margin,f_ice,mb_applied,f_grnd,H_ocn,ux,uy,mbal,calv, &
-                                    z_bed_sd,dx,dt,solver,boundaries,ice_allowed,H_min,sd_min,sd_max,calv_max,beta1,beta2,pc_step)
+                                    z_bed_sd,dx,dt,solver,boundaries,ice_allowed,H_min,sd_min,sd_max,calv_max,beta,pc_step)
         ! Interface subroutine to update ice thickness through application
         ! of advection, vertical mass balance terms and calving 
 
@@ -43,8 +43,7 @@ contains
         real(prec),       intent(IN)    :: sd_min               ! [m]   Minimum stdev(z_bed) parameter
         real(prec),       intent(IN)    :: sd_max               ! [m]   Maximum stdev(z_bed) parameter
         real(prec),       intent(IN)    :: calv_max             ! [m]   Maximum grounded calving rate parameter
-        real(prec),       intent(IN)    :: beta1 
-        real(prec),       intent(IN)    :: beta2 
+        real(prec),       intent(IN)    :: beta(4) 
         character(len=*), intent(IN)    :: pc_step 
 
         ! Local variables 
@@ -54,7 +53,7 @@ contains
         real(prec), allocatable :: dHdt_advec(:,:) 
         real(prec), allocatable :: ux_tmp(:,:) 
         real(prec), allocatable :: uy_tmp(:,:) 
-        
+
         nx = size(H_ice,1)
         ny = size(H_ice,2)
 
@@ -107,7 +106,7 @@ contains
                 call calc_advec2D(dHdt_n,H_ice,ux_tmp,uy_tmp,mbal*0.0,dx,dx,dt,solver)
 
                 ! Calculate rate of change using weighted advective rates of change 
-                dHdt_advec = beta1*dHdt_n + beta2*dHdt_advec 
+                dHdt_advec = beta(1)*dHdt_n + beta(2)*dHdt_advec 
                 
                 ! Calculate predicted ice thickness (time=n+1,pred)
                 H_ice = H_ice_n + dt*dHdt_advec 
@@ -118,7 +117,7 @@ contains
                 call calc_advec2D(dHdt_advec,H_ice_pred,ux_tmp,uy_tmp,mbal*0.0,dx,dx,dt,solver)
 
                 ! Calculate rate of change using weighted advective rates of change 
-                dHdt_advec = beta1*dHdt_advec + beta2*dHdt_n 
+                dHdt_advec = beta(3)*dHdt_advec + beta(4)*dHdt_n 
                 
                 ! Calculate corrected ice thickness (time=n+1)
                 H_ice = H_ice_n + dt*dHdt_advec 

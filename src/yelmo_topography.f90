@@ -95,7 +95,7 @@ contains
                                     solver=trim(tpo%par%solver),boundaries=trim(tpo%par%boundaries), &
                                     ice_allowed=bnd%ice_allowed,H_min=tpo%par%H_min_grnd, &
                                     sd_min=tpo%par%sd_min,sd_max=tpo%par%sd_max,calv_max=tpo%par%calv_max, &
-                                    beta1=tpo%par%dt_beta1,beta2=tpo%par%dt_beta2,pc_step=tpo%par%pc_step)
+                                    beta=tpo%par%dt_beta,pc_step=tpo%par%pc_step)
             
             ! If desired, relax solution to reference state
             if (tpo%par%topo_rel .ne. 0) then 
@@ -444,10 +444,12 @@ contains
         ! Define current time as unrealistic value
         par%time = 1000000000   ! [a] 1 billion years in the future 
 
-        ! Intialize timestepping parameters to Forward Euler (beta2=0: no contribution from previous timestep)
+        ! Intialize timestepping parameters to Forward Euler (beta2=beta4=0: no contribution from previous timestep)
         par%dt_zeta     = 1.0 
-        par%dt_beta1    = 1.0 
-        par%dt_beta2    = 0.0 
+        par%dt_beta(1)  = 1.0 
+        par%dt_beta(2)  = 0.0 
+        par%dt_beta(3)  = 1.0 
+        par%dt_beta(4)  = 0.0 
 
         return
 

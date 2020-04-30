@@ -74,7 +74,7 @@ contains
 
         ! Calculate the basal frictional heating 
         call calc_basal_heating(thrm%now%Q_b,dyn%now%ux_b,dyn%now%uy_b,dyn%now%taub_acx,dyn%now%taub_acy, &
-                        tpo%now%H_ice,thrm%now%T_prime_b,gamma=2.0_prec,beta1=thrm%par%dt_beta1,beta2=thrm%par%dt_beta2)
+                        tpo%now%H_ice,thrm%now%T_prime_b,gamma=2.0_prec,beta1=thrm%par%dt_beta(1),beta2=thrm%par%dt_beta(2))
 
         ! Ensure basal frictional heating is relatively smooth
         call regularize2D(thrm%now%Q_b,tpo%now%H_ice,tpo%par%dx)
@@ -91,13 +91,13 @@ contains
 
             call calc_strain_heating_sia(thrm%now%Q_strn,dyn%now%ux,dyn%now%uy,tpo%now%dzsdx,tpo%now%dzsdy, &
                                       thrm%now%cp,tpo%now%H_ice,rho_ice,thrm%par%zeta_aa,thrm%par%zeta_ac, &
-                                      thrm%par%dt_beta1,thrm%par%dt_beta2)
+                                      thrm%par%dt_beta(1),thrm%par%dt_beta(2))
         
         else
             ! Calculate strain heating from strain rate tensor and viscosity (general approach)
             
             call calc_strain_heating(thrm%now%Q_strn,mat%now%strn%de,mat%now%visc,thrm%now%cp,rho_ice, &
-                                                                        thrm%par%dt_beta1,thrm%par%dt_beta2)
+                                                                        thrm%par%dt_beta(1),thrm%par%dt_beta(2))
 
         end if 
         
@@ -128,13 +128,13 @@ contains
 
                         ! Calculate the explicit horizontal advection term using enthalpy from previous timestep
                         call calc_advec_horizontal_3D(thrm%now%advecxy,thrm%now%enth,tpo%now%H_ice,tpo%now%z_srf, &
-                                            dyn%now%ux,dyn%now%uy,thrm%par%zeta_aa,thrm%par%dx,thrm%par%dt_beta1,thrm%par%dt_beta2)
+                                            dyn%now%ux,dyn%now%uy,thrm%par%zeta_aa,thrm%par%dx,thrm%par%dt_beta(1),thrm%par%dt_beta(2))
                     
                     else 
 
                         ! Calculate the explicit horizontal advection term using temperature from previous timestep
                         call calc_advec_horizontal_3D(thrm%now%advecxy,thrm%now%T_ice,tpo%now%H_ice,tpo%now%z_srf, &
-                                            dyn%now%ux,dyn%now%uy,thrm%par%zeta_aa,thrm%par%dx,thrm%par%dt_beta1,thrm%par%dt_beta2)
+                                            dyn%now%ux,dyn%now%uy,thrm%par%zeta_aa,thrm%par%dx,thrm%par%dt_beta(1),thrm%par%dt_beta(2))
                     
                     end if 
 
@@ -522,8 +522,8 @@ contains
 
         ! Intialize timestepping parameters to Forward Euler (beta2=0: no contribution from previous timestep)
         par%dt_zeta     = 1.0 
-        par%dt_beta1    = 1.0 
-        par%dt_beta2    = 0.0 
+        par%dt_beta(1)  = 1.0 
+        par%dt_beta(2)  = 0.0 
 
         return
 

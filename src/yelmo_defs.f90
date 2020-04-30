@@ -95,7 +95,7 @@ module yelmo_defs
         character(len=256) :: boundaries 
         
         character(len=256) :: pc_step 
-        real(prec) :: dt_zeta, dt_beta1, dt_beta2 
+        real(prec) :: dt_zeta, dt_beta(4)
 
     end type
 
@@ -427,7 +427,7 @@ module yelmo_defs
         real(prec), allocatable :: dzeta_b(:)
         
         real(prec) :: time
-        real(prec) :: dt_zeta, dt_beta1, dt_beta2 
+        real(prec) :: dt_zeta, dt_beta(2)
 
     end type
 
@@ -659,6 +659,8 @@ module yelmo_defs
         real(prec)          :: cfl_diff_max 
         character (len=56)  :: pc_method
         character (len=56)  :: pc_controller
+        logical             :: pc_filter_vel 
+        logical             :: pc_use_H_pred 
         real(prec)          :: pc_tol 
         real(prec)          :: pc_eps  
 

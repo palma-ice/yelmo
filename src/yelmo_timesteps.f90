@@ -11,6 +11,7 @@ module yelmo_timesteps
     public :: calc_pc_eta
     public :: calc_pc_tau_fe_sbe
     public :: calc_pc_tau_ab_sam
+    public :: calc_pc_tau_heun
     public :: set_adaptive_timestep_pc
     
     public :: set_adaptive_timestep 
@@ -128,6 +129,27 @@ contains
         return 
 
     end subroutine calc_pc_tau_ab_sam
+
+    elemental subroutine calc_pc_tau_heun(tau,var_corr,var_pred,dt_n)
+        ! Calculate truncation error for Heun's timestepping method
+        ! as derived by Marisa Montoya 
+
+        implicit none 
+
+        real(prec), intent(OUT) :: tau
+        real(prec), intent(IN)  :: var_corr
+        real(prec), intent(IN)  :: var_pred
+        real(prec), intent(IN)  :: dt_n 
+        
+        if (dt_n .eq. 0.0_prec) then 
+            tau = 0.0_prec 
+        else 
+            tau = (1.0_prec / (6.0_prec*dt_n)) * (var_corr - var_pred)
+        end if 
+
+        return 
+
+    end subroutine calc_pc_tau_heun
 
     subroutine set_adaptive_timestep_pc(dt_new,dt,eta,eps,dtmin,dtmax,mask,ux_bar,uy_bar,dx,pc_k,controller)
         ! Calculate the timestep following algorithm for 

@@ -13,7 +13,7 @@ To run a simple ensemble, call run_yelmo.py via the `job run` command. For examp
 to run an ensemble of benchmark simulations with different resolutions of 30.0 and 50.0 km,
 you can run the following command:
 ```
-job run --shell -f -o output/run -p eismint.dx=30.0,50.0 -- python run_yelmo.py -x -r -e benchmarks {} par/gmd/yelmo_HALFAR.nml
+job run --shell -f -o output/run -p eismint.dx=30.0,50.0 -- python run_yelmo.py -x -r -e benchmarks {} par-gmd/yelmo_HALFAR.nml
 ```
 Everything after the `--` corresponds to the normal call to run_yelmo.py, with two key differences. It 
 is necessary to add the option `-x` to signal to run_yelmo.py that it should use capabilities for loading
@@ -32,7 +32,7 @@ It's also possible to acheive the above in two steps, first sampling the paramet
 in a file, then loading that file to generate the ensemble:
 ```
 job product eismint.dx=30.0,50.0 > ensemble1.txt 
-job run --shell -f -o output/run -i ensemble1.txt -- python run_yelmo.py -x -r -e benchmarks {} par/gmd/yelmo_HALFAR.nml
+job run --shell -f -o output/run -i ensemble1.txt -- python run_yelmo.py -x -r -e benchmarks {} par-gmd/yelmo_HALFAR.nml
 ```
 
 ## Parameter sampling 
@@ -41,7 +41,7 @@ Using the command `job sample`, it is possible to generate an ensemble drawing f
 parameter distributions instead:
 ```
 job sample eismint.dx=U?30.0,50.0 --size 10 > ensemble2.txt
-job run --shell -f -o output/run -i ensemble2.txt -- python run_yelmo.py -x -r -e benchmarks {} par/gmd/yelmo_HALFAR.nml
+job run --shell -f -o output/run -i ensemble2.txt -- python run_yelmo.py -x -r -e benchmarks {} par-gmd/yelmo_HALFAR.nml
 ```
 The above command samples 10 values of `eismint.dx` from a uniform distribution ranging from `30.0` to `50.0` following a Latin-Hypercube sampling method. It is also possible to sample from a normal distribution, e.g., 
 with mean and standard deviation of (40.0,10.0):

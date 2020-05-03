@@ -84,7 +84,7 @@ $(objdir)/velocity_hybrid_pd12.o: $(srcdir)/physics/velocity_hybrid_pd12.f90 \
 	$(FC) $(DFLAGS) $(FFLAGS) -c -o $@ $<
 
 $(objdir)/velocity_diva.o: $(srcdir)/physics/velocity_diva.f90 \
-						  	$(objdir)/yelmo_defs.o $(objdir)/yelmo_tools.o
+						  	$(objdir)/yelmo_defs.o $(objdir)/yelmo_tools.o $(objdir)/basal_dragging.o
 	$(FC) $(DFLAGS) $(FFLAGS) -c -o $@ $<
 
 $(objdir)/velocity_sia.o: $(srcdir)/physics/velocity_sia.f90 \

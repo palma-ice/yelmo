@@ -702,7 +702,7 @@ contains
             ! 2. Un-stagger shear terms to central aa-nodes
 
             duxdz_aa = 0.5_prec*(duxdz(i,j) + duxdz(im1,j))
-            duydz_aa = 0.5_prec*(duydz(i,j) + duydz(im1,j))
+            duydz_aa = 0.5_prec*(duydz(i,j) + duydz(i,jm1))
             
             ! Avoid underflows 
             if (abs(dudx) .lt. tol_underflow) dudx = 0.0 

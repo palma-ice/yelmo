@@ -9,6 +9,7 @@ module yelmo_dynamics
         calc_magnitude_from_staggered_ice, calc_vertical_integrated_2D, smooth_gauss_2D, &
         regularize2D !, limit_gradient
 
+    use velocity_diva
     use velocity_hybrid_pd12 
     use velocity_sia 
     use solver_ssa_sico5
@@ -81,7 +82,7 @@ contains
                 ! Depth-integrated variational approximation (DIVA) - Goldberg (2011); Lipscomb et al. (2019)
                 ! To do! 
 
-                call calc_ydyn_diva(dyn,tpo,mat,thrm,bnd)
+                call calc_ydyn_diva(dyn,tpo,mat,thrm,bnd,dt)
 
             case DEFAULT 
 
@@ -99,6 +100,120 @@ contains
 
     end subroutine calc_ydyn
     
+    subroutine calc_ydyn_diva(dyn,tpo,mat,thrm,bnd,dt)
+        ! Velocity is a steady-state solution to a given set of boundary conditions (topo, material, etc)
+        ! so no time step is passed here. 
+
+        implicit none
+        
+        type(ydyn_class),   intent(INOUT) :: dyn
+        type(ytopo_class),  intent(IN)    :: tpo 
+        type(ymat_class),   intent(IN)    :: mat
+        type(ytherm_class), intent(IN)    :: thrm 
+        type(ybound_class), intent(IN)    :: bnd  
+        real(prec),         intent(IN)    :: dt 
+
+        ! Local variables
+        integer :: iter, n_iter
+        integer :: i, j, k, nx, ny, nz_aa, nz_ac   
+        real(prec), allocatable :: uxy_prev(:,:) 
+
+        ! For vertical velocity calculation 
+        real(prec), allocatable :: bmb(:,:)
+
+        logical :: calc_ssa 
+
+        type(ydyn_class) :: dyn1 
+        type(ydyn_class) :: dyn2 
+        logical          :: is_grz_mid 
+        real(prec)       :: H_mid 
+
+        nx    = dyn%par%nx 
+        ny    = dyn%par%ny 
+        nz_aa = dyn%par%nz_aa 
+        nz_ac = dyn%par%nz_ac 
+        
+        allocate(bmb(nx,ny))
+        allocate(uxy_prev(nx,ny)) 
+
+        ! ===== Calculate general variables ==============================
+
+        ! Store initial uxy_bar solution 
+        uxy_prev = dyn%now%uxy_bar 
+        
+        ! Calculate driving stress 
+        call calc_driving_stress_ac(dyn%now%taud_acx,dyn%now%taud_acy,tpo%now%H_ice,tpo%now%dzsdx,tpo%now%dzsdy, &
+                                                                                            dyn%par%dx,dyn%par%taud_lim)
+
+        ! Calculate effective pressure 
+        call calc_ydyn_neff(dyn,tpo,thrm,bnd)
+
+        ! Update bed roughness coefficient c_bed (which is independent of velocity)
+        call calc_ydyn_cfref(dyn,tpo,thrm,bnd)
+        
+        ! ===== Calculate 3D horizontal velocity solution via DIVA algorithm ===================
+
+        ! Define grid points with ssa active (uses beta from previous timestep)
+        call set_ssa_masks(dyn%now%ssa_mask_acx,dyn%now%ssa_mask_acy,dyn%now%beta_acx,dyn%now%beta_acy, &
+                           tpo%now%H_ice,tpo%now%f_grnd_acx,tpo%now%f_grnd_acy,dyn%par%ssa_beta_max,dyn%par%use_ssa)
+
+        call calc_velocity_diva(dyn%now%ux,dyn%now%uy,dyn%now%ux_i,dyn%now%uy_i,dyn%now%ux_bar,dyn%now%uy_bar, &
+                            dyn%now%ux_b,dyn%now%uy_b,dyn%now%duxdz,dyn%now%duydz,dyn%now%taub_acx,dyn%now%taub_acy, &
+                            dyn%now%visc_eff,dyn%now%visc_eff_bar,dyn%now%beta,dyn%now%beta_acx,dyn%now%beta_acy, &
+                            dyn%now%ssa_mask_acx,dyn%now%ssa_mask_acy,dyn%now%c_bed,dyn%now%taud_acx,dyn%now%taud_acy, &
+                            tpo%now%H_ice,tpo%now%H_grnd,tpo%now%f_grnd,tpo%now%f_grnd_acx,tpo%now%f_grnd_acy,mat%now%ATT, &
+                            dyn%par%zeta_aa,bnd%z_sl,bnd%z_bed,dyn%par%dx,dyn%par%dy,mat%par%n_glen,dyn%par%ssa_vel_max, &
+                            dyn%par%beta_gl_stag,dyn%par%boundaries,dyn%par%ssa_solver_opt)
+
+
+        ! ===== Calculate the vertical velocity through continuity ============================
+
+        if (dyn%par%use_bmb) then 
+            bmb = tpo%now%bmb 
+        else 
+            bmb = 0.0 
+        end if 
+
+        call calc_uz_3D(dyn%now%uz,dyn%now%ux,dyn%now%uy,tpo%now%H_ice,bnd%z_bed,tpo%now%z_srf, &
+                        bnd%smb,bmb,tpo%now%dHicedt,tpo%now%dzsrfdt,dyn%par%zeta_aa,dyn%par%zeta_ac,dyn%par%dx,dyn%par%dy)
+        
+        ! ===== Additional diagnostic variables =======================
+
+        ! Diagnose ice flux 
+        call calc_ice_flux(dyn%now%qq_acx,dyn%now%qq_acy,dyn%now%ux_bar,dyn%now%uy_bar,tpo%now%H_ice, &
+                            dyn%par%dx,dyn%par%dy)
+        dyn%now%qq        = calc_magnitude_from_staggered_ice(dyn%now%qq_acx,dyn%now%qq_acy,tpo%now%H_ice)
+
+        dyn%now%taub      = calc_magnitude_from_staggered_ice(dyn%now%taub_acx,dyn%now%taub_acy,tpo%now%H_ice)
+        dyn%now%taud      = calc_magnitude_from_staggered_ice(dyn%now%taud_acx,dyn%now%taud_acy,tpo%now%H_ice)
+
+        dyn%now%uxy_b     = calc_magnitude_from_staggered_ice(dyn%now%ux_b,dyn%now%uy_b,tpo%now%H_ice)
+        dyn%now%uxy_i_bar = calc_magnitude_from_staggered_ice(dyn%now%ux_i_bar,dyn%now%uy_i_bar,tpo%now%H_ice)
+        dyn%now%uxy_bar   = calc_magnitude_from_staggered_ice(dyn%now%ux_bar,dyn%now%uy_bar,tpo%now%H_ice)
+
+        do k = 1, nz_aa
+            dyn%now%uxy(:,:,k) = calc_magnitude_from_staggered_ice(dyn%now%ux(:,:,k),dyn%now%uy(:,:,k),tpo%now%H_ice)
+        end do 
+
+        ! Store surface velocities for easy access too 
+        dyn%now%ux_s  = dyn%now%ux(:,:,nz_aa)
+        dyn%now%uy_s  = dyn%now%uy(:,:,nz_aa)
+        dyn%now%uxy_s = dyn%now%uxy(:,:,nz_aa)
+
+        ! Determine ratio of basal to surface velocity
+        dyn%now%f_vbvs = calc_vel_ratio(uxy_base=dyn%now%uxy_b,uxy_srf=dyn%now%uxy_s)
+
+        ! Finally, determine rate of velocity change 
+        if (dt .ne. 0.0_prec) then 
+            dyn%now%duxydt = (dyn%now%uxy_bar - uxy_prev) / dt 
+        else 
+            dyn%now%duxydt = 0.0_prec 
+        end if 
+
+        return
+
+    end subroutine calc_ydyn_diva
+
     subroutine calc_ydyn_adhoc(dyn,tpo,mat,thrm,bnd,dt)
         ! Velocity is a steady-state solution to a given set of boundary conditions (topo, material, etc)
         ! so no time step is passed here. 
@@ -393,7 +508,7 @@ contains
         ! ===== Additional diagnostic variables =======================
 
         ! 3b. Diagnose the shear reduction terms of PD12 
-        call calc_shear_reduction(dyn%now%lhs_x,dyn%now%lhs_y,dyn%now%ux_b,dyn%now%uy_b,dyn%now%visc_eff,dyn%par%dx)
+        call calc_shear_reduction(dyn%now%lhs_x,dyn%now%lhs_y,dyn%now%ux_b,dyn%now%uy_b,dyn%now%visc_eff_bar,dyn%par%dx)
         
         ! 3c. Diagnose the effective horizontal stress squared
         dyn%now%sigma_horiz_sq = calc_stress_eff_horizontal_squared(dyn%now%ux_bar,dyn%now%uy_bar, &
@@ -534,7 +649,7 @@ contains
             dyn%now%sigma_horiz_sq = calc_stress_eff_horizontal_squared(dyn%now%ux_bar,dyn%now%uy_bar, &
                                             mat%now%ATT_bar,dyn%par%dx,dyn%par%dy,mat%par%n_glen)
 
-            call calc_shear_reduction(dyn%now%lhs_x,dyn%now%lhs_y,dyn%now%ux_b,dyn%now%uy_b,dyn%now%visc_eff,dyn%par%dx)
+            call calc_shear_reduction(dyn%now%lhs_x,dyn%now%lhs_y,dyn%now%ux_b,dyn%now%uy_b,dyn%now%visc_eff_bar,dyn%par%dx)
             
             ! 2. Calculate the vertical shear fields 
             ! (accounting for effective stress with stretching and reduced driving stress)
@@ -576,18 +691,13 @@ contains
             ! ---------------------------------------------------------------------
             ! Stable viscosity solutions for SSA solver:
 
-!             dyn%now%visc_eff = 1e10 
+!             dyn%now%visc_eff_bar = 1e10 
 
-!             dyn%now%visc_eff = mat%now%visc_eff 
-                
-            ! Use 3D rate factor, but 2D shear:
-!             dyn%now%visc_eff = calc_visc_eff(dyn%now%ux_b,dyn%now%uy_b,dyn%now%duxdz_bar,dyn%now%duydz_bar, &
-!                                              tpo%now%H_ice,mat%now%ATT,dyn%par%zeta_aa,dyn%par%dx,dyn%par%dy,mat%par%n_glen)
-            dyn%now%visc_eff = calc_visc_eff(dyn%now%ux_bar,dyn%now%uy_bar,dyn%now%duxdz_bar*0.0,dyn%now%duydz_bar*0.0, &
-                                             tpo%now%H_ice,mat%now%ATT,dyn%par%zeta_aa,dyn%par%dx,dyn%par%dy,mat%par%n_glen)
+            dyn%now%visc_eff_bar = calc_visc_eff_2D(dyn%now%ux_bar,dyn%now%uy_bar,dyn%now%duxdz_bar*0.0,dyn%now%duydz_bar*0.0, &
+                                                    tpo%now%H_ice,mat%now%ATT,dyn%par%zeta_aa,dyn%par%dx,dyn%par%dy,mat%par%n_glen)
             
             ! Ensure viscosity is relatively smooth
-!             call regularize2D(dyn%now%visc_eff,tpo%now%H_ice,tpo%par%dx)
+!             call regularize2D(dyn%now%visc_eff_bar,tpo%now%H_ice,tpo%par%dx)
 
             ! ---------------------------------------------------------------------
             
@@ -608,7 +718,7 @@ contains
             if (calc_ssa) then
                 ! Call ssa solver to determine ux_bar/uy_bar, where ssa_mask_acx/y are > 0
                 
-                call calc_vxy_ssa_matrix(dyn%now%ux_bar,dyn%now%uy_bar,dyn%now%beta_acx,dyn%now%beta_acy,dyn%now%visc_eff, &
+                call calc_vxy_ssa_matrix(dyn%now%ux_bar,dyn%now%uy_bar,dyn%now%beta_acx,dyn%now%beta_acy,dyn%now%visc_eff_bar, &
                                      dyn%now%ssa_mask_acx,dyn%now%ssa_mask_acy,tpo%now%H_ice,dyn%now%taud_acx, &
                                      dyn%now%taud_acy,tpo%now%H_grnd,bnd%z_sl,bnd%z_bed,dyn%par%dx,dyn%par%dy, &
                                      dyn%par%ssa_vel_max,dyn%par%boundaries,dyn%par%ssa_solver_opt)
@@ -774,14 +884,13 @@ contains
 
             !   2. Calculate effective viscosity
             
-            ! Use 3D rate factor, but 2D shear:
             ! Note: disable shear contribution to viscosity for this solver, for mixed terms use hybrid-pd12 option.
-            ! Note: Here visc_eff is calculated using ux_b and uy_b (ssa velocity), not ux_bar/uy_bar as in hybrid-pd12. 
-            dyn%now%visc_eff = calc_visc_eff(dyn%now%ux_b,dyn%now%uy_b,dyn%now%duxdz_bar*0.0,dyn%now%duydz_bar*0.0, &
-                                             tpo%now%H_ice,mat%now%ATT,dyn%par%zeta_aa,dyn%par%dx,dyn%par%dy,mat%par%n_glen)
+            ! Note: Here visc_eff_bar is calculated using ux_b and uy_b (ssa velocity), not ux_bar/uy_bar as in hybrid-pd12. 
+            dyn%now%visc_eff_bar = calc_visc_eff_2D(dyn%now%ux_b,dyn%now%uy_b,dyn%now%duxdz_bar*0.0,dyn%now%duydz_bar*0.0, &
+                                                    tpo%now%H_ice,mat%now%ATT,dyn%par%zeta_aa,dyn%par%dx,dyn%par%dy,mat%par%n_glen)
             
             ! Ensure viscosity is relatively smooth
-!             call regularize2D(dyn%now%visc_eff,tpo%now%H_ice,tpo%par%dx)
+!             call regularize2D(dyn%now%visc_eff_bar,tpo%now%H_ice,tpo%par%dx)
 
             !   X. Prescribe grounding-line flux 
 if (.FALSE.) then
@@ -850,7 +959,7 @@ if (.TRUE.) then
 end if 
 
             ! Call ssa solver to determine ux_b/uy_b, where ssa_mask_acx/y are > 0
-            call calc_vxy_ssa_matrix(dyn%now%ux_b,dyn%now%uy_b,dyn%now%beta_acx,dyn%now%beta_acy,dyn%now%visc_eff, &
+            call calc_vxy_ssa_matrix(dyn%now%ux_b,dyn%now%uy_b,dyn%now%beta_acx,dyn%now%beta_acy,dyn%now%visc_eff_bar, &
                                      dyn%now%ssa_mask_acx,dyn%now%ssa_mask_acy,tpo%now%H_ice,dyn%now%taud_acx, &
                                      dyn%now%taud_acy,tpo%now%H_grnd,bnd%z_sl,bnd%z_bed,dyn%par%dx,dyn%par%dy, &
                                      dyn%par%ssa_vel_max,dyn%par%boundaries,dyn%par%ssa_solver_opt)
@@ -1457,8 +1566,9 @@ end if
         allocate(now%qq_acy(nx,ny)) 
         allocate(now%qq(nx,ny)) 
 
-        allocate(now%visc_eff(nx,ny))  
-        
+        allocate(now%visc_eff(nx,ny,nz_aa))  
+        allocate(now%visc_eff_bar(nx,ny))
+
         allocate(now%cf_ref(nx,ny))
         allocate(now%c_bed(nx,ny)) 
         
@@ -1533,6 +1643,7 @@ end if
         now%qq                = 0.0 
         
         now%visc_eff          = 0.0  
+        now%visc_eff_bar      = 0.0  
         
         now%cf_ref            = 0.0
         now%c_bed             = 0.0 
@@ -1618,6 +1729,7 @@ end if
         if (allocated(now%qq))              deallocate(now%qq) 
         
         if (allocated(now%visc_eff))        deallocate(now%visc_eff) 
+        if (allocated(now%visc_eff_bar))    deallocate(now%visc_eff_bar) 
         
         if (allocated(now%cf_ref))          deallocate(now%cf_ref) 
         if (allocated(now%c_bed))           deallocate(now%c_bed) 
@@ -1795,7 +1907,7 @@ end if
                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
         call nc_write(filename,"beta_acy",dyn%now%beta_acy,units="Pa a m^-1",long_name="Dragging coefficient (acy)", &
                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-        call nc_write(filename,"dyn_visc_eff",dyn%now%visc_eff,units="Pa a",long_name="Vertically averaged viscosity", &
+        call nc_write(filename,"dyn_visc_eff_bar",dyn%now%visc_eff_bar,units="Pa a",long_name="Vertically averaged effective viscosity", &
                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
 
         call nc_write(filename,"taud_acx",dyn%now%taud_acx,units="Pa",long_name="Driving stress, x-direction", &

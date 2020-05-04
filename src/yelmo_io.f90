@@ -214,7 +214,8 @@ contains
         call nc_write(filename,"qq_acy",        dom%dyn%now%qq_acy,   units="",dim1="xc",dim2="yc",ncid=ncid) 
         call nc_write(filename,"qq",            dom%dyn%now%qq,       units="",dim1="xc",dim2="yc",ncid=ncid) 
 
-        call nc_write(filename,"visc_eff",      dom%dyn%now%visc_eff,units="",dim1="xc",dim2="yc",ncid=ncid) 
+        call nc_write(filename,"visc_eff",      dom%dyn%now%visc_eff,    units="",dim1="xc",dim2="yc",dim3="zeta",ncid=ncid) 
+        call nc_write(filename,"visc_eff_bar",  dom%dyn%now%visc_eff_bar,units="",dim1="xc",dim2="yc",ncid=ncid) 
 
         call nc_write(filename,"N_eff",         dom%dyn%now%N_eff,    units="",dim1="xc",dim2="yc",ncid=ncid)        
         call nc_write(filename,"cf_ref",        dom%dyn%now%cf_ref,   units="",dim1="xc",dim2="yc",ncid=ncid) 
@@ -485,6 +486,7 @@ contains
         call nc_read(filename,"qq",            dom%dyn%now%qq,ncid=ncid) 
 
         call nc_read(filename,"visc_eff",      dom%dyn%now%visc_eff,ncid=ncid) 
+        call nc_read(filename,"visc_eff_bar",  dom%dyn%now%visc_eff_bar,ncid=ncid) 
 
         call nc_read(filename,"N_eff",         dom%dyn%now%N_eff,ncid=ncid)        
         call nc_read(filename,"cf_ref",        dom%dyn%now%cf_ref,ncid=ncid) 

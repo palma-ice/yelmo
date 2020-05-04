@@ -18,7 +18,7 @@ module velocity_hybrid_pd12
     public :: calc_basal_stress
     public :: calc_driving_stress_ac 
     public :: calc_driving_stress_gl_ac
-    public :: calc_visc_eff
+    public :: calc_visc_eff_2D
     public :: calc_stress_eff_horizontal_squared
     public :: calc_vel_ratio
 
@@ -631,7 +631,7 @@ contains
         
     end subroutine calc_shear_3D
     
-    function calc_visc_eff(ux,uy,duxdz,duydz,H_ice,ATT,zeta_aa,dx,dy,n) result(visc)
+    function calc_visc_eff_2D(ux,uy,duxdz,duydz,H_ice,ATT,zeta_aa,dx,dy,n) result(visc)
         ! Calculate effective viscosity eta to be used in SSA solver
         ! Pollard and de Conto (2012), Eqs. 2a/b and Eq. 4 (`visc=mu*H_ice*A**(-1/n)`)
         ! Note: calculated on same nodes as eps_sq (aa-nodes by default)
@@ -739,7 +739,7 @@ contains
 
         return
         
-    end function calc_visc_eff
+    end function calc_visc_eff_2D
 
     function calc_stress_eff_horizontal_squared(ux,uy,ATT_bar,dx,dy,n) result(sigma_sq)
         ! Calculate squared effective stress of horizontal stretching terms

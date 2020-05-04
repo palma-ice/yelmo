@@ -6,18 +6,20 @@ module velocity_diva
                     integrate_trapezoid1D_1D, integrate_trapezoid1D_pt, minmax
 
     use basal_dragging 
-
+    use solver_ssa_sico5 
+    
     implicit none 
 
     private 
+    public :: calc_velocity_diva
 
 contains 
 
-    subroutine calc_velocity_diva(ux,uy,uz,ux_i,uy_i,ux_bar,uy_bar,ux_b,uy_b,duxdz,duydz,taub_acx,taub_acy, &
+    subroutine calc_velocity_diva(ux,uy,ux_i,uy_i,ux_bar,uy_bar,ux_b,uy_b,duxdz,duydz,taub_acx,taub_acy, &
                                   visc_eff,visc_eff_bar,beta,beta_acx,beta_acy,ssa_mask_acx,ssa_mask_acy,c_bed, &
-                                  taud_acx,taud_acy,H_ice,H_grnd,f_grnd,f_grnd_acx,f_grnd_acy,ATT,zeta_aa,zeta_ac, &
+                                  taud_acx,taud_acy,H_ice,H_grnd,f_grnd,f_grnd_acx,f_grnd_acy,ATT,zeta_aa, &
                                   z_sl,z_bed,dx,dy,n_glen,vel_max,beta_gl_stag,boundaries,ssa_solver_opt)
-        ! This subroutine is used to solve the entire velocity system (ux,uy,uz)
+        ! This subroutine is used to solve the horizontal velocity system (ux,uy)
         ! following the Depth-Integrated Viscosity Approximation (DIVA),
         ! as outlined by Lipscomb et al. (2019). Method originally 
         ! proposed by Goldberg (2011), algorithm by Arthern et al (2015), 
@@ -27,7 +29,6 @@ contains
 
         real(prec), intent(INOUT) :: ux(:,:,:)          ! [m/a]
         real(prec), intent(INOUT) :: uy(:,:,:)          ! [m/a]
-        real(prec), intent(INOUT) :: uz(:,:,:)          ! [m/a] nz_ac points in the vertical
         real(prec), intent(INOUT) :: ux_i(:,:,:)        ! [m/a]
         real(prec), intent(INOUT) :: uy_i(:,:,:)        ! [m/a]
         real(prec), intent(INOUT) :: ux_bar(:,:)        ! [m/a]
@@ -55,7 +56,6 @@ contains
         real(prec), intent(IN)    :: f_grnd_acy(:,:)    ! [-]
         real(prec), intent(IN)    :: ATT(:,:,:)         ! [a^-1 Pa^-n_glen]
         real(prec), intent(IN)    :: zeta_aa(:)         ! [-]
-        real(prec), intent(IN)    :: zeta_ac(:)         ! [-]
         real(prec), intent(IN)    :: z_sl(:,:)          ! [m]
         real(prec), intent(IN)    :: z_bed(:,:)         ! [m]
         real(prec), intent(IN)    :: dx                 ! [m]
@@ -79,7 +79,6 @@ contains
         nx    = size(ux,1)
         ny    = size(ux,2)
         nz_aa = size(ux,3)
-        nz_ac = size(uz,3)
 
         iter_max = 2 
 
@@ -132,9 +131,11 @@ contains
         end do 
 
         ! Iterations are finished, finalize calculations of 3D velocity field 
-        
+
         ! Calculate the 3D horizontal velocity field
         call calc_vel_horizontal_3D(ux,uy,ux_b,uy_b,beta_acx,beta_acy,visc_eff,zeta_aa)
+
+        ! Calculate the surface velocity field 
 
         return 
 

@@ -284,7 +284,8 @@ module yelmo_defs
         real(prec), allocatable :: qq_acy(:,:) 
         real(prec), allocatable :: qq(:,:)
         
-        real(prec), allocatable :: visc_eff(:,:)
+        real(prec), allocatable :: visc_eff(:,:,:)
+        real(prec), allocatable :: visc_eff_bar(:,:)
 
         real(prec), allocatable :: N_eff(:,:)       ! Effective pressure
         real(prec), allocatable :: cf_ref(:,:)

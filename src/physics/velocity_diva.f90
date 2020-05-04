@@ -128,8 +128,13 @@ contains
             
             ! Calculate basal stress 
             call calc_basal_stress(taub_acx,taub_acy,beta_acx,beta_acy,ux_b,uy_b)
-            
+
         end do 
+
+        ! Iterations are finished, finalize calculations of 3D velocity field 
+        
+        ! Calculate the 3D horizontal velocity field
+        call calc_vel_horizontal_3D(ux,uy,ux_b,uy_b,beta_acx,beta_acy,visc_eff,zeta_aa)
 
         return 
 
@@ -187,6 +192,69 @@ contains
         return 
 
     end subroutine stagger_beta
+
+    subroutine calc_vel_horizontal_3D(ux,uy,ux_b,uy_b,beta_acx,beta_acy,visc_eff,zeta_aa)
+        ! Caluculate the 3D horizontal velocity field (ux,uy)
+        ! following L19, Eq. 29 
+
+        implicit none 
+
+        real(prec), intent(OUT) :: ux(:,:,:) 
+        real(prec), intent(OUT) :: uy(:,:,:) 
+        real(prec), intent(IN)  :: ux_b(:,:) 
+        real(prec), intent(IN)  :: uy_b(:,:) 
+        real(prec), intent(IN)  :: beta_acx(:,:) 
+        real(prec), intent(IN)  :: beta_acy(:,:) 
+        real(prec), intent(IN)  :: visc_eff(:,:,:)       
+        real(prec), intent(IN)  :: zeta_aa(:) 
+
+        ! Local variables
+        integer :: i, j, k, ip1, jp1, nx, ny, nz_aa  
+        real(prec) :: tmpval_ac 
+        real(prec), allocatable :: visc_eff_ac(:) 
+        real(prec), allocatable :: tmpcol_ac(:) 
+        
+        nx    = size(ux,1)
+        ny    = size(ux,2) 
+        nz_aa = size(ux,3) 
+
+        allocate(visc_eff_ac(nz_aa))
+        allocate(tmpcol_ac(nz_aa))
+
+        do j = 1, ny 
+        do i = 1, nx 
+
+            ip1 = min(i+1,nx)
+            jp1 = min(j+1,ny) 
+
+            ! === x direction ===============================================
+
+            ! Stagger viscosity column to ac-nodes 
+            visc_eff_ac = 0.5_prec*(visc_eff(i,j,:)+visc_eff(ip1,j,:))
+
+            ! Calculate integrated term of L19, Eq. 29 
+            tmpcol_ac = integrate_trapezoid1D_1D((1.0_prec/visc_eff_ac)*(1.0-zeta_aa),zeta_aa)
+
+            ! Calculate velocity column 
+            ux(i,j,:) = ux_b(i,j) + (beta_acx(i,j)*ux_b(i,j))*tmpcol_ac 
+
+            ! === y direction ===============================================
+
+            ! Stagger viscosity column to ac-nodes 
+            visc_eff_ac = 0.5_prec*(visc_eff(i,j,:)+visc_eff(i,jp1,:))
+
+            ! Calculate integrated term of L19, Eq. 29 
+            tmpcol_ac = integrate_trapezoid1D_1D((1.0_prec/visc_eff_ac)*(1.0-zeta_aa),zeta_aa)
+
+            ! Calculate velocity column 
+            uy(i,j,:) = uy_b(i,j) + (beta_acy(i,j)*uy_b(i,j))*tmpcol_ac 
+
+        end do 
+        end do  
+
+        return 
+
+    end subroutine calc_vel_horizontal_3D
 
     subroutine calc_vertical_shear_3D(duxdz,duydz,taub_acx,taub_acy,visc_eff,zeta_aa)
         ! Calculate vertical shear terms (L19, Eq. 36)

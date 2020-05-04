@@ -81,6 +81,7 @@ contains
                 ! Depth-integrated variational approximation (DIVA) - Goldberg (2011); Lipscomb et al. (2019)
                 ! To do! 
 
+                call calc_ydyn_diva(dyn,tpo,mat,thrm,bnd)
 
             case DEFAULT 
 
@@ -152,7 +153,7 @@ contains
         H_ice_acx = stagger_aa_acx(tpo%now%H_ice)
         H_ice_acy = stagger_aa_acy(tpo%now%H_ice)
 
-        ! ===== Calculate driving stress ==============================
+        ! ===== Calculate general variables ==============================
 
         ! Calculate driving stress 
         call calc_driving_stress_ac(dyn%now%taud_acx,dyn%now%taud_acy,tpo%now%H_ice,tpo%now%dzsdx,tpo%now%dzsdy, &
@@ -168,13 +169,12 @@ contains
         
 !         end if 
         
-
-        ! ===== Calculate effective pressure ==============================
-
         ! Calculate effective pressure 
         call calc_ydyn_neff(dyn,tpo,thrm,bnd)
 
-
+        ! Update bed roughness coefficient c_bed (which is independent of velocity)
+        call calc_ydyn_cfref(dyn,tpo,thrm,bnd)
+        
         ! ===== Calculate shear (ie, SIA) velocity solution ===========
 
         select case(trim(dyn%par%sia_solver))
@@ -276,9 +276,6 @@ contains
         end select 
 
         ! ===== Calculate sliding velocity solution ===================
-
-        ! Update bed roughness coefficient c_bed (which is independent of velocity)
-        call calc_ydyn_cfref(dyn,tpo,thrm,bnd)
 
         ! Define grid points with ssa active (uses beta from previous timestep)
         call set_ssa_masks(dyn%now%ssa_mask_acx,dyn%now%ssa_mask_acy,dyn%now%beta_acx,dyn%now%beta_acy, &
@@ -1212,7 +1209,7 @@ end if
 
 
             ! =============================================================================
-            ! Step 3: calculate cf_ref [Pa]
+            ! Step 3: calculate cf_ref [--]
             
             dyn%now%cf_ref = (cf_ref*lambda_bed)
             

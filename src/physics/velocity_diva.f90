@@ -88,7 +88,7 @@ contains
         type(diva_param_class), intent(IN) :: par       ! List of parameters that should be defined
 
         ! Local variables 
-        integer :: nx, ny, nz_aa, nz_ac
+        integer :: k, nx, ny, nz_aa, nz_ac
         integer :: iter, iter_max  
         logical :: is_converged 
         real(prec), allocatable :: ux_bar_nm1(:,:) 
@@ -146,26 +146,30 @@ contains
             ! Calculate 3D effective viscosity and its vertical average 
             call calc_visc_eff_3D(visc_eff,ATT,eps_sq,n_glen)
 
+            ! Note L19 uses eta_bar*H in the ssa equation. Yelmo uses eta_int right now,
+            ! so this naming should be cleaned up (ie visc_eff_bar => visc_eff_int).
             visc_eff_bar = calc_vertical_integrated_2D(visc_eff,zeta_aa) 
-            
-            ! Calculate F-integeral (F2) on aa-nodes 
-            call calc_F_integral(F2,visc_eff,H_ice,zeta_aa,n=2.0_prec)
+            where(H_ice .gt. 0.0_prec) visc_eff_bar = visc_eff_bar*H_ice 
 
             ! Calculate beta (at the ice base)
             call calc_beta(beta,c_bed,ux_b,uy_b,H_ice,H_grnd,f_grnd,z_bed,z_sl,par%beta_method, &
                                 par%beta_const,par%beta_q,par%beta_u0,par%beta_gl_scale,par%beta_gl_f, &
                                 par%H_grnd_lim,par%beta_min,par%boundaries)
 
+            ! Calculate F-integeral (F2) on aa-nodes 
+            call calc_F_integral(F2,visc_eff,H_ice,zeta_aa,n=2.0_prec)
+            
             ! Calculate effective beta 
-            call calc_beta_eff(beta_eff,beta,ux_b,uy_b,F2,zeta_aa)
+            !call calc_beta_eff(beta_eff,beta,ux_b,uy_b,F2,zeta_aa)
+            beta_eff = beta 
 
             ! Stagger beta_eff 
             call stagger_beta(beta_eff_acx,beta_eff_acy,beta_eff,f_grnd,f_grnd_acx,f_grnd_acy,par%beta_gl_stag)
 
-            write(*,*) "diva:: beta_eff:     ",minval(beta_eff), maxval(beta_eff)
-            write(*,*) "diva:: beta_eff_acx: ",minval(beta_eff_acx), maxval(beta_eff_acx)
-            write(*,*) "diva:: beta_eff_acy: ",minval(beta_eff_acy), maxval(beta_eff_acy)
-
+            write(*,*) "diva:: beta:         ", minval(beta),     maxval(beta)
+            write(*,*) "diva:: beta_eff:     ", minval(beta_eff), maxval(beta_eff)
+            write(*,*) "diva:: F2:           ", minval(F2),       maxval(F2)
+            
             ! =========================================================================================
             ! Step 2: Call the SSA solver to obtain new estimate of ux_bar/uy_bar
 
@@ -197,7 +201,9 @@ end if
             
             ! Calculate basal velocity from depth-averaged solution 
             call calc_vel_basal(ux_b,uy_b,ux_bar,uy_bar,F2,beta_acx,beta_acy)
-            
+            !ux_b = ux_bar 
+            !uy_b = uy_bar 
+
             ! Calculate basal stress 
             call calc_basal_stress(taub_acx,taub_acy,beta_acx,beta_acy,ux_b,uy_b)
 
@@ -210,6 +216,12 @@ end if
 
         ! Calculate the 3D horizontal velocity field
         call calc_vel_horizontal_3D(ux,uy,ux_b,uy_b,beta_acx,beta_acy,visc_eff,zeta_aa)
+
+        ! Also calculate the shearing contribution
+        do k = 1, nz_aa 
+            ux_i(:,:,k) = ux(:,:,k) - ux_b 
+            uy_i(:,:,k) = uy(:,:,k) - uy_b 
+        end do
 
         return 
 

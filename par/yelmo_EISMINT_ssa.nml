@@ -65,7 +65,7 @@
 /
 
 &ydyn
-    solver              = "hybrid-adhoc"  ! "fixed", "hybrid-adhoc", "hybrid-pd12"    
+    solver              = "diva"          ! "fixed", "hybrid-adhoc", "hybrid-pd12"    
     sia_solver          = "vel"           ! "vel", "shear", "none"
     ssa_solver_opt      = "-i bicgsafe -p jacobi -maxiter 100 -tol 1.0e-4 -initx_zeros false"  ! See Lis library
     mix_method          = 1               ! -2: sia, -1: ssa, 0: sia|ssa, 1: sia+ssa 2: ssa vel. fraction

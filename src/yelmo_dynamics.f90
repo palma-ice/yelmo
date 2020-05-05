@@ -24,7 +24,7 @@ module yelmo_dynamics
 
     public :: ydyn_par_load, ydyn_alloc, ydyn_dealloc
     public :: calc_ydyn
-    public :: calc_ydyn_neff, calc_ydyn_cfref, calc_ydyn_beta
+    public :: calc_ydyn_neff, calc_ydyn_cfref
     
 contains
 
@@ -725,7 +725,10 @@ contains
             
             ! 6. Calculate basal drag coefficient beta (beta, beta_acx, beta_acy) 
 
-            call calc_ydyn_beta(dyn,tpo,mat,bnd)
+!             call calc_ydyn_beta(dyn,tpo,mat,bnd)
+            
+            write(*,*) "Need to update interface to basal_dragging::calc_beta routine here!"
+            stop 
 
             ! 7. Calculate SSA solution if needed
 
@@ -1026,207 +1029,207 @@ end if
 
     end subroutine calc_ydyn_ssa 
 
-    subroutine calc_ydyn_beta(dyn,tpo,mat,bnd)
-        ! Update beta based on parameter choices
+!     subroutine calc_ydyn_beta(dyn,tpo,mat,bnd)
+!         ! Update beta based on parameter choices
 
-        implicit none
+!         implicit none
         
-        type(ydyn_class),   intent(INOUT) :: dyn
-        type(ytopo_class),  intent(IN)    :: tpo 
-        type(ymat_class),   intent(IN)    :: mat 
-        type(ybound_class), intent(IN)    :: bnd   
+!         type(ydyn_class),   intent(INOUT) :: dyn
+!         type(ytopo_class),  intent(IN)    :: tpo 
+!         type(ymat_class),   intent(IN)    :: mat 
+!         type(ybound_class), intent(IN)    :: bnd   
 
-        ! Local variables 
-        integer :: i, j, nx, ny 
-        real(prec), allocatable :: logbeta(:,:) 
+!         ! Local variables 
+!         integer :: i, j, nx, ny 
+!         real(prec), allocatable :: logbeta(:,:) 
         
-        nx = size(dyn%now%beta,1)
-        ny = size(dyn%now%beta,2)
-        allocate(logbeta(nx,ny))
-        logbeta = 0.0_prec 
+!         nx = size(dyn%now%beta,1)
+!         ny = size(dyn%now%beta,2)
+!         allocate(logbeta(nx,ny))
+!         logbeta = 0.0_prec 
 
-        ! 0. Calculate C_bed [Pa]
-        dyn%now%c_bed = dyn%now%cf_ref * dyn%now%N_eff 
+!         ! 0. Calculate C_bed [Pa]
+!         dyn%now%c_bed = dyn%now%cf_ref * dyn%now%N_eff 
 
-        ! 1. Apply beta method of choice 
-        select case(dyn%par%beta_method)
+!         ! 1. Apply beta method of choice 
+!         select case(dyn%par%beta_method)
 
-            case(-1)
-                ! beta (aa-nodes) has been defined externally - do nothing
+!             case(-1)
+!                 ! beta (aa-nodes) has been defined externally - do nothing
 
-            case(0)
-                ! Constant beta everywhere
+!             case(0)
+!                 ! Constant beta everywhere
 
-                dyn%now%beta = dyn%par%beta_const 
+!                 dyn%now%beta = dyn%par%beta_const 
 
-            case(1)
-                ! Calculate beta from a linear law (simply set beta=c_bed/u0)
+!             case(1)
+!                 ! Calculate beta from a linear law (simply set beta=c_bed/u0)
 
-                dyn%now%beta = dyn%now%c_bed * (1.0_prec / dyn%par%beta_u0)
+!                 dyn%now%beta = dyn%now%c_bed * (1.0_prec / dyn%par%beta_u0)
 
-            case(2)
-                ! Calculate beta from the quasi-plastic power-law as defined by Bueler and van Pelt (2015)
+!             case(2)
+!                 ! Calculate beta from the quasi-plastic power-law as defined by Bueler and van Pelt (2015)
 
-                call calc_beta_aa_power_plastic(dyn%now%beta,dyn%now%ux_b,dyn%now%uy_b,dyn%now%c_bed,dyn%par%beta_q,dyn%par%beta_u0)
+!                 call calc_beta_aa_power_plastic(dyn%now%beta,dyn%now%ux_b,dyn%now%uy_b,dyn%now%c_bed,dyn%par%beta_q,dyn%par%beta_u0)
                 
-            case(3)
-                ! Calculate beta from regularized Coulomb law (Joughin et al., GRL, 2019)
+!             case(3)
+!                 ! Calculate beta from regularized Coulomb law (Joughin et al., GRL, 2019)
 
-                call calc_beta_aa_reg_coulomb(dyn%now%beta,dyn%now%ux_b,dyn%now%uy_b,dyn%now%c_bed,dyn%par%beta_q,dyn%par%beta_u0)
+!                 call calc_beta_aa_reg_coulomb(dyn%now%beta,dyn%now%ux_b,dyn%now%uy_b,dyn%now%c_bed,dyn%par%beta_q,dyn%par%beta_u0)
                 
-            case DEFAULT 
-                ! Not recognized 
+!             case DEFAULT 
+!                 ! Not recognized 
 
-                write(*,*) "calc_ydyn_beta:: Error: beta_method not recognized."
-                write(*,*) "beta_method = ", dyn%par%beta_method
-                stop 
+!                 write(*,*) "calc_ydyn_beta:: Error: beta_method not recognized."
+!                 write(*,*) "beta_method = ", dyn%par%beta_method
+!                 stop 
 
-        end select 
+!         end select 
 
-        ! 1a. Ensure beta is relatively smooth 
-!         call regularize2D(dyn%now%beta,tpo%now%H_ice,tpo%par%dx)
-!         call limit_gradient(dyn%now%beta,tpo%now%H_ice,tpo%par%dx,log=.TRUE.)
+!         ! 1a. Ensure beta is relatively smooth 
+! !         call regularize2D(dyn%now%beta,tpo%now%H_ice,tpo%par%dx)
+! !         call limit_gradient(dyn%now%beta,tpo%now%H_ice,tpo%par%dx,log=.TRUE.)
 
-        ! 2. Scale beta as it approaches grounding line 
-        select case(dyn%par%beta_gl_scale) 
+!         ! 2. Scale beta as it approaches grounding line 
+!         select case(dyn%par%beta_gl_scale) 
 
-            case(0) 
-                ! Apply fractional parameter at grounding line, no scaling when beta_gl_f=1.0
+!             case(0) 
+!                 ! Apply fractional parameter at grounding line, no scaling when beta_gl_f=1.0
 
-                call scale_beta_gl_fraction(dyn%now%beta,tpo%now%f_grnd,dyn%par%beta_gl_f)
+!                 call scale_beta_gl_fraction(dyn%now%beta,tpo%now%f_grnd,dyn%par%beta_gl_f)
 
-            case(1) 
-                ! Apply H_grnd scaling, reducing beta linearly towards zero at the grounding line 
+!             case(1) 
+!                 ! Apply H_grnd scaling, reducing beta linearly towards zero at the grounding line 
 
-                call scale_beta_gl_Hgrnd(dyn%now%beta,tpo%now%H_grnd,dyn%par%H_grnd_lim)
+!                 call scale_beta_gl_Hgrnd(dyn%now%beta,tpo%now%H_grnd,dyn%par%H_grnd_lim)
 
-            case(2) 
-                ! Apply scaling according to thickness above flotation (Zstar approach of Gladstone et al., 2017)
-                ! norm==.TRUE., so that zstar-scaling is bounded between 0 and 1, and thus won't affect 
-                ! choice of c_bed value that is independent of this scaling. 
+!             case(2) 
+!                 ! Apply scaling according to thickness above flotation (Zstar approach of Gladstone et al., 2017)
+!                 ! norm==.TRUE., so that zstar-scaling is bounded between 0 and 1, and thus won't affect 
+!                 ! choice of c_bed value that is independent of this scaling. 
                 
-                call scale_beta_gl_zstar(dyn%now%beta,tpo%now%H_ice,bnd%z_bed,bnd%z_sl,norm=.TRUE.)
+!                 call scale_beta_gl_zstar(dyn%now%beta,tpo%now%H_ice,bnd%z_bed,bnd%z_sl,norm=.TRUE.)
 
-            case DEFAULT 
-                ! No scaling
+!             case DEFAULT 
+!                 ! No scaling
 
-                write(*,*) "calc_ydyn_beta:: Error: beta_gl_scale not recognized."
-                write(*,*) "beta_gl_scale = ", dyn%par%beta_gl_scale
-                stop 
+!                 write(*,*) "calc_ydyn_beta:: Error: beta_gl_scale not recognized."
+!                 write(*,*) "beta_gl_scale = ", dyn%par%beta_gl_scale
+!                 stop 
 
-        end select 
+!         end select 
 
-        ! 3. Apply grounding-line sub-element parameterization (sep, ie, subgrid method)
-        select case(dyn%par%beta_gl_sep)
+!         ! 3. Apply grounding-line sub-element parameterization (sep, ie, subgrid method)
+!         select case(dyn%par%beta_gl_sep)
 
-            case(-1) 
-                ! Apply ac-node subgrid treatment, therefore do nothing here 
+!             case(-1) 
+!                 ! Apply ac-node subgrid treatment, therefore do nothing here 
                 
-                !  Simply set beta to zero where purely floating
-                where (tpo%now%f_grnd .eq. 0.0) dyn%now%beta = 0.0 
+!                 !  Simply set beta to zero where purely floating
+!                 where (tpo%now%f_grnd .eq. 0.0) dyn%now%beta = 0.0 
                 
-                if (dyn%par%beta_gl_stag .ne. 3) then 
-                    write(*,*) "calc_ydyn_beta:: Error: beta_gl_stag must equal 3 for beta_gl_sep=-1."
-                    write(*,*) "beta_gl_sep  = ", dyn%par%beta_gl_sep
-                    write(*,*) "beta_gl_stag = ", dyn%par%beta_gl_stag
-                    stop 
-                end if 
+!                 if (dyn%par%beta_gl_stag .ne. 3) then 
+!                     write(*,*) "calc_ydyn_beta:: Error: beta_gl_stag must equal 3 for beta_gl_sep=-1."
+!                     write(*,*) "beta_gl_sep  = ", dyn%par%beta_gl_sep
+!                     write(*,*) "beta_gl_stag = ", dyn%par%beta_gl_stag
+!                     stop 
+!                 end if 
 
-                if (tpo%par%gl_sep .ne. 1) then 
-                    write(*,*) "calc_ydyn_beta:: Error: gl_sep must equal 1 for beta_gl_sep=-1."
-                    write(*,*) "beta_gl_sep  = ", dyn%par%beta_gl_sep
-                    write(*,*) "gl_sep       = ", tpo%par%gl_sep
-                    stop 
-                end if 
+!                 if (tpo%par%gl_sep .ne. 1) then 
+!                     write(*,*) "calc_ydyn_beta:: Error: gl_sep must equal 1 for beta_gl_sep=-1."
+!                     write(*,*) "beta_gl_sep  = ", dyn%par%beta_gl_sep
+!                     write(*,*) "gl_sep       = ", tpo%par%gl_sep
+!                     stop 
+!                 end if 
                 
-            case(0)
-                ! No subgrid weighting at the grounding line,
-                ! simply set beta to zero where purely floating  
+!             case(0)
+!                 ! No subgrid weighting at the grounding line,
+!                 ! simply set beta to zero where purely floating  
 
-                where (tpo%now%f_grnd .eq. 0.0) dyn%now%beta = 0.0 
+!                 where (tpo%now%f_grnd .eq. 0.0) dyn%now%beta = 0.0 
 
-            case(1)
-                ! Apply aa-node subgrid grounded fraction 
-                dyn%now%beta = dyn%now%beta * tpo%now%f_grnd 
+!             case(1)
+!                 ! Apply aa-node subgrid grounded fraction 
+!                 dyn%now%beta = dyn%now%beta * tpo%now%f_grnd 
 
-            case DEFAULT 
+!             case DEFAULT 
 
-                write(*,*) "calc_ydyn_beta:: Error: beta_gl_sep not recognized."
-                write(*,*) "beta_gl_sep = ", dyn%par%beta_gl_sep
-                stop 
+!                 write(*,*) "calc_ydyn_beta:: Error: beta_gl_sep not recognized."
+!                 write(*,*) "beta_gl_sep = ", dyn%par%beta_gl_sep
+!                 stop 
 
-        end select 
+!         end select 
 
-        ! 4. Apply smoothing if desired (only for points with beta > 0)
-        if (dyn%par%n_sm_beta .gt. 0) then
-            logbeta = 0.0_prec  
-            where(dyn%now%beta.gt.0.0_prec) logbeta = log10(dyn%now%beta)
-            call smooth_gauss_2D(logbeta,logbeta.gt.0.0,dyn%par%dx,dyn%par%n_sm_beta,logbeta.gt.0.0)
-            where(dyn%now%beta.gt.0.0_prec) dyn%now%beta = 10.0_prec**logbeta
-        end if 
+!         ! 4. Apply smoothing if desired (only for points with beta > 0)
+!         if (dyn%par%n_sm_beta .gt. 0) then
+!             logbeta = 0.0_prec  
+!             where(dyn%now%beta.gt.0.0_prec) logbeta = log10(dyn%now%beta)
+!             call smooth_gauss_2D(logbeta,logbeta.gt.0.0,dyn%par%dx,dyn%par%n_sm_beta,logbeta.gt.0.0)
+!             where(dyn%now%beta.gt.0.0_prec) dyn%now%beta = 10.0_prec**logbeta
+!         end if 
 
-        ! Apply additional condition for particular experiments
-        if (trim(dyn%par%boundaries) .eq. "EISMINT") then 
-            ! Redefine beta at the summit to reduce singularity
-            ! in symmetric EISMINT experiments with sliding active
-            i = (dyn%par%nx-1)/2 
-            j = (dyn%par%ny-1)/2
-            dyn%now%beta(i,j) = (dyn%now%beta(i-1,j)+dyn%now%beta(i+1,j) &
-                                    +dyn%now%beta(i,j-1)+dyn%now%beta(i,j+1)) / 4.0 
-        else if (trim(dyn%par%boundaries) .eq. "MISMIP3D") then 
-            ! Redefine beta at the summit to reduce singularity
-            ! in MISMIP symmetric experiments
-            dyn%now%beta(1,:) = dyn%now%beta(2,:) 
-        end if 
+!         ! Apply additional condition for particular experiments
+!         if (trim(dyn%par%boundaries) .eq. "EISMINT") then 
+!             ! Redefine beta at the summit to reduce singularity
+!             ! in symmetric EISMINT experiments with sliding active
+!             i = (dyn%par%nx-1)/2 
+!             j = (dyn%par%ny-1)/2
+!             dyn%now%beta(i,j) = (dyn%now%beta(i-1,j)+dyn%now%beta(i+1,j) &
+!                                     +dyn%now%beta(i,j-1)+dyn%now%beta(i,j+1)) / 4.0 
+!         else if (trim(dyn%par%boundaries) .eq. "MISMIP3D") then 
+!             ! Redefine beta at the summit to reduce singularity
+!             ! in MISMIP symmetric experiments
+!             dyn%now%beta(1,:) = dyn%now%beta(2,:) 
+!         end if 
 
-        ! Finally ensure that beta is higher than the lower allowed limit
-        where(dyn%now%beta .gt. 0.0 .and. dyn%now%beta .lt. dyn%par%beta_min) dyn%now%beta = dyn%par%beta_min 
+!         ! Finally ensure that beta is higher than the lower allowed limit
+!         where(dyn%now%beta .gt. 0.0 .and. dyn%now%beta .lt. dyn%par%beta_min) dyn%now%beta = dyn%par%beta_min 
 
-        ! ================================================================
-        ! Note: At this point the beta_aa field is available with beta=0 
-        ! for floating points and beta > 0 for non-floating points
-        ! ================================================================
+!         ! ================================================================
+!         ! Note: At this point the beta_aa field is available with beta=0 
+!         ! for floating points and beta > 0 for non-floating points
+!         ! ================================================================
         
-        ! 5. Apply staggering method with particular care for the grounding line 
-        select case(dyn%par%beta_gl_stag) 
+!         ! 5. Apply staggering method with particular care for the grounding line 
+!         select case(dyn%par%beta_gl_stag) 
 
-            case(0) 
-                ! Apply pure staggering everywhere (ac(i) = 0.5*(aa(i)+aa(i+1))
+!             case(0) 
+!                 ! Apply pure staggering everywhere (ac(i) = 0.5*(aa(i)+aa(i+1))
                 
-                call stagger_beta_aa_mean(dyn%now%beta_acx,dyn%now%beta_acy,dyn%now%beta)
+!                 call stagger_beta_aa_mean(dyn%now%beta_acx,dyn%now%beta_acy,dyn%now%beta)
 
-            case(1) 
-                ! Apply upstream beta_aa value at ac-node with at least one neighbor H_grnd_aa > 0
+!             case(1) 
+!                 ! Apply upstream beta_aa value at ac-node with at least one neighbor H_grnd_aa > 0
 
-                call stagger_beta_aa_upstream(dyn%now%beta_acx,dyn%now%beta_acy,dyn%now%beta,tpo%now%f_grnd)
+!                 call stagger_beta_aa_upstream(dyn%now%beta_acx,dyn%now%beta_acy,dyn%now%beta,tpo%now%f_grnd)
 
-            case(2) 
-                ! Apply downstream beta_aa value (==0.0) at ac-node with at least one neighbor H_grnd_aa > 0
+!             case(2) 
+!                 ! Apply downstream beta_aa value (==0.0) at ac-node with at least one neighbor H_grnd_aa > 0
 
-                call stagger_beta_aa_downstream(dyn%now%beta_acx,dyn%now%beta_acy,dyn%now%beta,tpo%now%f_grnd)
+!                 call stagger_beta_aa_downstream(dyn%now%beta_acx,dyn%now%beta_acy,dyn%now%beta,tpo%now%f_grnd)
 
-            case(3)
-                ! Apply subgrid scaling fraction at the grounding line when staggering 
+!             case(3)
+!                 ! Apply subgrid scaling fraction at the grounding line when staggering 
 
-                ! Note: now subgrid treatment is handled on aa-nodes above (using beta_gl_sep)
+!                 ! Note: now subgrid treatment is handled on aa-nodes above (using beta_gl_sep)
 
-                call stagger_beta_aa_subgrid(dyn%now%beta_acx,dyn%now%beta_acy,dyn%now%beta,tpo%now%f_grnd, &
-                                                tpo%now%f_grnd_acx,tpo%now%f_grnd_acy)
+!                 call stagger_beta_aa_subgrid(dyn%now%beta_acx,dyn%now%beta_acy,dyn%now%beta,tpo%now%f_grnd, &
+!                                                 tpo%now%f_grnd_acx,tpo%now%f_grnd_acy)
 
-!                 call stagger_beta_aa_subgrid_1(dyn%now%beta_acx,dyn%now%beta_acy,dyn%now%beta,tpo%now%H_grnd, &
-!                                             tpo%now%f_grnd,tpo%now%f_grnd_acx,tpo%now%f_grnd_acy)
+! !                 call stagger_beta_aa_subgrid_1(dyn%now%beta_acx,dyn%now%beta_acy,dyn%now%beta,tpo%now%H_grnd, &
+! !                                             tpo%now%f_grnd,tpo%now%f_grnd_acx,tpo%now%f_grnd_acy)
                 
-            case DEFAULT 
+!             case DEFAULT 
 
-                write(*,*) "calc_ydyn_beta:: Error: beta_gl_stag not recognized."
-                write(*,*) "beta_gl_stag = ", dyn%par%beta_gl_stag
-                stop 
+!                 write(*,*) "calc_ydyn_beta:: Error: beta_gl_stag not recognized."
+!                 write(*,*) "beta_gl_stag = ", dyn%par%beta_gl_stag
+!                 stop 
 
-        end select 
+!         end select 
 
-        return 
+!         return 
 
-    end subroutine calc_ydyn_beta 
+!     end subroutine calc_ydyn_beta 
 
     subroutine calc_ydyn_cfref(dyn,tpo,thrm,bnd)
         ! Update cf_ref [--] based on parameter choices

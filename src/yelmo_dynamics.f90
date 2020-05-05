@@ -118,6 +118,8 @@ contains
         integer :: i, j, k, nx, ny, nz_aa, nz_ac   
         real(prec), allocatable :: uxy_prev(:,:) 
 
+        type(diva_param_class) :: diva_par 
+
         ! For vertical velocity calculation 
         real(prec), allocatable :: bmb(:,:)
 
@@ -148,23 +150,41 @@ contains
         ! Calculate effective pressure 
         call calc_ydyn_neff(dyn,tpo,thrm,bnd)
 
-        ! Update bed roughness coefficient c_bed (which is independent of velocity)
+        ! Update bed roughness coefficients cf_ref and c_bed (which are independent of velocity)
         call calc_ydyn_cfref(dyn,tpo,thrm,bnd)
-        
+        call calc_c_bed(dyn%now%c_bed,dyn%now%cf_ref,dyn%now%N_eff)
+
         ! ===== Calculate 3D horizontal velocity solution via DIVA algorithm ===================
 
         ! Define grid points with ssa active (uses beta from previous timestep)
         call set_ssa_masks(dyn%now%ssa_mask_acx,dyn%now%ssa_mask_acy,dyn%now%beta_acx,dyn%now%beta_acy, &
                            tpo%now%H_ice,tpo%now%f_grnd_acx,tpo%now%f_grnd_acy,dyn%par%ssa_beta_max,dyn%par%use_ssa)
 
-        call calc_velocity_diva(dyn%now%ux,dyn%now%uy,dyn%now%ux_i,dyn%now%uy_i,dyn%now%ux_bar,dyn%now%uy_bar, &
-                            dyn%now%ux_b,dyn%now%uy_b,dyn%now%duxdz,dyn%now%duydz,dyn%now%taub_acx,dyn%now%taub_acy, &
-                            dyn%now%visc_eff,dyn%now%visc_eff_bar,dyn%now%beta,dyn%now%beta_acx,dyn%now%beta_acy, &
-                            dyn%now%ssa_mask_acx,dyn%now%ssa_mask_acy,dyn%now%c_bed,dyn%now%taud_acx,dyn%now%taud_acy, &
-                            tpo%now%H_ice,tpo%now%H_grnd,tpo%now%f_grnd,tpo%now%f_grnd_acx,tpo%now%f_grnd_acy,mat%now%ATT, &
-                            dyn%par%zeta_aa,bnd%z_sl,bnd%z_bed,dyn%par%dx,dyn%par%dy,mat%par%n_glen,dyn%par%ssa_vel_max, &
-                            dyn%par%beta_gl_stag,dyn%par%boundaries,dyn%par%ssa_solver_opt)
+        ! Set diva parameters from Yelmo settings 
+        diva_par%ssa_solver_opt = dyn%par%ssa_solver_opt 
+        diva_par%boundaries     = dyn%par%boundaries 
+        diva_par%beta_method    = dyn%par%beta_method 
+        diva_par%beta_const     = dyn%par%beta_const 
+        diva_par%beta_q         = dyn%par%beta_q 
+        diva_par%beta_u0        = dyn%par%beta_u0 
+        diva_par%beta_gl_scale  = dyn%par%beta_gl_scale 
+        diva_par%beta_gl_stag   = dyn%par%beta_gl_stag 
+        diva_par%beta_gl_f      = dyn%par%beta_gl_f 
+        diva_par%H_grnd_lim     = dyn%par%H_grnd_lim 
+        diva_par%beta_min       = dyn%par%beta_min 
+        diva_par%ssa_vel_max    = dyn%par%ssa_vel_max 
+        diva_par%ssa_iter_max   = dyn%par%ssa_iter_max 
+        diva_par%ssa_iter_rel   = dyn%par%ssa_iter_rel 
+        diva_par%ssa_iter_conv  = dyn%par%ssa_iter_conv 
+        diva_par%ssa_write_log  = yelmo_log
 
+        call calc_velocity_diva(dyn%now%ux,dyn%now%uy,dyn%now%ux_i,dyn%now%uy_i,dyn%now%ux_bar,dyn%now%uy_bar, &
+                                dyn%now%ux_b,dyn%now%uy_b,dyn%now%duxdz,dyn%now%duydz,dyn%now%taub_acx,dyn%now%taub_acy, &
+                                dyn%now%visc_eff,dyn%now%visc_eff_bar,dyn%now%ssa_mask_acx,dyn%now%ssa_mask_acy, &
+                                dyn%now%ssa_err_acx,dyn%now%ssa_err_acy,dyn%now%beta,dyn%now%beta_acx,dyn%now%beta_acy, &
+                                dyn%now%c_bed,dyn%now%taud_acx,dyn%now%taud_acy,tpo%now%H_ice,tpo%now%H_grnd, &
+                                tpo%now%f_grnd,tpo%now%f_grnd_acx,tpo%now%f_grnd_acy,mat%now%ATT, &
+                                dyn%par%zeta_aa,bnd%z_sl,bnd%z_bed,dyn%par%dx,dyn%par%dy,mat%par%n_glen,diva_par)
 
         ! ===== Calculate the vertical velocity through continuity ============================
 
@@ -287,9 +307,10 @@ contains
         ! Calculate effective pressure 
         call calc_ydyn_neff(dyn,tpo,thrm,bnd)
 
-        ! Update bed roughness coefficient c_bed (which is independent of velocity)
+        ! Update bed roughness coefficients cf_ref and c_bed (which are independent of velocity)
         call calc_ydyn_cfref(dyn,tpo,thrm,bnd)
-        
+        call calc_c_bed(dyn%now%c_bed,dyn%now%cf_ref,dyn%now%N_eff)
+
         ! ===== Calculate shear (ie, SIA) velocity solution ===========
 
         select case(trim(dyn%par%sia_solver))
@@ -597,9 +618,10 @@ contains
         H_ice_acx = stagger_aa_acx(tpo%now%H_ice)
         H_ice_acy = stagger_aa_acy(tpo%now%H_ice)
 
-        ! Update bed roughness coefficient c_bed (which is independent of velocity)
+        ! Update bed roughness coefficients cf_ref and c_bed (which are independent of velocity)
         call calc_ydyn_cfref(dyn,tpo,thrm,bnd)
-        
+        call calc_c_bed(dyn%now%c_bed,dyn%now%cf_ref,dyn%now%N_eff)
+
         ! Calculate driving stress
         call calc_driving_stress_ac(dyn%now%taud_acx,dyn%now%taud_acy,tpo%now%H_ice,tpo%now%dzsdx,tpo%now%dzsdy, &
                                                                                             dyn%par%dx,dyn%par%taud_lim)
@@ -880,7 +902,16 @@ contains
 
             !   1. Calculate basal drag coefficient beta (beta, beta_acx, beta_acy) 
 
-            call calc_ydyn_beta(dyn,tpo,mat,bnd)
+!             call calc_ydyn_beta(dyn,tpo,mat,bnd)
+
+            call calc_beta(dyn%now%beta,dyn%now%c_bed,dyn%now%ux_b,dyn%now%uy_b,tpo%now%H_ice,tpo%now%H_grnd, &
+                            tpo%now%f_grnd,bnd%z_bed,bnd%z_sl,dyn%par%beta_method, &
+                                dyn%par%beta_const,dyn%par%beta_q,dyn%par%beta_u0,dyn%par%beta_gl_scale, &
+                                dyn%par%beta_gl_f,dyn%par%H_grnd_lim,dyn%par%beta_min,dyn%par%boundaries)
+
+            ! Stagger beta
+            call stagger_beta(dyn%now%beta_acx,dyn%now%beta_acy,dyn%now%beta,tpo%now%f_grnd, &
+                            tpo%now%f_grnd_acx,tpo%now%f_grnd_acy,dyn%par%beta_gl_stag)
 
             !   2. Calculate effective viscosity
             
@@ -1642,8 +1673,8 @@ end if
         now%qq_acy            = 0.0 
         now%qq                = 0.0 
         
-        now%visc_eff          = 0.0  
-        now%visc_eff_bar      = 0.0  
+        now%visc_eff          = 1e3  
+        now%visc_eff_bar      = 1e3  
         
         now%cf_ref            = 0.0
         now%c_bed             = 0.0 

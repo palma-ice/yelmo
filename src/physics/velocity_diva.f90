@@ -7,18 +7,40 @@ module velocity_diva
 
     use basal_dragging 
     use solver_ssa_sico5 
-    
+
     implicit none 
 
-    private 
+    type diva_param_class
+
+        character(len=256) :: ssa_solver_opt 
+        character(len=256) :: boundaries 
+        integer    :: beta_method
+        real(prec) :: beta_const
+        real(prec) :: beta_q                ! Friction law exponent
+        real(prec) :: beta_u0               ! [m/a] Friction law velocity threshold 
+        integer    :: beta_gl_scale         ! Beta grounding-line scaling method (beta => 0 at gl?)
+        integer    :: beta_gl_stag          ! Beta grounding-line staggering method 
+        real(prec) :: beta_gl_f             ! Fraction of beta at gl 
+        real(prec) :: H_grnd_lim 
+        real(prec) :: beta_min              ! Minimum allowed value of beta
+        real(prec) :: ssa_vel_max
+        integer    :: ssa_iter_max 
+        real(prec) :: ssa_iter_rel 
+        real(prec) :: ssa_iter_conv 
+        logical    :: ssa_write_log 
+
+    end type
+
+    private
+    public :: diva_param_class 
     public :: calc_velocity_diva
 
 contains 
 
     subroutine calc_velocity_diva(ux,uy,ux_i,uy_i,ux_bar,uy_bar,ux_b,uy_b,duxdz,duydz,taub_acx,taub_acy, &
-                                  visc_eff,visc_eff_bar,beta,beta_acx,beta_acy,ssa_mask_acx,ssa_mask_acy,c_bed, &
-                                  taud_acx,taud_acy,H_ice,H_grnd,f_grnd,f_grnd_acx,f_grnd_acy,ATT,zeta_aa, &
-                                  z_sl,z_bed,dx,dy,n_glen,vel_max,beta_gl_stag,boundaries,ssa_solver_opt)
+                                  visc_eff,visc_eff_bar,ssa_mask_acx,ssa_mask_acy,ssa_err_acx,ssa_err_acy, &
+                                  beta,beta_acx,beta_acy,c_bed,taud_acx,taud_acy,H_ice,H_grnd,f_grnd, &
+                                  f_grnd_acx,f_grnd_acy,ATT,zeta_aa,z_sl,z_bed,dx,dy,n_glen,par)
         ! This subroutine is used to solve the horizontal velocity system (ux,uy)
         ! following the Depth-Integrated Viscosity Approximation (DIVA),
         ! as outlined by Lipscomb et al. (2019). Method originally 
@@ -41,11 +63,13 @@ contains
         real(prec), intent(INOUT) :: taub_acy(:,:)      ! [Pa]
         real(prec), intent(INOUT) :: visc_eff(:,:,:)    ! [Pa a m]
         real(prec), intent(OUT)   :: visc_eff_bar(:,:)  ! [Pa a m]
+        integer,    intent(OUT)   :: ssa_mask_acx(:,:)  ! [-]
+        integer,    intent(OUT)   :: ssa_mask_acy(:,:)  ! [-]
+        real(prec), intent(OUT)   :: ssa_err_acx(:,:)
+        real(prec), intent(OUT)   :: ssa_err_acy(:,:)
         real(prec), intent(OUT)   :: beta(:,:)          ! [Pa a/m]
         real(prec), intent(OUT)   :: beta_acx(:,:)      ! [Pa a/m]
         real(prec), intent(OUT)   :: beta_acy(:,:)      ! [Pa a/m]
-        integer,    intent(OUT)   :: ssa_mask_acx(:,:)  ! [-]
-        integer,    intent(OUT)   :: ssa_mask_acy(:,:)  ! [-]
         real(prec), intent(IN)    :: c_bed(:,:)         ! [Pa]
         real(prec), intent(IN)    :: taud_acx(:,:)      ! [Pa]
         real(prec), intent(IN)    :: taud_acy(:,:)      ! [Pa]
@@ -61,20 +85,22 @@ contains
         real(prec), intent(IN)    :: dx                 ! [m]
         real(prec), intent(IN)    :: dy                 ! [m]
         real(prec), intent(IN)    :: n_glen 
-        real(prec), intent(IN)    :: vel_max            ! [m/a]
-        integer,    intent(IN)    :: beta_gl_stag
-        character(len=*), intent(IN) :: boundaries      
-        character(len=*), intent(IN) :: ssa_solver_opt 
+        type(diva_param_class), intent(IN) :: par       ! List of parameters that should be defined
 
         ! Local variables 
         integer :: nx, ny, nz_aa, nz_ac
-        integer :: iter, iter_max   
+        integer :: iter, iter_max  
+        logical :: is_converged 
+        real(prec), allocatable :: ux_bar_nm1(:,:) 
+        real(prec), allocatable :: uy_bar_nm1(:,:) 
         real(prec), allocatable :: beta_eff(:,:) 
         real(prec), allocatable :: beta_eff_acx(:,:)
         real(prec), allocatable :: beta_eff_acy(:,:)  
-        real(prec), allocatable :: eps_sq(:,:,:) 
-        real(prec), allocatable :: F1(:,:) 
+        real(prec), allocatable :: eps_sq(:,:,:)  
         real(prec), allocatable :: F2(:,:) 
+
+        integer,    allocatable :: ssa_mask_acx_ref(:,:)
+        integer,    allocatable :: ssa_mask_acy_ref(:,:)
 
         nx    = size(ux,1)
         ny    = size(ux,2)
@@ -83,15 +109,31 @@ contains
         iter_max = 2 
 
         ! Prepare local variables 
+        allocate(ux_bar_nm1(nx,ny))
+        allocate(uy_bar_nm1(nx,ny))
         allocate(beta_eff(nx,ny))
         allocate(beta_eff_acx(nx,ny))
         allocate(beta_eff_acy(nx,ny))
         allocate(eps_sq(nx,ny,nz_aa))
-        allocate(F1(nx,ny))
         allocate(F2(nx,ny))
 
-        do iter = 1, iter_max 
+        allocate(ssa_mask_acx_ref(nx,ny))
+        allocate(ssa_mask_acy_ref(nx,ny))
 
+        ! Store original ssa mask before iterations
+        ssa_mask_acx_ref = ssa_mask_acx
+        ssa_mask_acy_ref = ssa_mask_acy
+            
+        ! Initially set error very high 
+        ssa_err_acx = 1.0_prec 
+        ssa_err_acy = 1.0_prec 
+        
+        do iter = 1, par%ssa_iter_max 
+
+            ! Store solution from previous iteration (nm1 == n minus 1) 
+            ux_bar_nm1 = ux_bar 
+            uy_bar_nm1 = uy_bar 
+            
             ! =========================================================================================
             ! Step 1: Calculate fields needed by ssa solver (visc_eff_bar, beta_eff)
 
@@ -106,28 +148,62 @@ contains
 
             visc_eff_bar = calc_vertical_integrated_2D(visc_eff,zeta_aa) 
             
-            ! Calculate F-integerals (F1,F2) on aa-nodes 
-            call calc_F_integral(F1,visc_eff,H_ice,zeta_aa,n=1.0_prec)
+            ! Calculate F-integeral (F2) on aa-nodes 
             call calc_F_integral(F2,visc_eff,H_ice,zeta_aa,n=2.0_prec)
+
+            ! Calculate beta (at the ice base)
+            call calc_beta(beta,c_bed,ux_b,uy_b,H_ice,H_grnd,f_grnd,z_bed,z_sl,par%beta_method, &
+                                par%beta_const,par%beta_q,par%beta_u0,par%beta_gl_scale,par%beta_gl_f, &
+                                par%H_grnd_lim,par%beta_min,par%boundaries)
 
             ! Calculate effective beta 
             call calc_beta_eff(beta_eff,beta,ux_b,uy_b,F2,zeta_aa)
 
             ! Stagger beta_eff 
-            call stagger_beta(beta_eff_acx,beta_eff_acy,beta_eff,f_grnd,f_grnd_acx,f_grnd_acy,beta_gl_stag)
+            call stagger_beta(beta_eff_acx,beta_eff_acy,beta_eff,f_grnd,f_grnd_acx,f_grnd_acy,par%beta_gl_stag)
+
+            write(*,*) "diva:: beta_eff:     ",minval(beta_eff), maxval(beta_eff)
+            write(*,*) "diva:: beta_eff_acx: ",minval(beta_eff_acx), maxval(beta_eff_acx)
+            write(*,*) "diva:: beta_eff_acy: ",minval(beta_eff_acy), maxval(beta_eff_acy)
 
             ! =========================================================================================
             ! Step 2: Call the SSA solver to obtain new estimate of ux_bar/uy_bar
-            call calc_vxy_ssa_matrix(ux_bar,uy_bar,beta_eff_acx,beta_eff_acy,visc_eff_bar,ssa_mask_acx,ssa_mask_acy, &
-                                H_ice,taud_acx,taud_acy,H_grnd,z_sl,z_bed,dx,dy,vel_max,boundaries,ssa_solver_opt)
 
+if (.FALSE.) then 
+            if (iter .gt. 1) then
+                ! Update ssa mask based on convergence with previous step to reduce calls 
+                call update_ssa_mask_convergence(ssa_mask_acx,ssa_mask_acy,ssa_err_acx,ssa_err_acy,err_lim=real(1e-3,prec)) 
+            end if 
+end if 
+
+            call calc_vxy_ssa_matrix(ux_bar,uy_bar,beta_eff_acx,beta_eff_acy,visc_eff_bar,ssa_mask_acx,ssa_mask_acy,H_ice, &
+                                taud_acx,taud_acy,H_grnd,z_sl,z_bed,dx,dy,par%ssa_vel_max,par%boundaries,par%ssa_solver_opt)
+
+
+            ! Apply relaxation to keep things stable
+            call relax_ssa(ux_bar,uy_bar,ux_bar_nm1,uy_bar_nm1,rel=par%ssa_iter_rel)
+            
+            ! Check for convergence
+            is_converged = check_vel_convergence_l2rel(ux_bar,uy_bar,ux_bar_nm1,uy_bar_nm1, &
+                                            ssa_mask_acx.gt.0.0_prec,ssa_mask_acy.gt.0.0_prec, &
+                                            par%ssa_iter_conv,iter,par%ssa_iter_max,par%ssa_write_log)
+
+            ! Calculate an L1 error metric over matrix for diagnostics
+            call check_vel_convergence_l1rel_matrix(ssa_err_acx,ssa_err_acy,ux_bar,uy_bar,ux_bar_nm1,uy_bar_nm1)
+
+            
+            ! =========================================================================================
             ! Update additional fields based on output of solver
+            
             ! Calculate basal velocity from depth-averaged solution 
             call calc_vel_basal(ux_b,uy_b,ux_bar,uy_bar,F2,beta_acx,beta_acy)
             
             ! Calculate basal stress 
             call calc_basal_stress(taub_acx,taub_acy,beta_acx,beta_acy,ux_b,uy_b)
 
+            ! Exit iterations if ssa solution has converged
+            if (is_converged) exit 
+            
         end do 
 
         ! Iterations are finished, finalize calculations of 3D velocity field 
@@ -135,64 +211,9 @@ contains
         ! Calculate the 3D horizontal velocity field
         call calc_vel_horizontal_3D(ux,uy,ux_b,uy_b,beta_acx,beta_acy,visc_eff,zeta_aa)
 
-        ! Calculate the surface velocity field 
-
         return 
 
     end subroutine calc_velocity_diva 
-
-    subroutine stagger_beta(beta_acx,beta_acy,beta,f_grnd,f_grnd_acx,f_grnd_acy,beta_gl_stag)
-
-        implicit none 
-
-        real(prec), intent(OUT) :: beta_acx(:,:) 
-        real(prec), intent(OUT) :: beta_acy(:,:) 
-        real(prec), intent(IN)  :: beta(:,:)
-        real(prec), intent(IN)  :: f_grnd(:,:) 
-        real(prec), intent(IN)  :: f_grnd_acx(:,:) 
-        real(prec), intent(IN)  :: f_grnd_acy(:,:) 
-        integer,    intent(IN)  :: beta_gl_stag 
-        
-        ! 5. Apply staggering method with particular care for the grounding line 
-        select case(beta_gl_stag) 
-
-            case(0) 
-                ! Apply pure staggering everywhere (ac(i) = 0.5*(aa(i)+aa(i+1))
-                
-                call stagger_beta_aa_mean(beta_acx,beta_acy,beta)
-
-            case(1) 
-                ! Apply upstream beta_aa value at ac-node with at least one neighbor H_grnd_aa > 0
-
-                call stagger_beta_aa_upstream(beta_acx,beta_acy,beta,f_grnd)
-
-            case(2) 
-                ! Apply downstream beta_aa value (==0.0) at ac-node with at least one neighbor H_grnd_aa > 0
-
-                call stagger_beta_aa_downstream(beta_acx,beta_acy,beta,f_grnd)
-
-            case(3)
-                ! Apply subgrid scaling fraction at the grounding line when staggering 
-
-                ! Note: now subgrid treatment is handled on aa-nodes above (using beta_gl_sep)
-
-                call stagger_beta_aa_subgrid(beta_acx,beta_acy,beta,f_grnd, &
-                                                f_grnd_acx,f_grnd_acy)
-
-!                 call stagger_beta_aa_subgrid_1(beta_acx,beta_acy,beta,H_grnd, &
-!                                             f_grnd,f_grnd_acx,f_grnd_acy)
-                
-            case DEFAULT 
-
-                write(*,*) "stagger_beta:: Error: beta_gl_stag not recognized."
-                write(*,*) "beta_gl_stag = ", beta_gl_stag
-                stop 
-
-        end select 
-
-        return 
-
-    end subroutine stagger_beta
 
     subroutine calc_vel_horizontal_3D(ux,uy,ux_b,uy_b,beta_acx,beta_acy,visc_eff,zeta_aa)
         ! Caluculate the 3D horizontal velocity field (ux,uy)
@@ -491,7 +512,7 @@ contains
             im1 = max(i-1,1)
             jm1 = max(j-1,1)
 
-            ! Calculatae basal velocity magnitude at grid center, aa-nodes
+            ! Calculate basal velocity magnitude at grid center, aa-nodes
             uxy_b = sqrt( 0.5_prec*(ux_b(i,j)+ux_b(im1,j))**2 + 0.5_prec*(ux_b(i,j)+ux_b(i,jm1))**2 )
 
             if (uxy_b .gt. 0.0) then 

@@ -505,7 +505,7 @@ contains
                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
         call nc_write(filename,"beta",ylmo%dyn%now%beta,units="Pa a m-1",long_name="Basal friction coefficient", &
                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-        call nc_write(filename,"visc_eff_bar",ylmo%dyn%now%visc_eff_bar,units="Pa a m",long_name="Effective viscosity (SSA)", &
+        call nc_write(filename,"visc_eff_int",ylmo%dyn%now%visc_eff_int,units="Pa a m",long_name="Depth-integrated effective viscosity (SSA)", &
                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
 
         call nc_write(filename,"uxy_s",ylmo%dyn%now%uxy_s,units="m/a",long_name="Surface velocity magnitude", &
@@ -694,11 +694,10 @@ contains
             uxy   = sqrt(ux_aa**2 + uy_aa**2)
 
             if (uxy .gt. 0.0) then 
+                ! Only modify areas with some velocity available 
 
                 ! Get direction perpindicular ice flow 
                 alpha = atan2(uy_aa,ux_aa) - pi/2.0 
-
-                ! Only modify areas with some velocity available 
 
                 ! Calculate second-derivative in each direction (2nd order)
                 dz2dx2 = (1.0/dx**2)*sum([fm2,fm1,f0,fp1,fp2]*z_bed(i-2:i+2,j))

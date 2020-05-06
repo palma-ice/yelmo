@@ -38,7 +38,7 @@ module velocity_diva
 contains 
 
     subroutine calc_velocity_diva(ux,uy,ux_i,uy_i,ux_bar,uy_bar,ux_b,uy_b,duxdz,duydz,taub_acx,taub_acy, &
-                                  visc_eff,visc_eff_bar,ssa_mask_acx,ssa_mask_acy,ssa_err_acx,ssa_err_acy, &
+                                  visc_eff,visc_eff_int,ssa_mask_acx,ssa_mask_acy,ssa_err_acx,ssa_err_acy, &
                                   beta,beta_acx,beta_acy,c_bed,taud_acx,taud_acy,H_ice,H_grnd,f_grnd, &
                                   f_grnd_acx,f_grnd_acy,ATT,zeta_aa,z_sl,z_bed,dx,dy,n_glen,par)
         ! This subroutine is used to solve the horizontal velocity system (ux,uy)
@@ -61,8 +61,8 @@ contains
         real(prec), intent(INOUT) :: duydz(:,:,:)       ! [1/a]
         real(prec), intent(INOUT) :: taub_acx(:,:)      ! [Pa]
         real(prec), intent(INOUT) :: taub_acy(:,:)      ! [Pa]
-        real(prec), intent(INOUT) :: visc_eff(:,:,:)    ! [Pa a m]
-        real(prec), intent(OUT)   :: visc_eff_bar(:,:)  ! [Pa a m]
+        real(prec), intent(INOUT) :: visc_eff(:,:,:)    ! [Pa a]
+        real(prec), intent(OUT)   :: visc_eff_int(:,:)  ! [Pa a m]
         integer,    intent(OUT)   :: ssa_mask_acx(:,:)  ! [-]
         integer,    intent(OUT)   :: ssa_mask_acy(:,:)  ! [-]
         real(prec), intent(OUT)   :: ssa_err_acx(:,:)
@@ -135,7 +135,7 @@ contains
             uy_bar_nm1 = uy_bar 
             
             ! =========================================================================================
-            ! Step 1: Calculate fields needed by ssa solver (visc_eff_bar, beta_eff)
+            ! Step 1: Calculate fields needed by ssa solver (visc_eff_int, beta_eff)
 
             ! Calculate the 3D vertical shear fields using viscosity estimated from the previous iteration 
             call calc_vertical_shear_3D(duxdz,duydz,taub_acx,taub_acy,visc_eff,zeta_aa)
@@ -146,10 +146,9 @@ contains
             ! Calculate 3D effective viscosity and its vertical average 
             call calc_visc_eff_3D(visc_eff,ATT,eps_sq,n_glen)
 
-            ! Note L19 uses eta_bar*H in the ssa equation. Yelmo uses eta_int right now,
-            ! so this naming should be cleaned up (ie visc_eff_bar => visc_eff_int).
-            visc_eff_bar = calc_vertical_integrated_2D(visc_eff,zeta_aa) 
-            where(H_ice .gt. 0.0_prec) visc_eff_bar = visc_eff_bar*H_ice 
+            ! Note L19 uses eta_bar*H in the ssa equation. Yelmo uses eta_int=eta_bar*H directly.
+            visc_eff_int = calc_vertical_integrated_2D(visc_eff,zeta_aa) 
+            where(H_ice .gt. 0.0_prec) visc_eff_int = visc_eff_int*H_ice 
 
             ! Calculate beta (at the ice base)
             call calc_beta(beta,c_bed,ux_b,uy_b,H_ice,H_grnd,f_grnd,z_bed,z_sl,par%beta_method, &
@@ -160,12 +159,13 @@ contains
             call calc_F_integral(F2,visc_eff,H_ice,zeta_aa,n=2.0_prec)
             
             ! Calculate effective beta 
-            !call calc_beta_eff(beta_eff,beta,ux_b,uy_b,F2,zeta_aa)
-            beta_eff = beta 
+            call calc_beta_eff(beta_eff,beta,ux_b,uy_b,F2,zeta_aa)
+            !beta_eff = beta 
 
-            ! Stagger beta_eff 
+            ! Stagger beta and beta_eff 
+            call stagger_beta(beta_acx,beta_acy,beta,f_grnd,f_grnd_acx,f_grnd_acy,par%beta_gl_stag)
             call stagger_beta(beta_eff_acx,beta_eff_acy,beta_eff,f_grnd,f_grnd_acx,f_grnd_acy,par%beta_gl_stag)
-
+            
             write(*,*) "diva:: beta:         ", minval(beta),     maxval(beta)
             write(*,*) "diva:: beta_eff:     ", minval(beta_eff), maxval(beta_eff)
             write(*,*) "diva:: F2:           ", minval(F2),       maxval(F2)
@@ -180,7 +180,7 @@ if (.FALSE.) then
             end if 
 end if 
 
-            call calc_vxy_ssa_matrix(ux_bar,uy_bar,beta_eff_acx,beta_eff_acy,visc_eff_bar,ssa_mask_acx,ssa_mask_acy,H_ice, &
+            call calc_vxy_ssa_matrix(ux_bar,uy_bar,beta_eff_acx,beta_eff_acy,visc_eff_int,ssa_mask_acx,ssa_mask_acy,H_ice, &
                                 taud_acx,taud_acy,H_grnd,z_sl,z_bed,dx,dy,par%ssa_vel_max,par%boundaries,par%ssa_solver_opt)
 
 
@@ -200,12 +200,12 @@ end if
             ! Update additional fields based on output of solver
             
             ! Calculate basal velocity from depth-averaged solution 
-            call calc_vel_basal(ux_b,uy_b,ux_bar,uy_bar,F2,beta_acx,beta_acy)
+            call calc_vel_basal(ux_b,uy_b,ux_bar,uy_bar,F2,taub_acx,taub_acy)
             !ux_b = ux_bar 
             !uy_b = uy_bar 
 
             ! Calculate basal stress 
-            call calc_basal_stress(taub_acx,taub_acy,beta_acx,beta_acy,ux_b,uy_b)
+            call calc_basal_stress(taub_acx,taub_acy,beta_eff_acx,beta_eff_acy,ux_bar,uy_bar)
 
             ! Exit iterations if ssa solution has converged
             if (is_converged) exit 
@@ -215,7 +215,7 @@ end if
         ! Iterations are finished, finalize calculations of 3D velocity field 
 
         ! Calculate the 3D horizontal velocity field
-        call calc_vel_horizontal_3D(ux,uy,ux_b,uy_b,beta_acx,beta_acy,visc_eff,zeta_aa)
+        call calc_vel_horizontal_3D(ux,uy,ux_b,uy_b,beta_acx,beta_acy,taub_acx,taub_acy,visc_eff,zeta_aa)
 
         ! Also calculate the shearing contribution
         do k = 1, nz_aa 
@@ -227,7 +227,7 @@ end if
 
     end subroutine calc_velocity_diva 
 
-    subroutine calc_vel_horizontal_3D(ux,uy,ux_b,uy_b,beta_acx,beta_acy,visc_eff,zeta_aa)
+    subroutine calc_vel_horizontal_3D(ux,uy,ux_b,uy_b,beta_acx,beta_acy,taub_acx,taub_acy,visc_eff,zeta_aa)
         ! Caluculate the 3D horizontal velocity field (ux,uy)
         ! following L19, Eq. 29 
 
@@ -239,6 +239,8 @@ end if
         real(prec), intent(IN)  :: uy_b(:,:) 
         real(prec), intent(IN)  :: beta_acx(:,:) 
         real(prec), intent(IN)  :: beta_acy(:,:) 
+        real(prec), intent(IN)  :: taub_acx(:,:) 
+        real(prec), intent(IN)  :: taub_acy(:,:)
         real(prec), intent(IN)  :: visc_eff(:,:,:)       
         real(prec), intent(IN)  :: zeta_aa(:) 
 
@@ -246,14 +248,14 @@ end if
         integer :: i, j, k, ip1, jp1, nx, ny, nz_aa  
         real(prec) :: tmpval_ac 
         real(prec), allocatable :: visc_eff_ac(:) 
-        real(prec), allocatable :: tmpcol_ac(:) 
+        real(prec), allocatable :: F1_ac(:) 
         
         nx    = size(ux,1)
         ny    = size(ux,2) 
         nz_aa = size(ux,3) 
 
         allocate(visc_eff_ac(nz_aa))
-        allocate(tmpcol_ac(nz_aa))
+        allocate(F1_ac(nz_aa))
 
         do j = 1, ny 
         do i = 1, nx 
@@ -267,10 +269,10 @@ end if
             visc_eff_ac = 0.5_prec*(visc_eff(i,j,:)+visc_eff(ip1,j,:))
 
             ! Calculate integrated term of L19, Eq. 29 
-            tmpcol_ac = integrate_trapezoid1D_1D((1.0_prec/visc_eff_ac)*(1.0-zeta_aa),zeta_aa)
+            F1_ac = integrate_trapezoid1D_1D((1.0_prec/visc_eff_ac)*(1.0-zeta_aa),zeta_aa)
 
             ! Calculate velocity column 
-            ux(i,j,:) = ux_b(i,j) + (beta_acx(i,j)*ux_b(i,j))*tmpcol_ac 
+            ux(i,j,:) = ux_b(i,j) + taub_acx(i,j)*F1_ac 
 
             ! === y direction ===============================================
 
@@ -278,10 +280,10 @@ end if
             visc_eff_ac = 0.5_prec*(visc_eff(i,j,:)+visc_eff(i,jp1,:))
 
             ! Calculate integrated term of L19, Eq. 29 
-            tmpcol_ac = integrate_trapezoid1D_1D((1.0_prec/visc_eff_ac)*(1.0-zeta_aa),zeta_aa)
+            F1_ac = integrate_trapezoid1D_1D((1.0_prec/visc_eff_ac)*(1.0-zeta_aa),zeta_aa)
 
-            ! Calculate velocity column 
-            uy(i,j,:) = uy_b(i,j) + (beta_acy(i,j)*uy_b(i,j))*tmpcol_ac 
+            ! Calculate velocity column
+            uy(i,j,:) = uy_b(i,j) + taub_acy(i,j)*F1_ac  
 
         end do 
         end do  
@@ -527,15 +529,15 @@ end if
             ! Calculate basal velocity magnitude at grid center, aa-nodes
             uxy_b = sqrt( 0.5_prec*(ux_b(i,j)+ux_b(im1,j))**2 + 0.5_prec*(ux_b(i,j)+ux_b(i,jm1))**2 )
 
-            if (uxy_b .gt. 0.0) then 
-                ! Basal sliding exists, follow L19, Eq. 33
+            if (uxy_b .gt. 0.0_prec) then 
+                ! Basal sliding exists, follow L19, Eq. 33 (or G11, Eq. 41)
 
-                beta_eff(i,j) = beta(i,j) / (1.0+beta(i,j)*F2(i,j))
+                beta_eff(i,j) = beta(i,j) / (1.0_prec+beta(i,j)*F2(i,j))
 
             else 
-                ! No basal sliding, follow L19, Eq. 35 
+                ! No basal sliding, follow L19, Eq. 35 (or G11, Eq. 42)
 
-                beta_eff(i,j) = 1.0 / F2(i,j) 
+                beta_eff(i,j) = 1.0_prec / F2(i,j) 
 
             end if 
 
@@ -547,8 +549,9 @@ end if
 
     end subroutine calc_beta_eff 
 
-    subroutine calc_vel_basal(ux_b,uy_b,ux_bar,uy_bar,F2,beta_acx,beta_acy)
-        ! Calculate basal sliding following L19, Eq. 32 
+    subroutine calc_vel_basal(ux_b,uy_b,ux_bar,uy_bar,F2,taub_acx,taub_acy)
+        ! Calculate basal sliding following Goldberg (2011), Eq. 34
+        ! (analgous to L19, Eq. 32)
 
         implicit none
         
@@ -557,8 +560,8 @@ end if
         real(prec), intent(IN)  :: ux_bar(:,:) 
         real(prec), intent(IN)  :: uy_bar(:,:)
         real(prec), intent(IN)  :: F2(:,:)
-        real(prec), intent(IN)  :: beta_acx(:,:) 
-        real(prec), intent(IN)  :: beta_acy(:,:)
+        real(prec), intent(IN)  :: taub_acx(:,:) 
+        real(prec), intent(IN)  :: taub_acy(:,:)
         
         ! Local variables 
         integer    :: i, j, nx, ny 
@@ -572,10 +575,10 @@ end if
             jp1 = min(j,ny)
 
             F2_ac = 0.5_prec*(F2(i,j) + F2(ip1,j))
-            ux_b(i,j) = ux_bar(i,j) / (1.0_prec + beta_acx(i,j)*F2_ac)
+            ux_b(i,j) = ux_bar(i,j) - taub_acx(i,j)*F2_ac 
 
             F2_ac = 0.5_prec*(F2(i,j) + F2(i,jp1))
-            uy_b(i,j) = uy_bar(i,j) / (1.0_prec + beta_acy(i,j)*F2_ac)
+            uy_b(i,j) = uy_bar(i,j) - taub_acy(i,j)*F2_ac 
 
         end do 
         end do  
@@ -584,53 +587,37 @@ end if
         
     end subroutine calc_vel_basal
 
-    function calc_vertical_integrated_3D_ice(var,H_ice,sigma) result(var_int)
-        ! Vertically integrate a field 3D field (nx,ny,nz)
-        ! layer by layer (in the z-direction), return a 3D array
-        
-        implicit none
-
-        real(prec), intent(IN) :: var(:,:,:)
-        real(prec), intent(IN) :: H_ice(:,:) 
-        real(prec), intent(IN) :: sigma(:)
-        real(prec) :: var_int(size(var,1),size(var,2),size(var,3))
-
-        ! Local variables 
-        integer :: i, j, nx, ny
-
-        nx = size(var,1)
-        ny = size(var,2)
-
-        do j = 1, ny
-        do i = 1, nx
-            var_int(i,j,:) = integrate_trapezoid1D_1D(var(i,j,:),sigma*H_ice(i,j))
-        end do
-        end do
-
-        return
-
-    end function calc_vertical_integrated_3D_ice
-
-    subroutine calc_basal_stress(taub_acx,taub_acy,beta_acx,beta_acy,ux_b,uy_b)
+    subroutine calc_basal_stress(taub_acx,taub_acy,beta_eff_acx,beta_eff_acy,ux_bar,uy_bar)
         ! Calculate the basal stress resulting from sliding (friction times velocity)
         ! Note: calculated on ac-nodes.
         ! taub [Pa] 
         ! beta [Pa a m-1]
         ! u    [m a-1]
-        ! taub = -beta*u 
+        ! taub = beta*u (here defined with taub in the same direction as u)
 
         implicit none 
 
-        real(prec), intent(OUT) :: taub_acx(:,:)   ! [Pa] Basal stress (acx nodes)
-        real(prec), intent(OUT) :: taub_acy(:,:)   ! [Pa] Basal stress (acy nodes)
-        real(prec), intent(IN)  :: beta_acx(:,:)   ! [Pa a m-1] Basal friction (acx nodes)
-        real(prec), intent(IN)  :: beta_acy(:,:)   ! [Pa a m-1] Basal friction (acy nodes)
-        real(prec), intent(IN)  :: ux_b(:,:)       ! [m a-1] Basal velocity (acx nodes)
-        real(prec), intent(IN)  :: uy_b(:,:)       ! [m a-1] Basal velocity (acy nodes)
+        real(prec), intent(OUT) :: taub_acx(:,:)        ! [Pa] Basal stress (acx nodes)
+        real(prec), intent(OUT) :: taub_acy(:,:)        ! [Pa] Basal stress (acy nodes)
+        real(prec), intent(IN)  :: beta_eff_acx(:,:)    ! [Pa a m-1] Effective basal friction (acx nodes)
+        real(prec), intent(IN)  :: beta_eff_acy(:,:)    ! [Pa a m-1] Effective basal friction (acy nodes)
+        real(prec), intent(IN)  :: ux_bar(:,:)          ! [m a-1] depth-ave velocity (acx nodes)
+        real(prec), intent(IN)  :: uy_bar(:,:)          ! [m a-1] depth-ave velocity (acy nodes)
         
-        ! Calculate basal stress 
-        taub_acx = -beta_acx * ux_b 
-        taub_acy = -beta_acy * uy_b 
+        ! Local variables 
+        integer :: i, j, nx, ny 
+
+        nx = size(taub_acx,1)
+        ny = size(taub_acy,2) 
+
+        do j = 1, ny 
+        do i = 1, nx 
+
+            taub_acx(i,j) = beta_eff_acx(i,j) * ux_bar(i,j) 
+            taub_acy(i,j) = beta_eff_acy(i,j) * uy_bar(i,j) 
+
+        end do 
+        end do  
 
         return 
 

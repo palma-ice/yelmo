@@ -274,7 +274,14 @@ end if
             ! === x direction ===============================================
 
             ! Stagger viscosity column to ac-nodes 
-            visc_eff_ac = 0.5_prec*(visc_eff(i,j,:)+visc_eff(ip1,j,:))
+            if (H_ice(i,j) .gt. 0.0 .and. H_ice(ip1,j) .eq. 0.0) then 
+                visc_eff_ac = visc_eff(i,j,:) 
+            else if (H_ice(i,j) .eq. 0.0 .and. H_ice(ip1,j) .gt. 0.0) then 
+                visc_eff_ac = visc_eff(ip1,j,:)
+            else  
+                visc_eff_ac = 0.5_prec*(visc_eff(i,j,:)+visc_eff(ip1,j,:))
+            end if 
+
             H_ice_ac    = 0.5_prec*(H_ice(i,j)+H_ice(ip1,j))
 
             ! Calculate integrated term of L19, Eq. 29 
@@ -286,7 +293,14 @@ end if
             ! === y direction ===============================================
 
             ! Stagger viscosity column to ac-nodes 
-            visc_eff_ac = 0.5_prec*(visc_eff(i,j,:)+visc_eff(i,jp1,:))
+            if (H_ice(i,j) .gt. 0.0 .and. H_ice(i,jp1) .eq. 0.0) then 
+                visc_eff_ac = visc_eff(i,j,:) 
+            else if (H_ice(i,j) .eq. 0.0 .and. H_ice(i,jp1) .gt. 0.0) then 
+                visc_eff_ac = visc_eff(i,jp1,:)
+            else  
+                visc_eff_ac = 0.5_prec*(visc_eff(i,j,:)+visc_eff(i,jp1,:))
+            end if 
+                
             H_ice_ac    = 0.5_prec*(H_ice(i,j)+H_ice(i,jp1))
             
             ! Calculate integrated term of L19, Eq. 29 
@@ -592,7 +606,7 @@ end if
 !                 visc_now = (4.0*visc(i,j,:) + 2.0*(visc(i-1,j,:)+visc(i+1,j,:)+visc(i,j-1,:)+visc(i,j+1,:))) / 16.0 &
 !                           + (visc(i-1,j-1,:)+visc(i+1,j-1,:)+visc(i+1,j+1,:)+visc(i-1,j+1,:)) / 16.0 
                 visc_now = visc(i,j,:) 
-                
+
                 Fint(i,j) = integrate_trapezoid1D_pt((H_ice_now/visc_now)*(1.0_prec-zeta_aa)**n,zeta_aa)
 
             else 

@@ -97,6 +97,8 @@ contains
         real(prec), allocatable :: beta_eff_acx(:,:)
         real(prec), allocatable :: beta_eff_acy(:,:)  
         real(prec), allocatable :: eps_sq(:,:,:)  
+        real(prec), allocatable :: F1_l19(:,:,:) 
+        real(prec), allocatable :: F2_l19(:,:) 
         real(prec), allocatable :: F2(:,:) 
 
         integer,    allocatable :: ssa_mask_acx_ref(:,:)
@@ -115,6 +117,8 @@ contains
         allocate(beta_eff_acx(nx,ny))
         allocate(beta_eff_acy(nx,ny))
         allocate(eps_sq(nx,ny,nz_aa))
+        allocate(F1_l19(nx,ny,nz_aa))
+        allocate(F2_l19(nx,ny))
         allocate(F2(nx,ny))
 
         allocate(ssa_mask_acx_ref(nx,ny))
@@ -143,9 +147,10 @@ contains
             ! Calculate the effective strain rate using velocity solution from previous iteration
             call calc_strain_eff_squared(eps_sq,ux_bar,uy_bar,duxdz,duydz,zeta_aa,dx,dy)
 
-            ! Calculate 3D effective viscosity and its vertical average 
+            ! Calculate 3D effective viscosity 
             call calc_visc_eff_3D(visc_eff,ATT,eps_sq,n_glen)
 
+            ! Calculate depth-integrated effective viscosity
             ! Note L19 uses eta_bar*H in the ssa equation. Yelmo uses eta_int=eta_bar*H directly.
             visc_eff_int = calc_vertical_integrated_2D(visc_eff,zeta_aa) 
             where(H_ice .gt. 0.0_prec) visc_eff_int = visc_eff_int*H_ice 
@@ -158,6 +163,10 @@ contains
             ! Calculate F-integeral (F2) on aa-nodes 
             call calc_F_integral(F2,visc_eff,H_ice,zeta_aa,n=2.0_prec)
             
+            ! Testing CISM (L19) formulation of integrals
+            ! ajr: results for F2 look very close, so we are probably doing it right!
+!             call calc_F_integrals(F1_l19,F2_l19,visc_eff,H_ice,zeta_aa)
+
             ! Calculate effective beta 
             call calc_beta_eff(beta_eff,beta,ux_b,uy_b,F2,zeta_aa)
             !beta_eff = beta 
@@ -166,9 +175,12 @@ contains
             call stagger_beta(beta_acx,beta_acy,beta,f_grnd,f_grnd_acx,f_grnd_acy,par%beta_gl_stag)
             call stagger_beta(beta_eff_acx,beta_eff_acy,beta_eff,f_grnd,f_grnd_acx,f_grnd_acy,par%beta_gl_stag)
             
-            write(*,*) "diva:: beta:         ", minval(beta),     maxval(beta)
-            write(*,*) "diva:: beta_eff:     ", minval(beta_eff), maxval(beta_eff)
-            write(*,*) "diva:: F2:           ", minval(F2),       maxval(F2)
+!             write(*,*) "diva:: beta:         ", minval(beta),     maxval(beta)
+!             write(*,*) "diva:: beta_eff:     ", minval(beta_eff), maxval(beta_eff)
+!             write(*,*) "diva:: F2:           ", minval(F2),       maxval(F2)
+! !             write(*,*) "diva:: F2_l19:       ", minval(F2_l19),   maxval(F2_l19)
+!             write(*,*) "diva:: taud(acx):    ", minval(taud_acx), maxval(taud_acx)
+!             write(*,*) "diva:: taub(acx):    ", minval(taub_acx), maxval(taub_acx)
             
             ! =========================================================================================
             ! Step 2: Call the SSA solver to obtain new estimate of ux_bar/uy_bar
@@ -215,7 +227,7 @@ end if
         ! Iterations are finished, finalize calculations of 3D velocity field 
 
         ! Calculate the 3D horizontal velocity field
-        call calc_vel_horizontal_3D(ux,uy,ux_b,uy_b,beta_acx,beta_acy,taub_acx,taub_acy,visc_eff,zeta_aa)
+        call calc_vel_horizontal_3D(ux,uy,ux_b,uy_b,taub_acx,taub_acy,visc_eff,H_ice,zeta_aa)
 
         ! Also calculate the shearing contribution
         do k = 1, nz_aa 
@@ -227,7 +239,7 @@ end if
 
     end subroutine calc_velocity_diva 
 
-    subroutine calc_vel_horizontal_3D(ux,uy,ux_b,uy_b,beta_acx,beta_acy,taub_acx,taub_acy,visc_eff,zeta_aa)
+    subroutine calc_vel_horizontal_3D(ux,uy,ux_b,uy_b,taub_acx,taub_acy,visc_eff,H_ice,zeta_aa)
         ! Caluculate the 3D horizontal velocity field (ux,uy)
         ! following L19, Eq. 29 
 
@@ -237,16 +249,15 @@ end if
         real(prec), intent(OUT) :: uy(:,:,:) 
         real(prec), intent(IN)  :: ux_b(:,:) 
         real(prec), intent(IN)  :: uy_b(:,:) 
-        real(prec), intent(IN)  :: beta_acx(:,:) 
-        real(prec), intent(IN)  :: beta_acy(:,:) 
         real(prec), intent(IN)  :: taub_acx(:,:) 
         real(prec), intent(IN)  :: taub_acy(:,:)
         real(prec), intent(IN)  :: visc_eff(:,:,:)       
+        real(prec), intent(IN)  :: H_ice(:,:)
         real(prec), intent(IN)  :: zeta_aa(:) 
 
         ! Local variables
         integer :: i, j, k, ip1, jp1, nx, ny, nz_aa  
-        real(prec) :: tmpval_ac 
+        real(prec) :: H_ice_ac 
         real(prec), allocatable :: visc_eff_ac(:) 
         real(prec), allocatable :: F1_ac(:) 
         
@@ -267,9 +278,10 @@ end if
 
             ! Stagger viscosity column to ac-nodes 
             visc_eff_ac = 0.5_prec*(visc_eff(i,j,:)+visc_eff(ip1,j,:))
+            H_ice_ac    = 0.5_prec*(H_ice(i,j)+H_ice(ip1,j))
 
             ! Calculate integrated term of L19, Eq. 29 
-            F1_ac = integrate_trapezoid1D_1D((1.0_prec/visc_eff_ac)*(1.0-zeta_aa),zeta_aa)
+            F1_ac = integrate_trapezoid1D_1D((H_ice_ac/visc_eff_ac)*(1.0-zeta_aa),zeta_aa)
 
             ! Calculate velocity column 
             ux(i,j,:) = ux_b(i,j) + taub_acx(i,j)*F1_ac 
@@ -278,9 +290,10 @@ end if
 
             ! Stagger viscosity column to ac-nodes 
             visc_eff_ac = 0.5_prec*(visc_eff(i,j,:)+visc_eff(i,jp1,:))
-
+            H_ice_ac    = 0.5_prec*(H_ice(i,j)+H_ice(i,jp1))
+            
             ! Calculate integrated term of L19, Eq. 29 
-            F1_ac = integrate_trapezoid1D_1D((1.0_prec/visc_eff_ac)*(1.0-zeta_aa),zeta_aa)
+            F1_ac = integrate_trapezoid1D_1D((H_ice_ac/visc_eff_ac)*(1.0-zeta_aa),zeta_aa)
 
             ! Calculate velocity column
             uy(i,j,:) = uy_b(i,j) + taub_acy(i,j)*F1_ac  
@@ -453,6 +466,46 @@ end if
 
     end subroutine calc_visc_eff_3D 
 
+    subroutine calc_F_integrals(F1,F2,visc,H_ice,zeta_aa)
+        ! Useful integrals, following Arthern et al. (2015) Eq. 7,
+        ! and Lipscomb et al. (2019), Eq. 30
+        ! F_n = int_zb_zs{ 1/visc * ((s-z)/H)**n dz}
+        implicit none 
+
+        real(prec), intent(OUT) :: F1(:,:,:) 
+        real(prec), intent(OUT) :: F2(:,:) 
+        real(prec), intent(IN)  :: visc(:,:,:)
+        real(prec), intent(IN)  :: H_ice(:,:)
+        real(prec), intent(IN)  :: zeta_aa(:) 
+
+        ! Local variables 
+        integer :: i, j, nx, ny
+        real(prec), parameter :: visc_min     = 1e3_prec
+
+        nx = size(visc,1)
+        ny = size(visc,2) 
+
+        ! Vertically integrate at each point
+        do j = 1, ny 
+        do i = 1, nx 
+            if (H_ice(i,j) .gt. 0.0_prec) then 
+                ! Viscosity should be nonzero here, perform integration 
+
+                call calc_diva_integral_column(F1(i,j,:),F2(i,j),visc(i,j,:),H_ice(i,j),zeta_aa)
+
+            else 
+
+                call calc_diva_integral_column(F1(i,j,:),F2(i,j),(visc(i,j,:)*0.0_prec+visc_min),1.0_prec,zeta_aa)
+
+            end if 
+
+        end do 
+        end do 
+
+        return
+
+    end subroutine calc_F_integrals
+    
     subroutine calc_F_integral(Fint,visc,H_ice,zeta_aa,n)
         ! Useful integrals, following Arthern et al. (2015) Eq. 7,
         ! and Lipscomb et al. (2019), Eq. 30
@@ -483,7 +536,7 @@ end if
             if (H_ice(i,j) .gt. 0.0_prec) then 
                 ! Viscosity should be nonzero here, perform integration 
 
-                Fint(i,j) = integrate_trapezoid1D_pt((1.0_prec/visc(i,j,:))*(1.0_prec-zeta_aa)**n,zeta_aa)
+                Fint(i,j) = integrate_trapezoid1D_pt((H_ice(i,j)/visc(i,j,:))*(1.0_prec-zeta_aa)**n,zeta_aa)
 
             else 
 
@@ -642,5 +695,55 @@ end if
         return 
 
     end subroutine limit_vel
+
+    subroutine calc_diva_integral_column(F1,F2,visc_eff,H_ice,zeta_aa)
+
+        implicit none 
+
+        !----------------------------------------------------------------
+        ! Compute some integrals used by the DIVA solver to relate velocities
+        ! in different parts of the column:
+        !
+        !    F1(z) = int_b^z {[(s-z)/H] * 1/efvs * dz}
+        !    F2    = int_b^s {[(s-z)/H]^2 * 1/efvs * dz}
+        !          = int_b^s {F1(z)/H * dz}
+        !
+        ! Because efvs is highly nonlinear and appears in the denominator,
+        ! it should be more accurate to compute the integral at each quadrature
+        ! point and then average to the cell center, rather than average efvs 
+        ! to the cell center and then integrate.
+        !----------------------------------------------------------------
+        
+        real(prec), intent(OUT) :: F1(:)
+        real(prec), intent(OUT) :: F2
+        real(prec), intent(IN)  :: visc_eff(:)
+        real(prec), intent(IN)  :: H_ice
+        real(prec), intent(IN)  :: zeta_aa(:) 
+        
+        ! Local variables 
+        integer :: k, nz 
+        real(prec) :: depth, dz, layer_avg 
+
+        nz = size(zeta_aa,1)
+    
+        ! Compute F1 in the vertical column
+        F1(1) = 0.d0
+        do k = 2, nz 
+            depth = (1.0-zeta_aa(k))   ! depth/thck
+            dz    = (zeta_aa(k)-zeta_aa(k-1)) * H_ice
+            F1(k) = F1(k-1) + depth/visc_eff(k) * dz
+        end do
+
+        ! Integrate F1 in the vertical to obtain F2
+        F2 = 0.d0
+        do k = 2, nz
+            layer_avg = 0.5d0*(F1(k) + F1(k-1))
+            dz        = zeta_aa(k)-zeta_aa(k-1)  ! dz/thck
+            F2        = F2 + layer_avg * dz
+        end do
+        
+        return 
+
+    end subroutine calc_diva_integral_column
 
 end module velocity_diva

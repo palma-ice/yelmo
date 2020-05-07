@@ -144,11 +144,8 @@ contains
             ! Calculate the 3D vertical shear fields using viscosity estimated from the previous iteration 
             call calc_vertical_shear_3D(duxdz,duydz,taub_acx,taub_acy,visc_eff,zeta_aa)
 
-            ! Calculate the effective strain rate using velocity solution from previous iteration
-            call calc_strain_eff_squared(eps_sq,ux_bar,uy_bar,duxdz,duydz,zeta_aa,dx,dy)
-
-            ! Calculate 3D effective viscosity 
-            call calc_visc_eff_3D(visc_eff,ATT,eps_sq,n_glen)
+            ! Calculate 3D effective viscosity, using velocity solution from previous iteration
+            call calc_visc_eff_3D(visc_eff,ux_bar,uy_bar,duxdz,duydz,ATT,zeta_aa,dx,dy,n_glen)
 
             ! Calculate depth-integrated effective viscosity
             ! Note L19 uses eta_bar*H in the ssa equation. Yelmo uses eta_int=eta_bar*H directly.
@@ -212,7 +209,7 @@ end if
             ! Update additional fields based on output of solver
             
             ! Calculate basal velocity from depth-averaged solution 
-            call calc_vel_basal(ux_b,uy_b,ux_bar,uy_bar,F2,taub_acx,taub_acy)
+            call calc_vel_basal(ux_b,uy_b,ux_bar,uy_bar,F2,taub_acx,taub_acy,H_ice)
             !ux_b = ux_bar 
             !uy_b = uy_bar 
 
@@ -425,40 +422,84 @@ end if
         
     end subroutine calc_strain_eff_squared
 
-    subroutine calc_visc_eff_3D(visc_eff,ATT,eps_sq,n_glen)
+    subroutine calc_visc_eff_3D(visc_eff,ux,uy,duxdz,duydz,ATT,zeta_aa,dx,dy,n_glen)
         ! Calculate 3D effective viscosity 
         ! following L19, Eq. 2
 
         implicit none 
         
-        real(prec), intent(OUT) :: visc_eff(:,:,:)  ! aa-nodes
-        real(prec), intent(IN)  :: ATT(:,:,:)       ! aa-nodes
-        real(prec), intent(IN)  :: eps_sq(:,:,:)    ! aa-nodes
+        real(prec), intent(OUT) :: visc_eff(:,:,:)      ! aa-nodes
+        real(prec), intent(IN)  :: ux(:,:)              ! [m/a] Vertically averaged horizontal velocity, x-component
+        real(prec), intent(IN)  :: uy(:,:)              ! [m/a] Vertically averaged horizontal velocity, y-component
+        real(prec), intent(IN)  :: duxdz(:,:,:)         ! [1/a] Vertical shearing, x-component
+        real(prec), intent(IN)  :: duydz(:,:,:)         ! [1/a] Vertical shearing, x-component
+        real(prec), intent(IN)  :: ATT(:,:,:)           ! aa-nodes
+        real(prec), intent(IN)  :: zeta_aa(:)           ! Vertical axis (sigma-coordinates from 0 to 1)
+        real(prec), intent(IN)  :: dx
+        real(prec), intent(IN)  :: dy
         real(prec), intent(IN)  :: n_glen   
-
+        
         ! Local variables 
-        integer :: i, j, k, nx, ny, nz  
-        real(prec) :: mu 
-
-        real(prec), parameter :: visc_min     = 1e3_prec 
+        integer    :: i, j, k, nx, ny, nz
+        integer    :: ip1, jp1, im1, jm1  
+        real(prec) :: inv_4dx, inv_4dy 
+        real(prec) :: dudx, dudy
+        real(prec) :: dvdx, dvdy 
+        real(prec) :: duxdz_aa, duydz_aa  
+        real(prec) :: p1, p2  
+        real(prec) :: eps_sq                            ! [1/a^2]
+        
+        real(prec), parameter :: epsilon_sq_0 = 1e-6_prec   ! [a^-1] Bueler and Brown (2009), Eq. 26
+        real(prec), parameter :: visc_min     = 1e3_prec    ! [Pa a] Non-zero, very low viscosity value
         
         nx = size(visc_eff,1)
         ny = size(visc_eff,2)
         nz = size(visc_eff,3)
         
-        do k = 1, nz 
+        ! Calculate scaling factors
+        inv_4dx = 1.0_prec / (4.0_prec*dx) 
+        inv_4dy = 1.0_prec / (4.0_prec*dy) 
+
+        ! Calculate exponents 
+        p1 = (1.0_prec - n_glen)/(2.0_prec*n_glen)
+        p2 = -1.0_prec/n_glen
+
         do j = 1, ny 
         do i = 1, nx 
 
-            ! Calculate intermediate term
-            mu = 0.5_prec*(eps_sq(i,j,k))**((1.0_prec - n_glen)/(2.0_prec*n_glen))
+            im1 = max(i-1,1) 
+            ip1 = min(i+1,nx) 
+            jm1 = max(j-1,1) 
+            jp1 = min(j+1,ny) 
+            
+            ! Calculate effective strain components from horizontal stretching
+            dudx = (ux(i,j) - ux(im1,j))/dx
+            dvdy = (uy(i,j) - uy(i,jm1))/dy
 
-            ! Calculate effective viscosity 
-            visc_eff(i,j,k) = ATT(i,j,k)**(-1.0_prec/n_glen) * mu
+            ! Calculate of cross terms on central aa-nodes (symmetrical results)
+            dudy = ((ux(i,jp1)   - ux(i,jm1))    &
+                  + (ux(im1,jp1) - ux(im1,jm1))) * inv_4dx 
+            dvdx = ((uy(ip1,j)   - uy(im1,j))    &
+                  + (uy(ip1,jm1) - uy(im1,jm1))) * inv_4dy 
 
-            if (visc_eff(i,j,k) .lt. visc_min) visc_eff(i,j,k) = visc_min 
+            ! Loop over column
+            do k = 1, nz 
 
-        end do 
+                ! Un-stagger shear terms to central aa-nodes in horizontal
+                duxdz_aa = 0.5_prec*(duxdz(i,j,k) + duxdz(im1,j,k))
+                duydz_aa = 0.5_prec*(duydz(i,j,k) + duydz(i,jm1,k))
+                
+                ! Calculate the total effective strain rate from L19, Eq. 21 
+                eps_sq = dudx**2 + dvdy**2 + dudx*dvdy + 0.25_prec*(dudy+dvdx)**2 &
+                       + 0.25_prec*duxdz_aa**2 + 0.25_prec*duydz_aa**2 + epsilon_sq_0
+                
+                ! Calculate effective viscosity 
+                visc_eff(i,j,k) = 0.5_prec*(eps_sq)**(p1) * ATT(i,j,k)**(p2)
+
+                if (visc_eff(i,j,k) .lt. visc_min) visc_eff(i,j,k) = visc_min 
+
+            end do 
+
         end do  
         end do 
 
@@ -519,24 +560,40 @@ end if
         real(prec), intent(IN)  :: n  
 
         ! Local variables 
-        integer :: i, j, nx, ny
+        integer :: i, j, nx, ny, nz_aa
         real(prec) :: Fint_min 
-        real(prec), parameter :: visc_min     = 1e3_prec
+        real(prec), parameter :: visc_min = 1e3_prec
 
-        nx = size(visc,1)
-        ny = size(visc,2) 
+        real(prec) :: H_ice_now
+        real(prec), allocatable :: visc_now(:)
+
+        nx    = size(visc,1)
+        ny    = size(visc,2) 
+        nz_aa = size(visc,3)
+
+        allocate(visc_now(nz_aa))
 
         ! Determine the minimum value of Fint, to assign when H_ice == 0,
         ! since Fint should be nonzero everywhere for numerics
         Fint_min = integrate_trapezoid1D_pt((1.0_prec/visc_min)*(1.0_prec-zeta_aa)**n,zeta_aa)
 
+        Fint = Fint_min
+
         ! Vertically integrate at each point
-        do j = 1, ny 
-        do i = 1, nx 
+        do j = 2, ny-1 
+        do i = 2, nx-1
             if (H_ice(i,j) .gt. 0.0_prec) then 
                 ! Viscosity should be nonzero here, perform integration 
 
-                Fint(i,j) = integrate_trapezoid1D_pt((H_ice(i,j)/visc(i,j,:))*(1.0_prec-zeta_aa)**n,zeta_aa)
+                ! Get weighted ice thickness for stability
+                H_ice_now = (4.0*H_ice(i,j) + 2.0*(H_ice(i-1,j)+H_ice(i+1,j)+H_ice(i,j-1)+H_ice(i,j+1))) / 16.0 &
+                          + (H_ice(i-1,j-1)+H_ice(i+1,j-1)+H_ice(i+1,j+1)+H_ice(i-1,j+1)) / 16.0 
+
+!                 visc_now = (4.0*visc(i,j,:) + 2.0*(visc(i-1,j,:)+visc(i+1,j,:)+visc(i,j-1,:)+visc(i,j+1,:))) / 16.0 &
+!                           + (visc(i-1,j-1,:)+visc(i+1,j-1,:)+visc(i+1,j+1,:)+visc(i-1,j+1,:)) / 16.0 
+                visc_now = visc(i,j,:) 
+                
+                Fint(i,j) = integrate_trapezoid1D_pt((H_ice_now/visc_now)*(1.0_prec-zeta_aa)**n,zeta_aa)
 
             else 
 
@@ -602,7 +659,7 @@ end if
 
     end subroutine calc_beta_eff 
 
-    subroutine calc_vel_basal(ux_b,uy_b,ux_bar,uy_bar,F2,taub_acx,taub_acy)
+    subroutine calc_vel_basal(ux_b,uy_b,ux_bar,uy_bar,F2,taub_acx,taub_acy,H_ice)
         ! Calculate basal sliding following Goldberg (2011), Eq. 34
         ! (analgous to L19, Eq. 32)
 
@@ -615,6 +672,7 @@ end if
         real(prec), intent(IN)  :: F2(:,:)
         real(prec), intent(IN)  :: taub_acx(:,:) 
         real(prec), intent(IN)  :: taub_acy(:,:)
+        real(prec), intent(IN)  :: H_ice(:,:)
         
         ! Local variables 
         integer    :: i, j, nx, ny 
@@ -627,10 +685,36 @@ end if
             ip1 = min(i,nx)
             jp1 = min(j,ny)
 
-            F2_ac = 0.5_prec*(F2(i,j) + F2(ip1,j))
+            if (H_ice(i,j) .gt. 0.0 .and. H_ice(ip1,j) .eq. 0.0) then 
+
+                F2_ac = F2(i,j) 
+
+            else if (H_ice(i,j) .eq. 0.0 .and. H_ice(ip1,j) .gt. 0.0) then
+
+                F2_ac = F2(ip1,j)
+
+            else 
+
+                F2_ac = 0.5_prec*(F2(i,j) + F2(ip1,j))
+
+            end if 
+
             ux_b(i,j) = ux_bar(i,j) - taub_acx(i,j)*F2_ac 
 
-            F2_ac = 0.5_prec*(F2(i,j) + F2(i,jp1))
+            if (H_ice(i,j) .gt. 0.0 .and. H_ice(i,jp1) .eq. 0.0) then 
+
+                F2_ac = F2(i,j) 
+
+            else if (H_ice(i,j) .eq. 0.0 .and. H_ice(i,jp1) .gt. 0.0) then
+
+                F2_ac = F2(i,jp1)
+
+            else 
+
+                F2_ac = 0.5_prec*(F2(i,j) + F2(i,jp1))
+
+            end if 
+            
             uy_b(i,j) = uy_bar(i,j) - taub_acy(i,j)*F2_ac 
 
         end do 

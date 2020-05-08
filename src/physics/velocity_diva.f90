@@ -519,6 +519,7 @@ end if
 
         ! Local variables 
         integer :: i, j, nx, ny, nz_aa
+        integer :: im1, jm1, ip1, jp1 
         real(prec) :: Fint_min 
         real(prec), parameter :: visc_min = 1e3_prec
 
@@ -540,6 +541,12 @@ end if
         ! Vertically integrate at each point
         do j = 2, ny-1 
         do i = 2, nx-1
+
+            im1 = max(i-1,1)
+            jm1 = max(j-1,1)
+            ip1 = min(i+1,nx)
+            jp1 = min(j+1,ny)
+
             if (H_ice(i,j) .gt. 0.0_prec) then 
                 ! Viscosity should be nonzero here, perform integration 
 
@@ -566,6 +573,22 @@ end if
 
     end subroutine calc_F_integral
     
+    subroutine smoothing_weights_ice(wts,H_ice)
+        ! Subroutine calculates neighborhood weights such 
+        ! that only ice covered neighbor points are used. 
+        ! Inputs in order: [H_ice(i,j),H_ice(i-1,j),H_ice(i+1,j),H_ice(i,j-1),H_ice(i,j+1)]
+        
+        implicit none 
+
+        real(prec), intent(OUT) :: wts(:) 
+        real(prec), intent(IN)  :: H_ice(:) 
+
+
+
+        return 
+
+    end subroutine smoothing_weights_ice
+
     subroutine calc_beta_eff(beta_eff,beta,ux_b,uy_b,F2,zeta_aa,no_slip)
         ! Calculate the depth-averaged horizontal velocity (ux_bar,uy_bar)
 

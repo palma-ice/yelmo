@@ -294,6 +294,9 @@ module yelmo_defs
         real(prec), allocatable :: beta_acy(:,:) 
         real(prec), allocatable :: beta(:,:) 
         
+        real(prec), allocatable :: beta_eff(:,:) 
+        real(prec), allocatable :: beta_diva(:,:)
+         
         real(prec), allocatable :: f_vbvs(:,:) 
 
         integer,    allocatable :: ssa_mask_acx(:,:) 

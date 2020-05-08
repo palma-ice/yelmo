@@ -182,8 +182,8 @@ contains
                                 dyn%now%ux_b,dyn%now%uy_b,dyn%now%duxdz,dyn%now%duydz,dyn%now%taub_acx,dyn%now%taub_acy, &
                                 dyn%now%visc_eff,dyn%now%visc_eff_int,dyn%now%ssa_mask_acx,dyn%now%ssa_mask_acy, &
                                 dyn%now%ssa_err_acx,dyn%now%ssa_err_acy,dyn%now%beta,dyn%now%beta_acx,dyn%now%beta_acy, &
-                                dyn%now%c_bed,dyn%now%taud_acx,dyn%now%taud_acy,tpo%now%H_ice,tpo%now%H_grnd, &
-                                tpo%now%f_grnd,tpo%now%f_grnd_acx,tpo%now%f_grnd_acy,mat%now%ATT, &
+                                dyn%now%beta_eff,dyn%now%beta_diva,dyn%now%c_bed,dyn%now%taud_acx,dyn%now%taud_acy,tpo%now%H_ice, &
+                                tpo%now%H_grnd,tpo%now%f_grnd,tpo%now%f_grnd_acx,tpo%now%f_grnd_acy,mat%now%ATT, &
                                 dyn%par%zeta_aa,bnd%z_sl,bnd%z_bed,dyn%par%dx,dyn%par%dy,mat%par%n_glen,diva_par)
 
         ! ===== Calculate the vertical velocity through continuity ============================
@@ -1612,6 +1612,9 @@ end if
         allocate(now%beta_acy(nx,ny))
         allocate(now%beta(nx,ny))
         
+        allocate(now%beta_eff(nx,ny))
+        allocate(now%beta_diva(nx,ny))
+
         allocate(now%f_vbvs(nx,ny)) 
         
         allocate(now%ssa_mask_acx(nx,ny)) 
@@ -1688,6 +1691,9 @@ end if
         now%beta_acy          = 0.0 
         now%beta              = 0.0 
         
+        now%beta_eff          = 0.0 
+        now%beta_diva         = 0.0 
+
         now%f_vbvs            = 0.0 
 
         now%ssa_mask_acx      = 0.0 
@@ -1774,6 +1780,9 @@ end if
         if (allocated(now%beta_acy))        deallocate(now%beta_acy) 
         if (allocated(now%beta))            deallocate(now%beta) 
         
+        if (allocated(now%beta_eff))        deallocate(now%beta_eff) 
+        if (allocated(now%beta_diva))       deallocate(now%beta_diva) 
+
         if (allocated(now%f_vbvs))          deallocate(now%f_vbvs) 
 
         if (allocated(now%ssa_mask_acx))    deallocate(now%ssa_mask_acx) 

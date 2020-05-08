@@ -39,7 +39,7 @@ contains
 
     subroutine calc_velocity_diva(ux,uy,ux_i,uy_i,ux_bar,uy_bar,ux_b,uy_b,duxdz,duydz,taub_acx,taub_acy, &
                                   visc_eff,visc_eff_int,ssa_mask_acx,ssa_mask_acy,ssa_err_acx,ssa_err_acy, &
-                                  beta,beta_acx,beta_acy,c_bed,taud_acx,taud_acy,H_ice,H_grnd,f_grnd, &
+                                  beta,beta_acx,beta_acy,beta_eff,beta_diva,c_bed,taud_acx,taud_acy,H_ice,H_grnd,f_grnd, &
                                   f_grnd_acx,f_grnd_acy,ATT,zeta_aa,z_sl,z_bed,dx,dy,n_glen,par)
         ! This subroutine is used to solve the horizontal velocity system (ux,uy)
         ! following the Depth-Integrated Viscosity Approximation (DIVA),
@@ -70,6 +70,8 @@ contains
         real(prec), intent(OUT)   :: beta(:,:)          ! [Pa a/m]
         real(prec), intent(OUT)   :: beta_acx(:,:)      ! [Pa a/m]
         real(prec), intent(OUT)   :: beta_acy(:,:)      ! [Pa a/m]
+        real(prec), intent(OUT)   :: beta_eff(:,:)      ! [Pa a/m]
+        real(prec), intent(OUT)   :: beta_diva(:,:)     ! [Pa a/m]
         real(prec), intent(IN)    :: c_bed(:,:)         ! [Pa]
         real(prec), intent(IN)    :: taud_acx(:,:)      ! [Pa]
         real(prec), intent(IN)    :: taud_acy(:,:)      ! [Pa]
@@ -88,18 +90,14 @@ contains
         type(diva_param_class), intent(IN) :: par       ! List of parameters that should be defined
 
         ! Local variables 
-        integer :: k, nx, ny, nz_aa, nz_ac
+        integer :: i, j, k, nx, ny, nz_aa, nz_ac
         integer :: iter, iter_max  
         logical :: is_converged 
         real(prec), allocatable :: ux_bar_nm1(:,:) 
-        real(prec), allocatable :: uy_bar_nm1(:,:) 
-        real(prec), allocatable :: beta_eff(:,:) 
+        real(prec), allocatable :: uy_bar_nm1(:,:)  
         real(prec), allocatable :: beta_eff_acx(:,:)
         real(prec), allocatable :: beta_eff_acy(:,:)  
-        real(prec), allocatable :: eps_sq(:,:,:)  
-        real(prec), allocatable :: F1_l19(:,:,:) 
-        real(prec), allocatable :: F2_l19(:,:) 
-        real(prec), allocatable :: F2(:,:) 
+        real(prec), allocatable :: F2(:,:)              ! [Pa^-1 a^-1 m == (Pa a/m)^-1]
 
         integer,    allocatable :: ssa_mask_acx_ref(:,:)
         integer,    allocatable :: ssa_mask_acy_ref(:,:)
@@ -113,12 +111,8 @@ contains
         ! Prepare local variables 
         allocate(ux_bar_nm1(nx,ny))
         allocate(uy_bar_nm1(nx,ny))
-        allocate(beta_eff(nx,ny))
         allocate(beta_eff_acx(nx,ny))
         allocate(beta_eff_acy(nx,ny))
-        allocate(eps_sq(nx,ny,nz_aa))
-        allocate(F1_l19(nx,ny,nz_aa))
-        allocate(F2_l19(nx,ny))
         allocate(F2(nx,ny))
 
         allocate(ssa_mask_acx_ref(nx,ny))
@@ -160,31 +154,20 @@ contains
             ! Calculate F-integeral (F2) on aa-nodes 
             call calc_F_integral(F2,visc_eff,H_ice,zeta_aa,n=2.0_prec)
             
-            ! Testing CISM (L19) formulation of integrals
-            ! ajr: results for F2 look very close, so we are probably doing it right!
-!             call calc_F_integrals(F1_l19,F2_l19,visc_eff,H_ice,zeta_aa)
-
             ! Calculate effective beta 
-            call calc_beta_eff(beta_eff,beta,ux_b,uy_b,F2,zeta_aa)
+            call calc_beta_eff(beta_eff,beta,ux_b,uy_b,F2,zeta_aa,no_slip=.FALSE.)
             !beta_eff = beta 
 
             ! Stagger beta and beta_eff 
             call stagger_beta(beta_acx,beta_acy,beta,f_grnd,f_grnd_acx,f_grnd_acy,par%beta_gl_stag)
             call stagger_beta(beta_eff_acx,beta_eff_acy,beta_eff,f_grnd,f_grnd_acx,f_grnd_acy,par%beta_gl_stag)
             
-!             write(*,*) "diva:: beta:         ", minval(beta),     maxval(beta)
-!             write(*,*) "diva:: beta_eff:     ", minval(beta_eff), maxval(beta_eff)
-!             write(*,*) "diva:: F2:           ", minval(F2),       maxval(F2)
-! !             write(*,*) "diva:: F2_l19:       ", minval(F2_l19),   maxval(F2_l19)
-!             write(*,*) "diva:: taud(acx):    ", minval(taud_acx), maxval(taud_acx)
-!             write(*,*) "diva:: taub(acx):    ", minval(taub_acx), maxval(taub_acx)
-            
             ! =========================================================================================
             ! Step 2: Call the SSA solver to obtain new estimate of ux_bar/uy_bar
 
-if (.FALSE.) then 
+if (.TRUE.) then 
             if (iter .gt. 1) then
-                ! Update ssa mask based on convergence with previous step to reduce calls 
+                ! Update ssa mask based on convergence with previous step to reduce area being solved 
                 call update_ssa_mask_convergence(ssa_mask_acx,ssa_mask_acy,ssa_err_acx,ssa_err_acy,err_lim=real(1e-3,prec)) 
             end if 
 end if 
@@ -208,13 +191,11 @@ end if
             ! =========================================================================================
             ! Update additional fields based on output of solver
             
-            ! Calculate basal velocity from depth-averaged solution 
-            call calc_vel_basal(ux_b,uy_b,ux_bar,uy_bar,F2,taub_acx,taub_acy,H_ice)
-            !ux_b = ux_bar 
-            !uy_b = uy_bar 
-
             ! Calculate basal stress 
             call calc_basal_stress(taub_acx,taub_acy,beta_eff_acx,beta_eff_acy,ux_bar,uy_bar)
+
+            ! Calculate basal velocity from depth-averaged solution and basal stress
+            call calc_vel_basal(ux_b,uy_b,ux_bar,uy_bar,F2,taub_acx,taub_acy,H_ice)
 
             ! Exit iterations if ssa solution has converged
             if (is_converged) exit 
@@ -231,6 +212,9 @@ end if
             ux_i(:,:,k) = ux(:,:,k) - ux_b 
             uy_i(:,:,k) = uy(:,:,k) - uy_b 
         end do
+
+        ! Diagnose beta actually being used by DIVA
+        call diagnose_beta_diva(beta_diva,beta_eff,F2,beta)
 
         return 
 
@@ -521,46 +505,6 @@ end if
 
     end subroutine calc_visc_eff_3D 
 
-    subroutine calc_F_integrals(F1,F2,visc,H_ice,zeta_aa)
-        ! Useful integrals, following Arthern et al. (2015) Eq. 7,
-        ! and Lipscomb et al. (2019), Eq. 30
-        ! F_n = int_zb_zs{ 1/visc * ((s-z)/H)**n dz}
-        implicit none 
-
-        real(prec), intent(OUT) :: F1(:,:,:) 
-        real(prec), intent(OUT) :: F2(:,:) 
-        real(prec), intent(IN)  :: visc(:,:,:)
-        real(prec), intent(IN)  :: H_ice(:,:)
-        real(prec), intent(IN)  :: zeta_aa(:) 
-
-        ! Local variables 
-        integer :: i, j, nx, ny
-        real(prec), parameter :: visc_min     = 1e3_prec
-
-        nx = size(visc,1)
-        ny = size(visc,2) 
-
-        ! Vertically integrate at each point
-        do j = 1, ny 
-        do i = 1, nx 
-            if (H_ice(i,j) .gt. 0.0_prec) then 
-                ! Viscosity should be nonzero here, perform integration 
-
-                call calc_diva_integral_column(F1(i,j,:),F2(i,j),visc(i,j,:),H_ice(i,j),zeta_aa)
-
-            else 
-
-                call calc_diva_integral_column(F1(i,j,:),F2(i,j),(visc(i,j,:)*0.0_prec+visc_min),1.0_prec,zeta_aa)
-
-            end if 
-
-        end do 
-        end do 
-
-        return
-
-    end subroutine calc_F_integrals
-    
     subroutine calc_F_integral(Fint,visc,H_ice,zeta_aa,n)
         ! Useful integrals, following Arthern et al. (2015) Eq. 7,
         ! and Lipscomb et al. (2019), Eq. 30
@@ -622,7 +566,7 @@ end if
 
     end subroutine calc_F_integral
     
-    subroutine calc_beta_eff(beta_eff,beta,ux_b,uy_b,F2,zeta_aa)
+    subroutine calc_beta_eff(beta_eff,beta,ux_b,uy_b,F2,zeta_aa,no_slip)
         ! Calculate the depth-averaged horizontal velocity (ux_bar,uy_bar)
 
         ! Note: L19 staggers the F-integral F2, then solves for beta 
@@ -635,6 +579,7 @@ end if
         real(prec), intent(IN)  :: uy_b(:,:)        ! ac-nodes
         real(prec), intent(IN)  :: F2(:,:)          ! aa-nodes
         real(prec), intent(IN)  :: zeta_aa(:)       ! aa-nodes
+        logical,    intent(IN)  :: no_slip 
 
         ! Local variables 
         integer    :: i, j, nx, ny
@@ -644,30 +589,19 @@ end if
         nx = size(beta_eff,1)
         ny = size(beta_eff,2)
 
-        do j = 1, ny 
-        do i = 1, nx 
+        if (no_slip) then 
+            ! No basal sliding allowed, impose beta_eff derived from viscosity 
+            ! following L19, Eq. 35 (or G11, Eq. 42)
 
-            im1 = max(i-1,1)
-            jm1 = max(j-1,1)
+            beta_eff = 1.0_prec / F2 
 
-            ! Calculate basal velocity magnitude at grid center, aa-nodes
-            uxy_b = sqrt( 0.5_prec*(ux_b(i,j)+ux_b(im1,j))**2 + 0.5_prec*(ux_b(i,j)+ux_b(i,jm1))**2 )
+        else 
+            ! Basal sliding allowed, calculate beta_eff 
+            ! following L19, Eq. 33 (or G11, Eq. 41)
 
-            if (uxy_b .gt. 0.0_prec) then 
-                ! Basal sliding exists, follow L19, Eq. 33 (or G11, Eq. 41)
+            beta_eff = beta / (1.0_prec+beta*F2)
 
-                beta_eff(i,j) = beta(i,j) / (1.0_prec+beta(i,j)*F2(i,j))
-
-            else 
-                ! No basal sliding, follow L19, Eq. 35 (or G11, Eq. 42)
-
-                beta_eff(i,j) = 1.0_prec / F2(i,j) 
-
-            end if 
-
-        end do 
-        end do 
-
+        end if 
 
         return 
 
@@ -692,6 +626,9 @@ end if
         integer    :: i, j, nx, ny 
         integer    :: ip1, jp1 
         real(prec) :: F2_ac 
+
+        nx = size(ux_b,1)
+        ny = size(ux_b,2) 
 
         do j = 1, ny 
         do i = 1, nx 
@@ -774,6 +711,136 @@ end if
 
     end subroutine calc_basal_stress
 
+    subroutine diagnose_beta_diva(beta_diva,beta_eff,F2,beta)
+        ! Given beta_eff and F2, iteratively solve for beta_diva,
+        ! where: beta_eff = beta_diva / (1+beta_diva*F2)
+        ! Use root-finding method: 0 = beta_eff - beta_diva / (1+beta_diva*F2)
+
+        implicit none 
+
+        real(prec), intent(OUT) :: beta_diva(:,:)       ! [Pa a/m] beta seen by diva solver (derived from beta_eff)
+        real(prec), intent(IN)  :: beta_eff(:,:)        ! [Pa a/m] Effective beta used directly in diva solver
+        real(prec), intent(IN)  :: beta(:,:)            ! [Pa a/m] Prescribed beta for points with ux/y_b > 0
+        real(prec), intent(IN)  :: F2(:,:)              ! [(Pa a)^-1]
+
+        ! To do !!!
+
+        ! For now, simply:
+        beta_diva = beta 
+
+        return
+
+    contains 
+
+        function f(beta_diva,beta_eff,F2) result(fout)
+
+            implicit none 
+
+            real(prec), intent(IN) :: beta_diva 
+            real(prec), intent(IN) :: beta_eff
+            real(prec), intent(IN) :: F2
+            real(prec) :: fout 
+
+            fout = beta_eff - beta_diva*(1.0_prec + beta_diva*F2)**(-1.0)
+
+            return 
+
+        end function f
+            
+        function fp(beta_diva,beta_eff,F2) result(fpout)
+
+            implicit none 
+
+            real(prec), intent(IN) :: beta_diva 
+            real(prec), intent(IN) :: beta_eff
+            real(prec), intent(IN) :: F2
+            real(prec) :: fpout 
+            
+            fpout = beta_diva*F2*(1.0_prec + beta_diva*F2)**(-2.0) - (1.0_prec + beta_diva*F2)**(-1.0)
+
+            return 
+
+        end function fp
+
+    end subroutine diagnose_beta_diva
+
+    subroutine solve_newton(x,x0,f,fp,debug)
+        ! Estimate the zero of f(x) using Newton's method. 
+        ! Input:
+        !   f:  the function to find a root of
+        !   fp: function returning the derivative f'
+        !   x0: the initial guess
+        !   debug: logical, prints iterations if debug=.true.
+        ! Returns:
+        !   the estimate x satisfying f(x)=0 (assumes Newton converged!) 
+        !   the number of iterations iters
+        
+        ! Adapted from: 
+        ! https://faculty.washington.edu/rjl/classes/am583s2013/notes/fortran_newton.html
+
+        implicit none
+
+        real(prec), intent(OUT) :: x
+        real(prec), intent(IN)  :: x0
+        real(prec), external    :: f, fp
+        logical,    intent(in)  :: debug
+
+        ! Declare any local variables:
+        real(prec) :: deltax, fx, fxprime
+        integer    :: k, iters
+
+        integer, parameter :: maxiter = 20
+        real(kind=8), parameter :: tol = 1.d-14
+
+        ! Save initial guess
+        x = x0
+
+        if (debug) then
+            write(*,*) "Initial guess: x = ", x
+        end if
+
+        ! Newton iteration to find a zero of f(x) 
+
+        do k = 1, maxiter
+
+            ! evaluate function and its derivative:
+            fx      = f(x)
+            fxprime = fp(x)
+
+            if (abs(fx) < tol) then
+                exit  ! jump out of do loop
+            end if
+
+            ! Compute Newton increment x:
+            deltax = fx/fxprime
+
+            ! update x:
+            x = x - deltax
+
+            if (debug) then
+                write(*,*) "After ", k, "iterations, x = ", x 
+            end if 
+
+        end do
+
+
+        if (k > maxiter) then
+        ! Solver did not converge
+
+            fx = f(x)
+            if (abs(fx) > tol) then
+                write(*,*) "*** Warning: has not yet converged"
+            end if
+
+        end if 
+
+        ! Number of iterations taken:
+        iters = k-1
+
+        return 
+
+    end subroutine solve_newton
+
     elemental subroutine limit_vel(u,u_lim)
         ! Apply a velocity limit (for stability)
 
@@ -793,55 +860,5 @@ end if
         return 
 
     end subroutine limit_vel
-
-    subroutine calc_diva_integral_column(F1,F2,visc_eff,H_ice,zeta_aa)
-
-        implicit none 
-
-        !----------------------------------------------------------------
-        ! Compute some integrals used by the DIVA solver to relate velocities
-        ! in different parts of the column:
-        !
-        !    F1(z) = int_b^z {[(s-z)/H] * 1/efvs * dz}
-        !    F2    = int_b^s {[(s-z)/H]^2 * 1/efvs * dz}
-        !          = int_b^s {F1(z)/H * dz}
-        !
-        ! Because efvs is highly nonlinear and appears in the denominator,
-        ! it should be more accurate to compute the integral at each quadrature
-        ! point and then average to the cell center, rather than average efvs 
-        ! to the cell center and then integrate.
-        !----------------------------------------------------------------
-        
-        real(prec), intent(OUT) :: F1(:)
-        real(prec), intent(OUT) :: F2
-        real(prec), intent(IN)  :: visc_eff(:)
-        real(prec), intent(IN)  :: H_ice
-        real(prec), intent(IN)  :: zeta_aa(:) 
-        
-        ! Local variables 
-        integer :: k, nz 
-        real(prec) :: depth, dz, layer_avg 
-
-        nz = size(zeta_aa,1)
-    
-        ! Compute F1 in the vertical column
-        F1(1) = 0.d0
-        do k = 2, nz 
-            depth = (1.0-zeta_aa(k))   ! depth/thck
-            dz    = (zeta_aa(k)-zeta_aa(k-1)) * H_ice
-            F1(k) = F1(k-1) + depth/visc_eff(k) * dz
-        end do
-
-        ! Integrate F1 in the vertical to obtain F2
-        F2 = 0.d0
-        do k = 2, nz
-            layer_avg = 0.5d0*(F1(k) + F1(k-1))
-            dz        = zeta_aa(k)-zeta_aa(k-1)  ! dz/thck
-            F2        = F2 + layer_avg * dz
-        end do
-        
-        return 
-
-    end subroutine calc_diva_integral_column
 
 end module velocity_diva

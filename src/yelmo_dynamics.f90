@@ -202,6 +202,10 @@ contains
         
         ! ===== Additional diagnostic variables =======================
 
+        ! Integrate from 3D shear velocity field to get depth-averaged field
+        dyn%now%ux_i_bar = calc_vertical_integrated_2D(dyn%now%ux_i,dyn%par%zeta_aa)
+        dyn%now%uy_i_bar = calc_vertical_integrated_2D(dyn%now%uy_i,dyn%par%zeta_aa)
+                
         ! Diagnose ice flux 
         call calc_ice_flux(dyn%now%qq_acx,dyn%now%qq_acy,dyn%now%ux_bar,dyn%now%uy_bar,tpo%now%H_ice, &
                             dyn%par%dx,dyn%par%dy)

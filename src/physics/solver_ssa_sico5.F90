@@ -82,7 +82,7 @@ contains
         if (trim(boundaries) .eq. "MISMIP3D") is_mismip = .TRUE. 
 
         is_periodic = .FALSE. 
-        if (trim(boundaries) .eq. "ISMIPHOM") is_periodic = .TRUE. 
+        if (trim(boundaries) .eq. "periodic") is_periodic = .TRUE. 
         
         nx = size(H_ice,1)
         ny = size(H_ice,2)
@@ -1000,7 +1000,7 @@ contains
         return 
 
     end subroutine calc_vxy_ssa_matrix
-    
+
     subroutine set_ssa_masks(ssa_mask_acx,ssa_mask_acy,beta_acx,beta_acy,H_ice,f_grnd_acx,f_grnd_acy,beta_max,use_ssa)
         ! Define where ssa calculations should be performed
         ! Note: could be binary, but perhaps also distinguish 

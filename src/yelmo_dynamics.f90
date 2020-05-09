@@ -68,26 +68,28 @@ contains
             case("fixed") 
                 ! Do nothing - dynamics is fixed 
 
-            case("hybrid-adhoc")
-                ! Classic mix methods
+            case("hybrid")
+                ! Classic SIA+SSA, including alternative SIA/SSA combinations and purely SIA or SSA
 
                 call calc_ydyn_adhoc(dyn,tpo,mat,thrm,bnd,dt)
 
             case("hybrid-pd12")
                 ! Variational approach of Pollard and de Conto (2012) - in progress!
 
+                write(*,*) "Not working - to do."
+                stop 
+
                 call calc_ydyn_pd12(dyn,tpo,mat,thrm,bnd)
 
             case("diva") 
                 ! Depth-integrated variational approximation (DIVA) - Goldberg (2011); Lipscomb et al. (2019)
-                ! To do! 
 
                 call calc_ydyn_diva(dyn,tpo,mat,thrm,bnd,dt)
 
             case DEFAULT 
 
                 write(*,*) "calc_ydyn:: Error: ydyn solver not recognized." 
-                write(*,*) "solver should be one of: ['fixed','hybrid-adhoc','hybrid-pd12']"
+                write(*,*) "solver should be one of: ['fixed','hybrid','diva']"
                 write(*,*) "solver = ", trim(dyn%par%solver) 
                 stop 
 
@@ -144,7 +146,7 @@ contains
         uxy_prev = dyn%now%uxy_bar 
         
         ! Calculate driving stress 
-        call calc_driving_stress_ac(dyn%now%taud_acx,dyn%now%taud_acy,tpo%now%H_ice,tpo%now%dzsdx,tpo%now%dzsdy, &
+        call calc_driving_stress(dyn%now%taud_acx,dyn%now%taud_acy,tpo%now%H_ice,tpo%now%dzsdx,tpo%now%dzsdy, &
                                                                                             dyn%par%dx,dyn%par%taud_lim)
 
         ! Calculate effective pressure 
@@ -292,14 +294,14 @@ contains
         ! ===== Calculate general variables ==============================
 
         ! Calculate driving stress 
-        call calc_driving_stress_ac(dyn%now%taud_acx,dyn%now%taud_acy,tpo%now%H_ice,tpo%now%dzsdx,tpo%now%dzsdy, &
+        call calc_driving_stress(dyn%now%taud_acx,dyn%now%taud_acy,tpo%now%H_ice,tpo%now%dzsdx,tpo%now%dzsdy, &
                                                                                             dyn%par%dx,dyn%par%taud_lim)
 
         
 !         if (dyn%par%tau_gl_method .ne. 0) then
 !             ! Additionally treat the driving stress at the grounding line
 
-!             call calc_driving_stress_gl_ac(dyn%now%taud_acx,dyn%now%taud_acy,tpo%now%H_ice,tpo%now%z_srf,bnd%z_bed,bnd%z_sl, &
+!             call calc_driving_stress_gl(dyn%now%taud_acx,dyn%now%taud_acy,tpo%now%H_ice,tpo%now%z_srf,bnd%z_bed,bnd%z_sl, &
 !                     tpo%now%H_grnd,tpo%now%f_grnd,tpo%now%f_grnd_acx,tpo%now%f_grnd_acy,dyn%par%dx, &
 !                     method=dyn%par%taud_gl_method,beta_gl_stag=dyn%par%beta_gl_stag)
         
@@ -624,11 +626,11 @@ contains
         call calc_c_bed(dyn%now%c_bed,dyn%now%cf_ref,dyn%now%N_eff)
 
         ! Calculate driving stress
-        call calc_driving_stress_ac(dyn%now%taud_acx,dyn%now%taud_acy,tpo%now%H_ice,tpo%now%dzsdx,tpo%now%dzsdy, &
+        call calc_driving_stress(dyn%now%taud_acx,dyn%now%taud_acy,tpo%now%H_ice,tpo%now%dzsdx,tpo%now%dzsdy, &
                                                                                             dyn%par%dx,dyn%par%taud_lim)
     
 !         ! Additionally calculate driving stress at the grounding line
-!         call calc_driving_stress_gl_ac(dyn%now%taud_acx,dyn%now%taud_acy,tpo%now%H_ice,tpo%now%z_srf,bnd%z_bed,bnd%z_sl, &
+!         call calc_driving_stress_gl(dyn%now%taud_acx,dyn%now%taud_acy,tpo%now%H_ice,tpo%now%z_srf,bnd%z_bed,bnd%z_sl, &
 !                  tpo%now%H_grnd,tpo%now%f_grnd,tpo%now%f_grnd_acx,tpo%now%f_grnd_acy,dyn%par%dx, &
 !                  method=dyn%par%taud_gl_method,beta_gl_stag=dyn%par%beta_gl_stag)
 
@@ -2073,7 +2075,7 @@ end module yelmo_dynamics
 !             dyn1%par%beta_gl_stag   = 1     ! Upstream scaling 
 
 !             ! Calculate driving stress 
-!             call calc_driving_stress_ac(dyn1%now%taud_acx,dyn1%now%taud_acy,tpo%now%H_ice,tpo%now%z_srf,bnd%z_bed,bnd%z_sl, &
+!             call calc_driving_stress(dyn1%now%taud_acx,dyn1%now%taud_acy,tpo%now%H_ice,tpo%now%z_srf,bnd%z_bed,bnd%z_sl, &
 !                      tpo%now%H_grnd,tpo%now%f_grnd,tpo%now%f_grnd_acx,tpo%now%f_grnd_acy,dyn1%par%dx,dyn1%par%taud_lim, &
 !                      method=dyn1%par%taud_gl_method,beta_gl_stag=dyn1%par%beta_gl_stag)
 
@@ -2089,7 +2091,7 @@ end module yelmo_dynamics
 !             dyn2%par%beta_gl_stag   = 2     ! Downstream scaling 
             
 !             ! Calculate driving stress 
-!             call calc_driving_stress_ac(dyn2%now%taud_acx,dyn2%now%taud_acy,tpo%now%H_ice,tpo%now%z_srf,bnd%z_bed,bnd%z_sl, &
+!             call calc_driving_stress(dyn2%now%taud_acx,dyn2%now%taud_acy,tpo%now%H_ice,tpo%now%z_srf,bnd%z_bed,bnd%z_sl, &
 !                      tpo%now%H_grnd,tpo%now%f_grnd,tpo%now%f_grnd_acx,tpo%now%f_grnd_acy,dyn2%par%dx,dyn1%par%taud_lim, &
 !                      method=dyn2%par%taud_gl_method,beta_gl_stag=dyn2%par%beta_gl_stag)
 

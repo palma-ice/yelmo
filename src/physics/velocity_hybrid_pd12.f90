@@ -16,8 +16,8 @@ module velocity_hybrid_pd12
     public :: calc_shear_3D
     public :: calc_ice_flux
     public :: calc_basal_stress
-    public :: calc_driving_stress_ac 
-    public :: calc_driving_stress_gl_ac
+    public :: calc_driving_stress 
+    public :: calc_driving_stress_gl
     public :: calc_visc_eff_2D
     public :: calc_stress_eff_horizontal_squared
     public :: calc_vel_ratio
@@ -857,12 +857,11 @@ contains
 
     end subroutine calc_basal_stress
 
-    subroutine calc_driving_stress_ac(taud_acx,taud_acy,H_ice,dzsdx,dzsdy,dx,taud_lim)
-        ! taud = rho_ice*g*H_ice
-        ! Calculate driving stress on staggered grid points, with 
-        ! special treatment of the grounding line 
+    subroutine calc_driving_stress(taud_acx,taud_acy,H_ice,dzsdx,dzsdy,dx,taud_lim)
+        ! Calculate driving stress on staggered grid points
         ! Units: taud [Pa] == [kg m-1 s-2]
-        
+        ! taud = rho_ice*g*H_ice
+
         ! Note: interpolation to Ab nodes no longer used here.
 
         ! Note: use parameter taud_lim to limit maximum allowed driving stress magnitude applied in the model.
@@ -922,9 +921,9 @@ contains
         
         return 
 
-    end subroutine calc_driving_stress_ac 
+    end subroutine calc_driving_stress 
 
-    subroutine calc_driving_stress_gl_ac(taud_acx,taud_acy,H_ice,z_srf,z_bed,z_sl,H_grnd, &
+    subroutine calc_driving_stress_gl(taud_acx,taud_acy,H_ice,z_srf,z_bed,z_sl,H_grnd, &
                                       f_grnd,f_grnd_acx,f_grnd_acy,dx,method,beta_gl_stag)
         ! taud = rho_ice*g*H_ice
         ! Calculate driving stress on staggered grid points, with 
@@ -1043,7 +1042,7 @@ end if
 
                 else 
 
-                    write(*,*) "calc_driving_stress_gl_ac:: Error: Wrong choice of beta_gl_stag for this method."
+                    write(*,*) "calc_driving_stress_gl:: Error: Wrong choice of beta_gl_stag for this method."
                     stop 
 
                 end if 
@@ -1233,7 +1232,7 @@ end if
 
         return 
 
-    end subroutine calc_driving_stress_gl_ac 
+    end subroutine calc_driving_stress_gl 
 
     function integrate_gl_driving_stress_linear(H_ice,H_ice1,z_bed,z_bed1,z_sl,z_sl1,dx) result(taud)
         ! Compute the driving stress for the grounding line more precisely (subgrid)

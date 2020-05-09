@@ -193,6 +193,13 @@ contains
                 H_ice(:,1)  = 0.0
                 H_ice(:,ny) = 0.0
 
+            case("periodic") 
+
+                H_ice(1,:)  = H_ice(nx-1,:) 
+                H_ice(nx,:) = H_ice(2,:) 
+                H_ice(:,1)  = H_ice(:,ny-1) 
+                H_ice(:,ny) = H_ice(:,2) 
+                
             case("EISMINT")
 
                 ! Set border values to zero

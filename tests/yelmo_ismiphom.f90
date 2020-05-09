@@ -19,7 +19,7 @@ program yelmo_ismiphom
     integer    :: n  
 
     character(len=56) :: grid_name, L_str
-    real(prec) :: L, dx  
+    real(prec) :: L, dx, x0, alpha, omega    
     integer    :: nx  
 
     real(8) :: cpu_start_time, cpu_end_time, cpu_dtime  
@@ -55,15 +55,13 @@ program yelmo_ismiphom
 
 
     ! Define grid based on length scale and number of points in each direction (square domain)
+    x0 = 0.0_prec 
     dx = L / (nx-2)
 
+    ! Define grid name
     write(L_str,*) int(L) 
     L_str = trim(adjustl(L_str))
-
     grid_name = "ISMIPHOM-"//trim(L_str)//"KM" 
-
-    write(*,*) "grid_name = ", trim(grid_name) 
-    stop 
 
     ! === Initialize ice sheet model =====
 
@@ -71,25 +69,57 @@ program yelmo_ismiphom
     call yelmo_global_init(path_const)
 
     ! Next define grid 
-    call yelmo_init_grid(yelmo1%grd,grid_name,units="km",dx=dx,nx=nx,dy=dx,ny=nx)
+    call yelmo_init_grid(yelmo1%grd,grid_name,units="km",x0=x0,dx=dx,nx=nx,y0=x0,dy=dx,ny=nx)
 
     ! Initialize data objects (without loading topography, which will be defined inline below)
     call yelmo_init(yelmo1,filename=path_par,grid_def="none",time=time_init,load_topo=.FALSE.,domain=domain,grid_name=grid_name)
     
-
     ! === Define initial topography =====
 
     select case(trim(experiment))
 
         case("EXPA")
             ! Bumps
-        
-            yelmo1%bnd%z_bed  = 720.0 - 778.50*(sqrt((yelmo1%grd%x*1e-3)**2+(yelmo1%grd%y*1e-3)**2))/750.0
-            yelmo1%tpo%now%H_ice  = 100.0
-            yelmo1%tpo%now%z_srf  = yelmo1%bnd%z_bed + yelmo1%tpo%now%H_ice
+            
+            alpha = 0.5*pi/180.0_prec   ! [rad] 
+            omega = 2.0_prec*pi / L     ! [rad/km]
 
-!             where(yelmo1%bnd%z_bed .lt. 0.0) yelmo1%bnd%smb = 0.0 
+            yelmo1%tpo%now%z_srf = -(yelmo1%grd%x*1e-3) * tan(alpha)
+            yelmo1%bnd%z_bed     = yelmo1%tpo%now%z_srf - 1000.0 + 500.0 * sin(omega*yelmo1%grd%x*1e-3) * sin(omega*yelmo1%grd%y*1e-3)
+
+            yelmo1%tpo%now%H_ice = yelmo1%tpo%now%z_srf - yelmo1%bnd%z_bed
+            
+            yelmo1%tpo%par%topo_fixed   = .TRUE. 
+            yelmo1%dyn%par%diva_no_slip = .TRUE. 
+
+            ! Not used in this experiment, but set it to a constant value anyway
+            yelmo1%dyn%par%beta_method = -1 
+            yelmo1%dyn%now%beta = 1000.0
+
+        case("EXPC")
+            ! Bumps
+            
+            alpha = 0.1*pi/180.0_prec   ! [rad] 
+            omega = 2.0_prec*pi / L     ! [rad/km]
+
+            yelmo1%tpo%now%z_srf = -(yelmo1%grd%x*1e-3) * tan(alpha)
+            yelmo1%bnd%z_bed     = yelmo1%tpo%now%z_srf - 1000.0
+
+            yelmo1%tpo%now%H_ice = yelmo1%tpo%now%z_srf - yelmo1%bnd%z_bed
         
+            yelmo1%tpo%par%topo_fixed   = .TRUE. 
+            yelmo1%dyn%par%diva_no_slip = .FALSE. 
+
+            yelmo1%dyn%par%beta_method = -1 
+            yelmo1%dyn%now%beta = 1000.0 + 1000.0 * sin(omega*yelmo1%grd%x*1e-3) * sin(omega*yelmo1%grd%y*1e-3)
+
+        case("EXPF") 
+
+            ! to do... 
+            
+            ! Ensure that topo_fixed is set to False here (the model will evolve) 
+            yelmo1%tpo%par%topo_fixed = .FALSE. 
+
         case DEFAULT 
 
             write(*,*) "ismiphom:: Error: experiment not recognized for topography definition."
@@ -101,14 +131,14 @@ program yelmo_ismiphom
 
     ! Load boundary values
 
-    yelmo1%bnd%z_sl     = 0.0
+    yelmo1%bnd%z_sl     = -2000.0       ! Set sea level to a very negative value to avoid allowing floating ice 
     yelmo1%bnd%bmb_shlf = 0.0  
     yelmo1%bnd%T_shlf   = T0  
     yelmo1%bnd%H_sed    = 0.0 
-
-    yelmo1%bnd%T_srf = 223.15 
-    yelmo1%bnd%Q_geo = 42.0 
-    yelmo1%bnd%smb   = 1.0
+    yelmo1%bnd%T_srf    = 260.0         ! Random filler values, not used
+    yelmo1%bnd%Q_geo    = 50.0          ! Random filler values, not used
+    
+    yelmo1%bnd%smb      = 0.0           ! Used for EXPF
 
     ! Check boundary values 
     call yelmo_print_bound(yelmo1%bnd)

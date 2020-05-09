@@ -14,6 +14,7 @@ module velocity_diva
 
         character(len=256) :: ssa_solver_opt 
         character(len=256) :: boundaries 
+        logical    :: diva_no_slip 
         integer    :: beta_method
         real(prec) :: beta_const
         real(prec) :: beta_q                ! Friction law exponent
@@ -155,8 +156,7 @@ contains
             call calc_F_integral(F2,visc_eff,H_ice,zeta_aa,n=2.0_prec)
             
             ! Calculate effective beta 
-            call calc_beta_eff(beta_eff,beta,ux_b,uy_b,F2,zeta_aa,no_slip=.FALSE.)
-            !beta_eff = beta 
+            call calc_beta_eff(beta_eff,beta,ux_b,uy_b,F2,zeta_aa,no_slip=par%diva_no_slip)
 
             ! Stagger beta and beta_eff 
             call stagger_beta(beta_acx,beta_acy,beta,f_grnd,f_grnd_acx,f_grnd_acy,par%beta_gl_stag)
@@ -171,7 +171,7 @@ if (.TRUE.) then
                 call update_ssa_mask_convergence(ssa_mask_acx,ssa_mask_acy,ssa_err_acx,ssa_err_acy,err_lim=real(1e-3,prec)) 
             end if 
 end if 
-
+            
             call calc_vxy_ssa_matrix(ux_bar,uy_bar,beta_eff_acx,beta_eff_acy,visc_eff_int,ssa_mask_acx,ssa_mask_acy,H_ice, &
                                 taud_acx,taud_acy,H_grnd,z_sl,z_bed,dx,dy,par%ssa_vel_max,par%boundaries,par%ssa_solver_opt)
 
@@ -196,6 +196,16 @@ end if
 
             ! Calculate basal velocity from depth-averaged solution and basal stress
             call calc_vel_basal(ux_b,uy_b,ux_bar,uy_bar,F2,taub_acx,taub_acy,H_ice)
+
+            if (trim(par%boundaries) .eq. "ISMIPHOM") then 
+                ! Apply periodic boundary conditions to velocity solutions 
+
+!                 call set_boundaries_periodic(ux_bar,uy_bar,xdir=.TRUE.,ydir=.TRUE.)
+!                 call set_boundaries_periodic(ux_b,uy_b,xdir=.TRUE.,ydir=.TRUE.)
+                
+                call set_boundaries_periodic(taub_acx,taub_acy,xdir=.TRUE.,ydir=.TRUE.)
+
+            end if 
 
             ! Exit iterations if ssa solution has converged
             if (is_converged) exit 
@@ -577,13 +587,14 @@ end if
         ! Subroutine calculates neighborhood weights such 
         ! that only ice covered neighbor points are used. 
         ! Inputs in order: [H_ice(i,j),H_ice(i-1,j),H_ice(i+1,j),H_ice(i,j-1),H_ice(i,j+1)]
-        
+
         implicit none 
 
         real(prec), intent(OUT) :: wts(:) 
         real(prec), intent(IN)  :: H_ice(:) 
 
-
+        ! Local variables 
+!         real(prec), parameter  :: wts_ref(5) 
 
         return 
 
@@ -883,5 +894,44 @@ end if
         return 
 
     end subroutine limit_vel
+
+    subroutine set_boundaries_periodic(varx,vary,xdir,ydir)
+
+        implicit none 
+
+        real(prec), intent(INOUT)    :: varx(:,:) 
+        real(prec), intent(INOUT)    :: vary(:,:) 
+        logical,    intent(IN)       :: xdir 
+        logical,    intent(IN)       :: ydir 
+
+        ! Local variables 
+        integer :: nx, ny 
+
+        nx = size(varx,1) 
+        ny = size(varx,2) 
+
+        if (xdir) then
+
+            varx(1,:)    = varx(nx-2,:) 
+            varx(nx-1,:) = varx(2,:) 
+            varx(nx,:)   = varx(3,:) 
+            varx(:,1)    = varx(:,ny-1)
+            varx(:,ny)   = varx(:,2) 
+
+        end if 
+
+        if (ydir) then
+
+            vary(1,:)    = vary(nx-1,:) 
+            vary(nx,:)   = vary(2,:) 
+            vary(:,1)    = vary(:,ny-2)
+            vary(:,ny-1) = vary(:,2) 
+            vary(:,ny)   = vary(:,3)
+
+        end if
+
+        return 
+
+    end subroutine set_boundaries_periodic
 
 end module velocity_diva

@@ -62,7 +62,7 @@ contains
         logical, allocatable    :: is_front_2(:,:)  
         real(prec), allocatable :: vis_int_g(:,:) 
         real(prec), allocatable :: vis_int_sgxy(:,:)  
-        logical :: is_mismip 
+        logical :: is_mismip, is_periodic  
         integer :: n_check 
 
 ! Include header for lis solver fortran interface
@@ -81,6 +81,9 @@ contains
         is_mismip = .FALSE. 
         if (trim(boundaries) .eq. "MISMIP3D") is_mismip = .TRUE. 
 
+        is_periodic = .FALSE. 
+        if (trim(boundaries) .eq. "ISMIPHOM") is_periodic = .TRUE. 
+        
         nx = size(H_ice,1)
         ny = size(H_ice,2)
         
@@ -159,10 +162,10 @@ contains
 
         do i=1, nx
         do j=1, ny
-           n2i(n)    = i
-           n2j(n)    = j
-           ij2n(i,j) = n
-           n=n+1
+            n2i(n)    = i
+            n2j(n)    = j
+            ij2n(i,j) = n
+            n=n+1
         end do
         end do
 
@@ -185,668 +188,819 @@ contains
 
         k = 0
 
-do n=1, nmax-1, 2
+        do n=1, nmax-1, 2
 
-   i = n2i((n+1)/2)
-   j = n2j((n+1)/2)
+            i = n2i((n+1)/2)
+            j = n2j((n+1)/2)
 
-!  ------ Equations for vx_m (at (i+1/2,j))
+            !  ------ Equations for vx_m (at (i+1/2,j))
 
-   nr = n   ! row counter
+            nr = n   ! row counter
 
-    if ( (i /= nx).and.(j /= 1).and.(j /= ny) ) then
-      ! inner point on the staggered grid in x-direction
+            ! Set current boundary variables for later access
+            beta_now = beta_acx(i,j) 
+            taud_now = taud_acx(i,j) 
 
-      beta_now  = beta_acx(i,j) 
-      taud_now  = taud_acx(i,j) 
+            ! == Treat special cases first ==
 
-      if (is_mismip .and. i == 1) then
-            ! MISMIP3D: free-slip border, vx = neighbor vx
+            if (i .eq. nx) then 
+                ! Right boundary 
+ 
+                if (is_periodic) then
+                    ! Periodic boundary condition, take velocity from one point
+                    ! interior to the left-border, as nx-1 will be set to value
+                    ! at the left-border 
 
-            k  = k+1
-            ! if (k > n_sprs) stop ' calc_vxy_ssa_matrix: n_sprs too small!'
-            lgs_a_value(k)  = 1.0   ! diagonal element only
-            lgs_a_index(k)  = nr
+                    k = k+1
+                    lgs_a_value(k)  = 1.0   ! diagonal element only
+                    lgs_a_index(k)  = nr
 
-            lgs_b_value(nr) = 0.0
-            lgs_x_value(nr) = 0.0
-      
-      else if (ssa_mask_acx(i,j) .eq. -1) then 
-        ! Assign prescribed boundary velocity to this point
-        ! (eg for prescribed velocity corresponding to analytical grounding line flux)
+                    lgs_b_value(nr) = vx_m(3,j)
+                    lgs_x_value(nr) = vx_m(3,j)
+                
+                else 
+                    ! Assume border velocity is zero 
 
-        k  = k+1
-        ! if (k > n_sprs) stop ' calc_vxy_ssa_matrix: n_sprs too small!'
-        lgs_a_value(k)  = 1.0   ! diagonal element only
-        lgs_a_index(k)  = nr
+                    k = k+1
+                    lgs_a_value(k)  = 1.0   ! diagonal element only
+                    lgs_a_index(k)  = nr
 
-        lgs_b_value(nr) = vx_m(i,j)
-        lgs_x_value(nr) = vx_m(i,j)
-        
-      ! === Proceed with normal ssa checks =================
-      
-      else if (ssa_mask_acx(i,j) .gt. 0) then 
+                    lgs_b_value(nr) = 0.0
+                    lgs_x_value(nr) = 0.0
 
-        if ( &
-              ( is_front_1(i,j).and.is_front_2(i+1,j) ) &
-              .or. &
-              ( is_front_2(i,j).and.is_front_1(i+1,j) ) &
-            ) then
-            ! one neighbour is ice-covered and the other is ice-free
-            ! (calving front, grounded ice front)
+                end if 
 
-           if (is_front_1(i,j)) then
-              i1 = i     ! ice-front marker
-           else   ! is_front_1(i+1,j)==.true.
-              i1 = i+1   ! ice-front marker 
-           end if
+            else if (j .eq. 1) then 
+                ! Lower boundary 
 
-           if (.not.( is_front_2(i1-1,j) &
-                      .and. &
-                      is_front_2(i1+1,j) ) ) then
-              ! discretization of the x-component of the BC
+                if (is_mismip) then
+                    ! MISMIP3D: free-slip border, vx = neighbor vx
 
-              nc = 2*ij2n(i1-1,j)-1
-                       ! smallest nc (column counter), for vx_m(i1-1,j)
-              k  = k+1
-              lgs_a_value(k) = -4.0_prec*inv_dxi*vis_int_g(i1,j)
-              lgs_a_index(k) = nc
+                    k = k+1
+                    lgs_a_value(k)  = 1.0   ! diagonal element only
+                    lgs_a_index(k)  = nr
 
-              nc = 2*ij2n(i1,j-1)
-                       ! next nc (column counter), for vy_m(i1,j-1)
-              k  = k+1
-              lgs_a_value(k) = -2.0_prec*inv_deta*vis_int_g(i1,j)
-              lgs_a_index(k) = nc
-
-              nc = 2*ij2n(i1,j)-1
-                       ! next nc (column counter), for vx_m(i1,j)
-              k  = k+1
-              lgs_a_value(k) = 4.0_prec*inv_dxi*vis_int_g(i1,j)
-              lgs_a_index(k) = nc
-
-              nc = 2*ij2n(i1,j)
-                       ! largest nc (column counter), for vy_m(i1,j)
-              k  = k+1
-              lgs_a_value(k) = 2.0_prec*inv_deta*vis_int_g(i1,j)
-              lgs_a_index(k) = nc
-
-              !lgs_b_value(nr) = factor_rhs_2*H_ice(i1,j)*H_ice(i1,j)
-
-              ! =========================================================
-              ! Generalized solution for all ice fronts (floating and grounded)
-
-              if (z_sl(i1,j)-z_bed(i1,j) .gt. 0.0) then 
-                ! Bed below sea level 
-                  H_ocn_now = min(rho_ice/rho_sw*H_ice(i1,j), &    ! Flotation depth 
-                                  z_sl(i1,j)-z_bed(i1,j))            ! Grounded depth 
-
-              else 
-                ! Bed above sea level 
-                H_ocn_now = 0.0 
-
-              end if 
-
-              H_ice_now = H_ice(i1,j)
-
-              lgs_b_value(nr) = factor_rhs_3a*H_ice_now*H_ice_now &
-                              - factor_rhs_3b*H_ocn_now*H_ocn_now
-
-!               if (i .eq. 80 .and. j .eq. 70) then 
-!                 ! Margin point
-!                 write(*,*) "front ", vx_m(i1,j), vx_m(i1-1,j), vy_m(i1,j), vy_m(i1,j-1)
-!                 write(*,*) "front ",vx_m(i1,j)-vx_m(i1-1,j), vy_m(i1,j)-vy_m(i1,j-1)
-!                 write(*,*) "front ",4.0_prec*inv_dxi*vis_int_g(i1,j)*(vx_m(i1,j)-vx_m(i1-1,j))
-!                 write(*,*) "front ",2.0_prec*inv_deta*vis_int_g(i1,j)*(vy_m(i1,j)-vy_m(i1,j-1))
-!                 write(*,*) "front ",lgs_b_value(nr), &
-!                   4.0_prec*inv_dxi*vis_int_g(i1,j)*(vx_m(i1,j)-vx_m(i1-1,j)) &
-!                 + 2.0_prec*inv_deta*vis_int_g(i1,j)*(vy_m(i1,j)-vy_m(i1,j-1)) &
-!                 - lgs_b_value(nr)
-!                 write(*,*) "front ", H_ice(i1-1,j+1), H_ice(i1,j+1), H_ice(i1+1,j+1)
-!                 write(*,*) "front ", H_ice(i1-1,j),   H_ice(i1,j),   H_ice(i1+1,j)
-!                 write(*,*) "front ", H_ice(i1-1,j-1), H_ice(i1,j-1), H_ice(i1+1,j-1)
-!                 write(*,*) "front "  
-!               end if 
-
-!               if (abs(vx_m(i,j)) .gt. 4e3) then 
-!                 write(*,*) "ssaxcf:", H_ice(i1,j), H_ocn_now/H_ice(i1,j), vx_m(i,j), vis_int_g(i1,j)
-!               else if (abs(vx_m(i,j)) .lt. 0.5e3) then 
-!                 write(*,*) "ssaxcs:", H_ice(i1,j), H_ocn_now/H_ice(i1,j), vx_m(i,j), vis_int_g(i1,j)
-!               end if 
-
-              ! =========================================================
-              
-              lgs_x_value(nr) = vx_m(i,j)
-              
-           else   !      (is_front_2(i1-1,j)==.true.)
-                  ! .and.(is_front_2(i1+1,j)==.true.);
-                  ! velocity assumed to be zero
-
-              k  = k+1
-              lgs_a_value(k) = 1.0_prec   ! diagonal element only
-              lgs_a_index(k) = nr
-
-              lgs_b_value(nr) = 0.0_prec
-
-              lgs_x_value(nr) = 0.0_prec
-
-           end if 
-
-        else if ( &
-                  ( (maske(i,j)==3).and.(maske(i+1,j)==1) ) &
-                  .or. &
-                  ( (maske(i,j)==1).and.(maske(i+1,j)==3) ) &
-                ) then
-                ! one neighbour is floating ice and the other is ice-free land;
-                ! velocity assumed to be zero
-
-           k  = k+1
-           ! if (k > n_sprs) stop ' >>> calc_vxy_ssa_matrix: n_sprs too small!'
-           lgs_a_value(k) = 1.0_prec   ! diagonal element only
-           lgs_a_index(k) = nr
-
-           lgs_b_value(nr) = 0.0_prec
-
-           lgs_x_value(nr) = 0.0_prec
-
-        else
-            ! inner shelfy stream or floating ice 
-
-            if (i .eq. 1) then  ! ajr: filler to avoid LIS errors 
-              k  = k+1
-              lgs_a_value(k) = 1.0 
-              lgs_a_index(k) = nr 
-            else 
-              nc = 2*ij2n(i-1,j)-1
-                     ! smallest nc (column counter), for vx_m(i-1,j)
-              k  = k+1
-              ! if (k > n_sprs) stop ' >>> calc_vxy_ssa_matrix: n_sprs too small!'
-              lgs_a_value(k) = 4.0_prec*inv_dxi2*vis_int_g(i,j)
-              lgs_a_index(k) = nc
-            end if 
-
-            nc = 2*ij2n(i,j-1)-1
-                     ! next nc (column counter), for vx_m(i,j-1)
-            k  = k+1
-            ! if (k > n_sprs) stop ' >>> calc_vxy_ssa_matrix: n_sprs too small!'
-            lgs_a_value(k) = inv_deta2*vis_int_sgxy(i,j-1)
-            lgs_a_index(k) = nc
-
-            nc = 2*ij2n(i,j-1)
-                     ! next nc (column counter), for vy_m(i,j-1)
-            k  = k+1
-            ! if (k > n_sprs) stop ' >>> calc_vxy_ssa_matrix: n_sprs too small!'
-            lgs_a_value(k) = inv_dxi_deta &
-                                    *(2.0_prec*vis_int_g(i,j)+vis_int_sgxy(i,j-1))
-            lgs_a_index(k) = nc
-
-            nc = 2*ij2n(i,j)-1
-                     ! next nc (column counter), for vx_m(i,j)
-!             if (nc /= nr) then   ! (diagonal element)
-!                errormsg = ' >>> calc_vxy_ssa_matrix: ' &
-!                              //'Check for diagonal element failed!'
-!                call error(errormsg)
-!             end if
-            k  = k+1
-            ! if (k > n_sprs) stop ' >>> calc_vxy_ssa_matrix: n_sprs too small!'
-            lgs_a_value(k) = -4.0_prec*inv_dxi2 &
-                                    *(vis_int_g(i+1,j)+vis_int_g(i,j)) &
-                             -inv_deta2 &
-                                    *(vis_int_sgxy(i,j)+vis_int_sgxy(i,j-1)) &
-                             -beta_now
-            lgs_a_index(k) = nc
-
-            nc = 2*ij2n(i,j)
-                     ! next nc (column counter), for vy_m(i,j)
-            k  = k+1
-            ! if (k > n_sprs) stop ' >>> calc_vxy_ssa_matrix: n_sprs too small!'
-            lgs_a_value(k) = -inv_dxi_deta &
-                                    *(2.0_prec*vis_int_g(i,j)+vis_int_sgxy(i,j))
-            lgs_a_index(k) = nc
-
-            nc = 2*ij2n(i,j+1)-1
-                     ! next nc (column counter), for vx_m(i,j+1)
-            k  = k+1
-            ! if (k > n_sprs) stop ' >>> calc_vxy_ssa_matrix: n_sprs too small!'
-            lgs_a_value(k) = inv_deta2*vis_int_sgxy(i,j)
-            lgs_a_index(k) = nc
-
-            nc = 2*ij2n(i+1,j-1)
-                     ! next nc (column counter), for vy_m(i+1,j-1)
-            k  = k+1
-            ! if (k > n_sprs) stop ' >>> calc_vxy_ssa_matrix: n_sprs too small!'
-            lgs_a_value(k) = -inv_dxi_deta &
-                                  *(2.0_prec*vis_int_g(i+1,j)+vis_int_sgxy(i,j-1))
-            lgs_a_index(k) = nc
-
-            nc = 2*ij2n(i+1,j)-1
-                     ! next nc (column counter), for vx_m(i+1,j)
-            k  = k+1
-            ! if (k > n_sprs) stop ' >>> calc_vxy_ssa_matrix: n_sprs too small!'
-            lgs_a_value(k) = 4.0_prec*inv_dxi2*vis_int_g(i+1,j)
-            lgs_a_index(k) = nc
-
-            nc = 2*ij2n(i+1,j)
-                     ! largest nc (column counter), for vy_m(i+1,j)
-            k  = k+1
-            ! if (k > n_sprs) stop ' >>> calc_vxy_ssa_matrix: n_sprs too small!'
-            lgs_a_value(k) = inv_dxi_deta &
-                                    *(2.0_prec*vis_int_g(i+1,j)+vis_int_sgxy(i,j))
-            lgs_a_index(k) = nc
-
-            lgs_b_value(nr) = taud_now
-
-            lgs_x_value(nr) = vx_m(i,j)
-
-        end if
-
-      else   ! neither neighbour is floating or grounded ice,
-             ! velocity assumed to be zero
-
-         k  = k+1
-         ! if (k > n_sprs) stop ' >>> calc_vxy_ssa_matrix: n_sprs too small!'
-         lgs_a_value(k) = 1.0_prec   ! diagonal element only
-         lgs_a_index(k) = nr
-
-         lgs_b_value(nr) = 0.0_prec
-
-         lgs_x_value(nr) = 0.0_prec
-
-      end if
-
-   else
-      ! boundary condition, velocity assumed to be zero (unless mismsip)
-
-        if (is_mismip .and. j == 1) then
-            ! MISMIP3D: free-slip border, vx = neighbor vx
-
-            k  = k+1
-            ! if (k > n_sprs) stop ' calc_vxy_ssa_matrix: n_sprs too small!'
-            lgs_a_value(k) = 1.0   ! diagonal element only
-            lgs_a_index(k) = nr
-
-            lgs_b_value(nr) = vx_m(i,j+1)
-            lgs_x_value(nr) = vx_m(i,j+1)
+                    lgs_b_value(nr) = vx_m(i,j+1)
+                    lgs_x_value(nr) = vx_m(i,j+1)
             
-        else if (is_mismip .and. j == ny) then
-            ! MISMIP3D: free-slip border, vx = neighbor vx
-            k  = k+1
-            ! if (k > n_sprs) stop ' calc_vxy_ssa_matrix: n_sprs too small!'
-            lgs_a_value(k) = 1.0   ! diagonal element only
-            lgs_a_index(k) = nr
+                else if (is_periodic) then 
+                    ! Periodic boundary, take velocity from the lower boundary
+                    
+                    k = k+1
+                    lgs_a_value(k)  = 1.0   ! diagonal element only
+                    lgs_a_index(k)  = nr
 
-            lgs_b_value(nr) = vx_m(i,j-1)
-            lgs_x_value(nr) = vx_m(i,j-1)
-        
-        else 
-            ! velocity assumed to be zero
+                    lgs_b_value(nr) = vx_m(i,ny-1)
+                    lgs_x_value(nr) = vx_m(i,ny-1)
 
-            k  = k+1
-            ! if (k > n_sprs) stop ' calc_vxy_ssa_matrix: n_sprs too small!'
-            lgs_a_value(k) = 1.0   ! diagonal element only
-            lgs_a_index(k) = nr
+                else 
+                    ! Assume border velocity is zero 
 
-            lgs_b_value(nr) = 0.0
+                    k = k+1
+                    lgs_a_value(k)  = 1.0   ! diagonal element only
+                    lgs_a_index(k)  = nr
 
-            lgs_x_value(nr) = 0.0
+                    lgs_b_value(nr) = 0.0
+                    lgs_x_value(nr) = 0.0
 
-        end if 
+                end if 
 
-   end if
+            else if (j .eq. ny) then 
+                ! Upper boundary 
 
-   lgs_a_ptr(nr+1) = k+1   ! row is completed, store index to next row
+                if (is_mismip) then
+                    ! MISMIP3D: free-slip border, vx = neighbor vx
 
-!  ------ Equations for vy_m (at (i,j+1/2))
+                    k = k+1
+                    lgs_a_value(k)  = 1.0   ! diagonal element only
+                    lgs_a_index(k)  = nr
 
-   nr = n+1   ! row counter
+                    lgs_b_value(nr) = vx_m(i,j-1)
+                    lgs_x_value(nr) = vx_m(i,j-1)
 
+                else if (is_periodic) then 
+                    ! Periodic boundary, take velocity from the lower boundary
+                    
+                    k = k+1
+                    lgs_a_value(k)  = 1.0   ! diagonal element only
+                    lgs_a_index(k)  = nr
 
-   if ( (j /= ny).and.(i /= 1).and.(i /= nx) ) then
-      ! inner point on the staggered grid in y-direction
+                    lgs_b_value(nr) = vx_m(i,2)
+                    lgs_x_value(nr) = vx_m(i,2)
 
-      beta_now  = beta_acy(i,j) 
-      taud_now  = taud_acy(i,j) 
+                else 
+                    ! Assume border velocity is zero 
 
-      if (is_mismip .and. j == 1) then
-            ! MISMIP3D: free-slip border, vy=0
+                    k = k+1
+                    lgs_a_value(k)  = 1.0   ! diagonal element only
+                    lgs_a_index(k)  = nr
 
-            k  = k+1
-            ! if (k > n_sprs) stop ' calc_vxy_ssa_matrix: n_sprs too small!'
-            lgs_a_value(k) = 1.0   ! diagonal element only
-            lgs_a_index(k) = nr
+                    lgs_b_value(nr) = 0.0
+                    lgs_x_value(nr) = 0.0
 
-            lgs_b_value(nr) = 0.0
-            lgs_x_value(nr) = 0.0
+                end if 
+
+            else if (i .eq. 1 .and. is_mismip) then
+                    ! MISMIP3D: free-slip border, vx = neighbor vx
+
+                k = k+1
+                lgs_a_value(k)  = 1.0   ! diagonal element only
+                lgs_a_index(k)  = nr
+
+                lgs_b_value(nr) = 0.0
+                lgs_x_value(nr) = 0.0
             
-      else if (ssa_mask_acy(i,j) .eq. -1) then 
-        ! Assign prescribed boundary velocity to this point
-        ! (eg for prescribed velocity corresponding to prescribed grounding line flux)
+            else if (i .eq. 1 .and. is_periodic) then 
+                ! Periodic boundary contion, set first point equal to 2 points in
+                ! from the left-border, since the border point is out of range 
+                ! and one point in from border is prescribed from right-border. 
 
-        ! TO DO
-        !write(*,*) "solver_ssa_sico5:: Error: prescribed boundary conditions not yet tested!"
-        !stop "solver_ssa_sico5 error, see log."
+                k = k+1
+                lgs_a_value(k)  = 1.0   ! diagonal element only
+                lgs_a_index(k)  = nr
 
-        k  = k+1
-        ! if (k > n_sprs) stop ' calc_vxy_ssa_matrix: n_sprs too small!'
-        lgs_a_value(k)  = 1.0   ! diagonal element only
-        lgs_a_index(k)  = nr
+                lgs_b_value(nr) = vx_m(nx-2,j)
+                lgs_x_value(nr) = vx_m(nx-2,j)
+            
+            else if (i .eq. nx-1 .and. is_periodic) then 
+                ! Set left-border point equal to one point in from right-border 
 
-        lgs_b_value(nr) = vy_m(i,j)
-        lgs_x_value(nr) = vy_m(i,j)
-      
-      ! === Proceed with normal ssa checks =================
+                k = k+1
+                lgs_a_value(k)  = 1.0   ! diagonal element only
+                lgs_a_index(k)  = nr
 
-      else if ( ssa_mask_acy(i,j) .gt. 0 ) then 
-          
-        if ( &
-              ( is_front_1(i,j).and.is_front_2(i,j+1) ) &
-              .or. &
-              ( is_front_2(i,j).and.is_front_1(i,j+1) ) &
-            ) then
-            ! one neighbour is ice-covered and the other is ice-free
-            ! (calving front, grounded ice front)
+                lgs_b_value(nr) = vx_m(2,j)
+                lgs_x_value(nr) = vx_m(2,j)
+                
+            else if (ssa_mask_acx(i,j) .eq. -1) then 
+                ! Assign prescribed boundary velocity to this point
+                ! (eg for prescribed velocity corresponding to analytical grounding line flux)
 
-         if (is_front_1(i,j)) then
-            j1 = j     ! ice-front marker
-         else   ! is_front_1(i,j+1)==.true.
-            j1 = j+1   ! ice-front marker
-         end if
+                k = k+1
+                lgs_a_value(k)  = 1.0   ! diagonal element only
+                lgs_a_index(k)  = nr
 
-         if (.not.( is_front_2(i,j1-1) &
-                    .and. &
-                    is_front_2(i,j1+1) ) ) then
-            ! discretization of the y-component of the BC
-
-            nc = 2*ij2n(i-1,j1)-1
-                     ! smallest nc (column counter), for vx_m(i-1,j1)
-            k  = k+1
-            lgs_a_value(k) = -2.0_prec*inv_dxi*vis_int_g(i,j1)
-            lgs_a_index(k) = nc
-
-            nc = 2*ij2n(i,j1-1)
-                     ! next nc (column counter), for vy_m(i,j1-1)
-            k  = k+1
-            lgs_a_value(k) = -4.0_prec*inv_deta*vis_int_g(i,j1)
-            lgs_a_index(k) = nc
-
-            nc = 2*ij2n(i,j1)-1
-                     ! next nc (column counter), for vx_m(i,j1)
-            k  = k+1
-            lgs_a_value(k) = 2.0_prec*inv_dxi*vis_int_g(i,j1)
-            lgs_a_index(k) = nc
-
-            nc = 2*ij2n(i,j1)
-                     ! largest nc (column counter), for vy_m(i,j1)
-            k  = k+1
-            lgs_a_value(k) = 4.0_prec*inv_deta*vis_int_g(i,j1)
-            lgs_a_index(k) = nc
-
-!             lgs_b_value(nr) = factor_rhs_2*H_ice(i,j1)*H_ice(i,j1)
-
-              ! =========================================================
-              ! Generalized solution for all ice fronts (floating and grounded)
-              
-              if (z_sl(i,j1)-z_bed(i,j1) .gt. 0.0) then 
-                ! Bed below sea level 
-                  H_ocn_now = min(rho_ice/rho_sw*H_ice(i,j1), &    ! Flotation depth 
-                                  z_sl(i,j1)-z_bed(i,j1))            ! Grounded depth 
-
-              else 
-                ! Bed above sea level 
-                H_ocn_now = 0.0 
-
-              end if 
-
-              H_ice_now = H_ice(i,j1)
-              
-               lgs_b_value(nr) = factor_rhs_3a*H_ice_now*H_ice_now &
-                               - factor_rhs_3b*H_ocn_now*H_ocn_now  
-
-              ! =========================================================
-              
-            lgs_x_value(nr) = vy_m(i,j)
+                lgs_b_value(nr) = vx_m(i,j)
+                lgs_x_value(nr) = vx_m(i,j)
+           
+            else if (ssa_mask_acx(i,j) .gt. 0) then 
+                ! === Proceed with normal ssa checks =================
+                ! inner point on the staggered grid in x-direction
+                ! ie, if ( (i /= nx).and.(j /= 1).and.(j /= ny) ) then
              
-         else   !      (is_front_2(i,j1-1)==.true.)
-                ! .and.(is_front_2(i,j1+1)==.true.);
-                ! velocity assumed to be zero
+                if (  ( is_front_1(i,j).and.is_front_2(i+1,j) ) &
+                      .or. &
+                      ( is_front_2(i,j).and.is_front_1(i+1,j) ) &
+                    ) then
+                    ! one neighbour is ice-covered and the other is ice-free
+                    ! (calving front, grounded ice front)
 
-            k  = k+1
-            lgs_a_value(k) = 1.0_prec   ! diagonal element only
-            lgs_a_index(k) = nr
+                    if (is_front_1(i,j)) then
+                        i1 = i     ! ice-front marker
+                    else   ! is_front_1(i+1,j)==.true.
+                        i1 = i+1   ! ice-front marker 
+                    end if
+    
+                    if (.not.( is_front_2(i1-1,j) .and. is_front_2(i1+1,j) ) ) then
+                        ! discretization of the x-component of the BC
 
-            lgs_b_value(nr) = 0.0_prec
+                        nc = 2*ij2n(i1-1,j)-1
+                               ! smallest nc (column counter), for vx_m(i1-1,j)
+                        k  = k+1
+                        lgs_a_value(k) = -4.0_prec*inv_dxi*vis_int_g(i1,j)
+                        lgs_a_index(k) = nc
 
-            lgs_x_value(nr) = 0.0_prec
+                        nc = 2*ij2n(i1,j-1)
+                               ! next nc (column counter), for vy_m(i1,j-1)
+                        k  = k+1
+                        lgs_a_value(k) = -2.0_prec*inv_deta*vis_int_g(i1,j)
+                        lgs_a_index(k) = nc
 
-         end if
+                        nc = 2*ij2n(i1,j)-1
+                               ! next nc (column counter), for vx_m(i1,j)
+                        k  = k+1
+                        lgs_a_value(k) = 4.0_prec*inv_dxi*vis_int_g(i1,j)
+                        lgs_a_index(k) = nc
 
-        else if ( &
-                ( (maske(i,j)==3).and.(maske(i,j+1)==1) ) &
-                .or. &
-                ( (maske(i,j)==1).and.(maske(i,j+1)==3) ) &
-              ) then
-           ! one neighbour is floating ice and the other is ice-free land;
-           ! velocity assumed to be zero
+                        nc = 2*ij2n(i1,j)
+                               ! largest nc (column counter), for vy_m(i1,j)
+                        k  = k+1
+                        lgs_a_value(k) = 2.0_prec*inv_deta*vis_int_g(i1,j)
+                        lgs_a_index(k) = nc
 
-           k  = k+1
-           ! if (k > n_sprs) stop ' >>> calc_vxy_ssa_matrix: n_sprs too small!'
-           lgs_a_value(k) = 1.0_prec   ! diagonal element only
-           lgs_a_index(k) = nr
+                        !lgs_b_value(nr) = factor_rhs_2*H_ice(i1,j)*H_ice(i1,j)
 
-           lgs_b_value(nr) = 0.0_prec
+                        ! =========================================================
+                        ! Generalized solution for all ice fronts (floating and grounded)
 
-           lgs_x_value(nr) = 0.0_prec
+                        if (z_sl(i1,j)-z_bed(i1,j) .gt. 0.0) then 
+                        ! Bed below sea level 
+                          H_ocn_now = min(rho_ice/rho_sw*H_ice(i1,j), &    ! Flotation depth 
+                                          z_sl(i1,j)-z_bed(i1,j))            ! Grounded depth 
 
-        else
-            ! inner shelfy stream or floating ice 
+                        else 
+                        ! Bed above sea level 
+                        H_ocn_now = 0.0 
 
-            nc = 2*ij2n(i-1,j)-1
-                     ! smallest nc (column counter), for vx_m(i-1,j)
-            k  = k+1
-            ! if (k > n_sprs) stop ' >>> calc_vxy_ssa_matrix: n_sprs too small!'
-            lgs_a_value(k) = inv_dxi_deta &
-                                    *(2.0_prec*vis_int_g(i,j)+vis_int_sgxy(i-1,j))
-            lgs_a_index(k) = nc
+                        end if 
 
-            nc = 2*ij2n(i-1,j)
-                     ! next nc (column counter), for vy_m(i-1,j)
-            k  = k+1
-            ! if (k > n_sprs) stop ' >>> calc_vxy_ssa_matrix: n_sprs too small!'
-            lgs_a_value(k) = inv_dxi2*vis_int_sgxy(i-1,j)
-            lgs_a_index(k) = nc
+                        H_ice_now = H_ice(i1,j)
 
-            nc = 2*ij2n(i-1,j+1)-1
-                     ! next nc (column counter), for vx_m(i-1,j+1)
-            k  = k+1
-            ! if (k > n_sprs) stop ' >>> calc_vxy_ssa_matrix: n_sprs too small!'
-            lgs_a_value(k) = -inv_dxi_deta &
-                                  *(2.0_prec*vis_int_g(i,j+1)+vis_int_sgxy(i-1,j))
-            lgs_a_index(k) = nc
+                        lgs_b_value(nr) = factor_rhs_3a*H_ice_now*H_ice_now &
+                                      - factor_rhs_3b*H_ocn_now*H_ocn_now
 
-            if (j .eq. 1) then  ! ajr: filler to avoid LIS errors 
-              k  = k+1
-              lgs_a_value(k) = 1.0   ! diagonal element only
-              lgs_a_index(k) = nr
-            else
-              nc = 2*ij2n(i,j-1)
-                       ! next nc (column counter), for vy_m(i,j-1)
-              k  = k+1
-              ! if (k > n_sprs) stop ' >>> calc_vxy_ssa_matrix: n_sprs too small!'
-              lgs_a_value(k) = 4.0_prec*inv_deta2*vis_int_g(i,j)
-              lgs_a_index(k) = nc
-            end if 
+!                         if (i .eq. 80 .and. j .eq. 70) then 
+!                             ! Margin point
+!                             write(*,*) "front ", vx_m(i1,j), vx_m(i1-1,j), vy_m(i1,j), vy_m(i1,j-1)
+!                             write(*,*) "front ",vx_m(i1,j)-vx_m(i1-1,j), vy_m(i1,j)-vy_m(i1,j-1)
+!                             write(*,*) "front ",4.0_prec*inv_dxi*vis_int_g(i1,j)*(vx_m(i1,j)-vx_m(i1-1,j))
+!                             write(*,*) "front ",2.0_prec*inv_deta*vis_int_g(i1,j)*(vy_m(i1,j)-vy_m(i1,j-1))
+!                             write(*,*) "front ",lgs_b_value(nr), &
+!                             4.0_prec*inv_dxi*vis_int_g(i1,j)*(vx_m(i1,j)-vx_m(i1-1,j)) &
+!                             + 2.0_prec*inv_deta*vis_int_g(i1,j)*(vy_m(i1,j)-vy_m(i1,j-1)) &
+!                             - lgs_b_value(nr)
+!                             write(*,*) "front ", H_ice(i1-1,j+1), H_ice(i1,j+1), H_ice(i1+1,j+1)
+!                             write(*,*) "front ", H_ice(i1-1,j),   H_ice(i1,j),   H_ice(i1+1,j)
+!                             write(*,*) "front ", H_ice(i1-1,j-1), H_ice(i1,j-1), H_ice(i1+1,j-1)
+!                             write(*,*) "front "  
+!                         end if 
 
-            nc = 2*ij2n(i,j)-1
-                     ! next nc (column counter), for vx_m(i,j)
-            k  = k+1
-            ! if (k > n_sprs) stop ' >>> calc_vxy_ssa_matrix: n_sprs too small!'
-            lgs_a_value(k) = -inv_dxi_deta &
+!                         if (abs(vx_m(i,j)) .gt. 4e3) then 
+!                             write(*,*) "ssaxcf:", H_ice(i1,j), H_ocn_now/H_ice(i1,j), vx_m(i,j), vis_int_g(i1,j)
+!                         else if (abs(vx_m(i,j)) .lt. 0.5e3) then 
+!                             write(*,*) "ssaxcs:", H_ice(i1,j), H_ocn_now/H_ice(i1,j), vx_m(i,j), vis_int_g(i1,j)
+!                         end if 
+
+                        ! =========================================================
+              
+                        lgs_x_value(nr) = vx_m(i,j)
+              
+                    else    ! (is_front_2(i1-1,j)==.true.).and.(is_front_2(i1+1,j)==.true.);
+                            ! velocity assumed to be zero
+
+                        k = k+1
+                        lgs_a_value(k)  = 1.0_prec   ! diagonal element only
+                        lgs_a_index(k)  = nr
+
+                        lgs_b_value(nr) = 0.0_prec
+                        lgs_x_value(nr) = 0.0_prec
+
+                    end if 
+
+                else if ( ( (maske(i,j)==3).and.(maske(i+1,j)==1) ) &
+                          .or. &
+                          ( (maske(i,j)==1).and.(maske(i+1,j)==3) ) &
+                        ) then
+                        ! one neighbour is floating ice and the other is ice-free land;
+                        ! velocity assumed to be zero
+
+                    k = k+1
+                    lgs_a_value(k)  = 1.0_prec   ! diagonal element only
+                    lgs_a_index(k)  = nr
+
+                    lgs_b_value(nr) = 0.0_prec
+                    lgs_x_value(nr) = 0.0_prec
+
+                else
+                    ! inner shelfy stream or floating ice 
+
+                    if (i .eq. 1) then  ! ajr: filler to avoid LIS errors 
+                        k  = k+1
+                        lgs_a_value(k) = 1.0 
+                        lgs_a_index(k) = nr 
+                    else 
+                        nc = 2*ij2n(i-1,j)-1
+                            ! smallest nc (column counter), for vx_m(i-1,j)
+                        k = k+1
+                        lgs_a_value(k) = 4.0_prec*inv_dxi2*vis_int_g(i,j)
+                        lgs_a_index(k) = nc
+                    end if 
+
+                    nc = 2*ij2n(i,j-1)-1
+                        ! next nc (column counter), for vx_m(i,j-1)
+                    k = k+1
+                    lgs_a_value(k) = inv_deta2*vis_int_sgxy(i,j-1)
+                    lgs_a_index(k) = nc
+
+                    nc = 2*ij2n(i,j-1)
+                        ! next nc (column counter), for vy_m(i,j-1)
+                    k = k+1
+                    lgs_a_value(k) = inv_dxi_deta &
+                                    *(2.0_prec*vis_int_g(i,j)+vis_int_sgxy(i,j-1))
+                    lgs_a_index(k) = nc
+
+                    nc = 2*ij2n(i,j)-1
+                        ! next nc (column counter), for vx_m(i,j)
+!                     if (nc /= nr) then   ! (diagonal element)
+!                         errormsg = ' >>> calc_vxy_ssa_matrix: ' &
+!                                      //'Check for diagonal element failed!'
+!                         call error(errormsg)
+!                     end if
+                    k = k+1
+                    lgs_a_value(k) = -4.0_prec*inv_dxi2 &
+                                            *(vis_int_g(i+1,j)+vis_int_g(i,j)) &
+                                     -inv_deta2 &
+                                            *(vis_int_sgxy(i,j)+vis_int_sgxy(i,j-1)) &
+                                     -beta_now
+                    lgs_a_index(k) = nc
+
+                    nc = 2*ij2n(i,j)
+                        ! next nc (column counter), for vy_m(i,j)
+                    k = k+1
+                    lgs_a_value(k) = -inv_dxi_deta &
                                     *(2.0_prec*vis_int_g(i,j)+vis_int_sgxy(i,j))
-            lgs_a_index(k) = nc
+                    lgs_a_index(k) = nc
 
-            nc = 2*ij2n(i,j)
-                     ! next nc (column counter), for vy_m(i,j)
-!             if (nc /= nr) then   ! (diagonal element)
-!                errormsg = ' >>> calc_vxy_ssa_matrix: ' &
-!                              //'Check for diagonal element failed!'
-!                call error(errormsg)
-!             end if
-            k  = k+1
-            ! if (k > n_sprs) stop ' >>> calc_vxy_ssa_matrix: n_sprs too small!'
-            lgs_a_value(k) = -4.0_prec*inv_deta2 &
-                                    *(vis_int_g(i,j+1)+vis_int_g(i,j)) &
-                             -inv_dxi2 &
-                                    *(vis_int_sgxy(i,j)+vis_int_sgxy(i-1,j)) &
-                             -beta_now
-            lgs_a_index(k) = nc
+                    nc = 2*ij2n(i,j+1)-1
+                        ! next nc (column counter), for vx_m(i,j+1)
+                    k = k+1
+                    lgs_a_value(k) = inv_deta2*vis_int_sgxy(i,j)
+                    lgs_a_index(k) = nc
 
-            nc = 2*ij2n(i,j+1)-1
-                     ! next nc (column counter), for vx_m(i,j+1)
-            k  = k+1
-            ! if (k > n_sprs) stop ' >>> calc_vxy_ssa_matrix: n_sprs too small!'
-            lgs_a_value(k) = inv_dxi_deta &
+                    nc = 2*ij2n(i+1,j-1)
+                        ! next nc (column counter), for vy_m(i+1,j-1)
+                    k  = k+1
+                    lgs_a_value(k) = -inv_dxi_deta &
+                                  *(2.0_prec*vis_int_g(i+1,j)+vis_int_sgxy(i,j-1))
+                    lgs_a_index(k) = nc
+
+                    nc = 2*ij2n(i+1,j)-1
+                        ! next nc (column counter), for vx_m(i+1,j)
+                    k = k+1
+                    lgs_a_value(k) = 4.0_prec*inv_dxi2*vis_int_g(i+1,j)
+                    lgs_a_index(k) = nc
+
+                    nc = 2*ij2n(i+1,j)
+                        ! largest nc (column counter), for vy_m(i+1,j)
+                    k  = k+1
+                    lgs_a_value(k) = inv_dxi_deta &
+                                    *(2.0_prec*vis_int_g(i+1,j)+vis_int_sgxy(i,j))
+                    lgs_a_index(k) = nc
+
+                    lgs_b_value(nr) = taud_now
+                    lgs_x_value(nr) = vx_m(i,j)
+
+                end if
+
+            else    ! neither neighbour is floating or grounded ice,
+                    ! velocity assumed to be zero
+
+                k = k+1
+                lgs_a_value(k) = 1.0_prec   ! diagonal element only
+                lgs_a_index(k) = nr
+
+                lgs_b_value(nr) = 0.0_prec
+                lgs_x_value(nr) = 0.0_prec
+
+            end if
+
+            lgs_a_ptr(nr+1) = k+1   ! row is completed, store index to next row
+
+            !  ------ Equations for vy_m (at (i,j+1/2))
+
+            nr = n+1   ! row counter
+
+            
+            ! Set current boundary variables for later access
+            beta_now  = beta_acy(i,j) 
+            taud_now  = taud_acy(i,j) 
+
+            ! == Treat special cases first ==
+
+            if (j .eq. ny) then 
+                ! Top boundary 
+
+                if (is_mismip) then 
+                    ! MISMIP3D: free-slip border, vy=0
+
+                    k = k+1
+                    lgs_a_value(k)  = 1.0_prec   ! diagonal element only
+                    lgs_a_index(k)  = nr
+
+                    lgs_b_value(nr) = 0.0_prec
+                    lgs_x_value(nr) = 0.0_prec
+
+                else if (is_periodic) then 
+                    ! Periodic boundary condition, take velocity from one point
+                    ! interior to the left-border, as nx-1 will be set to value
+                    ! at the left-border 
+
+                    k = k+1
+                    lgs_a_value(k)  = 1.0   ! diagonal element only
+                    lgs_a_index(k)  = nr
+
+                    lgs_b_value(nr) = vy_m(i,3)
+                    lgs_x_value(nr) = vy_m(i,3)
+                    
+                else 
+                    ! Velocity assumed to be zero
+            
+                    k = k+1
+                    lgs_a_value(k)  = 1.0_prec   ! diagonal element only
+                    lgs_a_index(k)  = nr
+
+                    lgs_b_value(nr) = 0.0_prec
+                    lgs_x_value(nr) = 0.0_prec
+
+                end if 
+                
+            else if (i .eq. 1) then 
+                ! Left boundary 
+
+                if (is_mismip) then 
+                    ! MISMIP3D: free-slip border, vy=0
+
+                    k = k+1
+                    lgs_a_value(k)  = 1.0_prec   ! diagonal element only
+                    lgs_a_index(k)  = nr
+
+                    lgs_b_value(nr) = 0.0_prec
+                    lgs_x_value(nr) = 0.0_prec
+
+                else if (is_periodic) then 
+                    ! Periodic boundary condition, set the left-border 
+                    ! equal to one point in from the right-border 
+
+                    k = k+1
+                    lgs_a_value(k)  = 1.0   ! diagonal element only
+                    lgs_a_index(k)  = nr
+
+                    lgs_b_value(nr) = vy_m(nx-1,j)
+                    lgs_x_value(nr) = vy_m(nx-1,j)
+                    
+                else 
+                    ! Velocity assumed to be zero
+            
+                    k = k+1
+                    lgs_a_value(k)  = 1.0_prec   ! diagonal element only
+                    lgs_a_index(k)  = nr
+
+                    lgs_b_value(nr) = 0.0_prec
+                    lgs_x_value(nr) = 0.0_prec
+
+                end if 
+
+            else if (i .eq. nx) then 
+                ! Right boundary 
+
+                if (is_mismip) then 
+                    ! MISMIP3D: free-slip border, vy=0
+
+                    k = k+1
+                    lgs_a_value(k)  = 1.0_prec   ! diagonal element only
+                    lgs_a_index(k)  = nr
+
+                    lgs_b_value(nr) = 0.0_prec
+                    lgs_x_value(nr) = 0.0_prec
+
+                else if (is_periodic) then 
+                    ! Periodic boundary condition, set the left-border 
+                    ! equal to one point in from the right-border 
+
+                    k = k+1
+                    lgs_a_value(k)  = 1.0   ! diagonal element only
+                    lgs_a_index(k)  = nr
+
+                    lgs_b_value(nr) = vy_m(2,j)
+                    lgs_x_value(nr) = vy_m(2,j)
+                    
+                else 
+                    ! Velocity assumed to be zero
+            
+                    k = k+1
+                    lgs_a_value(k)  = 1.0_prec   ! diagonal element only
+                    lgs_a_index(k)  = nr
+
+                    lgs_b_value(nr) = 0.0_prec
+                    lgs_x_value(nr) = 0.0_prec
+
+                end if 
+
+            else if (j .eq. 1 .and. is_mismip) then 
+                ! MISMIP3D: free-slip border, vy=0
+
+                k = k+1
+                lgs_a_value(k)  = 1.0   ! diagonal element only
+                lgs_a_index(k)  = nr
+
+                lgs_b_value(nr) = 0.0
+                lgs_x_value(nr) = 0.0
+
+            else if (j .eq. 1 .and. is_periodic) then 
+                ! Periodic boundary conditions
+
+                k = k+1
+                lgs_a_value(k)  = 1.0   ! diagonal element only
+                lgs_a_index(k)  = nr
+
+                lgs_b_value(nr) = vy_m(i,ny-2)
+                lgs_x_value(nr) = vy_m(i,ny-2)
+
+
+            else if (j .eq. ny-1 .and. is_periodic) then
+                ! Periodic boundary conditions
+
+                k = k+1
+                lgs_a_value(k)  = 1.0   ! diagonal element only
+                lgs_a_index(k)  = nr
+
+                lgs_b_value(nr) = vy_m(i,2)
+                lgs_x_value(nr) = vy_m(i,2)
+                
+            else if (ssa_mask_acy(i,j) .eq. -1) then 
+                ! Assign prescribed boundary velocity to this point
+                ! (eg for prescribed velocity corresponding to analytical grounding line flux)
+
+                k = k+1
+                lgs_a_value(k)  = 1.0   ! diagonal element only
+                lgs_a_index(k)  = nr
+
+                lgs_b_value(nr) = vy_m(i,j)
+                lgs_x_value(nr) = vy_m(i,j)
+           
+            else if (ssa_mask_acy(i,j) .gt. 0) then 
+                ! === Proceed with normal ssa checks =================
+                ! inner point on the staggered grid in y-direction
+                ! ie, if ( (j /= ny).and.(i /= 1).and.(i /= nx) ) then
+             
+                if (  ( is_front_1(i,j).and.is_front_2(i,j+1) ) &
+                      .or. &
+                      ( is_front_2(i,j).and.is_front_1(i,j+1) ) &
+                    ) then
+                    ! one neighbour is ice-covered and the other is ice-free
+                    ! (calving front, grounded ice front)
+
+                    if (is_front_1(i,j)) then
+                        j1 = j     ! ice-front marker
+                    else   ! is_front_1(i,j+1)==.true.
+                        j1 = j+1   ! ice-front marker
+                    end if
+
+                    if (.not.( is_front_2(i,j1-1) .and. is_front_2(i,j1+1) ) ) then
+                        ! discretization of the y-component of the BC
+
+                        nc = 2*ij2n(i-1,j1)-1
+                            ! smallest nc (column counter), for vx_m(i-1,j1)
+                        k = k+1
+                        lgs_a_value(k) = -2.0_prec*inv_dxi*vis_int_g(i,j1)
+                        lgs_a_index(k) = nc
+
+                        nc = 2*ij2n(i,j1-1)
+                            ! next nc (column counter), for vy_m(i,j1-1)
+                        k = k+1
+                        lgs_a_value(k) = -4.0_prec*inv_deta*vis_int_g(i,j1)
+                        lgs_a_index(k) = nc
+
+                        nc = 2*ij2n(i,j1)-1
+                            ! next nc (column counter), for vx_m(i,j1)
+                        k = k+1
+                        lgs_a_value(k) = 2.0_prec*inv_dxi*vis_int_g(i,j1)
+                        lgs_a_index(k) = nc
+
+                        nc = 2*ij2n(i,j1)
+                            ! largest nc (column counter), for vy_m(i,j1)
+                        k = k+1
+                        lgs_a_value(k) = 4.0_prec*inv_deta*vis_int_g(i,j1)
+                        lgs_a_index(k) = nc
+
+!                         lgs_b_value(nr) = factor_rhs_2*H_ice(i,j1)*H_ice(i,j1)
+
+                        ! =========================================================
+                        ! Generalized solution for all ice fronts (floating and grounded)
+              
+                        if (z_sl(i,j1)-z_bed(i,j1) .gt. 0.0) then 
+                            ! Bed below sea level 
+                            H_ocn_now = min(rho_ice/rho_sw*H_ice(i,j1), &    ! Flotation depth 
+                                          z_sl(i,j1)-z_bed(i,j1))            ! Grounded depth 
+
+                        else 
+                            ! Bed above sea level 
+                            H_ocn_now = 0.0 
+
+                        end if 
+
+                        H_ice_now = H_ice(i,j1)
+              
+                        lgs_b_value(nr) = factor_rhs_3a*H_ice_now*H_ice_now &
+                                        - factor_rhs_3b*H_ocn_now*H_ocn_now  
+
+                        ! =========================================================
+              
+                        lgs_x_value(nr) = vy_m(i,j)
+             
+                    else    ! (is_front_2(i,j1-1)==.true.).and.(is_front_2(i,j1+1)==.true.);
+                            ! velocity assumed to be zero
+
+                        k = k+1
+                        lgs_a_value(k)  = 1.0_prec   ! diagonal element only
+                        lgs_a_index(k)  = nr
+
+                        lgs_b_value(nr) = 0.0_prec
+                        lgs_x_value(nr) = 0.0_prec
+
+                    end if
+
+                else if ( ( (maske(i,j)==3).and.(maske(i,j+1)==1) ) &
+                        .or. &
+                        ( (maske(i,j)==1).and.(maske(i,j+1)==3) ) &
+                      ) then
+                    ! one neighbour is floating ice and the other is ice-free land;
+                    ! velocity assumed to be zero
+
+                    k = k+1
+                    lgs_a_value(k)  = 1.0_prec   ! diagonal element only
+                    lgs_a_index(k)  = nr
+
+                    lgs_b_value(nr) = 0.0_prec
+                    lgs_x_value(nr) = 0.0_prec
+
+                else
+                    ! inner shelfy stream or floating ice 
+
+                    nc = 2*ij2n(i-1,j)-1
+                        ! smallest nc (column counter), for vx_m(i-1,j)
+                    k = k+1
+                    lgs_a_value(k) = inv_dxi_deta &
+                                        *(2.0_prec*vis_int_g(i,j)+vis_int_sgxy(i-1,j))
+                    lgs_a_index(k) = nc
+
+                    nc = 2*ij2n(i-1,j)
+                        ! next nc (column counter), for vy_m(i-1,j)
+                    k = k+1
+                    lgs_a_value(k) = inv_dxi2*vis_int_sgxy(i-1,j)
+                    lgs_a_index(k) = nc
+
+                    nc = 2*ij2n(i-1,j+1)-1
+                        ! next nc (column counter), for vx_m(i-1,j+1)
+                    k = k+1
+                    lgs_a_value(k) = -inv_dxi_deta &
+                                          *(2.0_prec*vis_int_g(i,j+1)+vis_int_sgxy(i-1,j))
+                    lgs_a_index(k) = nc
+
+                    if (j .eq. 1) then  ! ajr: filler to avoid LIS errors 
+                        k  = k+1
+                        lgs_a_value(k) = 1.0   ! diagonal element only
+                        lgs_a_index(k) = nr
+                    else
+                        nc = 2*ij2n(i,j-1)
+                            ! next nc (column counter), for vy_m(i,j-1)
+                        k = k+1
+                        lgs_a_value(k) = 4.0_prec*inv_deta2*vis_int_g(i,j)
+                        lgs_a_index(k) = nc
+                    end if 
+
+                    nc = 2*ij2n(i,j)-1
+                        ! next nc (column counter), for vx_m(i,j)
+                    k = k+1
+                    lgs_a_value(k) = -inv_dxi_deta &
+                                            *(2.0_prec*vis_int_g(i,j)+vis_int_sgxy(i,j))
+                    lgs_a_index(k) = nc
+
+                    nc = 2*ij2n(i,j)
+                        ! next nc (column counter), for vy_m(i,j)
+!                     if (nc /= nr) then   ! (diagonal element)
+!                         errormsg = ' >>> calc_vxy_ssa_matrix: ' &
+!                                     //'Check for diagonal element failed!'
+!                         call error(errormsg)
+!                     end if
+                    k = k+1
+                    lgs_a_value(k) = -4.0_prec*inv_deta2 &
+                                        *(vis_int_g(i,j+1)+vis_int_g(i,j)) &
+                                     -inv_dxi2 &
+                                        *(vis_int_sgxy(i,j)+vis_int_sgxy(i-1,j)) &
+                                     -beta_now
+                    lgs_a_index(k) = nc
+
+                    nc = 2*ij2n(i,j+1)-1
+                        ! next nc (column counter), for vx_m(i,j+1)
+                    k = k+1
+                    lgs_a_value(k) = inv_dxi_deta &
                                     *(2.0_prec*vis_int_g(i,j+1)+vis_int_sgxy(i,j))
-            lgs_a_index(k) = nc
+                    lgs_a_index(k) = nc
 
-            nc = 2*ij2n(i,j+1)
-                     ! next nc (column counter), for vy_m(i,j+1)
-            k  = k+1
-            ! if (k > n_sprs) stop ' >>> calc_vxy_ssa_matrix: n_sprs too small!'
-            lgs_a_value(k) = 4.0_prec*inv_deta2*vis_int_g(i,j+1)
-            lgs_a_index(k) = nc
+                    nc = 2*ij2n(i,j+1)
+                        ! next nc (column counter), for vy_m(i,j+1)
+                    k = k+1
+                    lgs_a_value(k) = 4.0_prec*inv_deta2*vis_int_g(i,j+1)
+                    lgs_a_index(k) = nc
 
-            nc = 2*ij2n(i+1,j)
-                     ! largest nc (column counter), for vy_m(i+1,j)
-            k  = k+1
-            ! if (k > n_sprs) stop ' >>> calc_vxy_ssa_matrix: n_sprs too small!'
-            lgs_a_value(k) = inv_dxi2*vis_int_sgxy(i,j)
-            lgs_a_index(k) = nc
+                    nc = 2*ij2n(i+1,j)
+                        ! largest nc (column counter), for vy_m(i+1,j)
+                    k = k+1
+                    lgs_a_value(k)  = inv_dxi2*vis_int_sgxy(i,j)
+                    lgs_a_index(k)  = nc
 
-            lgs_b_value(nr) = taud_now 
+                    lgs_b_value(nr) = taud_now 
+                    lgs_x_value(nr) = vy_m(i,j)
 
-            lgs_x_value(nr) = vy_m(i,j)
+                end if
 
-        end if
+            else    ! neither neighbour is floating or grounded ice,
+                    ! velocity assumed to be zero
 
-      else   ! neither neighbour is floating or grounded ice,
-             ! velocity assumed to be zero
+                k = k+1
+                lgs_a_value(k)  = 1.0_prec   ! diagonal element only
+                lgs_a_index(k)  = nr
 
-         k  = k+1
-         ! if (k > n_sprs) stop ' >>> calc_vxy_ssa_matrix: n_sprs too small!'
-         lgs_a_value(k) = 1.0_prec   ! diagonal element only
-         lgs_a_index(k) = nr
+                lgs_b_value(nr) = 0.0_prec
+                lgs_x_value(nr) = 0.0_prec
 
-         lgs_b_value(nr) = 0.0_prec
-         lgs_x_value(nr) = 0.0_prec
+            end if
 
-      end if
+            lgs_a_ptr(nr+1) = k+1   ! row is completed, store index to next row
 
-   else   ! boundary condition, velocity assumed to be zero
+        end do
 
-      k  = k+1
-      ! if (k > n_sprs) stop ' >>> calc_vxy_ssa_matrix: n_sprs too small!'
-      lgs_a_value(k) = 1.0_prec   ! diagonal element only
-      lgs_a_index(k) = nr
+        !-------- Settings for Lis --------
+               
+        call lis_initialize(ierr)           ! Important for parallel computing environments   
+        call CHKERR(ierr)
 
-      lgs_b_value(nr) = 0.0_prec
-      lgs_x_value(nr) = 0.0_prec
+        call lis_matrix_create(LIS_COMM_WORLD, lgs_a, ierr)
+        call CHKERR(ierr)
+        call lis_vector_create(LIS_COMM_WORLD, lgs_b, ierr)
+        call lis_vector_create(LIS_COMM_WORLD, lgs_x, ierr)
 
-   end if
+        call lis_matrix_set_size(lgs_a, 0, nmax, ierr)
+        call CHKERR(ierr)
+        call lis_vector_set_size(lgs_b, 0, nmax, ierr)
+        call lis_vector_set_size(lgs_x, 0, nmax, ierr)
 
-   lgs_a_ptr(nr+1) = k+1   ! row is completed, store index to next row
+        ! === Storage order: compressed sparse row (CSR) ===
 
-end do
+        do nr=1, nmax
 
-!-------- Settings for Lis --------
-       
-call lis_initialize(ierr)           ! Important for parallel computing environments   
-call CHKERR(ierr)
+            do nc=lgs_a_ptr(nr), lgs_a_ptr(nr+1)-1
+                call lis_matrix_set_value(LIS_INS_VALUE, nr, lgs_a_index(nc), &
+                                                        lgs_a_value(nc), lgs_a, ierr)
+            end do
 
-call lis_matrix_create(LIS_COMM_WORLD, lgs_a, ierr)
-call CHKERR(ierr)
-call lis_vector_create(LIS_COMM_WORLD, lgs_b, ierr)
-call lis_vector_create(LIS_COMM_WORLD, lgs_x, ierr)
+            call lis_vector_set_value(LIS_INS_VALUE, nr, lgs_b_value(nr), lgs_b, ierr)
+            call lis_vector_set_value(LIS_INS_VALUE, nr, lgs_x_value(nr), lgs_x, ierr)
 
-call lis_matrix_set_size(lgs_a, 0, nmax, ierr)
-call CHKERR(ierr)
-call lis_vector_set_size(lgs_b, 0, nmax, ierr)
-call lis_vector_set_size(lgs_x, 0, nmax, ierr)
-
-! === Storage order: compressed sparse row (CSR) ===
-
-do nr=1, nmax
-
-   do nc=lgs_a_ptr(nr), lgs_a_ptr(nr+1)-1
-      call lis_matrix_set_value(LIS_INS_VALUE, nr, lgs_a_index(nc), &
-                                               lgs_a_value(nc), lgs_a, ierr)
-   end do
-
-   call lis_vector_set_value(LIS_INS_VALUE, nr, lgs_b_value(nr), lgs_b, ierr)
-   call lis_vector_set_value(LIS_INS_VALUE, nr, lgs_x_value(nr), lgs_x, ierr)
-
-end do 
+        end do 
 
 
-call lis_matrix_set_type(lgs_a, LIS_MATRIX_CSR, ierr)
-call lis_matrix_assemble(lgs_a, ierr)
+        call lis_matrix_set_type(lgs_a, LIS_MATRIX_CSR, ierr)
+        call lis_matrix_assemble(lgs_a, ierr)
 
-!-------- Solution of the system of linear equations with Lis --------
+        !-------- Solution of the system of linear equations with Lis --------
 
-call lis_solver_create(solver, ierr)
+        call lis_solver_create(solver, ierr)
 
-! ch_solver_set_option = '-i bicgsafe -p jacobi '// &
-!                         '-maxiter 100 -tol 1.0e-4 -initx_zeros false'
-call lis_solver_set_option(trim(lis_settings), solver, ierr)
-call CHKERR(ierr)
+        ! ch_solver_set_option = '-i bicgsafe -p jacobi '// &
+        !                         '-maxiter 100 -tol 1.0e-4 -initx_zeros false'
+        call lis_solver_set_option(trim(lis_settings), solver, ierr)
+        call CHKERR(ierr)
 
-call lis_solve(lgs_a, lgs_b, lgs_x, solver, ierr)
-call CHKERR(ierr)
+        call lis_solve(lgs_a, lgs_b, lgs_x, solver, ierr)
+        call CHKERR(ierr)
 
-!call lis_solver_get_iter(solver, lin_iter, ierr)
-!write(6,'(a,i0,a)', advance='no') 'lin_iter = ', lin_iter, ', '
+        !call lis_solver_get_iter(solver, lin_iter, ierr)
+        !write(6,'(a,i0,a)', advance='no') 'lin_iter = ', lin_iter, ', '
 
-!!! call lis_solver_get_time(solver,solver_time,ierr)
-!!! print *, 'calc_vxy_ssa_matrix: time (s) = ', solver_time
+        !!! call lis_solver_get_time(solver,solver_time,ierr)
+        !!! print *, 'calc_vxy_ssa_matrix: time (s) = ', solver_time
 
-lgs_x_value = 0.0_prec
-call lis_vector_gather(lgs_x, lgs_x_value, ierr)
-call CHKERR(ierr)
+        lgs_x_value = 0.0_prec
+        call lis_vector_gather(lgs_x, lgs_x_value, ierr)
+        call CHKERR(ierr)
 
-call lis_matrix_destroy(lgs_a, ierr)
-call CHKERR(ierr)
+        call lis_matrix_destroy(lgs_a, ierr)
+        call CHKERR(ierr)
 
-call lis_vector_destroy(lgs_b, ierr)
-call lis_vector_destroy(lgs_x, ierr)
-call lis_solver_destroy(solver, ierr)
-call CHKERR(ierr)
+        call lis_vector_destroy(lgs_b, ierr)
+        call lis_vector_destroy(lgs_x, ierr)
+        call lis_solver_destroy(solver, ierr)
+        call CHKERR(ierr)
 
-call lis_finalize(ierr)           ! Important for parallel computing environments
-call CHKERR(ierr)
+        call lis_finalize(ierr)           ! Important for parallel computing environments
+        call CHKERR(ierr)
 
-do n=1, nmax-1, 2
+        do n=1, nmax-1, 2
 
-   i = n2i((n+1)/2)
-   j = n2j((n+1)/2)
+            i = n2i((n+1)/2)
+            j = n2j((n+1)/2)
 
-   nr = n
-   vx_m(i,j) = lgs_x_value(nr)
+            nr = n
+            vx_m(i,j) = lgs_x_value(nr)
 
-   nr = n+1
-   vy_m(i,j) = lgs_x_value(nr)
+            nr = n+1
+            vy_m(i,j) = lgs_x_value(nr)
 
-end do
+        end do
 
-deallocate(lgs_a_value, lgs_a_index, lgs_a_ptr)
-deallocate(lgs_b_value, lgs_x_value)
+        deallocate(lgs_a_value, lgs_a_index, lgs_a_ptr)
+        deallocate(lgs_b_value, lgs_x_value)
 
-! Limit the velocity generally =====================
-call limit_vel(vx_m,ulim)
-call limit_vel(vy_m,ulim)
+        ! Limit the velocity generally =====================
+        call limit_vel(vx_m,ulim)
+        call limit_vel(vy_m,ulim)
 
-return 
+        return 
 
-end subroutine calc_vxy_ssa_matrix
-
-
+    end subroutine calc_vxy_ssa_matrix
+    
     subroutine set_ssa_masks(ssa_mask_acx,ssa_mask_acy,beta_acx,beta_acy,H_ice,f_grnd_acx,f_grnd_acy,beta_max,use_ssa)
         ! Define where ssa calculations should be performed
         ! Note: could be binary, but perhaps also distinguish 

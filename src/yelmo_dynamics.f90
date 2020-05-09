@@ -163,6 +163,7 @@ contains
         ! Set diva parameters from Yelmo settings 
         diva_par%ssa_solver_opt = dyn%par%ssa_solver_opt 
         diva_par%boundaries     = dyn%par%boundaries 
+        diva_par%diva_no_slip   = dyn%par%diva_no_slip 
         diva_par%beta_method    = dyn%par%beta_method 
         diva_par%beta_const     = dyn%par%beta_const 
         diva_par%beta_q         = dyn%par%beta_q 
@@ -1450,6 +1451,7 @@ end if
         call nml_read(filename,"ydyn","ssa_solver_opt",     par%ssa_solver_opt,     init=init_pars)
         call nml_read(filename,"ydyn","mix_method",         par%mix_method,         init=init_pars)
         call nml_read(filename,"ydyn","calc_diffusivity",   par%calc_diffusivity,   init=init_pars)
+        call nml_read(filename,"ydyn","diva_no_slip",       par%diva_no_slip,       init=init_pars)
         call nml_read(filename,"ydyn","beta_method",        par%beta_method,        init=init_pars)
         call nml_read(filename,"ydyn","beta_const",         par%beta_const,         init=init_pars)
         call nml_read(filename,"ydyn","beta_q",             par%beta_q,             init=init_pars)
@@ -1818,6 +1820,18 @@ end if
             case("zeros","EISMINT")
 
                 ! Border values are zero by default, do nothing 
+
+            case("periodic") 
+
+                ux(1,:)  = ux(nx-1,:) 
+                ux(nx,:) = ux(2,:) 
+                ux(:,1)  = ux(:,ny-1)
+                ux(:,ny) = ux(:,2) 
+
+                uy(1,:)  = uy(nx-1,:) 
+                uy(nx,:) = uy(2,:) 
+                uy(:,1)  = uy(:,ny-1)
+                uy(:,ny) = uy(:,2) 
 
             case("MISMIP3D")
 

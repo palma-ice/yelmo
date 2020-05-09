@@ -675,6 +675,12 @@ contains
                     stop 
                 end if 
             
+            case("ISMIPHOM") 
+                ! Periodic boundary conditions: X_1 = X_n-1; X_n = X_2
+
+                dom%tpo%par%boundaries = "periodic"
+                dom%dyn%par%boundaries = "periodic"
+
             case("infinite") 
                 ! Set border points equal to interior neighbors 
                 ! (ajr: not fully implemented yet)

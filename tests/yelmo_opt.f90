@@ -16,7 +16,6 @@ program yelmo_test
     character(len=512) :: path_par, path_const  
     real(prec) :: time_init, time_end, time_equil, time, dtt, dt1D_out, dt2D_out
     integer    :: n, q, n_now
-    real(4)    :: cpu_start_time, cpu_end_time 
 
     ! Parameters 
     real(prec) :: bmb_shlf_const, dT_ann, z_sl  
@@ -48,9 +47,11 @@ program yelmo_test
     ! No-ice mask (to impose additional melting)
     logical, allocatable :: mask_noice(:,:)  
 
+    real(8) :: cpu_start_time, cpu_end_time, cpu_dtime  
+    
     ! Start timing 
-    call cpu_time(cpu_start_time)
-
+    call yelmo_cpu_time(cpu_start_time)
+    
     ! Determine the parameter file from the command line 
     call yelmo_load_command_line_args(path_par)
 
@@ -419,11 +420,11 @@ end if
     call yelmo_end(yelmo1,time=time)
 
     ! Stop timing 
-    call cpu_time(cpu_end_time)
-
-    write(*,"(a,f12.3,a)") "Time  = ",(cpu_end_time-cpu_start_time)/60.0 ," min"
-    write(*,"(a,f12.1,a)") "Speed = ",(1e-3*(time-time_init))/((cpu_end_time-cpu_start_time)/3600.0), " kiloyears / hr"
-
+    call yelmo_cpu_time(cpu_end_time,cpu_start_time,cpu_dtime)
+    
+    write(*,"(a,f12.3,a)") "Time  = ",cpu_dtime/60.0 ," min"
+    write(*,"(a,f12.1,a)") "Speed = ",(1e-3*(time_end-time_init))/(cpu_dtime/3600.0), " kiloyears / hr"
+    
 contains
 
     subroutine write_step_2D_opt(ylmo,filename,time,cf_ref_dot,mb_corr,mask_noice,tau,err_scale)

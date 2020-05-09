@@ -19,8 +19,7 @@ program yelmo_test
     real(prec) :: time_init, time_end, time_equil, time, dtt, dt1D_out, dt2D_out 
     real(prec) :: bmb_shlf_const, dT_ann, z_sl    
     integer    :: n
-    real(8) :: cpu_start_time, cpu_end_time, cpu_dtime  
-
+    
     real(prec), allocatable :: cf_ref(:,:) 
 
     ! No-ice mask (to impose additional melting)
@@ -31,9 +30,11 @@ program yelmo_test
     character(len=256) :: file_cf_ref 
     character(len=256) :: file_bmelt 
 
+    real(8) :: cpu_start_time, cpu_end_time, cpu_dtime  
+    
     ! Start timing 
     call yelmo_cpu_time(cpu_start_time)
-
+    
     ! Determine the parameter file from the command line 
     call yelmo_load_command_line_args(path_par)
 
@@ -241,7 +242,6 @@ program yelmo_test
     
     ! Stop timing 
     call yelmo_cpu_time(cpu_end_time,cpu_start_time,cpu_dtime)
-
 
     write(*,"(a,f12.3,a)") "Time  = ",cpu_dtime/60.0 ," min"
     write(*,"(a,f12.1,a)") "Speed = ",(1e-3*(time_end-time_init))/(cpu_dtime/3600.0), " kiloyears / hr"

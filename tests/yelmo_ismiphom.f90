@@ -8,9 +8,6 @@ program yelmo_ismiphom
 
     use deformation 
 
-    use ice_benchmarks 
-    use mismip3D 
-
     implicit none 
 
     type(yelmo_class)     :: yelmo1
@@ -18,49 +15,40 @@ program yelmo_ismiphom
     type(bueler_test_type) :: buel 
     
     character(len=56)  :: domain    
-    character(len=256) :: outfldr, file2D, file1D, file_compare
+    character(len=256) :: outfldr, file2D, file1D
     character(len=256) :: file_restart
     character(len=512) :: path_par, path_const 
     character(len=56)  :: experiment
-    logical            :: with_ssa  
-    logical    :: topo_fixed, dyn_fixed 
-    character(len=256) :: topo_fixed_file 
     real(prec) :: time_init, time_end, time, dtt, dt2D_out, dt1D_out
-    real(prec) :: period, dt_test 
     integer    :: n  
 
-    character(len=56) :: grid_name
+    character(len=56) :: grid_name, L_str
     real(prec) :: dx, x0  
     integer    :: nx  
 
-    real(4) :: start, finish
+    real(8) :: cpu_start_time, cpu_end_time, cpu_dtime  
     
     ! Start timing 
-    call cpu_time(start)
-
+    call yelmo_cpu_time(cpu_start_time)
+    
     ! Assume program is running from the output folder
     outfldr = "./"
 
     ! Determine the parameter file from the command line 
     call yelmo_load_command_line_args(path_par)
-    !path_par   = trim(outfldr)//"yelmo_EISMINT.nml" 
     path_const = trim(outfldr)//"yelmo_const_EISMINT.nml"
     
     ! Define input and output locations 
     file1D       = trim(outfldr)//"yelmo1D.nc"
     file2D       = trim(outfldr)//"yelmo2D.nc"
-    file_compare = trim(outfldr)//"yelmo_compare.nc"
     file_restart = trim(outfldr)//"yelmo_restart.nc"
 
     
     ! Define the domain, grid and experiment from parameter file
-    call nml_read(path_par,"eismint","domain",       domain)        ! EISMINT1, EISMINT2
+    call nml_read(path_par,"eismint","domain",       domain)        ! ISMIPHOM
     call nml_read(path_par,"eismint","experiment",   experiment)    ! "fixed", "moving", "mismip", "EXPA", "EXPB", "BUELER-A"
-    call nml_read(path_par,"eismint","dx",           dx)            ! [km] Grid resolution 
-    call nml_read(path_par,"eismint","with_ssa",     with_ssa)      ! Include ssa in experiment?
-    call nml_read(path_par,"eismint","topo_fixed",   topo_fixed)    ! Calculate the topography, or use Heiko's topo file. 
-    call nml_read(path_par,"eismint","dyn_fixed",    dyn_fixed)     ! Calculate the topography, or use Heiko's topo file. 
-    call nml_read(path_par,"eismint","topo_fixed_file",topo_fixed_file)     ! File containing fixed topo field of H_ice
+    call nml_read(path_par,"eismint","L",            L)             ! [km] Length scale
+    call nml_read(path_par,"eismint","nx",           nx)            ! Number of grid points in one direction
     
     ! Timing parameters 
     call nml_read(path_par,"eismint","time_init",    time_init)     ! [yr] Starting time
@@ -69,45 +57,18 @@ program yelmo_ismiphom
     call nml_read(path_par,"eismint","dt2D_out",     dt2D_out)      ! [yr] Frequency of 2D output 
     dt1D_out = dtt  ! Set 1D output to frequency of main loop timestep 
 
-    ! Settings for transient EISMINT1 experiments 
-    call nml_read(path_par,"eismint","period",       period)        ! [yr] for transient experiments 
-    call nml_read(path_par,"eismint","dT_test",      dT_test)       ! [K] for test experiments  
-    
-    ! Define the model domain based on the experiment we are running
-    select case(trim(experiment))
 
-        case("mismip")
-            ! EISMINT1 experiment with modified EISMINT1-mismip grid proposed by Heiko
+    ! Define grid based on length scale and number of points in each direction (square domain)
+    dx = L / (nx-2)
 
-            grid_name = "EISMINT1-mismip"
-            nx = 73  
+    write(L_str,*) L 
+    L_str = trim(adjustl(L))
 
-        case("BUELER-A","BUELER-B")
+    grid_name = "ISMIPHOM-"//trim(L_str)//"KM" 
 
-            grid_name = "EISMINT-EXT"
-            nx = (2000.0 / dx) + 1      ! Domain width is 2000 km total (-1000 to 1000 km)
-            
-        case("HALFAR")
+    write(*,*) "grid_name = ", trim(grid_name) 
+    stop 
 
-            grid_name = "HALFAR"
-            nx = (80.0 / dx) + 1        ! Domain width is 60 km total (-30 to 30 km)
-            
-        case("HALFAR-MED")
-
-            grid_name = "HALFAR-MED"
-            nx = (300.0 / dx) + 1        ! Domain width is 300 km total (-150 to 150 km)
-
-        case DEFAULT 
-            ! EISMINT1, EISMINT2 and Bueler test grid setup 
-
-            grid_name = "EISMINT"
-            nx = (1500.0 / dx) + 1     ! Domain width is 1500 km total (-750 to 750 km)
-
-    end select 
-
-    ! Make sure that nx is odd, so that we get one grid point right at dome x=0,y=0
-    if (mod(nx,2).eq.0) nx=nx+1
-    
     ! === Initialize ice sheet model =====
 
     ! General initialization of yelmo constants (used globally)
@@ -115,8 +76,6 @@ program yelmo_ismiphom
 
     ! Next define grid 
     call yelmo_init_grid(yelmo1%grd,grid_name,units="km",dx=dx,nx=nx,dy=dx,ny=nx)
-
-
 
     ! Initialize data objects (without loading topography, which will be defined inline below)
     call yelmo_init(yelmo1,filename=path_par,grid_def="none",time=time_init,load_topo=.FALSE.,domain=domain,grid_name=grid_name)
@@ -263,22 +222,6 @@ program yelmo_ismiphom
 
     end select 
 
-    ! Call bueler_compare once to initialize comparison fields (even though it is not currently used for EISMINT sims)
-    call bueler_compare(buel,yelmo1%tpo%now%H_ice,dx=yelmo1%grd%dx)
-
-    ! Actually use a small circular ice sheet to get things rolling...
-    ! Set ice thickness to a circle of low ice thickness to start
-    ! (for testing only)
-    if (.FALSE.) then
-
-        yelmo1%tpo%now%H_ice  = 0.0
-        where(yelmo1%bnd%smb .gt. 0.0) 
-            yelmo1%tpo%now%H_ice = max(0.0, 1000.0 + (3000.0-1000.0)*(750.0-sqrt((yelmo1%grd%x*1e-3)**2+(yelmo1%grd%y*1e-3)**2))/750.0)
-!             yelmo1%tpo%now%H_ice = max(0.0, 10.0 + (300.0-100.0)*(750.0-sqrt((yelmo1%grd%x*1e-3)**2+(yelmo1%grd%y*1e-3)**2))/750.0)
-        end where 
-        yelmo1%tpo%now%z_srf  = yelmo1%bnd%z_bed + yelmo1%tpo%now%H_ice
-            
-    end if 
 
     ! Check boundary values 
     call yelmo_print_bound(yelmo1%bnd)
@@ -297,30 +240,12 @@ program yelmo_ismiphom
     call write_yreg_init(yelmo1,file1D,time_init=time_init,units="years",mask=yelmo1%bnd%ice_allowed)
     call write_yreg_step(yelmo1%reg,file1D,time=time_init) 
 
-    ! Comparison file 
-    call yelmo_write_init(yelmo1,file_compare,time_init=time_init,units="years")
-    call write_step_2D_bueler(yelmo1,buel,file_compare,time_init)
-    
-    if (dyn_fixed) then 
-        ! Set yelmo parameter to fix dynamics
-        yelmo1%dyn%par%solver = "fixed"
-    end if 
-
-
-
     ! Advance timesteps
     do n = 1, ceiling((time_end-time_init)/dtt)
 
         ! Get current time 
         time = time_init + n*dtt
         
-        ! Update bnd%enh_srf to test transition of enhancement layers in time 
-        if (time .lt. 0.5*(time_end-time_init)) then 
-            yelmo1%bnd%enh_srf = 3.0 
-        else 
-            yelmo1%bnd%enh_srf = 1.0 
-        end if 
-
         ! == Yelmo ice sheet ===================================================
         call yelmo_update(yelmo1,time)
         
@@ -375,8 +300,7 @@ program yelmo_ismiphom
 
         ! == MODEL OUTPUT =======================================================
         if (mod(nint(time*100),nint(dt2D_out*100))==0) then 
-            call write_step_2D(yelmo1,file2D,time=time) 
-            call write_step_2D_bueler(yelmo1,buel,file_compare,time)   
+            call write_step_2D(yelmo1,file2D,time=time)  
         end if 
 
         if (mod(nint(time*100),nint(dt1D_out*100))==0) then 
@@ -415,10 +339,11 @@ program yelmo_ismiphom
     call yelmo_end(yelmo1,time=time)
 
     ! Stop timing 
-    call cpu_time(finish)
-
-    print '("Time = ",f12.3," min.")', (finish-start)/60.0 
-
+    call yelmo_cpu_time(cpu_end_time,cpu_start_time,cpu_dtime)
+    
+    write(*,"(a,f12.3,a)") "Time  = ",cpu_dtime/60.0 ," min"
+    write(*,"(a,f12.1,a)") "Speed = ",(1e-3*(time_end-time_init))/(cpu_dtime/3600.0), " kiloyears / hr"
+    
 contains
     
     subroutine write_step_2D(ylmo,filename,time,buel)

@@ -1,29 +1,23 @@
 &eismint
 
-    domain       = "EISMINT"             ! "EISMINT"
-    experiment   = "EXPA"                ! "fixed", "moving", "mismip", "EXPA", "EXPB", "EXPF","BUELER-A", "BUELER-B", "HALFAR", "HALFAR-MED"
-    dx           = 25.0                  ! [km] Grid resolution (EISMINT1 = 50km, EISMINT2 = 25km)
-    with_ssa     = True                  ! Include ssa in experiment?
-    topo_fixed   = False                 ! Calculate the topography, or use Heiko's topo file.  
-    dyn_fixed    = False                 ! Fix dynamics after first calculation? 
-    topo_fixed_file = "/Users/robinson/models/EURICE/yelmo/tests/heiko_imau-ice_help_fields_eismint_M_200kyr.nc"
-
+    domain       = "ISMIPHOM"
+    experiment   = "EXPA"               ! "EXPA", "EXPC"
+    L            = 160.0                ! [km] Length scale
+    nx           = 40                   ! Number of grid points in one direction of square
+    
     ! Timing parameters 
-    time_init    = 0.0                   ! [yr] Starting time 
-    time_end     = 20000.0               ! [yr] Ending time 
-    dtt          = 2.0                   ! [yr] Main loop timestep 
-    dt2D_out     = 100.0                 ! [yr] Frequency of writing 2D output files 
+    time_init    = 0.0                  ! [yr] Starting time 
+    time_end     = 20000.0              ! [yr] Ending time 
+    dtt          = 5.0                  ! [yr] Main loop timestep 
+    dt2D_out     = 100.0                ! [yr] Frequency of writing 2D output files 
 
-    ! Settings for transient EISMINT1 experiments 
-    period       = 0.0                  ! [yr] for transient experiments (normally 0.0 yr or 20e3 yr)
-    dT_test      = 0.0                  ! [K]  to test an imposed constant temperature anomaly 
 /
 
 &yelmo
-    domain          = "EISMINT"
-    grid_name       = "EISMINT"
+    domain          = "ISMIPHOM"
+    grid_name       = "ISMIPHOM"
     grid_path       = "none"
-    experiment      = "EISMINT"         ! "None", "EISMINT", "MISMIP3D", "BUELER"  to apply special boundary conditions   
+    experiment      = "ISMIPHOM"         ! "None", "EISMINT", "MISMIP3D", "BUELER", "ISMIPHOM"  to apply special boundary conditions   
     restart         = "no"
     log_timestep    = True 
     zeta_scale      = "exp"             ! "linear", "exp", "tanh"
@@ -123,8 +117,8 @@
 
 &ymat
     flow_law                = "glen"        ! Only "glen" is possible right now
-    rf_method               = 1             ! -1: set externally; 0: rf_const everywhere; 1: standard function 
-    rf_const                = 1e-16         ! [Pa^-3 a^-1] Constant value for rf when rf_method=0
+    rf_method               = 0             ! -1: set externally; 0: rf_const everywhere; 1: standard function 
+    rf_const                = 1e-16         ! [Pa^-n a^-1] Constant value for rf when rf_method=0
     rf_use_eismint2         = True          ! Only applied for rf_method=1
     rf_with_water           = False         ! Only applied for rf_method=1, scale rf by water content?
     n_glen                  = 3.0           ! Glen flow law exponent
@@ -144,7 +138,7 @@
 /
 
 &ytherm
-    method          = "temp"            ! "fixed", "robin", "temp", "enth"
+    method          = "fixed"           ! "fixed", "robin", "temp", "enth"
     dt_method       = "FE"              ! "FE", "AB", "SAM"
     solver_advec    = "impl-upwind"     ! "expl", "impl-upwind"
     gamma           = 1.0               ! [K] Scalar for the pressure melting point decay function 

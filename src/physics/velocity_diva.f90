@@ -151,7 +151,7 @@ contains
             call calc_beta(beta,c_bed,ux_b,uy_b,H_ice,H_grnd,f_grnd,z_bed,z_sl,par%beta_method, &
                                 par%beta_const,par%beta_q,par%beta_u0,par%beta_gl_scale,par%beta_gl_f, &
                                 par%H_grnd_lim,par%beta_min,par%boundaries)
-
+            
             ! Calculate F-integeral (F2) on aa-nodes 
             call calc_F_integral(F2,visc_eff,H_ice,zeta_aa,n=2.0_prec)
             
@@ -161,6 +161,13 @@ contains
             ! Stagger beta and beta_eff 
             call stagger_beta(beta_acx,beta_acy,beta,f_grnd,f_grnd_acx,f_grnd_acy,par%beta_gl_stag)
             call stagger_beta(beta_eff_acx,beta_eff_acy,beta_eff,f_grnd,f_grnd_acx,f_grnd_acy,par%beta_gl_stag)
+                
+            if (trim(par%boundaries) .eq. "ISMIPHOM") then 
+                ! Apply periodic boundary conditions to velocity solutions 
+                call set_boundaries_periodic_staggered(beta_acx,beta_acy,xdir=.TRUE.,ydir=.TRUE.)
+                call set_boundaries_periodic_staggered(beta_eff_acx,beta_eff_acy,xdir=.TRUE.,ydir=.TRUE.)
+                
+            end if 
             
             ! =========================================================================================
             ! Step 2: Call the SSA solver to obtain new estimate of ux_bar/uy_bar
@@ -200,13 +207,11 @@ end if
             if (trim(par%boundaries) .eq. "ISMIPHOM") then 
                 ! Apply periodic boundary conditions to velocity solutions 
 
-!                 call set_boundaries_periodic(ux_bar,uy_bar,xdir=.TRUE.,ydir=.TRUE.)
-!                 call set_boundaries_periodic(ux_b,uy_b,xdir=.TRUE.,ydir=.TRUE.)
+                call set_boundaries_periodic_staggered(taub_acx,taub_acy,xdir=.TRUE.,ydir=.TRUE.)
+                call set_boundaries_periodic_staggered(ux_b,uy_b,xdir=.TRUE.,ydir=.TRUE.)
                 
-                call set_boundaries_periodic(taub_acx,taub_acy,xdir=.TRUE.,ydir=.TRUE.)
-
             end if 
-
+            
             ! Exit iterations if ssa solution has converged
             if (is_converged) exit 
             
@@ -355,81 +360,6 @@ end if
 
     end subroutine calc_vertical_shear_3D 
 
-    subroutine calc_strain_eff_squared(eps_sq,ux,uy,duxdz,duydz,zeta_aa,dx,dy)
-        ! Calculate effective strain rate for DIVA solver, using 3D vertical shear 
-        ! and 2D depth-averaged horizontal shear (L19, Eq. 21)
-
-        implicit none 
-        
-        real(prec), intent(OUT) :: eps_sq(:,:,:)        ! [1/a]^2
-        real(prec), intent(IN) :: ux(:,:)               ! [m/a] Vertically averaged horizontal velocity, x-component
-        real(prec), intent(IN) :: uy(:,:)               ! [m/a] Vertically averaged horizontal velocity, y-component
-        real(prec), intent(IN) :: duxdz(:,:,:)          ! [1/a] Vertical shearing, x-component
-        real(prec), intent(IN) :: duydz(:,:,:)          ! [1/a] Vertical shearing, x-component
-        real(prec), intent(IN) :: zeta_aa(:)            ! Vertical axis (sigma-coordinates from 0 to 1)
-        real(prec), intent(IN) :: dx, dy
-        
-        ! Local variables 
-        integer :: i, j, nx, ny, k, nz_aa 
-        integer :: im1, ip1, jm1, jp1  
-        real(prec) :: inv_4dx, inv_4dy
-        real(prec) :: dudx, dudy
-        real(prec) :: dvdx, dvdy 
-        real(prec) :: duxdz_aa, duydz_aa 
-
-        real(prec), parameter :: epsilon_sq_0 = 1e-6_prec   ! [a^-1] Bueler and Brown (2009), Eq. 26
-        
-        nx    = size(ux,1)
-        ny    = size(ux,2)
-        nz_aa = size(zeta_aa,1) 
-
-        inv_4dx = 1.0_prec / (4.0_prec*dx) 
-        inv_4dy = 1.0_prec / (4.0_prec*dy) 
-
-        ! Initialize strain rate to zero 
-        eps_sq = 0.0_prec 
-
-        ! Loop over domain to calculate viscosity at each aa-node
-         
-        do j = 1, ny
-        do i = 1, nx
-
-            im1 = max(i-1,1) 
-            ip1 = min(i+1,nx) 
-            jm1 = max(j-1,1) 
-            jp1 = min(j+1,ny) 
-            
-            ! Calculate effective strain components from horizontal stretching
-            dudx = (ux(i,j) - ux(im1,j))/dx
-            dvdy = (uy(i,j) - uy(i,jm1))/dy
-
-            ! Calculate of cross terms on central aa-nodes (symmetrical results)
-            dudy = ((ux(i,jp1)   - ux(i,jm1))    &
-                  + (ux(im1,jp1) - ux(im1,jm1))) * inv_4dx 
-            dvdx = ((uy(ip1,j)   - uy(im1,j))    &
-                  + (uy(ip1,jm1) - uy(im1,jm1))) * inv_4dy 
-
-            ! Loop over vertical dimension 
-            do k = 1, nz_aa 
-
-                ! Un-stagger shear terms to central aa-nodes in horizontal
-                duxdz_aa = 0.5_prec*(duxdz(i,j,k) + duxdz(im1,j,k))
-                duydz_aa = 0.5_prec*(duydz(i,j,k) + duydz(i,jm1,k))
-                
-                ! Calculate the total effective strain rate from L19, Eq. 21 
-                eps_sq(i,j,k) = dudx**2 + dvdy**2 + dudx*dvdy + 0.25_prec*(dudy+dvdx)**2 &
-                               + 0.25_prec*duxdz_aa**2 + 0.25_prec*duydz_aa**2 &
-                               + epsilon_sq_0
-            
-            end do 
-
-        end do 
-        end do 
-
-        return
-        
-    end subroutine calc_strain_eff_squared
-
     subroutine calc_visc_eff_3D(visc_eff,ux,uy,duxdz,duydz,ATT,zeta_aa,dx,dy,n_glen)
         ! Calculate 3D effective viscosity 
         ! following L19, Eq. 2
@@ -561,8 +491,9 @@ end if
                 ! Viscosity should be nonzero here, perform integration 
 
                 ! Get weighted ice thickness for stability
-                H_ice_now = (4.0*H_ice(i,j) + 2.0*(H_ice(i-1,j)+H_ice(i+1,j)+H_ice(i,j-1)+H_ice(i,j+1))) / 16.0 &
-                          + (H_ice(i-1,j-1)+H_ice(i+1,j-1)+H_ice(i+1,j+1)+H_ice(i-1,j+1)) / 16.0 
+!                 H_ice_now = (4.0*H_ice(i,j) + 2.0*(H_ice(i-1,j)+H_ice(i+1,j)+H_ice(i,j-1)+H_ice(i,j+1))) / 16.0 &
+!                           + (H_ice(i-1,j-1)+H_ice(i+1,j-1)+H_ice(i+1,j+1)+H_ice(i-1,j+1)) / 16.0 
+                H_ice_now = H_ice(i,j) 
 
 !                 visc_now = (4.0*visc(i,j,:) + 2.0*(visc(i-1,j,:)+visc(i+1,j,:)+visc(i,j-1,:)+visc(i,j+1,:))) / 16.0 &
 !                           + (visc(i-1,j-1,:)+visc(i+1,j-1,:)+visc(i+1,j+1,:)+visc(i-1,j+1,:)) / 16.0 
@@ -895,7 +826,28 @@ end if
 
     end subroutine limit_vel
 
-    subroutine set_boundaries_periodic(varx,vary,xdir,ydir)
+    subroutine set_boundaries_periodic(var)
+
+        implicit none 
+
+        real(prec), intent(INOUT)    :: var(:,:) 
+
+        ! Local variables 
+        integer :: nx, ny 
+
+        nx = size(var,1) 
+        ny = size(var,2) 
+
+        var(1,:)    = var(nx-2,:) 
+        var(nx,:)   = var(2,:) 
+        var(:,1)    = var(:,ny-1)
+        var(:,ny)   = var(:,2) 
+
+        return 
+
+    end subroutine set_boundaries_periodic
+
+    subroutine set_boundaries_periodic_staggered(varx,vary,xdir,ydir)
 
         implicit none 
 
@@ -932,6 +884,6 @@ end if
 
         return 
 
-    end subroutine set_boundaries_periodic
+    end subroutine set_boundaries_periodic_staggered
 
 end module velocity_diva

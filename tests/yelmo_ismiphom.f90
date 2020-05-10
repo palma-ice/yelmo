@@ -41,22 +41,31 @@ program yelmo_ismiphom
 
     
     ! Define the domain, grid and experiment from parameter file
-    call nml_read(path_par,"eismint","domain",       domain)        ! ISMIPHOM
-    call nml_read(path_par,"eismint","experiment",   experiment)    ! "fixed", "moving", "mismip", "EXPA", "EXPB", "BUELER-A"
-    call nml_read(path_par,"eismint","L",            L)             ! [km] Length scale
-    call nml_read(path_par,"eismint","nx",           nx)            ! Number of grid points in one direction
+    call nml_read(path_par,"control","domain",       domain)        ! ISMIPHOM
+    call nml_read(path_par,"control","experiment",   experiment)    ! "fixed", "moving", "mismip", "EXPA", "EXPB", "BUELER-A"
+    call nml_read(path_par,"control","L",            L)             ! [km] Length scale
+    call nml_read(path_par,"control","nx",           nx)            ! Number of grid points in one direction
     
     ! Timing parameters 
-    call nml_read(path_par,"eismint","time_init",    time_init)     ! [yr] Starting time
-    call nml_read(path_par,"eismint","time_end",     time_end)      ! [yr] Ending time
-    call nml_read(path_par,"eismint","dtt",          dtt)           ! [yr] Main loop time step 
-    call nml_read(path_par,"eismint","dt2D_out",     dt2D_out)      ! [yr] Frequency of 2D output 
+    call nml_read(path_par,"control","time_init",    time_init)     ! [yr] Starting time
+    call nml_read(path_par,"control","time_end",     time_end)      ! [yr] Ending time
+    call nml_read(path_par,"control","dtt",          dtt)           ! [yr] Main loop time step 
+    call nml_read(path_par,"control","dt2D_out",     dt2D_out)      ! [yr] Frequency of 2D output 
     dt1D_out = dtt  ! Set 1D output to frequency of main loop timestep 
 
 
     ! Define grid based on length scale and number of points in each direction (square domain)
     x0 = 0.0_prec 
     dx = L / (nx-2)
+
+    ! Now extend domain by half a period in each direction 
+    x0 = -0.5*L 
+    nx = (2*L) / dx + 1
+
+!     do n = 1, nx 
+!         write(*,*) n, x0 + (n-1)*dx 
+!     end do 
+!     stop 
 
     ! Define grid name
     write(L_str,*) int(L) 
@@ -91,18 +100,19 @@ program yelmo_ismiphom
             
             yelmo1%tpo%par%topo_fixed   = .TRUE. 
             yelmo1%dyn%par%diva_no_slip = .TRUE. 
+            yelmo1%dyn%par%use_ssa      = .FALSE. 
 
             ! Not used in this experiment, but set it to a constant value anyway
-            yelmo1%dyn%par%beta_method = -1 
-            yelmo1%dyn%now%beta = 1000.0
+            yelmo1%dyn%par%beta_method  = -1 
+            yelmo1%dyn%now%beta         = 1000.0
 
         case("EXPC")
             ! Bumps
             
-            alpha = 0.1*pi/180.0_prec   ! [rad] 
-            omega = 2.0_prec*pi / L     ! [rad/km]
+            alpha = 0.1*pi/180.0_prec       ! [rad] 
+            omega = 2.0_prec*pi / (L*1e3)   ! [rad/km]
 
-            yelmo1%tpo%now%z_srf = -(yelmo1%grd%x*1e-3) * tan(alpha)
+            yelmo1%tpo%now%z_srf = -yelmo1%grd%x * tan(alpha)
             yelmo1%bnd%z_bed     = yelmo1%tpo%now%z_srf - 1000.0
 
             yelmo1%tpo%now%H_ice = yelmo1%tpo%now%z_srf - yelmo1%bnd%z_bed
@@ -110,8 +120,8 @@ program yelmo_ismiphom
             yelmo1%tpo%par%topo_fixed   = .TRUE. 
             yelmo1%dyn%par%diva_no_slip = .FALSE. 
 
-            yelmo1%dyn%par%beta_method = -1 
-            yelmo1%dyn%now%beta = 1000.0 + 1000.0 * sin(omega*yelmo1%grd%x*1e-3) * sin(omega*yelmo1%grd%y*1e-3)
+            yelmo1%dyn%par%beta_method  = -1 
+            yelmo1%dyn%now%beta         = 1000.0 + 1000.0 * sin(omega*yelmo1%grd%x) * sin(omega*yelmo1%grd%y)
 
         case("EXPF") 
 

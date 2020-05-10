@@ -1,13 +1,13 @@
-&eismint
+&control
 
     domain       = "ISMIPHOM"
-    experiment   = "EXPA"               ! "EXPA", "EXPC"
+    experiment   = "EXPC"               ! "EXPA", "EXPC"
     L            = 80.0                 ! [km] Length scale
     nx           = 40                   ! Number of grid points in one direction of square
     
     ! Timing parameters 
     time_init    = 0.0                  ! [yr] Starting time 
-    time_end     = 200.0                ! [yr] Ending time 
+    time_end     = 500.0                ! [yr] Ending time 
     dtt          = 5.0                  ! [yr] Main loop timestep 
     dt2D_out     = 100.0                ! [yr] Frequency of writing 2D output files 
 

@@ -44,6 +44,12 @@ job run --shell -f -o ${fldr}/mismip/default -p ydyn.beta_gl_scale=0 ydyn.beta_g
 job run --shell -f -o ${fldr}/mismip/subgrid -p ydyn.beta_gl_scale=0 ydyn.beta_gl_sep=-1 ydyn.beta_gl_stag=3 mismip.dx=2.5,5.0,10.0,20.0 -- python run_yelmo.py -x -s -q medium -w 60 -e mismip {} par-gmd/yelmo_MISMIP3D.nml
 job run --shell -f -o ${fldr}/mismip/scaling -p ydyn.beta_gl_scale=2 ydyn.beta_gl_sep=-1 ydyn.beta_gl_stag=3 mismip.dx=2.5,5.0,10.0,20.0 -- python run_yelmo.py -x -s -q medium -w 60 -e mismip {} par-gmd/yelmo_MISMIP3D.nml
 
+### ISMIP-HOM TESTS ###
+
+make ismiphom 
+
+job run --shell -f -o ${fldr}/ismiphom/diva -p control.experiment="EXPA" control.L=5,10,20,40,80,160 ydyn.solver="diva" -- python run_yelmo.py -x -r -e ismiphom {} par/yelmo_ISMIPHOM.nml
+
 # Trough simulation following Feldmann and Levermann (2017)  (not part of GMD suite of tests)
 make trough
 

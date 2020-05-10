@@ -81,11 +81,11 @@ program yelmo_ismiphom
         case("EXPA")
             ! Bumps
             
-            alpha = 0.5*pi/180.0_prec   ! [rad] 
-            omega = 2.0_prec*pi / L     ! [rad/km]
+            alpha = 0.5*pi/180.0_prec       ! [rad] 
+            omega = 2.0_prec*pi / (L*1e3)   ! [rad/m]
 
-            yelmo1%tpo%now%z_srf = -(yelmo1%grd%x*1e-3) * tan(alpha)
-            yelmo1%bnd%z_bed     = yelmo1%tpo%now%z_srf - 1000.0 + 500.0 * sin(omega*yelmo1%grd%x*1e-3) * sin(omega*yelmo1%grd%y*1e-3)
+            yelmo1%tpo%now%z_srf = -yelmo1%grd%x * tan(alpha)
+            yelmo1%bnd%z_bed     = yelmo1%tpo%now%z_srf - 1000.0 + 500.0 * sin(omega*yelmo1%grd%x) * sin(omega*yelmo1%grd%y)
 
             yelmo1%tpo%now%H_ice = yelmo1%tpo%now%z_srf - yelmo1%bnd%z_bed
             

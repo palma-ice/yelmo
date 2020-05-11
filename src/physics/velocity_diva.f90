@@ -129,10 +129,6 @@ contains
         ssa_err_acx = 1.0_prec 
         ssa_err_acy = 1.0_prec 
         
-        write(*,"(a,20g15.5)") "inssa4728 1", duxdz(47,28,1), taub_acx(47,28), visc_eff(47,28,1), visc_eff_int(47,28), &
-            ux_bar(47,28), beta_eff(47,28)  !, beta(47,28), ATT(47,28,1), H_ice(47,28), taud_acx(47,28)
-
-
         do iter = 1, par%ssa_iter_max 
 
             ! Store solution from previous iteration (nm1 == n minus 1) 
@@ -207,11 +203,9 @@ end if
             
             ! =========================================================================================
             ! Update additional fields based on output of solver
-            
-!if (taub_acx(47,28) .eq. 0.0) then 
+             
             ! Calculate basal stress 
             call calc_basal_stress(taub_acx,taub_acy,beta_eff_acx,beta_eff_acy,ux_bar,uy_bar)
-!end if 
 
             ! Calculate basal velocity from depth-averaged solution and basal stress
             call calc_vel_basal(ux_b,uy_b,ux_bar,uy_bar,F2,taub_acx,taub_acy,H_ice)
@@ -228,9 +222,6 @@ end if
             if (is_converged) exit 
             
         end do 
-
-        write(*,"(a,20g15.5)") "inssa4728 2", duxdz(47,28,1), taub_acx(47,28), visc_eff(47,28,1), visc_eff_int(47,28), &
-            ux_bar(47,28), beta_eff(47,28)  !, beta(47,28), ATT(47,28,1), H_ice(47,28), taud_acx(47,28)
 
         ! Iterations are finished, finalize calculations of 3D velocity field 
 

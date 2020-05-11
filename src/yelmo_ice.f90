@@ -813,6 +813,7 @@ contains
         character(len=*),  intent(IN)    :: thrm_method 
 
         ! Local variables 
+        integer :: q 
         character(len=256) :: dom_thrm_method 
 
         ! Store original model choices locally 
@@ -866,9 +867,13 @@ contains
                 dom%dyn%now%beta   = dom%dyn%now%c_bed
             end if
             
-            ! Call dynamics 
-            call calc_ydyn(dom%dyn,dom%tpo,dom%mat,dom%thrm,dom%bnd,time)
-            
+            ! Call dynamics
+            !do q = 1, 100  
+                call calc_ydyn(dom%dyn,dom%tpo,dom%mat,dom%thrm,dom%bnd,time)
+            !    write(*,*) "4728: ", dom%dyn%now%ux_s(47,28) 
+            !end do 
+!             stop 
+
             ! Calculate material information again with updated dynamics
         
             call calc_ymat(dom%mat,dom%tpo,dom%dyn,dom%thrm,dom%bnd,time)

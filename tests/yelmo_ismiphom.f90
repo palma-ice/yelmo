@@ -156,6 +156,8 @@ program yelmo_ismiphom
     ! Initialize state variables (dyn,therm,mat)
     call yelmo_init_state(yelmo1,path_par,time=time_init,thrm_method="robin")
 
+!     call yelmo_update_equil(yelmo1,time,time_tot=100.0,topo_fixed=.TRUE.,dt=1.0,ssa_vel_max=5000.0)
+    
     ! == Write initial state ==
      
     ! 2D file 
@@ -302,6 +304,13 @@ contains
                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
         call nc_write(filename,"beta",ylmo%dyn%now%beta,units="Pa a m-1",long_name="Basal friction coefficient", &
                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
+        call nc_write(filename,"beta_acx",ylmo%dyn%now%beta_acx,units="Pa a m-1",long_name="Basal friction coefficient (x-direction)", &
+                      dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
+        call nc_write(filename,"beta_acy",ylmo%dyn%now%beta_acy,units="Pa a m-1",long_name="Basal friction coefficient (y-direction)", &
+                      dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
+        call nc_write(filename,"beta_eff",ylmo%dyn%now%beta_eff,units="Pa a m-1",long_name="Effective basal friction coefficient", &
+                      dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
+        
         call nc_write(filename,"visc_eff_int",ylmo%dyn%now%visc_eff_int,units="Pa a m",long_name="Depth-integrated effective viscosity (SSA)", &
                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
 

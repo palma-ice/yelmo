@@ -180,7 +180,7 @@ contains
         diva_par%ssa_iter_rel   = dyn%par%ssa_iter_rel 
         diva_par%ssa_iter_conv  = dyn%par%ssa_iter_conv 
         diva_par%ssa_write_log  = yelmo_log
-
+        
         call calc_velocity_diva(dyn%now%ux,dyn%now%uy,dyn%now%ux_i,dyn%now%uy_i,dyn%now%ux_bar,dyn%now%uy_bar, &
                                 dyn%now%ux_b,dyn%now%uy_b,dyn%now%duxdz,dyn%now%duydz,dyn%now%taub_acx,dyn%now%taub_acy, &
                                 dyn%now%visc_eff,dyn%now%visc_eff_int,dyn%now%ssa_mask_acx,dyn%now%ssa_mask_acy, &
@@ -608,6 +608,8 @@ contains
         ! For vertical velocity calculation 
         real(prec), allocatable :: bmb(:,:)
 
+        real(prec) :: L2_norm 
+
         logical :: calc_ssa 
         logical :: is_converged
         logical :: write_ssa_diagnostics
@@ -750,7 +752,7 @@ contains
             if (calc_ssa) then
                 ! Call ssa solver to determine ux_bar/uy_bar, where ssa_mask_acx/y are > 0
                 
-                call calc_vxy_ssa_matrix(dyn%now%ux_bar,dyn%now%uy_bar,dyn%now%beta_acx,dyn%now%beta_acy,dyn%now%visc_eff_int, &
+                call calc_vxy_ssa_matrix(dyn%now%ux_bar,dyn%now%uy_bar,L2_norm,dyn%now%beta_acx,dyn%now%beta_acy,dyn%now%visc_eff_int, &
                                      dyn%now%ssa_mask_acx,dyn%now%ssa_mask_acy,tpo%now%H_ice,dyn%now%taud_acx, &
                                      dyn%now%taud_acy,tpo%now%H_grnd,bnd%z_sl,bnd%z_bed,dyn%par%dx,dyn%par%dy, &
                                      dyn%par%ssa_vel_max,dyn%par%boundaries,dyn%par%ssa_solver_opt)
@@ -864,6 +866,8 @@ contains
 
         real(prec), allocatable :: beta_acx_prev(:,:) 
         real(prec), allocatable :: beta_acy_prev(:,:) 
+
+        real(prec) :: L2_norm 
 
         logical :: is_converged
         logical :: write_ssa_diagnostics
@@ -1000,7 +1004,7 @@ if (.TRUE.) then
 end if 
 
             ! Call ssa solver to determine ux_b/uy_b, where ssa_mask_acx/y are > 0
-            call calc_vxy_ssa_matrix(dyn%now%ux_b,dyn%now%uy_b,dyn%now%beta_acx,dyn%now%beta_acy,dyn%now%visc_eff_int, &
+            call calc_vxy_ssa_matrix(dyn%now%ux_b,dyn%now%uy_b,L2_norm,dyn%now%beta_acx,dyn%now%beta_acy,dyn%now%visc_eff_int, &
                                      dyn%now%ssa_mask_acx,dyn%now%ssa_mask_acy,tpo%now%H_ice,dyn%now%taud_acx, &
                                      dyn%now%taud_acy,tpo%now%H_grnd,bnd%z_sl,bnd%z_bed,dyn%par%dx,dyn%par%dy, &
                                      dyn%par%ssa_vel_max,dyn%par%boundaries,dyn%par%ssa_solver_opt)
@@ -1010,8 +1014,8 @@ end if
 
             ! Check for convergence
             is_converged = check_vel_convergence_l2rel(dyn%now%ux_b,dyn%now%uy_b,ux_b_prev,uy_b_prev, &
-                                            dyn%now%ssa_mask_acx.gt.0.0_prec,dyn%now%ssa_mask_acy.gt.0.0_prec, &
-                                            dyn%par%ssa_iter_conv,iter,dyn%par%ssa_iter_max,yelmo_log)
+                                        dyn%now%ssa_mask_acx.gt.0.0_prec,dyn%now%ssa_mask_acy.gt.0.0_prec, &
+                                        dyn%par%ssa_iter_conv,iter,dyn%par%ssa_iter_max,yelmo_log,use_L2_norm=.FALSE.)
 
             ! Calculate an L1 error metric over matrix for diagnostics
             call check_vel_convergence_l1rel_matrix(dyn%now%ssa_err_acx,dyn%now%ssa_err_acy,dyn%now%ux_b,dyn%now%uy_b, &

@@ -103,6 +103,8 @@ contains
         integer,    allocatable :: ssa_mask_acx_ref(:,:)
         integer,    allocatable :: ssa_mask_acy_ref(:,:)
 
+        real(prec) :: L2_norm 
+
         nx    = size(ux,1)
         ny    = size(ux,2)
         nz_aa = size(ux,3)
@@ -127,6 +129,10 @@ contains
         ssa_err_acx = 1.0_prec 
         ssa_err_acy = 1.0_prec 
         
+        write(*,"(a,20g15.5)") "inssa4728 1", duxdz(47,28,1), taub_acx(47,28), visc_eff(47,28,1), visc_eff_int(47,28), &
+            ux_bar(47,28), beta_eff(47,28)  !, beta(47,28), ATT(47,28,1), H_ice(47,28), taud_acx(47,28)
+
+
         do iter = 1, par%ssa_iter_max 
 
             ! Store solution from previous iteration (nm1 == n minus 1) 
@@ -151,7 +157,7 @@ contains
             call calc_beta(beta,c_bed,ux_b,uy_b,H_ice,H_grnd,f_grnd,z_bed,z_sl,par%beta_method, &
                                 par%beta_const,par%beta_q,par%beta_u0,par%beta_gl_scale,par%beta_gl_f, &
                                 par%H_grnd_lim,par%beta_min,par%boundaries)
-            
+
             ! Calculate F-integeral (F2) on aa-nodes 
             call calc_F_integral(F2,visc_eff,H_ice,zeta_aa,n=2.0_prec)
             
@@ -162,25 +168,28 @@ contains
             call stagger_beta(beta_acx,beta_acy,beta,f_grnd,f_grnd_acx,f_grnd_acy,par%beta_gl_stag)
             call stagger_beta(beta_eff_acx,beta_eff_acy,beta_eff,f_grnd,f_grnd_acx,f_grnd_acy,par%beta_gl_stag)
                 
-            if (trim(par%boundaries) .eq. "ISMIPHOM") then 
+            if (trim(par%boundaries) .eq. "periodic") then 
                 ! Apply periodic boundary conditions to velocity solutions 
                 call set_boundaries_periodic_staggered(beta_acx,beta_acy,xdir=.TRUE.,ydir=.TRUE.)
                 call set_boundaries_periodic_staggered(beta_eff_acx,beta_eff_acy,xdir=.TRUE.,ydir=.TRUE.)
                 
+                call set_boundaries_periodic(beta)
+                call set_boundaries_periodic(beta_eff)
+
             end if 
             
             ! =========================================================================================
             ! Step 2: Call the SSA solver to obtain new estimate of ux_bar/uy_bar
 
-if (.TRUE.) then 
+if (.FALSE.) then 
             if (iter .gt. 1) then
                 ! Update ssa mask based on convergence with previous step to reduce area being solved 
                 call update_ssa_mask_convergence(ssa_mask_acx,ssa_mask_acy,ssa_err_acx,ssa_err_acy,err_lim=real(1e-3,prec)) 
             end if 
 end if 
             
-            call calc_vxy_ssa_matrix(ux_bar,uy_bar,beta_eff_acx,beta_eff_acy,visc_eff_int,ssa_mask_acx,ssa_mask_acy,H_ice, &
-                                taud_acx,taud_acy,H_grnd,z_sl,z_bed,dx,dy,par%ssa_vel_max,par%boundaries,par%ssa_solver_opt)
+            call calc_vxy_ssa_matrix(ux_bar,uy_bar,L2_norm,beta_eff_acx,beta_eff_acy,visc_eff_int,ssa_mask_acx,ssa_mask_acy,H_ice, &
+                        taud_acx,taud_acy,H_grnd,z_sl,z_bed,dx,dy,par%ssa_vel_max,par%boundaries,par%ssa_solver_opt)
 
 
             ! Apply relaxation to keep things stable
@@ -189,7 +198,8 @@ end if
             ! Check for convergence
             is_converged = check_vel_convergence_l2rel(ux_bar,uy_bar,ux_bar_nm1,uy_bar_nm1, &
                                             ssa_mask_acx.gt.0.0_prec,ssa_mask_acy.gt.0.0_prec, &
-                                            par%ssa_iter_conv,iter,par%ssa_iter_max,par%ssa_write_log)
+                                            par%ssa_iter_conv,iter,par%ssa_iter_max,par%ssa_write_log, &
+                                            use_L2_norm=.FALSE.,L2_norm=L2_norm)
 
             ! Calculate an L1 error metric over matrix for diagnostics
             call check_vel_convergence_l1rel_matrix(ssa_err_acx,ssa_err_acy,ux_bar,uy_bar,ux_bar_nm1,uy_bar_nm1)
@@ -198,13 +208,15 @@ end if
             ! =========================================================================================
             ! Update additional fields based on output of solver
             
+!if (taub_acx(47,28) .eq. 0.0) then 
             ! Calculate basal stress 
             call calc_basal_stress(taub_acx,taub_acy,beta_eff_acx,beta_eff_acy,ux_bar,uy_bar)
+!end if 
 
             ! Calculate basal velocity from depth-averaged solution and basal stress
             call calc_vel_basal(ux_b,uy_b,ux_bar,uy_bar,F2,taub_acx,taub_acy,H_ice)
 
-            if (trim(par%boundaries) .eq. "ISMIPHOM") then 
+            if (trim(par%boundaries) .eq. "periodic") then 
                 ! Apply periodic boundary conditions to velocity solutions 
 
                 call set_boundaries_periodic_staggered(taub_acx,taub_acy,xdir=.TRUE.,ydir=.TRUE.)
@@ -217,10 +229,13 @@ end if
             
         end do 
 
+        write(*,"(a,20g15.5)") "inssa4728 2", duxdz(47,28,1), taub_acx(47,28), visc_eff(47,28,1), visc_eff_int(47,28), &
+            ux_bar(47,28), beta_eff(47,28)  !, beta(47,28), ATT(47,28,1), H_ice(47,28), taud_acx(47,28)
+
         ! Iterations are finished, finalize calculations of 3D velocity field 
 
         ! Calculate the 3D horizontal velocity field
-        call calc_vel_horizontal_3D(ux,uy,ux_b,uy_b,taub_acx,taub_acy,visc_eff,H_ice,zeta_aa)
+        call calc_vel_horizontal_3D(ux,uy,ux_b,uy_b,taub_acx,taub_acy,visc_eff,H_ice,zeta_aa,par%boundaries)
 
         ! Also calculate the shearing contribution
         do k = 1, nz_aa 
@@ -235,7 +250,7 @@ end if
 
     end subroutine calc_velocity_diva 
 
-    subroutine calc_vel_horizontal_3D(ux,uy,ux_b,uy_b,taub_acx,taub_acy,visc_eff,H_ice,zeta_aa)
+    subroutine calc_vel_horizontal_3D(ux,uy,ux_b,uy_b,taub_acx,taub_acy,visc_eff,H_ice,zeta_aa,boundaries)
         ! Caluculate the 3D horizontal velocity field (ux,uy)
         ! following L19, Eq. 29 
 
@@ -250,6 +265,7 @@ end if
         real(prec), intent(IN)  :: visc_eff(:,:,:)       
         real(prec), intent(IN)  :: H_ice(:,:)
         real(prec), intent(IN)  :: zeta_aa(:) 
+        character(len=*), intent(IN) :: boundaries 
 
         ! Local variables
         integer :: i, j, k, ip1, jp1, nx, ny, nz_aa  
@@ -310,6 +326,22 @@ end if
 
         end do 
         end do  
+
+        if (trim(boundaries) .eq. "periodic") then
+
+            ux(1,:,:)    = ux(nx-2,:,:) 
+            ux(nx-1,:,:) = ux(2,:,:) 
+            ux(nx,:,:)   = ux(3,:,:) 
+            ux(:,1,:)    = ux(:,ny-1,:)
+            ux(:,ny,:)   = ux(:,2,:) 
+
+            uy(1,:,:)    = uy(nx-1,:,:) 
+            uy(nx,:,:)   = uy(2,:,:) 
+            uy(:,1,:)    = uy(:,ny-2,:)
+            uy(:,ny-1,:) = uy(:,2,:) 
+            uy(:,ny,:)   = uy(:,3,:)
+
+        end if 
 
         return 
 

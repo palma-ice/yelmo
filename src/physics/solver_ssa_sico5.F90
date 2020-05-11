@@ -15,7 +15,7 @@ module solver_ssa_sico5
     
 contains 
 
-    subroutine calc_vxy_ssa_matrix(vx_m,vy_m,beta_acx,beta_acy,visc_eff, &
+    subroutine calc_vxy_ssa_matrix(vx_m,vy_m,L2_norm,beta_acx,beta_acy,visc_eff, &
                     ssa_mask_acx,ssa_mask_acy,H_ice,taud_acx,taud_acy,H_grnd,z_sl,z_bed, &
                     dx,dy,ulim,boundaries,lis_settings)
         ! Solution of the system of linear equations for the horizontal velocities
@@ -27,6 +27,7 @@ contains
 
         real(prec), intent(INOUT) :: vx_m(:,:)            ! [m a^-1] Horizontal velocity x (acx-nodes)
         real(prec), intent(INOUT) :: vy_m(:,:)            ! [m a^-1] Horizontal velocity y (acy-nodes)
+        real(prec), intent(OUT)   :: L2_norm              ! L2 norm convergence check from solver
         real(prec), intent(IN)    :: beta_acx(:,:)        ! [Pa a m^-1] Basal friction (acx-nodes)
         real(prec), intent(IN)    :: beta_acy(:,:)        ! [Pa a m^-1] Basal friction (acy-nodes)
         real(prec), intent(IN)    :: visc_eff(:,:)        ! [Pa a m] Vertically integrated viscosity (aa-nodes)
@@ -70,6 +71,7 @@ contains
         
         LIS_INTEGER :: ierr
         LIS_INTEGER :: nc, nr
+        LIS_REAL    :: residual 
         LIS_MATRIX  :: lgs_a
         LIS_VECTOR  :: lgs_b, lgs_x
         LIS_SOLVER  :: solver
@@ -962,6 +964,10 @@ contains
         !!! call lis_solver_get_time(solver,solver_time,ierr)
         !!! print *, 'calc_vxy_ssa_matrix: time (s) = ', solver_time
 
+        ! Obtain the relative L2_norm == ||b-Ax||_2 / ||b||_2
+        call lis_solver_get_residualnorm(solver,residual,ierr)
+        L2_norm = real(residual,prec) 
+
         lgs_x_value = 0.0_prec
         call lis_vector_gather(lgs_x, lgs_x_value, ierr)
         call CHKERR(ierr)
@@ -1209,7 +1215,8 @@ contains
 
     end subroutine check_vel_convergence_l1rel_matrix
 
-    function check_vel_convergence_l2rel(ux,uy,ux_prev,uy_prev,mask_acx,mask_acy,ssa_resid_tol,iter,iter_max,log) result(is_converged)
+    function check_vel_convergence_l2rel(ux,uy,ux_prev,uy_prev,mask_acx,mask_acy, &
+                                        ssa_resid_tol,iter,iter_max,log,use_L2_norm,L2_norm) result(is_converged)
 
         implicit none 
 
@@ -1223,6 +1230,8 @@ contains
         integer,    intent(IN) :: iter 
         integer,    intent(IN) :: iter_max 
         logical,    intent(IN) :: log 
+        logical,    intent(IN) :: use_L2_norm           ! Use externally provided value
+        real(prec), optional, intent(IN) :: L2_norm     ! Optional, externally calculated relative L2_norm 
         logical :: is_converged
 
         ! Local variables 
@@ -1237,25 +1246,42 @@ contains
         ! Calculate residual acoording to the L2 relative error norm
         ! (as Eq. 65 in Gagliardini et al., GMD, 2013)
 
-        ! Count how many points should be checked for convergence
-        nx_check = count(abs(ux).gt.ssa_vel_tolerance .and. mask_acx)
-        ny_check = count(abs(uy).gt.ssa_vel_tolerance .and. mask_acy)
+        if (use_L2_norm) then 
+            ! Try to use external value if available 
 
-        if (nx_check .gt. 0 .or. ny_check .gt. 0) then
+            if (.not. present(L2_norm)) then 
+                write(*,*) "check_vel_convergence_l2rel:: Error: external L2_norm value must be provided as an &
+                            &argument to set use_L2_norm=.TRUE."
+                stop 
+            end if 
 
-            res1 = sqrt( sum((ux-ux_prev)*(ux-ux_prev),mask=abs(ux).gt.ssa_vel_tolerance .and. mask_acx) &
-                       + sum((uy-uy_prev)*(uy-uy_prev),mask=abs(uy).gt.ssa_vel_tolerance .and. mask_acx) )
-
-            res2 = sqrt( sum((ux+ux_prev)*(ux+ux_prev),mask=abs(ux).gt.ssa_vel_tolerance .and. mask_acy) &
-                       + sum((uy+uy_prev)*(uy+uy_prev),mask=abs(uy).gt.ssa_vel_tolerance .and. mask_acy) )
-            res2 = max(res2,1e-5)
-
-            resid = 2.0_prec*res1/res2 
+            resid = L2_norm 
 
         else 
-            ! No points available for comparison, set residual equal to zero 
+            ! Calculate our own L2 norm based on velocity solution between previous
+            ! and current iteration (following SICOPOLIS implementation)
 
-            resid = 0.0_prec 
+            ! Count how many points should be checked for convergence
+            nx_check = count(abs(ux).gt.ssa_vel_tolerance .and. mask_acx)
+            ny_check = count(abs(uy).gt.ssa_vel_tolerance .and. mask_acy)
+
+            if (nx_check .gt. 0 .or. ny_check .gt. 0) then
+
+                res1 = sqrt( sum((ux-ux_prev)*(ux-ux_prev),mask=abs(ux).gt.ssa_vel_tolerance .and. mask_acx) &
+                           + sum((uy-uy_prev)*(uy-uy_prev),mask=abs(uy).gt.ssa_vel_tolerance .and. mask_acx) )
+
+                res2 = sqrt( sum((ux+ux_prev)*(ux+ux_prev),mask=abs(ux).gt.ssa_vel_tolerance .and. mask_acy) &
+                           + sum((uy+uy_prev)*(uy+uy_prev),mask=abs(uy).gt.ssa_vel_tolerance .and. mask_acy) )
+                res2 = max(res2,1e-8)
+
+                resid = 2.0_prec*res1/res2 
+
+            else 
+                ! No points available for comparison, set residual equal to zero 
+
+                resid = 0.0_prec 
+
+            end if 
 
         end if 
 

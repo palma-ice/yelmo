@@ -139,7 +139,7 @@ contains
             ! Step 1: Calculate fields needed by ssa solver (visc_eff_int, beta_eff)
 
             ! Calculate the 3D vertical shear fields using viscosity estimated from the previous iteration 
-            call calc_vertical_shear_3D(duxdz,duydz,taub_acx,taub_acy,visc_eff,zeta_aa)
+            call calc_vertical_shear_3D(duxdz,duydz,taub_acx,taub_acy,visc_eff,zeta_aa,par%boundaries)
 
             ! Calculate 3D effective viscosity, using velocity solution from previous iteration
             call calc_visc_eff_3D(visc_eff,ux_bar,uy_bar,duxdz,duydz,ATT,zeta_aa,dx,dy,n_glen)
@@ -161,18 +161,8 @@ contains
             call calc_beta_eff(beta_eff,beta,ux_b,uy_b,F2,zeta_aa,no_slip=par%diva_no_slip)
 
             ! Stagger beta and beta_eff 
-            call stagger_beta(beta_acx,beta_acy,beta,f_grnd,f_grnd_acx,f_grnd_acy,par%beta_gl_stag)
-            call stagger_beta(beta_eff_acx,beta_eff_acy,beta_eff,f_grnd,f_grnd_acx,f_grnd_acy,par%beta_gl_stag)
-                
-            if (trim(par%boundaries) .eq. "periodic") then 
-                ! Apply periodic boundary conditions to velocity solutions 
-                call set_boundaries_periodic_staggered(beta_acx,beta_acy,xdir=.TRUE.,ydir=.TRUE.)
-                call set_boundaries_periodic_staggered(beta_eff_acx,beta_eff_acy,xdir=.TRUE.,ydir=.TRUE.)
-                
-                call set_boundaries_periodic(beta)
-                call set_boundaries_periodic(beta_eff)
-
-            end if 
+            call stagger_beta(beta_acx,beta_acy,beta,f_grnd,f_grnd_acx,f_grnd_acy,par%beta_gl_stag,par%boundaries)
+            call stagger_beta(beta_eff_acx,beta_eff_acy,beta_eff,f_grnd,f_grnd_acx,f_grnd_acy,par%beta_gl_stag,par%boundaries)
             
             ! =========================================================================================
             ! Step 2: Call the SSA solver to obtain new estimate of ux_bar/uy_bar
@@ -208,16 +198,8 @@ end if
             call calc_basal_stress(taub_acx,taub_acy,beta_eff_acx,beta_eff_acy,ux_bar,uy_bar)
 
             ! Calculate basal velocity from depth-averaged solution and basal stress
-            call calc_vel_basal(ux_b,uy_b,ux_bar,uy_bar,F2,taub_acx,taub_acy,H_ice)
+            call calc_vel_basal(ux_b,uy_b,ux_bar,uy_bar,F2,taub_acx,taub_acy,H_ice,par%boundaries)
 
-            if (trim(par%boundaries) .eq. "periodic") then 
-                ! Apply periodic boundary conditions to velocity solutions 
-
-                call set_boundaries_periodic_staggered(taub_acx,taub_acy,xdir=.TRUE.,ydir=.TRUE.)
-                call set_boundaries_periodic_staggered(ux_b,uy_b,xdir=.TRUE.,ydir=.TRUE.)
-                
-            end if 
-            
             ! Exit iterations if ssa solution has converged
             if (is_converged) exit 
             
@@ -338,7 +320,7 @@ end if
 
     end subroutine calc_vel_horizontal_3D
 
-    subroutine calc_vertical_shear_3D(duxdz,duydz,taub_acx,taub_acy,visc_eff,zeta_aa)
+    subroutine calc_vertical_shear_3D(duxdz,duydz,taub_acx,taub_acy,visc_eff,zeta_aa,boundaries)
         ! Calculate vertical shear terms (L19, Eq. 36)
 
         implicit none 
@@ -349,7 +331,8 @@ end if
         real(prec), intent(IN)  :: taub_acy(:,:)        ! [Pa],     ac-nodes
         real(prec), intent(IN)  :: visc_eff(:,:,:)      ! [Pa a m], aa-nodes
         real(prec), intent(IN)  :: zeta_aa(:)           ! [-]
-        
+        character(len=*), intent(IN) :: boundaries 
+
         ! Local variables 
         integer :: i, j, k, nx, ny, nz_aa 
         integer :: ip1, jp1 
@@ -378,6 +361,22 @@ end if
         end do 
         end do 
         end do 
+
+        if (trim(boundaries) .eq. "periodic") then
+
+            duxdz(1,:,:)    = duxdz(nx-2,:,:) 
+            duxdz(nx-1,:,:) = duxdz(2,:,:) 
+            duxdz(nx,:,:)   = duxdz(3,:,:) 
+            duxdz(:,1,:)    = duxdz(:,ny-1,:)
+            duxdz(:,ny,:)   = duxdz(:,2,:) 
+
+            duydz(1,:,:)    = duydz(nx-1,:,:) 
+            duydz(nx,:,:)   = duydz(2,:,:) 
+            duydz(:,1,:)    = duydz(:,ny-2,:)
+            duydz(:,ny-1,:) = duydz(:,2,:) 
+            duydz(:,ny,:)   = duydz(:,3,:)
+
+        end if 
 
         return 
 
@@ -468,26 +467,27 @@ end if
 
     end subroutine calc_visc_eff_3D 
 
-    subroutine calc_F_integral(Fint,visc,H_ice,zeta_aa,n)
+    subroutine calc_F_integral(F_int,visc,H_ice,zeta_aa,n)
         ! Useful integrals, following Arthern et al. (2015) Eq. 7,
         ! and Lipscomb et al. (2019), Eq. 30
         ! F_n = int_zb_zs{ 1/visc * ((s-z)/H)**n dz}
         implicit none 
 
-        real(prec), intent(OUT) :: Fint(:,:) 
+        real(prec), intent(OUT) :: F_int(:,:) 
         real(prec), intent(IN)  :: visc(:,:,:)
         real(prec), intent(IN)  :: H_ice(:,:)
         real(prec), intent(IN)  :: zeta_aa(:)
         real(prec), intent(IN)  :: n  
 
         ! Local variables 
-        integer :: i, j, nx, ny, nz_aa
+        integer :: i, j, nx, ny, nz_aa, np
         integer :: im1, jm1, ip1, jp1 
-        real(prec) :: Fint_min 
+        real(prec) :: F_int_min 
         real(prec), parameter :: visc_min = 1e3_prec
 
         real(prec) :: H_ice_now
         real(prec), allocatable :: visc_now(:)
+        real(prec), allocatable :: F_int_ab(:,:) 
 
         nx    = size(visc,1)
         ny    = size(visc,2) 
@@ -495,15 +495,18 @@ end if
 
         allocate(visc_now(nz_aa))
 
-        ! Determine the minimum value of Fint, to assign when H_ice == 0,
-        ! since Fint should be nonzero everywhere for numerics
-        Fint_min = integrate_trapezoid1D_pt((1.0_prec/visc_min)*(1.0_prec-zeta_aa)**n,zeta_aa)
+        ! Determine the minimum value of F_int, to assign when H_ice == 0,
+        ! since F_int should be nonzero everywhere for numerics
+        F_int_min = integrate_trapezoid1D_pt((1.0_prec/visc_min)*(1.0_prec-zeta_aa)**n,zeta_aa)
 
-        Fint = Fint_min
+        F_int = F_int_min
+
+if (.FALSE.) then
+    ! Default algorithm
 
         ! Vertically integrate at each point
-        do j = 2, ny-1 
-        do i = 2, nx-1
+        do j = 1, ny 
+        do i = 1, nx
 
             im1 = max(i-1,1)
             jm1 = max(j-1,1)
@@ -522,17 +525,87 @@ end if
 !                           + (visc(i-1,j-1,:)+visc(i+1,j-1,:)+visc(i+1,j+1,:)+visc(i-1,j+1,:)) / 16.0 
                 visc_now = visc(i,j,:) 
 
-                Fint(i,j) = integrate_trapezoid1D_pt((H_ice_now/visc_now)*(1.0_prec-zeta_aa)**n,zeta_aa)
+                F_int(i,j) = integrate_trapezoid1D_pt((H_ice_now/visc_now)*(1.0_prec-zeta_aa)**n,zeta_aa)
 
             else 
 
-                Fint(i,j) = Fint_min
+                F_int(i,j) = F_int_min
 
             end if 
 
         end do 
         end do 
 
+else 
+    ! Vertically integrate at ab-nodes, then unstagger
+
+        allocate(F_int_ab(nx,ny)) 
+
+        ! Vertically integrate at each ab-node
+        do j = 1, ny 
+        do i = 1, nx
+
+            im1 = max(i-1,1)
+            jm1 = max(j-1,1)
+            ip1 = min(i+1,nx)
+            jp1 = min(j+1,ny)
+
+            H_ice_now = 0.25*(H_ice(i,j)+H_ice(ip1,j)+H_ice(i,jp1)+H_ice(ip1,jp1))
+
+            if (H_ice_now .gt. 0.0_prec) then 
+                ! Viscosity should be nonzero here, perform integration 
+
+                np       = 0 
+                visc_now = 0.0 
+                if (H_ice(i,j) .gt. 0.0) then 
+                    visc_now = visc_now + visc(i,j,:) 
+                    np = np + 1 
+                end if 
+                if (H_ice(i+1,j) .gt. 0.0) then 
+                    visc_now = visc_now + visc(i+1,j,:) 
+                    np = np + 1 
+                end if 
+                if (H_ice(i,j+1) .gt. 0.0) then 
+                    visc_now = visc_now + visc(i,j+1,:) 
+                    np = np + 1 
+                end if 
+                if (H_ice(i+1,j+1) .gt. 0.0) then 
+                    visc_now = visc_now + visc(i+1,j+1,:) 
+                    np = np + 1 
+                end if 
+
+                if (np .gt. 0) then 
+                    visc_now = visc_now / real(np,prec) 
+                end if 
+
+                !visc_now = 0.25*(visc(i,j,:)+visc(ip1,j,:)+visc(i,jp1,:)+visc(ip1,jp1,:))
+
+                F_int_ab(i,j) = integrate_trapezoid1D_pt((H_ice_now/visc_now)*(1.0_prec-zeta_aa)**n,zeta_aa)
+
+            else 
+
+                F_int_ab(i,j) = F_int_min
+
+            end if 
+
+        end do 
+        end do
+
+        ! Unstagger ab-nodes to aa-nodes 
+        do j = 1, ny 
+        do i = 1, nx
+
+            im1 = max(i-1,1)
+            jm1 = max(j-1,1)
+            ip1 = min(i+1,nx)
+            jp1 = min(j+1,ny)
+    
+            F_int(i,j) = 0.25*(F_int_ab(i,j)+F_int_ab(im1,j)+F_int_ab(i,jm1)+F_int_ab(im1,jm1))
+
+        end do 
+        end do  
+
+end if 
         return
 
     end subroutine calc_F_integral
@@ -595,7 +668,7 @@ end if
 
     end subroutine calc_beta_eff 
 
-    subroutine calc_vel_basal(ux_b,uy_b,ux_bar,uy_bar,F2,taub_acx,taub_acy,H_ice)
+    subroutine calc_vel_basal(ux_b,uy_b,ux_bar,uy_bar,F2,taub_acx,taub_acy,H_ice,boundaries)
         ! Calculate basal sliding following Goldberg (2011), Eq. 34
         ! (analgous to L19, Eq. 32)
 
@@ -609,7 +682,8 @@ end if
         real(prec), intent(IN)  :: taub_acx(:,:) 
         real(prec), intent(IN)  :: taub_acy(:,:)
         real(prec), intent(IN)  :: H_ice(:,:)
-        
+        character(len=*), intent(IN) :: boundaries 
+
         ! Local variables 
         integer    :: i, j, nx, ny 
         integer    :: ip1, jp1 
@@ -658,6 +732,22 @@ end if
 
         end do 
         end do  
+
+        if (trim(boundaries) .eq. "periodic") then 
+
+            ux_b(1,:)    = ux_b(nx-2,:) 
+            ux_b(nx-1,:) = ux_b(2,:) 
+            ux_b(nx,:)   = ux_b(3,:) 
+            ux_b(:,1)    = ux_b(:,ny-1)
+            ux_b(:,ny)   = ux_b(:,2) 
+            
+            uy_b(1,:)    = uy_b(nx-1,:) 
+            uy_b(nx,:)   = uy_b(2,:) 
+            uy_b(:,1)    = uy_b(:,ny-2)
+            uy_b(:,ny-1) = uy_b(:,2) 
+            uy_b(:,ny)   = uy_b(:,3)
+
+        end if 
 
         return
         

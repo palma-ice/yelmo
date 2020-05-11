@@ -93,7 +93,6 @@ contains
         real(prec), intent(IN)  :: beta_min 
         character(len=*), intent(IN) :: boundaries 
 
-
         ! Local variables 
         integer :: i, j, nx, ny 
         real(prec), allocatable :: logbeta(:,:) 
@@ -190,6 +189,14 @@ contains
             ! Redefine beta at the summit to reduce singularity
             ! in MISMIP symmetric experiments
             beta(1,:) = beta(2,:) 
+
+        else if (trim(boundaries) .eq. "periodic") then 
+            
+            beta(1,:)  = beta(nx-1,:)
+            beta(nx,:) = beta(2,:) 
+            beta(:,1)  = beta(:,ny-1)
+            beta(:,ny) = beta(:,2) 
+
         end if 
 
         ! Finally ensure that beta for grounded ice is higher than the lower allowed limit
@@ -204,7 +211,7 @@ contains
 
     end subroutine calc_beta 
 
-    subroutine stagger_beta(beta_acx,beta_acy,beta,f_grnd,f_grnd_acx,f_grnd_acy,beta_gl_stag)
+    subroutine stagger_beta(beta_acx,beta_acy,beta,f_grnd,f_grnd_acx,f_grnd_acy,beta_gl_stag,boundaries)
 
         implicit none 
 
@@ -215,6 +222,13 @@ contains
         real(prec), intent(IN)  :: f_grnd_acx(:,:) 
         real(prec), intent(IN)  :: f_grnd_acy(:,:) 
         integer,    intent(IN)  :: beta_gl_stag 
+        character(len=*), intent(IN) :: boundaries 
+
+        ! Local variables 
+        integer :: nx, ny 
+
+        nx = size(beta_acx,1)
+        ny = size(beta_acx,2) 
         
         ! 5. Apply staggering method with particular care for the grounding line 
         select case(beta_gl_stag) 
@@ -252,6 +266,22 @@ contains
                 stop 
 
         end select 
+
+        if (trim(boundaries) .eq. "periodic") then 
+
+            beta_acx(1,:)    = beta_acx(nx-2,:) 
+            beta_acx(nx-1,:) = beta_acx(2,:) 
+            beta_acx(nx,:)   = beta_acx(3,:) 
+            beta_acx(:,1)    = beta_acx(:,ny-1)
+            beta_acx(:,ny)   = beta_acx(:,2) 
+
+            beta_acy(1,:)    = beta_acy(nx-1,:) 
+            beta_acy(nx,:)   = beta_acy(2,:) 
+            beta_acy(:,1)    = beta_acy(:,ny-2)
+            beta_acy(:,ny-1) = beta_acy(:,2) 
+            beta_acy(:,ny)   = beta_acy(:,3)
+
+        end if 
 
         return 
 

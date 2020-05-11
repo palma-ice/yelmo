@@ -160,7 +160,7 @@ contains
 
         ! Define grid points with ssa active (uses beta from previous timestep)
         call set_ssa_masks(dyn%now%ssa_mask_acx,dyn%now%ssa_mask_acy,dyn%now%beta_acx,dyn%now%beta_acy, &
-                           tpo%now%H_ice,tpo%now%f_grnd_acx,tpo%now%f_grnd_acy,dyn%par%ssa_beta_max,dyn%par%use_ssa)
+                           tpo%now%H_ice,tpo%now%f_grnd_acx,tpo%now%f_grnd_acy,dyn%par%ssa_beta_max,use_ssa=.TRUE.)
 
         ! Set diva parameters from Yelmo settings 
         diva_par%ssa_solver_opt = dyn%par%ssa_solver_opt 
@@ -180,7 +180,7 @@ contains
         diva_par%ssa_iter_rel   = dyn%par%ssa_iter_rel 
         diva_par%ssa_iter_conv  = dyn%par%ssa_iter_conv 
         diva_par%ssa_write_log  = yelmo_log
-        
+
         call calc_velocity_diva(dyn%now%ux,dyn%now%uy,dyn%now%ux_i,dyn%now%uy_i,dyn%now%ux_bar,dyn%now%uy_bar, &
                                 dyn%now%ux_b,dyn%now%uy_b,dyn%now%duxdz,dyn%now%duydz,dyn%now%taub_acx,dyn%now%taub_acy, &
                                 dyn%now%visc_eff,dyn%now%visc_eff_int,dyn%now%ssa_mask_acx,dyn%now%ssa_mask_acy, &
@@ -925,7 +925,7 @@ contains
 
             ! Stagger beta
             call stagger_beta(dyn%now%beta_acx,dyn%now%beta_acy,dyn%now%beta,tpo%now%f_grnd, &
-                            tpo%now%f_grnd_acx,tpo%now%f_grnd_acy,dyn%par%beta_gl_stag)
+                            tpo%now%f_grnd_acx,tpo%now%f_grnd_acy,dyn%par%beta_gl_stag,dyn%par%boundaries)
 
             !   2. Calculate effective viscosity
             

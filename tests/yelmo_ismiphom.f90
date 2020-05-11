@@ -100,7 +100,12 @@ program yelmo_ismiphom
             
             yelmo1%tpo%par%topo_fixed   = .TRUE. 
             yelmo1%dyn%par%diva_no_slip = .TRUE. 
-            yelmo1%dyn%par%use_ssa      = .FALSE. 
+
+            if (trim(yelmo1%dyn%par%solver) .eq. "hybrid") then 
+                ! For this experiment, no basal sliding is allowed, so disable
+                ! ssa for hybrid solver (ie, set hybrid==SIA only)
+                yelmo1%dyn%par%use_ssa  = .FALSE. 
+            end if 
 
             ! Not used in this experiment, but set it to a constant value anyway
             yelmo1%dyn%par%beta_method  = -1 

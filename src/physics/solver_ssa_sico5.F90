@@ -1302,13 +1302,13 @@ contains
             ! Write summary to log if desired 
 
             ! Also calculate maximum error magnitude for perspective
-            if (count(abs(ux) .gt. ssa_vel_tolerance) .gt. 0) then 
+            if (nx_check .gt. 0) then 
                 ux_resid_max = maxval(abs(ux-ux_prev),mask=abs(ux).gt.ssa_vel_tolerance .and. mask_acx)
             else 
                 ux_resid_max = 0.0 
             end if 
 
-            if (count(abs(uy) .gt. ssa_vel_tolerance) .gt. 0) then 
+            if (ny_check .gt. 0) then 
                 uy_resid_max = maxval(abs(uy - uy_prev),mask=abs(uy).gt.ssa_vel_tolerance .and. mask_acy)
             else 
                 uy_resid_max = 0.0 

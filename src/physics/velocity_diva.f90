@@ -167,7 +167,7 @@ contains
             ! =========================================================================================
             ! Step 2: Call the SSA solver to obtain new estimate of ux_bar/uy_bar
 
-if (.FALSE.) then 
+if (.TRUE.) then 
             if (iter .gt. 1) then
                 ! Update ssa mask based on convergence with previous step to reduce area being solved 
                 call update_ssa_mask_convergence(ssa_mask_acx,ssa_mask_acy,ssa_err_acx,ssa_err_acy,err_lim=real(1e-3,prec)) 

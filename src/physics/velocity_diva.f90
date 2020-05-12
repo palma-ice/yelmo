@@ -174,6 +174,7 @@ if (.TRUE.) then
             end if 
 end if 
             
+            ! Call ssa solver
             call calc_vxy_ssa_matrix(ux_bar,uy_bar,L2_norm,beta_eff_acx,beta_eff_acy,visc_eff_int,ssa_mask_acx,ssa_mask_acy,H_ice, &
                         taud_acx,taud_acy,H_grnd,z_sl,z_bed,dx,dy,par%ssa_vel_max,par%boundaries,par%ssa_solver_opt)
 
@@ -244,6 +245,7 @@ end if
         integer :: i, j, k, ip1, jp1, nx, ny, nz_aa  
         real(prec) :: H_ice_ac 
         real(prec), allocatable :: visc_eff_ac(:) 
+        real(prec), allocatable :: F1(:,:,:) 
         real(prec), allocatable :: F1_ac(:) 
         
         nx    = size(ux,1)
@@ -251,8 +253,18 @@ end if
         nz_aa = size(ux,3) 
 
         allocate(visc_eff_ac(nz_aa))
+        allocate(F1(nx,ny,nz_aa))
         allocate(F1_ac(nz_aa))
 
+        ! First calculate F1 array on aa-nodes 
+        ! (performing integral before staggering seems to improve result slightly)
+        do j = 1, ny 
+        do i = 1, nx 
+            F1(i,j,:) = integrate_trapezoid1D_1D((H_ice(i,j)/visc_eff(i,j,:))*(1.0-zeta_aa),zeta_aa)
+        end do
+        end do  
+
+        ! Next calculate 3D horizontal velocity components 
         do j = 1, ny 
         do i = 1, nx 
 
@@ -261,38 +273,28 @@ end if
 
             ! === x direction ===============================================
 
-            ! Stagger viscosity column to ac-nodes 
+            ! Stagger F1 column to ac-nodes 
             if (H_ice(i,j) .gt. 0.0 .and. H_ice(ip1,j) .eq. 0.0) then 
-                visc_eff_ac = visc_eff(i,j,:) 
-            else if (H_ice(i,j) .eq. 0.0 .and. H_ice(ip1,j) .gt. 0.0) then 
-                visc_eff_ac = visc_eff(ip1,j,:)
-            else  
-                visc_eff_ac = 0.5_prec*(visc_eff(i,j,:)+visc_eff(ip1,j,:))
+                F1_ac = F1(i,j,:) 
+            else if (H_ice(i,j) .eq. 0.0 .and. H_ice(ip1,j) .gt. 0.0) then
+                F1_ac = F1(ip1,j,:)
+            else 
+                F1_ac = 0.5_prec*(F1(i,j,:) + F1(ip1,j,:))
             end if 
-
-            H_ice_ac    = 0.5_prec*(H_ice(i,j)+H_ice(ip1,j))
-
-            ! Calculate integrated term of L19, Eq. 29 
-            F1_ac = integrate_trapezoid1D_1D((H_ice_ac/visc_eff_ac)*(1.0-zeta_aa),zeta_aa)
 
             ! Calculate velocity column 
             ux(i,j,:) = ux_b(i,j) + taub_acx(i,j)*F1_ac 
 
             ! === y direction ===============================================
 
-            ! Stagger viscosity column to ac-nodes 
+            ! Stagger F1 column to ac-nodes 
             if (H_ice(i,j) .gt. 0.0 .and. H_ice(i,jp1) .eq. 0.0) then 
-                visc_eff_ac = visc_eff(i,j,:) 
-            else if (H_ice(i,j) .eq. 0.0 .and. H_ice(i,jp1) .gt. 0.0) then 
-                visc_eff_ac = visc_eff(i,jp1,:)
-            else  
-                visc_eff_ac = 0.5_prec*(visc_eff(i,j,:)+visc_eff(i,jp1,:))
+                F1_ac = F1(i,j,:) 
+            else if (H_ice(i,j) .eq. 0.0 .and. H_ice(i,jp1) .gt. 0.0) then
+                F1_ac = F1(i,jp1,:)
+            else 
+                F1_ac = 0.5_prec*(F1(i,j,:) + F1(i,jp1,:))
             end if 
-                
-            H_ice_ac    = 0.5_prec*(H_ice(i,j)+H_ice(i,jp1))
-            
-            ! Calculate integrated term of L19, Eq. 29 
-            F1_ac = integrate_trapezoid1D_1D((H_ice_ac/visc_eff_ac)*(1.0-zeta_aa),zeta_aa)
 
             ! Calculate velocity column
             uy(i,j,:) = uy_b(i,j) + taub_acy(i,j)*F1_ac  
@@ -300,6 +302,7 @@ end if
         end do 
         end do  
 
+        ! Apply boundary conditions as needed 
         if (trim(boundaries) .eq. "periodic") then
 
             ux(1,:,:)    = ux(nx-2,:,:) 
@@ -362,6 +365,7 @@ end if
         end do 
         end do 
 
+        ! Apply boundary conditions as needed 
         if (trim(boundaries) .eq. "periodic") then
 
             duxdz(1,:,:)    = duxdz(nx-2,:,:) 
@@ -485,24 +489,15 @@ end if
         real(prec) :: F_int_min 
         real(prec), parameter :: visc_min = 1e3_prec
 
-        real(prec) :: H_ice_now
-        real(prec), allocatable :: visc_now(:)
-        real(prec), allocatable :: F_int_ab(:,:) 
-
         nx    = size(visc,1)
         ny    = size(visc,2) 
         nz_aa = size(visc,3)
-
-        allocate(visc_now(nz_aa))
 
         ! Determine the minimum value of F_int, to assign when H_ice == 0,
         ! since F_int should be nonzero everywhere for numerics
         F_int_min = integrate_trapezoid1D_pt((1.0_prec/visc_min)*(1.0_prec-zeta_aa)**n,zeta_aa)
 
         F_int = F_int_min
-
-if (.FALSE.) then
-    ! Default algorithm
 
         ! Vertically integrate at each point
         do j = 1, ny 
@@ -516,14 +511,7 @@ if (.FALSE.) then
             if (H_ice(i,j) .gt. 0.0_prec) then 
                 ! Viscosity should be nonzero here, perform integration 
 
-                visc_now = visc(i,j,:) 
-                H_ice_now = H_ice(i,j) 
-                
-                ! Or, use weighted ice thickness for stability
-!                 H_ice_now = (4.0*H_ice(i,j) + 2.0*(H_ice(i-1,j)+H_ice(i+1,j)+H_ice(i,j-1)+H_ice(i,j+1))) / 16.0 &
-!                           + (H_ice(i-1,j-1)+H_ice(i+1,j-1)+H_ice(i+1,j+1)+H_ice(i-1,j+1)) / 16.0 
-                
-                F_int(i,j) = integrate_trapezoid1D_pt((H_ice_now/visc_now)*(1.0_prec-zeta_aa)**n,zeta_aa)
+                F_int(i,j) = integrate_trapezoid1D_pt((H_ice(i,j)/visc(i,j,:) )*(1.0_prec-zeta_aa)**n,zeta_aa)
 
             else 
 
@@ -534,78 +522,6 @@ if (.FALSE.) then
         end do 
         end do 
 
-else 
-    ! Vertically integrate at ab-nodes, then unstagger
-
-        allocate(F_int_ab(nx,ny)) 
-
-        ! Vertically integrate at each ab-node
-        do j = 1, ny 
-        do i = 1, nx
-
-            im1 = max(i-1,1)
-            jm1 = max(j-1,1)
-            ip1 = min(i+1,nx)
-            jp1 = min(j+1,ny)
-
-            H_ice_now = 0.25*(H_ice(i,j)+H_ice(ip1,j)+H_ice(i,jp1)+H_ice(ip1,jp1))
-
-            if (H_ice_now .gt. 0.0_prec) then 
-                ! Viscosity should be nonzero here, perform integration 
-
-                ! Stagger viscosity to ab-node using only points with ice thickness present
-                np       = 0 
-                visc_now = 0.0 
-                if (H_ice(i,j) .gt. 0.0) then 
-                    visc_now = visc_now + visc(i,j,:) 
-                    np = np + 1 
-                end if 
-                if (H_ice(ip1,j) .gt. 0.0) then 
-                    visc_now = visc_now + visc(ip1,j,:) 
-                    np = np + 1 
-                end if 
-                if (H_ice(i,jp1) .gt. 0.0) then 
-                    visc_now = visc_now + visc(i,jp1,:) 
-                    np = np + 1 
-                end if 
-                if (H_ice(ip1,jp1) .gt. 0.0) then 
-                    visc_now = visc_now + visc(ip1,jp1,:) 
-                    np = np + 1 
-                end if 
-
-                ! Get averaged visc at ab-node
-                if (np .gt. 0) then 
-                    visc_now = visc_now / real(np,prec) 
-                end if 
-
-                ! Vertically integrate to get F-integral
-                F_int_ab(i,j) = integrate_trapezoid1D_pt((H_ice_now/visc_now)*(1.0_prec-zeta_aa)**n,zeta_aa)
-
-            else 
-                ! Assign minimum value F-integral where no ice exists
-
-                F_int_ab(i,j) = F_int_min
-
-            end if 
-
-        end do 
-        end do
-
-        ! Unstagger ab-nodes to aa-nodes 
-        do j = 1, ny 
-        do i = 1, nx
-
-            im1 = max(i-1,1)
-            jm1 = max(j-1,1)
-            ip1 = min(i+1,nx)
-            jp1 = min(j+1,ny)
-    
-            F_int(i,j) = 0.25*(F_int_ab(i,j)+F_int_ab(im1,j)+F_int_ab(i,jm1)+F_int_ab(im1,jm1))
-
-        end do 
-        end do  
-
-end if 
         return
 
     end subroutine calc_F_integral
@@ -698,41 +614,38 @@ end if
             ip1 = min(i,nx)
             jp1 = min(j,ny)
 
+            ! ==== x-direction =====
+
+            ! Stagger the F2 integral to the ac-nodes
             if (H_ice(i,j) .gt. 0.0 .and. H_ice(ip1,j) .eq. 0.0) then 
-
                 F2_ac = F2(i,j) 
-
             else if (H_ice(i,j) .eq. 0.0 .and. H_ice(ip1,j) .gt. 0.0) then
-
                 F2_ac = F2(ip1,j)
-
             else 
-
                 F2_ac = 0.5_prec*(F2(i,j) + F2(ip1,j))
-
             end if 
 
+            ! Calculate basal velocity component 
             ux_b(i,j) = ux_bar(i,j) - taub_acx(i,j)*F2_ac 
 
-            if (H_ice(i,j) .gt. 0.0 .and. H_ice(i,jp1) .eq. 0.0) then 
-
-                F2_ac = F2(i,j) 
-
-            else if (H_ice(i,j) .eq. 0.0 .and. H_ice(i,jp1) .gt. 0.0) then
-
-                F2_ac = F2(i,jp1)
-
-            else 
-
-                F2_ac = 0.5_prec*(F2(i,j) + F2(i,jp1))
-
-            end if 
+            ! ==== y-direction =====
             
+            ! Stagger the F2 integral to the ac-nodes
+            if (H_ice(i,j) .gt. 0.0 .and. H_ice(i,jp1) .eq. 0.0) then 
+                F2_ac = F2(i,j) 
+            else if (H_ice(i,j) .eq. 0.0 .and. H_ice(i,jp1) .gt. 0.0) then
+                F2_ac = F2(i,jp1)
+            else 
+                F2_ac = 0.5_prec*(F2(i,j) + F2(i,jp1))
+            end if 
+                
+            ! Calculate basal velocity component 
             uy_b(i,j) = uy_bar(i,j) - taub_acy(i,j)*F2_ac 
 
         end do 
         end do  
 
+        ! Apply boundary conditions as needed 
         if (trim(boundaries) .eq. "periodic") then 
 
             ux_b(1,:)    = ux_b(nx-2,:) 

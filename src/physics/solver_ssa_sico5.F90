@@ -1242,7 +1242,7 @@ contains
         character(len=1) :: converged_txt 
 
         real(prec), parameter :: ssa_vel_tolerance = 1e-2   ! [m/a] only consider points with velocity above this tolerance limit
-        
+
         ! Calculate residual acoording to the L2 relative error norm
         ! (as Eq. 65 in Gagliardini et al., GMD, 2013)
 
@@ -1265,12 +1265,12 @@ contains
             nx_check = count(abs(ux).gt.ssa_vel_tolerance .and. mask_acx)
             ny_check = count(abs(uy).gt.ssa_vel_tolerance .and. mask_acy)
 
-            if (nx_check .gt. 0 .or. ny_check .gt. 0) then
+            if ( (nx_check+ny_check) .gt. 0 ) then
 
                 res1 = sqrt( sum((ux-ux_prev)*(ux-ux_prev),mask=abs(ux).gt.ssa_vel_tolerance .and. mask_acx) &
-                           + sum((uy-uy_prev)*(uy-uy_prev),mask=abs(uy).gt.ssa_vel_tolerance .and. mask_acx) )
+                           + sum((uy-uy_prev)*(uy-uy_prev),mask=abs(uy).gt.ssa_vel_tolerance .and. mask_acy) )
 
-                res2 = sqrt( sum((ux+ux_prev)*(ux+ux_prev),mask=abs(ux).gt.ssa_vel_tolerance .and. mask_acy) &
+                res2 = sqrt( sum((ux+ux_prev)*(ux+ux_prev),mask=abs(ux).gt.ssa_vel_tolerance .and. mask_acx) &
                            + sum((uy+uy_prev)*(uy+uy_prev),mask=abs(uy).gt.ssa_vel_tolerance .and. mask_acy) )
                 res2 = max(res2,1e-8)
 
@@ -1309,14 +1309,14 @@ contains
             end if 
 
             if (ny_check .gt. 0) then 
-                uy_resid_max = maxval(abs(uy - uy_prev),mask=abs(uy).gt.ssa_vel_tolerance .and. mask_acy)
+                uy_resid_max = maxval(abs(uy-uy_prev),mask=abs(uy).gt.ssa_vel_tolerance .and. mask_acy)
             else 
                 uy_resid_max = 0.0 
             end if 
 
             ! Write summary to log
-            write(*,"(a,i4,2i8,3g12.4,a2)") &
-                "ssa: ", iter, nx_check, ny_check, resid, ux_resid_max, uy_resid_max, trim(converged_txt)
+            write(*,"(a,a2,i4,g12.4,a3,2i8,2g12.4)") &
+                "ssa: ", trim(converged_txt), iter, resid, " | ", nx_check, ny_check, ux_resid_max, uy_resid_max 
 
         end if 
         
@@ -1335,16 +1335,10 @@ contains
         real(prec), intent(IN)    :: uy_prev
         real(prec), intent(IN)    :: rel
 
-        !real(prec), parameter :: du_max = 100.0 
-
         ! Apply relaxation 
         ux = rel*ux + (1.0-rel)*ux_prev 
         uy = rel*uy + (1.0-rel)*uy_prev
 
-        ! Additionally avoid really abrupt changes 
-        !if (abs(ux-ux_prev) .gt. du_max) ux = ux_prev + sign(du_max,ux-ux_prev)
-        !if (abs(uy-uy_prev) .gt. du_max) uy = uy_prev + sign(du_max,uy-uy_prev)
-        
         return 
 
     end subroutine relax_ssa

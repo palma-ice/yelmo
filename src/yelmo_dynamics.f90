@@ -1014,7 +1014,7 @@ end if
 
             ! Check for convergence
             is_converged = check_vel_convergence_l2rel(dyn%now%ux_b,dyn%now%uy_b,ux_b_prev,uy_b_prev, &
-                                        dyn%now%ssa_mask_acx.gt.0.0_prec,dyn%now%ssa_mask_acy.gt.0.0_prec, &
+                                        dyn%now%ssa_mask_acx.gt.0,dyn%now%ssa_mask_acy.gt.0, &
                                         dyn%par%ssa_iter_conv,iter,dyn%par%ssa_iter_max,yelmo_log,use_L2_norm=.FALSE.)
 
             ! Calculate an L1 error metric over matrix for diagnostics

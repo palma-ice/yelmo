@@ -183,7 +183,7 @@ end if
             
             ! Check for convergence
             is_converged = check_vel_convergence_l2rel(ux_bar,uy_bar,ux_bar_nm1,uy_bar_nm1, &
-                                            ssa_mask_acx.gt.0.0_prec,ssa_mask_acy.gt.0.0_prec, &
+                                            ssa_mask_acx.gt.0.0,ssa_mask_acy.gt.0.0, &
                                             par%ssa_iter_conv,iter,par%ssa_iter_max,par%ssa_write_log, &
                                             use_L2_norm=.FALSE.,L2_norm=L2_norm)
 
@@ -516,15 +516,13 @@ if (.FALSE.) then
             if (H_ice(i,j) .gt. 0.0_prec) then 
                 ! Viscosity should be nonzero here, perform integration 
 
-                ! Get weighted ice thickness for stability
+                visc_now = visc(i,j,:) 
+                H_ice_now = H_ice(i,j) 
+                
+                ! Or, use weighted ice thickness for stability
 !                 H_ice_now = (4.0*H_ice(i,j) + 2.0*(H_ice(i-1,j)+H_ice(i+1,j)+H_ice(i,j-1)+H_ice(i,j+1))) / 16.0 &
 !                           + (H_ice(i-1,j-1)+H_ice(i+1,j-1)+H_ice(i+1,j+1)+H_ice(i-1,j+1)) / 16.0 
-                H_ice_now = H_ice(i,j) 
-
-!                 visc_now = (4.0*visc(i,j,:) + 2.0*(visc(i-1,j,:)+visc(i+1,j,:)+visc(i,j-1,:)+visc(i,j+1,:))) / 16.0 &
-!                           + (visc(i-1,j-1,:)+visc(i+1,j-1,:)+visc(i+1,j+1,:)+visc(i-1,j+1,:)) / 16.0 
-                visc_now = visc(i,j,:) 
-
+                
                 F_int(i,j) = integrate_trapezoid1D_pt((H_ice_now/visc_now)*(1.0_prec-zeta_aa)**n,zeta_aa)
 
             else 
@@ -555,34 +553,36 @@ else
             if (H_ice_now .gt. 0.0_prec) then 
                 ! Viscosity should be nonzero here, perform integration 
 
+                ! Stagger viscosity to ab-node using only points with ice thickness present
                 np       = 0 
                 visc_now = 0.0 
                 if (H_ice(i,j) .gt. 0.0) then 
                     visc_now = visc_now + visc(i,j,:) 
                     np = np + 1 
                 end if 
-                if (H_ice(i+1,j) .gt. 0.0) then 
-                    visc_now = visc_now + visc(i+1,j,:) 
+                if (H_ice(ip1,j) .gt. 0.0) then 
+                    visc_now = visc_now + visc(ip1,j,:) 
                     np = np + 1 
                 end if 
-                if (H_ice(i,j+1) .gt. 0.0) then 
-                    visc_now = visc_now + visc(i,j+1,:) 
+                if (H_ice(i,jp1) .gt. 0.0) then 
+                    visc_now = visc_now + visc(i,jp1,:) 
                     np = np + 1 
                 end if 
-                if (H_ice(i+1,j+1) .gt. 0.0) then 
-                    visc_now = visc_now + visc(i+1,j+1,:) 
+                if (H_ice(ip1,jp1) .gt. 0.0) then 
+                    visc_now = visc_now + visc(ip1,jp1,:) 
                     np = np + 1 
                 end if 
 
+                ! Get averaged visc at ab-node
                 if (np .gt. 0) then 
                     visc_now = visc_now / real(np,prec) 
                 end if 
 
-                !visc_now = 0.25*(visc(i,j,:)+visc(ip1,j,:)+visc(i,jp1,:)+visc(ip1,jp1,:))
-
+                ! Vertically integrate to get F-integral
                 F_int_ab(i,j) = integrate_trapezoid1D_pt((H_ice_now/visc_now)*(1.0_prec-zeta_aa)**n,zeta_aa)
 
             else 
+                ! Assign minimum value F-integral where no ice exists
 
                 F_int_ab(i,j) = F_int_min
 

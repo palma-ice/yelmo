@@ -19,7 +19,7 @@ program yelmo_ismiphom
     integer    :: n  
 
     character(len=56) :: grid_name, L_str
-    real(prec) :: L, dx, x0, alpha, omega    
+    real(prec) :: L, dx, x0, alpha, omega, f_extend    
     integer    :: nx  
 
     real(8) :: cpu_start_time, cpu_end_time, cpu_dtime  
@@ -45,6 +45,7 @@ program yelmo_ismiphom
     call nml_read(path_par,"control","experiment",   experiment)    ! "fixed", "moving", "mismip", "EXPA", "EXPB", "BUELER-A"
     call nml_read(path_par,"control","L",            L)             ! [km] Length scale
     call nml_read(path_par,"control","nx",           nx)            ! Number of grid points in one direction
+    call nml_read(path_par,"control","f_extend",     f_extend)      ! Extend domain by half a period?
     
     ! Timing parameters 
     call nml_read(path_par,"control","time_init",    time_init)     ! [yr] Starting time
@@ -58,9 +59,12 @@ program yelmo_ismiphom
     x0 = 0.0_prec 
     dx = L / (nx-2)
 
-    ! Now extend domain by half a period in each direction 
-    x0 = -0.5*L 
-    nx = (2*L) / dx + 1
+
+    ! If desired, extend domain by fraction of a period in each direction to avoid edge effects
+    if (f_extend .gt. 0.0) then 
+        x0 = -f_extend*L 
+        nx = L*(1.0+2.0*f_extend) / dx + 1
+    end if 
 
 !     do n = 1, nx 
 !         write(*,*) n, x0 + (n-1)*dx 

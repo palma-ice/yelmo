@@ -4,7 +4,8 @@
     experiment   = "EXPC"               ! "EXPA", "EXPC"
     L            = 10.0                 ! [km] Length scale
     nx           = 40                   ! Number of grid points in one direction of square
-    
+    f_extend     = 0.5                  ! Extend domain by fraction of period on each side (default=0.0 or 0.5)
+
     ! Timing parameters 
     time_init    = 0.0                  ! [yr] Starting time 
     time_end     = 10.0                 ! [yr] Ending time 

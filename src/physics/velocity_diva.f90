@@ -175,18 +175,18 @@ if (.TRUE.) then
 end if 
             
             ! Call ssa solver
-            call calc_vxy_ssa_matrix(ux_bar,uy_bar,L2_norm,beta_eff_acx,beta_eff_acy,visc_eff_int,ssa_mask_acx,ssa_mask_acy,H_ice, &
-                        taud_acx,taud_acy,H_grnd,z_sl,z_bed,dx,dy,par%ssa_vel_max,par%boundaries,par%ssa_solver_opt)
+            call calc_vxy_ssa_matrix(ux_bar,uy_bar,L2_norm,beta_eff_acx,beta_eff_acy,visc_eff_int,  &
+                                     ssa_mask_acx,ssa_mask_acy,H_ice,taud_acx,taud_acy,H_grnd,z_sl, &
+                                     z_bed,dx,dy,par%ssa_vel_max,par%boundaries,par%ssa_solver_opt)
 
 
             ! Apply relaxation to keep things stable
             call relax_ssa(ux_bar,uy_bar,ux_bar_nm1,uy_bar_nm1,rel=par%ssa_iter_rel)
             
             ! Check for convergence
-            is_converged = check_vel_convergence_l2rel(ux_bar,uy_bar,ux_bar_nm1,uy_bar_nm1, &
-                                            ssa_mask_acx.gt.0.0,ssa_mask_acy.gt.0.0, &
-                                            par%ssa_iter_conv,iter,par%ssa_iter_max,par%ssa_write_log, &
-                                            use_L2_norm=.FALSE.,L2_norm=L2_norm)
+            is_converged = check_vel_convergence_l2rel(ux_bar,uy_bar,ux_bar_nm1,uy_bar_nm1,ssa_mask_acx.gt.0,     &
+                                                       ssa_mask_acy.gt.0,par%ssa_iter_conv,iter,par%ssa_iter_max, &
+                                                       par%ssa_write_log,use_L2_norm=.FALSE.,L2_norm=L2_norm)
 
             ! Calculate an L1 error metric over matrix for diagnostics
             call check_vel_convergence_l1rel_matrix(ssa_err_acx,ssa_err_acy,ux_bar,uy_bar,ux_bar_nm1,uy_bar_nm1)

@@ -1286,7 +1286,6 @@ contains
         end if 
 
         ! Check for convergence
-!         if (max(ux_resid_max,uy_resid_max) .le. ssa_resid_tol) then
         if (resid .le. ssa_resid_tol) then 
             is_converged = .TRUE. 
             converged_txt = "C"
@@ -1299,7 +1298,7 @@ contains
         end if 
 
         if (log .and. is_converged) then
-            ! Write summary to log if desired 
+            ! Write summary to log if desired and iterations have completed
 
             ! Also calculate maximum error magnitude for perspective
             if (nx_check .gt. 0) then 

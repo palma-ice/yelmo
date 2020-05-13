@@ -388,8 +388,7 @@ end if
     end subroutine calc_vertical_shear_3D 
 
     subroutine calc_visc_eff_3D(visc_eff,ux,uy,duxdz,duydz,ATT,zeta_aa,dx,dy,n_glen)
-        ! Calculate 3D effective viscosity 
-        ! following L19, Eq. 2
+        ! Calculate 3D effective viscosity following L19, Eq. 2
 
         implicit none 
         
@@ -476,6 +475,7 @@ end if
         ! Useful integrals, following Arthern et al. (2015) Eq. 7,
         ! and Lipscomb et al. (2019), Eq. 30
         ! F_n = int_zb_zs{ 1/visc * ((s-z)/H)**n dz}
+
         implicit none 
 
         real(prec), intent(OUT) :: F_int(:,:) 
@@ -498,6 +498,7 @@ end if
         ! since F_int should be nonzero everywhere for numerics
         F_int_min = integrate_trapezoid1D_pt((1.0_prec/visc_min)*(1.0_prec-zeta_aa)**n,zeta_aa)
 
+        ! Initially set F_int to minimum value everywhere 
         F_int = F_int_min
 
         ! Vertically integrate at each point
@@ -527,23 +528,6 @@ end if
 
     end subroutine calc_F_integral
     
-    subroutine smoothing_weights_ice(wts,H_ice)
-        ! Subroutine calculates neighborhood weights such 
-        ! that only ice covered neighbor points are used. 
-        ! Inputs in order: [H_ice(i,j),H_ice(i-1,j),H_ice(i+1,j),H_ice(i,j-1),H_ice(i,j+1)]
-
-        implicit none 
-
-        real(prec), intent(OUT) :: wts(:) 
-        real(prec), intent(IN)  :: H_ice(:) 
-
-        ! Local variables 
-!         real(prec), parameter  :: wts_ref(5) 
-
-        return 
-
-    end subroutine smoothing_weights_ice
-
     subroutine calc_beta_eff(beta_eff,beta,ux_b,uy_b,F2,zeta_aa,no_slip)
         ! Calculate the depth-averaged horizontal velocity (ux_bar,uy_bar)
 
@@ -587,7 +571,7 @@ end if
 
     subroutine calc_vel_basal(ux_b,uy_b,ux_bar,uy_bar,F2,taub_acx,taub_acy,H_ice,boundaries)
         ! Calculate basal sliding following Goldberg (2011), Eq. 34
-        ! (analgous to L19, Eq. 32)
+        ! (or it can also be obtained from L19, Eq. 32 given ub*beta=taub)
 
         implicit none
         
@@ -852,65 +836,5 @@ end if
         return 
 
     end subroutine limit_vel
-
-    subroutine set_boundaries_periodic(var)
-
-        implicit none 
-
-        real(prec), intent(INOUT)    :: var(:,:) 
-
-        ! Local variables 
-        integer :: nx, ny 
-
-        nx = size(var,1) 
-        ny = size(var,2) 
-
-        var(1,:)    = var(nx-2,:) 
-        var(nx,:)   = var(2,:) 
-        var(:,1)    = var(:,ny-1)
-        var(:,ny)   = var(:,2) 
-
-        return 
-
-    end subroutine set_boundaries_periodic
-
-    subroutine set_boundaries_periodic_staggered(varx,vary,xdir,ydir)
-
-        implicit none 
-
-        real(prec), intent(INOUT)    :: varx(:,:) 
-        real(prec), intent(INOUT)    :: vary(:,:) 
-        logical,    intent(IN)       :: xdir 
-        logical,    intent(IN)       :: ydir 
-
-        ! Local variables 
-        integer :: nx, ny 
-
-        nx = size(varx,1) 
-        ny = size(varx,2) 
-
-        if (xdir) then
-
-            varx(1,:)    = varx(nx-2,:) 
-            varx(nx-1,:) = varx(2,:) 
-            varx(nx,:)   = varx(3,:) 
-            varx(:,1)    = varx(:,ny-1)
-            varx(:,ny)   = varx(:,2) 
-
-        end if 
-
-        if (ydir) then
-
-            vary(1,:)    = vary(nx-1,:) 
-            vary(nx,:)   = vary(2,:) 
-            vary(:,1)    = vary(:,ny-2)
-            vary(:,ny-1) = vary(:,2) 
-            vary(:,ny)   = vary(:,3)
-
-        end if
-
-        return 
-
-    end subroutine set_boundaries_periodic_staggered
-
+    
 end module velocity_diva

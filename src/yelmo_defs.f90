@@ -160,8 +160,6 @@ module yelmo_defs
     type ydyn_param_class
 
         character(len=256) :: solver 
-        character(len=256) :: sia_solver 
-        character(len=256) :: ssa_solver_opt 
         integer    :: mix_method            ! Method for mixing sia and ssa velocity solutions
         logical    :: calc_diffusivity      ! Calculate diagnostic diffusivity field
         logical    :: diva_no_slip 
@@ -187,6 +185,7 @@ module yelmo_defs
         real(prec) :: cf_stream
         integer    :: n_sm_beta 
         real(prec) :: beta_min              ! Minimum allowed value of beta
+        character(len=256) :: ssa_lis_opt 
         real(prec) :: ssa_beta_max          ! Maximum value of beta for which ssa should be calculated
         real(prec) :: ssa_vel_max
         integer    :: ssa_iter_max 

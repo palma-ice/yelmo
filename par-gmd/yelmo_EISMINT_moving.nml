@@ -3,7 +3,6 @@
     domain       = "EISMINT"             ! "EISMINT"
     experiment   = "moving"              ! "fixed", "moving", "mismip", "EXPA", "EXPB", "EXPF","BUELER-A", "BUELER-B", "HALFAR", "HALFAR-MED"
     dx           = 50.0                  ! [km] Grid resolution (EISMINT1 = 50km, EISMINT2 = 25km)
-    with_ssa     = False                 ! Include ssa in experiment?
     topo_fixed   = False                 ! Calculate the topography, or use Heiko's topo file.  
     dyn_fixed    = False                 ! Fix dynamics after first calculation? 
     topo_fixed_file = "/Users/robinson/models/EURICE/yelmo/tests/heiko_imau-ice_help_fields_eismint_M_200kyr.nc"
@@ -65,7 +64,7 @@
 /
 
 &ydyn
-    solver              = "hybrid-adhoc"  ! "fixed", "hybrid-adhoc", "hybrid-pd12"    
+    solver              = "sia"           ! "fixed", "hybrid-adhoc", "hybrid-pd12"    
     sia_solver          = "vel"           ! "vel", "shear", "none"
     ssa_solver_opt      = "-i bicgsafe -p jacobi -maxiter 100 -tol 1.0e-4 -initx_zeros false"  ! See Lis library
     mix_method          = -2              ! -2: sia, -1: ssa, 0: sia|ssa, 1: sia+ssa 2: ssa vel. fraction

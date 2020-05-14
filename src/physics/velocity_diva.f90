@@ -12,7 +12,7 @@ module velocity_diva
 
     type diva_param_class
 
-        character(len=256) :: ssa_solver_opt 
+        character(len=256) :: ssa_lis_opt 
         character(len=256) :: boundaries 
         logical    :: diva_no_slip 
         integer    :: beta_method
@@ -107,7 +107,7 @@ contains
         nx    = size(ux,1)
         ny    = size(ux,2)
         nz_aa = size(ux,3)
-        
+
         ! Prepare local variables 
         allocate(ux_bar_nm1(nx,ny))
         allocate(uy_bar_nm1(nx,ny))
@@ -175,7 +175,7 @@ end if
             ! Call ssa solver
             call calc_vxy_ssa_matrix(ux_bar,uy_bar,L2_norm,beta_eff_acx,beta_eff_acy,visc_eff_int,  &
                                      ssa_mask_acx,ssa_mask_acy,H_ice,taud_acx,taud_acy,H_grnd,z_sl, &
-                                     z_bed,dx,dy,par%ssa_vel_max,par%boundaries,par%ssa_solver_opt)
+                                     z_bed,dx,dy,par%ssa_vel_max,par%boundaries,par%ssa_lis_opt)
 
 
             ! Apply relaxation to keep things stable

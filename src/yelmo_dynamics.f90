@@ -265,7 +265,7 @@ contains
                                tpo%now%H_ice,tpo%now%f_grnd_acx,tpo%now%f_grnd_acy,dyn%par%ssa_beta_max,use_ssa=.TRUE.)
 
             ! Set diva parameters from Yelmo settings 
-            hybrid_par%ssa_solver_opt = dyn%par%ssa_solver_opt 
+            hybrid_par%ssa_lis_opt = dyn%par%ssa_lis_opt 
             hybrid_par%boundaries     = dyn%par%boundaries  
             hybrid_par%beta_method    = dyn%par%beta_method 
             hybrid_par%beta_const     = dyn%par%beta_const 
@@ -379,7 +379,7 @@ contains
                            tpo%now%H_ice,tpo%now%f_grnd_acx,tpo%now%f_grnd_acy,dyn%par%ssa_beta_max,use_ssa=.TRUE.)
 
         ! Set diva parameters from Yelmo settings 
-        diva_par%ssa_solver_opt = dyn%par%ssa_solver_opt 
+        diva_par%ssa_lis_opt    = dyn%par%ssa_lis_opt 
         diva_par%boundaries     = dyn%par%boundaries 
         diva_par%diva_no_slip   = dyn%par%diva_no_slip 
         diva_par%beta_method    = dyn%par%beta_method 
@@ -452,6 +452,8 @@ contains
         real(prec), allocatable :: bmb(:,:)
 
         logical :: calc_ssa 
+        integer :: mix_method 
+        character(len=56) :: sia_solver 
 
         type(ydyn_class) :: dyn1 
         type(ydyn_class) :: dyn2 
@@ -504,7 +506,9 @@ contains
 
         ! ===== Calculate shear (ie, SIA) velocity solution ===========
 
-        select case(trim(dyn%par%sia_solver))
+        sia_solver = "vel" 
+
+        select case(trim(sia_solver))
 
             case("vel") 
                 ! Use classic-style SIA solver (solve directly for velocity)
@@ -597,7 +601,7 @@ contains
 
             case DEFAULT 
 
-                write(*,*) "calc_ydyn_adhoc:: Error: sia solver not recognized: ", trim(dyn%par%sia_solver)
+                write(*,*) "calc_ydyn_adhoc:: Error: sia solver not recognized: ", trim(sia_solver)
                 stop 
 
         end select 
@@ -628,7 +632,9 @@ contains
 
         ! ===== Combine sliding and shear into hybrid fields ==========
 
-        select case(dyn%par%mix_method)
+        mix_method = 1
+
+        select case(mix_method)
             ! Determine how to mix shearing (ux_i/uy_i) and sliding (ux_b/uy_b)
             ! Generally purely floating ice is only given by the SSA solution;
             ! Grounded or partially grounded ice is given by the hybrid solution 
@@ -696,7 +702,7 @@ contains
             case DEFAULT
 
                 write(*,*) "mix_method not recognized."
-                write(*,*) "mix_method = ", dyn%par%mix_method
+                write(*,*) "mix_method = ", mix_method
                 stop 
 
         end select
@@ -826,11 +832,6 @@ contains
 !         call calc_driving_stress_gl(dyn%now%taud_acx,dyn%now%taud_acy,tpo%now%H_ice,tpo%now%z_srf,bnd%z_bed,bnd%z_sl, &
 !                  tpo%now%H_grnd,tpo%now%f_grnd,tpo%now%f_grnd_acx,tpo%now%f_grnd_acy,dyn%par%dx, &
 !                  method=dyn%par%taud_gl_method,beta_gl_stag=dyn%par%beta_gl_stag)
-
-        ! Calculate 2D diffusivity too (for timestepping and diagnostics)
-!         call calc_diffusivity_2D(dyn%now%dd_ab_bar,tpo%now%H_ice,tpo%now%dzsdx,tpo%now%dzsdy, &
-!                                  mat%now%ATT,dyn%par%zeta_aa,dyn%par%dx,mat%par%n_glen,rho_ice,g)
-!         dyn%now%dd_ab_bar  = calc_vertical_integrated_2D(dyn%now%dd_ab,dyn%par%zeta_aa) 
         
         ! == Iterate over strain rate, viscosity and velocity solutions until convergence ==
 
@@ -942,7 +943,7 @@ contains
                 call calc_vxy_ssa_matrix(dyn%now%ux_bar,dyn%now%uy_bar,L2_norm,dyn%now%beta_acx,dyn%now%beta_acy,dyn%now%visc_eff_int, &
                                      dyn%now%ssa_mask_acx,dyn%now%ssa_mask_acy,tpo%now%H_ice,dyn%now%taud_acx, &
                                      dyn%now%taud_acy,tpo%now%H_grnd,bnd%z_sl,bnd%z_bed,dyn%par%dx,dyn%par%dy, &
-                                     dyn%par%ssa_vel_max,dyn%par%boundaries,dyn%par%ssa_solver_opt)
+                                     dyn%par%ssa_vel_max,dyn%par%boundaries,dyn%par%ssa_lis_opt)
 
             end if 
              
@@ -1194,7 +1195,7 @@ end if
             call calc_vxy_ssa_matrix(dyn%now%ux_b,dyn%now%uy_b,L2_norm,dyn%now%beta_acx,dyn%now%beta_acy,dyn%now%visc_eff_int, &
                                      dyn%now%ssa_mask_acx,dyn%now%ssa_mask_acy,tpo%now%H_ice,dyn%now%taud_acx, &
                                      dyn%now%taud_acy,tpo%now%H_grnd,bnd%z_sl,bnd%z_bed,dyn%par%dx,dyn%par%dy, &
-                                     dyn%par%ssa_vel_max,dyn%par%boundaries,dyn%par%ssa_solver_opt)
+                                     dyn%par%ssa_vel_max,dyn%par%boundaries,dyn%par%ssa_lis_opt)
 
             ! Apply relaxation to keep things stable
             call relax_ssa(dyn%now%ux_b,dyn%now%uy_b,ux_b_prev,uy_b_prev,rel=dyn%par%ssa_iter_rel)
@@ -1644,9 +1645,6 @@ end if
         if (present(init)) init_pars = .TRUE. 
         
         call nml_read(filename,"ydyn","solver",             par%solver,             init=init_pars)
-        call nml_read(filename,"ydyn","sia_solver",         par%sia_solver,         init=init_pars)
-        call nml_read(filename,"ydyn","ssa_solver_opt",     par%ssa_solver_opt,     init=init_pars)
-        call nml_read(filename,"ydyn","mix_method",         par%mix_method,         init=init_pars)
         call nml_read(filename,"ydyn","calc_diffusivity",   par%calc_diffusivity,   init=init_pars)
         call nml_read(filename,"ydyn","diva_no_slip",       par%diva_no_slip,       init=init_pars)
         call nml_read(filename,"ydyn","beta_method",        par%beta_method,        init=init_pars)
@@ -1671,6 +1669,7 @@ end if
         call nml_read(filename,"ydyn","cf_stream",          par%cf_stream,          init=init_pars)
         call nml_read(filename,"ydyn","n_sm_beta",          par%n_sm_beta,          init=init_pars)
         call nml_read(filename,"ydyn","beta_min",           par%beta_min,           init=init_pars)
+        call nml_read(filename,"ydyn","ssa_lis_opt",        par%ssa_lis_opt,        init=init_pars)
         call nml_read(filename,"ydyn","ssa_beta_max",       par%ssa_beta_max,       init=init_pars)
         call nml_read(filename,"ydyn","ssa_vel_max",        par%ssa_vel_max,        init=init_pars)
         call nml_read(filename,"ydyn","ssa_iter_max",       par%ssa_iter_max,       init=init_pars)
@@ -1723,9 +1722,6 @@ end if
 
         ! By default use ssa too, unless otherwise desired (can be set externally)
         par%use_ssa  = .TRUE. 
-
-        ! Specifically deactivate ssa for mix_method=-2 
-        if (par%mix_method .eq. -2) par%use_ssa = .FALSE. 
 
         ! Define current time as unrealistic value
         par%time = 1000000000   ! [a] 1 billion years in the future

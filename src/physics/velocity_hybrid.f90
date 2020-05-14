@@ -12,7 +12,7 @@ module velocity_hybrid
 
     type hybrid_param_class
 
-        character(len=256) :: ssa_solver_opt 
+        character(len=256) :: ssa_lis_opt 
         character(len=256) :: boundaries  
         integer    :: beta_method
         real(prec) :: beta_const
@@ -140,7 +140,7 @@ end if
             ! Call ssa solver
             call calc_vxy_ssa_matrix(ux_b,uy_b,L2_norm,beta_acx,beta_acy,visc_eff_int,  &
                                      ssa_mask_acx,ssa_mask_acy,H_ice,taud_acx,taud_acy,H_grnd,z_sl, &
-                                     z_bed,dx,dy,par%ssa_vel_max,par%boundaries,par%ssa_solver_opt)
+                                     z_bed,dx,dy,par%ssa_vel_max,par%boundaries,par%ssa_lis_opt)
 
 
             ! Apply relaxation to keep things stable

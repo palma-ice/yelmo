@@ -22,7 +22,6 @@ program yelmo_benchmarks
     character(len=256) :: file_restart
     character(len=512) :: path_par, path_const 
     character(len=56)  :: experiment
-    logical            :: with_ssa  
     logical    :: topo_fixed, dyn_fixed 
     character(len=256) :: topo_fixed_file 
     real(prec) :: time_init, time_end, time, dtt, dt2D_out, dt1D_out
@@ -37,7 +36,7 @@ program yelmo_benchmarks
     
     ! Start timing 
     call yelmo_cpu_time(cpu_start_time)
-    
+
     ! Assume program is running from the output folder
     outfldr = "./"
 
@@ -57,7 +56,6 @@ program yelmo_benchmarks
     call nml_read(path_par,"eismint","domain",       domain)        ! EISMINT1, EISMINT2
     call nml_read(path_par,"eismint","experiment",   experiment)    ! "fixed", "moving", "mismip", "EXPA", "EXPB", "BUELER-A"
     call nml_read(path_par,"eismint","dx",           dx)            ! [km] Grid resolution 
-    call nml_read(path_par,"eismint","with_ssa",     with_ssa)      ! Include ssa in experiment?
     call nml_read(path_par,"eismint","topo_fixed",   topo_fixed)    ! Calculate the topography, or use Heiko's topo file. 
     call nml_read(path_par,"eismint","dyn_fixed",    dyn_fixed)     ! Calculate the topography, or use Heiko's topo file. 
     call nml_read(path_par,"eismint","topo_fixed_file",topo_fixed_file)     ! File containing fixed topo field of H_ice
@@ -123,7 +121,6 @@ program yelmo_benchmarks
     
 
     ! Update parameter values with EISMINT choices 
-    yelmo1%dyn%par%use_ssa    = with_ssa 
     yelmo1%tpo%par%topo_fixed = topo_fixed 
 
 

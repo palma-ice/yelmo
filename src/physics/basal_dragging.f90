@@ -74,23 +74,23 @@ contains
 
         implicit none
         
-        real(prec), intent(OUT) :: beta(:,:) 
-        real(prec), intent(IN)  :: c_bed(:,:)  
-        real(prec), intent(IN)  :: ux_b(:,:) 
-        real(prec), intent(IN)  :: uy_b(:,:)  
-        real(prec), intent(IN)  :: H_ice(:,:) 
-        real(prec), intent(IN)  :: H_grnd(:,:) 
-        real(prec), intent(IN)  :: f_grnd(:,:) 
-        real(prec), intent(IN)  :: z_bed(:,:) 
-        real(prec), intent(IN)  :: z_sl(:,:) 
-        integer,    intent(IN)  :: beta_method
-        real(prec), intent(IN)  :: beta_const 
-        real(prec), intent(IN)  :: beta_q 
-        real(prec), intent(IN)  :: beta_u0 
-        integer,    intent(IN)  :: beta_gl_scale  
-        real(prec), intent(IN)  :: beta_gl_f
-        real(prec), intent(IN)  :: H_grnd_lim
-        real(prec), intent(IN)  :: beta_min 
+        real(prec), intent(INOUT) :: beta(:,:) 
+        real(prec), intent(IN)    :: c_bed(:,:)  
+        real(prec), intent(IN)    :: ux_b(:,:) 
+        real(prec), intent(IN)    :: uy_b(:,:)  
+        real(prec), intent(IN)    :: H_ice(:,:) 
+        real(prec), intent(IN)    :: H_grnd(:,:) 
+        real(prec), intent(IN)    :: f_grnd(:,:) 
+        real(prec), intent(IN)    :: z_bed(:,:) 
+        real(prec), intent(IN)    :: z_sl(:,:) 
+        integer,    intent(IN)    :: beta_method
+        real(prec), intent(IN)    :: beta_const 
+        real(prec), intent(IN)    :: beta_q 
+        real(prec), intent(IN)    :: beta_u0 
+        integer,    intent(IN)    :: beta_gl_scale  
+        real(prec), intent(IN)    :: beta_gl_f
+        real(prec), intent(IN)    :: H_grnd_lim
+        real(prec), intent(IN)    :: beta_min 
         character(len=*), intent(IN) :: boundaries 
 
         ! Local variables 

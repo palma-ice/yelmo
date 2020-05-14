@@ -257,13 +257,13 @@ contains
 
         ! 2. Calculate SSA solution =====
 
+        ! Define grid points with ssa active (uses beta from previous timestep)
+        call set_ssa_masks(dyn%now%ssa_mask_acx,dyn%now%ssa_mask_acy,dyn%now%beta_acx,dyn%now%beta_acy, &
+                           tpo%now%H_ice,tpo%now%f_grnd_acx,tpo%now%f_grnd_acy,dyn%par%ssa_beta_max,use_ssa=.TRUE.)
+        
         if (use_ssa .and. dyn%par%use_ssa .and. &
                 maxval(dyn%now%ssa_mask_acx+dyn%now%ssa_mask_acy) .gt. 0) then 
             ! Calculate SSA as normal 
-
-            ! Define grid points with ssa active (uses beta from previous timestep)
-            call set_ssa_masks(dyn%now%ssa_mask_acx,dyn%now%ssa_mask_acy,dyn%now%beta_acx,dyn%now%beta_acy, &
-                               tpo%now%H_ice,tpo%now%f_grnd_acx,tpo%now%f_grnd_acy,dyn%par%ssa_beta_max,use_ssa=.TRUE.)
 
             ! Set diva parameters from Yelmo settings 
             hybrid_par%ssa_lis_opt = dyn%par%ssa_lis_opt 
@@ -624,7 +624,7 @@ contains
             call calc_ydyn_ssa(dyn,tpo,thrm,mat,bnd)
             
         else 
-            ! No ssa calculations performed, set basal velocity fields to zeor 
+            ! No ssa calculations performed, set basal velocity fields to zero 
 
             dyn%now%ux_b = 0.0 
             dyn%now%uy_b = 0.0 

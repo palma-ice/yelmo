@@ -161,6 +161,9 @@ contains
             call stagger_beta(beta_acx,beta_acy,beta,f_grnd,f_grnd_acx,f_grnd_acy,par%beta_gl_stag,par%boundaries)
             call stagger_beta(beta_eff_acx,beta_eff_acy,beta_eff,f_grnd,f_grnd_acx,f_grnd_acy,par%beta_gl_stag,par%boundaries)
             
+            ! ajr: not very stable:
+            !call calc_beta_eff_ac(beta_eff_acx,beta_eff_acy,beta_acx,beta_acy,ux_b,uy_b,F2,H_ice,zeta_aa,par%diva_no_slip,par%boundaries)
+
             ! =========================================================================================
             ! Step 2: Call the SSA solver to obtain new estimate of ux_bar/uy_bar
 
@@ -542,8 +545,6 @@ end if
 
         ! Local variables 
         integer    :: i, j, nx, ny
-        integer    :: im1, jm1  
-        real(prec) :: uxy_b 
 
         nx = size(beta_eff,1)
         ny = size(beta_eff,2)
@@ -565,6 +566,115 @@ end if
         return 
 
     end subroutine calc_beta_eff 
+
+    subroutine calc_beta_eff_ac(beta_eff_acx,beta_eff_acy,beta_acx,beta_acy,ux_b,uy_b,F2,H_ice,zeta_aa,no_slip,boundaries)
+        ! Calculate the depth-averaged horizontal velocity (ux_bar,uy_bar)
+
+        ! Note: L19 staggers the F-integral F2, then solves for beta 
+
+        implicit none 
+        
+        real(prec), intent(OUT) :: beta_eff_acx(:,:)    ! ac-nodes
+        real(prec), intent(OUT) :: beta_eff_acy(:,:)    ! ac-nodes
+        real(prec), intent(IN)  :: beta_acx(:,:)        ! ac-nodes
+        real(prec), intent(IN)  :: beta_acy(:,:)        ! ac-nodes
+        real(prec), intent(IN)  :: ux_b(:,:)            ! ac-nodes
+        real(prec), intent(IN)  :: uy_b(:,:)            ! ac-nodes
+        real(prec), intent(IN)  :: F2(:,:)              ! aa-nodes
+        real(prec), intent(IN)  :: H_ice(:,:)           ! aa-nodes
+        real(prec), intent(IN)  :: zeta_aa(:)           ! aa-nodes
+        logical,    intent(IN)  :: no_slip 
+        character(len=*), intent(IN) :: boundaries  
+
+        ! Local variables 
+        integer    :: i, j, nx, ny
+        integer    :: ip1, jp1   
+        real(prec) :: F2_ac 
+
+        nx = size(beta_eff_acx,1)
+        ny = size(beta_eff_acx,2)
+
+        do j = 1, ny 
+        do i = 1, nx 
+
+            ip1 = min(i+1,nx)
+            jp1 = min(j+1,ny)
+
+            ! === x-direction =====
+
+            ! Stagger the F2 integral to the ac-nodes
+            if (H_ice(i,j) .gt. 0.0 .and. H_ice(ip1,j) .eq. 0.0) then 
+                F2_ac = F2(i,j) 
+            else if (H_ice(i,j) .eq. 0.0 .and. H_ice(ip1,j) .gt. 0.0) then
+                F2_ac = F2(ip1,j)
+            else 
+                F2_ac = 0.5_prec*(F2(i,j) + F2(ip1,j))
+            end if 
+
+
+            if (no_slip) then 
+                ! No basal sliding allowed, impose beta_eff derived from viscosity 
+                ! following L19, Eq. 35 (or G11, Eq. 42)
+
+                beta_eff_acx(i,j) = 1.0_prec / F2_ac 
+
+            else 
+                ! Basal sliding allowed, calculate beta_eff 
+                ! following L19, Eq. 33 (or G11, Eq. 41)
+
+                beta_eff_acx(i,j) = beta_acx(i,j) / (1.0_prec+beta_acx(i,j)*F2_ac)
+
+            end if 
+
+            ! === y-direction =====
+
+            ! Stagger the F2 integral to the ac-nodes
+            if (H_ice(i,j) .gt. 0.0 .and. H_ice(i,jp1) .eq. 0.0) then 
+                F2_ac = F2(i,j) 
+            else if (H_ice(i,j) .eq. 0.0 .and. H_ice(i,jp1) .gt. 0.0) then
+                F2_ac = F2(i,jp1)
+            else 
+                F2_ac = 0.5_prec*(F2(i,j) + F2(i,jp1))
+            end if 
+
+
+            if (no_slip) then 
+                ! No basal sliding allowed, impose beta_eff derived from viscosity 
+                ! following L19, Eq. 35 (or G11, Eq. 42)
+
+                beta_eff_acy(i,j) = 1.0_prec / F2_ac 
+
+            else 
+                ! Basal sliding allowed, calculate beta_eff 
+                ! following L19, Eq. 33 (or G11, Eq. 41)
+
+                beta_eff_acy(i,j) = beta_acy(i,j) / (1.0_prec+beta_acy(i,j)*F2_ac)
+
+            end if 
+
+        end do 
+        end do  
+
+        ! Apply boundary conditions as needed 
+        if (trim(boundaries) .eq. "periodic") then 
+
+            beta_eff_acx(1,:)    = beta_eff_acx(nx-2,:) 
+            beta_eff_acx(nx-1,:) = beta_eff_acx(2,:) 
+            beta_eff_acx(nx,:)   = beta_eff_acx(3,:) 
+            beta_eff_acx(:,1)    = beta_eff_acx(:,ny-1)
+            beta_eff_acx(:,ny)   = beta_eff_acx(:,2) 
+            
+            beta_eff_acy(1,:)    = beta_eff_acy(nx-1,:) 
+            beta_eff_acy(nx,:)   = beta_eff_acy(2,:) 
+            beta_eff_acy(:,1)    = beta_eff_acy(:,ny-2)
+            beta_eff_acy(:,ny-1) = beta_eff_acy(:,2) 
+            beta_eff_acy(:,ny)   = beta_eff_acy(:,3)
+
+        end if 
+
+        return 
+
+    end subroutine calc_beta_eff_ac 
 
     subroutine calc_vel_basal(ux_b,uy_b,ux_bar,uy_bar,F2,taub_acx,taub_acy,H_ice,boundaries)
         ! Calculate basal sliding following Goldberg (2011), Eq. 34

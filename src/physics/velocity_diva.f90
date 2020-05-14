@@ -91,15 +91,14 @@ contains
         type(diva_param_class), intent(IN) :: par       ! List of parameters that should be defined
 
         ! Local variables 
-        integer :: i, j, k, nx, ny, nz_aa, nz_ac
-        integer :: iter, iter_max  
-        logical :: is_converged 
+        integer :: i, j, k, nx, ny, nz_aa, nz_ac, iter 
+        logical :: is_converged
+
         real(prec), allocatable :: ux_bar_nm1(:,:) 
         real(prec), allocatable :: uy_bar_nm1(:,:)  
         real(prec), allocatable :: beta_eff_acx(:,:)
         real(prec), allocatable :: beta_eff_acy(:,:)  
         real(prec), allocatable :: F2(:,:)              ! [Pa^-1 a^-1 m == (Pa a/m)^-1]
-
         integer,    allocatable :: ssa_mask_acx_ref(:,:)
         integer,    allocatable :: ssa_mask_acy_ref(:,:)
 
@@ -108,9 +107,7 @@ contains
         nx    = size(ux,1)
         ny    = size(ux,2)
         nz_aa = size(ux,3)
-
-        iter_max = 2 
-
+        
         ! Prepare local variables 
         allocate(ux_bar_nm1(nx,ny))
         allocate(uy_bar_nm1(nx,ny))

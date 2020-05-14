@@ -9,9 +9,13 @@ module yelmo_dynamics
         calc_magnitude_from_staggered_ice, calc_vertical_integrated_2D, smooth_gauss_2D, &
         regularize2D !, limit_gradient
 
-    use velocity_diva
-    use velocity_hybrid_pd12 
+    use velocity_general
     use velocity_sia 
+    use velocity_hybrid 
+    use velocity_diva
+
+    use velocity_hybrid_pd12 
+    
     use solver_ssa_sico5
     use basal_dragging  
     use grounding_line_flux 
@@ -41,8 +45,20 @@ contains
         type(ybound_class), intent(IN)    :: bnd   
         real(prec),         intent(IN)    :: time 
 
-        ! Local variables 
+        ! Local variables
+        ! Local variables
+        integer :: i, j, k, nx, ny, nz_aa, nz_ac   
         real(prec) :: dt 
+
+        real(prec), allocatable :: uxy_prev(:,:) 
+
+        nx    = dyn%par%nx 
+        ny    = dyn%par%ny 
+        nz_aa = dyn%par%nz_aa 
+        nz_ac = dyn%par%nz_ac 
+        
+        allocate(uxy_prev(nx,ny)) 
+
 
         ! Initialize time if necessary 
         if (dyn%par%time .gt. time) then 
@@ -57,18 +73,76 @@ contains
         dyn%now%ux_bar_prev = dyn%now%ux_bar 
         dyn%now%uy_bar_prev = dyn%now%uy_bar 
         
-        ! ===== Calculate the horizontal velocity components =====
-        ! These calculations are done assuming that the final
-        ! 3D horizontal velocity fields (ux/uy) will be comprised
-        ! of an internal shear contribution (ux_i/uy_i) and a plug
-        ! flow contribution represented by basal velocity (ux_b/uy_b)
+        ! Store initial uxy_bar solution 
+        uxy_prev = dyn%now%uxy_bar 
+        
+        ! ===== Calculate general variables ========================================
+
+        ! Calculate driving stress 
+        call calc_driving_stress(dyn%now%taud_acx,dyn%now%taud_acy,tpo%now%H_ice,tpo%now%dzsdx,tpo%now%dzsdy, &
+                                                                                            dyn%par%dx,dyn%par%taud_lim)
+
+        ! Calculate effective pressure 
+        call calc_ydyn_neff(dyn,tpo,thrm,bnd)
+
+        ! Update bed roughness coefficients cf_ref and c_bed (which are independent of velocity)
+        call calc_ydyn_cfref(dyn,tpo,thrm,bnd)
+        call calc_c_bed(dyn%now%c_bed,dyn%now%cf_ref,dyn%now%N_eff)
+
+        ! ===== Calculate the 3D velocity field and helper variables =======================
+        ! The variables to be obtained from these routines are:
+        !     ux(:,:,:)           ! [m/a]
+        !     uy(:,:,:)           ! [m/a]
+        !     uz(:,:,:)           ! [m/a]
+        !     ux_i(:,:,:)         ! [m/a]
+        !     uy_i(:,:,:)         ! [m/a]
+        !     ux_bar(:,:)         ! [m/a]
+        !     uy_bar(:,:)         ! [m/a]
+        !     ux_b(:,:)           ! [m/a]
+        !     uy_b(:,:)           ! [m/a]
+        !     taub_acx(:,:)       ! [Pa]
+        !     taub_acy(:,:)       ! [Pa]
+        !     visc_eff(:,:,:)     ! [Pa a m]
+        !     visc_eff_int(:,:)   ! [Pa a m]
+        !     ssa_mask_acx(:,:)   ! [-]
+        !     ssa_mask_acy(:,:)   ! [-]
+        !     ssa_err_acx(:,:)
+        !     ssa_err_acy(:,:)
+        !     beta(:,:)           ! [Pa a/m]
+        !     beta_acx(:,:)       ! [Pa a/m]
+        !     beta_acy(:,:)       ! [Pa a/m]
+        !     beta_eff(:,:)       ! [Pa a/m]
+        !     beta_diva(:,:)      ! [Pa a/m]
+        ! If a given solver does not use/calculate the variable, it is set to zero. 
+        ! For the rest of Yelmo, at least these variables should be populated:
+        ! ux, uy, uz, ux_bar, uy_bar, ux_b, uy_b, taub_acx, taub_acy, beta 
 
         select case(dyn%par%solver)
 
             case("fixed") 
                 ! Do nothing - dynamics is fixed 
 
-            case("hybrid")
+            case("sia") 
+                ! SIA only 
+
+                call calc_ydyn_hybrid(dyn,tpo,mat,thrm,bnd,use_sia=.TRUE.,use_ssa=.FALSE.)
+
+            case("ssa") 
+                ! SSA only 
+
+                call calc_ydyn_hybrid(dyn,tpo,mat,thrm,bnd,use_sia=.FALSE.,use_ssa=.TRUE.)
+
+            case("hybrid") 
+                ! SIA+SSA
+
+                call calc_ydyn_hybrid(dyn,tpo,mat,thrm,bnd,use_sia=.TRUE.,use_ssa=.TRUE.)
+
+            case("diva") 
+                ! Depth-integrated variational approximation (DIVA) - Goldberg (2011); Lipscomb et al. (2019)
+
+                call calc_ydyn_diva(dyn,tpo,mat,thrm,bnd)
+
+            case("hybrid-old")
                 ! Classic SIA+SSA, including alternative SIA/SSA combinations and purely SIA or SSA
 
                 call calc_ydyn_adhoc(dyn,tpo,mat,thrm,bnd,dt)
@@ -81,11 +155,7 @@ contains
 
                 call calc_ydyn_pd12(dyn,tpo,mat,thrm,bnd)
 
-            case("diva") 
-                ! Depth-integrated variational approximation (DIVA) - Goldberg (2011); Lipscomb et al. (2019)
-
-                call calc_ydyn_diva(dyn,tpo,mat,thrm,bnd,dt)
-
+            
             case DEFAULT 
 
                 write(*,*) "calc_ydyn:: Error: ydyn solver not recognized." 
@@ -95,6 +165,39 @@ contains
 
         end select 
 
+        ! ===== Additional diagnostic variables ====================================
+              
+        ! Diagnose ice flux 
+        call calc_ice_flux(dyn%now%qq_acx,dyn%now%qq_acy,dyn%now%ux_bar,dyn%now%uy_bar,tpo%now%H_ice, &
+                            dyn%par%dx,dyn%par%dy)
+        dyn%now%qq        = calc_magnitude_from_staggered_ice(dyn%now%qq_acx,dyn%now%qq_acy,tpo%now%H_ice)
+
+        dyn%now%taub      = calc_magnitude_from_staggered_ice(dyn%now%taub_acx,dyn%now%taub_acy,tpo%now%H_ice)
+        dyn%now%taud      = calc_magnitude_from_staggered_ice(dyn%now%taud_acx,dyn%now%taud_acy,tpo%now%H_ice)
+
+        dyn%now%uxy_b     = calc_magnitude_from_staggered_ice(dyn%now%ux_b,dyn%now%uy_b,tpo%now%H_ice)
+        dyn%now%uxy_i_bar = calc_magnitude_from_staggered_ice(dyn%now%ux_i_bar,dyn%now%uy_i_bar,tpo%now%H_ice)
+        dyn%now%uxy_bar   = calc_magnitude_from_staggered_ice(dyn%now%ux_bar,dyn%now%uy_bar,tpo%now%H_ice)
+
+        do k = 1, nz_aa
+            dyn%now%uxy(:,:,k) = calc_magnitude_from_staggered_ice(dyn%now%ux(:,:,k),dyn%now%uy(:,:,k),tpo%now%H_ice)
+        end do 
+
+        ! Store surface velocities for easy access too 
+        dyn%now%ux_s  = dyn%now%ux(:,:,nz_aa)
+        dyn%now%uy_s  = dyn%now%uy(:,:,nz_aa)
+        dyn%now%uxy_s = dyn%now%uxy(:,:,nz_aa)
+
+        ! Determine ratio of basal to surface velocity
+        dyn%now%f_vbvs = calc_vel_ratio(uxy_base=dyn%now%uxy_b,uxy_srf=dyn%now%uxy_s)
+
+        ! Finally, determine rate of velocity change 
+        if (dt .ne. 0.0_prec) then 
+            dyn%now%duxydt = (dyn%now%uxy_bar - uxy_prev) / dt 
+        else 
+            dyn%now%duxydt = 0.0_prec 
+        end if 
+
         ! Advance ydyn timestep 
         dyn%par%time = time
 
@@ -102,9 +205,8 @@ contains
 
     end subroutine calc_ydyn
     
-    subroutine calc_ydyn_diva(dyn,tpo,mat,thrm,bnd,dt)
+    subroutine calc_ydyn_hybrid(dyn,tpo,mat,thrm,bnd,use_sia,use_ssa)
         ! Velocity is a steady-state solution to a given set of boundary conditions (topo, material, etc)
-        ! so no time step is passed here. 
 
         implicit none
         
@@ -112,25 +214,18 @@ contains
         type(ytopo_class),  intent(IN)    :: tpo 
         type(ymat_class),   intent(IN)    :: mat
         type(ytherm_class), intent(IN)    :: thrm 
-        type(ybound_class), intent(IN)    :: bnd  
-        real(prec),         intent(IN)    :: dt 
+        type(ybound_class), intent(IN)    :: bnd   
+        logical,            intent(IN)    :: use_sia 
+        logical,            intent(IN)    :: use_ssa 
 
         ! Local variables
         integer :: iter, n_iter
         integer :: i, j, k, nx, ny, nz_aa, nz_ac   
-        real(prec), allocatable :: uxy_prev(:,:) 
-
-        type(diva_param_class) :: diva_par 
+        
+        type(hybrid_param_class) :: hybrid_par 
 
         ! For vertical velocity calculation 
         real(prec), allocatable :: bmb(:,:)
-
-        logical :: calc_ssa 
-
-        type(ydyn_class) :: dyn1 
-        type(ydyn_class) :: dyn2 
-        logical          :: is_grz_mid 
-        real(prec)       :: H_mid 
 
         nx    = dyn%par%nx 
         ny    = dyn%par%ny 
@@ -138,24 +233,145 @@ contains
         nz_ac = dyn%par%nz_ac 
         
         allocate(bmb(nx,ny))
-        allocate(uxy_prev(nx,ny)) 
-
-        ! ===== Calculate general variables ==============================
-
-        ! Store initial uxy_bar solution 
-        uxy_prev = dyn%now%uxy_bar 
         
-        ! Calculate driving stress 
-        call calc_driving_stress(dyn%now%taud_acx,dyn%now%taud_acy,tpo%now%H_ice,tpo%now%dzsdx,tpo%now%dzsdy, &
-                                                                                            dyn%par%dx,dyn%par%taud_lim)
+        ! ===== Calculate 3D horizontal velocity solution via SIA + SSA algorithm ===================
 
-        ! Calculate effective pressure 
-        call calc_ydyn_neff(dyn,tpo,thrm,bnd)
+        ! 1. Calculate SIA solution =====
 
-        ! Update bed roughness coefficients cf_ref and c_bed (which are independent of velocity)
-        call calc_ydyn_cfref(dyn,tpo,thrm,bnd)
-        call calc_c_bed(dyn%now%c_bed,dyn%now%cf_ref,dyn%now%N_eff)
+        if (use_sia) then 
+            ! Calculate SIA as normal 
 
+            call calc_velocity_sia(dyn%now%ux_i,dyn%now%uy_i,dyn%now%ux_i_bar,dyn%now%uy_i_bar,tpo%now%H_ice, &
+                                    dyn%now%taud_acx,dyn%now%taud_acy,mat%now%ATT,dyn%par%zeta_aa,dyn%par%dx, &
+                                    mat%par%n_glen,rho_ice,g)
+
+        else 
+            ! Set all SIA terms to zero 
+
+            dyn%now%ux_i     = 0.0_prec  
+            dyn%now%uy_i     = 0.0_prec  
+            dyn%now%ux_i_bar = 0.0_prec 
+            dyn%now%uy_i_bar = 0.0_prec 
+
+        end if 
+
+        ! 2. Calculate SSA solution =====
+
+        if (use_ssa) then 
+            ! Calculate SSA as normal 
+
+            ! Define grid points with ssa active (uses beta from previous timestep)
+            call set_ssa_masks(dyn%now%ssa_mask_acx,dyn%now%ssa_mask_acy,dyn%now%beta_acx,dyn%now%beta_acy, &
+                               tpo%now%H_ice,tpo%now%f_grnd_acx,tpo%now%f_grnd_acy,dyn%par%ssa_beta_max,use_ssa=.TRUE.)
+
+            ! Set diva parameters from Yelmo settings 
+            hybrid_par%ssa_solver_opt = dyn%par%ssa_solver_opt 
+            hybrid_par%boundaries     = dyn%par%boundaries  
+            hybrid_par%beta_method    = dyn%par%beta_method 
+            hybrid_par%beta_const     = dyn%par%beta_const 
+            hybrid_par%beta_q         = dyn%par%beta_q 
+            hybrid_par%beta_u0        = dyn%par%beta_u0 
+            hybrid_par%beta_gl_scale  = dyn%par%beta_gl_scale 
+            hybrid_par%beta_gl_stag   = dyn%par%beta_gl_stag 
+            hybrid_par%beta_gl_f      = dyn%par%beta_gl_f 
+            hybrid_par%H_grnd_lim     = dyn%par%H_grnd_lim 
+            hybrid_par%beta_min       = dyn%par%beta_min 
+            hybrid_par%ssa_vel_max    = dyn%par%ssa_vel_max 
+            hybrid_par%ssa_iter_max   = dyn%par%ssa_iter_max 
+            hybrid_par%ssa_iter_rel   = dyn%par%ssa_iter_rel 
+            hybrid_par%ssa_iter_conv  = dyn%par%ssa_iter_conv 
+            hybrid_par%ssa_write_log  = yelmo_log
+
+            call calc_velocity_hybrid(dyn%now%ux_b,dyn%now%uy_b,dyn%now%taub_acx,dyn%now%taub_acy, &
+                                      dyn%now%visc_eff_int,dyn%now%ssa_mask_acx,dyn%now%ssa_mask_acy, &
+                                      dyn%now%ssa_err_acx,dyn%now%ssa_err_acy,dyn%now%beta,dyn%now%beta_acx,dyn%now%beta_acy, &
+                                      dyn%now%c_bed,dyn%now%taud_acx,dyn%now%taud_acy,tpo%now%H_ice, &
+                                      tpo%now%H_grnd,tpo%now%f_grnd,tpo%now%f_grnd_acx,tpo%now%f_grnd_acy,mat%now%ATT, &
+                                      dyn%par%zeta_aa,bnd%z_sl,bnd%z_bed,dyn%par%dx,dyn%par%dy,mat%par%n_glen,hybrid_par)
+
+        else 
+            ! Set all SSA terms to zero 
+
+            dyn%now%ux_b     = 0.0_prec 
+            dyn%now%uy_b     = 0.0_prec 
+            dyn%now%taub_acx = 0.0_prec 
+            dyn%now%taub_acy = 0.0_prec 
+
+        end if 
+
+        ! Additionally, check if using SIA only, then apply SIA sliding as desired 
+        if ( (use_sia .and. .not. use_ssa) .and. dyn%par%cb_sia .gt. 0.0) then 
+            ! Calculate basal velocity from Weertman sliding law (Greve 1997)
+                    
+            call calc_velocity_basal_sia_00(dyn%now%ux_b,dyn%now%uy_b,dyn%now%taub_acx,dyn%now%taub_acy, &
+                                            tpo%now%H_ice,tpo%now%dzsdx,tpo%now%dzsdy,thrm%now%f_pmp, &
+                                            dyn%par%zeta_aa,dyn%par%dx,dyn%par%cb_sia,rho_ice,g)
+            
+        end if 
+
+        ! 3. Join SIA and SSA solutions (SIA+SSA) =====
+
+        ! Calculate the 3D horizontal velocity field (sum of shear and basal sliding)
+        do k = 1, nz_aa 
+            dyn%now%ux(:,:,k) = dyn%now%ux_i(:,:,k) + dyn%now%ux_b 
+            dyn%now%uy(:,:,k) = dyn%now%uy_i(:,:,k) + dyn%now%uy_b 
+        end do 
+
+        ! Calculate the depth-averaged velocity too (sum of shear and basal sliding)
+        dyn%now%ux_bar = dyn%now%ux_i_bar + dyn%now%ux_b 
+        dyn%now%uy_bar = dyn%now%uy_i_bar + dyn%now%uy_b 
+
+
+        ! 4. Set other variables to zero that are not treated with this solver =====
+        dyn%now%visc_eff  = 0.0_prec 
+        dyn%now%duxdz     = 0.0_prec 
+        dyn%now%duydz     = 0.0_prec 
+        dyn%now%beta_eff  = 0.0_prec 
+        dyn%now%beta_diva = 0.0_prec 
+
+        ! ===== Calculate the vertical velocity through continuity ============================
+
+        if (dyn%par%use_bmb) then 
+            bmb = tpo%now%bmb 
+        else 
+            bmb = 0.0 
+        end if 
+
+        call calc_uz_3D(dyn%now%uz,dyn%now%ux,dyn%now%uy,tpo%now%H_ice,bnd%z_bed,tpo%now%z_srf, &
+                        bnd%smb,bmb,tpo%now%dHicedt,tpo%now%dzsrfdt,dyn%par%zeta_aa,dyn%par%zeta_ac,dyn%par%dx,dyn%par%dy)
+        
+        
+        return
+
+    end subroutine calc_ydyn_hybrid
+
+    subroutine calc_ydyn_diva(dyn,tpo,mat,thrm,bnd)
+        ! Velocity is a steady-state solution to a given set of boundary conditions (topo, material, etc)
+
+        implicit none
+        
+        type(ydyn_class),   intent(INOUT) :: dyn
+        type(ytopo_class),  intent(IN)    :: tpo 
+        type(ymat_class),   intent(IN)    :: mat
+        type(ytherm_class), intent(IN)    :: thrm 
+        type(ybound_class), intent(IN)    :: bnd   
+
+        ! Local variables
+        integer :: iter, n_iter
+        integer :: i, j, k, nx, ny, nz_aa, nz_ac   
+        
+        type(diva_param_class) :: diva_par 
+
+        ! For vertical velocity calculation 
+        real(prec), allocatable :: bmb(:,:)
+
+        nx    = dyn%par%nx 
+        ny    = dyn%par%ny 
+        nz_aa = dyn%par%nz_aa 
+        nz_ac = dyn%par%nz_ac 
+        
+        allocate(bmb(nx,ny))
+        
         ! ===== Calculate 3D horizontal velocity solution via DIVA algorithm ===================
 
         ! Define grid points with ssa active (uses beta from previous timestep)
@@ -188,7 +404,11 @@ contains
                                 dyn%now%beta_eff,dyn%now%beta_diva,dyn%now%c_bed,dyn%now%taud_acx,dyn%now%taud_acy,tpo%now%H_ice, &
                                 tpo%now%H_grnd,tpo%now%f_grnd,tpo%now%f_grnd_acx,tpo%now%f_grnd_acy,mat%now%ATT, &
                                 dyn%par%zeta_aa,bnd%z_sl,bnd%z_bed,dyn%par%dx,dyn%par%dy,mat%par%n_glen,diva_par)
-
+         
+        ! Integrate from 3D shear velocity field to get depth-averaged field
+        dyn%now%ux_i_bar = calc_vertical_integrated_2D(dyn%now%ux_i,dyn%par%zeta_aa)
+        dyn%now%uy_i_bar = calc_vertical_integrated_2D(dyn%now%uy_i,dyn%par%zeta_aa)
+          
         ! ===== Calculate the vertical velocity through continuity ============================
 
         if (dyn%par%use_bmb) then 
@@ -200,43 +420,7 @@ contains
         call calc_uz_3D(dyn%now%uz,dyn%now%ux,dyn%now%uy,tpo%now%H_ice,bnd%z_bed,tpo%now%z_srf, &
                         bnd%smb,bmb,tpo%now%dHicedt,tpo%now%dzsrfdt,dyn%par%zeta_aa,dyn%par%zeta_ac,dyn%par%dx,dyn%par%dy)
         
-        ! ===== Additional diagnostic variables =======================
-
-        ! Integrate from 3D shear velocity field to get depth-averaged field
-        dyn%now%ux_i_bar = calc_vertical_integrated_2D(dyn%now%ux_i,dyn%par%zeta_aa)
-        dyn%now%uy_i_bar = calc_vertical_integrated_2D(dyn%now%uy_i,dyn%par%zeta_aa)
-                
-        ! Diagnose ice flux 
-        call calc_ice_flux(dyn%now%qq_acx,dyn%now%qq_acy,dyn%now%ux_bar,dyn%now%uy_bar,tpo%now%H_ice, &
-                            dyn%par%dx,dyn%par%dy)
-        dyn%now%qq        = calc_magnitude_from_staggered_ice(dyn%now%qq_acx,dyn%now%qq_acy,tpo%now%H_ice)
-
-        dyn%now%taub      = calc_magnitude_from_staggered_ice(dyn%now%taub_acx,dyn%now%taub_acy,tpo%now%H_ice)
-        dyn%now%taud      = calc_magnitude_from_staggered_ice(dyn%now%taud_acx,dyn%now%taud_acy,tpo%now%H_ice)
-
-        dyn%now%uxy_b     = calc_magnitude_from_staggered_ice(dyn%now%ux_b,dyn%now%uy_b,tpo%now%H_ice)
-        dyn%now%uxy_i_bar = calc_magnitude_from_staggered_ice(dyn%now%ux_i_bar,dyn%now%uy_i_bar,tpo%now%H_ice)
-        dyn%now%uxy_bar   = calc_magnitude_from_staggered_ice(dyn%now%ux_bar,dyn%now%uy_bar,tpo%now%H_ice)
-
-        do k = 1, nz_aa
-            dyn%now%uxy(:,:,k) = calc_magnitude_from_staggered_ice(dyn%now%ux(:,:,k),dyn%now%uy(:,:,k),tpo%now%H_ice)
-        end do 
-
-        ! Store surface velocities for easy access too 
-        dyn%now%ux_s  = dyn%now%ux(:,:,nz_aa)
-        dyn%now%uy_s  = dyn%now%uy(:,:,nz_aa)
-        dyn%now%uxy_s = dyn%now%uxy(:,:,nz_aa)
-
-        ! Determine ratio of basal to surface velocity
-        dyn%now%f_vbvs = calc_vel_ratio(uxy_base=dyn%now%uxy_b,uxy_srf=dyn%now%uxy_s)
-
-        ! Finally, determine rate of velocity change 
-        if (dt .ne. 0.0_prec) then 
-            dyn%now%duxydt = (dyn%now%uxy_bar - uxy_prev) / dt 
-        else 
-            dyn%now%duxydt = 0.0_prec 
-        end if 
-
+        
         return
 
     end subroutine calc_ydyn_diva
@@ -456,9 +640,12 @@ contains
                 if (dyn%par%cb_sia .gt. 0.0) then 
                     ! Calculate basal velocity from Weertman sliding law (Greve 1997)
                     
-                    call calc_uxy_b_sia(dyn%now%ux_b,dyn%now%uy_b,tpo%now%H_ice,tpo%now%dzsdx,tpo%now%dzsdy, &
-                                thrm%now%f_pmp,dyn%par%zeta_aa,dyn%par%dx,dyn%par%cb_sia,rho_ice,g)
-                
+!                     call calc_uxy_b_sia(dyn%now%ux_b,dyn%now%uy_b,tpo%now%H_ice,tpo%now%dzsdx,tpo%now%dzsdy, &
+!                                 thrm%now%f_pmp,dyn%par%zeta_aa,dyn%par%dx,dyn%par%cb_sia,rho_ice,g)
+                    call calc_velocity_basal_sia_00(dyn%now%ux_b,dyn%now%uy_b,dyn%now%taub_acx,dyn%now%taub_acy, &
+                                         tpo%now%H_ice,tpo%now%dzsdx,tpo%now%dzsdy,thrm%now%f_pmp, &
+                                         dyn%par%zeta_aa,dyn%par%dx,dyn%par%cb_sia,rho_ice,g)
+
                 else 
                     ! Otherwise no basal sliding in SIA-only mode
                 

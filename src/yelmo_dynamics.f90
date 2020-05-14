@@ -257,7 +257,8 @@ contains
 
         ! 2. Calculate SSA solution =====
 
-        if (use_ssa) then 
+        if (use_ssa .and. dyn%par%use_ssa .and. &
+                maxval(dyn%now%ssa_mask_acx+dyn%now%ssa_mask_acy) .gt. 0) then 
             ! Calculate SSA as normal 
 
             ! Define grid points with ssa active (uses beta from previous timestep)

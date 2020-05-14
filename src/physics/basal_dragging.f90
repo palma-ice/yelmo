@@ -107,7 +107,7 @@ contains
 
             case(-1)
                 ! beta (aa-nodes) has been defined externally - do nothing
-
+                
             case(0)
                 ! Constant beta everywhere
 
@@ -215,13 +215,13 @@ contains
 
         implicit none 
 
-        real(prec), intent(OUT) :: beta_acx(:,:) 
-        real(prec), intent(OUT) :: beta_acy(:,:) 
-        real(prec), intent(IN)  :: beta(:,:)
-        real(prec), intent(IN)  :: f_grnd(:,:) 
-        real(prec), intent(IN)  :: f_grnd_acx(:,:) 
-        real(prec), intent(IN)  :: f_grnd_acy(:,:) 
-        integer,    intent(IN)  :: beta_gl_stag 
+        real(prec), intent(INOUT) :: beta_acx(:,:) 
+        real(prec), intent(INOUT) :: beta_acy(:,:) 
+        real(prec), intent(IN)    :: beta(:,:)
+        real(prec), intent(IN)    :: f_grnd(:,:) 
+        real(prec), intent(IN)    :: f_grnd_acx(:,:) 
+        real(prec), intent(IN)    :: f_grnd_acy(:,:) 
+        integer,    intent(IN)    :: beta_gl_stag 
         character(len=*), intent(IN) :: boundaries 
 
         ! Local variables 
@@ -229,9 +229,12 @@ contains
 
         nx = size(beta_acx,1)
         ny = size(beta_acx,2) 
-        
+
         ! 5. Apply staggering method with particular care for the grounding line 
         select case(beta_gl_stag) 
+
+            case(-1)
+                ! Do nothing - beta_acx/acy has been defined externally
 
             case(0) 
                 ! Apply pure staggering everywhere (ac(i) = 0.5*(aa(i)+aa(i+1))

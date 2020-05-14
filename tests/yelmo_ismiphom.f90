@@ -16,7 +16,8 @@ program yelmo_ismiphom
     character(len=512) :: path_par, path_const 
     character(len=56)  :: experiment
     real(prec) :: time_init, time_end, time, dtt, dt2D_out, dt1D_out
-    integer    :: n  
+    integer    :: i, j, n  
+    real(prec) :: x_now, y_now 
 
     character(len=56) :: grid_name, L_str
     real(prec) :: L, dx, x0, alpha, omega, f_extend    
@@ -129,8 +130,28 @@ program yelmo_ismiphom
             yelmo1%tpo%par%topo_fixed   = .TRUE. 
             yelmo1%dyn%par%diva_no_slip = .FALSE. 
 
-            yelmo1%dyn%par%beta_method  = -1 
+            yelmo1%dyn%par%beta_method  = -1
+            yelmo1%dyn%par%beta_gl_stag = -1
+
             yelmo1%dyn%now%beta         = 1000.0 + 1000.0 * sin(omega*yelmo1%grd%x) * sin(omega*yelmo1%grd%y)
+
+            do i = 1, yelmo1%grd%nx-1 
+            do j = 1, yelmo1%grd%ny 
+                x_now = 0.5*(yelmo1%grd%x(i,j)+yelmo1%grd%x(i+1,j))
+                y_now = yelmo1%grd%y(i,j)
+                yelmo1%dyn%now%beta_acx(i,j) = 1000.0 + 1000.0 * sin(omega*x_now) * sin(omega*y_now)
+            end do 
+            end do  
+            yelmo1%dyn%now%beta_acx(yelmo1%grd%nx,:) = yelmo1%dyn%now%beta_acx(yelmo1%grd%nx-1,:)
+            
+            do i = 1, yelmo1%grd%nx 
+            do j = 1, yelmo1%grd%ny-1 
+                x_now = yelmo1%grd%x(i,j)
+                y_now = 0.5*(yelmo1%grd%y(i,j)+yelmo1%grd%y(i,j+1))
+                yelmo1%dyn%now%beta_acx(i,j) = 1000.0 + 1000.0 * sin(omega*x_now) * sin(omega*y_now)
+            end do 
+            end do  
+            yelmo1%dyn%now%beta_acy(:,yelmo1%grd%ny) = yelmo1%dyn%now%beta_acy(:,yelmo1%grd%ny-1)
 
         case("EXPF") 
 

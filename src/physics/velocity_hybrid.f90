@@ -55,9 +55,9 @@ contains
         integer,    intent(OUT)   :: ssa_mask_acy(:,:)  ! [-]
         real(prec), intent(OUT)   :: ssa_err_acx(:,:)
         real(prec), intent(OUT)   :: ssa_err_acy(:,:)
-        real(prec), intent(OUT)   :: beta(:,:)          ! [Pa a/m]
-        real(prec), intent(OUT)   :: beta_acx(:,:)      ! [Pa a/m]
-        real(prec), intent(OUT)   :: beta_acy(:,:)      ! [Pa a/m]
+        real(prec), intent(INOUT) :: beta(:,:)          ! [Pa a/m]
+        real(prec), intent(INOUT) :: beta_acx(:,:)      ! [Pa a/m]
+        real(prec), intent(INOUT) :: beta_acy(:,:)      ! [Pa a/m]
         real(prec), intent(IN)    :: c_bed(:,:)         ! [Pa]
         real(prec), intent(IN)    :: taud_acx(:,:)      ! [Pa]
         real(prec), intent(IN)    :: taud_acy(:,:)      ! [Pa]

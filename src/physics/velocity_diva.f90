@@ -758,6 +758,131 @@ end if
         
     end subroutine calc_vel_basal
 
+    subroutine calc_vel_basal_ab(ux_b,uy_b,ux_bar,uy_bar,F2,taub_acx,taub_acy,H_ice,boundaries)
+        ! Calculate basal sliding following Goldberg (2011), Eq. 34
+        ! (or it can also be obtained from L19, Eq. 32 given ub*beta=taub)
+
+        implicit none
+        
+        real(prec), intent(OUT) :: ux_b(:,:) 
+        real(prec), intent(OUT) :: uy_b(:,:)
+        real(prec), intent(IN)  :: ux_bar(:,:) 
+        real(prec), intent(IN)  :: uy_bar(:,:)
+        real(prec), intent(IN)  :: F2(:,:)
+        real(prec), intent(IN)  :: taub_acx(:,:) 
+        real(prec), intent(IN)  :: taub_acy(:,:)
+        real(prec), intent(IN)  :: H_ice(:,:)
+        character(len=*), intent(IN) :: boundaries 
+
+        ! Local variables 
+        integer    :: i, j, nx, ny, k  
+        integer    :: ip1, jp1, im1, jm1  
+        real(prec) :: F2_ac 
+        real(prec), allocatable :: F2_ab(:,:) 
+
+        nx = size(ux_b,1)
+        ny = size(ux_b,2) 
+
+        allocate(F2_ab(nx,ny))
+
+        ! Stagger F2 to ab-nodes 
+        do j = 1, ny 
+        do i = 1, nx 
+
+            ip1 = min(i,nx)
+            jp1 = min(j,ny)
+
+            k = 0 
+
+            if (H_ice(i,j) .gt. 0.0) then 
+                F2_ab(i,j) = F2_ab(i,j) + F2(i,j) 
+                k = k + 1 
+            end if 
+
+            if (H_ice(ip1,j) .gt. 0.0) then 
+                F2_ab(i,j) = F2_ab(i,j) + F2(ip1,j) 
+                k = k + 1 
+            end if 
+            
+            if (H_ice(i,jp1) .gt. 0.0) then 
+                F2_ab(i,j) = F2_ab(i,j) + F2(i,jp1) 
+                k = k + 1 
+            end if 
+            
+            if (H_ice(ip1,jp1) .gt. 0.0) then 
+                F2_ab(i,j) = F2_ab(i,j) + F2(ip1,jp1) 
+                k = k + 1 
+            end if 
+            
+            if (k .gt. 0) then 
+                F2_ab(i,j) = F2_ab(i,j) / real(k,prec) 
+            else 
+                F2_ab = 0.25*(F2(i,j)+F2(ip1,j)+F2(i,jp1)+F2(ip1,jp1))
+            end if 
+
+        end do 
+        end do 
+
+        do j = 1, ny 
+        do i = 1, nx 
+
+            ip1 = min(i+1,nx)
+            jp1 = min(j+1,ny)
+            im1 = max(i-1,1)
+            jm1 = max(j-1,1)
+
+            ! ==== x-direction =====
+
+            ! Stagger the F2_ab integral to the ac-nodes
+            if (H_ice(i,j) .gt. 0.0 .and. H_ice(im1,j) .eq. 0.0) then 
+                F2_ac = F2(i,j) 
+            else if (H_ice(i,j) .eq. 0.0 .and. H_ice(ip1,j) .gt. 0.0) then
+                F2_ac = F2(ip1,j)
+            else 
+                F2_ac = 0.5_prec*(F2(i,j) + F2(ip1,j))
+            end if 
+
+            ! Calculate basal velocity component 
+            ux_b(i,j) = ux_bar(i,j) - taub_acx(i,j)*F2_ac 
+
+            ! ==== y-direction =====
+            
+            ! Stagger the F2 integral to the ac-nodes
+            if (H_ice(i,j) .gt. 0.0 .and. H_ice(i,jp1) .eq. 0.0) then 
+                F2_ac = F2(i,j) 
+            else if (H_ice(i,j) .eq. 0.0 .and. H_ice(i,jp1) .gt. 0.0) then
+                F2_ac = F2(i,jp1)
+            else 
+                F2_ac = 0.5_prec*(F2(i,j) + F2(i,jp1))
+            end if 
+                
+            ! Calculate basal velocity component 
+            uy_b(i,j) = uy_bar(i,j) - taub_acy(i,j)*F2_ac 
+
+        end do 
+        end do  
+
+        ! Apply boundary conditions as needed 
+        if (trim(boundaries) .eq. "periodic") then 
+
+            ux_b(1,:)    = ux_b(nx-2,:) 
+            ux_b(nx-1,:) = ux_b(2,:) 
+            ux_b(nx,:)   = ux_b(3,:) 
+            ux_b(:,1)    = ux_b(:,ny-1)
+            ux_b(:,ny)   = ux_b(:,2) 
+            
+            uy_b(1,:)    = uy_b(nx-1,:) 
+            uy_b(nx,:)   = uy_b(2,:) 
+            uy_b(:,1)    = uy_b(:,ny-2)
+            uy_b(:,ny-1) = uy_b(:,2) 
+            uy_b(:,ny)   = uy_b(:,3)
+
+        end if 
+
+        return
+        
+    end subroutine calc_vel_basal_ab
+    
     subroutine calc_basal_stress(taub_acx,taub_acy,beta_eff_acx,beta_eff_acy,ux_bar,uy_bar)
         ! Calculate the basal stress resulting from sliding (friction times velocity)
         ! Note: calculated on ac-nodes.

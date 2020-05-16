@@ -189,17 +189,19 @@ trough = libyelmo/bin/yelmo_trough.x
 
         else:
             # Run job in background 
-            pid = runjob(rundir,executable,par_fname)
+            pid = runjob(rundir,executable,par_fname,omp)
 
     return 
 
 ######### Helper functions ############### 
 
-def runjob(rundir,executable,par_path):
+def runjob(rundir,executable,par_path,omp):
     '''Run a job generated with makejob.'''
 
-    env_cmd = ""
-    #env_cmd = "&& export OMP_NUM_THREADS=2" # && export OMP_THREAD_LIMIT=2"
+    if omp > 0:
+        env_cmd = "&& export OMP_NUM_THREADS={}".format(omp) # && export OMP_THREAD_LIMIT=2"
+    else:
+        env_cmd = ""
     
     cmd = "cd {} {} && exec {} {} > {} &".format(rundir,env_cmd,executable,par_path,"out.out")
     #cmd = "cd {} {} && mpiexec -n 2 {} {} > {} &".format(rundir,env_cmd,executable,par_path,"out.out")

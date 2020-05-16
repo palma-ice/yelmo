@@ -53,13 +53,13 @@ trough = libyelmo/bin/yelmo_trough.x
     parser.add_argument('--group', type=str, default='anthroia',
         help='Email address to send job notifications from cluster')
     parser.add_argument('-x',action="store_true",
-        help='Use this argument if run_yelmo.py is being called by job run')
+        help='Use this argument if script is being called by job run')
 
     # Add arguments
     parser.add_argument('rundir',metavar='RUNDIR', type=str,
-         help='Path where yelmo simulation will run and store output.')
+         help='Path where simulation will run and store output.')
     parser.add_argument('par_path',metavar='PAR_PATH', type=str,
-         help='Path where yelmo simulation will run and store output.')
+         help='Path to parameter file.')
 
     # Parse the arguments
     args = parser.parse_args()

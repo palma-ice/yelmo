@@ -703,8 +703,8 @@ end if
         do j = 1, ny 
         do i = 1, nx 
 
-            ip1 = min(i,nx)
-            jp1 = min(j,ny)
+            ip1 = min(i+1,nx)
+            jp1 = min(j+1,ny)
 
             ! ==== x-direction =====
 

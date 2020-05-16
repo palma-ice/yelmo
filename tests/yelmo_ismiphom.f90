@@ -109,7 +109,15 @@ program yelmo_ismiphom
             if (trim(yelmo1%dyn%par%solver) .eq. "hybrid") then 
                 ! For this experiment, no basal sliding is allowed, so disable
                 ! ssa for hybrid solver (ie, set hybrid==SIA only)
+                
                 yelmo1%dyn%par%use_ssa  = .FALSE. 
+            
+            else if (trim(yelmo1%dyn%par%solver) .eq. "ssa") then
+
+                write(*,*) "yelmo_ismiphom:: error: solver='ssa' cannot be used &
+                &for Experiment A, since there is no sliding, velocity would be zero."
+                stop 
+
             end if 
 
             ! Not used in this experiment, but set it to a constant value anyway

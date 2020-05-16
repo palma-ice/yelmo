@@ -862,12 +862,17 @@ contains
         real(8), intent(OUT), optional :: dtime 
 
         ! Local variables
+        logical    :: using_omp 
         integer(4) :: clock 
         integer(4) :: clock_rate
         integer(4) :: clock_max 
         real(8)    :: wtime 
 
-        if (yelmo_use_omp) then 
+        ! Check openmp status - do not use global switch, since it may not have been initialized yet
+        using_omp = .FALSE. 
+        !$ using_omp = .TRUE.
+
+        if (using_omp) then 
             ! --------------------------------------
             ! omp_get_wtime must be used for multithread openmp execution to get timing on master thread 
             ! The following lines will overwrite time with the result from omp_get_wtime on the master thread 

@@ -64,7 +64,9 @@ contains
                       dim1="time",start=[n],count=[1],ncid=ncid)
         call nc_write(filename,"dt_avg",ylmo%par%dt_avg,units="yr",long_name="Average timestep", &
                       dim1="time",start=[n],count=[1],ncid=ncid)
-        call nc_write(filename,"eta_avg",ylmo%par%eta_avg,units="m a-1",long_name="Average eta (maximum PC truncation error)", &
+        call nc_write(filename,"eta_avg",ylmo%par%eta_avg,units="m a**-1",long_name="Average eta (maximum PC truncation error)", &
+                      dim1="time",start=[n],count=[1],ncid=ncid)
+        call nc_write(filename,"ssa_iter_avg",ylmo%par%ssa_iter_avg,units="",long_name="Average Picard iterations for SSA convergence", &
                       dim1="time",start=[n],count=[1],ncid=ncid)
 
         return 

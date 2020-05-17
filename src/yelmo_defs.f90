@@ -212,13 +212,15 @@ module yelmo_defs
         
         ! Internal parameters 
         character(len=256) :: boundaries 
-        logical    :: use_ssa                    ! Should ssa be used? 
-        logical    :: use_bmb                    ! Set to match `use_bmb` in ytopo_param_class 
+        logical    :: use_ssa                   ! Should ssa be used? 
+        logical    :: use_bmb                   ! Set to match `use_bmb` in ytopo_param_class 
         integer    :: nx, ny, nz_aa, nz_ac 
         real(prec) :: dx, dy
         real(prec), allocatable :: zeta_aa(:)   ! Layer centers (aa-nodes), plus base and surface: nz_aa points 
         real(prec), allocatable :: zeta_ac(:)   ! Layer borders (ac-nodes), plus base and surface: nz_ac == nz_aa-1 points
         real(prec) :: time
+
+        integer    :: ssa_iter_now              ! Number of iterations used for Picard iteration to solve ssa this timestep
 
     end type
 
@@ -683,13 +685,15 @@ module yelmo_defs
         real(prec) :: pc_eta(3)
         real(prec), allocatable :: pc_tau(:,:)
 
-        ! Timing information 
+        ! Timing information
         real(prec) :: model_speed 
-        real(prec) :: model_speeds(100)     ! Use 100 timesteps for running mean  
+        real(prec) :: model_speeds(100)         ! Eg, 100 timesteps for running mean 
         real(prec) :: dt_avg 
-        real(prec) :: dts(100)              ! Use 100 timesteps for running mean 
+        real(prec) :: dts(100)                  ! Eg, 100 timesteps for running mean
         real(prec) :: eta_avg 
-        real(prec) :: etas(100)             ! Use 100 timesteps for running mean 
+        real(prec) :: etas(100)                 ! Eg, 100 timesteps for running mean
+        real(prec) :: ssa_iter_avg 
+        real(prec) :: ssa_iters(100)            ! Eg, 100 timesteps for running mean
         
         character(len=512)   :: log_timestep_file 
 

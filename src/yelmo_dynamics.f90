@@ -260,7 +260,7 @@ contains
         ! Define grid points with ssa active (uses beta from previous timestep)
         call set_ssa_masks(dyn%now%ssa_mask_acx,dyn%now%ssa_mask_acy,dyn%now%beta_acx,dyn%now%beta_acy, &
                            tpo%now%H_ice,tpo%now%f_grnd_acx,tpo%now%f_grnd_acy,dyn%par%ssa_beta_max,use_ssa=.TRUE.)
-        
+
         if (use_ssa .and. dyn%par%use_ssa .and. &
                 maxval(dyn%now%ssa_mask_acx+dyn%now%ssa_mask_acy) .gt. 0) then 
             ! Calculate SSA as normal 
@@ -285,10 +285,10 @@ contains
 
             call calc_velocity_hybrid(dyn%now%ux_b,dyn%now%uy_b,dyn%now%taub_acx,dyn%now%taub_acy, &
                                       dyn%now%visc_eff_int,dyn%now%ssa_mask_acx,dyn%now%ssa_mask_acy, &
-                                      dyn%now%ssa_err_acx,dyn%now%ssa_err_acy,dyn%now%beta,dyn%now%beta_acx,dyn%now%beta_acy, &
-                                      dyn%now%c_bed,dyn%now%taud_acx,dyn%now%taud_acy,tpo%now%H_ice, &
-                                      tpo%now%H_grnd,tpo%now%f_grnd,tpo%now%f_grnd_acx,tpo%now%f_grnd_acy,mat%now%ATT, &
-                                      dyn%par%zeta_aa,bnd%z_sl,bnd%z_bed,dyn%par%dx,dyn%par%dy,mat%par%n_glen,hybrid_par)
+                                      dyn%now%ssa_err_acx,dyn%now%ssa_err_acy,dyn%par%ssa_iter_now,dyn%now%beta, &
+                                      dyn%now%beta_acx,dyn%now%beta_acy,dyn%now%c_bed,dyn%now%taud_acx,dyn%now%taud_acy, &
+                                      tpo%now%H_ice,tpo%now%H_grnd,tpo%now%f_grnd,tpo%now%f_grnd_acx,tpo%now%f_grnd_acy, &
+                                      mat%now%ATT,dyn%par%zeta_aa,bnd%z_sl,bnd%z_bed,dyn%par%dx,dyn%par%dy,mat%par%n_glen,hybrid_par)
 
         else 
             ! Set all SSA terms to zero 
@@ -401,9 +401,9 @@ contains
         call calc_velocity_diva(dyn%now%ux,dyn%now%uy,dyn%now%ux_i,dyn%now%uy_i,dyn%now%ux_bar,dyn%now%uy_bar, &
                                 dyn%now%ux_b,dyn%now%uy_b,dyn%now%duxdz,dyn%now%duydz,dyn%now%taub_acx,dyn%now%taub_acy, &
                                 dyn%now%visc_eff,dyn%now%visc_eff_int,dyn%now%ssa_mask_acx,dyn%now%ssa_mask_acy, &
-                                dyn%now%ssa_err_acx,dyn%now%ssa_err_acy,dyn%now%beta,dyn%now%beta_acx,dyn%now%beta_acy, &
-                                dyn%now%beta_eff,dyn%now%beta_diva,dyn%now%c_bed,dyn%now%taud_acx,dyn%now%taud_acy,tpo%now%H_ice, &
-                                tpo%now%H_grnd,tpo%now%f_grnd,tpo%now%f_grnd_acx,tpo%now%f_grnd_acy,mat%now%ATT, &
+                                dyn%now%ssa_err_acx,dyn%now%ssa_err_acy,dyn%par%ssa_iter_now,dyn%now%beta,dyn%now%beta_acx, &
+                                dyn%now%beta_acy,dyn%now%beta_eff,dyn%now%beta_diva,dyn%now%c_bed,dyn%now%taud_acx,dyn%now%taud_acy, &
+                                tpo%now%H_ice,tpo%now%H_grnd,tpo%now%f_grnd,tpo%now%f_grnd_acx,tpo%now%f_grnd_acy,mat%now%ATT, &
                                 dyn%par%zeta_aa,bnd%z_sl,bnd%z_bed,dyn%par%dx,dyn%par%dy,mat%par%n_glen,diva_par)
          
         ! Integrate from 3D shear velocity field to get depth-averaged field
@@ -1727,6 +1727,9 @@ end if
         ! Define current time as unrealistic value
         par%time = 1000000000   ! [a] 1 billion years in the future
         
+        ! Set ssa_iter_now = 1 to start 
+        par%ssa_iter_now = 1 
+
         return
 
     end subroutine ydyn_par_load

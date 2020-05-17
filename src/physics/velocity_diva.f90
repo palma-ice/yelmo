@@ -39,7 +39,7 @@ module velocity_diva
 contains 
 
     subroutine calc_velocity_diva(ux,uy,ux_i,uy_i,ux_bar,uy_bar,ux_b,uy_b,duxdz,duydz,taub_acx,taub_acy, &
-                                  visc_eff,visc_eff_int,ssa_mask_acx,ssa_mask_acy,ssa_err_acx,ssa_err_acy, &
+                                  visc_eff,visc_eff_int,ssa_mask_acx,ssa_mask_acy,ssa_err_acx,ssa_err_acy,ssa_iter_now, &
                                   beta,beta_acx,beta_acy,beta_eff,beta_diva,c_bed,taud_acx,taud_acy,H_ice,H_grnd,f_grnd, &
                                   f_grnd_acx,f_grnd_acy,ATT,zeta_aa,z_sl,z_bed,dx,dy,n_glen,par)
         ! This subroutine is used to solve the horizontal velocity system (ux,uy)
@@ -68,6 +68,7 @@ contains
         integer,    intent(OUT)   :: ssa_mask_acy(:,:)  ! [-]
         real(prec), intent(OUT)   :: ssa_err_acx(:,:)
         real(prec), intent(OUT)   :: ssa_err_acy(:,:)
+        integer,    intent(OUT)   :: ssa_iter_now 
         real(prec), intent(INOUT) :: beta(:,:)          ! [Pa a/m]
         real(prec), intent(INOUT) :: beta_acx(:,:)      ! [Pa a/m]
         real(prec), intent(INOUT) :: beta_acy(:,:)      ! [Pa a/m]
@@ -192,7 +193,9 @@ end if
             ! Calculate an L1 error metric over matrix for diagnostics
             call check_vel_convergence_l1rel_matrix(ssa_err_acx,ssa_err_acy,ux_bar,uy_bar,ux_bar_nm1,uy_bar_nm1)
 
-            
+            ! Store current total iterations for output
+            ssa_iter_now = iter 
+
             ! =========================================================================================
             ! Update additional fields based on output of solver
              

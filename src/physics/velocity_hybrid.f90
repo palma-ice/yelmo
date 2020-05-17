@@ -38,7 +38,7 @@ module velocity_hybrid
 contains 
 
     subroutine calc_velocity_hybrid(ux_b,uy_b,taub_acx,taub_acy,visc_eff_int,ssa_mask_acx,ssa_mask_acy, &
-                                  ssa_err_acx,ssa_err_acy,beta,beta_acx,beta_acy,c_bed,taud_acx,taud_acy,H_ice, &
+                                  ssa_err_acx,ssa_err_acy,ssa_iter_now,beta,beta_acx,beta_acy,c_bed,taud_acx,taud_acy,H_ice, &
                                   H_grnd,f_grnd,f_grnd_acx,f_grnd_acy,ATT,zeta_aa,z_sl,z_bed,dx,dy,n_glen,par)
         ! This subroutine is used to solve the horizontal velocity system (ux,uy)
         ! following the hybrid method (combination of SIA and SSA solutions)
@@ -55,6 +55,7 @@ contains
         integer,    intent(OUT)   :: ssa_mask_acy(:,:)  ! [-]
         real(prec), intent(OUT)   :: ssa_err_acx(:,:)
         real(prec), intent(OUT)   :: ssa_err_acy(:,:)
+        integer,    intent(OUT)   :: ssa_iter_now 
         real(prec), intent(INOUT) :: beta(:,:)          ! [Pa a/m]
         real(prec), intent(INOUT) :: beta_acx(:,:)      ! [Pa a/m]
         real(prec), intent(INOUT) :: beta_acy(:,:)      ! [Pa a/m]
@@ -155,6 +156,9 @@ end if
             call check_vel_convergence_l1rel_matrix(ssa_err_acx,ssa_err_acy,ux_b,uy_b,ux_b_nm1,uy_b_nm1)
 
             
+            ! Store current total iterations for output
+            ssa_iter_now = iter 
+
             ! =========================================================================================
             ! Update additional fields based on output of solver
              

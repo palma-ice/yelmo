@@ -376,16 +376,17 @@ contains
             dom%par%pc_eta = cshift(dom%par%pc_eta,shift=-1)
             dom%par%pc_eta(1) = eta_now
         
-            ! Save the current timestep for log and for running mean 
+            ! Save the current timestep and other data for log and for running mean 
             n_now = n_now + 1 
             dt_save(n_now) = dt_now 
             call yelmo_calc_running_mean(dom%par%dt_avg,dom%par%dts,dt_now)
             call yelmo_calc_running_mean(dom%par%eta_avg,dom%par%etas,dom%par%pc_eta(1))
-
+            call yelmo_calc_running_mean(dom%par%ssa_iter_avg,dom%par%ssa_iters,real(dom%dyn%par%ssa_iter_now,prec))
+            
             if (dom%par%log_timestep) then 
                 ! Write timestep file if desired
                 call yelmo_timestep_write(dom%par%log_timestep_file,time_now,dt_now,dt_adv_min,dt_pi, &
-                            dom%par%pc_eta(1),dom%par%pc_tau)
+                            dom%par%pc_eta(1),dom%par%pc_tau,dom%dyn%par%ssa_iter_now)
             end if 
 
             ! Make sure model is still running well
@@ -733,7 +734,7 @@ contains
             ! Timestep file 
             call yelmo_timestep_write_init(dom%par%log_timestep_file,time,dom%grd%xc,dom%grd%yc,dom%par%pc_eps)
             call yelmo_timestep_write(dom%par%log_timestep_file,time,0.0_prec,0.0_prec,dom%par%pc_dt(1), &
-                            dom%par%pc_eta(1),dom%par%pc_tau)
+                            dom%par%pc_eta(1),dom%par%pc_tau,dom%dyn%par%ssa_iter_now)
         end if 
 
         return
@@ -953,7 +954,8 @@ contains
         par%model_speeds = 0.0_prec 
         par%dt_avg       = 0.0_prec 
         par%eta_avg      = 0.0_prec 
-        
+        par%ssa_iter_avg = 0.0_prec 
+
         return
 
     end subroutine yelmo_par_load

@@ -10,17 +10,17 @@
     z_sl            = 0.0               ! [m] Sea level relative to present-day 
 
     load_cf_ref     = False             ! Load cf_ref from file? Otherwise define from cf_stream + inline tuning
-    file_cf_ref     = "input/{domain}/{grid_name}/{grid_name}_cf_ref_opt.nc"  ! Filename holding cf_ref to load 
+    file_cf_ref     = "ice_data/{domain}/{grid_name}/{grid_name}_cf_ref_opt.nc"  ! Filename holding cf_ref to load 
 
     load_bmelt      = False             ! Load PD bmelt observations from file? Else use bmb_shlf_const 
-    file_bmelt      = "input/{domain}/{grid_name}/{grid_name}_BMELT-R13.nc"
+    file_bmelt      = "ice_data/{domain}/{grid_name}/{grid_name}_BMELT-R13.nc"
 
 /
 
 &yelmo
     domain          = "Greenland"
     grid_name       = "GRL-16KM"
-    grid_path       = "input/{domain}/{grid_name}/{grid_name}_REGIONS.nc"
+    grid_path       = "ice_data/{domain}/{grid_name}/{grid_name}_REGIONS.nc"
     experiment      = "None"       
     restart         = "None"
     log_timestep    = True 
@@ -158,40 +158,40 @@
 
 &yelmo_masks
     basins_load     = True 
-    basins_path     = "input/{domain}/{grid_name}/{grid_name}_BASINS-nasa.nc" 
+    basins_path     = "ice_data/{domain}/{grid_name}/{grid_name}_BASINS-nasa.nc" 
     basins_nms      = "basin" "basin_mask"
     regions_load    = True 
-    regions_path    = "input/{domain}/{grid_name}/{grid_name}_REGIONS.nc"
+    regions_path    = "ice_data/{domain}/{grid_name}/{grid_name}_REGIONS.nc"
     regions_nms     = "mask" "None"
 /
 
 &yelmo_init_topo
     H_ice_load      = True 
-    H_ice_path      = "input/{domain}/{grid_name}/{grid_name}_TOPO-M17.nc"
+    H_ice_path      = "ice_data/{domain}/{grid_name}/{grid_name}_TOPO-M17.nc"
     H_ice_nm        = "H_ice"               ! [m] Ice thickness 
     z_bed_load      = True 
-    z_bed_path      = "input/{domain}/{grid_name}/{grid_name}_TOPO-M17.nc"
+    z_bed_path      = "ice_data/{domain}/{grid_name}/{grid_name}_TOPO-M17.nc"
     z_bed_nm        = "z_bed"               ! [m] Bedrock elevation 
     z_bed_sd_nm     = "z_bed_sd"            ! [m] Bedrock elevation standard deviation (if available) 
 /
 
 &yelmo_data 
     pd_topo_load      = True 
-    pd_topo_path      = "input/{domain}/{grid_name}/{grid_name}_TOPO-M17.nc"
+    pd_topo_path      = "ice_data/{domain}/{grid_name}/{grid_name}_TOPO-M17.nc"
     pd_topo_names     = "H_ice" "z_srf" "z_bed"      ! Ice thickness, Surface elevation, Bedrock elevation
     pd_tsrf_load      = True 
-    pd_tsrf_path      = "input/{domain}/{grid_name}/{grid_name}_MARv3.9-ERA-INT_ann_1980-1999.nc"
+    pd_tsrf_path      = "ice_data/{domain}/{grid_name}/{grid_name}_MARv3.9-ERA-INT_ann_1980-1999.nc"
     pd_tsrf_name      = "T_srf"                      ! Surface temperature (or near-surface temperature)
     pd_tsrf_monthly   = False
     pd_smb_load       = True 
-    pd_smb_path       = "input/{domain}/{grid_name}/{grid_name}_MARv3.9-ERA-INT_ann_1980-1999.nc"
+    pd_smb_path       = "ice_data/{domain}/{grid_name}/{grid_name}_MARv3.9-ERA-INT_ann_1980-1999.nc"
     pd_smb_name       = "smb"                        ! Surface mass balance 
     pd_smb_monthly    = False 
     pd_vel_load       = True 
-    pd_vel_path       = "input/{domain}/{grid_name}/{grid_name}_VEL-J18.nc"
+    pd_vel_path       = "ice_data/{domain}/{grid_name}/{grid_name}_VEL-J18.nc"
     pd_vel_names      = "ux_srf" "uy_srf"            ! Surface velocity 
     pd_age_load       = True 
-    pd_age_path       = "input/{domain}/{grid_name}/{grid_name}_STRAT-M15.nc"
+    pd_age_path       = "ice_data/{domain}/{grid_name}/{grid_name}_STRAT-M15.nc"
     pd_age_names      = "age_iso" "depth_iso"        ! ages of isochrones; depth of isochrones 
 
 /

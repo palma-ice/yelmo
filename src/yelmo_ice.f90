@@ -383,6 +383,9 @@ contains
             call yelmo_calc_running_mean(dom%par%eta_avg,dom%par%etas,dom%par%pc_eta(1))
             call yelmo_calc_running_mean(dom%par%ssa_iter_avg,dom%par%ssa_iters,real(dom%dyn%par%ssa_iter_now,prec))
             
+            ! Extra diagnostic field, not necessary for normal runs
+            call yelmo_calc_running_mean_2D(dom%par%pc_tau_avg,dom%par%pc_taus,dom%par%pc_tau)
+
             if (dom%par%log_timestep) then 
                 ! Write timestep file if desired
                 call yelmo_timestep_write(dom%par%log_timestep_file,time_now,dt_now,dt_adv_min,dt_pi, &
@@ -606,6 +609,15 @@ contains
         allocate(dom%par%pc_tau(dom%grd%nx,dom%grd%ny))
         
         dom%par%pc_tau   = 0.0_prec 
+        
+        ! Allocate truncation error averaging arrays 
+        if (allocated(dom%par%pc_taus))   deallocate(dom%par%pc_taus)
+        allocate(dom%par%pc_taus(dom%grd%nx,dom%grd%ny,10))
+        if (allocated(dom%par%pc_tau_avg))   deallocate(dom%par%pc_tau_avg)
+        allocate(dom%par%pc_tau_avg(dom%grd%nx,dom%grd%ny))
+
+        dom%par%pc_taus    = 0.0_prec 
+        dom%par%pc_tau_avg = 0.0_prec
         
         write(*,*) "yelmo_init:: yelmo initialized."
         

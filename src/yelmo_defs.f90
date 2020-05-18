@@ -695,6 +695,10 @@ module yelmo_defs
         real(prec) :: ssa_iter_avg 
         real(prec) :: ssa_iters(100)            ! Eg, 100 timesteps for running mean
         
+        ! Truncation error information over several timesteps
+        real(prec), allocatable :: pc_taus(:,:,:)
+        real(prec), allocatable :: pc_tau_avg(:,:)
+
         character(len=512)   :: log_timestep_file 
 
     end type
@@ -1002,6 +1006,41 @@ contains
         return 
 
     end subroutine yelmo_calc_running_mean
+
+    subroutine yelmo_calc_running_mean_2D(val_avg,vals,val_now)
+
+        implicit none 
+
+        real(prec), intent(OUT)   :: val_avg(:,:) 
+        real(prec), intent(INOUT) :: vals(:,:,:) 
+        real(prec), intent(IN)    :: val_now(:,:) 
+
+        ! Local variables 
+        integer :: n, k, n_now  
+
+        ! Shift rates vector to eliminate oldest entry, and add current entry
+        n = size(vals,3) 
+        vals        = cshift(vals,1,dim=3)
+        vals(:,:,n) = val_now  
+
+        ! Calculate running average value 
+        n_now   = 0 
+        val_avg = 0.0_prec
+
+        do k = 1, n 
+            if (sum(vals(:,:,k)) .ne. 0.0_prec) then 
+                n_now = n_now + 1 
+                val_avg = val_avg + vals(:,:,k) 
+            end if 
+        end do 
+
+        if (n_now .gt. 0) then 
+            val_avg = val_avg / real(n_now,prec) 
+        end if 
+        
+        return 
+
+    end subroutine yelmo_calc_running_mean_2D
 
 end module yelmo_defs
 

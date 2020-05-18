@@ -69,6 +69,9 @@ contains
         call nc_write(filename,"ssa_iter_avg",ylmo%par%ssa_iter_avg,units="",long_name="Average Picard iterations for SSA convergence", &
                       dim1="time",start=[n],count=[1],ncid=ncid)
 
+        call nc_write(filename,"pc_tau_avg",ylmo%par%pc_tau_avg,units="m a**-1",long_name="Average truncation error", &
+                      dim1="xc",dim2="yc",dim3="time",start=[1,1,n],count=[ylmo%grd%nx,ylmo%grd%ny,1],ncid=ncid)
+        
         return 
 
     end subroutine yelmo_write_step_model_metrics

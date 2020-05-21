@@ -58,7 +58,7 @@ contains
 
     end function calc_magnitude 
     
-    function calc_magnitude_from_staggered(u,v) result(umag)
+    function calc_magnitude_from_staggered(u,v,boundaries) result(umag)
         ! Calculate the centered (aa-nodes) magnitude of a vector 
         ! from the staggered (ac-nodes) components
 
@@ -66,6 +66,7 @@ contains
         
         real(prec), intent(IN)  :: u(:,:), v(:,:)  
         real(prec) :: umag(size(u,1),size(u,2)) 
+        character(len=*), intent(IN), optional :: boundaries 
 
         ! Local variables 
         integer :: i, j, nx, ny 
@@ -90,11 +91,25 @@ contains
         end do 
         end do 
 
+        if (present(boundaries)) then 
+            ! Apply conditions at boundaries of domain 
+
+            if (trim(boundaries) .eq. "periodic") then 
+
+                umag(1,:)  = umag(nx-1,:) 
+                umag(nx,:) = umag(2,:)  
+                umag(:,1)  = umag(:,ny-1)
+                umag(:,ny) = umag(:,2) 
+                
+            end if 
+
+        end if 
+
         return
 
     end function calc_magnitude_from_staggered 
     
-    function calc_magnitude_from_staggered_ice(u,v,H) result(umag)
+    function calc_magnitude_from_staggered_ice(u,v,H,boundaries) result(umag)
         ! Calculate the centered (aa-nodes) magnitude of a vector 
         ! from the staggered (ac-nodes) components
 
@@ -102,19 +117,21 @@ contains
         
         real(prec), intent(IN)  :: u(:,:), v(:,:), H(:,:) 
         real(prec) :: umag(size(u,1),size(u,2)) 
+        character(len=*), intent(IN), optional :: boundaries 
 
         ! Local variables 
         integer :: i, j, nx, ny 
         integer :: ip1, jp1, im1, jm1
         real(prec) :: unow, vnow 
         real(prec) :: f1, f2, H1, H2 
+        
         nx = size(u,1)
         ny = size(u,2) 
 
         umag = 0.0_prec 
 
-        do j = 2, ny-1 
-        do i = 2, nx-1 
+        do j = 1, ny 
+        do i = 1, nx 
 
             im1 = max(i-1,1)
             jm1 = max(j-1,1)
@@ -154,6 +171,20 @@ contains
             umag(i,j) = sqrt(unow*unow+vnow*vnow)
         end do 
         end do 
+
+        if (present(boundaries)) then 
+            ! Apply conditions at boundaries of domain 
+
+            if (trim(boundaries) .eq. "periodic") then 
+
+                umag(1,:)  = umag(nx-1,:) 
+                umag(nx,:) = umag(2,:)  
+                umag(:,1)  = umag(:,ny-1)
+                umag(:,ny) = umag(:,2) 
+                
+            end if 
+
+        end if 
 
         return
 

@@ -3,7 +3,7 @@
     domain       = "ISMIPHOM"
     experiment   = "EXPC"               ! "EXPA", "EXPC"
     L            = 10.0                 ! [km] Length scale
-    nx           = 40                   ! Number of grid points in one direction of square
+    nx           = 42                   ! Number of grid points in one direction of square
     f_extend     = 0.5                  ! Extend domain by fraction of period on each side (default=0.0 or 0.5)
 
     ! Timing parameters 

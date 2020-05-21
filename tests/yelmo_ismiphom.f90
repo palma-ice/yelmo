@@ -58,19 +58,14 @@ program yelmo_ismiphom
 
     ! Define grid based on length scale and number of points in each direction (square domain)
     x0 = 0.0_prec 
-    dx = L / (nx-2)
-
-
+    !dx = L / (nx-1)
+    dx = 0.25 * (L/10.0)
+    
     ! If desired, extend domain by fraction of a period in each direction to avoid edge effects
     if (f_extend .gt. 0.0) then 
         x0 = -f_extend*L 
-        nx = L*(1.0+2.0*f_extend) / dx + 1
+        nx = L*(1.0+2.0*f_extend) / dx
     end if 
-
-!     do n = 1, nx 
-!         write(*,*) n, x0 + (n-1)*dx 
-!     end do 
-!     stop 
 
     ! Define grid name
     write(L_str,*) int(L) 
@@ -85,6 +80,11 @@ program yelmo_ismiphom
     ! Next define grid 
     call yelmo_init_grid(yelmo1%grd,grid_name,units="km",x0=x0,dx=dx,nx=nx,y0=x0,dy=dx,ny=nx)
 
+!     do i = 1, yelmo1%grd%nx 
+!         write(*,*) i, yelmo1%grd%xc(i) 
+!     end do 
+!     stop 
+    
     ! Initialize data objects (without loading topography, which will be defined inline below)
     call yelmo_init(yelmo1,filename=path_par,grid_def="none",time=time_init,load_topo=.FALSE.,domain=domain,grid_name=grid_name)
     

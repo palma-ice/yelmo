@@ -346,6 +346,8 @@ end if
         integer :: ip1, jp1 
         real(prec) :: visc_eff_ac
 
+        real(prec) :: visc_eff_ab, taub_ab 
+
         nx    = size(duxdz,1)
         ny    = size(duxdz,2)
         nz_aa = size(duxdz,3) 
@@ -365,6 +367,13 @@ end if
             ! Calculate shear strain, acy-nodes
             visc_eff_ac  = 0.5_prec*(visc_eff(i,j,k) + visc_eff(i,jp1,k)) 
             duydz(i,j,k) = (taub_acy(i,j)/visc_eff_ac) * (1.0-zeta_aa(k))
+
+!             visc_eff_ab  = 0.25*(visc_eff(i,j,k)+visc_eff(ip1,j,k)+visc_eff(i,jp1,k)+visc_eff(ip1,jp1,k))
+!             taub_ab      = 0.50*(taub_acx(i,j)+taub_acx(i,jp1))
+!             duxdz(i,j,k) = (taub_ab/visc_eff_ab) * (1.0-zeta_aa(k))
+            
+!             taub_ab      = 0.50*(taub_acy(i,j)+taub_acy(ip1,j))
+!             duydz(i,j,k) = (taub_ab/visc_eff_ab) * (1.0-zeta_aa(k))
 
         end do 
         end do 
@@ -394,6 +403,9 @@ end if
     subroutine calc_visc_eff_3D(visc_eff,ux,uy,duxdz,duydz,ATT,zeta_aa,dx,dy,n_glen,eps_0)
         ! Calculate 3D effective viscosity following L19, Eq. 2
         ! Use of eps_0 ensures non-zero positive viscosity value everywhere 
+        ! Note: viscosity is first calculated on ab-nodes, then 
+        ! unstaggered back to aa-nodes. This ensures more stability for 
+        ! visc_eff (less likely to blow up for low strain rates). 
 
         implicit none 
         
@@ -415,9 +427,11 @@ end if
         real(prec) :: inv_4dx, inv_4dy 
         real(prec) :: dudx, dudy
         real(prec) :: dvdx, dvdy 
-        real(prec) :: duxdz_aa, duydz_aa  
+        real(prec) :: duxdz_ab, duydz_ab  
         real(prec) :: p1, p2, eps_0_sq  
         real(prec) :: eps_sq                            ! [1/a^2]
+        real(prec) :: ATT_ab 
+        real(prec), allocatable :: visc_eff_ref(:,:,:)  
         
         nx = size(visc_eff,1)
         ny = size(visc_eff,2)
@@ -442,35 +456,56 @@ end if
             jm1 = max(j-1,1) 
             jp1 = min(j+1,ny) 
 
-            ! Calculate effective strain components from horizontal stretching
-            dudx = (ux(i,j) - ux(im1,j))/dx
-            dvdy = (uy(i,j) - uy(i,jm1))/dy
+            ! Calculate effective strain components from horizontal stretching on ab-nodes
+            dudx = ( (ux(ip1,j) - ux(im1,j)) + (ux(ip1,jp1) - ux(im1,jp1)) ) *inv_4dx
+            dvdy = ( (uy(i,jp1) - uy(i,jm1)) + (uy(ip1,jp1) - uy(ip1,jm1)) ) *inv_4dy 
 
-            ! Calculate of cross terms on central aa-nodes (symmetrical results)
-            dudy = ((ux(i,jp1)   - ux(i,jm1))    &
-                  + (ux(im1,jp1) - ux(im1,jm1))) * inv_4dx 
-            dvdx = ((uy(ip1,j)   - uy(im1,j))    &
-                  + (uy(ip1,jm1) - uy(im1,jm1))) * inv_4dy 
+            ! Calculate of cross terms on ab-nodes
+            dudy = (ux(i,jp1) - ux(i,j)) / dx 
+            dvdx = (uy(ip1,j) - uy(i,j)) / dy 
 
             ! Loop over column
             do k = 1, nz 
 
                 ! Un-stagger shear terms to central aa-nodes in horizontal
-                duxdz_aa = 0.5_prec*(duxdz(i,j,k) + duxdz(im1,j,k))
-                duydz_aa = 0.5_prec*(duydz(i,j,k) + duydz(i,jm1,k))
+                duxdz_ab = 0.5_prec*(duxdz(i,j,k) + duxdz(i,jp1,k))
+                duydz_ab = 0.5_prec*(duydz(i,j,k) + duydz(ip1,j,k))
                 
                 ! Calculate the total effective strain rate from L19, Eq. 21 
                 eps_sq = dudx**2 + dvdy**2 + dudx*dvdy + 0.25_prec*(dudy+dvdx)**2 &
-                       + 0.25_prec*duxdz_aa**2 + 0.25_prec*duydz_aa**2 + eps_0_sq
+                       + 0.25_prec*duxdz_ab**2 + 0.25_prec*duydz_ab**2 + eps_0_sq
                 
-                ! Calculate effective viscosity 
-                visc_eff(i,j,k) = 0.5_prec*(eps_sq)**(p1) * ATT(i,j,k)**(p2)
+                ATT_ab = 0.25*(ATT(i,j,k)+ATT(im1,j,k)+ATT(i,jm1,k)+ATT(im1,jm1,k)) 
+                
+                ! Calculate effective viscosity on ab-nodes
+                visc_eff(i,j,k) = 0.5_prec*(eps_sq)**(p1) * ATT_ab**(p2)
 
             end do 
 
         end do  
         end do 
 
+        ! Unstagger from ab-nodes to aa-nodes 
+        allocate(visc_eff_ref(nx,ny,nz))
+        visc_eff_ref = visc_eff 
+
+        do j = 1, ny 
+        do i = 1, nx 
+
+            im1 = max(i-1,1) 
+            ip1 = min(i+1,nx) 
+            jm1 = max(j-1,1) 
+            jp1 = min(j+1,ny) 
+
+            ! Loop over column
+            do k = 1, nz 
+                visc_eff(i,j,k) = 0.25*(visc_eff_ref(i,j,k)+visc_eff_ref(im1,j,k) &
+                                        +visc_eff_ref(i,jm1,k)+visc_eff_ref(im1,jm1,k))
+            end do 
+
+        end do 
+        end do 
+        
         return 
 
     end subroutine calc_visc_eff_3D 

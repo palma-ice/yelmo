@@ -206,9 +206,11 @@ end if
         real(prec) :: dudx, dudy
         real(prec) :: dvdx, dvdy 
         real(prec) :: eps_sq, mu, eps_0_sq   
+        real(prec) :: ATT_ab 
 
         real(prec), allocatable :: visc1D(:) 
-        
+        real(prec), allocatable :: visc_ref(:,:) 
+
         nx    = size(ux,1)
         ny    = size(ux,2)
         nz_aa = size(zeta_aa,1) 
@@ -221,8 +223,7 @@ end if
         ! Calculate squared minimum strain rate 
         eps_0_sq = eps_0*eps_0 
         
-        ! Loop over domain to calculate viscosity at each aa-node
-         
+        ! Loop over domain to calculate viscosity at each ab-node (to be unstaggered later)
         do j = 1, ny
         do i = 1, nx
 
@@ -231,16 +232,13 @@ end if
             jm1 = max(j-1,1) 
             jp1 = min(j+1,ny) 
             
-            ! Calculate effective strain components from horizontal stretching on aa-nodes
+            ! Calculate effective strain components from horizontal stretching on ab-nodes
+            dudx = ( (ux(ip1,j) - ux(im1,j)) + (ux(ip1,jp1) - ux(im1,jp1)) ) *inv_4dx
+            dvdy = ( (uy(i,jp1) - uy(i,jm1)) + (uy(ip1,jp1) - uy(ip1,jm1)) ) *inv_4dy 
 
-            dudx = (ux(i,j) - ux(im1,j))/dx
-            dvdy = (uy(i,j) - uy(i,jm1))/dy
-
-            ! Calculation of cross terms on central aa-nodes (symmetrical results)
-            dudy = ((ux(i,jp1)   - ux(i,jm1))    &
-                  + (ux(im1,jp1) - ux(im1,jm1))) * inv_4dx 
-            dvdx = ((uy(ip1,j)   - uy(im1,j))    &
-                  + (uy(ip1,jm1) - uy(im1,jm1))) * inv_4dy 
+            ! Calculate of cross terms on ab-nodes
+            dudy = (ux(i,jp1) - ux(i,j)) / dx 
+            dvdx = (uy(ip1,j) - uy(i,j)) / dy 
 
             ! Calculate the total effective strain rate due to horizontal stretching terms
 
@@ -251,16 +249,38 @@ end if
 
             mu = 0.5_prec*(eps_sq)**((1.0_prec - n_glen)/(2.0_prec*n_glen))
 
-            do k = 1, nz_aa 
-                visc1D(k) = ATT(i,j,k)**(-1.0_prec/n_glen) * mu
+            do k = 1, nz_aa
+                ATT_ab = 0.25*(ATT(i,j,k)+ATT(im1,j,k)+ATT(i,jm1,k)+ATT(im1,jm1,k)) 
+                visc1D(k) = ATT_ab**(-1.0_prec/n_glen) * mu
             end do 
 
+            ! Get vertically averaged visc on ab-nodes
             visc(i,j) = integrate_trapezoid1D_pt(visc1D,zeta_aa) 
-            if (H_ice(i,j) .gt. 1.0_prec) visc(i,j) = visc(i,j) * H_ice(i,j) 
             
         end do 
         end do 
 
+        ! Unstagger from ab-nodes to aa-nodes 
+        allocate(visc_ref(nx,ny))
+        visc_ref = visc 
+
+        do j = 1, ny 
+        do i = 1, nx 
+
+            im1 = max(i-1,1) 
+            ip1 = min(i+1,nx) 
+            jm1 = max(j-1,1) 
+            jp1 = min(j+1,ny) 
+
+            visc(i,j) = 0.25*(visc_ref(i,j)+visc_ref(im1,j) &
+                            +visc_ref(i,jm1)+visc_ref(im1,jm1)) 
+
+            ! Multiply with ice thickness to get depth-integrated viscosity
+            if (H_ice(i,j) .gt. 1.0_prec) visc(i,j) = visc(i,j) * H_ice(i,j) 
+            
+        end do 
+        end do 
+        
         return
         
     end subroutine calc_visc_eff_int

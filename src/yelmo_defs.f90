@@ -185,6 +185,7 @@ module yelmo_defs
         real(prec) :: cf_stream
         integer    :: n_sm_beta 
         real(prec) :: beta_min              ! Minimum allowed value of beta
+        real(prec) :: eps_0                 ! Minimum assumed strain rate for effective viscosity regularization
         character(len=256) :: ssa_lis_opt 
         real(prec) :: ssa_beta_max          ! Maximum value of beta for which ssa should be calculated
         real(prec) :: ssa_vel_max

@@ -84,7 +84,7 @@ program yelmo_ismiphom
 !         write(*,*) i, yelmo1%grd%xc(i) 
 !     end do 
 !     stop 
-    
+
     ! Initialize data objects (without loading topography, which will be defined inline below)
     call yelmo_init(yelmo1,filename=path_par,grid_def="none",time=time_init,load_topo=.FALSE.,domain=domain,grid_name=grid_name)
     
@@ -350,6 +350,8 @@ contains
         call nc_write(filename,"beta_eff",ylmo%dyn%now%beta_eff,units="Pa a m-1",long_name="Effective basal friction coefficient", &
                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
         
+        call nc_write(filename,"visc_eff",ylmo%dyn%now%visc_eff,units="Pa a",long_name="Effective viscosity (SSA)", &
+                       dim1="xc",dim2="yc",dim3="zeta",dim4="time",start=[1,1,1,n],ncid=ncid)
         call nc_write(filename,"visc_eff_int",ylmo%dyn%now%visc_eff_int,units="Pa a m",long_name="Depth-integrated effective viscosity (SSA)", &
                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
 
@@ -439,6 +441,5 @@ contains
         return 
 
     end subroutine write_step_2D
-
-
+    
 end program yelmo_ismiphom 

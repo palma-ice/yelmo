@@ -23,6 +23,7 @@ module velocity_hybrid
         real(prec) :: beta_gl_f             ! Fraction of beta at gl 
         real(prec) :: H_grnd_lim 
         real(prec) :: beta_min              ! Minimum allowed value of beta
+        real(prec) :: eps_0 
         real(prec) :: ssa_vel_max
         integer    :: ssa_iter_max 
         real(prec) :: ssa_iter_rel 
@@ -116,7 +117,7 @@ contains
             ! Step 1: Calculate fields needed by ssa solver (visc_eff_int, beta)
 
             ! Use classic effective viscosity calculation using only horizontal stretching terms 
-            call calc_visc_eff_int(visc_eff_int,ux_b,uy_b,H_ice,ATT,zeta_aa,dx,dy,n_glen)
+            call calc_visc_eff_int(visc_eff_int,ux_b,uy_b,H_ice,ATT,zeta_aa,dx,dy,n_glen,par%eps_0)
 
             ! Calculate beta (at the ice base)
             call calc_beta(beta,c_bed,ux_b,uy_b,H_ice,H_grnd,f_grnd,z_bed,z_sl,par%beta_method, &
@@ -178,7 +179,7 @@ end if
 
     end subroutine calc_velocity_hybrid 
 
-    subroutine calc_visc_eff_int(visc,ux,uy,H_ice,ATT,zeta_aa,dx,dy,n_glen)
+    subroutine calc_visc_eff_int(visc,ux,uy,H_ice,ATT,zeta_aa,dx,dy,n_glen,eps_0)
         ! Calculate effective viscosity eta to be used in SSA solver
         ! Pollard and de Conto (2012), Eqs. 2a/b and Eq. 4 (`visc=mu*H_ice*A**(-1/n)`)
         ! Note: calculated on same nodes as eps_sq (aa-nodes by default)
@@ -195,20 +196,20 @@ end if
         real(prec), intent(IN)  :: zeta_aa(:)   ! Vertical axis (sigma-coordinates from 0 to 1)
         real(prec), intent(IN)  :: dx, dy
         real(prec), intent(IN)  :: n_glen
-        
+        real(prec), intent(IN)  :: eps_0        ! [1/a] Regularization constant (minimum strain rate, ~1e-8)
+
         ! Local variables 
         integer :: i, j, nx, ny, k, nz_aa 
         integer :: im1, ip1, jm1, jp1  
         real(prec) :: inv_4dx, inv_4dy
         real(prec) :: dudx, dudy
         real(prec) :: dvdx, dvdy 
-        real(prec) :: eps_sq, mu  
+        real(prec) :: eps_sq, mu, eps_0_sq   
 
         real(prec), allocatable :: visc1D(:) 
         
         real(prec), parameter :: visc_min = 1e3_prec    ! [Pa a]
-        real(prec), parameter :: eps_sq_0 = 1e-6_prec   ! [a^-1] Bueler and Brown (2009), Eq. 26
-        
+
         nx    = size(ux,1)
         ny    = size(ux,2)
         nz_aa = size(zeta_aa,1) 
@@ -218,6 +219,9 @@ end if
         inv_4dx = 1.0_prec / (4.0_prec*dx) 
         inv_4dy = 1.0_prec / (4.0_prec*dy) 
 
+        ! Calculate squared minimum strain rate 
+        eps_0_sq = eps_0*eps_0 
+        
         ! Initialize viscosity to minimum value 
         visc = visc_min 
         
@@ -244,10 +248,7 @@ end if
 
             ! Calculate the total effective strain rate due to horizontal stretching terms
 
-            eps_sq = dudx**2 + dvdy**2 + dudx*dvdy + 0.25*(dudy+dvdx)**2 + eps_sq_0
-            
-            ! Avoid underflow
-            if (abs(eps_sq) .lt. tol_underflow) eps_sq = 0.0_prec 
+            eps_sq = dudx**2 + dvdy**2 + dudx*dvdy + 0.25*(dudy+dvdx)**2 + eps_0_sq
             
             ! 4. Calculate the effective visocity (`eta` in Greve and Blatter, 2009)
             ! Pollard and de Conto (2012), Eqs. 2a/b and Eq. 4 (`visc=A**(-1/n_glen)*mu*H_ice`)

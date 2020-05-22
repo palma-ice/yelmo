@@ -276,13 +276,14 @@ contains
             hybrid_par%beta_gl_stag   = dyn%par%beta_gl_stag 
             hybrid_par%beta_gl_f      = dyn%par%beta_gl_f 
             hybrid_par%H_grnd_lim     = dyn%par%H_grnd_lim 
-            hybrid_par%beta_min       = dyn%par%beta_min 
+            hybrid_par%beta_min       = dyn%par%beta_min
+            hybrid_par%eps_0          = dyn%par%eps_0  
             hybrid_par%ssa_vel_max    = dyn%par%ssa_vel_max 
             hybrid_par%ssa_iter_max   = dyn%par%ssa_iter_max 
             hybrid_par%ssa_iter_rel   = dyn%par%ssa_iter_rel 
             hybrid_par%ssa_iter_conv  = dyn%par%ssa_iter_conv 
             hybrid_par%ssa_write_log  = yelmo_log
-
+            
             call calc_velocity_hybrid(dyn%now%ux_b,dyn%now%uy_b,dyn%now%taub_acx,dyn%now%taub_acy, &
                                       dyn%now%visc_eff_int,dyn%now%ssa_mask_acx,dyn%now%ssa_mask_acy, &
                                       dyn%now%ssa_err_acx,dyn%now%ssa_err_acy,dyn%par%ssa_iter_now,dyn%now%beta, &
@@ -392,6 +393,7 @@ contains
         diva_par%beta_gl_f      = dyn%par%beta_gl_f 
         diva_par%H_grnd_lim     = dyn%par%H_grnd_lim 
         diva_par%beta_min       = dyn%par%beta_min 
+        diva_par%eps_0          = dyn%par%eps_0 
         diva_par%ssa_vel_max    = dyn%par%ssa_vel_max 
         diva_par%ssa_iter_max   = dyn%par%ssa_iter_max 
         diva_par%ssa_iter_rel   = dyn%par%ssa_iter_rel 
@@ -1670,6 +1672,7 @@ end if
         call nml_read(filename,"ydyn","cf_stream",          par%cf_stream,          init=init_pars)
         call nml_read(filename,"ydyn","n_sm_beta",          par%n_sm_beta,          init=init_pars)
         call nml_read(filename,"ydyn","beta_min",           par%beta_min,           init=init_pars)
+        call nml_read(filename,"ydyn","eps_0",              par%eps_0,              init=init_pars)
         call nml_read(filename,"ydyn","ssa_lis_opt",        par%ssa_lis_opt,        init=init_pars)
         call nml_read(filename,"ydyn","ssa_beta_max",       par%ssa_beta_max,       init=init_pars)
         call nml_read(filename,"ydyn","ssa_vel_max",        par%ssa_vel_max,        init=init_pars)

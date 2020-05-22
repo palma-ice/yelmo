@@ -24,6 +24,7 @@ module velocity_diva
         real(prec) :: beta_gl_f             ! Fraction of beta at gl 
         real(prec) :: H_grnd_lim 
         real(prec) :: beta_min              ! Minimum allowed value of beta
+        real(prec) :: eps_0 
         real(prec) :: ssa_vel_max
         integer    :: ssa_iter_max 
         real(prec) :: ssa_iter_rel 
@@ -140,7 +141,7 @@ contains
             call calc_vertical_shear_3D(duxdz,duydz,taub_acx,taub_acy,visc_eff,zeta_aa,par%boundaries)
 
             ! Calculate 3D effective viscosity, using velocity solution from previous iteration
-            call calc_visc_eff_3D(visc_eff,ux_bar,uy_bar,duxdz,duydz,ATT,zeta_aa,dx,dy,n_glen)
+            call calc_visc_eff_3D(visc_eff,ux_bar,uy_bar,duxdz,duydz,ATT,zeta_aa,dx,dy,n_glen,par%eps_0)
 
             ! Calculate depth-integrated effective viscosity
             ! Note L19 uses eta_bar*H in the ssa equation. Yelmo uses eta_int=eta_bar*H directly.
@@ -390,7 +391,7 @@ end if
 
     end subroutine calc_vertical_shear_3D 
 
-    subroutine calc_visc_eff_3D(visc_eff,ux,uy,duxdz,duydz,ATT,zeta_aa,dx,dy,n_glen)
+    subroutine calc_visc_eff_3D(visc_eff,ux,uy,duxdz,duydz,ATT,zeta_aa,dx,dy,n_glen,eps_0)
         ! Calculate 3D effective viscosity following L19, Eq. 2
 
         implicit none 
@@ -405,6 +406,7 @@ end if
         real(prec), intent(IN)  :: dx
         real(prec), intent(IN)  :: dy
         real(prec), intent(IN)  :: n_glen   
+        real(prec), intent(IN)  :: eps_0                ! [1/a] Regularization constant (minimum strain rate, ~1e-8)
         
         ! Local variables 
         integer    :: i, j, k, nx, ny, nz
@@ -413,11 +415,10 @@ end if
         real(prec) :: dudx, dudy
         real(prec) :: dvdx, dvdy 
         real(prec) :: duxdz_aa, duydz_aa  
-        real(prec) :: p1, p2  
+        real(prec) :: p1, p2, eps_0_sq  
         real(prec) :: eps_sq                            ! [1/a^2]
         
-        real(prec), parameter :: epsilon_sq_0 = 1e-6_prec   ! [a^-1] Bueler and Brown (2009), Eq. 26
-        real(prec), parameter :: visc_min     = 1e3_prec    ! [Pa a] Non-zero, very low viscosity value
+        real(prec), parameter :: visc_min     = 1e3_prec        ! [Pa a] Non-zero, very low viscosity value
         
         nx = size(visc_eff,1)
         ny = size(visc_eff,2)
@@ -430,6 +431,9 @@ end if
         ! Calculate exponents 
         p1 = (1.0_prec - n_glen)/(2.0_prec*n_glen)
         p2 = -1.0_prec/n_glen
+
+        ! Calculate squared minimum strain rate 
+        eps_0_sq = eps_0*eps_0 
 
         do j = 1, ny 
         do i = 1, nx 
@@ -458,7 +462,7 @@ end if
                 
                 ! Calculate the total effective strain rate from L19, Eq. 21 
                 eps_sq = dudx**2 + dvdy**2 + dudx*dvdy + 0.25_prec*(dudy+dvdx)**2 &
-                       + 0.25_prec*duxdz_aa**2 + 0.25_prec*duydz_aa**2 + epsilon_sq_0
+                       + 0.25_prec*duxdz_aa**2 + 0.25_prec*duydz_aa**2 + eps_0_sq
                 
                 ! Calculate effective viscosity 
                 visc_eff(i,j,k) = 0.5_prec*(eps_sq)**(p1) * ATT(i,j,k)**(p2)

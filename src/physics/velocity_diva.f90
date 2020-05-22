@@ -393,6 +393,7 @@ end if
 
     subroutine calc_visc_eff_3D(visc_eff,ux,uy,duxdz,duydz,ATT,zeta_aa,dx,dy,n_glen,eps_0)
         ! Calculate 3D effective viscosity following L19, Eq. 2
+        ! Use of eps_0 ensures non-zero positive viscosity value everywhere 
 
         implicit none 
         
@@ -418,8 +419,6 @@ end if
         real(prec) :: p1, p2, eps_0_sq  
         real(prec) :: eps_sq                            ! [1/a^2]
         
-        real(prec), parameter :: visc_min     = 1e3_prec        ! [Pa a] Non-zero, very low viscosity value
-        
         nx = size(visc_eff,1)
         ny = size(visc_eff,2)
         nz = size(visc_eff,3)
@@ -442,7 +441,7 @@ end if
             ip1 = min(i+1,nx) 
             jm1 = max(j-1,1) 
             jp1 = min(j+1,ny) 
-            
+
             ! Calculate effective strain components from horizontal stretching
             dudx = (ux(i,j) - ux(im1,j))/dx
             dvdy = (uy(i,j) - uy(i,jm1))/dy
@@ -466,8 +465,6 @@ end if
                 
                 ! Calculate effective viscosity 
                 visc_eff(i,j,k) = 0.5_prec*(eps_sq)**(p1) * ATT(i,j,k)**(p2)
-
-                if (visc_eff(i,j,k) .lt. visc_min) visc_eff(i,j,k) = visc_min 
 
             end do 
 

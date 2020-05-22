@@ -185,7 +185,8 @@ end if
         ! Note: calculated on same nodes as eps_sq (aa-nodes by default)
         ! Note: this is equivalent to the vertically-integrated viscosity, 
         ! since it is multiplied with H_ice 
-
+        ! Use of eps_0 ensures non-zero positive viscosity value everywhere 
+        
         implicit none 
         
         real(prec), intent(OUT) :: visc(:,:)    ! [Pa a m]
@@ -208,8 +209,6 @@ end if
 
         real(prec), allocatable :: visc1D(:) 
         
-        real(prec), parameter :: visc_min = 1e3_prec    ! [Pa a]
-
         nx    = size(ux,1)
         ny    = size(ux,2)
         nz_aa = size(zeta_aa,1) 
@@ -221,9 +220,6 @@ end if
 
         ! Calculate squared minimum strain rate 
         eps_0_sq = eps_0*eps_0 
-        
-        ! Initialize viscosity to minimum value 
-        visc = visc_min 
         
         ! Loop over domain to calculate viscosity at each aa-node
          

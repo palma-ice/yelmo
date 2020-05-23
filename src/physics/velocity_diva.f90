@@ -431,12 +431,15 @@ end if
         real(prec) :: p1, p2, eps_0_sq  
         real(prec) :: eps_sq                            ! [1/a^2]
         real(prec) :: ATT_ab 
-        real(prec), allocatable :: visc_eff_ref(:,:,:)  
+        real(prec), allocatable :: visc_eff_ab(:,:,:)  
         
         nx = size(visc_eff,1)
         ny = size(visc_eff,2)
         nz = size(visc_eff,3)
         
+        ! Allocate local arrays 
+        allocate(visc_eff_ab(nx,ny,nz))
+
         ! Calculate scaling factors
         inv_4dx = 1.0_prec / (4.0_prec*dx) 
         inv_4dy = 1.0_prec / (4.0_prec*dy) 
@@ -478,7 +481,7 @@ end if
                 ATT_ab = 0.25*(ATT(i,j,k)+ATT(im1,j,k)+ATT(i,jm1,k)+ATT(im1,jm1,k)) 
                 
                 ! Calculate effective viscosity on ab-nodes
-                visc_eff(i,j,k) = 0.5_prec*(eps_sq)**(p1) * ATT_ab**(p2)
+                visc_eff_ab(i,j,k) = 0.5_prec*(eps_sq)**(p1) * ATT_ab**(p2)
 
             end do 
 
@@ -486,9 +489,6 @@ end if
         end do 
 
         ! Unstagger from ab-nodes to aa-nodes 
-        allocate(visc_eff_ref(nx,ny,nz))
-        visc_eff_ref = visc_eff 
-
         do j = 1, ny 
         do i = 1, nx 
 
@@ -499,13 +499,19 @@ end if
 
             ! Loop over column
             do k = 1, nz 
-                visc_eff(i,j,k) = 0.25*(visc_eff_ref(i,j,k)+visc_eff_ref(im1,j,k) &
-                                        +visc_eff_ref(i,jm1,k)+visc_eff_ref(im1,jm1,k))
+                visc_eff(i,j,k) = 0.25*(visc_eff_ab(i,j,k)+visc_eff_ab(im1,j,k) &
+                                        +visc_eff_ab(i,jm1,k)+visc_eff_ab(im1,jm1,k))
             end do 
 
         end do 
         end do 
         
+        ! Treat the corners to avoid extremes
+        visc_eff(1,1,:) = 0.5*(visc_eff(2,1,:)+visc_eff(1,2,:))
+        visc_eff(1,ny,:) = 0.5*(visc_eff(2,ny,:)+visc_eff(1,ny-1,:))
+        visc_eff(nx,1,:) = 0.5*(visc_eff(nx,2,:)+visc_eff(nx-1,1,:))
+        visc_eff(nx,ny,:) = 0.5*(visc_eff(nx-1,ny,:)+visc_eff(nx,ny-1,:))
+
         return 
 
     end subroutine calc_visc_eff_3D 

@@ -3,7 +3,7 @@ module velocity_hybrid
     ! using the 'hybrid' (SIA+SSA) approximation. 
 
     use yelmo_defs ,only  : sp, dp, prec, tol_underflow, rho_ice, rho_sw, rho_w, g
-    use yelmo_tools, only : stagger_aa_ab, stagger_aa_ab_ice, integrate_trapezoid1D_pt
+    use yelmo_tools, only : stagger_aa_ab, stagger_aa_ab_ice, integrate_trapezoid1D_pt, calc_vertical_integrated_2D
     
     use basal_dragging 
     use solver_ssa_sico5 
@@ -38,7 +38,7 @@ module velocity_hybrid
       
 contains 
 
-    subroutine calc_velocity_hybrid(ux_b,uy_b,taub_acx,taub_acy,visc_eff_int,ssa_mask_acx,ssa_mask_acy, &
+    subroutine calc_velocity_hybrid(ux_b,uy_b,taub_acx,taub_acy,visc_eff,visc_eff_int,ssa_mask_acx,ssa_mask_acy, &
                                   ssa_err_acx,ssa_err_acy,ssa_iter_now,beta,beta_acx,beta_acy,c_bed,taud_acx,taud_acy,H_ice, &
                                   H_grnd,f_grnd,f_grnd_acx,f_grnd_acy,ATT,zeta_aa,z_sl,z_bed,dx,dy,n_glen,par)
         ! This subroutine is used to solve the horizontal velocity system (ux,uy)
@@ -51,6 +51,7 @@ contains
         real(prec), intent(INOUT) :: uy_b(:,:)          ! [m/a]
         real(prec), intent(INOUT) :: taub_acx(:,:)      ! [Pa]
         real(prec), intent(INOUT) :: taub_acy(:,:)      ! [Pa]
+        real(prec), intent(OUT)   :: visc_eff(:,:,:)    ! [Pa a]
         real(prec), intent(OUT)   :: visc_eff_int(:,:)  ! [Pa a m]
         integer,    intent(OUT)   :: ssa_mask_acx(:,:)  ! [-]
         integer,    intent(OUT)   :: ssa_mask_acy(:,:)  ! [-]
@@ -116,8 +117,13 @@ contains
             ! =========================================================================================
             ! Step 1: Calculate fields needed by ssa solver (visc_eff_int, beta)
 
-            ! Use classic effective viscosity calculation using only horizontal stretching terms 
-            call calc_visc_eff_int(visc_eff_int,ux_b,uy_b,H_ice,ATT,zeta_aa,dx,dy,n_glen,par%eps_0)
+            ! Calculate 3D effective viscosity, using velocity solution from previous iteration
+            call calc_visc_eff_3D(visc_eff,ux_b,uy_b,ATT,zeta_aa,dx,dy,n_glen,par%eps_0)
+
+            ! Calculate depth-integrated effective viscosity
+            ! Note L19 uses eta_bar*H in the ssa equation. Yelmo uses eta_int=eta_bar*H directly.
+            visc_eff_int = calc_vertical_integrated_2D(visc_eff,zeta_aa) 
+            where(H_ice .gt. 0.0_prec) visc_eff_int = visc_eff_int*H_ice 
 
             ! Calculate beta (at the ice base)
             call calc_beta(beta,c_bed,ux_b,uy_b,H_ice,H_grnd,f_grnd,z_bed,z_sl,par%beta_method, &
@@ -179,90 +185,61 @@ end if
 
     end subroutine calc_velocity_hybrid 
 
-    subroutine calc_visc_eff_int(visc,ux,uy,H_ice,ATT,zeta_aa,dx,dy,n_glen,eps_0)
-        ! Calculate effective viscosity eta to be used in SSA solver
-        ! Pollard and de Conto (2012), Eqs. 2a/b and Eq. 4 (`visc=mu*H_ice*A**(-1/n)`)
-        ! Note: calculated on same nodes as eps_sq (aa-nodes by default)
-        ! Note: this is equivalent to the vertically-integrated viscosity, 
-        ! since it is multiplied with H_ice 
+        subroutine calc_visc_eff_3D(visc_eff,ux,uy,ATT,zeta_aa,dx,dy,n_glen,eps_0)
+        ! Calculate 3D effective viscosity following L19, Eq. 2
         ! Use of eps_0 ensures non-zero positive viscosity value everywhere 
-        
+        ! Note: viscosity is first calculated on ab-nodes, then 
+        ! unstaggered back to aa-nodes. This ensures more stability for 
+        ! visc_eff (less likely to blow up for low strain rates). 
+
+        ! Note: this routine is equivalent to that of velocity_diva, except
+        ! the shear strain terms duxdz/duydz are set to zero. Although most
+        ! equations for effective viscosity in SSA are given in 2D, the 
+        ! 3D rate factor implies a calculation in 3D first, then vertical integration
+        ! (the integral could be performed on B=A^(-1/n), but we make use of the available 3D visc_eff
+        ! variable and maintain the analogy with the DIVA solver)
+
         implicit none 
         
-        real(prec), intent(OUT) :: visc(:,:)    ! [Pa a m]
-        real(prec), intent(IN)  :: ux(:,:)      ! Vertically averaged horizontal velocity, x-component
-        real(prec), intent(IN)  :: uy(:,:)      ! Vertically averaged horizontal velocity, y-component
-        real(prec), intent(IN)  :: H_ice(:,:)   ! Ice thickness
-        real(prec), intent(IN)  :: ATT(:,:,:)   ! [a^-1 Pa^-n_glen] (nx,ny,nz_aa) Rate factor
-        real(prec), intent(IN)  :: zeta_aa(:)   ! Vertical axis (sigma-coordinates from 0 to 1)
-        real(prec), intent(IN)  :: dx, dy
-        real(prec), intent(IN)  :: n_glen
-        real(prec), intent(IN)  :: eps_0        ! [1/a] Regularization constant (minimum strain rate, ~1e-8)
-
+        real(prec), intent(OUT) :: visc_eff(:,:,:)      ! aa-nodes
+        real(prec), intent(IN)  :: ux(:,:)              ! [m/a] Vertically averaged horizontal velocity, x-component
+        real(prec), intent(IN)  :: uy(:,:)              ! [m/a] Vertically averaged horizontal velocity, y-component
+        real(prec), intent(IN)  :: ATT(:,:,:)           ! aa-nodes
+        real(prec), intent(IN)  :: zeta_aa(:)           ! Vertical axis (sigma-coordinates from 0 to 1)
+        real(prec), intent(IN)  :: dx
+        real(prec), intent(IN)  :: dy
+        real(prec), intent(IN)  :: n_glen   
+        real(prec), intent(IN)  :: eps_0                ! [1/a] Regularization constant (minimum strain rate, ~1e-8)
+        
         ! Local variables 
-        integer :: i, j, nx, ny, k, nz_aa 
-        integer :: im1, ip1, jm1, jp1  
-        real(prec) :: inv_4dx, inv_4dy
+        integer    :: i, j, k, nx, ny, nz
+        integer    :: ip1, jp1, im1, jm1  
+        real(prec) :: inv_4dx, inv_4dy 
         real(prec) :: dudx, dudy
         real(prec) :: dvdx, dvdy 
-        real(prec) :: eps_sq, mu, eps_0_sq   
+        real(prec) :: duxdz_ab, duydz_ab  
+        real(prec) :: p1, p2, eps_0_sq  
+        real(prec) :: eps_sq                            ! [1/a^2]
         real(prec) :: ATT_ab 
+        real(prec), allocatable :: visc_eff_ab(:,:,:)  
+        
+        nx = size(visc_eff,1)
+        ny = size(visc_eff,2)
+        nz = size(visc_eff,3)
+        
+        ! Allocate local arrays 
+        allocate(visc_eff_ab(nx,ny,nz))
 
-        real(prec), allocatable :: visc1D(:) 
-        real(prec), allocatable :: visc_ref(:,:) 
-
-        nx    = size(ux,1)
-        ny    = size(ux,2)
-        nz_aa = size(zeta_aa,1) 
-
-        allocate(visc1D(nz_aa))
-
+        ! Calculate scaling factors
         inv_4dx = 1.0_prec / (4.0_prec*dx) 
         inv_4dy = 1.0_prec / (4.0_prec*dy) 
 
+        ! Calculate exponents 
+        p1 = (1.0_prec - n_glen)/(2.0_prec*n_glen)
+        p2 = -1.0_prec/n_glen
+
         ! Calculate squared minimum strain rate 
         eps_0_sq = eps_0*eps_0 
-        
-        ! Loop over domain to calculate viscosity at each ab-node (to be unstaggered later)
-        do j = 1, ny
-        do i = 1, nx
-
-            im1 = max(i-1,1) 
-            ip1 = min(i+1,nx) 
-            jm1 = max(j-1,1) 
-            jp1 = min(j+1,ny) 
-            
-            ! Calculate effective strain components from horizontal stretching on ab-nodes
-            dudx = ( (ux(ip1,j) - ux(im1,j)) + (ux(ip1,jp1) - ux(im1,jp1)) ) *inv_4dx
-            dvdy = ( (uy(i,jp1) - uy(i,jm1)) + (uy(ip1,jp1) - uy(ip1,jm1)) ) *inv_4dy 
-
-            ! Calculate of cross terms on ab-nodes
-            dudy = (ux(i,jp1) - ux(i,j)) / dx 
-            dvdx = (uy(ip1,j) - uy(i,j)) / dy 
-
-            ! Calculate the total effective strain rate due to horizontal stretching terms
-
-            eps_sq = dudx**2 + dvdy**2 + dudx*dvdy + 0.25*(dudy+dvdx)**2 + eps_0_sq
-            
-            ! 4. Calculate the effective visocity (`eta` in Greve and Blatter, 2009)
-            ! Pollard and de Conto (2012), Eqs. 2a/b and Eq. 4 (`visc=A**(-1/n_glen)*mu*H_ice`)
-
-            mu = 0.5_prec*(eps_sq)**((1.0_prec - n_glen)/(2.0_prec*n_glen))
-
-            do k = 1, nz_aa
-                ATT_ab = 0.25*(ATT(i,j,k)+ATT(im1,j,k)+ATT(i,jm1,k)+ATT(im1,jm1,k)) 
-                visc1D(k) = ATT_ab**(-1.0_prec/n_glen) * mu
-            end do 
-
-            ! Get vertically averaged visc on ab-nodes
-            visc(i,j) = integrate_trapezoid1D_pt(visc1D,zeta_aa) 
-            
-        end do 
-        end do 
-
-        ! Unstagger from ab-nodes to aa-nodes 
-        allocate(visc_ref(nx,ny))
-        visc_ref = visc 
 
         do j = 1, ny 
         do i = 1, nx 
@@ -272,19 +249,63 @@ end if
             jm1 = max(j-1,1) 
             jp1 = min(j+1,ny) 
 
-            visc(i,j) = 0.25*(visc_ref(i,j)+visc_ref(im1,j) &
-                            +visc_ref(i,jm1)+visc_ref(im1,jm1)) 
+            ! Calculate effective strain components from horizontal stretching on ab-nodes
+            dudx = ( (ux(ip1,j) - ux(im1,j)) + (ux(ip1,jp1) - ux(im1,jp1)) ) *inv_4dx
+            dvdy = ( (uy(i,jp1) - uy(i,jm1)) + (uy(ip1,jp1) - uy(ip1,jm1)) ) *inv_4dy 
 
-            ! Multiply with ice thickness to get depth-integrated viscosity
-            if (H_ice(i,j) .gt. 1.0_prec) visc(i,j) = visc(i,j) * H_ice(i,j) 
-            
+            ! Calculate of cross terms on ab-nodes
+            dudy = (ux(i,jp1) - ux(i,j)) / dx 
+            dvdx = (uy(ip1,j) - uy(i,j)) / dy 
+
+            ! Loop over column
+            do k = 1, nz 
+
+                ! No shear contribution for SSA, set shear to zero
+                duxdz_ab = 0.0_prec 
+                duydz_ab = 0.0_prec 
+
+                ! Calculate the total effective strain rate from L19, Eq. 21 
+                eps_sq = dudx**2 + dvdy**2 + dudx*dvdy + 0.25_prec*(dudy+dvdx)**2 &
+                       + 0.25_prec*duxdz_ab**2 + 0.25_prec*duydz_ab**2 + eps_0_sq
+                
+                ATT_ab = 0.25*(ATT(i,j,k)+ATT(im1,j,k)+ATT(i,jm1,k)+ATT(im1,jm1,k)) 
+                
+                ! Calculate effective viscosity on ab-nodes
+                visc_eff_ab(i,j,k) = 0.5_prec*(eps_sq)**(p1) * ATT_ab**(p2)
+
+            end do 
+
+        end do  
+        end do 
+
+        ! Unstagger from ab-nodes to aa-nodes 
+        do j = 1, ny 
+        do i = 1, nx 
+
+            im1 = max(i-1,1) 
+            ip1 = min(i+1,nx) 
+            jm1 = max(j-1,1) 
+            jp1 = min(j+1,ny) 
+
+            ! Loop over column
+            do k = 1, nz 
+                visc_eff(i,j,k) = 0.25*(visc_eff_ab(i,j,k)+visc_eff_ab(im1,j,k) &
+                                        +visc_eff_ab(i,jm1,k)+visc_eff_ab(im1,jm1,k))
+            end do 
+
         end do 
         end do 
         
-        return
-        
-    end subroutine calc_visc_eff_int
+        ! Treat the corners to avoid extremes
+        visc_eff(1,1,:) = 0.5*(visc_eff(2,1,:)+visc_eff(1,2,:))
+        visc_eff(1,ny,:) = 0.5*(visc_eff(2,ny,:)+visc_eff(1,ny-1,:))
+        visc_eff(nx,1,:) = 0.5*(visc_eff(nx,2,:)+visc_eff(nx-1,1,:))
+        visc_eff(nx,ny,:) = 0.5*(visc_eff(nx-1,ny,:)+visc_eff(nx,ny-1,:))
 
+        return 
+
+    end subroutine calc_visc_eff_3D 
+    
     subroutine calc_basal_stress(taub_acx,taub_acy,beta_acx,beta_acy,ux_b,uy_b)
         ! Calculate the basal stress resulting from sliding (friction times velocity)
         ! Note: calculated on ac-nodes.

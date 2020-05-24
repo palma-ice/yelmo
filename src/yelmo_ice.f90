@@ -42,8 +42,17 @@ contains
         real(prec) :: dt_now, dt_max  
         real(prec) :: time_now, time_start 
         integer    :: n, nstep, n_now, n_dtmin 
-        real(8)    :: cpu_start_time 
+        real(8)    :: cpu_start_time
         real(prec), parameter :: time_tol = 1e-5
+
+        type timing_type 
+            real(8) :: cpu_time0, cpu_time1 
+            real(8) :: time0, time1 
+            real(8) :: cpu_dtime, dtime
+            real(prec) :: speed   
+        end type 
+
+        type(timing_type) :: timing1 
 
         real(prec) :: H_mean, T_mean 
         real(prec), allocatable :: dt_save(:) 
@@ -172,6 +181,10 @@ contains
 
         ! Iteration of yelmo component updates until external timestep is reached
         do n = 1, nstep
+
+            ! Initialize cpu timing for this iteration
+            call yelmo_cpu_time(timing1%cpu_time0) 
+            timing1%time0 = time_now 
 
             ! Store initial state of yelmo object in case a reset is necessary due to instability
             dom_ref = dom 
@@ -388,8 +401,19 @@ contains
 
             if (dom%par%log_timestep) then 
                 ! Write timestep file if desired
+
+                ! Calculate model speed for this iteration
+                call yelmo_cpu_time(timing1%cpu_time1)
+                timing1%cpu_dtime = (timing1%cpu_time1 - timing1%cpu_time0)/3600.d0 ! [sec] => [hr] 
+                timing1%dtime     = (time_now - timing1%time0)*1d-3                 ! [yr] => [kyr] 
+                if (timing1%cpu_dtime .gt. 0.0) then 
+                    timing1%speed = timing1%dtime / timing1%cpu_dtime               ! [kyr / hr]
+                else 
+                    timing1%speed = 0.0 
+                end if 
+
                 call yelmo_timestep_write(dom%par%log_timestep_file,time_now,dt_now,dt_adv_min,dt_pi, &
-                            dom%par%pc_eta(1),dom%par%pc_tau,dom%dyn%par%ssa_iter_now)
+                            dom%par%pc_eta(1),dom%par%pc_tau,timing1%speed,dom%dyn%par%ssa_iter_now)
             end if 
 
             ! Make sure model is still running well
@@ -407,7 +431,7 @@ contains
         ! Compare with data 
         call ydata_compare(dom%dta,dom%tpo,dom%dyn,dom%mat,dom%thrm,dom%bnd,dom%par%domain)
 
-        ! Calculate model speed [model-kyr / hr]
+        ! Calculate model speed over full outer timestep [model-kyr / hr]
         call yelmo_calc_speed(dom%par%model_speed,dom%par%model_speeds,time_start,time_now,cpu_start_time)
 
         ! Write some diagnostics to make sure something useful is happening 
@@ -732,11 +756,9 @@ contains
         write(*,*) "yelmo_init:: topo intialized (loaded data if desired)."
         
 
-        ! Set bnd%H_ice_ref to present-day ice thickness by default 
+        ! Set H_ice_ref and z_bed_ref to present-day ice thickness by default 
         dom%bnd%H_ice_ref = dom%dta%pd%H_ice 
-!mmr        ! Set bnd%z_bed_ref to present-day ice thickness by default 
-        dom%bnd%z_bed_ref = dom%dta%pd%z_bed       !mmr
-!mmr
+        dom%bnd%z_bed_ref = dom%dta%pd%z_bed
 
         write(*,*) 
         write(*,*) "yelmo_init:: Initialization complete for domain: "// &
@@ -746,7 +768,7 @@ contains
             ! Timestep file 
             call yelmo_timestep_write_init(dom%par%log_timestep_file,time,dom%grd%xc,dom%grd%yc,dom%par%pc_eps)
             call yelmo_timestep_write(dom%par%log_timestep_file,time,0.0_prec,0.0_prec,dom%par%pc_dt(1), &
-                            dom%par%pc_eta(1),dom%par%pc_tau,dom%dyn%par%ssa_iter_now)
+                            dom%par%pc_eta(1),dom%par%pc_tau,0.0_prec,dom%dyn%par%ssa_iter_now)
         end if 
 
         return

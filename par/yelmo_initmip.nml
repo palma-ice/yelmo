@@ -1,12 +1,12 @@
 &control    
     time_init       = 0.0               ! [yr] Starting time 
-    time_end        = 5e3               ! [yr] Ending time
-    time_equil      = 100.0             ! [yr] Equilibration time 
-    dtt             = 10.0              ! [yr] Main loop timestep 
+    time_end        = 1e3               ! [yr] Ending time
+    time_equil      = 1e3               ! [yr] Equilibration time 
+    dtt             = 5.0               ! [yr] Main loop timestep 
     dt1D_out        = 100.0             ! [yr] Frequency of writing 1D output files 
     dt2D_out        = 100.0             ! [yr] Frequency of writing 2D output files 
     
-    clim_nm         = "clim_pd"         ! "clim_pd" or "clim_lgm"
+    clim_nm         = "clim_pd_grl"     ! "clim_pd_grl", "clim_pd_ant" or "clim_lgm"
     
     load_cf_ref     = False             ! Load cf_ref from file? Otherwise define from cf_stream + inline tuning
     file_cf_ref     = "ice_data/{domain}/{grid_name}/{grid_name}_cf_ref_opt.nc"  ! Filename holding cf_ref to load 
@@ -16,8 +16,14 @@
 
 /
 
-&clim_pd 
+&clim_pd_grl 
     bmb_shlf_const  = -10.0             ! [m/a] Basal mass balance of ice shelves
+    dT_ann          = 0.0               ! [K]  Temperature anomaly (atm)
+    z_sl            = 0.0               ! [m] Sea level relative to present-day 
+/
+
+&clim_pd_ant 
+    bmb_shlf_const  = -0.2              ! [m/a] Basal mass balance of ice shelves
     dT_ann          = 0.0               ! [K]  Temperature anomaly (atm)
     z_sl            = 0.0               ! [m] Sea level relative to present-day 
 /
@@ -29,8 +35,8 @@
 /
 
 &yelmo
-    domain          = "Antarctica"
-    grid_name       = "ANT-32KM"
+    domain          = "Greenland"
+    grid_name       = "GRL-16KM"
     grid_path       = "ice_data/{domain}/{grid_name}/{grid_name}_REGIONS.nc"
     experiment      = "None"       
     restart         = "None"

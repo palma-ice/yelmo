@@ -70,7 +70,7 @@
     beta_const          = 1e3             ! [Pa a m−1] Constant value of basal friction coefficient to be used
     beta_q              = 1.0             ! Dragging law exponent 
     beta_u0             = 100.0           ! [m/a] Regularization term for regularized Coulomb law (beta_method=3)
-    beta_gl_scale       = 0               !  0: beta*beta_gl_f, 2: H_grnd linear scaling, 3: Zstar scaling 
+    beta_gl_scale       = 0               !  0: beta*beta_gl_f, 1: H_grnd linear scaling, 2: Zstar scaling 
     beta_gl_stag        = 1               !  0: simple staggering, 1: Upstream beta at gl, 2: downstream, 3: f_grnd_ac scaling 
     beta_gl_f           = 1.0             ! [-] Scaling of beta at the grounding line (for beta_gl_scale=0)
     taud_gl_method      = 0               !  0: binary, no subgrid, 1: Two-sided gradient
@@ -83,8 +83,8 @@
     cb_z0               = 0.0             ! [m] Bedrock elevation at which scaling goes to f_scale=e(-1)
     cb_z1               = 0.0             ! [m] Bedrock elevation above which scaling goes to f_scale=1
     cb_min              = 0.0             ! [--] Minimum allowed value of f_scale for grounded ice
-    cf_frozen           = 0.1             ! [--] Bed critical stress, frozen 
-    cf_stream           = 0.01            ! [--] Bed critical stress, stream  
+    cf_frozen           = 0.1             ! [--] Bed critical stress factor, frozen 
+    cf_stream           = 0.01            ! [--] Bed critical stress factor, stream  
     n_sm_beta           = 0               ! [-] Standard deviation in gridpoints for Gaussian smoothing of beta (0==no smoothing)
     beta_min            = 0.0             ! [Pa a m-1] Minimum value of beta allowed for grounded ice (for stability)
     eps_0               = 1e-6            ! [1/a] Regularization term for effective viscosity - minimum strain rate

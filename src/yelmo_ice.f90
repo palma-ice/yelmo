@@ -612,7 +612,7 @@ contains
         
         ! Allocate truncation error averaging arrays 
         if (allocated(dom%par%pc_taus))   deallocate(dom%par%pc_taus)
-        allocate(dom%par%pc_taus(dom%grd%nx,dom%grd%ny,10))
+        allocate(dom%par%pc_taus(dom%grd%nx,dom%grd%ny,20))
         if (allocated(dom%par%pc_tau_avg))   deallocate(dom%par%pc_tau_avg)
         allocate(dom%par%pc_tau_avg(dom%grd%nx,dom%grd%ny))
 

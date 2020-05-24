@@ -31,16 +31,20 @@ make initmip
 
 # Antarctica present-day and LGM simulations
 # In par-gmd/yelmo_Antarctica.nml, set control.clim_nm="clim_pd"
-python run_yelmo.py -r -e initmip output/test-ant-pd  par-gmd/yelmo_Antarctica.nml
+python run_yelmo.py -s -e initmip ${fldr}/ant-pd  par-gmd/yelmo_Antarctica.nml
 # In par-gmd/yelmo_Antarctica.nml, set control.clim_nm="clim_lgm"
-python run_yelmo.py -r -e initmip output/test-ant-lgm par-gmd/yelmo_Antarctica.nml
+python run_yelmo.py -s -e initmip ${fldr}/ant-lgm par-gmd/yelmo_Antarctica.nml
 
 # Or to run via batch call:
-job run --shell -f -o ${fldr}/ant -a -p control.clim_nm="clim_pd","clim_lgm" -- python run_yelmo.py -x -r -e initmip {} par-gmd/yelmo_Antarctica.nml
+job run --shell -f -o ${fldr}/ant -a -p control.clim_nm="clim_pd","clim_lgm" -- python run_yelmo.py -x -s -e initmip {} par-gmd/yelmo_Antarctica.nml
 
 
 # Greenland present-day simulation (not part of GMD suite of tests)
 python run_yelmo.py -s -e initmip ${fldr}/grl par/yelmo_Greenland_initmip.nml
+
+job run --shell -f -o tmp/perform2/grl -a -p control.clim_nm="clim_pd_grl" yelmo.domain="Greenland"  ydyn.solver="diva","hybrid" yelmo.grid_name="GRL-32KM","GRL-16KM","GRL-8KM" -- python run_yelmo.py -x -s -q priority -w 24 -e initmip {} par/yelmo_initmip.nml 
+job run --shell -f -o tmp/perform2/ant -a -p control.clim_nm="clim_pd_ant" yelmo.domain="Antarctica" ydyn.solver="diva","hybrid" yelmo.grid_name="ANT-32KM","ANT-16KM" -- python run_yelmo.py -x -s -q priority -w 24 -e initmip {} par/yelmo_initmip.nml 
+
 
 ### MISMIP TESTS ###
 
@@ -54,7 +58,10 @@ job run --shell -f -o ${fldr}/mismip/scaling -p ydyn.beta_gl_scale=2 ydyn.beta_g
 
 make ismiphom 
 
-job run --shell -f -o ${fldr}/ismiphom/diva -p control.experiment="EXPA" control.L=5,10,20,40,80,160 ydyn.solver="diva" -- python run_yelmo.py -x -r -e ismiphom {} par/yelmo_ISMIPHOM.nml
+job run --shell -f -o ${fldr}/ismiphom/expa/hybrid -p control.experiment="EXPA" control.L=5,10,20,40,80,160 ydyn.solver="hybrid" -- python run_yelmo.py -x -r -e ismiphom {} par/yelmo_ISMIPHOM.nml
+job run --shell -f -o ${fldr}/ismiphom/expa/diva   -p control.experiment="EXPA" control.L=5,10,20,40,80,160 ydyn.solver="diva"   -- python run_yelmo.py -x -r -e ismiphom {} par/yelmo_ISMIPHOM.nml
+job run --shell -f -o ${fldr}/ismiphom/expc/hybrid -p control.experiment="EXPC" control.L=5,10,20,40,80,160 ydyn.solver="hybrid" -- python run_yelmo.py -x -r -e ismiphom {} par/yelmo_ISMIPHOM.nml
+job run --shell -f -o ${fldr}/ismiphom/expc/diva   -p control.experiment="EXPC" control.L=5,10,20,40,80,160 ydyn.solver="diva"   -- python run_yelmo.py -x -r -e ismiphom {} par/yelmo_ISMIPHOM.nml
 
 # Trough simulation following Feldmann and Levermann (2017)  (not part of GMD suite of tests)
 make trough

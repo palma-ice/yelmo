@@ -1,6 +1,6 @@
 #!/bin/bash
 
-fldr='tmp/yelmo1.0'
+fldr='tmp/yelmo1.1'
 
 
 ### BENCHMARK TESTS ###

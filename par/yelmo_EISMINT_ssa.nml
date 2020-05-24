@@ -64,7 +64,8 @@
 /
 
 &ydyn
-    solver              = "hybrid"        ! "fixed", "sia", "ssa", "hybrid", "diva"     
+    solver              = "hybrid"        ! "fixed", "sia", "ssa", "hybrid", "diva"    
+    diva_no_slip        = False           ! If using the DIVA solver, is basal sliding allowed? 
     beta_method         = 1               ! 0: constant beta; 1: linear (beta=cb/u0); 2: psuedo-plastic-power; 3: Regularized Coulomb
     beta_const          = 1e3             ! [Pa a m−1] Constant value of basal friction coefficient to be used
     beta_q              = 1.0             ! Dragging law exponent 
@@ -73,7 +74,7 @@
     beta_gl_stag        = 1               !  0: simple staggering, 1: Upstream beta at gl, 2: downstream, 3: f_grnd_ac scaling 
     beta_gl_f           = 1.0             ! [-] Scaling of beta at the grounding line (for beta_gl_scale=0)
     taud_gl_method      = 0               !  0: binary, no subgrid, 1: Two-sided gradient
-    H_grnd_lim          = 500.0           ! [m] For beta_sep_method=2, reduce beta linearly between H_grnd=0 and H_grnd_lim 
+    H_grnd_lim          = 500.0           ! [m] For beta_gl_scale=2, reduce beta linearly between H_grnd=0 and H_grnd_lim 
     H_sed_sat           = 250.0           ! [m] Sediment thickness at which sediment effect is saturated
     cb_method           = 1               ! -1: set externally; 1: calculate cb online  
     cb_with_pmp         = True            ! Weighted cf_frozen/cf_stream as a function of f_pmp 
@@ -87,7 +88,7 @@
     n_sm_beta           = 0               ! [-] Standard deviation in gridpoints for Gaussian smoothing of beta (0==no smoothing)
     beta_min            = 0.0             ! [Pa a m-1] Minimum value of beta allowed for grounded ice (for stability)
     eps_0               = 1e-6            ! [1/a] Regularization term for effective viscosity - minimum strain rate
-    ssa_solver_opt      = "-i bicgsafe -p jacobi -maxiter 100 -tol 1.0e-4 -initx_zeros false"  ! See Lis library
+    ssa_lis_opt         = "-i bicgsafe -p jacobi -maxiter 100 -tol 1.0e-4 -initx_zeros false"  ! See Lis library
     ssa_beta_max        = 1e20            ! [Pa a m-1] Maximum value of beta for which ssa should be calculated 
     ssa_vel_max         = 5000.0          ! [m a-1] SSA velocity limit to avoid spurious results 
     ssa_iter_max        = 10              ! Number of maximum allowed iterations over ssa to converge on vel. solution

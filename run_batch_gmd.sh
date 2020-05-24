@@ -42,8 +42,8 @@ job run --shell -f -o ${fldr}/ant -a -p control.clim_nm="clim_pd","clim_lgm" -- 
 # Greenland present-day simulation (not part of GMD suite of tests)
 python run_yelmo.py -s -e initmip ${fldr}/grl par/yelmo_Greenland_initmip.nml
 
-job run --shell -f -o tmp/perform2/grl -a -p control.clim_nm="clim_pd_grl" yelmo.domain="Greenland"  ydyn.solver="diva","hybrid" yelmo.grid_name="GRL-32KM","GRL-16KM","GRL-8KM" -- python run_yelmo.py -x -s -q priority -w 24 -e initmip {} par/yelmo_initmip.nml 
-job run --shell -f -o tmp/perform2/ant -a -p control.clim_nm="clim_pd_ant" yelmo.domain="Antarctica" ydyn.solver="diva","hybrid" yelmo.grid_name="ANT-32KM","ANT-16KM" -- python run_yelmo.py -x -s -q priority -w 24 -e initmip {} par/yelmo_initmip.nml 
+job run --shell -f -o tmp/perform2 -a -p control.clim_nm="clim_pd_grl" yelmo.domain="Greenland"  ydyn.solver="diva","hybrid" yelmo.grid_name="GRL-32KM","GRL-16KM","GRL-8KM" -- python run_yelmo.py -x -s -q priority -w 24 -e initmip {} par/yelmo_initmip.nml 
+job run --shell -f -o tmp/perform2 -a -p control.clim_nm="clim_pd_ant" yelmo.domain="Antarctica" ydyn.solver="diva","hybrid" yelmo.grid_name="ANT-32KM","ANT-16KM" -- python run_yelmo.py -x -s -q priority -w 24 -e initmip {} par/yelmo_initmip.nml 
 
 
 ### MISMIP TESTS ###

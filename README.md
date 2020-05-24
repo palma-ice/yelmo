@@ -211,9 +211,11 @@ program file, as well as the output filename.
 ### 6. Antarctica present-day and glacial simulations
 To perform the Antarctica simulations as presented in the paper, it is necessary
 to compile the `initmip` executable and run with the present-day (pd) and
-glacial (lgm) parameter files:
+glacial (lgm) parameter values:
 ```
 make initmip
-python run_yelmo.py -r -e initmip output/test-ant-pd par-gmd/yelmo_Antarctica_pd.nml
-python run_yelmo.py -r -e initmip output/test-ant-lgm par-gmd/yelmo_Antarctica_lgm.nml
+# In par-gmd/yelmo_Antarctica.nml, set control.clim_nm="clim_pd"
+python run_yelmo.py -r -e initmip output/test-ant-pd par-gmd/yelmo_Antarctica.nml
+# In par-gmd/yelmo_Antarctica.nml, set control.clim_nm="clim_lgm"
+python run_yelmo.py -r -e initmip output/test-ant-lgm par-gmd/yelmo_Antarctica.nml
 ```

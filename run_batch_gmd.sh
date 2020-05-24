@@ -30,8 +30,14 @@ job run --shell -f -o ${fldr}/moving_dts -p eismint.time_end=25e3 yelmo.log_time
 make initmip
 
 # Antarctica present-day and LGM simulations
-python run_yelmo.py -s -e initmip ${fldr}/ant-pd par-gmd/yelmo_Antarctica_pd.nml
-python run_yelmo.py -s -e initmip ${fldr}/ant-lgm par-gmd/yelmo_Antarctica_lgm.nml
+# In par-gmd/yelmo_Antarctica.nml, set control.clim_nm="clim_pd"
+python run_yelmo.py -r -e initmip output/test-ant-pd  par-gmd/yelmo_Antarctica.nml
+# In par-gmd/yelmo_Antarctica.nml, set control.clim_nm="clim_lgm"
+python run_yelmo.py -r -e initmip output/test-ant-lgm par-gmd/yelmo_Antarctica.nml
+
+# Or to run via batch call:
+job run --shell -f -o ${fldr}/ant -a -p control.clim_nm="clim_pd","clim_lgm" -- python run_yelmo.py -x -r -e initmip {} par-gmd/yelmo_Antarctica.nml
+
 
 # Greenland present-day simulation (not part of GMD suite of tests)
 python run_yelmo.py -s -e initmip ${fldr}/grl par/yelmo_Greenland_initmip.nml

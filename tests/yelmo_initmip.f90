@@ -15,7 +15,7 @@ program yelmo_test
     type(yelmo_class)      :: yelmo1 
 
     character(len=256) :: outfldr, file1D, file2D, file_restart, domain 
-    character(len=512) :: path_par, path_const  
+    character(len=512) :: path_par, path_const, clim_nm  
     real(prec) :: time_init, time_end, time_equil, time, dtt, dt1D_out, dt2D_out 
     real(prec) :: bmb_shlf_const, dT_ann, z_sl    
     integer    :: n
@@ -45,15 +45,19 @@ program yelmo_test
     call nml_read(path_par,"control","dtt",             dtt)                       ! [yr] Main loop time step 
     call nml_read(path_par,"control","dt1D_out",        dt1D_out)                  ! [yr] Frequency of 1D output 
     call nml_read(path_par,"control","dt2D_out",        dt2D_out)                  ! [yr] Frequency of 2D output 
-    call nml_read(path_par,"control","bmb_shlf_const",  bmb_shlf_const)            ! [yr] Constant imposed bmb_shlf value
-    call nml_read(path_par,"control","dT_ann",          dT_ann)                    ! [K] Temperature anomaly (atm)
-    call nml_read(path_par,"control","z_sl",            z_sl)                      ! [m] Sea level relative to present-day
-
+    
+    call nml_read(path_par,"control","clim_nm",         clim_nm)                   ! Namelist group holding climate information
+    
     call nml_read(path_par,"control","load_cf_ref",     load_cf_ref)               ! Load cf_ref from file? Otherwise define from cf_stream + inline tuning
     call nml_read(path_par,"control","file_cf_ref",     file_cf_ref)               ! Filename holding cf_ref to load 
 
     call nml_read(path_par,"control","load_bmelt",      load_bmelt)                ! Load bmelt from file?
     call nml_read(path_par,"control","file_bmelt",      file_bmelt)                ! Filename holding bmelt field to load 
+
+    ! Load climate (eg, clim_pd or clim_lgm)
+    call nml_read(path_par,clim_nm,  "bmb_shlf_const",  bmb_shlf_const)            ! [yr] Constant imposed bmb_shlf value
+    call nml_read(path_par,clim_nm,  "dT_ann",          dT_ann)                    ! [K] Temperature anomaly (atm)
+    call nml_read(path_par,clim_nm,  "z_sl",            z_sl)                      ! [m] Sea level relative to present-day
 
     ! Assume program is running from the output folder
     outfldr = "./"
@@ -113,9 +117,12 @@ program yelmo_test
     ! Special treatment for Greenland
     if (trim(yelmo1%par%domain) .eq. "Greenland") then 
         
-        ! Impose additional negative mass balance to no ice points of 2 [m.i.e./a] melting
-        where(mask_noice) yelmo1%bnd%smb = yelmo1%dta%pd%smb - 2.0 
-    
+        ! Present-day
+        if (dT_ann .ge. 0.0) then 
+            ! Impose additional negative mass balance to no ice points of 2 [m.i.e./a] melting
+            where(mask_noice) yelmo1%bnd%smb = yelmo1%dta%pd%smb - 2.0 
+        end if 
+        
     end if 
 
     ! Special treatment for Antarctica
@@ -123,12 +130,7 @@ program yelmo_test
         
         ! Present-day
         if (dT_ann .ge. 0.0) then 
-            where(mask_noice) yelmo1%bnd%bmb_shlf = -2.0    ! [m/a]
-!             where(yelmo1%bnd%basins .ge. 23.0 .and. & 
-!                   yelmo1%bnd%basins .le. 26.0) yelmo1%bnd%bmb_shlf = -2.0   ! [m/a]
-!             where(yelmo1%bnd%basins .ge.  9.0 .and. & 
-!                   yelmo1%bnd%basins .le. 11.0) yelmo1%bnd%bmb_shlf = -1.0   ! [m/a]
-        
+            where(mask_noice) yelmo1%bnd%bmb_shlf = -2.0                ! [m/a]        
         end if 
 
         ! LGM

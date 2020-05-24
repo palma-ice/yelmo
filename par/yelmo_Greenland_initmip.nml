@@ -5,16 +5,27 @@
     dtt             = 10.0              ! [yr] Main loop timestep 
     dt1D_out        = 100.0             ! [yr] Frequency of writing 1D output files 
     dt2D_out        = 100.0             ! [yr] Frequency of writing 2D output files 
-    bmb_shlf_const  = -10.0             ! [m/a] Basal mass balance of ice shelves
-    dT_ann          = 0.0               ! [K]  Temperature anomaly (atm)
-    z_sl            = 0.0               ! [m] Sea level relative to present-day 
-
+    
+    clim_nm         = "clim_pd"         ! "clim_pd" or "clim_lgm"
+    
     load_cf_ref     = False             ! Load cf_ref from file? Otherwise define from cf_stream + inline tuning
     file_cf_ref     = "ice_data/{domain}/{grid_name}/{grid_name}_cf_ref_opt.nc"  ! Filename holding cf_ref to load 
 
     load_bmelt      = False             ! Load PD bmelt observations from file? Else use bmb_shlf_const 
     file_bmelt      = "ice_data/{domain}/{grid_name}/{grid_name}_BMELT-R13.nc"
 
+/
+
+&clim_pd 
+    bmb_shlf_const  = -10.0             ! [m/a] Basal mass balance of ice shelves
+    dT_ann          = 0.0               ! [K]  Temperature anomaly (atm)
+    z_sl            = 0.0               ! [m] Sea level relative to present-day 
+/
+
+&clim_lgm 
+    bmb_shlf_const  = 0.0               ! [m/a] Basal mass balance of ice shelves
+    dT_ann          = -10.0             ! [K] Temperature anomaly (atm)
+    z_sl            = -120.0            ! [m] Sea level relative to present-day 
 /
 
 &yelmo

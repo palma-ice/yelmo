@@ -229,6 +229,8 @@ contains
         call nc_write(filename,"beta_acy",      dom%dyn%now%beta_acy, units="",dim1="xc",dim2="yc",ncid=ncid) 
         call nc_write(filename,"beta",          dom%dyn%now%beta,     units="",dim1="xc",dim2="yc",ncid=ncid) 
 
+        call nc_write(filename,"beta_eff",      dom%dyn%now%beta_eff, units="",dim1="xc",dim2="yc",ncid=ncid) 
+        
         call nc_write(filename,"f_vbvs",        dom%dyn%now%f_vbvs,   units="",dim1="xc",dim2="yc",ncid=ncid) 
 
         call nc_write(filename,"ssa_mask_acx",  dom%dyn%now%ssa_mask_acx, units="",dim1="xc",dim2="yc",ncid=ncid) 
@@ -499,6 +501,8 @@ contains
         call nc_read(filename,"beta_acx",      dom%dyn%now%beta_acx,ncid=ncid) 
         call nc_read(filename,"beta_acy",      dom%dyn%now%beta_acy,ncid=ncid) 
         call nc_read(filename,"beta",          dom%dyn%now%beta,ncid=ncid) 
+
+        call nc_read(filename,"beta_eff",      dom%dyn%now%beta_eff,ncid=ncid) 
 
         call nc_read(filename,"f_vbvs",        dom%dyn%now%f_vbvs,ncid=ncid) 
 

@@ -122,7 +122,7 @@ program yelmo_test
             ! Impose additional negative mass balance to no ice points of 2 [m.i.e./a] melting
             where(mask_noice) yelmo1%bnd%smb = yelmo1%dta%pd%smb - 2.0 
         end if 
-        
+
     end if 
 
     ! Special treatment for Antarctica
@@ -187,6 +187,7 @@ program yelmo_test
     ! to equilibrate thermodynamics and dynamics
     call yelmo_update_equil(yelmo1,time,time_tot=10.0_prec,topo_fixed=.FALSE.,dt=1.0,ssa_vel_max=5000.0)
     call yelmo_update_equil(yelmo1,time,time_tot=time_equil,topo_fixed=.TRUE.,dt=1.0,ssa_vel_max=5000.0)
+    call yelmo_update_equil(yelmo1,time,time_tot=100.0_prec,topo_fixed=.FALSE.,dt=dtt,ssa_vel_max=5000.0)
     
     ! 2D file 
     call yelmo_write_init(yelmo1,file2D,time_init=time,units="years")  
@@ -216,6 +217,13 @@ program yelmo_test
 !             yelmo1%bnd%T_srf = yelmo1%dta%pd%T_srf
 !         end if 
         
+        if (time .gt. 1e3) then 
+            ! Warm up the ice sheet to impose some changes 
+            yelmo1%bnd%T_srf    = yelmo1%dta%pd%T_srf + 5.0
+            yelmo1%bnd%bmb_shlf = -10.0 
+            where (yelmo1%dta%pd%smb .lt. 0.0) yelmo1%bnd%smb = yelmo1%dta%pd%smb - 1.0 
+        end if 
+
         ! Update ice sheet 
         call yelmo_update(yelmo1,time)
 

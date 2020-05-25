@@ -217,12 +217,12 @@ program yelmo_test
 !             yelmo1%bnd%T_srf = yelmo1%dta%pd%T_srf
 !         end if 
         
-        if (time .gt. 1e3) then 
-            ! Warm up the ice sheet to impose some changes 
-            yelmo1%bnd%T_srf    = yelmo1%dta%pd%T_srf + 5.0
-            yelmo1%bnd%bmb_shlf = -10.0 
-            where (yelmo1%dta%pd%smb .lt. 0.0) yelmo1%bnd%smb = yelmo1%dta%pd%smb - 1.0 
-        end if 
+!         if (time .gt. 1e3) then 
+!             ! Warm up the ice sheet to impose some changes 
+!             yelmo1%bnd%T_srf    = yelmo1%dta%pd%T_srf + 5.0
+!             yelmo1%bnd%bmb_shlf = -10.0 
+!             where (yelmo1%dta%pd%smb .lt. 0.0) yelmo1%bnd%smb = yelmo1%dta%pd%smb - 1.0 
+!         end if 
 
         ! Update ice sheet 
         call yelmo_update(yelmo1,time)

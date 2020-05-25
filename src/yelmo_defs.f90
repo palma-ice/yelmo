@@ -698,7 +698,7 @@ module yelmo_defs
         
         ! Truncation error information over several timesteps
         real(prec), allocatable :: pc_taus(:,:,:)
-        real(prec), allocatable :: pc_tau_avg(:,:)
+        real(prec), allocatable :: pc_tau_max(:,:)
 
         character(len=512)   :: log_timestep_file 
 
@@ -980,68 +980,104 @@ contains
 
     end subroutine yelmo_calc_speed 
     
-    subroutine yelmo_calc_running_mean(val_avg,vals,val_now)
+    subroutine yelmo_calc_running_stats(val_out,vals,val_now,stat)
 
         implicit none 
 
-        real(prec), intent(OUT)   :: val_avg 
+        real(prec), intent(OUT)   :: val_out 
         real(prec), intent(INOUT) :: vals(:) 
         real(prec), intent(IN)    :: val_now 
-
+        character(len=*), intent(IN) :: stat          ! 'mean', 'min', 'max', 'stdev'
+        
         ! Local variables 
-        integer :: n 
+        integer    :: n 
+        real(prec) :: val_mean 
 
-        ! Shift rates vector to eliminate oldest entry, and add current entry
-        n = size(vals) 
-        vals    = cshift(vals,1)
-        vals(n) = val_now  
+        ! Shift rates vector to eliminate oldest entry, and add current entry in the first position
+        vals    = cshift(vals,-1)
+        vals(1) = val_now  
 
-        ! Calculate running average value 
+        ! Calculate running stats value 
         n    = count(vals .ne. 0.0_prec)
         if (n .gt. 0) then 
-            val_avg = sum(vals,mask=vals .ne. 0.0_prec) / real(n,prec)
-        else 
-            val_avg = 0.0_prec 
+
+            select case(trim(stat))
+
+                case("mean")
+                    val_out = sum(vals,mask=vals .ne. 0.0_prec) / real(n,prec)
+                case("min")
+                    val_out = minval(vals,mask=vals .ne. 0.0_prec)
+                case("max")
+                    val_out = maxval(vals,mask=vals .ne. 0.0_prec)
+                case("stdev")
+                    val_mean = sum(vals,mask=vals .ne. 0.0_prec) / real(n,prec)
+                    val_out  = sqrt(sum((vals-val_mean)**2,mask=vals .ne. 0.0_prec) / real(n,prec))
+
+                case DEFAULT 
+                    write(*,*) "yelmo_calc_running_stats:: Error: stat not found."
+                    write(*,*) "stat = ", trim(stat) 
+                    stop 
+
+            end select 
+                   
+        else
+
+            val_out = 0.0_prec 
+        
         end if 
 
         return 
 
-    end subroutine yelmo_calc_running_mean
+    end subroutine yelmo_calc_running_stats
 
-    subroutine yelmo_calc_running_mean_2D(val_avg,vals,val_now)
+    subroutine yelmo_calc_running_stats_2D(val_out,vals,val_now,stat)
 
         implicit none 
 
-        real(prec), intent(OUT)   :: val_avg(:,:) 
+        real(prec), intent(OUT)   :: val_out(:,:) 
         real(prec), intent(INOUT) :: vals(:,:,:) 
         real(prec), intent(IN)    :: val_now(:,:) 
-
-        ! Local variables 
+        character(len=*), intent(IN) :: stat            ! 'mean', 'min', 'max', 'stdev'
+        
+        ! Local variables
+        integer :: i, j, nx, ny  
         integer :: n, k, n_now  
 
-        ! Shift rates vector to eliminate oldest entry, and add current entry
-        n = size(vals,3) 
-        vals        = cshift(vals,1,dim=3)
-        vals(:,:,n) = val_now  
+        nx = size(val_out,1)
+        ny = size(val_out,2) 
 
-        ! Calculate running average value 
-        n_now   = 0 
-        val_avg = 0.0_prec
+        do j = 1, ny 
+        do i = 1, nx 
 
-        do k = 1, n 
-            if (sum(vals(:,:,k)) .ne. 0.0_prec) then 
-                n_now = n_now + 1 
-                val_avg = val_avg + vals(:,:,k) 
-            end if 
+            call yelmo_calc_running_stats(val_out(i,j),vals(i,j,:),val_now(i,j),stat)
+
         end do 
+        end do  
 
-        if (n_now .gt. 0) then 
-            val_avg = val_avg / real(n_now,prec) 
-        end if 
+
+!         ! Shift rates vector to eliminate oldest entry, and add current entry
+!         n = size(vals,3) 
+!         vals        = cshift(vals,1,dim=3)
+!         vals(:,:,n) = val_now  
+
+!         ! Calculate running stat value 
+!         n_now   = 0 
+!         val_avg = 0.0_prec
+
+!         do k = 1, n 
+!             if (sum(vals(:,:,k)) .ne. 0.0_prec) then 
+!                 n_now = n_now + 1 
+!                 val_avg = val_avg + vals(:,:,k) 
+!             end if 
+!         end do 
+
+!         if (n_now .gt. 0) then 
+!             val_avg = val_avg / real(n_now,prec) 
+!         end if 
         
         return 
 
-    end subroutine yelmo_calc_running_mean_2D
+    end subroutine yelmo_calc_running_stats_2D
 
 end module yelmo_defs
 

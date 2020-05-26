@@ -97,6 +97,8 @@ module yelmo_defs
         character(len=256) :: pc_step 
         real(prec) :: dt_zeta, dt_beta(4)
 
+        real(prec) :: speed, speed_pred, speed_corr 
+
     end type
 
     ! ytopo state variables
@@ -222,6 +224,7 @@ module yelmo_defs
         real(prec) :: time
 
         integer    :: ssa_iter_now              ! Number of iterations used for Picard iteration to solve ssa this timestep
+        real(prec) :: speed 
 
     end type
 
@@ -368,6 +371,8 @@ module yelmo_defs
         integer    :: nx, ny, nz_aa, nz_ac  
         integer    :: n_iso 
 
+        real(prec) :: speed 
+
         real(prec), allocatable :: zeta_aa(:)   ! Layer centers (aa-nodes), plus base and surface: nz_aa points 
         real(prec), allocatable :: zeta_ac(:)   ! Layer borders (ac-nodes), plus base and surface: nz_ac == nz_aa-1 points
         
@@ -435,6 +440,8 @@ module yelmo_defs
         
         real(prec) :: time
         real(prec) :: dt_zeta, dt_beta(2)
+
+        real(prec) :: speed 
 
     end type
 
@@ -922,58 +929,30 @@ contains
 
     end subroutine yelmo_cpu_time 
 
-    subroutine yelmo_calc_speed(rate,rates,model_time0,model_time1,cpu_time0)
+    subroutine yelmo_calc_speed(speed,model_time0,model_time1,cpu_time0,cpu_time1)
         ! Calculate the model computational speed [model-kyr / hr]
-        ! Note: uses a running mean of rates over the last X steps, in order
-        ! to provide a smoother estimate of the rate 
+        ! given model times for start and end of window in [yr]
+        ! and cpu processing times for start and end of window in [sec]
 
         implicit none 
 
-        real(prec), intent(OUT)   :: rate           ! [kyr / hr]
-        real(prec), intent(INOUT) :: rates(:)       ! [kyr / hr]
+        real(prec), intent(OUT) :: speed            ! [kyr / hr]
+        real(prec), intent(IN)  :: model_time0      ! [yr]
+        real(prec), intent(IN)  :: model_time1      ! [yr]
+        real(8),    intent(IN)  :: cpu_time0        ! [sec]
+        real(8),    intent(IN)  :: cpu_time1        ! [sec]
 
-        real(prec), intent(IN) :: model_time0       ! [yr]
-        real(prec), intent(IN) :: model_time1       ! [yr]
-        real(8),    intent(IN) :: cpu_time0         ! [sec]
-        
-        ! Local variables
-        integer    :: ntot, n 
-        real(8)    :: cpu_time1                     ! [sec]
-        real(8)    :: cpu_dtime                     ! [sec]
-        real(prec) :: rate_now 
+        ! Local variables 
+        real(prec) :: cpu_dtime 
+        real(prec) :: model_dtime 
 
-        ! Get current time 
-        call yelmo_cpu_time(cpu_time1,cpu_time0,cpu_dtime)
+        cpu_dtime   = (cpu_time1 - cpu_time0)/3600.d0       ! [sec] => [hr] 
+        model_dtime = (model_time1 - model_time0)*1d-3      ! [yr] => [kyr] 
 
-        if (model_time1 .gt. model_time0) then 
-            ! Model has advanced in time, calculate rate 
-
-            ! Calculate the model speed [model-yr / sec]
-            rate_now = (model_time1-model_time0) / cpu_dtime
-
-            ! Convert to more useful rate [model-kyr / hr]
-            rate_now = rate_now*1e-3*3600.0 
-
-            if (abs(rate_now) .lt. tol_underflow) rate_now = 0.0_prec 
-
+        if (cpu_dtime .gt. 0.0) then 
+            speed = model_dtime / cpu_dtime                 ! [kyr / hr]
         else 
-            rate_now = 0.0 
-        end if 
-
-        ! Shift rates vector to eliminate oldest entry, and add current entry
-        n = size(rates) 
-        rates    = cshift(rates,1)
-        rates(n) = rate_now 
-
-        ! Avoid underflows
-        !where(abs(rates) .lt. tol_underflow) rates = 0.0_prec
-        
-        ! Calculate running average rate 
-        n    = count(rates .gt. 0.0_prec)
-        if (n .gt. 0) then 
-            rate = sum(rates,mask=rates .gt. 0.0_prec) / real(n,prec)
-        else 
-            rate = 0.0_prec 
+            speed = 0.0 
         end if 
 
         return 
@@ -1054,27 +1033,6 @@ contains
         end do 
         end do  
 
-
-!         ! Shift rates vector to eliminate oldest entry, and add current entry
-!         n = size(vals,3) 
-!         vals        = cshift(vals,1,dim=3)
-!         vals(:,:,n) = val_now  
-
-!         ! Calculate running stat value 
-!         n_now   = 0 
-!         val_avg = 0.0_prec
-
-!         do k = 1, n 
-!             if (sum(vals(:,:,k)) .ne. 0.0_prec) then 
-!                 n_now = n_now + 1 
-!                 val_avg = val_avg + vals(:,:,k) 
-!             end if 
-!         end do 
-
-!         if (n_now .gt. 0) then 
-!             val_avg = val_avg / real(n_now,prec) 
-!         end if 
-        
         return 
 
     end subroutine yelmo_calc_running_stats_2D

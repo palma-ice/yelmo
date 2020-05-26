@@ -56,6 +56,10 @@ contains
         integer :: i, j, nx, ny  
         real(prec), allocatable :: mbal(:,:) 
         
+        real(8)    :: cpu_time0, cpu_time1
+        real(prec) :: model_time0, model_time1 
+        real(prec) :: speed 
+
         nx = size(tpo%now%H_ice,1)
         ny = size(tpo%now%H_ice,2)
 
@@ -69,7 +73,10 @@ contains
         ! Get time step
         dt = time - tpo%par%time 
 
-        
+        ! Store initial cpu time and model time for metrics later
+        call yelmo_cpu_time(cpu_time0)
+        model_time0 = tpo%par%time 
+
         ! Combine basal mass balance into one field accounting for 
         ! grounded/floating fraction of grid cells 
         call calc_bmb_total(tpo%now%bmb,thrm%now%bmb_grnd,bnd%bmb_shlf,tpo%now%f_grnd,tpo%par%diffuse_bmb_shlf)
@@ -248,6 +255,24 @@ contains
 
         ! Advance ytopo timestep 
         tpo%par%time = time
+
+        ! Calculate computational performance (model speed in kyr/hr)
+        call yelmo_cpu_time(cpu_time1)
+        model_time1 = tpo%par%time 
+        call yelmo_calc_speed(speed,model_time0,model_time1,cpu_time0,cpu_time1)
+
+        ! Store the speed variable in predictor or corrector speed variable
+        if (trim(tpo%par%pc_step) .eq. "predictor") then 
+            tpo%par%speed_pred = speed 
+        else 
+            tpo%par%speed_corr = speed 
+
+            ! If corrector step, then also calculate the speed of both 
+            ! predictor+corrector calls: mean of the predictor and corrector speeds
+            ! divided by two, since two calls were made. 
+            tpo%par%speed = 0.5 * (0.5*(tpo%par%speed_pred+tpo%par%speed_corr))
+            
+        end if 
 
 !         if (yelmo_log) then 
 

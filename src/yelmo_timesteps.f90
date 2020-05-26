@@ -975,7 +975,8 @@ contains
 
     end subroutine yelmo_timestep_write_init 
 
-    subroutine yelmo_timestep_write(filename,time,dt_now,dt_adv,dt_pi,pc_eta,pc_tau,speed,ssa_iter,iter_redo)
+    subroutine yelmo_timestep_write(filename,time,dt_now,dt_adv,dt_pi,pc_eta,pc_tau, &
+                                                speed,speed_tpo,speed_dyn,ssa_iter,iter_redo)
 
         implicit none 
 
@@ -987,6 +988,8 @@ contains
         real(prec), intent(IN) :: pc_eta 
         real(prec), intent(IN) :: pc_tau(:,:) 
         real(prec), intent(IN) :: speed 
+        real(prec), intent(IN) :: speed_tpo
+        real(prec), intent(IN) :: speed_dyn 
         integer,    intent(IN) :: ssa_iter 
         integer,    intent(IN) :: iter_redo 
 
@@ -1009,6 +1012,8 @@ contains
         call nc_write(filename,"time",time,dim1="time",start=[n],count=[1],ncid=ncid)
 
         call nc_write(filename, "speed",speed,dim1="time",start=[n],count=[1],ncid=ncid)
+        call nc_write(filename, "speed_tpo",speed_tpo,dim1="time",start=[n],count=[1],ncid=ncid)
+        call nc_write(filename, "speed_dyn",speed_dyn,dim1="time",start=[n],count=[1],ncid=ncid)
         
         call nc_write(filename, "dt_now",dt_now,dim1="time",start=[n],count=[1],ncid=ncid)
         call nc_write(filename, "dt_adv",dt_adv,dim1="time",start=[n],count=[1],ncid=ncid)

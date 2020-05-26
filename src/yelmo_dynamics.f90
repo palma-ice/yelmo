@@ -46,9 +46,10 @@ contains
         real(prec),         intent(IN)    :: time 
 
         ! Local variables
-        ! Local variables
         integer :: i, j, k, nx, ny, nz_aa, nz_ac   
         real(prec) :: dt 
+        real(8)    :: cpu_time0, cpu_time1
+        real(prec) :: model_time0, model_time1 
 
         real(prec), allocatable :: uxy_prev(:,:) 
 
@@ -64,6 +65,10 @@ contains
         if (dyn%par%time .gt. time) then 
             dyn%par%time = time
         end if 
+
+        ! Store initial cpu time and model time for metrics later
+        call yelmo_cpu_time(cpu_time0)
+        model_time0 = dyn%par%time 
 
         ! Get time step
         dt = time - dyn%par%time 
@@ -200,6 +205,11 @@ contains
 
         ! Advance ydyn timestep 
         dyn%par%time = time
+
+        ! Calculate computational performance (model speed in kyr/hr)
+        call yelmo_cpu_time(cpu_time1)
+        model_time1 = dyn%par%time 
+        call yelmo_calc_speed(dyn%par%speed,model_time0,model_time1,cpu_time0,cpu_time1)
 
         return
 

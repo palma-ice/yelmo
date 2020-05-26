@@ -40,19 +40,13 @@ contains
         type(yelmo_class)  :: dom_ref 
 
         real(prec) :: dt_now, dt_max  
-        real(prec) :: time_now, time_start 
+        real(prec) :: time_now 
         integer    :: n, nstep, n_now, n_dtmin 
-        real(8)    :: cpu_start_time
         real(prec), parameter :: time_tol = 1e-5
 
-        type timing_type 
-            real(8) :: cpu_time0, cpu_time1 
-            real(8) :: time0, time1 
-            real(8) :: cpu_dtime, dtime
-            real(prec) :: speed   
-        end type 
-
-        type(timing_type) :: timing1 
+        real(8)    :: cpu_time0, cpu_time1 
+        real(prec) :: model_time0, model_time1 
+        real(prec) :: speed  
 
         real(prec) :: H_mean, T_mean 
         real(prec), allocatable :: dt_save(:) 
@@ -165,10 +159,6 @@ contains
         ! Load last model time (from dom%tpo, should be equal to dom%thrm)
         time_now = dom%tpo%par%time
 
-        ! Initialize cpu timing 
-        call yelmo_cpu_time(cpu_start_time) 
-        time_start = time_now 
-        
         ! Determine maximum number of time steps to be iterated through   
         nstep   = ceiling( (time-time_now) / dom%par%dt_min )
         n_now   = 0  ! Number of timesteps saved 
@@ -183,8 +173,8 @@ contains
         do n = 1, nstep
 
             ! Initialize cpu timing for this iteration
-            call yelmo_cpu_time(timing1%cpu_time0) 
-            timing1%time0 = time_now 
+            call yelmo_cpu_time(cpu_time0) 
+            model_time0 = time_now 
 
             ! Store initial state of yelmo object in case a reset is necessary due to instability
             dom_ref = dom 
@@ -379,14 +369,8 @@ contains
             end do   ! End iteration loop 
             
             ! Calculate model speed for this iteration
-            call yelmo_cpu_time(timing1%cpu_time1)
-            timing1%cpu_dtime = (timing1%cpu_time1 - timing1%cpu_time0)/3600.d0 ! [sec] => [hr] 
-            timing1%dtime     = (time_now - timing1%time0)*1d-3                 ! [yr] => [kyr] 
-            if (timing1%cpu_dtime .gt. 0.0) then 
-                timing1%speed = timing1%dtime / timing1%cpu_dtime               ! [kyr / hr]
-            else 
-                timing1%speed = 0.0 
-            end if 
+            call yelmo_cpu_time(cpu_time1)
+            call yelmo_calc_speed(speed,model_time0,time_now,cpu_time0,cpu_time1)
 
             ! Collect how many times the redo-iteration loop had to run 
             ! (not counting the first pass, which is not a redo)
@@ -404,7 +388,7 @@ contains
             dt_save(n_now) = dt_now 
             call yelmo_calc_running_stats(dom%par%dt_avg,dom%par%dts,dt_now,stat="mean")
             
-            call yelmo_calc_running_stats(dom%par%model_speed,dom%par%model_speeds,timing1%speed,stat="mean")
+            call yelmo_calc_running_stats(dom%par%model_speed,dom%par%model_speeds,speed,stat="mean")
             call yelmo_calc_running_stats(dom%par%eta_avg,dom%par%etas,dom%par%pc_eta(1),stat="mean")
             call yelmo_calc_running_stats(dom%par%ssa_iter_avg,dom%par%ssa_iters,real(dom%dyn%par%ssa_iter_now,prec),stat="mean")
             
@@ -415,7 +399,8 @@ contains
                 ! Write timestep file if desired
 
                 call yelmo_timestep_write(dom%par%log_timestep_file,time_now,dt_now,dt_adv_min,dt_pi, &
-                            dom%par%pc_eta(1),dom%par%pc_tau,timing1%speed,dom%dyn%par%ssa_iter_now,iter_redo_tot)
+                            dom%par%pc_eta(1),dom%par%pc_tau,speed,dom%tpo%par%speed,dom%dyn%par%speed, &
+                            dom%dyn%par%ssa_iter_now,iter_redo_tot)
             
             end if 
 
@@ -768,7 +753,7 @@ contains
             ! Timestep file 
             call yelmo_timestep_write_init(dom%par%log_timestep_file,time,dom%grd%xc,dom%grd%yc,dom%par%pc_eps)
             call yelmo_timestep_write(dom%par%log_timestep_file,time,0.0_prec,0.0_prec,dom%par%pc_dt(1), &
-                            dom%par%pc_eta(1),dom%par%pc_tau,0.0_prec,dom%dyn%par%ssa_iter_now,0)
+                            dom%par%pc_eta(1),dom%par%pc_tau,0.0_prec,0.0_prec,0.0_prec,dom%dyn%par%ssa_iter_now,0)
         end if 
 
         return

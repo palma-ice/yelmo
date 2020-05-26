@@ -975,7 +975,7 @@ contains
 
     end subroutine yelmo_timestep_write_init 
 
-    subroutine yelmo_timestep_write(filename,time,dt_now,dt_adv,dt_pi,pc_eta,pc_tau,speed,ssa_iter)
+    subroutine yelmo_timestep_write(filename,time,dt_now,dt_adv,dt_pi,pc_eta,pc_tau,speed,ssa_iter,iter_redo)
 
         implicit none 
 
@@ -988,6 +988,7 @@ contains
         real(prec), intent(IN) :: pc_tau(:,:) 
         real(prec), intent(IN) :: speed 
         integer,    intent(IN) :: ssa_iter 
+        integer,    intent(IN) :: iter_redo 
 
         ! Local variables
         integer    :: ncid, n, nx, ny 
@@ -1016,7 +1017,8 @@ contains
         call nc_write(filename, "pc_eta",pc_eta,dim1="time",start=[n],count=[1],ncid=ncid)
         !call nc_write(filename, "pc_tau",pc_tau,dim1="xc",dim2="yc",dim3="time",start=[1,1,n],count=[nx,ny,1],ncid=ncid)
         
-        call nc_write(filename, "ssa_iter",ssa_iter,dim1="time",start=[n],count=[1],ncid=ncid)
+        call nc_write(filename, "ssa_iter", ssa_iter, dim1="time",start=[n],count=[1],ncid=ncid)
+        call nc_write(filename, "iter_redo",iter_redo,dim1="time",start=[n],count=[1],ncid=ncid)
         
         ! Close the netcdf file
         call nc_close(ncid)

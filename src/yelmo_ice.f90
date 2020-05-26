@@ -413,7 +413,7 @@ contains
                 end if 
 
                 call yelmo_timestep_write(dom%par%log_timestep_file,time_now,dt_now,dt_adv_min,dt_pi, &
-                            dom%par%pc_eta(1),dom%par%pc_tau,timing1%speed,dom%dyn%par%ssa_iter_now)
+                            dom%par%pc_eta(1),dom%par%pc_tau,timing1%speed,dom%dyn%par%ssa_iter_now,iter_redo_tot)
             end if 
 
             ! Make sure model is still running well
@@ -768,7 +768,7 @@ contains
             ! Timestep file 
             call yelmo_timestep_write_init(dom%par%log_timestep_file,time,dom%grd%xc,dom%grd%yc,dom%par%pc_eps)
             call yelmo_timestep_write(dom%par%log_timestep_file,time,0.0_prec,0.0_prec,dom%par%pc_dt(1), &
-                            dom%par%pc_eta(1),dom%par%pc_tau,0.0_prec,dom%dyn%par%ssa_iter_now)
+                            dom%par%pc_eta(1),dom%par%pc_tau,0.0_prec,dom%dyn%par%ssa_iter_now,0)
         end if 
 
         return

@@ -416,6 +416,7 @@ contains
 
                 call yelmo_timestep_write(dom%par%log_timestep_file,time_now,dt_now,dt_adv_min,dt_pi, &
                             dom%par%pc_eta(1),dom%par%pc_tau,timing1%speed,dom%dyn%par%ssa_iter_now,iter_redo_tot)
+            
             end if 
 
             ! Make sure model is still running well
@@ -432,7 +433,7 @@ contains
 
         ! Compare with data 
         call ydata_compare(dom%dta,dom%tpo,dom%dyn,dom%mat,dom%thrm,dom%bnd,dom%par%domain)
-        
+
         ! Write some diagnostics to make sure something useful is happening 
         if (yelmo_log) then
 

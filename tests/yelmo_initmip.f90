@@ -19,6 +19,7 @@ program yelmo_test
     real(prec) :: time_init, time_end, time_equil, time, dtt, dt1D_out, dt2D_out 
     real(prec) :: bmb_shlf_const, dT_ann, z_sl    
     integer    :: n
+    logical    :: with_anom 
     
     real(prec), allocatable :: cf_ref(:,:) 
 
@@ -47,6 +48,7 @@ program yelmo_test
     call nml_read(path_par,"control","dt2D_out",        dt2D_out)                  ! [yr] Frequency of 2D output 
     
     call nml_read(path_par,"control","clim_nm",         clim_nm)                   ! Namelist group holding climate information
+    call nml_read(path_par,"control","with_anom",       with_anom)                 ! Apply anomaly at the start of the simulation (after equilibration)
     
     call nml_read(path_par,"control","load_cf_ref",     load_cf_ref)               ! Load cf_ref from file? Otherwise define from cf_stream + inline tuning
     call nml_read(path_par,"control","file_cf_ref",     file_cf_ref)               ! Filename holding cf_ref to load 
@@ -196,7 +198,14 @@ program yelmo_test
     ! 1D file 
     call write_yreg_init(yelmo1,file1D,time_init=time_init,units="years",mask=yelmo1%bnd%ice_allowed)
     call write_yreg_step(yelmo1%reg,file1D,time=time)  
-    
+
+    if (with_anom) then 
+        ! Warm up the ice sheet to impose some changes 
+        yelmo1%bnd%T_srf    = yelmo1%dta%pd%T_srf + 5.0
+        yelmo1%bnd%bmb_shlf = -10.0 
+        where (yelmo1%dta%pd%smb .lt. 0.0) yelmo1%bnd%smb = yelmo1%dta%pd%smb - 1.0 
+    end if 
+
     ! Advance timesteps
     do n = 1, ceiling((time_end-time_init)/dtt)
 
@@ -217,13 +226,6 @@ program yelmo_test
 !             yelmo1%bnd%T_srf = yelmo1%dta%pd%T_srf
 !         end if 
         
-!         if (time .gt. 1e3) then 
-!             ! Warm up the ice sheet to impose some changes 
-!             yelmo1%bnd%T_srf    = yelmo1%dta%pd%T_srf + 5.0
-!             yelmo1%bnd%bmb_shlf = -10.0 
-!             where (yelmo1%dta%pd%smb .lt. 0.0) yelmo1%bnd%smb = yelmo1%dta%pd%smb - 1.0 
-!         end if 
-
         ! Update ice sheet 
         call yelmo_update(yelmo1,time)
 

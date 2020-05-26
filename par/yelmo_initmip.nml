@@ -7,6 +7,7 @@
     dt2D_out        = 50.0              ! [yr] Frequency of writing 2D output files 
     
     clim_nm         = "clim_pd_grl"     ! "clim_pd_grl", "clim_pd_ant" or "clim_lgm"
+    with_anom       = False             ! Apply anomaly at start of sim but after equilibration?
     
     load_cf_ref     = False             ! Load cf_ref from file? Otherwise define from cf_stream + inline tuning
     file_cf_ref     = "ice_data/{domain}/{grid_name}/{grid_name}_cf_ref_opt.nc"  ! Filename holding cf_ref to load 

@@ -692,7 +692,8 @@ module yelmo_defs
         real(prec) :: pc_dt(3)
         real(prec) :: pc_eta(3)
         real(prec), allocatable :: pc_tau(:,:)
-
+        real(prec), allocatable :: pc_tau_masked(:,:)
+        
         ! Timing information
         real(prec) :: model_speed 
         real(prec) :: model_speeds(100)         ! Eg, 100 timesteps for running mean 

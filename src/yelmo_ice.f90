@@ -346,6 +346,10 @@ contains
                 call set_pc_mask(pc_mask,dom%tpo%now%H_ice,dom%tpo%now%f_grnd)
                 eta_now = calc_pc_eta(dom%par%pc_tau,mask=pc_mask)
 
+                ! Save masked pc_tau for output too 
+                dom%par%pc_tau_masked = dom%par%pc_tau 
+                where( .not. pc_mask) dom%par%pc_tau_masked = 0.0_prec 
+
                 ! Check if this timestep should be rejected
                 if (eta_now .gt. dom%par%pc_tol .and. dt_now .gt. dom%par%dt_min) then
 
@@ -393,13 +397,13 @@ contains
             call yelmo_calc_running_stats(dom%par%ssa_iter_avg,dom%par%ssa_iters,real(dom%dyn%par%ssa_iter_now,prec),stat="mean")
             
             ! Extra diagnostic field, not necessary for normal runs
-            call yelmo_calc_running_stats_2D(dom%par%pc_tau_max,dom%par%pc_taus,dom%par%pc_tau,stat="max")
+            call yelmo_calc_running_stats_2D(dom%par%pc_tau_max,dom%par%pc_taus,dom%par%pc_tau_masked,stat="max")
 
             if (dom%par%log_timestep) then 
                 ! Write timestep file if desired
 
                 call yelmo_timestep_write(dom%par%log_timestep_file,time_now,dt_now,dt_adv_min,dt_pi, &
-                            dom%par%pc_eta(1),dom%par%pc_tau,speed,dom%tpo%par%speed,dom%dyn%par%speed, &
+                            dom%par%pc_eta(1),dom%par%pc_tau_masked,speed,dom%tpo%par%speed,dom%dyn%par%speed, &
                             dom%dyn%par%ssa_iter_now,iter_redo_tot)
             
             end if 
@@ -614,10 +618,13 @@ contains
         dom%par%pc_eta(:) = dom%par%pc_eps
 
         ! Allocate truncation error array 
-        if (allocated(dom%par%pc_tau))   deallocate(dom%par%pc_tau)
+        if (allocated(dom%par%pc_tau))          deallocate(dom%par%pc_tau)
+        if (allocated(dom%par%pc_tau_masked))   deallocate(dom%par%pc_tau_masked)
         allocate(dom%par%pc_tau(dom%grd%nx,dom%grd%ny))
+        allocate(dom%par%pc_tau_masked(dom%grd%nx,dom%grd%ny))
         
-        dom%par%pc_tau   = 0.0_prec 
+        dom%par%pc_tau        = 0.0_prec 
+        dom%par%pc_tau_masked = 0.0_prec 
         
         ! Allocate truncation error averaging arrays 
         if (allocated(dom%par%pc_taus))   deallocate(dom%par%pc_taus)
@@ -753,7 +760,7 @@ contains
             ! Timestep file 
             call yelmo_timestep_write_init(dom%par%log_timestep_file,time,dom%grd%xc,dom%grd%yc,dom%par%pc_eps)
             call yelmo_timestep_write(dom%par%log_timestep_file,time,0.0_prec,0.0_prec,dom%par%pc_dt(1), &
-                            dom%par%pc_eta(1),dom%par%pc_tau,0.0_prec,0.0_prec,0.0_prec,dom%dyn%par%ssa_iter_now,0)
+                            dom%par%pc_eta(1),dom%par%pc_tau_masked,0.0_prec,0.0_prec,0.0_prec,dom%dyn%par%ssa_iter_now,0)
         end if 
 
         return

@@ -35,10 +35,15 @@ contains
 
         ! Local variables 
         integer :: i, j, nx, ny 
+        integer :: im1, jm1, ip1, jp1 
 
         nx = size(mask,1)
         ny = size(mask,2) 
 
+if (.FALSE.) then 
+    ! Old method 
+
+        ! Initially set all points to False 
         mask = .FALSE. 
 
         ! Limit to ice-covered, grounded points 
@@ -54,6 +59,54 @@ contains
             end if 
         end do 
         end do
+
+else 
+
+        ! Initially set all points to True 
+        mask = .TRUE. 
+        
+        do j = 1, ny 
+        do i = 1, nx
+
+            im1 = max(i-1,1)
+            jm1 = max(j-1,1)
+            ip1 = min(i+1,nx)
+            jp1 = min(j+1,ny)
+
+            ! Define places that should not be checked 
+
+            if (H_ice(i,j) .eq. 0.0_prec) then 
+                ! Ice-free point
+
+                mask(i,j) = .FALSE. 
+
+            else
+                ! Ice-covered points, further checks below
+
+                 if (count(H_ice(im1:ip1,jm1:jp1).eq.0.0_prec) .gt. 0) then 
+                    ! Neighbor is ice-free: ice-margin point 
+
+                    mask(i,j) = .FALSE. 
+
+                else if (f_grnd(i,j) .lt. 1.0_prec) then 
+                    ! Grounding-line or floating ice point 
+
+                    mask(i,j) = .FALSE. 
+
+                else if (f_grnd(i,j) .eq. 1.0_prec .and. &
+                            count(f_grnd(im1:ip1,jm1:jp1).lt.1.0_prec) .gt. 0) then 
+                    ! Neighbor at the grounding line
+
+                    mask(i,j) = .FALSE. 
+
+                end if 
+
+            end if 
+
+        end do 
+        end do  
+
+end if 
 
         return 
 

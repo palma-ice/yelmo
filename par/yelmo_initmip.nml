@@ -8,7 +8,7 @@
     
     clim_nm         = "clim_pd_grl"     ! "clim_pd_grl", "clim_pd_ant" or "clim_lgm"
     with_anom       = False             ! Apply anomaly at start of sim but after equilibration?
-    
+
     load_cf_ref     = False             ! Load cf_ref from file? Otherwise define from cf_stream + inline tuning
     file_cf_ref     = "ice_data/{domain}/{grid_name}/{grid_name}_cf_ref_opt.nc"  ! Filename holding cf_ref to load 
 
@@ -54,7 +54,7 @@
     pc_filter_vel   = False             ! Use mean vel. solution of current and previous timestep
     pc_use_H_pred   = False             ! Use predicted H_ice instead of corrected H_ice 
     pc_tol          = 10.0              ! [m/a] Tolerance threshold to redo timestep
-    pc_eps          = 5.0               ! Predictor-corrector tolerance 
+    pc_eps          = 3.0               ! Predictor-corrector tolerance 
     
 /
 

@@ -93,11 +93,11 @@ else
 
                     mask(i,j) = .FALSE. 
 
-                else if (f_grnd(i,j) .eq. 1.0_prec .and. &
-                            count(f_grnd(im1:ip1,jm1:jp1).lt.1.0_prec) .gt. 0) then 
-                    ! Neighbor at the grounding line
+!                 else if (f_grnd(i,j) .eq. 1.0_prec .and. &
+!                             count(f_grnd(im1:ip1,jm1:jp1).lt.1.0_prec) .gt. 0) then 
+!                     ! Neighbor at the grounding line
 
-                    mask(i,j) = .FALSE. 
+!                     mask(i,j) = .FALSE. 
 
                 end if 
 

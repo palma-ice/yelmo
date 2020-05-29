@@ -1120,6 +1120,7 @@ contains
         integer :: i, j 
         logical :: kill_it, kill_it_H, kill_it_vel, kill_it_nan, kill_it_eta   
         character(len=512) :: kill_msg 
+        real(prec) :: pc_eta_avg 
 
         real(prec), parameter :: H_lim = 1e4   ! [m] 
         real(prec), parameter :: u_lim = 1e4   ! [m/a]
@@ -1156,9 +1157,12 @@ contains
         end do 
         end do 
 
-        if (dom%par%pc_eta(1) .gt. 2.0*dom%par%pc_tol) then 
+        pc_eta_avg = sum(dom%par%pc_eta) / real(size(dom%par%pc_eta,1),prec) 
+
+        if (pc_eta_avg .gt. 10.0*dom%par%pc_tol) then 
             kill_it_eta = .TRUE. 
-            write(kill_msg,*) "pc_eta >> pc_tol: pc_eta = ", dom%par%pc_eta(1) 
+            write(kill_msg,"(a,g12.4,a,10g12.4)") "mean(pc_eta) >> pc_tol: pc_eta_avg = ", pc_eta_avg, &
+                                                                             "\n pc_eta: ", dom%par%pc_eta
         end if 
 
 

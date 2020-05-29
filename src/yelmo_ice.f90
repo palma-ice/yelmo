@@ -1170,7 +1170,7 @@ contains
             write(*,*) 
             write(*,*) "Restart file written: "//"yelmo_killed.nc"
             write(*,*) 
-            write(*,*) "Stopping model."
+            write(*,"(a,f15.3,a)") "Time =", time, ": stopping model (killed)." 
             write(*,*) 
 
             stop "yelmo_check_kill error, see log."

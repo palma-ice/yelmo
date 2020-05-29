@@ -316,7 +316,8 @@ contains
         ! == Predictor-corrector (pc) variables ===
         ! (these will not be read in by yelmo_restart_read, but can be useful to output for diagnostics)
 
-        call nc_write(filename,"pc_tau",      dom%par%pc_tau,  units="m/yr",dim1="xc",dim2="yc",ncid=ncid)
+        call nc_write(filename,"pc_tau",      dom%par%pc_tau,      units="m/yr",dim1="xc",dim2="yc",ncid=ncid)
+        call nc_write(filename,"pc_tau_max",  dom%par%pc_tau_max,  units="m/yr",dim1="xc",dim2="yc",ncid=ncid)
         
         ! == ydata variables ===
 

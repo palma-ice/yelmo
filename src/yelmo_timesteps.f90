@@ -1064,19 +1064,20 @@ end if
         ! Update the time step
         call nc_write(filename,"time",time,dim1="time",start=[n],count=[1],ncid=ncid)
 
-        call nc_write(filename, "speed",speed,dim1="time",start=[n],count=[1],ncid=ncid)
-        call nc_write(filename, "speed_tpo",speed_tpo,dim1="time",start=[n],count=[1],ncid=ncid)
-        call nc_write(filename, "speed_dyn",speed_dyn,dim1="time",start=[n],count=[1],ncid=ncid)
+        call nc_write(filename, "speed",speed,dim1="time",start=[n],count=[1],units="kyr/hr",long_name="Yelmo model speed",ncid=ncid)
+        call nc_write(filename, "speed_tpo",speed_tpo,dim1="time",start=[n],count=[1],units="kyr/hr",long_name="Yelmo topo speed",ncid=ncid)
+        call nc_write(filename, "speed_dyn",speed_dyn,dim1="time",start=[n],count=[1],units="kyr/hr",long_name="Yelmo dyn speed",ncid=ncid)
         
-        call nc_write(filename, "dt_now",dt_now,dim1="time",start=[n],count=[1],ncid=ncid)
-        call nc_write(filename, "dt_adv",dt_adv,dim1="time",start=[n],count=[1],ncid=ncid)
+        call nc_write(filename, "dt_now",dt_now,dim1="time",start=[n],count=[1],units="yr",long_name="Timestep",ncid=ncid)
+        call nc_write(filename, "dt_adv",dt_adv,dim1="time",start=[n],count=[1],units="yr",long_name="Timestep (CFL criterion)",ncid=ncid)
         
-        call nc_write(filename,  "dt_pi", dt_pi,dim1="time",start=[n],count=[1],ncid=ncid)
-        call nc_write(filename, "pc_eta",pc_eta,dim1="time",start=[n],count=[1],ncid=ncid)
-        !call nc_write(filename, "pc_tau",pc_tau,dim1="xc",dim2="yc",dim3="time",start=[1,1,n],count=[nx,ny,1],ncid=ncid)
+        call nc_write(filename,  "dt_pi", dt_pi,dim1="time",start=[n],count=[1],units="yr",long_name="Timestep (PI controller)",ncid=ncid)
+        call nc_write(filename, "pc_eta",pc_eta,dim1="time",start=[n],count=[1],units="m/yr",long_name="eta (maximum PC truncation error)",ncid=ncid)
+        !call nc_write(filename, "pc_tau",pc_tau,dim1="xc",dim2="yc",dim3="time",start=[1,1,n],count=[nx,ny,1],count=[1],units="m a**-1", &
+!                         long_name="Truncation error",ncid=ncid)
         
-        call nc_write(filename, "ssa_iter", ssa_iter, dim1="time",start=[n],count=[1],ncid=ncid)
-        call nc_write(filename, "iter_redo",iter_redo,dim1="time",start=[n],count=[1],ncid=ncid)
+        call nc_write(filename, "ssa_iter", ssa_iter, dim1="time",start=[n],units="",long_name="Picard iterations for SSA convergence",ncid=ncid)
+        call nc_write(filename, "iter_redo",iter_redo,dim1="time",start=[n],units="",long_name="Number of redo iterations needed",count=[1],ncid=ncid)
         
         ! Close the netcdf file
         call nc_close(ncid)

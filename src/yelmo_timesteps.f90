@@ -240,12 +240,12 @@ end if
         
         ! Step 1: Save information needed for adapative controller algorithms 
 
-        ! Save dt from several timesteps
+        ! Save dt from several timesteps (potentially more available)
         dt_n    = max(dt(1),dtmin) 
         dt_nm1  = max(dt(2),dtmin) 
         dt_nm2  = max(dt(3),dtmin)
 
-        ! Save eta from several timesteps
+        ! Save eta from several timesteps (potentially more available)
         eta_n   = eta(1)
         eta_nm1 = eta(2)
         eta_nm2 = eta(3)

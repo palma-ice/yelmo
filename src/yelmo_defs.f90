@@ -675,6 +675,7 @@ module yelmo_defs
         character (len=56)  :: pc_controller
         logical             :: pc_filter_vel 
         logical             :: pc_use_H_pred 
+        integer             :: pc_n_redo 
         real(prec)          :: pc_tol 
         real(prec)          :: pc_eps  
 

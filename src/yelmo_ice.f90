@@ -58,10 +58,6 @@ contains
         
         character(len=1012) :: kill_txt
 
-        ! Number of iterations to repeat a timestep if the error tolerance is exceeded.
-        ! n_iter_redo=5 is rarely met, so it is a good choice - no need for a parameter.
-        integer, parameter :: n_iter_redo = 5 
-
         ! Determine which predictor-corrector (pc) method we are using for timestepping,
         ! assign scheme order and weights 
         select case(trim(dom%par%pc_method))
@@ -223,11 +219,13 @@ contains
             end select 
 
 
-            do iter_redo=1, n_iter_redo 
+            do iter_redo=1, dom%par%pc_n_redo 
                 ! Prepare to potentially perform several iterations of the same timestep.
                 ! If at the end of one iteration, the truncation error is too high, then 
                 ! redo the timestep with a lower dt. 
-                ! Repeat n_iter_redo times or until error is reduced. 
+                ! Repeat n_redo times or until error is reduced. 
+                ! Note: with eg, n_redo=5, iter_redo=n_redo is rarely met, 
+                ! so it is a good choice (not too high either allowing too many iterations).
 
                 ! Advance the local time variable
                 time_now   = time_now + dt_now
@@ -350,8 +348,13 @@ contains
                 dom%par%pc_tau_masked = dom%par%pc_tau 
                 where( .not. pc_mask) dom%par%pc_tau_masked = 0.0_prec 
 
-                ! Check if this timestep should be rejected
-                if (eta_now .gt. dom%par%pc_tol .and. dt_now .gt. dom%par%dt_min) then
+                ! Check if this timestep should be rejected:
+                ! Reject if eta > tolerance, the current timestep is
+                ! still larger than the minimum allowed, and 
+                ! also only if this is not the last allowed redo iteration.
+                if (iter_redo .ne. dom%par%pc_n_redo .and. &
+                    eta_now   .gt. dom%par%pc_tol    .and. &
+                    dt_now    .gt. dom%par%dt_min) then
 
                     ! Calculate timestep reduction to apply
                     !rho_now = 0.7_prec
@@ -942,6 +945,7 @@ contains
         call nml_read(filename,"yelmo","pc_controller", par%pc_controller)
         call nml_read(filename,"yelmo","pc_filter_vel", par%pc_filter_vel)
         call nml_read(filename,"yelmo","pc_use_H_pred", par%pc_use_H_pred)
+        call nml_read(filename,"yelmo","pc_n_redo",     par%pc_n_redo)
         call nml_read(filename,"yelmo","pc_tol",        par%pc_tol)
         call nml_read(filename,"yelmo","pc_eps",        par%pc_eps)
 

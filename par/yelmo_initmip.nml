@@ -53,6 +53,7 @@
     pc_controller   = "PI42"            ! PI42, H312b, H312PID, H321PID, PID1
     pc_filter_vel   = False             ! Use mean vel. solution of current and previous timestep
     pc_use_H_pred   = False             ! Use predicted H_ice instead of corrected H_ice 
+    pc_n_redo       = 5                 ! How many times can the same iteration be repeated (when high error exists)
     pc_tol          = 10.0              ! [m/a] Tolerance threshold to redo timestep
     pc_eps          = 3.0               ! Predictor-corrector tolerance 
     

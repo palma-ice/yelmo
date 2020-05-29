@@ -449,9 +449,9 @@ contains
             
         end if 
 
-        ! Check if model is becoming unstable via timesteps (eg 80% of timesteps are equal dt_min).
-        ! If so, then write a restart file and kill it. 
-        if ( (real(n_dtmin,prec)/real(n,prec)) .gt. 0.8 ) then 
+        ! If model is becoming unstable, then write a restart file and kill it.
+        ! Assume unstable if eg 80% of timesteps are equal to dt_min.
+        if ( (real(n_dtmin,prec)/real(n,prec)) .gt. 0.8) then 
 
             write(*,*) "pc_eta = ", dom%par%pc_eta
 
@@ -1118,46 +1118,69 @@ contains
 
         ! Local variables 
         integer :: i, j 
-        logical :: kill_it, kill_it_nan  
+        logical :: kill_it, kill_it_H, kill_it_vel, kill_it_nan, kill_it_eta   
+        character(len=512) :: kill_msg 
 
         real(prec), parameter :: H_lim = 1e4   ! [m] 
         real(prec), parameter :: u_lim = 1e4   ! [m/a]
 
-        kill_it     = .FALSE. 
+        kill_it_H   = .FALSE. 
+        kill_it_vel = .FALSE. 
         kill_it_nan = .FALSE. 
+        kill_it_eta = .FALSE. 
 
         if ( maxval(abs(dom%tpo%now%H_ice)) .ge. H_lim .or. &
-             maxval(abs(dom%tpo%now%H_ice-dom%tpo%now%H_ice)) .ne. 0.0 ) kill_it = .TRUE. 
+             maxval(abs(dom%tpo%now%H_ice-dom%tpo%now%H_ice)) .ne. 0.0 ) then 
+            
+            kill_it_H = .TRUE. 
+            kill_msg  = "Ice thickness too high or invalid."
+
+        end if 
 
         if ( maxval(abs(dom%dyn%now%uxy_bar)) .ge. u_lim .or. &
-             maxval(abs(dom%dyn%now%uxy_bar-dom%dyn%now%uxy_bar)) .ne. 0.0 ) kill_it = .TRUE. 
+             maxval(abs(dom%dyn%now%uxy_bar-dom%dyn%now%uxy_bar)) .ne. 0.0 ) then 
+
+            kill_it_vel = .TRUE. 
+            kill_msg  = "Depth-averaged velocity too fast or invalid."
+
+        end if 
 
         ! Additionally check for NANs using intrinsic ieee_arithmetic module 
         do j = 1, dom%grd%ny 
         do i = 1, dom%grd%nx 
             if (ieee_is_nan(dom%dyn%now%uxy_bar(i,j)) .or. ieee_is_nan(dom%tpo%now%H_ice(i,j))) then 
                 kill_it_nan = .TRUE. 
+                write(kill_msg,*) "** NANs detected ** ... i, j: ", i, j 
                 exit 
             end if 
         end do 
         end do 
 
-        if (kill_it .or. kill_it_nan) then 
-            ! Model has probably crashed, kill it. 
+        if (dom%par%pc_eta(1) .gt. 2.0*dom%par%pc_tol) then 
+            kill_it_eta = .TRUE. 
+            write(kill_msg,*) "pc_eta >> pc_tol: pc_eta = ", dom%par%pc_eta(1) 
+        end if 
+
+
+        ! Determine if model should be killed 
+        kill_it = kill_it_H .or. kill_it_vel .or. kill_it_nan .or. kill_it_eta 
+
+        if (kill_it) then 
+            ! Model is not running properly, kill it. 
 
             call yelmo_restart_write(dom,"yelmo_killed.nc",time=time) 
 
             write(*,*) 
             write(*,*) 
-            write(*,"(a)") "yelmo_check_kill:: Error: model has likely crashed, very high value of H_ice or uxy_bar found."
+            write(*,"(a)") "yelmo_check_kill:: Error: model is not running properly."
+            write(*,"(a)") trim(kill_msg) 
             write(*,"(a11,f15.3)")   "timestep = ", time 
             write(*,"(a16,2g14.4)") "range(H_ice):   ", minval(dom%tpo%now%H_ice), maxval(dom%tpo%now%H_ice)
             write(*,"(a16,2g14.4)") "range(uxy_bar): ", minval(dom%dyn%now%uxy_bar), maxval(dom%dyn%now%uxy_bar)
-            if (kill_it_nan) write(*,*) "** NANs detected ** ... i, j: ", i, j 
             write(*,*) 
             write(*,*) "Restart file written: "//"yelmo_killed.nc"
             write(*,*) 
-            write(*,*) "Stopping model."
+            write(*,"(a,f15.3,a)") "Time =", time, ": stopping model (killed)." 
             write(*,*) 
 
             stop "yelmo_check_kill error, see log."

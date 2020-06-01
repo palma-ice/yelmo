@@ -16,7 +16,8 @@ program yelmo_test
 
     character(len=256) :: outfldr, file1D, file2D, file_restart, domain 
     character(len=512) :: path_par, path_const, clim_nm  
-    real(prec) :: time_init, time_end, time_equil, time, dtt, dt1D_out, dt2D_out 
+    real(prec) :: time_init, time_end, time_equil, time, dtt, dtt_equil, dt1D_out, dt2D_out 
+    real(prec) :: dtt_equil_now 
     real(prec) :: bmb_shlf_const, dT_ann, z_sl    
     integer    :: n
     logical    :: with_anom 
@@ -44,6 +45,7 @@ program yelmo_test
     call nml_read(path_par,"control","time_end",        time_end)                  ! [yr] Ending time
     call nml_read(path_par,"control","time_equil",      time_equil)                ! [yr] Years to equilibrate first
     call nml_read(path_par,"control","dtt",             dtt)                       ! [yr] Main loop time step 
+    call nml_read(path_par,"control","dtt_equil",       dtt_equil)                 ! [yr] Timestep to use for dynamic equilibration (if dt_method=0)
     call nml_read(path_par,"control","dt1D_out",        dt1D_out)                  ! [yr] Frequency of 1D output 
     call nml_read(path_par,"control","dt2D_out",        dt2D_out)                  ! [yr] Frequency of 2D output 
     
@@ -78,6 +80,13 @@ program yelmo_test
     ! Initialize data objects and load initial topography
     call yelmo_init(yelmo1,filename=path_par,grid_def="file",time=time_init)
 
+    ! Determine maximum timestep to use with equilibration step 
+    if (yelmo1%par%dt_method .eq. 0) then 
+        dtt_equil_now = dtt_equil 
+    else 
+        dtt_equil_now = dtt 
+    end if 
+    
     ! === Set initial boundary conditions for current time and yelmo state =====
     ! ybound: z_bed, z_sl, H_sed, smb, T_srf, bmb_shlf , Q_geo
 
@@ -187,9 +196,9 @@ program yelmo_test
     
     ! Run yelmo for several years with constant boundary conditions and topo
     ! to equilibrate thermodynamics and dynamics
-    call yelmo_update_equil(yelmo1,time,time_tot=10.0_prec,topo_fixed=.FALSE.,dt=min(1.0,dtt),ssa_vel_max=5000.0)
+    call yelmo_update_equil(yelmo1,time,time_tot=10.0_prec,topo_fixed=.FALSE.,dt=min(1.0,dtt_equil_now),ssa_vel_max=5000.0)
     call yelmo_update_equil(yelmo1,time,time_tot=time_equil,topo_fixed=.TRUE.,dt=1.0,ssa_vel_max=5000.0)
-    call yelmo_update_equil(yelmo1,time,time_tot=100.0_prec,topo_fixed=.FALSE.,dt=dtt,ssa_vel_max=5000.0)
+    call yelmo_update_equil(yelmo1,time,time_tot=100.0_prec,topo_fixed=.FALSE.,dt=dtt_equil_now,ssa_vel_max=5000.0)
     
     ! 2D file 
     call yelmo_write_init(yelmo1,file2D,time_init=time,units="years")  

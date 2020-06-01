@@ -263,6 +263,9 @@ end if
 
         ! First calculate F1 array on aa-nodes 
         ! (performing integral before staggering seems to improve result slightly)
+        ! Note: L19 define the F1 integral as purely going from the base to the surface,
+        ! whereas here F1 is calculated from the base to each point in the vertical. So, 
+        ! it is not technically "F1" as defined by L19, Eq. 30, except at the surface.
         do j = 1, ny 
         do i = 1, nx 
             F1(i,j,:) = integrate_trapezoid1D_1D((H_ice(i,j)/visc_eff(i,j,:))*(1.0-zeta_aa),zeta_aa)

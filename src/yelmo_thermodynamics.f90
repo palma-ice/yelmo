@@ -32,15 +32,12 @@ contains
         ! Local variables 
         integer :: i, j, k, nx, ny  
         real(prec) :: dt 
-        real(prec), allocatable :: advecxy(:,:,:) 
         real(prec), allocatable :: H_w_now(:,:)
         
         nx = thrm%par%nx
         ny = thrm%par%ny
 
-        allocate(advecxy(nx,ny,thrm%par%nz_aa))
-        allocate(H_w_now(nx,ny))
-        advecxy = 0.0_prec 
+        allocate(H_w_now(nx,ny)) 
         H_w_now = 0.0_prec 
 
         ! Initialize time if necessary 
@@ -77,7 +74,7 @@ contains
 
         ! Calculate the basal frictional heating 
         call calc_basal_heating(thrm%now%Q_b,dyn%now%ux_b,dyn%now%uy_b,dyn%now%taub_acx,dyn%now%taub_acy, &
-                                tpo%now%H_ice,thrm%now%T_prime_b,gamma=2.0_prec)
+                        tpo%now%H_ice,thrm%now%T_prime_b,gamma=2.0_prec,beta1=thrm%par%dt_beta(1),beta2=thrm%par%dt_beta(2))
 
         ! Ensure basal frictional heating is relatively smooth
         call regularize2D(thrm%now%Q_b,tpo%now%H_ice,tpo%par%dx)
@@ -93,12 +90,14 @@ contains
             ! Calculate strain heating from SIA approximation
 
             call calc_strain_heating_sia(thrm%now%Q_strn,dyn%now%ux,dyn%now%uy,tpo%now%dzsdx,tpo%now%dzsdy, &
-                                      thrm%now%cp,tpo%now%H_ice,rho_ice,thrm%par%zeta_aa,thrm%par%zeta_ac)
+                                      thrm%now%cp,tpo%now%H_ice,rho_ice,thrm%par%zeta_aa,thrm%par%zeta_ac, &
+                                      thrm%par%dt_beta(1),thrm%par%dt_beta(2))
         
         else
             ! Calculate strain heating from strain rate tensor and viscosity (general approach)
             
-            call calc_strain_heating(thrm%now%Q_strn,mat%now%strn%de,mat%now%visc,thrm%now%cp,rho_ice)
+            call calc_strain_heating(thrm%now%Q_strn,mat%now%strn%de,mat%now%visc,thrm%now%cp,rho_ice, &
+                                                                        thrm%par%dt_beta(1),thrm%par%dt_beta(2))
 
         end if 
         
@@ -128,19 +127,19 @@ contains
                     if (trim(thrm%par%method) .eq. "enth") then 
 
                         ! Calculate the explicit horizontal advection term using enthalpy from previous timestep
-                        call calc_advec_horizontal_3D(advecxy,thrm%now%enth,tpo%now%H_ice,tpo%now%z_srf, &
-                                                            dyn%now%ux,dyn%now%uy,thrm%par%zeta_aa,thrm%par%dx)
+                        call calc_advec_horizontal_3D(thrm%now%advecxy,thrm%now%enth,tpo%now%H_ice,tpo%now%z_srf, &
+                                            dyn%now%ux,dyn%now%uy,thrm%par%zeta_aa,thrm%par%dx,thrm%par%dt_beta(1),thrm%par%dt_beta(2))
                     
                     else 
 
                         ! Calculate the explicit horizontal advection term using temperature from previous timestep
-                        call calc_advec_horizontal_3D(advecxy,thrm%now%T_ice,tpo%now%H_ice,tpo%now%z_srf, &
-                                                            dyn%now%ux,dyn%now%uy,thrm%par%zeta_aa,thrm%par%dx)
+                        call calc_advec_horizontal_3D(thrm%now%advecxy,thrm%now%T_ice,tpo%now%H_ice,tpo%now%z_srf, &
+                                            dyn%now%ux,dyn%now%uy,thrm%par%zeta_aa,thrm%par%dx,thrm%par%dt_beta(1),thrm%par%dt_beta(2))
                     
                     end if 
 
                     call calc_ytherm_enthalpy_3D(thrm%now%enth,thrm%now%T_ice,thrm%now%omega,thrm%now%bmb_grnd,thrm%now%Q_ice_b, &
-                                thrm%now%H_cts,thrm%now%T_pmp,thrm%now%cp,thrm%now%kt,advecxy,dyn%now%ux,dyn%now%uy,dyn%now%uz,thrm%now%Q_strn, &
+                                thrm%now%H_cts,thrm%now%T_pmp,thrm%now%cp,thrm%now%kt,thrm%now%advecxy,dyn%now%ux,dyn%now%uy,dyn%now%uz,thrm%now%Q_strn, &
                                 thrm%now%Q_b,bnd%Q_geo,bnd%T_srf,tpo%now%H_ice,tpo%now%z_srf,thrm%now%H_w,thrm%now%dHwdt,tpo%now%H_grnd, &
                                 tpo%now%f_grnd,tpo%now%dHicedt,tpo%now%dzsrfdt,thrm%par%zeta_aa,thrm%par%zeta_ac,thrm%par%dzeta_a,thrm%par%dzeta_b,thrm%par%enth_cr, &
                                 thrm%par%omega_max,dt,thrm%par%dx,thrm%par%method,thrm%par%solver_advec)
@@ -228,6 +227,8 @@ contains
 
         ! Note zeta=height, k=1 base, k=nz surface 
         
+        !$ use omp_lib
+
         implicit none 
 
         real(prec), intent(INOUT) :: enth(:,:,:)    ! [J m-3] Ice enthalpy
@@ -268,11 +269,9 @@ contains
 
         ! Local variables
         integer :: i, j, k, nx, ny, nz_aa, nz_ac  
-        real(prec), allocatable  :: uz_now(:)   ! [m a-1] Corrected vertical velocity 
         real(prec) :: T_shlf, H_grnd_lim, f_scalar, T_base  
-        !real(prec) :: H_ice_now 
+        real(prec) :: H_ice_now 
 
-        real(prec), allocatable :: H_ice_now(:,:) 
         real(prec) :: filter0(3,3), filter(3,3) 
 
         real(prec), parameter :: H_ice_thin = 10.0   ! [m] Threshold to define 'thin' ice
@@ -282,59 +281,35 @@ contains
         nz_aa = size(zeta_aa,1)
         nz_ac = size(zeta_ac,1)
 
-        allocate(H_ice_now(nx,ny))
-        allocate(uz_now(nz_ac))
-
-        ! First perform horizontal advection (this doesn't work properly, 
-        ! use column-based upwind horizontal advection below)
-        !call calc_enth_horizontal_advection_3D(T_ice,ux,uy,H_ice,dx,dt,solver_advec)
-        
-        ! Diagnose horizontal advection 
-!         advecxy3D = 0.0 
-!         do k = 2, nz_aa-1
-!             call calc_adv2D_impl_upwind_rate(advecxy3D(:,:,k),T_ice(:,:,k),ux(:,:,k),uy(:,:,k),H_ice*0.0,dx,dx,dt,f_upwind=1.0)
-!         end do 
-
-        ! Store original ice enthalpy field here for input to horizontal advection
-        ! calculations 
-!         enth_old  = enth 
-
-        ! === Get H_ice_now (with thicker margin points) ===
-        
-        ! Initialize gaussian filter kernel 
+        ! Initialize gaussian filter kernel for smoothing ice thickness at the margin
         filter0 = gauss_values(dx,dx,sigma=2.0*dx,n=size(filter,1))
 
-        ! Store input ice thickness in local array 
-        H_ice_now = H_ice 
- 
-if (.TRUE.) then        
+        ! ===================================================
+
+        ! ajr: openmp problematic here - leads to NaNs
+        !!!$omp parallel do
         do j = 2, ny-1
         do i = 2, nx-1 
             
-            ! Filter at the margin only 
+            H_ice_now = H_ice(i,j) 
+ 
+            ! Filter the ice thickness at the margin only to avoid a large
+            ! gradient in ice thickness there to rather thin ice points - 
+            ! helps with stability, particularly for EISMINT2 experiments.
             if (H_ice(i,j) .gt. 0.0 .and. count(H_ice(i-1:i+1,j-1:j+1) .eq. 0.0) .ge. 2) then
                 filter = filter0 
                 where (H_ice(i-1:i+1,j-1:j+1) .eq. 0.0) filter = 0.0 
                 filter = filter/sum(filter)
-                H_ice_now(i,j) = sum(H_ice(i-1:i+1,j-1:j+1)*filter)
+                H_ice_now = sum(H_ice(i-1:i+1,j-1:j+1)*filter)
             end if
-     
-        end do 
-        end do
-end if 
 
-        ! ===================================================
-
-        do j = 2, ny-1
-        do i = 2, nx-1 
-            
             ! For floating points, calculate the approximate marine-shelf temperature 
             ! ajr, later this should come from an external model, and T_shlf would
             ! be the boundary variable directly
             if (f_grnd(i,j) .lt. 1.0) then 
 
                 ! Calculate approximate marine freezing temp, limited to pressure melting point 
-                T_shlf = calc_T_base_shlf_approx(H_ice_now(i,j),T_pmp(i,j,1),H_grnd(i,j))
+                T_shlf = calc_T_base_shlf_approx(H_ice_now,T_pmp(i,j,1),H_grnd(i,j))
 
             else 
                 ! Assigned for safety 
@@ -343,7 +318,7 @@ end if
 
             end if 
 
-            if (H_ice_now(i,j) .le. H_ice_thin) then 
+            if (H_ice_now .le. H_ice_thin) then 
                 ! Ice is too thin or zero: prescribe linear temperature profile
                 ! between temperate ice at base and surface temperature 
                 ! (accounting for floating/grounded nature via T_base)
@@ -366,32 +341,17 @@ end if
             else 
                 ! Thick ice exists, call thermodynamic solver for the column
 
-                ! Pre-calculate the contribution of horizontal advection to column solution
-                ! (use unmodified enth_old field as input, to avoid mixing with new solution)
-!                 call calc_advec_horizontal_column(advecxy,enth_old,H_ice_now,z_srf,ux,uy,zeta_aa,dx,i,j)
-!                 call calc_advec_horizontal_column_quick(advecxy,enth_old,H_ice_now,ux,uy,dx,i,j)
-!                 do k = 1, nz_aa
-!                     call calc_adv2D_expl_rate(advecxy(k),enth_old(:,:,k),ux(:,:,k),uy(:,:,k),dx,dx,i,j)
-!                 end do 
-                !advecxy = advecxy3D(i,j,:)
-                !advecxy = 0.0_prec 
-!                 write(*,*) "advecxy: ", i,j, maxval(abs(advecxy3D(i,j,:)-advecxy))
-                
-                ! Calculate correction to vertical velocity due to horizontal gradient on vertical sigma-coordinate grid
-!                 call calc_advec_vertical_column_correction(uz_now,H_ice_now,z_srf,dHdt,dzsdt,ux,uy,uz,zeta_ac,dx,i,j)
-                uz_now = uz(i,j,:) 
-
                 if (trim(solver) .eq. "enth") then 
 
                     call calc_enth_column(enth(i,j,:),T_ice(i,j,:),omega(i,j,:),bmb_grnd(i,j),Q_ice_b(i,j),H_cts(i,j), &
-                            T_pmp(i,j,:),cp(i,j,:),kt(i,j,:),advecxy(i,j,:),uz_now,Q_strn(i,j,:),Q_b(i,j),Q_geo(i,j),T_srf(i,j), &
-                            T_shlf,H_ice_now(i,j),H_w(i,j),f_grnd(i,j),zeta_aa,zeta_ac,dzeta_a,dzeta_b,cr,omega_max,T0,dt)
+                            T_pmp(i,j,:),cp(i,j,:),kt(i,j,:),advecxy(i,j,:),uz(i,j,:),Q_strn(i,j,:),Q_b(i,j),Q_geo(i,j),T_srf(i,j), &
+                            T_shlf,H_ice_now,H_w(i,j),f_grnd(i,j),zeta_aa,zeta_ac,dzeta_a,dzeta_b,cr,omega_max,T0,dt)
                 
                 else 
 
                     call calc_temp_column(enth(i,j,:),T_ice(i,j,:),omega(i,j,:),bmb_grnd(i,j),Q_ice_b(i,j),H_cts(i,j), &
-                        T_pmp(i,j,:),cp(i,j,:),kt(i,j,:),advecxy(i,j,:),uz_now,Q_strn(i,j,:),Q_b(i,j),Q_geo(i,j),T_srf(i,j), &
-                        T_shlf,H_ice_now(i,j),H_w(i,j),f_grnd(i,j),zeta_aa,zeta_ac,dzeta_a,dzeta_b,omega_max,T0,dt)
+                        T_pmp(i,j,:),cp(i,j,:),kt(i,j,:),advecxy(i,j,:),uz(i,j,:),Q_strn(i,j,:),Q_b(i,j),Q_geo(i,j),T_srf(i,j), &
+                        T_shlf,H_ice_now,H_w(i,j),f_grnd(i,j),zeta_aa,zeta_ac,dzeta_a,dzeta_b,omega_max,T0,dt)
                 
                 end if 
 
@@ -399,6 +359,7 @@ end if
 
         end do 
         end do 
+        !!!$omp end parallel do
 
         ! Fill in borders 
         call fill_borders_3D(enth,nfill=1)
@@ -425,13 +386,14 @@ end if
         ! Local variables 
         integer :: i, j, k, n, nx, ny, nz 
         real(prec), allocatable :: T_dot(:,:) 
+        real(prec), allocatable :: dTdt(:,:) 
 
         nx = size(T_ice,1)
         ny = size(T_ice,2)
         nz = size(T_ice,3) 
 
-        allocate(T_dot(nx,ny)) 
-        T_dot = 0.0_prec 
+        allocate(dTdt(nx,ny)) 
+        dTdt = 0.0_prec 
 
         ! First populate boundary values so that T_ice next to ice sheet is equal to 
         ! ice sheet. 
@@ -481,7 +443,8 @@ end if
         ! Resolve horizontal advection layer by layer 
 
         do k = 2, nz-1    
-            call calc_advec2D(T_ice(:,:,k),ux(:,:,k),uy(:,:,k),T_dot,dx,dx,dt,solver)
+            call calc_advec2D(dTdt,T_ice(:,:,k),ux(:,:,k),uy(:,:,k),(T_ice(:,:,k)*0.0_prec),dx,dx,dt,solver)
+            T_ice(:,:,k) = T_ice(:,:,k) + dt*dTdt 
         end do 
 
         call fill_borders_3D(T_ice,nfill=2)
@@ -489,271 +452,6 @@ end if
         return 
 
     end subroutine calc_enth_horizontal_advection_3D
-
-    subroutine calc_adv2D_expl_rate(dvardt,var,ux,uy,dx,dy,i,j)
-        ! Solve 2D advection equation for ice sheet thickness via explicit flux divergence:
-        ! d[H]/dt = -grad[H*(ux,uy)] 
-        !
-        ! ajr: adapted from IMAU-ICE code from Heiko Goelzer (h.goelzer@uu.nl) 2016
-        ! Note: original algorithm called for interpolation of var to ab-nodes explicitly. 
-        ! It also works using the ac-nodes directly, but is less stable. This can be chosen via the parameter
-        ! use_ab_expl. 
-
-        implicit none 
-
-        real(prec), intent(OUT)   :: dvardt                 ! [m/yr] aa-nodes, Ice thickness 
-        real(prec), intent(IN)    :: var(:,:)               ! [m] aa-nodes, Ice thickness 
-        real(prec), intent(IN)    :: ux(:,:)                ! [m a^-1] ac-nodes, Horizontal velocity, x-direction
-        real(prec), intent(IN)    :: uy(:,:)                ! [m a^-1] ac-nodes, Horizontal velocity, y-direction
-        real(prec), intent(IN)    :: dx                     ! [m] Horizontal grid spacing, x-direction
-        real(prec), intent(IN)    :: dy                     ! [m] Horizontal grid spacing, y-direction
-        integer,    intent(IN)    :: i, j 
-
-        ! Local variables:
-        integer                 :: nx, ny 
-
-        real(prec) :: flux_xr                  ! [m^2 a^-1] ac-nodes, Flux in the x-direction to the right
-        real(prec) :: flux_xl                  ! [m^2 a^-1] ac-nodes, Flux in the x-direction to the left
-        real(prec) :: flux_yu                  ! [m^2 a^-1] ac-nodes, Flux in the y-direction upwards
-        real(prec) :: flux_yd                  ! [m^2 a^-1] ac-nodes, Flux in the y-direction downwards
-
-        ! Calculate the flux across each boundary [m^2 a^-1]
-        flux_xr = ux(i  ,j  ) * 0.5 * (var(i  ,j  ) + var(i+1,j  ))
-        flux_xl = ux(i-1,j  ) * 0.5 * (var(i-1,j  ) + var(i  ,j  ))
-        flux_yu = uy(i  ,j  ) * 0.5 * (var(i  ,j  ) + var(i  ,j+1))
-        flux_yd = uy(i  ,j-1) * 0.5 * (var(i  ,j-1) + var(i  ,j  ))
-
-        ! Calculate flux divergence on aa-node 
-        dvardt = (1.0 / dx) * (flux_xl - flux_xr) + (1.0 / dy) * (flux_yd - flux_yu) 
-
-        return 
-
-    end subroutine calc_adv2D_expl_rate
-
-    subroutine  calc_adv2D_impl_upwind_rate(dHdt,H_prev,ux,uy,mdot,dx,dy,dt,f_upwind)
-        ! To solve the 2D adevection equation:
-        ! dH/dt =
-        ! M H = Frelax
-        ! ajr: adapted from GRISLI (Ritz et al., 1997)
-
-        implicit none
-
-        real(prec), intent(OUT)   :: dHdt(:,:)      ! Variable rate of change (aa-node)
-        real(prec), intent(IN)    :: H_prev(:,:)    ! Variable (aa-node)
-        real(prec), intent(IN)    :: ux(:,:)        ! Depth-averaged velocity - x direction (ac-node)
-        real(prec), intent(IN)    :: uy(:,:)        ! Depth-averaged velocity - y direction (ac-node)
-        real(prec), intent(IN)    :: mdot(:,:)      ! Total column mass balance (aa-node)
-        real(prec), intent(IN)    :: dx             ! [m] x-resolution
-        real(prec), intent(IN)    :: dy             ! [m] y-resolution
-        real(prec), intent(IN)    :: dt             ! [a] Timestep (assumes dx=dy)
-        real(prec), intent(IN)    :: f_upwind       ! [-] Fraction of "upwind-ness" to apply (ajr: experimental!) - between 0.5 and 1.0, default f_upwind=1.0
-        ! Local variables
-        integer    :: i, j, nx, ny
-        integer    :: iter, ierr 
-        real(prec) :: dtdx, dtdx2
-        real(prec) :: reste, delh, tmp 
-        real(prec), allocatable :: crelax(:,:)      ! diagnonale de M
-        real(prec), allocatable :: arelax(:,:)      ! sous diagonale selon x
-        real(prec), allocatable :: brelax(:,:)      ! sur  diagonale selon x
-        real(prec), allocatable :: drelax(:,:)      ! sous diagonale selon y
-        real(prec), allocatable :: erelax(:,:)      ! sur  diagonale selon y
-        real(prec), allocatable :: frelax(:,:)      ! vecteur
-        real(prec), allocatable :: c_west(:,:)      ! sur demi mailles Ux
-        real(prec), allocatable :: c_east(:,:)      ! sur demi mailles Ux
-        real(prec), allocatable :: c_north(:,:)     ! sur demi mailles Uy
-        real(prec), allocatable :: c_south(:,:)     ! sur demi mailles Uy
-        real(prec), allocatable :: deltaH(:,:)      ! Change in H
-
-        real(prec), allocatable :: H(:,:)
-        
-        logical,    parameter :: use_upwind = .TRUE.  ! Apply upwind advection scheme or central scheme?   
-                                                      ! (now this is redundant with f_upwind parameter) 
-        
-        ! Note: f_upwind=0.6 gives good agreement with EISMINT1 summit elevation
-        ! for the moving and fixed margin experiments, when using the calc_shear_3D approach.
-        ! (f_upwind=0.5, ie central method, works well when using the velocity_sia approach)
-
-        ! Note: it may be that f_upwind>0.5 is more stable for real dynamic simulations
-
-        ! Determine array size
-        nx = size(H,1)
-        ny = size(H,2)
-
-        ! Allocate local arrays
-        allocate(crelax(nx,ny))
-        allocate(arelax(nx,ny))
-        allocate(brelax(nx,ny))
-        allocate(drelax(nx,ny))
-        allocate(erelax(nx,ny))
-        allocate(frelax(nx,ny))
-        allocate(c_west(nx,ny))
-        allocate(c_east(nx,ny))
-        allocate(c_north(nx,ny))
-        allocate(c_south(nx,ny))
-
-        allocate(deltaH(nx,ny))
-
-        allocate(H(nx,ny))
-        
-        ! Define some helpful values
-        dtdx2 = dt/(dx**2)
-        dtdx  = dt/dx
-
-        ! Initialize relaxation arrays
-        arelax = 0.0
-        brelax = 0.0
-        drelax = 0.0
-        erelax = 0.0
-        crelax = 1.0
-        frelax = 0.0
-        deltaH = 0.0
-
-        H = H_prev  
-
-        ! Modify coefficients depending on method (upwind, central)
-        if (use_upwind) then
-            ! Upwind method
-
-            if (f_upwind .eq. 1.0) then
-                ! Apply normal upwind scheme
-
-                where (ux.ge.0.0)
-                    c_west = 1.0
-                    c_east = 0.0
-                elsewhere
-                    c_west = 0.0
-                    c_east = 1.0
-                end where
-
-                where (uy.ge.0.0)
-                    c_south = 1.0
-                    c_north = 0.0
-                elsewhere
-                    c_south = 0.0
-                    c_north = 1.0
-                end where
-
-            else 
-                ! Apply fractional upwind scheme to reduce numerical diffusion,
-                ! but benefit from upwind stability (ajr: experimental!)
-                ! f_upwind = 0.5 => central difference, f_upwind = 1.0 => full upwind 
-
-                where (ux.ge.0.0)
-                    c_west = f_upwind
-                    c_east = 1.0 - f_upwind
-                elsewhere
-                    c_west = 1.0 - f_upwind
-                    c_east = f_upwind
-                end where
-
-                where (uy.ge.0.0)
-                    c_south = f_upwind
-                    c_north = 1.0 - f_upwind
-                elsewhere
-                    c_south = 1.0 - f_upwind
-                    c_north = f_upwind
-                end where
-
-            end if 
-
-        else
-            ! Central method
-
-            c_west  = 0.5
-            c_east  = 0.5
-            c_south = 0.5
-            c_north = 0.5
-
-        end if
-
-        ! Populate diagonals
-        do j=2,ny-1
-        do i=2,nx-1
-
-            !  sous diagonale en x
-            arelax(i,j) = -dtdx*c_west(i-1,j)*ux(i-1,j)    ! partie advective en x
-
-            !  sur diagonale en x
-            brelax(i,j) = +dtdx*c_east(i,j)*ux(i,j)        ! partie advective
-
-            !  sous diagonale en y
-            drelax(i,j) = -dtdx*c_south(i,j-1)*uy(i,j-1)   ! partie advective en y
-
-            !  sur diagonale en y
-            erelax(i,j) = +dtdx*c_north(i,j)*uy(i,j)       ! partie advective
-
-
-            ! diagonale
-            crelax(i,j) = 1.0 + dtdx* &
-                       ((c_west(i,j)*ux(i,j) - c_east(i-1,j)*ux(i-1,j)) &
-                      +(c_south(i,j)*uy(i,j) - c_north(i,j-1)*uy(i,j-1)))
-
-            ! Combine all terms
-            frelax(i,j) = H(i,j) + dt*mdot(i,j)
-
-        end do
-        end do
-
-        ! Avoid underflows 
-        where (abs(arelax) .lt. tol_underflow) arelax = 0.0_prec 
-        where (abs(brelax) .lt. tol_underflow) brelax = 0.0_prec 
-        where (abs(drelax) .lt. tol_underflow) drelax = 0.0_prec 
-        where (abs(erelax) .lt. tol_underflow) erelax = 0.0_prec 
-        
-        ! Initialize new H solution to zero (to get zeros at boundaries)
-        H  = 0.0
-
-        ! Initially assume convergence criterion is not satisfied 
-        ierr = -1   ! convergence criterion not fulfilled
-        
-        do iter = 1, 1000 
-            ! Relaxation loop 
-
-            ! Calculate change in H
-            do j=2,ny-1
-            do i=2,nx-1
-
-                reste = (((arelax(i,j)*H(i-1,j) + drelax(i,j)*H(i,j-1)) &
-                        + (brelax(i,j)*H(i+1,j) + erelax(i,j)*H(i,j+1))) &
-                        +  crelax(i,j)*H(i,j))  - frelax(i,j)
-
-                deltaH(i,j) = reste/crelax(i,j)
-
-            end do
-            end do
-
-            ! Adjust H to new value
-            H = H - deltaH
-
-            ! Check stopping criterion (something like rmse of remaining change in H)
-            where(abs(deltaH) .lt. tol_underflow) deltaH = 0.0_prec      ! Avoid underflows
-            delh = sqrt(sum(deltaH**2)) / ((nx-2)*(ny-2))
-            
-            ! Use simple stopping criterion: maximum remaining change in H
-            ! Note: this is less likely to converge given the same stopping
-            ! criterion.
-!             delh = maxval(abs(deltaH))
-            
-            if ( delh .lt. 1e-4) then
-                ! Solution has converged, exit  
-                ierr = 0 
-                exit 
-            end if 
-
-        end do ! End of relaxation loop
-
-        if (ierr .eq. -1) then 
-            write(*,*) "calc_adv2D_impl_upwind_rate:: Error: advection did not converge."
-            write(*,"(a,i10,g12.3)") "iter, delh = ", iter, delh 
-            stop 
-        end if 
-
-        ! Calculate rate of change 
-        dHdt = (H - H_prev) / dt 
-
-        return
-
-    end subroutine calc_adv2D_impl_upwind_rate
 
     subroutine ytherm_par_load(par,filename,zeta_aa,zeta_ac,nx,ny,dx,init)
 
@@ -774,6 +472,7 @@ end if
  
         ! Store local parameter values in output object
         call nml_read(filename,"ytherm","method",         par%method,           init=init_pars)
+        call nml_read(filename,"ytherm","dt_method",      par%dt_method,        init=init_pars)
         call nml_read(filename,"ytherm","solver_advec",   par%solver_advec,     init=init_pars)
         call nml_read(filename,"ytherm","gamma",          par%gamma,            init=init_pars)
         call nml_read(filename,"ytherm","use_strain_sia", par%use_strain_sia,   init=init_pars)
@@ -821,6 +520,11 @@ end if
         ! Define current time as unrealistic value
         par%time = 1000000000   ! [a] 1 billion years in the future
 
+        ! Intialize timestepping parameters to Forward Euler (beta2=0: no contribution from previous timestep)
+        par%dt_zeta     = 1.0 
+        par%dt_beta(1)  = 1.0 
+        par%dt_beta(2)  = 0.0 
+
         return
 
     end subroutine ytherm_par_load
@@ -850,22 +554,26 @@ end if
         allocate(now%H_w(nx,ny))
         allocate(now%dHwdt(nx,ny))
         
-        now%enth      = 0.0
-        now%T_ice     = 0.0
-        now%omega     = 0.0  
-        now%T_pmp     = 0.0
-        now%bmb_grnd  = 0.0 
-        now%f_pmp     = 0.0 
-        now%Q_strn    = 0.0 
-        now%Q_b       = 0.0 
-        now%Q_ice_b   = 0.0 
-        now%cp        = 0.0 
-        now%kt        = 0.0 
-        now%H_cts     = 0.0 
-        now%T_prime_b = 0.0 
-        now%H_w       = 0.0 
-        now%dHwdt     = 0.0 
+        allocate(now%advecxy(nx,ny,nz_aa))
+
+        now%enth        = 0.0
+        now%T_ice       = 0.0
+        now%omega       = 0.0  
+        now%T_pmp       = 0.0
+        now%bmb_grnd    = 0.0 
+        now%f_pmp       = 0.0 
+        now%Q_strn      = 0.0 
+        now%Q_b         = 0.0 
+        now%Q_ice_b     = 0.0 
+        now%cp          = 0.0 
+        now%kt          = 0.0 
+        now%H_cts       = 0.0 
+        now%T_prime_b   = 0.0 
+        now%H_w         = 0.0 
+        now%dHwdt       = 0.0 
         
+        now%advecxy     = 0.0 
+
         return
 
     end subroutine ytherm_alloc 
@@ -876,21 +584,23 @@ end if
 
         type(ytherm_state_class), intent(INOUT) :: now
 
-        if (allocated(now%enth))      deallocate(now%enth)
-        if (allocated(now%T_ice))     deallocate(now%T_ice)
-        if (allocated(now%omega))     deallocate(now%omega)
-        if (allocated(now%T_pmp))     deallocate(now%T_pmp)
-        if (allocated(now%bmb_grnd))  deallocate(now%bmb_grnd)
-        if (allocated(now%f_pmp))     deallocate(now%f_pmp)
-        if (allocated(now%Q_strn))    deallocate(now%Q_strn)
-        if (allocated(now%Q_b))       deallocate(now%Q_b)
-        if (allocated(now%Q_ice_b))   deallocate(now%Q_ice_b)
-        if (allocated(now%cp))        deallocate(now%cp)
-        if (allocated(now%kt))        deallocate(now%kt)
-        if (allocated(now%H_cts))     deallocate(now%H_cts)
-        if (allocated(now%T_prime_b)) deallocate(now%T_prime_b)
-        if (allocated(now%H_w))       deallocate(now%H_w)
-        if (allocated(now%dHwdt))     deallocate(now%dHwdt)
+        if (allocated(now%enth))        deallocate(now%enth)
+        if (allocated(now%T_ice))       deallocate(now%T_ice)
+        if (allocated(now%omega))       deallocate(now%omega)
+        if (allocated(now%T_pmp))       deallocate(now%T_pmp)
+        if (allocated(now%bmb_grnd))    deallocate(now%bmb_grnd)
+        if (allocated(now%f_pmp))       deallocate(now%f_pmp)
+        if (allocated(now%Q_strn))      deallocate(now%Q_strn)
+        if (allocated(now%Q_b))         deallocate(now%Q_b)
+        if (allocated(now%Q_ice_b))     deallocate(now%Q_ice_b)
+        if (allocated(now%cp))          deallocate(now%cp)
+        if (allocated(now%kt))          deallocate(now%kt)
+        if (allocated(now%H_cts))       deallocate(now%H_cts)
+        if (allocated(now%T_prime_b))   deallocate(now%T_prime_b)
+        if (allocated(now%H_w))         deallocate(now%H_w)
+        if (allocated(now%dHwdt))       deallocate(now%dHwdt)
+        
+        if (allocated(now%advecxy))     deallocate(now%advecxy)
         
         return 
 

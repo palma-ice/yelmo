@@ -15,6 +15,15 @@ $(objdir)/nml.o: $(libdir)/nml.f90
 $(objdir)/gaussian_filter.o: $(libdir)/gaussian_filter.f90
 	$(FC) $(DFLAGS) $(FFLAGS) -c -o $@ $<
 
+$(objdir)/climate_adjustments.o: $(libdir)/climate_adjustments.f90 $(objdir)/yelmo_defs.o
+	$(FC) $(DFLAGS) $(FFLAGS) -c -o $@ $<
+
+$(objdir)/ice_enhancement.o: $(libdir)/ice_enhancement.f90 $(objdir)/yelmo_defs.o $(objdir)/nml.o
+	$(FC) $(DFLAGS) $(FFLAGS) -c -o $@ $<
+
+$(objdir)/ice_optimization.o: $(libdir)/ice_optimization.f90 $(objdir)/yelmo_defs.o $(objdir)/gaussian_filter.o
+	$(FC) $(DFLAGS) $(FFLAGS) -c -o $@ $<
+
 $(objdir)/interp1D.o: $(libdir)/interp1D.f90 $(objdir)/yelmo_defs.o
 	$(FC) $(DFLAGS) $(FFLAGS) -c -o $@ $<
 
@@ -37,7 +46,7 @@ $(objdir)/deformation.o: $(srcdir)/physics/deformation.f90 $(objdir)/yelmo_defs.
 $(objdir)/thermodynamics.o : $(srcdir)/physics/thermodynamics.f90 $(objdir)/yelmo_defs.o $(objdir)/gaussian_filter.o
 	$(FC) $(DFLAGS) $(FFLAGS) -c -o $@ $<
 
-$(objdir)/ice_age.o : $(srcdir)/physics/ice_age.f90 $(objdir)/yelmo_defs.o $(objdir)/solver_tridiagonal.o
+$(objdir)/ice_tracer.o : $(srcdir)/physics/ice_tracer.f90 $(objdir)/yelmo_defs.o $(objdir)/solver_tridiagonal.o
 	$(FC) $(DFLAGS) $(FFLAGS) -c -o $@ $<
 
 $(objdir)/ice_enthalpy.o : $(srcdir)/physics/ice_enthalpy.f90 $(objdir)/yelmo_defs.o \
@@ -70,22 +79,32 @@ $(objdir)/solver_advection_new.o: $(srcdir)/physics/solver_advection_new.f90 $(o
 $(objdir)/topography.o: $(srcdir)/physics/topography.f90 $(objdir)/yelmo_defs.o
 	$(FC) $(DFLAGS) $(FFLAGS) -c -o $@ $<
 
-$(objdir)/velocity_hybrid_pd12.o: $(srcdir)/physics/velocity_hybrid_pd12.f90 \
-						  	$(objdir)/yelmo_defs.o $(objdir)/yelmo_tools.o
-	$(FC) $(DFLAGS) $(FFLAGS) -c -o $@ $<
-
-$(objdir)/velocity_diva.o: $(srcdir)/physics/velocity_diva.f90 \
-						  	$(objdir)/yelmo_defs.o $(objdir)/yelmo_tools.o
+$(objdir)/velocity_general.o: $(srcdir)/physics/velocity_general.f90 $(objdir)/yelmo_defs.o
 	$(FC) $(DFLAGS) $(FFLAGS) -c -o $@ $<
 
 $(objdir)/velocity_sia.o: $(srcdir)/physics/velocity_sia.f90 \
 						  	$(objdir)/yelmo_defs.o
 	$(FC) $(DFLAGS) $(FFLAGS) -c -o $@ $<
 
+$(objdir)/velocity_hybrid.o: $(srcdir)/physics/velocity_hybrid.f90 \
+						  	$(objdir)/yelmo_defs.o $(objdir)/yelmo_tools.o
+	$(FC) $(DFLAGS) $(FFLAGS) -c -o $@ $<
+
+$(objdir)/velocity_diva.o: $(srcdir)/physics/velocity_diva.f90 \
+						  	$(objdir)/yelmo_defs.o $(objdir)/yelmo_tools.o $(objdir)/basal_dragging.o \
+						  	$(objdir)/solver_ssa_sico5.o
+	$(FC) $(DFLAGS) $(FFLAGS) -c -o $@ $<
+
+$(objdir)/velocity_hybrid_pd12.o: $(srcdir)/physics/velocity_hybrid_pd12.f90 \
+						  	$(objdir)/yelmo_defs.o $(objdir)/yelmo_tools.o
+	$(FC) $(DFLAGS) $(FFLAGS) -c -o $@ $<
+
+
+
 ## YELMO BASE ###############################################
 
 $(objdir)/yelmo_defs.o: $(srcdir)/yelmo_defs.f90 $(objdir)/nml.o
-	$(FC) $(DFLAGS) $(FFLAGS) -c -o $@ $<
+	$(FC) $(DFLAGS) $(FFLAGS) $(INC_LIS) -c -o $@ $<
 
 $(objdir)/yelmo_grid.o: $(srcdir)/yelmo_grid.f90 $(objdir)/yelmo_defs.o $(objdir)/nml.o $(objdir)/ncio.o
 	$(FC) $(DFLAGS) $(FFLAGS) -c -o $@ $<
@@ -103,15 +122,17 @@ $(objdir)/yelmo_topography.o: $(srcdir)/yelmo_topography.f90 $(objdir)/yelmo_def
 	$(FC) $(DFLAGS) $(FFLAGS) -c -o $@ $<
 
 $(objdir)/yelmo_dynamics.o: $(srcdir)/yelmo_dynamics.f90 $(objdir)/yelmo_defs.o \
-							$(objdir)/velocity_hybrid_pd12.o \
-							$(objdir)/velocity_diva.o \
+							$(objdir)/velocity_general.o \
 							$(objdir)/velocity_sia.o \
+							$(objdir)/velocity_hybrid.o \
+							$(objdir)/velocity_diva.o \
+							$(objdir)/velocity_hybrid_pd12.o \
 							$(objdir)/solver_ssa_sico5.o \
 							$(objdir)/basal_dragging.o
 	$(FC) $(DFLAGS) $(FFLAGS) -c -o $@ $<
 
 $(objdir)/yelmo_material.o: $(srcdir)/yelmo_material.f90 $(objdir)/yelmo_defs.o $(objdir)/deformation.o \
-							$(objdir)/ice_age.o 
+							$(objdir)/ice_tracer.o 
 	$(FC) $(DFLAGS) $(FFLAGS) -c -o $@ $<
 
 $(objdir)/yelmo_thermodynamics.o: $(srcdir)/yelmo_thermodynamics.f90 $(objdir)/yelmo_defs.o \
@@ -167,6 +188,9 @@ $(objdir)/mismip3D.o: $(testdir)/mismip3D.f90 $(objdir)/ncio.o $(objdir)/yelmo_d
 #############################################################
 
 yelmo_libs = 		   $(objdir)/gaussian_filter.o \
+					   $(objdir)/climate_adjustments.o \
+					   $(objdir)/ice_enhancement.o \
+					   $(objdir)/ice_optimization.o \
 					   $(objdir)/interp1D.o \
 					   $(objdir)/nml.o \
 			 		   $(objdir)/ncio.o
@@ -176,7 +200,7 @@ yelmo_physics =  	   $(objdir)/basal_dragging.o \
 					   $(objdir)/calving.o \
 					   $(objdir)/deformation.o \
 					   $(objdir)/thermodynamics.o \
-					   $(objdir)/ice_age.o \
+					   $(objdir)/ice_tracer.o \
 					   $(objdir)/ice_enthalpy.o \
 					   $(objdir)/mass_conservation.o \
 					   $(objdir)/solver_ssa_sico5.o \
@@ -185,9 +209,13 @@ yelmo_physics =  	   $(objdir)/basal_dragging.o \
 					   $(objdir)/solver_advection_sico.o \
 					   $(objdir)/solver_advection_new.o \
 					   $(objdir)/topography.o \
-					   $(objdir)/velocity_hybrid_pd12.o \
+					   $(objdir)/velocity_general.o \
+					   $(objdir)/velocity_sia.o \
+					   $(objdir)/velocity_hybrid.o \
 					   $(objdir)/velocity_diva.o \
-					   $(objdir)/velocity_sia.o
+					   $(objdir)/velocity_hybrid_pd12.o
+					   
+					   
 
 yelmo_base = 		   $(objdir)/yelmo_defs.o \
 					   $(objdir)/yelmo_grid.o \

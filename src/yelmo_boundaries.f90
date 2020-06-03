@@ -148,12 +148,11 @@ contains
 
             case ("Greenland") 
 
-                where (bnd%regions .ne. 1.3) bnd%ice_allowed = .FALSE. 
-                bnd%ice_allowed(1,:)  = .FALSE. 
-                bnd%ice_allowed(nx,:) = .FALSE. 
-                bnd%ice_allowed(:,1)  = .FALSE. 
-                bnd%ice_allowed(:,ny) = .FALSE. 
-
+                bnd%ice_allowed = .FALSE. 
+                where (bnd%regions .eq. 1.3)  bnd%ice_allowed = .TRUE.      ! Main Greenland region
+                where (bnd%regions .eq. 1.11) bnd%ice_allowed = .TRUE.      ! Ellesmere Island
+                where (bnd%regions .eq. 1.0)  bnd%ice_allowed = .TRUE.      ! Open ocean (included some connections between 1.3 and 1.11)
+                
             case ("Antarctica") 
 
                 where (bnd%regions .eq. 2.0) bnd%ice_allowed = .FALSE. 
@@ -253,6 +252,8 @@ contains
         allocate(now%T_shlf(nx,ny))
         allocate(now%Q_geo(nx,ny))
 
+        allocate(now%enh_srf(nx,ny)) 
+
         allocate(now%basins(nx,ny))
         allocate(now%basin_mask(nx,ny))
         allocate(now%regions(nx,ny))
@@ -275,6 +276,8 @@ contains
         now%bmb_shlf    = 0.0_prec 
         now%T_shlf      = 0.0_prec 
         now%Q_geo       = 0.0_prec 
+
+        now%enh_srf     = 1.0_prec 
 
         now%basins      = 0.0_prec 
         now%basin_mask  = 0.0_prec 
@@ -306,6 +309,8 @@ contains
         if (allocated(now%bmb_shlf))    deallocate(now%bmb_shlf)
         if (allocated(now%T_shlf))      deallocate(now%T_shlf)
         if (allocated(now%Q_geo))       deallocate(now%Q_geo)
+        
+        if (allocated(now%enh_srf))     deallocate(now%enh_srf)
         
         if (allocated(now%basins))      deallocate(now%basins)
         if (allocated(now%basin_mask))  deallocate(now%basin_mask)

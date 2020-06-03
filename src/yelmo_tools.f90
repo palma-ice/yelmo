@@ -58,7 +58,7 @@ contains
 
     end function calc_magnitude 
     
-    function calc_magnitude_from_staggered(u,v) result(umag)
+    function calc_magnitude_from_staggered(u,v,boundaries) result(umag)
         ! Calculate the centered (aa-nodes) magnitude of a vector 
         ! from the staggered (ac-nodes) components
 
@@ -66,9 +66,11 @@ contains
         
         real(prec), intent(IN)  :: u(:,:), v(:,:)  
         real(prec) :: umag(size(u,1),size(u,2)) 
+        character(len=*), intent(IN), optional :: boundaries 
 
         ! Local variables 
         integer :: i, j, nx, ny 
+        integer :: ip1, jp1, im1, jm1 
         real(prec) :: unow, vnow 
 
         nx = size(u,1)
@@ -76,19 +78,38 @@ contains
 
         umag = 0.0_prec 
 
-        do j = 2, ny-1 
-        do i = 2, nx-1 
-            unow = 0.5_prec*(u(i,j)+u(i-1,j))
-            vnow = 0.5_prec*(v(i,j)+v(i,j-1))
+        do j = 1, ny 
+        do i = 1, nx
+
+            im1 = max(i-1,1)
+            jm1 = max(j-1,1)
+
+            unow = 0.5_prec*(u(i,j)+u(im1,j))
+            vnow = 0.5_prec*(v(i,j)+v(i,jm1))
             umag(i,j) = sqrt(unow*unow+vnow*vnow)
+            
         end do 
         end do 
+
+        if (present(boundaries)) then 
+            ! Apply conditions at boundaries of domain 
+
+            if (trim(boundaries) .eq. "periodic") then 
+
+                umag(1,:)  = umag(nx-1,:) 
+                umag(nx,:) = umag(2,:)  
+                umag(:,1)  = umag(:,ny-1)
+                umag(:,ny) = umag(:,2) 
+                
+            end if 
+
+        end if 
 
         return
 
     end function calc_magnitude_from_staggered 
     
-    function calc_magnitude_from_staggered_ice(u,v,H) result(umag)
+    function calc_magnitude_from_staggered_ice(u,v,H,boundaries) result(umag)
         ! Calculate the centered (aa-nodes) magnitude of a vector 
         ! from the staggered (ac-nodes) components
 
@@ -96,21 +117,29 @@ contains
         
         real(prec), intent(IN)  :: u(:,:), v(:,:), H(:,:) 
         real(prec) :: umag(size(u,1),size(u,2)) 
+        character(len=*), intent(IN), optional :: boundaries 
 
         ! Local variables 
         integer :: i, j, nx, ny 
+        integer :: ip1, jp1, im1, jm1
         real(prec) :: unow, vnow 
         real(prec) :: f1, f2, H1, H2 
+        
         nx = size(u,1)
         ny = size(u,2) 
 
         umag = 0.0_prec 
 
-        do j = 2, ny-1 
-        do i = 2, nx-1 
+        do j = 1, ny 
+        do i = 1, nx 
 
-            H1 = 0.5_prec*(H(i-1,j)+H(i,j))
-            H2 = 0.5_prec*(H(i,j)+H(i+1,j))
+            im1 = max(i-1,1)
+            jm1 = max(j-1,1)
+            ip1 = min(i+1,nx)
+            jp1 = min(j+1,ny)
+
+            H1 = 0.5_prec*(H(im1,j)+H(i,j))
+            H2 = 0.5_prec*(H(i,j)+H(ip1,j))
 
             f1 = 0.5_prec 
             f2 = 0.5_prec 
@@ -118,14 +147,14 @@ contains
             if (H2 .eq. 0.0) f2 = 0.0_prec   
 
             if (f1+f2 .gt. 0.0) then 
-                unow = (f1*u(i-1,j) + f2*u(i,j)) / (f1+f2)
+                unow = (f1*u(im1,j) + f2*u(i,j)) / (f1+f2)
                 if (abs(unow) .lt. tol_underflow) unow = 0.0_prec 
             else 
                 unow = 0.0 
             end if 
 
-            H1 = 0.5_prec*(H(i,j-1)+H(i,j))
-            H2 = 0.5_prec*(H(i,j)+H(i,j+1))
+            H1 = 0.5_prec*(H(i,jm1)+H(i,j))
+            H2 = 0.5_prec*(H(i,j)+H(i,jp1))
 
             f1 = 0.5_prec 
             f2 = 0.5_prec 
@@ -133,7 +162,7 @@ contains
             if (H2 .eq. 0.0) f2 = 0.0_prec   
 
             if (f1+f2 .gt. 0.0) then 
-                vnow = (f1*v(i,j-1) + f2*v(i,j)) / (f1+f2)
+                vnow = (f1*v(i,jm1) + f2*v(i,j)) / (f1+f2)
                 if (abs(vnow) .lt. tol_underflow) vnow = 0.0_prec 
             else 
                 vnow = 0.0 
@@ -142,6 +171,20 @@ contains
             umag(i,j) = sqrt(unow*unow+vnow*vnow)
         end do 
         end do 
+
+        if (present(boundaries)) then 
+            ! Apply conditions at boundaries of domain 
+
+            if (trim(boundaries) .eq. "periodic") then 
+
+                umag(1,:)  = umag(nx-1,:) 
+                umag(nx,:) = umag(2,:)  
+                umag(:,1)  = umag(:,ny-1)
+                umag(:,ny) = umag(:,2) 
+                
+            end if 
+
+        end if 
 
         return
 
@@ -1127,11 +1170,13 @@ contains
         nx = size(var,1)
         ny = size(var,2)
 
+        !$omp parallel do
         do j = 1, ny
         do i = 1, nx
             var_int(i,j,:) = integrate_trapezoid1D_1D(var(i,j,:),zeta)
         end do
         end do
+        !$omp end parallel do
 
         return
 
@@ -1153,11 +1198,13 @@ contains
         nx = size(var,1)
         ny = size(var,2)
 
+        !$omp parallel do 
         do j = 1, ny
         do i = 1, nx
             var_int(i,j) = integrate_trapezoid1D_pt(var(i,j,:),zeta)
         end do
         end do
+        !$omp end parallel do 
 
         return
 

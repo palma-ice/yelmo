@@ -26,11 +26,11 @@ program yelmo_trough
     real(prec) :: xmax, ymin, ymax 
     integer    :: i, j, nx, ny 
     
-    real(4) :: start, finish
-
+    real(8) :: cpu_start_time, cpu_end_time, cpu_dtime  
+    
     ! Start timing 
-    call cpu_time(start)
-
+    call yelmo_cpu_time(cpu_start_time)
+    
     ! Assume program is running from the output folder
     outfldr = "./"
 
@@ -151,10 +151,11 @@ program yelmo_trough
     call yelmo_end(yelmo1,time=time)
 
     ! Stop timing 
-    call cpu_time(finish)
-
-    print '("Time = ",f12.3," min.")', (finish-start)/60.0 
-
+    call yelmo_cpu_time(cpu_end_time,cpu_start_time,cpu_dtime)
+    
+    write(*,"(a,f12.3,a)") "Time  = ",cpu_dtime/60.0 ," min"
+    write(*,"(a,f12.1,a)") "Speed = ",(1e-3*(time_end-time_init))/(cpu_dtime/3600.0), " kiloyears / hr"
+    
 contains
 
     subroutine trough_f17_topo_init(z_bed,H_ice,z_srf,xc,yc,fc,dc,wc,x_cf)
@@ -336,7 +337,7 @@ contains
 !                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
 !         call nc_write(filename,"beta_acy",ylmo%dyn%now%beta_acy,units="Pa a m-1",long_name="Basal friction coefficient (acy)", &
 !                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-        call nc_write(filename,"visc_eff",ylmo%dyn%now%visc_eff,units="Pa a m",long_name="Effective viscosity (SSA)", &
+        call nc_write(filename,"visc_eff_int",ylmo%dyn%now%visc_eff_int,units="Pa a m",long_name="Depth-integrated effective viscosity (SSA)", &
                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
 
         call nc_write(filename,"taud_acx",ylmo%dyn%now%taud_acx,units="Pa",long_name="Driving stress, x-direction", &

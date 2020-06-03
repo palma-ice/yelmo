@@ -56,6 +56,10 @@ contains
         integer :: i, j, nx, ny  
         real(prec), allocatable :: mbal(:,:) 
         
+        real(8)    :: cpu_time0, cpu_time1
+        real(prec) :: model_time0, model_time1 
+        real(prec) :: speed 
+
         nx = size(tpo%now%H_ice,1)
         ny = size(tpo%now%H_ice,2)
 
@@ -69,7 +73,10 @@ contains
         ! Get time step
         dt = time - tpo%par%time 
 
-        
+        ! Store initial cpu time and model time for metrics later
+        call yelmo_cpu_time(cpu_time0)
+        model_time0 = tpo%par%time 
+
         ! Combine basal mass balance into one field accounting for 
         ! grounded/floating fraction of grid cells 
         call calc_bmb_total(tpo%now%bmb,thrm%now%bmb_grnd,bnd%bmb_shlf,tpo%now%f_grnd,tpo%par%diffuse_bmb_shlf)
@@ -78,9 +85,6 @@ contains
         ! Perform topography calculations 
         if ( .not. topo_fixed .and. dt .gt. 0.0 ) then 
 
-            ! Store previous ice thickness
-            tpo%now%dHicedt = tpo%now%H_ice 
-            
             ! Define temporary variable for total column mass balance 
            
             mbal = bnd%smb + tpo%now%bmb           
@@ -89,14 +93,16 @@ contains
                 ! WHEN RUNNING EISMINT1 ensure bmb is not accounted for here !!!
                 mbal = bnd%smb 
             end if 
-
+            
             ! 1. Calculate the ice thickness conservation -----
-            call calc_ice_thickness(tpo%now%H_ice,tpo%now%H_margin,tpo%now%f_ice,tpo%now%mb_applied, &
-                                    tpo%now%f_grnd,bnd%z_sl-bnd%z_bed,dyn%now%ux_bar,dyn%now%uy_bar, &
+            call calc_ice_thickness(tpo%now%H_ice,tpo%now%dHdt_n,tpo%now%H_ice_n,tpo%now%H_ice_pred, &
+                                    tpo%now%H_margin,tpo%now%f_ice,tpo%now%mb_applied,tpo%now%f_grnd, &
+                                    bnd%z_sl-bnd%z_bed,dyn%now%ux_bar,dyn%now%uy_bar, &
                                     mbal=mbal,calv=tpo%now%calv,z_bed_sd=bnd%z_bed_sd,dx=tpo%par%dx,dt=dt, &
                                     solver=trim(tpo%par%solver),boundaries=trim(tpo%par%boundaries), &
                                     ice_allowed=bnd%ice_allowed,H_min=tpo%par%H_min_grnd, &
-                                    sd_min=tpo%par%sd_min,sd_max=tpo%par%sd_max,calv_max=tpo%par%calv_max)
+                                    sd_min=tpo%par%sd_min,sd_max=tpo%par%sd_max,calv_max=tpo%par%calv_max, &
+                                    beta=tpo%par%dt_beta,pc_step=tpo%par%pc_step)
             
             ! If desired, relax solution to reference state
             if (tpo%par%topo_rel .ne. 0) then 
@@ -151,9 +157,6 @@ contains
             ! Apply calving
             call apply_calving(tpo%now%H_ice,tpo%now%calv,tpo%now%f_grnd,tpo%par%H_min_flt,dt)
 
-            ! Additionally apply calving to H_margin points (when isolated)
-            call apply_calving_ice_margin(tpo%now%calv,tpo%now%H_margin,tpo%now%H_ice,dt)  
-
             ! Apply special case for symmetric EISMINT domain when basal sliding is active
             ! (ensure summit thickness does not grow disproportionately)
             if (trim(tpo%par%boundaries) .eq. "EISMINT" .and. maxval(dyn%now%uxy_b) .gt. 0.0) then 
@@ -164,7 +167,7 @@ contains
             end if  
              
             ! Determine the rate of change of ice thickness [m/a]
-            tpo%now%dHicedt = (tpo%now%H_ice - tpo%now%dHicedt)/dt
+            tpo%now%dHicedt = (tpo%now%H_ice - tpo%now%H_ice_n)/dt
 
         else 
 
@@ -252,6 +255,24 @@ contains
 
         ! Advance ytopo timestep 
         tpo%par%time = time
+
+        ! Calculate computational performance (model speed in kyr/hr)
+        call yelmo_cpu_time(cpu_time1)
+        model_time1 = tpo%par%time 
+        call yelmo_calc_speed(speed,model_time0,model_time1,cpu_time0,cpu_time1)
+
+        ! Store the speed variable in predictor or corrector speed variable
+        if (trim(tpo%par%pc_step) .eq. "predictor") then 
+            tpo%par%speed_pred = speed 
+        else 
+            tpo%par%speed_corr = speed 
+
+            ! If corrector step, then also calculate the speed of both 
+            ! predictor+corrector calls: mean of the predictor and corrector speeds
+            ! divided by two, since two calls were made. 
+            tpo%par%speed = 0.5 * (0.5*(tpo%par%speed_pred+tpo%par%speed_corr))
+            
+        end if 
 
 !         if (yelmo_log) then 
 
@@ -448,6 +469,13 @@ contains
         ! Define current time as unrealistic value
         par%time = 1000000000   ! [a] 1 billion years in the future 
 
+        ! Intialize timestepping parameters to Forward Euler (beta2=beta4=0: no contribution from previous timestep)
+        par%dt_zeta     = 1.0 
+        par%dt_beta(1)  = 1.0 
+        par%dt_beta(2)  = 0.0 
+        par%dt_beta(3)  = 1.0 
+        par%dt_beta(4)  = 0.0 
+
         return
 
     end subroutine ytopo_par_load
@@ -493,29 +521,40 @@ contains
         allocate(now%is_grline(nx,ny))
         allocate(now%is_grz(nx,ny))
 
-        now%H_ice      = 0.0 
-        now%z_srf      = 0.0  
-        now%dzsrfdt    = 0.0 
-        now%dHicedt    = 0.0
-        now%bmb        = 0.0  
-        now%mb_applied = 0.0 
-        now%calv_grnd  = 0.0
-        now%calv       = 0.0
-        now%H_margin   = 0.0 
-        now%dzsdx      = 0.0 
-        now%dzsdy      = 0.0 
-        now%dHicedx    = 0.0 
-        now%dHicedy    = 0.0
-        now%H_grnd     = 0.0  
-        now%f_grnd     = 0.0  
-        now%f_grnd_acx = 0.0  
-        now%f_grnd_acy = 0.0  
-        now%f_ice      = 0.0  
+        allocate(now%dHdt_n(nx,ny))
+        allocate(now%H_ice_n(nx,ny))
+        allocate(now%H_ice_pred(nx,ny))
+        allocate(now%H_ice_corr(nx,ny))
+        
+        now%H_ice       = 0.0 
+        now%z_srf       = 0.0  
+        now%dzsrfdt     = 0.0 
+        now%dHicedt     = 0.0
+        now%bmb         = 0.0  
+        now%mb_applied  = 0.0 
+        now%calv_grnd   = 0.0
+        now%calv        = 0.0
+        now%H_margin    = 0.0 
+        now%dzsdx       = 0.0 
+        now%dzsdy       = 0.0 
+        now%dHicedx     = 0.0 
+        now%dHicedy     = 0.0
+        now%H_grnd      = 0.0  
+        now%f_grnd      = 0.0  
+        now%f_grnd_acx  = 0.0  
+        now%f_grnd_acy  = 0.0  
+        now%f_ice       = 0.0  
         now%dist_margin = 0.0
-        now%dist_grline = 0.0
-        now%mask_bed   = 0.0 
-        now%is_grline  = .FALSE. 
-        now%is_grz     = .FALSE. 
+        now%dist_grline = 0.0 
+        
+        now%mask_bed    = 0.0 
+        now%is_grline   = .FALSE. 
+        now%is_grz      = .FALSE. 
+         
+        now%dHdt_n      = 0.0  
+        now%H_ice_n     = 0.0 
+        now%H_ice_pred  = 0.0 
+        now%H_ice_corr  = 0.0 
         
         return 
     end subroutine ytopo_alloc 
@@ -526,39 +565,43 @@ contains
 
         type(ytopo_state_class), intent(INOUT) :: now
 
-        if (allocated(now%H_ice))      deallocate(now%H_ice)
-        if (allocated(now%z_srf))      deallocate(now%z_srf)
+        if (allocated(now%H_ice))       deallocate(now%H_ice)
+        if (allocated(now%z_srf))       deallocate(now%z_srf)
         
-        if (allocated(now%dzsrfdt))    deallocate(now%dzsrfdt)
-        if (allocated(now%dHicedt))    deallocate(now%dHicedt)
-        if (allocated(now%bmb))        deallocate(now%bmb)
-        if (allocated(now%mb_applied)) deallocate(now%mb_applied)
-        if (allocated(now%calv_grnd))  deallocate(now%calv_grnd)
-        if (allocated(now%calv))       deallocate(now%calv)
+        if (allocated(now%dzsrfdt))     deallocate(now%dzsrfdt)
+        if (allocated(now%dHicedt))     deallocate(now%dHicedt)
+        if (allocated(now%bmb))         deallocate(now%bmb)
+        if (allocated(now%mb_applied))  deallocate(now%mb_applied)
+        if (allocated(now%calv_grnd))   deallocate(now%calv_grnd)
+        if (allocated(now%calv))        deallocate(now%calv)
 
-        if (allocated(now%H_margin))   deallocate(now%H_margin)
+        if (allocated(now%H_margin))    deallocate(now%H_margin)
         
-        if (allocated(now%dzsdx))      deallocate(now%dzsdx)
-        if (allocated(now%dzsdy))      deallocate(now%dzsdy)
-        if (allocated(now%dHicedx))    deallocate(now%dHicedx)
-        if (allocated(now%dHicedy))    deallocate(now%dHicedy)
+        if (allocated(now%dzsdx))       deallocate(now%dzsdx)
+        if (allocated(now%dzsdy))       deallocate(now%dzsdy)
+        if (allocated(now%dHicedx))     deallocate(now%dHicedx)
+        if (allocated(now%dHicedy))     deallocate(now%dHicedy)
         
-        if (allocated(now%H_grnd))     deallocate(now%H_grnd)
+        if (allocated(now%H_grnd))      deallocate(now%H_grnd)
 
-        ! Masks
-        if (allocated(now%f_grnd))     deallocate(now%f_grnd)
-        if (allocated(now%f_grnd_acx)) deallocate(now%f_grnd_acx)
-        if (allocated(now%f_grnd_acy)) deallocate(now%f_grnd_acy)
+        if (allocated(now%f_grnd))      deallocate(now%f_grnd)
+        if (allocated(now%f_grnd_acx))  deallocate(now%f_grnd_acx)
+        if (allocated(now%f_grnd_acy))  deallocate(now%f_grnd_acy)
         
-        if (allocated(now%f_ice))      deallocate(now%f_ice)
+        if (allocated(now%f_ice))       deallocate(now%f_ice)
 
         if (allocated(now%dist_margin)) deallocate(now%dist_margin)
         if (allocated(now%dist_grline)) deallocate(now%dist_grline)
         
-        if (allocated(now%mask_bed))   deallocate(now%mask_bed)
-        if (allocated(now%is_grline))  deallocate(now%is_grline)
-        if (allocated(now%is_grz))     deallocate(now%is_grz)
+        if (allocated(now%mask_bed))    deallocate(now%mask_bed)
+        if (allocated(now%is_grline))   deallocate(now%is_grline)
+        if (allocated(now%is_grz))      deallocate(now%is_grz)
 
+        if (allocated(now%dHdt_n))      deallocate(now%dHdt_n)
+        if (allocated(now%H_ice_n))     deallocate(now%H_ice_n)
+        if (allocated(now%H_ice_pred))  deallocate(now%H_ice_pred)
+        if (allocated(now%H_ice_corr))  deallocate(now%H_ice_corr)
+        
         return 
 
     end subroutine ytopo_dealloc 

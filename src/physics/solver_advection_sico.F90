@@ -359,6 +359,8 @@ contains
         if (use_lis) then 
 
             !  ------ Settings for Lis
+                    
+            call lis_initialize(ierr)           ! Important for parallel computing environments
 
             call lis_matrix_create(LIS_COMM_WORLD, lgs_a, ierr)
             call lis_vector_create(LIS_COMM_WORLD, lgs_b, ierr)
@@ -387,8 +389,7 @@ contains
 
             call lis_solver_create(solver, ierr)
 
-            ch_solver_set_option = '-i bicg -p ilu '// &
-                                   '-maxiter 1000 -tol 1.0e-12 -initx_zeros false'
+            ch_solver_set_option = '-i bicg -p ilu -maxiter 1000 -tol 1.0e-12 -initx_zeros false'
 
             call lis_solver_set_option(trim(ch_solver_set_option), solver, ierr)
             call CHKERR(ierr)
@@ -405,6 +406,8 @@ contains
             call lis_vector_destroy(lgs_b, ierr)
             call lis_vector_destroy(lgs_x, ierr)
             call lis_solver_destroy(solver, ierr)
+                   
+            call lis_finalize(ierr)     ! Important for parallel computing environments 
 
         else 
             ! Use internal SOR solver 

@@ -9,7 +9,8 @@ libdir = libs
 testdir = tests
 
 # Command-line options at make call
-debug ?= 0
+debug    ?= 0
+parallel ?= 0 
 
 ## COMPILER CONFIGURATION ##
 # (should be loaded from config directory)
@@ -17,14 +18,14 @@ debug ?= 0
 <COMPILER_CONFIGURATION>
 
 # Determine whether to use normal flags or debugging flags
-DFLAGS   = $(DFLAGS_NODEBUG)
+DFLAGS = $(DFLAGS_NODEBUG)
 ifeq ($(debug), 1)
-	DFLAGS   = $(DFLAGS_DEBUG)
+	DFLAGS = $(DFLAGS_DEBUG)
 endif
 
 # Debugging flags with profiling output enabled
 ifeq ($(debug), 2)
-	DFLAGS   = $(DFLAGS_PROFILE)
+	DFLAGS = $(DFLAGS_PROFILE)
 endif
 
 ###############################################
@@ -71,6 +72,13 @@ mismip : yelmo-static
 		@echo "    yelmo_mismip.x is ready."
 		@echo " "
 
+ismiphom : yelmo-static
+		$(FC) $(DFLAGS) $(FFLAGS) $(INC_LIS) -o $(bindir)/yelmo_ismiphom.x tests/yelmo_ismiphom.f90 \
+			-L${CURDIR}/libyelmo/include -lyelmo $(LFLAGS) $(objdir)/nml.o
+		@echo " "
+		@echo "    yelmo_ismiphom.x is ready."
+		@echo " "
+
 icetemp : yelmo-static
 		$(FC) $(DFLAGS) $(FFLAGS) $(INC_LIS) -o $(bindir)/test_icetemp.x tests/test_icetemp.f90 \
 			-L${CURDIR}/libyelmo/include -lyelmo $(LFLAGS) $(objdir)/nml.o
@@ -97,6 +105,13 @@ trough : yelmo-static
 			-L${CURDIR}/libyelmo/include -lyelmo $(LFLAGS) $(objdir)/nml.o
 		@echo " "
 		@echo "    yelmo_trough.x is ready."
+		@echo " "
+
+check_sim : $(objdir)/ncio.o
+		$(FC) $(DFLAGS) $(FFLAGS) -o ./check_sim.x check_sim.f90 \
+			$(LFLAGS) $(objdir)/ncio.o
+		@echo " "
+		@echo "    check_sim.x is ready."
 		@echo " "
 
 .PHONY : usage

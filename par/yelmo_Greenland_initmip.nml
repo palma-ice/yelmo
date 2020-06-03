@@ -2,15 +2,38 @@
     time_init       = 0.0               ! [yr] Starting time 
     time_end        = 5e3               ! [yr] Ending time
     time_equil      = 100.0             ! [yr] Equilibration time 
-    dtt             = 5.0               ! [yr] Main loop timestep 
+    dtt             = 10.0              ! [yr] Main loop timestep 
+    dtt_equil       = 1.0               ! [yr] Timestep to use for dynamic equilibration (if dt_method=0)
     dt1D_out        = 100.0             ! [yr] Frequency of writing 1D output files 
     dt2D_out        = 100.0             ! [yr] Frequency of writing 2D output files 
-    bmb_shlf_const  = -10.0             ! [m/a] Basal mass balance of ice shelves
-    dT_ann          = 0.0               ! [K]  Temperature anomaly (atm)
-    z_sl            = 0.0               ! [m] Sea level relative to present-day 
+    
+    clim_nm         = "clim_pd_grl"     ! "clim_pd_grl", "clim_pd_ant" or "clim_lgm"
+    with_anom       = False             ! Apply anomaly at start of sim but after equilibration?
 
     load_cf_ref     = False             ! Load cf_ref from file? Otherwise define from cf_stream + inline tuning
     file_cf_ref     = "input/{domain}/{grid_name}/{grid_name}_cf_ref_opt.nc"  ! Filename holding cf_ref to load 
+
+    load_bmelt      = False             ! Load PD bmelt observations from file? Else use bmb_shlf_const 
+    file_bmelt      = "input/{domain}/{grid_name}/{grid_name}_BMELT-R13.nc"
+
+/
+
+&clim_pd_grl 
+    bmb_shlf_const  = -10.0             ! [m/a] Basal mass balance of ice shelves
+    dT_ann          = 0.0               ! [K]  Temperature anomaly (atm)
+    z_sl            = 0.0               ! [m] Sea level relative to present-day 
+/
+
+&clim_pd_ant 
+    bmb_shlf_const  = -0.2              ! [m/a] Basal mass balance of ice shelves
+    dT_ann          = 0.0               ! [K]  Temperature anomaly (atm)
+    z_sl            = 0.0               ! [m] Sea level relative to present-day 
+/
+
+&clim_lgm 
+    bmb_shlf_const  = 0.0               ! [m/a] Basal mass balance of ice shelves
+    dT_ann          = -10.0             ! [K] Temperature anomaly (atm)
+    z_sl            = -120.0            ! [m] Sea level relative to present-day 
 /
 
 &yelmo
@@ -27,9 +50,13 @@
     dt_min          = 0.01              ! [a] Minimum timestep 
     cfl_max         = 0.1               ! Maximum value is 1.0, lower will be more stable
     cfl_diff_max    = 0.12              ! Bueler et al (2007), Eq. 25  
-    pc_method       = "AB-SAM"          ! "FE-SBE" or "AB-SAM"
+    pc_method       = "AB-SAM"          ! "FE-SBE", "AB-SAM", "HEUN"
+    pc_controller   = "PI42"            ! PI42, H312b, H312PID, H321PID, PID1
+    pc_filter_vel   = False             ! Use mean vel. solution of current and previous timestep
+    pc_use_H_pred   = False             ! Use predicted H_ice instead of corrected H_ice 
+    pc_n_redo       = 5                 ! How many times can the same iteration be repeated (when high error exists)
     pc_tol          = 10.0              ! [m/a] Tolerance threshold to redo timestep
-    pc_eps          = 5.0               ! Predictor-corrector tolerance 
+    pc_eps          = 3.0               ! Predictor-corrector tolerance 
     
 /
 
@@ -56,21 +83,17 @@
 /
 
 &ydyn
-    solver              = "hybrid-adhoc"  ! "fixed", "hybrid-adhoc", "hybrid-pd12"    
-    sia_solver          = "vel"           ! "vel", "shear", "none"
-    ssa_solver_opt      = "-i bicgsafe -p jacobi -maxiter 100 -tol 1.0e-4 -initx_zeros false"  ! See Lis library
-    mix_method          = 1               ! -2: sia, -1: ssa, 0: sia|ssa, 1: sia+ssa 2: ssa vel. fraction
-    calc_diffusivity    = False           ! Calculate 2D diffusivity term for diagnostics
+    solver              = "diva"          ! "fixed", "sia", "ssa", "hybrid", "diva"    
+    diva_no_slip        = False           ! If using the DIVA solver, is basal sliding allowed? 
     beta_method         = 1               ! 0: constant beta; 1: linear (beta=cb/u0); 2: psuedo-plastic-power; 3: Regularized Coulomb
-    beta_const          = 1e3             ! [Pa a m−1] Constant value of basal friction coefficient to be used
+    beta_const          = 1e3             ! [Pa a m-1] Constant value of basal friction coefficient to be used
     beta_q              = 1.0             ! Dragging law exponent 
     beta_u0             = 100.0           ! [m/a] Regularization term for regularized Coulomb law (beta_method=3)
-    beta_gl_scale       = 0               !  0: beta*beta_gl_f, 2: H_grnd linear scaling, 3: Zstar scaling 
-    beta_gl_sep         = 0               !  -1: Apply subgrid treatment on ac-nodes (beta_gl_stag=3) 0: No subgrid treatment, 1: beta*f_grnd_aa        
+    beta_gl_scale       = 0               !  0: beta*beta_gl_f, 1: H_grnd linear scaling, 2: Zstar scaling 
     beta_gl_stag        = 1               !  0: simple staggering, 1: Upstream beta at gl, 2: downstream, 3: f_grnd_ac scaling 
     beta_gl_f           = 1.0             ! [-] Scaling of beta at the grounding line (for beta_gl_scale=0)
     taud_gl_method      = 0               !  0: binary, no subgrid, 1: Two-sided gradient
-    H_grnd_lim          = 500.0           ! [m] For beta_sep_method=2, reduce beta linearly between H_grnd=0 and H_grnd_lim 
+    H_grnd_lim          = 500.0           ! [m] For beta_gl_scale=1, reduce beta linearly between H_grnd=0 and H_grnd_lim 
     H_sed_sat           = 250.0           ! [m] Sediment thickness at which sediment effect is saturated
     cb_method           = 1               ! -1: set externally; 1: calculate cb online  
     cb_with_pmp         = False           ! Weighted cf_frozen/cf_stream as a function of f_pmp 
@@ -83,6 +106,8 @@
     cf_stream           = 0.2             ! [--] Bed critical stress factor, stream  
     n_sm_beta           = 0               ! [-] Standard deviation in gridpoints for Gaussian smoothing of beta (0==no smoothing)
     beta_min            = 100.0           ! [Pa a m-1] Minimum value of beta allowed for grounded ice (for stability)
+    eps_0               = 1e-6            ! [1/a] Regularization term for effective viscosity - minimum strain rate
+    ssa_lis_opt         = "-i bicgsafe -p jacobi -maxiter 100 -tol 1.0e-4 -initx_zeros false"  ! See Lis library !-omp_num_threads 2
     ssa_beta_max        = 1e20            ! [Pa a m-1] Maximum value of beta for which ssa should be calculated 
     ssa_vel_max         = 5000.0          ! [m a-1] SSA velocity limit to avoid spurious results 
     ssa_iter_max        = 20              ! Number of maximum allowed iterations over ssa to converge on vel. solution
@@ -114,24 +139,30 @@
 /
 
 &ymat
-    flow_law                = "glen"
-    rf_method               = 1         ! -1: set externally; 0: rf_const everywhere; 1: standard function 
-    rf_const                = 1e-18     ! [Pa^-3 a^-1]
-    rf_use_eismint2         = False     ! Only applied for rf_method=1
-    rf_with_water           = False     ! Only applied for rf_method=1, scale rf by water content?
-    n_glen                  = 3.0 
-    visc_min                = 1e3 
-    use_2D_enh              = False 
+    flow_law                = "glen"        ! Only "glen" is possible right now
+    rf_method               = 1             ! -1: set externally; 0: rf_const everywhere; 1: standard function 
+    rf_const                = 1e-18         ! [Pa^-3 a^-1]
+    rf_use_eismint2         = False         ! Only applied for rf_method=1
+    rf_with_water           = False         ! Only applied for rf_method=1, scale rf by water content?
+    n_glen                  = 3.0           ! Glen flow law exponent
+    visc_min                = 1e3           ! [Pa a] Minimum allowed viscosity 
+    de_max                  = 0.5           ! [a-1]  Maximum allowed effective strain rate
+    enh_method              = "shear3D"     ! "simple","shear2D", "shear3D", "paleo-shear" 
     enh_shear               = 2.0
     enh_stream              = 2.0
     enh_shlf                = 0.7
-    age_method              = "expl"    ! "None", "expl", "impl"
-    age_impl_kappa          = 1.5       ! [m2 a-1] Artificial diffusion term for implicit age solving 
-
+    enh_umin                = 50.0          ! [m/yr] Minimum transition velocity to enh_stream (enh_method="paleo-shear")
+    enh_umax                = 500.0         ! [m/yr] Maximum transition velocity to enh_stream (enh_method="paleo-shear")
+    calc_age                = False         ! Calculate age tracer field?
+    age_iso                 = 11.7, 29.0, 57.0, 115.0
+    tracer_method           = "expl"        ! "expl", "impl": used for age and 'paleo-shear' enh fields
+    tracer_impl_kappa       = 1.5           ! [m2 a-1] Artificial diffusion term for implicit tracer solving 
+    
 /
 
 &ytherm
     method          = "temp"            ! "fixed", "robin", "temp", "enth"
+    dt_method       = "FE"              ! "FE", "AB", "SAM"
     solver_advec    = "impl-upwind"     ! "expl", "impl-upwind"
     gamma           = 1.0               ! [K] Scalar for the pressure melting point decay function 
     use_strain_sia  = False             ! True: calculate strain heating from SIA approx.
@@ -181,5 +212,8 @@
     pd_vel_load       = True 
     pd_vel_path       = "input/{domain}/{grid_name}/{grid_name}_VEL-J18.nc"
     pd_vel_names      = "ux_srf" "uy_srf"            ! Surface velocity 
+    pd_age_load       = False 
+    pd_age_path       = "input/{domain}/{grid_name}/{grid_name}_STRAT-M15.nc"
+    pd_age_names      = "age_iso" "depth_iso"        ! ages of isochrones; depth of isochrones 
 
 /

@@ -8,29 +8,35 @@ program yelmo_test
     use basal_dragging 
     use yelmo_tools, only : gauss_values
     
+    use omp_lib
+
     implicit none 
 
     type(yelmo_class)      :: yelmo1 
 
     character(len=256) :: outfldr, file1D, file2D, file_restart, domain 
-    character(len=512) :: path_par, path_const  
-    real(prec) :: time_init, time_end, time_equil, time, dtt, dt1D_out, dt2D_out 
+    character(len=512) :: path_par, path_const, clim_nm  
+    real(prec) :: time_init, time_end, time_equil, time, dtt, dtt_equil, dt1D_out, dt2D_out 
+    real(prec) :: dtt_equil_now 
     real(prec) :: bmb_shlf_const, dT_ann, z_sl    
     integer    :: n
-    real(4) :: cpu_start_time, cpu_end_time 
-
+    logical    :: with_anom 
+    
     real(prec), allocatable :: cf_ref(:,:) 
 
     ! No-ice mask (to impose additional melting)
     logical, allocatable :: mask_noice(:,:)  
 
-    ! cf_ref 
-    logical :: load_cf_ref
+    ! cf_ref, bmelt  
+    logical :: load_cf_ref, load_bmelt
     character(len=256) :: file_cf_ref 
+    character(len=256) :: file_bmelt 
 
+    real(8) :: cpu_start_time, cpu_end_time, cpu_dtime  
+    
     ! Start timing 
-    call cpu_time(cpu_start_time)
-
+    call yelmo_cpu_time(cpu_start_time)
+    
     ! Determine the parameter file from the command line 
     call yelmo_load_command_line_args(path_par)
 
@@ -39,22 +45,32 @@ program yelmo_test
     call nml_read(path_par,"control","time_end",        time_end)                  ! [yr] Ending time
     call nml_read(path_par,"control","time_equil",      time_equil)                ! [yr] Years to equilibrate first
     call nml_read(path_par,"control","dtt",             dtt)                       ! [yr] Main loop time step 
+    call nml_read(path_par,"control","dtt_equil",       dtt_equil)                 ! [yr] Timestep to use for dynamic equilibration (if dt_method=0)
     call nml_read(path_par,"control","dt1D_out",        dt1D_out)                  ! [yr] Frequency of 1D output 
     call nml_read(path_par,"control","dt2D_out",        dt2D_out)                  ! [yr] Frequency of 2D output 
-    call nml_read(path_par,"control","bmb_shlf_const",  bmb_shlf_const)            ! [yr] Constant imposed bmb_shlf value
-    call nml_read(path_par,"control","dT_ann",          dT_ann)                    ! [K] Temperature anomaly (atm)
-    call nml_read(path_par,"control","z_sl",            z_sl)                      ! [m] Sea level relative to present-day
-
+    
+    call nml_read(path_par,"control","clim_nm",         clim_nm)                   ! Namelist group holding climate information
+    call nml_read(path_par,"control","with_anom",       with_anom)                 ! Apply anomaly at the start of the simulation (after equilibration)
+    
     call nml_read(path_par,"control","load_cf_ref",     load_cf_ref)               ! Load cf_ref from file? Otherwise define from cf_stream + inline tuning
     call nml_read(path_par,"control","file_cf_ref",     file_cf_ref)               ! Filename holding cf_ref to load 
+
+    call nml_read(path_par,"control","load_bmelt",      load_bmelt)                ! Load bmelt from file?
+    call nml_read(path_par,"control","file_bmelt",      file_bmelt)                ! Filename holding bmelt field to load 
+
+    ! Load climate (eg, clim_pd or clim_lgm)
+    call nml_read(path_par,clim_nm,  "bmb_shlf_const",  bmb_shlf_const)            ! [yr] Constant imposed bmb_shlf value
+    call nml_read(path_par,clim_nm,  "dT_ann",          dT_ann)                    ! [K] Temperature anomaly (atm)
+    call nml_read(path_par,clim_nm,  "z_sl",            z_sl)                      ! [m] Sea level relative to present-day
 
     ! Assume program is running from the output folder
     outfldr = "./"
 
     ! Define input and output locations 
-    path_const = trim(outfldr)//"yelmo_const_Earth.nml"
-    file1D     = trim(outfldr)//"yelmo1D.nc"
-    file2D     = trim(outfldr)//"yelmo2D.nc"
+    path_const   = trim(outfldr)//"yelmo_const_Earth.nml"
+    file1D       = trim(outfldr)//"yelmo1D.nc"
+    file2D       = trim(outfldr)//"yelmo2D.nc"
+    file_restart = trim(outfldr)//"yelmo_restart.nc"
 
     ! === Initialize ice sheet model =====
 
@@ -64,6 +80,13 @@ program yelmo_test
     ! Initialize data objects and load initial topography
     call yelmo_init(yelmo1,filename=path_par,grid_def="file",time=time_init)
 
+    ! Determine maximum timestep to use with equilibration step 
+    if (yelmo1%par%dt_method .eq. 0) then 
+        dtt_equil_now = dtt_equil 
+    else 
+        dtt_equil_now = dtt 
+    end if 
+    
     ! === Set initial boundary conditions for current time and yelmo state =====
     ! ybound: z_bed, z_sl, H_sed, smb, T_srf, bmb_shlf , Q_geo
 
@@ -75,7 +98,17 @@ program yelmo_test
     yelmo1%bnd%smb      = yelmo1%dta%pd%smb             ! [m.i.e./a]
     yelmo1%bnd%T_srf    = yelmo1%dta%pd%T_srf + dT_ann  ! [K]
     
-    yelmo1%bnd%bmb_shlf = bmb_shlf_const    ! [m.i.e./a]
+    if (load_bmelt) then
+
+        ! Parse filenames with grid information
+        call yelmo_parse_path(file_bmelt,yelmo1%par%domain,yelmo1%par%grid_name)
+ 
+        call nc_read(file_bmelt,"bm_ac_reese",yelmo1%bnd%bmb_shlf)
+        yelmo1%bnd%bmb_shlf = -yelmo1%bnd%bmb_shlf                  ! Negative because bmb = -bmelt 
+    else 
+        yelmo1%bnd%bmb_shlf = bmb_shlf_const    ! [m.i.e./a]
+    end if 
+
     yelmo1%bnd%T_shlf   = T0                ! [K]   
 
     if (dT_ann .lt. 0.0) yelmo1%bnd%T_shlf   = T0 + dT_ann*0.25_prec  ! [K] Oceanic temp anomaly
@@ -95,9 +128,12 @@ program yelmo_test
     ! Special treatment for Greenland
     if (trim(yelmo1%par%domain) .eq. "Greenland") then 
         
-        ! Impose additional negative mass balance to no ice points of 2 [m.i.e./a] melting
-        where(mask_noice) yelmo1%bnd%smb = yelmo1%dta%pd%smb - 2.0 
-    
+        ! Present-day
+        if (dT_ann .ge. 0.0) then 
+            ! Impose additional negative mass balance to no ice points of 2 [m.i.e./a] melting
+            where(mask_noice) yelmo1%bnd%smb = yelmo1%dta%pd%smb - 2.0 
+        end if 
+
     end if 
 
     ! Special treatment for Antarctica
@@ -105,12 +141,7 @@ program yelmo_test
         
         ! Present-day
         if (dT_ann .ge. 0.0) then 
-            where(mask_noice) yelmo1%bnd%bmb_shlf = -2.0    ! [m/a]
-!             where(yelmo1%bnd%basins .ge. 23.0 .and. & 
-!                   yelmo1%bnd%basins .le. 26.0) yelmo1%bnd%bmb_shlf = -2.0   ! [m/a]
-!             where(yelmo1%bnd%basins .ge.  9.0 .and. & 
-!                   yelmo1%bnd%basins .le. 11.0) yelmo1%bnd%bmb_shlf = -1.0   ! [m/a]
-        
+            where(mask_noice) yelmo1%bnd%bmb_shlf = -2.0                ! [m/a]        
         end if 
 
         ! LGM
@@ -150,9 +181,6 @@ program yelmo_test
 
         cf_ref = yelmo1%dyn%par%cf_stream  
 
-        ! Use location-specific tuning functions to modify cf_ref 
-        call modify_cf_ref(yelmo1%dyn,yelmo1%tpo,yelmo1%thrm,yelmo1%bnd,yelmo1%grd,yelmo1%par%domain,cf_ref)
-
     end if 
 
     ! ============================================================
@@ -168,8 +196,9 @@ program yelmo_test
     
     ! Run yelmo for several years with constant boundary conditions and topo
     ! to equilibrate thermodynamics and dynamics
-    call yelmo_update_equil(yelmo1,time,time_tot=10.0_prec,topo_fixed=.FALSE.,dt=1.0,ssa_vel_max=5000.0)
+    call yelmo_update_equil(yelmo1,time,time_tot=10.0_prec,topo_fixed=.FALSE.,dt=min(1.0,dtt_equil_now),ssa_vel_max=5000.0)
     call yelmo_update_equil(yelmo1,time,time_tot=time_equil,topo_fixed=.TRUE.,dt=1.0,ssa_vel_max=5000.0)
+    call yelmo_update_equil(yelmo1,time,time_tot=100.0_prec,topo_fixed=.FALSE.,dt=dtt_equil_now,ssa_vel_max=5000.0)
     
     ! 2D file 
     call yelmo_write_init(yelmo1,file2D,time_init=time,units="years")  
@@ -178,7 +207,14 @@ program yelmo_test
     ! 1D file 
     call write_yreg_init(yelmo1,file1D,time_init=time_init,units="years",mask=yelmo1%bnd%ice_allowed)
     call write_yreg_step(yelmo1%reg,file1D,time=time)  
-    
+
+    if (with_anom) then 
+        ! Warm up the ice sheet to impose some changes 
+        yelmo1%bnd%T_srf    = yelmo1%dta%pd%T_srf + 5.0
+        yelmo1%bnd%bmb_shlf = -10.0 
+        where (yelmo1%dta%pd%smb .lt. 0.0) yelmo1%bnd%smb = yelmo1%dta%pd%smb - 1.0 
+    end if 
+
     ! Advance timesteps
     do n = 1, ceiling((time_end-time_init)/dtt)
 
@@ -190,15 +226,15 @@ program yelmo_test
 !             ! Glacial period, impose cold climate 
 !             yelmo1%bnd%T_srf = yelmo1%dta%pd%T_srf - 10.0 
 
-!         else if (time .ge. -10e3 .and. time .lt. -8e3) then
+!         else if (time .ge. -10e3 .and. time .lt. -6e3) then
 !             ! Holocene optimum 
 !             yelmo1%bnd%T_srf = yelmo1%dta%pd%T_srf + 1.0 
 
-!         else if (time .ge. -8e3) then 
+!         else  ! time .ge. -6e3
 !             ! Entering Holocene, impose present-day temperatures 
 !             yelmo1%bnd%T_srf = yelmo1%dta%pd%T_srf
 !         end if 
-
+        
         ! Update ice sheet 
         call yelmo_update(yelmo1,time)
 
@@ -215,20 +251,21 @@ program yelmo_test
         if (mod(time,10.0)==0 .and. (.not. yelmo_log)) then
             write(*,"(a,f14.4)") "yelmo:: time = ", time
         end if 
-
+        
     end do 
     ! == Finished time loop == 
 
+    ! Write a final restart file 
+    call yelmo_restart_write(yelmo1,file_restart,time)
 
     ! Finalize program
     call yelmo_end(yelmo1,time=time)
-
+    
     ! Stop timing 
-    call cpu_time(cpu_end_time)
+    call yelmo_cpu_time(cpu_end_time,cpu_start_time,cpu_dtime)
 
-
-    write(*,"(a,f12.3,a)") "Time  = ",(cpu_end_time-cpu_start_time)/60.0 ," min"
-    write(*,"(a,f12.1,a)") "Speed = ",(1e-3*(time_end-time_init))/((cpu_end_time-cpu_start_time)/3600.0), " kiloyears / hr"
+    write(*,"(a,f12.3,a)") "Time  = ",cpu_dtime/60.0 ," min"
+    write(*,"(a,f12.1,a)") "Speed = ",(1e-3*(time_end-time_init))/(cpu_dtime/3600.0), " kiloyears / hr"
 
 contains
 
@@ -345,7 +382,16 @@ contains
                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
         call nc_write(filename,"beta",ylmo%dyn%now%beta,units="Pa a m^-1",long_name="Basal friction coefficient", &
                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-        call nc_write(filename,"visc_eff",ylmo%dyn%now%visc_eff,units="Pa a m",long_name="Effective viscosity (SSA)", &
+        call nc_write(filename,"visc_eff_int",ylmo%dyn%now%visc_eff_int,units="Pa a m",long_name="Depth-integrated effective viscosity (SSA)", &
+                      dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
+        call nc_write(filename,"taud",ylmo%dyn%now%taud,units="Pa",long_name="Driving stress", &
+                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
+        call nc_write(filename,"enh_bar",ylmo%mat%now%enh_bar,units="1",long_name="Vertically averaged enhancement factor", &
+                      dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
+        
+        call nc_write(filename,"beta_eff",ylmo%dyn%now%beta_eff,units="Pa a m^-1",long_name="Effective basal friction coefficient (DIVA)", &
+                      dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
+        call nc_write(filename,"beta_diva",ylmo%dyn%now%beta_diva,units="Pa a m^-1",long_name="Actual basal friction coefficient (DIVA)", &
                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
 
         call nc_write(filename,"dep_time",ylmo%mat%now%dep_time,units="yr",long_name="Deposition time", &
@@ -370,10 +416,10 @@ contains
                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
         
         ! Diagnostics 
-        call nc_write(filename,"taud_acx",ylmo%dyn%now%taud_acx,units="Pa",long_name="Driving stress (x)", &
-                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-        call nc_write(filename,"taud_acy",ylmo%dyn%now%taud_acy,units="Pa",long_name="Driving stress (y)", &
-                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
+!         call nc_write(filename,"taud_acx",ylmo%dyn%now%taud_acx,units="Pa",long_name="Driving stress (x)", &
+!                        dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
+!         call nc_write(filename,"taud_acy",ylmo%dyn%now%taud_acy,units="Pa",long_name="Driving stress (y)", &
+!                        dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
         
         ! Close the netcdf file
         call nc_close(ncid)
@@ -394,7 +440,7 @@ contains
         type(ygrid_class),  intent(IN)    :: grd
         character(len=*),   intent(IN)    :: domain 
         logical,            intent(IN)    :: mask_noice(:,:) 
-        real(prec),         intent(IN)    :: cf_ref(:,:) 
+        real(prec),         intent(INOUT) :: cf_ref(:,:) 
 
         integer :: i, j, nx, ny 
         integer :: i1, i2, j1, j2 
@@ -429,9 +475,19 @@ contains
                         ! Domain-specific modifications to lambda function
 
                         ! Increased friction in Wilkes Land (South - Southeast)
-                        where (bnd%basins .ge. 12 .and. &
-                               bnd%basins .le. 17) lambda_bed = calc_lambda_bed_exp(bnd%z_bed,-400.0,dyn%par%cb_z1)
+                        where (bnd%basins .ge. 12 .and. bnd%basins .le. 17) 
+                            lambda_bed = calc_lambda_bed_exp(bnd%z_bed,-400.0,dyn%par%cb_z1)
+                        end where
 
+                        ! Increased friction in WAIS divide area feeding the Ronne
+                        where (bnd%basins .eq.  1 .or. bnd%basins .eq.  2)
+                            lambda_bed = calc_lambda_bed_exp(bnd%z_bed,-2000.0,dyn%par%cb_z1)
+                        end where 
+
+!                         ! Increased friction in WAIS divide area feeding the Ross
+!                         where (bnd%basins .eq. 21 .or. bnd%basins .eq. 22)
+!                             lambda_bed = calc_lambda_bed_exp(bnd%z_bed,-2000.0,dyn%par%cb_z1)
+!                         end where
 
                     end if 
 
@@ -462,7 +518,13 @@ contains
             ! =============================================================================
             ! Step 3: calculate cf_ref [--]
             
-            dyn%now%cf_ref = (cf_ref*lambda_bed)
+            cf_ref = (cf_ref*lambda_bed)
+
+            ! Use location-specific tuning functions to modify cf_ref 
+            call modify_cf_ref(dyn,tpo,thrm,bnd,grd,domain,cf_ref)
+            
+            ! Finally store in dyn object for output
+            dyn%now%cf_ref = cf_ref 
 
         return 
 
@@ -488,6 +550,19 @@ contains
             ! Additionally modify cf_ref
             if (trim(domain) .eq. "Antarctica") then
 
+
+                ! Increase friction - feeding the Ronne ice shelf from the South
+!                 call scale_cf_gaussian(cf_ref,dyn%par%cf_stream*2.0,x0=-800.0, y0= 100.0,sigma=400.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
+!                 call scale_cf_gaussian(cf_ref,dyn%par%cf_stream*2.0,x0=-980.0, y0=-400.0,sigma=200.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
+                
+                ! Reduction friction - feeding the Ross ice shelf from the East
+                call scale_cf_gaussian(cf_ref,dyn%par%cf_stream*0.05,x0= 130.0, y0=-550.0, sigma=100.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
+                call scale_cf_gaussian(cf_ref,dyn%par%cf_stream*0.05,x0= 280.0, y0=-760.0, sigma=100.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
+                call scale_cf_gaussian(cf_ref,dyn%par%cf_stream*0.05,x0= 380.0, y0=-960.0, sigma=100.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
+                call scale_cf_gaussian(cf_ref,dyn%par%cf_stream*0.05,x0= 400.0, y0=-1150.0,sigma=100.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
+
+
+if (.FALSE.) then 
                 ! Increase - feeding the Ronne ice shelf from the North
                 call scale_cf_gaussian(cf_ref,dyn%par%cf_stream*4.00,x0=-700.0, y0=    0.0,sigma=200.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
                 
@@ -511,7 +586,9 @@ contains
                 call scale_cf_gaussian(cf_ref,dyn%par%cf_stream*0.05,x0= 280.0, y0=-760.0, sigma=100.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
                 call scale_cf_gaussian(cf_ref,dyn%par%cf_stream*0.05,x0= 380.0, y0=-960.0, sigma=100.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
                 call scale_cf_gaussian(cf_ref,dyn%par%cf_stream*0.05,x0= 400.0, y0=-1150.0,sigma=100.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
-                
+
+end if 
+
 if (.FALSE.) then
                 ! Reduction 
                 call scale_cf_gaussian(cf_ref,dyn%par%cf_stream*0.25,x0=-2000.0,y0=1000.0, sigma=100.0,xx=grd%x*1e-3,yy=grd%y*1e-3)

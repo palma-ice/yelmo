@@ -41,6 +41,7 @@ module yelmo_defs
 
     ! Yelmo configuration options 
     logical :: yelmo_log
+    logical :: yelmo_use_omp 
 
     ! Physical constants 
     real(prec) :: sec_year       ! [s] seconds per year 
@@ -93,6 +94,11 @@ module yelmo_defs
         real(prec)         :: dx, dy
         character(len=256) :: boundaries 
         
+        character(len=256) :: pc_step 
+        real(prec) :: dt_zeta, dt_beta(4)
+
+        real(prec) :: speed, speed_pred, speed_corr 
+
     end type
 
     ! ytopo state variables
@@ -131,13 +137,18 @@ module yelmo_defs
         logical,    allocatable :: is_grline(:,:)   ! Grounding line points
         logical,    allocatable :: is_grz(:,:)      ! Grounding line plus grounded neighbors
         
+        real(prec), allocatable :: dHdt_n(:,:)      ! [m/a] Ice thickness change due to advection only
+        real(prec), allocatable :: H_ice_n(:,:)     ! [m] Ice thickness from the previous timestep 
+        real(prec), allocatable :: H_ice_pred(:,:)  ! [m] Ice thickness, predicted, for time=n+1
+        real(prec), allocatable :: H_ice_corr(:,:)  ! [m] Ice thickness, corrected, for time=n+1 
+        
     end type
 
     ! ytopo class
     type ytopo_class
 
-        type(ytopo_param_class) :: par        ! Parameters
-        type(ytopo_state_class) :: now        ! Variables
+        type(ytopo_param_class) :: par          ! Parameters
+        type(ytopo_state_class) :: now          ! Variables
 
     end type
 
@@ -151,10 +162,9 @@ module yelmo_defs
     type ydyn_param_class
 
         character(len=256) :: solver 
-        character(len=256) :: sia_solver 
-        character(len=256) :: ssa_solver_opt 
         integer    :: mix_method            ! Method for mixing sia and ssa velocity solutions
         logical    :: calc_diffusivity      ! Calculate diagnostic diffusivity field
+        logical    :: diva_no_slip 
         integer    :: beta_method
         real(prec) :: beta_const
         real(prec) :: beta_q                ! Friction law exponent
@@ -177,6 +187,8 @@ module yelmo_defs
         real(prec) :: cf_stream
         integer    :: n_sm_beta 
         real(prec) :: beta_min              ! Minimum allowed value of beta
+        real(prec) :: eps_0                 ! Minimum assumed strain rate for effective viscosity regularization
+        character(len=256) :: ssa_lis_opt 
         real(prec) :: ssa_beta_max          ! Maximum value of beta for which ssa should be calculated
         real(prec) :: ssa_vel_max
         integer    :: ssa_iter_max 
@@ -203,13 +215,16 @@ module yelmo_defs
         
         ! Internal parameters 
         character(len=256) :: boundaries 
-        logical    :: use_ssa                    ! Should ssa be used? 
-        logical    :: use_bmb                    ! Set to match `use_bmb` in ytopo_param_class 
+        logical    :: use_ssa                   ! Should ssa be used? 
+        logical    :: use_bmb                   ! Set to match `use_bmb` in ytopo_param_class 
         integer    :: nx, ny, nz_aa, nz_ac 
         real(prec) :: dx, dy
         real(prec), allocatable :: zeta_aa(:)   ! Layer centers (aa-nodes), plus base and surface: nz_aa points 
         real(prec), allocatable :: zeta_ac(:)   ! Layer borders (ac-nodes), plus base and surface: nz_ac == nz_aa-1 points
         real(prec) :: time
+
+        integer    :: ssa_iter_now              ! Number of iterations used for Picard iteration to solve ssa this timestep
+        real(prec) :: speed 
 
     end type
 
@@ -226,12 +241,12 @@ module yelmo_defs
         real(prec), allocatable :: uy_bar(:,:)
         real(prec), allocatable :: uxy_bar(:,:)
 
+        real(prec), allocatable :: ux_bar_prev(:,:) 
+        real(prec), allocatable :: uy_bar_prev(:,:)
+
         real(prec), allocatable :: ux_b(:,:) 
         real(prec), allocatable :: uy_b(:,:)
         real(prec), allocatable :: uxy_b(:,:)
-
-        real(prec), allocatable :: ux_bar_nm1(:,:) 
-        real(prec), allocatable :: uy_bar_nm1(:,:)
 
         ! Surface velocity: eventually these could be pointers since it is simply
         ! the top layer in ux(:,:,:), etc. and only used, not calculated.
@@ -275,7 +290,8 @@ module yelmo_defs
         real(prec), allocatable :: qq_acy(:,:) 
         real(prec), allocatable :: qq(:,:)
         
-        real(prec), allocatable :: visc_eff(:,:)
+        real(prec), allocatable :: visc_eff(:,:,:)
+        real(prec), allocatable :: visc_eff_int(:,:)
 
         real(prec), allocatable :: N_eff(:,:)       ! Effective pressure
         real(prec), allocatable :: cf_ref(:,:)
@@ -284,6 +300,9 @@ module yelmo_defs
         real(prec), allocatable :: beta_acy(:,:) 
         real(prec), allocatable :: beta(:,:) 
         
+        real(prec), allocatable :: beta_eff(:,:) 
+        real(prec), allocatable :: beta_diva(:,:)
+
         real(prec), allocatable :: f_vbvs(:,:) 
 
         integer,    allocatable :: ssa_mask_acx(:,:) 
@@ -298,7 +317,7 @@ module yelmo_defs
 
         type(ydyn_param_class)    :: par        ! physical parameters
         type(ydyn_state_class)    :: now
-          
+
     end type
 
     ! =========================================================================
@@ -327,27 +346,32 @@ module yelmo_defs
     
     type ymat_param_class
         
-        character(len=56) :: flow_law
-        integer    :: rf_method 
-        real(prec) :: rf_const
-        logical    :: rf_use_eismint2
-        logical    :: rf_with_water 
-        real(prec) :: n_glen                     ! Flow law exponent (n_glen=3)
-        real(prec) :: visc_min  
-        logical    :: use_2D_enh
-        real(prec) :: enh_shear
-        real(prec) :: enh_stream
-        real(prec) :: enh_shlf
+        character(len=56)   :: flow_law
+        integer             :: rf_method 
+        real(prec)          :: rf_const
+        logical             :: rf_use_eismint2
+        logical             :: rf_with_water 
+        real(prec)          :: n_glen                       ! Flow law exponent (n_glen=3)
+        real(prec)          :: visc_min  
+        real(prec)          :: de_max 
+        character(len=56)   :: enh_method  
+        real(prec)          :: enh_shear
+        real(prec)          :: enh_stream
+        real(prec)          :: enh_shlf
+        real(prec)          :: enh_umin 
+        real(prec)          :: enh_umax
+        logical             :: calc_age
+        real(prec), allocatable :: age_iso(:)
+        character(len=56)   :: tracer_method  
+        real(prec)          :: tracer_impl_kappa
         
-        
-        character(len=56) :: age_method  
-        real(prec)        :: age_impl_kappa
-
         ! Internal parameters
         real(prec) :: time 
-        logical    :: calc_age
         real(prec) :: dx, dy  
         integer    :: nx, ny, nz_aa, nz_ac  
+        integer    :: n_iso 
+
+        real(prec) :: speed 
 
         real(prec), allocatable :: zeta_aa(:)   ! Layer centers (aa-nodes), plus base and surface: nz_aa points 
         real(prec), allocatable :: zeta_ac(:)   ! Layer borders (ac-nodes), plus base and surface: nz_ac == nz_aa-1 points
@@ -360,6 +384,7 @@ module yelmo_defs
         type(strain_3D_class)   :: strn 
 
         real(prec), allocatable :: enh(:,:,:)
+        real(prec), allocatable :: enh_bnd(:,:,:)
         real(prec), allocatable :: enh_bar(:,:)
         real(prec), allocatable :: ATT(:,:,:) 
         real(prec), allocatable :: ATT_bar(:,:)
@@ -368,7 +393,8 @@ module yelmo_defs
 
         real(prec), allocatable :: f_shear_bar(:,:) 
         
-        real(prec), allocatable :: dep_time(:,:,:)    ! Ice deposition time (for online age tracing)
+        real(prec), allocatable :: dep_time(:,:,:)      ! Ice deposition time (for online age tracing)
+        real(prec), allocatable :: depth_iso(:,:,:)     ! Depth of specific isochronal layers
 
     end type 
 
@@ -386,6 +412,7 @@ module yelmo_defs
     !ytherm parameters 
     type ytherm_param_class
         character(len=256)  :: method  
+        character(len=256)  :: dt_method  
         character(len=256)  :: solver_advec 
         integer             :: nx, ny 
         real(prec)          :: dx, dy  
@@ -412,6 +439,9 @@ module yelmo_defs
         real(prec), allocatable :: dzeta_b(:)
         
         real(prec) :: time
+        real(prec) :: dt_zeta, dt_beta(2)
+
+        real(prec) :: speed 
 
     end type
 
@@ -435,6 +465,8 @@ module yelmo_defs
         real(prec), allocatable :: kt(:,:,:)        ! Heat conductivity  
         real(prec), allocatable :: H_cts(:,:)       ! Height of the cts
         
+        real(prec), allocatable :: advecxy(:,:,:)
+
     end type
 
     ! ytherm class
@@ -469,6 +501,8 @@ module yelmo_defs
         real(prec), allocatable :: bmb_shlf(:,:)
         real(prec), allocatable :: T_shlf(:,:)
         real(prec), allocatable :: Q_geo(:,:)
+
+        real(prec), allocatable :: enh_srf(:,:)
 
         ! Useful masks
         real(prec), allocatable :: basins(:,:) 
@@ -509,7 +543,11 @@ module yelmo_defs
         logical             :: pd_vel_load  
         character(len=1028) :: pd_vel_path 
         character(len=56)   :: pd_vel_names(2) 
-        
+        logical             :: pd_age_load 
+        character(len=1028) :: pd_age_path 
+        character(len=56)   :: pd_age_names(2) 
+        integer             :: pd_age_n_iso 
+
         character(len=56)   :: domain 
     end type 
 
@@ -517,16 +555,22 @@ module yelmo_defs
         ! Variables that contain observations / reconstructions for comparison/inversion
         real(prec), allocatable :: H_ice(:,:), z_srf(:,:), z_bed(:,:), H_grnd(:,:)
         real(prec), allocatable :: ux_s(:,:), uy_s(:,:), uxy_s(:,:) 
-        real(prec), allocatable :: T_srf(:,:), smb(:,:) 
+        real(prec), allocatable :: T_srf(:,:), smb(:,:)
+        real(prec), allocatable :: depth_iso(:,:,:)  
+        
         ! Comparison metrics 
         real(prec), allocatable :: err_H_ice(:,:), err_z_srf(:,:), err_z_bed(:,:)
         real(prec), allocatable :: err_uxy_s(:,:)
-        
+        real(prec), allocatable :: err_depth_iso(:,:,:) 
+
+        ! Axis 
+        real(prec), allocatable :: age_iso(:) 
+
         real(prec) :: rmse_H 
         real(prec) :: rmse_zsrf
         real(prec) :: rmse_uxy 
         real(prec) :: rmse_loguxy 
-             
+        real(prec), allocatable :: rmse_iso(:) 
     
     end type
 
@@ -628,6 +672,10 @@ module yelmo_defs
         real(prec)          :: cfl_max 
         real(prec)          :: cfl_diff_max 
         character (len=56)  :: pc_method
+        character (len=56)  :: pc_controller
+        logical             :: pc_filter_vel 
+        logical             :: pc_use_H_pred 
+        integer             :: pc_n_redo 
         real(prec)          :: pc_tol 
         real(prec)          :: pc_eps  
 
@@ -645,15 +693,22 @@ module yelmo_defs
         real(prec) :: pc_dt(3)
         real(prec) :: pc_eta(3)
         real(prec), allocatable :: pc_tau(:,:)
-
-        ! Timing information 
-        real(prec) :: model_speed 
-        real(prec) :: model_speeds(100)     ! Use 100 timesteps for running mean  
-        real(prec) :: dt_avg 
-        real(prec) :: dts(100)              ! Use 100 timesteps for running mean 
-        real(prec) :: eta_avg 
-        real(prec) :: etas(100)             ! Use 100 timesteps for running mean 
+        real(prec), allocatable :: pc_tau_masked(:,:)
         
+        ! Timing information
+        real(prec) :: model_speed 
+        real(prec) :: model_speeds(100)         ! Eg, 100 timesteps for running mean 
+        real(prec) :: dt_avg 
+        real(prec) :: dts(100)                  ! Eg, 100 timesteps for running mean
+        real(prec) :: eta_avg 
+        real(prec) :: etas(100)                 ! Eg, 100 timesteps for running mean
+        real(prec) :: ssa_iter_avg 
+        real(prec) :: ssa_iters(100)            ! Eg, 100 timesteps for running mean
+        
+        ! Truncation error information over several timesteps
+        real(prec), allocatable :: pc_taus(:,:,:)
+        real(prec), allocatable :: pc_tau_max(:,:)
+
         character(len=512)   :: log_timestep_file 
 
     end type
@@ -705,13 +760,41 @@ contains
 
     subroutine yelmo_global_init(filename)
 
+        !$ use omp_lib 
+
+        implicit none 
+
         character(len=*), intent(IN)  :: filename
         
         ! Local variables
-        logical :: init_pars 
+        logical :: init_pars
+        integer :: n_threads 
+        character(len=10) :: n_threads_str 
 
         init_pars = .TRUE. 
         
+        ! Check openmp status - set global variable to use as a switch 
+        yelmo_use_omp = .FALSE. 
+        !$ yelmo_use_omp = .TRUE.
+
+        ! Output some information about openmp status 
+        if (yelmo_use_omp) then 
+            
+            n_threads = 1
+            !$ n_threads = omp_get_max_threads() 
+
+            write(n_threads_str,"(i10)") n_threads 
+            n_threads_str = adjustl(n_threads_str)
+
+            write(*,*) "yelmo_global_init:: openmp is active, Yelmo will run on "//trim(n_threads_str)//" thread(s)."
+            
+        else 
+            
+            n_threads = 1
+            write(*,*) "yelmo_global_init:: openmp is not active, Yelmo will run on 1 thread."
+
+        end if 
+
         ! Load parameter values 
 
         call nml_read(filename,"yelmo_config","yelmo_log",yelmo_log,init=init_pars)
@@ -781,90 +864,180 @@ contains
 
     end subroutine yelmo_load_command_line_args 
 
-     subroutine yelmo_calc_speed(rate,rates,model_time0,model_time1,cpu_time0)
-        ! Calculate the model computational speed [model-kyr / hr]
-        ! Note: uses a running mean of rates over the last X steps, in order
-        ! to provide a smoother estimate of the rate 
+    subroutine yelmo_cpu_time(time,time0,dtime)
+        ! Calculate time intervals using system_clock.
+
+        ! Note: for mulithreading, cpu_time() won't work properly.
+        ! Instead, system_clock() should be used as it is here, 
+        ! unless use_cpu_time=.TRUE. 
+
+        !$ use omp_lib
 
         implicit none 
 
-        real(prec), intent(OUT)   :: rate        ! [kyr / hr]
-        real(prec), intent(INOUT) :: rates(:)    ! [kyr / hr]
+        real(8), intent(OUT) :: time 
+        real(8), intent(IN),  optional :: time0 
+        real(8), intent(OUT), optional :: dtime 
 
-        real(prec), intent(IN) :: model_time0    ! [yr]
-        real(prec), intent(IN) :: model_time1    ! [yr]
-        real(prec), intent(IN) :: cpu_time0      ! [sec]
-        
         ! Local variables
-        integer    :: ntot, n 
-        real(4)    :: cpu_time1      ! [sec]
-        real(prec) :: rate_now 
+        logical    :: using_omp 
+        integer(4) :: clock 
+        integer(4) :: clock_rate
+        integer(4) :: clock_max 
+        real(8)    :: wtime 
 
-        ! Get current time 
-        call cpu_time(cpu_time1)
+        ! Check openmp status - do not use global switch, since it may not have been initialized yet
+        using_omp = .FALSE. 
+        !$ using_omp = .TRUE.
 
-        if (model_time1 .gt. model_time0) then 
-            ! Model has advanced in time, calculate rate 
+        if (using_omp) then 
+            ! --------------------------------------
+            ! omp_get_wtime must be used for multithread openmp execution to get timing on master thread 
+            ! The following lines will overwrite time with the result from omp_get_wtime on the master thread 
 
-            ! Calculate the model speed [model-yr / sec]
-            rate_now = (model_time1-model_time0) / (cpu_time1-cpu_time0)
+            !$ time = omp_get_wtime()
 
-            ! Convert to more useful rate [model-kyr / hr]
-            rate_now = rate_now*1e-3*3600.0 
-
-            if (abs(rate_now) .lt. tol_underflow) rate_now = 0.0_prec 
-
+            ! --------------------------------------
+            
         else 
-            rate_now = 0.0 
+
+            ! cpu_time can be used for serial execution to get timing on 1 processor
+            call cpu_time(time)
+
         end if 
 
-        ! Shift rates vector to eliminate oldest entry, and add current entry
-        n = size(rates) 
-        rates    = cshift(rates,1)
-        rates(n) = rate_now 
+        if (present(dtime)) then 
+            ! Calculate time interval 
 
-        ! Avoid underflows
-        !where(abs(rates) .lt. tol_underflow) rates = 0.0_prec
-        
-        ! Calculate running average rate 
-        n    = count(rates .gt. 0.0_prec)
-        if (n .gt. 0) then 
-            rate = sum(rates,mask=rates .gt. 0.0_prec) / real(n,prec)
+            if (.not. present(time0)) then  
+                write(*,*) "yelmo_cpu_time:: Error: time0 argument is missing, but necessary."
+                stop
+            end if 
+            
+            ! Calculate the difference between current time and time0 in [s]
+            dtime = time - time0
+
+            ! Limit dtime to non-zero number 
+            if (dtime .eq. 0.0d0) then
+                write(*,*) "yelmo_cpu_time:: Error: dtime cannot equal zero - check precision of timing variables, &
+                            &which should be real(kind=8) to maintain precision."
+                write(*,*) "clock", time, time0, dtime  
+                stop  
+            end if 
+
+        end if 
+
+        return 
+
+    end subroutine yelmo_cpu_time 
+
+    subroutine yelmo_calc_speed(speed,model_time0,model_time1,cpu_time0,cpu_time1)
+        ! Calculate the model computational speed [model-kyr / hr]
+        ! given model times for start and end of window in [yr]
+        ! and cpu processing times for start and end of window in [sec]
+
+        implicit none 
+
+        real(prec), intent(OUT) :: speed            ! [kyr / hr]
+        real(prec), intent(IN)  :: model_time0      ! [yr]
+        real(prec), intent(IN)  :: model_time1      ! [yr]
+        real(8),    intent(IN)  :: cpu_time0        ! [sec]
+        real(8),    intent(IN)  :: cpu_time1        ! [sec]
+
+        ! Local variables 
+        real(prec) :: cpu_dtime 
+        real(prec) :: model_dtime 
+
+        cpu_dtime   = (cpu_time1 - cpu_time0)/3600.d0       ! [sec] => [hr] 
+        model_dtime = (model_time1 - model_time0)*1d-3      ! [yr] => [kyr] 
+
+        if (cpu_dtime .gt. 0.0) then 
+            speed = model_dtime / cpu_dtime                 ! [kyr / hr]
         else 
-            rate = 0.0_prec 
+            speed = 0.0 
         end if 
 
         return 
 
     end subroutine yelmo_calc_speed 
     
-    subroutine yelmo_calc_running_mean(val_avg,vals,val_now)
+    subroutine yelmo_calc_running_stats(val_out,vals,val_now,stat)
 
         implicit none 
 
-        real(prec), intent(OUT)   :: val_avg 
+        real(prec), intent(OUT)   :: val_out 
         real(prec), intent(INOUT) :: vals(:) 
         real(prec), intent(IN)    :: val_now 
-
+        character(len=*), intent(IN) :: stat          ! 'mean', 'min', 'max', 'stdev'
+        
         ! Local variables 
-        integer :: n 
+        integer    :: n 
+        real(prec) :: val_mean 
 
-        ! Shift rates vector to eliminate oldest entry, and add current entry
-        n = size(vals) 
-        vals    = cshift(vals,1)
-        vals(n) = val_now  
+        ! Shift rates vector to eliminate oldest entry, and add current entry in the first position
+        vals    = cshift(vals,-1)
+        vals(1) = val_now  
 
-        ! Calculate running average value 
+        ! Calculate running stats value 
         n    = count(vals .ne. 0.0_prec)
         if (n .gt. 0) then 
-            val_avg = sum(vals,mask=vals .ne. 0.0_prec) / real(n,prec)
-        else 
-            val_avg = 0.0_prec 
+
+            select case(trim(stat))
+
+                case("mean")
+                    val_out = sum(vals,mask=vals .ne. 0.0_prec) / real(n,prec)
+                case("min")
+                    val_out = minval(vals,mask=vals .ne. 0.0_prec)
+                case("max")
+                    val_out = maxval(vals,mask=vals .ne. 0.0_prec)
+                case("stdev")
+                    val_mean = sum(vals,mask=vals .ne. 0.0_prec) / real(n,prec)
+                    val_out  = sqrt(sum((vals-val_mean)**2,mask=vals .ne. 0.0_prec) / real(n,prec))
+
+                case DEFAULT 
+                    write(*,*) "yelmo_calc_running_stats:: Error: stat not found."
+                    write(*,*) "stat = ", trim(stat) 
+                    stop 
+
+            end select 
+                   
+        else
+
+            val_out = 0.0_prec 
+        
         end if 
 
         return 
 
-    end subroutine yelmo_calc_running_mean
+    end subroutine yelmo_calc_running_stats
+
+    subroutine yelmo_calc_running_stats_2D(val_out,vals,val_now,stat)
+
+        implicit none 
+
+        real(prec), intent(OUT)   :: val_out(:,:) 
+        real(prec), intent(INOUT) :: vals(:,:,:) 
+        real(prec), intent(IN)    :: val_now(:,:) 
+        character(len=*), intent(IN) :: stat            ! 'mean', 'min', 'max', 'stdev'
+        
+        ! Local variables
+        integer :: i, j, nx, ny  
+        integer :: n, k, n_now  
+
+        nx = size(val_out,1)
+        ny = size(val_out,2) 
+
+        do j = 1, ny 
+        do i = 1, nx 
+
+            call yelmo_calc_running_stats(val_out(i,j),vals(i,j,:),val_now(i,j),stat)
+
+        end do 
+        end do  
+
+        return 
+
+    end subroutine yelmo_calc_running_stats_2D
 
 end module yelmo_defs
 

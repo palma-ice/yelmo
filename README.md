@@ -157,7 +157,7 @@ To perform the moving margin experiment, compile the benchmarks
 executable and call it with the EISMINT parameter file:
 ```
 make benchmarks
-python run_yelmo.py -r -e benchmarks output/test-moving par/gmd/yelmo_EISMINT_moving.nml
+python run_yelmo.py -r -e benchmarks output/test-moving par-gmd/yelmo_EISMINT_moving.nml
 ```
 
 ### 2. EISMINT2 EXPA
@@ -165,7 +165,7 @@ To perform Experiment A from the EISMINT2 benchmarks, compile the benchmarks
 executable and call it with the EXPA parameter file:
 ```
 make benchmarks
-python run_yelmo.py -r -e benchmarks output/test-expa par/gmd/yelmo_EISMINT_expa.nml
+python run_yelmo.py -r -e benchmarks output/test-expa par-gmd/yelmo_EISMINT_expa.nml
 ```
 
 ### 3. EISMINT2 EXPF
@@ -173,7 +173,7 @@ To perform Experiment F from the EISMINT2 benchmarks, compile the benchmarks
 executable and call it with the EXPF parameter file:
 ```
 make benchmarks
-python run_yelmo.py -r -e benchmarks output/test-expf par/gmd/yelmo_EISMINT_expf.nml
+python run_yelmo.py -r -e benchmarks output/test-expf par-gmd/yelmo_EISMINT_expf.nml
 ```
 
 ### 4. MISMIP RF
@@ -181,7 +181,7 @@ To perform the MISMIP rate factor experiment, compile the mismip executable
 and call it with the MISMIP parameter file:
 ```
 make mismip
-python run_yelmo.py -r -e mismip output/test-mismip par/gmd/yelmo_MISMIP3D.nml
+python run_yelmo.py -r -e mismip output/test-mismip par-gmd/yelmo_MISMIP3D.nml
 ```
 To perform the different permutations, it is necessary to change the resolution
 `&mismip::dx` in the parameter file (reducing the timestep `&mismip::dtt` for higher resolutions).
@@ -211,9 +211,11 @@ program file, as well as the output filename.
 ### 6. Antarctica present-day and glacial simulations
 To perform the Antarctica simulations as presented in the paper, it is necessary
 to compile the `initmip` executable and run with the present-day (pd) and
-glacial (lgm) parameter files:
+glacial (lgm) parameter values:
 ```
 make initmip
-python run_yelmo.py -r -e initmip output/test-ant-pd par/gmd/yelmo_Antarctica_pd.nml
-python run_yelmo.py -r -e initmip output/test-ant-lgm par/gmd/yelmo_Antarctica_lgm.nml
+# In par-gmd/yelmo_Antarctica.nml, set control.clim_nm="clim_pd"
+python run_yelmo.py -r -e initmip output/test-ant-pd par-gmd/yelmo_Antarctica.nml
+# In par-gmd/yelmo_Antarctica.nml, set control.clim_nm="clim_lgm"
+python run_yelmo.py -r -e initmip output/test-ant-lgm par-gmd/yelmo_Antarctica.nml
 ```

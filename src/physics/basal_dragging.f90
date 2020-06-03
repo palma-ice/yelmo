@@ -19,6 +19,11 @@ module basal_dragging
 
     private
 
+    ! General functions for beta
+    public :: calc_c_bed 
+    public :: calc_beta 
+    public :: stagger_beta 
+
     ! Effective pressure
     public :: calc_effective_pressure_overburden
     public :: calc_effective_pressure_marine
@@ -47,6 +52,243 @@ module basal_dragging
     public :: stagger_beta_aa_subgrid_1 
     
 contains 
+
+    subroutine calc_c_bed(c_bed,cf_ref,N_eff)
+
+        implicit none 
+
+        real(prec), intent(OUT) :: c_bed(:,:)       ! [Pa]
+        real(prec), intent(IN)  :: cf_ref(:,:)      ! [-]
+        real(prec), intent(IN)  :: N_eff(:,:)       ! [Pa] 
+
+        c_bed = cf_ref*N_eff 
+
+        return 
+
+    end subroutine calc_c_bed 
+
+    subroutine calc_beta(beta,c_bed,ux_b,uy_b,H_ice,H_grnd,f_grnd,z_bed,z_sl,beta_method, &
+                         beta_const,beta_q,beta_u0,beta_gl_scale,beta_gl_f,H_grnd_lim,beta_min,boundaries)
+
+        ! Update beta based on parameter choices
+
+        implicit none
+        
+        real(prec), intent(INOUT) :: beta(:,:) 
+        real(prec), intent(IN)    :: c_bed(:,:)  
+        real(prec), intent(IN)    :: ux_b(:,:) 
+        real(prec), intent(IN)    :: uy_b(:,:)  
+        real(prec), intent(IN)    :: H_ice(:,:) 
+        real(prec), intent(IN)    :: H_grnd(:,:) 
+        real(prec), intent(IN)    :: f_grnd(:,:) 
+        real(prec), intent(IN)    :: z_bed(:,:) 
+        real(prec), intent(IN)    :: z_sl(:,:) 
+        integer,    intent(IN)    :: beta_method
+        real(prec), intent(IN)    :: beta_const 
+        real(prec), intent(IN)    :: beta_q 
+        real(prec), intent(IN)    :: beta_u0 
+        integer,    intent(IN)    :: beta_gl_scale  
+        real(prec), intent(IN)    :: beta_gl_f
+        real(prec), intent(IN)    :: H_grnd_lim
+        real(prec), intent(IN)    :: beta_min 
+        character(len=*), intent(IN) :: boundaries 
+
+        ! Local variables 
+        integer :: i, j, nx, ny 
+        real(prec), allocatable :: logbeta(:,:) 
+        
+        nx = size(beta,1)
+        ny = size(beta,2)
+        allocate(logbeta(nx,ny))
+        logbeta = 0.0_prec 
+
+        ! 1. Apply beta method of choice 
+        select case(beta_method)
+
+            case(-1)
+                ! beta (aa-nodes) has been defined externally - do nothing
+                
+            case(0)
+                ! Constant beta everywhere
+
+                beta = beta_const 
+
+            case(1)
+                ! Calculate beta from a linear law (simply set beta=c_bed/u0)
+
+                beta = c_bed * (1.0_prec / beta_u0)
+
+            case(2)
+                ! Calculate beta from the quasi-plastic power-law as defined by Bueler and van Pelt (2015)
+
+                call calc_beta_aa_power_plastic(beta,ux_b,uy_b,c_bed,beta_q,beta_u0)
+                
+            case(3)
+                ! Calculate beta from regularized Coulomb law (Joughin et al., GRL, 2019)
+
+                call calc_beta_aa_reg_coulomb(beta,ux_b,uy_b,c_bed,beta_q,beta_u0)
+                
+            case DEFAULT 
+                ! Not recognized 
+
+                write(*,*) "calc_beta:: Error: beta_method not recognized."
+                write(*,*) "beta_method = ", beta_method
+                stop 
+
+        end select 
+
+        ! 1a. Ensure beta is relatively smooth 
+!         call regularize2D(beta,H_ice,dx)
+!         call limit_gradient(beta,H_ice,dx,log=.TRUE.)
+
+        ! 2. Scale beta as it approaches grounding line 
+        select case(beta_gl_scale) 
+
+            case(0) 
+                ! Apply fractional parameter at grounding line, no scaling when beta_gl_f=1.0
+
+                call scale_beta_gl_fraction(beta,f_grnd,beta_gl_f)
+
+            case(1) 
+                ! Apply H_grnd scaling, reducing beta linearly towards zero at the grounding line 
+
+                call scale_beta_gl_Hgrnd(beta,H_grnd,H_grnd_lim)
+
+            case(2) 
+                ! Apply scaling according to thickness above flotation (Zstar approach of Gladstone et al., 2017)
+                ! norm==.TRUE., so that zstar-scaling is bounded between 0 and 1, and thus won't affect 
+                ! choice of c_bed value that is independent of this scaling. 
+                
+                call scale_beta_gl_zstar(beta,H_ice,z_bed,z_sl,norm=.TRUE.)
+
+            case DEFAULT 
+                ! No scaling
+
+                write(*,*) "calc_beta:: Error: beta_gl_scale not recognized."
+                write(*,*) "beta_gl_scale = ", beta_gl_scale
+                stop 
+
+        end select 
+
+        ! 3. Ensure beta==0 for purely floating ice 
+        ! Note: since f_grnd_aa is binary, this does not affect any subgrid gl parameterization
+        ! that may be applied during the staggering step.
+
+        !  Simply set beta to zero where purely floating
+        where (f_grnd .eq. 0.0) beta = 0.0 
+        
+
+        ! Apply additional condition for particular experiments
+        if (trim(boundaries) .eq. "EISMINT") then 
+            ! Redefine beta at the summit to reduce singularity
+            ! in symmetric EISMINT experiments with sliding active
+            i = (nx-1)/2 
+            j = (ny-1)/2
+            beta(i,j) = (beta(i-1,j)+beta(i+1,j)+beta(i,j-1)+beta(i,j+1)) / 4.0 
+        else if (trim(boundaries) .eq. "MISMIP3D") then 
+            ! Redefine beta at the summit to reduce singularity
+            ! in MISMIP symmetric experiments
+            beta(1,:) = beta(2,:) 
+
+        else if (trim(boundaries) .eq. "periodic") then 
+            
+            beta(1,:)  = beta(nx-1,:)
+            beta(nx,:) = beta(2,:) 
+            beta(:,1)  = beta(:,ny-1)
+            beta(:,ny) = beta(:,2) 
+
+        end if 
+
+        ! Finally ensure that beta for grounded ice is higher than the lower allowed limit
+        where(beta .gt. 0.0 .and. beta .lt. beta_min) beta = beta_min 
+
+        ! ================================================================
+        ! Note: At this point the beta_aa field is available with beta=0 
+        ! for floating points and beta > 0 for non-floating points
+        ! ================================================================
+        
+        return 
+
+    end subroutine calc_beta 
+
+    subroutine stagger_beta(beta_acx,beta_acy,beta,f_grnd,f_grnd_acx,f_grnd_acy,beta_gl_stag,boundaries)
+
+        implicit none 
+
+        real(prec), intent(INOUT) :: beta_acx(:,:) 
+        real(prec), intent(INOUT) :: beta_acy(:,:) 
+        real(prec), intent(IN)    :: beta(:,:)
+        real(prec), intent(IN)    :: f_grnd(:,:) 
+        real(prec), intent(IN)    :: f_grnd_acx(:,:) 
+        real(prec), intent(IN)    :: f_grnd_acy(:,:) 
+        integer,    intent(IN)    :: beta_gl_stag 
+        character(len=*), intent(IN) :: boundaries 
+
+        ! Local variables 
+        integer :: nx, ny 
+
+        nx = size(beta_acx,1)
+        ny = size(beta_acx,2) 
+
+        ! 5. Apply staggering method with particular care for the grounding line 
+        select case(beta_gl_stag) 
+
+            case(-1)
+                ! Do nothing - beta_acx/acy has been defined externally
+
+            case(0) 
+                ! Apply pure staggering everywhere (ac(i) = 0.5*(aa(i)+aa(i+1))
+                
+                call stagger_beta_aa_mean(beta_acx,beta_acy,beta)
+
+            case(1) 
+                ! Apply upstream beta_aa value at ac-node with at least one neighbor H_grnd_aa > 0
+
+                call stagger_beta_aa_upstream(beta_acx,beta_acy,beta,f_grnd)
+
+            case(2) 
+                ! Apply downstream beta_aa value (==0.0) at ac-node with at least one neighbor H_grnd_aa > 0
+
+                call stagger_beta_aa_downstream(beta_acx,beta_acy,beta,f_grnd)
+
+            case(3)
+                ! Apply subgrid scaling fraction at the grounding line when staggering 
+
+                ! Note: now subgrid treatment is handled on aa-nodes above (using beta_gl_sep)
+
+                call stagger_beta_aa_subgrid(beta_acx,beta_acy,beta,f_grnd, &
+                                                f_grnd_acx,f_grnd_acy)
+
+!                 call stagger_beta_aa_subgrid_1(beta_acx,beta_acy,beta,H_grnd, &
+!                                             f_grnd,f_grnd_acx,f_grnd_acy)
+                
+            case DEFAULT 
+
+                write(*,*) "stagger_beta:: Error: beta_gl_stag not recognized."
+                write(*,*) "beta_gl_stag = ", beta_gl_stag
+                stop 
+
+        end select 
+
+        if (trim(boundaries) .eq. "periodic") then 
+
+            beta_acx(1,:)    = beta_acx(nx-2,:) 
+            beta_acx(nx-1,:) = beta_acx(2,:) 
+            beta_acx(nx,:)   = beta_acx(3,:) 
+            beta_acx(:,1)    = beta_acx(:,ny-1)
+            beta_acx(:,ny)   = beta_acx(:,2) 
+
+            beta_acy(1,:)    = beta_acy(nx-1,:) 
+            beta_acy(nx,:)   = beta_acy(2,:) 
+            beta_acy(:,1)    = beta_acy(:,ny-2)
+            beta_acy(:,ny-1) = beta_acy(:,2) 
+            beta_acy(:,ny)   = beta_acy(:,3)
+
+        end if 
+
+        return 
+
+    end subroutine stagger_beta
 
     elemental function calc_effective_pressure_overburden(H_ice,f_grnd) result(N_eff)
         ! Effective pressure as overburden pressure N_eff = rho*g*H_ice 

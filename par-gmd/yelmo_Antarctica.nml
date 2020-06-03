@@ -1,0 +1,209 @@
+&control    
+    time_init       = 0.0               ! [yr] Starting time 
+    time_end        = 50e3              ! [yr] Ending time
+    time_equil      = 100.0             ! [yr] Equilibration time 
+    dtt             = 5.0               ! [yr] Main loop timestep 
+    dt1D_out        = 100.0             ! [yr] Frequency of writing 1D output files 
+    dt2D_out        = 1000.0            ! [yr] Frequency of writing 2D output files 
+    
+    clim_nm         = "clim_pd"         ! "clim_pd" or "clim_lgm"
+    
+    load_cf_ref     = False             ! Load cf_ref from file? Otherwise define from cf_stream + inline tuning
+    file_cf_ref     = "input/{domain}/{grid_name}/{grid_name}_cf_ref_opt.nc"  ! Filename holding cf_ref to load 
+
+    load_bmelt      = False             ! Load PD bmelt observations from file? Else use bmb_shlf_const 
+    file_bmelt      = "input/{domain}/{grid_name}/{grid_name}_BMELT-R13.nc"
+/
+
+&clim_pd 
+    bmb_shlf_const  = -0.2              ! [m/a] Basal mass balance of ice shelves
+    dT_ann          = 0.0               ! [K] Temperature anomaly (atm)
+    z_sl            = 0.0               ! [m] Sea level relative to present-day 
+/
+
+&clim_lgm 
+    bmb_shlf_const  = 0.0               ! [m/a] Basal mass balance of ice shelves
+    dT_ann          = -10.0             ! [K] Temperature anomaly (atm)
+    z_sl            = -120.0            ! [m] Sea level relative to present-day 
+/
+
+&yelmo
+    domain          = "Antarctica"
+    grid_name       = "ANT-32KM"
+    grid_path       = "input/{domain}/{grid_name}/{grid_name}_REGIONS.nc"
+    experiment      = "None"       
+    restart         = "None"
+    log_timestep    = False 
+    zeta_scale      = "exp"             ! "linear", "exp", "tanh"
+    zeta_exp        = 2.0  
+    nz_aa           = 10                ! Vertical resolution in ice
+    dt_method       = 2                 ! 0: no internal timestep, 1: adaptive, cfl, 2: adaptive, pc
+    dt_min          = 0.01              ! [a] Minimum timestep 
+    cfl_max         = 0.1               ! Maximum value is 1.0, lower will be more stable
+    cfl_diff_max    = 0.12              ! Bueler et al (2007), Eq. 25  
+    pc_method       = "AB-SAM"          ! "FE-SBE", "AB-SAM", "HEUN"
+    pc_controller   = "PI42"            ! PI42, H312b, H312PID, H321PID, PID1
+    pc_filter_vel   = False             ! Use mean vel. solution of current and previous timestep
+    pc_use_H_pred   = False             ! Use predicted H_ice instead of corrected H_ice 
+    pc_tol          = 10.0              ! [m/a] Tolerance threshold to redo timestep
+    pc_eps          = 5.0               ! Predictor-corrector tolerance 
+    
+/
+
+&ytopo
+    solver            = "impl-upwind"   ! "expl", "impl-upwind"
+    calv_method       = "flux"          ! "zero", "simple", "flux", "kill"
+    surf_gl_method    = 0               ! 0: binary (max grnd/flt elevation), 1: subgrid average elevation
+    margin2nd         = False           ! Apply second-order upwind approximation to gradients at the margin
+    use_bmb           = True            ! Use basal mass balance in mass conservation equation
+    topo_fixed        = False           ! Keep ice thickness fixed, perform other ytopo calculations
+    topo_rel          = 0               ! 0: No relaxation; 1: relax shelf; 2: relax shelf + gl; 3: all points 
+    topo_rel_tau      = 10.0            ! [a] Time scale for relaxation 
+    calv_H_lim        = 175.0           ! [m] Calving limit in ice thickness (thinner ice calves)
+    calv_tau          = 1.0             ! [a] Characteristic calving time
+    H_min_grnd        = 5.0             ! [m] Minimum ice thickness at grounded margin (thinner ice is ablated) - helps with stability
+    H_min_flt         = 5.0             ! [m] Minimum ice thickness at floating margin (thinner ice is ablated) - helps with stability
+    sd_min            = 100.0           ! [m] calv_grnd(z_bed_sd <= sd_min) = 0.0 
+    sd_max            = 500.0           ! [m] calv_grnd(z_bed_sd >= sd_max) = calv_max  
+    calv_max          = 0.0             ! [m/a] Maximum grounded calving rate from high stdev(z_bed)
+    grad_lim          = 0.1             ! [m/m] Maximum allowed sloped in gradient calculations (dz/dx,dH/dx)
+    gl_sep            = 1               ! 1: Linear f_grnd_acx/acy and binary f_grnd, 2: area f_grnd, average to acx/acy
+    gl_sep_nx         = 15              ! [-] Number of interpolation points (nx*nx) to calculate grounded area at grounding line
+    diffuse_bmb_shlf  = False           ! Allow bmb_shlf to permeate inland at the grounding line 
+/
+
+&ydyn
+    solver              = "hybrid"        ! "fixed", "sia", "ssa", "hybrid", "diva"    
+    diva_no_slip        = False           ! If using the DIVA solver, is basal sliding allowed? 
+    beta_method         = 1               ! 0: constant beta; 1: linear (beta=cb/u0); 2: psuedo-plastic-power; 3: Regularized Coulomb
+    beta_const          = 1e3             ! [Pa a m−1] Constant value of basal friction coefficient to be used
+    beta_q              = 1.0             ! Dragging law exponent 
+    beta_u0             = 100.0           ! [m/a] Regularization term for regularized Coulomb law (beta_method=3)
+    beta_gl_scale       = 0               !  0: beta*beta_gl_f, 1: H_grnd linear scaling, 2: Zstar scaling 
+    beta_gl_stag        = 3               !  0: simple staggering, 1: Upstream beta at gl, 2: downstream, 3: f_grnd_ac scaling 
+    beta_gl_f           = 1.0             ! [-] Scaling of beta at the grounding line (for beta_gl_scale=0)
+    taud_gl_method      = 0               !  0: binary, no subgrid, 1: Two-sided gradient
+    H_grnd_lim          = 500.0           ! [m] For beta_gl_scale=1, reduce beta linearly between H_grnd=0 and H_grnd_lim 
+    H_sed_sat           = 250.0           ! [m] Sediment thickness at which sediment effect is saturated
+    cb_method           = -1              ! -1: set externally; 1: calculate cb online  
+    cb_with_pmp         = False           ! Weighted cf_frozen/cf_stream as a function of f_pmp 
+    cb_margin_pmp       = True            ! If using cb_with_pmp, additionally impose cf_stream at ice margins 
+    cb_scale            = "exp_zb"        ! "none", "lin_zb", "exp_zb", "till_const", "till_zb", scaling of cb spatially
+    cb_z0               = -200.0          ! [m] Bedrock elevation at which scaling goes to f_scale=e(-1)
+    cb_z1               =  250.0          ! [m] Bedrock elevation above which scaling goes to f_scale=1
+    cb_min              = 0.01            ! [--] Minimum allowed value of f_scale for grounded ice
+    cf_frozen           = 0.1             ! [--] Bed critical stress factor, frozen 
+    cf_stream           = 0.15            ! [--] Bed critical stress factor, stream  
+    n_sm_beta           = 0               ! [-] Standard deviation in gridpoints for Gaussian smoothing of beta (0==no smoothing)
+    beta_min            = 10.0            ! [Pa a m-1] Minimum value of beta allowed for grounded ice (for stability)
+    eps_0               = 1e-6            ! [1/a] Regularization term for effective viscosity - minimum strain rate
+    ssa_lis_opt         = "-i bicgsafe -p jacobi -maxiter 100 -tol 1.0e-4 -initx_zeros false"  ! See Lis library
+    ssa_beta_max        = 1e20            ! [Pa a m-1] Maximum value of beta for which ssa should be calculated 
+    ssa_vel_max         = 5000.0          ! [m a-1] SSA velocity limit to avoid spurious results 
+    ssa_iter_max        = 20              ! Number of maximum allowed iterations over ssa to converge on vel. solution
+    ssa_iter_rel        = 0.7             ! [--] Relaxation fraction [0:1] to stabilize ssa iterations
+    ssa_iter_conv       = 1e-2            ! [--] L2 relative error convergence limit to exit ssa iterations
+    taud_lim            = 2e5             ! [Pa] Maximum allowed driving stress 
+    cb_sia              = 0.0             ! [m a-1 Pa-1] Bed roughness coefficient for SIA sliding
+    
+/
+
+&ydyn_neff 
+    neff_method     = 2                 ! -1: external N_eff, 0: neff_const, 1: overburden pressure, 2: Leguy param., 3: Till pressure
+    neff_const      = 1e7               ! == rho_ice*g*(eg 1000 m ice thickness)
+    neff_p          = 1.0               ! *neff_method=2* marine connectivity exponent (0: none, 1: full)
+    neff_set_water  = False             ! *neff_method=3* Prescribe H_w = H_w_max for temperate ice instead of using H_w field?
+    neff_w_max      = 2.0               ! [m]  *neff_method=3* Maximum allowed water layer thickness for Till pressure 
+    neff_N0         = 1000.0            ! [Pa] *neff_method=3* Reference effective pressure 
+    neff_delta      = 0.04              ! [--] *neff_method=3* Fraction of overburden pressure for saturated till
+    neff_e0         = 0.69              ! [--] *neff_method=3* Reference void ratio at N0 
+    neff_Cc         = 0.12              ! [--] *neff_method=3* Till compressibility    
+/
+
+&ydyn_till
+    till_phi_const  =  10.0                 ! [degrees] Till friction angle, constant
+    till_phi_min    =   5.0                 ! [degrees] Till friction angle, minimum
+    till_phi_max    =  40.0                 ! [degrees] Till friction angle, maximum
+    till_phi_zmin   = -700.0                ! [m] Bedrock elevation for till_phi_min
+    till_phi_zmax   =  700.0                ! [m] Bedrock elevation for phi_max 
+/
+
+&ymat
+    flow_law                = "glen"        ! Only "glen" is possible right now
+    rf_method               = 1             ! -1: set externally; 0: rf_const everywhere; 1: standard function 
+    rf_const                = 1e-18         ! [Pa^-3 a^-1]
+    rf_use_eismint2         = False         ! Only applied for rf_method=1
+    rf_with_water           = False         ! Only applied for rf_method=1, scale rf by water content?
+    n_glen                  = 3.0           ! Glen flow law exponent
+    visc_min                = 1e3           ! [Pa a] Minimum allowed viscosity 
+    de_max                  = 0.5           ! [a-1]  Maximum allowed effective strain rate
+    enh_method              = "shear3D"     ! "simple","shear2D", "shear3D", "paleo-shear" 
+    enh_shear               = 2.0
+    enh_stream              = 0.7
+    enh_shlf                = 0.5
+    enh_umin                = 50.0          ! [m/yr] Minimum transition velocity to enh_stream (enh_method="paleo-shear")
+    enh_umax                = 500.0         ! [m/yr] Maximum transition velocity to enh_stream (enh_method="paleo-shear")
+    calc_age                = False         ! Calculate age tracer field?
+    age_iso                 = 0.0
+    tracer_method           = "expl"        ! "expl", "impl": used for age and 'paleo-shear' enh fields
+    tracer_impl_kappa       = 1.5           ! [m2 a-1] Artificial diffusion term for implicit tracer solving 
+    
+/
+
+&ytherm
+    method          = "temp"            ! "fixed", "robin", "temp", "enth"
+    dt_method       = "FE"              ! "FE", "AB", "SAM"
+    solver_advec    = "impl-upwind"     ! "expl", "impl-upwind"
+    gamma           = 1.0               ! [K] Scalar for the pressure melting point decay function 
+    use_strain_sia  = False             ! True: calculate strain heating from SIA approx.
+    n_sm_qstrn      = 0                 ! [-] Standard deviation in gridpoints for Gaussian smoothing of strain heating (0==no smoothing)
+    n_sm_qb         = 0                 ! [-] Standard deviation in gridpoints for Gaussian smoothing of basal heating (0==no smoothing)
+    use_const_cp    = False             ! Use specified constant value of heat capacity?
+    const_cp        = 2009.0            ! [J kg-1 K-1] Specific heat capacity 
+    use_const_kt    = False             ! Use specified constant value of heat conductivity?
+    const_kt        = 6.62e7            ! [J a-1 m-1 K-1] Thermal conductivity [W m-1 K-1 * sec_year] => [J a-1 m-1 K-1]
+    enth_cr         = 1e-3              ! [--] Conductivity ratio for temperate ice (kappa_temp     = enth_cr*kappa_cold)
+    omega_max       = 0.01              ! [--] Maximum allowed water content fraction 
+    till_rate       = 0.0               ! [m/a] Basal water till drainage rate (water equiv.)
+    H_w_max         = 2.0               ! [m] Maximum limit to basal water layer thickness (water equiv.)
+/
+
+&yelmo_masks
+    basins_load     = True 
+    basins_path     = "input/{domain}/{grid_name}/{grid_name}_BASINS-nasa.nc" 
+    basins_nms      = "basin" "basin_mask"
+    regions_load    = True 
+    regions_path    = "input/{domain}/{grid_name}/{grid_name}_REGIONS.nc"
+    regions_nms     = "mask" "None"
+/
+
+&yelmo_init_topo
+    H_ice_load      = True 
+    H_ice_path      = "input/{domain}/{grid_name}/{grid_name}_TOPO-RTOPO-2.0.1.nc"
+    H_ice_nm        = "H_ice"               ! [m] Ice thickness 
+    z_bed_load      = True 
+    z_bed_path      = "input/{domain}/{grid_name}/{grid_name}_TOPO-RTOPO-2.0.1.nc"
+    z_bed_nm        = "z_bed"               ! [m] Bedrock elevation 
+    z_bed_sd_nm     = "z_bed_sd"            ! [m] Bedrock elevation standard deviation (if available) 
+/
+
+&yelmo_data 
+    pd_topo_load      = True 
+    pd_topo_path      = "input/{domain}/{grid_name}/{grid_name}_TOPO-RTOPO-2.0.1.nc"
+    pd_topo_names     = "H_ice" "z_srf" "z_bed"      ! Ice thickness, Surface elevation, Bedrock elevation
+    pd_tsrf_load      = True 
+    pd_tsrf_path      = "input/{domain}/{grid_name}/{grid_name}_RACMO23-ERAINT-HYBRID_1981-2010.nc"
+    pd_tsrf_name      = "T_srf"                      ! Surface temperature (or near-surface temperature)
+    pd_tsrf_monthly   = True
+    pd_smb_load       = True 
+    pd_smb_path       = "input/{domain}/{grid_name}/{grid_name}_RACMO23-ERAINT-HYBRID_1981-2010.nc"
+    pd_smb_name       = "smb"                        ! Surface mass balance 
+    pd_smb_monthly    = True 
+    pd_vel_load       = True 
+    pd_vel_path       = "input/{domain}/{grid_name}/{grid_name}_VEL-R11-2.nc"
+    pd_vel_names      = "ux_srf" "uy_srf"            ! Surface velocity 
+    pd_age_load       = False 
+    pd_age_path       = "input/{domain}/{grid_name}/{grid_name}_STRAT-M15.nc"
+    pd_age_names      = "age_iso" "depth_iso"        ! ages of isochrones; depth of isochrones 
+
+/

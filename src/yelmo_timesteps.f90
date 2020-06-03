@@ -11,6 +11,7 @@ module yelmo_timesteps
     public :: calc_pc_eta
     public :: calc_pc_tau_fe_sbe
     public :: calc_pc_tau_ab_sam
+    public :: calc_pc_tau_heun
     public :: set_adaptive_timestep_pc
     
     public :: set_adaptive_timestep 
@@ -34,10 +35,15 @@ contains
 
         ! Local variables 
         integer :: i, j, nx, ny 
+        integer :: im1, jm1, ip1, jp1 
 
         nx = size(mask,1)
         ny = size(mask,2) 
 
+if (.FALSE.) then 
+    ! Old method 
+
+        ! Initially set all points to False 
         mask = .FALSE. 
 
         ! Limit to ice-covered, grounded points 
@@ -53,6 +59,54 @@ contains
             end if 
         end do 
         end do
+
+else 
+
+        ! Initially set all points to True 
+        mask = .TRUE. 
+        
+        do j = 1, ny 
+        do i = 1, nx
+
+            im1 = max(i-1,1)
+            jm1 = max(j-1,1)
+            ip1 = min(i+1,nx)
+            jp1 = min(j+1,ny)
+
+            ! Define places that should not be checked 
+
+            if (H_ice(i,j) .eq. 0.0_prec) then 
+                ! Ice-free point
+
+                mask(i,j) = .FALSE. 
+
+            else
+                ! Ice-covered points, further checks below
+
+                 if (count(H_ice(im1:ip1,jm1:jp1).eq.0.0_prec) .gt. 0) then 
+                    ! Neighbor is ice-free: ice-margin point 
+
+                    mask(i,j) = .FALSE. 
+
+                else if (f_grnd(i,j) .lt. 1.0_prec) then 
+                    ! Grounding-line or floating ice point 
+
+                    mask(i,j) = .FALSE. 
+
+!                 else if (f_grnd(i,j) .eq. 1.0_prec .and. &
+!                             count(f_grnd(im1:ip1,jm1:jp1).lt.1.0_prec) .gt. 0) then 
+!                     ! Neighbor at the grounding line
+
+!                     mask(i,j) = .FALSE. 
+
+                end if 
+
+            end if 
+
+        end do 
+        end do  
+
+end if 
 
         return 
 
@@ -129,7 +183,28 @@ contains
 
     end subroutine calc_pc_tau_ab_sam
 
-    subroutine set_adaptive_timestep_pc(dt_new,dt,eta,eps,dtmin,dtmax,mask,ux_bar,uy_bar,dx,pc_k)
+    elemental subroutine calc_pc_tau_heun(tau,var_corr,var_pred,dt_n)
+        ! Calculate truncation error for Heun's timestepping method
+        ! as derived by Marisa Montoya 
+
+        implicit none 
+
+        real(prec), intent(OUT) :: tau
+        real(prec), intent(IN)  :: var_corr
+        real(prec), intent(IN)  :: var_pred
+        real(prec), intent(IN)  :: dt_n 
+        
+        if (dt_n .eq. 0.0_prec) then 
+            tau = 0.0_prec 
+        else 
+            tau = (1.0_prec / (6.0_prec*dt_n)) * (var_corr - var_pred)
+        end if 
+
+        return 
+
+    end subroutine calc_pc_tau_heun
+
+    subroutine set_adaptive_timestep_pc(dt_new,dt,eta,eps,dtmin,dtmax,mask,ux_bar,uy_bar,dx,pc_k,controller)
         ! Calculate the timestep following algorithm for 
         ! a general predictor-corrector (pc) method.
         ! Implemented followig Cheng et al (2017, GMD)
@@ -147,6 +222,7 @@ contains
         real(prec), intent(IN)  :: uy_bar(:,:)          ! [m/yr]
         real(prec), intent(IN)  :: dx                   ! [m]
         integer,    intent(IN)  :: pc_k                 ! pc_k gives the order of the timestepping scheme (pc_k=2 for FE-SBE, pc_k=3 for AB-SAM)
+        character(len=*), intent(IN) :: controller      ! Adaptive controller to use [PI42, H312b, H312PID]
 
         ! Local variables
         real(prec) :: dt_n, dt_nm1, dt_nm2          ! [yr]   Timesteps (n:n-2)
@@ -155,12 +231,8 @@ contains
         real(prec) :: rhohat_n 
         real(prec) :: dt_adv 
         real(prec) :: dtmax_now
-
         real(prec) :: k_i 
-
-        ! Choose adaptive controller algorithm for updating timestep 
-        ! PI42, H312b, H312PID
-        character(len=56), parameter :: pc_adapt_method = "H312PID"
+        real(prec) :: k_p, k_d 
 
         ! Smoothing parameter; Söderlind and Wang (2006) method, Eq. 10
         ! Values on the order of [0.7,2.0] are reasonable. Higher kappa slows variation in dt
@@ -168,31 +240,47 @@ contains
         
         ! Step 1: Save information needed for adapative controller algorithms 
 
-        ! Save dt from several timesteps
+        ! Save dt from several timesteps (potentially more available)
         dt_n    = max(dt(1),dtmin) 
         dt_nm1  = max(dt(2),dtmin) 
         dt_nm2  = max(dt(3),dtmin)
 
-        ! Save eta from several timesteps
+        ! Save eta from several timesteps (potentially more available)
         eta_n   = eta(1)
         eta_nm1 = eta(2)
         eta_nm2 = eta(3)
 
         ! Calculate rho from several timesteps 
-        rho_nm1 = (dt_n / dt_nm1) 
+        rho_nm1 = (dt_n   / dt_nm1) 
         rho_nm2 = (dt_nm1 / dt_nm2) 
 
         ! Step 2: calculate scaling for the next timestep (dt,n+1)
-        select case(trim(pc_adapt_method))
+        select case(trim(controller))
 
             case("PI42")
                 ! Söderlind and Wang, 2006; Cheng et al., 2017
-                
-                rho_n = calc_pi_rho_pi42(eta_n,eta_nm1,rho_nm1,eps, &
-                                            beta_1  =  3.0_prec / (pc_k*5.0_prec),  &
-                                            beta_2  = -1.0_prec / (pc_k*5.0_prec), &
-                                            alpha_2 =  0.0_prec )
+                ! Deeper discussion in Söderlind, 2002. Note for example, 
+                ! that Söderlind (2002) recommends:
+                ! k*k_i >= 0.3 
+                ! k*k_p >= 0.2 
+                ! k*k_i + k*k_p <= 0.7 
+                ! However, the default values of Söderlind and Wang (2006) and Cheng et al (2017)
+                ! are outside of these bounds. 
 
+                ! Default parameter values 
+                k_i = 2.0_prec / (pc_k*5.0_prec)
+                k_p = 1.0_prec / (pc_k*5.0_prec)
+                
+                ! Improved parameter values (reduced oscillations)
+!                 k_i = 4.0_prec / (pc_k*10.0_prec)
+!                 k_p = 3.0_prec / (pc_k*10.0_prec)
+
+                ! Experimental parameter values (minimal oscillations, does not access largest timesteps)
+!                 k_i = 0.5_prec / (pc_k*10.0_prec)
+!                 k_p = 6.5_prec / (pc_k*10.0_prec)
+
+                ! Default parameter values
+                rho_n = calc_pi_rho_pi42(eta_n,eta_nm1,rho_nm1,eps,k_i,k_p,alpha_2=0.0_prec)
 
             case("H312b") 
                 ! Söderlind (2003) H312b, Eq. 31+ (unlabeled) 
@@ -208,11 +296,25 @@ contains
 
                 rho_n = calc_pi_rho_H312PID(eta_n,eta_nm1,eta_nm2,eps,k_i)
 
+            case("H321PID")
 
+                k_i = 0.1  / real(pc_k,prec)
+                k_p = 0.45 / real(pc_k,prec) 
+
+                rho_n = calc_pi_rho_H321PID(eta_n,eta_nm1,eta_nm2,dt_n,dt_nm1,eps,k_i,k_p)
+                
+            case("PID1")
+
+                k_i = 0.175 
+                k_p = 0.075
+                k_d = 0.01 
+
+                rho_n = calc_pi_rho_PID1(eta_n,eta_nm1,eta_nm2,eps,k_i,k_p,k_d)
+                
             case DEFAULT 
 
-                write(*,*) "set_adaptive_timestep_pc:: Error: pc_adapt_method not recognized."
-                write(*,*) "pc_adapt_method = ", trim(pc_adapt_method) 
+                write(*,*) "set_adaptive_timestep_pc:: Error: controller not recognized."
+                write(*,*) "controller = ", trim(controller) 
                 stop 
 
         end select 
@@ -238,7 +340,7 @@ contains
 
     end subroutine set_adaptive_timestep_pc
 
-    function calc_pi_rho_pi42(eta_n,eta_nm1,rho_nm1,eps,beta_1,beta_2,alpha_2) result(rho_n)
+    function calc_pi_rho_pi42(eta_n,eta_nm1,rho_nm1,eps,k_i,k_p,alpha_2) result(rho_n)
 
         implicit none 
 
@@ -246,13 +348,14 @@ contains
         real(prec), intent(IN) :: eta_nm1 
         real(prec), intent(IN) :: rho_nm1 
         real(prec), intent(IN) :: eps 
-        real(prec), intent(IN) :: beta_1 
-        real(prec), intent(IN) :: beta_2
+        real(prec), intent(IN) :: k_i 
+        real(prec), intent(IN) :: k_p
         real(prec), intent(IN) :: alpha_2 
         real(prec) :: rho_n 
 
         ! Söderlind and Wang, 2006; Cheng et al., 2017
-        rho_n   = (eps/eta_n)**beta_1 * (eps/eta_nm1)**beta_2 * rho_nm1**alpha_2
+        ! Original formulation: Söderlind, 2002, Eq. 3.12:
+        rho_n   = (eps/eta_n)**(k_i+k_p) * (eps/eta_nm1)**(-k_p) * rho_nm1**(-alpha_2)
 
         return 
 
@@ -314,6 +417,55 @@ contains
         return 
 
     end function calc_pi_rho_H312PID 
+
+    function calc_pi_rho_H321PID(eta_n,eta_nm1,eta_nm2,dt_n,dt_nm1,eps,k_i,k_p) result(rho_n)
+
+        implicit none 
+
+        real(prec), intent(IN) :: eta_n 
+        real(prec), intent(IN) :: eta_nm1 
+        real(prec), intent(IN) :: eta_nm2 
+        real(prec), intent(IN) :: dt_n 
+        real(prec), intent(IN) :: dt_nm1 
+        real(prec), intent(IN) :: eps 
+        real(prec), intent(IN) :: k_i  
+        real(prec), intent(IN) :: k_p
+        real(prec) :: rho_n 
+
+        ! Local variables 
+        real(prec) :: k_i_1, k_i_2, k_i_3
+
+        k_i_1   =   0.75_prec*k_i + 0.50_prec*k_p 
+        k_i_2   =   0.50_prec*k_i 
+        k_i_3   = -(0.25_prec*k_i + 0.50_prec*k_p)
+
+        ! Söderlind (2003) H321PID, Eq. 42
+        rho_n   = (eps/eta_n)**k_i_1 * (eps/eta_nm1)**k_i_2 * (eps/eta_nm2)**k_i_3 * (dt_n / dt_nm1)
+
+        return 
+
+    end function calc_pi_rho_H321PID 
+
+    function calc_pi_rho_PID1(eta_n,eta_nm1,eta_nm2,eps,k_i,k_p,k_d) result(rho_n)
+
+        implicit none 
+
+        real(prec), intent(IN) :: eta_n 
+        real(prec), intent(IN) :: eta_nm1 
+        real(prec), intent(IN) :: eta_nm2 
+        real(prec), intent(IN) :: eps 
+        real(prec), intent(IN) :: k_i  
+        real(prec), intent(IN) :: k_p
+        real(prec), intent(IN) :: k_d
+        real(prec) :: rho_n 
+
+        ! https://www.mathematik.uni-dortmund.de/~kuzmin/cfdintro/lecture8.pdf
+        ! Page 20 (theoretical basis unclear/unknown)
+        rho_n   = (eps/eta_n)**k_i * (eta_nm1/eta_n)**k_p * (eta_nm1**2/(eta_n*eta_nm2))**k_d
+
+        return 
+
+    end function calc_pi_rho_PID1 
 
     subroutine set_adaptive_timestep(dt,dt_adv,dt_diff,dt_adv3D, &
                         ux,uy,uz,ux_bar,uy_bar,D2D,H_ice,dHicedt,zeta_ac, &
@@ -876,7 +1028,8 @@ contains
 
     end subroutine yelmo_timestep_write_init 
 
-    subroutine yelmo_timestep_write(filename,time,dt_now,dt_adv,dt_pi,pc_eta,pc_tau)
+    subroutine yelmo_timestep_write(filename,time,dt_now,dt_adv,dt_pi,pc_eta,pc_tau, &
+                                                speed,speed_tpo,speed_dyn,ssa_iter,iter_redo)
 
         implicit none 
 
@@ -887,6 +1040,11 @@ contains
         real(prec), intent(IN) :: dt_pi 
         real(prec), intent(IN) :: pc_eta 
         real(prec), intent(IN) :: pc_tau(:,:) 
+        real(prec), intent(IN) :: speed 
+        real(prec), intent(IN) :: speed_tpo
+        real(prec), intent(IN) :: speed_dyn 
+        integer,    intent(IN) :: ssa_iter 
+        integer,    intent(IN) :: iter_redo 
 
         ! Local variables
         integer    :: ncid, n, nx, ny 
@@ -906,12 +1064,20 @@ contains
         ! Update the time step
         call nc_write(filename,"time",time,dim1="time",start=[n],count=[1],ncid=ncid)
 
-        call nc_write(filename, "dt_now",dt_now,dim1="time",start=[n],count=[1],ncid=ncid)
-        call nc_write(filename, "dt_adv",dt_adv,dim1="time",start=[n],count=[1],ncid=ncid)
+        call nc_write(filename, "speed",speed,dim1="time",start=[n],count=[1],units="kyr/hr",long_name="Yelmo model speed",ncid=ncid)
+        call nc_write(filename, "speed_tpo",speed_tpo,dim1="time",start=[n],count=[1],units="kyr/hr",long_name="Yelmo topo speed",ncid=ncid)
+        call nc_write(filename, "speed_dyn",speed_dyn,dim1="time",start=[n],count=[1],units="kyr/hr",long_name="Yelmo dyn speed",ncid=ncid)
         
-        call nc_write(filename,  "dt_pi", dt_pi,dim1="time",start=[n],count=[1],ncid=ncid)
-        call nc_write(filename, "pc_eta",pc_eta,dim1="time",start=[n],count=[1],ncid=ncid)
-        !call nc_write(filename, "pc_tau",pc_tau,dim1="xc",dim2="yc",dim3="time",start=[1,1,n],count=[nx,ny,1],ncid=ncid)
+        call nc_write(filename, "dt_now",dt_now,dim1="time",start=[n],count=[1],units="yr",long_name="Timestep",ncid=ncid)
+        call nc_write(filename, "dt_adv",dt_adv,dim1="time",start=[n],count=[1],units="yr",long_name="Timestep (CFL criterion)",ncid=ncid)
+        
+        call nc_write(filename,  "dt_pi", dt_pi,dim1="time",start=[n],count=[1],units="yr",long_name="Timestep (PI controller)",ncid=ncid)
+        call nc_write(filename, "pc_eta",pc_eta,dim1="time",start=[n],count=[1],units="m/yr",long_name="eta (maximum PC truncation error)",ncid=ncid)
+        !call nc_write(filename, "pc_tau",pc_tau,dim1="xc",dim2="yc",dim3="time",start=[1,1,n],count=[nx,ny,1],count=[1],units="m a**-1", &
+!                         long_name="Truncation error",ncid=ncid)
+        
+        call nc_write(filename, "ssa_iter", ssa_iter, dim1="time",start=[n],units="",long_name="Picard iterations for SSA convergence",ncid=ncid)
+        call nc_write(filename, "iter_redo",iter_redo,dim1="time",start=[n],units="",long_name="Number of redo iterations needed",count=[1],ncid=ncid)
         
         ! Close the netcdf file
         call nc_close(ncid)

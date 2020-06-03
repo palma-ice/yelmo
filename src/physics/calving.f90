@@ -253,6 +253,9 @@ contains
         ! Calculate the calving rate [m/a] based on the "eigencalving" law
         ! from Levermann et al. (2012)
 
+        ! Note: this routine is untested and incorrect. strain rate must be projected onto 
+        ! principal direction of flow. 
+
         implicit none 
 
         real(prec), intent(OUT) :: calv(:,:)
@@ -281,8 +284,8 @@ contains
         allocate(spr(nx,ny),eps_xx(nx,ny),eps_yy(nx,ny))
         allocate(is_front(nx,ny))
 
-        do j = 1, ny
-        do i = 1, nx
+        do j = 2, ny
+        do i = 2, nx
             ! Calculate strain rate locally (aa-node)
             eps_xx(i,j) = (ux_bar(i,j) - ux_bar(i-1,j))/dx
             eps_yy(i,j) = (uy_bar(i,j) - uy_bar(i,j-1))/dy            

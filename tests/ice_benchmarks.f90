@@ -203,8 +203,8 @@ contains
 
         H_ice = 0.0_prec 
 
-        do j = 2, ny-1
-        do i = 2, nx-1 
+        do j = 1, ny
+        do i = 1, nx 
 
             ! Calculate the radius value as a function of xx and yy [m]
             r_now = sqrt(xx(i,j)**2 + yy(i,j)**2)

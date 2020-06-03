@@ -22,7 +22,6 @@ program yelmo_benchmarks
     character(len=256) :: file_restart
     character(len=512) :: path_par, path_const 
     character(len=56)  :: experiment
-    logical            :: with_ssa  
     logical    :: topo_fixed, dyn_fixed 
     character(len=256) :: topo_fixed_file 
     real(prec) :: time_init, time_end, time, dtt, dt2D_out, dt1D_out
@@ -33,10 +32,10 @@ program yelmo_benchmarks
     real(prec) :: dx, x0  
     integer    :: nx  
 
-    real(4) :: start, finish
+    real(8) :: cpu_start_time, cpu_end_time, cpu_dtime  
     
     ! Start timing 
-    call cpu_time(start)
+    call yelmo_cpu_time(cpu_start_time)
 
     ! Assume program is running from the output folder
     outfldr = "./"
@@ -57,7 +56,6 @@ program yelmo_benchmarks
     call nml_read(path_par,"eismint","domain",       domain)        ! EISMINT1, EISMINT2
     call nml_read(path_par,"eismint","experiment",   experiment)    ! "fixed", "moving", "mismip", "EXPA", "EXPB", "BUELER-A"
     call nml_read(path_par,"eismint","dx",           dx)            ! [km] Grid resolution 
-    call nml_read(path_par,"eismint","with_ssa",     with_ssa)      ! Include ssa in experiment?
     call nml_read(path_par,"eismint","topo_fixed",   topo_fixed)    ! Calculate the topography, or use Heiko's topo file. 
     call nml_read(path_par,"eismint","dyn_fixed",    dyn_fixed)     ! Calculate the topography, or use Heiko's topo file. 
     call nml_read(path_par,"eismint","topo_fixed_file",topo_fixed_file)     ! File containing fixed topo field of H_ice
@@ -90,7 +88,7 @@ program yelmo_benchmarks
         case("HALFAR")
 
             grid_name = "HALFAR"
-            nx = (60.0 / dx) + 1        ! Domain width is 60 km total (-30 to 30 km)
+            nx = (80.0 / dx) + 1        ! Domain width is 60 km total (-30 to 30 km)
             
         case("HALFAR-MED")
 
@@ -123,7 +121,6 @@ program yelmo_benchmarks
     
 
     ! Update parameter values with EISMINT choices 
-    yelmo1%dyn%par%use_ssa    = with_ssa 
     yelmo1%tpo%par%topo_fixed = topo_fixed 
 
 
@@ -314,6 +311,13 @@ program yelmo_benchmarks
         ! Get current time 
         time = time_init + n*dtt
         
+        ! Update bnd%enh_srf to test transition of enhancement layers in time 
+        if (time .lt. 0.5*(time_end-time_init)) then 
+            yelmo1%bnd%enh_srf = 3.0 
+        else 
+            yelmo1%bnd%enh_srf = 1.0 
+        end if 
+
         ! == Yelmo ice sheet ===================================================
         call yelmo_update(yelmo1,time)
         
@@ -408,10 +412,11 @@ program yelmo_benchmarks
     call yelmo_end(yelmo1,time=time)
 
     ! Stop timing 
-    call cpu_time(finish)
-
-    print '("Time = ",f12.3," min.")', (finish-start)/60.0 
-
+    call yelmo_cpu_time(cpu_end_time,cpu_start_time,cpu_dtime)
+    
+    write(*,"(a,f12.3,a)") "Time  = ",cpu_dtime/60.0 ," min"
+    write(*,"(a,f12.1,a)") "Speed = ",(1e-3*(time_end-time_init))/(cpu_dtime/3600.0), " kiloyears / hr"
+    
 contains
     
     subroutine write_step_2D(ylmo,filename,time,buel)
@@ -542,9 +547,14 @@ contains
         call nc_write(filename,"visc",ylmo%mat%now%visc,units="Pa a",long_name="Viscosity", &
                       dim1="xc",dim2="yc",dim3="zeta",dim4="time",start=[1,1,1,n],ncid=ncid)
         
-!         call nc_write(filename,"dep_time",ylmo%mat%now%dep_time,units="a",long_name="Ice deposition time", &
+        call nc_write(filename,"dep_time",ylmo%mat%now%dep_time,units="a",long_name="Ice deposition time", &
+                      dim1="xc",dim2="yc",dim3="zeta",dim4="time",start=[1,1,1,n],ncid=ncid)
+!         call nc_write(filename,"age",time-ylmo%mat%now%dep_time,units="a",long_name="Ice age", &
 !                       dim1="xc",dim2="yc",dim3="zeta",dim4="time",start=[1,1,1,n],ncid=ncid)
-        call nc_write(filename,"age",time-ylmo%mat%now%dep_time,units="a",long_name="Ice age", &
+
+        call nc_write(filename,"enh_bnd",ylmo%mat%now%enh_bnd,units="",long_name="Enhancement factor tracer field", &
+                      dim1="xc",dim2="yc",dim3="zeta",dim4="time",start=[1,1,1,n],ncid=ncid)
+        call nc_write(filename,"enh",ylmo%mat%now%enh,units="",long_name="Enhancement factor", &
                       dim1="xc",dim2="yc",dim3="zeta",dim4="time",start=[1,1,1,n],ncid=ncid)
 
         ! == yelmo_dynamics ==
@@ -560,7 +570,7 @@ contains
                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
         call nc_write(filename,"beta",ylmo%dyn%now%beta,units="Pa a m-1",long_name="Basal friction coefficient", &
                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-        call nc_write(filename,"visc_eff",ylmo%dyn%now%visc_eff,units="Pa a m",long_name="Effective viscosity (SSA)", &
+        call nc_write(filename,"visc_eff_int",ylmo%dyn%now%visc_eff_int,units="Pa a m",long_name="Depth-integrated effective viscosity (SSA)", &
                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
 
         call nc_write(filename,"sigma_horiz_sq",ylmo%dyn%now%sigma_horiz_sq,units="1",long_name="Horizontal stress components squared", &
@@ -581,8 +591,8 @@ contains
 !                        dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
 !         call nc_write(filename,"uy_i_bar",ylmo%dyn%now%uy_i_bar,units="m/a",long_name="Internal shear velocity (y)", &
 !                        dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-!         call nc_write(filename,"uxy_i_bar",ylmo%dyn%now%uxy_i_bar,units="m/a",long_name="Internal shear velocity magnitude", &
-!                        dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
+        call nc_write(filename,"uxy_i_bar",ylmo%dyn%now%uxy_i_bar,units="m/a",long_name="Internal shear velocity magnitude", &
+                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
 
         call nc_write(filename,"ux_b",ylmo%dyn%now%ux_b,units="m/a",long_name="Basal sliding velocity (x)", &
                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
@@ -619,6 +629,20 @@ contains
 !         call nc_write(filename,"dd_ab",ylmo%dyn%now%dd_ab,units="m2 a-1",long_name="Diffusivity", &
 !                        dim1="xc",dim2="yc",dim3="zeta",dim4="time",start=[1,1,1,n],ncid=ncid)
         call nc_write(filename,"dd_ab_bar",ylmo%dyn%now%dd_ab_bar,units="m2 a-1",long_name="Diffusivity", &
+                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
+        
+        call nc_write(filename,"taud_acx",ylmo%dyn%now%taud_acx,units="Pa",long_name="Driving stress (x)", &
+                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
+        call nc_write(filename,"taud_acy",ylmo%dyn%now%taud_acy,units="Pa",long_name="Driving stress (y)", &
+                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
+        call nc_write(filename,"taud",ylmo%dyn%now%taud,units="Pa",long_name="Driving stress", &
+                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
+        
+        call nc_write(filename,"taub_acx",ylmo%dyn%now%taub_acx,units="Pa",long_name="Basal stress (x)", &
+                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
+        call nc_write(filename,"taub_acy",ylmo%dyn%now%taub_acy,units="Pa",long_name="Basal stress (y)", &
+                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
+        call nc_write(filename,"taub",ylmo%dyn%now%taub,units="Pa",long_name="Basal stress", &
                        dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
         
         call nc_write(filename,"ux",ylmo%dyn%now%ux,units="m/a",long_name="Horizontal velocity (x)", &

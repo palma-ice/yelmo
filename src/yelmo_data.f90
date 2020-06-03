@@ -16,24 +16,33 @@ module yelmo_data
 
 contains
 
-    subroutine ydata_compare(dta,tpo,dyn,thrm,bnd)
+    subroutine ydata_compare(dta,tpo,dyn,mat,thrm,bnd,domain)
 
         implicit none 
 
         type(ydata_class),  intent(INOUT) :: dta
         type(ytopo_class),  intent(IN)    :: tpo 
         type(ydyn_class),   intent(IN)    :: dyn 
+        type(ymat_class),   intent(IN)    :: mat
         type(ytherm_class), intent(IN)    :: thrm
         type(ybound_class), intent(IN)    :: bnd
-        
+        character(len=*),   intent(IN)    :: domain 
+
         ! Local variables 
-        integer :: nx, ny 
+        integer :: q, q1, nx, ny 
         real(prec), allocatable :: tmp(:,:) 
         real(prec), allocatable :: tmp1(:,:) 
-        
+        logical,    allocatable :: mask_region(:,:)
+        logical,    allocatable :: mask(:,:)
+
+        real(prec), parameter :: tol = 1e-3 
+
         nx = size(tpo%now%H_ice,1)
         ny = size(tpo%now%H_ice,2)
         
+        allocate(mask(nx,ny))
+        allocate(mask_region(nx,ny))
+
         ! ======================================================
         ! Calculate errors
 
@@ -41,26 +50,69 @@ contains
         dta%pd%err_z_srf   = tpo%now%z_srf - dta%pd%z_srf 
         dta%pd%err_uxy_s   = dyn%now%uxy_s - dta%pd%uxy_s 
         
+        ! Isochronal layer error 
+        dta%pd%err_depth_iso = mv
+
+        do q = 1, dta%par%pd_age_n_iso
+            ! Loop over observed isochronal layer depths 
+
+            do q1 = 1, mat%par%n_iso
+                ! Loop over isochronal layer depths in Yelmo 
+
+                if (abs(mat%par%age_iso(q1)-dta%pd%age_iso(q)) .lt. tol) then 
+                    ! Isochronal layer in data matches this one 
+
+                    where(dta%pd%depth_iso(:,:,q) .ne. mv) 
+                        dta%pd%err_depth_iso(:,:,q) = mat%now%depth_iso(:,:,q1) - dta%pd%depth_iso(:,:,q)
+                    elsewhere 
+                        dta%pd%err_depth_iso(:,:,q) = mv 
+                    end where 
+
+                end if
+
+            end do 
+
+        end do 
+
         ! ======================================================
         ! Whole ice sheet error metrics (rmse)
+
+        ! Calculate region over which to calculate metrics 
+
+        ! By default, calculate everywhere 
+        mask_region = .TRUE. 
+
+        ! For Greenland, limit to continental Greenland where data is defined currently
+        if (trim(domain) .eq. "Greenland") then 
+            where (bnd%regions .ne. 1.3) mask_region = .FALSE. 
+        end if 
 
         allocate(tmp(nx,ny))
         allocate(tmp1(nx,ny))
 
         ! == rmse[Ice thickness] ===================
+        
         tmp = tpo%now%H_ice-dta%pd%H_ice
-        if (count(tmp .ne. 0.0) .gt. 0) then 
-            dta%pd%rmse_H = sqrt(sum(tmp**2)/count(tmp .ne. 0.0))
+        
+        ! Define mask over which to perform comparison with data 
+        mask = (tpo%now%H_ice .ne. 0.0 .or. dta%pd%H_ice .ne. 0.0) .and. mask_region 
+        
+        if (count(mask) .gt. 0) then 
+            dta%pd%rmse_H = sqrt(sum(tmp**2)/count(mask))
         else 
             dta%pd%rmse_H = mv 
         end if 
 
         if (dta%pd%rmse_H .eq. 0.0_prec) dta%pd%rmse_H = mv 
 
-        ! == rmse[Surface elevation] =================== 
+        ! == rmse[Surface elevation] ===================
+
         tmp = dta%pd%err_z_srf
-        if (count(tmp .ne. 0.0) .gt. 0) then 
-            dta%pd%rmse_zsrf = sqrt(sum(tmp**2)/count(tmp .ne. 0.0))
+        
+        mask = tmp .ne. 0.0 .and. mask_region 
+         
+        if (count(mask) .gt. 0) then 
+            dta%pd%rmse_zsrf = sqrt(sum(tmp**2)/count(mask))
         else 
             dta%pd%rmse_zsrf = mv 
         end if 
@@ -69,8 +121,11 @@ contains
         
         ! == rmse[Surface velocity] ===================
         tmp = dta%pd%err_uxy_s
-        if (count(tmp .ne. 0.0) .gt. 0) then 
-            dta%pd%rmse_uxy = sqrt(sum(tmp**2)/count(tmp .ne. 0.0))
+
+        mask = tmp .ne. 0.0 .and. mask_region 
+         
+        if (count(mask) .gt. 0) then
+            dta%pd%rmse_uxy = sqrt(sum(tmp**2)/count(mask))
         else
             dta%pd%rmse_uxy = mv
         end if 
@@ -83,14 +138,27 @@ contains
         tmp1 = dyn%now%uxy_s 
         where(dyn%now%uxy_s .gt. 0.0) tmp1 = log(tmp1)
         
-        if (count(tmp1-tmp .ne. 0.0) .gt. 0) then 
-            dta%pd%rmse_loguxy = sqrt(sum((tmp1-tmp)**2)/count(tmp1-tmp .ne. 0.0))
+        mask = (tmp .ne. 0.0 .or. tmp1 .ne. 0.0) .and. mask_region 
+        
+        if (count(mask) .gt. 0) then 
+            dta%pd%rmse_loguxy = sqrt(sum((tmp1-tmp)**2)/count(mask))
         else
             dta%pd%rmse_loguxy = mv
         end if 
         
         if (dta%pd%rmse_loguxy .eq. 0.0_prec) dta%pd%rmse_loguxy = mv 
         
+        ! == rmse[isochronal layer depth] ============
+
+        do q1 = 1, dta%par%pd_age_n_iso
+            mask = dta%pd%err_depth_iso(:,:,q1) .ne. mv
+            if (count(mask) .gt. 0) then 
+                dta%pd%rmse_iso(q1) = sqrt( sum(dta%pd%err_depth_iso(:,:,q1)**2,mask=mask) / count(mask) )
+            else 
+                dta%pd%rmse_iso(q1) = mv 
+            end if 
+        end do 
+
         return 
 
     end subroutine ydata_compare 
@@ -217,16 +285,32 @@ contains
 
         end if 
 
+        if (dta%par%pd_age_load) then 
+            ! Load present-day data for isochrones (ice ages) 
+
+            ! =========================================
+            ! Load vel data from netcdf file 
+            filename = dta%par%pd_age_path
+            nms(1:2) = dta%par%pd_age_names
+
+            call nc_read(filename,nms(1), dta%pd%age_iso,   missing_value=mv)
+            call nc_read(filename,nms(2), dta%pd%depth_iso, missing_value=mv)
+
+        end if 
+
         ! Summarize data loading 
-        write(*,*) "ydata_load:: range(H_ice): ", minval(dta%pd%H_ice),   maxval(dta%pd%H_ice)
-        write(*,*) "ydata_load:: range(z_srf): ", minval(dta%pd%z_srf),   maxval(dta%pd%z_srf)
-        write(*,*) "ydata_load:: range(z_bed): ", minval(dta%pd%z_bed),   maxval(dta%pd%z_bed)
-        write(*,*) "ydata_load:: range(T_srf): ", minval(dta%pd%T_srf), maxval(dta%pd%T_srf)
-        write(*,*) "ydata_load:: range(smb):   ", minval(dta%pd%smb,dta%pd%smb .ne. mv), &
-                                                  maxval(dta%pd%smb,dta%pd%smb .ne. mv)
-        write(*,*) "ydata_load:: range(uxy_s): ", minval(dta%pd%uxy_s,dta%pd%uxy_s .ne. mv), &
-                                                  maxval(dta%pd%uxy_s,dta%pd%uxy_s .ne. mv)
-            
+        write(*,*) "ydata_load:: range(H_ice):     ",   minval(dta%pd%H_ice),   maxval(dta%pd%H_ice)
+        write(*,*) "ydata_load:: range(z_srf):     ",   minval(dta%pd%z_srf),   maxval(dta%pd%z_srf)
+        write(*,*) "ydata_load:: range(z_bed):     ",   minval(dta%pd%z_bed),   maxval(dta%pd%z_bed)
+        write(*,*) "ydata_load:: range(T_srf):     ",   minval(dta%pd%T_srf),   maxval(dta%pd%T_srf)
+        write(*,*) "ydata_load:: range(smb):       ",   minval(dta%pd%smb,dta%pd%smb .ne. mv), &
+                                                        maxval(dta%pd%smb,dta%pd%smb .ne. mv)
+        write(*,*) "ydata_load:: range(uxy_s):     ",   minval(dta%pd%uxy_s,dta%pd%uxy_s .ne. mv), &
+                                                        maxval(dta%pd%uxy_s,dta%pd%uxy_s .ne. mv)
+        write(*,*) "ydata_load:: range(age_iso):   ",   minval(dta%pd%age_iso), maxval(dta%pd%age_iso)
+        write(*,*) "ydata_load:: range(depth_iso): ",   minval(dta%pd%depth_iso,dta%pd%depth_iso .ne. mv), &
+                                                        maxval(dta%pd%depth_iso,dta%pd%depth_iso .ne. mv)
+                
 
         return 
 
@@ -259,26 +343,37 @@ contains
         call nml_read(filename,"yelmo_data","pd_vel_load",     par%pd_vel_load,     init=init_pars)
         call nml_read(filename,"yelmo_data","pd_vel_path",     par%pd_vel_path,     init=init_pars)
         call nml_read(filename,"yelmo_data","pd_vel_names",    par%pd_vel_names,    init=init_pars)
+        call nml_read(filename,"yelmo_data","pd_age_load",     par%pd_age_load,     init=init_pars)
+        call nml_read(filename,"yelmo_data","pd_age_path",     par%pd_age_path,     init=init_pars)
+        call nml_read(filename,"yelmo_data","pd_age_names",    par%pd_age_names,    init=init_pars)
         
         ! Subsitute domain/grid_name
         call yelmo_parse_path(par%pd_topo_path,domain,grid_name)
         call yelmo_parse_path(par%pd_tsrf_path,domain,grid_name)
         call yelmo_parse_path(par%pd_smb_path, domain,grid_name)
         call yelmo_parse_path(par%pd_vel_path, domain,grid_name)
+        call yelmo_parse_path(par%pd_age_path, domain,grid_name)
 
         ! Internal parameters 
         par%domain = trim(domain) 
-         
+        
+        ! Get number of isochrone layers to load 
+        if (par%pd_age_load) then 
+            par%pd_age_n_iso = nc_size(par%pd_age_path,par%pd_age_names(1))
+        else 
+            par%pd_age_n_iso = 1        ! To avoid allocation errors  
+        end if 
+
         return
 
     end subroutine ydata_par_load
 
-    subroutine ydata_alloc(pd,nx,ny,nz)
+    subroutine ydata_alloc(pd,nx,ny,nz,n_iso)
 
         implicit none 
 
         type(ydata_pd_class) :: pd 
-        integer :: nx, ny, nz  
+        integer :: nx, ny, nz, n_iso  
 
         call ydata_dealloc(pd)
         
@@ -290,6 +385,9 @@ contains
         allocate(pd%T_srf(nx,ny))
         allocate(pd%smb(nx,ny))
         
+        allocate(pd%age_iso(n_iso))
+        allocate(pd%depth_iso(nx,ny,n_iso))
+
         allocate(pd%ux_s(nx,ny))
         allocate(pd%uy_s(nx,ny))
         allocate(pd%uxy_s(nx,ny))
@@ -297,27 +395,34 @@ contains
         allocate(pd%err_H_ice(nx,ny))
         allocate(pd%err_z_srf(nx,ny))
         allocate(pd%err_z_bed(nx,ny))
-        
         allocate(pd%err_uxy_s(nx,ny))
-        
-        pd%H_ice        = 0.0 
-        pd%z_srf        = 0.0 
-        pd%z_bed        = 0.0 
-        pd%H_grnd       = 0.0 
-        
-        pd%T_srf        = 0.0 
-        pd%smb          = 0.0 
+        allocate(pd%err_depth_iso(nx,ny,n_iso))
 
-        pd%ux_s         = 0.0 
-        pd%uy_s         = 0.0 
-        pd%uxy_s        = 0.0 
+        allocate(pd%rmse_iso(n_iso))
         
-        pd%err_H_ice    = 0.0 
-        pd%err_z_srf    = 0.0 
-        pd%err_z_bed    = 0.0 
+        pd%H_ice         = 0.0 
+        pd%z_srf         = 0.0 
+        pd%z_bed         = 0.0 
+        pd%H_grnd        = 0.0 
         
-        pd%err_uxy_s = 0.0 
+        pd%T_srf         = 0.0 
+        pd%smb           = 0.0 
+
+        pd%age_iso       = 0.0 
+        pd%depth_iso     = 0.0 
+
+        pd%ux_s          = 0.0 
+        pd%uy_s          = 0.0 
+        pd%uxy_s         = 0.0 
         
+        pd%err_H_ice     = 0.0 
+        pd%err_z_srf     = 0.0 
+        pd%err_z_bed     = 0.0 
+        pd%err_uxy_s     = 0.0 
+        pd%err_depth_iso = 0.0 
+        
+        pd%rmse_iso      = mv 
+
         return 
     end subroutine ydata_alloc 
 
@@ -327,23 +432,27 @@ contains
 
         type(ydata_pd_class) :: pd
 
-        if (allocated(pd%H_ice))        deallocate(pd%H_ice)
-        if (allocated(pd%z_srf))        deallocate(pd%z_srf)
-        if (allocated(pd%z_bed))        deallocate(pd%z_bed)
-        if (allocated(pd%H_grnd))       deallocate(pd%H_grnd)
+        if (allocated(pd%H_ice))            deallocate(pd%H_ice)
+        if (allocated(pd%z_srf))            deallocate(pd%z_srf)
+        if (allocated(pd%z_bed))            deallocate(pd%z_bed)
+        if (allocated(pd%H_grnd))           deallocate(pd%H_grnd)
         
-        if (allocated(pd%T_srf))        deallocate(pd%T_srf)
-        if (allocated(pd%smb))          deallocate(pd%smb)
+        if (allocated(pd%T_srf))            deallocate(pd%T_srf)
+        if (allocated(pd%smb))              deallocate(pd%smb)
         
-        if (allocated(pd%ux_s))         deallocate(pd%ux_s)
-        if (allocated(pd%uy_s))         deallocate(pd%uy_s)
-        if (allocated(pd%uxy_s))        deallocate(pd%uxy_s)
+        if (allocated(pd%depth_iso))        deallocate(pd%depth_iso)
         
-        if (allocated(pd%err_H_ice))    deallocate(pd%err_H_ice)
-        if (allocated(pd%err_z_srf))    deallocate(pd%err_z_srf)
-        if (allocated(pd%err_z_bed))    deallocate(pd%err_z_bed)
+        if (allocated(pd%ux_s))             deallocate(pd%ux_s)
+        if (allocated(pd%uy_s))             deallocate(pd%uy_s)
+        if (allocated(pd%uxy_s))            deallocate(pd%uxy_s)
         
-        if (allocated(pd%err_uxy_s))    deallocate(pd%err_uxy_s)
+        if (allocated(pd%err_H_ice))        deallocate(pd%err_H_ice)
+        if (allocated(pd%err_z_srf))        deallocate(pd%err_z_srf)
+        if (allocated(pd%err_z_bed))        deallocate(pd%err_z_bed)
+        if (allocated(pd%err_uxy_s))        deallocate(pd%err_uxy_s)
+        if (allocated(pd%err_depth_iso))    deallocate(pd%err_depth_iso)
+        
+        if (allocated(pd%rmse_iso))         deallocate(pd%rmse_iso)
         
         return 
 

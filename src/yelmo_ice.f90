@@ -367,7 +367,9 @@ contains
                     dt_now   = max(dt_now*rho_now,dom%par%dt_min)
                     
                 else
-                    ! Timestep converged properly, exit the iteration loop for this timestep 
+                    ! Timestep converged properly or total redo iterations completed,
+                    ! or no further timestep reduction is possible:
+                    ! Exit the iteration loop for this timestep (ie, move on)
 
                     exit 
                 
@@ -1162,7 +1164,7 @@ contains
         if (pc_eta_avg .gt. 10.0*dom%par%pc_tol) then 
             kill_it_eta = .TRUE. 
             write(kill_msg,"(a,g12.4,a,10g12.4)") "mean(pc_eta) >> pc_tol: pc_eta_avg = ", pc_eta_avg, &
-                                                                             "\n pc_eta: ", dom%par%pc_eta
+                                                                             " | pc_eta: ", dom%par%pc_eta
         end if 
 
 
@@ -1176,9 +1178,10 @@ contains
 
             write(*,*) 
             write(*,*) 
-            write(*,"(a)") "yelmo_check_kill:: Error: model is not running properly."
+            write(*,"(a)") "yelmo_check_kill:: Error: model is not running properly:"
             write(*,"(a)") trim(kill_msg) 
-            write(*,"(a11,f15.3)")   "timestep = ", time 
+            write(*,*) 
+            write(*,"(a11,f15.3)")  "timestep = ", time 
             write(*,"(a16,2g14.4)") "range(H_ice):   ", minval(dom%tpo%now%H_ice), maxval(dom%tpo%now%H_ice)
             write(*,"(a16,2g14.4)") "range(uxy_bar): ", minval(dom%dyn%now%uxy_bar), maxval(dom%dyn%now%uxy_bar)
             write(*,*) 
@@ -1197,7 +1200,8 @@ contains
      
             write(*,*) 
             write(*,*) 
-            write(*,"(a)") "yelmo_check_kill:: kill requested: ",trim(kill_request)
+            write(*,"(a)") "yelmo_check_kill:: kill requested: "
+            write(*,"(a)") trim(kill_request)
             write(*,*) 
             write(*,*) "Restart file written: "//"yelmo_killed.nc"
             write(*,*) 

@@ -24,6 +24,7 @@ job run --shell -f -o ${fldr}/halfar -p eismint.dx=0.5,1.0,2.0,3.0,4.0,5.0,8.0 -
 # Note: make sure to specify: eismint.time_end=25e3 yelmo.log_timestep=True ytherm.method='fixed'
 job run --shell -f -o ${fldr}/moving_dts -p eismint.time_end=25e3 yelmo.log_timestep=True ytherm.method='fixed' eismint.dx=5.0,10.0,25.0,50.0,60.0 yelmo.pc_eps=1e-2,1e-1,1e0 -- python run_yelmo.py -x -s -e benchmarks {} par-gmd/yelmo_EISMINT_moving.nml
 
+#yelmo.pc_tol=1.5
 
 ### INITMIP TESTS ### 
 
@@ -50,13 +51,15 @@ job run --shell -f -o tmp/perform2 -a -p control.clim_nm="clim_pd_ant" yelmo.dom
 
 make mismip
 
-job run --shell -f -o ${fldr}/mismip/default -p ydyn.beta_gl_scale=0 ydyn.beta_gl_stag=0 mismip.dx=5.0,10.0,20.0 -- python run_yelmo.py -x -s -q medium -w 48 -e mismip {} par-gmd/yelmo_MISMIP3D.nml
-job run --shell -f -o ${fldr}/mismip/subgrid -p ydyn.beta_gl_scale=0 ydyn.beta_gl_stag=3 mismip.dx=5.0,10.0,20.0 -- python run_yelmo.py -x -s -q medium -w 48 -e mismip {} par-gmd/yelmo_MISMIP3D.nml
-job run --shell -f -o ${fldr}/mismip/scaling -p ydyn.beta_gl_scale=2 ydyn.beta_gl_stag=3 mismip.dx=5.0,10.0,20.0 -- python run_yelmo.py -x -s -q medium -w 48 -e mismip {} par-gmd/yelmo_MISMIP3D.nml
+# For faster, less high-resolution simulations:
+job run --shell -f -o ${fldr}/mismip/default -p ydyn.beta_gl_scale=0 ydyn.beta_gl_stag=0 mismip.dx=5.0,10.0,20.0 -- python run_yelmo.py -x -s -q short -w 24 -e mismip {} par-gmd/yelmo_MISMIP3D.nml
+job run --shell -f -o ${fldr}/mismip/subgrid -p ydyn.beta_gl_scale=0 ydyn.beta_gl_stag=3 mismip.dx=5.0,10.0,20.0 -- python run_yelmo.py -x -s -q short -w 24 -e mismip {} par-gmd/yelmo_MISMIP3D.nml
+job run --shell -f -o ${fldr}/mismip/scaling -p ydyn.beta_gl_scale=2 ydyn.beta_gl_stag=3 mismip.dx=5.0,10.0,20.0 -- python run_yelmo.py -x -s -q short -w 24 -e mismip {} par-gmd/yelmo_MISMIP3D.nml
 
-job run --shell -f -o ${fldr}/mismip-hi/default -p ydyn.beta_gl_scale=0 ydyn.beta_gl_stag=0 mismip.dx=2.5 yelmo.pc_eps=1.0 -- python run_yelmo.py -x -s -q medium -w 60 -e mismip {} par-gmd/yelmo_MISMIP3D.nml
-job run --shell -f -o ${fldr}/mismip-hi/subgrid -p ydyn.beta_gl_scale=0 ydyn.beta_gl_stag=3 mismip.dx=2.5 yelmo.pc_eps=1.0 -- python run_yelmo.py -x -s -q medium -w 60 -e mismip {} par-gmd/yelmo_MISMIP3D.nml
-job run --shell -f -o ${fldr}/mismip-hi/scaling -p ydyn.beta_gl_scale=2 ydyn.beta_gl_stag=3 mismip.dx=2.5 yelmo.pc_eps=1.0 -- python run_yelmo.py -x -s -q medium -w 60 -e mismip {} par-gmd/yelmo_MISMIP3D.nml
+# For high-resolution sims only (medium:
+job run --shell -f -o ${fldr}/mismip-hi/default -p ydyn.beta_gl_scale=0 ydyn.beta_gl_stag=0 mismip.dx=2.5 -- python run_yelmo.py -x -s -q medium -w 60 -e mismip {} par-gmd/yelmo_MISMIP3D.nml
+job run --shell -f -o ${fldr}/mismip-hi/subgrid -p ydyn.beta_gl_scale=0 ydyn.beta_gl_stag=3 mismip.dx=2.5 -- python run_yelmo.py -x -s -q medium -w 60 -e mismip {} par-gmd/yelmo_MISMIP3D.nml
+job run --shell -f -o ${fldr}/mismip-hi/scaling -p ydyn.beta_gl_scale=2 ydyn.beta_gl_stag=3 mismip.dx=2.5 -- python run_yelmo.py -x -s -q medium -w 60 -e mismip {} par-gmd/yelmo_MISMIP3D.nml
 
 ### ISMIP-HOM TESTS ###
 

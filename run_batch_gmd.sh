@@ -50,9 +50,13 @@ job run --shell -f -o tmp/perform2 -a -p control.clim_nm="clim_pd_ant" yelmo.dom
 
 make mismip
 
-job run --shell -f -o ${fldr}/mismip/default -p ydyn.beta_gl_scale=0 ydyn.beta_gl_stag=0 mismip.dx=2.5,5.0,10.0,20.0 -- python run_yelmo.py -x -s -q medium -w 60 -e mismip {} par-gmd/yelmo_MISMIP3D.nml
-job run --shell -f -o ${fldr}/mismip/subgrid -p ydyn.beta_gl_scale=0 ydyn.beta_gl_stag=3 mismip.dx=2.5,5.0,10.0,20.0 -- python run_yelmo.py -x -s -q medium -w 60 -e mismip {} par-gmd/yelmo_MISMIP3D.nml
-job run --shell -f -o ${fldr}/mismip/scaling -p ydyn.beta_gl_scale=2 ydyn.beta_gl_stag=3 mismip.dx=2.5,5.0,10.0,20.0 -- python run_yelmo.py -x -s -q medium -w 60 -e mismip {} par-gmd/yelmo_MISMIP3D.nml
+job run --shell -f -o ${fldr}/mismip/default -p ydyn.beta_gl_scale=0 ydyn.beta_gl_stag=0 mismip.dx=5.0,10.0,20.0 -- python run_yelmo.py -x -s -q medium -w 48 -e mismip {} par-gmd/yelmo_MISMIP3D.nml
+job run --shell -f -o ${fldr}/mismip/subgrid -p ydyn.beta_gl_scale=0 ydyn.beta_gl_stag=3 mismip.dx=5.0,10.0,20.0 -- python run_yelmo.py -x -s -q medium -w 48 -e mismip {} par-gmd/yelmo_MISMIP3D.nml
+job run --shell -f -o ${fldr}/mismip/scaling -p ydyn.beta_gl_scale=2 ydyn.beta_gl_stag=3 mismip.dx=5.0,10.0,20.0 -- python run_yelmo.py -x -s -q medium -w 48 -e mismip {} par-gmd/yelmo_MISMIP3D.nml
+
+job run --shell -f -o ${fldr}/mismip-hi/default -p ydyn.beta_gl_scale=0 ydyn.beta_gl_stag=0 mismip.dx=2.5 yelmo.pc_eps=1.0 -- python run_yelmo.py -x -s -q medium -w 60 -e mismip {} par-gmd/yelmo_MISMIP3D.nml
+job run --shell -f -o ${fldr}/mismip-hi/subgrid -p ydyn.beta_gl_scale=0 ydyn.beta_gl_stag=3 mismip.dx=2.5 yelmo.pc_eps=1.0 -- python run_yelmo.py -x -s -q medium -w 60 -e mismip {} par-gmd/yelmo_MISMIP3D.nml
+job run --shell -f -o ${fldr}/mismip-hi/scaling -p ydyn.beta_gl_scale=2 ydyn.beta_gl_stag=3 mismip.dx=2.5 yelmo.pc_eps=1.0 -- python run_yelmo.py -x -s -q medium -w 60 -e mismip {} par-gmd/yelmo_MISMIP3D.nml
 
 ### ISMIP-HOM TESTS ###
 

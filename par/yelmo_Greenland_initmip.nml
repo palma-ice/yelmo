@@ -7,7 +7,7 @@
     dt1D_out        = 100.0             ! [yr] Frequency of writing 1D output files 
     dt2D_out        = 100.0             ! [yr] Frequency of writing 2D output files 
     
-    clim_nm         = "clim_pd_grl"     ! "clim_pd_grl", "clim_pd_ant" or "clim_lgm"
+    clim_nm         = "clim_pd"         ! "clim_pd" or "clim_lgm"
     with_anom       = False             ! Apply anomaly at start of sim but after equilibration?
 
     load_cf_ref     = False             ! Load cf_ref from file? Otherwise define from cf_stream + inline tuning
@@ -18,14 +18,8 @@
 
 /
 
-&clim_pd_grl 
+&clim_pd 
     bmb_shlf_const  = -10.0             ! [m/a] Basal mass balance of ice shelves
-    dT_ann          = 0.0               ! [K]  Temperature anomaly (atm)
-    z_sl            = 0.0               ! [m] Sea level relative to present-day 
-/
-
-&clim_pd_ant 
-    bmb_shlf_const  = -0.2              ! [m/a] Basal mass balance of ice shelves
     dT_ann          = 0.0               ! [K]  Temperature anomaly (atm)
     z_sl            = 0.0               ! [m] Sea level relative to present-day 
 /

@@ -1163,7 +1163,7 @@ contains
 
         if (pc_eta_avg .gt. 10.0*dom%par%pc_tol) then 
             kill_it_eta = .TRUE. 
-            write(kill_msg,"(a,g12.4,a,10g12.4)") "mean(pc_eta) >> pc_tol: pc_eta_avg = ", pc_eta_avg, &
+            write(kill_msg,"(a,g12.4,a,10g12.4)") "mean[pc_eta] > [10*pc_tol]: pc_eta_avg = ", pc_eta_avg, &
                                                                              " | pc_eta: ", dom%par%pc_eta
         end if 
 

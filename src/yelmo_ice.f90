@@ -350,10 +350,10 @@ contains
                 dom%par%pc_tau_masked = dom%par%pc_tau 
                 where( .not. pc_mask) dom%par%pc_tau_masked = 0.0_prec 
 
-                ! Check if checkerboard has started, if so 
-                ! consider redoing timestep 
-                call check_checkerboard(pc_tau_unstable,dom%par%pc_tau,dom%par%pc_eps)
-
+                ! Check if checkerboard has started, if so consider redoing timestep 
+!                 call check_checkerboard(pc_tau_unstable,dom%par%pc_tau,dom%par%pc_eps)
+                pc_tau_unstable = .FALSE. 
+                
                 ! Check if this timestep should be rejected:
                 ! If the redo iteration is not the last allowed and the timestep is still larger  
                 ! than the minimum, then if eta > tolerance or checkerboard found in tau,

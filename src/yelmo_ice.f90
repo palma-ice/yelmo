@@ -8,7 +8,8 @@ module yelmo_ice
     use yelmo_defs
     use yelmo_grid, only : yelmo_init_grid
     use yelmo_timesteps, only : set_adaptive_timestep, set_adaptive_timestep_pc, set_pc_mask, calc_pc_eta,  &
-                                calc_pc_tau_fe_sbe,calc_pc_tau_ab_sam, calc_pc_tau_heun, limit_adaptive_timestep, &
+                                calc_pc_tau_fe_sbe,calc_pc_tau_ab_sam, calc_pc_tau_heun, check_checkerboard, &
+                                limit_adaptive_timestep, &
                                 yelmo_timestep_write_init, yelmo_timestep_write, calc_adv3D_timestep1
     use yelmo_io 
 
@@ -55,7 +56,8 @@ contains
         integer    :: iter_redo, pc_k, iter_redo_tot 
         real(prec) :: ab_zeta 
         logical, allocatable :: pc_mask(:,:) 
-        
+        logical    :: pc_tau_unstable 
+
         character(len=1012) :: kill_txt
 
         ! Determine which predictor-corrector (pc) method we are using for timestepping,
@@ -348,13 +350,16 @@ contains
                 dom%par%pc_tau_masked = dom%par%pc_tau 
                 where( .not. pc_mask) dom%par%pc_tau_masked = 0.0_prec 
 
+                ! Check if checkerboard has started, if so 
+                ! consider redoing timestep 
+                call check_checkerboard(pc_tau_unstable,dom%par%pc_tau,dom%par%pc_eps)
+
                 ! Check if this timestep should be rejected:
-                ! Reject if eta > tolerance, the current timestep is
-                ! still larger than the minimum allowed, and 
-                ! also only if this is not the last allowed redo iteration.
-                if (iter_redo .ne. dom%par%pc_n_redo .and. &
-                    eta_now   .gt. dom%par%pc_tol    .and. &
-                    dt_now    .gt. dom%par%dt_min) then
+                ! If the redo iteration is not the last allowed and the timestep is still larger  
+                ! than the minimum, then if eta > tolerance or checkerboard found in tau,
+                ! then redo iteration: reject this timestep and try again with a smaller timestep
+                if ( (iter_redo .lt. dom%par%pc_n_redo .and. dt_now .gt. dom%par%dt_min) &
+                     .and. (eta_now .gt. dom%par%pc_tol .or. pc_tau_unstable) ) then
 
                     ! Calculate timestep reduction to apply
                     !rho_now = 0.7_prec

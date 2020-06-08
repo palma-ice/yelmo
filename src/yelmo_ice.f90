@@ -440,7 +440,7 @@ contains
             end if 
 
             n       = count(dt_save .ne. missing_value)
-            n_dtmin = count(dt_save(1:n).eq.dom%par%dt_min) 
+            n_dtmin = count( abs(dt_save(1:n)-dom%par%dt_min) .lt. dom%par%dt_min*1e-3 )
 
             write(*,"(a,f13.2,f10.2,f10.1,f8.1,2G10.3,1i6)") &
                         !"yelmo:: [time,speed,H,T,max(dt),min(dt),n(dt==dt_min)]:", &
@@ -1118,10 +1118,11 @@ contains
         character(len=*), optional, intent(IN) :: kill_request 
 
         ! Local variables 
-        integer :: i, j 
+        integer :: i, j, k 
         logical :: kill_it, kill_it_H, kill_it_vel, kill_it_nan, kill_it_eta   
         character(len=512) :: kill_msg 
         real(prec) :: pc_eta_avg 
+        character(len=3) :: pc_iter_str(10) 
 
         real(prec), parameter :: H_lim = 1e4   ! [m] 
         real(prec), parameter :: u_lim = 1e4   ! [m/a]
@@ -1130,6 +1131,18 @@ contains
         kill_it_vel = .FALSE. 
         kill_it_nan = .FALSE. 
         kill_it_eta = .FALSE. 
+
+        pc_iter_str = "" 
+        pc_iter_str(1)  = "n"
+        pc_iter_str(2)  = "n-1"
+        pc_iter_str(3)  = "n-2"
+        pc_iter_str(4)  = "n-3"
+        pc_iter_str(5)  = "n-4"
+        pc_iter_str(6)  = "n-5"
+        pc_iter_str(7)  = "n-6"
+        pc_iter_str(8)  = "n-7"
+        pc_iter_str(9)  = "n-8"
+        pc_iter_str(10) = "n-9"
 
         if ( maxval(abs(dom%tpo%now%H_ice)) .ge. H_lim .or. &
              maxval(abs(dom%tpo%now%H_ice-dom%tpo%now%H_ice)) .ne. 0.0 ) then 
@@ -1163,7 +1176,7 @@ contains
         if (pc_eta_avg .gt. 10.0*dom%par%pc_tol) then 
             kill_it_eta = .TRUE. 
             write(kill_msg,"(a,g12.4,a,10g12.4)") "mean[pc_eta] > [10*pc_tol]: pc_eta_avg = ", pc_eta_avg, &
-                                                                             " | pc_eta: ", dom%par%pc_eta
+                                                                                " | pc_eta: ", dom%par%pc_eta
         end if 
 
 
@@ -1180,7 +1193,17 @@ contains
             write(*,"(a)") "yelmo_check_kill:: Error: model is not running properly:"
             write(*,"(a)") trim(kill_msg) 
             write(*,*) 
-            write(*,"(a11,f15.3)")  "timestep = ", time 
+            write(*,"(a11,f15.3)")  "timestep    = ", time
+            write(*,*) 
+            write(*,"(a,2g12.4)")   "pc_eps, tol = ", dom%par%pc_eps, dom%par%pc_tol 
+            write(*,"(a,g12.4)")    "pc_eta_avg  = ", pc_eta_avg
+            
+            write(*,"(a4,1x,2a12)") "iter", "pc_dt", "pc_eta"
+            do k = 1, size(dom%par%pc_eta,1)
+                write(*,"(a4,1x,2g12.4)") trim(pc_iter_str(k)), dom%par%pc_dt(k), dom%par%pc_eta(k) 
+            end do 
+
+            write(*,*) 
             write(*,"(a16,2g14.4)") "range(H_ice):   ", minval(dom%tpo%now%H_ice), maxval(dom%tpo%now%H_ice)
             write(*,"(a16,2g14.4)") "range(uxy_bar): ", minval(dom%dyn%now%uxy_bar), maxval(dom%dyn%now%uxy_bar)
             write(*,*) 

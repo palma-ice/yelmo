@@ -57,10 +57,22 @@ job run --shell -f -o ${fldr}/mismip-hi/default -p ydyn.beta_gl_scale=0 ydyn.bet
 job run --shell -f -o ${fldr}/mismip-hi/subgrid -p ydyn.beta_gl_scale=0 ydyn.beta_gl_stag=3 mismip.dx=2.5,5.0 -- python run_yelmo.py -x -s -q medium -w 60 -e mismip {} par-gmd/yelmo_MISMIP3D.nml
 job run --shell -f -o ${fldr}/mismip-hi/scaling -p ydyn.beta_gl_scale=2 ydyn.beta_gl_stag=3 mismip.dx=2.5,5.0 -- python run_yelmo.py -x -s -q medium -w 60 -e mismip {} par-gmd/yelmo_MISMIP3D.nml
 
-# Trough simulation following Feldmann and Levermann (2017)  (not part of GMD suite of tests)
+# Trough simulation (not part of GMD suite of tests)
+# MISMIP+ benchmark tests
+# Feldmann and Levermann (2017)
+
 make trough
 
+# MISMIP+
+python run_yelmo.py -s -e trough ${fldr}/mismip+ par/yelmo_MISMIP+.nml
+
+fldr=output 
+job run --shell -f -o ${fldr}/mismip+ -p ydyn.solver="hybrid","diva" -- python run_yelmo.py -x -r -e trough {} par/yelmo_MISMIP+.nml
+
+
+# F17
 python run_yelmo.py -s -e trough ${fldr}/trough par/yelmo_TROUGH-F17.nml
+
 
 ### AGE TESTS ###
 

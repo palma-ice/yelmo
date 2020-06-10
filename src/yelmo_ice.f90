@@ -694,7 +694,7 @@ contains
                 dom%tpo%par%boundaries = "EISMINT"
                 dom%dyn%par%boundaries = "EISMINT"
                 
-            case("MISMIP3D","TROUGH-F17") 
+            case("MISMIP3D","TROUGH-F17","MISMIP+") 
 
                 dom%tpo%par%boundaries = "MISMIP3D"
                 dom%dyn%par%boundaries = "MISMIP3D"

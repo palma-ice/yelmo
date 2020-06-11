@@ -4,8 +4,41 @@ module yelmo_regridding
     
     implicit none 
 
+    private 
+    public :: yelmo_regrid 
 
 contains 
+
+    subroutine yelmo_regrid(dom1,dom0,f_grid)
+
+        implicit none 
+
+        type(yelmo_class), intent(INOUT) :: dom1        ! Target Yelmo object 
+        type(yelmo_class), intent(IN)    :: dom0        ! Initial Yelmo object 
+        real(prec),        intent(IN)    :: f_grid      ! Ratio between initial and target grid
+
+        ! Local variables 
+        integer :: i, j, k 
+        real(prec), allocatable :: f_grid_allowed(:) 
+
+        ! First, make sure that the f_grid ratio is appropriate
+        ! (target grid must be a multiple of the source grid) 
+        f_grid_allowed = [0.0625_prec,0.125_prec,0.25_prec,0.5_prec,1.0_prec,2.0_prec,4.0_prec,8.0_prec,16.0_prec]
+        
+        if (.not. any(f_grid .eq. f_grid_allowed,1)) then 
+
+            write(*,*) "yelmo_regrid:: Error: target resolution must be a multiple of the original resolution."
+            write(*,*) "f_grid = ", f_grid 
+            stop 
+
+        end if 
+
+
+        
+        return 
+
+    end subroutine yelmo_regrid 
+
 
     subroutine calc_regrid_weights(wts,x0,y0,x1,y1)
 

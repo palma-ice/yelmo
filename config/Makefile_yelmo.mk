@@ -109,7 +109,7 @@ $(objdir)/yelmo_defs.o: $(srcdir)/yelmo_defs.f90 $(objdir)/nml.o
 $(objdir)/yelmo_grid.o: $(srcdir)/yelmo_grid.f90 $(objdir)/yelmo_defs.o $(objdir)/nml.o $(objdir)/ncio.o
 	$(FC) $(DFLAGS) $(FFLAGS) -c -o $@ $<
 
-$(objdir)/yelmo_regrid.o : $(srcdir)/yelmo_regrid.f90 $(objdir)/yelmo_defs.o $(objdir)/ncio.o
+$(objdir)/yelmo_regridding.o : $(srcdir)/yelmo_regridding.f90 $(objdir)/yelmo_defs.o $(objdir)/ncio.o
 	$(FC) $(DFLAGS) $(FFLAGS) $(INC_LIS) -c -o $@ $<
 
 $(objdir)/yelmo_tools.o: $(srcdir)/yelmo_tools.f90 $(objdir)/yelmo_defs.o
@@ -222,7 +222,7 @@ yelmo_physics =  	   $(objdir)/basal_dragging.o \
 
 yelmo_base = 		   $(objdir)/yelmo_defs.o \
 					   $(objdir)/yelmo_grid.o \
-					   $(objdir)/yelmo_regrid.o \
+					   $(objdir)/yelmo_regridding.o \
 	                   $(objdir)/yelmo_tools.o \
 			 		   $(objdir)/yelmo_timesteps.o \
 					   $(objdir)/yelmo_ice.o \

@@ -66,8 +66,8 @@ make trough
 # MISMIP+
 python run_yelmo.py -s -e trough ${fldr}/mismip+ par/yelmo_MISMIP+.nml
 
-fldr=output 
-job run --shell -f -o ${fldr}/mismip+ -p ydyn.solver="hybrid","diva" -- python run_yelmo.py -x -r -e trough {} par/yelmo_MISMIP+.nml
+# MISMIP+ ensemble (hybrid,diva), run on the cluster:
+job run --shell -f -o ${fldr}/mismip+ -p ydyn.solver="hybrid","diva" -- python run_yelmo.py -x -s -q priority -w 5 -e trough {} par/yelmo_MISMIP+.nml
 
 
 # F17

@@ -5,7 +5,8 @@
             "initmip"    : "libyelmo/bin/yelmo_initmip.x",
             "opt"        : "libyelmo/bin/yelmo_opt.x",
             "trough"     : "libyelmo/bin/yelmo_trough.x",
-            "ismiphom"   : "libyelmo/bin/yelmo_ismiphom.x"
+            "ismiphom"   : "libyelmo/bin/yelmo_ismiphom.x",
+            "regridding" : "libyelmo/bin/yelmo_test_regridding.x"
         },
 
     "const_paths" : 

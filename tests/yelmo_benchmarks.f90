@@ -22,10 +22,11 @@ program yelmo_benchmarks
     character(len=256) :: file_restart
     character(len=512) :: path_par, path_const 
     character(len=56)  :: experiment
-    logical    :: topo_fixed, dyn_fixed 
+    logical    :: topo_fixed, dyn_fixed, with_bumps 
     character(len=256) :: topo_fixed_file 
     real(prec) :: time_init, time_end, time, dtt, dt2D_out, dt1D_out
-    real(prec) :: period, dt_test 
+    real(prec) :: period, dt_test, alpha, omega, L, amp 
+    real(prec) :: bumps_L, bumps_A 
     integer    :: n  
 
     character(len=56) :: grid_name
@@ -71,6 +72,11 @@ program yelmo_benchmarks
     call nml_read(path_par,"eismint","period",       period)        ! [yr] for transient experiments 
     call nml_read(path_par,"eismint","dT_test",      dT_test)       ! [K] for test experiments  
     
+    call nml_read(path_par,"eismint","with_bumps",with_bumps)       ! Bedrock with sin bumps?
+    call nml_read(path_par,"eismint","bumps_L",bumps_L)             ! [km] Length scale of bumps
+    call nml_read(path_par,"eismint","bumps_A",bumps_A)             ! [m]  Amplitude of bumps
+    
+
     ! Define the model domain based on the experiment we are running
     select case(trim(experiment))
 
@@ -149,6 +155,18 @@ program yelmo_benchmarks
 
     end select 
 
+    if (with_bumps) then 
+
+        L     = bumps_L                 ! [km] Length scale 
+        amp   = bumps_A                 ! [m] Amplitude 
+        alpha = 0.5*pi/180.0_prec       ! [rad] 
+        omega = 2.0_prec*pi / (L*1e3)   ! [rad/m]
+
+        !yelmo1%tpo%now%z_srf = -yelmo1%grd%x * tan(alpha)
+        yelmo1%bnd%z_bed     = 0.0 + amp * sin(omega*yelmo1%grd%x) * sin(omega*yelmo1%grd%y)
+
+    end if 
+
     ! ==== READ STEADY-STATE TOPOGRAPHY FROM HEIKO'S RUN
     if (topo_fixed) then
 
@@ -173,6 +191,10 @@ program yelmo_benchmarks
     yelmo1%bnd%bmb_shlf = 0.0  
     yelmo1%bnd%T_shlf   = T0  
     yelmo1%bnd%H_sed    = 0.0 
+
+    if (with_bumps) then 
+        yelmo1%bnd%z_sl     = -5000.0
+    end if 
 
     select case(trim(experiment))
 

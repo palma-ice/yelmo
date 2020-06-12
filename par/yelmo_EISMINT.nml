@@ -2,8 +2,7 @@
 
     domain       = "EISMINT"             ! "EISMINT"
     experiment   = "moving"              ! "fixed", "moving", "mismip", "EXPA", "EXPB", "EXPF","BUELER-A", "BUELER-B", "HALFAR", "HALFAR-MED"
-    dx           = 50.0                  ! [km] Grid resolution (EISMINT1 = 50km, EISMINT2 = 25km)
-    with_ssa     = False                 ! Include ssa in experiment?
+    dx           = 10.0                  ! [km] Grid resolution (EISMINT1 = 50km, EISMINT2 = 25km)
     topo_fixed   = False                 ! Calculate the topography, or use Heiko's topo file.  
     dyn_fixed    = False                 ! Fix dynamics after first calculation? 
     topo_fixed_file = "/Users/robinson/models/EURICE/yelmo/tests/heiko_imau-ice_help_fields_eismint_M_200kyr.nc"
@@ -12,11 +11,17 @@
     time_init    = 0.0                  ! [yr] Starting time 
     time_end     = 25000.0              ! [yr] Ending time 
     dtt          = 100.0                ! [yr] Main loop timestep 
-    dt2D_out     = 1000.0               ! [yr] Frequency of writing 2D output files 
+    dt2D_out     = 200.0                ! [yr] Frequency of writing 2D output files 
 
     ! Settings for transient EISMINT1 experiments 
     period       = 0.0                  ! [yr] for transient experiments (normally 0.0 yr or 20e3 yr)
     dT_test      = 0.0                  ! [K]  to test an imposed constant temperature anomaly 
+
+    ! Basal bumps 
+    with_bumps   = True
+    bumps_L      = 200.0                ! [km] Length scale of bumps 
+    bumps_A      = 100.0                ! [m]  Amplitude of bumps 
+
 /
 
 &yelmo
@@ -66,10 +71,10 @@
 /
 
 &ydyn
-    solver              = "sia"           ! "fixed", "sia", "ssa", "hybrid", "diva"    
+    solver              = "hybrid"        ! "fixed", "sia", "ssa", "hybrid", "diva"    
     diva_no_slip        = False           ! If using the DIVA solver, is basal sliding allowed? 
-    beta_method         = 1               ! 0: constant beta; 1: linear (beta=cb/u0); 2: psuedo-plastic-power; 3: Regularized Coulomb
-    beta_const          = 1e3             ! [Pa a m−1] Constant value of basal friction coefficient to be used
+    beta_method         = 0               ! 0: constant beta; 1: linear (beta=cb/u0); 2: psuedo-plastic-power; 3: Regularized Coulomb
+    beta_const          = 1e4             ! [Pa a m−1] Constant value of basal friction coefficient to be used
     beta_q              = 3.0             ! Dragging law exponent 
     beta_u0             = 100.0           ! [m/a] Regularization term for regularized Coulomb law (beta_method=3)
     beta_gl_scale       = 0               !  0: beta*beta_gl_f, 1: H_grnd linear scaling, 2: Zstar scaling 
@@ -81,12 +86,12 @@
     cb_method           = 1               ! -1: set externally; 1: calculate cb online  
     cb_with_pmp         = False           ! Weighted cf_frozen/cf_stream as a function of f_pmp 
     cb_margin_pmp       = False           ! If using cb_with_pmp, additionally impose cf_stream at ice margins 
-    cb_scale            = "exp_zb"        ! "none", "lin_zb", "exp_zb", "till_const", "till_zb", scaling of cb spatially
+    cb_scale            = "none"          ! "none", "lin_zb", "exp_zb", "till_const", "till_zb", scaling of cb spatially
     cb_z0               = -200.0          ! [m] Bedrock elevation at which scaling goes to f_scale=e(-1)
     cb_z1               = 200.0           ! [m] Bedrock elevation above which scaling goes to f_scale=1
     cb_min              = 0.0             ! [--] Minimum allowed value of f_scale for grounded ice
     cf_frozen           = 0.1             ! [--] Bed critical stress factor, frozen 
-    cf_stream           = 0.01            ! [--] Bed critical stress factor, stream  
+    cf_stream           = 0.1             ! [--] Bed critical stress factor, stream  
     n_sm_beta           = 0               ! [-] Standard deviation in gridpoints for Gaussian smoothing of beta (0==no smoothing)
     beta_min            = 0.0             ! [Pa a m-1] Minimum value of beta allowed for grounded ice (for stability)
     eps_0               = 1e-6            ! [1/a] Regularization term for effective viscosity - minimum strain rate

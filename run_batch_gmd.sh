@@ -73,7 +73,6 @@ job run --shell -f -o ${fldr}/mismip+ -p ydyn.solver="hybrid","diva" -- python r
 # F17
 python run_yelmo.py -s -e trough ${fldr}/trough par/yelmo_TROUGH-F17.nml
 
-
 ### AGE TESTS ###
 
 # In test_icetemp.f90, set experiment="eismint", and check that the following values are set:

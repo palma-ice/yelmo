@@ -42,17 +42,17 @@ program yelmo_ismiphom
 
     
     ! Define the domain, grid and experiment from parameter file
-    call nml_read(path_par,"control","domain",       domain)        ! ISMIPHOM
-    call nml_read(path_par,"control","experiment",   experiment)    ! "fixed", "moving", "mismip", "EXPA", "EXPB", "BUELER-A"
-    call nml_read(path_par,"control","L",            L)             ! [km] Length scale
-    call nml_read(path_par,"control","nx",           nx)            ! Number of grid points in one direction
-    call nml_read(path_par,"control","f_extend",     f_extend)      ! Extend domain by half a period?
+    call nml_read(path_par,"ctrl","domain",       domain)        ! ISMIPHOM
+    call nml_read(path_par,"ctrl","experiment",   experiment)    ! "fixed", "moving", "mismip", "EXPA", "EXPB", "BUELER-A"
+    call nml_read(path_par,"ctrl","L",            L)             ! [km] Length scale
+    call nml_read(path_par,"ctrl","nx",           nx)            ! Number of grid points in one direction
+    call nml_read(path_par,"ctrl","f_extend",     f_extend)      ! Extend domain by half a period?
     
     ! Timing parameters 
-    call nml_read(path_par,"control","time_init",    time_init)     ! [yr] Starting time
-    call nml_read(path_par,"control","time_end",     time_end)      ! [yr] Ending time
-    call nml_read(path_par,"control","dtt",          dtt)           ! [yr] Main loop time step 
-    call nml_read(path_par,"control","dt2D_out",     dt2D_out)      ! [yr] Frequency of 2D output 
+    call nml_read(path_par,"ctrl","time_init",    time_init)     ! [yr] Starting time
+    call nml_read(path_par,"ctrl","time_end",     time_end)      ! [yr] Ending time
+    call nml_read(path_par,"ctrl","dtt",          dtt)           ! [yr] Main loop time step 
+    call nml_read(path_par,"ctrl","dt2D_out",     dt2D_out)      ! [yr] Frequency of 2D output 
     dt1D_out = dtt  ! Set 1D output to frequency of main loop timestep 
 
 

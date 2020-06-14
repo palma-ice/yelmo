@@ -44,28 +44,28 @@ program yelmo_trough
     file1D     = trim(outfldr)//"yelmo1D.nc"
     
     ! Define the domain, grid and experiment from parameter file
-    call nml_read(path_par,"control","domain",       domain)        ! TROUGH-F17, MISMIP+
+    call nml_read(path_par,"ctrl","domain",       domain)        ! TROUGH-F17, MISMIP+
 
     ! Timing parameters 
-    call nml_read(path_par,"control","time_init",    time_init)     ! [yr] Starting time
-    call nml_read(path_par,"control","time_end",     time_end)      ! [yr] Ending time
-    call nml_read(path_par,"control","dtt",          dtt)           ! [yr] Main loop time step 
-    call nml_read(path_par,"control","dt1D_out",     dt1D_out)      ! [yr] Frequency of 1D output 
-    call nml_read(path_par,"control","dt2D_out",     dt2D_out)      ! [yr] Frequency of 2D output 
+    call nml_read(path_par,"ctrl","time_init",    time_init)     ! [yr] Starting time
+    call nml_read(path_par,"ctrl","time_end",     time_end)      ! [yr] Ending time
+    call nml_read(path_par,"ctrl","dtt",          dtt)           ! [yr] Main loop time step 
+    call nml_read(path_par,"ctrl","dt1D_out",     dt1D_out)      ! [yr] Frequency of 1D output 
+    call nml_read(path_par,"ctrl","dt2D_out",     dt2D_out)      ! [yr] Frequency of 2D output 
 
     ! Domain parameters
-    call nml_read(path_par,"control","dx",           dx)            ! [km] Grid resolution ! must be multiple of xmax and ymax!!
-    call nml_read(path_par,"control","lx",           lx)            ! [km] Trough parameter
-    call nml_read(path_par,"control","ly",           ly)            ! [km] Trough parameter
-    call nml_read(path_par,"control","fc",           fc)            ! [km] Trough parameter
-    call nml_read(path_par,"control","dc",           dc)            ! [km] Trough parameter
-    call nml_read(path_par,"control","wc",           wc)            ! [km] Trough parameter
-    call nml_read(path_par,"control","x_cf",         x_cf)          ! [km] Trough parameter
+    call nml_read(path_par,"ctrl","dx",           dx)            ! [km] Grid resolution ! must be multiple of xmax and ymax!!
+    call nml_read(path_par,"ctrl","lx",           lx)            ! [km] Trough parameter
+    call nml_read(path_par,"ctrl","ly",           ly)            ! [km] Trough parameter
+    call nml_read(path_par,"ctrl","fc",           fc)            ! [km] Trough parameter
+    call nml_read(path_par,"ctrl","dc",           dc)            ! [km] Trough parameter
+    call nml_read(path_par,"ctrl","wc",           wc)            ! [km] Trough parameter
+    call nml_read(path_par,"ctrl","x_cf",         x_cf)          ! [km] Trough parameter
     
     ! Simulation parameters 
-    call nml_read(path_par,"control","Tsrf_const",   Tsrf_const)    ! [degC]  Surface temperature
-    call nml_read(path_par,"control","smb_const",    smb_const)     ! [m/yr]  Surface mass balance
-    call nml_read(path_par,"control","Qgeo_const",   Qgeo_const)    ! [mW/m2] Geothermal heat flux
+    call nml_read(path_par,"ctrl","Tsrf_const",   Tsrf_const)    ! [degC]  Surface temperature
+    call nml_read(path_par,"ctrl","smb_const",    smb_const)     ! [m/yr]  Surface mass balance
+    call nml_read(path_par,"ctrl","Qgeo_const",   Qgeo_const)    ! [mW/m2] Geothermal heat flux
     
     
     ! Define default grid name for completeness 

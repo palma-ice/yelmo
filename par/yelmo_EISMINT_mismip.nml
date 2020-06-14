@@ -1,4 +1,4 @@
-&eismint
+&ctrl
 
     domain       = "EISMINT"             ! "EISMINT"
     experiment   = "linear"              ! "linear", "overdeepened", "flat"

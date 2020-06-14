@@ -1,4 +1,4 @@
-&mismip
+&ctrl
 
     domain       = "MISMIP3D"           ! "MISMIP3D"
     experiment   = "RF"                 ! "Stnd", "RF"

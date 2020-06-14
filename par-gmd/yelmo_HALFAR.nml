@@ -1,4 +1,4 @@
-&eismint
+&ctrl
 
     domain       = "EISMINT"             ! "EISMINT"
     experiment   = "HALFAR"              ! "fixed", "moving", "mismip", "EXPA", "EXPB", "EXPF","BUELER-A", "BUELER-B", "HALFAR", "HALFAR-MED"

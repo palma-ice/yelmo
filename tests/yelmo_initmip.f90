@@ -41,22 +41,22 @@ program yelmo_test
     call yelmo_load_command_line_args(path_par)
 
     ! Timing and other parameters 
-    call nml_read(path_par,"control","time_init",       time_init)                 ! [yr] Starting time
-    call nml_read(path_par,"control","time_end",        time_end)                  ! [yr] Ending time
-    call nml_read(path_par,"control","time_equil",      time_equil)                ! [yr] Years to equilibrate first
-    call nml_read(path_par,"control","dtt",             dtt)                       ! [yr] Main loop time step 
-    call nml_read(path_par,"control","dtt_equil",       dtt_equil)                 ! [yr] Timestep to use for dynamic equilibration (if dt_method=0)
-    call nml_read(path_par,"control","dt1D_out",        dt1D_out)                  ! [yr] Frequency of 1D output 
-    call nml_read(path_par,"control","dt2D_out",        dt2D_out)                  ! [yr] Frequency of 2D output 
+    call nml_read(path_par,"ctrl","time_init",       time_init)                 ! [yr] Starting time
+    call nml_read(path_par,"ctrl","time_end",        time_end)                  ! [yr] Ending time
+    call nml_read(path_par,"ctrl","time_equil",      time_equil)                ! [yr] Years to equilibrate first
+    call nml_read(path_par,"ctrl","dtt",             dtt)                       ! [yr] Main loop time step 
+    call nml_read(path_par,"ctrl","dtt_equil",       dtt_equil)                 ! [yr] Timestep to use for dynamic equilibration (if dt_method=0)
+    call nml_read(path_par,"ctrl","dt1D_out",        dt1D_out)                  ! [yr] Frequency of 1D output 
+    call nml_read(path_par,"ctrl","dt2D_out",        dt2D_out)                  ! [yr] Frequency of 2D output 
     
-    call nml_read(path_par,"control","clim_nm",         clim_nm)                   ! Namelist group holding climate information
-    call nml_read(path_par,"control","with_anom",       with_anom)                 ! Apply anomaly at the start of the simulation (after equilibration)
+    call nml_read(path_par,"ctrl","clim_nm",         clim_nm)                   ! Namelist group holding climate information
+    call nml_read(path_par,"ctrl","with_anom",       with_anom)                 ! Apply anomaly at the start of the simulation (after equilibration)
     
-    call nml_read(path_par,"control","load_cf_ref",     load_cf_ref)               ! Load cf_ref from file? Otherwise define from cf_stream + inline tuning
-    call nml_read(path_par,"control","file_cf_ref",     file_cf_ref)               ! Filename holding cf_ref to load 
+    call nml_read(path_par,"ctrl","load_cf_ref",     load_cf_ref)               ! Load cf_ref from file? Otherwise define from cf_stream + inline tuning
+    call nml_read(path_par,"ctrl","file_cf_ref",     file_cf_ref)               ! Filename holding cf_ref to load 
 
-    call nml_read(path_par,"control","load_bmelt",      load_bmelt)                ! Load bmelt from file?
-    call nml_read(path_par,"control","file_bmelt",      file_bmelt)                ! Filename holding bmelt field to load 
+    call nml_read(path_par,"ctrl","load_bmelt",      load_bmelt)                ! Load bmelt from file?
+    call nml_read(path_par,"ctrl","file_bmelt",      file_bmelt)                ! Filename holding bmelt field to load 
 
     ! Load climate (eg, clim_pd or clim_lgm)
     call nml_read(path_par,clim_nm,  "bmb_shlf_const",  bmb_shlf_const)            ! [yr] Constant imposed bmb_shlf value

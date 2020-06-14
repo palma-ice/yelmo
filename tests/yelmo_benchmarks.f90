@@ -54,27 +54,27 @@ program yelmo_benchmarks
 
     
     ! Define the domain, grid and experiment from parameter file
-    call nml_read(path_par,"control","domain",       domain)        ! EISMINT1, EISMINT2
-    call nml_read(path_par,"control","experiment",   experiment)    ! "fixed", "moving", "mismip", "EXPA", "EXPB", "BUELER-A"
-    call nml_read(path_par,"control","dx",           dx)            ! [km] Grid resolution 
-    call nml_read(path_par,"control","topo_fixed",   topo_fixed)    ! Calculate the topography, or use Heiko's topo file. 
-    call nml_read(path_par,"control","dyn_fixed",    dyn_fixed)     ! Calculate the topography, or use Heiko's topo file. 
-    call nml_read(path_par,"control","topo_fixed_file",topo_fixed_file)     ! File containing fixed topo field of H_ice
+    call nml_read(path_par,"ctrl","domain",       domain)        ! EISMINT1, EISMINT2
+    call nml_read(path_par,"ctrl","experiment",   experiment)    ! "fixed", "moving", "mismip", "EXPA", "EXPB", "BUELER-A"
+    call nml_read(path_par,"ctrl","dx",           dx)            ! [km] Grid resolution 
+    call nml_read(path_par,"ctrl","topo_fixed",   topo_fixed)    ! Calculate the topography, or use Heiko's topo file. 
+    call nml_read(path_par,"ctrl","dyn_fixed",    dyn_fixed)     ! Calculate the topography, or use Heiko's topo file. 
+    call nml_read(path_par,"ctrl","topo_fixed_file",topo_fixed_file)     ! File containing fixed topo field of H_ice
     
     ! Timing parameters 
-    call nml_read(path_par,"control","time_init",    time_init)     ! [yr] Starting time
-    call nml_read(path_par,"control","time_end",     time_end)      ! [yr] Ending time
-    call nml_read(path_par,"control","dtt",          dtt)           ! [yr] Main loop time step 
-    call nml_read(path_par,"control","dt2D_out",     dt2D_out)      ! [yr] Frequency of 2D output 
+    call nml_read(path_par,"ctrl","time_init",    time_init)     ! [yr] Starting time
+    call nml_read(path_par,"ctrl","time_end",     time_end)      ! [yr] Ending time
+    call nml_read(path_par,"ctrl","dtt",          dtt)           ! [yr] Main loop time step 
+    call nml_read(path_par,"ctrl","dt2D_out",     dt2D_out)      ! [yr] Frequency of 2D output 
     dt1D_out = dtt  ! Set 1D output to frequency of main loop timestep 
 
     ! Settings for transient EISMINT1 experiments 
-    call nml_read(path_par,"control","period",       period)        ! [yr] for transient experiments 
-    call nml_read(path_par,"control","dT_test",      dT_test)       ! [K] for test experiments  
+    call nml_read(path_par,"ctrl","period",       period)        ! [yr] for transient experiments 
+    call nml_read(path_par,"ctrl","dT_test",      dT_test)       ! [K] for test experiments  
     
-    call nml_read(path_par,"control","with_bumps",with_bumps)       ! Bedrock with sin bumps?
-    call nml_read(path_par,"control","bumps_L",bumps_L)             ! [km] Length scale of bumps
-    call nml_read(path_par,"control","bumps_A",bumps_A)             ! [m]  Amplitude of bumps
+    call nml_read(path_par,"ctrl","with_bumps",with_bumps)       ! Bedrock with sin bumps?
+    call nml_read(path_par,"ctrl","bumps_L",bumps_L)             ! [km] Length scale of bumps
+    call nml_read(path_par,"ctrl","bumps_A",bumps_A)             ! [m]  Amplitude of bumps
     
 
     ! Define the model domain based on the experiment we are running

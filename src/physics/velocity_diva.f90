@@ -432,17 +432,13 @@ end if
         real(prec) :: ATT_ab
         real(prec) :: wt  
         real(prec), allocatable :: visc_eff_ab(:,:,:)
-        real(prec), allocatable :: dudx(:,:) 
-        real(prec), allocatable :: dvdy(:,:) 
-        
+
         nx = size(visc_eff,1)
         ny = size(visc_eff,2)
         nz = size(visc_eff,3)
         
         ! Allocate local arrays 
         allocate(visc_eff_ab(nx,ny,nz)) 
-        allocate(dudx(nx,ny))
-        allocate(dvdy(nx,ny)) 
 
         ! Calculate scaling factors
         inv_4dx = 1.0_prec / (4.0_prec*dx) 
@@ -455,22 +451,6 @@ end if
         ! Calculate squared minimum strain rate 
         eps_0_sq = eps_0*eps_0 
 
-        ! First calculate horizontal stretching
-        ! (do this step seperately to maintain minimum stencil for strain rate at the margins)
-        do j = 1, ny 
-        do i = 1, nx 
-
-            im1 = max(i-1,1) 
-            ip1 = min(i+1,nx) 
-            jm1 = max(j-1,1) 
-            jp1 = min(j+1,ny) 
-
-            dudx(i,j) = (ux(i,j)-ux(im1,j))/dx 
-            dvdy(i,j) = (uy(i,j)-uy(i,jm1))/dy 
-            
-        end do 
-        end do  
-
         do j = 1, ny 
         do i = 1, nx 
 
@@ -482,8 +462,6 @@ end if
             ! Calculate effective strain components from horizontal stretching on ab-nodes
             dudx_ab = ( (ux(ip1,j) - ux(im1,j)) + (ux(ip1,jp1) - ux(im1,jp1)) ) *inv_4dx
             dvdy_ab = ( (uy(i,jp1) - uy(i,jm1)) + (uy(ip1,jp1) - uy(ip1,jm1)) ) *inv_4dy 
-            !dudx_ab = 0.25*(dudx(i,j)+dudx(ip1,j)+dudx(i,jp1)+dudx(ip1,jp1))
-            !dvdy_ab = 0.25*(dvdy(i,j)+dvdy(ip1,j)+dvdy(i,jp1)+dvdy(ip1,jp1))
 
             ! Calculate of cross terms on ab-nodes
             dudy = (ux(i,jp1) - ux(i,j)) / dx 
@@ -514,6 +492,7 @@ end if
         end do 
 
         ! Unstagger from ab-nodes to aa-nodes 
+        ! only using contributions from ice covered neighbors
         do j = 1, ny 
         do i = 1, nx 
 

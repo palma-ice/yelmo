@@ -38,6 +38,8 @@ module ice_benchmarks
     public :: bueler_test_AE 
     public :: bueler_test_BC
 
+    public :: dome_init 
+
     public :: eismint_boundaries 
 
 contains
@@ -243,6 +245,48 @@ contains
 
     end function bueler_gamma 
 
+    subroutine dome_init(H_ice,xx,yy,R0,H0)
+
+        implicit none 
+
+        real(prec), intent(OUT) :: H_ice(:,:)  
+        real(prec), intent(IN)  :: xx(:,:)      ! [m] 
+        real(prec), intent(IN)  :: yy(:,:)      ! [m] 
+        real(prec), intent(IN)  :: R0           ! Normalized radius (in range 0:1), default=0.5
+        real(prec), intent(IN)  :: H0   
+         
+        ! Local variables 
+        integer    :: i, j, k, nx, ny 
+        real(prec) :: r_sq_now, r0_sq 
+        real(prec) :: xmax, ymax 
+        
+        nx = size(H_ice,1)
+        ny = size(H_ice,2) 
+
+        xmax = maxval(xx)
+        ymax = maxval(yy) 
+
+        r0_sq = R0*R0 
+
+        ! Initially set all points to zero ice thickness 
+        H_ice     = 0.0_prec 
+
+        do j = 1, ny
+        do i = 1, nx 
+
+            ! Calculate the squared-radius value as a function of xx and yy [m]
+            r_sq_now = (xx(i,j)/xmax)**2 + (yy(i,j)/ymax)**2
+
+            if (r_sq_now .lt. r0_sq) then 
+                H_ice(i,j) = H0 * sqrt(r0_sq - r_sq_now)
+            end if 
+
+        end do 
+        end do 
+
+        return 
+
+    end subroutine dome_init 
 
     subroutine eismint_boundaries(T_srf,smb,ghf,xx,yy,H_ice,experiment,time,period,rad_el,dT_test,dsmb_test)
 

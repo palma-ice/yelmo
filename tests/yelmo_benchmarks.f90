@@ -102,7 +102,7 @@ program yelmo_benchmarks
             nx = (300.0 / dx) + 1        ! Domain width is 300 km total (-150 to 150 km)
 
         case DEFAULT 
-            ! EISMINT1, EISMINT2 and Bueler test grid setup 
+            ! EISMINT1, EISMINT2, dome and Bueler test grid setup 
 
             grid_name = "EISMINT"
             nx = (1500.0 / dx) + 1     ! Domain width is 1500 km total (-750 to 750 km)
@@ -148,6 +148,15 @@ program yelmo_benchmarks
 
 !             where(yelmo1%bnd%z_bed .lt. 0.0) yelmo1%bnd%smb = 0.0 
         
+        case("dome") 
+            ! Define a radially symmetric ice sheet to start, based on an ellipsoidal (square root) profile
+            ! following Lipscomb et al. (2019) and CISMv2.1. 
+
+            call dome_init(yelmo1%tpo%now%H_ice,yelmo1%grd%x,yelmo1%grd%y,R0=0.5_prec,H0=2000.0_prec)
+
+            yelmo1%bnd%z_bed     = 0.0_prec 
+            yelmo1%tpo%now%z_srf = yelmo1%bnd%z_bed + yelmo1%tpo%now%H_ice
+
         case DEFAULT 
             ! EISMINT1, EISMINT2, BUELER 
 
@@ -271,6 +280,18 @@ program yelmo_benchmarks
             ! Initialize mismip boundary values 
             call mismip3D_boundaries(yelmo1%bnd%T_srf,yelmo1%bnd%smb,yelmo1%bnd%Q_geo,experiment="Stnd") 
 
+        case("dome") 
+            ! Boundary conditions are free to be chosen here 
+
+!             yelmo1%bnd%T_srf = T0 - 15.0_prec 
+!             yelmo1%bnd%Q_geo = 42.0 
+!             yelmo1%bnd%smb   = 0.0_prec 
+            
+            ! Set conditions from EISMINT2-EXPA with smaller radius 
+            call eismint_boundaries(yelmo1%bnd%T_srf,yelmo1%bnd%smb,yelmo1%bnd%Q_geo, &
+                            yelmo1%grd%x,yelmo1%grd%y,yelmo1%tpo%now%H_ice, &
+                            experiment="EXPA",time=time,rad_el=300.0_prec,period=period,dT_test=dT_test)
+
         case DEFAULT 
             ! EISMINT 
 
@@ -325,8 +346,6 @@ program yelmo_benchmarks
         yelmo1%dyn%par%solver = "fixed"
     end if 
 
-
-
     ! Advance timesteps
     do n = 1, ceiling((time_end-time_init)/dtt)
 
@@ -373,6 +392,14 @@ program yelmo_benchmarks
 
                 ! Initialize mismip boundary values 
                 call mismip3D_boundaries(yelmo1%bnd%T_srf,yelmo1%bnd%smb,yelmo1%bnd%Q_geo,experiment="Stnd") 
+
+            case("dome") 
+            ! Boundary conditions are free to be chosen here 
+
+                ! Set conditions from EISMINT2-EXPA with smaller radius 
+                call eismint_boundaries(yelmo1%bnd%T_srf,yelmo1%bnd%smb,yelmo1%bnd%Q_geo, &
+                                yelmo1%grd%x,yelmo1%grd%y,yelmo1%tpo%now%H_ice, &
+                                experiment="EXPA",time=time,rad_el=300.0_prec,period=period,dT_test=dT_test)
 
             case DEFAULT 
 

@@ -283,15 +283,11 @@ program yelmo_benchmarks
         case("dome") 
             ! Boundary conditions are free to be chosen here 
 
-!             yelmo1%bnd%T_srf = T0 - 15.0_prec 
-!             yelmo1%bnd%Q_geo = 42.0 
-!             yelmo1%bnd%smb   = 0.0_prec 
-            
-            ! Set conditions from EISMINT2-EXPA with smaller radius 
-            call eismint_boundaries(yelmo1%bnd%T_srf,yelmo1%bnd%smb,yelmo1%bnd%Q_geo, &
+            ! Set conditions similar to EISMINT2-EXPA with smaller radius 
+            call dome_boundaries(yelmo1%bnd%T_srf,yelmo1%bnd%smb,yelmo1%bnd%Q_geo, &
                             yelmo1%grd%x,yelmo1%grd%y,yelmo1%tpo%now%H_ice, &
-                            experiment="EXPA",time=time,rad_el=300.0_prec,period=period,dT_test=dT_test)
-
+                            experiment="dome",time=time,smb_max=0.3_prec,rad_el=300.0_prec,period=period,dT_test=dT_test)
+                
         case DEFAULT 
             ! EISMINT 
 
@@ -396,10 +392,10 @@ program yelmo_benchmarks
             case("dome") 
             ! Boundary conditions are free to be chosen here 
 
-                ! Set conditions from EISMINT2-EXPA with smaller radius 
-                call eismint_boundaries(yelmo1%bnd%T_srf,yelmo1%bnd%smb,yelmo1%bnd%Q_geo, &
+                ! Set conditions similar to EISMINT2-EXPA with smaller radius 
+                call dome_boundaries(yelmo1%bnd%T_srf,yelmo1%bnd%smb,yelmo1%bnd%Q_geo, &
                                 yelmo1%grd%x,yelmo1%grd%y,yelmo1%tpo%now%H_ice, &
-                                experiment="EXPA",time=time,rad_el=300.0_prec,period=period,dT_test=dT_test)
+                                experiment="dome",time=time,smb_max=0.3_prec,rad_el=300.0_prec,period=period,dT_test=dT_test)
 
             case DEFAULT 
 

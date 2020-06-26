@@ -39,7 +39,8 @@ module ice_benchmarks
     public :: bueler_test_BC
 
     public :: dome_init 
-
+    public :: dome_boundaries 
+    
     public :: eismint_boundaries 
 
 contains
@@ -245,49 +246,6 @@ contains
 
     end function bueler_gamma 
 
-    subroutine dome_init(H_ice,xx,yy,R0,H0)
-
-        implicit none 
-
-        real(prec), intent(OUT) :: H_ice(:,:)  
-        real(prec), intent(IN)  :: xx(:,:)      ! [m] 
-        real(prec), intent(IN)  :: yy(:,:)      ! [m] 
-        real(prec), intent(IN)  :: R0           ! Normalized radius (in range 0:1), default=0.5
-        real(prec), intent(IN)  :: H0   
-         
-        ! Local variables 
-        integer    :: i, j, k, nx, ny 
-        real(prec) :: r_sq_now, r0_sq 
-        real(prec) :: xmax, ymax 
-        
-        nx = size(H_ice,1)
-        ny = size(H_ice,2) 
-
-        xmax = maxval(xx)
-        ymax = maxval(yy) 
-
-        r0_sq = R0*R0 
-
-        ! Initially set all points to zero ice thickness 
-        H_ice     = 0.0_prec 
-
-        do j = 1, ny
-        do i = 1, nx 
-
-            ! Calculate the squared-radius value as a function of xx and yy [m]
-            r_sq_now = (xx(i,j)/xmax)**2 + (yy(i,j)/ymax)**2
-
-            if (r_sq_now .lt. r0_sq) then 
-                H_ice(i,j) = H0 * sqrt(r0_sq - r_sq_now)
-            end if 
-
-        end do 
-        end do 
-
-        return 
-
-    end subroutine dome_init 
-
     subroutine eismint_boundaries(T_srf,smb,ghf,xx,yy,H_ice,experiment,time,period,rad_el,dT_test,dsmb_test)
 
         implicit none 
@@ -467,5 +425,151 @@ contains
         return 
 
     end subroutine eismint_boundaries  
+    
+    subroutine dome_init(H_ice,xx,yy,R0,H0)
+
+        implicit none 
+
+        real(prec), intent(OUT) :: H_ice(:,:)  
+        real(prec), intent(IN)  :: xx(:,:)      ! [m] 
+        real(prec), intent(IN)  :: yy(:,:)      ! [m] 
+        real(prec), intent(IN)  :: R0           ! Normalized radius (in range 0:1), default=0.5
+        real(prec), intent(IN)  :: H0   
+         
+        ! Local variables 
+        integer    :: i, j, k, nx, ny 
+        real(prec) :: r_sq_now, r0_sq 
+        real(prec) :: xmax, ymax 
+        
+        nx = size(H_ice,1)
+        ny = size(H_ice,2) 
+
+        xmax = maxval(xx)
+        ymax = maxval(yy) 
+
+        r0_sq = R0*R0 
+
+        ! Initially set all points to zero ice thickness 
+        H_ice     = 0.0_prec 
+
+        do j = 1, ny
+        do i = 1, nx 
+
+            ! Calculate the squared-radius value as a function of xx and yy [m]
+            r_sq_now = (xx(i,j)/xmax)**2 + (yy(i,j)/ymax)**2
+
+            if (r_sq_now .lt. r0_sq) then 
+                H_ice(i,j) = H0 * sqrt(r0_sq - r_sq_now)
+            end if 
+
+        end do 
+        end do 
+
+        return 
+
+    end subroutine dome_init 
+
+    subroutine dome_boundaries(T_srf,smb,ghf,xx,yy,H_ice,experiment,time,smb_max,period,rad_el,dT_test,dsmb_test)
+
+        implicit none 
+
+        real(prec), intent(OUT) :: T_srf(:,:) 
+        real(prec), intent(OUT) :: smb(:,:) 
+        real(prec), intent(OUT) :: ghf(:,:) 
+        real(prec), intent(IN)  :: xx(:,:)      ! [m] 
+        real(prec), intent(IN)  :: yy(:,:)      ! [m] 
+        real(prec), intent(IN)  :: H_ice(:,:) 
+        character(len=*), intent(IN) :: experiment 
+        real(prec), intent(IN) :: time 
+        real(prec), intent(IN) :: smb_max
+        real(prec), intent(IN) :: period 
+        real(prec), intent(IN), optional :: rad_el 
+        real(prec), intent(IN), optional :: dT_test 
+        real(prec), intent(IN), optional :: dsmb_test  
+
+        real(prec), parameter :: x_summit = 0.0 
+        real(prec), parameter :: y_summit = 0.0 
+        
+        ! Local variables 
+        integer    :: i, j, nx, ny 
+        real(prec) :: dist
+        real(prec) :: R_el, s  
+        real(prec) :: dT, dR_el, dsmb 
+        real(prec) :: Tmin 
+
+        nx = size(T_srf,1)
+        ny = size(T_srf,2)
+        
+        if (period .gt. 0.0) then
+            ! Transient forcing  
+            dT    =  10.0*sin(2.0*pi*time/period)
+            dR_el = 100.0*sin(2.0*pi*time/period)
+            dsmb  =   0.2*sin(2.0*pi*time/period)
+        
+        else 
+            ! Constant forcing 
+            dT    = 0.0 
+            dR_el = 0.0
+            dsmb  = 0.0 
+
+        end if 
+
+        ! Allow modification of surface temperature via argument 
+        if (present(dT_test)) dT = dT + dT_test
+
+        ! Allow modification of surface temperature via argument 
+        if (present(dsmb_test)) dsmb = dsmb + dsmb_test
+
+
+        select case(trim(experiment))
+
+            case("dome")
+
+                ! Surface temperature 
+
+                Tmin  = 238.15                          ! [K] 
+                s     = 1.67e-2                         ! [K km-1]
+                
+                do j = 1, ny 
+                do i = 1, nx
+                
+                    dist = sqrt((xx(i,j)-x_summit)**2 + (yy(i,j)-y_summit)**2) *1e-3  ! [km]
+                    T_srf(i,j) = Tmin + s*dist + dT     ! [K]
+
+                end do 
+                end do 
+
+                ! Surface mass balance 
+
+                ! Default EISMINT1 parameter values 
+                R_el = 450.0 + dR_el ! [km]
+                s    = 0.01  ! [m/a / km]
+
+                ! Allow modification of equilibrium line radius via argument 
+                if (present(rad_el)) R_el = rad_el + dR_el
+
+                do j = 1, ny 
+                do i = 1, nx
+                
+                    dist = sqrt((xx(i,j)-x_summit)**2 + (yy(i,j)-y_summit)**2) *1e-3  ! [km]
+                    smb(i,j) = min(smb_max,s*(R_el-dist))
+
+                end do 
+                end do 
+
+                ! Geothermal heat flux 
+
+                ghf = 42.0   ! [mW/m2]
+            
+            case DEFAULT 
+
+                write(*,*) "Experiment not recognized: "//trim(experiment)
+                stop 
+
+        end select 
+
+        return 
+
+    end subroutine dome_boundaries  
     
 end module ice_benchmarks  

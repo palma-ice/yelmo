@@ -23,6 +23,8 @@ module yelmo_timesteps
     public :: calc_adv2D_timestep1
     public :: calc_adv3D_timestep1 
 
+    public :: check_checkerboard 
+
 contains
 
     subroutine set_pc_mask(mask,H_ice,f_grnd)
@@ -133,7 +135,7 @@ end if
         return 
 
     end function calc_pc_eta 
-
+    
     elemental subroutine calc_pc_tau_fe_sbe(tau,var_corr,var_pred,dt_n)
         ! Calculate truncation error for the FE-SBE timestepping method
         ! Forward Euler (FE) predictor step and Semi-implicit

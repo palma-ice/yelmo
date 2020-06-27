@@ -172,7 +172,7 @@ contains
         ! Limit grounded ice thickess to above minimum and below inland neighbor at the margin
 !         call limit_grounded_margin_thickness(H_ice,mb_applied,f_grnd,H_min,dt) 
         call limit_grounded_margin_thickness_flux(H_ice,mb_applied,f_grnd,mbal,ux_tmp,uy_tmp,dx,dt,H_min)
-            
+        
         ! Also ensure tiny numeric ice thicknesses are removed
         where (H_ice .lt. 1e-5) H_ice = 0.0 
 

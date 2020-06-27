@@ -1,4 +1,4 @@
-&mismip
+&ctrl
 
     domain       = "MISMIP3D"           ! "MISMIP3D"
     experiment   = "RF"                 ! "Stnd", "RF"
@@ -22,16 +22,16 @@
     zeta_exp        = 2.0  
     nz_aa           = 5                 ! Vertical resolution in ice
     dt_method       = 2                 ! 0: no internal timestep, 1: adaptive, cfl, 2: adaptive, pc
-    dt_min          = 0.01              ! [a] Minimum timestep 
+    dt_min          = 0.005             ! [a] Minimum timestep 
     cfl_max         = 0.1               ! Maximum value is 1.0, lower will be more stable
     cfl_diff_max    = 0.12              ! Bueler et al (2007), Eq. 25  
     pc_method       = "AB-SAM"          ! "FE-SBE", "AB-SAM", "HEUN"
     pc_controller   = "PI42"            ! PI42, H312b, H312PID, H321PID, PID1
     pc_filter_vel   = False             ! Use mean vel. solution of current and previous timestep
     pc_use_H_pred   = False             ! Use predicted H_ice instead of corrected H_ice 
-    pc_n_redo       = 5                 ! How many times can the same iteration be repeated (when high error exists)
+    pc_n_redo       = 10                ! How many times can the same iteration be repeated (when high error exists)
     pc_tol          = 2.0               ! [m/a] Tolerance threshold to redo timestep
-    pc_eps          = 5e-1              ! Predictor-corrector tolerance 
+    pc_eps          = 1e-1              ! Predictor-corrector tolerance 
     
 /
 
@@ -58,7 +58,7 @@
 /
 
 &ydyn
-    solver              = "hybrid"        ! "fixed", "sia", "ssa", "hybrid", "diva"    
+    solver              = "ssa"           ! "fixed", "sia", "ssa", "hybrid", "diva"    
     diva_no_slip        = False           ! If using the DIVA solver, is basal sliding allowed? 
     beta_method         = 2               ! 0: constant beta; 1: linear (beta=cb/u0); 2: psuedo-plastic-power; 3: Regularized Coulomb
     beta_const          = 1e3             ! [Pa a m−1] Constant value of basal friction coefficient to be used
@@ -81,7 +81,7 @@
     cf_stream           = 3.165176e4      ! [--] Bed critical stress factor, stream  
     n_sm_beta           = 0               ! [-] Standard deviation in gridpoints for Gaussian smoothing of beta (0==no smoothing)
     beta_min            = 0.0             ! [Pa a m-1] Minimum value of beta allowed for grounded ice (for stability)
-    eps_0               = 1e-8            ! [1/a] Regularization term for effective viscosity - minimum strain rate
+    eps_0               = 1e-6            ! [1/a] Regularization term for effective viscosity - minimum strain rate
     ssa_lis_opt         = "-i bicgsafe -p jacobi -maxiter 100 -tol 1.0e-4 -initx_zeros false"  ! See Lis library
     ssa_beta_max        = 1e20            ! [Pa a m-1] Maximum value of beta for which ssa should be calculated 
     ssa_vel_max         = 5000.0          ! [m a-1] SSA velocity limit to avoid spurious results 

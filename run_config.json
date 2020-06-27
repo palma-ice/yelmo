@@ -5,7 +5,8 @@
             "initmip"    : "libyelmo/bin/yelmo_initmip.x",
             "opt"        : "libyelmo/bin/yelmo_opt.x",
             "trough"     : "libyelmo/bin/yelmo_trough.x",
-            "ismiphom"   : "libyelmo/bin/yelmo_ismiphom.x"
+            "ismiphom"   : "libyelmo/bin/yelmo_ismiphom.x",
+            "regridding" : "libyelmo/bin/yelmo_test_regridding.x"
         },
 
     "const_paths" : 
@@ -13,6 +14,7 @@
             "HALFAR"   : "par/yelmo_const_EISMINT.nml",
             "MISMIP3D" : "par/yelmo_const_MISMIP3D.nml",
             "TROUGH"   : "par/yelmo_const_TROUGH.nml",
+            "MISMIP+"  : "par/yelmo_const_TROUGH.nml",
             "ISMIPHOM" : "par/yelmo_const_EISMINT.nml" 
         },
 

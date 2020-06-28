@@ -158,9 +158,11 @@ program yelmo_benchmarks
             yelmo1%tpo%now%z_srf = yelmo1%bnd%z_bed + yelmo1%tpo%now%H_ice
 
         case DEFAULT 
-            ! EISMINT1, EISMINT2, BUELER 
+            ! EISMINT1, EISMINT2, HALFAR, BUELER 
 
-            yelmo1%tpo%now%z_srf  = yelmo1%bnd%z_bed + yelmo1%tpo%now%H_ice 
+            yelmo1%bnd%z_bed     = 0.0_prec 
+            yelmo1%tpo%now%H_ice = 0.0_prec 
+            yelmo1%tpo%now%z_srf = yelmo1%bnd%z_bed + yelmo1%tpo%now%H_ice 
 
     end select 
 

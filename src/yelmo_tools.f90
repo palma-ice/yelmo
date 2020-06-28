@@ -238,8 +238,8 @@ contains
 
         do j = 1, ny 
         do i = 1, nx
-            ip1 = min(i+1,1)
-            jp1 = min(j+1,1)
+            ip1 = min(i+1,nx)
+            jp1 = min(j+1,ny)
             ustag(i,j) = 0.25_prec*(u(ip1,jp1)+u(ip1,j)+u(i,jp1)+u(i,j))
         end do 
         end do 
@@ -270,8 +270,8 @@ contains
         do j = 1, ny 
         do i = 1, nx
 
-            ip1 = min(i+1,1)
-            jp1 = min(j+1,1)
+            ip1 = min(i+1,nx)
+            jp1 = min(j+1,ny)
 
             k = 0 
             ustag(i,j) = 0.0 

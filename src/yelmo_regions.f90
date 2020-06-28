@@ -22,7 +22,7 @@ contains
 
         return 
 
-    end subroutine yregions_init 
+    end subroutine yregions_init
 
     subroutine calc_yregions(reg,tpo,dyn,thrm,mat,bnd,mask) 
         ! Calculate a set of regional variables (averages, totals)
@@ -236,7 +236,7 @@ contains
         
         return
 
-    end subroutine write_yreg_init 
+    end subroutine write_yreg_init
 
     subroutine write_yreg_step(reg,filename,time)
 

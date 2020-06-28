@@ -322,6 +322,8 @@ contains
 
         real(prec) :: c_x, c_y, dvardz 
 
+        real(prec), allocatable :: var_ice1(:,:,:) 
+
         ! Define some constants 
         dx_inv  = 1.0_prec / dx 
         dx_inv2 = 1.0_prec / (2.0_prec*dx)
@@ -329,6 +331,13 @@ contains
         nx  = size(var_ice,1)
         ny  = size(var_ice,2)
         nz_aa = size(var_ice,3) 
+
+        allocate(var_ice1(nx,ny,nz_aa))
+
+        ! Use temporary variable for var_ice and limit its 
+        ! small values to avoid potential underflow errors 
+        var_ice1 = var_ice 
+        where(abs(var_ice1) .lt. 1e-8) var_ice1 = 0.0_prec 
 
         advecx  = 0.0 
         advecy  = 0.0 
@@ -345,8 +354,8 @@ contains
             if (ux(i-1,j,k) .gt. 0.0_prec .and. ux(i,j,k) .lt. 0.0_prec .and. i .ge. 3 .and. i .le. nx-2) then 
                 ! Convergent flow - take the mean 
 
-                advecx    = dx_inv2 * ux(i-1,j,k)*(-(4.0*var_ice(i-1,j,k)-var_ice(i-2,j,k)-3.0*var_ice(i,j,k)))
-                advec_rev = dx_inv2 * ux(i,j,k)*((4.0*var_ice(i+1,j,k)-var_ice(i+2,j,k)-3.0*var_ice(i,j,k)))
+                advecx    = dx_inv2 * ux(i-1,j,k)*(-(4.0*var_ice1(i-1,j,k)-var_ice1(i-2,j,k)-3.0*var_ice1(i,j,k)))
+                advec_rev = dx_inv2 * ux(i,j,k)*((4.0*var_ice1(i+1,j,k)-var_ice1(i+2,j,k)-3.0*var_ice1(i,j,k)))
 
                 advecx    = 0.5_prec * (advecx + advec_rev) 
 
@@ -354,25 +363,25 @@ contains
                 ! Flow to the right - inner points
 
                 ! 2nd order
-                advecx = dx_inv2 * ux(i-1,j,k)*(-(4.0*var_ice(i-1,j,k)-var_ice(i-2,j,k)-3.0*var_ice(i,j,k)))
+                advecx = dx_inv2 * ux(i-1,j,k)*(-(4.0*var_ice1(i-1,j,k)-var_ice1(i-2,j,k)-3.0*var_ice1(i,j,k)))
 
             else if (ux_aa .gt. 0.0 .and. i .eq. 2) then  
                 ! Flow to the right - border points
 
                 ! 1st order
-                advecx = dx_inv * ux(i-1,j,k)*(-(var_ice(i-1,j,k)-var_ice(i,j,k)))
+                advecx = dx_inv * ux(i-1,j,k)*(-(var_ice1(i-1,j,k)-var_ice1(i,j,k)))
                 
             else if (ux_aa .lt. 0.0 .and. i .le. nx-2) then 
                 ! Flow to the left
 
                 ! 2nd order
-                advecx = dx_inv2 * ux(i,j,k)*((4.0*var_ice(i+1,j,k)-var_ice(i+2,j,k)-3.0*var_ice(i,j,k)))
+                advecx = dx_inv2 * ux(i,j,k)*((4.0*var_ice1(i+1,j,k)-var_ice1(i+2,j,k)-3.0*var_ice1(i,j,k)))
 
             else if (ux_aa .lt. 0.0 .and. i .eq. nx-1) then 
                 ! Flow to the left
 
                 ! 1st order 
-                advecx = dx_inv * ux(i,j,k)*((var_ice(i+1,j,k)-var_ice(i,j,k)))
+                advecx = dx_inv * ux(i,j,k)*((var_ice1(i+1,j,k)-var_ice1(i,j,k)))
                 
             else 
                 ! No flow or divergent 
@@ -384,8 +393,8 @@ contains
             if (uy(i,j-1,k) .gt. 0.0_prec .and. uy(i,j,k) .lt. 0.0_prec .and. j .ge. 3 .and. j .le. ny-2) then 
                 ! Convergent flow - take the mean 
 
-                advecy    = dx_inv2 * uy(i,j-1,k)*(-(4.0*var_ice(i,j-1,k)-var_ice(i,j-2,k)-3.0*var_ice(i,j,k)))
-                advec_rev = dx_inv2 * uy(i,j,k)*((4.0*var_ice(i,j+1,k)-var_ice(i,j+2,k)-3.0*var_ice(i,j,k)))
+                advecy    = dx_inv2 * uy(i,j-1,k)*(-(4.0*var_ice1(i,j-1,k)-var_ice1(i,j-2,k)-3.0*var_ice1(i,j,k)))
+                advec_rev = dx_inv2 * uy(i,j,k)*((4.0*var_ice1(i,j+1,k)-var_ice1(i,j+2,k)-3.0*var_ice1(i,j,k)))
                 
                 advecy    = 0.5_prec * (advecy + advec_rev) 
 
@@ -393,25 +402,25 @@ contains
                 ! Flow to the right  - inner points
 
                 ! 2nd order
-                advecy = dx_inv2 * uy(i,j-1,k)*(-(4.0*var_ice(i,j-1,k)-var_ice(i,j-2,k)-3.0*var_ice(i,j,k)))
+                advecy = dx_inv2 * uy(i,j-1,k)*(-(4.0*var_ice1(i,j-1,k)-var_ice1(i,j-2,k)-3.0*var_ice1(i,j,k)))
 
             else if (uy_aa .gt. 0.0 .and. j .eq. 2) then   
                 ! Flow to the right - border points
 
                 ! 1st order
-                advecy = dx_inv * uy(i,j-1,k)*(-(var_ice(i,j-1,k)-var_ice(i,j,k)))
+                advecy = dx_inv * uy(i,j-1,k)*(-(var_ice1(i,j-1,k)-var_ice1(i,j,k)))
                 
             else if (uy_aa .lt. 0.0 .and. j .le. ny-2) then 
                 ! Flow to the left
 
                 ! 2nd order
-                advecy = dx_inv2 * uy(i,j,k)*((4.0*var_ice(i,j+1,k)-var_ice(i,j+2,k)-3.0*var_ice(i,j,k)))
+                advecy = dx_inv2 * uy(i,j,k)*((4.0*var_ice1(i,j+1,k)-var_ice1(i,j+2,k)-3.0*var_ice1(i,j,k)))
             
             else if (uy_aa .lt. 0.0 .and. j .eq. ny-1) then 
                 ! Flow to the left
 
                 ! 1st order
-                advecy = dx_inv * uy(i,j,k)*((var_ice(i,j+1,k)-var_ice(i,j,k)))
+                advecy = dx_inv * uy(i,j,k)*((var_ice1(i,j+1,k)-var_ice1(i,j,k)))
                   
             else
                 ! No flow 

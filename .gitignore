@@ -3,5 +3,4 @@ libyelmo
 ice_data
 tests/plots
 output
-tests/.DS_Store
-.DS_Store
+*.DS_Store

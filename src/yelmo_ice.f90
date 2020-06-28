@@ -1179,14 +1179,17 @@ contains
                                                                                 " | pc_eta: ", dom%par%pc_eta
         end if 
 
-
         ! Determine if model should be killed 
         kill_it = kill_it_H .or. kill_it_vel .or. kill_it_nan .or. kill_it_eta 
 
+        ! Definitely kill the model if it was requested externally
+        if (present(kill_request)) then 
+            kill_it = .TRUE. 
+            kill_msg = trim(kill_request)
+        end if 
+
         if (kill_it) then 
             ! Model is not running properly, kill it. 
-
-            call yelmo_restart_write(dom,"yelmo_killed.nc",time=time) 
 
             write(*,*) 
             write(*,*) 
@@ -1207,24 +1210,9 @@ contains
             write(*,"(a16,2g14.4)") "range(H_ice):   ", minval(dom%tpo%now%H_ice), maxval(dom%tpo%now%H_ice)
             write(*,"(a16,2g14.4)") "range(uxy_bar): ", minval(dom%dyn%now%uxy_bar), maxval(dom%dyn%now%uxy_bar)
             write(*,*) 
-            write(*,*) "Restart file written: "//"yelmo_killed.nc"
-            write(*,*) 
-            write(*,"(a,f15.3,a)") "Time =", time, ": stopping model (killed)." 
-            write(*,*) 
-
-            stop "yelmo_check_kill error, see log."
-
-        end if 
-
-        if (present(kill_request)) then 
 
             call yelmo_restart_write(dom,"yelmo_killed.nc",time=time) 
-     
-            write(*,*) 
-            write(*,*) 
-            write(*,"(a)") "yelmo_check_kill:: kill requested: "
-            write(*,"(a)") trim(kill_request)
-            write(*,*) 
+
             write(*,*) "Restart file written: "//"yelmo_killed.nc"
             write(*,*) 
             write(*,"(a,f15.3,a)") "Time =", time, ": stopping model (killed)." 

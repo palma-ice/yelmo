@@ -162,6 +162,8 @@ contains
         call nc_write(filename,"H_ice_pred",  dom%tpo%now%H_ice_pred,  units="m",  dim1="xc",dim2="yc",ncid=ncid)
         call nc_write(filename,"H_ice_corr",  dom%tpo%now%H_ice_corr,  units="m",  dim1="xc",dim2="yc",ncid=ncid)
         
+        call nc_write(filename,"z_srf_n",     dom%tpo%now%z_srf_n,     units="m",  dim1="xc",dim2="yc",ncid=ncid)
+        
         ! == ydyn variables ===
 
         call nc_write(filename,"ux",            dom%dyn%now%ux,     units="m/a",dim1="xc",dim2="yc",dim3="zeta",ncid=ncid) 
@@ -400,6 +402,8 @@ contains
         call nc_read(filename,"H_ice_n",     dom%tpo%now%H_ice_n,ncid=ncid)
         call nc_read(filename,"H_ice_pred",  dom%tpo%now%H_ice_pred,ncid=ncid)
         call nc_read(filename,"H_ice_corr",  dom%tpo%now%H_ice_corr,ncid=ncid)
+        
+        call nc_read(filename,"z_srf_n",     dom%tpo%now%z_srf_n,ncid=ncid)
         
         ! Close the netcdf file
         call nc_close(ncid)

@@ -239,7 +239,7 @@ contains
 
     end subroutine trough_f17_topo_init 
 
-        subroutine trough_mismipp_topo_init(z_bed,H_ice,z_srf,xc,yc,fc,dc,wc,x_cf)
+    subroutine trough_mismipp_topo_init(z_bed,H_ice,z_srf,xc,yc,fc,dc,wc,x_cf)
 
         implicit none 
 
@@ -305,7 +305,7 @@ contains
 
         return 
 
-    end subroutine trough_mismipp_topo_init 
+    end subroutine trough_mismipp_topo_init
 
     subroutine write_step_2D(ylmo,filename,time)
 

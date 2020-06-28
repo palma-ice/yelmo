@@ -142,6 +142,8 @@ module yelmo_defs
         real(prec), allocatable :: H_ice_pred(:,:)  ! [m] Ice thickness, predicted, for time=n+1
         real(prec), allocatable :: H_ice_corr(:,:)  ! [m] Ice thickness, corrected, for time=n+1 
         
+        real(prec), allocatable :: z_srf_n(:,:)     ! [m] Surface elevation from the previous timestep 
+        
     end type
 
     ! ytopo class

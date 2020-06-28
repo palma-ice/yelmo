@@ -333,7 +333,16 @@ contains
         logical,    intent(IN)  :: mask(:,:) 
         real(prec), intent(IN)  :: tau 
 
-        where (mask) calv = H_ice / tau 
+        if (tau .eq. 0.0_prec) then 
+            ! Kill all ice immediately 
+
+            where (mask) calv = H_ice
+
+        else 
+            ! Kill using characteristic timescale 
+            where (mask) calv = H_ice / tau 
+
+        end if 
 
         return 
 

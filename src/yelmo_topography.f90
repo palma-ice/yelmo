@@ -55,7 +55,7 @@ contains
         real(prec) :: dx, dt   
         integer :: i, j, nx, ny  
         real(prec), allocatable :: mbal(:,:) 
-        
+
         real(8)    :: cpu_time0, cpu_time1
         real(prec) :: model_time0, model_time1 
         real(prec) :: speed 
@@ -64,7 +64,7 @@ contains
         ny = size(tpo%now%H_ice,2)
 
         allocate(mbal(nx,ny))
-
+        
         ! Initialize time if necessary 
         if (tpo%par%time .gt. time) then 
             tpo%par%time = time 
@@ -145,7 +145,7 @@ contains
                     call calc_calving_rate_kill(tpo%now%calv,tpo%now%H_ice, &
                                                     ( tpo%now%f_grnd .eq. 0.0_prec .and. &
                                                       tpo%now%H_ice  .gt. 0.0_prec .and. &
-                                                      bnd%calv_mask ), tau=real(1e-2,prec) )
+                                                      bnd%calv_mask ), tau=0.0_prec )
 
                 case DEFAULT 
 
@@ -179,9 +179,11 @@ contains
 
         ! 2. Calculate additional topographic properties ------------------
 
-        ! Store previous surface elevation 
-        tpo%now%dzsrfdt = tpo%now%z_srf
-        
+        ! Store previous surface elevation on predictor step
+        if (trim(tpo%par%pc_step) .eq. "predictor") then 
+            tpo%now%z_srf_n = tpo%now%z_srf 
+        end if 
+
         ! Calculate the surface elevation 
         select case(tpo%par%surf_gl_method)
             ! Choose method to treat grounding line points when calculating surface elevation
@@ -202,7 +204,7 @@ contains
 
         ! Determine rate of surface elevation change 
         if (dt .gt. 0.0) then 
-            tpo%now%dzsrfdt = (tpo%now%z_srf-tpo%now%dzsrfdt) / dt 
+            tpo%now%dzsrfdt = (tpo%now%z_srf-tpo%now%z_srf_n) / dt 
         else 
             tpo%now%dzsrfdt = 0.0 
         end if 
@@ -473,6 +475,8 @@ contains
         allocate(now%H_ice_pred(nx,ny))
         allocate(now%H_ice_corr(nx,ny))
         
+        allocate(now%z_srf_n(nx,ny))
+        
         now%H_ice       = 0.0 
         now%z_srf       = 0.0  
         now%dzsrfdt     = 0.0 
@@ -503,6 +507,8 @@ contains
         now%H_ice_pred  = 0.0 
         now%H_ice_corr  = 0.0 
         
+        now%z_srf_n     = 0.0 
+
         return 
     end subroutine ytopo_alloc 
 
@@ -548,6 +554,8 @@ contains
         if (allocated(now%H_ice_n))     deallocate(now%H_ice_n)
         if (allocated(now%H_ice_pred))  deallocate(now%H_ice_pred)
         if (allocated(now%H_ice_corr))  deallocate(now%H_ice_corr)
+        
+        if (allocated(now%z_srf_n))     deallocate(now%z_srf_n)
         
         return 
 

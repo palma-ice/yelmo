@@ -9,12 +9,9 @@
 	// Set *default* container specific settings.json values on container create.
 	"settings": {
 		"terminal.integrated.shell.linux": null,
+		"python.pythonPath": "/opt/conda/bin/python",
 		"python.formatting.provider": "black",
 		"editor.formatOnSave": true,
-		"[latex]": {
-			"editor.wordWrap": "on",
-			"editor.formatOnSave": false,
-		},
 		"python.linting.mypyEnabled": true,
 		"python.linting.enabled": true,
 		"python.linting.flake8Enabled": true,
@@ -24,17 +21,18 @@
 		"python.linting.pylintEnabled": true,
 		"autoDocstring.docstringFormat": "google",
 		"python.linting.pylintPath": "/opt/conda/bin/pylint",
+		"fortran-ls.executablePath": "/opt/conda/bin/fortls",
+		"fortran.gfortranExecutable": "/usr/bin/gfortran"
 	},
 	"extensions": [
+		"hansec.fortran-ls",
+		"krvajalm.linter-gfortran",
 		"ms-python.python",
 		"njpwerner.autodocstring",
 		"ms-azuretools.vscode-docker",
 		"mhutchie.git-graph",
 		"eamodio.gitlens",
-		"tomoki1207.pdf",
 		"ms-azuretools.vscode-docker",
-		"streetsidesoftware.code-spell-checker",
-		"oderwat.indent-rainbow",
 		"gua.rainbow-brackets"
 	],
 	"remoteUser": "glacier"

@@ -25,6 +25,7 @@
 		"fortran.gfortranExecutable": "/usr/bin/gfortran"
 	},
 	"extensions": [
+		"ms-vscode.cpptools",
 		"hansec.fortran-ls",
 		"krvajalm.linter-gfortran",
 		"ms-python.python",

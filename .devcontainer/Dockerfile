@@ -24,6 +24,7 @@ RUN apt-get -y update && \
     git \
     gcc \
     gfortran \ 
+    gdb \ 
     libnetcdf-dev \  
     libnetcdff-dev \
     less \ 
@@ -49,6 +50,12 @@ RUN echo "installing lis" \
     && make installcheck  \
     && rm -rf /tmp/lis-${LIS_VERSION} 
 
+# Python packages with conda
+COPY .devcontainer/environment.yml /tmp/conda-tmp/
+RUN if [ -f "/tmp/conda-tmp/environment.yml" ]; then /opt/conda/bin/conda env update -n base -f /tmp/conda-tmp/environment.yml; fi \
+    && rm -rf /tmp/conda-tmp  \
+    && conda init
+
 # Add user
 ENV USER=glacier
 RUN adduser --disabled-password --gecos '' ${USER} \
@@ -58,4 +65,3 @@ USER ${USER}
 ENV HOME=/home/${USER}
 
 WORKDIR /home/glacier/yelmo
-ENTRYPOINT [ "bash" ]

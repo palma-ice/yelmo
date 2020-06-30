@@ -1,0 +1,17 @@
+name: base
+channels:
+  - conda-forge
+  - defaults
+dependencies:
+  - black
+  - conda
+  - conda-package-handling
+  - python
+  - pip:
+    - mypy
+    - pylint
+    - flake8
+    - fortran-language-server
+    - pytest
+prefix: /opt/conda
+

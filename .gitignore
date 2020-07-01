@@ -5,3 +5,5 @@ tests/plots
 output
 tests/.DS_Store
 .DS_Store
+myTODO.md
+*.mod

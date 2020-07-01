@@ -53,8 +53,8 @@ RUN echo "installing lis" \
 # Python packages with conda
 COPY .devcontainer/environment.yml /tmp/conda-tmp/
 RUN if [ -f "/tmp/conda-tmp/environment.yml" ]; then /opt/conda/bin/conda env update -n base -f /tmp/conda-tmp/environment.yml; fi \
-    && rm -rf /tmp/conda-tmp  \
-    && conda init
+    && rm -rf /tmp/conda-tmp 
+
 
 # Add user
 ENV USER=glacier
@@ -63,5 +63,7 @@ RUN adduser --disabled-password --gecos '' ${USER} \
     && echo '%sudo ALL=(ALL) NOPASSWD:ALL' >> /etc/sudoers
 USER ${USER}
 ENV HOME=/home/${USER}
+
+RUN conda init
 
 WORKDIR /home/glacier/yelmo

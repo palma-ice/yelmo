@@ -43,7 +43,7 @@ RUN echo "installing lis" \
     && cd /tmp/lis-${LIS_VERSION} \
     && echo $PWD \
     && echo "configure and make of lis" \
-    && ./configure --prefix=${LIS_PATH} --enable-omp --enable-f90 \
+    && ./configure --prefix=${LIS_PATH} --enable-f90 \ 
     && make \
     && make check \
     && make install \
@@ -55,6 +55,9 @@ COPY .devcontainer/environment.yml /tmp/conda-tmp/
 RUN if [ -f "/tmp/conda-tmp/environment.yml" ]; then /opt/conda/bin/conda env update -n base -f /tmp/conda-tmp/environment.yml; fi \
     && rm -rf /tmp/conda-tmp 
 
+# runner
+RUN git clone https://github.com/perrette/runner /tmp/runner  \
+    && /opt/conda/bin/pip install /tmp/runner/
 
 # Add user
 ENV USER=glacier

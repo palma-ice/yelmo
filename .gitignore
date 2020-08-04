@@ -7,3 +7,6 @@ tests/.DS_Store
 .DS_Store
 myTODO.md
 *.mod
+*.vscode
+*.mypy_cache
+*.pytest_cache

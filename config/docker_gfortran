@@ -7,7 +7,7 @@ LISROOT = /usr/lib/lis
 INC_LIS = -I${LISROOT}/include 
 LIB_LIS = -L${LISROOT}/lib/ -llis
 
-FFLAGS  = -ffree-line-length-none -I$(objdir) -J$(objdir)
+FFLAGS  = -ffree-line-length-none -I$(objdir) -J$(objdir) -fopenmp
 LFLAGS  = $(LIB_NC) $(LIB_LIS) -Wl,-zmuldefs
 
 DFLAGS_NODEBUG = -O2

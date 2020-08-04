@@ -43,7 +43,7 @@ RUN echo "installing lis" \
     && cd /tmp/lis-${LIS_VERSION} \
     && echo $PWD \
     && echo "configure and make of lis" \
-    && ./configure --prefix=${LIS_PATH} --enable-f90 \ 
+    && ./configure --prefix=${LIS_PATH} --enable-omp --enable-f90 \ 
     && make \
     && make check \
     && make install \

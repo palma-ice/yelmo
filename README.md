@@ -23,18 +23,18 @@ instructions below in the section "Test cases".
 
 ## Quickstart with Docker and VS Code
 
-The easiest way to use yelmo is with VS Code and Docker. It works on any plattform and uses a Linux based container. You don't need to know Docker or VS Code to get started. Just install the following:
+The easiest way to use Yelmo is with VS Code and Docker. It works on any plattform and uses a Linux based container. You don't need to know Docker or VS Code to get started. Just install the following:
 
 1) [Docker](https://docs.docker.com/engine/install/)
 2) [VS Code](https://code.visualstudio.com) 
 3) get the code (see below)
 
 Then make sure that Docker is running and start VS Code. 
-Open the folder with the yelmo code. Say Yes, when VS Code asks you if you want to open it in the container.
+Open the folder with the Yelmo code. Say Yes, when VS Code asks you if you want to open it in the container.
 
-Now you can directy to step 3 below, just make sure that you use the terminal in VS Code.
+Now you can directly go to step 3 below, just make sure that you use the terminal in VS Code.
 
-This will give you everything you need to develop and run yelmo.
+This will give you everything you need to develop and run Yelmo.
 
 ## Dependencies
 

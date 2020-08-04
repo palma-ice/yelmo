@@ -7,11 +7,11 @@ dependencies:
   - conda
   - conda-package-handling
   - python
+  - pip
   - pip:
-    - mypy
-    - pylint
-    - flake8
-    - fortran-language-server
-    - pytest
+      - mypy
+      - pylint
+      - flake8
+      - fortran-language-server
+      - pytest
 prefix: /opt/conda
-

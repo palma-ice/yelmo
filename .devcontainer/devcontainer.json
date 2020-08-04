@@ -36,5 +36,6 @@
 		"ms-azuretools.vscode-docker",
 		"gua.rainbow-brackets"
 	],
-	"remoteUser": "glacier"
+	"remoteUser": "glacier",
+	"postCreateCommand": "python config.py config/docker_gfortran"
 }

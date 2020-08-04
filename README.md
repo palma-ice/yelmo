@@ -27,7 +27,8 @@ The easiest way to use Yelmo is with VS Code and Docker. It works on any plattfo
 
 1) [Docker](https://docs.docker.com/engine/install/)
 2) [VS Code](https://code.visualstudio.com) 
-3) get the code (see below)
+3) [install the remote development extension](https://marketplace.visualstudio.com/items?itemName=ms-vscode-remote.vscode-remote-extensionpack)
+4) get the code (see below)
 
 Then make sure that Docker is running and start VS Code. 
 Open the folder with the Yelmo code. Say Yes, when VS Code asks you if you want to open it in the container.

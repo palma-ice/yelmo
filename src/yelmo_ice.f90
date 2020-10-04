@@ -766,7 +766,7 @@ contains
 
         return
 
-    end subroutine yelmo_init 
+    end subroutine yelmo_init
 
     subroutine yelmo_init_topo(dom,filename,time,load_topo)
         ! This subroutine is the first step to intializing 

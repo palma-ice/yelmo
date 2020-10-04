@@ -1,4 +1,4 @@
-&control    
+&ctrl    
     time_init       = 0.0               ! [yr] Starting time 
     time_end        = 1e3               ! [yr] Ending time
     time_equil      = 2e3               ! [yr] Equilibration time 
@@ -55,8 +55,10 @@
     pc_filter_vel   = False             ! Use mean vel. solution of current and previous timestep
     pc_use_H_pred   = False             ! Use predicted H_ice instead of corrected H_ice 
     pc_n_redo       = 5                 ! How many times can the same iteration be repeated (when high error exists)
-    pc_tol          = 1.0               ! [m/a] Tolerance threshold to redo timestep
-    pc_eps          = 1e-1              ! Predictor-corrector tolerance 
+    !pc_tol          = 1.0               ! [m/a] Tolerance threshold to redo timestep
+    !pc_eps          = 1e-1              ! Predictor-corrector tolerance 
+    pc_tol          = 10.0              ! [m/a] Tolerance threshold to redo timestep
+    pc_eps          = 3.0               ! Predictor-corrector tolerance 
     
 /
 

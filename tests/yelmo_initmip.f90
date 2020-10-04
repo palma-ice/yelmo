@@ -196,7 +196,12 @@ program yelmo_test
     
     ! Run yelmo for several years with constant boundary conditions and topo
     ! to equilibrate thermodynamics and dynamics
+    yelmo1%tpo%par%topo_rel     = 2
+    yelmo1%tpo%par%topo_rel_tau = 10.0 
     call yelmo_update_equil(yelmo1,time,time_tot=10.0_prec,topo_fixed=.FALSE.,dt=min(1.0_prec,dtt_equil_now),ssa_vel_max=5000.0_prec)
+    yelmo1%tpo%par%topo_rel     = 0
+    
+
     call yelmo_update_equil(yelmo1,time,time_tot=time_equil,topo_fixed=.TRUE.,dt=1.0_prec,ssa_vel_max=5000.0_prec)
     call yelmo_update_equil(yelmo1,time,time_tot=100.0_prec,topo_fixed=.FALSE.,dt=dtt_equil_now,ssa_vel_max=5000.0_prec)
     

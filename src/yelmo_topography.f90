@@ -55,6 +55,7 @@ contains
         real(prec) :: dx, dt   
         integer :: i, j, nx, ny  
         real(prec), allocatable :: mbal(:,:) 
+        real(prec), allocatable :: H_ref(:,:) 
 
         real(8)    :: cpu_time0, cpu_time1
         real(prec) :: model_time0, model_time1 
@@ -64,7 +65,8 @@ contains
         ny = size(tpo%now%H_ice,2)
 
         allocate(mbal(nx,ny))
-        
+        allocate(H_ref(nx,ny))
+
         ! Initialize time if necessary 
         if (tpo%par%time .gt. time) then 
             tpo%par%time = time 
@@ -108,7 +110,20 @@ contains
             ! If desired, relax solution to reference state
             if (tpo%par%topo_rel .ne. 0) then 
 
-                call relax_ice_thickness(tpo%now%H_ice,tpo%now%f_grnd,bnd%H_ice_ref, &
+                ! Determine reference thickness to relax towards
+                if (tpo%par%topo_rel_ref .eq. "prev") then 
+                    ! Use ice thickness from previous timestep 
+
+                    H_ref = tpo%now%H_ice_n
+
+                else ! tpo%par%topo_rel_ref == "ref") 
+                    ! Use reference ice thickness (eg present-day ice thickness)
+
+                    H_ref = bnd%H_ice_ref
+
+                end if 
+
+                call relax_ice_thickness(tpo%now%H_ice,tpo%now%f_grnd,H_ref, &
                                             tpo%par%topo_rel,tpo%par%topo_rel_tau,dt)
                 
             end if 
@@ -391,6 +406,7 @@ contains
         call nml_read(filename,"ytopo","topo_fixed",        par%topo_fixed,       init=init_pars)
         call nml_read(filename,"ytopo","topo_rel",          par%topo_rel,         init=init_pars)
         call nml_read(filename,"ytopo","topo_rel_tau",      par%topo_rel_tau,     init=init_pars)
+        call nml_read(filename,"ytopo","topo_rel_ref",      par%topo_rel_ref,     init=init_pars)
         call nml_read(filename,"ytopo","calv_H_lim",        par%calv_H_lim,       init=init_pars)
         call nml_read(filename,"ytopo","calv_tau",          par%calv_tau,         init=init_pars)
         call nml_read(filename,"ytopo","H_min_grnd",        par%H_min_grnd,       init=init_pars)

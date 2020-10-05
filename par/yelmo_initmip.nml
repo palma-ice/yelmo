@@ -71,6 +71,7 @@
     topo_fixed        = False           ! Keep ice thickness fixed, perform other ytopo calculations
     topo_rel          = 0               ! 0: No relaxation; 1: relax shelf; 2: relax shelf + gl 
     topo_rel_tau      = 10.0            ! [a] Time scale for relaxation 
+    topo_rel_ref      = "prev"          ! Reference ice thickness is previous timestep ("prev") or reference field ("ref")
     calv_H_lim        = 200.0           ! [m] Calving limit in ice thickness (thinner ice calves)
     calv_tau          = 1.0             ! [a] Characteristic calving time
     H_min_grnd        = 5.0             ! [m] Minimum ice thickness at grounded margin (thinner ice is ablated) - helps with stability

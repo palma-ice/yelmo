@@ -295,7 +295,7 @@ contains
                 ! (elevation, ice thickness, calving, etc.)
                 call calc_ytopo(dom%tpo,dom%dyn,dom%thrm,dom%bnd,time_now,topo_fixed=dom%tpo%par%topo_fixed)    
                 
-                ! Store predicted ice thickness for later use 
+                ! Store corrected ice thickness for later use 
                 ! Do it here to ensure all changes to H_ice are accounted for (mb, calving, etc)
                 dom%tpo%now%H_ice_corr = dom%tpo%now%H_ice 
 

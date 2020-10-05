@@ -718,7 +718,7 @@ contains
 
         return 
 
-    end subroutine relax_ice_thickness 
+    end subroutine relax_ice_thickness
 
 
 end module mass_conservation

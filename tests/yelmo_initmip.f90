@@ -200,7 +200,6 @@ program yelmo_test
     par_ref = yelmo1%par 
     yelmo1%tpo%par%topo_rel     = 2
     yelmo1%tpo%par%topo_rel_tau = 10.0 
-    yelmo1%tpo%par%topo_rel_ref = "prev"
     yelmo1%par%dt_method        = 0 
     call yelmo_update_equil(yelmo1,time,time_tot=1.0_prec,topo_fixed=.FALSE.,dt=0.01,ssa_vel_max=5000.0_prec)
     yelmo1%tpo%par%topo_rel_tau = 100.0 

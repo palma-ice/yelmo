@@ -76,7 +76,6 @@ module yelmo_defs
         logical            :: topo_fixed
         integer            :: topo_rel
         real(prec)         :: topo_rel_tau 
-        character(len=256) :: topo_rel_ref
         real(prec)         :: calv_H_lim
         real(prec)         :: calv_tau  
         real(prec)         :: H_min_grnd

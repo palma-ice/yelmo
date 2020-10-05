@@ -42,28 +42,6 @@ contains
         nx = size(mask,1)
         ny = size(mask,2) 
 
-if (.FALSE.) then 
-    ! Old method 
-
-        ! Initially set all points to False 
-        mask = .FALSE. 
-
-        ! Limit to ice-covered, grounded points 
-        where (H_ice .gt. 0.0_prec .and. f_grnd .eq. 1.0_prec) mask = .TRUE. 
-
-        ! Set mask to false for ice margin points as well 
-        do j = 2, ny-1 
-        do i = 2, nx-1 
-            if (mask(i,j)) then 
-                if (count(H_ice(i-1:i+1,j-1:j+1).eq.0.0_prec) .gt. 0) then 
-                    mask(i,j) = .FALSE.
-                end if 
-            end if 
-        end do 
-        end do
-
-else 
-
         ! Initially set all points to True 
         mask = .TRUE. 
         
@@ -82,6 +60,11 @@ else
 
                 mask(i,j) = .FALSE. 
 
+            else if (H_ice(i,j) .lt. 50.0_prec) then 
+                ! Thin ice-covered point 
+
+                mask(i,j) = .FALSE. 
+                
             else
                 ! Ice-covered points, further checks below
 
@@ -107,8 +90,6 @@ else
 
         end do 
         end do  
-
-end if 
 
         return 
 

@@ -60,11 +60,12 @@ contains
 
                 mask(i,j) = .FALSE. 
 
-            else if (H_ice(i,j) .lt. 50.0_prec) then 
-                ! Thin ice-covered point 
-
-                mask(i,j) = .FALSE. 
-                
+            ! ajr: excluding thin points doesn't help...
+            !else if (H_ice(i,j) .lt. 50.0_prec) then 
+            !    ! Thin ice-covered point 
+            !
+            !    mask(i,j) = .FALSE. 
+            !
             else
                 ! Ice-covered points, further checks below
 

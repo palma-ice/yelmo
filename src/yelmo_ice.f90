@@ -412,6 +412,25 @@ contains
             ! Make sure model is still running well
             call yelmo_check_kill(dom,time_now)
 
+            ! Additionally check if minimum timestep is reached continuously
+            if (n .ge. 50) then
+
+                ! Check how many of the last 50 timesteps are dt = dt_min 
+                n_dtmin = count(abs(dt_save((n-50+1):n)-dom%par%dt_min) .lt. dom%par%dt_min*1e-3)
+                
+                ! If all 50 timesteps are at minimum, kill program
+                if (n_dtmin .ge. 50) then 
+                    
+                    write(kill_txt,"(a,i10,a,i10)") &
+                        "Too many iterations of dt_min called continuously for this timestep.", &
+                                            n_dtmin, " of ", n 
+
+                    call yelmo_check_kill(dom,time_now,kill_request=kill_txt)
+
+                end if 
+
+            end if 
+            
             ! Check if it is time to exit adaptive iterations
             ! (if current outer time step has been reached)
             if (abs(time_now - time) .lt. time_tol) exit 
@@ -450,8 +469,6 @@ contains
         ! If model is becoming unstable, then write a restart file and kill it.
         ! Assume unstable if eg 80% of timesteps are equal to dt_min.
         if ( (real(n_dtmin,prec)/real(n,prec)) .gt. 0.8) then 
-
-            write(*,*) "pc_eta = ", dom%par%pc_eta
 
             write(kill_txt,"(a,i10,a,i10)") "Too many iterations of dt_min called for this timestep.", &
                                             n_dtmin, " of ", n 
@@ -1150,7 +1167,7 @@ contains
              maxval(abs(dom%dyn%now%uxy_bar-dom%dyn%now%uxy_bar)) .ne. 0.0 ) then 
 
             kill_it_vel = .TRUE. 
-            kill_msg  = "Depth-averaged velocity too fast or invalid."
+            kill_msg    = "Depth-averaged velocity too fast or invalid."
 
         end if 
 

@@ -193,7 +193,8 @@ program yelmo_test
     ! Impose a colder boundary temperature for equilibration step 
     ! -5 [K] for mimicking glacial times
 !     yelmo1%bnd%T_srf = yelmo1%dta%pd%T_srf - 10.0  
-    
+
+if (.FALSE.) then 
     ! Run yelmo for several years with constant boundary conditions and topo
     ! to equilibrate thermodynamics and dynamics
     yelmo1%par%dt_method        = 0 
@@ -220,7 +221,15 @@ program yelmo_test
     ! Finally allow further dynamic equilibrium (therm + dyn) to ensure 
     ! everything is in sync
     call yelmo_update_equil(yelmo1,time,time_tot=100.0_prec,topo_fixed=.FALSE.,dt=dtt_equil_now,ssa_vel_max=5000.0_prec)
-    
+
+else 
+    ! Just testing...
+
+    ! Calculate dynamics and thermodynamics, constant ice thickness
+    call yelmo_update_equil(yelmo1,time,time_tot=10.0,topo_fixed=.TRUE.,dt=0.1_prec,ssa_vel_max=5000.0_prec)
+
+end if 
+
     ! 2D file 
     call yelmo_write_init(yelmo1,file2D,time_init=time,units="years")  
     call write_step_2D(yelmo1,file2D,time=time,cf_ref=cf_ref)
@@ -229,6 +238,9 @@ program yelmo_test
     call write_yreg_init(yelmo1,file1D,time_init=time_init,units="years",mask=yelmo1%bnd%ice_allowed)
     call write_yreg_step(yelmo1%reg,file1D,time=time)  
 
+    write(*,*) "Completed test."
+    stop 
+    
     if (with_anom) then 
         ! Warm up the ice sheet to impose some changes 
         yelmo1%bnd%T_srf    = yelmo1%dta%pd%T_srf + 5.0

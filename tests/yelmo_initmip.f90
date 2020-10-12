@@ -199,17 +199,26 @@ program yelmo_test
     yelmo1%par%dt_method        = 0 
     yelmo1%tpo%par%topo_rel     = 2
     yelmo1%tpo%par%topo_rel_tau = 10.0 
-    call yelmo_update_equil(yelmo1,time,time_tot=1.0_prec,topo_fixed=.FALSE.,dt=0.05,ssa_vel_max=5000.0_prec)
+    write(*,*) "timelog", "tau = ", yelmo1%tpo%par%topo_rel_tau
+    call yelmo_update_equil(yelmo1,time,time_tot=5.0_prec,topo_fixed=.FALSE.,dt=0.10,ssa_vel_max=5000.0_prec)
     yelmo1%tpo%par%topo_rel_tau = 100.0 
-    call yelmo_update_equil(yelmo1,time,time_tot=1.0_prec,topo_fixed=.FALSE.,dt=0.05,ssa_vel_max=5000.0_prec)
+    write(*,*) "timelog", "tau = ", yelmo1%tpo%par%topo_rel_tau
+    call yelmo_update_equil(yelmo1,time,time_tot=5.0_prec,topo_fixed=.FALSE.,dt=0.05,ssa_vel_max=5000.0_prec)
     yelmo1%tpo%par%topo_rel_tau = 1000.0 
+    write(*,*) "timelog", "tau = ", yelmo1%tpo%par%topo_rel_tau
     call yelmo_update_equil(yelmo1,time,time_tot=5.0_prec,topo_fixed=.FALSE.,dt=0.05,ssa_vel_max=5000.0_prec)
     yelmo1%tpo%par%topo_rel     = 0
-    call yelmo_update_equil(yelmo1,time,time_tot=10.0_prec,topo_fixed=.FALSE.,dt=0.05,ssa_vel_max=5000.0_prec)
+    write(*,*) "timelog", "no relaxation..."
+    call yelmo_update_equil(yelmo1,time,time_tot=5.0_prec,topo_fixed=.FALSE.,dt=0.05,ssa_vel_max=5000.0_prec)
     yelmo1%par%dt_method        = 2
-    
+    write(*,*) "timelog", "adaptive timestepping..."
     call yelmo_update_equil(yelmo1,time,time_tot=10.0_prec,topo_fixed=.FALSE.,dt=min(1.0_prec,dtt_equil_now),ssa_vel_max=5000.0_prec)
+
+    ! Next equilibrate thermodynamics and maintain constant ice topopgraphy (for speed)
     call yelmo_update_equil(yelmo1,time,time_tot=time_equil,topo_fixed=.TRUE.,dt=1.0_prec,ssa_vel_max=5000.0_prec)
+
+    ! Finally allow further dynamic equilibrium (therm + dyn) to ensure 
+    ! everything is in sync
     call yelmo_update_equil(yelmo1,time,time_tot=100.0_prec,topo_fixed=.FALSE.,dt=dtt_equil_now,ssa_vel_max=5000.0_prec)
     
     ! 2D file 

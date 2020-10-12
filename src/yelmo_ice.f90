@@ -430,7 +430,7 @@ contains
                 end if 
 
             end if 
-            
+
             ! Check if it is time to exit adaptive iterations
             ! (if current outer time step has been reached)
             if (abs(time_now - time) .lt. time_tol) exit 
@@ -931,7 +931,7 @@ contains
         
         return 
 
-    end subroutine yelmo_init_state 
+    end subroutine yelmo_init_state
 
     subroutine yelmo_par_load(par,filename,domain,grid_name)
 

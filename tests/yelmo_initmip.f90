@@ -228,6 +228,9 @@ else
     ! Calculate dynamics and thermodynamics, constant ice thickness
     call yelmo_update_equil(yelmo1,time,time_tot=10.0,topo_fixed=.TRUE.,dt=0.1_prec,ssa_vel_max=5000.0_prec)
 
+    ! Now let it advance one timestep 
+    call yelmo_update_equil(yelmo1,time,time_tot=10.0_prec,topo_fixed=.FALSE.,dt=0.1_prec,ssa_vel_max=5000.0_prec)
+    
 end if 
 
     ! 2D file 
@@ -240,7 +243,7 @@ end if
 
     write(*,*) "Completed test."
     stop 
-    
+
     if (with_anom) then 
         ! Warm up the ice sheet to impose some changes 
         yelmo1%bnd%T_srf    = yelmo1%dta%pd%T_srf + 5.0

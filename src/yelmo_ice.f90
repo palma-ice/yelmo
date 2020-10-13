@@ -346,6 +346,8 @@ contains
                 dom%par%pc_tau_masked = dom%par%pc_tau 
                 where( .not. pc_mask) dom%par%pc_tau_masked = 0.0_prec 
 
+                write(*,*) time_now, dt_now, eta_now 
+                    
                 ! Check if this timestep should be rejected:
                 ! If the redo iteration is not the last allowed and the timestep is still larger  
                 ! than the minimum, then if eta > tolerance or checkerboard found in tau,

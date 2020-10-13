@@ -232,24 +232,18 @@ else
     yelmo1%bnd%smb      = 0.0_prec 
     yelmo1%bnd%bmb_shlf = 0.0_prec 
 
-    call yelmo_update_equil(yelmo1,time,time_tot=1.0_prec,topo_fixed=.FALSE.,dt=0.1_prec,ssa_vel_max=5000.0_prec)
+    call yelmo_update_equil(yelmo1,time,time_tot=1.0_prec,topo_fixed=.FALSE., &
+            dt=0.1_prec,ssa_vel_max=5000.0_prec,f_smb=0.0_prec,f_bmb=0.0_prec)
 
-    !Re impose smb/bmb
-    yelmo1%bnd%smb      = yelmo1%dta%pd%smb             ! [m.i.e./a]
-    
-    if (load_bmelt) then
+    call yelmo_update_equil(yelmo1,time,time_tot=1.0_prec,topo_fixed=.FALSE., &
+            dt=0.1_prec,ssa_vel_max=5000.0_prec,f_smb=0.1_prec,f_bmb=0.1_prec)
 
-        ! Parse filenames with grid information
-        call yelmo_parse_path(file_bmelt,yelmo1%par%domain,yelmo1%par%grid_name)
- 
-        call nc_read(file_bmelt,"bm_ac_reese",yelmo1%bnd%bmb_shlf)
-        yelmo1%bnd%bmb_shlf = -yelmo1%bnd%bmb_shlf                  ! Negative because bmb = -bmelt 
-    else 
-        yelmo1%bnd%bmb_shlf = bmb_shlf_const    ! [m.i.e./a]
-    end if 
+    call yelmo_update_equil(yelmo1,time,time_tot=1.0_prec,topo_fixed=.FALSE., &
+            dt=0.1_prec,ssa_vel_max=5000.0_prec,f_smb=0.5_prec,f_bmb=0.5_prec)
 
-    call yelmo_update_equil(yelmo1,time,time_tot=1.0_prec,topo_fixed=.FALSE.,dt=0.1_prec,ssa_vel_max=5000.0_prec)
-    
+    call yelmo_update_equil(yelmo1,time,time_tot=1.0_prec,topo_fixed=.FALSE., &
+            dt=0.1_prec,ssa_vel_max=5000.0_prec,f_smb=1.0_prec,f_bmb=1.0_prec)
+
 end if 
 
     ! 2D file 

@@ -481,16 +481,18 @@ contains
 
     end subroutine yelmo_update
 
-    subroutine yelmo_update_equil(dom,time,time_tot,dt,topo_fixed,ssa_vel_max)
+    subroutine yelmo_update_equil(dom,time,time_tot,dt,topo_fixed,ssa_vel_max,f_smb,f_bmb)
         ! Iterate yelmo solutions to equilibrate without updating boundary conditions
 
         type(yelmo_class), intent(INOUT) :: dom
-        real(prec), intent(IN) :: time            ! [yr] Current time
-        real(prec), intent(IN) :: time_tot        ! [yr] Equilibration time 
-        real(prec), intent(IN) :: dt              ! Local dt to be used for all modules
-        logical,    intent(IN) :: topo_fixed      ! Should topography be fixed? 
-        real(prec), intent(IN) :: ssa_vel_max     ! Local vel limit to be used, if == 0.0, no ssa used
-
+        real(prec), intent(IN) :: time              ! [yr] Current time
+        real(prec), intent(IN) :: time_tot          ! [yr] Equilibration time 
+        real(prec), intent(IN) :: dt                ! Local dt to be used for all modules
+        logical,    intent(IN) :: topo_fixed        ! Should topography be fixed? 
+        real(prec), intent(IN) :: ssa_vel_max       ! Local vel limit to be used, if == 0.0, no ssa used
+        real(prec), intent(IN),optional :: f_smb    ! Fraction of smb boundary forcing to apply
+        real(prec), intent(IN),optional :: f_bmb    ! Fraction of bmb boundary forcing to apply
+        
         ! Local variables 
         real(prec) :: time_now  
         integer    :: n, nstep 
@@ -500,6 +502,12 @@ contains
         real(prec) :: dom_ssa_vel_max 
         integer    :: dom_ssa_iter_max 
         logical    :: dom_log_timestep 
+
+        real(prec), allocatable :: smb(:,:)
+        real(prec), allocatable :: bmb_shlf(:,:)
+        
+        allocate(smb(dom%grd%nx,dom%grd%ny))
+        allocate(bmb_shlf(dom%grd%nx,dom%grd%ny))
 
         ! Only run equilibration if time_tot > 0 
 
@@ -524,6 +532,16 @@ contains
             dom%dyn%par%ssa_iter_max = max(dom%dyn%par%ssa_iter_max,5)
             dom%par%log_timestep     = .FALSE. 
 
+            smb      = dom%bnd%smb 
+            bmb_shlf = dom%bnd%bmb_shlf 
+
+            if (present(f_smb)) then 
+                dom%bnd%smb = dom%bnd%smb*f_smb 
+            end if 
+            if (present(f_bmb)) then 
+                dom%bnd%bmb_shlf = dom%bnd%bmb_shlf*f_bmb 
+            end if 
+            
             ! Set model time to input time 
             call yelmo_set_time(dom,time)
 
@@ -543,6 +561,9 @@ contains
             dom%dyn%par%ssa_vel_max  = dom_ssa_vel_max
             dom%dyn%par%ssa_iter_max = dom_ssa_iter_max
             dom%par%log_timestep     = dom_log_timestep
+
+            dom%bnd%smb      = smb 
+            dom%bnd%bmb_shlf = bmb_shlf 
 
             write(*,*) 
             write(*,*) "Equilibration complete."

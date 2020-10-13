@@ -108,8 +108,8 @@ contains
                 call calc_advec2D(dHdt_n,H_ice,ux_tmp,uy_tmp,mbal*0.0,dx,dx,dt,solver)
 
                 ! ajr: testing stability fix for spin-up, limit advection rate!
-                where(dHdt_n .gt.  dHdt_advec_lim) dHdt_n = dHdt_advec_lim
-                where(dHdt_n .lt. -dHdt_advec_lim) dHdt_n = -dHdt_advec_lim
+                ! where(dHdt_n .gt.  dHdt_advec_lim) dHdt_n = dHdt_advec_lim
+                ! where(dHdt_n .lt. -dHdt_advec_lim) dHdt_n = -dHdt_advec_lim
                 
                 ! Calculate rate of change using weighted advective rates of change 
                 dHdt_advec = beta(1)*dHdt_n + beta(2)*dHdt_advec 
@@ -123,8 +123,8 @@ contains
                 call calc_advec2D(dHdt_advec,H_ice_pred,ux_tmp,uy_tmp,mbal*0.0,dx,dx,dt,solver)
 
                 ! ajr: testing stability fix for spin-up, limit advection rate!
-                where(dHdt_advec .gt.  dHdt_advec_lim) dHdt_advec = dHdt_advec_lim
-                where(dHdt_advec .lt. -dHdt_advec_lim) dHdt_advec = -dHdt_advec_lim
+                ! where(dHdt_advec .gt.  dHdt_advec_lim) dHdt_advec = dHdt_advec_lim
+                ! where(dHdt_advec .lt. -dHdt_advec_lim) dHdt_advec = -dHdt_advec_lim
                 
                 ! Calculate rate of change using weighted advective rates of change 
                 dHdt_advec = beta(3)*dHdt_advec + beta(4)*dHdt_n 

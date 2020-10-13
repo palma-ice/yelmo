@@ -42,6 +42,7 @@ contains
         real(prec) :: dt_now, dt_max  
         real(prec) :: time_now 
         integer    :: n, nstep, n_now, n_dtmin 
+        integer    :: n_lim 
         real(prec), parameter :: time_tol = 1e-5
 
         real(8)    :: cpu_time0, cpu_time1 
@@ -413,13 +414,18 @@ contains
             call yelmo_check_kill(dom,time_now)
 
             ! Additionally check if minimum timestep is reached continuously
-            if (n .ge. 50) then
+
+            ! Set limit for check to be the last 50 timesteps or, if it is smaller,
+            ! the total number of timesteps in this call of yelmo_update
+            n_lim = min(50,nstep)
+
+            if (n .ge. n_lim) then
 
                 ! Check how many of the last 50 timesteps are dt = dt_min 
-                n_dtmin = count(abs(dt_save((n-50+1):n)-dom%par%dt_min) .lt. dom%par%dt_min*1e-3)
+                n_dtmin = count(abs(dt_save((n-n_lim+1):n)-dom%par%dt_min) .lt. dom%par%dt_min*1e-3)
                 
-                ! If all 50 timesteps are at minimum, kill program
-                if (n_dtmin .ge. 50) then 
+                ! If all n_lim timesteps are at minimum, kill program
+                if (n_dtmin .ge. n_lim) then 
                     
                     write(kill_txt,"(a,i10,a,i10)") &
                         "Too many iterations of dt_min called continuously for this timestep.", &
@@ -466,16 +472,16 @@ contains
             
         end if 
 
-        ! If model is becoming unstable, then write a restart file and kill it.
-        ! Assume unstable if eg 80% of timesteps are equal to dt_min.
-        if ( (real(n_dtmin,prec)/real(n,prec)) .gt. 0.8) then 
+        ! ! If model is becoming unstable, then write a restart file and kill it.
+        ! ! Assume unstable if eg 80% of timesteps are equal to dt_min.
+        ! if ( (real(n_dtmin,prec)/real(n,prec)) .gt. 0.8) then 
 
-            write(kill_txt,"(a,i10,a,i10)") "Too many iterations of dt_min called for this timestep.", &
-                                            n_dtmin, " of ", n 
+        !     write(kill_txt,"(a,i10,a,i10)") "Too many iterations of dt_min called for this timestep.", &
+        !                                     n_dtmin, " of ", n 
 
-            call yelmo_check_kill(dom,time_now,kill_request=kill_txt)
+        !     call yelmo_check_kill(dom,time_now,kill_request=kill_txt)
 
-        end if 
+        ! end if 
 
         return
 

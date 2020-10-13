@@ -226,23 +226,23 @@ else
     ! Just testing...
 
     ! Calculate dynamics and thermodynamics, constant ice thickness
-    call yelmo_update_equil(yelmo1,time,time_tot=10.0,topo_fixed=.TRUE.,dt=1.0_prec,ssa_vel_max=5000.0_prec)
+    ! call yelmo_update_equil(yelmo1,time,time_tot=10.0,topo_fixed=.TRUE.,dt=1.0_prec,ssa_vel_max=5000.0_prec)
 
     ! Now let it advance one timestep with no smb/bmb
-    yelmo1%bnd%smb      = 0.0_prec 
-    yelmo1%bnd%bmb_shlf = 0.0_prec 
+    ! yelmo1%bnd%smb      = 0.0_prec 
+    ! yelmo1%bnd%bmb_shlf = 0.0_prec 
 
-    call yelmo_update_equil(yelmo1,time,time_tot=1.0_prec,topo_fixed=.FALSE., &
-            dt=0.1_prec,ssa_vel_max=5000.0_prec,f_smb=0.0_prec,f_bmb=0.0_prec)
+    ! call yelmo_update_equil(yelmo1,time,time_tot=1.0_prec,topo_fixed=.FALSE., &
+    !         dt=0.1_prec,ssa_vel_max=5000.0_prec,f_smb=0.0_prec,f_bmb=0.0_prec)
 
-    call yelmo_update_equil(yelmo1,time,time_tot=1.0_prec,topo_fixed=.FALSE., &
-            dt=0.1_prec,ssa_vel_max=5000.0_prec,f_smb=0.1_prec,f_bmb=0.1_prec)
+    ! call yelmo_update_equil(yelmo1,time,time_tot=1.0_prec,topo_fixed=.FALSE., &
+    !         dt=0.1_prec,ssa_vel_max=5000.0_prec,f_smb=0.1_prec,f_bmb=0.1_prec)
 
-    call yelmo_update_equil(yelmo1,time,time_tot=1.0_prec,topo_fixed=.FALSE., &
-            dt=0.1_prec,ssa_vel_max=5000.0_prec,f_smb=0.5_prec,f_bmb=0.5_prec)
+    ! call yelmo_update_equil(yelmo1,time,time_tot=1.0_prec,topo_fixed=.FALSE., &
+    !         dt=0.1_prec,ssa_vel_max=5000.0_prec,f_smb=0.5_prec,f_bmb=0.5_prec)
 
-    call yelmo_update_equil(yelmo1,time,time_tot=1.0_prec,topo_fixed=.FALSE., &
-            dt=0.1_prec,ssa_vel_max=5000.0_prec,f_smb=1.0_prec,f_bmb=1.0_prec)
+    call yelmo_update_equil(yelmo1,time,time_tot=5.0_prec,topo_fixed=.FALSE., &
+            dt=0.1_prec,ssa_vel_max=5000.0_prec)
 
 end if 
 

@@ -231,7 +231,7 @@ else
     ! Now let it advance one timestep with no smb/bmb
     yelmo1%bnd%smb      = 0.0_prec 
     yelmo1%bnd%bmb_shlf = 0.0_prec 
-    
+
     call yelmo_update_equil(yelmo1,time,time_tot=1.0_prec,topo_fixed=.FALSE.,dt=0.1_prec,ssa_vel_max=5000.0_prec)
 
     !Re impose smb/bmb
@@ -248,6 +248,8 @@ else
         yelmo1%bnd%bmb_shlf = bmb_shlf_const    ! [m.i.e./a]
     end if 
 
+    call yelmo_update_equil(yelmo1,time,time_tot=1.0_prec,topo_fixed=.FALSE.,dt=0.1_prec,ssa_vel_max=5000.0_prec)
+    
 end if 
 
     ! 2D file 

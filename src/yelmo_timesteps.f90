@@ -542,7 +542,7 @@ contains
         real(prec), intent(IN)    :: dtmax            ! [a] Maximum allowed timestep 
 
         ! Local variables  
-        real(prec), parameter :: n_decimal   = 4          ! Maximum decimals to treat for timestep
+        real(prec), parameter :: n_decimal   = 6          ! Maximum decimals to treat for timestep
         real(prec), parameter :: dt_half_lim = 0.5_prec   ! Should be 0.5 or greater to make sense
 
         ! Ensure timestep is also within parameter limits 

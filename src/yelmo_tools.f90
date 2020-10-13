@@ -1148,7 +1148,7 @@ contains
 
         return 
 
-    end subroutine regularize2D_gauss 
+    end subroutine regularize2D_gauss
 
     subroutine regularize2D(var,H_ice,dx)
         ! Ensure smoothness in 2D fields (ie, no checkerboard patterns)

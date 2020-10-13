@@ -650,7 +650,7 @@ contains
 
     end subroutine calc_strain_heating_sia
 
-    subroutine calc_basal_heating(Q_b,ux_b,uy_b,taub_acx,taub_acy,H_ice,T_prime_b,gamma,beta1,beta2)
+    subroutine calc_basal_heating(Q_b,ux_b,uy_b,taub_acx,taub_acy,H_ice,f_pmp,beta1,beta2)
          ! Qb [J a-1 m-2] == [m a-1] * [J m-3]
          ! Note: grounded ice fraction f_grnd_acx/y not used here, because taub_acx/y already accounts
          ! for the grounded fraction via beta_acx/y: Q_b = tau_b*u = -beta*u*u.
@@ -660,9 +660,8 @@ contains
         real(prec), intent(IN)    :: uy_b(:,:)          ! Basal velocity, y-compenent (acy)
         real(prec), intent(IN)    :: taub_acx(:,:)      ! Basal friction (acx)
         real(prec), intent(IN)    :: taub_acy(:,:)      ! Basal friction (acy) 
-        real(prec), intent(IN)    :: T_prime_b(:,:)     ! [degC] Basal homologous temperature (aa-nodes)
+        real(prec), intent(IN)    :: f_pmp(:,:)         ! [--] Grid-fraction at pmp (aa-nodes)
         real(prec), intent(IN)    :: H_ice(:,:)         ! [m] Ice thickness 
-        real(prec), intent(IN)    :: gamma 
         real(prec), intent(IN)    :: beta1              ! Timestepping weighting parameter
         real(prec), intent(IN)    :: beta2              ! Timestepping weighting parameter
         
@@ -670,8 +669,7 @@ contains
         integer    :: i, j, nx, ny, n 
         real(prec), allocatable :: Qb_acx(:,:)
         real(prec), allocatable :: Qb_acy(:,:)
-        real(prec) :: Q_b_now 
-        real(prec) :: f_pmp 
+        real(prec) :: Q_b_now
 
         nx = size(Q_b,1)
         ny = size(Q_b,2)
@@ -692,13 +690,11 @@ contains
             Q_b_now = 0.25*(Qb_acx(i,j)+Qb_acx(i-1,j)+Qb_acy(i,j)+Qb_acy(i,j-1))
 
 if (.TRUE.) then 
-            ! Reduction of Q_b with T_prime_b (apply decay function)
-            if (gamma .gt. 0.0) then 
-                f_pmp   = min(1.0, exp((T_prime_b(i,j))/gamma) )
-                Q_b_now = Q_b_now*f_pmp  
-            end if 
+            ! Reduction of Q_b with f_pmp (ajr: this is an open question)
+            Q_b_now = Q_b_now*f_pmp(i,j)  
 end if 
             
+            ! Get weighted average of Q_b with timestepping factors
             Q_b(i,j) = beta1*Q_b_now + beta2*Q_b(i,j) 
 
             ! Ensure Q_b is strictly positive 

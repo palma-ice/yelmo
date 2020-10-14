@@ -56,7 +56,7 @@
     pc_use_H_pred   = False             ! Use predicted H_ice instead of corrected H_ice 
     pc_n_redo       = 5                 ! How many times can the same iteration be repeated (when high error exists)
     pc_tol          = 5.0               ! [m/a] Tolerance threshold to redo timestep
-    pc_eps          = 1.5               ! Predictor-corrector tolerance 
+    pc_eps          = 2.0               ! Predictor-corrector tolerance 
 /
 
 &ytopo

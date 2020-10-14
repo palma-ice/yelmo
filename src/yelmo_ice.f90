@@ -59,6 +59,8 @@ contains
 
         character(len=1012) :: kill_txt
 
+        integer :: ij(2) 
+
         ! Determine which predictor-corrector (pc) method we are using for timestepping,
         ! assign scheme order and weights 
         select case(trim(dom%par%pc_method))
@@ -346,8 +348,14 @@ contains
                 dom%par%pc_tau_masked = dom%par%pc_tau 
                 where( .not. pc_mask) dom%par%pc_tau_masked = 0.0_prec 
 
-                write(*,"(a,f12.5,f12.5,f12.5)") "test: ", time_now, dt_now, eta_now
+                ij = maxloc(abs(dom%par%pc_tau_masked))
 
+                write(*,"(a,f12.5,f12.5,f12.5,f12.5,2i4,2f10.2)") &
+                    "test: ", time_now, dt_now, eta_now, &
+                    dom%par%pc_tau_masked(ij(1),ij(2)), ij(1), ij(2), &
+                    dom%tpo%now%H_ice_pred(ij(1),ij(2)), &
+                    dom%tpo%now%H_ice_corr(ij(1),ij(2))
+                
                 ! Check if this timestep should be rejected:
                 ! If the redo iteration is not the last allowed and the timestep is still larger  
                 ! than the minimum, then if eta > tolerance or checkerboard found in tau,

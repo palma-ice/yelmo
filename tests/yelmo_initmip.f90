@@ -227,12 +227,12 @@ else
     ! Just testing...
 
     yelmo1_ref = yelmo1 
-
+    
     ! Run full dynamics (tpo,dyn,thrm) to smooth initial topo
     ! Note: run this with SIA only dynamics for now
     yelmo1%dyn%par%solver = "sia"
 
-    call yelmo_update_equil(yelmo1,time,time_tot=0.2_prec,topo_fixed=.FALSE., &
+    call yelmo_update_equil(yelmo1,time,time_tot=10.0_prec,topo_fixed=.FALSE., &
             dt=0.2_prec,ssa_vel_max=5000.0_prec)
 
     ! Run full dynamics (tpo,dyn,thrm) to smooth initial topo
@@ -243,7 +243,7 @@ else
 
     ! Next equilibrate thermodynamics and maintain constant ice topopgraphy (for speed)
     call yelmo_update_equil(yelmo1,time,time_tot=time_equil,topo_fixed=.TRUE.,dt=1.0_prec,ssa_vel_max=5000.0_prec)
-
+    
 end if 
 
     ! 2D file 

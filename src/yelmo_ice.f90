@@ -348,9 +348,8 @@ contains
 
                 ij = maxloc(abs(dom%par%pc_tau_masked))
 
-                write(*,"(a,f12.5,f12.5,f12.5,f12.5,2i4,2f10.2)") &
-                    "test: ", time_now, dt_now, eta_now, &
-                    dom%par%pc_tau_masked(ij(1),ij(2)), ij(1), ij(2), &
+                write(*,"(a,f12.5,f12.5,f12.5,2i4,2f10.2)") &
+                    "test: ", time_now, dt_now, eta_now, ij(1), ij(2), &
                     dom%tpo%now%H_ice_pred(ij(1),ij(2)), &
                     dom%tpo%now%H_ice_corr(ij(1),ij(2))
                 

@@ -242,10 +242,10 @@ else
     !         dt=0.1_prec,ssa_vel_max=5000.0_prec,f_smb=0.5_prec,f_bmb=0.5_prec)
 
     ! Kill all ice less than 10m thick 
-    where (yelmo1%tpo%now%H_ice .lt. 10.0) yelmo1%tpo%now%H_ice = 0.0 
+    ! where (yelmo1%tpo%now%H_ice .lt. 10.0) yelmo1%tpo%now%H_ice = 0.0 
 
     call yelmo_update_equil(yelmo1,time,time_tot=5.0_prec,topo_fixed=.FALSE., &
-            dt=0.1_prec,ssa_vel_max=5000.0_prec)
+            dt=0.2_prec,ssa_vel_max=5000.0_prec)
 
 end if 
 
@@ -257,8 +257,8 @@ end if
     call write_yreg_init(yelmo1,file1D,time_init=time_init,units="years",mask=yelmo1%bnd%ice_allowed)
     call write_yreg_step(yelmo1%reg,file1D,time=time)  
 
-    write(*,*) "Completed test."
-    stop 
+    write(*,*) "test: completed."
+    !stop 
 
     if (with_anom) then 
         ! Warm up the ice sheet to impose some changes 

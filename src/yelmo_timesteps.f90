@@ -27,17 +27,20 @@ module yelmo_timesteps
 
 contains
 
-    subroutine set_pc_mask(mask,H_ice,f_grnd)
+    subroutine set_pc_mask(mask,H_ice_pred,H_ice_corr,f_grnd)
 
         implicit none 
 
         logical, intent(OUT) :: mask(:,:) 
-        real(prec), intent(IN) :: H_ice(:,:) 
+        real(prec), intent(IN) :: H_ice_pred(:,:) 
+        real(prec), intent(IN) :: H_ice_corr(:,:) 
         real(prec), intent(IN) :: f_grnd(:,:) 
 
         ! Local variables 
         integer :: i, j, nx, ny 
         integer :: im1, jm1, ip1, jp1 
+
+        real(prec) :: H_lim = 10.0      ! [m] 
 
         nx = size(mask,1)
         ny = size(mask,2) 
@@ -55,8 +58,8 @@ contains
 
             ! Define places that should not be checked 
 
-            if (H_ice(i,j) .eq. 0.0_prec) then 
-                ! Ice-free point
+            if (H_ice_pred(i,j) .lt. H_lim .or. H_ice_corr(i,j) .lt. H_lim) then 
+                ! (Near) ice-free point or may be transitioning state
 
                 mask(i,j) = .FALSE. 
 
@@ -69,8 +72,9 @@ contains
             else
                 ! Ice-covered points, further checks below
 
-                 if (count(H_ice(im1:ip1,jm1:jp1).eq.0.0_prec) .gt. 0) then 
-                    ! Neighbor is ice-free: ice-margin point 
+                 if (count(H_ice_pred(im1:ip1,jm1:jp1).lt.H_lim) .gt. 0 .or. &
+                     count(H_ice_corr(im1:ip1,jm1:jp1).lt.H_lim) .gt. 0) then 
+                    ! Neighbor is (near) ice-free: ice-margin point 
 
                     mask(i,j) = .FALSE. 
 
@@ -188,7 +192,7 @@ contains
 
     end subroutine calc_pc_tau_heun
 
-    subroutine set_adaptive_timestep_pc(dt_new,dt,eta,eps,dtmin,dtmax,mask,ux_bar,uy_bar,dx,pc_k,controller)
+    subroutine set_adaptive_timestep_pc(dt_new,dt,eta,eps,dtmin,dtmax,ux_bar,uy_bar,dx,pc_k,controller)
         ! Calculate the timestep following algorithm for 
         ! a general predictor-corrector (pc) method.
         ! Implemented followig Cheng et al (2017, GMD)
@@ -201,7 +205,6 @@ contains
         real(prec), intent(IN)  :: eps                  ! [--]   Tolerance value (eg, eps=1e-4)
         real(prec), intent(IN)  :: dtmin                ! [yr]   Minimum allowed timestep
         real(prec), intent(IN)  :: dtmax                ! [yr]   Maximum allowed timestep
-        logical,    intent(IN)  :: mask(:,:)            ! Where to calculate tau 
         real(prec), intent(IN)  :: ux_bar(:,:)          ! [m/yr]
         real(prec), intent(IN)  :: uy_bar(:,:)          ! [m/yr]
         real(prec), intent(IN)  :: dx                   ! [m]

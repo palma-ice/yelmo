@@ -190,10 +190,8 @@ contains
                                 dom%tpo%par%dx,dom%par%dt_min,dt_max,dom%par%cfl_max,dom%par%cfl_diff_max) 
             
             ! Calculate adaptive timestep using proportional-integral (PI) methods
-            call set_pc_mask(pc_mask,dom%tpo%now%H_ice,dom%tpo%now%f_grnd)
             call set_adaptive_timestep_pc(dt_pi,dom%par%pc_dt,dom%par%pc_eta,dom%par%pc_eps,dom%par%dt_min,dt_max, &
-                                         pc_mask,dom%dyn%now%ux_bar,dom%dyn%now%uy_bar,dom%tpo%par%dx,pc_k, &
-                                         dom%par%pc_controller)
+                                    dom%dyn%now%ux_bar,dom%dyn%now%uy_bar,dom%tpo%par%dx,pc_k,dom%par%pc_controller)
 
             ! Determine current time step to be used based on method of choice 
             select case(dom%par%dt_method) 
@@ -341,7 +339,7 @@ contains
                 end select 
 
                 ! Calculate eta for this timestep 
-                call set_pc_mask(pc_mask,dom%tpo%now%H_ice,dom%tpo%now%f_grnd)
+                call set_pc_mask(pc_mask,dom%tpo%now%H_ice_pred,dom%tpo%now%H_ice_corr,dom%tpo%now%f_grnd)
                 eta_now = calc_pc_eta(dom%par%pc_tau,mask=pc_mask)
 
                 ! Save masked pc_tau for output too 

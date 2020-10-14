@@ -120,7 +120,7 @@ contains
             ! something was not well-defined/well-initialized
 
             write(*,*) 
-            write(*,*) "calc_vxy_ssa_matrix:: Error: beta appears to be zero everywhere for grounded ice."
+            write(*,"(a)") "calc_vxy_ssa_matrix:: Error: beta appears to be zero everywhere for grounded ice."
             write(*,*) "range(beta_acx): ", minval(beta_acx), maxval(beta_acx)
             write(*,*) "range(beta_acy): ", minval(beta_acy), maxval(beta_acy)
             write(*,*) "range(H_grnd):   ", minval(H_grnd), maxval(H_grnd)

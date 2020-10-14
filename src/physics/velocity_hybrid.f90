@@ -183,7 +183,7 @@ end if
         
         return 
 
-    end subroutine calc_velocity_hybrid 
+    end subroutine calc_velocity_hybrid
 
         subroutine calc_visc_eff_3D(visc_eff,ux,uy,ATT,zeta_aa,dx,dy,n_glen,eps_0)
         ! Calculate 3D effective viscosity following L19, Eq. 2
@@ -268,7 +268,7 @@ end if
                 eps_sq = dudx**2 + dvdy**2 + dudx*dvdy + 0.25_prec*(dudy+dvdx)**2 &
                        + 0.25_prec*duxdz_ab**2 + 0.25_prec*duydz_ab**2 + eps_0_sq
                 
-                ATT_ab = 0.25*(ATT(i,j,k)+ATT(im1,j,k)+ATT(i,jm1,k)+ATT(im1,jm1,k)) 
+                ATT_ab = 0.25_prec*(ATT(i,j,k)+ATT(im1,j,k)+ATT(i,jm1,k)+ATT(im1,jm1,k)) 
                 
                 ! Calculate effective viscosity on ab-nodes
                 visc_eff_ab(i,j,k) = 0.5_prec*(eps_sq)**(p1) * ATT_ab**(p2)
@@ -289,8 +289,8 @@ end if
 
             ! Loop over column
             do k = 1, nz 
-                visc_eff(i,j,k) = 0.25*(visc_eff_ab(i,j,k)+visc_eff_ab(im1,j,k) &
-                                        +visc_eff_ab(i,jm1,k)+visc_eff_ab(im1,jm1,k))
+                visc_eff(i,j,k) = 0.25_prec*(visc_eff_ab(i,j,k)+visc_eff_ab(im1,j,k) &
+                                            +visc_eff_ab(i,jm1,k)+visc_eff_ab(im1,jm1,k))
             end do 
 
         end do 

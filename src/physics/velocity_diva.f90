@@ -106,6 +106,8 @@ contains
 
         real(prec) :: L2_norm 
 
+        integer :: ij(2) 
+
         nx    = size(ux,1)
         ny    = size(ux,2)
         nz_aa = size(ux,3)
@@ -161,8 +163,8 @@ contains
             call calc_F_integral(F2,visc_eff,H_ice,zeta_aa,n=2.0_prec)
             
             ! Calculate effective beta 
-            call calc_beta_eff(beta_eff,beta,ux_b,uy_b,F2,zeta_aa,no_slip=par%diva_no_slip)
-
+            call calc_beta_eff(beta_eff,beta,F2,zeta_aa,no_slip=par%diva_no_slip)
+            
             ! Stagger beta and beta_eff 
             call stagger_beta(beta_acx,beta_acy,beta,f_grnd,f_grnd_acx,f_grnd_acy,par%beta_gl_stag,par%boundaries)
             call stagger_beta(beta_eff_acx,beta_eff_acy,beta_eff,f_grnd,f_grnd_acx,f_grnd_acy,par%beta_gl_stag,par%boundaries)
@@ -351,6 +353,8 @@ end if
         integer :: ip1, jp1 
         real(prec) :: visc_eff_ac
 
+        real(prec), parameter :: visc_min = 1e3_prec 
+
         nx    = size(duxdz,1)
         ny    = size(duxdz,2)
         nz_aa = size(duxdz,3) 
@@ -364,13 +368,13 @@ end if
             jp1 = min(j+1,ny) 
 
             ! Calculate shear strain, acx-nodes
-            !visc_eff_ac  = 0.5_prec*(visc_eff(i,j,k) + visc_eff(ip1,j,k)) 
             visc_eff_ac  = calc_staggered_margin(visc_eff(i,j,k),visc_eff(ip1,j,k),H_ice(i,j),H_ice(ip1,j))
+            visc_eff_ac  = max(visc_eff_ac,visc_min)    ! For safety 
             duxdz(i,j,k) = (taub_acx(i,j)/visc_eff_ac) * (1.0-zeta_aa(k))
             
             ! Calculate shear strain, acy-nodes
-            !visc_eff_ac  = 0.5_prec*(visc_eff(i,j,k) + visc_eff(i,jp1,k)) 
             visc_eff_ac  = calc_staggered_margin(visc_eff(i,j,k),visc_eff(i,jp1,k),H_ice(i,j),H_ice(i,jp1))
+            visc_eff_ac  = max(visc_eff_ac,visc_min)    ! For safety 
             duydz(i,j,k) = (taub_acy(i,j)/visc_eff_ac) * (1.0-zeta_aa(k))
 
         end do 
@@ -396,7 +400,7 @@ end if
 
         return 
 
-    end subroutine calc_vertical_shear_3D 
+    end subroutine calc_vertical_shear_3D
 
     subroutine calc_visc_eff_3D(visc_eff,ux,uy,duxdz,duydz,ATT,H_ice,zeta_aa,dx,dy,n_glen,eps_0)
         ! Calculate 3D effective viscosity following L19, Eq. 2
@@ -481,7 +485,7 @@ end if
                 eps_sq = dudx_ab**2 + dvdy_ab**2 + dudx_ab*dvdy_ab + 0.25_prec*(dudy+dvdx)**2 &
                        + 0.25_prec*duxdz_ab**2 + 0.25_prec*duydz_ab**2 + eps_0_sq
                 
-                ATT_ab = 0.25*(ATT(i,j,k)+ATT(ip1,j,k)+ATT(i,jp1,k)+ATT(ip1,jp1,k)) 
+                ATT_ab = 0.25_prec*(ATT(i,j,k)+ATT(ip1,j,k)+ATT(i,jp1,k)+ATT(ip1,jp1,k)) 
                 
                 ! Calculate effective viscosity on ab-nodes
                 visc_eff_ab(i,j,k) = 0.5_prec*(eps_sq)**(p1) * ATT_ab**(p2)
@@ -531,8 +535,8 @@ end if
 
                 ! Loop over column
                 do k = 1, nz 
-                    visc_eff(i,j,k) = 0.25*(visc_eff_ab(i,j,k)+visc_eff_ab(im1,j,k) &
-                                            +visc_eff_ab(i,jm1,k)+visc_eff_ab(im1,jm1,k))
+                    visc_eff(i,j,k) = 0.25_prec*(visc_eff_ab(i,j,k)+visc_eff_ab(im1,j,k) &
+                                                +visc_eff_ab(i,jm1,k)+visc_eff_ab(im1,jm1,k))
                 end do 
 
             end if 
@@ -548,7 +552,7 @@ end if
 
         return 
 
-    end subroutine calc_visc_eff_3D 
+    end subroutine calc_visc_eff_3D
 
     function calc_staggered_margin(var0,var1,H0,H1) result(var_mid)
         ! Calculate a staggered point but taking upstream point at the margin 
@@ -580,7 +584,7 @@ end if
 
         return 
 
-    end function calc_staggered_margin 
+    end function calc_staggered_margin
 
     subroutine smooth_visc_eff_int_margin(visc_eff_int,H_ice)
 
@@ -656,7 +660,7 @@ end if
 
         return 
 
-    end subroutine smooth_visc_eff_int_margin 
+    end subroutine smooth_visc_eff_int_margin
 
     subroutine calc_F_integral(F_int,visc,H_ice,zeta_aa,n)
         ! Useful integrals, following Arthern et al. (2015) Eq. 7,
@@ -715,7 +719,7 @@ end if
 
     end subroutine calc_F_integral
     
-    subroutine calc_beta_eff(beta_eff,beta,ux_b,uy_b,F2,zeta_aa,no_slip)
+    subroutine calc_beta_eff(beta_eff,beta,F2,zeta_aa,no_slip)
         ! Calculate the depth-averaged horizontal velocity (ux_bar,uy_bar)
 
         ! Note: L19 staggers the F-integral F2, then solves for beta 
@@ -724,8 +728,6 @@ end if
         
         real(prec), intent(OUT) :: beta_eff(:,:)    ! aa-nodes
         real(prec), intent(IN)  :: beta(:,:)        ! aa-nodes
-        real(prec), intent(IN)  :: ux_b(:,:)        ! ac-nodes
-        real(prec), intent(IN)  :: uy_b(:,:)        ! ac-nodes
         real(prec), intent(IN)  :: F2(:,:)          ! aa-nodes
         real(prec), intent(IN)  :: zeta_aa(:)       ! aa-nodes
         logical,    intent(IN)  :: no_slip 
@@ -752,7 +754,7 @@ end if
 
         return 
 
-    end subroutine calc_beta_eff 
+    end subroutine calc_beta_eff
 
     subroutine calc_vel_basal(ux_b,uy_b,ux_bar,uy_bar,F2,taub_acx,taub_acy,H_ice,no_slip,boundaries)
         ! Calculate basal sliding following Goldberg (2011), Eq. 34

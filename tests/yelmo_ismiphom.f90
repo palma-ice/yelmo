@@ -169,6 +169,23 @@ program yelmo_ismiphom
             ! Ensure that topo_fixed is set to False here (the model will evolve) 
             yelmo1%tpo%par%topo_fixed = .FALSE. 
 
+        case("EXPG")
+            ! Goldberg timestepping analytical test 
+
+            ! Define topography (linear downward sloping bed)
+            alpha = 0.005           ! [rad] 
+            
+            yelmo1%tpo%now%z_srf = -yelmo1%grd%x * tan(alpha)
+            yelmo1%bnd%z_bed     = yelmo1%tpo%now%z_srf - 1000.0
+
+            yelmo1%tpo%now%H_ice = yelmo1%tpo%now%z_srf - yelmo1%bnd%z_bed
+            
+
+
+            ! Not used in this experiment, but set it to a constant value anyway
+            yelmo1%dyn%par%beta_method  = -1 
+            yelmo1%dyn%now%beta         = 1000.0
+
         case DEFAULT 
 
             write(*,*) "ismiphom:: Error: experiment not recognized for topography definition."

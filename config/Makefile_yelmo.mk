@@ -95,6 +95,11 @@ $(objdir)/velocity_diva.o: $(srcdir)/physics/velocity_diva.f90 \
 						  	$(objdir)/solver_ssa_sico5.o
 	$(FC) $(DFLAGS) $(FFLAGS) -c -o $@ $<
 
+$(objdir)/velocity_l1l2.o: $(srcdir)/physics/velocity_l1l2.f90 \
+						  	$(objdir)/yelmo_defs.o $(objdir)/yelmo_tools.o $(objdir)/basal_dragging.o \
+						  	$(objdir)/solver_ssa_sico5.o
+	$(FC) $(DFLAGS) $(FFLAGS) -c -o $@ $<
+
 $(objdir)/velocity_hybrid_pd12.o: $(srcdir)/physics/velocity_hybrid_pd12.f90 \
 						  	$(objdir)/yelmo_defs.o $(objdir)/yelmo_tools.o
 	$(FC) $(DFLAGS) $(FFLAGS) -c -o $@ $<
@@ -129,6 +134,7 @@ $(objdir)/yelmo_dynamics.o: $(srcdir)/yelmo_dynamics.f90 $(objdir)/yelmo_defs.o 
 							$(objdir)/velocity_sia.o \
 							$(objdir)/velocity_hybrid.o \
 							$(objdir)/velocity_diva.o \
+							$(objdir)/velocity_l1l2.o \
 							$(objdir)/velocity_hybrid_pd12.o \
 							$(objdir)/solver_ssa_sico5.o \
 							$(objdir)/basal_dragging.o
@@ -216,6 +222,7 @@ yelmo_physics =  	   $(objdir)/basal_dragging.o \
 					   $(objdir)/velocity_sia.o \
 					   $(objdir)/velocity_hybrid.o \
 					   $(objdir)/velocity_diva.o \
+					   $(objdir)/velocity_l1l2.o \
 					   $(objdir)/velocity_hybrid_pd12.o
 					   
 					   

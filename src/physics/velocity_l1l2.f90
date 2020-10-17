@@ -202,7 +202,7 @@ end if
         ! Iterations are finished, finalize calculations of 3D velocity field 
 
         ! Calculate the 3D horizontal velocity field
-        !call calc_vel_horizontal_3D(ux,uy,ux_b,uy_b,taub_acx,taub_acy,visc_eff,H_ice,zeta_aa,par%boundaries)
+        call calc_vel_horizontal_3D(ux,uy,ux_b,uy_b,taud_acx,taud_acy,visc_eff,ATT,H_ice,zeta_aa,dx,dy,n_glen,par%eps_0,par%boundaries)
 
         ! Also calculate the shearing contribution
         do k = 1, nz_aa 
@@ -214,7 +214,7 @@ end if
 
     end subroutine calc_velocity_l1l2
 
-    subroutine calc_vel_horizontal_3D(ux,uy,ux_b,uy_b,taud_acx,taud_acy,visc_eff,ATT,H_ice,zeta_aa,zeta_ac,dx,dy,n_glen,eps_0,boundaries)
+    subroutine calc_vel_horizontal_3D(ux,uy,ux_b,uy_b,taud_acx,taud_acy,visc_eff,ATT,H_ice,zeta_aa,dx,dy,n_glen,eps_0,boundaries)
         ! Caluculate the 3D horizontal velocity field (ux,uy)
         ! for the L1L2 solver following Perego et al. (2012)
 
@@ -230,7 +230,6 @@ end if
         real(prec), intent(IN)  :: ATT(:,:,:)  
         real(prec), intent(IN)  :: H_ice(:,:)
         real(prec), intent(IN)  :: zeta_aa(:) 
-        real(prec), intent(IN)  :: zeta_ac(:)
         real(prec), intent(IN)  :: dx
         real(prec), intent(IN)  :: dy
         real(prec), intent(IN)  :: n_glen   
@@ -241,6 +240,7 @@ end if
         integer :: i, j, k, nx, ny, nz_aa  
         integer    :: ip1, jp1, im1, jm1 
         real(prec) :: inv_4dx, inv_4dy 
+        real(prec) :: zeta_ac1, zeta_ac0 
         real(prec) :: H_ice_ac 
         real(prec) :: dw1dx, dw2dx, dw3dx 
         real(prec) :: dw1dy, dw2dy, dw3dy 
@@ -335,8 +335,10 @@ end if
 
             ! Integrate down to near the base 
             do k = nz_aa-1, 2, -1 
+                zeta_ac1 = 0.5_prec*(zeta_aa(k+1)+zeta_aa(k))
+                zeta_ac0 = 0.5_prec*(zeta_aa(k)+zeta_aa(k-1))
                 visc_eff_int3D_ab(i,j,k) = visc_eff_int3D_ab(i,j,k+1) &
-                                        + visc_eff_ab(i,j,k) * (zeta_ac(k)-zeta_ac(k-1))*H_ice_ab(i,j)
+                                        + visc_eff_ab(i,j,k) * (zeta_ac1-zeta_ac0)*H_ice_ab(i,j)
             end do 
             
             ! Get basal value

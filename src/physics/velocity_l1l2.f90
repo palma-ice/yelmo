@@ -471,29 +471,20 @@ end if
         real(prec) :: inv_4dx, inv_4dy 
         real(prec) :: zeta_ac1, zeta_ac0 
         real(prec) :: H_ice_ac 
-        real(prec) :: dw1dx, dw2dx, dw3dx 
-        real(prec) :: dw1dy, dw2dy, dw3dy 
         real(prec) :: tau_xz_ab, tau_yz_ab 
-        real(prec) :: tau_eff_sq_ab, ATT_ab, depth_ab
-        real(prec) :: fact_ac 
+        real(prec) :: tau_eff_sq_ab, ATT_ab 
         real(prec), allocatable :: dudx_ab(:,:)
         real(prec), allocatable :: dvdy_ab(:,:)
         real(prec), allocatable :: dudy_ab(:,:)
         real(prec), allocatable :: dvdx_ab(:,:)
         real(prec), allocatable :: H_ice_ab(:,:) 
         real(prec), allocatable :: visc_eff_ab(:,:,:) 
-        real(prec), allocatable :: visc_eff_int3D_ab(:,:,:) 
-        real(prec), allocatable :: visc_eff_ac(:) 
-        real(prec), allocatable :: tau_par_ab(:,:,:) 
-        real(prec), allocatable :: work1_ab(:,:)
-        real(prec), allocatable :: work2_ab(:,:)
-        real(prec), allocatable :: work3_ab(:,:)
-        real(prec), allocatable :: tau_xz(:,:,:) 
-        real(prec), allocatable :: tau_yz(:,:,:) 
-        real(prec), allocatable :: fact_ab(:,:) 
 
         real(prec) :: eps_par_sq, eps_par 
         real(prec) :: p1, p2, p3, eps_0_sq 
+        real(prec) :: taud_ab, tau_par_ab, tau_perp_ab 
+        real(prec) :: a, b, c, rootA, rootB 
+        real(prec) :: wt 
 
         nx    = size(ux_b,1)
         ny    = size(ux_b,2) 
@@ -506,15 +497,13 @@ end if
         allocate(dvdx_ab(nx,ny)) 
         allocate(H_ice_ab(nx,ny))
         allocate(visc_eff_ab(nx,ny,nz_aa)) 
-        allocate(visc_eff_int3D_ab(nx,ny,nz_aa)) 
-        allocate(visc_eff_ac(nz_aa))
-        allocate(tau_par_ab(nx,ny,nz_aa))
-        allocate(work1_ab(nx,ny)) 
-        allocate(work2_ab(nx,ny)) 
-        allocate(work3_ab(nx,ny)) 
-        allocate(tau_xz(nx,ny,nz_aa))
-        allocate(tau_yz(nx,ny,nz_aa))
-        allocate(fact_ab(nx,ny))
+
+        ! Consistency check 
+        if (n_glen .ne. 3.0_prec) then 
+            write(*,*) "calc_visc_eff_3D:: Error: currently, the L1L2 solver &
+            & can only be used with n_glen=3."
+            stop 
+        end if 
 
         ! Calculate scaling factors
         inv_4dx = 1.0_prec / (4.0_prec*dx) 
@@ -529,6 +518,115 @@ end if
         ! Calculate squared minimum strain rate 
         eps_0_sq = eps_0*eps_0 
 
+        ! Step 1: compute basal strain rates on ab-nodes and viscosity       
+        do j = 1, ny 
+        do i = 1, nx 
+
+            im1 = max(i-1,1) 
+            ip1 = min(i+1,nx) 
+            jm1 = max(j-1,1) 
+            jp1 = min(j+1,ny) 
+
+            ! Calculate effective strain components from horizontal stretching on ab-nodes
+            dudx_ab(i,j) = ( (ux_b(ip1,j) - ux_b(im1,j)) + (ux_b(ip1,jp1) - ux_b(im1,jp1)) ) *inv_4dx
+            dvdy_ab(i,j) = ( (uy_b(i,jp1) - uy_b(i,jm1)) + (uy_b(ip1,jp1) - uy_b(ip1,jm1)) ) *inv_4dy 
+
+            ! Calculate of cross terms on ab-nodes
+            dudy_ab(i,j) = (ux_b(i,jp1) - ux_b(i,j)) / dx 
+            dvdx_ab(i,j) = (uy_b(ip1,j) - uy_b(i,j)) / dy 
+
+            ! Calculate the 'parallel' effective strain rate from P12, Eq. 17
+            eps_par_sq = dudx_ab(i,j)**2 + dvdy_ab(i,j)**2 + dudx_ab(i,j)*dvdy_ab(i,j) &
+                        + 0.25_prec*(dudy_ab(i,j)+dvdx_ab(i,j))**2 + eps_0_sq
+            eps_par    = sqrt(eps_par_sq) 
+
+
+            ! Get current magnitude of driving stress on ab-nodes 
+            !taud_ab     = sqrt(taud_acx**2+taud_acy**2)
+                
+
+            ! Now calculate viscosity at each layer 
+            ! using the root-finding method of CISM
+            ! Note this method is only valid for n_glen = 3!!!
+            do k = 1, nz_aa 
+                
+                tau_perp_ab = taud_ab*(1.0_prec-zeta_aa(k))
+
+                a = tau_perp_ab**2 
+                b = -eps_par / ATT_ab 
+                c = sqrt(b**2/4.0_prec + a**3/27.0_prec) 
+
+                rootA = (-b/2.0_prec + c)**(1.0_prec/3.0_prec)
+
+                if (a**3/(27.0_prec) > 1.d-6 * (b**2/4.0_prec)) then
+                    rootB = -(b/2.0_prec + c)**(1.0_prec/3.0_prec)
+                else    ! b/2 + c is small; compute solution to first order without subtracting two large, nearly equal numbers
+                    rootB = -a / (3.0_prec*(abs(b))**(1.0_prec/3.0_prec))
+                end if
+
+                tau_par_ab = rootA + rootB 
+                visc_eff_ab(i,j,k) = 1.0_prec / (2.0_prec*ATT_ab*(tau_par_ab**2+tau_perp_ab**2)) 
+
+            end do 
+
+        end do 
+        end do  
+
+
+        ! Unstagger from ab-nodes to aa-nodes 
+        ! only using contributions from ice covered neighbors
+        do j = 1, ny 
+        do i = 1, nx 
+
+            im1 = max(i-1,1) 
+            ip1 = min(i+1,nx) 
+            jm1 = max(j-1,1) 
+            jp1 = min(j+1,ny) 
+
+            visc_eff(i,j,:) = 0.0 
+            wt              = 0.0 
+
+            if (count([H_ice(i,j),H_ice(ip1,j),H_ice(i,jp1),H_ice(ip1,jp1)].eq.0) .eq. 0) then  
+                visc_eff(i,j,:) = visc_eff(i,j,:) + visc_eff_ab(i,j,:) 
+                wt = wt + 1.0 
+            end if 
+            
+            if (count([H_ice(i,j),H_ice(im1,j),H_ice(im1,jp1),H_ice(i,jp1)].eq.0) .eq. 0) then  
+                visc_eff(i,j,:) = visc_eff(i,j,:) + visc_eff_ab(im1,j,:) 
+                wt = wt + 1.0 
+            end if 
+
+            if (count([H_ice(i,j),H_ice(i,jm1),H_ice(ip1,jm1),H_ice(ip1,j)].eq.0) .eq. 0) then 
+                visc_eff(i,j,:) = visc_eff(i,j,:) + visc_eff_ab(i,jm1,:) 
+                wt = wt + 1.0 
+            end if 
+            
+            if (count([H_ice(i,j),H_ice(im1,j),H_ice(im1,jm1),H_ice(i,jm1)].eq.0) .eq. 0) then 
+                visc_eff(i,j,:) = visc_eff(i,j,:) + visc_eff_ab(im1,jm1,:) 
+                wt = wt + 1.0 
+            end if 
+            
+            if (wt .gt. 0.0) then 
+                visc_eff(i,j,:) = visc_eff(i,j,:) / wt 
+            else 
+                ! Just get simple average for ice free points 
+
+                ! Loop over column
+                do k = 1, nz_aa 
+                    visc_eff(i,j,k) = 0.25_prec*(visc_eff_ab(i,j,k)+visc_eff_ab(im1,j,k) &
+                                                +visc_eff_ab(i,jm1,k)+visc_eff_ab(im1,jm1,k))
+                end do 
+
+            end if 
+
+        end do 
+        end do 
+        
+        ! Treat the corners to avoid extremes
+        visc_eff(1,1,:)   = 0.5*(visc_eff(2,1,:)+visc_eff(1,2,:))
+        visc_eff(1,ny,:)  = 0.5*(visc_eff(2,ny,:)+visc_eff(1,ny-1,:))
+        visc_eff(nx,1,:)  = 0.5*(visc_eff(nx,2,:)+visc_eff(nx-1,1,:))
+        visc_eff(nx,ny,:) = 0.5*(visc_eff(nx-1,ny,:)+visc_eff(nx,ny-1,:))
 
         return 
 

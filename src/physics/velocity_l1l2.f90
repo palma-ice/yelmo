@@ -256,16 +256,15 @@ end if
         real(prec) :: dw1dx, dw2dx, dw3dx 
         real(prec) :: dw1dy, dw2dy, dw3dy 
         real(prec) :: tau_xz_ab, tau_yz_ab 
-        real(prec) :: tau_eff_sq_ab, ATT_ab, depth_ab, H_ice_ab 
+        real(prec) :: tau_eff_sq_ab, ATT_ab, depth_ab 
         real(prec) :: fact_ac 
         real(prec), allocatable :: dudx_ab(:,:)
         real(prec), allocatable :: dvdy_ab(:,:)
         real(prec), allocatable :: dudy_ab(:,:)
         real(prec), allocatable :: dvdx_ab(:,:)
-        !real(prec), allocatable :: H_ice_ab(:,:) 
+        real(prec), allocatable :: H_ice_ab(:,:) 
         real(prec), allocatable :: visc_eff_ab(:,:,:) 
         real(prec), allocatable :: visc_eff_int3D_ab(:,:,:) 
-        real(prec), allocatable :: visc_eff_ac(:) 
         real(prec), allocatable :: tau_par_ab(:,:,:) 
         real(prec), allocatable :: work1_ab(:,:)
         real(prec), allocatable :: work2_ab(:,:)
@@ -287,10 +286,9 @@ end if
         allocate(dvdy_ab(nx,ny)) 
         allocate(dudy_ab(nx,ny)) 
         allocate(dvdx_ab(nx,ny)) 
-        !allocate(H_ice_ab(nx,ny))
+        allocate(H_ice_ab(nx,ny))
         allocate(visc_eff_ab(nx,ny,nz_aa)) 
         allocate(visc_eff_int3D_ab(nx,ny,nz_aa)) 
-        allocate(visc_eff_ac(nz_aa))
         allocate(tau_par_ab(nx,ny,nz_aa))
         allocate(work1_ab(nx,ny)) 
         allocate(work2_ab(nx,ny)) 
@@ -309,7 +307,8 @@ end if
         ! Calculate squared minimum strain rate 
         eps_0_sq = eps_0*eps_0 
 
-        ! Initialize integrated viscosity field 
+        ! Initialize integrated viscosity field
+        visc_eff_ab       = 0.0_prec  
         visc_eff_int3D_ab = 0.0_prec 
 
         ! Step 1: compute basal strain rates on ab-nodes and viscosity       
@@ -336,27 +335,33 @@ end if
 
             ! Compute the 'parallel' shear stress for each layer (tau_parallel)
             do k = 1, nz_aa 
+                ! Stagger visc_eff to ab-nodes for this layer and save for later
+                visc_eff_ab(i,j,k) = 0.25_prec*(visc_eff(i,j,k)+visc_eff(ip1,j,k) &
+                                                + visc_eff(i,jp1,k)+visc_eff(ip1,jp1,k))
+
+                ! Calculate tau_parallel
                 tau_par_ab(i,j,k) = 2.d0 * visc_eff_ab(i,j,k) * eps_par
             end do 
 
             ! Compute the integral of visc_eff from the base of each layer to the surface (P12, Eq. 28)
 
-            H_ice_ab = 0.25_prec*(H_ice(i,j)+H_ice(ip1,j)+H_ice(i,jp1)+H_ice(ip1,jp1))
+            H_ice_ab(i,j) = 0.25_prec*(H_ice(i,j)+H_ice(ip1,j)+H_ice(i,jp1)+H_ice(ip1,jp1))
             
             ! Start at the surface
-            visc_eff_int3D_ab(i,j,nz_aa) = visc_eff_ab(i,j,nz_aa) * (zeta_aa(nz_aa)-zeta_aa(nz_aa-1))*H_ice_ab
+            visc_eff_int3D_ab(i,j,nz_aa) = visc_eff_ab(i,j,nz_aa) &
+                                            * (zeta_aa(nz_aa)-zeta_aa(nz_aa-1))*H_ice_ab(i,j)
 
             ! Integrate down to near the base 
             do k = nz_aa-1, 2, -1 
                 zeta_ac1 = 0.5_prec*(zeta_aa(k+1)+zeta_aa(k))
                 zeta_ac0 = 0.5_prec*(zeta_aa(k)+zeta_aa(k-1))
                 visc_eff_int3D_ab(i,j,k) = visc_eff_int3D_ab(i,j,k+1) &
-                                        + visc_eff_ab(i,j,k) * (zeta_ac1-zeta_ac0)*H_ice_ab
+                                        + visc_eff_ab(i,j,k) * (zeta_ac1-zeta_ac0)*H_ice_ab(i,j)
             end do 
             
             ! Get basal value
             visc_eff_int3D_ab(i,j,1) = visc_eff_int3D_ab(i,j,2) &
-                                        + visc_eff_ab(i,j,1) * (zeta_aa(2)-zeta_aa(1))*H_ice_ab
+                                        + visc_eff_ab(i,j,1) * (zeta_aa(2)-zeta_aa(1))*H_ice_ab(i,j)
             
         end do  
         end do 
@@ -440,14 +445,13 @@ end if
 
                 ! Calculate factor to get velocity components
                 ATT_ab   = 0.25_prec*(ATT(i,j,k)+ATT(ip1,j,k)+ATT(i,jp1,k)+ATT(ip1,jp1,k))
-                H_ice_ab = 0.25_prec*(H_ice(i,j)+H_ice(ip1,j)+H_ice(i,jp1)+H_ice(ip1,jp1))
-                !depth_ab = H_ice_ab*(1.0_prec-zeta_aa(k))
+                !depth_ab = H_ice_ab(i,j)*(1.0_prec-zeta_aa(k))
                 depth_ab = (1.0_prec-zeta_aa(k))
 
                 !fact_ab(i,j) = 2.0_prec * ATT_ab * depth_ab * tau_eff_sq_ab**p1 
                 
                 fact_ab(i,j) = fact_ab(i,j) &
-                    - 2.0_prec * ATT_ab * depth_ab * tau_eff_sq_ab * (dzeta*H_ice_ab)
+                    - 2.0_prec * ATT_ab * depth_ab * tau_eff_sq_ab * (dzeta*H_ice_ab(i,j))
                 
             end do 
             end do 

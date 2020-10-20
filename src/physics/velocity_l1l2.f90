@@ -308,6 +308,8 @@ end if
         ! Calculate squared minimum strain rate 
         eps_0_sq = eps_0*eps_0 
 
+        ! Initialize integrated viscosity field 
+        visc_eff_int3D_ab = 0.0_prec 
 
         ! Step 1: compute basal strain rates on ab-nodes and viscosity       
         do j = 1, ny 
@@ -328,7 +330,7 @@ end if
 
             ! Calculate the 'parallel' effective strain rate from P12, Eq. 17
             eps_par_sq = dudx_ab(i,j)**2 + dvdy_ab(i,j)**2 + dudx_ab(i,j)*dvdy_ab(i,j) &
-                        + 0.25_prec*(dudy_ab(i,j)+dvdx_ab(i,j))**2 !+ eps_0_sq
+                        + 0.25_prec*(dudy_ab(i,j)+dvdx_ab(i,j))**2 + eps_0_sq
             eps_par    = sqrt(eps_par_sq) 
 
             ! Compute the 'parallel' shear stress at each layer (tau_parallel)

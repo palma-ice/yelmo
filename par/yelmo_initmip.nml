@@ -38,7 +38,7 @@
 
 &yelmo
     domain          = "Greenland"
-    grid_name       = "GRL-4KM"
+    grid_name       = "GRL-16KM"
     grid_path       = "ice_data/{domain}/{grid_name}/{grid_name}_REGIONS.nc"
     experiment      = "None"       
     restart         = "None"
@@ -82,7 +82,7 @@
 /
 
 &ydyn
-    solver              = "diva"          ! "fixed", "sia", "ssa", "hybrid", "diva"    
+    solver              = "l1l2"          ! "fixed", "sia", "ssa", "hybrid", "diva"    
     diva_no_slip        = False           ! If using the DIVA solver, is basal sliding allowed? 
     beta_method         = 1               ! 0: constant beta; 1: linear (beta=cb/u0); 2: psuedo-plastic-power; 3: Regularized Coulomb
     beta_const          = 1e3             ! [Pa a m-1] Constant value of basal friction coefficient to be used

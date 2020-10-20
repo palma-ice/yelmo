@@ -125,8 +125,8 @@ contains
         do iter = 1, par%ssa_iter_max 
 
             ! Store solution from previous iteration (nm1 == n minus 1) 
-            ux_b_nm1 = ux_bar 
-            uy_b_nm1 = uy_bar 
+            ux_b_nm1 = ux_b 
+            uy_b_nm1 = uy_b 
             
             ! =========================================================================================
             ! Step 1: Calculate fields needed by ssa solver (visc_eff_int, beta)
@@ -152,25 +152,36 @@ contains
             call stagger_beta(beta_acx,beta_acy,beta,f_grnd,f_grnd_acx,f_grnd_acy,par%beta_gl_stag,par%boundaries)
 
             ! =========================================================================================
-            ! Step 2: Call the SSA solver to obtain new estimate of ux_b/uy_b
+            ! Step 2: determine the basal velocity ux_b/uy_b 
+
+            if (par%no_slip) then 
+                ! Simply set ux_b/uy_b equal to zero, as no sliding is allowed 
+
+                ux_b = 0.0_prec 
+                uy_b = 0.0_prec 
+
+            else 
+                ! Call the SSA solver to obtain new estimate of ux_b/uy_b
 
 if (.TRUE.) then 
-            if (iter .gt. 1) then
-                ! Update ssa mask based on convergence with previous step to reduce area being solved 
-                call update_ssa_mask_convergence(ssa_mask_acx,ssa_mask_acy,ssa_err_acx,ssa_err_acy,err_lim=real(1e-5,prec))
-                !call update_ssa_mask_convergence(ssa_mask_acx,ssa_mask_acy,ssa_err_acx,ssa_err_acy,err_lim=par%ssa_iter_conv*1e-2)  
-            end if 
+                if (iter .gt. 1) then
+                    ! Update ssa mask based on convergence with previous step to reduce area being solved 
+                    call update_ssa_mask_convergence(ssa_mask_acx,ssa_mask_acy,ssa_err_acx,ssa_err_acy,err_lim=real(1e-5,prec))
+                    !call update_ssa_mask_convergence(ssa_mask_acx,ssa_mask_acy,ssa_err_acx,ssa_err_acy,err_lim=par%ssa_iter_conv*1e-2)  
+                end if 
 end if 
             
-            ! Call ssa solver
-            call calc_vxy_ssa_matrix(ux_b,uy_b,L2_norm,beta_acx,beta_acy,visc_eff_int,  &
-                                     ssa_mask_acx,ssa_mask_acy,H_ice,taud_acx,taud_acy,H_grnd,z_sl, &
-                                     z_bed,dx,dy,par%ssa_vel_max,par%boundaries,par%ssa_lis_opt)
+                ! Call ssa solver
+                call calc_vxy_ssa_matrix(ux_b,uy_b,L2_norm,beta_acx,beta_acy,visc_eff_int,  &
+                                         ssa_mask_acx,ssa_mask_acy,H_ice,taud_acx,taud_acy,H_grnd,z_sl, &
+                                         z_bed,dx,dy,par%ssa_vel_max,par%boundaries,par%ssa_lis_opt)
 
 
-            ! Apply relaxation to keep things stable
-            call relax_ssa(ux_b,uy_b,ux_b_nm1,uy_b_nm1,rel=par%ssa_iter_rel)
+                ! Apply relaxation to keep things stable
+                call relax_ssa(ux_b,uy_b,ux_b_nm1,uy_b_nm1,rel=par%ssa_iter_rel)
             
+            end if 
+
             ! Check for convergence
             is_converged = check_vel_convergence_l2rel(ux_b,uy_b,ux_b_nm1,uy_b_nm1,ssa_mask_acx.gt.0,     &
                                                        ssa_mask_acy.gt.0,par%ssa_iter_conv,iter,par%ssa_iter_max, &
@@ -196,7 +207,8 @@ end if
         ! Iterations are finished, finalize calculations of 3D velocity field 
 
         ! Calculate the 3D horizontal velocity field
-        call calc_vel_horizontal_3D(ux,uy,ux_b,uy_b,taud_acx,taud_acy,visc_eff,ATT,H_ice,zeta_aa,dx,dy,n_glen,par%eps_0,par%boundaries)
+        call calc_vel_horizontal_3D(ux,uy,ux_b,uy_b,taud_acx,taud_acy,visc_eff,ATT,H_ice, &
+                                            zeta_aa,dx,dy,n_glen,par%eps_0,par%boundaries)
         
         ! Calculate depth-averaged horizontal velocity 
         ux_bar = calc_vertical_integrated_2D(ux,zeta_aa)
@@ -263,7 +275,7 @@ end if
         real(prec), allocatable :: fact_ab(:,:) 
 
         real(prec) :: eps_par_sq, eps_par 
-        real(prec) :: p1, p2, p3, eps_0_sq 
+        real(prec) :: p1, eps_0_sq 
 
         nx    = size(ux,1)
         ny    = size(ux,2) 
@@ -291,10 +303,7 @@ end if
         inv_4dy = 1.0_prec / (4.0_prec*dy) 
 
         ! Calculate exponents 
-        p1 = (1.0_prec - n_glen)/(2.0_prec*n_glen)
-        p2 = -1.0_prec/n_glen
-
-        p3 = (n_glen - 1.0_prec) / 2.0_prec 
+        p1 = (n_glen - 1.0_prec) / 2.0_prec 
 
         ! Calculate squared minimum strain rate 
         eps_0_sq = eps_0*eps_0 
@@ -319,7 +328,7 @@ end if
 
             ! Calculate the 'parallel' effective strain rate from P12, Eq. 17
             eps_par_sq = dudx_ab(i,j)**2 + dvdy_ab(i,j)**2 + dudx_ab(i,j)*dvdy_ab(i,j) &
-                        + 0.25_prec*(dudy_ab(i,j)+dvdx_ab(i,j))**2 + eps_0_sq
+                        + 0.25_prec*(dudy_ab(i,j)+dvdx_ab(i,j))**2 !+ eps_0_sq
             eps_par    = sqrt(eps_par_sq) 
 
             ! Compute the 'parallel' shear stress at each layer (tau_parallel)
@@ -418,7 +427,7 @@ end if
                 ATT_ab   = 0.25_prec*(ATT(i,j,k)+ATT(ip1,j,k)+ATT(i,jp1,k)+ATT(ip1,jp1,k))
                 depth_ab = 0.25_prec*(H_ice(i,j)+H_ice(ip1,j)+H_ice(i,jp1)+H_ice(ip1,jp1))*(1.0_prec-zeta_aa(k))
 
-                fact_ab(i,j) = 2.0_prec * ATT_ab * depth_ab * tau_eff_sq_ab**p3 
+                fact_ab(i,j) = 2.0_prec * ATT_ab * depth_ab * tau_eff_sq_ab**p1 
                 
             end do 
             end do 
@@ -469,19 +478,12 @@ end if
         integer :: i, j, k, nx, ny, nz_aa  
         integer    :: ip1, jp1, im1, jm1 
         real(prec) :: inv_4dx, inv_4dy 
-        real(prec) :: zeta_ac1, zeta_ac0 
-        real(prec) :: H_ice_ac 
-        real(prec) :: tau_xz_ab, tau_yz_ab 
         real(prec) :: tau_eff_sq_ab, ATT_ab 
-        real(prec), allocatable :: dudx_ab(:,:)
-        real(prec), allocatable :: dvdy_ab(:,:)
-        real(prec), allocatable :: dudy_ab(:,:)
-        real(prec), allocatable :: dvdx_ab(:,:)
-        real(prec), allocatable :: H_ice_ab(:,:) 
+        real(prec) :: dudx_ab, dvdy_ab, dudy_ab, dvdx_ab
         real(prec), allocatable :: visc_eff_ab(:,:,:) 
 
-        real(prec) :: eps_par_sq, eps_par 
-        real(prec) :: p1, p2, p3, eps_0_sq 
+        real(prec) :: eps_par_sq, eps_par_ab 
+        real(prec) :: eps_0_sq 
         real(prec) :: taud_ab, tau_par_ab, tau_perp_ab 
         real(prec) :: a, b, c, rootA, rootB 
         real(prec) :: wt 
@@ -491,11 +493,6 @@ end if
         nz_aa = size(zeta_aa,1) 
 
         ! Allocate local arrays 
-        allocate(dudx_ab(nx,ny)) 
-        allocate(dvdy_ab(nx,ny)) 
-        allocate(dudy_ab(nx,ny)) 
-        allocate(dvdx_ab(nx,ny)) 
-        allocate(H_ice_ab(nx,ny))
         allocate(visc_eff_ab(nx,ny,nz_aa)) 
 
         ! Consistency check 
@@ -508,12 +505,6 @@ end if
         ! Calculate scaling factors
         inv_4dx = 1.0_prec / (4.0_prec*dx) 
         inv_4dy = 1.0_prec / (4.0_prec*dy) 
-
-        ! Calculate exponents 
-        p1 = (1.0_prec - n_glen)/(2.0_prec*n_glen)
-        p2 = -1.0_prec/n_glen
-
-        p3 = (n_glen - 1.0_prec) / 2.0_prec 
 
         ! Calculate squared minimum strain rate 
         eps_0_sq = eps_0*eps_0 
@@ -528,32 +519,34 @@ end if
             jp1 = min(j+1,ny) 
 
             ! Calculate effective strain components from horizontal stretching on ab-nodes
-            dudx_ab(i,j) = ( (ux_b(ip1,j) - ux_b(im1,j)) + (ux_b(ip1,jp1) - ux_b(im1,jp1)) ) *inv_4dx
-            dvdy_ab(i,j) = ( (uy_b(i,jp1) - uy_b(i,jm1)) + (uy_b(ip1,jp1) - uy_b(ip1,jm1)) ) *inv_4dy 
+            dudx_ab = ( (ux_b(ip1,j) - ux_b(im1,j)) + (ux_b(ip1,jp1) - ux_b(im1,jp1)) ) *inv_4dx
+            dvdy_ab = ( (uy_b(i,jp1) - uy_b(i,jm1)) + (uy_b(ip1,jp1) - uy_b(ip1,jm1)) ) *inv_4dy 
 
             ! Calculate of cross terms on ab-nodes
-            dudy_ab(i,j) = (ux_b(i,jp1) - ux_b(i,j)) / dx 
-            dvdx_ab(i,j) = (uy_b(ip1,j) - uy_b(i,j)) / dy 
+            dudy_ab = (ux_b(i,jp1) - ux_b(i,j)) / dx 
+            dvdx_ab = (uy_b(ip1,j) - uy_b(i,j)) / dy 
 
             ! Calculate the 'parallel' effective strain rate from P12, Eq. 17
-            eps_par_sq = dudx_ab(i,j)**2 + dvdy_ab(i,j)**2 + dudx_ab(i,j)*dvdy_ab(i,j) &
-                        + 0.25_prec*(dudy_ab(i,j)+dvdx_ab(i,j))**2 + eps_0_sq
-            eps_par    = sqrt(eps_par_sq) 
+            eps_par_sq = dudx_ab**2 + dvdy_ab**2 + dudx_ab*dvdy_ab &
+                        + 0.25_prec*(dudy_ab+dvdx_ab)**2 + eps_0_sq
+            eps_par_ab = sqrt(eps_par_sq) 
 
 
             ! Get current magnitude of driving stress on ab-nodes 
-            !taud_ab     = sqrt(taud_acx**2+taud_acy**2)
-                
+            taud_ab = sqrt( (0.5_prec*(taud_acx(i,j)+taud_acx(i,j+1)))**2 &
+                          + (0.5_prec*(taud_acy(i,j)+taud_acy(i+1,j)))**2 )
 
             ! Now calculate viscosity at each layer 
             ! using the root-finding method of CISM
             ! Note this method is only valid for n_glen = 3!!!
             do k = 1, nz_aa 
                 
+                ATT_ab = 0.25_prec*(ATT(i,j,k)+ATT(ip1,j,k)+ATT(i,jp1,k)+ATT(ip1,jp1,k))
+                
                 tau_perp_ab = taud_ab*(1.0_prec-zeta_aa(k))
 
                 a = tau_perp_ab**2 
-                b = -eps_par / ATT_ab 
+                b = -eps_par_ab / ATT_ab 
                 c = sqrt(b**2/4.0_prec + a**3/27.0_prec) 
 
                 rootA = (-b/2.0_prec + c)**(1.0_prec/3.0_prec)

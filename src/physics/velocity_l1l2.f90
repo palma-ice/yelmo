@@ -533,8 +533,8 @@ end if
 
 
             ! Get current magnitude of driving stress on ab-nodes 
-            taud_ab = sqrt( (0.5_prec*(taud_acx(i,j)+taud_acx(i,j+1)))**2 &
-                          + (0.5_prec*(taud_acy(i,j)+taud_acy(i+1,j)))**2 )
+            taud_ab = sqrt( (0.5_prec*(taud_acx(i,j)+taud_acx(i,jp1)))**2 &
+                          + (0.5_prec*(taud_acy(i,j)+taud_acy(ip1,j)))**2 )
 
             ! Now calculate viscosity at each layer 
             ! using the root-finding method of CISM

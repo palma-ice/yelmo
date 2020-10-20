@@ -99,6 +99,8 @@ contains
         integer,    allocatable :: ssa_mask_acx_ref(:,:)
         integer,    allocatable :: ssa_mask_acy_ref(:,:)
 
+        real(prec), allocatable :: visc_eff_ab(:,:,:) 
+
         real(prec) :: L2_norm 
 
         integer :: ij(2) 
@@ -113,6 +115,8 @@ contains
 
         allocate(ssa_mask_acx_ref(nx,ny))
         allocate(ssa_mask_acy_ref(nx,ny))
+
+        allocate(visc_eff_ab(nx,ny,nz_aa)) 
 
         ! Store original ssa mask before iterations
         ssa_mask_acx_ref = ssa_mask_acx
@@ -132,7 +136,7 @@ contains
             ! Step 1: Calculate fields needed by ssa solver (visc_eff_int, beta)
 
             ! Calculate 3D effective viscosity, using velocity solution from previous iteration
-            call calc_visc_eff_3D(visc_eff,ux_b,uy_b,taud_acx,taud_acy,ATT,H_ice,zeta_aa,dx,dy,n_glen,par%eps_0,par%boundaries)
+            call calc_visc_eff_3D(visc_eff,visc_eff_ab,ux_b,uy_b,taud_acx,taud_acy,ATT,H_ice,zeta_aa,dx,dy,n_glen,par%eps_0,par%boundaries)
 
             ! Calculate depth-integrated effective viscosity
             ! Note L19 uses eta_bar*H in the ssa equation. Yelmo uses eta_int=eta_bar*H directly.
@@ -207,7 +211,7 @@ end if
         ! Iterations are finished, finalize calculations of 3D velocity field 
 
         ! Calculate the 3D horizontal velocity field
-        call calc_vel_horizontal_3D(ux,uy,ux_b,uy_b,taud_acx,taud_acy,visc_eff,ATT,H_ice, &
+        call calc_vel_horizontal_3D(ux,uy,ux_b,uy_b,taud_acx,taud_acy,visc_eff_ab,ATT,H_ice, &
                                             zeta_aa,dx,dy,n_glen,par%eps_0,par%boundaries)
         
         ! Calculate depth-averaged horizontal velocity 
@@ -224,7 +228,7 @@ end if
 
     end subroutine calc_velocity_l1l2
 
-    subroutine calc_vel_horizontal_3D(ux,uy,ux_b,uy_b,taud_acx,taud_acy,visc_eff,ATT,H_ice,zeta_aa,dx,dy,n_glen,eps_0,boundaries)
+    subroutine calc_vel_horizontal_3D(ux,uy,ux_b,uy_b,taud_acx,taud_acy,visc_eff_ab,ATT,H_ice,zeta_aa,dx,dy,n_glen,eps_0,boundaries)
         ! Caluculate the 3D horizontal velocity field (ux,uy)
         ! for the L1L2 solver following Perego et al. (2012)
         ! and the blueprint by Lipscomb et al. (2019) in CISM
@@ -237,7 +241,7 @@ end if
         real(prec), intent(IN)  :: uy_b(:,:) 
         real(prec), intent(IN)  :: taud_acx(:,:) 
         real(prec), intent(IN)  :: taud_acy(:,:)
-        real(prec), intent(IN)  :: visc_eff(:,:,:)       
+        real(prec), intent(IN)  :: visc_eff_ab(:,:,:)   ! on ab-nodes already 
         real(prec), intent(IN)  :: ATT(:,:,:)  
         real(prec), intent(IN)  :: H_ice(:,:)
         real(prec), intent(IN)  :: zeta_aa(:) 
@@ -263,7 +267,6 @@ end if
         real(prec), allocatable :: dudy_ab(:,:)
         real(prec), allocatable :: dvdx_ab(:,:)
         real(prec), allocatable :: H_ice_ab(:,:) 
-        real(prec), allocatable :: visc_eff_ab(:,:,:) 
         real(prec), allocatable :: visc_eff_int3D_ab(:,:,:) 
         real(prec), allocatable :: tau_par_ab(:,:,:) 
         real(prec), allocatable :: work1_ab(:,:)
@@ -287,7 +290,6 @@ end if
         allocate(dudy_ab(nx,ny)) 
         allocate(dvdx_ab(nx,ny)) 
         allocate(H_ice_ab(nx,ny))
-        allocate(visc_eff_ab(nx,ny,nz_aa)) 
         allocate(visc_eff_int3D_ab(nx,ny,nz_aa)) 
         allocate(tau_par_ab(nx,ny,nz_aa))
         allocate(work1_ab(nx,ny)) 
@@ -308,7 +310,6 @@ end if
         eps_0_sq = eps_0*eps_0 
 
         ! Initialize integrated viscosity field
-        visc_eff_ab       = 0.0_prec  
         visc_eff_int3D_ab = 0.0_prec 
 
         ! Step 1: compute basal strain rates on ab-nodes and viscosity       
@@ -335,11 +336,6 @@ end if
 
             ! Compute the 'parallel' shear stress for each layer (tau_parallel)
             do k = 1, nz_aa 
-                ! Stagger visc_eff to ab-nodes for this layer and save for later
-                visc_eff_ab(i,j,k) = 0.25_prec*(visc_eff(i,j,k)+visc_eff(ip1,j,k) &
-                                                + visc_eff(i,jp1,k)+visc_eff(ip1,jp1,k))
-
-                ! Calculate tau_parallel
                 tau_par_ab(i,j,k) = 2.d0 * visc_eff_ab(i,j,k) * eps_par
             end do 
 
@@ -460,14 +456,15 @@ end if
             do i = 1, nx 
             do j = 1, ny 
 
+                im1 = max(i-1,1) 
+                jm1 = max(j-1,1) 
+                
                 ! stagger factor to acx-nodes and calculate velocity
-                fact_ac = 0.5_prec*(fact_ab(i,j)+fact_ab(i,jm1))
-                !ux(i,j,k) = ux(i,j,k-1) + fact_ac*tau_xz(i,j,k)
+                fact_ac   = 0.5_prec*(fact_ab(i,j)+fact_ab(i,jm1))
                 ux(i,j,k) = ux(i,j,1) + fact_ac*taud_acx(i,j)
 
                 ! stagger factor to acy-nodes and calculate velocity
-                fact_ac = 0.5_prec*(fact_ab(i,j)+fact_ab(im1,j))
-                !uy(i,j,k) = uy(i,j,k-1) + fact_ac*tau_yz(i,j,k)
+                fact_ac   = 0.5_prec*(fact_ab(i,j)+fact_ab(im1,j))
                 uy(i,j,k) = uy(i,j,1) + fact_ac*taud_acy(i,j)
 
             end do 
@@ -479,7 +476,7 @@ end if
 
     end subroutine calc_vel_horizontal_3D
 
-    subroutine calc_visc_eff_3D(visc_eff,ux_b,uy_b,taud_acx,taud_acy,ATT,H_ice,zeta_aa,dx,dy,n_glen,eps_0,boundaries)
+    subroutine calc_visc_eff_3D(visc_eff,visc_eff_ab,ux_b,uy_b,taud_acx,taud_acy,ATT,H_ice,zeta_aa,dx,dy,n_glen,eps_0,boundaries)
         ! Caluculate the 3D effective viscosity field
         ! for the L1L2 solver following Perego et al. (2012)
         ! and the blueprint by Lipscomb et al. (2019) in CISM
@@ -487,6 +484,7 @@ end if
         implicit none 
 
         real(prec), intent(OUT) :: visc_eff(:,:,:)       
+        real(prec), intent(OUT) :: visc_eff_ab(:,:,:) 
         real(prec), intent(IN)  :: ux_b(:,:) 
         real(prec), intent(IN)  :: uy_b(:,:) 
         real(prec), intent(IN)  :: taud_acx(:,:) 
@@ -506,8 +504,7 @@ end if
         real(prec) :: inv_4dx, inv_4dy 
         real(prec) :: tau_eff_sq_ab, ATT_ab 
         real(prec) :: dudx_ab, dvdy_ab, dudy_ab, dvdx_ab
-        real(prec), allocatable :: visc_eff_ab(:,:,:) 
-
+        
         real(prec) :: eps_par_sq, eps_par_ab 
         real(prec) :: eps_0_sq 
         real(prec) :: taud_ab, tau_par_ab, tau_perp_ab 
@@ -517,9 +514,6 @@ end if
         nx    = size(ux_b,1)
         ny    = size(ux_b,2) 
         nz_aa = size(zeta_aa,1) 
-
-        ! Allocate local arrays 
-        allocate(visc_eff_ab(nx,ny,nz_aa)) 
 
         ! Consistency check 
         if (n_glen .ne. 3.0_prec) then 
@@ -641,6 +635,12 @@ end if
         end do 
         end do 
         
+        ! Treat the corners to avoid extremes (ab-nodes)
+        visc_eff_ab(1,1,:)   = 0.5*(visc_eff_ab(2,1,:)+visc_eff_ab(1,2,:))
+        visc_eff_ab(1,ny,:)  = 0.5*(visc_eff_ab(2,ny,:)+visc_eff_ab(1,ny-1,:))
+        visc_eff_ab(nx,1,:)  = 0.5*(visc_eff_ab(nx,2,:)+visc_eff_ab(nx-1,1,:))
+        visc_eff_ab(nx,ny,:) = 0.5*(visc_eff_ab(nx-1,ny,:)+visc_eff_ab(nx,ny-1,:))
+
         ! Treat the corners to avoid extremes
         visc_eff(1,1,:)   = 0.5*(visc_eff(2,1,:)+visc_eff(1,2,:))
         visc_eff(1,ny,:)  = 0.5*(visc_eff(2,ny,:)+visc_eff(1,ny-1,:))

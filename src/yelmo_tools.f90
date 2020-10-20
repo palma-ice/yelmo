@@ -246,7 +246,7 @@ contains
 
         return
 
-    end function stagger_aa_ab 
+    end function stagger_aa_ab
     
     function stagger_aa_ab_ice(u,H_ice) result(ustag)
         ! Stagger from Aa => Ab

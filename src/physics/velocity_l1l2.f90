@@ -406,7 +406,7 @@ end if
 
         ux = 0.0 
         uy = 0.0 
-
+        
         ! Assign basal velocity value 
         ux(:,:,1) = ux_b 
         uy(:,:,1) = uy_b 

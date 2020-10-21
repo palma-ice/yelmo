@@ -38,31 +38,33 @@ module velocity_l1l2
     public :: calc_velocity_l1l2
 
 contains 
-
-    subroutine calc_velocity_l1l2(ux,uy,ux_i,uy_i,ux_bar,uy_bar,ux_b,uy_b,duxdz,duydz,taub_acx,taub_acy, &
-                                  visc_eff,visc_eff_int,ssa_mask_acx,ssa_mask_acy,ssa_err_acx,ssa_err_acy,ssa_iter_now, &
-                                  beta,beta_acx,beta_acy,c_bed,taud_acx,taud_acy,H_ice,H_grnd,f_grnd, &
+    
+    subroutine calc_velocity_l1l2(ux,uy,ux_bar,uy_bar,ux_b,uy_b,ux_i,uy_i,taub_acx,taub_acy, &
+                                  beta,beta_acx,beta_acy,visc_eff,visc_eff_int,  &
+                                  ssa_mask_acx,ssa_mask_acy,ssa_err_acx,ssa_err_acy,ssa_iter_now, &
+                                  c_bed,taud_acx,taud_acy,H_ice,H_grnd,f_grnd, &
                                   f_grnd_acx,f_grnd_acy,ATT,zeta_aa,z_sl,z_bed,dx,dy,n_glen,par)
         ! This subroutine is used to solve the horizontal velocity system (ux,uy)
-        ! following the Depth-Integrated Viscosity Approximation (DIVA),
-        ! as outlined by Lipscomb et al. (2019). Method originally 
-        ! proposed by Goldberg (2011), algorithm by Arthern et al (2015), 
-        ! updated by Lipscomb et al. (2019).
+        ! following the L1L2 solver formulation (ie, depth-integrated solver
+        ! that reduces to SIA in the limit of zero sliding), as outlined 
+        ! by Perego et al. (2012) and following the implementation
+        ! in CISMv2.
 
         implicit none 
 
         real(prec), intent(INOUT) :: ux(:,:,:)          ! [m/a]
         real(prec), intent(INOUT) :: uy(:,:,:)          ! [m/a]
-        real(prec), intent(INOUT) :: ux_i(:,:,:)        ! [m/a]
-        real(prec), intent(INOUT) :: uy_i(:,:,:)        ! [m/a]
         real(prec), intent(INOUT) :: ux_bar(:,:)        ! [m/a]
         real(prec), intent(INOUT) :: uy_bar(:,:)        ! [m/a]
         real(prec), intent(INOUT) :: ux_b(:,:)          ! [m/a]
         real(prec), intent(INOUT) :: uy_b(:,:)          ! [m/a]
-        real(prec), intent(INOUT) :: duxdz(:,:,:)       ! [1/a]
-        real(prec), intent(INOUT) :: duydz(:,:,:)       ! [1/a]
+        real(prec), intent(INOUT) :: ux_i(:,:,:)        ! [m/a]
+        real(prec), intent(INOUT) :: uy_i(:,:,:)        ! [m/a]
         real(prec), intent(INOUT) :: taub_acx(:,:)      ! [Pa]
         real(prec), intent(INOUT) :: taub_acy(:,:)      ! [Pa]
+        real(prec), intent(INOUT) :: beta(:,:)          ! [Pa a/m]
+        real(prec), intent(INOUT) :: beta_acx(:,:)      ! [Pa a/m]
+        real(prec), intent(INOUT) :: beta_acy(:,:)      ! [Pa a/m]
         real(prec), intent(INOUT) :: visc_eff(:,:,:)    ! [Pa a]
         real(prec), intent(OUT)   :: visc_eff_int(:,:)  ! [Pa a m]
         integer,    intent(OUT)   :: ssa_mask_acx(:,:)  ! [-]
@@ -70,9 +72,6 @@ contains
         real(prec), intent(OUT)   :: ssa_err_acx(:,:)
         real(prec), intent(OUT)   :: ssa_err_acy(:,:)
         integer,    intent(OUT)   :: ssa_iter_now 
-        real(prec), intent(INOUT) :: beta(:,:)          ! [Pa a/m]
-        real(prec), intent(INOUT) :: beta_acx(:,:)      ! [Pa a/m]
-        real(prec), intent(INOUT) :: beta_acy(:,:)      ! [Pa a/m]
         real(prec), intent(IN)    :: c_bed(:,:)         ! [Pa]
         real(prec), intent(IN)    :: taud_acx(:,:)      ! [Pa]
         real(prec), intent(IN)    :: taud_acy(:,:)      ! [Pa]
@@ -406,7 +405,7 @@ end if
 
         ux = 0.0 
         uy = 0.0 
-        
+
         ! Assign basal velocity value 
         ux(:,:,1) = ux_b 
         uy(:,:,1) = uy_b 

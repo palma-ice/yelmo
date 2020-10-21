@@ -504,13 +504,15 @@ contains
         l1l2_par%ssa_iter_rel   = dyn%par%ssa_iter_rel 
         l1l2_par%ssa_iter_conv  = dyn%par%ssa_iter_conv 
         l1l2_par%ssa_write_log  = yelmo_log
-
-        call calc_velocity_l1l2(dyn%now%ux,dyn%now%uy,dyn%now%ux_i,dyn%now%uy_i,dyn%now%ux_bar,dyn%now%uy_bar, &
-                                dyn%now%ux_b,dyn%now%uy_b,dyn%now%duxdz,dyn%now%duydz,dyn%now%taub_acx,dyn%now%taub_acy, &
-                                dyn%now%visc_eff,dyn%now%visc_eff_int,dyn%now%ssa_mask_acx,dyn%now%ssa_mask_acy, &
-                                dyn%now%ssa_err_acx,dyn%now%ssa_err_acy,dyn%par%ssa_iter_now,dyn%now%beta,dyn%now%beta_acx, &
-                                dyn%now%beta_acy,dyn%now%c_bed,dyn%now%taud_acx,dyn%now%taud_acy, &
-                                tpo%now%H_ice,tpo%now%H_grnd,tpo%now%f_grnd,tpo%now%f_grnd_acx,tpo%now%f_grnd_acy,mat%now%ATT, &
+        
+        call calc_velocity_l1l2(dyn%now%ux,dyn%now%uy,dyn%now%ux_bar,dyn%now%uy_bar, &
+                                dyn%now%ux_b,dyn%now%uy_b,dyn%now%ux_i,dyn%now%uy_i, &
+                                dyn%now%taub_acx,dyn%now%taub_acy,dyn%now%beta,dyn%now%beta_acx, &
+                                dyn%now%beta_acy,dyn%now%visc_eff,dyn%now%visc_eff_int, &
+                                dyn%now%ssa_mask_acx,dyn%now%ssa_mask_acy,dyn%now%ssa_err_acx, &
+                                dyn%now%ssa_err_acy,dyn%par%ssa_iter_now,dyn%now%c_bed, &
+                                dyn%now%taud_acx,dyn%now%taud_acy,tpo%now%H_ice,tpo%now%H_grnd, &
+                                tpo%now%f_grnd,tpo%now%f_grnd_acx,tpo%now%f_grnd_acy,mat%now%ATT, &
                                 dyn%par%zeta_aa,bnd%z_sl,bnd%z_bed,dyn%par%dx,dyn%par%dy,mat%par%n_glen,l1l2_par)
         
         ! Integrate from 3D shear velocity field to get depth-averaged field

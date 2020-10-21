@@ -143,24 +143,15 @@ contains
 
                 call calc_ydyn_hybrid(dyn,tpo,mat,thrm,bnd,use_sia=.TRUE.,use_ssa=.TRUE.)
 
-            case("diva") 
+            case("diva","diva-noslip") 
                 ! Depth-integrated variational approximation (DIVA) - Goldberg (2011); Lipscomb et al. (2019)
 
                 call calc_ydyn_diva(dyn,tpo,mat,thrm,bnd)
             
-            case("l1l2")
+            case("l1l2","l1l2-noslip")
                 ! L1L2 solver
 
                 call calc_ydyn_l1l2(dyn,tpo,mat,thrm,bnd)
-            
-            case("hybrid-pd12")
-                ! Variational approach of Pollard and de Conto (2012) - in progress!
-
-                write(*,*) "Not working - to do."
-                stop 
-
-                call calc_ydyn_pd12(dyn,tpo,mat,thrm,bnd)
-
             
             case DEFAULT 
 
@@ -376,11 +367,19 @@ contains
         ! Local variables
         integer :: iter, n_iter
         integer :: i, j, k, nx, ny, nz_aa, nz_ac   
-        
+        logical :: no_slip 
+
         type(diva_param_class) :: diva_par 
 
         ! For vertical velocity calculation 
         real(prec), allocatable :: bmb(:,:)
+
+        ! Determine whether basal sliding is allowed 
+        if (trim(dyn%par%solver) .eq. "diva-noslip") then 
+            no_slip = .TRUE. 
+        else 
+            no_slip = .FALSE. 
+        end if 
 
         nx    = dyn%par%nx 
         ny    = dyn%par%ny 
@@ -398,7 +397,7 @@ contains
         ! Set diva parameters from Yelmo settings 
         diva_par%ssa_lis_opt    = dyn%par%ssa_lis_opt 
         diva_par%boundaries     = dyn%par%boundaries 
-        diva_par%diva_no_slip   = dyn%par%diva_no_slip 
+        diva_par%no_slip        = no_slip 
         diva_par%beta_method    = dyn%par%beta_method 
         diva_par%beta_const     = dyn%par%beta_const 
         diva_par%beta_q         = dyn%par%beta_q 
@@ -415,12 +414,14 @@ contains
         diva_par%ssa_iter_conv  = dyn%par%ssa_iter_conv 
         diva_par%ssa_write_log  = yelmo_log
 
-        call calc_velocity_diva(dyn%now%ux,dyn%now%uy,dyn%now%ux_i,dyn%now%uy_i,dyn%now%ux_bar,dyn%now%uy_bar, &
-                                dyn%now%ux_b,dyn%now%uy_b,dyn%now%duxdz,dyn%now%duydz,dyn%now%taub_acx,dyn%now%taub_acy, &
-                                dyn%now%visc_eff,dyn%now%visc_eff_int,dyn%now%ssa_mask_acx,dyn%now%ssa_mask_acy, &
-                                dyn%now%ssa_err_acx,dyn%now%ssa_err_acy,dyn%par%ssa_iter_now,dyn%now%beta,dyn%now%beta_acx, &
-                                dyn%now%beta_acy,dyn%now%beta_eff,dyn%now%beta_diva,dyn%now%c_bed,dyn%now%taud_acx,dyn%now%taud_acy, &
-                                tpo%now%H_ice,tpo%now%H_grnd,tpo%now%f_grnd,tpo%now%f_grnd_acx,tpo%now%f_grnd_acy,mat%now%ATT, &
+        call calc_velocity_diva(dyn%now%ux,dyn%now%uy,dyn%now%ux_bar,dyn%now%uy_bar, &
+                                dyn%now%ux_b,dyn%now%uy_b,dyn%now%ux_i,dyn%now%uy_i, &
+                                dyn%now%taub_acx,dyn%now%taub_acy,dyn%now%beta,dyn%now%beta_acx, &
+                                dyn%now%beta_acy,dyn%now%beta_eff,dyn%now%visc_eff,dyn%now%visc_eff_int,    &
+                                dyn%now%duxdz,dyn%now%duydz,dyn%now%ssa_mask_acx,dyn%now%ssa_mask_acy,      &
+                                dyn%now%ssa_err_acx,dyn%now%ssa_err_acy,dyn%par%ssa_iter_now,dyn%now%c_bed, &
+                                dyn%now%taud_acx,dyn%now%taud_acy,tpo%now%H_ice,tpo%now%H_grnd,   &
+                                tpo%now%f_grnd,tpo%now%f_grnd_acx,tpo%now%f_grnd_acy,mat%now%ATT, &
                                 dyn%par%zeta_aa,bnd%z_sl,bnd%z_bed,dyn%par%dx,dyn%par%dy,mat%par%n_glen,diva_par)
          
         ! Integrate from 3D shear velocity field to get depth-averaged field
@@ -457,12 +458,20 @@ contains
         ! Local variables
         integer :: iter, n_iter
         integer :: i, j, k, nx, ny, nz_aa, nz_ac   
-        
+        logical :: no_slip 
+
         type(l1l2_param_class) :: l1l2_par 
 
         ! For vertical velocity calculation 
         real(prec), allocatable :: bmb(:,:)
 
+        ! Determine whether basal sliding is allowed 
+        if (trim(dyn%par%solver) .eq. "l1l2-noslip") then 
+            no_slip = .TRUE. 
+        else 
+            no_slip = .FALSE. 
+        end if 
+        
         nx    = dyn%par%nx 
         ny    = dyn%par%ny 
         nz_aa = dyn%par%nz_aa 
@@ -479,7 +488,7 @@ contains
         ! Set diva parameters from Yelmo settings 
         l1l2_par%ssa_lis_opt    = dyn%par%ssa_lis_opt 
         l1l2_par%boundaries     = dyn%par%boundaries 
-        l1l2_par%no_slip        = dyn%par%diva_no_slip 
+        l1l2_par%no_slip        = no_slip 
         l1l2_par%beta_method    = dyn%par%beta_method 
         l1l2_par%beta_const     = dyn%par%beta_const 
         l1l2_par%beta_q         = dyn%par%beta_q 
@@ -1193,7 +1202,6 @@ end if
         
         call nml_read(filename,"ydyn","solver",             par%solver,             init=init_pars)
         call nml_read(filename,"ydyn","calc_diffusivity",   par%calc_diffusivity,   init=init_pars)
-        call nml_read(filename,"ydyn","diva_no_slip",       par%diva_no_slip,       init=init_pars)
         call nml_read(filename,"ydyn","beta_method",        par%beta_method,        init=init_pars)
         call nml_read(filename,"ydyn","beta_const",         par%beta_const,         init=init_pars)
         call nml_read(filename,"ydyn","beta_q",             par%beta_q,             init=init_pars)

@@ -14,7 +14,7 @@ module velocity_diva
 
         character(len=256) :: ssa_lis_opt 
         character(len=256) :: boundaries 
-        logical    :: diva_no_slip 
+        logical    :: no_slip 
         integer    :: beta_method
         real(prec) :: beta_const
         real(prec) :: beta_q                ! Friction law exponent
@@ -39,9 +39,10 @@ module velocity_diva
 
 contains 
 
-    subroutine calc_velocity_diva(ux,uy,ux_i,uy_i,ux_bar,uy_bar,ux_b,uy_b,duxdz,duydz,taub_acx,taub_acy, &
-                                  visc_eff,visc_eff_int,ssa_mask_acx,ssa_mask_acy,ssa_err_acx,ssa_err_acy,ssa_iter_now, &
-                                  beta,beta_acx,beta_acy,beta_eff,beta_diva,c_bed,taud_acx,taud_acy,H_ice,H_grnd,f_grnd, &
+    subroutine calc_velocity_diva(ux,uy,ux_bar,uy_bar,ux_b,uy_b,ux_i,uy_i,taub_acx,taub_acy, &
+                                  beta,beta_acx,beta_acy,beta_eff,visc_eff,visc_eff_int,duxdz,duydz, &
+                                  ssa_mask_acx,ssa_mask_acy,ssa_err_acx,ssa_err_acy,ssa_iter_now, &
+                                  c_bed,taud_acx,taud_acy,H_ice,H_grnd,f_grnd, &
                                   f_grnd_acx,f_grnd_acy,ATT,zeta_aa,z_sl,z_bed,dx,dy,n_glen,par)
         ! This subroutine is used to solve the horizontal velocity system (ux,uy)
         ! following the Depth-Integrated Viscosity Approximation (DIVA),
@@ -53,28 +54,27 @@ contains
 
         real(prec), intent(INOUT) :: ux(:,:,:)          ! [m/a]
         real(prec), intent(INOUT) :: uy(:,:,:)          ! [m/a]
-        real(prec), intent(INOUT) :: ux_i(:,:,:)        ! [m/a]
-        real(prec), intent(INOUT) :: uy_i(:,:,:)        ! [m/a]
         real(prec), intent(INOUT) :: ux_bar(:,:)        ! [m/a]
         real(prec), intent(INOUT) :: uy_bar(:,:)        ! [m/a]
         real(prec), intent(INOUT) :: ux_b(:,:)          ! [m/a]
         real(prec), intent(INOUT) :: uy_b(:,:)          ! [m/a]
-        real(prec), intent(INOUT) :: duxdz(:,:,:)       ! [1/a]
-        real(prec), intent(INOUT) :: duydz(:,:,:)       ! [1/a]
+        real(prec), intent(INOUT) :: ux_i(:,:,:)        ! [m/a]
+        real(prec), intent(INOUT) :: uy_i(:,:,:)        ! [m/a]
         real(prec), intent(INOUT) :: taub_acx(:,:)      ! [Pa]
         real(prec), intent(INOUT) :: taub_acy(:,:)      ! [Pa]
+        real(prec), intent(INOUT) :: beta(:,:)          ! [Pa a/m]
+        real(prec), intent(INOUT) :: beta_acx(:,:)      ! [Pa a/m]
+        real(prec), intent(INOUT) :: beta_acy(:,:)      ! [Pa a/m]
+        real(prec), intent(OUT)   :: beta_eff(:,:)      ! [Pa a/m]
         real(prec), intent(INOUT) :: visc_eff(:,:,:)    ! [Pa a]
         real(prec), intent(OUT)   :: visc_eff_int(:,:)  ! [Pa a m]
+        real(prec), intent(OUT)   :: duxdz(:,:,:)       ! [1/a]
+        real(prec), intent(OUT)   :: duydz(:,:,:)       ! [1/a]
         integer,    intent(OUT)   :: ssa_mask_acx(:,:)  ! [-]
         integer,    intent(OUT)   :: ssa_mask_acy(:,:)  ! [-]
         real(prec), intent(OUT)   :: ssa_err_acx(:,:)
         real(prec), intent(OUT)   :: ssa_err_acy(:,:)
         integer,    intent(OUT)   :: ssa_iter_now 
-        real(prec), intent(INOUT) :: beta(:,:)          ! [Pa a/m]
-        real(prec), intent(INOUT) :: beta_acx(:,:)      ! [Pa a/m]
-        real(prec), intent(INOUT) :: beta_acy(:,:)      ! [Pa a/m]
-        real(prec), intent(OUT)   :: beta_eff(:,:)      ! [Pa a/m]
-        real(prec), intent(OUT)   :: beta_diva(:,:)     ! [Pa a/m]
         real(prec), intent(IN)    :: c_bed(:,:)         ! [Pa]
         real(prec), intent(IN)    :: taud_acx(:,:)      ! [Pa]
         real(prec), intent(IN)    :: taud_acy(:,:)      ! [Pa]
@@ -163,8 +163,8 @@ contains
             call calc_F_integral(F2,visc_eff,H_ice,zeta_aa,n=2.0_prec)
             
             ! Calculate effective beta 
-            call calc_beta_eff(beta_eff,beta,F2,zeta_aa,no_slip=par%diva_no_slip)
-            
+            call calc_beta_eff(beta_eff,beta,F2,zeta_aa,no_slip=par%no_slip)
+
             ! Stagger beta and beta_eff 
             call stagger_beta(beta_acx,beta_acy,beta,f_grnd,f_grnd_acx,f_grnd_acy,par%beta_gl_stag,par%boundaries)
             call stagger_beta(beta_eff_acx,beta_eff_acy,beta_eff,f_grnd,f_grnd_acx,f_grnd_acy,par%beta_gl_stag,par%boundaries)
@@ -207,7 +207,7 @@ end if
             call calc_basal_stress(taub_acx,taub_acy,beta_eff_acx,beta_eff_acy,ux_bar,uy_bar)
 
             ! Calculate basal velocity from depth-averaged solution and basal stress
-            call calc_vel_basal(ux_b,uy_b,ux_bar,uy_bar,F2,taub_acx,taub_acy,H_ice,par%diva_no_slip,par%boundaries)
+            call calc_vel_basal(ux_b,uy_b,ux_bar,uy_bar,F2,taub_acx,taub_acy,H_ice,par%no_slip,par%boundaries)
 
             ! Exit iterations if ssa solution has converged
             if (is_converged) exit 
@@ -225,12 +225,9 @@ end if
             uy_i(:,:,k) = uy(:,:,k) - uy_b 
         end do
 
-        ! Diagnose beta actually being used by DIVA
-        call diagnose_beta_diva(beta_diva,beta_eff,F2,beta)
-
         return 
 
-    end subroutine calc_velocity_diva 
+    end subroutine calc_velocity_diva
 
     subroutine calc_vel_horizontal_3D(ux,uy,ux_b,uy_b,taub_acx,taub_acy,visc_eff,H_ice,zeta_aa,boundaries)
         ! Caluculate the 3D horizontal velocity field (ux,uy)
@@ -887,136 +884,6 @@ end if
         return 
 
     end subroutine calc_basal_stress
-
-    subroutine diagnose_beta_diva(beta_diva,beta_eff,F2,beta)
-        ! Given beta_eff and F2, iteratively solve for beta_diva,
-        ! where: beta_eff = beta_diva / (1+beta_diva*F2)
-        ! Use root-finding method: 0 = beta_eff - beta_diva / (1+beta_diva*F2)
-
-        implicit none 
-
-        real(prec), intent(OUT) :: beta_diva(:,:)       ! [Pa a/m] beta seen by diva solver (derived from beta_eff)
-        real(prec), intent(IN)  :: beta_eff(:,:)        ! [Pa a/m] Effective beta used directly in diva solver
-        real(prec), intent(IN)  :: beta(:,:)            ! [Pa a/m] Prescribed beta for points with ux/y_b > 0
-        real(prec), intent(IN)  :: F2(:,:)              ! [(Pa a)^-1]
-
-        ! To do !!!
-
-        ! For now, simply:
-        beta_diva = beta 
-
-        return
-
-    contains 
-
-        function f(beta_diva,beta_eff,F2) result(fout)
-
-            implicit none 
-
-            real(prec), intent(IN) :: beta_diva 
-            real(prec), intent(IN) :: beta_eff
-            real(prec), intent(IN) :: F2
-            real(prec) :: fout 
-
-            fout = beta_eff - beta_diva*(1.0_prec + beta_diva*F2)**(-1.0)
-
-            return 
-
-        end function f
-            
-        function fp(beta_diva,beta_eff,F2) result(fpout)
-
-            implicit none 
-
-            real(prec), intent(IN) :: beta_diva 
-            real(prec), intent(IN) :: beta_eff
-            real(prec), intent(IN) :: F2
-            real(prec) :: fpout 
-            
-            fpout = beta_diva*F2*(1.0_prec + beta_diva*F2)**(-2.0) - (1.0_prec + beta_diva*F2)**(-1.0)
-
-            return 
-
-        end function fp
-
-    end subroutine diagnose_beta_diva
-
-    subroutine solve_newton(x,x0,f,fp,debug)
-        ! Estimate the zero of f(x) using Newton's method. 
-        ! Input:
-        !   f:  the function to find a root of
-        !   fp: function returning the derivative f'
-        !   x0: the initial guess
-        !   debug: logical, prints iterations if debug=.true.
-        ! Returns:
-        !   the estimate x satisfying f(x)=0 (assumes Newton converged!) 
-        !   the number of iterations iters
-        
-        ! Adapted from: 
-        ! https://faculty.washington.edu/rjl/classes/am583s2013/notes/fortran_newton.html
-
-        implicit none
-
-        real(prec), intent(OUT) :: x
-        real(prec), intent(IN)  :: x0
-        real(prec), external    :: f, fp
-        logical,    intent(in)  :: debug
-
-        ! Declare any local variables:
-        real(prec) :: deltax, fx, fxprime
-        integer    :: k, iters
-
-        integer, parameter :: maxiter = 20
-        real(kind=8), parameter :: tol = 1.d-14
-
-        ! Save initial guess
-        x = x0
-
-        if (debug) then
-            write(*,*) "Initial guess: x = ", x
-        end if
-
-        ! Newton iteration to find a zero of f(x) 
-
-        do k = 1, maxiter
-
-            ! evaluate function and its derivative:
-            fx      = f(x)
-            fxprime = fp(x)
-
-            if (abs(fx) < tol) then
-                exit  ! jump out of do loop
-            end if
-
-            ! Compute Newton increment x:
-            deltax = fx/fxprime
-
-            ! update x:
-            x = x - deltax
-
-            if (debug) then
-                write(*,*) "After ", k, "iterations, x = ", x 
-            end if 
-
-        end do
-
-
-        if (k > maxiter) then
-        ! Solver did not converge
-
-            fx = f(x)
-            if (abs(fx) > tol) then
-                write(*,*) "*** Warning: has not yet converged"
-            end if
-
-        end if 
-
-        ! Number of iterations taken:
-        iters = k-1
-
-        return 
-
-    end subroutine solve_newton
 
     elemental subroutine limit_vel(u,u_lim)
         ! Apply a velocity limit (for stability)

@@ -300,10 +300,8 @@ module yelmo_defs
         real(prec), allocatable :: c_bed(:,:)  
         real(prec), allocatable :: beta_acx(:,:) 
         real(prec), allocatable :: beta_acy(:,:) 
-        real(prec), allocatable :: beta(:,:) 
-        
+        real(prec), allocatable :: beta(:,:)         
         real(prec), allocatable :: beta_eff(:,:) 
-        real(prec), allocatable :: beta_diva(:,:)
 
         real(prec), allocatable :: f_vbvs(:,:) 
 

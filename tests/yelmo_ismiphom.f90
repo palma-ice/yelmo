@@ -104,7 +104,6 @@ program yelmo_ismiphom
             yelmo1%tpo%now%H_ice = yelmo1%tpo%now%z_srf - yelmo1%bnd%z_bed
             
             yelmo1%tpo%par%topo_fixed   = .TRUE. 
-            yelmo1%dyn%par%diva_no_slip = .TRUE. 
 
             if (trim(yelmo1%dyn%par%solver) .eq. "hybrid") then 
                 ! For this experiment, no basal sliding is allowed, so disable
@@ -117,6 +116,11 @@ program yelmo_ismiphom
                 write(*,*) "yelmo_ismiphom:: error: solver='ssa' cannot be used &
                 &for Experiment A, since there is no sliding, velocity would be zero."
                 stop 
+
+            else 
+                ! Modify solver name to specify noslip version
+
+                yelmo1%dyn%par%solver = trim(yelmo1%dyn%par%solver)//"-noslip"
 
             end if 
 
@@ -136,31 +140,9 @@ program yelmo_ismiphom
             yelmo1%tpo%now%H_ice = yelmo1%tpo%now%z_srf - yelmo1%bnd%z_bed
         
             yelmo1%tpo%par%topo_fixed   = .TRUE. 
-            yelmo1%dyn%par%diva_no_slip = .FALSE. 
 
             yelmo1%dyn%par%beta_method  = -1
-            
             yelmo1%dyn%now%beta         = 1000.0 + 1000.0 * sin(omega*yelmo1%grd%x) * sin(omega*yelmo1%grd%y)
-
-!             yelmo1%dyn%par%beta_gl_stag = -1
-
-!             do i = 1, yelmo1%grd%nx-1 
-!             do j = 1, yelmo1%grd%ny 
-!                 x_now = 0.5*(yelmo1%grd%x(i,j)+yelmo1%grd%x(i+1,j))
-!                 y_now = yelmo1%grd%y(i,j)
-!                 yelmo1%dyn%now%beta_acx(i,j) = 1000.0 + 1000.0 * sin(omega*x_now) * sin(omega*y_now)
-!             end do 
-!             end do  
-!             yelmo1%dyn%now%beta_acx(yelmo1%grd%nx,:) = yelmo1%dyn%now%beta_acx(yelmo1%grd%nx-1,:)
-            
-!             do i = 1, yelmo1%grd%nx 
-!             do j = 1, yelmo1%grd%ny-1 
-!                 x_now = yelmo1%grd%x(i,j)
-!                 y_now = 0.5*(yelmo1%grd%y(i,j)+yelmo1%grd%y(i,j+1))
-!                 yelmo1%dyn%now%beta_acx(i,j) = 1000.0 + 1000.0 * sin(omega*x_now) * sin(omega*y_now)
-!             end do 
-!             end do  
-!             yelmo1%dyn%now%beta_acy(:,yelmo1%grd%ny) = yelmo1%dyn%now%beta_acy(:,yelmo1%grd%ny-1)
 
         case("EXPF") 
 
@@ -170,7 +152,7 @@ program yelmo_ismiphom
             yelmo1%tpo%par%topo_fixed = .FALSE. 
 
         case("EXPG")
-            ! Goldberg timestepping analytical test 
+            ! Goldberg timestepping analytical tests - TO DO 
 
             ! Define topography (linear downward sloping bed)
             alpha = 0.005           ! [rad] 
@@ -180,8 +162,6 @@ program yelmo_ismiphom
 
             yelmo1%tpo%now%H_ice = yelmo1%tpo%now%z_srf - yelmo1%bnd%z_bed
             
-
-
             ! Not used in this experiment, but set it to a constant value anyway
             yelmo1%dyn%par%beta_method  = -1 
             yelmo1%dyn%now%beta         = 1000.0

@@ -229,9 +229,10 @@ else
     yelmo1_ref = yelmo1 
 
     ! Run full dynamics (tpo,dyn,thrm) to smooth initial topo
-    ! Note: run this with SIA only dynamics for now
+    ! Note: run this with SIA only dynamics for now, and allow plenty of redo timesteps
     yelmo1%dyn%par%solver = "sia"
-
+    yelmo1%par%pc_n_redo  = 10
+    
     call yelmo_update_equil(yelmo1,time,time_tot=10.0_prec,topo_fixed=.FALSE., &
             dt=0.2_prec,ssa_vel_max=5000.0_prec)
 
@@ -239,8 +240,9 @@ else
     ! again with SIA only for now
     call yelmo_update_equil(yelmo1,time,time_tot=1e3,topo_fixed=.TRUE.,dt=1.0_prec,ssa_vel_max=5000.0_prec)
     
-    ! Reactivate solver of choice
+    ! Reactivate solver of choice and restore desired number of redo timesteps allowed
     yelmo1%dyn%par%solver = yelmo1_ref%dyn%par%solver 
+    yelmo1%par%pc_n_redo  = yelmo1_ref%par%pc_n_redo
 
     ! Run full dynamics with correct solver (tpo,dyn,thrm)
     call yelmo_update_equil(yelmo1,time,time_tot=1.0_prec,topo_fixed=.FALSE., &
@@ -445,7 +447,7 @@ contains
         
         call nc_write(filename,"beta_eff",ylmo%dyn%now%beta_eff,units="Pa a m^-1",long_name="Effective basal friction coefficient (DIVA)", &
                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-        
+
         call nc_write(filename,"dep_time",ylmo%mat%now%dep_time,units="yr",long_name="Deposition time", &
                       dim1="xc",dim2="yc",dim3="zeta",dim4="time",start=[1,1,1,n],ncid=ncid)
         call nc_write(filename,"uz",ylmo%dyn%now%uz,units="m/a",long_name="Surface velocity (z)", &

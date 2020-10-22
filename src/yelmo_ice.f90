@@ -388,7 +388,7 @@ contains
             ! Collect how many times the redo-iteration loop had to run 
             ! (not counting the first pass, which is not a redo)
             iter_redo_tot = iter_redo_tot + (iter_redo-1) 
-
+            
             ! Update dt and eta vectors for last N timesteps (first index becomes latest value)
             dom%par%pc_dt = cshift(dom%par%pc_dt,shift=-1)
             dom%par%pc_dt(1) = dt_now 

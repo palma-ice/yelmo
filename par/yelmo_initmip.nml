@@ -38,7 +38,7 @@
 
 &yelmo
     domain          = "Greenland"
-    grid_name       = "GRL-32KM"
+    grid_name       = "GRL-16KM"
     grid_path       = "ice_data/{domain}/{grid_name}/{grid_name}_REGIONS.nc"
     experiment      = "None"       
     restart         = "None"
@@ -82,7 +82,9 @@
 /
 
 &ydyn
-    solver              = "l1l2"          ! "fixed", "sia", "ssa", "hybrid", "diva", "diva-noslip", l1l2", "l1l2-noslip"
+    solver              = "diva"          ! "fixed", "sia", "ssa", "hybrid", "diva", "diva-noslip", l1l2", "l1l2-noslip"
+    visc_method         = 0               ! 0: constant visc=visc_const, 1: dynamic viscosity
+    visc_const          = 1e7             ! [Pa a] Constant value for viscosity (if visc_method=0)
     beta_method         = 1               ! 0: constant beta; 1: linear (beta=cb/u0); 2: psuedo-plastic-power; 3: Regularized Coulomb
     beta_const          = 1e3             ! [Pa a m-1] Constant value of basal friction coefficient to be used
     beta_q              = 1.0             ! Dragging law exponent 

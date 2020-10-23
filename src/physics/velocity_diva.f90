@@ -15,6 +15,8 @@ module velocity_diva
         character(len=256) :: ssa_lis_opt 
         character(len=256) :: boundaries 
         logical    :: no_slip 
+        integer    :: visc_method
+        real(prec) :: visc_const
         integer    :: beta_method
         real(prec) :: beta_const
         real(prec) :: beta_q                ! Friction law exponent
@@ -142,9 +144,28 @@ contains
             ! Calculate the 3D vertical shear fields using viscosity estimated from the previous iteration 
             call calc_vertical_shear_3D(duxdz,duydz,taub_acx,taub_acy,visc_eff,H_ice,zeta_aa,par%boundaries)
 
-            ! Calculate 3D effective viscosity, using velocity solution from previous iteration
-            call calc_visc_eff_3D(visc_eff,ux_bar,uy_bar,duxdz,duydz,ATT,H_ice,zeta_aa,dx,dy,n_glen,par%eps_0)
+            ! Calculate 3D effective viscosity
+            select case(par%visc_method)
 
+                case(0)
+                    ! Impose constant viscosity value 
+
+                    visc_eff = par%visc_const 
+
+                case(1) 
+                    ! Calculate effective viscosity, using velocity solution from previous iteration
+                    
+                    call calc_visc_eff_3D(visc_eff,ux_bar,uy_bar,duxdz,duydz,ATT,H_ice, &
+                                                                zeta_aa,dx,dy,n_glen,par%eps_0)
+
+                case DEFAULT 
+
+                    write(*,*) "calc_velocity_diva:: Error: visc_method not recognized."
+                    write(*,*) "visc_method = ", par%visc_method 
+                    stop 
+
+            end select
+            
             ! Calculate depth-integrated effective viscosity
             ! Note L19 uses eta_bar*H in the ssa equation. Yelmo uses eta_int=eta_bar*H directly.
             visc_eff_int = calc_vertical_integrated_2D(visc_eff,zeta_aa) 

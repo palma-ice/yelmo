@@ -14,6 +14,8 @@ module velocity_hybrid
 
         character(len=256) :: ssa_lis_opt 
         character(len=256) :: boundaries  
+        integer    :: visc_method
+        real(prec) :: visc_const
         integer    :: beta_method
         real(prec) :: beta_const
         real(prec) :: beta_q                ! Friction law exponent
@@ -117,9 +119,27 @@ contains
             ! =========================================================================================
             ! Step 1: Calculate fields needed by ssa solver (visc_eff_int, beta)
 
-            ! Calculate 3D effective viscosity, using velocity solution from previous iteration
-            call calc_visc_eff_3D(visc_eff,ux_b,uy_b,ATT,zeta_aa,dx,dy,n_glen,par%eps_0)
+            ! Calculate 3D effective viscosity
+            select case(par%visc_method)
 
+                case(0)
+                    ! Impose constant viscosity value 
+
+                    visc_eff = par%visc_const 
+
+                case(1) 
+                    ! Calculate 3D effective viscosity, using velocity solution from previous iteration
+                    
+                    call calc_visc_eff_3D(visc_eff,ux_b,uy_b,ATT,zeta_aa,dx,dy,n_glen,par%eps_0)
+
+                case DEFAULT 
+
+                    write(*,*) "calc_velocity_diva:: Error: visc_method not recognized."
+                    write(*,*) "visc_method = ", par%visc_method 
+                    stop 
+
+            end select
+                    
             ! Calculate depth-integrated effective viscosity
             ! Note L19 uses eta_bar*H in the ssa equation. Yelmo uses eta_int=eta_bar*H directly.
             visc_eff_int = calc_vertical_integrated_2D(visc_eff,zeta_aa) 

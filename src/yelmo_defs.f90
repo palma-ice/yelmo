@@ -166,7 +166,8 @@ module yelmo_defs
         character(len=256) :: solver 
         integer    :: mix_method            ! Method for mixing sia and ssa velocity solutions
         logical    :: calc_diffusivity      ! Calculate diagnostic diffusivity field
-        logical    :: diva_no_slip 
+        integer    :: visc_method 
+        real(prec) :: visc_const 
         integer    :: beta_method
         real(prec) :: beta_const
         real(prec) :: beta_q                ! Friction law exponent

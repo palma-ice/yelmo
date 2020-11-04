@@ -348,10 +348,10 @@ contains
 
                 ij = maxloc(abs(dom%par%pc_tau_masked))
 
-                write(*,"(a,f12.5,f12.5,f12.5,2i4,2f10.2)") &
-                    "test: ", time_now, dt_now, eta_now, ij(1), ij(2), &
-                    dom%tpo%now%H_ice_pred(ij(1),ij(2)), &
-                    dom%tpo%now%H_ice_corr(ij(1),ij(2))
+                !write(*,"(a,f12.5,f12.5,f12.5,2i4,2f10.2)") &
+                !    "test: ", time_now, dt_now, eta_now, ij(1), ij(2), &
+                !    dom%tpo%now%H_ice_pred(ij(1),ij(2)), &
+                !    dom%tpo%now%H_ice_corr(ij(1),ij(2))
                 
                 ! Check if this timestep should be rejected:
                 ! If the redo iteration is not the last allowed and the timestep is still larger  

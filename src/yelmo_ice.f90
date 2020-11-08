@@ -543,9 +543,9 @@ contains
                 trim(dom%dyn%par%solver) .eq. "l1l2" .or. &
                 trim(dom%dyn%par%solver) .eq. "l1l2-noslip") then
 
-                dom_ssa_vel_max = max(dom%dyn%par%ssa_vel_max,10.0_prec)
+                dom_ssa_vel_max = max(dom%dyn%par%ssa_vel_max,100.0_prec)
             end if 
-            
+
             dom_log_timestep = dom%par%log_timestep
 
             ! Set model choices equal to equilibration choices 

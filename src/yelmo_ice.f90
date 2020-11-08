@@ -527,15 +527,25 @@ contains
         if (time_tot .gt. 0.0) then 
 
             ! Consistency check
-            use_ssa = .FALSE. 
-            if (ssa_vel_max .gt. 0.0 .and. dom%dyn%par%mix_method .ne. -2) use_ssa = .TRUE. 
+            use_ssa = .TRUE. 
+            if (trim(dom%dyn%par%solver) .eq. "sia") use_ssa = .FALSE. 
 
             ! Save original model choices 
             dom_topo_fixed   = dom%tpo%par%topo_fixed 
             dom_use_ssa      = dom%dyn%par%use_ssa 
-            dom_ssa_vel_max  = dom%dyn%par%ssa_vel_max
             dom_ssa_iter_max = dom%dyn%par%ssa_iter_max 
 
+            ! Don't allow ssa_vel_max to be fully zero 
+            ! for DIVA and L1L2 solvers
+            dom_ssa_vel_max  = dom%dyn%par%ssa_vel_max
+            if (trim(dom%dyn%par%solver) .eq. "diva" .or. & 
+                trim(dom%dyn%par%solver) .eq. "diva-noslip" .or. &
+                trim(dom%dyn%par%solver) .eq. "l1l2" .or. &
+                trim(dom%dyn%par%solver) .eq. "l1l2-noslip") then
+
+                dom_ssa_vel_max = max(dom%dyn%par%ssa_vel_max,10.0_prec)
+            end if 
+            
             dom_log_timestep = dom%par%log_timestep
 
             ! Set model choices equal to equilibration choices 
@@ -695,13 +705,6 @@ contains
         ! For particular case related to eismint,
         ! ensure that bmb is not used in mass conservation or vertical velocity 
         dom%dyn%par%use_bmb = dom%tpo%par%use_bmb
-
-        ! For the case of SIA-only inland, ensure ssa will not be calculated
-        ! and the shelves will be deleted
-        if (dom%dyn%par%mix_method .eq. -2) then 
-            !dom%tpo%par%calv_method = "kill" 
-            dom%dyn%par%ssa_vel_max = 0.0 
-        end if 
 
         ! Modify grid boundary treatment according to the experiment parameter 
         select case(trim(dom%par%experiment))

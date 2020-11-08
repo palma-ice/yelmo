@@ -164,8 +164,6 @@ module yelmo_defs
     type ydyn_param_class
 
         character(len=256) :: solver 
-        integer    :: mix_method            ! Method for mixing sia and ssa velocity solutions
-        logical    :: calc_diffusivity      ! Calculate diagnostic diffusivity field
         integer    :: visc_method 
         real(prec) :: visc_const 
         integer    :: beta_method

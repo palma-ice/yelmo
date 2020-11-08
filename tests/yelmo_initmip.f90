@@ -243,7 +243,7 @@ else
     ! Reactivate solver of choice and restore desired number of redo timesteps allowed
     yelmo1%dyn%par%solver = yelmo1_ref%dyn%par%solver 
     yelmo1%par%pc_n_redo  = yelmo1_ref%par%pc_n_redo
-
+    
     ! Run full dynamics with correct solver (tpo,dyn,thrm)
     call yelmo_update_equil(yelmo1,time,time_tot=1.0_prec,topo_fixed=.FALSE., &
             dt=0.2_prec,ssa_vel_max=5000.0_prec)

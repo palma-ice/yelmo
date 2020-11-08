@@ -7,7 +7,7 @@ module yelmo_ice
     
     use yelmo_defs
     use yelmo_grid, only : yelmo_init_grid
-    use yelmo_timesteps, only : set_adaptive_timestep, set_adaptive_timestep_pc, set_pc_mask, calc_pc_eta,  &
+    use yelmo_timesteps, only : ytime_init, set_adaptive_timestep, set_adaptive_timestep_pc, set_pc_mask, calc_pc_eta,  &
                                 calc_pc_tau_fe_sbe,calc_pc_tau_ab_sam, calc_pc_tau_heun, limit_adaptive_timestep, &
                                 yelmo_timestep_write_init, yelmo_timestep_write, calc_adv3D_timestep1
     use yelmo_io 
@@ -184,13 +184,13 @@ contains
             ! === Diagnose different adaptive timestep limits ===
 
             ! Calculate adaptive time step from CFL constraints 
-            call set_adaptive_timestep(dt_adv_min,dom%par%dt_adv,dom%par%dt_diff,dom%par%dt_adv3D, &
+            call set_adaptive_timestep(dt_adv_min,dom%time%dt_adv,dom%time%dt_diff,dom%time%dt_adv3D, &
                                 dom%dyn%now%ux,dom%dyn%now%uy,dom%dyn%now%uz,dom%dyn%now%ux_bar,dom%dyn%now%uy_bar, &
                                 dom%dyn%now%dd_ab_bar,dom%tpo%now%H_ice,dom%tpo%now%dHicedt,dom%par%zeta_ac, &
                                 dom%tpo%par%dx,dom%par%dt_min,dt_max,dom%par%cfl_max,dom%par%cfl_diff_max) 
             
             ! Calculate adaptive timestep using proportional-integral (PI) methods
-            call set_adaptive_timestep_pc(dt_pi,dom%par%pc_dt,dom%par%pc_eta,dom%par%pc_eps,dom%par%dt_min,dt_max, &
+            call set_adaptive_timestep_pc(dt_pi,dom%time%pc_dt,dom%time%pc_eta,dom%par%pc_eps,dom%par%dt_min,dt_max, &
                                     dom%dyn%now%ux_bar,dom%dyn%now%uy_bar,dom%tpo%par%dx,pc_k,dom%par%pc_controller)
 
             ! Determine current time step to be used based on method of choice 
@@ -233,7 +233,7 @@ contains
                 if (abs(time-time_now) .lt. time_tol) time_now = time 
                 
                 ! Calculate dt_zeta (ratio of current to previous timestep)
-                dom%tpo%par%dt_zeta  = dt_now / dom%par%pc_dt(1) 
+                dom%tpo%par%dt_zeta  = dt_now / dom%time%pc_dt(1) 
                 dom%thrm%par%dt_zeta = dom%tpo%par%dt_zeta
 
                 if (trim(dom%par%pc_method) .eq. "AB-SAM") then 
@@ -319,34 +319,34 @@ contains
                     case("FE-SBE")
                         
                         ! FE-SBE truncation error 
-                        call calc_pc_tau_fe_sbe(dom%par%pc_tau,dom%tpo%now%H_ice_corr,dom%tpo%now%H_ice_pred,dt_now)
+                        call calc_pc_tau_fe_sbe(dom%time%pc_tau,dom%tpo%now%H_ice_corr,dom%tpo%now%H_ice_pred,dt_now)
 
                     case("AB-SAM")
                         
                         ! AB-SAM truncation error 
-                        call calc_pc_tau_ab_sam(dom%par%pc_tau,dom%tpo%now%H_ice_corr,dom%tpo%now%H_ice_pred,dt_now, &
+                        call calc_pc_tau_ab_sam(dom%time%pc_tau,dom%tpo%now%H_ice_corr,dom%tpo%now%H_ice_pred,dt_now, &
                                                                                                 dom%tpo%par%dt_zeta)
 
                     case("HEUN")
 
                         ! HEUN truncation error (same as FE-SBE)
-                        call calc_pc_tau_heun(dom%par%pc_tau,dom%tpo%now%H_ice_corr,dom%tpo%now%H_ice_pred,dt_now)
+                        call calc_pc_tau_heun(dom%time%pc_tau,dom%tpo%now%H_ice_corr,dom%tpo%now%H_ice_pred,dt_now)
 
                     case("RALSTON")
 
-                        call calc_pc_tau_fe_sbe(dom%par%pc_tau,dom%tpo%now%H_ice_corr,dom%tpo%now%H_ice_pred,dt_now)
+                        call calc_pc_tau_fe_sbe(dom%time%pc_tau,dom%tpo%now%H_ice_corr,dom%tpo%now%H_ice_pred,dt_now)
 
                 end select 
 
                 ! Calculate eta for this timestep 
                 call set_pc_mask(pc_mask,dom%tpo%now%H_ice_pred,dom%tpo%now%H_ice_corr,dom%tpo%now%f_grnd)
-                eta_now = calc_pc_eta(dom%par%pc_tau,mask=pc_mask)
+                eta_now = calc_pc_eta(dom%time%pc_tau,mask=pc_mask)
 
                 ! Save masked pc_tau for output too 
-                dom%par%pc_tau_masked = dom%par%pc_tau 
-                where( .not. pc_mask) dom%par%pc_tau_masked = 0.0_prec 
+                dom%time%pc_tau_masked = dom%time%pc_tau 
+                where( .not. pc_mask) dom%time%pc_tau_masked = 0.0_prec 
 
-                ij = maxloc(abs(dom%par%pc_tau_masked))
+                ij = maxloc(abs(dom%time%pc_tau_masked))
 
                 !write(*,"(a,f12.5,f12.5,f12.5,2i4,2f10.2)") &
                 !    "test: ", time_now, dt_now, eta_now, ij(1), ij(2), &
@@ -390,29 +390,29 @@ contains
             iter_redo_tot = iter_redo_tot + (iter_redo-1) 
             
             ! Update dt and eta vectors for last N timesteps (first index becomes latest value)
-            dom%par%pc_dt = cshift(dom%par%pc_dt,shift=-1)
-            dom%par%pc_dt(1) = dt_now 
+            dom%time%pc_dt = cshift(dom%time%pc_dt,shift=-1)
+            dom%time%pc_dt(1) = dt_now 
 
-            dom%par%pc_eta = cshift(dom%par%pc_eta,shift=-1)
-            dom%par%pc_eta(1) = eta_now
+            dom%time%pc_eta = cshift(dom%time%pc_eta,shift=-1)
+            dom%time%pc_eta(1) = eta_now
         
             ! Save the current timestep and other data for log and for running mean 
             n_now = n_now + 1 
             dt_save(n_now) = dt_now 
-            call yelmo_calc_running_stats(dom%par%dt_avg,dom%par%dts,dt_now,stat="mean")
+            call yelmo_calc_running_stats(dom%time%dt_avg,dom%time%dts,dt_now,stat="mean")
             
-            call yelmo_calc_running_stats(dom%par%model_speed,dom%par%model_speeds,speed,stat="mean")
-            call yelmo_calc_running_stats(dom%par%eta_avg,dom%par%etas,dom%par%pc_eta(1),stat="mean")
-            call yelmo_calc_running_stats(dom%par%ssa_iter_avg,dom%par%ssa_iters,real(dom%dyn%par%ssa_iter_now,prec),stat="mean")
+            call yelmo_calc_running_stats(dom%time%model_speed,dom%time%model_speeds,speed,stat="mean")
+            call yelmo_calc_running_stats(dom%time%eta_avg,dom%time%etas,dom%time%pc_eta(1),stat="mean")
+            call yelmo_calc_running_stats(dom%time%ssa_iter_avg,dom%time%ssa_iters,real(dom%dyn%par%ssa_iter_now,prec),stat="mean")
             
             ! Extra diagnostic field, not necessary for normal runs
-            call yelmo_calc_running_stats_2D(dom%par%pc_tau_max,dom%par%pc_taus,dom%par%pc_tau_masked,stat="max")
+            call yelmo_calc_running_stats_2D(dom%time%pc_tau_max,dom%time%pc_taus,dom%time%pc_tau_masked,stat="max")
 
             if (dom%par%log_timestep) then 
                 ! Write timestep file if desired
 
-                call yelmo_timestep_write(dom%par%log_timestep_file,time_now,dt_now,dt_adv_min,dt_pi, &
-                            dom%par%pc_eta(1),dom%par%pc_tau_masked,speed,dom%tpo%par%speed,dom%dyn%par%speed, &
+                call yelmo_timestep_write(dom%time%log_timestep_file,time_now,dt_now,dt_adv_min,dt_pi, &
+                            dom%time%pc_eta(1),dom%time%pc_tau_masked,speed,dom%tpo%par%speed,dom%dyn%par%speed, &
                             dom%dyn%par%ssa_iter_now,iter_redo_tot)
             
             end if 
@@ -474,7 +474,7 @@ contains
             write(*,"(a,f13.2,f10.2,f10.1,f8.1,2G10.3,1i6)") &
                         !"yelmo:: [time,speed,H,T,max(dt),min(dt),n(dt==dt_min)]:", &
                         "yelmo:: timelog:", &
-                            time_now, dom%par%model_speed, H_mean, T_mean,  &
+                            time_now, dom%time%model_speed, H_mean, T_mean,  &
                                             maxval(dt_save(1:n)), minval(dt_save(1:n)), n_dtmin
             
         end if 
@@ -653,40 +653,9 @@ contains
         ! Calculate zeta_aa and zeta_ac 
         call calc_zeta(dom%par%zeta_aa,dom%par%zeta_ac,dom%par%zeta_scale,dom%par%zeta_exp)
 
+        ! Initialize ytime information here too 
+        call ytime_init(dom%time,dom%grd%nx,dom%grd%ny,dom%par%nz_aa,dom%par%dt_min,dom%par%pc_eps)
 
-        ! Allocate timestep arrays 
-        if (allocated(dom%par%dt_adv))   deallocate(dom%par%dt_adv)
-        if (allocated(dom%par%dt_diff))  deallocate(dom%par%dt_diff)
-        if (allocated(dom%par%dt_adv3D)) deallocate(dom%par%dt_adv3D)
-        allocate(dom%par%dt_adv(dom%grd%nx,dom%grd%ny))
-        allocate(dom%par%dt_diff(dom%grd%nx,dom%grd%ny))
-        allocate(dom%par%dt_adv3D(dom%grd%nx,dom%grd%ny,dom%par%nz_aa))
-        
-        dom%par%dt_adv   = 0.0 
-        dom%par%dt_diff  = 0.0 
-        dom%par%dt_adv3D = 0.0 
-
-        dom%par%pc_dt(:)  = dom%par%dt_min  
-        dom%par%pc_eta(:) = dom%par%pc_eps
-
-        ! Allocate truncation error array 
-        if (allocated(dom%par%pc_tau))          deallocate(dom%par%pc_tau)
-        if (allocated(dom%par%pc_tau_masked))   deallocate(dom%par%pc_tau_masked)
-        allocate(dom%par%pc_tau(dom%grd%nx,dom%grd%ny))
-        allocate(dom%par%pc_tau_masked(dom%grd%nx,dom%grd%ny))
-        
-        dom%par%pc_tau        = 0.0_prec 
-        dom%par%pc_tau_masked = 0.0_prec 
-        
-        ! Allocate truncation error averaging arrays 
-        if (allocated(dom%par%pc_taus))   deallocate(dom%par%pc_taus)
-        allocate(dom%par%pc_taus(dom%grd%nx,dom%grd%ny,50))
-        if (allocated(dom%par%pc_tau_max))   deallocate(dom%par%pc_tau_max)
-        allocate(dom%par%pc_tau_max(dom%grd%nx,dom%grd%ny))
-
-        dom%par%pc_taus    = 0.0_prec 
-        dom%par%pc_tau_max = 0.0_prec
-        
         write(*,*) "yelmo_init:: yelmo initialized."
         
         ! == topography ==
@@ -810,9 +779,9 @@ contains
 
         if (dom%par%log_timestep) then 
             ! Timestep file 
-            call yelmo_timestep_write_init(dom%par%log_timestep_file,time,dom%grd%xc,dom%grd%yc,dom%par%pc_eps)
-            call yelmo_timestep_write(dom%par%log_timestep_file,time,0.0_prec,0.0_prec,dom%par%pc_dt(1), &
-                            dom%par%pc_eta(1),dom%par%pc_tau_masked,0.0_prec,0.0_prec,0.0_prec,dom%dyn%par%ssa_iter_now,0)
+            call yelmo_timestep_write_init(dom%time%log_timestep_file,time,dom%grd%xc,dom%grd%yc,dom%par%pc_eps)
+            call yelmo_timestep_write(dom%time%log_timestep_file,time,0.0_prec,0.0_prec,dom%time%pc_dt(1), &
+                            dom%time%pc_eta(1),dom%time%pc_tau_masked,0.0_prec,0.0_prec,0.0_prec,dom%dyn%par%ssa_iter_now,0)
         end if 
 
         return
@@ -1025,13 +994,6 @@ contains
             stop 
         end if
 
-        par%log_timestep_file = "timesteps.nc" 
-        
-        par%model_speeds = 0.0_prec 
-        par%dt_avg       = 0.0_prec 
-        par%eta_avg      = 0.0_prec 
-        par%ssa_iter_avg = 0.0_prec 
-
         return
 
     end subroutine yelmo_par_load
@@ -1216,12 +1178,12 @@ contains
         end do 
         end do 
 
-        pc_eta_avg = sum(dom%par%pc_eta) / real(size(dom%par%pc_eta,1),prec) 
+        pc_eta_avg = sum(dom%time%pc_eta) / real(size(dom%time%pc_eta,1),prec) 
 
         if (pc_eta_avg .gt. 10.0*dom%par%pc_tol) then 
             kill_it_eta = .TRUE. 
             write(kill_msg,"(a,g12.4,a,10g12.4)") "mean[pc_eta] > [10*pc_tol]: pc_eta_avg = ", pc_eta_avg, &
-                                                                                " | pc_eta: ", dom%par%pc_eta
+                                                                                " | pc_eta: ", dom%time%pc_eta
         end if 
 
         ! Determine if model should be killed 
@@ -1247,8 +1209,8 @@ contains
             write(*,"(a,g12.4)")    "pc_eta_avg  = ", pc_eta_avg
             
             write(*,"(a4,1x,2a12)") "iter", "pc_dt", "pc_eta"
-            do k = 1, size(dom%par%pc_eta,1)
-                write(*,"(a4,1x,2g12.4)") trim(pc_iter_str(k)), dom%par%pc_dt(k), dom%par%pc_eta(k) 
+            do k = 1, size(dom%time%pc_eta,1)
+                write(*,"(a4,1x,2g12.4)") trim(pc_iter_str(k)), dom%time%pc_dt(k), dom%time%pc_eta(k) 
             end do 
 
             write(*,*) 

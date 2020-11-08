@@ -60,16 +60,16 @@ contains
         integer, optional             :: ncid 
         
         ! Write model speed 
-        call nc_write(filename,"speed",ylmo%par%model_speed,units="kyr/hr",long_name="Model speed (Yelmo only)", &
+        call nc_write(filename,"speed",ylmo%time%model_speed,units="kyr/hr",long_name="Model speed (Yelmo only)", &
                       dim1="time",start=[n],count=[1],ncid=ncid)
-        call nc_write(filename,"dt_avg",ylmo%par%dt_avg,units="yr",long_name="Average timestep", &
+        call nc_write(filename,"dt_avg",ylmo%time%dt_avg,units="yr",long_name="Average timestep", &
                       dim1="time",start=[n],count=[1],ncid=ncid)
-        call nc_write(filename,"eta_avg",ylmo%par%eta_avg,units="m a**-1",long_name="Average eta (maximum PC truncation error)", &
+        call nc_write(filename,"eta_avg",ylmo%time%eta_avg,units="m a**-1",long_name="Average eta (maximum PC truncation error)", &
                       dim1="time",start=[n],count=[1],ncid=ncid)
-        call nc_write(filename,"ssa_iter_avg",ylmo%par%ssa_iter_avg,units="",long_name="Average Picard iterations for SSA convergence", &
+        call nc_write(filename,"ssa_iter_avg",ylmo%time%ssa_iter_avg,units="",long_name="Average Picard iterations for SSA convergence", &
                       dim1="time",start=[n],count=[1],ncid=ncid)
 
-        call nc_write(filename,"pc_tau_max",abs(ylmo%par%pc_tau_max),units="m a**-1", &
+        call nc_write(filename,"pc_tau_max",abs(ylmo%time%pc_tau_max),units="m a**-1", &
                         long_name="Maximum truncation error over last N timestep (magnitude)", &
                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],count=[ylmo%grd%nx,ylmo%grd%ny,1],ncid=ncid)
         
@@ -318,8 +318,8 @@ contains
         ! == Predictor-corrector (pc) variables ===
         ! (these will not be read in by yelmo_restart_read, but can be useful to output for diagnostics)
 
-        call nc_write(filename,"pc_tau",      dom%par%pc_tau,      units="m/yr",dim1="xc",dim2="yc",ncid=ncid)
-        call nc_write(filename,"pc_tau_max",  dom%par%pc_tau_max,  units="m/yr",dim1="xc",dim2="yc",ncid=ncid)
+        call nc_write(filename,"pc_tau",      dom%time%pc_tau,     units="m/yr",dim1="xc",dim2="yc",ncid=ncid)
+        call nc_write(filename,"pc_tau_max",  dom%time%pc_tau_max, units="m/yr",dim1="xc",dim2="yc",ncid=ncid)
         
         ! == ydata variables ===
 

@@ -685,16 +685,21 @@ module yelmo_defs
         real(prec), allocatable :: zeta_ac(:)   ! Layer borders (ac-nodes), plus base and surface: nz_ac == nz_aa-1 points
         
         ! Other internal parameters
-        real(prec), allocatable :: dt_adv(:,:) 
-        real(prec), allocatable :: dt_diff(:,:) 
-        real(prec), allocatable :: dt_adv3D(:,:,:)
         logical :: use_restart 
         
+    end type
+
+    type ytime_class 
+
         ! Time step parameters for predictor-corrector (PC) method (Cheng et al, 2017)
         real(prec) :: pc_dt(3)
         real(prec) :: pc_eta(3)
         real(prec), allocatable :: pc_tau(:,:)
         real(prec), allocatable :: pc_tau_masked(:,:)
+        
+        real(prec), allocatable :: dt_adv(:,:) 
+        real(prec), allocatable :: dt_diff(:,:) 
+        real(prec), allocatable :: dt_adv3D(:,:,:)
         
         ! Timing information
         real(prec) :: model_speed 
@@ -712,13 +717,14 @@ module yelmo_defs
 
         character(len=512)   :: log_timestep_file 
 
-    end type
+    end type 
 
     ! Define the overall yelmo_class, which is a container for
     ! all information needed to model a given domain (eg, Greenland, Antarctica, NH)
     type yelmo_class
         type(yelmo_param_class) :: par      ! General domain parameters
         type(ygrid_class)       :: grd      ! Grid definition
+        type(ytime_class)       :: time     ! Timestep and timing variables
         type(ytopo_class)       :: tpo      ! Topography variables
         type(ydyn_class)        :: dyn      ! Dynamics variables
         type(ymat_class)        :: mat      ! Material variables

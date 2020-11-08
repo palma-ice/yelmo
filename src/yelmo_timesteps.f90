@@ -1,6 +1,6 @@
 module yelmo_timesteps
 
-    use yelmo_defs, only : sp, dp, prec  
+    use yelmo_defs, only : sp, dp, prec, ytime_class   
     use ncio 
 
     implicit none 
@@ -24,6 +24,8 @@ module yelmo_timesteps
     public :: calc_adv3D_timestep1 
 
     public :: check_checkerboard 
+
+    public :: ytime_init 
 
 contains
 
@@ -1071,6 +1073,90 @@ contains
 
         return 
 
-    end subroutine yelmo_timestep_write 
+    end subroutine yelmo_timestep_write
 
+    subroutine ytime_init(ytime,nx,ny,nz,dt_min,pc_eps)
+
+        type(ytime_class), intent(INOUT) :: ytime
+        integer,    intent(IN) :: nx, ny, nz 
+        real(prec), intent(IN) :: dt_min, pc_eps 
+
+        ! Allocate ytime object
+        call ytime_alloc(ytime,nx,ny,nz)
+
+        ytime%log_timestep_file = "timesteps.nc" 
+        
+        ! Initialize information about previous timesteps to minimum
+        ! timestep value and high error (to keep low timesteps initially)
+        ytime%pc_dt(:)      = dt_min  
+        ytime%pc_eta(:)     = pc_eps
+
+        ! Initialize arrays to zero 
+        ytime%dt_adv        = 0.0 
+        ytime%dt_diff       = 0.0 
+        ytime%dt_adv3D      = 0.0 
+
+        ytime%pc_tau        = 0.0_prec 
+        ytime%pc_tau_masked = 0.0_prec 
+        
+        ytime%pc_taus       = 0.0_prec 
+        ytime%pc_tau_max    = 0.0_prec
+        
+        ! Initialize averages to zero too
+        ytime%model_speeds  = 0.0_prec 
+        ytime%dt_avg        = 0.0_prec 
+        ytime%eta_avg       = 0.0_prec 
+        ytime%ssa_iter_avg  = 0.0_prec 
+
+        return
+
+    end subroutine ytime_init
+    
+    subroutine ytime_alloc(ytime,nx,ny,nz)
+
+        implicit none 
+
+        type(ytime_class), intent(INOUT) :: ytime
+        integer :: nx, ny, nz 
+
+        ! Ensure object is deallocated first
+        call ytime_dealloc(ytime) 
+
+        ! Allocate timestep arrays 
+        allocate(ytime%dt_adv(nx,ny))
+        allocate(ytime%dt_diff(nx,ny))
+        allocate(ytime%dt_adv3D(nx,ny,nz))
+        
+        ! Allocate truncation error array 
+        allocate(ytime%pc_tau(nx,ny))
+        allocate(ytime%pc_tau_masked(nx,ny))
+        
+        ! Allocate truncation error averaging arrays 
+        allocate(ytime%pc_taus(nx,ny,50))
+        allocate(ytime%pc_tau_max(nx,ny))
+
+        return 
+
+    end subroutine ytime_alloc
+
+    subroutine ytime_dealloc(ytime)
+
+        implicit none 
+
+        type(ytime_class), intent(INOUT) :: ytime
+        
+        if (allocated(ytime%dt_adv))        deallocate(ytime%dt_adv)
+        if (allocated(ytime%dt_diff))       deallocate(ytime%dt_diff)
+        if (allocated(ytime%dt_adv3D))      deallocate(ytime%dt_adv3D)
+        
+        if (allocated(ytime%pc_tau))        deallocate(ytime%pc_tau)
+        if (allocated(ytime%pc_tau_masked)) deallocate(ytime%pc_tau_masked)
+        
+        if (allocated(ytime%pc_taus))       deallocate(ytime%pc_taus)
+        if (allocated(ytime%pc_tau_max))    deallocate(ytime%pc_tau_max)
+        
+        return 
+
+    end subroutine ytime_dealloc
+    
 end module yelmo_timesteps 

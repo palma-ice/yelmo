@@ -494,77 +494,46 @@ contains
 
     end subroutine yelmo_update
 
-    subroutine yelmo_update_equil(dom,time,time_tot,dt,topo_fixed,ssa_vel_max,f_smb,f_bmb)
+    subroutine yelmo_update_equil(dom,time,time_tot,dt,topo_fixed,dyn_solver)
         ! Iterate yelmo solutions to equilibrate without updating boundary conditions
 
         type(yelmo_class), intent(INOUT) :: dom
-        real(prec), intent(IN) :: time              ! [yr] Current time
-        real(prec), intent(IN) :: time_tot          ! [yr] Equilibration time 
-        real(prec), intent(IN) :: dt                ! Local dt to be used for all modules
-        logical,    intent(IN) :: topo_fixed        ! Should topography be fixed? 
-        real(prec), intent(IN) :: ssa_vel_max       ! Local vel limit to be used, if == 0.0, no ssa used
-        real(prec), intent(IN),optional :: f_smb    ! Fraction of smb boundary forcing to apply
-        real(prec), intent(IN),optional :: f_bmb    ! Fraction of bmb boundary forcing to apply
+        real(prec),        intent(IN)    :: time              ! [yr] Current time
+        real(prec),        intent(IN)    :: time_tot          ! [yr] Equilibration time 
+        real(prec),        intent(IN)    :: dt                ! Local dt to be used for all modules
+        logical,           intent(IN)    :: topo_fixed        ! Should topography be fixed? 
+        character(len=*),  intent(IN), optional :: dyn_solver
         
         ! Local variables 
+        type(yelmo_class) :: dom_ref 
         real(prec) :: time_now  
         integer    :: n, nstep 
-        logical    :: use_ssa         ! Should ssa be active?  
-        logical    :: dom_topo_fixed
-        logical    :: dom_use_ssa  
-        real(prec) :: dom_ssa_vel_max 
-        integer    :: dom_ssa_iter_max 
-        logical    :: dom_log_timestep 
-
-        real(prec), allocatable :: smb(:,:)
-        real(prec), allocatable :: bmb_shlf(:,:)
         
-        allocate(smb(dom%grd%nx,dom%grd%ny))
-        allocate(bmb_shlf(dom%grd%nx,dom%grd%ny))
-
         ! Only run equilibration if time_tot > 0 
 
         if (time_tot .gt. 0.0) then 
 
-            ! Consistency check
-            use_ssa = .TRUE. 
-            if (trim(dom%dyn%par%solver) .eq. "sia") use_ssa = .FALSE. 
+            ! Save original model configuration 
+            dom_ref = dom 
 
-            ! Save original model choices 
-            dom_topo_fixed   = dom%tpo%par%topo_fixed 
-            dom_use_ssa      = dom%dyn%par%use_ssa 
-            dom_ssa_iter_max = dom%dyn%par%ssa_iter_max 
+            ! Set new, temporary parameter values from arguments 
+            dom%tpo%par%topo_fixed = topo_fixed 
 
-            ! Don't allow ssa_vel_max to be fully zero 
-            ! for DIVA and L1L2 solvers
-            dom_ssa_vel_max  = dom%dyn%par%ssa_vel_max
-            if (trim(dom%dyn%par%solver) .eq. "diva" .or. & 
-                trim(dom%dyn%par%solver) .eq. "diva-noslip" .or. &
-                trim(dom%dyn%par%solver) .eq. "l1l2" .or. &
-                trim(dom%dyn%par%solver) .eq. "l1l2-noslip") then
+            if (present(dyn_solver)) dom%dyn%par%solver = dyn_solver 
 
-                dom_ssa_vel_max = max(dom%dyn%par%ssa_vel_max,100.0_prec)
-            end if 
-
-            dom_log_timestep = dom%par%log_timestep
-
-            ! Set model choices equal to equilibration choices 
-            dom%tpo%par%topo_fixed   = topo_fixed 
-            dom%dyn%par%use_ssa      = use_ssa 
-            dom%dyn%par%ssa_vel_max  = ssa_vel_max
-            dom%dyn%par%ssa_iter_max = max(dom%dyn%par%ssa_iter_max,5)
+            ! Ensure during equilibration that at least 5 ssa iterations
+            ! are allowed, for solvers that depend on ssa. Not strictly
+            ! necessary, but potentially helps to get things going safely. 
+            dom%dyn%par%ssa_iter_max = max(dom_ref%dyn%par%ssa_iter_max,5)
+            
+            ! Do not log timesteps for equilibration period,
+            ! since time will be inconsistent.
             dom%par%log_timestep     = .FALSE. 
 
-            smb      = dom%bnd%smb 
-            bmb_shlf = dom%bnd%bmb_shlf 
+            ! Allow at least n=10 timestep redo iterations. Not strictly
+            ! necessary, but potentially helps to get things going safely. 
+            dom%par%pc_n_redo  = max(10,dom_ref%par%pc_n_redo)
 
-            if (present(f_smb)) then 
-                dom%bnd%smb = dom%bnd%smb*f_smb 
-            end if 
-            if (present(f_bmb)) then 
-                dom%bnd%bmb_shlf = dom%bnd%bmb_shlf*f_bmb 
-            end if 
-            
             ! Set model time to input time 
             call yelmo_set_time(dom,time)
 
@@ -578,16 +547,12 @@ contains
 
             end do
 
-            ! Restore original model choices 
-            dom%tpo%par%topo_fixed   = dom_topo_fixed 
-            dom%dyn%par%use_ssa      = dom_use_ssa 
-            dom%dyn%par%ssa_vel_max  = dom_ssa_vel_max
-            dom%dyn%par%ssa_iter_max = dom_ssa_iter_max
-            dom%par%log_timestep     = dom_log_timestep
-
-            dom%bnd%smb      = smb 
-            dom%bnd%bmb_shlf = bmb_shlf 
-
+            ! Restore original model choices
+            dom%par      = dom_ref%par 
+            dom%tpo%par  = dom_ref%tpo%par
+            dom%dyn%par  = dom_ref%dyn%par 
+            dom%thrm%par = dom_ref%thrm%par  
+            
             write(*,*) 
             write(*,*) "Equilibration complete."
             write(*,*) 

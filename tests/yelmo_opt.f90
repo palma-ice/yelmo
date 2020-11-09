@@ -195,7 +195,7 @@ program yelmo_test
                                 yelmo1%dta%pd%H_ice,yelmo1%dta%pd%H_grnd,yelmo1%dyn%par%beta_u0,cf_min,cf_max)
 
             ! Update ice sheet to get everything in sync
-            call yelmo_update_equil(yelmo1,time_init,time_tot=1.0,topo_fixed=.TRUE.,dt=1.0,ssa_vel_max=5e3)
+            call yelmo_update_equil(yelmo1,time_init,time_tot=1.0,dt=1.0_prec,topo_fixed=.TRUE.)
 
         case("restart")
 
@@ -219,7 +219,7 @@ program yelmo_test
         ! Step 1: Relaxtion step: run SIA model for a short time to smooth out the input
         ! topography that will be used as a target. 
 
-        call yelmo_update_equil(yelmo1,time_init,time_tot=20.0,topo_fixed=.FALSE.,dt=1.0,ssa_vel_max=0.0)
+        call yelmo_update_equil(yelmo1,time_init,time_tot=20.0_prec,dt=1.0_prec,topo_fixed=.FALSE.,dyn_solver="sia")
 
         ! Define present topo as present-day dataset for comparison 
         yelmo1%dta%pd%H_ice = yelmo1%tpo%now%H_ice 
@@ -230,7 +230,7 @@ program yelmo_test
         ! spin up the thermodynamics and have a reference state to reset.
         ! Store the reference state for future use.
         
-        call yelmo_update_equil(yelmo1,time_init,time_tot=20e3,topo_fixed=.TRUE.,dt=5.0,ssa_vel_max=5e3)
+        call yelmo_update_equil(yelmo1,time_init,time_tot=20e3_prec,dt=5.0_prec,topo_fixed=.TRUE.)
 
         ! Write a restart file 
         call yelmo_restart_write(yelmo1,file_restart_init,time_init)
@@ -328,7 +328,7 @@ if (opt_method .eq. 1) then
 
             if (time_iter_therm .gt. 0.0) then
                 ! Run thermodynamics without updating topography 
-                call yelmo_update_equil(yelmo_ref,time,time_tot=time_iter_therm,topo_fixed=.TRUE.,dt=5.0,ssa_vel_max=5e3)
+                call yelmo_update_equil(yelmo_ref,time,time_tot=time_iter_therm,dt=5.0_prec,topo_fixed=.TRUE.)
             end if 
 
             yelmo1 = yelmo_ref 
@@ -338,7 +338,7 @@ if (opt_method .eq. 1) then
 
             if (time_iter_therm .gt. 0.0) then
                 ! Run thermodynamics without updating topography  
-                call yelmo_update_equil(yelmo1,time,time_tot=time_iter_therm,topo_fixed=.TRUE.,dt=5.0,ssa_vel_max=5e3)
+                call yelmo_update_equil(yelmo1,time,time_tot=time_iter_therm,dt=5.0_prec,topo_fixed=.TRUE.)
             end if 
              
         end if 

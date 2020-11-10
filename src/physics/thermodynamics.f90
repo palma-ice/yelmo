@@ -18,7 +18,7 @@ module thermodynamics
     public :: calc_advec_horizontal_column_quick
     public :: calc_strain_heating
     public :: calc_strain_heating_sia
-    public :: calc_basal_heating
+    !public :: calc_basal_heating
     public :: calc_specific_heat_capacity
     public :: calc_thermal_conductivity
     public :: calc_T_pmp
@@ -31,8 +31,11 @@ module thermodynamics
     
     public :: calc_basal_water_local
 
-    public :: calc_basal_heating_00 
-    
+    public :: calc_basal_heating_fromaa 
+    public :: calc_basal_heating_fromab 
+    public :: calc_basal_heating_fromac 
+
+
 contains
 
     subroutine calc_bmb_grounded(bmb_grnd,T_prime_b,Q_ice_b,Q_b,Q_geo_now,f_grnd,rho_ice)
@@ -652,12 +655,64 @@ contains
 
     end subroutine calc_strain_heating_sia
 
-    subroutine calc_basal_heating(Q_b,ux_b,uy_b,taub_acx,taub_acy,H_ice,beta1,beta2)
+    subroutine calc_basal_heating_fromaa(Q_b,ux_b,uy_b,taub_acx,taub_acy,beta1,beta2)
          ! Qb [J a-1 m-2] == [m a-1] * [J m-3]
          ! Note: grounded ice fraction f_grnd_acx/y not used here, because taub_acx/y already accounts
          ! for the grounded fraction via beta_acx/y: Q_b = tau_b*u = -beta*u*u.
 
-        real(prec), intent(INOUT) :: Q_b(:,:)           ! [J a-1 K-1] Basal heat production (friction), aa-nodes
+        real(prec), intent(INOUT) :: Q_b(:,:)           ! [J a-1 m-2] Basal heat production (friction), aa-nodes
+        real(prec), intent(IN)    :: ux_b(:,:)          ! Basal velocity, x-component (acx)
+        real(prec), intent(IN)    :: uy_b(:,:)          ! Basal velocity, y-compenent (acy)
+        real(prec), intent(IN)    :: taub_acx(:,:)      ! Basal friction (acx)
+        real(prec), intent(IN)    :: taub_acy(:,:)      ! Basal friction (acy) 
+        real(prec), intent(IN)    :: beta1              ! Timestepping weighting parameter
+        real(prec), intent(IN)    :: beta2              ! Timestepping weighting parameter
+        
+        ! Local variables
+        integer    :: i, j, nx, ny, n 
+        integer    :: im1, ip1, jm1, jp1 
+        real(prec) :: uxy_aa, taub_aa 
+        real(prec) :: Q_b_now
+
+        nx = size(Q_b,1)
+        ny = size(Q_b,2)
+
+        ! First calculate basal frictional heating on ab-nodes 
+        do j = 1, ny
+        do i = 1, nx
+            
+            im1 = max(1,i-1)
+            ip1 = min(nx,i+1)
+            jm1 = max(1,j-1)
+            jp1 = min(ny,j+1)
+            
+            uxy_aa  = sqrt( (0.5_prec*(ux_b(i,j)+ux_b(im1,j)))**2 &
+                          + (0.5_prec*(uy_b(i,j)+uy_b(i,jm1)))**2 )
+
+            taub_aa = sqrt( (0.5_prec*(taub_acx(i,j)+taub_acx(im1,j)))**2 &
+                          + (0.5_prec*(taub_acy(i,j)+taub_acy(i,jm1)))**2 )
+            
+            Q_b_now = abs(uxy_aa*taub_aa)      ! [Pa m a-1] == [J a-1 m-2]
+
+            ! Get weighted average of Q_b with timestepping factors
+            Q_b(i,j) = beta1*Q_b_now + beta2*Q_b(i,j) 
+
+            ! Ensure Q_b is strictly positive 
+            if (Q_b(i,j) .lt. 0.0_prec) Q_b(i,j) = 0.0_prec 
+            
+        end do 
+        end do 
+
+        return 
+ 
+    end subroutine calc_basal_heating_fromaa
+
+    subroutine calc_basal_heating_fromab(Q_b,ux_b,uy_b,taub_acx,taub_acy,H_ice,beta1,beta2)
+         ! Qb [J a-1 m-2] == [m a-1] * [J m-3]
+         ! Note: grounded ice fraction f_grnd_acx/y not used here, because taub_acx/y already accounts
+         ! for the grounded fraction via beta_acx/y: Q_b = tau_b*u = -beta*u*u.
+
+        real(prec), intent(INOUT) :: Q_b(:,:)           ! [J a-1 m-2] Basal heat production (friction), aa-nodes
         real(prec), intent(IN)    :: ux_b(:,:)          ! Basal velocity, x-component (acx)
         real(prec), intent(IN)    :: uy_b(:,:)          ! Basal velocity, y-compenent (acy)
         real(prec), intent(IN)    :: taub_acx(:,:)      ! Basal friction (acx)
@@ -712,22 +767,22 @@ contains
             Q_b_now = 0.0_prec 
             wt      = 0.0_prec
 
-            if (count([H_ice(i,j),H_ice(ip1,j),H_ice(i,jp1),H_ice(ip1,jp1)].eq.0) .eq. 0) then  
+            if (count([H_ice(i,j),H_ice(ip1,j),H_ice(i,jp1),H_ice(ip1,jp1)].eq.0.0_prec) .eq. 0) then  
                 Q_b_now = Q_b_now + Qb_ab(i,j) 
                 wt = wt + 1.0_prec 
             end if 
             
-            if (count([H_ice(i,j),H_ice(im1,j),H_ice(im1,jp1),H_ice(i,jp1)].eq.0) .eq. 0) then  
+            if (count([H_ice(i,j),H_ice(im1,j),H_ice(im1,jp1),H_ice(i,jp1)].eq.0.0_prec) .eq. 0) then  
                 Q_b_now = Q_b_now + Qb_ab(im1,j) 
                 wt = wt + 1.0_prec 
             end if 
 
-            if (count([H_ice(i,j),H_ice(i,jm1),H_ice(ip1,jm1),H_ice(ip1,j)].eq.0) .eq. 0) then 
+            if (count([H_ice(i,j),H_ice(i,jm1),H_ice(ip1,jm1),H_ice(ip1,j)].eq.0.0_prec) .eq. 0) then 
                 Q_b_now = Q_b_now + Qb_ab(i,jm1) 
                 wt = wt + 1.0_prec 
             end if 
             
-            if (count([H_ice(i,j),H_ice(im1,j),H_ice(im1,jm1),H_ice(i,jm1)].eq.0) .eq. 0) then 
+            if (count([H_ice(i,j),H_ice(im1,j),H_ice(im1,jm1),H_ice(i,jm1)].eq.0.0_prec) .eq. 0) then 
                 Q_b_now = Q_b_now + Qb_ab(im1,jm1) 
                 wt = wt + 1.0_prec 
             end if 
@@ -753,14 +808,14 @@ contains
 
         return 
  
-    end subroutine calc_basal_heating
+    end subroutine calc_basal_heating_fromab
 
-    subroutine calc_basal_heating_00(Q_b,ux_b,uy_b,taub_acx,taub_acy,H_ice,f_pmp,beta1,beta2)
+    subroutine calc_basal_heating_fromac(Q_b,ux_b,uy_b,taub_acx,taub_acy,H_ice,f_pmp,beta1,beta2)
          ! Qb [J a-1 m-2] == [m a-1] * [J m-3]
          ! Note: grounded ice fraction f_grnd_acx/y not used here, because taub_acx/y already accounts
          ! for the grounded fraction via beta_acx/y: Q_b = tau_b*u = -beta*u*u.
 
-        real(prec), intent(INOUT) :: Q_b(:,:)           ! [J a-1 K-1] Basal heat production (friction), aa-nodes
+        real(prec), intent(INOUT) :: Q_b(:,:)           ! [J a-1 m-2] Basal heat production (friction), aa-nodes
         real(prec), intent(IN)    :: ux_b(:,:)          ! Basal velocity, x-component (acx)
         real(prec), intent(IN)    :: uy_b(:,:)          ! Basal velocity, y-compenent (acy)
         real(prec), intent(IN)    :: taub_acx(:,:)      ! Basal friction (acx)
@@ -810,7 +865,7 @@ end if
         
         return 
  
-    end subroutine calc_basal_heating_00
+    end subroutine calc_basal_heating_fromac
 
     elemental function calc_specific_heat_capacity(T_ice) result(cp)
 

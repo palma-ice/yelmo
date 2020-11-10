@@ -72,13 +72,16 @@ contains
 
         ! === Calculate heat source terms (Yelmo vertical grid) === 
 
+if (.TRUE.) then 
         ! Calculate the basal frictional heating 
         call calc_basal_heating(thrm%now%Q_b,dyn%now%ux_b,dyn%now%uy_b,dyn%now%taub_acx,dyn%now%taub_acy, &
-                                                        beta1=thrm%par%dt_beta(1),beta2=thrm%par%dt_beta(2))
+                                            tpo%now%H_ice,beta1=thrm%par%dt_beta(1),beta2=thrm%par%dt_beta(2))
 
+else 
         ! ajr: old interface with scaling optional via f_pmp
-        ! call calc_basal_heating(thrm%now%Q_b,dyn%now%ux_b,dyn%now%uy_b,dyn%now%taub_acx,dyn%now%taub_acy, &
-        !                 tpo%now%H_ice,thrm%now%f_pmp,beta1=thrm%par%dt_beta(1),beta2=thrm%par%dt_beta(2))
+        call calc_basal_heating_00(thrm%now%Q_b,dyn%now%ux_b,dyn%now%uy_b,dyn%now%taub_acx,dyn%now%taub_acy, &
+                        tpo%now%H_ice,thrm%now%f_pmp,beta1=thrm%par%dt_beta(1),beta2=thrm%par%dt_beta(2))
+end if 
 
         ! Ensure basal frictional heating is relatively smooth
         call regularize2D(thrm%now%Q_b,tpo%now%H_ice,tpo%par%dx)

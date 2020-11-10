@@ -74,7 +74,11 @@ contains
 
         ! Calculate the basal frictional heating 
         call calc_basal_heating(thrm%now%Q_b,dyn%now%ux_b,dyn%now%uy_b,dyn%now%taub_acx,dyn%now%taub_acy, &
-                        tpo%now%H_ice,thrm%now%f_pmp,beta1=thrm%par%dt_beta(1),beta2=thrm%par%dt_beta(2))
+                                                        beta1=thrm%par%dt_beta(1),beta2=thrm%par%dt_beta(2))
+
+        ! ajr: old interface with scaling optional via f_pmp
+        ! call calc_basal_heating(thrm%now%Q_b,dyn%now%ux_b,dyn%now%uy_b,dyn%now%taub_acx,dyn%now%taub_acy, &
+        !                 tpo%now%H_ice,thrm%now%f_pmp,beta1=thrm%par%dt_beta(1),beta2=thrm%par%dt_beta(2))
 
         ! Ensure basal frictional heating is relatively smooth
         call regularize2D(thrm%now%Q_b,tpo%now%H_ice,tpo%par%dx)

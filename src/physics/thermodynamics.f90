@@ -650,7 +650,77 @@ contains
 
     end subroutine calc_strain_heating_sia
 
-    subroutine calc_basal_heating(Q_b,ux_b,uy_b,taub_acx,taub_acy,H_ice,f_pmp,beta1,beta2)
+    subroutine calc_basal_heating(Q_b,ux_b,uy_b,taub_acx,taub_acy,beta1,beta2)
+         ! Qb [J a-1 m-2] == [m a-1] * [J m-3]
+         ! Note: grounded ice fraction f_grnd_acx/y not used here, because taub_acx/y already accounts
+         ! for the grounded fraction via beta_acx/y: Q_b = tau_b*u = -beta*u*u.
+
+        real(prec), intent(INOUT) :: Q_b(:,:)           ! [J a-1 K-1] Basal heat production (friction), aa-nodes
+        real(prec), intent(IN)    :: ux_b(:,:)          ! Basal velocity, x-component (acx)
+        real(prec), intent(IN)    :: uy_b(:,:)          ! Basal velocity, y-compenent (acy)
+        real(prec), intent(IN)    :: taub_acx(:,:)      ! Basal friction (acx)
+        real(prec), intent(IN)    :: taub_acy(:,:)      ! Basal friction (acy) 
+        real(prec), intent(IN)    :: beta1              ! Timestepping weighting parameter
+        real(prec), intent(IN)    :: beta2              ! Timestepping weighting parameter
+        
+        ! Local variables
+        integer    :: i, j, nx, ny, n 
+        integer    :: im1, ip1, jm1, jp1 
+        real(prec) :: uxy_ab, taub_ab 
+        real(prec), allocatable :: Qb_ab(:,:)
+        real(prec) :: Q_b_now
+
+        nx = size(Q_b,1)
+        ny = size(Q_b,2)
+
+        allocate(Qb_ab(nx,ny))
+
+        ! First calculate basal frictional heating on ab-nodes 
+        do j = 1, ny
+        do i = 1, nx
+            
+            im1 = max(1,i-1)
+            ip1 = min(nx,i+1)
+            jm1 = max(1,j-1)
+            jp1 = min(ny,j+1)
+            
+            uxy_ab  = sqrt( (0.5_prec*(ux_b(i,j)+ux_b(i,jp1)))**2 &
+                          + (0.5_prec*(uy_b(i,j)+uy_b(ip1,j)))**2 )
+
+            taub_ab = sqrt( (0.5_prec*(taub_acx(i,j)+taub_acx(i,jp1)))**2 &
+                          + (0.5_prec*(taub_acy(i,j)+taub_acy(ip1,j)))**2 )
+            
+            Qb_ab(i,j) = abs(uxy_ab*taub_ab)      ! [Pa m a-1] == [J a-1 m-2]
+
+        end do 
+        end do 
+
+
+        ! Unstagger to aa-nodes and account for time-stepping
+        do j = 1, ny
+        do i = 1, nx
+            
+            im1 = max(1,i-1)
+            ip1 = min(nx,i+1)
+            jm1 = max(1,j-1)
+            jp1 = min(ny,j+1)
+            
+            Q_b_now = 0.25_prec*(Qb_ab(i,j)+Qb_ab(im1,j)+Qb_ab(i,jm1)+Qb_ab(im1,jm1))
+
+            ! Get weighted average of Q_b with timestepping factors
+            Q_b(i,j) = beta1*Q_b_now + beta2*Q_b(i,j) 
+
+            ! Ensure Q_b is strictly positive 
+            if (Q_b(i,j) .lt. 0.0_prec) Q_b(i,j) = 0.0_prec 
+            
+        end do 
+        end do 
+
+        return 
+ 
+    end subroutine calc_basal_heating
+
+    subroutine calc_basal_heating_00(Q_b,ux_b,uy_b,taub_acx,taub_acy,H_ice,f_pmp,beta1,beta2)
          ! Qb [J a-1 m-2] == [m a-1] * [J m-3]
          ! Note: grounded ice fraction f_grnd_acx/y not used here, because taub_acx/y already accounts
          ! for the grounded fraction via beta_acx/y: Q_b = tau_b*u = -beta*u*u.
@@ -689,7 +759,7 @@ contains
             ! Average from ac-nodes to aa-node
             Q_b_now = 0.25*(Qb_acx(i,j)+Qb_acx(i-1,j)+Qb_acy(i,j)+Qb_acy(i,j-1))
 
-if (.TRUE.) then 
+if (.FALSE.) then 
             ! Reduction of Q_b with f_pmp (ajr: this is an open question)
             Q_b_now = Q_b_now*f_pmp(i,j)  
 end if 
@@ -705,7 +775,7 @@ end if
         
         return 
  
-    end subroutine calc_basal_heating
+    end subroutine calc_basal_heating_00
 
     elemental function calc_specific_heat_capacity(T_ice) result(cp)
 

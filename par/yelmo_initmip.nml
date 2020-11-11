@@ -7,7 +7,7 @@
     dt1D_out        = 50.0              ! [yr] Frequency of writing 1D output files 
     dt2D_out        = 200.0             ! [yr] Frequency of writing 2D output files 
     
-    clim_nm         = "clim_pd_ant"     ! "clim_pd_grl", "clim_pd_ant" or "clim_lgm"
+    clim_nm         = "clim_pd_grl"     ! "clim_pd_grl", "clim_pd_ant" or "clim_lgm"
     with_anom       = False             ! Apply anomaly at start of sim but after equilibration?
 
     load_cf_ref     = False             ! Load cf_ref from file? Otherwise define from cf_stream + inline tuning
@@ -37,8 +37,8 @@
 /
 
 &yelmo
-    domain          = "Antarctica"
-    grid_name       = "ANT-16KM"
+    domain          = "Greenland"
+    grid_name       = "GRL-16KM"
     grid_path       = "ice_data/{domain}/{grid_name}/{grid_name}_REGIONS.nc"
     experiment      = "None"       
     restart         = "None"

@@ -655,7 +655,7 @@ contains
 
     end subroutine calc_strain_heating_sia
 
-    subroutine calc_basal_heating_fromaa(Q_b,ux_b,uy_b,taub_acx,taub_acy,beta1,beta2)
+    subroutine calc_basal_heating_fromaa(Q_b,ux_b,uy_b,beta,beta1,beta2)
          ! Qb [J a-1 m-2] == [m a-1] * [J m-3]
          ! Note: grounded ice fraction f_grnd_acx/y not used here, because taub_acx/y already accounts
          ! for the grounded fraction via beta_acx/y: Q_b = tau_b*u = -beta*u*u.
@@ -663,15 +663,14 @@ contains
         real(prec), intent(INOUT) :: Q_b(:,:)           ! [J a-1 m-2] Basal heat production (friction), aa-nodes
         real(prec), intent(IN)    :: ux_b(:,:)          ! Basal velocity, x-component (acx)
         real(prec), intent(IN)    :: uy_b(:,:)          ! Basal velocity, y-compenent (acy)
-        real(prec), intent(IN)    :: taub_acx(:,:)      ! Basal friction (acx)
-        real(prec), intent(IN)    :: taub_acy(:,:)      ! Basal friction (acy) 
-        real(prec), intent(IN)    :: beta1              ! Timestepping weighting parameter
-        real(prec), intent(IN)    :: beta2              ! Timestepping weighting parameter
+        real(prec), intent(IN)    :: beta(:,:)          ! Basal friction coefficent (aa-nodes)
+        real(prec), intent(IN)    :: beta1              ! Timestepping weighting parameter (no relation to beta)
+        real(prec), intent(IN)    :: beta2              ! Timestepping weighting parameter (no relation to beta)
         
         ! Local variables
         integer    :: i, j, nx, ny, n 
         integer    :: im1, ip1, jm1, jp1 
-        real(prec) :: uxy_aa, taub_aa 
+        real(prec) :: uxy_sq_aa 
         real(prec) :: Q_b_now
 
         nx = size(Q_b,1)
@@ -686,13 +685,10 @@ contains
             jm1 = max(1,j-1)
             jp1 = min(ny,j+1)
             
-            uxy_aa  = sqrt( (0.5_prec*(ux_b(i,j)+ux_b(im1,j)))**2 &
-                          + (0.5_prec*(uy_b(i,j)+uy_b(i,jm1)))**2 )
+            uxy_sq_aa  = (0.5_prec*(ux_b(i,j)+ux_b(im1,j)))**2 &
+                       + (0.5_prec*(uy_b(i,j)+uy_b(i,jm1)))**2
 
-            taub_aa = sqrt( (0.5_prec*(taub_acx(i,j)+taub_acx(im1,j)))**2 &
-                          + (0.5_prec*(taub_acy(i,j)+taub_acy(i,jm1)))**2 )
-            
-            Q_b_now = abs(uxy_aa*taub_aa)      ! [Pa m a-1] == [J a-1 m-2]
+            Q_b_now = abs(uxy_sq_aa*beta(i,j))      ! [Pa m a-1] == [J a-1 m-2]
 
             ! Get weighted average of Q_b with timestepping factors
             Q_b(i,j) = beta1*Q_b_now + beta2*Q_b(i,j) 
@@ -707,7 +703,7 @@ contains
  
     end subroutine calc_basal_heating_fromaa
 
-    subroutine calc_basal_heating_fromab(Q_b,ux_b,uy_b,taub_acx,taub_acy,H_ice,beta1,beta2)
+    subroutine calc_basal_heating_fromab(Q_b,ux_b,uy_b,beta,H_ice,beta1,beta2)
          ! Qb [J a-1 m-2] == [m a-1] * [J m-3]
          ! Note: grounded ice fraction f_grnd_acx/y not used here, because taub_acx/y already accounts
          ! for the grounded fraction via beta_acx/y: Q_b = tau_b*u = -beta*u*u.
@@ -715,16 +711,15 @@ contains
         real(prec), intent(INOUT) :: Q_b(:,:)           ! [J a-1 m-2] Basal heat production (friction), aa-nodes
         real(prec), intent(IN)    :: ux_b(:,:)          ! Basal velocity, x-component (acx)
         real(prec), intent(IN)    :: uy_b(:,:)          ! Basal velocity, y-compenent (acy)
-        real(prec), intent(IN)    :: taub_acx(:,:)      ! Basal friction (acx)
-        real(prec), intent(IN)    :: taub_acy(:,:)      ! Basal friction (acy) 
+        real(prec), intent(IN)    :: beta(:,:)          ! Basal friction coefficeint (aa-nodes)
         real(prec), intent(IN)    :: H_ice(:,:)         ! [m] Ice thickness
-        real(prec), intent(IN)    :: beta1              ! Timestepping weighting parameter
-        real(prec), intent(IN)    :: beta2              ! Timestepping weighting parameter
+        real(prec), intent(IN)    :: beta1              ! Timestepping weighting parameter (no relation to beta)
+        real(prec), intent(IN)    :: beta2              ! Timestepping weighting parameter (no relation to beta)
         
         ! Local variables
         integer    :: i, j, nx, ny, n 
         integer    :: im1, ip1, jm1, jp1 
-        real(prec) :: uxy_ab, taub_ab 
+        real(prec) :: uxy_sq_ab, beta_ab 
         real(prec), allocatable :: Qb_ab(:,:)
         real(prec) :: Q_b_now, wt
 
@@ -742,13 +737,12 @@ contains
             jm1 = max(1,j-1)
             jp1 = min(ny,j+1)
             
-            uxy_ab  = sqrt( (0.5_prec*(ux_b(i,j)+ux_b(i,jp1)))**2 &
-                          + (0.5_prec*(uy_b(i,j)+uy_b(ip1,j)))**2 )
+            uxy_sq_ab  = (0.5_prec*(ux_b(i,j)+ux_b(i,jp1)))**2 &
+                       + (0.5_prec*(uy_b(i,j)+uy_b(ip1,j)))**2
 
-            taub_ab = sqrt( (0.5_prec*(taub_acx(i,j)+taub_acx(i,jp1)))**2 &
-                          + (0.5_prec*(taub_acy(i,j)+taub_acy(ip1,j)))**2 )
-            
-            Qb_ab(i,j) = abs(uxy_ab*taub_ab)      ! [Pa m a-1] == [J a-1 m-2]
+            beta_ab = 0.25_prec*(beta(i,j)+beta(ip1,j)+beta(i,jp1)+beta(ip1,jp1))
+
+            Qb_ab(i,j) = abs(uxy_sq_ab*beta_ab)      ! [Pa m a-1] == [J a-1 m-2]
 
         end do 
         end do 
@@ -795,7 +789,6 @@ contains
                 Q_b_now = 0.25_prec*(Qb_ab(i,j)+Qb_ab(im1,j)+Qb_ab(i,jm1)+Qb_ab(im1,jm1))
 
             end if 
-
 
             ! Get weighted average of Q_b with timestepping factors
             Q_b(i,j) = beta1*Q_b_now + beta2*Q_b(i,j) 

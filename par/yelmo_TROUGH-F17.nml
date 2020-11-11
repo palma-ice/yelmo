@@ -5,12 +5,12 @@
     ! Timing parameters 
     time_init    = 0.0                  ! [yr] Starting time 
     time_end     = 20e3                 ! [yr] Ending time 
-    dtt          = 10.0                 ! [yr] Main loop timestep 
+    dtt          = 5.0                  ! [yr] Main loop timestep 
     dt1D_out     = 100.0                ! [yr] Frequency of writing 1D output files 
     dt2D_out     = 200.0                ! [yr] Frequency of writing 2D output files 
 
     ! Domain parameters 
-    dx           =  10.0                ! [km] Grid resolution
+    dx           = 5.0                  ! [km] Grid resolution
     lx           = 700.0                ! [km] Grid length, x-direction 
     ly           = 160.0                ! [km] Grid width,  y-direction 
     fc           = 16.0                 ! [km] Characteristic width of channel side walls
@@ -43,8 +43,8 @@
     pc_filter_vel   = True              ! Use mean vel. solution of current and previous timestep
     pc_use_H_pred   = True              ! Use predicted H_ice instead of corrected H_ice 
     pc_n_redo       = 5                 ! How many times can the same iteration be repeated (when high error exists)
-    pc_tol          = 1.5               ! [m/a] Tolerance threshold to redo timestep
-    pc_eps          = 1e-2              ! Predictor-corrector tolerance 
+    pc_tol          = 10                ! [m/a] Tolerance threshold to redo timestep
+    pc_eps          = 3.0               ! Predictor-corrector tolerance 
     
 /
 
@@ -71,7 +71,7 @@
 /
 
 &ydyn
-    solver              = "hybrid"        ! "fixed", "sia", "ssa", "hybrid", "diva", "diva-noslip", l1l2", "l1l2-noslip"
+    solver              = "diva"          ! "fixed", "sia", "ssa", "hybrid", "diva", "diva-noslip", l1l2", "l1l2-noslip"
     visc_method         = 1               ! 0: constant visc=visc_const, 1: dynamic viscosity
     visc_const          = 1e7             ! [Pa a] Constant value for viscosity (if visc_method=0)
     beta_method         = 2               ! 0: constant beta; 1: linear (beta=cb/u0); 2: psuedo-plastic-power; 3: Regularized Coulomb
@@ -163,7 +163,7 @@
     const_kt        = 6.62e7            ! [J a-1 m-1 K-1] Thermal conductivity [W m-1 K-1 * sec_year] => [J a-1 m-1 K-1]
     enth_cr         = 1e-3              ! [--] Conductivity ratio for temperate ice (kappa_temp     = enth_cr*kappa_cold)
     omega_max       = 0.01              ! [--] Maximum allowed water content fraction 
-    till_rate       = 0.0               ! [m/a] Basal water till drainage rate (water equiv.)
+    till_rate       = 1e-3              ! [m/a] Basal water till drainage rate (water equiv.)
     H_w_max         = 2.0               ! [m] Maximum limit to basal water layer thickness (water equiv.)
 /
 

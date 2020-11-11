@@ -1228,7 +1228,7 @@ contains
 
         return 
 
-    end subroutine regularize2D 
+    end subroutine regularize2D
 
     ! === Generic integration functions ============
 

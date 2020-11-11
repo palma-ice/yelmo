@@ -34,7 +34,7 @@ module thermodynamics
     public :: calc_basal_heating_fromaa 
     public :: calc_basal_heating_fromab 
     public :: calc_basal_heating_fromac 
-
+    public :: calc_basal_heating_interp
 
 contains
 
@@ -91,7 +91,7 @@ contains
 
         return 
 
-    end subroutine calc_bmb_grounded 
+    end subroutine calc_bmb_grounded
 
     elemental subroutine calc_bmb_grounded_enth(bmb_grnd,T_prime_b,omega,Q_ice_b,Q_b,Q_geo_now,f_grnd,rho_ice)
         ! Calculate everywhere there is at least some grounded ice 
@@ -867,6 +867,195 @@ end if
  
     end subroutine calc_basal_heating_fromac
 
+    subroutine calc_basal_heating_interp(Q_b,ux_b,uy_b,beta_acx,beta_acy,H_ice,beta1,beta2)
+         ! Qb [J a-1 m-2] == [m a-1] * [J m-3]
+         ! Note: grounded ice fraction f_grnd_acx/y not used here, because beta_acx/y already accounts
+         ! for the grounded fraction via beta_acx/y: Q_b = tau_b*u = -beta*u*u.
+
+        real(prec), intent(INOUT) :: Q_b(:,:)           ! [J a-1 m-2] Basal heat production (friction), aa-nodes
+        real(prec), intent(IN)    :: ux_b(:,:)          ! Basal velocity, x-component (acx)
+        real(prec), intent(IN)    :: uy_b(:,:)          ! Basal velocity, y-compenent (acy)
+        real(prec), intent(IN)    :: beta_acx(:,:)      ! Basal friction coeff. (acx)
+        real(prec), intent(IN)    :: beta_acy(:,:)      ! Basal friction coeff. (acy) 
+        real(prec), intent(IN)    :: H_ice(:,:)         ! [m] Ice thickness
+        real(prec), intent(IN)    :: beta1              ! Timestepping weighting parameter
+        real(prec), intent(IN)    :: beta2              ! Timestepping weighting parameter
+        
+        ! Local variables
+        integer    :: i, j, nx, ny, n 
+        integer    :: im1, ip1, jm1, jp1 
+        real(prec) :: ux_1, ux_2, ux_3, ux_4 
+        real(prec) :: uy_1, uy_2, uy_3, uy_4 
+        real(prec) :: betax_1, betax_2, betax_3, betax_4 
+        real(prec) :: betay_1, betay_2, betay_3, betay_4
+        
+        real(prec) :: uxy_ab, taub_ab 
+        real(prec), allocatable :: Qb_ab(:,:)
+        real(prec) :: Q_b_now, wt
+
+        integer, parameter :: nhi = 10 
+        real(prec), allocatable :: uxhi(:,:)
+        real(prec), allocatable :: uyhi(:,:)
+        real(prec), allocatable :: betaxhi(:,:)
+        real(prec), allocatable :: betayhi(:,:)
+        real(prec), allocatable :: Qbhi(:,:)
+        real(prec) :: Qbhi_tot 
+
+        nx = size(Q_b,1)
+        ny = size(Q_b,2)
+
+        allocate(Qb_ab(nx,ny))
+
+        allocate(uxhi(nhi,nhi))
+        allocate(uyhi(nhi,nhi))
+        allocate(betaxhi(nhi,nhi))
+        allocate(betayhi(nhi,nhi))
+        allocate(Qbhi(nhi,nhi))
+        
+        ! First calculate basal frictional heating on ab-nodes 
+        do j = 1, ny
+        do i = 1, nx
+            
+            if (H_ice(i,j) .gt. 0.0_prec) then 
+                ! only treat ice-covered points 
+
+                im1 = max(1,i-1)
+                ip1 = min(nx,i+1)
+                jm1 = max(1,j-1)
+                jp1 = min(ny,j+1)
+                
+                ! Get variables on ab-nodes (corners of cell)
+                ! and calculate hi resolution subgrid values
+                ux_1 = 0.5_prec*(ux_b(i,j)  +ux_b(i,jp1))
+                ux_2 = 0.5_prec*(ux_b(im1,j)+ux_b(im1,jp1))
+                ux_3 = 0.5_prec*(ux_b(im1,j)+ux_b(im1,jm1))
+                ux_4 = 0.5_prec*(ux_b(i,j)  +ux_b(i,jm1))
+
+                call calc_hires_cell(uxhi,ux_1,ux_2,ux_3,ux_4)
+
+                uy_1 = 0.5_prec*(uy_b(i,j)  +uy_b(ip1,j))
+                uy_2 = 0.5_prec*(uy_b(i,j)  +uy_b(im1,j))
+                uy_3 = 0.5_prec*(uy_b(i,jm1)+uy_b(im1,jm1))
+                uy_4 = 0.5_prec*(uy_b(i,jm1)+uy_b(ip1,jm1))
+
+                call calc_hires_cell(uyhi,uy_1,uy_2,uy_3,uy_4)
+
+                betax_1 = 0.5_prec*(beta_acx(i,j)  +beta_acx(i,jp1))
+                betax_2 = 0.5_prec*(beta_acx(im1,j)+beta_acx(im1,jp1))
+                betax_3 = 0.5_prec*(beta_acx(im1,j)+beta_acx(im1,jm1))
+                betax_4 = 0.5_prec*(beta_acx(i,j)  +beta_acx(i,jm1))
+
+                call calc_hires_cell(betaxhi,betax_1,betax_2,betax_3,betax_4)
+
+                betay_1 = 0.5_prec*(beta_acy(i,j)  +beta_acy(ip1,j))
+                betay_2 = 0.5_prec*(beta_acy(i,j)  +beta_acy(im1,j))
+                betay_3 = 0.5_prec*(beta_acy(i,jm1)+beta_acy(im1,jm1))
+                betay_4 = 0.5_prec*(beta_acy(i,jm1)+beta_acy(ip1,jm1))
+
+                call calc_hires_cell(betayhi,betay_1,betay_2,betay_3,betay_4) 
+
+                Qbhi = abs( (uxhi**2 + uyhi**2) * 0.5_prec*(betaxhi+betayhi) )  ! [Pa m a-1] == [J a-1 m-2]
+
+                Qbhi_tot = sum(Qbhi)
+
+                if (Qbhi_tot .gt. 0.0_prec) then 
+                    
+                    Q_b_now = sum(Qbhi,mask=Qbhi .gt. 0.0_prec) &
+                                            / count(Qbhi .gt. 0.0_prec)
+
+                else 
+
+                    Q_b_now = 0.0_prec 
+
+                end if 
+
+            else 
+
+                Q_b_now = 0.0_prec 
+
+            end if 
+
+            ! Get weighted average of Q_b with timestepping factors
+            Q_b(i,j) = beta1*Q_b_now + beta2*Q_b(i,j) 
+
+            ! Ensure Q_b is strictly positive 
+            if (Q_b(i,j) .lt. 0.0_prec) Q_b(i,j) = 0.0_prec 
+            
+        end do 
+        end do 
+
+        return 
+ 
+    end subroutine calc_basal_heating_interp
+
+    subroutine calc_hires_cell(var_hi,var_1,var_2,var_3,var_4)
+        ! Given the four corners of a cell in quadrants 1,2,3,4,
+        ! calculate the grounded fraction (ie area with Hg>0)
+
+        implicit none 
+
+        real(prec), intent(OUT) :: var_hi(:,:) 
+        real(prec), intent(IN)  :: var_1,var_2,var_3,var_4
+        
+        ! Local variables 
+        integer :: i, j, nx  
+        real(prec) :: x(size(var_hi,1)), y(size(var_hi,2)) 
+
+        ! Populate x,y axes for interpolation points (between 0 and 1)
+        do i = 1, nx 
+            x(i) = 0.0_prec + real(i-1)/real(nx-1)
+        end do 
+        y = x 
+
+
+        ! Calculate linear interpolation value 
+        var_hi = 0.0_prec 
+
+        do i = 1, nx 
+        do j = 1, nx 
+
+            var_hi(i,j) = interp_bilin_pt(var_1,var_2,var_3,var_4,x(i),y(j))
+
+        end do 
+        end do 
+
+        return 
+
+    end subroutine calc_hires_cell
+
+    function interp_bilin_pt(z1,z2,z3,z4,xout,yout) result(zout)
+        ! Interpolate a point given four neighbors at corners of square (0:1,0:1)
+        ! z2    z1
+        !    x,y
+        ! z3    z4 
+        ! 
+
+        implicit none 
+
+        real(prec), intent(IN) :: z1, z2, z3, z4 
+        real(prec), intent(IN) :: xout, yout 
+        real(prec) :: zout 
+
+        ! Local variables 
+        real(prec) :: x0, x1, y0, y1 
+        real(prec) :: alpha1, alpha2, p0, p1 
+
+        x0 = 0.0_prec 
+        x1 = 1.0_prec
+        y0 = 0.0_prec
+        y1 = 1.0_prec
+
+        alpha1  = (xout - x0) / (x1-x0)
+        p0      = z3 + alpha1*(z4-z3)
+        p1      = z2 + alpha1*(z1-z2)
+            
+        alpha2  = (yout - y0) / (y1-y0)
+        zout    = p0 + alpha2*(p1-p0)
+
+        return 
+
+    end function interp_bilin_pt
+
     elemental function calc_specific_heat_capacity(T_ice) result(cp)
 
         implicit none 
@@ -938,30 +1127,30 @@ end if
         real(prec), intent(IN) :: f_grnd  
         real(prec) :: f_pmp 
 
-        if (f_grnd .eq. 0.0) then
+        if (f_grnd .eq. 0.0_prec) then
             ! Floating points are temperate by default
-            f_pmp = 1.0 
+            f_pmp = 1.0_prec 
 
         else 
             ! Calculate the fraction at the pressure melting point 
 
-            if (gamma .eq. 0.0) then
+            if (gamma .eq. 0.0_prec) then
                 ! No decay function, binary pmp fraction
 
                 if (T_ice .ge. T_pmp) then 
-                    f_pmp = 1.0
+                    f_pmp = 1.0_prec
                 else 
-                    f_pmp = 0.0 
+                    f_pmp = 0.0_prec 
                 end if 
 
             else
 
                 ! Apply decay function 
-                f_pmp = min(1.0, exp((T_ice-T_pmp)/gamma) )
+                f_pmp = min(1.0_prec, exp((T_ice-T_pmp)/gamma) )
 
                 ! Ensure pure values of 0.0 and 1.0 beyond a threshold 
-                if (f_pmp .lt. 1e-2)        f_pmp = 0.0 
-                if (f_pmp .gt. (1.0-1e-2))  f_pmp = 1.0 
+                if (f_pmp .lt. 1e-2)        f_pmp = 0.0_prec 
+                if (f_pmp .gt. (1.0-1e-2))  f_pmp = 1.0_prec 
 
             end if 
 

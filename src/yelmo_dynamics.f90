@@ -6,8 +6,7 @@ module yelmo_dynamics
 
     use yelmo_defs
     use yelmo_tools, only : stagger_aa_acx, stagger_aa_acy, stagger_ac_aa, &
-        calc_magnitude_from_staggered_ice, calc_vertical_integrated_2D, smooth_gauss_2D, &
-        regularize2D !, limit_gradient
+        calc_magnitude_from_staggered_ice, calc_vertical_integrated_2D
 
     use velocity_general
     use velocity_sia 
@@ -632,9 +631,6 @@ contains
             dyn%now%visc_eff_int = calc_visc_eff_2D(dyn%now%ux_b,dyn%now%uy_b,dyn%now%duxdz_bar*0.0,dyn%now%duydz_bar*0.0, &
                                                     tpo%now%H_ice,mat%now%ATT,dyn%par%zeta_aa,dyn%par%dx,dyn%par%dy,mat%par%n_glen)
             
-            ! Ensure viscosity is relatively smooth
-!             call regularize2D(dyn%now%visc_eff_int,tpo%now%H_ice,tpo%par%dx)
-
             !   X. Prescribe grounding-line flux 
 if (.FALSE.) then
             ! Testing prescribed grounding-line flux/vel - experimental!!!

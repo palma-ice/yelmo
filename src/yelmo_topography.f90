@@ -139,7 +139,7 @@ contains
                     
                 case("kill") 
                     ! Delete all floating ice (using characteristic time parameter)
-                    call calc_calving_rate_kill(tpo%now%calv,tpo%now%H_ice,tpo%now%f_grnd.eq.0.0_prec,tpo%par%calv_tau)
+                    call calc_calving_rate_kill(tpo%now%calv,tpo%now%H_ice,tpo%now%f_grnd.eq.0.0_prec,tpo%par%calv_tau,dt)
 
                 case("kill-pos")
                     ! Delete all floating ice beyond a given location (using characteristic time parameter)
@@ -147,7 +147,7 @@ contains
                     call calc_calving_rate_kill(tpo%now%calv,tpo%now%H_ice, &
                                                     ( tpo%now%f_grnd .eq. 0.0_prec .and. &
                                                       tpo%now%H_ice  .gt. 0.0_prec .and. &
-                                                      bnd%calv_mask ), tau=0.0_prec )
+                                                      bnd%calv_mask ), tau=0.0_prec, dt=dt )
 
                 case DEFAULT 
 
@@ -159,7 +159,7 @@ contains
  
             ! Apply calving
             call apply_calving(tpo%now%H_ice,tpo%now%calv,tpo%now%f_grnd,tpo%par%H_min_flt,dt)
-
+            
             ! Apply special case for symmetric EISMINT domain when basal sliding is active
             ! (ensure summit thickness does not grow disproportionately)
             if (trim(tpo%par%boundaries) .eq. "EISMINT" .and. maxval(dyn%now%uxy_b) .gt. 0.0) then 

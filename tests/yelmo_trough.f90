@@ -211,7 +211,7 @@ contains
         do i = 1, nx 
             
             ! x-direction 
-            zb_x = -150.0_prec - 0.84*xc(i) 
+            zb_x = -150.0_prec - 0.84*abs(xc(i))
 
             ! y-direction 
             e1 = -2.0*(yc(j)-wc)/fc 
@@ -237,7 +237,7 @@ contains
 
         return 
 
-    end subroutine trough_f17_topo_init 
+    end subroutine trough_f17_topo_init
 
     subroutine trough_mismipp_topo_init(z_bed,H_ice,z_srf,xc,yc,fc,dc,wc,x_cf)
 

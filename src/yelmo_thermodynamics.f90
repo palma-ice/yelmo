@@ -72,7 +72,7 @@ contains
 
         ! === Calculate heat source terms (Yelmo vertical grid) === 
 
-select case("aa")
+select case("interp")
 
     case("aa")
         ! Calculate the basal frictional heating (from ab-nodes)

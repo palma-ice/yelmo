@@ -978,20 +978,6 @@ end if
 
                 end if 
 
-                ! if (i .eq. ix .and. j .eq. jx) then 
-                !     ! Diagnostics 
-
-                !     write(*,*) "Qb -----------------------"
-                !     write(*,*) "Qb ", Qbhi_tot, Q_b_now
-                !     write(*,*) "Qb ", minval(uxhi),    maxval(uxhi)
-                !     write(*,*) "Qb ", minval(taubxhi), maxval(taubxhi)
-                !     write(*,*) "Qb ", ux_1, ux_2, ux_3, ux_4 
-                !     write(*,*) "Qb ", uy_1, uy_2, uy_3, uy_4 
-                !     write(*,*) "Qb ", taubx_1, taubx_2, taubx_3, taubx_4 
-                !     write(*,*) "Qb ", tauby_1, tauby_2, tauby_3, tauby_4 
-                    
-                ! end if 
-
             else 
 
                 Q_b_now = 0.0_prec 
@@ -1013,7 +999,8 @@ end if
 
     subroutine calc_hires_cell(var_hi,var_1,var_2,var_3,var_4)
         ! Given the four corners of a cell in quadrants 1,2,3,4,
-        ! calculate the grounded fraction (ie area with Hg>0)
+        ! calculate a high resolution grid of the variable
+        ! through bilinear interpolation that covers the cell.
 
         implicit none 
 
@@ -1028,10 +1015,14 @@ end if
         nx = size(var_hi,1)
 
         dx = 1/real(nx,prec)
-        
+
         ! Populate x,y axes for interpolation points (between 0 and 1)
+        ! Note: x and y points are offset from values of 0 and 1 to be
+        ! sure that each mini grid box has the same area contribution
+        ! to the total grid cell.
         do i = 1, nx 
-            x(i) = 0.0_prec + real(i-1)/real(nx-1)
+            !x(i) = 0.0_prec + real(i-1)/real(nx-1)
+            x(i) = 0.5_prec*dx + real(i-1)*dx 
         end do 
         y = x 
 

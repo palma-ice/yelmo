@@ -53,8 +53,8 @@ contains
         end if 
 
         ! Get time step and advance current time 
-        dt            = time - mat%par%time 
-        mat%par%time  = time 
+        dt            = dble(time) - mat%par%time 
+        mat%par%time  = dble(time) 
         
         ! 00. First update ice age if possible
         if (mat%par%calc_age .and. dt .gt. 0.0) then 

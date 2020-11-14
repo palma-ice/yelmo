@@ -89,7 +89,7 @@ module yelmo_defs
         logical            :: diffuse_bmb_shlf 
 
         ! Internal parameters 
-        real(prec)         :: time 
+        real(dp)           :: time 
         integer            :: nx, ny
         real(prec)         :: dx, dy
         character(len=256) :: boundaries 
@@ -222,7 +222,7 @@ module yelmo_defs
         real(prec) :: dx, dy
         real(prec), allocatable :: zeta_aa(:)   ! Layer centers (aa-nodes), plus base and surface: nz_aa points 
         real(prec), allocatable :: zeta_ac(:)   ! Layer borders (ac-nodes), plus base and surface: nz_ac == nz_aa-1 points
-        real(prec) :: time
+        real(dp)   :: time
 
         integer    :: ssa_iter_now              ! Number of iterations used for Picard iteration to solve ssa this timestep
         real(prec) :: speed 
@@ -365,7 +365,7 @@ module yelmo_defs
         real(prec)          :: tracer_impl_kappa
         
         ! Internal parameters
-        real(prec) :: time 
+        real(dp)   :: time 
         real(prec) :: dx, dy  
         integer    :: nx, ny, nz_aa, nz_ac  
         integer    :: n_iso 
@@ -437,7 +437,7 @@ module yelmo_defs
         real(prec), allocatable :: dzeta_a(:)
         real(prec), allocatable :: dzeta_b(:)
         
-        real(prec) :: time
+        real(dp)   :: time
         real(prec) :: dt_zeta, dt_beta(2)
 
         real(prec) :: speed 
@@ -867,7 +867,7 @@ contains
 
         return 
 
-    end subroutine yelmo_load_command_line_args 
+    end subroutine yelmo_load_command_line_args
 
     subroutine yelmo_cpu_time(time,time0,dtime)
         ! Calculate time intervals using system_clock.

@@ -41,14 +41,15 @@ contains
         H_w_now = 0.0_prec 
 
         ! Initialize time if necessary 
-        if (thrm%par%time .gt. time) then 
-            thrm%par%time = time
+        if (thrm%par%time .gt. dble(time)) then 
+            thrm%par%time = dble(time)
         end if 
 
         ! Get time step and advance current time 
-        dt            = time - thrm%par%time 
-        thrm%par%time = time 
+        dt            = dble(time) - thrm%par%time 
+        thrm%par%time = dble(time) 
         
+
         ! === Determine some thermal properties === 
 
         ! Calculate the specific heat capacity of the ice

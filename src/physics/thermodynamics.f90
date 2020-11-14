@@ -1131,7 +1131,7 @@ end if
         
         return 
 
-    end function calc_T_pmp 
+    end function calc_T_pmp
 
     elemental function calc_f_pmp(T_ice,T_pmp,gamma,f_grnd) result(f_pmp)
         ! Calculate the fraction of gridpoint at the pressure melting point (pmp),
@@ -1177,7 +1177,7 @@ end if
 
         return 
 
-    end function calc_f_pmp 
+    end function calc_f_pmp
     
     elemental function calc_T_base_shlf_approx(H_ice,T_pmp,H_grnd) result(T_base_shlf)
         ! Calculate the basal shelf temperature for floating ice

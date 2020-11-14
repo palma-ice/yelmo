@@ -68,12 +68,12 @@ contains
         allocate(H_ref(nx,ny))
 
         ! Initialize time if necessary 
-        if (tpo%par%time .gt. time) then 
-            tpo%par%time = time 
+        if (tpo%par%time .gt. dble(time)) then 
+            tpo%par%time = dble(time) 
         end if 
 
         ! Get time step
-        dt = time - tpo%par%time 
+        dt = dble(time) - tpo%par%time 
 
         ! Store initial cpu time and model time for metrics later
         call yelmo_cpu_time(cpu_time0)
@@ -261,7 +261,7 @@ contains
         ! ================================
 
         ! Advance ytopo timestep 
-        tpo%par%time = time
+        tpo%par%time = dble(time)
 
         ! Calculate computational performance (model speed in kyr/hr)
         call yelmo_cpu_time(cpu_time1)

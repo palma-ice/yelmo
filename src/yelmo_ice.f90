@@ -830,7 +830,7 @@ contains
         ! Local variables 
         integer :: q 
         character(len=256) :: dom_thrm_method 
-
+        
         ! Store original model choices locally 
         dom_thrm_method = dom%thrm%par%method 
 
@@ -859,12 +859,12 @@ contains
             call calc_ytopo(dom%tpo,dom%dyn,dom%thrm,dom%bnd,time,topo_fixed=.TRUE.)
             
             ! Calculate initial thermodynamic information
-            dom%thrm%par%time = time - dom%par%dt_min
+            dom%thrm%par%time = dble(time) - dom%par%dt_min
             call calc_ytherm(dom%thrm,dom%tpo,dom%dyn,dom%mat,dom%bnd,time)
 
             ! Calculate material information (with no dynamics), and set initial ice dep_time values
             
-            dom%mat%par%time     = time - dom%par%dt_min
+            dom%mat%par%time     = dble(time) - dom%par%dt_min
             dom%mat%now%dep_time = dom%mat%par%time
 
             call calc_ymat(dom%mat,dom%tpo,dom%dyn,dom%thrm,dom%bnd,time)

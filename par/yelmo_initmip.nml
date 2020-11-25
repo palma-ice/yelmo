@@ -194,7 +194,10 @@
     z_bed_load      = True 
     z_bed_path      = "ice_data/{domain}/{grid_name}/{grid_name}_TOPO.nc"
     z_bed_nm        = "z_bed"               ! [m] Bedrock elevation 
-    z_bed_sd_nm     = "z_bed_sd"            ! [m] Bedrock elevation standard deviation (if available) 
+    z_bed_sd_nm     = "z_bed_sd"            ! [m] Bedrock elevation standard deviation (if available)
+    z_bed_f_sd      = -1.0                  ! Scaling fraction to modify z_bed = z_bed + f_sd*z_bed_sd
+/
+ 
 /
 
 &yelmo_data 

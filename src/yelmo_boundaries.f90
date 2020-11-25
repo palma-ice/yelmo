@@ -202,7 +202,8 @@ contains
         logical            :: load_var
         character(len=512) :: filename
         character(len=56)  :: vname
-
+        real(prec)         :: f_sd 
+        
         ! == z_bed =====
         call nml_read(nml_path,nml_group,"z_bed_load",load_var)
 
@@ -226,8 +227,16 @@ contains
             bnd%z_bed_sd = 0.0  
         end if 
         
+        ! == z_bed scaling via z_bed_sd =====
+        call nml_read(nml_path,nml_group,"z_bed_f_sd",f_sd)
+
+        ! Apply scaling to adjust z_bed depending on standard deviation
+        bnd%z_bed = bnd%z_bed + f_sd*bnd%z_bed_sd 
+
+
         write(*,*) "ybound_load_z_bed:: range(z_bed):     ", minval(bnd%z_bed),    maxval(bnd%z_bed)
         write(*,*) "ybound_load_z_bed:: range(z_bed_sd):  ", minval(bnd%z_bed_sd), maxval(bnd%z_bed_sd)
+        write(*,*) "ybound_load_z_bed:: scaling fac f_sd: ", f_sd 
 
         return 
 

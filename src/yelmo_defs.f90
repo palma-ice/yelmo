@@ -511,10 +511,9 @@ module yelmo_defs
 
         logical,    allocatable :: ice_allowed(:,:)     ! Locations where ice thickness can be greater than zero 
         logical,    allocatable :: calv_mask(:,:)       ! for calv_method="kill-loc", where calv_mask==False, calv.
+        
         real(prec), allocatable :: H_ice_ref(:,:)       ! Reference ice thickness, may be used for relaxation routines
-!mmr
-        real(prec), allocatable :: z_bed_ref(:,:)       ! Reference bedrock elevation, may be used for relaxation routines - mmr
-!mmr
+        real(prec), allocatable :: z_bed_ref(:,:)       ! Reference bedrock elevation, may be used for relaxation routines
 
         ! Other external variables that can be useful, ie maybe with tracers
         ! to do 

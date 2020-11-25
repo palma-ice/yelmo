@@ -329,7 +329,7 @@ contains
         allocate(par%zeta_ac(par%nz_ac))
         par%zeta_ac = zeta_ac 
         
-        if (count(age_iso .eq. 0.0) .eq. size(age_iso)) then 
+        if ( (.not. par%calc_age) .or. count(age_iso .eq. 0.0) .eq. size(age_iso)) then 
             ! No isochrones to be calculated, fill with one layer for present day (age=0)
             par%n_iso = 1 
         else 
@@ -416,7 +416,7 @@ contains
         
         return 
 
-    end subroutine ymat_alloc 
+    end subroutine ymat_alloc
 
     subroutine ymat_dealloc(now)
 

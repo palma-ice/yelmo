@@ -350,7 +350,7 @@ if (opt_method .eq. 1) then
         write(*,"(a,i4,f10.1,i4,f10.1,f12.1,f10.1)") "iter_par: ", q, time, &
                             yelmo1%tpo%par%topo_rel, tau, err_scale, time_end
 
-        ! Perform iteration loop to diagnose error for modifying C_bed 
+        ! Perform iteration loop to diagnose error for modifying c_bed 
         do n = 1, int(time_end/dtt)
         
             time = time + dtt 
@@ -374,13 +374,13 @@ else
     
     do q = 1, n_iter 
 
-        ! Reset model to the initial state (including H_w) and time, with updated C_bed field 
-        yelmo_ref%dyn%now%C_bed = yelmo1%dyn%now%C_bed 
+        ! Reset model to the initial state (including H_w) and time, with updated c_bed field 
+        yelmo_ref%dyn%now%c_bed = yelmo1%dyn%now%c_bed 
         yelmo1 = yelmo_ref 
         time   = 0.0 
         call yelmo_set_time(yelmo1,time) 
         
-        ! Perform C_bed tuning step 
+        ! Perform c_bed tuning step 
         do n = 1, int(time_tune)
         
             time = time + 1.0
@@ -388,7 +388,7 @@ else
             ! Update ice sheet 
             call yelmo_update(yelmo1,time)
 
-            ! Update C_bed based on error metric(s) 
+            ! Update c_bed based on error metric(s) 
             call update_cf_ref_thickness_ratio(yelmo1%dyn%now%cf_ref,cf_ref_dot,yelmo1%tpo%now%H_ice, &
                             yelmo1%bnd%z_bed,yelmo1%dyn%now%ux_bar,yelmo1%dyn%now%uy_bar, &
                             yelmo1%dyn%now%uxy_i_bar,yelmo1%dyn%now%uxy_b,yelmo1%dta%pd%H_ice, &
@@ -396,7 +396,7 @@ else
 
         end do 
 
-        ! Perform iteration loop to diagnose error for modifying C_bed 
+        ! Perform iteration loop to diagnose error for modifying c_bed 
         do n = 1, int(time_iter)
         
             time = time + 1.0
@@ -494,7 +494,7 @@ contains
         call nc_write(filename,"dHicedt",ylmo%tpo%now%dHicedt,units="m/a",long_name="Ice thickness change", &
                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
         
-        call nc_write(filename,"C_bed",ylmo%dyn%now%C_bed,units="Pa",long_name="Bed friction coefficient", &
+        call nc_write(filename,"c_bed",ylmo%dyn%now%c_bed,units="Pa",long_name="Bed friction coefficient", &
                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
         
         call nc_write(filename,"cf_ref",yelmo1%dyn%now%cf_ref,units="",long_name="Bed friction scalar", &
@@ -568,7 +568,7 @@ contains
     ! Extra...
 
     subroutine calc_ydyn_cbed_external_channels(dyn,tpo,thrm,bnd,channels)
-        ! Update C_bed based on parameter choices
+        ! Update c_bed based on parameter choices
 
         implicit none
         
@@ -584,15 +584,15 @@ contains
 
         real(prec) :: channel_lim = 1e-6 
 
-        nx = size(dyn%now%C_bed,1)
-        ny = size(dyn%now%C_bed,2)
+        nx = size(dyn%now%c_bed,1)
+        ny = size(dyn%now%c_bed,2)
         
         allocate(f_channel(nx,ny)) 
 
-        ! Set C_bed according to temperate character of base
+        ! Set c_bed according to temperate character of base
 
-        ! Smooth transition between temperate and frozen C_bed
-        dyn%now%C_bed = (thrm%now%f_pmp)*dyn%par%cf_stream &
+        ! Smooth transition between temperate and frozen c_bed
+        dyn%now%c_bed = (thrm%now%f_pmp)*dyn%par%cf_stream &
                     + (1.0_prec - thrm%now%f_pmp)*dyn%par%cf_frozen 
 
         if (dyn%par%cb_margin_pmp) then 
@@ -616,7 +616,7 @@ contains
                      tpo%now%H_ice(i,j1) .le. 0.0 .or. &
                      tpo%now%H_ice(i,j2) .le. 0.0)) then 
 
-                    dyn%now%C_bed(i,j) = dyn%par%cf_stream
+                    dyn%now%c_bed(i,j) = dyn%par%cf_stream
 
                 end if 
 
@@ -624,27 +624,27 @@ contains
             end do 
 
             ! Also ensure that grounding line is also considered streaming
-            where(tpo%now%is_grline) dyn%now%C_bed = dyn%par%cf_stream
+            where(tpo%now%is_grline) dyn%now%c_bed = dyn%par%cf_stream
 
         end if 
 
-        ! == Until here, C_bed is defined as normally with cb_method=1,
+        ! == Until here, c_bed is defined as normally with cb_method=1,
         !    now refine to increase only marginal velocities 
 
-        ! Reduce C_bed further for low elevation points
-        !where(tpo%now%z_srf .lt. 1500.0) dyn%now%C_bed = 0.5*dyn%now%C_bed
+        ! Reduce c_bed further for low elevation points
+        !where(tpo%now%z_srf .lt. 1500.0) dyn%now%c_bed = 0.5*dyn%now%c_bed
 
         ! Next diagnose channels
         call calc_channels(channels,tpo%now%z_srf,dyn%now%ux_bar,dyn%now%uy_bar,tpo%par%dx)
 
-        ! Finally scale C_bed according to concavity of channels 
+        ! Finally scale c_bed according to concavity of channels 
         !f_channel = exp(-channels/channel_lim)
         !where(f_channel .lt. 0.1) f_channel = 0.1 
         !where(f_channel .gt. 2.0) f_channel = 2.0  
 
         f_channel = 1.0 
 
-        dyn%now%C_bed = dyn%now%C_bed * f_channel 
+        dyn%now%c_bed = dyn%now%c_bed * f_channel 
         
         return 
 

@@ -12,8 +12,8 @@ program yelmo_test
 
     implicit none 
 
-    type(yelmo_class)      :: yelmo1 
-
+    type(yelmo_class)       :: yelmo1 
+    
     character(len=256) :: outfldr, file1D, file2D, file_restart, domain 
     character(len=512) :: path_par, path_const, clim_nm  
     real(prec) :: time_init, time_end, time_equil, time, dtt, dtt_equil, dt1D_out, dt2D_out 
@@ -41,22 +41,22 @@ program yelmo_test
     call yelmo_load_command_line_args(path_par)
 
     ! Timing and other parameters 
-    call nml_read(path_par,"control","time_init",       time_init)                 ! [yr] Starting time
-    call nml_read(path_par,"control","time_end",        time_end)                  ! [yr] Ending time
-    call nml_read(path_par,"control","time_equil",      time_equil)                ! [yr] Years to equilibrate first
-    call nml_read(path_par,"control","dtt",             dtt)                       ! [yr] Main loop time step 
-    call nml_read(path_par,"control","dtt_equil",       dtt_equil)                 ! [yr] Timestep to use for dynamic equilibration (if dt_method=0)
-    call nml_read(path_par,"control","dt1D_out",        dt1D_out)                  ! [yr] Frequency of 1D output 
-    call nml_read(path_par,"control","dt2D_out",        dt2D_out)                  ! [yr] Frequency of 2D output 
+    call nml_read(path_par,"ctrl","time_init",       time_init)                 ! [yr] Starting time
+    call nml_read(path_par,"ctrl","time_end",        time_end)                  ! [yr] Ending time
+    call nml_read(path_par,"ctrl","time_equil",      time_equil)                ! [yr] Years to equilibrate first
+    call nml_read(path_par,"ctrl","dtt",             dtt)                       ! [yr] Main loop time step 
+    call nml_read(path_par,"ctrl","dtt_equil",       dtt_equil)                 ! [yr] Timestep to use for dynamic equilibration (if dt_method=0)
+    call nml_read(path_par,"ctrl","dt1D_out",        dt1D_out)                  ! [yr] Frequency of 1D output 
+    call nml_read(path_par,"ctrl","dt2D_out",        dt2D_out)                  ! [yr] Frequency of 2D output 
     
-    call nml_read(path_par,"control","clim_nm",         clim_nm)                   ! Namelist group holding climate information
-    call nml_read(path_par,"control","with_anom",       with_anom)                 ! Apply anomaly at the start of the simulation (after equilibration)
+    call nml_read(path_par,"ctrl","clim_nm",         clim_nm)                   ! Namelist group holding climate information
+    call nml_read(path_par,"ctrl","with_anom",       with_anom)                 ! Apply anomaly at the start of the simulation (after equilibration)
     
-    call nml_read(path_par,"control","load_cf_ref",     load_cf_ref)               ! Load cf_ref from file? Otherwise define from cf_stream + inline tuning
-    call nml_read(path_par,"control","file_cf_ref",     file_cf_ref)               ! Filename holding cf_ref to load 
+    call nml_read(path_par,"ctrl","load_cf_ref",     load_cf_ref)               ! Load cf_ref from file? Otherwise define from cf_stream + inline tuning
+    call nml_read(path_par,"ctrl","file_cf_ref",     file_cf_ref)               ! Filename holding cf_ref to load 
 
-    call nml_read(path_par,"control","load_bmelt",      load_bmelt)                ! Load bmelt from file?
-    call nml_read(path_par,"control","file_bmelt",      file_bmelt)                ! Filename holding bmelt field to load 
+    call nml_read(path_par,"ctrl","load_bmelt",      load_bmelt)                ! Load bmelt from file?
+    call nml_read(path_par,"ctrl","file_bmelt",      file_bmelt)                ! Filename holding bmelt field to load 
 
     ! Load climate (eg, clim_pd or clim_lgm)
     call nml_read(path_par,clim_nm,  "bmb_shlf_const",  bmb_shlf_const)            ! [yr] Constant imposed bmb_shlf value
@@ -193,13 +193,53 @@ program yelmo_test
     ! Impose a colder boundary temperature for equilibration step 
     ! -5 [K] for mimicking glacial times
 !     yelmo1%bnd%T_srf = yelmo1%dta%pd%T_srf - 10.0  
-    
+
+if (.FALSE.) then 
     ! Run yelmo for several years with constant boundary conditions and topo
     ! to equilibrate thermodynamics and dynamics
-    call yelmo_update_equil(yelmo1,time,time_tot=10.0_prec,topo_fixed=.FALSE.,dt=min(1.0,dtt_equil_now),ssa_vel_max=5000.0)
-    call yelmo_update_equil(yelmo1,time,time_tot=time_equil,topo_fixed=.TRUE.,dt=1.0,ssa_vel_max=5000.0)
-    call yelmo_update_equil(yelmo1,time,time_tot=100.0_prec,topo_fixed=.FALSE.,dt=dtt_equil_now,ssa_vel_max=5000.0)
+    yelmo1%par%dt_method        = 0 
+    yelmo1%tpo%par%topo_rel     = 2
+    yelmo1%tpo%par%topo_rel_tau = 10.0 
+    write(*,*) "timelog, tau = ", yelmo1%tpo%par%topo_rel_tau
+    call yelmo_update_equil(yelmo1,time,time_tot=1.0_prec,dt=0.05,topo_fixed=.FALSE.)
+    yelmo1%tpo%par%topo_rel_tau = 100.0 
+    write(*,*) "timelog, tau = ", yelmo1%tpo%par%topo_rel_tau
+    call yelmo_update_equil(yelmo1,time,time_tot=2.0_prec,dt=0.05,topo_fixed=.FALSE.)
+    yelmo1%tpo%par%topo_rel_tau = 1000.0 
+    write(*,*) "timelog, tau = ", yelmo1%tpo%par%topo_rel_tau
+    call yelmo_update_equil(yelmo1,time,time_tot=5.0_prec,dt=0.05,topo_fixed=.FALSE.)
+    yelmo1%tpo%par%topo_rel     = 0
+    write(*,*) "timelog, no relaxation..."
+    call yelmo_update_equil(yelmo1,time,time_tot=5.0_prec,dt=0.05,topo_fixed=.FALSE.)
+    yelmo1%par%dt_method        = 2
+    write(*,*) "timelog, adaptive timestepping..."
+    call yelmo_update_equil(yelmo1,time,time_tot=10.0_prec,dt=min(1.0_prec,dtt_equil_now),topo_fixed=.FALSE.)
+
+    ! Next equilibrate thermodynamics and maintain constant ice topopgraphy (for speed)
+    call yelmo_update_equil(yelmo1,time,time_tot=time_equil,dt=1.0_prec,topo_fixed=.TRUE.)
+
+    ! Finally allow further dynamic equilibrium (therm + dyn) to ensure 
+    ! everything is in sync
+    call yelmo_update_equil(yelmo1,time,time_tot=100.0_prec,dt=dtt_equil_now,topo_fixed=.FALSE.)
+
+else 
+    ! Just testing...
+
+    ! Run full dynamics (tpo,dyn,thrm) to smooth initial topo
+    call yelmo_update_equil(yelmo1,time,time_tot=10.0_prec,dt=0.2_prec,topo_fixed=.FALSE.,dyn_solver="sia")
+
+    ! Next equilibrate thermodynamics and maintain constant ice topopgraphy (for speed)
+    ! again with SIA only for now
+    call yelmo_update_equil(yelmo1,time,time_tot=1e3,dt=1.0_prec,topo_fixed=.TRUE.,dyn_solver="sia")
     
+    ! Run full dynamics with correct solver (tpo,dyn,thrm)
+    call yelmo_update_equil(yelmo1,time,time_tot=1.0_prec,dt=0.2_prec,topo_fixed=.FALSE.)
+
+    ! Next equilibrate thermodynamics further and maintain constant ice topopgraphy (for speed)
+    call yelmo_update_equil(yelmo1,time,time_tot=1e2,dt=1.0_prec,topo_fixed=.TRUE.)
+
+end if 
+
     ! 2D file 
     call yelmo_write_init(yelmo1,file2D,time_init=time,units="years")  
     call write_step_2D(yelmo1,file2D,time=time,cf_ref=cf_ref)
@@ -207,6 +247,9 @@ program yelmo_test
     ! 1D file 
     call write_yreg_init(yelmo1,file1D,time_init=time_init,units="years",mask=yelmo1%bnd%ice_allowed)
     call write_yreg_step(yelmo1%reg,file1D,time=time)  
+
+    write(*,*) "test: completed."
+    !stop 
 
     if (with_anom) then 
         ! Warm up the ice sheet to impose some changes 
@@ -389,9 +432,10 @@ contains
         call nc_write(filename,"enh_bar",ylmo%mat%now%enh_bar,units="1",long_name="Vertically averaged enhancement factor", &
                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
         
-        call nc_write(filename,"beta_eff",ylmo%dyn%now%beta_eff,units="Pa a m^-1",long_name="Effective basal friction coefficient (DIVA)", &
+        call nc_write(filename,"Q_b",ylmo%thrm%now%Q_b,units="Pa a m^-1",long_name="Basal friction coefficient", &
                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-        call nc_write(filename,"beta_diva",ylmo%dyn%now%beta_diva,units="Pa a m^-1",long_name="Actual basal friction coefficient (DIVA)", &
+        
+        call nc_write(filename,"beta_eff",ylmo%dyn%now%beta_eff,units="Pa a m^-1",long_name="Effective basal friction coefficient (DIVA)", &
                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
 
         call nc_write(filename,"dep_time",ylmo%mat%now%dep_time,units="yr",long_name="Deposition time", &
@@ -476,12 +520,12 @@ contains
 
                         ! Increased friction in Wilkes Land (South - Southeast)
                         where (bnd%basins .ge. 12 .and. bnd%basins .le. 17) 
-                            lambda_bed = calc_lambda_bed_exp(bnd%z_bed,-400.0,dyn%par%cb_z1)
+                            lambda_bed = calc_lambda_bed_exp(bnd%z_bed,-400.0_prec,dyn%par%cb_z1)
                         end where
 
                         ! Increased friction in WAIS divide area feeding the Ronne
                         where (bnd%basins .eq.  1 .or. bnd%basins .eq.  2)
-                            lambda_bed = calc_lambda_bed_exp(bnd%z_bed,-2000.0,dyn%par%cb_z1)
+                            lambda_bed = calc_lambda_bed_exp(bnd%z_bed,-2000.0_prec,dyn%par%cb_z1)
                         end where 
 
 !                         ! Increased friction in WAIS divide area feeding the Ross
@@ -556,61 +600,61 @@ contains
 !                 call scale_cf_gaussian(cf_ref,dyn%par%cf_stream*2.0,x0=-980.0, y0=-400.0,sigma=200.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
                 
                 ! Reduction friction - feeding the Ross ice shelf from the East
-                call scale_cf_gaussian(cf_ref,dyn%par%cf_stream*0.05,x0= 130.0, y0=-550.0, sigma=100.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
-                call scale_cf_gaussian(cf_ref,dyn%par%cf_stream*0.05,x0= 280.0, y0=-760.0, sigma=100.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
-                call scale_cf_gaussian(cf_ref,dyn%par%cf_stream*0.05,x0= 380.0, y0=-960.0, sigma=100.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
-                call scale_cf_gaussian(cf_ref,dyn%par%cf_stream*0.05,x0= 400.0, y0=-1150.0,sigma=100.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
+                call scale_cf_gaussian(cf_ref,dyn%par%cf_stream*0.05_prec,x0= 130.0_prec, y0=-550.0_prec, sigma=100.0_prec,xx=grd%x*1e-3_prec,yy=grd%y*1e-3_prec)
+                call scale_cf_gaussian(cf_ref,dyn%par%cf_stream*0.05_prec,x0= 280.0_prec, y0=-760.0_prec, sigma=100.0_prec,xx=grd%x*1e-3_prec,yy=grd%y*1e-3_prec)
+                call scale_cf_gaussian(cf_ref,dyn%par%cf_stream*0.05_prec,x0= 380.0_prec, y0=-960.0_prec, sigma=100.0_prec,xx=grd%x*1e-3_prec,yy=grd%y*1e-3_prec)
+                call scale_cf_gaussian(cf_ref,dyn%par%cf_stream*0.05_prec,x0= 400.0_prec, y0=-1150.0_prec,sigma=100.0_prec,xx=grd%x*1e-3_prec,yy=grd%y*1e-3_prec)
 
 
 if (.FALSE.) then 
                 ! Increase - feeding the Ronne ice shelf from the North
-                call scale_cf_gaussian(cf_ref,dyn%par%cf_stream*4.00,x0=-700.0, y0=    0.0,sigma=200.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
+                call scale_cf_gaussian(cf_ref,dyn%par%cf_stream*4.00_prec,x0=-700.0_prec, y0=    0.0_prec,sigma=200.0_prec,xx=grd%x*1e-3_prec,yy=grd%y*1e-3_prec)
                 
                 ! Increase - Southeast Antarctica inland
-                call scale_cf_gaussian(cf_ref,dyn%par%cf_stream*2.00,x0=1500.0, y0= -550.0,sigma=200.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
-                call scale_cf_gaussian(cf_ref,dyn%par%cf_stream*2.00,x0=1700.0, y0=-1000.0,sigma=200.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
+                call scale_cf_gaussian(cf_ref,dyn%par%cf_stream*2.00_prec,x0=1500.0_prec, y0= -550.0_prec,sigma=200.0_prec,xx=grd%x*1e-3_prec,yy=grd%y*1e-3_prec)
+                call scale_cf_gaussian(cf_ref,dyn%par%cf_stream*2.00_prec,x0=1700.0_prec, y0=-1000.0_prec,sigma=200.0_prec,xx=grd%x*1e-3_prec,yy=grd%y*1e-3_prec)
                 
                 ! Reduction - South pole 
-                call scale_cf_gaussian(cf_ref,dyn%par%cf_stream*0.10,x0=   0.0, y0=   0.0, sigma=400.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
-                call scale_cf_gaussian(cf_ref,dyn%par%cf_stream*0.20,x0=   0.0, y0= 600.0, sigma=300.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
-                call scale_cf_gaussian(cf_ref,dyn%par%cf_stream*0.10,x0= 500.0, y0=-500.0, sigma=400.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
+                call scale_cf_gaussian(cf_ref,dyn%par%cf_stream*0.10_prec,x0=   0.0_prec, y0=   0.0_prec, sigma=400.0_prec,xx=grd%x*1e-3_prec,yy=grd%y*1e-3_prec)
+                call scale_cf_gaussian(cf_ref,dyn%par%cf_stream*0.20_prec,x0=   0.0_prec, y0= 600.0_prec, sigma=300.0_prec,xx=grd%x*1e-3_prec,yy=grd%y*1e-3_prec)
+                call scale_cf_gaussian(cf_ref,dyn%par%cf_stream*0.10_prec,x0= 500.0_prec, y0=-500.0_prec, sigma=400.0_prec,xx=grd%x*1e-3_prec,yy=grd%y*1e-3_prec)
                 
                 ! Reduction - Amery ice shelf
-                call scale_cf_gaussian(cf_ref,dyn%par%cf_stream*0.05,x0=1500.0, y0= 650.0, sigma=300.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
+                call scale_cf_gaussian(cf_ref,dyn%par%cf_stream*0.05_prec,x0=1500.0_prec, y0= 650.0_prec, sigma=300.0_prec,xx=grd%x*1e-3_prec,yy=grd%y*1e-3_prec)
                 
                 ! Reduction - feeding the Ross ice shelf from the North
-                call scale_cf_gaussian(cf_ref,dyn%par%cf_stream*0.005,x0=-500.0, y0=-500.0, sigma=300.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
+                call scale_cf_gaussian(cf_ref,dyn%par%cf_stream*0.005_prec,x0=-500.0_prec, y0=-500.0_prec, sigma=300.0_prec,xx=grd%x*1e-3_prec,yy=grd%y*1e-3_prec)
 
                 ! Reduction - feeding the Ross ice shelf from the East
-                call scale_cf_gaussian(cf_ref,dyn%par%cf_stream*0.05,x0= 130.0, y0=-550.0, sigma=100.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
-                call scale_cf_gaussian(cf_ref,dyn%par%cf_stream*0.05,x0= 280.0, y0=-760.0, sigma=100.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
-                call scale_cf_gaussian(cf_ref,dyn%par%cf_stream*0.05,x0= 380.0, y0=-960.0, sigma=100.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
-                call scale_cf_gaussian(cf_ref,dyn%par%cf_stream*0.05,x0= 400.0, y0=-1150.0,sigma=100.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
+                call scale_cf_gaussian(cf_ref,dyn%par%cf_stream*0.05_prec,x0= 130.0_prec, y0=-550.0_prec, sigma=100.0_prec,xx=grd%x*1e-3_prec,yy=grd%y*1e-3_prec)
+                call scale_cf_gaussian(cf_ref,dyn%par%cf_stream*0.05_prec,x0= 280.0_prec, y0=-760.0_prec, sigma=100.0_prec,xx=grd%x*1e-3_prec,yy=grd%y*1e-3_prec)
+                call scale_cf_gaussian(cf_ref,dyn%par%cf_stream*0.05_prec,x0= 380.0_prec, y0=-960.0_prec, sigma=100.0_prec,xx=grd%x*1e-3_prec,yy=grd%y*1e-3_prec)
+                call scale_cf_gaussian(cf_ref,dyn%par%cf_stream*0.05_prec,x0= 400.0_prec, y0=-1150.0_prec,sigma=100.0_prec,xx=grd%x*1e-3_prec,yy=grd%y*1e-3_prec)
 
 end if 
 
 if (.FALSE.) then
                 ! Reduction 
-                call scale_cf_gaussian(cf_ref,dyn%par%cf_stream*0.25,x0=-2000.0,y0=1000.0, sigma=100.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
-                call scale_cf_gaussian(cf_ref,dyn%par%cf_stream*0.20,x0=-750.0, y0=-900.0, sigma=300.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
-                call scale_cf_gaussian(cf_ref,dyn%par%cf_stream*0.20,x0=-600.0, y0=-600.0, sigma=300.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
-                call scale_cf_gaussian(cf_ref,dyn%par%cf_stream*0.20,x0=-300.0, y0=   0.0, sigma=100.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
-                call scale_cf_gaussian(cf_ref,dyn%par%cf_stream*0.20,x0=-250.0, y0=-500.0, sigma=100.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
-                call scale_cf_gaussian(cf_ref,dyn%par%cf_stream*0.20,x0=-100.0, y0=-600.0, sigma=300.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
-                call scale_cf_gaussian(cf_ref,dyn%par%cf_stream*0.20,x0=-100.0, y0=-300.0, sigma=300.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
-                call scale_cf_gaussian(cf_ref,dyn%par%cf_stream*0.20,x0=   0.0, y0=   0.0, sigma=300.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
-                call scale_cf_gaussian(cf_ref,dyn%par%cf_stream*0.20,x0= 130.0, y0=-550.0, sigma= 50.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
-                call scale_cf_gaussian(cf_ref,dyn%par%cf_stream*0.20,x0= 280.0, y0=-760.0, sigma= 50.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
-                call scale_cf_gaussian(cf_ref,dyn%par%cf_stream*0.20,x0= 380.0, y0=-960.0, sigma= 50.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
-                call scale_cf_gaussian(cf_ref,dyn%par%cf_stream*0.50,x0= 400.0, y0=   0.0, sigma=300.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
-                call scale_cf_gaussian(cf_ref,dyn%par%cf_stream*0.20,x0= 400.0, y0=-1150.0,sigma= 50.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
-                call scale_cf_gaussian(cf_ref,dyn%par%cf_stream*0.25,x0= 700.0, y0= -500.0,sigma=400.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
-                call scale_cf_gaussian(cf_ref,dyn%par%cf_stream*0.20,x0=1500.0, y0= 650.0, sigma=300.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
+                call scale_cf_gaussian(cf_ref,dyn%par%cf_stream*0.25_prec,x0=-2000.0_prec,y0=1000.0_prec, sigma=100.0_prec,xx=grd%x*1e-3_prec,yy=grd%y*1e-3_prec)
+                call scale_cf_gaussian(cf_ref,dyn%par%cf_stream*0.20_prec,x0=-750.0_prec, y0=-900.0_prec, sigma=300.0_prec,xx=grd%x*1e-3_prec,yy=grd%y*1e-3_prec)
+                call scale_cf_gaussian(cf_ref,dyn%par%cf_stream*0.20_prec,x0=-600.0_prec, y0=-600.0_prec, sigma=300.0_prec,xx=grd%x*1e-3_prec,yy=grd%y*1e-3_prec)
+                call scale_cf_gaussian(cf_ref,dyn%par%cf_stream*0.20_prec,x0=-300.0_prec, y0=   0.0_prec, sigma=100.0_prec,xx=grd%x*1e-3_prec,yy=grd%y*1e-3_prec)
+                call scale_cf_gaussian(cf_ref,dyn%par%cf_stream*0.20_prec,x0=-250.0_prec, y0=-500.0_prec, sigma=100.0_prec,xx=grd%x*1e-3_prec,yy=grd%y*1e-3_prec)
+                call scale_cf_gaussian(cf_ref,dyn%par%cf_stream*0.20_prec,x0=-100.0_prec, y0=-600.0_prec, sigma=300.0_prec,xx=grd%x*1e-3_prec,yy=grd%y*1e-3_prec)
+                call scale_cf_gaussian(cf_ref,dyn%par%cf_stream*0.20_prec,x0=-100.0_prec, y0=-300.0_prec, sigma=300.0_prec,xx=grd%x*1e-3_prec,yy=grd%y*1e-3_prec)
+                call scale_cf_gaussian(cf_ref,dyn%par%cf_stream*0.20_prec,x0=   0.0_prec, y0=   0.0_prec, sigma=300.0_prec,xx=grd%x*1e-3_prec,yy=grd%y*1e-3_prec)
+                call scale_cf_gaussian(cf_ref,dyn%par%cf_stream*0.20_prec,x0= 130.0_prec, y0=-550.0_prec, sigma= 50.0_prec,xx=grd%x*1e-3_prec,yy=grd%y*1e-3_prec)
+                call scale_cf_gaussian(cf_ref,dyn%par%cf_stream*0.20_prec,x0= 280.0_prec, y0=-760.0_prec, sigma= 50.0_prec,xx=grd%x*1e-3_prec,yy=grd%y*1e-3_prec)
+                call scale_cf_gaussian(cf_ref,dyn%par%cf_stream*0.20_prec,x0= 380.0_prec, y0=-960.0_prec, sigma= 50.0_prec,xx=grd%x*1e-3_prec,yy=grd%y*1e-3_prec)
+                call scale_cf_gaussian(cf_ref,dyn%par%cf_stream*0.50_prec,x0= 400.0_prec, y0=   0.0_prec, sigma=300.0_prec,xx=grd%x*1e-3_prec,yy=grd%y*1e-3_prec)
+                call scale_cf_gaussian(cf_ref,dyn%par%cf_stream*0.20_prec,x0= 400.0_prec, y0=-1150.0_prec,sigma= 50.0_prec,xx=grd%x*1e-3_prec,yy=grd%y*1e-3_prec)
+                call scale_cf_gaussian(cf_ref,dyn%par%cf_stream*0.25_prec,x0= 700.0_prec, y0= -500.0_prec,sigma=400.0_prec,xx=grd%x*1e-3_prec,yy=grd%y*1e-3_prec)
+                call scale_cf_gaussian(cf_ref,dyn%par%cf_stream*0.20_prec,x0=1500.0_prec, y0= 650.0_prec, sigma=300.0_prec,xx=grd%x*1e-3_prec,yy=grd%y*1e-3_prec)
                 
                 ! Increase
-                call scale_cf_gaussian(cf_ref,dyn%par%cf_stream*4.00,x0=-600.0, y0=    0.0,sigma=200.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
-                call scale_cf_gaussian(cf_ref,dyn%par%cf_stream*2.00,x0=1200.0, y0=-1200.0,sigma=300.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
-                call scale_cf_gaussian(cf_ref,dyn%par%cf_stream*1.50,x0=2000.0, y0=    0.0,sigma=300.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
+                call scale_cf_gaussian(cf_ref,dyn%par%cf_stream*4.00_prec,x0=-600.0_prec, y0=    0.0_prec,sigma=200.0_prec,xx=grd%x*1e-3_prec,yy=grd%y*1e-3_prec)
+                call scale_cf_gaussian(cf_ref,dyn%par%cf_stream*2.00_prec,x0=1200.0_prec, y0=-1200.0_prec,sigma=300.0_prec,xx=grd%x*1e-3_prec,yy=grd%y*1e-3_prec)
+                call scale_cf_gaussian(cf_ref,dyn%par%cf_stream*1.50_prec,x0=2000.0_prec, y0=    0.0_prec,sigma=300.0_prec,xx=grd%x*1e-3_prec,yy=grd%y*1e-3_prec)
 end if 
 
             end if 

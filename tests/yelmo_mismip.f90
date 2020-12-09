@@ -47,15 +47,15 @@ program yelmo_mismip
     file1D     = trim(outfldr)//"yelmo1D.nc"
     
     ! Define the domain, grid and experiment from parameter file
-    call nml_read(path_par,"mismip","domain",       domain)        ! MISMIP3D
-    call nml_read(path_par,"mismip","experiment",   experiment)    ! "Std", "RF"
-    call nml_read(path_par,"mismip","dx",           dx)            ! [km] Grid resolution ! must be multiple of xmax and ymax!!
+    call nml_read(path_par,"ctrl","domain",       domain)        ! MISMIP3D
+    call nml_read(path_par,"ctrl","experiment",   experiment)    ! "Std", "RF"
+    call nml_read(path_par,"ctrl","dx",           dx)            ! [km] Grid resolution ! must be multiple of xmax and ymax!!
 
     ! Timing parameters 
-    call nml_read(path_par,"mismip","time_init",    time_init)     ! [yr] Starting time
-    call nml_read(path_par,"mismip","time_end",     time_end)      ! [yr] Ending time
-    call nml_read(path_par,"mismip","dtt",          dtt)           ! [yr] Main loop time step 
-    call nml_read(path_par,"mismip","dt2D_out",     dt2D_out)      ! [yr] Frequency of 2D output 
+    call nml_read(path_par,"ctrl","time_init",    time_init)     ! [yr] Starting time
+    call nml_read(path_par,"ctrl","time_end",     time_end)      ! [yr] Ending time
+    call nml_read(path_par,"ctrl","dtt",          dtt)           ! [yr] Main loop time step 
+    call nml_read(path_par,"ctrl","dt2D_out",     dt2D_out)      ! [yr] Frequency of 2D output 
 
     ! Define default grid name for completeness 
     grid_name = "MISMIP3D" 

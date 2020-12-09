@@ -23,7 +23,7 @@ module yelmo_topography
     integer, parameter :: mask_bed_island = 6
     
     private
-    public :: calc_ytopo, calc_ytopo_masks
+    public :: calc_ytopo
     public :: ytopo_load_H_ice
     public :: ytopo_par_load, ytopo_alloc, ytopo_dealloc
      
@@ -55,7 +55,8 @@ contains
         real(prec) :: dx, dt   
         integer :: i, j, nx, ny  
         real(prec), allocatable :: mbal(:,:) 
-        
+        real(prec), allocatable :: H_ref(:,:) 
+
         real(8)    :: cpu_time0, cpu_time1
         real(prec) :: model_time0, model_time1 
         real(prec) :: speed 
@@ -64,14 +65,15 @@ contains
         ny = size(tpo%now%H_ice,2)
 
         allocate(mbal(nx,ny))
+        allocate(H_ref(nx,ny))
 
         ! Initialize time if necessary 
-        if (tpo%par%time .gt. time) then 
-            tpo%par%time = time 
+        if (tpo%par%time .gt. dble(time)) then 
+            tpo%par%time = dble(time) 
         end if 
 
         ! Get time step
-        dt = time - tpo%par%time 
+        dt = dble(time) - tpo%par%time 
 
         ! Store initial cpu time and model time for metrics later
         call yelmo_cpu_time(cpu_time0)
@@ -82,7 +84,8 @@ contains
         call calc_bmb_total(tpo%now%bmb,thrm%now%bmb_grnd,bnd%bmb_shlf,tpo%now%f_grnd,tpo%par%diffuse_bmb_shlf)
         
         
-        ! Perform topography calculations 
+        ! 1. Perform topography calculations ------------------
+
         if ( .not. topo_fixed .and. dt .gt. 0.0 ) then 
 
             ! Define temporary variable for total column mass balance 
@@ -136,7 +139,7 @@ contains
                     
                 case("kill") 
                     ! Delete all floating ice (using characteristic time parameter)
-                    call calc_calving_rate_kill(tpo%now%calv,tpo%now%H_ice,tpo%now%f_grnd.eq.0.0_prec,tpo%par%calv_tau)
+                    call calc_calving_rate_kill(tpo%now%calv,tpo%now%H_ice,tpo%now%f_grnd.eq.0.0_prec,tpo%par%calv_tau,dt)
 
                 case("kill-pos")
                     ! Delete all floating ice beyond a given location (using characteristic time parameter)
@@ -144,7 +147,7 @@ contains
                     call calc_calving_rate_kill(tpo%now%calv,tpo%now%H_ice, &
                                                     ( tpo%now%f_grnd .eq. 0.0_prec .and. &
                                                       tpo%now%H_ice  .gt. 0.0_prec .and. &
-                                                      bnd%calv_mask ), tpo%par%calv_tau)
+                                                      bnd%calv_mask ), tau=0.0_prec, dt=dt )
 
                 case DEFAULT 
 
@@ -156,7 +159,7 @@ contains
  
             ! Apply calving
             call apply_calving(tpo%now%H_ice,tpo%now%calv,tpo%now%f_grnd,tpo%par%H_min_flt,dt)
-
+            
             ! Apply special case for symmetric EISMINT domain when basal sliding is active
             ! (ensure summit thickness does not grow disproportionately)
             if (trim(tpo%par%boundaries) .eq. "EISMINT" .and. maxval(dyn%now%uxy_b) .gt. 0.0) then 
@@ -166,8 +169,8 @@ contains
                                         +tpo%now%H_ice(i,j-1)+tpo%now%H_ice(i,j+1)) / 4.0 
             end if  
              
-            ! Determine the rate of change of ice thickness [m/a]
-            tpo%now%dHicedt = (tpo%now%H_ice - tpo%now%H_ice_n)/dt
+            ! Save the rate of change of ice thickness in output variable [m/a]
+            tpo%now%dHicedt = (tpo%now%H_ice - tpo%now%H_ice_n) / dt 
 
         else 
 
@@ -176,43 +179,13 @@ contains
 
         end if 
 
-!         ! 2. Calculate new masks ------------------------------
+        ! 2. Calculate additional topographic properties ------------------
 
-!         ! Calculate grounding overburden ice thickness 
-!         call calc_H_grnd(tpo%now%H_grnd,tpo%now%H_ice,bnd%z_bed,bnd%z_sl)
+        ! Store previous surface elevation on predictor step
+        if (trim(tpo%par%pc_step) .eq. "predictor") then 
+            tpo%now%z_srf_n = tpo%now%z_srf 
+        end if 
 
-
-!         ! Calculate the grounded fraction and grounding line mask of each grid cell
-!         select case(tpo%par%gl_sep)
-
-!             case(1) 
-!                 ! Binary f_grnd, linear f_grnd_acx/acy based on H_grnd
-
-!                 call calc_f_grnd_subgrid_linear(tpo%now%f_grnd,tpo%now%f_grnd_acx,tpo%now%f_grnd_acy,tpo%now%H_grnd)
-
-!             case(2)
-!                 ! Grounded area f_gnrd, average to f_grnd_acx/acy 
-
-!                 call calc_f_grnd_subgrid_area(tpo%now%f_grnd,tpo%now%f_grnd_acx,tpo%now%f_grnd_acy,tpo%now%H_grnd,tpo%par%gl_sep_nx)
-            
-!         end select
-        
-! !         ! Filter f_grnd to avoid lakes of one grid point inside of grounded ice 
-! !         ! ajr: note, this should be improved to treat ac-nodes too 
-! !         call filter_f_grnd(tpo%now%f_grnd)
-
-!         ! Calculate the grounding line mask 
-!         call calc_grline(tpo%now%is_grline,tpo%now%is_grz,tpo%now%f_grnd)
-
-!         ! Calculate the bed mask
-!         tpo%now%mask_bed = gen_mask_bed(tpo%now%H_ice,thrm%now%f_pmp,tpo%now%f_grnd,tpo%now%is_grline)
-
-
-        ! 3. Calculate additional topographic properties ------------------
-
-        ! Store previous surface elevation 
-        tpo%now%dzsrfdt = tpo%now%z_srf
-        
         ! Calculate the surface elevation 
         select case(tpo%par%surf_gl_method)
             ! Choose method to treat grounding line points when calculating surface elevation
@@ -233,7 +206,7 @@ contains
 
         ! Determine rate of surface elevation change 
         if (dt .gt. 0.0) then 
-            tpo%now%dzsrfdt = (tpo%now%z_srf-tpo%now%dzsrfdt) / dt 
+            tpo%now%dzsrfdt = (tpo%now%z_srf-tpo%now%z_srf_n) / dt 
         else 
             tpo%now%dzsrfdt = 0.0 
         end if 
@@ -246,6 +219,38 @@ contains
         ! Modify surface slope gradient at the grounding line if desired 
 !         call calc_gradient_ac_gl(tpo%now%dzsdx,tpo%now%dzsdy,tpo%now%z_srf,tpo%now%H_ice, &
 !                                       tpo%now%f_grnd_acx,tpo%now%f_grnd_acy,tpo%par%dx,method=2,grad_lim=tpo%par%grad_lim)
+        
+        
+        ! 3. Calculate new masks ------------------------------
+
+        ! Calculate grounding overburden ice thickness 
+        call calc_H_grnd(tpo%now%H_grnd,tpo%now%H_ice,bnd%z_bed,bnd%z_sl)
+
+
+        ! Calculate the grounded fraction and grounding line mask of each grid cell
+        select case(tpo%par%gl_sep)
+
+            case(1) 
+                ! Binary f_grnd, linear f_grnd_acx/acy based on H_grnd
+
+                call calc_f_grnd_subgrid_linear(tpo%now%f_grnd,tpo%now%f_grnd_acx,tpo%now%f_grnd_acy,tpo%now%H_grnd)
+
+            case(2)
+                ! Grounded area f_gnrd, average to f_grnd_acx/acy 
+
+                call calc_f_grnd_subgrid_area(tpo%now%f_grnd,tpo%now%f_grnd_acx,tpo%now%f_grnd_acy,tpo%now%H_grnd,tpo%par%gl_sep_nx)
+            
+        end select
+        
+!         ! Filter f_grnd to avoid lakes of one grid point inside of grounded ice 
+!         ! ajr: note, this should be improved to treat ac-nodes too 
+!         call filter_f_grnd(tpo%now%f_grnd)
+
+        ! Calculate the grounding line mask 
+        call calc_grline(tpo%now%is_grline,tpo%now%is_grz,tpo%now%f_grnd)
+
+        ! Calculate the bed mask
+        tpo%now%mask_bed = gen_mask_bed(tpo%now%H_ice,thrm%now%f_pmp,tpo%now%f_grnd,tpo%now%is_grline)
 
         ! Calculate distance to ice margin (really slow if always on)
         !tpo%now%dist_margin = distance_to_margin(tpo%now%H_ice,tpo%par%dx)
@@ -253,8 +258,10 @@ contains
         ! Calculate distance to grounding line (really slow if always on)
         !tpo%now%dist_grline = distance_to_grline(tpo%now%is_grline,tpo%now%f_grnd,tpo%par%dx)
 
+        ! ================================
+
         ! Advance ytopo timestep 
-        tpo%par%time = time
+        tpo%par%time = dble(time)
 
         ! Calculate computational performance (model speed in kyr/hr)
         call yelmo_cpu_time(cpu_time1)
@@ -288,62 +295,6 @@ contains
         return 
 
     end subroutine calc_ytopo
-
-    subroutine calc_ytopo_masks(tpo,dyn,thrm,bnd)
-        ! Calculate adjustments to surface elevation, bedrock elevation
-        ! and ice thickness 
-
-        implicit none 
-
-        type(ytopo_class),  intent(INOUT) :: tpo
-        type(ydyn_class),   intent(IN)    :: dyn
-        type(ytherm_class), intent(IN)    :: thrm  
-        type(ybound_class), intent(IN)    :: bnd 
-
-        ! Local variables 
-        real(prec) :: dx   
-
-        ! 2. Calculate new masks ------------------------------
-
-        ! Calculate grounding overburden ice thickness 
-        call calc_H_grnd(tpo%now%H_grnd,tpo%now%H_ice,bnd%z_bed,bnd%z_sl)
-
-
-        ! Calculate the grounded fraction and grounding line mask of each grid cell
-        select case(tpo%par%gl_sep)
-
-            case(1) 
-                ! Binary f_grnd, linear f_grnd_acx/acy based on H_grnd
-
-                call calc_f_grnd_subgrid_linear(tpo%now%f_grnd,tpo%now%f_grnd_acx,tpo%now%f_grnd_acy,tpo%now%H_grnd)
-
-            case(2)
-                ! Grounded area f_gnrd, average to f_grnd_acx/acy 
-
-                call calc_f_grnd_subgrid_area(tpo%now%f_grnd,tpo%now%f_grnd_acx,tpo%now%f_grnd_acy,tpo%now%H_grnd,tpo%par%gl_sep_nx)
-            
-        end select
-        
-!         ! Filter f_grnd to avoid lakes of one grid point inside of grounded ice 
-!         ! ajr: note, this should be improved to treat ac-nodes too 
-!         call filter_f_grnd(tpo%now%f_grnd)
-
-        ! Calculate the grounding line mask 
-        call calc_grline(tpo%now%is_grline,tpo%now%is_grz,tpo%now%f_grnd)
-
-        ! Calculate the bed mask
-        tpo%now%mask_bed = gen_mask_bed(tpo%now%H_ice,thrm%now%f_pmp,tpo%now%f_grnd,tpo%now%is_grline)
-
-
-        ! Calculate distance to ice margin (really slow if always on)
-        !tpo%now%dist_margin = distance_to_margin(tpo%now%H_ice,tpo%par%dx)
-
-        ! Calculate distance to grounding line (really slow if always on)
-        !tpo%now%dist_grline = distance_to_grline(tpo%now%is_grline,tpo%now%f_grnd,tpo%par%dx)
-
-        return 
-
-    end subroutine calc_ytopo_masks
 
     subroutine ytopo_load_H_ice(tpo,nml_path,nml_group,domain,grid_name,ice_allowed)
         ! Update the topography of the yelmo domain 
@@ -526,6 +477,8 @@ contains
         allocate(now%H_ice_pred(nx,ny))
         allocate(now%H_ice_corr(nx,ny))
         
+        allocate(now%z_srf_n(nx,ny))
+        
         now%H_ice       = 0.0 
         now%z_srf       = 0.0  
         now%dzsrfdt     = 0.0 
@@ -556,6 +509,8 @@ contains
         now%H_ice_pred  = 0.0 
         now%H_ice_corr  = 0.0 
         
+        now%z_srf_n     = 0.0 
+
         return 
     end subroutine ytopo_alloc 
 
@@ -601,6 +556,8 @@ contains
         if (allocated(now%H_ice_n))     deallocate(now%H_ice_n)
         if (allocated(now%H_ice_pred))  deallocate(now%H_ice_pred)
         if (allocated(now%H_ice_corr))  deallocate(now%H_ice_corr)
+        
+        if (allocated(now%z_srf_n))     deallocate(now%z_srf_n)
         
         return 
 

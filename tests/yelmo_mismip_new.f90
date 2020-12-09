@@ -53,21 +53,21 @@ program yelmo_mismip
     file_compare = trim(outfldr)//"yelmo_compare.nc"
     
     ! Define the domain, grid and experiment from parameter file
-    call nml_read(path_par,"eismint","domain",       domain)        ! EISMINT1, EISMINT2
-    call nml_read(path_par,"eismint","experiment",   experiment)    ! "linear", "overdeepened", "flat"
-    call nml_read(path_par,"eismint","dx",           dx)            ! [km] Grid resolution 
-    call nml_read(path_par,"eismint","with_ssa",     with_ssa)      ! Include ssa in experiment?
+    call nml_read(path_par,"ctrl","domain",       domain)        ! EISMINT1, EISMINT2
+    call nml_read(path_par,"ctrl","experiment",   experiment)    ! "linear", "overdeepened", "flat"
+    call nml_read(path_par,"ctrl","dx",           dx)            ! [km] Grid resolution 
+    call nml_read(path_par,"ctrl","with_ssa",     with_ssa)      ! Include ssa in experiment?
 
     ! Timing parameters 
-    call nml_read(path_par,"eismint","time_init",    time_init)     ! [yr] Starting time
-    call nml_read(path_par,"eismint","time_end",     time_end)      ! [yr] Ending time
-    call nml_read(path_par,"eismint","dtt",          dtt)           ! [yr] Main loop time step 
-    call nml_read(path_par,"eismint","dt2D_out",     dt2D_out)      ! [yr] Frequency of 2D output 
+    call nml_read(path_par,"ctrl","time_init",    time_init)     ! [yr] Starting time
+    call nml_read(path_par,"ctrl","time_end",     time_end)      ! [yr] Ending time
+    call nml_read(path_par,"ctrl","dtt",          dtt)           ! [yr] Main loop time step 
+    call nml_read(path_par,"ctrl","dt2D_out",     dt2D_out)      ! [yr] Frequency of 2D output 
     dt1D_out = dtt  ! Set 1D output to frequency of main loop timestep 
 
     ! Settings for transient EISMINT1 experiments 
-    call nml_read(path_par,"eismint","period",       period)        ! [yr] for transient experiments 
-    call nml_read(path_par,"eismint","dT_test",      dT_test)       ! [K] for test experiments  
+    call nml_read(path_par,"ctrl","period",       period)        ! [yr] for transient experiments 
+    call nml_read(path_par,"ctrl","dT_test",      dT_test)       ! [K] for test experiments  
     
     ! Define the model domain based on the experiment we are running
     

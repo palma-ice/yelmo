@@ -42,17 +42,17 @@ program yelmo_ismiphom
 
     
     ! Define the domain, grid and experiment from parameter file
-    call nml_read(path_par,"control","domain",       domain)        ! ISMIPHOM
-    call nml_read(path_par,"control","experiment",   experiment)    ! "fixed", "moving", "mismip", "EXPA", "EXPB", "BUELER-A"
-    call nml_read(path_par,"control","L",            L)             ! [km] Length scale
-    call nml_read(path_par,"control","nx",           nx)            ! Number of grid points in one direction
-    call nml_read(path_par,"control","f_extend",     f_extend)      ! Extend domain by half a period?
+    call nml_read(path_par,"ctrl","domain",       domain)        ! ISMIPHOM
+    call nml_read(path_par,"ctrl","experiment",   experiment)    ! "fixed", "moving", "mismip", "EXPA", "EXPB", "BUELER-A"
+    call nml_read(path_par,"ctrl","L",            L)             ! [km] Length scale
+    call nml_read(path_par,"ctrl","nx",           nx)            ! Number of grid points in one direction
+    call nml_read(path_par,"ctrl","f_extend",     f_extend)      ! Extend domain by half a period?
     
     ! Timing parameters 
-    call nml_read(path_par,"control","time_init",    time_init)     ! [yr] Starting time
-    call nml_read(path_par,"control","time_end",     time_end)      ! [yr] Ending time
-    call nml_read(path_par,"control","dtt",          dtt)           ! [yr] Main loop time step 
-    call nml_read(path_par,"control","dt2D_out",     dt2D_out)      ! [yr] Frequency of 2D output 
+    call nml_read(path_par,"ctrl","time_init",    time_init)     ! [yr] Starting time
+    call nml_read(path_par,"ctrl","time_end",     time_end)      ! [yr] Ending time
+    call nml_read(path_par,"ctrl","dtt",          dtt)           ! [yr] Main loop time step 
+    call nml_read(path_par,"ctrl","dt2D_out",     dt2D_out)      ! [yr] Frequency of 2D output 
     dt1D_out = dtt  ! Set 1D output to frequency of main loop timestep 
 
 
@@ -104,7 +104,6 @@ program yelmo_ismiphom
             yelmo1%tpo%now%H_ice = yelmo1%tpo%now%z_srf - yelmo1%bnd%z_bed
             
             yelmo1%tpo%par%topo_fixed   = .TRUE. 
-            yelmo1%dyn%par%diva_no_slip = .TRUE. 
 
             if (trim(yelmo1%dyn%par%solver) .eq. "hybrid") then 
                 ! For this experiment, no basal sliding is allowed, so disable
@@ -117,6 +116,11 @@ program yelmo_ismiphom
                 write(*,*) "yelmo_ismiphom:: error: solver='ssa' cannot be used &
                 &for Experiment A, since there is no sliding, velocity would be zero."
                 stop 
+
+            else 
+                ! Modify solver name to specify noslip version
+
+                yelmo1%dyn%par%solver = trim(yelmo1%dyn%par%solver)//"-noslip"
 
             end if 
 
@@ -136,31 +140,9 @@ program yelmo_ismiphom
             yelmo1%tpo%now%H_ice = yelmo1%tpo%now%z_srf - yelmo1%bnd%z_bed
         
             yelmo1%tpo%par%topo_fixed   = .TRUE. 
-            yelmo1%dyn%par%diva_no_slip = .FALSE. 
 
             yelmo1%dyn%par%beta_method  = -1
-            
             yelmo1%dyn%now%beta         = 1000.0 + 1000.0 * sin(omega*yelmo1%grd%x) * sin(omega*yelmo1%grd%y)
-
-!             yelmo1%dyn%par%beta_gl_stag = -1
-
-!             do i = 1, yelmo1%grd%nx-1 
-!             do j = 1, yelmo1%grd%ny 
-!                 x_now = 0.5*(yelmo1%grd%x(i,j)+yelmo1%grd%x(i+1,j))
-!                 y_now = yelmo1%grd%y(i,j)
-!                 yelmo1%dyn%now%beta_acx(i,j) = 1000.0 + 1000.0 * sin(omega*x_now) * sin(omega*y_now)
-!             end do 
-!             end do  
-!             yelmo1%dyn%now%beta_acx(yelmo1%grd%nx,:) = yelmo1%dyn%now%beta_acx(yelmo1%grd%nx-1,:)
-            
-!             do i = 1, yelmo1%grd%nx 
-!             do j = 1, yelmo1%grd%ny-1 
-!                 x_now = yelmo1%grd%x(i,j)
-!                 y_now = 0.5*(yelmo1%grd%y(i,j)+yelmo1%grd%y(i,j+1))
-!                 yelmo1%dyn%now%beta_acx(i,j) = 1000.0 + 1000.0 * sin(omega*x_now) * sin(omega*y_now)
-!             end do 
-!             end do  
-!             yelmo1%dyn%now%beta_acy(:,yelmo1%grd%ny) = yelmo1%dyn%now%beta_acy(:,yelmo1%grd%ny-1)
 
         case("EXPF") 
 
@@ -168,6 +150,21 @@ program yelmo_ismiphom
             
             ! Ensure that topo_fixed is set to False here (the model will evolve) 
             yelmo1%tpo%par%topo_fixed = .FALSE. 
+
+        case("EXPG")
+            ! Goldberg timestepping analytical tests - TO DO 
+
+            ! Define topography (linear downward sloping bed)
+            alpha = 0.005           ! [rad] 
+            
+            yelmo1%tpo%now%z_srf = -yelmo1%grd%x * tan(alpha)
+            yelmo1%bnd%z_bed     = yelmo1%tpo%now%z_srf - 1000.0
+
+            yelmo1%tpo%now%H_ice = yelmo1%tpo%now%z_srf - yelmo1%bnd%z_bed
+            
+            ! Not used in this experiment, but set it to a constant value anyway
+            yelmo1%dyn%par%beta_method  = -1 
+            yelmo1%dyn%now%beta         = 1000.0
 
         case DEFAULT 
 
@@ -195,7 +192,7 @@ program yelmo_ismiphom
     ! Initialize state variables (dyn,therm,mat)
     call yelmo_init_state(yelmo1,path_par,time=time_init,thrm_method="robin")
 
-    call yelmo_update_equil(yelmo1,time_init,time_tot=1.0,topo_fixed=.TRUE.,dt=1.0,ssa_vel_max=5000.0)
+    call yelmo_update_equil(yelmo1,time_init,time_tot=1.0,dt=1.0,topo_fixed=.TRUE.)
     
     ! == Write initial state ==
      

@@ -1,9 +1,8 @@
-&eismint
+&ctrl
 
     domain       = "EISMINT"             ! "EISMINT"
     experiment   = "EXPA"                ! "fixed", "moving", "mismip", "EXPA", "EXPB", "EXPF","BUELER-A", "BUELER-B", "HALFAR", "HALFAR-MED"
     dx           = 25.0                  ! [km] Grid resolution (EISMINT1 = 50km, EISMINT2 = 25km)
-    with_ssa     = False                 ! Include ssa in experiment?
     topo_fixed   = False                 ! Calculate the topography, or use Heiko's topo file.  
     dyn_fixed    = False                 ! Fix dynamics after first calculation? 
     topo_fixed_file = "/Users/robinson/models/EURICE/yelmo/tests/heiko_imau-ice_help_fields_eismint_M_200kyr.nc"
@@ -37,9 +36,9 @@
     pc_controller   = "PI42"            ! PI42, H312b, H312PID, H321PID, PID1
     pc_filter_vel   = False             ! Use mean vel. solution of current and previous timestep
     pc_use_H_pred   = False             ! Use predicted H_ice instead of corrected H_ice 
-    pc_n_redo       = 5                 ! How many times can the same iteration be repeated (when high error exists)
-    pc_tol          = 1.5               ! [m/a] Tolerance threshold to redo timestep
-    pc_eps          = 1e-3              ! Predictor-corrector tolerance 
+    pc_n_redo       = 10                ! How many times can the same iteration be repeated (when high error exists)
+    pc_tol          = 2.0               ! [m/a] Tolerance threshold to redo timestep
+    pc_eps          = 1e-2              ! Predictor-corrector tolerance 
     
 /
 
@@ -66,8 +65,9 @@
 /
 
 &ydyn
-    solver              = "sia"           ! "fixed", "sia", "ssa", "hybrid", "diva"    
-    diva_no_slip        = False           ! If using the DIVA solver, is basal sliding allowed? 
+    solver              = "sia"           ! "fixed", "sia", "ssa", "hybrid", "diva", "diva-noslip", l1l2", "l1l2-noslip"
+    visc_method         = 1               ! 0: constant visc=visc_const, 1: dynamic viscosity
+    visc_const          = 1e7             ! [Pa a] Constant value for viscosity (if visc_method=0)
     beta_method         = 1               ! 0: constant beta; 1: linear (beta=cb/u0); 2: psuedo-plastic-power; 3: Regularized Coulomb
     beta_const          = 1e3             ! [Pa a m−1] Constant value of basal friction coefficient to be used
     beta_q              = 1.0             ! Dragging law exponent 
@@ -96,7 +96,7 @@
     ssa_iter_max        = 2               ! Number of maximum allowed iterations over ssa to converge on vel. solution
     ssa_iter_rel        = 0.7             ! [--] Relaxation fraction [0:1] to stabilize ssa iterations
     ssa_iter_conv       = 1e-2            ! [--] L2 relative error convergence limit to exit ssa iterations
-    taud_lim            = 1e6             ! [Pa] Maximum allowed driving stress 
+    taud_lim            = 2e5             ! [Pa] Maximum allowed driving stress 
     cb_sia              = 0.0             ! [m a-1 Pa-1] Bed roughness coefficient for SIA sliding
     
 /

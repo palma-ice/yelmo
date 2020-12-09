@@ -287,7 +287,7 @@ contains
     subroutine calc_driving_stress(taud_acx,taud_acy,H_ice,dzsdx,dzsdy,dx,taud_lim)
         ! Calculate driving stress on staggered grid points
         ! Units: taud [Pa] == [kg m-1 s-2]
-        ! taud = rho_ice*g*H_ice
+        ! taud = rho_ice*g*H_ice*dzs/dx
 
         ! Note: interpolation to Ab nodes no longer used here.
 

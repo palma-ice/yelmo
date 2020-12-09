@@ -323,7 +323,7 @@ contains
 
     end subroutine calc_calving_rate_eigen
 
-    subroutine calc_calving_rate_kill(calv,H_ice,mask,tau)
+    subroutine calc_calving_rate_kill(calv,H_ice,mask,tau,dt)
         ! Kill all ice in a given mask using a characteristic timescale tau
 
         implicit none 
@@ -332,8 +332,18 @@ contains
         real(prec), intent(IN)  :: H_ice(:,:)
         logical,    intent(IN)  :: mask(:,:) 
         real(prec), intent(IN)  :: tau 
+        real(prec), intent(IN)  :: dt 
 
-        where (mask) calv = H_ice / tau 
+        if (tau .eq. 0.0_prec) then 
+            ! Kill all ice immediately 
+
+            where (mask) calv = H_ice / dt
+
+        else 
+            ! Kill using characteristic timescale 
+            where (mask) calv = H_ice / tau 
+
+        end if 
 
         return 
 

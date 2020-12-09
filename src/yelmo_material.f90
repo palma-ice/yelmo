@@ -4,7 +4,7 @@ module yelmo_material
     use nml 
 
     use yelmo_defs
-    use yelmo_tools, only : calc_vertical_integrated_2D, calc_vertical_integrated_3D, regularize2D
+    use yelmo_tools, only : calc_vertical_integrated_2D, calc_vertical_integrated_3D
     
     use deformation
     use ice_tracer  
@@ -53,8 +53,8 @@ contains
         end if 
 
         ! Get time step and advance current time 
-        dt            = time - mat%par%time 
-        mat%par%time  = time 
+        dt            = dble(time) - mat%par%time 
+        mat%par%time  = dble(time) 
         
         ! 00. First update ice age if possible
         if (mat%par%calc_age .and. dt .gt. 0.0) then 
@@ -246,11 +246,6 @@ contains
                     call scale_rate_factor_water(mat%now%ATT,thrm%now%omega)
                 end if 
 
-                ! Ensure rate factor is relatively smooth
-!                 do k = 1, nz_aa
-!                     call regularize2D(mat%now%ATT(:,:,k),tpo%now%H_ice,tpo%par%dx)
-!                 end do 
-
                 ! Get vertically averaged value 
                 mat%now%ATT_bar = calc_vertical_integrated_2D(mat%now%ATT,mat%par%zeta_aa)
             
@@ -269,11 +264,6 @@ contains
         
         mat%now%visc = calc_viscosity_glen(mat%now%strn%de,mat%now%ATT,mat%par%n_glen,mat%par%visc_min)
         
-        ! Ensure viscosity is relatively smooth
-!         do k = 1, nz_aa
-!             call regularize2D(mat%now%visc(:,:,k),tpo%now%H_ice,tpo%par%dx)
-!         end do 
-
         ! Calculate visc_int (vertically integrated visc) as diagnostic quantity
         mat%now%visc_int = calc_vertical_integrated_2D(mat%now%visc,mat%par%zeta_aa)
         where(tpo%now%H_ice .gt. 0.0) mat%now%visc_int = mat%now%visc_int*tpo%now%H_ice 

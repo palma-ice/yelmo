@@ -14,6 +14,7 @@ module yelmo_tools
     public :: stagger_aa_ab
     public :: stagger_aa_ab_ice 
     public :: stagger_ab_aa 
+    public :: stagger_ab_aa_ice
     public :: stagger_aa_acx
     public :: stagger_aa_acy
     public :: stagger_acx_aa
@@ -228,21 +229,24 @@ contains
 
         ! Local variables 
         integer :: i, j, nx, ny  
-
+        integer :: im1, ip1, jm1, jp1 
+        
         nx = size(u,1)
         ny = size(u,2) 
 
         ustag = 0.0_prec 
 
-        do j = 1, ny-1 
-        do i = 1, nx-1
-            ustag(i,j) = 0.25_prec*(u(i+1,j+1)+u(i+1,j)+u(i,j+1)+u(i,j))
+        do j = 1, ny 
+        do i = 1, nx
+            ip1 = min(i+1,nx)
+            jp1 = min(j+1,ny)
+            ustag(i,j) = 0.25_prec*(u(ip1,jp1)+u(ip1,j)+u(i,jp1)+u(i,j))
         end do 
         end do 
 
         return
 
-    end function stagger_aa_ab 
+    end function stagger_aa_ab
     
     function stagger_aa_ab_ice(u,H_ice) result(ustag)
         ! Stagger from Aa => Ab
@@ -256,14 +260,19 @@ contains
 
         ! Local variables 
         integer :: i, j, nx, ny, k   
+        integer :: im1, ip1, jm1, jp1 
 
         nx = size(u,1)
         ny = size(u,2) 
 
         ustag = 0.0_prec 
 
-        do j = 1, ny-1 
-        do i = 1, nx-1
+        do j = 1, ny 
+        do i = 1, nx
+
+            ip1 = min(i+1,nx)
+            jp1 = min(j+1,ny)
+
             k = 0 
             ustag(i,j) = 0.0 
             if (H_ice(i,j) .gt. 0.0) then 
@@ -271,26 +280,27 @@ contains
                 k = k+1
             end if 
 
-            if (H_ice(i+1,j) .gt. 0.0) then 
-                ustag(i,j) = ustag(i,j) + u(i+1,j) 
+            if (H_ice(ip1,j) .gt. 0.0) then 
+                ustag(i,j) = ustag(i,j) + u(ip1,j) 
                 k = k+1 
             end if 
             
-            if (H_ice(i,j+1) .gt. 0.0) then 
-                ustag(i,j) = ustag(i,j) + u(i,j+1) 
+            if (H_ice(i,jp1) .gt. 0.0) then 
+                ustag(i,j) = ustag(i,j) + u(i,jp1) 
                 k = k+1 
             end if 
             
-            if (H_ice(i+1,j+1) .gt. 0.0) then 
-                ustag(i,j) = ustag(i,j) + u(i+1,j+1) 
+            if (H_ice(ip1,jp1) .gt. 0.0) then 
+                ustag(i,j) = ustag(i,j) + u(ip1,jp1) 
                 k = k+1 
             end if 
             
             if (k .gt. 0) then 
                 ustag(i,j) = ustag(i,j) / real(k,prec)
+            else 
+                ustag(i,j) = 0.25_prec*(u(ip1,jp1)+u(ip1,j)+u(i,jp1)+u(i,j))
             end if 
 
-            !ustag(i,j) = 0.25_prec*(u(i+1,j+1)+u(i+1,j)+u(i,j+1)+u(i,j))
         end do 
         end do 
 
@@ -309,21 +319,89 @@ contains
 
         ! Local variables 
         integer :: i, j, nx, ny  
+        integer :: im1, jm1, ip1, jp1
 
         nx = size(u,1)
         ny = size(u,2) 
 
         ustag = 0.0_prec 
 
-        do j = 2, ny 
-        do i = 2, nx
-            ustag(i,j) = 0.25_prec*(u(i,j)+u(i-1,j)+u(i,j-1)+u(i-1,j-1))
+        do j = 1, ny 
+        do i = 1, nx
+            im1 = max(i-1,1)
+            jm1 = max(j-1,1)
+            ustag(i,j) = 0.25_prec*(u(i,j)+u(im1,j)+u(i,jm1)+u(im1,jm1))
         end do 
         end do 
 
         return
 
     end function stagger_ab_aa 
+    
+    function stagger_ab_aa_ice(u,H_ice) result(ustag)
+        ! Stagger from ab => aa
+        ! Four point average from corner ab-nodes to central aa-node 
+
+        implicit none 
+
+        real(prec), intent(IN)  :: u(:,:) 
+        real(prec), intent(IN)  :: H_ice(:,:) 
+        real(prec) :: ustag(size(u,1),size(u,2)) 
+
+        ! Local variables 
+        integer :: i, j, nx, ny, k   
+        integer :: im1, jm1, ip1, jp1 
+        real(prec), allocatable ::H_ice_ab(:,:) 
+
+        nx = size(u,1)
+        ny = size(u,2) 
+
+        allocate(H_ice_ab(nx,ny))
+
+        H_ice_ab = stagger_aa_ab(H_ice) 
+
+        ustag = 0.0_prec 
+
+        do j = 1, ny 
+        do i = 1, nx
+
+            im1 = max(i-1,1)
+            jm1 = max(j-1,1)
+
+            k = 0 
+            ustag(i,j) = 0.0 
+            if (H_ice_ab(i,j) .gt. 0.0) then 
+                ustag(i,j) = ustag(i,j) + u(i,j) 
+                k = k+1
+            end if 
+
+            if (H_ice_ab(im1,j) .gt. 0.0) then 
+                ustag(i,j) = ustag(i,j) + u(im1,j) 
+                k = k+1 
+            end if 
+            
+            if (H_ice_ab(i,jm1) .gt. 0.0) then 
+                ustag(i,j) = ustag(i,j) + u(i,jm1) 
+                k = k+1 
+            end if 
+            
+            if (H_ice_ab(im1,jm1) .gt. 0.0) then 
+                ustag(i,j) = ustag(i,j) + u(im1,jm1) 
+                k = k+1 
+            end if 
+            
+            if (k .gt. 0) then 
+                ustag(i,j) = ustag(i,j) / real(k,prec)
+            else 
+                ustag(i,j) = 0.25_prec*(u(im1,jm1)+u(im1,j)+u(i,jm1)+u(i,j))
+            end if 
+
+        end do 
+        end do 
+
+        return
+
+    end function stagger_ab_aa_ice 
     
     function stagger_aa_acx(u) result(ustag)
         ! Stagger from Aa => Ac, x-direction 
@@ -1070,7 +1148,7 @@ contains
 
         return 
 
-    end subroutine regularize2D_gauss 
+    end subroutine regularize2D_gauss
 
     subroutine regularize2D(var,H_ice,dx)
         ! Ensure smoothness in 2D fields (ie, no checkerboard patterns)
@@ -1150,7 +1228,7 @@ contains
 
         return 
 
-    end subroutine regularize2D 
+    end subroutine regularize2D
 
     ! === Generic integration functions ============
 

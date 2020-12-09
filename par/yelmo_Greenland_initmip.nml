@@ -1,4 +1,4 @@
-&control    
+&ctrl   
     time_init       = 0.0               ! [yr] Starting time 
     time_end        = 5e3               ! [yr] Ending time
     time_equil      = 100.0             ! [yr] Equilibration time 
@@ -7,7 +7,7 @@
     dt1D_out        = 100.0             ! [yr] Frequency of writing 1D output files 
     dt2D_out        = 100.0             ! [yr] Frequency of writing 2D output files 
     
-    clim_nm         = "clim_pd_grl"     ! "clim_pd_grl", "clim_pd_ant" or "clim_lgm"
+    clim_nm         = "clim_pd"         ! "clim_pd" or "clim_lgm"
     with_anom       = False             ! Apply anomaly at start of sim but after equilibration?
 
     load_cf_ref     = False             ! Load cf_ref from file? Otherwise define from cf_stream + inline tuning
@@ -18,14 +18,8 @@
 
 /
 
-&clim_pd_grl 
+&clim_pd 
     bmb_shlf_const  = -10.0             ! [m/a] Basal mass balance of ice shelves
-    dT_ann          = 0.0               ! [K]  Temperature anomaly (atm)
-    z_sl            = 0.0               ! [m] Sea level relative to present-day 
-/
-
-&clim_pd_ant 
-    bmb_shlf_const  = -0.2              ! [m/a] Basal mass balance of ice shelves
     dT_ann          = 0.0               ! [K]  Temperature anomaly (atm)
     z_sl            = 0.0               ! [m] Sea level relative to present-day 
 /
@@ -83,8 +77,9 @@
 /
 
 &ydyn
-    solver              = "diva"          ! "fixed", "sia", "ssa", "hybrid", "diva"    
-    diva_no_slip        = False           ! If using the DIVA solver, is basal sliding allowed? 
+    solver              = "diva"          ! "fixed", "sia", "ssa", "hybrid", "diva", "diva-noslip", l1l2", "l1l2-noslip"
+    visc_method         = 1               ! 0: constant visc=visc_const, 1: dynamic viscosity
+    visc_const          = 1e7             ! [Pa a] Constant value for viscosity (if visc_method=0)
     beta_method         = 1               ! 0: constant beta; 1: linear (beta=cb/u0); 2: psuedo-plastic-power; 3: Regularized Coulomb
     beta_const          = 1e3             ! [Pa a m-1] Constant value of basal friction coefficient to be used
     beta_q              = 1.0             ! Dragging law exponent 

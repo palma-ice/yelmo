@@ -54,6 +54,8 @@ contains
         real(prec), allocatable :: ux_tmp(:,:) 
         real(prec), allocatable :: uy_tmp(:,:) 
 
+        real(prec), parameter :: dHdt_advec_lim = 10.0_prec     ! [m/a] Limit on advection rate
+
         nx = size(H_ice,1)
         ny = size(H_ice,2)
 
@@ -105,6 +107,10 @@ contains
                 ! Determine current advective rate of change (time=n)
                 call calc_advec2D(dHdt_n,H_ice,ux_tmp,uy_tmp,mbal*0.0,dx,dx,dt,solver)
 
+                ! ajr: testing stability fix for spin-up, limit advection rate!
+                ! where(dHdt_n .gt.  dHdt_advec_lim) dHdt_n = dHdt_advec_lim
+                ! where(dHdt_n .lt. -dHdt_advec_lim) dHdt_n = -dHdt_advec_lim
+                
                 ! Calculate rate of change using weighted advective rates of change 
                 dHdt_advec = beta(1)*dHdt_n + beta(2)*dHdt_advec 
                 
@@ -116,6 +122,10 @@ contains
                 ! Determine advective rate of change based on predicted H,ux/y fields (time=n+1,pred)
                 call calc_advec2D(dHdt_advec,H_ice_pred,ux_tmp,uy_tmp,mbal*0.0,dx,dx,dt,solver)
 
+                ! ajr: testing stability fix for spin-up, limit advection rate!
+                ! where(dHdt_advec .gt.  dHdt_advec_lim) dHdt_advec = dHdt_advec_lim
+                ! where(dHdt_advec .lt. -dHdt_advec_lim) dHdt_advec = -dHdt_advec_lim
+                
                 ! Calculate rate of change using weighted advective rates of change 
                 dHdt_advec = beta(3)*dHdt_advec + beta(4)*dHdt_n 
                 
@@ -172,7 +182,7 @@ contains
         ! Limit grounded ice thickess to above minimum and below inland neighbor at the margin
 !         call limit_grounded_margin_thickness(H_ice,mb_applied,f_grnd,H_min,dt) 
         call limit_grounded_margin_thickness_flux(H_ice,mb_applied,f_grnd,mbal,ux_tmp,uy_tmp,dx,dt,H_min)
-            
+        
         ! Also ensure tiny numeric ice thicknesses are removed
         where (H_ice .lt. 1e-5) H_ice = 0.0 
 
@@ -718,7 +728,7 @@ contains
 
         return 
 
-    end subroutine relax_ice_thickness 
+    end subroutine relax_ice_thickness
 
 
 end module mass_conservation

@@ -22,10 +22,11 @@ program yelmo_benchmarks
     character(len=256) :: file_restart
     character(len=512) :: path_par, path_const 
     character(len=56)  :: experiment
-    logical    :: topo_fixed, dyn_fixed 
+    logical    :: topo_fixed, dyn_fixed, with_bumps 
     character(len=256) :: topo_fixed_file 
     real(prec) :: time_init, time_end, time, dtt, dt2D_out, dt1D_out
-    real(prec) :: period, dt_test 
+    real(prec) :: period, dt_test, alpha, omega, L, amp 
+    real(prec) :: bumps_L, bumps_A 
     integer    :: n  
 
     character(len=56) :: grid_name
@@ -53,24 +54,29 @@ program yelmo_benchmarks
 
     
     ! Define the domain, grid and experiment from parameter file
-    call nml_read(path_par,"eismint","domain",       domain)        ! EISMINT1, EISMINT2
-    call nml_read(path_par,"eismint","experiment",   experiment)    ! "fixed", "moving", "mismip", "EXPA", "EXPB", "BUELER-A"
-    call nml_read(path_par,"eismint","dx",           dx)            ! [km] Grid resolution 
-    call nml_read(path_par,"eismint","topo_fixed",   topo_fixed)    ! Calculate the topography, or use Heiko's topo file. 
-    call nml_read(path_par,"eismint","dyn_fixed",    dyn_fixed)     ! Calculate the topography, or use Heiko's topo file. 
-    call nml_read(path_par,"eismint","topo_fixed_file",topo_fixed_file)     ! File containing fixed topo field of H_ice
+    call nml_read(path_par,"ctrl","domain",       domain)        ! EISMINT1, EISMINT2
+    call nml_read(path_par,"ctrl","experiment",   experiment)    ! "fixed", "moving", "mismip", "EXPA", "EXPB", "BUELER-A"
+    call nml_read(path_par,"ctrl","dx",           dx)            ! [km] Grid resolution 
+    call nml_read(path_par,"ctrl","topo_fixed",   topo_fixed)    ! Calculate the topography, or use Heiko's topo file. 
+    call nml_read(path_par,"ctrl","dyn_fixed",    dyn_fixed)     ! Calculate the topography, or use Heiko's topo file. 
+    call nml_read(path_par,"ctrl","topo_fixed_file",topo_fixed_file)     ! File containing fixed topo field of H_ice
     
     ! Timing parameters 
-    call nml_read(path_par,"eismint","time_init",    time_init)     ! [yr] Starting time
-    call nml_read(path_par,"eismint","time_end",     time_end)      ! [yr] Ending time
-    call nml_read(path_par,"eismint","dtt",          dtt)           ! [yr] Main loop time step 
-    call nml_read(path_par,"eismint","dt2D_out",     dt2D_out)      ! [yr] Frequency of 2D output 
+    call nml_read(path_par,"ctrl","time_init",    time_init)     ! [yr] Starting time
+    call nml_read(path_par,"ctrl","time_end",     time_end)      ! [yr] Ending time
+    call nml_read(path_par,"ctrl","dtt",          dtt)           ! [yr] Main loop time step 
+    call nml_read(path_par,"ctrl","dt2D_out",     dt2D_out)      ! [yr] Frequency of 2D output 
     dt1D_out = dtt  ! Set 1D output to frequency of main loop timestep 
 
     ! Settings for transient EISMINT1 experiments 
-    call nml_read(path_par,"eismint","period",       period)        ! [yr] for transient experiments 
-    call nml_read(path_par,"eismint","dT_test",      dT_test)       ! [K] for test experiments  
+    call nml_read(path_par,"ctrl","period",       period)        ! [yr] for transient experiments 
+    call nml_read(path_par,"ctrl","dT_test",      dT_test)       ! [K] for test experiments  
     
+    call nml_read(path_par,"ctrl","with_bumps",with_bumps)       ! Bedrock with sin bumps?
+    call nml_read(path_par,"ctrl","bumps_L",bumps_L)             ! [km] Length scale of bumps
+    call nml_read(path_par,"ctrl","bumps_A",bumps_A)             ! [m]  Amplitude of bumps
+    
+
     ! Define the model domain based on the experiment we are running
     select case(trim(experiment))
 
@@ -96,7 +102,7 @@ program yelmo_benchmarks
             nx = (300.0 / dx) + 1        ! Domain width is 300 km total (-150 to 150 km)
 
         case DEFAULT 
-            ! EISMINT1, EISMINT2 and Bueler test grid setup 
+            ! EISMINT1, EISMINT2, dome and Bueler test grid setup 
 
             grid_name = "EISMINT"
             nx = (1500.0 / dx) + 1     ! Domain width is 1500 km total (-750 to 750 km)
@@ -142,12 +148,35 @@ program yelmo_benchmarks
 
 !             where(yelmo1%bnd%z_bed .lt. 0.0) yelmo1%bnd%smb = 0.0 
         
-        case DEFAULT 
-            ! EISMINT1, EISMINT2, BUELER 
+        case("dome") 
+            ! Define a radially symmetric ice sheet to start, based on an ellipsoidal (square root) profile
+            ! following Lipscomb et al. (2019) and CISMv2.1. 
 
-            yelmo1%tpo%now%z_srf  = yelmo1%bnd%z_bed + yelmo1%tpo%now%H_ice 
+            call dome_init(yelmo1%tpo%now%H_ice,yelmo1%grd%x,yelmo1%grd%y,R0=0.5_prec,H0=2000.0_prec)
+
+            yelmo1%bnd%z_bed     = 0.0_prec 
+            yelmo1%tpo%now%z_srf = yelmo1%bnd%z_bed + yelmo1%tpo%now%H_ice
+
+        case DEFAULT 
+            ! EISMINT1, EISMINT2, HALFAR, BUELER 
+
+            yelmo1%bnd%z_bed     = 0.0_prec 
+            yelmo1%tpo%now%H_ice = 0.0_prec 
+            yelmo1%tpo%now%z_srf = yelmo1%bnd%z_bed + yelmo1%tpo%now%H_ice 
 
     end select 
+
+    if (with_bumps) then 
+
+        L     = bumps_L                 ! [km] Length scale 
+        amp   = bumps_A                 ! [m] Amplitude 
+        alpha = 0.5*pi/180.0_prec       ! [rad] 
+        omega = 2.0_prec*pi / (L*1e3)   ! [rad/m]
+
+        !yelmo1%tpo%now%z_srf = -yelmo1%grd%x * tan(alpha)
+        yelmo1%bnd%z_bed     = 0.0 + amp * sin(omega*yelmo1%grd%x) * sin(omega*yelmo1%grd%y)
+
+    end if 
 
     ! ==== READ STEADY-STATE TOPOGRAPHY FROM HEIKO'S RUN
     if (topo_fixed) then
@@ -173,6 +202,10 @@ program yelmo_benchmarks
     yelmo1%bnd%bmb_shlf = 0.0  
     yelmo1%bnd%T_shlf   = T0  
     yelmo1%bnd%H_sed    = 0.0 
+
+    if (with_bumps) then 
+        yelmo1%bnd%z_sl     = -5000.0
+    end if 
 
     select case(trim(experiment))
 
@@ -249,6 +282,14 @@ program yelmo_benchmarks
             ! Initialize mismip boundary values 
             call mismip3D_boundaries(yelmo1%bnd%T_srf,yelmo1%bnd%smb,yelmo1%bnd%Q_geo,experiment="Stnd") 
 
+        case("dome") 
+            ! Boundary conditions are free to be chosen here 
+
+            ! Set conditions similar to EISMINT2-EXPA with smaller radius 
+            call dome_boundaries(yelmo1%bnd%T_srf,yelmo1%bnd%smb,yelmo1%bnd%Q_geo, &
+                            yelmo1%grd%x,yelmo1%grd%y,yelmo1%tpo%now%H_ice, &
+                            experiment="dome",time=time,smb_max=0.3_prec,rad_el=300.0_prec,period=period,dT_test=dT_test)
+                
         case DEFAULT 
             ! EISMINT 
 
@@ -303,8 +344,6 @@ program yelmo_benchmarks
         yelmo1%dyn%par%solver = "fixed"
     end if 
 
-
-
     ! Advance timesteps
     do n = 1, ceiling((time_end-time_init)/dtt)
 
@@ -351,6 +390,14 @@ program yelmo_benchmarks
 
                 ! Initialize mismip boundary values 
                 call mismip3D_boundaries(yelmo1%bnd%T_srf,yelmo1%bnd%smb,yelmo1%bnd%Q_geo,experiment="Stnd") 
+
+            case("dome") 
+            ! Boundary conditions are free to be chosen here 
+
+                ! Set conditions similar to EISMINT2-EXPA with smaller radius 
+                call dome_boundaries(yelmo1%bnd%T_srf,yelmo1%bnd%smb,yelmo1%bnd%Q_geo, &
+                                yelmo1%grd%x,yelmo1%grd%y,yelmo1%tpo%now%H_ice, &
+                                experiment="dome",time=time,smb_max=0.3_prec,rad_el=300.0_prec,period=period,dT_test=dT_test)
 
             case DEFAULT 
 

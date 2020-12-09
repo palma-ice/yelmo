@@ -1,6 +1,6 @@
 #!/bin/bash
 
-fldr='tmp/yelmo1.1'
+fldr='tmp/yelmo1.2'
 
 
 ### BENCHMARK TESTS ###
@@ -29,43 +29,48 @@ job run --shell -f -o ${fldr}/moving_dts -p eismint.time_end=25e3 yelmo.log_time
 
 make initmip
 
-# Antarctica present-day and LGM simulations
-# In par-gmd/yelmo_Antarctica.nml, set control.clim_nm="clim_pd"
+# Antarctica present-day and LGM simulations (now with ydyn.solver='diva' by default)
+# In par-gmd/yelmo_Antarctica.nml, set ctrl.clim_nm="clim_pd"
 python run_yelmo.py -s -e initmip ${fldr}/ant-pd  par-gmd/yelmo_Antarctica.nml
-# In par-gmd/yelmo_Antarctica.nml, set control.clim_nm="clim_lgm"
+# In par-gmd/yelmo_Antarctica.nml, set ctrl.clim_nm="clim_lgm"
 python run_yelmo.py -s -e initmip ${fldr}/ant-lgm par-gmd/yelmo_Antarctica.nml
 
 # Or to run via batch call:
-job run --shell -f -o ${fldr}/ant -a -p control.clim_nm="clim_pd","clim_lgm" -- python run_yelmo.py -x -s -e initmip {} par-gmd/yelmo_Antarctica.nml
+job run --shell -f -o ${fldr}/ant -a -p ctrl.clim_nm="clim_pd","clim_lgm" -- python run_yelmo.py -x -s -e initmip {} par-gmd/yelmo_Antarctica.nml
 
 
 # Greenland present-day simulation (not part of GMD suite of tests)
 python run_yelmo.py -s -e initmip ${fldr}/grl par/yelmo_Greenland_initmip.nml
-
-job run --shell -f -o tmp/perform2 -a -p control.clim_nm="clim_pd_grl" yelmo.domain="Greenland"  ydyn.solver="diva","hybrid" yelmo.grid_name="GRL-32KM","GRL-16KM","GRL-8KM" -- python run_yelmo.py -x -s -q priority -w 24 -e initmip {} par/yelmo_initmip.nml 
-job run --shell -f -o tmp/perform2 -a -p control.clim_nm="clim_pd_ant" yelmo.domain="Antarctica" ydyn.solver="diva","hybrid" yelmo.grid_name="ANT-32KM","ANT-16KM" -- python run_yelmo.py -x -s -q priority -w 24 -e initmip {} par/yelmo_initmip.nml 
 
 
 ### MISMIP TESTS ###
 
 make mismip
 
-job run --shell -f -o ${fldr}/mismip/default -p ydyn.beta_gl_scale=0 ydyn.beta_gl_stag=0 mismip.dx=2.5,5.0,10.0,20.0 -- python run_yelmo.py -x -s -q medium -w 60 -e mismip {} par-gmd/yelmo_MISMIP3D.nml
-job run --shell -f -o ${fldr}/mismip/subgrid -p ydyn.beta_gl_scale=0 ydyn.beta_gl_stag=3 mismip.dx=2.5,5.0,10.0,20.0 -- python run_yelmo.py -x -s -q medium -w 60 -e mismip {} par-gmd/yelmo_MISMIP3D.nml
-job run --shell -f -o ${fldr}/mismip/scaling -p ydyn.beta_gl_scale=2 ydyn.beta_gl_stag=3 mismip.dx=2.5,5.0,10.0,20.0 -- python run_yelmo.py -x -s -q medium -w 60 -e mismip {} par-gmd/yelmo_MISMIP3D.nml
+# For faster, less high-resolution simulations:
+job run --shell -f -o ${fldr}/mismip/default -p ydyn.beta_gl_scale=0 ydyn.beta_gl_stag=0 mismip.dx=10.0,20.0 -- python run_yelmo.py -x -s -q short -w 24 -e mismip {} par-gmd/yelmo_MISMIP3D.nml
+job run --shell -f -o ${fldr}/mismip/subgrid -p ydyn.beta_gl_scale=0 ydyn.beta_gl_stag=3 mismip.dx=10.0,20.0 -- python run_yelmo.py -x -s -q short -w 24 -e mismip {} par-gmd/yelmo_MISMIP3D.nml
+job run --shell -f -o ${fldr}/mismip/scaling -p ydyn.beta_gl_scale=2 ydyn.beta_gl_stag=3 mismip.dx=10.0,20.0 -- python run_yelmo.py -x -s -q short -w 24 -e mismip {} par-gmd/yelmo_MISMIP3D.nml
 
-### ISMIP-HOM TESTS ###
+# For high-resolution sims only (medium queue):
+job run --shell -f -o ${fldr}/mismip-hi/default -p ydyn.beta_gl_scale=0 ydyn.beta_gl_stag=0 mismip.dx=2.5,5.0 -- python run_yelmo.py -x -s -q medium -w 60 -e mismip {} par-gmd/yelmo_MISMIP3D.nml
+job run --shell -f -o ${fldr}/mismip-hi/subgrid -p ydyn.beta_gl_scale=0 ydyn.beta_gl_stag=3 mismip.dx=2.5,5.0 -- python run_yelmo.py -x -s -q medium -w 60 -e mismip {} par-gmd/yelmo_MISMIP3D.nml
+job run --shell -f -o ${fldr}/mismip-hi/scaling -p ydyn.beta_gl_scale=2 ydyn.beta_gl_stag=3 mismip.dx=2.5,5.0 -- python run_yelmo.py -x -s -q medium -w 60 -e mismip {} par-gmd/yelmo_MISMIP3D.nml
 
-make ismiphom 
+# Trough simulation (not part of GMD suite of tests)
+# MISMIP+ benchmark tests
+# Feldmann and Levermann (2017)
 
-job run --shell -f -o ${fldr}/ismiphom/expa/hybrid -p control.experiment="EXPA" control.L=5,10,20,40,80,160 ydyn.solver="hybrid" -- python run_yelmo.py -x -r -e ismiphom {} par/yelmo_ISMIPHOM.nml
-job run --shell -f -o ${fldr}/ismiphom/expa/diva   -p control.experiment="EXPA" control.L=5,10,20,40,80,160 ydyn.solver="diva"   -- python run_yelmo.py -x -r -e ismiphom {} par/yelmo_ISMIPHOM.nml
-job run --shell -f -o ${fldr}/ismiphom/expc/hybrid -p control.experiment="EXPC" control.L=5,10,20,40,80,160 ydyn.solver="hybrid" -- python run_yelmo.py -x -r -e ismiphom {} par/yelmo_ISMIPHOM.nml
-job run --shell -f -o ${fldr}/ismiphom/expc/diva   -p control.experiment="EXPC" control.L=5,10,20,40,80,160 ydyn.solver="diva"   -- python run_yelmo.py -x -r -e ismiphom {} par/yelmo_ISMIPHOM.nml
-
-# Trough simulation following Feldmann and Levermann (2017)  (not part of GMD suite of tests)
 make trough
 
+# MISMIP+
+python run_yelmo.py -s -e trough ${fldr}/mismip+ par/yelmo_MISMIP+.nml
+
+# MISMIP+ ensemble (hybrid,diva), run on the cluster:
+job run --shell -f -o ${fldr}/mismip+ -p ydyn.solver="hybrid","diva" -- python run_yelmo.py -x -s -q priority -w 5 -e trough {} par/yelmo_MISMIP+.nml
+
+
+# F17
 python run_yelmo.py -s -e trough ${fldr}/trough par/yelmo_TROUGH-F17.nml
 
 ### AGE TESTS ###

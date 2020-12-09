@@ -89,7 +89,7 @@ module yelmo_defs
         logical            :: diffuse_bmb_shlf 
 
         ! Internal parameters 
-        real(prec)         :: time 
+        real(dp)           :: time 
         integer            :: nx, ny
         real(prec)         :: dx, dy
         character(len=256) :: boundaries 
@@ -142,6 +142,8 @@ module yelmo_defs
         real(prec), allocatable :: H_ice_pred(:,:)  ! [m] Ice thickness, predicted, for time=n+1
         real(prec), allocatable :: H_ice_corr(:,:)  ! [m] Ice thickness, corrected, for time=n+1 
         
+        real(prec), allocatable :: z_srf_n(:,:)     ! [m] Surface elevation from the previous timestep 
+        
     end type
 
     ! ytopo class
@@ -162,9 +164,8 @@ module yelmo_defs
     type ydyn_param_class
 
         character(len=256) :: solver 
-        integer    :: mix_method            ! Method for mixing sia and ssa velocity solutions
-        logical    :: calc_diffusivity      ! Calculate diagnostic diffusivity field
-        logical    :: diva_no_slip 
+        integer    :: visc_method 
+        real(prec) :: visc_const 
         integer    :: beta_method
         real(prec) :: beta_const
         real(prec) :: beta_q                ! Friction law exponent
@@ -221,7 +222,7 @@ module yelmo_defs
         real(prec) :: dx, dy
         real(prec), allocatable :: zeta_aa(:)   ! Layer centers (aa-nodes), plus base and surface: nz_aa points 
         real(prec), allocatable :: zeta_ac(:)   ! Layer borders (ac-nodes), plus base and surface: nz_ac == nz_aa-1 points
-        real(prec) :: time
+        real(dp)   :: time
 
         integer    :: ssa_iter_now              ! Number of iterations used for Picard iteration to solve ssa this timestep
         real(prec) :: speed 
@@ -298,10 +299,8 @@ module yelmo_defs
         real(prec), allocatable :: c_bed(:,:)  
         real(prec), allocatable :: beta_acx(:,:) 
         real(prec), allocatable :: beta_acy(:,:) 
-        real(prec), allocatable :: beta(:,:) 
-        
+        real(prec), allocatable :: beta(:,:)         
         real(prec), allocatable :: beta_eff(:,:) 
-        real(prec), allocatable :: beta_diva(:,:)
 
         real(prec), allocatable :: f_vbvs(:,:) 
 
@@ -366,7 +365,7 @@ module yelmo_defs
         real(prec)          :: tracer_impl_kappa
         
         ! Internal parameters
-        real(prec) :: time 
+        real(dp)   :: time 
         real(prec) :: dx, dy  
         integer    :: nx, ny, nz_aa, nz_ac  
         integer    :: n_iso 
@@ -438,7 +437,7 @@ module yelmo_defs
         real(prec), allocatable :: dzeta_a(:)
         real(prec), allocatable :: dzeta_b(:)
         
-        real(prec) :: time
+        real(dp)   :: time
         real(prec) :: dt_zeta, dt_beta(2)
 
         real(prec) :: speed 
@@ -684,16 +683,21 @@ module yelmo_defs
         real(prec), allocatable :: zeta_ac(:)   ! Layer borders (ac-nodes), plus base and surface: nz_ac == nz_aa-1 points
         
         ! Other internal parameters
-        real(prec), allocatable :: dt_adv(:,:) 
-        real(prec), allocatable :: dt_diff(:,:) 
-        real(prec), allocatable :: dt_adv3D(:,:,:)
         logical :: use_restart 
         
+    end type
+
+    type ytime_class 
+
         ! Time step parameters for predictor-corrector (PC) method (Cheng et al, 2017)
         real(prec) :: pc_dt(3)
         real(prec) :: pc_eta(3)
         real(prec), allocatable :: pc_tau(:,:)
         real(prec), allocatable :: pc_tau_masked(:,:)
+        
+        real(prec), allocatable :: dt_adv(:,:) 
+        real(prec), allocatable :: dt_diff(:,:) 
+        real(prec), allocatable :: dt_adv3D(:,:,:)
         
         ! Timing information
         real(prec) :: model_speed 
@@ -711,13 +715,14 @@ module yelmo_defs
 
         character(len=512)   :: log_timestep_file 
 
-    end type
+    end type 
 
     ! Define the overall yelmo_class, which is a container for
     ! all information needed to model a given domain (eg, Greenland, Antarctica, NH)
     type yelmo_class
         type(yelmo_param_class) :: par      ! General domain parameters
         type(ygrid_class)       :: grd      ! Grid definition
+        type(ytime_class)       :: time     ! Timestep and timing variables
         type(ytopo_class)       :: tpo      ! Topography variables
         type(ydyn_class)        :: dyn      ! Dynamics variables
         type(ymat_class)        :: mat      ! Material variables
@@ -862,7 +867,7 @@ contains
 
         return 
 
-    end subroutine yelmo_load_command_line_args 
+    end subroutine yelmo_load_command_line_args
 
     subroutine yelmo_cpu_time(time,time0,dtime)
         ! Calculate time intervals using system_clock.

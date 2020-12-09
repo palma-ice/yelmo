@@ -1,7 +1,7 @@
 module velocity_diva
 
     use yelmo_defs ,only  : prec, rho_ice, rho_sw, rho_w, g
-    use yelmo_tools, only : stagger_aa_ab, stagger_aa_ab_ice, &
+    use yelmo_tools, only : stagger_aa_ab, stagger_aa_ab_ice, stagger_ab_aa_ice, &
                     calc_vertical_integrated_2D, & 
                     integrate_trapezoid1D_1D, integrate_trapezoid1D_pt, minmax
 
@@ -14,7 +14,9 @@ module velocity_diva
 
         character(len=256) :: ssa_lis_opt 
         character(len=256) :: boundaries 
-        logical    :: diva_no_slip 
+        logical    :: no_slip 
+        integer    :: visc_method
+        real(prec) :: visc_const
         integer    :: beta_method
         real(prec) :: beta_const
         real(prec) :: beta_q                ! Friction law exponent
@@ -39,9 +41,10 @@ module velocity_diva
 
 contains 
 
-    subroutine calc_velocity_diva(ux,uy,ux_i,uy_i,ux_bar,uy_bar,ux_b,uy_b,duxdz,duydz,taub_acx,taub_acy, &
-                                  visc_eff,visc_eff_int,ssa_mask_acx,ssa_mask_acy,ssa_err_acx,ssa_err_acy,ssa_iter_now, &
-                                  beta,beta_acx,beta_acy,beta_eff,beta_diva,c_bed,taud_acx,taud_acy,H_ice,H_grnd,f_grnd, &
+    subroutine calc_velocity_diva(ux,uy,ux_bar,uy_bar,ux_b,uy_b,ux_i,uy_i,taub_acx,taub_acy, &
+                                  beta,beta_acx,beta_acy,beta_eff,visc_eff,visc_eff_int,duxdz,duydz, &
+                                  ssa_mask_acx,ssa_mask_acy,ssa_err_acx,ssa_err_acy,ssa_iter_now, &
+                                  c_bed,taud_acx,taud_acy,H_ice,H_grnd,f_grnd, &
                                   f_grnd_acx,f_grnd_acy,ATT,zeta_aa,z_sl,z_bed,dx,dy,n_glen,par)
         ! This subroutine is used to solve the horizontal velocity system (ux,uy)
         ! following the Depth-Integrated Viscosity Approximation (DIVA),
@@ -53,28 +56,27 @@ contains
 
         real(prec), intent(INOUT) :: ux(:,:,:)          ! [m/a]
         real(prec), intent(INOUT) :: uy(:,:,:)          ! [m/a]
-        real(prec), intent(INOUT) :: ux_i(:,:,:)        ! [m/a]
-        real(prec), intent(INOUT) :: uy_i(:,:,:)        ! [m/a]
         real(prec), intent(INOUT) :: ux_bar(:,:)        ! [m/a]
         real(prec), intent(INOUT) :: uy_bar(:,:)        ! [m/a]
         real(prec), intent(INOUT) :: ux_b(:,:)          ! [m/a]
         real(prec), intent(INOUT) :: uy_b(:,:)          ! [m/a]
-        real(prec), intent(INOUT) :: duxdz(:,:,:)       ! [1/a]
-        real(prec), intent(INOUT) :: duydz(:,:,:)       ! [1/a]
+        real(prec), intent(INOUT) :: ux_i(:,:,:)        ! [m/a]
+        real(prec), intent(INOUT) :: uy_i(:,:,:)        ! [m/a]
         real(prec), intent(INOUT) :: taub_acx(:,:)      ! [Pa]
         real(prec), intent(INOUT) :: taub_acy(:,:)      ! [Pa]
+        real(prec), intent(INOUT) :: beta(:,:)          ! [Pa a/m]
+        real(prec), intent(INOUT) :: beta_acx(:,:)      ! [Pa a/m]
+        real(prec), intent(INOUT) :: beta_acy(:,:)      ! [Pa a/m]
+        real(prec), intent(OUT)   :: beta_eff(:,:)      ! [Pa a/m]
         real(prec), intent(INOUT) :: visc_eff(:,:,:)    ! [Pa a]
         real(prec), intent(OUT)   :: visc_eff_int(:,:)  ! [Pa a m]
+        real(prec), intent(OUT)   :: duxdz(:,:,:)       ! [1/a]
+        real(prec), intent(OUT)   :: duydz(:,:,:)       ! [1/a]
         integer,    intent(OUT)   :: ssa_mask_acx(:,:)  ! [-]
         integer,    intent(OUT)   :: ssa_mask_acy(:,:)  ! [-]
         real(prec), intent(OUT)   :: ssa_err_acx(:,:)
         real(prec), intent(OUT)   :: ssa_err_acy(:,:)
         integer,    intent(OUT)   :: ssa_iter_now 
-        real(prec), intent(INOUT) :: beta(:,:)          ! [Pa a/m]
-        real(prec), intent(INOUT) :: beta_acx(:,:)      ! [Pa a/m]
-        real(prec), intent(INOUT) :: beta_acy(:,:)      ! [Pa a/m]
-        real(prec), intent(OUT)   :: beta_eff(:,:)      ! [Pa a/m]
-        real(prec), intent(OUT)   :: beta_diva(:,:)     ! [Pa a/m]
         real(prec), intent(IN)    :: c_bed(:,:)         ! [Pa]
         real(prec), intent(IN)    :: taud_acx(:,:)      ! [Pa]
         real(prec), intent(IN)    :: taud_acy(:,:)      ! [Pa]
@@ -105,6 +107,8 @@ contains
         integer,    allocatable :: ssa_mask_acy_ref(:,:)
 
         real(prec) :: L2_norm 
+
+        integer :: ij(2) 
 
         nx    = size(ux,1)
         ny    = size(ux,2)
@@ -138,15 +142,38 @@ contains
             ! Step 1: Calculate fields needed by ssa solver (visc_eff_int, beta_eff)
 
             ! Calculate the 3D vertical shear fields using viscosity estimated from the previous iteration 
-            call calc_vertical_shear_3D(duxdz,duydz,taub_acx,taub_acy,visc_eff,zeta_aa,par%boundaries)
+            call calc_vertical_shear_3D(duxdz,duydz,taub_acx,taub_acy,visc_eff,H_ice,zeta_aa,par%boundaries)
 
-            ! Calculate 3D effective viscosity, using velocity solution from previous iteration
-            call calc_visc_eff_3D(visc_eff,ux_bar,uy_bar,duxdz,duydz,ATT,zeta_aa,dx,dy,n_glen,par%eps_0)
+            ! Calculate 3D effective viscosity
+            select case(par%visc_method)
 
+                case(0)
+                    ! Impose constant viscosity value 
+
+                    visc_eff = par%visc_const 
+
+                case(1) 
+                    ! Calculate effective viscosity, using velocity solution from previous iteration
+                    
+                    call calc_visc_eff_3D(visc_eff,ux_bar,uy_bar,duxdz,duydz,ATT,H_ice, &
+                                                                zeta_aa,dx,dy,n_glen,par%eps_0)
+
+                case DEFAULT 
+
+                    write(*,*) "calc_velocity_diva:: Error: visc_method not recognized."
+                    write(*,*) "visc_method = ", par%visc_method 
+                    stop 
+
+            end select
+            
             ! Calculate depth-integrated effective viscosity
             ! Note L19 uses eta_bar*H in the ssa equation. Yelmo uses eta_int=eta_bar*H directly.
             visc_eff_int = calc_vertical_integrated_2D(visc_eff,zeta_aa) 
             where(H_ice .gt. 0.0_prec) visc_eff_int = visc_eff_int*H_ice 
+
+            ! Smooth the viscosity at the ice margins if it is too low
+            ! to avoid singularities (mainly for EISMINT/dome experiments)
+            !call smooth_visc_eff_int_margin(visc_eff_int,H_ice)
 
             ! Calculate beta (at the ice base)
             call calc_beta(beta,c_bed,ux_b,uy_b,H_ice,H_grnd,f_grnd,z_bed,z_sl,par%beta_method, &
@@ -157,15 +184,12 @@ contains
             call calc_F_integral(F2,visc_eff,H_ice,zeta_aa,n=2.0_prec)
             
             ! Calculate effective beta 
-            call calc_beta_eff(beta_eff,beta,ux_b,uy_b,F2,zeta_aa,no_slip=par%diva_no_slip)
+            call calc_beta_eff(beta_eff,beta,F2,zeta_aa,no_slip=par%no_slip)
 
             ! Stagger beta and beta_eff 
             call stagger_beta(beta_acx,beta_acy,beta,f_grnd,f_grnd_acx,f_grnd_acy,par%beta_gl_stag,par%boundaries)
             call stagger_beta(beta_eff_acx,beta_eff_acy,beta_eff,f_grnd,f_grnd_acx,f_grnd_acy,par%beta_gl_stag,par%boundaries)
             
-            ! ajr: not very stable:
-            !call calc_beta_eff_ac(beta_eff_acx,beta_eff_acy,beta_acx,beta_acy,ux_b,uy_b,F2,H_ice,zeta_aa,par%diva_no_slip,par%boundaries)
-
             ! =========================================================================================
             ! Step 2: Call the SSA solver to obtain new estimate of ux_bar/uy_bar
 
@@ -204,7 +228,7 @@ end if
             call calc_basal_stress(taub_acx,taub_acy,beta_eff_acx,beta_eff_acy,ux_bar,uy_bar)
 
             ! Calculate basal velocity from depth-averaged solution and basal stress
-            call calc_vel_basal(ux_b,uy_b,ux_bar,uy_bar,F2,taub_acx,taub_acy,H_ice,par%boundaries)
+            call calc_vel_basal(ux_b,uy_b,ux_bar,uy_bar,F2,taub_acx,taub_acy,H_ice,par%no_slip,par%boundaries)
 
             ! Exit iterations if ssa solution has converged
             if (is_converged) exit 
@@ -222,12 +246,9 @@ end if
             uy_i(:,:,k) = uy(:,:,k) - uy_b 
         end do
 
-        ! Diagnose beta actually being used by DIVA
-        call diagnose_beta_diva(beta_diva,beta_eff,F2,beta)
-
         return 
 
-    end subroutine calc_velocity_diva 
+    end subroutine calc_velocity_diva
 
     subroutine calc_vel_horizontal_3D(ux,uy,ux_b,uy_b,taub_acx,taub_acy,visc_eff,H_ice,zeta_aa,boundaries)
         ! Caluculate the 3D horizontal velocity field (ux,uy)
@@ -331,7 +352,7 @@ end if
 
     end subroutine calc_vel_horizontal_3D
 
-    subroutine calc_vertical_shear_3D(duxdz,duydz,taub_acx,taub_acy,visc_eff,zeta_aa,boundaries)
+    subroutine calc_vertical_shear_3D(duxdz,duydz,taub_acx,taub_acy,visc_eff,H_ice,zeta_aa,boundaries)
         ! Calculate vertical shear terms (L19, Eq. 36)
 
         implicit none 
@@ -341,6 +362,7 @@ end if
         real(prec), intent(IN)  :: taub_acx(:,:)        ! [Pa],     ac-nodes
         real(prec), intent(IN)  :: taub_acy(:,:)        ! [Pa],     ac-nodes
         real(prec), intent(IN)  :: visc_eff(:,:,:)      ! [Pa a m], aa-nodes
+        real(prec), intent(IN)  :: H_ice(:,:) 
         real(prec), intent(IN)  :: zeta_aa(:)           ! [-]
         character(len=*), intent(IN) :: boundaries 
 
@@ -349,7 +371,7 @@ end if
         integer :: ip1, jp1 
         real(prec) :: visc_eff_ac
 
-        real(prec) :: visc_eff_ab, taub_ab 
+        real(prec), parameter :: visc_min = 1e3_prec 
 
         nx    = size(duxdz,1)
         ny    = size(duxdz,2)
@@ -364,19 +386,14 @@ end if
             jp1 = min(j+1,ny) 
 
             ! Calculate shear strain, acx-nodes
-            visc_eff_ac  = 0.5_prec*(visc_eff(i,j,k) + visc_eff(ip1,j,k)) 
+            visc_eff_ac  = calc_staggered_margin(visc_eff(i,j,k),visc_eff(ip1,j,k),H_ice(i,j),H_ice(ip1,j))
+            visc_eff_ac  = max(visc_eff_ac,visc_min)    ! For safety 
             duxdz(i,j,k) = (taub_acx(i,j)/visc_eff_ac) * (1.0-zeta_aa(k))
             
             ! Calculate shear strain, acy-nodes
-            visc_eff_ac  = 0.5_prec*(visc_eff(i,j,k) + visc_eff(i,jp1,k)) 
+            visc_eff_ac  = calc_staggered_margin(visc_eff(i,j,k),visc_eff(i,jp1,k),H_ice(i,j),H_ice(i,jp1))
+            visc_eff_ac  = max(visc_eff_ac,visc_min)    ! For safety 
             duydz(i,j,k) = (taub_acy(i,j)/visc_eff_ac) * (1.0-zeta_aa(k))
-
-!             visc_eff_ab  = 0.25*(visc_eff(i,j,k)+visc_eff(ip1,j,k)+visc_eff(i,jp1,k)+visc_eff(ip1,jp1,k))
-!             taub_ab      = 0.50*(taub_acx(i,j)+taub_acx(i,jp1))
-!             duxdz(i,j,k) = (taub_ab/visc_eff_ab) * (1.0-zeta_aa(k))
-            
-!             taub_ab      = 0.50*(taub_acy(i,j)+taub_acy(ip1,j))
-!             duydz(i,j,k) = (taub_ab/visc_eff_ab) * (1.0-zeta_aa(k))
 
         end do 
         end do 
@@ -401,9 +418,9 @@ end if
 
         return 
 
-    end subroutine calc_vertical_shear_3D 
+    end subroutine calc_vertical_shear_3D
 
-    subroutine calc_visc_eff_3D(visc_eff,ux,uy,duxdz,duydz,ATT,zeta_aa,dx,dy,n_glen,eps_0)
+    subroutine calc_visc_eff_3D(visc_eff,ux,uy,duxdz,duydz,ATT,H_ice,zeta_aa,dx,dy,n_glen,eps_0)
         ! Calculate 3D effective viscosity following L19, Eq. 2
         ! Use of eps_0 ensures non-zero positive viscosity value everywhere 
         ! Note: viscosity is first calculated on ab-nodes, then 
@@ -418,6 +435,7 @@ end if
         real(prec), intent(IN)  :: duxdz(:,:,:)         ! [1/a] Vertical shearing, x-component
         real(prec), intent(IN)  :: duydz(:,:,:)         ! [1/a] Vertical shearing, x-component
         real(prec), intent(IN)  :: ATT(:,:,:)           ! aa-nodes
+        real(prec), intent(IN)  :: H_ice(:,:) 
         real(prec), intent(IN)  :: zeta_aa(:)           ! Vertical axis (sigma-coordinates from 0 to 1)
         real(prec), intent(IN)  :: dx
         real(prec), intent(IN)  :: dy
@@ -426,22 +444,23 @@ end if
         
         ! Local variables 
         integer    :: i, j, k, nx, ny, nz
-        integer    :: ip1, jp1, im1, jm1  
+        integer    :: ip1, jp1, im1, jm1   
         real(prec) :: inv_4dx, inv_4dy 
-        real(prec) :: dudx, dudy
-        real(prec) :: dvdx, dvdy 
+        real(prec) :: dudx_ab, dvdy_ab
+        real(prec) :: dudy, dvdx
         real(prec) :: duxdz_ab, duydz_ab  
         real(prec) :: p1, p2, eps_0_sq  
         real(prec) :: eps_sq                            ! [1/a^2]
-        real(prec) :: ATT_ab 
-        real(prec), allocatable :: visc_eff_ab(:,:,:)  
-        
+        real(prec) :: ATT_ab
+        real(prec) :: wt  
+        real(prec), allocatable :: visc_eff_ab(:,:,:)
+
         nx = size(visc_eff,1)
         ny = size(visc_eff,2)
         nz = size(visc_eff,3)
         
         ! Allocate local arrays 
-        allocate(visc_eff_ab(nx,ny,nz))
+        allocate(visc_eff_ab(nx,ny,nz)) 
 
         ! Calculate scaling factors
         inv_4dx = 1.0_prec / (4.0_prec*dx) 
@@ -463,8 +482,8 @@ end if
             jp1 = min(j+1,ny) 
 
             ! Calculate effective strain components from horizontal stretching on ab-nodes
-            dudx = ( (ux(ip1,j) - ux(im1,j)) + (ux(ip1,jp1) - ux(im1,jp1)) ) *inv_4dx
-            dvdy = ( (uy(i,jp1) - uy(i,jm1)) + (uy(ip1,jp1) - uy(ip1,jm1)) ) *inv_4dy 
+            dudx_ab = ( (ux(ip1,j) - ux(im1,j)) + (ux(ip1,jp1) - ux(im1,jp1)) ) *inv_4dx
+            dvdy_ab = ( (uy(i,jp1) - uy(i,jm1)) + (uy(ip1,jp1) - uy(ip1,jm1)) ) *inv_4dy 
 
             ! Calculate of cross terms on ab-nodes
             dudy = (ux(i,jp1) - ux(i,j)) / dx 
@@ -474,14 +493,17 @@ end if
             do k = 1, nz 
 
                 ! Un-stagger shear terms to central aa-nodes in horizontal
-                duxdz_ab = 0.5_prec*(duxdz(i,j,k) + duxdz(i,jp1,k))
-                duydz_ab = 0.5_prec*(duydz(i,j,k) + duydz(ip1,j,k))
-                
+                !duxdz_ab = 0.5_prec*(duxdz(i,j,k) + duxdz(i,jp1,k))
+                duxdz_ab = calc_staggered_margin(duxdz(i,j,k),duxdz(i,jp1,k),H_ice(i,j),H_ice(i,jp1))
+            
+                !duydz_ab = 0.5_prec*(duydz(i,j,k) + duydz(ip1,j,k))
+                duydz_ab = calc_staggered_margin(duydz(i,j,k),duydz(ip1,j,k),H_ice(i,j),H_ice(ip1,j))
+            
                 ! Calculate the total effective strain rate from L19, Eq. 21 
-                eps_sq = dudx**2 + dvdy**2 + dudx*dvdy + 0.25_prec*(dudy+dvdx)**2 &
+                eps_sq = dudx_ab**2 + dvdy_ab**2 + dudx_ab*dvdy_ab + 0.25_prec*(dudy+dvdx)**2 &
                        + 0.25_prec*duxdz_ab**2 + 0.25_prec*duydz_ab**2 + eps_0_sq
                 
-                ATT_ab = 0.25*(ATT(i,j,k)+ATT(im1,j,k)+ATT(i,jm1,k)+ATT(im1,jm1,k)) 
+                ATT_ab = 0.25_prec*(ATT(i,j,k)+ATT(ip1,j,k)+ATT(i,jp1,k)+ATT(ip1,jp1,k)) 
                 
                 ! Calculate effective viscosity on ab-nodes
                 visc_eff_ab(i,j,k) = 0.5_prec*(eps_sq)**(p1) * ATT_ab**(p2)
@@ -492,6 +514,7 @@ end if
         end do 
 
         ! Unstagger from ab-nodes to aa-nodes 
+        ! only using contributions from ice covered neighbors
         do j = 1, ny 
         do i = 1, nx 
 
@@ -500,24 +523,162 @@ end if
             jm1 = max(j-1,1) 
             jp1 = min(j+1,ny) 
 
-            ! Loop over column
-            do k = 1, nz 
-                visc_eff(i,j,k) = 0.25*(visc_eff_ab(i,j,k)+visc_eff_ab(im1,j,k) &
-                                        +visc_eff_ab(i,jm1,k)+visc_eff_ab(im1,jm1,k))
-            end do 
+            visc_eff(i,j,:) = 0.0 
+            wt              = 0.0 
+
+            if (count([H_ice(i,j),H_ice(ip1,j),H_ice(i,jp1),H_ice(ip1,jp1)].eq.0) .eq. 0) then  
+                visc_eff(i,j,:) = visc_eff(i,j,:) + visc_eff_ab(i,j,:) 
+                wt = wt + 1.0 
+            end if 
+            
+            if (count([H_ice(i,j),H_ice(im1,j),H_ice(im1,jp1),H_ice(i,jp1)].eq.0) .eq. 0) then  
+                visc_eff(i,j,:) = visc_eff(i,j,:) + visc_eff_ab(im1,j,:) 
+                wt = wt + 1.0 
+            end if 
+
+            if (count([H_ice(i,j),H_ice(i,jm1),H_ice(ip1,jm1),H_ice(ip1,j)].eq.0) .eq. 0) then 
+                visc_eff(i,j,:) = visc_eff(i,j,:) + visc_eff_ab(i,jm1,:) 
+                wt = wt + 1.0 
+            end if 
+            
+            if (count([H_ice(i,j),H_ice(im1,j),H_ice(im1,jm1),H_ice(i,jm1)].eq.0) .eq. 0) then 
+                visc_eff(i,j,:) = visc_eff(i,j,:) + visc_eff_ab(im1,jm1,:) 
+                wt = wt + 1.0 
+            end if 
+            
+            if (wt .gt. 0.0) then 
+                visc_eff(i,j,:) = visc_eff(i,j,:) / wt 
+            else 
+                ! Just get simple average for ice free points 
+
+                ! Loop over column
+                do k = 1, nz 
+                    visc_eff(i,j,k) = 0.25_prec*(visc_eff_ab(i,j,k)+visc_eff_ab(im1,j,k) &
+                                                +visc_eff_ab(i,jm1,k)+visc_eff_ab(im1,jm1,k))
+                end do 
+
+            end if 
 
         end do 
         end do 
         
         ! Treat the corners to avoid extremes
-        visc_eff(1,1,:) = 0.5*(visc_eff(2,1,:)+visc_eff(1,2,:))
-        visc_eff(1,ny,:) = 0.5*(visc_eff(2,ny,:)+visc_eff(1,ny-1,:))
-        visc_eff(nx,1,:) = 0.5*(visc_eff(nx,2,:)+visc_eff(nx-1,1,:))
+        visc_eff(1,1,:)   = 0.5*(visc_eff(2,1,:)+visc_eff(1,2,:))
+        visc_eff(1,ny,:)  = 0.5*(visc_eff(2,ny,:)+visc_eff(1,ny-1,:))
+        visc_eff(nx,1,:)  = 0.5*(visc_eff(nx,2,:)+visc_eff(nx-1,1,:))
         visc_eff(nx,ny,:) = 0.5*(visc_eff(nx-1,ny,:)+visc_eff(nx,ny-1,:))
 
         return 
 
-    end subroutine calc_visc_eff_3D 
+    end subroutine calc_visc_eff_3D
+
+    function calc_staggered_margin(var0,var1,H0,H1) result(var_mid)
+        ! Calculate a staggered point but taking upstream point at the margin 
+
+        implicit none 
+
+        real(prec), intent(IN) :: var0 
+        real(prec), intent(IN) :: var1 
+        real(prec), intent(IN) :: H0 
+        real(prec), intent(IN) :: H1
+        real(prec) :: var_mid 
+
+        if (H0 .gt. 0.0_prec .and. H1 .eq. 0.0_prec) then 
+            ! At the margin 
+
+            var_mid = var0 
+
+        else if (H0 .eq. 0.0_prec .and. H1 .gt. 0.0_prec) then 
+            ! At the margin 
+
+            var_mid = var1 
+
+        else 
+            ! Inland ice, or ice free, simple average 
+
+            var_mid = 0.5_prec*(var0+var1) 
+
+        end if 
+
+        return 
+
+    end function calc_staggered_margin
+
+    subroutine smooth_visc_eff_int_margin(visc_eff_int,H_ice)
+
+        implicit none 
+
+        real(prec), intent(INOUT) :: visc_eff_int(:,:) 
+        real(prec), intent(IN)    :: H_ice(:,:) 
+        
+        ! Local variables 
+        integer    :: i, j, nx, ny 
+        integer    :: im1, ip1, jm1, jp1 
+        integer    :: n_ice 
+        real(prec) :: H_neighb(4) 
+        real(prec) :: visc_neighb(4) 
+        logical    :: mask_neighb(4) 
+        real(prec) :: visc_mean 
+        logical    :: is_margin 
+        logical    :: is_low_visc 
+
+        real(prec), allocatable :: visc_eff_int_ref(:,:) 
+
+        real(prec), parameter :: visc_ratio_lim = 1e-1      ! visc / mean(visc_neighb) > visc_ratio_lim 
+
+        nx = size(visc_eff_int,1) 
+        ny = size(visc_eff_int,2) 
+
+        ! Allocate local arrays 
+        allocate(visc_eff_int_ref(nx,ny)) 
+
+        visc_eff_int_ref = visc_eff_int 
+
+        ! Check margin for extreme viscosity values, smooth them as necessary
+        do j = 1, ny 
+        do i = 1, nx 
+
+            im1 = max(i-1,1) 
+            ip1 = min(i+1,nx) 
+            jm1 = max(j-1,1) 
+            jp1 = min(j+1,ny) 
+
+            if (H_ice(i,j) .gt. 0.0) then 
+                ! Ice-covered point 
+
+                H_neighb    = [H_ice(im1,j),H_ice(ip1,j),H_ice(i,jm1),H_ice(i,jp1)]
+                mask_neighb = H_neighb .gt. 0.0_prec 
+                n_ice       = count(mask_neighb)
+                is_margin   = n_ice .lt. 4
+                
+                if (n_ice .gt. 0) then 
+                    ! Some neighbors are ice covered too 
+                    visc_neighb = [visc_eff_int_ref(im1,j),visc_eff_int_ref(ip1,j),visc_eff_int_ref(i,jm1),visc_eff_int_ref(i,jp1)]
+                    visc_mean   = sum(visc_neighb,mask=mask_neighb) / real(n_ice,prec)
+                else 
+                    ! Just set neighbor mean == to current visc to move on to next point 
+                    visc_mean   = visc_eff_int_ref(i,j) 
+                end if 
+
+                ! Check if this point has a low viscosity relative to its neighbors 
+                is_low_visc = visc_eff_int_ref(i,j) / visc_mean .lt. visc_ratio_lim 
+
+                if (is_margin .and. is_low_visc) then 
+                    ! If this is an ice-margin point, and the viscosity is *much*
+                    ! lower than ice-covered neighbors, then smooth viscosity here. 
+
+                    visc_eff_int(i,j) = visc_mean 
+
+                end if 
+
+            end if 
+                    
+        end do 
+        end do  
+
+        return 
+
+    end subroutine smooth_visc_eff_int_margin
 
     subroutine calc_F_integral(F_int,visc,H_ice,zeta_aa,n)
         ! Useful integrals, following Arthern et al. (2015) Eq. 7,
@@ -576,7 +737,7 @@ end if
 
     end subroutine calc_F_integral
     
-    subroutine calc_beta_eff(beta_eff,beta,ux_b,uy_b,F2,zeta_aa,no_slip)
+    subroutine calc_beta_eff(beta_eff,beta,F2,zeta_aa,no_slip)
         ! Calculate the depth-averaged horizontal velocity (ux_bar,uy_bar)
 
         ! Note: L19 staggers the F-integral F2, then solves for beta 
@@ -585,8 +746,6 @@ end if
         
         real(prec), intent(OUT) :: beta_eff(:,:)    ! aa-nodes
         real(prec), intent(IN)  :: beta(:,:)        ! aa-nodes
-        real(prec), intent(IN)  :: ux_b(:,:)        ! ac-nodes
-        real(prec), intent(IN)  :: uy_b(:,:)        ! ac-nodes
         real(prec), intent(IN)  :: F2(:,:)          ! aa-nodes
         real(prec), intent(IN)  :: zeta_aa(:)       ! aa-nodes
         logical,    intent(IN)  :: no_slip 
@@ -613,118 +772,9 @@ end if
 
         return 
 
-    end subroutine calc_beta_eff 
+    end subroutine calc_beta_eff
 
-    subroutine calc_beta_eff_ac(beta_eff_acx,beta_eff_acy,beta_acx,beta_acy,ux_b,uy_b,F2,H_ice,zeta_aa,no_slip,boundaries)
-        ! Calculate the depth-averaged horizontal velocity (ux_bar,uy_bar)
-
-        ! Note: L19 staggers the F-integral F2, then solves for beta 
-
-        implicit none 
-        
-        real(prec), intent(OUT) :: beta_eff_acx(:,:)    ! ac-nodes
-        real(prec), intent(OUT) :: beta_eff_acy(:,:)    ! ac-nodes
-        real(prec), intent(IN)  :: beta_acx(:,:)        ! ac-nodes
-        real(prec), intent(IN)  :: beta_acy(:,:)        ! ac-nodes
-        real(prec), intent(IN)  :: ux_b(:,:)            ! ac-nodes
-        real(prec), intent(IN)  :: uy_b(:,:)            ! ac-nodes
-        real(prec), intent(IN)  :: F2(:,:)              ! aa-nodes
-        real(prec), intent(IN)  :: H_ice(:,:)           ! aa-nodes
-        real(prec), intent(IN)  :: zeta_aa(:)           ! aa-nodes
-        logical,    intent(IN)  :: no_slip 
-        character(len=*), intent(IN) :: boundaries  
-
-        ! Local variables 
-        integer    :: i, j, nx, ny
-        integer    :: ip1, jp1   
-        real(prec) :: F2_ac 
-
-        nx = size(beta_eff_acx,1)
-        ny = size(beta_eff_acx,2)
-
-        do j = 1, ny 
-        do i = 1, nx 
-
-            ip1 = min(i+1,nx)
-            jp1 = min(j+1,ny)
-
-            ! === x-direction =====
-
-            ! Stagger the F2 integral to the ac-nodes
-            if (H_ice(i,j) .gt. 0.0 .and. H_ice(ip1,j) .eq. 0.0) then 
-                F2_ac = F2(i,j) 
-            else if (H_ice(i,j) .eq. 0.0 .and. H_ice(ip1,j) .gt. 0.0) then
-                F2_ac = F2(ip1,j)
-            else 
-                F2_ac = 0.5_prec*(F2(i,j) + F2(ip1,j))
-            end if 
-
-
-            if (no_slip) then 
-                ! No basal sliding allowed, impose beta_eff derived from viscosity 
-                ! following L19, Eq. 35 (or G11, Eq. 42)
-
-                beta_eff_acx(i,j) = 1.0_prec / F2_ac 
-
-            else 
-                ! Basal sliding allowed, calculate beta_eff 
-                ! following L19, Eq. 33 (or G11, Eq. 41)
-
-                beta_eff_acx(i,j) = beta_acx(i,j) / (1.0_prec+beta_acx(i,j)*F2_ac)
-
-            end if 
-
-            ! === y-direction =====
-
-            ! Stagger the F2 integral to the ac-nodes
-            if (H_ice(i,j) .gt. 0.0 .and. H_ice(i,jp1) .eq. 0.0) then 
-                F2_ac = F2(i,j) 
-            else if (H_ice(i,j) .eq. 0.0 .and. H_ice(i,jp1) .gt. 0.0) then
-                F2_ac = F2(i,jp1)
-            else 
-                F2_ac = 0.5_prec*(F2(i,j) + F2(i,jp1))
-            end if 
-
-
-            if (no_slip) then 
-                ! No basal sliding allowed, impose beta_eff derived from viscosity 
-                ! following L19, Eq. 35 (or G11, Eq. 42)
-
-                beta_eff_acy(i,j) = 1.0_prec / F2_ac 
-
-            else 
-                ! Basal sliding allowed, calculate beta_eff 
-                ! following L19, Eq. 33 (or G11, Eq. 41)
-
-                beta_eff_acy(i,j) = beta_acy(i,j) / (1.0_prec+beta_acy(i,j)*F2_ac)
-
-            end if 
-
-        end do 
-        end do  
-
-        ! Apply boundary conditions as needed 
-        if (trim(boundaries) .eq. "periodic") then 
-
-            beta_eff_acx(1,:)    = beta_eff_acx(nx-2,:) 
-            beta_eff_acx(nx-1,:) = beta_eff_acx(2,:) 
-            beta_eff_acx(nx,:)   = beta_eff_acx(3,:) 
-            beta_eff_acx(:,1)    = beta_eff_acx(:,ny-1)
-            beta_eff_acx(:,ny)   = beta_eff_acx(:,2) 
-            
-            beta_eff_acy(1,:)    = beta_eff_acy(nx-1,:) 
-            beta_eff_acy(nx,:)   = beta_eff_acy(2,:) 
-            beta_eff_acy(:,1)    = beta_eff_acy(:,ny-2)
-            beta_eff_acy(:,ny-1) = beta_eff_acy(:,2) 
-            beta_eff_acy(:,ny)   = beta_eff_acy(:,3)
-
-        end if 
-
-        return 
-
-    end subroutine calc_beta_eff_ac 
-
-    subroutine calc_vel_basal(ux_b,uy_b,ux_bar,uy_bar,F2,taub_acx,taub_acy,H_ice,boundaries)
+    subroutine calc_vel_basal(ux_b,uy_b,ux_bar,uy_bar,F2,taub_acx,taub_acy,H_ice,no_slip,boundaries)
         ! Calculate basal sliding following Goldberg (2011), Eq. 34
         ! (or it can also be obtained from L19, Eq. 32 given ub*beta=taub)
 
@@ -738,6 +788,7 @@ end if
         real(prec), intent(IN)  :: taub_acx(:,:) 
         real(prec), intent(IN)  :: taub_acy(:,:)
         real(prec), intent(IN)  :: H_ice(:,:)
+        logical,    intent(IN)  :: no_slip
         character(len=*), intent(IN) :: boundaries 
 
         ! Local variables 
@@ -748,57 +799,70 @@ end if
         nx = size(ux_b,1)
         ny = size(ux_b,2) 
 
-        do j = 1, ny 
-        do i = 1, nx 
-
-            ip1 = min(i+1,nx)
-            jp1 = min(j+1,ny)
-
-            ! ==== x-direction =====
-
-            ! Stagger the F2 integral to the ac-nodes
-            if (H_ice(i,j) .gt. 0.0 .and. H_ice(ip1,j) .eq. 0.0) then 
-                F2_ac = F2(i,j) 
-            else if (H_ice(i,j) .eq. 0.0 .and. H_ice(ip1,j) .gt. 0.0) then
-                F2_ac = F2(ip1,j)
-            else 
-                F2_ac = 0.5_prec*(F2(i,j) + F2(ip1,j))
-            end if 
-
-            ! Calculate basal velocity component 
-            ux_b(i,j) = ux_bar(i,j) - taub_acx(i,j)*F2_ac 
-
-            ! ==== y-direction =====
+        if (no_slip) then 
+            ! Set basal velocity to zero 
+            ! (this comes out naturally more or less with beta_eff set as above, 
+            !  but ensuring basal velocity is zero adds stability)
             
-            ! Stagger the F2 integral to the ac-nodes
-            if (H_ice(i,j) .gt. 0.0 .and. H_ice(i,jp1) .eq. 0.0) then 
-                F2_ac = F2(i,j) 
-            else if (H_ice(i,j) .eq. 0.0 .and. H_ice(i,jp1) .gt. 0.0) then
-                F2_ac = F2(i,jp1)
-            else 
-                F2_ac = 0.5_prec*(F2(i,j) + F2(i,jp1))
-            end if 
+            ux_b = 0.0_prec 
+            uy_b = 0.0_prec 
+
+        else 
+            ! Calculate basal velocity normally 
+
+            do j = 1, ny 
+            do i = 1, nx 
+
+                ip1 = min(i+1,nx)
+                jp1 = min(j+1,ny)
+
+                ! ==== x-direction =====
+
+                ! Stagger the F2 integral to the ac-nodes
+                if (H_ice(i,j) .gt. 0.0 .and. H_ice(ip1,j) .eq. 0.0) then 
+                    F2_ac = F2(i,j) 
+                else if (H_ice(i,j) .eq. 0.0 .and. H_ice(ip1,j) .gt. 0.0) then
+                    F2_ac = F2(ip1,j)
+                else 
+                    F2_ac = 0.5_prec*(F2(i,j) + F2(ip1,j))
+                end if 
+
+                ! Calculate basal velocity component 
+                ux_b(i,j) = ux_bar(i,j) - taub_acx(i,j)*F2_ac 
+
+                ! ==== y-direction =====
                 
-            ! Calculate basal velocity component 
-            uy_b(i,j) = uy_bar(i,j) - taub_acy(i,j)*F2_ac 
+                ! Stagger the F2 integral to the ac-nodes
+                if (H_ice(i,j) .gt. 0.0 .and. H_ice(i,jp1) .eq. 0.0) then 
+                    F2_ac = F2(i,j) 
+                else if (H_ice(i,j) .eq. 0.0 .and. H_ice(i,jp1) .gt. 0.0) then
+                    F2_ac = F2(i,jp1)
+                else 
+                    F2_ac = 0.5_prec*(F2(i,j) + F2(i,jp1))
+                end if 
+                    
+                ! Calculate basal velocity component 
+                uy_b(i,j) = uy_bar(i,j) - taub_acy(i,j)*F2_ac 
 
-        end do 
-        end do  
+            end do 
+            end do  
 
-        ! Apply boundary conditions as needed 
-        if (trim(boundaries) .eq. "periodic") then 
+            ! Apply boundary conditions as needed 
+            if (trim(boundaries) .eq. "periodic") then 
 
-            ux_b(1,:)    = ux_b(nx-2,:) 
-            ux_b(nx-1,:) = ux_b(2,:) 
-            ux_b(nx,:)   = ux_b(3,:) 
-            ux_b(:,1)    = ux_b(:,ny-1)
-            ux_b(:,ny)   = ux_b(:,2) 
-            
-            uy_b(1,:)    = uy_b(nx-1,:) 
-            uy_b(nx,:)   = uy_b(2,:) 
-            uy_b(:,1)    = uy_b(:,ny-2)
-            uy_b(:,ny-1) = uy_b(:,2) 
-            uy_b(:,ny)   = uy_b(:,3)
+                ux_b(1,:)    = ux_b(nx-2,:) 
+                ux_b(nx-1,:) = ux_b(2,:) 
+                ux_b(nx,:)   = ux_b(3,:) 
+                ux_b(:,1)    = ux_b(:,ny-1)
+                ux_b(:,ny)   = ux_b(:,2) 
+                
+                uy_b(1,:)    = uy_b(nx-1,:) 
+                uy_b(nx,:)   = uy_b(2,:) 
+                uy_b(:,1)    = uy_b(:,ny-2)
+                uy_b(:,ny-1) = uy_b(:,2) 
+                uy_b(:,ny)   = uy_b(:,3)
+
+            end if 
 
         end if 
 
@@ -806,131 +870,6 @@ end if
         
     end subroutine calc_vel_basal
 
-    subroutine calc_vel_basal_ab(ux_b,uy_b,ux_bar,uy_bar,F2,taub_acx,taub_acy,H_ice,boundaries)
-        ! Calculate basal sliding following Goldberg (2011), Eq. 34
-        ! (or it can also be obtained from L19, Eq. 32 given ub*beta=taub)
-
-        implicit none
-        
-        real(prec), intent(OUT) :: ux_b(:,:) 
-        real(prec), intent(OUT) :: uy_b(:,:)
-        real(prec), intent(IN)  :: ux_bar(:,:) 
-        real(prec), intent(IN)  :: uy_bar(:,:)
-        real(prec), intent(IN)  :: F2(:,:)
-        real(prec), intent(IN)  :: taub_acx(:,:) 
-        real(prec), intent(IN)  :: taub_acy(:,:)
-        real(prec), intent(IN)  :: H_ice(:,:)
-        character(len=*), intent(IN) :: boundaries 
-
-        ! Local variables 
-        integer    :: i, j, nx, ny, k  
-        integer    :: ip1, jp1, im1, jm1  
-        real(prec) :: F2_ac 
-        real(prec), allocatable :: F2_ab(:,:) 
-
-        nx = size(ux_b,1)
-        ny = size(ux_b,2) 
-
-        allocate(F2_ab(nx,ny))
-
-        ! Stagger F2 to ab-nodes 
-        do j = 1, ny 
-        do i = 1, nx 
-
-            ip1 = min(i,nx)
-            jp1 = min(j,ny)
-
-            k = 0 
-
-            if (H_ice(i,j) .gt. 0.0) then 
-                F2_ab(i,j) = F2_ab(i,j) + F2(i,j) 
-                k = k + 1 
-            end if 
-
-            if (H_ice(ip1,j) .gt. 0.0) then 
-                F2_ab(i,j) = F2_ab(i,j) + F2(ip1,j) 
-                k = k + 1 
-            end if 
-            
-            if (H_ice(i,jp1) .gt. 0.0) then 
-                F2_ab(i,j) = F2_ab(i,j) + F2(i,jp1) 
-                k = k + 1 
-            end if 
-            
-            if (H_ice(ip1,jp1) .gt. 0.0) then 
-                F2_ab(i,j) = F2_ab(i,j) + F2(ip1,jp1) 
-                k = k + 1 
-            end if 
-            
-            if (k .gt. 0) then 
-                F2_ab(i,j) = F2_ab(i,j) / real(k,prec) 
-            else 
-                F2_ab = 0.25*(F2(i,j)+F2(ip1,j)+F2(i,jp1)+F2(ip1,jp1))
-            end if 
-
-        end do 
-        end do 
-
-        do j = 1, ny 
-        do i = 1, nx 
-
-            ip1 = min(i+1,nx)
-            jp1 = min(j+1,ny)
-            im1 = max(i-1,1)
-            jm1 = max(j-1,1)
-
-            ! ==== x-direction =====
-
-            ! Stagger the F2_ab integral to the ac-nodes
-            if (H_ice(i,j) .gt. 0.0 .and. H_ice(im1,j) .eq. 0.0) then 
-                F2_ac = F2(i,j) 
-            else if (H_ice(i,j) .eq. 0.0 .and. H_ice(ip1,j) .gt. 0.0) then
-                F2_ac = F2(ip1,j)
-            else 
-                F2_ac = 0.5_prec*(F2(i,j) + F2(ip1,j))
-            end if 
-
-            ! Calculate basal velocity component 
-            ux_b(i,j) = ux_bar(i,j) - taub_acx(i,j)*F2_ac 
-
-            ! ==== y-direction =====
-            
-            ! Stagger the F2 integral to the ac-nodes
-            if (H_ice(i,j) .gt. 0.0 .and. H_ice(i,jp1) .eq. 0.0) then 
-                F2_ac = F2(i,j) 
-            else if (H_ice(i,j) .eq. 0.0 .and. H_ice(i,jp1) .gt. 0.0) then
-                F2_ac = F2(i,jp1)
-            else 
-                F2_ac = 0.5_prec*(F2(i,j) + F2(i,jp1))
-            end if 
-                
-            ! Calculate basal velocity component 
-            uy_b(i,j) = uy_bar(i,j) - taub_acy(i,j)*F2_ac 
-
-        end do 
-        end do  
-
-        ! Apply boundary conditions as needed 
-        if (trim(boundaries) .eq. "periodic") then 
-
-            ux_b(1,:)    = ux_b(nx-2,:) 
-            ux_b(nx-1,:) = ux_b(2,:) 
-            ux_b(nx,:)   = ux_b(3,:) 
-            ux_b(:,1)    = ux_b(:,ny-1)
-            ux_b(:,ny)   = ux_b(:,2) 
-            
-            uy_b(1,:)    = uy_b(nx-1,:) 
-            uy_b(nx,:)   = uy_b(2,:) 
-            uy_b(:,1)    = uy_b(:,ny-2)
-            uy_b(:,ny-1) = uy_b(:,2) 
-            uy_b(:,ny)   = uy_b(:,3)
-
-        end if 
-
-        return
-        
-    end subroutine calc_vel_basal_ab
-    
     subroutine calc_basal_stress(taub_acx,taub_acy,beta_eff_acx,beta_eff_acy,ux_bar,uy_bar)
         ! Calculate the basal stress resulting from sliding (friction times velocity)
         ! Note: calculated on ac-nodes.
@@ -966,136 +905,6 @@ end if
         return 
 
     end subroutine calc_basal_stress
-
-    subroutine diagnose_beta_diva(beta_diva,beta_eff,F2,beta)
-        ! Given beta_eff and F2, iteratively solve for beta_diva,
-        ! where: beta_eff = beta_diva / (1+beta_diva*F2)
-        ! Use root-finding method: 0 = beta_eff - beta_diva / (1+beta_diva*F2)
-
-        implicit none 
-
-        real(prec), intent(OUT) :: beta_diva(:,:)       ! [Pa a/m] beta seen by diva solver (derived from beta_eff)
-        real(prec), intent(IN)  :: beta_eff(:,:)        ! [Pa a/m] Effective beta used directly in diva solver
-        real(prec), intent(IN)  :: beta(:,:)            ! [Pa a/m] Prescribed beta for points with ux/y_b > 0
-        real(prec), intent(IN)  :: F2(:,:)              ! [(Pa a)^-1]
-
-        ! To do !!!
-
-        ! For now, simply:
-        beta_diva = beta 
-
-        return
-
-    contains 
-
-        function f(beta_diva,beta_eff,F2) result(fout)
-
-            implicit none 
-
-            real(prec), intent(IN) :: beta_diva 
-            real(prec), intent(IN) :: beta_eff
-            real(prec), intent(IN) :: F2
-            real(prec) :: fout 
-
-            fout = beta_eff - beta_diva*(1.0_prec + beta_diva*F2)**(-1.0)
-
-            return 
-
-        end function f
-            
-        function fp(beta_diva,beta_eff,F2) result(fpout)
-
-            implicit none 
-
-            real(prec), intent(IN) :: beta_diva 
-            real(prec), intent(IN) :: beta_eff
-            real(prec), intent(IN) :: F2
-            real(prec) :: fpout 
-            
-            fpout = beta_diva*F2*(1.0_prec + beta_diva*F2)**(-2.0) - (1.0_prec + beta_diva*F2)**(-1.0)
-
-            return 
-
-        end function fp
-
-    end subroutine diagnose_beta_diva
-
-    subroutine solve_newton(x,x0,f,fp,debug)
-        ! Estimate the zero of f(x) using Newton's method. 
-        ! Input:
-        !   f:  the function to find a root of
-        !   fp: function returning the derivative f'
-        !   x0: the initial guess
-        !   debug: logical, prints iterations if debug=.true.
-        ! Returns:
-        !   the estimate x satisfying f(x)=0 (assumes Newton converged!) 
-        !   the number of iterations iters
-        
-        ! Adapted from: 
-        ! https://faculty.washington.edu/rjl/classes/am583s2013/notes/fortran_newton.html
-
-        implicit none
-
-        real(prec), intent(OUT) :: x
-        real(prec), intent(IN)  :: x0
-        real(prec), external    :: f, fp
-        logical,    intent(in)  :: debug
-
-        ! Declare any local variables:
-        real(prec) :: deltax, fx, fxprime
-        integer    :: k, iters
-
-        integer, parameter :: maxiter = 20
-        real(kind=8), parameter :: tol = 1.d-14
-
-        ! Save initial guess
-        x = x0
-
-        if (debug) then
-            write(*,*) "Initial guess: x = ", x
-        end if
-
-        ! Newton iteration to find a zero of f(x) 
-
-        do k = 1, maxiter
-
-            ! evaluate function and its derivative:
-            fx      = f(x)
-            fxprime = fp(x)
-
-            if (abs(fx) < tol) then
-                exit  ! jump out of do loop
-            end if
-
-            ! Compute Newton increment x:
-            deltax = fx/fxprime
-
-            ! update x:
-            x = x - deltax
-
-            if (debug) then
-                write(*,*) "After ", k, "iterations, x = ", x 
-            end if 
-
-        end do
-
-
-        if (k > maxiter) then
-        ! Solver did not converge
-
-            fx = f(x)
-            if (abs(fx) > tol) then
-                write(*,*) "*** Warning: has not yet converged"
-            end if
-
-        end if 
-
-        ! Number of iterations taken:
-        iters = k-1
-
-        return 
-
-    end subroutine solve_newton
 
     elemental subroutine limit_vel(u,u_lim)
         ! Apply a velocity limit (for stability)

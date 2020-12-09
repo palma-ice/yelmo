@@ -1,0 +1,30 @@
+FC = gfortran
+
+INC_NC  = -I/opt/local/include
+#LIB_NC  = -L/opt/local/lib -lnetcdff -lnetcdf
+LIB_NC  = -L/opt/local/lib -lnetcdff -L/opt/local/lib -Wl,-headerpad_max_install_names -Wl,-syslibroot,/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX10.14.sdk -arch x86_64 -lnetcdf -lnetcdf
+
+LISROOT = /Users/robinson/apps/lis/lis
+INC_LIS = -I${LISROOT}/include 
+LIB_LIS = -L${LISROOT}/lib/ -llis
+
+FFLAGS = -I$(objdir) -J$(objdir) -m64 -ffree-line-length-none 
+
+ifeq ($(parallel), 1)
+    # Overwrite default choices with openmp relevant choices 
+
+    LISROOT = /Users/robinson/apps/lis/lis-omp
+    INC_LIS = -I${LISROOT}/include 
+    LIB_LIS = -L${LISROOT}/lib/ -llis
+
+    FFLAGS  = -I$(objdir) -J$(objdir) -m64 -ffree-line-length-none -fomit-frame-pointer -fopenmp 
+
+endif 
+
+LFLAGS  = $(LIB_NC) $(LIB_LIS)
+
+DFLAGS_NODEBUG = -O2
+DFLAGS_DEBUG   = -w -g -p -ggdb -ffpe-trap=invalid,zero,overflow -fbacktrace -fcheck=all -Wp,-DDEBUG
+DFLAGS_PROFILE = -O2 -p -ggdb
+
+#DFLAGS_DEBUG   = -w -g -p -ggdb -ffpe-trap=invalid,zero,overflow,underflow -fbacktrace -fcheck=all

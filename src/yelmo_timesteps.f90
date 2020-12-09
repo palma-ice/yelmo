@@ -1,6 +1,6 @@
 module yelmo_timesteps
 
-    use yelmo_defs, only : sp, dp, prec  
+    use yelmo_defs, only : sp, dp, prec, ytime_class   
     use ncio 
 
     implicit none 
@@ -23,44 +23,29 @@ module yelmo_timesteps
     public :: calc_adv2D_timestep1
     public :: calc_adv3D_timestep1 
 
+    public :: check_checkerboard 
+
+    public :: ytime_init 
+
 contains
 
-    subroutine set_pc_mask(mask,H_ice,f_grnd)
+    subroutine set_pc_mask(mask,H_ice_pred,H_ice_corr,f_grnd)
 
         implicit none 
 
         logical, intent(OUT) :: mask(:,:) 
-        real(prec), intent(IN) :: H_ice(:,:) 
+        real(prec), intent(IN) :: H_ice_pred(:,:) 
+        real(prec), intent(IN) :: H_ice_corr(:,:) 
         real(prec), intent(IN) :: f_grnd(:,:) 
 
         ! Local variables 
         integer :: i, j, nx, ny 
         integer :: im1, jm1, ip1, jp1 
 
+        real(prec) :: H_lim = 10.0      ! [m] 
+
         nx = size(mask,1)
         ny = size(mask,2) 
-
-if (.FALSE.) then 
-    ! Old method 
-
-        ! Initially set all points to False 
-        mask = .FALSE. 
-
-        ! Limit to ice-covered, grounded points 
-        where (H_ice .gt. 0.0_prec .and. f_grnd .eq. 1.0_prec) mask = .TRUE. 
-
-        ! Set mask to false for ice margin points as well 
-        do j = 2, ny-1 
-        do i = 2, nx-1 
-            if (mask(i,j)) then 
-                if (count(H_ice(i-1:i+1,j-1:j+1).eq.0.0_prec) .gt. 0) then 
-                    mask(i,j) = .FALSE.
-                end if 
-            end if 
-        end do 
-        end do
-
-else 
 
         ! Initially set all points to True 
         mask = .TRUE. 
@@ -75,16 +60,23 @@ else
 
             ! Define places that should not be checked 
 
-            if (H_ice(i,j) .eq. 0.0_prec) then 
-                ! Ice-free point
+            if (H_ice_pred(i,j) .lt. H_lim .or. H_ice_corr(i,j) .lt. H_lim) then 
+                ! (Near) ice-free point or may be transitioning state
 
                 mask(i,j) = .FALSE. 
 
+            ! ajr: excluding thin points doesn't help...
+            !else if (H_ice(i,j) .lt. 50.0_prec) then 
+            !    ! Thin ice-covered point 
+            !
+            !    mask(i,j) = .FALSE. 
+            !
             else
                 ! Ice-covered points, further checks below
 
-                 if (count(H_ice(im1:ip1,jm1:jp1).eq.0.0_prec) .gt. 0) then 
-                    ! Neighbor is ice-free: ice-margin point 
+                 if (count(H_ice_pred(im1:ip1,jm1:jp1).lt.H_lim) .gt. 0 .or. &
+                     count(H_ice_corr(im1:ip1,jm1:jp1).lt.H_lim) .gt. 0) then 
+                    ! Neighbor is (near) ice-free: ice-margin point 
 
                     mask(i,j) = .FALSE. 
 
@@ -105,8 +97,6 @@ else
 
         end do 
         end do  
-
-end if 
 
         return 
 
@@ -133,7 +123,7 @@ end if
         return 
 
     end function calc_pc_eta 
-
+    
     elemental subroutine calc_pc_tau_fe_sbe(tau,var_corr,var_pred,dt_n)
         ! Calculate truncation error for the FE-SBE timestepping method
         ! Forward Euler (FE) predictor step and Semi-implicit
@@ -204,7 +194,7 @@ end if
 
     end subroutine calc_pc_tau_heun
 
-    subroutine set_adaptive_timestep_pc(dt_new,dt,eta,eps,dtmin,dtmax,mask,ux_bar,uy_bar,dx,pc_k,controller)
+    subroutine set_adaptive_timestep_pc(dt_new,dt,eta,eps,dtmin,dtmax,ux_bar,uy_bar,dx,pc_k,controller)
         ! Calculate the timestep following algorithm for 
         ! a general predictor-corrector (pc) method.
         ! Implemented followig Cheng et al (2017, GMD)
@@ -217,7 +207,6 @@ end if
         real(prec), intent(IN)  :: eps                  ! [--]   Tolerance value (eg, eps=1e-4)
         real(prec), intent(IN)  :: dtmin                ! [yr]   Minimum allowed timestep
         real(prec), intent(IN)  :: dtmax                ! [yr]   Maximum allowed timestep
-        logical,    intent(IN)  :: mask(:,:)            ! Where to calculate tau 
         real(prec), intent(IN)  :: ux_bar(:,:)          ! [m/yr]
         real(prec), intent(IN)  :: uy_bar(:,:)          ! [m/yr]
         real(prec), intent(IN)  :: dx                   ! [m]
@@ -558,7 +547,7 @@ end if
         real(prec), intent(IN)    :: dtmax            ! [a] Maximum allowed timestep 
 
         ! Local variables  
-        real(prec), parameter :: n_decimal   = 4          ! Maximum decimals to treat for timestep
+        real(prec), parameter :: n_decimal   = 6          ! Maximum decimals to treat for timestep
         real(prec), parameter :: dt_half_lim = 0.5_prec   ! Should be 0.5 or greater to make sense
 
         ! Ensure timestep is also within parameter limits 
@@ -1084,6 +1073,90 @@ end if
 
         return 
 
-    end subroutine yelmo_timestep_write 
+    end subroutine yelmo_timestep_write
 
+    subroutine ytime_init(ytime,nx,ny,nz,dt_min,pc_eps)
+
+        type(ytime_class), intent(INOUT) :: ytime
+        integer,    intent(IN) :: nx, ny, nz 
+        real(prec), intent(IN) :: dt_min, pc_eps 
+
+        ! Allocate ytime object
+        call ytime_alloc(ytime,nx,ny,nz)
+
+        ytime%log_timestep_file = "timesteps.nc" 
+        
+        ! Initialize information about previous timesteps to minimum
+        ! timestep value and high error (to keep low timesteps initially)
+        ytime%pc_dt(:)      = dt_min  
+        ytime%pc_eta(:)     = pc_eps
+
+        ! Initialize arrays to zero 
+        ytime%dt_adv        = 0.0 
+        ytime%dt_diff       = 0.0 
+        ytime%dt_adv3D      = 0.0 
+
+        ytime%pc_tau        = 0.0_prec 
+        ytime%pc_tau_masked = 0.0_prec 
+        
+        ytime%pc_taus       = 0.0_prec 
+        ytime%pc_tau_max    = 0.0_prec
+        
+        ! Initialize averages to zero too
+        ytime%model_speeds  = 0.0_prec 
+        ytime%dt_avg        = 0.0_prec 
+        ytime%eta_avg       = 0.0_prec 
+        ytime%ssa_iter_avg  = 0.0_prec 
+
+        return
+
+    end subroutine ytime_init
+    
+    subroutine ytime_alloc(ytime,nx,ny,nz)
+
+        implicit none 
+
+        type(ytime_class), intent(INOUT) :: ytime
+        integer :: nx, ny, nz 
+
+        ! Ensure object is deallocated first
+        call ytime_dealloc(ytime) 
+
+        ! Allocate timestep arrays 
+        allocate(ytime%dt_adv(nx,ny))
+        allocate(ytime%dt_diff(nx,ny))
+        allocate(ytime%dt_adv3D(nx,ny,nz))
+        
+        ! Allocate truncation error array 
+        allocate(ytime%pc_tau(nx,ny))
+        allocate(ytime%pc_tau_masked(nx,ny))
+        
+        ! Allocate truncation error averaging arrays 
+        allocate(ytime%pc_taus(nx,ny,50))
+        allocate(ytime%pc_tau_max(nx,ny))
+
+        return 
+
+    end subroutine ytime_alloc
+
+    subroutine ytime_dealloc(ytime)
+
+        implicit none 
+
+        type(ytime_class), intent(INOUT) :: ytime
+        
+        if (allocated(ytime%dt_adv))        deallocate(ytime%dt_adv)
+        if (allocated(ytime%dt_diff))       deallocate(ytime%dt_diff)
+        if (allocated(ytime%dt_adv3D))      deallocate(ytime%dt_adv3D)
+        
+        if (allocated(ytime%pc_tau))        deallocate(ytime%pc_tau)
+        if (allocated(ytime%pc_tau_masked)) deallocate(ytime%pc_tau_masked)
+        
+        if (allocated(ytime%pc_taus))       deallocate(ytime%pc_taus)
+        if (allocated(ytime%pc_tau_max))    deallocate(ytime%pc_tau_max)
+        
+        return 
+
+    end subroutine ytime_dealloc
+    
 end module yelmo_timesteps 

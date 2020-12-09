@@ -4,7 +4,7 @@ module yelmo_thermodynamics
     use nml 
     use yelmo_defs 
     use yelmo_tools, only : smooth_gauss_2D, smooth_gauss_3D, gauss_values, fill_borders_2D, fill_borders_3D, &
-            stagger_aa_ab, regularize2D
+            stagger_aa_ab
     
     use thermodynamics 
     use ice_enthalpy
@@ -41,14 +41,15 @@ contains
         H_w_now = 0.0_prec 
 
         ! Initialize time if necessary 
-        if (thrm%par%time .gt. time) then 
-            thrm%par%time = time
+        if (thrm%par%time .gt. dble(time)) then 
+            thrm%par%time = dble(time)
         end if 
 
         ! Get time step and advance current time 
-        dt            = time - thrm%par%time 
-        thrm%par%time = time 
+        dt            = dble(time) - thrm%par%time 
+        thrm%par%time = dble(time) 
         
+
         ! === Determine some thermal properties === 
 
         ! Calculate the specific heat capacity of the ice
@@ -72,13 +73,30 @@ contains
 
         ! === Calculate heat source terms (Yelmo vertical grid) === 
 
-        ! Calculate the basal frictional heating 
-        call calc_basal_heating(thrm%now%Q_b,dyn%now%ux_b,dyn%now%uy_b,dyn%now%taub_acx,dyn%now%taub_acy, &
-                        tpo%now%H_ice,thrm%now%T_prime_b,gamma=2.0_prec,beta1=thrm%par%dt_beta(1),beta2=thrm%par%dt_beta(2))
+select case("ab")
 
-        ! Ensure basal frictional heating is relatively smooth
-        call regularize2D(thrm%now%Q_b,tpo%now%H_ice,tpo%par%dx)
-            
+    case("aa")
+        ! Calculate the basal frictional heating (from ab-nodes)
+        call calc_basal_heating_fromaa(thrm%now%Q_b,dyn%now%ux_b,dyn%now%uy_b,dyn%now%taub_acx,dyn%now%taub_acy, &
+                                            beta1=thrm%par%dt_beta(1),beta2=thrm%par%dt_beta(2))
+
+    case("ab")
+        ! Calculate the basal frictional heating (from ab-nodes)
+        call calc_basal_heating_fromab(thrm%now%Q_b,dyn%now%ux_b,dyn%now%uy_b,dyn%now%taub_acx,dyn%now%taub_acy, &
+                                            tpo%now%H_ice,beta1=thrm%par%dt_beta(1),beta2=thrm%par%dt_beta(2))
+
+    case("ac")
+        ! ajr: old interface with scaling optional via f_pmp
+        call calc_basal_heating_fromac(thrm%now%Q_b,dyn%now%ux_b,dyn%now%uy_b,dyn%now%taub_acx,dyn%now%taub_acy, &
+                        tpo%now%H_ice,thrm%now%f_pmp,beta1=thrm%par%dt_beta(1),beta2=thrm%par%dt_beta(2))
+
+    case("interp")
+
+        call calc_basal_heating_interp(thrm%now%Q_b,dyn%now%ux_b,dyn%now%uy_b,dyn%now%taub_acx,dyn%now%taub_acy, &
+                                            tpo%now%H_ice,beta1=thrm%par%dt_beta(1),beta2=thrm%par%dt_beta(2))
+
+end select
+        
         ! Smooth basal frictional heating 
         if (thrm%par%n_sm_qb .gt. 0) then 
             call smooth_gauss_2D(thrm%now%Q_b,tpo%now%H_ice.gt.0.0,thrm%par%dx,thrm%par%n_sm_qb, &

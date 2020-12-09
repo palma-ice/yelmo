@@ -1,0 +1,37 @@
+
+{
+	"name": "yelmo",
+	"context": "..",
+	"dockerFile": "Dockerfile",
+	"settings": {
+		"terminal.integrated.shell.linux": null,
+		"python.pythonPath": "/opt/conda/bin/python",
+		"python.formatting.provider": "black",
+		"editor.formatOnSave": true,
+		"python.linting.mypyEnabled": true,
+		"python.linting.enabled": true,
+		"python.linting.flake8Enabled": true,
+		"python.linting.flake8Args": [
+			"--max-line-length=88"
+		],
+		"python.linting.pylintEnabled": true,
+		"autoDocstring.docstringFormat": "google",
+		"python.linting.pylintPath": "/opt/conda/bin/pylint",
+		"fortran-ls.executablePath": "/opt/conda/bin/fortls",
+		"fortran.gfortranExecutable": "/usr/bin/gfortran"
+	},
+	"extensions": [
+		"ms-vscode.cpptools",
+		"hansec.fortran-ls",
+		"krvajalm.linter-gfortran",
+		"ms-python.python",
+		"njpwerner.autodocstring",
+		"ms-azuretools.vscode-docker",
+		"mhutchie.git-graph",
+		"eamodio.gitlens",
+		"ms-azuretools.vscode-docker",
+		"gua.rainbow-brackets"
+	],
+	"remoteUser": "glacier",
+	"postCreateCommand": "python config.py config/docker_gfortran"
+}

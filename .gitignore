@@ -3,4 +3,10 @@ libyelmo
 ice_data
 tests/plots
 output
+tests/.DS_Store
+.DS_Store
 *.DS_Store
+*.mod
+*.vscode
+*.mypy_cache
+*.pytest_cache

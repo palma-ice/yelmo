@@ -21,22 +21,6 @@ instructions below in the section "Usage".
 The test cases shown by Robinson et al. (in prep) can be reproduced following the
 instructions below in the section "Test cases".
 
-## Quickstart with Docker and VS Code
-
-The easiest way to use Yelmo is with VS Code and Docker. It works on any plattform and uses a Linux based container. You don't need to know Docker or VS Code to get started. Just install the following:
-
-1) [Docker](https://docs.docker.com/engine/install/)
-2) [VS Code](https://code.visualstudio.com) 
-3) [install the remote development extension](https://marketplace.visualstudio.com/items?itemName=ms-vscode-remote.vscode-remote-extensionpack)
-4) get the code (see below)
-
-Then make sure that Docker is running and start VS Code. 
-Open the folder with the Yelmo code. Say Yes, when VS Code asks you if you want to open it in the container.
-
-Now you can directly go to step 3 below, just make sure that you use the terminal in VS Code.
-
-This will give you everything you need to develop and run Yelmo.
-
 ## Dependencies
 
 - NetCDF (tested with version 4.0 and higher): [NetCDF library](https://www.unidata.ucar.edu/software/netcdf/docs/getting_and_building_netcdf.html)
@@ -159,6 +143,23 @@ mismip     = libyelmo/bin/yemo_mismip.x
 initmip    = libyelmo/bin/yelmo_initmip.x
 ```
 The last two mandatory arguments are always the output/run directory and the parameter file to be used for this simulation. In the case of the above simulation, the output directory is defined as `output/test`, where all model parameters (loaded from the file `par/yelmo_EISMINT.nml`) and model output can be found.
+
+
+## Alternative - quickstart with Docker and VS Code
+
+Instead of a manual install, one way to get up and running quickly with Yelmo is with VS Code and Docker. It works on any plattform and uses a Linux based container. You don't need to know Docker or VS Code to get started. Just install the following:
+
+1) [Docker](https://docs.docker.com/engine/install/)
+2) [VS Code](https://code.visualstudio.com) 
+3) [install the remote development extension](https://marketplace.visualstudio.com/items?itemName=ms-vscode-remote.vscode-remote-extensionpack)
+4) get the code (see below)
+
+Then make sure that Docker is running and start VS Code. 
+Open the folder with the Yelmo code. Say Yes, when VS Code asks you if you want to open it in the container.
+
+Now you can directly go to step 3 below, just make sure that you use the terminal in VS Code.
+
+This will give you everything you need to develop and run Yelmo.
 
 ## Test cases
 

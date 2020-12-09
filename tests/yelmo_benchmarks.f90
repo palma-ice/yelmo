@@ -500,12 +500,12 @@ contains
         call yelmo_write_step_model_metrics(filename,ylmo,n,ncid)
 
         ! Time step limits 
-        call nc_write(filename,"dt_adv",ylmo%par%dt_adv,units="a",long_name="Advective timestep", &
+        call nc_write(filename,"dt_adv",ylmo%time%dt_adv,units="a",long_name="Advective timestep", &
                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-        call nc_write(filename,"dt_diff",ylmo%par%dt_diff,units="a",long_name="Diffusive timestep", &
+        call nc_write(filename,"dt_diff",ylmo%time%dt_diff,units="a",long_name="Diffusive timestep", &
                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
         
-        call nc_write(filename,"dt_adv3D",ylmo%par%dt_adv3D,units="a",long_name="Advective timestep", &
+        call nc_write(filename,"dt_adv3D",ylmo%time%dt_adv3D,units="a",long_name="Advective timestep", &
                       dim1="xc",dim2="yc",dim3="zeta",dim4="time",start=[1,1,1,n],ncid=ncid)
 
         ! == yelmo_topography ==

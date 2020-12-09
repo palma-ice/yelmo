@@ -89,6 +89,20 @@ python config.py config/myhost_mycompiler
 ```
 The result should be a Makefile in `$YELMOROOT` that is ready for use.
 
+## Alternative - quickstart with Docker and VS Code
+
+Instead of a manual install, one way to get up and running quickly with Yelmo is with VS Code and Docker. It works on any plattform and uses a Linux based container. You don't need to know Docker or VS Code to get started. Just install the following:
+
+1) [Docker](https://docs.docker.com/engine/install/)
+2) [VS Code](https://code.visualstudio.com) 
+3) [install the remote development extension](https://marketplace.visualstudio.com/items?itemName=ms-vscode-remote.vscode-remote-extensionpack)
+4) get the code (see below)
+
+Then make sure that Docker is running and start VS Code. 
+Open the folder with the Yelmo code. Say Yes, when VS Code asks you if you want to open it in the container.
+
+Now you can directly go to step 3 below, just make sure that you use the terminal in VS Code.
+
 ### 3. Compile the code.
 
 Now you are ready to compile Yelmo as a static library:

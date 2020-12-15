@@ -202,7 +202,7 @@ program yelmo_ismiphom
     
     ! 1D file 
     call write_yreg_init(yelmo1,file1D,time_init=time_init,units="years",mask=yelmo1%bnd%ice_allowed)
-    call write_yreg_step(yelmo1%reg,file1D,time=time_init) 
+    call write_yreg_step(yelmo1,file1D,time=time_init) 
 
     ! Advance timesteps
     do n = 1, ceiling((time_end-time_init)/dtt)
@@ -219,7 +219,7 @@ program yelmo_ismiphom
         end if 
 
         if (mod(nint(time*100),nint(dt1D_out*100))==0) then 
-            call write_yreg_step(yelmo1%reg,file1D,time=time) 
+            call write_yreg_step(yelmo1,file1D,time=time) 
         end if 
 
         if (mod(time,10.0)==0 .and. (.not. yelmo_log)) then

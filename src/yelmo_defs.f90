@@ -728,7 +728,7 @@ module yelmo_defs
         type(ytherm_class)      :: thrm     ! Thermodynamics variables
         type(ybound_class)      :: bnd      ! Boundary variables to drive model
         type(ydata_class)       :: dta      ! Data variables for comparison
-        type(yregions_class)    :: reg      ! Regionally aggregated variables  
+        type(yregions_class)    :: reg      ! Regionally aggregated variables for whole domain 
     end type
 
     public   ! All yelmo defs are public

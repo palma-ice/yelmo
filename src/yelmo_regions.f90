@@ -14,7 +14,14 @@ module yelmo_regions
 contains
 
     subroutine yregions_init()
-
+        ! To do, potentially. 
+        ! If we want to initialize several regions 
+        ! internally in Yelmo, to be updating them
+        ! automatically. For now, region calculations 
+        ! aside from the global domain will be specified 
+        ! by the user in the main program with 
+        ! the routines defined here. 
+        
         implicit none 
 
 
@@ -238,17 +245,51 @@ contains
 
     end subroutine write_yreg_init
 
-    subroutine write_yreg_step(reg,filename,time)
+    subroutine write_yreg_step(dom,filename,time,mask,reg_now)
 
         implicit none 
         
-        type(yregions_class), intent(IN) :: reg
+        type(yelmo_class),    intent(IN) :: dom 
         character(len=*),     intent(IN) :: filename
         real(prec),           intent(IN) :: time
+        logical, intent(IN), optional    :: mask(:,:) 
+        type(yregions_class), intent(IN), optional :: reg_now 
 
         ! Local variables
         integer    :: ncid, n
         real(prec) :: time_prev 
+        type(yregions_class) :: reg
+        
+        ! 1. Determine regional values of variables 
+
+        if (present(mask) .and. present(reg_now)) then 
+            write(*,*) "write_yreg_step:: Error: either a mask or a region &
+                       &object must be provided, not both. Try again."
+            write(*,*) "filename = ", trim(filename) 
+            write(*,*) "time     = ", time 
+            stop 
+        end if 
+
+        if (present(mask)) then 
+            ! If a mask is provided, assume the regional 
+            ! values must be calculated now.
+
+            call calc_yregions(reg,dom%tpo,dom%dyn,dom%thrm,dom%mat,dom%bnd,mask) 
+
+        else if (present(reg_now)) then 
+            ! Assume region has been calculated and is available 
+            ! in the input object reg_now 
+
+            reg = reg_now 
+
+        else 
+            ! Take the global regional data object that 
+            ! is calculated over the whole domain at each timestep 
+            reg = dom%reg 
+
+        end if 
+
+        ! 2. Begin writing step 
 
         ! Open the file for writing
         call nc_open(filename,ncid,writable=.TRUE.)
@@ -359,30 +400,5 @@ contains
         return 
 
     end subroutine write_yreg_step
-
-    subroutine calc_write_yreg_step(dom,filename,time,mask)
-
-        implicit none 
-        
-        type(yelmo_class), intent(IN) :: dom 
-        character(len=*),  intent(IN) :: filename
-        real(prec),        intent(IN) :: time
-        logical,           intent(IN) :: mask(:,:) 
-
-        ! Local variables
-        integer    :: ncid, n
-        real(prec) :: time_prev 
-
-        type(yregions_class) :: reg
-        
-        ! 1. Calculate the regional values 
-        call calc_yregions(reg,dom%tpo,dom%dyn,dom%thrm,dom%mat,dom%bnd,mask) 
-
-        ! 2. Write the region to the specified file 
-        call write_yreg_step(reg,filename,time)
-
-        return 
-
-    end subroutine calc_write_yreg_step
 
 end module yelmo_regions

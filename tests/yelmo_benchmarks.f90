@@ -325,6 +325,19 @@ program yelmo_benchmarks
     call yelmo_init_state(yelmo1,path_par,time=time_init,thrm_method="robin")
 
 
+    ! For dome experiment, let it equilibrate for several thousand years
+    if (trim(experiment) .eq. "dome") then 
+
+        ! Set conditions similar to EISMINT2-EXPA with smaller radius 
+        call dome_boundaries(yelmo1%bnd%T_srf,yelmo1%bnd%smb,yelmo1%bnd%Q_geo, &
+                        yelmo1%grd%x,yelmo1%grd%y,yelmo1%tpo%now%H_ice, &
+                        experiment="dome",time=time,smb_max=0.3_prec,rad_el=300.0_prec,period=period,dT_test=dT_test)
+
+        call yelmo_update_equil(yelmo1,time_init,time_tot=real(5e3,prec), &
+                                dt=5.0_prec,topo_fixed=.FALSE.,dyn_solver="sia")
+
+    end if 
+
     ! == Write initial state ==
      
     ! 2D file 

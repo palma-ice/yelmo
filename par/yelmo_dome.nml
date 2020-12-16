@@ -9,9 +9,9 @@
 
     ! Timing parameters 
     time_init    = 0.0                  ! [yr] Starting time 
-    time_end     = 1000.0               ! [yr] Ending time 
+    time_end     = 2000.0               ! [yr] Ending time 
     dtt          = 5.0                  ! [yr] Main loop timestep 
-    dt2D_out     = 200.0                ! [yr] Frequency of writing 2D output files 
+    dt2D_out     = 500.0                ! [yr] Frequency of writing 2D output files 
 
     ! Settings for transient EISMINT1 experiments 
     period       = 0.0                  ! [yr] for transient experiments (normally 0.0 yr or 20e3 yr)
@@ -43,7 +43,7 @@
 /
 
 &ytopo
-    solver            = "expl"          ! "expl", "expl-upwind", "impl-upwind"
+    solver            = "impl-upwind"   ! "expl", "expl-upwind", "impl-upwind"
     calv_method       = "zero"          ! "zero", "simple", "flux", "kill"
     surf_gl_method    = 0               ! 0: binary (max grnd/flt elevation), 1: subgrid average elevation
     margin2nd         = False           ! Apply second-order upwind approximation to gradients at the margin

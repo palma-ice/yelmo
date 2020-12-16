@@ -12,6 +12,7 @@
     "const_paths" : 
         {   "EISMINT"  : "par/yelmo_const_EISMINT.nml",
             "HALFAR"   : "par/yelmo_const_EISMINT.nml",
+            "dome"     : "par/yelmo_const_EISMINT.nml",
             "MISMIP3D" : "par/yelmo_const_MISMIP3D.nml",
             "TROUGH"   : "par/yelmo_const_TROUGH.nml",
             "MISMIP+"  : "par/yelmo_const_TROUGH.nml",

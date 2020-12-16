@@ -334,7 +334,7 @@ program yelmo_benchmarks
                         experiment="dome",time=time,smb_max=0.3_prec,rad_el=300.0_prec,period=period,dT_test=dT_test)
 
         call yelmo_update_equil(yelmo1,time_init,time_tot=real(5e3,prec), &
-                                dt=5.0_prec,topo_fixed=.FALSE.,dyn_solver="sia")
+                                                dt=5.0_prec,topo_fixed=.FALSE.)
 
     end if 
 

@@ -10,7 +10,7 @@
     ! Timing parameters 
     time_init    = 0.0                  ! [yr] Starting time 
     time_end     = 2000.0               ! [yr] Ending time 
-    dtt          = 5.0                  ! [yr] Main loop timestep 
+    dtt          = 10.0                 ! [yr] Main loop timestep 
     dt2D_out     = 500.0                ! [yr] Frequency of writing 2D output files 
 
     ! Settings for transient EISMINT1 experiments 

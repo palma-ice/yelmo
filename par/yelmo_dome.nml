@@ -10,7 +10,7 @@
     ! Timing parameters 
     time_init    = 0.0                  ! [yr] Starting time 
     time_end     = 2000.0               ! [yr] Ending time 
-    dtt          = 10.0                 ! [yr] Main loop timestep 
+    dtt          = 20.0                 ! [yr] Main loop timestep 
     dt2D_out     = 500.0                ! [yr] Frequency of writing 2D output files 
 
     ! Settings for transient EISMINT1 experiments 
@@ -38,7 +38,7 @@
     pc_use_H_pred   = False             ! Use predicted H_ice instead of corrected H_ice 
     pc_n_redo       = 5                 ! How many times can the same iteration be repeated (when high error exists)
     pc_tol          = 10.0              ! [m/a] Tolerance threshold to redo timestep
-    pc_eps          = 3.0               ! Predictor-corrector tolerance 
+    pc_eps          = 1.0               ! Predictor-corrector tolerance 
     
 /
 

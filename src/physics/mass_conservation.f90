@@ -316,12 +316,13 @@ contains
         real(prec), intent(IN) :: H_min                 ! [m] Threshold for calving
 
         ! Local variables 
-        integer :: i, j, nx, ny
+        integer :: i, j, nx, ny, im1, jm1
         real(prec) :: eps_xx, eps_yy  
         logical :: test_mij, test_pij, test_imj, test_ipj
         logical :: is_margin, positive_mb 
         real(prec), allocatable :: dHdt(:,:), H_diff(:,:) 
         real(prec), allocatable :: H_ice_0(:,:) 
+        real(prec) :: dux, duy 
 
         nx = size(H_ice,1)
         ny = size(H_ice,2)
@@ -336,15 +337,25 @@ contains
         ! Diagnosed lagrangian rate of change
         dHdt = 0.0 
 
-        do j = 2, ny
-        do i = 2, nx
-        
-                ! Calculate strain rate locally (aa-node)
-                eps_xx = (ux(i,j) - ux(i-1,j))/dx
-                eps_yy = (uy(i,j) - uy(i,j-1))/dx
+        do j = 1, ny
+        do i = 1, nx
 
-                ! Calculate thickness change via conservation
-                dHdt(i,j) = mbal(i,j) - H_ice(i,j)*(eps_xx+eps_yy)
+            im1 = max(1,i-1)
+            jm1 = max(1,j-1)
+
+            dux = ux(i,j) - ux(im1,j)
+            duy = uy(i,j) - uy(i,jm1)
+
+            ! Avoid underflow errors 
+            if (abs(dux) .lt. 1e-8) dux = 0.0_prec
+            if (abs(duy) .lt. 1e-8) duy = 0.0_prec
+            
+            ! Calculate strain rate locally (aa-node)
+            eps_xx = dux/dx
+            eps_yy = duy/dx
+
+            ! Calculate thickness change via conservation
+            dHdt(i,j) = mbal(i,j) - H_ice(i,j)*(eps_xx+eps_yy)
 
         end do 
         end do

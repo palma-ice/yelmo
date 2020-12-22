@@ -84,16 +84,16 @@ contains
         if (npts_tot .gt. 0) then 
 
             ! ytopo variables 
-            reg%H_ice      = sum(tpo%now%H_ice,mask=mask_tot)/npts_tot     ! [m]
-            reg%z_srf      = sum(tpo%now%z_srf,mask=mask_tot)/npts_tot     ! [m]
-            reg%dHicedt    = sum(tpo%now%dHicedt,mask=mask_tot)/npts_tot   ! [m/a]
-            reg%H_ice_max  = maxval(tpo%now%H_ice,mask=mask_tot)       ! [m]
-            reg%dzsrfdt    = sum(tpo%now%dzsrfdt,mask=mask_tot)/npts_tot   ! [m/a]
+            reg%H_ice      = sum(tpo%now%H_ice,mask=mask_tot)/npts_tot      ! [m]
+            reg%z_srf      = sum(tpo%now%z_srf,mask=mask_tot)/npts_tot      ! [m]
+            reg%dHicedt    = sum(tpo%now%dHicedt,mask=mask_tot)/npts_tot    ! [m/a]
+            reg%H_ice_max  = maxval(tpo%now%H_ice,mask=mask_tot)            ! [m]
+            reg%dzsrfdt    = sum(tpo%now%dzsrfdt,mask=mask_tot)/npts_tot    ! [m/a]
             
-            reg%V_ice      = sum(tpo%now%H_ice,mask=mask_tot)*tpo%par%dx*tpo%par%dy*m3_km3             ! [km^3]
-            reg%A_ice      = count(tpo%now%H_ice .gt. 0.0 .and. mask_tot)*tpo%par%dx*tpo%par%dy*m2_km2 ! [km^2]
-            reg%dVicedt    = sum(tpo%now%dHicedt,mask=mask_tot)*tpo%par%dx*tpo%par%dy*m3_km3           ! [km^3/a]
-            reg%fwf        = -reg%dVicedt*conv_km3a_Sv   ! [Sv]
+            reg%V_ice      = sum(tpo%now%H_ice,mask=mask_tot)*tpo%par%dx*tpo%par%dy*m3_km3              ! [km^3]
+            reg%A_ice      = count(tpo%now%H_ice .gt. 0.0 .and. mask_tot)*tpo%par%dx*tpo%par%dy*m2_km2  ! [km^2]
+            reg%dVicedt    = sum(tpo%now%dHicedt,mask=mask_tot)*tpo%par%dx*tpo%par%dy*m3_km3            ! [km^3/a]
+            reg%fwf        = -reg%dVicedt*conv_km3a_Sv                      ! [Sv]
 
             ! Volume above sea level
             reg%V_sl       = sum(tpo%now%H_grnd,mask=tpo%now%H_grnd.gt.0.0_prec)*tpo%par%dx*tpo%par%dy*m3_km3   ! [km^3]

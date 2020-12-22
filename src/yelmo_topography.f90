@@ -172,11 +172,6 @@ contains
             ! Save the rate of change of ice thickness in output variable [m/a]
             tpo%now%dHicedt = (tpo%now%H_ice - tpo%now%H_ice_n) / dt 
 
-        else 
-
-            ! Set rate of change to zero 
-            tpo%now%dHicedt = 0.0 
-
         end if 
 
         ! 2. Calculate additional topographic properties ------------------
@@ -207,8 +202,6 @@ contains
         ! Determine rate of surface elevation change 
         if (dt .gt. 0.0) then 
             tpo%now%dzsrfdt = (tpo%now%z_srf-tpo%now%z_srf_n) / dt 
-        else 
-            tpo%now%dzsrfdt = 0.0 
         end if 
         
         ! Calculate the surface slope (on staggered Ac x/y nodes)
@@ -260,9 +253,6 @@ contains
 
         ! ================================
 
-        ! Advance ytopo timestep 
-        tpo%par%time = dble(time)
-
         ! Calculate computational performance (model speed in kyr/hr)
         call yelmo_cpu_time(cpu_time1)
         model_time1 = tpo%par%time 
@@ -281,6 +271,13 @@ contains
             
         end if 
 
+        if (trim(tpo%par%pc_step) .eq. "corrector") then 
+            ! Advance ytopo timestep on corrector step 
+
+            tpo%par%time = dble(time)
+            
+        end if 
+        
 !         if (yelmo_log) then 
 
 !             if (count(tpo%now%H_ice.gt.0.0) .gt. 0) then 

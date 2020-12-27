@@ -710,15 +710,7 @@ contains
                 
         end select 
 
-        ! == data and boundary == 
-        
-        call ydata_par_load(dom%dta%par,filename,dom%par%domain,dom%par%grid_name,init=.TRUE.)
-        call ydata_alloc(dom%dta%pd,dom%grd%nx,dom%grd%ny,dom%par%nz_aa,dom%dta%par%pd_age_n_iso)
-
-        ! Load data objects   
-        call ydata_load(dom%dta,dom%bnd%ice_allowed)
-
-        write(*,*) "yelmo_init:: data intialized (loaded data if desired)."
+        ! == boundary == 
         
         ! Allocate the yelmo data objects (arrays, etc)
         call ybound_alloc(dom%bnd,dom%grd%nx,dom%grd%ny)
@@ -729,11 +721,21 @@ contains
         ! Update the ice_allowed mask based on domain definition 
         call ybound_define_ice_allowed(dom%bnd,dom%par%domain)
         
+        write(*,*) "yelmo_init:: boundary intialized (loaded masks, set ref. topography)."
+        
+        ! == data == 
+        
+        call ydata_par_load(dom%dta%par,filename,dom%par%domain,dom%par%grid_name,init=.TRUE.)
+        call ydata_alloc(dom%dta%pd,dom%grd%nx,dom%grd%ny,dom%par%nz_aa,dom%dta%par%pd_age_n_iso)
+
+        ! Load data objects   
+        call ydata_load(dom%dta,dom%bnd%ice_allowed)
+
         ! Set H_ice_ref and z_bed_ref to present-day ice thickness by default 
         dom%bnd%H_ice_ref = dom%dta%pd%H_ice 
         dom%bnd%z_bed_ref = dom%dta%pd%z_bed
 
-        write(*,*) "yelmo_init:: boundary intialized (loaded masks, set ref. topography)."
+        write(*,*) "yelmo_init:: data intialized (loaded data if desired)."
         
         ! == topography ==
 
@@ -776,8 +778,8 @@ contains
         logical :: init_topo_load 
         character(len=1028) :: init_topo_path
         character(len=56)   :: init_topo_names(4)
-        integer     :: init_topo_state
-        real(prec)  :: z_bed_f_sd 
+        integer             :: init_topo_state
+        real(prec)          :: z_bed_f_sd 
 
         ! Initialize variables
          

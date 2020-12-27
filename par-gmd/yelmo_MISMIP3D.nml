@@ -164,14 +164,11 @@
 /
 
 &yelmo_init_topo
-    H_ice_load      = False 
-    H_ice_path      = "none"
-    H_ice_nm        = "H_ice"               ! [m] Ice thickness 
-    z_bed_load      = False 
-    z_bed_path      = "none"
-    z_bed_nm        = "z_bed"               ! [m] Bedrock elevation 
-    z_bed_sd_nm     = "z_bed_sd"            ! [m] Bedrock elevation standard deviation (if available) 
-
+    init_topo_load  = False 
+    init_topo_path  = "none"
+    init_topo_names = "H_ice" "z_bed" "z_bed_sd"    ! Ice thickness, Bedrock elevation, bedrock noise
+    init_topo_state = 0                             ! 0: from file, 1: ice-free, 2: ice-free, rebounded 
+    z_bed_f_sd      = 0.0                           ! Scaling fraction to modify z_bed = z_bed + f_sd*z_bed_sd
 /
 
 &yelmo_data 

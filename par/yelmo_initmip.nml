@@ -188,16 +188,6 @@
 /
 
 &yelmo_init_topo
-    H_ice_load      = True 
-    H_ice_path      = "ice_data/{domain}/{grid_name}/{grid_name}_TOPO.nc"
-    H_ice_nm        = "H_ice"               ! [m] Ice thickness 
-    z_bed_load      = True 
-    z_bed_path      = "ice_data/{domain}/{grid_name}/{grid_name}_TOPO.nc"
-    z_bed_nm        = "z_bed"               ! [m] Bedrock elevation 
-    z_bed_sd_nm     = "z_bed_sd"            ! [m] Bedrock elevation standard deviation (if available)
-    /
- 
-&yelmo_init_topo
     init_topo_load  = True 
     init_topo_path  = "ice_data/{domain}/{grid_name}/{grid_name}_TOPO.nc"
     init_topo_names = "H_ice" "z_bed" "z_bed_sd"    ! Ice thickness, Bedrock elevation, bedrock noise

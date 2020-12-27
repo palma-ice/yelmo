@@ -2,6 +2,8 @@
 
 module yelmo_ice
 
+    use, intrinsic :: iso_fortran_env, only : input_unit, output_unit, error_unit
+
     use nml 
     use ncio 
     
@@ -103,7 +105,7 @@ contains
             
             case("RALSTON")
                 
-                write(*,*) "This method does not work yet - the truncation error is incorrect."
+                write(error_unit,*) "This method does not work yet - the truncation error is incorrect."
                 stop 
 
                 ! Order of the method 
@@ -117,8 +119,8 @@ contains
             
             case DEFAULT 
 
-                write(*,*) "yelmo_udpate:: Error: pc_method does not match available options [FE-SBE, AB-SAM, HEUN]."
-                write(*,*) "pc_method = ", trim(dom%par%pc_method)
+                write(error_unit,*) "yelmo_udpate:: Error: pc_method does not match available options [FE-SBE, AB-SAM, HEUN]."
+                write(error_unit,*) "pc_method = ", trim(dom%par%pc_method)
                 stop 
 
         end select 
@@ -149,8 +151,8 @@ contains
 
             case DEFAULT 
 
-                write(*,*) "yelmo_udpate:: Error: thermodynamics dt_method does not match available options [FE, SBE, AB, SAM]."
-                write(*,*) "thrm:: dt_method = ", trim(dom%thrm%par%dt_method)
+                write(error_unit,*) "yelmo_update:: Error: thermodynamics dt_method does not match available options [FE, SBE, AB, SAM]."
+                write(error_unit,*) "thrm:: dt_method = ", trim(dom%thrm%par%dt_method)
                 stop 
 
         end select 
@@ -213,8 +215,8 @@ contains
                     
                 case DEFAULT 
 
-                    write(*,*) "yelmo_update:: Error: dt_method not recognized."
-                    write(*,*) "dt_method = ", dom%par%dt_method 
+                    write(error_unit,*) "yelmo_update:: Error: dt_method not recognized."
+                    write(error_unit,*) "dt_method = ", dom%par%dt_method 
                     stop 
 
             end select 
@@ -603,15 +605,15 @@ contains
 
             case DEFAULT 
 
-                write(*,*) "yelmo_init:: Error: parameter grid_def not recognized: "//trim(grid_def)
+                write(error_unit,*) "yelmo_init:: Error: parameter grid_def not recognized: "//trim(grid_def)
                 stop 
 
         end select 
 
         ! Check that grid has been defined properly 
         if (.not. allocated(dom%grd%x)) then 
-            write(*,*) "yelmo_init:: Error: ygrid has not been properly defined yet."
-            write(*,*) "(Either use yelmo_init_grid externally with desired grid parameters &
+            write(error_unit,*) "yelmo_init:: Error: ygrid has not been properly defined yet."
+            write(error_unit,*) "(Either use yelmo_init_grid externally with desired grid parameters &
                        &or set grid_def=['name','file'])"
             stop 
         end if 
@@ -686,7 +688,7 @@ contains
 
                 ! Consistency check 
                 if (trim(dom%tpo%par%solver) .ne. "impl-upwind") then 
-                    write(*,*) "yelmo_init:: Error: the mass conservation solver for MISMIP3D experiments &
+                    write(error_unit,*) "yelmo_init:: Error: the mass conservation solver for MISMIP3D experiments &
                     &must be 'impl-upwind' for stability. The 'expl' solver has not yet been designed to &
                     &handle ice advected at the border point nx-1, and thus oscillations can be produced. &
                     &Please set 'solver=impl-upwind'."
@@ -708,7 +710,15 @@ contains
                 
         end select 
 
-        ! == boundary and data == 
+        ! == data and boundary == 
+        
+        call ydata_par_load(dom%dta%par,filename,dom%par%domain,dom%par%grid_name,init=.TRUE.)
+        call ydata_alloc(dom%dta%pd,dom%grd%nx,dom%grd%ny,dom%par%nz_aa,dom%dta%par%pd_age_n_iso)
+
+        ! Load data objects   
+        call ydata_load(dom%dta,dom%bnd%ice_allowed)
+
+        write(*,*) "yelmo_init:: data intialized (loaded data if desired)."
         
         ! Allocate the yelmo data objects (arrays, etc)
         call ybound_alloc(dom%bnd,dom%grd%nx,dom%grd%ny)
@@ -719,15 +729,11 @@ contains
         ! Update the ice_allowed mask based on domain definition 
         call ybound_define_ice_allowed(dom%bnd,dom%par%domain)
         
-        write(*,*) "yelmo_init:: boundary intialized (loaded masks)."
-        
-        call ydata_par_load(dom%dta%par,filename,dom%par%domain,dom%par%grid_name,init=.TRUE.)
-        call ydata_alloc(dom%dta%pd,dom%grd%nx,dom%grd%ny,dom%par%nz_aa,dom%dta%par%pd_age_n_iso)
+        ! Set H_ice_ref and z_bed_ref to present-day ice thickness by default 
+        dom%bnd%H_ice_ref = dom%dta%pd%H_ice 
+        dom%bnd%z_bed_ref = dom%dta%pd%z_bed
 
-        ! Load data objects   
-        call ydata_load(dom%dta,dom%bnd%ice_allowed)
-
-        write(*,*) "yelmo_init:: data intialized (loaded data if desired)."
+        write(*,*) "yelmo_init:: boundary intialized (loaded masks, set ref. topography)."
         
         ! == topography ==
 
@@ -736,11 +742,6 @@ contains
 
         write(*,*) "yelmo_init:: topo intialized (loaded data if desired)."
         
-
-        ! Set H_ice_ref and z_bed_ref to present-day ice thickness by default 
-        dom%bnd%H_ice_ref = dom%dta%pd%H_ice 
-        dom%bnd%z_bed_ref = dom%dta%pd%z_bed
-
         write(*,*) 
         write(*,*) "yelmo_init:: Initialization complete for domain: "// &
                    trim(dom%par%domain) 
@@ -772,7 +773,11 @@ contains
         logical, optional, intent(IN)    :: load_topo 
 
         ! Local variables 
-        logical :: load_topo_from_par 
+        logical :: init_topo_load 
+        character(len=1028) :: init_topo_path
+        character(len=56)   :: init_topo_names(4)
+        integer     :: init_topo_state
+        real(prec)  :: z_bed_f_sd 
 
         ! Initialize variables
          
@@ -782,30 +787,83 @@ contains
             call yelmo_restart_read_topo(dom,trim(dom%par%restart),time)
 
         else
-            ! Determine whether topography has already been defined externally or
-            ! to load initial topography data from file based on parameter choices 
-            load_topo_from_par = .TRUE. 
-            if (present(load_topo)) then 
-                load_topo_from_par = load_topo 
-            end if 
 
-            if (load_topo_from_par) then 
+            ! Load parameters related to topography initiaization 
+            call nml_read(filename,"yelmo_init_topo","init_topo_load",  init_topo_load)
+            call nml_read(filename,"yelmo_init_topo","init_topo_path",  init_topo_path)
+            call nml_read(filename,"yelmo_init_topo","init_topo_names", init_topo_names)
+            call nml_read(filename,"yelmo_init_topo","init_topo_state", init_topo_state)
+            call nml_read(filename,"yelmo_init_topo","z_bed_f_sd",      z_bed_f_sd)
 
-                ! Load bedrock elevation from file 
-                call ybound_load_z_bed(dom%bnd,filename,"yelmo_init_topo",dom%par%domain,dom%par%grid_name)
-                
-                ! Load ice thickness from file
-                call ytopo_load_H_ice(dom%tpo,filename,"yelmo_init_topo",dom%par%domain,dom%par%grid_name,dom%bnd%ice_allowed)
+            call yelmo_parse_path(init_topo_path,dom%par%domain,dom%par%grid_name)
+            
+            ! Override parameter choice if command-line argument present 
+            if (present(load_topo)) init_topo_load = load_topo 
+
+            if (init_topo_load) then 
+                ! =========================================
+                ! Load topography data from netcdf file 
+
+                call nc_read(init_topo_path,init_topo_names(1), dom%tpo%now%H_ice, missing_value=mv)
+                call nc_read(init_topo_path,init_topo_names(2), dom%bnd%z_bed, missing_value=mv) 
+
+                if (trim(init_topo_names(3)) .ne. ""     .and. &
+                    trim(init_topo_names(3)) .ne. "none" .and. &
+                    trim(init_topo_names(3)) .ne. "None") then 
+
+                    call nc_read(init_topo_path,init_topo_names(3),dom%bnd%z_bed_sd)
+
+                    ! Apply scaling to adjust z_bed depending on standard deviation
+                    dom%bnd%z_bed = dom%bnd%z_bed + z_bed_f_sd*dom%bnd%z_bed_sd 
+
+                else
+                    dom%bnd%z_bed_sd = 0.0_prec 
+                end if 
+
+                ! Clean up ice thickness field 
+                where (.not. dom%bnd%ice_allowed)  dom%tpo%now%H_ice = 0.0_prec 
+                where(dom%tpo%now%H_ice  .lt. 1.0) dom%tpo%now%H_ice = 0.0_prec 
+
+                ! Additionally modify initial topographic state 
+                select case(init_topo_state)
+
+                    case(0) 
+
+                        ! Pass, use topography as loaded 
+
+                    case(1) 
+                        ! Remove ice, but do not adjust bedrock 
+
+                        dom%tpo%now%H_ice = 0.0_prec 
+
+                    case(2)
+                        ! Remove ice, set bedrock to isostatically rebounded state 
+
+                        dom%bnd%z_bed     = dom%bnd%z_bed + (rho_ice/rho_a)*dom%tpo%now%H_ice
+                        dom%tpo%now%H_ice = 0.0_prec
+
+                    case DEFAULT 
+
+                        write(error_unit,*) "yelmo_init_topo:: Error: init_topo_state choice not recognized."
+                        write(error_unit,*) "init_topo_state = ", init_topo_state 
+                        stop 
+
+                end select
 
             end if 
 
             ! Calculate topographic information (masks, etc)
             call calc_ytopo(dom%tpo,dom%dyn,dom%thrm,dom%bnd,time,topo_fixed=.TRUE.)
             
-            ! Update regional calculations (for now entire domain with ice)
+            ! Update regional calculations (for entire domain)
             call calc_yregions(dom%reg,dom%tpo,dom%dyn,dom%thrm,dom%mat,dom%bnd,mask=dom%bnd%ice_allowed)
 
         end if 
+
+        write(*,*) "yelmo_init_topo:: range(z_bed):     ", minval(dom%bnd%z_bed),     maxval(dom%bnd%z_bed)
+        write(*,*) "yelmo_init_topo:: range(z_bed_sd):  ", minval(dom%bnd%z_bed_sd),  maxval(dom%bnd%z_bed_sd)
+        write(*,*) "yelmo_init_topo:: range(H_ice):     ", minval(dom%tpo%now%H_ice), maxval(dom%tpo%now%H_ice)
+        write(*,*) "yelmo_init_topo:: scaling fac z_bed_f_sd: ", z_bed_f_sd 
 
         return 
 
@@ -849,7 +907,7 @@ contains
             ! Consistency check 
             if (trim(thrm_method) .ne. "linear" .and. trim(thrm_method) .ne. "robin" &
                 .and. trim(thrm_method) .ne. "robin-cold") then 
-                write(*,*) "yelmo_init_state:: Error: temperature initialization must be &
+                write(error_unit,*) "yelmo_init_state:: Error: temperature initialization must be &
                            &'linear', 'robin' or 'robin-cold' in order to properly prescribe &
                            &initial temperatures."
                 stop 
@@ -957,8 +1015,8 @@ contains
         end if 
 
         if (par%pc_eps .gt. par%pc_tol) then 
-            write(*,*) "yelmo_par_load:: error: pc_eps must be greater than pc_tol."
-            write(*,*) "pc_eps, pc_tol: ", par%pc_eps, par%pc_tol 
+            write(error_unit,*) "yelmo_par_load:: error: pc_eps must be greater than pc_tol."
+            write(error_unit,*) "pc_eps, pc_tol: ", par%pc_eps, par%pc_tol 
             stop 
         end if
 
@@ -1166,32 +1224,32 @@ contains
         if (kill_it) then 
             ! Model is not running properly, kill it. 
 
-            write(*,*) 
-            write(*,*) 
-            write(*,"(a)") "yelmo_check_kill:: Error: model is not running properly:"
-            write(*,"(a)") trim(kill_msg) 
-            write(*,*) 
-            write(*,"(a11,f15.3)")  "timestep    = ", time
-            write(*,*) 
-            write(*,"(a,2g12.4)")   "pc_eps, tol = ", dom%par%pc_eps, dom%par%pc_tol 
-            write(*,"(a,g12.4)")    "pc_eta_avg  = ", pc_eta_avg
+            write(error_unit,*) 
+            write(error_unit,*) 
+            write(error_unit,"(a)") "yelmo_check_kill:: Error: model is not running properly:"
+            write(error_unit,"(a)") trim(kill_msg) 
+            write(error_unit,*) 
+            write(error_unit,"(a11,f15.3)")  "timestep    = ", time
+            write(error_unit,*) 
+            write(error_unit,"(a,2g12.4)")   "pc_eps, tol = ", dom%par%pc_eps, dom%par%pc_tol 
+            write(error_unit,"(a,g12.4)")    "pc_eta_avg  = ", pc_eta_avg
             
-            write(*,"(a4,1x,2a12)") "iter", "pc_dt", "pc_eta"
+            write(error_unit,"(a4,1x,2a12)") "iter", "pc_dt", "pc_eta"
             do k = 1, size(dom%time%pc_eta,1)
-                write(*,"(a4,1x,2g12.4)") trim(pc_iter_str(k)), dom%time%pc_dt(k), dom%time%pc_eta(k) 
+                write(error_unit,"(a4,1x,2g12.4)") trim(pc_iter_str(k)), dom%time%pc_dt(k), dom%time%pc_eta(k) 
             end do 
 
-            write(*,*) 
-            write(*,"(a16,2g14.4)") "range(H_ice):   ", minval(dom%tpo%now%H_ice), maxval(dom%tpo%now%H_ice)
-            write(*,"(a16,2g14.4)") "range(uxy_bar): ", minval(dom%dyn%now%uxy_bar), maxval(dom%dyn%now%uxy_bar)
-            write(*,*) 
+            write(error_unit,*) 
+            write(error_unit,"(a16,2g14.4)") "range(H_ice):   ", minval(dom%tpo%now%H_ice), maxval(dom%tpo%now%H_ice)
+            write(error_unit,"(a16,2g14.4)") "range(uxy_bar): ", minval(dom%dyn%now%uxy_bar), maxval(dom%dyn%now%uxy_bar)
+            write(error_unit,*) 
 
             call yelmo_restart_write(dom,"yelmo_killed.nc",time=time) 
 
-            write(*,*) "Restart file written: "//"yelmo_killed.nc"
-            write(*,*) 
-            write(*,"(a,f15.3,a)") "Time =", time, ": stopping model (killed)." 
-            write(*,*) 
+            write(error_unit,*) "Restart file written: "//"yelmo_killed.nc"
+            write(error_unit,*) 
+            write(error_unit,"(a,f15.3,a)") "Time =", time, ": stopping model (killed)." 
+            write(error_unit,*) 
 
             stop "yelmo_check_kill error, see log."
 
@@ -1199,7 +1257,7 @@ contains
 
         return 
 
-    end subroutine yelmo_check_kill 
+    end subroutine yelmo_check_kill
 
 end module yelmo_ice
 

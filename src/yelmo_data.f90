@@ -161,7 +161,7 @@ contains
 
         return 
 
-    end subroutine ydata_compare 
+    end subroutine ydata_compare
 
     subroutine ydata_load(dta,ice_allowed)
 
@@ -314,7 +314,7 @@ contains
 
         return 
 
-    end subroutine ydata_load 
+    end subroutine ydata_load
 
     subroutine ydata_par_load(par,filename,domain,grid_name,init)
 

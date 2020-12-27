@@ -10,10 +10,7 @@ module yelmo_boundaries
     private
     public :: ybound_load_masks
     public :: ybound_define_ice_allowed
-    public :: ybound_load_z_bed 
     public :: ybound_alloc, ybound_dealloc
-    
-    public :: ybound_load_pd 
     
 contains
 
@@ -183,65 +180,11 @@ contains
                 bnd%ice_allowed = .TRUE. 
 
         end select
-
-                
+          
         return 
 
     end subroutine ybound_define_ice_allowed
 
-    subroutine ybound_load_z_bed(bnd,nml_path,nml_group,domain,grid_name)
-        ! Load the bedrock elevation boundary field
-
-        implicit none
-
-        type(ybound_class), intent(INOUT) :: bnd
-        character(len=*),   intent(IN)    :: nml_path, nml_group
-        character(len=*),   intent(IN)    :: domain, grid_name 
-
-        ! Local variables
-        logical            :: load_var
-        character(len=512) :: filename
-        character(len=56)  :: vname
-        real(prec)         :: f_sd 
-        
-        ! == z_bed =====
-        call nml_read(nml_path,nml_group,"z_bed_load",load_var)
-
-        if (load_var) then 
-            call nml_read(nml_path,nml_group,"z_bed_path",filename)
-            call yelmo_parse_path(filename,domain,grid_name)
-            call nml_read(nml_path,nml_group,"z_bed_nm",  vname)
-            call nc_read(filename,vname,bnd%z_bed)
-
-            vname = ""
-            call nml_read(nml_path,nml_group,"z_bed_sd_nm",  vname)
-            
-            if (trim(vname) .ne. "" .and. trim(vname) .ne. "none" .and. trim(vname) .ne. "None") then 
-                call nc_read(filename,vname,bnd%z_bed_sd)
-            else
-                bnd%z_bed_sd = 0.0 
-            end if 
-
-        else 
-            bnd%z_bed    = 0.0 
-            bnd%z_bed_sd = 0.0  
-        end if 
-        
-        ! == z_bed scaling via z_bed_sd =====
-        call nml_read(nml_path,nml_group,"z_bed_f_sd",f_sd)
-
-        ! Apply scaling to adjust z_bed depending on standard deviation
-        bnd%z_bed = bnd%z_bed + f_sd*bnd%z_bed_sd 
-
-
-        write(*,*) "ybound_load_z_bed:: range(z_bed):     ", minval(bnd%z_bed),    maxval(bnd%z_bed)
-        write(*,*) "ybound_load_z_bed:: range(z_bed_sd):  ", minval(bnd%z_bed_sd), maxval(bnd%z_bed_sd)
-        write(*,*) "ybound_load_z_bed:: scaling fac f_sd: ", f_sd 
-
-        return 
-
-    end subroutine ybound_load_z_bed 
-    
     subroutine ybound_alloc(now,nx,ny)
 
         implicit none 
@@ -272,9 +215,7 @@ contains
         allocate(now%calv_mask(nx,ny))
         
         allocate(now%H_ice_ref(nx,ny))
-!mmr
-        allocate(now%z_bed_ref(nx,ny)) !mmr 
-!mmr
+        allocate(now%z_bed_ref(nx,ny))
         
         now%z_bed       = 0.0_prec 
         now%z_bed_sd    = 0.0_prec
@@ -297,11 +238,11 @@ contains
         now%calv_mask   = .FALSE. ! By default no, no calving mask 
 
         now%H_ice_ref   = 0.0_prec 
-!mmr
-        now%z_bed_ref = 0.0_prec !mmr
-!mr
+        now%z_bed_ref   = 0.0_prec
+
         return 
-    end subroutine ybound_alloc 
+
+    end subroutine ybound_alloc
 
     subroutine ybound_dealloc(now)
 
@@ -329,106 +270,11 @@ contains
         if (allocated(now%ice_allowed)) deallocate(now%ice_allowed)
         if (allocated(now%calv_mask))   deallocate(now%calv_mask)
         
-        if (allocated(now%H_ice_ref))   deallocate(now%H_ice_ref)
-!mmr 
-       if (allocated(now%z_bed_ref))   deallocate(now%z_bed_ref) !mmr
-!mmr        
-        return 
-
-    end subroutine ybound_dealloc 
-
-! ajr: unused...
-! Note: some of this functionality is now in yelmo_data. Careful thought
-! needed about which routines are relevant and in which module they should appear...
-    
-    subroutine ybound_load_pd(bnd,nml_path,nml_group,domain,grid_name)
-        ! Load all boundary fields for the present day (except z_bed, handled via ybound_load_zbed) 
-
-        ! ajr: not used yet, needs testing...
-
-        implicit none
-
-        type(ybound_class), intent(INOUT) :: bnd 
-        character(len=*),   intent(IN)    :: nml_path, nml_group 
-        character(len=*),   intent(IN)    :: domain, grid_name
-
-        ! Local variables
-        logical            :: load_var
-        character(len=512) :: filename
-        character(len=56)  :: vname 
-
-        ! == z_sl =====
-
-        bnd%z_sl = 0.0 
-
-        ! == H_sed =====
-        call nml_read(nml_path,nml_group,"H_sed_load",load_var)
-        if (load_var) then 
-            call nml_read(nml_path,nml_group,"H_sed_path",filename)
-            call yelmo_parse_path(filename,domain,grid_name)
-            call nml_read(nml_path,nml_group,"H_sed_nm",  vname)
-            call nc_read(filename,vname,bnd%H_sed)
-        else 
-            bnd%H_sed = mv 
-        end if 
-        
-        ! == smb =====
-        call nml_read(nml_path,nml_group,"smb_load",load_var)
-        if (load_var) then 
-            call nml_read(nml_path,nml_group,"smb_path",filename)
-            call yelmo_parse_path(filename,domain,grid_name)
-            call nml_read(nml_path,nml_group,"smb_nm",  vname)
-            call nc_read(filename,vname,bnd%smb)
-        else 
-            bnd%smb = mv 
-        end if 
-
-        ! == T_srf =====
-        call nml_read(nml_path,nml_group,"T_srf_load",load_var)
-        if (load_var) then 
-            call nml_read(nml_path,nml_group,"T_srf_path",filename)
-            call yelmo_parse_path(filename,domain,grid_name)
-            call nml_read(nml_path,nml_group,"T_srf_nm",  vname)
-            call nc_read(filename,vname,bnd%T_srf)
-        else 
-            bnd%T_srf = mv 
-        end if 
-
-        ! == bmb_shlf =====
-        call nml_read(nml_path,nml_group,"bmb_shlf_load",load_var)
-        if (load_var) then 
-            call nml_read(nml_path,nml_group,"bmb_shlf_path",filename)
-            call yelmo_parse_path(filename,domain,grid_name)
-            call nml_read(nml_path,nml_group,"bmb_shlf_nm",  vname)
-            call nc_read(filename,vname,bnd%bmb_shlf)
-        else 
-            bnd%bmb_shlf = mv 
-        end if 
-
-        ! == T_shlf =====
-        call nml_read(nml_path,nml_group,"T_shlf_load",load_var)
-        if (load_var) then 
-            call nml_read(nml_path,nml_group,"T_shlf_path",filename)
-            call yelmo_parse_path(filename,domain,grid_name)
-            call nml_read(nml_path,nml_group,"T_shlf_nm",  vname)
-            call nc_read(filename,vname,bnd%T_shlf)
-        else 
-            bnd%T_shlf = mv 
-        end if 
-
-        ! == Q_geo =====
-        call nml_read(nml_path,nml_group,"Q_geo_load",load_var)
-        if (load_var) then 
-            call nml_read(nml_path,nml_group,"Q_geo_path",filename)
-            call yelmo_parse_path(filename,domain,grid_name)
-            call nml_read(nml_path,nml_group,"Q_geo_nm",  vname)
-            call nc_read(filename,vname,bnd%Q_geo)
-        else 
-            bnd%Q_geo = mv 
-        end if 
+        if (allocated(now%H_ice_ref))   deallocate(now%H_ice_ref) 
+        if (allocated(now%z_bed_ref))   deallocate(now%z_bed_ref)
 
         return 
 
-    end subroutine ybound_load_pd 
+    end subroutine ybound_dealloc
 
 end module yelmo_boundaries

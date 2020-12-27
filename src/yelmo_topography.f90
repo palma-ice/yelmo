@@ -24,7 +24,6 @@ module yelmo_topography
     
     private
     public :: calc_ytopo
-    public :: ytopo_load_H_ice
     public :: ytopo_par_load, ytopo_alloc, ytopo_dealloc
      
     ! Integers
@@ -277,7 +276,7 @@ contains
             tpo%par%time = dble(time)
             
         end if 
-        
+
 !         if (yelmo_log) then 
 
 !             if (count(tpo%now%H_ice.gt.0.0) .gt. 0) then 
@@ -292,45 +291,6 @@ contains
         return 
 
     end subroutine calc_ytopo
-
-    subroutine ytopo_load_H_ice(tpo,nml_path,nml_group,domain,grid_name,ice_allowed)
-        ! Update the topography of the yelmo domain 
-
-        implicit none
-
-        type(ytopo_class), intent(INOUT) :: tpo
-        character(len=*), intent(IN)     :: nml_path, nml_group
-        character(len=*), intent(IN)     :: domain, grid_name 
-        logical,          intent(IN)     :: ice_allowed(:,:) 
-
-        ! Local variables
-        logical            :: load_var
-        character(len=512) :: filename
-        character(len=56)  :: vname 
-
-        ! == H_ice =====
-        call nml_read(nml_path,nml_group,"H_ice_load",load_var)
-
-        if (load_var) then 
-            call nml_read(nml_path,nml_group,"H_ice_path",filename)
-            call yelmo_parse_path(filename, domain,grid_name)
-            call nml_read(nml_path,nml_group,"H_ice_nm",  vname)
-            call nc_read(filename,vname,tpo%now%H_ice)
-        else 
-            tpo%now%H_ice = 0.0  
-        end if 
-        
-        ! Clean up field 
-        where(tpo%now%H_ice  .lt. 1.0) tpo%now%H_ice = 0.0 
-
-        ! Artificially delete ice from locations that are not allowed
-        where (.not. ice_allowed) tpo%now%H_ice = 0.0 
-        
-        write(*,*) "ytopo_load_H_ice:: range(H_ice):  ", minval(tpo%now%H_ice),  maxval(tpo%now%H_ice)
-
-        return 
-
-    end subroutine ytopo_load_H_ice 
 
     elemental function gen_mask_bed(H_ice,f_pmp,f_grnd,is_grline) result(mask)
         ! Generate an output mask for model conditions at bed

@@ -528,7 +528,7 @@ contains
 
     end subroutine write_step_2D
     
-end program yelmo_trough 
+end program yelmo_trough
 
 
 

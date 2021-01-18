@@ -1,5 +1,5 @@
 &yelmo_config 
-    yelmo_log          = True  
+    yelmo_log  = True
 /
 
 &yelmo_constants 

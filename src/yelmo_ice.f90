@@ -777,7 +777,7 @@ contains
         ! Local variables 
         logical :: init_topo_load 
         character(len=1028) :: init_topo_path
-        character(len=56)   :: init_topo_names(4)
+        character(len=56)   :: init_topo_names(3)
         integer             :: init_topo_state
         real(prec)          :: z_bed_f_sd 
 

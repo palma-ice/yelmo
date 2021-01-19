@@ -14,7 +14,7 @@ module mass_conservation
 contains 
 
     subroutine calc_ice_thickness(H_ice,dHdt_n,H_ice_n,H_ice_pred,H_margin,f_ice,mb_applied,f_grnd,H_ocn,ux,uy,mbal,calv, &
-                                    z_bed_sd,dx,dt,solver,boundaries,ice_allowed,H_min,sd_min,sd_max,calv_max,beta,pc_step)
+                                    z_bed_sd,dx,dt,solver,boundaries,ice_allowed,H_ice_fill,H_min,sd_min,sd_max,calv_max,beta,pc_step)
         ! Interface subroutine to update ice thickness through application
         ! of advection, vertical mass balance terms and calving 
 
@@ -39,6 +39,7 @@ contains
         character(len=*), intent(IN)    :: solver               ! Solver to use for the ice thickness advection equation
         character(len=*), intent(IN)    :: boundaries           ! What boundary conditions should apply?
         logical,          intent(IN)    :: ice_allowed(:,:)     ! Mask of where ice is allowed to be greater than zero 
+        real(prec),       intent(IN)    :: H_ice_fill(:,:)      ! Ice thickness variable to prescribe at boundaries 
         real(prec),       intent(IN)    :: H_min                ! [m]   Minimum allowed ice thickness parameter
         real(prec),       intent(IN)    :: sd_min               ! [m]   Minimum stdev(z_bed) parameter
         real(prec),       intent(IN)    :: sd_max               ! [m]   Maximum stdev(z_bed) parameter
@@ -195,7 +196,7 @@ contains
 
         select case(trim(boundaries))
 
-            case("zeros")
+            case("zeros","EISMINT")
 
                 ! Set border values to zero
                 H_ice(1,:)  = 0.0
@@ -203,21 +204,23 @@ contains
                 H_ice(:,1)  = 0.0
                 H_ice(:,ny) = 0.0
 
-            case("periodic") 
+            case("periodic","periodic-xy") 
 
                 H_ice(1,:)  = H_ice(nx-1,:) 
                 H_ice(nx,:) = H_ice(2,:) 
                 H_ice(:,1)  = H_ice(:,ny-1) 
                 H_ice(:,ny) = H_ice(:,2) 
-                
-            case("EISMINT")
+            
+            case("periodic-x") 
 
-                ! Set border values to zero
-                H_ice(1,:)  = 0.0
-                H_ice(nx,:) = 0.0
-                H_ice(:,1)  = 0.0
-                H_ice(:,ny) = 0.0
-                
+                ! Periodic x 
+                H_ice(1,:)  = H_ice(nx-1,:) 
+                H_ice(nx,:) = H_ice(2,:) 
+
+                ! Free-slip y (infinite)
+                H_ice(:,1)  = H_ice(:,2)
+                H_ice(:,ny) = H_ice(:,ny-1)
+
             case("MISMIP3D")
 
                 ! === MISMIP3D =====
@@ -227,9 +230,14 @@ contains
                 H_ice(:,ny)   = H_ice(:,ny-1)    ! y= 50km, Free-slip condition
 
             case("infinite")
-                ! ajr: we should check setting border H values equal to inner neighbors
-                
+                ! Set border points equal to inner neighbors 
+
                 call fill_borders_2D(H_ice,nfill=1)
+
+            case("fixed") 
+                ! Set border points equal to prescribed values from array
+
+                call fill_borders_2D(H_ice,nfill=1,fill=H_ice_fill)
 
             case DEFAULT 
 

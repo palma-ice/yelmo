@@ -84,8 +84,8 @@ contains
         ! ===== Calculate general variables ========================================
 
         ! Calculate driving stress 
-        call calc_driving_stress(dyn%now%taud_acx,dyn%now%taud_acy,tpo%now%H_ice,tpo%now%dzsdx,tpo%now%dzsdy, &
-                                                                                            dyn%par%dx,dyn%par%taud_lim)
+        call calc_driving_stress(dyn%now%taud_acx,dyn%now%taud_acy,tpo%now%H_ice,tpo%now%dzsdx, &
+                                        tpo%now%dzsdy,dyn%par%dx,dyn%par%taud_lim,dyn%par%boundaries)
 
         ! Calculate effective pressure 
         call calc_ydyn_neff(dyn,tpo,thrm,bnd)

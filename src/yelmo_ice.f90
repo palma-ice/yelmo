@@ -695,18 +695,29 @@ contains
                     stop 
                 end if 
             
-            case("ISMIPHOM") 
-                ! Periodic boundary conditions: X_1 = X_n-1; X_n = X_2
+            case("ISMIPHOM","periodic","periodic-xy") 
+                ! Periodic boundary conditions in x and y, eg: X_1 = X_n-1; X_n = X_2
 
                 dom%tpo%par%boundaries = "periodic"
                 dom%dyn%par%boundaries = "periodic"
 
+            case("slab") 
+
+                dom%tpo%par%boundaries = "periodic" 
+                dom%dyn%par%boundaries = "periodic"
+                
             case("infinite") 
                 ! Set border points equal to interior neighbors 
                 ! (ajr: not fully implemented yet)
 
                 dom%tpo%par%boundaries = "infinite"
                 dom%dyn%par%boundaries = "infinite"
+            
+            case("periodic-x") 
+                ! Periodic boundary conditions in x-direction,
+                ! infinite in y-direction
+                dom%tpo%par%boundaries = "periodic-x"
+                dom%dyn%par%boundaries = "periodic-x"
                 
         end select 
 

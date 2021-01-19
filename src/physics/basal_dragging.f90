@@ -65,7 +65,7 @@ contains
 
         return 
 
-    end subroutine calc_c_bed 
+    end subroutine calc_c_bed
 
     subroutine calc_beta(beta,c_bed,ux_b,uy_b,H_ice,H_grnd,f_grnd,z_bed,z_sl,beta_method, &
                          beta_const,beta_q,beta_u0,beta_gl_scale,beta_gl_f,H_grnd_lim,beta_min,boundaries)
@@ -197,6 +197,13 @@ contains
             beta(:,1)  = beta(:,ny-1)
             beta(:,ny) = beta(:,2) 
 
+        else if (trim(boundaries) .eq. "infinite") then 
+            
+            beta(1,:)  = beta(nx-1,:)
+            beta(nx,:) = beta(2,:) 
+            beta(:,1)  = beta(:,2)
+            beta(:,ny) = beta(:,ny-1) 
+
         end if 
 
         ! Finally ensure that beta for grounded ice is higher than the lower allowed limit
@@ -283,6 +290,20 @@ contains
             beta_acy(:,1)    = beta_acy(:,ny-2)
             beta_acy(:,ny-1) = beta_acy(:,2) 
             beta_acy(:,ny)   = beta_acy(:,3)
+
+        else if (trim(boundaries) .eq. "infinite") then 
+
+            beta_acx(1,:)    = beta_acx(2,:) 
+            beta_acx(nx-1,:) = beta_acx(nx-2,:) 
+            beta_acx(nx,:)   = beta_acx(nx-2,:) 
+            beta_acx(:,1)    = beta_acx(:,2)
+            beta_acx(:,ny)   = beta_acx(:,ny-1) 
+
+            beta_acy(1,:)    = beta_acy(2,:) 
+            beta_acy(nx,:)   = beta_acy(nx-1,:) 
+            beta_acy(:,1)    = beta_acy(:,2)
+            beta_acy(:,ny-1) = beta_acy(:,ny-2) 
+            beta_acy(:,ny)   = beta_acy(:,ny-2)
 
         end if 
 

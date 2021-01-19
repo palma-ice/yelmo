@@ -63,8 +63,15 @@ contains
         logical, allocatable    :: is_front_2(:,:)  
         real(prec), allocatable :: vis_int_g(:,:) 
         real(prec), allocatable :: vis_int_sgxy(:,:)  
-        logical :: is_mismip, is_periodic  
         integer :: n_check 
+
+        ! Boundary conditions counterclockwise unit circle 
+        ! 1: x, right-border
+        ! 2: y, upper-border 
+        ! 3: x, left-border 
+        ! 4: y, lower-border 
+        character(len=56) :: boundaries_vx(4)
+        character(len=56) :: boundaries_vy(4)
 
 ! Include header for lis solver fortran interface
 #include "lisf.h"
@@ -80,12 +87,49 @@ contains
         LIS_INTEGER, allocatable, dimension(:) :: lgs_a_ptr, lgs_a_index
         LIS_SCALAR,  allocatable, dimension(:) :: lgs_a_value, lgs_b_value, lgs_x_value
 
-        is_mismip = .FALSE. 
-        if (trim(boundaries) .eq. "MISMIP3D") is_mismip = .TRUE. 
+        ! Define border conditions (zeros, infinite, periodic)
+        select case(trim(boundaries)) 
 
-        is_periodic = .FALSE. 
-        if (trim(boundaries) .eq. "periodic") is_periodic = .TRUE. 
-        
+            case("MISMIP3D")
+
+                boundaries_vx(1) = "zeros"
+                boundaries_vx(2) = "infinite"
+                boundaries_vx(3) = "zeros"
+                boundaries_vx(4) = "infinite"
+
+                boundaries_vy(1:4) = "zeros" 
+
+            case("periodic")
+
+                boundaries_vx(1:4) = "periodic" 
+
+                boundaries_vy(1:4) = "periodic" 
+
+            case("periodic-x")
+                boundaries_vx(1) = "periodic"
+                boundaries_vx(2) = "infinite"
+                boundaries_vx(3) = "periodic"
+                boundaries_vx(4) = "infinite"
+
+                boundaries_vy(1) = "periodic"
+                boundaries_vy(2) = "infinite"
+                boundaries_vy(3) = "periodic"
+                boundaries_vy(4) = "infinite"
+
+            case("infinite")
+
+                boundaries_vx(1:4) = "infinite" 
+
+                boundaries_vy(1:4) = "infinite" 
+                
+            case DEFAULT 
+
+                boundaries_vx(1:4) = "zeros" 
+
+                boundaries_vy(1:4) = "zeros" 
+                
+        end select 
+
         nx = size(H_ice,1)
         ny = size(H_ice,2)
         
@@ -206,135 +250,235 @@ contains
 
             ! == Treat special cases first ==
 
-            if (i .eq. nx) then 
-                ! Right boundary 
- 
-                if (is_periodic) then
-                    ! Periodic boundary condition, take velocity from one point
-                    ! interior to the left-border, as nx-1 will be set to value
-                    ! at the left-border 
+            if (i .eq. 1) then 
+                ! Left boundary 
 
-                    k = k+1
-                    lgs_a_value(k)  = 1.0   ! diagonal element only
-                    lgs_a_index(k)  = nr
+                select case(trim(boundaries_vx(3)))
 
-                    lgs_b_value(nr) = vx_m(3,j)
-                    lgs_x_value(nr) = vx_m(3,j)
+                    case("zeros")
+                        ! Assume border velocity is zero 
+
+                        k = k+1
+                        lgs_a_value(k)  = 1.0   ! diagonal element only
+                        lgs_a_index(k)  = nr
+
+                        lgs_b_value(nr) = 0.0
+                        lgs_x_value(nr) = 0.0
+
+                    case("infinite")
+                        ! Infinite boundary condition, take 
+                        ! value from one point inward
+
+                        k = k+1
+                        lgs_a_value(k)  = 1.0   ! diagonal element only
+                        lgs_a_index(k)  = nr
+
+                        lgs_b_value(nr) = vx_m(2,j)
+                        lgs_x_value(nr) = vx_m(2,j)
+
+                    case("periodic")
+                        ! Periodic boundary, take velocity from the right boundary
+                        
+                        k = k+1
+                        lgs_a_value(k)  = 1.0   ! diagonal element only
+                        lgs_a_index(k)  = nr
+
+                        lgs_b_value(nr) = vx_m(nx-2,j)
+                        lgs_x_value(nr) = vx_m(nx-2,j)
                 
-                else 
-                    ! Assume border velocity is zero 
+                    case DEFAULT 
 
-                    k = k+1
-                    lgs_a_value(k)  = 1.0   ! diagonal element only
-                    lgs_a_index(k)  = nr
+                        write(*,*) "calc_vxy_ssa_matrix:: Error: left-border condition not &
+                        &recognized: "//trim(boundaries_vx(3))
+                        write(*,*) "boundaries parameter set to: "//trim(boundaries)
+                        stop
 
-                    lgs_b_value(nr) = 0.0
-                    lgs_x_value(nr) = 0.0
+                end select 
+                
+            else if (i .eq. nx) then 
+                ! Right boundary 
+                
+                select case(trim(boundaries_vx(1)))
 
-                end if 
+                    case("zeros")
+                        ! Assume border velocity is zero 
+
+                        k = k+1
+                        lgs_a_value(k)  = 1.0   ! diagonal element only
+                        lgs_a_index(k)  = nr
+
+                        lgs_b_value(nr) = 0.0
+                        lgs_x_value(nr) = 0.0
+
+                    case("infinite")
+                        ! Infinite boundary condition, take 
+                        ! value from two points inward (one point inward will also be prescribed)
+
+                        k = k+1
+                        lgs_a_value(k)  = 1.0   ! diagonal element only
+                        lgs_a_index(k)  = nr
+
+                        lgs_b_value(nr) = vx_m(nx-2,j)
+                        lgs_x_value(nr) = vx_m(nx-2,j)
+                    
+                    case("periodic")
+                        ! Periodic boundary condition, take velocity from one point
+                        ! interior to the left-border, as nx-1 will be set to value
+                        ! at the left-border 
+
+                        k = k+1
+                        lgs_a_value(k)  = 1.0   ! diagonal element only
+                        lgs_a_index(k)  = nr
+
+                        lgs_b_value(nr) = vx_m(3,j)
+                        lgs_x_value(nr) = vx_m(3,j)
+                    
+                    case DEFAULT 
+
+                        write(*,*) "calc_vxy_ssa_matrix:: Error: right-border condition not &
+                        &recognized: "//trim(boundaries_vx(1))
+                        write(*,*) "boundaries parameter set to: "//trim(boundaries)
+                        stop
+
+                end select 
+
+            else if (i .eq. nx-1) then 
+                ! Right boundary, staggered one point further inward 
+                
+                select case(trim(boundaries_vx(1)))
+
+                    case("zeros")
+                        ! Assume border velocity is zero 
+
+                        k = k+1
+                        lgs_a_value(k)  = 1.0   ! diagonal element only
+                        lgs_a_index(k)  = nr
+
+                        lgs_b_value(nr) = 0.0
+                        lgs_x_value(nr) = 0.0
+
+                    case("infinite")
+                        ! Infinite boundary condition, take 
+                        ! value from two points inward (one point inward will also be prescribed)
+
+                        k = k+1
+                        lgs_a_value(k)  = 1.0   ! diagonal element only
+                        lgs_a_index(k)  = nr
+
+                        lgs_b_value(nr) = vx_m(nx-2,j)
+                        lgs_x_value(nr) = vx_m(nx-2,j)
+                    
+                    case("periodic")
+                        ! Periodic boundary condition, take velocity from one point
+                        ! interior to the left-border, as nx-1 will be set to value
+                        ! at the left-border 
+
+                        k = k+1
+                        lgs_a_value(k)  = 1.0   ! diagonal element only
+                        lgs_a_index(k)  = nr
+
+                        lgs_b_value(nr) = vx_m(2,j)
+                        lgs_x_value(nr) = vx_m(2,j)
+                    
+                    case DEFAULT 
+
+                        write(*,*) "calc_vxy_ssa_matrix:: Error: right-border condition not &
+                        &recognized: "//trim(boundaries_vx(1))
+                        write(*,*) "boundaries parameter set to: "//trim(boundaries)
+                        stop
+
+                end select 
 
             else if (j .eq. 1) then 
                 ! Lower boundary 
 
-                if (is_mismip) then
-                    ! MISMIP3D: free-slip border, vx = neighbor vx
+                select case(trim(boundaries_vx(4)))
 
-                    k = k+1
-                    lgs_a_value(k)  = 1.0   ! diagonal element only
-                    lgs_a_index(k)  = nr
+                    case("zeros")
+                        ! Assume border velocity is zero 
 
-                    lgs_b_value(nr) = vx_m(i,j+1)
-                    lgs_x_value(nr) = vx_m(i,j+1)
-            
-                else if (is_periodic) then 
-                    ! Periodic boundary, take velocity from the lower boundary
+                        k = k+1
+                        lgs_a_value(k)  = 1.0   ! diagonal element only
+                        lgs_a_index(k)  = nr
+
+                        lgs_b_value(nr) = 0.0
+                        lgs_x_value(nr) = 0.0
+
+                    case("infinite")
+                        ! Infinite boundary condition, take 
+                        ! value from one point inward
+
+                        k = k+1
+                        lgs_a_value(k)  = 1.0   ! diagonal element only
+                        lgs_a_index(k)  = nr
+
+                        lgs_b_value(nr) = vx_m(i,j+1)
+                        lgs_x_value(nr) = vx_m(i,j+1)
+                
+                    case("periodic")
+                        ! Periodic boundary, take velocity from the upper boundary
                     
-                    k = k+1
-                    lgs_a_value(k)  = 1.0   ! diagonal element only
-                    lgs_a_index(k)  = nr
+                        k = k+1
+                        lgs_a_value(k)  = 1.0   ! diagonal element only
+                        lgs_a_index(k)  = nr
 
-                    lgs_b_value(nr) = vx_m(i,ny-1)
-                    lgs_x_value(nr) = vx_m(i,ny-1)
+                        lgs_b_value(nr) = vx_m(i,ny-1)
+                        lgs_x_value(nr) = vx_m(i,ny-1)
 
-                else 
-                    ! Assume border velocity is zero 
+                    case DEFAULT 
 
-                    k = k+1
-                    lgs_a_value(k)  = 1.0   ! diagonal element only
-                    lgs_a_index(k)  = nr
+                        write(*,*) "calc_vxy_ssa_matrix:: Error: upper-border condition not &
+                        &recognized: "//trim(boundaries_vx(4))
+                        write(*,*) "boundaries parameter set to: "//trim(boundaries)
+                        stop
 
-                    lgs_b_value(nr) = 0.0
-                    lgs_x_value(nr) = 0.0
-
-                end if 
+                end select 
 
             else if (j .eq. ny) then 
                 ! Upper boundary 
 
-                if (is_mismip) then
-                    ! MISMIP3D: free-slip border, vx = neighbor vx
+                select case(trim(boundaries_vx(2)))
 
-                    k = k+1
-                    lgs_a_value(k)  = 1.0   ! diagonal element only
-                    lgs_a_index(k)  = nr
+                    case("zeros")
+                        ! Assume border velocity is zero 
 
-                    lgs_b_value(nr) = vx_m(i,j-1)
-                    lgs_x_value(nr) = vx_m(i,j-1)
+                        k = k+1
+                        lgs_a_value(k)  = 1.0   ! diagonal element only
+                        lgs_a_index(k)  = nr
 
-                else if (is_periodic) then 
-                    ! Periodic boundary, take velocity from the lower boundary
+                        lgs_b_value(nr) = 0.0
+                        lgs_x_value(nr) = 0.0
+
+                    case("infinite")
+                        ! Infinite boundary condition, take 
+                        ! value from one point inward
+
+                        k = k+1
+                        lgs_a_value(k)  = 1.0   ! diagonal element only
+                        lgs_a_index(k)  = nr
+
+                        lgs_b_value(nr) = vx_m(i,j-1)
+                        lgs_x_value(nr) = vx_m(i,j-1)
+
+                    case("periodic")
+                        ! Periodic boundary, take velocity from the lower boundary
                     
-                    k = k+1
-                    lgs_a_value(k)  = 1.0   ! diagonal element only
-                    lgs_a_index(k)  = nr
+                        k = k+1
+                        lgs_a_value(k)  = 1.0   ! diagonal element only
+                        lgs_a_index(k)  = nr
 
-                    lgs_b_value(nr) = vx_m(i,2)
-                    lgs_x_value(nr) = vx_m(i,2)
+                        lgs_b_value(nr) = vx_m(i,2)
+                        lgs_x_value(nr) = vx_m(i,2)
 
-                else 
-                    ! Assume border velocity is zero 
+                    case DEFAULT 
 
-                    k = k+1
-                    lgs_a_value(k)  = 1.0   ! diagonal element only
-                    lgs_a_index(k)  = nr
+                        write(*,*) "calc_vxy_ssa_matrix:: Error: upper-border condition not &
+                        &recognized: "//trim(boundaries_vx(2))
+                        write(*,*) "boundaries parameter set to: "//trim(boundaries)
+                        stop
 
-                    lgs_b_value(nr) = 0.0
-                    lgs_x_value(nr) = 0.0
+                end select 
 
-                end if 
-
-            else if (i .eq. 1 .and. is_mismip) then
-                    ! MISMIP3D: free-slip border, vx = neighbor vx
-
-                k = k+1
-                lgs_a_value(k)  = 1.0   ! diagonal element only
-                lgs_a_index(k)  = nr
-
-                lgs_b_value(nr) = 0.0
-                lgs_x_value(nr) = 0.0
-            
-            else if (i .eq. 1 .and. is_periodic) then 
-                ! Periodic boundary contion, set first point equal to 2 points in
-                ! from the left-border, since the border point is out of range 
-                ! and one point in from border is prescribed from right-border. 
-
-                k = k+1
-                lgs_a_value(k)  = 1.0   ! diagonal element only
-                lgs_a_index(k)  = nr
-
-                lgs_b_value(nr) = vx_m(nx-2,j)
-                lgs_x_value(nr) = vx_m(nx-2,j)
-            
-            else if (i .eq. nx-1 .and. is_periodic) then 
-                ! Set left-border point equal to one point in from right-border 
-
-                k = k+1
-                lgs_a_value(k)  = 1.0   ! diagonal element only
-                lgs_a_index(k)  = nr
-
-                lgs_b_value(nr) = vx_m(2,j)
-                lgs_x_value(nr) = vx_m(2,j)
-                
             else if (ssa_mask_acx(i,j) .eq. -1) then 
                 ! Assign prescribed boundary velocity to this point
                 ! (eg for prescribed velocity corresponding to analytical grounding line flux)
@@ -570,146 +714,228 @@ contains
 
             ! == Treat special cases first ==
 
-            if (j .eq. ny) then 
-                ! Top boundary 
+            if (j .eq. 1) then 
+                ! lower boundary 
 
-                if (is_mismip) then 
-                    ! MISMIP3D: free-slip border, vy=0
+                select case(trim(boundaries_vy(4)))
 
-                    k = k+1
-                    lgs_a_value(k)  = 1.0_prec   ! diagonal element only
-                    lgs_a_index(k)  = nr
+                    case("zeros")
+                        ! Assume border vy velocity is zero 
 
-                    lgs_b_value(nr) = 0.0_prec
-                    lgs_x_value(nr) = 0.0_prec
+                        k = k+1
+                        lgs_a_value(k)  = 1.0_prec   ! diagonal element only
+                        lgs_a_index(k)  = nr
 
-                else if (is_periodic) then 
-                    ! Periodic boundary condition, take velocity from one point
-                    ! interior to the left-border, as nx-1 will be set to value
-                    ! at the left-border 
+                        lgs_b_value(nr) = 0.0_prec
+                        lgs_x_value(nr) = 0.0_prec
 
-                    k = k+1
-                    lgs_a_value(k)  = 1.0   ! diagonal element only
-                    lgs_a_index(k)  = nr
+                    case("infinite")
+                        ! Infinite boundary, take velocity from one point inward
+                        
+                        k = k+1
+                        lgs_a_value(k)  = 1.0   ! diagonal element only
+                        lgs_a_index(k)  = nr
 
-                    lgs_b_value(nr) = vy_m(i,3)
-                    lgs_x_value(nr) = vy_m(i,3)
-                    
-                else 
-                    ! Velocity assumed to be zero
+                        lgs_b_value(nr) = vy_m(i,2)
+                        lgs_x_value(nr) = vy_m(i,2)
+                        
+                    case("periodic")
+                        ! Periodic boundary, take velocity from the opposite boundary
+                        
+                        k = k+1
+                        lgs_a_value(k)  = 1.0   ! diagonal element only
+                        lgs_a_index(k)  = nr
+
+                        lgs_b_value(nr) = vy_m(i,ny-2)
+                        lgs_x_value(nr) = vy_m(i,ny-2)
+                        
+                    case DEFAULT 
+
+                        write(*,*) "calc_vxy_ssa_matrix:: Error: lower-border condition not &
+                        &recognized: "//trim(boundaries_vy(4))
+                        write(*,*) "boundaries parameter set to: "//trim(boundaries)
+                        stop
+
+                end select 
+
+            else if (j .eq. ny) then 
+                ! Upper boundary 
+
+                select case(trim(boundaries_vy(2)))
+
+                    case("zeros")
+                        ! Assume border velocity is zero 
+
+                        k = k+1
+                        lgs_a_value(k)  = 1.0_prec   ! diagonal element only
+                        lgs_a_index(k)  = nr
+
+                        lgs_b_value(nr) = 0.0_prec
+                        lgs_x_value(nr) = 0.0_prec
+
+                    case("infinite")
+                        ! Infinite boundary, take velocity from two points inward
+                        ! (to account for staggering)
+
+                        k = k+1
+                        lgs_a_value(k)  = 1.0   ! diagonal element only
+                        lgs_a_index(k)  = nr
+
+                        lgs_b_value(nr) = vy_m(i,ny-2)
+                        lgs_x_value(nr) = vy_m(i,ny-2)
+                        
+                    case("periodic")
+                        ! Periodic boundary, take velocity from the right boundary
+                        
+                        k = k+1
+                        lgs_a_value(k)  = 1.0   ! diagonal element only
+                        lgs_a_index(k)  = nr
+
+                        lgs_b_value(nr) = vy_m(i,3)
+                        lgs_x_value(nr) = vy_m(i,3)
+                        
+                    case DEFAULT 
+
+                        write(*,*) "calc_vxy_ssa_matrix:: Error: upper-border condition not &
+                        &recognized: "//trim(boundaries_vy(2))
+                        write(*,*) "boundaries parameter set to: "//trim(boundaries)
+                        stop
+
+                end select 
             
-                    k = k+1
-                    lgs_a_value(k)  = 1.0_prec   ! diagonal element only
-                    lgs_a_index(k)  = nr
+            else if (j .eq. ny-1) then
+                ! Upper boundary, inward by one point
 
-                    lgs_b_value(nr) = 0.0_prec
-                    lgs_x_value(nr) = 0.0_prec
+                select case(trim(boundaries_vy(2)))
 
-                end if 
+                    case("zeros")
+                        ! Assume border velocity is zero 
+
+                        k = k+1
+                        lgs_a_value(k)  = 1.0_prec   ! diagonal element only
+                        lgs_a_index(k)  = nr
+
+                        lgs_b_value(nr) = 0.0_prec
+                        lgs_x_value(nr) = 0.0_prec
+
+                    case("infinite")
+                        ! Infinite boundary, take velocity from two points inward
+                        ! (to account for staggering)
+
+                        k = k+1
+                        lgs_a_value(k)  = 1.0   ! diagonal element only
+                        lgs_a_index(k)  = nr
+
+                        lgs_b_value(nr) = vy_m(i,ny-2)
+                        lgs_x_value(nr) = vy_m(i,ny-2)
+                        
+                    case("periodic")
+                        ! Periodic boundary, take velocity from the right boundary
+                        
+                        k = k+1
+                        lgs_a_value(k)  = 1.0   ! diagonal element only
+                        lgs_a_index(k)  = nr
+
+                        lgs_b_value(nr) = vy_m(i,2)
+                        lgs_x_value(nr) = vy_m(i,2)
+                        
+                    case DEFAULT 
+
+                        write(*,*) "calc_vxy_ssa_matrix:: Error: upper-border condition not &
+                        &recognized: "//trim(boundaries_vy(2))
+                        write(*,*) "boundaries parameter set to: "//trim(boundaries)
+                        stop
+
+                end select 
                 
             else if (i .eq. 1) then 
                 ! Left boundary 
 
-                if (is_mismip) then 
-                    ! MISMIP3D: free-slip border, vy=0
+                select case(trim(boundaries_vy(3)))
 
-                    k = k+1
-                    lgs_a_value(k)  = 1.0_prec   ! diagonal element only
-                    lgs_a_index(k)  = nr
+                    case("zeros")
+                        ! Assume border velocity is zero 
 
-                    lgs_b_value(nr) = 0.0_prec
-                    lgs_x_value(nr) = 0.0_prec
+                        k = k+1
+                        lgs_a_value(k)  = 1.0_prec   ! diagonal element only
+                        lgs_a_index(k)  = nr
 
-                else if (is_periodic) then 
-                    ! Periodic boundary condition, set the left-border 
-                    ! equal to one point in from the right-border 
+                        lgs_b_value(nr) = 0.0_prec
+                        lgs_x_value(nr) = 0.0_prec
 
-                    k = k+1
-                    lgs_a_value(k)  = 1.0   ! diagonal element only
-                    lgs_a_index(k)  = nr
+                    case("infinite")
+                        ! Infinite boundary, take velocity from one point inward
 
-                    lgs_b_value(nr) = vy_m(nx-1,j)
-                    lgs_x_value(nr) = vy_m(nx-1,j)
-                    
-                else 
-                    ! Velocity assumed to be zero
-            
-                    k = k+1
-                    lgs_a_value(k)  = 1.0_prec   ! diagonal element only
-                    lgs_a_index(k)  = nr
+                        k = k+1
+                        lgs_a_value(k)  = 1.0   ! diagonal element only
+                        lgs_a_index(k)  = nr
 
-                    lgs_b_value(nr) = 0.0_prec
-                    lgs_x_value(nr) = 0.0_prec
+                        lgs_b_value(nr) = vy_m(i,2)
+                        lgs_x_value(nr) = vy_m(i,2)
+                        
+                    case("periodic")
+                        ! Periodic boundary, take velocity from the right boundary
+                        
+                        k = k+1
+                        lgs_a_value(k)  = 1.0   ! diagonal element only
+                        lgs_a_index(k)  = nr
 
-                end if 
+                        lgs_b_value(nr) = vy_m(nx-1,j)
+                        lgs_x_value(nr) = vy_m(nx-1,j)
+                        
+                    case DEFAULT 
 
+                        write(*,*) "calc_vxy_ssa_matrix:: Error: left-border condition not &
+                        &recognized: "//trim(boundaries_vy(3))
+                        write(*,*) "boundaries parameter set to: "//trim(boundaries)
+                        stop
+
+                end select 
+                
             else if (i .eq. nx) then 
                 ! Right boundary 
 
-                if (is_mismip) then 
-                    ! MISMIP3D: free-slip border, vy=0
+                select case(trim(boundaries_vy(1)))
 
-                    k = k+1
-                    lgs_a_value(k)  = 1.0_prec   ! diagonal element only
-                    lgs_a_index(k)  = nr
+                    case("zeros")
+                        ! Assume border velocity is zero 
 
-                    lgs_b_value(nr) = 0.0_prec
-                    lgs_x_value(nr) = 0.0_prec
+                        k = k+1
+                        lgs_a_value(k)  = 1.0_prec   ! diagonal element only
+                        lgs_a_index(k)  = nr
 
-                else if (is_periodic) then 
-                    ! Periodic boundary condition, set the left-border 
-                    ! equal to one point in from the right-border 
+                        lgs_b_value(nr) = 0.0_prec
+                        lgs_x_value(nr) = 0.0_prec
 
-                    k = k+1
-                    lgs_a_value(k)  = 1.0   ! diagonal element only
-                    lgs_a_index(k)  = nr
+                    case("infinite")
+                        ! Infinite boundary, take velocity from one point inward
 
-                    lgs_b_value(nr) = vy_m(2,j)
-                    lgs_x_value(nr) = vy_m(2,j)
-                    
-                else 
-                    ! Velocity assumed to be zero
+                        k = k+1
+                        lgs_a_value(k)  = 1.0   ! diagonal element only
+                        lgs_a_index(k)  = nr
+
+                        lgs_b_value(nr) = vy_m(nx-1,j)
+                        lgs_x_value(nr) = vy_m(nx-1,j)
+                        
+                    case("periodic")
+                        ! Periodic boundary, take velocity from the right boundary
+                        
+                        k = k+1
+                        lgs_a_value(k)  = 1.0   ! diagonal element only
+                        lgs_a_index(k)  = nr
+
+                        lgs_b_value(nr) = vy_m(2,j)
+                        lgs_x_value(nr) = vy_m(2,j)
+                        
+                    case DEFAULT 
+
+                        write(*,*) "calc_vxy_ssa_matrix:: Error: right-border condition not &
+                        &recognized: "//trim(boundaries_vy(1))
+                        write(*,*) "boundaries parameter set to: "//trim(boundaries)
+                        stop
+
+                end select 
             
-                    k = k+1
-                    lgs_a_value(k)  = 1.0_prec   ! diagonal element only
-                    lgs_a_index(k)  = nr
-
-                    lgs_b_value(nr) = 0.0_prec
-                    lgs_x_value(nr) = 0.0_prec
-
-                end if 
-
-            else if (j .eq. 1 .and. is_mismip) then 
-                ! MISMIP3D: free-slip border, vy=0
-
-                k = k+1
-                lgs_a_value(k)  = 1.0   ! diagonal element only
-                lgs_a_index(k)  = nr
-
-                lgs_b_value(nr) = 0.0
-                lgs_x_value(nr) = 0.0
-
-            else if (j .eq. 1 .and. is_periodic) then 
-                ! Periodic boundary conditions
-
-                k = k+1
-                lgs_a_value(k)  = 1.0   ! diagonal element only
-                lgs_a_index(k)  = nr
-
-                lgs_b_value(nr) = vy_m(i,ny-2)
-                lgs_x_value(nr) = vy_m(i,ny-2)
-
-
-            else if (j .eq. ny-1 .and. is_periodic) then
-                ! Periodic boundary conditions
-
-                k = k+1
-                lgs_a_value(k)  = 1.0   ! diagonal element only
-                lgs_a_index(k)  = nr
-
-                lgs_b_value(nr) = vy_m(i,2)
-                lgs_x_value(nr) = vy_m(i,2)
-                
             else if (ssa_mask_acy(i,j) .eq. -1) then 
                 ! Assign prescribed boundary velocity to this point
                 ! (eg for prescribed velocity corresponding to analytical grounding line flux)

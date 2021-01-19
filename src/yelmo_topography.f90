@@ -102,7 +102,7 @@ contains
                                     bnd%z_sl-bnd%z_bed,dyn%now%ux_bar,dyn%now%uy_bar, &
                                     mbal=mbal,calv=tpo%now%calv,z_bed_sd=bnd%z_bed_sd,dx=tpo%par%dx,dt=dt, &
                                     solver=trim(tpo%par%solver),boundaries=trim(tpo%par%boundaries), &
-                                    ice_allowed=bnd%ice_allowed,H_min=tpo%par%H_min_grnd, &
+                                    ice_allowed=bnd%ice_allowed,H_ice_fill=bnd%H_ice_ref,H_min=tpo%par%H_min_grnd, &
                                     sd_min=tpo%par%sd_min,sd_max=tpo%par%sd_max,calv_max=tpo%par%calv_max, &
                                     beta=tpo%par%dt_beta,pc_step=tpo%par%pc_step)
             
@@ -204,8 +204,10 @@ contains
         end if 
         
         ! Calculate the surface slope (on staggered Ac x/y nodes)
-        call calc_gradient_ac_ice(tpo%now%dzsdx,tpo%now%dzsdy,tpo%now%z_srf,tpo%now%H_ice,tpo%par%dx,tpo%par%margin2nd,tpo%par%grad_lim)
-        call calc_gradient_ac_ice(tpo%now%dHicedx,tpo%now%dHicedy,tpo%now%H_ice,tpo%now%H_ice,tpo%par%dx,tpo%par%margin2nd,tpo%par%grad_lim)
+        call calc_gradient_ac_ice(tpo%now%dzsdx,tpo%now%dzsdy,tpo%now%z_srf,tpo%now%H_ice,tpo%par%dx, &
+                                                tpo%par%margin2nd,tpo%par%grad_lim,tpo%par%boundaries)
+        call calc_gradient_ac_ice(tpo%now%dHicedx,tpo%now%dHicedy,tpo%now%H_ice,tpo%now%H_ice,tpo%par%dx, &
+                                                tpo%par%margin2nd,tpo%par%grad_lim,tpo%par%boundaries)
         
         ! ajr: experimental, doesn't seem to work properly yet! ===>
         ! Modify surface slope gradient at the grounding line if desired 

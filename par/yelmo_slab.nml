@@ -2,18 +2,16 @@
     domain       = "slab"
     H0           = 1000.0               ! [m] Reference ice thickness 
     H_stdev      = 1.0                  ! [m] Initial perturbation standard deviation
-    lx           = 200.0                ! [km] Length of domain
-    ly           =  50.0                ! [km] Length of domain
+    nx           = 51                   ! Number of points x-direction
+    ny           = 11                   ! Number of points x-direction
     dx           = 10.0                 ! [km] Grid resolution 
     alpha        = 5.0                  ! [degrees] Angle of bed slope 
-    visc_const   = 1e5                  ! [Pa yr] Constant viscosity 
-    beta_const   = 1e3                  ! [Pa yr/m] Constant basal friction 
     
     ! Timing parameters 
     time_init    = 0.0                  ! [yr] Starting time 
     time_end     = 100.0                ! [yr] Ending time 
     dtt          = 1.0                  ! [yr] Main loop timestep 
-    dt2D_out     = 1.0                  ! [yr] Frequency of writing 2D output files 
+    dt2D_out     = 5.0                  ! [yr] Frequency of writing 2D output files 
 
 /
 
@@ -21,7 +19,7 @@
     domain          = "slab"
     grid_name       = "slab"
     grid_path       = "none"
-    experiment      = "ISMIPHOM"        ! Periodic boundary conditions 
+    experiment      = "slab"         ! Infinite boundary conditions 
     restart         = "no"
     log_timestep    = True 
     zeta_scale      = "linear"          ! "linear", "exp", "tanh"
@@ -47,7 +45,7 @@
     surf_gl_method    = 0               ! 0: binary (max grnd/flt elevation), 1: subgrid average elevation
     margin2nd         = False           ! Apply second-order upwind approximation to gradients at the margin
     use_bmb           = False           ! Use basal mass balance in mass conservation equation
-    topo_fixed        = True            ! Keep ice thickness fixed, perform other ytopo calculations
+    topo_fixed        = False           ! Keep ice thickness fixed, perform other ytopo calculations
     topo_rel          = 0               ! 0: No relaxation; 1: relax shelf; 2: relax shelf + gl; 3: all points 
     topo_rel_tau      = 10.0            ! [a] Time scale for relaxation 
     calv_H_lim        = 200.0           ! [m] Calving limit in ice thickness (thinner ice calves)
@@ -61,12 +59,13 @@
     gl_sep            = 1               ! 1: Linear f_grnd_acx/acy and binary f_grnd, 2: area f_grnd, average to acx/acy
     gl_sep_nx         = 15              ! [-] Number of interpolation points (nx*nx) to calculate grounded area at grounding line
     diffuse_bmb_shlf  = False           ! Allow bmb_shlf to permeate inland at the grounding line 
+    fill_border       = True            ! Fill in border H_ice points with prescribed values from bnd%H_ice_fill
 /
 
 &ydyn
     solver              = "diva"          ! "fixed", "sia", "ssa", "hybrid", "diva", "diva-noslip", l1l2", "l1l2-noslip"
     visc_method         = 0               ! 0: constant visc=visc_const, 1: dynamic viscosity
-    visc_const          = 1e7             ! [Pa a] Constant value for viscosity (if visc_method=0)
+    visc_const          = 1e5             ! [Pa a] Constant value for viscosity (if visc_method=0)
     beta_method         = 0               ! 0: constant beta; 1: linear (beta=cb/u0); 2: psuedo-plastic-power; 3: Regularized Coulomb
     beta_const          = 1e3             ! [Pa a m−1] Constant value of basal friction coefficient to be used
     beta_q              = 1.0             ! Dragging law exponent 

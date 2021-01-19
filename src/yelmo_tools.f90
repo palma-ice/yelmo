@@ -598,7 +598,7 @@ contains
 
     end subroutine calc_gradient_ac
     
-    subroutine calc_gradient_ac_ice(dvardx,dvardy,var,H_ice,dx,margin2nd,grad_lim)
+    subroutine calc_gradient_ac_ice(dvardx,dvardy,var,H_ice,dx,margin2nd,grad_lim,boundaries)
         ! Calculate gradient on ac nodes 
         ! for an ice sheet, only using non-zero thickness points
 
@@ -611,9 +611,11 @@ contains
         real(prec), intent(IN)  :: dx 
         logical,    intent(IN)  :: margin2nd 
         real(prec), intent(IN)  :: grad_lim 
+        character(len=*), intent(IN) :: boundaries  ! Boundary conditions to apply 
 
         ! Local variables 
         integer :: i, j, nx, ny 
+        integer    :: im1, ip1, jm1, jp1 
         real(prec) :: dy 
         real(prec) :: H0, H1, H2 
 
@@ -623,17 +625,34 @@ contains
         ! Assume y-resolution is identical to x-resolution 
         dy = dx 
 
-        ! Slope in x-direction
-        do j = 1, ny 
-        do i = 1, nx-1 
-            dvardx(i,j) = (var(i+1,j)-var(i,j))/dx 
-        end do 
-        end do 
+        ! ! Slope in x-direction
+        ! do j = 1, ny 
+        ! do i = 1, nx-1 
+        !     dvardx(i,j) = (var(i+1,j)-var(i,j))/dx 
+        ! end do 
+        ! end do 
 
-        ! Slope in y-direction
-        do j = 1, ny-1 
+        ! ! Slope in y-direction
+        ! do j = 1, ny-1 
+        ! do i = 1, nx 
+        !     dvardy(i,j) = (var(i,j+1)-var(i,j))/dy
+        ! end do 
+        ! end do 
+
+        do j = 1, ny 
         do i = 1, nx 
-            dvardy(i,j) = (var(i,j+1)-var(i,j))/dy
+
+            im1 = max(1, i-1)
+            ip1 = min(nx,i+1)
+            
+            jm1 = max(1, j-1)
+            jp1 = min(ny,j+1)
+
+            ! Slope in x-direction
+            dvardx(i,j) = (var(ip1,j)-var(i,j))/dx 
+
+            ! Slope in y-direction
+            dvardy(i,j) = (var(i,jp1)-var(i,j))/dy
         end do 
         end do 
 
@@ -701,6 +720,36 @@ contains
         ! Finally, ensure that gradient is beneath desired limit 
         call minmax(dvardx,grad_lim)
         call minmax(dvardy,grad_lim)
+
+        if (trim(boundaries) .eq. "periodic") then 
+
+            dvardx(1,:)    = dvardx(nx-2,:) 
+            dvardx(nx-1,:) = dvardx(2,:) 
+            dvardx(nx,:)   = dvardx(3,:) 
+            dvardx(:,1)    = dvardx(:,ny-1)
+            dvardx(:,ny)   = dvardx(:,2) 
+
+            dvardy(1,:)    = dvardy(nx-1,:) 
+            dvardy(nx,:)   = dvardy(2,:) 
+            dvardy(:,1)    = dvardy(:,ny-2)
+            dvardy(:,ny-1) = dvardy(:,2) 
+            dvardy(:,ny)   = dvardy(:,3)
+
+        else if (trim(boundaries) .eq. "infinite") then 
+
+            dvardx(1,:)    = dvardx(2,:) 
+            dvardx(nx-1,:) = dvardx(nx-2,:) 
+            dvardx(nx,:)   = dvardx(nx-2,:) 
+            dvardx(:,1)    = dvardx(:,2)
+            dvardx(:,ny)   = dvardx(:,ny-1) 
+
+            dvardy(1,:)    = dvardy(2,:) 
+            dvardy(nx,:)   = dvardy(nx-1,:) 
+            dvardy(:,1)    = dvardy(:,2)
+            dvardy(:,ny-1) = dvardy(:,ny-2) 
+            dvardy(:,ny)   = dvardy(:,ny-2)
+
+        end if 
 
         return 
 
@@ -886,12 +935,13 @@ contains
 
     end subroutine minmax 
 
-    subroutine fill_borders_2D(var,nfill)
+    subroutine fill_borders_2D(var,nfill,fill)
 
         implicit none 
 
         real(prec), intent(INOUT) :: var(:,:) 
         integer,    intent(IN)    :: nfill        ! How many neighbors to fill in 
+        real(prec), intent(IN), optional :: fill(:,:) ! Values to impose 
 
         ! Local variables 
         integer :: i, j, nx, ny, q 
@@ -899,13 +949,29 @@ contains
         nx = size(var,1)
         ny = size(var,2)
 
-        do q = 1, nfill 
-            var(q,:)      = var(nfill+1,:)      
-            var(nx-q+1,:) = var(nx-nfill,:)   
-            
-            var(:,q)      = var(:,nfill+1)     
-            var(:,ny-q+1) = var(:,ny-nfill)  
-        end do 
+        if (present(fill)) then 
+            ! Fill with prescribed values from array 'fill' 
+
+            do q = 1, nfill 
+                var(q,:)      = fill(nfill+1,:)      
+                var(nx-q+1,:) = fill(nx-nfill,:)   
+                
+                var(:,q)      = fill(:,nfill+1)     
+                var(:,ny-q+1) = fill(:,ny-nfill)  
+            end do 
+
+        else 
+            ! Fill with interior neighbor values 
+
+            do q = 1, nfill 
+                var(q,:)      = var(nfill+1,:)      
+                var(nx-q+1,:) = var(nx-nfill,:)   
+                
+                var(:,q)      = var(:,nfill+1)     
+                var(:,ny-q+1) = var(:,ny-nfill)  
+            end do 
+
+        end if 
 
         return 
 

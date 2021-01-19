@@ -284,7 +284,7 @@ contains
 
     end subroutine calc_advec_vertical_column_correction
 
-    subroutine calc_driving_stress(taud_acx,taud_acy,H_ice,dzsdx,dzsdy,dx,taud_lim)
+    subroutine calc_driving_stress(taud_acx,taud_acy,H_ice,dzsdx,dzsdy,dx,taud_lim,boundaries)
         ! Calculate driving stress on staggered grid points
         ! Units: taud [Pa] == [kg m-1 s-2]
         ! taud = rho_ice*g*H_ice*dzs/dx
@@ -305,9 +305,11 @@ contains
         real(prec), intent(IN)  :: dzsdy(:,:)       ! [--]
         real(prec), intent(IN)  :: dx               ! [m] 
         real(prec), intent(IN)  :: taud_lim         ! [Pa]
+        character(len=*), intent(IN) :: boundaries  ! Boundary conditions to apply 
 
         ! Local variables 
         integer :: i, j, nx, ny 
+        integer    :: im1, ip1, jm1, jp1 
         real(prec) :: dy, rhog 
         real(prec) :: H_mid
         
@@ -320,32 +322,82 @@ contains
         ! Assume grid resolution is symmetrical 
         dy = dx 
 
-        ! x-direction
-        taud_acx = 0.0_prec  
-        do j = 2, ny 
-        do i = 1, nx-1 
-            H_mid         = 0.5_prec*(H_ice(i,j)+H_ice(i+1,j)) 
-            taud_acx(i,j) = rhog * H_mid * dzsdx(i,j) 
-        end do 
-        end do 
-        taud_acx(nx,:) = taud_acx(nx-1,:) 
-        taud_acx(:,1)  = taud_acx(:,2) 
+        ! ! x-direction
+        ! taud_acx = 0.0_prec  
+        ! do j = 2, ny 
+        ! do i = 1, nx-1 
+        !     H_mid         = 0.5_prec*(H_ice(i,j)+H_ice(i+1,j)) 
+        !     taud_acx(i,j) = rhog * H_mid * dzsdx(i,j) 
+        ! end do 
+        ! end do 
+        ! taud_acx(nx,:) = taud_acx(nx-1,:) 
+        ! taud_acx(:,1)  = taud_acx(:,2) 
 
-        ! y-direction
-        taud_acy = 0.0_prec  
-        do j = 1, ny-1 
-        do i = 2, nx 
-            H_mid         = 0.5_prec*(H_ice(i,j)+H_ice(i,j+1))
+        ! ! y-direction
+        ! taud_acy = 0.0_prec  
+        ! do j = 1, ny-1 
+        ! do i = 2, nx 
+        !     H_mid         = 0.5_prec*(H_ice(i,j)+H_ice(i,j+1))
+        !     taud_acy(i,j) = rhog * H_mid * dzsdy(i,j) 
+        ! end do 
+        ! end do   
+        ! taud_acy(:,ny) = taud_acy(:,ny-1)  
+        ! taud_acy(1,:)  = taud_acy(2,:)
+
+        do j = 1, ny 
+        do i = 1, nx 
+
+            im1 = max(1, i-1)
+            ip1 = min(nx,i+1)
+            
+            jm1 = max(1, j-1)
+            jp1 = min(ny,j+1)
+
+            ! x-direction
+            H_mid         = 0.5_prec*(H_ice(i,j)+H_ice(ip1,j)) 
+            taud_acx(i,j) = rhog * H_mid * dzsdx(i,j) 
+
+            ! y-direction 
+            H_mid         = 0.5_prec*(H_ice(i,j)+H_ice(i,jp1))
             taud_acy(i,j) = rhog * H_mid * dzsdy(i,j) 
+
+        end do
         end do 
-        end do   
-        taud_acy(:,ny) = taud_acy(:,ny-1)  
-        taud_acy(1,:)  = taud_acy(2,:)
 
         ! Apply limit 
         where(abs(taud_acx) .gt. taud_lim) taud_acx = sign(taud_lim,taud_acx)
         where(abs(taud_acy) .gt. taud_lim) taud_acy = sign(taud_lim,taud_acy)
         
+        if (trim(boundaries) .eq. "periodic") then 
+
+            taud_acx(1,:)    = taud_acx(nx-2,:) 
+            taud_acx(nx-1,:) = taud_acx(2,:) 
+            taud_acx(nx,:)   = taud_acx(3,:) 
+            taud_acx(:,1)    = taud_acx(:,ny-1)
+            taud_acx(:,ny)   = taud_acx(:,2) 
+
+            taud_acy(1,:)    = taud_acy(nx-1,:) 
+            taud_acy(nx,:)   = taud_acy(2,:) 
+            taud_acy(:,1)    = taud_acy(:,ny-2)
+            taud_acy(:,ny-1) = taud_acy(:,2) 
+            taud_acy(:,ny)   = taud_acy(:,3)
+
+        else if (trim(boundaries) .eq. "infinite") then 
+
+            taud_acx(1,:)    = taud_acx(2,:) 
+            taud_acx(nx-1,:) = taud_acx(nx-2,:) 
+            taud_acx(nx,:)   = taud_acx(nx-2,:) 
+            taud_acx(:,1)    = taud_acx(:,2)
+            taud_acx(:,ny)   = taud_acx(:,ny-1) 
+
+            taud_acy(1,:)    = taud_acy(2,:) 
+            taud_acy(nx,:)   = taud_acy(nx-1,:) 
+            taud_acy(:,1)    = taud_acy(:,2)
+            taud_acy(:,ny-1) = taud_acy(:,ny-2) 
+            taud_acy(:,ny)   = taud_acy(:,ny-2)
+
+        end if 
+
         return 
 
     end subroutine calc_driving_stress 

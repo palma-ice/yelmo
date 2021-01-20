@@ -119,7 +119,7 @@ program yelmo_slab
 
     ! Define initial ice thickness 
     allocate(dh(yelmo1%grd%nx,yelmo1%grd%ny))
-    call gen_random_normal(dh,0.0_wp,1.0_wp) 
+    call gen_random_normal(dh,0.0_wp,ctrl%H_stdev) 
     yelmo1%tpo%now%H_ice = ctrl%H0 + dh 
 
     ! Define surface elevation 

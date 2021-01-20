@@ -201,23 +201,25 @@ contains
                 ! Set border values to zero
                 H_ice(1,:)  = 0.0
                 H_ice(nx,:) = 0.0
+
                 H_ice(:,1)  = 0.0
                 H_ice(:,ny) = 0.0
 
             case("periodic","periodic-xy") 
 
-                H_ice(1,:)  = H_ice(nx-1,:) 
-                H_ice(nx,:) = H_ice(2,:) 
-                H_ice(:,1)  = H_ice(:,ny-1) 
-                H_ice(:,ny) = H_ice(:,2) 
+                H_ice(1:2,:)  = H_ice(nx-3:nx-2,:) 
+                H_ice(nx-1:nx,:) = H_ice(2:3,:) 
+
+                H_ice(:,1:2)  = H_ice(:,ny-3:ny-2) 
+                H_ice(:,ny-1:ny) = H_ice(:,2:3) 
             
             case("periodic-x") 
 
                 ! Periodic x 
-                H_ice(1,:)  = H_ice(nx-1,:) 
-                H_ice(nx,:) = H_ice(2,:) 
-
-                ! Free-slip y (infinite)
+                H_ice(1:2,:)  = H_ice(nx-3:nx-2,:) 
+                H_ice(nx-1:nx,:) = H_ice(2:3,:) 
+                
+                ! Infinite (free-slip too)
                 H_ice(:,1)  = H_ice(:,2)
                 H_ice(:,ny) = H_ice(:,ny-1)
 
@@ -226,6 +228,7 @@ contains
                 ! === MISMIP3D =====
                 H_ice(1,:)    = H_ice(2,:)       ! x=0, Symmetry 
                 H_ice(nx,:)   = 0.0              ! x=800km, no ice
+                
                 H_ice(:,1)    = H_ice(:,2)       ! y=-50km, Free-slip condition
                 H_ice(:,ny)   = H_ice(:,ny-1)    ! y= 50km, Free-slip condition
 

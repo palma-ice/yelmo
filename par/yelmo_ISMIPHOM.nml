@@ -18,7 +18,7 @@
     domain          = "ISMIPHOM"
     grid_name       = "ISMIPHOM"
     grid_path       = "none"
-    experiment      = "ISMIPHOM"         ! "None", "EISMINT", "MISMIP3D", "BUELER", "ISMIPHOM"  to apply special boundary conditions   
+    experiment      = "periodic"        ! "None", "EISMINT", "MISMIP3D", "BUELER",  to apply special boundary conditions   
     restart         = "no"
     log_timestep    = True 
     zeta_scale      = "linear"             ! "linear", "exp", "tanh"

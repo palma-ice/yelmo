@@ -139,6 +139,8 @@ contains
             ip1 = min(i+1,nx)
             jp1 = min(j+1,ny)
 
+            ! x-direction =====
+
             H1 = 0.5_prec*(H(im1,j)+H(i,j))
             H2 = 0.5_prec*(H(i,j)+H(ip1,j))
 
@@ -153,6 +155,8 @@ contains
             else 
                 unow = 0.0 
             end if 
+
+            ! y-direction =====
 
             H1 = 0.5_prec*(H(i,jm1)+H(i,j))
             H2 = 0.5_prec*(H(i,j)+H(i,jp1))
@@ -179,7 +183,8 @@ contains
             if (trim(boundaries) .eq. "periodic") then 
 
                 umag(1,:)  = umag(nx-1,:) 
-                umag(nx,:) = umag(2,:)  
+                umag(nx,:) = umag(2,:) 
+                 
                 umag(:,1)  = umag(:,ny-1)
                 umag(:,ny) = umag(:,2) 
                 
@@ -189,7 +194,7 @@ contains
 
         return
 
-    end function calc_magnitude_from_staggered_ice 
+    end function calc_magnitude_from_staggered_ice
     
     function stagger_ac_aa(u,v) result(umag)
         ! Calculate the centered (aa-node) magnitude of a scalar 
@@ -216,7 +221,7 @@ contains
 
         return
 
-    end function stagger_ac_aa 
+    end function stagger_ac_aa
     
     function stagger_aa_ab(u) result(ustag)
         ! Stagger from Aa => Ab
@@ -306,7 +311,7 @@ contains
 
         return
 
-    end function stagger_aa_ab_ice 
+    end function stagger_aa_ab_ice
     
     function stagger_ab_aa(u) result(ustag)
         ! Stagger from Ab => Aa
@@ -336,7 +341,7 @@ contains
 
         return
 
-    end function stagger_ab_aa 
+    end function stagger_ab_aa
     
     function stagger_ab_aa_ice(u,H_ice) result(ustag)
         ! Stagger from ab => aa
@@ -401,7 +406,7 @@ contains
 
         return
 
-    end function stagger_ab_aa_ice 
+    end function stagger_ab_aa_ice
     
     function stagger_aa_acx(u) result(ustag)
         ! Stagger from Aa => Ac, x-direction 
@@ -427,7 +432,7 @@ contains
 
         return
 
-    end function stagger_aa_acx 
+    end function stagger_aa_acx
     
     function stagger_aa_acy(u) result(ustag)
         ! Stagger from Aa => Ac 
@@ -453,7 +458,7 @@ contains
 
         return
 
-    end function stagger_aa_acy 
+    end function stagger_aa_acy
     
     function stagger_acx_aa(u) result(ustag)
         ! Stagger from Aa => Ac, x-direction 
@@ -479,7 +484,7 @@ contains
 
         return
 
-    end function stagger_acx_aa 
+    end function stagger_acx_aa
     
     function stagger_acy_aa(u) result(ustag)
         ! Stagger from Aa => Ac 
@@ -505,7 +510,7 @@ contains
 
         return
 
-    end function stagger_acy_aa 
+    end function stagger_acy_aa
     
     function stagger_ab_acx(u) result(ustag)
         ! Stagger from Ab => Ac, x-direction 
@@ -531,7 +536,7 @@ contains
 
         return
 
-    end function stagger_ab_acx 
+    end function stagger_ab_acx
     
     function stagger_ab_acy(u) result(ustag)
         ! Stagger from Ab => Ac 
@@ -570,7 +575,8 @@ contains
         real(prec), intent(IN)  :: dx 
 
         ! Local variables 
-        integer :: i, j, nx, ny 
+        integer    :: i, j, nx, ny
+        integer    :: im1, ip1, jm1, jp1  
         real(prec) :: dy 
 
         nx = size(var,1)
@@ -579,20 +585,22 @@ contains
         ! Assume y-resolution is identical to x-resolution 
         dy = dx 
 
-        ! Slope in x-direction
         do j = 1, ny 
-        do i = 1, nx-1 
-            dvardx(i,j) = (var(i+1,j)-var(i,j))/dx 
-        end do 
-        end do 
-
-        ! Slope in y-direction
-        do j = 1, ny-1 
         do i = 1, nx 
-            dvardy(i,j) = (var(i,j+1)-var(i,j))/dy
-        end do 
-        end do 
 
+            im1 = max(1, i-1)
+            ip1 = min(nx,i+1)
+            
+            jm1 = max(1, j-1)
+            jp1 = min(ny,j+1)
+
+            ! Slope in x-direction
+            dvardx(i,j) = (var(ip1,j)-var(i,j))/dx 
+
+            ! Slope in y-direction
+            dvardy(i,j) = (var(i,jp1)-var(i,j))/dy
+        end do 
+        end do 
 
         return 
 
@@ -614,7 +622,7 @@ contains
         character(len=*), intent(IN) :: boundaries  ! Boundary conditions to apply 
 
         ! Local variables 
-        integer :: i, j, nx, ny 
+        integer    :: i, j, nx, ny 
         integer    :: im1, ip1, jm1, jp1 
         real(prec) :: dy 
         real(prec) :: H0, H1, H2 
@@ -624,20 +632,6 @@ contains
 
         ! Assume y-resolution is identical to x-resolution 
         dy = dx 
-
-        ! ! Slope in x-direction
-        ! do j = 1, ny 
-        ! do i = 1, nx-1 
-        !     dvardx(i,j) = (var(i+1,j)-var(i,j))/dx 
-        ! end do 
-        ! end do 
-
-        ! ! Slope in y-direction
-        ! do j = 1, ny-1 
-        ! do i = 1, nx 
-        !     dvardy(i,j) = (var(i,j+1)-var(i,j))/dy
-        ! end do 
-        ! end do 
 
         do j = 1, ny 
         do i = 1, nx 

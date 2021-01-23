@@ -31,6 +31,7 @@
     experiment      = "TROUGH-F17"
     restart         = "no"
     log_timestep    = False 
+    disable_kill    = False             ! Disable automatic kill if unstable
     zeta_scale      = "exp"             ! "linear", "exp", "tanh"
     zeta_exp        = 2.0  
     nz_aa           = 20                ! Vertical resolution in ice

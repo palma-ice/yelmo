@@ -18,6 +18,7 @@
     experiment      = "MISMIP3D"        ! "None", "EISMINT", "MISMIP3D", "BUELER"  to apply special boundary conditions   
     restart         = "no"
     log_timestep    = False 
+    disable_kill    = False             ! Disable automatic kill if unstable
     zeta_scale      = "linear"          ! "linear", "exp", "tanh"
     zeta_exp        = 2.0  
     nz_aa           = 5                 ! Vertical resolution in ice

@@ -20,10 +20,19 @@ program yelmo_slab
         real(wp)            :: alpha
 
         real(wp)            :: time_init
-        real(wp)            :: time_end
+        !real(wp)            :: time_end
+        integer             :: nt 
         real(wp)            :: dtt
         real(wp)            :: dt1D_out
         real(wp)            :: dt2D_out
+
+        integer             :: n_dtt 
+        real(wp)            :: dtts(50) 
+        integer             :: n_dx 
+        real(wp)            :: dxs(50) 
+
+        character(len=512)  :: path_par 
+        
     end type 
 
     type(ctrl_par) :: ctrl 
@@ -31,11 +40,15 @@ program yelmo_slab
     character(len=256) :: outfldr, file2D, file1D, file_restart
     character(len=512) :: path_par, path_const 
     
-    integer  :: n  
+    integer  :: n
     real(wp) :: time 
     real(wp) :: xmin, xmax, ymin, ymax 
     real(wp), allocatable :: dh(:,:) 
     
+    integer  :: q, q1, q2  
+    real(wp) :: dtt_now
+    real(wp) :: stdev, factor 
+
     real(8)  :: cpu_start_time
     real(8)  :: cpu_end_time
     real(8)  :: cpu_dtime
@@ -66,16 +79,25 @@ program yelmo_slab
 
     ! Timing parameters 
     call nml_read(path_par,"ctrl","time_init",    ctrl%time_init)     ! [yr] Starting time
-    call nml_read(path_par,"ctrl","time_end",     ctrl%time_end)      ! [yr] Ending time
+    !call nml_read(path_par,"ctrl","time_end",     ctrl%time_end)      ! [yr] Ending time
+    call nml_read(path_par,"ctrl","nt",           ctrl%nt)            ! [--] Total timesteps to run
     call nml_read(path_par,"ctrl","dtt",          ctrl%dtt)           ! [yr] Main loop time step 
+    call nml_read(path_par,"ctrl","dt1D_out",     ctrl%dt1D_out)      ! [yr] Frequency of 2D output 
     call nml_read(path_par,"ctrl","dt2D_out",     ctrl%dt2D_out)      ! [yr] Frequency of 2D output 
-        
+    
+    ! Set ctrl parameters for later use 
+    ctrl%path_par   = path_par 
+    
     ! Define default grid name for completeness 
-    ctrl%grid_name = trim(ctrl%domain)
-    ctrl%dt1D_out  = ctrl%dtt 
+    ctrl%grid_name = trim(ctrl%domain) 
+
+    ! Set time to initial time 
+    time = ctrl%time_init 
 
     ! General initialization of yelmo constants (used globally)
     call yelmo_global_init(path_const)
+
+    ! === Initialize ice sheet model =====
 
     ! Define the domain and grid
     xmin =  0.0_prec 
@@ -85,12 +107,6 @@ program yelmo_slab
     call yelmo_init_grid(yelmo1%grd,ctrl%grid_name,units="km", &
                          x0=xmin,dx=ctrl%dx,nx=ctrl%nx, &
                          y0=ymin,dy=ctrl%dx,ny=ctrl%ny)
-
-    ! Set time to initial time 
-
-    time = ctrl%time_init 
-
-    ! === Initialize ice sheet model =====
 
     ! Initialize data objects
     call yelmo_init(yelmo1,filename=path_par,grid_def="none",time=time,load_topo=.FALSE., &
@@ -115,7 +131,7 @@ program yelmo_slab
     
     ! ===== Intialize topography and set parameters =========
     
-    yelmo1%bnd%z_bed = 1000.0_wp - sin(ctrl%alpha*degrees_to_radians)*(yelmo1%grd%x*1e-3)
+    yelmo1%bnd%z_bed = 1000.0_wp - ctrl%alpha*(yelmo1%grd%x)
 
     ! Define initial ice thickness 
     allocate(dh(yelmo1%grd%nx,yelmo1%grd%ny))
@@ -136,12 +152,16 @@ program yelmo_slab
     ! Write initial state 
     call write_step_2D(yelmo1,file2D,time=time) 
 
-    ! 1D file 
-    call write_yreg_init(yelmo1,file1D,time_init=time,units="years",mask=yelmo1%bnd%ice_allowed)
-    call write_yreg_step(yelmo1,file1D,time=time)  
-    
+    ! ! 1D file 
+    ! call write_yreg_init(yelmo1,file1D,time_init=time,units="years",mask=yelmo1%bnd%ice_allowed)
+    ! call write_yreg_step(yelmo1,file1D,time=time)  
+
+
+if (ctrl%dtt .ne. 0.0) then 
+    ! == Perform one simulation with an outer timestep of ctrl%dtt =======
+
     ! Advance timesteps
-    do n = 1, ceiling((ctrl%time_end-ctrl%time_init)/ctrl%dtt)
+    do n = 1, ctrl%nt 
 
         ! Get current time 
         time = ctrl%time_init + n*ctrl%dtt
@@ -149,25 +169,22 @@ program yelmo_slab
         ! == Yelmo ice sheet ===================================================
         call yelmo_update(yelmo1,time)
 
-
-        ! == MODEL OUTPUT =======================================================
-        if (mod(nint(time*100),nint(ctrl%dt2D_out*100))==0) then  
-            call write_step_2D(yelmo1,file2D,time=time)    
-        end if 
-
-        if (mod(nint(time*100),nint(ctrl%dt1D_out*100))==0) then 
-            call write_yreg_step(yelmo1,file1D,time=time) 
-        end if
-
         if (mod(time,10.0)==0 .and. (.not. yelmo_log)) then
             write(*,"(a,f14.4)") "yelmo:: time = ", time
         end if  
 
     end do 
 
+    ! Write final state 
+    call write_step_2D(yelmo1,file2D,time=time) 
+
+    ! Calculate summary 
+    call calc_stdev(stdev,yelmo1%tpo%now%H_ice)
+    factor = stdev / max(ctrl%H_stdev,1e-5)
+
     ! Write summary 
     write(*,*) "====== "//trim(ctrl%domain)//" ======="
-    write(*,*) "nz, H0 = ", yelmo1%par%nz_aa, maxval(yelmo1%tpo%now%H_ice)
+    write(*,*) "factor", ctrl%dx, ctrl%dtt, ctrl%H_stdev, stdev, factor 
 
     ! Finalize program
     call yelmo_end(yelmo1,time=time)
@@ -176,10 +193,157 @@ program yelmo_slab
     call yelmo_cpu_time(cpu_end_time,cpu_start_time,cpu_dtime)
     
     write(*,"(a,f12.3,a)") "Time  = ",cpu_dtime/60.0 ," min"
-    write(*,"(a,f12.1,a)") "Speed = ",(1e-3*(ctrl%time_end-ctrl%time_init))/(cpu_dtime/3600.0), " kiloyears / hr"
+    write(*,"(a,f12.1,a)") "Speed = ",(1e-3*(time-ctrl%time_init))/(cpu_dtime/3600.0), " kiloyears / hr"
     
+else 
+    ! === Perform ensemble of simulations with multiple values of dx and dt =====
+
+    ! Test different timesteps 
+    
+    ctrl%n_dtt = 40 
+    ctrl%dtts  = 0.0_wp
+    do q = 1, ctrl%n_dtt 
+        ctrl%dtts(q) = exp(log(0.005)+(log(1.0)-log(0.005))*(q-1)/(ctrl%n_dtt-1))
+    end do 
+
+    ctrl%n_dx     = 8
+    ctrl%dxs      = 0.0_wp 
+    ctrl%dxs(1:8) = [0.1_wp,0.2_wp,0.5_wp,1.0_wp,2.0_wp,5.0_wp,10.0_wp,20.0_wp]
+
+
+    ! ctrl%n_dtt = 20 
+    ! ctrl%dtts  = 0.0_wp
+    ! do q = 1, ctrl%n_dtt 
+    !     ctrl%dtts(q) = exp(log(0.005)+(log(0.3)-log(0.005))*(q-1)/(ctrl%n_dtt-1))
+    ! end do 
+
+    ! ctrl%n_dx     = 3
+    ! ctrl%dxs      = 0.0_wp 
+    ! ! ctrl%dxs(1:3) = [0.05_wp,0.1_wp,0.2_wp]
+    ! ctrl%dxs(1:3) = [0.005_wp,0.01_wp,0.02_wp]
+
+    write(*,*) "dtts: ", ctrl%dtts(1:ctrl%n_dtt) 
+    write(*,*) "dxs:  ", ctrl%dxs(1:ctrl%n_dx) 
+    
+    open(unit=15,file=trim(outfldr)//"slab_dt_factor.txt",status="UNKNOWN")
+    write(15,"(a12,a12,a12)") "dx", "dt", "factor" 
+
+    do q1 = 1, ctrl%n_dx
+
+        ! Reset factor to a small value 
+        factor = 1e-5 
+
+    do q2 = 1, ctrl%n_dtt 
+
+        if (factor .ge. 3.0) then 
+            ! If factor has already surpassed one, meaning 
+            ! model has become unstable for ctrl%dtts(q2-1),
+            ! then don't run the model further, just set 
+            ! factor to high value 
+
+            factor = 100.0_wp 
+
+        else 
+            ! factor is still small, run the model for this timestep value
+
+            ctrl%dx  = ctrl%dxs(q1) 
+            ctrl%dtt = ctrl%dtts(q2) 
+
+            call run_yelmo_test(factor,ctrl)
+            
+        end if 
+
+        write(15,"(g12.3,g12.3,g12.3)") ctrl%dxs(q1), ctrl%dtts(q2), factor 
+        write(*, "(a,g12.3,g12.3,g12.3)") "factor", ctrl%dxs(q1), ctrl%dtts(q2), factor
+    end do 
+    end do 
+
+    close(15) 
+
+    ! Stop timing 
+    call yelmo_cpu_time(cpu_end_time,cpu_start_time,cpu_dtime)
+    
+    write(*,"(a,f12.3,a)") "Time  = ",cpu_dtime/60.0 ," min"
+    
+end if 
+
+
+
 contains
     
+    subroutine run_yelmo_test(factor,ctrl)
+
+        implicit none 
+
+        real(wp),       intent(OUT) :: factor 
+        type(ctrl_par), intent(IN)  :: ctrl  
+
+        ! Local variables 
+        type(yelmo_class)     :: yelmo1
+
+        integer  :: n
+        real(wp) :: time 
+        real(wp) :: xmin, xmax, ymin, ymax 
+        real(wp), allocatable :: dh(:,:) 
+        real(wp) :: stdev
+
+        ! Define the time 
+        time = ctrl%time_init 
+
+        ! Define the domain and grid
+        xmin =  0.0_prec 
+        xmax =  (ctrl%nx-1)*ctrl%dx  
+        ymax =  (ctrl%ny-1)*ctrl%dx/2.0_prec 
+        ymin = -ymax
+        call yelmo_init_grid(yelmo1%grd,ctrl%grid_name,units="km", &
+                             x0=xmin,dx=ctrl%dx,nx=ctrl%nx, &
+                             y0=ymin,dy=ctrl%dx,ny=ctrl%ny)
+
+        ! Initialize data objects
+        call yelmo_init(yelmo1,filename=ctrl%path_par,grid_def="none",time=time,load_topo=.FALSE., &
+                            domain=ctrl%domain,grid_name=ctrl%grid_name)
+
+        ! ===== Intialize topography and set parameters =========
+        
+        yelmo1%bnd%z_bed = 1000.0_wp - ctrl%alpha*(yelmo1%grd%x)
+
+        ! Define initial ice thickness 
+        allocate(dh(yelmo1%grd%nx,yelmo1%grd%ny))
+        call gen_random_normal(dh,0.0_wp,ctrl%H_stdev) 
+        yelmo1%tpo%now%H_ice = ctrl%H0 + dh 
+
+        ! Define surface elevation 
+        yelmo1%tpo%now%z_srf = yelmo1%bnd%z_bed + yelmo1%tpo%now%H_ice
+
+        ! Define reference ice thickness (for prescribing boundary values, potentially)
+        yelmo1%bnd%H_ice_ref = ctrl%H0 
+
+        ! =======================================================
+
+        ! Initialize the yelmo state (dyn,therm,mat)
+        call yelmo_init_state(yelmo1,path_par,time=time,thrm_method="robin-cold")
+
+        ! Advance timesteps
+        do n = 1, ctrl%nt 
+
+            ! Get current time 
+            time = ctrl%time_init + n*ctrl%dtt
+
+            ! == Yelmo ice sheet ====================
+            call yelmo_update(yelmo1,time)
+
+        end do 
+
+        ! Calculate summary 
+        call calc_stdev(stdev,yelmo1%tpo%now%H_ice)
+        factor = stdev / max(ctrl%H_stdev,1e-5)
+
+        call yelmo_end(yelmo1,time) 
+
+        return 
+
+    end subroutine run_yelmo_test
+
     subroutine write_step_2D(ylmo,filename,time)
 
         implicit none 
@@ -339,6 +503,29 @@ contains
         return 
 
     end subroutine gen_random_normal
+
+    subroutine calc_stdev(stdev,var)
+
+        implicit none 
+
+        real(wp), intent(OUT) :: stdev 
+        real(wp), intent(IN)  :: var(:,:) 
+
+        ! Local variables 
+        real(wp) :: mean 
+        integer  :: n 
+
+        n = size(var,1)*size(var,2)
+
+        ! Calculate the mean 
+        mean = sum(var) / real(n,wp)
+
+        ! Calculate standard deviation 
+        stdev = sqrt(sum( (var-mean)**2 ) / real(n-1,wp))
+
+        return 
+
+    end subroutine calc_stdev
 
 end program yelmo_slab
 

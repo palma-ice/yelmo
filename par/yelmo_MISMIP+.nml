@@ -31,6 +31,7 @@
     experiment      = "MISMIP+"
     restart         = "no"
     log_timestep    = True 
+    disable_kill    = False             ! Disable automatic kill if unstable
     zeta_scale      = "exp"             ! "linear", "exp", "tanh"
     zeta_exp        = 2.0  
     nz_aa           = 10                ! Vertical resolution in ice

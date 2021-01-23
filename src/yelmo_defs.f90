@@ -662,24 +662,27 @@ module yelmo_defs
         ! Data logging 
         logical             :: log_timestep 
 
+        ! Automatic kill step for unstable performance 
+        logical             :: disable_kill 
+
         ! Vertical dimension definition
         character (len=56)  :: zeta_scale 
-        real(wp)          :: zeta_exp 
+        real(wp)            :: zeta_exp 
         integer             :: nz_ac
         integer             :: nz_aa 
 
         ! Yelmo timesteps 
         integer             :: dt_method 
-        real(wp)          :: dt_min
-        real(wp)          :: cfl_max 
-        real(wp)          :: cfl_diff_max 
+        real(wp)            :: dt_min
+        real(wp)            :: cfl_max 
+        real(wp)            :: cfl_diff_max 
         character (len=56)  :: pc_method
         character (len=56)  :: pc_controller
         logical             :: pc_filter_vel 
         logical             :: pc_use_H_pred 
         integer             :: pc_n_redo 
-        real(wp)          :: pc_tol 
-        real(wp)          :: pc_eps  
+        real(wp)            :: pc_tol 
+        real(wp)            :: pc_eps  
 
         ! Sigma coordinates (internal parameter)
         real(wp), allocatable :: zeta_aa(:)   ! Layer centers (aa-nodes), plus base and surface: nz_aa points 

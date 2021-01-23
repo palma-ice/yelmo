@@ -42,6 +42,7 @@
     experiment      = "None"       
     restart         = "None"  ! "input/{domain}/{grid_name}/{grid_name}_yelmo_restart-opt-1.nc"
     log_timestep    = False 
+    disable_kill    = False             ! Disable automatic kill if unstable
     zeta_scale      = "exp"             ! "linear", "exp", "tanh"
     zeta_exp        = 2.0  
     nz_aa           = 10                ! Vertical resolution in ice

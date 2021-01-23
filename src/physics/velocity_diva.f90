@@ -185,7 +185,7 @@ contains
             
             ! Calculate effective beta 
             call calc_beta_eff(beta_eff,beta,F2,zeta_aa,no_slip=par%no_slip)
-
+            
             ! Stagger beta and beta_eff 
             call stagger_beta(beta_acx,beta_acy,beta,f_grnd,f_grnd_acx,f_grnd_acy,par%beta_gl_stag,par%boundaries)
             call stagger_beta(beta_eff_acx,beta_eff_acy,beta_eff,f_grnd,f_grnd_acx,f_grnd_acy,par%beta_gl_stag,par%boundaries)
@@ -399,7 +399,7 @@ end if
         integer :: ip1, jp1 
         real(prec) :: visc_eff_ac
 
-        real(prec), parameter :: visc_min = 1e3_prec 
+        !real(prec), parameter :: visc_min = 1e3_prec 
 
         nx    = size(duxdz,1)
         ny    = size(duxdz,2)
@@ -415,12 +415,12 @@ end if
 
             ! Calculate shear strain, acx-nodes
             visc_eff_ac  = calc_staggered_margin(visc_eff(i,j,k),visc_eff(ip1,j,k),H_ice(i,j),H_ice(ip1,j))
-            visc_eff_ac  = max(visc_eff_ac,visc_min)    ! For safety 
+            !visc_eff_ac  = max(visc_eff_ac,visc_min)    ! For safety 
             duxdz(i,j,k) = (taub_acx(i,j)/visc_eff_ac) * (1.0-zeta_aa(k))
             
             ! Calculate shear strain, acy-nodes
             visc_eff_ac  = calc_staggered_margin(visc_eff(i,j,k),visc_eff(i,jp1,k),H_ice(i,j),H_ice(i,jp1))
-            visc_eff_ac  = max(visc_eff_ac,visc_min)    ! For safety 
+            !visc_eff_ac  = max(visc_eff_ac,visc_min)    ! For safety 
             duydz(i,j,k) = (taub_acy(i,j)/visc_eff_ac) * (1.0-zeta_aa(k))
 
         end do 

@@ -21,6 +21,7 @@
     experiment      = "periodic"        ! "None", "EISMINT", "MISMIP3D", "BUELER",  to apply special boundary conditions   
     restart         = "no"
     log_timestep    = True 
+    disable_kill    = False             ! Disable automatic kill if unstable
     zeta_scale      = "linear"             ! "linear", "exp", "tanh"
     zeta_exp        = 2.0  
     nz_aa           = 10                ! Vertical resolution in ice

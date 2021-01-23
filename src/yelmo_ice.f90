@@ -481,17 +481,6 @@ contains
             
         end if 
 
-        ! ! If model is becoming unstable, then write a restart file and kill it.
-        ! ! Assume unstable if eg 80% of timesteps are equal to dt_min.
-        ! if ( (real(n_dtmin,prec)/real(n,prec)) .gt. 0.8) then 
-
-        !     write(kill_txt,"(a,i10,a,i10)") "Too many iterations of dt_min called for this timestep.", &
-        !                                     n_dtmin, " of ", n 
-
-        !     call yelmo_check_kill(dom,time_now,kill_request=kill_txt)
-
-        ! end if 
-
         return
 
     end subroutine yelmo_update
@@ -988,6 +977,7 @@ contains
         call nml_read(filename,"yelmo","experiment",    par%experiment)
         call nml_read(filename,"yelmo","restart",       par%restart)
         call nml_read(filename,"yelmo","log_timestep",  par%log_timestep)
+        call nml_read(filename,"yelmo","disable_kill",  par%disable_kill)
         call nml_read(filename,"yelmo","zeta_scale",    par%zeta_scale)
         call nml_read(filename,"yelmo","zeta_exp",      par%zeta_exp)
         call nml_read(filename,"yelmo","nz_aa",         par%nz_aa)
@@ -1234,7 +1224,7 @@ contains
             kill_msg = trim(kill_request)
         end if 
 
-        if (kill_it) then 
+        if (kill_it .and. (.not. dom%par%disable_kill)) then 
             ! Model is not running properly, kill it. 
 
             write(error_unit,*) 

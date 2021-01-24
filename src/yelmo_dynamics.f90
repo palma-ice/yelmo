@@ -1084,11 +1084,6 @@ end if
         allocate(now%dd_ab(nx,ny,nz_aa))
         allocate(now%dd_ab_bar(nx,ny))
 
-        allocate(now%sigma_horiz_sq(nx,ny))
-        allocate(now%lhs_x(nx,ny)) 
-        allocate(now%lhs_y(nx,ny)) 
-        allocate(now%lhs_xy(nx,ny)) 
-        
         allocate(now%duxdz(nx,ny,nz_aa)) 
         allocate(now%duydz(nx,ny,nz_aa))
         allocate(now%duxdz_bar(nx,ny)) 
@@ -1160,11 +1155,6 @@ end if
 
         now%dd_ab             = 0.0
         now%dd_ab_bar         = 0.0
-        
-        now%sigma_horiz_sq    = 0.0
-        now%lhs_x             = 0.0 
-        now%lhs_y             = 0.0 
-        now%lhs_xy            = 0.0 
         
         now%duxdz             = 0.0 
         now%duydz             = 0.0
@@ -1247,11 +1237,6 @@ end if
         
         if (allocated(now%dd_ab))           deallocate(now%dd_ab)
         if (allocated(now%dd_ab_bar))       deallocate(now%dd_ab_bar)
-        
-        if (allocated(now%sigma_horiz_sq))  deallocate(now%sigma_horiz_sq)
-        if (allocated(now%lhs_x))           deallocate(now%lhs_x) 
-        if (allocated(now%lhs_y))           deallocate(now%lhs_y) 
-        if (allocated(now%lhs_xy))          deallocate(now%lhs_xy) 
         
         if (allocated(now%duxdz))           deallocate(now%duxdz) 
         if (allocated(now%duydz))           deallocate(now%duydz)
@@ -1473,15 +1458,6 @@ end if
         call nc_write(filename,"taud_acy",dyn%now%taud_acy,units="Pa",long_name="Driving stress, y-direction", &
                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
         
-        call nc_write(filename,"sigma_horiz_sq",dyn%now%sigma_horiz_sq,units="1",long_name="Horizontal stress components squared", &
-                      dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-        call nc_write(filename,"lhs_x",dyn%now%lhs_x,units="Pa",long_name="Shear reduction (x)", &
-                      dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-        call nc_write(filename,"lhs_y",dyn%now%lhs_y,units="Pa",long_name="Shear reduction (y)", &
-                      dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-        call nc_write(filename,"lhs_xy",dyn%now%lhs_xy,units="Pa",long_name="Shear reduction magnitude", &
-                      dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-
 !         call nc_write(filename,"ux_i_bar",dyn%now%ux_i_bar,units="m/a",long_name="Internal shear velocity (x)", &
 !                        dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
 !         call nc_write(filename,"uy_i_bar",dyn%now%uy_i_bar,units="m/a",long_name="Internal shear velocity (y)", &

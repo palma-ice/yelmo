@@ -199,11 +199,6 @@ contains
         call nc_write(filename,"dd_ab",         dom%dyn%now%dd_ab,    units="",dim1="xc",dim2="yc",dim3="zeta",ncid=ncid) 
         call nc_write(filename,"dd_ab_bar",     dom%dyn%now%dd_ab_bar,units="",dim1="xc",dim2="yc",ncid=ncid) 
 
-        call nc_write(filename,"sigma_horiz_sq",dom%dyn%now%sigma_horiz_sq,units="",dim1="xc",dim2="yc",ncid=ncid) 
-        call nc_write(filename,"lhs_x",         dom%dyn%now%lhs_x,         units="",dim1="xc",dim2="yc",ncid=ncid) 
-        call nc_write(filename,"lhs_y",         dom%dyn%now%lhs_y,         units="",dim1="xc",dim2="yc",ncid=ncid) 
-        call nc_write(filename,"lhs_xy",        dom%dyn%now%lhs_xy,        units="",dim1="xc",dim2="yc",ncid=ncid) 
-
         call nc_write(filename,"duxdz",         dom%dyn%now%duxdz,     units="",dim1="xc",dim2="yc",dim3="zeta",ncid=ncid) 
         call nc_write(filename,"duydz",         dom%dyn%now%duydz,     units="",dim1="xc",dim2="yc",dim3="zeta",ncid=ncid) 
         call nc_write(filename,"duxdz_bar",     dom%dyn%now%duxdz_bar, units="",dim1="xc",dim2="yc",ncid=ncid) 
@@ -474,12 +469,7 @@ contains
 
         call nc_read(filename,"dd_ab",         dom%dyn%now%dd_ab,ncid=ncid) 
         call nc_read(filename,"dd_ab_bar",     dom%dyn%now%dd_ab_bar,ncid=ncid) 
-
-        call nc_read(filename,"sigma_horiz_sq",dom%dyn%now%sigma_horiz_sq,ncid=ncid) 
-        call nc_read(filename,"lhs_x",         dom%dyn%now%lhs_x,ncid=ncid) 
-        call nc_read(filename,"lhs_y",         dom%dyn%now%lhs_y,ncid=ncid) 
-        call nc_read(filename,"lhs_xy",        dom%dyn%now%lhs_xy,ncid=ncid) 
-
+        
         call nc_read(filename,"duxdz",         dom%dyn%now%duxdz,ncid=ncid) 
         call nc_read(filename,"duydz",         dom%dyn%now%duydz,ncid=ncid) 
         call nc_read(filename,"duxdz_bar",     dom%dyn%now%duxdz_bar,ncid=ncid) 

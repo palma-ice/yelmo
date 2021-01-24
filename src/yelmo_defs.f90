@@ -270,11 +270,6 @@ module yelmo_defs
         real(wp), allocatable :: dd_ab(:,:,:)  
         real(wp), allocatable :: dd_ab_bar(:,:)  
         
-        real(wp), allocatable :: sigma_horiz_sq(:,:)
-        real(wp), allocatable :: lhs_x(:,:) 
-        real(wp), allocatable :: lhs_y(:,:) 
-        real(wp), allocatable :: lhs_xy(:,:) 
-
         real(wp), allocatable :: duxdz(:,:,:) 
         real(wp), allocatable :: duydz(:,:,:)
         real(wp), allocatable :: duxdz_bar(:,:) 

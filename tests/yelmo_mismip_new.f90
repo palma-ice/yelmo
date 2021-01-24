@@ -458,15 +458,6 @@ contains
                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
         call nc_write(filename,"visc_eff_int",ylmo%dyn%now%visc_eff_int,units="Pa a m",long_name="Depth-integrated effective viscosity (SSA)", &
                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-
-!         call nc_write(filename,"sigma_horiz_sq",ylmo%dyn%now%sigma_horiz_sq,units="1",long_name="Horizontal stress components squared", &
-!                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-!         call nc_write(filename,"lhs_x",ylmo%dyn%now%lhs_x,units="Pa",long_name="Shear reduction (x)", &
-!                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-!         call nc_write(filename,"lhs_y",ylmo%dyn%now%lhs_y,units="Pa",long_name="Shear reduction (y)", &
-!                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-!         call nc_write(filename,"lhs_xy",ylmo%dyn%now%lhs_xy,units="Pa",long_name="Shear reduction magnitude", &
-!                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
         
 !         call nc_write(filename,"duxdz",ylmo%dyn%now%duxdz,units="1/a",long_name="Vertical shear (x)", &
 !                        dim1="xc",dim2="yc",dim3="zeta",dim4="time",start=[1,1,1,n],ncid=ncid)

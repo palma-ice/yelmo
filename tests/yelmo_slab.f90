@@ -40,7 +40,7 @@ program yelmo_slab
     character(len=256) :: outfldr, file2D, file1D, file_restart
     character(len=512) :: path_par, path_const 
     
-    integer  :: n
+    integer  :: n, j
     real(wp) :: time 
     real(wp) :: xmin, xmax, ymin, ymax 
     real(wp), allocatable :: dh(:,:) 
@@ -137,6 +137,11 @@ program yelmo_slab
     allocate(dh(yelmo1%grd%nx,yelmo1%grd%ny))
     call gen_random_normal(dh,0.0_wp,ctrl%H_stdev) 
     yelmo1%tpo%now%H_ice = ctrl%H0 + dh 
+
+    ! Make sure all values are the same in y-direction
+    do j = 1, yelmo1%grd%ny 
+        yelmo1%tpo%now%H_ice(:,j) = yelmo1%tpo%now%H_ice(:,1)
+    end do 
 
     ! Define surface elevation 
     yelmo1%tpo%now%z_srf = yelmo1%bnd%z_bed + yelmo1%tpo%now%H_ice

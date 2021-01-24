@@ -4,13 +4,13 @@
     H_stdev      = 1.0                  ! [m] Initial perturbation standard deviation
     nx           = 51                   ! Number of points x-direction
     ny           = 11                   ! Number of points x-direction
-    dx           = 10.0                 ! [km] Grid resolution 
+    dx           = 1.0                 ! [km] Grid resolution 
     alpha        = 1e-3                 ! [m/m] Bed slope (dzb/dx)
     
     ! Timing parameters 
     time_init    = 0.0                  ! [yr] Starting time 
     nt           = 100                  ! [-] Total number of timesteps
-    dtt          = 0.0                  ! [yr] Main loop timestep 
+    dtt          = 0.03                  ! [yr] Main loop timestep 
     dt1D_out     = 5.0                  ! [yr] Frequency of writing 2D output files 
     dt2D_out     = 5.0                  ! [yr] Frequency of writing 2D output files 
 

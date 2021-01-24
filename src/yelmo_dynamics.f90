@@ -393,6 +393,12 @@ contains
         call set_ssa_masks(dyn%now%ssa_mask_acx,dyn%now%ssa_mask_acy,dyn%now%beta_acx,dyn%now%beta_acy, &
                            tpo%now%H_ice,tpo%now%f_grnd_acx,tpo%now%f_grnd_acy,dyn%par%ssa_beta_max,use_ssa=.TRUE.)
 
+        ! ajr: add these two statements for testing 2D flow (no flow in y-direction)
+        ! Should consider whether this should be made into a parameter option of some kind,
+        ! but it needs to be generalized, here it is hard-coded for diva only...
+        ! dyn%now%ssa_mask_acy = 0_wp 
+        ! dyn%now%uy_bar = 0.0_wp 
+
         ! Set diva parameters from Yelmo settings 
         diva_par%ssa_lis_opt    = dyn%par%ssa_lis_opt 
         diva_par%boundaries     = dyn%par%boundaries 

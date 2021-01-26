@@ -1,6 +1,6 @@
 module velocity_l1l2
 
-    use yelmo_defs ,only  : prec, rho_ice, rho_sw, rho_w, g
+    use yelmo_defs ,only  : wp, prec, rho_ice, rho_sw, rho_w, g
     use yelmo_tools, only : stagger_aa_ab, stagger_aa_ab_ice, stagger_ab_aa_ice, &
                     calc_vertical_integrated_2D, & 
                     integrate_trapezoid1D_1D, integrate_trapezoid1D_pt, minmax
@@ -494,6 +494,51 @@ end if
 
         end do 
 
+        ! Apply boundary conditions as needed 
+        if (trim(boundaries) .eq. "periodic") then
+
+            ux(1,:,:)    = ux(nx-2,:,:) 
+            ux(nx-1,:,:) = ux(2,:,:) 
+            ux(nx,:,:)   = ux(3,:,:) 
+            ux(:,1,:)    = ux(:,ny-1,:)
+            ux(:,ny,:)   = ux(:,2,:) 
+
+            uy(1,:,:)    = uy(nx-1,:,:) 
+            uy(nx,:,:)   = uy(2,:,:) 
+            uy(:,1,:)    = uy(:,ny-2,:)
+            uy(:,ny-1,:) = uy(:,2,:) 
+            uy(:,ny,:)   = uy(:,3,:)
+
+        else if (trim(boundaries) .eq. "periodic-x") then 
+            
+            ux(1,:,:)    = ux(nx-2,:,:) 
+            ux(nx-1,:,:) = ux(2,:,:) 
+            ux(nx,:,:)   = ux(3,:,:) 
+            ux(:,1,:)    = ux(:,2,:)
+            ux(:,ny,:)   = ux(:,ny-1,:) 
+
+            uy(1,:,:)    = uy(nx-1,:,:) 
+            uy(nx,:,:)   = uy(2,:,:) 
+            uy(:,1,:)    = uy(:,2,:)
+            uy(:,ny-1,:) = uy(:,ny-2,:) 
+            uy(:,ny,:)   = uy(:,ny-1,:)
+
+        else if (trim(boundaries) .eq. "infinite") then 
+            
+            ux(1,:,:)    = ux(2,:,:) 
+            ux(nx-1,:,:) = ux(nx-2,:,:) 
+            ux(nx,:,:)   = ux(nx-1,:,:) 
+            ux(:,1,:)    = ux(:,2,:)
+            ux(:,ny,:)   = ux(:,ny-1,:) 
+
+            uy(1,:,:)    = uy(2,:,:) 
+            uy(nx,:,:)   = uy(nx-1,:,:) 
+            uy(:,1,:)    = uy(:,2,:)
+            uy(:,ny-1,:) = uy(:,ny-2,:) 
+            uy(:,ny,:)   = uy(:,ny-1,:)
+
+        end if 
+
         return 
 
     end subroutine calc_vel_horizontal_3D
@@ -530,8 +575,10 @@ end if
         real(prec) :: eps_par_sq, eps_par_ab 
         real(prec) :: eps_0_sq 
         real(prec) :: taud_ab, tau_par_ab, tau_perp_ab 
-        real(prec) :: a, b, c, rootA, rootB 
+        real(prec) :: a, b, c, rootA, rootB, np  
         real(prec) :: wt 
+
+        integer :: n_iter 
 
         nx    = size(ux_b,1)
         ny    = size(ux_b,2) 
@@ -581,12 +628,17 @@ end if
             ! Now calculate viscosity at each layer 
             ! using the root-finding method of CISM
             ! Note this method is only valid for n_glen = 3!!!
+            ! effstrain = A * (tau_parallel^2 + tau_perp^2)^{(n-1)/2} * tau_parallel
+            ! y = A * (x^2 + tau^2)^{(n-1)/2} * x 
+
             do k = 1, nz_aa 
                 
                 ATT_ab = 0.25_prec*(ATT(i,j,k)+ATT(ip1,j,k)+ATT(i,jp1,k)+ATT(ip1,jp1,k))
                 
                 tau_perp_ab = taud_ab*(1.0_prec-zeta_aa(k))
 
+if (.FALSE.) then 
+    ! CISM root equation for n_glen=3 only 
                 a = tau_perp_ab**2 
                 b = -eps_par_ab / ATT_ab 
                 c = sqrt(b**2/4.0_prec + a**3/27.0_prec) 
@@ -599,7 +651,22 @@ end if
                     rootB = -a / (3.0_prec*(abs(b))**(1.0_prec/3.0_prec))
                 end if
 
-                tau_par_ab = rootA + rootB 
+                tau_par_ab = rootA + rootB
+
+                !write(*,*) "tau_par_ab: ", a, b, tau_par_ab  
+else 
+    ! Root finding code (more expensive, but works for ISMIPHOM)
+
+                a  = tau_perp_ab**2 
+                b  = eps_par_ab / ATT_ab 
+                np = (n_glen-1)/2.0_wp 
+
+                !write(*,*) 'newton', a, b, np 
+                call solve_secant(tau_par_ab,n_iter,10e3,1e-3,50,funY,a,b,np,.FALSE.) 
+                !call solve_newton(tau_par_ab,n_iter,10e3,1e-3,50,funY,funYp,a,b,np,.FALSE.)
+                !stop 
+end if 
+
                 visc_eff_ab(i,j,k) = 1.0_prec / (2.0_prec*ATT_ab*(tau_par_ab**2+tau_perp_ab**2)) 
 
             end do 
@@ -607,6 +674,41 @@ end if
         end do 
         end do  
 
+        ! Apply boundary conditions as needed 
+        if (trim(boundaries) .eq. "periodic") then
+
+            visc_eff_ab(1,:,:)    = visc_eff_ab(nx-2,:,:) 
+            visc_eff_ab(nx-1,:,:) = visc_eff_ab(2,:,:) 
+            visc_eff_ab(nx,:,:)   = visc_eff_ab(3,:,:) 
+            visc_eff_ab(:,1,:)    = visc_eff_ab(:,ny-2,:)
+            visc_eff_ab(:,ny-1,:) = visc_eff_ab(:,2,:) 
+            visc_eff_ab(:,ny,:)   = visc_eff_ab(:,3,:)
+
+        else if (trim(boundaries) .eq. "periodic-x") then 
+            
+            visc_eff_ab(1,:,:)    = visc_eff_ab(nx-2,:,:) 
+            visc_eff_ab(nx-1,:,:) = visc_eff_ab(2,:,:) 
+            visc_eff_ab(nx,:,:)   = visc_eff_ab(3,:,:) 
+            visc_eff_ab(:,1,:)    = visc_eff_ab(:,2,:)
+            visc_eff_ab(:,ny,:)   = visc_eff_ab(:,ny-1,:)
+            
+
+        else if (trim(boundaries) .eq. "infinite") then 
+            
+            visc_eff_ab(1,:,:)    = visc_eff_ab(2,:,:) 
+            visc_eff_ab(nx-1,:,:) = visc_eff_ab(nx-2,:,:) 
+            visc_eff_ab(nx,:,:)   = visc_eff_ab(nx-2,:,:) 
+            visc_eff_ab(:,1,:)    = visc_eff_ab(:,2,:)
+            visc_eff_ab(:,ny-1,:) = visc_eff_ab(:,ny-2,:)
+            visc_eff_ab(:,ny,:)   = visc_eff_ab(:,ny-2,:)
+            
+        end if 
+
+        ! Treat the corners to avoid extremes (ab-nodes)
+        visc_eff_ab(1,1,:)   = 0.5*(visc_eff_ab(2,1,:)+visc_eff_ab(1,2,:))
+        visc_eff_ab(1,ny,:)  = 0.5*(visc_eff_ab(2,ny,:)+visc_eff_ab(1,ny-1,:))
+        visc_eff_ab(nx,1,:)  = 0.5*(visc_eff_ab(nx,2,:)+visc_eff_ab(nx-1,1,:))
+        visc_eff_ab(nx,ny,:) = 0.5*(visc_eff_ab(nx-1,ny,:)+visc_eff_ab(nx,ny-1,:))
 
         ! Unstagger from ab-nodes to aa-nodes 
         ! only using contributions from ice covered neighbors
@@ -656,12 +758,30 @@ end if
 
         end do 
         end do 
-        
-        ! Treat the corners to avoid extremes (ab-nodes)
-        visc_eff_ab(1,1,:)   = 0.5*(visc_eff_ab(2,1,:)+visc_eff_ab(1,2,:))
-        visc_eff_ab(1,ny,:)  = 0.5*(visc_eff_ab(2,ny,:)+visc_eff_ab(1,ny-1,:))
-        visc_eff_ab(nx,1,:)  = 0.5*(visc_eff_ab(nx,2,:)+visc_eff_ab(nx-1,1,:))
-        visc_eff_ab(nx,ny,:) = 0.5*(visc_eff_ab(nx-1,ny,:)+visc_eff_ab(nx,ny-1,:))
+            
+        ! Apply boundary conditions as needed 
+        if (trim(boundaries) .eq. "periodic") then
+
+            visc_eff(1,:,:)    = visc_eff(nx-1,:,:) 
+            visc_eff(nx-1,:,:) = visc_eff(2,:,:) 
+            visc_eff(:,1,:)    = visc_eff(:,ny-1,:)
+            visc_eff(:,ny,:)   = visc_eff(:,2,:) 
+
+        else if (trim(boundaries) .eq. "periodic-x") then 
+            
+            visc_eff(1,:,:)    = visc_eff(nx-1,:,:) 
+            visc_eff(nx-1,:,:) = visc_eff(2,:,:) 
+            visc_eff(:,1,:)    = visc_eff(:,2,:)
+            visc_eff(:,ny,:)   = visc_eff(:,ny-1,:) 
+
+        else if (trim(boundaries) .eq. "infinite") then 
+            
+            visc_eff(1,:,:)    = visc_eff(2,:,:) 
+            visc_eff(nx,:,:)   = visc_eff(nx-1,:,:) 
+            visc_eff(:,1,:)    = visc_eff(:,2,:)
+            visc_eff(:,ny,:)   = visc_eff(:,ny-1,:) 
+
+        end if 
 
         ! Treat the corners to avoid extremes
         visc_eff(1,1,:)   = 0.5*(visc_eff(2,1,:)+visc_eff(1,2,:))
@@ -837,4 +957,140 @@ end if
 
     end subroutine limit_vel
     
+
+    subroutine solve_newton(x,n_iter,x_init,tol,n_max,f,fp,a,b,np,debug)
+        ! Estimate the zero of f(x) using Newton's method. 
+        ! Adapted from: 
+        ! https://faculty.washington.edu/rjl/classes/am583s2013/notes/fortran_newton.html
+
+        implicit none
+
+        real(wp), intent(OUT) :: x          ! Best guess of root
+        integer,  intent(OUT) :: n_iter     ! Number of iterations to reach it
+        real(wp), intent(IN)  :: x_init     ! Initial guess
+        real(wp), intent(IN)  :: tol        ! Tolerance to convergence
+        integer,  intent(IN)  :: n_max      ! Maximum iterations allowed
+        real(wp), external    :: f          ! Function to find root of 
+        real(wp), external    :: fp         ! Derivative of Function
+        real(wp), intent(IN)  :: a,b,np     ! Additional function parameters
+        logical,  intent(IN)  :: debug      ! Print iteration information?
+        
+        ! Declare any local variables:
+        real(wp) :: deltax, fx, fxprime
+        integer    :: k
+
+        ! Save initial guess
+        x = x_init
+
+        ! Newton iteration to find a zero of f(x) 
+        n_iter = 0 
+
+        do k = 1, n_max
+
+            n_iter = n_iter + 1 
+
+            ! evaluate function and its derivative:
+            fx      = f(x,a,b,np)
+            fxprime = fp(x,a,b,np)
+
+            if (debug) then
+                !write(*,*) n_iter, "x, f(x) = ", x, fx
+                write(*,*) n_iter, "a, b, np, x, f(x) = ", a, b, np, x, fx
+            end if 
+
+            if (abs(fx) < tol) then
+                exit  ! jump out of do loop
+            end if
+
+            ! Compute Newton increment x:
+            deltax = fx/fxprime
+
+            ! update x:
+            x = x - deltax
+
+        end do
+
+
+        if (n_iter .eq. n_max .and. abs(fx) > tol) then
+            write(*,*) "solve_newton:: Warning: no convergence."
+        end if
+
+        return 
+
+    end subroutine solve_newton
+
+    subroutine solve_secant(x,n_iter,x_init,tol,n_max,f,a,b,np,debug) 
+        ! Estimate the zero of f(x) using the Secand method. 
+        ! Adapted from: 
+        ! http://jean-pierre.moreau.pagesperso-orange.fr/Fortran/secant_f90.txt
+        ! https://rosettacode.org/wiki/Roots_of_a_function#Fortran
+
+        implicit none 
+
+        real(wp), intent(OUT) :: x          ! Best guess of root
+        integer,  intent(OUT) :: n_iter     ! Number of iterations to reach it
+        real(wp), intent(IN)  :: x_init     ! Initial guess
+        real(wp), intent(IN)  :: tol        ! Tolerance to convergence
+        integer,  intent(IN)  :: n_max      ! Maximum iterations allowed
+        real(wp), external    :: f          ! Function to find root of 
+        real(wp), intent(IN)  :: a,b,np     ! Additional function parameters
+        logical,  intent(IN)  :: debug      ! Print iteration information?
+        
+        ! Local variables 
+        integer  :: n 
+        real(wp) :: x1, x2  
+        real(wp) :: y1, y2  
+        real(wp) :: d 
+
+        ! Set x to initial guess and a slightly different value
+        x1 = x_init 
+        x2 = x_init*0.5_wp
+        if (x_init .eq. 0.0_wp) x2 = x_init + 0.1_wp  
+
+        n_iter = 0
+
+        ! Start iterations
+        do n = 1, n_max 
+
+            n_iter = n_iter + 1 
+
+            ! Calculate new value of y at x
+            y1 = f(x1,a,b,np)
+            y2 = f(x2,a,b,np)
+
+            if (debug) write(*,*) n_iter, x1, x2, y1, y2 
+
+            if (abs(y2) < tol) exit
+
+            
+            d = (x2 - x1) / (y2 - y1) * y2
+            
+            x1 = x2
+            x2 = x2 - d
+
+        end do 
+
+        x = x2 
+
+        if (n_iter .eq. n_max .and. abs(y2) > tol) then 
+            write(*,*) "solve_secant:: Warning: no convergence."
+        end if 
+
+        return 
+
+    end subroutine solve_secant
+
+    ! Functions for root finding methods, specific to L1L2 solver: 
+
+    real(wp) function funY(x,a,b,n)
+        real(wp) :: x,a,b,n 
+        funY = (x * (x**2 + a)**n)/b - 1
+    end function funY
+    
+    real(wp) function funYp(x,a,b,n)
+        real(wp) :: x,a,b,n
+        funYp = (2.0_wp * n * x**2 * (x**2 + a)**(n-1.0_wp)/b) + ((x**2 + a)**n/b)
+    end function funYp
+
+
 end module velocity_l1l2

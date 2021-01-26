@@ -93,6 +93,13 @@ icetemp : yelmo-static
 		@echo "    test_icetemp.x is ready."
 		@echo " "
 
+roots : $(objdir)/root_finder.o tests/test_roots.f90
+		$(FC) $(DFLAGS) $(FFLAGS) -o $(bindir)/test_roots.x tests/test_roots.f90 \
+			$(objdir)/root_finder.o $(LFLAGS) $(objdir)/nml.o
+		@echo " "
+		@echo "    test_roots.x is ready."
+		@echo " "
+
 mismip1 : yelmo-static
 		$(FC) $(DFLAGS) $(FFLAGS) $(INC_LIS) -o $(bindir)/yelmo_mismip.x tests/yelmo_mismip_new.f90 \
 			-L${CURDIR}/libyelmo/include -lyelmo $(LFLAGS) $(objdir)/nml.o

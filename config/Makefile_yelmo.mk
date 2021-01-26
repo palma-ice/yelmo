@@ -27,6 +27,9 @@ $(objdir)/ice_optimization.o: $(libdir)/ice_optimization.f90 $(objdir)/yelmo_def
 $(objdir)/interp1D.o: $(libdir)/interp1D.f90 $(objdir)/yelmo_defs.o
 	$(FC) $(DFLAGS) $(FFLAGS) -c -o $@ $<
 
+$(objdir)/root_finder.o: $(libdir)/root_finder.f90 $(objdir)/yelmo_defs.o
+	$(FC) $(DFLAGS) $(FFLAGS) -c -o $@ $<
+
 ## INTERNAL PHYSICS LIBRARIES ###############################
 
 $(objdir)/basal_dragging.o: $(srcdir)/physics/basal_dragging.f90 $(objdir)/yelmo_defs.o \
@@ -202,7 +205,8 @@ yelmo_libs = 		   $(objdir)/gaussian_filter.o \
 					   $(objdir)/ice_optimization.o \
 					   $(objdir)/interp1D.o \
 					   $(objdir)/nml.o \
-			 		   $(objdir)/ncio.o
+			 		   $(objdir)/ncio.o \
+			 		   $(objdir)/root_finder.o
 
 yelmo_physics =  	   $(objdir)/basal_dragging.o \
 					   $(objdir)/grounding_line_flux.o \

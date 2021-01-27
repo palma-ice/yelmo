@@ -33,6 +33,7 @@ contains
         integer :: i, j, k, nx, ny  
         real(prec) :: dt 
         real(prec), allocatable :: H_w_now(:,:)
+        real(prec), allocatable :: dTdz_b_now(:,:)
         
         nx = thrm%par%nx
         ny = thrm%par%ny

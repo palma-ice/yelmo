@@ -664,7 +664,8 @@ else
                 !write(*,*) 'newton', a, b, np 
                 call solve_secant(tau_par_ab,n_iter,10e3,1e-3,50,funY,a,b,np,.FALSE.) 
                 !call solve_newton(tau_par_ab,n_iter,10e3,1e-3,50,funY,funYp,a,b,np,.FALSE.)
-                !stop 
+                !stop
+
 end if 
 
                 visc_eff_ab(i,j,k) = 1.0_prec / (2.0_prec*ATT_ab*(tau_par_ab**2+tau_perp_ab**2)) 
@@ -1020,7 +1021,7 @@ end if
     end subroutine solve_newton
 
     subroutine solve_secant(x,n_iter,x_init,tol,n_max,f,a,b,np,debug) 
-        ! Estimate the zero of f(x) using the Secand method. 
+        ! Estimate the zero of f(x) using the Secant method. 
         ! Adapted from: 
         ! http://jean-pierre.moreau.pagesperso-orange.fr/Fortran/secant_f90.txt
         ! https://rosettacode.org/wiki/Roots_of_a_function#Fortran

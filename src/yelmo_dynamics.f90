@@ -922,7 +922,7 @@ end if
                 ! Effective pressure as basal till pressure
                 ! following van Pelt and Bueler (2015)
 
-                dyn%now%N_eff = calc_effective_pressure_till(H_w,tpo%now%H_ice,tpo%now%f_grnd,dyn%par%neff_w_max, &
+                dyn%now%N_eff = calc_effective_pressure_till(H_w,tpo%now%H_ice,tpo%now%f_grnd,thrm%par%H_w_max, &
                                             dyn%par%neff_N0,dyn%par%neff_delta,dyn%par%neff_e0,dyn%par%neff_Cc) 
 
             case DEFAULT 

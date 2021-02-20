@@ -48,21 +48,21 @@ module yelmo_defs
     logical :: yelmo_use_omp 
 
     ! Physical constants 
-    real(wp) :: sec_year       ! [s] seconds per year 
-    real(wp) :: g              ! [m s-2] Gravitational accel.  
-    real(wp) :: T0             ! [K] Reference freezing temperature  
-    real(wp) :: rho_ice        ! [kg m-3] Density ice           
-    real(wp) :: rho_w          ! [kg m-3] Density water          
-    real(wp) :: rho_sw         ! [kg m-3] Density seawater      
-    real(wp) :: rho_a          ! [kg m-3] Density asthenosphere  
-    real(wp) :: rho_m          ! [kg m-3] Density mantle (lith) 
-    real(wp) :: L_ice          ! [J kg-1] Latent heat           
-    real(wp) :: T_pmp_beta     ! [K Pa-1] Melt point pressure slope
+    real(wp)   :: sec_year       ! [s] seconds per year 
+    real(wp)   :: g              ! [m s-2] Gravitational accel.  
+    real(wp)   :: T0             ! [K] Reference freezing temperature  
+    real(wp)   :: rho_ice        ! [kg m-3] Density ice           
+    real(wp)   :: rho_w          ! [kg m-3] Density water          
+    real(wp)   :: rho_sw         ! [kg m-3] Density seawater      
+    real(wp)   :: rho_a          ! [kg m-3] Density asthenosphere  
+    real(wp)   :: rho_l          ! [kg m-3] Density lithosphere (mantle) 
+    real(wp)   :: L_ice          ! [J kg-1] Latent heat           
+    real(wp)   :: T_pmp_beta     ! [K Pa-1] Melt point pressure slope
 
     ! Internal parameters 
-    real(wp) :: conv_we_ie        ! Conversion water equiv. => m/a ice equiv. 
-    real(wp) :: conv_mmdwe_maie   ! Conversion mm/d water equiv. => m/a ice equiv.
-    real(wp) :: conv_mmawe_maie   ! Conversion mm/a water equiv. => m/a ice equiv. 
+    real(wp)   :: conv_we_ie        ! Conversion water equiv. => m/a ice equiv. 
+    real(wp)   :: conv_mmdwe_maie   ! Conversion mm/d water equiv. => m/a ice equiv.
+    real(wp)   :: conv_mmawe_maie   ! Conversion mm/a water equiv. => m/a ice equiv. 
     
     ! =========================================================================
     !
@@ -79,15 +79,15 @@ module yelmo_defs
         logical            :: use_bmb  
         logical            :: topo_fixed
         integer            :: topo_rel
-        real(wp)         :: topo_rel_tau 
-        real(wp)         :: calv_H_lim
-        real(wp)         :: calv_tau  
-        real(wp)         :: H_min_grnd
-        real(wp)         :: H_min_flt 
-        real(wp)         :: sd_min 
-        real(wp)         :: sd_max 
-        real(wp)         :: calv_max  
-        real(wp)         :: grad_lim 
+        real(wp)           :: topo_rel_tau 
+        real(wp)           :: calv_H_lim
+        real(wp)           :: calv_tau  
+        real(wp)           :: H_min_grnd
+        real(wp)           :: H_min_flt 
+        real(wp)           :: sd_min 
+        real(wp)           :: sd_max 
+        real(wp)           :: calv_max  
+        real(wp)           :: grad_lim 
         integer            :: gl_sep 
         integer            :: gl_sep_nx 
         logical            :: diffuse_bmb_shlf 
@@ -95,13 +95,13 @@ module yelmo_defs
         ! Internal parameters 
         real(dp)           :: time 
         integer            :: nx, ny
-        real(wp)         :: dx, dy
+        real(wp)           :: dx, dy
         character(len=256) :: boundaries 
         
         character(len=256) :: pc_step 
-        real(wp) :: dt_zeta, dt_beta(4)
+        real(wp)   :: dt_zeta, dt_beta(4)
 
-        real(wp) :: speed, speed_pred, speed_corr 
+        real(wp)   :: speed, speed_pred, speed_corr 
 
     end type
 
@@ -109,44 +109,44 @@ module yelmo_defs
     type ytopo_state_class
         ! Model variables that the define the state of the domain 
 
-        real(wp), allocatable :: H_ice(:,:)      ! Ice thickness [m] 
-        real(wp), allocatable :: z_srf(:,:)      ! Surface elevation [m]
-        real(wp), allocatable :: dzsrfdt(:,:)    ! Surface elevation rate of change [m/a] 
-        real(wp), allocatable :: dHicedt(:,:)    ! Ice thickness rate of change [m/a] 
-        real(wp), allocatable :: bmb(:,:)        ! Combined field of bmb_grnd and bmb_shlf 
-        real(wp), allocatable :: mb_applied(:,:) ! Actual mass balance applied [m/a], for mass balance accounting
-        real(wp), allocatable :: calv_grnd(:,:)  ! Grounded calving [m/a]
-        real(wp), allocatable :: calv(:,:)       ! Calving [m/a]
+        real(wp), allocatable   :: H_ice(:,:)      ! Ice thickness [m] 
+        real(wp), allocatable   :: z_srf(:,:)      ! Surface elevation [m]
+        real(wp), allocatable   :: dzsrfdt(:,:)    ! Surface elevation rate of change [m/a] 
+        real(wp), allocatable   :: dHicedt(:,:)    ! Ice thickness rate of change [m/a] 
+        real(wp), allocatable   :: bmb(:,:)        ! Combined field of bmb_grnd and bmb_shlf 
+        real(wp), allocatable   :: mb_applied(:,:) ! Actual mass balance applied [m/a], for mass balance accounting
+        real(wp), allocatable   :: calv_grnd(:,:)  ! Grounded calving [m/a]
+        real(wp), allocatable   :: calv(:,:)       ! Calving [m/a]
         
-        real(wp), allocatable :: H_margin(:,:)   ! [m] Margin ice thickness in partially filled cells 
+        real(wp), allocatable   :: H_margin(:,:)   ! [m] Margin ice thickness in partially filled cells 
 
-        real(wp), allocatable :: dzsdx(:,:)      ! Surface elevation slope [m m-1], Ac x nodes
-        real(wp), allocatable :: dzsdy(:,:)      ! Surface elevation slope [m m-1], Ac y nodes
-        real(wp), allocatable :: dHicedx(:,:)    ! Ice thickness gradient slope [m m-1], Ac x nodes
-        real(wp), allocatable :: dHicedy(:,:)    ! Ice thickness gradient slope [m m-1], Ac y nodes
+        real(wp), allocatable   :: dzsdx(:,:)      ! Surface elevation slope [m m-1], Ac x nodes
+        real(wp), allocatable   :: dzsdy(:,:)      ! Surface elevation slope [m m-1], Ac y nodes
+        real(wp), allocatable   :: dHicedx(:,:)    ! Ice thickness gradient slope [m m-1], Ac x nodes
+        real(wp), allocatable   :: dHicedy(:,:)    ! Ice thickness gradient slope [m m-1], Ac y nodes
         
-        real(wp), allocatable :: H_grnd(:,:)       ! Ice thickness overburden [m]
+        real(wp), allocatable   :: H_grnd(:,:)       ! Ice thickness overburden [m]
         
         ! Masks 
-        real(wp), allocatable :: f_grnd(:,:)       ! Grounded fraction (grounding line fraction between 0 and 1)
-        real(wp), allocatable :: f_grnd_acx(:,:)   ! Grounded fraction (acx nodes)
-        real(wp), allocatable :: f_grnd_acy(:,:)   ! Grounded fraction (acy nodes)
-        real(wp), allocatable :: f_ice(:,:)        ! Ice-covered fraction 
+        real(wp), allocatable   :: f_grnd(:,:)       ! Grounded fraction (grounding line fraction between 0 and 1)
+        real(wp), allocatable   :: f_grnd_acx(:,:)   ! Grounded fraction (acx nodes)
+        real(wp), allocatable   :: f_grnd_acy(:,:)   ! Grounded fraction (acy nodes)
+        real(wp), allocatable   :: f_ice(:,:)        ! Ice-covered fraction 
 
-        real(wp), allocatable :: dist_margin(:,:)  ! Distance to nearest margin point 
-        real(wp), allocatable :: dist_grline(:,:)  ! Distance to nearest grounding-line point 
+        real(wp), allocatable   :: dist_margin(:,:)  ! Distance to nearest margin point 
+        real(wp), allocatable   :: dist_grline(:,:)  ! Distance to nearest grounding-line point 
         
         ! Additional masks 
         integer,    allocatable :: mask_bed(:,:)    ! Multi-valued bed mask
         logical,    allocatable :: is_grline(:,:)   ! Grounding line points
         logical,    allocatable :: is_grz(:,:)      ! Grounding line plus grounded neighbors
         
-        real(wp), allocatable :: dHdt_n(:,:)      ! [m/a] Ice thickness change due to advection only
-        real(wp), allocatable :: H_ice_n(:,:)     ! [m] Ice thickness from the previous timestep 
-        real(wp), allocatable :: H_ice_pred(:,:)  ! [m] Ice thickness, predicted, for time=n+1
-        real(wp), allocatable :: H_ice_corr(:,:)  ! [m] Ice thickness, corrected, for time=n+1 
+        real(wp), allocatable   :: dHdt_n(:,:)      ! [m/a] Ice thickness change due to advection only
+        real(wp), allocatable   :: H_ice_n(:,:)     ! [m] Ice thickness from the previous timestep 
+        real(wp), allocatable   :: H_ice_pred(:,:)  ! [m] Ice thickness, predicted, for time=n+1
+        real(wp), allocatable   :: H_ice_corr(:,:)  ! [m] Ice thickness, corrected, for time=n+1 
         
-        real(wp), allocatable :: z_srf_n(:,:)     ! [m] Surface elevation from the previous timestep 
+        real(wp), allocatable   :: z_srf_n(:,:)     ! [m] Surface elevation from the previous timestep 
         
     end type
 
@@ -169,67 +169,67 @@ module yelmo_defs
 
         character(len=256) :: solver 
         integer    :: visc_method 
-        real(wp) :: visc_const 
+        real(wp)   :: visc_const 
         integer    :: beta_method
-        real(wp) :: beta_const
-        real(wp) :: beta_q                ! Friction law exponent
-        real(wp) :: beta_u0               ! [m/a] Friction law velocity threshold 
+        real(wp)   :: beta_const
+        real(wp)   :: beta_q                ! Friction law exponent
+        real(wp)   :: beta_u0               ! [m/a] Friction law velocity threshold 
         integer    :: beta_gl_scale         ! Beta grounding-line scaling method (beta => 0 at gl?)
         integer    :: beta_gl_sep           ! Beta grounding-line sub-element (subgrid) parameterization
         integer    :: beta_gl_stag          ! Beta grounding-line staggering method 
-        real(wp) :: beta_gl_f             ! Fraction of beta at gl 
+        real(wp)   :: beta_gl_f             ! Fraction of beta at gl 
         integer    :: taud_gl_method        ! Driving stress grounding line treatment 
-        real(wp) :: H_grnd_lim 
-        real(wp) :: H_sed_sat
+        real(wp)   :: H_grnd_lim 
+        real(wp)   :: H_sed_sat
         integer    :: cb_method
         logical    :: cb_with_pmp           ! Scale friction coefficient between frozen and streaming values?
         logical    :: cb_margin_pmp         ! Ensure margin and grline are considered streaming?
         character(len=256) :: cb_scale      ! Method for scaling cb with elevation
-        real(wp) :: cb_z0  
-        real(wp) :: cb_z1
-        real(wp) :: cb_min      
-        real(wp) :: cf_frozen
-        real(wp) :: cf_stream
+        real(wp)   :: cb_z0  
+        real(wp)   :: cb_z1
+        real(wp)   :: cb_min      
+        real(wp)   :: cf_frozen
+        real(wp)   :: cf_stream
         integer    :: n_sm_beta 
-        real(wp) :: beta_min              ! Minimum allowed value of beta
-        real(wp) :: eps_0                 ! Minimum assumed strain rate for effective viscosity regularization
+        real(wp)   :: beta_min              ! Minimum allowed value of beta
+        real(wp)   :: eps_0                 ! Minimum assumed strain rate for effective viscosity regularization
         character(len=256) :: ssa_lis_opt 
-        real(wp) :: ssa_beta_max          ! Maximum value of beta for which ssa should be calculated
-        real(wp) :: ssa_vel_max
+        real(wp)   :: ssa_beta_max          ! Maximum value of beta for which ssa should be calculated
+        real(wp)   :: ssa_vel_max
         integer    :: ssa_iter_max 
-        real(wp) :: ssa_iter_rel 
-        real(wp) :: ssa_iter_conv 
-        real(wp) :: taud_lim 
-        real(wp) :: cb_sia
+        real(wp)   :: ssa_iter_rel 
+        real(wp)   :: ssa_iter_conv 
+        real(wp)   :: taud_lim 
+        real(wp)   :: cb_sia
         
         integer    :: neff_method
-        real(wp) :: neff_const
-        real(wp) :: neff_p 
+        real(wp)   :: neff_const
+        real(wp)   :: neff_p 
         logical    :: neff_set_water 
-        real(wp) :: neff_w_max
-        real(wp) :: neff_N0
-        real(wp) :: neff_delta 
-        real(wp) :: neff_e0 
-        real(wp) :: neff_Cc 
+        real(wp)   :: neff_w_max
+        real(wp)   :: neff_N0
+        real(wp)   :: neff_delta 
+        real(wp)   :: neff_e0 
+        real(wp)   :: neff_Cc 
 
-        real(wp) :: till_phi_const 
-        real(wp) :: till_phi_min 
-        real(wp) :: till_phi_max 
-        real(wp) :: till_phi_zmin 
-        real(wp) :: till_phi_zmax 
+        real(wp)   :: till_phi_const 
+        real(wp)   :: till_phi_min 
+        real(wp)   :: till_phi_max 
+        real(wp)   :: till_phi_zmin 
+        real(wp)   :: till_phi_zmax 
         
         ! Internal parameters 
         character(len=256) :: boundaries 
         logical    :: use_ssa                   ! Should ssa be used? 
         logical    :: use_bmb                   ! Set to match `use_bmb` in ytopo_param_class 
         integer    :: nx, ny, nz_aa, nz_ac 
-        real(wp) :: dx, dy
+        real(wp)   :: dx, dy
         real(wp), allocatable :: zeta_aa(:)   ! Layer centers (aa-nodes), plus base and surface: nz_aa points 
         real(wp), allocatable :: zeta_ac(:)   ! Layer borders (ac-nodes), plus base and surface: nz_ac == nz_aa-1 points
         real(dp)   :: time
 
         integer    :: ssa_iter_now              ! Number of iterations used for Picard iteration to solve ssa this timestep
-        real(wp) :: speed 
+        real(wp)   :: speed 
 
     end type
 
@@ -365,11 +365,11 @@ module yelmo_defs
         
         ! Internal parameters
         real(dp)   :: time 
-        real(wp) :: dx, dy  
+        real(wp)   :: dx, dy  
         integer    :: nx, ny, nz_aa, nz_ac  
         integer    :: n_iso 
 
-        real(wp) :: speed 
+        real(wp)   :: speed 
 
         real(wp), allocatable :: zeta_aa(:)   ! Layer centers (aa-nodes), plus base and surface: nz_aa points 
         real(wp), allocatable :: zeta_ac(:)   ! Layer borders (ac-nodes), plus base and surface: nz_ac == nz_aa-1 points
@@ -413,22 +413,21 @@ module yelmo_defs
         character(len=256)  :: dt_method  
         character(len=256)  :: solver_advec 
         integer             :: nx, ny 
-        real(wp)          :: dx, dy  
+        real(wp)            :: dx, dy  
         integer             :: nz_aa     ! Number of vertical points in ice (layer centers, plus base and surface)
         integer             :: nz_ac     ! Number of vertical points in ice (layer boundaries)
-        integer             :: nzr       ! Number of vertical points in bedrock 
-        real(wp)          :: gamma  
+        real(wp)            :: gamma  
         logical             :: use_strain_sia 
         integer             :: n_sm_qstrn    ! Standard deviation (in points) for Gaussian smoothing of strain heating
         integer             :: n_sm_qb       ! Standard deviation (in points) for Gaussian smoothing of basal heating
         logical             :: use_const_cp 
-        real(wp)          :: const_cp 
+        real(wp)            :: const_cp 
         logical             :: use_const_kt 
-        real(wp)          :: const_kt 
-        real(wp)          :: enth_cr  
-        real(wp)          :: omega_max 
-        real(wp)          :: till_rate 
-        real(wp)          :: H_w_max 
+        real(wp)            :: const_kt 
+        real(wp)            :: enth_cr  
+        real(wp)            :: omega_max 
+        real(wp)            :: till_rate 
+        real(wp)            :: H_w_max 
         
         real(wp), allocatable :: zeta_aa(:)   ! Layer centers (aa-nodes), plus base and surface: nz_aa points 
         real(wp), allocatable :: zeta_ac(:)   ! Layer borders (ac-nodes), plus base and surface: nz_ac == nz_aa-1 points
@@ -437,10 +436,26 @@ module yelmo_defs
         real(wp), allocatable :: dzeta_b(:)
         
         real(dp)   :: time
-        real(wp) :: dt_zeta, dt_beta(2)
+        real(wp)   :: dt_zeta, dt_beta(2)
 
-        real(wp) :: speed 
+        real(wp)   :: speed 
 
+        ! Lithosphere 
+        character(len=256)  :: lith_method  
+        integer             :: lith_nz_aa       ! Number of vertical points in bedrock 
+        integer             :: lith_nz_ac       ! Number of vertical points in bedrock 
+        character (len=56)  :: lith_zeta_scale 
+        real(wp)            :: lith_zeta_exp 
+        real(wp)            :: H_lith 
+        real(wp)            :: lith_cp 
+        real(wp)            :: lith_kt
+        
+        real(wp), allocatable :: lith_zeta_aa(:)   ! Layer centers (aa-nodes), plus base and surface: nz_aa points 
+        real(wp), allocatable :: lith_zeta_ac(:)   ! Layer borders (ac-nodes), plus base and surface: nz_ac == nz_aa-1 points
+
+        real(wp), allocatable :: lith_dzeta_a(:)
+        real(wp), allocatable :: lith_dzeta_b(:)
+        
     end type
 
     ! ytherm state variables
@@ -465,6 +480,14 @@ module yelmo_defs
         
         real(wp), allocatable :: advecxy(:,:,:)
 
+        ! Lithosphere
+        real(wp), allocatable :: Q_lith(:,:)
+        real(wp), allocatable :: enth_lith(:,:,:)
+        real(wp), allocatable :: T_lith(:,:,:)
+        real(wp), allocatable :: H_lith(:,:) 
+        real(wp), allocatable :: cp_lith(:,:,:)
+        real(wp), allocatable :: kt_lith(:,:,:)
+
     end type
 
     ! ytherm class
@@ -485,9 +508,9 @@ module yelmo_defs
     type ybound_class
 
         ! Region constants
-        real(wp) :: index_north = 1.0   ! Northern Hemisphere region number
-        real(wp) :: index_south = 2.0   ! Antarctica region number
-        real(wp) :: index_grl   = 1.3   ! Greenland region number
+        real(wp)   :: index_north = 1.0   ! Northern Hemisphere region number
+        real(wp)   :: index_south = 2.0   ! Antarctica region number
+        real(wp)   :: index_grl   = 1.3   ! Greenland region number
 
         ! Variables that save the current boundary conditions
         real(wp), allocatable :: z_bed(:,:)
@@ -563,10 +586,10 @@ module yelmo_defs
         ! Axis 
         real(wp), allocatable :: age_iso(:) 
 
-        real(wp) :: rmse_H 
-        real(wp) :: rmse_zsrf
-        real(wp) :: rmse_uxy 
-        real(wp) :: rmse_loguxy 
+        real(wp)   :: rmse_H 
+        real(wp)   :: rmse_zsrf
+        real(wp)   :: rmse_uxy 
+        real(wp)   :: rmse_loguxy 
         real(wp), allocatable :: rmse_iso(:) 
     
     end type
@@ -587,16 +610,16 @@ module yelmo_defs
         ! Individual values of interest to output from a Yelmo domain 
 
         ! ===== Total ice variables =====
-        real(wp) :: H_ice, z_srf, dHicedt, H_ice_max, dzsrfdt
-        real(wp) :: V_ice, A_ice, dVicedt, fwf, V_sl 
-        real(wp) :: uxy_bar, uxy_s, uxy_b, z_bed, smb, T_srf, bmb
+        real(wp)   :: H_ice, z_srf, dHicedt, H_ice_max, dzsrfdt
+        real(wp)   :: V_ice, A_ice, dVicedt, fwf, V_sl 
+        real(wp)   :: uxy_bar, uxy_s, uxy_b, z_bed, smb, T_srf, bmb
 
         ! ===== Grounded ice variables =====
-        real(wp) :: H_ice_g, z_srf_g, V_ice_g, A_ice_g, uxy_bar_g, uxy_s_g, uxy_b_g
-        real(wp) :: f_pmp, H_w, bmb_g 
+        real(wp)   :: H_ice_g, z_srf_g, V_ice_g, A_ice_g, uxy_bar_g, uxy_s_g, uxy_b_g
+        real(wp)   :: f_pmp, H_w, bmb_g 
 
         ! ===== Floating ice variables =====
-        real(wp) :: H_ice_f, V_ice_f, A_ice_f, uxy_bar_f, uxy_s_f, uxy_b_f, z_sl, bmb_shlf, T_shlf
+        real(wp)   :: H_ice_f, V_ice_f, A_ice_f, uxy_bar_f, uxy_s_f, uxy_b_f, z_sl, bmb_shlf, T_shlf
         
     end type
 
@@ -613,16 +636,16 @@ module yelmo_defs
         
         ! Parameters
         integer    :: nx, ny, npts
-        real(wp) :: dx, dy
+        real(wp)   :: dx, dy
 
         ! Projection parameters (optional)
         character(len=256) :: mtype 
-        real(wp) :: lambda
-        real(wp) :: phi
-        real(wp) :: alpha
-        real(wp) :: scale
-        real(wp) :: x_e
-        real(wp) :: y_n
+        real(wp)   :: lambda
+        real(wp)   :: phi
+        real(wp)   :: alpha
+        real(wp)   :: scale
+        real(wp)   :: x_e
+        real(wp)   :: y_n
         logical    :: is_projection 
 
         ! Axes
@@ -691,8 +714,8 @@ module yelmo_defs
     type ytime_class 
 
         ! Time step parameters for predictor-corrector (PC) method (Cheng et al, 2017)
-        real(wp) :: pc_dt(3)
-        real(wp) :: pc_eta(3)
+        real(wp)   :: pc_dt(3)
+        real(wp)   :: pc_eta(3)
         real(wp), allocatable :: pc_tau(:,:)
         real(wp), allocatable :: pc_tau_masked(:,:)
         
@@ -701,14 +724,14 @@ module yelmo_defs
         real(wp), allocatable :: dt_adv3D(:,:,:)
         
         ! Timing information
-        real(wp) :: model_speed 
-        real(wp) :: model_speeds(100)         ! Eg, 100 timesteps for running mean 
-        real(wp) :: dt_avg 
-        real(wp) :: dts(100)                  ! Eg, 100 timesteps for running mean
-        real(wp) :: eta_avg 
-        real(wp) :: etas(100)                 ! Eg, 100 timesteps for running mean
-        real(wp) :: ssa_iter_avg 
-        real(wp) :: ssa_iters(100)            ! Eg, 100 timesteps for running mean
+        real(wp)   :: model_speed 
+        real(wp)   :: model_speeds(100)         ! Eg, 100 timesteps for running mean 
+        real(wp)   :: dt_avg 
+        real(wp)   :: dts(100)                  ! Eg, 100 timesteps for running mean
+        real(wp)   :: eta_avg 
+        real(wp)   :: etas(100)                 ! Eg, 100 timesteps for running mean
+        real(wp)   :: ssa_iter_avg 
+        real(wp)   :: ssa_iters(100)            ! Eg, 100 timesteps for running mean
         
         ! Truncation error information over several timesteps
         real(wp), allocatable :: pc_taus(:,:,:)
@@ -813,7 +836,7 @@ contains
         call nml_read(filename,"yelmo_constants","rho_w",       rho_w,      init=init_pars)
         call nml_read(filename,"yelmo_constants","rho_sw",      rho_sw,     init=init_pars)
         call nml_read(filename,"yelmo_constants","rho_a",       rho_a,      init=init_pars)
-        call nml_read(filename,"yelmo_constants","rho_m",       rho_m,      init=init_pars)
+        call nml_read(filename,"yelmo_constants","rho_l",       rho_l,      init=init_pars)
         call nml_read(filename,"yelmo_constants","L_ice",       L_ice,      init=init_pars)
         call nml_read(filename,"yelmo_constants","T_pmp_beta",  T_pmp_beta, init=init_pars)
         
@@ -829,7 +852,7 @@ contains
             write(*,*) "    rho_w      = ", rho_w 
             write(*,*) "    rho_sw     = ", rho_sw 
             write(*,*) "    rho_a      = ", rho_a 
-            write(*,*) "    rho_m      = ", rho_m 
+            write(*,*) "    rho_l      = ", rho_l 
             write(*,*) "    L_ice      = ", L_ice 
             write(*,*) "    T_pmp_beta = ", T_pmp_beta 
             
@@ -951,8 +974,8 @@ contains
         real(8),    intent(IN)  :: cpu_time1        ! [sec]
 
         ! Local variables 
-        real(wp) :: cpu_dtime 
-        real(wp) :: model_dtime 
+        real(wp)   :: cpu_dtime 
+        real(wp)   :: model_dtime 
 
         cpu_dtime   = (cpu_time1 - cpu_time0)/3600.d0       ! [sec] => [hr] 
         model_dtime = (model_time1 - model_time0)*1d-3      ! [yr] => [kyr] 
@@ -978,7 +1001,7 @@ contains
         
         ! Local variables 
         integer    :: n 
-        real(wp) :: val_mean 
+        real(wp)   :: val_mean 
 
         ! Shift rates vector to eliminate oldest entry, and add current entry in the first position
         vals    = cshift(vals,-1)

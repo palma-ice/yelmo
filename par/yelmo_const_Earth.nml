@@ -10,7 +10,7 @@
     rho_w      = 1000.0         ! [kg/m^3] Density water          
     rho_sw     = 1028.0         ! [kg/m^3] Density seawater       
     rho_a      = 3300.0         ! [kg m-3] Density asthenosphere
-    rho_m      = 2000.0         ! [kg m-3] Density mantle (lithosphere)
+    rho_l      = 2000.0         ! [kg m-3] Density lithosphere (mantle)
     L_ice      = 333500.0       ! [J kg-1] Latent heat of fusion for ice/water
     T_pmp_beta = 9.8e-8         ! [K Pa^-1] Greve and Blatter (2009)      
 /

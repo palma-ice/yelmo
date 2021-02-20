@@ -3,6 +3,7 @@ module yelmo_thermodynamics
 
     use nml 
     use yelmo_defs 
+    use yelmo_grid, only : calc_zeta
     use yelmo_tools, only : smooth_gauss_2D, smooth_gauss_3D, gauss_values, fill_borders_2D, fill_borders_3D, &
             stagger_aa_ab
     
@@ -126,9 +127,25 @@ end select
                                     tpo%now%H_ice.gt.0.0)
         end if 
 
+        if (maxval(thrm%now%Q_lith) .eq. 0.0) then 
+            ! It has not been initialized, set equal to Q_geo to start 
+
+            thrm%now%Q_lith = bnd%Q_geo 
+
+        else 
+            ! Calculate heat flux from vertical temp. gradient in lithosphere 
+
+            ! Calculate heat flux through bed surface from lithosphere [mW m-2]
+            call calc_Q_lith(thrm%now%Q_lith,thrm%now%T_lith,thrm%now%kt_lith, &
+                                        thrm%now%H_lith,thrm%par%lith_zeta_aa)
+            ! thrm%now%Q_lith = bnd%Q_geo 
+
+        end if
+
+
         if ( dt .gt. 0.0 ) then     
             ! Ice thermodynamics should evolve, perform calculations 
-
+                     
             ! Store initial value of H_w 
             H_w_now = thrm%now%H_w 
 
@@ -159,7 +176,7 @@ end select
 
                     call calc_ytherm_enthalpy_3D(thrm%now%enth,thrm%now%T_ice,thrm%now%omega,thrm%now%bmb_grnd,thrm%now%Q_ice_b, &
                                 thrm%now%H_cts,thrm%now%T_pmp,thrm%now%cp,thrm%now%kt,thrm%now%advecxy,dyn%now%ux,dyn%now%uy,dyn%now%uz,thrm%now%Q_strn, &
-                                thrm%now%Q_b,bnd%Q_geo,bnd%T_srf,tpo%now%H_ice,tpo%now%z_srf,thrm%now%H_w,thrm%now%dHwdt,tpo%now%H_grnd, &
+                                thrm%now%Q_b,thrm%now%Q_lith,bnd%T_srf,tpo%now%H_ice,tpo%now%z_srf,thrm%now%H_w,thrm%now%dHwdt,tpo%now%H_grnd, &
                                 tpo%now%f_grnd,tpo%now%dHicedt,tpo%now%dzsrfdt,thrm%par%zeta_aa,thrm%par%zeta_ac,thrm%par%dzeta_a,thrm%par%dzeta_b,thrm%par%enth_cr, &
                                 thrm%par%omega_max,dt,thrm%par%dx,thrm%par%method,thrm%par%solver_advec)
                     
@@ -167,7 +184,7 @@ end select
                     ! Use Robin solution for ice temperature 
 
                     call define_temp_robin_3D(thrm%now%T_ice,thrm%now%T_pmp,thrm%now%cp,thrm%now%kt, &
-                                       bnd%Q_geo,bnd%T_srf,tpo%now%H_ice,thrm%now%H_w,bnd%smb, &
+                                       thrm%now%Q_lith,bnd%T_srf,tpo%now%H_ice,thrm%now%H_w,bnd%smb, &
                                        thrm%now%bmb_grnd,tpo%now%f_grnd,thrm%par%zeta_aa,cold=.FALSE.)
 
                     ! Also populate enthalpy 
@@ -179,7 +196,7 @@ end select
                     ! to ensure cold ice at the base
 
                     call define_temp_robin_3D(thrm%now%T_ice,thrm%now%T_pmp,thrm%now%cp,thrm%now%kt, &
-                                       bnd%Q_geo,bnd%T_srf,tpo%now%H_ice,thrm%now%H_w,bnd%smb, &
+                                       thrm%now%Q_lith,bnd%T_srf,tpo%now%H_ice,thrm%now%H_w,bnd%smb, &
                                        thrm%now%bmb_grnd,tpo%now%f_grnd,thrm%par%zeta_aa,cold=.TRUE.)
 
                     ! Set water content to zero 
@@ -217,6 +234,50 @@ end select
             call calc_basal_water_local(thrm%now%H_w,thrm%now%dHwdt,tpo%now%H_ice,-thrm%now%bmb_grnd*(rho_ice/rho_w), &
                                     tpo%now%f_grnd,dt,thrm%par%till_rate,thrm%par%H_w_max)
 
+
+
+            ! ==== Lithosphere ======================================
+
+            ! Make sure constants are prescribed 
+            ! (currently cp, kt and H_lith are spatially constant)
+            thrm%now%cp_lith = thrm%par%lith_cp 
+            thrm%now%kt_lith = thrm%par%lith_kt 
+            thrm%now%H_lith  = thrm%par%H_lith 
+            
+            ! Update the lithosphere temperature profile 
+            ! (using basal ice temperature from previous timestep)
+            select case(trim(thrm%par%lith_method))
+
+                case("equil")
+                    ! Prescribe lithospheric temperature profile assuming 
+                    ! equilibrium with the bed surface temperature 
+                    ! (ie, no active bedrock) 
+
+                    call define_temp_lith_3D(thrm%now%T_lith,thrm%now%cp_lith,thrm%now%kt_lith, &
+                                             bnd%Q_geo,thrm%now%T_ice(:,:,1),thrm%now%H_lith,thrm%par%lith_zeta_aa)
+
+                    ! Get enthalpy too 
+                    call convert_to_enthalpy(thrm%now%enth_lith,thrm%now%T_lith,0.0_wp,0.0_wp, &
+                                                                        thrm%now%cp_lith,0.0_wp)
+
+                case("active")
+                    ! Solve thermodynamic equation for the lithosphere 
+
+                    call calc_ytherm_enthalpy_bedrock_3D(thrm%now%enth_lith,thrm%now%T_lith,thrm%now%T_ice(:,:,1), &
+                                                         thrm%now%T_pmp(:,:,1),thrm%now%cp_lith,thrm%now%kt_lith, &
+                                                         thrm%now%H_lith,tpo%now%H_ice,tpo%now%H_grnd,bnd%Q_geo, &
+                                                         thrm%par%lith_zeta_aa,thrm%par%lith_zeta_ac, &
+                                                         thrm%par%lith_dzeta_a,thrm%par%lith_dzeta_b,dt)
+
+                case DEFAULT 
+
+                    write(*,*) "calc_ytherm:: Error: lith_method not recognized."
+                    write(*,*) "lith_method = ", trim(thrm%par%lith_method)
+
+            end select 
+
+            ! =======================================================
+
         end if 
 
         ! Calculate homologous temperature at the base 
@@ -238,7 +299,7 @@ end select
 
     end subroutine calc_ytherm
 
-    subroutine calc_ytherm_enthalpy_3D(enth,T_ice,omega,bmb_grnd,Q_ice_b,H_cts,T_pmp,cp,kt,advecxy,ux,uy,uz,Q_strn,Q_b,Q_geo, &
+    subroutine calc_ytherm_enthalpy_3D(enth,T_ice,omega,bmb_grnd,Q_ice_b,H_cts,T_pmp,cp,kt,advecxy,ux,uy,uz,Q_strn,Q_b,Q_lith, &
                                         T_srf,H_ice,z_srf,H_w,dHwdt,H_grnd,f_grnd,dHdt,dzsdt,zeta_aa,zeta_ac,dzeta_a,dzeta_b, &
                                         cr,omega_max,dt,dx,solver,solver_advec)
         ! This wrapper subroutine breaks the thermodynamics problem into individual columns,
@@ -265,7 +326,7 @@ end select
         real(prec), intent(IN)    :: uz(:,:,:)      ! [m a-1] Vertical velocity 
         real(prec), intent(IN)    :: Q_strn(:,:,:)  ! [K a-1] Internal strain heat production in ice
         real(prec), intent(IN)    :: Q_b(:,:)       ! [J a-1 m-2] Basal frictional heat production 
-        real(prec), intent(IN)    :: Q_geo(:,:)     ! [mW m-2] Geothermal heat flux 
+        real(prec), intent(IN)    :: Q_lith(:,:)    ! [mW m-2] Heat flux at bed surface from lithosphere (like Q_geo)
         real(prec), intent(IN)    :: T_srf(:,:)     ! [K] Surface temperature 
         real(prec), intent(IN)    :: H_ice(:,:)     ! [m] Ice thickness 
         real(prec), intent(IN)    :: z_srf(:,:)     ! [m] Surface elevation 
@@ -363,14 +424,14 @@ end select
                 if (trim(solver) .eq. "enth") then 
 
                     call calc_enth_column(enth(i,j,:),T_ice(i,j,:),omega(i,j,:),bmb_grnd(i,j),Q_ice_b(i,j),H_cts(i,j), &
-                            T_pmp(i,j,:),cp(i,j,:),kt(i,j,:),advecxy(i,j,:),uz(i,j,:),Q_strn(i,j,:),Q_b(i,j),Q_geo(i,j),T_srf(i,j), &
+                            T_pmp(i,j,:),cp(i,j,:),kt(i,j,:),advecxy(i,j,:),uz(i,j,:),Q_strn(i,j,:),Q_b(i,j),Q_lith(i,j),T_srf(i,j), &
                             T_shlf,H_ice_now,H_w(i,j),f_grnd(i,j),zeta_aa,zeta_ac,dzeta_a,dzeta_b,cr,omega_max,T0,dt)
                 
                 else 
 
                     call calc_temp_column(enth(i,j,:),T_ice(i,j,:),omega(i,j,:),bmb_grnd(i,j),Q_ice_b(i,j),H_cts(i,j), &
-                        T_pmp(i,j,:),cp(i,j,:),kt(i,j,:),advecxy(i,j,:),uz(i,j,:),Q_strn(i,j,:),Q_b(i,j),Q_geo(i,j),T_srf(i,j), &
-                        T_shlf,H_ice_now,H_w(i,j),f_grnd(i,j),zeta_aa,zeta_ac,dzeta_a,dzeta_b,omega_max,T0,dt)
+                    T_pmp(i,j,:),cp(i,j,:),kt(i,j,:),advecxy(i,j,:),uz(i,j,:),Q_strn(i,j,:),Q_b(i,j),Q_lith(i,j),T_srf(i,j), &
+                    T_shlf,H_ice_now,H_w(i,j),f_grnd(i,j),zeta_aa,zeta_ac,dzeta_a,dzeta_b,omega_max,T0,dt)                
                 
                 end if 
 
@@ -390,6 +451,88 @@ end select
 
     end subroutine calc_ytherm_enthalpy_3D
 
+    subroutine calc_ytherm_enthalpy_bedrock_3D(enth,T_lith,T_ice_b,T_pmp_b,cp,kt,H_lith, &
+                                                H_ice,H_grnd,Q_geo,zeta_aa,zeta_ac,dzeta_a,dzeta_b,dt)
+        ! This wrapper subroutine breaks the thermodynamics problem into individual columns,
+        ! which are solved independently by calling calc_enth_column
+
+        ! Note zeta=height, k=1 base, k=nz surface 
+        
+        !$ use omp_lib
+
+        implicit none 
+
+        real(prec), intent(INOUT) :: enth(:,:,:)    ! [J m-3] Lithosphere enthalpy
+        real(prec), intent(INOUT) :: T_lith(:,:,:)  ! [K] Lithosphere temperature
+        real(prec), intent(IN)    :: T_ice_b(:,:)   ! [K] Ice temperature at ice base
+        real(prec), intent(IN)    :: T_pmp_b(:,:)   ! [K] Pressure melting point temp at ice base.
+        real(prec), intent(IN)    :: cp(:,:,:)      ! [J kg-1 K-1] Specific heat capacity lithosphere
+        real(prec), intent(IN)    :: kt(:,:,:)      ! [J a-1 m-1 K-1] Heat conductivity lithosphere
+        real(prec), intent(IN)    :: H_lith(:,:)    ! [m] Lithosphere thickness 
+        real(prec), intent(IN)    :: H_ice(:,:)     ! [m] Ice thickness 
+        real(prec), intent(IN)    :: H_grnd(:,:)    ! [--] Ice thickness above flotation 
+        real(prec), intent(IN)    :: Q_geo(:,:)     ! [mW m-2] Geothermal heat flux deep in bedrock
+        real(prec), intent(IN)    :: zeta_aa(:)     ! [--] Vertical sigma coordinates (zeta==height), aa-nodes
+        real(prec), intent(IN)    :: zeta_ac(:)     ! [--] Vertical sigma coordinates (zeta==height), ac-nodes
+        real(prec), intent(IN)    :: dzeta_a(:)     ! nz_aa [--] Solver discretization helper variable ak
+        real(prec), intent(IN)    :: dzeta_b(:)     ! nz_aa [--] Solver discretization helper variable bk
+        real(prec), intent(IN)    :: dt             ! [a] Time step 
+
+        ! Local variables
+        integer :: i, j, k, nx, ny, nz_aa, nz_ac  
+        real(prec) :: T_base
+
+        nx    = size(T_lith,1)
+        ny    = size(T_lith,2)
+        nz_aa = size(zeta_aa,1)
+        nz_ac = size(zeta_ac,1)
+
+        ! ===================================================
+
+        ! ajr: openmp problematic here - leads to NaNs
+        !!!$omp parallel do
+        do j = 1, ny
+        do i = 1, nx 
+
+            ! For floating points, calculate the approximate marine-shelf temperature 
+            ! although really the temperature at the bottom of the ocean is needed
+            if (H_grnd(i,j) .lt. 0.0) then 
+
+                ! Calculate approximate marine freezing temp, limited to pressure melting point 
+                T_base = calc_T_base_shlf_approx(H_ice(i,j),T_pmp_b(i,j),H_grnd(i,j))
+
+            else 
+                ! Assign ice basal temperature
+                T_base   = T_ice_b(i,j)
+
+            end if 
+
+            if (H_ice(i,j) .gt. 0.0) then 
+                ! Call thermodynamic solver for the column
+
+                call calc_temp_column_bedrock(enth(i,j,:),T_lith(i,j,:),cp(i,j,:),kt(i,j,:),  &
+                        Q_geo(i,j),T_base,H_lith(i,j),zeta_aa,zeta_ac,dzeta_a,dzeta_b,dt)
+            
+            else 
+                ! Assume equilibrium conditions: impose linear temperature 
+                ! profile following Q_geo and T_base
+
+                T_lith(i,j,:) = calc_temp_lith_column(zeta_aa,kt(i,j,:),cp(i,j,:), &
+                                                    rho_l,H_lith(i,j),T_base,Q_geo(i,j))
+
+                ! Get enthalpy too 
+                call convert_to_enthalpy(enth(i,j,:),T_lith(i,j,:),0.0_wp,0.0_wp,cp(i,j,:),0.0_wp)
+
+            end if 
+
+        end do 
+        end do 
+        !!!$omp end parallel do
+
+        return 
+
+    end subroutine calc_ytherm_enthalpy_bedrock_3D
+    
     subroutine calc_enth_horizontal_advection_3D(T_ice,ux,uy,H_ice,dx,dt,solver)
 
         implicit none 
@@ -506,6 +649,15 @@ end select
         call nml_read(filename,"ytherm","till_rate",      par%till_rate,        init=init_pars)
         call nml_read(filename,"ytherm","H_w_max",        par%H_w_max,          init=init_pars)
         
+        call nml_read(filename,"ytherm_lith","method",    par%lith_method,     init=init_pars)
+        call nml_read(filename,"ytherm_lith","nz_aa",     par%lith_nz_aa,       init=init_pars)
+        call nml_read(filename,"ytherm_lith","zeta_scale",par%lith_zeta_scale,  init=init_pars)
+        call nml_read(filename,"ytherm_lith","zeta_exp",  par%lith_zeta_exp,    init=init_pars)
+        call nml_read(filename,"ytherm_lith","H_lith",    par%H_lith,           init=init_pars)
+        call nml_read(filename,"ytherm_lith","cp",        par%lith_cp,          init=init_pars)
+        call nml_read(filename,"ytherm_lith","kt",        par%lith_kt,          init=init_pars)
+        
+
         ! In case of method=="temp", prescribe some parameters
         if (trim(par%method) .eq. "temp") then  
             par%enth_cr   = 1.0_prec 
@@ -536,6 +688,44 @@ end select
         
         call calc_dzeta_terms(par%dzeta_a,par%dzeta_b,par%zeta_aa,par%zeta_ac)
 
+        ! == Lithosphere == 
+
+        ! Define size of zeta_ac axis
+        par%lith_nz_ac = par%lith_nz_aa-1
+
+        ! Allocate z-axes
+        if (allocated(par%lith_zeta_aa)) deallocate(par%lith_zeta_aa)
+        if (allocated(par%lith_zeta_ac)) deallocate(par%lith_zeta_ac)
+        allocate(par%lith_zeta_aa(par%lith_nz_aa)) 
+        allocate(par%lith_zeta_ac(par%lith_nz_ac))
+
+        ! Calculate zeta_aa and zeta_ac 
+        call calc_zeta(par%lith_zeta_aa,par%lith_zeta_ac, &
+                            par%lith_zeta_scale,par%lith_zeta_exp)
+
+        ! Calculate domain-level dzeta terms too 
+        if (allocated(par%lith_dzeta_a)) deallocate(par%lith_dzeta_a)
+        if (allocated(par%lith_dzeta_b)) deallocate(par%lith_dzeta_b)
+        allocate(par%lith_dzeta_a(par%lith_nz_aa))
+        allocate(par%lith_dzeta_b(par%lith_nz_aa))
+        
+        call calc_dzeta_terms(par%lith_dzeta_a,par%lith_dzeta_b, &
+                                    par%lith_zeta_aa,par%lith_zeta_ac)
+
+
+        ! write(*,*) "========="
+        ! do k = size(par%zeta_aa), 1, -1
+        !     write(*,*) par%zeta_aa(k), par%zeta_ac(k), par%dzeta_a(k), par%dzeta_b(k) 
+        ! end do 
+        ! write(*,*) "========="
+        ! do k = size(par%lith_zeta_aa), 1, -1
+        !     write(*,*) par%lith_zeta_aa(k), par%lith_zeta_ac(k), par%lith_dzeta_a(k), par%lith_dzeta_b(k) 
+        ! end do 
+        ! write(*,*) "========="
+        ! stop 
+
+        ! =================
+
         ! Define current time as unrealistic value
         par%time = 1000000000   ! [a] 1 billion years in the future
 
@@ -548,12 +738,12 @@ end select
 
     end subroutine ytherm_par_load
 
-    subroutine ytherm_alloc(now,nx,ny,nz_aa,nz_ac,nzr)
+    subroutine ytherm_alloc(now,nx,ny,nz_aa,nzl_aa)
 
         implicit none 
 
         type(ytherm_state_class), intent(INOUT) :: now 
-        integer, intent(IN) :: nx, ny, nz_aa, nz_ac, nzr 
+        integer, intent(IN) :: nx, ny, nz_aa, nzl_aa
 
         call ytherm_dealloc(now)
 
@@ -575,6 +765,13 @@ end select
         
         allocate(now%advecxy(nx,ny,nz_aa))
 
+        allocate(now%Q_lith(nx,ny))
+        allocate(now%enth_lith(nx,ny,nzl_aa))
+        allocate(now%T_lith(nx,ny,nzl_aa))
+        allocate(now%H_lith(nx,ny))
+        allocate(now%cp_lith(nx,ny,nz_aa))
+        allocate(now%kt_lith(nx,ny,nz_aa))
+
         now%enth        = 0.0
         now%T_ice       = 0.0
         now%omega       = 0.0  
@@ -593,9 +790,16 @@ end select
         
         now%advecxy     = 0.0 
 
+        now%Q_lith      = 0.0 
+        now%enth_lith   = 0.0 
+        now%T_lith      = 0.0 
+        now%H_lith      = 0.0 
+        now%cp_lith     = 0.0 
+        now%kt_lith     = 0.0 
+
         return
 
-    end subroutine ytherm_alloc 
+    end subroutine ytherm_alloc
 
     subroutine ytherm_dealloc(now)
 
@@ -621,8 +825,15 @@ end select
         
         if (allocated(now%advecxy))     deallocate(now%advecxy)
         
+        if (allocated(now%Q_lith))      deallocate(now%Q_lith)
+        if (allocated(now%enth_lith))   deallocate(now%enth_lith)
+        if (allocated(now%T_lith))      deallocate(now%T_lith)
+        if (allocated(now%H_lith))      deallocate(now%H_lith)
+        if (allocated(now%cp_lith))     deallocate(now%cp_lith)
+        if (allocated(now%kt_lith))     deallocate(now%kt_lith)
+
         return 
 
-    end subroutine ytherm_dealloc 
+    end subroutine ytherm_dealloc
 
 end module yelmo_thermodynamics

@@ -4,7 +4,8 @@ module thermodynamics
     ! Note: once icetemp is working well, this module could be 
     ! remerged into icetemp as one module. 
 
-    use yelmo_defs, only : prec, sec_year, pi, T0, g, rho_ice, rho_sw, rho_w, L_ice, T_pmp_beta 
+    use yelmo_defs, only : prec, wp, sec_year, pi, T0, g, rho_ice, &
+                           rho_sw, rho_w, rho_l, L_ice, T_pmp_beta 
 
     implicit none 
 
@@ -29,6 +30,10 @@ module thermodynamics
     public :: calc_temp_linear_column
     public :: calc_temp_robin_column
     
+    public :: define_temp_lith_3D
+    public :: calc_temp_lith_column
+    public :: calc_Q_lith
+
     public :: calc_basal_water_local
 
     public :: calc_basal_heating_fromaa 
@@ -38,7 +43,7 @@ module thermodynamics
 
 contains
 
-    subroutine calc_bmb_grounded(bmb_grnd,T_prime_b,Q_ice_b,Q_b,Q_geo_now,f_grnd,rho_ice)
+    subroutine calc_bmb_grounded(bmb_grnd,T_prime_b,Q_ice_b,Q_b,Q_lith_now,f_grnd,rho_ice)
         ! Calculate everywhere there is at least some grounded ice 
         ! (centered aa node calculation)
 
@@ -52,7 +57,7 @@ contains
         real(prec), intent(IN)  :: T_prime_b         ! [K] Basal ice temp relative to pressure melting point (ie T_prime_b=0 K == temperate)
         real(prec), intent(IN)  :: Q_ice_b           ! [J a-1 m-2] Ice basal heat flux (positive up)
         real(prec), intent(IN)  :: Q_b               ! [J a-1 m-2] Basal heat production from friction and strain heating
-        real(prec), intent(IN)  :: Q_geo_now         ! [J a-1 m-2] Geothermal heat flux 
+        real(prec), intent(IN)  :: Q_lith_now         ! [J a-1 m-2] Geothermal heat flux 
         real(prec), intent(IN)  :: f_grnd            ! [--] Grounded fraction (centered aa node)                 
         real(prec), intent(IN)  :: rho_ice           ! [kg m-3] Ice density 
         
@@ -67,7 +72,7 @@ contains
             ! Classic Cuffey and Patterson (2010) formula
             
             ! Calculate net energy flux at the base [J a-1 m-2]
-            Q_net = Q_b + Q_ice_b + Q_geo_now
+            Q_net = Q_b + Q_ice_b + Q_lith_now
             
             bmb_grnd = -Q_net /(rho_ice*L_ice)
 
@@ -93,7 +98,7 @@ contains
 
     end subroutine calc_bmb_grounded
 
-    elemental subroutine calc_bmb_grounded_enth(bmb_grnd,T_prime_b,omega,Q_ice_b,Q_b,Q_geo_now,f_grnd,rho_ice)
+    elemental subroutine calc_bmb_grounded_enth(bmb_grnd,T_prime_b,omega,Q_ice_b,Q_b,Q_lith_now,f_grnd,rho_ice)
         ! Calculate everywhere there is at least some grounded ice 
         ! (centered aa node calculation)
 
@@ -108,7 +113,7 @@ contains
         real(prec), intent(IN)  :: omega 
         real(prec), intent(IN)  :: Q_ice_b           ! [J a-1 m-2] Conductive heat flux to the base (positive down)
         real(prec), intent(IN)  :: Q_b               ! [J a-1 m-2] Basal heat production from friction and strain heating (postive up)
-        real(prec), intent(IN)  :: Q_geo_now         ! [J a-1 m-2] Geothermal heat flux (positive up)
+        real(prec), intent(IN)  :: Q_lith_now         ! [J a-1 m-2] Geothermal heat flux (positive up)
         real(prec), intent(IN)  :: f_grnd            ! [--] Grounded fraction (centered aa node)                 
         real(prec), intent(IN)  :: rho_ice           ! [kg m-3] Ice density 
         
@@ -120,7 +125,7 @@ contains
             ! Grounded point 
 
             ! Calculate net energy flux at the base [J a-1 m-2]
-            Q_net = Q_b + Q_ice_b + Q_geo_now
+            Q_net = Q_b + Q_ice_b + Q_lith_now
             
             bmb_grnd = -Q_net / (rho_ice*L_ice)
 
@@ -136,7 +141,7 @@ contains
 
         return 
 
-    end subroutine calc_bmb_grounded_enth 
+    end subroutine calc_bmb_grounded_enth
 
     subroutine calc_advec_vertical_column(advecz,Q,uz,H_ice,zeta_aa)
         ! Calculate vertical advection term advecz, which enters
@@ -1261,7 +1266,7 @@ end if
         
         return 
 
-    end subroutine define_temp_linear_3D 
+    end subroutine define_temp_linear_3D
 
     function calc_temp_linear_column(T_srf,T_base,T0,zeta_aa) result(T_ice)
 
@@ -1289,7 +1294,7 @@ end if
 
     end function calc_temp_linear_column
 
-    subroutine define_temp_robin_3D (T_ice,T_pmp,cp,ct,Q_geo,T_srf,H_ice,H_w,smb,bmb,f_grnd,zeta_aa,cold)
+    subroutine define_temp_robin_3D (T_ice,T_pmp,cp,ct,Q_lith,T_srf,H_ice,H_w,smb,bmb,f_grnd,zeta_aa,cold)
         ! Robin solution for thermodynamics for a given column of ice 
         ! Note zeta=height, k=1 base, k=nz surface 
 
@@ -1299,7 +1304,7 @@ end if
         real(prec), intent(IN)  :: T_pmp(:,:,:)     ! [K] Pressure melting point temp.
         real(prec), intent(IN)  :: cp(:,:,:)        ! [J kg-1 K-1] Specific heat capacity
         real(prec), intent(IN)  :: ct(:,:,:)        ! [J a-1 m-1 K-1] Heat conductivity 
-        real(prec), intent(IN)  :: Q_geo(:,:)       ! [mW m-2] Geothermal heat flux 
+        real(prec), intent(IN)  :: Q_lith(:,:)       ! [mW m-2] Geothermal heat flux 
         real(prec), intent(IN)  :: T_srf(:,:)       ! [K] Surface temperature 
         real(prec), intent(IN)  :: H_ice(:,:)       ! [m] Ice thickness 
         real(prec), intent(IN)  :: H_w(:,:)         ! [m] Basal water layer thickness 
@@ -1327,7 +1332,7 @@ end if
             is_float = (f_grnd(i,j) .eq. 0.0)
 
             T_ice(i,j,:) = calc_temp_robin_column(zeta_aa,T_pmp(i,j,:),ct(i,j,:),cp(i,j,:),rho_ice,H_ice(i,j), &
-                                                  T_srf(i,j),smb(i,j)+bmb(i,j),Q_geo(i,j),is_float)
+                                                  T_srf(i,j),smb(i,j)+bmb(i,j),Q_lith(i,j),is_float)
 
             if (cold) then 
                 T1(nz_aa) = T_srf(i,j)
@@ -1349,7 +1354,7 @@ end if
 
     end subroutine define_temp_robin_3D
 
-    function calc_temp_robin_column(zeta_aa,T_pmp,kt,cp,rho_ice,H_ice,T_srf,mb_net,Q_geo,is_float) result(T_ice)
+    function calc_temp_robin_column(zeta_aa,T_pmp,kt,cp,rho_ice,H_ice,T_srf,mb_net,Q_lith,is_float) result(T_ice)
         ! This function will impose a temperature solution in a given ice column.
         ! For:
         !  Grounded ice with positive net mass balance: Robin solution where possible
@@ -1367,7 +1372,7 @@ end if
         real(prec), intent(IN) :: H_ice 
         real(prec), intent(IN) :: T_srf 
         real(prec), intent(IN) :: mb_net
-        real(prec), intent(IN) :: Q_geo 
+        real(prec), intent(IN) :: Q_lith 
         logical,    intent(IN) :: is_float 
 
         real(prec) :: T_ice(size(zeta_aa,1))
@@ -1380,14 +1385,14 @@ end if
         real(prec), parameter :: T_ocn     = 271.15   ! [K]
         real(prec), parameter :: H_ice_min = 0.1      ! [m] Minimum ice thickness to calculate Robin solution 
         real(prec), parameter :: mb_net_min = 1e-2    ! [m a-1] Minimum allowed net mass balance for stability
-        real(prec) :: Q_geo_now, mb_now  
+        real(prec) :: Q_lith_now, mb_now  
 
         nz_aa = size(T_ice,1) 
         
-        Q_geo_now = Q_geo *1e-3*sec_year    ! [mW m-2] => [J a-1 m-2]
+        Q_lith_now = Q_lith *1e-3*sec_year    ! [mW m-2] => [J a-1 m-2]
 
         ! Calculate temperature gradient at base 
-        dTdz_b = -Q_geo_now/kt(1) 
+        dTdz_b = -Q_lith_now/kt(1) 
 
         if (.not. is_float .and. H_ice .gt. H_ice_min .and. mb_net .gt. 0.0) then 
             ! Impose Robin solution 
@@ -1438,6 +1443,125 @@ end if
         return 
 
     end function calc_temp_robin_column
+
+    subroutine define_temp_lith_3D(T_lith,cp,kt,Q_geo,T_bed,H_lith,zeta_aa)
+        ! Robin solution for thermodynamics for a given column of ice 
+        ! Note zeta=height, k=1 base, k=nz surface 
+
+        implicit none 
+
+        real(prec), intent(OUT) :: T_lith(:,:,:)     ! [K] Ice column temperature
+        real(prec), intent(IN)  :: cp(:,:,:)        ! [J kg-1 K-1] Specific heat capacity
+        real(prec), intent(IN)  :: kt(:,:,:)        ! [J a-1 m-1 K-1] Heat conductivity 
+        real(prec), intent(IN)  :: Q_geo(:,:)       ! [mW m-2] Geothermal heat flux 
+        real(prec), intent(IN)  :: T_bed(:,:)       ! [K] Surface temperature 
+        real(prec), intent(IN)  :: H_lith(:,:)       ! [m] Ice thickness 
+        real(prec), intent(IN)  :: zeta_aa(:)       ! [--] Vertical zeta coordinates (zeta==height), aa-nodes
+
+        ! Local variable
+        integer :: i, j, k, nx, ny, nz_aa  
+        
+        nx    = size(T_lith,1)
+        ny    = size(T_lith,2)
+        nz_aa = size(zeta_aa)
+
+        do j = 1, ny
+        do i = 1, nx 
+
+            T_lith(i,j,:) = calc_temp_lith_column(zeta_aa,kt(i,j,:),cp(i,j,:),rho_l,H_lith(i,j), &
+                                                  T_bed(i,j),Q_geo(i,j))
+
+        end do 
+        end do 
+
+        return 
+
+    end subroutine define_temp_lith_3D
+
+    function calc_temp_lith_column(zeta_aa,kt,cp,rho_l,H_lith,T_bed,Q_geo) result(T_lith)
+        ! This function will impose a temperature solution in a given ice column.
+        ! For:
+        !  Grounded ice with positive net mass balance: Robin solution where possible
+        !  Grounded ice with negative net mass balance: Linear profile 
+        !  Floating ice: Linear profile 
+        !  No or thin ice: Surface temperature 
+        
+        implicit none 
+
+        real(prec), intent(IN) :: zeta_aa(:) 
+        real(prec), intent(IN) :: kt(:) 
+        real(prec), intent(IN) :: cp(:) 
+        real(prec), intent(IN) :: rho_l 
+        real(prec), intent(IN) :: H_lith
+        real(prec), intent(IN) :: T_bed 
+        real(prec), intent(IN) :: Q_geo 
+
+        real(prec) :: T_lith(size(zeta_aa,1))
+
+        ! Local variables
+        integer :: k, nz_aa
+        real(prec) :: Q_geo_now 
+        real(prec) :: dTdz
+        
+        nz_aa = size(zeta_aa,1)
+
+        ! Get geothermal heat flux in proper units 
+        Q_geo_now = Q_geo*1e-3*sec_year   ! [mW m-2] => [J m-2 a-1]
+
+        ! Temperature at the bed surface is equal to the boundary temperature
+        T_lith(nz_aa) = T_bed 
+
+        ! Descend into bedrock and linear gradient
+        do k = nz_aa-1, 1, -1 
+
+            ! Determine the slope based on equilibrium with geothermal heat flux 
+            dTdz = -Q_geo_now / kt(k+1)
+
+            ! Calculate the temperature of the lithosphere at each layer 
+            T_lith(k) = T_lith(k+1) - dTdz*(H_lith*(zeta_aa(k+1)-zeta_aa(k)))
+
+        end do 
+
+        return 
+
+    end function calc_temp_lith_column
+
+    subroutine calc_Q_lith(Q_lith,T_lith,kt,H_lith,zeta_aa)
+
+        implicit none 
+
+        real(wp), intent(OUT) :: Q_lith(:,:) 
+        real(wp), intent(IN)  :: T_lith(:,:,:) 
+        real(wp), intent(IN)  :: kt(:,:,:) 
+        real(wp), intent(IN)  :: H_lith(:,:) 
+        real(wp), intent(IN)  :: zeta_aa(:) 
+
+        ! Local variables 
+        integer  :: i, j, nx, ny, nz_aa 
+        real(wp) :: dz 
+
+        nx    = size(Q_lith,1)
+        ny    = size(Q_lith,2) 
+        nz_aa = size(zeta_aa,1) 
+
+        do j = 1, ny 
+        do i = 1, nx 
+
+            ! Determine layer thickness of lithosphere at bed surface
+            dz = H_lith(i,j)*(zeta_aa(nz_aa)-zeta_aa(nz_aa-1))
+
+            ! Calculate lithospheric heat flux [J a-1 m-2]
+            Q_lith(i,j) = -kt(i,j,nz_aa) * (T_lith(i,j,nz_aa)-T_lith(i,j,nz_aa-1)) / dz 
+
+        end do 
+        end do  
+
+        ! [J a-1 m-2] => [mW m-2] (same units as Q_geo by default)
+        Q_lith = Q_lith *1e3 / sec_year 
+
+        return 
+
+    end subroutine calc_Q_lith
 
     function error_function(X) result(ERR)
         ! Purpose: Compute error function erf(x)
@@ -1569,4 +1693,4 @@ end if
 
     end subroutine calc_basal_water_local
 
-end module thermodynamics 
+end module thermodynamics

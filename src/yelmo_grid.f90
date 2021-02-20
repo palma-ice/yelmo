@@ -16,6 +16,9 @@ module yelmo_grid
     end interface 
     
     private 
+
+    public :: calc_zeta 
+
     public :: yelmo_init_grid 
     public :: yelmo_init_grid_fromfile
     public :: yelmo_init_grid_fromnml
@@ -25,7 +28,62 @@ module yelmo_grid
     public :: yelmo_grid_write
 
 contains 
+    
+    subroutine calc_zeta(zeta_aa,zeta_ac,zeta_scale,zeta_exp)
+        ! Calculate the vertical layer-edge axis (vertical ac-nodes)
+        ! and the vertical cell-center axis (vertical aa-nodes),
+        ! including an extra zero-thickness aa-node at the base and surface
 
+        implicit none 
+
+        real(prec), intent(INOUT)  :: zeta_aa(:) 
+        real(prec), intent(INOUT)  :: zeta_ac(:) 
+        character(*), intent(IN)   :: zeta_scale 
+        real(prec),   intent(IN)   :: zeta_exp 
+
+        ! Local variables
+        integer :: k, nz_aa, nz_ac 
+
+        nz_aa  = size(zeta_aa)
+        nz_ac  = size(zeta_ac)   ! == nz_aa - 1 
+        
+        ! Initially define a linear zeta scale 
+        ! Base = 0.0, Surface = 1.0 
+        do k = 1, nz_ac
+            zeta_ac(k) = 0.0 + 1.0*(k-1)/real(nz_ac-1)
+        end do 
+
+        ! Scale zeta to produce different resolution through column if desired
+        ! zeta_scale = ["linear","exp","wave"]
+        select case(trim(zeta_scale))
+            
+            case("exp")
+                ! Increase resolution at the base 
+                zeta_ac = zeta_ac**(zeta_exp) 
+
+            case("tanh")
+                ! Increase resolution at base and surface 
+
+                zeta_ac = tanh(1.0*pi*(zeta_ac-0.5))
+                zeta_ac = zeta_ac - minval(zeta_ac)
+                zeta_ac = zeta_ac / maxval(zeta_ac)
+
+            case DEFAULT
+            ! Do nothing, scale should be linear as defined above
+        
+        end select  
+        
+        ! Get zeta_aa (between zeta_ac values, as well as at the base and surface)
+        zeta_aa(1) = 0.0 
+        do k = 2, nz_aa-1
+            zeta_aa(k) = 0.5 * (zeta_ac(k-1)+zeta_ac(k))
+        end do 
+        zeta_aa(nz_aa) = 1.0 
+
+        return 
+
+    end subroutine calc_zeta
+    
     subroutine yelmo_init_grid_fromfile(grd,filename,grid_name)
 
         implicit none 

@@ -35,6 +35,7 @@ contains
         call nc_write_dim(filename,"month",     x=1,dx=1,nx=12,         units="month")
         call nc_write_dim(filename,"zeta",      x=ylmo%par%zeta_aa,     units="1")
         call nc_write_dim(filename,"zeta_ac",   x=ylmo%par%zeta_ac,     units="1")
+        call nc_write_dim(filename,"zeta_l",    x=ylmo%thrm%par%lith_zeta_aa,units="1")
         call nc_write_dim(filename,"age_iso",   x=ylmo%mat%par%age_iso, units="kyr")
         call nc_write_dim(filename,"pd_age_iso",x=ylmo%dta%pd%age_iso,  units="kyr")
         

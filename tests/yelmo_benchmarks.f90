@@ -571,6 +571,12 @@ contains
 !         call nc_write(filename,"T_pmp",ylmo%thrm%now%T_pmp,units="K",long_name="Ice pressure melting point (pmp)", &
 !                       dim1="xc",dim2="yc",dim3="zeta",dim4="time",start=[1,1,1,n],ncid=ncid)
         
+        call nc_write(filename,"T_lith",ylmo%thrm%now%T_lith,units="K",long_name="Lithosphere temperature", &
+                      dim1="xc",dim2="yc",dim3="zeta_l",dim4="time",start=[1,1,1,n],ncid=ncid)
+        
+        call nc_write(filename,"Q_lith",ylmo%thrm%now%Q_lith,units="J a-1 m-2",long_name="Lithosphere heat flux at bed surface", &
+                      dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
+        
         call nc_write(filename,"T_prime_b",ylmo%thrm%now%T_prime_b,units="deg C",long_name="Homologous basal ice temperature", &
                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
 

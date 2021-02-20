@@ -5,7 +5,7 @@ program test_icetemp
     use yelmo_defs
     use thermodynamics 
     use ice_enthalpy  
-    use ice_age 
+    use ice_tracer
 
     use interp1D 
 
@@ -50,6 +50,10 @@ program test_icetemp
     type(icesheet) :: robin 
     type(icesheet) :: diff 
     
+    type(icesheet) :: lith1 
+    logical        :: test_lith 
+    character(len=512) :: file1D_lith  
+
     ! Local variables
     real(prec)         :: t_start, t_end, dt, time  
     integer            :: n, ntot  
@@ -79,7 +83,7 @@ program test_icetemp
     ! ===============================================================
     ! User options 
 
-    experiment     = "k15expb"      ! "eismint", "k15expa", "k15expb", "bg15a"
+    experiment     = "eismint"      ! "eismint", "k15expa", "k15expb", "bg15a"
     
     ! General options
     zeta_scale      = "linear"      ! "linear", "exp", "tanh"
@@ -92,6 +96,8 @@ program test_icetemp
     enth_solver     = "temp"        ! "enth" or "temp" 
     omega_max       = 0.03          ! Maximum allowed water content (fraction)
     enth_cr         = 1e-3          ! Enthalpy solver: conductivity ratio kappa_water / kappa_ice 
+
+    test_lith = .TRUE. 
 
     ! Overwrite options for nz and enth_cr if available from arguments
     narg = command_argument_count() 
@@ -121,6 +127,7 @@ program test_icetemp
     write(file1D,*) "output/test_"//trim(experiment)//"_nz",trim(nz_str),   &
                                         "_cr",trim(cr_str),"_",trim(prec_str),".nc"
     
+    file1D_lith = "output/test_lith.nc"
     ! ===============================================================
 
     T0_ref = T0 
@@ -178,6 +185,12 @@ program test_icetemp
 
             call init_eismint_summit(ice1,smb=0.1_prec)
 
+            if (test_lith) then 
+                ! Intialize lithosphere too 
+                call icesheet_allocate(lith1,nz=10,zeta_scale="linear") 
+                call init_lithosphere(lith1) 
+            end if 
+
     end select 
 
     ! Initialize time and calculate number of time steps to iterate and 
@@ -196,6 +209,12 @@ program test_icetemp
     ! Calculate initial enthalpy (ice1)
     call convert_to_enthalpy(ice1%vec%enth,ice1%vec%T_ice,ice1%vec%omega,ice1%vec%T_pmp,ice1%vec%cp,L_ice)
     
+    if (test_lith) then 
+        call convert_to_enthalpy(lith1%vec%enth,lith1%vec%T_ice,lith1%vec%omega,lith1%vec%T_pmp,lith1%vec%cp,L_ice)
+        lith1%H_w   = 0.0 
+        lith1%H_cts = 0.0 
+    end if 
+
     ! Calculate initial enthalpy (robin)
     call convert_to_enthalpy(robin%vec%enth,robin%vec%T_ice,robin%vec%omega,robin%vec%T_pmp,robin%vec%cp,L_ice)
 
@@ -208,6 +227,11 @@ program test_icetemp
     ! Initialize output file for model and write intial conditions 
     call write_init(ice1,filename=file1D,zeta=ice1%vec%zeta,zeta_ac=ice1%vec%zeta_ac,time_init=time)
     call write_step(ice1,ice1%vec,filename=file1D,time=time)
+
+    if (test_lith) then 
+        call write_init(lith1,filename=file1D_lith,zeta=lith1%vec%zeta,zeta_ac=lith1%vec%zeta_ac,time_init=time)
+        call write_step(lith1,lith1%vec,filename=file1D_lith,time=time)
+    end if 
 
     ! Loop over time steps and perform thermodynamic calculations
     do n = 1, ntot 
@@ -270,6 +294,19 @@ program test_icetemp
 
         end select 
 
+        if (test_lith) then 
+            ! call calc_temp_column(lith1%vec%enth,lith1%vec%T_ice,lith1%vec%omega,lith1%bmb,lith1%Q_ice_b,lith1%H_cts,lith1%vec%T_pmp, &
+            !             lith1%vec%cp,lith1%vec%kt,lith1%vec%advecxy,lith1%vec%uz,lith1%vec%Q_strn,lith1%Q_b,lith1%Q_geo,lith1%T_srf,lith1%T_shlf, &
+            !             lith1%H_ice,lith1%H_w,lith1%f_grnd,lith1%vec%zeta,lith1%vec%zeta_ac,lith1%vec%dzeta_a,lith1%vec%dzeta_b,omega_max,T0_ref,dt)
+            
+            call calc_temp_column_bedrock(lith1%vec%enth,lith1%vec%T_ice, &
+                        lith1%vec%cp,lith1%vec%kt,lith1%Q_geo,lith1%T_srf,lith1%H_ice, &
+                        lith1%vec%zeta,lith1%vec%zeta_ac,lith1%vec%dzeta_a,lith1%vec%dzeta_b,dt)
+            
+            ! call calc_temp_column_bedrock(lith1%vec%enth,lith1%vec%T_ice,lith1%vec%cp,lith1%vec%kt, &
+            !                     lith1%Q_geo,lith1%T_srf,lith1%H_ice,lith1%vec%zeta,lith1%vec%zeta_ac,lith1%vec%dzeta_a,lith1%vec%dzeta_b,T0_ref,dt)
+        end if 
+
         ! Update basal water thickness [m/a i.e.] => [m/a w.e.]
         ice1%H_w = max(ice1%H_w - (ice1%bmb*rho_ice/rho_w)*dt, 0.0_prec)
 
@@ -283,6 +320,10 @@ program test_icetemp
 
         if (mod(time,dt_out)==0) then 
             call write_step(ice1,ice1%vec,filename=file1D,time=time,T_robin=robin%vec%T_ice)
+        end if 
+
+        if (mod(time,dt_out)==0 .and. test_lith) then 
+            call write_step(lith1,lith1%vec,filename=file1D_lith,time=time)
         end if 
 
         if (mod(time,50.0)==0) then
@@ -302,6 +343,64 @@ program test_icetemp
     write(*,*)
 
 contains 
+    
+    subroutine init_lithosphere(ice)
+
+        implicit none 
+
+        type(icesheet), intent(INOUT) :: ice
+
+        ! Local variables 
+        integer :: k, nz, nz_ac   
+
+        nz    = size(ice%vec%zeta)
+        nz_ac = nz - 1 
+
+        ! Assign point values
+        ice%T_srf    = 239.0       ! [K]
+        ice%T_shlf   = T0          ! [K] T_shlf not used in this idealized setup, set to T0  
+        ice%smb      = 0.0         ! [m/a]
+        ice%bmb      = 0.0         ! [m/a]
+        ice%Q_geo    = 42.0        ! [mW/m2]
+        ice%H_ice    = 2000.0      ! [m] Summit thickness
+        ice%H_w      = 0.0         ! [m] No basal water
+        ice%Q_b      = 0.0         ! [] No basal frictional heating 
+        ice%f_grnd   = 1.0         ! Grounded point 
+
+        ! EISMINT1
+        ice%vec%cp      = 1000.0    ! [J kg-1 K-1]
+        ice%vec%kt      = 9.46e7    ! [J a-1 m-1 K-1]
+        
+        ice%vec%Q_strn  = 0.0       ! [J a-1 m-3] No internal strain heating 
+        ice%vec%advecxy = 0.0       ! [] No horizontal advection 
+        ice%vec%uz      = 0.0       ! [m a-1] No verical advection 
+
+        ! Calculate pressure melting point 
+        ice%vec%T_pmp = calc_T_pmp(ice%H_ice,ice%vec%zeta,T0,T_pmp_beta) 
+
+        if (is_celcius) then 
+            ice%T_srf     = ice%T_srf     - T0
+            ice%T_shlf    = ice%T_shlf    - T0
+            ice%vec%T_pmp = ice%vec%T_pmp - T0 
+        end if 
+
+        ! Define initial temperature profile, linear 
+        ! from T_srf at the surface to 10deg below freezing point at the base
+
+        ice%vec%T_ice(nz) = ice%T_srf 
+        ice%vec%T_ice(1)  = 300.0 
+
+        ! Intermediate layers are linearly interpolated 
+        do k = 2, nz-1 
+            ice%vec%T_ice(k) = ice%vec%T_ice(1)+ice%vec%zeta(k)*(ice%vec%T_ice(nz)-ice%vec%T_ice(1))
+        end do 
+
+        ! Define linear vertical velocity profile
+        ice%vec%uz = -ice%smb*ice%vec%zeta_ac 
+        
+        return 
+
+    end subroutine init_lithosphere
 
     subroutine init_eismint_summit(ice,smb)
 
@@ -359,7 +458,7 @@ contains
         
         return 
 
-    end subroutine init_eismint_summit 
+    end subroutine init_eismint_summit
 
     subroutine init_k15expa(ice)
 
@@ -414,7 +513,7 @@ contains
 
         return 
 
-    end subroutine init_k15expa 
+    end subroutine init_k15expa
     
     subroutine init_k15expb(ice,smb,T_srf)
 
@@ -498,7 +597,7 @@ contains
 
         return 
 
-    end subroutine init_k15expb 
+    end subroutine init_k15expb
     
     subroutine init_bg15a(ice,smb,T_srf)
 
@@ -577,7 +676,7 @@ contains
 
         return 
 
-    end subroutine init_bg15a 
+    end subroutine init_bg15a
     
     subroutine icesheet_allocate(ice,nz,zeta_scale)
         ! Allocate the ice sheet object 
@@ -652,7 +751,7 @@ contains
 
         return 
 
-    end subroutine icesheet_allocate 
+    end subroutine icesheet_allocate
 
     subroutine write_init(ice,filename,zeta,zeta_ac,time_init)
 
@@ -676,7 +775,7 @@ contains
 
         return
 
-    end subroutine write_init 
+    end subroutine write_init
     
     subroutine write_step(ice,vecs,filename,time,T_robin)
 

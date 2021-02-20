@@ -8,7 +8,7 @@ module yelmo_ice
     use ncio 
     
     use yelmo_defs
-    use yelmo_grid, only : yelmo_init_grid
+    use yelmo_grid, only : yelmo_init_grid, calc_zeta
     use yelmo_timesteps, only : ytime_init, set_adaptive_timestep, set_adaptive_timestep_pc, set_pc_mask, calc_pc_eta,  &
                                 calc_pc_tau_fe_sbe,calc_pc_tau_ab_sam, calc_pc_tau_heun, limit_adaptive_timestep, &
                                 yelmo_timestep_write_init, yelmo_timestep_write, calc_adv3D_timestep1
@@ -652,7 +652,7 @@ contains
         
         call ytherm_par_load(dom%thrm%par,filename,dom%par%zeta_aa,dom%par%zeta_ac,dom%grd%nx,dom%grd%ny,dom%grd%dx,init=.TRUE.)
 
-        call ytherm_alloc(dom%thrm%now,dom%thrm%par%nx,dom%thrm%par%ny,dom%thrm%par%nz_aa,dom%thrm%par%nz_ac,dom%thrm%par%nzr)
+        call ytherm_alloc(dom%thrm%now,dom%thrm%par%nx,dom%thrm%par%ny,dom%thrm%par%nz_aa,dom%thrm%par%lith_nz_aa)
         
         write(*,*) "yelmo_init:: thermodynamics initialized."
         
@@ -890,13 +890,16 @@ contains
         ! Local variables 
         integer :: q 
         character(len=256) :: dom_thrm_method 
+        character(len=256) :: dom_thrm_lith_method 
         
         ! Store original model choices locally 
-        dom_thrm_method = dom%thrm%par%method 
+        dom_thrm_method      = dom%thrm%par%method 
+        dom_thrm_lith_method = dom%thrm%par%lith_method 
 
         ! Impose initialization choices 
-        dom%thrm%par%method = thrm_method 
-         
+        dom%thrm%par%method      = thrm_method 
+        dom%thrm%par%lith_method = "equil" 
+
         ! Initialize variables
 
         if (dom%par%use_restart) then 
@@ -958,8 +961,9 @@ contains
         
         ! Restore original model choices 
         ! Impose initialization choices 
-        dom%thrm%par%method = dom_thrm_method 
-        
+        dom%thrm%par%method      = dom_thrm_method 
+        dom%thrm%par%lith_method = dom_thrm_lith_method
+
         return 
 
     end subroutine yelmo_init_state
@@ -1070,7 +1074,7 @@ contains
         
         return 
 
-    end subroutine yelmo_print_bound 
+    end subroutine yelmo_print_bound
 
     subroutine yelmo_set_time(dom,time)
 
@@ -1086,63 +1090,8 @@ contains
         
         return 
 
-    end subroutine yelmo_set_time 
+    end subroutine yelmo_set_time
 
-    subroutine calc_zeta(zeta_aa,zeta_ac,zeta_scale,zeta_exp)
-        ! Calculate the vertical layer-edge axis (vertical ac-nodes)
-        ! and the vertical cell-center axis (vertical aa-nodes),
-        ! including an extra zero-thickness aa-node at the base and surface
-
-        implicit none 
-
-        real(prec), intent(INOUT)  :: zeta_aa(:) 
-        real(prec), intent(INOUT)  :: zeta_ac(:) 
-        character(*), intent(IN)   :: zeta_scale 
-        real(prec),   intent(IN)   :: zeta_exp 
-
-        ! Local variables
-        integer :: k, nz_aa, nz_ac 
-
-        nz_aa  = size(zeta_aa)
-        nz_ac  = size(zeta_ac)   ! == nz_aa - 1 
-
-        ! Initially define a linear zeta scale 
-        ! Base = 0.0, Surface = 1.0 
-        do k = 1, nz_ac
-            zeta_ac(k) = 0.0 + 1.0*(k-1)/real(nz_ac-1)
-        end do 
-
-        ! Scale zeta to produce different resolution through column if desired
-        ! zeta_scale = ["linear","exp","wave"]
-        select case(trim(zeta_scale))
-            
-            case("exp")
-                ! Increase resolution at the base 
-                zeta_ac = zeta_ac**(zeta_exp) 
-
-            case("tanh")
-                ! Increase resolution at base and surface 
-
-                zeta_ac = tanh(1.0*pi*(zeta_ac-0.5))
-                zeta_ac = zeta_ac - minval(zeta_ac)
-                zeta_ac = zeta_ac / maxval(zeta_ac)
-
-            case DEFAULT
-            ! Do nothing, scale should be linear as defined above
-        
-        end select  
-        
-        ! Get zeta_aa (between zeta_ac values, as well as at the base and surface)
-        zeta_aa(1) = 0.0 
-        do k = 2, nz_aa-1
-            zeta_aa(k) = 0.5 * (zeta_ac(k-1)+zeta_ac(k))
-        end do 
-        zeta_aa(nz_aa) = 1.0 
-
-        return 
-
-    end subroutine calc_zeta
-    
     subroutine yelmo_check_kill(dom,time,kill_request)
             
         use ieee_arithmetic

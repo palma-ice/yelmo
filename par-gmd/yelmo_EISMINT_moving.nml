@@ -67,7 +67,8 @@
 
 &ydyn
     solver              = "sia"           ! "fixed", "sia", "ssa", "hybrid", "diva", "diva-noslip", l1l2", "l1l2-noslip"
-    diva_no_slip        = False           ! If using the DIVA solver, is basal sliding allowed? 
+    visc_method         = 1               ! 0: constant visc=visc_const, 1: dynamic viscosity
+    visc_const          = 1e7             ! [Pa a] Constant value for viscosity (if visc_method=0)
     beta_method         = 1               ! 0: constant beta; 1: linear (beta=cb/u0); 2: psuedo-plastic-power; 3: Regularized Coulomb
     beta_const          = 1e3             ! [Pa a m−1] Constant value of basal friction coefficient to be used
     beta_q              = 3.0             ! Dragging law exponent 

@@ -698,7 +698,7 @@ end select
         if (allocated(par%lith_zeta_ac)) deallocate(par%lith_zeta_ac)
         allocate(par%lith_zeta_aa(par%lith_nz_aa)) 
         allocate(par%lith_zeta_ac(par%lith_nz_ac))
-
+        
         ! Calculate zeta_aa and zeta_ac 
         call calc_zeta(par%lith_zeta_aa,par%lith_zeta_ac, &
                             par%lith_zeta_scale,par%lith_zeta_exp)
@@ -769,8 +769,8 @@ end select
         allocate(now%enth_lith(nx,ny,nzl_aa))
         allocate(now%T_lith(nx,ny,nzl_aa))
         allocate(now%H_lith(nx,ny))
-        allocate(now%cp_lith(nx,ny,nz_aa))
-        allocate(now%kt_lith(nx,ny,nz_aa))
+        allocate(now%cp_lith(nx,ny,nzl_aa))
+        allocate(now%kt_lith(nx,ny,nzl_aa))
 
         now%enth        = 0.0
         now%T_ice       = 0.0

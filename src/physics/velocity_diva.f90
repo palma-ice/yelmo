@@ -415,12 +415,12 @@ end if
 
             ! Calculate shear strain, acx-nodes
             visc_eff_ac  = calc_staggered_margin(visc_eff(i,j,k),visc_eff(ip1,j,k),H_ice(i,j),H_ice(ip1,j))
-            !visc_eff_ac  = max(visc_eff_ac,visc_min)    ! For safety 
+            visc_eff_ac  = max(visc_eff_ac,visc_min)    ! For safety 
             duxdz(i,j,k) = (taub_acx(i,j)/visc_eff_ac) * (1.0-zeta_aa(k))
             
             ! Calculate shear strain, acy-nodes
             visc_eff_ac  = calc_staggered_margin(visc_eff(i,j,k),visc_eff(i,jp1,k),H_ice(i,j),H_ice(i,jp1))
-            !visc_eff_ac  = max(visc_eff_ac,visc_min)    ! For safety 
+            visc_eff_ac  = max(visc_eff_ac,visc_min)    ! For safety 
             duydz(i,j,k) = (taub_acy(i,j)/visc_eff_ac) * (1.0-zeta_aa(k))
 
         end do 

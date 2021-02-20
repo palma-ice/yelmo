@@ -399,7 +399,7 @@ end if
         integer :: ip1, jp1 
         real(prec) :: visc_eff_ac
 
-        !real(prec), parameter :: visc_min = 1e3_prec 
+        real(prec), parameter :: visc_min = 1e3_prec 
 
         nx    = size(duxdz,1)
         ny    = size(duxdz,2)

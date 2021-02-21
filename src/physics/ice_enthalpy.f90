@@ -22,7 +22,7 @@ module ice_enthalpy
     public :: get_cts_index
 
 contains 
-
+    
     subroutine calc_temp_column(enth,T_ice,omega,bmb_grnd,Q_ice_b,H_cts,T_pmp,cp,kt,advecxy,uz, &
                                 Q_strn,Q_b,Q_lith,T_srf,T_shlf,H_ice,H_w,f_grnd,zeta_aa,zeta_ac, &
                                 dzeta_a,dzeta_b,omega_max,T0,dt)
@@ -1833,7 +1833,7 @@ end if
         return 
 
 
-    end function calc_cts_height 
+    end function calc_cts_height
 
     subroutine calc_dzeta_terms(dzeta_a,dzeta_b,zeta_aa,zeta_ac)
         ! zeta_aa  = depth axis at layer centers (plus base and surface values)
@@ -2049,7 +2049,7 @@ end if
             
         return 
 
-    end function get_cts_index 
+    end function get_cts_index
 
     function interp_linear_point(x0,x1,y0,y1,xout) result(yout)
         ! Interpolates for the y value at the desired x value, 
@@ -2073,7 +2073,7 @@ end if
 
         return
 
-    end function interp_linear_point 
+    end function interp_linear_point
 
 end module ice_enthalpy
 

@@ -127,6 +127,15 @@ end select
                                     tpo%now%H_ice.gt.0.0)
         end if 
 
+        ! Make sure lithospheric constants are prescribed 
+        ! (currently cp, kt and H_lith are spatially constant)
+        thrm%now%cp_lith = thrm%par%lith_cp 
+        thrm%now%kt_lith = thrm%par%lith_kt 
+        thrm%now%H_lith  = thrm%par%H_lith 
+        
+        ! Calculate heat flux from bedrock to bed surface 
+        ! (when bedrock is in equilibrium Q_lith==Q_geo) 
+
         if (maxval(thrm%now%Q_lith) .eq. 0.0) then 
             ! It has not been initialized, set equal to Q_geo to start 
 
@@ -153,6 +162,42 @@ end select
             call calc_basal_water_local(thrm%now%H_w,thrm%now%dHwdt,tpo%now%H_ice,-thrm%now%bmb_grnd*(rho_ice/rho_w), &
                                     tpo%now%f_grnd,dt*0.5_prec,thrm%par%till_rate,thrm%par%H_w_max)
             
+            ! ==== Lithosphere (dt step 1) ======================================
+
+            ! Update the lithosphere temperature profile 
+            ! (using basal ice temperature from previous timestep)
+            select case(trim(thrm%par%lith_method))
+
+                case("equil")
+                    ! Prescribe lithospheric temperature profile assuming 
+                    ! equilibrium with the bed surface temperature 
+                    ! (ie, no active bedrock) 
+
+                    call define_temp_lith_3D(thrm%now%T_lith,thrm%now%cp_lith,thrm%now%kt_lith, &
+                                             bnd%Q_geo,thrm%now%T_ice(:,:,1),thrm%now%H_lith,thrm%par%lith_zeta_aa)
+
+                    ! Get enthalpy too 
+                    call convert_to_enthalpy(thrm%now%enth_lith,thrm%now%T_lith,0.0_wp,0.0_wp, &
+                                                                        thrm%now%cp_lith,0.0_wp)
+
+                case("active")
+                    ! Solve thermodynamic equation for the lithosphere 
+
+                    call calc_ytherm_enthalpy_bedrock_3D(thrm%now%enth_lith,thrm%now%T_lith,thrm%now%T_ice(:,:,1), &
+                                                         thrm%now%T_pmp(:,:,1),thrm%now%cp_lith,thrm%now%kt_lith, &
+                                                         thrm%now%H_lith,tpo%now%H_ice,tpo%now%H_grnd,bnd%Q_geo, &
+                                                         thrm%par%lith_zeta_aa,thrm%par%lith_zeta_ac, &
+                                                         thrm%par%lith_dzeta_a,thrm%par%lith_dzeta_b,dt*0.5_wp)
+
+                case DEFAULT 
+
+                    write(*,*) "calc_ytherm:: Error: lith_method not recognized."
+                    write(*,*) "lith_method = ", trim(thrm%par%lith_method)
+
+            end select 
+
+            ! =======================================================
+
             select case(trim(thrm%par%method))
 
                 case("enth","temp") 
@@ -235,15 +280,8 @@ end select
                                     tpo%now%f_grnd,dt,thrm%par%till_rate,thrm%par%H_w_max)
 
 
+            ! ==== Lithosphere (dt step 2) ======================================
 
-            ! ==== Lithosphere ======================================
-
-            ! Make sure constants are prescribed 
-            ! (currently cp, kt and H_lith are spatially constant)
-            thrm%now%cp_lith = thrm%par%lith_cp 
-            thrm%now%kt_lith = thrm%par%lith_kt 
-            thrm%now%H_lith  = thrm%par%H_lith 
-            
             ! Update the lithosphere temperature profile 
             ! (using basal ice temperature from previous timestep)
             select case(trim(thrm%par%lith_method))
@@ -267,7 +305,7 @@ end select
                                                          thrm%now%T_pmp(:,:,1),thrm%now%cp_lith,thrm%now%kt_lith, &
                                                          thrm%now%H_lith,tpo%now%H_ice,tpo%now%H_grnd,bnd%Q_geo, &
                                                          thrm%par%lith_zeta_aa,thrm%par%lith_zeta_ac, &
-                                                         thrm%par%lith_dzeta_a,thrm%par%lith_dzeta_b,dt)
+                                                         thrm%par%lith_dzeta_a,thrm%par%lith_dzeta_b,dt*0.5_wp)
 
                 case DEFAULT 
 
@@ -698,7 +736,7 @@ end select
         if (allocated(par%lith_zeta_ac)) deallocate(par%lith_zeta_ac)
         allocate(par%lith_zeta_aa(par%lith_nz_aa)) 
         allocate(par%lith_zeta_ac(par%lith_nz_ac))
-        
+
         ! Calculate zeta_aa and zeta_ac 
         call calc_zeta(par%lith_zeta_aa,par%lith_zeta_ac, &
                             par%lith_zeta_scale,par%lith_zeta_exp)

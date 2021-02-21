@@ -163,9 +163,9 @@
 /
 
 &ytherm_lith
-    method          = "active"          ! "equil" (not active bedrock) or "active"
+    method          = "equil"           ! "equil" (not active bedrock) or "active"
     nz_aa           = 10                ! Number of vertical points in bedrock 
-    zeta_scale      = "linear"          ! "linear", "exp_surf"
+    zeta_scale      = "exp-inv"         ! "linear", "exp-inv"
     zeta_exp        = 2.0  
     H_lith          = 2000.0            ! [m] Lithosphere thickness 
     cp              = 1000.0            ! [J kg-1 K-1] Specific heat capacity of bedrock

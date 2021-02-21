@@ -1,7 +1,7 @@
 module yelmo_grid
     ! This module holds routines to manage the gridded coordinates of a given Yelmo domain 
 
-    use yelmo_defs, only : sp, dp, prec, pi, ygrid_class
+    use yelmo_defs, only : sp, dp, prec, wp, pi, ygrid_class
     use nml 
     use ncio 
 
@@ -43,10 +43,11 @@ contains
 
         ! Local variables
         integer :: k, nz_aa, nz_ac 
+        real(prec), allocatable :: tmp(:) 
 
         nz_aa  = size(zeta_aa)
         nz_ac  = size(zeta_ac)   ! == nz_aa - 1 
-        
+
         ! Initially define a linear zeta scale 
         ! Base = 0.0, Surface = 1.0 
         do k = 1, nz_ac
@@ -59,7 +60,20 @@ contains
             
             case("exp")
                 ! Increase resolution at the base 
+                
                 zeta_ac = zeta_ac**(zeta_exp) 
+
+            case("exp-inv")
+                ! Increase resolution at the surface 
+                
+                zeta_ac = 1.0_wp - zeta_ac**(zeta_exp)
+
+                ! Reverse order 
+                allocate(tmp(nz_ac))
+                tmp = zeta_ac 
+                do k = 1, nz_ac
+                    zeta_ac(k) = tmp(nz_ac-k+1)
+                end do 
 
             case("tanh")
                 ! Increase resolution at base and surface 

@@ -167,9 +167,9 @@
     nz_aa           = 10                ! Number of vertical points in bedrock 
     zeta_scale      = "exp-inv"         ! "linear", "exp-inv"
     zeta_exp        = 2.0  
-    H_lith          = 2000.0            ! [m] Lithosphere thickness 
+    H_lith          = 3000.0            ! [m] Lithosphere thickness 
     cp              = 1000.0            ! [J kg-1 K-1] Specific heat capacity of bedrock
-    kt              = 9.46e7            ! [J a-1 m-1 K-1] Thermal conductivity of bedrock [W m-1 K-1 * sec_year] => [J a-1 m-1 K-1]
+    kt              = 6.3e7             ! [J a-1 m-1 K-1] Thermal conductivity of bedrock [W m-1 K-1 * sec_year] => [J a-1 m-1 K-1]
 /
 
 &yelmo_masks

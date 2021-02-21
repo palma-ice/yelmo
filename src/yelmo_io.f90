@@ -126,6 +126,7 @@ contains
         call nc_write_dim(filename,"yc",       x=dom%grd%yc*1e-3,       units="kilometers")
         call nc_write_dim(filename,"zeta",     x=dom%par%zeta_aa,       units="1")
         call nc_write_dim(filename,"zeta_ac",  x=dom%par%zeta_ac,       units="1")
+        call nc_write_dim(filename,"zeta_l",   x=dom%thrm%par%lith_zeta_aa,units="1")
         call nc_write_dim(filename,"age_iso",  x=dom%mat%par%age_iso,   units="kyr")
         call nc_write_dim(filename,"time",     x=time,dx=1.0_prec,nx=1, units="years ago")
  

@@ -311,8 +311,8 @@ end if
 
     subroutine calc_temp_column_internal(temp,kappa,uz,advecxy,Q_strn,val_base,val_srf,thickness, &
                                                 zeta_aa,zeta_ac,dzeta_a,dzeta_b,T_ref,dt,is_basal_flux)
-        ! Thermodynamics solver for a given column of ice 
-        ! Note zeta=height, k=1 base, k=nz surface 
+        ! Thermodynamics solver 1D (eg, for column of ice or bedrock)
+        ! Note zeta= column height, k=1 base, k=nz surface 
         ! Note: nz = number of vertical boundaries (including zeta=0.0 and zeta=1.0), 
         ! temperature is defined for cell centers, plus a value at the surface and the base
         ! so nz_ac = nz_aa - 1 
@@ -1185,7 +1185,7 @@ end if
 
         return 
 
-    end subroutine calc_enth_column_poly 
+    end subroutine calc_enth_column_poly
 
     subroutine calc_enth_column_cold(enth,enth_pmp,cp,kt,advecxy,uz,Q_strn, &
                                                             zeta_aa,zeta_ac,H_now,rho_ice,dt)
@@ -1313,7 +1313,7 @@ end if
 
         return 
 
-    end subroutine calc_enth_column_cold 
+    end subroutine calc_enth_column_cold
 
     subroutine calc_enth_column_temperate(enth,enth_pmp,cp,kt,advecxy,uz,Q_strn, &
                                                             zeta_aa,zeta_ac,H_now,rho_ice,dt)
@@ -1465,7 +1465,7 @@ end if
         
         return 
 
-    end subroutine calc_enth_column_temperate 
+    end subroutine calc_enth_column_temperate
 
     subroutine calc_enth_column_zoom(enth,enth_pmp,cp,kt,advecxy,uz,Q_strn, &
                                                             zeta_aa,zeta_ac,cr,H_now,rho_ice,dt)
@@ -1594,7 +1594,7 @@ end if
 
         return 
 
-    end subroutine calc_enth_column_zoom 
+    end subroutine calc_enth_column_zoom
 
     ! ========== ENTHALPY ==========================================
 

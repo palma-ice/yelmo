@@ -29,24 +29,31 @@ module yelmo_grid
 
 contains 
     
-    subroutine calc_zeta(zeta_aa,zeta_ac,zeta_scale,zeta_exp)
+    subroutine calc_zeta(zeta_aa,zeta_ac,nz_aa,zeta_scale,zeta_exp)
         ! Calculate the vertical layer-edge axis (vertical ac-nodes)
         ! and the vertical cell-center axis (vertical aa-nodes),
         ! including an extra zero-thickness aa-node at the base and surface
 
         implicit none 
 
-        real(prec), intent(INOUT)  :: zeta_aa(:) 
-        real(prec), intent(INOUT)  :: zeta_ac(:) 
+        real(prec), allocatable, intent(INOUT)  :: zeta_aa(:) 
+        real(prec), allocatable, intent(INOUT)  :: zeta_ac(:) 
+        integer,      intent(IN)   :: nz_aa 
         character(*), intent(IN)   :: zeta_scale 
         real(prec),   intent(IN)   :: zeta_exp 
 
         ! Local variables
-        integer :: k, nz_aa, nz_ac 
+        integer :: k, nz_ac 
         real(prec), allocatable :: tmp(:) 
 
-        nz_aa  = size(zeta_aa)
-        nz_ac  = size(zeta_ac)   ! == nz_aa - 1 
+        ! Get size of zeta ac-node vector
+        nz_ac = nz_aa - 1 
+
+        ! First allocate arrays 
+        if (allocated(zeta_aa)) deallocate(zeta_aa)
+        if (allocated(zeta_ac)) deallocate(zeta_ac)
+        allocate(zeta_aa(nz_aa))
+        allocate(zeta_ac(nz_ac))
 
         ! Initially define a linear zeta scale 
         ! Base = 0.0, Surface = 1.0 

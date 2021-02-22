@@ -18,7 +18,7 @@ module yelmo_thermodynamics
     public :: ytherm_par_load, ytherm_alloc, ytherm_dealloc 
 
 contains
-
+    
     subroutine calc_ytherm(thrm,tpo,dyn,mat,bnd,time)
 
         implicit none
@@ -31,13 +31,18 @@ contains
         real(prec),         intent(IN)    :: time  
 
         ! Local variables 
-        integer :: i, j, k, nx, ny  
+        integer :: i, j, k, nx, ny
+        integer :: k0, nz_aa    
         real(prec) :: dt 
         real(prec), allocatable :: H_w_now(:,:)
         real(prec), allocatable :: dTdz_b_now(:,:)
         
-        nx = thrm%par%nx
-        ny = thrm%par%ny
+        nx    = thrm%par%nx
+        ny    = thrm%par%ny
+        nz_aa = thrm%par%ztot%nz_aa 
+
+        ! Assign shortcut to ice basal layer index 
+        k0 = thrm%par%k0 
 
         allocate(H_w_now(nx,ny)) 
         H_w_now = 0.0_prec 
@@ -50,29 +55,39 @@ contains
         ! Get time step and advance current time 
         dt            = dble(time) - thrm%par%time 
         thrm%par%time = dble(time) 
-        
 
         ! === Determine some thermal properties === 
 
+        ! == ice column == 
+
         ! Calculate the specific heat capacity of the ice
         if (thrm%par%use_const_cp) then 
-            thrm%now%cp  = thrm%par%const_cp
+            thrm%now%cp(:,:,k0:nz_aa)  = thrm%par%const_cp
         else  
-            thrm%now%cp  = calc_specific_heat_capacity(thrm%now%T_ice)
+            thrm%now%cp(:,:,k0:nz_aa)  = calc_specific_heat_capacity(thrm%now%T_tot(:,:,k0:nz_aa))
         end if 
         
         ! Calculate the heat conductivity of the ice
         if (thrm%par%use_const_kt) then 
-            thrm%now%kt  = thrm%par%const_kt
+            thrm%now%kt(:,:,k0:nz_aa)  = thrm%par%const_kt
         else  
-            thrm%now%kt  = calc_thermal_conductivity(thrm%now%T_ice)
+            thrm%now%kt(:,:,k0:nz_aa)  = calc_thermal_conductivity(thrm%now%T_tot(:,:,k0:nz_aa))
         end if 
 
         ! Calculate the pressure-corrected melting point (in Kelvin)
-        do k = 1, thrm%par%nz_aa  
-            thrm%now%T_pmp(:,:,k) = calc_T_pmp(tpo%now%H_ice,thrm%par%zeta_aa(k),T0,T_pmp_beta)
+        do k = k0, nz_aa  
+            thrm%now%T_pmp_tot(:,:,k) = calc_T_pmp(tpo%now%H_ice,thrm%par%ztot%zeta_aa(k),T0,T_pmp_beta)
         end do 
 
+        ! == lithosphere column == 
+
+        ! Prescibe constant values of heat capacity, thermal conductivity 
+        ! and pressure melting point withint the lithospheric column 
+
+        thrm%now%cp(:,:,1:k0-1) = thrm%par%lith_cp 
+        thrm%now%kt(:,:,1:k0-1) = thrm%par%lith_kt 
+        thrm%now%T_pmp_tot(:,:,1:k0-1) = 1e8      ! [K] Set to unreachably high value
+        
         ! === Calculate heat source terms (Yelmo vertical grid) === 
 
 select case("ab")
@@ -104,234 +119,7 @@ end select
             call smooth_gauss_2D(thrm%now%Q_b,tpo%now%H_ice.gt.0.0,thrm%par%dx,thrm%par%n_sm_qb, &
                                     tpo%now%H_ice.gt.0.0)
         end if 
-
-        ! Calculate internal strain heating
-        if (thrm%par%use_strain_sia) then 
-            ! Calculate strain heating from SIA approximation
-
-            call calc_strain_heating_sia(thrm%now%Q_strn,dyn%now%ux,dyn%now%uy,tpo%now%dzsdx,tpo%now%dzsdy, &
-                                      thrm%now%cp,tpo%now%H_ice,rho_ice,thrm%par%zeta_aa,thrm%par%zeta_ac, &
-                                      thrm%par%dt_beta(1),thrm%par%dt_beta(2))
         
-        else
-            ! Calculate strain heating from strain rate tensor and viscosity (general approach)
-            
-            call calc_strain_heating(thrm%now%Q_strn,mat%now%strn%de,mat%now%visc,thrm%now%cp,rho_ice, &
-                                                                        thrm%par%dt_beta(1),thrm%par%dt_beta(2))
-
-        end if 
-        
-        ! Smooth strain heating 
-        if (thrm%par%n_sm_qstrn .gt. 0) then 
-            call smooth_gauss_3D(thrm%now%Q_strn,tpo%now%H_ice.gt.0.0,thrm%par%dx,thrm%par%n_sm_qstrn, &
-                                    tpo%now%H_ice.gt.0.0)
-        end if 
-
-        ! Make sure lithospheric constants are prescribed 
-        ! (currently cp, kt and H_lith are spatially constant)
-        thrm%now%cp_lith = thrm%par%lith_cp 
-        thrm%now%kt_lith = thrm%par%lith_kt 
-        thrm%now%H_lith  = thrm%par%H_lith 
-        
-        ! Calculate heat flux from bedrock to bed surface 
-        ! (when bedrock is in equilibrium Q_lith==Q_geo) 
-
-        if (maxval(thrm%now%Q_lith) .eq. 0.0) then 
-            ! It has not been initialized, set equal to Q_geo to start 
-
-            thrm%now%Q_lith = bnd%Q_geo 
-
-        else 
-            ! Calculate heat flux from vertical temp. gradient in lithosphere 
-
-            ! Calculate heat flux through bed surface from lithosphere [mW m-2]
-            call calc_Q_lith(thrm%now%Q_lith,thrm%now%T_lith,thrm%now%kt_lith, &
-                                        thrm%now%H_lith,thrm%par%lith_zeta_aa)
-            ! thrm%now%Q_lith = bnd%Q_geo 
-
-        end if
-
-
-        if ( dt .gt. 0.0 ) then     
-            ! Ice thermodynamics should evolve, perform calculations 
-                     
-            ! Store initial value of H_w 
-            H_w_now = thrm%now%H_w 
-
-            ! Update basal water layer thickness for half timestep (Runge Kutta, step 1)
-            call calc_basal_water_local(thrm%now%H_w,thrm%now%dHwdt,tpo%now%H_ice,-thrm%now%bmb_grnd*(rho_ice/rho_w), &
-                                    tpo%now%f_grnd,dt*0.5_prec,thrm%par%till_rate,thrm%par%H_w_max)
-            
-            ! ==== Lithosphere (dt step 1) ======================================
-
-            ! Update the lithosphere temperature profile 
-            ! (using basal ice temperature from previous timestep)
-            select case(trim(thrm%par%lith_method))
-
-                case("equil")
-                    ! Prescribe lithospheric temperature profile assuming 
-                    ! equilibrium with the bed surface temperature 
-                    ! (ie, no active bedrock) 
-
-                    call define_temp_lith_3D(thrm%now%T_lith,thrm%now%cp_lith,thrm%now%kt_lith, &
-                                             bnd%Q_geo,thrm%now%T_ice(:,:,1),thrm%now%H_lith,thrm%par%lith_zeta_aa)
-
-                    ! Get enthalpy too 
-                    call convert_to_enthalpy(thrm%now%enth_lith,thrm%now%T_lith,0.0_wp,0.0_wp, &
-                                                                        thrm%now%cp_lith,0.0_wp)
-
-                case("active")
-                    ! Solve thermodynamic equation for the lithosphere 
-
-                    call calc_ytherm_enthalpy_bedrock_3D(thrm%now%enth_lith,thrm%now%T_lith,thrm%now%T_ice(:,:,1), &
-                                                         thrm%now%T_pmp(:,:,1),thrm%now%cp_lith,thrm%now%kt_lith, &
-                                                         thrm%now%H_lith,tpo%now%H_ice,tpo%now%H_grnd,bnd%Q_geo, &
-                                                         thrm%par%lith_zeta_aa,thrm%par%lith_zeta_ac, &
-                                                         thrm%par%lith_dzeta_a,thrm%par%lith_dzeta_b,dt*0.5_wp)
-
-                case DEFAULT 
-
-                    write(*,*) "calc_ytherm:: Error: lith_method not recognized."
-                    write(*,*) "lith_method = ", trim(thrm%par%lith_method)
-
-            end select 
-
-            ! =======================================================
-
-            select case(trim(thrm%par%method))
-
-                case("enth","temp") 
-                    ! Perform enthalpy/temperature solving via advection-diffusion equation
-                    ! Note: method==temp performs the same calculations as for method==enth, 
-                    ! except enth_cr=1.0 and omega_max=0.0 as prescribed in par_load(). 
-
-                    if (trim(thrm%par%method) .eq. "enth") then 
-
-                        ! Calculate the explicit horizontal advection term using enthalpy from previous timestep
-                        call calc_advec_horizontal_3D(thrm%now%advecxy,thrm%now%enth,tpo%now%H_ice,tpo%now%z_srf, &
-                                            dyn%now%ux,dyn%now%uy,thrm%par%zeta_aa,thrm%par%dx,thrm%par%dt_beta(1),thrm%par%dt_beta(2))
-                    
-                    else 
-
-                        ! Calculate the explicit horizontal advection term using temperature from previous timestep
-                        call calc_advec_horizontal_3D(thrm%now%advecxy,thrm%now%T_ice,tpo%now%H_ice,tpo%now%z_srf, &
-                                            dyn%now%ux,dyn%now%uy,thrm%par%zeta_aa,thrm%par%dx,thrm%par%dt_beta(1),thrm%par%dt_beta(2))
-                    
-                    end if 
-
-                    call calc_ytherm_enthalpy_3D(thrm%now%enth,thrm%now%T_ice,thrm%now%omega,thrm%now%bmb_grnd,thrm%now%Q_ice_b, &
-                                thrm%now%H_cts,thrm%now%T_pmp,thrm%now%cp,thrm%now%kt,thrm%now%advecxy,dyn%now%ux,dyn%now%uy,dyn%now%uz,thrm%now%Q_strn, &
-                                thrm%now%Q_b,thrm%now%Q_lith,bnd%T_srf,tpo%now%H_ice,tpo%now%z_srf,thrm%now%H_w,thrm%now%dHwdt,tpo%now%H_grnd, &
-                                tpo%now%f_grnd,tpo%now%dHicedt,tpo%now%dzsrfdt,thrm%par%zeta_aa,thrm%par%zeta_ac,thrm%par%dzeta_a,thrm%par%dzeta_b,thrm%par%enth_cr, &
-                                thrm%par%omega_max,dt,thrm%par%dx,thrm%par%method,thrm%par%solver_advec)
-                    
-                case("robin")
-                    ! Use Robin solution for ice temperature 
-
-                    call define_temp_robin_3D(thrm%now%T_ice,thrm%now%T_pmp,thrm%now%cp,thrm%now%kt, &
-                                       thrm%now%Q_lith,bnd%T_srf,tpo%now%H_ice,thrm%now%H_w,bnd%smb, &
-                                       thrm%now%bmb_grnd,tpo%now%f_grnd,thrm%par%zeta_aa,cold=.FALSE.)
-
-                    ! Also populate enthalpy 
-                    call convert_to_enthalpy(thrm%now%enth,thrm%now%T_ice,thrm%now%omega,thrm%now%T_pmp, &
-                                            thrm%now%cp,L_ice)
-
-                case("robin-cold")
-                    ! Use Robin solution for ice temperature averaged with cold linear profile
-                    ! to ensure cold ice at the base
-
-                    call define_temp_robin_3D(thrm%now%T_ice,thrm%now%T_pmp,thrm%now%cp,thrm%now%kt, &
-                                       thrm%now%Q_lith,bnd%T_srf,tpo%now%H_ice,thrm%now%H_w,bnd%smb, &
-                                       thrm%now%bmb_grnd,tpo%now%f_grnd,thrm%par%zeta_aa,cold=.TRUE.)
-
-                    ! Set water content to zero 
-                    thrm%now%omega = 0.0_prec 
-                    
-                    ! Also populate enthalpy 
-                    call convert_to_enthalpy(thrm%now%enth,thrm%now%T_ice,thrm%now%omega,thrm%now%T_pmp, &
-                                            thrm%now%cp,L_ice)
-
-                case("linear")
-                    ! Use linear solution for ice temperature
-
-                    ! Calculate the ice temperature (eventually water content and enthalpy too)
-                    call define_temp_linear_3D(thrm%now%T_ice,thrm%par%zeta_aa,tpo%now%H_ice,bnd%T_srf)
-
-                    ! Set water content to zero 
-                    thrm%now%omega = 0.0_prec 
-
-                    ! Also populate enthalpy 
-                    call convert_to_enthalpy(thrm%now%enth,thrm%now%T_ice,thrm%now%omega,thrm%now%T_pmp, &
-                                            thrm%now%cp,L_ice)
-
-                case("fixed") 
-                    ! Pass - do nothing, use the temperature field as it is defined
-
-                case DEFAULT 
-
-                    write(*,*) "ytherm:: Error: thermodynamics option not recognized: method = ", trim(thrm%par%method)
-                    stop 
-
-            end select 
-
-            ! Update basal water layer thickness for full timestep with corrected rate (Runge Kutta, step 2)
-            thrm%now%H_w = H_w_now 
-            call calc_basal_water_local(thrm%now%H_w,thrm%now%dHwdt,tpo%now%H_ice,-thrm%now%bmb_grnd*(rho_ice/rho_w), &
-                                    tpo%now%f_grnd,dt,thrm%par%till_rate,thrm%par%H_w_max)
-
-
-            ! ==== Lithosphere (dt step 2) ======================================
-
-            ! Update the lithosphere temperature profile 
-            ! (using basal ice temperature from previous timestep)
-            select case(trim(thrm%par%lith_method))
-
-                case("equil")
-                    ! Prescribe lithospheric temperature profile assuming 
-                    ! equilibrium with the bed surface temperature 
-                    ! (ie, no active bedrock) 
-
-                    call define_temp_lith_3D(thrm%now%T_lith,thrm%now%cp_lith,thrm%now%kt_lith, &
-                                             bnd%Q_geo,thrm%now%T_ice(:,:,1),thrm%now%H_lith,thrm%par%lith_zeta_aa)
-
-                    ! Get enthalpy too 
-                    call convert_to_enthalpy(thrm%now%enth_lith,thrm%now%T_lith,0.0_wp,0.0_wp, &
-                                                                        thrm%now%cp_lith,0.0_wp)
-
-                case("active")
-                    ! Solve thermodynamic equation for the lithosphere 
-
-                    call calc_ytherm_enthalpy_bedrock_3D(thrm%now%enth_lith,thrm%now%T_lith,thrm%now%T_ice(:,:,1), &
-                                                         thrm%now%T_pmp(:,:,1),thrm%now%cp_lith,thrm%now%kt_lith, &
-                                                         thrm%now%H_lith,tpo%now%H_ice,tpo%now%H_grnd,bnd%Q_geo, &
-                                                         thrm%par%lith_zeta_aa,thrm%par%lith_zeta_ac, &
-                                                         thrm%par%lith_dzeta_a,thrm%par%lith_dzeta_b,dt*0.5_wp)
-
-                case DEFAULT 
-
-                    write(*,*) "calc_ytherm:: Error: lith_method not recognized."
-                    write(*,*) "lith_method = ", trim(thrm%par%lith_method)
-
-            end select 
-
-            ! =======================================================
-
-        end if 
-
-        ! Calculate homologous temperature at the base 
-        thrm%now%T_prime_b = thrm%now%T_ice(:,:,1) - thrm%now%T_pmp(:,:,1) 
-        
-        ! Calculate gridpoint fraction at the pressure melting point
-        thrm%now%f_pmp = calc_f_pmp(thrm%now%T_ice(:,:,1),thrm%now%T_pmp(:,:,1),thrm%par%gamma,tpo%now%f_grnd)
-
-!         if (yelmo_log) then 
-!             if (count(tpo%now%H_ice.gt.0.0) .gt. 0) then 
-!                 write(*,"(a,f14.4,f10.4,f10.2)") "calc_ytherm:: time = ", thrm%par%time, dt, &
-!                     sum(thrm%now%T_ice(:,:,thrm%par%nz_aa),mask=tpo%now%H_ice.gt.0.0)/real(count(tpo%now%H_ice.gt.0.0))
-!             else 
-!                 write(*,"(a,f14.4,f10.4,f10.2)") "calc_ytherm:: time = ", thrm%par%time, dt, 0.0 
-!             end if 
-!         end if 
 
         return
 
@@ -653,12 +441,10 @@ end select
 
     end subroutine calc_enth_horizontal_advection_3D
 
-    subroutine ytherm_par_load(par,filename,zeta_aa,zeta_ac,nx,ny,dx,init)
+    subroutine ytherm_par_load(par,filename,nx,ny,dx,init)
 
         type(ytherm_param_class), intent(OUT) :: par
         character(len=*),         intent(IN)  :: filename
-        real(prec),               intent(IN)  :: zeta_aa(:)  
-        real(prec),               intent(IN)  :: zeta_ac(:)  
         integer,                  intent(IN)  :: nx, ny 
         real(prec),               intent(IN)  :: dx 
         logical, optional,        intent(IN)  :: init
@@ -671,7 +457,12 @@ end select
         if (present(init)) init_pars = .TRUE. 
  
         ! Store local parameter values in output object
+        call nml_read(filename,"ytherm","nz_aa",          par%zice%nz_aa,       init=init_pars)
+        call nml_read(filename,"ytherm","zeta_scale",     par%zice%zeta_scale,  init=init_pars)
+        call nml_read(filename,"ytherm","zeta_exp",       par%zice%zeta_exp,    init=init_pars)
+        
         call nml_read(filename,"ytherm","method",         par%method,           init=init_pars)
+        call nml_read(filename,"ytherm","method_lith",    par%lith_method,      init=init_pars)
         call nml_read(filename,"ytherm","dt_method",      par%dt_method,        init=init_pars)
         call nml_read(filename,"ytherm","solver_advec",   par%solver_advec,     init=init_pars)
         call nml_read(filename,"ytherm","gamma",          par%gamma,            init=init_pars)
@@ -687,10 +478,11 @@ end select
         call nml_read(filename,"ytherm","till_rate",      par%till_rate,        init=init_pars)
         call nml_read(filename,"ytherm","H_w_max",        par%H_w_max,          init=init_pars)
         
-        call nml_read(filename,"ytherm_lith","method",    par%lith_method,     init=init_pars)
-        call nml_read(filename,"ytherm_lith","nz_aa",     par%lith_nz_aa,       init=init_pars)
-        call nml_read(filename,"ytherm_lith","zeta_scale",par%lith_zeta_scale,  init=init_pars)
-        call nml_read(filename,"ytherm_lith","zeta_exp",  par%lith_zeta_exp,    init=init_pars)
+        ! Lithosphere specific settings
+        call nml_read(filename,"ytherm_lith","nz_aa",     par%zlith%nz_aa,      init=init_pars)
+        call nml_read(filename,"ytherm_lith","zeta_scale",par%zlith%zeta_scale, init=init_pars)
+        call nml_read(filename,"ytherm_lith","zeta_exp",  par%zlith%zeta_exp,   init=init_pars)
+        
         call nml_read(filename,"ytherm_lith","H_lith",    par%H_lith,           init=init_pars)
         call nml_read(filename,"ytherm_lith","cp",        par%lith_cp,          init=init_pars)
         call nml_read(filename,"ytherm_lith","kt",        par%lith_kt,          init=init_pars)
@@ -707,60 +499,71 @@ end select
         par%ny  = ny 
         par%dx  = dx
         par%dy  = dx  
-        par%nz_aa = size(zeta_aa,1)     ! bottom, layer centers, top 
-        par%nz_ac = size(zeta_ac,1)     ! layer borders
-
-        if (allocated(par%zeta_aa)) deallocate(par%zeta_aa)
-        allocate(par%zeta_aa(par%nz_aa))
-        par%zeta_aa = zeta_aa 
         
-        if (allocated(par%zeta_ac)) deallocate(par%zeta_ac)
-        allocate(par%zeta_ac(par%nz_ac))
-        par%zeta_ac = zeta_ac 
+        ! Define different vertical axes =====
+
+        ! Set ac-node lengths
+        par%zice%nz_ac  = par%zice%nz_aa - 1 
+        par%zlith%nz_ac = par%zlith%nz_aa - 1 
         
-        ! Calculate domain-level dzeta terms too 
-        if (allocated(par%dzeta_a)) deallocate(par%dzeta_a)
-        if (allocated(par%dzeta_b)) deallocate(par%dzeta_b)
-        allocate(par%dzeta_a(par%nz_aa))
-        allocate(par%dzeta_b(par%nz_aa))
+        ! == Ice column == 
+        call calc_zeta(par%zice%zeta_aa,par%zice%zeta_ac,par%zice%nz_aa,&
+                            par%zice%zeta_scale,par%zice%zeta_exp)
+
+        ! == Lithosphere column == (should go from -1 to 0)
+        call calc_zeta(par%zlith%zeta_aa,par%zlith%zeta_ac,par%zlith%nz_aa,&
+                            par%zlith%zeta_scale,par%zlith%zeta_exp)
+        par%zlith%zeta_aa = par%zlith%zeta_aa - 1.0_wp 
+        par%zlith%zeta_ac = par%zlith%zeta_ac - 1.0_wp 
         
-        call calc_dzeta_terms(par%dzeta_a,par%dzeta_b,par%zeta_aa,par%zeta_ac)
+        ! == Total column == 
+        ! Lithosphere from -1 to 0, ice column from 0 to 1, 
+        ! zlith%zeta_aa(par%zlith%nz_aa) == zice%zeta_aa(1) = 0 
 
-        ! == Lithosphere == 
+        ! Get index of ice base 
+        par%k0 = par%zlith%nz_aa 
 
-        ! Define size of zeta_ac axis
-        par%lith_nz_ac = par%lith_nz_aa-1
+        par%ztot%nz_aa = par%zice%nz_aa + par%zlith%nz_aa - 1 
+        par%ztot%nz_ac = par%ztot%nz_aa - 1 
 
-        ! Allocate z-axes
-        if (allocated(par%lith_zeta_aa)) deallocate(par%lith_zeta_aa)
-        if (allocated(par%lith_zeta_ac)) deallocate(par%lith_zeta_ac)
-        allocate(par%lith_zeta_aa(par%lith_nz_aa)) 
-        allocate(par%lith_zeta_ac(par%lith_nz_ac))
-
-        ! Calculate zeta_aa and zeta_ac 
-        call calc_zeta(par%lith_zeta_aa,par%lith_zeta_ac, &
-                            par%lith_zeta_scale,par%lith_zeta_exp)
-
-        ! Calculate domain-level dzeta terms too 
-        if (allocated(par%lith_dzeta_a)) deallocate(par%lith_dzeta_a)
-        if (allocated(par%lith_dzeta_b)) deallocate(par%lith_dzeta_b)
-        allocate(par%lith_dzeta_a(par%lith_nz_aa))
-        allocate(par%lith_dzeta_b(par%lith_nz_aa))
+        if (allocated(par%ztot%zeta_aa)) deallocate(par%ztot%zeta_aa)
+        if (allocated(par%ztot%zeta_ac)) deallocate(par%ztot%zeta_ac)
+        allocate(par%ztot%zeta_aa(par%ztot%nz_aa))
+        allocate(par%ztot%zeta_ac(par%ztot%nz_ac))
         
-        call calc_dzeta_terms(par%lith_dzeta_a,par%lith_dzeta_b, &
-                                    par%lith_zeta_aa,par%lith_zeta_ac)
+        par%ztot%zeta_aa(1:par%k0)              = par%zlith%zeta_aa 
+        par%ztot%zeta_aa(par%k0:par%ztot%nz_aa) = par%zice%zeta_aa 
 
+        par%ztot%zeta_ac(1:par%k0-1)            = par%zlith%zeta_ac 
+        par%ztot%zeta_ac(par%k0:par%ztot%nz_ac) = par%zice%zeta_ac 
+
+        par%ztot%zeta_ac(par%k0-1:par%k0) = [-1e-5,1e-5]
+
+        if (allocated(par%ztot%dzeta_a)) deallocate(par%ztot%dzeta_a)
+        if (allocated(par%ztot%dzeta_b)) deallocate(par%ztot%dzeta_b)
+        allocate(par%ztot%dzeta_a(par%ztot%nz_aa))
+        allocate(par%ztot%dzeta_b(par%ztot%nz_aa))
+        
+        par%ztot%dzeta_a = 0.0_wp 
+        par%ztot%dzeta_b = 0.0_wp 
+        
+        call calc_dzeta_terms(par%ztot%dzeta_a,par%ztot%dzeta_b,par%ztot%zeta_aa,par%ztot%zeta_ac)
 
         ! write(*,*) "========="
-        ! do k = size(par%zeta_aa), 1, -1
-        !     write(*,*) par%zeta_aa(k), par%zeta_ac(k), par%dzeta_a(k), par%dzeta_b(k) 
+        ! do k = par%ztot%nz_aa, 1, -1
+        !     if (k .eq. par%ztot%nz_aa) then 
+        !         write(*,*) k, par%ztot%zeta_aa(k), -9999.0, par%ztot%dzeta_a(k), par%ztot%dzeta_b(k)
+        !     else 
+        !         write(*,*) k, par%ztot%zeta_aa(k), par%ztot%zeta_ac(k), par%ztot%dzeta_a(k), par%ztot%dzeta_b(k) 
+        !     end if  
+
         ! end do 
         ! write(*,*) "========="
         ! do k = size(par%lith_zeta_aa), 1, -1
         !     write(*,*) par%lith_zeta_aa(k), par%lith_zeta_ac(k), par%lith_dzeta_a(k), par%lith_dzeta_b(k) 
         ! end do 
         ! write(*,*) "========="
-        ! stop 
+        stop 
 
         ! =================
 
@@ -776,65 +579,86 @@ end select
 
     end subroutine ytherm_par_load
 
-    subroutine ytherm_alloc(now,nx,ny,nz_aa,nzl_aa)
+    subroutine ytherm_alloc(now,nx,ny,nz_aa,nz_aa_ice,nz_aa_lith)
 
         implicit none 
 
         type(ytherm_state_class), intent(INOUT) :: now 
-        integer, intent(IN) :: nx, ny, nz_aa, nzl_aa
+        integer, intent(IN) :: nx, ny
+        integer, intent(IN) :: nz_aa
+        integer, intent(IN) :: nz_aa_ice
+        integer, intent(IN) :: nz_aa_lith
 
         call ytherm_dealloc(now)
 
-        allocate(now%enth(nx,ny,nz_aa))
-        allocate(now%T_ice(nx,ny,nz_aa))
-        allocate(now%omega(nx,ny,nz_aa))
-        allocate(now%T_pmp(nx,ny,nz_aa))
-        allocate(now%bmb_grnd(nx,ny))
-        allocate(now%f_pmp(nx,ny))
-        allocate(now%Q_strn(nx,ny,nz_aa))
+        allocate(now%E_tot(nx,ny,nz_aa))
+        allocate(now%T_tot(nx,ny,nz_aa))
+        allocate(now%w_tot(nx,ny,nz_aa))
+        allocate(now%T_pmp_tot(nx,ny,nz_aa))
+        allocate(now%cp_tot(nx,ny,nz_aa))
+        allocate(now%kt_tot(nx,ny,nz_aa))
+        allocate(now%Q_strn_tot(nx,ny,nz_aa))
+        allocate(now%advecxy_tot(nx,ny,nz_aa))
+        
+        allocate(now%E_ice(nx,ny,nz_aa_ice))
+        allocate(now%T_ice(nx,ny,nz_aa_ice))
+        allocate(now%w_ice(nx,ny,nz_aa_ice))
+        allocate(now%T_pmp(nx,ny,nz_aa_ice))
+        allocate(now%cp(nx,ny,nz_aa_ice))
+        allocate(now%kt(nx,ny,nz_aa_ice))
+        allocate(now%Q_strn(nx,ny,nz_aa_ice))
+        allocate(now%advecxy(nx,ny,nz_aa_ice))
+        
+        allocate(now%E_lith(nx,ny,nz_aa_lith))
+        allocate(now%T_lith(nx,ny,nz_aa_lith))
+
         allocate(now%Q_b(nx,ny))
         allocate(now%Q_ice_b(nx,ny))
-        allocate(now%cp(nx,ny,nz_aa))
-        allocate(now%kt(nx,ny,nz_aa))
-        allocate(now%H_cts(nx,ny))
+        allocate(now%Q_lith(nx,ny))
+        
+        allocate(now%bmb_grnd(nx,ny))
+        allocate(now%f_pmp(nx,ny))
         allocate(now%T_prime_b(nx,ny))
+        
+        allocate(now%H_cts(nx,ny))
+        
         allocate(now%H_w(nx,ny))
         allocate(now%dHwdt(nx,ny))
         
-        allocate(now%advecxy(nx,ny,nz_aa))
-
-        allocate(now%Q_lith(nx,ny))
-        allocate(now%enth_lith(nx,ny,nzl_aa))
-        allocate(now%T_lith(nx,ny,nzl_aa))
-        allocate(now%H_lith(nx,ny))
-        allocate(now%cp_lith(nx,ny,nzl_aa))
-        allocate(now%kt_lith(nx,ny,nzl_aa))
-
-        now%enth        = 0.0
-        now%T_ice       = 0.0
-        now%omega       = 0.0  
-        now%T_pmp       = 0.0
-        now%bmb_grnd    = 0.0 
-        now%f_pmp       = 0.0 
-        now%Q_strn      = 0.0 
-        now%Q_b         = 0.0 
-        now%Q_ice_b     = 0.0 
-        now%cp          = 0.0 
-        now%kt          = 0.0 
-        now%H_cts       = 0.0 
-        now%T_prime_b   = 0.0 
-        now%H_w         = 0.0 
-        now%dHwdt       = 0.0 
+        now%E_tot       = 0.0_wp
+        now%T_tot       = 0.0_wp
+        now%w_tot       = 0.0_wp
+        now%T_pmp_tot   = 0.0_wp
+        now%cp_tot      = 0.0_wp
+        now%kt_tot      = 0.0_wp
+        now%Q_strn_tot  = 0.0_wp
+        now%advecxy_tot = 0.0_wp
         
-        now%advecxy     = 0.0 
-
-        now%Q_lith      = 0.0 
-        now%enth_lith   = 0.0 
-        now%T_lith      = 0.0 
-        now%H_lith      = 0.0 
-        now%cp_lith     = 0.0 
-        now%kt_lith     = 0.0 
-
+        now%E_ice       = 0.0_wp
+        now%T_ice       = 0.0_wp
+        now%w_ice       = 0.0_wp
+        now%T_pmp       = 0.0_wp
+        now%cp          = 0.0_wp
+        now%kt          = 0.0_wp
+        now%Q_strn      = 0.0_wp
+        now%advecxy     = 0.0_wp
+        
+        now%E_lith      = 0.0_wp
+        now%T_lith      = 0.0_wp
+        
+        now%Q_b         = 0.0_wp
+        now%Q_ice_b     = 0.0_wp
+        now%Q_lith      = 0.0_wp
+        
+        now%bmb_grnd    = 0.0_wp
+        now%f_pmp       = 0.0_wp
+        now%T_prime_b   = 0.0_wp
+        
+        now%H_cts       = 0.0_wp
+        
+        now%H_w         = 0.0_wp 
+        now%dHwdt       = 0.0_wp
+        
         return
 
     end subroutine ytherm_alloc
@@ -845,31 +669,40 @@ end select
 
         type(ytherm_state_class), intent(INOUT) :: now
 
-        if (allocated(now%enth))        deallocate(now%enth)
-        if (allocated(now%T_ice))       deallocate(now%T_ice)
-        if (allocated(now%omega))       deallocate(now%omega)
-        if (allocated(now%T_pmp))       deallocate(now%T_pmp)
-        if (allocated(now%bmb_grnd))    deallocate(now%bmb_grnd)
-        if (allocated(now%f_pmp))       deallocate(now%f_pmp)
-        if (allocated(now%Q_strn))      deallocate(now%Q_strn)
-        if (allocated(now%Q_b))         deallocate(now%Q_b)
-        if (allocated(now%Q_ice_b))     deallocate(now%Q_ice_b)
-        if (allocated(now%cp))          deallocate(now%cp)
-        if (allocated(now%kt))          deallocate(now%kt)
-        if (allocated(now%H_cts))       deallocate(now%H_cts)
-        if (allocated(now%T_prime_b))   deallocate(now%T_prime_b)
-        if (allocated(now%H_w))         deallocate(now%H_w)
-        if (allocated(now%dHwdt))       deallocate(now%dHwdt)
+        if (allocated(now%E_tot))           deallocate(now%E_tot)
+        if (allocated(now%T_tot))           deallocate(now%T_tot)
+        if (allocated(now%w_tot))           deallocate(now%w_tot)
+        if (allocated(now%T_pmp_tot))       deallocate(now%T_pmp_tot)
+        if (allocated(now%cp_tot))          deallocate(now%cp_tot)
+        if (allocated(now%kt_tot))          deallocate(now%kt_tot)
+        if (allocated(now%Q_strn_tot))      deallocate(now%Q_strn_tot)
+        if (allocated(now%advecxy_tot))     deallocate(now%advecxy_tot)
         
-        if (allocated(now%advecxy))     deallocate(now%advecxy)
+        if (allocated(now%E_ice))           deallocate(now%E_ice)
+        if (allocated(now%T_ice))           deallocate(now%T_ice)
+        if (allocated(now%w_ice))           deallocate(now%w_ice)
+        if (allocated(now%T_pmp))           deallocate(now%T_pmp)
+        if (allocated(now%cp))              deallocate(now%cp)
+        if (allocated(now%kt))              deallocate(now%kt)
+        if (allocated(now%Q_strn))          deallocate(now%Q_strn)
+        if (allocated(now%advecxy))         deallocate(now%advecxy)
         
-        if (allocated(now%Q_lith))      deallocate(now%Q_lith)
-        if (allocated(now%enth_lith))   deallocate(now%enth_lith)
-        if (allocated(now%T_lith))      deallocate(now%T_lith)
-        if (allocated(now%H_lith))      deallocate(now%H_lith)
-        if (allocated(now%cp_lith))     deallocate(now%cp_lith)
-        if (allocated(now%kt_lith))     deallocate(now%kt_lith)
+        if (allocated(now%E_lith))          deallocate(now%E_lith)
+        if (allocated(now%T_lith))          deallocate(now%T_lith)
 
+        if (allocated(now%Q_b))             deallocate(now%Q_b)
+        if (allocated(now%Q_ice_b))         deallocate(now%Q_ice_b)
+        if (allocated(now%Q_lith))          deallocate(now%Q_lith)
+        
+        if (allocated(now%bmb_grnd))        deallocate(now%bmb_grnd)
+        if (allocated(now%f_pmp))           deallocate(now%f_pmp)
+        if (allocated(now%T_prime_b))       deallocate(now%T_prime_b)
+        
+        if (allocated(now%H_cts))           deallocate(now%H_cts)
+        
+        if (allocated(now%H_w))             deallocate(now%H_w)
+        if (allocated(now%dHwdt))           deallocate(now%dHwdt)
+        
         return 
 
     end subroutine ytherm_dealloc

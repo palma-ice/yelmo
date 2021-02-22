@@ -560,11 +560,11 @@ contains
                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
 
         ! == yelmo_thermodynamics ==
-        call nc_write(filename,"enth",ylmo%thrm%now%enth,units="J m-3",long_name="Ice enthalpy", &
+        call nc_write(filename,"E_ice",ylmo%thrm%now%E_ice,units="J m-3",long_name="Ice enthalpy", &
                       dim1="xc",dim2="yc",dim3="zeta",dim4="time",start=[1,1,1,n],ncid=ncid)
         call nc_write(filename,"T_ice",ylmo%thrm%now%T_ice,units="K",long_name="Ice temperature", &
                       dim1="xc",dim2="yc",dim3="zeta",dim4="time",start=[1,1,1,n],ncid=ncid)
-        call nc_write(filename,"omega",ylmo%thrm%now%omega,units="--",long_name="Ice water content", &
+        call nc_write(filename,"w_ice",ylmo%thrm%now%w_ice,units="--",long_name="Ice water content", &
                       dim1="xc",dim2="yc",dim3="zeta",dim4="time",start=[1,1,1,n],ncid=ncid)
         call nc_write(filename,"T_prime",ylmo%thrm%now%T_ice-ylmo%thrm%now%T_pmp,units="deg C",long_name="Homologous ice temperature", &
                       dim1="xc",dim2="yc",dim3="zeta",dim4="time",start=[1,1,1,n],ncid=ncid)
@@ -572,7 +572,7 @@ contains
 !                       dim1="xc",dim2="yc",dim3="zeta",dim4="time",start=[1,1,1,n],ncid=ncid)
         
         call nc_write(filename,"T_lith",ylmo%thrm%now%T_lith,units="K",long_name="Lithosphere temperature", &
-                      dim1="xc",dim2="yc",dim3="zeta_l",dim4="time",start=[1,1,1,n],ncid=ncid)
+                      dim1="xc",dim2="yc",dim3="zeta_lith",dim4="time",start=[1,1,1,n],ncid=ncid)
         
         call nc_write(filename,"Q_lith",ylmo%thrm%now%Q_lith,units="J a-1 m-2",long_name="Lithosphere heat flux at bed surface", &
                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)

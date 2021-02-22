@@ -407,6 +407,18 @@ module yelmo_defs
     !
     ! =========================================================================
     
+    type ytherm_column_class 
+        integer               :: nz_aa          ! Number of vertical points in ice (layer centers, plus base and surface)
+        integer               :: nz_ac          ! Number of vertical points in ice (layer boundaries)
+        character (len=56)    :: zeta_scale 
+        real(wp)              :: zeta_exp 
+        
+        real(wp), allocatable :: zeta_aa(:)     ! Layer centers (aa-nodes), plus base and surface: nz_aa points 
+        real(wp), allocatable :: zeta_ac(:)     ! Layer borders (ac-nodes), plus base and surface: nz_ac == nz_aa-1 points
+        real(wp), allocatable :: dzeta_a(:)
+        real(wp), allocatable :: dzeta_b(:)
+    end type
+
     !ytherm parameters 
     type ytherm_param_class
         character(len=256)  :: method  
@@ -414,8 +426,6 @@ module yelmo_defs
         character(len=256)  :: solver_advec 
         integer             :: nx, ny 
         real(wp)            :: dx, dy  
-        integer             :: nz_aa     ! Number of vertical points in ice (layer centers, plus base and surface)
-        integer             :: nz_ac     ! Number of vertical points in ice (layer boundaries)
         real(wp)            :: gamma  
         logical             :: use_strain_sia 
         integer             :: n_sm_qstrn    ! Standard deviation (in points) for Gaussian smoothing of strain heating
@@ -429,65 +439,67 @@ module yelmo_defs
         real(wp)            :: till_rate 
         real(wp)            :: H_w_max 
         
-        real(wp), allocatable :: zeta_aa(:)   ! Layer centers (aa-nodes), plus base and surface: nz_aa points 
-        real(wp), allocatable :: zeta_ac(:)   ! Layer borders (ac-nodes), plus base and surface: nz_ac == nz_aa-1 points
-
-        real(wp), allocatable :: dzeta_a(:)
-        real(wp), allocatable :: dzeta_b(:)
+        type(ytherm_column_class) :: ztot
+        type(ytherm_column_class) :: zice
+        type(ytherm_column_class) :: zlith
         
-        real(dp)   :: time
-        real(wp)   :: dt_zeta, dt_beta(2)
-
-        real(wp)   :: speed 
-
         ! Lithosphere 
         character(len=256)  :: lith_method  
-        integer             :: lith_nz_aa       ! Number of vertical points in bedrock 
-        integer             :: lith_nz_ac       ! Number of vertical points in bedrock 
-        character (len=56)  :: lith_zeta_scale 
-        real(wp)            :: lith_zeta_exp 
         real(wp)            :: H_lith 
         real(wp)            :: lith_cp 
         real(wp)            :: lith_kt
         
-        real(wp), allocatable :: lith_zeta_aa(:)   ! Layer centers (aa-nodes), plus base and surface: nz_aa points 
-        real(wp), allocatable :: lith_zeta_ac(:)   ! Layer borders (ac-nodes), plus base and surface: nz_ac == nz_aa-1 points
+        integer    :: k0                        ! Index of ice base (rock-ice interface point - no thickness)
 
-        real(wp), allocatable :: lith_dzeta_a(:)
-        real(wp), allocatable :: lith_dzeta_b(:)
+        real(dp)   :: time
+        real(wp)   :: dt_zeta, dt_beta(2)
+
+        real(wp)   :: speed 
         
     end type
 
     ! ytherm state variables
     type ytherm_state_class
-        real(wp), allocatable :: enth(:,:,:)      ! [J m-3] Ice enthalpy 
-        real(wp), allocatable :: T_ice(:,:,:)     ! [K]     Ice temp. 
-        real(wp), allocatable :: omega(:,:,:)     ! [--]    Ice water content
-        real(wp), allocatable :: T_pmp(:,:,:)     ! Pressure-corrected melting point
+
+
+        ! Total vertical column (ice + lithosphere)
+        real(wp), allocatable :: E_tot(:,:,:)               ! [J m-3] Column enthalpy 
+        real(wp), allocatable :: T_tot(:,:,:)               ! [K]     Column temp. 
+        real(wp), allocatable :: w_tot(:,:,:)               ! [--]    Column water content
+        real(wp), allocatable :: T_pmp_tot(:,:,:)           ! [K]     Pressure-corrected melting point
+        real(wp), allocatable :: cp_tot(:,:,:)              ! [J kg-1 K-1] Specific heat capacity  
+        real(wp), allocatable :: kt_tot(:,:,:)              ! [J a-1 m-1 K-1] Heat conductivity  
+        real(wp), allocatable :: Q_strn_tot(:,:,:)          ! [K a-1] Column internal heat production 
+        real(wp), allocatable :: advecxy_tot(:,:,:)         ! [K m-1] Column advective heat transport
+
+        ! Ice column 
+        real(wp), allocatable :: E_ice(:,:,:)               ! [J m-3] Ice enthalpy 
+        real(wp), allocatable :: T_ice(:,:,:)               ! [K]     Ice temp. 
+        real(wp), allocatable :: w_ice(:,:,:)               ! [--]    Ice water content
+        real(wp), allocatable :: T_pmp(:,:,:)               ! [K]     Pressure-corrected melting point
+        real(wp), allocatable :: cp(:,:,:)                  ! [J kg-1 K-1] Ice specific heat capacity  
+        real(wp), allocatable :: kt(:,:,:)                  ! [J a-1 m-1 K-1] Ice heat conductivity  
+        real(wp), allocatable :: Q_strn(:,:,:)              ! [K a-1] Ice internal heat production  
+        real(wp), allocatable :: advecxy(:,:,:)             ! [K m-1] Ice advective heat transport
         
-        real(wp), allocatable :: f_pmp(:,:)       ! fraction of cell at pressure melting point
-        real(wp), allocatable :: bmb_grnd(:,:)    ! Grounded basal mass balance 
-        real(wp), allocatable :: Q_strn(:,:,:)    ! Internal heat production 
+        ! Lithosphere column 
+        real(wp), allocatable :: E_lith(:,:,:)              ! [J m-3] Lithosphere enthalpy 
+        real(wp), allocatable :: T_lith(:,:,:)              ! [K]     Lithosphere temp. 
+
+        ! Additional variables 
         real(wp), allocatable :: Q_b(:,:)         ! Basal friction heat production
         real(wp), allocatable :: Q_ice_b(:,:)     ! Basal ice heat flux 
+        real(wp), allocatable :: Q_lith(:,:)      ! Lithosphere surface heat flux 
+        
+        real(wp), allocatable :: bmb_grnd(:,:)    ! Grounded basal mass balance 
+        real(wp), allocatable :: f_pmp(:,:)       ! fraction of cell at pressure melting point
         real(wp), allocatable :: T_prime_b(:,:)   ! Homologous temperature at the base 
+        
+        real(wp), allocatable :: H_cts(:,:)       ! Height of the cts
+        
         real(wp), allocatable :: H_w(:,:)         ! [m] Basal water layer thickness 
         real(wp), allocatable :: dHwdt(:,:)       ! [m/a] Basal water layer thickness rate of change
         
-        real(wp), allocatable :: cp(:,:,:)        ! Specific heat capacity  
-        real(wp), allocatable :: kt(:,:,:)        ! Heat conductivity  
-        real(wp), allocatable :: H_cts(:,:)       ! Height of the cts
-        
-        real(wp), allocatable :: advecxy(:,:,:)
-
-        ! Lithosphere
-        real(wp), allocatable :: Q_lith(:,:)
-        real(wp), allocatable :: enth_lith(:,:,:)
-        real(wp), allocatable :: T_lith(:,:,:)
-        real(wp), allocatable :: H_lith(:,:) 
-        real(wp), allocatable :: cp_lith(:,:,:)
-        real(wp), allocatable :: kt_lith(:,:,:)
-
     end type
 
     ! ytherm class

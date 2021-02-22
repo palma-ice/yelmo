@@ -243,7 +243,7 @@ contains
 
                 ! Scale rate factor by water content if desired 
                 if (mat%par%rf_with_water) then 
-                    call scale_rate_factor_water(mat%now%ATT,thrm%now%omega)
+                    call scale_rate_factor_water(mat%now%ATT,thrm%now%w_ice)
                 end if 
 
                 ! Get vertically averaged value 

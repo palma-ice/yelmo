@@ -464,7 +464,7 @@ contains
             n = count(dom%tpo%now%H_ice.gt.0.0)
             if (n .gt. 0.0) then 
                 H_mean = sum(dom%tpo%now%H_ice,mask=dom%tpo%now%H_ice.gt.0.0)/real(n)
-                T_mean = sum(dom%thrm%now%T_ice(:,:,dom%thrm%par%nz_aa),mask=dom%tpo%now%H_ice.gt.0.0)/real(n)
+                T_mean = sum(dom%thrm%now%T_ice(:,:,dom%thrm%par%zice%nz_aa),mask=dom%tpo%now%H_ice.gt.0.0)/real(n)
             else 
                 H_mean = 0.0_prec 
                 T_mean = 0.0_prec
@@ -609,15 +609,10 @@ contains
 
         ! Define size of zeta_ac axis
         dom%par%nz_ac = dom%par%nz_aa-1 
-        
-        ! Allocate z-axes
-        if (allocated(dom%par%zeta_aa)) deallocate(dom%par%zeta_aa)
-        if (allocated(dom%par%zeta_ac)) deallocate(dom%par%zeta_ac)
-        allocate(dom%par%zeta_aa(dom%par%nz_aa)) 
-        allocate(dom%par%zeta_ac(dom%par%nz_ac))
 
-        ! Calculate zeta_aa and zeta_ac 
-        call calc_zeta(dom%par%zeta_aa,dom%par%zeta_ac,dom%par%zeta_scale,dom%par%zeta_exp)
+        ! Define vertical axes for ice column (dynamics, material)
+        call calc_zeta(dom%par%zeta_aa,dom%par%zeta_ac,dom%par%nz_aa,&
+                            dom%par%zeta_scale,dom%par%zeta_exp)
 
         ! Initialize ytime information here too 
         call ytime_init(dom%time,dom%grd%nx,dom%grd%ny,dom%par%nz_aa,dom%par%dt_min,dom%par%pc_eps)
@@ -650,9 +645,10 @@ contains
         
         ! == thermodynamics == 
         
-        call ytherm_par_load(dom%thrm%par,filename,dom%par%zeta_aa,dom%par%zeta_ac,dom%grd%nx,dom%grd%ny,dom%grd%dx,init=.TRUE.)
+        call ytherm_par_load(dom%thrm%par,filename,dom%grd%nx,dom%grd%ny,dom%grd%dx,init=.TRUE.)
 
-        call ytherm_alloc(dom%thrm%now,dom%thrm%par%nx,dom%thrm%par%ny,dom%thrm%par%nz_aa,dom%thrm%par%lith_nz_aa)
+        call ytherm_alloc(dom%thrm%now,dom%thrm%par%nx,dom%thrm%par%ny,dom%thrm%par%ztot%nz_aa, &
+                                                dom%thrm%par%zice%nz_aa,dom%thrm%par%zlith%nz_aa)
         
         write(*,*) "yelmo_init:: thermodynamics initialized."
         

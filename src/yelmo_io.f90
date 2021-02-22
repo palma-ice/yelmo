@@ -35,7 +35,8 @@ contains
         call nc_write_dim(filename,"month",     x=1,dx=1,nx=12,         units="month")
         call nc_write_dim(filename,"zeta",      x=ylmo%par%zeta_aa,     units="1")
         call nc_write_dim(filename,"zeta_ac",   x=ylmo%par%zeta_ac,     units="1")
-        call nc_write_dim(filename,"zeta_l",    x=ylmo%thrm%par%lith_zeta_aa,units="1")
+        call nc_write_dim(filename,"zeta_lith", x=ylmo%thrm%par%zlith%zeta_aa,units="1")
+        call nc_write_dim(filename,"zeta_tot",  x=ylmo%thrm%par%ztot%zeta_aa,units="1")
         call nc_write_dim(filename,"age_iso",   x=ylmo%mat%par%age_iso, units="kyr")
         call nc_write_dim(filename,"pd_age_iso",x=ylmo%dta%pd%age_iso,  units="kyr")
         
@@ -126,7 +127,7 @@ contains
         call nc_write_dim(filename,"yc",       x=dom%grd%yc*1e-3,       units="kilometers")
         call nc_write_dim(filename,"zeta",     x=dom%par%zeta_aa,       units="1")
         call nc_write_dim(filename,"zeta_ac",  x=dom%par%zeta_ac,       units="1")
-        call nc_write_dim(filename,"zeta_l",   x=dom%thrm%par%lith_zeta_aa,units="1")
+        call nc_write_dim(filename,"zeta_lith",x=dom%thrm%par%zlith%zeta_aa,units="1")
         call nc_write_dim(filename,"age_iso",  x=dom%mat%par%age_iso,   units="kyr")
         call nc_write_dim(filename,"time",     x=time,dx=1.0_prec,nx=1, units="years ago")
  
@@ -270,31 +271,39 @@ contains
         
         ! == ytherm variables ===
 
-        call nc_write(filename,"enth",        dom%thrm%now%enth,       units="",dim1="xc",dim2="yc",dim3="zeta",ncid=ncid)      
+        call nc_write(filename,"E_tot",       dom%thrm%now%E_tot,      units="",dim1="xc",dim2="yc",dim3="zeta_tot",ncid=ncid)      
+        call nc_write(filename,"T_tot",       dom%thrm%now%T_tot,      units="",dim1="xc",dim2="yc",dim3="zeta_tot",ncid=ncid)      
+        call nc_write(filename,"w_tot",       dom%thrm%now%w_tot,      units="",dim1="xc",dim2="yc",dim3="zeta_tot",ncid=ncid)      
+        call nc_write(filename,"T_pmp_tot",   dom%thrm%now%T_pmp_tot,  units="",dim1="xc",dim2="yc",dim3="zeta_tot",ncid=ncid)      
+        call nc_write(filename,"cp_tot",      dom%thrm%now%cp_tot,     units="",dim1="xc",dim2="yc",dim3="zeta_tot",ncid=ncid)      
+        call nc_write(filename,"kt_tot",      dom%thrm%now%kt_tot,     units="",dim1="xc",dim2="yc",dim3="zeta_tot",ncid=ncid)      
+        call nc_write(filename,"Q_strn_tot",  dom%thrm%now%Q_strn_tot, units="",dim1="xc",dim2="yc",dim3="zeta_tot",ncid=ncid)      
+        call nc_write(filename,"advecxy_tot", dom%thrm%now%advecxy_tot,units="",dim1="xc",dim2="yc",dim3="zeta_tot",ncid=ncid)      
+        
+        call nc_write(filename,"E_ice",       dom%thrm%now%E_ice,      units="",dim1="xc",dim2="yc",dim3="zeta",ncid=ncid)      
         call nc_write(filename,"T_ice",       dom%thrm%now%T_ice,      units="",dim1="xc",dim2="yc",dim3="zeta",ncid=ncid)      
-        call nc_write(filename,"omega",       dom%thrm%now%omega,      units="",dim1="xc",dim2="yc",dim3="zeta",ncid=ncid)      
+        call nc_write(filename,"w_ice",       dom%thrm%now%w_ice,      units="",dim1="xc",dim2="yc",dim3="zeta",ncid=ncid)      
         call nc_write(filename,"T_pmp",       dom%thrm%now%T_pmp,      units="",dim1="xc",dim2="yc",dim3="zeta",ncid=ncid)      
-        
-        call nc_write(filename,"f_pmp",       dom%thrm%now%f_pmp,      units="",dim1="xc",dim2="yc",ncid=ncid)        
-        call nc_write(filename,"bmb_grnd",    dom%thrm%now%bmb_grnd,   units="",dim1="xc",dim2="yc",ncid=ncid)     
-        call nc_write(filename,"Q_strn",      dom%thrm%now%Q_strn,     units="",dim1="xc",dim2="yc",dim3="zeta",ncid=ncid)     
-        call nc_write(filename,"Q_b",         dom%thrm%now%Q_b,        units="",dim1="xc",dim2="yc",ncid=ncid)          
-        call nc_write(filename,"Q_ice_b",     dom%thrm%now%Q_ice_b,    units="",dim1="xc",dim2="yc",ncid=ncid)          
-        call nc_write(filename,"T_prime_b",   dom%thrm%now%T_prime_b,  units="",dim1="xc",dim2="yc",ncid=ncid)    
-        call nc_write(filename,"H_w",         dom%thrm%now%H_w,        units="",dim1="xc",dim2="yc",ncid=ncid)
-        call nc_write(filename,"dHwdt",       dom%thrm%now%dHwdt,      units="",dim1="xc",dim2="yc",ncid=ncid)
-        
-        call nc_write(filename,"cp",          dom%thrm%now%cp,         units="",dim1="xc",dim2="yc",dim3="zeta",ncid=ncid)         
-        call nc_write(filename,"kt",          dom%thrm%now%kt,         units="",dim1="xc",dim2="yc",dim3="zeta",ncid=ncid)         
-        call nc_write(filename,"H_cts",       dom%thrm%now%H_cts,      units="",dim1="xc",dim2="yc",ncid=ncid)      
-        
+        call nc_write(filename,"cp",          dom%thrm%now%cp,         units="",dim1="xc",dim2="yc",dim3="zeta",ncid=ncid)      
+        call nc_write(filename,"kt",          dom%thrm%now%kt,         units="",dim1="xc",dim2="yc",dim3="zeta",ncid=ncid)      
+        call nc_write(filename,"Q_strn",      dom%thrm%now%Q_strn,     units="",dim1="xc",dim2="yc",dim3="zeta",ncid=ncid)      
         call nc_write(filename,"advecxy",     dom%thrm%now%advecxy,    units="",dim1="xc",dim2="yc",dim3="zeta",ncid=ncid)      
         
+        call nc_write(filename,"E_lith",      dom%thrm%now%E_lith,     units="",dim1="xc",dim2="yc",dim3="zeta_lith",ncid=ncid)      
+        call nc_write(filename,"T_lith",      dom%thrm%now%T_lith,     units="",dim1="xc",dim2="yc",dim3="zeta_lith",ncid=ncid)      
+        
+        call nc_write(filename,"Q_b",         dom%thrm%now%Q_b,        units="",dim1="xc",dim2="yc",ncid=ncid)          
+        call nc_write(filename,"Q_ice_b",     dom%thrm%now%Q_ice_b,    units="",dim1="xc",dim2="yc",ncid=ncid)          
         call nc_write(filename,"Q_lith",      dom%thrm%now%Q_lith,     units="mW m-2",dim1="xc",dim2="yc",ncid=ncid)        
-        call nc_write(filename,"enth_lith",   dom%thrm%now%enth_lith,  units="",      dim1="xc",dim2="yc",dim3="zeta_l",ncid=ncid)      
-        call nc_write(filename,"T_lith",      dom%thrm%now%T_lith,     units="K",     dim1="xc",dim2="yc",dim3="zeta_l",ncid=ncid)      
-        call nc_write(filename,"cp_lith",     dom%thrm%now%cp_lith,    units="",      dim1="xc",dim2="yc",dim3="zeta_l",ncid=ncid)      
-        call nc_write(filename,"kt_lith",     dom%thrm%now%kt_lith,    units="",      dim1="xc",dim2="yc",dim3="zeta_l",ncid=ncid)      
+        
+        call nc_write(filename,"bmb_grnd",    dom%thrm%now%bmb_grnd,   units="",dim1="xc",dim2="yc",ncid=ncid)     
+        call nc_write(filename,"f_pmp",       dom%thrm%now%f_pmp,      units="",dim1="xc",dim2="yc",ncid=ncid)        
+        call nc_write(filename,"T_prime_b",   dom%thrm%now%T_prime_b,  units="",dim1="xc",dim2="yc",ncid=ncid)    
+        
+        call nc_write(filename,"H_cts",       dom%thrm%now%H_cts,      units="",dim1="xc",dim2="yc",ncid=ncid)      
+        
+        call nc_write(filename,"H_w",         dom%thrm%now%H_w,        units="",dim1="xc",dim2="yc",ncid=ncid)
+        call nc_write(filename,"dHwdt",       dom%thrm%now%dHwdt,      units="",dim1="xc",dim2="yc",ncid=ncid)
         
         ! == ybound variables ===
 
@@ -547,31 +556,39 @@ contains
         
         ! == ytherm variables ===
 
-        call nc_read(filename,"enth",        dom%thrm%now%enth,ncid=ncid)   
+        call nc_read(filename,"E_tot",       dom%thrm%now%E_tot,ncid=ncid)   
+        call nc_read(filename,"T_tot",       dom%thrm%now%T_tot,ncid=ncid)    
+        call nc_read(filename,"w_tot",       dom%thrm%now%w_tot,ncid=ncid) 
+        call nc_read(filename,"T_pmp_tot",   dom%thrm%now%T_pmp_tot,ncid=ncid) 
+        call nc_read(filename,"cp_tot",      dom%thrm%now%cp_tot,ncid=ncid) 
+        call nc_read(filename,"kt_tot",      dom%thrm%now%kt_tot,ncid=ncid) 
+        call nc_read(filename,"Q_strn_tot",  dom%thrm%now%Q_strn_tot,ncid=ncid) 
+        call nc_read(filename,"advecxy_tot", dom%thrm%now%advecxy_tot,ncid=ncid) 
+        
+        call nc_read(filename,"E_ice",       dom%thrm%now%E_ice,ncid=ncid)   
         call nc_read(filename,"T_ice",       dom%thrm%now%T_ice,ncid=ncid)    
-        call nc_read(filename,"omega",       dom%thrm%now%omega,ncid=ncid) 
+        call nc_read(filename,"w_ice",       dom%thrm%now%w_ice,ncid=ncid) 
         call nc_read(filename,"T_pmp",       dom%thrm%now%T_pmp,ncid=ncid) 
-        
-        call nc_read(filename,"f_pmp",       dom%thrm%now%f_pmp,ncid=ncid) 
-        call nc_read(filename,"bmb_grnd",    dom%thrm%now%bmb_grnd,ncid=ncid)    
-        call nc_read(filename,"Q_strn",      dom%thrm%now%Q_strn,ncid=ncid)      
-        call nc_read(filename,"Q_b",         dom%thrm%now%Q_b,ncid=ncid)         
-        call nc_read(filename,"Q_ice_b",     dom%thrm%now%Q_ice_b,ncid=ncid)         
-        call nc_read(filename,"T_prime_b",   dom%thrm%now%T_prime_b,ncid=ncid)  
-        call nc_read(filename,"H_w",         dom%thrm%now%H_w,ncid=ncid) 
-        call nc_read(filename,"dHwdt",       dom%thrm%now%dHwdt,ncid=ncid) 
-        
         call nc_read(filename,"cp",          dom%thrm%now%cp,ncid=ncid) 
         call nc_read(filename,"kt",          dom%thrm%now%kt,ncid=ncid)      
+        call nc_read(filename,"Q_strn",      dom%thrm%now%Q_strn,ncid=ncid) 
+        call nc_read(filename,"advecxy",     dom%thrm%now%advecxy,ncid=ncid) 
+        
+        call nc_read(filename,"E_lith",      dom%thrm%now%E_lith,     ncid=ncid)      
+        call nc_read(filename,"T_lith",      dom%thrm%now%T_lith,     ncid=ncid)      
+
+        call nc_read(filename,"Q_b",         dom%thrm%now%Q_b,ncid=ncid)         
+        call nc_read(filename,"Q_ice_b",     dom%thrm%now%Q_ice_b,ncid=ncid)         
+        call nc_read(filename,"Q_lith",      dom%thrm%now%Q_lith,     ncid=ncid)        
+        
+        call nc_read(filename,"bmb_grnd",    dom%thrm%now%bmb_grnd,ncid=ncid)    
+        call nc_read(filename,"f_pmp",       dom%thrm%now%f_pmp,ncid=ncid) 
+        call nc_read(filename,"T_prime_b",   dom%thrm%now%T_prime_b,ncid=ncid)  
+        
         call nc_read(filename,"H_cts",       dom%thrm%now%H_cts,ncid=ncid)       
         
-        call nc_read(filename,"advecxy",     dom%thrm%now%advecxy,ncid=ncid)   
-        
-        call nc_read(filename,"Q_lith",      dom%thrm%now%Q_lith,     ncid=ncid)        
-        call nc_read(filename,"enth_lith",   dom%thrm%now%enth_lith,  ncid=ncid)      
-        call nc_read(filename,"T_lith",      dom%thrm%now%T_lith,     ncid=ncid)      
-        call nc_read(filename,"cp_lith",     dom%thrm%now%cp_lith,    ncid=ncid)      
-        call nc_read(filename,"kt_lith",     dom%thrm%now%kt_lith,    ncid=ncid)      
+        call nc_read(filename,"H_w",         dom%thrm%now%H_w,ncid=ncid) 
+        call nc_read(filename,"dHwdt",       dom%thrm%now%dHwdt,ncid=ncid) 
         
         ! == ybound variables ===
 

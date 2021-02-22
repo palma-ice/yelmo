@@ -62,32 +62,38 @@ contains
 
         ! Calculate the specific heat capacity of the ice
         if (thrm%par%use_const_cp) then 
-            thrm%now%cp(:,:,k0:nz_aa)  = thrm%par%const_cp
+            thrm%now%cp  = thrm%par%const_cp
         else  
-            thrm%now%cp(:,:,k0:nz_aa)  = calc_specific_heat_capacity(thrm%now%T_tot(:,:,k0:nz_aa))
+            thrm%now%cp  = calc_specific_heat_capacity(thrm%now%T_ice)
         end if 
         
         ! Calculate the heat conductivity of the ice
         if (thrm%par%use_const_kt) then 
-            thrm%now%kt(:,:,k0:nz_aa)  = thrm%par%const_kt
+            thrm%now%kt  = thrm%par%const_kt
         else  
-            thrm%now%kt(:,:,k0:nz_aa)  = calc_thermal_conductivity(thrm%now%T_tot(:,:,k0:nz_aa))
+            thrm%now%kt  = calc_thermal_conductivity(thrm%now%T_ice)
         end if 
 
         ! Calculate the pressure-corrected melting point (in Kelvin)
-        do k = k0, nz_aa  
-            thrm%now%T_pmp_tot(:,:,k) = calc_T_pmp(tpo%now%H_ice,thrm%par%ztot%zeta_aa(k),T0,T_pmp_beta)
+        do k = 1, thrm%par%zice%nz_aa  
+            thrm%now%T_pmp(:,:,k) = calc_T_pmp(tpo%now%H_ice,thrm%par%zice%zeta_aa(k),T0,T_pmp_beta)
         end do 
 
-        ! == lithosphere column == 
+        ! == Total column == 
 
         ! Prescibe constant values of heat capacity, thermal conductivity 
-        ! and pressure melting point withint the lithospheric column 
+        ! and pressure melting point withint the lithospheric column.
+        ! Set values in the ice column from calculations above. 
 
-        thrm%now%cp(:,:,1:k0-1) = thrm%par%lith_cp 
-        thrm%now%kt(:,:,1:k0-1) = thrm%par%lith_kt 
-        thrm%now%T_pmp_tot(:,:,1:k0-1) = 1e8      ! [K] Set to unreachably high value
-        
+        thrm%now%cp_tot(:,:,1:k0-1)   = thrm%par%lith_cp
+        thrm%now%cp_tot(:,:,k0:nz_aa) = thrm%now%cp
+
+        thrm%now%kt_tot(:,:,1:k0-1)   = thrm%par%lith_kt 
+        thrm%now%kt_tot(:,:,k0:nz_aa) = thrm%now%kt
+
+        thrm%now%T_pmp_tot(:,:,1:k0-1)   = 1e8      ! [K] Set to unreachably high value
+        thrm%now%T_pmp_tot(:,:,k0:nz_aa) = thrm%now%T_pmp
+
         ! === Calculate heat source terms (Yelmo vertical grid) === 
 
 select case("ab")
@@ -119,13 +125,81 @@ end select
             call smooth_gauss_2D(thrm%now%Q_b,tpo%now%H_ice.gt.0.0,thrm%par%dx,thrm%par%n_sm_qb, &
                                     tpo%now%H_ice.gt.0.0)
         end if 
-        
 
+        ! Calculate internal strain heating
+
+        if (thrm%par%use_strain_sia) then 
+            ! Calculate strain heating from SIA approximation
+
+            call calc_strain_heating_sia(thrm%now%Q_strn,dyn%now%ux,dyn%now%uy, &
+                                      tpo%now%dzsdx,tpo%now%dzsdy,thrm%now%cp,tpo%now%H_ice,rho_ice,thrm%par%zice%zeta_aa, &
+                                      thrm%par%zice%zeta_ac,thrm%par%dt_beta(1),thrm%par%dt_beta(2))
+        
+        else
+            ! Calculate strain heating from strain rate tensor and viscosity (general approach)
+            
+            call calc_strain_heating(thrm%now%Q_strn,mat%now%strn%de,mat%now%visc, &
+                                     thrm%now%cp(:,:,thrm%par%k0:thrm%par%ztot%nz_aa),rho_ice, &
+                                     thrm%par%dt_beta(1),thrm%par%dt_beta(2))
+
+        end if 
+        
+        ! Smooth strain heating 
+        if (thrm%par%n_sm_qstrn .gt. 0) then 
+            call smooth_gauss_3D(thrm%now%Q_strn(:,:,thrm%par%k0:thrm%par%ztot%nz_aa),tpo%now%H_ice.gt.0.0,thrm%par%dx, &
+                                    thrm%par%n_sm_qstrn,tpo%now%H_ice.gt.0.0)
+        end if 
+
+        ! Set Q_strn in total column 
+        thrm%now%Q_strn_tot(:,:,1:thrm%par%k0-1) = 0.0_wp 
+        thrm%now%Q_strn_tot(:,:,thrm%par%k0:thrm%par%ztot%nz_aa) = thrm%now%Q_strn 
+
+        ! if ( dt .gt. 0.0 ) then     
+        !     ! Ice thermodynamics should evolve, perform calculations 
+                     
+        !     ! Store initial value of H_w 
+        !     H_w_now = thrm%now%H_w 
+
+        !     ! Update basal water layer thickness for half timestep (Runge Kutta, step 1)
+        !     call calc_basal_water_local(thrm%now%H_w,thrm%now%dHwdt,tpo%now%H_ice,-thrm%now%bmb_grnd*(rho_ice/rho_w), &
+        !                             tpo%now%f_grnd,dt*0.5_prec,thrm%par%till_rate,thrm%par%H_w_max)
+            
+        !     select case(trim(thrm%par%method))
+
+        !         case("enth","temp") 
+        !             ! Perform enthalpy/temperature solving via advection-diffusion equation
+        !             ! Note: method==temp performs the same calculations as for method==enth, 
+        !             ! except enth_cr=1.0 and omega_max=0.0 as prescribed in par_load(). 
+
+        !             if (trim(thrm%par%method) .eq. "enth") then 
+
+        !                 ! Calculate the explicit horizontal advection term using enthalpy from previous timestep
+        !                 call calc_advec_horizontal_3D(thrm%now%advecxy,thrm%now%E_ice,tpo%now%H_ice,tpo%now%z_srf, &
+        !                                     dyn%now%ux,dyn%now%uy,thrm%par%zice%zeta_aa,thrm%par%dx,thrm%par%dt_beta(1),thrm%par%dt_beta(2))
+                    
+        !             else 
+
+        !                 ! Calculate the explicit horizontal advection term using temperature from previous timestep
+        !                 call calc_advec_horizontal_3D(thrm%now%advecxy,thrm%now%T_ice,tpo%now%H_ice,tpo%now%z_srf, &
+        !                                     dyn%now%ux,dyn%now%uy,thrm%par%zice%zeta_aa,thrm%par%dx,thrm%par%dt_beta(1),thrm%par%dt_beta(2))
+                    
+        !             end if 
+
+        !             ! Set advecxy in total column 
+        !             thrm%now%advecxy_tot(:,:,1:thrm%par%k0-1) = 0.0_wp 
+        !             thrm%now%advecxy_tot(:,:,thrm%par%k0:thrm%par%ztot%nz_aa) = thrm%now%advecxy 
+
+        !             call calc_ytherm_enthalpy_3D(thrm%now%E_tot,thrm%now%T_tot,thrm%now%w_tot,thrm%now%bmb_grnd,thrm%now%Q_ice_b, &
+        !                         thrm%now%H_cts,thrm%now%T_pmp_tot,thrm%now%cp_tot,thrm%now%kt_tot,thrm%now%advecxy_tot,dyn%now%ux,dyn%now%uy,dyn%now%uz,thrm%now%Q_strn_tot, &
+        !                         thrm%now%Q_b,thrm%now%Q_lith,bnd%T_srf,tpo%now%H_ice,tpo%now%z_srf,thrm%now%H_w,thrm%now%dHwdt,tpo%now%H_grnd, &
+        !                         tpo%now%f_grnd,tpo%now%dHicedt,tpo%now%dzsrfdt,thrm%par%zeta_aa,thrm%ztot,thrm%par%enth_cr, &
+        !                         thrm%par%omega_max,dt,thrm%par%dx,thrm%par%method,thrm%par%solver_advec)
+                    
         return
 
     end subroutine calc_ytherm
 
-    subroutine calc_ytherm_enthalpy_3D(enth,T_ice,omega,bmb_grnd,Q_ice_b,H_cts,T_pmp,cp,kt,advecxy,ux,uy,uz,Q_strn,Q_b,Q_lith, &
+    subroutine calc_ytherm_enthalpy_3D(enth,T_ice,omega,bmb_grnd,Q_ice_b,H_cts,T_pmp,cp,kt,advecxy,uz,Q_strn,Q_b,Q_lith, &
                                         T_srf,H_ice,z_srf,H_w,dHwdt,H_grnd,f_grnd,dHdt,dzsdt,zeta_aa,zeta_ac,dzeta_a,dzeta_b, &
                                         cr,omega_max,dt,dx,solver,solver_advec)
         ! This wrapper subroutine breaks the thermodynamics problem into individual columns,
@@ -147,8 +221,6 @@ end select
         real(prec), intent(IN)    :: cp(:,:,:)      ! [J kg-1 K-1] Specific heat capacity
         real(prec), intent(IN)    :: kt(:,:,:)      ! [J a-1 m-1 K-1] Heat conductivity 
         real(prec), intent(IN)    :: advecxy(:,:,:) ! [m a-1] Horizontal x-velocity 
-        real(prec), intent(IN)    :: ux(:,:,:)      ! [m a-1] Horizontal x-velocity 
-        real(prec), intent(IN)    :: uy(:,:,:)      ! [m a-1] Horizontal y-velocity 
         real(prec), intent(IN)    :: uz(:,:,:)      ! [m a-1] Vertical velocity 
         real(prec), intent(IN)    :: Q_strn(:,:,:)  ! [K a-1] Internal strain heat production in ice
         real(prec), intent(IN)    :: Q_b(:,:)       ! [J a-1 m-2] Basal frictional heat production 

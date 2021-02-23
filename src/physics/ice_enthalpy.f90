@@ -49,7 +49,7 @@ contains
         real(prec), intent(IN)    :: uz(:)          ! nz_ac [m a-1] Vertical velocity 
         real(prec), intent(IN)    :: Q_strn(:)      ! nz_aa [J a-1 m-3] Internal strain heat production in ice
         real(prec), intent(IN)    :: Q_b            ! [mW m-2] Basal frictional heat production
-        real(prec), intent(IN)    :: Q_lith         ! [mW m-2] Bedrock heat flux (positive up)
+        real(prec), intent(IN)    :: Q_lith         ! [mW m-2] Bedrock heat flux (positive down)
         real(prec), intent(IN)    :: T_srf          ! [K] Surface temperature 
         real(prec), intent(IN)    :: T_shlf         ! [K] Marine-shelf interface temperature
         real(prec), intent(IN)    :: H_ice          ! [m] Ice thickness 
@@ -136,7 +136,7 @@ contains
                 ! Frozen at bed, or about to become frozen 
 
                 ! backward Euler flux basal boundary condition
-                val_base = (Q_b_now + Q_lith_now) / kt(1)
+                val_base = -(Q_b_now + Q_lith_now) / kt(1)
                 is_basal_flux = .TRUE. 
                 
             else 
@@ -259,8 +259,8 @@ end if
         real(prec), intent(INOUT) :: T_ice(:)       ! nz_aa [K] Ice column temperature
         real(prec), intent(IN)    :: cp(:)          ! nz_aa [J kg-1 K-1] Specific heat capacity
         real(prec), intent(IN)    :: kt(:)          ! nz_aa [J a-1 m-1 K-1] Heat conductivity 
-        real(prec), intent(IN)    :: Q_ice_b        ! [mW m-2]
-        real(prec), intent(IN)    :: Q_geo          ! [mW m-2] Bedrock heat flux (positive up)
+        real(prec), intent(IN)    :: Q_ice_b        ! [mW m-2] Ice basal heat flux (positive up)
+        real(prec), intent(IN)    :: Q_geo          ! [mW m-2] Bedrock heat flux (positive down)
         real(prec), intent(IN)    :: T_srf          ! [K] Surface temperature 
         real(prec), intent(IN)    :: H_ice          ! [m] Ice thickness 
         real(prec), intent(IN)    :: zeta_aa(:)     ! nz_aa [--] Vertical sigma coordinates (zeta==height), layer centered aa-nodes
@@ -315,7 +315,7 @@ end if
         ! === Basal boundary condition =====================
 
         ! backward Euler flux basal boundary condition
-        val_base      = Q_geo_now / kt(1)
+        val_base      = -Q_geo_now / kt(1)
         is_basal_flux = .TRUE. 
         
         ! === Solver =============================
@@ -391,8 +391,8 @@ end if
 
             ! backward Euler flux basal boundary condition
             subd(1) =  0.0_prec
-            diag(1) =  1.0_prec
-            supd(1) = -1.0_prec
+            diag(1) = -1.0_prec
+            supd(1) =  1.0_prec
             rhs(1)  = val_base * dz
             
         else 

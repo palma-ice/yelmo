@@ -57,7 +57,7 @@ contains
         real(prec), intent(IN)  :: T_prime_b         ! [K] Basal ice temp relative to pressure melting point (ie T_prime_b=0 K == temperate)
         real(prec), intent(IN)  :: Q_ice_b_now       ! [J a-1 m-2] Ice basal heat flux (positive up)
         real(prec), intent(IN)  :: Q_b               ! [J a-1 m-2] Basal heat production from friction and strain heating
-        real(prec), intent(IN)  :: Q_lith_now        ! [J a-1 m-2] Basal heat flux from bedrock surface (positive up)
+        real(prec), intent(IN)  :: Q_lith_now        ! [J a-1 m-2] Basal heat flux from bedrock surface (positive down)
         real(prec), intent(IN)  :: f_grnd            ! [--] Grounded fraction (centered aa node)                 
         real(prec), intent(IN)  :: rho_ice           ! [kg m-3] Ice density 
         
@@ -111,9 +111,9 @@ contains
         real(prec), intent(OUT) :: bmb_grnd          ! [m/a ice equiv.] Basal mass balance, grounded
         real(prec), intent(IN)  :: T_prime_b         ! [K] Basal ice temp relative to pressure melting point (ie T_prime_b=0 K == temperate)
         real(prec), intent(IN)  :: omega 
-        real(prec), intent(IN)  :: Q_ice_b_now       ! [J a-1 m-2] Conductive heat flux to the base (positive down)
+        real(prec), intent(IN)  :: Q_ice_b_now       ! [J a-1 m-2] Conductive heat flux to the base (positive up)
         real(prec), intent(IN)  :: Q_b               ! [J a-1 m-2] Basal heat production from friction and strain heating (postive up)
-        real(prec), intent(IN)  :: Q_lith_now        ! [J a-1 m-2] Basal heat flux from bedrock surface (positive up)
+        real(prec), intent(IN)  :: Q_lith_now        ! [J a-1 m-2] Basal heat flux from bedrock surface (positive down)
         real(prec), intent(IN)  :: f_grnd            ! [--] Grounded fraction (centered aa node)                 
         real(prec), intent(IN)  :: rho_ice           ! [kg m-3] Ice density 
         
@@ -1503,7 +1503,7 @@ end if
         real(prec), intent(IN) :: rho_l 
         real(prec), intent(IN) :: H_lith
         real(prec), intent(IN) :: T_bed 
-        real(prec), intent(IN) :: Q_geo 
+        real(prec), intent(IN) :: Q_geo         ! [mW m-2] Positive down
 
         real(prec) :: T_lith(size(zeta_aa,1))
 
@@ -1539,7 +1539,7 @@ end if
 
         implicit none 
 
-        real(wp), intent(OUT) :: Q_lith(:,:) 
+        real(wp), intent(OUT) :: Q_lith(:,:)        ! [mW m-2] Heat flux and bed surface (positive down like Q_geo)
         real(wp), intent(IN)  :: T_lith(:,:,:) 
         real(wp), intent(IN)  :: kt(:,:,:) 
         real(wp), intent(IN)  :: H_lith(:,:) 

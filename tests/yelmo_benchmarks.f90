@@ -370,6 +370,12 @@ program yelmo_benchmarks
             yelmo1%bnd%enh_srf = 1.0 
         end if 
 
+        ! if (time .le. 25e3) then 
+        !     yelmo1%thrm%par%lith_method = "equil"
+        ! else 
+        !     yelmo1%thrm%par%lith_method = "active" 
+        ! end if 
+
         ! == Yelmo ice sheet ===================================================
         call yelmo_update(yelmo1,time)
         
@@ -574,9 +580,6 @@ contains
         call nc_write(filename,"T_lith",ylmo%thrm%now%T_lith,units="K",long_name="Lithosphere temperature", &
                       dim1="xc",dim2="yc",dim3="zeta_l",dim4="time",start=[1,1,1,n],ncid=ncid)
         
-        call nc_write(filename,"Q_lith",ylmo%thrm%now%Q_lith,units="J a-1 m-2",long_name="Lithosphere heat flux at bed surface", &
-                      dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-        
         call nc_write(filename,"T_prime_b",ylmo%thrm%now%T_prime_b,units="deg C",long_name="Homologous basal ice temperature", &
                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
 
@@ -587,12 +590,14 @@ contains
         call nc_write(filename,"f_pmp",ylmo%thrm%now%f_pmp,units="1",long_name="Fraction of grid point at pmp", &
                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
         
-        call nc_write(filename,"Q_ice_b",ylmo%thrm%now%Q_ice_b,units="J a-1 m-2",long_name="Basal ice heat flux", &
+        call nc_write(filename,"Q_lith",ylmo%thrm%now%Q_lith,units="mW m-2",long_name="Lithosphere heat flux at bed surface", &
+                      dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
+        call nc_write(filename,"Q_ice_b",ylmo%thrm%now%Q_ice_b,units="mW m-2",long_name="Basal ice heat flux", &
                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
         call nc_write(filename,"Q_strn",ylmo%thrm%now%Q_strn/(rho_ice*ylmo%thrm%now%cp),units="K a-1",long_name="Strain heating", &
                       dim1="xc",dim2="yc",dim3="zeta",dim4="time",start=[1,1,1,n],ncid=ncid)
 
-        call nc_write(filename,"Q_b",ylmo%thrm%now%Q_b,units="J a-1 m-2",long_name="Basal frictional heating", &
+        call nc_write(filename,"Q_b",ylmo%thrm%now%Q_b,units="mW m-2",long_name="Basal frictional heating", &
                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
         
         call nc_write(filename,"bmb_grnd",ylmo%thrm%now%bmb_grnd,units="m/a ice equiv.",long_name="Basal mass balance (grounded)", &

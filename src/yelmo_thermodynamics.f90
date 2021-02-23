@@ -329,7 +329,7 @@ end select
         real(prec), intent(IN)    :: uy(:,:,:)      ! [m a-1] Horizontal y-velocity 
         real(prec), intent(IN)    :: uz(:,:,:)      ! [m a-1] Vertical velocity 
         real(prec), intent(IN)    :: Q_strn(:,:,:)  ! [K a-1] Internal strain heat production in ice
-        real(prec), intent(IN)    :: Q_b(:,:)       ! [J a-1 m-2] Basal frictional heat production 
+        real(prec), intent(IN)    :: Q_b(:,:)       ! [mW m-2] Basal frictional heat production 
         real(prec), intent(IN)    :: Q_lith(:,:)    ! [mW m-2] Heat flux at bed surface from lithosphere (like Q_geo)
         real(prec), intent(IN)    :: T_srf(:,:)     ! [K] Surface temperature 
         real(prec), intent(IN)    :: H_ice(:,:)     ! [m] Ice thickness 
@@ -516,7 +516,7 @@ end select
                 ! Call thermodynamic solver for the column
 
                 call calc_temp_column_bedrock(enth(i,j,:),T_lith(i,j,:),cp(i,j,:),kt(i,j,:),  &
-                        Q_ice_b(i,j),Q_geo(i,j),T_base,H_lith(i,j),zeta_aa,zeta_ac,dzeta_a,dzeta_b,dt)
+                        Q_ice_b(i,j),Q_geo(i,j),T_base,T_pmp_b(i,j),H_lith(i,j),zeta_aa,zeta_ac,dzeta_a,dzeta_b,dt)
             
             else 
                 ! Assume equilibrium conditions: impose linear temperature 

@@ -243,7 +243,7 @@ end if
 
     end subroutine calc_temp_column
 
-    subroutine calc_temp_column_bedrock(enth,T_ice,cp,kt,Q_ice_b,Q_geo,T_srf,H_ice, &
+    subroutine calc_temp_column_bedrock(enth,temp,cp,kt,Q_ice_b,Q_geo,T_srf,T_pmp_srf,H_ice, &
                                                 zeta_aa,zeta_ac,dzeta_a,dzeta_b,dt)
         ! Thermodynamics solver for a given column of ice 
         ! Note zeta=height, k=1 base, k=nz surface 
@@ -256,12 +256,13 @@ end if
         implicit none 
 
         real(prec), intent(INOUT) :: enth(:)        ! nz_aa [J kg] Ice column enthalpy
-        real(prec), intent(INOUT) :: T_ice(:)       ! nz_aa [K] Ice column temperature
+        real(prec), intent(INOUT) :: temp(:)        ! nz_aa [K] Ice column temperature
         real(prec), intent(IN)    :: cp(:)          ! nz_aa [J kg-1 K-1] Specific heat capacity
         real(prec), intent(IN)    :: kt(:)          ! nz_aa [J a-1 m-1 K-1] Heat conductivity 
         real(prec), intent(IN)    :: Q_ice_b        ! [mW m-2] Ice basal heat flux (positive up)
         real(prec), intent(IN)    :: Q_geo          ! [mW m-2] Bedrock heat flux (positive down)
         real(prec), intent(IN)    :: T_srf          ! [K] Surface temperature 
+        real(prec), intent(IN)    :: T_pmp_srf      ! [K] Surface pressure-melting-point temperature 
         real(prec), intent(IN)    :: H_ice          ! [m] Ice thickness 
         real(prec), intent(IN)    :: zeta_aa(:)     ! nz_aa [--] Vertical sigma coordinates (zeta==height), layer centered aa-nodes
         real(prec), intent(IN)    :: zeta_ac(:)     ! nz_ac [--] Vertical height axis temperature (0:1), layer edges ac-nodes
@@ -309,9 +310,22 @@ end if
 
         ! === Surface boundary condition =====================
 
-        val_srf      =  Q_ice_b_now / kt(nz_aa)
-        is_surf_flux = .TRUE.   
+        if ( T_srf .lt. T_pmp_srf ) then
+                ! Frozen at bed
 
+            ! backward Euler flux surface boundary condition
+            val_srf      =  Q_ice_b_now / kt(nz_aa)
+            is_surf_flux = .TRUE.   
+
+        else 
+            ! Temperate at bed 
+            ! Hold bed surface temperature at pressure melting point
+
+            val_srf      = T_srf
+            is_surf_flux = .FALSE. 
+            
+        end if
+            
         ! === Basal boundary condition =====================
 
         ! backward Euler flux basal boundary condition
@@ -320,12 +334,12 @@ end if
         
         ! === Solver =============================
      
-        call calc_temp_column_internal(T_ice,kappa_aa,uz,advecxy,Q_strn,val_base,val_srf,H_ice, &
+        call calc_temp_column_internal(temp,kappa_aa,uz,advecxy,Q_strn,val_base,val_srf,H_ice, &
                                                 zeta_aa,zeta_ac,dzeta_a,dzeta_b,T_ref,dt, &
                                                 is_basal_flux,is_surf_flux)
 
         ! Finally, get enthalpy too 
-        call convert_to_enthalpy(enth,T_ice,omega=0.0_wp,T_pmp=0.0_wp,cp=cp,L=0.0_wp)
+        call convert_to_enthalpy(enth,temp,omega=0.0_wp,T_pmp=0.0_wp,cp=cp,L=0.0_wp)
 
         return 
 

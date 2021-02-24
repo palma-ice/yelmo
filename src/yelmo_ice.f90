@@ -607,7 +607,7 @@ contains
             stop 
         end if 
 
-        ! Calculate zeta_aa and zeta_ac 
+        ! Calculate zeta_aa, zeta_ac and nz_ac given the chosen nz_aa
         call calc_zeta(dom%par%zeta_aa,dom%par%zeta_ac,dom%par%nz_ac,dom%par%nz_aa, &
                                                     dom%par%zeta_scale,dom%par%zeta_exp)
 

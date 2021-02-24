@@ -200,7 +200,7 @@ end select
                     call calc_ytherm_enthalpy_3D_combined(thrm%now%enth,thrm%now%T_ice,thrm%now%omega,thrm%now%bmb_grnd,thrm%now%Q_ice_b, &
                                 thrm%now%H_cts,thrm%now%T_pmp,thrm%now%cp,thrm%now%kt,thrm%now%advecxy,dyn%now%ux,dyn%now%uy,dyn%now%uz,thrm%now%Q_strn, &
                                 thrm%now%Q_b,bnd%Q_geo,bnd%T_srf,tpo%now%H_ice,tpo%now%z_srf,thrm%now%H_w,thrm%now%dHwdt,tpo%now%H_grnd, &
-                                tpo%now%f_grnd,tpo%now%dHicedt,tpo%now%dzsrfdt,thrm%par%zeta_aa,thrm%par%dzeta_b,thrm%par%enth_cr, &
+                                tpo%now%f_grnd,tpo%now%dHicedt,tpo%now%dzsrfdt,thrm%par%zeta_aa,thrm%par%zeta_ac,thrm%par%enth_cr, &
                                 thrm%par%omega_max,dt,thrm%par%dx,thrm%par%method,thrm%par%solver_advec, &
                                 thrm%now%enth_lith,thrm%now%T_lith,thrm%now%Q_lith,thrm%now%H_lith,thrm%now%cp_lith,thrm%now%kt_lith, &
                                 thrm%par%lith_zeta_aa,thrm%par%lith_zeta_ac)
@@ -374,14 +374,27 @@ end select
         real(prec), intent(IN)    :: kt_lith(:,:,:)         ! [J a-1 m-1 K-1] Lithosphere heat conductivity 
         real(prec), intent(IN)    :: lith_zeta_aa(:)        ! [--] Vertical sigma coordinates (zeta==height), aa-nodes
         real(prec), intent(IN)    :: lith_zeta_ac(:)        ! [--] Vertical sigma coordinates (zeta==height), ac-nodes
-        
+
         ! Local variables
         integer :: i, j, k, nx, ny, nz_aa, nz_ac  
         real(prec) :: T_shlf, H_grnd_lim, f_scalar, T_base  
         real(prec) :: H_ice_now 
 
-        real(wp), allocatable :: dzeta_a(:) 
-        real(wp), allocatable :: dzeta_b(:) 
+        integer :: tot_nz_aa, tot_nz_ac, k0  
+        real(wp), allocatable :: tot_zeta_aa(:) 
+        real(wp), allocatable :: tot_zeta_ac(:) 
+        real(wp), allocatable :: tot_dzeta_a(:) 
+        real(wp), allocatable :: tot_dzeta_b(:) 
+
+        real(wp), allocatable :: tot_enth(:)
+        real(wp), allocatable :: tot_T(:) 
+        real(wp), allocatable :: tot_omega(:)
+        real(wp), allocatable :: tot_T_pmp(:) 
+        real(wp), allocatable :: tot_cp(:)
+        real(wp), allocatable :: tot_kt(:)
+        real(wp), allocatable :: tot_advecxy(:)
+        real(wp), allocatable :: tot_uz(:)
+        real(wp), allocatable :: tot_Q_strn(:)
 
         real(prec) :: filter0(3,3), filter(3,3) 
 
@@ -392,6 +405,66 @@ end select
         nz_aa = size(zeta_aa,1)
         nz_ac = size(zeta_ac,1)
 
+        ! ====================================================================
+
+        ! Define combined vertical axis =====
+        ! Lithosphere from -1 to 0, ice column from 0 to 1, 
+        ! lith_zeta_aa(lith_nz_aa) == zeta_aa(1) = 0 
+
+        tot_nz_aa = nz_aa + size(lith_zeta_aa,1) - 1 
+        tot_nz_ac = tot_nz_aa + 1 
+
+        ! Get index of ice base 
+        k0 = size(lith_zeta_aa,1) 
+
+        allocate(tot_zeta_aa(tot_nz_aa))
+        allocate(tot_zeta_ac(tot_nz_ac))
+        
+        tot_zeta_aa(1:k0)           = lith_zeta_aa     - 1.0_wp 
+        tot_zeta_aa(k0+1:tot_nz_aa) = zeta_aa(2:nz_aa) 
+
+        tot_zeta_ac(1:k0)           = lith_zeta_ac(1:k0) - 1.0_wp  
+        tot_zeta_ac(k0+1:tot_nz_ac) = zeta_ac(2:nz_ac)
+
+        !tot_zeta_ac(k0) = 0.5_prec*(tot_zeta_aa(k0-1)+par%ztot%zeta_aa(k0))
+
+        if (allocated(tot_dzeta_a)) deallocate(tot_dzeta_a)
+        if (allocated(tot_dzeta_b)) deallocate(tot_dzeta_b)
+        allocate(tot_dzeta_a(tot_nz_aa))
+        allocate(tot_dzeta_b(tot_nz_aa))
+        
+        tot_dzeta_a = 0.0_wp 
+        tot_dzeta_b = 0.0_wp 
+        
+        call calc_dzeta_terms(tot_dzeta_a,tot_dzeta_b,tot_zeta_aa,tot_zeta_ac)
+
+        ! =================
+        write(*,*) "Vertical axis:"
+        do k = tot_nz_ac, 1, -1
+            if (k .eq. tot_nz_ac) then 
+                write(*,*) k, -9999.0, tot_zeta_ac(k), -9999.0, -9999.0
+            else 
+                write(*,*) k, tot_zeta_aa(k), tot_zeta_ac(k), tot_dzeta_a(k), tot_dzeta_b(k) 
+            end if  
+
+        end do 
+        stop 
+        ! =================
+
+        ! ====================================================================
+
+        ! Allocate helper arrays 
+
+        allocate(tot_enth(tot_nz_aa))
+        allocate(tot_T(tot_nz_aa))
+        allocate(tot_omega(tot_nz_aa))
+        allocate(tot_T_pmp(tot_nz_aa))
+        allocate(tot_cp(tot_nz_aa))
+        allocate(tot_kt(tot_nz_aa))
+        allocate(tot_advecxy(tot_nz_aa))
+        allocate(tot_uz(tot_nz_ac))
+        allocate(tot_Q_strn(tot_nz_aa))
+        
         ! Initialize gaussian filter kernel for smoothing ice thickness at the margin
         filter0 = gauss_values(dx,dx,sigma=2.0*dx,n=size(filter,1))
 
@@ -449,22 +522,51 @@ end select
                 Q_ice_b(i,j)  = 0.0_prec 
                 H_cts(i,j)    = 0.0_prec
 
+                T_lith(i,j,:) = calc_temp_lith_column(lith_zeta_aa,kt_lith(i,j,:),cp_lith(i,j,:), &
+                                                      rho_l,H_lith(i,j),T_ice(i,j,1),Q_geo(i,j))
+
+                ! Get enthalpy too 
+                call convert_to_enthalpy(enth_lith(i,j,:),T_lith(i,j,:),0.0_wp,0.0_wp,cp_lith(i,j,:),0.0_wp)
+
             else 
                 ! Thick ice exists, call thermodynamic solver for the column
 
-                if (trim(solver) .eq. "enth") then 
+                ! Populate total column variables ==
 
-                    call calc_enth_column(enth(i,j,:),T_ice(i,j,:),omega(i,j,:),bmb_grnd(i,j),Q_ice_b(i,j),H_cts(i,j), &
-                            T_pmp(i,j,:),cp(i,j,:),kt(i,j,:),advecxy(i,j,:),uz(i,j,:),Q_strn(i,j,:),Q_b(i,j),Q_lith(i,j),T_srf(i,j), &
-                            T_shlf,H_ice_now,H_w(i,j),f_grnd(i,j),zeta_aa,zeta_ac,dzeta_a,dzeta_b,cr,omega_max,T0,dt)
+                ! Ice 
+                tot_enth(k0:tot_nz_aa)    = enth(i,j,:) 
+                tot_T(k0:tot_nz_aa)       = T_ice(i,j,:) 
+                tot_omega(k0:tot_nz_aa)   = omega(i,j,:) 
+                tot_T_pmp(k0:tot_nz_aa)   = T_pmp(i,j,:) 
+                tot_cp(k0:tot_nz_aa)      = cp(i,j,:) 
+                tot_kt(k0:tot_nz_aa)      = kt(i,j,:) 
+                tot_advecxy(k0:tot_nz_aa) = advecxy(i,j,:) 
+                tot_uz(k0:tot_nz_ac)      = uz(i,j,:) 
+                tot_Q_strn(k0:tot_nz_aa)  = Q_strn(i,j,:) 
                 
-                else 
+                ! Lithosphere 
+                tot_enth(1:k0-1)          = enth_lith(i,j,1:k0-1)
+                tot_T(1:k0-1)             = T_lith(i,j,1:k0-1)
+                tot_omega(1:k0-1)         = 0.0_wp 
+                tot_T_pmp(1:k0-1)         = 1e8
+                tot_cp(1:k0-1)            = cp_lith(i,j,1:k0-1)
+                tot_kt(1:k0-1)            = kt_lith(i,j,1:k0-1)
+                tot_advecxy(1:k0-1)       = 0.0_wp 
+                tot_uz(1:k0-1)            = 0.0_wp 
+                tot_Q_strn(1:k0-1)        = 0.0_wp 
+                
+                call calc_temp_column_combined(tot_enth,tot_T,tot_omega,bmb_grnd(i,j),Q_ice_b(i,j),Q_lith(i,j),H_cts(i,j), &
+                    tot_T_pmp,tot_cp,tot_kt,tot_advecxy,tot_uz,tot_Q_strn,Q_b(i,j),Q_geo(i,j),T_srf(i,j), &
+                    T_shlf,H_ice_now,H_lith(i,j),H_w(i,j),f_grnd(i,j),tot_zeta_aa,tot_zeta_ac, &
+                    tot_dzeta_a,tot_dzeta_b,omega_max,T0,dt,k0)                
 
-                    call calc_temp_column(enth(i,j,:),T_ice(i,j,:),omega(i,j,:),bmb_grnd(i,j),Q_ice_b(i,j),H_cts(i,j), &
-                    T_pmp(i,j,:),cp(i,j,:),kt(i,j,:),advecxy(i,j,:),uz(i,j,:),Q_strn(i,j,:),Q_b(i,j),Q_lith(i,j),T_srf(i,j), &
-                    T_shlf,H_ice_now,H_w(i,j),f_grnd(i,j),zeta_aa,zeta_ac,dzeta_a,dzeta_b,omega_max,T0,dt)                
+                ! Repopulate separate ice and lithosphere quantities for output 
+                enth(i,j,:)               = tot_enth(k0:tot_nz_aa)
+                T_ice(i,j,:)              = tot_T(k0:tot_nz_aa)     
+                omega(i,j,:)              = tot_omega(k0:tot_nz_aa)
                 
-                end if 
+                enth_lith(i,j,1:k0-1)     = tot_enth(1:k0-1)          
+                T_lith(i,j,1:k0-1)        = tot_T(1:k0-1)        
 
             end if 
 

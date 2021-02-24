@@ -122,8 +122,8 @@ contains
 
                     ! Greve and Blatter (2009), Eq. 5.72
                     ! Bueler and Brown  (2009), Eq. 4
-                    duxdx_aa  = (ux(i,j,k)   - ux(i-1,j,k)  )/dx
-                    duydy_aa  = (uy(i,j,k)   - uy(i,j-1,k)  )/dy
+                    duxdx_aa  = (ux(i,j,k-1)   - ux(i-1,j,k-1)  )/dx
+                    duydy_aa  = (uy(i,j,k-1)   - uy(i,j-1,k-1)  )/dy
                     
                     ! Testing wider stencil for stability (no effect so far)
 !                     duxdx_aa  = 0.5*((ux(i,j+1,k) - ux(i-1,j+1,k))/dx + (ux(i,j-1,k) - ux(i-1,j-1,k))/dx)
@@ -247,11 +247,11 @@ contains
                     ux_aa = 0.5_prec*(ux(i,j,k)+ux(i-1,j,k))
                     uy_aa = 0.5_prec*(uy(i,j,k)+uy(i,j-1,k))
                 else if (k .eq. nz_ac) then 
-                    ux_aa = 0.5_prec*(ux(i,j,k)+ux(i-1,j,k+1))
-                    uy_aa = 0.5_prec*(uy(i,j,k)+uy(i,j-1,k+1))
+                    ux_aa = 0.5_prec*(ux(i,j,k-1)+ux(i-1,j,k-1))
+                    uy_aa = 0.5_prec*(uy(i,j,k-1)+uy(i,j-1,k-1))
                 else 
-                    ux_aa = 0.25_prec*(ux(i,j,k)+ux(i-1,j,k) + ux(i,j,k+1)+ux(i-1,j,k+1))
-                    uy_aa = 0.25_prec*(uy(i,j,k)+uy(i,j-1,k) + uy(i,j,k+1)+uy(i,j-1,k+1))
+                    ux_aa = 0.25_prec*(ux(i,j,k)+ux(i-1,j,k-1) + ux(i,j,k)+ux(i-1,j,k-1))
+                    uy_aa = 0.25_prec*(uy(i,j,k)+uy(i,j-1,k-1) + uy(i,j,k)+uy(i,j-1,k-1))
                 end if 
 
                 ! Get horizontal scaling correction terms 

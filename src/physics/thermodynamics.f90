@@ -1455,7 +1455,7 @@ end if
         real(prec), intent(IN)  :: kt(:,:,:)        ! [J a-1 m-1 K-1] Heat conductivity 
         real(prec), intent(IN)  :: Q_geo(:,:)       ! [mW m-2] Geothermal heat flux 
         real(prec), intent(IN)  :: T_bed(:,:)       ! [K] Surface temperature 
-        real(prec), intent(IN)  :: H_lith(:,:)       ! [m] Ice thickness 
+        real(prec), intent(IN)  :: H_lith           ! [m] Ice thickness 
         real(prec), intent(IN)  :: zeta_aa(:)       ! [--] Vertical zeta coordinates (zeta==height), aa-nodes
 
         ! Local variable
@@ -1467,8 +1467,8 @@ end if
 
         do j = 1, ny
         do i = 1, nx 
-
-            T_lith(i,j,:) = calc_temp_lith_column(zeta_aa,kt(i,j,:),cp(i,j,:),rho_l,H_lith(i,j), &
+            
+            T_lith(i,j,:) = calc_temp_lith_column(zeta_aa,kt(i,j,:),cp(i,j,:),rho_l,H_lith, &
                                                   T_bed(i,j),Q_geo(i,j))
 
         end do 

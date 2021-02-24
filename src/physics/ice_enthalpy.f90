@@ -1,7 +1,7 @@
 module ice_enthalpy 
     ! Module contains the ice temperature and basal mass balance (grounded) solution
 
-    use yelmo_defs, only : wp, pi, g, sec_year, rho_ice, rho_sw, rho_w, rho_l, L_ice  
+    use yelmo_defs, only : wp, pi, g, sec_year, rho_ice, rho_sw, rho_w, rho_l, L_ice
     use solver_tridiagonal, only : solve_tridiag 
     use thermodynamics, only : calc_bmb_grounded, calc_bmb_grounded_enth, calc_advec_vertical_column, &
                                 calc_Q_lith 
@@ -2051,7 +2051,7 @@ end if
         real(wp), intent(INOUT) :: dzeta_a(:)    ! nz_aa
         real(wp), intent(INOUT) :: dzeta_b(:)    ! nz_aa
         real(wp), intent(IN)    :: zeta_aa(:)    ! nz_aa 
-        real(wp), intent(IN)    :: zeta_ac(:)    ! nz_ac == nz_aa-1 
+        real(wp), intent(IN)    :: zeta_ac(:)    ! nz_ac == nz_aa+1 
 
         ! Local variables 
         integer :: k, nz_layers, nz_aa    
@@ -2065,11 +2065,11 @@ end if
         dzeta_b = 0.0 
         
         do k = 2, nz_aa-1 
-            dzeta_a(k) = 1.0/ ( (zeta_ac(k) - zeta_ac(k-1)) * (zeta_aa(k) - zeta_aa(k-1)) )
+            dzeta_a(k) = 1.0/ ( (zeta_ac(k+1) - zeta_ac(k)) * (zeta_aa(k) - zeta_aa(k-1)) )
         enddo
 
         do k = 2, nz_aa-1
-            dzeta_b(k) = 1.0/ ( (zeta_ac(k) - zeta_ac(k-1)) * (zeta_aa(k+1) - zeta_aa(k)) )
+            dzeta_b(k) = 1.0/ ( (zeta_ac(k+1) - zeta_ac(k)) * (zeta_aa(k+1) - zeta_aa(k)) )
         end do
 
         return 

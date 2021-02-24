@@ -195,7 +195,7 @@ contains
                     call calc_tracer_3D(mat%now%enh_bnd,X_srf,dyn%now%ux,dyn%now%uy,dyn%now%uz,tpo%now%H_ice, &
                                         tpo%now%bmb,mat%par%zeta_aa,mat%par%zeta_ac,mat%par%tracer_method, &
                                         mat%par%tracer_impl_kappa,dt,thrm%par%dx,time,mask=mask_tracers)
-
+                    
                 end if 
 
                 ! Ensure enh_bnd is always non-zero and positive,

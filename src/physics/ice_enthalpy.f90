@@ -48,8 +48,8 @@ contains
         real(prec), intent(IN)    :: advecxy(:)     ! nz_aa [K a-1] Horizontal heat advection 
         real(prec), intent(IN)    :: uz(:)          ! nz_ac [m a-1] Vertical velocity 
         real(prec), intent(IN)    :: Q_strn(:)      ! nz_aa [J a-1 m-3] Internal strain heat production in ice
-        real(prec), intent(IN)    :: Q_b            ! [mW m-2] Basal frictional heat production
-        real(prec), intent(IN)    :: Q_lith         ! [mW m-2] Bedrock heat flux (positive down)
+        real(prec), intent(IN)    :: Q_b            ! [mW m-2] Basal frictional heat production (positive up)
+        real(prec), intent(IN)    :: Q_lith         ! [mW m-2] Bedrock heat flux (positive up)
         real(prec), intent(IN)    :: T_srf          ! [K] Surface temperature 
         real(prec), intent(IN)    :: T_shlf         ! [K] Marine-shelf interface temperature
         real(prec), intent(IN)    :: H_ice          ! [m] Ice thickness 
@@ -169,7 +169,7 @@ contains
             ! Calculate basal mass balance as sum of all water produced in column,
             ! reset temperature to pmp  
             if (T_excess .gt. 0.0) then 
-                melt_internal = melt_internal + T_excess * H_ice*(zeta_ac(k)-zeta_ac(k-1))*cp(k) / (L_ice * dt) 
+                melt_internal = melt_internal + T_excess * H_ice*(zeta_ac(k+1)-zeta_ac(k))*cp(k) / (L_ice * dt) 
                 T_ice(k)      = T_pmp(k)
             end if 
             
@@ -192,7 +192,7 @@ if (.TRUE.) then
             ! 1st order, upwind gradient dTdz 
             ! Works, but can cause oscillations in H_w 
             dz = H_ice * (zeta_aa(2)-zeta_aa(1))
-            Q_ice_b = kt(1) * (T_ice(2) - T_ice(1)) / dz 
+            Q_ice_b = -kt(1) * (T_ice(2) - T_ice(1)) / dz 
 
 else
             ! Seems more stable on grl sim, but causes noise on EISMINT sims
@@ -204,7 +204,7 @@ else
 !             Q_ice_b = kt(1) * (T_ice(2) - T_ice(1) - (0.5_prec*dz*dz*d2Tdz2)) / dz 
             
             dz = H_ice * (zeta_aa(2)-zeta_aa(1))
-            Q_ice_b = kt(1) * (T_ice(2) - T_ice(1)) / dz 
+            Q_ice_b = -kt(1) * (T_ice(2) - T_ice(1)) / dz 
             
             if (Q_ice_b .gt. 0.0_prec) then 
                 ! 2nd order, upwind gradient dTdz
@@ -214,7 +214,7 @@ else
                 T02      = interp_linear_point(zeta_aa(2),zeta_aa(3),T_ice(2),T_ice(3),zeta_now)
                 T01      = T_ice(2)
                 T00      = T_ice(1) 
-                Q_ice_b  = kt(1) * (-1.5_prec*T00 + 2.0_prec*T01 - 0.5_prec*T02) / dz 
+                Q_ice_b  = -kt(1) * (-1.5_prec*T00 + 2.0_prec*T01 - 0.5_prec*T02) / dz 
             end if 
 
 end if 
@@ -260,7 +260,7 @@ end if
         real(prec), intent(IN)    :: cp(:)          ! nz_aa [J kg-1 K-1] Specific heat capacity
         real(prec), intent(IN)    :: kt(:)          ! nz_aa [J a-1 m-1 K-1] Heat conductivity 
         real(prec), intent(IN)    :: Q_ice_b        ! [mW m-2] Ice basal heat flux (positive up)
-        real(prec), intent(IN)    :: Q_geo          ! [mW m-2] Bedrock heat flux (positive down)
+        real(prec), intent(IN)    :: Q_geo          ! [mW m-2] Bedrock heat flux (positive up)
         real(prec), intent(IN)    :: T_srf          ! [K] Surface temperature 
         real(prec), intent(IN)    :: T_pmp_srf      ! [K] Surface pressure-melting-point temperature 
         real(prec), intent(IN)    :: H_ice          ! [m] Ice thickness 
@@ -314,7 +314,7 @@ end if
                 ! Frozen at bed
 
             ! backward Euler flux surface boundary condition
-            val_srf      =  Q_ice_b_now / kt(nz_aa)
+            val_srf      =  -Q_ice_b_now / kt(nz_aa)
             is_surf_flux = .TRUE.   
 
         else 
@@ -402,7 +402,7 @@ end if
             ! (ac-node) and the centered (aa-node) temperature point above
             ! Note: zeta_aa(1) == zeta_ac(1) == bottom boundary 
             dz = thickness * (zeta_aa(2) - zeta_aa(1))
-
+            
             ! backward Euler flux basal boundary condition
             subd(1) =  0.0_prec
             diag(1) = -1.0_prec
@@ -424,16 +424,16 @@ end if
         do k = 2, nz_aa-1
 
             ! Get implicit vertical advection term, ac => aa nodes
-            uz_aa   = 0.5*(uz(k-1)+uz(k))
+            uz_aa   = 0.5*(uz(k)+uz(k+1))
 
             ! Get kappa for the lower and upper ac-nodes using harmonic mean from aa-nodes
             
-            dz1 = zeta_ac(k-1)-zeta_aa(k-1)
-            dz2 = zeta_aa(k)-zeta_ac(k-1)
+            dz1 = zeta_ac(k)-zeta_aa(k-1)
+            dz2 = zeta_aa(k)-zeta_ac(k)
             call calc_wtd_harmonic_mean(kappa_a,kappa(k-1),kappa(k),dz1,dz2)
 
-            dz1 = zeta_ac(k)-zeta_aa(k)
-            dz2 = zeta_aa(k+1)-zeta_ac(k)
+            dz1 = zeta_ac(k+1)-zeta_aa(k)
+            dz2 = zeta_aa(k+1)-zeta_ac(k+1)
             call calc_wtd_harmonic_mean(kappa_b,kappa(k),kappa(k+1),dz1,dz2)
 
             ! Vertical distance for centered difference advection scheme
@@ -458,7 +458,7 @@ end if
             ! (ac-node) and the centered (aa-node) temperature point above
             ! Note: zeta_aa(nz_aa) == zeta_ac(nz_ac) == top boundary 
             dz = thickness * (zeta_aa(nz_aa) - zeta_aa(nz_aa-1))
-
+            
             ! backward Euler flux basal boundary condition
             subd(nz_aa) = -1.0_prec
             diag(nz_aa) =  1.0_prec
@@ -512,7 +512,7 @@ end if
         real(prec), intent(IN)    :: advecxy(:)     ! nz_aa [K a-1] Horizontal heat advection 
         real(prec), intent(IN)    :: uz(:)          ! nz_ac [m a-1] Vertical velocity 
         real(prec), intent(IN)    :: Q_strn(:)      ! nz_aa [J a-1 m-3] Internal strain heat production in ice
-        real(prec), intent(IN)    :: Q_b            ! [mW m-2] Basal frictional heat production
+        real(prec), intent(IN)    :: Q_b            ! [mW m-2] Basal frictional heat production (positive up)
         real(prec), intent(IN)    :: Q_lith         ! [mW m-2] Bedrock heat flux (positive up)
         real(prec), intent(IN)    :: T_srf          ! [K] Surface temperature 
         real(prec), intent(IN)    :: T_shlf         ! [K] Marine-shelf interface temperature

@@ -195,7 +195,7 @@ contains
         
         return 
 
-    end subroutine calc_uz_3D 
+    end subroutine calc_uz_3D
 
     subroutine calc_advec_vertical_column_correction(uz,ux,uy,H_ice,z_srf,dHdt,dzsdt,zeta_ac,dx)
         ! Calculate the corrected vertical velocity, accounting for stretching of 

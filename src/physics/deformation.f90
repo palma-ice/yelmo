@@ -577,22 +577,16 @@ contains
 
                         lzx = (vz(ip1,j,k)-vz(im1,j,k))*0.5*fact_x(i,j)
                         lzy = (vz(i,jp1,k)-vz(i,jm1,k))*0.5*fact_y(i,j)
-
-                    else if (k .eq. nz_aa) then 
-                        ! Surface layer
-
-                        lzx = (vz(ip1,j,k-1)-vz(im1,j,k-1))*0.5*fact_x(i,j)
-                        lzy = (vz(i,jp1,k-1)-vz(i,jm1,k-1))*0.5*fact_y(i,j)
-
+                        
                     else 
                         ! Intermediate layers 
 
-                        lzx = (  (vz(ip1,j,k)+vz(ip1,j,k-1))   &
-                               - (vz(im1,j,k)+vz(im1,j,k-1)) ) &
+                        lzx = (  (vz(ip1,j,k+1)+vz(ip1,j,k))   &
+                               - (vz(im1,j,k+1)+vz(im1,j,k)) ) &
                                 *0.25*fact_x(i,j)
 
-                        lzy = (  (vz(i,jp1,k)+vz(i,jp1,k-1))   &
-                               - (vz(i,jm1,k)+vz(i,jm1,k-1)) ) &
+                        lzy = (  (vz(i,jp1,k+1)+vz(i,jp1,k))   &
+                               - (vz(i,jm1,k+1)+vz(i,jm1,k)) ) &
                                 *0.25*fact_y(i,j)
 
                     end if 

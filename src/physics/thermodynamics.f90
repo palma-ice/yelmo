@@ -57,7 +57,7 @@ contains
         real(prec), intent(IN)  :: T_prime_b         ! [K] Basal ice temp relative to pressure melting point (ie T_prime_b=0 K == temperate)
         real(prec), intent(IN)  :: Q_ice_b_now       ! [J a-1 m-2] Ice basal heat flux (positive up)
         real(prec), intent(IN)  :: Q_b               ! [J a-1 m-2] Basal heat production from friction and strain heating
-        real(prec), intent(IN)  :: Q_lith_now        ! [J a-1 m-2] Basal heat flux from bedrock surface (positive down)
+        real(prec), intent(IN)  :: Q_lith_now        ! [J a-1 m-2] Basal heat flux from bedrock surface (positive up)
         real(prec), intent(IN)  :: f_grnd            ! [--] Grounded fraction (centered aa node)                 
         real(prec), intent(IN)  :: rho_ice           ! [kg m-3] Ice density 
         
@@ -72,7 +72,7 @@ contains
             ! Classic Cuffey and Patterson (2010) formula
             
             ! Calculate net energy flux at the base [J a-1 m-2]
-            Q_net = Q_b + Q_ice_b_now + Q_lith_now
+            Q_net = Q_lith_now + Q_b - Q_ice_b_now
             
             bmb_grnd = -Q_net /(rho_ice*L_ice)
 
@@ -113,7 +113,7 @@ contains
         real(prec), intent(IN)  :: omega 
         real(prec), intent(IN)  :: Q_ice_b_now       ! [J a-1 m-2] Conductive heat flux to the base (positive up)
         real(prec), intent(IN)  :: Q_b               ! [J a-1 m-2] Basal heat production from friction and strain heating (postive up)
-        real(prec), intent(IN)  :: Q_lith_now        ! [J a-1 m-2] Basal heat flux from bedrock surface (positive down)
+        real(prec), intent(IN)  :: Q_lith_now        ! [J a-1 m-2] Basal heat flux from bedrock surface (positive up)
         real(prec), intent(IN)  :: f_grnd            ! [--] Grounded fraction (centered aa node)                 
         real(prec), intent(IN)  :: rho_ice           ! [kg m-3] Ice density 
         
@@ -123,9 +123,9 @@ contains
         
         if (f_grnd .gt. 0.0) then 
             ! Grounded point 
-
+            
             ! Calculate net energy flux at the base [J a-1 m-2]
-            Q_net = Q_b + Q_ice_b_now + Q_lith_now
+            Q_net = Q_lith_now + Q_b - Q_ice_b_now
             
             bmb_grnd = -Q_net / (rho_ice*L_ice)
 
@@ -628,7 +628,7 @@ contains
                     uy_aa_up  = 0.25*(uy(i,j-1,k)+uy(i,j,k)+uy(i,j-1,k+1)+uy(i,j,k+1))
                     uy_aa_dwn = 0.25*(uy(i,j-1,k)+uy(i,j,k)+uy(i,j-1,k-1)+uy(i,j,k-1))
                     
-                    dz = H_ice(i,j)*(zeta_ac(k) - zeta_ac(k-1)) 
+                    dz = H_ice(i,j)*(zeta_ac(k+1) - zeta_ac(k)) 
 
                     duxdz = (ux_aa_up-ux_aa_dwn)/dz 
                     duydz = (uy_aa_up-uy_aa_dwn)/dz 

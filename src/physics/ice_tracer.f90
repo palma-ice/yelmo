@@ -319,15 +319,15 @@ contains
                 kappa_a = kappa_aa(1)
             else 
                 ! Weighted average between lower half and upper half of point k-1 to k 
-                dz1 = zeta_ac(k-1)-zeta_aa(k-1)
-                dz2 = zeta_aa(k)-zeta_ac(k-1)
+                dz1 = zeta_ac(k)-zeta_aa(k-1)
+                dz2 = zeta_aa(k)-zeta_ac(k+1)
                 kappa_a = (dz1*kappa_aa(k-1) + dz2*kappa_aa(k))/(dz1+dz2)
             end if 
 
             ! ac-node between k and k+1 
 
             ! Weighted average between lower half and upper half of point k to k+1
-            dz1 = zeta_ac(k+1)-zeta_aa(k)
+            dz1 = zeta_ac(k)-zeta_aa(k)
             dz2 = zeta_aa(k+1)-zeta_ac(k+1)
             kappa_b = (dz1*kappa_aa(k) + dz2*kappa_aa(k+1))/(dz1+dz2)
 
@@ -583,7 +583,7 @@ contains
             
             if (k .ge. 2) then 
                 
-                dz = H_ice*(zeta_ac(k)-zeta_ac(k-1))
+                dz = H_ice*(zeta_ac(k+1)-zeta_ac(k))
 
                 uz_ac_up  = uz(k)
                 uz_ac_dwn = uz(k-1) 
@@ -708,7 +708,7 @@ contains
 
         return 
 
-    end subroutine calc_X_base 
+    end subroutine calc_X_base
 
     subroutine calc_advec_horizontal_column(advecxy,var_ice,ux,uy,dx,i,j,ulim)
         ! Newly implemented advection algorithms (ajr)
@@ -969,7 +969,7 @@ contains
         real(prec), intent(INOUT) :: dzeta_a(:)    ! nz_aa
         real(prec), intent(INOUT) :: dzeta_b(:)    ! nz_aa
         real(prec), intent(IN)    :: zeta_aa(:)    ! nz_aa 
-        real(prec), intent(IN)    :: zeta_ac(:)    ! nz_ac == nz_aa-1 
+        real(prec), intent(IN)    :: zeta_ac(:)    ! nz_ac == nz_aa+1 
 
         ! Local variables 
         integer :: k, nz_layers, nz_aa    
@@ -983,17 +983,16 @@ contains
         dzeta_b = 0.0 
         
         do k = 2, nz_aa-1 
-            dzeta_a(k) = 1.0/ ( (zeta_ac(k) - zeta_ac(k-1)) * (zeta_aa(k) - zeta_aa(k-1)) )
+            dzeta_a(k) = 1.0/ ( (zeta_ac(k+1) - zeta_ac(k)) * (zeta_aa(k) - zeta_aa(k-1)) )
         enddo
 
         do k = 2, nz_aa-1
-            dzeta_b(k) = 1.0/ ( (zeta_ac(k) - zeta_ac(k-1)) * (zeta_aa(k+1) - zeta_aa(k)) )
+            dzeta_b(k) = 1.0/ ( (zeta_ac(k+1) - zeta_ac(k)) * (zeta_aa(k+1) - zeta_aa(k)) )
         end do
 
         return 
 
     end subroutine calc_dzeta_terms
-
 
     subroutine calc_isochrones(depth_iso,dep_time,H_ice,age_iso,zeta,time)
         ! Calculate specific isochronal layers (depth_iso) at specified ages (age_iso)
@@ -1077,5 +1076,5 @@ contains
 
     end subroutine calc_isochrones
 
-end module ice_tracer 
+end module ice_tracer
 

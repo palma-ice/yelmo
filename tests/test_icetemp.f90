@@ -35,7 +35,8 @@ program test_icetemp
         real(prec) :: T_shlf            ! [K] Ice shelf base temperature 
         real(prec) :: smb               ! [m a**-1] Surface mass balance
         real(prec) :: bmb               ! [m a**-1] Basal mass balance
-        real(prec) :: Q_ice_b           ! [J a-1 m-2] Ice basal heat flux (positive up)
+        real(prec) :: Q_ice_b           ! [mW m-2] Ice basal heat flux (positive up)
+        real(prec) :: Q_lith            ! [mW m-2] Bed surface heat flux (positive up)
         real(prec) :: H_cts             ! [m] cold-temperate transition surface (CTS) height
         real(prec) :: Q_geo             ! [mW m-2] Geothermal heat flux 
         real(prec) :: Q_b               ! [J a-1 m-2] Basal heat production
@@ -299,10 +300,15 @@ program test_icetemp
             !             lith1%vec%cp,lith1%vec%kt,lith1%vec%advecxy,lith1%vec%uz,lith1%vec%Q_strn,lith1%Q_b,lith1%Q_geo,lith1%T_srf,lith1%T_shlf, &
             !             lith1%H_ice,lith1%H_w,lith1%f_grnd,lith1%vec%zeta,lith1%vec%zeta_ac,lith1%vec%dzeta_a,lith1%vec%dzeta_b,omega_max,T0_ref,dt)
             
-            call calc_temp_column_bedrock(lith1%vec%enth,lith1%vec%T_ice, &
-                        lith1%vec%cp,lith1%vec%kt,lith1%Q_geo,lith1%T_srf,lith1%H_ice, &
+            lith1%T_srf   = ice1%vec%T_ice(1) 
+            lith1%Q_ice_b = ice1%Q_ice_b 
+
+            call calc_temp_column_bedrock(lith1%vec%enth,lith1%vec%T_ice,lith1%Q_lith, &
+                        lith1%vec%cp,lith1%vec%kt,lith1%Q_ice_b,lith1%Q_geo,lith1%T_srf,ice1%vec%T_pmp(1),lith1%H_ice, &
                         lith1%vec%zeta,lith1%vec%zeta_ac,lith1%vec%dzeta_a,lith1%vec%dzeta_b,dt)
             
+            ice1%Q_geo = lith1%Q_lith 
+
             ! call calc_temp_column_bedrock(lith1%vec%enth,lith1%vec%T_ice,lith1%vec%cp,lith1%vec%kt, &
             !                     lith1%Q_geo,lith1%T_srf,lith1%H_ice,lith1%vec%zeta,lith1%vec%zeta_ac,lith1%vec%dzeta_a,lith1%vec%dzeta_b,T0_ref,dt)
         end if 
@@ -354,7 +360,7 @@ contains
         integer :: k, nz, nz_ac   
 
         nz    = size(ice%vec%zeta)
-        nz_ac = nz - 1 
+        nz_ac = nz + 1 
 
         ! Assign point values
         ice%T_srf    = 239.0       ! [K]
@@ -366,6 +372,8 @@ contains
         ice%H_w      = 0.0         ! [m] No basal water
         ice%Q_b      = 0.0         ! [] No basal frictional heating 
         ice%f_grnd   = 1.0         ! Grounded point 
+
+        ice%Q_lith   = ice%Q_geo 
 
         ! EISMINT1
         ice%vec%cp      = 1000.0    ! [J kg-1 K-1]

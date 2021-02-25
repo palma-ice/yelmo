@@ -21,6 +21,7 @@ module ice_enthalpy
     public :: calc_zeta_twolayers
     public :: calc_zeta_combined
     public :: get_cts_index
+    public :: calc_wtd_harmonic_mean 
 
 contains 
     
@@ -70,7 +71,7 @@ contains
         ! Local variables 
         integer    :: k, nz_aa, nz_ac
         real(prec) :: H_w_predicted
-        real(prec) :: dz 
+        real(prec) :: dz, dz1, dz2  
         real(prec) :: T_excess
         real(prec) :: Q_geo_now 
         real(prec) :: Q_lith_now 
@@ -106,9 +107,14 @@ contains
         
         ! Define kappa of mixed basal cell (part ice, part lithosphere) 
 
-        kappa_aa(k0) = kt(k0) / (rho_ice*cp(k0))
+        ! Just take ice-kappa for now:
+        !kappa_aa(k0) = kt(k0) / (rho_ice*cp(k0))
 
-        ! [To do: harmonic/geometric mean of ice/lith]
+        ! Harmonic/geometric mean of ice/lith]:
+        dz1 = H_ice*(zeta_aa(k0) - zeta_ac(k0))
+        dz2 = H_lith*(zeta_ac(k0+1) - zeta_aa(k0))
+        call calc_wtd_harmonic_mean(kappa_aa(k0),kappa_aa(k0-1),kappa_aa(k0+1),dz1,dz2)
+
 
         ! Convert units of Q_strn [J a-1 m-3] => [K a-1] 
         Q_strn_now(k0:nz_aa) = Q_strn(k0:nz_aa) / (rho_ice*cp(k0:nz_aa))
@@ -155,16 +161,16 @@ contains
                 ! Frozen at bed, or about to become frozen 
 
                 ! backward Euler flux basal boundary condition
-                !val_ice_base = -(Q_b_now + Q_lith_now) / kt(1)
-                val_ice_base = -Q_lith_now / kt(k0) 
+                ! val_ice_base      = -(Q_b_now + Q_lith_now) / kt(k0)
+                val_ice_base      = -Q_b_now !/ kt(k0) 
                 is_ice_basal_flux = .TRUE. 
                 
             else 
                 ! Temperate at bed 
                 ! Hold basal temperature at pressure melting point
 
-                val_base = T_pmp(1)
-                is_basal_flux = .FALSE. 
+                val_ice_base      = T_pmp(k0)
+                is_ice_basal_flux = .FALSE. 
                 
             end if   ! melting or frozen
 
@@ -172,7 +178,7 @@ contains
 
         ! === Solver =============================
      
-        call calc_temp_column_internal_combined(temp,kappa_aa,uz,advecxy,Q_strn_now,val_base,val_ice_base,val_srf, &
+        call calc_temp_column_internal_combined(temp,kappa_aa,kt,uz,advecxy,Q_strn_now,val_base,val_ice_base,val_srf, &
                                                 H_ice,H_lith,zeta_aa,zeta_ac,dzeta_a,dzeta_b,T_ref,dt, &
                                                 is_basal_flux,is_ice_basal_flux,is_surf_flux,k0)
 
@@ -219,7 +225,7 @@ contains
         ! Set global units to [mW m-2]
         Q_ice_b = Q_ice_b_now *1e3 / sec_year 
 
-        ! Calculate heat flux at lithosphere surface as temperature gradient * conductivity [J a-1 m-2]
+        ! Recalculate heat flux at lithosphere surface as temperature gradient * conductivity [J a-1 m-2]
 
         ! 1st order, upwind gradient dTdz 
         ! Works, but can cause oscillations in H_w 
@@ -243,7 +249,7 @@ contains
 
     end subroutine calc_temp_column_combined
 
-    subroutine calc_temp_column_internal_combined(temp,kappa,uz,advecxy,Q_strn,val_base,val_ice_base,val_srf,thickness, &
+    subroutine calc_temp_column_internal_combined(temp,kappa,kt,uz,advecxy,Q_strn,val_base,val_ice_base,val_srf,thickness, &
                                                     thickness_lith,zeta_aa,zeta_ac,dzeta_a,dzeta_b,T_ref,dt, &
                                                     is_basal_flux,is_ice_basal_flux,is_surf_flux,k0)
         ! Thermodynamics solver 1D (eg, for column of ice or bedrock)
@@ -257,7 +263,8 @@ contains
         implicit none 
 
         real(prec), intent(INOUT) :: temp(:)        ! nz_aa [K] Ice column temperature
-        real(prec), intent(IN)    :: kappa(:)       ! nz_aa [] Diffusivity
+        real(prec), intent(IN)    :: kappa(:)       ! nz_aa [m2 a-1] Diffusivity
+        real(prec), intent(IN)    :: kt(:)          ! nz_aa [J a-1 m-1 K-1] Thermal conductivity
         real(prec), intent(IN)    :: uz(:)          ! nz_ac [m a-1] Vertical velocity 
         real(prec), intent(IN)    :: advecxy(:)     ! nz_aa [K a-1] Horizontal heat advection 
         real(prec), intent(IN)    :: Q_strn(:)      ! nz_aa [K a-1] Internal strain heat production in ice
@@ -276,7 +283,7 @@ contains
         logical,    intent(IN)    :: is_ice_basal_flux  ! Is ice basal condition flux/Neumann condition (True) or const/Direchlet (False)
         logical,    intent(IN)    :: is_surf_flux   ! Is surf  condition flux/Neumann condition (True) or const/Direchlet (False)
         integer,    intent(IN)    :: k0 
-        
+
         ! Local variables 
         integer    :: k, nz_aa
         real(prec) :: fac, fac_a, fac_b, uz_aa, dz
@@ -295,7 +302,7 @@ contains
         allocate(rhs(nz_aa))
         allocate(solution(nz_aa))
 
-        ! == Ice base ==
+        ! == Lithosphere base ==
 
         if (is_basal_flux) then 
             ! Impose basal flux (Neumann condition)
@@ -303,7 +310,7 @@ contains
             ! Calculate dz for the bottom layer between the basal boundary
             ! (ac-node) and the centered (aa-node) temperature point above
             ! Note: zeta_aa(1) == zeta_ac(1) == bottom boundary 
-            dz = thickness * (zeta_aa(2) - zeta_aa(1))
+            dz = thickness_lith * (zeta_aa(2) - zeta_aa(1))
             
             ! backward Euler flux basal boundary condition
             subd(1) =  0.0_prec
@@ -360,26 +367,13 @@ contains
 
             ! Get kappa for the lower and upper ac-nodes using harmonic mean from aa-nodes
             
-            ! lith
-            dz1 = zeta_ac(k)-zeta_aa(k-1)
-            dz2 = zeta_aa(k)-zeta_ac(k)
-            call calc_wtd_harmonic_mean(kappa_a,kappa(k-1),kappa(k),dz1,dz2)
-
-            ! ice 
-            dz1 = zeta_ac(k+1)-zeta_aa(k)
-            dz2 = zeta_aa(k+1)-zeta_ac(k+1)
-            call calc_wtd_harmonic_mean(kappa_b,kappa(k),kappa(k+1),dz1,dz2)
-
-            fac_a   = kappa_a / (thickness_lith*(zeta_aa(k)-zeta_ac(k)))
-            fac_b   = kappa_b / (thickness*(zeta_ac(k+1)-zeta_aa(k)))
+            fac_a   = kt(k-1) / (thickness_lith*(zeta_aa(k)-zeta_aa(k-1)))
+            fac_b   = kt(k+1) / (thickness*(zeta_aa(k+1)-zeta_aa(k)))
             
-            ! Ice thickness part 
-            dz = zeta_ac(k+1) - zeta_aa(k) 
-
             subd(k) = fac_a 
             supd(k) = fac_b 
             diag(k) = - fac_a - fac_b
-            rhs(k)  = val_ice_base*dz 
+            rhs(k)  = val_ice_base
         
         else 
 
@@ -678,7 +672,7 @@ end if
 
     end subroutine calc_temp_column
 
-    subroutine calc_temp_column_bedrock(enth,temp,cp,kt,Q_ice_b,Q_geo,T_srf,T_pmp_srf,H_ice, &
+    subroutine calc_temp_column_bedrock(enth,temp,Q_lith,cp,kt,Q_ice_b,Q_geo,T_srf,T_pmp_srf,H_lith, &
                                                 zeta_aa,zeta_ac,dzeta_a,dzeta_b,dt)
         ! Thermodynamics solver for a given column of ice 
         ! Note zeta=height, k=1 base, k=nz surface 
@@ -692,13 +686,14 @@ end if
 
         real(prec), intent(INOUT) :: enth(:)        ! nz_aa [J kg] Ice column enthalpy
         real(prec), intent(INOUT) :: temp(:)        ! nz_aa [K] Ice column temperature
+        real(prec), intent(OUT)   :: Q_lith         ! [mW m-2] Bed surface heat flux (positive up)
         real(prec), intent(IN)    :: cp(:)          ! nz_aa [J kg-1 K-1] Specific heat capacity
         real(prec), intent(IN)    :: kt(:)          ! nz_aa [J a-1 m-1 K-1] Heat conductivity 
         real(prec), intent(IN)    :: Q_ice_b        ! [mW m-2] Ice basal heat flux (positive up)
         real(prec), intent(IN)    :: Q_geo          ! [mW m-2] Bedrock heat flux (positive up)
         real(prec), intent(IN)    :: T_srf          ! [K] Surface temperature 
         real(prec), intent(IN)    :: T_pmp_srf      ! [K] Surface pressure-melting-point temperature 
-        real(prec), intent(IN)    :: H_ice          ! [m] Ice thickness 
+        real(prec), intent(IN)    :: H_lith         ! [m] Lithosphere thickness 
         real(prec), intent(IN)    :: zeta_aa(:)     ! nz_aa [--] Vertical sigma coordinates (zeta==height), layer centered aa-nodes
         real(prec), intent(IN)    :: zeta_ac(:)     ! nz_ac [--] Vertical height axis temperature (0:1), layer edges ac-nodes
         real(prec), intent(IN)    :: dzeta_a(:)     ! nz_aa [--] Solver discretization helper variable ak
@@ -707,6 +702,7 @@ end if
 
         ! Local variables 
         integer    :: k, nz_aa, nz_ac
+        real(prec) :: Q_lith_now, dz 
         real(prec) :: Q_ice_b_now
         real(prec) :: Q_geo_now 
         real(prec) :: val_base, val_srf 
@@ -745,21 +741,21 @@ end if
 
         ! === Surface boundary condition =====================
 
-        if ( T_srf .lt. T_pmp_srf ) then
-                ! Frozen at bed
+        ! if ( T_srf .lt. T_pmp_srf ) then
+        !         ! Frozen at bed
 
-            ! backward Euler flux surface boundary condition
-            val_srf      =  -Q_ice_b_now / kt(nz_aa)
-            is_surf_flux = .TRUE.   
+        !     ! backward Euler flux surface boundary condition
+        !     val_srf      =  -Q_ice_b_now / kt(nz_aa)
+        !     is_surf_flux = .TRUE.   
 
-        else 
-            ! Temperate at bed 
-            ! Hold bed surface temperature at pressure melting point
+        ! else 
+            ! Temperate at bed surface
+            ! Hold bed surface temperature at ice base temperature
 
             val_srf      = T_srf
             is_surf_flux = .FALSE. 
             
-        end if
+        ! end if
             
         ! === Basal boundary condition =====================
 
@@ -769,10 +765,20 @@ end if
         
         ! === Solver =============================
      
-        call calc_temp_column_internal(temp,kappa_aa,uz,advecxy,Q_strn,val_base,val_srf,H_ice, &
+        call calc_temp_column_internal(temp,kappa_aa,uz,advecxy,Q_strn,val_base,val_srf,H_lith, &
                                                 zeta_aa,zeta_ac,dzeta_a,dzeta_b,T_ref,dt, &
                                                 is_basal_flux,is_surf_flux)
 
+        ! Calculate heat flux at lithosphere surface as temperature gradient * conductivity [J a-1 m-2]
+
+        ! 1st order, upwind gradient dTdz 
+        ! Works, but can cause oscillations in H_w 
+        dz = H_lith * (zeta_aa(nz_aa)-zeta_aa(nz_aa-1))
+        Q_lith_now = -kt(nz_aa) * (temp(nz_aa) - temp(nz_aa-1)) / dz 
+
+        ! Set global units to [mW m-2]
+        Q_lith = Q_lith_now *1e3 / sec_year 
+        
         ! Finally, get enthalpy too 
         call convert_to_enthalpy(enth,temp,omega=0.0_wp,T_pmp=0.0_wp,cp=cp,L=0.0_wp)
 

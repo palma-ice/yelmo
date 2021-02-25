@@ -35,6 +35,8 @@ program yelmo_benchmarks
 
     real(8) :: cpu_start_time, cpu_end_time, cpu_dtime  
     
+    character(len=56) :: lith_method_default 
+
     ! Start timing 
     call yelmo_cpu_time(cpu_start_time)
 
@@ -357,6 +359,9 @@ program yelmo_benchmarks
         yelmo1%dyn%par%solver = "fixed"
     end if 
 
+    ! Store default lithosphere solver method, to be activated after several years 
+    lith_method_default = trim(yelmo1%thrm%par%lith_method)
+
     ! Advance timesteps
     do n = 1, ceiling((time_end-time_init)/dtt)
 
@@ -370,11 +375,11 @@ program yelmo_benchmarks
             yelmo1%bnd%enh_srf = 1.0 
         end if 
 
-        ! if (time .le. 25e3) then 
-        !     yelmo1%thrm%par%lith_method = "equil"
-        ! else 
-        !     yelmo1%thrm%par%lith_method = "active" 
-        ! end if 
+        if (time .le. 50e3) then 
+            yelmo1%thrm%par%lith_method = "equil"
+        else 
+            yelmo1%thrm%par%lith_method = trim(lith_method_default)
+        end if 
 
         ! == Yelmo ice sheet ===================================================
         call yelmo_update(yelmo1,time)

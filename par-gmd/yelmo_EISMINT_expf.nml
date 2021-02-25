@@ -163,8 +163,8 @@
 /
 
 &ytherm_lith
-    method          = "equil"           ! "equil" (not active bedrock) or "active"
-    nz_aa           = 10                ! Number of vertical points in bedrock 
+    method          = "active"          ! "equil" (not active bedrock) or "active"
+    nz_aa           = 5                 ! Number of vertical points in bedrock 
     zeta_scale      = "exp-inv"         ! "linear", "exp-inv"
     zeta_exp        = 2.0  
     H_lith          = 3000.0            ! [m] Lithosphere thickness 

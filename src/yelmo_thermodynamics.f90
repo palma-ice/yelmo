@@ -145,9 +145,9 @@ end select
             ! Calculate heat flux from vertical temp. gradient in lithosphere 
 
             ! Calculate heat flux through bed surface from lithosphere [mW m-2]
-            ! call calc_Q_lith(thrm%now%Q_lith,thrm%now%T_lith,thrm%now%kt_lith, &
-            !                             thrm%now%H_lith,thrm%par%lith_zeta_aa)
-            thrm%now%Q_lith = bnd%Q_geo 
+            call calc_Q_lith(thrm%now%Q_lith,thrm%now%T_lith,thrm%now%kt_lith, &
+                                        thrm%now%H_lith,thrm%par%lith_zeta_aa)
+            !thrm%now%Q_lith = bnd%Q_geo 
 
         end if
 

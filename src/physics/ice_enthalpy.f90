@@ -893,14 +893,14 @@ end if
         ! == Ice surface ==
 
         if (is_surf_flux) then 
-            ! Impose basal flux (Neumann condition)
+            ! Impose surface flux (Neumann condition)
 
             ! Calculate dz for the top layer between the surface boundary
             ! (ac-node) and the centered (aa-node) temperature point above
             ! Note: zeta_aa(nz_aa) == zeta_ac(nz_ac) == top boundary 
             dz = thickness * (zeta_aa(nz_aa) - zeta_aa(nz_aa-1))
             
-            ! backward Euler flux basal boundary condition
+            ! backward Euler flux surface boundary condition
             subd(nz_aa) = -1.0_prec
             diag(nz_aa) =  1.0_prec
             supd(nz_aa) =  0.0_prec

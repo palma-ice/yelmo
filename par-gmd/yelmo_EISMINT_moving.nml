@@ -145,7 +145,7 @@
 /
 
 &ytherm
-    method          = "temp"            ! "fixed", "robin", "temp", "enth"
+    method          = "temp-combined"            ! "fixed", "robin", "temp", "enth"
     dt_method       = "FE"              ! "FE", "AB", "SAM"
     solver_advec    = "impl-upwind"     ! "expl", "impl-upwind"
     gamma           = 1.0               ! [K] Scalar for the pressure melting point decay function 
@@ -163,7 +163,7 @@
 /
 
 &ytherm_lith
-    method          = "active"          ! "equil" (not active bedrock) or "active"
+    method          = "combined"          ! "equil" (not active bedrock) or "active"
     nz_aa           = 5                 ! Number of vertical points in bedrock 
     zeta_scale      = "exp-inv"         ! "linear", "exp-inv"
     zeta_exp        = 2.0  

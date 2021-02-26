@@ -32,7 +32,8 @@ module thermodynamics
     public :: define_temp_lith_3D
     public :: calc_temp_lith_column
     public :: calc_Q_lith
-
+    public :: calc_Q_lith_column
+    
     public :: calc_basal_water_local
 
     public :: calc_basal_heating_fromaa 
@@ -1510,7 +1511,7 @@ end if
 
         ! Calculate heat flux through bed surface from lithosphere [mW m-2]
         call calc_Q_lith(Q_lith,temp,kt,thickness,zeta_aa)
-            
+           
         return 
 
     end subroutine define_temp_lith_3D
@@ -1600,6 +1601,36 @@ end if
 
     end subroutine calc_Q_lith
 
+    subroutine calc_Q_lith_column(Q_lith,T_lith,kt,H_lith,zeta_aa)
+
+        implicit none 
+
+        real(wp), intent(OUT) :: Q_lith 
+        real(wp), intent(IN)  :: T_lith(:) 
+        real(wp), intent(IN)  :: kt(:) 
+        real(wp), intent(IN)  :: H_lith 
+        real(wp), intent(IN)  :: zeta_aa(:) 
+
+        ! Local variables 
+        integer  :: nz_aa 
+        real(wp) :: dz 
+
+        nz_aa = size(zeta_aa,1) 
+
+        ! Determine layer thickness of lithosphere at bed surface
+        dz = H_lith*(zeta_aa(nz_aa)-zeta_aa(nz_aa-1))
+
+        ! Calculate lithospheric heat flux [J a-1 m-2]
+        Q_lith = -kt(nz_aa) * (T_lith(nz_aa)-T_lith(nz_aa-1)) / dz 
+
+
+        ! [J a-1 m-2] => [mW m-2] (same units as Q_geo by default)
+        Q_lith = Q_lith *1e3 / sec_year 
+
+        return 
+
+    end subroutine calc_Q_lith_column
+    
     function error_function(X) result(ERR)
         ! Purpose: Compute error function erf(x)
         ! Input:   x   --- Argument of erf(x)

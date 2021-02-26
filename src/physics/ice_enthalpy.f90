@@ -40,7 +40,7 @@ contains
         real(prec), intent(INOUT) :: T_ice(:)       ! nz_aa [K] Ice column temperature
         real(prec), intent(INOUT) :: omega(:)       ! nz_aa [-] Ice column water content fraction
         real(prec), intent(INOUT) :: bmb_grnd       ! [m a-1] Basal mass balance (melting is negative)
-        real(prec), intent(OUT)   :: Q_ice_b        ! [J a-1 m-2] Ice basal heat flux (positive up)
+        real(prec), intent(OUT)   :: Q_ice_b        ! [mW m-2] Ice basal heat flux (positive up)
         real(prec), intent(OUT)   :: H_cts          ! [m] cold-temperate transition surface (CTS) height
         real(prec), intent(IN)    :: T_pmp(:)       ! nz_aa [K] Pressure melting point temp.
         real(prec), intent(IN)    :: cp(:)          ! nz_aa [J kg-1 K-1] Specific heat capacity
@@ -48,8 +48,8 @@ contains
         real(prec), intent(IN)    :: advecxy(:)     ! nz_aa [K a-1] Horizontal heat advection 
         real(prec), intent(IN)    :: uz(:)          ! nz_ac [m a-1] Vertical velocity 
         real(prec), intent(IN)    :: Q_strn(:)      ! nz_aa [J a-1 m-3] Internal strain heat production in ice
-        real(prec), intent(IN)    :: Q_b            ! [J a-1 m-2] Basal frictional heat production
-        real(prec), intent(IN)    :: Q_lith         ! [J a-1 m-2] Bedrock heat flux (positive up)
+        real(prec), intent(IN)    :: Q_b            ! [mW m-2] Basal frictional heat production
+        real(prec), intent(IN)    :: Q_lith         ! [mW m-2] Bedrock heat flux (positive up)
         real(prec), intent(IN)    :: T_srf          ! [K] Surface temperature 
         real(prec), intent(IN)    :: T_shlf         ! [K] Marine-shelf interface temperature
         real(prec), intent(IN)    :: H_ice          ! [m] Ice thickness 
@@ -69,7 +69,7 @@ contains
         real(prec) :: dz, dz1, dz2, d2Tdz2 
         real(prec) :: T00, T01, T02, zeta_now  
         real(prec) :: T_excess
-        real(prec) :: Q_lith_now 
+        real(prec) :: Q_ice_b_now, Q_b_now, Q_lith_now 
         real(prec) :: melt_internal
         real(prec) :: val_base, val_srf 
         logical    :: is_basal_flux  
@@ -87,6 +87,9 @@ contains
 
         ! Get lithosphere heat flux in proper units 
         Q_lith_now = Q_lith*1e-3*sec_year   ! [mW m-2] => [J m-2 a-1]
+
+        ! Get basal frictional heat flux in proper units 
+        Q_b_now = Q_b*1e-3*sec_year         ! [mW m-2] => [J m-2 a-1]
 
         ! Step 0: Calculate diffusivity on cell centers (aa-nodes)
 
@@ -129,7 +132,7 @@ contains
                 ! Frozen at bed, or about to become frozen 
 
                 ! backward Euler flux basal boundary condition
-                val_base = (Q_b + Q_lith_now) / kt(1)
+                val_base = -(Q_b_now + Q_lith_now) / kt(1)
                 is_basal_flux = .TRUE. 
                 
             else 
@@ -180,43 +183,22 @@ contains
         ! Calculate heat flux at ice base as temperature gradient * conductivity [J a-1 m-2]
         if (H_ice .gt. 0.0_prec) then 
 
-if (.TRUE.) then 
             ! 1st order, upwind gradient dTdz 
             ! Works, but can cause oscillations in H_w 
             dz = H_ice * (zeta_aa(2)-zeta_aa(1))
-            Q_ice_b = kt(1) * (T_ice(2) - T_ice(1)) / dz 
-
-else
-            ! Seems more stable on grl sim, but causes noise on EISMINT sims
-!             dz  = H_ice*(zeta_ac(3)-zeta_ac(2))
-!             dz1 = H_ice*(zeta_aa(2)-zeta_aa(1))
-!             dz2 = H_ice*(zeta_aa(3)-zeta_aa(2)) 
-!             d2Tdz2 = ( ((T_ice(3)-T_ice(2))/dz2) - ((T_ice(2)-T_ice(1))/dz1) ) / dz 
-!             dz = H_ice * (zeta_aa(2)-zeta_aa(1))
-!             Q_ice_b = kt(1) * (T_ice(2) - T_ice(1) - (0.5_prec*dz*dz*d2Tdz2)) / dz 
-            
-            dz = H_ice * (zeta_aa(2)-zeta_aa(1))
-            Q_ice_b = kt(1) * (T_ice(2) - T_ice(1)) / dz 
-            
-            if (Q_ice_b .gt. 0.0_prec) then 
-                ! 2nd order, upwind gradient dTdz
-                ! Causes slight noise on EISMINT sims, but seems stable also on grl sim.
-                dz       = H_ice*(zeta_aa(2)-zeta_aa(1))
-                zeta_now = zeta_aa(2) + (zeta_aa(2)-zeta_aa(1))
-                T02      = interp_linear_point(zeta_aa(2),zeta_aa(3),T_ice(2),T_ice(3),zeta_now)
-                T01      = T_ice(2)
-                T00      = T_ice(1) 
-                Q_ice_b  = kt(1) * (-1.5_prec*T00 + 2.0_prec*T01 - 0.5_prec*T02) / dz 
-            end if 
-
-end if 
+            Q_ice_b_now = -kt(1) * (T_ice(2) - T_ice(1)) / dz 
 
         else 
-            Q_ice_b = 0.0  
+
+            Q_ice_b_now = 0.0  
+
         end if 
         
+        ! Calculate Q_ice_b for global output 
+        Q_ice_b = Q_ice_b_now*1e3/sec_year      ! [J a-1 m-2] => [mW m-2]
+
         ! Calculate basal mass balance (valid for grounded ice only)
-        call calc_bmb_grounded(bmb_grnd,T_ice(1)-T_pmp(1),Q_ice_b,Q_b,Q_lith_now,f_grnd,rho_ice)
+        call calc_bmb_grounded(bmb_grnd,T_ice(1)-T_pmp(1),Q_ice_b_now,Q_b_now,Q_lith_now,f_grnd,rho_ice)
         
         ! Include internal melting in bmb_grnd 
         bmb_grnd = bmb_grnd - melt_internal 
@@ -245,7 +227,7 @@ end if
         real(prec), intent(INOUT) :: T_ice(:)       ! nz_aa [K] Ice column temperature
         real(prec), intent(IN)    :: cp(:)          ! nz_aa [J kg-1 K-1] Specific heat capacity
         real(prec), intent(IN)    :: kt(:)          ! nz_aa [J a-1 m-1 K-1] Heat conductivity 
-        real(prec), intent(IN)    :: Q_geo          ! [J a-1 m-2] Bedrock heat flux (positive up)
+        real(prec), intent(IN)    :: Q_geo          ! [mW m-2] Bedrock heat flux (positive up)
         real(prec), intent(IN)    :: T_srf          ! [K] Surface temperature 
         real(prec), intent(IN)    :: H_ice          ! [m] Ice thickness 
         real(prec), intent(IN)    :: zeta_aa(:)     ! nz_aa [--] Vertical sigma coordinates (zeta==height), layer centered aa-nodes
@@ -294,7 +276,7 @@ end if
         ! === Basal boundary condition =====================
 
         ! backward Euler flux basal boundary condition
-        val_base = Q_geo_now / kt(1)
+        val_base = -Q_geo_now / kt(1)
         is_basal_flux = .TRUE. 
         
         ! === Solver =============================
@@ -366,8 +348,8 @@ end if
 
             ! backward Euler flux basal boundary condition
             subd(1) =  0.0_prec
-            diag(1) =  1.0_prec
-            supd(1) = -1.0_prec
+            diag(1) = -1.0_prec
+            supd(1) =  1.0_prec
             rhs(1)  = val_base * dz
                 
         else 

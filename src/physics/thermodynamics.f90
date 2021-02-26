@@ -43,7 +43,7 @@ module thermodynamics
 
 contains
 
-    subroutine calc_bmb_grounded(bmb_grnd,T_prime_b,Q_ice_b,Q_b,Q_lith_now,f_grnd,rho_ice)
+    subroutine calc_bmb_grounded(bmb_grnd,T_prime_b,Q_ice_b_now,Q_b_now,Q_lith_now,f_grnd,rho_ice)
         ! Calculate everywhere there is at least some grounded ice 
         ! (centered aa node calculation)
 
@@ -55,9 +55,9 @@ contains
         
         real(prec), intent(OUT) :: bmb_grnd          ! [m/a ice equiv.] Basal mass balance, grounded
         real(prec), intent(IN)  :: T_prime_b         ! [K] Basal ice temp relative to pressure melting point (ie T_prime_b=0 K == temperate)
-        real(prec), intent(IN)  :: Q_ice_b           ! [J a-1 m-2] Ice basal heat flux (positive up)
-        real(prec), intent(IN)  :: Q_b               ! [J a-1 m-2] Basal heat production from friction and strain heating
-        real(prec), intent(IN)  :: Q_lith_now         ! [J a-1 m-2] Geothermal heat flux 
+        real(prec), intent(IN)  :: Q_ice_b_now       ! [J a-1 m-2] Ice basal heat flux (positive up)
+        real(prec), intent(IN)  :: Q_b_now           ! [J a-1 m-2] Basal heat production from friction and strain heating
+        real(prec), intent(IN)  :: Q_lith_now        ! [J a-1 m-2] Geothermal heat flux 
         real(prec), intent(IN)  :: f_grnd            ! [--] Grounded fraction (centered aa node)                 
         real(prec), intent(IN)  :: rho_ice           ! [kg m-3] Ice density 
         
@@ -72,7 +72,7 @@ contains
             ! Classic Cuffey and Patterson (2010) formula
             
             ! Calculate net energy flux at the base [J a-1 m-2]
-            Q_net = Q_b + Q_ice_b + Q_lith_now
+            Q_net = Q_lith_now + Q_b_now - Q_ice_b_now
             
             bmb_grnd = -Q_net /(rho_ice*L_ice)
 
@@ -98,7 +98,7 @@ contains
 
     end subroutine calc_bmb_grounded
 
-    elemental subroutine calc_bmb_grounded_enth(bmb_grnd,T_prime_b,omega,Q_ice_b,Q_b,Q_lith_now,f_grnd,rho_ice)
+    elemental subroutine calc_bmb_grounded_enth(bmb_grnd,T_prime_b,omega,Q_ice_b_now,Q_b_now,Q_lith_now,f_grnd,rho_ice)
         ! Calculate everywhere there is at least some grounded ice 
         ! (centered aa node calculation)
 
@@ -111,9 +111,9 @@ contains
         real(prec), intent(OUT) :: bmb_grnd          ! [m/a ice equiv.] Basal mass balance, grounded
         real(prec), intent(IN)  :: T_prime_b         ! [K] Basal ice temp relative to pressure melting point (ie T_prime_b=0 K == temperate)
         real(prec), intent(IN)  :: omega 
-        real(prec), intent(IN)  :: Q_ice_b           ! [J a-1 m-2] Conductive heat flux to the base (positive down)
-        real(prec), intent(IN)  :: Q_b               ! [J a-1 m-2] Basal heat production from friction and strain heating (postive up)
-        real(prec), intent(IN)  :: Q_lith_now         ! [J a-1 m-2] Geothermal heat flux (positive up)
+        real(prec), intent(IN)  :: Q_ice_b_now       ! [J a-1 m-2] Conductive heat flux to the base (positive down)
+        real(prec), intent(IN)  :: Q_b_now           ! [J a-1 m-2] Basal heat production from friction and strain heating (postive up)
+        real(prec), intent(IN)  :: Q_lith_now        ! [J a-1 m-2] Geothermal heat flux (positive up)
         real(prec), intent(IN)  :: f_grnd            ! [--] Grounded fraction (centered aa node)                 
         real(prec), intent(IN)  :: rho_ice           ! [kg m-3] Ice density 
         
@@ -125,9 +125,9 @@ contains
             ! Grounded point 
 
             ! Calculate net energy flux at the base [J a-1 m-2]
-            Q_net = Q_b + Q_ice_b + Q_lith_now
+            Q_net = Q_lith_now + Q_b_now - Q_ice_b_now
             
-            bmb_grnd = -Q_net / (rho_ice*L_ice)
+            bmb_grnd = -Q_net /(rho_ice*L_ice)
 
         else 
             ! Floating point, no grounded bmb 
@@ -665,7 +665,7 @@ contains
          ! Note: grounded ice fraction f_grnd_acx/y not used here, because taub_acx/y already accounts
          ! for the grounded fraction via beta_acx/y: Q_b = tau_b*u = -beta*u*u.
 
-        real(prec), intent(INOUT) :: Q_b(:,:)           ! [J a-1 m-2] Basal heat production (friction), aa-nodes
+        real(prec), intent(INOUT) :: Q_b(:,:)           ! [mW m-2] Basal heat production (friction), aa-nodes
         real(prec), intent(IN)    :: ux_b(:,:)          ! Basal velocity, x-component (acx)
         real(prec), intent(IN)    :: uy_b(:,:)          ! Basal velocity, y-compenent (acy)
         real(prec), intent(IN)    :: taub_acx(:,:)      ! Basal friction (acx)
@@ -708,6 +708,9 @@ contains
         end do 
         end do 
 
+        ! Finally convert to [mW m-2]
+        Q_b = Q_b * 1e3 / sec_year      ! [J a-1 m-2] => [mW m-2]
+
         return 
  
     end subroutine calc_basal_heating_fromaa
@@ -717,7 +720,7 @@ contains
          ! Note: grounded ice fraction f_grnd_acx/y not used here, because taub_acx/y already accounts
          ! for the grounded fraction via beta_acx/y: Q_b = tau_b*u = -beta*u*u.
 
-        real(prec), intent(INOUT) :: Q_b(:,:)           ! [J a-1 m-2] Basal heat production (friction), aa-nodes
+        real(prec), intent(INOUT) :: Q_b(:,:)           ! [mW m-2] Basal heat production (friction), aa-nodes
         real(prec), intent(IN)    :: ux_b(:,:)          ! Basal velocity, x-component (acx)
         real(prec), intent(IN)    :: uy_b(:,:)          ! Basal velocity, y-compenent (acy)
         real(prec), intent(IN)    :: taub_acx(:,:)      ! Basal friction (acx)
@@ -811,6 +814,9 @@ contains
         end do 
         end do 
 
+        ! Finally convert to [mW m-2]
+        Q_b = Q_b * 1e3 / sec_year      ! [J a-1 m-2] => [mW m-2]
+
         return 
  
     end subroutine calc_basal_heating_fromab
@@ -820,7 +826,7 @@ contains
          ! Note: grounded ice fraction f_grnd_acx/y not used here, because taub_acx/y already accounts
          ! for the grounded fraction via beta_acx/y: Q_b = tau_b*u = -beta*u*u.
 
-        real(prec), intent(INOUT) :: Q_b(:,:)           ! [J a-1 m-2] Basal heat production (friction), aa-nodes
+        real(prec), intent(INOUT) :: Q_b(:,:)           ! [mW m-2] Basal heat production (friction), aa-nodes
         real(prec), intent(IN)    :: ux_b(:,:)          ! Basal velocity, x-component (acx)
         real(prec), intent(IN)    :: uy_b(:,:)          ! Basal velocity, y-compenent (acy)
         real(prec), intent(IN)    :: taub_acx(:,:)      ! Basal friction (acx)
@@ -874,6 +880,9 @@ end if
         end do 
         end do 
         
+        ! Finally convert to [mW m-2]
+        Q_b = Q_b * 1e3 / sec_year      ! [J a-1 m-2] => [mW m-2]
+
         return 
  
     end subroutine calc_basal_heating_fromac
@@ -883,7 +892,7 @@ end if
          ! Note: grounded ice fraction f_grnd_acx/y not used here, because beta_acx/y already accounts
          ! for the grounded fraction via beta_acx/y: Q_b = tau_b*u = -beta*u*u.
 
-        real(prec), intent(INOUT) :: Q_b(:,:)           ! [J a-1 m-2] Basal heat production (friction), aa-nodes
+        real(prec), intent(INOUT) :: Q_b(:,:)           ! [mW m-2] Basal heat production (friction), aa-nodes
         real(prec), intent(IN)    :: ux_b(:,:)          ! Basal velocity, x-component (acx)
         real(prec), intent(IN)    :: uy_b(:,:)          ! Basal velocity, y-compenent (acy)
         real(prec), intent(IN)    :: taub_acx(:,:)      ! Basal stress (acx)
@@ -997,6 +1006,9 @@ end if
             
         end do 
         end do 
+
+        ! Finally convert to [mW m-2]
+        Q_b = Q_b * 1e3 / sec_year      ! [J a-1 m-2] => [mW m-2]
 
         return 
  

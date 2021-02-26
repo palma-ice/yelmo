@@ -607,17 +607,9 @@ contains
             stop 
         end if 
 
-        ! Define size of zeta_ac axis
-        dom%par%nz_ac = dom%par%nz_aa-1 
-        
-        ! Allocate z-axes
-        if (allocated(dom%par%zeta_aa)) deallocate(dom%par%zeta_aa)
-        if (allocated(dom%par%zeta_ac)) deallocate(dom%par%zeta_ac)
-        allocate(dom%par%zeta_aa(dom%par%nz_aa)) 
-        allocate(dom%par%zeta_ac(dom%par%nz_ac))
-
         ! Calculate zeta_aa and zeta_ac 
-        call calc_zeta(dom%par%zeta_aa,dom%par%zeta_ac,dom%par%zeta_scale,dom%par%zeta_exp)
+        call calc_zeta(dom%par%zeta_aa,dom%par%zeta_ac,dom%par%nz_ac,dom%par%nz_aa, &
+                                                    dom%par%zeta_scale,dom%par%zeta_exp)
 
         ! Initialize ytime information here too 
         call ytime_init(dom%time,dom%grd%nx,dom%grd%ny,dom%par%nz_aa,dom%par%dt_min,dom%par%pc_eps)

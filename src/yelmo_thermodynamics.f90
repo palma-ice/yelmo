@@ -727,19 +727,10 @@ end select
         call calc_dzeta_terms(par%dzeta_a,par%dzeta_b,par%zeta_aa,par%zeta_ac)
 
         ! == Lithosphere == 
-
-        ! Define size of zeta_ac axis
-        par%lith_nz_ac = par%lith_nz_aa-1
-
-        ! Allocate z-axes
-        if (allocated(par%lith_zeta_aa)) deallocate(par%lith_zeta_aa)
-        if (allocated(par%lith_zeta_ac)) deallocate(par%lith_zeta_ac)
-        allocate(par%lith_zeta_aa(par%lith_nz_aa)) 
-        allocate(par%lith_zeta_ac(par%lith_nz_ac))
-
+        
         ! Calculate zeta_aa and zeta_ac 
-        call calc_zeta(par%lith_zeta_aa,par%lith_zeta_ac, &
-                            par%lith_zeta_scale,par%lith_zeta_exp)
+        call calc_zeta(par%lith_zeta_aa,par%lith_zeta_ac,par%lith_nz_ac, &
+                            par%lith_nz_aa,par%lith_zeta_scale,par%lith_zeta_exp)
 
         ! Calculate domain-level dzeta terms too 
         if (allocated(par%lith_dzeta_a)) deallocate(par%lith_dzeta_a)

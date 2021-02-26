@@ -133,24 +133,12 @@ end select
         thrm%now%kt_lith = thrm%par%lith_kt 
         thrm%now%H_lith  = thrm%par%H_lith 
         
-        ! Calculate heat flux from bedrock to bed surface 
-        ! (when bedrock is in equilibrium Q_lith==Q_geo) 
-
+        ! Ensure that Q_lith is defined. At initialization, 
+        ! it may have a value of zero. In this case, set equal 
+        ! to Q_geo to be consistent with equilibrium lithosphere conditions. 
         if (maxval(thrm%now%Q_lith) .eq. 0.0) then 
-            ! It has not been initialized, set equal to Q_geo to start 
-
             thrm%now%Q_lith = bnd%Q_geo 
-
-        else 
-            ! Calculate heat flux from vertical temp. gradient in lithosphere 
-
-            ! Calculate heat flux through bed surface from lithosphere [mW m-2]
-            call calc_Q_lith(thrm%now%Q_lith,thrm%now%T_lith,thrm%now%kt_lith, &
-                                        thrm%now%H_lith,thrm%par%lith_zeta_aa)
-            ! thrm%now%Q_lith = bnd%Q_geo 
-
         end if
-
 
         if ( dt .gt. 0.0 ) then     
             ! Ice thermodynamics should evolve, perform calculations 
@@ -173,12 +161,9 @@ end select
                     ! equilibrium with the bed surface temperature 
                     ! (ie, no active bedrock) 
 
-                    call define_temp_lith_3D(thrm%now%T_lith,thrm%now%cp_lith,thrm%now%kt_lith, &
-                                             bnd%Q_geo,thrm%now%T_ice(:,:,1),thrm%now%H_lith,thrm%par%lith_zeta_aa)
-
-                    ! Get enthalpy too 
-                    call convert_to_enthalpy(thrm%now%enth_lith,thrm%now%T_lith,0.0_wp,0.0_wp, &
-                                                                        thrm%now%cp_lith,0.0_wp)
+                    call define_temp_lith_3D(thrm%now%enth_lith,thrm%now%T_lith,thrm%now%Q_lith,thrm%now%cp_lith, &
+                                             thrm%now%kt_lith,bnd%Q_geo,thrm%now%T_ice(:,:,1), &
+                                             thrm%now%H_lith,thrm%par%lith_zeta_aa)
 
                 case("active")
                     ! Solve thermodynamic equation for the lithosphere 
@@ -189,6 +174,9 @@ end select
                                         thrm%par%lith_zeta_aa,thrm%par%lith_zeta_ac, &
                                         thrm%par%lith_dzeta_a,thrm%par%lith_dzeta_b,dt*0.5_wp)
 
+                case("fixed") 
+                    ! Pass - do nothing, use the enth/temp/omega fields as they are defined
+                    
                 case DEFAULT 
 
                     write(*,*) "calc_ytherm:: Error: lith_method not recognized."
@@ -228,44 +216,26 @@ end select
                 case("robin")
                     ! Use Robin solution for ice temperature 
 
-                    call define_temp_robin_3D(thrm%now%T_ice,thrm%now%T_pmp,thrm%now%cp,thrm%now%kt, &
+                    call define_temp_robin_3D(thrm%now%enth,thrm%now%T_ice,thrm%now%omega,thrm%now%T_pmp,thrm%now%cp,thrm%now%kt, &
                                        thrm%now%Q_lith,bnd%T_srf,tpo%now%H_ice,thrm%now%H_w,bnd%smb, &
                                        thrm%now%bmb_grnd,tpo%now%f_grnd,thrm%par%zeta_aa,cold=.FALSE.)
-
-                    ! Also populate enthalpy 
-                    call convert_to_enthalpy(thrm%now%enth,thrm%now%T_ice,thrm%now%omega,thrm%now%T_pmp, &
-                                            thrm%now%cp,L_ice)
 
                 case("robin-cold")
                     ! Use Robin solution for ice temperature averaged with cold linear profile
                     ! to ensure cold ice at the base
 
-                    call define_temp_robin_3D(thrm%now%T_ice,thrm%now%T_pmp,thrm%now%cp,thrm%now%kt, &
+                    call define_temp_robin_3D(thrm%now%enth,thrm%now%T_ice,thrm%now%omega,thrm%now%T_pmp,thrm%now%cp,thrm%now%kt, &
                                        thrm%now%Q_lith,bnd%T_srf,tpo%now%H_ice,thrm%now%H_w,bnd%smb, &
                                        thrm%now%bmb_grnd,tpo%now%f_grnd,thrm%par%zeta_aa,cold=.TRUE.)
-
-                    ! Set water content to zero 
-                    thrm%now%omega = 0.0_prec 
-                    
-                    ! Also populate enthalpy 
-                    call convert_to_enthalpy(thrm%now%enth,thrm%now%T_ice,thrm%now%omega,thrm%now%T_pmp, &
-                                            thrm%now%cp,L_ice)
 
                 case("linear")
                     ! Use linear solution for ice temperature
 
                     ! Calculate the ice temperature (eventually water content and enthalpy too)
-                    call define_temp_linear_3D(thrm%now%T_ice,thrm%par%zeta_aa,tpo%now%H_ice,bnd%T_srf)
-
-                    ! Set water content to zero 
-                    thrm%now%omega = 0.0_prec 
-
-                    ! Also populate enthalpy 
-                    call convert_to_enthalpy(thrm%now%enth,thrm%now%T_ice,thrm%now%omega,thrm%now%T_pmp, &
-                                            thrm%now%cp,L_ice)
+                    call define_temp_linear_3D(thrm%now%enth,thrm%now%T_ice,thrm%now%omega,thrm%now%cp,tpo%now%H_ice,bnd%T_srf,thrm%par%zeta_aa)
 
                 case("fixed") 
-                    ! Pass - do nothing, use the temperature field as it is defined
+                    ! Pass - do nothing, use the enth/temp/omega fields as they are defined
 
                 case DEFAULT 
 
@@ -291,12 +261,9 @@ end select
                     ! equilibrium with the bed surface temperature 
                     ! (ie, no active bedrock) 
 
-                    call define_temp_lith_3D(thrm%now%T_lith,thrm%now%cp_lith,thrm%now%kt_lith, &
-                                             bnd%Q_geo,thrm%now%T_ice(:,:,1),thrm%now%H_lith,thrm%par%lith_zeta_aa)
-
-                    ! Get enthalpy too 
-                    call convert_to_enthalpy(thrm%now%enth_lith,thrm%now%T_lith,0.0_wp,0.0_wp, &
-                                                                        thrm%now%cp_lith,0.0_wp)
+                    call define_temp_lith_3D(thrm%now%enth_lith,thrm%now%T_lith,thrm%now%Q_lith,thrm%now%cp_lith, &
+                                             thrm%now%kt_lith,bnd%Q_geo,thrm%now%T_ice(:,:,1), &
+                                             thrm%now%H_lith,thrm%par%lith_zeta_aa)
 
                 case("active")
                     ! Solve thermodynamic equation for the lithosphere 
@@ -306,6 +273,9 @@ end select
                                         thrm%now%H_lith,tpo%now%H_ice,tpo%now%H_grnd,thrm%now%Q_ice_b,bnd%Q_geo, &
                                         thrm%par%lith_zeta_aa,thrm%par%lith_zeta_ac, &
                                         thrm%par%lith_dzeta_a,thrm%par%lith_dzeta_b,dt*0.5_wp)
+
+                case("fixed") 
+                    ! Pass - do nothing, use the enth/temp/omega fields as they are defined
 
                 case DEFAULT 
 

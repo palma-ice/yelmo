@@ -3,7 +3,8 @@ module ice_enthalpy
 
     use yelmo_defs, only : prec, wp, pi, g, sec_year, rho_ice, rho_sw, rho_w, rho_l, L_ice  
     use solver_tridiagonal, only : solve_tridiag 
-    use thermodynamics, only : calc_bmb_grounded, calc_bmb_grounded_enth, calc_advec_vertical_column
+    use thermodynamics, only : calc_bmb_grounded, calc_bmb_grounded_enth, calc_advec_vertical_column, &
+                               convert_to_enthalpy, convert_from_enthalpy_column
 
     !use interp1D 
 
@@ -14,8 +15,6 @@ module ice_enthalpy
     public :: calc_temp_column_bedrock
     public :: calc_enth_column0
     public :: calc_enth_column
-    public :: convert_to_enthalpy
-    public :: convert_from_enthalpy_column
     public :: calc_dzeta_terms
     public :: calc_zeta_twolayers
     public :: calc_zeta_combined
@@ -1637,87 +1636,6 @@ end if
     end subroutine calc_enth_column_zoom
 
     ! ========== ENTHALPY ==========================================
-
-    elemental subroutine convert_to_enthalpy(enth,temp,omega,T_pmp,cp,L)
-        ! Given temperature and water content, calculate enthalpy.
-
-        implicit none 
-
-        real(prec), intent(OUT) :: enth             ! [J m-3] Enthalpy 
-        real(prec), intent(IN)  :: temp             ! [K] Temperature 
-        real(prec), intent(IN)  :: omega            ! [-] Water content (fraction)
-        real(prec), intent(IN)  :: T_pmp            ! [K] Pressure melting point
-        real(prec), intent(IN)  :: cp               ! [J kg-1 K-1] Heat capacity 
-        real(prec), intent(IN)  :: L                ! [J kg-1] Latent heat of fusion 
-        
-        enth = (1.0_prec-omega)*(cp*temp) + omega*(cp*T_pmp + L)
-
-        return 
-
-    end subroutine convert_to_enthalpy
-
-    subroutine convert_from_enthalpy_column(enth,temp,omega,T_pmp,cp,L)
-        ! Given enthalpy, calculate temperature and water content. 
-
-        implicit none 
-
-        real(prec), intent(INOUT) :: enth(:)            ! [J m-3] Enthalpy, nz_aa nodes
-        real(prec), intent(OUT)   :: temp(:)            ! [K] Temperature, nz_aa nodes  
-        real(prec), intent(OUT)   :: omega(:)           ! [-] Water content (fraction), nz_aa nodes 
-        real(prec), intent(IN)    :: T_pmp(:)           ! [K] Pressure melting point, nz_aa nodes 
-        real(prec), intent(IN)    :: cp(:)              ! [J kg-1 K-1] Heat capacity,nz_aa nodes 
-        real(prec), intent(IN)    :: L                  ! [J kg-1] Latent heat of fusion
-        
-        ! Local variables
-        integer    :: k, nz_aa  
-        real(prec), allocatable :: enth_pmp(:)  
-
-        nz_aa = size(enth,1)
-
-        allocate(enth_pmp(nz_aa))
-
-        ! Find pressure melting point enthalpy
-        enth_pmp = T_pmp * cp 
-
-        ! Column interior and basal layer
-        ! Note: although the k=1 is a boundary value with no thickness,
-        ! allow it to retain omega to maintain consistency with grid points above.
-        do k = 1, nz_aa-1
-
-            if (enth(k) .gt. enth_pmp(k)) then
-                ! Temperate ice 
-                
-                temp(k)  = T_pmp(k)
-                omega(k) = (enth(k) - enth_pmp(k)) / L 
-             else
-                ! Cold ice 
-
-                temp(k)  = enth(k) / cp(k) 
-                omega(k) = 0.0_prec
-
-             end if
-
-        end do 
-
-        ! Surface layer 
-        if (enth(nz_aa) .ge. enth_pmp(nz_aa)) then 
-            ! Temperate surface, reset omega to zero and enth to pmp value 
-            
-            enth(nz_aa)  = enth_pmp(nz_aa)
-            temp(nz_aa)  = enth(nz_aa) / cp(nz_aa)
-            omega(nz_aa) = 0.0_prec 
-        
-        else 
-            ! Cold surface, calculate T, and reset omega to zero 
-            
-            temp(nz_aa)  = enth(nz_aa) / cp(nz_aa)
-            omega(nz_aa) = 0.0_prec 
-        
-        end if 
-        
-        return 
-
-    end subroutine convert_from_enthalpy_column
 
     subroutine calc_enth_diffusivity(kappa,enth,enth_pmp,cp,kt,cr,rho_ice)
         ! Calculate the enthalpy vertical diffusivity for use with the diffusion solver:

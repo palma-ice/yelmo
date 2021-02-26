@@ -9,7 +9,7 @@
 
     ! Timing parameters 
     time_init    = 0.0                  ! [yr] Starting time 
-    time_end     = 100000.0             ! [yr] Ending time 
+    time_end     = 150000.0             ! [yr] Ending time 
     dtt          = 100.0                ! [yr] Main loop timestep 
     dt2D_out     = 5000.0               ! [yr] Frequency of writing 2D output files 
 
@@ -163,7 +163,7 @@
 /
 
 &ytherm_lith
-    method          = "equil"           ! "equil" (not active bedrock) or "active"
+    method          = "active"          ! "equil" (not active bedrock) or "active"
     nz_aa           = 5                 ! Number of vertical points in bedrock 
     zeta_scale      = "exp-inv"         ! "linear", "exp-inv"
     zeta_exp        = 2.0  

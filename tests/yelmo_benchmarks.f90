@@ -29,6 +29,8 @@ program yelmo_benchmarks
     real(prec) :: bumps_L, bumps_A 
     integer    :: n  
 
+    character(len=56) :: lith_method_default 
+
     character(len=56) :: grid_name
     real(prec) :: dx, x0  
     integer    :: nx  
@@ -357,6 +359,9 @@ program yelmo_benchmarks
         yelmo1%dyn%par%solver = "fixed"
     end if 
 
+    ! Store default lithosphere solver method, to be activated after several years 
+    lith_method_default = trim(yelmo1%thrm%par%lith_method)
+
     ! Advance timesteps
     do n = 1, ceiling((time_end-time_init)/dtt)
 
@@ -368,6 +373,12 @@ program yelmo_benchmarks
             yelmo1%bnd%enh_srf = 3.0 
         else 
             yelmo1%bnd%enh_srf = 1.0 
+        end if 
+
+        if (time .le. 50e3) then 
+            yelmo1%thrm%par%lith_method = "equil"
+        else 
+            yelmo1%thrm%par%lith_method = trim(lith_method_default)
         end if 
 
         ! == Yelmo ice sheet ===================================================

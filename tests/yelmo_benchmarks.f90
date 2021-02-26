@@ -375,11 +375,11 @@ program yelmo_benchmarks
             yelmo1%bnd%enh_srf = 1.0 
         end if 
 
-        ! if (time .le. 50e3) then 
-        !     yelmo1%thrm%par%lith_method = "equil"
-        ! else 
-        !     yelmo1%thrm%par%lith_method = trim(lith_method_default)
-        ! end if 
+        if (time .le. 50e3) then 
+            yelmo1%thrm%par%lith_method = "equil"
+        else 
+            yelmo1%thrm%par%lith_method = trim(lith_method_default)
+        end if 
 
         ! == Yelmo ice sheet ===================================================
         call yelmo_update(yelmo1,time)

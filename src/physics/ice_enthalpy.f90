@@ -94,6 +94,9 @@ contains
         real(prec), allocatable :: kappa_lith(:)    ! aa-nodes
         real(prec), allocatable :: Q_strn_now(:)    ! aa-nodes
         
+        real(prec), allocatable :: temp0(:)         ! aa-nodes
+        real(prec), allocatable :: temp_lith0(:)    ! aa-nodes
+        
         real(prec), parameter   :: T_ref = 273.15_prec   
 
 
@@ -103,6 +106,12 @@ contains
         allocate(kappa(nz_aa))
         allocate(kappa_lith(lith_nz_aa))
         allocate(Q_strn_now(nz_aa))
+
+        allocate(temp0(nz_aa))
+        allocate(temp_lith0(lith_nz_aa))
+
+        temp0      = temp 
+        temp_lith0 = temp_lith
 
         ! Get geothermal heat flux in proper units 
         Q_geo_now = Q_geo*1e-3*sec_year   ! [mW m-2] => [J m-2 a-1]
@@ -139,8 +148,55 @@ contains
             val_ice_base      = (f_grnd*T_pmp(1) + (1.0-f_grnd)*T_shlf)
             is_ice_basal_flux = .FALSE. 
 
+            ! === Solver =============================
+         
+            call calc_temp_column_internal_combined(temp,kappa,kt,uz,advecxy,Q_strn_now, &
+                                                    temp_lith,kappa_lith,kt_lith, &
+                                                    val_base,val_ice_base,val_srf, &
+                                                    is_basal_flux,is_ice_basal_flux,is_surf_flux, &
+                                                    H_ice,H_lith,T_ref,dt, &
+                                                    zeta_aa,zeta_ac,dzeta_a,dzeta_b, &
+                                                    lith_zeta_aa,lith_zeta_ac,lith_dzeta_a,lith_dzeta_b)
+
         else 
             ! Grounded ice 
+
+            ! Step 1: Assume frozen
+
+            ! backward Euler flux basal boundary condition
+            ! val_ice_base      = -(Q_b_now + Q_lith_now) / kt(1)
+            val_ice_base      = -Q_b_now !/ kt(1) 
+            is_ice_basal_flux = .TRUE. 
+                
+            ! === Solver =============================
+         
+            call calc_temp_column_internal_combined(temp,kappa,kt,uz,advecxy,Q_strn_now, &
+                                                    temp_lith,kappa_lith,kt_lith, &
+                                                    val_base,val_ice_base,val_srf, &
+                                                    is_basal_flux,is_ice_basal_flux,is_surf_flux, &
+                                                    H_ice,H_lith,T_ref,dt, &
+                                                    zeta_aa,zeta_ac,dzeta_a,dzeta_b, &
+                                                    lith_zeta_aa,lith_zeta_ac,lith_dzeta_a,lith_dzeta_b)
+
+            if (temp(1) .ge. T_pmp(1)) then 
+
+                ! Actually solution is temperate, recalculated 
+
+                val_ice_base      = T_pmp(1)
+                is_ice_basal_flux = .FALSE.
+
+                temp      = temp0 
+                temp_lith = temp_lith0
+
+                call calc_temp_column_internal_combined(temp,kappa,kt,uz,advecxy,Q_strn_now, &
+                                                    temp_lith,kappa_lith,kt_lith, &
+                                                    val_base,val_ice_base,val_srf, &
+                                                    is_basal_flux,is_ice_basal_flux,is_surf_flux, &
+                                                    H_ice,H_lith,T_ref,dt, &
+                                                    zeta_aa,zeta_ac,dzeta_a,dzeta_b, &
+                                                    lith_zeta_aa,lith_zeta_ac,lith_dzeta_a,lith_dzeta_b)
+            end if 
+
 
             ! Determine expected basal water thickness [m] for this timestep,
             ! using basal mass balance from previous time step (good guess)
@@ -174,16 +230,7 @@ contains
 
         end if  ! floating or grounded 
 
-        ! === Solver =============================
-     
-        call calc_temp_column_internal_combined(temp,kappa,kt,uz,advecxy,Q_strn_now, &
-                                                temp_lith,kappa_lith,kt_lith, &
-                                                val_base,val_ice_base,val_srf, &
-                                                is_basal_flux,is_ice_basal_flux,is_surf_flux, &
-                                                H_ice,H_lith,T_ref,dt, &
-                                                zeta_aa,zeta_ac,dzeta_a,dzeta_b, &
-                                                lith_zeta_aa,lith_zeta_ac,lith_dzeta_a,lith_dzeta_b)
-
+            
         ! Now calculate internal melt (only allow melting, no accretion)
     
         melt_internal = 0.0 
@@ -721,7 +768,7 @@ contains
         kappa_aa = kt / (rho_l*cp)
         
         ! Set unused terms to zero (via pointers to save allocations)
-        allocate(zeros(nz_aa))
+        allocate(zeros(nz_ac))
         zeros = 0.0_wp 
         
         advecxy => zeros(1:nz_aa) 

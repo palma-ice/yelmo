@@ -183,11 +183,11 @@ end select
                 case("active")
                     ! Solve thermodynamic equation for the lithosphere 
 
-                    call calc_ytherm_enthalpy_bedrock_3D(thrm%now%enth_lith,thrm%now%T_lith,thrm%now%T_ice(:,:,1), &
-                                                         thrm%now%T_pmp(:,:,1),thrm%now%cp_lith,thrm%now%kt_lith, &
-                                                         thrm%now%H_lith,tpo%now%H_ice,tpo%now%H_grnd,bnd%Q_geo, &
-                                                         thrm%par%lith_zeta_aa,thrm%par%lith_zeta_ac, &
-                                                         thrm%par%lith_dzeta_a,thrm%par%lith_dzeta_b,dt*0.5_wp)
+                    call calc_ytherm_enthalpy_bedrock_3D(thrm%now%enth_lith,thrm%now%T_lith,thrm%now%Q_lith, &
+                                        thrm%now%T_ice(:,:,1),thrm%now%T_pmp(:,:,1),thrm%now%cp_lith,thrm%now%kt_lith, &
+                                        thrm%now%H_lith,tpo%now%H_ice,tpo%now%H_grnd,thrm%now%Q_ice_b,bnd%Q_geo, &
+                                        thrm%par%lith_zeta_aa,thrm%par%lith_zeta_ac, &
+                                        thrm%par%lith_dzeta_a,thrm%par%lith_dzeta_b,dt*0.5_wp)
 
                 case DEFAULT 
 
@@ -301,11 +301,11 @@ end select
                 case("active")
                     ! Solve thermodynamic equation for the lithosphere 
 
-                    call calc_ytherm_enthalpy_bedrock_3D(thrm%now%enth_lith,thrm%now%T_lith,thrm%now%T_ice(:,:,1), &
-                                                         thrm%now%T_pmp(:,:,1),thrm%now%cp_lith,thrm%now%kt_lith, &
-                                                         thrm%now%H_lith,tpo%now%H_ice,tpo%now%H_grnd,bnd%Q_geo, &
-                                                         thrm%par%lith_zeta_aa,thrm%par%lith_zeta_ac, &
-                                                         thrm%par%lith_dzeta_a,thrm%par%lith_dzeta_b,dt*0.5_wp)
+                    call calc_ytherm_enthalpy_bedrock_3D(thrm%now%enth_lith,thrm%now%T_lith,thrm%now%Q_lith, &
+                                        thrm%now%T_ice(:,:,1),thrm%now%T_pmp(:,:,1),thrm%now%cp_lith,thrm%now%kt_lith, &
+                                        thrm%now%H_lith,tpo%now%H_ice,tpo%now%H_grnd,thrm%now%Q_ice_b,bnd%Q_geo, &
+                                        thrm%par%lith_zeta_aa,thrm%par%lith_zeta_ac, &
+                                        thrm%par%lith_dzeta_a,thrm%par%lith_dzeta_b,dt*0.5_wp)
 
                 case DEFAULT 
 
@@ -489,8 +489,8 @@ end select
 
     end subroutine calc_ytherm_enthalpy_3D
 
-    subroutine calc_ytherm_enthalpy_bedrock_3D(enth,T_lith,T_ice_b,T_pmp_b,cp,kt,H_lith, &
-                                                H_ice,H_grnd,Q_geo,zeta_aa,zeta_ac,dzeta_a,dzeta_b,dt)
+    subroutine calc_ytherm_enthalpy_bedrock_3D(enth,T_lith,Q_Lith,T_ice_b,T_pmp_b,cp,kt,H_lith, &
+                                                H_ice,H_grnd,Q_ice_b,Q_geo,zeta_aa,zeta_ac,dzeta_a,dzeta_b,dt)
         ! This wrapper subroutine breaks the thermodynamics problem into individual columns,
         ! which are solved independently by calling calc_enth_column
 
@@ -502,6 +502,7 @@ end select
 
         real(prec), intent(INOUT) :: enth(:,:,:)    ! [J m-3] Lithosphere enthalpy
         real(prec), intent(INOUT) :: T_lith(:,:,:)  ! [K] Lithosphere temperature
+        real(prec), intent(OUT)   :: Q_lith(:,:)    ! [mW m-2] Bed surface heat flux 
         real(prec), intent(IN)    :: T_ice_b(:,:)   ! [K] Ice temperature at ice base
         real(prec), intent(IN)    :: T_pmp_b(:,:)   ! [K] Pressure melting point temp at ice base.
         real(prec), intent(IN)    :: cp(:,:,:)      ! [J kg-1 K-1] Specific heat capacity lithosphere
@@ -509,6 +510,7 @@ end select
         real(prec), intent(IN)    :: H_lith(:,:)    ! [m] Lithosphere thickness 
         real(prec), intent(IN)    :: H_ice(:,:)     ! [m] Ice thickness 
         real(prec), intent(IN)    :: H_grnd(:,:)    ! [--] Ice thickness above flotation 
+        real(prec), intent(IN)    :: Q_ice_b(:,:)   ! [mW m-2] Ice base heat flux
         real(prec), intent(IN)    :: Q_geo(:,:)     ! [mW m-2] Geothermal heat flux deep in bedrock
         real(prec), intent(IN)    :: zeta_aa(:)     ! [--] Vertical sigma coordinates (zeta==height), aa-nodes
         real(prec), intent(IN)    :: zeta_ac(:)     ! [--] Vertical sigma coordinates (zeta==height), ac-nodes
@@ -548,8 +550,8 @@ end select
             if (H_ice(i,j) .gt. 0.0) then 
                 ! Call thermodynamic solver for the column
 
-                call calc_temp_column_bedrock(enth(i,j,:),T_lith(i,j,:),cp(i,j,:),kt(i,j,:),  &
-                        Q_geo(i,j),T_base,H_lith(i,j),zeta_aa,zeta_ac,dzeta_a,dzeta_b,dt)
+                call calc_temp_column_bedrock(enth(i,j,:),T_lith(i,j,:),Q_lith(i,j),cp(i,j,:),kt(i,j,:),  &
+                        Q_ice_b(i,j),Q_geo(i,j),T_base,H_lith(i,j),zeta_aa,zeta_ac,dzeta_a,dzeta_b,dt)
             
             else 
                 ! Assume equilibrium conditions: impose linear temperature 
@@ -727,7 +729,7 @@ end select
         call calc_dzeta_terms(par%dzeta_a,par%dzeta_b,par%zeta_aa,par%zeta_ac)
 
         ! == Lithosphere == 
-        
+
         ! Calculate zeta_aa and zeta_ac 
         call calc_zeta(par%lith_zeta_aa,par%lith_zeta_ac,par%lith_nz_ac, &
                             par%lith_nz_aa,par%lith_zeta_scale,par%lith_zeta_exp)

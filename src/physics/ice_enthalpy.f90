@@ -73,6 +73,7 @@ contains
         real(prec) :: melt_internal
         real(prec) :: val_base, val_srf 
         logical    :: is_basal_flux  
+        logical    :: is_surf_flux 
 
         real(prec), allocatable :: kappa_aa(:)    ! aa-nodes
         real(prec), allocatable :: Q_strn_now(:)  ! aa-nodes
@@ -100,7 +101,8 @@ contains
 
         ! === Surface boundary condition =====================
 
-        val_srf =  min(T_srf,T0)    
+        val_srf      =  min(T_srf,T0)    
+        is_surf_flux = .FALSE. 
 
         ! === Basal boundary condition =====================
 
@@ -109,7 +111,7 @@ contains
             ! to basal temperature at pressure melting point, or marine freezing temp,
             ! or weighted average between the two.
             
-            val_base = (f_grnd*T_pmp(1) + (1.0-f_grnd)*T_shlf)
+            val_base      = (f_grnd*T_pmp(1) + (1.0-f_grnd)*T_shlf)
             is_basal_flux = .FALSE. 
 
         else 
@@ -125,21 +127,21 @@ contains
                 ! Temperate at bed 
                 ! Hold basal temperature at pressure melting point
 
-                val_base = T_pmp(1)
+                val_base      = T_pmp(1)
                 is_basal_flux = .FALSE.
 
             else if ( T_ice(1) .lt. T_pmp(1) .or. H_w_predicted .lt. 0.0_prec ) then
                 ! Frozen at bed, or about to become frozen 
 
                 ! backward Euler flux basal boundary condition
-                val_base = -(Q_b_now + Q_lith_now) / kt(1)
+                val_base      = -(Q_b_now + Q_lith_now) / kt(1)
                 is_basal_flux = .TRUE. 
                 
             else 
                 ! Temperate at bed 
                 ! Hold basal temperature at pressure melting point
 
-                val_base = T_pmp(1)
+                val_base      = T_pmp(1)
                 is_basal_flux = .FALSE. 
                 
             end if   ! melting or frozen
@@ -149,7 +151,8 @@ contains
         ! === Solver =============================
      
         call calc_temp_column_internal(T_ice,kappa_aa,uz,advecxy,Q_strn_now,val_base,val_srf,H_ice, &
-                                                zeta_aa,zeta_ac,dzeta_a,dzeta_b,T_ref,dt,is_basal_flux)
+                                                zeta_aa,zeta_ac,dzeta_a,dzeta_b,T_ref,dt, &
+                                                is_basal_flux,is_surf_flux)
 
         ! Now calculate internal melt (only allow melting, no accretion)
     
@@ -211,7 +214,7 @@ contains
 
     end subroutine calc_temp_column
 
-    subroutine calc_temp_column_bedrock(enth,T_ice,cp,kt,Q_geo,T_srf,H_ice, &
+    subroutine calc_temp_column_bedrock(enth,temp,Q_lith,cp,kt,Q_ice_b,Q_geo,T_srf,H_lith, &
                                                 zeta_aa,zeta_ac,dzeta_a,dzeta_b,dt)
         ! Thermodynamics solver for a given column of ice 
         ! Note zeta=height, k=1 base, k=nz surface 
@@ -224,12 +227,14 @@ contains
         implicit none 
 
         real(prec), intent(INOUT) :: enth(:)        ! nz_aa [J kg] Ice column enthalpy
-        real(prec), intent(INOUT) :: T_ice(:)       ! nz_aa [K] Ice column temperature
+        real(prec), intent(INOUT) :: temp(:)        ! nz_aa [K] Ice column temperature
+        real(prec), intent(OUT)   :: Q_lith         ! [mW m-2] Bed surface heat flux (positive up)
         real(prec), intent(IN)    :: cp(:)          ! nz_aa [J kg-1 K-1] Specific heat capacity
         real(prec), intent(IN)    :: kt(:)          ! nz_aa [J a-1 m-1 K-1] Heat conductivity 
+        real(prec), intent(IN)    :: Q_ice_b        ! [mW m-2] Ice basal heat flux (positive up)
         real(prec), intent(IN)    :: Q_geo          ! [mW m-2] Bedrock heat flux (positive up)
         real(prec), intent(IN)    :: T_srf          ! [K] Surface temperature 
-        real(prec), intent(IN)    :: H_ice          ! [m] Ice thickness 
+        real(prec), intent(IN)    :: H_lith         ! [m] Lithosphere thickness 
         real(prec), intent(IN)    :: zeta_aa(:)     ! nz_aa [--] Vertical sigma coordinates (zeta==height), layer centered aa-nodes
         real(prec), intent(IN)    :: zeta_ac(:)     ! nz_ac [--] Vertical height axis temperature (0:1), layer edges ac-nodes
         real(prec), intent(IN)    :: dzeta_a(:)     ! nz_aa [--] Solver discretization helper variable ak
@@ -238,9 +243,13 @@ contains
 
         ! Local variables 
         integer    :: k, nz_aa, nz_ac
+        real(prec) :: Q_lith_now 
+        real(prec) :: Q_ice_b_now 
         real(prec) :: Q_geo_now 
+        real(prec) :: dz 
         real(prec) :: val_base, val_srf 
         logical    :: is_basal_flux  
+        logical    :: is_surf_flux  
 
         real(prec), allocatable :: kappa_aa(:)      ! aa-nodes
         
@@ -254,7 +263,10 @@ contains
         nz_aa = size(zeta_aa,1)
         nz_ac = size(zeta_ac,1) 
 
-        ! Get lithosphere heat flux in proper units 
+        ! Get basal heat flux from ice in proper units 
+        Q_ice_b_now = Q_ice_b*1e-3*sec_year     ! [mW m-2] => [J m-2 a-1]
+
+        ! Get deep lithosphere heat flux in proper units 
         Q_geo_now = Q_geo*1e-3*sec_year   ! [mW m-2] => [J m-2 a-1]
 
         ! Step 0: Calculate diffusivity on cell centers (aa-nodes)
@@ -271,8 +283,22 @@ contains
 
         ! === Surface boundary condition =====================
 
-        val_srf =  T_srf   
+        ! if ( T_srf .lt. T_pmp_srf ) then
+        !         ! Frozen at bed
 
+        !     ! backward Euler flux surface boundary condition
+        !     val_srf      =  -Q_ice_b_now / kt(nz_aa)
+        !     is_surf_flux = .TRUE.   
+
+        ! else 
+            ! Temperate at bed surface
+            ! Hold bed surface temperature at ice base temperature
+
+            val_srf      = T_srf
+            is_surf_flux = .FALSE. 
+            
+        ! end if
+        
         ! === Basal boundary condition =====================
 
         ! backward Euler flux basal boundary condition
@@ -281,18 +307,29 @@ contains
         
         ! === Solver =============================
      
-        call calc_temp_column_internal(T_ice,kappa_aa,uz,advecxy,Q_strn,val_base,val_srf,H_ice, &
-                                                zeta_aa,zeta_ac,dzeta_a,dzeta_b,T_ref,dt,is_basal_flux)
+        call calc_temp_column_internal(temp,kappa_aa,uz,advecxy,Q_strn,val_base,val_srf,H_lith, &
+                                                zeta_aa,zeta_ac,dzeta_a,dzeta_b,T_ref,dt, &
+                                                is_basal_flux,is_surf_flux)
 
-        ! Finally, get enthalpy too 
-        call convert_to_enthalpy(enth,T_ice,omega=0.0_wp,T_pmp=0.0_wp,cp=cp,L=0.0_wp)
+        ! Convert to enthalpy too 
+        call convert_to_enthalpy(enth,temp,omega=0.0_wp,T_pmp=0.0_wp,cp=cp,L=0.0_wp)
 
+        ! Calculate heat flux at lithosphere surface as temperature gradient * conductivity [J a-1 m-2]
+
+        ! 1st order, upwind gradient dTdz 
+        ! Works, but can cause oscillations in H_w 
+        dz = H_lith * (zeta_aa(nz_aa)-zeta_aa(nz_aa-1))
+        Q_lith_now = -kt(nz_aa) * (temp(nz_aa) - temp(nz_aa-1)) / dz 
+
+        ! Set global units to [mW m-2]
+        Q_lith = Q_lith_now *1e3 / sec_year 
+        
         return 
 
     end subroutine calc_temp_column_bedrock
 
     subroutine calc_temp_column_internal(temp,kappa,uz,advecxy,Q_strn,val_base,val_srf,thickness, &
-                                                zeta_aa,zeta_ac,dzeta_a,dzeta_b,T_ref,dt,is_basal_flux)
+                                                zeta_aa,zeta_ac,dzeta_a,dzeta_b,T_ref,dt,is_basal_flux,is_surf_flux)
         ! Thermodynamics solver 1D (eg, for column of ice or bedrock)
         ! Note zeta= column height, k=1 base, k=nz surface 
         ! Note: nz = number of vertical boundaries (including zeta=0.0 and zeta=1.0), 
@@ -309,7 +346,7 @@ contains
         real(prec), intent(IN)    :: advecxy(:)     ! nz_aa [K a-1] Horizontal heat advection 
         real(prec), intent(IN)    :: Q_strn(:)      ! nz_aa [K a-1] Internal strain heat production in ice
         real(prec), intent(IN)    :: val_base       ! [K or flux] Basal boundary condition
-        real(prec), intent(IN)    :: val_srf        ! [K] Surface temperature 
+        real(prec), intent(IN)    :: val_srf        ! [K or flux] Surface temperature 
         real(prec), intent(IN)    :: thickness      ! [m] Total column thickness 
         real(prec), intent(IN)    :: zeta_aa(:)     ! nz_aa [--] Vertical sigma coordinates (zeta==height), layer centered aa-nodes
         real(prec), intent(IN)    :: zeta_ac(:)     ! nz_ac [--] Vertical height axis temperature (0:1), layer edges ac-nodes
@@ -317,7 +354,9 @@ contains
         real(prec), intent(IN)    :: dzeta_b(:)     ! nz_aa [--] Solver discretization helper variable bk
         real(prec), intent(IN)    :: T_ref          ! [K] Reference temperature to scale calculation
         real(prec), intent(IN)    :: dt             ! [a] Time step 
-        logical,    intent(IN)    :: is_basal_flux  ! Is basal condition flux condition (True) or Neumann (False)
+        logical,    intent(IN)    :: is_basal_flux  ! Is basal bc flux condition (True) or Neumann (False)
+        logical,    intent(IN)    :: is_surf_flux   ! Is surf  bc flux condition (True) or Neumann (False)
+        
         ! Local variables 
         integer    :: k, nz_aa
         real(prec) :: fac, fac_a, fac_b, uz_aa, dz
@@ -392,12 +431,31 @@ contains
             
         end do 
 
-        ! == Ice surface ==
+        ! == Column surface ==
 
-        subd(nz_aa) = 0.0_prec
-        diag(nz_aa) = 1.0_prec
-        supd(nz_aa) = 0.0_prec
-        rhs(nz_aa)  = (val_srf-T_ref)
+        if (is_surf_flux) then 
+            ! Impose surface flux (Neumann condition)
+
+            ! Calculate dz for the top layer between the surface boundary
+            ! (ac-node) and the centered (aa-node) temperature point above
+            ! Note: zeta_aa(nz_aa) == zeta_ac(nz_ac) == top boundary 
+            dz = thickness * (zeta_aa(nz_aa) - zeta_aa(nz_aa-1))
+            
+            ! backward Euler flux surface boundary condition
+            subd(nz_aa) = -1.0_prec
+            diag(nz_aa) =  1.0_prec
+            supd(nz_aa) =  0.0_prec
+            rhs(nz_aa)  = val_srf * dz
+            
+        else 
+            ! Impose surface temperature (Dirichlet condition) 
+
+            subd(nz_aa) = 0.0_prec
+            diag(nz_aa) = 1.0_prec
+            supd(nz_aa) = 0.0_prec
+            rhs(nz_aa)  = (val_srf-T_ref)
+
+        end if 
 
         ! == Call solver ==
 

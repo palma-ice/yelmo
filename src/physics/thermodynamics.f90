@@ -19,7 +19,6 @@ module thermodynamics
     public :: calc_advec_horizontal_column_quick
     public :: calc_strain_heating
     public :: calc_strain_heating_sia
-    !public :: calc_basal_heating
     public :: calc_specific_heat_capacity
     public :: calc_thermal_conductivity
     public :: calc_T_pmp

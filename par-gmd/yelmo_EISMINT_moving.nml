@@ -9,7 +9,7 @@
 
     ! Timing parameters 
     time_init    = 0.0                  ! [yr] Starting time 
-    time_end     = 150000.0             ! [yr] Ending time 
+    time_end     = 100000.0             ! [yr] Ending time 
     dtt          = 100.0                ! [yr] Main loop timestep 
     dt2D_out     = 5000.0               ! [yr] Frequency of writing 2D output files 
 

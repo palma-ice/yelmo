@@ -3,7 +3,7 @@ module yelmo_thermodynamics
 
     use nml 
     use yelmo_defs 
-    use yelmo_grid, only : calc_zeta
+    use yelmo_grid, only : calc_zeta1, calc_zeta
     use yelmo_tools, only : smooth_gauss_2D, smooth_gauss_3D, gauss_values, fill_borders_2D, fill_borders_3D, &
             stagger_aa_ab
     
@@ -696,12 +696,12 @@ end select
         allocate(par%dzeta_a(par%nz_aa))
         allocate(par%dzeta_b(par%nz_aa))
         
-        call calc_dzeta_terms(par%dzeta_a,par%dzeta_b,par%zeta_aa,par%zeta_ac)
+        call calc_dzeta1_terms(par%dzeta_a,par%dzeta_b,par%zeta_aa,par%zeta_ac)
 
         ! == Lithosphere == 
 
         ! Calculate zeta_aa and zeta_ac 
-        call calc_zeta(par%lith_zeta_aa,par%lith_zeta_ac,par%lith_nz_ac, &
+        call calc_zeta1(par%lith_zeta_aa,par%lith_zeta_ac,par%lith_nz_ac, &
                             par%lith_nz_aa,par%lith_zeta_scale,par%lith_zeta_exp)
 
         ! Calculate domain-level dzeta terms too 
@@ -710,7 +710,7 @@ end select
         allocate(par%lith_dzeta_a(par%lith_nz_aa))
         allocate(par%lith_dzeta_b(par%lith_nz_aa))
         
-        call calc_dzeta_terms(par%lith_dzeta_a,par%lith_dzeta_b, &
+        call calc_dzeta1_terms(par%lith_dzeta_a,par%lith_dzeta_b, &
                                     par%lith_zeta_aa,par%lith_zeta_ac)
 
 

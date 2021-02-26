@@ -8,7 +8,7 @@ module yelmo_ice
     use ncio 
     
     use yelmo_defs
-    use yelmo_grid, only : yelmo_init_grid, calc_zeta
+    use yelmo_grid, only : yelmo_init_grid, calc_zeta1, calc_zeta
     use yelmo_timesteps, only : ytime_init, set_adaptive_timestep, set_adaptive_timestep_pc, set_pc_mask, calc_pc_eta,  &
                                 calc_pc_tau_fe_sbe,calc_pc_tau_ab_sam, calc_pc_tau_heun, limit_adaptive_timestep, &
                                 yelmo_timestep_write_init, yelmo_timestep_write, calc_adv3D_timestep1
@@ -608,7 +608,7 @@ contains
         end if 
 
         ! Calculate zeta_aa and zeta_ac 
-        call calc_zeta(dom%par%zeta_aa,dom%par%zeta_ac,dom%par%nz_ac,dom%par%nz_aa, &
+        call calc_zeta1(dom%par%zeta_aa,dom%par%zeta_ac,dom%par%nz_ac,dom%par%nz_aa, &
                                                     dom%par%zeta_scale,dom%par%zeta_exp)
 
         ! Initialize ytime information here too 

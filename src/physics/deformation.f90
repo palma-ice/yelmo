@@ -581,11 +581,30 @@ contains
                     else if (k .eq. nz_aa) then 
                         ! Surface layer
 
+if (.TRUE.) then 
+    ! zeta1
+                        lzx = (vz(ip1,j,k+1)-vz(im1,j,k+1))*0.5*fact_x(i,j)
+                        lzy = (vz(i,jp1,k+1)-vz(i,jm1,k+1))*0.5*fact_y(i,j)
+else
                         lzx = (vz(ip1,j,k-1)-vz(im1,j,k-1))*0.5*fact_x(i,j)
                         lzy = (vz(i,jp1,k-1)-vz(i,jm1,k-1))*0.5*fact_y(i,j)
+end if 
 
                     else 
                         ! Intermediate layers 
+
+if (.TRUE.) then 
+    ! zeta1 
+                        lzx = (  (vz(ip1,j,k+1)+vz(ip1,j,k))   &
+                               - (vz(im1,j,k+1)+vz(im1,j,k)) ) &
+                                *0.25*fact_x(i,j)
+
+                        lzy = (  (vz(i,jp1,k+1)+vz(i,jp1,k))   &
+                               - (vz(i,jm1,k+1)+vz(i,jm1,k)) ) &
+                                *0.25*fact_y(i,j)
+
+
+else 
 
                         lzx = (  (vz(ip1,j,k)+vz(ip1,j,k-1))   &
                                - (vz(im1,j,k)+vz(im1,j,k-1)) ) &
@@ -594,6 +613,7 @@ contains
                         lzy = (  (vz(i,jp1,k)+vz(i,jp1,k-1))   &
                                - (vz(i,jm1,k)+vz(i,jm1,k-1)) ) &
                                 *0.25*fact_y(i,j)
+end if 
 
                     end if 
                     

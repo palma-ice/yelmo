@@ -17,6 +17,7 @@ module yelmo_grid
     
     private 
 
+    public :: calc_zeta1 
     public :: calc_zeta 
 
     public :: yelmo_init_grid 
@@ -129,8 +130,8 @@ contains
 
         real(prec), allocatable, intent(INOUT)  :: zeta_aa(:) 
         real(prec), allocatable, intent(INOUT)  :: zeta_ac(:)
-        integer,    intent(OUT)    :: nz_ac 
-        integer,    intent(OUT)    :: nz_aa 
+        integer,                 intent(OUT)    :: nz_ac 
+        integer,      intent(IN)   :: nz_aa 
         character(*), intent(IN)   :: zeta_scale 
         real(prec),   intent(IN)   :: zeta_exp 
 

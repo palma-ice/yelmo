@@ -266,7 +266,7 @@ contains
         ! Note: for constant zeta axis, this can be done once outside
         ! instead of for each column. However, it is done here to allow
         ! use of adaptive vertical axis.
-        call calc_dzeta_terms(dzeta_a,dzeta_b,zeta_aa,zeta_ac)
+        call calc_dzeta1_terms(dzeta_a,dzeta_b,zeta_aa,zeta_ac)
         
 !         kappa_aa(1)     = 1e-4
 !         kappa_aa(nz_aa) = 1.5e0 
@@ -307,9 +307,24 @@ contains
                 uz_aa = 0.0 
 
             else
+
+if (.TRUE.) then 
+    ! zeta1
+                ! With implicit vertical advection (diffusion + advection)
+                uz_aa   = 0.5*(uz(k)+uz(k+1))   ! ac => aa nodes
+else
                 ! With implicit vertical advection (diffusion + advection)
                 uz_aa   = 0.5*(uz(k-1)+uz(k))   ! ac => aa nodes
+end if 
             end if 
+
+if (.TRUE.) then 
+    ! zeta1 
+
+    write(*,*) "To do: Need to implement zeta1 for tracers!"
+    stop 
+
+end if 
 
             ! Stagger kappa to the lower and upper ac-nodes
 
@@ -958,7 +973,41 @@ contains
 
         return
 
-    end function interp_linear_pt 
+    end function interp_linear_pt
+
+    subroutine calc_dzeta1_terms(dzeta_a,dzeta_b,zeta_aa,zeta_ac)
+        ! zeta_aa  = depth axis at layer centers (plus base and surface values)
+        ! zeta_ac  = depth axis (1: base, nz: surface), at layer boundaries
+        ! Calculate ak, bk terms as defined in Hoffmann et al (2018)
+        implicit none 
+
+        real(prec), intent(INOUT) :: dzeta_a(:)    ! nz_aa
+        real(prec), intent(INOUT) :: dzeta_b(:)    ! nz_aa
+        real(prec), intent(IN)    :: zeta_aa(:)    ! nz_aa 
+        real(prec), intent(IN)    :: zeta_ac(:)    ! nz_ac == nz_aa+1 
+
+        ! Local variables 
+        integer :: k, nz_layers, nz_aa    
+
+        nz_aa = size(zeta_aa)
+
+        ! Note: zeta_aa is calculated outside in the main program 
+
+        ! Initialize dzeta_a/dzeta_b to zero, first and last indices will not be used (end points)
+        dzeta_a = 0.0 
+        dzeta_b = 0.0 
+        
+        do k = 2, nz_aa-1 
+            dzeta_a(k) = 1.0/ ( (zeta_ac(k+1) - zeta_ac(k)) * (zeta_aa(k) - zeta_aa(k-1)) )
+        enddo
+
+        do k = 2, nz_aa-1
+            dzeta_b(k) = 1.0/ ( (zeta_ac(k+1) - zeta_ac(k)) * (zeta_aa(k+1) - zeta_aa(k)) )
+        end do
+
+        return 
+
+    end subroutine calc_dzeta1_terms
 
     subroutine calc_dzeta_terms(dzeta_a,dzeta_b,zeta_aa,zeta_ac)
         ! zeta_aa  = depth axis at layer centers (plus base and surface values)

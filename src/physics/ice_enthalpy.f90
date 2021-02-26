@@ -15,6 +15,7 @@ module ice_enthalpy
     public :: calc_temp_column_bedrock
     public :: calc_enth_column0
     public :: calc_enth_column
+    public :: calc_dzeta1_terms
     public :: calc_dzeta_terms
     public :: calc_zeta_twolayers
     public :: calc_zeta_combined
@@ -402,6 +403,40 @@ contains
 
         ! == Ice interior layers 2:nz_aa-1 ==
 
+if (.TRUE.) then 
+    ! use with zeta1, dzeta1 
+
+        do k = 2, nz_aa-1
+
+            ! Get implicit vertical advection term, ac => aa nodes
+            uz_aa   = 0.5*(uz(k)+uz(k+1))
+
+            ! Get kappa for the lower and upper ac-nodes using harmonic mean from aa-nodes
+            
+            dz1 = zeta_ac(k)-zeta_aa(k-1)
+            dz2 = zeta_aa(k)-zeta_ac(k)
+            call calc_wtd_harmonic_mean(kappa_a,kappa(k-1),kappa(k),dz1,dz2)
+
+            dz1 = zeta_ac(k+1)-zeta_aa(k)
+            dz2 = zeta_aa(k+1)-zeta_ac(k+1)
+            call calc_wtd_harmonic_mean(kappa_b,kappa(k),kappa(k+1),dz1,dz2)
+
+            ! Vertical distance for centered difference advection scheme
+            dz      =  thickness*(zeta_aa(k+1)-zeta_aa(k-1))
+            
+            fac_a   = -kappa_a*dzeta_a(k)*dt/thickness**2
+            fac_b   = -kappa_b*dzeta_b(k)*dt/thickness**2
+
+            subd(k) = fac_a - uz_aa * dt/dz
+            supd(k) = fac_b + uz_aa * dt/dz
+            diag(k) = 1.0_prec - fac_a - fac_b
+            rhs(k)  = (temp(k)-T_ref) - dt*advecxy(k) + dt*Q_strn(k)
+            
+        end do 
+
+else 
+    ! use with zeta, dzeta 
+
         do k = 2, nz_aa-1
 
             ! Get implicit vertical advection term, ac => aa nodes
@@ -429,6 +464,8 @@ contains
             rhs(k)  = (temp(k)-T_ref) - dt*advecxy(k) + dt*Q_strn(k)
             
         end do 
+
+end if 
 
         ! == Column surface ==
 
@@ -1792,6 +1829,40 @@ end if
 
 
     end function calc_cts_height
+
+    subroutine calc_dzeta1_terms(dzeta_a,dzeta_b,zeta_aa,zeta_ac)
+        ! zeta_aa  = depth axis at layer centers (plus base and surface values)
+        ! zeta_ac  = depth axis (1: base, nz: surface), at layer boundaries
+        ! Calculate ak, bk terms as defined in Hoffmann et al (2018)
+        implicit none 
+
+        real(prec), intent(INOUT) :: dzeta_a(:)    ! nz_aa
+        real(prec), intent(INOUT) :: dzeta_b(:)    ! nz_aa
+        real(prec), intent(IN)    :: zeta_aa(:)    ! nz_aa 
+        real(prec), intent(IN)    :: zeta_ac(:)    ! nz_ac == nz_aa+1 
+
+        ! Local variables 
+        integer :: k, nz_layers, nz_aa    
+
+        nz_aa = size(zeta_aa)
+
+        ! Note: zeta_aa is calculated outside in the main program 
+
+        ! Initialize dzeta_a/dzeta_b to zero, first and last indices will not be used (end points)
+        dzeta_a = 0.0 
+        dzeta_b = 0.0 
+        
+        do k = 2, nz_aa-1 
+            dzeta_a(k) = 1.0/ ( (zeta_ac(k+1) - zeta_ac(k)) * (zeta_aa(k) - zeta_aa(k-1)) )
+        enddo
+
+        do k = 2, nz_aa-1
+            dzeta_b(k) = 1.0/ ( (zeta_ac(k+1) - zeta_ac(k)) * (zeta_aa(k+1) - zeta_aa(k)) )
+        end do
+
+        return 
+
+    end subroutine calc_dzeta1_terms
 
     subroutine calc_dzeta_terms(dzeta_a,dzeta_b,zeta_aa,zeta_ac)
         ! zeta_aa  = depth axis at layer centers (plus base and surface values)

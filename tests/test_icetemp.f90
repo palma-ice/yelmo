@@ -34,9 +34,7 @@ program test_icetemp
         
         real(prec), allocatable :: enth_rock(:) ! [J kg-1] Bedrock enthalpy
         real(prec), allocatable :: T_rock(:)    ! [K] Bedrock temperature 
-        real(prec), allocatable :: cp_rock(:)   ! [] Bedrock heat capacity 
-        real(prec), allocatable :: kt_rock(:)   ! [] Bedrock conductivity  
-        
+
     end type 
 
     type icesheet 
@@ -53,6 +51,8 @@ program test_icetemp
         real(prec) :: Q_b               ! [mW m-2] Basal heat production
         real(prec) :: H_cts             ! [m] cold-temperate transition surface (CTS) height
         real(prec) :: H_ice             ! [m] Ice thickness 
+        real(prec) :: cp_rock           ! [] Bedrock heat capacity
+        real(prec) :: kt_rock           ! [] Bedrock conductivity 
         real(prec) :: H_rock            ! [m] Bedrock thickness 
         
         real(prec) :: T_srf             ! [K] Ice surface temperature 
@@ -103,7 +103,7 @@ program test_icetemp
     ! ===============================================================
     ! User options 
 
-    experiment     = "eismint"      ! "eismint", "k15expa", "k15expb", "bg15a"
+    experiment     = "k15expa"      ! "eismint", "k15expa", "k15expb", "bg15a"
     
     ! General options
     zeta_scale      = "linear"      ! "linear", "exp", "tanh"
@@ -302,16 +302,16 @@ program test_icetemp
             case("equil")
 
                 ! Define temperature profile in bedrock too 
-                ice1%vec%T_rock = calc_temp_lith_column(ice1%zr%zeta,ice1%vec%kt_rock,ice1%vec%cp_rock,rho_l, &
-                                                    ice1%H_rock,ice1%vec%T_ice(1),ice1%Q_geo)
+                call calc_temp_bedrock_column(ice1%vec%T_rock,ice1%kt_rock,rho_rock, &
+                                        ice1%H_rock,ice1%vec%T_ice(1),ice1%Q_geo,ice1%zr%zeta)
 
-                call convert_to_enthalpy(ice1%vec%enth_rock,ice1%vec%T_rock,0.0_wp,1e8_wp,ice1%vec%cp_rock,0.0_wp)
+                call convert_to_enthalpy(ice1%vec%enth_rock,ice1%vec%T_rock,0.0_wp,1e8_wp,ice1%cp_rock,0.0_wp)
 
 
             case("active")
 
                 call calc_temp_column_bedrock(ice1%vec%enth_rock,ice1%vec%T_rock,ice1%Q_rock, &
-                            ice1%vec%cp_rock,ice1%vec%kt_rock,ice1%Q_ice_b,ice1%Q_geo,ice1%T_srf,ice1%H_rock, &
+                            ice1%cp_rock,ice1%kt_rock,ice1%Q_ice_b,ice1%Q_geo,ice1%T_srf,ice1%H_rock, &
                             ice1%zr%zeta,ice1%zr%zeta_ac,ice1%zr%dzeta_a,ice1%zr%dzeta_b,dt)
                 
             case DEFAULT 
@@ -376,16 +376,14 @@ contains
         ice%Q_b      = 0.0          ! [] No basal frictional heating 
         ice%f_grnd   = 1.0          ! Grounded point 
 
+        ice%cp_rock  = 1000.0    ! [J kg-1 K-1]
+        ice%kt_rock  = 9.46e7    ! [J a-1 m-1 K-1]
         ice%H_rock   = 2000.0       ! [m] 
         ice%Q_rock   = ice%Q_geo 
         
         ! EISMINT1
         ice%vec%cp      = 2009.0    ! [J kg-1 K-1]
         ice%vec%kt      = 6.67e7    ! [J a-1 m-1 K-1]
-        
-
-        ice%vec%cp_rock = 1000.0    ! [J kg-1 K-1]
-        ice%vec%kt_rock = 9.46e7    ! [J a-1 m-1 K-1]
         
         ice%vec%Q_strn  = 0.0       ! [J a-1 m-3] No internal strain heating 
         ice%vec%advecxy = 0.0       ! [] No horizontal advection 
@@ -417,10 +415,10 @@ contains
         call convert_to_enthalpy(ice%vec%enth,ice%vec%T_ice,ice%vec%omega,ice%vec%T_pmp,ice%vec%cp,L_ice)
         
         ! Define temperature profile in bedrock too 
-        ice%vec%T_rock = calc_temp_lith_column(ice%zr%zeta,ice%vec%kt_rock,ice%vec%cp_rock,rho_l, &
-                                            ice%H_rock,ice%vec%T_ice(1),ice%Q_geo)
+        call calc_temp_bedrock_column(ice1%vec%T_rock,ice1%kt_rock,rho_rock, &
+                                    ice1%H_rock,ice1%vec%T_ice(1),ice1%Q_geo,ice1%zr%zeta)
 
-        call convert_to_enthalpy(ice%vec%enth_rock,ice%vec%T_rock,0.0_wp,1e8_wp,ice%vec%cp_rock,0.0_wp)
+        call convert_to_enthalpy(ice%vec%enth_rock,ice%vec%T_rock,0.0_wp,1e8_wp,ice%cp_rock,0.0_wp)
 
         return 
 
@@ -448,15 +446,14 @@ contains
         ice%Q_b      = 0.0              ! [] No basal frictional heating 
         ice%f_grnd   = 1.0              ! Grounded point 
 
-        ice%H_rock   = 2000.0           ! [m] 
+        ice%cp_rock  = 1000.0    ! [J kg-1 K-1]
+        ice%kt_rock  = 9.46e7    ! [J a-1 m-1 K-1]
+        ice%H_rock   = 2000.0       ! [m] 
         ice%Q_rock   = ice%Q_geo 
         
         ! EISMINT1
         ice%vec%cp      = 2009.0        ! [J kg-1 K-1]
         ice%vec%kt      = 6.6269e7      ! [J a-1 m-1 K-1]   == 2.1*sec_year  [J s-1 m-1 K-1] => J a-1 m-1 K-1]
-        
-        ice%vec%cp_rock = 1000.0        ! [J kg-1 K-1]
-        ice%vec%kt_rock = 9.46e7        ! [J a-1 m-1 K-1]
         
         ice%vec%Q_strn  = 0.0           ! [] No internal strain heating 
         ice%vec%advecxy = 0.0           ! [] No horizontal advection 
@@ -487,10 +484,10 @@ contains
         call convert_to_enthalpy(ice%vec%enth,ice%vec%T_ice,ice%vec%omega,ice%vec%T_pmp,ice%vec%cp,L_ice)
         
         ! Define temperature profile in bedrock too 
-        ice%vec%T_rock = calc_temp_lith_column(ice%zr%zeta,ice%vec%kt_rock,ice%vec%cp_rock,rho_l, &
-                                            ice%H_rock,ice%vec%T_ice(1),ice%Q_geo)
+        call calc_temp_bedrock_column(ice1%vec%T_rock,ice1%kt_rock,rho_rock, &
+                                    ice1%H_rock,ice1%vec%T_ice(1),ice1%Q_geo,ice1%zr%zeta)
 
-        call convert_to_enthalpy(ice%vec%enth_rock,ice%vec%T_rock,0.0_wp,1e8_wp,ice%vec%cp_rock,0.0_wp)
+        call convert_to_enthalpy(ice%vec%enth_rock,ice%vec%T_rock,0.0_wp,1e8_wp,ice%cp_rock,0.0_wp)
 
         return 
 
@@ -525,16 +522,15 @@ contains
         ice%Q_b      = 0.0              ! [] No basal frictional heating 
         ice%f_grnd   = 1.0              ! Grounded point 
 
+        ice%cp_rock  = 1000.0    ! [J kg-1 K-1]
+        ice%kt_rock  = 9.46e7    ! [J a-1 m-1 K-1]
+        ice%H_rock   = 2000.0       ! [m] 
         ice%H_rock   = 2000.0           ! [m] 
         ice%Q_rock   = ice%Q_geo 
         
         ! EISMINT1
         ice%vec%cp      = 2009.0        ! [J kg-1 K-1]
         ice%vec%kt      = 6.6269e7      ! [J a-1 m-1 K-1]   == 2.1*sec_year  [J s-1 m-1 K-1] => J a-1 m-1 K-1]
-        
-        ice%vec%cp_rock = 1000.0        ! [J kg-1 K-1]
-        ice%vec%kt_rock = 9.46e7        ! [J a-1 m-1 K-1]
-        
 
         ATT             = 5.3e-24*sec_year      ! Rate factor
         gamma           = 4.0                   ! [degrees] Bed slope 
@@ -586,10 +582,10 @@ contains
         call convert_to_enthalpy(ice%vec%enth,ice%vec%T_ice,ice%vec%omega,ice%vec%T_pmp,ice%vec%cp,L_ice)
         
         ! Define temperature profile in bedrock too 
-        ice%vec%T_rock = calc_temp_lith_column(ice%zr%zeta,ice%vec%kt_rock,ice%vec%cp_rock,rho_l, &
-                                            ice%H_rock,ice%vec%T_ice(1),ice%Q_geo)
+        call calc_temp_bedrock_column(ice1%vec%T_rock,ice1%kt_rock,rho_rock, &
+                                    ice1%H_rock,ice1%vec%T_ice(1),ice1%Q_geo,ice1%zr%zeta)
 
-        call convert_to_enthalpy(ice%vec%enth_rock,ice%vec%T_rock,0.0_wp,1e8_wp,ice%vec%cp_rock,0.0_wp)
+        call convert_to_enthalpy(ice%vec%enth_rock,ice%vec%T_rock,0.0_wp,1e8_wp,ice%cp_rock,0.0_wp)
 
         return 
 
@@ -622,6 +618,9 @@ contains
         ice%Q_b      = 0.0              ! [] No basal frictional heating 
         ice%f_grnd   = 1.0              ! Grounded point 
 
+        ice%cp_rock  = 1000.0    ! [J kg-1 K-1]
+        ice%kt_rock  = 9.46e7    ! [J a-1 m-1 K-1]
+        ice%H_rock   = 2000.0       ! [m] 
         ice%H_rock   = 2000.0           ! [m] 
         ice%Q_rock   = ice%Q_geo 
         
@@ -629,9 +628,6 @@ contains
         ice%vec%cp      = 2009.0        ! [J kg-1 K-1]
         ice%vec%kt      = 6.6269e7      ! [J a-1 m-1 K-1]   == 2.1*sec_year  [J s-1 m-1 K-1] => J a-1 m-1 K-1]
         
-        ice%vec%cp_rock = 1000.0        ! [J kg-1 K-1]
-        ice%vec%kt_rock = 9.46e7        ! [J a-1 m-1 K-1]
-
         ATT             = 5.3e-24*sec_year      ! Rate factor
         gamma           = 4.0                   ! [degrees] Bed slope 
         T_init          = T0 - 1.5 
@@ -679,10 +675,10 @@ contains
         call convert_to_enthalpy(ice%vec%enth,ice%vec%T_ice,ice%vec%omega,ice%vec%T_pmp,ice%vec%cp,L_ice)
         
         ! Define temperature profile in bedrock too 
-        ice%vec%T_rock = calc_temp_lith_column(ice%zr%zeta,ice%vec%kt_rock,ice%vec%cp_rock,rho_l, &
-                                            ice%H_rock,ice%vec%T_ice(1),ice%Q_geo)
+        call calc_temp_bedrock_column(ice1%vec%T_rock,ice1%kt_rock,rho_rock, &
+                                    ice1%H_rock,ice1%vec%T_ice(1),ice1%Q_geo,ice1%zr%zeta)
 
-        call convert_to_enthalpy(ice%vec%enth_rock,ice%vec%T_rock,0.0_wp,1e8_wp,ice%vec%cp_rock,0.0_wp)
+        call convert_to_enthalpy(ice%vec%enth_rock,ice%vec%T_rock,0.0_wp,1e8_wp,ice%cp_rock,0.0_wp)
 
         return 
 
@@ -738,9 +734,7 @@ contains
         
         allocate(ice%vec%enth_rock(nzr))
         allocate(ice%vec%T_rock(nzr))
-        allocate(ice%vec%cp_rock(nzr))
-        allocate(ice%vec%kt_rock(nzr))
-        
+
         ! Initialize remaining vectors to zero 
         ice%vec%enth      = 0.0 
         ice%vec%T_ice     = 0.0 
@@ -755,9 +749,7 @@ contains
         
         ice%vec%enth_rock = 0.0 
         ice%vec%T_rock    = 0.0 
-        ice%vec%cp_rock   = 0.0
-        ice%vec%kt_rock   = 0.0
-        
+
         ! Calculate derivative terms 
         call calc_dzeta_terms(ice%z%dzeta_a,ice%z%dzeta_b,ice%z%zeta,ice%z%zeta_ac) 
         call calc_dzeta_terms(ice%zr%dzeta_a,ice%zr%dzeta_b,ice%zr%zeta,ice%zr%zeta_ac) 

@@ -120,22 +120,11 @@ contains
                 ! Integrate upward to each point above base until surface is reached 
                 do k = 2, nz_ac 
 
-if (.TRUE.) then 
-    ! zeta1 
                     ! Greve and Blatter (2009), Eq. 5.72
                     ! Bueler and Brown  (2009), Eq. 4
                     duxdx_aa  = (ux(i,j,k-1)   - ux(i-1,j,k-1)  )/dx
                     duydy_aa  = (uy(i,j,k-1)   - uy(i,j-1,k-1)  )/dy
                     
-else 
-
-                    ! Greve and Blatter (2009), Eq. 5.72
-                    ! Bueler and Brown  (2009), Eq. 4
-                    duxdx_aa  = (ux(i,j,k)   - ux(i-1,j,k)  )/dx
-                    duydy_aa  = (uy(i,j,k)   - uy(i,j-1,k)  )/dy
-                    
-end if 
-
                     ! Testing wider stencil for stability (no effect so far)
 !                     duxdx_aa  = 0.5*((ux(i,j+1,k) - ux(i-1,j+1,k))/dx + (ux(i,j-1,k) - ux(i-1,j-1,k))/dx)
 !                     duydy_aa  = 0.5*((uy(i+1,j,k)   - uy(i+1,j-1,k)  )/dy + (uy(i-1,j,k)   - uy(i-1,j-1,k)  )/dy)
@@ -252,9 +241,6 @@ end if
 
             do k = 1, nz_ac 
 
-if (.TRUE.) then 
-    ! zeta1 
-
                 ! Estimate direction of current flow into cell (x and y), centered horizontally in grid point
                 ! and averaged to staggered cell edges where uz is defined.
                 if (k .eq. 1) then 
@@ -267,23 +253,6 @@ if (.TRUE.) then
                     ux_aa = 0.25_prec*(ux(i,j,k-1)+ux(i-1,j,k-1) + ux(i,j,k)+ux(i-1,j,k))
                     uy_aa = 0.25_prec*(uy(i,j,k-1)+uy(i,j-1,k-1) + uy(i,j,k)+uy(i,j-1,k))
                 end if 
-
-else 
-
-                ! Estimate direction of current flow into cell (x and y), centered horizontally in grid point
-                ! and averaged to staggered cell edges where uz is defined.
-                if (k .eq. 1) then 
-                    ux_aa = 0.5_prec*(ux(i,j,k)+ux(i-1,j,k))
-                    uy_aa = 0.5_prec*(uy(i,j,k)+uy(i,j-1,k))
-                else if (k .eq. nz_ac) then 
-                    ux_aa = 0.5_prec*(ux(i,j,k)+ux(i-1,j,k+1))
-                    uy_aa = 0.5_prec*(uy(i,j,k)+uy(i,j-1,k+1))
-                else 
-                    ux_aa = 0.25_prec*(ux(i,j,k)+ux(i-1,j,k) + ux(i,j,k+1)+ux(i-1,j,k+1))
-                    uy_aa = 0.25_prec*(uy(i,j,k)+uy(i,j-1,k) + uy(i,j,k+1)+uy(i,j-1,k+1))
-                end if 
-
-end if 
 
                 ! Get horizontal scaling correction terms 
                 c_x = (1.0_prec-zeta_ac(k))*(H_ice(i+1,j)-H_ice(i-1,j))*dx_inv2 - (z_srf(i+1,j)-z_srf(i-1,j))*dx_inv2

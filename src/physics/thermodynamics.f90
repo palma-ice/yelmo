@@ -631,13 +631,8 @@ contains
                     uy_aa_up  = 0.25*(uy(i,j-1,k)+uy(i,j,k)+uy(i,j-1,k+1)+uy(i,j,k+1))
                     uy_aa_dwn = 0.25*(uy(i,j-1,k)+uy(i,j,k)+uy(i,j-1,k-1)+uy(i,j,k-1))
 
-if (.TRUE.) then 
-    ! zeta1
                     dz = H_ice(i,j)*(zeta_ac(k+1) - zeta_ac(k)) 
-else
-                    dz = H_ice(i,j)*(zeta_ac(k) - zeta_ac(k-1)) 
-end if 
-
+                    
                     duxdz = (ux_aa_up-ux_aa_dwn)/dz 
                     duydz = (uy_aa_up-uy_aa_dwn)/dz 
 
@@ -1515,7 +1510,7 @@ end if
         return 
 
     end subroutine define_temp_bedrock_3D
-    
+
     subroutine calc_temp_bedrock_column(T_rock,kt_rock,rho_rock,H_rock,T_bed,Q_geo,zeta_aa)
         ! This function will impose a temperature profile in a column 
         ! of bedrock assuming equilibrium with the bed surface temperature (T_bed)

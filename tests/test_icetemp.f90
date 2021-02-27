@@ -103,7 +103,7 @@ program test_icetemp
     ! ===============================================================
     ! User options 
 
-    experiment     = "k15expa"      ! "eismint", "k15expa", "k15expb", "bg15a"
+    experiment     = "eismint"      ! "eismint", "k15expa", "k15expb", "bg15a"
     
     ! General options
     zeta_scale      = "linear"      ! "linear", "exp", "tanh"
@@ -205,7 +205,7 @@ program test_icetemp
             !T_pmp_beta = 9.8e-8         ! [K Pa^-1] Greve and Blatter (2009) 
             T_pmp_beta = 9.7e-8         ! [K Pa^-1] EISMINT2 value (beta1 = 8.66e-4 [K m^-1])
 
-            call init_eismint_summit(ice1,smb=0.1_prec)
+            call init_eismint_summit(ice1,smb=0.5_prec)
 
     end select 
 
@@ -376,8 +376,8 @@ contains
         ice%Q_b      = 0.0          ! [] No basal frictional heating 
         ice%f_grnd   = 1.0          ! Grounded point 
 
-        ice%cp_rock  = 1000.0    ! [J kg-1 K-1]
-        ice%kt_rock  = 9.46e7    ! [J a-1 m-1 K-1]
+        ice%cp_rock  = 1000.0       ! [J kg-1 K-1]
+        ice%kt_rock  = 9.46e7       ! [J a-1 m-1 K-1]
         ice%H_rock   = 2000.0       ! [m] 
         ice%Q_rock   = ice%Q_geo 
         

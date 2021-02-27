@@ -339,7 +339,7 @@ contains
 
         return 
 
-    end function calc_rate_factor_inverted 
+    end function calc_rate_factor_inverted
     
     function calc_rate_factor_integrated(ATT,zeta_aa,n_glen) result(ATT_int)
         ! Greve and Blatter (2009), Chpt 5, page 82 
@@ -581,20 +581,12 @@ contains
                     else if (k .eq. nz_aa) then 
                         ! Surface layer
 
-if (.TRUE.) then 
-    ! zeta1
                         lzx = (vz(ip1,j,k+1)-vz(im1,j,k+1))*0.5*fact_x(i,j)
                         lzy = (vz(i,jp1,k+1)-vz(i,jm1,k+1))*0.5*fact_y(i,j)
-else
-                        lzx = (vz(ip1,j,k-1)-vz(im1,j,k-1))*0.5*fact_x(i,j)
-                        lzy = (vz(i,jp1,k-1)-vz(i,jm1,k-1))*0.5*fact_y(i,j)
-end if 
 
                     else 
                         ! Intermediate layers 
 
-if (.TRUE.) then 
-    ! zeta1 
                         lzx = (  (vz(ip1,j,k+1)+vz(ip1,j,k))   &
                                - (vz(im1,j,k+1)+vz(im1,j,k)) ) &
                                 *0.25*fact_x(i,j)
@@ -602,18 +594,6 @@ if (.TRUE.) then
                         lzy = (  (vz(i,jp1,k+1)+vz(i,jp1,k))   &
                                - (vz(i,jm1,k+1)+vz(i,jm1,k)) ) &
                                 *0.25*fact_y(i,j)
-
-
-else 
-
-                        lzx = (  (vz(ip1,j,k)+vz(ip1,j,k-1))   &
-                               - (vz(im1,j,k)+vz(im1,j,k-1)) ) &
-                                *0.25*fact_x(i,j)
-
-                        lzy = (  (vz(i,jp1,k)+vz(i,jp1,k-1))   &
-                               - (vz(i,jm1,k)+vz(i,jm1,k-1)) ) &
-                                *0.25*fact_y(i,j)
-end if 
 
                     end if 
                     
@@ -736,7 +716,7 @@ end if
 
 !     end subroutine calc_stress_3D
     
-end module deformation 
+end module deformation
 
 
 

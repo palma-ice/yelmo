@@ -404,9 +404,6 @@ contains
 
         ! == Ice interior layers 2:nz_aa-1 ==
 
-if (.TRUE.) then 
-    ! use with zeta1, dzeta1 
-
         do k = 2, nz_aa-1
 
             ! Get implicit vertical advection term, ac => aa nodes
@@ -434,40 +431,7 @@ if (.TRUE.) then
             rhs(k)  = (temp(k)-T_ref) - dt*advecxy(k) + dt*Q_strn(k)
             
         end do 
-
-else 
-    ! use with zeta, dzeta 
-
-        do k = 2, nz_aa-1
-
-            ! Get implicit vertical advection term, ac => aa nodes
-            uz_aa   = 0.5*(uz(k-1)+uz(k))
-
-            ! Get kappa for the lower and upper ac-nodes using harmonic mean from aa-nodes
-            
-            dz1 = zeta_ac(k-1)-zeta_aa(k-1)
-            dz2 = zeta_aa(k)-zeta_ac(k-1)
-            call calc_wtd_harmonic_mean(kappa_a,kappa(k-1),kappa(k),dz1,dz2)
-
-            dz1 = zeta_ac(k)-zeta_aa(k)
-            dz2 = zeta_aa(k+1)-zeta_ac(k)
-            call calc_wtd_harmonic_mean(kappa_b,kappa(k),kappa(k+1),dz1,dz2)
-
-            ! Vertical distance for centered difference advection scheme
-            dz      =  thickness*(zeta_aa(k+1)-zeta_aa(k-1))
-            
-            fac_a   = -kappa_a*dzeta_a(k)*dt/thickness**2
-            fac_b   = -kappa_b*dzeta_b(k)*dt/thickness**2
-
-            subd(k) = fac_a - uz_aa * dt/dz
-            supd(k) = fac_b + uz_aa * dt/dz
-            diag(k) = 1.0_prec - fac_a - fac_b
-            rhs(k)  = (temp(k)-T_ref) - dt*advecxy(k) + dt*Q_strn(k)
-            
-        end do 
-
-end if 
-
+        
         ! == Column surface ==
 
         if (is_surf_flux) then 

@@ -266,7 +266,7 @@ contains
         ! Note: for constant zeta axis, this can be done once outside
         ! instead of for each column. However, it is done here to allow
         ! use of adaptive vertical axis.
-        call calc_dzeta1_terms(dzeta_a,dzeta_b,zeta_aa,zeta_ac)
+        call calc_dzeta_terms(dzeta_a,dzeta_b,zeta_aa,zeta_ac)
         
 !         kappa_aa(1)     = 1e-4
 !         kappa_aa(nz_aa) = 1.5e0 
@@ -308,36 +308,19 @@ contains
 
             else
 
-if (.TRUE.) then 
-    ! zeta1
                 ! With implicit vertical advection (diffusion + advection)
                 uz_aa   = 0.5*(uz(k)+uz(k+1))   ! ac => aa nodes
-else
-                ! With implicit vertical advection (diffusion + advection)
-                uz_aa   = 0.5*(uz(k-1)+uz(k))   ! ac => aa nodes
-end if 
+
             end if 
-
-if (.TRUE.) then 
-    ! zeta1 
-
-    write(*,*) "To do: Need to implement zeta1 for tracers!"
-    stop 
-
-end if 
 
             ! Stagger kappa to the lower and upper ac-nodes
 
             ! ac-node between k-1 and k 
-            if (k .eq. 2) then 
-                ! Bottom layer, kappa is kappa for now (later with bedrock kappa?)
-                kappa_a = kappa_aa(1)
-            else 
-                ! Weighted average between lower half and upper half of point k-1 to k 
-                dz1 = zeta_ac(k-1)-zeta_aa(k-1)
-                dz2 = zeta_aa(k)-zeta_ac(k-1)
-                kappa_a = (dz1*kappa_aa(k-1) + dz2*kappa_aa(k))/(dz1+dz2)
-            end if 
+            
+            ! Weighted average between lower half and upper half of point k-1 to k 
+            dz1 = zeta_ac(k)-zeta_aa(k-1)
+            dz2 = zeta_aa(k)-zeta_ac(k)
+            kappa_a = (dz1*kappa_aa(k-1) + dz2*kappa_aa(k))/(dz1+dz2)
 
             ! ac-node between k and k+1 
 
@@ -448,17 +431,17 @@ end if
         ! Loop over internal cell centers and perform upwind advection 
         do k = 2, nz_aa-1 
             
-            u_aa = 0.5_prec*(uz(k-1)+uz(k))
+            u_aa = 0.5_prec*(uz(k)+uz(k+1))
             
             if (u_aa < 0.0) then 
                 ! Upwind negative
                 dz        = H_ice*(zeta_aa(k+1)-zeta_aa(k))
-                advecz(k) = uz(k)*(Q(k+1)-Q(k))/dz  
+                advecz(k) = uz(k+1)*(Q(k+1)-Q(k))/dz  
 
             else
                 ! Upwind positive
                 dz        = H_ice*(zeta_aa(k)-zeta_aa(k-1))
-                advecz(k) = uz(k-1)*(Q(k)-Q(k-1))/dz
+                advecz(k) = uz(k)*(Q(k)-Q(k-1))/dz
 
             end if 
         end do 
@@ -495,7 +478,7 @@ end if
         ! Loop over internal cell centers and perform upwind advection 
         do k = 2, nz_aa-1 
             
-            u_aa = 0.5_prec*(uz(k-1)+uz(k))
+            u_aa = 0.5_prec*(uz(k)+uz(k+1))
             
             if (u_aa < 0.0) then 
                 ! Upwind negative
@@ -514,16 +497,16 @@ end if
                     if (zout .le. z2) then 
                         Q2   = interp_linear_pt([z1,z2],[Q(k+1),Q(k+2)],zout)
 
-                        advecz(k) = uz(k)*((4.0*Q1-Q2-3.0*Q0))/(2.0*dz)
+                        advecz(k) = uz(k+1)*((4.0*Q1-Q2-3.0*Q0))/(2.0*dz)
 
                     else 
                         ! 1st order 
-                        advecz(k) = uz(k)*(Q(k+1)-Q(k))/dz 
+                        advecz(k) = uz(k+1)*(Q(k+1)-Q(k))/dz 
                     end if 
 
                 else
                     ! 1st order 
-                    advecz(k) = uz(k)*(Q(k+1)-Q(k))/dz 
+                    advecz(k) = uz(k+1)*(Q(k+1)-Q(k))/dz 
 
                 end if 
 
@@ -544,10 +527,10 @@ end if
                     end if 
                     Q2   = interp_linear_pt([z2,z1],[Q(k-2),Q(k-1)],zout)
 
-                    advecz(k) = uz(k-1)*(-(4.0*Q1-Q2-3.0*Q0))/(2.0*dz)
+                    advecz(k) = uz(k)*(-(4.0*Q1-Q2-3.0*Q0))/(2.0*dz)
                 else
                     ! 1st order 
-                    advecz(k) = uz(k-1)*(Q(k)-Q(k-1))/dz
+                    advecz(k) = uz(k)*(Q(k)-Q(k-1))/dz
                 
                 end if 
                 
@@ -598,10 +581,10 @@ end if
             
             if (k .ge. 2) then 
                 
-                dz = H_ice*(zeta_ac(k)-zeta_ac(k-1))
+                dz = H_ice*(zeta_ac(k+1)-zeta_ac(k))
 
-                uz_ac_up  = uz(k)
-                uz_ac_dwn = uz(k-1) 
+                uz_ac_up  = uz(k+1)
+                uz_ac_dwn = uz(k) 
 
                 Q_up     = Q(k+1)
                 Q_ac_up  = 0.5_prec*(Q(k)+Q(k+1))
@@ -628,13 +611,13 @@ end if
             else
                 ! 1st order upstream
                 dz        = H_ice*(zeta_aa(k+1)-zeta_aa(k))
-                advecz(k) = uz(k)*(Q(k+1)-Q(k))/dz 
+                advecz(k) = uz(k+1)*(Q(k+1)-Q(k))/dz 
 
             end if 
 
 !             if (k .ge. 3) then 
 
-!                 u_aa = 0.5_prec*(uz(k-1)+uz(k))
+!                 u_aa = 0.5_prec*(uz(k)+uz(k+1))
                 
 !                 dim2 = H_ice*(zeta_aa(k) - zeta_aa(k-2))
 !                 dim1 = H_ice*(zeta_aa(k) - zeta_aa(k-1))
@@ -651,7 +634,7 @@ end if
 !             else
 !                 ! 1st order upstream
 !                 dz        = H_ice*(zeta_aa(k+1)-zeta_aa(k))
-!                 advecz(k) = uz(k)*(Q(k+1)-Q(k))/dz 
+!                 advecz(k) = uz(k+1)*(Q(k+1)-Q(k))/dz 
 
 !             end if 
 
@@ -670,7 +653,7 @@ end if
 !             else
 !                 ! 1st order upstream
 !                 dz        = H_ice*(zeta_aa(k+1)-zeta_aa(k))
-!                 advecz(k) = uz(k)*(Q(k+1)-Q(k))/dz 
+!                 advecz(k) = uz(k+1)*(Q(k+1)-Q(k))/dz 
 
 !             end if 
 
@@ -723,7 +706,7 @@ end if
 
         return 
 
-    end subroutine calc_X_base 
+    end subroutine calc_X_base
 
     subroutine calc_advec_horizontal_column(advecxy,var_ice,ux,uy,dx,i,j,ulim)
         ! Newly implemented advection algorithms (ajr)
@@ -762,6 +745,7 @@ end if
         ! Loop over each point in the column
         do k = 1, nz_aa-1 
 
+            ! ajr: ux is already vertically centered on aa-nodes, is the below averaging between k and k-1 useful??
             ! Estimate direction of current flow into cell (x and y), centered in vertical layer and grid point
             if (k .eq. 1) then 
                 ! Basal layer, take current k-value 
@@ -975,7 +959,7 @@ end if
 
     end function interp_linear_pt
 
-    subroutine calc_dzeta1_terms(dzeta_a,dzeta_b,zeta_aa,zeta_ac)
+    subroutine calc_dzeta_terms(dzeta_a,dzeta_b,zeta_aa,zeta_ac)
         ! zeta_aa  = depth axis at layer centers (plus base and surface values)
         ! zeta_ac  = depth axis (1: base, nz: surface), at layer boundaries
         ! Calculate ak, bk terms as defined in Hoffmann et al (2018)
@@ -1007,42 +991,7 @@ end if
 
         return 
 
-    end subroutine calc_dzeta1_terms
-
-    subroutine calc_dzeta_terms(dzeta_a,dzeta_b,zeta_aa,zeta_ac)
-        ! zeta_aa  = depth axis at layer centers (plus base and surface values)
-        ! zeta_ac  = depth axis (1: base, nz: surface), at layer boundaries
-        ! Calculate ak, bk terms as defined in Hoffmann et al (2018)
-        implicit none 
-
-        real(prec), intent(INOUT) :: dzeta_a(:)    ! nz_aa
-        real(prec), intent(INOUT) :: dzeta_b(:)    ! nz_aa
-        real(prec), intent(IN)    :: zeta_aa(:)    ! nz_aa 
-        real(prec), intent(IN)    :: zeta_ac(:)    ! nz_ac == nz_aa-1 
-
-        ! Local variables 
-        integer :: k, nz_layers, nz_aa    
-
-        nz_aa = size(zeta_aa)
-
-        ! Note: zeta_aa is calculated outside in the main program 
-
-        ! Initialize dzeta_a/dzeta_b to zero, first and last indices will not be used (end points)
-        dzeta_a = 0.0 
-        dzeta_b = 0.0 
-        
-        do k = 2, nz_aa-1 
-            dzeta_a(k) = 1.0/ ( (zeta_ac(k) - zeta_ac(k-1)) * (zeta_aa(k) - zeta_aa(k-1)) )
-        enddo
-
-        do k = 2, nz_aa-1
-            dzeta_b(k) = 1.0/ ( (zeta_ac(k) - zeta_ac(k-1)) * (zeta_aa(k+1) - zeta_aa(k)) )
-        end do
-
-        return 
-
     end subroutine calc_dzeta_terms
-
 
     subroutine calc_isochrones(depth_iso,dep_time,H_ice,age_iso,zeta,time)
         ! Calculate specific isochronal layers (depth_iso) at specified ages (age_iso)
@@ -1126,5 +1075,5 @@ end if
 
     end subroutine calc_isochrones
 
-end module ice_tracer 
+end module ice_tracer
 

@@ -29,6 +29,7 @@ program yelmo_benchmarks
     real(prec) :: bumps_L, bumps_A 
     integer    :: n  
 
+    character(len=56) :: thrm_method_default 
     character(len=56) :: lith_method_default 
 
     character(len=56) :: grid_name
@@ -360,6 +361,7 @@ program yelmo_benchmarks
     end if 
 
     ! Store default lithosphere solver method, to be activated after several years 
+    thrm_method_default = trim(yelmo1%thrm%par%method)
     lith_method_default = trim(yelmo1%thrm%par%lith_method)
 
     ! Advance timesteps
@@ -376,8 +378,10 @@ program yelmo_benchmarks
         end if 
 
         if (time .le. 50e3) then 
+            yelmo1%thrm%par%method      = "temp"
             yelmo1%thrm%par%lith_method = "equil"
         else 
+            yelmo1%thrm%par%method      = trim(thrm_method_default)
             yelmo1%thrm%par%lith_method = trim(lith_method_default)
         end if 
 

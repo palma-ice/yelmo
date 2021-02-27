@@ -150,42 +150,6 @@ end select
             call calc_basal_water_local(thrm%now%H_w,thrm%now%dHwdt,tpo%now%H_ice,-thrm%now%bmb_grnd*(rho_ice/rho_w), &
                                     tpo%now%f_grnd,dt*0.5_prec,thrm%par%till_rate,thrm%par%H_w_max)
             
-            ! ==== Lithosphere (dt step 1) ======================================
-
-            ! Update the lithosphere temperature profile 
-            ! (using basal ice temperature from previous timestep)
-            select case(trim(thrm%par%lith_method))
-
-                case("equil")
-                    ! Prescribe lithospheric temperature profile assuming 
-                    ! equilibrium with the bed surface temperature 
-                    ! (ie, no active bedrock) 
-
-                    call define_temp_lith_3D(thrm%now%enth_lith,thrm%now%T_lith,thrm%now%Q_lith,thrm%now%cp_lith, &
-                                             thrm%now%kt_lith,bnd%Q_geo,thrm%now%T_ice(:,:,1), &
-                                             thrm%now%H_lith,thrm%par%lith_zeta_aa)
-
-                case("active")
-                    ! Solve thermodynamic equation for the lithosphere 
-
-                    call calc_ytherm_enthalpy_bedrock_3D(thrm%now%enth_lith,thrm%now%T_lith,thrm%now%Q_lith, &
-                                        thrm%now%T_ice(:,:,1),thrm%now%T_pmp(:,:,1),thrm%now%cp_lith,thrm%now%kt_lith, &
-                                        thrm%now%H_lith,tpo%now%H_ice,tpo%now%H_grnd,thrm%now%Q_ice_b,bnd%Q_geo, &
-                                        thrm%par%lith_zeta_aa,thrm%par%lith_zeta_ac, &
-                                        thrm%par%lith_dzeta_a,thrm%par%lith_dzeta_b,dt*0.5_wp)
-
-                case("fixed","combined") 
-                    ! Pass - do nothing, use the enth/temp/omega fields as they are defined
-                    
-                case DEFAULT 
-
-                    write(*,*) "calc_ytherm:: Error: lith_method not recognized."
-                    write(*,*) "lith_method = ", trim(thrm%par%lith_method)
-
-            end select 
-
-            ! =======================================================
-
             select case(trim(thrm%par%method))
 
                 case("enth","temp") 
@@ -264,7 +228,7 @@ end select
                                     tpo%now%f_grnd,dt,thrm%par%till_rate,thrm%par%H_w_max)
 
 
-            ! ==== Lithosphere (dt step 2) ======================================
+            ! ==== Lithosphere ======================================
 
             ! Update the lithosphere temperature profile 
             ! (using basal ice temperature from previous timestep)
@@ -286,7 +250,7 @@ end select
                                         thrm%now%T_ice(:,:,1),thrm%now%T_pmp(:,:,1),thrm%now%cp_lith,thrm%now%kt_lith, &
                                         thrm%now%H_lith,tpo%now%H_ice,tpo%now%H_grnd,thrm%now%Q_ice_b,bnd%Q_geo, &
                                         thrm%par%lith_zeta_aa,thrm%par%lith_zeta_ac, &
-                                        thrm%par%lith_dzeta_a,thrm%par%lith_dzeta_b,dt*0.5_wp)
+                                        thrm%par%lith_dzeta_a,thrm%par%lith_dzeta_b,dt)
 
                 case("fixed","combined") 
                     ! Pass - do nothing, use the enth/temp/omega fields as they are defined

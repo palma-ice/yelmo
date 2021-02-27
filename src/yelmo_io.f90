@@ -291,8 +291,9 @@ contains
         call nc_write(filename,"advecxy",     dom%thrm%now%advecxy,    units="",dim1="xc",dim2="yc",dim3="zeta",ncid=ncid)      
         
         call nc_write(filename,"Q_lith",      dom%thrm%now%Q_lith,     units="mW m-2",dim1="xc",dim2="yc",ncid=ncid)        
-        call nc_write(filename,"enth_lith",   dom%thrm%now%enth_lith,  units="",      dim1="xc",dim2="yc",dim3="zeta_l",ncid=ncid)      
+        call nc_write(filename,"enth_lith",   dom%thrm%now%enth_lith,  units="J m-3", dim1="xc",dim2="yc",dim3="zeta_l",ncid=ncid)      
         call nc_write(filename,"T_lith",      dom%thrm%now%T_lith,     units="K",     dim1="xc",dim2="yc",dim3="zeta_l",ncid=ncid)      
+        call nc_write(filename,"H_lith",      dom%thrm%now%H_lith,     units="",      dim1="xc",dim2="yc",ncid=ncid)      
         call nc_write(filename,"cp_lith",     dom%thrm%now%cp_lith,    units="",      dim1="xc",dim2="yc",dim3="zeta_l",ncid=ncid)      
         call nc_write(filename,"kt_lith",     dom%thrm%now%kt_lith,    units="",      dim1="xc",dim2="yc",dim3="zeta_l",ncid=ncid)      
         
@@ -570,6 +571,7 @@ contains
         call nc_read(filename,"Q_lith",      dom%thrm%now%Q_lith,     ncid=ncid)        
         call nc_read(filename,"enth_lith",   dom%thrm%now%enth_lith,  ncid=ncid)      
         call nc_read(filename,"T_lith",      dom%thrm%now%T_lith,     ncid=ncid)      
+        call nc_read(filename,"H_lith",      dom%thrm%now%H_lith,     ncid=ncid)      
         call nc_read(filename,"cp_lith",     dom%thrm%now%cp_lith,    ncid=ncid)      
         call nc_read(filename,"kt_lith",     dom%thrm%now%kt_lith,    ncid=ncid)      
         

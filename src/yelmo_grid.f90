@@ -16,8 +16,7 @@ module yelmo_grid
     end interface 
     
     private 
-
-    public :: calc_zeta1 
+    
     public :: calc_zeta 
 
     public :: yelmo_init_grid 
@@ -30,7 +29,7 @@ module yelmo_grid
 
 contains 
     
-    subroutine calc_zeta1(zeta_aa,zeta_ac,nz_ac,nz_aa,zeta_scale,zeta_exp)
+    subroutine calc_zeta(zeta_aa,zeta_ac,nz_ac,nz_aa,zeta_scale,zeta_exp)
         ! Calculate the vertical axis cell-centers first (aa-nodes),
         ! including a cell centered at the base on the surface. 
         ! Then calculate the vertical axis cell-edges (ac-nodes).
@@ -116,83 +115,6 @@ contains
         ! end do 
         ! stop 
         ! =================
-
-        return 
-
-    end subroutine calc_zeta1
-    
-    subroutine calc_zeta(zeta_aa,zeta_ac,nz_ac,nz_aa,zeta_scale,zeta_exp)
-        ! Calculate the vertical layer-edge axis (vertical ac-nodes)
-        ! and the vertical cell-center axis (vertical aa-nodes),
-        ! including an extra zero-thickness aa-node at the base and surface
-
-        implicit none 
-
-        real(prec), allocatable, intent(INOUT)  :: zeta_aa(:) 
-        real(prec), allocatable, intent(INOUT)  :: zeta_ac(:)
-        integer,                 intent(OUT)    :: nz_ac 
-        integer,      intent(IN)   :: nz_aa 
-        character(*), intent(IN)   :: zeta_scale 
-        real(prec),   intent(IN)   :: zeta_exp 
-
-        ! Local variables
-        integer :: k
-        real(prec), allocatable :: tmp(:) 
-
-        ! Define size of zeta ac-node vector
-        nz_ac = nz_aa - 1 
-
-        ! First allocate arrays 
-        if (allocated(zeta_aa)) deallocate(zeta_aa)
-        if (allocated(zeta_ac)) deallocate(zeta_ac)
-        allocate(zeta_aa(nz_aa))
-        allocate(zeta_ac(nz_ac))
-
-        ! Initially define a linear zeta scale 
-        ! Base = 0.0, Surface = 1.0 
-        do k = 1, nz_ac
-            zeta_ac(k) = 0.0 + 1.0*(k-1)/real(nz_ac-1)
-        end do 
-
-        ! Scale zeta to produce different resolution through column if desired
-        ! zeta_scale = ["linear","exp","wave"]
-        select case(trim(zeta_scale))
-            
-            case("exp")
-                ! Increase resolution at the base 
-                
-                zeta_ac = zeta_ac**(zeta_exp) 
-
-            case("exp-inv")
-                ! Increase resolution at the surface 
-                
-                zeta_ac = 1.0_wp - zeta_ac**(zeta_exp)
-
-                ! Reverse order 
-                allocate(tmp(nz_ac))
-                tmp = zeta_ac 
-                do k = 1, nz_ac
-                    zeta_ac(k) = tmp(nz_ac-k+1)
-                end do 
-
-            case("tanh")
-                ! Increase resolution at base and surface 
-
-                zeta_ac = tanh(1.0*pi*(zeta_ac-0.5))
-                zeta_ac = zeta_ac - minval(zeta_ac)
-                zeta_ac = zeta_ac / maxval(zeta_ac)
-
-            case DEFAULT
-            ! Do nothing, scale should be linear as defined above
-        
-        end select  
-        
-        ! Get zeta_aa (between zeta_ac values, as well as at the base and surface)
-        zeta_aa(1) = 0.0 
-        do k = 2, nz_aa-1
-            zeta_aa(k) = 0.5 * (zeta_ac(k-1)+zeta_ac(k))
-        end do 
-        zeta_aa(nz_aa) = 1.0 
 
         return 
 

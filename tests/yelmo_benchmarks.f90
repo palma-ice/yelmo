@@ -30,7 +30,7 @@ program yelmo_benchmarks
     integer    :: n  
 
     character(len=56) :: thrm_method_default 
-    character(len=56) :: lith_method_default 
+    character(len=56) :: rock_method_default 
 
     character(len=56) :: grid_name
     real(prec) :: dx, x0  
@@ -360,9 +360,9 @@ program yelmo_benchmarks
         yelmo1%dyn%par%solver = "fixed"
     end if 
 
-    ! Store default lithosphere solver method, to be activated after several years 
+    ! Store default bedrock solver method, to be activated after several years 
     thrm_method_default = trim(yelmo1%thrm%par%method)
-    lith_method_default = trim(yelmo1%thrm%par%lith_method)
+    rock_method_default = trim(yelmo1%thrm%par%rock_method)
 
     ! Advance timesteps
     do n = 1, ceiling((time_end-time_init)/dtt)
@@ -379,10 +379,10 @@ program yelmo_benchmarks
 
         if (time .le. 50e3) then 
             yelmo1%thrm%par%method      = "temp"
-            yelmo1%thrm%par%lith_method = "equil"
+            yelmo1%thrm%par%rock_method = "equil"
         else 
             yelmo1%thrm%par%method      = trim(thrm_method_default)
-            yelmo1%thrm%par%lith_method = trim(lith_method_default)
+            yelmo1%thrm%par%rock_method = trim(rock_method_default)
         end if 
 
         ! == Yelmo ice sheet ===================================================
@@ -586,10 +586,10 @@ contains
 !         call nc_write(filename,"T_pmp",ylmo%thrm%now%T_pmp,units="K",long_name="Ice pressure melting point (pmp)", &
 !                       dim1="xc",dim2="yc",dim3="zeta",dim4="time",start=[1,1,1,n],ncid=ncid)
         
-        call nc_write(filename,"T_lith",ylmo%thrm%now%T_lith,units="K",long_name="Lithosphere temperature", &
-                      dim1="xc",dim2="yc",dim3="zeta_l",dim4="time",start=[1,1,1,n],ncid=ncid)
+        call nc_write(filename,"T_rock",ylmo%thrm%now%T_rock,units="K",long_name="Bedrock temperature", &
+                      dim1="xc",dim2="yc",dim3="zeta_rock",dim4="time",start=[1,1,1,n],ncid=ncid)
         
-        call nc_write(filename,"Q_lith",ylmo%thrm%now%Q_lith,units="mW m-2",long_name="Lithosphere heat flux at bed surface", &
+        call nc_write(filename,"Q_rock",ylmo%thrm%now%Q_rock,units="mW m-2",long_name="Bedrock surface heat flux", &
                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
         
         call nc_write(filename,"T_prime_b",ylmo%thrm%now%T_prime_b,units="deg C",long_name="Homologous basal ice temperature", &

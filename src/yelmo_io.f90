@@ -35,7 +35,7 @@ contains
         call nc_write_dim(filename,"month",     x=1,dx=1,nx=12,         units="month")
         call nc_write_dim(filename,"zeta",      x=ylmo%par%zeta_aa,     units="1")
         call nc_write_dim(filename,"zeta_ac",   x=ylmo%par%zeta_ac,     units="1")
-        call nc_write_dim(filename,"zeta_l",    x=ylmo%thrm%par%lith_zeta_aa,units="1")
+        call nc_write_dim(filename,"zeta_rock", x=ylmo%thrm%par%zr%zeta_aa,units="1")
         call nc_write_dim(filename,"age_iso",   x=ylmo%mat%par%age_iso, units="kyr")
         call nc_write_dim(filename,"pd_age_iso",x=ylmo%dta%pd%age_iso,  units="kyr")
         
@@ -126,7 +126,7 @@ contains
         call nc_write_dim(filename,"yc",       x=dom%grd%yc*1e-3,       units="kilometers")
         call nc_write_dim(filename,"zeta",     x=dom%par%zeta_aa,       units="1")
         call nc_write_dim(filename,"zeta_ac",  x=dom%par%zeta_ac,       units="1")
-        call nc_write_dim(filename,"zeta_l",   x=dom%thrm%par%lith_zeta_aa,units="1")
+        call nc_write_dim(filename,"zeta_rock",x=dom%thrm%par%zr%zeta_aa,units="1")
         call nc_write_dim(filename,"age_iso",  x=dom%mat%par%age_iso,   units="kyr")
         call nc_write_dim(filename,"time",     x=time,dx=1.0_prec,nx=1, units="years ago")
  
@@ -290,13 +290,10 @@ contains
         
         call nc_write(filename,"advecxy",     dom%thrm%now%advecxy,    units="",dim1="xc",dim2="yc",dim3="zeta",ncid=ncid)      
         
-        call nc_write(filename,"Q_lith",      dom%thrm%now%Q_lith,     units="mW m-2",dim1="xc",dim2="yc",ncid=ncid)        
-        call nc_write(filename,"enth_lith",   dom%thrm%now%enth_lith,  units="J m-3", dim1="xc",dim2="yc",dim3="zeta_l",ncid=ncid)      
-        call nc_write(filename,"T_lith",      dom%thrm%now%T_lith,     units="K",     dim1="xc",dim2="yc",dim3="zeta_l",ncid=ncid)      
-        call nc_write(filename,"H_lith",      dom%thrm%now%H_lith,     units="",      dim1="xc",dim2="yc",ncid=ncid)      
-        call nc_write(filename,"cp_lith",     dom%thrm%now%cp_lith,    units="",      dim1="xc",dim2="yc",dim3="zeta_l",ncid=ncid)      
-        call nc_write(filename,"kt_lith",     dom%thrm%now%kt_lith,    units="",      dim1="xc",dim2="yc",dim3="zeta_l",ncid=ncid)      
-        
+        call nc_write(filename,"Q_rock",      dom%thrm%now%Q_rock,     units="mW m-2",dim1="xc",dim2="yc",ncid=ncid)        
+        call nc_write(filename,"enth_rock",   dom%thrm%now%enth_rock,  units="J m-3", dim1="xc",dim2="yc",dim3="zeta_rock",ncid=ncid)      
+        call nc_write(filename,"T_rock",      dom%thrm%now%T_rock,     units="K",     dim1="xc",dim2="yc",dim3="zeta_rock",ncid=ncid)      
+
         ! == ybound variables ===
 
         call nc_write(filename,"z_bed",       dom%bnd%z_bed,       units="",dim1="xc",dim2="yc",ncid=ncid)
@@ -568,13 +565,10 @@ contains
         
         call nc_read(filename,"advecxy",     dom%thrm%now%advecxy,ncid=ncid)   
         
-        call nc_read(filename,"Q_lith",      dom%thrm%now%Q_lith,     ncid=ncid)        
-        call nc_read(filename,"enth_lith",   dom%thrm%now%enth_lith,  ncid=ncid)      
-        call nc_read(filename,"T_lith",      dom%thrm%now%T_lith,     ncid=ncid)      
-        call nc_read(filename,"H_lith",      dom%thrm%now%H_lith,     ncid=ncid)      
-        call nc_read(filename,"cp_lith",     dom%thrm%now%cp_lith,    ncid=ncid)      
-        call nc_read(filename,"kt_lith",     dom%thrm%now%kt_lith,    ncid=ncid)      
-        
+        call nc_read(filename,"Q_rock",      dom%thrm%now%Q_rock,     ncid=ncid)        
+        call nc_read(filename,"enth_rock",   dom%thrm%now%enth_rock,  ncid=ncid)      
+        call nc_read(filename,"T_rock",      dom%thrm%now%T_rock,     ncid=ncid)      
+
         ! == ybound variables ===
 
         call nc_read(filename,"z_bed",       dom%bnd%z_bed,ncid=ncid) 

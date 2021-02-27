@@ -55,7 +55,7 @@ module yelmo_defs
     real(wp)   :: rho_w          ! [kg m-3] Density water          
     real(wp)   :: rho_sw         ! [kg m-3] Density seawater      
     real(wp)   :: rho_a          ! [kg m-3] Density asthenosphere  
-    real(wp)   :: rho_l          ! [kg m-3] Density lithosphere (mantle) 
+    real(wp)   :: rho_rock       ! [kg m-3] Density bedrock (mantle/lithosphere) 
     real(wp)   :: L_ice          ! [J kg-1] Latent heat           
     real(wp)   :: T_pmp_beta     ! [K Pa-1] Melt point pressure slope
 
@@ -407,6 +407,14 @@ module yelmo_defs
     !
     ! =========================================================================
     
+    type zeta_column_class 
+        real(wp), allocatable :: zeta_aa(:)   ! Layer centers (aa-nodes), plus base and surface: nz_aa points 
+        real(wp), allocatable :: zeta_ac(:)   ! Layer borders (ac-nodes), plus base and surface: nz_ac == nz_aa-1 points
+
+        real(wp), allocatable :: dzeta_a(:)
+        real(wp), allocatable :: dzeta_b(:)
+    end type
+
     !ytherm parameters 
     type ytherm_param_class
         character(len=256)  :: method  
@@ -416,6 +424,8 @@ module yelmo_defs
         real(wp)            :: dx, dy  
         integer             :: nz_aa     ! Number of vertical points in ice (layer centers, plus base and surface)
         integer             :: nz_ac     ! Number of vertical points in ice (layer boundaries)
+        integer             :: nzr_aa    ! Number of vertical points in bedrock (layer centers, plus base and surface)
+        integer             :: nzr_ac    ! Number of vertical points in bedrock (layer boundaries)
         real(wp)            :: gamma  
         logical             :: use_strain_sia 
         integer             :: n_sm_qstrn    ! Standard deviation (in points) for Gaussian smoothing of strain heating
@@ -429,33 +439,21 @@ module yelmo_defs
         real(wp)            :: till_rate 
         real(wp)            :: H_w_max 
         
-        real(wp), allocatable :: zeta_aa(:)   ! Layer centers (aa-nodes), plus base and surface: nz_aa points 
-        real(wp), allocatable :: zeta_ac(:)   ! Layer borders (ac-nodes), plus base and surface: nz_ac == nz_aa-1 points
-
-        real(wp), allocatable :: dzeta_a(:)
-        real(wp), allocatable :: dzeta_b(:)
+        type(zeta_column_class) :: z        ! Ice column vertical axis info
+        type(zeta_column_class) :: zr       ! Bedrock column vertical axis info
+        
+        character(len=256)  :: rock_method  
+        character (len=56)  :: zeta_scale_rock  
+        real(wp)            :: zeta_exp_rock 
+        real(wp)            :: H_rock 
+        real(wp)            :: cp_rock
+        real(wp)            :: kt_rock
         
         real(dp)   :: time
         real(wp)   :: dt_zeta, dt_beta(2)
 
         real(wp)   :: speed 
 
-        ! Lithosphere 
-        character(len=256)  :: lith_method  
-        integer             :: lith_nz_aa       ! Number of vertical points in bedrock 
-        integer             :: lith_nz_ac       ! Number of vertical points in bedrock 
-        character (len=56)  :: lith_zeta_scale 
-        real(wp)            :: lith_zeta_exp 
-        real(wp)            :: H_lith 
-        real(wp)            :: lith_cp 
-        real(wp)            :: lith_kt
-        
-        real(wp), allocatable :: lith_zeta_aa(:)   ! Layer centers (aa-nodes), plus base and surface: nz_aa points 
-        real(wp), allocatable :: lith_zeta_ac(:)   ! Layer borders (ac-nodes), plus base and surface: nz_ac == nz_aa-1 points
-
-        real(wp), allocatable :: lith_dzeta_a(:)
-        real(wp), allocatable :: lith_dzeta_b(:)
-        
     end type
 
     ! ytherm state variables
@@ -480,13 +478,10 @@ module yelmo_defs
         
         real(wp), allocatable :: advecxy(:,:,:)
 
-        ! Lithosphere
-        real(wp), allocatable :: Q_lith(:,:)
-        real(wp), allocatable :: enth_lith(:,:,:)
-        real(wp), allocatable :: T_lith(:,:,:)
-        real(wp), allocatable :: H_lith(:,:) 
-        real(wp), allocatable :: cp_lith(:,:,:)
-        real(wp), allocatable :: kt_lith(:,:,:)
+        ! Bedrock / lithosphere 
+        real(wp), allocatable :: Q_rock(:,:)
+        real(wp), allocatable :: enth_rock(:,:,:)
+        real(wp), allocatable :: T_rock(:,:,:)
 
     end type
 
@@ -531,8 +526,8 @@ module yelmo_defs
         real(wp), allocatable :: regions(:,:) 
         real(wp), allocatable :: region_mask(:,:) 
 
-        logical,    allocatable :: ice_allowed(:,:)     ! Locations where ice thickness can be greater than zero 
-        logical,    allocatable :: calv_mask(:,:)       ! for calv_method="kill-loc", where calv_mask==False, calv.
+        logical,  allocatable :: ice_allowed(:,:)     ! Locations where ice thickness can be greater than zero 
+        logical,  allocatable :: calv_mask(:,:)       ! for calv_method="kill-loc", where calv_mask==False, calv.
         
         real(wp), allocatable :: H_ice_ref(:,:)       ! Reference ice thickness, may be used for relaxation routines
         real(wp), allocatable :: z_bed_ref(:,:)       ! Reference bedrock elevation, may be used for relaxation routines
@@ -836,7 +831,7 @@ contains
         call nml_read(filename,"yelmo_constants","rho_w",       rho_w,      init=init_pars)
         call nml_read(filename,"yelmo_constants","rho_sw",      rho_sw,     init=init_pars)
         call nml_read(filename,"yelmo_constants","rho_a",       rho_a,      init=init_pars)
-        call nml_read(filename,"yelmo_constants","rho_l",       rho_l,      init=init_pars)
+        call nml_read(filename,"yelmo_constants","rho_rock",    rho_rock,   init=init_pars)
         call nml_read(filename,"yelmo_constants","L_ice",       L_ice,      init=init_pars)
         call nml_read(filename,"yelmo_constants","T_pmp_beta",  T_pmp_beta, init=init_pars)
         
@@ -852,7 +847,7 @@ contains
             write(*,*) "    rho_w      = ", rho_w 
             write(*,*) "    rho_sw     = ", rho_sw 
             write(*,*) "    rho_a      = ", rho_a 
-            write(*,*) "    rho_l      = ", rho_l 
+            write(*,*) "    rho_rock   = ", rho_rock 
             write(*,*) "    L_ice      = ", L_ice 
             write(*,*) "    T_pmp_beta = ", T_pmp_beta 
             

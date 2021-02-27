@@ -8,7 +8,7 @@ module yelmo_ice
     use ncio 
     
     use yelmo_defs
-    use yelmo_grid, only : yelmo_init_grid, calc_zeta1, calc_zeta
+    use yelmo_grid, only : yelmo_init_grid, calc_zeta
     use yelmo_timesteps, only : ytime_init, set_adaptive_timestep, set_adaptive_timestep_pc, set_pc_mask, calc_pc_eta,  &
                                 calc_pc_tau_fe_sbe,calc_pc_tau_ab_sam, calc_pc_tau_heun, limit_adaptive_timestep, &
                                 yelmo_timestep_write_init, yelmo_timestep_write, calc_adv3D_timestep1
@@ -608,7 +608,7 @@ contains
         end if 
 
         ! Calculate zeta_aa and zeta_ac 
-        call calc_zeta1(dom%par%zeta_aa,dom%par%zeta_ac,dom%par%nz_ac,dom%par%nz_aa, &
+        call calc_zeta(dom%par%zeta_aa,dom%par%zeta_ac,dom%par%nz_ac,dom%par%nz_aa, &
                                                     dom%par%zeta_scale,dom%par%zeta_exp)
 
         ! Initialize ytime information here too 
@@ -644,7 +644,7 @@ contains
         
         call ytherm_par_load(dom%thrm%par,filename,dom%par%zeta_aa,dom%par%zeta_ac,dom%grd%nx,dom%grd%ny,dom%grd%dx,init=.TRUE.)
 
-        call ytherm_alloc(dom%thrm%now,dom%thrm%par%nx,dom%thrm%par%ny,dom%thrm%par%nz_aa,dom%thrm%par%lith_nz_aa)
+        call ytherm_alloc(dom%thrm%now,dom%thrm%par%nx,dom%thrm%par%ny,dom%thrm%par%nz_aa,dom%thrm%par%nzr_aa)
         
         write(*,*) "yelmo_init:: thermodynamics initialized."
         
@@ -882,15 +882,15 @@ contains
         ! Local variables 
         integer :: q 
         character(len=256) :: dom_thrm_method 
-        character(len=256) :: dom_thrm_lith_method 
+        character(len=256) :: dom_thrm_rock_method 
         
         ! Store original model choices locally 
         dom_thrm_method      = dom%thrm%par%method 
-        dom_thrm_lith_method = dom%thrm%par%lith_method 
+        dom_thrm_rock_method = dom%thrm%par%rock_method 
 
         ! Impose initialization choices 
         dom%thrm%par%method      = thrm_method 
-        dom%thrm%par%lith_method = "equil" 
+        dom%thrm%par%rock_method = "equil" 
 
         ! Initialize variables
 
@@ -954,7 +954,7 @@ contains
         ! Restore original model choices 
         ! Impose initialization choices 
         dom%thrm%par%method      = dom_thrm_method 
-        dom%thrm%par%lith_method = dom_thrm_lith_method
+        dom%thrm%par%rock_method = dom_thrm_rock_method
 
         return 
 

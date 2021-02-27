@@ -171,20 +171,6 @@ end select
                                 tpo%now%f_grnd,tpo%now%dHicedt,tpo%now%dzsrfdt,thrm%par%z%zeta_aa,thrm%par%z%zeta_ac,thrm%par%z%dzeta_a,thrm%par%z%dzeta_b, &
                                 thrm%par%enth_cr,thrm%par%omega_max,dt,thrm%par%dx,thrm%par%method,thrm%par%solver_advec)
                 
-                case("temp-combined")
-
-                    ! Calculate the explicit horizontal advection term using temperature from previous timestep
-                    call calc_advec_horizontal_3D(thrm%now%advecxy,thrm%now%T_ice,tpo%now%H_ice,tpo%now%z_srf, &
-                                        dyn%now%ux,dyn%now%uy,thrm%par%z%zeta_aa,thrm%par%dx,thrm%par%dt_beta(1),thrm%par%dt_beta(2))
-                    
-                    call calc_ytherm_enthalpy_combined_3D(thrm%now%enth,thrm%now%T_ice,thrm%now%omega,thrm%now%enth_rock,thrm%now%T_rock,thrm%now%bmb_grnd, &
-                                thrm%now%Q_ice_b,thrm%now%Q_rock, &
-                                thrm%now%H_cts,thrm%now%T_pmp,thrm%now%cp,thrm%now%kt,thrm%par%cp_rock,thrm%par%kt_rock,thrm%now%advecxy,dyn%now%ux,dyn%now%uy,dyn%now%uz,thrm%now%Q_strn, &
-                                thrm%now%Q_b,bnd%Q_geo,bnd%T_srf,tpo%now%H_ice,thrm%par%H_rock,tpo%now%z_srf,thrm%now%H_w,thrm%now%dHwdt,tpo%now%H_grnd, &
-                                tpo%now%f_grnd,tpo%now%dHicedt,tpo%now%dzsrfdt,thrm%par%z%zeta_aa,thrm%par%z%zeta_ac,thrm%par%z%dzeta_a,thrm%par%z%dzeta_b, &
-                                thrm%par%zr%zeta_aa,thrm%par%zr%zeta_ac,thrm%par%zr%dzeta_a,thrm%par%zr%dzeta_b,thrm%par%enth_cr, &
-                                thrm%par%omega_max,dt,thrm%par%dx,thrm%par%method,thrm%par%solver_advec)
-                    
                 case("robin")
                     ! Use Robin solution for ice temperature 
 
@@ -246,7 +232,7 @@ end select
                                         thrm%par%zr%zeta_aa,thrm%par%zr%zeta_ac, &
                                         thrm%par%zr%dzeta_a,thrm%par%zr%dzeta_b,dt)
 
-                case("fixed","combined") 
+                case("fixed") 
                     ! Pass - do nothing, use the enth/temp/omega fields as they are defined
 
                 case DEFAULT 
@@ -278,174 +264,6 @@ end select
         return
 
     end subroutine calc_ytherm
-
-    subroutine calc_ytherm_enthalpy_combined_3D(enth,T_ice,omega,enth_rock,T_rock,bmb_grnd,Q_ice_b,Q_rock,H_cts,T_pmp,cp,kt, &
-                        cp_rock,kt_rock,advecxy,ux,uy,uz,Q_strn,Q_b,Q_geo, &
-                        T_srf,H_ice,H_rock,z_srf,H_w,dHwdt,H_grnd,f_grnd,dHdt,dzsdt,zeta_aa,zeta_ac,dzeta_a,dzeta_b, &
-                        r_zeta_aa,r_zeta_ac,r_dzeta_a,r_dzeta_b,cr,omega_max,dt,dx,solver,solver_advec)
-        ! This wrapper subroutine breaks the thermodynamics problem into individual columns,
-        ! which are solved independently by calling calc_enth_column
-
-        ! Note zeta=height, k=1 base, k=nz surface 
-        
-        !$ use omp_lib
-
-        implicit none 
-
-        real(prec), intent(INOUT) :: enth(:,:,:)    ! [J m-3] Ice enthalpy
-        real(prec), intent(INOUT) :: T_ice(:,:,:)   ! [K] Ice column temperature
-        real(prec), intent(INOUT) :: enth_rock(:,:,:)    ! [J m-3] Ice enthalpy
-        real(prec), intent(INOUT) :: T_rock(:,:,:)   ! [K] Ice column temperature
-        real(prec), intent(INOUT) :: omega(:,:,:)   ! [--] Ice water content
-        real(prec), intent(INOUT) :: bmb_grnd(:,:)  ! [m a-1] Basal mass balance (melting is negative)
-        real(prec), intent(OUT)   :: Q_ice_b(:,:)   ! [J a-1 m-2] Basal ice heat flux 
-        real(prec), intent(OUT)   :: Q_rock(:,:)   ! [J a-1 m-2] Bedrock surface heat flux
-        real(prec), intent(OUT)   :: H_cts(:,:)     ! [m] Height of the cold-temperate transition surface (CTS)
-        real(prec), intent(IN)    :: T_pmp(:,:,:)   ! [K] Pressure melting point temp.
-        real(prec), intent(IN)    :: cp(:,:,:)      ! [J kg-1 K-1] Specific heat capacity
-        real(prec), intent(IN)    :: kt(:,:,:)      ! [J a-1 m-1 K-1] Heat conductivity 
-        real(prec), intent(IN)    :: cp_rock        ! [J kg-1 K-1] Specific heat capacity
-        real(prec), intent(IN)    :: kt_rock        ! [J a-1 m-1 K-1] Heat conductivity 
-        real(prec), intent(IN)    :: advecxy(:,:,:) ! [m a-1] Horizontal x-velocity 
-        real(prec), intent(IN)    :: ux(:,:,:)      ! [m a-1] Horizontal x-velocity 
-        real(prec), intent(IN)    :: uy(:,:,:)      ! [m a-1] Horizontal y-velocity 
-        real(prec), intent(IN)    :: uz(:,:,:)      ! [m a-1] Vertical velocity 
-        real(prec), intent(IN)    :: Q_strn(:,:,:)  ! [K a-1] Internal strain heat production in ice
-        real(prec), intent(IN)    :: Q_b(:,:)       ! [mW m-2] Basal frictional heat production 
-        real(prec), intent(IN)    :: Q_geo(:,:)    ! [mW m-2] Geothermal heat flux 
-        real(prec), intent(IN)    :: T_srf(:,:)     ! [K] Surface temperature 
-        real(prec), intent(IN)    :: H_ice(:,:)     ! [m] Ice thickness 
-        real(prec), intent(IN)    :: H_rock         ! [m] Ice thickness 
-        real(prec), intent(IN)    :: z_srf(:,:)     ! [m] Surface elevation 
-        real(prec), intent(IN)    :: H_w(:,:)       ! [m] Basal water layer thickness 
-        real(prec), intent(IN)    :: dHwdt(:,:)     ! [m/a] Basal water layer thickness change
-        real(prec), intent(IN)    :: H_grnd(:,:)    ! [--] Ice thickness above flotation 
-        real(prec), intent(IN)    :: f_grnd(:,:)    ! [--] Grounded fraction
-        real(prec), intent(IN)    :: dHdt(:,:)      ! [m/a] Ice thickness change
-        real(prec), intent(IN)    :: dzsdt(:,:)     ! [m/a] Ice surface change
-        real(prec), intent(IN)    :: zeta_aa(:)     ! [--] Vertical sigma coordinates (zeta==height), aa-nodes
-        real(prec), intent(IN)    :: zeta_ac(:)     ! [--] Vertical sigma coordinates (zeta==height), ac-nodes
-        real(prec), intent(IN)    :: dzeta_a(:)     ! nz_aa [--] Solver discretization helper variable ak
-        real(prec), intent(IN)    :: dzeta_b(:)     ! nz_aa [--] Solver discretization helper variable bk
-        real(prec), intent(IN)    :: r_zeta_aa(:)    ! [--] Vertical sigma coordinates (zeta==height), aa-nodes
-        real(prec), intent(IN)    :: r_zeta_ac(:)    ! [--] Vertical sigma coordinates (zeta==height), ac-nodes
-        real(prec), intent(IN)    :: r_dzeta_a(:)    ! nz_aa [--] Solver discretization helper variable ak
-        real(prec), intent(IN)    :: r_dzeta_b(:)    ! nz_aa [--] Solver discretization helper variable bk
-        real(prec), intent(IN)    :: cr             ! [--] Conductivity ratio for temperate ice (kappa_temp = enth_cr*kappa_cold)
-        real(prec), intent(IN)    :: omega_max      ! [--] Maximum allowed water content fraction 
-        real(prec), intent(IN)    :: dt             ! [a] Time step 
-        real(prec), intent(IN)    :: dx             ! [a] Horizontal grid step 
-        character(len=*), intent(IN) :: solver      ! "enth" or "temp" 
-        character(len=*), intent(IN) :: solver_advec    ! "expl" or "impl-upwind"
-
-        ! Local variables
-        integer :: i, j, k, nx, ny, nz_aa, nz_ac  
-        real(prec) :: T_shlf, H_grnd_lim, f_scalar, T_base  
-        real(prec) :: H_ice_now 
-
-        real(prec) :: filter0(3,3), filter(3,3) 
-
-        real(prec), parameter :: H_ice_thin = 10.0   ! [m] Threshold to define 'thin' ice
-
-        nx    = size(T_ice,1)
-        ny    = size(T_ice,2)
-        nz_aa = size(zeta_aa,1)
-        nz_ac = size(zeta_ac,1)
-
-        ! Initialize gaussian filter kernel for smoothing ice thickness at the margin
-        filter0 = gauss_values(dx,dx,sigma=2.0*dx,n=size(filter,1))
-
-        ! ===================================================
-
-        ! ajr: openmp problematic here - leads to NaNs
-        !!!$omp parallel do
-        do j = 2, ny-1
-        do i = 2, nx-1 
-            
-            H_ice_now = H_ice(i,j) 
- 
-            ! Filter the ice thickness at the margin only to avoid a large
-            ! gradient in ice thickness there to rather thin ice points - 
-            ! helps with stability, particularly for EISMINT2 experiments.
-            if (H_ice(i,j) .gt. 0.0 .and. count(H_ice(i-1:i+1,j-1:j+1) .eq. 0.0) .ge. 2) then
-                filter = filter0 
-                where (H_ice(i-1:i+1,j-1:j+1) .eq. 0.0) filter = 0.0 
-                filter = filter/sum(filter)
-                H_ice_now = sum(H_ice(i-1:i+1,j-1:j+1)*filter)
-            end if
-
-            ! For floating points, calculate the approximate marine-shelf temperature 
-            ! ajr, later this should come from an external model, and T_shlf would
-            ! be the boundary variable directly
-            if (f_grnd(i,j) .lt. 1.0) then 
-
-                ! Calculate approximate marine freezing temp, limited to pressure melting point 
-                T_shlf = calc_T_base_shlf_approx(H_ice_now,T_pmp(i,j,1),H_grnd(i,j))
-
-            else 
-                ! Assigned for safety 
-
-                T_shlf   = T_pmp(i,j,1)
-
-            end if 
-
-            if (H_ice_now .le. H_ice_thin) then 
-                ! Ice is too thin or zero: prescribe linear temperature profile
-                ! between temperate ice at base and surface temperature 
-                ! (accounting for floating/grounded nature via T_base)
-
-                if (f_grnd(i,j) .lt. 1.0) then 
-                    ! Impose T_shlf for the basal temperature
-                    T_base = T_shlf 
-                else
-                    ! Impose temperature at the pressure melting point of grounded ice 
-                    T_base = T_pmp(i,j,1) 
-                end if 
-
-                T_ice(i,j,:)  = calc_temp_linear_column(T_srf(i,j),T_base,T_pmp(i,j,nz_aa),zeta_aa)
-                omega(i,j,:)  = 0.0_prec 
-                call convert_to_enthalpy(enth(i,j,:),T_ice(i,j,:),omega(i,j,:),T_pmp(i,j,:),cp(i,j,:),L_ice)
-                bmb_grnd(i,j) = 0.0_prec
-                Q_ice_b(i,j)  = 0.0_prec 
-                H_cts(i,j)    = 0.0_prec
-
-                call calc_temp_bedrock_column(T_rock(i,j,:),kt_rock,rho_rock,H_rock, &
-                                                T_ice(i,j,1),Q_geo(i,j),r_zeta_aa)
-
-                ! Get enthalpy too 
-                call convert_to_enthalpy(enth_rock(i,j,:),T_rock(i,j,:),0.0_wp,0.0_wp,cp_rock,0.0_wp)
-
-                ! Calculate heat flux through bed surface from bedrock [mW m-2]
-                call calc_Q_bedrock_column(Q_rock(i,j),T_rock(i,j,:),kt_rock,H_rock,zeta_aa)
-        
-            else 
-                ! Thick ice exists, call thermodynamic solver for the column
-
-                call calc_temp_column_combined(enth(i,j,:),T_ice(i,j,:),omega(i,j,:),enth_rock(i,j,:),T_rock(i,j,:), &
-                            bmb_grnd(i,j),Q_ice_b(i,j),Q_rock(i,j),H_cts(i,j),T_pmp(i,j,:),cp(i,j,:), &
-                            kt(i,j,:),cp_rock,kt_rock,advecxy(i,j,:),uz(i,j,:),Q_strn(i,j,:),Q_b(i,j), &
-                            Q_geo(i,j),T_srf(i,j),T_shlf,H_ice_now,H_rock,H_w(i,j),f_grnd(i,j), &
-                            zeta_aa,zeta_ac,dzeta_a,dzeta_b,r_zeta_aa,r_zeta_ac,r_dzeta_a, &
-                            r_dzeta_b,omega_max,T0,dt)                
-                
-            end if 
-
-        end do 
-        end do 
-        !!!$omp end parallel do
-
-        ! Fill in borders 
-        call fill_borders_3D(enth,nfill=1)
-        call fill_borders_3D(T_ice,nfill=1)
-        call fill_borders_3D(omega,nfill=1)
-        call fill_borders_2D(bmb_grnd,nfill=1)
-        
-        call fill_borders_3D(enth_rock,nfill=1)
-        call fill_borders_3D(T_rock,nfill=1)
-        
-        return 
-
-    end subroutine calc_ytherm_enthalpy_combined_3D
 
     subroutine calc_ytherm_enthalpy_3D(enth,T_ice,omega,bmb_grnd,Q_ice_b,H_cts,T_pmp,cp,kt,advecxy,ux,uy,uz,Q_strn,Q_b,Q_rock, &
                                         T_srf,H_ice,z_srf,H_w,dHwdt,H_grnd,f_grnd,dHdt,dzsdt,zeta_aa,zeta_ac,dzeta_a,dzeta_b, &

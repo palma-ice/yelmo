@@ -79,8 +79,13 @@ program test_icetemp
     real(prec)         :: dt_out 
     character(len=56)  :: zeta_scale 
     integer            :: nz 
-    character(len=56)  :: zeta_scale_rock 
     integer            :: nzr 
+    character(len=56)  :: zeta_scale_rock 
+    real(prec)         :: T_srf
+    real(prec)         :: T_anom
+    real(prec)         :: smb 
+    real(prec)         :: H_ice
+    real(prec)         :: H_rock 
     logical            :: is_celcius 
     character(len=56)  :: age_method 
     real(prec)         :: age_impl_kappa
@@ -89,11 +94,14 @@ program test_icetemp
     real(prec)         :: omega_max 
     character(len=56)  :: experiment 
 
+    character(len=56)  :: rock_method_default 
+
     real(prec)         :: T0_ref 
 
     integer            :: narg 
     character(len=12)  :: arg_nz, arg_cr
-    character(len=32)  :: nz_str, cr_str, prec_str 
+    character(len=32)  :: nz_str, nzr_str, cr_str, prec_str 
+    character(len=32)  :: H_rock_str 
 
     integer :: iter, n_iter 
 
@@ -103,16 +111,17 @@ program test_icetemp
     ! ===============================================================
     ! User options 
 
-    experiment     = "eismint"      ! "eismint", "k15expa", "k15expb", "bg15a"
+    experiment     = "r21a"         ! "eismint", "k15expa", "k15expb", "bg15a"
     
     ! General options
-    zeta_scale      = "linear"      ! "linear", "exp", "tanh"
     nz              = 22            ! [--] Number of ice sheet points (aa-nodes + base + surface)
+    zeta_scale      = "exp"         ! "linear", "exp", "tanh"
     is_celcius      = .FALSE. 
 
-    zeta_scale_rock = "exp-inv" 
+    rock_method     = "active"      ! "equil" or "active" bedrock 
     nzr             = 5 
-    rock_method     = "equil"       ! "equil" or "active" bedrock 
+    zeta_scale_rock = "exp-inv" 
+    H_rock          = 5000.0         ! [m] Bedrock thickness 
 
     age_method      = "expl"        ! "expl" or "impl"
     age_impl_kappa  = 1.5           ! [m2 a-1] Artificial diffusion for age tracing
@@ -134,22 +143,6 @@ program test_icetemp
         read(arg_cr,*)  enth_cr
     end if 
 
-    ! ## Save simulation parameters as strings ##
-    write(nz_str,*) nz 
-    if (trim(zeta_scale) .ne. "linear") write(nz_str,*) trim(nz_str)//trim(zeta_scale)
-    nz_str =  adjustl(nz_str)
-
-    write(cr_str,"(e8.2)") enth_cr
-    cr_str =  adjustl(cr_str)   
-
-    prec_str = "sp" 
-    if (prec .eq. dp) prec_str = "dp" 
-
-    ! Use a more precise filename to specify cr value and dz
-    !file1D = "output/test_"//trim(experiment)//".nc"
-    write(file1D,*) "output/test_"//trim(experiment)//"_nz",trim(nz_str),   &
-                                        "_cr",trim(cr_str),"_",trim(prec_str),".nc"
-    
     ! ===============================================================
 
     T0_ref = T0 
@@ -180,7 +173,7 @@ program test_icetemp
 
             T_pmp_beta = 0.0            ! [K Pa^-1] Kleiner et al. (2015), expb
             
-            call init_k15expb(ice1,smb=0.2_prec,T_srf=-3.0_prec)
+            call init_k15expb(ice1,smb=0.2_prec,T_srf=-3.0_prec,H_rock=H_rock)
 
         case("bg15a")
 
@@ -191,9 +184,27 @@ program test_icetemp
 
             T_pmp_beta = 0.0            ! [K Pa^-1] Blatter and Greve (2015), expa
             
-            call init_bg15a(ice1,smb=0.2_prec,T_srf=-4.0_prec)
+            call init_bg15a(ice1,smb=0.2_prec,T_srf=-4.0_prec,H_rock=H_rock)
 
+        case("r21a")
 
+            t_start = 0.0       ! [yr]
+            t_end   = 300e3     ! [yr] 
+            dt      = 10.0      ! [yr] 
+            dt_out  = 100.0     ! [yr] 
+
+            T_pmp_beta = 0.0            ! [K Pa^-1] Kleiner et al. (2015), expb
+            !T_pmp_beta = 9.7e-8         ! [K Pa^-1] EISMINT2 value (beta1 = 8.66e-4 [K m^-1])
+            
+            H_ice      = 1000.0 ! [m] 
+            smb        = 0.05   ! [m/yr]
+            T_srf      = -30.0  ! [degC] Surface temperature
+            T_anom     = 5.0    ! [K] Temperature anomaly to apply 
+
+            !call init_eismint_summit(ice1,smb=0.5_prec,H_rock=H_rock)
+
+            call init_r21a(ice1,smb,T_srf,H_ice,H_rock)
+                
         case DEFAULT 
             ! EISMINT 
 
@@ -205,9 +216,44 @@ program test_icetemp
             !T_pmp_beta = 9.8e-8         ! [K Pa^-1] Greve and Blatter (2009) 
             T_pmp_beta = 9.7e-8         ! [K Pa^-1] EISMINT2 value (beta1 = 8.66e-4 [K m^-1])
 
-            call init_eismint_summit(ice1,smb=0.5_prec)
+            call init_eismint_summit(ice1,smb=0.5_prec,H_rock=H_rock)
 
     end select 
+
+
+    ! ## Save simulation parameters as strings ##
+    write(nz_str,*) nz 
+    if (trim(zeta_scale) .ne. "linear") write(nz_str,*) trim(nz_str)//trim(zeta_scale)
+    nz_str =  adjustl(nz_str)
+
+    write(nzr_str,*) nzr 
+    nzr_str =  adjustl(nzr_str)
+
+    write(cr_str,"(e8.2)") enth_cr
+    cr_str =  adjustl(cr_str)   
+
+    write(H_rock_str,"(i4)") int(H_rock) 
+    H_rock_str =  adjustl(H_rock_str)
+
+    prec_str = "sp" 
+    if (prec .eq. dp) prec_str = "dp" 
+
+    ! Use a more precise filename to specify cr value and dz
+    !file1D = "output/test_"//trim(experiment)//".nc"
+    write(file1D,*) "output/test_"//trim(experiment)//"_nz",trim(nz_str),   &
+                                        "_cr",trim(cr_str),"_",trim(prec_str),".nc"
+    
+    ! Specify r21a output filename here 
+    if (trim(experiment) .eq. "r21a") then 
+
+        if (trim(rock_method) .eq. "equil") then 
+            write(file1D,*) "output/test_"//trim(experiment)//"_nz",trim(nz_str),".nc"
+        else 
+            write(file1D,*) "output/test_"//trim(experiment)//"_nz",trim(nz_str),   &
+                                        "_nzr",trim(nzr_str),"_Hr",trim(H_rock_str),".nc"
+        end if 
+
+    end if 
 
     ! Initialize time and calculate number of time steps to iterate and 
     time = t_start 
@@ -236,11 +282,28 @@ program test_icetemp
                                                 zeta_r=ice1%zr%zeta,time_init=time)
     call write_step(ice1,ice1%vec,filename=file1D,time=time)
 
+    rock_method_default = rock_method 
+
     ! Loop over time steps and perform thermodynamic calculations
     do n = 1, ntot 
 
         ! Get current time 
         time = t_start + n*dt 
+
+        if (trim(experiment) .eq. "r21a") then 
+
+            if (time .le. 50e3) then 
+                rock_method = "equil"
+            else 
+                rock_method = rock_method_default
+            end if 
+
+            if (time .le. 100e3) then
+                ice1%T_srf = T_srf + T0
+            else 
+                ice1%T_srf = T_srf + T0 + T_anom 
+            end if 
+        end if 
 
         if (trim(experiment) .eq. "k15expa") then 
             if (time .le. 100e3) then 
@@ -311,9 +374,9 @@ program test_icetemp
             case("active")
 
                 call calc_temp_column_bedrock(ice1%vec%enth_rock,ice1%vec%T_rock,ice1%Q_rock, &
-                            ice1%cp_rock,ice1%kt_rock,ice1%Q_ice_b,ice1%Q_geo,ice1%T_srf,ice1%H_rock, &
+                            ice1%cp_rock,ice1%kt_rock,ice1%Q_ice_b,ice1%Q_geo,ice1%vec%T_ice(1),ice1%H_rock, &
                             ice1%zr%zeta,ice1%zr%zeta_ac,ice1%zr%dzeta_a,ice1%zr%dzeta_b,dt)
-                
+
             case DEFAULT 
 
                 write(*,*) "rock method not recognized: ", trim(rock_method)
@@ -353,12 +416,13 @@ program test_icetemp
 
 contains 
     
-    subroutine init_eismint_summit(ice,smb)
+    subroutine init_eismint_summit(ice,smb,H_rock)
 
         implicit none 
 
         type(icesheet), intent(INOUT) :: ice
         real(prec),     intent(IN)    :: smb 
+        real(prec),     intent(IN)    :: H_rock 
 
         ! Local variables 
         integer :: k, nz   
@@ -378,7 +442,7 @@ contains
 
         ice%cp_rock  = 1000.0       ! [J kg-1 K-1]
         ice%kt_rock  = 9.46e7       ! [J a-1 m-1 K-1]
-        ice%H_rock   = 2000.0       ! [m] 
+        ice%H_rock   = H_rock       ! [m] 
         ice%Q_rock   = ice%Q_geo 
         
         ! EISMINT1
@@ -446,9 +510,9 @@ contains
         ice%Q_b      = 0.0              ! [] No basal frictional heating 
         ice%f_grnd   = 1.0              ! Grounded point 
 
-        ice%cp_rock  = 1000.0    ! [J kg-1 K-1]
-        ice%kt_rock  = 9.46e7    ! [J a-1 m-1 K-1]
-        ice%H_rock   = 2000.0       ! [m] 
+        ice%cp_rock  = 1000.0           ! [J kg-1 K-1]
+        ice%kt_rock  = 9.46e7           ! [J a-1 m-1 K-1]
+        ice%H_rock   = 2000.0           ! [m] 
         ice%Q_rock   = ice%Q_geo 
         
         ! EISMINT1
@@ -493,14 +557,15 @@ contains
 
     end subroutine init_k15expa
     
-    subroutine init_k15expb(ice,smb,T_srf)
+    subroutine init_k15expb(ice,smb,T_srf,H_rock)
 
         implicit none 
 
         type(icesheet), intent(INOUT) :: ice
         real(prec),     intent(IN)    :: smb 
         real(prec),     intent(IN)    :: T_srf ! [degrees Celcius]
-            
+        real(prec),     intent(IN)    :: H_rock 
+
         ! Local variables 
         integer :: k, nz 
         real(prec) :: ATT, gamma, T_init    
@@ -522,10 +587,9 @@ contains
         ice%Q_b      = 0.0              ! [] No basal frictional heating 
         ice%f_grnd   = 1.0              ! Grounded point 
 
-        ice%cp_rock  = 1000.0    ! [J kg-1 K-1]
-        ice%kt_rock  = 9.46e7    ! [J a-1 m-1 K-1]
-        ice%H_rock   = 2000.0       ! [m] 
-        ice%H_rock   = 2000.0           ! [m] 
+        ice%cp_rock  = 1000.0           ! [J kg-1 K-1]
+        ice%kt_rock  = 9.46e7           ! [J a-1 m-1 K-1]
+        ice%H_rock   = H_rock           ! [m] 
         ice%Q_rock   = ice%Q_geo 
         
         ! EISMINT1
@@ -591,14 +655,15 @@ contains
 
     end subroutine init_k15expb
     
-    subroutine init_bg15a(ice,smb,T_srf)
+    subroutine init_bg15a(ice,smb,T_srf,H_rock)
 
         implicit none 
 
         type(icesheet), intent(INOUT) :: ice
         real(prec),     intent(IN)    :: smb 
         real(prec),     intent(IN)    :: T_srf ! [degrees Celcius]
-            
+        real(prec),     intent(IN)    :: H_rock 
+
         ! Local variables 
         integer :: k, nz 
         real(prec) :: ATT, gamma, T_init    
@@ -618,10 +683,9 @@ contains
         ice%Q_b      = 0.0              ! [] No basal frictional heating 
         ice%f_grnd   = 1.0              ! Grounded point 
 
-        ice%cp_rock  = 1000.0    ! [J kg-1 K-1]
-        ice%kt_rock  = 9.46e7    ! [J a-1 m-1 K-1]
-        ice%H_rock   = 2000.0       ! [m] 
-        ice%H_rock   = 2000.0           ! [m] 
+        ice%cp_rock  = 1000.0           ! [J kg-1 K-1]
+        ice%kt_rock  = 9.46e7           ! [J a-1 m-1 K-1]
+        ice%H_rock   = H_rock           ! [m] 
         ice%Q_rock   = ice%Q_geo 
         
         ! EISMINT1
@@ -683,6 +747,109 @@ contains
         return 
 
     end subroutine init_bg15a
+    
+    subroutine init_r21a(ice,smb,T_srf,H_ice,H_rock)
+        ! Robinson et al (2021) experiment a 
+        ! for bedrock temperature influence 
+
+        implicit none 
+
+        type(icesheet), intent(INOUT) :: ice
+        real(prec),     intent(IN)    :: smb 
+        real(prec),     intent(IN)    :: T_srf ! [degrees Celcius]
+        real(prec),     intent(IN)    :: H_ice 
+        real(prec),     intent(IN)    :: H_rock 
+
+        ! Local variables 
+        integer :: k, nz 
+        real(prec) :: ATT, gamma, T_init    
+        real(prec), allocatable :: ux(:)
+        real(prec), allocatable :: uy(:)  
+        real(prec), allocatable :: mu(:)
+        real(prec), allocatable :: eps(:) 
+
+        nz    = size(ice%z%zeta)
+
+        ! Assign point values
+        ice%T_srf    = T_srf + T0       ! [K]
+        ice%T_shlf   = T0               ! [K] T_shlf not used in this idealized setup, set to T0  
+        ice%smb      = smb              ! [m/a]
+        ice%bmb      = 0.0              ! [m/a]
+        ice%Q_geo    = 42.0             ! [mW/m2]
+        ice%H_ice    = H_ice            ! [m] Ice thickness
+        ice%H_w      = 0.0              ! [m] No basal water
+        ice%Q_b      = 0.0              ! [] No basal frictional heating 
+        ice%f_grnd   = 1.0              ! Grounded point 
+
+        ice%cp_rock  = 1000.0           ! [J kg-1 K-1]
+        ice%kt_rock  = 9.46e7           ! [J a-1 m-1 K-1]
+        ice%H_rock   = H_rock           ! [m] 
+        ice%Q_rock   = ice%Q_geo 
+        
+        ! EISMINT1
+        ice%vec%cp      = 2009.0        ! [J kg-1 K-1]
+        ice%vec%kt      = 6.6269e7      ! [J a-1 m-1 K-1]   == 2.1*sec_year  [J s-1 m-1 K-1] => J a-1 m-1 K-1]
+
+        ATT             = 5.3e-24*sec_year      ! Rate factor
+        gamma           = 4.0                   ! [degrees] Bed slope 
+        T_init          = ice%T_srf !T0 - 10.0 
+
+        allocate(ux(nz))
+        allocate(uy(nz))
+        allocate(eps(nz))
+        allocate(mu(nz))
+
+        ux = 0.5*ATT*(rho_ice*g*sin(gamma*pi/180.0))**3 * (ice%H_ice**4 - (ice%H_ice - ice%H_ice*ice%z%zeta)**4)
+        uy = 0.0 
+
+        eps = ATT*(rho_ice*g*sin(gamma*pi/180.0))**3 *(ice%H_ice - ice%H_ice*ice%z%zeta)**3
+        mu  = 0.5*ATT**(-1.0/3.0)*eps**(-2.0/3.0)
+
+        ice%vec%Q_strn  = 0.0  
+        ! ice%vec%Q_strn(1:nz-1)  = 4.0*mu(1:nz-1)*eps(1:nz-1)**2     ! [J a-1 m-3] Prescribed strain heating 
+
+        ice%vec%advecxy = 0.0                                       ! [] No horizontal advection (assume constant)
+
+        ! Write strain heating to compare basal value of ~2.6e-3 W/m-3
+        !do k = nz, 1, -1 
+        !    write(*,*) ice%z%zeta(k), ice%vec%Q_strn(k)/sec_year 
+        !end do 
+
+        ! Calculate pressure melting point 
+        ice%vec%T_pmp = calc_T_pmp(ice%H_ice,ice%z%zeta,T0,T_pmp_beta) 
+
+        if (is_celcius) then 
+            ice%T_srf     = ice%T_srf     - T0
+            ice%T_shlf    = ice%T_shlf    - T0
+            ice%vec%T_pmp = ice%vec%T_pmp - T0 
+        end if 
+
+        ! Define initial temperature profile
+        ! (constant equal to surface temp)
+        ice%vec%T_ice(nz) = T_init
+        ice%vec%T_ice(1)  = T_init 
+
+        ! Intermediate layers are linearly interpolated 
+        do k = 2, nz-1 
+            ice%vec%T_ice(k) = ice%vec%T_ice(1)+ice%z%zeta(k)*(ice%vec%T_ice(nz)-ice%vec%T_ice(1))
+        end do 
+
+        ! Define  vertical velocity profile
+        ice%vec%uz = -ice%smb       ! constant 
+        ! ice%vec%uz = -ice%smb*ice%z%zeta_ac   ! linear 
+
+        ! Calculate initial enthalpy (ice1)
+        call convert_to_enthalpy(ice%vec%enth,ice%vec%T_ice,ice%vec%omega,ice%vec%T_pmp,ice%vec%cp,L_ice)
+        
+        ! Define temperature profile in bedrock too 
+        call calc_temp_bedrock_column(ice1%vec%T_rock,ice1%kt_rock,rho_rock, &
+                                    ice1%H_rock,ice1%vec%T_ice(1),ice1%Q_geo,ice1%zr%zeta)
+
+        call convert_to_enthalpy(ice%vec%enth_rock,ice%vec%T_rock,0.0_wp,1e8_wp,ice%cp_rock,0.0_wp)
+
+        return 
+
+    end subroutine init_r21a
     
     subroutine icesheet_allocate(ice,nz,nzr,zeta_scale,zeta_scale_rock)
         ! Allocate the ice sheet object 

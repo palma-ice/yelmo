@@ -16,13 +16,14 @@ module yelmo_grid
     end interface 
     
     private 
-    
+
     public :: calc_zeta 
 
     public :: yelmo_init_grid 
     public :: yelmo_init_grid_fromfile
     public :: yelmo_init_grid_fromnml
     public :: yelmo_init_grid_fromname
+    public :: yelmo_init_grid_fromaxes
     public :: yelmo_init_grid_fromopt 
     public :: yelmo_init_grid_fromgrd
     public :: yelmo_grid_write
@@ -554,7 +555,7 @@ contains
 
         return 
 
-    end subroutine yelmo_init_grid_fromgrd 
+    end subroutine yelmo_init_grid_fromgrd
 
     subroutine yelmo_init_grid_fromaxes(grd,grid_name,xc,yc,lon,lat,area)
 
@@ -643,7 +644,7 @@ contains
 
         return 
 
-    end subroutine yelmo_init_grid_fromaxes 
+    end subroutine yelmo_init_grid_fromaxes
     
     subroutine yelmo_init_grid_fromopt(grd,grid_name,units,x0,dx,nx,y0,dy,ny,lon,lat,area)
 
@@ -760,7 +761,7 @@ contains
 
         return 
 
-    end subroutine yelmo_init_grid_fromopt 
+    end subroutine yelmo_init_grid_fromopt
 
     subroutine axis_init(x,x0,dx)
 
@@ -789,7 +790,7 @@ contains
         end if 
 
         return 
-    end subroutine axis_init 
+    end subroutine axis_init
 
     subroutine ygrid_dealloc(grd)
 
@@ -866,160 +867,5 @@ contains
 
     end subroutine yelmo_grid_write
 
-
-! BELOW: PREVIOUS ROUTINE USED FOR INITIALIZING YELMO GRID WHEN
-! COORDINATES LIBRARY WAS USED - NOW REPLACED WITH INTERNAL FUNCTIONS
-
-!     subroutine yelmo_init_grid(grid,grid_name,grid_in)
-
-!         implicit none 
-
-!         type(grid_class), intent(OUT)   :: grid  
-!         character(len=*), intent(INOUT) :: grid_name      ! Overwritable if grid_in is present
-!         type(grid_class), intent(IN), optional :: grid_in 
-
-!         if (present(grid_in)) then 
-
-!             grid = grid_in 
-
-!             ! Ensure parameter grid_name is consistent with defined grid 
-!             grid_name = grid%name 
-        
-!         else 
-!             ! Define yelmo grid from predefined options 
-
-!             select case(trim(grid_name))
-
-!                 ! Note - all North projections now use the ESPG-3413
-!                 ! polar stereographic projection with (lambda=-45.d0,phi=70.d0)
-!                 ! Smaller Northern domains like Eurasia and Greenland use
-!                 ! the same projection for consistency. 
-!                 ! ESPG-3413 (lambda=-45.d0,phi=70.d0) is used for Greenland in 
-!                 ! model intercomparison exercises, eg ISMIP6. 
-
-!                 ! NORTH DOMAINS ======================= 
-
-!                 case("NH-40KM")
-!                     call grid_init(grid,name="NH-40KM",mtype="polar_stereographic",units="kilometers", &
-!                             lon180=.TRUE.,x0=-4900.d0,dx=40.0d0,nx=221,y0=-5400.d0,dy=40.0d0,ny=221, &
-!                             lambda=-45.d0,phi=70.d0)
-                
-!                 case("NH-20KM")
-!                     call grid_init(grid,name="NH-20KM",mtype="polar_stereographic",units="kilometers", &
-!                             lon180=.TRUE.,x0=-4900.d0,dx=20.0d0,nx=441,y0=-5400.d0,dy=20.0d0,ny=441, &
-!                             lambda=-45.d0,phi=70.d0)
-                
-!                 case("NH-10KM")
-!                     call grid_init(grid,name="NH-10KM",mtype="polar_stereographic",units="kilometers", &
-!                             lon180=.TRUE.,x0=-4900.d0,dx=10.0d0,nx=881,y0=-5400.d0,dy=10.0d0,ny=881, &
-!                             lambda=-45.d0,phi=70.d0)
-                
-!                 case("NH-5KM")
-!                     call grid_init(grid,name="NH-5KM",mtype="polar_stereographic",units="kilometers", &
-!                             lon180=.TRUE.,x0=-4900.d0,dx=5.0d0,nx=1761,y0=-5400.d0,dy=5.0d0,ny=1761, &
-!                             lambda=-45.d0,phi=70.d0)
-            
-!                 ! EURASIA DOMAINS ======================= 
-
-!                 case("EIS-40KM")
-!                     call grid_init(grid,name="EIS-40KM",mtype="polar_stereographic",units="kilometers", &
-!                             lon180=.TRUE.,x0=380.d0,dx=40.0d0,nx=89,y0=-5000.d0,dy=40.0d0,ny=161, &
-!                             lambda=-45.d0,phi=70.d0)
-                
-!                 case("EIS-20KM")
-!                     call grid_init(grid,name="EIS-20KM",mtype="polar_stereographic",units="kilometers", &
-!                             lon180=.TRUE.,x0=380.d0,dx=20.0d0,nx=177,y0=-5000.d0,dy=20.0d0,ny=321, &
-!                             lambda=-45.d0,phi=70.d0)
-                
-!                 case("EIS-10KM")
-!                     call grid_init(grid,name="EIS-10KM",mtype="polar_stereographic",units="kilometers", &
-!                             lon180=.TRUE.,x0=380.d0,dx=10.0d0,nx=353,y0=-5000.d0,dy=10.0d0,ny=641, &
-!                             lambda=-45.d0,phi=70.d0)
-                
-!                 case("EIS-5KM")
-!                     call grid_init(grid,name="EIS-5KM",mtype="polar_stereographic",units="kilometers", &
-!                             lon180=.TRUE.,x0=380.d0,dx=5.0d0,nx=705,y0=-5000.d0,dy=5.0d0,ny=1281, &
-!                             lambda=-45.d0,phi=70.d0)
-                    
-!                 ! GREENLAND DOMAINS =======================
-
-!                 case("GRL-40KM")
-!                     call grid_init(grid,name="GRL-40KM",mtype="polar_stereographic",units="kilometers", &
-!                             lon180=.TRUE.,x0=-720.d0,dx=40.0d0,nx=43,y0=-3450.d0,dy=40.0d0,ny=73, &
-!                             lambda=-45.d0,phi=70.d0)
-                
-!                 case("GRL-20KM")
-!                     call grid_init(grid,name="GRL-20KM",mtype="polar_stereographic",units="kilometers", &
-!                             lon180=.TRUE.,x0=-720.d0,dx=20.0d0,nx=85,y0=-3450.d0,dy=20.0d0,ny=145, &
-!                             lambda=-45.d0,phi=70.d0)
-                
-!                 case("GRL-10KM")
-!                     call grid_init(grid,name="GRL-10KM",mtype="polar_stereographic",units="kilometers", &
-!                             lon180=.TRUE.,x0=-720.d0,dx=10.0d0,nx=169,y0=-3450.d0,dy=10.0d0,ny=289, &
-!                             lambda=-45.d0,phi=70.d0)
-                
-!                 case("GRL-5KM")
-!                     call grid_init(grid,name="GRL-5KM",mtype="polar_stereographic",units="kilometers", &
-!                             lon180=.TRUE.,x0=-720.d0,dx=5.0d0,nx=337,y0=-3450.d0,dy=5.0d0,ny=577, &
-!                             lambda=-45.d0,phi=70.d0)
-                
-!                 case("GRL-2KM")
-!                     call grid_init(grid,name="GRL-2KM",mtype="polar_stereographic",units="kilometers", &
-!                             lon180=.TRUE.,x0=-720.d0,dx=2.0d0,nx=841,y0=-3450.d0,dy=2.0d0,ny=1441, &
-!                             lambda=-45.d0,phi=70.d0)
-                
-!                 case("GRL-1KM")
-!                     call grid_init(grid,name="GRL-1KM",mtype="polar_stereographic",units="kilometers", &
-!                             lon180=.TRUE.,x0=-720.d0,dx=1.0d0,nx=1681,y0=-3450.d0,dy=1.0d0,ny=2881, &
-!                             lambda=-45.d0,phi=70.d0)
-
-!                 case("Bamber01-20KM")
-!                     call grid_init(grid,name="Bamber01-20KM",mtype="polar_stereographic",units="kilometers", &
-!                             lon180=.TRUE.,x0=-800.d0,dx=20.d0,nx=76,y0=-3400.d0,dy=20.d0,ny=141, &
-!                             lambda=-39.d0,phi=90.d0)
-
-!                 case("Bamber01-10KM")
-!                     call grid_init(grid,name="Bamber01-10KM",mtype="polar_stereographic",units="kilometers", &
-!                             lon180=.TRUE.,x0=-800.d0,dx=10.d0,nx=151,y0=-3400.d0,dy=10.d0,ny=281, &
-!                             lambda=-39.d0,phi=90.d0)
-
-!                 ! ANTARCTICA DOMAINS ======================= 
-
-!                 case("ANT-80KM")
-!                     call grid_init(grid,name="ANT-80KM",mtype="polar_stereographic",units="kilometers", &
-!                            lon180=.TRUE.,dx=80.d0,nx=79,dy=80.d0,ny=74,lambda=0.d0,phi=-71.d0)
-
-!                 case("ANT-40KM")
-!                     call grid_init(grid,name="ANT-40KM",mtype="polar_stereographic",units="kilometers", &
-!                            lon180=.TRUE.,dx=40.d0,nx=157,dy=40.d0,ny=147,lambda=0.d0,phi=-71.d0)
-
-!                 case("ANT-20KM")
-!                     call grid_init(grid,name="ANT-20KM",mtype="polar_stereographic",units="kilometers", &
-!                            lon180=.TRUE.,dx=20.d0,nx=313,dy=20.d0,ny=293,lambda=0.d0,phi=-71.d0)
-
-!                 case("ANT-10KM")
-!                     call grid_init(grid,name="ANT-10KM",mtype="polar_stereographic",units="kilometers", &
-!                            lon180=.TRUE.,dx=10.d0,nx=625,dy=10.d0,ny=585,lambda=0.d0,phi=-71.d0)
-
-!                 case("ANT-5KM")
-!                     call grid_init(grid,name="ANT-5KM",mtype="polar_stereographic",units="kilometers", &
-!                            lon180=.TRUE.,dx=5.d0,nx=1249,dy=5.d0,ny=1169,lambda=0.d0,phi=-71.d0)
-
-!                 case("ANT-1KM")
-!                     call grid_init(grid,name="ANT-1KM",mtype="polar_stereographic",units="kilometers", &
-!                            lon180=.TRUE.,dx=1.d0,nx=6241,dy=1.d0,ny=5841,lambda=0.d0,phi=-71.d0)
-
-!                 case DEFAULT
-!                     write(*,*) "yelmo_init_grid:: error: grid name not recognized: "//trim(grid_name)
-!                     stop 
-
-!             end select
-
-!         end if 
-
-!         return 
-
-!     end subroutine yelmo_init_grid
-    
-end module yelmo_grid 
+end module yelmo_grid
 

@@ -863,7 +863,7 @@ contains
 
     end subroutine yelmo_init_topo
 
-    subroutine yelmo_init_state(dom,filename,time,thrm_method)
+    subroutine yelmo_init_state(dom,time,thrm_method)
         ! This subroutine is the second step to intializing 
         ! the state variables. It initializes ice temperatures,
         ! material properties and dynamics. It is called after the topography
@@ -875,7 +875,6 @@ contains
         implicit none 
 
         type(yelmo_class), intent(INOUT) :: dom
-        character(len=*),  intent(IN)    :: filename
         real(prec),        intent(IN)    :: time  
         character(len=*),  intent(IN)    :: thrm_method 
 

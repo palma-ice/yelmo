@@ -325,7 +325,7 @@ program yelmo_benchmarks
     call yelmo_print_bound(yelmo1%bnd)
 
     ! Initialize state variables (dyn,therm,mat)
-    call yelmo_init_state(yelmo1,path_par,time=time_init,thrm_method="robin")
+    call yelmo_init_state(yelmo1,time=time_init,thrm_method="robin")
 
 
     ! For dome experiment, let it equilibrate for several thousand years

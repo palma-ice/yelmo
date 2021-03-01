@@ -286,10 +286,10 @@ contains
 
         ! Local variables 
         logical :: init_pars 
-        real(prec) :: age_iso(100) 
+        real(prec) :: age_iso(10) 
 
         age_iso = 0.0 
-
+        
         init_pars = .FALSE.
         if (present(init)) init_pars = .TRUE. 
  

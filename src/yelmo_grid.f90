@@ -12,6 +12,7 @@ module yelmo_grid
 !         module procedure yelmo_init_grid_fromnml    ! Ambiguous interface with yelmo_init_grid_fromfile
         module procedure yelmo_init_grid_fromname
         module procedure yelmo_init_grid_fromgrd
+        module procedure yelmo_init_grid_fromaxes
         module procedure yelmo_init_grid_fromopt
     end interface 
     

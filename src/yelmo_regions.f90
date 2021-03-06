@@ -8,8 +8,8 @@ module yelmo_regions
     
     private
     public :: calc_yregions
-    public :: write_yreg_init
-    public :: write_yreg_step 
+    public :: yelmo_write_reg_init
+    public :: yelmo_write_reg_step 
 
 contains
 
@@ -220,9 +220,9 @@ contains
         
         return 
 
-    end subroutine calc_yregions 
+    end subroutine calc_yregions
 
-    subroutine write_yreg_init(dom,filename,time_init,units,mask)
+    subroutine yelmo_write_reg_init(dom,filename,time_init,units,mask)
 
         implicit none 
 
@@ -243,9 +243,9 @@ contains
         
         return
 
-    end subroutine write_yreg_init
+    end subroutine yelmo_write_reg_init
 
-    subroutine write_yreg_step(dom,filename,time,mask,reg_now)
+    subroutine yelmo_write_reg_step(dom,filename,time,mask,reg_now)
 
         implicit none 
         
@@ -263,7 +263,7 @@ contains
         ! 1. Determine regional values of variables 
 
         if (present(mask) .and. present(reg_now)) then 
-            write(*,*) "write_yreg_step:: Error: either a mask or a region &
+            write(*,*) "yelmo_write_reg_step:: Error: either a mask or a region &
                        &object must be provided, not both. Try again."
             write(*,*) "filename = ", trim(filename) 
             write(*,*) "time     = ", time 
@@ -399,6 +399,6 @@ contains
 
         return 
 
-    end subroutine write_yreg_step
+    end subroutine yelmo_write_reg_step
 
 end module yelmo_regions

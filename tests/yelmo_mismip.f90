@@ -168,7 +168,7 @@ program yelmo_mismip
     yelmo1%dyn%par%use_ssa = .TRUE. 
 
     ! Initialize the yelmo state (dyn,therm,mat)
-    call yelmo_init_state(yelmo1,path_par,time=time_init,thrm_method="robin")
+    call yelmo_init_state(yelmo1,time=time_init,thrm_method="robin")
 
     ! Write initial state 
     x_gl      = find_x_gl(yelmo1%grd%x*1e-3,yelmo1%grd%y*1e-3,yelmo1%tpo%now%H_grnd)

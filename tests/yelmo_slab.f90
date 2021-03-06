@@ -152,14 +152,14 @@ program yelmo_slab
     ! =======================================================
 
     ! Initialize the yelmo state (dyn,therm,mat)
-    call yelmo_init_state(yelmo1,path_par,time=time,thrm_method="robin-cold")
+    call yelmo_init_state(yelmo1,time=time,thrm_method="robin-cold")
 
     ! Write initial state 
     call write_step_2D(yelmo1,file2D,time=time) 
 
     ! ! 1D file 
-    ! call write_yreg_init(yelmo1,file1D,time_init=time,units="years",mask=yelmo1%bnd%ice_allowed)
-    ! call write_yreg_step(yelmo1,file1D,time=time)  
+    ! call yelmo_write_reg_init(yelmo1,file1D,time_init=time,units="years",mask=yelmo1%bnd%ice_allowed)
+    ! call yelmo_write_reg_step(yelmo1,file1D,time=time)  
 
 
 if (ctrl%dtt .ne. 0.0) then 
@@ -326,7 +326,7 @@ contains
         ! =======================================================
 
         ! Initialize the yelmo state (dyn,therm,mat)
-        call yelmo_init_state(yelmo1,path_par,time=time,thrm_method="robin-cold")
+        call yelmo_init_state(yelmo1,time=time,thrm_method="robin-cold")
 
         ! Advance timesteps
         do n = 1, ctrl%nt 

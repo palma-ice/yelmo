@@ -12,7 +12,7 @@ module ice_enthalpy
     
     private
     public :: calc_temp_column
-    public :: calc_temp_column_bedrock
+    public :: calc_temp_bedrock_column
     public :: calc_enth_column0
     public :: calc_enth_column
     public :: calc_dzeta_terms
@@ -213,7 +213,7 @@ contains
 
     end subroutine calc_temp_column
 
-    subroutine calc_temp_column_bedrock(enth,temp,Q_rock,cp,kt,Q_ice_b,Q_geo,T_srf,H_rock, &
+    subroutine calc_temp_bedrock_column(enth,temp,Q_rock,cp,kt,Q_ice_b,Q_geo,T_srf,H_rock, &
                                                 zeta_aa,zeta_ac,dzeta_a,dzeta_b,dt)
         ! Thermodynamics solver for a given column of ice 
         ! Note zeta=height, k=1 base, k=nz surface 
@@ -327,7 +327,7 @@ contains
         
         return 
 
-    end subroutine calc_temp_column_bedrock
+    end subroutine calc_temp_bedrock_column
 
     subroutine calc_temp_column_internal(temp,kappa,uz,advecxy,Q_strn,val_base,val_srf,thickness, &
                                                 zeta_aa,zeta_ac,dzeta_a,dzeta_b,T_ref,dt,is_basal_flux,is_surf_flux)
@@ -431,7 +431,7 @@ contains
             rhs(k)  = (temp(k)-T_ref) - dt*advecxy(k) + dt*Q_strn(k)
             
         end do 
-        
+
         ! == Column surface ==
 
         if (is_surf_flux) then 

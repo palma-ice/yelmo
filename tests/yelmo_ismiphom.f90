@@ -190,7 +190,7 @@ program yelmo_ismiphom
     call yelmo_print_bound(yelmo1%bnd)
 
     ! Initialize state variables (dyn,therm,mat)
-    call yelmo_init_state(yelmo1,path_par,time=time_init,thrm_method="robin")
+    call yelmo_init_state(yelmo1,time=time_init,thrm_method="robin")
 
     call yelmo_update_equil(yelmo1,time_init,time_tot=1.0,dt=1.0,topo_fixed=.TRUE.)
     
@@ -201,8 +201,8 @@ program yelmo_ismiphom
     call write_step_2D(yelmo1,file2D,time=time_init)  
     
     ! 1D file 
-    call write_yreg_init(yelmo1,file1D,time_init=time_init,units="years",mask=yelmo1%bnd%ice_allowed)
-    call write_yreg_step(yelmo1,file1D,time=time_init) 
+    call yelmo_write_reg_init(yelmo1,file1D,time_init=time_init,units="years",mask=yelmo1%bnd%ice_allowed)
+    call yelmo_write_reg_step(yelmo1,file1D,time=time_init) 
 
     ! Advance timesteps
     do n = 1, ceiling((time_end-time_init)/dtt)
@@ -219,7 +219,7 @@ program yelmo_ismiphom
         end if 
 
         if (mod(nint(time*100),nint(dt1D_out*100))==0) then 
-            call write_yreg_step(yelmo1,file1D,time=time) 
+            call yelmo_write_reg_step(yelmo1,file1D,time=time) 
         end if 
 
         if (mod(time,10.0)==0 .and. (.not. yelmo_log)) then

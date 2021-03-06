@@ -107,7 +107,6 @@
     neff_const      = 1e7               ! == rho_ice*g*(1000 m ice thickness)
     neff_p          = 0.0               ! *neff_method=2* marine connectivity exponent (0: none, 1: full)
     neff_set_water  = False             ! *neff_method=3* Prescribe H_w = H_w_max for temperate ice instead of using H_w field?
-    neff_w_max      = 2.0               ! [m]  *neff_method=3* Maximum allowed water layer thickness for Till pressure 
     neff_N0         = 1000.0            ! [Pa] *neff_method=3* Reference effective pressure 
     neff_delta      = 0.04              ! [--] *neff_method=3* Fraction of overburden pressure for saturated till
     neff_e0         = 0.69              ! [--] *neff_method=3* Reference void ratio at N0 
@@ -160,16 +159,14 @@
     omega_max       = 0.01              ! [--] Maximum allowed water content fraction 
     till_rate       = 0.0               ! [m/a] Basal water till drainage rate (water equiv.)
     H_w_max         = 2.0               ! [m] Maximum limit to basal water layer thickness (water equiv.)
-/
 
-&ytherm_lith
-    method          = "equil"           ! "equil" (not active bedrock) or "active"
-    nz_aa           = 10                ! Number of vertical points in bedrock 
-    zeta_scale      = "exp-inv"         ! "linear", "exp-inv"
-    zeta_exp        = 2.0  
-    H_lith          = 3000.0            ! [m] Lithosphere thickness 
-    cp              = 1000.0            ! [J kg-1 K-1] Specific heat capacity of bedrock
-    kt              = 6.3e7             ! [J a-1 m-1 K-1] Thermal conductivity of bedrock [W m-1 K-1 * sec_year] => [J a-1 m-1 K-1]
+    rock_method     = "equil"           ! "equil" (not active bedrock) or "active"
+    nzr_aa          = 5                 ! Number of vertical points in bedrock 
+    zeta_scale_rock = "exp-inv"         ! "linear", "exp-inv"
+    zeta_exp_rock   = 2.0  
+    H_rock          = 2000.0            ! [m] Lithosphere thickness 
+    cp_rock         = 1000.0            ! [J kg-1 K-1] Specific heat capacity of bedrock
+    kt_rock         = 6.3e7             ! [J a-1 m-1 K-1] Thermal conductivity of bedrock [W m-1 K-1 * sec_year] => [J a-1 m-1 K-1]
 /
 
 &yelmo_masks

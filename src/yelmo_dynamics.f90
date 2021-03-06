@@ -890,7 +890,7 @@ end if
         ! Determine whether to use actual water layer thickness or parameterized layer thickness
         if (dyn%par%neff_set_water) then
             ! Set water to maximum thickness for temperate ice
-            H_w = dyn%par%neff_w_max * thrm%now%f_pmp  
+            H_w = thrm%par%H_w_max * thrm%now%f_pmp  
         else 
             ! Use boundary water thickness field
             H_w = thrm%now%H_w 
@@ -999,7 +999,6 @@ end if
         call nml_read(filename,"ydyn_neff","neff_const",    par%neff_const,         init=init_pars)
         call nml_read(filename,"ydyn_neff","neff_p",        par%neff_p,             init=init_pars)
         call nml_read(filename,"ydyn_neff","neff_set_water",par%neff_set_water,     init=init_pars)
-        call nml_read(filename,"ydyn_neff","neff_w_max",    par%neff_w_max,         init=init_pars)
         call nml_read(filename,"ydyn_neff","neff_N0",       par%neff_N0,            init=init_pars)
         call nml_read(filename,"ydyn_neff","neff_delta",    par%neff_delta,         init=init_pars)
         call nml_read(filename,"ydyn_neff","neff_e0",       par%neff_e0,            init=init_pars)

@@ -156,7 +156,7 @@ program yelmo_test
 
     ! Initialize state variables (dyn,therm,mat)
     ! (initialize temps with robin method with a cold base)
-    call yelmo_init_state(yelmo1,path_par,time=time_init,thrm_method="robin-cold")
+    call yelmo_init_state(yelmo1,time=time_init,thrm_method="robin-cold")
 
     ! ============================================================
     ! Load or define cf_ref 
@@ -245,8 +245,8 @@ end if
     call write_step_2D(yelmo1,file2D,time=time,cf_ref=cf_ref)
     
     ! 1D file 
-    call write_yreg_init(yelmo1,file1D,time_init=time_init,units="years",mask=yelmo1%bnd%ice_allowed)
-    call write_yreg_step(yelmo1,file1D,time=time)  
+    call yelmo_write_reg_init(yelmo1,file1D,time_init=time_init,units="years",mask=yelmo1%bnd%ice_allowed)
+    call yelmo_write_reg_step(yelmo1,file1D,time=time)  
 
     write(*,*) "test: completed."
     !stop 
@@ -288,7 +288,7 @@ end if
         end if 
 
         if (mod(nint(time*100),nint(dt1D_out*100))==0) then 
-            call write_yreg_step(yelmo1,file1D,time=time) 
+            call yelmo_write_reg_step(yelmo1,file1D,time=time) 
         end if 
 
         if (mod(time,10.0)==0 .and. (.not. yelmo_log)) then

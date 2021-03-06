@@ -377,7 +377,7 @@ end select
                     T_base = T_pmp(i,j,1) 
                 end if 
 
-                T_ice(i,j,:)  = calc_temp_linear_column(T_srf(i,j),T_base,T_pmp(i,j,nz_aa),zeta_aa)
+                T_ice(i,j,:)  = define_temp_linear_column(T_srf(i,j),T_base,T_pmp(i,j,nz_aa),zeta_aa)
                 omega(i,j,:)  = 0.0_prec 
                 call convert_to_enthalpy(enth(i,j,:),T_ice(i,j,:),omega(i,j,:),T_pmp(i,j,:),cp(i,j,:),L_ice)
                 bmb_grnd(i,j) = 0.0_prec
@@ -480,7 +480,7 @@ end select
             if (H_ice(i,j) .gt. 0.0) then 
                 ! Call thermodynamic solver for the column
 
-                call calc_temp_column_bedrock(enth_rock(i,j,:),T_rock(i,j,:),Q_rock(i,j),  &
+                call calc_temp_bedrock_column(enth_rock(i,j,:),T_rock(i,j,:),Q_rock(i,j),  &
                         cp_rock,kt_rock,Q_ice_b(i,j),Q_geo(i,j),T_base,H_rock,zeta_aa, &
                         zeta_ac,dzeta_a,dzeta_b,dt)
             
@@ -488,7 +488,7 @@ end select
                 ! Assume equilibrium conditions: impose linear temperature 
                 ! profile following Q_geo and T_base
 
-                call calc_temp_bedrock_column(T_rock(i,j,:),kt_rock,rho_rock,H_rock, &
+                call define_temp_bedrock_column(T_rock(i,j,:),kt_rock,rho_rock,H_rock, &
                                                                     T_base,Q_geo(i,j),zeta_aa)
 
                 ! Get enthalpy too 

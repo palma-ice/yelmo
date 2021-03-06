@@ -161,7 +161,7 @@
     till_rate       = 0.0               ! [m/a] Basal water till drainage rate (water equiv.)
     H_w_max         = 2.0               ! [m] Maximum limit to basal water layer thickness (water equiv.)
 
-    rock_method     = "active"          ! "equil" (not active bedrock) or "active"
+    rock_method     = "equil"           ! "equil" (not active bedrock) or "active"
     nzr_aa          = 5                 ! Number of vertical points in bedrock 
     zeta_scale_rock = "exp-inv"         ! "linear", "exp-inv"
     zeta_exp_rock   = 2.0  

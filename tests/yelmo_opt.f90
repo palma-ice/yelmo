@@ -183,7 +183,7 @@ program yelmo_test
     ! Initialize state variables (dyn,therm,mat)
     ! (initialize temps with robin method with a cold base),
     ! or from restart file, if specified 
-    call yelmo_init_state(yelmo1,path_par,time=time_init,thrm_method="robin-cold")
+    call yelmo_init_state(yelmo1,time=time_init,thrm_method="robin-cold")
 
 
     select case(trim(cf_ref_init_method))

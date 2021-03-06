@@ -200,7 +200,7 @@ program yelmo_mismip
     call yelmo_print_bound(yelmo1%bnd)
 
     ! Initialize state variables (dyn,therm,mat)
-    call yelmo_init_state(yelmo1,path_par,time=time_init,thrm_method="robin")
+    call yelmo_init_state(yelmo1,time=time_init,thrm_method="robin")
 
     ! Calculate grounding line position 
     call find_x_gl_2D(x_gl,x_gl_std,yelmo1%grd%x*1e-3,yelmo1%grd%y*1e-3,yelmo1%tpo%now%f_grnd)
@@ -212,8 +212,8 @@ program yelmo_mismip
     call write_step_2D(yelmo1,file2D,time=time_init,x_gl=x_gl,x_gl_std=x_gl_std)  
     
     ! 1D file 
-    call write_yreg_init(yelmo1,file1D,time_init=time_init,units="years",mask=yelmo1%bnd%ice_allowed)
-    call write_yreg_step(yelmo1,file1D,time=time_init) 
+    call yelmo_write_reg_init(yelmo1,file1D,time_init=time_init,units="years",mask=yelmo1%bnd%ice_allowed)
+    call yelmo_write_reg_step(yelmo1,file1D,time=time_init) 
 
 
     ! Set exit to false
@@ -280,7 +280,7 @@ program yelmo_mismip
         end if 
 
         if (mod(nint(time*100),nint(dt1D_out*100))==0) then 
-            call write_yreg_step(yelmo1,file1D,time=time) 
+            call yelmo_write_reg_step(yelmo1,file1D,time=time) 
         end if 
 
         write(*,"(a,f14.4)") "time = ", time

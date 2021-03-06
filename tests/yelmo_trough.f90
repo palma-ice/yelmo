@@ -131,14 +131,14 @@ program yelmo_trough
     where (yelmo1%grd%x*1e-3 .ge. x_cf) yelmo1%bnd%calv_mask = .TRUE. 
 
     ! Initialize the yelmo state (dyn,therm,mat)
-    call yelmo_init_state(yelmo1,path_par,time=time_init,thrm_method="robin-cold")
+    call yelmo_init_state(yelmo1,time=time_init,thrm_method="robin-cold")
 
     ! Write initial state 
     call write_step_2D(yelmo1,file2D,time=time_init) 
 
     ! 1D file 
-    call write_yreg_init(yelmo1,file1D,time_init=time_init,units="years",mask=yelmo1%bnd%ice_allowed)
-    call write_yreg_step(yelmo1,file1D,time=time)  
+    call yelmo_write_reg_init(yelmo1,file1D,time_init=time_init,units="years",mask=yelmo1%bnd%ice_allowed)
+    call yelmo_write_reg_step(yelmo1,file1D,time=time)  
     
     ! Advance timesteps
     do n = 1, ceiling((time_end-time_init)/dtt)
@@ -156,7 +156,7 @@ program yelmo_trough
         end if 
 
         if (mod(nint(time*100),nint(dt1D_out*100))==0) then 
-            call write_yreg_step(yelmo1,file1D,time=time) 
+            call yelmo_write_reg_step(yelmo1,file1D,time=time) 
         end if
 
         if (mod(time,10.0)==0 .and. (.not. yelmo_log)) then

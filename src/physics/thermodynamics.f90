@@ -26,11 +26,11 @@ module thermodynamics
     public :: calc_T_base_shlf_approx
     public :: define_temp_linear_3D
     public :: define_temp_robin_3D
-    public :: calc_temp_linear_column
-    public :: calc_temp_robin_column
+    public :: define_temp_linear_column
+    public :: define_temp_robin_column
     
     public :: define_temp_bedrock_3D
-    public :: calc_temp_bedrock_column
+    public :: define_temp_bedrock_column
     public :: calc_Q_bedrock
     public :: calc_Q_bedrock_column
 
@@ -1264,7 +1264,7 @@ end if
                 ! Ice is present, define linear temperature profile with frozen bed (-10 degC)
                  
                 T_base       = calc_T_pmp(H_ice(i,j),zeta_aa(1),T0,T_pmp_beta) - 10.0 
-                T_ice(i,j,:) = calc_temp_linear_column(T_srf(i,j),T_base,T0,zeta_aa)
+                T_ice(i,j,:) = define_temp_linear_column(T_srf(i,j),T_base,T0,zeta_aa)
 
             else 
                 ! No ice present, set equal to T_pmp (ie, T0)
@@ -1285,7 +1285,7 @@ end if
 
     end subroutine define_temp_linear_3D
 
-    function calc_temp_linear_column(T_srf,T_base,T0,zeta_aa) result(T_ice)
+    function define_temp_linear_column(T_srf,T_base,T0,zeta_aa) result(T_ice)
 
         implicit none 
 
@@ -1309,7 +1309,7 @@ end if
 
         return 
 
-    end function calc_temp_linear_column
+    end function define_temp_linear_column
 
     subroutine define_temp_robin_3D (enth,T_ice,omega,T_pmp,cp,ct,Q_rock,T_srf,H_ice,H_w,smb,bmb,f_grnd,zeta_aa,cold)
         ! Robin solution for thermodynamics for a given column of ice 
@@ -1350,7 +1350,7 @@ end if
 
             is_float = (f_grnd(i,j) .eq. 0.0)
 
-            T_ice(i,j,:) = calc_temp_robin_column(zeta_aa,T_pmp(i,j,:),ct(i,j,:),cp(i,j,:),rho_ice,H_ice(i,j), &
+            T_ice(i,j,:) = define_temp_robin_column(zeta_aa,T_pmp(i,j,:),ct(i,j,:),cp(i,j,:),rho_ice,H_ice(i,j), &
                                                   T_srf(i,j),smb(i,j)+bmb(i,j),Q_rock(i,j),is_float)
 
             if (cold) then 
@@ -1379,7 +1379,7 @@ end if
 
     end subroutine define_temp_robin_3D
 
-    function calc_temp_robin_column(zeta_aa,T_pmp,kt,cp,rho_ice,H_ice,T_srf,mb_net,Q_rock,is_float) result(T_ice)
+    function define_temp_robin_column(zeta_aa,T_pmp,kt,cp,rho_ice,H_ice,T_srf,mb_net,Q_rock,is_float) result(T_ice)
         ! This function will impose a temperature solution in a given ice column.
         ! For:
         !  Grounded ice with positive net mass balance: Robin solution where possible
@@ -1467,7 +1467,7 @@ end if
 
         return 
 
-    end function calc_temp_robin_column
+    end function define_temp_robin_column
 
     subroutine define_temp_bedrock_3D(enth_rock,T_rock,Q_rock,cp_rock,kt_rock,Q_geo,T_bed,H_rock,zeta_aa)
         ! Define 3D bedrock enth/temp field 
@@ -1495,7 +1495,7 @@ end if
         do i = 1, nx 
 
             ! Calculate temperature profile 
-            call calc_temp_bedrock_column(T_rock(i,j,:),kt_rock,rho_rock,H_rock, &
+            call define_temp_bedrock_column(T_rock(i,j,:),kt_rock,rho_rock,H_rock, &
                                                     T_bed(i,j),Q_geo(i,j),zeta_aa)
 
             ! Calculate heat flux through bed surface from lithosphere [mW m-2]
@@ -1511,7 +1511,7 @@ end if
 
     end subroutine define_temp_bedrock_3D
 
-    subroutine calc_temp_bedrock_column(T_rock,kt_rock,rho_rock,H_rock,T_bed,Q_geo,zeta_aa)
+    subroutine define_temp_bedrock_column(T_rock,kt_rock,rho_rock,H_rock,T_bed,Q_geo,zeta_aa)
         ! This function will impose a temperature profile in a column 
         ! of bedrock assuming equilibrium with the bed surface temperature (T_bed)
         ! and the geothermal heat flux deep in the bedrock (Q_geo) 
@@ -1552,7 +1552,7 @@ end if
 
         return 
 
-    end subroutine calc_temp_bedrock_column
+    end subroutine define_temp_bedrock_column
 
     subroutine calc_Q_bedrock(Q_rock,T_rock,kt_rock,H_rock,zeta_aa)
 

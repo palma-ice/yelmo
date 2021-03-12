@@ -144,8 +144,10 @@ def main():
     # Additional options, consistency checks
 
     if with_runner and not runner_is_installed:
-        print("The Python module 'runner' is not installed. Do not use option -x.")
-        sys.exit()
+        raise Exception("The Python module 'runner' is not installed. Do not use option -x.")
+
+    if not par is None and not runner_is_installed:
+        raise Exception("The Python module 'runner' is not installed. Do not use option -p.")
 
     # Copy the executable file to the output directory, or
     # call it from its compiled location?    

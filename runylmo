@@ -341,7 +341,7 @@ def runjob(rundir,cmd,omp):
     # be ok in this context, see https://docs.python.org/2/library/subprocess.html#frequently-used-arguments
     #jobstatus = subp.check_call(cmd_job,shell=True)
     try:
-        jobstatus = subp.check_output(cmd_job,shell=True,stderr=subp.STDOUT)
+        jobstatus = subp.check_output(cmd_job,shell=True,stdin=None,stderr=None)
     except subp.CalledProcessError as error:
         print(error)
         sys.exit() 

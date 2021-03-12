@@ -107,7 +107,6 @@
     neff_const      = 1e7               ! == rho_ice*g*(1000 m ice thickness)
     neff_p          = 0.0               ! *neff_method=2* marine connectivity exponent (0: none, 1: full)
     neff_set_water  = False             ! *neff_method=3* Prescribe H_w = H_w_max for temperate ice instead of using H_w field?
-    neff_w_max      = 2.0               ! [m]  *neff_method=3* Maximum allowed water layer thickness for Till pressure 
     neff_N0         = 1000.0            ! [Pa] *neff_method=3* Reference effective pressure 
     neff_delta      = 0.04              ! [--] *neff_method=3* Fraction of overburden pressure for saturated till
     neff_e0         = 0.69              ! [--] *neff_method=3* Reference void ratio at N0 

@@ -10,6 +10,7 @@ import sys, os, socket, argparse, shutil, glob, datetime, json
 
 try:
     from runner.ext.namelist import Namelist
+    from runner.ext.namelist import nml_update_if_exists
 
     # Shortcut to namelist fuctionality
     nml = Namelist()  # you could use your own module for reading namelist
@@ -267,7 +268,12 @@ def runner_param_write(par_path,rundir):
     params = nml.load(open(par_path))
 
     # Update default parameters with runner.json parameter values
-    params.update(js['params']) 
+    #params.update(js['params']) 
+    params = nml_update_if_exists(params,js['params']) 
+
+    # for key in js['params']:
+    #     if key in params:
+    #         params.update({key:js['params'].get(key)})
 
     # To do: Add a map to be able to avoid defining the group name from the command line arguments
     #pmap      = {'p1':'g1.p1', 'p2':'g2.p2'}

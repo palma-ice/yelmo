@@ -1,0 +1,13 @@
+### OMP Specific settings ###
+#SBATCH --nodes=1
+#SBATCH --tasks-per-node=1
+#SBATCH --cpus-per-task=<OMP>
+#SBATCH --no-requeue
+#SBATCH --constraint=<PARTITION>
+
+export OMP_PROC_BIND=true       # make sure our threads stick to cores
+export OMP_NUM_THREADS=<OMP>       # matches how many cpus-per-task we asked for
+export OMP_NESTED=false
+export OMP_STACKSIZE=512M
+export MKL_NUM_THREADS=<OMP>
+### DONE OMP Specific settings ###

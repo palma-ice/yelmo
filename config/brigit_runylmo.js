@@ -3,12 +3,12 @@
     {
         "jobname"       : "Yelmo",
         "email"         : "USER@ucm.es",
-        "group"         : "", 
+        "group"         : None, 
         "omp"           : 0,
         "wall"          : 24, 
-        "qos"           : "short",
+        "qos"           : "normal",
         "partition"     : "",
-        "job_template"  : "config/pik_submit_slurm"
+        "job_template"  : "config/brigit_submit_slurm"
     },
 
     "exe_aliases" : 
@@ -47,9 +47,7 @@
     "const_path_default" : "par/yelmo_const_Earth.nml",
     
     "job_queues" :
-        {   "short" :
-            {   "wall" : 168 },
-            "normal" :
+        {  "normal" :
             {   "wall" : 10000 }
         }
 }

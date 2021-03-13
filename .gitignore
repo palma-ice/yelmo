@@ -10,3 +10,5 @@ tests/.DS_Store
 *.vscode
 *.mypy_cache
 *.pytest_cache
+runylmo.js
+tmp

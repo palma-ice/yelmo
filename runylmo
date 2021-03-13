@@ -46,13 +46,31 @@ class DictAction(argparse.Action):
 def main():
     '''Main subroutine to run one simulation.'''
 
-    # Load info json configuration file 
+    # Define name of standard info json configuration file 
     info_file = os.path.basename(__file__) + ".js"
+    
     if os.path.isfile(info_file):
+        # If file is found, load it up
         info = json.load(open(info_file))
     else: 
-        print("Required json file '{}' containing run options not found.".format(info_file))
-        sys.exit()
+        # Copy file from config directory, inform user, 
+        # and then load it. 
+        # error_msg = ("Required json file '{}' containing run options not found. \n".format(info_file) +
+        #              "This is probably the first time you are running this script. \n" +
+        #              "The default file will be generated now. Check it is correct, \n" +
+        #              "or copy your own file, and then run this script again.")
+        # print(error_msg)
+
+        info_file_default = os.path.join("config",info_file)
+        shutil.copy(info_file_default,info_file)
+        
+        # Load info file 
+        info = json.load(open(info_file))
+
+        error_msg = ("Missing required json configuration file.\n" +
+                     "Copied {} to {}.\n".format(info_file_default,info_file) +
+                     "Confirm defaults are correct and try again.")
+        raise Exception(error_msg)
 
     ## Get defaults for arguments ##
     default_jobname  = info['defaults']['jobname']
@@ -376,9 +394,6 @@ def submitjob(path_template,rundir,cmd,qos,wall,partition,group,email,omp,jobnam
     
     if "brigit" in hostname:
         # Host is the UCM brigit cluster, use the following submit script
-        
-        # print("runcx:: job_script not yet configured for brigit.")
-        # sys.exit() 
         script  = generate_jobscript(path_template,cmd,jobname,group,email,qos,wall,partition,omp,queues)
         jobfile = open(path_jobscript,'w').write(script)
         cmd_job = "cd {} && sbatch {}".format(rundir,nm_jobscript)

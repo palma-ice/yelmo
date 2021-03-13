@@ -55,20 +55,24 @@ def main():
         sys.exit()
 
     ## Get defaults for arguments ##
-    default_jobname = info['defaults']['jobname']
-    default_email   = info['defaults']['email']
-    default_group   = info['defaults']['group']
-    default_omp     = info['defaults']['omp']
-    default_wall    = info['defaults']['wall']
-    default_qos     = info['defaults']['qos']
-    default_part    = info['defaults']['partition'] 
-
+    default_jobname  = info['defaults']['jobname']
+    default_email    = info['defaults']['email']
+    default_group    = info['defaults']['group']
+    default_omp      = info['defaults']['omp']
+    default_wall     = info['defaults']['wall']
+    default_qos      = info['defaults']['qos']
+    default_part     = info['defaults']['partition'] 
+    default_template = info['defaults']['job_template']
+    
     # Substitute USER for actual username in email if found:
     default_email   = default_email.replace('USER',os.environ.get('USER'))
     
     # Make exe_aliases string for printing help
     exe_aliases_str = "; ".join(["{}={}".format(key,val) 
                         for key,val in info["exe_aliases"].items()])
+
+    # Additional info 
+    queues = info['job_queues'] 
 
     ### Manage command-line arguments ############################
 
@@ -127,19 +131,20 @@ def main():
     run         = args.run 
     submit      = args.submit 
     qos         = args.qos  
-    wtime       = args.wall 
+    wall        = args.wall 
     partition   = args.part
     omp         = args.omp 
-    useremail   = args.email 
-    usergroup   = args.group
+    email       = args.email 
+    group       = args.group
     with_runner = args.x   
     verbose     = args.v 
     par         = args.p 
     rundir      = args.rundir 
     par_path    = args.par_path 
 
-    # Define jobname based on default value (no parameter for now)
-    jobname = default_jobname
+    # Define some variables based on default values (not parameters for now)
+    jobname                 = default_jobname
+    path_jobscript_template = default_template 
 
     # Additional options, consistency checks
 
@@ -153,7 +158,7 @@ def main():
         error_msg = "The Python module 'runner' is not installed. Do not use option -p. " \
                     "To install runner, see: https://github.com/alex-robinson/runner"
         raise Exception(error_msg)
-    
+
     # Copy the executable file to the output directory, or
     # call it from its compiled location?    
     copy_exec = True 
@@ -253,6 +258,7 @@ def main():
         par_paths_rundir.append(par_path_now) 
       
     # Modify parameter files as needed
+    # (Note: only modify parameter files in rundir, not originals!)
 
     # First modify parameter files according to command-line
     # "-p key=val key=val ..." argument.
@@ -318,7 +324,8 @@ def main():
 
         if submit:
             # Submit job to queue 
-            pid = submitjob(rundir,executable,qos,wtime,partition,usergroup,useremail,omp,jobname) 
+            pid = submitjob(path_jobscript_template,rundir,executable,qos,
+                            wall,partition,group,email,omp,jobname,queues) 
 
         else:
             # Run job in background 
@@ -355,7 +362,7 @@ def runjob(rundir,cmd,omp):
     
     return jobstatus
 
-def submitjob(rundir,cmd,qos,wtime,partition,usergroup,useremail,omp,jobname):
+def submitjob(path_template,rundir,cmd,qos,wall,partition,group,email,omp,jobname,queues=None):
     '''Submit a job to a HPC queue (qsub,sbatch)'''
 
     # Get info about current system
@@ -372,14 +379,10 @@ def submitjob(rundir,cmd,qos,wtime,partition,usergroup,useremail,omp,jobname):
         
         print("runcx:: job_script not yet configured for brigit.")
         sys.exit() 
-
-        script  = jobscript_slurm_brigit(cmd,rundir,username,usergroup,qos,wtime,useremail,omp)
-        jobfile = open(path_jobscript,'w').write(script)
-        cmd_job = "cd {} && sbatch {}".format(rundir,nm_jobscript)
-            
+     
     else:
         # Host is the PIK 2015 cluster, use the following submit script
-        script  = jobscript_slurm_pik(cmd,rundir,username,usergroup,qos,wtime,partition,useremail,omp,jobname)
+        script  = generate_jobscript(path_template,cmd,jobname,group,email,qos,wall,partition,omp,queues)
         jobfile = open(path_jobscript,'w').write(script)
         cmd_job = "cd {} && sbatch {}".format(rundir,nm_jobscript)
     
@@ -563,78 +566,64 @@ def get_git_revision_hash():
     githash = subp.check_output(['git', 'rev-parse', 'HEAD']).strip()
     return githash.decode("ascii") 
 
-def jobscript_slurm_pik(cmd,rundir,username,usergroup,qos,wtime,partition,useremail,omp,jobname):
-    '''Definition of the job script'''
+def generate_jobscript(template,cmd,jobname,group,email,qos,wall,partition,omp,queues=None):
+    '''Definition of the job script based on a template file and 
+    fields in < > that can be substituted.'''
 
-# Extra parameter options
+# Extra parameter options to consider:
 ##SBATCH --partition=ram_gpu
 ##SBATCH --mem=50000 
     
-    # Check that wtime is consistent with qos
-    if qos in ["priority","short"] and wtime > 24:
-        print("Error in wtime for '{}'' queue, wtime = {}".format(qos,wtime))
-        sys.exit()
+    # Check queue information if available
+    if not queues == None: 
 
-    if qos == "medium" and wtime > 24*7:
-        print("Error in wtime for '{}'' queue, wtime = {}".format(qos,wtime))
-        sys.exit()
-    
+        # First ensure desired queue is available 
+        if not qos in queues:
+            error_msg = "Error generating jobscript. Desired queue not in available list. \n" \
+                        "{} not in {}".format(qos,"-".join(queues))
+            raise Exception(error_msg)
+
+        # Check that wall time was set properly
+        if wall > queues[qos]['wall']:
+            error_msg = "Error generating jobscript. Wall time too large for desired queue. \n" \
+                        "wall={} greater than limit of {} for queue '{}'".format(wall,queues[qos]['wall'],qos)
+            raise Exception(error_msg)
+
+    # If omp has been set, generate a jobscript string with appropriate settings
     if omp > 0:
         # Use openmp settings 
         # Notes:
         #    --cpus-per-task=32 on broadwell, 16 on haswell
-        omp_script = """
-#SBATCH --nodes=1
-#SBATCH --tasks-per-node=1
-#SBATCH --cpus-per-task={} 
-#SBATCH --no-requeue
-#SBATCH --constraint={}
+        
+        # Read in omp section template
+        omp_script = open(template+"_omp",'r').read()
 
-export OMP_PROC_BIND=true  # make sure our threads stick to cores
-export OMP_NUM_THREADS={}  # matches how many cpus-per-task we asked for
-export OMP_NESTED=false
-export OMP_STACKSIZE=512M
-export MKL_NUM_THREADS={}
-""".format(omp,partition,omp,omp)
-
-
+        # Now make substitutions to match argument choices 
+        omp_script = omp_script.replace('<OMP>',"{}".format(omp))
+        omp_script = omp_script.replace('<PARTITION>',partition)
+    
     else: 
         # No openmp 
         omp_script = "" 
 
 
-    # Now, make full job script
+    # Read in jobscript template 
+    job_script = open(template,'r').read()
 
-    script = """#!/bin/bash
-#SBATCH --qos={}
-#SBATCH --time={}:00:00
-#SBATCH --job-name={}
-#SBATCH --account={}
-#SBATCH --mail-user={}
-#SBATCH --mail-type=END
-#SBATCH --mail-type=FAIL
-#SBATCH --mail-type=REQUEUE
-#SBATCH --output=./out.out
-#SBATCH --error=./out.err
-{}
+    # Substitute in omp section as needed to make full job script
+    job_script = job_script.replace('<OMPSECTION>',omp_script)
+    
+    # Make additional substitutions to match argument choices 
+    job_script = job_script.replace('<PARTITION>',partition)
+    job_script = job_script.replace('<QOS>',qos)
+    job_script = job_script.replace('<WALL>',"{}".format(wall))
+    job_script = job_script.replace('<JOBNAME>',jobname)
+    job_script = job_script.replace('<GROUP>',group)
+    job_script = job_script.replace('<EMAIL>',email)
+    job_script = job_script.replace('<CMD>',cmd)
+    
+    return job_script
 
-export GMON_OUT_PREFIX=./gmon
-
-ulimit -s unlimited
-#ulimit -c unlimited
-#ulimit -s unlimited
-#ulimit -d unlimited
-#ulimit -m unlimited
-ulimit -v unlimited
-#ulimit -f unlimited
-ulimit -a
-
-# Run the job
-srun {} 
-
-""".format(qos,wtime,jobname,usergroup,useremail,omp_script,cmd)
-
-    return script
 
 if __name__ == "__main__": 
 

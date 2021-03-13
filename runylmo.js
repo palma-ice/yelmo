@@ -1,13 +1,14 @@
 {
     "defaults" :
     {
-        "jobname"   : "Yelmo",
-        "email"     : "USER@ucm.es",
-        "group"     : "anthroia", 
-        "omp"       : 0,
-        "wall"      : 24, 
-        "qos"       : "priority",
-        "partition" : "haswell"
+        "jobname"       : "Yelmo",
+        "email"         : "USER@ucm.es",
+        "group"         : "anthroia", 
+        "omp"           : 0,
+        "wall"          : 24, 
+        "qos"           : "priority",
+        "partition"     : "haswell",
+        "job_template"  : "config/pik_submit_slurm"
     },
 
     "exe_aliases" : 
@@ -43,6 +44,16 @@
             "slab"     : "par/yelmo_const_EISMINT.nml" 
         },
 
-    "const_path_default" : "par/yelmo_const_Earth.nml"
+    "const_path_default" : "par/yelmo_const_Earth.nml",
     
+    "job_queues" :
+        {   "priority" :
+            {   "wall" : 24  },
+            "short" :
+            {   "wall" : 24  },
+            "medium" :
+            {   "wall" : 168 },
+            "long" :
+            {   "wall" : 720 }
+        }
 }

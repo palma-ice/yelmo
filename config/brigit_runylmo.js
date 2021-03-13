@@ -3,10 +3,10 @@
     {
         "jobname"       : "Yelmo",
         "email"         : "USER@ucm.es",
-        "group"         : "PalMA", 
+        "group"         : "", 
         "omp"           : 0,
         "wall"          : 24, 
-        "qos"           : "normal",
+        "qos"           : "short",
         "partition"     : "",
         "job_template"  : "config/pik_submit_slurm"
     },
@@ -47,7 +47,9 @@
     "const_path_default" : "par/yelmo_const_Earth.nml",
     
     "job_queues" :
-        {   "normal" :
-            {   "wall" : 1000 },
+        {   "short" :
+            {   "wall" : 168 },
+            "normal" :
+            {   "wall" : 10000 }
         }
 }

@@ -3,7 +3,7 @@
     {
         "jobname"       : "Yelmo",
         "email"         : "USER@ucm.es",
-        "group"         : None, 
+        "group"         : "", 
         "omp"           : 0,
         "wall"          : 24, 
         "qos"           : "normal",

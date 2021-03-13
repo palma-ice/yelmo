@@ -144,11 +144,16 @@ def main():
     # Additional options, consistency checks
 
     if with_runner and not runner_is_installed:
-        raise Exception("The Python module 'runner' is not installed. Do not use option -x.")
+        error_msg = "The Python module 'runner' is not installed. Do not use option -x. " \
+                    "This option should only be used by the runner::jobrun script internally. " \
+                    "To install runner, see: https://github.com/alex-robinson/runner"
+        raise Exception(error_msg)
 
     if not par is None and not runner_is_installed:
-        raise Exception("The Python module 'runner' is not installed. Do not use option -p.")
-
+        error_msg = "The Python module 'runner' is not installed. Do not use option -p. " \
+                    "To install runner, see: https://github.com/alex-robinson/runner"
+        raise Exception(error_msg)
+    
     # Copy the executable file to the output directory, or
     # call it from its compiled location?    
     copy_exec = True 

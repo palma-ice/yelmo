@@ -377,9 +377,12 @@ def submitjob(path_template,rundir,cmd,qos,wall,partition,group,email,omp,jobnam
     if "brigit" in hostname:
         # Host is the UCM brigit cluster, use the following submit script
         
-        print("runcx:: job_script not yet configured for brigit.")
-        sys.exit() 
-     
+        # print("runcx:: job_script not yet configured for brigit.")
+        # sys.exit() 
+        script  = generate_jobscript(path_template,cmd,jobname,group,email,qos,wall,partition,omp,queues)
+        jobfile = open(path_jobscript,'w').write(script)
+        cmd_job = "cd {} && sbatch {}".format(rundir,nm_jobscript)
+    
     else:
         # Host is the PIK 2015 cluster, use the following submit script
         script  = generate_jobscript(path_template,cmd,jobname,group,email,qos,wall,partition,omp,queues)

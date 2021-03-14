@@ -203,6 +203,16 @@ def main():
     else:
         exe_args = os.path.join(rundir,par_fname)
 
+    # Define prefix part of command for running with a profiler (eg vtune)
+    if with_profiler:
+        # Use prefix for vtune profiler 
+        if copy_exec:
+            profiler_prefix = "amplxe-cl -c hotspots -r {} -- ".format("./")
+        else:
+            profiler_prefix = "amplxe-cl -c hotspots -r {} -- ".format(rundir)
+    else: 
+        profiler_prefix = ""
+
     ### Yelmo-specific ###
     # Get path of constants parameter file based on parameter name
     # First set const_path to default, then see if it should be overwritten 
@@ -330,13 +340,13 @@ def main():
     # Generate the appropriate executable command to run job
     if copy_exec:
         # Assume executable is running from rundir
-        executable = "./{} {}".format(exe_fname,exe_args)
+        executable = "{}./{} {}".format(profiler_prefix,exe_fname,exe_args)
 
     else:
         # Assume executable will run from current working directory 
         cwd = os.getcwd()
-        executable = "{}/{} {}".format(cwd,exe_path,exe_args)
-
+        executable = "{}{}/{} {}".format(profiler_prefix,cwd,exe_path,exe_args)
+    
     # Run the job if desired 
     if run:
 

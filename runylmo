@@ -108,9 +108,9 @@ def main():
     parser.add_argument('-q','--qos',type=str, default=default_qos,
         help='Name of the qos the job should be submitted to (priority,short,medium,long)')
     parser.add_argument('-w','--wall', type=int, default=default_wall,
-        help='Maximum wall time to allow for job (only for jobs submitted to queue)')
+        help='Maximum wall time [hrs] to allow for job (only for jobs submitted to queue)')
     parser.add_argument('--part',type=str, metavar="PARTITION", default=default_part,
-        help='Name of the partition the job should be submitted to (haswell, broadwell)')
+        help='Name of the partition the job should be submitted to (e.g., haswell, broadwell)')
     parser.add_argument('--omp', type=int, default=default_omp,
         help='Specify number of threads for omp job submission (default = 0 implies no omp specification)')
     parser.add_argument('--email', type=str, default=default_email,
@@ -118,7 +118,7 @@ def main():
     parser.add_argument('--group', type=str, default=default_group,
         help='Email address to send job notifications from cluster')
     parser.add_argument('-x',action="store_true",
-        help='Use this argument if script is being called by job run')
+        help='This argument is used when the script called by jobrun')
     parser.add_argument('-v',action="store_true",help='Verbose script output?')
 
     parser.add_argument("-p",metavar="KEY=VALUE",nargs='+',action=DictAction,
@@ -164,6 +164,9 @@ def main():
     jobname                 = default_jobname
     path_jobscript_template = default_template 
 
+    # Could maybe add this as a parameter choice:
+    with_profiler = False 
+    
     # Additional options, consistency checks
 
     if with_runner and not runner_is_installed:
@@ -346,7 +349,7 @@ def main():
         # Assume executable will run from current working directory 
         cwd = os.getcwd()
         executable = "{}{}/{} {}".format(profiler_prefix,cwd,exe_path,exe_args)
-    
+
     # Run the job if desired 
     if run:
 

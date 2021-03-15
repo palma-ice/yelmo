@@ -199,29 +199,17 @@ make benchmarks
 
 ### 4. MISMIP RF
 To perform the MISMIP rate factor experiment, compile the mismip executable
-and call it with the MISMIP parameter file:
+and call it with the MISMIP parameter file the three parameter permutations of interest (default, subgrid and subgrid+gl-scaling):
 ```
 make mismip
-./runylmo -r -e mismip -o output/mismip-rf -n par-gmd/yelmo_MISMIP3D.nml
+./runylmo -r -e mismip -o output/mismip-rf-0 -n par-gmd/yelmo_MISMIP3D.nml -p ydyn.beta_gl_stag=0 ydyn.beta_gl_scale=0
+./runylmo -r -e mismip -o output/mismip-rf-1 -n par-gmd/yelmo_MISMIP3D.nml -p ydyn.beta_gl_stag=3 ydyn.beta_gl_scale=0
+./runylmo -r -e mismip -o output/mismip-rf-2 -n par-gmd/yelmo_MISMIP3D.nml -p ydyn.beta_gl_stag=3 ydyn.beta_gl_scale=2
 ```
-To perform the different permutations, it is necessary to change the resolution
-`mismip.dx` in the parameter file (reducing the timestep `mismip.dtt` for higher resolutions).
-By default, no subgrid grounding line treatment or scaling is applied. To add subgrid treatment,
-set the following parameters:
+To additionally change the resolution of the simulations change the parameter `mismip.dx`, e.g. for the default simulation with 10km resolution , call:
 ```
-&ydyn
-    beta_gl_sep         = -1
-    beta_gl_stag        =  3
-/
+./runylmo -r -e mismip -o output/mismip-rf-0-10km -n par-gmd/yelmo_MISMIP3D.nml -p ydyn.beta_gl_stag=0 ydyn.beta_gl_scale=0 mismip.dx=10
 ```
-Meanwhile, to also apply linear scaling to basal friction as it approaches the grounding line,
-set `ydyn.beta_gl_scale = 2`. These two permutations can be run directly using the following commands:
-```
-make mismip
-./runylmo -r -e mismip -o output/mismip-rf-1 -n par-gmd/yelmo_MISMIP3D.nml -p ydyn.beta_gl_sep=-1 ydyn.beta_gl_stag=3
-./runylmo -r -e mismip -o output/mismip-rf-2 -n par-gmd/yelmo_MISMIP3D.nml -p ydyn.beta_gl_sep=-1 ydyn.beta_gl_stag=3 ydyn.beta_gl_scale=2
-``
-
 
 ### 5. Age profile experiments
 To perform the age profile experiments, compile the Fortran program `tests/test_icetemp.f90`
@@ -241,8 +229,6 @@ to compile the `initmip` executable and run with the present-day (pd) and
 glacial (lgm) parameter values:
 ```
 make initmip
-# In par-gmd/yelmo_Antarctica.nml, set control.clim_nm="clim_pd"
-python run_yelmo.py -r -e initmip output/test-ant-pd par-gmd/yelmo_Antarctica.nml
-# In par-gmd/yelmo_Antarctica.nml, set control.clim_nm="clim_lgm"
-python run_yelmo.py -r -e initmip output/test-ant-lgm par-gmd/yelmo_Antarctica.nml
+./runylmo -r -e initmip -o output/ant-pd -n par-gmd/yelmo_Antarctica.nml -p ctrl.clim_nm="clim_pd"
+./runylmo -r -e initmip -o output/ant-lgm -n par-gmd/yelmo_Antarctica.nml -p ctrl.clim_nm="clim_lgm"
 ```

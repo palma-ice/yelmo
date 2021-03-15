@@ -49,8 +49,8 @@ ln -s path/to/ice_data ice_data
 make clean 
 make benchmarks      # makes executable libyelmo/bin/yelmo_benchmarks.x 
 
-# Run the program using run_yelmo.py (see run_yelmo.py -h for details) 
-python run_yelmo.py -r -e benchmarks output/test par/yelmo_EISMINT.nml 
+# Run the program using runylmo (see runylmo -h for details) 
+./runylmo -r -e benchmarks -o output/test -n par/yelmo_EISMINT.nml 
 
 # Check the output 
 cd output/test 

@@ -30,7 +30,7 @@ See: [Dependencies](https://palma-ice.github.io/yelmo-docs/dependencies/)
 
 OPTIONAL:
 - Python 3.x, which is only needed for automatic configuration of the Makefile
-and the use of the script `run_yelmo.py` for job preparation and submission.
+and the use of the script `runylmo` for job preparation and submission.
 
 ## Directory structure
 ```fortran
@@ -136,19 +136,19 @@ The Makefile additionally allows you to specify debugging compiler flags with th
 ### 4. Run the model.
 
 Once an executable has been created, you can run the model. This can be
-achieved via the included Python job submission script `run_yelmo.py`. The following steps
+achieved via the included Python job submission script `runylmo`. The following steps
 are carried out via the script:
 
 1. The output directory is created.
 2. The executable is copied to the output directory
 3. The relevant parameter files are copied to the output directory.
-4. Links to the input data paths (`input` and `ice_data`) are created in the output directory. (Note `ice_data` is typically linked to an external data repository, and is not necessary.)
-4. The executable is run from the output directory, either as a background process or it is submitted to the queue (the script currently supports `qsubmit` and `sbatch` commands).
+4. Links to the input data paths (`input` and `ice_data`) are created in the output directory. Note that many simulations, such as benchmark experiments, do not depend on these external data sources, but the links are made anyway.
+4. The executable is run from the output directory, either as a background process or it is submitted to the queue via `sbatch` (the SLURM workload manager).
 
 To run a benchmark simulation, for example, use the following command:
 
 ```
-python run_yelmo.py -r -e benchmarks output/test par/yelmo_EISMINT.nml
+./runylmo -r -e benchmarks -o output/test -n par/yelmo_EISMINT.nml
 ```
 where the option `-r` implies that the model should be run as a background process. If this is omitted, then the output directory will be populated, but no executable will be run, while `-s` instead will submit the simulation to cluster queue system instead of running in the background. The option `-e` lets you specify the executable. For some standard cases, shortcuts have been created:
 ```
@@ -156,7 +156,14 @@ benchmarks = libyelmo/bin/yelmo_benchmarks.x
 mismip     = libyelmo/bin/yemo_mismip.x
 initmip    = libyelmo/bin/yelmo_initmip.x
 ```
-The last two mandatory arguments are always the output/run directory and the parameter file to be used for this simulation. In the case of the above simulation, the output directory is defined as `output/test`, where all model parameters (loaded from the file `par/yelmo_EISMINT.nml`) and model output can be found.
+The last two mandatory arguments `-o OUTDIR` and `-n PAR_PATH` are the output/run directory and the parameter file to be used for this simulation, respectively. In the case of the above simulation, the output directory is defined as `output/test`, where all model parameters (loaded from the file `par/yelmo_EISMINT.nml`) and model output can be found.
+
+It is also possible to modify parameters inline via the option `-p KEY=VAL [KEY=VAL ...]`. The parameter should be specified with its namelist group and its name. E.g., to change the resolution of the EISMINT benchmark experiment to 10km, use:
+```
+./runylmo -r -e benchmarks -o output/test -n par/yelmo_EISMINT.nml -p ctrl.dx=10
+```
+
+See `runylmo -h` for more details on the run script. 
 
 ## Test cases
 
@@ -171,7 +178,7 @@ To perform the moving margin experiment, compile the benchmarks
 executable and call it with the EISMINT parameter file:
 ```
 make benchmarks
-python run_yelmo.py -r -e benchmarks output/test-moving par-gmd/yelmo_EISMINT_moving.nml
+./runylmo -r -e benchmarks -o output/eismint-moving -n par-gmd/yelmo_EISMINT_moving.nml
 ```
 
 ### 2. EISMINT2 EXPA
@@ -179,7 +186,7 @@ To perform Experiment A from the EISMINT2 benchmarks, compile the benchmarks
 executable and call it with the EXPA parameter file:
 ```
 make benchmarks
-python run_yelmo.py -r -e benchmarks output/test-expa par-gmd/yelmo_EISMINT_expa.nml
+./runylmo -r -e benchmarks -o output/eismint-expa -n par-gmd/yelmo_EISMINT_expa.nml
 ```
 
 ### 3. EISMINT2 EXPF
@@ -187,7 +194,7 @@ To perform Experiment F from the EISMINT2 benchmarks, compile the benchmarks
 executable and call it with the EXPF parameter file:
 ```
 make benchmarks
-python run_yelmo.py -r -e benchmarks output/test-expf par-gmd/yelmo_EISMINT_expf.nml
+./runylmo -r -e benchmarks -o output/eismint-expf -n par-gmd/yelmo_EISMINT_expf.nml
 ```
 
 ### 4. MISMIP RF
@@ -195,10 +202,10 @@ To perform the MISMIP rate factor experiment, compile the mismip executable
 and call it with the MISMIP parameter file:
 ```
 make mismip
-python run_yelmo.py -r -e mismip output/test-mismip par-gmd/yelmo_MISMIP3D.nml
+./runylmo -r -e mismip -o output/mismip-rf -n par-gmd/yelmo_MISMIP3D.nml
 ```
 To perform the different permutations, it is necessary to change the resolution
-`&mismip::dx` in the parameter file (reducing the timestep `&mismip::dtt` for higher resolutions).
+`mismip.dx` in the parameter file (reducing the timestep `mismip.dtt` for higher resolutions).
 By default, no subgrid grounding line treatment or scaling is applied. To add subgrid treatment,
 set the following parameters:
 ```
@@ -207,8 +214,14 @@ set the following parameters:
     beta_gl_stag        =  3
 /
 ```
-Meanwhile, to apply linear scaling to basal friction as it approaches the grounding line,
-set `&ydyn::beta_gl_scale = 2`.
+Meanwhile, to also apply linear scaling to basal friction as it approaches the grounding line,
+set `ydyn.beta_gl_scale = 2`. These two permutations can be run directly using the following commands:
+```
+make mismip
+./runylmo -r -e mismip -o output/mismip-rf-1 -n par-gmd/yelmo_MISMIP3D.nml -p ydyn.beta_gl_sep=-1 ydyn.beta_gl_stag=3
+./runylmo -r -e mismip -o output/mismip-rf-2 -n par-gmd/yelmo_MISMIP3D.nml -p ydyn.beta_gl_sep=-1 ydyn.beta_gl_stag=3 ydyn.beta_gl_scale=2
+``
+
 
 ### 5. Age profile experiments
 To perform the age profile experiments, compile the Fortran program `tests/test_icetemp.f90`

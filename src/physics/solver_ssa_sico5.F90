@@ -92,7 +92,7 @@ contains
 
             case("MISMIP3D")
 
-                boundaries_vx(1) = "zeros"
+                boundaries_vx(1) = "infinite"
                 boundaries_vx(2) = "infinite"
                 boundaries_vx(3) = "zeros"
                 boundaries_vx(4) = "infinite"

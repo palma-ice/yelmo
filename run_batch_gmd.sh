@@ -1,6 +1,6 @@
 #!/bin/bash
 
-fldr='tmp/yelmo1.4'
+fldr='tmp/yelmo1.41'
 
 
 ### BENCHMARK TESTS ###
@@ -51,9 +51,9 @@ jobrun ./runylmo -s -q short -w 24 -e mismip -n par-gmd/yelmo_MISMIP3D.nml -- -o
 jobrun ./runylmo -s -q short -w 24 -e mismip -n par-gmd/yelmo_MISMIP3D.nml -- -o ${fldr}/mismip/scaling -p ydyn.beta_gl_scale=2 ydyn.beta_gl_stag=3 mismip.dx=10.0,20.0
 
 # For high-resolution sims only (medium queue):
-jobrun ./runylmo -s -q medium -w 60 -e mismip -n par-gmd/yelmo_MISMIP3D.nml -- -o ${fldr}/mismip/default -p ydyn.beta_gl_scale=0 ydyn.beta_gl_stag=0 mismip.dx=2.5,5.0
-jobrun ./runylmo -s -q medium -w 60 -e mismip -n par-gmd/yelmo_MISMIP3D.nml -- -o ${fldr}/mismip/subgrid -p ydyn.beta_gl_scale=0 ydyn.beta_gl_stag=3 mismip.dx=2.5,5.0
-jobrun ./runylmo -s -q medium -w 60 -e mismip -n par-gmd/yelmo_MISMIP3D.nml -- -o ${fldr}/mismip/scaling -p ydyn.beta_gl_scale=2 ydyn.beta_gl_stag=3 mismip.dx=2.5,5.0
+jobrun ./runylmo -s -q medium -w 60 -e mismip -n par-gmd/yelmo_MISMIP3D.nml -- -o ${fldr}/mismip/default-hi -p ydyn.beta_gl_scale=0 ydyn.beta_gl_stag=0 mismip.dx=2.5,5.0
+jobrun ./runylmo -s -q medium -w 60 -e mismip -n par-gmd/yelmo_MISMIP3D.nml -- -o ${fldr}/mismip/subgrid-hi -p ydyn.beta_gl_scale=0 ydyn.beta_gl_stag=3 mismip.dx=2.5,5.0
+jobrun ./runylmo -s -q medium -w 60 -e mismip -n par-gmd/yelmo_MISMIP3D.nml -- -o ${fldr}/mismip/scaling-hi -p ydyn.beta_gl_scale=2 ydyn.beta_gl_stag=3 mismip.dx=2.5,5.0
 
 # Trough simulation (not part of GMD suite of tests)
 # MISMIP+ benchmark tests

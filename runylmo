@@ -136,7 +136,7 @@ def main():
     requiredNamed = parser.add_argument_group('required named arguments')
     requiredNamed.add_argument('-o',dest='rundir',metavar='RUNDIR',type=str,required=True,
          help='Path where simulation will run and store output.')
-    requiredNamed.add_argument('--pp',dest='par_path',metavar='PAR_PATH',type=str,required=True,
+    requiredNamed.add_argument('-n',dest='par_path',metavar='PAR_PATH',type=str,required=True,
          help='Path to input parameter file.')
 
     # Parse the arguments

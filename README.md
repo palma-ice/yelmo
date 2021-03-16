@@ -20,13 +20,11 @@ physics and numerous parameterizations. It is not recommended to use the ice
 sheet model as a black box without understanding of the key parameters that
 affect its performance.
 
-To get started with comping and running the model, see the quick-start
-instructions below in the section "Usage". Or go to the documentation directly: [https://palma-ice.github.io/yelmo-docs/getting-started/](https://palma-ice.github.io/yelmo-docs/getting-started/).
-
-The test cases shown by Robinson et al. (2020) can be reproduced following the
+Note that the test cases shown by Robinson et al. (2020) can be reproduced following the
 instructions below in the section "Test cases".
 
-The sections below can also be found in the documentation here: [Getting started](https://palma-ice.github.io/yelmo-docs/getting-started/).
+To get started with compiling and running the model, see the quick-start
+instructions below. Or go to the documentation directly: [https://palma-ice.github.io/yelmo-docs/getting-started/](https://palma-ice.github.io/yelmo-docs/getting-started/).
 
 # Getting started
 
@@ -58,15 +56,12 @@ make initmip
 
 ## Dependencies
 
+See: [Dependencies](https://palma-ice.github.io/yelmo-docs/dependencies/) for installation tips.
+
 - NetCDF library (preferably version 4.0 or higher)
 - LIS: [Library of Iterative Solvers for Linear Systems](http://www.ssisc.org/lis/)
-
-See: [Dependencies](https://palma-ice.github.io/yelmo-docs/dependencies/)
-
-OPTIONAL:
-
-- Python 3.x, which is only needed for automatic configuration of the Makefile and the use of the script `runylmo` for job preparation and submission.
-- Python library `runner` for changing parameters at the command line using `runylmo`, and for running ensembles. Installation instructions here [https://github.com/alex-robinson/runner](https://github.com/alex-robinson/runner)
+- [Optional] Python 3.x, which is only needed for automatic configuration of the Makefile and the use of the script `runylmo` for job preparation and submission.
+- [Optional] 'runner' Python library: [https://github.com/alex-robinson/runner](https://github.com/alex-robinson/runner). Used for changing parameters at the command line using `runylmo`, and for running ensembles. 
 
 ## Directory structure
 
@@ -132,14 +127,13 @@ python config.py config/myhost_mycompiler
 
 The result should be a Makefile in `$YELMOROOT` that is ready for use.
 
-#### Alternative - quickstart with Docker and VS Code
+#### Alternative configuration - quickstart with Docker and VS Code
 
 Instead of a manual install, one way to get up and running quickly with Yelmo is with VS Code and Docker. It works on any plattform and uses a Linux based container. You don't need to know Docker or VS Code to get started. Just install the following:
 
-1) [Docker](https://docs.docker.com/engine/install/)
-2) [VS Code](https://code.visualstudio.com) 
-3) [install the remote development extension](https://marketplace.visualstudio.com/items?itemName=ms-vscode-remote.vscode-remote-extensionpack)
-4) get the code (see below)
+1. [Docker](https://docs.docker.com/engine/install/)
+2. [VS Code](https://code.visualstudio.com) 
+3. [install the remote development extension](https://marketplace.visualstudio.com/items?itemName=ms-vscode-remote.vscode-remote-extensionpack)
 
 Then make sure that Docker is running and start VS Code. 
 Open the folder with the Yelmo code. Say Yes, when VS Code asks you if you want to open it in the container.

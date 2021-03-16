@@ -12,18 +12,10 @@ from pandas import DataFrame
 
 # Check whether runner library is installed or not:
 try:
-    from runner.ext.namelist import Namelist
-    from runner.ext.namelist import nml_update_if_exists
-
-    # Shortcut to namelist fuctionality
-    nml = Namelist()  # you could use your own module for reading namelist
-
-    runner_is_installed = True 
-
+    from runner.ext.namelist import param_summary, param_write_to_files
+    runner_is_installed = True
 except:
-
-    runner_is_installed = False 
-
+    runner_is_installed = False
 
 class DictAction(argparse.Action):
     '''Parse a list of parameters ['key=val',...] into a dict.
@@ -42,6 +34,7 @@ class DictAction(argparse.Action):
             except:
                 value = valstr 
             getattr(namespace, self.dest)[key] = value
+
 
 def main():
     '''Main subroutine to run one simulation.'''
@@ -170,13 +163,13 @@ def main():
     # Additional options, consistency checks
 
     if with_runner and not runner_is_installed:
-        error_msg = "The Python module 'runner' is not installed. Do not use option -x. " \
+        error_msg = "The Python module 'runner' is not installed, or not installed properly. Do not use option -x. " \
                     "This option should only be used by the runner::jobrun script internally. " \
                     "To install runner, see: https://github.com/alex-robinson/runner"
         raise Exception(error_msg)
 
     if not par is None and not runner_is_installed:
-        error_msg = "The Python module 'runner' is not installed. Do not use option -p. " \
+        error_msg = "The Python module 'runner' is not installed, or not installed properly. Do not use option -p. " \
                     "To install runner, see: https://github.com/alex-robinson/runner"
         raise Exception(error_msg)
 
@@ -287,21 +280,16 @@ def main():
     for par_path in par_paths:
         par_path_now = os.path.join(rundir,os.path.basename(par_path))
         par_paths_rundir.append(par_path_now) 
-      
-    # Modify parameter files as needed
-    # (Note: only modify parameter files in rundir, not originals!)
-
-    # First modify parameter files according to command-line
+    
+    # First modify parameters according to command-line values
     # "-p key=val key=val ..." argument.
     if not par is None:
-
-        for par_path_now in par_paths_rundir:
-
-            # Modify parameter values and write to file
-            param_write(par_path_now,par_path_now,par,info["grp_aliases"])
-
-    # Next modify parameter files according to parameters specified
-    # by runner (via `jobrun` "-p key=val key=val ..." argument)
+        
+        # Write parameters to files (in rundir!)
+        param_write_to_files(par,par_paths_rundir,par_paths_rundir,info["grp_aliases"])
+        
+    # Next modify parameters according to command-line values specified
+    # by runner (via `jobrun` "-p key=val [key=val ...]" argument)
     if with_runner:
 
         # Read param file runner.json always written by runner to rundir
@@ -312,13 +300,11 @@ def main():
         # Summarize what is to be done
         param_summary(par_runner,rundir,verbose) 
 
-        # Loop over parameter files and update parameters
-        for par_path_now in par_paths_rundir:
-
-            # Modify parameter values and write to file
-            param_write(par_path_now,par_path_now,par_runner,info["grp_aliases"])
-
+        # Write parameters to files (in rundir!)
+        param_write_to_files(par_runner,par_paths_rundir,par_paths_rundir,info["grp_aliases"])
+        
     ### DONE WITH PARAMETER FILES ###
+
 
     ## Write summary file to rundir 
 
@@ -428,81 +414,7 @@ def submitjob(path_template,rundir,cmd,qos,wall,partition,group,email,omp,jobnam
         print(error)
         sys.exit() 
 
-    return jobstatus 
-
-def param_summary(par,rundir,verbose):
-    '''Write summary to screen about this run based on runner.json'''
-
-    # Print run directory
-    print("rundir : {}".format(rundir))
-
-    if verbose:
-        # Print parameters specified for this run
-
-        out_list_head = ["Parameter","Value"]
-        out_list = []
-        for key,val in par.items():
-            out_list.append([key,val])
-        
-        df = DataFrame(out_list,columns=out_list_head)
-        print(df.to_string(index=False))
-
-    return 
-
-def param_write(nml_src,nml_dst,par,grp_aliases=None):
-    '''Load parameters from a namelist parameter file,
-    update values according to the dictionary provided,
-    and then write the updated namelist parameter file. 
-    '''
-
-    # Expand input parameter group-name aliases 
-    if not grp_aliases is None:
-        par_mapped = map_param_groups(par,grp_aliases)
-
-    # Load input namelist parameters
-    params_now = nml.load(open(nml_src))
-
-    # Update parameters with desired values (only update 
-    # parameter values if the parameters are defined in this set)
-    params_now = nml_update_if_exists(params_now,par_mapped) 
-    #params_now.update(par_mapped)
-
-    # Write updated parameter file to rundir
-    f = open(nml_dst, 'w')
-    nml.dump(params_now, f)
-
-    return 
-
-def map_param_groups(params,grp_aliases):
-    '''Convert shortcut group names used on command line into 
-       actual groups that exist in parameter file using the mapping
-       defined in the config file.
-    '''
-
-    params_out = dict() 
-
-    for key,val in params.items():
-        if '.' in key:
-            tmp = key.split('.')
-            grp = tmp[0]
-            par = tmp[1] 
-
-            if grp in [*grp_aliases]:
-                grp_new = grp_aliases[grp]
-            else:
-                grp_new = grp 
-
-            key_new = "{}.{}".format(grp_new,par)
-
-        else:
-            key_new = key 
-
-        params_out[key_new] = val 
-
-    # for key,val in params_out.items():
-    #     print(key,val)
-
-    return params_out
+    return jobstatus
 
 def make_link(srcname,rundir,target=None):
     '''Make a link in the output dir.'''

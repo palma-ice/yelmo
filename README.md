@@ -7,7 +7,7 @@ and fully coupled ice-sheet and climate simulations.
 
 The physics and design of the model are described in the following article:
 
-Robinson, A., Alvarez-Solas, J., Montoya, M., Goelzer, H., Greve, R., and Ritz, C.: Description and validation of the ice-sheet model Yelmo (version 1.0), Geosci. Model Dev., 13, 2805–2823, [https://doi.org/10.5194/gmd-13-2805-2020](https://doi.org/10.5194/gmd-13-2805-2020), 2020.
+> Robinson, A., Alvarez-Solas, J., Montoya, M., Goelzer, H., Greve, R., and Ritz, C.: Description and validation of the ice-sheet model Yelmo (version 1.0), Geosci. Model Dev., 13, 2805–2823, [https://doi.org/10.5194/gmd-13-2805-2020](https://doi.org/10.5194/gmd-13-2805-2020), 2020.
 
 The (growing) model documentation is provided help with proper use of the model,
 and can be found at:
@@ -196,7 +196,9 @@ To run a benchmark simulation, for example, use the following command:
 ```
 ./runylmo -r -e benchmarks -o output/test -n par/yelmo_EISMINT.nml
 ```
+
 where the option `-r` implies that the model should be run as a background process. If this is omitted, then the output directory will be populated, but no executable will be run, while `-s` instead will submit the simulation to cluster queue system instead of running in the background. The option `-e` lets you specify the executable. For some standard cases, shortcuts have been created:
+
 ```
 benchmarks = libyelmo/bin/yelmo_benchmarks.x
 mismip     = libyelmo/bin/yemo_mismip.x
@@ -205,6 +207,7 @@ initmip    = libyelmo/bin/yelmo_initmip.x
 The last two mandatory arguments `-o OUTDIR` and `-n PAR_PATH` are the output/run directory and the parameter file to be used for this simulation, respectively. In the case of the above simulation, the output directory is defined as `output/test`, where all model parameters (loaded from the file `par/yelmo_EISMINT.nml`) and model output can be found.
 
 It is also possible to modify parameters inline via the option `-p KEY=VAL [KEY=VAL ...]`. The parameter should be specified with its namelist group and its name. E.g., to change the resolution of the EISMINT benchmark experiment to 10km, use:
+
 ```
 ./runylmo -r -e benchmarks -o output/test -n par/yelmo_EISMINT.nml -p ctrl.dx=10
 ```
@@ -222,6 +225,7 @@ it is assumed that the user has already configured the model for their system
 ### 1. EISMINT1 moving margin experiment
 To perform the moving margin experiment, compile the benchmarks
 executable and call it with the EISMINT parameter file:
+
 ```
 make benchmarks
 ./runylmo -r -e benchmarks -o output/eismint-moving -n par-gmd/yelmo_EISMINT_moving.nml
@@ -230,6 +234,7 @@ make benchmarks
 ### 2. EISMINT2 EXPA
 To perform Experiment A from the EISMINT2 benchmarks, compile the benchmarks
 executable and call it with the EXPA parameter file:
+
 ```
 make benchmarks
 ./runylmo -r -e benchmarks -o output/eismint-expa -n par-gmd/yelmo_EISMINT_expa.nml
@@ -238,6 +243,7 @@ make benchmarks
 ### 3. EISMINT2 EXPF
 To perform Experiment F from the EISMINT2 benchmarks, compile the benchmarks
 executable and call it with the EXPF parameter file:
+
 ```
 make benchmarks
 ./runylmo -r -e benchmarks -o output/eismint-expf -n par-gmd/yelmo_EISMINT_expf.nml
@@ -246,6 +252,7 @@ make benchmarks
 ### 4. MISMIP RF
 To perform the MISMIP rate factor experiment, compile the mismip executable
 and call it with the MISMIP parameter file the three parameter permutations of interest (default, subgrid and subgrid+gl-scaling):
+
 ```
 make mismip
 ./runylmo -r -e mismip -o output/mismip-rf-0 -n par-gmd/yelmo_MISMIP3D.nml -p ydyn.beta_gl_stag=0 ydyn.beta_gl_scale=0
@@ -253,6 +260,7 @@ make mismip
 ./runylmo -r -e mismip -o output/mismip-rf-2 -n par-gmd/yelmo_MISMIP3D.nml -p ydyn.beta_gl_stag=3 ydyn.beta_gl_scale=2
 ```
 To additionally change the resolution of the simulations change the parameter `mismip.dx`, e.g. for the default simulation with 10km resolution , call:
+
 ```
 ./runylmo -r -e mismip -o output/mismip-rf-0-10km -n par-gmd/yelmo_MISMIP3D.nml -p ydyn.beta_gl_stag=0 ydyn.beta_gl_scale=0 mismip.dx=10
 ```
@@ -260,10 +268,12 @@ To additionally change the resolution of the simulations change the parameter `m
 ### 5. Age profile experiments
 To perform the age profile experiments, compile the Fortran program `tests/test_icetemp.f90`
 and run it:
+
 ```
 make icetemp
 ./libyelmo/bin/test_icetemp.x
 ```
+
 To perform the different permutations, it is necessary to recompile for
 single or double precision after changing the precision parameter `prec` in the file
 `src/yelmo_defs.f90`. The number of vertical grid points can be specified in the main
@@ -273,6 +283,7 @@ program file, as well as the output filename.
 To perform the Antarctica simulations as presented in the paper, it is necessary
 to compile the `initmip` executable and run with the present-day (pd) and
 glacial (lgm) parameter values:
+
 
 ```
 make initmip

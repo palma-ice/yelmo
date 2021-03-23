@@ -75,10 +75,10 @@ program yelmo_benchmarks
     call nml_read(path_par,"ctrl","period",       period)        ! [yr] for transient experiments 
     call nml_read(path_par,"ctrl","dT_test",      dT_test)       ! [K] for test experiments  
     
-    call nml_read(path_par,"ctrl","with_bumps",with_bumps)       ! Bedrock with sin bumps?
-    call nml_read(path_par,"ctrl","bumps_L",bumps_L)             ! [km] Length scale of bumps
-    call nml_read(path_par,"ctrl","bumps_A",bumps_A)             ! [m]  Amplitude of bumps
-    
+    ! call nml_read(path_par,"ctrl","with_bumps",with_bumps)       ! Bedrock with sin bumps?
+    ! call nml_read(path_par,"ctrl","bumps_L",bumps_L)             ! [km] Length scale of bumps
+    ! call nml_read(path_par,"ctrl","bumps_A",bumps_A)             ! [m]  Amplitude of bumps
+    with_bumps = .FALSE. 
 
     ! Define the model domain based on the experiment we are running
     select case(trim(experiment))

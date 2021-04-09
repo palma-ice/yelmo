@@ -12,7 +12,8 @@ module calving
     public :: calc_calving_rate_simple
     public :: calc_calving_rate_flux 
     public :: calc_calving_rate_eigen
-    public :: calc_calving_rate_kill 
+    public :: calc_calving_rate_kill
+    public :: calc_calving_rate_pd12 
     
 contains 
 
@@ -359,5 +360,57 @@ contains
         return 
 
     end subroutine calc_calving_rate_kill
+
+    subroutine calc_calving_rate_pd12(calv,H_ice,is_margin,h_calv,h_lim,ux_bar,uy_bar,dx)
+        ! Compute calving as in Pollard and deConto 2012 (also Pattyn 2017)    
+
+        implicit none
+
+        real(prec), intent(OUT) :: calv(:,:)
+        real(prec), intent(IN)  :: H_ice(:,:)
+        logical, intent(IN)     :: is_margin(:,:)
+        real(prec), intent(IN)  :: h_calv, h_lim
+        real(prec), intent(IN)  :: ux_bar(:,:)
+        real(prec), intent(IN)  :: uy_bar(:,:)
+        real(prec), intent(IN)  :: dx
+
+        ! Inernal variables
+        integer :: i, j, nx, ny
+        real(prec), allocatable :: w_c(:,:), h_max(:,:), h_e(:,:)
+        real(prec), allocatable :: eps_xx(:,:), eps_yy(:,:)
+
+        allocate(eps_xx(nx,ny),eps_yy(nx,ny))
+
+        do j = 2, ny
+        do i = 2, nx
+            ! Calculate strain rate locally (aa-node)
+            eps_xx(i,j) = (ux_bar(i,j) - ux_bar(i-1,j))/dx
+            eps_yy(i,j) = (uy_bar(i,j) - uy_bar(i,j-1))/dx
+        end do
+        end do
+
+        w_c   = 0.0
+        h_max = 0.0
+        h_e   = 0.0
+        calv  = 0.0
+
+        do j=2,ny-1
+        do i=2,nx-1
+
+            if(is_margin(i,j)) then
+
+               h_max(i,j) = MAX(H_ice(i-1,j),H_ice(i+1,j),H_ice(i,j+1),H_ice(i,j-1))
+               h_e(i,j)   = MAX(h_max(i,j)*MAX(0.25,EXP(-h_max(i,j)/100.0)),H_ice(i,j),h_lim)
+               w_c(i,j)   = MIN(1.0,h_e(i,j)/h_calv)
+               calv(i,j)  = h_lim*(1.0-w_c(i,j))+3.0e5*MAX(eps_xx(i,j)+eps_yy(i,j),0.0)*w_c(i,j)*h_e(i,j)/dx
+
+            end if
+        
+        end do
+        end do 
+
+        return
+
+    end subroutine calc_calving_rate_pd12
 
 end module calving 

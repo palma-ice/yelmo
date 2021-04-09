@@ -54,7 +54,8 @@ contains
         real(prec) :: dx, dt   
         integer :: i, j, nx, ny  
         real(prec), allocatable :: mbal(:,:) 
-        real(prec), allocatable :: H_ref(:,:) 
+        real(prec), allocatable :: H_ref(:,:)
+        logical, allocatable    :: is_margin(:,:) 
 
         real(8)    :: cpu_time0, cpu_time1
         real(prec) :: model_time0, model_time1 
@@ -65,6 +66,7 @@ contains
 
         allocate(mbal(nx,ny))
         allocate(H_ref(nx,ny))
+        is_margin = .FALSE.
 
         ! Initialize time if necessary 
         if (tpo%par%time .gt. dble(time)) then 
@@ -147,6 +149,14 @@ contains
                                                     ( tpo%now%f_grnd .eq. 0.0_prec .and. &
                                                       tpo%now%H_ice  .gt. 0.0_prec .and. &
                                                       bnd%calv_mask ), tau=0.0_prec, dt=dt )
+
+                case("PD12")
+                    ! jablasco
+                    ! Compute as in Pollard DeConto 2012 or Pattyn2017
+
+                    is_margin = calc_margin(tpo%now%H_ice)
+                    call calc_calving_rate_pd12(tpo%now%calv,tpo%now%H_ice,is_margin,tpo%par%calv_H_lim,tpo%par%H_min_flt, &
+                                                dyn%now%ux_bar,dyn%now%uy_bar,tpo%par%dx) 
 
                 case DEFAULT 
 
@@ -521,5 +531,39 @@ contains
         return 
 
     end subroutine ytopo_dealloc 
+
+    ! jablasco: for simplicity in calving - define ice margin before
+    function calc_margin(H_ice) result(is_margin)
+        ! Determine the ice margin
+
+        implicit none
+
+        real(prec), intent(IN) :: H_ice(:,:)
+        logical :: is_margin(size(H_ice,1),size(H_ice,2))
+
+        ! Local variables 
+        integer :: i, j, nx, ny
+
+        nx = size(is_margin,1)
+        ny = size(is_margin,2)
+
+        is_margin = .FALSE.
+        do i = 2, nx-1
+        do j = 2, ny-1
+
+            ! Floating point or partially floating point with grounded neighbors
+            if (H_ice(i,j) .gt. 0.0 .and. &
+                (H_ice(i-1,j) .eq. 0.0 .or. H_ice(i+1,j) .eq. 0.0 .or. &
+                 H_ice(i,j-1) .eq. 0.0 .or. H_ice(i,j+1) .eq. 0.0) ) then
+                is_margin(i,j) = .TRUE.
+
+            end if
+
+        end do
+        end do
+
+        return
+
+    end function calc_margin
     
 end module yelmo_topography

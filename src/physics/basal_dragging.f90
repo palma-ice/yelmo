@@ -327,7 +327,7 @@ contains
 
     end function calc_effective_pressure_overburden
 
-    elemental function calc_effective_pressure_marine(H_ice,z_bed,z_sl,H_w,p) result(N_eff)
+    elemental function calc_effective_pressure_marine(H_ice,f_grnd,z_bed,z_sl,H_w,p) result(N_eff)
         ! Effective pressure as a function of connectivity to the ocean
         ! as defined by Leguy et al. (2014), Eq. 14, and modified
         ! by Robinson and Alvarez-Solas to account for basal water pressure (to do!)
@@ -337,7 +337,8 @@ contains
 
         implicit none 
 
-        real(prec), intent(IN) :: H_ice 
+        real(prec), intent(IN) :: H_ice
+        real(prec), intent(IN) :: f_grnd 
         real(prec), intent(IN) :: z_bed 
         real(prec), intent(IN) :: z_sl 
         real(prec), intent(IN) :: H_w 
@@ -356,23 +357,25 @@ contains
         H_float = max(0.0_prec, rho_sw_ice*(z_sl-z_bed))
 
         ! Calculate basal water pressure 
-        if (H_ice .eq. 0.0) then
+        if (H_ice .eq. 0.0 .or. f_grnd .eq. 1.0) then
             ! No water pressure for ice-free points
-
+            ! Water pressure not present in fully grounded points
+          
             p_w = 0.0 
 
-        else if (H_ice .lt. H_float) then 
+        else if (H_ice .ne. 0.0 .and. f_grnd .eq. 0.0) then 
             ! Floating ice: water pressure equals ice pressure 
 
             p_w   = (rho_ice*g*H_ice)
 
-        else
+        else if (f_grnd .lt. 1.0 .and. f_grnd .gt. 0.0) then
             ! Determine water pressure based on marine connectivity (Leguy et al., 2014, Eq. 14)
+            ! at the grounding line
 
             x     = min(1.0_prec, H_float/H_ice)
             p_w   = (rho_ice*g*H_ice)*(1.0_prec - (1.0_prec-x)**p)
 
-        end if 
+        end if
 
         ! Calculate effective pressure [Pa] (overburden pressure minus basal water pressure)
         N_eff = (rho_ice*g*H_ice) - p_w 

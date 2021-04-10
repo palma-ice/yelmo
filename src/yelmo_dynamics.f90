@@ -916,7 +916,7 @@ end if
                 ! Effective pressure diminishes with marine character
                 ! following Leguy et al. (2014) 
 
-                dyn%now%N_eff = calc_effective_pressure_marine(tpo%now%H_ice,bnd%z_bed,bnd%z_sl,H_w,p=dyn%par%neff_p)
+                dyn%now%N_eff = calc_effective_pressure_marine(tpo%now%H_ice,tpo%now%f_grnd,bnd%z_bed,bnd%z_sl,H_w,p=dyn%par%neff_p)
 
             case(3)
                 ! Effective pressure as basal till pressure

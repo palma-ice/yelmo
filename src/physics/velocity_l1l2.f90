@@ -637,7 +637,7 @@ end if
                 
                 tau_perp_ab = taud_ab*(1.0_prec-zeta_aa(k))
 
-if (.FALSE.) then 
+if (.TRUE.) then 
     ! CISM root equation for n_glen=3 only 
                 a = tau_perp_ab**2 
                 b = -eps_par_ab / ATT_ab 
@@ -656,6 +656,7 @@ if (.FALSE.) then
                 !write(*,*) "tau_par_ab: ", a, b, tau_par_ab  
 else 
     ! Root finding code (more expensive, but works for ISMIPHOM)
+    ! Crashed for a random Antarctica simulation - needs testing! 
 
                 a  = tau_perp_ab**2 
                 b  = eps_par_ab / ATT_ab 

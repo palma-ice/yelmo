@@ -146,8 +146,8 @@ end if
 
                 ! Get adjustment rate given error in ice thickness  =========
 
-                cf_ref_dot(i,j) = -(cf_ref(i,j)/H0)*((H_err_now / tau_c) + f_damp*dHdt_now)
-
+                cf_ref_dot(i,j) = -(cf_prev(i,j)/H0)*((H_err_now / tau_c) + f_damp*dHdt_now)
+                
                 ! Apply correction to current node =========
 
                 cf_ref(i,j) = cf_prev(i,j) + cf_ref_dot(i,j)*dt 

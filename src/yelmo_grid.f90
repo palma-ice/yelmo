@@ -531,18 +531,31 @@ contains
 
     end subroutine yelmo_init_grid_fromname
 
-    subroutine yelmo_init_grid_fromgrd(grd,grd_src,dx,dy)
+    subroutine yelmo_init_grid_fromgrd(grd,grid_name,grd_src,dx,dy)
+        ! Generate a new grid (grd) with the same bounds
+        ! as source grid (grd_src), but with new resolution 
 
         implicit none 
 
         type(ygrid_class), intent(INOUT) :: grd 
+        character(len=*),  intent(IN)    :: grid_name 
         type(ygrid_class), intent(IN)    :: grd_src
-        real(prec), intent(IN), optional :: dx 
-        real(prec), intent(IN), optional :: dy 
+        real(wp), intent(IN)             :: dx 
+        real(wp), intent(IN)             :: dy 
         
         ! Local variables 
-        integer :: nx, ny 
-        real(prec) :: x0, y0
+        integer  :: nx, ny 
+        real(wp) :: x0, y0
+
+        ! First ensure all variables are deallocated 
+        call ygrid_dealloc(grd)
+
+        ! Set grid name 
+        grd%name = trim(grid_name)
+
+        ! Determine lower-left corner (starting point for new grid)
+        x0 = grd_src%xc(1)
+        y0 = grd_src%yc(1) 
 
         ! Assign nx/ny from source grid
         nx = grd_src%nx 
@@ -550,6 +563,10 @@ contains
 
         write(*,*) "yelmo_init_grid_fromgrd:: Error: not yet implemented - see yelmo_grid.f90."
         stop 
+
+        ! axis_init(x,x0,dx)
+
+
 
 !         ! Or, determine nx, ny based on desired dx/dy
 !         if (present(dx)) 

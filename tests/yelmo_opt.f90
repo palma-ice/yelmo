@@ -21,8 +21,10 @@ program yelmo_test
     real(prec) :: bmb_shlf_const, dT_ann, z_sl  
 
     ! Optimization variables  
-    integer    :: opt_method 
-    real(prec) :: cf_min, cf_max, cf_init  
+    character(len=12) :: opt_method 
+    real(prec) :: cf_min
+    real(prec) :: cf_max
+    real(prec) :: cf_init  
     
     integer    :: n_iter 
     real(prec) :: time_iter
@@ -36,6 +38,8 @@ program yelmo_test
     real(prec) :: sigma_err, sigma_vel 
 
     real(prec) :: tau, err_scale 
+    real(prec) :: tau_c 
+    real(prec) :: H0 
 
     character(len=12) :: optvar 
     logical           :: reset_model
@@ -55,13 +59,10 @@ program yelmo_test
     ! Determine the parameter file from the command line 
     call yelmo_load_command_line_args(path_par)
 
-    call nml_read(path_par,"ctrl","n_iter",          n_iter)                 ! Total number of iterations
-    call nml_read(path_par,"ctrl","time_iter",       time_iter)              ! [yr] Time for each iteration
-    call nml_read(path_par,"ctrl","time_iter_therm", time_iter_therm)        ! [yr] Time to run thermodynamics for each iteration
-    call nml_read(path_par,"ctrl","time_steady_end", time_steady_end)        ! [yr] Time for each iteration
+    ! ====================================================
+    ! Load general parameters 
 
-    call nml_read(path_par,"ctrl","optvar",          optvar)                 ! "ice" or "vel" 
-    call nml_read(path_par,"ctrl","reset_model",     reset_model)            ! Reset model to reference state between iterations?
+    call nml_read(path_par,"ctrl","opt_method", opt_method)                 ! Total number of iterations
     call nml_read(path_par,"ctrl","cf_ref_init_method", cf_ref_init_method)  ! How should cf_ref be initialized (guess, restart, none)
     call nml_read(path_par,"ctrl","sigma_err",       sigma_err)              ! [--] Smoothing radius for error to calculate correction in cf_ref (in multiples of dx)
     call nml_read(path_par,"ctrl","sigma_vel",       sigma_vel)              ! [m/a] Speed at which smoothing diminishes to zero
@@ -72,55 +73,82 @@ program yelmo_test
     call nml_read(path_par,"ctrl","dT_ann",          dT_ann)                 ! [K] Temperature anomaly (atm)
     call nml_read(path_par,"ctrl","z_sl",            z_sl)                   ! [m] Sea level relative to present-day
 
-    if (trim(optvar) .eq. "vel") then
-        call nml_read(path_par,"optvel","rel_tau1",    rel_tau1)             ! [yr] Initial relaxation tau, fixed until rel_time1 
-        call nml_read(path_par,"optvel","rel_tau2",    rel_tau2)             ! [yr] Final tau, reached at rel_time2
-        call nml_read(path_par,"optice","scale_ftime", scale_ftime)          ! [-]  Fraction of time_iter_tot at which to start transition from scale_err1 to scale_err2
-        call nml_read(path_par,"optvel","scale_err1",  scale_err1)           ! [m/a] Initial value for err_scale parameter in cf_ref optimization  
-        call nml_read(path_par,"optvel","scale_err2",  scale_err2)           ! [m/a] Final value for err_scale parameter reached at scale_time2       
-    else ! "ice":
-        call nml_read(path_par,"optice","rel_tau1",    rel_tau1)             ! [yr] Initial relaxation tau, fixed until rel_time1 
-        call nml_read(path_par,"optice","rel_tau2",    rel_tau2)             ! [yr] Final tau, reached at rel_time2, when relaxation disabled 
-        call nml_read(path_par,"optice","scale_ftime", scale_ftime)          ! [-]  Fraction of time_iter_tot at which to start transition from scale_err1 to scale_err2
-        call nml_read(path_par,"optice","scale_err1",  scale_err1)           ! [m]  Initial value for err_scale parameter in cf_ref optimization 
-        call nml_read(path_par,"optice","scale_err2",  scale_err2)           ! [m]  Final value for err_scale parameter reached at scale_time2   
-    end if 
+    ! ====================================================
+    ! Load optimization-method specific parameters 
 
-    ! Determine total iteration time 
-    time_iter_tot = time_iter*(n_iter-1)
+    select case(trim(opt_method))
 
-    ! Choose optimization method (1: error method, 2: ratio method) 
-    ! ajr: opt_method=2 is currently inactive and outdated.
-    opt_method = 1 
+        case("P12") 
+            ! Pollard and DeConto (2012) 
 
-    time_init           = 0.0               ! [yr] Starting time
-    dtt                 = 5.0               ! [yr] Time step for time loop 
-    dt2D_out            = time_iter         ! [yr] 2D output writing 
+            call nml_read(path_par,"opt_P12","time_init",       time_init)                 ! Total number of iterations
+            call nml_read(path_par,"opt_P12","n_iter",          n_iter)                 ! Total number of iterations
+            call nml_read(path_par,"opt_P12","time_iter",       time_iter)              ! [yr] Time for each iteration
+            call nml_read(path_par,"opt_P12","time_iter_therm", time_iter_therm)        ! [yr] Time to run thermodynamics for each iteration
+            call nml_read(path_par,"opt_P12","time_steady_end", time_steady_end)        ! [yr] Time for each iteration
+            call nml_read(path_par,"opt_P12","reset_model",     reset_model)            ! Reset model to reference state between iterations?
+            
+            optvar = "ice"   ! ice/vel
+            call nml_read(path_par,"opt_P12","rel_tau1",    rel_tau1)             ! [yr] Initial relaxation tau, fixed until rel_time1 
+            call nml_read(path_par,"opt_P12","rel_tau2",    rel_tau2)             ! [yr] Final tau, reached at rel_time2, when relaxation disabled 
+            call nml_read(path_par,"opt_P12","scale_ftime", scale_ftime)          ! [-]  Fraction of time_iter_tot at which to start transition from scale_err1 to scale_err2
+            call nml_read(path_par,"opt_P12","scale_err1",  scale_err1)           ! [m]  Initial value for err_scale parameter in cf_ref optimization 
+            call nml_read(path_par,"opt_P12","scale_err2",  scale_err2)           ! [m]  Final value for err_scale parameter reached at scale_time2   
 
-    ! Optimization parameters 
-    rel_time1           = time_iter_tot*0.4 ! [yr] Time to begin reducing tau from tau1 to tau2 
-    rel_time2           = time_iter_tot*0.8 ! [yr] Time to reach tau2, and to disable relaxation 
-    rel_m               = 2.0               ! [--] Non-linear exponent to scale interpolation between time1 and time2 
+            ! Optimization parameters 
+            rel_time1           = time_iter_tot*0.4 ! [yr] Time to begin reducing tau from tau1 to tau2 
+            rel_time2           = time_iter_tot*0.8 ! [yr] Time to reach tau2, and to disable relaxation 
+            rel_m               = 2.0               ! [--] Non-linear exponent to scale interpolation between time1 and time2 
 
-    scale_time1         = time_iter_tot*scale_ftime ! [yr] Time to begin increasing err_scale from scale_err1 to scale_err2 
-    scale_time2         = time_iter_tot*1.0         ! [yr] Time to reach scale_H2 
+            scale_time1         = time_iter_tot*scale_ftime ! [yr] Time to begin increasing err_scale from scale_err1 to scale_err2 
+            scale_time2         = time_iter_tot*1.0         ! [yr] Time to reach scale_H2 
 
-    cf_init             = 0.2               ! [--] Initial cf value everywhere (not too important)
+            ! Determine total iteration time 
+            time_iter_tot = time_iter*(n_iter-1)
+            dtt                 = 5.0               ! [yr] Time step for time loop 
+            dt2D_out            = time_iter         ! [yr] 2D output writing 
+            cf_init             = 0.2               ! [--] Initial cf value everywhere (not too important)
 
-! Not used:
-!         ! Ratio method 
-!         n_iter                = 100       ! Total number of iterations
-!         time_tune           = 20.0      ! [yr]
-!         time_iter           = 200.0     ! [yr] 
+            ! === Consistency checks =============================
+            
+            ! Ensure error scaling only increases with time
+            scale_err2 = max(scale_err1,scale_err2)
+            
+            ! Ensure relaxation constant only increases with time 
+            rel_tau2 = max(rel_tau1,rel_tau2)
+            
+        case("L21")
+            ! Lipscomb et al. (2021) 
+
+            call nml_read(path_par,"opt_P12","time_init",       time_init)   
+            call nml_read(path_par,"opt_P12","time_end",        time_end)    
+            
+            call nml_read(path_par,"opt_P12","rel_tau1",        rel_tau1)             
+            call nml_read(path_par,"opt_P12","rel_tau2",        rel_tau2)             
+            call nml_read(path_par,"opt_P12","rel_time1",       rel_time1)           
+            call nml_read(path_par,"opt_P12","rel_time2",       rel_time2)           
+            
+            call nml_read(path_par,"opt_L21","tau_c",  tau_c)    ! [yr] L21: Relaxation time scale for cf_ref adjustment 
+            call nml_read(path_par,"opt_L21","H0",     H0)       ! [m]  L21: Error scaling
+
+            dtt                 = 5.0               ! [yr] Time step for time loop 
+            dt2D_out            = 100.0             ! [yr] 2D output writing 
+            cf_init             = 0.2               ! [--] Initial cf value everywhere (not too important)
+
+        case("L19")
+            ! Le clec’h et al. (2019) - needs revising 
+
+            write(*,*) "This method is outdated and needs checking, mainly the parameter loading."
+            stop 
+
+            ! Not used:
+            ! ! Ratio method 
+            ! n_iter                = 100       ! Total number of iterations
+            ! time_tune           = 20.0      ! [yr]
+            ! time_iter           = 200.0     ! [yr] 
     
-    ! === Consistency checks =============================
-    
-    ! Ensure error scaling only increases with time
-    scale_err2 = max(scale_err1,scale_err2)
-    
-    ! Ensure relaxation constant only increases with time 
-    rel_tau2 = max(rel_tau1,rel_tau2)
-    
+    end select
+
     ! ====================================================
 
     ! Assume program is running from the output folder
@@ -216,17 +244,17 @@ program yelmo_test
         ! Run initialization steps 
 
         ! ============================================================================================
-        ! Step 1: Relaxtion step: run SIA model for a short time to smooth out the input
+        ! Step 1: Relaxtion step: run DIVA model for a short time to smooth out the input
         ! topography that will be used as a target. 
 
-        call yelmo_update_equil(yelmo1,time_init,time_tot=20.0_prec,dt=1.0_prec,topo_fixed=.FALSE.,dyn_solver="sia")
+        call yelmo_update_equil(yelmo1,time_init,time_tot=20.0_prec,dt=1.0_prec,topo_fixed=.FALSE.,dyn_solver="diva")
 
         ! Define present topo as present-day dataset for comparison 
         yelmo1%dta%pd%H_ice = yelmo1%tpo%now%H_ice 
         yelmo1%dta%pd%z_srf = yelmo1%tpo%now%z_srf 
 
         ! ============================================================================================
-        ! Step 2: Run the model for several ka in hybrid mode with topo_fixed to
+        ! Step 2: Run the model for several ka in standard mode with topo_fixed to
         ! spin up the thermodynamics and have a reference state to reset.
         ! Store the reference state for future use.
         
@@ -235,8 +263,7 @@ program yelmo_test
         ! Write a restart file 
         call yelmo_restart_write(yelmo1,file_restart_init,time_init)
 !         stop "**** Done ****"
-
-
+        
     else 
         ! If restart file was used, redefine boundary conditions here since they 
         ! may have been overwritten with other information.
@@ -280,138 +307,188 @@ program yelmo_test
     
     write(*,*) "Starting optimization..."
 
-if (opt_method .eq. 1) then 
-    ! Error method (Pollard and De Conto, 2012)
 
-    ! Initialize timing variables 
-    time = time_init 
-    n_now = 1 
+    select case(opt_method)
 
-    do q = 1, n_iter 
+        case("P12")
+            ! Pollard and DeConto (2012) 
 
-        ! === Optimization parameters =========
-        
-        tau       = get_opt_param(time,time1=rel_time1,time2=rel_time2,p1=rel_tau1,p2=rel_tau2,m=rel_m)
-        err_scale = get_opt_param(time,time1=scale_time1,time2=scale_time2,p1=scale_err1,p2=scale_err2,m=1.0)
-        
-        ! Set model tau, and set yelmo relaxation switch (2: gl-line and shelves relaxing; 0: no relaxation)
-        yelmo1%tpo%par%topo_rel_tau = tau 
-        yelmo1%tpo%par%topo_rel     = 2
-        if (time .gt. rel_time2) yelmo1%tpo%par%topo_rel = 0 
+            ! Initialize timing variables 
+            time = time_init 
+            n_now = 1 
 
-        ! Update relaxation parameters for reference model too 
-        yelmo_ref%tpo%par%topo_rel_tau = yelmo1%tpo%par%topo_rel_tau
-        yelmo_ref%tpo%par%topo_rel     = yelmo1%tpo%par%topo_rel
+            do q = 1, n_iter 
 
-        ! Diagnose mass balance correction term 
-        call update_mb_corr(mb_corr,yelmo1%tpo%now%H_ice,yelmo1%dta%pd%H_ice,tau)
-        
-        ! === Update cf_ref and reset model ===================
+                ! === Optimization parameters =========
+                
+                tau       = get_opt_param(time,time1=rel_time1,time2=rel_time2,p1=rel_tau1,p2=rel_tau2,m=rel_m)
+                err_scale = get_opt_param(time,time1=scale_time1,time2=scale_time2,p1=scale_err1,p2=scale_err2,m=1.0)
+                
+                ! Set model tau, and set yelmo relaxation switch (2: gl-line and shelves relaxing; 0: no relaxation)
+                yelmo1%tpo%par%topo_rel_tau = tau 
+                yelmo1%tpo%par%topo_rel     = 2
+                if (time .gt. rel_time2) yelmo1%tpo%par%topo_rel = 0 
 
-        if (q .gt. 1) then
-            ! Perform optimization after first iteration
+                ! Update relaxation parameters for reference model too 
+                yelmo_ref%tpo%par%topo_rel_tau = yelmo1%tpo%par%topo_rel_tau
+                yelmo_ref%tpo%par%topo_rel     = yelmo1%tpo%par%topo_rel
 
-            ! Update cf_ref based on error metric(s) 
-            call update_cf_ref_errscaling(yelmo1%dyn%now%cf_ref,cf_ref_dot,yelmo1%tpo%now%H_ice, &
-                                yelmo1%bnd%z_bed,yelmo1%dyn%now%ux_s,yelmo1%dyn%now%uy_s, &
-                                yelmo1%dta%pd%H_ice,yelmo1%dta%pd%uxy_s,yelmo1%dta%pd%H_grnd.le.0.0_prec, &
-                                yelmo1%tpo%par%dx,cf_min,cf_max,sigma_err,sigma_vel,err_scale, &
-                                fill_dist=80.0_prec,optvar=optvar)
+                ! Diagnose mass balance correction term 
+                call update_mb_corr(mb_corr,yelmo1%tpo%now%H_ice,yelmo1%dta%pd%H_ice,tau)
+                
+                ! === Update cf_ref and reset model ===================
 
-        end if 
-        
-        if (reset_model) then
-            ! Reset model to reference state with updated cf_ref 
+                if (q .gt. 1) then
+                    ! Perform optimization after first iteration
 
-            yelmo_ref%dyn%now%cf_ref = yelmo1%dyn%now%cf_ref
-            call yelmo_set_time(yelmo_ref,time)
+                    ! Update cf_ref based on error metric(s) 
+                    call update_cf_ref_errscaling(yelmo1%dyn%now%cf_ref,cf_ref_dot,yelmo1%tpo%now%H_ice, &
+                                        yelmo1%bnd%z_bed,yelmo1%dyn%now%ux_s,yelmo1%dyn%now%uy_s, &
+                                        yelmo1%dta%pd%H_ice,yelmo1%dta%pd%uxy_s,yelmo1%dta%pd%H_grnd.le.0.0_prec, &
+                                        yelmo1%tpo%par%dx,cf_min,cf_max,sigma_err,sigma_vel,err_scale, &
+                                        fill_dist=80.0_prec,optvar=optvar)
 
-            if (time_iter_therm .gt. 0.0) then
-                ! Run thermodynamics without updating topography 
-                call yelmo_update_equil(yelmo_ref,time,time_tot=time_iter_therm,dt=5.0_prec,topo_fixed=.TRUE.)
-            end if 
+                end if 
+                
+                if (reset_model) then
+                    ! Reset model to reference state with updated cf_ref 
 
-            yelmo1 = yelmo_ref 
+                    yelmo_ref%dyn%now%cf_ref = yelmo1%dyn%now%cf_ref
+                    call yelmo_set_time(yelmo_ref,time)
 
-        else 
-            ! Continue with the model as it is
+                    if (time_iter_therm .gt. 0.0) then
+                        ! Run thermodynamics without updating topography 
+                        call yelmo_update_equil(yelmo_ref,time,time_tot=time_iter_therm,dt=5.0_prec,topo_fixed=.TRUE.)
+                    end if 
 
-            if (time_iter_therm .gt. 0.0) then
-                ! Run thermodynamics without updating topography  
-                call yelmo_update_equil(yelmo1,time,time_tot=time_iter_therm,dt=5.0_prec,topo_fixed=.TRUE.)
-            end if 
-             
-        end if 
+                    yelmo1 = yelmo_ref 
 
-        ! === Update time_iter ==================
-        time_end = time_iter
-        if (q .eq. n_iter) time_end = time_steady_end 
+                else 
+                    ! Continue with the model as it is
 
-        write(*,"(a,i4,f10.1,i4,f10.1,f12.1,f10.1)") "iter_par: ", q, time, &
-                            yelmo1%tpo%par%topo_rel, tau, err_scale, time_end
+                    if (time_iter_therm .gt. 0.0) then
+                        ! Run thermodynamics without updating topography  
+                        call yelmo_update_equil(yelmo1,time,time_tot=time_iter_therm,dt=5.0_prec,topo_fixed=.TRUE.)
+                    end if 
+                     
+                end if 
 
-        ! Perform iteration loop to diagnose error for modifying c_bed 
-        do n = 1, int(time_end/dtt)
-        
-            time = time + dtt 
+                ! === Update time_iter ==================
+                time_end = time_iter
+                if (q .eq. n_iter) time_end = time_steady_end 
 
-            ! Update ice sheet 
-            call yelmo_update(yelmo1,time)
+                write(*,"(a,i4,f10.1,i4,f10.1,f12.1,f10.1)") "iter_par: ", q, time, &
+                                    yelmo1%tpo%par%topo_rel, tau, err_scale, time_end
 
-            if (mod(nint(time*100),nint(dt2D_out*100))==0) then
+                ! Perform iteration loop to diagnose error for modifying c_bed 
+                do n = 1, int(time_end/dtt)
+                
+                    time = time + dtt 
+
+                    ! Update ice sheet 
+                    call yelmo_update(yelmo1,time)
+
+                    if (mod(nint(time*100),nint(dt2D_out*100))==0) then
+                        call write_step_2D_opt(yelmo1,file2D,time,cf_ref_dot,mb_corr,mask_noice,tau,err_scale)
+                    end if 
+
+                end do 
+
+            end do 
+
+        case("L21") 
+            ! Lipscomb et al. (2021)
+            
+            ! Perform transient simulation with cf_ref nudging  
+            do n = 1, ceiling((time_end-time_init)/dtt)
+
+                ! Get current time 
+                time = time_init + n*dtt
+                
+                ! === Optimization parameters =========
+                
+                ! Update model relaxation time scale and error scaling (in [m])
+                tau = get_opt_param(time,time1=rel_time1,time2=rel_time2,p1=rel_tau1,p2=rel_tau2,m=rel_m)
+                
+                ! Set model tau, and set yelmo relaxation switch (2: gl-line and shelves relaxing; 0: no relaxation)
+                yelmo1%tpo%par%topo_rel_tau = tau 
+                yelmo1%tpo%par%topo_rel     = 2
+                if (time .gt. rel_time2) yelmo1%tpo%par%topo_rel = 0 
+
+                ! Diagnose mass balance correction term 
+                call update_mb_corr(mb_corr,yelmo1%tpo%now%H_ice,yelmo1%dta%pd%H_ice,tau)
+                
+
+                ! === Optimization update step =========
+
+                ! Update cf_ref based on error metric(s) 
+                call update_cf_ref_errscaling_l21(yelmo1%dyn%now%cf_ref,cf_ref_dot,yelmo1%tpo%now%H_ice, &
+                                    yelmo1%tpo%now%dHicedt,yelmo1%bnd%z_bed,yelmo1%dyn%now%ux_s,yelmo1%dyn%now%uy_s, &
+                                    yelmo1%dta%pd%H_ice,yelmo1%dta%pd%uxy_s,yelmo1%dta%pd%H_grnd.le.0.0_prec, &
+                                    yelmo1%tpo%par%dx,cf_min,cf_max,sigma_err,sigma_vel,tau_c,H0, &
+                                    fill_dist=80.0_prec,dt=dtt)
+
+                ! === Advance ice sheet =========
+
+                ! Update ice sheet 
+                call yelmo_update(yelmo1,time)
+
+                if (mod(nint(time*100),nint(dt2D_out*100))==0) then
+                    call write_step_2D_opt(yelmo1,file2D,time,cf_ref_dot,mb_corr,mask_noice,tau,err_scale)
+                end if 
+
+            end do 
+
+        case("L19")
+            ! Ratio method (Le clec’h et al, 2019) - needs revising
+
+            write(*,*) "This method may not work now - check carefully."
+            stop 
+
+            ! Initialize timing variables 
+            time = time_init 
+            
+            do q = 1, n_iter 
+
+                ! Reset model to the initial state (including H_w) and time, with updated c_bed field 
+                yelmo_ref%dyn%now%c_bed = yelmo1%dyn%now%c_bed 
+                yelmo1 = yelmo_ref 
+                time   = 0.0 
+                call yelmo_set_time(yelmo1,time) 
+                
+                ! Perform c_bed tuning step 
+                do n = 1, int(time_tune)
+                
+                    time = time + 1.0
+
+                    ! Update ice sheet 
+                    call yelmo_update(yelmo1,time)
+
+                    ! Update c_bed based on error metric(s) 
+                    call update_cf_ref_thickness_ratio(yelmo1%dyn%now%cf_ref,cf_ref_dot,yelmo1%tpo%now%H_ice, &
+                                    yelmo1%bnd%z_bed,yelmo1%dyn%now%ux_bar,yelmo1%dyn%now%uy_bar, &
+                                    yelmo1%dyn%now%uxy_i_bar,yelmo1%dyn%now%uxy_b,yelmo1%dta%pd%H_ice, &
+                                    yelmo1%tpo%par%dx,cf_min,cf_max=cf_max)
+
+                end do 
+
+                ! Perform iteration loop to diagnose error for modifying c_bed 
+                do n = 1, int(time_iter)
+                
+                    time = time + 1.0
+
+                    ! Update ice sheet 
+                    call yelmo_update(yelmo1,time)
+
+                end do 
+
+                ! Write the current solution 
                 call write_step_2D_opt(yelmo1,file2D,time,cf_ref_dot,mb_corr,mask_noice,tau,err_scale)
-            end if 
+                
+            end do 
 
-        end do 
+    end select 
 
-    end do 
-
-else 
-    ! Ratio method (Le clec’h et al, 2019) - needs revising
-
-    ! Initialize timing variables 
-    time = time_init 
-    
-    do q = 1, n_iter 
-
-        ! Reset model to the initial state (including H_w) and time, with updated c_bed field 
-        yelmo_ref%dyn%now%c_bed = yelmo1%dyn%now%c_bed 
-        yelmo1 = yelmo_ref 
-        time   = 0.0 
-        call yelmo_set_time(yelmo1,time) 
-        
-        ! Perform c_bed tuning step 
-        do n = 1, int(time_tune)
-        
-            time = time + 1.0
-
-            ! Update ice sheet 
-            call yelmo_update(yelmo1,time)
-
-            ! Update c_bed based on error metric(s) 
-            call update_cf_ref_thickness_ratio(yelmo1%dyn%now%cf_ref,cf_ref_dot,yelmo1%tpo%now%H_ice, &
-                            yelmo1%bnd%z_bed,yelmo1%dyn%now%ux_bar,yelmo1%dyn%now%uy_bar, &
-                            yelmo1%dyn%now%uxy_i_bar,yelmo1%dyn%now%uxy_b,yelmo1%dta%pd%H_ice, &
-                            yelmo1%tpo%par%dx,cf_min,cf_max=cf_max)
-
-        end do 
-
-        ! Perform iteration loop to diagnose error for modifying c_bed 
-        do n = 1, int(time_iter)
-        
-            time = time + 1.0
-
-            ! Update ice sheet 
-            call yelmo_update(yelmo1,time)
-
-        end do 
-
-        ! Write the current solution 
-        call write_step_2D_opt(yelmo1,file2D,time,cf_ref_dot,mb_corr,mask_noice,tau,err_scale)
-        
-    end do 
-
-end if 
     
     ! Write a final restart file 
     call yelmo_restart_write(yelmo1,file_restart,time)

@@ -193,6 +193,29 @@ contains
             ! =========================================================================================
             ! Step 2: Call the SSA solver to obtain new estimate of ux_bar/uy_bar
 
+
+            ! -------------------------------------------------------
+            ! amc: adaptive mesh coarsening 
+            ! On high res. grid, determine which points are elegible 
+            ! for amc. 
+
+            ! If enough points exist...
+            ! Interpolate quantities onto low resolution grid 
+            ! (ux_bar,uy_bar,beta_eff_acx,beta_eff_acy,visc_eff_int,ssa_mask_acx
+            !  ssa_mask_acy,H_ice,taud_acx,taud_acy,H_grnd,z_sl,z_bed)
+
+            ! Call solver for low resolution solution 
+
+            ! Copy low resolution solution to high-res amc-elegible points 
+            ! Interpolate high-res amc-elegible points in between those actually solved 
+
+            ! Mask high-res amc-points to prescribe solution there 
+
+            ! Solve high-res as normal 
+            ! -------------------------------------------------------
+
+
+
 if (.TRUE.) then 
             if (iter .gt. 1) then
                 ! Update ssa mask based on convergence with previous step to reduce area being solved 

@@ -108,7 +108,7 @@ contains
 
         return
 
-    end function calc_magnitude_from_staggered 
+    end function calc_magnitude_from_staggered
     
     function calc_magnitude_from_staggered_ice(u,v,H,boundaries) result(umag)
         ! Calculate the centered (aa-nodes) magnitude of a vector 

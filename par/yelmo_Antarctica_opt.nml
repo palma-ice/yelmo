@@ -1,12 +1,6 @@
 &ctrl    
-    ! Simulation parameters
-    n_iter          = 51                ! Total number of iterations     
-    time_iter       = 500.0             ! [yr] Time for each iteration 
-    time_iter_therm = 0.0               ! [yr] Time to run thermodynamics for each iteration 
-    time_steady_end = 10e3              ! [yr] Time to run to steady state at the end without further optimization
-
-    optvar          = "ice"             ! "ice" or "vel" - optimization variable to use 
-    reset_model     = False             ! Reset model to reference state between iterations?
+    
+    opt_method      = "L21"             ! P12: Pollard and DeConto (2012); L21: Lipscomb et al. (2021); L19: Le clec’h et al. (2019)
     cf_ref_init_method = "none"         ! How should cf_ref be initialized
     sigma_err       = 1.5               ! [--] Smoothing radius for error to calculate correction in cf_ref (in multiples of dx)
     sigma_vel       = 200.0             ! [m/a] Speed at which smoothing diminishes to zero
@@ -19,20 +13,37 @@
 
 /
 
-&optice 
+&opt_L21 
+
+    time_init   = 0.0               ! [yr] Starting time 
+    time_end    = 20e3              ! [yr] Ending time
+    
+    rel_tau1    = 10.0 
+    rel_tau2    = 1000.0 
+    rel_time1   = 5e3 
+    rel_time2   = 10e3
+
+    tau_c       = 500.0         ! [yr] L21: Optimization relaxation timescale 
+    H0          = 100.0         ! [m]  L21: Optimization ice-thickness error scaling 
+     
+/ 
+
+&opt_P12
+    
+    ! Simulation parameters
+    time_init       = 0.0               ! [yr] Starting time 
+    n_iter          = 51                ! Total number of iterations     
+    time_iter       = 500.0             ! [yr] Time for each iteration 
+    time_iter_therm = 0.0               ! [yr] Time to run thermodynamics for each iteration 
+    time_steady_end = 10e3              ! [yr] Time to run to steady state at the end without further optimization
+    reset_model     = False             ! Reset model to reference state between iterations?
+    
     rel_tau1            = 10.0          ! [yr] Initial relaxation tau, fixed until rel_time1 
     rel_tau2            = 1000.0        ! [yr] Final tau, reached at rel_time2, when relaxation disabled 
     scale_ftime         = 0.6           ! [-]  Fraction of time_iter_tot at which to start transition from scale_err1 to scale_err2
     scale_err1          =  500.0        ! [m]  Initial value for err_scale parameter in cf_ref optimization 
     scale_err2          = 2000.0        ! [m]  Final value for err_scale parameter reached at scale_time2 
-/
 
-&optvel
-    rel_tau1            = 10.0          ! [yr] Initial relaxation tau, fixed until rel_time1 
-    rel_tau2            = 100.0         ! [yr] Final tau, reached at rel_time2
-    scale_ftime         = 0.6           ! [-]  Fraction of time_iter_tot at which to start transition from scale_err1 to scale_err2
-    scale_err1          = 200.0         ! [m/a] Initial value for err_scale parameter in cf_ref optimization 
-    scale_err2          = 500.0         ! [m/a] Final value for err_scale parameter reached at scale_time2 
 /
 
 &yelmo

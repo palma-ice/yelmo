@@ -8,6 +8,7 @@ module ice_optimization
 
     private 
     public :: update_cf_ref_errscaling
+    public :: update_cf_ref_errscaling_l21
     public :: update_cf_ref_thickness_ratio
     public :: update_mb_corr
     public :: guess_cf_ref
@@ -16,6 +17,165 @@ module ice_optimization
     public :: get_opt_param
 
 contains 
+
+    subroutine update_cf_ref_errscaling_l21(cf_ref,cf_ref_dot,H_ice,dHdt,z_bed,ux,uy,H_obs,uxy_obs,is_float_obs, &
+                                        dx,cf_min,cf_max,sigma_err,sigma_vel,tau_c,H0,fill_dist,dt)
+        ! Update method following Lipscomb et al. (2021, tc)
+
+        implicit none 
+
+        real(prec), intent(INOUT) :: cf_ref(:,:) 
+        real(prec), intent(INOUT) :: cf_ref_dot(:,:) 
+        real(prec), intent(IN)    :: H_ice(:,:) 
+        real(prec), intent(IN)    :: dHdt(:,:) 
+        real(prec), intent(IN)    :: z_bed(:,:) 
+        real(prec), intent(IN)    :: ux(:,:) 
+        real(prec), intent(IN)    :: uy(:,:) 
+        real(prec), intent(IN)    :: H_obs(:,:) 
+        real(prec), intent(IN)    :: uxy_obs(:,:) 
+        logical,    intent(IN)    :: is_float_obs(:,:) 
+        real(prec), intent(IN)    :: dx 
+        real(prec), intent(IN)    :: cf_min 
+        real(prec), intent(IN)    :: cf_max
+        real(prec), intent(IN)    :: sigma_err 
+        real(prec), intent(IN)    :: sigma_vel
+        real(prec), intent(IN)    :: tau_c                  ! [yr]
+        real(prec), intent(IN)    :: H0                     ! [m]
+        real(prec), intent(IN)    :: fill_dist              ! [km] Distance over which to smooth between nearest neighbor and minimum value
+        real(prec), intent(IN)    :: dt 
+
+        ! Local variables 
+        integer :: i, j, nx, ny, i1, j1  
+        real(prec) :: dx_km, f_damp   
+        real(prec) :: ux_aa, uy_aa, uxy_aa
+        real(prec) :: H_err_now, dHdt_now, f_vel   
+        real(prec) :: xwt, ywt, xywt   
+
+        real(prec), allocatable   :: H_err_sm(:,:)
+        real(prec), allocatable   :: H_err(:,:)
+        real(prec), allocatable   :: uxy(:,:)
+        real(prec), allocatable   :: uxy_err(:,:)
+        real(prec), allocatable   :: cf_prev(:,:) 
+
+        nx = size(cf_ref,1)
+        ny = size(cf_ref,2) 
+
+        dx_km = dx*1e-3  
+        
+        allocate(H_err_sm(nx,ny))
+        allocate(H_err(nx,ny))
+        allocate(uxy(nx,ny))
+        allocate(uxy_err(nx,ny))
+        allocate(cf_prev(nx,ny))
+
+        ! Internal parameters 
+        f_damp = 2.0 
+
+        ! Store initial cf_ref solution 
+        cf_prev = cf_ref 
+
+        ! Calculate ice thickness error 
+        H_err = H_ice - H_obs 
+
+        ! Calculate velocity magnitude and velocity error 
+        uxy = calc_magnitude_from_staggered_ice(ux,uy,H_ice)
+         
+        uxy_err = MV 
+        where(uxy_obs .ne. MV .and. uxy_obs .ne. 0.0) uxy_err = (uxy - uxy_obs)
+
+if (.FALSE.) then 
+        ! Additionally, apply a Gaussian filter to H_err to ensure smooth transitions
+        ! Apply a weighted average between smoothed and original H_err, where 
+        ! slow regions get more smoothed, and fast regions use more local error 
+        if (sigma_err .gt. 0.0) then
+            H_err_sm = H_err  
+            call filter_gaussian(var=H_err_sm,sigma=dx_km*sigma_err,dx=dx_km)
+
+            do j = 1, ny 
+            do i = 1, nx 
+                f_vel = min( uxy(i,j)/sigma_vel, 1.0 )
+                H_err(i,j) = (1.0-f_vel)*H_err_sm(i,j) + f_vel*H_err(i,j)  
+            end do 
+            end do  
+
+        end if 
+end if 
+
+        ! Initially set cf to missing value for now where no correction possible
+        cf_ref = MV 
+
+        do j = 1, ny-1 
+        do i = 1, nx-1 
+
+            ux_aa = 0.5*(ux(i,j)+ux(i+1,j))
+            uy_aa = 0.5*(uy(i,j)+uy(i,j+1))
+            
+            uxy_aa = sqrt(ux_aa**2+uy_aa**2)
+
+            if ( uxy(i,j) .ne. 0.0 .and. uxy_err(i,j) .ne. MV ) then 
+                ! Update coefficient where velocity exists
+
+                ! Determine upstream node(s) 
+
+                if (ux_aa .ge. 0.0) then 
+                    i1 = i-1 
+                else 
+                    i1 = i+1 
+                end if 
+
+                if (uy_aa .ge. 0.0) then 
+                    j1 = j-1
+                else 
+                    j1 = j+1  
+                end if 
+                
+                ! Get weighted error  =========
+
+                xwt   = 0.5 
+                ywt   = 0.5
+                xywt  = abs(ux(i1,j))+abs(uy(i,j1))
+
+                if (xywt .gt. 0.0) then 
+                    xwt = abs(ux(i1,j)) / xywt 
+                    ywt = abs(uy(i,j1)) / xywt 
+                end if 
+
+                ! Define error for ice thickness 
+                H_err_now = xwt*H_err(i1,j) + ywt*H_err(i,j1) 
+                dHdt_now  = xwt*dHdt(i1,j)  + ywt*dHdt(i,j1) 
+
+                ! Get adjustment rate given error in ice thickness  =========
+
+                cf_ref_dot(i,j) = -(cf_ref(i,j)/H0)*((H_err_now / tau_c) + f_damp*dHdt_now)
+
+                ! Apply correction to current node =========
+
+                cf_ref(i,j) = cf_prev(i,j) + cf_ref_dot(i,j)*dt 
+
+            end if 
+
+        end do 
+        end do 
+
+        ! Fill in missing values with nearest neighbor or cf_min when none available
+        call fill_nearest(cf_ref,missing_value=MV,fill_value=cf_min,fill_dist=fill_dist,n=5,dx=dx)
+
+        ! Ensure cf_ref is not below lower or upper limit 
+        where (cf_ref .lt. cf_min) cf_ref = cf_min 
+        where (cf_ref .gt. cf_max) cf_ref = cf_max 
+
+        ! Additionally, apply a Gaussian filter to cf_ref to ensure smooth transitions
+        !call filter_gaussian(var=cf_ref,sigma=dx_km*0.2,dx=dx_km)     !,mask=err_z_srf .ne. 0.0)
+        
+        ! Ensure where obs are floating, set cf_ref = cf_min 
+        !where(is_float_obs) cf_ref = cf_min 
+
+        ! Also where no ice exists, set cf_ref = cf_min 
+        !where(H_obs .eq. 0.0) cf_ref = cf_min 
+
+        return 
+
+    end subroutine update_cf_ref_errscaling_l21
 
     subroutine update_cf_ref_errscaling(cf_ref,cf_ref_dot,H_ice,z_bed,ux,uy,H_obs,uxy_obs,is_float_obs, &
                                         dx,cf_min,cf_max,sigma_err,sigma_vel,err_scale,fill_dist,optvar)
@@ -350,7 +510,7 @@ end if
 
         return 
 
-    end subroutine update_mb_corr 
+    end subroutine update_mb_corr
 
     subroutine guess_cf_ref(cf_ref,tau_d,uxy_obs,H_obs,H_grnd,u0,cf_min,cf_max)
         ! Use suggestion by Morlighem et al. (2013) to guess friction
@@ -391,7 +551,7 @@ end if
 
         return 
 
-    end subroutine guess_cf_ref 
+    end subroutine guess_cf_ref
 
     
 
@@ -545,12 +705,12 @@ end if
 
         return 
 
-    end function get_opt_param 
+    end function get_opt_param
 
     ! Yelmo functions duplicated here to avoid dependency
 
     ! From yelmo_tools.f90:
-    function calc_magnitude_from_staggered_ice(u,v,H) result(umag)
+    function calc_magnitude_from_staggered_ice(u,v,H,boundaries) result(umag)
         ! Calculate the centered (aa-nodes) magnitude of a vector 
         ! from the staggered (ac-nodes) components
 
@@ -558,21 +718,31 @@ end if
         
         real(prec), intent(IN)  :: u(:,:), v(:,:), H(:,:) 
         real(prec) :: umag(size(u,1),size(u,2)) 
+        character(len=*), intent(IN), optional :: boundaries 
 
         ! Local variables 
         integer :: i, j, nx, ny 
+        integer :: ip1, jp1, im1, jm1
         real(prec) :: unow, vnow 
         real(prec) :: f1, f2, H1, H2 
+        
         nx = size(u,1)
         ny = size(u,2) 
 
         umag = 0.0_prec 
 
-        do j = 2, ny-1 
-        do i = 2, nx-1 
+        do j = 1, ny 
+        do i = 1, nx 
 
-            H1 = 0.5_prec*(H(i-1,j)+H(i,j))
-            H2 = 0.5_prec*(H(i,j)+H(i+1,j))
+            im1 = max(i-1,1)
+            jm1 = max(j-1,1)
+            ip1 = min(i+1,nx)
+            jp1 = min(j+1,ny)
+
+            ! x-direction =====
+
+            H1 = 0.5_prec*(H(im1,j)+H(i,j))
+            H2 = 0.5_prec*(H(i,j)+H(ip1,j))
 
             f1 = 0.5_prec 
             f2 = 0.5_prec 
@@ -580,14 +750,16 @@ end if
             if (H2 .eq. 0.0) f2 = 0.0_prec   
 
             if (f1+f2 .gt. 0.0) then 
-                unow = (f1*u(i-1,j) + f2*u(i,j)) / (f1+f2)
+                unow = (f1*u(im1,j) + f2*u(i,j)) / (f1+f2)
                 if (abs(unow) .lt. tol_underflow) unow = 0.0_prec 
             else 
                 unow = 0.0 
             end if 
 
-            H1 = 0.5_prec*(H(i,j-1)+H(i,j))
-            H2 = 0.5_prec*(H(i,j)+H(i,j+1))
+            ! y-direction =====
+
+            H1 = 0.5_prec*(H(i,jm1)+H(i,j))
+            H2 = 0.5_prec*(H(i,j)+H(i,jp1))
 
             f1 = 0.5_prec 
             f2 = 0.5_prec 
@@ -595,7 +767,7 @@ end if
             if (H2 .eq. 0.0) f2 = 0.0_prec   
 
             if (f1+f2 .gt. 0.0) then 
-                vnow = (f1*v(i,j-1) + f2*v(i,j)) / (f1+f2)
+                vnow = (f1*v(i,jm1) + f2*v(i,j)) / (f1+f2)
                 if (abs(vnow) .lt. tol_underflow) vnow = 0.0_prec 
             else 
                 vnow = 0.0 
@@ -605,9 +777,24 @@ end if
         end do 
         end do 
 
+        if (present(boundaries)) then 
+            ! Apply conditions at boundaries of domain 
+
+            if (trim(boundaries) .eq. "periodic") then 
+
+                umag(1,:)  = umag(nx-1,:) 
+                umag(nx,:) = umag(2,:) 
+                 
+                umag(:,1)  = umag(:,ny-1)
+                umag(:,ny) = umag(:,2) 
+                
+            end if 
+
+        end if 
+
         return
 
-    end function calc_magnitude_from_staggered_ice 
+    end function calc_magnitude_from_staggered_ice
     
     ! From yelmo_tools.f90:
     function gauss_values(dx,dy,sigma,n) result(filt)
@@ -652,4 +839,4 @@ end if
 
     end function gauss_values
 
-end module ice_optimization 
+end module ice_optimization

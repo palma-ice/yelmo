@@ -40,9 +40,9 @@ contains
         
         return 
 
-    end subroutine yelmo_regrid 
+    end subroutine yelmo_regrid
 
-
+    
     subroutine calc_regrid_weights(wts,x0,y0,x1,y1)
 
         implicit none 
@@ -56,6 +56,6 @@ contains
 
         return 
 
-    end subroutine calc_regrid_weights 
+    end subroutine calc_regrid_weights
 
 end module yelmo_regridding

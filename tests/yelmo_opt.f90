@@ -120,13 +120,13 @@ program yelmo_test
         case("L21")
             ! Lipscomb et al. (2021) 
 
-            call nml_read(path_par,"opt_P12","time_init",       time_init)   
-            call nml_read(path_par,"opt_P12","time_end",        time_end)    
+            call nml_read(path_par,"opt_L21","time_init",       time_init)   
+            call nml_read(path_par,"opt_L21","time_end",        time_end)    
             
-            call nml_read(path_par,"opt_P12","rel_tau1",        rel_tau1)             
-            call nml_read(path_par,"opt_P12","rel_tau2",        rel_tau2)             
-            call nml_read(path_par,"opt_P12","rel_time1",       rel_time1)           
-            call nml_read(path_par,"opt_P12","rel_time2",       rel_time2)           
+            call nml_read(path_par,"opt_L21","rel_tau1",        rel_tau1)             
+            call nml_read(path_par,"opt_L21","rel_tau2",        rel_tau2)             
+            call nml_read(path_par,"opt_L21","rel_time1",       rel_time1)           
+            call nml_read(path_par,"opt_L21","rel_time2",       rel_time2)           
             
             call nml_read(path_par,"opt_L21","tau_c",  tau_c)    ! [yr] L21: Relaxation time scale for cf_ref adjustment 
             call nml_read(path_par,"opt_L21","H0",     H0)       ! [m]  L21: Error scaling
@@ -815,7 +815,7 @@ contains
 
     end subroutine calc_channels
 
-end program yelmo_test 
+end program yelmo_test
 
 
 

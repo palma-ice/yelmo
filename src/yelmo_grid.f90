@@ -553,7 +553,7 @@ contains
 
 !         ! Or, determine nx, ny based on desired dx/dy
 !         if (present(dx)) 
-
+        
         return 
 
     end subroutine yelmo_init_grid_fromgrd

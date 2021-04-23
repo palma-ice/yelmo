@@ -192,8 +192,7 @@ contains
             
             ! =========================================================================================
             ! Step 2: Call the SSA solver to obtain new estimate of ux_bar/uy_bar
-
-
+            
             ! -------------------------------------------------------
             ! amc: adaptive mesh coarsening 
             ! On high res. grid, determine which points are elegible 

@@ -147,7 +147,7 @@ end if
                 ! Get adjustment rate given error in ice thickness  =========
 
                 cf_ref_dot(i,j) = -(cf_prev(i,j)/H0)*((H_err_now / tau_c) + f_damp*dHdt_now)
-                
+
                 ! Apply correction to current node =========
 
                 cf_ref(i,j) = cf_prev(i,j) + cf_ref_dot(i,j)*dt 
@@ -652,7 +652,7 @@ end if
 
         return 
 
-    end subroutine fill_nearest 
+    end subroutine fill_nearest
 
     
     subroutine wtd_mean(var_ave,var,wts)

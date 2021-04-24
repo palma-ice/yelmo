@@ -197,7 +197,7 @@ program yelmo_test
     ! Impose present-day surface temperature and surface mass balance fields
     yelmo1%bnd%T_srf    = yelmo1%dta%pd%T_srf + dT_ann  ! [K]
     yelmo1%bnd%smb      = yelmo1%dta%pd%smb             ! [m.i.e./a]
-        
+    
     ! Impose additional negative mass balance to no ice points of 2 [m.i.e./a] melting
     if (trim(yelmo1%par%domain) .eq. "Greenland") then 
         where(mask_noice) yelmo1%bnd%smb = yelmo1%dta%pd%smb - 2.0 

@@ -132,7 +132,7 @@ program yelmo_test
             call nml_read(path_par,"opt_L21","H0",     H0)       ! [m]  L21: Error scaling
 
             dtt                 = 5.0               ! [yr] Time step for time loop 
-            dt2D_out            = 10.0              ! [yr] 2D output writing 
+            dt2D_out            = 100.0             ! [yr] 2D output writing 
             cf_init             = 0.2               ! [--] Initial cf value everywhere (not too important)
 
         case("L19")

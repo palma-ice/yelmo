@@ -51,7 +51,7 @@
     grid_name       = "ANT-32KM"
     grid_path       = "input/{domain}/{grid_name}/{grid_name}_REGIONS.nc"
     experiment      = "None"       
-    restart         = "None"  ! "input/{domain}/{grid_name}/{grid_name}_yelmo_restart-opt-1.nc"
+    restart         = "input/{domain}/{grid_name}/{grid_name}_yelmo_restart-ant20kyr.nc "
     log_timestep    = False 
     disable_kill    = False             ! Disable automatic kill if unstable
     zeta_scale      = "exp"             ! "linear", "exp", "tanh"
@@ -97,9 +97,9 @@
     solver              = "diva"          ! "fixed", "sia", "ssa", "hybrid", "diva", "diva-noslip", l1l2", "l1l2-noslip"
     visc_method         = 1               ! 0: constant visc=visc_const, 1: dynamic viscosity
     visc_const          = 1e7             ! [Pa a] Constant value for viscosity (if visc_method=0)
-    beta_method         = 1               ! 0: constant beta; 1: linear (beta=cb/u0); 2: psuedo-plastic-power; 3: Regularized Coulomb
+    beta_method         = 3               ! 0: constant beta; 1: linear (beta=cb/u0); 2: psuedo-plastic-power; 3: Regularized Coulomb
     beta_const          = 1e3             ! [Pa a m−1] Constant value of basal friction coefficient to be used
-    beta_q              = 1.0             ! Dragging law exponent 
+    beta_q              = 0.2             ! Dragging law exponent 
     beta_u0             = 100.0           ! [m/a] Regularization term for regularized Coulomb law (beta_method=3)
     beta_gl_scale       = 0               !  0: beta*beta_gl_f, 2: H_grnd linear scaling, 3: Zstar scaling 
     beta_gl_stag        = 3               !  0: simple staggering, 1: Upstream beta at gl, 2: downstream, 3: f_grnd_ac scaling 
@@ -131,7 +131,7 @@
 /
 
 &ydyn_neff 
-    neff_method     = 1                 ! -1: external N_eff, 0: neff_const, 1: overburden pressure, 2: Leguy param., 3: Till pressure
+    neff_method     = 3                 ! -1: external N_eff, 0: neff_const, 1: overburden pressure, 2: Leguy param., 3: Till pressure
     neff_const      = 1e7               ! == rho_ice*g*(eg 1000 m ice thickness)
     neff_p          = 1.0               ! *neff_method=2* marine connectivity exponent (0: none, 1: full)
     neff_set_water  = False             ! *neff_method=3* Prescribe H_w = H_w_max for temperate ice instead of using H_w field?

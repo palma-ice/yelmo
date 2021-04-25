@@ -562,7 +562,7 @@ contains
 
         return
 
-    end function stagger_ab_acy 
+    end function stagger_ab_acy
     
     subroutine calc_gradient_ac(dvardx,dvardy,var,dx)
         ! Calculate gradient on ac nodes 
@@ -910,7 +910,7 @@ contains
 
         return 
 
-    end function mean_mask 
+    end function mean_mask
     
     elemental subroutine minmax(var,var_lim)
 
@@ -927,7 +927,7 @@ contains
 
         return 
 
-    end subroutine minmax 
+    end subroutine minmax
 
     subroutine fill_borders_2D(var,nfill,fill)
 

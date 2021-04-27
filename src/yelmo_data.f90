@@ -423,8 +423,15 @@ contains
         
         pd%rmse_iso      = mv 
 
+        ! Assign some other initial values here too
+        pd%rmse_H        = mv  
+        pd%rmse_zsrf     = mv 
+        pd%rmse_uxy      = mv 
+        pd%rmse_loguxy   = mv 
+
         return 
-    end subroutine ydata_alloc 
+
+    end subroutine ydata_alloc
 
     subroutine ydata_dealloc(pd)
 
@@ -456,6 +463,6 @@ contains
         
         return 
 
-    end subroutine ydata_dealloc 
+    end subroutine ydata_dealloc
 
 end module yelmo_data

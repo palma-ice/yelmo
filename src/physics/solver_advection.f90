@@ -432,11 +432,16 @@ contains
             end do
             end do
 
+            ! Avoid underflows
+            where(abs(deltaH) .lt. tol_underflow) deltaH = 0.0_prec
+            
             ! Adjust H to new value
             H = H - deltaH
 
+            ! Avoid underflows
+            where(abs(H) .lt. tol_underflow) H = 0.0_prec
+            
             ! Check stopping criterion (something like rmse of remaining change in H)
-            where(abs(deltaH) .lt. tol_underflow) deltaH = 0.0_prec      ! Avoid underflows
             delh = sqrt(sum(deltaH**2)) / ((nx-2)*(ny-2))
             
             ! Use simple stopping criterion: maximum remaining change in H

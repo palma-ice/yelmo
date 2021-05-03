@@ -8,7 +8,7 @@ module yelmo_regridding
     public :: yelmo_regrid 
 
 contains 
-
+    
     subroutine yelmo_regrid(dom1,dom0,dx1)
 
         implicit none 
@@ -57,5 +57,41 @@ contains
         return 
 
     end subroutine calc_regrid_weights
+
+    subroutine regrid_downsample(dst,src,dx_dst,dx_src)
+
+        implicit none 
+
+        real(prec), intent(OUT) :: dst(:,:) 
+        real(prec), intent(IN)  :: src(:,:) 
+        real(prec), intent(IN)  :: dx_dst 
+        real(prec), intent(IN)  :: dx_src 
+
+        ! Local variables 
+        integer :: i, j, nx, ny 
+        integer :: i1, j1, n 
+        integer :: scale 
+
+        nx = size(dst,1)
+        ny = size(dst,2)
+
+        ! Scale should be a positive integer 
+        scale = int(dx_src/dx_dst) 
+
+        ! Loop over target grid 
+        do j = 1, ny 
+        do i = 1, nx 
+
+            ! Determine point on source grid that coincides 
+            ! with this point 
+            !i1 = 
+
+
+        end do 
+        end do  
+
+        return 
+
+    end subroutine regrid_downsample
 
 end module yelmo_regridding

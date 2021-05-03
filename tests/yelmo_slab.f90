@@ -125,7 +125,7 @@ program yelmo_slab
 
     ! Check boundary values 
     call yelmo_print_bound(yelmo1%bnd)
-
+    
     ! Initialize output file 
     call yelmo_write_init(yelmo1,file2D,time_init=time,units="years")
     

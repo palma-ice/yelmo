@@ -105,6 +105,18 @@ module yelmo_defs
 
     end type
 
+    type ytopo_amc_class 
+
+        integer    :: nx, ny 
+        real(wp)   :: dt_zeta
+
+        real(wp), allocatable   :: dHdt_n(:,:)      ! [m/a] Ice thickness change due to advection only
+        real(wp), allocatable   :: H_ice_n(:,:)     ! [m] Ice thickness from the previous timestep 
+        real(wp), allocatable   :: H_ice_pred(:,:)  ! [m] Ice thickness, predicted, for time=n+1
+        real(wp), allocatable   :: H_ice_corr(:,:)  ! [m] Ice thickness, corrected, for time=n+1 
+        
+    end type
+
     ! ytopo state variables
     type ytopo_state_class
         ! Model variables that the define the state of the domain 
@@ -147,6 +159,8 @@ module yelmo_defs
         real(wp), allocatable   :: H_ice_corr(:,:)  ! [m] Ice thickness, corrected, for time=n+1 
         
         real(wp), allocatable   :: z_srf_n(:,:)     ! [m] Surface elevation from the previous timestep 
+        
+        type(ytopo_amc_class)   :: amc
         
     end type
 
@@ -742,6 +756,7 @@ module yelmo_defs
         type(yelmo_param_class) :: par      ! General domain parameters
         type(ygrid_class)       :: grd      ! Grid definition
         type(ytime_class)       :: time     ! Timestep and timing variables
+        type(ytime_class)       :: time_amc ! Timestep and timing variables
         type(ytopo_class)       :: tpo      ! Topography variables
         type(ydyn_class)        :: dyn      ! Dynamics variables
         type(ymat_class)        :: mat      ! Material variables

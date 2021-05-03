@@ -124,7 +124,7 @@ contains
                 stop 
 
         end select 
-
+        
         ! Calculate timestepping factors for thermodynamics horizontal advection term too 
         select case(trim(dom%thrm%par%dt_method))
 

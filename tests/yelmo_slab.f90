@@ -205,10 +205,10 @@ else
 
     ! Test different timesteps 
     
-    ctrl%n_dtt = 40 
+    ctrl%n_dtt = 50 
     ctrl%dtts  = 0.0_wp
     do q = 1, ctrl%n_dtt 
-        ctrl%dtts(q) = exp(log(0.005)+(log(1.0)-log(0.005))*(q-1)/(ctrl%n_dtt-1))
+        ctrl%dtts(q) = 10**(log10(0.001)+(log10(10.0)-log10(0.001))*(q-1)/(ctrl%n_dtt-1))
     end do 
 
     ctrl%n_dx     = 8

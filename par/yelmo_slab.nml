@@ -9,7 +9,7 @@
     
     ! Timing parameters 
     time_init    = 0.0                  ! [yr] Starting time 
-    nt           = 200                  ! [-] Total number of timesteps
+    nt           = 100                  ! [-] Total number of timesteps
     dtt          = 0.03                  ! [yr] Main loop timestep 
     dt1D_out     = 5.0                  ! [yr] Frequency of writing 2D output files 
     dt2D_out     = 5.0                  ! [yr] Frequency of writing 2D output files 

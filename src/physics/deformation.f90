@@ -425,38 +425,11 @@ contains
         
     end subroutine calc_strain_rate_2D
     
-    subroutine calc_strain_rate_3D(strn,vx,vy,vz,H_ice,f_grnd,zeta_aa,zeta_ac,dx,de_max)
-
-        implicit none
-         
-        type(strain_3D_class), intent(INOUT) :: strn  ! [a^-1] 
-        real(prec), intent(IN) :: vx(:,:,:) 
-        real(prec), intent(IN) :: vy(:,:,:) 
-        real(prec), intent(IN) :: vz(:,:,:) 
-        real(prec), intent(IN) :: H_ice(:,:) 
-        real(prec), intent(IN) :: f_grnd(:,:) 
-        real(prec), intent(IN) :: zeta_aa(:) 
-        real(prec), intent(IN) :: zeta_ac(:) 
-        real(prec), intent(IN) :: dx 
-        real(prec), intent(IN) :: de_max 
-
-        ! Local variables 
-        real(prec) :: dy  
-
-        dy = dx 
-
-        ! Calculate 3D strain rate
-        call calc_dxyz(strn,vx,vy,vz,H_ice,f_grnd,zeta_aa,zeta_ac,dx,dy,de_max)
-        
-        return 
-
-    end subroutine calc_strain_rate_3D
-
-    subroutine calc_dxyz(strn, vx, vy, vz, H_ice, f_grnd, zeta_aa, zeta_ac, dx, dy, de_max)
+    subroutine calc_strain_rate_3D(strn, vx, vy, vz, H_ice, f_grnd, zeta_aa, zeta_ac, dx, de_max)
         ! -------------------------------------------------------------------------------
         !  Computation of all components of the strain-rate tensor, the full
         !  effective strain rate and the shear fraction.
-        !  Alexander Robinson: Adapted from sicopolis5-dev
+        !  Alexander Robinson: Adapted from sicopolis5-dev::calc_dxyz 
         ! ------------------------------------------------------------------------------
 
         ! Note: vx, vy are staggered on ac-nodes in the horizontal, but are on the zeta_aa nodes (ie layer-centered)
@@ -465,7 +438,7 @@ contains
 
         implicit none
         
-        type(strain_3D_class), intent(INOUT) :: strn            ! [a^-1] on aa-nodes (3D)
+        type(strain_3D_class), intent(INOUT) :: strn            ! [yr^-1] on aa-nodes (3D)
         real(prec), intent(IN) :: vx(:,:,:)                     ! nx,ny,nz_aa
         real(prec), intent(IN) :: vy(:,:,:)                     ! nx,ny,nz_aa
         real(prec), intent(IN) :: vz(:,:,:)                     ! nx,ny,nz_ac
@@ -474,14 +447,14 @@ contains
         real(prec), intent(IN) :: zeta_aa(:) 
         real(prec), intent(IN) :: zeta_ac(:) 
         real(prec), intent(IN) :: dx
-        real(prec), intent(IN) :: dy
-        real(prec), intent(IN) :: de_max                        ! [a^-1] Maximum allowed effective strain rate
+        real(prec), intent(IN) :: de_max                        ! [yr^-1] Maximum allowed effective strain rate
         
         ! Local variables 
         integer    :: i, j, k
         integer    :: im1, ip1, jm1, jp1 
         integer    :: nx, ny, nz_aa, nz_ac  
         real(prec) :: dxi, deta, dzeta
+        real(prec) :: dy  
         real(prec) :: dx_inv, dy_inv
         real(prec) :: H_ice_inv
         real(prec) :: abs_v_ssa_inv, nx1, ny1
@@ -491,6 +464,9 @@ contains
         real(prec) :: shear_squared  
         real(prec), allocatable :: fact_x(:,:), fact_y(:,:)
         real(prec), allocatable :: fact_z(:)
+
+        ! Define dy 
+        dy = dx 
 
         ! Determine sizes and allocate local variables 
         nx    = size(vx,1)
@@ -692,7 +668,7 @@ contains
 
         return 
 
-    end subroutine calc_dxyz
+    end subroutine calc_strain_rate_3D
 
 !     subroutine calc_stress_3D(strss,visc,strn)
 !         ! Note: this is not used explicitly in Yelmo,

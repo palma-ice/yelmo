@@ -670,6 +670,7 @@ contains
 
     end subroutine calc_strain_rate_3D
 
+! ajr: see Lipscomb et al (2019), Eq. 45...
 !     subroutine calc_stress_3D(strss,visc,strn)
 !         ! Note: this is not used explicitly in Yelmo,
 !         ! it's just here for completeness. For SIA/SSA

@@ -479,6 +479,25 @@ contains
 
 !         write(*,"(a,a,a)") "ncio:: nc_read:: ",trim(filename)//" : ",trim(v%name)
 
+        ! CONSISTENCY CHECK 
+        n1 = 0
+        do i = 1, size(dat,1)
+            if (ieee_is_nan(dat(i))) then
+                n1 = n1 + 1
+            end if
+        end do
+
+        if (n1 .gt. 0) then
+            write(*,*) "nc4_read_internal_numeric:: Error 1: still NaNs."
+            write(*,*) trim(filename)//": ",trim(name)
+            stop
+        end if
+        if (maxval(abs(dat)) .gt. 1e15) then
+            write(*,*) "nc4_read_intenral_numeric:: Error 2: still NaNs."
+            write(*,*) trim(filename)//": ",trim(name)
+            stop
+        end if
+
         if (present(iostat)) iostat = nf90_noerr
         return
 

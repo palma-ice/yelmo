@@ -230,13 +230,13 @@ else
 
     ! Next equilibrate thermodynamics and maintain constant ice topopgraphy (for speed)
     ! again with SIA only for now
-    call yelmo_update_equil(yelmo1,time,time_tot=1e3,dt=1.0_prec,topo_fixed=.TRUE.,dyn_solver="sia")
+    ! call yelmo_update_equil(yelmo1,time,time_tot=1e3,dt=1.0_prec,topo_fixed=.TRUE.,dyn_solver="sia")
     
     ! Run full dynamics with correct solver (tpo,dyn,thrm)
     call yelmo_update_equil(yelmo1,time,time_tot=1.0_prec,dt=0.2_prec,topo_fixed=.FALSE.)
 
     ! Next equilibrate thermodynamics further and maintain constant ice topopgraphy (for speed)
-    call yelmo_update_equil(yelmo1,time,time_tot=1e2,dt=1.0_prec,topo_fixed=.TRUE.)
+    ! call yelmo_update_equil(yelmo1,time,time_tot=1e2,dt=1.0_prec,topo_fixed=.TRUE.)
 
 end if 
 

@@ -10,7 +10,7 @@ module basal_dragging
     ! particularly at the grounding line, beta should be defined
     ! directly on the ac nodes (acx,acy). 
 
-    use yelmo_defs, only : sp, dp, prec, pi, g, rho_sw, rho_ice, rho_w  
+    use yelmo_defs, only : sp, dp, wp, prec, pi, g, rho_sw, rho_ice, rho_w  
 
     use yelmo_tools, only : stagger_aa_acx, stagger_aa_acy
 
@@ -57,9 +57,9 @@ contains
 
         implicit none 
 
-        real(prec), intent(OUT) :: c_bed(:,:)       ! [Pa]
-        real(prec), intent(IN)  :: cf_ref(:,:)      ! [-]
-        real(prec), intent(IN)  :: N_eff(:,:)       ! [Pa] 
+        real(wp), intent(OUT) :: c_bed(:,:)       ! [Pa]
+        real(wp), intent(IN)  :: cf_ref(:,:)      ! [-]
+        real(wp), intent(IN)  :: N_eff(:,:)       ! [Pa] 
 
         c_bed = cf_ref*N_eff 
 
@@ -74,28 +74,28 @@ contains
 
         implicit none
         
-        real(prec), intent(INOUT) :: beta(:,:) 
-        real(prec), intent(IN)    :: c_bed(:,:)  
-        real(prec), intent(IN)    :: ux_b(:,:) 
-        real(prec), intent(IN)    :: uy_b(:,:)  
-        real(prec), intent(IN)    :: H_ice(:,:) 
-        real(prec), intent(IN)    :: H_grnd(:,:) 
-        real(prec), intent(IN)    :: f_grnd(:,:) 
-        real(prec), intent(IN)    :: z_bed(:,:) 
-        real(prec), intent(IN)    :: z_sl(:,:) 
-        integer,    intent(IN)    :: beta_method
-        real(prec), intent(IN)    :: beta_const 
-        real(prec), intent(IN)    :: beta_q 
-        real(prec), intent(IN)    :: beta_u0 
-        integer,    intent(IN)    :: beta_gl_scale  
-        real(prec), intent(IN)    :: beta_gl_f
-        real(prec), intent(IN)    :: H_grnd_lim
-        real(prec), intent(IN)    :: beta_min 
+        real(wp), intent(INOUT) :: beta(:,:) 
+        real(wp), intent(IN)    :: c_bed(:,:)  
+        real(wp), intent(IN)    :: ux_b(:,:) 
+        real(wp), intent(IN)    :: uy_b(:,:)  
+        real(wp), intent(IN)    :: H_ice(:,:) 
+        real(wp), intent(IN)    :: H_grnd(:,:) 
+        real(wp), intent(IN)    :: f_grnd(:,:) 
+        real(wp), intent(IN)    :: z_bed(:,:) 
+        real(wp), intent(IN)    :: z_sl(:,:) 
+        integer,  intent(IN)    :: beta_method
+        real(wp), intent(IN)    :: beta_const 
+        real(wp), intent(IN)    :: beta_q 
+        real(wp), intent(IN)    :: beta_u0 
+        integer,  intent(IN)    :: beta_gl_scale  
+        real(wp), intent(IN)    :: beta_gl_f
+        real(wp), intent(IN)    :: H_grnd_lim
+        real(wp), intent(IN)    :: beta_min 
         character(len=*), intent(IN) :: boundaries 
 
         ! Local variables 
         integer :: i, j, nx, ny 
-        real(prec), allocatable :: logbeta(:,:) 
+        real(wp), allocatable :: logbeta(:,:) 
         
         nx = size(beta,1)
         ny = size(beta,2)
@@ -179,32 +179,37 @@ contains
         
 
         ! Apply additional condition for particular experiments
-        if (trim(boundaries) .eq. "EISMINT") then 
-            ! Redefine beta at the summit to reduce singularity
-            ! in symmetric EISMINT experiments with sliding active
-            i = (nx-1)/2 
-            j = (ny-1)/2
-            beta(i,j) = (beta(i-1,j)+beta(i+1,j)+beta(i,j-1)+beta(i,j+1)) / 4.0 
-        else if (trim(boundaries) .eq. "MISMIP3D") then 
-            ! Redefine beta at the summit to reduce singularity
-            ! in MISMIP symmetric experiments
-            beta(1,:) = beta(2,:) 
+        select case(trim(boundaries))
 
-        else if (trim(boundaries) .eq. "periodic") then 
+            case("EISMINT")
+                ! Redefine beta at the summit to reduce singularity
+                ! in symmetric EISMINT experiments with sliding active
+
+                i = (nx-1)/2 
+                j = (ny-1)/2
+                beta(i,j) = 0.25*(beta(i-1,j)+beta(i+1,j)+beta(i,j-1)+beta(i,j+1))
             
-            beta(1,:)  = beta(nx-1,:)
-            beta(nx,:) = beta(2,:) 
-            beta(:,1)  = beta(:,ny-1)
-            beta(:,ny) = beta(:,2) 
+            case("MISMIP3D") 
+                ! Redefine beta at the summit to reduce singularity
+                ! in MISMIP symmetric experiments
+                
+                beta(1,:) = beta(2,:) 
 
-        else if (trim(boundaries) .eq. "infinite") then 
+            case("periodic") 
             
-            beta(1,:)  = beta(nx-1,:)
-            beta(nx,:) = beta(2,:) 
-            beta(:,1)  = beta(:,2)
-            beta(:,ny) = beta(:,ny-1) 
+                beta(1,:)  = beta(nx-1,:)
+                beta(nx,:) = beta(2,:) 
+                beta(:,1)  = beta(:,ny-1)
+                beta(:,ny) = beta(:,2) 
 
-        end if 
+            case("infinite") 
+            
+                beta(1,:)  = beta(nx-1,:)
+                beta(nx,:) = beta(2,:) 
+                beta(:,1)  = beta(:,2)
+                beta(:,ny) = beta(:,ny-1) 
+
+        end select
 
         ! Finally ensure that beta for grounded ice is higher than the lower allowed limit
         where(beta .gt. 0.0 .and. beta .lt. beta_min) beta = beta_min 
@@ -216,19 +221,19 @@ contains
         
         return 
 
-    end subroutine calc_beta 
+    end subroutine calc_beta
 
     subroutine stagger_beta(beta_acx,beta_acy,beta,f_grnd,f_grnd_acx,f_grnd_acy,beta_gl_stag,boundaries)
 
         implicit none 
 
-        real(prec), intent(INOUT) :: beta_acx(:,:) 
-        real(prec), intent(INOUT) :: beta_acy(:,:) 
-        real(prec), intent(IN)    :: beta(:,:)
-        real(prec), intent(IN)    :: f_grnd(:,:) 
-        real(prec), intent(IN)    :: f_grnd_acx(:,:) 
-        real(prec), intent(IN)    :: f_grnd_acy(:,:) 
-        integer,    intent(IN)    :: beta_gl_stag 
+        real(wp), intent(INOUT) :: beta_acx(:,:) 
+        real(wp), intent(INOUT) :: beta_acy(:,:) 
+        real(wp), intent(IN)    :: beta(:,:)
+        real(wp), intent(IN)    :: f_grnd(:,:) 
+        real(wp), intent(IN)    :: f_grnd_acx(:,:) 
+        real(wp), intent(IN)    :: f_grnd_acy(:,:) 
+        integer,  intent(IN)    :: beta_gl_stag 
         character(len=*), intent(IN) :: boundaries 
 
         ! Local variables 
@@ -316,9 +321,9 @@ contains
 
         implicit none 
 
-        real(prec), intent(IN) :: H_ice 
-        real(prec), intent(IN) :: f_grnd 
-        real(prec) :: N_eff                 ! [Pa]
+        real(wp), intent(IN) :: H_ice 
+        real(wp), intent(IN) :: f_grnd 
+        real(wp) :: N_eff                 ! [Pa]
 
         ! Calculate effective pressure [Pa] (overburden pressure)
         N_eff = f_grnd * (rho_ice*g*H_ice)
@@ -337,18 +342,18 @@ contains
 
         implicit none 
 
-        real(prec), intent(IN) :: H_ice 
-        real(prec), intent(IN) :: z_bed 
-        real(prec), intent(IN) :: z_sl 
-        real(prec), intent(IN) :: H_w 
-        real(prec), intent(IN) :: p       ! [0:1], 0: no ocean connectivity, 1: full ocean connectivity
-        real(prec) :: N_eff               ! [Pa]
+        real(wp), intent(IN) :: H_ice 
+        real(wp), intent(IN) :: z_bed 
+        real(wp), intent(IN) :: z_sl 
+        real(wp), intent(IN) :: H_w 
+        real(wp), intent(IN) :: p       ! [0:1], 0: no ocean connectivity, 1: full ocean connectivity
+        real(wp) :: N_eff               ! [Pa]
 
         ! Local variables  
-        real(prec) :: H_float     ! Maximum ice thickness to allow floating ice
-        real(prec) :: p_w         ! Pressure of water at the base of the ice sheet
-        real(prec) :: x 
-        real(prec) :: rho_sw_ice 
+        real(wp) :: H_float     ! Maximum ice thickness to allow floating ice
+        real(wp) :: p_w         ! Pressure of water at the base of the ice sheet
+        real(wp) :: x 
+        real(wp) :: rho_sw_ice 
 
         rho_sw_ice = rho_sw/rho_ice 
 
@@ -387,19 +392,19 @@ contains
         
         implicit none 
         
-        real(prec), intent(IN)    :: H_w
-        real(prec), intent(IN)    :: H_ice
-        real(prec), intent(IN)    :: f_grnd  
-        real(prec), intent(IN)    :: H_w_max            ! [m] Maximum allowed water depth 
-        real(prec), intent(IN)    :: N0                 ! [Pa] Reference effective pressure 
-        real(prec), intent(IN)    :: delta              ! [--] Fraction of overburden pressure for saturated till
-        real(prec), intent(IN)    :: e0                 ! [--] Reference void ratio at N0 
-        real(prec), intent(IN)    :: Cc                 ! [--] Till compressibility 
-        real(prec)                :: N_eff              ! [Pa] Effective pressure 
+        real(wp), intent(IN)    :: H_w
+        real(wp), intent(IN)    :: H_ice
+        real(wp), intent(IN)    :: f_grnd  
+        real(wp), intent(IN)    :: H_w_max            ! [m] Maximum allowed water depth 
+        real(wp), intent(IN)    :: N0                 ! [Pa] Reference effective pressure 
+        real(wp), intent(IN)    :: delta              ! [--] Fraction of overburden pressure for saturated till
+        real(wp), intent(IN)    :: e0                 ! [--] Reference void ratio at N0 
+        real(wp), intent(IN)    :: Cc                 ! [--] Till compressibility 
+        real(wp)                :: N_eff              ! [Pa] Effective pressure 
         
         ! Local variables 
-        real(prec) :: P0, s 
-        real(prec) :: N_eff_maxHw
+        real(wp) :: P0, s 
+        real(wp) :: N_eff_maxHw
 
         if (f_grnd .eq. 0.0_prec) then 
             ! No effective pressure at base for floating ice
@@ -428,10 +433,10 @@ contains
         
         implicit none 
         
-        real(prec), intent(IN)    :: z_bed  
-        real(prec), intent(IN)    :: z0
-        real(prec), intent(IN)    :: z1
-        real(prec)                :: lambda 
+        real(wp), intent(IN)    :: z_bed  
+        real(wp), intent(IN)    :: z0
+        real(wp), intent(IN)    :: z1
+        real(wp)                :: lambda 
 
         lambda = (z_bed - z0) / (z1 - z0)
         
@@ -447,10 +452,10 @@ contains
 
         implicit none 
         
-        real(prec), intent(IN)    :: z_bed  
-        real(prec), intent(IN)    :: z0
-        real(prec), intent(IN)    :: z1
-        real(prec)                :: lambda 
+        real(wp), intent(IN)    :: z_bed  
+        real(wp), intent(IN)    :: z0
+        real(wp), intent(IN)    :: z1
+        real(wp)                :: lambda 
 
         lambda = exp( (z_bed - z1) / (z1 - z0) )
                 
@@ -465,8 +470,8 @@ contains
         
         implicit none 
         
-        real(prec), intent(IN)    :: phi                ! [deg] Constant till angle  
-        real(prec)                :: lambda 
+        real(wp), intent(IN)    :: phi                ! [deg] Constant till angle  
+        real(wp)                :: lambda 
 
         ! Calculate bed friction coefficient as the tangent
         lambda = tan(phi*pi/180.0)
@@ -481,16 +486,16 @@ contains
         
         implicit none 
         
-        real(prec), intent(IN)    :: z_bed              ! [m] Bedrock elevation
-        real(prec), intent(IN)    :: z_sl               ! [m] Sea level 
-        real(prec), intent(IN)    :: phi_min            ! [deg] Minimum till angle 
-        real(prec), intent(IN)    :: phi_max            ! [deg] Maximum till angle 
-        real(prec), intent(IN)    :: phi_zmin           ! [m] C[z=zmin] = tan(phi_min)
-        real(prec), intent(IN)    :: phi_zmax           ! [m] C[z=zmax] = tan(phi_max) 
-        real(prec)                :: lambda 
+        real(wp), intent(IN)    :: z_bed              ! [m] Bedrock elevation
+        real(wp), intent(IN)    :: z_sl               ! [m] Sea level 
+        real(wp), intent(IN)    :: phi_min            ! [deg] Minimum till angle 
+        real(wp), intent(IN)    :: phi_max            ! [deg] Maximum till angle 
+        real(wp), intent(IN)    :: phi_zmin           ! [m] C[z=zmin] = tan(phi_min)
+        real(wp), intent(IN)    :: phi_zmax           ! [m] C[z=zmax] = tan(phi_max) 
+        real(wp)                :: lambda 
 
         ! Local variables 
-        real(prec) :: phi, f_scale, z_rel  
+        real(wp) :: phi, f_scale, z_rel  
 
         ! Get bedrock elevation relative to sea level 
 !         z_rel = z_sl - z_bed 
@@ -524,19 +529,19 @@ contains
         
         implicit none
         
-        real(prec), intent(OUT) :: beta(:,:)        ! aa-nodes
-        real(prec), intent(IN)  :: ux_b(:,:)        ! ac-nodes
-        real(prec), intent(IN)  :: uy_b(:,:)        ! ac-nodes
-        real(prec), intent(IN)  :: C_bed(:,:)       ! aa-nodes
-        real(prec), intent(IN)  :: q
-        real(prec), intent(IN)  :: u_0              ! [m/a] 
+        real(wp), intent(OUT) :: beta(:,:)        ! aa-nodes
+        real(wp), intent(IN)  :: ux_b(:,:)        ! ac-nodes
+        real(wp), intent(IN)  :: uy_b(:,:)        ! ac-nodes
+        real(wp), intent(IN)  :: C_bed(:,:)       ! aa-nodes
+        real(wp), intent(IN)  :: q
+        real(wp), intent(IN)  :: u_0              ! [m/a] 
 
         ! Local variables
         integer    :: i, j, nx, ny
         integer    :: i1, j1 
-        real(prec) :: ux_b_mid, uy_b_mid, uxy_b  
+        real(wp) :: ux_b_mid, uy_b_mid, uxy_b  
 
-        real(prec), parameter :: ub_sq_min = (1e-1_prec)**2  ! [m/a] Minimum velocity is positive small value to avoid divide by zero
+        real(wp), parameter :: ub_sq_min = (1e-1_prec)**2  ! [m/a] Minimum velocity is positive small value to avoid divide by zero
 
         nx = size(beta,1)
         ny = size(beta,2)
@@ -587,19 +592,19 @@ contains
         
         implicit none
         
-        real(prec), intent(OUT) :: beta(:,:)        ! aa-nodes
-        real(prec), intent(IN)  :: ux_b(:,:)        ! ac-nodes
-        real(prec), intent(IN)  :: uy_b(:,:)        ! ac-nodes
-        real(prec), intent(IN)  :: C_bed(:,:)       ! aa-nodes
-        real(prec), intent(IN)  :: q
-        real(prec), intent(IN)  :: u_0              ! [m/a] 
+        real(wp), intent(OUT) :: beta(:,:)        ! aa-nodes
+        real(wp), intent(IN)  :: ux_b(:,:)        ! ac-nodes
+        real(wp), intent(IN)  :: uy_b(:,:)        ! ac-nodes
+        real(wp), intent(IN)  :: C_bed(:,:)       ! aa-nodes
+        real(wp), intent(IN)  :: q
+        real(wp), intent(IN)  :: u_0              ! [m/a] 
 
         ! Local variables
         integer    :: i, j, nx, ny
         integer    :: i1, j1 
-        real(prec) :: ux_b_mid, uy_b_mid, uxy_b  
+        real(wp) :: ux_b_mid, uy_b_mid, uxy_b  
 
-        real(prec), parameter :: ub_sq_min = (1e-1_prec)**2  ! [m/a] Minimum velocity is positive small value to avoid divide by zero
+        real(wp), parameter :: ub_sq_min = (1e-1_prec)**2  ! [m/a] Minimum velocity is positive small value to avoid divide by zero
 
         nx = size(beta,1)
         ny = size(beta,2)
@@ -640,9 +645,9 @@ contains
         
         implicit none
         
-        real(prec), intent(INOUT) :: beta(:,:)     ! aa-nodes
-        real(prec), intent(IN)    :: f_grnd(:,:)   ! aa-nodes
-        real(prec), intent(IN)    :: f_gl          ! Fraction parameter      
+        real(wp), intent(INOUT) :: beta(:,:)     ! aa-nodes
+        real(wp), intent(IN)    :: f_grnd(:,:)   ! aa-nodes
+        real(wp), intent(IN)    :: f_gl          ! Fraction parameter      
         
         ! Local variables
         integer    :: i, j, nx, ny
@@ -690,13 +695,13 @@ contains
         
         implicit none
         
-        real(prec), intent(INOUT) :: beta(:,:)     ! aa-nodes
-        real(prec), intent(IN)    :: H_grnd(:,:)  ! aa-nodes
-        real(prec), intent(IN)    :: H_grnd_lim       
+        real(wp), intent(INOUT) :: beta(:,:)     ! aa-nodes
+        real(wp), intent(IN)    :: H_grnd(:,:)  ! aa-nodes
+        real(wp), intent(IN)    :: H_grnd_lim       
 
         ! Local variables
         integer    :: i, j, nx, ny
-        real(prec) :: f_scale 
+        real(wp) :: f_scale 
 
         nx = size(H_grnd,1)
         ny = size(H_grnd,2) 
@@ -729,16 +734,16 @@ contains
         
         implicit none
         
-        real(prec), intent(INOUT) :: beta(:,:)     ! aa-nodes
-        real(prec), intent(IN)    :: H_ice(:,:)     ! aa-nodes
-        real(prec), intent(IN)    :: z_bed(:,:)     ! aa-nodes        
-        real(prec), intent(IN)    :: z_sl(:,:)      ! aa-nodes        
+        real(wp), intent(INOUT) :: beta(:,:)     ! aa-nodes
+        real(wp), intent(IN)    :: H_ice(:,:)     ! aa-nodes
+        real(wp), intent(IN)    :: z_bed(:,:)     ! aa-nodes        
+        real(wp), intent(IN)    :: z_sl(:,:)      ! aa-nodes        
         logical,    intent(IN)    :: norm           ! Normalize by H_ice? 
 
         ! Local variables
         integer    :: i, j, nx, ny
-        real(prec) :: rho_sw_ice 
-        real(prec) :: f_scale 
+        real(wp) :: rho_sw_ice 
+        real(wp) :: f_scale 
 
         rho_sw_ice = rho_sw / rho_ice 
 
@@ -781,9 +786,9 @@ contains
 
         implicit none
         
-        real(prec), intent(INOUT) :: beta_acx(:,:)   ! ac-nodes
-        real(prec), intent(INOUT) :: beta_acy(:,:)   ! ac-nodes
-        real(prec), intent(IN)    :: beta(:,:)       ! aa-nodes
+        real(wp), intent(INOUT) :: beta_acx(:,:)   ! ac-nodes
+        real(wp), intent(INOUT) :: beta_acy(:,:)   ! ac-nodes
+        real(wp), intent(IN)    :: beta(:,:)       ! aa-nodes
 
         ! Local variables
         integer    :: i, j, nx, ny
@@ -822,10 +827,10 @@ contains
 
         implicit none
         
-        real(prec), intent(INOUT) :: beta_acx(:,:)   ! ac-nodes
-        real(prec), intent(INOUT) :: beta_acy(:,:)   ! ac-nodes
-        real(prec), intent(IN)    :: beta(:,:)       ! aa-nodes
-        real(prec), intent(IN)    :: f_grnd(:,:)     ! aa-nodes    
+        real(wp), intent(INOUT) :: beta_acx(:,:)   ! ac-nodes
+        real(wp), intent(INOUT) :: beta_acy(:,:)   ! ac-nodes
+        real(wp), intent(IN)    :: beta(:,:)       ! aa-nodes
+        real(wp), intent(IN)    :: f_grnd(:,:)     ! aa-nodes    
         
         ! Local variables
         integer    :: i, j, nx, ny 
@@ -885,10 +890,10 @@ contains
 
         implicit none
         
-        real(prec), intent(INOUT) :: beta_acx(:,:)   ! ac-nodes
-        real(prec), intent(INOUT) :: beta_acy(:,:)   ! ac-nodes
-        real(prec), intent(IN)    :: beta(:,:)       ! aa-nodes
-        real(prec), intent(IN)    :: f_grnd(:,:)     ! aa-nodes    
+        real(wp), intent(INOUT) :: beta_acx(:,:)   ! ac-nodes
+        real(wp), intent(INOUT) :: beta_acy(:,:)   ! ac-nodes
+        real(wp), intent(IN)    :: beta(:,:)       ! aa-nodes
+        real(wp), intent(IN)    :: f_grnd(:,:)     ! aa-nodes    
         
         ! Local variables
         integer    :: i, j, nx, ny 
@@ -940,12 +945,12 @@ contains
 
         implicit none
         
-        real(prec), intent(INOUT) :: beta_acx(:,:)      ! ac-nodes
-        real(prec), intent(INOUT) :: beta_acy(:,:)      ! ac-nodes
-        real(prec), intent(IN)    :: beta(:,:)          ! aa-nodes
-        real(prec), intent(IN)    :: f_grnd(:,:)        ! aa-nodes     
-        real(prec), intent(IN)    :: f_grnd_acx(:,:)    ! ac-nodes     
-        real(prec), intent(IN)    :: f_grnd_acy(:,:)    ! ac-nodes     
+        real(wp), intent(INOUT) :: beta_acx(:,:)      ! ac-nodes
+        real(wp), intent(INOUT) :: beta_acy(:,:)      ! ac-nodes
+        real(wp), intent(IN)    :: beta(:,:)          ! aa-nodes
+        real(wp), intent(IN)    :: f_grnd(:,:)        ! aa-nodes     
+        real(wp), intent(IN)    :: f_grnd_acx(:,:)    ! ac-nodes     
+        real(wp), intent(IN)    :: f_grnd_acy(:,:)    ! ac-nodes     
         
         ! Local variables
         integer    :: i, j, nx, ny 
@@ -1012,17 +1017,17 @@ contains
 
         implicit none
         
-        real(prec), intent(INOUT) :: beta_acx(:,:)   ! ac-nodes
-        real(prec), intent(INOUT) :: beta_acy(:,:)   ! ac-nodes
-        real(prec), intent(INOUT) :: beta(:,:)       ! aa-nodes
-        real(prec), intent(IN)    :: H_grnd(:,:)     ! aa-nodes    
-        real(prec), intent(IN)    :: f_grnd_acx(:,:) ! ac-nodes 
-        real(prec), intent(IN)    :: f_grnd_acy(:,:) ! ac-nodes
-        real(prec), intent(IN)    :: dHdt(:,:)       ! aa-nodes  
+        real(wp), intent(INOUT) :: beta_acx(:,:)   ! ac-nodes
+        real(wp), intent(INOUT) :: beta_acy(:,:)   ! ac-nodes
+        real(wp), intent(INOUT) :: beta(:,:)       ! aa-nodes
+        real(wp), intent(IN)    :: H_grnd(:,:)     ! aa-nodes    
+        real(wp), intent(IN)    :: f_grnd_acx(:,:) ! ac-nodes 
+        real(wp), intent(IN)    :: f_grnd_acy(:,:) ! ac-nodes
+        real(wp), intent(IN)    :: dHdt(:,:)       ! aa-nodes  
         
         ! Local variables
         integer    :: i, j, nx, ny
-        real(prec) :: H_grnd_now, dHdt_now  
+        real(wp) :: H_grnd_now, dHdt_now  
         logical    :: is_float 
 
         nx = size(beta_acx,1)
@@ -1149,16 +1154,16 @@ contains
         
         implicit none 
 
-        real(prec), intent(IN) :: N_eff 
-        real(prec), intent(IN) :: uxy_b 
-        real(prec), intent(IN) :: ATT_base 
-        real(prec), intent(IN) :: m_drag     
-        real(prec), intent(IN) :: m_max 
-        real(prec), intent(IN) :: lambda_max 
-        real(prec) :: f_np 
+        real(wp), intent(IN) :: N_eff 
+        real(wp), intent(IN) :: uxy_b 
+        real(wp), intent(IN) :: ATT_base 
+        real(wp), intent(IN) :: m_drag     
+        real(wp), intent(IN) :: m_max 
+        real(wp), intent(IN) :: lambda_max 
+        real(wp) :: f_np 
 
         ! Local variables 
-        real(prec) :: kappa 
+        real(wp) :: kappa 
 
         ! Calculate the velocity scaling 
         kappa = m_max / (lambda_max*ATT_base)

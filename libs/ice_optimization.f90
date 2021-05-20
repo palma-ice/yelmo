@@ -203,6 +203,7 @@ end if
         real(wp), allocatable :: z_bnd(:) 
         real(wp), allocatable :: z_lev(:) 
         real(wp), allocatable :: cf_lev(:) 
+        logical,  allocatable :: mask(:,:) 
 
         nx = size(cf_ref,1) 
         ny = size(cf_ref,2) 
@@ -212,6 +213,8 @@ end if
         allocate(z_lev(nlev))
         allocate(cf_lev(nlev))
 
+        allocate(mask(nx,ny)) 
+
         ! Determine z_bed bin boundaries and bin centers
         z_bnd = [-2000.0,-1000.0,-500.0,-400.0,-300.0,-200.0,-100.0,0.0,100.0,200.0]
 
@@ -219,17 +222,19 @@ end if
             z_lev(k) = 0.5_wp*(z_bnd(k) + z_bnd(k+1))
         end do 
 
+        ! Define mask 
+        mask = (H_ice .gt. 0.0_wp) .and. (.not. is_float_obs) .and. (cf_ref .ne. mv)
+
         ! Determine mean values of cf_ref for each bin based 
         ! on values available for grounded ice 
         cf_lev(1) = cf_min 
         do k = 2, nlev 
 
-            n = count(z_bed .ge. z_bnd(k-1) .and. z_bed .lt. z_bnd(k) &
-                        .and. H_ice .gt. 0.0_wp .and. (.not. is_float_obs))
+            n = count(z_bed .ge. z_bnd(k-1) .and. z_bed .lt. z_bnd(k) .and. mask)
 
             if (n .gt. 0) then 
-                cf_lev(k) = sum(z_bed, mask=z_bed .ge. z_bnd(k-1) .and. z_bed .lt. z_bnd(k) &
-                                        .and. H_ice .gt. 0.0_wp .and. (.not. is_float_obs)) &
+                cf_lev(k) = sum(cf_ref, &
+                            mask=z_bed .ge. z_bnd(k-1) .and. z_bed .lt. z_bnd(k) .and. mask) &
                                     / real(n,wp)
             else 
                 cf_lev(k) = cf_min 
@@ -255,7 +260,7 @@ end if
 
         end do 
         end do 
-
+        
         return 
 
     end subroutine fill_cf_ref

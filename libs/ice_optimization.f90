@@ -1,6 +1,6 @@
 module ice_optimization
 
-    use yelmo_defs, only : sp, dp, prec, pi, missing_value, mv, tol_underflow, rho_ice, g 
+    use yelmo_defs, only : sp, dp, wp, prec, pi, missing_value, mv, tol_underflow, rho_ice, rho_sw, g 
 
     use gaussian_filter 
     
@@ -18,44 +18,46 @@ module ice_optimization
 
 contains 
 
-    subroutine update_cf_ref_errscaling_l21(cf_ref,cf_ref_dot,H_ice,dHdt,z_bed,ux,uy,H_obs,uxy_obs,is_float_obs, &
+    subroutine update_cf_ref_errscaling_l21(cf_ref,cf_ref_dot,H_ice,dHdt,z_bed,z_sl,ux,uy,H_obs,uxy_obs,is_float_obs, &
                                         dx,cf_min,cf_max,sigma_err,sigma_vel,tau_c,H0,fill_dist,dt)
         ! Update method following Lipscomb et al. (2021, tc)
 
         implicit none 
 
-        real(prec), intent(INOUT) :: cf_ref(:,:) 
-        real(prec), intent(INOUT) :: cf_ref_dot(:,:) 
-        real(prec), intent(IN)    :: H_ice(:,:) 
-        real(prec), intent(IN)    :: dHdt(:,:) 
-        real(prec), intent(IN)    :: z_bed(:,:) 
-        real(prec), intent(IN)    :: ux(:,:) 
-        real(prec), intent(IN)    :: uy(:,:) 
-        real(prec), intent(IN)    :: H_obs(:,:) 
-        real(prec), intent(IN)    :: uxy_obs(:,:) 
+        real(wp), intent(INOUT) :: cf_ref(:,:) 
+        real(wp), intent(INOUT) :: cf_ref_dot(:,:) 
+        real(wp), intent(IN)    :: H_ice(:,:) 
+        real(wp), intent(IN)    :: dHdt(:,:) 
+        real(wp), intent(IN)    :: z_bed(:,:) 
+        real(wp), intent(IN)    :: z_sl(:,:) 
+        real(wp), intent(IN)    :: ux(:,:) 
+        real(wp), intent(IN)    :: uy(:,:) 
+        real(wp), intent(IN)    :: H_obs(:,:) 
+        real(wp), intent(IN)    :: uxy_obs(:,:) 
         logical,    intent(IN)    :: is_float_obs(:,:) 
-        real(prec), intent(IN)    :: dx 
-        real(prec), intent(IN)    :: cf_min 
-        real(prec), intent(IN)    :: cf_max
-        real(prec), intent(IN)    :: sigma_err 
-        real(prec), intent(IN)    :: sigma_vel
-        real(prec), intent(IN)    :: tau_c                  ! [yr]
-        real(prec), intent(IN)    :: H0                     ! [m]
-        real(prec), intent(IN)    :: fill_dist              ! [km] Distance over which to smooth between nearest neighbor and minimum value
-        real(prec), intent(IN)    :: dt 
+        real(wp), intent(IN)    :: dx 
+        real(wp), intent(IN)    :: cf_min 
+        real(wp), intent(IN)    :: cf_max
+        real(wp), intent(IN)    :: sigma_err 
+        real(wp), intent(IN)    :: sigma_vel
+        real(wp), intent(IN)    :: tau_c                  ! [yr]
+        real(wp), intent(IN)    :: H0                     ! [m]
+        real(wp), intent(IN)    :: fill_dist              ! [km] Distance over which to smooth between nearest neighbor and minimum value
+        real(wp), intent(IN)    :: dt 
 
         ! Local variables 
         integer :: i, j, nx, ny, i1, j1  
-        real(prec) :: dx_km, f_damp   
-        real(prec) :: ux_aa, uy_aa, uxy_aa
-        real(prec) :: H_err_now, dHdt_now, f_vel   
-        real(prec) :: xwt, ywt, xywt   
+        real(wp) :: dx_km, f_damp   
+        real(wp) :: ux_aa, uy_aa, uxy_aa
+        real(wp) :: H_err_now, dHdt_now, f_vel   
+        real(wp) :: xwt, ywt, xywt   
+        real(wp) :: cf_val 
 
-        real(prec), allocatable   :: H_err_sm(:,:)
-        real(prec), allocatable   :: H_err(:,:)
-        real(prec), allocatable   :: uxy(:,:)
-        real(prec), allocatable   :: uxy_err(:,:)
-        real(prec), allocatable   :: cf_prev(:,:) 
+        real(wp), allocatable   :: H_err_sm(:,:)
+        real(wp), allocatable   :: H_err(:,:)
+        real(wp), allocatable   :: uxy(:,:)
+        real(wp), allocatable   :: uxy_err(:,:)
+        real(wp), allocatable   :: cf_prev(:,:) 
 
         nx = size(cf_ref,1)
         ny = size(cf_ref,2) 
@@ -83,7 +85,7 @@ contains
         uxy_err = MV 
         where(uxy_obs .ne. MV .and. uxy_obs .ne. 0.0) uxy_err = (uxy - uxy_obs)
 
-if (.FALSE.) then 
+if (.TRUE.) then 
         ! Additionally, apply a Gaussian filter to H_err to ensure smooth transitions
         ! Apply a weighted average between smoothed and original H_err, where 
         ! slow regions get more smoothed, and fast regions use more local error 
@@ -157,7 +159,10 @@ end if
         end do 
         end do 
 
-        ! Fill in missing values with nearest neighbor or cf_min when none available
+        ! Fill in cf_ref for floating points using bed analogy method
+        call fill_cf_ref(cf_ref,H_ice,z_bed,z_sl,is_float_obs,cf_min)
+
+        ! Fill in remaining missing values with nearest neighbor or cf_min when none available
         call fill_nearest(cf_ref,missing_value=MV,fill_value=cf_min,fill_dist=fill_dist,n=5,dx=dx)
 
         ! Ensure cf_ref is not below lower or upper limit 
@@ -168,51 +173,165 @@ end if
         !call filter_gaussian(var=cf_ref,sigma=dx_km*0.2,dx=dx_km)     !,mask=err_z_srf .ne. 0.0)
         
         ! Ensure where obs are floating, set cf_ref = cf_min 
-        !where(is_float_obs) cf_ref = cf_min 
+        ! where(is_float_obs) cf_ref = cf_min 
 
         ! Also where no ice exists, set cf_ref = cf_min 
-        !where(H_obs .eq. 0.0) cf_ref = cf_min 
+        ! where(H_obs .eq. 0.0) cf_ref = cf_min 
 
         return 
 
     end subroutine update_cf_ref_errscaling_l21
 
+    subroutine fill_cf_ref(cf_ref,H_ice,z_bed,z_sl,is_float_obs,cf_min)
+        ! Fill points that cannot be optimized with 
+        ! analagous values from similar bed elevations 
+
+        implicit none 
+
+        real(wp), intent(INOUT) :: cf_ref(:,:) 
+        real(wp), intent(IN)    :: H_ice(:,:) 
+        real(wp), intent(IN)    :: z_bed(:,:) 
+        real(wp), intent(IN)    :: z_sl(:,:) 
+        logical,  intent(IN)    :: is_float_obs(:,:) 
+        real(wp), intent(IN)    :: cf_min 
+
+        ! Local variables 
+        integer :: i, j, nx, ny 
+        integer :: k, nlev, n 
+        logical :: is_float 
+        real(wp) :: rho_sw_ice
+        real(wp), allocatable :: z_bnd(:) 
+        real(wp), allocatable :: z_lev(:) 
+        real(wp), allocatable :: cf_lev(:) 
+
+        nx = size(cf_ref,1) 
+        ny = size(cf_ref,2) 
+
+        nlev = 10
+        allocate(z_bnd(nlev+1))
+        allocate(z_lev(nlev))
+        allocate(cf_lev(nlev))
+
+        ! Determine z_bed bin boundaries and bin centers
+        z_bnd = [-2000.0,-1000.0,-500.0,-400.0,-300.0,-200.0,-100.0,0.0,100.0,200.0]
+
+        do k = 1, nlev 
+            z_lev(k) = 0.5_wp*(z_bnd(k) + z_bnd(k+1))
+        end do 
+
+        ! Determine mean values of cf_ref for each bin based 
+        ! on values available for grounded ice 
+        cf_lev(1) = cf_min 
+        do k = 2, nlev 
+
+            n = count(z_bed .ge. z_bnd(k-1) .and. z_bed .lt. z_bnd(k) &
+                        .and. H_ice .gt. 0.0_wp .and. (.not. is_float_obs))
+
+            if (n .gt. 0) then 
+                cf_lev(k) = sum(z_bed, mask=z_bed .ge. z_bnd(k-1) .and. z_bed .lt. z_bnd(k) &
+                                        .and. H_ice .gt. 0.0_wp .and. (.not. is_float_obs)) &
+                                    / real(n,wp)
+            else 
+                cf_lev(k) = cf_min 
+            end if 
+
+        end do 
+
+        ! Perform linear interpolation at points of interest 
+
+        rho_sw_ice = rho_sw/rho_ice ! Ratio of density of seawater to ice [--]
+        
+        do j = 1, ny 
+        do i = 1, nx 
+
+            ! Determine if current point is floating 
+            is_float = H_ice(i,j) - rho_sw_ice*max(z_sl(i,j)-z_bed(i,j),0.0_wp) .le. 0.0_wp 
+
+            if (is_float) then 
+
+                cf_ref(i,j) = interp_linear(z_lev,cf_lev,xout=z_bed(i,j))
+
+            end if 
+
+        end do 
+        end do 
+
+        return 
+
+    end subroutine fill_cf_ref
+
+    function interp_linear(x,y,xout) result(yout)
+        ! Simple linear interpolation of a point
+
+        implicit none 
+ 
+        real(wp), dimension(:), intent(IN) :: x, y
+        real(wp), intent(IN) :: xout
+        real(wp) :: yout 
+        integer :: i, j, n, nout 
+        real(wp) :: alph
+
+        n    = size(x) 
+
+        if (xout .lt. x(1)) then
+            yout = y(1)
+        else if (xout .gt. x(n)) then
+            yout = y(n)
+        else
+            do j = 1, n 
+                if (x(j) .ge. xout) exit 
+            end do
+
+            if (j .eq. 1) then 
+                yout = y(1) 
+            else if (j .eq. n+1) then 
+                yout = y(n)
+            else 
+                alph = (xout - x(j-1)) / (x(j) - x(j-1))
+                yout = y(j-1) + alph*(y(j) - y(j-1))
+            end if 
+        end if 
+
+        return 
+
+    end function interp_linear
+    
     subroutine update_cf_ref_errscaling(cf_ref,cf_ref_dot,H_ice,z_bed,ux,uy,H_obs,uxy_obs,is_float_obs, &
                                         dx,cf_min,cf_max,sigma_err,sigma_vel,err_scale,fill_dist,optvar)
 
         implicit none 
 
-        real(prec), intent(INOUT) :: cf_ref(:,:) 
-        real(prec), intent(INOUT) :: cf_ref_dot(:,:) 
-        real(prec), intent(IN)    :: H_ice(:,:) 
-        real(prec), intent(IN)    :: z_bed(:,:) 
-        real(prec), intent(IN)    :: ux(:,:) 
-        real(prec), intent(IN)    :: uy(:,:) 
-        real(prec), intent(IN)    :: H_obs(:,:) 
-        real(prec), intent(IN)    :: uxy_obs(:,:) 
-        logical,    intent(IN)    :: is_float_obs(:,:) 
-        real(prec), intent(IN)    :: dx 
-        real(prec), intent(IN)    :: cf_min 
-        real(prec), intent(IN)    :: cf_max
-        real(prec), intent(IN)    :: sigma_err 
-        real(prec), intent(IN)    :: sigma_vel
-        real(prec), intent(IN)    :: err_scale              ! [m] or [m/a]
-        real(prec), intent(IN)    :: fill_dist              ! [km] Distance over which to smooth between nearest neighbor and minimum value
+        real(wp), intent(INOUT) :: cf_ref(:,:) 
+        real(wp), intent(INOUT) :: cf_ref_dot(:,:) 
+        real(wp), intent(IN)    :: H_ice(:,:) 
+        real(wp), intent(IN)    :: z_bed(:,:) 
+        real(wp), intent(IN)    :: ux(:,:) 
+        real(wp), intent(IN)    :: uy(:,:) 
+        real(wp), intent(IN)    :: H_obs(:,:) 
+        real(wp), intent(IN)    :: uxy_obs(:,:) 
+        logical,  intent(IN)    :: is_float_obs(:,:) 
+        real(wp), intent(IN)    :: dx 
+        real(wp), intent(IN)    :: cf_min 
+        real(wp), intent(IN)    :: cf_max
+        real(wp), intent(IN)    :: sigma_err 
+        real(wp), intent(IN)    :: sigma_vel
+        real(wp), intent(IN)    :: err_scale              ! [m] or [m/a]
+        real(wp), intent(IN)    :: fill_dist              ! [km] Distance over which to smooth between nearest neighbor and minimum value
         character(len=*), intent(IN) :: optvar
 
         ! Local variables 
-        integer :: i, j, nx, ny, i1, j1  
-        real(prec) :: dx_km, f_err, f_err_lim, f_scale, f_scale_vel   
-        real(prec) :: ux_aa, uy_aa, uxy_aa
-        real(prec) :: err_now, err_now_vel, err_scale_vel, f_err_vel, f_vel   
+        integer  :: i, j, nx, ny, i1, j1  
+        real(wp) :: dx_km, f_err, f_err_lim, f_scale, f_scale_vel   
+        real(wp) :: ux_aa, uy_aa, uxy_aa
+        real(wp) :: err_now, err_now_vel, err_scale_vel, f_err_vel, f_vel   
 
-        real(prec) :: xwt, ywt, xywt   
+        real(wp) :: xwt, ywt, xywt   
 
-        real(prec), allocatable   :: H_err_sm(:,:)
-        real(prec), allocatable   :: H_err(:,:)
-        real(prec), allocatable   :: uxy(:,:)
-        real(prec), allocatable   :: uxy_err(:,:)
-        real(prec), allocatable   :: cf_prev(:,:) 
+        real(wp), allocatable   :: H_err_sm(:,:)
+        real(wp), allocatable   :: H_err(:,:)
+        real(wp), allocatable   :: uxy(:,:)
+        real(wp), allocatable   :: uxy_err(:,:)
+        real(wp), allocatable   :: cf_prev(:,:) 
 
         nx = size(cf_ref,1)
         ny = size(cf_ref,2) 
@@ -366,29 +485,29 @@ end if
 
         implicit none 
 
-        real(prec), intent(INOUT) :: cf_ref(:,:) 
-        real(prec), intent(INOUT) :: cf_ref_dot(:,:) 
-        real(prec), intent(IN)    :: H_ice(:,:) 
-        real(prec), intent(IN)    :: z_bed(:,:) 
-        real(prec), intent(IN)    :: ux(:,:)        ! Depth-averaged velocity (ux_bar)
-        real(prec), intent(IN)    :: uy(:,:)        ! Depth-averaged velocity (uy_bar)
-        real(prec), intent(IN)    :: uxy_i(:,:)     ! Internal shear velocity magnitude 
-        real(prec), intent(IN)    :: uxy_b(:,:)     ! Basal sliding velocity magnitude 
-        real(prec), intent(IN)    :: H_obs(:,:) 
-        real(prec), intent(IN)    :: dx 
-        real(prec), intent(IN)    :: cf_min 
-        real(prec), intent(IN)    :: cf_max
+        real(wp), intent(INOUT) :: cf_ref(:,:) 
+        real(wp), intent(INOUT) :: cf_ref_dot(:,:) 
+        real(wp), intent(IN)    :: H_ice(:,:) 
+        real(wp), intent(IN)    :: z_bed(:,:) 
+        real(wp), intent(IN)    :: ux(:,:)        ! Depth-averaged velocity (ux_bar)
+        real(wp), intent(IN)    :: uy(:,:)        ! Depth-averaged velocity (uy_bar)
+        real(wp), intent(IN)    :: uxy_i(:,:)     ! Internal shear velocity magnitude 
+        real(wp), intent(IN)    :: uxy_b(:,:)     ! Basal sliding velocity magnitude 
+        real(wp), intent(IN)    :: H_obs(:,:) 
+        real(wp), intent(IN)    :: dx 
+        real(wp), intent(IN)    :: cf_min 
+        real(wp), intent(IN)    :: cf_max
 
         ! Local variables 
         integer :: i, j, nx, ny, i1, j1, n 
-        real(prec) :: f_err, f_vel, f_corr, dx_km 
-        real(prec) :: ux_aa, uy_aa 
-        real(prec) :: H_ice_now, H_obs_now 
+        real(wp) :: f_err, f_vel, f_corr, dx_km 
+        real(wp) :: ux_aa, uy_aa 
+        real(wp) :: H_ice_now, H_obs_now 
 
-        real(prec), allocatable   :: cf_prev(:,:) 
-        real(prec) :: wts0(5,5), wts(5,5) 
+        real(wp), allocatable   :: cf_prev(:,:) 
+        real(wp) :: wts0(5,5), wts(5,5) 
 
-        real(prec),parameter :: exp1 = 2.0
+        real(wp),parameter :: exp1 = 2.0
 
         nx = size(cf_ref,1)
         ny = size(cf_ref,2) 
@@ -501,10 +620,10 @@ end if
 
         implicit none 
 
-        real(prec), intent(OUT) :: mb_corr(:,:)     ! [m/a] Mass balance correction term 
-        real(prec), intent(IN)  :: H_ice(:,:)       ! [m] Simulated ice thickness
-        real(prec), intent(IN)  :: H_obs(:,:)       ! [m] Target observed ice thickness
-        real(prec), intent(IN)  :: tau              ! [a] Relaxation time constant 
+        real(wp), intent(OUT) :: mb_corr(:,:)     ! [m/a] Mass balance correction term 
+        real(wp), intent(IN)  :: H_ice(:,:)       ! [m] Simulated ice thickness
+        real(wp), intent(IN)  :: H_obs(:,:)       ! [m] Target observed ice thickness
+        real(wp), intent(IN)  :: tau              ! [a] Relaxation time constant 
 
         mb_corr = -(H_ice - H_obs) / tau 
 
@@ -523,17 +642,17 @@ end if
 
         implicit none 
 
-        real(prec), intent(OUT) :: cf_ref(:,:) 
-        real(prec), intent(IN)  :: tau_d(:,:) 
-        real(prec), intent(IN)  :: uxy_obs(:,:) 
-        real(prec), intent(IN)  :: H_obs(:,:)
-        real(prec), intent(IN)  :: H_grnd(:,:)
-        real(prec), intent(IN)  :: u0 
-        real(prec), intent(IN)  :: cf_min 
-        real(prec), intent(IN)  :: cf_max  
+        real(wp), intent(OUT) :: cf_ref(:,:) 
+        real(wp), intent(IN)  :: tau_d(:,:) 
+        real(wp), intent(IN)  :: uxy_obs(:,:) 
+        real(wp), intent(IN)  :: H_obs(:,:)
+        real(wp), intent(IN)  :: H_grnd(:,:)
+        real(wp), intent(IN)  :: u0 
+        real(wp), intent(IN)  :: cf_min 
+        real(wp), intent(IN)  :: cf_max  
 
         ! Local variables 
-        real(prec), parameter :: ebs = 0.1          ! [m/yr] To avoid divide by zero 
+        real(wp), parameter :: ebs = 0.1          ! [m/yr] To avoid divide by zero 
 
         where (H_obs .eq. 0.0_prec .or. H_grnd .eq. 0.0_prec) 
             ! Set floating or ice-free points to minimum 
@@ -559,21 +678,21 @@ end if
 
         implicit none 
 
-        real(prec), intent(INOUT) :: var(:,:)
-        real(prec), intent(IN)    :: missing_value
-        real(prec), intent(IN)    :: fill_value 
-        real(prec), intent(IN)    :: fill_dist          ! [km]
+        real(wp), intent(INOUT) :: var(:,:)
+        real(wp), intent(IN)    :: missing_value
+        real(wp), intent(IN)    :: fill_value 
+        real(wp), intent(IN)    :: fill_dist          ! [km]
         integer,    intent(IN)    :: n                  ! Average of n neighbors 
-        real(prec), intent(IN)    :: dx                 ! [m] 
+        real(wp), intent(IN)    :: dx                 ! [m] 
 
         ! Local variables 
         integer :: i, j, nx, ny, i1, j1, q, n_now, ij(2) 
         integer :: ntot 
-        real(prec) :: dx_km 
-        real(prec) :: dist_now, f_d 
+        real(wp) :: dx_km 
+        real(wp) :: dist_now, f_d 
 
-        real(prec), allocatable :: var0(:,:) 
-        real(prec), allocatable :: dist(:,:) 
+        real(wp), allocatable :: var0(:,:) 
+        real(wp), allocatable :: dist(:,:) 
 
         nx = size(var,1)
         ny = size(var,2) 
@@ -660,13 +779,13 @@ end if
 
         implicit none
 
-        real(prec), intent(OUT) :: var_ave 
-        real(prec), intent(IN)  :: var(:,:) 
-        real(prec), intent(IN)  :: wts(:,:) 
+        real(wp), intent(OUT) :: var_ave 
+        real(wp), intent(IN)  :: var(:,:) 
+        real(wp), intent(IN)  :: wts(:,:) 
 
         ! Local variables 
-        real(prec) :: wts_tot 
-        real(prec) :: wts_norm(size(wts,1),size(wts,2))
+        real(wp) :: wts_tot 
+        real(wp) :: wts_norm(size(wts,1),size(wts,2))
 
         wts_tot = sum(wts) 
         if (wts_tot .gt. 0.0) then 
@@ -686,13 +805,13 @@ end if
 
         implicit none 
 
-        real(prec), intent(IN) :: time 
-        real(prec), intent(IN) :: time1 
-        real(prec), intent(IN) :: time2
-        real(prec), intent(IN) :: p1
-        real(prec), intent(IN) :: p2
-        real(prec), intent(IN) :: m         ! Non-linear exponent (m=1.0 or higher)
-        real(prec) :: p 
+        real(wp), intent(IN) :: time 
+        real(wp), intent(IN) :: time1 
+        real(wp), intent(IN) :: time2
+        real(wp), intent(IN) :: p1
+        real(wp), intent(IN) :: p2
+        real(wp), intent(IN) :: m         ! Non-linear exponent (m=1.0 or higher)
+        real(wp) :: p 
 
         if (time .le. time1) then 
             p = p1 
@@ -716,15 +835,15 @@ end if
 
         implicit none 
         
-        real(prec), intent(IN)  :: u(:,:), v(:,:), H(:,:) 
-        real(prec) :: umag(size(u,1),size(u,2)) 
+        real(wp), intent(IN)  :: u(:,:), v(:,:), H(:,:) 
+        real(wp) :: umag(size(u,1),size(u,2)) 
         character(len=*), intent(IN), optional :: boundaries 
 
         ! Local variables 
         integer :: i, j, nx, ny 
         integer :: ip1, jp1, im1, jm1
-        real(prec) :: unow, vnow 
-        real(prec) :: f1, f2, H1, H2 
+        real(wp) :: unow, vnow 
+        real(wp) :: f1, f2, H1, H2 
         
         nx = size(u,1)
         ny = size(u,2) 
@@ -803,14 +922,14 @@ end if
 
         implicit none 
 
-        real(prec), intent(IN) :: dx 
-        real(prec), intent(IN) :: dy 
-        real(prec), intent(IN) :: sigma 
+        real(wp), intent(IN) :: dx 
+        real(wp), intent(IN) :: dy 
+        real(wp), intent(IN) :: sigma 
         integer,    intent(IN) :: n 
-        real(prec) :: filt(n,n) 
+        real(wp) :: filt(n,n) 
 
         ! Local variables 
-        real(prec) :: x, y  
+        real(wp) :: x, y  
         integer    :: n2, i, j, i1, j1  
 
         if (mod(n,2) .ne. 1) then 

@@ -15,7 +15,7 @@ module grounding_line_flux
 contains 
 
     subroutine calc_grounding_line_flux(qq_gl_acx,qq_gl_acy,H_ice,ATT_bar,C_bed,ux_bar,uy_bar, &
-                                            f_grnd,f_grnd_acx,f_grnd_acy,n_glen,m_drag,Q0,f_drag,gl_flux_method)
+                                            f_grnd,f_grnd_acx,f_grnd_acy,n_glen,m_drag,Q0,f_drag,glf_method)
 
         implicit none 
 
@@ -33,7 +33,7 @@ contains
         real(prec), intent(IN)  :: m_drag               ! [--] Power law exponent
         real(prec), intent(IN)  :: Q0                   ! [?] Scaling coefficient, in the range of 0.60-0.65
         real(prec), intent(IN)  :: f_drag               ! [--] Dragging coefficient, f_drag ~ 0.6 
-        character(len=*), intent(IN) :: gl_flux_method  ! "power" or "coulomb" method 
+        character(len=*), intent(IN) :: glf_method      ! "power" or "coulomb" method 
 
         ! Local variables
         integer    :: i, j, nx, ny
@@ -83,7 +83,7 @@ contains
 
                 ! 2. Calculate flux directly at the grounding line ============================
 
-                select case(trim(gl_flux_method))
+                select case(trim(glf_method))
 
                     case("power")
                         ! Calculate magnitude of flux given a Coulomb friction relation, following Schoof (2007)
@@ -97,9 +97,9 @@ contains
 
                     case DEFAULT 
 
-                        write(*,*) "calc_grounding_line_flux:: Error: gl_flux_method not recognized, &
+                        write(*,*) "calc_grounding_line_flux:: Error: glf_method not recognized, &
                                    &must be 'coulomb' (Tsai) or 'power' (Schoof)"
-                        write(*,*) "gl_flux_method: ", trim(gl_flux_method)
+                        write(*,*) "glf_method: ", trim(glf_method)
                         stop 
 
                 end select 

@@ -1,6 +1,6 @@
 module velocity_diva
 
-    use yelmo_defs ,only  : sp, dp, wp, rho_ice, rho_sw, rho_w, g
+    use yelmo_defs, only  : sp, dp, wp, rho_ice, rho_sw, rho_w, g
     use yelmo_tools, only : stagger_aa_ab, stagger_aa_ab_ice, stagger_ab_aa_ice, &
                     calc_vertical_integrated_2D, & 
                     integrate_trapezoid1D_1D, integrate_trapezoid1D_pt, minmax
@@ -14,18 +14,19 @@ module velocity_diva
 
         character(len=256) :: ssa_lis_opt 
         character(len=256) :: boundaries 
+        character(len=256) :: glf_method 
         logical  :: no_slip 
         integer  :: visc_method
         real(wp) :: visc_const
         integer  :: beta_method
         real(wp) :: beta_const
-        real(wp) :: beta_q                ! Friction law exponent
-        real(wp) :: beta_u0               ! [m/a] Friction law velocity threshold 
-        integer  :: beta_gl_scale         ! Beta grounding-line scaling method (beta => 0 at gl?)
-        integer  :: beta_gl_stag          ! Beta grounding-line staggering method 
-        real(wp) :: beta_gl_f             ! Fraction of beta at gl 
+        real(wp) :: beta_q                  ! Friction law exponent
+        real(wp) :: beta_u0                 ! [m/a] Friction law velocity threshold 
+        integer  :: beta_gl_scale           ! Beta grounding-line scaling method (beta => 0 at gl?)
+        integer  :: beta_gl_stag            ! Beta grounding-line staggering method 
+        real(wp) :: beta_gl_f               ! Fraction of beta at gl 
         real(wp) :: H_grnd_lim 
-        real(wp) :: beta_min              ! Minimum allowed value of beta
+        real(wp) :: beta_min                ! Minimum allowed value of beta
         real(wp) :: eps_0 
         real(wp) :: ssa_vel_max
         integer  :: ssa_iter_max 
@@ -33,6 +34,8 @@ module velocity_diva
         real(wp) :: ssa_iter_conv 
         logical  :: ssa_write_log 
 
+        real(wp) :: glf_Q0                  ! Q0=0.61_wp
+        real(wp) :: glf_f_drag              ! f_drag=0.6_wp
     end type
 
     private
@@ -45,10 +48,8 @@ contains
     ! qq_gl_acx 
     ! qq_gl_acy 
     ! ATT_bar 
-    ! Q0=0.61_wp
-    ! f_drag=0.6_wp
-    ! gl_flux_method="power"
-
+    ! 
+    
     subroutine calc_velocity_diva(ux,uy,ux_bar,uy_bar,ux_b,uy_b,ux_i,uy_i,taub_acx,taub_acy, &
                                   beta,beta_acx,beta_acy,beta_eff,visc_eff,visc_eff_int,duxdz,duydz, &
                                   ssa_mask_acx,ssa_mask_acy,ssa_err_acx,ssa_err_acy,ssa_iter_now, &
@@ -114,6 +115,12 @@ contains
         integer,  allocatable :: ssa_mask_acx_ref(:,:)
         integer,  allocatable :: ssa_mask_acy_ref(:,:)
 
+        ! For glf methods 
+        logical :: with_glf 
+        real(wp), allocatable :: ATT_bar(:,:) 
+        real(wp), allocatable :: qq_gl_acx(:,:) 
+        real(wp), allocatable :: qq_gl_acy(:,:) 
+        
         real(wp) :: L2_norm 
 
         integer  :: ij(2) 
@@ -131,6 +138,9 @@ contains
 
         allocate(ssa_mask_acx_ref(nx,ny))
         allocate(ssa_mask_acy_ref(nx,ny))
+
+        with_glf = .FALSE. 
+        if (trim(par%glf_method) .eq. "power") with_glf = .TRUE.
 
         ! Store original ssa mask before iterations
         ssa_mask_acx_ref = ssa_mask_acx

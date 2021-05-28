@@ -18,14 +18,13 @@ module ice_optimization
 
 contains 
 
-    subroutine update_cf_ref_errscaling_l21(cf_ref,cf_ref_dot,H_ice,dHdt,z_bed,z_sl,ux,uy,H_obs,uxy_obs,is_float_obs, &
+    subroutine update_cf_ref_errscaling_l21(cf_ref,H_ice,dHdt,z_bed,z_sl,ux,uy,H_obs,uxy_obs,is_float_obs, &
                                         dx,cf_min,cf_max,sigma_err,sigma_vel,tau_c,H0,fill_dist,dt)
         ! Update method following Lipscomb et al. (2021, tc)
 
         implicit none 
 
         real(wp), intent(INOUT) :: cf_ref(:,:) 
-        real(wp), intent(INOUT) :: cf_ref_dot(:,:) 
         real(wp), intent(IN)    :: H_ice(:,:) 
         real(wp), intent(IN)    :: dHdt(:,:) 
         real(wp), intent(IN)    :: z_bed(:,:) 
@@ -58,6 +57,7 @@ contains
         real(wp), allocatable   :: uxy(:,:)
         real(wp), allocatable   :: uxy_err(:,:)
         real(wp), allocatable   :: cf_prev(:,:) 
+        real(wp), allocatable   :: cf_ref_dot(:,:)
 
         nx = size(cf_ref,1)
         ny = size(cf_ref,2) 
@@ -69,7 +69,8 @@ contains
         allocate(uxy(nx,ny))
         allocate(uxy_err(nx,ny))
         allocate(cf_prev(nx,ny))
-
+        allocate(cf_ref_dot(nx,ny)) 
+        
         ! Internal parameters 
         f_damp = 2.0 
 
@@ -301,13 +302,12 @@ end if
 
     end function interp_linear
     
-    subroutine update_cf_ref_errscaling(cf_ref,cf_ref_dot,H_ice,z_bed,ux,uy,H_obs,uxy_obs,is_float_obs, &
+    subroutine update_cf_ref_errscaling(cf_ref,H_ice,z_bed,ux,uy,H_obs,uxy_obs,is_float_obs, &
                                         dx,cf_min,cf_max,sigma_err,sigma_vel,err_scale,fill_dist,optvar)
 
         implicit none 
 
         real(wp), intent(INOUT) :: cf_ref(:,:) 
-        real(wp), intent(INOUT) :: cf_ref_dot(:,:) 
         real(wp), intent(IN)    :: H_ice(:,:) 
         real(wp), intent(IN)    :: z_bed(:,:) 
         real(wp), intent(IN)    :: ux(:,:) 
@@ -479,19 +479,15 @@ end if
         ! Also where no ice exists, set cf_ref = cf_min 
         !where(H_obs .eq. 0.0) cf_ref = cf_min 
 
-        ! Diagnose current rate of change of C_bed 
-        cf_ref_dot = cf_ref - cf_prev
-
         return 
 
     end subroutine update_cf_ref_errscaling
 
-    subroutine update_cf_ref_thickness_ratio(cf_ref,cf_ref_dot,H_ice,z_bed,ux,uy,uxy_i,uxy_b,H_obs,dx,cf_min,cf_max)
+    subroutine update_cf_ref_thickness_ratio(cf_ref,H_ice,z_bed,ux,uy,uxy_i,uxy_b,H_obs,dx,cf_min,cf_max)
 
         implicit none 
 
         real(wp), intent(INOUT) :: cf_ref(:,:) 
-        real(wp), intent(INOUT) :: cf_ref_dot(:,:) 
         real(wp), intent(IN)    :: H_ice(:,:) 
         real(wp), intent(IN)    :: z_bed(:,:) 
         real(wp), intent(IN)    :: ux(:,:)        ! Depth-averaged velocity (ux_bar)
@@ -613,9 +609,6 @@ end if
         
         ! Also where no ice exists, set cf_ref = cf_min 
         where(H_ice .eq. 0.0) cf_ref = cf_min 
-
-        ! Diagnose current rate of change of cf_ref 
-        cf_ref_dot = cf_ref - cf_prev
 
         return 
 

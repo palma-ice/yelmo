@@ -46,7 +46,6 @@ program yelmo_test
     character(len=56) :: cf_ref_init_method
 
     real(prec), allocatable :: mb_corr(:,:) 
-    real(prec), allocatable :: cf_ref_dot(:,:) 
 
     ! No-ice mask (to impose additional melting)
     logical, allocatable :: mask_noice(:,:)  
@@ -179,11 +178,6 @@ program yelmo_test
     mask_noice = .FALSE. 
     !where(yelmo1%dta%pd%H_ice .le. 0.0) mask_noice = .TRUE. 
 
-    ! Define cf_ref_dot for later use 
-    allocate(cf_ref_dot(yelmo1%grd%nx,yelmo1%grd%ny))
-    cf_ref_dot = 0.0 
-    
-
     ! === Set initial boundary conditions for current time and yelmo state =====
     ! ybound: z_bed, z_sl, H_sed, H_w, smb, T_srf, bmb_shlf , Q_geo
 
@@ -303,7 +297,7 @@ program yelmo_test
 
     ! Initialize the 2D output file and write the initial model state 
     call yelmo_write_init(yelmo1,file2D,time_init,units="years")  
-    call write_step_2D_opt(yelmo1,file2D,time_init,cf_ref_dot,mb_corr,mask_noice,tau,err_scale)  
+    call write_step_2D_opt(yelmo1,file2D,time_init,mb_corr,mask_noice,tau,err_scale)  
     
     write(*,*) "Starting optimization..."
 
@@ -342,7 +336,7 @@ program yelmo_test
                     ! Perform optimization after first iteration
 
                     ! Update cf_ref based on error metric(s) 
-                    call update_cf_ref_errscaling(yelmo1%dyn%now%cf_ref,cf_ref_dot,yelmo1%tpo%now%H_ice, &
+                    call update_cf_ref_errscaling(yelmo1%dyn%now%cf_ref,yelmo1%tpo%now%H_ice, &
                                         yelmo1%bnd%z_bed,yelmo1%dyn%now%ux_s,yelmo1%dyn%now%uy_s, &
                                         yelmo1%dta%pd%H_ice,yelmo1%dta%pd%uxy_s,yelmo1%dta%pd%H_grnd.le.0.0_prec, &
                                         yelmo1%tpo%par%dx,cf_min,cf_max,sigma_err,sigma_vel,err_scale, &
@@ -389,7 +383,7 @@ program yelmo_test
                     call yelmo_update(yelmo1,time)
 
                     if (mod(nint(time*100),nint(dt2D_out*100))==0) then
-                        call write_step_2D_opt(yelmo1,file2D,time,cf_ref_dot,mb_corr,mask_noice,tau,err_scale)
+                        call write_step_2D_opt(yelmo1,file2D,time,mb_corr,mask_noice,tau,err_scale)
                     end if 
 
                 end do 
@@ -422,7 +416,7 @@ program yelmo_test
                 ! === Optimization update step =========
 
                 ! Update cf_ref based on error metric(s) 
-                call update_cf_ref_errscaling_l21(yelmo1%dyn%now%cf_ref,cf_ref_dot,yelmo1%tpo%now%H_ice, &
+                call update_cf_ref_errscaling_l21(yelmo1%dyn%now%cf_ref,yelmo1%tpo%now%H_ice, &
                                     yelmo1%tpo%now%dHicedt,yelmo1%bnd%z_bed,yelmo1%bnd%z_sl,yelmo1%dyn%now%ux_s,yelmo1%dyn%now%uy_s, &
                                     yelmo1%dta%pd%H_ice,yelmo1%dta%pd%uxy_s,yelmo1%dta%pd%H_grnd.le.0.0_prec, &
                                     yelmo1%tpo%par%dx,cf_min,cf_max,sigma_err,sigma_vel,tau_c,H0, &
@@ -434,7 +428,7 @@ program yelmo_test
                 call yelmo_update(yelmo1,time)
 
                 if (mod(nint(time*100),nint(dt2D_out*100))==0) then
-                    call write_step_2D_opt(yelmo1,file2D,time,cf_ref_dot,mb_corr,mask_noice,tau,err_scale)
+                    call write_step_2D_opt(yelmo1,file2D,time,mb_corr,mask_noice,tau,err_scale)
                 end if 
 
             end do 
@@ -465,7 +459,7 @@ program yelmo_test
                     call yelmo_update(yelmo1,time)
 
                     ! Update c_bed based on error metric(s) 
-                    call update_cf_ref_thickness_ratio(yelmo1%dyn%now%cf_ref,cf_ref_dot,yelmo1%tpo%now%H_ice, &
+                    call update_cf_ref_thickness_ratio(yelmo1%dyn%now%cf_ref,yelmo1%tpo%now%H_ice, &
                                     yelmo1%bnd%z_bed,yelmo1%dyn%now%ux_bar,yelmo1%dyn%now%uy_bar, &
                                     yelmo1%dyn%now%uxy_i_bar,yelmo1%dyn%now%uxy_b,yelmo1%dta%pd%H_ice, &
                                     yelmo1%tpo%par%dx,cf_min,cf_max=cf_max)
@@ -483,7 +477,7 @@ program yelmo_test
                 end do 
 
                 ! Write the current solution 
-                call write_step_2D_opt(yelmo1,file2D,time,cf_ref_dot,mb_corr,mask_noice,tau,err_scale)
+                call write_step_2D_opt(yelmo1,file2D,time,mb_corr,mask_noice,tau,err_scale)
                 
             end do 
 
@@ -504,14 +498,13 @@ program yelmo_test
     
 contains
 
-    subroutine write_step_2D_opt(ylmo,filename,time,cf_ref_dot,mb_corr,mask_noice,tau,err_scale)
+    subroutine write_step_2D_opt(ylmo,filename,time,mb_corr,mask_noice,tau,err_scale)
 
         implicit none 
         
         type(yelmo_class), intent(IN) :: ylmo
         character(len=*),  intent(IN) :: filename
         real(prec), intent(IN) :: time
-        real(prec), intent(IN) :: cf_ref_dot(:,:)
         real(prec), intent(IN) :: mb_corr(:,:)
         logical,    intent(IN) :: mask_noice(:,:) 
         real(prec), intent(IN) :: tau 
@@ -576,9 +569,7 @@ contains
         
         call nc_write(filename,"cf_ref",yelmo1%dyn%now%cf_ref,units="",long_name="Bed friction scalar", &
                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-        call nc_write(filename,"cf_ref_dot",cf_ref_dot,units="1/a",long_name="Bed friction scalar rate of change", &
-                      dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-
+        
         call nc_write(filename,"N_eff",ylmo%dyn%now%N_eff,units="Pa",long_name="Effective pressure", &
                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
         call nc_write(filename,"beta",ylmo%dyn%now%beta,units="Pa a m-1",long_name="Basal friction coefficient", &

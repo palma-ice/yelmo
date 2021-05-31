@@ -195,7 +195,7 @@ contains
         
         return 
 
-    end subroutine calc_uz_3D 
+    end subroutine calc_uz_3D
 
     subroutine calc_advec_vertical_column_correction(uz,ux,uy,H_ice,z_srf,dHdt,dzsdt,zeta_ac,dx)
         ! Calculate the corrected vertical velocity, accounting for stretching of 
@@ -322,28 +322,6 @@ contains
         ! Assume grid resolution is symmetrical 
         dy = dx 
 
-        ! ! x-direction
-        ! taud_acx = 0.0_prec  
-        ! do j = 2, ny 
-        ! do i = 1, nx-1 
-        !     H_mid         = 0.5_prec*(H_ice(i,j)+H_ice(i+1,j)) 
-        !     taud_acx(i,j) = rhog * H_mid * dzsdx(i,j) 
-        ! end do 
-        ! end do 
-        ! taud_acx(nx,:) = taud_acx(nx-1,:) 
-        ! taud_acx(:,1)  = taud_acx(:,2) 
-
-        ! ! y-direction
-        ! taud_acy = 0.0_prec  
-        ! do j = 1, ny-1 
-        ! do i = 2, nx 
-        !     H_mid         = 0.5_prec*(H_ice(i,j)+H_ice(i,j+1))
-        !     taud_acy(i,j) = rhog * H_mid * dzsdy(i,j) 
-        ! end do 
-        ! end do   
-        ! taud_acy(:,ny) = taud_acy(:,ny-1)  
-        ! taud_acy(1,:)  = taud_acy(2,:)
-
         do j = 1, ny 
         do i = 1, nx 
 
@@ -400,7 +378,7 @@ contains
 
         return 
 
-    end subroutine calc_driving_stress 
+    end subroutine calc_driving_stress
 
     subroutine calc_driving_stress_gl(taud_acx,taud_acy,H_ice,z_srf,z_bed,z_sl,H_grnd, &
                                       f_grnd,f_grnd_acx,f_grnd_acy,dx,method,beta_gl_stag)
@@ -660,9 +638,6 @@ end if
             case(3) 
                 ! Linear interpolation following Gladstone et al. (2010, TC) Eq. 27
 
-                ! Note: this does not handle 'floating on the left' case correctly - fix! 
-                stop 
-
                 ! x-direction 
                 do j = 1, ny 
                 do i = 1, nx-1 
@@ -676,7 +651,7 @@ end if
                     else if (H_grnd(i,j) .le. 0.0 .and. H_grnd(i+1,j) .gt. 0.0) then 
                         ! (i,j) floating; (i+1,j) grounded 
 
-                        taud_acx(i,j) = integrate_gl_driving_stress_linear(H_ice(i+1,j),H_ice(i,j), &
+                        taud_acx(i,j) = -integrate_gl_driving_stress_linear(H_ice(i+1,j),H_ice(i,j), &
                                                     z_bed(i+1,j),z_bed(i,j),z_sl(i+1,j),z_sl(i,j),dx)
                     end if 
 
@@ -697,7 +672,7 @@ end if
                     else if (H_grnd(i,j) .le. 0.0 .and. H_grnd(i,j+1) .gt. 0.0) then
                         ! (i,j) floating; (i,j+1) grounded
 
-                        taud_acy(i,j) = integrate_gl_driving_stress_linear(H_ice(i,j+1),H_ice(i,j), &
+                        taud_acy(i,j) = -integrate_gl_driving_stress_linear(H_ice(i,j+1),H_ice(i,j), &
                                                     z_bed(i,j+1),z_bed(i,j),z_sl(i,j+1),z_sl(i,j),dx)
                          
                     end if 
@@ -711,7 +686,7 @@ end if
 
         return 
 
-    end subroutine calc_driving_stress_gl 
+    end subroutine calc_driving_stress_gl
 
     function integrate_gl_driving_stress_linear(H_ice,H_ice1,z_bed,z_bed1,z_sl,z_sl1,dx) result(taud)
         ! Compute the driving stress for the grounding line more precisely (subgrid)
@@ -783,7 +758,7 @@ end if
 
         return 
 
-    end function integrate_gl_driving_stress_linear 
+    end function integrate_gl_driving_stress_linear
     
     subroutine calc_ice_flux(qq_acx,qq_acy,ux_bar,uy_bar,H_ice,dx,dy)
         ! Calculate the basal stress resulting from sliding (friction times velocity)

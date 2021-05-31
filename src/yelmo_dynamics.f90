@@ -87,6 +87,17 @@ contains
         call calc_driving_stress(dyn%now%taud_acx,dyn%now%taud_acy,tpo%now%H_ice,tpo%now%dzsdx, &
                                         tpo%now%dzsdy,dyn%par%dx,dyn%par%taud_lim,dyn%par%boundaries)
 
+        if (dyn%par%taud_gl_method .ne. 0) then 
+            ! Calculate driving stress specifically at the grounding line 
+            ! via method of choice. 
+
+            call calc_driving_stress_gl(dyn%now%taud_acx,dyn%now%taud_acy, &
+                        tpo%now%H_ice,tpo%now%z_srf,bnd%z_bed,bnd%z_sl,tpo%now%H_grnd, &
+                                      tpo%now%f_grnd,tpo%now%f_grnd_acx,tpo%now%f_grnd_acy, &
+                                      dyn%par%dx,dyn%par%taud_gl_method,beta_gl_stag=1)
+
+        end if 
+
         ! Calculate effective pressure 
         call calc_ydyn_neff(dyn,tpo,thrm,bnd)
 
@@ -627,7 +638,7 @@ contains
                                 dyn%par%beta_gl_f,dyn%par%H_grnd_lim,dyn%par%beta_min,dyn%par%boundaries)
 
             ! Stagger beta
-            call stagger_beta(dyn%now%beta_acx,dyn%now%beta_acy,dyn%now%beta,tpo%now%f_grnd, &
+            call stagger_beta(dyn%now%beta_acx,dyn%now%beta_acy,dyn%now%beta,tpo%now%H_ice,dyn%now%ux_b,dyn%now%uy_b,tpo%now%f_grnd, &
                             tpo%now%f_grnd_acx,tpo%now%f_grnd_acy,dyn%par%beta_gl_stag,dyn%par%boundaries)
 
             !   2. Calculate effective viscosity

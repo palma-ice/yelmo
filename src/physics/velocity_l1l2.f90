@@ -175,7 +175,8 @@ contains
                                 par%H_grnd_lim,par%beta_min,par%boundaries)
 
             ! Stagger beta and beta_eff 
-            call stagger_beta(beta_acx,beta_acy,beta,f_grnd,f_grnd_acx,f_grnd_acy,par%beta_gl_stag,par%boundaries)
+            call stagger_beta(beta_acx,beta_acy,beta,H_ice,ux_b,uy_b, &
+                        f_grnd,f_grnd_acx,f_grnd_acy,par%beta_gl_stag,par%boundaries)
 
             ! =========================================================================================
             ! Step 2: determine the basal velocity ux_b/uy_b 

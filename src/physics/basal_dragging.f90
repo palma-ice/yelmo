@@ -50,7 +50,7 @@ module basal_dragging
     public :: stagger_beta_aa_downstream    
     public :: stagger_beta_aa_subgrid
     public :: stagger_beta_aa_subgrid_1 
-    
+    public :: stagger_beta_aa_subgrid_flux 
 contains 
 
     subroutine calc_c_bed(c_bed,cf_ref,N_eff)
@@ -223,13 +223,16 @@ contains
 
     end subroutine calc_beta
 
-    subroutine stagger_beta(beta_acx,beta_acy,beta,f_grnd,f_grnd_acx,f_grnd_acy,beta_gl_stag,boundaries)
+    subroutine stagger_beta(beta_acx,beta_acy,beta,H_ice,ux,uy,f_grnd,f_grnd_acx,f_grnd_acy,beta_gl_stag,boundaries)
 
         implicit none 
 
         real(wp), intent(INOUT) :: beta_acx(:,:) 
         real(wp), intent(INOUT) :: beta_acy(:,:) 
         real(wp), intent(IN)    :: beta(:,:)
+        real(wp), intent(IN)    :: H_ice(:,:)
+        real(wp), intent(IN)    :: ux(:,:)
+        real(wp), intent(IN)    :: uy(:,:)
         real(wp), intent(IN)    :: f_grnd(:,:) 
         real(wp), intent(IN)    :: f_grnd_acx(:,:) 
         real(wp), intent(IN)    :: f_grnd_acy(:,:) 
@@ -273,7 +276,14 @@ contains
 
 !                 call stagger_beta_aa_subgrid_1(beta_acx,beta_acy,beta,H_grnd, &
 !                                             f_grnd,f_grnd_acx,f_grnd_acy)
-                
+            
+            case(4)
+                ! Apply subgrid scaling fraction at the grounding line when staggering,
+                ! with subgrid weighting calculated from linearly interpolated flux. 
+
+                call stagger_beta_aa_subgrid_flux(beta_acx,beta_acy,beta, &
+                                        H_ice,ux,uy,f_grnd,f_grnd_acx,f_grnd_acy)
+
             case DEFAULT 
 
                 write(*,*) "stagger_beta:: Error: beta_gl_stag not recognized."
@@ -1138,6 +1148,194 @@ contains
         
     end subroutine stagger_beta_aa_subgrid_1
     
+
+    subroutine stagger_beta_aa_subgrid_flux(beta_acx,beta_acy,beta,H_ice,ux,uy,f_grnd,f_grnd_acx,f_grnd_acy)
+        ! Modify basal friction coefficient by grounded fraction 
+        ! weighted by linear-interpolated flux. 
+
+        implicit none
+        
+        real(wp), intent(INOUT) :: beta_acx(:,:)      ! ac-nodes
+        real(wp), intent(INOUT) :: beta_acy(:,:)      ! ac-nodes
+        real(wp), intent(IN)    :: beta(:,:)          ! aa-nodes
+        real(wp), intent(IN)    :: H_ice(:,:)         ! aa-nodes 
+        real(wp), intent(IN)    :: ux(:,:)            ! ac-nodes
+        real(wp), intent(IN)    :: uy(:,:)            ! ac-nodes
+        real(wp), intent(IN)    :: f_grnd(:,:)        ! aa-nodes     
+        real(wp), intent(IN)    :: f_grnd_acx(:,:)    ! ac-nodes     
+        real(wp), intent(IN)    :: f_grnd_acy(:,:)    ! ac-nodes     
+        
+        ! Local variables
+        integer    :: i, j, nx, ny 
+        integer    :: im1, ip1, jm1, jp1 
+        real(wp)   :: ux_aa_a, ux_aa_b 
+        real(wp)   :: uy_aa_a, uy_aa_b
+
+        nx = size(beta_acx,1)
+        ny = size(beta_acx,2) 
+
+        ! Apply simple staggering to ac-nodes
+
+        do j = 1, ny 
+        do i = 1, nx
+
+            im1 = max(1, i-1)
+            ip1 = min(nx,i+1)
+            
+            jm1 = max(1, j-1)
+            jp1 = min(ny,j+1)
+
+            ! acx-nodes
+            if (f_grnd(i,j) .gt. 0.0 .and. f_grnd(ip1,j) .eq. 0.0) then 
+                ! Floating to the right
+
+                ux_aa_a = 0.5_wp*(ux(im1,j)+ux(i,j))
+                ux_aa_b = 0.5_wp*(ux(ip1,j)+ux(i,j))
+                
+                call calc_beta_gl_flux_weight(beta_acx(i,j),beta(i,j),beta(ip1,j), &
+                                ux_aa_a,ux_aa_b,H_ice(i,j),H_ice(ip1,j),f_grnd_acx(i,j))
+
+            else if (f_grnd(i,j) .eq. 0.0 .and. f_grnd(ip1,j) .gt. 0.0) then 
+                ! Floating to the left 
+
+                ux_aa_a = 0.5_wp*(ux(ip1,j)+ux(i,j))
+                ux_aa_b = 0.5_wp*(ux(im1,j)+ux(i,j))
+                
+                call calc_beta_gl_flux_weight(beta_acx(i,j),beta(ip1,j),beta(i,j), &
+                                ux_aa_a,ux_aa_b,H_ice(ip1,j),H_ice(i,j),f_grnd_acx(i,j))
+
+            else if (f_grnd(i,j) .gt. 0.0 .and. f_grnd(ip1,j) .gt. 0.0) then 
+                ! Fully grounded, simple staggering
+
+                beta_acx(i,j) = 0.5*(beta(i,j) + beta(ip1,j))
+
+            else 
+                ! Fully floating
+
+                beta_acx(i,j) = 0.0
+
+            end if 
+
+            ! acy-nodes
+            if (f_grnd(i,j) .gt. 0.0 .and. f_grnd(i,jp1) .eq. 0.0) then 
+                ! Floating to the top
+
+                uy_aa_a = 0.5_wp*(uy(i,jm1)+uy(i,j))
+                uy_aa_b = 0.5_wp*(uy(i,jp1)+uy(i,j))
+                
+                call calc_beta_gl_flux_weight(beta_acy(i,j),beta(i,j),beta(i,jp1), &
+                                uy_aa_a,uy_aa_b,H_ice(i,j),H_ice(i,jp1),f_grnd_acy(i,j))
+
+            else if (f_grnd(i,j) .eq. 0.0 .and. f_grnd(ip1,j) .gt. 0.0) then 
+                ! Floating to the bottom 
+
+                uy_aa_a = 0.5_wp*(uy(i,jp1)+uy(i,j))
+                uy_aa_b = 0.5_wp*(uy(i,jm1)+uy(i,j))
+                
+                call calc_beta_gl_flux_weight(beta_acy(i,j),beta(i,jp1),beta(i,j), &
+                                uy_aa_a,uy_aa_b,H_ice(i,jp1),H_ice(i,j),f_grnd_acx(i,j))
+
+            else if (f_grnd(i,j) .gt. 0.0 .and. f_grnd(i,jp1) .gt. 0.0) then 
+                ! Fully grounded, simple staggering
+
+                beta_acy(i,j) = 0.5*(beta(i,j) + beta(i,jp1))
+
+            else 
+                ! Fully floating
+
+                beta_acy(i,j) = 0.0
+                 
+            end if 
+
+        end do 
+        end do 
+
+        return
+        
+    end subroutine stagger_beta_aa_subgrid_flux
+    
+    subroutine calc_beta_gl_flux_weight(beta_ac,beta_a,beta_b,ux_a,ux_b,H_a,H_b,f_grnd_ac)
+        ! aa-node 'a' is grounded, aa-node 'b' is floating 
+        ! Calculate weighted beta such that the weighting fraction 
+        ! is scaled by u_g / u_tot, where u_g is sum of vel. for grounded segments 
+        ! in cell between aa-nodes a and b, and u_tot is the sum of 
+        ! all segments. Then:
+        ! beta_ac = beta_a * (1-u_g/u_tot)
+
+        ! Following "B2" approach proposed by Gladstone et al. (2010), 
+        ! Eqs. 29, 30 & 31. 
+
+        implicit none 
+
+        real(wp), intent(OUT)   :: beta_ac
+        real(wp), intent(IN)    :: beta_a
+        real(wp), intent(IN)    :: beta_b
+        real(wp), intent(IN)    :: ux_a
+        real(wp), intent(IN)    :: ux_b 
+        real(wp), intent(IN)    :: H_a 
+        real(wp), intent(IN)    :: H_b  
+        real(wp), intent(IN)    :: f_grnd_ac 
+
+        ! Local variables 
+        integer  :: i  
+        real(wp) :: lambda 
+        real(wp) :: q_a, q_b, q_now
+        real(wp) :: H_now 
+        real(wp) :: u_now 
+        real(wp) :: uu_grnd, uu_tot 
+        real(wp) :: weight 
+
+        integer, parameter :: nseg = 100        ! 100 segments 
+        
+        ! First calculate flux and boundary aa-nodes 
+        q_a = ux_a*H_a 
+        q_b = ux_b*H_b 
+
+        ! Set grounded and total flux sums to zero
+        uu_grnd = 0.0 
+        uu_tot  = 0.0 
+
+        do i = 1, nseg 
+
+            ! Get fraction along cell 
+            lambda = real(i-1,wp)/real(nseg-1,wp)
+
+            ! Get thickness and flux for current segment 
+            H_now = H_a*lambda + H_b*(1.0_wp-lambda) 
+            q_now = q_a*lambda + q_b*(1.0_wp-lambda)
+
+            ! Recover velocity for current segment 
+            if (H_now .gt. 0.0_wp) then 
+                u_now = q_now / H_now 
+            else
+                u_now = 0.0_wp 
+            end if 
+
+            ! Add to total 
+            uu_tot = uu_tot + q_now 
+
+            ! If in grounded region, add to grounded total 
+            if (lambda .lt. f_grnd_ac) then 
+                uu_grnd = uu_grnd + q_now 
+            end if 
+
+        end do 
+
+        ! Calculate grounded weight 
+        if (uu_tot .gt. 0.0_wp) then 
+            weight = uu_grnd / uu_tot 
+        else
+            ! Assume floating (no velocities or ice thicknesses found...)
+            weight = 0.0_wp 
+        end if 
+
+        ! Calculate subgrid beta value 
+        beta_ac = beta_a*weight 
+
+        return 
+
+    end subroutine calc_beta_gl_flux_weight
+
     ! ================================================================================
     ! ================================================================================
 

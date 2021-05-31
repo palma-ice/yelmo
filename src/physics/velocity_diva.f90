@@ -205,8 +205,10 @@ contains
             call calc_beta_eff(beta_eff,beta,F2,zeta_aa,no_slip=par%no_slip)
             
             ! Stagger beta and beta_eff 
-            call stagger_beta(beta_acx,beta_acy,beta,f_grnd,f_grnd_acx,f_grnd_acy,par%beta_gl_stag,par%boundaries)
-            call stagger_beta(beta_eff_acx,beta_eff_acy,beta_eff,f_grnd,f_grnd_acx,f_grnd_acy,par%beta_gl_stag,par%boundaries)
+            call stagger_beta(beta_acx,beta_acy,beta,H_ice,ux_bar,uy_bar, &
+                        f_grnd,f_grnd_acx,f_grnd_acy,par%beta_gl_stag,par%boundaries)
+            call stagger_beta(beta_eff_acx,beta_eff_acy,beta_eff,H_ice,ux_bar,uy_bar, &
+                        f_grnd,f_grnd_acx,f_grnd_acy,par%beta_gl_stag,par%boundaries)
             
             ! =========================================================================================
             ! Step 2: Call the SSA solver to obtain new estimate of ux_bar/uy_bar

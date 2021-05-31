@@ -1,7 +1,7 @@
 module velocity_general 
     ! This module contains general routines that are used by several solvers. 
     
-    use yelmo_defs ,only  : sp, dp, prec, tol_underflow, rho_ice, rho_sw, rho_w, g
+    use yelmo_defs ,only  : sp, dp, wp, prec, tol_underflow, rho_ice, rho_sw, rho_w, g
     use yelmo_tools, only : stagger_aa_ab, stagger_aa_ab_ice, &
                     integrate_trapezoid1D_1D, integrate_trapezoid1D_pt, minmax
 
@@ -406,7 +406,8 @@ contains
         integer,    intent(IN)  :: beta_gl_stag  ! Method of grounding line staggering of beta 
 
         ! Local variables 
-        integer :: i, j, nx, ny 
+        integer :: i, j, nx, ny
+        integer :: im1, ip1, jm1, jp1  
         real(prec) :: dy, rhog 
         real(prec) :: taud_grnd, taud_flt, taud_now 
         real(prec) :: H_mid, H_gl, z_gl, H_grnd_mid 
@@ -638,48 +639,56 @@ end if
             case(3) 
                 ! Linear interpolation following Gladstone et al. (2010, TC) Eq. 27
 
-                ! x-direction 
+                 
                 do j = 1, ny 
-                do i = 1, nx-1 
-                    if (H_grnd(i,j) .gt. 0.0 .and. H_grnd(i+1,j) .le. 0.0) then 
+                do i = 1, nx
+
+                    im1 = max(1, i-1)
+                    ip1 = min(nx,i+1)
+                    
+                    jm1 = max(1, j-1)
+                    jp1 = min(ny,j+1)
+
+                    ! x-direction
+                    if (H_grnd(i,j) .gt. 0.0 .and. H_grnd(ip1,j) .le. 0.0) then 
                         ! Grounding line point 
 
-                        ! (i,j) grounded; (i+1,j) floating
-                        taud_acx(i,j) = integrate_gl_driving_stress_linear(H_ice(i,j),H_ice(i+1,j), &
-                                                    z_bed(i,j),z_bed(i+1,j),z_sl(i,j), z_sl(i+1,j),dx)
+                        ! (i,j) grounded; (ip1,j) floating
+                        call integrate_gl_driving_stress_linear(taud_acx(i,j),H_ice(i,j),H_ice(ip1,j), &
+                                                    z_bed(i,j),z_bed(ip1,j),z_sl(i,j), z_sl(ip1,j),dx)
                     
-                    else if (H_grnd(i,j) .le. 0.0 .and. H_grnd(i+1,j) .gt. 0.0) then 
-                        ! (i,j) floating; (i+1,j) grounded 
+                    else if (H_grnd(i,j) .le. 0.0 .and. H_grnd(ip1,j) .gt. 0.0) then 
+                        ! (i,j) floating; (ip1,j) grounded 
 
-                        taud_acx(i,j) = -integrate_gl_driving_stress_linear(H_ice(i+1,j),H_ice(i,j), &
-                                                    z_bed(i+1,j),z_bed(i,j),z_sl(i+1,j),z_sl(i,j),dx)
+                        call integrate_gl_driving_stress_linear(taud_acx(i,j),H_ice(ip1,j),H_ice(i,j), &
+                                                    z_bed(ip1,j),z_bed(i,j),z_sl(ip1,j),z_sl(i,j),dx)
+                        
+                        ! Set negative for direction 
+                        taud_acx(i,j) = -taud_acx(i,j)
+
                     end if 
 
-                end do 
-                end do 
-                taud_acx(nx,:) = taud_acx(nx-1,:) 
-        
-                ! y-direction 
-                do j = 1, ny-1 
-                do i = 1, nx 
-                    if (H_grnd(i,j) .gt. 0.0 .and. H_grnd(i,j+1) .le. 0.0) then
+                    ! y-direction 
+                    if (H_grnd(i,j) .gt. 0.0 .and. H_grnd(i,jp1) .le. 0.0) then
                         ! Grounding line point
  
-                        ! (i,j) grounded; (i,j+1) floating 
-                        taud_acy(i,j) = integrate_gl_driving_stress_linear(H_ice(i,j),H_ice(i,j+1), &
-                                                    z_bed(i,j),z_bed(i,j+1),z_sl(i,j),z_sl(i,j+1),dx)
+                        ! (i,j) grounded; (i,jp1) floating 
+                        call integrate_gl_driving_stress_linear(taud_acy(i,j),H_ice(i,j),H_ice(i,jp1), &
+                                                    z_bed(i,j),z_bed(i,jp1),z_sl(i,j),z_sl(i,jp1),dx)
 
-                    else if (H_grnd(i,j) .le. 0.0 .and. H_grnd(i,j+1) .gt. 0.0) then
-                        ! (i,j) floating; (i,j+1) grounded
+                    else if (H_grnd(i,j) .le. 0.0 .and. H_grnd(i,jp1) .gt. 0.0) then
+                        ! (i,j) floating; (i,jp1) grounded
 
-                        taud_acy(i,j) = -integrate_gl_driving_stress_linear(H_ice(i,j+1),H_ice(i,j), &
-                                                    z_bed(i,j+1),z_bed(i,j),z_sl(i,j+1),z_sl(i,j),dx)
-                         
-                    end if 
+                        call integrate_gl_driving_stress_linear(taud_acy(i,j),H_ice(i,jp1),H_ice(i,j), &
+                                                    z_bed(i,jp1),z_bed(i,j),z_sl(i,jp1),z_sl(i,j),dx)
+                        
+                        ! Set negative for direction 
+                        taud_acy(i,j) = -taud_acy(i,j) 
+                    end if
+
                 end do 
                 end do 
-                taud_acy(:,ny) = taud_acy(:,ny-1) 
-                
+
             case DEFAULT  
                 ! Do nothing, use the standard no-subgrid treatment 
         end select 
@@ -688,7 +697,7 @@ end if
 
     end subroutine calc_driving_stress_gl
 
-    function integrate_gl_driving_stress_linear(H_ice,H_ice1,z_bed,z_bed1,z_sl,z_sl1,dx) result(taud)
+    subroutine integrate_gl_driving_stress_linear(taud,H_a,H_b,zb_a,zb_b,z_sl_a,z_sl_b,dx)
         ! Compute the driving stress for the grounding line more precisely (subgrid)
         ! following Gladstone et al. (2010, TC), Eq. 27 
         ! Note: here cell i is grounded and cell i+1 is floating 
@@ -696,18 +705,18 @@ end if
 
         implicit none 
 
-        real(prec), intent(IN) :: H_ice, H_ice1     ! Ice thickness cell i and i+1, resp.
-        real(prec), intent(IN) :: z_bed, z_bed1     ! Bedrock elevation cell i and i+1, resp.
-        real(prec), intent(IN) :: z_sl,  z_sl1      ! Sea level cell i and i+1, resp.
-        real(prec), intent(IN) :: dx 
-        real(prec) :: taud 
+        real(wp), intent(OUT) :: taud
+        real(wp), intent(IN) :: H_a, H_b          ! Ice thickness cell i and i+1, resp.
+        real(wp), intent(IN) :: zb_a, zb_b        ! Bedrock elevation cell i and i+1, resp.
+        real(wp), intent(IN) :: z_sl_a,  z_sl_b   ! Sea level cell i and i+1, resp.
+        real(wp), intent(IN) :: dx  
 
         ! Local variables 
-        real(prec) :: Ha, Hb, Sa, Sb, Ba, Bb, sla, slb 
-        real(prec) :: dl, dxab 
-        real(prec) :: H_mid, dzsdx 
-        real(prec) :: rho_sw_ice, rho_ice_sw 
-        integer :: n 
+        real(wp) :: Ha, Hb, Sa, Sb, Ba, Bb, sla, slb 
+        real(wp) :: dl, dx_ab 
+        real(wp) :: H_mid, dzsdx 
+        real(wp) :: rho_sw_ice, rho_ice_sw 
+        integer  :: n 
         integer, parameter :: ntot = 100 
 
         ! Parameters 
@@ -715,24 +724,24 @@ end if
         rho_ice_sw = rho_ice / rho_sw 
 
         ! Get step size (dimensionless) and step resolution
-        dl    = 1.0_prec / real(ntot,prec)
-        dxab  = dx*dl 
+        dl    = 1.0_wp / real(ntot-1.0_wp,wp)
+        dx_ab  = dx*dl 
 
         ! Initialize driving stress to zero 
-        taud = 0.0_prec 
+        taud = 0.0_wp 
 
         ! Step through the grid cell and calculate
         ! each piecewise value of driving stress
         do n = 1, ntot 
 
-            Ha  = H_ice + (H_ice1-H_ice)*dl*(n-1)
-            Hb  = H_ice + (H_ice1-H_ice)*dl*(n)
+            Ha  = H_a + (H_b-H_a)*dl*(n-1)
+            Hb  = H_a + (H_b-H_a)*dl*(n)
 
-            Ba  = z_bed + (z_bed1-z_bed)*dl*(n-1)
-            Bb  = z_bed + (z_bed1-z_bed)*dl*(n)
+            Ba  = zb_a + (zb_b-zb_a)*dl*(n-1)
+            Bb  = zb_a + (zb_b-zb_a)*dl*(n)
             
-            sla = z_sl + (z_sl1-z_sl)*dl*(n-1)
-            slb = z_sl + (z_sl1-z_sl)*dl*(n)
+            sla = z_sl_a + (z_sl_b-z_sl_a)*dl*(n-1)
+            slb = z_sl_a + (z_sl_b-z_sl_a)*dl*(n)
             
             if (Ha < rho_sw_ice*(sla-Ba)) then 
                 Sa = (1.0-rho_ice_sw)*Ha
@@ -746,8 +755,8 @@ end if
                 Sb = Bb + Hb 
             end if 
             
-            H_mid = 0.5_prec * (Ha+Hb)
-            dzsdx = (Sb-Sa) / dxab 
+            H_mid = 0.5_wp * (Ha+Hb)
+            dzsdx = (Sb-Sa) / dx_ab 
 
             taud  = taud + (H_mid * dzsdx)*dl 
 
@@ -758,7 +767,7 @@ end if
 
         return 
 
-    end function integrate_gl_driving_stress_linear
+    end subroutine integrate_gl_driving_stress_linear
     
     subroutine calc_ice_flux(qq_acx,qq_acy,ux_bar,uy_bar,H_ice,dx,dy)
         ! Calculate the basal stress resulting from sliding (friction times velocity)

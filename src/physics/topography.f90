@@ -1,6 +1,6 @@
 module topography 
 
-    use yelmo_defs, only : prec, sec_year, pi, T0, g, rho_ice, rho_sw, rho_w 
+    use yelmo_defs, only : wp, prec, sec_year, pi, T0, g, rho_ice, rho_sw, rho_w 
 
     implicit none 
 
@@ -15,6 +15,7 @@ module topography
     public :: filter_f_grnd
     public :: calc_grline
     public :: calc_bmb_total
+    public :: calc_fmb_total
     public :: distance_to_grline
     public :: distance_to_margin
     
@@ -60,7 +61,7 @@ contains
         
         return 
 
-    end subroutine calc_z_srf 
+    end subroutine calc_z_srf
 
     subroutine calc_z_srf_max(z_srf,H_ice,z_bed,z_sl)
         ! Calculate surface elevation
@@ -84,7 +85,7 @@ contains
         
         return 
 
-    end subroutine calc_z_srf_max 
+    end subroutine calc_z_srf_max
 
     subroutine calc_z_srf_subgrid_area(z_srf,f_grnd,H_ice,z_bed,z_sl,gl_sep_nx)
         ! Interpolate variables at grounding line to subgrid level to 
@@ -368,7 +369,7 @@ end if
 
         return
         
-    end subroutine calc_f_grnd_subgrid_area    
+    end subroutine calc_f_grnd_subgrid_area
     
     subroutine calc_f_grnd_subgrid_linear(f_grnd,f_grnd_x,f_grnd_y,H_grnd)
         ! Calculate the grounded fraction of a cell in the x- and y-directions
@@ -699,7 +700,126 @@ end if
 
         return 
 
-    end subroutine calc_bmb_total 
+    end subroutine calc_bmb_total
+
+    subroutine calc_fmb_total(fmb,fmb_shlf,bmb_shlf,H_ice,H_grnd,f_ice,fmb_method,fmb_scale,dx)
+
+        implicit none 
+
+        real(wp), intent(OUT) :: fmb(:,:) 
+        real(wp), intent(IN)  :: fmb_shlf(:,:) 
+        real(wp), intent(IN)  :: bmb_shlf(:,:) 
+        real(wp), intent(IN)  :: H_ice(:,:)
+        real(wp), intent(IN)  :: H_grnd(:,:) 
+        real(wp), intent(IN)  :: f_ice(:,:)
+        integer,  intent(IN)  :: fmb_method 
+        real(wp), intent(IN)  :: fmb_scale
+        real(wp), intent(IN)  :: dx
+
+        ! Local variables
+        integer    :: i, j, nx, ny, n_margin
+        integer    :: im1, ip1, jm1, jp1
+        real(wp) :: H_ref, dz  
+        real(wp) :: area_flt
+        real(wp) :: area_tot
+        real(wp) :: bmb_eff 
+        logical  :: mask(4) 
+
+        real(wp) :: rho_ice_sw 
+        
+        rho_ice_sw = rho_ice/rho_sw ! Ratio of density of ice to seawater [--]
+        
+        ! Total cell area 
+        area_tot = dx*dx 
+
+        nx = size(fmb,1)
+        ny = size(fmb,2) 
+
+        select case(fmb_method)
+
+            case(0)
+                ! fmb provided by boundary field fmb_shlf 
+
+                fmb = fmb_shlf
+
+            case(1) 
+                ! Calculate fmb as proportional to local bmb_shlf value and 
+                ! scaled to the area of the grid cell itself where it will be applied
+
+
+                do j = 1, ny 
+                do i = 1, nx 
+
+                    ! Get neighbor indices
+                    im1 = max(i-1,1) 
+                    ip1 = min(i+1,nx) 
+                    jm1 = max(j-1,1) 
+                    jp1 = min(j+1,ny) 
+                    
+                    ! Get mask of neighbors that are ice free 
+                    mask = ( [H_ice(im1,j),H_ice(ip1,j),H_ice(i,jm1),H_ice(i,jp1)].eq.0.0 )
+
+                    ! Count how many neighbors are ice free 
+                    n_margin = count(mask) 
+
+                    if (H_ice(i,j) .gt. 0.0_wp .and. &
+                        H_grnd(i,j) .lt. H_ice(i,j) .and. &
+                                            n_margin .gt. 0) then 
+                        ! Cell is ice-covered, [grounded below sea level or floating] and at the ice margin
+
+                        ! Get margin-scaled ice thickness (f_ice > 0 since H_ice > 0, except on first timestep, be safe!)
+                        if (f_ice(i,j) .eq. 0.0_wp) then 
+                            ! f_ice not yet defined, assume point covers cell 
+                            H_ref = H_ice(i,j) 
+                        else 
+                            H_ref = H_ice(i,j) / f_ice(i,j) 
+                        end if 
+                        
+                        ! Determine depth of adjacent water using centered cell information
+                        if (H_grnd(i,j) .lt. 0.0_wp) then 
+                            ! Cell is floating, calculate submerged ice thickness 
+                            
+                            dz = (H_ref*rho_ice_sw)
+                            
+                        else 
+                            ! Cell is grounded, recover depth of seawater
+
+                            dz = max( (H_ref - H_grnd(i,j)) * rho_ice_sw, 0.0_wp)
+
+                        end if 
+
+                        ! Get area of ice submerged and adjacent to seawater
+                        area_flt = real(n_margin,wp)*dz*dx 
+
+                        ! Also calculate the mean bmb_shlf value for the ice-free neighbors 
+                        bmb_eff = sum([bmb_shlf(im1,j),bmb_shlf(ip1,j),bmb_shlf(i,jm1),bmb_shlf(i,jp1)], &
+                                        mask=mask) / real(n_margin,wp)
+
+                        ! Finally calculate the effective front mass balance rate 
+
+                        fmb(i,j) = bmb_eff*(area_flt/area_tot)*fmb_scale
+
+                    else 
+                        ! Set front mass balance equal to zero 
+
+                        fmb(i,j) = 0.0_wp 
+
+                    end if 
+
+                end do 
+                end do 
+
+            case DEFAULT 
+
+                write(*,*) "calc_fmb_total:: Error: fmb_method not recongized."
+                write(*,*) "fmb_method = ", fmb_method 
+                stop 
+
+        end select
+
+        return 
+
+    end subroutine calc_fmb_total
 
     subroutine calc_subgrid_array(vint,v1,v2,v3,v4,nx)
         ! Given the four corners of a cell in quadrants 1,2,3,4,

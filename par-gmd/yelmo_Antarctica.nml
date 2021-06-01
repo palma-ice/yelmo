@@ -57,6 +57,7 @@
 &ytopo
     solver            = "impl-upwind"   ! "expl", "impl-upwind"
     calv_method       = "flux"          ! "zero", "simple", "flux", "kill"
+    fmb_method        = 1               ! 0: prescribe boundary field fmb_shlf; 1: calculate proportional fmb~bmb_shlf.
     surf_gl_method    = 0               ! 0: binary (max grnd/flt elevation), 1: subgrid average elevation
     margin2nd         = False           ! Apply second-order upwind approximation to gradients at the margin
     use_bmb           = True            ! Use basal mass balance in mass conservation equation
@@ -74,6 +75,7 @@
     gl_sep            = 1               ! 1: Linear f_grnd_acx/acy and binary f_grnd, 2: area f_grnd, average to acx/acy
     gl_sep_nx         = 15              ! [-] Number of interpolation points (nx*nx) to calculate grounded area at grounding line
     diffuse_bmb_shlf  = False           ! Allow bmb_shlf to permeate inland at the grounding line 
+    fmb_scale         = 10.0            ! Scaling of fmb ~ scale*bmb, scale=10 suggested by Pollard and DeConto (2016)
 /
 
 &ydyn

@@ -99,6 +99,10 @@ contains
         ! grounded/floating fraction of grid cells 
         call calc_bmb_total(tpo%now%bmb,thrm%now%bmb_grnd,bnd%bmb_shlf,tpo%now%f_grnd,tpo%par%diffuse_bmb_shlf)
         
+        ! Combine frontal mass balance into one field, and 
+        ! calculate as needed 
+        call calc_fmb_total(tpo%now%fmb,bnd%fmb_shlf,bnd%bmb_shlf,tpo%now%H_ice, &
+                        tpo%now%H_grnd,tpo%now%f_ice,tpo%par%fmb_method,tpo%par%fmb_scale,tpo%par%dx)
         
         ! ====== STRAIN and STRESS  ======
         ! Diagnose 2D stress tensor components 
@@ -113,11 +117,11 @@ contains
 
             ! Define temporary variable for total column mass balance 
            
-            mbal = bnd%smb + tpo%now%bmb + bnd%fmb_shlf       
+            mbal = bnd%smb + tpo%now%bmb + tpo%now%fmb       
             
             if (.not. tpo%par%use_bmb) then
                 ! WHEN RUNNING EISMINT1 ensure bmb is not accounted for here !!!
-                mbal = bnd%smb + bnd%fmb_shlf 
+                mbal = bnd%smb + tpo%now%fmb 
             end if 
             
             ! 1. Calculate the ice thickness conservation -----
@@ -370,6 +374,7 @@ contains
         call nml_read(filename,"ytopo","solver",            par%solver,           init=init_pars)
         call nml_read(filename,"ytopo","surf_gl_method",    par%surf_gl_method,   init=init_pars)
         call nml_read(filename,"ytopo","calv_method",       par%calv_method,      init=init_pars)
+        call nml_read(filename,"ytopo","fmb_method",        par%fmb_method,       init=init_pars)
         call nml_read(filename,"ytopo","margin2nd",         par%margin2nd,        init=init_pars)
         call nml_read(filename,"ytopo","use_bmb",           par%use_bmb,          init=init_pars)
         call nml_read(filename,"ytopo","topo_fixed",        par%topo_fixed,       init=init_pars)
@@ -386,6 +391,7 @@ contains
         call nml_read(filename,"ytopo","gl_sep",            par%gl_sep,           init=init_pars)
         call nml_read(filename,"ytopo","gl_sep_nx",         par%gl_sep_nx,        init=init_pars)
         call nml_read(filename,"ytopo","diffuse_bmb_shlf",  par%diffuse_bmb_shlf, init=init_pars)
+        call nml_read(filename,"ytopo","fmb_scale",         par%fmb_scale,        init=init_pars)
         
         ! === Set internal parameters =====
 
@@ -427,6 +433,7 @@ contains
         allocate(now%dzsrfdt(nx,ny))
         allocate(now%dHicedt(nx,ny))
         allocate(now%bmb(nx,ny))
+        allocate(now%fmb(nx,ny))
         allocate(now%mb_applied(nx,ny))
         allocate(now%calv_grnd(nx,ny))
         allocate(now%calv(nx,ny))
@@ -466,6 +473,7 @@ contains
         now%dzsrfdt     = 0.0 
         now%dHicedt     = 0.0
         now%bmb         = 0.0  
+        now%fmb         = 0.0
         now%mb_applied  = 0.0 
         now%calv_grnd   = 0.0
         now%calv        = 0.0
@@ -508,6 +516,7 @@ contains
         if (allocated(now%dzsrfdt))     deallocate(now%dzsrfdt)
         if (allocated(now%dHicedt))     deallocate(now%dHicedt)
         if (allocated(now%bmb))         deallocate(now%bmb)
+        if (allocated(now%fmb))         deallocate(now%fmb)
         if (allocated(now%mb_applied))  deallocate(now%mb_applied)
         if (allocated(now%calv_grnd))   deallocate(now%calv_grnd)
         if (allocated(now%calv))        deallocate(now%calv)

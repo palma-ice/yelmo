@@ -74,6 +74,7 @@ module yelmo_defs
     type ytopo_param_class
         character(len=256) :: solver
         character(len=256) :: calv_method  
+        integer            :: fmb_method  
         integer            :: surf_gl_method 
         logical            :: margin2nd 
         logical            :: use_bmb  
@@ -91,7 +92,8 @@ module yelmo_defs
         integer            :: gl_sep 
         integer            :: gl_sep_nx 
         logical            :: diffuse_bmb_shlf 
-
+        real(wp)           :: fmb_scale 
+        
         ! Internal parameters 
         real(dp)           :: time 
         integer            :: nx, ny
@@ -126,6 +128,7 @@ module yelmo_defs
         real(wp), allocatable   :: dzsrfdt(:,:)    ! Surface elevation rate of change [m/a] 
         real(wp), allocatable   :: dHicedt(:,:)    ! Ice thickness rate of change [m/a] 
         real(wp), allocatable   :: bmb(:,:)        ! Combined field of bmb_grnd and bmb_shlf 
+        real(wp), allocatable   :: fmb(:,:)        ! Combined field of fmb_grnd and fmb_shlf 
         real(wp), allocatable   :: mb_applied(:,:) ! Actual mass balance applied [m/a], for mass balance accounting
         real(wp), allocatable   :: calv_grnd(:,:)  ! Grounded calving [m/a]
         real(wp), allocatable   :: calv(:,:)       ! Calving [m/a]

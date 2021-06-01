@@ -549,6 +549,7 @@ module yelmo_defs
         real(wp), allocatable :: smb(:,:)
         real(wp), allocatable :: T_srf(:,:)
         real(wp), allocatable :: bmb_shlf(:,:)
+        real(wp), allocatable :: fmb_shlf(:,:) 
         real(wp), allocatable :: T_shlf(:,:)
         real(wp), allocatable :: Q_geo(:,:)
 

@@ -100,23 +100,24 @@ contains
         call calc_bmb_total(tpo%now%bmb,thrm%now%bmb_grnd,bnd%bmb_shlf,tpo%now%f_grnd,tpo%par%diffuse_bmb_shlf)
         
         
-        ! ====== STRESS  ======
+        ! ====== STRAIN and STRESS  ======
         ! Diagnose 2D stress tensor components 
 
         call calc_strain_rate_2D(strn2D,dyn%now%ux_bar,dyn%now%uy_bar,dyn%par%dx,dyn%par%dy)
         call calc_stress_2D(strs2D,mat%now%visc_bar,strn2D)
         
+
         ! 1. Perform topography calculations ------------------
 
         if ( .not. topo_fixed .and. dt .gt. 0.0 ) then 
 
             ! Define temporary variable for total column mass balance 
            
-            mbal = bnd%smb + tpo%now%bmb           
+            mbal = bnd%smb + tpo%now%bmb + bnd%fmb_shlf       
             
             if (.not. tpo%par%use_bmb) then
                 ! WHEN RUNNING EISMINT1 ensure bmb is not accounted for here !!!
-                mbal = bnd%smb 
+                mbal = bnd%smb + bnd%fmb_shlf 
             end if 
             
             ! 1. Calculate the ice thickness conservation -----

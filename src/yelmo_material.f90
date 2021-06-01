@@ -85,37 +85,22 @@ contains
 
         ! Calculate the strain rate from the full 3D tensor
 
-        if (.TRUE.) then 
-            ! 3D strain rate - standard 
-
-            call calc_strain_rate_3D(mat%now%strn,dyn%now%ux,dyn%now%uy,dyn%now%uz,tpo%now%H_ice, &
-                                     tpo%now%f_grnd,mat%par%zeta_aa,mat%par%zeta_ac,mat%par%dx,mat%par%de_max)
+        call calc_strain_rate_3D(mat%now%strn,dyn%now%ux,dyn%now%uy,dyn%now%uz,tpo%now%H_ice, &
+                                 tpo%now%f_grnd,mat%par%zeta_aa,mat%par%zeta_ac,mat%par%dx,mat%par%de_max)
 
 
-            ! And get the vertical average of shear
-            mat%now%f_shear_bar = calc_vertical_integrated_2D(mat%now%strn%f_shear,mat%par%zeta_aa) 
-            
-            ! Get the 2D average of strain rate in case it is needed 
-            mat%now%strn2D%dxx = calc_vertical_integrated_2D(mat%now%strn%dxx,mat%par%zeta_aa)
-            mat%now%strn2D%dyy = calc_vertical_integrated_2D(mat%now%strn%dyy,mat%par%zeta_aa)
-            mat%now%strn2D%dxy = calc_vertical_integrated_2D(mat%now%strn%dxy,mat%par%zeta_aa)
-            mat%now%strn2D%de  = calc_vertical_integrated_2D(mat%now%strn%de, mat%par%zeta_aa)
+        ! And get the vertical average of shear
+        mat%now%f_shear_bar = calc_vertical_integrated_2D(mat%now%strn%f_shear,mat%par%zeta_aa) 
         
-        else 
-            ! 2D strain rate - for testing only, since it is less accurate than the 3D strain rate
+        ! Get the 2D average of strain rate in case it is needed 
+        mat%now%strn2D%dxx = calc_vertical_integrated_2D(mat%now%strn%dxx,mat%par%zeta_aa)
+        mat%now%strn2D%dyy = calc_vertical_integrated_2D(mat%now%strn%dyy,mat%par%zeta_aa)
+        mat%now%strn2D%dxy = calc_vertical_integrated_2D(mat%now%strn%dxy,mat%par%zeta_aa)
+        mat%now%strn2D%de  = calc_vertical_integrated_2D(mat%now%strn%de, mat%par%zeta_aa)
+        
+        ! Calculate the deviatoric stress tensor 
 
-            call calc_strain_rate_2D(mat%now%strn2D,dyn%now%ux_bar,dyn%now%uy_bar,mat%par%dx,mat%par%dx)
-            
-            do k = 1, nz_aa 
-                mat%now%strn%dxx(:,:,k) = mat%now%strn2D%dxx 
-                mat%now%strn%dyy(:,:,k) = mat%now%strn2D%dyy 
-                mat%now%strn%dxy(:,:,k) = mat%now%strn2D%dxy 
-                mat%now%strn%de(:,:,k)  = mat%now%strn2D%de 
-            end do 
-
-            mat%now%f_shear_bar = 1.0 
-
-        end if 
+        call calc_stress_3D(mat%now%strs,mat%now%visc,mat%now%strn)
 
         ! 1. Update enhancement factor ======================
 
@@ -264,8 +249,9 @@ contains
         
         mat%now%visc = calc_viscosity_glen(mat%now%strn%de,mat%now%ATT,mat%par%n_glen,mat%par%visc_min)
         
-        ! Calculate visc_int (vertically integrated visc) as diagnostic quantity
-        mat%now%visc_int = calc_vertical_integrated_2D(mat%now%visc,mat%par%zeta_aa)
+        ! Calculate visc_bar and visc_int (vertically integrated visc) as diagnostic quantities
+        mat%now%visc_bar = calc_vertical_integrated_2D(mat%now%visc,mat%par%zeta_aa)
+        mat%now%visc_int = mat%now%visc_bar 
         where(tpo%now%H_ice .gt. 0.0) mat%now%visc_int = mat%now%visc_int*tpo%now%H_ice 
         
         return
@@ -373,6 +359,19 @@ contains
         allocate(now%strn%de(nx,ny,nz_aa))
         allocate(now%strn%f_shear(nx,ny,nz_aa))
         
+        allocate(now%strs2D%txx(nx,ny))
+        allocate(now%strs2D%tyy(nx,ny))
+        allocate(now%strs2D%txy(nx,ny))
+        allocate(now%strs2D%te(nx,ny))
+        
+        allocate(now%strs%txx(nx,ny,nz_aa))
+        allocate(now%strs%tyy(nx,ny,nz_aa))
+        allocate(now%strs%tzz(nx,ny,nz_aa))
+        allocate(now%strs%txy(nx,ny,nz_aa))
+        allocate(now%strs%txz(nx,ny,nz_aa))
+        allocate(now%strs%tyz(nx,ny,nz_aa))
+        allocate(now%strs%te(nx,ny,nz_aa))
+        
         allocate(now%enh(nx,ny,nz_aa))
         allocate(now%enh_bnd(nx,ny,nz_aa))
         allocate(now%enh_bar(nx,ny))
@@ -380,6 +379,7 @@ contains
         allocate(now%ATT_bar(nx,ny))
         
         allocate(now%visc(nx,ny,nz_aa))
+        allocate(now%visc_bar(nx,ny))
         allocate(now%visc_int(nx,ny))
 
         allocate(now%f_shear_bar(nx,ny)) 
@@ -400,13 +400,27 @@ contains
         now%strn%dyz     = 0.0
         now%strn%de      = 0.0
         now%strn%f_shear = 0.0 
-     
+        
+        now%strs2D%txx   = 0.0 
+        now%strs2D%tyy   = 0.0 
+        now%strs2D%txy   = 0.0
+        now%strs2D%te    = 0.0 
+        
+        now%strs%txx     = 0.0 
+        now%strs%tyy     = 0.0 
+        now%strs%tzz     = 0.0
+        now%strs%txy     = 0.0 
+        now%strs%txz     = 0.0
+        now%strs%tyz     = 0.0
+        now%strs%te      = 0.0
+        
         now%enh          = 1.0 
         now%enh_bnd      = 1.0 
         now%enh_bar      = 0.0 
         now%ATT          = 0.0 
         now%ATT_bar      = 0.0    
         now%visc         = 0.0 
+        now%visc_bar     = 0.0 
         now%visc_int     = 0.0 
 
         now%f_shear_bar  = 0.0 
@@ -437,6 +451,18 @@ contains
         if (allocated(now%strn%de))         deallocate(now%strn%de)
         if (allocated(now%strn%f_shear))    deallocate(now%strn%f_shear)
         
+        if (allocated(now%strs2D%txx))      deallocate(now%strs2D%txx)
+        if (allocated(now%strs2D%tyy))      deallocate(now%strs2D%tyy)
+        if (allocated(now%strs2D%txy))      deallocate(now%strs2D%txy)
+        if (allocated(now%strs2D%te))       deallocate(now%strs2D%te)
+        
+        if (allocated(now%strs%txx))        deallocate(now%strs%txx)
+        if (allocated(now%strs%tyy))        deallocate(now%strs%tyy)
+        if (allocated(now%strs%txy))        deallocate(now%strs%txy)
+        if (allocated(now%strs%txz))        deallocate(now%strs%txz)
+        if (allocated(now%strs%tyz))        deallocate(now%strs%tyz)
+        if (allocated(now%strs%te))         deallocate(now%strs%te)
+        
         if (allocated(now%enh))             deallocate(now%enh)
         if (allocated(now%enh_bnd))         deallocate(now%enh_bnd)
         if (allocated(now%enh_bar))         deallocate(now%enh_bar)
@@ -444,6 +470,7 @@ contains
         if (allocated(now%ATT_bar))         deallocate(now%ATT_bar)
 
         if (allocated(now%visc))            deallocate(now%visc)
+        if (allocated(now%visc_bar))        deallocate(now%visc_bar)
         if (allocated(now%visc_int))        deallocate(now%visc_int)
         
         if (allocated(now%f_shear_bar))     deallocate(now%f_shear_bar)
@@ -453,6 +480,6 @@ contains
         
         return 
 
-    end subroutine ymat_dealloc 
+    end subroutine ymat_dealloc
 
 end module yelmo_material

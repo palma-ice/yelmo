@@ -9,7 +9,8 @@ module deformation
 
     ! Note: 3D arrays defined such that first index (k=1) == base, and max index (k=nk) == surface 
 
-    use yelmo_defs,  only : sp, dp, prec, tol_underflow, T0, strain_2D_class, strain_3D_class
+    use yelmo_defs,  only : sp, dp, prec, tol_underflow, T0, &
+                        strain_2D_class, strain_3D_class, stress_2D_class, stress_3D_class
     use yelmo_tools, only : calc_vertical_integrated_2D, integrate_trapezoid1D_1D   
 
     implicit none 
@@ -27,6 +28,8 @@ module deformation
     public :: calc_rate_factor_integrated
     public :: calc_strain_rate_2D
     public :: calc_strain_rate_3D
+    public :: calc_stress_2D
+    public :: calc_stress_3D 
 
 contains 
 
@@ -372,13 +375,14 @@ contains
     
         implicit none
 
-        real(prec), intent(IN) :: ux_bar(:,:)    ! [m/a] Vertically integrated vel., x
-        real(prec), intent(IN) :: uy_bar(:,:)    ! [m/a] Vertically integrated vel., y
+        real(prec), intent(IN) :: ux_bar(:,:)    ! [m/a] Vertically averaged vel., x
+        real(prec), intent(IN) :: uy_bar(:,:)    ! [m/a] Vertically averaged vel., y
         real(prec), intent(IN) :: dx, dy         ! [m] Resolution
         type(strain_2D_class)  :: strn2D         ! [a^-1] Strain rate tensor
 
         ! Local variables
         integer :: i, j, k, nx, ny, nz
+        integer :: im1, ip1, jm1, jp1 
         real(prec) :: dvdx, dudy
         
         nx = size(ux_bar,1)
@@ -389,28 +393,26 @@ contains
         strn2D%dxy = 0.0 
         strn2D%de  = 0.0 
 
-        do j = 2, ny-1
-        do i = 2, nx-1
+        do j = 1, ny
+        do i = 1, nx
             
+            ! Get neighbor indices
+            im1 = max(i-1,1) 
+            ip1 = min(i+1,nx) 
+            jm1 = max(j-1,1) 
+            jp1 = min(j+1,ny) 
+                
             ! Strain rates should be returned on central aa-nodes
             
-            ! Note: in Grisli-version8-chris, the cross terms dudy/dvdx were
-            ! calculated on the 'noeud mineur': Ab nodes. However, this results
-            ! in asymmetrical de and visc fields in EISMINT tests. Using the older
-            ! version that caculates cross terms on the Aa nodes results
-            ! in symmetrical de and visc fields. 
-            ! Grisli-version8-chris also did not employ the cross terms in the calulation
-            ! of de, which is perhaps why no asymmetery was noticed in the results? 
+            ! aa-nodes
+            strn2D%dxx(i,j) = (ux_bar(i,j) - ux_bar(im1,j))/dx
+            strn2D%dyy(i,j) = (uy_bar(i,j) - uy_bar(i,jm1))/dy
 
-            ! Aa node
-            strn2D%dxx(i,j) = (ux_bar(i,j) - ux_bar(i-1,j))/dx
-            strn2D%dyy(i,j) = (uy_bar(i,j) - uy_bar(i,j-1))/dy
-
-            ! Calculation of cross terms on central Aa nodes (symmetrical results)
-            dudy = ((ux_bar(i,j+1) - ux_bar(i,j-1))    &
-                  + (ux_bar(i-1,j+1)   - ux_bar(i-1,j-1))) /(4.0*dy)
-            dvdx = ((uy_bar(i+1,j) - uy_bar(i-1,j))    &
-                  + (uy_bar(i+1,j-1)   - uy_bar(i-1,j-1)))/(4.0*dx)
+            ! Calculation of cross terms on central aa-nodes (symmetrical results)
+            dudy = ((ux_bar(i,jp1) - ux_bar(i,jm1))    &
+                  + (ux_bar(im1,jp1)   - ux_bar(im1,jm1))) /(4.0*dy)
+            dvdx = ((uy_bar(ip1,j) - uy_bar(im1,j))    &
+                  + (uy_bar(ip1,jm1)   - uy_bar(im1,jm1)))/(4.0*dx)
 
             strn2D%dxy(i,j) = 0.5*(dudy+dvdx)
 
@@ -670,28 +672,64 @@ contains
 
     end subroutine calc_strain_rate_3D
 
-! ajr: see Lipscomb et al (2019), Eq. 45...
-!     subroutine calc_stress_3D(strss,visc,strn)
-!         ! Note: this is not used explicitly in Yelmo,
-!         ! it's just here for completeness. For SIA/SSA
-!         ! it is enough to use strain everywhere. 
+    subroutine calc_stress_2D(strs2D,visc_bar,strn2D)
+        ! Calculate the deviatoric stress tensor components [Pa]
+        ! following from, eg, Thoma et al. (2014), Eq. 7.
         
-!         implicit none 
+        implicit none 
 
-!         type(stress_3D_class), intent(INOUT) :: strss 
-!         real(prec),            intent(IN)    :: visc(:,:,:)
-!         type(strain_3D_class), intent(IN)    :: strn 
+        type(stress_2D_class), intent(INOUT) :: strs2D 
+        real(prec),            intent(IN)    :: visc_bar(:,:)
+        type(strain_2D_class), intent(IN)    :: strn2D 
 
-!         strss%txx = 2.0*visc*strn%dxx
-!         strss%tyy = 2.0*visc*strn%dyy
-!         strss%txy = 2.0*visc*strn%dxy
-!         strss%txz = 2.0*visc*strn%dxz
-!         strss%tyz = 2.0*visc*strn%dyz
-!         strss%tzz = 2.0*visc*strn%dzz
+        strs2D%txx = 2.0*visc_bar*strn2D%dxx
+        strs2D%tyy = 2.0*visc_bar*strn2D%dyy
+        strs2D%txy = 2.0*visc_bar*strn2D%dxy
         
-!         return 
+        ! Also calculate the effective stress 
+        ! analogous to the effective strain rate
+        ! (or, eg, Lipscomb et al., 2019, Eq. 44)
 
-!     end subroutine calc_stress_3D
+        strs2D%te =  sqrt(strs2D%txx*strs2D%txx &
+                        + strs2D%tyy*strs2D%tyy &
+                        + strs2D%txx*strs2D%tyy &
+                        + strs2D%txy*strs2D%txy )
+
+        return 
+
+    end subroutine calc_stress_2D
+    
+    subroutine calc_stress_3D(strs,visc,strn)
+        ! Calculate the deviatoric stress tensor components [Pa]
+        ! following from, eg, Thoma et al. (2014), Eq. 7.
+        
+        implicit none 
+
+        type(stress_3D_class), intent(INOUT) :: strs 
+        real(prec),            intent(IN)    :: visc(:,:,:)
+        type(strain_3D_class), intent(IN)    :: strn 
+
+        strs%txx = 2.0*visc*strn%dxx
+        strs%tyy = 2.0*visc*strn%dyy
+        strs%txy = 2.0*visc*strn%dxy
+        strs%txz = 2.0*visc*strn%dxz
+        strs%tyz = 2.0*visc*strn%dyz
+        strs%tzz = 2.0*visc*strn%dzz
+        
+        ! Also calculate the effective stress 
+        ! analogous to the effective strain rate
+        ! (or, eg, Lipscomb et al., 2019, Eq. 44)
+
+        strs%te =  sqrt(  strs%txx*strs%txx &
+                        + strs%tyy*strs%tyy &
+                        + strs%txx*strs%tyy &
+                        + strs%txy*strs%txy &
+                        + strs%txz*strs%txz &
+                        + strs%tyz*strs%tyz )
+
+        return 
+
+    end subroutine calc_stress_3D
     
 end module deformation
 

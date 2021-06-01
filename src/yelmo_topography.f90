@@ -10,7 +10,8 @@ module yelmo_topography
     use mass_conservation
     use calving
     use topography 
-    
+    use deformation 
+
     implicit none
     
     ! Key for matching bed types given by mask_bed 
@@ -37,7 +38,7 @@ module yelmo_topography
     
 contains
 
-    subroutine calc_ytopo(tpo,dyn,thrm,bnd,time,topo_fixed)
+    subroutine calc_ytopo(tpo,dyn,mat,thrm,bnd,time,topo_fixed)
         ! Calculate adjustments to surface elevation, bedrock elevation
         ! and ice thickness 
 
@@ -45,6 +46,7 @@ contains
 
         type(ytopo_class),  intent(INOUT) :: tpo
         type(ydyn_class),   intent(IN)    :: dyn
+        type(ymat_class),   intent(IN)    :: mat
         type(ytherm_class), intent(IN)    :: thrm  
         type(ybound_class), intent(IN)    :: bnd 
         real(prec),         intent(IN)    :: time  
@@ -56,6 +58,9 @@ contains
         real(prec), allocatable :: mbal(:,:) 
         real(prec), allocatable :: H_ref(:,:) 
 
+        type(strain_2D_class) :: strn2D 
+        type(stress_2D_class) :: strs2D
+
         real(8)    :: cpu_time0, cpu_time1
         real(prec) :: model_time0, model_time1 
         real(prec) :: speed 
@@ -65,6 +70,18 @@ contains
 
         allocate(mbal(nx,ny))
         allocate(H_ref(nx,ny))
+
+        ! Strain and stress 
+        allocate(strn2D%dxx(nx,ny))
+        allocate(strn2D%dyy(nx,ny))
+        allocate(strn2D%dxy(nx,ny))
+        allocate(strn2D%de(nx,ny))
+        
+        allocate(strs2D%txx(nx,ny))
+        allocate(strs2D%tyy(nx,ny))
+        allocate(strs2D%txy(nx,ny))
+        allocate(strs2D%te(nx,ny))
+        
 
         ! Initialize time if necessary 
         if (tpo%par%time .gt. dble(time)) then 
@@ -82,6 +99,12 @@ contains
         ! grounded/floating fraction of grid cells 
         call calc_bmb_total(tpo%now%bmb,thrm%now%bmb_grnd,bnd%bmb_shlf,tpo%now%f_grnd,tpo%par%diffuse_bmb_shlf)
         
+        
+        ! ====== STRESS  ======
+        ! Diagnose 2D stress tensor components 
+
+        call calc_strain_rate_2D(strn2D,dyn%now%ux_bar,dyn%now%uy_bar,dyn%par%dx,dyn%par%dy)
+        call calc_stress_2D(strs2D,mat%now%visc_bar,strn2D)
         
         ! 1. Perform topography calculations ------------------
 
@@ -113,7 +136,6 @@ contains
                                             tpo%par%topo_rel,tpo%par%topo_rel_tau,dt)
                 
             end if 
-
 
             ! ====== CALVING ======
 

@@ -356,26 +356,43 @@ module yelmo_defs
         real(wp), allocatable :: f_shear(:,:,:) 
     end type 
     
+    type stress_2D_class 
+        real(wp), allocatable :: txx(:,:) 
+        real(wp), allocatable :: tyy(:,:) 
+        real(wp), allocatable :: txy(:,:) 
+        real(wp), allocatable :: te(:,:) 
+    end type 
+
+    type stress_3D_class 
+        real(wp), allocatable :: txx(:,:,:) 
+        real(wp), allocatable :: tyy(:,:,:) 
+        real(wp), allocatable :: tzz(:,:,:)
+        real(wp), allocatable :: txy(:,:,:) 
+        real(wp), allocatable :: txz(:,:,:) 
+        real(wp), allocatable :: tyz(:,:,:) 
+        real(wp), allocatable :: te(:,:,:) 
+    end type 
+    
     type ymat_param_class
         
-        character(len=56)   :: flow_law
-        integer             :: rf_method 
-        real(wp)          :: rf_const
-        logical             :: rf_use_eismint2
-        logical             :: rf_with_water 
-        real(wp)          :: n_glen                       ! Flow law exponent (n_glen=3)
-        real(wp)          :: visc_min  
-        real(wp)          :: de_max 
-        character(len=56)   :: enh_method  
-        real(wp)          :: enh_shear
-        real(wp)          :: enh_stream
-        real(wp)          :: enh_shlf
-        real(wp)          :: enh_umin 
-        real(wp)          :: enh_umax
-        logical             :: calc_age
-        real(wp), allocatable :: age_iso(:)
-        character(len=56)   :: tracer_method  
-        real(wp)          :: tracer_impl_kappa
+        character(len=56)       :: flow_law
+        integer                 :: rf_method 
+        real(wp)                :: rf_const
+        logical                 :: rf_use_eismint2
+        logical                 :: rf_with_water 
+        real(wp)                :: n_glen                       ! Flow law exponent (n_glen=3)
+        real(wp)                :: visc_min  
+        real(wp)                :: de_max 
+        character(len=56)       :: enh_method  
+        real(wp)                :: enh_shear
+        real(wp)                :: enh_stream
+        real(wp)                :: enh_shlf
+        real(wp)                :: enh_umin 
+        real(wp)                :: enh_umax
+        logical                 :: calc_age
+        real(wp), allocatable   :: age_iso(:)
+        character(len=56)       :: tracer_method  
+        real(wp)                :: tracer_impl_kappa
         
         ! Internal parameters
         real(dp)   :: time 
@@ -394,13 +411,16 @@ module yelmo_defs
 
         type(strain_2D_class)   :: strn2D
         type(strain_3D_class)   :: strn 
-
+        type(stress_2D_class)   :: strs2D
+        type(stress_3D_class)   :: strs 
+        
         real(wp), allocatable :: enh(:,:,:)
         real(wp), allocatable :: enh_bnd(:,:,:)
         real(wp), allocatable :: enh_bar(:,:)
         real(wp), allocatable :: ATT(:,:,:) 
         real(wp), allocatable :: ATT_bar(:,:)
         real(wp), allocatable :: visc(:,:,:) 
+        real(wp), allocatable :: visc_bar(:,:)
         real(wp), allocatable :: visc_int(:,:) 
 
         real(wp), allocatable :: f_shear_bar(:,:) 

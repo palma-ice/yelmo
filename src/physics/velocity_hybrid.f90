@@ -275,22 +275,7 @@ end if
             ip1 = min(i+1,nx) 
             jm1 = max(j-1,1) 
             jp1 = min(j+1,ny) 
-
-            if (H_ice(i,j) .gt. 0.0_wp) then
-                ! For ice-covered points, only take contributions from ice-covered points
-                ! (at margin, this will conservatively err towards higher viscosity) 
-                if (H_ice(im1,j) .eq. 0.0_wp) im1 = i 
-                if (H_ice(ip1,j) .eq. 0.0_wp) ip1 = i 
-                if (H_ice(i,jm1) .eq. 0.0_wp) jm1 = j 
-                if (H_ice(i,jp1) .eq. 0.0_wp) jp1 = j 
-            else
-                ! For ice-free points only take ice-free contributions
-                if (H_ice(im1,j) .gt. 0.0_wp) im1 = i 
-                if (H_ice(ip1,j) .gt. 0.0_wp) ip1 = i 
-                if (H_ice(i,jm1) .gt. 0.0_wp) jm1 = j 
-                if (H_ice(i,jp1) .gt. 0.0_wp) jp1 = j 
-            end if 
-
+            
             ! Calculate effective strain components from horizontal stretching on ab-nodes
             dudx_ab = ( (ux(ip1,j) - ux(im1,j)) + (ux(ip1,jp1) - ux(im1,jp1)) ) *inv_4dx
             dvdy_ab = ( (uy(i,jp1) - uy(i,jm1)) + (uy(ip1,jp1) - uy(ip1,jm1)) ) *inv_4dy 

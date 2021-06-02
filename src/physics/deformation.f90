@@ -615,7 +615,7 @@ contains
         end do
         !$omp end parallel do
 
-
+if (.FALSE.) then 
         ! Correct margin points by extrapolating strain-rate tensor
         ! from the dominant upstream neighbor. 
         do j=1, ny
@@ -676,6 +676,7 @@ contains
 
         end do
         end do
+end if 
 
         ! === Also calculate vertically averaged strain rate tensor ===
         
@@ -756,7 +757,7 @@ contains
 
         end do
         end do
-        
+
         ! Extrapolate strain-rate tensor to margin 
         ! points from the dominant upstream neighbor. 
         do j=1, ny

@@ -83,24 +83,19 @@ contains
         ! Note: this calculation of strain rate is particular to the material module, and 
         ! may differ from the effective strain rate calculated locally in the dynamics module
 
-        ! Calculate the strain rate from the full 3D tensor
+        ! Calculate the strain rate tensor
 
-        call calc_strain_rate_3D(mat%now%strn,dyn%now%ux,dyn%now%uy,dyn%now%uz,tpo%now%H_ice, &
-                                 tpo%now%f_grnd,mat%par%zeta_aa,mat%par%zeta_ac,mat%par%dx,mat%par%de_max)
+        call calc_strain_rate_tensor(mat%now%strn,mat%now%strn2D,dyn%now%ux,dyn%now%uy,dyn%now%uz, &
+                                 tpo%now%H_ice,tpo%now%f_grnd,mat%par%zeta_aa, &
+                                 mat%par%zeta_ac,mat%par%dx,mat%par%de_max)
 
 
-        ! And get the vertical average of shear
-        mat%now%f_shear_bar = calc_vertical_integrated_2D(mat%now%strn%f_shear,mat%par%zeta_aa) 
-        
-        ! Get the 2D average of strain rate in case it is needed 
-        mat%now%strn2D%dxx = calc_vertical_integrated_2D(mat%now%strn%dxx,mat%par%zeta_aa)
-        mat%now%strn2D%dyy = calc_vertical_integrated_2D(mat%now%strn%dyy,mat%par%zeta_aa)
-        mat%now%strn2D%dxy = calc_vertical_integrated_2D(mat%now%strn%dxy,mat%par%zeta_aa)
-        mat%now%strn2D%de  = calc_vertical_integrated_2D(mat%now%strn%de, mat%par%zeta_aa)
-        
-        ! Calculate the deviatoric stress tensor 
+        ! Assign vertical average of shear for external use 
+        mat%now%f_shear_bar = mat%now%strn2D%f_shear
 
-        call calc_stress_3D(mat%now%strs,mat%now%visc,mat%now%strn)
+        ! Calculate the deviatoric stress tensor and 2D average
+
+        call calc_stress_tensor(mat%now%strs,mat%now%strs2D,mat%now%visc,mat%now%strn,mat%par%zeta_aa) 
 
         ! 1. Update enhancement factor ======================
 
@@ -348,11 +343,12 @@ contains
         allocate(now%strn2D%dxx(nx,ny))
         allocate(now%strn2D%dyy(nx,ny))
         allocate(now%strn2D%dxy(nx,ny))
+        allocate(now%strn2D%dxz(nx,ny))
+        allocate(now%strn2D%dyz(nx,ny))
         allocate(now%strn2D%de(nx,ny))
         
         allocate(now%strn%dxx(nx,ny,nz_aa))
         allocate(now%strn%dyy(nx,ny,nz_aa))
-        allocate(now%strn%dzz(nx,ny,nz_aa))
         allocate(now%strn%dxy(nx,ny,nz_aa))
         allocate(now%strn%dxz(nx,ny,nz_aa))
         allocate(now%strn%dyz(nx,ny,nz_aa))
@@ -362,11 +358,14 @@ contains
         allocate(now%strs2D%txx(nx,ny))
         allocate(now%strs2D%tyy(nx,ny))
         allocate(now%strs2D%txy(nx,ny))
+        allocate(now%strs2D%txz(nx,ny))
+        allocate(now%strs2D%tyz(nx,ny))
         allocate(now%strs2D%te(nx,ny))
+        allocate(now%strs2D%teig1(nx,ny))
+        allocate(now%strs2D%teig2(nx,ny))
         
         allocate(now%strs%txx(nx,ny,nz_aa))
         allocate(now%strs%tyy(nx,ny,nz_aa))
-        allocate(now%strs%tzz(nx,ny,nz_aa))
         allocate(now%strs%txy(nx,ny,nz_aa))
         allocate(now%strs%txz(nx,ny,nz_aa))
         allocate(now%strs%tyz(nx,ny,nz_aa))
@@ -390,11 +389,12 @@ contains
         now%strn2D%dxx   = 0.0 
         now%strn2D%dyy   = 0.0 
         now%strn2D%dxy   = 0.0
+        now%strn2D%dxz   = 0.0
+        now%strn2D%dyz   = 0.0
         now%strn2D%de    = 0.0 
         
         now%strn%dxx     = 0.0 
         now%strn%dyy     = 0.0 
-        now%strn%dzz     = 0.0
         now%strn%dxy     = 0.0 
         now%strn%dxz     = 0.0
         now%strn%dyz     = 0.0
@@ -404,11 +404,14 @@ contains
         now%strs2D%txx   = 0.0 
         now%strs2D%tyy   = 0.0 
         now%strs2D%txy   = 0.0
+        now%strs2D%txz   = 0.0
+        now%strs2D%tyz   = 0.0
         now%strs2D%te    = 0.0 
+        now%strs2D%teig1 = 0.0 
+        now%strs2D%teig2 = 0.0 
         
         now%strs%txx     = 0.0 
         now%strs%tyy     = 0.0 
-        now%strs%tzz     = 0.0
         now%strs%txy     = 0.0 
         now%strs%txz     = 0.0
         now%strs%tyz     = 0.0
@@ -441,6 +444,8 @@ contains
         if (allocated(now%strn2D%dxx))      deallocate(now%strn2D%dxx)
         if (allocated(now%strn2D%dyy))      deallocate(now%strn2D%dyy)
         if (allocated(now%strn2D%dxy))      deallocate(now%strn2D%dxy)
+        if (allocated(now%strn2D%dxz))      deallocate(now%strn2D%dxz)
+        if (allocated(now%strn2D%dyz))      deallocate(now%strn2D%dyz)
         if (allocated(now%strn2D%de))       deallocate(now%strn2D%de)
         
         if (allocated(now%strn%dxx))        deallocate(now%strn%dxx)
@@ -454,7 +459,11 @@ contains
         if (allocated(now%strs2D%txx))      deallocate(now%strs2D%txx)
         if (allocated(now%strs2D%tyy))      deallocate(now%strs2D%tyy)
         if (allocated(now%strs2D%txy))      deallocate(now%strs2D%txy)
+        if (allocated(now%strs2D%txz))      deallocate(now%strs2D%txz)
+        if (allocated(now%strs2D%tyz))      deallocate(now%strs2D%tyz)
         if (allocated(now%strs2D%te))       deallocate(now%strs2D%te)
+        if (allocated(now%strs2D%teig1))    deallocate(now%strs2D%teig1)
+        if (allocated(now%strs2D%teig2))    deallocate(now%strs2D%teig2)
         
         if (allocated(now%strs%txx))        deallocate(now%strs%txx)
         if (allocated(now%strs%tyy))        deallocate(now%strs%tyy)

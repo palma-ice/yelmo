@@ -541,8 +541,9 @@ end if
         real(wp), intent(IN)  :: eps_0                ! [1/a] Regularization constant (minimum strain rate, ~1e-8)
         
         ! Local variables 
-        integer    :: i, j, k, nx, ny, nz
-        integer    :: ip1, jp1, im1, jm1   
+        integer  :: i, j, k, i1, j1
+        integer  :: ip1, jp1, im1, jm1 
+        integer  :: nx, ny, nz  
         real(wp) :: inv_4dx, inv_4dy 
         real(wp) :: dudx_ab, dvdy_ab
         real(wp) :: dudy, dvdx
@@ -552,6 +553,9 @@ end if
         real(wp) :: ATT_ab
         real(wp) :: wt  
         real(wp), allocatable :: visc_eff_ab(:,:,:)
+
+        real(wp) :: ux_aa, uy_aa 
+        logical  :: is_margin 
 
         nx = size(visc_eff,1)
         ny = size(visc_eff,2)
@@ -579,11 +583,26 @@ end if
             jm1 = max(j-1,1) 
             jp1 = min(j+1,ny) 
 
+            if (H_ice(i,j) .gt. 0.0_wp) then
+                ! For ice-covered points, only take contributions from ice-covered points
+                ! (at margin, this will conservatively err towards higher viscosity) 
+                if (H_ice(im1,j) .eq. 0.0_wp) im1 = i 
+                if (H_ice(ip1,j) .eq. 0.0_wp) ip1 = i 
+                if (H_ice(i,jm1) .eq. 0.0_wp) jm1 = j 
+                if (H_ice(i,jp1) .eq. 0.0_wp) jp1 = j 
+            else
+                ! For ice-free points only take ice-free contributions
+                if (H_ice(im1,j) .gt. 0.0_wp) im1 = i 
+                if (H_ice(ip1,j) .gt. 0.0_wp) ip1 = i 
+                if (H_ice(i,jm1) .gt. 0.0_wp) jm1 = j 
+                if (H_ice(i,jp1) .gt. 0.0_wp) jp1 = j 
+            end if 
+
             ! Calculate effective strain components from horizontal stretching on ab-nodes
             dudx_ab = ( (ux(ip1,j) - ux(im1,j)) + (ux(ip1,jp1) - ux(im1,jp1)) ) *inv_4dx
             dvdy_ab = ( (uy(i,jp1) - uy(i,jm1)) + (uy(ip1,jp1) - uy(ip1,jm1)) ) *inv_4dy 
 
-            ! Calculate of cross terms on ab-nodes
+            ! Calculation of cross terms on ab-nodes
             dudy = (ux(i,jp1) - ux(i,j)) / dx 
             dvdx = (uy(ip1,j) - uy(i,j)) / dy 
 
@@ -624,30 +643,64 @@ end if
             visc_eff(i,j,:) = 0.0 
             wt              = 0.0 
 
-            if (count([H_ice(i,j),H_ice(ip1,j),H_ice(i,jp1),H_ice(ip1,jp1)].eq.0) .eq. 0) then  
-                visc_eff(i,j,:) = visc_eff(i,j,:) + visc_eff_ab(i,j,:) 
-                wt = wt + 1.0 
-            end if 
+            if (H_ice(i,j) .gt. 0.0_wp) then
+                ! Ice-covered point. 
+                ! Only use contributions from ice-covered neighbors 
+
+                if (count([H_ice(i,j),H_ice(ip1,j),H_ice(i,jp1),H_ice(ip1,jp1)].eq.0) .eq. 0) then  
+                    visc_eff(i,j,:) = visc_eff(i,j,:) + visc_eff_ab(i,j,:) 
+                    wt = wt + 1.0 
+                end if 
+                
+                if (count([H_ice(i,j),H_ice(im1,j),H_ice(im1,jp1),H_ice(i,jp1)].eq.0) .eq. 0) then  
+                    visc_eff(i,j,:) = visc_eff(i,j,:) + visc_eff_ab(im1,j,:) 
+                    wt = wt + 1.0 
+                end if 
+
+                if (count([H_ice(i,j),H_ice(i,jm1),H_ice(ip1,jm1),H_ice(ip1,j)].eq.0) .eq. 0) then 
+                    visc_eff(i,j,:) = visc_eff(i,j,:) + visc_eff_ab(i,jm1,:) 
+                    wt = wt + 1.0 
+                end if 
+                
+                if (count([H_ice(i,j),H_ice(im1,j),H_ice(im1,jm1),H_ice(i,jm1)].eq.0) .eq. 0) then 
+                    visc_eff(i,j,:) = visc_eff(i,j,:) + visc_eff_ab(im1,jm1,:) 
+                    wt = wt + 1.0 
+                end if 
             
-            if (count([H_ice(i,j),H_ice(im1,j),H_ice(im1,jp1),H_ice(i,jp1)].eq.0) .eq. 0) then  
-                visc_eff(i,j,:) = visc_eff(i,j,:) + visc_eff_ab(im1,j,:) 
-                wt = wt + 1.0 
+            else
+                ! Ice-free point.
+                ! Only use contributions from ice-free neighbors 
+
+                if (count([H_ice(i,j),H_ice(ip1,j),H_ice(i,jp1),H_ice(ip1,jp1)].gt.0) .eq. 0) then  
+                    visc_eff(i,j,:) = visc_eff(i,j,:) + visc_eff_ab(i,j,:) 
+                    wt = wt + 1.0 
+                end if 
+                
+                if (count([H_ice(i,j),H_ice(im1,j),H_ice(im1,jp1),H_ice(i,jp1)].gt.0) .eq. 0) then  
+                    visc_eff(i,j,:) = visc_eff(i,j,:) + visc_eff_ab(im1,j,:) 
+                    wt = wt + 1.0 
+                end if 
+
+                if (count([H_ice(i,j),H_ice(i,jm1),H_ice(ip1,jm1),H_ice(ip1,j)].gt.0) .eq. 0) then 
+                    visc_eff(i,j,:) = visc_eff(i,j,:) + visc_eff_ab(i,jm1,:) 
+                    wt = wt + 1.0 
+                end if 
+                
+                if (count([H_ice(i,j),H_ice(im1,j),H_ice(im1,jm1),H_ice(i,jm1)].gt.0) .eq. 0) then 
+                    visc_eff(i,j,:) = visc_eff(i,j,:) + visc_eff_ab(im1,jm1,:) 
+                    wt = wt + 1.0 
+                end if 
+            
             end if 
 
-            if (count([H_ice(i,j),H_ice(i,jm1),H_ice(ip1,jm1),H_ice(ip1,j)].eq.0) .eq. 0) then 
-                visc_eff(i,j,:) = visc_eff(i,j,:) + visc_eff_ab(i,jm1,:) 
-                wt = wt + 1.0 
-            end if 
-            
-            if (count([H_ice(i,j),H_ice(im1,j),H_ice(im1,jm1),H_ice(i,jm1)].eq.0) .eq. 0) then 
-                visc_eff(i,j,:) = visc_eff(i,j,:) + visc_eff_ab(im1,jm1,:) 
-                wt = wt + 1.0 
-            end if 
-            
             if (wt .gt. 0.0) then 
+                ! Get the weighted mean of the viscosity for this aa-node 
+
                 visc_eff(i,j,:) = visc_eff(i,j,:) / wt 
+
             else 
-                ! Just get simple average for ice free points 
+                ! Just get simple average for safety
+                ! (this case should not occur)
 
                 ! Loop over column
                 do k = 1, nz 
@@ -659,7 +712,43 @@ end if
 
         end do 
         end do 
-        
+ 
+        ! Remove strange low viscosity points bordering ice sheet
+        ! (ice-free neighbors), mainly for aesthetics.  
+        do j=1, ny
+        do i=1, nx
+
+            ! Get neighbor indices
+            im1 = max(i-1,1) 
+            ip1 = min(i+1,nx) 
+            jm1 = max(j-1,1) 
+            jp1 = min(j+1,ny) 
+            
+            if ( H_ice(i,j)   .eq. 0.0_wp .and.  &
+                 H_ice(im1,j) .eq. 0.0_wp .and. H_ice(ip1,j) .gt. 0.0_wp ) then 
+
+                visc_eff(i,j,:) = visc_eff(im1,j,:) 
+
+            else if (H_ice(i,j) .eq. 0.0_wp .and.  &
+                 H_ice(ip1,j) .eq. 0.0_wp .and. H_ice(im1,j) .gt. 0.0_wp ) then 
+
+                visc_eff(i,j,:) = visc_eff(ip1,j,:) 
+
+            else if (H_ice(i,j) .eq. 0.0_wp .and.  &
+                 H_ice(i,jm1) .eq. 0.0_wp .and. H_ice(i,jp1) .gt. 0.0_wp ) then 
+
+                visc_eff(i,j,:) = visc_eff(i,jm1,:)
+
+            else if (H_ice(i,j) .eq. 0.0_wp .and.  &
+                 H_ice(i,jp1) .eq. 0.0_wp .and. H_ice(i,jm1) .gt. 0.0_wp ) then 
+
+                visc_eff(i,j,:) = visc_eff(i,jp1,:)
+
+            end if 
+
+        end do
+        end do
+
         ! Treat the corners to avoid extremes
         visc_eff(1,1,:)   = 0.5*(visc_eff(2,1,:)+visc_eff(1,2,:))
         visc_eff(1,ny,:)  = 0.5*(visc_eff(2,ny,:)+visc_eff(1,ny-1,:))

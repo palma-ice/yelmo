@@ -345,13 +345,15 @@ module yelmo_defs
         real(wp), allocatable :: dxx(:,:) 
         real(wp), allocatable :: dyy(:,:) 
         real(wp), allocatable :: dxy(:,:) 
-        real(wp), allocatable :: de(:,:) 
+        real(wp), allocatable :: dxz(:,:) 
+        real(wp), allocatable :: dyz(:,:)
+        real(wp), allocatable :: de(:,:)
+        real(wp), allocatable :: f_shear(:,:) 
     end type 
 
     type strain_3D_class 
         real(wp), allocatable :: dxx(:,:,:) 
         real(wp), allocatable :: dyy(:,:,:) 
-        real(wp), allocatable :: dzz(:,:,:)
         real(wp), allocatable :: dxy(:,:,:) 
         real(wp), allocatable :: dxz(:,:,:) 
         real(wp), allocatable :: dyz(:,:,:) 
@@ -363,7 +365,13 @@ module yelmo_defs
         real(wp), allocatable :: txx(:,:) 
         real(wp), allocatable :: tyy(:,:) 
         real(wp), allocatable :: txy(:,:) 
+        real(wp), allocatable :: txz(:,:)
+        real(wp), allocatable :: tyz(:,:)
         real(wp), allocatable :: te(:,:) 
+
+        real(wp), allocatable :: teig1(:,:) 
+        real(wp), allocatable :: teig2(:,:) 
+        
     end type 
 
     type stress_3D_class 

@@ -45,7 +45,8 @@ contains
         real(wp), intent(IN)    :: dt 
 
         ! Local variables 
-        integer :: i, j, nx, ny, i1, j1  
+        integer  :: i, j, nx, ny, i1, j1 
+        integer  :: im1, ip1, jm1, jp1  
         real(wp) :: dx_km, f_damp   
         real(wp) :: ux_aa, uy_aa, uxy_aa
         real(wp) :: H_err_now, dHdt_now, f_vel   
@@ -107,11 +108,17 @@ end if
         ! Initially set cf to missing value for now where no correction possible
         cf_ref = MV 
 
-        do j = 1, ny-1 
-        do i = 1, nx-1 
+        do j = 1, ny 
+        do i = 1, nx 
 
-            ux_aa = 0.5*(ux(i,j)+ux(i+1,j))
-            uy_aa = 0.5*(uy(i,j)+uy(i,j+1))
+            ! Get neighbor indices
+            im1 = max(i-1,1) 
+            ip1 = min(i+1,nx) 
+            jm1 = max(j-1,1) 
+            jp1 = min(j+1,ny) 
+            
+            ux_aa = 0.5*(ux(i,j)+ux(im1,j))
+            uy_aa = 0.5*(uy(i,j)+uy(i,jm1))
             
             uxy_aa = sqrt(ux_aa**2+uy_aa**2)
 
@@ -121,26 +128,27 @@ end if
                 ! Determine upstream node(s) 
 
                 if (ux_aa .ge. 0.0) then 
-                    i1 = i-1 
+                    i1 = im1
                 else 
-                    i1 = i+1 
+                    i1 = ip1 
                 end if 
 
                 if (uy_aa .ge. 0.0) then 
-                    j1 = j-1
+                    j1 = jm1
                 else 
-                    j1 = j+1  
+                    j1 = jp1  
                 end if 
                 
                 ! Get weighted error  =========
 
-                xwt   = 0.5 
-                ywt   = 0.5
-                xywt  = abs(ux(i1,j))+abs(uy(i,j1))
-
+                xywt  = abs(ux_aa)+abs(uy_aa)
                 if (xywt .gt. 0.0) then 
-                    xwt = abs(ux(i1,j)) / xywt 
-                    ywt = abs(uy(i,j1)) / xywt 
+                    xwt = abs(ux_aa) / xywt 
+                    ywt = abs(uy_aa) / xywt 
+                else 
+                    ! Dummy weights
+                    xwt   = 0.5 
+                    ywt   = 0.5
                 end if 
 
                 ! Define error for ice thickness 

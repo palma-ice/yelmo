@@ -75,14 +75,20 @@ contains
         allocate(strn2D%dxx(nx,ny))
         allocate(strn2D%dyy(nx,ny))
         allocate(strn2D%dxy(nx,ny))
+        allocate(strn2D%dxz(nx,ny))
+        allocate(strn2D%dyz(nx,ny))
         allocate(strn2D%de(nx,ny))
-        
+        allocate(strn2D%f_shear(nx,ny))
+
         allocate(strs2D%txx(nx,ny))
         allocate(strs2D%tyy(nx,ny))
         allocate(strs2D%txy(nx,ny))
+        allocate(strs2D%txz(nx,ny))
+        allocate(strs2D%tyz(nx,ny))
         allocate(strs2D%te(nx,ny))
+        allocate(strs2D%teig1(nx,ny))
+        allocate(strs2D%teig2(nx,ny))
         
-
         ! Initialize time if necessary 
         if (tpo%par%time .gt. dble(time)) then 
             tpo%par%time = dble(time) 
@@ -104,12 +110,17 @@ contains
         call calc_fmb_total(tpo%now%fmb,bnd%fmb_shlf,bnd%bmb_shlf,tpo%now%H_ice, &
                         tpo%now%H_grnd,tpo%now%f_ice,tpo%par%fmb_method,tpo%par%fmb_scale,tpo%par%dx)
         
-        ! ====== STRAIN and STRESS  ======
-        ! Diagnose 2D stress tensor components 
+if (.FALSE.) then 
+    ! ajr: not clear if this is needed for calving yet...
 
-        call calc_strain_rate_2D(strn2D,dyn%now%ux_bar,dyn%now%uy_bar,dyn%par%dx,dyn%par%dy)
-        call calc_stress_2D(strs2D,mat%now%visc_bar,strn2D)
-        
+        ! ====== STRAIN and STRESS  ======
+        ! Diagnose 2D strain and stress tensor components 
+
+        call calc_strain_rate_tensor_2D(strn2D,dyn%now%ux_bar,dyn%now%uy_bar,tpo%now%H_ice, &
+                                                            dyn%par%dx,dyn%par%dy)
+        call calc_stress_tensor_2D(strs2D,mat%now%visc_bar,strn2D)
+
+end if 
 
         ! 1. Perform topography calculations ------------------
 

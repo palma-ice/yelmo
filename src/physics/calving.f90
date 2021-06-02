@@ -1,7 +1,7 @@
 module calving
     ! Definitions for various calving laws 
 
-    use yelmo_defs, only : sp, dp, prec 
+    use yelmo_defs, only : sp, dp, wp, prec 
 
     implicit none 
 
@@ -22,17 +22,17 @@ contains
 
         implicit none 
 
-        real(prec), intent(INOUT) :: H_ice(:,:) 
-        real(prec), intent(INOUT) :: calv(:,:) 
-        real(prec), intent(IN)    :: f_grnd(:,:) 
-        real(prec), intent(IN)    :: H_min_flt
-        real(prec), intent(IN)    :: dt  
+        real(wp), intent(INOUT) :: H_ice(:,:) 
+        real(wp), intent(INOUT) :: calv(:,:) 
+        real(wp), intent(IN)    :: f_grnd(:,:) 
+        real(wp), intent(IN)    :: H_min_flt
+        real(wp), intent(IN)    :: dt  
         
         ! Local variables 
         integer :: i, j, nx, ny 
         integer :: n_mrgn 
 
-        real(prec), parameter :: tau_mrgn = 5.0         ! [a] Time scale for calving of points with many ice-free neighbors
+        real(wp), parameter :: tau_mrgn = 5.0         ! [a] Time scale for calving of points with many ice-free neighbors
         nx = size(H_ice,1)
         ny = size(H_ice,2) 
 
@@ -84,16 +84,16 @@ contains
 
         implicit none 
 
-        real(prec), intent(OUT) :: calv(:,:)
-        real(prec), intent(IN)  :: H_ice(:,:)                ! [m] Ice thickness 
-        real(prec), intent(IN)  :: f_grnd(:,:)               ! [-] Grounded fraction
-        real(prec), intent(IN)  :: f_ice(:,:)
-        real(prec), intent(IN)  :: H_calv 
-        real(prec), intent(IN)  :: tau                       ! [a] Calving timescale, ~ 1yr
+        real(wp), intent(OUT) :: calv(:,:)
+        real(wp), intent(IN)  :: H_ice(:,:)                ! [m] Ice thickness 
+        real(wp), intent(IN)  :: f_grnd(:,:)               ! [-] Grounded fraction
+        real(wp), intent(IN)  :: f_ice(:,:)
+        real(wp), intent(IN)  :: H_calv 
+        real(wp), intent(IN)  :: tau                       ! [a] Calving timescale, ~ 1yr
 
         ! Local variables 
         integer :: i, j, nx, ny
-        real(prec) :: H_mrgn
+        real(wp) :: H_mrgn
         logical :: is_front 
         integer :: n_ocean 
 
@@ -145,25 +145,25 @@ contains
 
         implicit none 
 
-        real(prec), intent(OUT) :: calv(:,:)
-        real(prec), intent(IN)  :: H_ice(:,:)                ! [m] Ice thickness 
-        real(prec), intent(IN)  :: f_grnd(:,:)               ! [-] Grounded fraction
-        real(prec), intent(IN)  :: f_ice(:,:)
-        real(prec), intent(IN)  :: mbal(:,:)                 ! [m/a] Net mass balance 
-        real(prec), intent(IN)  :: ux(:,:)                   ! [m/a] velocity, x-direction (ac-nodes)
-        real(prec), intent(IN)  :: uy(:,:)                   ! [m/a] velocity, y-direction (ac-nodes)
-        real(prec), intent(IN)  :: dx 
-        real(prec), intent(IN)  :: H_calv                    ! [m] Threshold for calving
-        real(prec), intent(IN)  :: tau                       ! [a] Calving timescale, ~ 1yr
+        real(wp), intent(OUT) :: calv(:,:)
+        real(wp), intent(IN)  :: H_ice(:,:)                ! [m] Ice thickness 
+        real(wp), intent(IN)  :: f_grnd(:,:)               ! [-] Grounded fraction
+        real(wp), intent(IN)  :: f_ice(:,:)
+        real(wp), intent(IN)  :: mbal(:,:)                 ! [m/a] Net mass balance 
+        real(wp), intent(IN)  :: ux(:,:)                   ! [m/a] velocity, x-direction (ac-nodes)
+        real(wp), intent(IN)  :: uy(:,:)                   ! [m/a] velocity, y-direction (ac-nodes)
+        real(wp), intent(IN)  :: dx 
+        real(wp), intent(IN)  :: H_calv                    ! [m] Threshold for calving
+        real(wp), intent(IN)  :: tau                       ! [a] Calving timescale, ~ 1yr
 
         ! Local variables 
         integer :: i, j, nx, ny, im1, jm1
-        real(prec) :: eps_xx, eps_yy  
+        real(wp) :: eps_xx, eps_yy  
         logical :: test_mij, test_pij, test_imj, test_ipj
         logical :: positive_mb 
-        real(prec), allocatable :: dHdt(:,:), H_diff(:,:)  
-        real(prec), allocatable :: H_mrgn(:,:) 
-        real(prec) :: dux, duy 
+        real(wp), allocatable :: dHdt(:,:), H_diff(:,:)  
+        real(wp), allocatable :: H_mrgn(:,:) 
+        real(wp) :: dux, duy 
         
         nx = size(H_ice,1)
         ny = size(H_ice,2)
@@ -260,6 +260,84 @@ contains
 
     end subroutine calc_calving_rate_flux
     
+    subroutine calc_calving_rate_vonmises_l19(calv,H_ice,f_grnd,f_ice,teig1,teig2,dx,dy,kt,w2)
+        ! Calculate the 'horizontal' calving rate [m/yr] based on the 
+        ! von Mises stress approach, as outlined by Lipscomb et al. (2019)
+        ! Eqs. 73-75.
+
+        implicit none 
+
+        real(wp), intent(OUT) :: calv(:,:)
+        real(wp), intent(IN)  :: H_ice(:,:)
+        real(wp), intent(IN)  :: f_grnd(:,:)  
+        real(wp), intent(IN)  :: f_ice(:,:)
+        real(wp), intent(IN)  :: teig1(:,:)
+        real(wp), intent(IN)  :: teig2(:,:)
+        real(wp), intent(IN)  :: dx, dy 
+        real(wp), intent(IN)  :: kt
+        real(wp), intent(IN)  :: w2
+
+        ! Local variables 
+        integer  :: i, j
+        integer  :: im1, jm1, ip1, jp1
+        integer  :: nx, ny
+        integer  :: n_ocean 
+        logical  :: is_margin 
+        real(wp) :: tau1, tau2 
+        real(wp) :: tau_eff 
+        real(wp) :: calv_ref
+        real(wp) :: H_ref 
+
+        nx = size(H_ice,1)
+        ny = size(H_ice,2)
+
+        calv = 0.0_wp
+
+        do j = 1, ny
+        do i = 1, nx  
+            
+            ! Get neighbor indices
+            im1 = max(i-1,1) 
+            ip1 = min(i+1,nx) 
+            jm1 = max(j-1,1) 
+            jp1 = min(j+1,ny) 
+            
+            ! Ice-shelf floating margin: floating ice point with open ocean neighbor 
+            ! If this point is an ice front, calculate calving
+            is_margin =  (f_grnd(i,j) .eq. 0.0 .and. H_ice(i,j) .gt. 0.0) .and. &
+                       ( (f_grnd(im1,j) .eq. 0.0 .and. H_ice(im1,j).eq.0.0) .or. &
+                         (f_grnd(ip1,j) .eq. 0.0 .and. H_ice(ip1,j).eq.0.0) .or. &
+                         (f_grnd(i,jm1) .eq. 0.0 .and. H_ice(i,jm1).eq.0.0) .or. &
+                         (f_grnd(i,jp1) .eq. 0.0 .and. H_ice(i,jp1).eq.0.0) ) 
+
+            if (is_margin) then 
+                ! Calculate calving rate here 
+
+                tau1 = max(teig1(i,j),0.0_wp)
+                tau2 = max(teig2(i,j),0.0_wp)
+
+                tau_eff = sqrt(tau1**2 + (w2 * tau2)**2)
+
+                ! Calculate lateral calving rate 
+                calv_ref = kt*tau_eff 
+
+                ! Convert to horizontal volume change 
+                if (f_ice(i,j) .gt. 0.0) then 
+                    H_ref = H_ice(i,j) / f_ice(i,j)
+                else 
+                    H_ref = H_ice(i,j)
+                end if 
+
+                calv(i,j) = (H_ref*calv_ref) / sqrt(dx*dy)
+            end if
+
+        end do
+        end do
+
+        return 
+
+    end subroutine calc_calving_rate_vonmises_l19
+
     subroutine calc_calving_rate_eigen(calv,H_ice,f_grnd,f_ice,ux_bar,uy_bar,dx,dy,H_calv,k_calv)
         ! Calculate the calving rate [m/a] based on the "eigencalving" law
         ! from Levermann et al. (2012)
@@ -269,22 +347,22 @@ contains
 
         implicit none 
 
-        real(prec), intent(OUT) :: calv(:,:)
-        real(prec), intent(IN)  :: H_ice(:,:)
-        real(prec), intent(IN)  :: f_grnd(:,:)  
-        real(prec), intent(IN)  :: f_ice(:,:)
-        real(prec), intent(IN)  :: ux_bar(:,:)
-        real(prec), intent(IN)  :: uy_bar(:,:)
-        real(prec), intent(IN)  :: dx, dy 
-        real(prec), intent(IN)  :: H_calv 
-        real(prec), intent(IN)  :: k_calv
+        real(wp), intent(OUT) :: calv(:,:)
+        real(wp), intent(IN)  :: H_ice(:,:)
+        real(wp), intent(IN)  :: f_grnd(:,:)  
+        real(wp), intent(IN)  :: f_ice(:,:)
+        real(wp), intent(IN)  :: ux_bar(:,:)
+        real(wp), intent(IN)  :: uy_bar(:,:)
+        real(wp), intent(IN)  :: dx, dy 
+        real(wp), intent(IN)  :: H_calv 
+        real(wp), intent(IN)  :: k_calv
 
         ! Local variables 
         integer :: i, j, nx, ny
-        real(prec), allocatable :: eps_xx(:,:), eps_yy(:,:) 
-        real(prec) :: eps_xx_max, eps_yy_max 
+        real(wp), allocatable :: eps_xx(:,:), eps_yy(:,:) 
+        real(wp) :: eps_xx_max, eps_yy_max 
         integer :: imax_xx, jmax_xx, imax_yy, jmax_yy                                          
-        real(prec), allocatable :: spr(:,:)   ! total spreading rate in the two directions epsxx * epsyyy 
+        real(wp), allocatable :: spr(:,:)   ! total spreading rate in the two directions epsxx * epsyyy 
 
         logical, allocatable :: is_front(:,:)   
         integer :: n_ocean 
@@ -339,11 +417,11 @@ contains
 
         implicit none 
 
-        real(prec), intent(OUT) :: calv(:,:)
-        real(prec), intent(IN)  :: H_ice(:,:)
+        real(wp), intent(OUT) :: calv(:,:)
+        real(wp), intent(IN)  :: H_ice(:,:)
         logical,    intent(IN)  :: mask(:,:) 
-        real(prec), intent(IN)  :: tau 
-        real(prec), intent(IN)  :: dt 
+        real(wp), intent(IN)  :: tau 
+        real(wp), intent(IN)  :: dt 
 
         if (tau .eq. 0.0_prec) then 
             ! Kill all ice immediately 

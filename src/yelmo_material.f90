@@ -94,8 +94,11 @@ contains
         mat%now%f_shear_bar = mat%now%strn2D%f_shear
 
         ! Calculate the deviatoric stress tensor and 2D average
-
-        call calc_stress_tensor(mat%now%strs,mat%now%strs2D,mat%now%visc,mat%now%strn,mat%par%zeta_aa) 
+        ! ajr: for now, only calculate the 2D stress tensor directly. This is 
+        ! currently only used for calving, and so only horizontal stresses are
+        ! needed (ie, assume constant vertical profile for horizontal velocity)
+        !call calc_stress_tensor(mat%now%strs,mat%now%strs2D,mat%now%visc,mat%now%strn,mat%par%zeta_aa) 
+        call calc_stress_tensor_2D(mat%now%strs2D,mat%now%visc_bar,mat%now%strn2D)
 
         ! 1. Update enhancement factor ======================
 

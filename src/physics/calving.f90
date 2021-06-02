@@ -126,7 +126,7 @@ contains
                 if (H_mrgn .lt. H_calv) then 
                     ! Apply calving at front, delete all ice in point (H_ice) 
 
-                    calv(i,j) = max(H_calv-H_mrgn,0.0) / tau 
+                    calv(i,j) = f_ice(i,j) * max(H_calv-H_mrgn,0.0) / tau 
 
                 end if 
 
@@ -247,7 +247,7 @@ contains
                 if ((.not.(test_mij.or.test_pij.or.test_imj.or.test_ipj))) then
                     ! This point does not pass the test, determine calving rate 
 
-                    calv(i,j) = max(H_calv - H_mrgn(i,j),0.0) / tau
+                    calv(i,j) = f_ice(i,j) * max(H_calv - H_mrgn(i,j),0.0) / tau
 
                 end if  
 

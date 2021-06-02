@@ -371,7 +371,7 @@ contains
 
     end function calc_rate_factor_integrated
     
-    subroutine calc_strain_rate_tensor(strn, strn2D, vx, vy, vz, H_ice, f_grnd, zeta_aa, zeta_ac, dx, de_max)
+    subroutine calc_strain_rate_tensor(strn, strn2D, vx, vy, vz, H_ice, f_grnd, f_ice, zeta_aa, zeta_ac, dx, de_max)
         ! -------------------------------------------------------------------------------
         !  Computation of all components of the strain-rate tensor, the full
         !  effective strain rate and the shear fraction.
@@ -391,6 +391,7 @@ contains
         real(wp), intent(IN) :: vz(:,:,:)                       ! nx,ny,nz_ac
         real(wp), intent(IN) :: H_ice(:,:)
         real(wp), intent(IN) :: f_grnd(:,:)
+        real(wp), intent(IN) :: f_ice(:,:)
         real(wp), intent(IN) :: zeta_aa(:) 
         real(wp), intent(IN) :: zeta_ac(:) 
         real(wp), intent(IN) :: dx
@@ -615,8 +616,7 @@ contains
         end do
         !$omp end parallel do
 
-if (.FALSE.) then 
-        ! Correct margin points by extrapolating strain-rate tensor
+        ! Correct partially-filled margin points by extrapolating strain-rate tensor
         ! from the dominant upstream neighbor. 
         do j=1, ny
         do i=1, nx
@@ -627,8 +627,8 @@ if (.FALSE.) then
             jm1 = max(j-1,1) 
             jp1 = min(j+1,ny) 
             
-            is_margin = ( H_ice(i,j) .gt. 0.0_wp .and. count([H_ice(im1,j),H_ice(ip1,j),&
-                                    H_ice(i,jm1),H_ice(i,jp1)] .eq. 0.0_wp) .gt. 0 )
+            is_margin = ( H_ice(i,j) .gt. 0.0_wp .and. f_ice(i,j) .lt. 1.0_wp .and. &
+                count([H_ice(im1,j),H_ice(ip1,j),H_ice(i,jm1),H_ice(i,jp1)] .eq. 0.0_wp) .gt. 0 )
 
             if (is_margin) then 
                 ! Ice-covered grid cell at the margin, determine strain 
@@ -676,7 +676,6 @@ if (.FALSE.) then
 
         end do
         end do
-end if 
 
         ! === Also calculate vertically averaged strain rate tensor ===
         
@@ -693,7 +692,7 @@ end if
 
     end subroutine calc_strain_rate_tensor
 
-    subroutine calc_strain_rate_tensor_2D(strn2D,ux_bar,uy_bar,H_ice,dx,dy)
+    subroutine calc_strain_rate_tensor_2D(strn2D,ux_bar,uy_bar,H_ice,f_ice,dx,dy)
         ! Calculate the 2D (vertically averaged) strain rate tensor,
         ! assuming a constant vertical velocity profile. 
 
@@ -702,6 +701,7 @@ end if
         real(wp), intent(IN) :: ux_bar(:,:)         ! [m/yr] Vertically averaged vel., x
         real(wp), intent(IN) :: uy_bar(:,:)         ! [m/yr] Vertically averaged vel., y
         real(wp), intent(IN) :: H_ice(:,:)          ! [m] Ice thickness 
+        real(wp), intent(IN) :: f_ice(:,:)
         real(wp), intent(IN) :: dx, dy              ! [m] Resolution
         type(strain_2D_class)  :: strn2D            ! [yr^-1] Strain rate tensor
 
@@ -769,8 +769,8 @@ end if
             jm1 = max(j-1,1) 
             jp1 = min(j+1,ny) 
             
-            is_margin = ( H_ice(i,j) .gt. 0.0_wp .and. count([H_ice(im1,j),H_ice(ip1,j),&
-                                    H_ice(i,jm1),H_ice(i,jp1)] .eq. 0.0_wp) .gt. 0 )
+            is_margin = ( H_ice(i,j) .gt. 0.0_wp .and. f_ice(i,j) .lt. 1.0_wp .and. &
+                count([H_ice(im1,j),H_ice(ip1,j),H_ice(i,jm1),H_ice(i,jp1)] .eq. 0.0_wp) .gt. 0 )
 
             if (is_margin) then 
                 ! Ice-covered grid cell at the margin, determine strain 

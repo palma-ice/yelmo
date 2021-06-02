@@ -75,7 +75,7 @@ contains
         ux_tmp = ux 
         do j = 1, ny 
         do i = 1, nx-1 
-            if (H_margin(i,j) .gt. 0.0_prec .and. H_ice(i+1,j) .eq. 0.0_prec)    ux_tmp(i,j) = 0.0_prec 
+            if (H_margin(i,j) .gt. 0.0_prec .and. H_ice(i+1,j)    .eq. 0.0_prec) ux_tmp(i,j) = 0.0_prec 
             if (H_ice(i,j)    .eq. 0.0_prec .and. H_margin(i+1,j) .gt. 0.0_prec) ux_tmp(i,j) = 0.0_prec 
         end do 
         end do  
@@ -83,7 +83,7 @@ contains
         uy_tmp = uy 
         do j = 1, ny-1 
         do i = 1, nx  
-            if (H_margin(i,j) .gt. 0.0_prec .and. H_ice(i,j+1) .eq. 0.0_prec)    uy_tmp(i,j) = 0.0_prec 
+            if (H_margin(i,j) .gt. 0.0_prec .and. H_ice(i,j+1)    .eq. 0.0_prec) uy_tmp(i,j) = 0.0_prec 
             if (H_ice(i,j)    .eq. 0.0_prec .and. H_margin(i,j+1) .gt. 0.0_prec) uy_tmp(i,j) = 0.0_prec 
         end do 
         end do  

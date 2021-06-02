@@ -117,7 +117,7 @@ if (.FALSE.) then
         ! Diagnose 2D strain and stress tensor components 
 
         call calc_strain_rate_tensor_2D(strn2D,dyn%now%ux_bar,dyn%now%uy_bar,tpo%now%H_ice, &
-                                                            dyn%par%dx,dyn%par%dy)
+                                                            tpo%now%f_ice,dyn%par%dx,dyn%par%dy)
         call calc_stress_tensor_2D(strs2D,mat%now%visc_bar,strn2D)
 
 end if 

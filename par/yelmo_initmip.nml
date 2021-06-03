@@ -62,7 +62,7 @@
 
 &ytopo
     solver              = "impl-upwind"     ! "expl", "impl-upwind"
-    calv_method         = "vm-l19"          ! "zero", "simple", "flux", "vm-l19" "kill"
+    calv_method         = "vm-l19"          ! "zero", "simple", "flux", "vm-l19", "kill"
     surf_gl_method      = 0                 ! 0: binary (max grnd/flt elevation), 1: subgrid average elevation
     margin2nd           = False             ! Apply second-order upwind approximation to gradients at the margin
     use_bmb             = True              ! Use basal mass balance in mass conservation equation

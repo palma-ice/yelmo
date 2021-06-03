@@ -109,18 +109,6 @@ contains
         ! calculate as needed 
         call calc_fmb_total(tpo%now%fmb,bnd%fmb_shlf,bnd%bmb_shlf,tpo%now%H_ice, &
                         tpo%now%H_grnd,tpo%now%f_ice,tpo%par%fmb_method,tpo%par%fmb_scale,tpo%par%dx)
-        
-if (.FALSE.) then 
-    ! ajr: not clear if this is needed for calving yet...
-
-        ! ====== STRAIN and STRESS  ======
-        ! Diagnose 2D strain and stress tensor components 
-
-        call calc_strain_rate_tensor_2D(strn2D,dyn%now%ux_bar,dyn%now%uy_bar,tpo%now%H_ice, &
-                                                            tpo%now%f_ice,dyn%par%dx,dyn%par%dy)
-        call calc_stress_tensor_2D(strs2D,mat%now%visc_bar,strn2D)
-
-end if 
 
         ! 1. Perform topography calculations ------------------
 
@@ -173,7 +161,13 @@ end if
 
                     call calc_calving_rate_flux(tpo%now%calv,tpo%now%H_ice,tpo%now%f_grnd,tpo%now%f_ice,mbal,dyn%now%ux_bar, &
                                                 dyn%now%uy_bar,tpo%par%dx,tpo%par%calv_H_lim,tpo%par%calv_tau)
-                    
+                
+                case("vm-l19")
+                    ! Use von Mises calving as defined by Lipscomb et al. (2019)
+
+                    call calc_calving_rate_vonmises_l19(tpo%now%calv,tpo%now%H_ice,tpo%now%f_grnd,tpo%now%f_ice, &
+                                        mat%now%strs2D%teig1,mat%now%strs2D%teig2,tpo%par%dx,tpo%par%dx,tpo%par%kt,tpo%par%w2)
+
                 case("kill") 
                     ! Delete all floating ice (using characteristic time parameter)
                     call calc_calving_rate_kill(tpo%now%calv,tpo%now%H_ice,tpo%now%f_grnd.eq.0.0_prec,tpo%par%calv_tau,dt)
@@ -403,6 +397,8 @@ end if
         call nml_read(filename,"ytopo","gl_sep_nx",         par%gl_sep_nx,        init=init_pars)
         call nml_read(filename,"ytopo","diffuse_bmb_shlf",  par%diffuse_bmb_shlf, init=init_pars)
         call nml_read(filename,"ytopo","fmb_scale",         par%fmb_scale,        init=init_pars)
+        call nml_read(filename,"ytopo","kt",                par%kt,               init=init_pars)
+        call nml_read(filename,"ytopo","w2",                par%w2,               init=init_pars)
         
         ! === Set internal parameters =====
 

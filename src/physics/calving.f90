@@ -11,6 +11,7 @@ module calving
     public :: apply_calving
     public :: calc_calving_rate_simple
     public :: calc_calving_rate_flux 
+    public :: calc_calving_rate_vonmises_l19
     public :: calc_calving_rate_eigen
     public :: calc_calving_rate_kill 
     
@@ -264,6 +265,7 @@ contains
         ! Calculate the 'horizontal' calving rate [m/yr] based on the 
         ! von Mises stress approach, as outlined by Lipscomb et al. (2019)
         ! Eqs. 73-75.
+        ! L19: kt = 0.0025 m yr-1 Pa-1, w2=25
 
         implicit none 
 

@@ -92,7 +92,9 @@ module yelmo_defs
         integer            :: gl_sep 
         integer            :: gl_sep_nx 
         logical            :: diffuse_bmb_shlf 
-        real(wp)           :: fmb_scale 
+        real(wp)           :: fmb_scale
+        real(wp)           :: kt 
+        real(wp)           :: w2  
         
         ! Internal parameters 
         real(dp)           :: time 

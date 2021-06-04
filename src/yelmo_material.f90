@@ -87,7 +87,7 @@ contains
 
         call calc_strain_rate_tensor(mat%now%strn,mat%now%strn2D,dyn%now%ux,dyn%now%uy,dyn%now%uz, &
                                  tpo%now%H_ice,tpo%now%f_grnd,tpo%now%f_ice,mat%par%zeta_aa, &
-                                 mat%par%zeta_ac,mat%par%dx,mat%par%de_max)
+                                 mat%par%zeta_ac,mat%par%dx,mat%par%de_max,mat%now%ATT_bar,mat%par%n_glen)
 
 
         ! Assign vertical average of shear for external use 
@@ -348,6 +348,7 @@ contains
         allocate(now%strn2D%dxy(nx,ny))
         allocate(now%strn2D%dxz(nx,ny))
         allocate(now%strn2D%dyz(nx,ny))
+        allocate(now%strn2D%ddiv(nx,ny))
         allocate(now%strn2D%de(nx,ny))
         
         allocate(now%strn%dxx(nx,ny,nz_aa))
@@ -355,6 +356,7 @@ contains
         allocate(now%strn%dxy(nx,ny,nz_aa))
         allocate(now%strn%dxz(nx,ny,nz_aa))
         allocate(now%strn%dyz(nx,ny,nz_aa))
+        allocate(now%strn%ddiv(nx,ny,nz_aa))
         allocate(now%strn%de(nx,ny,nz_aa))
         allocate(now%strn%f_shear(nx,ny,nz_aa))
         
@@ -394,6 +396,7 @@ contains
         now%strn2D%dxy   = 0.0
         now%strn2D%dxz   = 0.0
         now%strn2D%dyz   = 0.0
+        now%strn2D%ddiv  = 0.0
         now%strn2D%de    = 0.0 
         
         now%strn%dxx     = 0.0 
@@ -401,6 +404,7 @@ contains
         now%strn%dxy     = 0.0 
         now%strn%dxz     = 0.0
         now%strn%dyz     = 0.0
+        now%strn%ddiv    = 0.0
         now%strn%de      = 0.0
         now%strn%f_shear = 0.0 
         
@@ -449,6 +453,7 @@ contains
         if (allocated(now%strn2D%dxy))      deallocate(now%strn2D%dxy)
         if (allocated(now%strn2D%dxz))      deallocate(now%strn2D%dxz)
         if (allocated(now%strn2D%dyz))      deallocate(now%strn2D%dyz)
+        if (allocated(now%strn2D%ddiv))     deallocate(now%strn2D%ddiv)
         if (allocated(now%strn2D%de))       deallocate(now%strn2D%de)
         
         if (allocated(now%strn%dxx))        deallocate(now%strn%dxx)
@@ -456,6 +461,7 @@ contains
         if (allocated(now%strn%dxy))        deallocate(now%strn%dxy)
         if (allocated(now%strn%dxz))        deallocate(now%strn%dxz)
         if (allocated(now%strn%dyz))        deallocate(now%strn%dyz)
+        if (allocated(now%strn%ddiv))       deallocate(now%strn%ddiv)
         if (allocated(now%strn%de))         deallocate(now%strn%de)
         if (allocated(now%strn%f_shear))    deallocate(now%strn%f_shear)
         

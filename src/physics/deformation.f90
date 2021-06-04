@@ -9,7 +9,7 @@ module deformation
 
     ! Note: 3D arrays defined such that first index (k=1) == base, and max index (k=nk) == surface 
 
-    use yelmo_defs,  only : sp, dp, wp, prec, tol_underflow, T0, &
+    use yelmo_defs,  only : sp, dp, wp, prec, tol_underflow, T0, rho_ice, g, &
                         strain_2D_class, strain_3D_class, stress_2D_class, stress_3D_class
     use yelmo_tools, only : calc_vertical_integrated_2D, integrate_trapezoid1D_1D   
 
@@ -30,6 +30,7 @@ module deformation
     public :: calc_strain_rate_tensor_2D
     public :: calc_stress_tensor 
     public :: calc_stress_tensor_2D
+    public :: calc_stress_eigen_values
     
 contains 
 
@@ -274,7 +275,7 @@ contains
 
         return 
 
-    end function calc_rate_factor 
+    end function calc_rate_factor
     
     elemental function calc_rate_factor_eismint(T_ice,T_pmp,enh) result(ATT)
         ! Greve and Blatter (2009): Chapter 4, page 54 
@@ -307,7 +308,7 @@ contains
 
         return 
 
-    end function calc_rate_factor_eismint 
+    end function calc_rate_factor_eismint
     
     elemental subroutine scale_rate_factor_water(ATT,omega)
         ! This routine scales the rate factor when 
@@ -371,7 +372,8 @@ contains
 
     end function calc_rate_factor_integrated
     
-    subroutine calc_strain_rate_tensor(strn, strn2D, vx, vy, vz, H_ice, f_grnd, f_ice, zeta_aa, zeta_ac, dx, de_max)
+    subroutine calc_strain_rate_tensor(strn, strn2D, vx, vy, vz, H_ice, f_grnd, f_ice, &
+                    zeta_aa, zeta_ac, dx, de_max, ATT_bar, n_glen)
         ! -------------------------------------------------------------------------------
         !  Computation of all components of the strain-rate tensor, the full
         !  effective strain rate and the shear fraction.
@@ -396,7 +398,9 @@ contains
         real(wp), intent(IN) :: zeta_ac(:) 
         real(wp), intent(IN) :: dx
         real(wp), intent(IN) :: de_max                          ! [yr^-1] Maximum allowed effective strain rate
-        
+        real(wp), intent(IN) :: ATT_bar(:,:)
+        real(wp), intent(IN) :: n_glen
+
         ! Local variables 
         integer  :: i, j, k, i1, j1 
         integer  :: im1, ip1, jm1, jp1 
@@ -415,6 +419,7 @@ contains
         real(wp), allocatable :: fact_z(:)
 
         logical :: is_margin 
+        real(wp) :: ddiv_free, dxx_free, dyy_free 
 
         ! Define dy 
         dy = dx 
@@ -588,6 +593,9 @@ contains
                         
                     if (strn%de(i,j,k) .gt. de_max) strn%de(i,j,k) = de_max 
 
+                    ! Calculate the horizontal divergence too 
+                    strn%ddiv(i,j,k) = strn%dxx(i,j,k) + strn%dyy(i,j,k) 
+
                     ! Note: Using only the below should be equivalent to applying
                     ! the SIA approximation to calculate `de`
                     !strn%de(i,j,k)    =  sqrt( shear_squared(k) )
@@ -610,112 +618,173 @@ contains
 
                 end do 
 
+                ! Also estimate the free-spreading strain rate (Pollard et al., 2015, EPSL, Eq. B2.b)
+                ! ddiv = A*(rho*g*h/4)^n = dxx + dyy
+                ! assume equal spreading in both directions:
+                ! dxx = dyy; de = 2*dxx
+                ! dxx = de/2
+                ddiv_free = ATT_bar(i,j) * (0.25*rho_ice*g*H_ice(i,j))**n_glen
+                dxx_free  = ddiv_free / 2.0
+                dyy_free  = dxx_free 
+
+
+                is_margin = ( H_ice(i,j) .gt. 0.0_wp .and. f_ice(i,j) .lt. 1.0_wp .and. &
+                    count([H_ice(im1,j),H_ice(ip1,j),H_ice(i,jm1),H_ice(i,jp1)] .eq. 0.0_wp) .gt. 0 )
+                
+                ! For partially covered grid cells at margin, or floating points
+                ! ensure effective strain rate is not larger than free-spreading strain rate
+                if (is_margin .or. &
+                     (f_grnd(i,j) .eq. 0.0 .and. strn2D%ddiv(i,j) .gt. ddiv_free) ) then 
+                    ! Overwrite above value and impose free-spreading strain 
+
+                    strn%ddiv(i,j,:)    = ATT_bar(i,j) * (0.25*rho_ice*g*H_ice(i,j))**n_glen
+                    strn%dxx(i,j,:)     = strn%ddiv(i,j,1) / 2.0
+                    strn%dyy(i,j,:)     = strn%ddiv(i,j,1) / 2.0
+                    strn%dxy(i,j,:)     = 0.0
+                    strn%dxz(i,j,:)     = 0.0 
+                    strn%dyz(i,j,:)     = 0.0 
+
+                    strn%de(i,j,k) =  sqrt(  strn%dxx(i,j,k)*strn%dxx(i,j,k) &
+                                           + strn%dyy(i,j,k)*strn%dyy(i,j,k) &
+                                           + strn%dxx(i,j,k)*strn%dyy(i,j,k) &
+                                           + strn%dxy(i,j,k)*strn%dxy(i,j,k) &
+                                           + shear_squared )
+                        
+                    if (strn%de(i,j,k) .gt. de_max) strn%de(i,j,k) = de_max 
+
+                    strn%f_shear(i,j,:) = 0.0 
+
+                end if 
+
             end if ! ice-free or ice-covered 
 
         end do
         end do
         !$omp end parallel do
 
-        ! Correct partially-filled margin points by extrapolating strain-rate tensor
-        ! from the dominant upstream neighbor. 
-        do j=1, ny
-        do i=1, nx
-
-            ! Get neighbor indices
-            im1 = max(i-1,1) 
-            ip1 = min(i+1,nx) 
-            jm1 = max(j-1,1) 
-            jp1 = min(j+1,ny) 
-            
-            is_margin = ( H_ice(i,j) .gt. 0.0_wp .and. f_ice(i,j) .lt. 1.0_wp .and. &
-                count([H_ice(im1,j),H_ice(ip1,j),H_ice(i,jm1),H_ice(i,jp1)] .eq. 0.0_wp) .gt. 0 )
-
-            if (is_margin) then 
-                ! Ice-covered grid cell at the margin, determine strain 
-                ! rate from upstream neighbor with dominant velocity component. 
-
-                ! Determine upstream node from surface velocity components
-                ux_aa = 0.5_wp*(vx(i,j,nz_aa)+vx(im1,j,nz_aa))
-                uy_aa = 0.5_wp*(vy(i,j,nz_aa)+vy(i,jm1,nz_aa))
-                
-                if (abs(ux_aa) .gt. abs(uy_aa)) then
-                    ! x-direction is dominant 
-
-                    if (ux_aa .ge. 0.0_wp) then 
-                        i1 = im1 
-                    else 
-                        i1 = ip1
-                    end if 
-
-                    j1 = j  
-
-                else 
-                    ! y-direction is dominant
-
-                    if (uy_aa .ge. 0.0_wp) then 
-                        j1 = jm1
-                    else 
-                        j1 = jp1  
-                    end if 
-                    
-                    i1 = i 
-
-                end if 
-
-                ! Assign upstream strain-rate components
-
-                strn%dxx(i,j,:)     = strn%dxx(i1,j1,:)
-                strn%dyy(i,j,:)     = strn%dyy(i1,j1,:)
-                strn%dxy(i,j,:)     = strn%dxy(i1,j1,:)
-                strn%dxz(i,j,:)     = strn%dxz(i1,j1,:)
-                strn%dyz(i,j,:)     = strn%dyz(i1,j1,:)
-                strn%de(i,j,:)      = strn%de(i1,j1,:)
-                strn%f_shear(i,j,:) = strn%f_shear(i1,j1,:)
-
-            end if
-
-        end do
-        end do
-
         ! === Also calculate vertically averaged strain rate tensor ===
         
         ! Get the 2D average of strain rate in case it is needed 
-        strn2D%dxx     = calc_vertical_integrated_2D(strn%dxx,zeta_aa)
-        strn2D%dyy     = calc_vertical_integrated_2D(strn%dyy,zeta_aa)
-        strn2D%dxy     = calc_vertical_integrated_2D(strn%dxy,zeta_aa)
-        strn2D%dxz     = calc_vertical_integrated_2D(strn%dxz,zeta_aa)
-        strn2D%dyz     = calc_vertical_integrated_2D(strn%dyz,zeta_aa)
-        strn2D%de      = calc_vertical_integrated_2D(strn%de, zeta_aa)
+        strn2D%dxx     = calc_vertical_integrated_2D(strn%dxx, zeta_aa)
+        strn2D%dyy     = calc_vertical_integrated_2D(strn%dyy, zeta_aa)
+        strn2D%dxy     = calc_vertical_integrated_2D(strn%dxy, zeta_aa)
+        strn2D%dxz     = calc_vertical_integrated_2D(strn%dxz, zeta_aa)
+        strn2D%dyz     = calc_vertical_integrated_2D(strn%dyz, zeta_aa)
+        strn2D%ddiv    = calc_vertical_integrated_2D(strn%ddiv,zeta_aa)
+        strn2D%de      = calc_vertical_integrated_2D(strn%de,  zeta_aa)
         strn2D%f_shear = calc_vertical_integrated_2D(strn%f_shear,zeta_aa) 
         
         return 
 
     end subroutine calc_strain_rate_tensor
 
-    subroutine calc_strain_rate_tensor_2D(strn2D,ux_bar,uy_bar,H_ice,f_ice,dx,dy)
+    subroutine calc_strain_rate_tensor_2D(strn2D,ux_bar,uy_bar,H_ice,f_ice,f_grnd,dx,dy,ATT_bar,n_glen)
         ! Calculate the 2D (vertically averaged) strain rate tensor,
         ! assuming a constant vertical velocity profile. 
 
         implicit none
 
+        type(strain_2D_class), intent(OUT) :: strn2D            ! [yr^-1] Strain rate tensor
         real(wp), intent(IN) :: ux_bar(:,:)         ! [m/yr] Vertically averaged vel., x
         real(wp), intent(IN) :: uy_bar(:,:)         ! [m/yr] Vertically averaged vel., y
         real(wp), intent(IN) :: H_ice(:,:)          ! [m] Ice thickness 
         real(wp), intent(IN) :: f_ice(:,:)
+        real(wp), intent(IN) :: f_grnd(:,:)
         real(wp), intent(IN) :: dx, dy              ! [m] Resolution
-        type(strain_2D_class)  :: strn2D            ! [yr^-1] Strain rate tensor
+        real(wp), intent(IN) :: ATT_bar(:,:) 
+        real(wp), intent(IN) :: n_glen 
 
         ! Local variables
         integer  :: i, j, k, i1, j1
-        integer  :: im1, ip1, jm1, jp1 
+        integer  :: im1, ip1, jm1, jp1
         integer  :: nx, ny
         real(wp) :: dvdx, dudy
         real(wp) :: ux_aa, uy_aa 
-        
-        logical :: is_margin 
+        logical  :: is_margin 
+
+        real(wp), allocatable :: ux_ext(:,:) 
+        real(wp), allocatable :: uy_ext(:,:) 
+        real(wp) :: wt_tot 
+
+        real(wp) :: ddiv_free, dxx_free, dyy_free  
 
         nx = size(ux_bar,1)
         ny = size(ux_bar,2)
+
+        allocate(ux_ext(nx,ny)) 
+        allocate(uy_ext(nx,ny)) 
+
+        ! First, extend velocity vectors to grid points 
+        ! neighboring ice sheets, to account for new points.
+        ux_ext = ux_bar
+        uy_ext = uy_bar
+
+        do j = 1, ny
+        do i = 1, nx
+            
+            ! Get neighbor indices
+            im1 = max(i-1,1) 
+            ip1 = min(i+1,nx) 
+            jm1 = max(j-1,1) 
+            jp1 = min(j+1,ny) 
+
+            ! Get neighborhood average value 
+            ! (rough approximation, but simpler than alternatives)
+
+            if (ux_bar(i,j) .eq. 0.0) then 
+                ux_ext(i,j) = 0.0
+                wt_tot      = 0.0 
+
+                if (ux_bar(im1,j) .ne. 0.0) then 
+                    ux_ext(i,j) = ux_ext(i,j) + ux_bar(im1,j) 
+                    wt_tot = wt_tot + 1.0 
+                end if 
+                if (ux_bar(ip1,j) .ne. 0.0) then 
+                    ux_ext(i,j) = ux_ext(i,j) + ux_bar(ip1,j) 
+                    wt_tot = wt_tot + 1.0 
+                end if 
+                if (ux_bar(i,jm1) .ne. 0.0) then 
+                    ux_ext(i,j) = ux_ext(i,j) + ux_bar(i,jm1) 
+                    wt_tot = wt_tot + 1.0 
+                end if 
+                if (ux_bar(i,jp1) .ne. 0.0) then 
+                    ux_ext(i,j) = ux_ext(i,j) + ux_bar(i,jp1) 
+                    wt_tot = wt_tot + 1.0 
+                end if 
+
+                if (wt_tot .gt. 0.0) then 
+                    ux_ext(i,j) = ux_ext(i,j) / wt_tot 
+                end if 
+            end if 
+
+            if (uy_bar(i,j) .eq. 0.0) then 
+                uy_ext(i,j) = 0.0
+                wt_tot      = 0.0 
+
+                if (uy_bar(im1,j) .ne. 0.0) then 
+                    uy_ext(i,j) = uy_ext(i,j) + uy_bar(im1,j) 
+                    wt_tot = wt_tot + 1.0 
+                end if 
+                if (uy_bar(ip1,j) .ne. 0.0) then 
+                    uy_ext(i,j) = uy_ext(i,j) + uy_bar(ip1,j) 
+                    wt_tot = wt_tot + 1.0 
+                end if 
+                if (uy_bar(i,jm1) .ne. 0.0) then 
+                    uy_ext(i,j) = uy_ext(i,j) + uy_bar(i,jm1) 
+                    wt_tot = wt_tot + 1.0 
+                end if 
+                if (uy_bar(i,jp1) .ne. 0.0) then 
+                    uy_ext(i,j) = uy_ext(i,j) + uy_bar(i,jp1) 
+                    wt_tot = wt_tot + 1.0 
+                end if 
+
+                if (wt_tot .gt. 0.0) then 
+                    uy_ext(i,j) = uy_ext(i,j) / wt_tot 
+                end if 
+            end if 
+
+        end do 
+        end do 
 
         strn2D%dxx      = 0.0 
         strn2D%dyy      = 0.0 
@@ -738,80 +807,50 @@ contains
                 ! Grounded or floating ice, calculate strain rate here (aa-nodes)
 
                 ! aa-nodes
-                strn2D%dxx(i,j) = (ux_bar(i,j) - ux_bar(im1,j))/dx
-                strn2D%dyy(i,j) = (uy_bar(i,j) - uy_bar(i,jm1))/dy
+                strn2D%dxx(i,j) = (ux_ext(i,j) - ux_ext(im1,j))/dx
+                strn2D%dyy(i,j) = (uy_ext(i,j) - uy_ext(i,jm1))/dy
 
                 ! Calculation of cross terms on central aa-nodes (symmetrical results)
-                dudy = ((ux_bar(i,jp1)   - ux_bar(i,jm1))    &
-                      + (ux_bar(im1,jp1) - ux_bar(im1,jm1))) /(4.0*dy)
-                dvdx = ((uy_bar(ip1,j)   - uy_bar(im1,j))    &
-                      + (uy_bar(ip1,jm1) - uy_bar(im1,jm1))) /(4.0*dx)
+                dudy = ((ux_ext(i,jp1)   - ux_ext(i,jm1))    &
+                      + (ux_ext(im1,jp1) - ux_ext(im1,jm1))) /(4.0*dy)
+                dvdx = ((uy_ext(ip1,j)   - uy_ext(im1,j))    &
+                      + (uy_ext(ip1,jm1) - uy_ext(im1,jm1))) /(4.0*dx)
 
                 strn2D%dxy(i,j) = 0.5*(dudy+dvdx)
 
                 ! Calculate the effective strain rate from the trace 
                 strn2D%de(i,j) = sqrt( strn2D%dxx(i,j)**2 + strn2D%dyy(i,j)**2 &
                             + strn2D%dxx(i,j)*strn2D%dyy(i,j) + strn2D%dxy(i,j)**2 )
-            
-            end if 
-
-        end do
-        end do
-
-        ! Extrapolate strain-rate tensor to margin 
-        ! points from the dominant upstream neighbor. 
-        do j=1, ny
-        do i=1, nx
-
-            ! Get neighbor indices
-            im1 = max(i-1,1) 
-            ip1 = min(i+1,nx) 
-            jm1 = max(j-1,1) 
-            jp1 = min(j+1,ny) 
-            
-            is_margin = ( H_ice(i,j) .gt. 0.0_wp .and. f_ice(i,j) .lt. 1.0_wp .and. &
-                count([H_ice(im1,j),H_ice(ip1,j),H_ice(i,jm1),H_ice(i,jp1)] .eq. 0.0_wp) .gt. 0 )
-
-            if (is_margin) then 
-                ! Ice-covered grid cell at the margin, determine strain 
-                ! rate from upstream neighbor with dominant velocity component. 
-
-                ! Determine upstream node from velocity components
-                ux_aa = 0.5_wp*(ux_bar(i,j)+ux_bar(im1,j))
-                uy_aa = 0.5_wp*(uy_bar(i,j)+uy_bar(i,jm1))
                 
-                if (abs(ux_aa) .gt. abs(uy_aa)) then
-                    ! x-direction is dominant 
 
-                    if (ux_aa .ge. 0.0_wp) then 
-                        i1 = im1 
-                    else 
-                        i1 = ip1
-                    end if 
+                ! Also estimate the free-spreading strain rate (Pollard et al., 2015, EPSL, Eq. B2.b)
+                ! ddiv = A*(rho*g*h/4)^n = dxx + dyy
+                ! assume equal spreading in both directions:
+                ! dxx = dyy; ddiv = 2*dxx
+                ! dxx = ddiv/2
+                ddiv_free = ATT_bar(i,j) * (0.25*rho_ice*g*H_ice(i,j))**n_glen
+                dxx_free  = ddiv_free / 2.0
+                dyy_free  = dxx_free 
+                
+                is_margin = ( H_ice(i,j) .gt. 0.0_wp .and. f_ice(i,j) .lt. 1.0_wp .and. &
+                    count([H_ice(im1,j),H_ice(ip1,j),H_ice(i,jm1),H_ice(i,jp1)] .eq. 0.0_wp) .gt. 0 )
+                
+                ! For partially covered grid cells at margin, or floating points
+                ! ensure effective strain rate is not larger than free-spreading strain rate
+                if (is_margin .or. &
+                     (f_grnd(i,j) .eq. 0.0 .and. strn2D%de(i,j) .gt. ddiv_free) ) then 
+                    ! Overwrite above value and impose free-spreading strain 
+                    strn2D%ddiv(i,j) = ddiv_free 
+                    strn2D%dxx(i,j)  = dxx_free 
+                    strn2D%dyy(i,j)  = dyy_free 
+                    strn2D%dxy(i,j)  = 0.0
 
-                    j1 = j  
-
-                else 
-                    ! y-direction is dominant
-
-                    if (uy_aa .ge. 0.0_wp) then 
-                        j1 = jm1
-                    else 
-                        j1 = jp1  
-                    end if 
-                    
-                    i1 = i 
-
+                    strn2D%de(i,j) = sqrt( strn2D%dxx(i,j)**2 + strn2D%dyy(i,j)**2 &
+                            + strn2D%dxx(i,j)*strn2D%dyy(i,j) + strn2D%dxy(i,j)**2 )
+                 
                 end if 
 
-                ! Assign upstream strain-rate components
-
-                strn2D%dxx(i,j)     = strn2D%dxx(i1,j1)
-                strn2D%dyy(i,j)     = strn2D%dyy(i1,j1)
-                strn2D%dxy(i,j)     = strn2D%dxy(i1,j1)
-                strn2D%de(i,j)      = strn2D%de(i1,j1)
-
-            end if
+            end if 
 
         end do
         end do
@@ -858,8 +897,8 @@ contains
         strs2D%te  = calc_vertical_integrated_2D(strs%te, zeta_aa)
         
         ! Finally, calculate the first two eigenvectors for 2D stress tensor 
-        call calc_stress_eigen_2D(strs2D%teig1,strs2D%teig2, &
-                                    strs2D%txx,strs2D%tyy,strs2D%txy)
+        call calc_stress_eigen_values(strs2D%teig1,strs2D%teig2, &
+                                        strs2D%txx,strs2D%tyy,strs2D%txy)
 
         return 
 
@@ -889,63 +928,53 @@ contains
                         + strs2D%txy*strs2D%txy )
 
         ! Finally, calculate the first two eigenvectors for 2D stress tensor 
-        call calc_stress_eigen_2D(strs2D%teig1,strs2D%teig2, &
+        call calc_stress_eigen_values(strs2D%teig1,strs2D%teig2, &
                                     strs2D%txx,strs2D%tyy,strs2D%txy)
 
         return 
 
     end subroutine calc_stress_tensor_2D
     
-    subroutine calc_stress_eigen_2D(teig1,teig2,txx,tyy,txy)
+    elemental subroutine calc_stress_eigen_values(teig1,teig2,txx,tyy,txy)
         ! Calculate the first two eigenvectors of 2D deviatoric stress tensor 
 
         implicit none
 
-        real(wp), intent(OUT) :: teig1(:,:)         ! [Pa] Eigenvalue 1
-        real(wp), intent(OUT) :: teig2(:,:)         ! [Pa] Eigenvalue 2
-        real(wp), intent(IN)  :: txx(:,:)
-        real(wp), intent(IN)  :: tyy(:,:)
-        real(wp), intent(IN)  :: txy(:,:)
+        real(wp), intent(OUT) :: teig1              ! [Pa] Eigenvalue 1
+        real(wp), intent(OUT) :: teig2              ! [Pa] Eigenvalue 2
+        real(wp), intent(IN)  :: txx
+        real(wp), intent(IN)  :: tyy
+        real(wp), intent(IN)  :: txy
 
         ! Local variables
-        integer :: i, j, nx, ny 
-        integer :: im1, ip1, jm1, jp1 
         real(wp) :: a, b, c, root
         real(wp) :: lambda1, lambda2 
 
-        nx = size(teig1,1)
-        ny = size(teig1,2) 
-
-        ! Initialize eigenvalues to zero 
-        teig1 = 0.0_wp 
-        teig2 = 0.0_wp 
-
-        do j = 1, ny 
-        do i = 1, nx 
-
-            ! compute the eigenvalues of the vertically integrated stress tensor
-            a = 1.0_wp
-            b = -(txx(i,j) + tyy(i,j))
-            c = txx(i,j)*tyy(i,j) - txy(i,j)*txy(i,j)
-            if (b*b - 4.0_wp*a*c > 0.0_wp) then   ! two real eigenvalues
-                root = sqrt(b*b - 4.0_wp*a*c)
-                lambda1 = (-b + root) / (2.0_wp*a)
-                lambda2 = (-b - root) / (2.0_wp*a)
-                if (lambda1 > lambda2) then
-                    teig1(i,j) = lambda1
-                    teig2(i,j) = lambda2
-                else
-                    teig1(i,j) = lambda2
-                    teig2(i,j) = lambda1
-                end if
-            end if  ! b^2 - 4ac > 0
-
-        end do 
-        end do
+        ! compute the eigenvalues of the vertically integrated stress tensor
+        a = 1.0_wp
+        b = -(txx + tyy)
+        c = txx*tyy - txy*txy
+        if (b*b - 4.0_wp*a*c > 0.0_wp) then   ! two real eigenvalues
+            root = sqrt(b*b - 4.0_wp*a*c)
+            lambda1 = (-b + root) / (2.0_wp*a)
+            lambda2 = (-b - root) / (2.0_wp*a)
+            if (lambda1 > lambda2) then
+                teig1 = lambda1
+                teig2 = lambda2
+            else
+                teig1 = lambda2
+                teig2 = lambda1
+            end if
+        else 
+            ! No eigenvalues, set to zero 
+            teig1 = 0.0_wp 
+            teig2 = 0.0_wp 
+        end if  ! b^2 - 4ac > 0
 
         return
 
-    end subroutine calc_stress_eigen_2D
+    end subroutine calc_stress_eigen_values
+
 
 end module deformation
 

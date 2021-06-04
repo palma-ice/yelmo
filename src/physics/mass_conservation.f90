@@ -1,6 +1,6 @@
 module mass_conservation
 
-    use yelmo_defs, only : sp, dp, prec, tol_underflow, g, rho_ice, rho_sw  
+    use yelmo_defs, only : sp, dp, wp, tol_underflow, g, rho_ice, rho_sw  
     use yelmo_tools, only : fill_borders_2D
 
     use solver_advection, only : calc_advec2D  
@@ -8,83 +8,76 @@ module mass_conservation
     implicit none 
 
     private
-    public :: calc_ice_thickness
+    public :: calc_ice_thickness_dyn
+    public :: calc_ice_thickness_mbal
+    public :: apply_ice_thickness_boundaries
     public :: relax_ice_thickness
 
 contains 
 
-    subroutine calc_ice_thickness(H_ice,dHdt_n,H_ice_n,H_ice_pred,H_margin,f_ice,mb_applied,f_grnd,H_ocn,ux,uy,mbal,calv, &
-                                    z_bed_sd,dx,dt,solver,boundaries,ice_allowed,H_ice_fill,H_min,sd_min,sd_max,calv_max,beta,pc_step)
+    subroutine calc_ice_thickness_dyn(H_ice,dHdt_n,H_ice_n,H_ice_pred,H_margin,f_ice,f_grnd,ux,uy, &
+                                      solver,dx,dt,beta,pc_step)
         ! Interface subroutine to update ice thickness through application
         ! of advection, vertical mass balance terms and calving 
 
         implicit none 
 
-        real(prec),       intent(INOUT) :: H_ice(:,:)           ! [m]   Ice thickness 
-        real(prec),       intent(INOUT) :: dHdt_n(:,:)          ! [m/a] Advective rate of ice thickness change from previous=>current timestep 
-        real(prec),       intent(INOUT) :: H_ice_n(:,:)         ! [m]   Ice thickness from previous=>current timestep 
-        real(prec),       intent(INOUT) :: H_ice_pred(:,:)      ! [m]   Ice thickness from predicted timestep 
-        real(prec),       intent(INOUT) :: H_margin(:,:)        ! [m]   Margin ice thickness (assuming full area coverage) 
-        real(prec),       intent(INOUT) :: f_ice(:,:)           ! [m]   Ice area fraction 
-        real(prec),       intent(OUT)   :: mb_applied(:,:)      ! [m/a] Actual mass balance applied to real ice points
-        real(prec),       intent(IN)    :: f_grnd(:,:)          ! [--]  Grounded fraction 
-        real(prec),       intent(IN)    :: H_ocn(:,:)           ! [m]   Ocean thickness (ie, depth)
-        real(prec),       intent(IN)    :: ux(:,:)              ! [m/a] Depth-averaged velocity, x-direction (ac-nodes)
-        real(prec),       intent(IN)    :: uy(:,:)              ! [m/a] Depth-averaged velocity, y-direction (ac-nodes)
-        real(prec),       intent(IN)    :: mbal(:,:)            ! [m/a] Net mass balance; mbal = smb+bmb  !-calv 
-        real(prec),       intent(IN)    :: calv(:,:)            ! [m/a] Calving rate 
-        real(prec),       intent(IN)    :: z_bed_sd(:,:)        ! [m]   Standard deviation of bed topography
-        real(prec),       intent(IN)    :: dx                   ! [m]   Horizontal resolution
-        real(prec),       intent(IN)    :: dt                   ! [a]   Timestep 
+        real(wp),         intent(INOUT) :: H_ice(:,:)           ! [m]   Ice thickness 
+        real(wp),         intent(INOUT) :: dHdt_n(:,:)          ! [m/a] Advective rate of ice thickness change from previous=>current timestep 
+        real(wp),         intent(INOUT) :: H_ice_n(:,:)         ! [m]   Ice thickness from previous=>current timestep 
+        real(wp),         intent(INOUT) :: H_ice_pred(:,:)      ! [m]   Ice thickness from predicted timestep 
+        real(wp),         intent(INOUT) :: H_margin(:,:)        ! [m]   Margin ice thickness (assuming full area coverage) 
+        real(wp),         intent(INOUT) :: f_ice(:,:)           ! [--]  Ice area fraction 
+        real(wp),         intent(INOUT) :: f_grnd(:,:)          ! [--]  Fraction of grounded ice 
+        real(wp),         intent(IN)    :: ux(:,:)              ! [m/a] Depth-averaged velocity, x-direction (ac-nodes)
+        real(wp),         intent(IN)    :: uy(:,:)              ! [m/a] Depth-averaged velocity, y-direction (ac-nodes)
         character(len=*), intent(IN)    :: solver               ! Solver to use for the ice thickness advection equation
-        character(len=*), intent(IN)    :: boundaries           ! What boundary conditions should apply?
-        logical,          intent(IN)    :: ice_allowed(:,:)     ! Mask of where ice is allowed to be greater than zero 
-        real(prec),       intent(IN)    :: H_ice_fill(:,:)      ! Ice thickness variable to prescribe at boundaries 
-        real(prec),       intent(IN)    :: H_min                ! [m]   Minimum allowed ice thickness parameter
-        real(prec),       intent(IN)    :: sd_min               ! [m]   Minimum stdev(z_bed) parameter
-        real(prec),       intent(IN)    :: sd_max               ! [m]   Maximum stdev(z_bed) parameter
-        real(prec),       intent(IN)    :: calv_max             ! [m]   Maximum grounded calving rate parameter
-        real(prec),       intent(IN)    :: beta(4) 
-        character(len=*), intent(IN)    :: pc_step 
+        real(wp),         intent(IN)    :: dx                   ! [m]   Horizontal resolution
+        real(wp),         intent(IN)    :: dt                   ! [a]   Timestep 
+        real(wp),         intent(IN)    :: beta(4)              ! Timestep weighting parameters
+        character(len=*), intent(IN)    :: pc_step              ! Current predictor-corrector step ('predictor' or 'corrector')
 
         ! Local variables 
-        integer :: i, j, nx, ny 
-        integer :: n  
-        real(prec), allocatable :: calv_grnd(:,:) 
-        real(prec), allocatable :: dHdt_advec(:,:) 
-        real(prec), allocatable :: ux_tmp(:,:) 
-        real(prec), allocatable :: uy_tmp(:,:) 
+        integer :: i, j, nx, ny  
+        real(wp), allocatable :: mbal_zero(:,:) 
+        real(wp), allocatable :: dHdt_advec(:,:) 
+        real(wp), allocatable :: ux_tmp(:,:) 
+        real(wp), allocatable :: uy_tmp(:,:) 
 
-        real(prec), parameter :: dHdt_advec_lim = 10.0_prec     ! [m/a] Limit on advection rate
+        real(wp), parameter :: dHdt_advec_lim = 10.0_wp     ! [m/a] Hard limit on advection rate
 
         nx = size(H_ice,1)
         ny = size(H_ice,2)
 
-        allocate(calv_grnd(nx,ny))
-        calv_grnd = 0.0_prec 
+        allocate(mbal_zero(nx,ny))
+        mbal_zero = 0.0_wp 
 
         allocate(ux_tmp(nx,ny))
         allocate(uy_tmp(nx,ny))
-        ux_tmp = 0.0_prec 
-        uy_tmp = 0.0_prec 
+        ux_tmp = 0.0_wp 
+        uy_tmp = 0.0_wp 
 
         allocate(dHdt_advec(nx,ny))
-        dHdt_advec = 0.0_prec 
+        dHdt_advec = 0.0_wp 
+
+        ! First, diagnose margin ice and determine f_ice to ensure 
+        ! it matches current ice distribution.
+        call calc_ice_margin(H_ice,H_margin,f_ice,f_grnd)
 
         ! Ensure that no velocity is defined for outer boundaries of margin points
         ux_tmp = ux 
         do j = 1, ny 
         do i = 1, nx-1 
-            if (H_margin(i,j) .gt. 0.0_prec .and. H_ice(i+1,j)    .eq. 0.0_prec) ux_tmp(i,j) = 0.0_prec 
-            if (H_ice(i,j)    .eq. 0.0_prec .and. H_margin(i+1,j) .gt. 0.0_prec) ux_tmp(i,j) = 0.0_prec 
+            if (H_margin(i,j) .gt. 0.0_wp .and. H_ice(i+1,j)    .eq. 0.0_wp) ux_tmp(i,j) = 0.0_wp 
+            if (H_ice(i,j)    .eq. 0.0_wp .and. H_margin(i+1,j) .gt. 0.0_wp) ux_tmp(i,j) = 0.0_wp 
         end do 
         end do  
 
         uy_tmp = uy 
         do j = 1, ny-1 
         do i = 1, nx  
-            if (H_margin(i,j) .gt. 0.0_prec .and. H_ice(i,j+1)    .eq. 0.0_prec) uy_tmp(i,j) = 0.0_prec 
-            if (H_ice(i,j)    .eq. 0.0_prec .and. H_margin(i,j+1) .gt. 0.0_prec) uy_tmp(i,j) = 0.0_prec 
+            if (H_margin(i,j) .gt. 0.0_wp .and. H_ice(i,j+1)    .eq. 0.0_wp) uy_tmp(i,j) = 0.0_wp 
+            if (H_ice(i,j)    .eq. 0.0_wp .and. H_margin(i,j+1) .gt. 0.0_wp) uy_tmp(i,j) = 0.0_wp 
         end do 
         end do  
     
@@ -93,7 +86,7 @@ contains
 !         uy_tmp = uy 
         
         ! ===================================================================================
-        ! First, only resolve the dynamic part (ice advection) using multistep method
+        ! Resolve the dynamic part (ice advection) using multistep method
 
         select case(trim(pc_step))
         
@@ -106,7 +99,7 @@ contains
                 dHdt_advec = dHdt_n 
 
                 ! Determine current advective rate of change (time=n)
-                call calc_advec2D(dHdt_n,H_ice,ux_tmp,uy_tmp,mbal*0.0,dx,dx,dt,solver)
+                call calc_advec2D(dHdt_n,H_ice,ux_tmp,uy_tmp,mbal_zero,dx,dx,dt,solver)
 
                 ! ajr: testing stability fix for spin-up, limit advection rate!
                 ! where(dHdt_n .gt.  dHdt_advec_lim) dHdt_n = dHdt_advec_lim
@@ -121,7 +114,7 @@ contains
             case("corrector") ! corrector 
 
                 ! Determine advective rate of change based on predicted H,ux/y fields (time=n+1,pred)
-                call calc_advec2D(dHdt_advec,H_ice_pred,ux_tmp,uy_tmp,mbal*0.0,dx,dx,dt,solver)
+                call calc_advec2D(dHdt_advec,H_ice_pred,ux_tmp,uy_tmp,mbal_zero,dx,dx,dt,solver)
 
                 ! ajr: testing stability fix for spin-up, limit advection rate!
                 ! where(dHdt_advec .gt.  dHdt_advec_lim) dHdt_advec = dHdt_advec_lim
@@ -136,17 +129,96 @@ contains
                 ! Finally, update dHdt_n with correct term to use as n-1 on next iteration
                 dHdt_n = dHdt_advec 
 
-        end select  
+        end select
+
+        ! Post processing of H_ice ================
 
         ! Ensure ice thickness is greater than zero for safety 
-        where(H_ice .lt. 0.0_prec) H_ice = 0.0_prec 
+        where(H_ice .lt. 0.0_wp) H_ice = 0.0_wp 
 
-        ! ===================================================================================
+        ! Also ensure tiny numeric ice thicknesses are removed
+        where (H_ice .lt. 1e-5) H_ice = 0.0 
+
+        ! Update margin ice and determine f_ice to ensure 
+        ! it matches current ice distribution.
+        call calc_ice_margin(H_ice,H_margin,f_ice,f_grnd)
+
+        return 
+
+    end subroutine calc_ice_thickness_dyn
+
+    subroutine calc_ice_thickness_mbal(H_ice,H_margin,f_ice,mb_applied,calv,f_grnd,H_ocn, &
+                                       ux,uy,mbal,calv_flt,calv_grnd,z_bed_sd,dx,dt)
+        ! Interface subroutine to update ice thickness through application
+        ! of advection, vertical mass balance terms and calving 
+
+        implicit none 
+
+        real(wp),       intent(INOUT) :: H_ice(:,:)             ! [m]   Ice thickness 
+        real(wp),       intent(INOUT) :: H_margin(:,:)          ! [m]   Margin ice thickness (assuming full area coverage) 
+        real(wp),       intent(INOUT) :: f_ice(:,:)             ! [--]  Ice area fraction 
+        real(wp),       intent(OUT)   :: mb_applied(:,:)        ! [m/a] Actual mass balance applied to real ice points
+        real(wp),       intent(OUT)   :: calv(:,:)              ! [m/a] Actual calving rate 
+        real(wp),       intent(IN)    :: f_grnd(:,:)            ! [--]  Grounded fraction 
+        real(wp),       intent(IN)    :: H_ocn(:,:)             ! [m]   Ocean thickness (ie, depth)
+        real(wp),       intent(IN)    :: ux(:,:)                ! [m/a] Depth-averaged velocity, x-direction (ac-nodes)
+        real(wp),       intent(IN)    :: uy(:,:)                ! [m/a] Depth-averaged velocity, y-direction (ac-nodes)
+        real(wp),       intent(IN)    :: mbal(:,:)              ! [m/a] Net mass balance; mbal = smb+bmb (calving separate) 
+        real(wp),       intent(IN)    :: calv_flt(:,:)          ! [m/a] Potential calving rate (floating)
+        real(wp),       intent(IN)    :: calv_grnd(:,:)         ! [m/a] Potential calving rate (grounded)
+        real(wp),       intent(IN)    :: z_bed_sd(:,:)          ! [m]   Standard deviation of bed topography
+        real(wp),       intent(IN)    :: dx                     ! [m]   Horizontal resolution
+        real(wp),       intent(IN)    :: dt                     ! [a]   Timestep 
+
+        ! Local variables 
+        integer :: i, j, nx, ny 
+        integer :: n  
+        real(wp), allocatable :: ux_tmp(:,:) 
+        real(wp), allocatable :: uy_tmp(:,:) 
+
+        nx = size(H_ice,1)
+        ny = size(H_ice,2)
+
+        allocate(ux_tmp(nx,ny))
+        allocate(uy_tmp(nx,ny))
+        ux_tmp = 0.0_wp 
+        uy_tmp = 0.0_wp 
+
+        ! First, diagnose margin ice and determine f_ice to ensure 
+        ! it matches current ice distribution.
+        call calc_ice_margin(H_ice,H_margin,f_ice,f_grnd)
+
+        ! Ensure that no velocity is defined for outer boundaries of margin points
+        ux_tmp = ux 
+        do j = 1, ny 
+        do i = 1, nx-1 
+            if (H_margin(i,j) .gt. 0.0_wp .and. H_ice(i+1,j)    .eq. 0.0_wp) ux_tmp(i,j) = 0.0_wp 
+            if (H_ice(i,j)    .eq. 0.0_wp .and. H_margin(i+1,j) .gt. 0.0_wp) ux_tmp(i,j) = 0.0_wp 
+        end do 
+        end do  
+
+        uy_tmp = uy 
+        do j = 1, ny-1 
+        do i = 1, nx  
+            if (H_margin(i,j) .gt. 0.0_wp .and. H_ice(i,j+1)    .eq. 0.0_wp) uy_tmp(i,j) = 0.0_wp 
+            if (H_ice(i,j)    .eq. 0.0_wp .and. H_margin(i,j+1) .gt. 0.0_wp) uy_tmp(i,j) = 0.0_wp 
+        end do 
+        end do  
+    
+!         ! No margin treatment 
+!         ux_tmp = ux
+!         uy_tmp = uy 
         
+        
+        ! Limit calving contributions to margin points 
+        ! (for now assume this was done well externally)
+
+        calv = calv_flt + calv_grnd 
+
 
         ! Next, handle mass balance in order to be able to diagnose
         ! precisely how much mass was lost/gained 
-        mb_applied = mbal
+        mb_applied = mbal - calv 
 
         ! Ensure ice cannot form in open ocean 
         where(f_grnd .eq. 0.0 .and. H_ice .eq. 0.0)  mb_applied = 0.0  
@@ -157,23 +229,24 @@ contains
         ! Apply modified mass balance to update the ice thickness 
         H_ice = H_ice + dt*mb_applied
         
-        if (trim(boundaries) .eq. "MISMIP3D") then 
-            ! Do not use H_margin treatment for MISMIP3D, it is problematic
-            ! at the domain boundaries.
+        ! ajr: see if we can avoid this without relying on "boundaries"
+        ! if (trim(boundaries) .eq. "MISMIP3D") then 
+        !     ! Do not use H_margin treatment for MISMIP3D, it is problematic
+        !     ! at the domain boundaries.
 
-                f_ice = 0.0 
-                where (H_ice .gt. 0.0) f_ice = 1.0
-                H_margin = 0.0 
+        !         f_ice = 0.0 
+        !         where (H_ice .gt. 0.0) f_ice = 1.0
+        !         H_margin = 0.0 
 
-        else 
-            ! Diagnose margin ice and determine f_ice
+        ! else 
+        !     ! Diagnose margin ice and determine f_ice
 
-            call calc_ice_margin(H_ice,H_margin,f_ice,f_grnd)
+        !     call calc_ice_margin(H_ice,H_margin,f_ice,f_grnd)
 
-        end if 
+        ! end if 
 
         ! Determine grounded calving from highly variable terrain  
-        call calc_calving_rate_grounded(calv_grnd,H_ice,f_grnd,z_bed_sd,sd_min,sd_max,calv_max,dt)
+        ! call calc_calving_rate_grounded(calv_grnd,H_ice,f_grnd,z_bed_sd,sd_min,sd_max,calv_max,dt)
 
         ! Limit grounded ice thickness to below maximum threshold value
         ! based on shear stress limit 
@@ -182,93 +255,147 @@ contains
 
         ! Limit grounded ice thickess to above minimum and below inland neighbor at the margin
 !         call limit_grounded_margin_thickness(H_ice,mb_applied,f_grnd,H_min,dt) 
-        call limit_grounded_margin_thickness_flux(H_ice,mb_applied,f_grnd,mbal,ux_tmp,uy_tmp,dx,dt,H_min)
+        ! call limit_grounded_margin_thickness_flux(H_ice,mb_applied,f_grnd,mbal,ux_tmp,uy_tmp,dx,dt,H_min)
         
         ! Also ensure tiny numeric ice thicknesses are removed
         where (H_ice .lt. 1e-5) H_ice = 0.0 
 
 
+        ! Update margin ice and determine f_ice to ensure 
+        ! it matches current ice distribution.
+        call calc_ice_margin(H_ice,H_margin,f_ice,f_grnd)
+        
+        return 
+
+    end subroutine calc_ice_thickness_mbal
+
+    subroutine apply_ice_thickness_boundaries(H_ice,mb_resid,ice_allowed,f_grnd,uxy_b,boundaries,H_ice_ref, &
+                                                H_min_flt,H_min_grnd,dt)
+
+        implicit none
+
+        real(wp),           intent(INOUT)   :: H_ice(:,:)               ! [m] Ice thickness 
+        real(wp),           intent(OUT)     :: mb_resid(:,:)            ! [m/yr] Residual mass balance
+        logical,            intent(IN)      :: ice_allowed(:,:)         ! Mask of where ice is allowed to be greater than zero 
+        real(wp),           intent(IN)      :: f_grnd(:,:)              ! [--] Grounded ice fraction
+        real(wp),           intent(IN)      :: uxy_b(:,:)               ! [m/a] Basal sliding speed, aa-nodes
+        character(len=*),   intent(IN)      :: boundaries               ! Boundary condition choice
+        real(wp),           intent(IN)      :: H_ice_ref(:,:)           ! [m]  Reference ice thickness to fill with for boundaries=="fixed"
+        real(wp),           intent(IN)      :: H_min_flt                ! [m] Minimum allowed floating ice thickness 
+        real(wp),           intent(IN)      :: H_min_grnd               ! [m] Minimum allowed grounded ice thickness 
+        real(wp),           intent(IN)      :: dt                       ! [yr] Timestep
+
+        ! Local variables 
+        integer :: i, j, nx, ny 
+        real(wp), allocatable :: H_ice_new(:,:)
+
+        nx = size(H_ice,1)
+        ny = size(H_ice,2) 
+
+        allocate(H_ice_new(nx,ny)) 
+        H_ice_new = H_ice 
+
+        ! Apply special case for symmetric EISMINT domain when basal sliding is active
+        ! (ensure summit thickness does not grow disproportionately)
+        if (trim(boundaries) .eq. "EISMINT" .and. maxval(uxy_b) .gt. 0.0) then 
+            i = (nx-1)/2 
+            j = (ny-1)/2
+            H_ice_new(i,j) = (H_ice(i-1,j)+H_ice(i+1,j) &
+                                    +H_ice(i,j-1)+H_ice(i,j+1)) / 4.0 
+        end if  
+        
         ! Artificially delete ice from locations that are not allowed
         ! according to boundary mask (ie, EISMINT, BUELER-A, open ocean)
-        where (.not. ice_allowed) H_ice = 0.0 
+        where (.not. ice_allowed) H_ice_new = 0.0 
 
-        ! Post processing of H_ice ================
+
+        ! Remove ice that is too thin 
+        where (f_grnd .lt. 1.0_wp .and. H_ice_new .lt. H_min_flt)   H_ice_new = 0.0_wp 
+        where (f_grnd .eq. 1.0_wp .and. H_ice_new .lt. H_min_grnd)  H_ice_new = 0.0_wp 
+        
 
         select case(trim(boundaries))
 
             case("zeros","EISMINT")
 
                 ! Set border values to zero
-                H_ice(1,:)  = 0.0
-                H_ice(nx,:) = 0.0
+                H_ice_new(1,:)  = 0.0
+                H_ice_new(nx,:) = 0.0
 
-                H_ice(:,1)  = 0.0
-                H_ice(:,ny) = 0.0
+                H_ice_new(:,1)  = 0.0
+                H_ice_new(:,ny) = 0.0
 
             case("periodic","periodic-xy") 
 
-                H_ice(1:2,:)  = H_ice(nx-3:nx-2,:) 
-                H_ice(nx-1:nx,:) = H_ice(2:3,:) 
+                H_ice_new(1:2,:)     = H_ice_new(nx-3:nx-2,:) 
+                H_ice_new(nx-1:nx,:) = H_ice_new(2:3,:) 
 
-                H_ice(:,1:2)  = H_ice(:,ny-3:ny-2) 
-                H_ice(:,ny-1:ny) = H_ice(:,2:3) 
+                H_ice_new(:,1:2)     = H_ice_new(:,ny-3:ny-2) 
+                H_ice_new(:,ny-1:ny) = H_ice_new(:,2:3) 
             
             case("periodic-x") 
 
                 ! Periodic x 
-                H_ice(1:2,:)  = H_ice(nx-3:nx-2,:) 
-                H_ice(nx-1:nx,:) = H_ice(2:3,:) 
+                H_ice_new(1:2,:)     = H_ice_new(nx-3:nx-2,:) 
+                H_ice_new(nx-1:nx,:) = H_ice_new(2:3,:) 
                 
                 ! Infinite (free-slip too)
-                H_ice(:,1)  = H_ice(:,2)
-                H_ice(:,ny) = H_ice(:,ny-1)
+                H_ice_new(:,1)  = H_ice_new(:,2)
+                H_ice_new(:,ny) = H_ice_new(:,ny-1)
 
             case("MISMIP3D")
 
                 ! === MISMIP3D =====
-                H_ice(1,:)    = H_ice(2,:)       ! x=0, Symmetry 
-                H_ice(nx,:)   = 0.0              ! x=800km, no ice
+                H_ice_new(1,:)    = H_ice_new(2,:)       ! x=0, Symmetry 
+                H_ice_new(nx,:)   = 0.0              ! x=800km, no ice
                 
-                H_ice(:,1)    = H_ice(:,2)       ! y=-50km, Free-slip condition
-                H_ice(:,ny)   = H_ice(:,ny-1)    ! y= 50km, Free-slip condition
+                H_ice_new(:,1)    = H_ice_new(:,2)       ! y=-50km, Free-slip condition
+                H_ice_new(:,ny)   = H_ice_new(:,ny-1)    ! y= 50km, Free-slip condition
 
             case("infinite")
                 ! Set border points equal to inner neighbors 
 
-                call fill_borders_2D(H_ice,nfill=1)
+                call fill_borders_2D(H_ice_new,nfill=1)
 
             case("fixed") 
                 ! Set border points equal to prescribed values from array
 
-                call fill_borders_2D(H_ice,nfill=1,fill=H_ice_fill)
+                call fill_borders_2D(H_ice_new,nfill=1,fill=H_ice_ref)
 
             case DEFAULT 
 
-                write(*,*) "calc_ice_thickness:: error: boundary method not recognized: "//trim(boundaries)
+                write(*,*) "apply_ice_thickness_boundaries:: error: boundary method not recognized: "//trim(boundaries)
                 stop 
 
         end select 
         
-        return 
+        ! Determine mass balance related to changes applied here 
+        mb_resid = (H_ice_new - H_ice) / dt 
 
-    end subroutine calc_ice_thickness
+        ! Reset actual ice thickness to new values 
+        H_ice = H_ice_new 
+
+        return
+
+    end subroutine apply_ice_thickness_boundaries
+
 
     subroutine limit_grounded_margin_thickness(H_ice,mb_applied,f_grnd,H_min,dt)
 
         implicit none 
 
-        real(prec), intent(INOUT) :: H_ice(:,:) 
-        real(prec), intent(INOUT) :: mb_applied(:,:) 
-        real(prec), intent(IN)    :: f_grnd(:,:) 
-        real(prec), intent(IN)    :: H_min
-        real(prec), intent(IN)    :: dt
+        real(wp), intent(INOUT) :: H_ice(:,:) 
+        real(wp), intent(INOUT) :: mb_applied(:,:) 
+        real(wp), intent(IN)    :: f_grnd(:,:) 
+        real(wp), intent(IN)    :: H_min
+        real(wp), intent(IN)    :: dt
         
         ! Local variables 
         integer :: i, j, nx, ny 
         logical :: is_margin 
-        real(prec) :: H_min_neighbor, H_diff 
+        real(wp) :: H_min_neighbor, H_diff 
 
-        real(prec), allocatable :: H_ice_0(:,:) 
+        real(wp), allocatable :: H_ice_0(:,:) 
 
         nx = size(H_ice,1)
         ny = size(H_ice,2)
@@ -317,23 +444,23 @@ contains
 
         implicit none 
 
-        real(prec), intent(INOUT) :: H_ice(:,:)         ! [m] Ice thickness 
-        real(prec), intent(INOUT) :: mb_applied(:,:) 
-        real(prec), intent(IN) :: f_grnd(:,:)           ! [-] Grounded fraction
-        real(prec), intent(IN) :: mbal(:,:)             ! [m/a] Net mass balance 
-        real(prec), intent(IN) :: ux(:,:)               ! [m/a] velocity, x-direction (ac-nodes)
-        real(prec), intent(IN) :: uy(:,:)               ! [m/a] velocity, y-direction (ac-nodes)
-        real(prec), intent(IN) :: dx, dt 
-        real(prec), intent(IN) :: H_min                 ! [m] Threshold for calving
+        real(wp), intent(INOUT) :: H_ice(:,:)         ! [m] Ice thickness 
+        real(wp), intent(INOUT) :: mb_applied(:,:) 
+        real(wp), intent(IN) :: f_grnd(:,:)           ! [-] Grounded fraction
+        real(wp), intent(IN) :: mbal(:,:)             ! [m/a] Net mass balance 
+        real(wp), intent(IN) :: ux(:,:)               ! [m/a] velocity, x-direction (ac-nodes)
+        real(wp), intent(IN) :: uy(:,:)               ! [m/a] velocity, y-direction (ac-nodes)
+        real(wp), intent(IN) :: dx, dt 
+        real(wp), intent(IN) :: H_min                 ! [m] Threshold for calving
 
         ! Local variables 
         integer :: i, j, nx, ny, im1, jm1
-        real(prec) :: eps_xx, eps_yy  
+        real(wp) :: eps_xx, eps_yy  
         logical :: test_mij, test_pij, test_imj, test_ipj
         logical :: is_margin, positive_mb 
-        real(prec), allocatable :: dHdt(:,:), H_diff(:,:) 
-        real(prec), allocatable :: H_ice_0(:,:) 
-        real(prec) :: dux, duy 
+        real(wp), allocatable :: dHdt(:,:), H_diff(:,:) 
+        real(wp), allocatable :: H_ice_0(:,:) 
+        real(wp) :: dux, duy 
 
         nx = size(H_ice,1)
         ny = size(H_ice,2)
@@ -358,8 +485,8 @@ contains
             duy = uy(i,j) - uy(i,jm1)
 
             ! Avoid underflow errors 
-            if (abs(dux) .lt. 1e-8) dux = 0.0_prec
-            if (abs(duy) .lt. 1e-8) duy = 0.0_prec
+            if (abs(dux) .lt. 1e-8) dux = 0.0_wp
+            if (abs(duy) .lt. 1e-8) duy = 0.0_wp
             
             ! Calculate strain rate locally (aa-node)
             eps_xx = dux/dx
@@ -426,22 +553,22 @@ contains
 
         implicit none 
 
-        real(prec), intent(INOUT) :: H_ice(:,:)             ! [m] Ice thickness 
-        real(prec), intent(INOUT) :: mb_applied(:,:)        ! [m/a] Applied mass balance
-        real(prec), intent(IN)    :: f_grnd(:,:)            ! [-] Grounded fraction
-        real(prec), intent(IN)    :: H_ocn(:,:)             ! [m] Ocean thickness (depth)
-        real(prec), intent(IN)    :: dt 
+        real(wp), intent(INOUT) :: H_ice(:,:)             ! [m] Ice thickness 
+        real(wp), intent(INOUT) :: mb_applied(:,:)        ! [m/a] Applied mass balance
+        real(wp), intent(IN)    :: f_grnd(:,:)            ! [-] Grounded fraction
+        real(wp), intent(IN)    :: H_ocn(:,:)             ! [m] Ocean thickness (depth)
+        real(wp), intent(IN)    :: dt 
 
         ! Local variables 
         integer    :: i, j, nx, ny
-        real(prec) :: tau_c, H_max, H_ocn_now 
+        real(wp) :: tau_c, H_max, H_ocn_now 
         logical    :: is_margin  
-        real(prec) :: rho_ice_g, rho_sw_ice, rho_ice_sw  
-        real(prec), allocatable :: H_ice_0(:,:) 
+        real(wp) :: rho_ice_g, rho_sw_ice, rho_ice_sw  
+        real(wp), allocatable :: H_ice_0(:,:) 
 
-        real(prec), parameter :: C0    = 1e6                ! [Pa] Depth-averaged shear stress in ice 
-        real(prec), parameter :: alpha = 0.0                ! [--] Friction coefficient for Bassis and Walker (2012), Eq. 2.13
-        real(prec), parameter :: r     = 0.0                ! [--] Crevasse fraction 
+        real(wp), parameter :: C0    = 1e6                ! [Pa] Depth-averaged shear stress in ice 
+        real(wp), parameter :: alpha = 0.0                ! [--] Friction coefficient for Bassis and Walker (2012), Eq. 2.13
+        real(wp), parameter :: r     = 0.0                ! [--] Crevasse fraction 
         
         rho_ice_g  = rho_ice * g 
         rho_sw_ice = rho_sw / rho_ice 
@@ -504,18 +631,18 @@ contains
 
         implicit none 
 
-        real(prec), intent(OUT) :: calv(:,:)                ! [m/a] Calculated calving rate 
-        real(prec), intent(IN)  :: H_ice(:,:)               ! [m] Ice thickness 
-        real(prec), intent(IN)  :: f_grnd(:,:)              ! [-] Grounded fraction
-        real(prec), intent(IN)  :: z_bed_sd(:,:)            ! [m] Standard deviation of bedrock topography
-        real(prec), intent(IN)  :: sd_min                   ! [m] stdev(z_bed) at/below which calv=0
-        real(prec), intent(IN)  :: sd_max                   ! [m] stdev(z_bed) at/above which calv=calv_max 
-        real(prec), intent(IN)  :: calv_max                 ! [m/a] Maximum allowed calving rate
-        real(prec), intent(IN)  :: dt      
+        real(wp), intent(OUT) :: calv(:,:)                ! [m/a] Calculated calving rate 
+        real(wp), intent(IN)  :: H_ice(:,:)               ! [m] Ice thickness 
+        real(wp), intent(IN)  :: f_grnd(:,:)              ! [-] Grounded fraction
+        real(wp), intent(IN)  :: z_bed_sd(:,:)            ! [m] Standard deviation of bedrock topography
+        real(wp), intent(IN)  :: sd_min                   ! [m] stdev(z_bed) at/below which calv=0
+        real(wp), intent(IN)  :: sd_max                   ! [m] stdev(z_bed) at/above which calv=calv_max 
+        real(wp), intent(IN)  :: calv_max                 ! [m/a] Maximum allowed calving rate
+        real(wp), intent(IN)  :: dt      
 
         ! Local variables
         integer :: i, j, nx, ny  
-        real(prec) :: f_scale 
+        real(wp) :: f_scale 
         logical    :: is_grnd_margin 
 
         nx = size(H_ice,1)
@@ -562,17 +689,17 @@ contains
 
         implicit none 
 
-        real(prec), intent(INOUT) :: H_ice(:,:)             ! [m] Ice thickness on standard grid (aa-nodes)
-        real(prec), intent(INOUT) :: H_margin(:,:)          ! [m] Margin ice thickness for partially filled cells, H_margin*1.0 = H_ref*f_ice
-        real(prec), intent(INOUT) :: f_ice(:,:)             ! [--] Ice covered fraction (aa-nodes)
-        real(prec), intent(IN)    :: f_grnd(:,:)            ! [--] Grounded fraction (aa-nodes)
+        real(wp), intent(INOUT) :: H_ice(:,:)             ! [m] Ice thickness on standard grid (aa-nodes)
+        real(wp), intent(INOUT) :: H_margin(:,:)          ! [m] Margin ice thickness for partially filled cells, H_margin*1.0 = H_ref*f_ice
+        real(wp), intent(INOUT) :: f_ice(:,:)             ! [--] Ice covered fraction (aa-nodes)
+        real(wp), intent(IN)    :: f_grnd(:,:)            ! [--] Grounded fraction (aa-nodes)
 
         ! Local variables 
         integer :: i, j, nx, ny, i1, i2, j1, j2  
-        real(prec) :: H_neighb(4)
+        real(wp) :: H_neighb(4)
         logical :: mask_neighb(4)
-        real(prec) :: H_ref  
-        real(prec), allocatable :: H_ice_0(:,:) 
+        real(wp) :: H_ref  
+        real(wp), allocatable :: H_ice_0(:,:) 
 
         nx = size(H_ice,1)
         ny = size(H_ice,2)
@@ -581,8 +708,8 @@ contains
 
         ! Initially set fraction to one everywhere there is ice 
         ! and zero everywhere there is no ice
-        f_ice = 0.0_prec  
-        where (H_ice .gt. 0.0) f_ice = 1.0_prec
+        f_ice = 0.0_wp  
+        where (H_ice .gt. 0.0) f_ice = 1.0_wp
 
         ! For ice-covered points with ice-free neighbors (ie, at the floating or grounded margin),
         ! determine the fraction of grid point that should be ice covered. 
@@ -590,7 +717,7 @@ contains
         H_ice_0 = H_ice 
 
         ! Reset H_margin to zero, will be diagnosed below 
-        H_margin = 0.0_prec
+        H_margin = 0.0_wp
 
         do j = 1, ny
         do i = 1, nx 
@@ -676,17 +803,17 @@ contains
 
         implicit none 
 
-        real(prec), intent(INOUT) :: H_ice(:,:) 
-        real(prec), intent(IN)    :: f_grnd(:,:)  
-        real(prec), intent(IN)    :: H_ref(:,:) 
+        real(wp), intent(INOUT) :: H_ice(:,:) 
+        real(wp), intent(IN)    :: f_grnd(:,:)  
+        real(wp), intent(IN)    :: H_ref(:,:) 
         integer,    intent(IN)    :: topo_rel 
-        real(prec), intent(IN)    :: tau
-        real(prec), intent(IN)    :: dt 
+        real(wp), intent(IN)    :: tau
+        real(wp), intent(IN)    :: dt 
 
         ! Local variables 
         integer    :: i, j, nx, ny 
         logical    :: apply_relax 
-        real(prec) :: dHdt 
+        real(wp) :: dHdt 
 
         nx = size(H_ice,1)
         ny = size(H_ice,2) 

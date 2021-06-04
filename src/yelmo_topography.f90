@@ -114,26 +114,15 @@ contains
 
         if ( .not. topo_fixed .and. dt .gt. 0.0 ) then 
 
-            ! Define temporary variable for total column mass balance 
-           
-            mbal = bnd%smb + tpo%now%bmb + tpo%now%fmb       
-            
-            if (.not. tpo%par%use_bmb) then
-                ! WHEN RUNNING EISMINT1 ensure bmb is not accounted for here !!!
-                mbal = bnd%smb + tpo%now%fmb 
-            end if 
-            
-            ! 1. Calculate the ice thickness conservation -----
-            call calc_ice_thickness(tpo%now%H_ice,tpo%now%dHdt_n,tpo%now%H_ice_n,tpo%now%H_ice_pred, &
-                                    tpo%now%H_margin,tpo%now%f_ice,tpo%now%mb_applied,tpo%now%f_grnd, &
-                                    bnd%z_sl-bnd%z_bed,dyn%now%ux_bar,dyn%now%uy_bar, &
-                                    mbal=mbal,calv=tpo%now%calv,z_bed_sd=bnd%z_bed_sd,dx=tpo%par%dx,dt=dt, &
-                                    solver=trim(tpo%par%solver),boundaries=trim(tpo%par%boundaries), &
-                                    ice_allowed=bnd%ice_allowed,H_ice_fill=bnd%H_ice_ref,H_min=tpo%par%H_min_grnd, &
-                                    sd_min=tpo%par%sd_min,sd_max=tpo%par%sd_max,calv_max=tpo%par%calv_max, &
-                                    beta=tpo%par%dt_beta,pc_step=tpo%par%pc_step)
-            
+            ! === Step 1: ice thickness evolution from dynamics alone ===
+
+            ! Calculate the ice thickness conservation from dynamics only -----
+            call calc_ice_thickness_dyn(tpo%now%H_ice,tpo%now%dHdt_n,tpo%now%H_ice_n,tpo%now%H_ice_pred, &
+                                        tpo%now%H_margin,tpo%now%f_ice,tpo%now%f_grnd,dyn%now%ux_bar,dyn%now%uy_bar, &
+                                        solver=tpo%par%solver,dx=tpo%par%dx,dt=dt,beta=tpo%par%dt_beta,pc_step=tpo%par%pc_step)
+
             ! If desired, relax solution to reference state
+            ! ajr: why is this here? Shouldn't it go after all dyn+calv+mb steps applied?
             if (tpo%par%topo_rel .ne. 0) then 
 
                 call relax_ice_thickness(tpo%now%H_ice,tpo%now%f_grnd,bnd%H_ice_ref, &
@@ -141,41 +130,44 @@ contains
                 
             end if 
 
-            ! ====== CALVING ======
+            ! === Step 2: ice thickness evolution from vertical column mass balance ===
 
-            ! Diagnose calving rate [m/a]
-            select case(trim(tpo%par%calv_method))
+            ! First, diagnose CALVING
+
+            ! Diagnose potential floating-ice calving rate [m/a]
+            select case(trim(tpo%par%calv_flt_method))
 
                 case("zero")
 
-                    tpo%now%calv = 0.0 
+                    tpo%now%calv_flt = 0.0 
 
                 case("simple") 
                     ! Use simple threshold method
 
-                    call calc_calving_rate_simple(tpo%now%calv,tpo%now%H_ice,tpo%now%f_grnd,tpo%now%f_ice, &
+                    call calc_calving_rate_simple(tpo%now%calv_flt,tpo%now%H_ice,tpo%now%f_grnd,tpo%now%f_ice, &
                                                     tpo%par%calv_H_lim,tpo%par%calv_tau)
                     
                 case("flux") 
                     ! Use threshold+flux method from GRISLI 
 
-                    call calc_calving_rate_flux(tpo%now%calv,tpo%now%H_ice,tpo%now%f_grnd,tpo%now%f_ice,mbal,dyn%now%ux_bar, &
+                    call calc_calving_rate_flux(tpo%now%calv_flt,tpo%now%H_ice,tpo%now%f_grnd,tpo%now%f_ice,mbal,dyn%now%ux_bar, &
                                                 dyn%now%uy_bar,tpo%par%dx,tpo%par%calv_H_lim,tpo%par%calv_tau)
                 
                 case("vm-l19")
                     ! Use von Mises calving as defined by Lipscomb et al. (2019)
 
-                    call calc_calving_rate_vonmises_l19(tpo%now%calv,tpo%now%H_ice,tpo%now%f_grnd,tpo%now%f_ice, &
-                                        mat%now%strs2D%teig1,mat%now%strs2D%teig2,tpo%par%dx,tpo%par%dx,tpo%par%kt,tpo%par%w2)
+                    call calc_calving_rate_vonmises_l19(tpo%now%calv_flt,tpo%now%H_ice,tpo%now%f_grnd,tpo%now%f_ice, &
+                                                        mat%now%strs2D%teig1,mat%now%strs2D%teig2,mat%now%ATT_bar, &
+                                                        mat%now%visc_bar,tpo%par%dx,tpo%par%dx,tpo%par%kt,tpo%par%w2,mat%par%n_glen)
 
                 case("kill") 
                     ! Delete all floating ice (using characteristic time parameter)
-                    call calc_calving_rate_kill(tpo%now%calv,tpo%now%H_ice,tpo%now%f_grnd.eq.0.0_prec,tpo%par%calv_tau,dt)
+                    call calc_calving_rate_kill(tpo%now%calv_flt,tpo%now%H_ice,tpo%now%f_grnd.eq.0.0_prec,tpo%par%calv_tau,dt)
 
                 case("kill-pos")
                     ! Delete all floating ice beyond a given location (using characteristic time parameter)
 
-                    call calc_calving_rate_kill(tpo%now%calv,tpo%now%H_ice, &
+                    call calc_calving_rate_kill(tpo%now%calv_flt,tpo%now%H_ice, &
                                                     ( tpo%now%f_grnd .eq. 0.0_prec .and. &
                                                       tpo%now%H_ice  .gt. 0.0_prec .and. &
                                                       bnd%calv_mask ), tau=0.0_prec, dt=dt )
@@ -183,23 +175,41 @@ contains
                 case DEFAULT 
 
                     write(*,*) "calc_ytopo:: Error: calving method not recognized."
-                    write(*,*) "calv_method = ", trim(tpo%par%calv_method)
+                    write(*,*) "calv_flt_method = ", trim(tpo%par%calv_flt_method)
                     stop 
 
             end select
- 
-            ! Apply calving
-            call apply_calving(tpo%now%H_ice,tpo%now%calv,tpo%now%f_grnd,tpo%par%H_min_flt,dt)
             
-            ! Apply special case for symmetric EISMINT domain when basal sliding is active
-            ! (ensure summit thickness does not grow disproportionately)
-            if (trim(tpo%par%boundaries) .eq. "EISMINT" .and. maxval(dyn%now%uxy_b) .gt. 0.0) then 
-                i = (tpo%par%nx-1)/2 
-                j = (tpo%par%ny-1)/2
-                tpo%now%H_ice(i,j) = (tpo%now%H_ice(i-1,j)+tpo%now%H_ice(i+1,j) &
-                                        +tpo%now%H_ice(i,j-1)+tpo%now%H_ice(i,j+1)) / 4.0 
-            end if  
-             
+
+            ! Diagnose potential grounded-ice calving rate [m/a]
+
+            ! For now, set it to zero 
+            tpo%now%calv_grnd = 0.0
+
+            ! Also, define temporary variable for total column mass balance (without calving)
+           
+            mbal = bnd%smb + tpo%now%bmb + tpo%now%fmb 
+            
+            if (.not. tpo%par%use_bmb) then
+                ! WHEN RUNNING EISMINT1 ensure bmb is not accounted for here !!!
+                mbal = bnd%smb + tpo%now%fmb  
+            end if 
+            
+
+            ! Now, apply mass-conservation step 2: mass balance 
+            call calc_ice_thickness_mbal(tpo%now%H_ice,tpo%now%H_margin,tpo%now%f_ice,tpo%now%mb_applied,tpo%now%calv, &
+                                         tpo%now%f_grnd,bnd%z_sl-bnd%z_bed,dyn%now%ux_bar,dyn%now%uy_bar, &
+                                         mbal,tpo%now%calv_flt,tpo%now%calv_grnd,bnd%z_bed_sd,tpo%par%dx,dt)
+
+
+
+            ! Finally, apply all additional (generally artificial) ice thickness adjustments 
+            ! and store changes in residual mass balance field. 
+            call apply_ice_thickness_boundaries(tpo%now%H_ice,tpo%now%mb_resid,bnd%ice_allowed,tpo%now%f_grnd, &
+                                                dyn%now%uxy_b,tpo%par%boundaries,bnd%H_ice_ref, &
+                                                tpo%par%H_min_flt,tpo%par%H_min_grnd,dt)
+
+            
             ! Save the rate of change of ice thickness in output variable [m/a]
             tpo%now%dHicedt = (tpo%now%H_ice - tpo%now%H_ice_n) / dt 
 
@@ -207,7 +217,8 @@ contains
 
         ! 2. Calculate additional topographic properties ------------------
 
-        ! Store previous surface elevation on predictor step
+        ! Store previous surface elevation on predictor step for calculating
+        ! rate of change of surface elevation.
         if (trim(tpo%par%pc_step) .eq. "predictor") then 
             tpo%now%z_srf_n = tpo%now%z_srf 
         end if 
@@ -378,7 +389,8 @@ contains
         ! Store parameter values in output object
         call nml_read(filename,"ytopo","solver",            par%solver,           init=init_pars)
         call nml_read(filename,"ytopo","surf_gl_method",    par%surf_gl_method,   init=init_pars)
-        call nml_read(filename,"ytopo","calv_method",       par%calv_method,      init=init_pars)
+        call nml_read(filename,"ytopo","calv_flt_method",   par%calv_flt_method,  init=init_pars)
+        call nml_read(filename,"ytopo","calv_grnd_method",  par%calv_grnd_method, init=init_pars)
         call nml_read(filename,"ytopo","fmb_method",        par%fmb_method,       init=init_pars)
         call nml_read(filename,"ytopo","margin2nd",         par%margin2nd,        init=init_pars)
         call nml_read(filename,"ytopo","use_bmb",           par%use_bmb,          init=init_pars)
@@ -442,9 +454,12 @@ contains
         allocate(now%bmb(nx,ny))
         allocate(now%fmb(nx,ny))
         allocate(now%mb_applied(nx,ny))
-        allocate(now%calv_grnd(nx,ny))
+        allocate(now%mb_resid(nx,ny))
+        
         allocate(now%calv(nx,ny))
-
+        allocate(now%calv_flt(nx,ny))
+        allocate(now%calv_grnd(nx,ny))
+        
         allocate(now%H_margin(nx,ny))
         
         allocate(now%dzsdx(nx,ny))
@@ -482,8 +497,10 @@ contains
         now%bmb         = 0.0  
         now%fmb         = 0.0
         now%mb_applied  = 0.0 
-        now%calv_grnd   = 0.0
+        now%mb_resid    = 0.0
         now%calv        = 0.0
+        now%calv_flt    = 0.0
+        now%calv_grnd   = 0.0
         now%H_margin    = 0.0 
         now%dzsdx       = 0.0 
         now%dzsdy       = 0.0 
@@ -525,9 +542,12 @@ contains
         if (allocated(now%bmb))         deallocate(now%bmb)
         if (allocated(now%fmb))         deallocate(now%fmb)
         if (allocated(now%mb_applied))  deallocate(now%mb_applied)
-        if (allocated(now%calv_grnd))   deallocate(now%calv_grnd)
+        if (allocated(now%mb_resid))    deallocate(now%mb_resid)
+        
         if (allocated(now%calv))        deallocate(now%calv)
-
+        if (allocated(now%calv_flt))    deallocate(now%calv_flt)
+        if (allocated(now%calv_grnd))   deallocate(now%calv_grnd)
+        
         if (allocated(now%H_margin))    deallocate(now%H_margin)
         
         if (allocated(now%dzsdx))       deallocate(now%dzsdx)

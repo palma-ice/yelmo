@@ -770,7 +770,7 @@ end if
     end subroutine integrate_gl_driving_stress_linear
     
     subroutine calc_ice_flux(qq_acx,qq_acy,ux_bar,uy_bar,H_ice,dx,dy)
-        ! Calculate the basal stress resulting from sliding (friction times velocity)
+        ! Calculate the ice flux at a given point.
         ! Note: calculated on ac-nodes.
         ! qq      [m3 a-1] 
         ! ux,uy   [m a-1]

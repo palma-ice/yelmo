@@ -73,7 +73,8 @@ module yelmo_defs
     ! ytopo parameters
     type ytopo_param_class
         character(len=256) :: solver
-        character(len=256) :: calv_method  
+        character(len=256) :: calv_flt_method  
+        character(len=256) :: calv_grnd_method  
         integer            :: fmb_method  
         integer            :: surf_gl_method 
         logical            :: margin2nd 
@@ -132,8 +133,11 @@ module yelmo_defs
         real(wp), allocatable   :: bmb(:,:)        ! Combined field of bmb_grnd and bmb_shlf 
         real(wp), allocatable   :: fmb(:,:)        ! Combined field of fmb_grnd and fmb_shlf 
         real(wp), allocatable   :: mb_applied(:,:) ! Actual mass balance applied [m/a], for mass balance accounting
-        real(wp), allocatable   :: calv_grnd(:,:)  ! Grounded calving [m/a]
-        real(wp), allocatable   :: calv(:,:)       ! Calving [m/a]
+        real(wp), allocatable   :: mb_resid(:,:)   ! Residual mass balance from boundary conditions, cleanup
+        
+        real(wp), allocatable   :: calv(:,:)       ! Calving rate (applied) [m/a]
+        real(wp), allocatable   :: calv_flt(:,:)   ! Reference floating calving rate [m/a]
+        real(wp), allocatable   :: calv_grnd(:,:)  ! Reference grounded calving rate [m/a]
         
         real(wp), allocatable   :: H_margin(:,:)   ! [m] Margin ice thickness in partially filled cells 
 
@@ -350,6 +354,7 @@ module yelmo_defs
         real(wp), allocatable :: dxz(:,:) 
         real(wp), allocatable :: dyz(:,:)
         real(wp), allocatable :: de(:,:)
+        real(wp), allocatable :: ddiv(:,:) 
         real(wp), allocatable :: f_shear(:,:) 
     end type 
 
@@ -360,6 +365,7 @@ module yelmo_defs
         real(wp), allocatable :: dxz(:,:,:) 
         real(wp), allocatable :: dyz(:,:,:) 
         real(wp), allocatable :: de(:,:,:) 
+        real(wp), allocatable :: ddiv(:,:,:) 
         real(wp), allocatable :: f_shear(:,:,:) 
     end type 
     

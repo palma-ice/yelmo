@@ -283,7 +283,7 @@ end select
         real(prec), intent(INOUT) :: bmb_grnd(:,:)  ! [m a-1] Basal mass balance (melting is negative)
         real(prec), intent(OUT)   :: Q_ice_b(:,:)   ! [J a-1 m-2] Basal ice heat flux 
         real(prec), intent(OUT)   :: H_cts(:,:)     ! [m] Height of the cold-temperate transition surface (CTS)
-        real(prec), intent(IN)    :: T_pmp(:,:,:)   ! [K] Pressure melting point temp.
+        real(prec), intent(INOUT) :: T_pmp(:,:,:)   ! [K] Pressure melting point temp.
         real(prec), intent(IN)    :: cp(:,:,:)      ! [J kg-1 K-1] Specific heat capacity
         real(prec), intent(IN)    :: kt(:,:,:)      ! [J a-1 m-1 K-1] Heat conductivity 
         real(prec), intent(IN)    :: advecxy(:,:,:) ! [m a-1] Horizontal x-velocity 
@@ -319,6 +319,9 @@ end select
         real(prec) :: H_ice_now 
 
         real(prec) :: filter0(3,3), filter(3,3) 
+
+        real(prec) :: wt_neighb(3,3) 
+        real(prec) :: wt_tot 
 
         real(prec), parameter :: H_ice_thin = 10.0   ! [m] Threshold to define 'thin' ice
 
@@ -408,6 +411,37 @@ end select
         end do 
         end do 
         !!!$omp end parallel do
+
+        ! Ensure that temperature of ice-free points just outside margin of ice sheet 
+        ! matches the temperature inside the ice sheet (to give good values of ATT to newly advected points)
+        do j = 2, ny-1
+        do i = 2, nx-1 
+            
+            if (H_ice(i,j) .eq. 0.0) then 
+
+                wt_neighb = 0.0 
+                where (H_ice(i-1:i+1,j-1:j+1) .gt. 0) wt_neighb = 1.0 
+                wt_tot = sum(wt_neighb)
+
+                if (wt_tot .gt. 0.0) then 
+                    ! Ice covered neighbor(s) found, assign average of neighbors 
+
+                    do k = 1, nz_aa 
+                        enth(i,j,k)  = sum(enth(i-1:i+1,j-1:j+1,k) *wt_neighb) / wt_tot 
+                        T_ice(i,j,k) = sum(T_ice(i-1:i+1,j-1:j+1,k)*wt_neighb) / wt_tot 
+                        omega(i,j,k) = sum(omega(i-1:i+1,j-1:j+1,k)*wt_neighb) / wt_tot 
+                        T_pmp(i,j,k) = sum(T_pmp(i-1:i+1,j-1:j+1,k)*wt_neighb) / wt_tot 
+                        
+                    end do 
+
+                end if 
+
+            end if 
+    
+        end do 
+        end do 
+
+
 
         ! Fill in borders 
         call fill_borders_3D(enth,nfill=1)

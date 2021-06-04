@@ -624,9 +624,17 @@ contains
                 ! dxx = dyy; de = 2*dxx
                 ! dxx = de/2
                 ddiv_free = ATT_bar(i,j) * (0.25*rho_ice*g*H_ice(i,j))**n_glen
-                dxx_free  = ddiv_free / 2.0
-                dyy_free  = dxx_free 
-
+                ! dxx_free  = ddiv_free / 2.0
+                ! dyy_free  = dxx_free 
+                if ( abs(0.5*vx(i,j,nz_aa)+vx(im1,j,nz_aa)) &
+                      .gt. abs(0.5*vy(i,j,nz_aa)+vy(i,jm1,nz_aa)) ) then 
+                    dxx_free  = ddiv_free
+                    dyy_free  = 0.0 
+                else 
+                    dxx_free  = 0.0
+                    dyy_free  = ddiv_free
+                end if 
+                
 
                 is_margin = ( H_ice(i,j) .gt. 0.0_wp .and. f_ice(i,j) .lt. 1.0_wp .and. &
                     count([H_ice(im1,j),H_ice(ip1,j),H_ice(i,jm1),H_ice(i,jp1)] .eq. 0.0_wp) .gt. 0 )
@@ -637,9 +645,9 @@ contains
                      (f_grnd(i,j) .eq. 0.0 .and. strn2D%ddiv(i,j) .gt. ddiv_free) ) then 
                     ! Overwrite above value and impose free-spreading strain 
 
-                    strn%ddiv(i,j,:)    = ATT_bar(i,j) * (0.25*rho_ice*g*H_ice(i,j))**n_glen
-                    strn%dxx(i,j,:)     = strn%ddiv(i,j,1) / 2.0
-                    strn%dyy(i,j,:)     = strn%ddiv(i,j,1) / 2.0
+                    strn%ddiv(i,j,:)    = ddiv_free
+                    strn%dxx(i,j,:)     = dxx_free
+                    strn%dyy(i,j,:)     = dyy_free
                     strn%dxy(i,j,:)     = 0.0
                     strn%dxz(i,j,:)     = 0.0 
                     strn%dyz(i,j,:)     = 0.0 
@@ -829,9 +837,17 @@ contains
                 ! dxx = dyy; ddiv = 2*dxx
                 ! dxx = ddiv/2
                 ddiv_free = ATT_bar(i,j) * (0.25*rho_ice*g*H_ice(i,j))**n_glen
-                dxx_free  = ddiv_free / 2.0
-                dyy_free  = dxx_free 
-                
+                ! dxx_free  = ddiv_free / 2.0
+                ! dyy_free  = dxx_free 
+                if ( abs(0.5*ux_ext(i,j)+ux_ext(im1,j)) &
+                      .gt. abs(0.5*uy_ext(i,j)+uy_ext(i,jm1)) ) then 
+                    dxx_free  = ddiv_free
+                    dyy_free  = 0.0 
+                else 
+                    dxx_free  = 0.0
+                    dyy_free  = ddiv_free
+                end if 
+
                 is_margin = ( H_ice(i,j) .gt. 0.0_wp .and. f_ice(i,j) .lt. 1.0_wp .and. &
                     count([H_ice(im1,j),H_ice(ip1,j),H_ice(i,jm1),H_ice(i,jp1)] .eq. 0.0_wp) .gt. 0 )
                 

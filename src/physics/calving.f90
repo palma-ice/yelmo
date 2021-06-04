@@ -369,8 +369,8 @@ contains
  
                     ! Define current strain rate tensor components first 
                     ddiv  = ATT_bar(i,j) * (0.25*rho_ice*g*H_ice(i,j))**n_glen
-                    dxx = ddiv / 2.0
-                    dyy = ddiv / 2.0
+                    dxx = ddiv ! ddiv / 2.0
+                    dyy = 0.0  ! ddiv / 2.0
                     dxy = 0.0
 
                     ! Now define current stress tensor components 

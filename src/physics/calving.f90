@@ -356,6 +356,7 @@ contains
 
                 end if
 
+if (.FALSE.) then
                 if (tau_eff .eq. 0.0) then 
                     ! tau_eff is still zero! Likely, this is a newly advected
                     ! point and the neighbors do not have velocity defined.
@@ -385,6 +386,7 @@ contains
                     tau_eff = calc_tau_eff(teig1_now,teig2_now,w2)
 
                 end if 
+end if
 
                 ! ajr: tau_eff is still zero in some cases, ie, in the case above,
                 ! because when txx=tyy and txy=0, then there are no real eigenvalues

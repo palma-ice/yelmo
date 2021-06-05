@@ -305,7 +305,7 @@ contains
                                       dyn%now%visc_eff,dyn%now%visc_eff_int,dyn%now%ssa_mask_acx,dyn%now%ssa_mask_acy, &
                                       dyn%now%ssa_err_acx,dyn%now%ssa_err_acy,dyn%par%ssa_iter_now,dyn%now%beta, &
                                       dyn%now%beta_acx,dyn%now%beta_acy,dyn%now%c_bed,dyn%now%taud_acx,dyn%now%taud_acy, &
-                                      tpo%now%H_ice,tpo%now%H_grnd,tpo%now%f_grnd,tpo%now%f_grnd_acx,tpo%now%f_grnd_acy, &
+                                      tpo%now%H_ice,tpo%now%f_ice,tpo%now%H_grnd,tpo%now%f_grnd,tpo%now%f_grnd_acx,tpo%now%f_grnd_acy, &
                                       mat%now%ATT,dyn%par%zeta_aa,bnd%z_sl,bnd%z_bed,dyn%par%dx,dyn%par%dy,mat%par%n_glen,hybrid_par)
 
         else 
@@ -438,7 +438,7 @@ contains
                                 dyn%now%beta_acy,dyn%now%beta_eff,dyn%now%visc_eff,dyn%now%visc_eff_int,    &
                                 dyn%now%duxdz,dyn%now%duydz,dyn%now%ssa_mask_acx,dyn%now%ssa_mask_acy,      &
                                 dyn%now%ssa_err_acx,dyn%now%ssa_err_acy,dyn%par%ssa_iter_now,dyn%now%c_bed, &
-                                dyn%now%taud_acx,dyn%now%taud_acy,tpo%now%H_ice,tpo%now%H_grnd,   &
+                                dyn%now%taud_acx,dyn%now%taud_acy,tpo%now%H_ice,tpo%now%f_ice,tpo%now%H_grnd,   &
                                 tpo%now%f_grnd,tpo%now%f_grnd_acx,tpo%now%f_grnd_acy,mat%now%ATT, &
                                 dyn%par%zeta_aa,bnd%z_sl,bnd%z_bed,dyn%par%dx,dyn%par%dy,mat%par%n_glen,diva_par)
          
@@ -531,7 +531,7 @@ contains
                                 dyn%now%beta_acy,dyn%now%visc_eff,dyn%now%visc_eff_int, &
                                 dyn%now%ssa_mask_acx,dyn%now%ssa_mask_acy,dyn%now%ssa_err_acx, &
                                 dyn%now%ssa_err_acy,dyn%par%ssa_iter_now,dyn%now%c_bed, &
-                                dyn%now%taud_acx,dyn%now%taud_acy,tpo%now%H_ice,tpo%now%H_grnd, &
+                                dyn%now%taud_acx,dyn%now%taud_acy,tpo%now%H_ice,tpo%now%f_ice,tpo%now%H_grnd, &
                                 tpo%now%f_grnd,tpo%now%f_grnd_acx,tpo%now%f_grnd_acy,mat%now%ATT, &
                                 dyn%par%zeta_aa,bnd%z_sl,bnd%z_bed,dyn%par%dx,dyn%par%dy,mat%par%n_glen,l1l2_par)
         
@@ -716,7 +716,7 @@ end if
 
             ! Call ssa solver to determine ux_b/uy_b, where ssa_mask_acx/y are > 0
             call calc_vxy_ssa_matrix(dyn%now%ux_b,dyn%now%uy_b,L2_norm,dyn%now%beta_acx,dyn%now%beta_acy,dyn%now%visc_eff_int, &
-                                     dyn%now%ssa_mask_acx,dyn%now%ssa_mask_acy,tpo%now%H_ice,dyn%now%taud_acx, &
+                                     dyn%now%ssa_mask_acx,dyn%now%ssa_mask_acy,tpo%now%H_ice,tpo%now%f_ice,dyn%now%taud_acx, &
                                      dyn%now%taud_acy,tpo%now%H_grnd,bnd%z_sl,bnd%z_bed,dyn%par%dx,dyn%par%dy, &
                                      dyn%par%ssa_vel_max,dyn%par%boundaries,dyn%par%ssa_lis_opt)
 
@@ -1365,7 +1365,7 @@ end if
 
         return 
 
-    end subroutine ydyn_set_borders 
+    end subroutine ydyn_set_borders
 
     subroutine yelmo_write_init_ssa(filename,nx,ny,time_init)
 
@@ -1384,7 +1384,7 @@ end if
 
         return
 
-    end subroutine yelmo_write_init_ssa 
+    end subroutine yelmo_write_init_ssa
 
     subroutine write_step_2D_ssa(tpo,dyn,filename,ux_b_prev,uy_b_prev,time)
 

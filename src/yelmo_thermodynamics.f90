@@ -70,7 +70,7 @@ contains
 
         ! Calculate the pressure-corrected melting point (in Kelvin)
         do k = 1, thrm%par%nz_aa  
-            thrm%now%T_pmp(:,:,k) = calc_T_pmp(tpo%now%H_ice,thrm%par%z%zeta_aa(k),T0,T_pmp_beta)
+            thrm%now%T_pmp(:,:,k) = calc_T_pmp(tpo%now%H_corr,thrm%par%z%zeta_aa(k),T0,T_pmp_beta)
         end do 
 
         ! === Calculate heat source terms (Yelmo vertical grid) === 
@@ -167,7 +167,7 @@ end select
 
                     call calc_ytherm_enthalpy_3D(thrm%now%enth,thrm%now%T_ice,thrm%now%omega,thrm%now%bmb_grnd,thrm%now%Q_ice_b, &
                                 thrm%now%H_cts,thrm%now%T_pmp,thrm%now%cp,thrm%now%kt,thrm%now%advecxy,dyn%now%ux,dyn%now%uy,dyn%now%uz,thrm%now%Q_strn, &
-                                thrm%now%Q_b,thrm%now%Q_rock,bnd%T_srf,tpo%now%H_ice,tpo%now%z_srf,thrm%now%H_w,thrm%now%dHwdt,tpo%now%H_grnd, &
+                                thrm%now%Q_b,thrm%now%Q_rock,bnd%T_srf,tpo%now%H_corr,tpo%now%z_srf,thrm%now%H_w,thrm%now%dHwdt,tpo%now%H_grnd, &
                                 tpo%now%f_grnd,tpo%now%dHicedt,tpo%now%dzsrfdt,thrm%par%z%zeta_aa,thrm%par%z%zeta_ac,thrm%par%z%dzeta_a,thrm%par%z%dzeta_b, &
                                 thrm%par%enth_cr,thrm%par%omega_max,dt,thrm%par%dx,thrm%par%method,thrm%par%solver_advec)
                 
@@ -175,7 +175,7 @@ end select
                     ! Use Robin solution for ice temperature 
 
                     call define_temp_robin_3D(thrm%now%enth,thrm%now%T_ice,thrm%now%omega,thrm%now%T_pmp,thrm%now%cp,thrm%now%kt, &
-                                       thrm%now%Q_rock,bnd%T_srf,tpo%now%H_ice,thrm%now%H_w,bnd%smb, &
+                                       thrm%now%Q_rock,bnd%T_srf,tpo%now%H_corr,thrm%now%H_w,bnd%smb, &
                                        thrm%now%bmb_grnd,tpo%now%f_grnd,thrm%par%z%zeta_aa,cold=.FALSE.)
 
                 case("robin-cold")
@@ -183,14 +183,14 @@ end select
                     ! to ensure cold ice at the base
 
                     call define_temp_robin_3D(thrm%now%enth,thrm%now%T_ice,thrm%now%omega,thrm%now%T_pmp,thrm%now%cp,thrm%now%kt, &
-                                       thrm%now%Q_rock,bnd%T_srf,tpo%now%H_ice,thrm%now%H_w,bnd%smb, &
+                                       thrm%now%Q_rock,bnd%T_srf,tpo%now%H_corr,thrm%now%H_w,bnd%smb, &
                                        thrm%now%bmb_grnd,tpo%now%f_grnd,thrm%par%z%zeta_aa,cold=.TRUE.)
 
                 case("linear")
                     ! Use linear solution for ice temperature
 
                     ! Calculate the ice temperature (eventually water content and enthalpy too)
-                    call define_temp_linear_3D(thrm%now%enth,thrm%now%T_ice,thrm%now%omega,thrm%now%cp,tpo%now%H_ice,bnd%T_srf,thrm%par%z%zeta_aa)
+                    call define_temp_linear_3D(thrm%now%enth,thrm%now%T_ice,thrm%now%omega,thrm%now%cp,tpo%now%H_corr,bnd%T_srf,thrm%par%z%zeta_aa)
 
                 case("fixed") 
                     ! Pass - do nothing, use the enth/temp/omega fields as they are defined

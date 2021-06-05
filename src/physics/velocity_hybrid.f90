@@ -42,7 +42,7 @@ contains
 
     subroutine calc_velocity_hybrid(ux_b,uy_b,taub_acx,taub_acy,visc_eff,visc_eff_int,ssa_mask_acx,ssa_mask_acy, &
                                   ssa_err_acx,ssa_err_acy,ssa_iter_now,beta,beta_acx,beta_acy,c_bed,taud_acx,taud_acy,H_ice, &
-                                  H_grnd,f_grnd,f_grnd_acx,f_grnd_acy,ATT,zeta_aa,z_sl,z_bed,dx,dy,n_glen,par)
+                                  f_ice,H_grnd,f_grnd,f_grnd_acx,f_grnd_acy,ATT,zeta_aa,z_sl,z_bed,dx,dy,n_glen,par)
         ! This subroutine is used to solve the horizontal velocity system (ux,uy)
         ! following the hybrid method (combination of SIA and SSA solutions)
         ! Bueler and Brown (2009), Winkelmann et al (2011), Pollard and DeConto (2012)
@@ -67,6 +67,7 @@ contains
         real(prec), intent(IN)    :: taud_acx(:,:)      ! [Pa]
         real(prec), intent(IN)    :: taud_acy(:,:)      ! [Pa]
         real(prec), intent(IN)    :: H_ice(:,:)         ! [m]
+        real(prec), intent(IN)    :: f_ice(:,:)         ! [--]
         real(prec), intent(IN)    :: H_grnd(:,:)        ! [m]
         real(prec), intent(IN)    :: f_grnd(:,:)        ! [-]
         real(prec), intent(IN)    :: f_grnd_acx(:,:)    ! [-]
@@ -168,7 +169,7 @@ end if
             
             ! Call ssa solver
             call calc_vxy_ssa_matrix(ux_b,uy_b,L2_norm,beta_acx,beta_acy,visc_eff_int,  &
-                                     ssa_mask_acx,ssa_mask_acy,H_ice,taud_acx,taud_acy,H_grnd,z_sl, &
+                                     ssa_mask_acx,ssa_mask_acy,H_ice,f_ice,taud_acx,taud_acy,H_grnd,z_sl, &
                                      z_bed,dx,dy,par%ssa_vel_max,par%boundaries,par%ssa_lis_opt)
 
 

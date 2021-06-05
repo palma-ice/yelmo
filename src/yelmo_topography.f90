@@ -123,6 +123,7 @@ contains
 
             ! If desired, relax solution to reference state
             ! ajr: why is this here? Shouldn't it go after all dyn+calv+mb steps applied?
+            ! Test two options to see.
             if (tpo%par%topo_rel .ne. 0) then 
 
                 call relax_ice_thickness(tpo%now%H_ice,tpo%now%f_grnd,bnd%H_ice_ref, &
@@ -132,7 +133,26 @@ contains
 
             ! === Step 2: ice thickness evolution from vertical column mass balance ===
 
-            ! First, diagnose CALVING
+            tpo%now%mb_applied  = 0.0_wp  
+            tpo%now%calv        = 0.0_wp 
+
+            ! Also, define temporary variable for total column mass balance (without calving)
+           
+            mbal = bnd%smb + tpo%now%bmb + tpo%now%fmb 
+            
+            if (.not. tpo%par%use_bmb) then
+                ! WHEN RUNNING EISMINT1 ensure bmb is not accounted for here !!!
+                mbal = bnd%smb + tpo%now%fmb  
+            end if 
+            
+
+            ! Now, apply mass-conservation step 2: mass balance 
+            call calc_ice_thickness_mbal(tpo%now%H_ice,tpo%now%H_margin,tpo%now%f_ice,tpo%now%mb_applied,tpo%now%calv, &
+                                         tpo%now%f_grnd,bnd%z_sl-bnd%z_bed,dyn%now%ux_bar,dyn%now%uy_bar, &
+                                         mbal,tpo%now%calv_flt*0.0_wp,tpo%now%calv_grnd*0.0_wp,bnd%z_bed_sd,tpo%par%dx,dt)
+
+
+            ! Next, diagnose CALVING
 
             ! Diagnose potential floating-ice calving rate [m/a]
             select case(trim(tpo%par%calv_flt_method))
@@ -186,27 +206,16 @@ contains
             ! For now, set it to zero 
             tpo%now%calv_grnd = 0.0
 
-            ! Also, define temporary variable for total column mass balance (without calving)
-           
-            mbal = bnd%smb + tpo%now%bmb + tpo%now%fmb 
-            
-            if (.not. tpo%par%use_bmb) then
-                ! WHEN RUNNING EISMINT1 ensure bmb is not accounted for here !!!
-                mbal = bnd%smb + tpo%now%fmb  
-            end if 
-            
-
-            ! Now, apply mass-conservation step 2: mass balance 
+            ! Now, apply mass-conservation step 3: calving
             call calc_ice_thickness_mbal(tpo%now%H_ice,tpo%now%H_margin,tpo%now%f_ice,tpo%now%mb_applied,tpo%now%calv, &
                                          tpo%now%f_grnd,bnd%z_sl-bnd%z_bed,dyn%now%ux_bar,dyn%now%uy_bar, &
                                          mbal,tpo%now%calv_flt,tpo%now%calv_grnd,bnd%z_bed_sd,tpo%par%dx,dt)
 
 
-
             ! Finally, apply all additional (generally artificial) ice thickness adjustments 
             ! and store changes in residual mass balance field. 
-            call apply_ice_thickness_boundaries(tpo%now%H_ice,tpo%now%mb_resid,bnd%ice_allowed,tpo%now%f_grnd, &
-                                                dyn%now%uxy_b,tpo%par%boundaries,bnd%H_ice_ref, &
+            call apply_ice_thickness_boundaries(tpo%now%H_ice,tpo%now%mb_resid,bnd%ice_allowed,tpo%now%f_ice, &
+                                                tpo%now%f_grnd,dyn%now%uxy_b,tpo%par%boundaries,bnd%H_ice_ref, &
                                                 tpo%par%H_min_flt,tpo%par%H_min_grnd,dt)
 
             
@@ -257,7 +266,10 @@ contains
 !         call calc_gradient_ac_gl(tpo%now%dzsdx,tpo%now%dzsdy,tpo%now%z_srf,tpo%now%H_ice, &
 !                                       tpo%now%f_grnd_acx,tpo%now%f_grnd_acy,tpo%par%dx,method=2,grad_lim=tpo%par%grad_lim)
         
-        
+        ! Calculate H_corr
+        call calc_H_corr(tpo%now%H_corr,tpo%now%H_ice,tpo%now%f_ice)
+
+
         ! 3. Calculate new masks ------------------------------
 
         ! Calculate grounding overburden ice thickness 
@@ -468,6 +480,7 @@ contains
         allocate(now%dHicedx(nx,ny))
         allocate(now%dHicedy(nx,ny))
         
+        allocate(now%H_corr(nx,ny))
         allocate(now%H_grnd(nx,ny))
 
         ! Masks 
@@ -506,6 +519,7 @@ contains
         now%dzsdy       = 0.0 
         now%dHicedx     = 0.0 
         now%dHicedy     = 0.0
+        now%H_corr      = 0.0 
         now%H_grnd      = 0.0  
         now%f_grnd      = 0.0  
         now%f_grnd_acx  = 0.0  
@@ -526,7 +540,8 @@ contains
         now%z_srf_n     = 0.0 
 
         return 
-    end subroutine ytopo_alloc 
+
+    end subroutine ytopo_alloc
 
     subroutine ytopo_dealloc(now)
 
@@ -555,6 +570,7 @@ contains
         if (allocated(now%dHicedx))     deallocate(now%dHicedx)
         if (allocated(now%dHicedy))     deallocate(now%dHicedy)
         
+        if (allocated(now%H_corr))      deallocate(now%H_corr)
         if (allocated(now%H_grnd))      deallocate(now%H_grnd)
 
         if (allocated(now%f_grnd))      deallocate(now%f_grnd)
@@ -579,6 +595,6 @@ contains
         
         return 
 
-    end subroutine ytopo_dealloc 
+    end subroutine ytopo_dealloc
     
 end module yelmo_topography

@@ -16,7 +16,7 @@ module solver_ssa_sico5
 contains 
 
     subroutine calc_vxy_ssa_matrix(vx_m,vy_m,L2_norm,beta_acx,beta_acy,visc_eff, &
-                    ssa_mask_acx,ssa_mask_acy,H_ice,taud_acx,taud_acy,H_grnd,z_sl,z_bed, &
+                    ssa_mask_acx,ssa_mask_acy,H_ice,f_ice,taud_acx,taud_acy,H_grnd,z_sl,z_bed, &
                     dx,dy,ulim,boundaries,lis_settings)
         ! Solution of the system of linear equations for the horizontal velocities
         ! vx_m, vy_m in the shallow shelf approximation.
@@ -34,6 +34,7 @@ contains
         integer,    intent(IN)    :: ssa_mask_acx(:,:)    ! [--] Mask to determine ssa solver actions (acx-nodes)
         integer,    intent(IN)    :: ssa_mask_acy(:,:)    ! [--] Mask to determine ssa solver actions (acy-nodes)
         real(prec), intent(IN)    :: H_ice(:,:)           ! [m]  Ice thickness (aa-nodes)
+        real(prec), intent(IN)    :: f_ice(:,:)
         real(prec), intent(IN)    :: taud_acx(:,:)        ! [Pa] Driving stress (acx nodes)
         real(prec), intent(IN)    :: taud_acy(:,:)        ! [Pa] Driving stress (acy nodes)
         real(prec), intent(IN)    :: H_grnd(:,:)  
@@ -188,7 +189,7 @@ contains
 
         ! Set maske and grounding line / calving front flags
 
-        call set_sico_masks(maske,is_front_1,is_front_2,is_grline_1,is_grline_2, H_ice, H_grnd)
+        call set_sico_masks(maske,is_front_1,is_front_2,is_grline_1,is_grline_2, H_ice, f_ice, H_grnd)
         
         !-------- Depth-integrated viscosity on the staggered grid
         !                                       [at (i+1/2,j+1/2)] --------
@@ -1564,7 +1565,7 @@ contains
 
     end subroutine stagger_visc_aa_ab
 
-    subroutine set_sico_masks(maske,front1,front2,gl1,gl2,H_ice,H_grnd)
+    subroutine set_sico_masks(maske,front1,front2,gl1,gl2,H_ice,f_ice,H_grnd)
         ! Define where ssa calculations should be performed
         ! Note: could be binary, but perhaps also distinguish 
         ! grounding line/zone to use this mask for later gl flux corrections
@@ -1583,6 +1584,7 @@ contains
         logical,    intent(OUT) :: gl1(:,:)
         logical,    intent(OUT) :: gl2(:,:) 
         real(prec), intent(IN)  :: H_ice(:,:)
+        real(prec), intent(IN)  :: f_ice(:,:)
         real(prec), intent(IN)  :: H_grnd(:,:)
         
         ! Local variables
@@ -1607,8 +1609,8 @@ contains
             ! Check if this point would be floating
             is_float = H_grnd(i,j) .le. 0.0 
 
-            if (H_ice(i,j) .eq. 0.0) then 
-                ! Ice-free point 
+            if (H_ice(i,j) .eq. 0.0 .or. f_ice(i,j) .lt. 1.0) then 
+                ! Ice-free point, or only partially-covered (consider ice free)
 
                 if (is_float) then 
                     ! Open ocean 
@@ -1647,21 +1649,21 @@ contains
           j1 = max(j-1,1)
           j2 = min(j+1,ny)
           
-          if (H_ice(i,j) .gt. 0.0 .and. &
-              (H_ice(i1,j) .eq. 0.0 .or. &
-               H_ice(i2,j) .eq. 0.0 .or. &
-               H_ice(i,j1) .eq. 0.0 .or. &
-               H_ice(i,j2) .eq. 0.0)) then 
+          if (  (H_ice(i,j) .gt. 0.0 .and. f_ice(i,j) .eq. 1.0) .and. &
+              ( (H_ice(i1,j) .eq. 0.0 .or. f_ice(i1,j) .lt. 1.0) .or. &
+                (H_ice(i2,j) .eq. 0.0 .or. f_ice(i2,j) .lt. 1.0) .or. &
+                (H_ice(i,j1) .eq. 0.0 .or. f_ice(i,j1) .lt. 1.0) .or. &
+                (H_ice(i,j2) .eq. 0.0 .or. f_ice(i,j2) .lt. 1.0) ) ) then 
 
             front1(i,j) = .TRUE. 
 
           end if 
 
-          if (H_ice(i,j) .eq. 0.0 .and. &
-              (H_ice(i1,j) .gt. 0.0 .or. &
-               H_ice(i2,j) .gt. 0.0 .or. &
-               H_ice(i,j1) .gt. 0.0 .or. &
-               H_ice(i,j2) .gt. 0.0)) then 
+          if (  (H_ice(i,j) .eq. 0.0 .or. f_ice(i,j) .lt. 1.0) .and. &
+              ( (H_ice(i1,j) .gt. 0.0 .and. f_ice(i1,j) .eq. 1.0) .or. &
+                (H_ice(i2,j) .gt. 0.0 .and. f_ice(i2,j) .eq. 1.0) .or. &
+                (H_ice(i,j1) .gt. 0.0 .and. f_ice(i,j1) .eq. 1.0) .or. &
+                (H_ice(i,j2) .gt. 0.0 .and. f_ice(i,j2) .eq. 1.0) ) ) then 
 
             front2(i,j) = .TRUE. 
 
@@ -1680,7 +1682,7 @@ contains
         
         return
         
-    end subroutine set_sico_masks 
+    end subroutine set_sico_masks
     
     elemental subroutine limit_vel(u,u_lim)
         ! Apply a velocity limit (for stability)

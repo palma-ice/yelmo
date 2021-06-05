@@ -9,6 +9,7 @@ module topography
     public :: calc_z_srf
     public :: calc_z_srf_max
     public :: calc_z_srf_subgrid_area
+    public :: calc_H_corr
     public :: calc_H_grnd
     public :: calc_f_grnd_subgrid_area
     public :: calc_f_grnd_subgrid_linear
@@ -196,6 +197,27 @@ contains
         return
         
     end subroutine calc_z_srf_subgrid_area
+
+    elemental subroutine calc_H_corr(H_corr,H_ice,f_ice)
+        ! Calculate ice-thickness, scaled at margins to actual thickness
+        ! but as if it covered the whole grid cell.
+        
+        implicit none
+
+        real(prec), intent(OUT) :: H_corr 
+        real(prec), intent(IN)  :: H_ice 
+        real(prec), intent(IN)  :: f_ice 
+
+        
+        if (H_ice .gt. 0.0 .and. f_ice .gt. 0.0 .and. f_ice .lt. 1.0) then 
+            H_corr = H_ice / f_ice
+        else 
+            H_corr = H_ice 
+        end if
+
+        return
+
+    end subroutine calc_H_corr
 
     elemental subroutine calc_H_grnd(H_grnd,H_ice,z_bed,z_sl)
         ! Calculate ice thickness overburden, H_grnd

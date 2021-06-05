@@ -53,7 +53,7 @@ contains
     subroutine calc_velocity_diva(ux,uy,ux_bar,uy_bar,ux_b,uy_b,ux_i,uy_i,taub_acx,taub_acy, &
                                   beta,beta_acx,beta_acy,beta_eff,visc_eff,visc_eff_int,duxdz,duydz, &
                                   ssa_mask_acx,ssa_mask_acy,ssa_err_acx,ssa_err_acy,ssa_iter_now, &
-                                  c_bed,taud_acx,taud_acy,H_ice,H_grnd,f_grnd, &
+                                  c_bed,taud_acx,taud_acy,H_ice,f_ice,H_grnd,f_grnd, &
                                   f_grnd_acx,f_grnd_acy,ATT,zeta_aa,z_sl,z_bed,dx,dy,n_glen,par)
         ! This subroutine is used to solve the horizontal velocity system (ux,uy)
         ! following the Depth-Integrated Viscosity Approximation (DIVA),
@@ -90,6 +90,7 @@ contains
         real(wp), intent(IN)    :: taud_acx(:,:)      ! [Pa]
         real(wp), intent(IN)    :: taud_acy(:,:)      ! [Pa]
         real(wp), intent(IN)    :: H_ice(:,:)         ! [m]
+        real(wp), intent(IN)    :: f_ice(:,:)         ! [--]
         real(wp), intent(IN)    :: H_grnd(:,:)        ! [m]
         real(wp), intent(IN)    :: f_grnd(:,:)        ! [-]
         real(wp), intent(IN)    :: f_grnd_acx(:,:)    ! [-]
@@ -173,7 +174,7 @@ contains
                 case(1) 
                     ! Calculate effective viscosity, using velocity solution from previous iteration
                     
-                    call calc_visc_eff_3D(visc_eff,ux_bar,uy_bar,duxdz,duydz,ATT,H_ice, &
+                    call calc_visc_eff_3D(visc_eff,ux_bar,uy_bar,duxdz,duydz,ATT,H_ice,f_ice, &
                                                                 zeta_aa,dx,dy,n_glen,par%eps_0)
 
                 case DEFAULT 
@@ -245,7 +246,7 @@ end if
             
             ! Call ssa solver
             call calc_vxy_ssa_matrix(ux_bar,uy_bar,L2_norm,beta_eff_acx,beta_eff_acy,visc_eff_int,  &
-                                     ssa_mask_acx,ssa_mask_acy,H_ice,taud_acx,taud_acy,H_grnd,z_sl, &
+                                     ssa_mask_acx,ssa_mask_acy,H_ice,f_ice,taud_acx,taud_acy,H_grnd,z_sl, &
                                      z_bed,dx,dy,par%ssa_vel_max,par%boundaries,par%ssa_lis_opt)
 
 
@@ -518,7 +519,7 @@ end if
 
     end subroutine calc_vertical_shear_3D
 
-    subroutine calc_visc_eff_3D(visc_eff,ux,uy,duxdz,duydz,ATT,H_ice,zeta_aa,dx,dy,n_glen,eps_0)
+    subroutine calc_visc_eff_3D(visc_eff,ux,uy,duxdz,duydz,ATT,H_ice,f_ice,zeta_aa,dx,dy,n_glen,eps_0)
         ! Calculate 3D effective viscosity following L19, Eq. 2
         ! Use of eps_0 ensures non-zero positive viscosity value everywhere 
         ! Note: viscosity is first calculated on ab-nodes, then 
@@ -534,6 +535,7 @@ end if
         real(wp), intent(IN)  :: duydz(:,:,:)         ! [1/a] Vertical shearing, x-component
         real(wp), intent(IN)  :: ATT(:,:,:)           ! aa-nodes
         real(wp), intent(IN)  :: H_ice(:,:) 
+        real(wp), intent(IN)  :: f_ice(:,:)
         real(wp), intent(IN)  :: zeta_aa(:)           ! Vertical axis (sigma-coordinates from 0 to 1)
         real(wp), intent(IN)  :: dx
         real(wp), intent(IN)  :: dy
@@ -697,10 +699,10 @@ end if
 
         end do 
         end do 
- 
- if (.TRUE.) then 
-        ! Remove strange low viscosity points bordering ice sheet
-        ! (ice-free neighbors), mainly for aesthetics.  
+    
+
+
+        ! Extrapolate viscosity to bordering ice-free or partially ice-covered cells
         do j=1, ny
         do i=1, nx
 
@@ -710,32 +712,40 @@ end if
             jm1 = max(j-1,1) 
             jp1 = min(j+1,ny) 
             
-            if ( H_ice(i,j)   .eq. 0.0_wp .and.  &
-                 H_ice(im1,j) .eq. 0.0_wp .and. H_ice(ip1,j) .gt. 0.0_wp ) then 
+            if ( (H_ice(i,j) .eq. 0.0 .or. f_ice(i,j) .lt. 1.0) .and. &
+                count([H_ice(im1,j),H_ice(ip1,j),H_ice(i,jm1),H_ice(i,jp1)] .gt. 0.0_wp) .gt. 0 ) then 
+                ! Ice-free (or partially ice-free) with ice-covered neighbors
 
-                visc_eff(i,j,:) = visc_eff(im1,j,:) 
+                visc_eff(i,j,:) = 0.0 
+                wt      = 0.0 
 
-            else if (H_ice(i,j) .eq. 0.0_wp .and.  &
-                 H_ice(ip1,j) .eq. 0.0_wp .and. H_ice(im1,j) .gt. 0.0_wp ) then 
+                if (H_ice(im1,j).gt.0.0) then 
+                    visc_eff(i,j,:) = visc_eff(i,j,:) + visc_eff(im1,j,:) 
+                    wt = wt + 1.0 
+                end if 
+                if (H_ice(ip1,j).gt.0.0) then 
+                    visc_eff(i,j,:) = visc_eff(i,j,:) + visc_eff(ip1,j,:) 
+                    wt = wt + 1.0 
+                end if 
+                if (H_ice(i,jm1).gt.0.0) then 
+                    visc_eff(i,j,:) = visc_eff(i,j,:) + visc_eff(i,jm1,:) 
+                    wt = wt + 1.0 
+                end if 
+                if (H_ice(i,jp1).gt.0.0) then 
+                    visc_eff(i,j,:) = visc_eff(i,j,:) + visc_eff(i,jp1,:) 
+                    wt = wt + 1.0 
+                end if 
+                
+                if (wt .gt. 0.0) then 
+                    visc_eff(i,j,:) = visc_eff(i,j,:) / wt 
 
-                visc_eff(i,j,:) = visc_eff(ip1,j,:) 
-
-            else if (H_ice(i,j) .eq. 0.0_wp .and.  &
-                 H_ice(i,jm1) .eq. 0.0_wp .and. H_ice(i,jp1) .gt. 0.0_wp ) then 
-
-                visc_eff(i,j,:) = visc_eff(i,jm1,:)
-
-            else if (H_ice(i,j) .eq. 0.0_wp .and.  &
-                 H_ice(i,jp1) .eq. 0.0_wp .and. H_ice(i,jm1) .gt. 0.0_wp ) then 
-
-                visc_eff(i,j,:) = visc_eff(i,jp1,:)
+                end if 
 
             end if 
 
-        end do
-        end do
-end if 
-
+        end do 
+        end do 
+        
         ! Treat the corners to avoid extremes
         visc_eff(1,1,:)   = 0.5*(visc_eff(2,1,:)+visc_eff(1,2,:))
         visc_eff(1,ny,:)  = 0.5*(visc_eff(2,ny,:)+visc_eff(1,ny-1,:))

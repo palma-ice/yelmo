@@ -146,6 +146,7 @@ module yelmo_defs
         real(wp), allocatable   :: dHicedx(:,:)    ! Ice thickness gradient slope [m m-1], Ac x nodes
         real(wp), allocatable   :: dHicedy(:,:)    ! Ice thickness gradient slope [m m-1], Ac y nodes
         
+        real(wp), allocatable   :: H_corr(:,:)       ! Ice thickness margin-corrected [m]
         real(wp), allocatable   :: H_grnd(:,:)       ! Ice thickness overburden [m]
         
         ! Masks 

@@ -417,7 +417,7 @@ end if
 
     end subroutine calc_calving_rate_vonmises_l19
 
-    function calc_tau_eff(teig1,teig2,w2) result(tau_eff) 
+    elemental function calc_tau_eff(teig1,teig2,w2) result(tau_eff) 
 
         implicit none 
 

@@ -420,6 +420,7 @@ contains
 
         logical :: is_margin 
         real(wp) :: ddiv_free, dxx_free, dyy_free 
+        real(wp) :: wt 
 
         ! Define dy 
         dy = dx 
@@ -580,17 +581,14 @@ contains
                     if (abs(strn%dyz(i,j,k)) .lt. tol_underflow) strn%dyz(i,j,k) = 0.0 
     
                     ! ====== Finished calculating individual strain rate terms ====== 
-                
-                    ! Calculate the shear-based strain, stretching and the shear-fraction
-                    shear_squared  =   strn%dxz(i,j,k)*strn%dxz(i,j,k) &
-                                     + strn%dyz(i,j,k)*strn%dyz(i,j,k)
-
+                    
                     strn%de(i,j,k) =  sqrt(  strn%dxx(i,j,k)*strn%dxx(i,j,k) &
                                            + strn%dyy(i,j,k)*strn%dyy(i,j,k) &
                                            + strn%dxx(i,j,k)*strn%dyy(i,j,k) &
                                            + strn%dxy(i,j,k)*strn%dxy(i,j,k) &
-                                           + shear_squared )
-                        
+                                           + strn%dxz(i,j,k)*strn%dxz(i,j,k) &
+                                           + strn%dyz(i,j,k)*strn%dyz(i,j,k) )
+                    
                     if (strn%de(i,j,k) .gt. de_max) strn%de(i,j,k) = de_max 
 
                     ! Calculate the horizontal divergence too 
@@ -601,6 +599,9 @@ contains
                     !strn%de(i,j,k)    =  sqrt( shear_squared(k) )
 
                     if (strn%de(i,j,k) .gt. 0.0) then 
+                        ! Calculate the shear-based strain, stretching and the shear-fraction
+                        shear_squared  =   strn%dxz(i,j,k)*strn%dxz(i,j,k) &
+                                         + strn%dyz(i,j,k)*strn%dyz(i,j,k)
                         strn%f_shear(i,j,k) = sqrt(shear_squared)/strn%de(i,j,k)
                     else 
                         strn%f_shear(i,j,k) = 1.0   ! Shearing by default for low strain rates
@@ -617,6 +618,13 @@ contains
                     strn%f_shear(i,j,k) = min(max(strn%f_shear(i,j,k), 0.0), 1.0)
 
                 end do 
+
+
+
+if (.FALSE.) then
+    ! ajr: Extrapolating to ice-free and partially ice-free neighbors, 
+    ! as done further below, is more stable and convincing than 
+    ! imposing the free-spreading strain rate. So this section is disabled. 
 
                 ! Also estimate the free-spreading strain rate (Pollard et al., 2015, EPSL, Eq. B2.b)
                 ! ddiv = A*(rho*g*h/4)^n = dxx + dyy
@@ -656,19 +664,137 @@ contains
                                            + strn%dyy(i,j,k)*strn%dyy(i,j,k) &
                                            + strn%dxx(i,j,k)*strn%dyy(i,j,k) &
                                            + strn%dxy(i,j,k)*strn%dxy(i,j,k) &
-                                           + shear_squared )
-                        
+                                           + strn%dxz(i,j,k)*strn%dxz(i,j,k) &
+                                           + strn%dyz(i,j,k)*strn%dyz(i,j,k) )
+                    
                     if (strn%de(i,j,k) .gt. de_max) strn%de(i,j,k) = de_max 
 
-                    strn%f_shear(i,j,:) = 0.0 
+                    ! Calculate the horizontal divergence too 
+                    strn%ddiv(i,j,k) = strn%dxx(i,j,k) + strn%dyy(i,j,k) 
 
                 end if 
+end if 
+
+
 
             end if ! ice-free or ice-covered 
 
         end do
         end do
         !$omp end parallel do
+
+
+        ! === Extrapolate to ice-free neighbors === 
+        ! (in case ice gets advected there)
+        do j=1, ny
+        do i=1, nx
+
+            ! Get neighbor indices
+            im1 = max(i-1,1) 
+            ip1 = min(i+1,nx) 
+            jm1 = max(j-1,1) 
+            jp1 = min(j+1,ny) 
+                
+            if ( (H_ice(i,j) .eq. 0.0 .or. f_ice(i,j) .lt. 1.0) .and. &
+                count([H_ice(im1,j),H_ice(ip1,j),H_ice(i,jm1),H_ice(i,jp1)] .gt. 0.0_wp) .gt. 0 ) then 
+                ! Ice-free (or partially ice-free) with ice-covered neighbors
+
+
+                strn%dxx(i,j,:) = 0.0 
+                strn%dyy(i,j,:) = 0.0
+                strn%dxy(i,j,:) = 0.0
+                strn%dxz(i,j,:) = 0.0 
+                strn%dyz(i,j,:) = 0.0
+
+                if (H_ice(im1,j) .gt. 0.0) then 
+                    strn%dxx(i,j,:) = strn%dxx(i,j,:) + strn%dxx(im1,j,:)
+                    strn%dyy(i,j,:) = strn%dyy(i,j,:) + strn%dyy(im1,j,:)
+                    strn%dxy(i,j,:) = strn%dxy(i,j,:) + strn%dxy(im1,j,:)
+                    strn%dxz(i,j,:) = strn%dxz(i,j,:) + strn%dxz(im1,j,:)
+                    strn%dyz(i,j,:) = strn%dyz(i,j,:) + strn%dyz(im1,j,:)
+                    wt = wt + 1.0 
+                end if 
+                if (H_ice(ip1,j) .gt. 0.0) then 
+                    strn%dxx(i,j,:) = strn%dxx(i,j,:) + strn%dxx(ip1,j,:)
+                    strn%dyy(i,j,:) = strn%dyy(i,j,:) + strn%dyy(ip1,j,:)
+                    strn%dxy(i,j,:) = strn%dxy(i,j,:) + strn%dxy(ip1,j,:)
+                    strn%dxz(i,j,:) = strn%dxz(i,j,:) + strn%dxz(ip1,j,:)
+                    strn%dyz(i,j,:) = strn%dyz(i,j,:) + strn%dyz(ip1,j,:)
+                    wt = wt + 1.0 
+                end if
+                if (H_ice(i,jm1) .gt. 0.0) then 
+                    strn%dxx(i,j,:) = strn%dxx(i,j,:) + strn%dxx(i,jm1,:)
+                    strn%dyy(i,j,:) = strn%dyy(i,j,:) + strn%dyy(i,jm1,:)
+                    strn%dxy(i,j,:) = strn%dxy(i,j,:) + strn%dxy(i,jm1,:)
+                    strn%dxz(i,j,:) = strn%dxz(i,j,:) + strn%dxz(i,jm1,:)
+                    strn%dyz(i,j,:) = strn%dyz(i,j,:) + strn%dyz(i,jm1,:)
+                    wt = wt + 1.0 
+                end if
+                if (H_ice(i,jp1) .gt. 0.0) then 
+                    strn%dxx(i,j,:) = strn%dxx(i,j,:) + strn%dxx(i,jp1,:)
+                    strn%dyy(i,j,:) = strn%dyy(i,j,:) + strn%dyy(i,jp1,:)
+                    strn%dxy(i,j,:) = strn%dxy(i,j,:) + strn%dxy(i,jp1,:)
+                    strn%dxz(i,j,:) = strn%dxz(i,j,:) + strn%dxz(i,jp1,:)
+                    strn%dyz(i,j,:) = strn%dyz(i,j,:) + strn%dyz(i,jp1,:)
+                    wt = wt + 1.0 
+                end if
+
+                if (wt .gt. 0.0) then 
+                    strn%dxx(i,j,:) = strn%dxx(i,j,:) / wt
+                    strn%dyy(i,j,:) = strn%dyy(i,j,:) / wt
+                    strn%dxy(i,j,:) = strn%dxy(i,j,:) / wt
+                    strn%dxz(i,j,:) = strn%dxz(i,j,:) / wt
+                    strn%dyz(i,j,:) = strn%dyz(i,j,:) / wt
+                end if 
+
+
+                ! Obtain effective strain rate and divergence
+
+                do k = 1, nz_aa 
+                    ! ====== Finished calculating individual strain rate terms ====== 
+                    
+                    strn%de(i,j,k) =  sqrt(  strn%dxx(i,j,k)*strn%dxx(i,j,k) &
+                                           + strn%dyy(i,j,k)*strn%dyy(i,j,k) &
+                                           + strn%dxx(i,j,k)*strn%dyy(i,j,k) &
+                                           + strn%dxy(i,j,k)*strn%dxy(i,j,k) &
+                                           + strn%dxz(i,j,k)*strn%dxz(i,j,k) &
+                                           + strn%dyz(i,j,k)*strn%dyz(i,j,k) )
+                    
+                    if (strn%de(i,j,k) .gt. de_max) strn%de(i,j,k) = de_max 
+
+                    ! Calculate the horizontal divergence too 
+                    strn%ddiv(i,j,k) = strn%dxx(i,j,k) + strn%dyy(i,j,k) 
+
+                    ! Note: Using only the below should be equivalent to applying
+                    ! the SIA approximation to calculate `de`
+                    !strn%de(i,j,k)    =  sqrt( shear_squared(k) )
+
+                    if (strn%de(i,j,k) .gt. 0.0) then 
+                        ! Calculate the shear-based strain, stretching and the shear-fraction
+                        shear_squared  =   strn%dxz(i,j,k)*strn%dxz(i,j,k) &
+                                         + strn%dyz(i,j,k)*strn%dyz(i,j,k)
+                        strn%f_shear(i,j,k) = sqrt(shear_squared)/strn%de(i,j,k)
+                    else 
+                        strn%f_shear(i,j,k) = 1.0   ! Shearing by default for low strain rates
+                    end if 
+
+                    !  ------ Modification of the shear fraction for floating ice (ice shelves)
+
+                    if (f_grnd(i,j) .eq. 0.0) then 
+                        strn%f_shear(i,j,k) = 0.0    ! Assume ice shelf is only stretching, no shear 
+                    end if 
+
+                    !  ------ Constrain the shear fraction to reasonable [0,1] interval
+
+                    strn%f_shear(i,j,k) = min(max(strn%f_shear(i,j,k), 0.0), 1.0) 
+                end do 
+
+
+            end if 
+
+        end do
+        end do
+
 
         ! === Also calculate vertically averaged strain rate tensor ===
         
@@ -686,19 +812,20 @@ contains
 
     end subroutine calc_strain_rate_tensor
 
-    subroutine calc_strain_rate_tensor_2D(strn2D,ux_bar,uy_bar,H_ice,f_ice,f_grnd,dx,dy,ATT_bar,n_glen)
+    subroutine calc_strain_rate_tensor_2D(strn2D,ux_bar,uy_bar,H_ice,f_ice,f_grnd,dx,dy,de_max,ATT_bar,n_glen)
         ! Calculate the 2D (vertically averaged) strain rate tensor,
         ! assuming a constant vertical velocity profile. 
 
         implicit none
 
         type(strain_2D_class), intent(OUT) :: strn2D            ! [yr^-1] Strain rate tensor
-        real(wp), intent(IN) :: ux_bar(:,:)         ! [m/yr] Vertically averaged vel., x
-        real(wp), intent(IN) :: uy_bar(:,:)         ! [m/yr] Vertically averaged vel., y
-        real(wp), intent(IN) :: H_ice(:,:)          ! [m] Ice thickness 
+        real(wp), intent(IN) :: ux_bar(:,:)                     ! [m/yr] Vertically averaged vel., x
+        real(wp), intent(IN) :: uy_bar(:,:)                     ! [m/yr] Vertically averaged vel., y
+        real(wp), intent(IN) :: H_ice(:,:)                      ! [m] Ice thickness 
         real(wp), intent(IN) :: f_ice(:,:)
         real(wp), intent(IN) :: f_grnd(:,:)
-        real(wp), intent(IN) :: dx, dy              ! [m] Resolution
+        real(wp), intent(IN) :: dx, dy                          ! [m] Resolution
+        real(wp), intent(IN) :: de_max                          ! [yr^-1] Maximum allowed effective strain rate
         real(wp), intent(IN) :: ATT_bar(:,:) 
         real(wp), intent(IN) :: n_glen 
 
@@ -710,89 +837,12 @@ contains
         real(wp) :: ux_aa, uy_aa 
         logical  :: is_margin 
 
-        real(wp), allocatable :: ux_ext(:,:) 
-        real(wp), allocatable :: uy_ext(:,:) 
-        real(wp) :: wt_tot 
+        real(wp) :: wt 
 
         real(wp) :: ddiv_free, dxx_free, dyy_free  
 
         nx = size(ux_bar,1)
         ny = size(ux_bar,2)
-
-        allocate(ux_ext(nx,ny)) 
-        allocate(uy_ext(nx,ny)) 
-
-        ! First, extend velocity vectors to grid points 
-        ! neighboring ice sheets, to account for new points.
-        ux_ext = ux_bar
-        uy_ext = uy_bar
-
-        do j = 1, ny
-        do i = 1, nx
-            
-            ! Get neighbor indices
-            im1 = max(i-1,1) 
-            ip1 = min(i+1,nx) 
-            jm1 = max(j-1,1) 
-            jp1 = min(j+1,ny) 
-
-            ! Get neighborhood average value 
-            ! (rough approximation, but simpler than alternatives)
-
-            if (ux_bar(i,j) .eq. 0.0) then 
-                ux_ext(i,j) = 0.0
-                wt_tot      = 0.0 
-
-                if (ux_bar(im1,j) .ne. 0.0) then 
-                    ux_ext(i,j) = ux_ext(i,j) + ux_bar(im1,j) 
-                    wt_tot = wt_tot + 1.0 
-                end if 
-                if (ux_bar(ip1,j) .ne. 0.0) then 
-                    ux_ext(i,j) = ux_ext(i,j) + ux_bar(ip1,j) 
-                    wt_tot = wt_tot + 1.0 
-                end if 
-                if (ux_bar(i,jm1) .ne. 0.0) then 
-                    ux_ext(i,j) = ux_ext(i,j) + ux_bar(i,jm1) 
-                    wt_tot = wt_tot + 1.0 
-                end if 
-                if (ux_bar(i,jp1) .ne. 0.0) then 
-                    ux_ext(i,j) = ux_ext(i,j) + ux_bar(i,jp1) 
-                    wt_tot = wt_tot + 1.0 
-                end if 
-
-                if (wt_tot .gt. 0.0) then 
-                    ux_ext(i,j) = ux_ext(i,j) / wt_tot 
-                end if 
-            end if 
-
-            if (uy_bar(i,j) .eq. 0.0) then 
-                uy_ext(i,j) = 0.0
-                wt_tot      = 0.0 
-
-                if (uy_bar(im1,j) .ne. 0.0) then 
-                    uy_ext(i,j) = uy_ext(i,j) + uy_bar(im1,j) 
-                    wt_tot = wt_tot + 1.0 
-                end if 
-                if (uy_bar(ip1,j) .ne. 0.0) then 
-                    uy_ext(i,j) = uy_ext(i,j) + uy_bar(ip1,j) 
-                    wt_tot = wt_tot + 1.0 
-                end if 
-                if (uy_bar(i,jm1) .ne. 0.0) then 
-                    uy_ext(i,j) = uy_ext(i,j) + uy_bar(i,jm1) 
-                    wt_tot = wt_tot + 1.0 
-                end if 
-                if (uy_bar(i,jp1) .ne. 0.0) then 
-                    uy_ext(i,j) = uy_ext(i,j) + uy_bar(i,jp1) 
-                    wt_tot = wt_tot + 1.0 
-                end if 
-
-                if (wt_tot .gt. 0.0) then 
-                    uy_ext(i,j) = uy_ext(i,j) / wt_tot 
-                end if 
-            end if 
-
-        end do 
-        end do 
 
         strn2D%dxx      = 0.0 
         strn2D%dyy      = 0.0 
@@ -815,14 +865,14 @@ contains
                 ! Grounded or floating ice, calculate strain rate here (aa-nodes)
 
                 ! aa-nodes
-                strn2D%dxx(i,j) = (ux_ext(i,j) - ux_ext(im1,j))/dx
-                strn2D%dyy(i,j) = (uy_ext(i,j) - uy_ext(i,jm1))/dy
+                strn2D%dxx(i,j) = (ux_bar(i,j) - ux_bar(im1,j))/dx
+                strn2D%dyy(i,j) = (uy_bar(i,j) - uy_bar(i,jm1))/dy
 
                 ! Calculation of cross terms on central aa-nodes (symmetrical results)
-                dudy = ((ux_ext(i,jp1)   - ux_ext(i,jm1))    &
-                      + (ux_ext(im1,jp1) - ux_ext(im1,jm1))) /(4.0*dy)
-                dvdx = ((uy_ext(ip1,j)   - uy_ext(im1,j))    &
-                      + (uy_ext(ip1,jm1) - uy_ext(im1,jm1))) /(4.0*dx)
+                dudy = ((ux_bar(i,jp1)   - ux_bar(i,jm1))    &
+                      + (ux_bar(im1,jp1) - ux_bar(im1,jm1))) /(4.0*dy)
+                dvdx = ((uy_bar(ip1,j)   - uy_bar(im1,j))    &
+                      + (uy_bar(ip1,jm1) - uy_bar(im1,jm1))) /(4.0*dx)
 
                 strn2D%dxy(i,j) = 0.5*(dudy+dvdx)
 
@@ -830,6 +880,10 @@ contains
                 strn2D%de(i,j) = sqrt( strn2D%dxx(i,j)**2 + strn2D%dyy(i,j)**2 &
                             + strn2D%dxx(i,j)*strn2D%dyy(i,j) + strn2D%dxy(i,j)**2 )
                 
+if (.FALSE.) then
+    ! ajr: Extrapolating to ice-free and partially ice-free neighbors, 
+    ! as done further below, is more stable and convincing than 
+    ! imposing the free-spreading strain rate. So this section is disabled. 
 
                 ! Also estimate the free-spreading strain rate (Pollard et al., 2015, EPSL, Eq. B2.b)
                 ! ddiv = A*(rho*g*h/4)^n = dxx + dyy
@@ -839,8 +893,8 @@ contains
                 ddiv_free = ATT_bar(i,j) * (0.25*rho_ice*g*H_ice(i,j))**n_glen
                 ! dxx_free  = ddiv_free / 2.0
                 ! dyy_free  = dxx_free 
-                if ( abs(0.5*ux_ext(i,j)+ux_ext(im1,j)) &
-                      .gt. abs(0.5*uy_ext(i,j)+uy_ext(i,jm1)) ) then 
+                if ( abs(0.5*ux_bar(i,j)+ux_bar(im1,j)) &
+                      .gt. abs(0.5*uy_bar(i,j)+uy_bar(i,jm1)) ) then 
                     dxx_free  = ddiv_free
                     dyy_free  = 0.0 
                 else 
@@ -865,6 +919,85 @@ contains
                             + strn2D%dxx(i,j)*strn2D%dyy(i,j) + strn2D%dxy(i,j)**2 )
                  
                 end if 
+
+end if 
+
+
+
+            end if 
+
+        end do
+        end do
+
+        ! === Extrapolate to ice-free neighbors === 
+        ! (in case ice gets advected there)
+        do j=1, ny
+        do i=1, nx
+
+            ! Get neighbor indices
+            im1 = max(i-1,1) 
+            ip1 = min(i+1,nx) 
+            jm1 = max(j-1,1) 
+            jp1 = min(j+1,ny) 
+                
+            if ( (H_ice(i,j) .eq. 0.0 .or. f_ice(i,j) .lt. 1.0) .and. &
+                count([H_ice(im1,j),H_ice(ip1,j),H_ice(i,jm1),H_ice(i,jp1)] .gt. 0.0_wp) .gt. 0 ) then 
+                ! Ice-free (or partially ice-free) with ice-covered neighbors
+
+
+                strn2D%dxx(i,j) = 0.0 
+                strn2D%dyy(i,j) = 0.0
+                strn2D%dxy(i,j) = 0.0
+                strn2D%dxz(i,j) = 0.0 
+                strn2D%dyz(i,j) = 0.0
+
+                if (H_ice(im1,j) .gt. 0.0) then 
+                    strn2D%dxx(i,j) = strn2D%dxx(i,j) + strn2D%dxx(im1,j)
+                    strn2D%dyy(i,j) = strn2D%dyy(i,j) + strn2D%dyy(im1,j)
+                    strn2D%dxy(i,j) = strn2D%dxy(i,j) + strn2D%dxy(im1,j)
+                    wt = wt + 1.0 
+                end if 
+                if (H_ice(ip1,j) .gt. 0.0) then 
+                    strn2D%dxx(i,j) = strn2D%dxx(i,j) + strn2D%dxx(ip1,j)
+                    strn2D%dyy(i,j) = strn2D%dyy(i,j) + strn2D%dyy(ip1,j)
+                    strn2D%dxy(i,j) = strn2D%dxy(i,j) + strn2D%dxy(ip1,j)
+                    wt = wt + 1.0 
+                end if
+                if (H_ice(i,jm1) .gt. 0.0) then 
+                    strn2D%dxx(i,j) = strn2D%dxx(i,j) + strn2D%dxx(i,jm1)
+                    strn2D%dyy(i,j) = strn2D%dyy(i,j) + strn2D%dyy(i,jm1)
+                    strn2D%dxy(i,j) = strn2D%dxy(i,j) + strn2D%dxy(i,jm1)
+                    wt = wt + 1.0 
+                end if
+                if (H_ice(i,jp1) .gt. 0.0) then 
+                    strn2D%dxx(i,j) = strn2D%dxx(i,j) + strn2D%dxx(i,jp1)
+                    strn2D%dyy(i,j) = strn2D%dyy(i,j) + strn2D%dyy(i,jp1)
+                    strn2D%dxy(i,j) = strn2D%dxy(i,j) + strn2D%dxy(i,jp1)
+                    wt = wt + 1.0 
+                end if
+
+                if (wt .gt. 0.0) then 
+                    strn2D%dxx(i,j) = strn2D%dxx(i,j) / wt
+                    strn2D%dyy(i,j) = strn2D%dyy(i,j) / wt
+                    strn2D%dxy(i,j) = strn2D%dxy(i,j) / wt
+                end if 
+
+                ! ====== Finished calculating individual strain rate terms ====== 
+                
+                strn2D%de(i,j) =  sqrt(  strn2D%dxx(i,j)*strn2D%dxx(i,j) &
+                                       + strn2D%dyy(i,j)*strn2D%dyy(i,j) &
+                                       + strn2D%dxx(i,j)*strn2D%dyy(i,j) &
+                                       + strn2D%dxy(i,j)*strn2D%dxy(i,j) &
+                                       + strn2D%dxz(i,j)*strn2D%dxz(i,j) &
+                                       + strn2D%dyz(i,j)*strn2D%dyz(i,j) )
+                
+                if (strn2D%de(i,j) .gt. de_max) strn2D%de(i,j) = de_max 
+
+                ! Calculate the horizontal divergence too 
+                strn2D%ddiv(i,j) = strn2D%dxx(i,j) + strn2D%dyy(i,j) 
+
+                ! No shearing estimated from 2D components
+                strn2D%f_shear(i,j) = 0.0
 
             end if 
 

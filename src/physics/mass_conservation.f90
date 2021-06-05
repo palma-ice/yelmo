@@ -157,8 +157,8 @@ contains
         real(wp),       intent(INOUT) :: H_ice(:,:)             ! [m]   Ice thickness 
         real(wp),       intent(INOUT) :: H_margin(:,:)          ! [m]   Margin ice thickness (assuming full area coverage) 
         real(wp),       intent(INOUT) :: f_ice(:,:)             ! [--]  Ice area fraction 
-        real(wp),       intent(OUT)   :: mb_applied(:,:)        ! [m/a] Actual mass balance applied to real ice points
-        real(wp),       intent(OUT)   :: calv(:,:)              ! [m/a] Actual calving rate 
+        real(wp),       intent(INOUT) :: mb_applied(:,:)        ! [m/a] Actual mass balance applied to real ice points
+        real(wp),       intent(INOUT) :: calv(:,:)              ! [m/a] Actual calving rate 
         real(wp),       intent(IN)    :: f_grnd(:,:)            ! [--]  Grounded fraction 
         real(wp),       intent(IN)    :: H_ocn(:,:)             ! [m]   Ocean thickness (ie, depth)
         real(wp),       intent(IN)    :: ux(:,:)                ! [m/a] Depth-averaged velocity, x-direction (ac-nodes)
@@ -213,12 +213,12 @@ contains
         ! Limit calving contributions to margin points 
         ! (for now assume this was done well externally)
 
-        calv = calv_flt + calv_grnd 
+        calv = calv + (calv_flt + calv_grnd) 
 
 
         ! Next, handle mass balance in order to be able to diagnose
         ! precisely how much mass was lost/gained 
-        mb_applied = mbal - calv 
+        mb_applied = mb_applied + (mbal - calv) 
 
         ! Ensure ice cannot form in open ocean 
         where(f_grnd .eq. 0.0 .and. H_ice .eq. 0.0)  mb_applied = 0.0  
@@ -269,7 +269,7 @@ contains
 
     end subroutine calc_ice_thickness_mbal
 
-    subroutine apply_ice_thickness_boundaries(H_ice,mb_resid,ice_allowed,f_grnd,uxy_b,boundaries,H_ice_ref, &
+    subroutine apply_ice_thickness_boundaries(H_ice,mb_resid,ice_allowed,f_ice,f_grnd,uxy_b,boundaries,H_ice_ref, &
                                                 H_min_flt,H_min_grnd,dt)
 
         implicit none
@@ -277,6 +277,7 @@ contains
         real(wp),           intent(INOUT)   :: H_ice(:,:)               ! [m] Ice thickness 
         real(wp),           intent(OUT)     :: mb_resid(:,:)            ! [m/yr] Residual mass balance
         logical,            intent(IN)      :: ice_allowed(:,:)         ! Mask of where ice is allowed to be greater than zero 
+        real(wp),           intent(IN)      :: f_ice(:,:)               ! [--] Fraction of ice cover
         real(wp),           intent(IN)      :: f_grnd(:,:)              ! [--] Grounded ice fraction
         real(wp),           intent(IN)      :: uxy_b(:,:)               ! [m/a] Basal sliding speed, aa-nodes
         character(len=*),   intent(IN)      :: boundaries               ! Boundary condition choice
@@ -288,6 +289,7 @@ contains
         ! Local variables 
         integer :: i, j, nx, ny 
         real(wp), allocatable :: H_ice_new(:,:)
+        real(wp) :: H_ref 
 
         nx = size(H_ice,1)
         ny = size(H_ice,2) 
@@ -308,11 +310,27 @@ contains
         ! according to boundary mask (ie, EISMINT, BUELER-A, open ocean)
         where (.not. ice_allowed) H_ice_new = 0.0 
 
+        do j = 1, ny 
+        do i = 1, nx 
 
-        ! Remove ice that is too thin 
-        where (f_grnd .lt. 1.0_wp .and. H_ice_new .lt. H_min_flt)   H_ice_new = 0.0_wp 
-        where (f_grnd .eq. 1.0_wp .and. H_ice_new .lt. H_min_grnd)  H_ice_new = 0.0_wp 
-        
+            if (H_ice_new(i,j) .gt. 0.0) then 
+                ! Ice covered point 
+
+                ! Calculate current ice thickness 
+                if (f_ice(i,j) .gt. 0.0) then 
+                    H_ref = H_ice_new(i,j) / f_ice(i,j) 
+                else 
+                    H_ref = H_ice_new(i,j) 
+                end if 
+
+                ! Remove ice that is too thin 
+                if (f_grnd(i,j) .lt. 1.0_wp .and. H_ref .lt. H_min_flt)  H_ice_new(i,j) = 0.0_wp 
+                if (f_grnd(i,j) .eq. 1.0_wp .and. H_ref .lt. H_min_grnd) H_ice_new(i,j) = 0.0_wp 
+
+            end if 
+
+        end do 
+        end do 
 
         select case(trim(boundaries))
 

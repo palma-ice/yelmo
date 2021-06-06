@@ -706,7 +706,9 @@ end if
                 strn%dxz(i,j,:) = 0.0 
                 strn%dyz(i,j,:) = 0.0
 
-                if (H_ice(im1,j) .gt. 0.0) then 
+                wt = 0.0 
+
+                if (H_ice(im1,j) .gt. 0.0 .and. f_ice(im1,j) .eq. 1.0) then 
                     strn%dxx(i,j,:) = strn%dxx(i,j,:) + strn%dxx(im1,j,:)
                     strn%dyy(i,j,:) = strn%dyy(i,j,:) + strn%dyy(im1,j,:)
                     strn%dxy(i,j,:) = strn%dxy(i,j,:) + strn%dxy(im1,j,:)
@@ -714,7 +716,7 @@ end if
                     strn%dyz(i,j,:) = strn%dyz(i,j,:) + strn%dyz(im1,j,:)
                     wt = wt + 1.0 
                 end if 
-                if (H_ice(ip1,j) .gt. 0.0) then 
+                if (H_ice(ip1,j) .gt. 0.0 .and. f_ice(ip1,j) .eq. 1.0) then 
                     strn%dxx(i,j,:) = strn%dxx(i,j,:) + strn%dxx(ip1,j,:)
                     strn%dyy(i,j,:) = strn%dyy(i,j,:) + strn%dyy(ip1,j,:)
                     strn%dxy(i,j,:) = strn%dxy(i,j,:) + strn%dxy(ip1,j,:)
@@ -722,7 +724,7 @@ end if
                     strn%dyz(i,j,:) = strn%dyz(i,j,:) + strn%dyz(ip1,j,:)
                     wt = wt + 1.0 
                 end if
-                if (H_ice(i,jm1) .gt. 0.0) then 
+                if (H_ice(i,jm1) .gt. 0.0 .and. f_ice(i,jm1) .eq. 1.0) then 
                     strn%dxx(i,j,:) = strn%dxx(i,j,:) + strn%dxx(i,jm1,:)
                     strn%dyy(i,j,:) = strn%dyy(i,j,:) + strn%dyy(i,jm1,:)
                     strn%dxy(i,j,:) = strn%dxy(i,j,:) + strn%dxy(i,jm1,:)
@@ -730,7 +732,7 @@ end if
                     strn%dyz(i,j,:) = strn%dyz(i,j,:) + strn%dyz(i,jm1,:)
                     wt = wt + 1.0 
                 end if
-                if (H_ice(i,jp1) .gt. 0.0) then 
+                if (H_ice(i,jp1) .gt. 0.0 .and. f_ice(i,jp1) .eq. 1.0) then 
                     strn%dxx(i,j,:) = strn%dxx(i,j,:) + strn%dxx(i,jp1,:)
                     strn%dyy(i,j,:) = strn%dyy(i,j,:) + strn%dyy(i,jp1,:)
                     strn%dxy(i,j,:) = strn%dxy(i,j,:) + strn%dxy(i,jp1,:)
@@ -951,25 +953,27 @@ end if
                 strn2D%dxz(i,j) = 0.0 
                 strn2D%dyz(i,j) = 0.0
 
-                if (H_ice(im1,j) .gt. 0.0) then 
+                wt = 0.0 
+
+                if (H_ice(im1,j) .gt. 0.0 .and. f_ice(im1,j) .eq. 1.0) then 
                     strn2D%dxx(i,j) = strn2D%dxx(i,j) + strn2D%dxx(im1,j)
                     strn2D%dyy(i,j) = strn2D%dyy(i,j) + strn2D%dyy(im1,j)
                     strn2D%dxy(i,j) = strn2D%dxy(i,j) + strn2D%dxy(im1,j)
                     wt = wt + 1.0 
                 end if 
-                if (H_ice(ip1,j) .gt. 0.0) then 
+                if (H_ice(ip1,j) .gt. 0.0 .and. f_ice(ip1,j) .eq. 1.0) then 
                     strn2D%dxx(i,j) = strn2D%dxx(i,j) + strn2D%dxx(ip1,j)
                     strn2D%dyy(i,j) = strn2D%dyy(i,j) + strn2D%dyy(ip1,j)
                     strn2D%dxy(i,j) = strn2D%dxy(i,j) + strn2D%dxy(ip1,j)
                     wt = wt + 1.0 
                 end if
-                if (H_ice(i,jm1) .gt. 0.0) then 
+                if (H_ice(i,jm1) .gt. 0.0 .and. f_ice(i,jm1) .eq. 1.0) then 
                     strn2D%dxx(i,j) = strn2D%dxx(i,j) + strn2D%dxx(i,jm1)
                     strn2D%dyy(i,j) = strn2D%dyy(i,j) + strn2D%dyy(i,jm1)
                     strn2D%dxy(i,j) = strn2D%dxy(i,j) + strn2D%dxy(i,jm1)
                     wt = wt + 1.0 
                 end if
-                if (H_ice(i,jp1) .gt. 0.0) then 
+                if (H_ice(i,jp1) .gt. 0.0 .and. f_ice(i,jp1) .eq. 1.0) then 
                     strn2D%dxx(i,j) = strn2D%dxx(i,j) + strn2D%dxx(i,jp1)
                     strn2D%dyy(i,j) = strn2D%dyy(i,j) + strn2D%dyy(i,jp1)
                     strn2D%dxy(i,j) = strn2D%dxy(i,j) + strn2D%dxy(i,jp1)
@@ -1074,7 +1078,9 @@ end if
         strs2D%te =  sqrt(strs2D%txx*strs2D%txx &
                         + strs2D%tyy*strs2D%tyy &
                         + strs2D%txx*strs2D%tyy &
-                        + strs2D%txy*strs2D%txy )
+                        + strs2D%txy*strs2D%txy &
+                        + strs2D%txz*strs2D%txz &
+                        + strs2D%tyz*strs2D%tyz )
 
         ! Finally, calculate the first two eigenvectors for 2D stress tensor 
         call calc_stress_eigen_values(strs2D%teig1,strs2D%teig2, &

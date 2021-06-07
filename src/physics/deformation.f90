@@ -402,7 +402,7 @@ contains
         real(wp), intent(IN) :: n_glen
 
         ! Local variables 
-        integer  :: i, j, k, i1, j1 
+        integer  :: i, j, k
         integer  :: im1, ip1, jm1, jp1 
         integer  :: nx, ny, nz_aa, nz_ac  
         real(wp) :: dxi, deta, dzeta
@@ -832,7 +832,7 @@ end if
         real(wp), intent(IN) :: n_glen 
 
         ! Local variables
-        integer  :: i, j, k, i1, j1
+        integer  :: i, j, k
         integer  :: im1, ip1, jm1, jp1
         integer  :: nx, ny
         real(wp) :: dvdx, dudy

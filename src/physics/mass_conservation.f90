@@ -713,7 +713,8 @@ contains
         real(wp), intent(IN)    :: f_grnd(:,:)            ! [--] Grounded fraction (aa-nodes)
 
         ! Local variables 
-        integer :: i, j, nx, ny, i1, i2, j1, j2  
+        integer :: i, j, nx, ny
+        integer :: im1, ip1, jm1, jp1
         real(wp) :: H_neighb(4)
         logical :: mask_neighb(4)
         real(wp) :: H_ref  
@@ -740,13 +741,14 @@ contains
         do j = 1, ny
         do i = 1, nx 
 
-            i1 = max(i-1,1)
-            j1 = max(j-1,1)
-            i2 = min(i+1,nx)
-            j2 = min(j+1,ny)
-
+            ! Get neighbor indices
+            im1 = max(i-1,1) 
+            ip1 = min(i+1,nx) 
+            jm1 = max(j-1,1) 
+            jp1 = min(j+1,ny) 
+            
             ! Store neighbor heights 
-            H_neighb = [H_ice_0(i1,j),H_ice_0(i2,j),H_ice_0(i,j1),H_ice_0(i,j2)]
+            H_neighb = [H_ice_0(im1,j),H_ice_0(ip1,j),H_ice_0(i,jm1),H_ice_0(i,jp1)]
             
             if (H_ice(i,j) .gt. 0.0 .and. minval(H_neighb) .eq. 0.0 .and. f_grnd(i,j) .eq. 0.0) then 
                 ! This point is at the floating ice margin

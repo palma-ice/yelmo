@@ -548,7 +548,7 @@ contains
 
         ! Local variables
         integer    :: i, j, nx, ny
-        integer    :: i1, j1 
+        integer    :: im1, jm1 
         real(wp) :: ux_b_mid, uy_b_mid, uxy_b  
 
         real(wp), parameter :: ub_sq_min = (1e-1_prec)**2  ! [m/a] Minimum velocity is positive small value to avoid divide by zero
@@ -571,12 +571,12 @@ contains
             do j = 1, ny
             do i = 1, nx
 
-                i1 = max(i-1,1)
-                j1 = max(j-1,1) 
+                im1 = max(i-1,1)
+                jm1 = max(j-1,1) 
                 
                 ! Calculate magnitude of basal velocity on aa-node 
-                ux_b_mid  = 0.5_prec*(ux_b(i1,j)+ux_b(i,j))
-                uy_b_mid  = 0.5_prec*(uy_b(i,j1)+uy_b(i,j))
+                ux_b_mid  = 0.5_prec*(ux_b(im1,j)+ux_b(i,j))
+                uy_b_mid  = 0.5_prec*(uy_b(i,jm1)+uy_b(i,j))
                 uxy_b     = (ux_b_mid**2 + uy_b_mid**2 + ub_sq_min)**0.5_prec
 
                 ! Nonlinear beta as a function of basal velocity
@@ -611,7 +611,7 @@ contains
 
         ! Local variables
         integer    :: i, j, nx, ny
-        integer    :: i1, j1 
+        integer    :: im1, jm1
         real(wp) :: ux_b_mid, uy_b_mid, uxy_b  
 
         real(wp), parameter :: ub_sq_min = (1e-1_prec)**2  ! [m/a] Minimum velocity is positive small value to avoid divide by zero
@@ -625,12 +625,12 @@ contains
         do j = 1, ny
         do i = 1, nx
 
-            i1 = max(i-1,1)
-            j1 = max(j-1,1) 
+            im1 = max(i-1,1)
+            jm1 = max(j-1,1) 
             
             ! Calculate magnitude of basal velocity on aa-node 
-            ux_b_mid  = 0.5_prec*(ux_b(i1,j)+ux_b(i,j))
-            uy_b_mid  = 0.5_prec*(uy_b(i,j1)+uy_b(i,j))
+            ux_b_mid  = 0.5_prec*(ux_b(im1,j)+ux_b(i,j))
+            uy_b_mid  = 0.5_prec*(uy_b(i,jm1)+uy_b(i,j))
             uxy_b     = (ux_b_mid**2 + uy_b_mid**2 + ub_sq_min)**0.5_prec
 
             ! Nonlinear beta as a function of basal velocity

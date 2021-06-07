@@ -104,7 +104,7 @@ contains
         ! Local variables
         integer    :: i, j, nx, ny
         real(prec) :: v1, v2, v3, v4 
-        integer    :: i1, i2, j1, j2 
+        integer    :: im1, ip1, jm1, jp1
         real(prec) :: rho_ice_sw
 
         real(prec), allocatable :: z_srf_int(:,:) 
@@ -144,32 +144,33 @@ contains
                 ! Partially grounded and floating (ie, grounding line) 
                 ! Perform subgrid calculations 
 
-                i1 = max(i-1,1) 
-                i2 = min(i+1,nx) 
-                j1 = max(j-1,1) 
-                j2 = min(j+1,ny) 
-
+                ! Get neighbor indices
+                im1 = max(i-1,1) 
+                ip1 = min(i+1,nx) 
+                jm1 = max(j-1,1) 
+                jp1 = min(j+1,ny) 
+                
                 ! Calculate values at corners (ab-nodes) and interpolate
                 
                 ! == H_ice == 
-                v1 = 0.25_prec*(H_ice(i,j) + H_ice(i2,j) + H_ice(i2,j2) + H_ice(i,j2))
-                v2 = 0.25_prec*(H_ice(i,j) + H_ice(i1,j) + H_ice(i1,j2) + H_ice(i,j2))
-                v3 = 0.25_prec*(H_ice(i,j) + H_ice(i1,j) + H_ice(i1,j1) + H_ice(i,j1))
-                v4 = 0.25_prec*(H_ice(i,j) + H_ice(i2,j) + H_ice(i2,j1) + H_ice(i,j1))
+                v1 = 0.25_prec*(H_ice(i,j) + H_ice(ip1,j) + H_ice(ip1,jp1) + H_ice(i,jp1))
+                v2 = 0.25_prec*(H_ice(i,j) + H_ice(im1,j) + H_ice(im1,jp1) + H_ice(i,jp1))
+                v3 = 0.25_prec*(H_ice(i,j) + H_ice(im1,j) + H_ice(im1,jm1) + H_ice(i,jm1))
+                v4 = 0.25_prec*(H_ice(i,j) + H_ice(ip1,j) + H_ice(ip1,jm1) + H_ice(i,jm1))
                 call calc_subgrid_array(H_ice_int,v1,v2,v3,v4,gl_sep_nx)
                 
                 ! == z_bed == 
-                v1 = 0.25_prec*(z_bed(i,j) + z_bed(i2,j) + z_bed(i2,j2) + z_bed(i,j2))
-                v2 = 0.25_prec*(z_bed(i,j) + z_bed(i1,j) + z_bed(i1,j2) + z_bed(i,j2))
-                v3 = 0.25_prec*(z_bed(i,j) + z_bed(i1,j) + z_bed(i1,j1) + z_bed(i,j1))
-                v4 = 0.25_prec*(z_bed(i,j) + z_bed(i2,j) + z_bed(i2,j1) + z_bed(i,j1))
+                v1 = 0.25_prec*(z_bed(i,j) + z_bed(ip1,j) + z_bed(ip1,jp1) + z_bed(i,jp1))
+                v2 = 0.25_prec*(z_bed(i,j) + z_bed(im1,j) + z_bed(im1,jp1) + z_bed(i,jp1))
+                v3 = 0.25_prec*(z_bed(i,j) + z_bed(im1,j) + z_bed(im1,jm1) + z_bed(i,jm1))
+                v4 = 0.25_prec*(z_bed(i,j) + z_bed(ip1,j) + z_bed(ip1,jm1) + z_bed(i,jm1))
                 call calc_subgrid_array(z_bed_int,v1,v2,v3,v4,gl_sep_nx)
                 
                 ! == z_sl == 
-                v1 = 0.25_prec*(z_sl(i,j) + z_sl(i2,j) + z_sl(i2,j2) + z_sl(i,j2))
-                v2 = 0.25_prec*(z_sl(i,j) + z_sl(i1,j) + z_sl(i1,j2) + z_sl(i,j2))
-                v3 = 0.25_prec*(z_sl(i,j) + z_sl(i1,j) + z_sl(i1,j1) + z_sl(i,j1))
-                v4 = 0.25_prec*(z_sl(i,j) + z_sl(i2,j) + z_sl(i2,j1) + z_sl(i,j1))
+                v1 = 0.25_prec*(z_sl(i,j) + z_sl(ip1,j) + z_sl(ip1,jp1) + z_sl(i,jp1))
+                v2 = 0.25_prec*(z_sl(i,j) + z_sl(im1,j) + z_sl(im1,jp1) + z_sl(i,jp1))
+                v3 = 0.25_prec*(z_sl(i,j) + z_sl(im1,j) + z_sl(im1,jm1) + z_sl(i,jm1))
+                v4 = 0.25_prec*(z_sl(i,j) + z_sl(ip1,j) + z_sl(ip1,jm1) + z_sl(i,jm1))
                 call calc_subgrid_array(z_sl_int,v1,v2,v3,v4,gl_sep_nx)
                 
                 
@@ -259,7 +260,7 @@ contains
         ! Local variables
         integer    :: i, j, nx, ny
         real(prec) :: Hg_1, Hg_2, Hg_3, Hg_4, Hg_mid  
-        integer    :: i1, i2, j1, j2 
+        integer    :: im1, ip1, jm1, jp1 
 
         !integer, parameter :: nx_interp = 15
 
@@ -268,22 +269,23 @@ contains
 
         ! First binary estimate of f_grnd based on aa-nodes
         f_grnd = 1.0
-        where (H_grnd < 0.0) f_grnd = 0.0
+        where (H_grnd .lt. 0.0) f_grnd = 0.0
         
         ! Find grounding line cells and determine fraction 
         do j = 1, ny 
         do i = 1, nx
 
-            i1 = max(i-1,1) 
-            i2 = min(i+1,nx) 
-            j1 = max(j-1,1) 
-            j2 = min(j+1,ny) 
-
+            ! Get neighbor indices
+            im1 = max(i-1,1) 
+            ip1 = min(i+1,nx) 
+            jm1 = max(j-1,1) 
+            jp1 = min(j+1,ny) 
+                
             ! Calculate Hg at corners (ab-nodes)
-            Hg_1 = 0.25_prec*(H_grnd(i,j) + H_grnd(i2,j) + H_grnd(i2,j2) + H_grnd(i,j2))
-            Hg_2 = 0.25_prec*(H_grnd(i,j) + H_grnd(i1,j) + H_grnd(i1,j2) + H_grnd(i,j2))
-            Hg_3 = 0.25_prec*(H_grnd(i,j) + H_grnd(i1,j) + H_grnd(i1,j1) + H_grnd(i,j1))
-            Hg_4 = 0.25_prec*(H_grnd(i,j) + H_grnd(i2,j) + H_grnd(i2,j1) + H_grnd(i,j1))
+            Hg_1 = 0.25_prec*(H_grnd(i,j) + H_grnd(ip1,j) + H_grnd(ip1,jp1) + H_grnd(i,jp1))
+            Hg_2 = 0.25_prec*(H_grnd(i,j) + H_grnd(im1,j) + H_grnd(im1,jp1) + H_grnd(i,jp1))
+            Hg_3 = 0.25_prec*(H_grnd(i,j) + H_grnd(im1,j) + H_grnd(im1,jm1) + H_grnd(i,jm1))
+            Hg_4 = 0.25_prec*(H_grnd(i,j) + H_grnd(ip1,j) + H_grnd(ip1,jm1) + H_grnd(i,jm1))
             
             if (max(Hg_1,Hg_2,Hg_3,Hg_4) .ge. 0.0 .and. min(Hg_1,Hg_2,Hg_3,Hg_4) .lt. 0.0) then 
                 ! Point contains grounding line, get grounded area  
@@ -320,16 +322,20 @@ else
         ! acx-nodes 
         do j = 1, ny 
         do i = 1, nx
-            i1 = max(i-1,1) 
-            i2 = min(i+1,nx) 
-            j1 = max(j-1,1) 
-            j2 = min(j+1,ny) 
 
-            ! Calculate Hg at corners (acy-nodes)
-            Hg_1 = 0.5_prec*(H_grnd(i2,j) + H_grnd(i2,j2))
-            Hg_2 = 0.5_prec*(H_grnd(i,j)  + H_grnd(i,j2))
-            Hg_3 = 0.5_prec*(H_grnd(i,j)  + H_grnd(i,j1))
-            Hg_4 = 0.5_prec*(H_grnd(i2,j) + H_grnd(i2,j1))
+            ! Get neighbor indices
+            im1 = max(i-1,1) 
+            ip1 = min(i+1,nx) 
+            jm1 = max(j-1,1) 
+            jp1 = min(j+1,ny) 
+            
+            ! === acy nodes === 
+
+            ! First, calculate Hg at corners (acy-nodes)
+            Hg_1 = 0.5_prec*(H_grnd(ip1,j) + H_grnd(ip1,jp1))
+            Hg_2 = 0.5_prec*(H_grnd(i,j)   + H_grnd(i,jp1))
+            Hg_3 = 0.5_prec*(H_grnd(i,j)   + H_grnd(i,jm1))
+            Hg_4 = 0.5_prec*(H_grnd(ip1,j) + H_grnd(ip1,jm1))
             
             if (max(Hg_1,Hg_2,Hg_3,Hg_4) .ge. 0.0 .and. min(Hg_1,Hg_2,Hg_3,Hg_4) .lt. 0.0) then 
                 ! Point contains grounding line, get grounded area  
@@ -339,7 +345,7 @@ else
             else 
                 ! Purely grounded or floating point 
 
-                Hg_mid = 0.5_prec*(H_grnd(i,j)  + H_grnd(i2,j))
+                Hg_mid = 0.5_prec*(H_grnd(i,j)  + H_grnd(ip1,j))
 
                 if (Hg_mid .lt. 0.0) then 
                     f_grnd_acx(i,j) = 0.0_prec 
@@ -349,22 +355,13 @@ else
 
             end if 
 
-        end do 
-        end do
+            ! === acy nodes === 
 
-        ! acy-nodes 
-        do j = 1, ny 
-        do i = 1, nx
-            i1 = max(i-1,1) 
-            i2 = min(i+1,nx) 
-            j1 = max(j-1,1) 
-            j2 = min(j+1,ny) 
-
-            ! Calculate Hg at corners (acx-nodes)
-            Hg_1 = 0.5_prec*(H_grnd(i,j2)  + H_grnd(i2,j2))
-            Hg_2 = 0.5_prec*(H_grnd(i1,j2) + H_grnd(i,j2))
-            Hg_3 = 0.5_prec*(H_grnd(i1,j)  + H_grnd(i,j))
-            Hg_4 = 0.5_prec*(H_grnd(i2,j)  + H_grnd(i,j))
+            ! First, calculate Hg at corners (acx-nodes)
+            Hg_1 = 0.5_prec*(H_grnd(i,jp1)   + H_grnd(ip1,jp1))
+            Hg_2 = 0.5_prec*(H_grnd(im1,jp1) + H_grnd(i,jp1))
+            Hg_3 = 0.5_prec*(H_grnd(im1,j)   + H_grnd(i,j))
+            Hg_4 = 0.5_prec*(H_grnd(ip1,j)   + H_grnd(i,j))
             
             if (max(Hg_1,Hg_2,Hg_3,Hg_4) .ge. 0.0 .and. min(Hg_1,Hg_2,Hg_3,Hg_4) .lt. 0.0) then 
                 ! Point contains grounding line, get grounded area  
@@ -374,7 +371,7 @@ else
             else 
                 ! Purely grounded or floating point 
                 
-                Hg_mid = 0.5_prec*(H_grnd(i,j)  + H_grnd(i,j2))
+                Hg_mid = 0.5_prec*(H_grnd(i,j)  + H_grnd(i,jp1))
                 
                 if (Hg_mid .lt. 0.0) then 
                     f_grnd_acy(i,j) = 0.0_prec 

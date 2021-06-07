@@ -1,8 +1,7 @@
 module velocity_diva
 
     use yelmo_defs, only  : sp, dp, wp, rho_ice, rho_sw, rho_w, g
-    use yelmo_tools, only : stagger_aa_ab, stagger_aa_ab_ice, stagger_ab_aa_ice, &
-                    calc_vertical_integrated_2D, & 
+    use yelmo_tools, only : stagger_aa_ab, stagger_aa_ab_ice, stagger_ab_aa_ice, & 
                     integrate_trapezoid1D_1D, integrate_trapezoid1D_pt, minmax
 
     use basal_dragging 
@@ -161,7 +160,7 @@ contains
             ! Step 1: Calculate fields needed by ssa solver (visc_eff_int, beta_eff)
 
             ! Calculate the 3D vertical shear fields using viscosity estimated from the previous iteration 
-            call calc_vertical_shear_3D(duxdz,duydz,taub_acx,taub_acy,visc_eff,H_ice,zeta_aa,par%boundaries)
+            call calc_vertical_shear_3D(duxdz,duydz,taub_acx,taub_acy,visc_eff,H_ice,f_ice,zeta_aa,par%boundaries)
 
             ! Calculate 3D effective viscosity
             select case(par%visc_method)
@@ -187,9 +186,8 @@ contains
             
             ! Calculate depth-integrated effective viscosity
             ! Note L19 uses eta_bar*H in the ssa equation. Yelmo uses eta_int=eta_bar*H directly.
-            visc_eff_int = calc_vertical_integrated_2D(visc_eff,zeta_aa) 
-            where(H_ice .gt. 0.0_wp) visc_eff_int = visc_eff_int*H_ice 
-
+            call calc_visc_eff_int(visc_eff_int,visc_eff,H_ice,f_ice,zeta_aa)
+            
             ! Smooth the viscosity at the ice margins if it is too low
             ! to avoid singularities (mainly for EISMINT/dome experiments)
             !call smooth_visc_eff_int_margin(visc_eff_int,H_ice)
@@ -200,7 +198,7 @@ contains
                                 par%H_grnd_lim,par%beta_min,par%boundaries)
 
             ! Calculate F-integeral (F2) on aa-nodes 
-            call calc_F_integral(F2,visc_eff,H_ice,zeta_aa,n=2.0_wp)
+            call calc_F_integral(F2,visc_eff,H_ice,f_ice,zeta_aa,n=2.0_wp)
             
             ! Calculate effective beta 
             call calc_beta_eff(beta_eff,beta,F2,zeta_aa,no_slip=par%no_slip)
@@ -271,7 +269,7 @@ end if
             call calc_basal_stress(taub_acx,taub_acy,beta_eff_acx,beta_eff_acy,ux_bar,uy_bar)
 
             ! Calculate basal velocity from depth-averaged solution and basal stress
-            call calc_vel_basal(ux_b,uy_b,ux_bar,uy_bar,F2,taub_acx,taub_acy,H_ice,par%no_slip,par%boundaries)
+            call calc_vel_basal(ux_b,uy_b,ux_bar,uy_bar,F2,taub_acx,taub_acy,H_ice,f_ice,par%no_slip,par%boundaries)
 
             ! Exit iterations if ssa solution has converged
             if (is_converged) exit 
@@ -423,7 +421,7 @@ end if
 
     end subroutine calc_vel_horizontal_3D
 
-    subroutine calc_vertical_shear_3D(duxdz,duydz,taub_acx,taub_acy,visc_eff,H_ice,zeta_aa,boundaries)
+    subroutine calc_vertical_shear_3D(duxdz,duydz,taub_acx,taub_acy,visc_eff,H_ice,f_ice,zeta_aa,boundaries)
         ! Calculate vertical shear terms (L19, Eq. 36)
 
         implicit none 
@@ -434,6 +432,7 @@ end if
         real(wp), intent(IN)  :: taub_acy(:,:)        ! [Pa],     ac-nodes
         real(wp), intent(IN)  :: visc_eff(:,:,:)      ! [Pa a m], aa-nodes
         real(wp), intent(IN)  :: H_ice(:,:) 
+        real(wp), intent(IN)  :: f_ice(:,:) 
         real(wp), intent(IN)  :: zeta_aa(:)           ! [-]
         character(len=*), intent(IN) :: boundaries 
 
@@ -457,12 +456,12 @@ end if
             jp1 = min(j+1,ny) 
 
             ! Calculate shear strain, acx-nodes
-            visc_eff_ac  = calc_staggered_margin(visc_eff(i,j,k),visc_eff(ip1,j,k),H_ice(i,j),H_ice(ip1,j))
+            visc_eff_ac  = calc_staggered_margin(visc_eff(i,j,k),visc_eff(ip1,j,k),f_ice(i,j),f_ice(ip1,j))
             visc_eff_ac  = max(visc_eff_ac,visc_min)    ! For safety 
             duxdz(i,j,k) = (taub_acx(i,j)/visc_eff_ac) * (1.0-zeta_aa(k))
             
             ! Calculate shear strain, acy-nodes
-            visc_eff_ac  = calc_staggered_margin(visc_eff(i,j,k),visc_eff(i,jp1,k),H_ice(i,j),H_ice(i,jp1))
+            visc_eff_ac  = calc_staggered_margin(visc_eff(i,j,k),visc_eff(i,jp1,k),f_ice(i,j),f_ice(i,jp1))
             visc_eff_ac  = max(visc_eff_ac,visc_min)    ! For safety 
             duydz(i,j,k) = (taub_acy(i,j)/visc_eff_ac) * (1.0-zeta_aa(k))
 
@@ -543,7 +542,7 @@ end if
         real(wp), intent(IN)  :: eps_0                ! [1/a] Regularization constant (minimum strain rate, ~1e-8)
         
         ! Local variables 
-        integer  :: i, j, k, i1, j1
+        integer  :: i, j, k
         integer  :: ip1, jp1, im1, jm1 
         integer  :: nx, ny, nz  
         real(wp) :: inv_4dx, inv_4dy 
@@ -598,10 +597,10 @@ end if
 
                 ! Un-stagger shear terms to central aa-nodes in horizontal
                 !duxdz_ab = 0.5_wp*(duxdz(i,j,k) + duxdz(i,jp1,k))
-                duxdz_ab = calc_staggered_margin(duxdz(i,j,k),duxdz(i,jp1,k),H_ice(i,j),H_ice(i,jp1))
+                duxdz_ab = calc_staggered_margin(duxdz(i,j,k),duxdz(i,jp1,k),f_ice(i,j),f_ice(i,jp1))
             
                 !duydz_ab = 0.5_wp*(duydz(i,j,k) + duydz(ip1,j,k))
-                duydz_ab = calc_staggered_margin(duydz(i,j,k),duydz(ip1,j,k),H_ice(i,j),H_ice(ip1,j))
+                duydz_ab = calc_staggered_margin(duydz(i,j,k),duydz(ip1,j,k),f_ice(i,j),f_ice(ip1,j))
             
                 ! Calculate the total effective strain rate from L19, Eq. 21 
                 eps_sq = dudx_ab**2 + dvdy_ab**2 + dudx_ab*dvdy_ab + 0.25_wp*(dudy+dvdx)**2 &
@@ -630,26 +629,26 @@ end if
             visc_eff(i,j,:) = 0.0 
             wt              = 0.0 
 
-            if (H_ice(i,j) .gt. 0.0_wp) then
+            if (f_ice(i,j) .eq. 1.0) then
                 ! Ice-covered point. 
                 ! Only use contributions from ice-covered neighbors 
 
-                if (count([H_ice(i,j),H_ice(ip1,j),H_ice(i,jp1),H_ice(ip1,jp1)].eq.0) .eq. 0) then  
+                if (count([f_ice(i,j),f_ice(ip1,j),f_ice(i,jp1),f_ice(ip1,jp1)].eq.1.0) .eq. 0) then  
                     visc_eff(i,j,:) = visc_eff(i,j,:) + visc_eff_ab(i,j,:) 
                     wt = wt + 1.0 
                 end if 
                 
-                if (count([H_ice(i,j),H_ice(im1,j),H_ice(im1,jp1),H_ice(i,jp1)].eq.0) .eq. 0) then  
+                if (count([f_ice(i,j),f_ice(im1,j),f_ice(im1,jp1),f_ice(i,jp1)].eq.1.0) .eq. 0) then  
                     visc_eff(i,j,:) = visc_eff(i,j,:) + visc_eff_ab(im1,j,:) 
                     wt = wt + 1.0 
                 end if 
 
-                if (count([H_ice(i,j),H_ice(i,jm1),H_ice(ip1,jm1),H_ice(ip1,j)].eq.0) .eq. 0) then 
+                if (count([f_ice(i,j),f_ice(i,jm1),f_ice(ip1,jm1),f_ice(ip1,j)].eq.1.0) .eq. 0) then 
                     visc_eff(i,j,:) = visc_eff(i,j,:) + visc_eff_ab(i,jm1,:) 
                     wt = wt + 1.0 
                 end if 
                 
-                if (count([H_ice(i,j),H_ice(im1,j),H_ice(im1,jm1),H_ice(i,jm1)].eq.0) .eq. 0) then 
+                if (count([f_ice(i,j),f_ice(im1,j),f_ice(im1,jm1),f_ice(i,jm1)].eq.1.0) .eq. 0) then 
                     visc_eff(i,j,:) = visc_eff(i,j,:) + visc_eff_ab(im1,jm1,:) 
                     wt = wt + 1.0 
                 end if 
@@ -658,22 +657,22 @@ end if
                 ! Ice-free point.
                 ! Only use contributions from ice-free neighbors 
 
-                if (count([H_ice(i,j),H_ice(ip1,j),H_ice(i,jp1),H_ice(ip1,jp1)].gt.0) .eq. 0) then  
+                if (count([f_ice(i,j),f_ice(ip1,j),f_ice(i,jp1),f_ice(ip1,jp1)].lt.1.0) .eq. 0) then  
                     visc_eff(i,j,:) = visc_eff(i,j,:) + visc_eff_ab(i,j,:) 
                     wt = wt + 1.0 
                 end if 
                 
-                if (count([H_ice(i,j),H_ice(im1,j),H_ice(im1,jp1),H_ice(i,jp1)].gt.0) .eq. 0) then  
+                if (count([f_ice(i,j),f_ice(im1,j),f_ice(im1,jp1),f_ice(i,jp1)].lt.1.0) .eq. 0) then  
                     visc_eff(i,j,:) = visc_eff(i,j,:) + visc_eff_ab(im1,j,:) 
                     wt = wt + 1.0 
                 end if 
 
-                if (count([H_ice(i,j),H_ice(i,jm1),H_ice(ip1,jm1),H_ice(ip1,j)].gt.0) .eq. 0) then 
+                if (count([f_ice(i,j),f_ice(i,jm1),f_ice(ip1,jm1),f_ice(ip1,j)].lt.1.0) .eq. 0) then 
                     visc_eff(i,j,:) = visc_eff(i,j,:) + visc_eff_ab(i,jm1,:) 
                     wt = wt + 1.0 
                 end if 
                 
-                if (count([H_ice(i,j),H_ice(im1,j),H_ice(im1,jm1),H_ice(i,jm1)].gt.0) .eq. 0) then 
+                if (count([f_ice(i,j),f_ice(im1,j),f_ice(im1,jm1),f_ice(i,jm1)].lt.1.0) .eq. 0) then 
                     visc_eff(i,j,:) = visc_eff(i,j,:) + visc_eff_ab(im1,jm1,:) 
                     wt = wt + 1.0 
                 end if 
@@ -701,7 +700,6 @@ end if
         end do 
     
 
-
         ! Extrapolate viscosity to bordering ice-free or partially ice-covered cells
         do j=1, ny
         do i=1, nx
@@ -712,26 +710,26 @@ end if
             jm1 = max(j-1,1) 
             jp1 = min(j+1,ny) 
             
-            if ( (H_ice(i,j) .eq. 0.0 .or. f_ice(i,j) .lt. 1.0) .and. &
-                count([H_ice(im1,j),H_ice(ip1,j),H_ice(i,jm1),H_ice(i,jp1)] .gt. 0.0_wp) .gt. 0 ) then 
+            if ( f_ice(i,j) .lt. 1.0 .and. &
+                count([f_ice(im1,j),f_ice(ip1,j),f_ice(i,jm1),f_ice(i,jp1)] .eq. 1.0_wp) .gt. 0 ) then 
                 ! Ice-free (or partially ice-free) with ice-covered neighbors
 
                 visc_eff(i,j,:) = 0.0 
-                wt      = 0.0 
+                wt = 0.0 
 
-                if (H_ice(im1,j).gt.0.0) then 
+                if (f_ice(im1,j).eq.1.0) then 
                     visc_eff(i,j,:) = visc_eff(i,j,:) + visc_eff(im1,j,:) 
                     wt = wt + 1.0 
                 end if 
-                if (H_ice(ip1,j).gt.0.0) then 
+                if (f_ice(ip1,j).eq.1.0) then 
                     visc_eff(i,j,:) = visc_eff(i,j,:) + visc_eff(ip1,j,:) 
                     wt = wt + 1.0 
                 end if 
-                if (H_ice(i,jm1).gt.0.0) then 
+                if (f_ice(i,jm1).eq.1.0) then 
                     visc_eff(i,j,:) = visc_eff(i,j,:) + visc_eff(i,jm1,:) 
                     wt = wt + 1.0 
                 end if 
-                if (H_ice(i,jp1).gt.0.0) then 
+                if (f_ice(i,jp1).eq.1.0) then 
                     visc_eff(i,j,:) = visc_eff(i,j,:) + visc_eff(i,jp1,:) 
                     wt = wt + 1.0 
                 end if 
@@ -745,7 +743,7 @@ end if
 
         end do 
         end do 
-        
+
         ! Treat the corners to avoid extremes
         visc_eff(1,1,:)   = 0.5*(visc_eff(2,1,:)+visc_eff(1,2,:))
         visc_eff(1,ny,:)  = 0.5*(visc_eff(2,ny,:)+visc_eff(1,ny-1,:))
@@ -756,23 +754,106 @@ end if
 
     end subroutine calc_visc_eff_3D
 
-    function calc_staggered_margin(var0,var1,H0,H1) result(var_mid)
+    subroutine calc_visc_eff_int(visc_eff_int,visc_eff,H_ice,f_ice,zeta_aa)
+
+        implicit none 
+
+        real(wp), intent(OUT) :: visc_eff_int(:,:)
+        real(wp), intent(IN)  :: visc_eff(:,:,:)
+        real(wp), intent(IN)  :: H_ice(:,:)
+        real(wp), intent(IN)  :: f_ice(:,:)
+        real(wp), intent(IN)  :: zeta_aa(:)
+
+        ! Local variables 
+        integer :: i, j, nx, ny
+        integer :: im1, ip1, jm1, jp1  
+        real(wp) :: H_now
+        real(wp) :: visc_eff_mean 
+        real(wp) :: wt 
+
+        nx = size(visc_eff_int,1)
+        ny = size(visc_eff_int,2)
+
+
+        do j = 1, ny 
+        do i = 1, nx
+
+            ! Calculate the vertically averaged viscosity for this point
+            visc_eff_mean = integrate_trapezoid1D_pt(visc_eff(i,j,:),zeta_aa) 
+            
+            if (f_ice(i,j) .eq. 1.0) then 
+                visc_eff_int(i,j) = visc_eff_mean*H_ice(i,j) 
+            else
+                visc_eff_int(i,j) = visc_eff_mean 
+            end if 
+
+        end do 
+        end do 
+
+        
+        ! Now extrapolate to ice-free or partially ice-free neighbors
+        do j = 1, ny 
+        do i = 1, nx
+
+            im1 = max(i-1,1) 
+            ip1 = min(i+1,nx) 
+            jm1 = max(j-1,1) 
+            jp1 = min(j+1,ny) 
+
+            if ( f_ice(i,j) .lt. 1.0 .and. &
+                count([f_ice(im1,j),f_ice(ip1,j),f_ice(i,jm1),f_ice(i,jp1)] .eq. 1.0) .gt. 0) then 
+                ! Ice-free or partially ice-free point at ice margin
+
+                visc_eff_int(i,j) = 0.0_wp 
+                wt = 0.0_wp 
+
+                if (f_ice(im1,j).eq.1.0) then 
+                    visc_eff_int(i,j) = visc_eff_int(i,j) + visc_eff_int(im1,j) 
+                    wt = wt + 1.0 
+                end if 
+                if (f_ice(ip1,j).eq.1.0) then 
+                    visc_eff_int(i,j) = visc_eff_int(i,j) + visc_eff_int(ip1,j) 
+                    wt = wt + 1.0 
+                end if 
+                if (f_ice(i,jm1).eq.1.0) then 
+                    visc_eff_int(i,j) = visc_eff_int(i,j) + visc_eff_int(i,jm1) 
+                    wt = wt + 1.0 
+                end if 
+                if (f_ice(i,jp1).eq.1.0) then 
+                    visc_eff_int(i,j) = visc_eff_int(i,j) + visc_eff_int(i,jp1) 
+                    wt = wt + 1.0 
+                end if 
+                
+                if (wt .gt. 0.0) then 
+                    visc_eff_int(i,j) = visc_eff_int(i,j) / wt 
+                end if 
+
+            end if 
+
+        end do 
+        end do 
+
+        return
+
+    end subroutine calc_visc_eff_int
+
+    function calc_staggered_margin(var0,var1,f0,f1) result(var_mid)
         ! Calculate a staggered point but taking upstream point at the margin 
 
         implicit none 
 
         real(wp), intent(IN) :: var0 
         real(wp), intent(IN) :: var1 
-        real(wp), intent(IN) :: H0 
-        real(wp), intent(IN) :: H1
+        real(wp), intent(IN) :: f0 
+        real(wp), intent(IN) :: f1
         real(wp) :: var_mid 
 
-        if (H0 .gt. 0.0_wp .and. H1 .eq. 0.0_wp) then 
+        if (f0 .eq. 1.0_wp .and. f1 .lt. 1.0_wp) then 
             ! At the margin 
 
             var_mid = var0 
 
-        else if (H0 .eq. 0.0_wp .and. H1 .gt. 0.0_wp) then 
+        else if (f0 .lt. 1.0_wp .and. f1 .eq. 1.0_wp) then 
             ! At the margin 
 
             var_mid = var1 
@@ -789,6 +870,10 @@ end if
     end function calc_staggered_margin
 
     subroutine smooth_visc_eff_int_margin(visc_eff_int,H_ice)
+        ! ajr: not currently, used, needs to be updated with f_ice if 
+        ! it will be used in the future...
+        ! (most likely we should delete this routine and solve visc_eff
+        ! properly at the margin) 
 
         implicit none 
 
@@ -864,7 +949,7 @@ end if
 
     end subroutine smooth_visc_eff_int_margin
 
-    subroutine calc_F_integral(F_int,visc,H_ice,zeta_aa,n)
+    subroutine calc_F_integral(F_int,visc,H_ice,f_ice,zeta_aa,n)
         ! Useful integrals, following Arthern et al. (2015) Eq. 7,
         ! and Lipscomb et al. (2019), Eq. 30
         ! F_n = int_zb_zs{ 1/visc * ((s-z)/H)**n dz}
@@ -874,6 +959,7 @@ end if
         real(wp), intent(OUT) :: F_int(:,:) 
         real(wp), intent(IN)  :: visc(:,:,:)
         real(wp), intent(IN)  :: H_ice(:,:)
+        real(wp), intent(IN)  :: f_ice(:,:)
         real(wp), intent(IN)  :: zeta_aa(:)
         real(wp), intent(IN)  :: n  
 
@@ -903,7 +989,7 @@ end if
             ip1 = min(i+1,nx)
             jp1 = min(j+1,ny)
 
-            if (H_ice(i,j) .gt. 0.0_wp) then 
+            if (H_ice(i,j) .gt. 0.0_wp .and. f_ice(i,j) .eq. 1.0) then 
                 ! Viscosity should be nonzero here, perform integration 
 
                 F_int(i,j) = integrate_trapezoid1D_pt((H_ice(i,j)/visc(i,j,:) )*(1.0_wp-zeta_aa)**n,zeta_aa)
@@ -958,7 +1044,7 @@ end if
 
     end subroutine calc_beta_eff
 
-    subroutine calc_vel_basal(ux_b,uy_b,ux_bar,uy_bar,F2,taub_acx,taub_acy,H_ice,no_slip,boundaries)
+    subroutine calc_vel_basal(ux_b,uy_b,ux_bar,uy_bar,F2,taub_acx,taub_acy,H_ice,f_ice,no_slip,boundaries)
         ! Calculate basal sliding following Goldberg (2011), Eq. 34
         ! (or it can also be obtained from L19, Eq. 32 given ub*beta=taub)
 
@@ -972,6 +1058,7 @@ end if
         real(wp), intent(IN)  :: taub_acx(:,:) 
         real(wp), intent(IN)  :: taub_acy(:,:)
         real(wp), intent(IN)  :: H_ice(:,:)
+        real(wp), intent(IN)  :: f_ice(:,:)
         logical,    intent(IN)  :: no_slip
         character(len=*), intent(IN) :: boundaries 
 
@@ -1003,9 +1090,9 @@ end if
                 ! ==== x-direction =====
 
                 ! Stagger the F2 integral to the ac-nodes
-                if (H_ice(i,j) .gt. 0.0 .and. H_ice(ip1,j) .eq. 0.0) then 
+                if (f_ice(i,j) .eq. 1.0 .and. f_ice(ip1,j) .lt. 1.0) then 
                     F2_ac = F2(i,j) 
-                else if (H_ice(i,j) .eq. 0.0 .and. H_ice(ip1,j) .gt. 0.0) then
+                else if (f_ice(i,j) .lt. 1.0 .and. f_ice(ip1,j) .eq. 1.0) then
                     F2_ac = F2(ip1,j)
                 else 
                     F2_ac = 0.5_wp*(F2(i,j) + F2(ip1,j))
@@ -1017,9 +1104,9 @@ end if
                 ! ==== y-direction =====
                 
                 ! Stagger the F2 integral to the ac-nodes
-                if (H_ice(i,j) .gt. 0.0 .and. H_ice(i,jp1) .eq. 0.0) then 
+                if (f_ice(i,j) .eq. 1.0 .and. f_ice(i,jp1) .lt. 1.0) then 
                     F2_ac = F2(i,j) 
-                else if (H_ice(i,j) .eq. 0.0 .and. H_ice(i,jp1) .gt. 0.0) then
+                else if (f_ice(i,j) .lt. 1.0 .and. f_ice(i,jp1) .eq. 1.0) then
                     F2_ac = F2(i,jp1)
                 else 
                     F2_ac = 0.5_wp*(F2(i,j) + F2(i,jp1))

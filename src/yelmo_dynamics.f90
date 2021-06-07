@@ -762,7 +762,7 @@ end if
         type(ybound_class), intent(IN)    :: bnd  
 
         integer :: i, j, nx, ny 
-        integer :: i1, i2, j1, j2 
+        integer :: im1, ip1, jm1, jp1
         real(prec) :: f_scale 
         real(prec), allocatable :: cf_ref(:,:) 
         real(prec), allocatable :: lambda_bed(:,:)  
@@ -806,16 +806,16 @@ end if
                 do j = 1, ny 
                 do i = 1, nx 
 
-                    i1 = max(i-1,1)
-                    i2 = min(i+1,nx)
-                    j1 = max(j-1,1)
-                    j2 = min(j+1,ny)
+                    im1 = max(i-1,1)
+                    ip1 = min(i+1,nx)
+                    jm1 = max(j-1,1)
+                    jp1 = min(j+1,ny)
 
                     if (tpo%now%H_ice(i,j) .gt. 0.0 .and. &
-                        (tpo%now%H_ice(i1,j) .le. 0.0 .or. &
-                         tpo%now%H_ice(i2,j) .le. 0.0 .or. &
-                         tpo%now%H_ice(i,j1) .le. 0.0 .or. &
-                         tpo%now%H_ice(i,j2) .le. 0.0)) then 
+                        (tpo%now%H_ice(im1,j) .le. 0.0 .or. &
+                         tpo%now%H_ice(ip1,j) .le. 0.0 .or. &
+                         tpo%now%H_ice(i,jm1) .le. 0.0 .or. &
+                         tpo%now%H_ice(i,jp1) .le. 0.0)) then 
                         
                         cf_ref(i,j) = dyn%par%cf_stream
 

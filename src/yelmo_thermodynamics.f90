@@ -70,7 +70,7 @@ contains
 
         ! Calculate the pressure-corrected melting point (in Kelvin)
         do k = 1, thrm%par%nz_aa  
-            thrm%now%T_pmp(:,:,k) = calc_T_pmp(tpo%now%H_corr,thrm%par%z%zeta_aa(k),T0,T_pmp_beta)
+            thrm%now%T_pmp(:,:,k) = calc_T_pmp(tpo%now%H_ice,thrm%par%z%zeta_aa(k),T0,T_pmp_beta)
         end do 
 
         ! === Calculate heat source terms (Yelmo vertical grid) === 
@@ -167,7 +167,7 @@ end select
 
                     call calc_ytherm_enthalpy_3D(thrm%now%enth,thrm%now%T_ice,thrm%now%omega,thrm%now%bmb_grnd,thrm%now%Q_ice_b, &
                                 thrm%now%H_cts,thrm%now%T_pmp,thrm%now%cp,thrm%now%kt,thrm%now%advecxy,dyn%now%ux,dyn%now%uy,dyn%now%uz,thrm%now%Q_strn, &
-                                thrm%now%Q_b,thrm%now%Q_rock,bnd%T_srf,tpo%now%H_corr,tpo%now%z_srf,thrm%now%H_w,thrm%now%dHwdt,tpo%now%H_grnd, &
+                                thrm%now%Q_b,thrm%now%Q_rock,bnd%T_srf,tpo%now%H_ice,tpo%now%f_ice,tpo%now%z_srf,thrm%now%H_w,thrm%now%dHwdt,tpo%now%H_grnd, &
                                 tpo%now%f_grnd,tpo%now%dHicedt,tpo%now%dzsrfdt,thrm%par%z%zeta_aa,thrm%par%z%zeta_ac,thrm%par%z%dzeta_a,thrm%par%z%dzeta_b, &
                                 thrm%par%enth_cr,thrm%par%omega_max,dt,thrm%par%dx,thrm%par%method,thrm%par%solver_advec)
                 
@@ -175,7 +175,7 @@ end select
                     ! Use Robin solution for ice temperature 
 
                     call define_temp_robin_3D(thrm%now%enth,thrm%now%T_ice,thrm%now%omega,thrm%now%T_pmp,thrm%now%cp,thrm%now%kt, &
-                                       thrm%now%Q_rock,bnd%T_srf,tpo%now%H_corr,thrm%now%H_w,bnd%smb, &
+                                       thrm%now%Q_rock,bnd%T_srf,tpo%now%H_ice,thrm%now%H_w,bnd%smb, &
                                        thrm%now%bmb_grnd,tpo%now%f_grnd,thrm%par%z%zeta_aa,cold=.FALSE.)
 
                 case("robin-cold")
@@ -183,14 +183,14 @@ end select
                     ! to ensure cold ice at the base
 
                     call define_temp_robin_3D(thrm%now%enth,thrm%now%T_ice,thrm%now%omega,thrm%now%T_pmp,thrm%now%cp,thrm%now%kt, &
-                                       thrm%now%Q_rock,bnd%T_srf,tpo%now%H_corr,thrm%now%H_w,bnd%smb, &
+                                       thrm%now%Q_rock,bnd%T_srf,tpo%now%H_ice,thrm%now%H_w,bnd%smb, &
                                        thrm%now%bmb_grnd,tpo%now%f_grnd,thrm%par%z%zeta_aa,cold=.TRUE.)
 
                 case("linear")
                     ! Use linear solution for ice temperature
 
                     ! Calculate the ice temperature (eventually water content and enthalpy too)
-                    call define_temp_linear_3D(thrm%now%enth,thrm%now%T_ice,thrm%now%omega,thrm%now%cp,tpo%now%H_corr,bnd%T_srf,thrm%par%z%zeta_aa)
+                    call define_temp_linear_3D(thrm%now%enth,thrm%now%T_ice,thrm%now%omega,thrm%now%cp,tpo%now%H_ice,bnd%T_srf,thrm%par%z%zeta_aa)
 
                 case("fixed") 
                     ! Pass - do nothing, use the enth/temp/omega fields as they are defined
@@ -266,7 +266,7 @@ end select
     end subroutine calc_ytherm
 
     subroutine calc_ytherm_enthalpy_3D(enth,T_ice,omega,bmb_grnd,Q_ice_b,H_cts,T_pmp,cp,kt,advecxy,ux,uy,uz,Q_strn,Q_b,Q_rock, &
-                                        T_srf,H_ice,z_srf,H_w,dHwdt,H_grnd,f_grnd,dHdt,dzsdt,zeta_aa,zeta_ac,dzeta_a,dzeta_b, &
+                                        T_srf,H_ice,f_ice,z_srf,H_w,dHwdt,H_grnd,f_grnd,dHdt,dzsdt,zeta_aa,zeta_ac,dzeta_a,dzeta_b, &
                                         cr,omega_max,dt,dx,solver,solver_advec)
         ! This wrapper subroutine breaks the thermodynamics problem into individual columns,
         ! which are solved independently by calling calc_enth_column
@@ -295,6 +295,7 @@ end select
         real(prec), intent(IN)    :: Q_rock(:,:)    ! [mW m-2] Heat flux at bed surface from bedrock (like Q_geo)
         real(prec), intent(IN)    :: T_srf(:,:)     ! [K] Surface temperature 
         real(prec), intent(IN)    :: H_ice(:,:)     ! [m] Ice thickness 
+        real(prec), intent(IN)    :: f_ice(:,:)     ! [--] Area fraction ice cover
         real(prec), intent(IN)    :: z_srf(:,:)     ! [m] Surface elevation 
         real(prec), intent(IN)    :: H_w(:,:)       ! [m] Basal water layer thickness 
         real(prec), intent(IN)    :: dHwdt(:,:)     ! [m/a] Basal water layer thickness change
@@ -412,15 +413,16 @@ end select
         end do 
         !!!$omp end parallel do
 
-        ! Ensure that temperature of ice-free points just outside margin of ice sheet 
-        ! matches the temperature inside the ice sheet (to give good values of ATT to newly advected points)
+        ! Extrapolate thermodynamics to ice-free and partially ice-covered 
+        ! neighbors to the ice margin.
+        ! (Helps with stability to give good values of ATT to newly advected points)
         do j = 2, ny-1
         do i = 2, nx-1 
             
-            if (H_ice(i,j) .eq. 0.0) then 
+            if (H_ice(i,j) .eq. 0.0 .or. f_ice(i,j) .lt. 1.0) then 
 
                 wt_neighb = 0.0 
-                where (H_ice(i-1:i+1,j-1:j+1) .gt. 0) wt_neighb = 1.0 
+                where (H_ice(i-1:i+1,j-1:j+1) .gt. 0 .and. f_ice(i,j) .eq. 1.0) wt_neighb = 1.0 
                 wt_tot = sum(wt_neighb)
 
                 if (wt_tot .gt. 0.0) then 
@@ -440,8 +442,6 @@ end select
     
         end do 
         end do 
-
-
 
         ! Fill in borders 
         call fill_borders_3D(enth,nfill=1)
@@ -538,88 +538,6 @@ end select
 
     end subroutine calc_ytherm_enthalpy_bedrock_3D
     
-    subroutine calc_enth_horizontal_advection_3D(T_ice,ux,uy,H_ice,dx,dt,solver)
-
-        implicit none 
-
-        real(prec),       intent(INOUT) :: T_ice(:,:,:)         ! [K]   Ice temperature/enthalpy, aa-nodes  
-        real(prec),       intent(IN)    :: ux(:,:,:)            ! [m/a] 2D velocity, x-direction (ac-nodes)
-        real(prec),       intent(IN)    :: uy(:,:,:)            ! [m/a] 2D velocity, y-direction (ac-nodes)
-        real(prec),       intent(IN)    :: H_ice(:,:)           ! [m]   Ice thickness 
-        real(prec),       intent(IN)    :: dx                   ! [m]   Horizontal resolution
-        real(prec),       intent(IN)    :: dt                   ! [a]   Timestep 
-        character(len=*), intent(IN)    :: solver               ! Solver to use for the ice thickness advection equation
-
-        ! Local variables 
-        integer :: i, j, k, n, nx, ny, nz 
-        real(prec), allocatable :: T_dot(:,:) 
-        real(prec), allocatable :: dTdt(:,:) 
-
-        nx = size(T_ice,1)
-        ny = size(T_ice,2)
-        nz = size(T_ice,3) 
-
-        allocate(dTdt(nx,ny)) 
-        dTdt = 0.0_prec 
-
-        ! First populate boundary values so that T_ice next to ice sheet is equal to 
-        ! ice sheet. 
-        do j = 2, ny-1 
-        do i = 2, nx-1 
-
-            if (H_ice(i,j) .eq. 0.0 .and. &
-                count([H_ice(i-1,j),H_ice(i+1,j),H_ice(i,j-1),H_ice(i,j+1)] .gt. 0.0) .gt. 0) then 
-                ! Apply to ice-free points with ice-neighbors only 
-
-                T_ice(i,j,:) = 0.0_prec 
-                n = 0 
-
-                if (H_ice(i-1,j) .gt. 0.0) then 
-                    T_ice(i,j,:) = T_ice(i,j,:) + T_ice(i-1,j,:)
-                    n = n+1 
-                end if 
-                
-                if (H_ice(i+1,j) .gt. 0.0) then 
-                    T_ice(i,j,:) = T_ice(i,j,:) + T_ice(i+1,j,:)
-                    n = n+1 
-                end if 
-                
-                if (H_ice(i,j-1) .gt. 0.0) then 
-                    T_ice(i,j,:) = T_ice(i,j,:) + T_ice(i,j-1,:)
-                    n = n+1 
-                end if 
-                
-                if (H_ice(i,j+1) .gt. 0.0) then 
-                    T_ice(i,j,:) = T_ice(i,j,:) + T_ice(i,j+1,:)
-                    n = n+1 
-                end if 
-                
-                if (n .gt. 0) then 
-                    ! Get average 
-                    T_ice(i,j,:) = T_ice(i,j,:) / real(n,prec) 
-                else 
-                    write(*,*) "calc_enth_horizontal_advection_3D:: error: something went wrong!"
-                    stop 
-                end if 
-
-            end if 
-
-        end do 
-        end do 
-
-        ! Resolve horizontal advection layer by layer 
-
-        do k = 2, nz-1    
-            call calc_advec2D(dTdt,T_ice(:,:,k),ux(:,:,k),uy(:,:,k),(T_ice(:,:,k)*0.0_prec),dx,dx,dt,solver)
-            T_ice(:,:,k) = T_ice(:,:,k) + dt*dTdt 
-        end do 
-
-        call fill_borders_3D(T_ice,nfill=2)
-        
-        return 
-
-    end subroutine calc_enth_horizontal_advection_3D
-
     subroutine ytherm_par_load(par,filename,zeta_aa,zeta_ac,nx,ny,dx,init)
 
         type(ytherm_param_class), intent(OUT) :: par

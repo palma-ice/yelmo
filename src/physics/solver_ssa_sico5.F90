@@ -194,7 +194,7 @@ contains
         !-------- Depth-integrated viscosity on the staggered grid
         !                                       [at (i+1/2,j+1/2)] --------
 
-        call stagger_visc_aa_ab(vis_int_sgxy,vis_int_g,H_ice)
+        call stagger_visc_aa_ab(vis_int_sgxy,vis_int_g,H_ice,f_ice)
 
         !-------- Basal drag parameter (for shelfy stream) --------
 
@@ -1293,7 +1293,7 @@ contains
 
         return
         
-    end subroutine set_ssa_masks 
+    end subroutine set_ssa_masks
     
     subroutine update_ssa_mask_convergence(ssa_mask_acx,ssa_mask_acy,err_x,err_y,err_lim)
         ! Update grounded ice ssa_masks, by prescribing vel at points that have
@@ -1512,16 +1512,18 @@ contains
 
 ! === INTERNAL ROUTINES ==== 
 
-    subroutine stagger_visc_aa_ab(visc_ab,visc,H_ice)
+    subroutine stagger_visc_aa_ab(visc_ab,visc,H_ice,f_ice)
 
         implicit none 
 
         real(prec), intent(OUT) :: visc_ab(:,:) 
         real(prec), intent(IN)  :: visc(:,:) 
         real(prec), intent(IN)  :: H_ice(:,:) 
+        real(prec), intent(IN)  :: f_ice(:,:) 
 
         ! Local variables 
         integer :: i, j, k
+        integer :: im1, ip1, jm1, jp1 
         integer :: nx, ny 
 
         nx = size(visc,1)
@@ -1531,32 +1533,38 @@ contains
         visc_ab = 0.0_prec 
 
         ! Stagger viscosity only using contributions from neighbors that have ice  
-        do i = 1, nx-1 
-        do j = 1, ny-1 
+        do i = 1, nx 
+        do j = 1, ny 
 
+            ! Get neighbor indices
+            im1 = max(i-1,1) 
+            ip1 = min(i+1,nx) 
+            jm1 = max(j-1,1) 
+            jp1 = min(j+1,ny) 
+            
             k=0
 
-            if (H_ice(i,j) > 0) then
+            if (H_ice(i,j) .gt. 0 .and. f_ice(i,j) .eq. 1.0) then
                 k = k+1                              ! floating or grounded ice
                 visc_ab(i,j) = visc_ab(i,j) + visc(i,j)
             end if
 
-            if (H_ice(i+1,j) > 0) then
+            if (H_ice(ip1,j) .gt. 0 .and. f_ice(ip1,j) .eq. 1.0) then
                 k = k+1                                  ! floating or grounded ice
-                visc_ab(i,j) = visc_ab(i,j) + visc(i+1,j)
+                visc_ab(i,j) = visc_ab(i,j) + visc(ip1,j)
             end if
 
-            if (H_ice(i,j+1) > 0) then
+            if (H_ice(i,jp1) .gt. 0 .and. f_ice(i,jp1) .eq. 1.0) then
                 k = k+1                                  ! floating or grounded ice
-                visc_ab(i,j) = visc_ab(i,j) + visc(i,j+1)
+                visc_ab(i,j) = visc_ab(i,j) + visc(i,jp1)
             end if
 
-            if (H_ice(i+1,j+1) > 0) then
+            if (H_ice(ip1,jp1) .gt. 0 .and. f_ice(ip1,jp1) .eq. 1.0) then
                 k = k+1                                      ! floating or grounded ice
-                visc_ab(i,j) = visc_ab(i,j) + visc(i+1,j+1)
+                visc_ab(i,j) = visc_ab(i,j) + visc(ip1,jp1)
             end if
 
-            if (k>0) visc_ab(i,j) = visc_ab(i,j)/real(k,prec)
+            if (k .gt. 0) visc_ab(i,j) = visc_ab(i,j)/real(k,prec)
 
         end do
         end do

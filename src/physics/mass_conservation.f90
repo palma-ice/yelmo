@@ -15,7 +15,7 @@ module mass_conservation
 
 contains 
 
-    subroutine calc_ice_thickness_dyn(H_ice,dHdt_n,H_ice_n,H_ice_pred,H_margin,f_ice,f_grnd,ux,uy, &
+    subroutine calc_ice_thickness_dyn(H_ice,dHdt_n,H_ice_n,H_ice_pred,f_ice,f_grnd,ux,uy, &
                                       solver,dx,dt,beta,pc_step)
         ! Interface subroutine to update ice thickness through application
         ! of advection, vertical mass balance terms and calving 
@@ -26,9 +26,8 @@ contains
         real(wp),         intent(INOUT) :: dHdt_n(:,:)          ! [m/a] Advective rate of ice thickness change from previous=>current timestep 
         real(wp),         intent(INOUT) :: H_ice_n(:,:)         ! [m]   Ice thickness from previous=>current timestep 
         real(wp),         intent(INOUT) :: H_ice_pred(:,:)      ! [m]   Ice thickness from predicted timestep 
-        real(wp),         intent(INOUT) :: H_margin(:,:)        ! [m]   Margin ice thickness (assuming full area coverage) 
-        real(wp),         intent(INOUT) :: f_ice(:,:)           ! [--]  Ice area fraction 
-        real(wp),         intent(INOUT) :: f_grnd(:,:)          ! [--]  Fraction of grounded ice 
+        real(wp),         intent(IN)    :: f_ice(:,:)           ! [--]  Ice area fraction 
+        real(wp),         intent(IN)    :: f_grnd(:,:)          ! [--]  Fraction of grounded ice 
         real(wp),         intent(IN)    :: ux(:,:)              ! [m/a] Depth-averaged velocity, x-direction (ac-nodes)
         real(wp),         intent(IN)    :: uy(:,:)              ! [m/a] Depth-averaged velocity, y-direction (ac-nodes)
         character(len=*), intent(IN)    :: solver               ! Solver to use for the ice thickness advection equation
@@ -38,7 +37,8 @@ contains
         character(len=*), intent(IN)    :: pc_step              ! Current predictor-corrector step ('predictor' or 'corrector')
 
         ! Local variables 
-        integer :: i, j, nx, ny  
+        integer :: i, j, nx, ny
+        integer :: im1, ip1, jm1, jp1  
         real(wp), allocatable :: mbal_zero(:,:) 
         real(wp), allocatable :: dHdt_advec(:,:) 
         real(wp), allocatable :: ux_tmp(:,:) 
@@ -60,27 +60,29 @@ contains
         allocate(dHdt_advec(nx,ny))
         dHdt_advec = 0.0_wp 
 
-        ! First, diagnose margin ice and determine f_ice to ensure 
-        ! it matches current ice distribution.
-        call calc_ice_margin(H_ice,H_margin,f_ice,f_grnd)
-
         ! Ensure that no velocity is defined for outer boundaries of margin points
-        ux_tmp = ux 
+        ux_tmp = ux
+        uy_tmp = uy  
         do j = 1, ny 
-        do i = 1, nx-1 
-            if (H_margin(i,j) .gt. 0.0_wp .and. H_ice(i+1,j)    .eq. 0.0_wp) ux_tmp(i,j) = 0.0_wp 
-            if (H_ice(i,j)    .eq. 0.0_wp .and. H_margin(i+1,j) .gt. 0.0_wp) ux_tmp(i,j) = 0.0_wp 
-        end do 
-        end do  
+        do i = 1, nx 
 
-        uy_tmp = uy 
-        do j = 1, ny-1 
-        do i = 1, nx  
-            if (H_margin(i,j) .gt. 0.0_wp .and. H_ice(i,j+1)    .eq. 0.0_wp) uy_tmp(i,j) = 0.0_wp 
-            if (H_ice(i,j)    .eq. 0.0_wp .and. H_margin(i,j+1) .gt. 0.0_wp) uy_tmp(i,j) = 0.0_wp 
+            ! Get neighbor indices 
+            im1 = max(i-1,1)
+            ip1 = min(i+1,nx)
+            jm1 = max(j-1,1)
+            jp1 = min(j+1,ny)
+
+            ! x-direction
+            if (f_ice(i,j) .lt. 1.0_wp .and. f_ice(ip1,j) .eq. 0.0_wp) ux_tmp(i,j) = 0.0_wp 
+            if (f_ice(i,j) .eq. 0.0_wp .and. f_ice(ip1,j) .lt. 1.0_wp) ux_tmp(i,j) = 0.0_wp 
+        
+            ! y-direction
+            if (f_ice(i,j) .lt. 1.0_wp .and. f_ice(i,jp1) .eq. 0.0_wp) uy_tmp(i,j) = 0.0_wp 
+            if (f_ice(i,j) .eq. 0.0_wp .and. f_ice(i,jp1) .lt. 1.0_wp) uy_tmp(i,j) = 0.0_wp 
+        
         end do 
         end do  
-    
+        
 !         ! No margin treatment 
 !         ux_tmp = ux
 !         uy_tmp = uy 
@@ -139,15 +141,11 @@ contains
         ! Also ensure tiny numeric ice thicknesses are removed
         where (H_ice .lt. 1e-5) H_ice = 0.0 
 
-        ! Update margin ice and determine f_ice to ensure 
-        ! it matches current ice distribution.
-        call calc_ice_margin(H_ice,H_margin,f_ice,f_grnd)
-
         return 
 
     end subroutine calc_ice_thickness_dyn
 
-    subroutine calc_ice_thickness_mbal(H_ice,H_margin,f_ice,mb_applied,calv,f_grnd,H_ocn, &
+    subroutine calc_ice_thickness_mbal(H_ice,mb_applied,calv,f_ice,f_grnd,H_ocn, &
                                        ux,uy,mbal,calv_flt,calv_grnd,z_bed_sd,dx,dt)
         ! Interface subroutine to update ice thickness through application
         ! of advection, vertical mass balance terms and calving 
@@ -155,10 +153,9 @@ contains
         implicit none 
 
         real(wp),       intent(INOUT) :: H_ice(:,:)             ! [m]   Ice thickness 
-        real(wp),       intent(INOUT) :: H_margin(:,:)          ! [m]   Margin ice thickness (assuming full area coverage) 
-        real(wp),       intent(INOUT) :: f_ice(:,:)             ! [--]  Ice area fraction 
         real(wp),       intent(INOUT) :: mb_applied(:,:)        ! [m/a] Actual mass balance applied to real ice points
         real(wp),       intent(INOUT) :: calv(:,:)              ! [m/a] Actual calving rate 
+        real(wp),       intent(IN)    :: f_ice(:,:)             ! [--]  Ice area fraction 
         real(wp),       intent(IN)    :: f_grnd(:,:)            ! [--]  Grounded fraction 
         real(wp),       intent(IN)    :: H_ocn(:,:)             ! [m]   Ocean thickness (ie, depth)
         real(wp),       intent(IN)    :: ux(:,:)                ! [m/a] Depth-averaged velocity, x-direction (ac-nodes)
@@ -171,7 +168,8 @@ contains
         real(wp),       intent(IN)    :: dt                     ! [a]   Timestep 
 
         ! Local variables 
-        integer :: i, j, nx, ny 
+        integer :: i, j, nx, ny
+        integer :: im1, ip1, jm1, jp1 
         integer :: n  
         real(wp), allocatable :: ux_tmp(:,:) 
         real(wp), allocatable :: uy_tmp(:,:) 
@@ -184,24 +182,26 @@ contains
         ux_tmp = 0.0_wp 
         uy_tmp = 0.0_wp 
 
-        ! First, diagnose margin ice and determine f_ice to ensure 
-        ! it matches current ice distribution.
-        call calc_ice_margin(H_ice,H_margin,f_ice,f_grnd)
-
         ! Ensure that no velocity is defined for outer boundaries of margin points
-        ux_tmp = ux 
+        ux_tmp = ux
+        uy_tmp = uy  
         do j = 1, ny 
-        do i = 1, nx-1 
-            if (H_margin(i,j) .gt. 0.0_wp .and. H_ice(i+1,j)    .eq. 0.0_wp) ux_tmp(i,j) = 0.0_wp 
-            if (H_ice(i,j)    .eq. 0.0_wp .and. H_margin(i+1,j) .gt. 0.0_wp) ux_tmp(i,j) = 0.0_wp 
-        end do 
-        end do  
+        do i = 1, nx 
 
-        uy_tmp = uy 
-        do j = 1, ny-1 
-        do i = 1, nx  
-            if (H_margin(i,j) .gt. 0.0_wp .and. H_ice(i,j+1)    .eq. 0.0_wp) uy_tmp(i,j) = 0.0_wp 
-            if (H_ice(i,j)    .eq. 0.0_wp .and. H_margin(i,j+1) .gt. 0.0_wp) uy_tmp(i,j) = 0.0_wp 
+            ! Get neighbor indices 
+            im1 = max(i-1,1)
+            ip1 = min(i+1,nx)
+            jm1 = max(j-1,1)
+            jp1 = min(j+1,ny)
+
+            ! x-direction
+            if (f_ice(i,j) .lt. 1.0_wp .and. f_ice(ip1,j) .eq. 0.0_wp) ux_tmp(i,j) = 0.0_wp 
+            if (f_ice(i,j) .eq. 0.0_wp .and. f_ice(ip1,j) .lt. 1.0_wp) ux_tmp(i,j) = 0.0_wp 
+        
+            ! y-direction
+            if (f_ice(i,j) .lt. 1.0_wp .and. f_ice(i,jp1) .eq. 0.0_wp) uy_tmp(i,j) = 0.0_wp 
+            if (f_ice(i,j) .eq. 0.0_wp .and. f_ice(i,jp1) .lt. 1.0_wp) uy_tmp(i,j) = 0.0_wp 
+        
         end do 
         end do  
     
@@ -209,12 +209,10 @@ contains
 !         ux_tmp = ux
 !         uy_tmp = uy 
         
-        
         ! Limit calving contributions to margin points 
         ! (for now assume this was done well externally)
 
         calv = calv + (calv_flt + calv_grnd) 
-
 
         ! Next, handle mass balance in order to be able to diagnose
         ! precisely how much mass was lost/gained 
@@ -260,26 +258,21 @@ contains
         ! Also ensure tiny numeric ice thicknesses are removed
         where (H_ice .lt. 1e-5) H_ice = 0.0 
 
-
-        ! Update margin ice and determine f_ice to ensure 
-        ! it matches current ice distribution.
-        call calc_ice_margin(H_ice,H_margin,f_ice,f_grnd)
-        
         return 
 
     end subroutine calc_ice_thickness_mbal
 
-    subroutine apply_ice_thickness_boundaries(H_ice,mb_resid,ice_allowed,f_ice,f_grnd,uxy_b,boundaries,H_ice_ref, &
+    subroutine apply_ice_thickness_boundaries(H_ice,mb_resid,f_ice,f_grnd,uxy_b,ice_allowed,boundaries,H_ice_ref, &
                                                 H_min_flt,H_min_grnd,dt)
 
         implicit none
 
         real(wp),           intent(INOUT)   :: H_ice(:,:)               ! [m] Ice thickness 
         real(wp),           intent(OUT)     :: mb_resid(:,:)            ! [m/yr] Residual mass balance
-        logical,            intent(IN)      :: ice_allowed(:,:)         ! Mask of where ice is allowed to be greater than zero 
         real(wp),           intent(IN)      :: f_ice(:,:)               ! [--] Fraction of ice cover
         real(wp),           intent(IN)      :: f_grnd(:,:)              ! [--] Grounded ice fraction
         real(wp),           intent(IN)      :: uxy_b(:,:)               ! [m/a] Basal sliding speed, aa-nodes
+        logical,            intent(IN)      :: ice_allowed(:,:)         ! Mask of where ice is allowed to be greater than zero 
         character(len=*),   intent(IN)      :: boundaries               ! Boundary condition choice
         real(wp),           intent(IN)      :: H_ice_ref(:,:)           ! [m]  Reference ice thickness to fill with for boundaries=="fixed"
         real(wp),           intent(IN)      :: H_min_flt                ! [m] Minimum allowed floating ice thickness 
@@ -700,122 +693,6 @@ contains
 
     end subroutine calc_calving_rate_grounded
 
-    subroutine calc_ice_margin(H_ice,H_margin,f_ice,f_grnd)
-        ! Determine the area fraction of a grid cell
-        ! that is ice-covered. Assume that marginal points
-        ! have equal thickness to inland neighbors 
-
-        implicit none 
-
-        real(wp), intent(INOUT) :: H_ice(:,:)             ! [m] Ice thickness on standard grid (aa-nodes)
-        real(wp), intent(INOUT) :: H_margin(:,:)          ! [m] Margin ice thickness for partially filled cells, H_margin*1.0 = H_ref*f_ice
-        real(wp), intent(INOUT) :: f_ice(:,:)             ! [--] Ice covered fraction (aa-nodes)
-        real(wp), intent(IN)    :: f_grnd(:,:)            ! [--] Grounded fraction (aa-nodes)
-
-        ! Local variables 
-        integer :: i, j, nx, ny
-        integer :: im1, ip1, jm1, jp1
-        real(wp) :: H_neighb(4)
-        logical :: mask_neighb(4)
-        real(wp) :: H_ref  
-        real(wp), allocatable :: H_ice_0(:,:) 
-
-        nx = size(H_ice,1)
-        ny = size(H_ice,2)
-
-        allocate(H_ice_0(nx,ny))
-
-        ! Initially set fraction to one everywhere there is ice 
-        ! and zero everywhere there is no ice
-        f_ice = 0.0_wp  
-        where (H_ice .gt. 0.0) f_ice = 1.0_wp
-
-        ! For ice-covered points with ice-free neighbors (ie, at the floating or grounded margin),
-        ! determine the fraction of grid point that should be ice covered. 
-
-        H_ice_0 = H_ice 
-
-        ! Reset H_margin to zero, will be diagnosed below 
-        H_margin = 0.0_wp
-
-        do j = 1, ny
-        do i = 1, nx 
-
-            ! Get neighbor indices
-            im1 = max(i-1,1) 
-            ip1 = min(i+1,nx) 
-            jm1 = max(j-1,1) 
-            jp1 = min(j+1,ny) 
-            
-            ! Store neighbor heights 
-            H_neighb = [H_ice_0(im1,j),H_ice_0(ip1,j),H_ice_0(i,jm1),H_ice_0(i,jp1)]
-            
-            if (H_ice(i,j) .gt. 0.0 .and. minval(H_neighb) .eq. 0.0 .and. f_grnd(i,j) .eq. 0.0) then 
-                ! This point is at the floating ice margin
-!             if (H_ice(i,j) .gt. 0.0 .and. minval(H_neighb) .eq. 0.0) then 
-!                 ! This point is at the ice margin
-
-                ! Store mask of neighbors with ice 
-                mask_neighb = (H_neighb .gt. 0.0)
-
-                if (count(mask_neighb) .gt. 0) then 
-                    ! This point has ice-covered neighbors (generally true)
-
-                    ! Determine height to give to partially filled cell
-                    if (f_grnd(i,j) .eq. 0.0) then 
-                        ! Floating point, set H_ref = minimum of neighbors
-
-                        H_ref = minval(H_neighb,mask=mask_neighb)
-
-                    else 
-                        ! Grounded point, set H_ref < H_mean arbitrarily (0.5 works well)
-                        ! Note: H_min instead of H_mean seems to work better (tested with EISMINT2 EXPA + sliding)
-                        !H_ref = 0.5*sum(H_neighb,mask=mask_neighb) / real(count(mask_neighb),prec)
-                        H_ref = 0.5*minval(H_neighb,mask=mask_neighb)
-                    end if
-                    
-                    ! Determine the cell ice fraction
-                    ! Note: fraction is determined as a ratio of 
-                    ! thicknesses, derived from volume conservation 
-                    ! vol = H_ice*dx*dy = H_ref*area_frac 
-                    ! f_ice = area_frac / (dx*dy)
-                    ! f_ice = H_ice/H_ref 
-                    ! Note: H_ref == 0.0 probably won't happen, but keep if-statement 
-                    ! for safety 
-
-                    if (H_ref .gt. 0.0) then 
-                        f_ice(i,j) = min( H_ice(i,j) / H_ref, 1.0 ) 
-                    else 
-                        f_ice(i,j) = 1.0 
-                    end if 
-
-                else 
-                    ! Island point, assume the cell is not full to 
-                    ! ensure it is assigned as an H_margin point
-
-                    H_ref = H_ice(i,j) 
-                    f_ice(i,j) = 0.1 
-
-                end if 
-
-                ! Now determine if ice should be in buffer (with f_ice < 1.0)
-                if (f_ice(i,j) .gt. 0.0 .and. f_ice(i,j) .lt. 1.0) then 
-                    ! Ice exists, but does not fill the entire cell,
-                    ! define it in H_margin
-
-                    H_margin(i,j) = H_ice(i,j)
-
-                end if 
-
-            end if  
-
-        end do 
-        end do 
-
-        return 
-
-    end subroutine calc_ice_margin
-    
     subroutine relax_ice_thickness(H_ice,f_grnd,H_ref,topo_rel,tau,dt)
         ! This routines allows ice within a given mask to be
         ! relaxed to a reference state with certain timescale tau 

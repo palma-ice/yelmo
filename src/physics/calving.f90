@@ -141,115 +141,185 @@ contains
 
     end subroutine calc_calving_rate_simple
     
-    subroutine calc_calving_rate_flux(calv,H_ice,f_grnd,f_ice,mbal,ux,uy,dx,H_calv,tau)
+    subroutine calc_calving_rate_flux(calv,H_ice,f_ice,f_grnd,mbal,ux,uy,dx,H_calv,tau)
         ! Calculate the calving rate [m/a] based on a simple threshold rule
         ! H_ice < H_calv
 
         implicit none 
 
-        real(wp), intent(OUT) :: calv(:,:)
-        real(wp), intent(IN)  :: H_ice(:,:)                ! [m] Ice thickness 
-        real(wp), intent(IN)  :: f_grnd(:,:)               ! [-] Grounded fraction
-        real(wp), intent(IN)  :: f_ice(:,:)
-        real(wp), intent(IN)  :: mbal(:,:)                 ! [m/a] Net mass balance 
-        real(wp), intent(IN)  :: ux(:,:)                   ! [m/a] velocity, x-direction (ac-nodes)
-        real(wp), intent(IN)  :: uy(:,:)                   ! [m/a] velocity, y-direction (ac-nodes)
-        real(wp), intent(IN)  :: dx 
-        real(wp), intent(IN)  :: H_calv                    ! [m] Threshold for calving
-        real(wp), intent(IN)  :: tau                       ! [a] Calving timescale, ~ 1yr
+        real(wp), intent(OUT) :: calv(:,:)                  ! [m/yr] Calving rate scaled to horizontal grid size
+        real(wp), intent(IN)  :: H_ice(:,:)                 ! [m] Ice thickness 
+        real(wp), intent(IN)  :: f_ice(:,:)                 ! [--] Ice area fraction
+        real(wp), intent(IN)  :: f_grnd(:,:)                ! [-] Grounded fraction
+        real(wp), intent(IN)  :: mbal(:,:)                  ! [m/yr] Net mass balance 
+        real(wp), intent(IN)  :: ux(:,:)                    ! [m/yr] velocity, x-direction (ac-nodes)
+        real(wp), intent(IN)  :: uy(:,:)                    ! [m/yr] velocity, y-direction (ac-nodes)
+        real(wp), intent(IN)  :: dx                         ! [m] Grid resolution
+        real(wp), intent(IN)  :: H_calv                     ! [m] Threshold for calving
+        real(wp), intent(IN)  :: tau                        ! [yr] Calving timescale, ~ 1yr
 
         ! Local variables 
-        integer :: i, j, nx, ny, im1, jm1
-        real(wp) :: eps_xx, eps_yy  
-        logical :: test_mij, test_pij, test_imj, test_ipj
+        integer :: i, j, nx, ny
+        integer :: im1, ip1, jm1, jp1
+        real(wp) :: dxx, dyy  
+        logical :: flux_mij, flux_pij, flux_imj, flux_ipj
         logical :: positive_mb 
-        real(wp), allocatable :: dHdt(:,:), H_diff(:,:)  
-        real(wp), allocatable :: H_mrgn(:,:) 
-        real(wp) :: dux, duy 
-        
+        real(wp), allocatable :: dHdt(:,:)
+        real(wp), allocatable :: H_diff(:,:)  
+        real(wp), allocatable :: ddiv(:,:)  
+        real(wp) :: H_ref
+        real(wp) :: wt 
+
         nx = size(H_ice,1)
         ny = size(H_ice,2)
 
         allocate(dHdt(nx,ny))
         allocate(H_diff(nx,ny))
-        allocate(H_mrgn(nx,ny))
+        allocate(ddiv(nx,ny)) 
 
-        ! Ice thickness above threshold
-        where(f_ice .gt. 0.0_prec) 
-            H_mrgn = H_ice/f_ice
-        elsewhere 
-            H_mrgn = H_ice 
-        end where 
-
-        ! Ice thickness above threshold
-        H_diff = H_mrgn - H_calv
-
-        ! Diagnosed lagrangian rate of change
-        dHdt = 0.0 
-
+        ! Calculate horizontal divergence over the grid
         do j = 1, ny
         do i = 1, nx
             
-            im1 = max(1,i-1)
-            jm1 = max(1,j-1)
-
-            dux = ux(i,j) - ux(im1,j)
-            duy = uy(i,j) - uy(i,jm1)
-
-            ! Avoid underflow errors 
-            if (abs(dux) .lt. 1e-8) dux = 0.0_prec
-            if (abs(duy) .lt. 1e-8) duy = 0.0_prec
+            ! Get neighbor indices
+            im1 = max(i-1,1)
+            jm1 = max(j-1,1)
             
-            ! Calculate strain rate locally (aa-node)
-            eps_xx = dux/dx
-            eps_yy = duy/dx
+            if (f_ice(i,j) .eq. 1.0) then 
 
-            ! Calculate thickness change via conservation
-            dHdt(i,j) = mbal(i,j) - H_mrgn(i,j)*(eps_xx+eps_yy)
+                ! Calculate horizontal divergence 
+                ddiv(i,j) = (ux(i,j)-ux(im1,j))/dx &
+                          + (uy(i,j)-uy(i,jm1))/dx
+
+                ! Avoid underflow errors 
+                if (abs(ddiv(i,j)) .lt. 1e-8) ddiv(i,j) = 0.0_prec
+            
+            else 
+
+                ddiv(i,j) = 0.0_wp
+
+            end if 
 
         end do 
         end do
         
+        ! Extrapolate to partially ice-covered points, then 
+        ! calculate lagrangian rate of change and thickness relative to threshold
 
+        dHdt   = 0.0 
+        H_diff = 0.0 
+
+        do j = 1, ny
+        do i = 1, nx
+            
+            ! Get neighbor indices
+            im1 = max(i-1,1)
+            ip1 = min(i+1,nx)
+            jm1 = max(j-1,1)
+            jp1 = min(j+1,ny)
+
+            if ( f_ice(i,j) .lt. 1.0 .and. &
+                count([f_ice(im1,j),f_ice(ip1,j),f_ice(i,jm1),f_ice(i,jp1)] .eq. 1.0_wp) .gt. 0 ) then 
+                ! Ice-free (or partially ice-free) with ice-covered neighbors
+
+                ddiv(i,j) = 0.0
+                wt        = 0.0 
+
+                if (f_ice(im1,j) .eq. 1.0) then 
+                    ddiv(i,j) = ddiv(i,j) + ddiv(im1,j)
+                    wt = wt + 1.0 
+                end if 
+                if (f_ice(ip1,j) .eq. 1.0) then 
+                    ddiv(i,j) = ddiv(i,j) + ddiv(ip1,j)
+                    wt = wt + 1.0 
+                end if
+                if (f_ice(i,jm1) .eq. 1.0) then 
+                    ddiv(i,j) = ddiv(i,j) + ddiv(i,jm1)
+                    wt = wt + 1.0 
+                end if
+                if (f_ice(i,jp1) .eq. 1.0) then 
+                    ddiv(i,j) = ddiv(i,j) + ddiv(i,jp1)
+                    wt = wt + 1.0 
+                end if
+
+                if (wt .gt. 0.0) then 
+                    ddiv(i,j) = ddiv(i,j) / wt
+                end if 
+
+            end if 
+
+            ! Margin points 
+            if (f_ice(i,j) .gt. 0.0) then 
+                H_ref = H_ice(i,j) / f_ice(i,j) 
+            else 
+                H_ref = H_ice(i,j)  ! == 0.0
+            end if 
+
+            ! Calculate thickness change via conservation
+            dHdt(i,j) = mbal(i,j) - H_ref*ddiv(i,j)
+
+            ! Also calculate ice thickness relative to the calving threshold 
+            H_diff(i,j) = H_ref - H_calv 
+
+        end do 
+        end do
+        
         ! Initially set calving rate to zero 
         calv = 0.0 
 
-        do j = 2, ny-1
-        do i = 2, nx-1
+        do j = 1, ny
+        do i = 1, nx
 
+            ! Get neighbor indices 
+            im1 = max(i-1,1)
+            ip1 = min(i+1,nx)
+            jm1 = max(j-1,1)
+            jp1 = min(j+1,ny)
+            
             if ( (f_grnd(i,j) .eq. 0.0 .and. H_ice(i,j) .gt. 0.0 .and. H_diff(i,j).lt.0.0) .and. &
-                   ( (f_grnd(i-1,j) .eq. 0.0 .and. H_ice(i-1,j).eq.0.0) .or. &
-                     (f_grnd(i+1,j) .eq. 0.0 .and. H_ice(i+1,j).eq.0.0) .or. &
-                     (f_grnd(i,j-1) .eq. 0.0 .and. H_ice(i,j-1).eq.0.0) .or. &
-                     (f_grnd(i,j+1) .eq. 0.0 .and. H_ice(i,j+1).eq.0.0) ) ) then 
+                   ( (f_grnd(im1,j) .eq. 0.0 .and. f_ice(im1,j).eq.0.0) .or. &
+                     (f_grnd(ip1,j) .eq. 0.0 .and. f_ice(ip1,j).eq.0.0) .or. &
+                     (f_grnd(i,jm1) .eq. 0.0 .and. f_ice(i,jm1).eq.0.0) .or. &
+                     (f_grnd(i,jp1) .eq. 0.0 .and. f_ice(i,jp1).eq.0.0) ) ) then 
                 ! Ice-shelf floating margin: floating ice point with open ocean neighbor 
-                 
-                ! Check if current point is at the floating ice front,
-                ! and has thickness less than threshold, or if
-                ! ice below H_calv limit, accounting for mass flux from inland
+                ! that is also below the calving threshold thickness 
+
+                ! Check if current point would still be below threshold when 
+                ! accounting for mass flux from inland (ie, inland ice 
+                ! thickness is larger than threshold and flow is going into
+                ! the margin point, and inland point has enough thickness to 
+                ! maintain itself above the threshold, even accounting for ice 
+                ! advected out of it). Or, inland point is grounded with positive mass balance
 
                 positive_mb = (mbal(i,j).gt.0.0)
 
-                test_mij = ( ((H_diff(i-1,j).gt.0.0).and.(ux(i-1,j).gt.0.0)  &  ! neighbor (i-1,j) total > H_calv
-                    .and.  (dHdt(i-1,j).gt.(-H_diff(i-1,j)*abs(ux(i-1,j)/dx)))) & 
-                    .or.(f_grnd(i-1,j).gt.0.0.and.positive_mb ))
+                flux_mij = ( ((H_diff(im1,j).gt.0.0).and.(ux(im1,j).gt.0.0)  &  ! neighbor (im1,j) total > H_calv
+                    .and.  (dHdt(im1,j).gt.(-H_diff(im1,j)*abs(ux(im1,j)/dx)))) & 
+                    .or.(f_grnd(im1,j).gt.0.0.and.positive_mb ))
 
-                test_pij = ( ((H_diff(i+1,j).gt.0.0).and.(ux(i,j).lt.0.0) & ! neighbor (i+1,j) total > H_calv
-                    .and.(dHdt(i+1,j).gt.(-H_diff(i+1,j)*abs(ux(i,j)/dx)))) &
-                    .or.(f_grnd(i+1,j).gt.0.0.and.positive_mb ))
+                flux_pij = ( ((H_diff(ip1,j).gt.0.0).and.(ux(i,j).lt.0.0) & ! neighbor (ip1,j) total > H_calv
+                    .and.(dHdt(ip1,j).gt.(-H_diff(ip1,j)*abs(ux(i,j)/dx)))) &
+                    .or.(f_grnd(ip1,j).gt.0.0.and.positive_mb ))
 
-                test_imj = ( ((H_diff(i,j-1).gt.0.0).and.(uy(i,j-1).gt.0.0)  &  ! neighbor (i,j-1) total > H_calv
-                    .and.(dHdt(i,j-1).gt.(-H_diff(i,j-1)*abs(uy(i,j-1)/dx))))&
-                    .or.(f_grnd(i,j-1).gt.0.0.and.positive_mb ))
+                flux_imj = ( ((H_diff(i,jm1).gt.0.0).and.(uy(i,jm1).gt.0.0)  &  ! neighbor (i,jm1) total > H_calv
+                    .and.(dHdt(i,jm1).gt.(-H_diff(i,jm1)*abs(uy(i,jm1)/dx))))&
+                    .or.(f_grnd(i,jm1).gt.0.0.and.positive_mb ))
 
-                test_ipj = ( ((H_diff(i,j+1).gt.0.0).and.(uy(i,j).lt.0.0) & ! neighbor (i,j+1) total > H_calv
-                    .and.(dHdt(i,j+1).gt.(-H_diff(i,j+1)*abs(uy(i,j)/dx))))&
-                    .or.(f_grnd(i,j+1).gt.0.0.and.positive_mb ))
+                flux_ipj = ( ((H_diff(i,jp1).gt.0.0).and.(uy(i,j).lt.0.0) & ! neighbor (i,jp1) total > H_calv
+                    .and.(dHdt(i,jp1).gt.(-H_diff(i,jp1)*abs(uy(i,j)/dx))))&
+                    .or.(f_grnd(i,jp1).gt.0.0.and.positive_mb ))
 
-                if ((.not.(test_mij.or.test_pij.or.test_imj.or.test_ipj))) then
-                    ! This point does not pass the test, determine calving rate 
+                if ( .not. (flux_mij.or.flux_pij.or.flux_imj.or.flux_ipj) ) then
+                    ! This point is not sustained from neighbors, determine calving rate 
+                    ! f_ice ensures rate is adjusted to size of grid cell 
 
-                    calv(i,j) = f_ice(i,j) * max(H_calv - H_mrgn(i,j),0.0) / tau
+                    if (f_ice(i,j) .gt. 0.0) then 
+                        H_ref = H_ice(i,j) / f_ice(i,j) 
+                    else 
+                        H_ref = H_ice(i,j)  ! == 0.0
+                    end if 
+
+                    calv(i,j) = f_ice(i,j) * max(H_calv - H_ref,0.0) / tau
 
                 end if  
 
@@ -262,7 +332,7 @@ contains
 
     end subroutine calc_calving_rate_flux
     
-    subroutine calc_calving_rate_vonmises_l19(calv,H_ice,f_grnd,f_ice,teig1,teig2,ATT_bar,visc_bar,dx,dy,kt,w2,n_glen)
+    subroutine calc_calving_rate_vonmises_l19(calv,H_ice,f_ice,f_grnd,teig1,teig2,ATT_bar,visc_bar,dx,dy,kt,w2,n_glen)
         ! Calculate the 'horizontal' calving rate [m/yr] based on the 
         ! von Mises stress approach, as outlined by Lipscomb et al. (2019)
         ! Eqs. 73-75.
@@ -272,8 +342,8 @@ contains
 
         real(wp), intent(OUT) :: calv(:,:)
         real(wp), intent(IN)  :: H_ice(:,:)
-        real(wp), intent(IN)  :: f_grnd(:,:)  
         real(wp), intent(IN)  :: f_ice(:,:)
+        real(wp), intent(IN)  :: f_grnd(:,:)  
         real(wp), intent(IN)  :: teig1(:,:)
         real(wp), intent(IN)  :: teig2(:,:)
         real(wp), intent(IN)  :: ATT_bar(:,:)
@@ -327,25 +397,31 @@ contains
 
                 tau_eff = calc_tau_eff(teig1(i,j),teig2(i,j),w2)
 
+
+if (.FALSE.) then 
+    ! ajr: this extrapolation should not be needed since strain rates 
+    ! are extrapolated to cells neighboring ice margin 
+
                 if (tau_eff .eq. 0.0) then 
+                    ! For safety, use tau of upstream neighbors in this case
 
                     tau_eff = 0.0 
                     wt      = 0.0 
 
-                    if (f_grnd(im1,j) .eq. 0.0 .and. H_ice(im1,j).eq.0.0) then 
+                    if (f_grnd(im1,j) .eq. 0.0 .and. f_ice(im1,j).eq.1.0) then 
                         tau_eff = tau_eff + calc_tau_eff(teig1(im1,j),teig2(im1,j),w2)
                         wt = wt + 1.0 
                     end if 
-                    if (f_grnd(ip1,j) .eq. 0.0 .and. H_ice(ip1,j).eq.0.0) then 
+                    if (f_grnd(ip1,j) .eq. 0.0 .and. f_ice(ip1,j).eq.1.0) then 
                         tau_eff = tau_eff + calc_tau_eff(teig1(ip1,j),teig2(ip1,j),w2)
                         wt = wt + 1.0 
                     end if 
-                    if (f_grnd(jm1,j) .eq. 0.0 .and. H_ice(jm1,j).eq.0.0) then 
-                        tau_eff = tau_eff + calc_tau_eff(teig1(jm1,j),teig2(jm1,j),w2)
+                    if (f_grnd(i,jm1) .eq. 0.0 .and. f_ice(i,jm1).eq.1.0) then 
+                        tau_eff = tau_eff + calc_tau_eff(teig1(i,jm1),teig2(i,jm1),w2)
                         wt = wt + 1.0 
                     end if 
-                    if (f_grnd(jp1,j) .eq. 0.0 .and. H_ice(jp1,j).eq.0.0) then 
-                        tau_eff = tau_eff + calc_tau_eff(teig1(jp1,j),teig2(jp1,j),w2)
+                    if (f_grnd(i,jp1) .eq. 0.0 .and. f_ice(i,jp1).eq.1.0) then 
+                        tau_eff = tau_eff + calc_tau_eff(teig1(i,jp1),teig2(i,jp1),w2)
                         wt = wt + 1.0 
                     end if 
                     
@@ -354,12 +430,20 @@ contains
 
                     end if 
 
+                    write(*,*) "tau_eff: ", tau_eff, i, j  
+
                 end if
+
+end if 
+
 
 if (.FALSE.) then
                 if (tau_eff .eq. 0.0) then 
                     ! tau_eff is still zero! Likely, this is a newly advected
                     ! point and the neighbors do not have velocity defined.
+
+                    ! Or, eigenvalues are negative...
+                    ! ajr: this section should probably just be deleted. 
 
                     ! Impose the free-spreading rate (Pollard et al., 2015, EPSL, Eq. B2.b)
                     ! ddiv = A*(rho*g*h/4)^n = dxx + dyy
@@ -385,8 +469,7 @@ if (.FALSE.) then
                     ! Calculate effective stress
                     tau_eff = calc_tau_eff(teig1_now,teig2_now,w2)
 
-                end if 
-end if
+                end if
 
                 ! ajr: tau_eff is still zero in some cases, ie, in the case above,
                 ! because when txx=tyy and txy=0, then there are no real eigenvalues
@@ -396,6 +479,8 @@ end if
                 !     write(*,"(a,2i4,5g14.3)") "tau_eff still zero!",  &
                 !             i, j, H_ice(i,j), ddiv, teig1_now, teig2_now, tau_eff 
                 ! end if 
+                 
+end if
                 
                 ! Calculate lateral calving rate 
                 calv_ref = kt*tau_eff 

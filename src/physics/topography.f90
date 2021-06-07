@@ -6,6 +6,7 @@ module topography
 
     private  
 
+    public :: calc_ice_fraction
     public :: calc_z_srf
     public :: calc_z_srf_max
     public :: calc_z_srf_subgrid_area
@@ -31,6 +32,122 @@ contains
     !
     ! ============================================================
 
+    subroutine calc_ice_fraction(f_ice,H_margin,H_ice,f_grnd)
+        ! Determine the area fraction of a grid cell
+        ! that is ice-covered. Assume that marginal points
+        ! have equal thickness to inland neighbors 
+
+        implicit none 
+
+        real(wp), intent(INOUT) :: f_ice(:,:)             ! [--] Ice covered fraction (aa-nodes)
+        real(wp), intent(INOUT) :: H_margin(:,:)          ! [m] Margin ice thickness for partially filled cells, H_margin*1.0 = H_ref*f_ice
+        real(wp), intent(IN)    :: H_ice(:,:)             ! [m] Ice thickness on standard grid (aa-nodes)
+        real(wp), intent(IN)    :: f_grnd(:,:)            ! [--] Grounded fraction (aa-nodes)
+
+        ! Local variables 
+        integer :: i, j, nx, ny
+        integer :: im1, ip1, jm1, jp1
+        real(wp) :: H_neighb(4)
+        logical :: mask_neighb(4)
+        real(wp) :: H_ref  
+        real(wp), allocatable :: H_ice_0(:,:) 
+
+        nx = size(H_ice,1)
+        ny = size(H_ice,2)
+
+        allocate(H_ice_0(nx,ny))
+
+        ! Initially set fraction to one everywhere there is ice 
+        ! and zero everywhere there is no ice
+        f_ice = 0.0_wp  
+        where (H_ice .gt. 0.0) f_ice = 1.0_wp
+
+        ! For ice-covered points with ice-free neighbors (ie, at the floating or grounded margin),
+        ! determine the fraction of grid point that should be ice covered. 
+
+        H_ice_0 = H_ice 
+
+        ! Reset H_margin to zero, will be diagnosed below 
+        H_margin = 0.0_wp
+
+        do j = 1, ny
+        do i = 1, nx 
+
+            ! Get neighbor indices
+            im1 = max(i-1,1) 
+            ip1 = min(i+1,nx) 
+            jm1 = max(j-1,1) 
+            jp1 = min(j+1,ny) 
+            
+            ! Store neighbor heights 
+            H_neighb = [H_ice_0(im1,j),H_ice_0(ip1,j),H_ice_0(i,jm1),H_ice_0(i,jp1)]
+            
+            if (H_ice(i,j) .gt. 0.0 .and. minval(H_neighb) .eq. 0.0 .and. f_grnd(i,j) .eq. 0.0) then 
+                ! This point is at the floating ice margin
+!             if (H_ice(i,j) .gt. 0.0 .and. minval(H_neighb) .eq. 0.0) then 
+!                 ! This point is at the ice margin
+
+                ! Store mask of neighbors with ice 
+                mask_neighb = (H_neighb .gt. 0.0)
+
+                if (count(mask_neighb) .gt. 0) then 
+                    ! This point has ice-covered neighbors (generally true)
+
+                    ! Determine height to give to partially filled cell
+                    if (f_grnd(i,j) .eq. 0.0) then 
+                        ! Floating point, set H_ref = minimum of neighbors
+
+                        H_ref = minval(H_neighb,mask=mask_neighb)
+
+                    else 
+                        ! Grounded point, set H_ref < H_mean arbitrarily (0.5 works well)
+                        ! Note: H_min instead of H_mean seems to work better (tested with EISMINT2 EXPA + sliding)
+                        !H_ref = 0.5*sum(H_neighb,mask=mask_neighb) / real(count(mask_neighb),prec)
+                        H_ref = 0.5*minval(H_neighb,mask=mask_neighb)
+                    end if
+                    
+                    ! Determine the cell ice fraction
+                    ! Note: fraction is determined as a ratio of 
+                    ! thicknesses, derived from volume conservation 
+                    ! vol = H_ice*dx*dy = H_ref*area_frac 
+                    ! f_ice = area_frac / (dx*dy)
+                    ! f_ice = H_ice/H_ref 
+                    ! Note: H_ref == 0.0 probably won't happen, but keep if-statement 
+                    ! for safety 
+
+                    if (H_ref .gt. 0.0) then 
+                        f_ice(i,j) = min( H_ice(i,j) / H_ref, 1.0 ) 
+                    else 
+                        f_ice(i,j) = 1.0 
+                    end if 
+
+                else 
+                    ! Island point, assume the cell is not full to 
+                    ! ensure it is assigned as an H_margin point
+
+                    H_ref = H_ice(i,j) 
+                    f_ice(i,j) = 0.1 
+
+                end if 
+
+                ! Now determine if ice should be in buffer (with f_ice < 1.0)
+                if (f_ice(i,j) .gt. 0.0 .and. f_ice(i,j) .lt. 1.0) then 
+                    ! Ice exists, but does not fill the entire cell,
+                    ! define it in H_margin
+
+                    H_margin(i,j) = H_ice(i,j)
+
+                end if 
+
+            end if  
+
+        end do 
+        end do 
+
+        return 
+
+    end subroutine calc_ice_fraction
+    
     elemental subroutine calc_z_srf(z_srf,H_ice,H_grnd,z_bed,z_sl)
         ! Calculate surface elevation
 

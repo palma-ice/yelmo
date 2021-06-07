@@ -118,9 +118,12 @@ contains
 
             ! Calculate the ice thickness conservation from dynamics only -----
             call calc_ice_thickness_dyn(tpo%now%H_ice,tpo%now%dHdt_n,tpo%now%H_ice_n,tpo%now%H_ice_pred, &
-                                        tpo%now%H_margin,tpo%now%f_ice,tpo%now%f_grnd,dyn%now%ux_bar,dyn%now%uy_bar, &
+                                        tpo%now%f_ice,tpo%now%f_grnd,dyn%now%ux_bar,dyn%now%uy_bar, &
                                         solver=tpo%par%solver,dx=tpo%par%dx,dt=dt,beta=tpo%par%dt_beta,pc_step=tpo%par%pc_step)
 
+            ! Update ice fraction mask 
+            call calc_ice_fraction(tpo%now%f_ice,tpo%now%H_margin,tpo%now%H_ice,tpo%now%f_grnd)
+            
             ! If desired, relax solution to reference state
             ! ajr: why is this here? Shouldn't it go after all dyn+calv+mb steps applied?
             ! Test two options to see.
@@ -147,11 +150,14 @@ contains
             
 
             ! Now, apply mass-conservation step 2: mass balance 
-            call calc_ice_thickness_mbal(tpo%now%H_ice,tpo%now%H_margin,tpo%now%f_ice,tpo%now%mb_applied,tpo%now%calv, &
+
+            call calc_ice_thickness_mbal(tpo%now%H_ice,tpo%now%mb_applied,tpo%now%calv,tpo%now%f_ice, &
                                          tpo%now%f_grnd,bnd%z_sl-bnd%z_bed,dyn%now%ux_bar,dyn%now%uy_bar, &
                                          mbal,tpo%now%calv_flt*0.0_wp,tpo%now%calv_grnd*0.0_wp,bnd%z_bed_sd,tpo%par%dx,dt)
 
-
+            ! Update ice fraction mask 
+            call calc_ice_fraction(tpo%now%f_ice,tpo%now%H_margin,tpo%now%H_ice,tpo%now%f_grnd)
+            
             ! Next, diagnose CALVING
 
             ! Diagnose potential floating-ice calving rate [m/a]
@@ -168,15 +174,15 @@ contains
                                                     tpo%par%calv_H_lim,tpo%par%calv_tau)
                     
                 case("flux") 
-                    ! Use threshold+flux method from GRISLI 
+                    ! Use threshold+flux method from Peyaud et al. (2007), ie, GRISLI 
 
-                    call calc_calving_rate_flux(tpo%now%calv_flt,tpo%now%H_ice,tpo%now%f_grnd,tpo%now%f_ice,mbal,dyn%now%ux_bar, &
+                    call calc_calving_rate_flux(tpo%now%calv_flt,tpo%now%H_ice,tpo%now%f_ice,tpo%now%f_grnd,mbal,dyn%now%ux_bar, &
                                                 dyn%now%uy_bar,tpo%par%dx,tpo%par%calv_H_lim,tpo%par%calv_tau)
                 
                 case("vm-l19")
                     ! Use von Mises calving as defined by Lipscomb et al. (2019)
 
-                    call calc_calving_rate_vonmises_l19(tpo%now%calv_flt,tpo%now%H_ice,tpo%now%f_grnd,tpo%now%f_ice, &
+                    call calc_calving_rate_vonmises_l19(tpo%now%calv_flt,tpo%now%H_ice,tpo%now%f_ice,tpo%now%f_grnd, &
                                                         mat%now%strs2D%teig1,mat%now%strs2D%teig2,mat%now%ATT_bar, &
                                                         mat%now%visc_bar,tpo%par%dx,tpo%par%dx,tpo%par%kt,tpo%par%w2,mat%par%n_glen)
 
@@ -207,17 +213,21 @@ contains
             tpo%now%calv_grnd = 0.0
 
             ! Now, apply mass-conservation step 3: calving
-            call calc_ice_thickness_mbal(tpo%now%H_ice,tpo%now%H_margin,tpo%now%f_ice,tpo%now%mb_applied,tpo%now%calv, &
+            call calc_ice_thickness_mbal(tpo%now%H_ice,tpo%now%mb_applied,tpo%now%calv,tpo%now%f_ice, &
                                          tpo%now%f_grnd,bnd%z_sl-bnd%z_bed,dyn%now%ux_bar,dyn%now%uy_bar, &
                                          mbal,tpo%now%calv_flt,tpo%now%calv_grnd,bnd%z_bed_sd,tpo%par%dx,dt)
 
-
+            ! Update ice fraction mask 
+            call calc_ice_fraction(tpo%now%f_ice,tpo%now%H_margin,tpo%now%H_ice,tpo%now%f_grnd)
+            
             ! Finally, apply all additional (generally artificial) ice thickness adjustments 
             ! and store changes in residual mass balance field. 
-            call apply_ice_thickness_boundaries(tpo%now%H_ice,tpo%now%mb_resid,bnd%ice_allowed,tpo%now%f_ice, &
-                                                tpo%now%f_grnd,dyn%now%uxy_b,tpo%par%boundaries,bnd%H_ice_ref, &
+            call apply_ice_thickness_boundaries(tpo%now%H_ice,tpo%now%mb_resid,tpo%now%f_ice,tpo%now%f_grnd, &
+                                                dyn%now%uxy_b,bnd%ice_allowed,tpo%par%boundaries,bnd%H_ice_ref, &
                                                 tpo%par%H_min_flt,tpo%par%H_min_grnd,dt)
 
+            ! Update ice fraction mask 
+            call calc_ice_fraction(tpo%now%f_ice,tpo%now%H_margin,tpo%now%H_ice,tpo%now%f_grnd)
             
             ! Save the rate of change of ice thickness in output variable [m/a]
             tpo%now%dHicedt = (tpo%now%H_ice - tpo%now%H_ice_n) / dt 

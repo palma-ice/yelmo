@@ -576,6 +576,9 @@ end if
         ! Calculate squared minimum strain rate 
         eps_0_sq = eps_0*eps_0 
 
+        
+        ! === First calculate visc_eff on ab-nodes ===
+
         do j = 1, ny 
         do i = 1, nx 
 

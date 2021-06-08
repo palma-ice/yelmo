@@ -94,10 +94,10 @@ contains
         real(wp), intent(IN)  :: tau                       ! [a] Calving timescale, ~ 1yr
 
         ! Local variables 
-        integer :: i, j, nx, ny
-        real(wp) :: H_mrgn
-        logical :: is_front 
-        integer :: n_ocean 
+        integer  :: i, j, nx, ny
+        real(wp) :: H_eff
+        logical  :: is_front 
+        integer  :: n_ocean 
 
         nx = size(H_ice,1)
         ny = size(H_ice,2)
@@ -117,18 +117,18 @@ contains
                 ! Ice-shelf floating margin: floating ice point with open ocean neighbor 
                 ! If this point is an ice front, check for calving
 
-                ! Calculate current ice thickness (H_ref = H_ice/f_ice)
+                ! Calculate current ice thickness (H_eff = H_ice/f_ice)
                 ! Check f_ice==0 for safety, but this should never happen for an ice-covered point
                 if (f_ice(i,j) .gt. 0.0_prec) then 
-                    H_mrgn = H_ice(i,j) / f_ice(i,j) 
+                    H_eff = H_ice(i,j) / f_ice(i,j) 
                 else
-                    H_mrgn = H_ice(i,j) 
+                    H_eff = H_ice(i,j) 
                 end if 
 
-                if (H_mrgn .lt. H_calv) then 
+                if (H_eff .lt. H_calv) then 
                     ! Apply calving at front, delete all ice in point (H_ice) 
 
-                    calv(i,j) = f_ice(i,j) * max(H_calv-H_mrgn,0.0) / tau 
+                    calv(i,j) = f_ice(i,j) * max(H_calv-H_eff,0.0) / tau 
 
                 end if 
 
@@ -167,7 +167,7 @@ contains
         real(wp), allocatable :: dHdt(:,:)
         real(wp), allocatable :: H_diff(:,:)  
         real(wp), allocatable :: ddiv(:,:)  
-        real(wp) :: H_ref
+        real(wp) :: H_eff
         real(wp) :: wt 
 
         nx = size(H_ice,1)
@@ -250,16 +250,16 @@ contains
 
             ! Margin points 
             if (f_ice(i,j) .gt. 0.0) then 
-                H_ref = H_ice(i,j) / f_ice(i,j) 
+                H_eff = H_ice(i,j) / f_ice(i,j) 
             else 
-                H_ref = H_ice(i,j)  ! == 0.0
+                H_eff = H_ice(i,j)  ! == 0.0
             end if 
 
             ! Calculate thickness change via conservation
-            dHdt(i,j) = mbal(i,j) - H_ref*ddiv(i,j)
+            dHdt(i,j) = mbal(i,j) - H_eff*ddiv(i,j)
 
             ! Also calculate ice thickness relative to the calving threshold 
-            H_diff(i,j) = H_ref - H_calv 
+            H_diff(i,j) = H_eff - H_calv 
 
         end do 
         end do
@@ -314,12 +314,12 @@ contains
                     ! f_ice ensures rate is adjusted to size of grid cell 
 
                     if (f_ice(i,j) .gt. 0.0) then 
-                        H_ref = H_ice(i,j) / f_ice(i,j) 
+                        H_eff = H_ice(i,j) / f_ice(i,j) 
                     else 
-                        H_ref = H_ice(i,j)  ! == 0.0
+                        H_eff = H_ice(i,j)  ! == 0.0
                     end if 
 
-                    calv(i,j) = f_ice(i,j) * max(H_calv - H_ref,0.0) / tau
+                    calv(i,j) = f_ice(i,j) * max(H_calv - H_eff,0.0) / tau
 
                 end if  
 
@@ -362,7 +362,7 @@ contains
         real(wp) :: tau1, tau2 
         real(wp) :: tau_eff 
         real(wp) :: calv_ref
-        real(wp) :: H_ref 
+        real(wp) :: H_eff 
 
         real(wp) :: ddiv, dxx, dyy, dxy 
         real(wp) :: txx, tyy, txy
@@ -487,12 +487,12 @@ end if
 
                 ! Convert to horizontal volume change 
                 if (f_ice(i,j) .gt. 0.0) then 
-                    H_ref = H_ice(i,j) / f_ice(i,j)
+                    H_eff = H_ice(i,j) / f_ice(i,j)
                 else 
-                    H_ref = H_ice(i,j)
+                    H_eff = H_ice(i,j)
                 end if 
 
-                calv(i,j) = (H_ref*calv_ref) / sqrt(dx*dy)
+                calv(i,j) = (H_eff*calv_ref) / sqrt(dx*dy)
             end if
 
         end do

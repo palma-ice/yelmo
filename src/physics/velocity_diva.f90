@@ -279,7 +279,7 @@ end if
         ! Iterations are finished, finalize calculations of 3D velocity field 
 
         ! Calculate the 3D horizontal velocity field
-        call calc_vel_horizontal_3D(ux,uy,ux_b,uy_b,taub_acx,taub_acy,visc_eff,H_ice,zeta_aa,par%boundaries)
+        call calc_vel_horizontal_3D(ux,uy,ux_b,uy_b,taub_acx,taub_acy,visc_eff,H_ice,f_ice,zeta_aa,par%boundaries)
 
         ! Also calculate the shearing contribution
         do k = 1, nz_aa 
@@ -291,7 +291,7 @@ end if
 
     end subroutine calc_velocity_diva
 
-    subroutine calc_vel_horizontal_3D(ux,uy,ux_b,uy_b,taub_acx,taub_acy,visc_eff,H_ice,zeta_aa,boundaries)
+    subroutine calc_vel_horizontal_3D(ux,uy,ux_b,uy_b,taub_acx,taub_acy,visc_eff,H_ice,f_ice,zeta_aa,boundaries)
         ! Caluculate the 3D horizontal velocity field (ux,uy)
         ! following L19, Eq. 29 
 
@@ -305,13 +305,13 @@ end if
         real(wp), intent(IN)  :: taub_acy(:,:)
         real(wp), intent(IN)  :: visc_eff(:,:,:)       
         real(wp), intent(IN)  :: H_ice(:,:)
+        real(wp), intent(IN)  :: f_ice(:,:)
         real(wp), intent(IN)  :: zeta_aa(:) 
         character(len=*), intent(IN) :: boundaries 
 
         ! Local variables
         integer :: i, j, k, ip1, jp1, nx, ny, nz_aa  
-        real(wp) :: H_ice_ac 
-        real(wp), allocatable :: visc_eff_ac(:) 
+        real(wp) :: H_eff
         real(wp), allocatable :: F1(:,:,:) 
         real(wp), allocatable :: F1_ac(:) 
         
@@ -319,7 +319,6 @@ end if
         ny    = size(ux,2) 
         nz_aa = size(ux,3) 
 
-        allocate(visc_eff_ac(nz_aa))
         allocate(F1(nx,ny,nz_aa))
         allocate(F1_ac(nz_aa))
 
@@ -330,7 +329,12 @@ end if
         ! it is not technically "F1" as defined by L19, Eq. 30, except at the surface.
         do j = 1, ny 
         do i = 1, nx 
-            F1(i,j,:) = integrate_trapezoid1D_1D((H_ice(i,j)/visc_eff(i,j,:))*(1.0-zeta_aa),zeta_aa)
+            if (f_ice(i,j) .gt. 0.0) then 
+                H_eff = H_ice(i,j) / f_ice(i,j) 
+            else
+                H_eff = H_ice(i,j)
+            end if 
+            F1(i,j,:) = integrate_trapezoid1D_1D((H_eff/visc_eff(i,j,:))*(1.0-zeta_aa),zeta_aa)
         end do
         end do  
 
@@ -344,9 +348,9 @@ end if
             ! === x direction ===============================================
 
             ! Stagger F1 column to ac-nodes 
-            if (H_ice(i,j) .gt. 0.0 .and. H_ice(ip1,j) .eq. 0.0) then 
+            if (f_ice(i,j) .eq. 1.0 .and. f_ice(ip1,j) .lt. 1.0) then 
                 F1_ac = F1(i,j,:) 
-            else if (H_ice(i,j) .eq. 0.0 .and. H_ice(ip1,j) .gt. 0.0) then
+            else if (f_ice(i,j) .lt. 1.0 .and. f_ice(ip1,j) .eq. 1.0) then
                 F1_ac = F1(ip1,j,:)
             else 
                 F1_ac = 0.5_wp*(F1(i,j,:) + F1(ip1,j,:))
@@ -358,9 +362,9 @@ end if
             ! === y direction ===============================================
 
             ! Stagger F1 column to ac-nodes 
-            if (H_ice(i,j) .gt. 0.0 .and. H_ice(i,jp1) .eq. 0.0) then 
+            if (f_ice(i,j) .eq. 1.0 .and. f_ice(i,jp1) .lt. 1.0) then 
                 F1_ac = F1(i,j,:) 
-            else if (H_ice(i,j) .eq. 0.0 .and. H_ice(i,jp1) .gt. 0.0) then
+            else if (f_ice(i,j) .lt. 1.0 .and. f_ice(i,jp1) .eq. 1.0) then
                 F1_ac = F1(i,jp1,:)
             else 
                 F1_ac = 0.5_wp*(F1(i,j,:) + F1(i,jp1,:))
@@ -441,7 +445,7 @@ end if
         integer :: ip1, jp1 
         real(wp) :: visc_eff_ac
 
-        real(wp), parameter :: visc_min = 1e3_wp 
+        real(wp), parameter :: visc_min = 1e4_wp 
 
         nx    = size(duxdz,1)
         ny    = size(duxdz,2)
@@ -576,7 +580,7 @@ end if
         ! Calculate squared minimum strain rate 
         eps_0_sq = eps_0*eps_0 
 
-        
+
         ! === First calculate visc_eff on ab-nodes ===
 
         do j = 1, ny 
@@ -636,30 +640,6 @@ end if
                 ! Ice-covered point. 
                 ! Only use contributions from ice-covered neighbors 
 
-                if (count([f_ice(i,j),f_ice(ip1,j),f_ice(i,jp1),f_ice(ip1,jp1)].eq.1.0) .eq. 0) then  
-                    visc_eff(i,j,:) = visc_eff(i,j,:) + visc_eff_ab(i,j,:) 
-                    wt = wt + 1.0 
-                end if 
-                
-                if (count([f_ice(i,j),f_ice(im1,j),f_ice(im1,jp1),f_ice(i,jp1)].eq.1.0) .eq. 0) then  
-                    visc_eff(i,j,:) = visc_eff(i,j,:) + visc_eff_ab(im1,j,:) 
-                    wt = wt + 1.0 
-                end if 
-
-                if (count([f_ice(i,j),f_ice(i,jm1),f_ice(ip1,jm1),f_ice(ip1,j)].eq.1.0) .eq. 0) then 
-                    visc_eff(i,j,:) = visc_eff(i,j,:) + visc_eff_ab(i,jm1,:) 
-                    wt = wt + 1.0 
-                end if 
-                
-                if (count([f_ice(i,j),f_ice(im1,j),f_ice(im1,jm1),f_ice(i,jm1)].eq.1.0) .eq. 0) then 
-                    visc_eff(i,j,:) = visc_eff(i,j,:) + visc_eff_ab(im1,jm1,:) 
-                    wt = wt + 1.0 
-                end if 
-            
-            else
-                ! Ice-free point.
-                ! Only use contributions from ice-free neighbors 
-
                 if (count([f_ice(i,j),f_ice(ip1,j),f_ice(i,jp1),f_ice(ip1,jp1)].lt.1.0) .eq. 0) then  
                     visc_eff(i,j,:) = visc_eff(i,j,:) + visc_eff_ab(i,j,:) 
                     wt = wt + 1.0 
@@ -676,6 +656,30 @@ end if
                 end if 
                 
                 if (count([f_ice(i,j),f_ice(im1,j),f_ice(im1,jm1),f_ice(i,jm1)].lt.1.0) .eq. 0) then 
+                    visc_eff(i,j,:) = visc_eff(i,j,:) + visc_eff_ab(im1,jm1,:) 
+                    wt = wt + 1.0 
+                end if 
+            
+            else
+                ! Ice-free point.
+                ! Only use contributions from ice-free neighbors 
+
+                if (count([f_ice(i,j),f_ice(ip1,j),f_ice(i,jp1),f_ice(ip1,jp1)].eq.1.0) .eq. 0) then  
+                    visc_eff(i,j,:) = visc_eff(i,j,:) + visc_eff_ab(i,j,:) 
+                    wt = wt + 1.0 
+                end if 
+                
+                if (count([f_ice(i,j),f_ice(im1,j),f_ice(im1,jp1),f_ice(i,jp1)].eq.1.0) .eq. 0) then  
+                    visc_eff(i,j,:) = visc_eff(i,j,:) + visc_eff_ab(im1,j,:) 
+                    wt = wt + 1.0 
+                end if 
+
+                if (count([f_ice(i,j),f_ice(i,jm1),f_ice(ip1,jm1),f_ice(ip1,j)].eq.1.0) .eq. 0) then 
+                    visc_eff(i,j,:) = visc_eff(i,j,:) + visc_eff_ab(i,jm1,:) 
+                    wt = wt + 1.0 
+                end if 
+                
+                if (count([f_ice(i,j),f_ice(im1,j),f_ice(im1,jm1),f_ice(i,jm1)].eq.1.0) .eq. 0) then 
                     visc_eff(i,j,:) = visc_eff(i,j,:) + visc_eff_ab(im1,jm1,:) 
                     wt = wt + 1.0 
                 end if 
@@ -968,9 +972,10 @@ end if
 
         ! Local variables 
         integer :: i, j, nx, ny, nz_aa, np
-        integer :: im1, jm1, ip1, jp1 
+        integer :: im1, jm1, ip1, jp1
+        real(wp) :: H_eff  
         real(wp) :: F_int_min 
-        real(wp), parameter :: visc_min = 1e3_wp
+        real(wp), parameter :: visc_min = 1e4_wp
 
         nx    = size(visc,1)
         ny    = size(visc,2) 
@@ -992,10 +997,11 @@ end if
             ip1 = min(i+1,nx)
             jp1 = min(j+1,ny)
 
-            if (H_ice(i,j) .gt. 0.0_wp .and. f_ice(i,j) .eq. 1.0) then 
+            if (f_ice(i,j) .gt. 0.0) then 
                 ! Viscosity should be nonzero here, perform integration 
 
-                F_int(i,j) = integrate_trapezoid1D_pt((H_ice(i,j)/visc(i,j,:) )*(1.0_wp-zeta_aa)**n,zeta_aa)
+                H_eff = H_ice(i,j) / f_ice(i,j) 
+                F_int(i,j) = integrate_trapezoid1D_pt((H_eff/visc(i,j,:) )*(1.0_wp-zeta_aa)**n,zeta_aa)
 
             else 
 

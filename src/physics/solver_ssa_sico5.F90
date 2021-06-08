@@ -251,7 +251,18 @@ contains
 
             ! == Treat special cases first ==
 
-            if (i .eq. 1) then 
+            if (ssa_mask_acx(i,j) .eq. -1) then 
+                ! Assign prescribed boundary velocity to this point
+                ! (eg for prescribed velocity corresponding to analytical grounding line flux)
+
+                k = k+1
+                lgs_a_value(k)  = 1.0   ! diagonal element only
+                lgs_a_index(k)  = nr
+
+                lgs_b_value(nr) = vx_m(i,j)
+                lgs_x_value(nr) = vx_m(i,j)
+           
+            else if (i .eq. 1) then 
                 ! Left boundary 
 
                 select case(trim(boundaries_vx(3)))
@@ -449,17 +460,6 @@ contains
 
                 end select 
 
-            else if (ssa_mask_acx(i,j) .eq. -1) then 
-                ! Assign prescribed boundary velocity to this point
-                ! (eg for prescribed velocity corresponding to analytical grounding line flux)
-
-                k = k+1
-                lgs_a_value(k)  = 1.0   ! diagonal element only
-                lgs_a_index(k)  = nr
-
-                lgs_b_value(nr) = vx_m(i,j)
-                lgs_x_value(nr) = vx_m(i,j)
-           
             else if (  ( is_front_1(i,j).and.is_front_2(i+1,j) ) &
                       .or. &
                       ( is_front_2(i,j).and.is_front_1(i+1,j) ) &
@@ -574,8 +574,18 @@ contains
                     lgs_b_value(nr) = 0.0_prec
                     lgs_x_value(nr) = 0.0_prec
 
-            else if (ssa_mask_acx(i,j) .gt. 0) then 
-                ! === Proceed with normal ssa checks =================
+            else if (ssa_mask_acx(i,j) .eq. 0) then    ! neither neighbour is floating or grounded ice,
+                    ! velocity assumed to be zero
+
+                k = k+1
+                lgs_a_value(k) = 1.0_prec   ! diagonal element only
+                lgs_a_index(k) = nr
+
+                lgs_b_value(nr) = 0.0_prec
+                lgs_x_value(nr) = 0.0_prec
+
+            else
+                ! === Proceed with normal ssa solution =================
                 ! inner point on the staggered grid in x-direction
                 ! ie, if ( (i /= nx).and.(j /= 1).and.(j /= ny) ) then
              
@@ -657,18 +667,6 @@ contains
                     lgs_b_value(nr) = taud_now
                     lgs_x_value(nr) = vx_m(i,j)
 
-                ! end if
-
-            else    ! neither neighbour is floating or grounded ice,
-                    ! velocity assumed to be zero
-
-                k = k+1
-                lgs_a_value(k) = 1.0_prec   ! diagonal element only
-                lgs_a_index(k) = nr
-
-                lgs_b_value(nr) = 0.0_prec
-                lgs_x_value(nr) = 0.0_prec
-
             end if
 
             lgs_a_ptr(nr+1) = k+1   ! row is completed, store index to next row
@@ -684,7 +682,19 @@ contains
 
             ! == Treat special cases first ==
 
-            if (j .eq. 1) then 
+            if (ssa_mask_acy(i,j) .eq. -1) then 
+                ! Assign prescribed boundary velocity to this point
+                ! (eg for prescribed velocity corresponding to analytical grounding line flux)
+
+                k = k+1
+                lgs_a_value(k)  = 1.0   ! diagonal element only
+                lgs_a_index(k)  = nr
+
+                lgs_b_value(nr) = vy_m(i,j)
+                lgs_x_value(nr) = vy_m(i,j)
+           
+            
+            else if (j .eq. 1) then 
                 ! lower boundary 
 
                 select case(trim(boundaries_vy(4)))
@@ -875,18 +885,6 @@ contains
 
                 end select 
             
-            else if (ssa_mask_acy(i,j) .eq. -1) then 
-                ! Assign prescribed boundary velocity to this point
-                ! (eg for prescribed velocity corresponding to analytical grounding line flux)
-
-                k = k+1
-                lgs_a_value(k)  = 1.0   ! diagonal element only
-                lgs_a_index(k)  = nr
-
-                lgs_b_value(nr) = vy_m(i,j)
-                lgs_x_value(nr) = vy_m(i,j)
-           
-            
             else if (  ( is_front_1(i,j).and.is_front_2(i,j+1) ) &
                       .or. &
                       ( is_front_2(i,j).and.is_front_1(i,j+1) ) &
@@ -979,8 +977,18 @@ contains
                     lgs_b_value(nr) = 0.0_prec
                     lgs_x_value(nr) = 0.0_prec
 
-            else if (ssa_mask_acy(i,j) .gt. 0) then 
-                ! === Proceed with normal ssa checks =================
+            else if (ssa_mask_acy(i,j) .eq. 0) then    ! neither neighbour is floating or grounded ice,
+                    ! velocity assumed to be zero
+
+                k = k+1
+                lgs_a_value(k)  = 1.0_prec   ! diagonal element only
+                lgs_a_index(k)  = nr
+
+                lgs_b_value(nr) = 0.0_prec
+                lgs_x_value(nr) = 0.0_prec
+
+            else
+                ! === Proceed with normal ssa solution =================
                 ! inner point on the staggered grid in y-direction
                 ! ie, if ( (j /= ny).and.(i /= 1).and.(i /= nx) ) then
              
@@ -1061,19 +1069,7 @@ contains
 
                     lgs_b_value(nr) = taud_now 
                     lgs_x_value(nr) = vy_m(i,j)
-
-                ! end if
-
-            else    ! neither neighbour is floating or grounded ice,
-                    ! velocity assumed to be zero
-
-                k = k+1
-                lgs_a_value(k)  = 1.0_prec   ! diagonal element only
-                lgs_a_index(k)  = nr
-
-                lgs_b_value(nr) = 0.0_prec
-                lgs_x_value(nr) = 0.0_prec
-
+            
             end if
 
             lgs_a_ptr(nr+1) = k+1   ! row is completed, store index to next row

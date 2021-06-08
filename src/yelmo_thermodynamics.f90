@@ -419,10 +419,10 @@ end select
         do j = 2, ny-1
         do i = 2, nx-1 
             
-            if (H_ice(i,j) .eq. 0.0 .or. f_ice(i,j) .lt. 1.0) then 
+            if (f_ice(i,j) .lt. 1.0) then 
 
                 wt_neighb = 0.0 
-                where (H_ice(i-1:i+1,j-1:j+1) .gt. 0 .and. f_ice(i,j) .eq. 1.0) wt_neighb = 1.0 
+                where (f_ice(i-1:i+1,j-1:j+1) .eq. 1.0) wt_neighb = 1.0 
                 wt_tot = sum(wt_neighb)
 
                 if (wt_tot .gt. 0.0) then 

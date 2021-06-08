@@ -519,7 +519,6 @@ contains
 
                         end if 
 
-
                         lgs_b_value(nr) = factor_rhs_3a*H_ice_now*H_ice_now &
                                       - factor_rhs_3b*H_ocn_now*H_ocn_now
 
@@ -932,7 +931,7 @@ contains
 
                         ! =========================================================
                         ! Generalized solution for all ice fronts (floating and grounded)
-                        
+            
                         H_ice_now = H_ice(i,j1)
                         !H_ice_now = H_ice(i,j1)/f_ice(i,j1)
 
@@ -1221,6 +1220,7 @@ contains
 
                 ! x-direction
                 if (f_ice(i,j) .eq. 1.0 .or. f_ice(ip1,j) .eq. 1.0) then
+
                     ! Ice is present on ac-node
                     
                     if (f_grnd_acx(i,j) .gt. 0.0) then 
@@ -1238,6 +1238,7 @@ contains
 
                 ! y-direction
                 if (f_ice(i,j) .eq. 1.0 .or. f_ice(i,jp1) .eq. 1.0) then
+
                     ! Ice is present on ac-node
                     
                     if (f_grnd_acy(i,j) .gt. 0.0) then 
@@ -1603,7 +1604,6 @@ contains
         ! Local variables
         integer    :: i, j, nx, ny
         integer    :: im1, ip1, jm1, jp1 
-        integer    :: i1, i2, j1, j2 
         logical    :: is_float 
         
         logical, parameter :: disable_grounded_fronts = .TRUE. 
@@ -1678,6 +1678,7 @@ contains
                   f_ice(ip1,j) .eq. 1.0 .or. &
                   f_ice(i,jm1) .eq. 1.0 .or. &
                   f_ice(i,jp1) .eq. 1.0 ) ) then
+
             front2(i,j) = .TRUE. 
 
           end if 

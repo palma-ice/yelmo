@@ -318,9 +318,7 @@ contains
                 count([f_ice(im1,j),f_ice(ip1,j),f_ice(i,jm1),f_ice(i,jp1)].eq.0.0) .gt. 0
 
             if (is_margin) then
-                ! Ice covered point at the margin  
-            !if (H_ice_new(i,j) .gt. 0.0) then 
-                ! Ice covered point 
+                ! Ice covered point at the margin
 
                 ! Calculate current ice thickness 
                 if (f_ice(i,j) .gt. 0.0) then 

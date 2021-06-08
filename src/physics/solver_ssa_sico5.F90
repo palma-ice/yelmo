@@ -1,7 +1,7 @@
 module solver_ssa_sico5
     ! This ssa solver code was adapted from SICOPOLIS (v5-dev, svn revision 1421) module calc_vxy_m.F90. 
     
-    use yelmo_defs, only : sp, dp, prec, rho_ice, rho_sw, g 
+    use yelmo_defs, only : sp, dp, wp, prec, rho_ice, rho_sw, g 
 
     implicit none 
 
@@ -460,12 +460,7 @@ contains
                 lgs_b_value(nr) = vx_m(i,j)
                 lgs_x_value(nr) = vx_m(i,j)
            
-            else if (ssa_mask_acx(i,j) .gt. 0) then 
-                ! === Proceed with normal ssa checks =================
-                ! inner point on the staggered grid in x-direction
-                ! ie, if ( (i /= nx).and.(j /= 1).and.(j /= ny) ) then
-             
-                if (  ( is_front_1(i,j).and.is_front_2(i+1,j) ) &
+            else if (  ( is_front_1(i,j).and.is_front_2(i+1,j) ) &
                       .or. &
                       ( is_front_2(i,j).and.is_front_1(i+1,j) ) &
                     ) then
@@ -510,9 +505,12 @@ contains
                         ! =========================================================
                         ! Generalized solution for all ice fronts (floating and grounded)
 
+                        H_ice_now = H_ice(i1,j)
+                        !H_ice_now = H_ice(i1,j)/f_ice(i1,j)
+
                         if (z_sl(i1,j)-z_bed(i1,j) .gt. 0.0) then 
                         ! Bed below sea level 
-                          H_ocn_now = min(rho_ice/rho_sw*H_ice(i1,j), &    ! Flotation depth 
+                          H_ocn_now = min(rho_ice/rho_sw*H_ice_now, &    ! Flotation depth 
                                           z_sl(i1,j)-z_bed(i1,j))            ! Grounded depth 
 
                         else 
@@ -521,7 +519,6 @@ contains
 
                         end if 
 
-                        H_ice_now = H_ice(i1,j)
 
                         lgs_b_value(nr) = factor_rhs_3a*H_ice_now*H_ice_now &
                                       - factor_rhs_3b*H_ocn_now*H_ocn_now
@@ -564,12 +561,12 @@ contains
 
                     end if 
 
-                else if ( ( (maske(i,j)==3).and.(maske(i+1,j)==1) ) &
-                          .or. &
-                          ( (maske(i,j)==1).and.(maske(i+1,j)==3) ) &
-                        ) then
-                        ! one neighbour is floating ice and the other is ice-free land;
-                        ! velocity assumed to be zero
+            else if ( ( (maske(i,j)==3).and.(maske(i+1,j)==1) ) &
+                      .or. &
+                      ( (maske(i,j)==1).and.(maske(i+1,j)==3) ) &
+                    ) then
+                    ! one neighbour is floating ice and the other is ice-free land;
+                    ! velocity assumed to be zero
 
                     k = k+1
                     lgs_a_value(k)  = 1.0_prec   ! diagonal element only
@@ -578,7 +575,11 @@ contains
                     lgs_b_value(nr) = 0.0_prec
                     lgs_x_value(nr) = 0.0_prec
 
-                else
+            else if (ssa_mask_acx(i,j) .gt. 0) then 
+                ! === Proceed with normal ssa checks =================
+                ! inner point on the staggered grid in x-direction
+                ! ie, if ( (i /= nx).and.(j /= 1).and.(j /= ny) ) then
+             
                     ! inner shelfy stream or floating ice 
 
                     if (i .eq. 1) then  ! ajr: filler to avoid LIS errors 
@@ -657,7 +658,7 @@ contains
                     lgs_b_value(nr) = taud_now
                     lgs_x_value(nr) = vx_m(i,j)
 
-                end if
+                ! end if
 
             else    ! neither neighbour is floating or grounded ice,
                     ! velocity assumed to be zero
@@ -886,12 +887,8 @@ contains
                 lgs_b_value(nr) = vy_m(i,j)
                 lgs_x_value(nr) = vy_m(i,j)
            
-            else if (ssa_mask_acy(i,j) .gt. 0) then 
-                ! === Proceed with normal ssa checks =================
-                ! inner point on the staggered grid in y-direction
-                ! ie, if ( (j /= ny).and.(i /= 1).and.(i /= nx) ) then
-             
-                if (  ( is_front_1(i,j).and.is_front_2(i,j+1) ) &
+            
+            else if (  ( is_front_1(i,j).and.is_front_2(i,j+1) ) &
                       .or. &
                       ( is_front_2(i,j).and.is_front_1(i,j+1) ) &
                     ) then
@@ -935,10 +932,13 @@ contains
 
                         ! =========================================================
                         ! Generalized solution for all ice fronts (floating and grounded)
-              
+                        
+                        H_ice_now = H_ice(i,j1)
+                        !H_ice_now = H_ice(i,j1)/f_ice(i,j1)
+
                         if (z_sl(i,j1)-z_bed(i,j1) .gt. 0.0) then 
                             ! Bed below sea level 
-                            H_ocn_now = min(rho_ice/rho_sw*H_ice(i,j1), &    ! Flotation depth 
+                            H_ocn_now = min(rho_ice/rho_sw*H_ice_now, &    ! Flotation depth 
                                           z_sl(i,j1)-z_bed(i,j1))            ! Grounded depth 
 
                         else 
@@ -947,8 +947,6 @@ contains
 
                         end if 
 
-                        H_ice_now = H_ice(i,j1)
-              
                         lgs_b_value(nr) = factor_rhs_3a*H_ice_now*H_ice_now &
                                         - factor_rhs_3b*H_ocn_now*H_ocn_now  
 
@@ -968,7 +966,7 @@ contains
 
                     end if
 
-                else if ( ( (maske(i,j)==3).and.(maske(i,j+1)==1) ) &
+            else if ( ( (maske(i,j)==3).and.(maske(i,j+1)==1) ) &
                         .or. &
                         ( (maske(i,j)==1).and.(maske(i,j+1)==3) ) &
                       ) then
@@ -982,7 +980,11 @@ contains
                     lgs_b_value(nr) = 0.0_prec
                     lgs_x_value(nr) = 0.0_prec
 
-                else
+            else if (ssa_mask_acy(i,j) .gt. 0) then 
+                ! === Proceed with normal ssa checks =================
+                ! inner point on the staggered grid in y-direction
+                ! ie, if ( (j /= ny).and.(i /= 1).and.(i /= nx) ) then
+             
                     ! inner shelfy stream or floating ice 
 
                     nc = 2*ij2n(i-1,j)-1
@@ -1061,7 +1063,7 @@ contains
                     lgs_b_value(nr) = taud_now 
                     lgs_x_value(nr) = vy_m(i,j)
 
-                end if
+                ! end if
 
             else    ! neither neighbour is floating or grounded ice,
                     ! velocity assumed to be zero
@@ -1173,7 +1175,7 @@ contains
 
     end subroutine calc_vxy_ssa_matrix
 
-    subroutine set_ssa_masks(ssa_mask_acx,ssa_mask_acy,beta_acx,beta_acy,H_ice,f_grnd_acx,f_grnd_acy,beta_max,use_ssa)
+    subroutine set_ssa_masks(ssa_mask_acx,ssa_mask_acy,beta_acx,beta_acy,H_ice,f_ice,f_grnd_acx,f_grnd_acy,beta_max,use_ssa)
         ! Define where ssa calculations should be performed
         ! Note: could be binary, but perhaps also distinguish 
         ! grounding line/zone to use this mask for later gl flux corrections
@@ -1188,6 +1190,7 @@ contains
         real(prec), intent(IN)  :: beta_acx(:,:)
         real(prec), intent(IN)  :: beta_acy(:,:)
         real(prec), intent(IN)  :: H_ice(:,:)
+        real(prec), intent(IN)  :: f_ice(:,:)
         real(prec), intent(IN)  :: f_grnd_acx(:,:)
         real(prec), intent(IN)  :: f_grnd_acy(:,:)
         real(prec), intent(IN)  :: beta_max
@@ -1195,6 +1198,7 @@ contains
 
         ! Local variables
         integer    :: i, j, nx, ny
+        integer    :: im1, ip1, jm1, jp1
         real(prec) :: H_acx, H_acy
         
         nx = size(H_ice,1)
@@ -1206,11 +1210,17 @@ contains
         
         if (use_ssa) then 
 
-            ! x-direction
             do j = 1, ny
-            do i = 1, nx-1
+            do i = 1, nx
 
-                if (H_ice(i,j) .gt. 0.0 .or. H_ice(i+1,j) .gt. 0.0) then 
+                ! Get neighbor indices
+                im1 = max(i-1,1) 
+                ip1 = min(i+1,nx) 
+                jm1 = max(j-1,1) 
+                jp1 = min(j+1,ny)
+
+                ! x-direction
+                if (f_ice(i,j) .eq. 1.0 .or. f_ice(ip1,j) .eq. 1.0) then
                     ! Ice is present on ac-node
                     
                     if (f_grnd_acx(i,j) .gt. 0.0) then 
@@ -1226,14 +1236,8 @@ contains
                     
                 end if
 
-            end do 
-            end do
-
-            ! y-direction
-            do j = 1, ny-1
-            do i = 1, nx
-
-                if (H_ice(i,j) .gt. 0.0 .or. H_ice(i,j+1) .gt. 0.0) then 
+                ! y-direction
+                if (f_ice(i,j) .eq. 1.0 .or. f_ice(i,jp1) .eq. 1.0) then
                     ! Ice is present on ac-node
                     
                     if (f_grnd_acy(i,j) .gt. 0.0) then 
@@ -1542,24 +1546,25 @@ contains
             jm1 = max(j-1,1) 
             jp1 = min(j+1,ny) 
             
+            visc_ab(i,j) = 0.0_wp
             k=0
 
-            if (H_ice(i,j) .gt. 0 .and. f_ice(i,j) .eq. 1.0) then
+            if (f_ice(i,j) .eq. 1.0) then
                 k = k+1                              ! floating or grounded ice
                 visc_ab(i,j) = visc_ab(i,j) + visc(i,j)
             end if
 
-            if (H_ice(ip1,j) .gt. 0 .and. f_ice(ip1,j) .eq. 1.0) then
+            if (f_ice(ip1,j) .eq. 1.0) then
                 k = k+1                                  ! floating or grounded ice
                 visc_ab(i,j) = visc_ab(i,j) + visc(ip1,j)
             end if
 
-            if (H_ice(i,jp1) .gt. 0 .and. f_ice(i,jp1) .eq. 1.0) then
+            if (f_ice(i,jp1) .eq. 1.0) then
                 k = k+1                                  ! floating or grounded ice
                 visc_ab(i,j) = visc_ab(i,j) + visc(i,jp1)
             end if
 
-            if (H_ice(ip1,jp1) .gt. 0 .and. f_ice(ip1,jp1) .eq. 1.0) then
+            if (f_ice(ip1,jp1) .eq. 1.0) then
                 k = k+1                                      ! floating or grounded ice
                 visc_ab(i,j) = visc_ab(i,j) + visc(ip1,jp1)
             end if
@@ -1597,6 +1602,7 @@ contains
         
         ! Local variables
         integer    :: i, j, nx, ny
+        integer    :: im1, ip1, jm1, jp1 
         integer    :: i1, i2, j1, j2 
         logical    :: is_float 
         
@@ -1617,7 +1623,7 @@ contains
             ! Check if this point would be floating
             is_float = H_grnd(i,j) .le. 0.0 
 
-            if (H_ice(i,j) .eq. 0.0 .or. f_ice(i,j) .lt. 1.0) then 
+            if (f_ice(i,j) .lt. 1.0) then 
                 ! Ice-free point, or only partially-covered (consider ice free)
 
                 if (is_float) then 
@@ -1644,35 +1650,34 @@ contains
         end do 
         end do 
         
-        !-------- Detection of the grounding line and the calving front --------
+        !-------- Detection of the calving front --------
 
         front1  = .false. 
         front2  = .false. 
 
         do j = 1, ny
         do i = 1, nx
-         
-          i1 = max(i-1,1)
-          i2 = min(i+1,nx)
-          j1 = max(j-1,1)
-          j2 = min(j+1,ny)
-          
-          if (  (H_ice(i,j) .gt. 0.0 .and. f_ice(i,j) .eq. 1.0) .and. &
-              ( (H_ice(i1,j) .eq. 0.0 .or. f_ice(i1,j) .lt. 1.0) .or. &
-                (H_ice(i2,j) .eq. 0.0 .or. f_ice(i2,j) .lt. 1.0) .or. &
-                (H_ice(i,j1) .eq. 0.0 .or. f_ice(i,j1) .lt. 1.0) .or. &
-                (H_ice(i,j2) .eq. 0.0 .or. f_ice(i,j2) .lt. 1.0) ) ) then 
 
+            ! Get neighbor indices 
+            im1 = max(i-1,1)
+            ip1 = min(i+1,nx)
+            jm1 = max(j-1,1)
+            jp1 = min(j+1,ny)
+            
+          if (  f_ice(i,j) .eq. 1.0 .and. &
+                ( f_ice(im1,j) .lt. 1.0 .or. &
+                  f_ice(ip1,j) .lt. 1.0 .or. &
+                  f_ice(i,jm1) .lt. 1.0 .or. &
+                  f_ice(i,jp1) .lt. 1.0 ) ) then
             front1(i,j) = .TRUE. 
 
           end if 
-
-          if (  (H_ice(i,j) .eq. 0.0 .or. f_ice(i,j) .lt. 1.0) .and. &
-              ( (H_ice(i1,j) .gt. 0.0 .and. f_ice(i1,j) .eq. 1.0) .or. &
-                (H_ice(i2,j) .gt. 0.0 .and. f_ice(i2,j) .eq. 1.0) .or. &
-                (H_ice(i,j1) .gt. 0.0 .and. f_ice(i,j1) .eq. 1.0) .or. &
-                (H_ice(i,j2) .gt. 0.0 .and. f_ice(i,j2) .eq. 1.0) ) ) then 
-
+          
+          if (  f_ice(i,j) .lt. 1.0 .and. &
+                ( f_ice(im1,j) .eq. 1.0 .or. &
+                  f_ice(ip1,j) .eq. 1.0 .or. &
+                  f_ice(i,jm1) .eq. 1.0 .or. &
+                  f_ice(i,jp1) .eq. 1.0 ) ) then
             front2(i,j) = .TRUE. 
 
           end if 

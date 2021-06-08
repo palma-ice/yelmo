@@ -60,7 +60,7 @@ contains
         allocate(dHdt_advec(nx,ny))
         dHdt_advec = 0.0_wp 
 
-        ! Ensure that no velocity is defined for outer boundaries of margin points
+        ! Ensure that no velocity is defined for outer boundaries of partially-filled margin points
         ux_tmp = ux
         uy_tmp = uy  
         do j = 1, ny 
@@ -281,8 +281,10 @@ contains
 
         ! Local variables 
         integer :: i, j, nx, ny 
+        integer :: im1, ip1, jm1, jp1 
         real(wp), allocatable :: H_ice_new(:,:)
-        real(wp) :: H_ref 
+        real(wp) :: H_eff 
+        logical  :: is_margin 
 
         nx = size(H_ice,1)
         ny = size(H_ice,2) 
@@ -306,19 +308,30 @@ contains
         do j = 1, ny 
         do i = 1, nx 
 
-            if (H_ice_new(i,j) .gt. 0.0) then 
+            ! Get neighbor indices 
+            im1 = max(i-1,1)
+            ip1 = min(i+1,nx)
+            jm1 = max(j-1,1)
+            jp1 = min(j+1,ny)
+
+            is_margin = f_ice(i,j) .gt. 0.0 .and. &
+                count([f_ice(im1,j),f_ice(ip1,j),f_ice(i,jm1),f_ice(i,jp1)].eq.0.0) .gt. 0
+
+            if (is_margin) then
+                ! Ice covered point at the margin  
+            !if (H_ice_new(i,j) .gt. 0.0) then 
                 ! Ice covered point 
 
                 ! Calculate current ice thickness 
                 if (f_ice(i,j) .gt. 0.0) then 
-                    H_ref = H_ice_new(i,j) / f_ice(i,j) 
+                    H_eff = H_ice_new(i,j) / f_ice(i,j) 
                 else 
-                    H_ref = H_ice_new(i,j) 
+                    H_eff = H_ice_new(i,j) 
                 end if 
 
                 ! Remove ice that is too thin 
-                if (f_grnd(i,j) .lt. 1.0_wp .and. H_ref .lt. H_min_flt)  H_ice_new(i,j) = 0.0_wp 
-                if (f_grnd(i,j) .eq. 1.0_wp .and. H_ref .lt. H_min_grnd) H_ice_new(i,j) = 0.0_wp 
+                if (f_grnd(i,j) .lt. 1.0_wp .and. H_eff .lt. H_min_flt)  H_ice_new(i,j) = 0.0_wp 
+                if (f_grnd(i,j) .eq. 1.0_wp .and. H_eff .lt. H_min_grnd) H_ice_new(i,j) = 0.0_wp 
 
             end if 
 

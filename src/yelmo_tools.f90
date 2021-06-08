@@ -110,13 +110,14 @@ contains
 
     end function calc_magnitude_from_staggered
     
-    function calc_magnitude_from_staggered_ice(u,v,H,boundaries) result(umag)
+    function calc_magnitude_from_staggered_ice(u,v,f_ice,boundaries) result(umag)
         ! Calculate the centered (aa-nodes) magnitude of a vector 
         ! from the staggered (ac-nodes) components
 
         implicit none 
         
-        real(prec), intent(IN)  :: u(:,:), v(:,:), H(:,:) 
+        real(prec), intent(IN)  :: u(:,:), v(:,:)
+        real(prec), intent(IN)  :: f_ice(:,:) 
         real(prec) :: umag(size(u,1),size(u,2)) 
         character(len=*), intent(IN), optional :: boundaries 
 
@@ -139,41 +140,18 @@ contains
             ip1 = min(i+1,nx)
             jp1 = min(j+1,ny)
 
-            ! x-direction =====
-
-            H1 = 0.5_prec*(H(im1,j)+H(i,j))
-            H2 = 0.5_prec*(H(i,j)+H(ip1,j))
-
-            f1 = 0.5_prec 
-            f2 = 0.5_prec 
-            if (H1 .eq. 0.0) f1 = 0.0_prec  
-            if (H2 .eq. 0.0) f2 = 0.0_prec   
-
-            if (f1+f2 .gt. 0.0) then 
-                unow = (f1*u(im1,j) + f2*u(i,j)) / (f1+f2)
-                if (abs(unow) .lt. tol_underflow) unow = 0.0_prec 
+            if (f_ice(i,j) .eq. 1.0) then 
+                unow = 0.5*(u(im1,j)+u(i,j))
+                vnow = 0.5*(v(i,jm1)+v(i,j))
             else 
                 unow = 0.0 
-            end if 
-
-            ! y-direction =====
-
-            H1 = 0.5_prec*(H(i,jm1)+H(i,j))
-            H2 = 0.5_prec*(H(i,j)+H(i,jp1))
-
-            f1 = 0.5_prec 
-            f2 = 0.5_prec 
-            if (H1 .eq. 0.0) f1 = 0.0_prec  
-            if (H2 .eq. 0.0) f2 = 0.0_prec   
-
-            if (f1+f2 .gt. 0.0) then 
-                vnow = (f1*v(i,jm1) + f2*v(i,j)) / (f1+f2)
-                if (abs(vnow) .lt. tol_underflow) vnow = 0.0_prec 
-            else 
                 vnow = 0.0 
             end if 
 
             umag(i,j) = sqrt(unow*unow+vnow*vnow)
+
+            if (abs(umag(i,j)) .lt. tol_underflow) umag(i,j) = 0.0_prec
+
         end do 
         end do 
 
@@ -606,7 +584,7 @@ contains
 
     end subroutine calc_gradient_ac
     
-    subroutine calc_gradient_ac_ice(dvardx,dvardy,var,H_ice,dx,margin2nd,grad_lim,boundaries)
+    subroutine calc_gradient_ac_ice(dvardx,dvardy,var,f_ice,dx,margin2nd,grad_lim,boundaries)
         ! Calculate gradient on ac nodes 
         ! for an ice sheet, only using non-zero thickness points
 
@@ -615,7 +593,7 @@ contains
         real(prec), intent(OUT) :: dvardx(:,:) 
         real(prec), intent(OUT) :: dvardy(:,:) 
         real(prec), intent(IN)  :: var(:,:) 
-        real(prec), intent(IN)  :: H_ice(:,:)
+        real(prec), intent(IN)  :: f_ice(:,:)
         real(prec), intent(IN)  :: dx 
         logical,    intent(IN)  :: margin2nd 
         real(prec), intent(IN)  :: grad_lim 
@@ -659,7 +637,7 @@ contains
             do j = 1, ny 
             do i = 2, nx-3
 
-                if (H_ice(i,j) .gt. 0.0 .and. H_ice(i+1,j) .eq. 0.0) then 
+                if (f_ice(i,j) .eq. 1.0 .and. f_ice(i+1,j) .lt. 1.0) then 
                     ! Margin point (ice-free to the right)
 
                     H0 = var(i,j) 
@@ -668,7 +646,7 @@ contains
                     ! Second-order upwind
                     dvardx(i,j) = -(1.0/(3.0*dx))*(H0+H1)
 
-                else if (H_ice(i,j) .eq. 0.0 .and. H_ice(i+1,j) .gt. 0.0) then
+                else if (f_ice(i,j) .lt. 1.0 .and. f_ice(i+1,j) .eq. 1.0) then
                     ! Margin point (ice-free to the left)
 
                     H0 = var(i+1,j) 
@@ -686,7 +664,7 @@ contains
             do j = 2, ny-3 
             do i = 1, nx
 
-                if (H_ice(i,j) .gt. 0.0 .and. H_ice(i,j+1) .eq. 0.0) then 
+                if (f_ice(i,j) .eq. 1.0 .and. f_ice(i,j+1) .lt. 1.0) then 
                     ! Margin point (ice-free above)
 
                     H0 = var(i,j) 
@@ -695,7 +673,7 @@ contains
                     ! Second-order upwind
                     dvardy(i,j) = -(1.0/(3.0*dy))*(H0+H1)
 
-                else if (H_ice(i,j) .eq. 0.0 .and. H_ice(i,j+1) .gt. 0.0) then
+                else if (f_ice(i,j) .lt. 1.0 .and. f_ice(i,j+1) .eq. 1.0) then
                     ! Margin point (ice-free below)
 
                     H0 = var(i,j+1) 

@@ -15,14 +15,15 @@ module yelmo_topography
     implicit none
     
     ! Key for matching bed types given by mask_bed 
-    integer, parameter :: mask_bed_ocean  = 0 
-    integer, parameter :: mask_bed_land   = 1
-    integer, parameter :: mask_bed_frozen = 2
-    integer, parameter :: mask_bed_stream = 3
-    integer, parameter :: mask_bed_grline = 4
-    integer, parameter :: mask_bed_float  = 5
-    integer, parameter :: mask_bed_island = 6
-    
+    integer, parameter :: mask_bed_ocean   = 0 
+    integer, parameter :: mask_bed_land    = 1
+    integer, parameter :: mask_bed_frozen  = 2
+    integer, parameter :: mask_bed_stream  = 3
+    integer, parameter :: mask_bed_grline  = 4
+    integer, parameter :: mask_bed_float   = 5
+    integer, parameter :: mask_bed_island  = 6
+    integer, parameter :: mask_bed_partial = 7
+
     private
     public :: calc_ytopo
     public :: ytopo_par_load, ytopo_alloc, ytopo_dealloc
@@ -122,7 +123,7 @@ contains
                                         solver=tpo%par%solver,dx=tpo%par%dx,dt=dt,beta=tpo%par%dt_beta,pc_step=tpo%par%pc_step)
 
             ! Update ice fraction mask 
-            call calc_ice_fraction(tpo%now%f_ice,tpo%now%H_margin,tpo%now%H_ice,tpo%now%f_grnd)
+            call calc_ice_fraction(tpo%now%f_ice,tpo%now%H_ice,tpo%now%f_grnd)
             
             ! If desired, relax solution to reference state
             ! ajr: why is this here? Shouldn't it go after all dyn+calv+mb steps applied?
@@ -156,7 +157,7 @@ contains
                                          mbal,tpo%now%calv_flt*0.0_wp,tpo%now%calv_grnd*0.0_wp,bnd%z_bed_sd,tpo%par%dx,dt)
 
             ! Update ice fraction mask 
-            call calc_ice_fraction(tpo%now%f_ice,tpo%now%H_margin,tpo%now%H_ice,tpo%now%f_grnd)
+            call calc_ice_fraction(tpo%now%f_ice,tpo%now%H_ice,tpo%now%f_grnd)
             
             ! Next, diagnose CALVING
 
@@ -218,7 +219,7 @@ contains
                                          mbal,tpo%now%calv_flt,tpo%now%calv_grnd,bnd%z_bed_sd,tpo%par%dx,dt)
 
             ! Update ice fraction mask 
-            call calc_ice_fraction(tpo%now%f_ice,tpo%now%H_margin,tpo%now%H_ice,tpo%now%f_grnd)
+            call calc_ice_fraction(tpo%now%f_ice,tpo%now%H_ice,tpo%now%f_grnd)
             
             ! Finally, apply all additional (generally artificial) ice thickness adjustments 
             ! and store changes in residual mass balance field. 
@@ -227,7 +228,7 @@ contains
                                                 tpo%par%H_min_flt,tpo%par%H_min_grnd,dt)
 
             ! Update ice fraction mask 
-            call calc_ice_fraction(tpo%now%f_ice,tpo%now%H_margin,tpo%now%H_ice,tpo%now%f_grnd)
+            call calc_ice_fraction(tpo%now%f_ice,tpo%now%H_ice,tpo%now%f_grnd)
             
             ! Save the rate of change of ice thickness in output variable [m/a]
             tpo%now%dHicedt = (tpo%now%H_ice - tpo%now%H_ice_n) / dt 
@@ -266,9 +267,9 @@ contains
         end if 
         
         ! Calculate the surface slope (on staggered Ac x/y nodes)
-        call calc_gradient_ac_ice(tpo%now%dzsdx,tpo%now%dzsdy,tpo%now%z_srf,tpo%now%H_ice,tpo%par%dx, &
+        call calc_gradient_ac_ice(tpo%now%dzsdx,tpo%now%dzsdy,tpo%now%z_srf,tpo%now%f_ice,tpo%par%dx, &
                                                 tpo%par%margin2nd,tpo%par%grad_lim,tpo%par%boundaries)
-        call calc_gradient_ac_ice(tpo%now%dHicedx,tpo%now%dHicedy,tpo%now%H_ice,tpo%now%H_ice,tpo%par%dx, &
+        call calc_gradient_ac_ice(tpo%now%dHicedx,tpo%now%dHicedy,tpo%now%H_ice,tpo%now%f_ice,tpo%par%dx, &
                                                 tpo%par%margin2nd,tpo%par%grad_lim,tpo%par%boundaries)
         
         ! ajr: experimental, doesn't seem to work properly yet! ===>
@@ -276,10 +277,6 @@ contains
 !         call calc_gradient_ac_gl(tpo%now%dzsdx,tpo%now%dzsdy,tpo%now%z_srf,tpo%now%H_ice, &
 !                                       tpo%now%f_grnd_acx,tpo%now%f_grnd_acy,tpo%par%dx,method=2,grad_lim=tpo%par%grad_lim)
         
-        ! Calculate H_corr
-        call calc_H_corr(tpo%now%H_corr,tpo%now%H_ice,tpo%now%f_ice)
-
-
         ! 3. Calculate new masks ------------------------------
 
         ! Calculate grounding overburden ice thickness 
@@ -309,7 +306,7 @@ contains
         call calc_grline(tpo%now%is_grline,tpo%now%is_grz,tpo%now%f_grnd)
 
         ! Calculate the bed mask
-        tpo%now%mask_bed = gen_mask_bed(tpo%now%H_ice,thrm%now%f_pmp,tpo%now%f_grnd,tpo%now%is_grline)
+        call gen_mask_bed(tpo%now%mask_bed,tpo%now%f_ice,thrm%now%f_pmp,tpo%now%f_grnd,tpo%now%is_grline)
 
         ! Calculate distance to ice margin (really slow if always on)
         !tpo%now%dist_margin = distance_to_margin(tpo%now%H_ice,tpo%par%dx)
@@ -359,40 +356,73 @@ contains
 
     end subroutine calc_ytopo
 
-    elemental function gen_mask_bed(H_ice,f_pmp,f_grnd,is_grline) result(mask)
+    elemental subroutine gen_mask_bed(mask,f_ice,f_pmp,f_grnd,is_grline)
         ! Generate an output mask for model conditions at bed
         ! based on input masks 
         ! 0: ocean, 1: land, 2: sia, 3: streams, grline: 4, floating: 5, islands: 6
+        ! 7: partially-covered ice cell.
 
         implicit none 
 
-        real(prec), intent(IN) :: H_ice, f_pmp, f_grnd
-        logical, intent(IN) :: is_grline
-        integer :: mask
+        integer,    intent(OUT) :: mask 
+        real(prec), intent(IN)  :: f_ice, f_pmp, f_grnd
+        logical,    intent(IN)  :: is_grline
 
         if (is_grline) then
-            mask = mask_bed_grline        ! Grounding line
+            ! Grounding line
 
-        else if (f_grnd .gt. 0.0 .and. H_ice .eq. 0.0) then 
-            mask = mask_bed_land        ! Ice-free land
+            mask = mask_bed_grline
 
-        else if (f_grnd .gt. 0.0 .and. f_pmp .lt. 0.5) then 
-            mask = mask_bed_frozen        ! Inland frozen bed
+        else if (f_ice .eq. 0.0) then 
+            ! Ice-free points 
 
-        else if (f_grnd .gt. 0.0) then 
-            mask = mask_bed_stream        ! Inland stream
+            if (f_grnd .gt. 0.0) then
+                ! Ice-free land
 
-        else if (f_grnd .eq. 0.0 .and. H_ice .gt. 0.0) then 
-            mask = mask_bed_float        ! Floating ice shelves
+                mask = mask_bed_land
 
-        else 
-            mask = mask_bed_ocean        ! Ocean 
+            else
+                ! Ice-free ocean
+
+                mask = mask_bed_ocean
+
+            end if 
+
+        else if (f_ice .gt. 0.0 .and. f_ice .lt. 1.0) then 
+            ! Partially ice-covered points 
+
+            mask = mask_bed_partial
+
+        else
+            ! Fully ice-covered points 
+
+            if (f_grnd .gt. 0.0) then
+                ! Grounded ice-covered points 
+
+                if (f_pmp .gt. 0.5) then 
+                    ! Temperate points
+
+                    mask = mask_bed_stream 
+
+                else
+                    ! Frozen points 
+
+                    mask = mask_bed_frozen 
+
+                end if 
+
+            else
+                ! Floating ice-covered points 
+
+                mask = mask_bed_float
+
+            end if 
 
         end if 
-
+        
         return 
 
-    end function gen_mask_bed 
+    end subroutine gen_mask_bed
 
     subroutine ytopo_par_load(par,filename,nx,ny,dx,init)
 
@@ -482,15 +512,13 @@ contains
         allocate(now%calv_flt(nx,ny))
         allocate(now%calv_grnd(nx,ny))
         
-        allocate(now%H_margin(nx,ny))
-        
         allocate(now%dzsdx(nx,ny))
         allocate(now%dzsdy(nx,ny))
 
         allocate(now%dHicedx(nx,ny))
         allocate(now%dHicedy(nx,ny))
         
-        allocate(now%H_corr(nx,ny))
+        allocate(now%H_eff(nx,ny))
         allocate(now%H_grnd(nx,ny))
 
         ! Masks 
@@ -524,12 +552,11 @@ contains
         now%calv        = 0.0
         now%calv_flt    = 0.0
         now%calv_grnd   = 0.0
-        now%H_margin    = 0.0 
         now%dzsdx       = 0.0 
         now%dzsdy       = 0.0 
         now%dHicedx     = 0.0 
         now%dHicedy     = 0.0
-        now%H_corr      = 0.0 
+        now%H_eff       = 0.0 
         now%H_grnd      = 0.0  
         now%f_grnd      = 0.0  
         now%f_grnd_acx  = 0.0  
@@ -572,15 +599,13 @@ contains
         if (allocated(now%calv))        deallocate(now%calv)
         if (allocated(now%calv_flt))    deallocate(now%calv_flt)
         if (allocated(now%calv_grnd))   deallocate(now%calv_grnd)
-        
-        if (allocated(now%H_margin))    deallocate(now%H_margin)
-        
+            
         if (allocated(now%dzsdx))       deallocate(now%dzsdx)
         if (allocated(now%dzsdy))       deallocate(now%dzsdy)
         if (allocated(now%dHicedx))     deallocate(now%dHicedx)
         if (allocated(now%dHicedy))     deallocate(now%dHicedy)
         
-        if (allocated(now%H_corr))      deallocate(now%H_corr)
+        if (allocated(now%H_eff))       deallocate(now%H_eff)
         if (allocated(now%H_grnd))      deallocate(now%H_grnd)
 
         if (allocated(now%f_grnd))      deallocate(now%f_grnd)

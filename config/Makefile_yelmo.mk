@@ -123,7 +123,8 @@ $(objdir)/yelmo_regridding.o : $(srcdir)/yelmo_regridding.f90 $(objdir)/yelmo_de
 $(objdir)/yelmo_tools.o: $(srcdir)/yelmo_tools.f90 $(objdir)/yelmo_defs.o
 	$(FC) $(DFLAGS) $(FFLAGS) -c -o $@ $<
 
-$(objdir)/yelmo_timesteps.o : $(srcdir)/yelmo_timesteps.f90 $(objdir)/yelmo_defs.o $(objdir)/ncio.o
+$(objdir)/yelmo_timesteps.o : $(srcdir)/yelmo_timesteps.f90 $(objdir)/yelmo_defs.o $(objdir)/ncio.o \
+							$(objdir)/topography.o 
 	$(FC) $(DFLAGS) $(FFLAGS) $(INC_LIS) -c -o $@ $<
 
 $(objdir)/yelmo_topography.o: $(srcdir)/yelmo_topography.f90 $(objdir)/yelmo_defs.o \

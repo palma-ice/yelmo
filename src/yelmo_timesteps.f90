@@ -3,6 +3,8 @@ module yelmo_timesteps
     use yelmo_defs, only : sp, dp, prec, ytime_class   
     use ncio 
 
+    use topography, only : calc_ice_fraction
+
     implicit none 
 
     private
@@ -42,10 +44,20 @@ contains
         integer :: i, j, nx, ny 
         integer :: im1, jm1, ip1, jp1 
 
-        real(prec) :: H_lim = 10.0      ! [m] 
-
+        real(prec), allocatable :: f_ice_pred(:,:) 
+        real(prec), allocatable :: f_ice_corr(:,:) 
+            
+        real(prec), parameter :: H_lim = 10.0      ! [m] 
+        
         nx = size(mask,1)
         ny = size(mask,2) 
+
+        allocate(f_ice_pred(nx,ny))
+        allocate(f_ice_corr(nx,ny))
+        
+        ! Get the ice area fraction mask for each ice thickness map 
+        call calc_ice_fraction(f_ice_pred,H_ice_pred,f_grnd)
+        call calc_ice_fraction(f_ice_corr,H_ice_corr,f_grnd)
 
         ! Initially set all points to True 
         mask = .TRUE. 
@@ -74,9 +86,9 @@ contains
             else
                 ! Ice-covered points, further checks below
 
-                 if (count(H_ice_pred(im1:ip1,jm1:jp1).lt.H_lim) .gt. 0 .or. &
-                     count(H_ice_corr(im1:ip1,jm1:jp1).lt.H_lim) .gt. 0) then 
-                    ! Neighbor is (near) ice-free: ice-margin point 
+                 if (count(f_ice_pred(im1:ip1,jm1:jp1).lt.1.0) .gt. 0 .or. &
+                     count(f_ice_corr(im1:ip1,jm1:jp1).lt.1.0) .gt. 0) then 
+                    ! Point is at (or near) ice-margin point 
 
                     mask(i,j) = .FALSE. 
 

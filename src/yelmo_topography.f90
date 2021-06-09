@@ -149,18 +149,6 @@ contains
                 mbal = bnd%smb + tpo%now%fmb  
             end if 
             
-if (.FALSE.) then 
-
-            ! Now, apply mass-conservation step 2: mass balance (no calving terms)
-            call calc_ice_thickness_mbal(tpo%now%H_ice,tpo%now%mb_applied,tpo%now%calv,tpo%now%f_ice, &
-                                         tpo%now%f_grnd,bnd%z_sl-bnd%z_bed,dyn%now%ux_bar,dyn%now%uy_bar, &
-                                         mbal,tpo%now%calv_flt*0.0_wp,tpo%now%calv_grnd*0.0_wp,bnd%z_bed_sd,tpo%par%dx,dt)
-
-            ! Update ice fraction mask 
-            call calc_ice_fraction(tpo%now%f_ice,tpo%now%H_ice,tpo%now%f_grnd)
-
-end if 
-
             ! Next, diagnose CALVING
 
             ! Diagnose potential floating-ice calving rate [m/a]
@@ -215,21 +203,11 @@ end if
             ! For now, set it to zero 
             tpo%now%calv_grnd = 0.0
 
-if (.FALSE.) then 
-            ! Now, apply mass-conservation step 3: calving (no mbal term)
-            call calc_ice_thickness_mbal(tpo%now%H_ice,tpo%now%mb_applied,tpo%now%calv,tpo%now%f_ice, &
-                                         tpo%now%f_grnd,bnd%z_sl-bnd%z_bed,dyn%now%ux_bar,dyn%now%uy_bar, &
-                                         mbal*0.0,tpo%now%calv_flt,tpo%now%calv_grnd,bnd%z_bed_sd,tpo%par%dx,dt)
-
-else
-
+            
             ! Apply mass-conservation step (mbal and calving together)
             call calc_ice_thickness_mbal(tpo%now%H_ice,tpo%now%mb_applied,tpo%now%calv,tpo%now%f_ice, &
                                          tpo%now%f_grnd,bnd%z_sl-bnd%z_bed,dyn%now%ux_bar,dyn%now%uy_bar, &
                                          mbal,tpo%now%calv_flt,tpo%now%calv_grnd,bnd%z_bed_sd,tpo%par%dx,dt)
-
-
-end if 
 
             ! Update ice fraction mask 
             call calc_ice_fraction(tpo%now%f_ice,tpo%now%H_ice,tpo%now%f_grnd)

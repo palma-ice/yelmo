@@ -1216,7 +1216,7 @@ contains
 
                 ! x-direction
                 if (f_ice(i,j) .eq. 1.0 .or. f_ice(ip1,j) .eq. 1.0) then
-
+                
                     ! Ice is present on ac-node
                     
                     if (f_grnd_acx(i,j) .gt. 0.0) then 

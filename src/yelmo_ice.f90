@@ -308,7 +308,7 @@ contains
                     ! This gives great results for EISMINT, grl, etc.
 
                     dom%tpo%now%H_ice = dom%tpo%now%H_ice_pred 
-
+                    
                     ! Also recalculate z_srf and masks for consistency
                     call calc_ytopo(dom%tpo,dom%dyn,dom%mat,dom%thrm,dom%bnd,time_now,topo_fixed=.TRUE.)    
                     

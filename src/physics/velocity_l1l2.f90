@@ -150,7 +150,7 @@ contains
                     ! Calculate 3D effective viscosity, using velocity solution from previous iteration
                     
                     call calc_visc_eff_3D(visc_eff,visc_eff_ab,ux_b,uy_b,taud_acx,taud_acy,ATT, &
-                                                H_ice,zeta_aa,dx,dy,n_glen,par%eps_0,par%boundaries)
+                                                H_ice,f_ice,zeta_aa,dx,dy,n_glen,par%eps_0,par%boundaries)
 
                 case DEFAULT 
 
@@ -545,7 +545,7 @@ end if
 
     end subroutine calc_vel_horizontal_3D
 
-    subroutine calc_visc_eff_3D(visc_eff,visc_eff_ab,ux_b,uy_b,taud_acx,taud_acy,ATT,H_ice,zeta_aa,dx,dy,n_glen,eps_0,boundaries)
+    subroutine calc_visc_eff_3D(visc_eff,visc_eff_ab,ux_b,uy_b,taud_acx,taud_acy,ATT,H_ice,f_ice,zeta_aa,dx,dy,n_glen,eps_0,boundaries)
         ! Caluculate the 3D effective viscosity field
         ! for the L1L2 solver following Perego et al. (2012)
         ! and the blueprint by Lipscomb et al. (2019) in CISM
@@ -560,6 +560,7 @@ end if
         real(prec), intent(IN)  :: taud_acy(:,:)
         real(prec), intent(IN)  :: ATT(:,:,:)  
         real(prec), intent(IN)  :: H_ice(:,:)
+        real(prec), intent(IN)  :: f_ice(:,:)
         real(prec), intent(IN)  :: zeta_aa(:) 
         real(prec), intent(IN)  :: dx
         real(prec), intent(IN)  :: dy
@@ -678,42 +679,6 @@ end if
         end do 
         end do  
 
-        ! Apply boundary conditions as needed 
-        if (trim(boundaries) .eq. "periodic") then
-
-            visc_eff_ab(1,:,:)    = visc_eff_ab(nx-2,:,:) 
-            visc_eff_ab(nx-1,:,:) = visc_eff_ab(2,:,:) 
-            visc_eff_ab(nx,:,:)   = visc_eff_ab(3,:,:) 
-            visc_eff_ab(:,1,:)    = visc_eff_ab(:,ny-2,:)
-            visc_eff_ab(:,ny-1,:) = visc_eff_ab(:,2,:) 
-            visc_eff_ab(:,ny,:)   = visc_eff_ab(:,3,:)
-
-        else if (trim(boundaries) .eq. "periodic-x") then 
-            
-            visc_eff_ab(1,:,:)    = visc_eff_ab(nx-2,:,:) 
-            visc_eff_ab(nx-1,:,:) = visc_eff_ab(2,:,:) 
-            visc_eff_ab(nx,:,:)   = visc_eff_ab(3,:,:) 
-            visc_eff_ab(:,1,:)    = visc_eff_ab(:,2,:)
-            visc_eff_ab(:,ny,:)   = visc_eff_ab(:,ny-1,:)
-            
-
-        else if (trim(boundaries) .eq. "infinite") then 
-            
-            visc_eff_ab(1,:,:)    = visc_eff_ab(2,:,:) 
-            visc_eff_ab(nx-1,:,:) = visc_eff_ab(nx-2,:,:) 
-            visc_eff_ab(nx,:,:)   = visc_eff_ab(nx-2,:,:) 
-            visc_eff_ab(:,1,:)    = visc_eff_ab(:,2,:)
-            visc_eff_ab(:,ny-1,:) = visc_eff_ab(:,ny-2,:)
-            visc_eff_ab(:,ny,:)   = visc_eff_ab(:,ny-2,:)
-            
-        end if 
-
-        ! Treat the corners to avoid extremes (ab-nodes)
-        visc_eff_ab(1,1,:)   = 0.5*(visc_eff_ab(2,1,:)+visc_eff_ab(1,2,:))
-        visc_eff_ab(1,ny,:)  = 0.5*(visc_eff_ab(2,ny,:)+visc_eff_ab(1,ny-1,:))
-        visc_eff_ab(nx,1,:)  = 0.5*(visc_eff_ab(nx,2,:)+visc_eff_ab(nx-1,1,:))
-        visc_eff_ab(nx,ny,:) = 0.5*(visc_eff_ab(nx-1,ny,:)+visc_eff_ab(nx,ny-1,:))
-
         ! Unstagger from ab-nodes to aa-nodes 
         ! only using contributions from ice covered neighbors
         do j = 1, ny 
@@ -727,34 +692,68 @@ end if
             visc_eff(i,j,:) = 0.0 
             wt              = 0.0 
 
-            if (count([H_ice(i,j),H_ice(ip1,j),H_ice(i,jp1),H_ice(ip1,jp1)].eq.0) .eq. 0) then  
-                visc_eff(i,j,:) = visc_eff(i,j,:) + visc_eff_ab(i,j,:) 
-                wt = wt + 1.0 
-            end if 
+            if (f_ice(i,j) .eq. 1.0) then
+                ! Ice-covered point. 
+                ! Only use contributions from ice-covered neighbors 
+
+                if (count([f_ice(i,j),f_ice(ip1,j),f_ice(i,jp1),f_ice(ip1,jp1)].lt.1.0) .eq. 0) then  
+                    visc_eff(i,j,:) = visc_eff(i,j,:) + visc_eff_ab(i,j,:) 
+                    wt = wt + 1.0 
+                end if 
+                
+                if (count([f_ice(i,j),f_ice(im1,j),f_ice(im1,jp1),f_ice(i,jp1)].lt.1.0) .eq. 0) then  
+                    visc_eff(i,j,:) = visc_eff(i,j,:) + visc_eff_ab(im1,j,:) 
+                    wt = wt + 1.0 
+                end if 
+
+                if (count([f_ice(i,j),f_ice(i,jm1),f_ice(ip1,jm1),f_ice(ip1,j)].lt.1.0) .eq. 0) then 
+                    visc_eff(i,j,:) = visc_eff(i,j,:) + visc_eff_ab(i,jm1,:) 
+                    wt = wt + 1.0 
+                end if 
+                
+                if (count([f_ice(i,j),f_ice(im1,j),f_ice(im1,jm1),f_ice(i,jm1)].lt.1.0) .eq. 0) then 
+                    visc_eff(i,j,:) = visc_eff(i,j,:) + visc_eff_ab(im1,jm1,:) 
+                    wt = wt + 1.0 
+                end if 
             
-            if (count([H_ice(i,j),H_ice(im1,j),H_ice(im1,jp1),H_ice(i,jp1)].eq.0) .eq. 0) then  
-                visc_eff(i,j,:) = visc_eff(i,j,:) + visc_eff_ab(im1,j,:) 
-                wt = wt + 1.0 
+            else
+                ! Ice-free point.
+                ! Only use contributions from ice-free neighbors 
+
+                if (count([f_ice(i,j),f_ice(ip1,j),f_ice(i,jp1),f_ice(ip1,jp1)].eq.1.0) .eq. 0) then  
+                    visc_eff(i,j,:) = visc_eff(i,j,:) + visc_eff_ab(i,j,:) 
+                    wt = wt + 1.0 
+                end if 
+                
+                if (count([f_ice(i,j),f_ice(im1,j),f_ice(im1,jp1),f_ice(i,jp1)].eq.1.0) .eq. 0) then  
+                    visc_eff(i,j,:) = visc_eff(i,j,:) + visc_eff_ab(im1,j,:) 
+                    wt = wt + 1.0 
+                end if 
+
+                if (count([f_ice(i,j),f_ice(i,jm1),f_ice(ip1,jm1),f_ice(ip1,j)].eq.1.0) .eq. 0) then 
+                    visc_eff(i,j,:) = visc_eff(i,j,:) + visc_eff_ab(i,jm1,:) 
+                    wt = wt + 1.0 
+                end if 
+                
+                if (count([f_ice(i,j),f_ice(im1,j),f_ice(im1,jm1),f_ice(i,jm1)].eq.1.0) .eq. 0) then 
+                    visc_eff(i,j,:) = visc_eff(i,j,:) + visc_eff_ab(im1,jm1,:) 
+                    wt = wt + 1.0 
+                end if 
+            
             end if 
 
-            if (count([H_ice(i,j),H_ice(i,jm1),H_ice(ip1,jm1),H_ice(ip1,j)].eq.0) .eq. 0) then 
-                visc_eff(i,j,:) = visc_eff(i,j,:) + visc_eff_ab(i,jm1,:) 
-                wt = wt + 1.0 
-            end if 
-            
-            if (count([H_ice(i,j),H_ice(im1,j),H_ice(im1,jm1),H_ice(i,jm1)].eq.0) .eq. 0) then 
-                visc_eff(i,j,:) = visc_eff(i,j,:) + visc_eff_ab(im1,jm1,:) 
-                wt = wt + 1.0 
-            end if 
-            
             if (wt .gt. 0.0) then 
+                ! Get the weighted mean of the viscosity for this aa-node 
+
                 visc_eff(i,j,:) = visc_eff(i,j,:) / wt 
+
             else 
-                ! Just get simple average for ice free points 
+                ! Just get simple average for safety
+                ! (this case should not occur)
 
                 ! Loop over column
                 do k = 1, nz_aa 
-                    visc_eff(i,j,k) = 0.25_prec*(visc_eff_ab(i,j,k)+visc_eff_ab(im1,j,k) &
+                    visc_eff(i,j,k) = 0.25_wp*(visc_eff_ab(i,j,k)+visc_eff_ab(im1,j,k) &
                                                 +visc_eff_ab(i,jm1,k)+visc_eff_ab(im1,jm1,k))
                 end do 
 
@@ -762,7 +761,52 @@ end if
 
         end do 
         end do 
+    
+
+        ! Extrapolate viscosity to bordering ice-free or partially ice-covered cells
+        do j=1, ny
+        do i=1, nx
+
+            ! Get neighbor indices
+            im1 = max(i-1,1) 
+            ip1 = min(i+1,nx) 
+            jm1 = max(j-1,1) 
+            jp1 = min(j+1,ny) 
             
+            if ( f_ice(i,j) .lt. 1.0 .and. &
+                count([f_ice(im1,j),f_ice(ip1,j),f_ice(i,jm1),f_ice(i,jp1)] .eq. 1.0_wp) .gt. 0 ) then 
+                ! Ice-free (or partially ice-free) with ice-covered neighbors
+
+                visc_eff(i,j,:) = 0.0 
+                wt = 0.0 
+
+                if (f_ice(im1,j).eq.1.0) then 
+                    visc_eff(i,j,:) = visc_eff(i,j,:) + visc_eff(im1,j,:) 
+                    wt = wt + 1.0 
+                end if 
+                if (f_ice(ip1,j).eq.1.0) then 
+                    visc_eff(i,j,:) = visc_eff(i,j,:) + visc_eff(ip1,j,:) 
+                    wt = wt + 1.0 
+                end if 
+                if (f_ice(i,jm1).eq.1.0) then 
+                    visc_eff(i,j,:) = visc_eff(i,j,:) + visc_eff(i,jm1,:) 
+                    wt = wt + 1.0 
+                end if 
+                if (f_ice(i,jp1).eq.1.0) then 
+                    visc_eff(i,j,:) = visc_eff(i,j,:) + visc_eff(i,jp1,:) 
+                    wt = wt + 1.0 
+                end if 
+                
+                if (wt .gt. 0.0) then 
+                    visc_eff(i,j,:) = visc_eff(i,j,:) / wt 
+
+                end if 
+
+            end if 
+
+        end do 
+        end do 
+
         ! Apply boundary conditions as needed 
         if (trim(boundaries) .eq. "periodic") then
 
@@ -796,114 +840,6 @@ end if
         return 
 
     end subroutine calc_visc_eff_3D
-
-    function calc_staggered_margin(var0,var1,H0,H1) result(var_mid)
-        ! Calculate a staggered point but taking upstream point at the margin 
-
-        implicit none 
-
-        real(prec), intent(IN) :: var0 
-        real(prec), intent(IN) :: var1 
-        real(prec), intent(IN) :: H0 
-        real(prec), intent(IN) :: H1
-        real(prec) :: var_mid 
-
-        if (H0 .gt. 0.0_prec .and. H1 .eq. 0.0_prec) then 
-            ! At the margin 
-
-            var_mid = var0 
-
-        else if (H0 .eq. 0.0_prec .and. H1 .gt. 0.0_prec) then 
-            ! At the margin 
-
-            var_mid = var1 
-
-        else 
-            ! Inland ice, or ice free, simple average 
-
-            var_mid = 0.5_prec*(var0+var1) 
-
-        end if 
-
-        return 
-
-    end function calc_staggered_margin
-
-    subroutine smooth_visc_eff_int_margin(visc_eff_int,H_ice)
-
-        implicit none 
-
-        real(prec), intent(INOUT) :: visc_eff_int(:,:) 
-        real(prec), intent(IN)    :: H_ice(:,:) 
-        
-        ! Local variables 
-        integer    :: i, j, nx, ny 
-        integer    :: im1, ip1, jm1, jp1 
-        integer    :: n_ice 
-        real(prec) :: H_neighb(4) 
-        real(prec) :: visc_neighb(4) 
-        logical    :: mask_neighb(4) 
-        real(prec) :: visc_mean 
-        logical    :: is_margin 
-        logical    :: is_low_visc 
-
-        real(prec), allocatable :: visc_eff_int_ref(:,:) 
-
-        real(prec), parameter :: visc_ratio_lim = 1e-1      ! visc / mean(visc_neighb) > visc_ratio_lim 
-
-        nx = size(visc_eff_int,1) 
-        ny = size(visc_eff_int,2) 
-
-        ! Allocate local arrays 
-        allocate(visc_eff_int_ref(nx,ny)) 
-
-        visc_eff_int_ref = visc_eff_int 
-
-        ! Check margin for extreme viscosity values, smooth them as necessary
-        do j = 1, ny 
-        do i = 1, nx 
-
-            im1 = max(i-1,1) 
-            ip1 = min(i+1,nx) 
-            jm1 = max(j-1,1) 
-            jp1 = min(j+1,ny) 
-
-            if (H_ice(i,j) .gt. 0.0) then 
-                ! Ice-covered point 
-
-                H_neighb    = [H_ice(im1,j),H_ice(ip1,j),H_ice(i,jm1),H_ice(i,jp1)]
-                mask_neighb = H_neighb .gt. 0.0_prec 
-                n_ice       = count(mask_neighb)
-                is_margin   = n_ice .lt. 4
-                
-                if (n_ice .gt. 0) then 
-                    ! Some neighbors are ice covered too 
-                    visc_neighb = [visc_eff_int_ref(im1,j),visc_eff_int_ref(ip1,j),visc_eff_int_ref(i,jm1),visc_eff_int_ref(i,jp1)]
-                    visc_mean   = sum(visc_neighb,mask=mask_neighb) / real(n_ice,prec)
-                else 
-                    ! Just set neighbor mean == to current visc to move on to next point 
-                    visc_mean   = visc_eff_int_ref(i,j) 
-                end if 
-
-                ! Check if this point has a low viscosity relative to its neighbors 
-                is_low_visc = visc_eff_int_ref(i,j) / visc_mean .lt. visc_ratio_lim 
-
-                if (is_margin .and. is_low_visc) then 
-                    ! If this is an ice-margin point, and the viscosity is *much*
-                    ! lower than ice-covered neighbors, then smooth viscosity here. 
-
-                    visc_eff_int(i,j) = visc_mean 
-
-                end if 
-
-            end if 
-                    
-        end do 
-        end do  
-
-        return 
-
-    end subroutine smooth_visc_eff_int_margin
 
     subroutine calc_basal_stress(taub_acx,taub_acy,beta_acx,beta_acy,ux_b,uy_b)
         ! Calculate the basal stress resulting from sliding (friction times velocity)

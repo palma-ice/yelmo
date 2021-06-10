@@ -194,7 +194,7 @@ program yelmo_test
     ! -5 [K] for mimicking glacial times
 !     yelmo1%bnd%T_srf = yelmo1%dta%pd%T_srf - 10.0  
 
-if (.FALSE.) then 
+if (.TRUE.) then 
     ! Run yelmo for several years with constant boundary conditions and topo
     ! to equilibrate thermodynamics and dynamics
     yelmo1%par%dt_method        = 0 

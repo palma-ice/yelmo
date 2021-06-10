@@ -57,6 +57,7 @@ contains
         real(prec) :: dx, dt   
         integer :: i, j, nx, ny  
         real(prec), allocatable :: mbal(:,:) 
+        real(prec), allocatable :: calv_sd(:,:) 
         real(prec), allocatable :: H_ref(:,:) 
 
         type(strain_2D_class) :: strn2D 
@@ -70,6 +71,7 @@ contains
         ny = size(tpo%now%H_ice,2)
 
         allocate(mbal(nx,ny))
+        allocate(calv_sd(nx,ny))
         allocate(H_ref(nx,ny))
 
         ! Strain and stress 
@@ -149,9 +151,8 @@ contains
                 mbal = bnd%smb + tpo%now%fmb  
             end if 
             
-            ! Next, diagnose CALVING
-
-            ! Diagnose potential floating-ice calving rate [m/a]
+            ! Diagnose potential floating-ice calving rate [m/yr]
+            
             select case(trim(tpo%par%calv_flt_method))
 
                 case("zero")
@@ -191,23 +192,45 @@ contains
 
                 case DEFAULT 
 
-                    write(*,*) "calc_ytopo:: Error: calving method not recognized."
+                    write(*,*) "calc_ytopo:: Error: floating calving method not recognized."
                     write(*,*) "calv_flt_method = ", trim(tpo%par%calv_flt_method)
                     stop 
 
             end select
             
 
-            ! Diagnose potential grounded-ice calving rate [m/a]
+            ! Diagnose potential grounded-ice calving rate [m/yr]
 
-            ! For now, set it to zero 
-            tpo%now%calv_grnd = 0.0
+            select case(trim(tpo%par%calv_grnd_method))
 
+                case("zero")
+
+                    tpo%now%calv_grnd = 0.0 
+
+                case("stress-b12") 
+                    ! Use simple threshold method
+
+                    call calc_calving_ground_rate_stress_b12(tpo%now%calv_grnd,tpo%now%H_ice,tpo%now%f_ice, &
+                                                    tpo%now%f_grnd,bnd%z_sl-bnd%z_bed,tpo%par%calv_tau)
+
+                case DEFAULT 
+
+                    write(*,*) "calc_ytopo:: Error: grounded calving method not recognized."
+                    write(*,*) "calv_grnd_method = ", trim(tpo%par%calv_grnd_method)
+                    stop 
+
+            end select
+            
+            ! Additionally include parameterized grounded calving 
+            ! to account for grid resolution 
+            call calc_calving_ground_rate_stdev(calv_sd,tpo%now%H_ice,tpo%now%f_ice,tpo%now%f_grnd, &
+                                            bnd%z_bed_sd,tpo%par%sd_min,tpo%par%sd_max,tpo%par%calv_max,tpo%par%calv_tau)
+            tpo%now%calv_grnd = tpo%now%calv_grnd + calv_sd 
             
             ! Apply mass-conservation step (mbal and calving together)
             call calc_ice_thickness_mbal(tpo%now%H_ice,tpo%now%mb_applied,tpo%now%calv,tpo%now%f_ice, &
                                          tpo%now%f_grnd,bnd%z_sl-bnd%z_bed,dyn%now%ux_bar,dyn%now%uy_bar, &
-                                         mbal,tpo%now%calv_flt,tpo%now%calv_grnd,bnd%z_bed_sd,tpo%par%dx,dt)
+                                         mbal,tpo%now%calv_flt,tpo%now%calv_grnd,tpo%par%dx,dt)
 
             ! Update ice fraction mask 
             call calc_ice_fraction(tpo%now%f_ice,tpo%now%H_ice,tpo%now%f_grnd)

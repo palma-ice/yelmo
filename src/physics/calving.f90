@@ -1,7 +1,7 @@
 module calving
     ! Definitions for various calving laws 
 
-    use yelmo_defs, only : sp, dp, wp, prec, rho_ice, g  
+    use yelmo_defs, only : sp, dp, wp, prec, rho_ice, rho_sw, g  
     use deformation, only : calc_stress_eigen_values
 
     implicit none 
@@ -9,13 +9,19 @@ module calving
 
     private 
 
-    public :: apply_calving
+    public :: apply_calving     ! ajr: currently not used...
+    public :: calc_calving_rate_kill 
+    
+    ! Floating calving routines 
     public :: calc_calving_rate_simple
     public :: calc_calving_rate_flux 
     public :: calc_calving_rate_vonmises_l19
     public :: calc_calving_rate_eigen
-    public :: calc_calving_rate_kill 
     
+    ! Grounded calving routines 
+    public :: calc_calving_ground_rate_stress_b12
+    public :: calc_calving_ground_rate_stdev
+
 contains 
 
     subroutine apply_calving(H_ice,calv,f_grnd,H_min_flt,dt)
@@ -79,6 +85,38 @@ contains
         return 
         
     end subroutine apply_calving
+
+    subroutine calc_calving_rate_kill(calv,H_ice,mask,tau,dt)
+        ! Kill all ice in a given mask using a characteristic timescale tau
+
+        implicit none 
+
+        real(wp), intent(OUT) :: calv(:,:)
+        real(wp), intent(IN)  :: H_ice(:,:)
+        logical,    intent(IN)  :: mask(:,:) 
+        real(wp), intent(IN)  :: tau 
+        real(wp), intent(IN)  :: dt 
+
+        if (tau .eq. 0.0_prec) then 
+            ! Kill all ice immediately 
+
+            where (mask) calv = H_ice / dt
+
+        else 
+            ! Kill using characteristic timescale 
+            where (mask) calv = H_ice / tau 
+
+        end if 
+
+        return 
+
+    end subroutine calc_calving_rate_kill
+
+! ===================================================================
+!
+! Calving - floating ice 
+!
+! ===================================================================
 
     subroutine calc_calving_rate_simple(calv,H_ice,f_grnd,f_ice,H_calv,tau)
         ! Calculate the calving rate [m/a] based on a simple threshold rule
@@ -276,7 +314,7 @@ contains
             jm1 = max(j-1,1)
             jp1 = min(j+1,ny)
             
-            if ( (f_grnd(i,j) .eq. 0.0 .and. H_ice(i,j) .gt. 0.0 .and. H_diff(i,j).lt.0.0) .and. &
+            if ( (f_grnd(i,j) .eq. 0.0 .and. f_ice(i,j) .gt. 0.0 .and. H_diff(i,j).lt.0.0) .and. &
                    ( (f_grnd(im1,j) .eq. 0.0 .and. f_ice(im1,j).eq.0.0) .or. &
                      (f_grnd(ip1,j) .eq. 0.0 .and. f_ice(ip1,j).eq.0.0) .or. &
                      (f_grnd(i,jm1) .eq. 0.0 .and. f_ice(i,jm1).eq.0.0) .or. &
@@ -596,30 +634,163 @@ end if
 
     end subroutine calc_calving_rate_eigen
 
-    subroutine calc_calving_rate_kill(calv,H_ice,mask,tau,dt)
-        ! Kill all ice in a given mask using a characteristic timescale tau
+! ===================================================================
+!
+! Calving - grounded ice 
+!
+! ===================================================================
+
+    subroutine calc_calving_ground_rate_stress_b12(calv,H_ice,f_ice,f_grnd,H_ocn,tau)
+        ! Remove marginal ice that exceeds a stress threshold following
+        ! Bassis and Walker (2012), Eq. 2.12 
 
         implicit none 
 
-        real(wp), intent(OUT) :: calv(:,:)
-        real(wp), intent(IN)  :: H_ice(:,:)
-        logical,    intent(IN)  :: mask(:,:) 
-        real(wp), intent(IN)  :: tau 
-        real(wp), intent(IN)  :: dt 
+        real(wp), intent(OUT) :: calv(:,:)              ! [m/yr] Grounded horizontal calving rate 
+        real(wp), intent(IN)  :: H_ice(:,:)             ! [m] Ice thickness 
+        real(wp), intent(IN)  :: f_ice(:,:)             ! [--] Ice area fraction 
+        real(wp), intent(IN)  :: f_grnd(:,:)            ! [-] Grounded fraction
+        real(wp), intent(IN)  :: H_ocn(:,:)             ! [m] Ocean thickness (depth)
+        real(wp), intent(IN)  :: tau                    ! [yr] Calving timescale 
 
-        if (tau .eq. 0.0_prec) then 
-            ! Kill all ice immediately 
+        ! Local variables 
+        integer  :: i, j, nx, ny
+        integer  :: im1, ip1, jm1, jp1 
+        real(wp) :: tau_c, H_eff, H_max, H_ocn_now 
+        logical  :: is_grnd_margin  
+        real(wp) :: rho_ice_g, rho_sw_ice, rho_ice_sw  
 
-            where (mask) calv = H_ice / dt
+        real(wp), parameter :: C0    = 1e6                ! [Pa] Depth-averaged shear stress in ice 
+        real(wp), parameter :: alpha = 0.0                ! [--] Friction coefficient for Bassis and Walker (2012), Eq. 2.13
+        real(wp), parameter :: r     = 0.0                ! [--] Crevasse fraction 
+        
+        rho_ice_g  = rho_ice * g 
+        rho_sw_ice = rho_sw / rho_ice 
+        rho_ice_sw = rho_ice / rho_sw 
 
-        else 
-            ! Kill using characteristic timescale 
-            where (mask) calv = H_ice / tau 
+        nx = size(H_ice,1)
+        ny = size(H_ice,2)
+
+        do j = 1, ny
+        do i = 1, nx 
+
+            ! Get neighbor indices
+            im1 = max(i-1,1) 
+            ip1 = min(i+1,nx) 
+            jm1 = max(j-1,1) 
+            jp1 = min(j+1,ny) 
+
+            ! Determine if grounded, ice-covered point has an ice-free neighbor (ie, at the grounded ice margin)
+            is_grnd_margin = (f_ice(i,j) .gt. 0.0 .and. f_grnd(i,j) .gt. 0.0 &
+                .and. count([f_ice(im1,j),f_ice(ip1,j),f_ice(i,jm1),f_ice(i,jp1)] .eq. 0.0) .gt. 0)
+
+            if (is_grnd_margin) then 
+                ! Margin point
+
+                ! Get effective ice thickness 
+                if (f_ice(i,j) .gt. 0.0) then 
+                    H_eff = H_ice(i,j) / f_ice(i,j)
+                else 
+                    H_eff = H_ice(i,j)
+                end if 
+
+                ! Calculate depth of seawater (limited by ice thickness and flotation criterion)
+                if (H_ocn(i,j) .gt. 0.0) then 
+                    H_ocn_now = min(rho_ice_sw*H_eff,H_ocn(i,j))
+                else 
+                    H_ocn_now = 0.0 
+                end if 
+
+                ! Get depth-averaged shear-stress in ice, Bassis and Walker (2012), Eq. 2.13 vertically integrated
+                ! alpha = 0.65: model S1 validated for cold ice 
+                ! alpha = 0.4 : model S2 for warmer ice 
+                ! alpha = 0.0 : model S3 for purely plastic yielding (default)
+                tau_c = C0 + 0.5*alpha*rho_ice_g*H_eff
+
+                ! Get critical ice thickness to cause stress failure
+                H_max = (1.0-r)*tau_c/rho_ice_g + sqrt(((1.0-r)*tau_c/rho_ice_g)**2 + rho_sw_ice*H_ocn_now**2)
+
+                if (H_eff .gt. H_max) then 
+                    ! Critical stress exceeded, determine horizontal calving rate 
+
+                    calv(i,j) = f_ice(i,j) * max(H_eff-H_max,0.0) / tau
+
+                end if 
+
+            end if
+
+        end do 
+        end do 
+
+        return 
+
+    end subroutine calc_calving_ground_rate_stress_b12
+    
+    subroutine calc_calving_ground_rate_stdev(calv,H_ice,f_ice,f_grnd,z_bed_sd,sd_min,sd_max,calv_max,tau)
+        ! Parameterize grounded ice-margin calving as a function of 
+        ! standard deviation of bedrock at each grid point.
+        ! Assumes that higher variability in subgrid implies cliffs
+        ! that are not represented at low resolution. 
+
+        implicit none 
+
+        real(wp), intent(OUT) :: calv(:,:)                ! [m/yr] Calculated calving rate 
+        real(wp), intent(IN)  :: H_ice(:,:)               ! [m] Ice thickness 
+        real(wp), intent(IN)  :: f_ice(:,:)               ! [-] Ice area fraction
+        real(wp), intent(IN)  :: f_grnd(:,:)              ! [-] Grounded fraction
+        real(wp), intent(IN)  :: z_bed_sd(:,:)            ! [m] Standard deviation of bedrock topography
+        real(wp), intent(IN)  :: sd_min                   ! [m] stdev(z_bed) at/below which calv=0
+        real(wp), intent(IN)  :: sd_max                   ! [m] stdev(z_bed) at/above which calv=calv_max 
+        real(wp), intent(IN)  :: calv_max                 ! [m/yr] Maximum allowed calving rate
+        real(wp), intent(IN)  :: tau                      ! [yr] Calving timescale       
+
+        ! Local variables
+        integer  :: i, j, nx, ny  
+        integer  :: im1, ip1, jm1, jp1 
+        real(wp) :: f_scale 
+        logical  :: is_grnd_margin 
+
+        nx = size(H_ice,1)
+        ny = size(H_ice,2)
+
+        calv = 0.0 
+        
+        if (calv_max .gt. 0.0) then 
+            ! Determine grounded calving rate 
+
+            do j = 1, ny
+            do i = 1, nx 
+
+                ! Get neighbor indices
+                im1 = max(i-1,1) 
+                ip1 = min(i+1,nx) 
+                jm1 = max(j-1,1) 
+                jp1 = min(j+1,ny) 
+
+                ! Determine if grounded, ice-covered point has an ice-free neighbor (ie, at the grounded ice margin)
+                is_grnd_margin = (f_ice(i,j) .gt. 0.0 .and. f_grnd(i,j) .gt. 0.0 &
+                    .and. count([f_ice(im1,j),f_ice(ip1,j),f_ice(i,jm1),f_ice(i,jp1)] .eq. 0.0) .gt. 0)
+
+                if (is_grnd_margin) then 
+                    ! Margin point
+
+                    f_scale = (z_bed_sd(i,j) - sd_min)/(sd_max-sd_min)
+                    if (f_scale .lt. 0.0) f_scale = 0.0 
+                    if (f_scale .gt. 1.0) f_scale = 1.0 
+
+                    ! Calculate calving rate from linear function, 
+                    ! limited to available ice thickness 
+                    calv(i,j) = min(f_scale*calv_max, H_ice(i,j)/tau) 
+                    
+                end if 
+
+            end do 
+            end do 
 
         end if 
 
         return 
 
-    end subroutine calc_calving_rate_kill
+    end subroutine calc_calving_ground_rate_stdev
 
-end module calving 
+end module calving

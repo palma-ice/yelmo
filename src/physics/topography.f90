@@ -61,11 +61,30 @@ contains
         f_ice = 0.0_wp  
         where (H_ice .gt. 0.0) f_ice = 1.0_wp
 
+
+
+        ! ajr: see if we can avoid this without relying on "boundaries"
+        ! if (trim(boundaries) .eq. "MISMIP3D") then 
+        !     ! Do not use H_margin treatment for MISMIP3D, it is problematic
+        !     ! at the domain boundaries.
+
+        !         f_ice = 0.0 
+        !         where (H_ice .gt. 0.0) f_ice = 1.0
+        !         H_margin = 0.0 
+
+        ! else 
+        !     ! Diagnose margin ice and determine f_ice
+
+        !     Continue as normal below...
+        !
+        ! end if 
+
+
         ! For ice-covered points with ice-free neighbors (ie, at the floating or grounded margin),
         ! determine the fraction of grid point that should be ice covered. 
 
         H_ice_0 = H_ice 
-        
+
         do j = 1, ny
         do i = 1, nx 
 

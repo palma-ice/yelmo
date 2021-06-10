@@ -139,8 +139,6 @@ module yelmo_defs
         real(wp), allocatable   :: calv_flt(:,:)   ! Reference floating calving rate [m/a]
         real(wp), allocatable   :: calv_grnd(:,:)  ! Reference grounded calving rate [m/a]
         
-        real(wp), allocatable   :: H_margin(:,:)   ! [m] Margin ice thickness in partially filled cells 
-
         real(wp), allocatable   :: dzsdx(:,:)      ! Surface elevation slope [m m-1], Ac x nodes
         real(wp), allocatable   :: dzsdy(:,:)      ! Surface elevation slope [m m-1], Ac y nodes
         real(wp), allocatable   :: dHicedx(:,:)    ! Ice thickness gradient slope [m m-1], Ac x nodes

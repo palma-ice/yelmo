@@ -419,7 +419,7 @@ contains
         real(wp), allocatable :: fact_z(:)
 
         logical :: is_margin 
-        real(wp) :: ddiv_free, dxx_free, dyy_free 
+        real(wp) :: div_free, dxx_free, dyy_free 
         real(wp) :: wt 
 
         ! Define dy 
@@ -592,7 +592,7 @@ contains
                     if (strn%de(i,j,k) .gt. de_max) strn%de(i,j,k) = de_max 
 
                     ! Calculate the horizontal divergence too 
-                    strn%ddiv(i,j,k) = strn%dxx(i,j,k) + strn%dyy(i,j,k) 
+                    strn%div(i,j,k) = strn%dxx(i,j,k) + strn%dyy(i,j,k) 
 
                     ! Note: Using only the below should be equivalent to applying
                     ! the SIA approximation to calculate `de`
@@ -627,20 +627,20 @@ if (.FALSE.) then
     ! imposing the free-spreading strain rate. So this section is disabled. 
 
                 ! Also estimate the free-spreading strain rate (Pollard et al., 2015, EPSL, Eq. B2.b)
-                ! ddiv = A*(rho*g*h/4)^n = dxx + dyy
+                ! div = A*(rho*g*h/4)^n = dxx + dyy
                 ! assume equal spreading in both directions:
                 ! dxx = dyy; de = 2*dxx
                 ! dxx = de/2
-                ddiv_free = ATT_bar(i,j) * (0.25*rho_ice*g*H_ice(i,j))**n_glen
-                ! dxx_free  = ddiv_free / 2.0
+                div_free = ATT_bar(i,j) * (0.25*rho_ice*g*H_ice(i,j))**n_glen
+                ! dxx_free  = div_free / 2.0
                 ! dyy_free  = dxx_free 
                 if ( abs(0.5*vx(i,j,nz_aa)+vx(im1,j,nz_aa)) &
                       .gt. abs(0.5*vy(i,j,nz_aa)+vy(i,jm1,nz_aa)) ) then 
-                    dxx_free  = ddiv_free
+                    dxx_free  = div_free
                     dyy_free  = 0.0 
                 else 
                     dxx_free  = 0.0
-                    dyy_free  = ddiv_free
+                    dyy_free  = div_free
                 end if 
                 
 
@@ -650,10 +650,10 @@ if (.FALSE.) then
                 ! For partially covered grid cells at margin, or floating points
                 ! ensure effective strain rate is not larger than free-spreading strain rate
                 if (is_margin .or. &
-                     (f_grnd(i,j) .eq. 0.0 .and. strn2D%ddiv(i,j) .gt. ddiv_free) ) then 
+                     (f_grnd(i,j) .eq. 0.0 .and. strn2D%div(i,j) .gt. div_free) ) then 
                     ! Overwrite above value and impose free-spreading strain 
 
-                    strn%ddiv(i,j,:)    = ddiv_free
+                    strn%div(i,j,:)     = div_free
                     strn%dxx(i,j,:)     = dxx_free
                     strn%dyy(i,j,:)     = dyy_free
                     strn%dxy(i,j,:)     = 0.0
@@ -670,7 +670,7 @@ if (.FALSE.) then
                     if (strn%de(i,j,k) .gt. de_max) strn%de(i,j,k) = de_max 
 
                     ! Calculate the horizontal divergence too 
-                    strn%ddiv(i,j,k) = strn%dxx(i,j,k) + strn%dyy(i,j,k) 
+                    strn%div(i,j,k) = strn%dxx(i,j,k) + strn%dyy(i,j,k) 
 
                 end if 
 end if 
@@ -765,7 +765,7 @@ end if
                     if (strn%de(i,j,k) .gt. de_max) strn%de(i,j,k) = de_max 
 
                     ! Calculate the horizontal divergence too 
-                    strn%ddiv(i,j,k) = strn%dxx(i,j,k) + strn%dyy(i,j,k) 
+                    strn%div(i,j,k) = strn%dxx(i,j,k) + strn%dyy(i,j,k) 
 
                     ! Note: Using only the below should be equivalent to applying
                     ! the SIA approximation to calculate `de`
@@ -806,7 +806,7 @@ end if
         strn2D%dxy     = calc_vertical_integrated_2D(strn%dxy, zeta_aa)
         strn2D%dxz     = calc_vertical_integrated_2D(strn%dxz, zeta_aa)
         strn2D%dyz     = calc_vertical_integrated_2D(strn%dyz, zeta_aa)
-        strn2D%ddiv    = calc_vertical_integrated_2D(strn%ddiv,zeta_aa)
+        strn2D%div     = calc_vertical_integrated_2D(strn%div, zeta_aa)
         strn2D%de      = calc_vertical_integrated_2D(strn%de,  zeta_aa)
         strn2D%f_shear = calc_vertical_integrated_2D(strn%f_shear,zeta_aa) 
         
@@ -841,7 +841,7 @@ end if
 
         real(wp) :: wt 
 
-        real(wp) :: ddiv_free, dxx_free, dyy_free  
+        real(wp) :: div_free, dxx_free, dyy_free  
 
         nx = size(ux_bar,1)
         ny = size(ux_bar,2)
@@ -888,20 +888,20 @@ if (.FALSE.) then
     ! imposing the free-spreading strain rate. So this section is disabled. 
 
                 ! Also estimate the free-spreading strain rate (Pollard et al., 2015, EPSL, Eq. B2.b)
-                ! ddiv = A*(rho*g*h/4)^n = dxx + dyy
+                ! div = A*(rho*g*h/4)^n = dxx + dyy
                 ! assume equal spreading in both directions:
-                ! dxx = dyy; ddiv = 2*dxx
-                ! dxx = ddiv/2
-                ddiv_free = ATT_bar(i,j) * (0.25*rho_ice*g*H_ice(i,j))**n_glen
-                ! dxx_free  = ddiv_free / 2.0
+                ! dxx = dyy; div = 2*dxx
+                ! dxx = div/2
+                div_free = ATT_bar(i,j) * (0.25*rho_ice*g*H_ice(i,j))**n_glen
+                ! dxx_free  = div_free / 2.0
                 ! dyy_free  = dxx_free 
                 if ( abs(0.5*ux_bar(i,j)+ux_bar(im1,j)) &
                       .gt. abs(0.5*uy_bar(i,j)+uy_bar(i,jm1)) ) then 
-                    dxx_free  = ddiv_free
+                    dxx_free  = div_free
                     dyy_free  = 0.0 
                 else 
                     dxx_free  = 0.0
-                    dyy_free  = ddiv_free
+                    dyy_free  = div_free
                 end if 
 
                 is_margin = ( H_ice(i,j) .gt. 0.0_wp .and. f_ice(i,j) .lt. 1.0_wp .and. &
@@ -910,9 +910,9 @@ if (.FALSE.) then
                 ! For partially covered grid cells at margin, or floating points
                 ! ensure effective strain rate is not larger than free-spreading strain rate
                 if (is_margin .or. &
-                     (f_grnd(i,j) .eq. 0.0 .and. strn2D%de(i,j) .gt. ddiv_free) ) then 
+                     (f_grnd(i,j) .eq. 0.0 .and. strn2D%de(i,j) .gt. div_free) ) then 
                     ! Overwrite above value and impose free-spreading strain 
-                    strn2D%ddiv(i,j) = ddiv_free 
+                    strn2D%div(i,j) = div_free 
                     strn2D%dxx(i,j)  = dxx_free 
                     strn2D%dyy(i,j)  = dyy_free 
                     strn2D%dxy(i,j)  = 0.0
@@ -998,7 +998,7 @@ end if
                 if (strn2D%de(i,j) .gt. de_max) strn2D%de(i,j) = de_max 
 
                 ! Calculate the horizontal divergence too 
-                strn2D%ddiv(i,j) = strn2D%dxx(i,j) + strn2D%dyy(i,j) 
+                strn2D%div(i,j) = strn2D%dxx(i,j) + strn2D%dyy(i,j) 
 
                 ! No shearing estimated from 2D components
                 strn2D%f_shear(i,j) = 0.0

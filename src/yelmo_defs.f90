@@ -325,8 +325,8 @@ module yelmo_defs
 
         real(wp), allocatable :: f_vbvs(:,:) 
 
-        integer,    allocatable :: ssa_mask_acx(:,:) 
-        integer,    allocatable :: ssa_mask_acy(:,:) 
+        integer,  allocatable :: ssa_mask_acx(:,:) 
+        integer,  allocatable :: ssa_mask_acy(:,:) 
         real(wp), allocatable :: ssa_err_acx(:,:) 
         real(wp), allocatable :: ssa_err_acy(:,:) 
 
@@ -353,7 +353,7 @@ module yelmo_defs
         real(wp), allocatable :: dxz(:,:) 
         real(wp), allocatable :: dyz(:,:)
         real(wp), allocatable :: de(:,:)
-        real(wp), allocatable :: ddiv(:,:) 
+        real(wp), allocatable :: div(:,:) 
         real(wp), allocatable :: f_shear(:,:) 
     end type 
 
@@ -364,7 +364,7 @@ module yelmo_defs
         real(wp), allocatable :: dxz(:,:,:) 
         real(wp), allocatable :: dyz(:,:,:) 
         real(wp), allocatable :: de(:,:,:) 
-        real(wp), allocatable :: ddiv(:,:,:) 
+        real(wp), allocatable :: div(:,:,:) 
         real(wp), allocatable :: f_shear(:,:,:) 
     end type 
     
@@ -384,7 +384,6 @@ module yelmo_defs
     type stress_3D_class 
         real(wp), allocatable :: txx(:,:,:) 
         real(wp), allocatable :: tyy(:,:,:) 
-        real(wp), allocatable :: tzz(:,:,:)
         real(wp), allocatable :: txy(:,:,:) 
         real(wp), allocatable :: txz(:,:,:) 
         real(wp), allocatable :: tyz(:,:,:) 

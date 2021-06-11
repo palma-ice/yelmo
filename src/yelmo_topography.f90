@@ -127,16 +127,6 @@ contains
             ! Update ice fraction mask 
             call calc_ice_fraction(tpo%now%f_ice,tpo%now%H_ice,tpo%now%f_grnd)
             
-            ! If desired, relax solution to reference state
-            ! ajr: why is this here? Shouldn't it go after all dyn+calv+mb steps applied?
-            ! Test two options to see.
-            if (tpo%par%topo_rel .ne. 0) then 
-
-                call relax_ice_thickness(tpo%now%H_ice,tpo%now%f_grnd,bnd%H_ice_ref, &
-                                            tpo%par%topo_rel,tpo%par%topo_rel_tau,dt)
-                
-            end if 
-
             ! === Step 2: ice thickness evolution from vertical column mass balance ===
 
             tpo%now%mb_applied  = 0.0_wp  
@@ -226,7 +216,7 @@ contains
             call calc_calving_ground_rate_stdev(calv_sd,tpo%now%H_ice,tpo%now%f_ice,tpo%now%f_grnd, &
                                             bnd%z_bed_sd,tpo%par%sd_min,tpo%par%sd_max,tpo%par%calv_max,tpo%par%calv_tau)
             tpo%now%calv_grnd = tpo%now%calv_grnd + calv_sd 
-            
+
             ! Apply mass-conservation step (mbal and calving together)
             call calc_ice_thickness_mbal(tpo%now%H_ice,tpo%now%mb_applied,tpo%now%calv,tpo%now%f_ice, &
                                          tpo%now%f_grnd,bnd%z_sl-bnd%z_bed,dyn%now%ux_bar,dyn%now%uy_bar, &
@@ -244,8 +234,18 @@ contains
             ! Update ice fraction mask 
             call calc_ice_fraction(tpo%now%f_ice,tpo%now%H_ice,tpo%now%f_grnd)
             
+            
             ! Save the rate of change of ice thickness in output variable [m/a]
             tpo%now%dHicedt = (tpo%now%H_ice - tpo%now%H_ice_n) / dt 
+
+
+            ! If desired, finally relax solution to reference state
+            if (tpo%par%topo_rel .ne. 0) then 
+
+                call relax_ice_thickness(tpo%now%H_ice,tpo%now%f_grnd,bnd%H_ice_ref, &
+                                            tpo%par%topo_rel,tpo%par%topo_rel_tau,dt)
+                
+            end if 
 
         end if 
 

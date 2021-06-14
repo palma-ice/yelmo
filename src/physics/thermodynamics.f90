@@ -735,16 +735,21 @@ contains
         ! Local variables
         integer    :: i, j, nx, ny, n 
         integer    :: im1, ip1, jm1, jp1 
-        real(prec) :: uxy_ab, taub_ab 
-        real(prec), allocatable :: Qb_ab(:,:)
-        real(prec) :: Q_b_now, wt
+        real(wp) :: uxb_ab(4) 
+        real(wp) :: uyb_ab(4) 
+        real(wp) :: taubx_ab(4) 
+        real(wp) :: tauby_ab(4)
+        real(wp) :: Qb_ab(4) 
+        real(wp) :: wt_ab(4) 
+        real(wp) :: Q_b_now
+        real(wp) :: wt
 
         nx = size(Q_b,1)
         ny = size(Q_b,2)
 
-        allocate(Qb_ab(nx,ny))
-
-        ! First calculate basal frictional heating on ab-nodes 
+        ! Calculate current basal frictional heating at ab-nodes
+        ! following quadrature method, and then average to get 
+        ! the grid center (using contributions from ice-covered nodes)
         do j = 1, ny
         do i = 1, nx
             
@@ -753,60 +758,70 @@ contains
             jm1 = max(1,j-1)
             jp1 = min(ny,j+1)
             
-            uxy_ab  = sqrt( (0.5_prec*(ux_b(i,j)+ux_b(i,jp1)))**2 &
-                          + (0.5_prec*(uy_b(i,j)+uy_b(ip1,j)))**2 )
-
-            taub_ab = sqrt( (0.5_prec*(taub_acx(i,j)+taub_acx(i,jp1)))**2 &
-                          + (0.5_prec*(taub_acy(i,j)+taub_acy(ip1,j)))**2 )
-            
-            Qb_ab(i,j) = abs(uxy_ab*taub_ab)      ! [Pa m a-1] == [J a-1 m-2]
-
-        end do 
-        end do 
-
-
-        ! Unstagger to aa-nodes, only including contributions from
-        ! ice-covered points, and account for time-stepping
-        do j = 1, ny
-        do i = 1, nx
-            
-            im1 = max(1,i-1)
-            ip1 = min(nx,i+1)
-            jm1 = max(1,j-1)
-            jp1 = min(ny,j+1)
-            
-            Q_b_now = 0.0_prec 
-            wt      = 0.0_prec
-
-            if (count([f_ice(i,j),f_ice(ip1,j),f_ice(i,jp1),f_ice(ip1,jp1)].lt.1.0_wp) .eq. 0) then  
-                Q_b_now = Q_b_now + Qb_ab(i,j) 
-                wt = wt + 1.0_prec 
+            ! Get ab-node weighting based on whether ice is present 
+            wt_ab = 0.0_wp 
+            if (count([f_ice(i,j),f_ice(ip1,j),f_ice(i,jp1),f_ice(ip1,jp1)].lt.1.0_wp) .eq. 0) then 
+                wt_ab(1) = 1.0_wp
+            end if
+            if (count([f_ice(i,j),f_ice(im1,j),f_ice(im1,jp1),f_ice(i,jp1)].lt.1.0_wp) .eq. 0) then 
+                wt_ab(2) = 1.0_wp 
             end if 
-            
-            if (count([f_ice(i,j),f_ice(im1,j),f_ice(im1,jp1),f_ice(i,jp1)].lt.1.0_wp) .eq. 0) then  
-                Q_b_now = Q_b_now + Qb_ab(im1,j) 
-                wt = wt + 1.0_prec 
-            end if 
-
             if (count([f_ice(i,j),f_ice(i,jm1),f_ice(ip1,jm1),f_ice(ip1,j)].lt.1.0_wp) .eq. 0) then 
-                Q_b_now = Q_b_now + Qb_ab(i,jm1) 
-                wt = wt + 1.0_prec 
+                wt_ab(3) = 1.0_wp 
             end if 
             
             if (count([f_ice(i,j),f_ice(im1,j),f_ice(im1,jm1),f_ice(i,jm1)].lt.1.0_wp) .eq. 0) then 
-                Q_b_now = Q_b_now + Qb_ab(im1,jm1) 
-                wt = wt + 1.0_prec 
+                wt_ab(4) = 1.0_wp
             end if 
             
-            if (wt .gt. 0.0_prec) then 
-                Q_b_now = Q_b_now / wt 
-            else 
-                ! Just get simple average for ice free points 
+            wt = sum(wt_ab)
+            
+            if (f_ice(i,j) .eq. 1.0_wp .and. wt .gt. 0.0_wp) then 
+                ! Fully ice-covered point with some fully ice-covered neighbors 
 
-                Q_b_now = 0.25_prec*(Qb_ab(i,j)+Qb_ab(im1,j)+Qb_ab(i,jm1)+Qb_ab(im1,jm1))
+                ! Normalize weighting 
+                wt_ab = wt_ab / wt 
+
+                ! === ux =========
+
+                uxb_ab(1) = 0.5_wp*(ux_b(i,j)+ux_b(i,jp1))
+                uxb_ab(2) = 0.5_wp*(ux_b(im1,j)+ux_b(im1,jp1))
+                uxb_ab(3) = 0.5_wp*(ux_b(im1,jm1)+ux_b(im1,j))
+                uxb_ab(4) = 0.5_wp*(ux_b(i,jm1)+ux_b(i,j))
+
+                ! === uy =========
+
+                uyb_ab(1) = 0.5_wp*(uy_b(i,j)+uy_b(ip1,j))
+                uyb_ab(2) = 0.5_wp*(uy_b(i,j)+uy_b(im1,j))
+                uyb_ab(3) = 0.5_wp*(uy_b(i,jm1)+uy_b(im1,jm1))
+                uyb_ab(4) = 0.5_wp*(uy_b(i,jm1)+uy_b(ip1,jm1))
+
+                ! === taubx =========
+
+                taubx_ab(1) = 0.5_wp*(taub_acx(i,j)+taub_acx(i,jp1))
+                taubx_ab(2) = 0.5_wp*(taub_acx(im1,j)+taub_acx(im1,jp1))
+                taubx_ab(3) = 0.5_wp*(taub_acx(im1,jm1)+taub_acx(im1,j))
+                taubx_ab(4) = 0.5_wp*(taub_acx(i,jm1)+taub_acx(i,j))
+
+                ! === tauby =========
+
+                tauby_ab(1) = 0.5_wp*(taub_acy(i,j)+taub_acy(ip1,j))
+                tauby_ab(2) = 0.5_wp*(taub_acy(i,j)+taub_acy(im1,j))
+                tauby_ab(3) = 0.5_wp*(taub_acy(i,jm1)+taub_acy(im1,jm1))
+                tauby_ab(4) = 0.5_wp*(taub_acy(i,jm1)+taub_acy(ip1,jm1))
+
+                ! Calculate Qb at quadrature points [Pa m a-1] == [J a-1 m-2]
+                Qb_ab = abs( sqrt(uxb_ab**2+uyb_ab**2) &
+                              * sqrt(taubx_ab**2+tauby_ab**2) )
+
+                ! Get weighted average using only ice-covered nodes
+                Q_b_now = sum(wt_ab*Qb_ab)     
+
+            else 
+
+                Q_b_now = 0.0_wp 
 
             end if 
-
 
             ! Get weighted average of Q_b with timestepping factors
             Q_b(i,j) = beta1*Q_b_now + beta2*Q_b(i,j) 

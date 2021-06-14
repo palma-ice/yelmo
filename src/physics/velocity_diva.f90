@@ -193,7 +193,7 @@ contains
             !call smooth_visc_eff_int_margin(visc_eff_int,H_ice)
 
             ! Calculate beta (at the ice base)
-            call calc_beta(beta,c_bed,ux_b,uy_b,H_ice,H_grnd,f_grnd,z_bed,z_sl,par%beta_method, &
+            call calc_beta(beta,c_bed,ux_b,uy_b,H_ice,f_ice,H_grnd,f_grnd,z_bed,z_sl,par%beta_method, &
                                 par%beta_const,par%beta_q,par%beta_u0,par%beta_gl_scale,par%beta_gl_f, &
                                 par%H_grnd_lim,par%beta_min,par%boundaries)
 
@@ -204,9 +204,9 @@ contains
             call calc_beta_eff(beta_eff,beta,F2,zeta_aa,no_slip=par%no_slip)
             
             ! Stagger beta and beta_eff 
-            call stagger_beta(beta_acx,beta_acy,beta,H_ice,ux_bar,uy_bar, &
+            call stagger_beta(beta_acx,beta_acy,beta,H_ice,f_ice,ux_bar,uy_bar, &
                         f_grnd,f_grnd_acx,f_grnd_acy,par%beta_gl_stag,par%boundaries)
-            call stagger_beta(beta_eff_acx,beta_eff_acy,beta_eff,H_ice,ux_bar,uy_bar, &
+            call stagger_beta(beta_eff_acx,beta_eff_acy,beta_eff,H_ice,f_ice,ux_bar,uy_bar, &
                         f_grnd,f_grnd_acx,f_grnd_acy,par%beta_gl_stag,par%boundaries)
             
             ! =========================================================================================
@@ -756,7 +756,7 @@ end if
         visc_eff(1,ny,:)  = 0.5*(visc_eff(2,ny,:)+visc_eff(1,ny-1,:))
         visc_eff(nx,1,:)  = 0.5*(visc_eff(nx,2,:)+visc_eff(nx-1,1,:))
         visc_eff(nx,ny,:) = 0.5*(visc_eff(nx-1,ny,:)+visc_eff(nx,ny-1,:))
-        
+
         return 
 
     end subroutine calc_visc_eff_3D

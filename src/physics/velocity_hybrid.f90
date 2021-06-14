@@ -146,12 +146,12 @@ contains
             call calc_visc_eff_int(visc_eff_int,visc_eff,H_ice,f_ice,zeta_aa)
             
             ! Calculate beta (at the ice base)
-            call calc_beta(beta,c_bed,ux_b,uy_b,H_ice,H_grnd,f_grnd,z_bed,z_sl,par%beta_method, &
+            call calc_beta(beta,c_bed,ux_b,uy_b,H_ice,f_ice,H_grnd,f_grnd,z_bed,z_sl,par%beta_method, &
                                 par%beta_const,par%beta_q,par%beta_u0,par%beta_gl_scale,par%beta_gl_f, &
                                 par%H_grnd_lim,par%beta_min,par%boundaries)
 
             ! Stagger beta
-            call stagger_beta(beta_acx,beta_acy,beta,H_ice,ux_b,uy_b, &
+            call stagger_beta(beta_acx,beta_acy,beta,H_ice,f_ice,ux_b,uy_b, &
                         f_grnd,f_grnd_acx,f_grnd_acy,par%beta_gl_stag,par%boundaries)
 
 

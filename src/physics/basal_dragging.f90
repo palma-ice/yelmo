@@ -46,11 +46,11 @@ module basal_dragging
 
     ! Beta staggering functions (aa- to ac-nodes)
     public :: stagger_beta_aa_mean
-    public :: stagger_beta_aa_upstream
-    public :: stagger_beta_aa_downstream    
-    public :: stagger_beta_aa_subgrid
-    public :: stagger_beta_aa_subgrid_1 
-    public :: stagger_beta_aa_subgrid_flux 
+    public :: stagger_beta_aa_gl_upstream
+    public :: stagger_beta_aa_gl_downstream    
+    public :: stagger_beta_aa_gl_subgrid
+    public :: stagger_beta_aa_gl_subgrid_1 
+    public :: stagger_beta_aa_gl_subgrid_flux 
 contains 
 
     subroutine calc_c_bed(c_bed,cf_ref,N_eff)
@@ -67,7 +67,7 @@ contains
 
     end subroutine calc_c_bed
 
-    subroutine calc_beta(beta,c_bed,ux_b,uy_b,H_ice,H_grnd,f_grnd,z_bed,z_sl,beta_method, &
+    subroutine calc_beta(beta,c_bed,ux_b,uy_b,H_ice,f_ice,H_grnd,f_grnd,z_bed,z_sl,beta_method, &
                          beta_const,beta_q,beta_u0,beta_gl_scale,beta_gl_f,H_grnd_lim,beta_min,boundaries)
 
         ! Update beta based on parameter choices
@@ -79,6 +79,7 @@ contains
         real(wp), intent(IN)    :: ux_b(:,:) 
         real(wp), intent(IN)    :: uy_b(:,:)  
         real(wp), intent(IN)    :: H_ice(:,:) 
+        real(wp), intent(IN)    :: f_ice(:,:) 
         real(wp), intent(IN)    :: H_grnd(:,:) 
         real(wp), intent(IN)    :: f_grnd(:,:) 
         real(wp), intent(IN)    :: z_bed(:,:) 
@@ -121,12 +122,12 @@ contains
             case(2)
                 ! Calculate beta from the quasi-plastic power-law as defined by Bueler and van Pelt (2015)
 
-                call calc_beta_aa_power_plastic(beta,ux_b,uy_b,c_bed,beta_q,beta_u0)
+                call calc_beta_aa_power_plastic(beta,ux_b,uy_b,c_bed,f_ice,beta_q,beta_u0)
                 
             case(3)
                 ! Calculate beta from regularized Coulomb law (Joughin et al., GRL, 2019)
 
-                call calc_beta_aa_reg_coulomb(beta,ux_b,uy_b,c_bed,beta_q,beta_u0)
+                call calc_beta_aa_reg_coulomb(beta,ux_b,uy_b,c_bed,f_ice,beta_q,beta_u0)
                 
             case DEFAULT 
                 ! Not recognized 
@@ -223,7 +224,7 @@ contains
 
     end subroutine calc_beta
 
-    subroutine stagger_beta(beta_acx,beta_acy,beta,H_ice,ux,uy,f_grnd,f_grnd_acx,f_grnd_acy,beta_gl_stag,boundaries)
+    subroutine stagger_beta(beta_acx,beta_acy,beta,H_ice,f_ice,ux,uy,f_grnd,f_grnd_acx,f_grnd_acy,beta_gl_stag,boundaries)
 
         implicit none 
 
@@ -231,6 +232,7 @@ contains
         real(wp), intent(INOUT) :: beta_acy(:,:) 
         real(wp), intent(IN)    :: beta(:,:)
         real(wp), intent(IN)    :: H_ice(:,:)
+        real(wp), intent(IN)    :: f_ice(:,:)
         real(wp), intent(IN)    :: ux(:,:)
         real(wp), intent(IN)    :: uy(:,:)
         real(wp), intent(IN)    :: f_grnd(:,:) 
@@ -245,52 +247,61 @@ contains
         nx = size(beta_acx,1)
         ny = size(beta_acx,2) 
 
-        ! 5. Apply staggering method with particular care for the grounding line 
-        select case(beta_gl_stag) 
+        if (beta_gl_stag .eq. -1) then 
 
-            case(-1)
-                ! Do nothing - beta_acx/acy has been defined externally
+            ! Do nothing - beta_acx/acy has been defined externally
 
-            case(0) 
-                ! Apply pure staggering everywhere (ac(i) = 0.5*(aa(i)+aa(i+1))
+        else  
+            ! Calculate staggered beta_acx/acy fields from beta. 
+
+            ! First calculate beta with a standard staggering approach 
+            call stagger_beta_aa_mean(beta_acx,beta_acy,beta,f_ice,f_grnd)
+
+            ! Modify beta at the grounding line 
+            select case(beta_gl_stag) 
+     
+                case(-1,0) 
+
+                    ! Do nothing, staggering has already been computed properly 
+
+                case(1) 
+                    ! Apply upstream beta_aa value at ac-node with at least one neighbor H_grnd_aa > 0
+
+                    call stagger_beta_aa_gl_upstream(beta_acx,beta_acy,beta,f_grnd)
+
+                case(2) 
+                    ! Apply downstream beta_aa value (==0.0) at ac-node with at least one neighbor H_grnd_aa > 0
+
+                    call stagger_beta_aa_gl_downstream(beta_acx,beta_acy,beta,f_grnd)
+
+                case(3)
+                    ! Apply subgrid scaling fraction at the grounding line when staggering 
+
+                    ! Note: now subgrid treatment is handled on aa-nodes above (using beta_gl_sep)
+
+                    call stagger_beta_aa_gl_subgrid(beta_acx,beta_acy,beta,f_grnd, &
+                                                    f_grnd_acx,f_grnd_acy)
+
+    !                 call stagger_beta_aa_gl_subgrid_1(beta_acx,beta_acy,beta,f_ice,H_grnd, &
+    !                                             f_grnd,f_grnd_acx,f_grnd_acy)
                 
-                call stagger_beta_aa_mean(beta_acx,beta_acy,beta)
+                case(4)
+                    ! Apply subgrid scaling fraction at the grounding line when staggering,
+                    ! with subgrid weighting calculated from linearly interpolated flux. 
 
-            case(1) 
-                ! Apply upstream beta_aa value at ac-node with at least one neighbor H_grnd_aa > 0
+                    call stagger_beta_aa_gl_subgrid_flux(beta_acx,beta_acy,beta, &
+                                            H_ice,ux,uy,f_grnd,f_grnd_acx,f_grnd_acy)
 
-                call stagger_beta_aa_upstream(beta_acx,beta_acy,beta,f_grnd)
+                case DEFAULT 
 
-            case(2) 
-                ! Apply downstream beta_aa value (==0.0) at ac-node with at least one neighbor H_grnd_aa > 0
+                    write(*,*) "stagger_beta:: Error: beta_gl_stag not recognized."
+                    write(*,*) "beta_gl_stag = ", beta_gl_stag
+                    stop 
 
-                call stagger_beta_aa_downstream(beta_acx,beta_acy,beta,f_grnd)
+            end select 
 
-            case(3)
-                ! Apply subgrid scaling fraction at the grounding line when staggering 
+        end if 
 
-                ! Note: now subgrid treatment is handled on aa-nodes above (using beta_gl_sep)
-
-                call stagger_beta_aa_subgrid(beta_acx,beta_acy,beta,f_grnd, &
-                                                f_grnd_acx,f_grnd_acy)
-
-!                 call stagger_beta_aa_subgrid_1(beta_acx,beta_acy,beta,H_grnd, &
-!                                             f_grnd,f_grnd_acx,f_grnd_acy)
-            
-            case(4)
-                ! Apply subgrid scaling fraction at the grounding line when staggering,
-                ! with subgrid weighting calculated from linearly interpolated flux. 
-
-                call stagger_beta_aa_subgrid_flux(beta_acx,beta_acy,beta, &
-                                        H_ice,ux,uy,f_grnd,f_grnd_acx,f_grnd_acy)
-
-            case DEFAULT 
-
-                write(*,*) "stagger_beta:: Error: beta_gl_stag not recognized."
-                write(*,*) "beta_gl_stag = ", beta_gl_stag
-                stop 
-
-        end select 
 
         if (trim(boundaries) .eq. "periodic") then 
 
@@ -532,7 +543,7 @@ contains
     !
     ! ================================================================================
 
-    subroutine calc_beta_aa_power_plastic(beta,ux_b,uy_b,C_bed,q,u_0)
+    subroutine calc_beta_aa_power_plastic(beta,ux_b,uy_b,c_bed,f_ice,q,u_0)
         ! Calculate basal friction coefficient (beta) that
         ! enters the SSA solver as a function of basal velocity
         ! using a power-law form following Bueler and van Pelt (2015)
@@ -542,7 +553,8 @@ contains
         real(wp), intent(OUT) :: beta(:,:)        ! aa-nodes
         real(wp), intent(IN)  :: ux_b(:,:)        ! ac-nodes
         real(wp), intent(IN)  :: uy_b(:,:)        ! ac-nodes
-        real(wp), intent(IN)  :: C_bed(:,:)       ! aa-nodes
+        real(wp), intent(IN)  :: c_bed(:,:)       ! aa-nodes
+        real(wp), intent(IN)  :: f_ice(:,:)       ! aa-nodes
         real(wp), intent(IN)  :: q
         real(wp), intent(IN)  :: u_0              ! [m/a] 
 
@@ -554,8 +566,10 @@ contains
         real(wp) :: uy_ab(4) 
         real(wp) :: uxy_ab(4) 
         real(wp) :: wt_ab(4) 
-
-        real(wp), parameter :: ub_sq_min = (1e-1_prec)**2  ! [m/a] Minimum velocity is positive small value to avoid divide by zero
+        real(wp) :: wt 
+        
+        real(wp), parameter :: ub_min    = 1e-1_wp          ! [m/a] Minimum velocity is positive small value to avoid divide by zero
+        real(wp), parameter :: ub_sq_min = ub_min**2
 
         nx = size(beta,1)
         ny = size(beta,2)
@@ -566,7 +580,7 @@ contains
         if (q .eq. 1.0) then 
             ! q==1: linear law, no loops needed 
 
-            beta = C_bed * (1.0_prec / u_0)
+            beta = c_bed * (1.0_prec / u_0)
 
         else 
             ! q/=1: Nonlinear law, loops needed 
@@ -575,11 +589,142 @@ contains
             do j = 1, ny
             do i = 1, nx
 
+                ! Get neighbor indices 
                 im1 = max(i-1,1)
                 ip1 = min(i+1,nx)
                 jm1 = max(j-1,1) 
                 jp1 = min(j+1,ny)
                 
+                ! Get ab-node weighting based on whether ice is present 
+                wt_ab = 0.0_wp 
+                if (count([f_ice(i,j),f_ice(ip1,j),f_ice(i,jp1),f_ice(ip1,jp1)].lt.1.0_wp) .eq. 0) then 
+                    wt_ab(1) = 1.0_wp
+                end if
+                if (count([f_ice(i,j),f_ice(im1,j),f_ice(im1,jp1),f_ice(i,jp1)].lt.1.0_wp) .eq. 0) then 
+                    wt_ab(2) = 1.0_wp 
+                end if 
+                if (count([f_ice(i,j),f_ice(i,jm1),f_ice(ip1,jm1),f_ice(ip1,j)].lt.1.0_wp) .eq. 0) then 
+                    wt_ab(3) = 1.0_wp 
+                end if 
+                
+                if (count([f_ice(i,j),f_ice(im1,j),f_ice(im1,jm1),f_ice(i,jm1)].lt.1.0_wp) .eq. 0) then 
+                    wt_ab(4) = 1.0_wp
+                end if 
+                
+                wt = sum(wt_ab)
+                
+                if (f_ice(i,j) .eq. 1.0_wp .and. wt .gt. 0.0_wp) then 
+                    ! Fully ice-covered point with some fully ice-covered neighbors 
+
+                    ! Normalize weighting 
+                    wt_ab = wt_ab / wt 
+
+                    ! Calculate magnitude of basal velocity on aa-node 
+                    ! from ab-nodes (quadrature points)
+                    ux_ab(1) = 0.5_wp*(ux_b(i,j)+ux_b(i,jp1))
+                    ux_ab(2) = 0.5_wp*(ux_b(im1,j)+ux_b(im1,jp1))
+                    ux_ab(3) = 0.5_wp*(ux_b(im1,jm1)+ux_b(im1,j))
+                    ux_ab(4) = 0.5_wp*(ux_b(i,jm1)+ux_b(i,j))
+
+                    uy_ab(1) = 0.5_wp*(uy_b(i,j)+uy_b(ip1,j))
+                    uy_ab(2) = 0.5_wp*(uy_b(i,j)+uy_b(im1,j))
+                    uy_ab(3) = 0.5_wp*(uy_b(i,jm1)+uy_b(im1,jm1))
+                    uy_ab(4) = 0.5_wp*(uy_b(i,jm1)+uy_b(ip1,jm1))
+
+                    uxy_ab = sqrt(ux_ab**2 + uy_ab**2 + ub_sq_min)
+                    uxy_b  = sum(wt_ab*uxy_ab)
+
+                else
+                    ! Assign minimum velocity value 
+
+                    uxy_b  = ub_min 
+
+                end if 
+
+                ! Nonlinear beta as a function of basal velocity
+                beta(i,j) = c_bed(i,j) * (uxy_b / u_0)**q * (1.0_prec / uxy_b)
+
+            end do
+            end do
+
+        end if 
+            
+        return
+        
+    end subroutine calc_beta_aa_power_plastic
+
+    subroutine calc_beta_aa_reg_coulomb(beta,ux_b,uy_b,c_bed,f_ice,q,u_0)
+        ! Calculate basal friction coefficient (beta) that
+        ! enters the SSA solver as a function of basal velocity
+        ! using a regularized Coulomb friction law following
+        ! Joughin et al (2019), GRL, Eqs. 2a/2b
+        ! Note: Calculated on aa-nodes
+        ! Note: beta should be calculated for bed everywhere, 
+        ! independent of floatation, which is accounted for later
+        
+        implicit none
+        
+        real(wp), intent(OUT) :: beta(:,:)        ! aa-nodes
+        real(wp), intent(IN)  :: ux_b(:,:)        ! ac-nodes
+        real(wp), intent(IN)  :: uy_b(:,:)        ! ac-nodes
+        real(wp), intent(IN)  :: c_bed(:,:)       ! aa-nodes
+        real(wp), intent(IN)  :: f_ice(:,:)       ! aa-nodes
+        real(wp), intent(IN)  :: q
+        real(wp), intent(IN)  :: u_0              ! [m/a] 
+
+        ! Local variables
+        integer  :: i, j, nx, ny
+        integer  :: im1, ip1, jm1, jp1
+        real(wp) :: uxy_b  
+        real(wp) :: ux_ab(4) 
+        real(wp) :: uy_ab(4) 
+        real(wp) :: uxy_ab(4) 
+        real(wp) :: wt_ab(4) 
+        real(wp) :: wt 
+        real(wp) :: beta_now
+
+        real(wp), parameter :: ub_min    = 1e-1_wp          ! [m/a] Minimum velocity is positive small value to avoid divide by zero
+        real(wp), parameter :: ub_sq_min = ub_min**2
+
+        nx = size(beta,1)
+        ny = size(beta,2)
+        
+        ! Initially set friction to zero everywhere
+        beta = 0.0_prec 
+
+        do j = 1, ny
+        do i = 1, nx
+
+            ! Get neighbor indices 
+            im1 = max(i-1,1)
+            ip1 = min(i+1,nx)
+            jm1 = max(j-1,1) 
+            jp1 = min(j+1,ny)
+            
+            ! Get ab-node weighting based on whether ice is present 
+            wt_ab = 0.0_wp 
+            if (count([f_ice(i,j),f_ice(ip1,j),f_ice(i,jp1),f_ice(ip1,jp1)].lt.1.0_wp) .eq. 0) then 
+                wt_ab(1) = 1.0_wp
+            end if
+            if (count([f_ice(i,j),f_ice(im1,j),f_ice(im1,jp1),f_ice(i,jp1)].lt.1.0_wp) .eq. 0) then 
+                wt_ab(2) = 1.0_wp 
+            end if 
+            if (count([f_ice(i,j),f_ice(i,jm1),f_ice(ip1,jm1),f_ice(ip1,j)].lt.1.0_wp) .eq. 0) then 
+                wt_ab(3) = 1.0_wp 
+            end if 
+            
+            if (count([f_ice(i,j),f_ice(im1,j),f_ice(im1,jm1),f_ice(i,jm1)].lt.1.0_wp) .eq. 0) then 
+                wt_ab(4) = 1.0_wp
+            end if 
+            
+            wt = sum(wt_ab)
+            
+            if (f_ice(i,j) .eq. 1.0_wp .and. wt .gt. 0.0_wp) then 
+                ! Fully ice-covered point with some fully ice-covered neighbors 
+
+                ! Normalize weighting 
+                wt_ab = wt_ab / wt 
+
                 ! Calculate magnitude of basal velocity on aa-node 
                 ! from ab-nodes (quadrature points)
                 ux_ab(1) = 0.5_wp*(ux_b(i,j)+ux_b(i,jp1))
@@ -595,85 +740,62 @@ contains
                 uxy_ab = sqrt(ux_ab**2 + uy_ab**2 + ub_sq_min)
                 uxy_b  = sum(wt_ab*uxy_ab)
 
-                ! Nonlinear beta as a function of basal velocity
-                beta(i,j) = C_bed(i,j) * (uxy_b / u_0)**q * (1.0_prec / uxy_b)
+            else
+                ! Assign minimum velocity value 
 
-            end do
-            end do
+                uxy_b  = ub_min 
 
-        end if 
-            
-        return
-        
-    end subroutine calc_beta_aa_power_plastic
-
-    subroutine calc_beta_aa_reg_coulomb(beta,ux_b,uy_b,c_bed,q,u_0)
-        ! Calculate basal friction coefficient (beta) that
-        ! enters the SSA solver as a function of basal velocity
-        ! using a regularized Coulomb friction law following
-        ! Joughin et al (2019), GRL, Eqs. 2a/2b
-        ! Note: Calculated on aa-nodes
-        ! Note: beta should be calculated for bed everywhere, 
-        ! independent of floatation, which is accounted for later
-        
-        implicit none
-        
-        real(wp), intent(OUT) :: beta(:,:)        ! aa-nodes
-        real(wp), intent(IN)  :: ux_b(:,:)        ! ac-nodes
-        real(wp), intent(IN)  :: uy_b(:,:)        ! ac-nodes
-        real(wp), intent(IN)  :: c_bed(:,:)       ! aa-nodes
-        real(wp), intent(IN)  :: q
-        real(wp), intent(IN)  :: u_0              ! [m/a] 
-
-        ! Local variables
-        integer    :: i, j, nx, ny
-        integer    :: im1, ip1, jm1, jp1
-        real(wp) :: uxy_b  
-        real(wp) :: ux_ab(4) 
-        real(wp) :: uy_ab(4) 
-        real(wp) :: uxy_ab(4) 
-        real(wp) :: wt_ab(4) 
-
-        real(wp), parameter :: ub_sq_min = (1e-1_wp)**2  ! [m/a] Minimum velocity is positive small value to avoid divide by zero
-
-        nx = size(beta,1)
-        ny = size(beta,2)
-        
-        ! Initially set friction to zero everywhere
-        beta = 0.0_prec 
-
-        wt_ab = 1.0_wp 
-        wt_ab = wt_ab / sum(wt_ab) 
-
-        do j = 1, ny
-        do i = 1, nx
-
-            im1 = max(i-1,1)
-            ip1 = min(i+1,nx)
-            jm1 = max(j-1,1) 
-            jp1 = min(j+1,ny)
-            
-            ! Calculate magnitude of basal velocity on aa-node 
-            ! from ab-nodes (quadrature points)
-            ux_ab(1) = 0.5_wp*(ux_b(i,j)+ux_b(i,jp1))
-            ux_ab(2) = 0.5_wp*(ux_b(im1,j)+ux_b(im1,jp1))
-            ux_ab(3) = 0.5_wp*(ux_b(im1,jm1)+ux_b(im1,j))
-            ux_ab(4) = 0.5_wp*(ux_b(i,jm1)+ux_b(i,j))
-
-            uy_ab(1) = 0.5_wp*(uy_b(i,j)+uy_b(ip1,j))
-            uy_ab(2) = 0.5_wp*(uy_b(i,j)+uy_b(im1,j))
-            uy_ab(3) = 0.5_wp*(uy_b(i,jm1)+uy_b(im1,jm1))
-            uy_ab(4) = 0.5_wp*(uy_b(i,jm1)+uy_b(ip1,jm1))
-
-            uxy_ab = sqrt(ux_ab**2 + uy_ab**2 + ub_sq_min)
-            uxy_b  = sum(wt_ab*uxy_ab)
+            end if 
 
             ! Nonlinear beta as a function of basal velocity
             beta(i,j) = c_bed(i,j) * (uxy_b / (uxy_b+u_0))**q * (1.0_wp / uxy_b)
 
         end do
         end do 
-            
+        
+        ! === Extrapolate to ice-free neighbors === 
+        do j=1, ny
+        do i=1, nx
+
+            ! Get neighbor indices
+            im1 = max(i-1,1) 
+            ip1 = min(i+1,nx) 
+            jm1 = max(j-1,1) 
+            jp1 = min(j+1,ny) 
+                
+            if ( f_ice(i,j) .lt. 1.0 .and. &
+                count([f_ice(im1,j),f_ice(ip1,j),f_ice(i,jm1),f_ice(i,jp1)] .eq. 1.0_wp) .gt. 0 ) then 
+                ! Ice-free (or partially ice-free) with ice-covered neighbors
+
+                beta_now = 0.0 
+                wt       = 0.0 
+
+                if (f_ice(im1,j) .eq. 1.0) then 
+                    beta_now = beta_now + beta(im1,j)
+                    wt = wt + 1.0 
+                end if 
+                if (f_ice(ip1,j) .eq. 1.0) then 
+                    beta_now = beta_now + beta(ip1,j)
+                    wt = wt + 1.0 
+                end if
+                if (f_ice(i,jm1) .eq. 1.0) then 
+                    beta_now = beta_now + beta(i,jm1)
+                    wt = wt + 1.0 
+                end if
+                if (f_ice(i,jp1) .eq. 1.0) then 
+                    beta_now = beta_now + beta(i,jp1)
+                    wt = wt + 1.0 
+                end if
+
+                if (wt .gt. 0.0) then 
+                    beta(i,j) = beta_now / wt
+                end if 
+
+            end if 
+
+        end do 
+        end do
+
         return
         
     end subroutine calc_beta_aa_reg_coulomb
@@ -824,7 +946,7 @@ contains
     !
     ! ================================================================================
 
-    subroutine stagger_beta_aa_mean(beta_acx,beta_acy,beta)
+    subroutine stagger_beta_aa_mean(beta_acx,beta_acy,beta,f_ice,f_grnd)
         ! Stagger beta from aa-nodes to ac-nodes
         ! using simple staggering method, independent
         ! of any information about flotation, etc. 
@@ -834,36 +956,72 @@ contains
         real(wp), intent(INOUT) :: beta_acx(:,:)   ! ac-nodes
         real(wp), intent(INOUT) :: beta_acy(:,:)   ! ac-nodes
         real(wp), intent(IN)    :: beta(:,:)       ! aa-nodes
+        real(wp), intent(IN)    :: f_ice(:,:)      ! aa-nodes
+        real(wp), intent(IN)    :: f_grnd(:,:)     ! aa-nodes
 
         ! Local variables
-        integer    :: i, j, nx, ny
+        integer :: i, j, nx, ny
+        integer :: im1, ip1, jm1, jp1 
 
         nx = size(beta_acx,1)
         ny = size(beta_acx,2) 
 
         ! === Stagger to ac-nodes === 
-
-        ! acx-nodes
         do j = 1, ny 
-        do i = 1, nx-1
-            beta_acx(i,j) = 0.5_prec*(beta(i,j)+beta(i+1,j))
-        end do 
-        end do 
-        beta_acx(nx,:) = beta_acx(nx-1,:) 
-        
-        ! acy-nodes 
-        do j = 1, ny-1 
         do i = 1, nx
-            beta_acy(i,j) = 0.5_prec*(beta(i,j)+beta(i,j+1))
+
+            ! Get neighbor indices 
+            im1 = max(i-1,1)
+            ip1 = min(i+1,nx)
+            jm1 = max(j-1,1) 
+            jp1 = min(j+1,ny)
+            
+            if (f_grnd(i,j) .eq. 0.0 .and. f_grnd(ip1,j) .eq. 0.0) then 
+                ! Fully floating node 
+
+                beta_acx(i,j) = 0.0 
+
+            else  
+                ! Other nodes 
+
+                ! acx-nodes
+                if (f_ice(i,j) .eq. 1.0 .and. f_ice(ip1,j) .lt. 1.0) then 
+                    beta_acx(i,j) = beta(i,j) 
+                else if (f_ice(i,j) .lt. 1.0 .and. f_ice(ip1,j) .eq. 1.0) then
+                    beta_acx(i,j) = beta(ip1,j)  
+                else 
+                    beta_acx(i,j) = 0.5_prec*(beta(i,j)+beta(ip1,j))
+                end if 
+
+            end if 
+
+            if (f_grnd(i,j) .eq. 0.0 .and. f_grnd(i,jp1) .eq. 0.0) then 
+                ! Fully floating node 
+
+                beta_acy(i,j) = 0.0 
+
+            else  
+                ! Other nodes 
+
+                ! acy-nodes
+                if (f_ice(i,j) .eq. 1.0 .and. f_ice(i,jp1) .lt. 1.0) then 
+                    beta_acy(i,j) = beta(i,j) 
+                else if (f_ice(i,j) .lt. 1.0 .and. f_ice(i,jp1) .eq. 1.0) then
+                    beta_acy(i,j) = beta(i,jp1)  
+                else 
+                    beta_acy(i,j) = 0.5_prec*(beta(i,j)+beta(i,jp1))
+                end if 
+            
+            end if 
+
         end do 
         end do 
-        beta_acy(:,ny) = beta_acy(:,ny-1) 
         
         return
         
     end subroutine stagger_beta_aa_mean
     
-    subroutine stagger_beta_aa_upstream(beta_acx,beta_acy,beta,f_grnd)
+    subroutine stagger_beta_aa_gl_upstream(beta_acx,beta_acy,beta,f_grnd)
         ! Modify basal friction coefficient by grounded/floating binary mask
         ! (via the grounded fraction)
         ! Analagous to method "NSEP" in Seroussi et al (2014): 
@@ -878,7 +1036,8 @@ contains
         real(wp), intent(IN)    :: f_grnd(:,:)     ! aa-nodes    
         
         ! Local variables
-        integer    :: i, j, nx, ny 
+        integer    :: i, j, nx, ny
+        integer    :: im1, ip1, jm1, jp1  
         logical    :: is_float 
 
         nx = size(beta_acx,1)
@@ -886,47 +1045,37 @@ contains
 
         ! === Stagger to ac-nodes === 
 
-        ! acx-nodes
         do j = 1, ny 
-        do i = 1, nx-1
-
-            if (f_grnd(i,j) .eq. 0.0 .and. f_grnd(i+1,j) .eq. 0.0) then 
-                beta_acx(i,j) = 0.0 
-            else if (f_grnd(i,j) .gt. 0.0 .and. f_grnd(i+1,j) .eq. 0.0) then 
-                beta_acx(i,j) = beta(i,j)
-            else if (f_grnd(i,j) .eq. 0.0 .and. f_grnd(i+1,j) .gt. 0.0) then
-                beta_acx(i,j) = beta(i+1,j)
-            else 
-                beta_acx(i,j) = 0.5_prec*(beta(i,j)+beta(i+1,j))
-            end if 
-            
-        end do 
-        end do 
-        beta_acx(nx,:) = beta_acx(nx-1,:) 
-        
-        ! acy-nodes 
-        do j = 1, ny-1 
         do i = 1, nx
 
-            if (f_grnd(i,j) .eq. 0.0 .and. f_grnd(i,j+1) .eq. 0.0) then 
-                beta_acy(i,j) = 0.0 
-            else if (f_grnd(i,j) .gt. 0.0 .and. f_grnd(i,j+1) .eq. 0.0) then 
+            ! Get neighbor indices 
+            im1 = max(i-1,1)
+            ip1 = min(i+1,nx)
+            jm1 = max(j-1,1) 
+            jp1 = min(j+1,ny)
+            
+            ! grounding line, acx-nodes
+            if (f_grnd(i,j) .gt. 0.0 .and. f_grnd(ip1,j) .eq. 0.0) then 
+                beta_acx(i,j) = beta(i,j)
+            else if (f_grnd(i,j) .eq. 0.0 .and. f_grnd(ip1,j) .gt. 0.0) then
+                beta_acx(i,j) = beta(ip1,j)
+            end if 
+            
+            ! grounding line, acy-nodes
+            if (f_grnd(i,j) .gt. 0.0 .and. f_grnd(i,jp1) .eq. 0.0) then 
                 beta_acy(i,j) = beta(i,j)
-            else if (f_grnd(i,j) .eq. 0.0 .and. f_grnd(i,j+1) .gt. 0.0) then
-                beta_acy(i,j) = beta(i,j+1)
-            else 
-                beta_acy(i,j) = 0.5_prec*(beta(i,j)+beta(i,j+1))
+            else if (f_grnd(i,j) .eq. 0.0 .and. f_grnd(i,jp1) .gt. 0.0) then
+                beta_acy(i,j) = beta(i,jp1)
             end if 
             
         end do 
-        end do 
-        beta_acy(:,ny) = beta_acy(:,ny-1) 
-        
+        end do
+
         return
         
-    end subroutine stagger_beta_aa_upstream
+    end subroutine stagger_beta_aa_gl_upstream
     
-    subroutine stagger_beta_aa_downstream(beta_acx,beta_acy,beta,f_grnd)
+    subroutine stagger_beta_aa_gl_downstream(beta_acx,beta_acy,beta,f_grnd)
         ! Modify basal friction coefficient by grounded/floating binary mask
         ! (via the grounded fraction)
         ! Analagous to method "NSEP" in Seroussi et al (2014): 
@@ -941,8 +1090,9 @@ contains
         real(wp), intent(IN)    :: f_grnd(:,:)     ! aa-nodes    
         
         ! Local variables
-        integer    :: i, j, nx, ny 
-        logical    :: is_float 
+        integer :: i, j, nx, ny
+        integer :: im1, ip1, jm1, jp1 
+        logical :: is_float 
 
         nx = size(beta_acx,1)
         ny = size(beta_acx,2) 
@@ -951,37 +1101,36 @@ contains
 
         ! acx-nodes
         do j = 1, ny 
-        do i = 1, nx-1
-
-            if (f_grnd(i,j) .eq. 0.0 .or. f_grnd(i+1,j) .eq. 0.0) then 
-                beta_acx(i,j) = 0.0 
-            else 
-                beta_acx(i,j) = 0.5_prec*(beta(i,j)+beta(i+1,j))
-            end if 
-            
-        end do 
-        end do 
-        beta_acx(nx,:) = beta_acx(nx-1,:) 
-        
-        ! acy-nodes 
-        do j = 1, ny-1 
         do i = 1, nx
 
-            if (f_grnd(i,j) .eq. 0.0 .or. f_grnd(i,j+1) .eq. 0.0) then 
-                beta_acy(i,j) = 0.0 
-            else 
-                beta_acy(i,j) = 0.5_prec*(beta(i,j)+beta(i,j+1))
+            ! Get neighbor indices 
+            im1 = max(i-1,1)
+            ip1 = min(i+1,nx)
+            jm1 = max(j-1,1) 
+            jp1 = min(j+1,ny)
+            
+            ! grounding line, acx-nodes
+            if (f_grnd(i,j) .gt. 0.0 .and. f_grnd(ip1,j) .eq. 0.0) then 
+                beta_acx(i,j) = beta(ip1,j)
+            else if (f_grnd(i,j) .eq. 0.0 .and. f_grnd(ip1,j) .gt. 0.0) then
+                beta_acx(i,j) = beta(i,j)
+            end if 
+            
+            ! grounding line, acy-nodes
+            if (f_grnd(i,j) .gt. 0.0 .and. f_grnd(i,jp1) .eq. 0.0) then 
+                beta_acy(i,j) = beta(i,jp1)
+            else if (f_grnd(i,j) .eq. 0.0 .and. f_grnd(i,jp1) .gt. 0.0) then
+                beta_acy(i,j) = beta(i,j)
             end if 
             
         end do 
         end do 
-        beta_acy(:,ny) = beta_acy(:,ny-1) 
-        
+
         return
         
-    end subroutine stagger_beta_aa_downstream
+    end subroutine stagger_beta_aa_gl_downstream
     
-    subroutine stagger_beta_aa_subgrid(beta_acx,beta_acy,beta,f_grnd,f_grnd_acx,f_grnd_acy)
+    subroutine stagger_beta_aa_gl_subgrid(beta_acx,beta_acy,beta,f_grnd,f_grnd_acx,f_grnd_acy)
         ! Modify basal friction coefficient by grounded/floating binary mask
         ! (via the grounded fraction)
         ! Analagous to method "NSEP" in Seroussi et al (2014): 
@@ -998,62 +1147,48 @@ contains
         real(wp), intent(IN)    :: f_grnd_acy(:,:)    ! ac-nodes     
         
         ! Local variables
-        integer    :: i, j, nx, ny 
+        integer :: i, j, nx, ny 
+        integer :: im1, ip1, jm1, jp1
 
         nx = size(beta_acx,1)
         ny = size(beta_acx,2) 
 
         ! Apply simple staggering to ac-nodes
-
-        ! acx-nodes
         do j = 1, ny 
-        do i = 1, nx-1
-
-            if (f_grnd(i,j) .gt. 0.0 .and. f_grnd(i+1,j) .eq. 0.0) then 
-                ! Floating to the right 
-                beta_acx(i,j) = f_grnd_acx(i,j)*beta(i,j) + (1.0-f_grnd_acx(i,j))*beta(i+1,j)
-            else if (f_grnd(i,j) .eq. 0.0 .and. f_grnd(i+1,j) .gt. 0.0) then 
-                ! Floating to the left 
-                beta_acx(i,j) = (1.0-f_grnd_acx(i,j))*beta(i,j) + f_grnd_acx(i,j)*beta(i+1,j)
-            else if (f_grnd(i,j) .gt. 0.0 .and. f_grnd(i+1,j) .gt. 0.0) then 
-                ! Fully grounded, simple staggering 
-                beta_acx(i,j) = 0.5*(beta(i,j) + beta(i+1,j))
-            else 
-                ! Fully floating 
-                beta_acx(i,j) = 0.0 
-            end if 
-
-        end do 
-        end do 
-        beta_acx(nx,:) = beta_acx(nx-1,:) 
-        
-        ! acy-nodes 
-        do j = 1, ny-1 
         do i = 1, nx
 
-            if (f_grnd(i,j) .gt. 0.0 .and. f_grnd(i,j+1) .eq. 0.0) then 
+            ! Get neighbor indices 
+            im1 = max(i-1,1)
+            ip1 = min(i+1,nx)
+            jm1 = max(j-1,1) 
+            jp1 = min(j+1,ny)
+            
+            ! grounding line, acx-nodes
+            if (f_grnd(i,j) .gt. 0.0 .and. f_grnd(ip1,j) .eq. 0.0) then 
+                ! Floating to the right 
+                beta_acx(i,j) = f_grnd_acx(i,j)*beta(i,j) + (1.0-f_grnd_acx(i,j))*beta(ip1,j)
+            else if (f_grnd(i,j) .eq. 0.0 .and. f_grnd(ip1,j) .gt. 0.0) then 
+                ! Floating to the left 
+                beta_acx(i,j) = (1.0-f_grnd_acx(i,j))*beta(i,j) + f_grnd_acx(i,j)*beta(ip1,j)
+            end if 
+
+            ! grounding line, acy-nodes 
+            if (f_grnd(i,j) .gt. 0.0 .and. f_grnd(i,jp1) .eq. 0.0) then 
                 ! Floating to the top 
-                beta_acy(i,j) = f_grnd_acy(i,j)*beta(i,j) + (1.0-f_grnd_acy(i,j))*beta(i,j+1)
-            else if (f_grnd(i,j) .eq. 0.0 .and. f_grnd(i,j+1) .gt. 0.0) then 
+                beta_acy(i,j) = f_grnd_acy(i,j)*beta(i,j) + (1.0-f_grnd_acy(i,j))*beta(i,jp1)
+            else if (f_grnd(i,j) .eq. 0.0 .and. f_grnd(i,jp1) .gt. 0.0) then 
                 ! Floating to the bottom 
-                beta_acy(i,j) = (1.0-f_grnd_acy(i,j))*beta(i,j) + f_grnd_acy(i,j)*beta(i,j+1)
-            else if (f_grnd(i,j) .gt. 0.0 .and. f_grnd(i,j+1) .gt. 0.0) then 
-                ! Fully grounded, simple staggering 
-                beta_acy(i,j) = 0.5*(beta(i,j) + beta(i,j+1))
-            else 
-                ! Fully floating 
-                beta_acy(i,j) = 0.0 
+                beta_acy(i,j) = (1.0-f_grnd_acy(i,j))*beta(i,j) + f_grnd_acy(i,j)*beta(i,jp1)
             end if 
 
         end do 
         end do 
-        beta_acy(:,ny) = beta_acy(:,ny-1) 
-        
+
         return
         
-    end subroutine stagger_beta_aa_subgrid
+    end subroutine stagger_beta_aa_gl_subgrid
     
-    subroutine stagger_beta_aa_subgrid_1(beta_acx,beta_acy,beta,H_grnd,f_grnd_acx,f_grnd_acy,dHdt)
+    subroutine stagger_beta_aa_gl_subgrid_1(beta_acx,beta_acy,beta,H_grnd,f_grnd_acx,f_grnd_acy,dHdt)
         ! Modify basal friction coefficient by grounded/floating binary mask
         ! (via the grounded fraction)
         ! Analagous to method "NSEP" in Seroussi et al (2014): 
@@ -1181,10 +1316,10 @@ contains
         
         return
         
-    end subroutine stagger_beta_aa_subgrid_1
+    end subroutine stagger_beta_aa_gl_subgrid_1
     
 
-    subroutine stagger_beta_aa_subgrid_flux(beta_acx,beta_acy,beta,H_ice,ux,uy,f_grnd,f_grnd_acx,f_grnd_acy)
+    subroutine stagger_beta_aa_gl_subgrid_flux(beta_acx,beta_acy,beta,H_ice,ux,uy,f_grnd,f_grnd_acx,f_grnd_acy)
         ! Modify basal friction coefficient by grounded fraction 
         ! weighted by linear-interpolated flux. 
 
@@ -1287,7 +1422,7 @@ contains
 
         return
         
-    end subroutine stagger_beta_aa_subgrid_flux
+    end subroutine stagger_beta_aa_gl_subgrid_flux
     
     subroutine calc_beta_gl_flux_weight(beta_ac,beta_a,beta_b,ux_a,ux_b,H_a,H_b,f_grnd_ac)
         ! aa-node 'a' is grounded, aa-node 'b' is floating 

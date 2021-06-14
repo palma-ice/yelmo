@@ -632,13 +632,13 @@ contains
 
 !             call calc_ydyn_beta(dyn,tpo,mat,bnd)
 
-            call calc_beta(dyn%now%beta,dyn%now%c_bed,dyn%now%ux_b,dyn%now%uy_b,tpo%now%H_ice,tpo%now%H_grnd, &
+            call calc_beta(dyn%now%beta,dyn%now%c_bed,dyn%now%ux_b,dyn%now%uy_b,tpo%now%H_ice,tpo%now%f_ice,tpo%now%H_grnd, &
                             tpo%now%f_grnd,bnd%z_bed,bnd%z_sl,dyn%par%beta_method, &
                                 dyn%par%beta_const,dyn%par%beta_q,dyn%par%beta_u0,dyn%par%beta_gl_scale, &
                                 dyn%par%beta_gl_f,dyn%par%H_grnd_lim,dyn%par%beta_min,dyn%par%boundaries)
 
             ! Stagger beta
-            call stagger_beta(dyn%now%beta_acx,dyn%now%beta_acy,dyn%now%beta,tpo%now%H_ice,dyn%now%ux_b,dyn%now%uy_b,tpo%now%f_grnd, &
+            call stagger_beta(dyn%now%beta_acx,dyn%now%beta_acy,dyn%now%beta,tpo%now%H_ice,tpo%now%f_ice,dyn%now%ux_b,dyn%now%uy_b,tpo%now%f_grnd, &
                             tpo%now%f_grnd_acx,tpo%now%f_grnd_acy,dyn%par%beta_gl_stag,dyn%par%boundaries)
 
             !   2. Calculate effective viscosity

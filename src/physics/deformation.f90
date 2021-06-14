@@ -723,7 +723,7 @@ contains
                                     - 0.5_wp*(vy(i,jm1,k-1)+vy(ip1,jm1,k-1)) )*fact_z(k)*H_ice_inv
 
                     end if 
-                    
+
                     lyz = 0.25_wp*sum(dd_ab)
 
                     ! ====== Calculate cross terms from intermediate values (dxy,dxz,dyz) ====== 
@@ -1066,7 +1066,7 @@ end if
         do j=1, ny
         do i=1, nx
 
-            if (H_ice(i,j) .gt. 0.0_wp) then 
+            if (f_ice(i,j) .eq. 1.0_wp) then 
                 ! Grounded or floating ice, calculate strain rate here
 
                 H_ice_inv = 1.0_wp/H_ice(i,j)
@@ -1214,65 +1214,7 @@ end if
 
                     strn%f_shear(i,j,k) = min(max(strn%f_shear(i,j,k), 0.0), 1.0)
 
-                end do 
-
-
-
-if (.FALSE.) then
-    ! ajr: Extrapolating to ice-free and partially ice-free neighbors, 
-    ! as done further below, is more stable and convincing than 
-    ! imposing the free-spreading strain rate. So this section is disabled. 
-
-                ! Also estimate the free-spreading strain rate (Pollard et al., 2015, EPSL, Eq. B2.b)
-                ! div = A*(rho*g*h/4)^n = dxx + dyy
-                ! assume equal spreading in both directions:
-                ! dxx = dyy; de = 2*dxx
-                ! dxx = de/2
-                div_free = ATT_bar(i,j) * (0.25*rho_ice*g*H_ice(i,j))**n_glen
-                ! dxx_free  = div_free / 2.0
-                ! dyy_free  = dxx_free 
-                if ( abs(0.5*vx(i,j,nz_aa)+vx(im1,j,nz_aa)) &
-                      .gt. abs(0.5*vy(i,j,nz_aa)+vy(i,jm1,nz_aa)) ) then 
-                    dxx_free  = div_free
-                    dyy_free  = 0.0 
-                else 
-                    dxx_free  = 0.0
-                    dyy_free  = div_free
-                end if 
-                
-
-                is_margin = ( H_ice(i,j) .gt. 0.0_wp .and. f_ice(i,j) .lt. 1.0_wp .and. &
-                    count([H_ice(im1,j),H_ice(ip1,j),H_ice(i,jm1),H_ice(i,jp1)] .eq. 0.0_wp) .gt. 0 )
-                
-                ! For partially covered grid cells at margin, or floating points
-                ! ensure effective strain rate is not larger than free-spreading strain rate
-                if (is_margin .or. &
-                     (f_grnd(i,j) .eq. 0.0 .and. strn2D%div(i,j) .gt. div_free) ) then 
-                    ! Overwrite above value and impose free-spreading strain 
-
-                    strn%div(i,j,:)     = div_free
-                    strn%dxx(i,j,:)     = dxx_free
-                    strn%dyy(i,j,:)     = dyy_free
-                    strn%dxy(i,j,:)     = 0.0
-                    strn%dxz(i,j,:)     = 0.0 
-                    strn%dyz(i,j,:)     = 0.0 
-
-                    strn%de(i,j,k) =  sqrt(  strn%dxx(i,j,k)*strn%dxx(i,j,k) &
-                                           + strn%dyy(i,j,k)*strn%dyy(i,j,k) &
-                                           + strn%dxx(i,j,k)*strn%dyy(i,j,k) &
-                                           + strn%dxy(i,j,k)*strn%dxy(i,j,k) &
-                                           + strn%dxz(i,j,k)*strn%dxz(i,j,k) &
-                                           + strn%dyz(i,j,k)*strn%dyz(i,j,k) )
-                    
-                    if (strn%de(i,j,k) .gt. de_max) strn%de(i,j,k) = de_max 
-
-                    ! Calculate the horizontal divergence too 
-                    strn%div(i,j,k) = strn%dxx(i,j,k) + strn%dyy(i,j,k) 
-
-                end if 
-end if 
-
-
+                end do
 
             end if ! ice-free or ice-covered 
 
@@ -1415,6 +1357,10 @@ end if
         ! Calculate the 2D (vertically averaged) strain rate tensor,
         ! assuming a constant vertical velocity profile. 
 
+        ! ajr: to do: perform calculation on ab-nodes (quadrature)
+        ! to be consistent with new formulation above for 
+        ! calc_strain_rate_tensor. 
+
         implicit none
 
         type(strain_2D_class), intent(OUT) :: strn2D            ! [yr^-1] Strain rate tensor
@@ -1479,50 +1425,6 @@ end if
                 strn2D%de(i,j) = sqrt( strn2D%dxx(i,j)**2 + strn2D%dyy(i,j)**2 &
                             + strn2D%dxx(i,j)*strn2D%dyy(i,j) + strn2D%dxy(i,j)**2 )
                 
-if (.FALSE.) then
-    ! ajr: Extrapolating to ice-free and partially ice-free neighbors, 
-    ! as done further below, is more stable and convincing than 
-    ! imposing the free-spreading strain rate. So this section is disabled. 
-
-                ! Also estimate the free-spreading strain rate (Pollard et al., 2015, EPSL, Eq. B2.b)
-                ! div = A*(rho*g*h/4)^n = dxx + dyy
-                ! assume equal spreading in both directions:
-                ! dxx = dyy; div = 2*dxx
-                ! dxx = div/2
-                div_free = ATT_bar(i,j) * (0.25*rho_ice*g*H_ice(i,j))**n_glen
-                ! dxx_free  = div_free / 2.0
-                ! dyy_free  = dxx_free 
-                if ( abs(0.5*ux_bar(i,j)+ux_bar(im1,j)) &
-                      .gt. abs(0.5*uy_bar(i,j)+uy_bar(i,jm1)) ) then 
-                    dxx_free  = div_free
-                    dyy_free  = 0.0 
-                else 
-                    dxx_free  = 0.0
-                    dyy_free  = div_free
-                end if 
-
-                is_margin = ( H_ice(i,j) .gt. 0.0_wp .and. f_ice(i,j) .lt. 1.0_wp .and. &
-                    count([H_ice(im1,j),H_ice(ip1,j),H_ice(i,jm1),H_ice(i,jp1)] .eq. 0.0_wp) .gt. 0 )
-                
-                ! For partially covered grid cells at margin, or floating points
-                ! ensure effective strain rate is not larger than free-spreading strain rate
-                if (is_margin .or. &
-                     (f_grnd(i,j) .eq. 0.0 .and. strn2D%de(i,j) .gt. div_free) ) then 
-                    ! Overwrite above value and impose free-spreading strain 
-                    strn2D%div(i,j) = div_free 
-                    strn2D%dxx(i,j)  = dxx_free 
-                    strn2D%dyy(i,j)  = dyy_free 
-                    strn2D%dxy(i,j)  = 0.0
-
-                    strn2D%de(i,j) = sqrt( strn2D%dxx(i,j)**2 + strn2D%dyy(i,j)**2 &
-                            + strn2D%dxx(i,j)*strn2D%dyy(i,j) + strn2D%dxy(i,j)**2 )
-                 
-                end if 
-
-end if 
-
-
-
             end if 
 
         end do

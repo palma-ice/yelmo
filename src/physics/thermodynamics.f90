@@ -131,7 +131,7 @@ contains
             Q_net = Q_rock_now + Q_b_now - Q_ice_b_now
             
             bmb_grnd = -Q_net /(rho_ice*L_ice)
-
+            
         else 
             ! Floating point, no grounded bmb 
 

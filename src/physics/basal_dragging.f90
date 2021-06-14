@@ -548,8 +548,12 @@ contains
 
         ! Local variables
         integer    :: i, j, nx, ny
-        integer    :: im1, jm1 
-        real(wp) :: ux_b_mid, uy_b_mid, uxy_b  
+        integer    :: im1, ip1, jm1, jp1 
+        real(wp) :: uxy_b  
+        real(wp) :: ux_ab(4) 
+        real(wp) :: uy_ab(4) 
+        real(wp) :: uxy_ab(4) 
+        real(wp) :: wt_ab(4) 
 
         real(wp), parameter :: ub_sq_min = (1e-1_prec)**2  ! [m/a] Minimum velocity is positive small value to avoid divide by zero
 
@@ -572,12 +576,24 @@ contains
             do i = 1, nx
 
                 im1 = max(i-1,1)
+                ip1 = min(i+1,nx)
                 jm1 = max(j-1,1) 
+                jp1 = min(j+1,ny)
                 
                 ! Calculate magnitude of basal velocity on aa-node 
-                ux_b_mid  = 0.5_prec*(ux_b(im1,j)+ux_b(i,j))
-                uy_b_mid  = 0.5_prec*(uy_b(i,jm1)+uy_b(i,j))
-                uxy_b     = (ux_b_mid**2 + uy_b_mid**2 + ub_sq_min)**0.5_prec
+                ! from ab-nodes (quadrature points)
+                ux_ab(1) = 0.5_wp*(ux_b(i,j)+ux_b(i,jp1))
+                ux_ab(2) = 0.5_wp*(ux_b(im1,j)+ux_b(im1,jp1))
+                ux_ab(3) = 0.5_wp*(ux_b(im1,jm1)+ux_b(im1,j))
+                ux_ab(4) = 0.5_wp*(ux_b(i,jm1)+ux_b(i,j))
+
+                uy_ab(1) = 0.5_wp*(uy_b(i,j)+uy_b(ip1,j))
+                uy_ab(2) = 0.5_wp*(uy_b(i,j)+uy_b(im1,j))
+                uy_ab(3) = 0.5_wp*(uy_b(i,jm1)+uy_b(im1,jm1))
+                uy_ab(4) = 0.5_wp*(uy_b(i,jm1)+uy_b(ip1,jm1))
+
+                uxy_ab = sqrt(ux_ab**2 + uy_ab**2 + ub_sq_min)
+                uxy_b  = sum(wt_ab*uxy_ab)
 
                 ! Nonlinear beta as a function of basal velocity
                 beta(i,j) = C_bed(i,j) * (uxy_b / u_0)**q * (1.0_prec / uxy_b)
@@ -591,7 +607,7 @@ contains
         
     end subroutine calc_beta_aa_power_plastic
 
-    subroutine calc_beta_aa_reg_coulomb(beta,ux_b,uy_b,C_bed,q,u_0)
+    subroutine calc_beta_aa_reg_coulomb(beta,ux_b,uy_b,c_bed,q,u_0)
         ! Calculate basal friction coefficient (beta) that
         ! enters the SSA solver as a function of basal velocity
         ! using a regularized Coulomb friction law following
@@ -605,16 +621,20 @@ contains
         real(wp), intent(OUT) :: beta(:,:)        ! aa-nodes
         real(wp), intent(IN)  :: ux_b(:,:)        ! ac-nodes
         real(wp), intent(IN)  :: uy_b(:,:)        ! ac-nodes
-        real(wp), intent(IN)  :: C_bed(:,:)       ! aa-nodes
+        real(wp), intent(IN)  :: c_bed(:,:)       ! aa-nodes
         real(wp), intent(IN)  :: q
         real(wp), intent(IN)  :: u_0              ! [m/a] 
 
         ! Local variables
         integer    :: i, j, nx, ny
-        integer    :: im1, jm1
-        real(wp) :: ux_b_mid, uy_b_mid, uxy_b  
+        integer    :: im1, ip1, jm1, jp1
+        real(wp) :: uxy_b  
+        real(wp) :: ux_ab(4) 
+        real(wp) :: uy_ab(4) 
+        real(wp) :: uxy_ab(4) 
+        real(wp) :: wt_ab(4) 
 
-        real(wp), parameter :: ub_sq_min = (1e-1_prec)**2  ! [m/a] Minimum velocity is positive small value to avoid divide by zero
+        real(wp), parameter :: ub_sq_min = (1e-1_wp)**2  ! [m/a] Minimum velocity is positive small value to avoid divide by zero
 
         nx = size(beta,1)
         ny = size(beta,2)
@@ -622,19 +642,34 @@ contains
         ! Initially set friction to zero everywhere
         beta = 0.0_prec 
 
+        wt_ab = 1.0_wp 
+        wt_ab = wt_ab / sum(wt_ab) 
+
         do j = 1, ny
         do i = 1, nx
 
             im1 = max(i-1,1)
+            ip1 = min(i+1,nx)
             jm1 = max(j-1,1) 
+            jp1 = min(j+1,ny)
             
             ! Calculate magnitude of basal velocity on aa-node 
-            ux_b_mid  = 0.5_prec*(ux_b(im1,j)+ux_b(i,j))
-            uy_b_mid  = 0.5_prec*(uy_b(i,jm1)+uy_b(i,j))
-            uxy_b     = (ux_b_mid**2 + uy_b_mid**2 + ub_sq_min)**0.5_prec
+            ! from ab-nodes (quadrature points)
+            ux_ab(1) = 0.5_wp*(ux_b(i,j)+ux_b(i,jp1))
+            ux_ab(2) = 0.5_wp*(ux_b(im1,j)+ux_b(im1,jp1))
+            ux_ab(3) = 0.5_wp*(ux_b(im1,jm1)+ux_b(im1,j))
+            ux_ab(4) = 0.5_wp*(ux_b(i,jm1)+ux_b(i,j))
+
+            uy_ab(1) = 0.5_wp*(uy_b(i,j)+uy_b(ip1,j))
+            uy_ab(2) = 0.5_wp*(uy_b(i,j)+uy_b(im1,j))
+            uy_ab(3) = 0.5_wp*(uy_b(i,jm1)+uy_b(im1,jm1))
+            uy_ab(4) = 0.5_wp*(uy_b(i,jm1)+uy_b(ip1,jm1))
+
+            uxy_ab = sqrt(ux_ab**2 + uy_ab**2 + ub_sq_min)
+            uxy_b  = sum(wt_ab*uxy_ab)
 
             ! Nonlinear beta as a function of basal velocity
-            beta(i,j) = C_bed(i,j) * (uxy_b / (uxy_b+u_0))**q * (1.0_prec / uxy_b)
+            beta(i,j) = c_bed(i,j) * (uxy_b / (uxy_b+u_0))**q * (1.0_wp / uxy_b)
 
         end do
         end do 

@@ -62,9 +62,9 @@
 
 &ytopo
     solver              = "impl-upwind"     ! "expl", "impl-upwind"
-    calv_flt_method     = "vm-l19"          ! "zero", "simple", "flux", "vm-l19", "kill"
-    calv_grnd_method    = "stress-b12"      ! "zero", "stress-b12"
-    fmb_method          = 1                 ! 0: prescribe boundary field fmb_shlf; 1: calculate proportional fmb~bmb_shlf.
+    calv_flt_method     = "flux"            ! "zero", "simple", "flux", "vm-l19", "kill"
+    calv_grnd_method    = "zero"            ! "zero", "stress-b12"
+    fmb_method          = 0                 ! 0: prescribe boundary field fmb_shlf; 1: calculate proportional fmb~bmb_shlf.
     surf_gl_method      = 0                 ! 0: binary (max grnd/flt elevation), 1: subgrid average elevation
     margin2nd           = False             ! Apply second-order upwind approximation to gradients at the margin
     use_bmb             = True              ! Use basal mass balance in mass conservation equation
@@ -93,11 +93,11 @@
     visc_const          = 1e7             ! [Pa a] Constant value for viscosity (if visc_method=0)
     beta_method         = 1               ! 0: constant beta; 1: linear (beta=cb/u0); 2: psuedo-plastic-power; 3: Regularized Coulomb
     beta_const          = 1e3             ! [Pa a m-1] Constant value of basal friction coefficient to be used
-    beta_q              = 0.2             ! Dragging law exponent 
+    beta_q              = 1.0             ! Dragging law exponent 
     beta_u0             = 100.0           ! [m/a] Regularization term for regularized Coulomb law (beta_method=3)
     beta_gl_scale       = 0               !  0: beta*beta_gl_f, 1: H_grnd linear scaling, 2: Zstar scaling 
-    beta_gl_stag        = 3               !  0: simple staggering, 1: Upstream beta at gl, 2: downstream, 3: f_grnd_ac scaling 
-    beta_gl_f           = 0.1             ! [-] Scaling of beta at the grounding line (for beta_gl_scale=0)
+    beta_gl_stag        = 1               !  0: simple staggering, 1: Upstream beta at gl, 2: downstream, 3: f_grnd_ac scaling 
+    beta_gl_f           = 1.0             ! [-] Scaling of beta at the grounding line (for beta_gl_scale=0)
     taud_gl_method      = 0               !  0: binary, no subgrid, 1: Two-sided gradient
     H_grnd_lim          = 500.0           ! [m] For beta_gl_scale=1, reduce beta linearly between H_grnd=0 and H_grnd_lim 
     H_sed_sat           = 250.0           ! [m] Sediment thickness at which sediment effect is saturated
@@ -153,8 +153,8 @@
     visc_min                = 1e3           ! [Pa a] Minimum allowed viscosity 
     de_max                  = 0.5           ! [a-1]  Maximum allowed effective strain rate
     enh_method              = "shear3D"     ! "simple","shear2D", "shear3D", "paleo-shear" 
-    enh_shear               = 3.0
-    enh_stream              = 1.0
+    enh_shear               = 2.0
+    enh_stream              = 2.0
     enh_shlf                = 0.7
     enh_umin                = 50.0          ! [m/yr] Minimum transition velocity to enh_stream (enh_method="paleo-shear")
     enh_umax                = 500.0         ! [m/yr] Maximum transition velocity to enh_stream (enh_method="paleo-shear")

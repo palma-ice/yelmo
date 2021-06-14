@@ -718,7 +718,7 @@ contains
  
     end subroutine calc_basal_heating_fromaa
 
-    subroutine calc_basal_heating_fromab(Q_b,ux_b,uy_b,taub_acx,taub_acy,H_ice,beta1,beta2)
+    subroutine calc_basal_heating_fromab(Q_b,ux_b,uy_b,taub_acx,taub_acy,f_ice,beta1,beta2)
          ! Qb [J a-1 m-2] == [m a-1] * [J m-3]
          ! Note: grounded ice fraction f_grnd_acx/y not used here, because taub_acx/y already accounts
          ! for the grounded fraction via beta_acx/y: Q_b = tau_b*u = -beta*u*u.
@@ -728,7 +728,7 @@ contains
         real(prec), intent(IN)    :: uy_b(:,:)          ! Basal velocity, y-compenent (acy)
         real(prec), intent(IN)    :: taub_acx(:,:)      ! Basal friction (acx)
         real(prec), intent(IN)    :: taub_acy(:,:)      ! Basal friction (acy) 
-        real(prec), intent(IN)    :: H_ice(:,:)         ! [m] Ice thickness
+        real(prec), intent(IN)    :: f_ice(:,:)         ! [--] Ice area fraction
         real(prec), intent(IN)    :: beta1              ! Timestepping weighting parameter
         real(prec), intent(IN)    :: beta2              ! Timestepping weighting parameter
         
@@ -778,22 +778,22 @@ contains
             Q_b_now = 0.0_prec 
             wt      = 0.0_prec
 
-            if (count([H_ice(i,j),H_ice(ip1,j),H_ice(i,jp1),H_ice(ip1,jp1)].eq.0.0_prec) .eq. 0) then  
+            if (count([f_ice(i,j),f_ice(ip1,j),f_ice(i,jp1),f_ice(ip1,jp1)].lt.1.0_wp) .eq. 0) then  
                 Q_b_now = Q_b_now + Qb_ab(i,j) 
                 wt = wt + 1.0_prec 
             end if 
             
-            if (count([H_ice(i,j),H_ice(im1,j),H_ice(im1,jp1),H_ice(i,jp1)].eq.0.0_prec) .eq. 0) then  
+            if (count([f_ice(i,j),f_ice(im1,j),f_ice(im1,jp1),f_ice(i,jp1)].lt.1.0_wp) .eq. 0) then  
                 Q_b_now = Q_b_now + Qb_ab(im1,j) 
                 wt = wt + 1.0_prec 
             end if 
 
-            if (count([H_ice(i,j),H_ice(i,jm1),H_ice(ip1,jm1),H_ice(ip1,j)].eq.0.0_prec) .eq. 0) then 
+            if (count([f_ice(i,j),f_ice(i,jm1),f_ice(ip1,jm1),f_ice(ip1,j)].lt.1.0_wp) .eq. 0) then 
                 Q_b_now = Q_b_now + Qb_ab(i,jm1) 
                 wt = wt + 1.0_prec 
             end if 
             
-            if (count([H_ice(i,j),H_ice(im1,j),H_ice(im1,jm1),H_ice(i,jm1)].eq.0.0_prec) .eq. 0) then 
+            if (count([f_ice(i,j),f_ice(im1,j),f_ice(im1,jm1),f_ice(i,jm1)].lt.1.0_wp) .eq. 0) then 
                 Q_b_now = Q_b_now + Qb_ab(im1,jm1) 
                 wt = wt + 1.0_prec 
             end if 

@@ -116,9 +116,10 @@ contains
 
             case(1)
                 ! Calculate beta from a linear law (simply set beta=c_bed/u0)
+                ! (use power-plastic function to ensure proper staggering)
 
-                beta = c_bed * (1.0_prec / beta_u0)
-
+                call calc_beta_aa_power_plastic(beta,ux_b,uy_b,c_bed,f_ice,1.0_wp,beta_u0)
+                
             case(2)
                 ! Calculate beta from the quasi-plastic power-law as defined by Bueler and van Pelt (2015)
 
@@ -565,9 +566,12 @@ contains
         real(wp) :: ux_ab(4) 
         real(wp) :: uy_ab(4) 
         real(wp) :: uxy_ab(4) 
+        real(wp) :: cb_ab(4)
+        real(wp) :: beta_ab(4)
         real(wp) :: wt_ab(4) 
         real(wp) :: wt 
-        
+        real(wp) :: beta_now 
+
         real(wp), parameter :: ub_min    = 1e-1_wp          ! [m/a] Minimum velocity is positive small value to avoid divide by zero
         real(wp), parameter :: ub_sq_min = ub_min**2
 
@@ -576,48 +580,53 @@ contains
         
         ! Initially set friction to zero everywhere
         beta = 0.0_prec 
-        
-        if (q .eq. 1.0) then 
-            ! q==1: linear law, no loops needed 
+                 
+        do j = 1, ny
+        do i = 1, nx
 
-            beta = c_bed * (1.0_prec / u_0)
+            ! Get neighbor indices 
+            im1 = max(i-1,1)
+            ip1 = min(i+1,nx)
+            jm1 = max(j-1,1) 
+            jp1 = min(j+1,ny)
+            
+            ! Get ab-node weighting based on whether ice is present 
+            wt_ab = 0.0_wp 
+            if (count([f_ice(i,j),f_ice(ip1,j),f_ice(i,jp1),f_ice(ip1,jp1)].lt.1.0_wp) .eq. 0) then 
+                wt_ab(1) = 1.0_wp
+            end if
+            if (count([f_ice(i,j),f_ice(im1,j),f_ice(im1,jp1),f_ice(i,jp1)].lt.1.0_wp) .eq. 0) then 
+                wt_ab(2) = 1.0_wp 
+            end if 
+            if (count([f_ice(i,j),f_ice(i,jm1),f_ice(ip1,jm1),f_ice(ip1,j)].lt.1.0_wp) .eq. 0) then 
+                wt_ab(3) = 1.0_wp 
+            end if 
+            
+            if (count([f_ice(i,j),f_ice(im1,j),f_ice(im1,jm1),f_ice(i,jm1)].lt.1.0_wp) .eq. 0) then 
+                wt_ab(4) = 1.0_wp
+            end if 
+            
+            wt = sum(wt_ab)
+            
+            if (f_ice(i,j) .eq. 1.0_wp .and. wt .gt. 0.0_wp) then 
+                ! Fully ice-covered point with some fully ice-covered neighbors 
 
-        else 
-            ! q/=1: Nonlinear law, loops needed 
+                ! Normalize weighting 
+                wt_ab = wt_ab / wt 
 
-            ! x-direction 
-            do j = 1, ny
-            do i = 1, nx
+                cb_ab(1) = 0.25_wp*(c_bed(i,j)+c_bed(ip1,j)+c_bed(i,jp1)+c_bed(ip1,jp1))
+                cb_ab(2) = 0.25_wp*(c_bed(i,j)+c_bed(im1,j)+c_bed(i,jp1)+c_bed(im1,jp1))
+                cb_ab(3) = 0.25_wp*(c_bed(i,j)+c_bed(im1,j)+c_bed(i,jm1)+c_bed(im1,jm1))
+                cb_ab(4) = 0.25_wp*(c_bed(i,j)+c_bed(ip1,j)+c_bed(i,jm1)+c_bed(ip1,jm1))
 
-                ! Get neighbor indices 
-                im1 = max(i-1,1)
-                ip1 = min(i+1,nx)
-                jm1 = max(j-1,1) 
-                jp1 = min(j+1,ny)
-                
-                ! Get ab-node weighting based on whether ice is present 
-                wt_ab = 0.0_wp 
-                if (count([f_ice(i,j),f_ice(ip1,j),f_ice(i,jp1),f_ice(ip1,jp1)].lt.1.0_wp) .eq. 0) then 
-                    wt_ab(1) = 1.0_wp
-                end if
-                if (count([f_ice(i,j),f_ice(im1,j),f_ice(im1,jp1),f_ice(i,jp1)].lt.1.0_wp) .eq. 0) then 
-                    wt_ab(2) = 1.0_wp 
-                end if 
-                if (count([f_ice(i,j),f_ice(i,jm1),f_ice(ip1,jm1),f_ice(ip1,j)].lt.1.0_wp) .eq. 0) then 
-                    wt_ab(3) = 1.0_wp 
-                end if 
-                
-                if (count([f_ice(i,j),f_ice(im1,j),f_ice(im1,jm1),f_ice(i,jm1)].lt.1.0_wp) .eq. 0) then 
-                    wt_ab(4) = 1.0_wp
-                end if 
-                
-                wt = sum(wt_ab)
-                
-                if (f_ice(i,j) .eq. 1.0_wp .and. wt .gt. 0.0_wp) then 
-                    ! Fully ice-covered point with some fully ice-covered neighbors 
 
-                    ! Normalize weighting 
-                    wt_ab = wt_ab / wt 
+                if (q .eq. 1.0_wp) then 
+                    ! Linear law, no f(ub) term
+
+                    beta_ab = cb_ab / u_0
+
+                else
+                    ! Non-linear law with f(ub) term 
 
                     ! Calculate magnitude of basal velocity on aa-node 
                     ! from ab-nodes (quadrature points)
@@ -632,23 +641,67 @@ contains
                     uy_ab(4) = 0.5_wp*(uy_b(i,jm1)+uy_b(ip1,jm1))
 
                     uxy_ab = sqrt(ux_ab**2 + uy_ab**2 + ub_sq_min)
-                    uxy_b  = sum(wt_ab*uxy_ab)
-
-                else
-                    ! Assign minimum velocity value 
-
-                    uxy_b  = ub_min 
+                    
+                    beta_ab = cb_ab * (uxy_ab / u_0)**q * (1.0_prec / uxy_ab)
 
                 end if 
 
-                ! Nonlinear beta as a function of basal velocity
+                beta(i,j) = sum(wt_ab*beta_ab)
+
+            else
+                ! Assign minimum velocity value, ignore staggering for simplicity
+
+                uxy_b  = ub_min 
                 beta(i,j) = c_bed(i,j) * (uxy_b / u_0)**q * (1.0_prec / uxy_b)
 
-            end do
-            end do
+            end if 
 
-        end if 
-            
+        end do
+        end do
+
+        ! === Extrapolate to ice-free neighbors === 
+        do j=1, ny
+        do i=1, nx
+
+            ! Get neighbor indices
+            im1 = max(i-1,1) 
+            ip1 = min(i+1,nx) 
+            jm1 = max(j-1,1) 
+            jp1 = min(j+1,ny) 
+                
+            if ( f_ice(i,j) .lt. 1.0 .and. &
+                count([f_ice(im1,j),f_ice(ip1,j),f_ice(i,jm1),f_ice(i,jp1)] .eq. 1.0_wp) .gt. 0 ) then 
+                ! Ice-free (or partially ice-free) with ice-covered neighbors
+
+                beta_now = 0.0 
+                wt       = 0.0 
+
+                if (f_ice(im1,j) .eq. 1.0) then 
+                    beta_now = beta_now + beta(im1,j)
+                    wt = wt + 1.0 
+                end if 
+                if (f_ice(ip1,j) .eq. 1.0) then 
+                    beta_now = beta_now + beta(ip1,j)
+                    wt = wt + 1.0 
+                end if
+                if (f_ice(i,jm1) .eq. 1.0) then 
+                    beta_now = beta_now + beta(i,jm1)
+                    wt = wt + 1.0 
+                end if
+                if (f_ice(i,jp1) .eq. 1.0) then 
+                    beta_now = beta_now + beta(i,jp1)
+                    wt = wt + 1.0 
+                end if
+
+                if (wt .gt. 0.0) then 
+                    beta(i,j) = beta_now / wt
+                end if 
+
+            end if 
+
+        end do 
+        end do
+
         return
         
     end subroutine calc_beta_aa_power_plastic
@@ -679,6 +732,8 @@ contains
         real(wp) :: ux_ab(4) 
         real(wp) :: uy_ab(4) 
         real(wp) :: uxy_ab(4) 
+        real(wp) :: cb_ab(4)
+        real(wp) :: beta_ab(4)
         real(wp) :: wt_ab(4) 
         real(wp) :: wt 
         real(wp) :: beta_now
@@ -725,6 +780,11 @@ contains
                 ! Normalize weighting 
                 wt_ab = wt_ab / wt 
 
+                cb_ab(1) = 0.25_wp*(c_bed(i,j)+c_bed(ip1,j)+c_bed(i,jp1)+c_bed(ip1,jp1))
+                cb_ab(2) = 0.25_wp*(c_bed(i,j)+c_bed(im1,j)+c_bed(i,jp1)+c_bed(im1,jp1))
+                cb_ab(3) = 0.25_wp*(c_bed(i,j)+c_bed(im1,j)+c_bed(i,jm1)+c_bed(im1,jm1))
+                cb_ab(4) = 0.25_wp*(c_bed(i,j)+c_bed(ip1,j)+c_bed(i,jm1)+c_bed(ip1,jm1))
+
                 ! Calculate magnitude of basal velocity on aa-node 
                 ! from ab-nodes (quadrature points)
                 ux_ab(1) = 0.5_wp*(ux_b(i,j)+ux_b(i,jp1))
@@ -737,19 +797,20 @@ contains
                 uy_ab(3) = 0.5_wp*(uy_b(i,jm1)+uy_b(im1,jm1))
                 uy_ab(4) = 0.5_wp*(uy_b(i,jm1)+uy_b(ip1,jm1))
 
-                uxy_ab = sqrt(ux_ab**2 + uy_ab**2 + ub_sq_min)
-                uxy_b  = sum(wt_ab*uxy_ab)
+                uxy_ab    = sqrt(ux_ab**2 + uy_ab**2 + ub_sq_min)
+
+                beta_ab   = cb_ab * (uxy_ab / u_0)**q * (1.0_prec / uxy_ab)
+
+                beta(i,j) = sum(wt_ab*beta_ab)
 
             else
-                ! Assign minimum velocity value 
+                ! Assign minimum velocity value, ignore staggering for simplicity 
 
                 uxy_b  = ub_min 
+                beta(i,j) = c_bed(i,j) * (uxy_b / (uxy_b+u_0))**q * (1.0_wp / uxy_b)
 
             end if 
-
-            ! Nonlinear beta as a function of basal velocity
-            beta(i,j) = c_bed(i,j) * (uxy_b / (uxy_b+u_0))**q * (1.0_wp / uxy_b)
-
+            
         end do
         end do 
         

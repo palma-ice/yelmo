@@ -640,17 +640,17 @@ end if
 
                 ! === dudy ======================
 
-                dudy_ab(1) = (ux(i,jp1)   - ux(i,j))     / dx 
-                dudy_ab(2) = (ux(im1,jp1) - ux(im1,j))   / dx 
-                dudy_ab(3) = (ux(im1,j)   - ux(im1,jm1)) / dx 
-                dudy_ab(4) = (ux(i,j)     - ux(i,jm1))   / dx 
+                dudy_ab(1) = (ux(i,jp1)   - ux(i,j))     / dy 
+                dudy_ab(2) = (ux(im1,jp1) - ux(im1,j))   / dy 
+                dudy_ab(3) = (ux(im1,j)   - ux(im1,jm1)) / dy 
+                dudy_ab(4) = (ux(i,j)     - ux(i,jm1))   / dy 
                 
                 ! === dvdx ======================
 
-                dvdx_ab(1) = (uy(ip1,j)   - uy(i,j))     / dy 
-                dvdx_ab(2) = (uy(i,j)     - uy(im1,j))   / dy 
-                dvdx_ab(3) = (uy(i,jm1)   - uy(im1,jm1)) / dy
-                dvdx_ab(4) = (uy(ip1,jm1) - uy(i,jm1))   / dy
+                dvdx_ab(1) = (uy(ip1,j)   - uy(i,j))     / dx 
+                dvdx_ab(2) = (uy(i,j)     - uy(im1,j))   / dx 
+                dvdx_ab(3) = (uy(i,jm1)   - uy(im1,jm1)) / dx
+                dvdx_ab(4) = (uy(ip1,jm1) - uy(i,jm1))   / dx
 
                 ! Loop over column
                 do k = 1, nz 
@@ -670,8 +670,11 @@ end if
                                 + 0.25_wp*duxdz_ab**2 + 0.25_wp*duydz_ab**2 + eps_0_sq
                     
                     ! Get the rate factor on ab-nodes too
-                    ATT_ab = 0.25_wp*(ATT(i,j,k)+ATT(ip1,j,k)+ATT(i,jp1,k)+ATT(ip1,jp1,k)) 
-                
+                    ATT_ab(1) = 0.25_wp*(ATT(i,j,k)+ATT(ip1,j,k)+ATT(i,jp1,k)+ATT(ip1,jp1,k)) 
+                    ATT_ab(2) = 0.25_wp*(ATT(i,j,k)+ATT(im1,j,k)+ATT(i,jp1,k)+ATT(im1,jp1,k)) 
+                    ATT_ab(3) = 0.25_wp*(ATT(i,j,k)+ATT(im1,j,k)+ATT(i,jm1,k)+ATT(im1,jm1,k)) 
+                    ATT_ab(4) = 0.25_wp*(ATT(i,j,k)+ATT(ip1,j,k)+ATT(i,jm1,k)+ATT(ip1,jm1,k)) 
+                    
                     ! Calculate effective viscosity on ab-nodes
                     visc_eff_ab = 0.5_wp*(eps_sq_ab)**(p1) * ATT_ab**(p2)
 
@@ -686,7 +689,7 @@ end if
                 do k = 1, nz
                     visc_eff(i,j,k) = 0.5_wp*(eps_0_sq)**(p1) * ATT(i,j,k)**(p2)
                 end do 
-                
+
             end if 
 
         end do  

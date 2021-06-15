@@ -225,7 +225,7 @@ contains
 
         ! Apply modified mass balance to update the ice thickness 
         H_ice = H_ice + dt*mb_applied
-        
+
         ! Also ensure tiny numeric ice thicknesses are removed
         where (H_ice .lt. 1e-5) H_ice = 0.0 
 
@@ -256,7 +256,8 @@ contains
         real(wp), allocatable :: H_ice_new(:,:)
         real(wp) :: H_eff 
         logical  :: is_margin 
-
+        logical  :: is_island 
+        
         nx = size(H_ice,1)
         ny = size(H_ice,2) 
 
@@ -302,6 +303,22 @@ contains
                 if (f_grnd(i,j) .lt. 1.0_wp .and. H_eff .lt. H_min_flt)  H_ice_new(i,j) = 0.0_wp 
                 if (f_grnd(i,j) .eq. 1.0_wp .and. H_eff .lt. H_min_grnd) H_ice_new(i,j) = 0.0_wp 
 
+            end if 
+
+            ! Check for ice islands
+            is_island = f_ice(i,j) .gt. 0.0 .and. &
+                count([f_ice(im1,j),f_ice(ip1,j),f_ice(i,jm1),f_ice(i,jp1)].gt.0.0) .eq. 0
+
+            if (is_island) then 
+                ! Ice-covered island
+                ! Redistribute ice to neighbors
+                ! (slowly island will disappear or merge with bigger ice body)
+
+                H_ice_new(im1,j) = H_ice_new(im1,j) + 0.125_wp*H_ice(i,j)
+                H_ice_new(ip1,j) = H_ice_new(ip1,j) + 0.125_wp*H_ice(i,j)
+                H_ice_new(i,jm1) = H_ice_new(i,jm1) + 0.125_wp*H_ice(i,j)
+                H_ice_new(i,jp1) = H_ice_new(i,jp1) + 0.125_wp*H_ice(i,j)
+                H_ice_new(i,j)   = 0.500_wp*H_ice(i,j)
             end if 
 
         end do 
@@ -371,7 +388,7 @@ contains
         return
 
     end subroutine apply_ice_thickness_boundaries
-    
+
     subroutine relax_ice_thickness(H_ice,f_grnd,H_ref,topo_rel,tau,dt)
         ! This routines allows ice within a given mask to be
         ! relaxed to a reference state with certain timescale tau 

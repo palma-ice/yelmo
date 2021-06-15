@@ -257,6 +257,8 @@ contains
         real(wp) :: H_eff 
         logical  :: is_margin 
         logical  :: is_island 
+        logical  :: is_isthmus_x 
+        logical  :: is_isthmus_y 
         
         nx = size(H_ice,1)
         ny = size(H_ice,2) 
@@ -309,6 +311,12 @@ contains
             is_island = f_ice(i,j) .gt. 0.0 .and. &
                 count([f_ice(im1,j),f_ice(ip1,j),f_ice(i,jm1),f_ice(i,jp1)].gt.0.0) .eq. 0
 
+            is_isthmus_x = f_ice(i,j) .gt. 0.0 .and. &
+                count([f_ice(im1,j),f_ice(ip1,j)].gt.0.0) .eq. 0
+
+            is_isthmus_y = f_ice(i,j) .gt. 0.0 .and. &
+                count([f_ice(i,jm1),f_ice(i,jp1)].gt.0.0) .eq. 0
+            
             if (is_island) then 
                 ! Ice-covered island
                 ! Redistribute ice to neighbors
@@ -319,6 +327,19 @@ contains
                 H_ice_new(i,jm1) = H_ice_new(i,jm1) + 0.125_wp*H_ice(i,j)
                 H_ice_new(i,jp1) = H_ice_new(i,jp1) + 0.125_wp*H_ice(i,j)
                 H_ice_new(i,j)   = 0.500_wp*H_ice(i,j)
+            
+            else if (is_isthmus_x) then 
+
+                H_ice_new(im1,j) = H_ice_new(im1,j) + 0.250_wp*H_ice(i,j)
+                H_ice_new(ip1,j) = H_ice_new(ip1,j) + 0.250_wp*H_ice(i,j)
+                H_ice_new(i,j)   = 0.500_wp*H_ice(i,j)
+
+            else if (is_isthmus_y) then 
+
+                H_ice_new(i,jm1) = H_ice_new(i,jm1) + 0.250_wp*H_ice(i,j)
+                H_ice_new(i,jp1) = H_ice_new(i,jp1) + 0.250_wp*H_ice(i,j)
+                H_ice_new(i,j)   = 0.500_wp*H_ice(i,j)
+
             end if 
 
         end do 

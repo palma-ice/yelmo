@@ -171,9 +171,12 @@ contains
 
         end select 
 
-        ! Limit 3D velocity values to avoid potential underflow errors 
+        ! Limit velocity values to avoid potential underflow errors 
         where (abs(dyn%now%ux) .lt. 1e-10) dyn%now%ux = 0.0_prec 
         where (abs(dyn%now%uy) .lt. 1e-10) dyn%now%uy = 0.0_prec 
+        
+        where (abs(dyn%now%ux_bar) .lt. 1e-10) dyn%now%ux_bar = 0.0_prec 
+        where (abs(dyn%now%uy_bar) .lt. 1e-10) dyn%now%uy_bar = 0.0_prec 
         
         ! ===== Additional diagnostic variables ====================================
         

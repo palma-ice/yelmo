@@ -64,17 +64,18 @@ contains
         
         ! Write model speed 
         call nc_write(filename,"speed",ylmo%time%model_speed,units="kyr/hr",long_name="Model speed (Yelmo only)", &
-                      dim1="time",start=[n],count=[1],ncid=ncid)
+                      dim1="time",start=[n],count=[1],missing_value=mv,ncid=ncid)
         call nc_write(filename,"dt_avg",ylmo%time%dt_avg,units="yr",long_name="Average timestep", &
-                      dim1="time",start=[n],count=[1],ncid=ncid)
+                      dim1="time",start=[n],count=[1],missing_value=mv,ncid=ncid)
         call nc_write(filename,"eta_avg",ylmo%time%eta_avg,units="m a**-1",long_name="Average eta (maximum PC truncation error)", &
-                      dim1="time",start=[n],count=[1],ncid=ncid)
+                      dim1="time",start=[n],count=[1],missing_value=mv,ncid=ncid)
         call nc_write(filename,"ssa_iter_avg",ylmo%time%ssa_iter_avg,units="",long_name="Average Picard iterations for SSA convergence", &
-                      dim1="time",start=[n],count=[1],ncid=ncid)
+                      dim1="time",start=[n],count=[1],missing_value=mv,ncid=ncid)
 
         call nc_write(filename,"pc_tau_max",abs(ylmo%time%pc_tau_max),units="m a**-1", &
                         long_name="Maximum truncation error over last N timestep (magnitude)", &
-                      dim1="xc",dim2="yc",dim3="time",start=[1,1,n],count=[ylmo%grd%nx,ylmo%grd%ny,1],ncid=ncid)
+                      dim1="xc",dim2="yc",dim3="time",start=[1,1,n],count=[ylmo%grd%nx,ylmo%grd%ny,1], &
+                      missing_value=mv,ncid=ncid)
         
         return 
 

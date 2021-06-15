@@ -325,7 +325,6 @@ contains
                     ATT_ab_km1 = 0.25_wp*(ATT(i,j,k-1)+ATT(ip1,j,k-1)+ATT(i,jp1,k-1)+ATT(ip1,jp1,k-1))*(1.0-zeta_aa(k-1))**n_glen
                     ATT_ab_k   = 0.25_wp*(ATT(i,j,k)  +ATT(ip1,j,k)  +ATT(i,jp1,k)  +ATT(ip1,jp1,k))  *(1.0-zeta_aa(k))**n_glen
                     ATT_int_ab = ATT_int_ab + 0.5_wp*(ATT_ab_k+ATT_ab_km1)*(zeta_aa(k) - zeta_aa(k-1))
-                    if (abs(ATT_int_ab) .lt. TOL_UNDERFLOW) ATT_int_ab = 0.0_wp 
 
                     ! Calculate quasi-diffusivity for this layer
                     dd_ab_3D(i,j,k) = 2.0_wp * H_ice_ab * ATT_int_ab * sigma_tot_ab**(n_glen-1.0) 

@@ -1,6 +1,6 @@
 module yelmo_timesteps
 
-    use yelmo_defs, only : sp, dp, wp, prec, ytime_class, TOL_UNDERFLOW   
+    use yelmo_defs, only : sp, dp, wp, prec, ytime_class, MV, TOL_UNDERFLOW   
     use ncio 
 
     use topography, only : calc_ice_fraction
@@ -1119,10 +1119,15 @@ contains
         ytime%pc_tau_max    = 0.0_prec
         
         ! Initialize averages to zero too
-        ytime%model_speeds  = 0.0_prec 
-        ytime%dt_avg        = 0.0_prec 
-        ytime%eta_avg       = 0.0_prec 
-        ytime%ssa_iter_avg  = 0.0_prec 
+        ytime%model_speeds  = MV
+        ytime%etas          = MV 
+        ytime%ssa_iters     = MV 
+        ytime%dts           = MV 
+
+        ytime%model_speed   = MV
+        ytime%dt_avg        = MV
+        ytime%eta_avg       = MV
+        ytime%ssa_iter_avg  = MV
 
         return
 

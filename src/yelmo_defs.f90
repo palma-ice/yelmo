@@ -1056,20 +1056,20 @@ contains
         vals(1) = val_now  
 
         ! Calculate running stats value 
-        n    = count(vals .ne. 0.0_wp)
+        n    = count(vals .ne. MV)
         if (n .gt. 0) then 
 
             select case(trim(stat))
 
                 case("mean")
-                    val_out = sum(vals,mask=vals .ne. 0.0_wp) / real(n,wp)
+                    val_out = sum(vals,mask=vals .ne. MV) / real(n,wp)
                 case("min")
-                    val_out = minval(vals,mask=vals .ne. 0.0_wp)
+                    val_out = minval(vals,mask=vals .ne. MV)
                 case("max")
-                    val_out = maxval(vals,mask=vals .ne. 0.0_wp)
+                    val_out = maxval(vals,mask=vals .ne. MV)
                 case("stdev")
-                    val_mean = sum(vals,mask=vals .ne. 0.0_wp) / real(n,wp)
-                    val_out  = sqrt(sum((vals-val_mean)**2,mask=vals .ne. 0.0_wp) / real(n,wp))
+                    val_mean = sum(vals,mask=vals .ne. MV) / real(n,wp)
+                    val_out  = sqrt(sum((vals-val_mean)**2,mask=vals .ne. MV) / real(n,wp))
 
                 case DEFAULT 
                     write(*,*) "yelmo_calc_running_stats:: Error: stat not found."
@@ -1080,7 +1080,7 @@ contains
                    
         else
 
-            val_out = 0.0_wp
+            val_out = MV
         
         end if 
 

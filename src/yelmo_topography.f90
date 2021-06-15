@@ -231,10 +231,6 @@ contains
                                                 dyn%now%uxy_b,bnd%ice_allowed,tpo%par%boundaries,bnd%H_ice_ref, &
                                                 tpo%par%H_min_flt,tpo%par%H_min_grnd,dt)
 
-            ! Update ice fraction mask 
-            call calc_ice_fraction(tpo%now%f_ice,tpo%now%H_ice,tpo%now%f_grnd)
-            
-            
             ! Save the rate of change of ice thickness in output variable [m/a]
             tpo%now%dHicedt = (tpo%now%H_ice - tpo%now%H_ice_n) / dt 
 
@@ -249,6 +245,9 @@ contains
 
         end if 
 
+        ! Final update of ice fraction mask (or define it now for fixed topography)
+        call calc_ice_fraction(tpo%now%f_ice,tpo%now%H_ice,tpo%now%f_grnd)
+            
         ! 2. Calculate additional topographic properties ------------------
 
         ! Store previous surface elevation on predictor step for calculating

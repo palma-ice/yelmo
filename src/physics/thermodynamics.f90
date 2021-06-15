@@ -131,7 +131,7 @@ contains
             Q_net = Q_rock_now + Q_b_now - Q_ice_b_now
             
             bmb_grnd = -Q_net /(rho_ice*L_ice)
-            
+
         else 
             ! Floating point, no grounded bmb 
 
@@ -753,6 +753,7 @@ contains
         do j = 1, ny
         do i = 1, nx
             
+            ! Define neighbor indices
             im1 = max(1,i-1)
             ip1 = min(nx,i+1)
             jm1 = max(1,j-1)

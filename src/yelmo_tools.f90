@@ -173,7 +173,7 @@ contains
         return
 
     end function calc_magnitude_from_staggered_ice
-    
+
     function stagger_ac_aa(u,v) result(umag)
         ! Calculate the centered (aa-node) magnitude of a scalar 
         ! from the staggered (ac-node) components
@@ -1340,7 +1340,8 @@ contains
 
         ! Local variables 
         integer :: k, nk
-
+        real(prec) :: var_mid 
+        
         nk = size(var,1)
 
         ! Initial value is zero
@@ -1349,7 +1350,9 @@ contains
         ! Intermediate values include sum of all previous values 
         ! Take current value as average between points
         do k = 2, nk
-             var_int = var_int + 0.5_prec*(var(k)+var(k-1))*(zeta(k) - zeta(k-1))
+            var_mid = 0.5_prec*(var(k)+var(k-1))
+            if (abs(var_mid) .lt. TOL_UNDERFLOW) var_mid = 0.0_prec 
+            var_int = var_int + 0.5_prec*(var(k)+var(k-1))*(zeta(k) - zeta(k-1))
         end do
 
         return

@@ -629,7 +629,7 @@ contains
         real(prec), intent(IN) :: var(:)
         real(prec), intent(IN) :: zeta(:)
         real(prec) :: var_int
-
+        real(prec) :: var_mid
         ! Local variables 
         integer :: k, nk
 
@@ -641,7 +641,9 @@ contains
         ! Intermediate values include sum of all previous values 
         ! Take current value as average between points
         do k = 2, nk
-             var_int = var_int + 0.5_prec*(var(k)+var(k-1))*(zeta(k) - zeta(k-1))
+            var_mid = 0.5_prec*(var(k)+var(k-1))
+            if (abs(var_mid) .lt. TOL_UNDERFLOW) var_mid = 0.0_prec 
+            var_int = var_int + var_mid*(zeta(k) - zeta(k-1))
         end do
 
         return

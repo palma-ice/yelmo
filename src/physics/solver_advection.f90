@@ -268,6 +268,7 @@ contains
         integer    :: iter, ierr 
         real(prec) :: dtdx, dtdx2
         real(prec) :: reste, delh, tmp 
+        real(prec) :: ux_i, ux_im1, uy_j, uy_jm1
         real(prec), allocatable :: crelax(:,:)      ! diagnonale de M
         real(prec), allocatable :: arelax(:,:)      ! sous diagonale selon x
         real(prec), allocatable :: brelax(:,:)      ! sur  diagonale selon x
@@ -381,22 +382,30 @@ contains
         do i=2,nx-1
 
             !  sous diagonale en x
-            arelax(i,j) = -dtdx*c_west(i-1,j)*ux(i-1,j)    ! partie advective en x
+            ux_im1 = ux(i-1,j)
+            if (abs(ux_im1) .lt. TOL_UNDERFLOW) ux_im1 = 0.0
+            arelax(i,j) = -dtdx*c_west(i-1,j)*ux_im1    ! partie advective en x
 
             !  sur diagonale en x
-            brelax(i,j) = +dtdx*c_east(i,j)*ux(i,j)        ! partie advective
+            ux_i = ux(i,j)
+            if (abs(ux_i) .lt. TOL_UNDERFLOW) ux_i = 0.0
+            brelax(i,j) = +dtdx*c_east(i,j)*ux_i        ! partie advective
 
             !  sous diagonale en y
-            drelax(i,j) = -dtdx*c_south(i,j-1)*uy(i,j-1)   ! partie advective en y
+            uy_jm1 = uy(i,j-1)
+            if (abs(uy_jm1) .lt. TOL_UNDERFLOW) uy_jm1 = 0.0
+            drelax(i,j) = -dtdx*c_south(i,j-1)*uy_jm1   ! partie advective en y
 
             !  sur diagonale en y
-            erelax(i,j) = +dtdx*c_north(i,j)*uy(i,j)       ! partie advective
+            uy_j = uy(i,j)
+            if (abs(uy_j) .lt. TOL_UNDERFLOW) uy_j = 0.0
+            erelax(i,j) = +dtdx*c_north(i,j)*uy_j       ! partie advective
 
 
             ! diagonale
             crelax(i,j) = 1.0 + dtdx* &
-                       ((c_west(i,j)*ux(i,j) - c_east(i-1,j)*ux(i-1,j)) &
-                      +(c_south(i,j)*uy(i,j) - c_north(i,j-1)*uy(i,j-1)))
+                       ((c_west(i,j)*ux_i - c_east(i-1,j)*ux_im1) &
+                      +(c_south(i,j)*uy_j - c_north(i,j-1)*uy_jm1))
 
             ! Combine all terms
             frelax(i,j) = H(i,j) + dt*mdot(i,j)

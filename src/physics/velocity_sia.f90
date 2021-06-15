@@ -1,6 +1,6 @@
 module velocity_sia 
     
-    use yelmo_defs, only : sp, dp, prec, yelmo_use_omp 
+    use yelmo_defs, only : sp, dp, prec, yelmo_use_omp, TOL_UNDERFLOW 
 
     implicit none 
 
@@ -504,6 +504,7 @@ contains
             do j=2,ny
             do i=1,nx
                 dd_acx    = 0.5*(dd_ab(i,j-1)+dd_ab(i,j))
+                if (abs(dd_acx) .lt. TOL_UNDERFLOW) dd_acx = 0.0
                 ux(i,j,k) = -dd_acx*taud_acx(i,j)
             end do
             end do
@@ -512,6 +513,7 @@ contains
             do j=1,ny
             do i=2,nx
                 dd_acy    = 0.5*(dd_ab(i-1,j)+dd_ab(i,j))
+                if (abs(dd_acy) .lt. TOL_UNDERFLOW) dd_acy = 0.0
                 uy(i,j,k) = -dd_acy*taud_acy(i,j)
             end do
             end do

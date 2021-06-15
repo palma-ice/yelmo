@@ -29,8 +29,8 @@ module yelmo_defs
     
     ! Error distance (very large), error index, and smallest number epsilon 
     real(wp), parameter :: ERR_DIST = real(1E8,wp) 
-    integer,    parameter :: ERR_IND  = -1 
-    real(wp), parameter :: tol_underflow = real(1E-15,wp)
+    integer,  parameter :: ERR_IND  = -1 
+    real(wp), parameter :: TOL_UNDERFLOW = real(1E-15,wp)
 
     ! Mathematical constants
     real(wp), parameter :: pi  = real(2._dp*acos(0.0_dp),wp)

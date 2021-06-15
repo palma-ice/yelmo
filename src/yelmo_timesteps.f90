@@ -1,6 +1,6 @@
 module yelmo_timesteps
 
-    use yelmo_defs, only : sp, dp, prec, ytime_class   
+    use yelmo_defs, only : sp, dp, wp, prec, ytime_class, TOL_UNDERFLOW   
     use ncio 
 
     use topography, only : calc_ice_fraction
@@ -646,13 +646,17 @@ contains
             !ux_now = max(abs(ux(i-1,j)),abs(ux(i,j)))
             !uy_now = max(abs(uy(i,j-1)),abs(uy(i,j)))
             
-!             ux_now = abs(ux(i,j) - ux(i-1,j))
-!             uy_now = abs(uy(i,j) - uy(i,j-1))
+            ux_now = abs(ux(i,j) - ux(i-1,j))
+            uy_now = abs(uy(i,j) - uy(i,j-1))
 
-!             dt(i,j) = cfl_max * 1.0 / (ux_now/dx + uy_now/dy + eps/dx)
+            if (abs(ux_now) .lt. TOL_UNDERFLOW) ux_now = 0.0_wp 
+            if (abs(uy_now) .lt. TOL_UNDERFLOW) uy_now = 0.0_wp 
 
-            dt(i,j) = cfl_max * 1.0 / (abs(ux(i-1,j))/dx + abs(ux(i,j))/dx &
-                                       + abs(uy(i,j-1))/dy + abs(uy(i,j))/dy + eps/(dx+dy))
+            dt(i,j) = cfl_max * 1.0 / (ux_now/dx + uy_now/dy + eps/dx)
+            
+            ! Underflow issues:
+            !dt(i,j) = cfl_max * 1.0 / (abs(ux(i-1,j))/dx + abs(ux(i,j))/dx &
+            !                           + abs(uy(i,j-1))/dy + abs(uy(i,j))/dy + eps/(dx+dy))
         end do 
         end do 
 

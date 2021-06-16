@@ -14,7 +14,6 @@ module velocity_general
     public :: calc_ice_flux
     public :: calc_vel_ratio
     public :: limit_vel
-    public :: calc_vertical_integrated_3D_ice
 
 contains 
 
@@ -855,33 +854,5 @@ end if
         return 
 
     end subroutine limit_vel
-
-    function calc_vertical_integrated_3D_ice(var,H_ice,sigma) result(var_int)
-        ! Vertically integrate a field 3D field (nx,ny,nz)
-        ! layer by layer (in the z-direction), return a 3D array
-        
-        implicit none
-
-        real(prec), intent(IN) :: var(:,:,:)
-        real(prec), intent(IN) :: H_ice(:,:) 
-        real(prec), intent(IN) :: sigma(:)
-        real(prec) :: var_int(size(var,1),size(var,2),size(var,3))
-
-        ! Local variables 
-        integer :: i, j, nx, ny
-
-        nx = size(var,1)
-        ny = size(var,2)
-         
-        do j = 1, ny
-        do i = 1, nx
-            var_int(i,j,:) = integrate_trapezoid1D_1D(var(i,j,:),sigma*H_ice(i,j))
-        end do
-        end do 
-
-        return
-
-    end function calc_vertical_integrated_3D_ice
-
-
-end module velocity_general 
+    
+end module velocity_general

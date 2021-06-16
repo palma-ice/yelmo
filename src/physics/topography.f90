@@ -97,8 +97,8 @@ contains
             ! Store neighbor heights 
             H_neighb = [H_ice_0(im1,j),H_ice_0(ip1,j),H_ice_0(i,jm1),H_ice_0(i,jp1)]
             
-            if (H_ice(i,j) .gt. 0.0 .and. minval(H_neighb) .eq. 0.0 .and. f_grnd(i,j) .eq. 0.0) then 
-                ! This point is at the floating ice margin
+            if (H_ice(i,j) .gt. 0.0 .and. minval(H_neighb) .eq. 0.0) then 
+                ! This point is at the ice margin
 
                 ! Store mask of neighbors with ice 
                 mask_neighb = (H_neighb .gt. 0.0)

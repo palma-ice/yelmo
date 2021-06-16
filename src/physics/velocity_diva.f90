@@ -188,9 +188,6 @@ contains
             ! Note L19 uses eta_bar*H in the ssa equation. Yelmo uses eta_int=eta_bar*H directly.
             call calc_visc_eff_int(visc_eff_int,visc_eff,H_ice,f_ice,zeta_aa)
             
-            ! ajr: testing symmetry!!!
-            visc_eff_int = maxval(visc_eff_int) 
-
             ! Smooth the viscosity at the ice margins if it is too low
             ! to avoid singularities (mainly for EISMINT/dome experiments)
             !call smooth_visc_eff_int_margin(visc_eff_int,H_ice)
@@ -607,15 +604,14 @@ end if
             if (count([f_ice(i,j),f_ice(ip1,j),f_ice(i,jp1),f_ice(ip1,jp1)].lt.1.0_wp) .eq. 0) then 
                 wt_ab(1) = 1.0_wp
             end if
-            if (count([f_ice(i,j),f_ice(im1,j),f_ice(im1,jp1),f_ice(i,jp1)].lt.1.0_wp) .eq. 0) then 
+            if (count([f_ice(i,j),f_ice(im1,j),f_ice(i,jp1),f_ice(im1,jp1)].lt.1.0_wp) .eq. 0) then 
                 wt_ab(2) = 1.0_wp 
             end if 
-            if (count([f_ice(i,j),f_ice(i,jm1),f_ice(ip1,jm1),f_ice(ip1,j)].lt.1.0_wp) .eq. 0) then 
-                wt_ab(3) = 1.0_wp 
+            if (count([f_ice(i,j),f_ice(im1,j),f_ice(i,jm1),f_ice(im1,jm1)].lt.1.0_wp) .eq. 0) then 
+                wt_ab(3) = 1.0_wp
             end if 
-            
-            if (count([f_ice(i,j),f_ice(im1,j),f_ice(im1,jm1),f_ice(i,jm1)].lt.1.0_wp) .eq. 0) then 
-                wt_ab(4) = 1.0_wp
+            if (count([f_ice(i,j),f_ice(ip1,j),f_ice(i,jm1),f_ice(ip1,jm1)].lt.1.0_wp) .eq. 0) then 
+                wt_ab(4) = 1.0_wp 
             end if 
             
             wt = sum(wt_ab)

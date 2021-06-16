@@ -183,13 +183,15 @@ contains
         ! Apply additional condition for particular experiments
         select case(trim(boundaries))
 
-            case("EISMINT")
-                ! Redefine beta at the summit to reduce singularity
-                ! in symmetric EISMINT experiments with sliding active
+            ! ajr: EISMINT case seems to not be necessary anymore
+            ! since beta is first calculated on quadrature points (ab-nodes)
+            ! case("EISMINT")
+            !     ! Redefine beta at the summit to reduce singularity
+            !     ! in symmetric EISMINT experiments with sliding active
 
-                i = (nx-1)/2 
-                j = (ny-1)/2
-                beta(i,j) = 0.25*(beta(i-1,j)+beta(i+1,j)+beta(i,j-1)+beta(i,j+1))
+            !     i = (nx-1)/2 
+            !     j = (ny-1)/2
+            !     beta(i,j) = 0.25*(beta(i-1,j)+beta(i+1,j)+beta(i,j-1)+beta(i,j+1))
             
             case("MISMIP3D") 
                 ! Redefine beta at the summit to reduce singularity
@@ -617,7 +619,7 @@ contains
                 cb_ab(2) = 0.25_wp*(c_bed(i,j)+c_bed(im1,j)+c_bed(i,jp1)+c_bed(im1,jp1))
                 cb_ab(3) = 0.25_wp*(c_bed(i,j)+c_bed(im1,j)+c_bed(i,jm1)+c_bed(im1,jm1))
                 cb_ab(4) = 0.25_wp*(c_bed(i,j)+c_bed(ip1,j)+c_bed(i,jm1)+c_bed(ip1,jm1))
-                
+
                 if (q .eq. 1.0_wp) then 
                     ! Linear law, no f(ub) term
 

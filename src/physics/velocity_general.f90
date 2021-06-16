@@ -17,7 +17,7 @@ module velocity_general
 
 contains 
 
-    subroutine calc_uz_3D(uz,ux,uy,H_ice,z_bed,z_srf,smb,bmb,dHdt,dzsdt,zeta_aa,zeta_ac,dx,dy)
+    subroutine calc_uz_3D(uz,ux,uy,H_ice,f_ice,z_bed,z_srf,smb,bmb,dHdt,dzsdt,zeta_aa,zeta_ac,dx,dy)
         ! Following algorithm outlined by the Glimmer ice sheet model:
         ! https://www.geos.ed.ac.uk/~mhagdorn/glide/glide-doc/glimmer_htmlse9.html#x17-660003.1.5
 
@@ -30,6 +30,7 @@ contains
         real(prec), intent(IN)  :: ux(:,:,:)        ! nx,ny,nz_aa
         real(prec), intent(IN)  :: uy(:,:,:)        ! nx,ny,nz_aa
         real(prec), intent(IN)  :: H_ice(:,:)
+        real(prec), intent(IN)  :: f_ice(:,:)
         real(prec), intent(IN)  :: z_bed(:,:) 
         real(prec), intent(IN)  :: z_srf(:,:) 
         real(prec), intent(IN)  :: smb(:,:) 
@@ -42,7 +43,8 @@ contains
         real(prec), intent(IN)  :: dy
 
         ! Local variables 
-        integer :: i, j, k, nx, ny, nz_aa, nz_ac   
+        integer :: i, j, k, nx, ny, nz_aa, nz_ac
+        integer :: im1, ip1, jm1, jp1   
         real(prec) :: H_ij
         !real(prec) :: dHdx_aa, dHdy_aa, dzsdx_aa, dzsdy_aa 
         real(prec) :: dzbdx_aa
@@ -69,32 +71,38 @@ contains
         ! Next, calculate velocity 
 
         !$omp parallel do 
-        do j = 2, ny-1
-        do i = 2, nx-1
+        do j = 1, ny
+        do i = 1, nx
 
-            if (H_ice(i,j) .gt. 0.0) then
+            ! Define neighbor indices
+            im1 = max(1,i-1)
+            ip1 = min(nx,i+1)
+            jm1 = max(1,j-1)
+            jp1 = min(ny,j+1)
+            
+            if (f_ice(i,j) .eq. 1.0) then
 
                 ! Get weighted ice thickness for stability
-!                 H_ij = (4.0*H_ice(i,j) + 2.0*(H_ice(i-1,j)+H_ice(i+1,j)+H_ice(i,j-1)+H_ice(i,j+1))) / 16.0 &
-!                       + (H_ice(i-1,j-1)+H_ice(i+1,j-1)+H_ice(i+1,j+1)+H_ice(i-1,j+1)) / 16.0 
+!                 H_ij = (4.0*H_ice(i,j) + 2.0*(H_ice(im1,j)+H_ice(ip1,j)+H_ice(i,jm1)+H_ice(i,jp1))) / 16.0 &
+!                       + (H_ice(im1,jm1)+H_ice(ip1,jm1)+H_ice(ip1,jp1)+H_ice(im1,jp1)) / 16.0 
 
                 H_ij = H_ice(i,j) 
 
                 ! Get the centered bedrock gradient 
-                dzbdx_aa = (z_bed(i+1,j)-z_bed(i-1,j))/(2.0_prec*dx)
-                dzbdy_aa = (z_bed(i,j+1)-z_bed(i,j-1))/(2.0_prec*dy)
+                dzbdx_aa = (z_bed(ip1,j)-z_bed(im1,j))/(2.0_prec*dx)
+                dzbdy_aa = (z_bed(i,jp1)-z_bed(i,jm1))/(2.0_prec*dy)
                 
                 ! Get the centered horizontal velocity at the base
-                ux_aa = 0.5_prec* (ux(i-1,j,1) + ux(i,j,1))
-                uy_aa = 0.5_prec* (uy(i,j-1,1) + uy(i,j,1))
+                ux_aa = 0.5_prec* (ux(im1,j,1) + ux(i,j,1))
+                uy_aa = 0.5_prec* (uy(i,jm1,1) + uy(i,j,1))
                 
 !                 ! Get the centered surface gradient 
-!                 dzsdx_aa = (z_srf(i+1,j)-z_srf(i-1,j))/(2.0_prec*dx)
-!                 dzsdy_aa = (z_srf(i,j+1)-z_srf(i,j-1))/(2.0_prec*dy)
+!                 dzsdx_aa = (z_srf(ip1,j)-z_srf(im1,j))/(2.0_prec*dx)
+!                 dzsdy_aa = (z_srf(i,jp1)-z_srf(i,jm1))/(2.0_prec*dy)
                 
 !                 ! Get the centered ice thickness gradient 
-!                 dHdx_aa = (H_ice(i+1,j)-H_ice(i-1,j))/(2.0_prec*dx)
-!                 dHdy_aa = (H_ice(i,j+1)-H_ice(i,j-1))/(2.0_prec*dy)
+!                 dHdx_aa = (H_ice(ip1,j)-H_ice(im1,j))/(2.0_prec*dx)
+!                 dHdy_aa = (H_ice(i,jp1)-H_ice(i,jm1))/(2.0_prec*dy)
                 
                 ! Determine grid vertical velocity at the base due to sigma-coordinates 
                 ! Glimmer, Eq. 3.35 
@@ -121,12 +129,12 @@ contains
 
                     ! Greve and Blatter (2009), Eq. 5.72
                     ! Bueler and Brown  (2009), Eq. 4
-                    duxdx_aa  = (ux(i,j,k-1)   - ux(i-1,j,k-1)  )/dx
-                    duydy_aa  = (uy(i,j,k-1)   - uy(i,j-1,k-1)  )/dy
+                    duxdx_aa  = (ux(i,j,k-1)   - ux(im1,j,k-1)  )/dx
+                    duydy_aa  = (uy(i,j,k-1)   - uy(i,jm1,k-1)  )/dy
                     
                     ! Testing wider stencil for stability (no effect so far)
-!                     duxdx_aa  = 0.5*((ux(i,j+1,k) - ux(i-1,j+1,k))/dx + (ux(i,j-1,k) - ux(i-1,j-1,k))/dx)
-!                     duydy_aa  = 0.5*((uy(i+1,j,k)   - uy(i+1,j-1,k)  )/dy + (uy(i-1,j,k)   - uy(i-1,j-1,k)  )/dy)
+!                     duxdx_aa  = 0.5*((ux(i,jp1,k) - ux(im1,jp1,k))/dx + (ux(i,jm1,k) - ux(im1,jm1,k))/dx)
+!                     duydy_aa  = 0.5*((uy(ip1,j,k) - uy(i+1,jm1,k))/dy + (uy(im1,j,k) - uy(im1,jm1,k))/dy)
 
                     uz(i,j,k) = uz(i,j,k-1) & 
                         - H_ij*(zeta_ac(k)-zeta_ac(k-1))*(duxdx_aa+duydy_aa)
@@ -154,43 +162,6 @@ contains
 
         ! Calculate and apply correction for sigma-coordinate stretching 
         call calc_advec_vertical_column_correction(uz,ux,uy,H_ice,z_srf,dHdt,dzsdt,zeta_ac,dx)
-
-        ! Fill in boundaries 
-        j = 1 
-        do i = 2, nx-1 
-            if(H_ice(i,j) .gt. 0.0_prec) uz(i,j,:) = uz(i,j+1,:) 
-        end do 
-
-        j = ny 
-        do i = 2, nx-1 
-            if(H_ice(i,j) .gt. 0.0_prec) uz(i,j,:) = uz(i,j-1,:) 
-        end do 
-        
-        i = 1 
-        do j = 2, ny-1 
-            if(H_ice(i,j) .gt. 0.0_prec) uz(i,j,:) = uz(i+1,j,:) 
-        end do 
-
-        i = nx 
-        do j = 2, ny-1 
-            if(H_ice(i,j) .gt. 0.0_prec) uz(i,j,:) = uz(i-1,j,:) 
-        end do 
-
-        i = 1
-        j = 1 
-        if(H_ice(i,j) .gt. 0.0_prec) uz(i,j,:) = 0.5_prec*(uz(i+1,j,:)+uz(i,j+1,:))
-
-        i = nx
-        j = 1 
-        if(H_ice(i,j) .gt. 0.0_prec) uz(i,j,:) = 0.5_prec*(uz(i-1,j,:)+uz(i,j+1,:))
-
-        i = nx
-        j = ny
-        if(H_ice(i,j) .gt. 0.0_prec) uz(i,j,:) = 0.5_prec*(uz(i-1,j,:)+uz(i,j-1,:))
-
-        i = 1
-        j = ny
-        if(H_ice(i,j) .gt. 0.0_prec) uz(i,j,:) = 0.5_prec*(uz(i+1,j,:)+uz(i,j-1,:))
         
         return 
 
@@ -216,7 +187,8 @@ contains
         real(prec), intent(IN)    :: dx   
 
         ! Local variables 
-        integer :: i, j, k, nx, ny, nz_ac 
+        integer :: i, j, k, nx, ny, nz_ac
+        integer :: im1, ip1, jm1, jp1 
         real(prec) :: ux_aa, uy_aa 
         real(prec) :: dx_inv, dx_inv2
         real(prec) :: c_x, c_y, c_t 
@@ -235,34 +207,40 @@ contains
         dx_inv2 = 1.0_prec / (2.0_prec*dx)
         
         !$omp parallel do 
-        do j = 2, ny-1 
-        do i = 2, nx-1 
+        do j = 1, ny 
+        do i = 1, nx 
 
+            ! Define neighbor indices
+            im1 = max(1,i-1)
+            ip1 = min(nx,i+1)
+            jm1 = max(1,j-1)
+            jp1 = min(ny,j+1)
+            
             do k = 1, nz_ac 
 
                 ! Estimate direction of current flow into cell (x and y), centered horizontally in grid point
                 ! and averaged to staggered cell edges where uz is defined.
                 if (k .eq. 1) then 
-                    ux_aa = 0.5_prec*(ux(i,j,k)+ux(i-1,j,k))
-                    uy_aa = 0.5_prec*(uy(i,j,k)+uy(i,j-1,k))
+                    ux_aa = 0.5_prec*(ux(i,j,k)+ux(im1,j,k))
+                    uy_aa = 0.5_prec*(uy(i,j,k)+uy(i,jm1,k))
                 else if (k .eq. nz_ac) then 
                     ux_aa = 0.5_prec*(ux(i,j,k-1))
                     uy_aa = 0.5_prec*(uy(i,j,k-1))
                 else 
-                    ux_aa = 0.25_prec*(ux(i,j,k-1)+ux(i-1,j,k-1) + ux(i,j,k)+ux(i-1,j,k))
-                    uy_aa = 0.25_prec*(uy(i,j,k-1)+uy(i,j-1,k-1) + uy(i,j,k)+uy(i,j-1,k))
+                    ux_aa = 0.25_prec*(ux(i,j,k-1)+ux(im1,j,k-1) + ux(i,j,k)+ux(im1,j,k))
+                    uy_aa = 0.25_prec*(uy(i,j,k-1)+uy(i,jm1,k-1) + uy(i,j,k)+uy(i,jm1,k))
                 end if 
 
                 if (abs(ux_aa) .lt. TOL_UNDERFLOW) ux_aa = 0.0_wp 
                 if (abs(uy_aa) .lt. TOL_UNDERFLOW) uy_aa = 0.0_wp 
 
                 ! Get horizontal scaling correction terms 
-                c_x = (1.0_prec-zeta_ac(k))*(H_ice(i+1,j)-H_ice(i-1,j))*dx_inv2 - (z_srf(i+1,j)-z_srf(i-1,j))*dx_inv2
-                c_y = (1.0_prec-zeta_ac(k))*(H_ice(i,j+1)-H_ice(i,j-1))*dx_inv2 - (z_srf(i,j+1)-z_srf(i,j-1))*dx_inv2
+                c_x = (1.0_prec-zeta_ac(k))*(H_ice(ip1,j)-H_ice(im1,j))*dx_inv2 - (z_srf(ip1,j)-z_srf(im1,j))*dx_inv2
+                c_y = (1.0_prec-zeta_ac(k))*(H_ice(i,jp1)-H_ice(i,jm1))*dx_inv2 - (z_srf(i,jp1)-z_srf(i,jm1))*dx_inv2
                 
                 ! Get grid velocity term 
                 c_t = (1.0_prec-zeta_ac(k))*dHdt(i,j) - dzsdt(i,j) 
-
+                
                 ! Calculate total correction term, and limit it to within max_corr 
                 corr = ux_aa*c_x + uy_aa*c_y + c_t  
                 corr = sign(min(abs(corr),abs(max_corr*uz(i,j,k))),corr)

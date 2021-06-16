@@ -341,8 +341,14 @@ end select
         do j = 2, ny-1
         do i = 2, nx-1 
             
-            H_ice_now = H_ice(i,j) 
- 
+            if (f_ice(i,j) .gt. 0.0) then 
+                H_ice_now = H_ice(i,j) / f_ice(i,j) 
+            else 
+                H_ice_now = H_ice(i,j) 
+            end if 
+
+            ! ajr: below filter should be tested again, now with the f_ice treatment 
+            ! properly handled everywhere. Is it needed?? 
             ! Filter the ice thickness at the margin only to avoid a large
             ! gradient in ice thickness there to rather thin ice points - 
             ! helps with stability, particularly for EISMINT2 experiments.
@@ -368,27 +374,7 @@ end select
 
             end if 
 
-            if (H_ice_now .le. H_ice_thin) then 
-                ! Ice is too thin or zero: prescribe linear temperature profile
-                ! between temperate ice at base and surface temperature 
-                ! (accounting for floating/grounded nature via T_base)
-
-                if (f_grnd(i,j) .lt. 1.0) then 
-                    ! Impose T_shlf for the basal temperature
-                    T_base = T_shlf 
-                else
-                    ! Impose temperature at the pressure melting point of grounded ice 
-                    T_base = T_pmp(i,j,1) 
-                end if 
-
-                T_ice(i,j,:)  = define_temp_linear_column(T_srf(i,j),T_base,T_pmp(i,j,nz_aa),zeta_aa)
-                omega(i,j,:)  = 0.0_prec 
-                call convert_to_enthalpy(enth(i,j,:),T_ice(i,j,:),omega(i,j,:),T_pmp(i,j,:),cp(i,j,:),L_ice)
-                bmb_grnd(i,j) = 0.0_prec
-                Q_ice_b(i,j)  = 0.0_prec 
-                H_cts(i,j)    = 0.0_prec
-
-            else 
+            if (f_ice(i,j) .eq. 1.0 .and. H_ice_now .gt. H_ice_thin) then 
                 ! Thick ice exists, call thermodynamic solver for the column
 
                 if (trim(solver) .eq. "enth") then 
@@ -406,6 +392,26 @@ end select
                             zeta_ac,dzeta_a,dzeta_b,omega_max,T0,dt)                
                 
                 end if 
+
+            else 
+                ! Ice is at margin, too thin or zero: prescribe linear temperature profile
+                ! between temperate ice at base and surface temperature 
+                ! (accounting for floating/grounded nature via T_base)
+
+                if (f_grnd(i,j) .lt. 1.0) then 
+                    ! Impose T_shlf for the basal temperature
+                    T_base = T_shlf 
+                else
+                    ! Impose temperature at the pressure melting point of grounded ice 
+                    T_base = T_pmp(i,j,1) 
+                end if 
+
+                T_ice(i,j,:)  = define_temp_linear_column(T_srf(i,j),T_base,T_pmp(i,j,nz_aa),zeta_aa)
+                omega(i,j,:)  = 0.0_prec 
+                call convert_to_enthalpy(enth(i,j,:),T_ice(i,j,:),omega(i,j,:),T_pmp(i,j,:),cp(i,j,:),L_ice)
+                bmb_grnd(i,j) = 0.0_prec
+                Q_ice_b(i,j)  = 0.0_prec 
+                H_cts(i,j)    = 0.0_prec
 
             end if 
 

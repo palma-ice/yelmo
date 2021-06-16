@@ -1,6 +1,6 @@
 module velocity_diva
 
-    use yelmo_defs, only  : sp, dp, wp, rho_ice, rho_sw, rho_w, g
+    use yelmo_defs, only  : sp, dp, wp, rho_ice, rho_sw, rho_w, g, TOL_UNDERFLOW
     use yelmo_tools, only : stagger_aa_ab, stagger_aa_ab_ice, stagger_ab_aa_ice, & 
                     integrate_trapezoid1D_1D, integrate_trapezoid1D_pt, minmax
 
@@ -628,6 +628,7 @@ end if
                 dudx_ab(2) = ( (ux(i,j)   - ux(im2,j)) + (ux(i,jp1)   - ux(im2,jp1)) ) *inv_4dx
                 dudx_ab(3) = ( (ux(i,j)   - ux(im2,j)) + (ux(i,jm1)   - ux(im2,jm1)) ) *inv_4dx
                 dudx_ab(4) = ( (ux(ip1,j) - ux(im1,j)) + (ux(ip1,jm1) - ux(im1,jm1)) ) *inv_4dx
+                where(abs(dudx_ab) .lt. TOL_UNDERFLOW) dudx_ab = 0.0_wp
                 
                 ! === dvdy ======================
 
@@ -635,6 +636,7 @@ end if
                 dvdy_ab(2) = ( (uy(i,jp1) - uy(i,jm1)) + (uy(im1,jp1) - uy(im1,jm1)) ) *inv_4dy 
                 dvdy_ab(3) = ( (uy(i,j)   - uy(i,jm2)) + (uy(im1,j)   - uy(im1,jm2)) ) *inv_4dy 
                 dvdy_ab(4) = ( (uy(i,j)   - uy(i,jm2)) + (uy(ip1,j)   - uy(ip1,jm2)) ) *inv_4dy 
+                where(abs(dvdy_ab) .lt. TOL_UNDERFLOW) dvdy_ab = 0.0_wp
                 
 
                 ! === dudy ======================
@@ -643,6 +645,7 @@ end if
                 dudy_ab(2) = (ux(im1,jp1) - ux(im1,j))   / dy 
                 dudy_ab(3) = (ux(im1,j)   - ux(im1,jm1)) / dy 
                 dudy_ab(4) = (ux(i,j)     - ux(i,jm1))   / dy 
+                where(abs(dudy_ab) .lt. TOL_UNDERFLOW) dudy_ab = 0.0_wp
                 
                 ! === dvdx ======================
 
@@ -650,6 +653,7 @@ end if
                 dvdx_ab(2) = (uy(i,j)     - uy(im1,j))   / dx 
                 dvdx_ab(3) = (uy(i,jm1)   - uy(im1,jm1)) / dx
                 dvdx_ab(4) = (uy(ip1,jm1) - uy(i,jm1))   / dx
+                where(abs(dvdx_ab) .lt. TOL_UNDERFLOW) dvdx_ab = 0.0_wp
 
                 ! Loop over column
                 do k = 1, nz 
@@ -658,11 +662,13 @@ end if
                     duxdz_ab(2) = 0.5_wp*(duxdz(im1,j,k) + duxdz(im1,jp1,k))
                     duxdz_ab(3) = 0.5_wp*(duxdz(im1,j,k) + duxdz(im1,jm1,k))
                     duxdz_ab(4) = 0.5_wp*(duxdz(i,j,k)   + duxdz(i,jm1,k))
+                    where(abs(duxdz_ab) .lt. TOL_UNDERFLOW) duxdz_ab = 0.0_wp
 
                     duydz_ab(1) = 0.5_wp*(duydz(i,j,k)   + duydz(ip1,j,k))
                     duydz_ab(2) = 0.5_wp*(duydz(i,j,k)   + duydz(im1,j,k))
                     duydz_ab(3) = 0.5_wp*(duydz(i,jm1,k) + duydz(im1,jm1,k))
                     duydz_ab(4) = 0.5_wp*(duydz(i,jm1,k) + duydz(ip1,jm1,k))
+                    where(abs(duydz_ab) .lt. TOL_UNDERFLOW) duydz_ab = 0.0_wp
 
                     ! Calculate the total effective strain rate from L19, Eq. 21 
                     eps_sq_ab = dudx_ab**2 + dvdy_ab**2 + dudx_ab*dvdy_ab + 0.25_wp*(dudy_ab+dvdx_ab)**2 &
@@ -1193,7 +1199,10 @@ end if
         do i = 1, nx 
 
             taub_acx(i,j) = beta_eff_acx(i,j) * ux_bar(i,j) 
+            if (abs(taub_acx(i,j)) .lt. TOL_UNDERFLOW) taub_acx(i,j) = 0.0_wp 
+
             taub_acy(i,j) = beta_eff_acy(i,j) * uy_bar(i,j) 
+            if (abs(taub_acy(i,j)) .lt. TOL_UNDERFLOW) taub_acy(i,j) = 0.0_wp 
 
         end do 
         end do  

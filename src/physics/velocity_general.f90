@@ -254,6 +254,9 @@ contains
                     uy_aa = 0.25_prec*(uy(i,j,k-1)+uy(i,j-1,k-1) + uy(i,j,k)+uy(i,j-1,k))
                 end if 
 
+                if (abs(ux_aa) .lt. TOL_UNDERFLOW) ux_aa = 0.0_wp 
+                if (abs(uy_aa) .lt. TOL_UNDERFLOW) uy_aa = 0.0_wp 
+
                 ! Get horizontal scaling correction terms 
                 c_x = (1.0_prec-zeta_ac(k))*(H_ice(i+1,j)-H_ice(i-1,j))*dx_inv2 - (z_srf(i+1,j)-z_srf(i-1,j))*dx_inv2
                 c_y = (1.0_prec-zeta_ac(k))*(H_ice(i,j+1)-H_ice(i,j-1))*dx_inv2 - (z_srf(i,j+1)-z_srf(i,j-1))*dx_inv2

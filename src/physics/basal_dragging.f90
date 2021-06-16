@@ -10,7 +10,8 @@ module basal_dragging
     ! particularly at the grounding line, beta should be defined
     ! directly on the ac nodes (acx,acy). 
 
-    use yelmo_defs, only : sp, dp, wp, prec, pi, g, rho_sw, rho_ice, rho_w  
+    use yelmo_defs, only : sp, dp, wp, prec, pi, g, rho_sw, rho_ice, rho_w, &
+                           TOL_UNDERFLOW  
 
     use yelmo_tools, only : stagger_aa_acx, stagger_aa_acy
 
@@ -790,11 +791,13 @@ contains
                 ux_ab(2) = 0.5_wp*(ux_b(im1,j)+ux_b(im1,jp1))
                 ux_ab(3) = 0.5_wp*(ux_b(im1,jm1)+ux_b(im1,j))
                 ux_ab(4) = 0.5_wp*(ux_b(i,jm1)+ux_b(i,j))
+                where( abs(ux_ab) .lt. TOL_UNDERFLOW) ux_ab = 0.0_wp 
 
                 uy_ab(1) = 0.5_wp*(uy_b(i,j)+uy_b(ip1,j))
                 uy_ab(2) = 0.5_wp*(uy_b(i,j)+uy_b(im1,j))
                 uy_ab(3) = 0.5_wp*(uy_b(i,jm1)+uy_b(im1,jm1))
                 uy_ab(4) = 0.5_wp*(uy_b(i,jm1)+uy_b(ip1,jm1))
+                where( abs(uy_ab) .lt. TOL_UNDERFLOW) uy_ab = 0.0_wp 
 
                 uxy_ab    = sqrt(ux_ab**2 + uy_ab**2 + ub_sq_min)
 

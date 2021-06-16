@@ -5,7 +5,8 @@ module thermodynamics
     ! remerged into icetemp as one module. 
 
     use yelmo_defs, only : prec, wp, sec_year, pi, T0, g, rho_ice, &
-                           rho_sw, rho_w, rho_rock, L_ice, T_pmp_beta 
+                           rho_sw, rho_w, rho_rock, L_ice, T_pmp_beta, &
+                           TOL_UNDERFLOW 
 
     implicit none 
 
@@ -788,6 +789,7 @@ contains
                 uxb_ab(2) = 0.5_wp*(ux_b(im1,j)+ux_b(im1,jp1))
                 uxb_ab(3) = 0.5_wp*(ux_b(im1,jm1)+ux_b(im1,j))
                 uxb_ab(4) = 0.5_wp*(ux_b(i,jm1)+ux_b(i,j))
+                where (abs(uxb_ab) .lt. TOL_UNDERFLOW) uxb_ab = 0.0_wp 
 
                 ! === uy =========
 
@@ -795,6 +797,7 @@ contains
                 uyb_ab(2) = 0.5_wp*(uy_b(i,j)+uy_b(im1,j))
                 uyb_ab(3) = 0.5_wp*(uy_b(i,jm1)+uy_b(im1,jm1))
                 uyb_ab(4) = 0.5_wp*(uy_b(i,jm1)+uy_b(ip1,jm1))
+                where (abs(uyb_ab) .lt. TOL_UNDERFLOW) uyb_ab = 0.0_wp 
 
                 ! === taubx =========
 
@@ -802,6 +805,7 @@ contains
                 taubx_ab(2) = 0.5_wp*(taub_acx(im1,j)+taub_acx(im1,jp1))
                 taubx_ab(3) = 0.5_wp*(taub_acx(im1,jm1)+taub_acx(im1,j))
                 taubx_ab(4) = 0.5_wp*(taub_acx(i,jm1)+taub_acx(i,j))
+                where (abs(taubx_ab) .lt. TOL_UNDERFLOW) taubx_ab = 0.0_wp 
 
                 ! === tauby =========
 
@@ -809,6 +813,7 @@ contains
                 tauby_ab(2) = 0.5_wp*(taub_acy(i,j)+taub_acy(im1,j))
                 tauby_ab(3) = 0.5_wp*(taub_acy(i,jm1)+taub_acy(im1,jm1))
                 tauby_ab(4) = 0.5_wp*(taub_acy(i,jm1)+taub_acy(ip1,jm1))
+                where (abs(tauby_ab) .lt. TOL_UNDERFLOW) tauby_ab = 0.0_wp 
 
                 ! Calculate Qb at quadrature points [Pa m a-1] == [J a-1 m-2]
                 Qb_ab = abs( sqrt(uxb_ab**2+uyb_ab**2) &

@@ -2,7 +2,7 @@ module yelmo_tools
     ! Generic functions and subroutines that could be used in many contexts:
     ! math, vectors, sorting, etc. 
 
-    use yelmo_defs, only : sp, dp, prec, missing_value, tol_underflow, pi
+    use yelmo_defs, only : sp, dp, wp, prec, missing_value, TOL_UNDERFLOW, pi
     
     implicit none 
 
@@ -143,6 +143,9 @@ contains
             if (f_ice(i,j) .eq. 1.0) then 
                 unow = 0.5*(u(im1,j)+u(i,j))
                 vnow = 0.5*(v(i,jm1)+v(i,j))
+                
+                if (abs(unow) .lt. TOL_UNDERFLOW) unow = 0.0_wp 
+                if (abs(vnow) .lt. TOL_UNDERFLOW) vnow = 0.0_wp 
             else 
                 unow = 0.0 
                 vnow = 0.0 
@@ -150,7 +153,7 @@ contains
 
             umag(i,j) = sqrt(unow*unow+vnow*vnow)
 
-            if (abs(umag(i,j)) .lt. tol_underflow) umag(i,j) = 0.0_prec
+            if (abs(umag(i,j)) .lt. TOL_UNDERFLOW) umag(i,j) = 0.0_prec
 
         end do 
         end do 

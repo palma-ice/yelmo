@@ -188,6 +188,9 @@ contains
             ! Note L19 uses eta_bar*H in the ssa equation. Yelmo uses eta_int=eta_bar*H directly.
             call calc_visc_eff_int(visc_eff_int,visc_eff,H_ice,f_ice,zeta_aa)
             
+            ! ajr: testing symmetry!!!
+            visc_eff_int = maxval(visc_eff_int) 
+
             ! Smooth the viscosity at the ice margins if it is too low
             ! to avoid singularities (mainly for EISMINT/dome experiments)
             !call smooth_visc_eff_int_margin(visc_eff_int,H_ice)

@@ -595,15 +595,14 @@ contains
             if (count([f_ice(i,j),f_ice(ip1,j),f_ice(i,jp1),f_ice(ip1,jp1)].lt.1.0_wp) .eq. 0) then 
                 wt_ab(1) = 1.0_wp
             end if
-            if (count([f_ice(i,j),f_ice(im1,j),f_ice(im1,jp1),f_ice(i,jp1)].lt.1.0_wp) .eq. 0) then 
+            if (count([f_ice(i,j),f_ice(im1,j),f_ice(i,jp1),f_ice(im1,jp1)].lt.1.0_wp) .eq. 0) then 
                 wt_ab(2) = 1.0_wp 
             end if 
-            if (count([f_ice(i,j),f_ice(i,jm1),f_ice(ip1,jm1),f_ice(ip1,j)].lt.1.0_wp) .eq. 0) then 
-                wt_ab(3) = 1.0_wp 
+            if (count([f_ice(i,j),f_ice(im1,j),f_ice(i,jm1),f_ice(im1,jm1)].lt.1.0_wp) .eq. 0) then 
+                wt_ab(3) = 1.0_wp
             end if 
-            
-            if (count([f_ice(i,j),f_ice(im1,j),f_ice(im1,jm1),f_ice(i,jm1)].lt.1.0_wp) .eq. 0) then 
-                wt_ab(4) = 1.0_wp
+            if (count([f_ice(i,j),f_ice(ip1,j),f_ice(i,jm1),f_ice(ip1,jm1)].lt.1.0_wp) .eq. 0) then 
+                wt_ab(4) = 1.0_wp 
             end if 
             
             wt = sum(wt_ab)
@@ -618,8 +617,7 @@ contains
                 cb_ab(2) = 0.25_wp*(c_bed(i,j)+c_bed(im1,j)+c_bed(i,jp1)+c_bed(im1,jp1))
                 cb_ab(3) = 0.25_wp*(c_bed(i,j)+c_bed(im1,j)+c_bed(i,jm1)+c_bed(im1,jm1))
                 cb_ab(4) = 0.25_wp*(c_bed(i,j)+c_bed(ip1,j)+c_bed(i,jm1)+c_bed(ip1,jm1))
-
-
+                
                 if (q .eq. 1.0_wp) then 
                     ! Linear law, no f(ub) term
 
@@ -761,15 +759,14 @@ contains
             if (count([f_ice(i,j),f_ice(ip1,j),f_ice(i,jp1),f_ice(ip1,jp1)].lt.1.0_wp) .eq. 0) then 
                 wt_ab(1) = 1.0_wp
             end if
-            if (count([f_ice(i,j),f_ice(im1,j),f_ice(im1,jp1),f_ice(i,jp1)].lt.1.0_wp) .eq. 0) then 
+            if (count([f_ice(i,j),f_ice(im1,j),f_ice(i,jp1),f_ice(im1,jp1)].lt.1.0_wp) .eq. 0) then 
                 wt_ab(2) = 1.0_wp 
             end if 
-            if (count([f_ice(i,j),f_ice(i,jm1),f_ice(ip1,jm1),f_ice(ip1,j)].lt.1.0_wp) .eq. 0) then 
-                wt_ab(3) = 1.0_wp 
+            if (count([f_ice(i,j),f_ice(im1,j),f_ice(i,jm1),f_ice(im1,jm1)].lt.1.0_wp) .eq. 0) then 
+                wt_ab(3) = 1.0_wp
             end if 
-            
-            if (count([f_ice(i,j),f_ice(im1,j),f_ice(im1,jm1),f_ice(i,jm1)].lt.1.0_wp) .eq. 0) then 
-                wt_ab(4) = 1.0_wp
+            if (count([f_ice(i,j),f_ice(ip1,j),f_ice(i,jm1),f_ice(ip1,jm1)].lt.1.0_wp) .eq. 0) then 
+                wt_ab(4) = 1.0_wp 
             end if 
             
             wt = sum(wt_ab)
@@ -810,7 +807,7 @@ contains
                 beta(i,j) = c_bed(i,j) * (uxy_b / (uxy_b+u_0))**q * (1.0_wp / uxy_b)
 
             end if 
-            
+
         end do
         end do 
         

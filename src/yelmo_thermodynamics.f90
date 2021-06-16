@@ -428,12 +428,14 @@ end select
                 if (wt_tot .gt. 0.0) then 
                     ! Ice covered neighbor(s) found, assign average of neighbors 
 
+                    ! Normalize weights 
+                    wt_neighb = wt_neighb / wt_tot 
+
                     do k = 1, nz_aa 
-                        enth(i,j,k)  = sum(enth(i-1:i+1,j-1:j+1,k) *wt_neighb) / wt_tot 
-                        T_ice(i,j,k) = sum(T_ice(i-1:i+1,j-1:j+1,k)*wt_neighb) / wt_tot 
-                        omega(i,j,k) = sum(omega(i-1:i+1,j-1:j+1,k)*wt_neighb) / wt_tot 
-                        T_pmp(i,j,k) = sum(T_pmp(i-1:i+1,j-1:j+1,k)*wt_neighb) / wt_tot 
-                        
+                        enth(i,j,k)  = sum(enth(i-1:i+1,j-1:j+1,k) *wt_neighb)
+                        T_ice(i,j,k) = sum(T_ice(i-1:i+1,j-1:j+1,k)*wt_neighb)
+                        omega(i,j,k) = sum(omega(i-1:i+1,j-1:j+1,k)*wt_neighb)
+                        T_pmp(i,j,k) = sum(T_pmp(i-1:i+1,j-1:j+1,k)*wt_neighb)
                     end do 
 
                 end if 

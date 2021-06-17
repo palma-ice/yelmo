@@ -322,6 +322,7 @@ end if
                 dudx_ab(2) = ( (ux(i,j)   - ux(im2,j)) + (ux(i,jp1)   - ux(im2,jp1)) ) *inv_4dx
                 dudx_ab(3) = ( (ux(i,j)   - ux(im2,j)) + (ux(i,jm1)   - ux(im2,jm1)) ) *inv_4dx
                 dudx_ab(4) = ( (ux(ip1,j) - ux(im1,j)) + (ux(ip1,jm1) - ux(im1,jm1)) ) *inv_4dx
+                where(abs(dudx_ab) .lt. TOL_UNDERFLOW) dudx_ab = 0.0_wp
                 
                 ! === dvdy ======================
 
@@ -329,36 +330,55 @@ end if
                 dvdy_ab(2) = ( (uy(i,jp1) - uy(i,jm1)) + (uy(im1,jp1) - uy(im1,jm1)) ) *inv_4dy 
                 dvdy_ab(3) = ( (uy(i,j)   - uy(i,jm2)) + (uy(im1,j)   - uy(im1,jm2)) ) *inv_4dy 
                 dvdy_ab(4) = ( (uy(i,j)   - uy(i,jm2)) + (uy(ip1,j)   - uy(ip1,jm2)) ) *inv_4dy 
+                where(abs(dvdy_ab) .lt. TOL_UNDERFLOW) dvdy_ab = 0.0_wp
                 
 
                 ! === dudy ======================
 
-                dudy_ab(1) = (ux(i,jp1)   - ux(i,j))     / dx 
-                dudy_ab(2) = (ux(im1,jp1) - ux(im1,j))   / dx 
-                dudy_ab(3) = (ux(im1,j)   - ux(im1,jm1)) / dx 
-                dudy_ab(4) = (ux(i,j)     - ux(i,jm1))   / dx 
+                dudy_ab(1) = (ux(i,jp1)   - ux(i,j))     / dy 
+                dudy_ab(2) = (ux(im1,jp1) - ux(im1,j))   / dy 
+                dudy_ab(3) = (ux(im1,j)   - ux(im1,jm1)) / dy 
+                dudy_ab(4) = (ux(i,j)     - ux(i,jm1))   / dy 
+                where(abs(dudy_ab) .lt. TOL_UNDERFLOW) dudy_ab = 0.0_wp
                 
                 ! === dvdx ======================
 
-                dvdx_ab(1) = (uy(ip1,j)   - uy(i,j))     / dy 
-                dvdx_ab(2) = (uy(i,j)     - uy(im1,j))   / dy 
-                dvdx_ab(3) = (uy(i,jm1)   - uy(im1,jm1)) / dy
-                dvdx_ab(4) = (uy(ip1,jm1) - uy(i,jm1))   / dy
+                dvdx_ab(1) = (uy(ip1,j)   - uy(i,j))     / dx 
+                dvdx_ab(2) = (uy(i,j)     - uy(im1,j))   / dx 
+                dvdx_ab(3) = (uy(i,jm1)   - uy(im1,jm1)) / dx
+                dvdx_ab(4) = (uy(ip1,jm1) - uy(i,jm1))   / dx
+                where(abs(dvdx_ab) .lt. TOL_UNDERFLOW) dvdx_ab = 0.0_wp
 
-                ! No vertical shear terms here
-                duxdz_ab = 0.0_wp 
-                duydz_ab = 0.0_wp 
-
-                ! Calculate the total effective strain rate from L19, Eq. 21 
-                eps_sq_ab = dudx_ab**2 + dvdy_ab**2 + dudx_ab*dvdy_ab + 0.25_wp*(dudy_ab+dvdx_ab)**2 &
-                            + 0.25_wp*duxdz_ab**2 + 0.25_wp*duydz_ab**2 + eps_0_sq
-                
                 ! Loop over column
                 do k = 1, nz 
+                    
+                    ! No vertical shear terms here 
+                    duxdz_ab = 0.0_wp 
+                    duydz_ab = 0.0_wp 
 
+                    ! Calculate the total effective strain rate from L19, Eq. 21 
+                    eps_sq_ab = dudx_ab**2 + dvdy_ab**2 + dudx_ab*dvdy_ab + 0.25_wp*(dudy_ab+dvdx_ab)**2 &
+                                + 0.25_wp*duxdz_ab**2 + 0.25_wp*duydz_ab**2 + eps_0_sq
+
+! ajr: Although logically I would choose to use the ab-node values 
+! of ATT, calculate viscosity at each ab node and then average, this 
+! seems to reduce stability of the model. Rather it seems to work 
+! better by only calculating the effective strain rate at each ab-node,
+! and center it, then multiply with the centered ATT value to get visc. 
+! So that is why the central ATT value is used below. This should be 
+! investigated further in the future perhaps.
+if (.FALSE.) then  
                     ! Get the rate factor on ab-nodes too
-                    ATT_ab = 0.25_wp*(ATT(i,j,k)+ATT(ip1,j,k)+ATT(i,jp1,k)+ATT(ip1,jp1,k)) 
-                
+                    ATT_ab(1) = 0.25_wp*(ATT(i,j,k)+ATT(ip1,j,k)+ATT(i,jp1,k)+ATT(ip1,jp1,k)) 
+                    ATT_ab(2) = 0.25_wp*(ATT(i,j,k)+ATT(im1,j,k)+ATT(i,jp1,k)+ATT(im1,jp1,k)) 
+                    ATT_ab(3) = 0.25_wp*(ATT(i,j,k)+ATT(im1,j,k)+ATT(i,jm1,k)+ATT(im1,jm1,k)) 
+                    ATT_ab(4) = 0.25_wp*(ATT(i,j,k)+ATT(ip1,j,k)+ATT(i,jm1,k)+ATT(ip1,jm1,k)) 
+else
+                    ! Just use the aa-node central value of ATT 
+                    ATT_ab = ATT(i,j,k)
+
+end if
+
                     ! Calculate effective viscosity on ab-nodes
                     visc_eff_ab = 0.5_wp*(eps_sq_ab)**(p1) * ATT_ab**(p2)
 
@@ -373,7 +393,7 @@ end if
                 do k = 1, nz
                     visc_eff(i,j,k) = 0.5_wp*(eps_0_sq)**(p1) * ATT(i,j,k)**(p2)
                 end do 
-                
+
             end if 
 
         end do  

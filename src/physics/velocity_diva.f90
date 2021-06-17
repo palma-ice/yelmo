@@ -7,7 +7,7 @@ module velocity_diva
     use basal_dragging 
     use solver_ssa_sico5 
     use velocity_general, only : set_inactive_margins
-    
+
     implicit none 
 
     type diva_param_class
@@ -678,15 +678,25 @@ end if
                     ! Calculate the total effective strain rate from L19, Eq. 21 
                     eps_sq_ab = dudx_ab**2 + dvdy_ab**2 + dudx_ab*dvdy_ab + 0.25_wp*(dudy_ab+dvdx_ab)**2 &
                                 + 0.25_wp*duxdz_ab**2 + 0.25_wp*duydz_ab**2 + eps_0_sq
-                    
+
+! ajr: Although logically I would choose to use the ab-node values 
+! of ATT, calculate viscosity at each ab node and then average, this 
+! seems to reduce stability of the model. Rather it seems to work 
+! better by only calculating the effective strain rate at each ab-node,
+! and center it, then multiply with the centered ATT value to get visc. 
+! So that is why the central ATT value is used below. This should be 
+! investigated further in the future perhaps.
+if (.FALSE.) then  
                     ! Get the rate factor on ab-nodes too
                     ATT_ab(1) = 0.25_wp*(ATT(i,j,k)+ATT(ip1,j,k)+ATT(i,jp1,k)+ATT(ip1,jp1,k)) 
                     ATT_ab(2) = 0.25_wp*(ATT(i,j,k)+ATT(im1,j,k)+ATT(i,jp1,k)+ATT(im1,jp1,k)) 
                     ATT_ab(3) = 0.25_wp*(ATT(i,j,k)+ATT(im1,j,k)+ATT(i,jm1,k)+ATT(im1,jm1,k)) 
                     ATT_ab(4) = 0.25_wp*(ATT(i,j,k)+ATT(ip1,j,k)+ATT(i,jm1,k)+ATT(ip1,jm1,k)) 
-                    
-                    ! ajr:testing
+else
+                    ! Just use the aa-node central value of ATT 
                     ATT_ab = ATT(i,j,k)
+
+end if
 
                     ! Calculate effective viscosity on ab-nodes
                     visc_eff_ab = 0.5_wp*(eps_sq_ab)**(p1) * ATT_ab**(p2)

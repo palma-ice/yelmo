@@ -162,7 +162,7 @@ contains
         !$omp end parallel do 
 
         ! Calculate and apply correction for sigma-coordinate stretching 
-        call calc_advec_vertical_column_correction(uz,ux,uy,H_ice,z_srf,dHdt,dzsdt,zeta_ac,dx)
+        call calc_advec_vertical_column_correction(uz,ux,uy,H_ice,f_ice,z_srf,dHdt,dzsdt,zeta_ac,dx)
 
         return 
 
@@ -262,7 +262,7 @@ contains
                 end do         
 
             end if 
-            
+
         end do 
         end do 
         !$omp end parallel do 

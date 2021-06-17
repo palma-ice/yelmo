@@ -168,7 +168,7 @@ contains
 
     end subroutine calc_uz_3D
 
-    subroutine calc_advec_vertical_column_correction(uz,ux,uy,H_ice,z_srf,dHdt,dzsdt,zeta_ac,dx)
+    subroutine calc_advec_vertical_column_correction(uz,ux,uy,H_ice,f_ice,z_srf,dHdt,dzsdt,zeta_ac,dx)
         ! Calculate the corrected vertical velocity, accounting for stretching of 
         ! the vertical axis between grid cells due to the use of sigma-coordinates. 
 
@@ -181,6 +181,7 @@ contains
         real(prec), intent(IN)    :: ux(:,:,:)          ! nx,ny,nz_aa
         real(prec), intent(IN)    :: uy(:,:,:)          ! nx,ny,nz_aa
         real(prec), intent(IN)    :: H_ice(:,:)         ! nx,ny 
+        real(prec), intent(IN)    :: f_ice(:,:)         ! nx,ny
         real(prec), intent(IN)    :: z_srf(:,:)         ! nx,ny 
         real(prec), intent(IN)    :: dHdt(:,:)          ! nx,ny 
         real(prec), intent(IN)    :: dzsdt(:,:)         ! nx,ny 
@@ -217,46 +218,51 @@ contains
             jm1 = max(1,j-1)
             jp1 = min(ny,j+1)
             
-            do k = 1, nz_ac 
+            if (f_ice(i,j) .eq. 1.0_wp) then 
+                ! Fully ice-covered point
 
-                ! Estimate direction of current flow into cell (x and y), centered horizontally in grid point
-                ! and averaged to staggered cell edges where uz is defined.
-                if (k .eq. 1) then 
-                    ux_aa = 0.5_prec*(ux(i,j,k)+ux(im1,j,k))
-                    uy_aa = 0.5_prec*(uy(i,j,k)+uy(i,jm1,k))
-                else if (k .eq. nz_ac) then 
-                    ux_aa = 0.5_prec*(ux(i,j,k-1))
-                    uy_aa = 0.5_prec*(uy(i,j,k-1))
-                else 
-                    ux_aa = 0.25_prec*(ux(i,j,k-1)+ux(im1,j,k-1) + ux(i,j,k)+ux(im1,j,k))
-                    uy_aa = 0.25_prec*(uy(i,j,k-1)+uy(i,jm1,k-1) + uy(i,j,k)+uy(i,jm1,k))
-                end if 
+                do k = 1, nz_ac 
 
-                if (abs(ux_aa) .lt. TOL_UNDERFLOW) ux_aa = 0.0_wp 
-                if (abs(uy_aa) .lt. TOL_UNDERFLOW) uy_aa = 0.0_wp 
+                    ! Estimate direction of current flow into cell (x and y), centered horizontally in grid point
+                    ! and averaged to staggered cell edges where uz is defined.
+                    if (k .eq. 1) then 
+                        ux_aa = 0.5_prec*(ux(i,j,k)+ux(im1,j,k))
+                        uy_aa = 0.5_prec*(uy(i,j,k)+uy(i,jm1,k))
+                    else if (k .eq. nz_ac) then 
+                        ux_aa = 0.5_prec*(ux(i,j,k-1))
+                        uy_aa = 0.5_prec*(uy(i,j,k-1))
+                    else 
+                        ux_aa = 0.25_prec*(ux(i,j,k-1)+ux(im1,j,k-1) + ux(i,j,k)+ux(im1,j,k))
+                        uy_aa = 0.25_prec*(uy(i,j,k-1)+uy(i,jm1,k-1) + uy(i,j,k)+uy(i,jm1,k))
+                    end if 
 
-                ! Get horizontal scaling correction terms 
-                c_x = (1.0_prec-zeta_ac(k))*(H_ice(ip1,j)-H_ice(im1,j))*dx_inv2 - (z_srf(ip1,j)-z_srf(im1,j))*dx_inv2
-                c_y = (1.0_prec-zeta_ac(k))*(H_ice(i,jp1)-H_ice(i,jm1))*dx_inv2 - (z_srf(i,jp1)-z_srf(i,jm1))*dx_inv2
-                
-                ! Get grid velocity term 
-                c_t = (1.0_prec-zeta_ac(k))*dHdt(i,j) - dzsdt(i,j) 
+                    if (abs(ux_aa) .lt. TOL_UNDERFLOW) ux_aa = 0.0_wp 
+                    if (abs(uy_aa) .lt. TOL_UNDERFLOW) uy_aa = 0.0_wp 
 
-                ! Calculate total correction term, and limit it to within max_corr 
-                corr = ux_aa*c_x + uy_aa*c_y + c_t  
-                corr = sign(min(abs(corr),abs(max_corr*uz(i,j,k))),corr)
+                    ! Get horizontal scaling correction terms 
+                    c_x = (1.0_prec-zeta_ac(k))*(H_ice(ip1,j)-H_ice(im1,j))*dx_inv2 - (z_srf(ip1,j)-z_srf(im1,j))*dx_inv2
+                    c_y = (1.0_prec-zeta_ac(k))*(H_ice(i,jp1)-H_ice(i,jm1))*dx_inv2 - (z_srf(i,jp1)-z_srf(i,jm1))*dx_inv2
+                    
+                    ! Get grid velocity term 
+                    c_t = (1.0_prec-zeta_ac(k))*dHdt(i,j) - dzsdt(i,j) 
 
-                ! Apply correction 
-                uz_corr = uz(i,j,k) + corr 
+                    ! Calculate total correction term, and limit it to within max_corr 
+                    corr = ux_aa*c_x + uy_aa*c_y + c_t  
+                    corr = sign(min(abs(corr),abs(max_corr*uz(i,j,k))),corr)
 
-                ! Limit new velocity to avoid underflow errors 
-                if (abs(uz_corr) .le. tol) uz_corr = 0.0_prec 
+                    ! Apply correction 
+                    uz_corr = uz(i,j,k) + corr 
 
-                ! Set uz equal to new corrected uz 
-                uz(i,j,k) = uz_corr  
+                    ! Limit new velocity to avoid underflow errors 
+                    if (abs(uz_corr) .le. tol) uz_corr = 0.0_prec 
 
-            end do         
+                    ! Set uz equal to new corrected uz 
+                    uz(i,j,k) = uz_corr  
 
+                end do         
+
+            end if 
+            
         end do 
         end do 
         !$omp end parallel do 

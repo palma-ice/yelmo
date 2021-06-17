@@ -156,6 +156,9 @@ contains
             tau = (1.0_prec / (2.0_prec*dt_n)) * (var_corr - var_pred)
         end if 
 
+        ! Keep tau positive to make crash analysis simpler
+        tau = abs(tau) 
+
         return 
 
     end subroutine calc_pc_tau_fe_sbe
@@ -181,6 +184,9 @@ contains
             tau = zeta * (var_corr - var_pred) / ((3.0_prec*zeta + 3.0_prec)*dt_n)
         end if 
 
+        ! Keep tau positive to make crash analysis simpler
+        tau = abs(tau) 
+        
         return 
 
     end subroutine calc_pc_tau_ab_sam
@@ -202,6 +208,9 @@ contains
             tau = (1.0_prec / (6.0_prec*dt_n)) * (var_corr - var_pred)
         end if 
 
+        ! Keep tau positive to make crash analysis simpler
+        tau = abs(tau) 
+        
         return 
 
     end subroutine calc_pc_tau_heun

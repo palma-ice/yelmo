@@ -45,18 +45,30 @@ contains
 
         ! Local variables 
         integer :: i, j, k, nx, ny, nz_aa, nz_ac
-        integer :: im1, ip1, jm1, jp1   
+        integer :: im1, ip1, jm1, jp1
+        integer :: im2, jm2    
         real(prec) :: H_ij
+        real(prec) :: H_inv
+        real(prec) :: H_acx(2), H_acy(2)
+        real(prec) :: thk_now 
         !real(prec) :: dHdx_aa, dHdy_aa, dzsdx_aa, dzsdy_aa 
         real(prec) :: dzbdx_aa
         real(prec) :: dzbdy_aa
+        real(prec) :: dzsdx_aa
+        real(prec) :: dzsdy_aa
         real(prec) :: duxdx_aa
         real(prec) :: duydy_aa
+        real(prec) :: duxdz_aa 
+        real(prec) :: duydz_aa
+        real(prec) :: duxdx_now 
+        real(prec) :: duydy_now 
         real(prec) :: ux_aa 
         real(prec) :: uy_aa 
         real(prec) :: uz_grid 
         real(prec) :: uz_srf 
         real(prec) :: corr 
+        real(prec) :: c_x 
+        real(prec) :: c_y 
 
         real(prec), parameter :: dzbdt = 0.0   ! For posterity, keep dzbdt variable, but set to zero 
         real(prec), parameter :: tol   = 1e-4 
@@ -76,30 +88,35 @@ contains
         do i = 1, nx
 
             ! Define neighbor indices
-            im1 = max(1,i-1)
-            ip1 = min(nx,i+1)
-            jm1 = max(1,j-1)
-            jp1 = min(ny,j+1)
+            im1 = max(i-1,1)
+            ip1 = min(i+1,nx)
+            jm1 = max(j-1,1)
+            jp1 = min(j+1,ny)
             
+            im2 = max(i-2,1)
+            jm2 = max(j-2,1) 
+
             if (f_ice(i,j) .eq. 1.0) then
 
                 ! Get weighted ice thickness for stability
 !                 H_ij = (4.0*H_ice(i,j) + 2.0*(H_ice(im1,j)+H_ice(ip1,j)+H_ice(i,jm1)+H_ice(i,jp1))) / 16.0 &
 !                       + (H_ice(im1,jm1)+H_ice(ip1,jm1)+H_ice(ip1,jp1)+H_ice(im1,jp1)) / 16.0 
 
-                H_ij = H_ice(i,j) 
+                H_ij  = H_ice(i,j) 
+                H_inv = 1.0/H_ij 
 
                 ! Get the centered bedrock gradient 
                 dzbdx_aa = (z_bed(ip1,j)-z_bed(im1,j))/(2.0_prec*dx)
                 dzbdy_aa = (z_bed(i,jp1)-z_bed(i,jm1))/(2.0_prec*dy)
                 
+                ! Get the centered surface gradient 
+                dzsdx_aa = (z_srf(ip1,j)-z_srf(im1,j))/(2.0_prec*dx)
+                dzsdy_aa = (z_srf(i,jp1)-z_srf(i,jm1))/(2.0_prec*dy)
+                
                 ! Get the centered horizontal velocity at the base
                 ux_aa = 0.5_prec* (ux(im1,j,1) + ux(i,j,1))
                 uy_aa = 0.5_prec* (uy(i,jm1,1) + uy(i,j,1))
                 
-!                 ! Get the centered surface gradient 
-!                 dzsdx_aa = (z_srf(ip1,j)-z_srf(im1,j))/(2.0_prec*dx)
-!                 dzsdy_aa = (z_srf(i,jp1)-z_srf(i,jm1))/(2.0_prec*dy)
                 
 !                 ! Get the centered ice thickness gradient 
 !                 dHdx_aa = (H_ice(ip1,j)-H_ice(im1,j))/(2.0_prec*dx)
@@ -118,27 +135,66 @@ contains
                 ! Determine basal vertical velocity for this grid point 
                 ! Following Eq. 5.31 of Greve and Blatter (2009)
                 uz(i,j,1) = dzbdt + uz_grid + bmb(i,j) + ux_aa*dzbdx_aa + uy_aa*dzbdy_aa
-
+                ! uz(i,j,1) = dzbdt + uz_grid + bmb(i,j) &
+                !         + ux(im1,j,1)*dzbdx_ac(1) + ux(i,j,1)*dzbdx_ac(2) &
+                !         + uy(i,jm1,1)*dzbdy_ac(1) + uy(i,j,1)*dzbdy_ac(2)
+                
                 if (abs(uz(i,j,1)) .le. tol) uz(i,j,1) = 0.0_prec 
                 
                 ! Determine surface vertical velocity following kinematic boundary condition 
                 ! Glimmer, Eq. 3.10 [or Folwer, Chpt 10, Eq. 10.8]
                 !uz_srf = dzsdt(i,j) + ux_aa*dzsdx_aa + uy_aa*dzsdy_aa - smb(i,j) 
                 
-                ! Integrate upward to each point above base until surface is reached 
+                ! Integrate upward to each point above base until just below surface is reached 
                 do k = 2, nz_ac 
 
                     ! Greve and Blatter (2009), Eq. 5.72
                     ! Bueler and Brown  (2009), Eq. 4
-                    duxdx_aa  = (ux(i,j,k-1)   - ux(im1,j,k-1)  )/dx
-                    duydy_aa  = (uy(i,j,k-1)   - uy(i,jm1,k-1)  )/dy
+                    if (k .eq. nz_ac) then 
+                        duxdx_aa  = (ux(i,j,k-1)   - ux(im1,j,k-1)  )/dx
+                        duydy_aa  = (uy(i,j,k-1)   - uy(i,jm1,k-1)  )/dy
+                    else
+                        duxdx_aa  = (ux(i,j,k)   - ux(im1,j,k)  )/dx
+                        duydy_aa  = (uy(i,j,k)   - uy(i,jm1,k)  )/dy
+                    end if 
+
+                    ! Note: nz_aa = nz_ac - 1
+                    if (k .eq. nz_ac-1) then
+                        duxdz_aa  = ( 0.5*(ux(i,j,k)+ux(im1,j,k)) &
+                            - 0.5*(ux(i,j,k-1)+ux(im1,j,k-1)) ) / (zeta_aa(k)-zeta_aa(k-1))
+                        duydz_aa  = ( 0.5*(uy(i,j,k)+uy(i,jm1,k)) &
+                            - 0.5*(uy(i,j,k-1)+uy(i,jm1,k-1)) ) / (zeta_aa(k)-zeta_aa(k-1))
+                    else if (k .eq. nz_ac) then
+                        duxdz_aa  = ( 0.5*(ux(i,j,k-1)+ux(im1,j,k-1)) &
+                            - 0.5*(ux(i,j,k-2)+ux(im1,j,k-2)) ) / (zeta_aa(k-1)-zeta_aa(k-2))
+                        duydz_aa  = ( 0.5*(uy(i,j,k-1)+uy(i,jm1,k-1)) &
+                            - 0.5*(uy(i,j,k-2)+uy(i,jm1,k-2)) ) / (zeta_aa(k-1)-zeta_aa(k-2))
+                    else
+                        ! Centered difference vertically
+                        duxdz_aa  = ( 0.5*(ux(i,j,k+1)+ux(im1,j,k+1)) &
+                            - 0.5*(ux(i,j,k-1)+ux(im1,j,k-1)) ) / (zeta_aa(k+1)-zeta_aa(k-1))
+                        duydz_aa  = ( 0.5*(uy(i,j,k+1)+uy(i,jm1,k+1)) &
+                            - 0.5*(uy(i,j,k-1)+uy(i,jm1,k-1)) ) / (zeta_aa(k+1)-zeta_aa(k-1))
+                    end if 
+
+                    c_x = H_inv * ( (1.0-zeta_ac(k))*dzbdx_aa + zeta_ac(k)*dzsdx_aa )
+                    c_y = H_inv * ( (1.0-zeta_ac(k))*dzbdy_aa + zeta_ac(k)*dzsdy_aa )
+
+                    duxdx_now = duxdx_aa - c_x*duxdz_aa 
+                    duydy_now = duydy_aa - c_y*duydz_aa 
                     
                     ! Testing wider stencil for stability (no effect so far)
 !                     duxdx_aa  = 0.5*((ux(i,jp1,k) - ux(im1,jp1,k))/dx + (ux(i,jm1,k) - ux(im1,jm1,k))/dx)
 !                     duydy_aa  = 0.5*((uy(ip1,j,k) - uy(i+1,jm1,k))/dy + (uy(im1,j,k) - uy(im1,jm1,k))/dy)
 
                     uz(i,j,k) = uz(i,j,k-1) & 
-                        - H_ij*(zeta_ac(k)-zeta_ac(k-1))*(duxdx_aa+duydy_aa)
+                        - H_ij*(zeta_ac(k)-zeta_ac(k-1))*(duxdx_now+duydy_now)
+
+                    ! thk_now = H_ij*(zeta_ac(k)-zeta_ac(k-1))
+
+                    ! uz(i,j,k) = uz(i,j,k-1) & 
+                    !             - thk_now*duxdx_ac(1) - thk_now*duxdx_ac(2) &
+                    !             - thk_now*duydy_ac(1) - thk_now*duydy_ac(2)
 
                     ! Apply correction to match kinematic boundary condition at surface 
                     !uz(i,j,k) = uz(i,j,k) - zeta_ac(k)*(uz(i,j,k)-uz_srf)
@@ -162,13 +218,13 @@ contains
         !$omp end parallel do 
 
         ! Calculate and apply correction for sigma-coordinate stretching 
-        call calc_advec_vertical_column_correction(uz,ux,uy,H_ice,f_ice,z_srf,dHdt,dzsdt,zeta_ac,dx)
+        !call calc_advec_vertical_column_correction(uz,ux,uy,H_ice,f_ice,z_srf,z_bed,dHdt,dzsdt,zeta_ac,dx)
 
         return 
 
     end subroutine calc_uz_3D
 
-    subroutine calc_advec_vertical_column_correction(uz,ux,uy,H_ice,f_ice,z_srf,dHdt,dzsdt,zeta_ac,dx)
+    subroutine calc_advec_vertical_column_correction(uz,ux,uy,H_ice,f_ice,z_srf,z_bed,dHdt,dzsdt,zeta_ac,dx)
         ! Calculate the corrected vertical velocity, accounting for stretching of 
         ! the vertical axis between grid cells due to the use of sigma-coordinates. 
 
@@ -183,6 +239,7 @@ contains
         real(prec), intent(IN)    :: H_ice(:,:)         ! nx,ny 
         real(prec), intent(IN)    :: f_ice(:,:)         ! nx,ny
         real(prec), intent(IN)    :: z_srf(:,:)         ! nx,ny 
+        real(prec), intent(IN)    :: z_bed(:,:)         ! nx,ny 
         real(prec), intent(IN)    :: dHdt(:,:)          ! nx,ny 
         real(prec), intent(IN)    :: dzsdt(:,:)         ! nx,ny 
         real(prec), intent(IN)    :: zeta_ac(:)         ! nz_ac

@@ -58,7 +58,7 @@ $(objdir)/ice_enthalpy.o : $(srcdir)/physics/ice_enthalpy.f90 $(objdir)/yelmo_de
 
 $(objdir)/mass_conservation.o : $(srcdir)/physics/mass_conservation.f90 $(objdir)/yelmo_defs.o \
 								$(objdir)/solver_advection.o $(objdir)/solver_advection_sico.o \
-								$(objdir)/solver_advection_new.o
+								$(objdir)/solver_advection_new.o $(objdir)/velocity_general.o
 	$(FC) $(DFLAGS) $(FFLAGS) -c -o $@ $<
 
 $(objdir)/solver_ssa_sico5.o: $(srcdir)/physics/solver_ssa_sico5.F90 $(objdir)/yelmo_defs.o \

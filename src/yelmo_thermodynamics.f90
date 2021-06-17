@@ -319,8 +319,6 @@ end select
         real(prec) :: T_shlf, H_grnd_lim, f_scalar, T_base  
         real(prec) :: H_ice_now 
 
-        real(prec) :: filter0(3,3), filter(3,3) 
-
         real(prec) :: wt_neighb(3,3) 
         real(prec) :: wt_tot 
 
@@ -330,10 +328,7 @@ end select
         ny    = size(T_ice,2)
         nz_aa = size(zeta_aa,1)
         nz_ac = size(zeta_ac,1)
-
-        ! Initialize gaussian filter kernel for smoothing ice thickness at the margin
-        filter0 = gauss_values(dx,dx,sigma=2.0*dx,n=size(filter,1))
-
+        
         ! ===================================================
 
         ! ajr: openmp problematic here - leads to NaNs
@@ -346,18 +341,6 @@ end select
             else 
                 H_ice_now = H_ice(i,j) 
             end if 
-
-            ! ajr: below filter should be tested again, now with the f_ice treatment 
-            ! properly handled everywhere. Is it needed?? 
-            ! Filter the ice thickness at the margin only to avoid a large
-            ! gradient in ice thickness there to rather thin ice points - 
-            ! helps with stability, particularly for EISMINT2 experiments.
-            if (H_ice(i,j) .gt. 0.0 .and. count(H_ice(i-1:i+1,j-1:j+1) .eq. 0.0) .ge. 2) then
-                filter = filter0 
-                where (H_ice(i-1:i+1,j-1:j+1) .eq. 0.0) filter = 0.0 
-                filter = filter/sum(filter)
-                H_ice_now = sum(H_ice(i-1:i+1,j-1:j+1)*filter)
-            end if
 
             ! For floating points, calculate the approximate marine-shelf temperature 
             ! ajr, later this should come from an external model, and T_shlf would

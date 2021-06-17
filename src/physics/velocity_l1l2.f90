@@ -7,7 +7,8 @@ module velocity_l1l2
 
     use basal_dragging 
     use solver_ssa_sico5 
-
+    use velocity_general, only : set_inactive_margins
+    
     implicit none 
 
     type l1l2_param_class
@@ -128,6 +129,10 @@ contains
         ssa_err_acx = 1.0_prec 
         ssa_err_acy = 1.0_prec 
         
+        ! Ensure dynamically inactive cells have no velocity at 
+        ! outer margins before starting iterations
+        call set_inactive_margins(ux_b,uy_b,f_ice)
+
         do iter = 1, par%ssa_iter_max 
 
             ! Store solution from previous iteration (nm1 == n minus 1) 

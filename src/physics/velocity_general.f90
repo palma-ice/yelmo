@@ -11,6 +11,7 @@ module velocity_general
     public :: calc_uz_3D
     public :: calc_driving_stress
     public :: calc_driving_stress_gl
+    public :: set_inactive_margins
     public :: calc_ice_flux
     public :: calc_vel_ratio
     public :: limit_vel
@@ -162,7 +163,7 @@ contains
 
         ! Calculate and apply correction for sigma-coordinate stretching 
         call calc_advec_vertical_column_correction(uz,ux,uy,H_ice,z_srf,dHdt,dzsdt,zeta_ac,dx)
-        
+
         return 
 
     end subroutine calc_uz_3D
@@ -240,7 +241,7 @@ contains
                 
                 ! Get grid velocity term 
                 c_t = (1.0_prec-zeta_ac(k))*dHdt(i,j) - dzsdt(i,j) 
-                
+
                 ! Calculate total correction term, and limit it to within max_corr 
                 corr = ux_aa*c_x + uy_aa*c_y + c_t  
                 corr = sign(min(abs(corr),abs(max_corr*uz(i,j,k))),corr)
@@ -749,6 +750,50 @@ end if
 
     end subroutine integrate_gl_driving_stress_linear
     
+    subroutine set_inactive_margins(ux,uy,f_ice)
+
+        implicit none
+
+        real(wp), intent(INOUT) :: ux(:,:) 
+        real(wp), intent(INOUT) :: uy(:,:) 
+        real(wp), intent(IN)    :: f_ice(:,:) 
+
+        ! Local variables 
+        integer :: i, j, nx, ny 
+        integer :: im1, ip1, jm1, jp1 
+
+        nx = size(f_ice,1) 
+        ny = size(f_ice,2) 
+
+        ! Find partially-filled outer margins and set velocity to zero
+
+        do j = 1, ny 
+        do i = 1, nx 
+
+            ip1 = min(i+1,nx)
+            jp1 = min(j+1,ny)
+
+            if (f_ice(i,j) .lt. 1.0 .and. f_ice(ip1,j) .eq. 0.0 .and. ux(i,j) .ne. 0.0) then 
+                ux(i,j) = 0.0 
+            end if
+            if (f_ice(i,j) .eq. 0.0 .and. f_ice(ip1,j) .lt. 1.0 .and. ux(i,j) .ne. 0.0) then 
+                ux(i,j) = 0.0
+            end if 
+
+            if (f_ice(i,j) .lt. 1.0 .and. f_ice(i,jp1) .eq. 0.0 .and. uy(i,j) .ne. 0.0) then 
+                uy(i,j) = 0.0 
+            end if
+            if (f_ice(i,j) .eq. 0.0 .and. f_ice(i,jp1) .lt. 1.0 .and. uy(i,j) .ne. 0.0) then 
+                uy(i,j) = 0.0 
+            end if
+
+        end do
+        end do
+
+        return
+
+    end subroutine set_inactive_margins
+
     subroutine calc_ice_flux(qq_acx,qq_acy,ux_bar,uy_bar,H_ice,dx,dy)
         ! Calculate the ice flux at a given point.
         ! Note: calculated on ac-nodes.

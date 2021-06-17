@@ -44,10 +44,10 @@ contains
         call calc_dd_ab_3D(dd_ab,H_ice,f_ice,taud_acx,taud_acy,ATT,zeta_aa,dx,n_glen,rho_ice,g)
 
         ! Calculate the 3D horizontal shear velocity fields
-        call calc_uxy_sia_3D(ux_i,uy_i,dd_ab,taud_acx,taud_acy)
+        call calc_uxy_sia_3D(ux_i,uy_i,dd_ab,taud_acx,taud_acy,f_ice)
         
         ! Calculate the depth-averaged horizontal shear velocity fields too
-        call calc_uxy_sia_2D(ux_i_bar,uy_i_bar,dd_ab,taud_acx,taud_acy,zeta_aa)
+        call calc_uxy_sia_2D(ux_i_bar,uy_i_bar,dd_ab,taud_acx,taud_acy,f_ice,zeta_aa)
 
 !         Or, simply integrate from 3D velocity field to get depth-averaged field (slower)
 !         ux_i_bar = calc_vertical_integrated_2D(ux_i,zeta_aa)
@@ -347,7 +347,7 @@ contains
         
     end subroutine calc_dd_ab_3D
 
-    subroutine calc_uxy_sia_2D(ux,uy,dd_ab_3D,taud_acx,taud_acy,zeta_aa)
+    subroutine calc_uxy_sia_2D(ux,uy,dd_ab_3D,taud_acx,taud_acy,f_ice,zeta_aa)
         ! Calculate the 2D horizontal velocity field using SIA
 
         implicit none
@@ -357,10 +357,12 @@ contains
         real(prec), intent(IN)  :: dd_ab_3D(:,:,:)      ! Diffusivity constant 
         real(prec), intent(IN)  :: taud_acx(:,:)        ! [Pa] Driving stress x-direction 
         real(prec), intent(IN)  :: taud_acy(:,:)        ! [Pa] Driving stress y-direction
+        real(prec), intent(IN)  :: f_ice(:,:)           ! [--] Ice area fraction
         real(prec), intent(IN)  :: zeta_aa(:)           ! [--]  Height vector 0:1 
 
         ! Local variables
         integer :: i, j, k, nx, ny
+        integer :: im1, ip1, jm1, jp1 
         real(prec) :: dd_acx, dd_acy 
         real(prec), allocatable :: dd_ab(:,:)           ! [m^2/a] SIA diffusivity, ab-nodes
 
@@ -374,28 +376,37 @@ contains
         ! Stagger diffusivity constant back from ab- to ac-nodes
         ! and calculate velocity components on ac-nodes 
         ux = 0.0 
-        do j=2,ny
-        do i=1,nx
-            dd_acx  = 0.5*(dd_ab(i,j-1)+dd_ab(i,j))
-            ux(i,j) = -dd_acx*taud_acx(i,j)
-        end do
-        end do
-        ux(:,1) = ux(:,2)
-
         uy = 0.0 
+
         do j=1,ny
-        do i=2,nx
-            dd_acy  = 0.5*(dd_ab(i-1,j)+dd_ab(i,j))
-            uy(i,j) = -dd_acy*taud_acy(i,j)
+        do i=1,nx
+
+            ! Define neighbor indices
+            im1 = max(1,i-1)
+            ip1 = min(nx,i+1)
+            jm1 = max(1,j-1)
+            jp1 = min(ny,j+1)
+            
+            ! x-direction 
+            if (f_ice(i,j) .eq. 1.0 .or. f_ice(ip1,j) .eq. 1.0) then 
+                dd_acx  = 0.5*(dd_ab(i,jm1)+dd_ab(i,j))
+                ux(i,j) = -dd_acx*taud_acx(i,j)
+            end if 
+
+            ! y-direction
+            if (f_ice(i,j) .eq. 1.0 .or. f_ice(i,jp1) .eq. 1.0) then 
+                dd_acy  = 0.5*(dd_ab(im1,j)+dd_ab(i,j))
+                uy(i,j) = -dd_acy*taud_acy(i,j)
+            end if
+
         end do
         end do
-        uy(1,:) = uy(2,:) 
 
         return
         
     end subroutine calc_uxy_sia_2D
 
-    subroutine calc_uxy_sia_3D(ux,uy,dd_ab_3D,taud_acx,taud_acy)
+    subroutine calc_uxy_sia_3D(ux,uy,dd_ab_3D,taud_acx,taud_acy,f_ice)
         ! Calculate the 3D horizontal velocity field using SIA
 
         implicit none
@@ -405,47 +416,51 @@ contains
         real(prec), intent(IN)  :: dd_ab_3D(:,:,:)  ! Diffusivity constant
         real(prec), intent(IN)  :: taud_acx(:,:)    ! [Pa] Driving stress x-direction 
         real(prec), intent(IN)  :: taud_acy(:,:)    ! [Pa] Driving stress y-direction
-        
+        real(prec), intent(IN)  :: f_ice(:,:)       ! [--] Ice area fraction 
+
         ! Local variables
         integer :: i, j, k, nx, ny, nz_aa
+        integer :: im1, ip1, jm1, jp1
         real(prec) :: dd_acx, dd_acy  
-        real(prec), allocatable :: dd_ab(:,:) 
 
         nx    = size(ux,1)
         ny    = size(ux,2)
         nz_aa = size(ux,3) 
 
-        allocate(dd_ab(nx,ny)) 
-
         ! Reset velocity solution to zero everywhere 
         ux = 0.0 
         uy = 0.0 
 
-        ! Loop over each vertical layer 
-        do k = 1, nz_aa 
+        ! Stagger diffusivity back from Ab to Ac nodes
+        ! and calculate velocity components on ac-nodes 
 
-            dd_ab = dd_ab_3D(:,:,k) 
+        do j=1,ny
+        do i=1,nx
 
-            ! Stagger diffusivity back from Ab to Ac nodes
-            ! and calculate velocity components on ac-nodes 
-            do j=2,ny
-            do i=1,nx
-                dd_acx    = 0.5*(dd_ab(i,j-1)+dd_ab(i,j))
-                if (abs(dd_acx) .lt. TOL_UNDERFLOW) dd_acx = 0.0
-                ux(i,j,k) = -dd_acx*taud_acx(i,j)
-            end do
-            end do
-            ux(:,1,k) = ux(:,2,k)
+            ! Define neighbor indices
+            im1 = max(1,i-1)
+            ip1 = min(nx,i+1)
+            jm1 = max(1,j-1)
+            jp1 = min(ny,j+1)
+            
+            ! Loop over each vertical layer 
+            do k = 1, nz_aa 
 
-            do j=1,ny
-            do i=2,nx
-                dd_acy    = 0.5*(dd_ab(i-1,j)+dd_ab(i,j))
-                if (abs(dd_acy) .lt. TOL_UNDERFLOW) dd_acy = 0.0
-                uy(i,j,k) = -dd_acy*taud_acy(i,j)
-            end do
-            end do
-            uy(1,:,k) = uy(2,:,k)
+                ! x-direction 
+                if (f_ice(i,j) .eq. 1.0 .or. f_ice(ip1,j) .eq. 1.0) then 
+                    dd_acx    = 0.5*(dd_ab_3D(i,jm1,k)+dd_ab_3D(i,j,k))
+                    ux(i,j,k) = -dd_acx*taud_acx(i,j)
+                end if 
 
+                ! y-direction
+                if (f_ice(i,j) .eq. 1.0 .or. f_ice(i,jp1) .eq. 1.0) then 
+                    dd_acy    = 0.5*(dd_ab_3D(im1,j,k)+dd_ab_3D(i,j,k))
+                    uy(i,j,k) = -dd_acy*taud_acy(i,j)
+                end if
+            
+            end do 
+
+        end do
         end do 
 
         return

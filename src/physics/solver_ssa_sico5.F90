@@ -74,6 +74,8 @@ contains
         character(len=56) :: boundaries_vx(4)
         character(len=56) :: boundaries_vy(4)
 
+        integer :: im1, ip1, jm1, jp1 
+
 ! Include header for lis solver fortran interface
 #include "lisf.h"
         
@@ -191,6 +193,29 @@ contains
 
         call set_sico_masks(maske,is_front_1,is_front_2,is_grline_1,is_grline_2, H_ice, f_ice, H_grnd)
         
+
+        ! ! ajr:testing 
+        ! do j = 1, ny
+        ! do i = 1, nx
+
+        !     ! Get neighbor indices
+        !     im1 = max(i-1,1) 
+        !     ip1 = min(i+1,nx) 
+        !     jm1 = max(j-1,1) 
+        !     jp1 = min(j+1,ny)
+
+        !     if (f_ice(i,j) .lt. 1.0 .and. f_ice(ip1,j) .lt. 1.0) then  
+        !         if (ssa_mask_acx(i,j) .ne. 0) then 
+        !             write(*,*) "ssacheck: ", ssa_mask_acx(i,j) 
+        !         end if
+        !     end if
+        
+        ! end do 
+        ! end do
+
+
+
+
         !-------- Depth-integrated viscosity on the staggered grid
         !                                       [at (i+1/2,j+1/2)] --------
 
@@ -1214,6 +1239,7 @@ contains
                 jm1 = max(j-1,1) 
                 jp1 = min(j+1,ny)
 
+
                 ! x-direction
                 if (f_ice(i,j) .eq. 1.0 .or. f_ice(ip1,j) .eq. 1.0) then
                 
@@ -1249,18 +1275,25 @@ contains
                     if ( beta_acy(i,j) .ge. beta_max .and. f_grnd_acy(i,j) .eq. 1.0 ) ssa_mask_acy(i,j) = 0 
                     
                 end if
-                 
+
             end do 
             end do
 
             ! Final check on both masks to avoid isolated non-ssa points
-            do j = 2, ny-1
-            do i = 2, nx-1
+            do j = 1, ny
+            do i = 1, nx
+
+                ! Get neighbor indices
+                im1 = max(i-1,1) 
+                ip1 = min(i+1,nx) 
+                jm1 = max(j-1,1) 
+                jp1 = min(j+1,ny)
 
                 ! acx-nodes 
-                if (  ssa_mask_acx(i,j) .eq. 0 .and. &
-                    ssa_mask_acx(i+1,j) .gt. 0 .and. ssa_mask_acx(i-1,j) .gt. 0 .and.  &
-                    ssa_mask_acx(i,j+1) .gt. 0 .and. ssa_mask_acx(i,j-1) .gt. 0 ) then 
+                if ( (f_ice(i,j) .eq. 1.0 .or. f_ice(ip1,j) .eq. 1.0) .and. &
+                      ssa_mask_acx(i,j) .eq. 0 .and. &
+                    ssa_mask_acx(ip1,j) .gt. 0 .and. ssa_mask_acx(im1,j) .gt. 0 .and.  &
+                    ssa_mask_acx(i,jp1) .gt. 0 .and. ssa_mask_acx(i,jm1) .gt. 0 ) then 
 
                     if (f_grnd_acx(i,j) .gt. 0.0) then 
                         ! Grounded ice or grounding line (ie, shelfy-stream)
@@ -1273,9 +1306,10 @@ contains
                 end if 
 
                 ! acy-nodes 
-                if (  ssa_mask_acy(i,j) .eq. 0 .and. &
-                    ssa_mask_acy(i+1,j) .gt. 0 .and. ssa_mask_acy(i-1,j) .gt. 0 .and.  &
-                    ssa_mask_acy(i,j+1) .gt. 0 .and. ssa_mask_acy(i,j-1) .gt. 0 ) then 
+                if ( (f_ice(i,j) .eq. 1.0 .or. f_ice(i,jp1) .eq. 1.0) .and. & 
+                      ssa_mask_acy(i,j) .eq. 0 .and. &
+                    ssa_mask_acy(ip1,j) .gt. 0 .and. ssa_mask_acy(im1,j) .gt. 0 .and.  &
+                    ssa_mask_acy(i,jp1) .gt. 0 .and. ssa_mask_acy(i,jm1) .gt. 0 ) then 
 
                     if (f_grnd_acy(i,j) .gt. 0.0) then 
                         ! Shelfy stream 
@@ -1584,7 +1618,7 @@ contains
         ! mask = 2: Open ocean  
         ! mask = 3: Ice shelf 
 
-        ! Note: this mask is defined on central Aa nodes 
+        ! Note: this mask is defined on central aa-nodes 
         
         implicit none 
         

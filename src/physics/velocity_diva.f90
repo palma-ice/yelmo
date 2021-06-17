@@ -6,7 +6,8 @@ module velocity_diva
 
     use basal_dragging 
     use solver_ssa_sico5 
-
+    use velocity_general, only : set_inactive_margins
+    
     implicit none 
 
     type diva_param_class
@@ -122,8 +123,8 @@ contains
         real(wp), allocatable :: qq_gl_acy(:,:) 
         
         real(wp) :: L2_norm 
-
-        integer  :: ij(2) 
+         
+        integer  :: ntot, ip1, jp1  
 
         nx    = size(ux,1)
         ny    = size(ux,2)
@@ -150,6 +151,10 @@ contains
         ssa_err_acx = 1.0_wp 
         ssa_err_acy = 1.0_wp 
         
+        ! Ensure dynamically inactive cells have no velocity at 
+        ! outer margins before starting iterations
+        call set_inactive_margins(ux_bar,uy_bar,f_ice)
+
         do iter = 1, par%ssa_iter_max 
 
             ! Store solution from previous iteration (nm1 == n minus 1) 
@@ -680,6 +685,9 @@ end if
                     ATT_ab(3) = 0.25_wp*(ATT(i,j,k)+ATT(im1,j,k)+ATT(i,jm1,k)+ATT(im1,jm1,k)) 
                     ATT_ab(4) = 0.25_wp*(ATT(i,j,k)+ATT(ip1,j,k)+ATT(i,jm1,k)+ATT(ip1,jm1,k)) 
                     
+                    ! ajr:testing
+                    ATT_ab = ATT(i,j,k)
+
                     ! Calculate effective viscosity on ab-nodes
                     visc_eff_ab = 0.5_wp*(eps_sq_ab)**(p1) * ATT_ab**(p2)
 

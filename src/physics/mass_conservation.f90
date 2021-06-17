@@ -4,6 +4,7 @@ module mass_conservation
     use yelmo_tools, only : fill_borders_2D
 
     use solver_advection, only : calc_advec2D  
+    use velocity_general, only : set_inactive_margins 
 
     implicit none 
 
@@ -54,38 +55,16 @@ contains
 
         allocate(ux_tmp(nx,ny))
         allocate(uy_tmp(nx,ny))
-        ux_tmp = 0.0_wp 
-        uy_tmp = 0.0_wp 
-
         allocate(dHdt_advec(nx,ny))
+
         dHdt_advec = 0.0_wp 
 
-        ! Ensure that no velocity is defined for outer boundaries of partially-filled margin points
+        ! Set local velocity fields with no margin treatment intially
         ux_tmp = ux
-        uy_tmp = uy  
-        do j = 1, ny 
-        do i = 1, nx 
-
-            ! Get neighbor indices 
-            im1 = max(i-1,1)
-            ip1 = min(i+1,nx)
-            jm1 = max(j-1,1)
-            jp1 = min(j+1,ny)
-
-            ! x-direction
-            if (f_ice(i,j) .lt. 1.0_wp .and. f_ice(ip1,j) .eq. 0.0_wp) ux_tmp(i,j) = 0.0_wp 
-            if (f_ice(i,j) .eq. 0.0_wp .and. f_ice(ip1,j) .lt. 1.0_wp) ux_tmp(i,j) = 0.0_wp 
+        uy_tmp = uy
         
-            ! y-direction
-            if (f_ice(i,j) .lt. 1.0_wp .and. f_ice(i,jp1) .eq. 0.0_wp) uy_tmp(i,j) = 0.0_wp 
-            if (f_ice(i,j) .eq. 0.0_wp .and. f_ice(i,jp1) .lt. 1.0_wp) uy_tmp(i,j) = 0.0_wp 
-        
-        end do 
-        end do  
-        
-!         ! No margin treatment 
-!         ux_tmp = ux
-!         uy_tmp = uy 
+        ! Ensure that no velocity is defined for outer boundaries of partially-filled margin points
+        call set_inactive_margins(ux_tmp,uy_tmp,f_ice)
         
         ! ===================================================================================
         ! Resolve the dynamic part (ice advection) using multistep method
@@ -146,7 +125,7 @@ contains
     end subroutine calc_ice_thickness_dyn
 
     subroutine calc_ice_thickness_mbal(H_ice,mb_applied,calv,f_ice,f_grnd,H_ocn, &
-                                       ux,uy,mbal,calv_flt,calv_grnd,dx,dt)
+                                       mbal,calv_flt,calv_grnd,dx,dt)
         ! Interface subroutine to update ice thickness through application
         ! of advection, vertical mass balance terms and calving 
 
@@ -158,56 +137,12 @@ contains
         real(wp),       intent(IN)    :: f_ice(:,:)             ! [--]  Ice area fraction 
         real(wp),       intent(IN)    :: f_grnd(:,:)            ! [--]  Grounded fraction 
         real(wp),       intent(IN)    :: H_ocn(:,:)             ! [m]   Ocean thickness (ie, depth)
-        real(wp),       intent(IN)    :: ux(:,:)                ! [m/a] Depth-averaged velocity, x-direction (ac-nodes)
-        real(wp),       intent(IN)    :: uy(:,:)                ! [m/a] Depth-averaged velocity, y-direction (ac-nodes)
         real(wp),       intent(IN)    :: mbal(:,:)              ! [m/a] Net mass balance; mbal = smb+bmb (calving separate) 
         real(wp),       intent(IN)    :: calv_flt(:,:)          ! [m/a] Potential calving rate (floating)
         real(wp),       intent(IN)    :: calv_grnd(:,:)         ! [m/a] Potential calving rate (grounded)
         real(wp),       intent(IN)    :: dx                     ! [m]   Horizontal resolution
         real(wp),       intent(IN)    :: dt                     ! [a]   Timestep 
 
-        ! Local variables 
-        integer :: i, j, nx, ny
-        integer :: im1, ip1, jm1, jp1 
-        integer :: n  
-        real(wp), allocatable :: ux_tmp(:,:) 
-        real(wp), allocatable :: uy_tmp(:,:) 
-
-        nx = size(H_ice,1)
-        ny = size(H_ice,2)
-
-        allocate(ux_tmp(nx,ny))
-        allocate(uy_tmp(nx,ny))
-        ux_tmp = 0.0_wp 
-        uy_tmp = 0.0_wp 
-
-        ! Ensure that no velocity is defined for outer boundaries of margin points
-        ux_tmp = ux
-        uy_tmp = uy  
-        do j = 1, ny 
-        do i = 1, nx 
-
-            ! Get neighbor indices 
-            im1 = max(i-1,1)
-            ip1 = min(i+1,nx)
-            jm1 = max(j-1,1)
-            jp1 = min(j+1,ny)
-
-            ! x-direction
-            if (f_ice(i,j) .lt. 1.0_wp .and. f_ice(ip1,j) .eq. 0.0_wp) ux_tmp(i,j) = 0.0_wp 
-            if (f_ice(i,j) .eq. 0.0_wp .and. f_ice(ip1,j) .lt. 1.0_wp) ux_tmp(i,j) = 0.0_wp 
-        
-            ! y-direction
-            if (f_ice(i,j) .lt. 1.0_wp .and. f_ice(i,jp1) .eq. 0.0_wp) uy_tmp(i,j) = 0.0_wp 
-            if (f_ice(i,j) .eq. 0.0_wp .and. f_ice(i,jp1) .lt. 1.0_wp) uy_tmp(i,j) = 0.0_wp 
-        
-        end do 
-        end do  
-    
-!         ! No margin treatment 
-!         ux_tmp = ux
-!         uy_tmp = uy 
-        
         ! Limit calving contributions to margin points 
         ! (for now assume this was done well externally)
 
@@ -259,7 +194,7 @@ contains
         logical  :: is_island 
         logical  :: is_isthmus_x 
         logical  :: is_isthmus_y 
-        
+
         nx = size(H_ice,1)
         ny = size(H_ice,2) 
 
@@ -308,14 +243,14 @@ contains
             end if 
 
             ! Check for ice islands
-            is_island = f_ice(i,j) .gt. 0.0 .and. &
+            is_island = f_ice(i,j) .eq. 1.0 .and. &
                 count([f_ice(im1,j),f_ice(ip1,j),f_ice(i,jm1),f_ice(i,jp1)].gt.0.0) .eq. 0
 
-            is_isthmus_x = f_ice(i,j) .gt. 0.0 .and. &
-                count([f_ice(im1,j),f_ice(ip1,j)].gt.0.0) .eq. 0
+            is_isthmus_x = f_ice(i,j) .eq. 1.0 .and. &
+                count([f_ice(im1,j),f_ice(ip1,j)].eq.1.0) .eq. 0
 
-            is_isthmus_y = f_ice(i,j) .gt. 0.0 .and. &
-                count([f_ice(i,jm1),f_ice(i,jp1)].gt.0.0) .eq. 0
+            is_isthmus_y = f_ice(i,j) .eq. 1.0 .and. &
+                count([f_ice(i,jm1),f_ice(i,jp1)].eq.1.0) .eq. 0
             
             if (is_island) then 
                 ! Ice-covered island

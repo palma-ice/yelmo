@@ -219,8 +219,8 @@ contains
 
             ! Apply mass-conservation step (mbal and calving together)
             call calc_ice_thickness_mbal(tpo%now%H_ice,tpo%now%mb_applied,tpo%now%calv,tpo%now%f_ice, &
-                                         tpo%now%f_grnd,bnd%z_sl-bnd%z_bed,dyn%now%ux_bar,dyn%now%uy_bar, &
-                                         mbal,tpo%now%calv_flt,tpo%now%calv_grnd,tpo%par%dx,dt)
+                                         tpo%now%f_grnd,bnd%z_sl-bnd%z_bed,mbal, &
+                                         tpo%now%calv_flt,tpo%now%calv_grnd,tpo%par%dx,dt)
 
             ! Update ice fraction mask 
             call calc_ice_fraction(tpo%now%f_ice,tpo%now%H_ice,tpo%now%f_grnd)

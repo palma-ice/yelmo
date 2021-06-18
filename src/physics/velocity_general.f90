@@ -9,6 +9,7 @@ module velocity_general
 
     private 
     public :: calc_uz_3D
+    public :: calc_uz_advec_corr_3D
     public :: calc_driving_stress
     public :: calc_driving_stress_gl
     public :: set_inactive_margins
@@ -204,106 +205,115 @@ contains
         end do 
         !$omp end parallel do 
 
-        ! Calculate and apply correction for sigma-coordinate stretching 
-        !call calc_advec_vertical_column_correction(uz,ux,uy,H_ice,f_ice,z_srf,z_bed,dHdt,dzsdt,zeta_ac,dx)
-
         return 
 
     end subroutine calc_uz_3D
 
-    subroutine calc_advec_vertical_column_correction(uz,ux,uy,H_ice,f_ice,z_srf,z_bed,dHdt,dzsdt,zeta_ac,dx)
-        ! Calculate the corrected vertical velocity, accounting for stretching of 
-        ! the vertical axis between grid cells due to the use of sigma-coordinates. 
+    subroutine calc_uz_advec_corr_3D(uz_star,uz,ux,uy,f_ice,z_bed,z_srf,dzsdt,zeta_aa,zeta_ac,dx,dy)
+        ! Following algorithm outlined by the Glimmer ice sheet model:
+        ! https://www.geos.ed.ac.uk/~mhagdorn/glide/glide-doc/glimmer_htmlse9.html#x17-660003.1.5
 
-        ! Note: parameter max_corr may be necessary for very steep topography that violates 
-        ! shallow-model assumptions. Imposing this limit ensures the model can continue. 
-        
+        ! Note: rate of bedrock uplift (dzbdt) no longer considered, since the rate is 
+        ! very small and now z_bed is updated externally (ie, now assume dzbdt = 0.0 here)
+
         implicit none 
 
-        real(prec), intent(INOUT) :: uz(:,:,:)          ! nx,ny,nz_ac
-        real(prec), intent(IN)    :: ux(:,:,:)          ! nx,ny,nz_aa
-        real(prec), intent(IN)    :: uy(:,:,:)          ! nx,ny,nz_aa
-        real(prec), intent(IN)    :: H_ice(:,:)         ! nx,ny 
-        real(prec), intent(IN)    :: f_ice(:,:)         ! nx,ny
-        real(prec), intent(IN)    :: z_srf(:,:)         ! nx,ny 
-        real(prec), intent(IN)    :: z_bed(:,:)         ! nx,ny 
-        real(prec), intent(IN)    :: dHdt(:,:)          ! nx,ny 
-        real(prec), intent(IN)    :: dzsdt(:,:)         ! nx,ny 
-        real(prec), intent(IN)    :: zeta_ac(:)         ! nz_ac
-        real(prec), intent(IN)    :: dx   
+        real(prec), intent(OUT) :: uz_star(:,:,:)   ! nx,ny,nz_ac
+        real(prec), intent(IN)  :: uz(:,:,:)        ! nx,ny,nz_ac
+        real(prec), intent(IN)  :: ux(:,:,:)        ! nx,ny,nz_aa
+        real(prec), intent(IN)  :: uy(:,:,:)        ! nx,ny,nz_aa
+        real(prec), intent(IN)  :: f_ice(:,:)
+        real(prec), intent(IN)  :: z_bed(:,:) 
+        real(prec), intent(IN)  :: z_srf(:,:) 
+        real(prec), intent(IN)  :: dzsdt(:,:) 
+        real(prec), intent(IN)  :: zeta_aa(:)    ! z-coordinate, aa-nodes 
+        real(prec), intent(IN)  :: zeta_ac(:)    ! z-coordinate, ac-nodes  
+        real(prec), intent(IN)  :: dx 
+        real(prec), intent(IN)  :: dy
 
         ! Local variables 
-        integer :: i, j, k, nx, ny, nz_ac
-        integer :: im1, ip1, jm1, jp1 
-        real(prec) :: ux_aa, uy_aa 
-        real(prec) :: dx_inv, dx_inv2
-        real(prec) :: c_x, c_y, c_t 
-        real(prec) :: corr 
-        real(prec) :: uz_corr                           ! [m/a] nz_ac 
-        
-        real(prec), parameter :: tol = 1e-4 
-        real(prec), parameter :: max_corr = 1.0_prec    ! Maximum allowed deviation from original uz (eg 200%)
+        integer :: i, j, k, nx, ny, nz_aa, nz_ac
+        integer :: im1, ip1, jm1, jp1
+        real(prec) :: dzbdx_aa
+        real(prec) :: dzbdy_aa
+        real(prec) :: dzsdx_aa
+        real(prec) :: dzsdy_aa
+        real(prec) :: ux_aa 
+        real(prec) :: uy_aa 
+        real(prec) :: c_x 
+        real(prec) :: c_y 
+        real(prec) :: c_t 
 
-        nx    = size(H_ice,1)
-        ny    = size(H_ice,2)
+        real(prec), parameter :: dzbdt = 0.0   ! For posterity, keep dzbdt variable, but set to zero 
+
+        nx    = size(ux,1)
+        ny    = size(ux,2)
+        nz_aa = size(zeta_aa,1)
         nz_ac = size(zeta_ac,1) 
 
-        ! Define some constants 
-        dx_inv  = 1.0_prec / dx 
-        dx_inv2 = 1.0_prec / (2.0_prec*dx)
-        
+        ! Initialize adjusted vertical velocity to zero 
+        uz_star = 0.0 
+
+        ! Next, calculate velocity 
+
         !$omp parallel do 
-        do j = 1, ny 
-        do i = 1, nx 
+        do j = 1, ny
+        do i = 1, nx
 
             ! Define neighbor indices
-            im1 = max(1,i-1)
-            ip1 = min(nx,i+1)
-            jm1 = max(1,j-1)
-            jp1 = min(ny,j+1)
+            im1 = max(i-1,1)
+            ip1 = min(i+1,nx)
+            jm1 = max(j-1,1)
+            jp1 = min(j+1,ny)
             
-            if (f_ice(i,j) .eq. 1.0_wp) then 
-                ! Fully ice-covered point
+            if (f_ice(i,j) .eq. 1.0) then
 
+                ! Get the centered bedrock gradient 
+                dzbdx_aa = (z_bed(ip1,j)-z_bed(im1,j))/(2.0_prec*dx)
+                dzbdy_aa = (z_bed(i,jp1)-z_bed(i,jm1))/(2.0_prec*dy)
+                
+                ! Get the centered surface gradient 
+                dzsdx_aa = (z_srf(ip1,j)-z_srf(im1,j))/(2.0_prec*dx)
+                dzsdy_aa = (z_srf(i,jp1)-z_srf(i,jm1))/(2.0_prec*dy)
+                
+
+                ! Calculate adjusted vertical velocity for each layer
                 do k = 1, nz_ac 
 
-                    ! Estimate direction of current flow into cell (x and y), centered horizontally in grid point
-                    ! and averaged to staggered cell edges where uz is defined.
-                    if (k .eq. 1) then 
-                        ux_aa = 0.5_prec*(ux(i,j,k)+ux(im1,j,k))
-                        uy_aa = 0.5_prec*(uy(i,j,k)+uy(i,jm1,k))
-                    else if (k .eq. nz_ac) then 
-                        ux_aa = 0.5_prec*(ux(i,j,k-1))
-                        uy_aa = 0.5_prec*(uy(i,j,k-1))
-                    else 
-                        ux_aa = 0.25_prec*(ux(i,j,k-1)+ux(im1,j,k-1) + ux(i,j,k)+ux(im1,j,k))
-                        uy_aa = 0.25_prec*(uy(i,j,k-1)+uy(i,jm1,k-1) + uy(i,j,k)+uy(i,jm1,k))
+                    ! Get the centered horizontal velocity of box
+                    ! (vertical aa-nodes? Check!)
+                    if (k .eq. nz_ac) then 
+                        ux_aa = 0.5_prec* (ux(im1,j,k-1) + ux(i,j,k-1))
+                        uy_aa = 0.5_prec* (uy(i,jm1,k-1) + uy(i,j,k-1))
+                    else
+                        ux_aa = 0.5_prec* (ux(im1,j,k) + ux(i,j,k))
+                        uy_aa = 0.5_prec* (uy(i,jm1,k) + uy(i,j,k))
                     end if 
 
-                    if (abs(ux_aa) .lt. TOL_UNDERFLOW) ux_aa = 0.0_wp 
-                    if (abs(uy_aa) .lt. TOL_UNDERFLOW) uy_aa = 0.0_wp 
+                    ! Calculate sigma-coordinate derivative correction factors
+                    ! (Greve and Blatter, 2009, Eqs. 5.131 and 5.132)
+                    ! Not dividing by H here, since this is done in the thermodynamics advection step
+                    c_x = -ux_aa * ( (1.0-zeta_ac(k))*dzbdx_aa + zeta_ac(k)*dzsdx_aa )
+                    c_y = -uy_aa * ( (1.0-zeta_ac(k))*dzbdy_aa + zeta_ac(k)*dzsdy_aa )
 
-                    ! Get horizontal scaling correction terms 
-                    c_x = (1.0_prec-zeta_ac(k))*(H_ice(ip1,j)-H_ice(im1,j))*dx_inv2 - (z_srf(ip1,j)-z_srf(im1,j))*dx_inv2
-                    c_y = (1.0_prec-zeta_ac(k))*(H_ice(i,jp1)-H_ice(i,jm1))*dx_inv2 - (z_srf(i,jp1)-z_srf(i,jm1))*dx_inv2
+                    c_t = -( (1.0-zeta_ac(k))*dzbdt + zeta_ac(k)*dzsdt(i,j) )
                     
-                    ! Get grid velocity term 
-                    c_t = (1.0_prec-zeta_ac(k))*dHdt(i,j) - dzsdt(i,j) 
 
-                    ! Calculate total correction term, and limit it to within max_corr 
-                    corr = ux_aa*c_x + uy_aa*c_y + c_t  
-                    corr = sign(min(abs(corr),abs(max_corr*uz(i,j,k))),corr)
+                    ! Calculate adjusted vertical velocity for advection 
+                    ! of this layer
+                    ! (e.g., Greve and Blatter, 2009, Eq. 5.148)
+                    uz_star(i,j,k) = uz(i,j,k) + c_x + c_y + c_t 
 
-                    ! Apply correction 
-                    uz_corr = uz(i,j,k) + corr 
+                    if (abs(uz_star(i,j,k)) .lt. TOL_UNDERFLOW) uz_star(i,j,k) = 0.0_prec 
+                    
+                end do 
+                
+            else 
+                ! No ice here, no adjustment needed. 
 
-                    ! Limit new velocity to avoid underflow errors 
-                    if (abs(uz_corr) .le. tol) uz_corr = 0.0_prec 
-
-                    ! Set uz equal to new corrected uz 
-                    uz(i,j,k) = uz_corr  
-
-                end do         
+                do k = 1, nz_ac 
+                    uz_star(i,j,k) = uz(i,j,k)
+               end do 
 
             end if 
 
@@ -313,7 +323,7 @@ contains
 
         return 
 
-    end subroutine calc_advec_vertical_column_correction
+    end subroutine calc_uz_advec_corr_3D
 
     subroutine calc_driving_stress(taud_acx,taud_acy,H_ice,dzsdx,dzsdy,dx,taud_lim,boundaries)
         ! Calculate driving stress on staggered grid points

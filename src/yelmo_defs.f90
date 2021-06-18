@@ -528,6 +528,7 @@ module yelmo_defs
         real(wp), allocatable :: H_cts(:,:)       ! Height of the cts
         
         real(wp), allocatable :: advecxy(:,:,:)
+        real(wp), allocatable :: uz_star(:,:,:)
 
         ! Bedrock / lithosphere 
         real(wp), allocatable :: Q_rock(:,:)

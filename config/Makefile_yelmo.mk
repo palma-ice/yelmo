@@ -151,7 +151,7 @@ $(objdir)/yelmo_material.o: $(srcdir)/yelmo_material.f90 $(objdir)/yelmo_defs.o 
 
 $(objdir)/yelmo_thermodynamics.o: $(srcdir)/yelmo_thermodynamics.f90 $(objdir)/yelmo_defs.o \
 								  $(objdir)/ice_enthalpy.o $(objdir)/thermodynamics.o \
-								  $(objdir)/solver_advection.o
+								  $(objdir)/solver_advection.o $(objdir)/velocity_general.o
 	$(FC) $(DFLAGS) $(FFLAGS) -c -o $@ $<
 
 $(objdir)/yelmo_boundaries.o: $(srcdir)/yelmo_boundaries.f90 $(objdir)/yelmo_defs.o $(objdir)/ncio.o

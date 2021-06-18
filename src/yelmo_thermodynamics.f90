@@ -10,6 +10,7 @@ module yelmo_thermodynamics
     use thermodynamics 
     use ice_enthalpy
     use solver_advection, only : calc_advec2D  
+    use velocity_general, only : calc_uz_advec_corr_3D
 
     implicit none
     
@@ -165,8 +166,17 @@ end select
                     
                     end if 
 
+                    ! First calculate corrected vertical velocity to account 
+                    ! for sigma-coordinate grid stretching (horizontal derivatives
+                    ! lead to vertical advection adjusment)
+                    call calc_uz_advec_corr_3D(thrm%now%uz_star,dyn%now%uz,dyn%now%ux,dyn%now%uy,tpo%now%f_ice,bnd%z_bed,tpo%now%z_srf, &
+                                            tpo%now%dzsrfdt,thrm%par%z%zeta_aa,thrm%par%z%zeta_ac,thrm%par%dx,thrm%par%dx)
+                    
+
+                    ! Now calculate the thermodynamics:
+
                     call calc_ytherm_enthalpy_3D(thrm%now%enth,thrm%now%T_ice,thrm%now%omega,thrm%now%bmb_grnd,thrm%now%Q_ice_b, &
-                                thrm%now%H_cts,thrm%now%T_pmp,thrm%now%cp,thrm%now%kt,thrm%now%advecxy,dyn%now%ux,dyn%now%uy,dyn%now%uz,thrm%now%Q_strn, &
+                                thrm%now%H_cts,thrm%now%T_pmp,thrm%now%cp,thrm%now%kt,thrm%now%advecxy,dyn%now%ux,dyn%now%uy,thrm%now%uz_star,thrm%now%Q_strn, &
                                 thrm%now%Q_b,thrm%now%Q_rock,bnd%T_srf,tpo%now%H_ice,tpo%now%f_ice,tpo%now%z_srf,thrm%now%H_w,thrm%now%dHwdt,tpo%now%H_grnd, &
                                 tpo%now%f_grnd,tpo%now%dHicedt,tpo%now%dzsrfdt,thrm%par%z%zeta_aa,thrm%par%z%zeta_ac,thrm%par%z%dzeta_a,thrm%par%z%dzeta_b, &
                                 thrm%par%enth_cr,thrm%par%omega_max,dt,thrm%par%dx,thrm%par%method,thrm%par%solver_advec)
@@ -318,7 +328,6 @@ end select
         integer :: i, j, k, nx, ny, nz_aa, nz_ac  
         real(prec) :: T_shlf, H_grnd_lim, f_scalar, T_base  
         real(prec) :: H_ice_now 
-
         real(prec) :: wt_neighb(3,3) 
         real(prec) :: wt_tot 
 
@@ -328,7 +337,7 @@ end select
         ny    = size(T_ice,2)
         nz_aa = size(zeta_aa,1)
         nz_ac = size(zeta_ac,1)
-        
+
         ! ===================================================
 
         ! ajr: openmp problematic here - leads to NaNs
@@ -619,12 +628,12 @@ end select
 
     end subroutine ytherm_par_load
 
-    subroutine ytherm_alloc(now,nx,ny,nz_aa,nzr_aa)
+    subroutine ytherm_alloc(now,nx,ny,nz_aa,nz_ac,nzr_aa)
 
         implicit none 
 
         type(ytherm_state_class), intent(INOUT) :: now 
-        integer, intent(IN) :: nx, ny, nz_aa, nzr_aa
+        integer, intent(IN) :: nx, ny, nz_aa, nz_ac, nzr_aa
 
         call ytherm_dealloc(now)
 
@@ -645,6 +654,7 @@ end select
         allocate(now%dHwdt(nx,ny))
         
         allocate(now%advecxy(nx,ny,nz_aa))
+        allocate(now%uz_star(nx,ny,nz_ac))
 
         allocate(now%Q_rock(nx,ny))
         allocate(now%enth_rock(nx,ny,nzr_aa))
@@ -667,7 +677,8 @@ end select
         now%dHwdt       = 0.0 
         
         now%advecxy     = 0.0 
-
+        now%uz_star     = 0.0 
+        
         now%Q_rock      = 0.0 
         now%enth_rock   = 0.0 
         now%T_rock      = 0.0 
@@ -699,6 +710,7 @@ end select
         if (allocated(now%dHwdt))       deallocate(now%dHwdt)
         
         if (allocated(now%advecxy))     deallocate(now%advecxy)
+        if (allocated(now%uz_star))     deallocate(now%uz_star)
         
         if (allocated(now%Q_rock))      deallocate(now%Q_rock)
         if (allocated(now%enth_rock))   deallocate(now%enth_rock)

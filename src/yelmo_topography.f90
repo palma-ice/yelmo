@@ -238,9 +238,28 @@ contains
             ! If desired, finally relax solution to reference state
             if (tpo%par%topo_rel .ne. 0) then 
 
-                call relax_ice_thickness(tpo%now%H_ice,tpo%now%f_grnd,bnd%H_ice_ref, &
-                                            tpo%par%topo_rel,tpo%par%topo_rel_tau,dt)
-                
+                select case(trim(tpo%par%topo_rel_field))
+
+                    case("H_ref")
+                        ! Relax towards reference ice thickness field H_ref
+
+                        call relax_ice_thickness(tpo%now%H_ice,tpo%now%f_grnd,bnd%H_ice_ref, &
+                                                    tpo%par%topo_rel,tpo%par%topo_rel_tau,dt)
+                    case("H_ice_n")
+                        ! Relax towards previous iteration ice thickness 
+                        ! (ie slow down changes)
+
+                        call relax_ice_thickness(tpo%now%H_ice,tpo%now%f_grnd,tpo%now%H_ice_n, &
+                                                    tpo%par%topo_rel,tpo%par%topo_rel_tau,dt)
+                    
+                    case DEFAULT 
+
+                        write(*,*) "calc_ytopo:: Error: topo_rel_field not recognized."
+                        write(*,*) "topo_rel_field = ", trim(tpo%par%topo_rel_field)
+                        stop 
+
+                end select
+
             end if 
 
         end if 
@@ -462,6 +481,7 @@ contains
         call nml_read(filename,"ytopo","topo_fixed",        par%topo_fixed,       init=init_pars)
         call nml_read(filename,"ytopo","topo_rel",          par%topo_rel,         init=init_pars)
         call nml_read(filename,"ytopo","topo_rel_tau",      par%topo_rel_tau,     init=init_pars)
+        call nml_read(filename,"ytopo","topo_rel_field",    par%topo_rel_field,   init=init_pars)
         call nml_read(filename,"ytopo","calv_H_lim",        par%calv_H_lim,       init=init_pars)
         call nml_read(filename,"ytopo","calv_tau",          par%calv_tau,         init=init_pars)
         call nml_read(filename,"ytopo","H_min_grnd",        par%H_min_grnd,       init=init_pars)

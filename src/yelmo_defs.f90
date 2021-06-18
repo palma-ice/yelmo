@@ -81,7 +81,8 @@ module yelmo_defs
         logical            :: use_bmb  
         logical            :: topo_fixed
         integer            :: topo_rel
-        real(wp)           :: topo_rel_tau 
+        real(wp)           :: topo_rel_tau
+        character(len=12)  :: topo_rel_field  
         real(wp)           :: calv_H_lim
         real(wp)           :: calv_tau  
         real(wp)           :: H_min_grnd

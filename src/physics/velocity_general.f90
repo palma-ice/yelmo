@@ -47,11 +47,8 @@ contains
         integer :: i, j, k, nx, ny, nz_aa, nz_ac
         integer :: im1, ip1, jm1, jp1
         integer :: im2, jm2    
-        real(prec) :: H_ij
+        real(prec) :: H_now
         real(prec) :: H_inv
-        real(prec) :: H_acx(2), H_acy(2)
-        real(prec) :: thk_now 
-        !real(prec) :: dHdx_aa, dHdy_aa, dzsdx_aa, dzsdy_aa 
         real(prec) :: dzbdx_aa
         real(prec) :: dzbdy_aa
         real(prec) :: dzsdx_aa
@@ -71,7 +68,6 @@ contains
         real(prec) :: c_y 
 
         real(prec), parameter :: dzbdt = 0.0   ! For posterity, keep dzbdt variable, but set to zero 
-        real(prec), parameter :: tol   = 1e-4 
 
         nx    = size(ux,1)
         ny    = size(ux,2)
@@ -99,11 +95,11 @@ contains
             if (f_ice(i,j) .eq. 1.0) then
 
                 ! Get weighted ice thickness for stability
-!                 H_ij = (4.0*H_ice(i,j) + 2.0*(H_ice(im1,j)+H_ice(ip1,j)+H_ice(i,jm1)+H_ice(i,jp1))) / 16.0 &
+!                 H_now = (4.0*H_ice(i,j) + 2.0*(H_ice(im1,j)+H_ice(ip1,j)+H_ice(i,jm1)+H_ice(i,jp1))) / 16.0 &
 !                       + (H_ice(im1,jm1)+H_ice(ip1,jm1)+H_ice(ip1,jp1)+H_ice(im1,jp1)) / 16.0 
 
-                H_ij  = H_ice(i,j) 
-                H_inv = 1.0/H_ij 
+                H_now  = H_ice(i,j) 
+                H_inv = 1.0/H_now 
 
                 ! Get the centered bedrock gradient 
                 dzbdx_aa = (z_bed(ip1,j)-z_bed(im1,j))/(2.0_prec*dx)
@@ -135,11 +131,7 @@ contains
                 ! Determine basal vertical velocity for this grid point 
                 ! Following Eq. 5.31 of Greve and Blatter (2009)
                 uz(i,j,1) = dzbdt + uz_grid + bmb(i,j) + ux_aa*dzbdx_aa + uy_aa*dzbdy_aa
-                ! uz(i,j,1) = dzbdt + uz_grid + bmb(i,j) &
-                !         + ux(im1,j,1)*dzbdx_ac(1) + ux(i,j,1)*dzbdx_ac(2) &
-                !         + uy(i,jm1,1)*dzbdy_ac(1) + uy(i,j,1)*dzbdy_ac(2)
-                
-                if (abs(uz(i,j,1)) .le. tol) uz(i,j,1) = 0.0_prec 
+                if (abs(uz(i,j,1)) .lt. TOL_UNDERFLOW) uz(i,j,1) = 0.0_prec 
                 
                 ! Determine surface vertical velocity following kinematic boundary condition 
                 ! Glimmer, Eq. 3.10 [or Folwer, Chpt 10, Eq. 10.8]
@@ -177,29 +169,24 @@ contains
                             - 0.5*(uy(i,j,k-1)+uy(i,jm1,k-1)) ) / (zeta_aa(k+1)-zeta_aa(k-1))
                     end if 
 
+                    ! Calculate sigma-coordinate derivative correction factors
+                    ! (Greve and Blatter, 2009, Eqs. 5.131 and 5.132)
                     c_x = H_inv * ( (1.0-zeta_ac(k))*dzbdx_aa + zeta_ac(k)*dzsdx_aa )
                     c_y = H_inv * ( (1.0-zeta_ac(k))*dzbdy_aa + zeta_ac(k)*dzsdy_aa )
 
+                    ! Calculate derivatives
                     duxdx_now = duxdx_aa - c_x*duxdz_aa 
                     duydy_now = duydy_aa - c_y*duydz_aa 
                     
-                    ! Testing wider stencil for stability (no effect so far)
-!                     duxdx_aa  = 0.5*((ux(i,jp1,k) - ux(im1,jp1,k))/dx + (ux(i,jm1,k) - ux(im1,jm1,k))/dx)
-!                     duydy_aa  = 0.5*((uy(ip1,j,k) - uy(i+1,jm1,k))/dy + (uy(im1,j,k) - uy(im1,jm1,k))/dy)
-
+                    ! Calculate vertical velocity of this layer
+                    ! (Greve and Blatter, 2009, Eq. 5.95)
                     uz(i,j,k) = uz(i,j,k-1) & 
-                        - H_ij*(zeta_ac(k)-zeta_ac(k-1))*(duxdx_now+duydy_now)
-
-                    ! thk_now = H_ij*(zeta_ac(k)-zeta_ac(k-1))
-
-                    ! uz(i,j,k) = uz(i,j,k-1) & 
-                    !             - thk_now*duxdx_ac(1) - thk_now*duxdx_ac(2) &
-                    !             - thk_now*duydy_ac(1) - thk_now*duydy_ac(2)
+                        - H_now*(zeta_ac(k)-zeta_ac(k-1))*(duxdx_now+duydy_now)
 
                     ! Apply correction to match kinematic boundary condition at surface 
                     !uz(i,j,k) = uz(i,j,k) - zeta_ac(k)*(uz(i,j,k)-uz_srf)
 
-                    if (abs(uz(i,j,k)) .le. tol) uz(i,j,k) = 0.0_prec 
+                    if (abs(uz(i,j,k)) .lt. TOL_UNDERFLOW) uz(i,j,k) = 0.0_prec 
                     
                 end do 
                 
@@ -208,7 +195,7 @@ contains
 
                 do k = 1, nz_ac 
                     uz(i,j,k) = dzbdt - max(smb(i,j),0.0)
-                    if (abs(uz(i,j,k)) .le. tol) uz(i,j,k) = 0.0_prec 
+                    if (abs(uz(i,j,k)) .lt. TOL_UNDERFLOW) uz(i,j,k) = 0.0_prec 
                end do 
 
             end if 

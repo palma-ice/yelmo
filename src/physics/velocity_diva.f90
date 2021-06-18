@@ -686,7 +686,7 @@ end if
 ! and center it, then multiply with the centered ATT value to get visc. 
 ! So that is why the central ATT value is used below. This should be 
 ! investigated further in the future perhaps.
-if (.FALSE.) then  
+if (.TRUE.) then  
                     ! Get the rate factor on ab-nodes too
                     ATT_ab(1) = 0.25_wp*(ATT(i,j,k)+ATT(ip1,j,k)+ATT(i,jp1,k)+ATT(ip1,jp1,k)) 
                     ATT_ab(2) = 0.25_wp*(ATT(i,j,k)+ATT(im1,j,k)+ATT(i,jp1,k)+ATT(im1,jp1,k)) 

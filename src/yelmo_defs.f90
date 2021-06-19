@@ -1036,9 +1036,10 @@ contains
             speed = 0.0 
         end if 
 
+        if (abs(speed) .lt. TOL_UNDERFLOW) speed = 0.0_wp 
         return 
 
-    end subroutine yelmo_calc_speed 
+    end subroutine yelmo_calc_speed
     
     subroutine yelmo_calc_running_stats(val_out,vals,val_now,stat)
 

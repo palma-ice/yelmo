@@ -355,14 +355,14 @@ contains
 
         ! Store the speed variable in predictor or corrector speed variable
         if (trim(tpo%par%pc_step) .eq. "predictor") then 
-            tpo%par%speed_pred = speed 
+            tpo%par%speed_pred = speed
         else 
             tpo%par%speed_corr = speed 
-
+            
             ! If corrector step, then also calculate the speed of both 
             ! predictor+corrector calls: mean of the predictor and corrector speeds
             ! divided by two, since two calls were made. 
-            tpo%par%speed = 0.5 * (0.5*(tpo%par%speed_pred+tpo%par%speed_corr))
+            tpo%par%speed = 0.5_wp * (0.5_wp*(tpo%par%speed_pred+tpo%par%speed_corr))
             
         end if 
 
@@ -518,6 +518,11 @@ contains
         par%dt_beta(2)  = 0.0 
         par%dt_beta(3)  = 1.0 
         par%dt_beta(4)  = 0.0 
+
+        ! Set some additional values to start out right
+        par%pc_step    = "predictor"
+        par%speed_pred = 0.0_wp 
+        par%speed_corr = 0.0_wp 
 
         return
 

@@ -65,7 +65,7 @@ contains
         
         ! Ensure that no velocity is defined for outer boundaries of partially-filled margin points
         call set_inactive_margins(ux_tmp,uy_tmp,f_ice)
-        
+
         ! ===================================================================================
         ! Resolve the dynamic part (ice advection) using multistep method
 
@@ -114,9 +114,6 @@ contains
 
         ! Post processing of H_ice ================
 
-        ! Ensure ice thickness is greater than zero for safety 
-        where(H_ice .lt. 0.0_wp) H_ice = 0.0_wp 
-
         ! Also ensure tiny numeric ice thicknesses are removed
         where (H_ice .lt. 1e-5) H_ice = 0.0 
 
@@ -161,7 +158,7 @@ contains
         ! Apply modified mass balance to update the ice thickness 
         H_ice = H_ice + dt*mb_applied
 
-        ! Also ensure tiny numeric ice thicknesses are removed
+        ! Ensure tiny numeric ice thicknesses are removed
         where (H_ice .lt. 1e-5) H_ice = 0.0 
 
         return 
@@ -243,15 +240,22 @@ contains
             end if 
 
             ! Check for ice islands
-            is_island = f_ice(i,j) .eq. 1.0 .and. &
-                count([f_ice(im1,j),f_ice(ip1,j),f_ice(i,jm1),f_ice(i,jp1)].gt.0.0) .eq. 0
+            is_island = H_ice(i,j) .gt. 0.0 .and. &
+                count([H_ice(im1,j),H_ice(ip1,j),H_ice(i,jm1),H_ice(i,jp1)].gt.0.0) .eq. 0
 
-            is_isthmus_x = f_ice(i,j) .eq. 1.0 .and. &
-                count([f_ice(im1,j),f_ice(ip1,j)].eq.1.0) .eq. 0
+! ajr: Treatment of isthmuses makes the model 
+! more unstable. Disable for now - maybe it is not needed.
+if (.FALSE.) then
+            is_isthmus_x = H_ice(i,j) .gt. 0.0 .and. &
+                count([H_ice(im1,j),H_ice(ip1,j)].gt.0.0) .eq. 0
 
-            is_isthmus_y = f_ice(i,j) .eq. 1.0 .and. &
-                count([f_ice(i,jm1),f_ice(i,jp1)].eq.1.0) .eq. 0
-            
+            is_isthmus_y = H_ice(i,j) .gt. 0.0 .and. &
+                count([H_ice(i,jm1),H_ice(i,jp1)].gt.0.0) .eq. 0
+else       
+            is_isthmus_x = .FALSE. 
+            is_isthmus_y = .FALSE. 
+end if 
+
             if (is_island) then 
                 ! Ice-covered island
                 ! Redistribute ice to neighbors

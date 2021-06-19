@@ -130,9 +130,9 @@ contains
 
                 ! Treat a special case 
                 if (count([H_ice(im1,j),H_ice(ip1,j), &
+                        H_ice(i,jm1),H_ice(i,jp1)] .gt. 0.0) .eq. 0) then
                     ! Island point, assume the cell is not full to ensure it
-                    ! is not dynamically active.
-                        H_ice(i,jm1),H_ice(i,jp1)] .gt. 0.0) .eq. 0) then 
+                    ! is not dynamically active. 
                     f_ice(i,j) = 0.1 
                 end if 
 

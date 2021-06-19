@@ -475,7 +475,7 @@ contains
 
         return 
 
-    end function calc_pi_rho_PID1 
+    end function calc_pi_rho_PID1
 
     subroutine set_adaptive_timestep(dt,dt_adv,dt_diff,dt_adv3D, &
                         ux,uy,uz,ux_bar,uy_bar,D2D,H_ice,dHicedt,zeta_ac, &
@@ -652,12 +652,9 @@ contains
 !             ux_now = abs( 0.5*(ux(i-1,j)+ux(i,j)) )
 !             uy_now = abs( 0.5*(uy(i,j-1)+uy(i,j)) )
 
-            !ux_now = max(abs(ux(i-1,j)),abs(ux(i,j)))
-            !uy_now = max(abs(uy(i,j-1)),abs(uy(i,j)))
+            ux_now = max(abs(ux(i-1,j)),abs(ux(i,j)))
+            uy_now = max(abs(uy(i,j-1)),abs(uy(i,j)))
             
-            ux_now = abs(ux(i,j) - ux(i-1,j))
-            uy_now = abs(uy(i,j) - uy(i,j-1))
-
             if (abs(ux_now) .lt. TOL_UNDERFLOW) ux_now = 0.0_wp 
             if (abs(uy_now) .lt. TOL_UNDERFLOW) uy_now = 0.0_wp 
 

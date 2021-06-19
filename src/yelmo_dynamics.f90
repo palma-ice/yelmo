@@ -53,6 +53,8 @@ contains
 
         real(prec), allocatable :: uxy_prev(:,:) 
 
+        logical, parameter :: write_ssa_diagnostics = .FALSE.
+
         nx    = dyn%par%nx 
         ny    = dyn%par%ny 
         nz_aa = dyn%par%nz_aa 
@@ -218,6 +220,14 @@ contains
         call yelmo_cpu_time(cpu_time1)
         model_time1 = dyn%par%time 
         call yelmo_calc_speed(dyn%par%speed,model_time0,model_time1,cpu_time0,cpu_time1)
+
+        if (write_ssa_diagnostics) then 
+            ! Write diagnostic output every timestep
+            ! This could also be called internal to each Picard iteration,
+            ! but this lets us see a snapshot after each full dynamics solve.
+            call yelmo_write_init_ssa("ssa.nc",dyn%par%nx,dyn%par%ny,time)
+            call write_step_2D_ssa(tpo,dyn,"ssa.nc",time)
+        end if 
 
         return
 
@@ -737,7 +747,7 @@ end if
 
             
             if (write_ssa_diagnostics) then  
-                call write_step_2D_ssa(tpo,dyn,"yelmo_ssa.nc",ux_b_prev,uy_b_prev,time=real(iter,prec))    
+                !call write_step_2D_ssa(tpo,dyn,"yelmo_ssa.nc",ux_b_prev,uy_b_prev,time=real(iter,prec))    
             end if 
 
             ! Exit iterations if ssa solution has converged
@@ -1389,15 +1399,13 @@ end if
 
     end subroutine yelmo_write_init_ssa
 
-    subroutine write_step_2D_ssa(tpo,dyn,filename,ux_b_prev,uy_b_prev,time)
+    subroutine write_step_2D_ssa(tpo,dyn,filename,time)
 
         implicit none 
         
         type(ytopo_class), intent(IN) :: tpo 
         type(ydyn_class),  intent(IN) :: dyn 
-        character(len=*),  intent(IN) :: filename
-        real(prec), intent(IN) :: ux_b_prev(:,:) 
-        real(prec), intent(IN) :: uy_b_prev(:,:) 
+        character(len=*),  intent(IN) :: filename 
         real(prec), intent(IN) :: time
 
         ! Local variables
@@ -1478,16 +1486,16 @@ end if
 !         call nc_write(filename,"uxy_i_bar",dyn%now%uxy_i_bar,units="m/a",long_name="Internal shear velocity magnitude", &
 !                        dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
 
-        call nc_write(filename,"ux_b",dyn%now%ux_b,units="m/a",long_name="Basal sliding velocity (x)", &
+        call nc_write(filename,"ux_bar",dyn%now%ux_bar,units="m/a",long_name="Depth-averaged velocity (x)", &
                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-        call nc_write(filename,"uy_b",dyn%now%uy_b,units="m/a",long_name="Basal sliding velocity (y)", &
+        call nc_write(filename,"uy_bar",dyn%now%uy_bar,units="m/a",long_name="Depth-averaged velocity (y)", &
                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-        call nc_write(filename,"uxy_b",dyn%now%uxy_b,units="m/a",long_name="Basal sliding velocity magnitude", &
+        call nc_write(filename,"uxy_bar",dyn%now%uxy_bar,units="m/a",long_name="Depth-averaged velocity magnitude", &
                      dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
         
-        call nc_write(filename,"ux_b_diff",dyn%now%ux_b-ux_b_prev,units="m/a",long_name="Basal sliding velocity difference (x)", &
+        call nc_write(filename,"ux_bar_diff",dyn%now%ux_bar-dyn%now%ux_bar_prev,units="m/a",long_name="Depth-averaged velocity difference (x)", &
                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-        call nc_write(filename,"uy_b_diff",dyn%now%uy_b-uy_b_prev,units="m/a",long_name="Basal sliding velocity difference (y)", &
+        call nc_write(filename,"uy_bar_diff",dyn%now%uy_bar-dyn%now%uy_bar_prev,units="m/a",long_name="Depth-averaged velocity difference (y)", &
                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
         
         call nc_write(filename,"ssa_err_acx",dyn%now%ssa_err_acx,units="1",long_name="SSA L1 error metric (x)", &

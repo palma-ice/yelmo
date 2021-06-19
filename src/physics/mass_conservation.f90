@@ -122,10 +122,10 @@ contains
     end subroutine calc_ice_thickness_dyn
 
     subroutine calc_ice_thickness_mbal(H_ice,mb_applied,calv,f_ice,f_grnd,H_ocn, &
-                                       mbal,calv_flt,calv_grnd,dx,dt)
+                                       mbal,calv_flt,calv_grnd,dx,dt,reset)
         ! Interface subroutine to update ice thickness through application
         ! of advection, vertical mass balance terms and calving 
-
+        
         implicit none 
 
         real(wp),       intent(INOUT) :: H_ice(:,:)             ! [m]   Ice thickness 
@@ -139,6 +139,16 @@ contains
         real(wp),       intent(IN)    :: calv_grnd(:,:)         ! [m/a] Potential calving rate (grounded)
         real(wp),       intent(IN)    :: dx                     ! [m]   Horizontal resolution
         real(wp),       intent(IN)    :: dt                     ! [a]   Timestep 
+        logical,        intent(IN)    :: reset 
+
+        if (reset) then 
+            ! Make sure to first initialize calv and mb_applied to 
+            ! zero 
+
+            calv        = 0.0_wp 
+            mb_applied  = 0.0_wp 
+
+        end if 
 
         ! Limit calving contributions to margin points 
         ! (for now assume this was done well externally)

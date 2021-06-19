@@ -67,6 +67,8 @@ contains
         real(prec) :: model_time0, model_time1 
         real(prec) :: speed 
 
+        logical, parameter :: mbal_two_steps = .TRUE. 
+        
         nx = size(tpo%now%H_ice,1)
         ny = size(tpo%now%H_ice,2)
 
@@ -129,9 +131,6 @@ contains
             
             ! === Step 2: ice thickness evolution from vertical column mass balance ===
 
-            tpo%now%mb_applied  = 0.0_wp  
-            tpo%now%calv        = 0.0_wp 
-
             ! Also, define temporary variable for total column mass balance (without calving)
            
             mbal = bnd%smb + tpo%now%bmb + tpo%now%fmb 
@@ -140,7 +139,17 @@ contains
                 ! WHEN RUNNING EISMINT1 ensure bmb is not accounted for here !!!
                 mbal = bnd%smb + tpo%now%fmb  
             end if 
-            
+
+if (mbal_two_steps) then 
+            ! Apply mass-conservation step (mbal only)
+            call calc_ice_thickness_mbal(tpo%now%H_ice,tpo%now%mb_applied,tpo%now%calv,tpo%now%f_ice, &
+                                         tpo%now%f_grnd,bnd%z_sl-bnd%z_bed,mbal, &
+                                         tpo%now%calv_flt*0.0_wp,tpo%now%calv_grnd*0.0_wp,tpo%par%dx,dt,reset=.TRUE.)
+
+            ! Update ice fraction mask 
+            call calc_ice_fraction(tpo%now%f_ice,tpo%now%H_ice,tpo%now%f_grnd)
+end if 
+
             ! Diagnose potential floating-ice calving rate [m/yr]
             
             select case(trim(tpo%par%calv_flt_method))
@@ -217,11 +226,17 @@ contains
                                             bnd%z_bed_sd,tpo%par%sd_min,tpo%par%sd_max,tpo%par%calv_max,tpo%par%calv_tau)
             tpo%now%calv_grnd = tpo%now%calv_grnd + calv_sd 
 
+if (mbal_two_steps) then
+            ! Apply mass-conservation step (now calving only) 
+            call calc_ice_thickness_mbal(tpo%now%H_ice,tpo%now%mb_applied,tpo%now%calv,tpo%now%f_ice, &
+                                         tpo%now%f_grnd,bnd%z_sl-bnd%z_bed,mbal, &
+                                         tpo%now%calv_flt,tpo%now%calv_grnd,tpo%par%dx,dt,reset=.FALSE.)
+else
             ! Apply mass-conservation step (mbal and calving together)
             call calc_ice_thickness_mbal(tpo%now%H_ice,tpo%now%mb_applied,tpo%now%calv,tpo%now%f_ice, &
                                          tpo%now%f_grnd,bnd%z_sl-bnd%z_bed,mbal, &
-                                         tpo%now%calv_flt,tpo%now%calv_grnd,tpo%par%dx,dt)
-
+                                         tpo%now%calv_flt,tpo%now%calv_grnd,tpo%par%dx,dt,reset=.TRUE.)
+end if
             ! Update ice fraction mask 
             call calc_ice_fraction(tpo%now%f_ice,tpo%now%H_ice,tpo%now%f_grnd)
             
@@ -358,7 +373,7 @@ contains
             tpo%par%speed_pred = speed
         else 
             tpo%par%speed_corr = speed 
-            
+
             ! If corrector step, then also calculate the speed of both 
             ! predictor+corrector calls: mean of the predictor and corrector speeds
             ! divided by two, since two calls were made. 

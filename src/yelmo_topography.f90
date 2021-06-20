@@ -59,16 +59,13 @@ contains
         real(prec), allocatable :: mbal(:,:) 
         real(prec), allocatable :: calv_sd(:,:) 
         real(prec), allocatable :: H_ref(:,:) 
-
-        type(strain_2D_class) :: strn2D 
-        type(stress_2D_class) :: strs2D
-
+        
         real(8)    :: cpu_time0, cpu_time1
         real(prec) :: model_time0, model_time1 
         real(prec) :: speed 
 
         logical, parameter :: mbal_two_steps = .TRUE. 
-        
+
         nx = size(tpo%now%H_ice,1)
         ny = size(tpo%now%H_ice,2)
 
@@ -76,24 +73,6 @@ contains
         allocate(calv_sd(nx,ny))
         allocate(H_ref(nx,ny))
 
-        ! Strain and stress 
-        allocate(strn2D%dxx(nx,ny))
-        allocate(strn2D%dyy(nx,ny))
-        allocate(strn2D%dxy(nx,ny))
-        allocate(strn2D%dxz(nx,ny))
-        allocate(strn2D%dyz(nx,ny))
-        allocate(strn2D%de(nx,ny))
-        allocate(strn2D%f_shear(nx,ny))
-
-        allocate(strs2D%txx(nx,ny))
-        allocate(strs2D%tyy(nx,ny))
-        allocate(strs2D%txy(nx,ny))
-        allocate(strs2D%txz(nx,ny))
-        allocate(strs2D%tyz(nx,ny))
-        allocate(strs2D%te(nx,ny))
-        allocate(strs2D%teig1(nx,ny))
-        allocate(strs2D%teig2(nx,ny))
-        
         ! Initialize time if necessary 
         if (tpo%par%time .gt. dble(time)) then 
             tpo%par%time = dble(time) 

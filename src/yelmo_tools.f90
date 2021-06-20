@@ -607,12 +607,20 @@ contains
         integer    :: im1, ip1, jm1, jp1 
         real(prec) :: dy 
         real(prec) :: H0, H1, H2 
+        real(prec) :: dvardx_ab(4) 
+        real(prec) :: dvardy_ab(4) 
+        real(prec) :: wt_ab(4) 
+        real(prec) :: wt 
 
         nx = size(var,1)
         ny = size(var,2)
 
         ! Assume y-resolution is identical to x-resolution 
         dy = dx 
+
+        wt_ab = 1.0 
+        wt    = sum(wt_ab)
+        wt_ab = wt_ab / wt 
 
         do j = 1, ny 
         do i = 1, nx 
@@ -623,11 +631,39 @@ contains
             jm1 = max(1, j-1)
             jp1 = min(ny,j+1)
 
+if (.TRUE.) then
             ! Slope in x-direction
             dvardx(i,j) = (var(ip1,j)-var(i,j))/dx 
 
             ! Slope in y-direction
             dvardy(i,j) = (var(i,jp1)-var(i,j))/dy
+
+else
+
+            ! First get slope on ab nodes 
+            dvardx_ab(1) = 0.5_wp*(var(ip1,jp1)-var(i,jp1))   /dx &
+                         + 0.5_wp*(var(ip1,j)  -var(i,j))     /dx
+            dvardx_ab(2) = 0.5_wp*(var(i,jp1)  -var(im1,jp1)) /dx &
+                         + 0.5_wp*(var(i,j)    -var(im1,j))   /dx
+            dvardx_ab(3) = 0.5_wp*(var(i,j)    -var(im1,j))   /dx &
+                         + 0.5_wp*(var(i,jm1)  -var(im1,jm1)) /dx
+            dvardx_ab(4) = 0.5_wp*(var(ip1,j)  -var(i,j))     /dx &
+                         + 0.5_wp*(var(ip1,jm1)-var(i,jm1))   /dx
+
+            ! First get slope on ab nodes 
+            dvardy_ab(1) = 0.5_wp*(var(ip1,jp1)-var(ip1,j))   /dy &
+                         + 0.5_wp*(var(i,jp1)  -var(i,j))     /dy
+            dvardy_ab(2) = 0.5_wp*(var(i,jp1)  -var(i,j))     /dy &
+                         + 0.5_wp*(var(im1,jp1)-var(im1,j))   /dy
+            dvardy_ab(3) = 0.5_wp*(var(i,j)    -var(i,jm1))   /dy &
+                         + 0.5_wp*(var(im1,j)  -var(im1,jm1)) /dy
+            dvardy_ab(4) = 0.5_wp*(var(ip1,j)  -var(ip1,jm1)) /dy &
+                         + 0.5_wp*(var(i,j)    -var(i,jm1))   /dy
+            
+            dvardx(i,j) = sum(wt_ab*dvardx_ab)
+            dvardy(i,j) = sum(wt_ab*dvardy_ab)
+end if 
+
         end do 
         end do 
 

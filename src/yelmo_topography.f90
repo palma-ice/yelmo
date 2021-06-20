@@ -59,13 +59,16 @@ contains
         real(prec), allocatable :: mbal(:,:) 
         real(prec), allocatable :: calv_sd(:,:) 
         real(prec), allocatable :: H_ref(:,:) 
-        
+
         real(8)    :: cpu_time0, cpu_time1
         real(prec) :: model_time0, model_time1 
         real(prec) :: speed 
 
-        logical, parameter :: mbal_two_steps = .TRUE. 
-
+        logical, parameter :: mbal_two_steps = .FALSE. 
+        ! ajr: Note, it seems that mbal_two_steps doesn't work 
+        ! as well when grounded calving is enabled. It tends to eat 
+        ! away at the margins of Greenland more than expected. 
+        
         nx = size(tpo%now%H_ice,1)
         ny = size(tpo%now%H_ice,2)
 
@@ -208,7 +211,7 @@ end if
 if (mbal_two_steps) then
             ! Apply mass-conservation step (now calving only) 
             call calc_ice_thickness_mbal(tpo%now%H_ice,tpo%now%mb_applied,tpo%now%calv,tpo%now%f_ice, &
-                                         tpo%now%f_grnd,bnd%z_sl-bnd%z_bed,mbal, &
+                                         tpo%now%f_grnd,bnd%z_sl-bnd%z_bed,mbal*0.0, &
                                          tpo%now%calv_flt,tpo%now%calv_grnd,tpo%par%dx,dt,reset=.FALSE.)
 else
             ! Apply mass-conservation step (mbal and calving together)

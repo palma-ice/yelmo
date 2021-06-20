@@ -671,6 +671,9 @@ end if
         nx = size(H_ice,1)
         ny = size(H_ice,2)
 
+        ! Intialize calving rate to zero 
+        calv = 0.0 
+
         do j = 1, ny
         do i = 1, nx 
 
@@ -753,6 +756,7 @@ end if
         nx = size(H_ice,1)
         ny = size(H_ice,2)
 
+        ! Intialize calving rate to zero 
         calv = 0.0 
         
         if (calv_max .gt. 0.0) then 

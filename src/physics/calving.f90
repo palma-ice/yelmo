@@ -118,24 +118,24 @@ contains
 !
 ! ===================================================================
 
-    subroutine calc_calving_rate_simple(calv,H_ice,f_grnd,f_ice,H_calv,tau)
+    subroutine calc_calving_rate_simple(calv,H_ice,f_ice,f_grnd,H_calv,tau)
         ! Calculate the calving rate [m/a] based on a simple threshold rule
         ! H_ice < H_calv
 
         implicit none 
 
         real(wp), intent(OUT) :: calv(:,:)
-        real(wp), intent(IN)  :: H_ice(:,:)                ! [m] Ice thickness 
-        real(wp), intent(IN)  :: f_grnd(:,:)               ! [-] Grounded fraction
-        real(wp), intent(IN)  :: f_ice(:,:)
-        real(wp), intent(IN)  :: H_calv 
-        real(wp), intent(IN)  :: tau                       ! [a] Calving timescale, ~ 1yr
+        real(wp), intent(IN)  :: H_ice(:,:)                 ! [m] Ice thickness 
+        real(wp), intent(IN)  :: f_ice(:,:)                 ! [--] Ice area fraction
+        real(wp), intent(IN)  :: f_grnd(:,:)                ! [--] Grounded fraction
+        real(wp), intent(IN)  :: H_calv                     ! [m] Calving thickness threshold
+        real(wp), intent(IN)  :: tau                        ! [a] Calving timescale, ~ 1yr
 
         ! Local variables 
         integer  :: i, j, nx, ny
+        integer  :: im1, ip1, jm1, jp1
         real(wp) :: H_eff
-        logical  :: is_front 
-        integer  :: n_ocean 
+        integer  :: wt 
 
         nx = size(H_ice,1)
         ny = size(H_ice,2)
@@ -144,31 +144,44 @@ contains
         ! Initially set calving rate to zero 
         calv = 0.0 
 
-        do j=2,ny-1
-        do i=2,nx-1
+        do j=1,ny
+        do i=1,nx
 
-            if ( (f_grnd(i,j) .eq. 0.0 .and. H_ice(i,j) .gt. 0.0) .and. &
-                   ( (f_grnd(i-1,j) .eq. 0.0 .and. H_ice(i-1,j).eq.0.0) .or. &
-                     (f_grnd(i+1,j) .eq. 0.0 .and. H_ice(i+1,j).eq.0.0) .or. &
-                     (f_grnd(i,j-1) .eq. 0.0 .and. H_ice(i,j-1).eq.0.0) .or. &
-                     (f_grnd(i,j+1) .eq. 0.0 .and. H_ice(i,j+1).eq.0.0) ) ) then 
-                ! Ice-shelf floating margin: floating ice point with open ocean neighbor 
-                ! If this point is an ice front, check for calving
+            ! Get neighbor indices 
+            im1 = max(i-1,1)
+            ip1 = min(i+1,nx)
+            jm1 = max(j-1,1)
+            jp1 = min(j+1,ny)
+            if ( (f_grnd(i,j) .eq. 0.0 .and. f_ice(i,j) .gt. 0.0) ) then 
+                ! Floating ice point
 
-                ! Calculate current ice thickness (H_eff = H_ice/f_ice)
-                ! Check f_ice==0 for safety, but this should never happen for an ice-covered point
-                if (f_ice(i,j) .gt. 0.0_prec) then 
-                    H_eff = H_ice(i,j) / f_ice(i,j) 
-                else
-                    H_eff = H_ice(i,j) 
-                end if 
+                ! How many calving-front neighbors?
+                wt = 0.0 
+                if (f_grnd(im1,j) .eq. 0.0 .and. f_ice(im1,j).eq.0.0) wt = wt + 1.0_wp
+                if (f_grnd(ip1,j) .eq. 0.0 .and. f_ice(ip1,j).eq.0.0) wt = wt + 1.0_wp
+                if (f_grnd(i,jm1) .eq. 0.0 .and. f_ice(i,jm1).eq.0.0) wt = wt + 1.0_wp
+                if (f_grnd(i,jp1) .eq. 0.0 .and. f_ice(i,jp1).eq.0.0) wt = wt + 1.0_wp
 
-                if (H_eff .lt. H_calv) then 
-                    ! Apply calving at front, delete all ice in point (H_ice) 
+                if (wt .gt. 0.0_wp) then 
+                    ! Point is at calving front 
 
-                    calv(i,j) = f_ice(i,j) * max(H_calv-H_eff,0.0) / tau 
+                    ! Calculate current ice thickness (H_eff = H_ice/f_ice)
+                    ! Check f_ice==0 for safety, but this should never happen for an ice-covered point
+                    if (f_ice(i,j) .gt. 0.0_prec) then 
+                        H_eff = H_ice(i,j) / f_ice(i,j) 
+                    else
+                        H_eff = H_ice(i,j) 
+                    end if 
 
-                end if 
+                    if (H_eff .lt. H_calv) then 
+                        ! Apply calving at front, with faster 
+                        ! calving timescale for more exposed fronts
+
+                        calv(i,j) = f_ice(i,j) * (H_calv-H_eff) * wt / tau
+
+                    end if 
+
+                end if
 
             end if
 
@@ -584,7 +597,7 @@ end if
         real(wp), allocatable :: eps_xx(:,:), eps_yy(:,:) 
         real(wp) :: eps_xx_max, eps_yy_max 
         integer :: imax_xx, jmax_xx, imax_yy, jmax_yy                                          
-        
+
         logical, allocatable :: is_front(:,:)   
         integer :: n_ocean 
 

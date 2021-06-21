@@ -143,7 +143,7 @@ end if
                 case("simple") 
                     ! Use simple threshold method
 
-                    call calc_calving_rate_simple(tpo%now%calv_flt,tpo%now%H_ice,tpo%now%f_grnd,tpo%now%f_ice, &
+                    call calc_calving_rate_simple(tpo%now%calv_flt,tpo%now%H_ice,tpo%now%f_ice,tpo%now%f_grnd, &
                                                     tpo%par%calv_H_lim,tpo%par%calv_tau)
                     
                 case("flux") 

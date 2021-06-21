@@ -1,6 +1,6 @@
 module mass_conservation
 
-    use yelmo_defs, only : sp, dp, wp, tol_underflow, g, rho_ice, rho_sw  
+    use yelmo_defs, only : sp, dp, wp, TOL_UNDERFLOW, g, rho_ice, rho_sw  
     use yelmo_tools, only : fill_borders_2D
 
     use solver_advection, only : calc_advec2D  
@@ -125,7 +125,7 @@ contains
                                        mbal,calv_flt,calv_grnd,dx,dt,reset)
         ! Interface subroutine to update ice thickness through application
         ! of advection, vertical mass balance terms and calving 
-        
+
         implicit none 
 
         real(wp),       intent(INOUT) :: H_ice(:,:)             ! [m]   Ice thickness 
@@ -141,6 +141,19 @@ contains
         real(wp),       intent(IN)    :: dt                     ! [a]   Timestep 
         logical,        intent(IN)    :: reset 
 
+        ! Local variables 
+        integer :: i, j, nx, ny 
+        integer :: im1, ip1, jm1, jp1 
+        real(wp) :: calv_applied
+        real(wp), allocatable :: calv_resid(:,:) 
+        real(wp) :: wts(4)
+
+        nx = size(H_ice,1)
+        ny = size(H_ice,2) 
+
+        allocate(calv_resid(nx,ny))
+        calv_resid = 0.0 
+
         if (reset) then 
             ! Make sure to first initialize calv and mb_applied to 
             ! zero 
@@ -150,20 +163,90 @@ contains
 
         end if 
 
-        ! Limit calving contributions to margin points 
-        ! (for now assume this was done well externally)
+        ! ==== MASS BALANCE =====
 
-        calv = calv + (calv_flt + calv_grnd) 
-
-        ! Next, handle mass balance in order to be able to diagnose
-        ! precisely how much mass was lost/gained 
-        mb_applied = mb_applied + (mbal - calv) 
+        ! First apply mass balance 
+        mb_applied = mb_applied + mbal
 
         ! Ensure ice cannot form in open ocean 
         where(f_grnd .eq. 0.0 .and. H_ice .eq. 0.0)  mb_applied = 0.0  
 
         ! Ensure melt is limited to amount of available ice to melt  
         where((H_ice+dt*mb_applied) .lt. 0.0) mb_applied = -H_ice/dt
+
+
+        ! ===== CALVING ======
+        ! Limit calving contributions to margin points 
+        ! (for now assume this was done well externally)
+
+        ! Combine grounded and floating calving into one field for output
+        calv = calv + (calv_flt + calv_grnd) 
+
+
+        ! Diagnose residual calving 
+        where((H_ice-dt*calv) .lt. 0.0_wp) 
+            calv_resid = -(H_ice-dt*calv)/dt
+        elsewhere
+            calv_resid = 0.0_wp
+        end where
+
+        ! Eliminate residual calving from calving field 
+        calv = calv - calv_resid 
+        where (abs(calv) .lt. TOL_UNDERFLOW) calv = 0.0_wp 
+
+if (.TRUE.) then
+    ! Ensure that excess calving gets applied to upstream neighbors with 
+    ! full ice cover. 
+                 
+        ! Determine if any residual calving should migrate to neighboring inland
+        ! cells if all ice in the margin cell is deleted.
+        do j = 1, ny 
+        do i = 1, nx 
+
+            ! Define neighbor indices
+            im1 = max(i-1,1)
+            ip1 = min(i+1,nx)
+            jm1 = max(j-1,1)
+            jp1 = min(j+1,ny)
+            
+            if (calv_resid(i,j) .gt. 0.0_wp) then 
+                ! Calving diagnosed for this point 
+
+                if (f_ice(ip1,j) .eq. 1.0) wts(1) = 1.0_wp 
+                if (f_ice(i,jp1) .eq. 1.0) wts(2) = 1.0_wp 
+                if (f_ice(im1,j) .eq. 1.0) wts(3) = 1.0_wp 
+                if (f_ice(i,jm1) .eq. 1.0) wts(4) = 1.0_wp 
+                
+                if (sum(wts) .eq. 0.0) then 
+                    ! This shouldn't happen, something went wrong! 
+                    write(*,*) "calc_ice_thickness_mbal:: Error: &
+                    &calving point found with no fully ice-covered neighbors. Check!"
+                    write(*,*) "i, j: ", i, j 
+                else
+                    wts = wts / sum(wts) 
+                end if 
+
+                calv(ip1,j) = calv(ip1,j) + calv_resid(i,j)*wts(1)
+                calv(i,jp1) = calv(i,jp1) + calv_resid(i,j)*wts(2)
+                calv(im1,j) = calv(im1,j) + calv_resid(i,j)*wts(3)
+                calv(i,jm1) = calv(i,jm1) + calv_resid(i,j)*wts(4)
+
+                calv_resid(i,j) = calv_resid(i,j) - sum(wts)*calv_resid(i,j)
+            
+            end if 
+        end do 
+        end do 
+
+        if (maxval(abs(calv_resid)) .gt. 1e-10) then 
+            write(*,*) "calc_ice_thickness_mbal:: Error: residual calving not &
+            & properly accounted for."
+            write(*,*) "calv_resid: ", minval(calv_resid), maxval(calv_resid)
+            stop 
+        end if 
+end if 
+
+        ! Subtract calving from mb_applied 
+        mb_applied = mb_applied - calv 
 
         ! Apply modified mass balance to update the ice thickness 
         H_ice = H_ice + dt*mb_applied

@@ -690,10 +690,11 @@ contains
         do j = 1, ny
         do i = 1, nx
             
-            im1 = max(1,i-1)
-            ip1 = min(nx,i+1)
-            jm1 = max(1,j-1)
-            jp1 = min(ny,j+1)
+            ! Define neighbor indices
+            im1 = max(i-1,1)
+            ip1 = min(i+1,nx)
+            jm1 = max(j-1,1)
+            jp1 = min(j+1,ny)
             
             uxy_aa  = sqrt( (0.5_prec*(ux_b(i,j)+ux_b(im1,j)))**2 &
                           + (0.5_prec*(uy_b(i,j)+uy_b(i,jm1)))**2 )
@@ -755,10 +756,10 @@ contains
         do i = 1, nx
             
             ! Define neighbor indices
-            im1 = max(1,i-1)
-            ip1 = min(nx,i+1)
-            jm1 = max(1,j-1)
-            jp1 = min(ny,j+1)
+            im1 = max(i-1,1)
+            ip1 = min(i+1,nx)
+            jm1 = max(j-1,1)
+            jp1 = min(j+1,ny)
             
             ! Get ab-node weighting based on whether ice is present 
             wt_ab = 0.0_wp 
@@ -881,10 +882,11 @@ contains
         do j = 1, ny
         do i = 1, nx
 
-            im1 = max(1,i-1)
-            ip1 = min(nx,i+1)
-            jm1 = max(1,j-1)
-            jp1 = min(ny,j+1)
+            ! Define neighbor indices
+            im1 = max(i-1,1)
+            ip1 = min(i+1,nx)
+            jm1 = max(j-1,1)
+            jp1 = min(j+1,ny)
             
             ! Average from ac-nodes to aa-node
             Q_b_now = 0.25*(Qb_acx(i,j)+Qb_acx(im1,j)+Qb_acy(i,j)+Qb_acy(i,jm1))
@@ -965,11 +967,12 @@ end if
             if (H_ice(i,j) .gt. 0.0_prec) then 
                 ! only treat ice-covered points 
 
-                im1 = max(1,i-1)
-                ip1 = min(nx,i+1)
-                jm1 = max(1,j-1)
-                jp1 = min(ny,j+1)
-                
+                ! Define neighbor indices
+                im1 = max(i-1,1)
+                ip1 = min(i+1,nx)
+                jm1 = max(j-1,1)
+                jp1 = min(j+1,ny)
+            
                 ! Get variables on ab-nodes (corners of cell)
                 ! and calculate hi resolution subgrid values
                 ux_1 = 0.5_prec*(ux_b(i,j)  +ux_b(i,jp1))
@@ -1735,12 +1738,12 @@ end if
         do j = 1, ny 
         do i = 1, nx
 
-            im1 = max(1, i-1)
-            ip1 = min(nx,i+1)
+            ! Define neighbor indices
+            im1 = max(i-1,1)
+            ip1 = min(i+1,nx)
+            jm1 = max(j-1,1)
+            jp1 = min(j+1,ny)
             
-            jm1 = max(1, j-1)
-            jp1 = min(ny,j+1)
-
             ! Grounded point or partially floating point with floating neighbors
             if (H_ice(i,j) .gt. 0.0 .and. f_grnd(i,j) .gt. 0.0 .and. &
                 (f_grnd(im1,j) .eq. 0.0 .or. f_grnd(ip1,j) .eq. 0.0 .or. &

@@ -584,15 +584,13 @@ end if
         real(wp), allocatable :: eps_xx(:,:), eps_yy(:,:) 
         real(wp) :: eps_xx_max, eps_yy_max 
         integer :: imax_xx, jmax_xx, imax_yy, jmax_yy                                          
-        real(wp), allocatable :: spr(:,:)   ! total spreading rate in the two directions epsxx * epsyyy 
-
+        
         logical, allocatable :: is_front(:,:)   
         integer :: n_ocean 
 
         nx = size(H_ice,1)
         ny = size(H_ice,2)
 
-        allocate(spr(nx,ny),eps_xx(nx,ny),eps_yy(nx,ny))
         allocate(is_front(nx,ny))
 
         do j = 2, ny

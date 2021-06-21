@@ -31,11 +31,12 @@ module yelmo_timesteps
 
 contains
 
-    subroutine set_pc_mask(mask,H_ice_pred,H_ice_corr,f_grnd)
+    subroutine set_pc_mask(mask,pc_tau,H_ice_pred,H_ice_corr,f_grnd)
 
         implicit none 
 
         logical, intent(OUT) :: mask(:,:) 
+        real(prec), intent(IN) :: pc_tau(:,:) 
         real(prec), intent(IN) :: H_ice_pred(:,:) 
         real(prec), intent(IN) :: H_ice_corr(:,:) 
         real(prec), intent(IN) :: f_grnd(:,:) 
@@ -673,8 +674,7 @@ contains
 
         return 
 
-    end function calc_adv2D_timestep1 
-    
+    end function calc_adv2D_timestep1
 
     function calc_adv3D_timestep1(ux,uy,uz,dx,dy,H_ice,zeta_ac,cfl_max) result(dt)
         ! Calculate maximum advective time step based

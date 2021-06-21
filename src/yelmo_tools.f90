@@ -639,7 +639,10 @@ if (.TRUE.) then
             dvardy(i,j) = (var(i,jp1)-var(i,j))/dy
 
 else
-
+            ! ajr: Note, the strategy below does seem to improve 
+            ! stability, but with a very strong and undesirable
+            ! diffusion of the gradient. Not currently recommended...
+            
             ! First get slope on ab nodes 
             dvardx_ab(1) = 0.5_wp*(var(ip1,jp1)-var(i,jp1))   /dx &
                          + 0.5_wp*(var(ip1,j)  -var(i,j))     /dx

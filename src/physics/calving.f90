@@ -152,6 +152,7 @@ contains
             ip1 = min(i+1,nx)
             jm1 = max(j-1,1)
             jp1 = min(j+1,ny)
+
             if ( (f_grnd(i,j) .eq. 0.0 .and. f_ice(i,j) .gt. 0.0) ) then 
                 ! Floating ice point
 
@@ -174,10 +175,12 @@ contains
                     end if 
 
                     if (H_eff .lt. H_calv) then 
-                        ! Apply calving at front, with faster 
-                        ! calving timescale for more exposed fronts
-
-                        calv(i,j) = f_ice(i,j) * (H_calv-H_eff) * wt / tau
+                        ! If ice is too thin, diagnose calving rate, with
+                        ! faster calving timescale for more exposed fronts
+                        ! (multiply by f_ice to convert to a horizontal calving rate)
+                        
+                        calv(i,j) = f_ice(i,j) * (H_calv-H_eff) / tau                        
+                        ! calv(i,j) = f_ice(i,j) * (H_calv-H_eff) * wt / tau
 
                     end if 
 

@@ -197,7 +197,7 @@ contains
 if (.TRUE.) then
     ! Ensure that excess calving gets applied to upstream neighbors with 
     ! full ice cover. 
-                 
+
         ! Determine if any residual calving should migrate to neighboring inland
         ! cells if all ice in the margin cell is deleted.
         do j = 1, ny 
@@ -237,7 +237,7 @@ if (.TRUE.) then
         end do 
         end do 
 
-        if (maxval(abs(calv_resid)) .gt. 1e-10) then 
+        if (maxval(abs(calv_resid)) .gt. 1e-3) then 
             write(*,*) "calc_ice_thickness_mbal:: Error: residual calving not &
             & properly accounted for."
             write(*,*) "calv_resid: ", minval(calv_resid), maxval(calv_resid)

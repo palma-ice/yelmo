@@ -177,12 +177,17 @@ contains
         end do 
         end do 
 
+if (.FALSE.) then 
+    ! ajr: this check is not needed, generally everything sums up well.
+
         if (maxval(abs(calv_resid)) .gt. 1e-3) then 
             write(*,*) "calc_calving_residual:: Error: residual calving not &
             & properly accounted for."
             write(*,*) "calv_resid: ", minval(calv_resid), maxval(calv_resid)
             stop 
         end if 
+
+end if 
 
         return 
 
@@ -835,6 +840,7 @@ end if
                 end if 
 
                 calv(i,j) = (H_eff*calv_ref) / sqrt(dx*dy)
+                
             end if
 
         end do

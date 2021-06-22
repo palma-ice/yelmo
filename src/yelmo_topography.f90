@@ -147,7 +147,7 @@ end if
                                                     tpo%par%calv_H_lim,tpo%par%calv_tau)
                     
                     call calc_calving_residual(tpo%now%calv_flt,tpo%now%H_ice,tpo%now%f_ice,dt,resid_lim=0.01_wp)
-                    
+
                 case("flux") 
                     ! Use threshold+flux method from Peyaud et al. (2007), ie, GRISLI 
 
@@ -232,7 +232,7 @@ end if
             ! and store changes in residual mass balance field. 
             call apply_ice_thickness_boundaries(tpo%now%H_ice,tpo%now%mb_resid,tpo%now%f_ice,tpo%now%f_grnd, &
                                                 dyn%now%uxy_b,bnd%ice_allowed,tpo%par%boundaries,bnd%H_ice_ref, &
-                                                tpo%par%H_min_flt,tpo%par%H_min_grnd,dt)
+                                                tpo%par%H_min_flt,tpo%par%H_min_grnd,dt,reset=.TRUE.)
 
             ! Save the rate of change of ice thickness in output variable [m/a]
             tpo%now%dHicedt = (tpo%now%H_ice - tpo%now%H_ice_n) / dt 
@@ -251,6 +251,7 @@ end if
                     case("H_ice_n")
                         ! Relax towards previous iteration ice thickness 
                         ! (ie slow down changes)
+                        ! ajr: needs testing, not sure if this works well or helps anything.
 
                         call relax_ice_thickness(tpo%now%H_ice,tpo%now%f_grnd,tpo%now%H_ice_n, &
                                                     tpo%par%topo_rel,tpo%par%topo_rel_tau,dt)

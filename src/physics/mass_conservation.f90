@@ -186,7 +186,7 @@ contains
     end subroutine calc_ice_thickness_mbal
 
     subroutine apply_ice_thickness_boundaries(H_ice,mb_resid,f_ice,f_grnd,uxy_b,ice_allowed,boundaries,H_ice_ref, &
-                                                H_min_flt,H_min_grnd,dt)
+                                                H_min_flt,H_min_grnd,dt,reset)
 
         implicit none
 
@@ -201,6 +201,7 @@ contains
         real(wp),           intent(IN)      :: H_min_flt                ! [m] Minimum allowed floating ice thickness 
         real(wp),           intent(IN)      :: H_min_grnd               ! [m] Minimum allowed grounded ice thickness 
         real(wp),           intent(IN)      :: dt                       ! [yr] Timestep
+        logical,            intent(IN)      :: reset 
 
         ! Local variables 
         integer :: i, j, nx, ny 
@@ -349,8 +350,12 @@ end if
 
         end select 
         
+        if (reset) then
+            mb_resid = 0.0_wp 
+        end if 
+
         ! Determine mass balance related to changes applied here 
-        mb_resid = (H_ice_new - H_ice) / dt 
+        mb_resid = mb_resid + (H_ice_new - H_ice) / dt 
 
         ! Reset actual ice thickness to new values 
         H_ice = H_ice_new 

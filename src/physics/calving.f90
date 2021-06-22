@@ -16,6 +16,7 @@ module calving
     ! Floating calving routines 
     public :: calc_calving_rate_simple
     public :: calc_calving_rate_flux 
+    public :: calc_calving_rate_flux_grisli
     public :: calc_calving_rate_vonmises_l19
     public :: calc_calving_rate_eigen
     
@@ -488,7 +489,7 @@ end if
 
     end subroutine calc_calving_rate_flux
     
-    subroutine calc_calving_rate_flux_old(calv,H_ice,f_ice,f_grnd,mbal,ux,uy,dx,H_calv,tau)
+    subroutine calc_calving_rate_flux_grisli(calv,H_ice,f_ice,f_grnd,mbal,ux,uy,dx,H_calv,tau)
         ! Calculate the calving rate [m/a] based on a simple threshold rule
         ! H_ice < H_calv
 
@@ -677,7 +678,7 @@ end if
 
         return 
 
-    end subroutine calc_calving_rate_flux_old
+    end subroutine calc_calving_rate_flux_grisli
     
     subroutine calc_calving_rate_vonmises_l19(calv,H_ice,f_ice,f_grnd,teig1,teig2,ATT_bar,visc_bar,dx,dy,kt,w2,n_glen)
         ! Calculate the 'horizontal' calving rate [m/yr] based on the 
@@ -742,93 +743,9 @@ end if
             if (is_margin) then 
                 ! Calculate calving rate here 
 
+                ! Calculate the effective stress
                 tau_eff = calc_tau_eff(teig1(i,j),teig2(i,j),w2)
-
-
-if (.FALSE.) then 
-    ! ajr: this extrapolation should not be needed since strain rates 
-    ! are extrapolated to cells neighboring ice margin 
-
-                if (tau_eff .eq. 0.0) then 
-                    ! For safety, use tau of upstream neighbors in this case
-
-                    tau_eff = 0.0 
-                    wt      = 0.0 
-
-                    if (f_grnd(im1,j) .eq. 0.0 .and. f_ice(im1,j).eq.1.0) then 
-                        tau_eff = tau_eff + calc_tau_eff(teig1(im1,j),teig2(im1,j),w2)
-                        wt = wt + 1.0 
-                    end if 
-                    if (f_grnd(ip1,j) .eq. 0.0 .and. f_ice(ip1,j).eq.1.0) then 
-                        tau_eff = tau_eff + calc_tau_eff(teig1(ip1,j),teig2(ip1,j),w2)
-                        wt = wt + 1.0 
-                    end if 
-                    if (f_grnd(i,jm1) .eq. 0.0 .and. f_ice(i,jm1).eq.1.0) then 
-                        tau_eff = tau_eff + calc_tau_eff(teig1(i,jm1),teig2(i,jm1),w2)
-                        wt = wt + 1.0 
-                    end if 
-                    if (f_grnd(i,jp1) .eq. 0.0 .and. f_ice(i,jp1).eq.1.0) then 
-                        tau_eff = tau_eff + calc_tau_eff(teig1(i,jp1),teig2(i,jp1),w2)
-                        wt = wt + 1.0 
-                    end if 
-                    
-                    if (wt .gt. 0.0) then 
-                        tau_eff = tau_eff / wt 
-
-                    end if 
-
-                    write(*,*) "tau_eff: ", tau_eff, i, j  
-
-                end if
-
-end if 
-
-
-if (.FALSE.) then
-                if (tau_eff .eq. 0.0) then 
-                    ! tau_eff is still zero! Likely, this is a newly advected
-                    ! point and the neighbors do not have velocity defined.
-
-                    ! Or, eigenvalues are negative...
-                    ! ajr: this section should probably just be deleted. 
-
-                    ! Impose the free-spreading rate (Pollard et al., 2015, EPSL, Eq. B2.b)
-                    ! ddiv = A*(rho*g*h/4)^n = dxx + dyy
-                    ! assume equal spreading in both directions:
-                    ! dxx = dyy; ddiv = 2*dxx
-                    ! dxx = ddiv/2
-                    ! and if dx=dy => dxy = dxx 
- 
-                    ! Define current strain rate tensor components first 
-                    ddiv  = ATT_bar(i,j) * (0.25*rho_ice*g*H_ice(i,j))**n_glen
-                    dxx = ddiv ! ddiv / 2.0
-                    dyy = 0.0  ! ddiv / 2.0
-                    dxy = 0.0
-
-                    ! Now define current stress tensor components 
-                    txx = 2.0*visc_bar(i,j)*dxx 
-                    tyy = 2.0*visc_bar(i,j)*dyy 
-                    txy = 2.0*visc_bar(i,j)*dxy 
-                    
-                    ! Get current eigen values 
-                    call calc_stress_eigen_values(teig1_now,teig2_now,txx,tyy,txy)
-
-                    ! Calculate effective stress
-                    tau_eff = calc_tau_eff(teig1_now,teig2_now,w2)
-
-                end if
-
-                ! ajr: tau_eff is still zero in some cases, ie, in the case above,
-                ! because when txx=tyy and txy=0, then there are no real eigenvalues
-                ! and tau_eff = 0. This needs further thought. These seem to mainly 
-                ! affect points with tiny ice thickness which are maybe not too relevant.
-                ! if (tau_eff .eq. 0.0) then 
-                !     write(*,"(a,2i4,5g14.3)") "tau_eff still zero!",  &
-                !             i, j, H_ice(i,j), ddiv, teig1_now, teig2_now, tau_eff 
-                ! end if 
-                 
-end if
-                
+                                 
                 ! Calculate lateral calving rate 
                 calv_ref = kt*tau_eff 
 
@@ -840,7 +757,7 @@ end if
                 end if 
 
                 calv(i,j) = (H_eff*calv_ref) / sqrt(dx*dy)
-                
+
             end if
 
         end do

@@ -156,6 +156,13 @@ end if
                     
                     call calc_calving_residual(tpo%now%calv_flt,tpo%now%H_ice,tpo%now%f_ice,dt,resid_lim=0.01_wp)
 
+                case("flux-grisli")
+                    
+                    call calc_calving_rate_flux_grisli(tpo%now%calv_flt,tpo%now%H_ice,tpo%now%f_ice,tpo%now%f_grnd,mbal, &
+                                                dyn%now%ux_bar,dyn%now%uy_bar,tpo%par%dx,tpo%par%calv_H_lim,tpo%par%calv_tau)
+                    
+                    call calc_calving_residual(tpo%now%calv_flt,tpo%now%H_ice,tpo%now%f_ice,dt,resid_lim=0.01_wp)
+
                 case("vm-l19")
                     ! Use von Mises calving as defined by Lipscomb et al. (2019)
 

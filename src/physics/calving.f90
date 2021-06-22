@@ -1,7 +1,7 @@
 module calving
     ! Definitions for various calving laws 
 
-    use yelmo_defs, only : sp, dp, wp, prec, rho_ice, rho_sw, g  
+    use yelmo_defs, only : sp, dp, wp, prec, TOL_UNDERFLOW, rho_ice, rho_sw, g  
     use deformation, only : calc_stress_eigen_values
 
     implicit none 
@@ -10,6 +10,7 @@ module calving
     private 
 
     public :: apply_calving     ! ajr: currently not used...
+    public :: calc_calving_residual
     public :: calc_calving_rate_kill 
     
     ! Floating calving routines 
@@ -85,6 +86,107 @@ contains
         return 
         
     end subroutine apply_calving
+
+    subroutine calc_calving_residual(calv,H_ice,f_ice,dt,resid_lim)
+
+        implicit none 
+
+        real(wp), intent(INOUT) :: calv(:,:) 
+        real(wp), intent(IN)    :: H_ice(:,:) 
+        real(wp), intent(IN)    :: f_ice(:,:)
+        real(wp), intent(IN)    :: dt 
+        real(wp), intent(IN), optional :: resid_lim 
+
+        ! Local variables 
+        integer :: i, j, nx, ny
+        integer :: im1, ip1, jm1, jp1 
+        real(wp) :: wts(4)
+        real(wp), allocatable :: calv_resid(:,:) 
+
+        nx = size(calv,1)
+        ny = size(calv,2) 
+
+        allocate(calv_resid(nx,ny))
+
+        
+        ! Diagnose residual calving 
+        where( dt*calv - H_ice .gt. 0.0_wp) 
+            calv_resid = (dt*calv-H_ice)/dt
+            calv       = H_ice/dt 
+        elsewhere
+            calv_resid = 0.0_wp
+        end where
+
+        ! Limit residual calving as desired 
+        if (present(resid_lim)) then 
+
+            ! For upstream cells, limit calving to a fraction
+            ! of the available ice thickness (resid_lim*H_ice)
+            ! rather than the diagnosed calv_resid value. This 
+            ! is useful for threshold-based calving. Usually 
+            ! a limit of just 0.01 is imposed, so that the cell 
+            ! becomes less than fully ice covered and dynamically 
+            ! inactive. Approach designed following CISM in 
+            ! glissade_calving
+
+            where(calv_resid .gt. 0.0_wp .and. calv_resid .gt. (H_ice*resid_lim)/dt)
+                calv_resid = (H_ice*resid_lim)/dt
+            end where 
+
+        end if 
+
+        ! Avoid underflow errors
+        where (abs(calv) .lt. TOL_UNDERFLOW) calv = 0.0_wp 
+
+        ! Determine if any residual calving should migrate to neighboring inland
+        ! cells if all ice in the margin cell is deleted.
+        do j = 1, ny 
+        do i = 1, nx 
+
+            ! Define neighbor indices
+            im1 = max(i-1,1)
+            ip1 = min(i+1,nx)
+            jm1 = max(j-1,1)
+            jp1 = min(j+1,ny)
+            
+            if (calv_resid(i,j) .gt. 0.0_wp) then 
+                ! Calving diagnosed for this point 
+
+                if (f_ice(ip1,j) .eq. 1.0) wts(1) = 1.0_wp 
+                if (f_ice(i,jp1) .eq. 1.0) wts(2) = 1.0_wp 
+                if (f_ice(im1,j) .eq. 1.0) wts(3) = 1.0_wp 
+                if (f_ice(i,jm1) .eq. 1.0) wts(4) = 1.0_wp 
+                
+                if (sum(wts) .eq. 0.0) then 
+                    ! This shouldn't happen, something went wrong! 
+                    write(*,*) "calc_calving_residual:: Error: &
+                    &calving point found with no fully ice-covered neighbors. Check!"
+                    write(*,*) "i, j: ", i, j 
+                else
+                    wts = wts / sum(wts) 
+                end if 
+
+                calv(ip1,j) = calv(ip1,j) + calv_resid(i,j)*wts(1)
+                calv(i,jp1) = calv(i,jp1) + calv_resid(i,j)*wts(2)
+                calv(im1,j) = calv(im1,j) + calv_resid(i,j)*wts(3)
+                calv(i,jm1) = calv(i,jm1) + calv_resid(i,j)*wts(4)
+
+                calv_resid(i,j) = calv_resid(i,j) - sum(wts)*calv_resid(i,j)
+            
+            end if 
+        end do 
+        end do 
+
+        if (maxval(abs(calv_resid)) .gt. 1e-3) then 
+            write(*,*) "calc_calving_residual:: Error: residual calving not &
+            & properly accounted for."
+            write(*,*) "calv_resid: ", minval(calv_resid), maxval(calv_resid)
+            stop 
+        end if 
+
+        return 
+
+    end subroutine calc_calving_residual
 
     subroutine calc_calving_rate_kill(calv,H_ice,mask,tau,dt)
         ! Kill all ice in a given mask using a characteristic timescale tau
@@ -179,8 +281,8 @@ contains
                         ! faster calving timescale for more exposed fronts
                         ! (multiply by f_ice to convert to a horizontal calving rate)
                         
-                        calv(i,j) = f_ice(i,j) * (H_calv-H_eff) / tau                        
-                        ! calv(i,j) = f_ice(i,j) * (H_calv-H_eff) * wt / tau
+                        ! calv(i,j) = f_ice(i,j) * (H_calv-H_eff) / tau                        
+                        calv(i,j) = f_ice(i,j) * (H_calv-H_eff) * wt / tau
 
                     end if 
 
@@ -196,6 +298,192 @@ contains
     end subroutine calc_calving_rate_simple
     
     subroutine calc_calving_rate_flux(calv,H_ice,f_ice,f_grnd,mbal,ux,uy,dx,H_calv,tau)
+        ! Calculate the calving rate [m/a] based on a simple threshold rule
+        ! H_ice < H_calv
+
+        implicit none 
+
+        real(wp), intent(OUT) :: calv(:,:)                  ! [m/yr] Calving rate scaled to horizontal grid size
+        real(wp), intent(IN)  :: H_ice(:,:)                 ! [m] Ice thickness 
+        real(wp), intent(IN)  :: f_ice(:,:)                 ! [--] Ice area fraction
+        real(wp), intent(IN)  :: f_grnd(:,:)                ! [-] Grounded fraction
+        real(wp), intent(IN)  :: mbal(:,:)                  ! [m/yr] Net mass balance 
+        real(wp), intent(IN)  :: ux(:,:)                    ! [m/yr] velocity, x-direction (ac-nodes)
+        real(wp), intent(IN)  :: uy(:,:)                    ! [m/yr] velocity, y-direction (ac-nodes)
+        real(wp), intent(IN)  :: dx                         ! [m] Grid resolution
+        real(wp), intent(IN)  :: H_calv                     ! [m] Threshold for calving
+        real(wp), intent(IN)  :: tau                        ! [yr] Calving timescale, ~ 1yr
+
+        ! Local variables 
+        integer  :: i, j, nx, ny
+        integer  :: im1, ip1, jm1, jp1
+        real(wp) :: dy  
+        real(wp) :: flux_xr, flux_xl, flux_yd, flux_yu
+        real(wp) :: dhdt_upstream
+        logical  :: positive_mb 
+        real(wp), allocatable :: dHdt(:,:)
+        real(wp), allocatable :: H_diff(:,:)   
+        real(wp) :: H_eff
+        real(wp) :: wt 
+
+        dy = dx 
+
+        nx = size(H_ice,1)
+        ny = size(H_ice,2)
+
+        allocate(dHdt(nx,ny))
+        allocate(H_diff(nx,ny))
+
+        ! Calculate lagrangian rate of change and thickness relative to threshold
+
+        dHdt   = 0.0 
+        H_diff = 0.0 
+
+        do j = 1, ny
+        do i = 1, nx
+            
+            ! Get neighbor indices
+            im1 = max(i-1,1)
+            ip1 = min(i+1,nx)
+            jm1 = max(j-1,1)
+            jp1 = min(j+1,ny)
+
+            ! Get effective ice thickness
+            if (f_ice(i,j) .gt. 0.0) then 
+                H_eff = H_ice(i,j) / f_ice(i,j) 
+            else 
+                H_eff = H_ice(i,j) 
+            end if 
+            
+            ! Calculate ice thickness relative to the calving threshold 
+            H_diff(i,j) = H_eff - H_calv
+
+
+            ! Calculate expected ice thickness change at each ice covered point
+
+            if (f_ice(i,j) .eq. 1.0) then 
+                ! Fully ice-covered points     
+                
+                ! Use explicit upstream advection algorithm 
+                ! to calculate the flux across each boundary [m^2 a^-1]
+                if (ux(i,j) .gt. 0.0) then 
+                    flux_xr = ux(i,j)*H_ice(i,j)
+                else
+                    flux_xr = ux(i,j)*H_ice(ip1,j) 
+                end if 
+
+                if (ux(i-1,j) .gt. 0.0) then 
+                    flux_xl = ux(im1,j)*H_ice(im1,j)
+                else
+                    flux_xl = ux(im1,j)*H_ice(i,j) 
+                end if 
+
+                if (uy(i,j) .gt. 0.0) then 
+                    flux_yu = uy(i,j)*H_ice(i,j)
+                else
+                    flux_yu = uy(i,j)*H_ice(i,jp1) 
+                end if 
+
+                if (uy(i,jp1) .gt. 0.0) then 
+                    flux_yd = uy(i,jp1)*H_ice(i,jm1)
+                else
+                    flux_yd = uy(i,jp1)*H_ice(i,j) 
+                end if 
+
+                ! Calculate flux divergence on aa-nodes combined with mass balance
+                ! (ie,thickness change via conservation)
+                dHdt(i,j) = f_ice(i,j)*mbal(i,j) &
+                    + (1.0 / dx) * (flux_xl - flux_xr) + (1.0 / dy) * (flux_yd - flux_yu)
+
+            end if 
+                 
+        end do 
+        end do
+        
+        ! Initialize calving to zero 
+        calv = 0.0_wp 
+
+        do j = 1, ny
+        do i = 1, nx
+
+            ! Get neighbor indices 
+            im1 = max(i-1,1)
+            ip1 = min(i+1,nx)
+            jm1 = max(j-1,1)
+            jp1 = min(j+1,ny)
+            
+            ! Check if mass balance of current point is positive, 
+            ! and there is at least one grounded neighbor. In this
+            ! case, do not allow calving.
+            positive_mb = mbal(i,j).gt.0.0 .and. &
+                (f_grnd(im1,j).gt.0.0 .or. f_grnd(ip1,j).gt.0.0 .or. &
+                 f_grnd(i,jm1).gt.0.0 .or. f_grnd(i,jp1).gt.0.0)
+            
+            if ( (f_grnd(i,j) .eq. 0.0 .and. f_ice(i,j) .gt. 0.0 .and. &
+                    H_diff(i,j).lt.0.0) .and. (.not. positive_mb) .and. &
+                   ( (f_grnd(im1,j) .eq. 0.0 .and. f_ice(im1,j).eq.0.0) .or. &
+                     (f_grnd(ip1,j) .eq. 0.0 .and. f_ice(ip1,j).eq.0.0) .or. &
+                     (f_grnd(i,jm1) .eq. 0.0 .and. f_ice(i,jm1).eq.0.0) .or. &
+                     (f_grnd(i,jp1) .eq. 0.0 .and. f_ice(i,jp1).eq.0.0) ) ) then 
+                ! Ice-shelf floating margin with potential for calving: 
+                ! floating ice point with open ocean neighbor, 
+                ! that is also below the calving threshold thickness,
+                ! and not with positive mass balance next to grounded ice. 
+
+                ! Get the flux [m^2/yr] from upstream points that are 
+                ! fully ice covered, with ice thickness greater than calving threshold 
+                ! and velocity flowing into the margin point of interest. 
+
+                if (f_ice(im1,j).eq.1.0.and.H_diff(im1,j).gt.0.0.and.ux(im1,j).gt.0.0) then
+                    !flux_xl = max( (dHdt(im1,j)+H_diff(im1,j))/tau,0.0_wp) 
+                    flux_xl = ux(im1,j)*H_diff(im1,j)
+                end if 
+
+                if (f_ice(ip1,j).eq.1.0.and.H_diff(ip1,j).gt.0.0.and.ux(i,j).lt.0.0) then 
+                    !flux_xr = max( (dHdt(ip1,j)+H_diff(ip1,j))/tau,0.0_wp)
+                    flux_xr = ux(i,j)*H_diff(ip1,j)
+                end if
+
+                if (f_ice(i,jm1).eq.1.0.and.H_diff(i,jm1).gt.0.0.and.uy(i,jm1).gt.0.0) then
+                    !flux_yd = max( (dHdt(i,jm1)+H_diff(i,jm1))/tau,0.0_wp) 
+                    flux_yd = uy(i,jp1)*H_diff(i,jm1)
+                end if
+
+                if (f_ice(i,jp1).eq.1.0.and.H_diff(i,jp1).gt.0.0.and.uy(i,j).lt.0.0) then
+                    !flux_yu = max( (dHdt(i,jp1)+H_diff(i,jp1))/tau,0.0_wp)
+                    flux_yu = uy(i,j)*H_diff(i,jp1)
+                end if
+
+                ! Diagnose total incoming horizontal flux to calving cell [m/yr]
+                dhdt_upstream = (flux_xl+flux_xr)/dx + (flux_yd+flux_yu)/dy 
+
+
+                ! Calculate effective ice thickness of calving cell
+                if (f_ice(i,j) .gt. 0.0) then 
+                    H_eff = H_ice(i,j) / f_ice(i,j) 
+                else 
+                    H_eff = H_ice(i,j)  ! == 0.0
+                end if 
+
+
+                ! Diagnose calving rate not accounting for upstream flux
+                calv(i,j) = f_ice(i,j) * max(H_calv - H_eff,0.0_wp) / tau
+
+
+                ! Adjust calving rate for upstream flux 
+                calv(i,j) = max(calv(i,j) - dhdt_upstream,0.0_wp)
+
+                if (abs(calv(i,j)) .lt. TOL_UNDERFLOW) calv(i,j) = 0.0_wp 
+            end if
+
+        end do
+        end do
+
+        return 
+
+    end subroutine calc_calving_rate_flux
+    
+    subroutine calc_calving_rate_flux_old(calv,H_ice,f_ice,f_grnd,mbal,ux,uy,dx,H_calv,tau)
         ! Calculate the calving rate [m/a] based on a simple threshold rule
         ! H_ice < H_calv
 
@@ -384,7 +672,7 @@ contains
 
         return 
 
-    end subroutine calc_calving_rate_flux
+    end subroutine calc_calving_rate_flux_old
     
     subroutine calc_calving_rate_vonmises_l19(calv,H_ice,f_ice,f_grnd,teig1,teig2,ATT_bar,visc_bar,dx,dy,kt,w2,n_glen)
         ! Calculate the 'horizontal' calving rate [m/yr] based on the 

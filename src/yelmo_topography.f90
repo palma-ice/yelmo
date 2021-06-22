@@ -68,7 +68,7 @@ contains
         ! ajr: Note, it seems that mbal_two_steps doesn't work 
         ! as well when grounded calving is enabled. It tends to eat 
         ! away at the margins of Greenland more than expected. 
-        
+
         nx = size(tpo%now%H_ice,1)
         ny = size(tpo%now%H_ice,2)
 
@@ -118,8 +118,8 @@ contains
             mbal = bnd%smb + tpo%now%bmb + tpo%now%fmb 
             
             if (.not. tpo%par%use_bmb) then
-                ! WHEN RUNNING EISMINT1 ensure bmb is not accounted for here !!!
-                mbal = bnd%smb + tpo%now%fmb  
+                ! WHEN RUNNING EISMINT1 ensure bmb and fmb are not accounted for here !!!
+                mbal = bnd%smb  
             end if 
 
 if (mbal_two_steps) then 
@@ -146,18 +146,24 @@ end if
                     call calc_calving_rate_simple(tpo%now%calv_flt,tpo%now%H_ice,tpo%now%f_ice,tpo%now%f_grnd, &
                                                     tpo%par%calv_H_lim,tpo%par%calv_tau)
                     
+                    call calc_calving_residual(tpo%now%calv_flt,tpo%now%H_ice,tpo%now%f_ice,dt,resid_lim=0.01_wp)
+                    
                 case("flux") 
                     ! Use threshold+flux method from Peyaud et al. (2007), ie, GRISLI 
 
-                    call calc_calving_rate_flux(tpo%now%calv_flt,tpo%now%H_ice,tpo%now%f_ice,tpo%now%f_grnd,mbal,dyn%now%ux_bar, &
-                                                dyn%now%uy_bar,tpo%par%dx,tpo%par%calv_H_lim,tpo%par%calv_tau)
-                
+                    call calc_calving_rate_flux(tpo%now%calv_flt,tpo%now%H_ice,tpo%now%f_ice,tpo%now%f_grnd,mbal, &
+                                                dyn%now%ux_bar,dyn%now%uy_bar,tpo%par%dx,tpo%par%calv_H_lim,tpo%par%calv_tau)
+                    
+                    call calc_calving_residual(tpo%now%calv_flt,tpo%now%H_ice,tpo%now%f_ice,dt,resid_lim=0.01_wp)
+
                 case("vm-l19")
                     ! Use von Mises calving as defined by Lipscomb et al. (2019)
 
                     call calc_calving_rate_vonmises_l19(tpo%now%calv_flt,tpo%now%H_ice,tpo%now%f_ice,tpo%now%f_grnd, &
                                                         mat%now%strs2D%teig1,mat%now%strs2D%teig2,mat%now%ATT_bar, &
                                                         mat%now%visc_bar,tpo%par%dx,tpo%par%dx,tpo%par%kt,tpo%par%w2,mat%par%n_glen)
+
+                    call calc_calving_residual(tpo%now%calv_flt,tpo%now%H_ice,tpo%now%f_ice,dt)
 
                 case("kill") 
                     ! Delete all floating ice (using characteristic time parameter)

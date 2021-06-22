@@ -153,6 +153,8 @@ contains
             if (calv_resid(i,j) .gt. 0.0_wp) then 
                 ! Calving diagnosed for this point 
 
+                wts = 0.0_wp 
+
                 if (f_ice(ip1,j) .eq. 1.0) wts(1) = 1.0_wp 
                 if (f_ice(i,jp1) .eq. 1.0) wts(2) = 1.0_wp 
                 if (f_ice(im1,j) .eq. 1.0) wts(3) = 1.0_wp 
@@ -378,7 +380,7 @@ end if
                     flux_xr = ux(i,j)*H_ice(ip1,j) 
                 end if 
 
-                if (ux(i-1,j) .gt. 0.0) then 
+                if (ux(im1,j) .gt. 0.0) then 
                     flux_xl = ux(im1,j)*H_ice(im1,j)
                 else
                     flux_xl = ux(im1,j)*H_ice(i,j) 

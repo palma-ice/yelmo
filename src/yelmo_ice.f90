@@ -908,7 +908,7 @@ contains
                            &initial temperatures."
                 stop 
             end if
-
+            
             ! Run topo to make sure all fields are synchronized (masks, etc)
             call calc_ytopo(dom%tpo,dom%dyn,dom%mat,dom%thrm,dom%bnd,time,topo_fixed=.TRUE.)
             

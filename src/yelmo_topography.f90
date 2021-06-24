@@ -146,22 +146,27 @@ end if
                     call calc_calving_rate_simple(tpo%now%calv_flt,tpo%now%H_ice,tpo%now%f_ice,tpo%now%f_grnd, &
                                                     tpo%par%calv_H_lim,tpo%par%calv_tau)
                     
-                    call calc_calving_residual(tpo%now%calv_flt,tpo%now%H_ice,tpo%now%f_ice,dt,resid_lim=0.01_wp)
-
+                    !call calc_calving_residual(tpo%now%calv_flt,tpo%now%H_ice,tpo%now%f_ice,dt,resid_lim=0.01_wp)
+                    call calc_calving_residual(tpo%now%calv_flt,tpo%now%H_ice,tpo%now%f_ice,dt)
+                    
                 case("flux") 
-                    ! Use threshold+flux method from Peyaud et al. (2007), ie, GRISLI 
+                    ! Use threshold+flux method from Peyaud et al. (2007), ie, GRISLI,
+                    ! but reformulated. 
 
                     call calc_calving_rate_flux(tpo%now%calv_flt,tpo%now%H_ice,tpo%now%f_ice,tpo%now%f_grnd,mbal, &
                                                 dyn%now%ux_bar,dyn%now%uy_bar,tpo%par%dx,tpo%par%calv_H_lim,tpo%par%calv_tau)
                     
-                    call calc_calving_residual(tpo%now%calv_flt,tpo%now%H_ice,tpo%now%f_ice,dt,resid_lim=0.01_wp)
-
-                case("flux-grisli")
+                    !call calc_calving_residual(tpo%now%calv_flt,tpo%now%H_ice,tpo%now%f_ice,dt,resid_lim=0.01_wp)
+                    call calc_calving_residual(tpo%now%calv_flt,tpo%now%H_ice,tpo%now%f_ice,dt)
                     
+                case("flux-grisli")
+                    ! Use threshold+flux method from Peyaud et al. (2007), ie, GRISLI
+
                     call calc_calving_rate_flux_grisli(tpo%now%calv_flt,tpo%now%H_ice,tpo%now%f_ice,tpo%now%f_grnd,mbal, &
                                                 dyn%now%ux_bar,dyn%now%uy_bar,tpo%par%dx,tpo%par%calv_H_lim,tpo%par%calv_tau)
                     
-                    call calc_calving_residual(tpo%now%calv_flt,tpo%now%H_ice,tpo%now%f_ice,dt,resid_lim=0.01_wp)
+                    !call calc_calving_residual(tpo%now%calv_flt,tpo%now%H_ice,tpo%now%f_ice,dt,resid_lim=0.01_wp)
+                    call calc_calving_residual(tpo%now%calv_flt,tpo%now%H_ice,tpo%now%f_ice,dt)
 
                 case("vm-l19")
                     ! Use von Mises calving as defined by Lipscomb et al. (2019)

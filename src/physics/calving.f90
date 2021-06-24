@@ -101,8 +101,11 @@ contains
         ! Local variables 
         integer :: i, j, nx, ny
         integer :: im1, ip1, jm1, jp1 
+        real(wp) :: H_eff
         real(wp) :: wts(4)
         real(wp), allocatable :: calv_resid(:,:) 
+
+        real(wp), parameter :: tol = 1e-3 
 
         nx = size(calv,1)
         ny = size(calv,2) 
@@ -150,15 +153,26 @@ contains
             jm1 = max(j-1,1)
             jp1 = min(j+1,ny)
             
+            ! Calculate effective ice thickness for current cell
+            if (f_ice(i,j) .gt. 0.0_prec) then 
+                H_eff = H_ice(i,j) / f_ice(i,j) 
+            else
+                H_eff = H_ice(i,j) 
+            end if 
+
             if (calv_resid(i,j) .gt. 0.0_wp) then 
                 ! Calving diagnosed for this point 
 
                 wts = 0.0_wp 
 
-                if (f_ice(ip1,j) .eq. 1.0) wts(1) = 1.0_wp 
-                if (f_ice(i,jp1) .eq. 1.0) wts(2) = 1.0_wp 
-                if (f_ice(im1,j) .eq. 1.0) wts(3) = 1.0_wp 
-                if (f_ice(i,jm1) .eq. 1.0) wts(4) = 1.0_wp 
+                if (f_ice(ip1,j) .eq. 1.0 .and. &
+                    (abs(H_ice(ip1,j)-H_eff) .lt. tol .or. H_ice(ip1,j) .lt. H_eff)) wts(1) = 1.0_wp 
+                if (f_ice(i,jp1) .eq. 1.0 .and. &
+                    (abs(H_ice(i,jp1)-H_eff) .lt. tol .or. H_ice(i,jp1) .lt. H_eff)) wts(2) = 1.0_wp 
+                if (f_ice(im1,j) .eq. 1.0 .and. &
+                    (abs(H_ice(im1,j)-H_eff) .lt. tol .or. H_ice(im1,j) .lt. H_eff)) wts(3) = 1.0_wp 
+                if (f_ice(i,jm1) .eq. 1.0 .and. &
+                    (abs(H_ice(i,jm1)-H_eff) .lt. tol .or. H_ice(i,jm1) .lt. H_eff)) wts(4) = 1.0_wp 
                 
                 if (sum(wts) .eq. 0.0) then 
                     ! This shouldn't happen, something went wrong! 
@@ -290,8 +304,9 @@ end if
                         ! (multiply by f_ice to convert to a horizontal calving rate)
                         
                         ! calv(i,j) = f_ice(i,j) * (H_calv-H_eff) / tau                        
-                        calv(i,j) = f_ice(i,j) * (H_calv-H_eff) * wt / tau
-
+                        !calv(i,j) = f_ice(i,j) * (H_calv-H_eff) * wt / tau
+                        calv(i,j) = (H_calv-H_eff) * wt / tau
+                        
                     end if 
 
                 end if
@@ -475,8 +490,9 @@ end if
 
 
                 ! Diagnose calving rate not accounting for upstream flux
-                calv(i,j) = f_ice(i,j) * max(H_calv - H_eff,0.0_wp) / tau
-
+                !calv(i,j) = f_ice(i,j) * max(H_calv - H_eff,0.0_wp) / tau
+                calv(i,j) = max(H_calv - H_eff,0.0_wp) / tau
+                
 
                 ! Adjust calving rate for upstream flux 
                 calv(i,j) = max(calv(i,j) - dhdt_upstream,0.0_wp)
@@ -669,7 +685,8 @@ end if
                         H_eff = H_ice(i,j)  ! == 0.0
                     end if 
 
-                    calv(i,j) = f_ice(i,j) * max(H_calv - H_eff,0.0) / tau
+                    !calv(i,j) = f_ice(i,j) * max(H_calv - H_eff,0.0) / tau
+                    calv(i,j) = max(H_calv - H_eff,0.0) / tau
 
                 end if  
 

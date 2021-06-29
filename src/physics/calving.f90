@@ -174,12 +174,8 @@ contains
                 if (f_ice(i,jm1) .eq. 1.0 .and. &
                     (abs(H_ice(i,jm1)-H_eff) .lt. tol .or. H_ice(i,jm1) .lt. H_eff)) wts(4) = 1.0_wp 
                 
-                if (sum(wts) .eq. 0.0) then 
-                    ! This shouldn't happen, something went wrong! 
-                    write(*,*) "calc_calving_residual:: Error: &
-                    &calving point found with no fully ice-covered neighbors. Check!"
-                    write(*,*) "i, j: ", i, j 
-                else
+                if (sum(wts) .gt. 0.0_wp) then 
+                    ! Normalize available weights to sum to 1
                     wts = wts / sum(wts) 
                 end if 
 

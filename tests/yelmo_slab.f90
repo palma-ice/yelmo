@@ -10,26 +10,26 @@ program yelmo_slab
     type(yelmo_class)     :: yelmo1
 
     type ctrl_par 
-        character(len=56)   :: domain 
-        character(len=56)   :: grid_name
-        real(wp)            :: H0 
-        real(wp)            :: H_stdev
-        integer             :: nx
-        integer             :: ny
-        real(wp)            :: dx
-        real(wp)            :: alpha
+        character(len=56)       :: domain 
+        character(len=56)       :: grid_name
+        real(wp)                :: H0 
+        real(wp)                :: H_stdev
+        integer                 :: nx
+        integer                 :: ny
+        real(wp)                :: dx
+        real(wp)                :: alpha
 
-        real(wp)            :: time_init
-        !real(wp)            :: time_end
-        integer             :: nt 
-        real(wp)            :: dtt
-        real(wp)            :: dt1D_out
-        real(wp)            :: dt2D_out
+        real(wp)                :: time_init
+        ! real(wp)                :: time_end
+        integer                 :: nt 
+        real(wp)                :: dtt
+        real(wp)                :: dt1D_out
+        real(wp)                :: dt2D_out
 
-        integer             :: n_dtt 
-        real(wp)            :: dtts(50) 
-        integer             :: n_dx 
-        real(wp)            :: dxs(50) 
+        integer                 :: n_dtt 
+        real(wp), allocatable   :: dtts(:) 
+        integer                 :: n_dx 
+        real(wp), allocatable   :: dxs(:) 
 
         character(len=512)  :: path_par 
         
@@ -205,16 +205,17 @@ else
 
     ! Test different timesteps 
     
-    ctrl%n_dtt = 60 
+    ctrl%n_dtt = 60
+    allocate(ctrl%dtts(ctrl%n_dtt)) 
     ctrl%dtts  = 0.0_wp
     do q = 1, ctrl%n_dtt 
-        ctrl%dtts(q) = 10**(log10(0.005)+(log10(10.0)-log10(0.001))*(q-1)/(ctrl%n_dtt-1))
-    end do 
+        ctrl%dtts(q) = 10.0_dp**(log10(0.001_dp)+(log10(10.0_dp)-log10(0.001_dp))*(q-1)/real(ctrl%n_dtt-1,dp))
+    end do
 
     ctrl%n_dx     = 8
+    allocate(ctrl%dxs(ctrl%n_dx)) 
     ctrl%dxs      = 0.0_wp 
     ctrl%dxs(1:8) = [0.1_wp,0.25_wp,0.5_wp,1.0_wp,2.5_wp,5.0_wp,10.0_wp,25.0_wp]
-
 
     ! ctrl%n_dtt = 20 
     ! ctrl%dtts  = 0.0_wp
@@ -229,7 +230,7 @@ else
 
     write(*,*) "dtts: ", ctrl%dtts(1:ctrl%n_dtt) 
     write(*,*) "dxs:  ", ctrl%dxs(1:ctrl%n_dx) 
-    
+
     open(unit=15,file=trim(outfldr)//"slab_dt_factor.txt",status="UNKNOWN")
     write(15,"(a12,a12,a12)") "dx", "dt", "factor" 
 

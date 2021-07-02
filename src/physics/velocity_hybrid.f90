@@ -263,16 +263,15 @@ end if
         real(wp) :: ux_aa, uy_aa 
         logical  :: is_margin 
 
-        real(wp), allocatable :: ATT_bar(:,:) 
+        !real(wp), allocatable :: ATT_bar(:,:) 
 
         nx = size(visc_eff,1)
         ny = size(visc_eff,2)
         nz = size(visc_eff,3)
         
-        allocate(ATT_bar(nx,ny))
-
         ! Get vertically averaged value 
-        ATT_bar = calc_vertical_integrated_2D(ATT,zeta_aa)
+        !allocate(ATT_bar(nx,ny))
+        !ATT_bar = calc_vertical_integrated_2D(ATT,zeta_aa)
             
         ! Calculate scaling factors
         inv_4dx = 1.0_wp / (4.0_wp*dx) 
@@ -380,11 +379,14 @@ if (.FALSE.) then
                     ATT_ab(2) = 0.25_wp*(ATT(i,j,k)+ATT(im1,j,k)+ATT(i,jp1,k)+ATT(im1,jp1,k)) 
                     ATT_ab(3) = 0.25_wp*(ATT(i,j,k)+ATT(im1,j,k)+ATT(i,jm1,k)+ATT(im1,jm1,k)) 
                     ATT_ab(4) = 0.25_wp*(ATT(i,j,k)+ATT(ip1,j,k)+ATT(i,jm1,k)+ATT(ip1,jm1,k)) 
+                    ! ATT_ab(1) = 0.25_wp*(ATT_bar(i,j)+ATT_bar(ip1,j)+ATT_bar(i,jp1)+ATT_bar(ip1,jp1)) 
+                    ! ATT_ab(2) = 0.25_wp*(ATT_bar(i,j)+ATT_bar(im1,j)+ATT_bar(i,jp1)+ATT_bar(im1,jp1)) 
+                    ! ATT_ab(3) = 0.25_wp*(ATT_bar(i,j)+ATT_bar(im1,j)+ATT_bar(i,jm1)+ATT_bar(im1,jm1)) 
+                    ! ATT_ab(4) = 0.25_wp*(ATT_bar(i,j)+ATT_bar(ip1,j)+ATT_bar(i,jm1)+ATT_bar(ip1,jm1)) 
 else
                     ! Just use the aa-node central value of ATT 
-                    !ATT_ab = ATT(i,j,k)
-                    ATT_ab = ATT_bar(i,j)
-
+                    ATT_ab = ATT(i,j,k)
+                    !ATT_ab = ATT_bar(i,j)
 end if
 
                     ! Calculate effective viscosity on ab-nodes
@@ -399,8 +401,8 @@ end if
                 ! Get simple effective viscosity ignoring staggering
 
                 do k = 1, nz
-                    !visc_eff(i,j,k) = 0.5_wp*(eps_0_sq)**(p1) * ATT(i,j,k)**(p2)
-                    visc_eff(i,j,k) = 0.5_wp*(eps_0_sq)**(p1) * ATT_bar(i,j)**(p2)
+                    visc_eff(i,j,k) = 0.5_wp*(eps_0_sq)**(p1) * ATT(i,j,k)**(p2)
+                    !visc_eff(i,j,k) = 0.5_wp*(eps_0_sq)**(p1) * ATT_bar(i,j)**(p2)
                 end do 
 
             end if 

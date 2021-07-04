@@ -212,10 +212,12 @@ else
         ctrl%dtts(q) = 10.0_dp**(log10(0.001_dp)+(log10(10.0_dp)-log10(0.001_dp))*(q-1)/real(ctrl%n_dtt-1,dp))
     end do
 
-    ctrl%n_dx     = 12
+    ctrl%n_dx      = 12
     allocate(ctrl%dxs(ctrl%n_dx)) 
-    ctrl%dxs      = 0.0_wp 
-    ctrl%dxs(1:8) = [0.01_wp,0.025_wp,0.05_wp,0.1_wp,0.25_wp,0.5_wp,1.0_wp,2.5_wp,5.0_wp,10.0_wp,25.0_wp,40.0_wp]
+    ctrl%dxs       = 0.0_wp 
+    do q = 1, ctrl%n_dx 
+        ctrl%dxs(q) = 10.0_dp**(log10(0.01_dp)+(log10(40.0_dp)-log10(0.01_dp))*(q-1)/real(ctrl%n_dx-1,dp))
+    end do
 
     ! ctrl%n_dtt = 20 
     ! ctrl%dtts  = 0.0_wp

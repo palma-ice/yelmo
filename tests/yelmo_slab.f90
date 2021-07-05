@@ -136,7 +136,7 @@ program yelmo_slab
     ! Define initial ice thickness 
     allocate(dh(yelmo1%grd%nx,yelmo1%grd%ny))
     call gen_random_normal(dh,0.0_wp,ctrl%H_stdev) 
-    yelmo1%tpo%now%H_ice = ctrl%H0 + dh 
+    yelmo1%tpo%now%H_ice = ctrl%H0 !+ dh 
 
     ! Make sure all values are the same in y-direction
     do j = 1, yelmo1%grd%ny 
@@ -158,17 +158,34 @@ program yelmo_slab
     ! Initialize the yelmo state (dyn,therm,mat)
     call yelmo_init_state(yelmo1,time=time,thrm_method="robin-cold")
 
-    ! Write initial state 
-    call write_step_2D(yelmo1,file2D,time=time) 
-
-    ! ! 1D file 
-    ! call yelmo_write_reg_init(yelmo1,file1D,time_init=time,units="years",mask=yelmo1%bnd%ice_allowed)
-    ! call yelmo_write_reg_step(yelmo1,file1D,time=time)  
-
-
 if (ctrl%dtt .ne. 0.0) then 
     ! == Perform one simulation with an outer timestep of ctrl%dtt =======
 
+    yelmo1%tpo%par%topo_fixed = .TRUE. 
+
+    ! Advance timesteps
+    do n = 1, 20 
+
+        ! Get current time 
+        time = ctrl%time_init + n*ctrl%dtt
+
+        ! == Yelmo ice sheet ===================================================
+        call yelmo_update(yelmo1,time)
+
+        if (mod(time,10.0)==0 .and. (.not. yelmo_log)) then
+            write(*,"(a,f14.4)") "yelmo:: time = ", time
+        end if  
+
+    end do 
+
+    time = ctrl%time_init
+    call yelmo_set_time(yelmo1,time)
+    yelmo1%tpo%par%topo_fixed   = .FALSE. 
+    yelmo1%tpo%now%H_ice        = ctrl%H0 + dh 
+
+    ! Write initial state 
+    call write_step_2D(yelmo1,file2D,time=time) 
+    
     ! Advance timesteps
     do n = 1, ctrl%nt 
 
@@ -188,7 +205,7 @@ if (ctrl%dtt .ne. 0.0) then
     call write_step_2D(yelmo1,file2D,time=time) 
 
     ! Calculate summary 
-    call calc_stdev(stdev,yelmo1%tpo%now%H_ice)
+    call calc_stdev(stdev,yelmo1%tpo%now%H_ice,ctrl%H0)
     factor = stdev / max(ctrl%H_stdev,1e-5)
 
     ! Write summary 
@@ -322,7 +339,7 @@ contains
         ! Define initial ice thickness 
         allocate(dh(yelmo1%grd%nx,yelmo1%grd%ny))
         call gen_random_normal(dh,0.0_wp,ctrl%H_stdev) 
-        yelmo1%tpo%now%H_ice = ctrl%H0 + dh 
+        yelmo1%tpo%now%H_ice = ctrl%H0 !+ dh 
 
         ! Define surface elevation 
         yelmo1%tpo%now%z_srf = yelmo1%bnd%z_bed + yelmo1%tpo%now%H_ice
@@ -339,6 +356,27 @@ contains
         ! Initialize the yelmo state (dyn,therm,mat)
         call yelmo_init_state(yelmo1,time=time,thrm_method="robin-cold")
 
+        yelmo1%tpo%par%topo_fixed = .TRUE. 
+
+        ! Advance timesteps
+        do n = 1, 20 
+
+            ! Get current time 
+            time = ctrl%time_init + n*ctrl%dtt
+
+            ! == Yelmo ice sheet ===================================================
+            call yelmo_update(yelmo1,time)
+
+            if (mod(time,10.0)==0 .and. (.not. yelmo_log)) then
+                write(*,"(a,f14.4)") "yelmo:: time = ", time
+            end if  
+
+        end do 
+
+        call yelmo_set_time(yelmo1,ctrl%time_init)
+        yelmo1%tpo%par%topo_fixed   = .FALSE. 
+        yelmo1%tpo%now%H_ice        = ctrl%H0 + dh 
+    
         ! Advance timesteps
         do n = 1, ctrl%nt 
 
@@ -351,7 +389,7 @@ contains
         end do 
 
         ! Calculate summary 
-        call calc_stdev(stdev,yelmo1%tpo%now%H_ice)
+        call calc_stdev(stdev,yelmo1%tpo%now%H_ice,ctrl%H0)
         factor = stdev / max(ctrl%H_stdev,1e-5)
 
         call yelmo_end(yelmo1,time) 
@@ -520,21 +558,27 @@ contains
 
     end subroutine gen_random_normal
 
-    subroutine calc_stdev(stdev,var)
+    subroutine calc_stdev(stdev,var,mean_ref)
 
         implicit none 
 
         real(wp), intent(OUT) :: stdev 
         real(wp), intent(IN)  :: var(:,:) 
-
+        real(wp), intent(IN), optional  :: mean_ref
         ! Local variables 
         real(wp) :: mean 
         integer  :: n 
 
         n = size(var,1)*size(var,2)
 
-        ! Calculate the mean 
-        mean = sum(var) / real(n,wp)
+        if (present(mean_ref)) then
+            ! Use reference mean value instead of calculating it
+            ! (to ensure high stdev value when mean is far from mean_ref) 
+            mean = mean_ref 
+        else 
+            ! Calculate the mean 
+            mean = sum(var) / real(n,wp)
+        end if 
 
         ! Calculate standard deviation 
         stdev = sqrt(sum( (var-mean)**2 ) / real(n-1,wp))

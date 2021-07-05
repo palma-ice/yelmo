@@ -1008,7 +1008,7 @@ contains
 
         return 
 
-    end subroutine yelmo_cpu_time 
+    end subroutine yelmo_cpu_time
 
     subroutine yelmo_calc_speed(speed,model_time0,model_time1,cpu_time0,cpu_time1)
         ! Calculate the model computational speed [model-kyr / hr]

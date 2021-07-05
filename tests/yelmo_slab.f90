@@ -114,7 +114,7 @@ program yelmo_slab
 
     ! Load boundary values
 
-    yelmo1%bnd%z_sl     = -10000.0
+    yelmo1%bnd%z_sl     = 0.0
     yelmo1%bnd%bmb_shlf = 0.0 
     yelmo1%bnd%T_shlf   = T0  
     yelmo1%bnd%H_sed    = 0.0 
@@ -131,7 +131,7 @@ program yelmo_slab
     
     ! ===== Intialize topography and set parameters =========
     
-    yelmo1%bnd%z_bed = 1000.0_wp - ctrl%alpha*(yelmo1%grd%x)
+    yelmo1%bnd%z_bed = 10000.0_wp - ctrl%alpha*(yelmo1%grd%x)
 
     ! Define initial ice thickness 
     allocate(dh(yelmo1%grd%nx,yelmo1%grd%ny))
@@ -317,7 +317,7 @@ contains
 
         ! ===== Intialize topography and set parameters =========
         
-        yelmo1%bnd%z_bed = 1000.0_wp - ctrl%alpha*(yelmo1%grd%x)
+        yelmo1%bnd%z_bed = 10000.0_wp - ctrl%alpha*(yelmo1%grd%x)
 
         ! Define initial ice thickness 
         allocate(dh(yelmo1%grd%nx,yelmo1%grd%ny))
@@ -329,6 +329,10 @@ contains
 
         ! Define reference ice thickness (for prescribing boundary values, potentially)
         yelmo1%bnd%H_ice_ref = ctrl%H0 
+
+        ! Initialize velocity to u0 value too
+        call calc_u0(yelmo1%dyn%now%ux_bar,ctrl%H0,yelmo1%dyn%par%beta_const, &
+                        yelmo1%dyn%par%visc_const,ctrl%alpha)
 
         ! =======================================================
 

@@ -126,9 +126,6 @@ program yelmo_slab
     ! Check boundary values 
     call yelmo_print_bound(yelmo1%bnd)
     
-    ! Initialize output file 
-    call yelmo_write_init(yelmo1,file2D,time_init=time,units="years")
-    
     ! ===== Intialize topography and set parameters =========
     
     yelmo1%bnd%z_bed = 10000.0_wp - ctrl%alpha*(yelmo1%grd%x)
@@ -183,6 +180,9 @@ if (ctrl%dtt .ne. 0.0) then
     yelmo1%tpo%par%topo_fixed   = .FALSE. 
     yelmo1%tpo%now%H_ice        = ctrl%H0 + dh 
 
+    ! Initialize output file 
+    call yelmo_write_init(yelmo1,file2D,time_init=time,units="years")
+    
     ! Write initial state 
     call write_step_2D(yelmo1,file2D,time=time) 
     

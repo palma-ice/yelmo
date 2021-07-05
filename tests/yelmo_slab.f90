@@ -149,6 +149,10 @@ program yelmo_slab
     ! Define reference ice thickness (for prescribing boundary values, potentially)
     yelmo1%bnd%H_ice_ref = ctrl%H0 
 
+    ! Initialize velocity to u0 value too
+    call calc_u0(yelmo1%dyn%now%ux_bar,ctrl%H0,yelmo1%dyn%par%beta_const, &
+                    yelmo1%dyn%par%visc_const,ctrl%alpha)
+
     ! =======================================================
 
     ! Initialize the yelmo state (dyn,therm,mat)
@@ -534,6 +538,25 @@ contains
         return 
 
     end subroutine calc_stdev
+
+    elemental subroutine calc_u0(u0,H0,beta,eta,alpha)
+        ! Prescribe initial velocity as u0 
+
+        real(wp), intent(OUT) :: u0 
+        real(wp), intent(IN)  :: H0
+        real(wp), intent(IN)  :: beta 
+        real(wp), intent(IN)  :: eta
+        real(wp), intent(IN)  :: alpha 
+
+        ! Local variables 
+        real(wp) :: F2 
+
+        F2 = H0/(3.0*eta)
+        u0 = (rho_ice*g) * H0 * (1.0+beta*F2)/beta*alpha
+
+        return 
+
+    end subroutine calc_u0
 
 end program yelmo_slab
 

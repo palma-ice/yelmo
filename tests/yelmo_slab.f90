@@ -48,6 +48,7 @@ program yelmo_slab
     integer  :: q, q1, q2  
     real(wp) :: dtt_now
     real(wp) :: stdev, factor 
+    real(wp) :: H_mean, ux_mean 
 
     real(8)  :: cpu_start_time
     real(8)  :: cpu_end_time
@@ -159,9 +160,10 @@ if (ctrl%dtt .ne. 0.0) then
     ! == Perform one simulation with an outer timestep of ctrl%dtt =======
 
     yelmo1%tpo%par%topo_fixed = .TRUE. 
+    write(*,*) "=== Timesteps with fixed topo. ==="
 
     ! Advance timesteps
-    do n = 1, 20 
+    do n = 1, 200 
 
         ! Get current time 
         time = ctrl%time_init + n*ctrl%dtt
@@ -173,12 +175,25 @@ if (ctrl%dtt .ne. 0.0) then
             write(*,"(a,f14.4)") "yelmo:: time = ", time
         end if  
 
+        if (yelmo1%dyn%par%ssa_iter_now .lt. 10) then 
+            ! Solution is near stable
+            write(*,*) "n = ", n 
+            exit 
+        end if 
+
     end do 
 
     time = ctrl%time_init
     call yelmo_set_time(yelmo1,time)
     yelmo1%tpo%par%topo_fixed   = .FALSE. 
     yelmo1%tpo%now%H_ice        = ctrl%H0 + dh 
+
+    ! Make sure all values are the same in y-direction
+    do j = 1, yelmo1%grd%ny 
+        yelmo1%tpo%now%H_ice(:,j) = yelmo1%tpo%now%H_ice(:,1)
+    end do 
+
+    write(*,*) "=== Timesteps with prognostic topo. ==="
 
     ! Initialize output file 
     call yelmo_write_init(yelmo1,file2D,time_init=time,units="years")
@@ -195,6 +210,9 @@ if (ctrl%dtt .ne. 0.0) then
         ! == Yelmo ice sheet ===================================================
         call yelmo_update(yelmo1,time)
 
+        ! Write final state 
+        !call write_step_2D(yelmo1,file2D,time=time) 
+
         if (mod(time,10.0)==0 .and. (.not. yelmo_log)) then
             write(*,"(a,f14.4)") "yelmo:: time = ", time
         end if  
@@ -208,10 +226,14 @@ if (ctrl%dtt .ne. 0.0) then
     call calc_stdev(stdev,yelmo1%tpo%now%H_ice,ctrl%H0)
     factor = stdev / max(ctrl%H_stdev,1e-5)
 
+    H_mean  = sum(yelmo1%tpo%now%H_ice)  / real(yelmo1%grd%npts,wp)
+    ux_mean = sum(yelmo1%dyn%now%ux_bar) / real(yelmo1%grd%npts,wp)
+        
     ! Write summary 
     write(*,*) "====== "//trim(ctrl%domain)//" ======="
-    write(*,*) "factor", ctrl%dx, ctrl%dtt, ctrl%H_stdev, stdev, factor 
-
+    !write(*,*) "factor", ctrl%dx, ctrl%dtt, ctrl%H_stdev, stdev, factor 
+    write(*, "(a,5g12.3)") "factor", ctrl%dx, ctrl%dtt, factor, H_mean, ux_mean
+    
     ! Finalize program
     call yelmo_end(yelmo1,time=time)
 
@@ -255,7 +277,7 @@ else
     write(*,*) "dxs:  ", ctrl%dxs(1:ctrl%n_dx) 
 
     open(unit=15,file=trim(outfldr)//"slab_dt_factor.txt",status="UNKNOWN")
-    write(15,"(a12,a12,a12)") "dx", "dt", "factor" 
+    write(15,"(5a12)") "dx", "dt", "factor", "H_mean", "ux_mean"
 
     do q1 = 1, ctrl%n_dx
 
@@ -270,7 +292,9 @@ else
             ! then don't run the model further, just set 
             ! factor to high value 
 
-            factor = 100.0_wp 
+            factor  = 100.0_wp 
+            H_mean  = 0.0_wp
+            ux_mean = 0.0_wp 
 
         else 
             ! factor is still small, run the model for this timestep value
@@ -278,12 +302,13 @@ else
             ctrl%dx  = ctrl%dxs(q1) 
             ctrl%dtt = ctrl%dtts(q2) 
 
-            call run_yelmo_test(factor,ctrl)
+            call run_yelmo_test(factor,H_mean,ux_mean,ctrl)
             
         end if 
 
-        write(15,"(g12.3,g12.3,g12.3)") ctrl%dxs(q1), ctrl%dtts(q2), factor 
-        write(*, "(a,g12.3,g12.3,g12.3)") "factor", ctrl%dxs(q1), ctrl%dtts(q2), factor
+        write(15,"(5g12.3)") ctrl%dxs(q1), ctrl%dtts(q2), factor, H_mean, ux_mean
+        write(*, "(5g12.3)") "factor", ctrl%dxs(q1), ctrl%dtts(q2), factor, H_mean, ux_mean
+        
     end do 
     end do 
 
@@ -300,17 +325,19 @@ end if
 
 contains
     
-    subroutine run_yelmo_test(factor,ctrl)
+    subroutine run_yelmo_test(factor,H_mean,ux_mean,ctrl)
 
         implicit none 
 
         real(wp),       intent(OUT) :: factor 
+        real(wp),       intent(OUT) :: H_mean
+        real(wp),       intent(OUT) :: ux_mean 
         type(ctrl_par), intent(IN)  :: ctrl  
 
         ! Local variables 
         type(yelmo_class)     :: yelmo1
 
-        integer  :: n
+        integer  :: n, j 
         real(wp) :: time 
         real(wp) :: xmin, xmax, ymin, ymax 
         real(wp), allocatable :: dh(:,:) 
@@ -358,8 +385,10 @@ contains
 
         yelmo1%tpo%par%topo_fixed = .TRUE. 
 
+        write(*,*) "=== Timesteps with fixed topo. ==="
+
         ! Advance timesteps
-        do n = 1, 20 
+        do n = 1, 200 
 
             ! Get current time 
             time = ctrl%time_init + n*ctrl%dtt
@@ -376,7 +405,14 @@ contains
         call yelmo_set_time(yelmo1,ctrl%time_init)
         yelmo1%tpo%par%topo_fixed   = .FALSE. 
         yelmo1%tpo%now%H_ice        = ctrl%H0 + dh 
-    
+        
+        ! Make sure all values are the same in y-direction
+        do j = 1, yelmo1%grd%ny 
+            yelmo1%tpo%now%H_ice(:,j) = yelmo1%tpo%now%H_ice(:,1)
+        end do 
+
+        write(*,*) "=== Timesteps with prognostic topo. ==="
+
         ! Advance timesteps
         do n = 1, ctrl%nt 
 
@@ -392,6 +428,9 @@ contains
         call calc_stdev(stdev,yelmo1%tpo%now%H_ice,ctrl%H0)
         factor = stdev / max(ctrl%H_stdev,1e-5)
 
+        H_mean  = sum(yelmo1%tpo%now%H_ice)  / real(yelmo1%grd%npts,wp)
+        ux_mean = sum(yelmo1%dyn%now%ux_bar) / real(yelmo1%grd%npts,wp)
+        
         call yelmo_end(yelmo1,time) 
 
         return 

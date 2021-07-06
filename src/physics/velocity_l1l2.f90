@@ -366,6 +366,9 @@ end if
                 tau_par_ab(i,j,k) = 2.d0 * visc_eff_ab(i,j,k) * eps_par
             end do 
 
+            ! Note: above, eps_par and thus tau_par should be zero when no_slip=True 
+            ! and the basal velocity components are zero. 
+
             ! Compute the integral of visc_eff from the base of each layer to the surface (P12, Eq. 28)
 
             H_ice_ab(i,j) = 0.25_prec*(H_ice(i,j)+H_ice(ip1,j)+H_ice(i,jp1)+H_ice(ip1,jp1))
@@ -468,18 +471,16 @@ end if
 
                 ! Calculate factor to get velocity components
                 ATT_ab   = 0.25_prec*(ATT(i,j,k)+ATT(ip1,j,k)+ATT(i,jp1,k)+ATT(ip1,jp1,k))
-                !depth_ab = H_ice_ab(i,j)*(1.0_prec-zeta_aa(k))
-                depth_ab = (1.0_prec-zeta_aa(k))
+                depth_ab = (1.0_prec-zeta_aa(k))    ! depth of sigma scale, since H is inside of tau_d
 
-                !fact_ab(i,j) = 2.0_prec * ATT_ab * depth_ab * tau_eff_sq_ab**p1 
-                ! fact_ab(i,j) = 2.0_prec * ATT_ab * tau_eff_sq_ab**p1 * (dzeta*H_ice_ab(i,j))
-                
-                ! fact = 2.d0 * stagflwa(i,j) * tau_eff_sq**((gn-1.d0)/2.d0) * (sigma(k+1) - sigma(k))*stagthck(i,j)
+                if (p1 .ne. 0.0_wp) then  
+                    fact_ab(i,j) = fact_ab(i,j) &
+                        - 2.0_prec * depth_ab * ATT_ab * tau_eff_sq_ab**p1 * (dzeta*H_ice_ab(i,j))
+                else
+                    fact_ab(i,j) = fact_ab(i,j) &
+                        - 2.0_prec * depth_ab * ATT_ab * (dzeta*H_ice_ab(i,j))
+                end if 
 
-
-                fact_ab(i,j) = fact_ab(i,j) &
-                    - 2.0_prec * ATT_ab * depth_ab * tau_eff_sq_ab * (dzeta*H_ice_ab(i,j))
-                
             end do 
             end do 
 

@@ -330,15 +330,15 @@ end if
         inv_4dx = 1.0_prec / (4.0_prec*dx) 
         inv_4dy = 1.0_prec / (4.0_prec*dy) 
 
-        ! Calculate exponent
-        p1 = (n_glen - 1.0_prec) / 2.0_prec 
+        ! Calculate an exponent 
+        p1 = (n_glen-1.0_wp)/2.0_wp
 
         ! Calculate squared minimum strain rate 
         eps_0_sq = eps_0*eps_0 
 
         ! Initialize integrated viscosity field
         visc_eff_int3D_ab = 0.0_prec 
-
+                
         ! Step 1: compute basal strain rates on ab-nodes and viscosity       
         do j = 1, ny 
         do i = 1, nx 
@@ -435,9 +435,9 @@ end if
         uy = 0.0 
 
         ! Assign basal velocity value 
-        ux(:,:,1) = ux_b 
-        uy(:,:,1) = uy_b 
-        fact_ab   = 0.0_prec 
+        ux(:,:,1)    = ux_b 
+        uy(:,:,1)    = uy_b 
+        fact_ab(:,:) = 0.0_prec 
 
         ! Loop over layers starting from first layer above the base to surface 
         do k = 2, nz_aa
@@ -472,7 +472,11 @@ end if
                 depth_ab = (1.0_prec-zeta_aa(k))
 
                 !fact_ab(i,j) = 2.0_prec * ATT_ab * depth_ab * tau_eff_sq_ab**p1 
+                ! fact_ab(i,j) = 2.0_prec * ATT_ab * tau_eff_sq_ab**p1 * (dzeta*H_ice_ab(i,j))
                 
+                ! fact = 2.d0 * stagflwa(i,j) * tau_eff_sq**((gn-1.d0)/2.d0) * (sigma(k+1) - sigma(k))*stagthck(i,j)
+
+
                 fact_ab(i,j) = fact_ab(i,j) &
                     - 2.0_prec * ATT_ab * depth_ab * tau_eff_sq_ab * (dzeta*H_ice_ab(i,j))
                 
@@ -593,7 +597,7 @@ end if
         ! Consistency check 
         if (n_glen .ne. 3.0_prec) then 
             write(*,*) "calc_visc_eff_3D:: Error: currently, the L1L2 solver &
-            & can only be used with n_glen=3."
+            & with dynamic viscosity can only be used with n_glen=3."
             stop 
         end if 
 

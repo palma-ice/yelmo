@@ -126,11 +126,11 @@
 
 &ymat
     flow_law                = "glen"        ! Only "glen" is possible right now
-    rf_method               = 0             ! -1: set externally; 0: rf_const everywhere; 1: standard function 
+    rf_method               = 2             ! -1: set externally; 0: rf_const everywhere; 1: standard function; 2: inverted from visc. 
     rf_const                = 1e-16         ! [Pa^-n a^-1] Constant value for rf when rf_method=0
     rf_use_eismint2         = True          ! Only applied for rf_method=1
     rf_with_water           = False         ! Only applied for rf_method=1, scale rf by water content?
-    n_glen                  = 3.0           ! Glen flow law exponent
+    n_glen                  = 1.0           ! Glen flow law exponent
     visc_min                = 1e3           ! [Pa a] Minimum allowed viscosity 
     de_max                  = 0.5           ! [a-1]  Maximum allowed effective strain rate
     enh_method              = "shear3D"     ! "simple","shear2D", "shear3D", "paleo-shear" 

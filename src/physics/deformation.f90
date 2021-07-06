@@ -24,7 +24,6 @@ module deformation
     public :: calc_rate_factor
     public :: calc_rate_factor_eismint
     public :: scale_rate_factor_water
-    public :: calc_rate_factor_inverted
     public :: calc_rate_factor_integrated
     public :: calc_strain_rate_tensor
     public :: calc_strain_rate_tensor_2D
@@ -329,22 +328,6 @@ contains
 
     end subroutine scale_rate_factor_water
 
-    elemental function calc_rate_factor_inverted(ATT,n_glen) result(BTT)
-        ! BTT  => from Greve and Blatter (2009), Eq. 4.35 (written as `B(T_prime)`)
-        ! ajr, currently not used, instead ATT**(1/n_glen) is used directly in subroutines 
-
-        implicit none 
-
-        real(prec), intent(IN) :: ATT      ! Rate factor
-        real(prec), intent(IN) :: n_glen   ! [--] Glen law exponent (n=3)
-        real(prec) :: BTT 
-
-        BTT = ATT**(-1.0/n_glen) 
-
-        return 
-
-    end function calc_rate_factor_inverted
-    
     function calc_rate_factor_integrated(ATT,zeta_aa,n_glen) result(ATT_int)
         ! Greve and Blatter (2009), Chpt 5, page 82 
 
@@ -372,7 +355,7 @@ contains
 
     end function calc_rate_factor_integrated
     
-        subroutine calc_strain_rate_tensor(strn, strn2D, vx, vy, vz, H_ice, f_ice, f_grnd,  &
+    subroutine calc_strain_rate_tensor(strn, strn2D, vx, vy, vz, H_ice, f_ice, f_grnd,  &
                     zeta_aa, zeta_ac, dx, de_max, ATT_bar, n_glen)
         ! -------------------------------------------------------------------------------
         !  Computation of all components of the strain-rate tensor, the full

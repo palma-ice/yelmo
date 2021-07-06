@@ -57,7 +57,6 @@ program yelmo_ismiphom
 
 
     ! Define grid based on length scale and number of points in each direction (square domain)
-    x0 = 0.0_prec 
     !dx = L / (nx-1)
     dx = 0.25 * (L/10.0)
     
@@ -65,6 +64,9 @@ program yelmo_ismiphom
     if (f_extend .gt. 0.0) then 
         x0 = -f_extend*L 
         nx = L*(1.0+2.0*f_extend) / dx
+    else 
+        x0 = 0.0_prec 
+        nx = L / dx
     end if 
 
     ! Define grid name
@@ -177,7 +179,7 @@ program yelmo_ismiphom
 
     ! Load boundary values
 
-    yelmo1%bnd%z_sl     = -2000.0       ! Set sea level to a very negative value to avoid allowing floating ice 
+    yelmo1%bnd%z_sl     = -10000.0       ! Set sea level to a very negative value to avoid allowing floating ice 
     yelmo1%bnd%bmb_shlf = 0.0  
     yelmo1%bnd%T_shlf   = T0  
     yelmo1%bnd%H_sed    = 0.0 

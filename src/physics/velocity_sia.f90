@@ -1,6 +1,7 @@
 module velocity_sia 
     
     use yelmo_defs, only : sp, dp, wp, prec, yelmo_use_omp, TOL_UNDERFLOW 
+    use yelmo_tools, only : fill_borders_3D
 
     implicit none 
 
@@ -11,24 +12,25 @@ module velocity_sia
     
 contains 
 
-    subroutine calc_velocity_sia(ux_i,uy_i,ux_i_bar,uy_i_bar,H_ice,f_ice,taud_acx,taud_acy,ATT,zeta_aa,dx,n_glen,rho_ice,g)
+    subroutine calc_velocity_sia(ux_i,uy_i,ux_i_bar,uy_i_bar,H_ice,f_ice,taud_acx,taud_acy,ATT,zeta_aa,dx,n_glen,rho_ice,g,boundaries)
 
         implicit none 
 
-        real(prec), intent(OUT) :: ux_i(:,:,:) 
-        real(prec), intent(OUT) :: uy_i(:,:,:) 
-        real(prec), intent(OUT) :: ux_i_bar(:,:) 
-        real(prec), intent(OUT) :: uy_i_bar(:,:) 
-        real(prec), intent(IN)  :: H_ice(:,:) 
-        real(prec), intent(IN)  :: f_ice(:,:)
-        real(prec), intent(IN)  :: taud_acx(:,:) 
-        real(prec), intent(IN)  :: taud_acy(:,:) 
-        real(prec), intent(IN)  :: ATT(:,:,:)
-        real(prec), intent(IN)  :: zeta_aa(:) 
-        real(prec), intent(IN)  :: dx 
-        real(prec), intent(IN)  :: n_glen 
-        real(prec), intent(IN)  :: rho_ice 
-        real(prec), intent(IN)  :: g 
+        real(prec),         intent(OUT) :: ux_i(:,:,:) 
+        real(prec),         intent(OUT) :: uy_i(:,:,:) 
+        real(prec),         intent(OUT) :: ux_i_bar(:,:) 
+        real(prec),         intent(OUT) :: uy_i_bar(:,:) 
+        real(prec),         intent(IN)  :: H_ice(:,:) 
+        real(prec),         intent(IN)  :: f_ice(:,:)
+        real(prec),         intent(IN)  :: taud_acx(:,:) 
+        real(prec),         intent(IN)  :: taud_acy(:,:) 
+        real(prec),         intent(IN)  :: ATT(:,:,:)
+        real(prec),         intent(IN)  :: zeta_aa(:) 
+        real(prec),         intent(IN)  :: dx 
+        real(prec),         intent(IN)  :: n_glen 
+        real(prec),         intent(IN)  :: rho_ice 
+        real(prec),         intent(IN)  :: g 
+        character(len=*),   intent(IN)  :: boundaries 
 
         ! Local variables 
         integer :: nx, ny, nz_aa 
@@ -41,13 +43,14 @@ contains
         allocate(dd_ab(nx,ny,nz_aa))
 
         ! Calculate diffusivity constant on ab-nodes
-        call calc_dd_ab_3D(dd_ab,H_ice,f_ice,taud_acx,taud_acy,ATT,zeta_aa,dx,n_glen,rho_ice,g)
+        call calc_dd_ab_3D(dd_ab,H_ice,f_ice,taud_acx,taud_acy,ATT, &
+                                zeta_aa,dx,n_glen,rho_ice,g,boundaries)
 
         ! Calculate the 3D horizontal shear velocity fields
-        call calc_uxy_sia_3D(ux_i,uy_i,dd_ab,taud_acx,taud_acy,f_ice)
+        call calc_uxy_sia_3D(ux_i,uy_i,dd_ab,taud_acx,taud_acy,f_ice,boundaries)
         
         ! Calculate the depth-averaged horizontal shear velocity fields too
-        call calc_uxy_sia_2D(ux_i_bar,uy_i_bar,dd_ab,taud_acx,taud_acy,f_ice,zeta_aa)
+        call calc_uxy_sia_2D(ux_i_bar,uy_i_bar,dd_ab,taud_acx,taud_acy,f_ice,zeta_aa,boundaries)
 
 !         Or, simply integrate from 3D velocity field to get depth-averaged field (slower)
 !         ux_i_bar = calc_vertical_integrated_2D(ux_i,zeta_aa)
@@ -246,7 +249,7 @@ contains
         
     end subroutine calc_velocity_basal_sia_00
     
-    subroutine calc_dd_ab_3D(dd_ab_3D,H_ice,f_ice,taud_acx,taud_acy,ATT,zeta_aa,dx,n_glen,rho_ice,g)
+    subroutine calc_dd_ab_3D(dd_ab_3D,H_ice,f_ice,taud_acx,taud_acy,ATT,zeta_aa,dx,n_glen,rho_ice,g,boundaries)
         ! Calculate the 3D diffusivity helper field on ab-nodes, as an input 
         ! to the SIA calculation. 
 
@@ -254,17 +257,18 @@ contains
 
         implicit none
         
-        real(wp), intent(OUT) :: dd_ab_3D(:,:,:)    ! nx,ny,nz_aa [m/a] Diffusivity helper, ab-nodes
-        real(wp), intent(IN)  :: H_ice(:,:)         ! [m] Ice thickness 
-        real(wp), intent(IN)  :: f_ice(:,:)         ! [--] Ice area fraction 
-        real(wp), intent(IN)  :: taud_acx(:,:)      ! [Pa] Driving stress x-direction 
-        real(wp), intent(IN)  :: taud_acy(:,:)      ! [Pa] Driving stress y-direction 
-        real(wp), intent(IN)  :: ATT(:,:,:)         ! nx,ny,nz_aa [a-1 Pa-3] Rate factor
-        real(wp), intent(IN)  :: zeta_aa(:)         ! [--] Height axis 0:1, layer centers (aa-nodes)
-        real(wp), intent(IN)  :: dx                 ! [m] Horizontal resolution 
-        real(wp), intent(IN)  :: n_glen
-        real(wp), intent(IN)  :: rho_ice            ! [kg m-3] Ice density 
-        real(wp), intent(IN)  :: g                  ! [m s-2] Gravitational acceleration
+        real(wp),           intent(OUT) :: dd_ab_3D(:,:,:)    ! nx,ny,nz_aa [m/a] Diffusivity helper, ab-nodes
+        real(wp),           intent(IN)  :: H_ice(:,:)         ! [m] Ice thickness 
+        real(wp),           intent(IN)  :: f_ice(:,:)         ! [--] Ice area fraction 
+        real(wp),           intent(IN)  :: taud_acx(:,:)      ! [Pa] Driving stress x-direction 
+        real(wp),           intent(IN)  :: taud_acy(:,:)      ! [Pa] Driving stress y-direction 
+        real(wp),           intent(IN)  :: ATT(:,:,:)         ! nx,ny,nz_aa [a-1 Pa-3] Rate factor
+        real(wp),           intent(IN)  :: zeta_aa(:)         ! [--] Height axis 0:1, layer centers (aa-nodes)
+        real(wp),           intent(IN)  :: dx                 ! [m] Horizontal resolution 
+        real(wp),           intent(IN)  :: n_glen
+        real(wp),           intent(IN)  :: rho_ice            ! [kg m-3] Ice density 
+        real(wp),           intent(IN)  :: g                  ! [m s-2] Gravitational acceleration
+        character(len=*),   intent(IN)  :: boundaries 
 
         ! Local variables
         integer  :: i, j, k, nx, ny, nz_aa
@@ -327,8 +331,12 @@ contains
                     ATT_int_ab = ATT_int_ab + 0.5_wp*(ATT_ab_k+ATT_ab_km1)*(zeta_aa(k) - zeta_aa(k-1))
 
                     ! Calculate quasi-diffusivity for this layer
-                    dd_ab_3D(i,j,k) = 2.0_wp * H_ice_ab * ATT_int_ab * sigma_tot_ab**(n_glen-1.0) 
-                
+                    if (n_glen .ne. 1.0_wp) then 
+                        dd_ab_3D(i,j,k) = 2.0_wp * H_ice_ab * ATT_int_ab * sigma_tot_ab**(n_glen-1.0) 
+                    else
+                        dd_ab_3D(i,j,k) = 2.0_wp * H_ice_ab * ATT_int_ab
+                    end if 
+
                 end do 
 
             end if 
@@ -337,28 +345,73 @@ contains
         end do 
         !$omp end parallel do 
 
-        ! Fill in the borders 
-        dd_ab_3D(1,:,:)  = dd_ab_3D(2,:,:) 
-        dd_ab_3D(nx,:,:) = dd_ab_3D(nx-1,:,:) 
-        dd_ab_3D(:,1,:)  = dd_ab_3D(:,2,:)
-        dd_ab_3D(:,ny,:) = dd_ab_3D(:,ny-1,:)
+        select case(trim(boundaries))
+
+            ! case("zeros","EISMINT")
+
+            !     ! Set border values to zero
+            !     H_ice_new(1,:)  = 0.0
+            !     H_ice_new(nx,:) = 0.0
+
+            !     H_ice_new(:,1)  = 0.0
+            !     H_ice_new(:,ny) = 0.0
+
+            case("periodic","periodic-xy") 
+
+                dd_ab_3D(1:2,:,:)     = dd_ab_3D(nx-3:nx-2,:,:) 
+                dd_ab_3D(nx-1:nx,:,:) = dd_ab_3D(2:3,:,:) 
+
+                dd_ab_3D(:,1:2,:)     = dd_ab_3D(:,ny-3:ny-2,:) 
+                dd_ab_3D(:,ny-1:ny,:) = dd_ab_3D(:,2:3,:) 
+            
+            case("periodic-x") 
+
+                ! Periodic x 
+                dd_ab_3D(1:2,:,:)     = dd_ab_3D(nx-3:nx-2,:,:) 
+                dd_ab_3D(nx-1:nx,:,:) = dd_ab_3D(2:3,:,:) 
+                
+                ! Infinite (free-slip too)
+                dd_ab_3D(:,1,:)  = dd_ab_3D(:,2,:)
+                dd_ab_3D(:,ny,:) = dd_ab_3D(:,ny-1,:)
+
+            ! case("MISMIP3D")
+
+            !     ! === MISMIP3D =====
+            !     H_ice_new(1,:)    = H_ice_new(2,:)       ! x=0, Symmetry 
+            !     H_ice_new(nx,:)   = 0.0              ! x=800km, no ice
+                
+            !     H_ice_new(:,1)    = H_ice_new(:,2)       ! y=-50km, Free-slip condition
+            !     H_ice_new(:,ny)   = H_ice_new(:,ny-1)    ! y= 50km, Free-slip condition
+
+            case("infinite")
+                ! Set border points equal to inner neighbors 
+
+                call fill_borders_3D(dd_ab_3D,nfill=1)
+
+            case DEFAULT 
+
+                write(*,*) "apply_ice_thickness_boundaries:: error: boundary method not recognized: "//trim(boundaries)
+                stop 
+
+        end select 
 
         return
         
     end subroutine calc_dd_ab_3D
 
-    subroutine calc_uxy_sia_2D(ux,uy,dd_ab_3D,taud_acx,taud_acy,f_ice,zeta_aa)
+    subroutine calc_uxy_sia_2D(ux,uy,dd_ab_3D,taud_acx,taud_acy,f_ice,zeta_aa,boundaries)
         ! Calculate the 2D horizontal velocity field using SIA
 
         implicit none
 
-        real(prec), intent(OUT) :: ux(:,:)              ! [m/a] SIA velocity x-direction, acx-nodes
-        real(prec), intent(OUT) :: uy(:,:)              ! [m/a] SIA velocity y-direction, acy-nodes
-        real(prec), intent(IN)  :: dd_ab_3D(:,:,:)      ! Diffusivity constant 
-        real(prec), intent(IN)  :: taud_acx(:,:)        ! [Pa] Driving stress x-direction 
-        real(prec), intent(IN)  :: taud_acy(:,:)        ! [Pa] Driving stress y-direction
-        real(prec), intent(IN)  :: f_ice(:,:)           ! [--] Ice area fraction
-        real(prec), intent(IN)  :: zeta_aa(:)           ! [--]  Height vector 0:1 
+        real(prec),         intent(OUT) :: ux(:,:)              ! [m/a] SIA velocity x-direction, acx-nodes
+        real(prec),         intent(OUT) :: uy(:,:)              ! [m/a] SIA velocity y-direction, acy-nodes
+        real(prec),         intent(IN)  :: dd_ab_3D(:,:,:)      ! Diffusivity constant 
+        real(prec),         intent(IN)  :: taud_acx(:,:)        ! [Pa] Driving stress x-direction 
+        real(prec),         intent(IN)  :: taud_acy(:,:)        ! [Pa] Driving stress y-direction
+        real(prec),         intent(IN)  :: f_ice(:,:)           ! [--] Ice area fraction
+        real(prec),         intent(IN)  :: zeta_aa(:)           ! [--]  Height vector 0:1 
+        character(len=*),   intent(IN)  :: boundaries 
 
         ! Local variables
         integer :: i, j, k, nx, ny
@@ -402,21 +455,67 @@ contains
         end do
         end do
 
+        ! Apply boundary conditions as needed 
+        if (trim(boundaries) .eq. "periodic") then
+
+            ux(1,:)    = ux(nx-2,:) 
+            ux(nx-1,:) = ux(2,:) 
+            ux(nx,:)   = ux(3,:) 
+            ux(:,1)    = ux(:,ny-1)
+            ux(:,ny)   = ux(:,2) 
+
+            uy(1,:)    = uy(nx-1,:) 
+            uy(nx,:)   = uy(2,:) 
+            uy(:,1)    = uy(:,ny-2)
+            uy(:,ny-1) = uy(:,2) 
+            uy(:,ny)   = uy(:,3)
+
+        else if (trim(boundaries) .eq. "periodic-x") then 
+            
+            ux(1,:)    = ux(nx-2,:) 
+            ux(nx-1,:) = ux(2,:) 
+            ux(nx,:)   = ux(3,:) 
+            ux(:,1)    = ux(:,2)
+            ux(:,ny)   = ux(:,ny-1) 
+
+            uy(1,:)    = uy(nx-1,:) 
+            uy(nx,:)   = uy(2,:) 
+            uy(:,1)    = uy(:,2)
+            uy(:,ny-1) = uy(:,ny-2) 
+            uy(:,ny)   = uy(:,ny-1)
+
+        else if (trim(boundaries) .eq. "infinite") then 
+            
+            ux(1,:)    = ux(2,:) 
+            ux(nx-1,:) = ux(nx-2,:) 
+            ux(nx,:)   = ux(nx-1,:) 
+            ux(:,1)    = ux(:,2)
+            ux(:,ny)   = ux(:,ny-1) 
+
+            uy(1,:)    = uy(2,:) 
+            uy(nx,:)   = uy(nx-1,:) 
+            uy(:,1)    = uy(:,2)
+            uy(:,ny-1) = uy(:,ny-2) 
+            uy(:,ny)   = uy(:,ny-1)
+
+        end if 
+
         return
         
     end subroutine calc_uxy_sia_2D
 
-    subroutine calc_uxy_sia_3D(ux,uy,dd_ab_3D,taud_acx,taud_acy,f_ice)
+    subroutine calc_uxy_sia_3D(ux,uy,dd_ab_3D,taud_acx,taud_acy,f_ice,boundaries)
         ! Calculate the 3D horizontal velocity field using SIA
 
         implicit none
         
-        real(prec), intent(OUT) :: ux(:,:,:)        ! nx,ny,nz_aa [m/a] SIA velocity x-direction, acx-nodes
-        real(prec), intent(OUT) :: uy(:,:,:)        ! nx,ny,nz_aa [m/a] SIA velocity y-direction, acy-nodes
-        real(prec), intent(IN)  :: dd_ab_3D(:,:,:)  ! Diffusivity constant
-        real(prec), intent(IN)  :: taud_acx(:,:)    ! [Pa] Driving stress x-direction 
-        real(prec), intent(IN)  :: taud_acy(:,:)    ! [Pa] Driving stress y-direction
-        real(prec), intent(IN)  :: f_ice(:,:)       ! [--] Ice area fraction 
+        real(prec),         intent(OUT) :: ux(:,:,:)        ! nx,ny,nz_aa [m/a] SIA velocity x-direction, acx-nodes
+        real(prec),         intent(OUT) :: uy(:,:,:)        ! nx,ny,nz_aa [m/a] SIA velocity y-direction, acy-nodes
+        real(prec),         intent(IN)  :: dd_ab_3D(:,:,:)  ! Diffusivity constant
+        real(prec),         intent(IN)  :: taud_acx(:,:)    ! [Pa] Driving stress x-direction 
+        real(prec),         intent(IN)  :: taud_acy(:,:)    ! [Pa] Driving stress y-direction
+        real(prec),         intent(IN)  :: f_ice(:,:)       ! [--] Ice area fraction 
+        character(len=*),   intent(IN)  :: boundaries 
 
         ! Local variables
         integer :: i, j, k, nx, ny, nz_aa
@@ -462,6 +561,51 @@ contains
 
         end do
         end do 
+
+                ! Apply boundary conditions as needed 
+        if (trim(boundaries) .eq. "periodic") then
+
+            ux(1,:,:)    = ux(nx-2,:,:) 
+            ux(nx-1,:,:) = ux(2,:,:) 
+            ux(nx,:,:)   = ux(3,:,:) 
+            ux(:,1,:)    = ux(:,ny-1,:)
+            ux(:,ny,:)   = ux(:,2,:) 
+
+            uy(1,:,:)    = uy(nx-1,:,:) 
+            uy(nx,:,:)   = uy(2,:,:) 
+            uy(:,1,:)    = uy(:,ny-2,:)
+            uy(:,ny-1,:) = uy(:,2,:) 
+            uy(:,ny,:)   = uy(:,3,:)
+
+        else if (trim(boundaries) .eq. "periodic-x") then 
+            
+            ux(1,:,:)    = ux(nx-2,:,:) 
+            ux(nx-1,:,:) = ux(2,:,:) 
+            ux(nx,:,:)   = ux(3,:,:) 
+            ux(:,1,:)    = ux(:,2,:)
+            ux(:,ny,:)   = ux(:,ny-1,:) 
+
+            uy(1,:,:)    = uy(nx-1,:,:) 
+            uy(nx,:,:)   = uy(2,:,:) 
+            uy(:,1,:)    = uy(:,2,:)
+            uy(:,ny-1,:) = uy(:,ny-2,:) 
+            uy(:,ny,:)   = uy(:,ny-1,:)
+
+        else if (trim(boundaries) .eq. "infinite") then 
+            
+            ux(1,:,:)    = ux(2,:,:) 
+            ux(nx-1,:,:) = ux(nx-2,:,:) 
+            ux(nx,:,:)   = ux(nx-1,:,:) 
+            ux(:,1,:)    = ux(:,2,:)
+            ux(:,ny,:)   = ux(:,ny-1,:) 
+
+            uy(1,:,:)    = uy(2,:,:) 
+            uy(nx,:,:)   = uy(nx-1,:,:) 
+            uy(:,1,:)    = uy(:,2,:)
+            uy(:,ny-1,:) = uy(:,ny-2,:) 
+            uy(:,ny,:)   = uy(:,ny-1,:)
+
+        end if 
 
         return
         

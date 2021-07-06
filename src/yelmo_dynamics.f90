@@ -271,7 +271,7 @@ contains
 
             call calc_velocity_sia(dyn%now%ux_i,dyn%now%uy_i,dyn%now%ux_i_bar,dyn%now%uy_i_bar,tpo%now%H_ice, &
                                     tpo%now%f_ice,dyn%now%taud_acx,dyn%now%taud_acy,mat%now%ATT,dyn%par%zeta_aa, &
-                                    dyn%par%dx,mat%par%n_glen,rho_ice,g)
+                                    dyn%par%dx,mat%par%n_glen,rho_ice,g,dyn%par%boundaries)
 
         else 
             ! Set all SIA terms to zero 

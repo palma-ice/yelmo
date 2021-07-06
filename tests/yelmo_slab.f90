@@ -7,8 +7,6 @@ program yelmo_slab
 
     implicit none 
 
-    type(yelmo_class)     :: yelmo1
-
     type ctrl_par 
         character(len=56)       :: domain 
         character(len=56)       :: grid_name
@@ -98,150 +96,17 @@ program yelmo_slab
     ! General initialization of yelmo constants (used globally)
     call yelmo_global_init(path_const)
 
-    ! === Initialize ice sheet model =====
-
-    ! Define the domain and grid
-    xmin =  0.0_prec 
-    xmax =  (ctrl%nx-1)*ctrl%dx  
-    ymax =  (ctrl%ny-1)*ctrl%dx/2.0_prec 
-    ymin = -ymax
-    call yelmo_init_grid(yelmo1%grd,ctrl%grid_name,units="km", &
-                         x0=xmin,dx=ctrl%dx,nx=ctrl%nx, &
-                         y0=ymin,dy=ctrl%dx,ny=ctrl%ny)
-
-    ! Initialize data objects
-    call yelmo_init(yelmo1,filename=path_par,grid_def="none",time=time,load_topo=.FALSE., &
-                        domain=ctrl%domain,grid_name=ctrl%grid_name)
-
-    ! Load boundary values
-
-    yelmo1%bnd%z_sl     = 0.0
-    yelmo1%bnd%bmb_shlf = 0.0 
-    yelmo1%bnd%T_shlf   = T0  
-    yelmo1%bnd%H_sed    = 0.0 
-
-    yelmo1%bnd%T_srf    = T0                ! [K] 
-    yelmo1%bnd%smb      = 0.0_prec          ! [m/yr]
-    yelmo1%bnd%Q_geo    = 50.0_prec         ! [mW/m2] 
-
-    ! Check boundary values 
-    call yelmo_print_bound(yelmo1%bnd)
-    
-    ! ===== Intialize topography and set parameters =========
-    
-    yelmo1%bnd%z_bed = 10000.0_wp - ctrl%alpha*(yelmo1%grd%x)
-
-    ! Define initial ice thickness 
-    allocate(dh(yelmo1%grd%nx,yelmo1%grd%ny))
-    call gen_random_normal(dh,0.0_wp,ctrl%H_stdev) 
-    yelmo1%tpo%now%H_ice = ctrl%H0 !+ dh 
-
-    ! Make sure all values are the same in y-direction
-    do j = 1, yelmo1%grd%ny 
-        yelmo1%tpo%now%H_ice(:,j) = yelmo1%tpo%now%H_ice(:,1)
-    end do 
-
-    ! Define surface elevation 
-    yelmo1%tpo%now%z_srf = yelmo1%bnd%z_bed + yelmo1%tpo%now%H_ice
-
-    ! Define reference ice thickness (for prescribing boundary values, potentially)
-    yelmo1%bnd%H_ice_ref = ctrl%H0 
-
-    ! Initialize velocity to u0 value too
-    call calc_u0(yelmo1%dyn%now%ux_bar,ctrl%H0,yelmo1%dyn%par%beta_const, &
-                    yelmo1%dyn%par%visc_const,ctrl%alpha)
-
-    ! =======================================================
-
-    ! Initialize the yelmo state (dyn,therm,mat)
-    call yelmo_init_state(yelmo1,time=time,thrm_method="robin-cold")
 
 if (ctrl%dtt .ne. 0.0) then 
     ! == Perform one simulation with an outer timestep of ctrl%dtt =======
-
-    yelmo1%tpo%par%topo_fixed = .TRUE. 
-    write(*,*) "=== Timesteps with fixed topo. ==="
-
-    ! Advance timesteps
-    do n = 1, 200 
-
-        ! Get current time 
-        time = ctrl%time_init + n*ctrl%dtt
-
-        ! == Yelmo ice sheet ===================================================
-        call yelmo_update(yelmo1,time)
-
-        if (mod(time,10.0)==0 .and. (.not. yelmo_log)) then
-            write(*,"(a,f14.4)") "yelmo:: time = ", time
-        end if  
-
-        if (yelmo1%dyn%par%ssa_iter_now .lt. 10) then 
-            ! Solution is near stable
-            write(*,*) "n = ", n 
-            exit 
-        end if 
-
-    end do 
-
-    time = ctrl%time_init
-    call yelmo_set_time(yelmo1,time)
-    yelmo1%tpo%par%topo_fixed   = .FALSE. 
-    yelmo1%tpo%now%H_ice        = ctrl%H0 + dh 
-
-    ! Make sure all values are the same in y-direction
-    do j = 1, yelmo1%grd%ny 
-        yelmo1%tpo%now%H_ice(:,j) = yelmo1%tpo%now%H_ice(:,1)
-    end do 
-
-    write(*,*) "=== Timesteps with prognostic topo. ==="
-
-    ! Initialize output file 
-    call yelmo_write_init(yelmo1,file2D,time_init=time,units="years")
     
-    ! Write initial state 
-    call write_step_2D(yelmo1,file2D,time=time) 
+
+    call run_yelmo_test(factor,H_mean,ux_mean,ctrl,file2D)
     
-    ! Advance timesteps
-    do n = 1, ctrl%nt 
-
-        ! Get current time 
-        time = ctrl%time_init + n*ctrl%dtt
-
-        ! == Yelmo ice sheet ===================================================
-        call yelmo_update(yelmo1,time)
-
-        ! Write final state 
-        !call write_step_2D(yelmo1,file2D,time=time) 
-
-        if (mod(time,10.0)==0 .and. (.not. yelmo_log)) then
-            write(*,"(a,f14.4)") "yelmo:: time = ", time
-        end if  
-
-    end do 
-
-    ! Write final state 
-    call write_step_2D(yelmo1,file2D,time=time) 
-
-    ! Calculate summary 
-    call calc_stdev(stdev,yelmo1%tpo%now%H_ice,ctrl%H0)
-    factor = stdev / max(ctrl%H_stdev,1e-5)
-
-    H_mean  = sum(yelmo1%tpo%now%H_ice)  / real(yelmo1%grd%npts,wp)
-    ux_mean = sum(yelmo1%dyn%now%ux_bar) / real(yelmo1%grd%npts,wp)
-        
     ! Write summary 
     write(*,*) "====== "//trim(ctrl%domain)//" ======="
     !write(*,*) "factor", ctrl%dx, ctrl%dtt, ctrl%H_stdev, stdev, factor 
     write(*, "(a,5g12.3)") "factor", ctrl%dx, ctrl%dtt, factor, H_mean, ux_mean
-    
-    ! Finalize program
-    call yelmo_end(yelmo1,time=time)
-
-    ! Stop timing 
-    call yelmo_cpu_time(cpu_end_time,cpu_start_time,cpu_dtime)
-    
-    write(*,"(a,f12.3,a)") "Time  = ",cpu_dtime/60.0 ," min"
-    write(*,"(a,f12.1,a)") "Speed = ",(1e-3*(time-ctrl%time_init))/(cpu_dtime/3600.0), " kiloyears / hr"
     
 else 
     ! === Perform ensemble of simulations with multiple values of dx and dt =====
@@ -261,17 +126,6 @@ else
     do q = 1, ctrl%n_dx 
         ctrl%dxs(q) = 10.0_dp**(log10(0.01_dp)+(log10(40.0_dp)-log10(0.01_dp))*(q-1)/real(ctrl%n_dx-1,dp))
     end do
-
-    ! ctrl%n_dtt = 20 
-    ! ctrl%dtts  = 0.0_wp
-    ! do q = 1, ctrl%n_dtt 
-    !     ctrl%dtts(q) = exp(log(0.005)+(log(0.3)-log(0.005))*(q-1)/(ctrl%n_dtt-1))
-    ! end do 
-
-    ! ctrl%n_dx     = 3
-    ! ctrl%dxs      = 0.0_wp 
-    ! ! ctrl%dxs(1:3) = [0.05_wp,0.1_wp,0.2_wp]
-    ! ctrl%dxs(1:3) = [0.005_wp,0.01_wp,0.02_wp]
 
     write(*,*) "dtts: ", ctrl%dtts(1:ctrl%n_dtt) 
     write(*,*) "dxs:  ", ctrl%dxs(1:ctrl%n_dx) 
@@ -314,33 +168,35 @@ else
 
     close(15) 
 
-    ! Stop timing 
-    call yelmo_cpu_time(cpu_end_time,cpu_start_time,cpu_dtime)
-    
-    write(*,"(a,f12.3,a)") "Time  = ",cpu_dtime/60.0 ," min"
-    
 end if 
 
+! Stop timing 
+call yelmo_cpu_time(cpu_end_time,cpu_start_time,cpu_dtime)
 
+write(*,"(a,f12.3,a)") "Time  = ",cpu_dtime/60.0 ," min"
+
+! ===== DONE ======
 
 contains
     
-    subroutine run_yelmo_test(factor,H_mean,ux_mean,ctrl)
+    subroutine run_yelmo_test(factor,H_mean,ux_mean,ctrl,file2D)
 
         implicit none 
 
-        real(wp),       intent(OUT) :: factor 
-        real(wp),       intent(OUT) :: H_mean
-        real(wp),       intent(OUT) :: ux_mean 
-        type(ctrl_par), intent(IN)  :: ctrl  
+        real(wp),           intent(OUT) :: factor 
+        real(wp),           intent(OUT) :: H_mean
+        real(wp),           intent(OUT) :: ux_mean 
+        type(ctrl_par),     intent(IN)  :: ctrl  
+        character(len=*),   intent(IN), optional :: file2D 
 
         ! Local variables 
-        type(yelmo_class)     :: yelmo1
+        type(yelmo_class) :: yelmo1
 
         integer  :: n, j 
         real(wp) :: time 
         real(wp) :: xmin, xmax, ymin, ymax 
         real(wp), allocatable :: dh(:,:) 
+        real(wp) :: u0, ub0 
         real(wp) :: stdev
 
         ! Define the time 
@@ -375,8 +231,21 @@ contains
         yelmo1%bnd%H_ice_ref = ctrl%H0 
 
         ! Initialize velocity to u0 value too
-        call calc_u0(yelmo1%dyn%now%ux_bar,ctrl%H0,yelmo1%dyn%par%beta_const, &
+        call calc_u0(u0,ctrl%H0,yelmo1%dyn%par%beta_const, &
                         yelmo1%dyn%par%visc_const,ctrl%alpha)
+        
+        yelmo1%dyn%now%ux_bar = u0
+
+        if (trim(yelmo1%dyn%par%solver) .ne. "diva") then 
+            call calc_ub0(ub0,ctrl%H0,yelmo1%dyn%par%beta_const, &
+                        yelmo1%dyn%par%visc_const,ctrl%alpha)
+            
+            yelmo1%dyn%now%ux_b = ub0 
+        else 
+            ub0 = 0.0_wp 
+        end if 
+
+        write(*,*) "u0, ub0 = ", u0, ub0
 
         ! =======================================================
 
@@ -400,6 +269,12 @@ contains
                 write(*,"(a,f14.4)") "yelmo:: time = ", time
             end if  
 
+            if (yelmo1%dyn%par%ssa_iter_now .lt. 10) then 
+                ! Solution is near stable
+                write(*,*) "n = ", n 
+                exit 
+            end if 
+
         end do 
 
         call yelmo_set_time(yelmo1,ctrl%time_init)
@@ -413,6 +288,14 @@ contains
 
         write(*,*) "=== Timesteps with prognostic topo. ==="
 
+        if (present(file2D)) then 
+            ! Initialize output file 
+            call yelmo_write_init(yelmo1,file2D,time_init=time,units="years")
+        
+            ! Write initial state 
+            call write_step_2D(yelmo1,file2D,time=time) 
+        end if 
+
         ! Advance timesteps
         do n = 1, ctrl%nt 
 
@@ -424,12 +307,20 @@ contains
 
         end do 
 
+        if (present(file2D)) then 
+            ! Write final state 
+            call write_step_2D(yelmo1,file2D,time=time) 
+        end if 
+
         ! Calculate summary 
         call calc_stdev(stdev,yelmo1%tpo%now%H_ice,ctrl%H0)
         factor = stdev / max(ctrl%H_stdev,1e-5)
 
-        H_mean  = sum(yelmo1%tpo%now%H_ice)  / real(yelmo1%grd%npts,wp)
-        ux_mean = sum(yelmo1%dyn%now%ux_bar) / real(yelmo1%grd%npts,wp)
+        ! Get mean values along center x-profile
+
+        j = floor(yelmo1%grd%ny/2.0_wp)
+        H_mean  = sum(yelmo1%tpo%now%H_ice(:,j))  / real(yelmo1%grd%nx,wp)
+        ux_mean = sum(yelmo1%dyn%now%ux_bar(:,j)) / real(yelmo1%grd%nx,wp)
         
         call yelmo_end(yelmo1,time) 
 
@@ -547,6 +438,18 @@ contains
         call nc_write(filename,"uxy_bar",ylmo%dyn%now%uxy_bar,units="m/a",long_name="Vertically averaged velocity magnitude", &
                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
         
+        call nc_write(filename,"ux_b",ylmo%dyn%now%ux_b,units="m/a",long_name="Basal velocity (x)", &
+                      dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
+        
+        call nc_write(filename,"ux_i_bar",ylmo%dyn%now%ux_i_bar,units="m/a",long_name="Vertically averaged shearing velocity (x)", &
+                      dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
+        
+        call nc_write(filename,"ux_i",ylmo%dyn%now%ux_i,units="m/a",long_name="Horizontal shearing velocity (x)", &
+                      dim1="xc",dim2="yc",dim3="zeta",dim4="time",start=[1,1,1,n],ncid=ncid)
+        
+        call nc_write(filename,"ux",ylmo%dyn%now%ux,units="m/a",long_name="Horizontal velocity (x)", &
+                      dim1="xc",dim2="yc",dim3="zeta",dim4="time",start=[1,1,1,n],ncid=ncid)
+        
         ! call nc_write(filename,"de",ylmo%mat%now%strn%de,units="a^-1",long_name="Vertically averaged strain rate", &
         !               dim1="xc",dim2="yc",dim3="zeta",dim4="time",start=[1,1,1,n],ncid=ncid)
 
@@ -632,18 +535,33 @@ contains
         real(wp), intent(OUT) :: u0 
         real(wp), intent(IN)  :: H0
         real(wp), intent(IN)  :: beta 
-        real(wp), intent(IN)  :: eta
-        real(wp), intent(IN)  :: alpha 
+        real(wp), intent(IN)  :: eta            ! Viscosity!
+        real(wp), intent(IN)  :: alpha
 
         ! Local variables 
         real(wp) :: F2 
-
+ 
         F2 = H0/(3.0*eta)
-        u0 = (rho_ice*g) * H0 * (1.0+beta*F2)/beta*alpha
+        u0 = (rho_ice*g) * H0 * alpha * (1.0+beta*F2)/beta
 
         return 
 
     end subroutine calc_u0
+
+    elemental subroutine calc_ub0(ub0,H0,beta,eta,alpha)
+        ! Prescribe initial velocity as u0 
+
+        real(wp), intent(OUT) :: ub0 
+        real(wp), intent(IN)  :: H0
+        real(wp), intent(IN)  :: beta 
+        real(wp), intent(IN)  :: eta            ! Viscosity!
+        real(wp), intent(IN)  :: alpha
+
+        ub0 = (rho_ice*g) * H0 * alpha / beta
+
+        return 
+
+    end subroutine calc_ub0
 
 end program yelmo_slab
 

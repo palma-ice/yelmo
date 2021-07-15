@@ -46,7 +46,7 @@ program yelmo_slab
     integer  :: q, q1, q2  
     real(wp) :: dtt_now
     real(wp) :: stdev, factor 
-    real(wp) :: H_mean, ux_mean 
+    real(wp) :: H_mean, ux_mean, uxb_mean, uxs_mean 
 
     real(8)  :: cpu_start_time
     real(8)  :: cpu_end_time
@@ -101,12 +101,12 @@ if (ctrl%dtt .ne. 0.0) then
     ! == Perform one simulation with an outer timestep of ctrl%dtt =======
     
 
-    call run_yelmo_test(factor,H_mean,ux_mean,ctrl,file2D)
+    call run_yelmo_test(factor,H_mean,ux_mean,uxb_mean,uxs_mean,ctrl,file2D)
     
     ! Write summary 
     write(*,*) "====== "//trim(ctrl%domain)//" ======="
     !write(*,*) "factor", ctrl%dx, ctrl%dtt, ctrl%H_stdev, stdev, factor 
-    write(*, "(a,5g12.3)") "factor", ctrl%dx, ctrl%dtt, factor, H_mean, ux_mean
+    write(*, "(a,8g12.3)") "factor", ctrl%dx, ctrl%dtt, factor, H_mean, ux_mean, uxb_mean, uxs_mean
     
 else 
     ! === Perform ensemble of simulations with multiple values of dx and dt =====
@@ -146,9 +146,11 @@ else
             ! then don't run the model further, just set 
             ! factor to high value 
 
-            factor  = 100.0_wp 
-            H_mean  = 0.0_wp
-            ux_mean = 0.0_wp 
+            factor   = 100.0_wp 
+            H_mean   = 0.0_wp
+            ux_mean  = 0.0_wp 
+            uxb_mean = 0.0_wp 
+            uxs_mean = 0.0_wp 
 
         else 
             ! factor is still small, run the model for this timestep value
@@ -156,12 +158,12 @@ else
             ctrl%dx  = ctrl%dxs(q1) 
             ctrl%dtt = ctrl%dtts(q2) 
 
-            call run_yelmo_test(factor,H_mean,ux_mean,ctrl)
+            call run_yelmo_test(factor,H_mean,ux_mean,uxb_mean,uxs_mean,ctrl)
             
         end if 
 
-        write(15,"(5g12.3)") ctrl%dxs(q1), ctrl%dtts(q2), factor, H_mean, ux_mean
-        write(*, "(5g12.3)") "factor", ctrl%dxs(q1), ctrl%dtts(q2), factor, H_mean, ux_mean
+        write(15,"(8g12.3)") ctrl%dxs(q1), ctrl%dtts(q2), factor, H_mean, ux_mean, uxb_mean,uxs_mean
+        write(*, "(8g12.3)") "factor", ctrl%dxs(q1), ctrl%dtts(q2), factor, H_mean, ux_mean, uxb_mean,uxs_mean
         
     end do 
     end do 
@@ -179,13 +181,15 @@ write(*,"(a,f12.3,a)") "Time  = ",cpu_dtime/60.0 ," min"
 
 contains
     
-    subroutine run_yelmo_test(factor,H_mean,ux_mean,ctrl,file2D)
+    subroutine run_yelmo_test(factor,H_mean,ux_mean,uxb_mean,uxs_mean,ctrl,file2D)
 
         implicit none 
 
         real(wp),           intent(OUT) :: factor 
         real(wp),           intent(OUT) :: H_mean
         real(wp),           intent(OUT) :: ux_mean 
+        real(wp),           intent(OUT) :: uxb_mean 
+        real(wp),           intent(OUT) :: uxs_mean 
         type(ctrl_par),     intent(IN)  :: ctrl  
         character(len=*),   intent(IN), optional :: file2D 
 
@@ -319,8 +323,10 @@ contains
         ! Get mean values along center x-profile
 
         j = floor(yelmo1%grd%ny/2.0_wp)
-        H_mean  = sum(yelmo1%tpo%now%H_ice(:,j))  / real(yelmo1%grd%nx,wp)
-        ux_mean = sum(yelmo1%dyn%now%ux_bar(:,j)) / real(yelmo1%grd%nx,wp)
+        H_mean   = sum(yelmo1%tpo%now%H_ice(:,j))  / real(yelmo1%grd%nx,wp)
+        ux_mean  = sum(yelmo1%dyn%now%ux_bar(:,j)) / real(yelmo1%grd%nx,wp)
+        uxb_mean = sum(yelmo1%dyn%now%ux_b(:,j))   / real(yelmo1%grd%nx,wp)
+        uxs_mean = sum(yelmo1%dyn%now%ux_s(:,j))   / real(yelmo1%grd%nx,wp)
         
         call yelmo_end(yelmo1,time) 
 

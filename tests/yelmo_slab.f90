@@ -131,7 +131,7 @@ else
     write(*,*) "dxs:  ", ctrl%dxs(1:ctrl%n_dx) 
 
     open(unit=15,file=trim(outfldr)//"slab_dt_factor.txt",status="UNKNOWN")
-    write(15,"(5a12)") "dx", "dt", "factor", "H_mean", "ux_mean"
+    write(15,"(7a12)") "dx", "dt", "factor", "H", "ux_bar", "ux_b", "ux_s"
 
     do q1 = 1, ctrl%n_dx
 

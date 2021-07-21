@@ -11,8 +11,57 @@ module velocity_sia
     public :: calc_velocity_basal_sia       ! Not ready yet, needs checking that it is consistent with Weertman sliding law 
     
 contains 
+    
+        subroutine calc_velocity_sia(ux_i,uy_i,ux_i_bar,uy_i_bar,H_ice,f_ice,taud_acx,taud_acy,ATT,zeta_aa,dx,n_glen,rho_ice,g,boundaries)
 
-    subroutine calc_velocity_sia(ux_i,uy_i,ux_i_bar,uy_i_bar,H_ice,f_ice,taud_acx,taud_acy,ATT,zeta_aa,dx,n_glen,rho_ice,g,boundaries)
+        implicit none 
+
+        real(prec),         intent(OUT) :: ux_i(:,:,:) 
+        real(prec),         intent(OUT) :: uy_i(:,:,:) 
+        real(prec),         intent(OUT) :: ux_i_bar(:,:) 
+        real(prec),         intent(OUT) :: uy_i_bar(:,:) 
+        real(prec),         intent(IN)  :: H_ice(:,:) 
+        real(prec),         intent(IN)  :: f_ice(:,:)
+        real(prec),         intent(IN)  :: taud_acx(:,:) 
+        real(prec),         intent(IN)  :: taud_acy(:,:) 
+        real(prec),         intent(IN)  :: ATT(:,:,:)
+        real(prec),         intent(IN)  :: zeta_aa(:) 
+        real(prec),         intent(IN)  :: dx 
+        real(prec),         intent(IN)  :: n_glen 
+        real(prec),         intent(IN)  :: rho_ice 
+        real(prec),         intent(IN)  :: g 
+        character(len=*),   intent(IN)  :: boundaries 
+
+        ! Local variables 
+        integer :: nx, ny, nz_aa 
+        real(prec), allocatable :: tau_xz(:,:,:) 
+        real(prec), allocatable :: tau_yz(:,:,:) 
+
+        nx    = size(ux_i,1)
+        ny    = size(ux_i,2)
+        nz_aa = size(ux_i,3)
+        
+        allocate(tau_xz(nx,ny,nz_aa))
+        allocate(tau_yz(nx,ny,nz_aa))
+
+        ! Calculate diffusivity constant on ab-nodes
+        call calc_shear_stress_3D(tau_xz,tau_yz,taud_acx,taud_acy,f_ice,zeta_aa,boundaries)
+
+        ! Calculate the 3D horizontal shear velocity fields
+        call calc_uxy_sia_3D(ux_i,uy_i,tau_xz,tau_yz,taud_acx,taud_acy,H_ice,f_ice,ATT,n_glen,zeta_aa,boundaries)
+        
+        ! Calculate the depth-averaged horizontal shear velocity fields too
+        ! call calc_uxy_sia_2D(ux_i_bar,uy_i_bar,dd_ab,taud_acx,taud_acy,f_ice,zeta_aa,boundaries)
+
+        ! Or, simply integrate from 3D velocity field to get depth-averaged field (slower)
+        ux_i_bar = calc_vertical_integrated_2D(ux_i,zeta_aa)
+        uy_i_bar = calc_vertical_integrated_2D(uy_i,zeta_aa)
+        
+        return 
+
+    end subroutine calc_velocity_sia
+
+    subroutine calc_velocity_sia_0(ux_i,uy_i,ux_i_bar,uy_i_bar,H_ice,f_ice,taud_acx,taud_acy,ATT,zeta_aa,dx,n_glen,rho_ice,g,boundaries)
 
         implicit none 
 
@@ -47,7 +96,7 @@ contains
                                 zeta_aa,dx,n_glen,rho_ice,g,boundaries)
 
         ! Calculate the 3D horizontal shear velocity fields
-        call calc_uxy_sia_3D(ux_i,uy_i,dd_ab,taud_acx,taud_acy,f_ice,boundaries)
+        call calc_uxy_sia_3D_0(ux_i,uy_i,dd_ab,taud_acx,taud_acy,f_ice,boundaries)
         
         ! Calculate the depth-averaged horizontal shear velocity fields too
         call calc_uxy_sia_2D(ux_i_bar,uy_i_bar,dd_ab,taud_acx,taud_acy,f_ice,zeta_aa,boundaries)
@@ -58,7 +107,7 @@ contains
         
         return 
 
-    end subroutine calc_velocity_sia
+    end subroutine calc_velocity_sia_0
 
     subroutine calc_velocity_basal_sia(ux_b,uy_b,taub_acx,taub_acy,dd_ab_3D,H_ice,taud_acx,taud_acy,f_pmp,zeta_aa,dx,cf_sia,rho_ice,g)
         ! Calculate the parameterized basal velocity for use with SIA
@@ -249,6 +298,277 @@ contains
         
     end subroutine calc_velocity_basal_sia_00
     
+    subroutine calc_shear_stress_3D(tau_xz,tau_yz,taud_acx,taud_acy,f_ice,zeta_aa,boundaries)
+        ! Calculate the shear stress (x/y) components at each vertical level, as an input 
+        ! to the SIA calculation. 
+
+        !$ use omp_lib
+
+        implicit none
+        
+        real(wp),           intent(OUT) :: tau_xz(:,:,:)        ! nx,ny,nz_aa [m/a] Shear stress 
+        real(wp),           intent(OUT) :: tau_yz(:,:,:)        ! nx,ny,nz_aa [m/a] Shear stress 
+        real(wp),           intent(IN)  :: taud_acx(:,:)      ! [Pa] Driving stress x-direction 
+        real(wp),           intent(IN)  :: taud_acy(:,:)      ! [Pa] Driving stress y-direction 
+        real(wp),           intent(IN)  :: f_ice(:,:)         ! [--] Ice area fraction 
+        real(wp),           intent(IN)  :: zeta_aa(:)         ! [--] Height axis 0:1, layer centers (aa-nodes)
+        character(len=*),   intent(IN)  :: boundaries 
+
+        ! Local variables
+        integer  :: i, j, k, nx, ny, nz_aa
+        integer  :: im1, ip1, jm1, jp1
+        real(wp) :: H_ice_ab
+        real(wp) :: ATT_ab_km1 
+        real(wp) :: ATT_ab_k
+        real(wp) :: ATT_int_ab 
+
+        logical  :: is_ice_or_margin 
+
+        nx    = size(f_ice,1)
+        ny    = size(f_ice,2)
+        nz_aa = size(zeta_aa,1)
+
+        tau_xz = 0.0_wp 
+        tau_yz = 0.0_wp 
+
+        !$omp parallel do 
+        do j = 1, ny 
+        do i = 1, nx 
+
+            ! Define neighbor indices
+            im1 = max(1,i-1)
+            ip1 = min(nx,i+1)
+            jm1 = max(1,j-1)
+            jp1 = min(ny,j+1)
+            
+            ! Determine if current point is part of the ice sheet or nearby
+            is_ice_or_margin = (count([f_ice(i,j),f_ice(im1,j),f_ice(ip1,j), &
+                                       f_ice(i,jm1),f_ice(i,jp1),f_ice(im1,jp1), &
+                                       f_ice(im1,jm1),f_ice(ip1,jp1),f_ice(ip1,jm1)].gt.0.0_wp) .gt. 0)
+
+            if (is_ice_or_margin) then 
+                ! Ice covered, or nearby (to include all ab-nodes)
+
+                ! Calculate shear stress on ac-nodes at each level
+                do k = 1, nz_aa 
+                    tau_xz(i,j,k) = -(1.0_prec-zeta_aa(k))*taud_acx(i,j)
+                    tau_yz(i,j,k) = -(1.0_prec-zeta_aa(k))*taud_acy(i,j)
+                end do 
+
+            end if 
+
+        end do 
+        end do 
+        !$omp end parallel do 
+
+        ! Apply boundary conditions as needed 
+        select case(trim(boundaries))
+            
+            case("periodic")
+
+                tau_xz(1,:,:)    = tau_xz(nx-2,:,:) 
+                tau_xz(nx-1,:,:) = tau_xz(2,:,:) 
+                tau_xz(nx,:,:)   = tau_xz(3,:,:) 
+                tau_xz(:,1,:)    = tau_xz(:,ny-1,:)
+                tau_xz(:,ny,:)   = tau_xz(:,2,:) 
+
+                tau_yz(1,:,:)    = tau_yz(nx-1,:,:) 
+                tau_yz(nx,:,:)   = tau_yz(2,:,:) 
+                tau_yz(:,1,:)    = tau_yz(:,ny-2,:)
+                tau_yz(:,ny-1,:) = tau_yz(:,2,:) 
+                tau_yz(:,ny,:)   = tau_yz(:,3,:)
+
+            case("periodic-x") 
+            
+                tau_xz(1,:,:)    = tau_xz(nx-2,:,:) 
+                tau_xz(nx-1,:,:) = tau_xz(2,:,:) 
+                tau_xz(nx,:,:)   = tau_xz(3,:,:) 
+                tau_xz(:,1,:)    = tau_xz(:,2,:)
+                tau_xz(:,ny,:)   = tau_xz(:,ny-1,:) 
+
+                tau_yz(1,:,:)    = tau_yz(nx-1,:,:) 
+                tau_yz(nx,:,:)   = tau_yz(2,:,:) 
+                tau_yz(:,1,:)    = tau_yz(:,2,:)
+                tau_yz(:,ny-1,:) = tau_yz(:,ny-2,:) 
+                tau_yz(:,ny,:)   = tau_yz(:,ny-1,:)
+
+            case("infinite") 
+            
+                tau_xz(1,:,:)    = tau_xz(2,:,:) 
+                tau_xz(nx-1,:,:) = tau_xz(nx-2,:,:) 
+                tau_xz(nx,:,:)   = tau_xz(nx-1,:,:) 
+                tau_xz(:,1,:)    = tau_xz(:,2,:)
+                tau_xz(:,ny,:)   = tau_xz(:,ny-1,:) 
+
+                tau_yz(1,:,:)    = tau_yz(2,:,:) 
+                tau_yz(nx,:,:)   = tau_yz(nx-1,:,:) 
+                tau_yz(:,1,:)    = tau_yz(:,2,:)
+                tau_yz(:,ny-1,:) = tau_yz(:,ny-2,:) 
+                tau_yz(:,ny,:)   = tau_yz(:,ny-1,:)
+
+        end select
+
+        return
+        
+    end subroutine calc_shear_stress_3D
+
+    subroutine calc_uxy_sia_3D(ux,uy,tau_xz,tau_yz,taud_acx,taud_acy,H_ice,f_ice,ATT,n_glen,zeta_aa,boundaries)
+        ! Calculate the 3D horizontal velocity field using SIA
+
+        implicit none
+        
+        real(wp),           intent(OUT) :: ux(:,:,:)        ! nx,ny,nz_aa [m/a] SIA velocity x-direction, acx-nodes
+        real(wp),           intent(OUT) :: uy(:,:,:)        ! nx,ny,nz_aa [m/a] SIA velocity y-direction, acy-nodes
+        real(wp),           intent(IN)  :: tau_xz(:,:,:)    ! [Pa] Shear stress, x-direction
+        real(wp),           intent(IN)  :: tau_yz(:,:,:)    ! [Pa] Shear stress, y-direction
+        real(wp),           intent(IN)  :: taud_acx(:,:)    ! [Pa] Driving stress x-direction 
+        real(wp),           intent(IN)  :: taud_acy(:,:)    ! [Pa] Driving stress y-direction
+        real(wp),           intent(IN)  :: H_ice(:,:)       ! [m] Ice thickness 
+        real(wp),           intent(IN)  :: f_ice(:,:)       ! [--] Ice area fraction 
+        real(wp),           intent(IN)  :: ATT(:,:,:)       ! nx,ny,nz_aa [a-1 Pa-3] Rate factor
+        real(wp),           intent(IN)  :: n_glen 
+        real(wp),           intent(IN)  :: zeta_aa(:) 
+        character(len=*),   intent(IN)  :: boundaries 
+
+        ! Local variables
+        integer  :: i, j, k, nx, ny, nz_aa
+        integer  :: im1, ip1, jm1, jp1
+        real(wp) :: tau_xz_ab
+        real(wp) :: tau_yz_ab
+        real(wp) :: tau_eff_sq_ab
+        real(wp) :: p1   
+        real(wp) :: ATT_ab 
+        real(wp) :: depth_ab 
+        real(wp) :: H_ice_ab 
+        real(wp) :: fact_ac
+        real(wp) :: dzeta 
+
+        real(wp), allocatable :: fact_ab(:,:) 
+
+        nx    = size(ux,1)
+        ny    = size(ux,2)
+        nz_aa = size(ux,3) 
+
+        allocate(fact_ab(nx,ny)) 
+
+        ! Define exponent 
+        p1 = (n_glen-1.0_wp)/2.0_wp
+
+        ! Initialize velocity solution to zero everywhere 
+        ux = 0.0 
+        uy = 0.0 
+
+        ! Set integrative factor to zero everywhere too
+        fact_ab = 0.0_prec 
+
+        ! Loop over layers starting from first layer above the base to surface 
+        do k = 2, nz_aa
+            
+            dzeta = zeta_aa(k) - zeta_aa(k-1) 
+
+            ! Calculate integrative factor on ab-nodes
+            do i = 1, nx 
+            do j = 1, ny 
+
+                im1 = max(i-1,1) 
+                ip1 = min(i+1,nx) 
+                jm1 = max(j-1,1) 
+                jp1 = min(j+1,ny) 
+
+                ! Calculate effective stress 
+                tau_xz_ab = 0.5_prec*(tau_xz(i,j,k)+tau_xz(i,jp1,k))
+                tau_yz_ab = 0.5_prec*(tau_yz(i,j,k)+tau_yz(ip1,j,k))
+                tau_eff_sq_ab = tau_xz_ab**2 + tau_yz_ab**2
+
+                ATT_ab   = 0.25_prec*(ATT(i,j,k)+ATT(ip1,j,k)+ATT(i,jp1,k)+ATT(ip1,jp1,k))
+                depth_ab = (1.0_prec-zeta_aa(k))    ! depth of sigma scale, since H is inside of tau_d
+
+                H_ice_ab = 0.25_prec*(H_ice(i,j)+H_ice(ip1,j)+H_ice(i,jp1)+H_ice(ip1,jp1))
+                
+                if (p1 .ne. 0.0_wp) then  
+                    fact_ab(i,j) = fact_ab(i,j) &
+                        - 2.0_prec * depth_ab * ATT_ab * tau_eff_sq_ab**p1 * (dzeta*H_ice_ab)
+                else
+                    fact_ab(i,j) = fact_ab(i,j) &
+                        - 2.0_prec * depth_ab * ATT_ab * (dzeta*H_ice_ab)
+                end if 
+
+            end do 
+            end do 
+
+            ! Calculate 3D horizontal velocity components on acx/acy nodes
+            do j = 1, ny 
+            do i = 1, nx 
+            
+                im1 = max(i-1,1) 
+                jm1 = max(j-1,1) 
+                
+                ! stagger factor to acx-nodes and calculate velocity
+                if (f_ice(i,j) .eq. 1.0 .or. f_ice(ip1,j) .eq. 1.0) then 
+                    fact_ac   = 0.5_prec*(fact_ab(i,j)+fact_ab(i,jm1))
+                    ux(i,j,k) = ux(i,j,1) + fact_ac*taud_acx(i,j)
+                end if 
+
+                ! stagger factor to acy-nodes and calculate velocity
+                if (f_ice(i,j) .eq. 1.0 .or. f_ice(im1,j) .eq. 1.0) then
+                    fact_ac   = 0.5_prec*(fact_ab(i,j)+fact_ab(im1,j))
+                    uy(i,j,k) = uy(i,j,1) + fact_ac*taud_acy(i,j)
+                end if 
+
+            end do 
+            end do 
+
+        end do 
+
+        ! Apply boundary conditions as needed 
+        if (trim(boundaries) .eq. "periodic") then
+
+            ux(1,:,:)    = ux(nx-2,:,:) 
+            ux(nx-1,:,:) = ux(2,:,:) 
+            ux(nx,:,:)   = ux(3,:,:) 
+            ux(:,1,:)    = ux(:,ny-1,:)
+            ux(:,ny,:)   = ux(:,2,:) 
+
+            uy(1,:,:)    = uy(nx-1,:,:) 
+            uy(nx,:,:)   = uy(2,:,:) 
+            uy(:,1,:)    = uy(:,ny-2,:)
+            uy(:,ny-1,:) = uy(:,2,:) 
+            uy(:,ny,:)   = uy(:,3,:)
+
+        else if (trim(boundaries) .eq. "periodic-x") then 
+            
+            ux(1,:,:)    = ux(nx-2,:,:) 
+            ux(nx-1,:,:) = ux(2,:,:) 
+            ux(nx,:,:)   = ux(3,:,:) 
+            ux(:,1,:)    = ux(:,2,:)
+            ux(:,ny,:)   = ux(:,ny-1,:) 
+
+            uy(1,:,:)    = uy(nx-1,:,:) 
+            uy(nx,:,:)   = uy(2,:,:) 
+            uy(:,1,:)    = uy(:,2,:)
+            uy(:,ny-1,:) = uy(:,ny-2,:) 
+            uy(:,ny,:)   = uy(:,ny-1,:)
+
+        else if (trim(boundaries) .eq. "infinite") then 
+            
+            ux(1,:,:)    = ux(2,:,:) 
+            ux(nx-1,:,:) = ux(nx-2,:,:) 
+            ux(nx,:,:)   = ux(nx-1,:,:) 
+            ux(:,1,:)    = ux(:,2,:)
+            ux(:,ny,:)   = ux(:,ny-1,:) 
+
+            uy(1,:,:)    = uy(2,:,:) 
+            uy(nx,:,:)   = uy(nx-1,:,:) 
+            uy(:,1,:)    = uy(:,2,:)
+            uy(:,ny-1,:) = uy(:,ny-2,:) 
+            uy(:,ny,:)   = uy(:,ny-1,:)
+
+        end if 
+
+        return
+        
+    end subroutine calc_uxy_sia_3D
+
     subroutine calc_dd_ab_3D(dd_ab_3D,H_ice,f_ice,taud_acx,taud_acy,ATT,zeta_aa,dx,n_glen,rho_ice,g,boundaries)
         ! Calculate the 3D diffusivity helper field on ab-nodes, as an input 
         ! to the SIA calculation. 
@@ -504,7 +824,7 @@ contains
         
     end subroutine calc_uxy_sia_2D
 
-    subroutine calc_uxy_sia_3D(ux,uy,dd_ab_3D,taud_acx,taud_acy,f_ice,boundaries)
+    subroutine calc_uxy_sia_3D_0(ux,uy,dd_ab_3D,taud_acx,taud_acy,f_ice,boundaries)
         ! Calculate the 3D horizontal velocity field using SIA
 
         implicit none
@@ -609,7 +929,7 @@ contains
 
         return
         
-    end subroutine calc_uxy_sia_3D
+    end subroutine calc_uxy_sia_3D_0
 
     function calc_rate_factor_integrated(ATT,zeta,n_glen) result(ATT_int)
         ! Greve and Blatter (2009), Chpt 5, page 82

@@ -46,7 +46,7 @@ contains
                                   beta,beta_acx,beta_acy,visc_eff,visc_eff_int,  &
                                   ssa_mask_acx,ssa_mask_acy,ssa_err_acx,ssa_err_acy,ssa_iter_now, &
                                   c_bed,taud_acx,taud_acy,H_ice,f_ice,H_grnd,f_grnd, &
-                                  f_grnd_acx,f_grnd_acy,ATT,zeta_aa,z_sl,z_bed,dx,dy,n_glen,par)
+                                  f_grnd_acx,f_grnd_acy,ATT,zeta_aa,zeta_ac,z_sl,z_bed,dx,dy,n_glen,par)
         ! This subroutine is used to solve the horizontal velocity system (ux,uy)
         ! following the L1L2 solver formulation (ie, depth-integrated solver
         ! that reduces to SIA in the limit of zero sliding), as outlined 
@@ -86,6 +86,7 @@ contains
         real(prec), intent(IN)    :: f_grnd_acy(:,:)    ! [-]
         real(prec), intent(IN)    :: ATT(:,:,:)         ! [a^-1 Pa^-n_glen]
         real(prec), intent(IN)    :: zeta_aa(:)         ! [-]
+        real(prec), intent(IN)    :: zeta_ac(:)         ! [-]
         real(prec), intent(IN)    :: z_sl(:,:)          ! [m]
         real(prec), intent(IN)    :: z_bed(:,:)         ! [m]
         real(prec), intent(IN)    :: dx                 ! [m]
@@ -238,8 +239,8 @@ end if
         ! Iterations are finished, finalize calculations of 3D velocity field 
 
         ! Calculate the 3D horizontal velocity field
-        call calc_vel_horizontal_3D(ux,uy,ux_b,uy_b,taud_acx,taud_acy,visc_eff_ab,ATT,H_ice, &
-                                            zeta_aa,dx,dy,n_glen,par%eps_0,par%boundaries)
+        call calc_vel_horizontal_3D(ux,uy,ux_b,uy_b,taud_acx,taud_acy,visc_eff,visc_eff_ab,ATT,H_ice, &
+                                            zeta_aa,zeta_ac,dx,dy,n_glen,par%eps_0,par%boundaries)
         
         ! Calculate depth-averaged horizontal velocity 
         ux_bar = calc_vertical_integrated_2D(ux,zeta_aa)
@@ -255,7 +256,7 @@ end if
 
     end subroutine calc_velocity_l1l2
 
-    subroutine calc_vel_horizontal_3D(ux,uy,ux_b,uy_b,taud_acx,taud_acy,visc_eff_ab,ATT,H_ice,zeta_aa,dx,dy,n_glen,eps_0,boundaries)
+    subroutine calc_vel_horizontal_3D(ux,uy,ux_b,uy_b,taud_acx,taud_acy,visc_eff_aa,visc_eff_ab,ATT,H_ice,zeta_aa,zeta_ac,dx,dy,n_glen,eps_0,boundaries)
         ! Caluculate the 3D horizontal velocity field (ux,uy)
         ! for the L1L2 solver following Perego et al. (2012)
         ! and the blueprint by Lipscomb et al. (2019) in CISM
@@ -268,10 +269,12 @@ end if
         real(prec), intent(IN)  :: uy_b(:,:) 
         real(prec), intent(IN)  :: taud_acx(:,:) 
         real(prec), intent(IN)  :: taud_acy(:,:)
+        real(prec), intent(IN)  :: visc_eff_aa(:,:,:)   ! on aa-nodes 
         real(prec), intent(IN)  :: visc_eff_ab(:,:,:)   ! on ab-nodes already 
         real(prec), intent(IN)  :: ATT(:,:,:)  
         real(prec), intent(IN)  :: H_ice(:,:)
         real(prec), intent(IN)  :: zeta_aa(:) 
+        real(prec), intent(IN)  :: zeta_ac(:) 
         real(prec), intent(IN)  :: dx
         real(prec), intent(IN)  :: dy
         real(prec), intent(IN)  :: n_glen   
@@ -279,7 +282,7 @@ end if
         character(len=*), intent(IN) :: boundaries 
 
         ! Local variables
-        integer :: i, j, k, nx, ny, nz_aa  
+        integer :: i, j, k, nx, ny, nz_aa, nz_ac   
         integer    :: ip1, jp1, im1, jm1 
         real(prec) :: inv_4dx, inv_4dy 
         real(prec) :: zeta_ac1, zeta_ac0 
@@ -289,11 +292,12 @@ end if
         real(prec) :: tau_xz_ab, tau_yz_ab 
         real(prec) :: tau_eff_sq_ab, ATT_ab, depth_ab 
         real(prec) :: fact_ac 
+        real(prec) :: visc_eff_ab_now 
+        real(prec) :: H_ice_ab 
         real(prec), allocatable :: dudx_ab(:,:)
         real(prec), allocatable :: dvdy_ab(:,:)
         real(prec), allocatable :: dudy_ab(:,:)
         real(prec), allocatable :: dvdx_ab(:,:)
-        real(prec), allocatable :: H_ice_ab(:,:) 
         real(prec), allocatable :: visc_eff_int3D_ab(:,:,:) 
         real(prec), allocatable :: tau_par_ab(:,:,:) 
         real(prec), allocatable :: work1_ab(:,:)
@@ -310,13 +314,13 @@ end if
         nx    = size(ux,1)
         ny    = size(ux,2) 
         nz_aa = size(ux,3) 
+        nz_ac = size(zeta_ac,1)
 
         ! Allocate local arrays 
         allocate(dudx_ab(nx,ny)) 
         allocate(dvdy_ab(nx,ny)) 
         allocate(dudy_ab(nx,ny)) 
         allocate(dvdx_ab(nx,ny)) 
-        allocate(H_ice_ab(nx,ny))
         allocate(visc_eff_int3D_ab(nx,ny,nz_aa)) 
         allocate(tau_par_ab(nx,ny,nz_aa))
         allocate(work1_ab(nx,ny)) 
@@ -352,9 +356,9 @@ end if
             dudx_ab(i,j) = ( (ux_b(ip1,j) - ux_b(im1,j)) + (ux_b(ip1,jp1) - ux_b(im1,jp1)) ) *inv_4dx
             dvdy_ab(i,j) = ( (uy_b(i,jp1) - uy_b(i,jm1)) + (uy_b(ip1,jp1) - uy_b(ip1,jm1)) ) *inv_4dy 
 
-            ! Calculate of cross terms on ab-nodes
-            dudy_ab(i,j) = (ux_b(i,jp1) - ux_b(i,j)) / dx 
-            dvdx_ab(i,j) = (uy_b(ip1,j) - uy_b(i,j)) / dy 
+            ! Calculate cross terms on ab-nodes
+            dudy_ab(i,j) = (ux_b(i,jp1) - ux_b(i,j)) / dy 
+            dvdx_ab(i,j) = (uy_b(ip1,j) - uy_b(i,j)) / dx 
 
             ! Calculate the 'parallel' effective strain rate from P12, Eq. 17
             eps_par_sq = dudx_ab(i,j)**2 + dvdy_ab(i,j)**2 + dudx_ab(i,j)*dvdy_ab(i,j) &
@@ -367,27 +371,37 @@ end if
             end do 
 
             ! Note: above, eps_par and thus tau_par should be zero when no_slip=True 
-            ! and the basal velocity components are zero. 
+            ! and the basal velocity components are zero (effectively zero because eps_0 ensures nonzero value). 
 
             ! Compute the integral of visc_eff from the base of each layer to the surface (P12, Eq. 28)
 
-            H_ice_ab(i,j) = 0.25_prec*(H_ice(i,j)+H_ice(ip1,j)+H_ice(i,jp1)+H_ice(ip1,jp1))
+            H_ice_ab = 0.25_prec*(H_ice(i,j)+H_ice(ip1,j)+H_ice(i,jp1)+H_ice(ip1,jp1))
             
             ! Start at the surface
-            visc_eff_int3D_ab(i,j,nz_aa) = visc_eff_ab(i,j,nz_aa) &
-                                            * (zeta_aa(nz_aa)-zeta_aa(nz_aa-1))*H_ice_ab(i,j)
+            zeta_ac1 = zeta_aa(nz_aa)
+            zeta_ac0 = 0.5_prec*(zeta_aa(nz_aa)+zeta_aa(nz_aa-1))
+            visc_eff_ab_now = 0.25_prec*(visc_eff_ab(i,j,nz_aa)+visc_eff_ab(ip1,j,nz_aa)+ &
+                                visc_eff_ab(i,jp1,nz_aa)+visc_eff_ab(ip1,jp1,nz_aa))
+            visc_eff_int3D_ab(i,j,nz_aa) = visc_eff_ab_now &
+                                            * (zeta_ac1-zeta_ac0)*H_ice_ab
 
             ! Integrate down to near the base 
             do k = nz_aa-1, 2, -1 
                 zeta_ac1 = 0.5_prec*(zeta_aa(k+1)+zeta_aa(k))
                 zeta_ac0 = 0.5_prec*(zeta_aa(k)+zeta_aa(k-1))
+                visc_eff_ab_now = 0.25_prec*(visc_eff_ab(i,j,k)+visc_eff_ab(ip1,j,k)+ &
+                                visc_eff_ab(i,jp1,k)+visc_eff_ab(ip1,jp1,k))
                 visc_eff_int3D_ab(i,j,k) = visc_eff_int3D_ab(i,j,k+1) &
-                                        + visc_eff_ab(i,j,k) * (zeta_ac1-zeta_ac0)*H_ice_ab(i,j)
+                                        + visc_eff_ab_now * (zeta_ac1-zeta_ac0)*H_ice_ab
             end do 
             
             ! Get basal value
+            zeta_ac1 = 0.5_prec*(zeta_aa(2)+zeta_aa(1))
+            zeta_ac0 = zeta_aa(1)
+            visc_eff_ab_now = 0.25_prec*(visc_eff_ab(i,j,1)+visc_eff_ab(ip1,j,1)+ &
+                                visc_eff_ab(i,jp1,1)+visc_eff_ab(ip1,jp1,1))
             visc_eff_int3D_ab(i,j,1) = visc_eff_int3D_ab(i,j,2) &
-                                        + visc_eff_ab(i,j,1) * (zeta_aa(2)-zeta_aa(1))*H_ice_ab(i,j)
+                                        + visc_eff_ab_now * (zeta_ac1-zeta_ac0)*H_ice_ab
             
         end do  
         end do 
@@ -434,8 +448,8 @@ end if
 
         end do 
 
-        ux = 0.0 
-        uy = 0.0 
+        ux = 0.0_wp 
+        uy = 0.0_wp
 
         ! Assign basal velocity value 
         ux(:,:,1)    = ux_b 
@@ -444,15 +458,8 @@ end if
 
         ! Loop over layers starting from first layer above the base to surface 
         do k = 2, nz_aa
-
-            if (k .eq. nz_aa) then 
-                zeta_ac1 = zeta_aa(nz_aa)
-            else 
-                zeta_ac1 = 0.5_prec*(zeta_aa(k+1)+zeta_aa(k))
-            end if 
-            zeta_ac0 = 0.5_prec*(zeta_aa(k)+zeta_aa(k-1))
             
-            dzeta = zeta_ac1 - zeta_ac0 
+            dzeta = zeta_aa(k) - zeta_aa(k-1) 
 
             ! Calculate tau_perp, tau_eff and factor to calculate velocities,
             ! all on ab-nodes 
@@ -467,27 +474,29 @@ end if
                 ! Calculate effective stress 
                 tau_xz_ab = 0.5_prec*(tau_xz(i,j,k)+tau_xz(i,jp1,k))
                 tau_yz_ab = 0.5_prec*(tau_yz(i,j,k)+tau_yz(ip1,j,k))
-                tau_eff_sq_ab = tau_par_ab(i,j,k)**2 + tau_xz_ab**2 + tau_yz_ab**2
+                tau_eff_sq_ab = tau_xz_ab**2 + tau_yz_ab**2 + tau_par_ab(i,j,k)**2
 
                 ! Calculate factor to get velocity components
                 ATT_ab   = 0.25_prec*(ATT(i,j,k)+ATT(ip1,j,k)+ATT(i,jp1,k)+ATT(ip1,jp1,k))
                 depth_ab = (1.0_prec-zeta_aa(k))    ! depth of sigma scale, since H is inside of tau_d
 
+                H_ice_ab = 0.25_prec*(H_ice(i,j)+H_ice(ip1,j)+H_ice(i,jp1)+H_ice(ip1,jp1))
+                
                 if (p1 .ne. 0.0_wp) then  
                     fact_ab(i,j) = fact_ab(i,j) &
-                        - 2.0_prec * depth_ab * ATT_ab * tau_eff_sq_ab**p1 * (dzeta*H_ice_ab(i,j))
+                        - 2.0_prec * depth_ab * ATT_ab * tau_eff_sq_ab**p1 * (dzeta*H_ice_ab)
                 else
                     fact_ab(i,j) = fact_ab(i,j) &
-                        - 2.0_prec * depth_ab * ATT_ab * (dzeta*H_ice_ab(i,j))
+                        - 2.0_prec * depth_ab * ATT_ab * (dzeta*H_ice_ab)
                 end if 
 
             end do 
             end do 
 
             ! Calculate 3D horizontal velocity components on acx/acy nodes
-            do i = 1, nx 
             do j = 1, ny 
-
+            do i = 1, nx 
+            
                 im1 = max(i-1,1) 
                 jm1 = max(j-1,1) 
                 
@@ -849,7 +858,303 @@ end if
 
     end subroutine calc_visc_eff_3D
 
-        subroutine calc_visc_eff_int(visc_eff_int,visc_eff,H_ice,f_ice,zeta_aa)
+    subroutine calc_visc_eff_3D_0(visc_eff,visc_eff_ab,ux_b,uy_b,taud_acx,taud_acy,ATT,H_ice,f_ice,zeta_aa,dx,dy,n_glen,eps_0,boundaries)
+        ! Caluculate the 3D effective viscosity field
+        ! for the L1L2 solver following Perego et al. (2012)
+        ! and the blueprint by Lipscomb et al. (2019) in CISM
+
+        implicit none 
+
+        real(prec), intent(OUT) :: visc_eff(:,:,:)       
+        real(prec), intent(OUT) :: visc_eff_ab(:,:,:) 
+        real(prec), intent(IN)  :: ux_b(:,:) 
+        real(prec), intent(IN)  :: uy_b(:,:) 
+        real(prec), intent(IN)  :: taud_acx(:,:) 
+        real(prec), intent(IN)  :: taud_acy(:,:)
+        real(prec), intent(IN)  :: ATT(:,:,:)  
+        real(prec), intent(IN)  :: H_ice(:,:)
+        real(prec), intent(IN)  :: f_ice(:,:)
+        real(prec), intent(IN)  :: zeta_aa(:) 
+        real(prec), intent(IN)  :: dx
+        real(prec), intent(IN)  :: dy
+        real(prec), intent(IN)  :: n_glen   
+        real(prec), intent(IN)  :: eps_0                ! [1/a] Regularization constant (minimum strain rate, ~1e-8)
+        character(len=*), intent(IN) :: boundaries 
+
+        ! Local variables
+        integer :: i, j, k, nx, ny, nz_aa  
+        integer    :: ip1, jp1, im1, jm1 
+        real(prec) :: inv_4dx, inv_4dy 
+        real(prec) :: tau_eff_sq_ab, ATT_ab 
+        real(prec) :: dudx_ab, dvdy_ab, dudy_ab, dvdx_ab
+        
+        real(prec) :: eps_par_sq, eps_par_ab 
+        real(prec) :: eps_0_sq 
+        real(prec) :: taud_ab, tau_par_ab, tau_perp_ab 
+        real(prec) :: a, b, c, rootA, rootB, np  
+        real(prec) :: wt 
+
+        integer :: n_iter 
+
+        nx    = size(ux_b,1)
+        ny    = size(ux_b,2) 
+        nz_aa = size(zeta_aa,1) 
+
+        ! Consistency check 
+        if (n_glen .ne. 3.0_prec) then 
+            write(*,*) "calc_visc_eff_3D:: Error: currently, the L1L2 solver &
+            & with dynamic viscosity can only be used with n_glen=3."
+            stop 
+        end if 
+
+        ! Calculate scaling factors
+        inv_4dx = 1.0_prec / (4.0_prec*dx) 
+        inv_4dy = 1.0_prec / (4.0_prec*dy) 
+
+        ! Calculate squared minimum strain rate 
+        eps_0_sq = eps_0*eps_0 
+
+        ! Step 1: compute basal strain rates on ab-nodes and viscosity       
+        do j = 1, ny 
+        do i = 1, nx 
+
+            im1 = max(i-1,1) 
+            ip1 = min(i+1,nx) 
+            jm1 = max(j-1,1) 
+            jp1 = min(j+1,ny) 
+
+            ! Calculate effective strain components from horizontal stretching on ab-nodes
+            dudx_ab = ( (ux_b(ip1,j) - ux_b(im1,j)) + (ux_b(ip1,jp1) - ux_b(im1,jp1)) ) *inv_4dx
+            dvdy_ab = ( (uy_b(i,jp1) - uy_b(i,jm1)) + (uy_b(ip1,jp1) - uy_b(ip1,jm1)) ) *inv_4dy 
+
+            ! Calculate of cross terms on ab-nodes
+            dudy_ab = (ux_b(i,jp1) - ux_b(i,j)) / dx 
+            dvdx_ab = (uy_b(ip1,j) - uy_b(i,j)) / dy 
+
+            ! Calculate the 'parallel' effective strain rate from P12, Eq. 17
+            eps_par_sq = dudx_ab**2 + dvdy_ab**2 + dudx_ab*dvdy_ab &
+                        + 0.25_prec*(dudy_ab+dvdx_ab)**2 + eps_0_sq
+            eps_par_ab = sqrt(eps_par_sq) 
+
+
+            ! Get current magnitude of driving stress on ab-nodes 
+            taud_ab = sqrt( (0.5_prec*(taud_acx(i,j)+taud_acx(i,jp1)))**2 &
+                          + (0.5_prec*(taud_acy(i,j)+taud_acy(ip1,j)))**2 )
+
+            ! Now calculate viscosity at each layer 
+            ! using the root-finding method of CISM
+            ! Note this method is only valid for n_glen = 3!!!
+            ! effstrain = A * (tau_parallel^2 + tau_perp^2)^{(n-1)/2} * tau_parallel
+            ! y = A * (x^2 + tau^2)^{(n-1)/2} * x 
+
+            do k = 1, nz_aa 
+                
+                ATT_ab = 0.25_prec*(ATT(i,j,k)+ATT(ip1,j,k)+ATT(i,jp1,k)+ATT(ip1,jp1,k))
+                
+                tau_perp_ab = taud_ab*(1.0_prec-zeta_aa(k))
+
+if (.TRUE.) then 
+    ! CISM root equation for n_glen=3 only 
+                a = tau_perp_ab**2 
+                b = -eps_par_ab / ATT_ab 
+                c = sqrt(b**2/4.0_prec + a**3/27.0_prec) 
+
+                rootA = (-b/2.0_prec + c)**(1.0_prec/3.0_prec)
+
+                if (a**3/(27.0_prec) > 1.d-6 * (b**2/4.0_prec)) then
+                    rootB = -(b/2.0_prec + c)**(1.0_prec/3.0_prec)
+                else    ! b/2 + c is small; compute solution to first order without subtracting two large, nearly equal numbers
+                    rootB = -a / (3.0_prec*(abs(b))**(1.0_prec/3.0_prec))
+                end if
+
+                tau_par_ab = rootA + rootB
+
+                !write(*,*) "tau_par_ab: ", a, b, tau_par_ab  
+else 
+    ! Root finding code (more expensive, but works for ISMIPHOM)
+    ! Crashed for a random Antarctica simulation - needs testing! 
+
+                a  = tau_perp_ab**2 
+                b  = eps_par_ab / ATT_ab 
+                np = (n_glen-1)/2.0_wp 
+
+                !write(*,*) 'newton', a, b, np 
+                call solve_secant(tau_par_ab,n_iter,10e3,1e-3,50,funY,a,b,np,.FALSE.) 
+                !call solve_newton(tau_par_ab,n_iter,10e3,1e-3,50,funY,funYp,a,b,np,.FALSE.)
+                !stop
+
+end if 
+
+                visc_eff_ab(i,j,k) = 1.0_prec / (2.0_prec*ATT_ab*(tau_par_ab**2+tau_perp_ab**2)) 
+
+            end do 
+
+        end do 
+        end do  
+
+        ! Unstagger from ab-nodes to aa-nodes 
+        ! only using contributions from ice covered neighbors
+        do j = 1, ny 
+        do i = 1, nx 
+
+            im1 = max(i-1,1) 
+            ip1 = min(i+1,nx) 
+            jm1 = max(j-1,1) 
+            jp1 = min(j+1,ny) 
+
+            visc_eff(i,j,:) = 0.0 
+            wt              = 0.0 
+
+            if (f_ice(i,j) .eq. 1.0) then
+                ! Ice-covered point. 
+                ! Only use contributions from ice-covered neighbors 
+
+                if (count([f_ice(i,j),f_ice(ip1,j),f_ice(i,jp1),f_ice(ip1,jp1)].lt.1.0) .eq. 0) then  
+                    visc_eff(i,j,:) = visc_eff(i,j,:) + visc_eff_ab(i,j,:) 
+                    wt = wt + 1.0 
+                end if 
+                
+                if (count([f_ice(i,j),f_ice(im1,j),f_ice(im1,jp1),f_ice(i,jp1)].lt.1.0) .eq. 0) then  
+                    visc_eff(i,j,:) = visc_eff(i,j,:) + visc_eff_ab(im1,j,:) 
+                    wt = wt + 1.0 
+                end if 
+
+                if (count([f_ice(i,j),f_ice(i,jm1),f_ice(ip1,jm1),f_ice(ip1,j)].lt.1.0) .eq. 0) then 
+                    visc_eff(i,j,:) = visc_eff(i,j,:) + visc_eff_ab(i,jm1,:) 
+                    wt = wt + 1.0 
+                end if 
+                
+                if (count([f_ice(i,j),f_ice(im1,j),f_ice(im1,jm1),f_ice(i,jm1)].lt.1.0) .eq. 0) then 
+                    visc_eff(i,j,:) = visc_eff(i,j,:) + visc_eff_ab(im1,jm1,:) 
+                    wt = wt + 1.0 
+                end if 
+            
+            else
+                ! Ice-free point.
+                ! Only use contributions from ice-free neighbors 
+
+                if (count([f_ice(i,j),f_ice(ip1,j),f_ice(i,jp1),f_ice(ip1,jp1)].eq.1.0) .eq. 0) then  
+                    visc_eff(i,j,:) = visc_eff(i,j,:) + visc_eff_ab(i,j,:) 
+                    wt = wt + 1.0 
+                end if 
+                
+                if (count([f_ice(i,j),f_ice(im1,j),f_ice(im1,jp1),f_ice(i,jp1)].eq.1.0) .eq. 0) then  
+                    visc_eff(i,j,:) = visc_eff(i,j,:) + visc_eff_ab(im1,j,:) 
+                    wt = wt + 1.0 
+                end if 
+
+                if (count([f_ice(i,j),f_ice(i,jm1),f_ice(ip1,jm1),f_ice(ip1,j)].eq.1.0) .eq. 0) then 
+                    visc_eff(i,j,:) = visc_eff(i,j,:) + visc_eff_ab(i,jm1,:) 
+                    wt = wt + 1.0 
+                end if 
+                
+                if (count([f_ice(i,j),f_ice(im1,j),f_ice(im1,jm1),f_ice(i,jm1)].eq.1.0) .eq. 0) then 
+                    visc_eff(i,j,:) = visc_eff(i,j,:) + visc_eff_ab(im1,jm1,:) 
+                    wt = wt + 1.0 
+                end if 
+            
+            end if 
+
+            if (wt .gt. 0.0) then 
+                ! Get the weighted mean of the viscosity for this aa-node 
+
+                visc_eff(i,j,:) = visc_eff(i,j,:) / wt 
+
+            else 
+                ! Just get simple average for safety
+                ! (this case should not occur)
+
+                ! Loop over column
+                do k = 1, nz_aa 
+                    visc_eff(i,j,k) = 0.25_wp*(visc_eff_ab(i,j,k)+visc_eff_ab(im1,j,k) &
+                                                +visc_eff_ab(i,jm1,k)+visc_eff_ab(im1,jm1,k))
+                end do 
+
+            end if 
+
+        end do 
+        end do 
+    
+
+        ! Extrapolate viscosity to bordering ice-free or partially ice-covered cells
+        do j=1, ny
+        do i=1, nx
+
+            ! Get neighbor indices
+            im1 = max(i-1,1) 
+            ip1 = min(i+1,nx) 
+            jm1 = max(j-1,1) 
+            jp1 = min(j+1,ny) 
+            
+            if ( f_ice(i,j) .lt. 1.0 .and. &
+                count([f_ice(im1,j),f_ice(ip1,j),f_ice(i,jm1),f_ice(i,jp1)] .eq. 1.0_wp) .gt. 0 ) then 
+                ! Ice-free (or partially ice-free) with ice-covered neighbors
+
+                visc_eff(i,j,:) = 0.0 
+                wt = 0.0 
+
+                if (f_ice(im1,j).eq.1.0) then 
+                    visc_eff(i,j,:) = visc_eff(i,j,:) + visc_eff(im1,j,:) 
+                    wt = wt + 1.0 
+                end if 
+                if (f_ice(ip1,j).eq.1.0) then 
+                    visc_eff(i,j,:) = visc_eff(i,j,:) + visc_eff(ip1,j,:) 
+                    wt = wt + 1.0 
+                end if 
+                if (f_ice(i,jm1).eq.1.0) then 
+                    visc_eff(i,j,:) = visc_eff(i,j,:) + visc_eff(i,jm1,:) 
+                    wt = wt + 1.0 
+                end if 
+                if (f_ice(i,jp1).eq.1.0) then 
+                    visc_eff(i,j,:) = visc_eff(i,j,:) + visc_eff(i,jp1,:) 
+                    wt = wt + 1.0 
+                end if 
+                
+                if (wt .gt. 0.0) then 
+                    visc_eff(i,j,:) = visc_eff(i,j,:) / wt 
+
+                end if 
+
+            end if 
+
+        end do 
+        end do 
+
+        ! Apply boundary conditions as needed 
+        if (trim(boundaries) .eq. "periodic") then
+
+            visc_eff(1,:,:)    = visc_eff(nx-1,:,:) 
+            visc_eff(nx-1,:,:) = visc_eff(2,:,:) 
+            visc_eff(:,1,:)    = visc_eff(:,ny-1,:)
+            visc_eff(:,ny,:)   = visc_eff(:,2,:) 
+
+        else if (trim(boundaries) .eq. "periodic-x") then 
+            
+            visc_eff(1,:,:)    = visc_eff(nx-1,:,:) 
+            visc_eff(nx-1,:,:) = visc_eff(2,:,:) 
+            visc_eff(:,1,:)    = visc_eff(:,2,:)
+            visc_eff(:,ny,:)   = visc_eff(:,ny-1,:) 
+
+        else if (trim(boundaries) .eq. "infinite") then 
+            
+            visc_eff(1,:,:)    = visc_eff(2,:,:) 
+            visc_eff(nx,:,:)   = visc_eff(nx-1,:,:) 
+            visc_eff(:,1,:)    = visc_eff(:,2,:)
+            visc_eff(:,ny,:)   = visc_eff(:,ny-1,:) 
+
+        end if 
+
+        ! Treat the corners to avoid extremes
+        visc_eff(1,1,:)   = 0.5*(visc_eff(2,1,:)+visc_eff(1,2,:))
+        visc_eff(1,ny,:)  = 0.5*(visc_eff(2,ny,:)+visc_eff(1,ny-1,:))
+        visc_eff(nx,1,:)  = 0.5*(visc_eff(nx,2,:)+visc_eff(nx-1,1,:))
+        visc_eff(nx,ny,:) = 0.5*(visc_eff(nx-1,ny,:)+visc_eff(nx,ny-1,:))
+
+        return 
+
+    end subroutine calc_visc_eff_3D_0
+
+    subroutine calc_visc_eff_int(visc_eff_int,visc_eff,H_ice,f_ice,zeta_aa)
 
         implicit none 
 

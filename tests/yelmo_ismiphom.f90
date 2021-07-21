@@ -107,24 +107,26 @@ program yelmo_ismiphom
             
             yelmo1%tpo%par%topo_fixed   = .TRUE. 
 
-            if (trim(yelmo1%dyn%par%solver) .eq. "hybrid") then 
-                ! For this experiment, no basal sliding is allowed, so disable
-                ! ssa for hybrid solver (ie, set hybrid==SIA only)
+            select case(trim(yelmo1%dyn%par%solver))
+
+                case("hybrid")
+                    ! For this experiment, no basal sliding is allowed, so disable
+                    ! ssa for hybrid solver (ie, set hybrid==SIA only)
                 
-                yelmo1%dyn%par%use_ssa  = .FALSE. 
+                    yelmo1%dyn%par%use_ssa  = .FALSE. 
             
-            else if (trim(yelmo1%dyn%par%solver) .eq. "ssa") then
+                case("ssa")
 
-                write(*,*) "yelmo_ismiphom:: error: solver='ssa' cannot be used &
-                &for Experiment A, since there is no sliding, velocity would be zero."
-                stop 
+                    write(*,*) "yelmo_ismiphom:: error: solver='ssa' cannot be used &
+                    &for Experiment A, since there is no sliding, velocity would be zero."
+                    stop 
 
-            else 
-                ! Modify solver name to specify noslip version
+                case("diva","l1l2")
+                    ! Modify solver name to specify noslip version
 
-                yelmo1%dyn%par%solver = trim(yelmo1%dyn%par%solver)//"-noslip"
+                    yelmo1%dyn%par%solver = trim(yelmo1%dyn%par%solver)//"-noslip"
 
-            end if 
+            end select 
 
             ! Not used in this experiment, but set it to a constant value anyway
             yelmo1%dyn%par%beta_method  = -1 

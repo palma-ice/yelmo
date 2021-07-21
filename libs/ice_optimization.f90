@@ -13,6 +13,7 @@ module ice_optimization
     public :: update_mb_corr
     public :: guess_cf_ref
     public :: fill_nearest
+    public :: fill_cf_ref
     public :: wtd_mean
     public :: get_opt_param
 

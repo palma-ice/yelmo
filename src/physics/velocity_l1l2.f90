@@ -240,7 +240,7 @@ end if
 
         ! Calculate the 3D horizontal velocity field
         call calc_vel_horizontal_3D(ux,uy,ux_b,uy_b,taud_acx,taud_acy,visc_eff,visc_eff_ab,ATT,H_ice, &
-                                            zeta_aa,zeta_ac,dx,dy,n_glen,par%eps_0,par%boundaries)
+                                    f_ice,zeta_aa,zeta_ac,dx,dy,n_glen,par%eps_0,par%boundaries)
         
         ! Calculate depth-averaged horizontal velocity 
         ux_bar = calc_vertical_integrated_2D(ux,zeta_aa)
@@ -256,7 +256,9 @@ end if
 
     end subroutine calc_velocity_l1l2
 
-    subroutine calc_vel_horizontal_3D(ux,uy,ux_b,uy_b,taud_acx,taud_acy,visc_eff_aa,visc_eff_ab,ATT,H_ice,zeta_aa,zeta_ac,dx,dy,n_glen,eps_0,boundaries)
+    subroutine calc_vel_horizontal_3D(ux,uy,ux_b,uy_b,taud_acx,taud_acy, &
+                        visc_eff_aa,visc_eff_ab,ATT,H_ice,f_ice,zeta_aa,zeta_ac, &
+                        dx,dy,n_glen,eps_0,boundaries)
         ! Caluculate the 3D horizontal velocity field (ux,uy)
         ! for the L1L2 solver following Perego et al. (2012)
         ! and the blueprint by Lipscomb et al. (2019) in CISM
@@ -273,6 +275,7 @@ end if
         real(prec), intent(IN)  :: visc_eff_ab(:,:,:)   ! on ab-nodes already 
         real(prec), intent(IN)  :: ATT(:,:,:)  
         real(prec), intent(IN)  :: H_ice(:,:)
+        real(prec), intent(IN)  :: f_ice(:,:)
         real(prec), intent(IN)  :: zeta_aa(:) 
         real(prec), intent(IN)  :: zeta_ac(:) 
         real(prec), intent(IN)  :: dx
@@ -305,11 +308,13 @@ end if
         real(prec), allocatable :: work3_ab(:,:)
         real(prec), allocatable :: tau_xz(:,:,:) 
         real(prec), allocatable :: tau_yz(:,:,:) 
-        real(prec), allocatable :: fact_ab(:,:) 
+        real(prec), allocatable :: fact_x_ab(:,:) 
+        real(prec), allocatable :: fact_y_ab(:,:) 
 
         real(prec) :: eps_par_sq, eps_par 
         real(prec) :: p1, eps_0_sq 
         real(prec) :: dzeta 
+        real(wp)   :: depth 
 
         nx    = size(ux,1)
         ny    = size(ux,2) 
@@ -328,7 +333,8 @@ end if
         allocate(work3_ab(nx,ny)) 
         allocate(tau_xz(nx,ny,nz_aa))
         allocate(tau_yz(nx,ny,nz_aa))
-        allocate(fact_ab(nx,ny))
+        allocate(fact_x_ab(nx,ny))
+        allocate(fact_y_ab(nx,ny))
 
         ! Calculate scaling factors
         inv_4dx = 1.0_prec / (4.0_prec*dx) 
@@ -454,12 +460,14 @@ end if
         ! Assign basal velocity value 
         ux(:,:,1)    = ux_b 
         uy(:,:,1)    = uy_b 
-        fact_ab(:,:) = 0.0_prec 
+        fact_x_ab(:,:) = 0.0_prec 
+        fact_y_ab(:,:) = 0.0_prec 
 
         ! Loop over layers starting from first layer above the base to surface 
         do k = 2, nz_aa
-            
+
             dzeta = zeta_aa(k) - zeta_aa(k-1) 
+            depth = 1.0_wp - zeta_aa(k) 
 
             ! Calculate tau_perp, tau_eff and factor to calculate velocities,
             ! all on ab-nodes 
@@ -472,22 +480,28 @@ end if
                 jp1 = min(j+1,ny) 
 
                 ! Calculate effective stress 
-                tau_xz_ab = 0.5_prec*(tau_xz(i,j,k)+tau_xz(i,jp1,k))
-                tau_yz_ab = 0.5_prec*(tau_yz(i,j,k)+tau_yz(ip1,j,k))
+                tau_xz_ab       = 0.25_prec*(  tau_xz(i,j,k)+tau_xz(i,jp1,k) &
+                                             + tau_xz(i,j,k-1)+tau_xz(i,jp1,k-1))
+                tau_yz_ab       = 0.25_prec*(  tau_yz(i,j,k)+tau_yz(ip1,j,k) &
+                                             + tau_yz(i,j,k-1)+tau_yz(ip1,j,k-1))
                 tau_eff_sq_ab = tau_xz_ab**2 + tau_yz_ab**2 + tau_par_ab(i,j,k)**2
 
                 ! Calculate factor to get velocity components
-                ATT_ab   = 0.25_prec*(ATT(i,j,k)+ATT(ip1,j,k)+ATT(i,jp1,k)+ATT(ip1,jp1,k))
-                depth_ab = (1.0_prec-zeta_aa(k))    ! depth of sigma scale, since H is inside of tau_d
-
+                ATT_ab   = 0.5_wp*( 0.25_prec*(ATT(i,j,k)+ATT(ip1,j,k)+ATT(i,jp1,k)+ATT(ip1,jp1,k)) &
+                                   +0.25_prec*(ATT(i,j,k-1)+ATT(ip1,j,k-1)+ATT(i,jp1,k-1)+ATT(ip1,jp1,k-1)) )
+                
                 H_ice_ab = 0.25_prec*(H_ice(i,j)+H_ice(ip1,j)+H_ice(i,jp1)+H_ice(ip1,jp1))
                 
                 if (p1 .ne. 0.0_wp) then  
-                    fact_ab(i,j) = fact_ab(i,j) &
-                        - 2.0_prec * depth_ab * ATT_ab * tau_eff_sq_ab**p1 * (dzeta*H_ice_ab)
+                    fact_x_ab(i,j) = fact_x_ab(i,j) &
+                        + 2.0_prec * ATT_ab * tau_eff_sq_ab**p1 * tau_xz_ab * (dzeta*H_ice_ab)
+                    fact_y_ab(i,j) = fact_y_ab(i,j) &
+                        + 2.0_prec * ATT_ab * tau_eff_sq_ab**p1 * tau_yz_ab * (dzeta*H_ice_ab)
                 else
-                    fact_ab(i,j) = fact_ab(i,j) &
-                        - 2.0_prec * depth_ab * ATT_ab * (dzeta*H_ice_ab)
+                    fact_x_ab(i,j) = fact_x_ab(i,j) &
+                        + 2.0_prec * ATT_ab * tau_xz_ab * (dzeta*H_ice_ab)
+                    fact_y_ab(i,j) = fact_y_ab(i,j) &
+                        + 2.0_prec * ATT_ab * tau_yz_ab * (dzeta*H_ice_ab)
                 end if 
 
             end do 
@@ -498,15 +512,21 @@ end if
             do i = 1, nx 
             
                 im1 = max(i-1,1) 
+                ip1 = min(i+1,nx) 
                 jm1 = max(j-1,1) 
-                
+                jp1 = min(j+1,ny) 
+
                 ! stagger factor to acx-nodes and calculate velocity
-                fact_ac   = 0.5_prec*(fact_ab(i,j)+fact_ab(i,jm1))
-                ux(i,j,k) = ux(i,j,1) + fact_ac*taud_acx(i,j)
+                if (f_ice(i,j) .eq. 1.0 .or. f_ice(ip1,j) .eq. 1.0) then 
+                    fact_ac   = 0.5_prec*(fact_x_ab(i,j)+fact_x_ab(i,jm1))
+                    ux(i,j,k) = ux(i,j,1) + fact_ac!*(-taud_acx(i,j))
+                end if 
 
                 ! stagger factor to acy-nodes and calculate velocity
-                fact_ac   = 0.5_prec*(fact_ab(i,j)+fact_ab(im1,j))
-                uy(i,j,k) = uy(i,j,1) + fact_ac*taud_acy(i,j)
+                if (f_ice(i,j) .eq. 1.0 .or. f_ice(im1,j) .eq. 1.0) then
+                    fact_ac   = 0.5_prec*(fact_y_ab(i,j)+fact_y_ab(im1,j))
+                    uy(i,j,k) = uy(i,j,1) + fact_ac!*(-taud_acy(i,j))
+                end if 
 
             end do 
             end do 

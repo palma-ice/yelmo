@@ -140,7 +140,7 @@ contains
 
                 case DEFAULT 
 
-                    write(*,*) "calc_velocity_diva:: Error: visc_method not recognized."
+                    write(*,*) "calc_velocity_hybrid:: Error: visc_method not recognized."
                     write(*,*) "visc_method = ", par%visc_method 
                     stop 
 

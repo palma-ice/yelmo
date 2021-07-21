@@ -139,7 +139,7 @@ contains
             case("fixed") 
                 ! Do nothing - dynamics is fixed 
 
-            case("sia","sia-noslip") 
+            case("sia") 
                 ! SIA only 
 
                 call calc_ydyn_hybrid(dyn,tpo,mat,thrm,bnd,use_sia=.TRUE.,use_ssa=.FALSE.)
@@ -272,6 +272,9 @@ contains
             call calc_velocity_sia(dyn%now%ux_i,dyn%now%uy_i,dyn%now%ux_i_bar,dyn%now%uy_i_bar,tpo%now%H_ice, &
                                     tpo%now%f_ice,dyn%now%taud_acx,dyn%now%taud_acy,mat%now%ATT,dyn%par%zeta_aa, &
                                     dyn%par%dx,mat%par%n_glen,rho_ice,g,dyn%par%boundaries)
+            ! call calc_velocity_sia_0(dyn%now%ux_i,dyn%now%uy_i,dyn%now%ux_i_bar,dyn%now%uy_i_bar,tpo%now%H_ice, &
+            !                         tpo%now%f_ice,dyn%now%taud_acx,dyn%now%taud_acy,mat%now%ATT,dyn%par%zeta_aa, &
+            !                         dyn%par%dx,mat%par%n_glen,rho_ice,g,dyn%par%boundaries)
 
         else 
             ! Set all SIA terms to zero 

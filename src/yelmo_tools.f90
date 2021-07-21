@@ -1394,7 +1394,7 @@ end if
         do k = 2, nk
             var_mid = 0.5_prec*(var(k)+var(k-1))
             if (abs(var_mid) .lt. TOL_UNDERFLOW) var_mid = 0.0_prec 
-            var_int = var_int + 0.5_prec*(var(k)+var(k-1))*(zeta(k) - zeta(k-1))
+            var_int = var_int + var_mid*(zeta(k) - zeta(k-1))
         end do
 
         return
@@ -1415,7 +1415,8 @@ end if
         real(prec) :: var_int(size(var,1))
 
         ! Local variables 
-        integer :: k, nk
+        integer    :: k, nk
+        real(prec) :: var_mid 
 
         nk = size(var,1)
 
@@ -1425,7 +1426,9 @@ end if
         ! Intermediate values include sum of all previous values 
         ! Take current value as average between points
         do k = 2, nk
-             var_int(k:nk) = var_int(k:nk) + 0.5_prec*(var(k)+var(k-1))*(zeta(k) - zeta(k-1))
+            var_mid = 0.5_prec*(var(k)+var(k-1))
+            if (abs(var_mid) .lt. TOL_UNDERFLOW) var_mid = 0.0_prec 
+            var_int(k:nk) = var_int(k:nk) + 0.5_prec*(var(k)+var(k-1))*(zeta(k) - zeta(k-1))
         end do
         
         return

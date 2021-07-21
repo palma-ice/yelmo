@@ -7,6 +7,7 @@ module velocity_sia
 
     private
     public :: calc_velocity_sia
+    public :: calc_velocity_sia_0
     public :: calc_velocity_basal_sia_00
     public :: calc_velocity_basal_sia       ! Not ready yet, needs checking that it is consistent with Weertman sliding law 
     
@@ -438,18 +439,20 @@ contains
         real(wp) :: tau_eff_sq_ab
         real(wp) :: p1   
         real(wp) :: ATT_ab 
-        real(wp) :: depth_ab 
         real(wp) :: H_ice_ab 
         real(wp) :: fact_ac
+        real(wp) :: depth 
         real(wp) :: dzeta 
 
-        real(wp), allocatable :: fact_ab(:,:) 
+        real(wp), allocatable :: fact_x_ab(:,:) 
+        real(wp), allocatable :: fact_y_ab(:,:) 
 
         nx    = size(ux,1)
         ny    = size(ux,2)
         nz_aa = size(ux,3) 
 
-        allocate(fact_ab(nx,ny)) 
+        allocate(fact_x_ab(nx,ny)) 
+        allocate(fact_y_ab(nx,ny))
 
         ! Define exponent 
         p1 = (n_glen-1.0_wp)/2.0_wp
@@ -459,12 +462,14 @@ contains
         uy = 0.0 
 
         ! Set integrative factor to zero everywhere too
-        fact_ab = 0.0_prec 
+        fact_x_ab = 0.0_prec 
+        fact_y_ab = 0.0_prec 
 
         ! Loop over layers starting from first layer above the base to surface 
         do k = 2, nz_aa
             
             dzeta = zeta_aa(k) - zeta_aa(k-1) 
+            depth = 1.0_wp - zeta_aa(k) 
 
             ! Calculate integrative factor on ab-nodes
             do i = 1, nx 
@@ -475,22 +480,28 @@ contains
                 jm1 = max(j-1,1) 
                 jp1 = min(j+1,ny) 
 
-                ! Calculate effective stress 
-                tau_xz_ab = 0.5_prec*(tau_xz(i,j,k)+tau_xz(i,jp1,k))
-                tau_yz_ab = 0.5_prec*(tau_yz(i,j,k)+tau_yz(ip1,j,k))
-                tau_eff_sq_ab = tau_xz_ab**2 + tau_yz_ab**2
+                ! Calculate effective stress on horizontal ab-nodes and vertical ac-node
+                tau_xz_ab       = 0.25_prec*(  tau_xz(i,j,k)+tau_xz(i,jp1,k) &
+                                             + tau_xz(i,j,k-1)+tau_xz(i,jp1,k-1))
+                tau_yz_ab       = 0.25_prec*(  tau_yz(i,j,k)+tau_yz(ip1,j,k) &
+                                             + tau_yz(i,j,k-1)+tau_yz(ip1,j,k-1))
+                tau_eff_sq_ab   = tau_xz_ab**2 + tau_yz_ab**2
 
-                ATT_ab   = 0.25_prec*(ATT(i,j,k)+ATT(ip1,j,k)+ATT(i,jp1,k)+ATT(ip1,jp1,k))
-                depth_ab = (1.0_prec-zeta_aa(k))    ! depth of sigma scale, since H is inside of tau_d
+                ATT_ab   = 0.5_wp*( 0.25_prec*(ATT(i,j,k)+ATT(ip1,j,k)+ATT(i,jp1,k)+ATT(ip1,jp1,k)) &
+                                   +0.25_prec*(ATT(i,j,k-1)+ATT(ip1,j,k-1)+ATT(i,jp1,k-1)+ATT(ip1,jp1,k-1)) )
 
                 H_ice_ab = 0.25_prec*(H_ice(i,j)+H_ice(ip1,j)+H_ice(i,jp1)+H_ice(ip1,jp1))
-                
+
                 if (p1 .ne. 0.0_wp) then  
-                    fact_ab(i,j) = fact_ab(i,j) &
-                        - 2.0_prec * depth_ab * ATT_ab * tau_eff_sq_ab**p1 * (dzeta*H_ice_ab)
+                    fact_x_ab(i,j) = fact_x_ab(i,j) &
+                        + 2.0_prec * ATT_ab * tau_eff_sq_ab**p1 * tau_xz_ab * (dzeta*H_ice_ab)
+                    fact_y_ab(i,j) = fact_y_ab(i,j) &
+                        + 2.0_prec * ATT_ab * tau_eff_sq_ab**p1 * tau_yz_ab * (dzeta*H_ice_ab)
                 else
-                    fact_ab(i,j) = fact_ab(i,j) &
-                        - 2.0_prec * depth_ab * ATT_ab * (dzeta*H_ice_ab)
+                    fact_x_ab(i,j) = fact_x_ab(i,j) &
+                        + 2.0_prec * ATT_ab * tau_xz_ab * (dzeta*H_ice_ab)
+                    fact_y_ab(i,j) = fact_y_ab(i,j) &
+                        + 2.0_prec * ATT_ab * tau_yz_ab * (dzeta*H_ice_ab)
                 end if 
 
             end do 
@@ -501,18 +512,20 @@ contains
             do i = 1, nx 
             
                 im1 = max(i-1,1) 
+                ip1 = min(i+1,nx) 
                 jm1 = max(j-1,1) 
-                
-                ! stagger factor to acx-nodes and calculate velocity
+                jp1 = min(j+1,ny) 
+
+                ! stagger factor to acx-nodes to calculate velocity
                 if (f_ice(i,j) .eq. 1.0 .or. f_ice(ip1,j) .eq. 1.0) then 
-                    fact_ac   = 0.5_prec*(fact_ab(i,j)+fact_ab(i,jm1))
-                    ux(i,j,k) = ux(i,j,1) + fact_ac*taud_acx(i,j)
+                    fact_ac   = 0.5_prec*(fact_x_ab(i,j)+fact_x_ab(i,jm1))
+                    ux(i,j,k) = ux(i,j,1) + fact_ac
                 end if 
 
-                ! stagger factor to acy-nodes and calculate velocity
+                ! stagger factor to acy-nodes to calculate velocity
                 if (f_ice(i,j) .eq. 1.0 .or. f_ice(im1,j) .eq. 1.0) then
-                    fact_ac   = 0.5_prec*(fact_ab(i,j)+fact_ab(im1,j))
-                    uy(i,j,k) = uy(i,j,1) + fact_ac*taud_acy(i,j)
+                    fact_ac   = 0.5_prec*(fact_y_ab(i,j)+fact_y_ab(im1,j))
+                    uy(i,j,k) = uy(i,j,1) + fact_ac
                 end if 
 
             end do 
@@ -595,6 +608,7 @@ contains
         integer  :: im1, ip1, jm1, jp1
         real(wp) :: H_ice_ab
         real(wp) :: sigma_tot_ab
+        real(wp) :: ATT_ab 
         real(wp) :: ATT_ab_km1 
         real(wp) :: ATT_ab_k
         real(wp) :: ATT_int_ab 
@@ -648,7 +662,8 @@ contains
                     ! (integrate using trapezoid method - done by hand here for speed)
                     ATT_ab_km1 = 0.25_wp*(ATT(i,j,k-1)+ATT(ip1,j,k-1)+ATT(i,jp1,k-1)+ATT(ip1,jp1,k-1))*(1.0-zeta_aa(k-1))**n_glen
                     ATT_ab_k   = 0.25_wp*(ATT(i,j,k)  +ATT(ip1,j,k)  +ATT(i,jp1,k)  +ATT(ip1,jp1,k))  *(1.0-zeta_aa(k))**n_glen
-                    ATT_int_ab = ATT_int_ab + 0.5_wp*(ATT_ab_k+ATT_ab_km1)*(zeta_aa(k) - zeta_aa(k-1))
+                    ATT_ab     = 0.5_wp*(ATT_ab_k+ATT_ab_km1)
+                    ATT_int_ab = ATT_int_ab + ATT_ab*(zeta_aa(k) - zeta_aa(k-1))
 
                     ! Calculate quasi-diffusivity for this layer
                     if (n_glen .ne. 1.0_wp) then 

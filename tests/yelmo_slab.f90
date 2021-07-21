@@ -113,11 +113,11 @@ else
 
     ! Test different timesteps 
     
-    ctrl%n_dtt = 60
+    ctrl%n_dtt = 80
     allocate(ctrl%dtts(ctrl%n_dtt)) 
     ctrl%dtts  = 0.0_wp
     do q = 1, ctrl%n_dtt 
-        ctrl%dtts(q) = 10.0_dp**(log10(0.001_dp)+(log10(10.0_dp)-log10(0.001_dp))*(q-1)/real(ctrl%n_dtt-1,dp))
+        ctrl%dtts(q) = 10.0_dp**(log10(0.001_dp)+(log10(20.0_dp)-log10(0.001_dp))*(q-1)/real(ctrl%n_dtt-1,dp))
     end do
 
     ctrl%n_dx      = 12

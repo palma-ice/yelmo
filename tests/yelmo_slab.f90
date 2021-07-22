@@ -168,13 +168,13 @@ else
             
         end do 
 
-        if (maxval(ctrl%factors) .lt. 1.0_wp) then 
+        if (maxval(ctrl%factors,mask=ctrl%dts.ne.0.0_wp) .lt. 1.0_wp) then 
             ! All dt values tested were stable, do not test more 
             ! (implies maximum stable timestep is above the tested range)
 
             ! Do nothing 
 
-        else if (minval(ctrl%factors) .gt. 1.0_wp) then
+        else if (minval(ctrl%factors,mask=ctrl%dts.ne.0.0_wp) .gt. 1.0_wp) then
             ! No dt values tested were stable, do not test more
             ! (implies maximum stable timestep is below the tested range)
 

@@ -205,8 +205,8 @@ else
                 write(*, "(8g12.3)") "factor", res%dx, res%dt, res%factor, res%H_mean, res%ux_mean, res%uxb_mean, res%uxs_mean
                 
                 ! Exit loop if dt has converged enough
-                ! (checking percent difference between current and previous timestep)
-                if (100.0_wp*abs(ctrl%dts(q2)-ctrl%dts(q2-1))/ctrl%dts(q2-1) .lt. ctrl%conv_tol) then 
+                ! (checking fractional difference between current and previous timestep)
+                if (abs(ctrl%dts(q2)-ctrl%dts(q2-1))/ctrl%dts(q2-1) .lt. ctrl%conv_tol) then 
                     exit 
                 end if 
 

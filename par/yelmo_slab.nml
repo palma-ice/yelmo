@@ -19,7 +19,7 @@
     n_dt            = 15                    ! Maximum number of timestep values to test for each dx
     dx_range        = 1e-2, 40.0            ! [km] Min. and max. values of dx to test
     dt_range        = 1e-3, 50.0            ! [yr] Min. and max. values of dt to test
-    conv_tol        = 0.01                  ! [%] Convergence tolerance level
+    conv_tol        = 1e-3                  ! [1] Convergence tolerance level (fractional difference)
 /
 
 &yelmo

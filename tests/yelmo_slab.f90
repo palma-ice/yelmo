@@ -24,29 +24,38 @@ program yelmo_slab
         real(wp)                :: dt1D_out
         real(wp)                :: dt2D_out
 
-        integer                 :: n_dtt 
-        real(wp), allocatable   :: dtts(:) 
         integer                 :: n_dx 
-        real(wp), allocatable   :: dxs(:) 
+        integer                 :: n_dt
+        real(wp)                :: dx_range(2)
+        real(wp)                :: dt_range(2) 
+        real(wp)                :: conv_tol 
 
         character(len=512)  :: path_par 
         
+        ! Internal variables
+        real(wp), allocatable   :: dxs(:)
+        real(wp), allocatable   :: dts(:)
+        real(wp), allocatable   :: factors(:)
     end type 
 
     type(ctrl_par) :: ctrl 
 
+    type results_class 
+        real(wp), allocatable   :: dx
+        real(wp), allocatable   :: dt
+        real(wp), allocatable   :: factor
+        real(wp), allocatable   :: H_mean
+        real(wp), allocatable   :: ux_mean
+        real(wp), allocatable   :: uxb_mean
+        real(wp), allocatable   :: uxs_mean
+    end type 
+
+    type(results_class) :: res
+        
     character(len=256) :: outfldr, file2D, file1D, file_restart
     character(len=512) :: path_par, path_const 
     
-    integer  :: n, j
-    real(wp) :: time 
-    real(wp) :: xmin, xmax, ymin, ymax 
-    real(wp), allocatable :: dh(:,:) 
-    
-    integer  :: q, q1, q2  
-    real(wp) :: dtt_now
-    real(wp) :: stdev, factor 
-    real(wp) :: H_mean, ux_mean, uxb_mean, uxs_mean 
+    integer  :: q, q1, q2, qmax, qmax1
 
     real(8)  :: cpu_start_time
     real(8)  :: cpu_end_time
@@ -84,14 +93,17 @@ program yelmo_slab
     call nml_read(path_par,"ctrl","dt1D_out",     ctrl%dt1D_out)      ! [yr] Frequency of 2D output 
     call nml_read(path_par,"ctrl","dt2D_out",     ctrl%dt2D_out)      ! [yr] Frequency of 2D output 
     
+    call nml_read(path_par,"ctrl","n_dx",         ctrl%n_dx)
+    call nml_read(path_par,"ctrl","n_dt",         ctrl%n_dt)
+    call nml_read(path_par,"ctrl","dx_range",     ctrl%dx_range)
+    call nml_read(path_par,"ctrl","dt_range",     ctrl%dt_range)
+    call nml_read(path_par,"ctrl","conv_tol",     ctrl%conv_tol)
+    
     ! Set ctrl parameters for later use 
     ctrl%path_par   = path_par 
     
     ! Define default grid name for completeness 
     ctrl%grid_name = trim(ctrl%domain) 
-
-    ! Set time to initial time 
-    time = ctrl%time_init 
 
     ! General initialization of yelmo constants (used globally)
     call yelmo_global_init(path_const)
@@ -100,72 +112,108 @@ program yelmo_slab
 if (ctrl%dtt .ne. 0.0) then 
     ! == Perform one simulation with an outer timestep of ctrl%dtt =======
     
-
-    call run_yelmo_test(factor,H_mean,ux_mean,uxb_mean,uxs_mean,ctrl,file2D)
+    call run_yelmo_test(res,ctrl,file2D)
     
     ! Write summary 
     write(*,*) "====== "//trim(ctrl%domain)//" ======="
-    !write(*,*) "factor", ctrl%dx, ctrl%dtt, ctrl%H_stdev, stdev, factor 
-    write(*, "(a,8g12.3)") "factor", ctrl%dx, ctrl%dtt, factor, H_mean, ux_mean, uxb_mean, uxs_mean
+    write(*, "(a,8a12)")   "factor","dx", "dt", "factor", "H", "ux_bar", "ux_b", "ux_s"
+    write(*, "(a,8g12.3)") "factor", res%dx, res%dt, res%factor, res%H_mean, res%ux_mean, res%uxb_mean, res%uxs_mean
     
 else 
     ! === Perform ensemble of simulations with multiple values of dx and dt =====
+    ! Use bisection method to refine estimate of maximum stable timestep
 
-    ! Test different timesteps 
-    
-    ctrl%n_dtt = 80
-    allocate(ctrl%dtts(ctrl%n_dtt)) 
-    ctrl%dtts  = 0.0_wp
-    do q = 1, ctrl%n_dtt 
-        ctrl%dtts(q) = 10.0_dp**(log10(0.001_dp)+(log10(20.0_dp)-log10(0.001_dp))*(q-1)/real(ctrl%n_dtt-1,dp))
-    end do
+    ! Define dx values to be tested
+    ! (evenly spaced in log-space for dx_range)
 
-    ctrl%n_dx      = 12
     allocate(ctrl%dxs(ctrl%n_dx)) 
-    ctrl%dxs       = 0.0_wp 
-    do q = 1, ctrl%n_dx 
-        ctrl%dxs(q) = 10.0_dp**(log10(0.01_dp)+(log10(40.0_dp)-log10(0.01_dp))*(q-1)/real(ctrl%n_dx-1,dp))
-    end do
+    call sample_log10_space(ctrl%dxs,ctrl%dx_range(1),ctrl%dx_range(2))
 
-    write(*,*) "dtts: ", ctrl%dtts(1:ctrl%n_dtt) 
-    write(*,*) "dxs:  ", ctrl%dxs(1:ctrl%n_dx) 
+    write(*,*) "dxs:  ", ctrl%dxs
 
+    ! Define total number of dt values, but intially set to zero
+    allocate(ctrl%dts(ctrl%n_dt))
+    ctrl%dts = 0.0_wp 
+
+    ! Define factors array too
+    allocate(ctrl%factors(ctrl%n_dt))
+    ctrl%factors = 0.0_wp 
+
+    
     open(unit=15,file=trim(outfldr)//"slab_dt_factor.txt",status="UNKNOWN")
     write(15,"(7a12)") "dx", "dt", "factor", "H", "ux_bar", "ux_b", "ux_s"
 
     do q1 = 1, ctrl%n_dx
 
-        ! Reset factor to a small value 
-        factor = 1e-5 
+        ! Reset all dt and factor values to zero
+        ctrl%dts     = 0.0_wp 
+        ctrl%factors = 0.0_wp 
 
-    do q2 = 1, ctrl%n_dtt 
+        ! Initially test 5 values of dt over the desired range
+        call sample_log10_space(ctrl%dts(1:5),ctrl%dt_range(1),ctrl%dt_range(2))
 
-        if (factor .ge. 3.0) then 
-            ! If factor has already surpassed one, meaning 
-            ! model has become unstable for ctrl%dtts(q2-1),
-            ! then don't run the model further, just set 
-            ! factor to high value 
+        do q2 = 1, 5  
 
-            factor   = 100.0_wp 
-            H_mean   = 0.0_wp
-            ux_mean  = 0.0_wp 
-            uxb_mean = 0.0_wp 
-            uxs_mean = 0.0_wp 
+            ! Assign current dx and dt values and test model
+            ctrl%dx  = ctrl%dxs(q1)
+            ctrl%dtt = ctrl%dts(q2) 
+            call run_yelmo_test(res,ctrl)
+            
+            ! Store results 
+            ctrl%factors(q2) = res%factor 
+
+            ! Write current results to output table
+            write(15,"(8g12.3)") res%dx, res%dt, res%factor, res%H_mean, res%ux_mean, res%uxb_mean, res%uxs_mean
+            write(*, "(8g12.3)") "factor", res%dx, res%dt, res%factor, res%H_mean, res%ux_mean, res%uxb_mean, res%uxs_mean
+            
+        end do 
+
+        if (maxval(ctrl%factors) .lt. 1.0_wp) then 
+            ! All dt values tested were stable, do not test more 
+            ! (implies maximum stable timestep is above the tested range)
+
+            ! Do nothing 
+
+        else if (minval(ctrl%factors) .gt. 1.0_wp) then
+            ! No dt values tested were stable, do not test more
+            ! (implies maximum stable timestep is below the tested range)
+
+            ! Do nothing 
 
         else 
-            ! factor is still small, run the model for this timestep value
+            ! Continue testing dt values 
 
-            ctrl%dx  = ctrl%dxs(q1) 
-            ctrl%dtt = ctrl%dtts(q2) 
+            do q2 = 6, ctrl%n_dt 
 
-            call run_yelmo_test(factor,H_mean,ux_mean,uxb_mean,uxs_mean,ctrl)
-            
+                ! Determine index of current estimate of maximum stable timestep
+                qmax  = maxloc(ctrl%dts,mask=ctrl%factors.lt.1.0_wp,dim=1)
+                qmax1 = minloc(abs(ctrl%dts-ctrl%dts(qmax)),mask=ctrl%dts.gt.ctrl%dts(qmax),dim=1)
+
+                ! Add another timestep between this one and the next higher 
+                ctrl%dts(q2) = 0.5_wp*(ctrl%dts(qmax)+ctrl%dts(qmax1))
+
+                ! Assign current dx and dt values and test model
+                ctrl%dx  = ctrl%dxs(q1)
+                ctrl%dtt = ctrl%dts(q2) 
+                call run_yelmo_test(res,ctrl)
+                
+                ! Store results 
+                ctrl%factors(q2) = res%factor 
+
+                ! Write current results to output table
+                write(15,"(8g12.3)") res%dx, res%dt, res%factor, res%H_mean, res%ux_mean, res%uxb_mean, res%uxs_mean
+                write(*, "(8g12.3)") "factor", res%dx, res%dt, res%factor, res%H_mean, res%ux_mean, res%uxb_mean, res%uxs_mean
+                
+                ! Exit loop if dt has converged enough
+                ! (checking percent difference between current and previous timestep)
+                if (100.0_wp*abs(ctrl%dts(q2)-ctrl%dts(q2-1))/ctrl%dts(q2-1) .lt. ctrl%conv_tol) then 
+                    exit 
+                end if 
+
+            end do 
+
         end if 
 
-        write(15,"(8g12.3)") ctrl%dxs(q1), ctrl%dtts(q2), factor, H_mean, ux_mean, uxb_mean,uxs_mean
-        write(*, "(8g12.3)") "factor", ctrl%dxs(q1), ctrl%dtts(q2), factor, H_mean, ux_mean, uxb_mean,uxs_mean
-        
-    end do 
     end do 
 
     close(15) 
@@ -181,17 +229,13 @@ write(*,"(a,f12.3,a)") "Time  = ",cpu_dtime/60.0 ," min"
 
 contains
     
-    subroutine run_yelmo_test(factor,H_mean,ux_mean,uxb_mean,uxs_mean,ctrl,file2D)
+    subroutine run_yelmo_test(res,ctrl,file2D)
 
         implicit none 
 
-        real(wp),           intent(OUT) :: factor 
-        real(wp),           intent(OUT) :: H_mean
-        real(wp),           intent(OUT) :: ux_mean 
-        real(wp),           intent(OUT) :: uxb_mean 
-        real(wp),           intent(OUT) :: uxs_mean 
-        type(ctrl_par),     intent(IN)  :: ctrl  
-        character(len=*),   intent(IN), optional :: file2D 
+        type(results_class),    intent(OUT) :: res 
+        type(ctrl_par),         intent(IN)  :: ctrl  
+        character(len=*),       intent(IN), optional :: file2D 
 
         ! Local variables 
         type(yelmo_class) :: yelmo1
@@ -318,16 +362,23 @@ contains
 
         ! Calculate summary 
         call calc_stdev(stdev,yelmo1%tpo%now%H_ice,ctrl%H0)
-        factor = stdev / max(ctrl%H_stdev,1e-5)
+        res%factor = stdev / max(ctrl%H_stdev,1e-5)
+
+        ! Limit factor to a reasonable value 
+        res%factor = min(res%factor,1e3)
 
         ! Get mean values along center x-profile
 
         j = floor(yelmo1%grd%ny/2.0_wp)
-        H_mean   = sum(yelmo1%tpo%now%H_ice(:,j))  / real(yelmo1%grd%nx,wp)
-        ux_mean  = sum(yelmo1%dyn%now%ux_bar(:,j)) / real(yelmo1%grd%nx,wp)
-        uxb_mean = sum(yelmo1%dyn%now%ux_b(:,j))   / real(yelmo1%grd%nx,wp)
-        uxs_mean = sum(yelmo1%dyn%now%ux_s(:,j))   / real(yelmo1%grd%nx,wp)
+        res%H_mean   = sum(yelmo1%tpo%now%H_ice(:,j))  / real(yelmo1%grd%nx,wp)
+        res%ux_mean  = sum(yelmo1%dyn%now%ux_bar(:,j)) / real(yelmo1%grd%nx,wp)
+        res%uxb_mean = sum(yelmo1%dyn%now%ux_b(:,j))   / real(yelmo1%grd%nx,wp)
+        res%uxs_mean = sum(yelmo1%dyn%now%ux_s(:,j))   / real(yelmo1%grd%nx,wp)
         
+        ! Also save dx and dt 
+        res%dx = ctrl%dx*1e3    ! Save dx in [m]
+        res%dt = ctrl%dtt 
+
         call yelmo_end(yelmo1,time) 
 
         return 
@@ -568,6 +619,29 @@ contains
         return 
 
     end subroutine calc_ub0
+
+    subroutine sample_log10_space(vals,val_min,val_max)
+
+        implicit none 
+
+        real(wp), intent(OUT) :: vals(:)
+        real(wp), intent(IN)  :: val_min
+        real(wp), intent(IN)  :: val_max
+        
+        ! Local variables
+        integer :: n, q 
+
+        n = size(vals)
+
+        vals  = 0.0_wp
+        
+        do q = 1, n
+            vals(q) = 10.0_dp**(log10(real(val_min,dp))+(log10(real(val_max,dp))-log10(real(val_min,dp)))*(q-1)/real(n-1,dp))
+        end do
+
+        return
+
+    end subroutine sample_log10_space
 
 end program yelmo_slab
 

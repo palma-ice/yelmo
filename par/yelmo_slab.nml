@@ -1,19 +1,25 @@
 &ctrl
-    domain       = "slab"
-    H0           = 1000.0               ! [m] Reference ice thickness 
-    H_stdev      = 1.0                  ! [m] Initial perturbation standard deviation
-    nx           = 51                   ! Number of points x-direction
-    ny           = 11                   ! Number of points x-direction
-    dx           = 1.0                  ! [km] Grid resolution 
-    alpha        = 1e-3                 ! [m/m] Bed slope (dzb/dx)
+    domain          = "slab"
+    H0              = 1000.0                ! [m] Reference ice thickness 
+    H_stdev         = 0.1                   ! [m] Initial perturbation standard deviation
+    nx              = 51                    ! Number of points x-direction
+    ny              = 5                     ! Number of points x-direction
+    dx              = 1.0                   ! [km] Grid resolution 
+    alpha           = 1e-3                  ! [m/m] Bed slope (dzb/dx)
     
     ! Timing parameters 
-    time_init    = 0.0                  ! [yr] Starting time 
-    nt           = 100                  ! [-] Total number of timesteps
-    dtt          = 0.01                 ! [yr] Main loop timestep 
-    dt1D_out     = 5.0                  ! [yr] Frequency of writing 2D output files 
-    dt2D_out     = 5.0                  ! [yr] Frequency of writing 2D output files 
+    time_init       = 0.0                   ! [yr] Starting time 
+    nt              = 100                   ! [-] Total number of timesteps
+    dtt             = 0.01                  ! [yr] Main loop timestep 
+    dt1D_out        = 5.0                   ! [yr] Frequency of writing 2D output files 
+    dt2D_out        = 5.0                   ! [yr] Frequency of writing 2D output files 
 
+    ! Testing range (if dtt==0.0)
+    n_dx            = 12                    ! How many dx values to test
+    n_dt            = 15                    ! Maximum number of timestep values to test for each dx
+    dx_range        = 1e-2, 40.0            ! [km] Min. and max. values of dx to test
+    dt_range        = 1e-3, 50.0            ! [yr] Min. and max. values of dt to test
+    conv_tol        = 0.01                  ! [%] Convergence tolerance level
 /
 
 &yelmo
@@ -31,7 +37,7 @@
     dt_min          = 0.1               ! [a] Minimum timestep 
     cfl_max         = 0.1               ! Maximum value is 1.0, lower will be more stable
     cfl_diff_max    = 0.12              ! Bueler et al (2007), Eq. 25  
-    pc_method       = "AB-SAM"          ! "FE-SBE", "AB-SAM", "HEUN"
+    pc_method       = "FE-SBE"          ! "FE-SBE", "AB-SAM", "HEUN"
     pc_controller   = "PI42"            ! PI42, H312b, H312PID, H321PID, PID1
     pc_filter_vel   = False             ! Use mean vel. solution of current and previous timestep
     pc_use_H_pred   = False             ! Use predicted H_ice instead of corrected H_ice 

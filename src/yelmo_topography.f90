@@ -124,7 +124,7 @@ contains
 
 if (mbal_two_steps) then 
             ! Apply mass-conservation step (mbal only)
-            call calc_ice_thickness_mbal(tpo%now%H_ice,tpo%now%mb_applied,tpo%now%calv,tpo%now%f_ice, &
+            call calc_ice_thickness_mbal(tpo%now%H_ice,tpo%now%mb_applied,tpo%now%calv, &
                                          tpo%now%f_grnd,bnd%z_sl-bnd%z_bed,mbal, &
                                          tpo%now%calv_flt*0.0_wp,tpo%now%calv_grnd*0.0_wp,tpo%par%dx,dt,reset=.TRUE.)
 
@@ -228,23 +228,27 @@ end if
 
 if (mbal_two_steps) then
             ! Apply mass-conservation step (now calving only) 
-            call calc_ice_thickness_mbal(tpo%now%H_ice,tpo%now%mb_applied,tpo%now%calv,tpo%now%f_ice, &
+            call calc_ice_thickness_mbal(tpo%now%H_ice,tpo%now%mb_applied,tpo%now%calv, &
                                          tpo%now%f_grnd,bnd%z_sl-bnd%z_bed,mbal*0.0, &
                                          tpo%now%calv_flt,tpo%now%calv_grnd,tpo%par%dx,dt,reset=.FALSE.)
 else
             ! Apply mass-conservation step (mbal and calving together)
-            call calc_ice_thickness_mbal(tpo%now%H_ice,tpo%now%mb_applied,tpo%now%calv,tpo%now%f_ice, &
+            call calc_ice_thickness_mbal(tpo%now%H_ice,tpo%now%mb_applied,tpo%now%calv, &
                                          tpo%now%f_grnd,bnd%z_sl-bnd%z_bed,mbal, &
                                          tpo%now%calv_flt,tpo%now%calv_grnd,tpo%par%dx,dt,reset=.TRUE.)
 end if
             ! Update ice fraction mask 
             call calc_ice_fraction(tpo%now%f_ice,tpo%now%H_ice,tpo%now%f_grnd)
             
-            ! Finally, apply all additional (generally artificial) ice thickness adjustments 
-            ! and store changes in residual mass balance field. 
-            call apply_ice_thickness_boundaries(tpo%now%H_ice,tpo%now%mb_resid,tpo%now%f_ice,tpo%now%f_grnd, &
-                                                dyn%now%uxy_b,bnd%ice_allowed,tpo%par%boundaries,bnd%H_ice_ref, &
-                                                tpo%par%H_min_flt,tpo%par%H_min_grnd,dt,reset=.TRUE.)
+            if (trim(tpo%par%pc_step) .eq. "corrector") then 
+
+                ! Finally, apply all additional (generally artificial) ice thickness adjustments 
+                ! and store changes in residual mass balance field. 
+                call apply_ice_thickness_boundaries(tpo%now%H_ice,tpo%now%mb_resid,tpo%now%f_ice,tpo%now%f_grnd, &
+                                                    dyn%now%uxy_b,bnd%ice_allowed,tpo%par%boundaries,bnd%H_ice_ref, &
+                                                    tpo%par%H_min_flt,tpo%par%H_min_grnd,dt,reset=.TRUE.)
+
+            end if 
 
             ! Save the rate of change of ice thickness in output variable [m/a]
             tpo%now%dHicedt = (tpo%now%H_ice - tpo%now%H_ice_n) / dt 

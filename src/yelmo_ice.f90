@@ -845,7 +845,7 @@ contains
                 end select
 
             end if 
-
+            
             ! Calculate topographic information (masks, etc)
             call calc_ytopo(dom%tpo,dom%dyn,dom%mat,dom%thrm,dom%bnd,time,topo_fixed=.TRUE.)
             

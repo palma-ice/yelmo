@@ -121,7 +121,7 @@ contains
 
     end subroutine calc_ice_thickness_dyn
 
-    subroutine calc_ice_thickness_mbal(H_ice,mb_applied,calv,f_ice,f_grnd,H_ocn, &
+    subroutine calc_ice_thickness_mbal(H_ice,mb_applied,calv,f_grnd,H_ocn, &
                                        mbal,calv_flt,calv_grnd,dx,dt,reset)
         ! Interface subroutine to update ice thickness through application
         ! of advection, vertical mass balance terms and calving 
@@ -131,7 +131,6 @@ contains
         real(wp),       intent(INOUT) :: H_ice(:,:)             ! [m]   Ice thickness 
         real(wp),       intent(INOUT) :: mb_applied(:,:)        ! [m/a] Actual mass balance applied to real ice points
         real(wp),       intent(INOUT) :: calv(:,:)              ! [m/a] Actual calving rate 
-        real(wp),       intent(IN)    :: f_ice(:,:)             ! [--]  Ice area fraction 
         real(wp),       intent(IN)    :: f_grnd(:,:)            ! [--]  Grounded fraction 
         real(wp),       intent(IN)    :: H_ocn(:,:)             ! [m]   Ocean thickness (ie, depth)
         real(wp),       intent(IN)    :: mbal(:,:)              ! [m/a] Net mass balance; mbal = smb+bmb (calving separate) 

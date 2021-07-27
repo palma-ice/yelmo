@@ -12,6 +12,7 @@ module yelmo_ice
     use yelmo_timesteps, only : ytime_init, set_adaptive_timestep, set_adaptive_timestep_pc, set_pc_mask, calc_pc_eta,  &
                                 calc_pc_tau_fe_sbe,calc_pc_tau_ab_sam, calc_pc_tau_heun, limit_adaptive_timestep, &
                                 yelmo_timestep_write_init, yelmo_timestep_write, calc_adv3D_timestep1
+    use yelmo_tools, only : smooth_gauss_2D
     use yelmo_io 
 
     use yelmo_topography
@@ -772,6 +773,7 @@ contains
         character(len=56)   :: init_topo_names(3)
         integer             :: init_topo_state
         real(prec)          :: z_bed_f_sd 
+        logical             :: smooth_H_ice
 
         ! Initialize variables
          
@@ -788,6 +790,7 @@ contains
             call nml_read(filename,"yelmo_init_topo","init_topo_names", init_topo_names)
             call nml_read(filename,"yelmo_init_topo","init_topo_state", init_topo_state)
             call nml_read(filename,"yelmo_init_topo","z_bed_f_sd",      z_bed_f_sd)
+            call nml_read(filename,"yelmo_init_topo","smooth_H_ice",    smooth_H_ice)
 
             call yelmo_parse_path(init_topo_path,dom%par%domain,dom%par%grid_name)
             
@@ -818,6 +821,11 @@ contains
                 where (.not. dom%bnd%ice_allowed)  dom%tpo%now%H_ice = 0.0_prec 
                 where(dom%tpo%now%H_ice  .lt. 1.0) dom%tpo%now%H_ice = 0.0_prec 
 
+                ! Smooth ice thickness field, if desired 
+                if (smooth_H_ice) then 
+                    call smooth_gauss_2D(dom%tpo%now%H_ice,dx=dom%grd%dx,n_smooth=2)
+                end if 
+
                 ! Additionally modify initial topographic state 
                 select case(init_topo_state)
 
@@ -845,7 +853,7 @@ contains
                 end select
 
             end if 
-            
+
             ! Calculate topographic information (masks, etc)
             call calc_ytopo(dom%tpo,dom%dyn,dom%mat,dom%thrm,dom%bnd,time,topo_fixed=.TRUE.)
             

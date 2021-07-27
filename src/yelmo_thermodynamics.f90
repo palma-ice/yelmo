@@ -102,8 +102,8 @@ end select
         
         ! Smooth basal frictional heating 
         if (thrm%par%n_sm_qb .gt. 0) then 
-            call smooth_gauss_2D(thrm%now%Q_b,tpo%now%H_ice.gt.0.0,thrm%par%dx,thrm%par%n_sm_qb, &
-                                    tpo%now%H_ice.gt.0.0)
+            call smooth_gauss_2D(thrm%now%Q_b,thrm%par%dx,thrm%par%n_sm_qb, &
+                                    tpo%now%H_ice.gt.0.0,tpo%now%H_ice.gt.0.0)
         end if 
 
         ! Calculate internal strain heating
@@ -124,8 +124,8 @@ end select
         
         ! Smooth strain heating 
         if (thrm%par%n_sm_qstrn .gt. 0) then 
-            call smooth_gauss_3D(thrm%now%Q_strn,tpo%now%H_ice.gt.0.0,thrm%par%dx,thrm%par%n_sm_qstrn, &
-                                    tpo%now%H_ice.gt.0.0)
+            call smooth_gauss_3D(thrm%now%Q_strn,thrm%par%dx,thrm%par%n_sm_qstrn, &
+                                        tpo%now%H_ice.gt.0.0,tpo%now%H_ice.gt.0.0)
         end if 
 
         ! Ensure that Q_rock is defined. At initialization, 

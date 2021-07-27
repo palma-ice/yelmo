@@ -519,13 +519,13 @@ end if
                 ! stagger factor to acx-nodes and calculate velocity
                 if (f_ice(i,j) .eq. 1.0 .or. f_ice(ip1,j) .eq. 1.0) then 
                     fact_ac   = 0.5_prec*(fact_x_ab(i,j)+fact_x_ab(i,jm1))
-                    ux(i,j,k) = ux(i,j,1) + fact_ac!*(-taud_acx(i,j))
+                    ux(i,j,k) = ux(i,j,1) + fact_ac
                 end if 
 
                 ! stagger factor to acy-nodes and calculate velocity
                 if (f_ice(i,j) .eq. 1.0 .or. f_ice(im1,j) .eq. 1.0) then
                     fact_ac   = 0.5_prec*(fact_y_ab(i,j)+fact_y_ab(im1,j))
-                    uy(i,j,k) = uy(i,j,1) + fact_ac!*(-taud_acy(i,j))
+                    uy(i,j,k) = uy(i,j,1) + fact_ac
                 end if 
 
             end do 

@@ -1017,16 +1017,16 @@ end if
 
     end subroutine fill_borders_3D
 
-    subroutine smooth_gauss_3D(var,mask_apply,dx,n_smooth,mask_use)
+    subroutine smooth_gauss_3D(var,dx,n_smooth,mask_apply,mask_use)
 
         ! Smooth out strain heating to avoid noise 
 
         implicit none
 
         real(prec), intent(INOUT) :: var(:,:,:)      ! nx,ny,nz_aa: 3D variable
-        logical,    intent(IN)    :: mask_apply(:,:) 
         real(prec), intent(IN)    :: dx 
         integer,    intent(IN)    :: n_smooth  
+        logical,    intent(IN), optional :: mask_apply(:,:) 
         logical,    intent(IN), optional :: mask_use(:,:) 
 
         ! Local variables
@@ -1035,14 +1035,14 @@ end if
         nz_aa = size(var,3)
 
         do k = 1, nz_aa 
-             call smooth_gauss_2D(var(:,:,k),mask_apply,dx,n_smooth,mask_use)
+             call smooth_gauss_2D(var(:,:,k),dx,n_smooth,mask_apply,mask_use)
         end do 
 
         return 
 
     end subroutine smooth_gauss_3D
     
-    subroutine smooth_gauss_2D(var,mask_apply,dx,n_smooth,mask_use)
+    subroutine smooth_gauss_2D(var,dx,n_smooth,mask_apply,mask_use)
         ! Smooth out a field to avoid noise 
         ! mask_apply designates where smoothing should be applied 
         ! mask_use   designates which points can be considered in the smoothing filter 
@@ -1050,9 +1050,9 @@ end if
         implicit none
 
         real(prec), intent(INOUT) :: var(:,:)      ! [nx,ny] 2D variable
-        logical,    intent(IN)    :: mask_apply(:,:) 
         real(prec), intent(IN)    :: dx 
         integer,    intent(IN)    :: n_smooth  
+        logical,    intent(IN), optional :: mask_apply(:,:) 
         logical,    intent(IN), optional :: mask_use(:,:) 
 
         ! Local variables
@@ -1060,6 +1060,7 @@ end if
         real(prec) :: sigma    
         real(prec), allocatable :: filter0(:,:), filter(:,:) 
         real(prec), allocatable :: var_old(:,:) 
+        logical,    allocatable :: mask_apply_local(:,:) 
         logical,    allocatable :: mask_use_local(:,:) 
 
         nx    = size(var,1)
@@ -1070,9 +1071,23 @@ end if
         sigma = dx*n_smooth 
 
         allocate(var_old(nx,ny))
+        allocate(mask_apply_local(nx,ny))
         allocate(mask_use_local(nx,ny))
         allocate(filter0(n,n))
         allocate(filter(n,n))
+
+        ! Check whether mask_apply is available 
+        if (present(mask_apply)) then 
+            ! use mask_use to define neighborhood points
+            
+            mask_apply_local = mask_apply 
+
+        else
+            ! Assume that everywhere should be smoothed
+
+            mask_use_local = .TRUE.
+        
+        end if
 
         ! Check whether mask_use is available 
         if (present(mask_use)) then 
@@ -1083,7 +1098,7 @@ end if
         else
             ! Assume that mask_apply also gives the points to use for smoothing 
 
-            mask_use_local = mask_apply
+            mask_use_local = mask_apply_local
         
         end if
 
@@ -1095,7 +1110,7 @@ end if
         do j = n2+1, ny-n2
         do i = n2+1, nx-n2
 
-            if (mask_apply(i,j)) then 
+            if (mask_apply_local(i,j)) then 
                 ! Apply smoothing to this point 
 
                 filter = filter0 

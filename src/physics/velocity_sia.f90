@@ -504,6 +504,9 @@ contains
                 ! SIA velocity in ISMIPHOM-EXPA (~119 m/yr). The latter ISMIPHOM-EXPA 
                 ! velocity is somewhat low (~108 m/yr). 
                 
+                ! With stagger_fact_ab=True, the EISMINT1-moving test shows strange
+                ! oscillatory patterns in ice thickness. 
+
 if (stagger_fact_ab) then  
                 if (p1 .ne. 0.0_wp) then 
                     fact_x_ab(i,j) = fact_x_ab(i,j) &

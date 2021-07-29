@@ -141,6 +141,10 @@ contains
 
                             H_eff = minval(H_neighb,mask=mask)
 
+                            ! ajr: following CISM, do not allow partially filled cells
+                            ! for grounded ice 
+                            !H_eff = H_ice(i,j) 
+
                         else 
                             ! Grounded point, set H_eff < H_min arbitrarily (0.5 works well)
 

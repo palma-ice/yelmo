@@ -1,6 +1,6 @@
 module velocity_l1l2
 
-    use yelmo_defs ,only  : wp, prec, rho_ice, rho_sw, rho_w, g
+    use yelmo_defs ,only  : wp, prec, rho_ice, rho_sw, rho_w, g, TOL_UNDERFLOW
     use yelmo_tools, only : stagger_aa_ab, stagger_aa_ab_ice, stagger_ab_aa_ice, &
                     calc_vertical_integrated_2D, & 
                     integrate_trapezoid1D_1D, integrate_trapezoid1D_pt, minmax
@@ -241,7 +241,7 @@ end if
         ! Calculate the 3D horizontal velocity field
         call calc_vel_horizontal_3D(ux,uy,ux_b,uy_b,taud_acx,taud_acy,visc_eff,visc_eff_ab,ATT,H_ice, &
                                     f_ice,zeta_aa,zeta_ac,dx,dy,n_glen,par%eps_0,par%boundaries)
-        
+
         ! Calculate depth-averaged horizontal velocity 
         ux_bar = calc_vertical_integrated_2D(ux,zeta_aa)
         uy_bar = calc_vertical_integrated_2D(uy,zeta_aa)
@@ -492,16 +492,26 @@ end if
                 
                 H_ice_ab = 0.25_prec*(H_ice(i,j)+H_ice(ip1,j)+H_ice(i,jp1)+H_ice(ip1,jp1))
                 
+                ! ajr: At this point, it is possible to calculate 'fact_ab' either 
+                ! individually for the x-dir and for the y-dir incorporating the 
+                ! variable tau_xz_ab. Or, the depth can be used here, making `fact_ab`
+                ! independent of direction, and then taud_acx/y can be used later in the 
+                ! actual calculation of velocity. The former agrees well for analytical
+                ! SIA velocity in ISMIPHOM-EXPA (~119 m/yr), however, in EISMINT1-moving
+                ! it generates strange oscillatory patterns in H_ice. The latter gives
+                ! great, smooth results for EISMINT1-moving, but the ISMIPHOM-EXPA velocity
+                ! is somewhat low (~108 m/yr). 
+                
                 if (p1 .ne. 0.0_wp) then  
                     fact_x_ab(i,j) = fact_x_ab(i,j) &
-                        + 2.0_prec * ATT_ab * tau_eff_sq_ab**p1 * tau_xz_ab * (dzeta*H_ice_ab)
+                        + 2.0_prec * ATT_ab * tau_eff_sq_ab**p1 * (-depth) * (dzeta*H_ice_ab)
                     fact_y_ab(i,j) = fact_y_ab(i,j) &
-                        + 2.0_prec * ATT_ab * tau_eff_sq_ab**p1 * tau_yz_ab * (dzeta*H_ice_ab)
+                        + 2.0_prec * ATT_ab * tau_eff_sq_ab**p1 * (-depth) * (dzeta*H_ice_ab)
                 else
                     fact_x_ab(i,j) = fact_x_ab(i,j) &
-                        + 2.0_prec * ATT_ab * tau_xz_ab * (dzeta*H_ice_ab)
+                        + 2.0_prec * ATT_ab * (-depth) * (dzeta*H_ice_ab)
                     fact_y_ab(i,j) = fact_y_ab(i,j) &
-                        + 2.0_prec * ATT_ab * tau_yz_ab * (dzeta*H_ice_ab)
+                        + 2.0_prec * ATT_ab * (-depth) * (dzeta*H_ice_ab)
                 end if 
 
             end do 
@@ -519,13 +529,13 @@ end if
                 ! stagger factor to acx-nodes and calculate velocity
                 if (f_ice(i,j) .eq. 1.0 .or. f_ice(ip1,j) .eq. 1.0) then 
                     fact_ac   = 0.5_prec*(fact_x_ab(i,j)+fact_x_ab(i,jm1))
-                    ux(i,j,k) = ux(i,j,1) + fact_ac
+                    ux(i,j,k) = ux(i,j,1) + fact_ac*taud_acx(i,j)
                 end if 
 
                 ! stagger factor to acy-nodes and calculate velocity
                 if (f_ice(i,j) .eq. 1.0 .or. f_ice(im1,j) .eq. 1.0) then
                     fact_ac   = 0.5_prec*(fact_y_ab(i,j)+fact_y_ab(im1,j))
-                    uy(i,j,k) = uy(i,j,1) + fact_ac
+                    uy(i,j,k) = uy(i,j,1) + fact_ac*taud_acy(i,j)
                 end if 
 
             end do 

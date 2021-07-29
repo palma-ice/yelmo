@@ -660,8 +660,8 @@ contains
 
             case("EISMINT")
 
-                dom%tpo%par%boundaries = "EISMINT"
-                dom%dyn%par%boundaries = "EISMINT"
+                dom%tpo%par%boundaries = "infinite"
+                dom%dyn%par%boundaries = "infinite"
                 
             case("MISMIP3D","TROUGH-F17","MISMIP+") 
 

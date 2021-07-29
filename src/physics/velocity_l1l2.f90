@@ -316,6 +316,9 @@ end if
         real(prec) :: dzeta 
         real(wp)   :: depth 
 
+        ! See comments below.
+        logical, parameter :: stagger_fact_ab = .TRUE.
+
         nx    = size(ux,1)
         ny    = size(ux,2) 
         nz_aa = size(ux,3) 
@@ -479,11 +482,11 @@ end if
                 jm1 = max(j-1,1) 
                 jp1 = min(j+1,ny) 
 
-                ! Calculate effective stress 
-                tau_xz_ab       = 0.25_prec*(  tau_xz(i,j,k)+tau_xz(i,jp1,k) &
-                                             + tau_xz(i,j,k-1)+tau_xz(i,jp1,k-1))
-                tau_yz_ab       = 0.25_prec*(  tau_yz(i,j,k)+tau_yz(ip1,j,k) &
-                                             + tau_yz(i,j,k-1)+tau_yz(ip1,j,k-1))
+                ! Calculate effective stress on horizontal ab-nodes and vertical ac-node
+                tau_xz_ab     = 0.25_prec*(  tau_xz(i,j,k)+tau_xz(i,jp1,k) &
+                                           + tau_xz(i,j,k-1)+tau_xz(i,jp1,k-1))
+                tau_yz_ab     = 0.25_prec*(  tau_yz(i,j,k)+tau_yz(ip1,j,k) &
+                                           + tau_yz(i,j,k-1)+tau_yz(ip1,j,k-1))
                 tau_eff_sq_ab = tau_xz_ab**2 + tau_yz_ab**2 + tau_par_ab(i,j,k)**2
 
                 ! Calculate factor to get velocity components
@@ -494,26 +497,37 @@ end if
                 
                 ! ajr: At this point, it is possible to calculate 'fact_ab' either 
                 ! individually for the x-dir and for the y-dir incorporating the 
-                ! variable tau_xz_ab. Or, the depth can be used here, making `fact_ab`
+                ! variable tau_xz_ab, or the depth can be used here, making `fact_ab`
                 ! independent of direction, and then taud_acx/y can be used later in the 
                 ! actual calculation of velocity. The former agrees well for analytical
-                ! SIA velocity in ISMIPHOM-EXPA (~119 m/yr), however, in EISMINT1-moving
-                ! it generates strange oscillatory patterns in H_ice. The latter gives
-                ! great, smooth results for EISMINT1-moving, but the ISMIPHOM-EXPA velocity
-                ! is somewhat low (~108 m/yr). 
+                ! SIA velocity in ISMIPHOM-EXPA (~119 m/yr). The latter ISMIPHOM-EXPA 
+                ! velocity is somewhat low (~108 m/yr). 
                 
-                if (p1 .ne. 0.0_wp) then  
+if (stagger_fact_ab) then  
+                if (p1 .ne. 0.0_wp) then 
                     fact_x_ab(i,j) = fact_x_ab(i,j) &
-                        + 2.0_prec * ATT_ab * tau_eff_sq_ab**p1 * (-depth) * (dzeta*H_ice_ab)
+                        + 2.0_prec * ATT_ab * tau_xz_ab * (dzeta*H_ice_ab) * tau_eff_sq_ab**p1
                     fact_y_ab(i,j) = fact_y_ab(i,j) &
-                        + 2.0_prec * ATT_ab * tau_eff_sq_ab**p1 * (-depth) * (dzeta*H_ice_ab)
+                        + 2.0_prec * ATT_ab * tau_yz_ab * (dzeta*H_ice_ab) * tau_eff_sq_ab**p1
+                else
+                    fact_x_ab(i,j) = fact_x_ab(i,j) &
+                        + 2.0_prec * ATT_ab * tau_xz_ab * (dzeta*H_ice_ab)
+                    fact_y_ab(i,j) = fact_y_ab(i,j) &
+                        + 2.0_prec * ATT_ab * tau_yz_ab * (dzeta*H_ice_ab)
+                end if 
+else
+                if (p1 .ne. 0.0_wp) then 
+                    fact_x_ab(i,j) = fact_x_ab(i,j) &
+                        + 2.0_prec * ATT_ab * (-depth) * (dzeta*H_ice_ab) * tau_eff_sq_ab**p1
+                    fact_y_ab(i,j) = fact_y_ab(i,j) &
+                        + 2.0_prec * ATT_ab * (-depth) * (dzeta*H_ice_ab) * tau_eff_sq_ab**p1
                 else
                     fact_x_ab(i,j) = fact_x_ab(i,j) &
                         + 2.0_prec * ATT_ab * (-depth) * (dzeta*H_ice_ab)
                     fact_y_ab(i,j) = fact_y_ab(i,j) &
                         + 2.0_prec * ATT_ab * (-depth) * (dzeta*H_ice_ab)
                 end if 
-
+end if 
             end do 
             end do 
 
@@ -526,16 +540,24 @@ end if
                 jm1 = max(j-1,1) 
                 jp1 = min(j+1,ny) 
 
-                ! stagger factor to acx-nodes and calculate velocity
+                ! stagger factor to acx-nodes to calculate velocity
                 if (f_ice(i,j) .eq. 1.0 .or. f_ice(ip1,j) .eq. 1.0) then 
                     fact_ac   = 0.5_prec*(fact_x_ab(i,j)+fact_x_ab(i,jm1))
+if (stagger_fact_ab) then  
+                    ux(i,j,k) = ux(i,j,1) + fact_ac
+else
                     ux(i,j,k) = ux(i,j,1) + fact_ac*taud_acx(i,j)
+end if
                 end if 
 
-                ! stagger factor to acy-nodes and calculate velocity
-                if (f_ice(i,j) .eq. 1.0 .or. f_ice(im1,j) .eq. 1.0) then
+                ! stagger factor to acy-nodes to calculate velocity
+                if (f_ice(i,j) .eq. 1.0 .or. f_ice(i,jp1) .eq. 1.0) then
                     fact_ac   = 0.5_prec*(fact_y_ab(i,j)+fact_y_ab(im1,j))
+if (stagger_fact_ab) then  
+                    uy(i,j,k) = uy(i,j,1) + fact_ac
+else
                     uy(i,j,k) = uy(i,j,1) + fact_ac*taud_acy(i,j)
+end if
                 end if 
 
             end do 

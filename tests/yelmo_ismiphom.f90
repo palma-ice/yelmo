@@ -232,11 +232,13 @@ program yelmo_ismiphom
 
     end do 
 
+    ! Write a restart file too
+    call yelmo_restart_write(yelmo1,file_restart,time=time)
+
     ! Write summary 
     write(*,*) "====== "//trim(domain)//"-"//trim(experiment)//" ======="
 
-    ! Write a restart file too
-    call yelmo_restart_write(yelmo1,file_restart,time=time)
+    write(*,*) "max(ux_s) = ", maxval(yelmo1%dyn%now%ux_s)
 
     ! Finalize program
     call yelmo_end(yelmo1,time=time)
@@ -246,7 +248,7 @@ program yelmo_ismiphom
     
     write(*,"(a,f12.3,a)") "Time  = ",cpu_dtime/60.0 ," min"
     write(*,"(a,f12.1,a)") "Speed = ",(1e-3*(time_end-time_init))/(cpu_dtime/3600.0), " kiloyears / hr"
-
+    
 contains
     
     subroutine write_step_2D(ylmo,filename,time)

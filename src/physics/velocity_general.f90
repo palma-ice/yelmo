@@ -172,12 +172,12 @@ contains
 
                     ! Calculate sigma-coordinate derivative correction factors
                     ! (Greve and Blatter, 2009, Eqs. 5.131 and 5.132)
-                    c_x = H_inv * ( (1.0-zeta_ac(k))*dzbdx_aa + zeta_ac(k)*dzsdx_aa )
-                    c_y = H_inv * ( (1.0-zeta_ac(k))*dzbdy_aa + zeta_ac(k)*dzsdy_aa )
+                    c_x = -H_inv * ( (1.0-zeta_ac(k))*dzbdx_aa + zeta_ac(k)*dzsdx_aa )
+                    c_y = -H_inv * ( (1.0-zeta_ac(k))*dzbdy_aa + zeta_ac(k)*dzsdy_aa )
 
                     ! Calculate derivatives
-                    duxdx_now = duxdx_aa - c_x*duxdz_aa 
-                    duydy_now = duydy_aa - c_y*duydz_aa 
+                    duxdx_now = duxdx_aa + c_x*duxdz_aa 
+                    duydy_now = duydy_aa + c_y*duydz_aa 
                     
                     ! Calculate vertical velocity of this layer
                     ! (Greve and Blatter, 2009, Eq. 5.95)
@@ -269,12 +269,12 @@ contains
             if (f_ice(i,j) .eq. 1.0) then
 
                 ! Get the centered bedrock gradient 
-                dzbdx_aa = (z_bed(ip1,j)-z_bed(im1,j))/(2.0_prec*dx)
-                dzbdy_aa = (z_bed(i,jp1)-z_bed(i,jm1))/(2.0_prec*dy)
+                dzbdx_aa = (z_bed(ip1,j)-z_bed(im1,j))/(2.0_wp*dx)
+                dzbdy_aa = (z_bed(i,jp1)-z_bed(i,jm1))/(2.0_wp*dy)
                 
                 ! Get the centered surface gradient 
-                dzsdx_aa = (z_srf(ip1,j)-z_srf(im1,j))/(2.0_prec*dx)
-                dzsdy_aa = (z_srf(i,jp1)-z_srf(i,jm1))/(2.0_prec*dy)
+                dzsdx_aa = (z_srf(ip1,j)-z_srf(im1,j))/(2.0_wp*dx)
+                dzsdy_aa = (z_srf(i,jp1)-z_srf(i,jm1))/(2.0_wp*dy)
                 
 
                 ! Calculate adjusted vertical velocity for each layer
@@ -283,20 +283,20 @@ contains
                     ! Get the centered horizontal velocity of box
                     ! (vertical aa-nodes? Check!)
                     if (k .eq. nz_ac) then 
-                        ux_aa = 0.5_prec* (ux(im1,j,k-1) + ux(i,j,k-1))
-                        uy_aa = 0.5_prec* (uy(i,jm1,k-1) + uy(i,j,k-1))
+                        ux_aa = 0.5_wp* (ux(im1,j,k-1) + ux(i,j,k-1))
+                        uy_aa = 0.5_wp* (uy(i,jm1,k-1) + uy(i,j,k-1))
                     else
-                        ux_aa = 0.5_prec* (ux(im1,j,k) + ux(i,j,k))
-                        uy_aa = 0.5_prec* (uy(i,jm1,k) + uy(i,j,k))
+                        ux_aa = 0.5_wp* (ux(im1,j,k) + ux(i,j,k))
+                        uy_aa = 0.5_wp* (uy(i,jm1,k) + uy(i,j,k))
                     end if 
 
                     ! Calculate sigma-coordinate derivative correction factors
                     ! (Greve and Blatter, 2009, Eqs. 5.131 and 5.132)
                     ! Not dividing by H here, since this is done in the thermodynamics advection step
-                    c_x = -ux_aa * ( (1.0-zeta_ac(k))*dzbdx_aa + zeta_ac(k)*dzsdx_aa )
-                    c_y = -uy_aa * ( (1.0-zeta_ac(k))*dzbdy_aa + zeta_ac(k)*dzsdy_aa )
+                    c_x = -ux_aa * ( (1.0_wp-zeta_ac(k))*dzbdx_aa + zeta_ac(k)*dzsdx_aa )
+                    c_y = -uy_aa * ( (1.0_wp-zeta_ac(k))*dzbdy_aa + zeta_ac(k)*dzsdy_aa )
 
-                    c_t = -( (1.0-zeta_ac(k))*dzbdt + zeta_ac(k)*dzsdt(i,j) )
+                    c_t = -( (1.0_wp-zeta_ac(k))*dzbdt + zeta_ac(k)*dzsdt(i,j) )
                     
 
                     ! Calculate adjusted vertical velocity for advection 

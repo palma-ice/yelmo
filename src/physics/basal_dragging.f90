@@ -870,7 +870,7 @@ contains
     ! ================================================================================
 
     subroutine scale_beta_gl_fraction(beta,f_grnd,f_gl)
-        ! Applyt scalar between 0 and 1 to modify basal friction coefficient
+        ! Apply scalar between 0 and 1 to modify basal friction coefficient
         ! at the grounding line.
         
         implicit none
@@ -1611,4 +1611,4 @@ contains
 
     end function calc_l14_scalar
 
-end module basal_dragging 
+end module basal_dragging

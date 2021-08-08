@@ -169,12 +169,17 @@ contains
             jm2 = max(j-2,1)
             jp2 = min(j+2,ny)
             
+            ! Second-order spatial derivative following
+            ! https://web.media.mit.edu/~crtaylor/calculator.html
+            dfxdx = (1.0_wp/(2.0_wp*dx))*(-1.0_wp*fx(im1,j)+1.0_wp*fx(ip1,j))
+            dfydy = (1.0_wp/(2.0_wp*dy))*(-1.0_wp*fy(i,jm1)+1.0_wp*fy(i,jp1))
 
+            ! ajr: works for simple (EISMINT tests), but not for non-linear
+            ! realistic ice sheets
             ! Fourth order spatial derivative following
             ! Man and Tsai (2008).
-
-            dfxdx = (1.0_wp/(12.0_wp*dx))*(fx(im2,j)-8.0_wp*fx(im1,j)+8.0_wp*fx(ip1,j)-fx(ip2,j))
-            dfydy = (1.0_wp/(12.0_wp*dy))*(fy(i,jm2)-8.0_wp*fy(i,jm1)+8.0_wp*fy(i,jp1)-fy(i,jp1))
+            ! dfxdx = (1.0_wp/(12.0_wp*dx))*(fx(im2,j)-8.0_wp*fx(im1,j)+8.0_wp*fx(ip1,j)-fx(ip2,j))
+            ! dfydy = (1.0_wp/(12.0_wp*dy))*(fy(i,jm2)-8.0_wp*fy(i,jm1)+8.0_wp*fy(i,jp1)-fy(i,jp1))
 
 
             dHdt(i,j) = -dfxdx - dfydy 

@@ -317,22 +317,18 @@ end if
             ! Calculate the flux across each boundary [m^2 a^-1]
             ux_now = ux(i,j)
             !ux_now = 0.5_wp*ux(i,j)+0.25_wp*ux(i,jp1)+0.25_wp*ux(i,jm1)
-            !flux_xr = ux_now * 0.5 * (H_ice_ab(i  ,j  ) + H_ice_ab(i  ,jm1))
             flux_xr = ux_now * 0.5*(H_ab(1)+H_ab(4))
 
             ux_now = ux(im1,j)
             !ux_now = 0.5_wp*ux(im1,j)+0.25_wp*ux(im1,jp1)+0.25_wp*ux(im1,jm1)
-            !flux_xl = ux_now * 0.5 * (H_ice_ab(im1,j  ) + H_ice_ab(im1,jm1))
             flux_xl = ux_now * 0.5*(H_ab(2)+H_ab(3))
             
             uy_now = uy(i,j)
             !uy_now = 0.5_wp*uy(i,j)+0.25_wp*uy(ip1,j)+0.25_wp*uy(im1,j)
-            !flux_yu = uy_now * 0.5 * (H_ice_ab(i  ,j  ) + H_ice_ab(im1,j  ))
             flux_yu = uy_now * 0.5*(H_ab(1)+H_ab(2))
 
             uy_now = uy(i,jm1)
             !uy_now = 0.5_wp*uy(i,jm1)+0.25_wp*uy(ip1,jm1)+0.25_wp*uy(im1,jm1)
-            !flux_yd = uy(i  ,jm1) * 0.5 * (H_ice_ab(i  ,jm1) + H_ice_ab(im1,jm1))
             flux_yd = uy_now * 0.5*(H_ab(3)+H_ab(4))
 
             ! flux_xr = ux(i,j)   * 0.5*(H_ab(1) + H_ab(4))

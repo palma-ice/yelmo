@@ -243,6 +243,7 @@ contains
         real(prec) :: c_x 
         real(prec) :: c_y 
         real(prec) :: c_t 
+        real(wp)   :: dzsdt_now 
 
         real(prec), parameter :: dzbdt = 0.0   ! For posterity, keep dzbdt variable, but set to zero 
 
@@ -280,14 +281,26 @@ contains
                 ! Calculate adjusted vertical velocity for each layer
                 do k = 1, nz_ac 
 
-                    ! Get the centered horizontal velocity of box
-                    ! (vertical aa-nodes? Check!)
-                    if (k .eq. nz_ac) then 
+                ! Get the centered horizontal velocity of box
+                ! on vertical ac-nodes at the level k 
+                ! ajr: Given that the correction is 
+                ! applied to uz, which is defined on 
+                ! ac-nodes, it seems the correction
+                ! should also be calculated on ac-nodes.
+                ! Note: nz_ac = nz_aa + 1
+    
+                    if (k .eq. 1) then 
+                        ux_aa = 0.5_wp* (ux(im1,j,k) + ux(i,j,k))
+                        uy_aa = 0.5_wp* (uy(i,jm1,k) + uy(i,j,k))
+                    else if (k .eq. nz_ac-1) then  
+                        ux_aa = 0.5_wp* (ux(im1,j,k) + ux(i,j,k))
+                        uy_aa = 0.5_wp* (uy(i,jm1,k) + uy(i,j,k))
+                    else if (k .eq. nz_ac) then 
                         ux_aa = 0.5_wp* (ux(im1,j,k-1) + ux(i,j,k-1))
                         uy_aa = 0.5_wp* (uy(i,jm1,k-1) + uy(i,j,k-1))
                     else
-                        ux_aa = 0.5_wp* (ux(im1,j,k) + ux(i,j,k))
-                        uy_aa = 0.5_wp* (uy(i,jm1,k) + uy(i,j,k))
+                        ux_aa = 0.25_wp* (ux(im1,j,k) + ux(i,j,k) + ux(im1,j,k+1) + ux(i,j,k+1))
+                        uy_aa = 0.25_wp* (uy(i,jm1,k) + uy(i,j,k) + uy(i,jm1,k+1) + uy(i,j,k+1))
                     end if 
 
                     ! Calculate sigma-coordinate derivative correction factors
@@ -296,7 +309,12 @@ contains
                     c_x = -ux_aa * ( (1.0_wp-zeta_ac(k))*dzbdx_aa + zeta_ac(k)*dzsdx_aa )
                     c_y = -uy_aa * ( (1.0_wp-zeta_ac(k))*dzbdy_aa + zeta_ac(k)*dzsdy_aa )
 
-                    c_t = -( (1.0_wp-zeta_ac(k))*dzbdt + zeta_ac(k)*dzsdt(i,j) )
+                    ! Get a locally smoothed value of dzsdt to avoid spurious oscillations
+                    ! (eg in EISMINT-EXPA dhdt field)
+                    dzsdt_now = 0.5_wp*dzsdt(i,j) &
+                              + 0.125_wp*( dzsdt(im1,j)+dzsdt(ip1,j)+dzsdt(i,jm1)+dzsdt(i,jp1) )
+                    
+                    c_t = -( (1.0_wp-zeta_ac(k))*dzbdt + zeta_ac(k)*dzsdt_now )
                     
 
                     ! Calculate adjusted vertical velocity for advection 

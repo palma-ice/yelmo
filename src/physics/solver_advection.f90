@@ -103,6 +103,11 @@ contains
         integer    :: im1, ip1, jm1, jp1
         integer    :: im2, ip2, jm2, jp2
         real(wp)   :: H_ac(2)
+        real(wp)   :: H_ab(4)
+        real(wp)   :: ux_ab(4)
+        real(wp)   :: uy_ab(4)
+        real(wp)   :: fx_ab(4)
+        real(wp)   :: fy_ab(4) 
         real(wp)   :: ux_now, uy_now 
         real(wp)   :: dfxdx, dfydy 
         real(wp), allocatable :: dHdt(:,:)                ! [m] aa-nodes, Total change this timestep due to fluxes divergence and mdot 
@@ -134,25 +139,58 @@ contains
             jm1 = max(j-1,1)
             jp1 = min(j+1,ny)
             
-            ! ! Get centered velocities (aa-nodes)
-            ! ux_now = 0.5_wp*(ux(i,j)+ux(im1,j))
-            ! uy_now = 0.5_wp*(uy(i,j)+uy(i,jm1))
+            H_ab(1) = 0.25_wp*(H_ice(i,j)+H_ice(ip1,j)+H_ice(i,jp1)+H_ice(ip1,jp1)) 
+            H_ab(2) = 0.25_wp*(H_ice(i,j)+H_ice(im1,j)+H_ice(i,jp1)+H_ice(im1,jp1)) 
+            H_ab(3) = 0.25_wp*(H_ice(i,j)+H_ice(im1,j)+H_ice(i,jm1)+H_ice(im1,jm1)) 
+            H_ab(4) = 0.25_wp*(H_ice(i,j)+H_ice(ip1,j)+H_ice(i,jm1)+H_ice(ip1,jm1)) 
 
-            ! fx(i,j) = ux_now*H_ice(i,j)
-            ! fy(i,j) = uy_now*H_ice(i,j)
+            ! === ux =========
 
-            ! Get centered fluxes (aa-nodes)
-            H_ac(1) = 0.5_wp*(H_ice(i,j)+H_ice(im1,j))
-            H_ac(2) = 0.5_wp*(H_ice(i,j)+H_ice(ip1,j))
-            fx(i,j) = 0.5_wp*(H_ac(1)*ux(im1,j) + H_ac(2)*ux(i,j))
+            ux_ab(1) = 0.5_wp*(ux(i,j)+ux(i,jp1))
+            ux_ab(2) = 0.5_wp*(ux(im1,j)+ux(im1,jp1))
+            ux_ab(3) = 0.5_wp*(ux(im1,jm1)+ux(im1,j))
+            ux_ab(4) = 0.5_wp*(ux(i,jm1)+ux(i,j))
+            where (abs(ux_ab) .lt. TOL_UNDERFLOW) ux_ab = 0.0_wp 
 
-            H_ac(1) = 0.5_wp*(H_ice(i,j)+H_ice(i,jm1))
-            H_ac(2) = 0.5_wp*(H_ice(i,j)+H_ice(i,jp1))
-            fy(i,j) = 0.5_wp*(H_ac(1)*uy(i,jm1) + H_ac(2)*uy(i,j))
+            ! === uy =========
+
+            uy_ab(1) = 0.5_wp*(uy(i,j)+uy(ip1,j))
+            uy_ab(2) = 0.5_wp*(uy(i,j)+uy(im1,j))
+            uy_ab(3) = 0.5_wp*(uy(i,jm1)+uy(im1,jm1))
+            uy_ab(4) = 0.5_wp*(uy(i,jm1)+uy(ip1,jm1))
+            where (abs(uy_ab) .lt. TOL_UNDERFLOW) uy_ab = 0.0_wp 
+
+            fx_ab = H_ab*ux_ab
+            fy_ab = H_ab*uy_ab 
+
+            dfxdx = 0.5_wp*( (fx_ab(1)-fx_ab(2))/dx + (fx_ab(4)-fx_ab(3))/dx )
+            dfydy = 0.5_wp*( (fy_ab(1)-fy_ab(4))/dy + (fy_ab(2)-fy_ab(3))/dy )
+            
+            dHdt(i,j) = -dfxdx - dfydy 
+
+            ! Limit dHdt for stability 
+            if (dHdt(i,j) .lt. -dHdt_lim) dHdt(i,j) = -dHdt_lim 
+            if (dHdt(i,j) .gt.  dHdt_lim) dHdt(i,j) =  dHdt_lim 
+            
+
+
+            ! ! Get centered fluxes (aa-nodes)
+            ! fx(i,j) = 0.25_wp*(sum(H_ab*ux_ab))
+            ! fy(i,j) = 0.25_wp*(sum(H_ab*uy_ab))
+            
+            ! ! Get centered fluxes (aa-nodes)
+            ! H_ac(1) = 0.5_wp*(H_ice(i,j)+H_ice(im1,j))
+            ! H_ac(2) = 0.5_wp*(H_ice(i,j)+H_ice(ip1,j))
+            ! fx(i,j) = 0.5_wp*(H_ac(1)*ux(im1,j) + H_ac(2)*ux(i,j))
+
+            ! H_ac(1) = 0.5_wp*(H_ice(i,j)+H_ice(i,jm1))
+            ! H_ac(2) = 0.5_wp*(H_ice(i,j)+H_ice(i,jp1))
+            ! fy(i,j) = 0.5_wp*(H_ac(1)*uy(i,jm1) + H_ac(2)*uy(i,j))
             
         end do
         end do 
 
+if (.FALSE.) then
         ! Now calculate spatial derivatives dfx/dx / dfy/dy
         ! to obtain dh/dt
         do i = 1, nx
@@ -169,6 +207,8 @@ contains
             jm2 = max(j-2,1)
             jp2 = min(j+2,ny)
             
+            ! ajr: works for simple (EISMINT tests), but not for non-linear
+            ! realistic ice sheets
             ! Second-order spatial derivative following
             ! https://web.media.mit.edu/~crtaylor/calculator.html
             dfxdx = (1.0_wp/(2.0_wp*dx))*(-1.0_wp*fx(im1,j)+1.0_wp*fx(ip1,j))
@@ -190,6 +230,8 @@ contains
             
         end do
         end do
+
+end if 
 
         ! Update H_ice:
         H_ice = H_ice + dt*dHdt + dt*mdot 

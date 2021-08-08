@@ -80,7 +80,7 @@ contains
                 dHdt_advec = dHdt_n 
 
                 ! Determine current advective rate of change (time=n)
-                call calc_advec2D(dHdt_n,H_ice,ux_tmp,uy_tmp,mbal_zero,dx,dx,dt,solver)
+                call calc_advec2D(dHdt_n,H_ice,f_ice,ux_tmp,uy_tmp,mbal_zero,dx,dx,dt,solver)
 
                 ! ajr: testing stability fix for spin-up, limit advection rate!
                 ! where(dHdt_n .gt.  dHdt_advec_lim) dHdt_n = dHdt_advec_lim
@@ -95,7 +95,7 @@ contains
             case("corrector") ! corrector 
 
                 ! Determine advective rate of change based on predicted H,ux/y fields (time=n+1,pred)
-                call calc_advec2D(dHdt_advec,H_ice_pred,ux_tmp,uy_tmp,mbal_zero,dx,dx,dt,solver)
+                call calc_advec2D(dHdt_advec,H_ice_pred,f_ice,ux_tmp,uy_tmp,mbal_zero,dx,dx,dt,solver)
 
                 ! ajr: testing stability fix for spin-up, limit advection rate!
                 ! where(dHdt_advec .gt.  dHdt_advec_lim) dHdt_advec = dHdt_advec_lim

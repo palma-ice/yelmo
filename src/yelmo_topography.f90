@@ -314,7 +314,7 @@ end if
             tpo%now%dzsrfdt = (tpo%now%z_srf-tpo%now%z_srf_n) / dt 
         end if 
         
-        ! Calculate the surface slope (on staggered Ac x/y nodes)
+        ! Calculate the surface slope (on staggered acx/y nodes)
         call calc_gradient_ac_ice(tpo%now%dzsdx,tpo%now%dzsdy,tpo%now%z_srf,tpo%now%f_ice,tpo%par%dx, &
                                                 tpo%par%margin2nd,tpo%par%grad_lim,tpo%par%boundaries)
         call calc_gradient_ac_ice(tpo%now%dHicedx,tpo%now%dHicedy,tpo%now%H_ice,tpo%now%f_ice,tpo%par%dx, &

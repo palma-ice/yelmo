@@ -1061,6 +1061,8 @@ contains
         integer    :: ncid, n, nx, ny 
         real(prec) :: time_prev 
 
+        logical, parameter :: write_pc_tau_field = .TRUE.  ! Signficantly increases filesize, careful!
+
         nx = size(pc_tau,1)
         ny = size(pc_tau,2) 
 
@@ -1084,9 +1086,12 @@ contains
         
         call nc_write(filename,  "dt_pi", dt_pi,dim1="time",start=[n],count=[1],units="yr",long_name="Timestep (PI controller)",ncid=ncid)
         call nc_write(filename, "pc_eta",pc_eta,dim1="time",start=[n],count=[1],units="m/yr",long_name="eta (maximum PC truncation error)",ncid=ncid)
-        !call nc_write(filename, "pc_tau",pc_tau,dim1="xc",dim2="yc",dim3="time",start=[1,1,n],count=[nx,ny,1],count=[1],units="m a**-1", &
-!                         long_name="Truncation error",ncid=ncid)
         
+        if (write_pc_tau_field) then 
+            call nc_write(filename, "pc_tau",pc_tau,dim1="xc",dim2="yc",dim3="time",start=[1,1,n],count=[nx,ny,1],units="m a**-1", &
+                            long_name="Truncation error",ncid=ncid)
+        end if 
+
         call nc_write(filename, "ssa_iter", ssa_iter, dim1="time",start=[n],units="",long_name="Picard iterations for SSA convergence",ncid=ncid)
         call nc_write(filename, "iter_redo",iter_redo,dim1="time",start=[n],units="",long_name="Number of redo iterations needed",count=[1],ncid=ncid)
         

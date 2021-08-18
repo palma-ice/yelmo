@@ -1061,7 +1061,7 @@ contains
         integer    :: ncid, n, nx, ny 
         real(prec) :: time_prev 
 
-        logical, parameter :: write_pc_tau_field = .TRUE.  ! Signficantly increases filesize, careful!
+        logical, parameter :: write_pc_tau_field = .FALSE.  ! Signficantly increases filesize, careful!
 
         nx = size(pc_tau,1)
         ny = size(pc_tau,2) 

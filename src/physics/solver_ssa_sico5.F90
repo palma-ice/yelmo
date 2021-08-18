@@ -278,7 +278,8 @@ contains
 
             if (ssa_mask_acx(i,j) .eq. -1) then 
                 ! Assign prescribed boundary velocity to this point
-                ! (eg for prescribed velocity corresponding to analytical grounding line flux)
+                ! (eg for prescribed velocity corresponding to 
+                ! analytical grounding line flux, or for a regional domain)
 
                 k = k+1
                 lgs_a_value(k)  = 1.0   ! diagonal element only
@@ -498,7 +499,8 @@ contains
                         i1 = i+1   ! ice-front marker 
                     end if
     
-                    if (.not.( is_front_2(i1-1,j) .and. is_front_2(i1+1,j) ) ) then
+                    if ( (.not. is_front_2(i1-1,j)) .or. (.not. is_front_2(i1+1,j)) ) then
+                        ! Ice exists inland too,
                         ! discretization of the x-component of the BC
 
                         nc = 2*ij2n(i1-1,j)-1
@@ -534,12 +536,14 @@ contains
                         !H_ice_now = H_ice(i1,j)/f_ice(i1,j)
 
                         if (z_sl(i1,j)-z_bed(i1,j) .gt. 0.0) then 
-                        ! Bed below sea level 
-                          H_ocn_now = min(rho_ice/rho_sw*H_ice_now, &    ! Flotation depth 
-                                          z_sl(i1,j)-z_bed(i1,j))            ! Grounded depth 
+                        ! Bed below sea level
+
+                          H_ocn_now = min(rho_ice/rho_sw*H_ice_now, &       ! Flotation depth 
+                                          z_sl(i1,j)-z_bed(i1,j))           ! Grounded depth 
 
                         else 
-                        ! Bed above sea level 
+                        ! Bed above sea level
+
                         H_ocn_now = 0.0 
 
                         end if 
@@ -616,17 +620,11 @@ contains
              
                     ! inner shelfy stream or floating ice 
 
-                    if (i .eq. 1) then  ! ajr: filler to avoid LIS errors 
-                        k  = k+1
-                        lgs_a_value(k) = 1.0 
-                        lgs_a_index(k) = nr 
-                    else 
-                        nc = 2*ij2n(i-1,j)-1
-                            ! smallest nc (column counter), for vx_m(i-1,j)
-                        k = k+1
-                        lgs_a_value(k) = 4.0_prec*inv_dxi2*vis_int_g(i,j)
-                        lgs_a_index(k) = nc
-                    end if 
+                    nc = 2*ij2n(i-1,j)-1
+                        ! smallest nc (column counter), for vx_m(i-1,j)
+                    k = k+1
+                    lgs_a_value(k) = 4.0_prec*inv_dxi2*vis_int_g(i,j)
+                    lgs_a_index(k) = nc 
 
                     nc = 2*ij2n(i,j-1)-1
                         ! next nc (column counter), for vx_m(i,j-1)
@@ -923,7 +921,8 @@ contains
                         j1 = j+1   ! ice-front marker
                     end if
 
-                    if (.not.( is_front_2(i,j1-1) .and. is_front_2(i,j1+1) ) ) then
+                    if ( (.not. is_front_2(i,j1-1)) .and. (.not. is_front_2(i,j1+1)) ) then
+                        ! Inland ice exists,
                         ! discretization of the y-component of the BC
 
                         nc = 2*ij2n(i-1,j1)-1
@@ -960,8 +959,8 @@ contains
 
                         if (z_sl(i,j1)-z_bed(i,j1) .gt. 0.0) then 
                             ! Bed below sea level 
-                            H_ocn_now = min(rho_ice/rho_sw*H_ice_now, &    ! Flotation depth 
-                                          z_sl(i,j1)-z_bed(i,j1))            ! Grounded depth 
+                            H_ocn_now = min(rho_ice/rho_sw*H_ice_now, &     ! Flotation depth 
+                                          z_sl(i,j1)-z_bed(i,j1))           ! Grounded depth 
 
                         else 
                             ! Bed above sea level 
@@ -1253,7 +1252,7 @@ contains
                         ssa_mask_acx(i,j) = 2
                     end if 
 
-                    ! Deactivate if dragging is to high and away from grounding line
+                    ! Deactivate if dragging is too high and away from grounding line
                     if ( beta_acx(i,j) .ge. beta_max .and. f_grnd_acx(i,j) .eq. 1.0 ) ssa_mask_acx(i,j) = 0 
                     
                 end if
@@ -1271,7 +1270,7 @@ contains
                         ssa_mask_acy(i,j) = 2
                     end if 
 
-                    ! Deactivate if dragging is to high and away from grounding line
+                    ! Deactivate if dragging is too high and away from grounding line
                     if ( beta_acy(i,j) .ge. beta_max .and. f_grnd_acy(i,j) .eq. 1.0 ) ssa_mask_acy(i,j) = 0 
                     
                 end if
@@ -1680,7 +1679,7 @@ contains
         end do 
         end do 
         
-        !-------- Detection of the calving front --------
+        !-------- Detection of the ice front/margins --------
 
         front1  = .false. 
         front2  = .false. 

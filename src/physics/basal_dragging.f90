@@ -50,7 +50,6 @@ module basal_dragging
     public :: stagger_beta_aa_gl_upstream
     public :: stagger_beta_aa_gl_downstream    
     public :: stagger_beta_aa_gl_subgrid
-    public :: stagger_beta_aa_gl_subgrid_1 
     public :: stagger_beta_aa_gl_subgrid_flux 
 contains 
 
@@ -286,15 +285,12 @@ contains
                     call stagger_beta_aa_gl_subgrid(beta_acx,beta_acy,beta,f_ice,f_grnd, &
                                                     f_grnd_acx,f_grnd_acy)
 
-    !                 call stagger_beta_aa_gl_subgrid_1(beta_acx,beta_acy,beta,f_ice,H_grnd, &
-    !                                             f_grnd,f_grnd_acx,f_grnd_acy)
-                
                 case(4)
                     ! Apply subgrid scaling fraction at the grounding line when staggering,
                     ! with subgrid weighting calculated from linearly interpolated flux. 
 
                     call stagger_beta_aa_gl_subgrid_flux(beta_acx,beta_acy,beta, &
-                                            H_ice,ux,uy,f_grnd,f_grnd_acx,f_grnd_acy)
+                                            H_ice,f_ice,ux,uy,f_grnd,f_grnd_acx,f_grnd_acy)
 
                 case DEFAULT 
 
@@ -1250,23 +1246,33 @@ contains
             jp1 = min(j+1,ny)
             
             ! grounding line, acx-nodes
-            if (f_grnd(i,j) .gt. 0.0 .and. f_grnd(ip1,j) .eq. 0.0) then 
-                ! Floating to the right 
-                beta_acx(i,j) = f_grnd_acx(i,j)*beta(i,j) + (1.0-f_grnd_acx(i,j))*beta(ip1,j)
-            else if (f_grnd(i,j) .eq. 0.0 .and. f_grnd(ip1,j) .gt. 0.0) then 
-                ! Floating to the left 
-                beta_acx(i,j) = (1.0-f_grnd_acx(i,j))*beta(i,j) + f_grnd_acx(i,j)*beta(ip1,j)
+            if (f_ice(i,j) .eq. 1.0 .and. f_ice(ip1,j) .eq. 1.0) then 
+                ! Both aa-nodes are ice covered 
+
+                if (f_grnd(i,j) .gt. 0.0 .and. f_grnd(ip1,j) .eq. 0.0) then 
+                    ! Floating to the right 
+                    beta_acx(i,j) = f_grnd_acx(i,j)*beta(i,j) + (1.0-f_grnd_acx(i,j))*beta(ip1,j)
+                else if (f_grnd(i,j) .eq. 0.0 .and. f_grnd(ip1,j) .gt. 0.0) then 
+                    ! Floating to the left 
+                    beta_acx(i,j) = (1.0-f_grnd_acx(i,j))*beta(i,j) + f_grnd_acx(i,j)*beta(ip1,j)
+                end if 
+
             end if 
 
             ! grounding line, acy-nodes 
-            if (f_grnd(i,j) .gt. 0.0 .and. f_grnd(i,jp1) .eq. 0.0) then 
-                ! Floating to the top 
-                beta_acy(i,j) = f_grnd_acy(i,j)*beta(i,j) + (1.0-f_grnd_acy(i,j))*beta(i,jp1)
-            else if (f_grnd(i,j) .eq. 0.0 .and. f_grnd(i,jp1) .gt. 0.0) then 
-                ! Floating to the bottom 
-                beta_acy(i,j) = (1.0-f_grnd_acy(i,j))*beta(i,j) + f_grnd_acy(i,j)*beta(i,jp1)
-            end if 
+            if (f_ice(i,j) .eq. 1.0 .and. f_ice(i,jp1) .eq. 1.0) then 
+                ! Both aa-nodes are ice covered 
 
+                if (f_grnd(i,j) .gt. 0.0 .and. f_grnd(i,jp1) .eq. 0.0) then 
+                    ! Floating to the top 
+                    beta_acy(i,j) = f_grnd_acy(i,j)*beta(i,j) + (1.0-f_grnd_acy(i,j))*beta(i,jp1)
+                else if (f_grnd(i,j) .eq. 0.0 .and. f_grnd(i,jp1) .gt. 0.0) then 
+                    ! Floating to the bottom 
+                    beta_acy(i,j) = (1.0-f_grnd_acy(i,j))*beta(i,j) + f_grnd_acy(i,j)*beta(i,jp1)
+                end if 
+
+            end if
+            
         end do 
         end do 
 
@@ -1274,138 +1280,7 @@ contains
         
     end subroutine stagger_beta_aa_gl_subgrid
     
-    subroutine stagger_beta_aa_gl_subgrid_1(beta_acx,beta_acy,beta,H_grnd,f_grnd_acx,f_grnd_acy,dHdt)
-        ! Modify basal friction coefficient by grounded/floating binary mask
-        ! (via the grounded fraction)
-        ! Analagous to method "NSEP" in Seroussi et al (2014): 
-        ! Friction is zero if a staggered node contains a floating fraction,
-        ! ie, f_grnd_acx/acy > 1.0 
-
-        implicit none
-        
-        real(wp), intent(INOUT) :: beta_acx(:,:)   ! ac-nodes
-        real(wp), intent(INOUT) :: beta_acy(:,:)   ! ac-nodes
-        real(wp), intent(INOUT) :: beta(:,:)       ! aa-nodes
-        real(wp), intent(IN)    :: H_grnd(:,:)     ! aa-nodes    
-        real(wp), intent(IN)    :: f_grnd_acx(:,:) ! ac-nodes 
-        real(wp), intent(IN)    :: f_grnd_acy(:,:) ! ac-nodes
-        real(wp), intent(IN)    :: dHdt(:,:)       ! aa-nodes  
-        
-        ! Local variables
-        integer    :: i, j, nx, ny
-        real(wp) :: H_grnd_now, dHdt_now  
-        logical    :: is_float 
-
-        nx = size(beta_acx,1)
-        ny = size(beta_acx,2) 
-
-        ! === Treat beta at the grounding line on aa-nodes ===
-
-        ! Cut-off beta according to floating criterion on aa-nodes
-        !where (H_grnd .le. 0.0) beta = 0.0 
-        !beta = beta*f_grnd
-
-        ! === Stagger to ac-nodes === 
-
-        ! acx-nodes
-        do j = 1, ny 
-        do i = 1, nx-1
-
-            H_grnd_now = 0.5_prec*(H_grnd(i,j)+H_grnd(i+1,j))
-            !dHdt_now   = 0.5_prec*(dHdt(i,j)+dHdt(i+1,j))
-            dHdt_now   = max(dHdt(i,j),dHdt(i+1,j))
-
-            if (dHdt_now .gt. 0.0 .and. f_grnd_acx(i,j) .eq. 0.0) then 
-                ! Purely floating points only considered floating (ie, domain more grounded)
-
-                is_float = .TRUE. 
-
-            else if (dHdt_now .le. 0.0 .and. f_grnd_acx(i,j) .lt. 1.0) then 
-                ! Purely floating and partially grounded points considered floating (ie, domain more floating)
-                
-                is_float = .TRUE. 
-
-            else 
-                ! Grounded 
-
-                is_float = .FALSE. 
-
-            end if 
-
-            if (is_float) then
-                ! Consider ac-node floating
-
-                beta_acx(i,j) = 0.0 
-
-            else 
-                ! Consider ac-node grounded 
-
-                if (H_grnd(i,j) .gt. 0.0 .and. H_grnd(i+1,j) .le. 0.0) then 
-                    beta_acx(i,j) = beta(i,j) !*f_grnd_acx(i,j)
-                else if (H_grnd(i,j) .le. 0.0 .and. H_grnd(i+1,j) .gt. 0.0) then
-                    beta_acx(i,j) = beta(i+1,j) !*f_grnd_acx(i,j)
-                else 
-                    beta_acx(i,j) = 0.5_prec*(beta(i,j)+beta(i+1,j))
-                end if 
-                
-            end if 
-            
-        end do 
-        end do 
-        beta_acx(nx,:) = beta_acx(nx-1,:) 
-        
-        ! acy-nodes 
-        do j = 1, ny-1 
-        do i = 1, nx
-
-!             dHdt_now   = 0.5_prec*(dHdt(i,j)+dHdt(i,j+1))
-            dHdt_now   = max(dHdt(i,j),dHdt(i,j+1))
-            
-            if (dHdt_now .gt. 0.0 .and. f_grnd_acy(i,j) .eq. 0.0) then 
-                ! Purely floating points only considered floating (ie, domain more grounded)
-
-                is_float = .TRUE. 
-
-            else if (dHdt_now .le. 0.0 .and. f_grnd_acy(i,j) .lt. 1.0) then 
-                ! Purely floating and partially grounded points considered floating (ie, domain more floating)
-                
-                is_float = .TRUE. 
-
-            else 
-                ! Grounded 
-
-                is_float = .FALSE. 
-
-            end if 
-
-            if (is_float) then
-                ! Consider ac-node floating
-
-                beta_acy(i,j) = 0.0 
-
-            else 
-                ! Consider ac-node grounded 
-
-                if (H_grnd(i,j) .gt. 0.0 .and. H_grnd(i,j+1) .le. 0.0) then 
-                    beta_acy(i,j) = beta(i,j) !*f_grnd_acy(i,j)
-                else if (H_grnd(i,j) .le. 0.0 .and. H_grnd(i,j+1) .gt. 0.0) then
-                    beta_acy(i,j) = beta(i,j+1) !*f_grnd_acy(i,j)
-                else 
-                    beta_acy(i,j) = 0.5_prec*(beta(i,j)+beta(i,j+1))
-                end if 
-                
-            end if 
-            
-        end do 
-        end do 
-        beta_acy(:,ny) = beta_acy(:,ny-1) 
-        
-        return
-        
-    end subroutine stagger_beta_aa_gl_subgrid_1
-    
-
-    subroutine stagger_beta_aa_gl_subgrid_flux(beta_acx,beta_acy,beta,H_ice,ux,uy,f_grnd,f_grnd_acx,f_grnd_acy)
+    subroutine stagger_beta_aa_gl_subgrid_flux(beta_acx,beta_acy,beta,H_ice,f_ice,ux,uy,f_grnd,f_grnd_acx,f_grnd_acy)
         ! Modify basal friction coefficient by grounded fraction 
         ! weighted by linear-interpolated flux. 
 
@@ -1415,6 +1290,7 @@ contains
         real(wp), intent(INOUT) :: beta_acy(:,:)      ! ac-nodes
         real(wp), intent(IN)    :: beta(:,:)          ! aa-nodes
         real(wp), intent(IN)    :: H_ice(:,:)         ! aa-nodes 
+        real(wp), intent(IN)    :: f_ice(:,:)         ! aa-nodes 
         real(wp), intent(IN)    :: ux(:,:)            ! ac-nodes
         real(wp), intent(IN)    :: uy(:,:)            ! ac-nodes
         real(wp), intent(IN)    :: f_grnd(:,:)        ! aa-nodes     
@@ -1442,65 +1318,55 @@ contains
             jp1 = min(ny,j+1)
 
             ! acx-nodes
-            if (f_grnd(i,j) .gt. 0.0 .and. f_grnd(ip1,j) .eq. 0.0) then 
-                ! Floating to the right
+            if (f_ice(i,j) .eq. 1.0 .and. f_ice(ip1,j) .eq. 1.0) then 
+                ! Both aa-nodes are ice covered 
 
-                ux_aa_a = 0.5_wp*(ux(im1,j)+ux(i,j))
-                ux_aa_b = 0.5_wp*(ux(ip1,j)+ux(i,j))
-                
-                call calc_beta_gl_flux_weight(beta_acx(i,j),beta(i,j),beta(ip1,j), &
-                                ux_aa_a,ux_aa_b,H_ice(i,j),H_ice(ip1,j),f_grnd_acx(i,j))
+                if (f_grnd(i,j) .gt. 0.0 .and. f_grnd(ip1,j) .eq. 0.0) then 
+                    ! Floating to the right
 
-            else if (f_grnd(i,j) .eq. 0.0 .and. f_grnd(ip1,j) .gt. 0.0) then 
-                ! Floating to the left 
+                    ux_aa_a = 0.5_wp*(ux(im1,j)+ux(i,j))
+                    ux_aa_b = 0.5_wp*(ux(ip1,j)+ux(i,j))
+                    
+                    call calc_beta_gl_flux_weight(beta_acx(i,j),beta(i,j),beta(ip1,j), &
+                                    ux_aa_a,ux_aa_b,H_ice(i,j),H_ice(ip1,j),f_grnd_acx(i,j))
 
-                ux_aa_a = 0.5_wp*(ux(ip1,j)+ux(i,j))
-                ux_aa_b = 0.5_wp*(ux(im1,j)+ux(i,j))
-                
-                call calc_beta_gl_flux_weight(beta_acx(i,j),beta(ip1,j),beta(i,j), &
-                                ux_aa_a,ux_aa_b,H_ice(ip1,j),H_ice(i,j),f_grnd_acx(i,j))
+                else if (f_grnd(i,j) .eq. 0.0 .and. f_grnd(ip1,j) .gt. 0.0) then 
+                    ! Floating to the left 
 
-            else if (f_grnd(i,j) .gt. 0.0 .and. f_grnd(ip1,j) .gt. 0.0) then 
-                ! Fully grounded, simple staggering
+                    ux_aa_a = 0.5_wp*(ux(ip1,j)+ux(i,j))
+                    ux_aa_b = 0.5_wp*(ux(im1,j)+ux(i,j))
+                    
+                    call calc_beta_gl_flux_weight(beta_acx(i,j),beta(ip1,j),beta(i,j), &
+                                    ux_aa_a,ux_aa_b,H_ice(ip1,j),H_ice(i,j),f_grnd_acx(i,j))
 
-                beta_acx(i,j) = 0.5*(beta(i,j) + beta(ip1,j))
-
-            else 
-                ! Fully floating
-
-                beta_acx(i,j) = 0.0
+                end if 
 
             end if 
 
             ! acy-nodes
-            if (f_grnd(i,j) .gt. 0.0 .and. f_grnd(i,jp1) .eq. 0.0) then 
-                ! Floating to the top
+            if (f_ice(i,j) .eq. 1.0 .and. f_ice(i,jp1) .eq. 1.0) then 
+                ! Both aa-nodes are ice covered 
 
-                uy_aa_a = 0.5_wp*(uy(i,jm1)+uy(i,j))
-                uy_aa_b = 0.5_wp*(uy(i,jp1)+uy(i,j))
-                
-                call calc_beta_gl_flux_weight(beta_acy(i,j),beta(i,j),beta(i,jp1), &
-                                uy_aa_a,uy_aa_b,H_ice(i,j),H_ice(i,jp1),f_grnd_acy(i,j))
+                if (f_grnd(i,j) .gt. 0.0 .and. f_grnd(i,jp1) .eq. 0.0) then 
+                    ! Floating to the top
 
-            else if (f_grnd(i,j) .eq. 0.0 .and. f_grnd(ip1,j) .gt. 0.0) then 
-                ! Floating to the bottom 
+                    uy_aa_a = 0.5_wp*(uy(i,jm1)+uy(i,j))
+                    uy_aa_b = 0.5_wp*(uy(i,jp1)+uy(i,j))
+                    
+                    call calc_beta_gl_flux_weight(beta_acy(i,j),beta(i,j),beta(i,jp1), &
+                                    uy_aa_a,uy_aa_b,H_ice(i,j),H_ice(i,jp1),f_grnd_acy(i,j))
 
-                uy_aa_a = 0.5_wp*(uy(i,jp1)+uy(i,j))
-                uy_aa_b = 0.5_wp*(uy(i,jm1)+uy(i,j))
-                
-                call calc_beta_gl_flux_weight(beta_acy(i,j),beta(i,jp1),beta(i,j), &
-                                uy_aa_a,uy_aa_b,H_ice(i,jp1),H_ice(i,j),f_grnd_acx(i,j))
+                else if (f_grnd(i,j) .eq. 0.0 .and. f_grnd(ip1,j) .gt. 0.0) then 
+                    ! Floating to the bottom 
 
-            else if (f_grnd(i,j) .gt. 0.0 .and. f_grnd(i,jp1) .gt. 0.0) then 
-                ! Fully grounded, simple staggering
+                    uy_aa_a = 0.5_wp*(uy(i,jp1)+uy(i,j))
+                    uy_aa_b = 0.5_wp*(uy(i,jm1)+uy(i,j))
+                    
+                    call calc_beta_gl_flux_weight(beta_acy(i,j),beta(i,jp1),beta(i,j), &
+                                    uy_aa_a,uy_aa_b,H_ice(i,jp1),H_ice(i,j),f_grnd_acx(i,j))
 
-                beta_acy(i,j) = 0.5*(beta(i,j) + beta(i,jp1))
+                end if 
 
-            else 
-                ! Fully floating
-
-                beta_acy(i,j) = 0.0
-                 
             end if 
 
         end do 

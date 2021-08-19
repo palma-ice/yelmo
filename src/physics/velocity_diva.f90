@@ -178,7 +178,7 @@ contains
                 case(1) 
                     ! Calculate effective viscosity, using velocity solution from previous iteration
                     
-                    call calc_visc_eff_3D(visc_eff,ux_bar,uy_bar,duxdz,duydz,ATT,H_ice, &
+                    call calc_visc_eff_3D(visc_eff,ux_bar,uy_bar,duxdz,duydz,ATT,H_ice,f_ice, &
                                                                 zeta_aa,dx,dy,n_glen,par%eps_0)
 
                     ! call calc_visc_eff_3D_new(visc_eff,ux_bar,uy_bar,duxdz,duydz,ATT,H_ice,f_ice, &
@@ -530,7 +530,7 @@ end if
 
     end subroutine calc_vertical_shear_3D
 
-    subroutine calc_visc_eff_3D(visc_eff,ux,uy,duxdz,duydz,ATT,H_ice,zeta_aa,dx,dy,n_glen,eps_0)
+    subroutine calc_visc_eff_3D(visc_eff,ux,uy,duxdz,duydz,ATT,H_ice,f_ice,zeta_aa,dx,dy,n_glen,eps_0)
         ! Calculate 3D effective viscosity following L19, Eq. 2
         ! Use of eps_0 ensures non-zero positive viscosity value everywhere 
         ! Note: viscosity is first calculated on ab-nodes, then 
@@ -539,31 +539,35 @@ end if
 
         implicit none 
         
-        real(prec), intent(OUT) :: visc_eff(:,:,:)      ! aa-nodes
-        real(prec), intent(IN)  :: ux(:,:)              ! [m/a] Vertically averaged horizontal velocity, x-component
-        real(prec), intent(IN)  :: uy(:,:)              ! [m/a] Vertically averaged horizontal velocity, y-component
-        real(prec), intent(IN)  :: duxdz(:,:,:)         ! [1/a] Vertical shearing, x-component
-        real(prec), intent(IN)  :: duydz(:,:,:)         ! [1/a] Vertical shearing, x-component
-        real(prec), intent(IN)  :: ATT(:,:,:)           ! aa-nodes
-        real(prec), intent(IN)  :: H_ice(:,:) 
-        real(prec), intent(IN)  :: zeta_aa(:)           ! Vertical axis (sigma-coordinates from 0 to 1)
-        real(prec), intent(IN)  :: dx
-        real(prec), intent(IN)  :: dy
-        real(prec), intent(IN)  :: n_glen   
-        real(prec), intent(IN)  :: eps_0                ! [1/a] Regularization constant (minimum strain rate, ~1e-8)
+        real(wp), intent(OUT) :: visc_eff(:,:,:)      ! aa-nodes
+        real(wp), intent(IN)  :: ux(:,:)              ! [m/a] Vertically averaged horizontal velocity, x-component
+        real(wp), intent(IN)  :: uy(:,:)              ! [m/a] Vertically averaged horizontal velocity, y-component
+        real(wp), intent(IN)  :: duxdz(:,:,:)         ! [1/a] Vertical shearing, x-component
+        real(wp), intent(IN)  :: duydz(:,:,:)         ! [1/a] Vertical shearing, x-component
+        real(wp), intent(IN)  :: ATT(:,:,:)           ! aa-nodes
+        real(wp), intent(IN)  :: H_ice(:,:) 
+        real(wp), intent(IN)  :: f_ice(:,:)
+        real(wp), intent(IN)  :: zeta_aa(:)           ! Vertical axis (sigma-coordinates from 0 to 1)
+        real(wp), intent(IN)  :: dx
+        real(wp), intent(IN)  :: dy
+        real(wp), intent(IN)  :: n_glen   
+        real(wp), intent(IN)  :: eps_0                ! [1/a] Regularization constant (minimum strain rate, ~1e-8)
         
         ! Local variables 
         integer    :: i, j, k, nx, ny, nz
         integer    :: ip1, jp1, im1, jm1   
-        real(prec) :: inv_4dx, inv_4dy 
-        real(prec) :: dudx_ab, dvdy_ab
-        real(prec) :: dudy, dvdx
-        real(prec) :: duxdz_ab, duydz_ab  
-        real(prec) :: p1, p2, eps_0_sq  
-        real(prec) :: eps_sq                            ! [1/a^2]
-        real(prec) :: ATT_ab
-        real(prec) :: wt  
-        real(prec), allocatable :: visc_eff_ab(:,:,:)
+        real(wp) :: inv_4dx, inv_4dy 
+        real(wp) :: dudx_ab, dvdy_ab
+        real(wp) :: dudy, dvdx
+        real(wp) :: duxdz_ab, duydz_ab  
+        real(wp) :: p1, p2, eps_0_sq  
+        real(wp) :: eps_sq                            ! [1/a^2]
+        real(wp) :: ATT_ab
+        real(wp) :: visc_eff_ab_now(4)
+        real(wp) :: wt_ab(4)
+        real(wp) :: wt  
+
+        real(wp), allocatable :: visc_eff_ab(:,:,:)
 
         nx = size(visc_eff,1)
         ny = size(visc_eff,2)
@@ -633,31 +637,41 @@ end if
             jm1 = max(j-1,1) 
             jp1 = min(j+1,ny) 
 
-            visc_eff(i,j,:) = 0.0 
-            wt              = 0.0 
+            ! Get ab-node weighting based on whether ice is present 
+            wt_ab = 0.0_wp 
+            if (count([f_ice(i,j),f_ice(ip1,j),f_ice(i,jp1),f_ice(ip1,jp1)].lt.1.0_wp) .eq. 0) then 
+                wt_ab(1) = 1.0_wp
+            end if
+            if (count([f_ice(i,j),f_ice(im1,j),f_ice(i,jp1),f_ice(im1,jp1)].lt.1.0_wp) .eq. 0) then 
+                wt_ab(2) = 1.0_wp 
+            end if 
+            if (count([f_ice(i,j),f_ice(im1,j),f_ice(i,jm1),f_ice(im1,jm1)].lt.1.0_wp) .eq. 0) then 
+                wt_ab(3) = 1.0_wp
+            end if 
+            if (count([f_ice(i,j),f_ice(ip1,j),f_ice(i,jm1),f_ice(ip1,jm1)].lt.1.0_wp) .eq. 0) then 
+                wt_ab(4) = 1.0_wp 
+            end if 
+            
+            wt = sum(wt_ab)
+            
+            if (f_ice(i,j) .eq. 1.0_wp .and. wt .gt. 0.0_wp) then 
+                ! Fully ice-covered point with some fully ice-covered neighbors 
 
-            if (count([H_ice(i,j),H_ice(ip1,j),H_ice(i,jp1),H_ice(ip1,jp1)].eq.0) .eq. 0) then  
-                visc_eff(i,j,:) = visc_eff(i,j,:) + visc_eff_ab(i,j,:) 
-                wt = wt + 1.0 
-            end if 
-            
-            if (count([H_ice(i,j),H_ice(im1,j),H_ice(im1,jp1),H_ice(i,jp1)].eq.0) .eq. 0) then  
-                visc_eff(i,j,:) = visc_eff(i,j,:) + visc_eff_ab(im1,j,:) 
-                wt = wt + 1.0 
-            end if 
+                ! Normalize weighting 
+                wt_ab = wt_ab / wt 
 
-            if (count([H_ice(i,j),H_ice(i,jm1),H_ice(ip1,jm1),H_ice(ip1,j)].eq.0) .eq. 0) then 
-                visc_eff(i,j,:) = visc_eff(i,j,:) + visc_eff_ab(i,jm1,:) 
-                wt = wt + 1.0 
-            end if 
-            
-            if (count([H_ice(i,j),H_ice(im1,j),H_ice(im1,jm1),H_ice(i,jm1)].eq.0) .eq. 0) then 
-                visc_eff(i,j,:) = visc_eff(i,j,:) + visc_eff_ab(im1,jm1,:) 
-                wt = wt + 1.0 
-            end if 
-            
-            if (wt .gt. 0.0) then 
-                visc_eff(i,j,:) = visc_eff(i,j,:) / wt 
+                do k = 1, nz
+
+                    visc_eff_ab_now(1) = visc_eff_ab(i,j,k) 
+                    visc_eff_ab_now(2) = visc_eff_ab(im1,j,k) 
+                    visc_eff_ab_now(3) = visc_eff_ab(im1,jm1,k) 
+                    visc_eff_ab_now(4) = visc_eff_ab(i,jm1,k) 
+
+                    ! Calcualte effective viscosity on aa-nodes
+                    visc_eff(i,j,k) = sum(wt_ab*visc_eff_ab_now)
+
+                end do 
+                
             else 
                 ! Just get simple average for ice free points 
 
@@ -672,6 +686,50 @@ end if
         end do 
         end do 
         
+        ! Extrapolate viscosity to bordering ice-free or partially ice-covered cells
+        do j=1, ny
+        do i=1, nx
+
+            ! Get neighbor indices
+            im1 = max(i-1,1) 
+            ip1 = min(i+1,nx) 
+            jm1 = max(j-1,1) 
+            jp1 = min(j+1,ny) 
+            
+            if ( f_ice(i,j) .lt. 1.0 .and. &
+                count([f_ice(im1,j),f_ice(ip1,j),f_ice(i,jm1),f_ice(i,jp1)] .eq. 1.0_wp) .gt. 0 ) then 
+                ! Ice-free (or partially ice-free) with ice-covered neighbors
+
+                visc_eff(i,j,:) = 0.0 
+                wt = 0.0 
+
+                if (f_ice(im1,j).eq.1.0) then 
+                    visc_eff(i,j,:) = visc_eff(i,j,:) + visc_eff(im1,j,:) 
+                    wt = wt + 1.0 
+                end if 
+                if (f_ice(ip1,j).eq.1.0) then 
+                    visc_eff(i,j,:) = visc_eff(i,j,:) + visc_eff(ip1,j,:) 
+                    wt = wt + 1.0 
+                end if 
+                if (f_ice(i,jm1).eq.1.0) then 
+                    visc_eff(i,j,:) = visc_eff(i,j,:) + visc_eff(i,jm1,:) 
+                    wt = wt + 1.0 
+                end if 
+                if (f_ice(i,jp1).eq.1.0) then 
+                    visc_eff(i,j,:) = visc_eff(i,j,:) + visc_eff(i,jp1,:) 
+                    wt = wt + 1.0 
+                end if 
+                
+                if (wt .gt. 0.0) then 
+                    visc_eff(i,j,:) = visc_eff(i,j,:) / wt 
+
+                end if 
+
+            end if 
+
+        end do 
+        end do 
+
         ! Treat the corners to avoid extremes
         visc_eff(1,1,:)   = 0.5*(visc_eff(2,1,:)+visc_eff(1,2,:))
         visc_eff(1,ny,:)  = 0.5*(visc_eff(2,ny,:)+visc_eff(1,ny-1,:))

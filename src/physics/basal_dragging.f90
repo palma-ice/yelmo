@@ -271,19 +271,19 @@ contains
                 case(1) 
                     ! Apply upstream beta_aa value at ac-node with at least one neighbor H_grnd_aa > 0
 
-                    call stagger_beta_aa_gl_upstream(beta_acx,beta_acy,beta,f_grnd)
+                    call stagger_beta_aa_gl_upstream(beta_acx,beta_acy,beta,f_ice,f_grnd)
 
                 case(2) 
                     ! Apply downstream beta_aa value (==0.0) at ac-node with at least one neighbor H_grnd_aa > 0
 
-                    call stagger_beta_aa_gl_downstream(beta_acx,beta_acy,beta,f_grnd)
+                    call stagger_beta_aa_gl_downstream(beta_acx,beta_acy,beta,f_ice,f_grnd)
 
                 case(3)
                     ! Apply subgrid scaling fraction at the grounding line when staggering 
 
                     ! Note: now subgrid treatment is handled on aa-nodes above (using beta_gl_sep)
 
-                    call stagger_beta_aa_gl_subgrid(beta_acx,beta_acy,beta,f_grnd, &
+                    call stagger_beta_aa_gl_subgrid(beta_acx,beta_acy,beta,f_ice,f_grnd, &
                                                     f_grnd_acx,f_grnd_acy)
 
     !                 call stagger_beta_aa_gl_subgrid_1(beta_acx,beta_acy,beta,f_ice,H_grnd, &
@@ -1084,7 +1084,7 @@ contains
         
     end subroutine stagger_beta_aa_mean
     
-    subroutine stagger_beta_aa_gl_upstream(beta_acx,beta_acy,beta,f_grnd)
+    subroutine stagger_beta_aa_gl_upstream(beta_acx,beta_acy,beta,f_ice,f_grnd)
         ! Modify basal friction coefficient by grounded/floating binary mask
         ! (via the grounded fraction)
         ! Analagous to method "NSEP" in Seroussi et al (2014): 
@@ -1093,10 +1093,11 @@ contains
 
         implicit none
         
-        real(wp), intent(INOUT) :: beta_acx(:,:)   ! ac-nodes
-        real(wp), intent(INOUT) :: beta_acy(:,:)   ! ac-nodes
-        real(wp), intent(IN)    :: beta(:,:)       ! aa-nodes
-        real(wp), intent(IN)    :: f_grnd(:,:)     ! aa-nodes    
+        real(wp), intent(INOUT) :: beta_acx(:,:)    ! ac-nodes
+        real(wp), intent(INOUT) :: beta_acy(:,:)    ! ac-nodes
+        real(wp), intent(IN)    :: beta(:,:)        ! aa-nodes
+        real(wp), intent(IN)    :: f_ice(:,:)       ! aa-nodes
+        real(wp), intent(IN)    :: f_grnd(:,:)      ! aa-nodes    
         
         ! Local variables
         integer    :: i, j, nx, ny
@@ -1118,19 +1119,29 @@ contains
             jp1 = min(j+1,ny)
             
             ! grounding line, acx-nodes
-            if (f_grnd(i,j) .gt. 0.0 .and. f_grnd(ip1,j) .eq. 0.0) then 
-                beta_acx(i,j) = beta(i,j)
-            else if (f_grnd(i,j) .eq. 0.0 .and. f_grnd(ip1,j) .gt. 0.0) then
-                beta_acx(i,j) = beta(ip1,j)
-            end if 
+            if (f_ice(i,j) .eq. 1.0 .and. f_ice(ip1,j) .eq. 1.0) then 
+                ! Both aa-nodes are ice covered 
+
+                if (f_grnd(i,j) .gt. 0.0 .and. f_grnd(ip1,j) .eq. 0.0) then 
+                    beta_acx(i,j) = beta(i,j)
+                else if (f_grnd(i,j) .eq. 0.0 .and. f_grnd(ip1,j) .gt. 0.0) then
+                    beta_acx(i,j) = beta(ip1,j)
+                end if 
             
+            end if 
+
             ! grounding line, acy-nodes
-            if (f_grnd(i,j) .gt. 0.0 .and. f_grnd(i,jp1) .eq. 0.0) then 
-                beta_acy(i,j) = beta(i,j)
-            else if (f_grnd(i,j) .eq. 0.0 .and. f_grnd(i,jp1) .gt. 0.0) then
-                beta_acy(i,j) = beta(i,jp1)
-            end if 
+            if (f_ice(i,j) .eq. 1.0 .and. f_ice(i,jp1) .eq. 1.0) then 
+                ! Both aa-nodes are ice covered 
+
+                if (f_grnd(i,j) .gt. 0.0 .and. f_grnd(i,jp1) .eq. 0.0) then 
+                    beta_acy(i,j) = beta(i,j)
+                else if (f_grnd(i,j) .eq. 0.0 .and. f_grnd(i,jp1) .gt. 0.0) then
+                    beta_acy(i,j) = beta(i,jp1)
+                end if 
             
+            end if 
+
         end do 
         end do
 
@@ -1138,7 +1149,7 @@ contains
         
     end subroutine stagger_beta_aa_gl_upstream
     
-    subroutine stagger_beta_aa_gl_downstream(beta_acx,beta_acy,beta,f_grnd)
+    subroutine stagger_beta_aa_gl_downstream(beta_acx,beta_acy,beta,f_ice,f_grnd)
         ! Modify basal friction coefficient by grounded/floating binary mask
         ! (via the grounded fraction)
         ! Analagous to method "NSEP" in Seroussi et al (2014): 
@@ -1147,10 +1158,11 @@ contains
 
         implicit none
         
-        real(wp), intent(INOUT) :: beta_acx(:,:)   ! ac-nodes
-        real(wp), intent(INOUT) :: beta_acy(:,:)   ! ac-nodes
-        real(wp), intent(IN)    :: beta(:,:)       ! aa-nodes
-        real(wp), intent(IN)    :: f_grnd(:,:)     ! aa-nodes    
+        real(wp), intent(INOUT) :: beta_acx(:,:)    ! ac-nodes
+        real(wp), intent(INOUT) :: beta_acy(:,:)    ! ac-nodes
+        real(wp), intent(IN)    :: beta(:,:)        ! aa-nodes
+        real(wp), intent(IN)    :: f_ice(:,:)       ! aa-nodes
+        real(wp), intent(IN)    :: f_grnd(:,:)      ! aa-nodes    
         
         ! Local variables
         integer :: i, j, nx, ny
@@ -1173,18 +1185,28 @@ contains
             jp1 = min(j+1,ny)
             
             ! grounding line, acx-nodes
-            if (f_grnd(i,j) .gt. 0.0 .and. f_grnd(ip1,j) .eq. 0.0) then 
-                beta_acx(i,j) = beta(ip1,j)
-            else if (f_grnd(i,j) .eq. 0.0 .and. f_grnd(ip1,j) .gt. 0.0) then
-                beta_acx(i,j) = beta(i,j)
-            end if 
+            if (f_ice(i,j) .eq. 1.0 .and. f_ice(ip1,j) .eq. 1.0) then 
+                ! Both aa-nodes are ice covered 
+
+                if (f_grnd(i,j) .gt. 0.0 .and. f_grnd(ip1,j) .eq. 0.0) then 
+                    beta_acx(i,j) = beta(ip1,j)
+                else if (f_grnd(i,j) .eq. 0.0 .and. f_grnd(ip1,j) .gt. 0.0) then
+                    beta_acx(i,j) = beta(i,j)
+                end if 
             
-            ! grounding line, acy-nodes
-            if (f_grnd(i,j) .gt. 0.0 .and. f_grnd(i,jp1) .eq. 0.0) then 
-                beta_acy(i,j) = beta(i,jp1)
-            else if (f_grnd(i,j) .eq. 0.0 .and. f_grnd(i,jp1) .gt. 0.0) then
-                beta_acy(i,j) = beta(i,j)
             end if 
+
+            ! grounding line, acy-nodes
+            if (f_ice(i,j) .eq. 1.0 .and. f_ice(i,jp1) .eq. 1.0) then 
+                ! Both aa-nodes are ice covered 
+
+                if (f_grnd(i,j) .gt. 0.0 .and. f_grnd(i,jp1) .eq. 0.0) then 
+                    beta_acy(i,j) = beta(i,jp1)
+                else if (f_grnd(i,j) .eq. 0.0 .and. f_grnd(i,jp1) .gt. 0.0) then
+                    beta_acy(i,j) = beta(i,j)
+                end if 
+
+            end if
             
         end do 
         end do 
@@ -1193,7 +1215,7 @@ contains
         
     end subroutine stagger_beta_aa_gl_downstream
     
-    subroutine stagger_beta_aa_gl_subgrid(beta_acx,beta_acy,beta,f_grnd,f_grnd_acx,f_grnd_acy)
+    subroutine stagger_beta_aa_gl_subgrid(beta_acx,beta_acy,beta,f_ice,f_grnd,f_grnd_acx,f_grnd_acy)
         ! Modify basal friction coefficient by grounded/floating binary mask
         ! (via the grounded fraction)
         ! Analagous to method "NSEP" in Seroussi et al (2014): 
@@ -1202,12 +1224,13 @@ contains
 
         implicit none
         
-        real(wp), intent(INOUT) :: beta_acx(:,:)      ! ac-nodes
-        real(wp), intent(INOUT) :: beta_acy(:,:)      ! ac-nodes
-        real(wp), intent(IN)    :: beta(:,:)          ! aa-nodes
-        real(wp), intent(IN)    :: f_grnd(:,:)        ! aa-nodes     
-        real(wp), intent(IN)    :: f_grnd_acx(:,:)    ! ac-nodes     
-        real(wp), intent(IN)    :: f_grnd_acy(:,:)    ! ac-nodes     
+        real(wp), intent(INOUT) :: beta_acx(:,:)        ! ac-nodes
+        real(wp), intent(INOUT) :: beta_acy(:,:)        ! ac-nodes
+        real(wp), intent(IN)    :: beta(:,:)            ! aa-nodes
+        real(wp), intent(IN)    :: f_ice(:,:)           ! aa-nodes
+        real(wp), intent(IN)    :: f_grnd(:,:)          ! aa-nodes     
+        real(wp), intent(IN)    :: f_grnd_acx(:,:)      ! ac-nodes     
+        real(wp), intent(IN)    :: f_grnd_acy(:,:)      ! ac-nodes     
         
         ! Local variables
         integer :: i, j, nx, ny 

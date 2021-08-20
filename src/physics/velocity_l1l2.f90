@@ -242,6 +242,10 @@ end if
         call calc_vel_horizontal_3D(ux,uy,ux_b,uy_b,taud_acx,taud_acy,visc_eff,visc_eff_ab,ATT,H_ice, &
                                     f_ice,zeta_aa,zeta_ac,dx,dy,n_glen,par%eps_0,par%boundaries)
 
+        ! Limit the velocity generally =====================
+        call limit_vel(ux,par%ssa_vel_max)
+        call limit_vel(uy,par%ssa_vel_max)
+        
         ! Calculate depth-averaged horizontal velocity 
         ux_bar = calc_vertical_integrated_2D(ux,zeta_aa)
         uy_bar = calc_vertical_integrated_2D(uy,zeta_aa)
@@ -520,7 +524,7 @@ end if
                     uy(i,j,k) = uy(i,j,k-1) &
                                 + fact_ac*0.5_wp*(tau_yz(i,j,k)+tau_yz(i,j,k-1))
                 end if 
-                
+
             end do 
             end do 
 
@@ -1302,7 +1306,7 @@ end if
         ! Also avoid underflow errors 
         if (abs(u) .lt. tol) u = 0.0 
 
-        return 
+        return
 
     end subroutine limit_vel
     

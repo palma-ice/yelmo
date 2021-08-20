@@ -790,5 +790,5 @@ end if
         return 
 
     end subroutine calc_basal_stress
-
-end module velocity_hybrid 
+    
+end module velocity_hybrid

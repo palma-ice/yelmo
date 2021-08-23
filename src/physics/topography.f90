@@ -149,7 +149,7 @@ contains
                             H_eff = H_ice(i,j) 
 
                             ! Alternative approach:
-                            ! H_eff = 0.5*minval(H_neighb,mask=mask)
+                        ! H_eff = 0.5*minval(H_neighb,mask=mask)
 
                         end if
                     
@@ -1222,6 +1222,6 @@ end if
 
     end function distance_to_grline
 
-end module topography 
+end module topography
 
 

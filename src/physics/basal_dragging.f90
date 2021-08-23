@@ -646,10 +646,19 @@ contains
                 beta(i,j) = sum(wt_ab*beta_ab)
 
             else
-                ! Assign minimum velocity value, ignore staggering for simplicity
+                ! Assign minimum velocity value, no staggering for simplicity
 
-                uxy_b  = ub_min 
-                beta(i,j) = c_bed(i,j) * (uxy_b / u_0)**q * (1.0_prec / uxy_b)
+                if (q .eq. 1.0_wp) then 
+                    ! Linear law, no f(ub) term
+
+                    beta(i,j) = c_bed(i,j) / u_0
+
+                else
+                    
+                    uxy_b  = ub_min 
+                    beta(i,j) = c_bed(i,j) * (uxy_b / u_0)**q * (1.0_prec / uxy_b)
+
+                end if 
 
             end if 
 
@@ -1272,7 +1281,7 @@ contains
                 end if 
 
             end if
-            
+
         end do 
         end do 
 

@@ -26,6 +26,7 @@ module deformation
     public :: scale_rate_factor_water
     public :: calc_rate_factor_integrated
     public :: calc_strain_rate_tensor
+    public :: calc_strain_rate_tensor_aa
     public :: calc_strain_rate_tensor_2D
     public :: calc_stress_tensor 
     public :: calc_stress_tensor_2D

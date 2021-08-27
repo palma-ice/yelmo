@@ -20,8 +20,8 @@ module velocity_general
 contains 
     
     ! ajr: testing old (erroneous) routines from revision 62db688. 
-        
-    subroutine calc_uz_3D(uz,ux,uy,H_ice,f_ice,z_bed,z_srf,smb,bmb,dHdt,dzsdt,zeta_aa,zeta_ac,dx,dy)
+
+    subroutine calc_uz_3D_62db688(uz,ux,uy,H_ice,f_ice,z_bed,z_srf,smb,bmb,dHdt,dzsdt,zeta_aa,zeta_ac,dx,dy)
         ! Following algorithm outlined by the Glimmer ice sheet model:
         ! https://www.geos.ed.ac.uk/~mhagdorn/glide/glide-doc/glimmer_htmlse9.html#x17-660003.1.5
 
@@ -199,9 +199,9 @@ contains
         
         return 
 
-    end subroutine calc_uz_3D
+    end subroutine calc_uz_3D_62db688
 
-    subroutine calc_advec_vertical_column_correction(uz,ux,uy,H_ice,z_srf,dHdt,dzsdt,zeta_ac,dx)
+    subroutine calc_advec_vertical_column_correction_62db688(uz,ux,uy,H_ice,z_srf,dHdt,dzsdt,zeta_ac,dx)
         ! Calculate the corrected vertical velocity, accounting for stretching of 
         ! the vertical axis between grid cells due to the use of sigma-coordinates. 
 
@@ -286,9 +286,9 @@ contains
 
         return 
 
-    end subroutine calc_advec_vertical_column_correction
+    end subroutine calc_advec_vertical_column_correction_62db688
 
-    subroutine calc_uz_advec_corr_3D(uz_star,uz,ux,uy,f_ice,z_bed,z_srf,dzsdt,zeta_aa,zeta_ac,dx,dy)
+    subroutine calc_uz_advec_corr_3D_62db688(uz_star,uz,ux,uy,f_ice,z_bed,z_srf,dzsdt,zeta_aa,zeta_ac,dx,dy)
         ! Following algorithm outlined by the Glimmer ice sheet model:
         ! https://www.geos.ed.ac.uk/~mhagdorn/glide/glide-doc/glimmer_htmlse9.html#x17-660003.1.5
 
@@ -336,12 +336,12 @@ contains
 
         return 
 
-    end subroutine calc_uz_advec_corr_3D
+    end subroutine calc_uz_advec_corr_3D_62db688
 
 
 
 
-    subroutine calc_uz_3D_1(uz,ux,uy,H_ice,f_ice,z_bed,z_srf,smb,bmb,dHdt,dzsdt,zeta_aa,zeta_ac,dx,dy)
+    subroutine calc_uz_3D(uz,ux,uy,H_ice,f_ice,z_bed,z_srf,smb,bmb,dHdt,dzsdt,zeta_aa,zeta_ac,dx,dy)
         ! Following algorithm outlined by the Glimmer ice sheet model:
         ! https://www.geos.ed.ac.uk/~mhagdorn/glide/glide-doc/glimmer_htmlse9.html#x17-660003.1.5
 
@@ -529,9 +529,9 @@ contains
 
         return 
 
-    end subroutine calc_uz_3D_1
+    end subroutine calc_uz_3D
 
-    subroutine calc_uz_advec_corr_3D_1(uz_star,uz,ux,uy,f_ice,z_bed,z_srf,dzsdt,zeta_aa,zeta_ac,dx,dy)
+    subroutine calc_uz_advec_corr_3D(uz_star,uz,ux,uy,f_ice,z_bed,z_srf,dzsdt,zeta_aa,zeta_ac,dx,dy)
         ! Following algorithm outlined by the Glimmer ice sheet model:
         ! https://www.geos.ed.ac.uk/~mhagdorn/glide/glide-doc/glimmer_htmlse9.html#x17-660003.1.5
 
@@ -663,7 +663,7 @@ contains
 
         return 
 
-    end subroutine calc_uz_advec_corr_3D_1
+    end subroutine calc_uz_advec_corr_3D
 
     subroutine calc_driving_stress(taud_acx,taud_acy,H_ice,dzsdx,dzsdy,dx,taud_lim,boundaries)
         ! Calculate driving stress on staggered grid points

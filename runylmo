@@ -1,0 +1,577 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+'''
+Script to run one simulation.
+Example command to run an ensemble using 'jobrun' via the runner module:
+jobrun ./runcx -r -- -o output/run -p ctl.nyears=5000
+'''
+import subprocess as subp 
+import sys, os, socket, argparse, shutil, glob, datetime, json
+from distutils.dir_util import copy_tree
+from pandas import DataFrame
+
+# Check whether runner library is installed or not:
+try:
+    from runner.ext.namelist import param_summary, param_write_to_files
+    runner_is_installed = True
+except:
+    runner_is_installed = False
+
+class DictAction(argparse.Action):
+    '''Parse a list of parameters ['key=val',...] into a dict.
+    Convert parameter values to appropriate type (str,float,int)
+    Adapted from: https://sumit-ghosh.com/articles/parsing-dictionary-key-value-pairs-kwargs-argparse-python/
+    '''
+    def __call__(self, parser, namespace, values, option_string=None):
+        setattr(namespace, self.dest, dict())
+        for value in values:
+            key, valstr = value.split('=')
+            if ',' in valstr:
+                raise Exception('Only one value allowed for each parameter using -p: {}={}'.format(key,valstr))
+            try:
+                value = float(valstr)
+                if value % 1 == 0 and not '.' in valstr: value = int(value)
+            except:
+                value = valstr 
+            getattr(namespace, self.dest)[key] = value
+
+
+def main():
+    '''Main subroutine to run one simulation.'''
+
+    # Define name of standard info json configuration file 
+    info_file = os.path.basename(__file__) + ".js"
+    
+    if os.path.isfile(info_file):
+        # If file is found, load it up
+        info = json.load(open(info_file))
+    else: 
+        # Copy file from config directory, inform user, 
+        # and then load it. 
+        # error_msg = ("Required json file '{}' containing run options not found. \n".format(info_file) +
+        #              "This is probably the first time you are running this script. \n" +
+        #              "The default file will be generated now. Check it is correct, \n" +
+        #              "or copy your own file, and then run this script again.")
+        # print(error_msg)
+
+        info_file_default = os.path.join("config",info_file)
+        shutil.copy(info_file_default,info_file)
+        
+        # Load info file 
+        info = json.load(open(info_file))
+
+        error_msg = ("Missing required json configuration file.\n" +
+                     "Copied {} to {}.\n".format(info_file_default,info_file) +
+                     "Confirm defaults are correct and try again.")
+        raise Exception(error_msg)
+
+    ## Get defaults for arguments ##
+    default_jobname  = info['defaults']['jobname']
+    default_email    = info['defaults']['email']
+    default_group    = info['defaults']['group']
+    default_omp      = info['defaults']['omp']
+    default_wall     = info['defaults']['wall']
+    default_qos      = info['defaults']['qos']
+    default_part     = info['defaults']['partition'] 
+    default_template = info['defaults']['job_template']
+    
+    # Substitute USER for actual username in email if found:
+    default_email   = default_email.replace('USER',os.environ.get('USER'))
+    
+    # Make exe_aliases string for printing help
+    exe_aliases_str = "; ".join(["{}={}".format(key,val) 
+                        for key,val in info["exe_aliases"].items()])
+
+    # Additional info 
+    queues = info['job_queues'] 
+
+    ### Manage command-line arguments ############################
+
+    # Initialize argument parser
+    parser = argparse.ArgumentParser()
+
+    # Add options
+    parser.add_argument('-e','--exe',type=str,default='initmip',
+        help="Define the executable file to use here. " \
+             "Shortcuts: " + exe_aliases_str)
+    parser.add_argument('-r','--run',action="store_true",
+        help='Run the executable after preparing the job?')
+    parser.add_argument('-s','--submit',action="store_true",
+        help='Run the executable after preparing the job by submitting to the queue?')
+    parser.add_argument('-q','--qos',type=str, default=default_qos,
+        help='Name of the qos the job should be submitted to (priority,short,medium,long)')
+    parser.add_argument('-w','--wall', type=int, default=default_wall,
+        help='Maximum wall time [hrs] to allow for job (only for jobs submitted to queue)')
+    parser.add_argument('--part',type=str, metavar="PARTITION", default=default_part,
+        help='Name of the partition the job should be submitted to (e.g., haswell, broadwell)')
+    parser.add_argument('--omp', type=int, default=default_omp,
+        help='Specify number of threads for omp job submission (default = 0 implies no omp specification)')
+    parser.add_argument('--email', type=str, default=default_email,
+        help='Email address to send job notifications from cluster')
+    parser.add_argument('--group', type=str, default=default_group,
+        help='Email address to send job notifications from cluster')
+    parser.add_argument('-x',action="store_true",
+        help='This argument is used when the script called by jobrun')
+    parser.add_argument('-v',action="store_true",help='Verbose script output?')
+
+    parser.add_argument("-p",metavar="KEY=VALUE",nargs='+',action=DictAction,
+                        help="Set a number of key-value pairs "
+                             "(do not put spaces before or after the = sign). "
+                             "If a value contains spaces, you should define "
+                             "it with double quotes: "
+                             'foo="this is a sentence". Note that '
+                             "values are always treated as strings.")
+
+    # Required arguments:
+    # Note: Given the `-p` argument above with multiple parameters possible,
+    # `rundir` cannot be a positional argument. Thus it is specified as 
+    # required with the `-o` prefix:
+    requiredNamed = parser.add_argument_group('required named arguments')
+    requiredNamed.add_argument('-o',dest='rundir',metavar='RUNDIR',type=str,required=True,
+         help='Path where simulation will run and store output.')
+    requiredNamed.add_argument('-n',dest='par_path',metavar='PAR_PATH',type=str,required=True,
+         help='Path to input parameter file.')
+
+    # Parse the arguments
+    args = parser.parse_args()
+
+    ### Manage user options and arguments ############################
+    
+    # Options
+    exe_path    = args.exe       # Path relative to current working directory (cwd)
+    run         = args.run 
+    submit      = args.submit 
+    qos         = args.qos  
+    wall        = args.wall 
+    partition   = args.part
+    omp         = args.omp 
+    email       = args.email 
+    group       = args.group
+    with_runner = args.x   
+    verbose     = args.v 
+    par         = args.p 
+    rundir      = args.rundir 
+    par_path    = args.par_path 
+
+    # Define some variables based on default values (not parameters for now)
+    jobname                 = default_jobname
+    path_jobscript_template = default_template 
+
+    # Could maybe add this as a parameter choice:
+    with_profiler = False 
+    
+    # Additional options, consistency checks
+
+    if with_runner and not runner_is_installed:
+        error_msg = "The Python module 'runner' is not installed, or not installed properly. Do not use option -x. " \
+                    "This option should only be used by the runner::jobrun script internally. " \
+                    "To install runner, see: https://github.com/alex-robinson/runner"
+        raise Exception(error_msg)
+
+    if not par is None and not runner_is_installed:
+        error_msg = "The Python module 'runner' is not installed, or not installed properly. Do not use option -p. " \
+                    "To install runner, see: https://github.com/alex-robinson/runner"
+        raise Exception(error_msg)
+
+    # Copy the executable file to the output directory, or
+    # call it from its compiled location?    
+    copy_exec = True 
+
+    # If argument 'submit' is true, then ensure 'run' is also true
+    if submit: run = True 
+
+    # Expand executable path alias if defined, otherwise exe_path remains unchanged.
+    if exe_path in info["exe_aliases"]:
+        exe_path = info["exe_aliases"].get(exe_path)
+    
+    # Also extract executable filename 
+    exe_fname = os.path.basename(exe_path)
+
+    # Yelmo-specific:
+    par_fname  = os.path.basename(par_path)
+    
+    # Yelmo-specific:
+    # Executable assumed to take parameter file as command line argument
+    # Define argument depending on whether running from rundir (copy_exec==True)
+    # or from central directory. 
+    if copy_exec: 
+        exe_args = os.path.basename(par_path)
+    else:
+        exe_args = os.path.join(rundir,par_fname)
+
+    # Define prefix part of command for running with a profiler (eg vtune)
+    if with_profiler:
+        # Use prefix for vtune profiler 
+        if copy_exec:
+            profiler_prefix = "amplxe-cl -c hotspots -r {} -- ".format("./")
+        else:
+            profiler_prefix = "amplxe-cl -c hotspots -r {} -- ".format(rundir)
+    else: 
+        profiler_prefix = ""
+
+    ### Yelmo-specific ###
+    # Get path of constants parameter file based on parameter name
+    # First set const_path to default, then see if it should be overwritten 
+    const_path = info["const_path_default"]
+    for key, value in info["const_paths"].items():
+        if key in par_fname: 
+            const_path = value 
+
+    # Make sure input files exist 
+    if not os.path.isfile(const_path):
+        print("Input file does not exist: {}".format(const_path))
+        sys.exit() 
+
+    if not os.path.isfile(par_path):
+        print("Input file does not exist: {}".format(par_path))
+        sys.exit() 
+
+    ### END Yelmo-specific ###
+
+
+    # Make sure input file(s) exist 
+    if not os.path.isfile(exe_path):
+        print("Input file does not exist: {}".format(exe_path))
+        sys.exit() 
+    
+
+    ### Start the script to make the job, and then run it ############################
+
+
+    ##########################################
+    # 1. Make the job (output directory, 
+    #    parameter files, additional 
+    #    data files/links)
+    ##########################################
+
+    # Using `jobrun` (runner), the rundir has already been created,
+    # if not, it needs to be created here (removing existing nc and nml files): 
+    if not with_runner: 
+        makedirs(rundir,remove=True)
+
+    # Copy files as needed 
+    copy_files(info["files"],rundir) 
+
+    # Copy special dir that need a different destination 
+    for src, dst in info["dir-special"].items():
+        copy_dir(src,rundir,dst)
+
+    ## Generate symbolic links to input data folders
+    for link in info["links"]:
+        make_link(link,rundir)
+
+    # Copy exe file to rundir (even if running from cwd)
+    shutil.copy(exe_path,rundir)
+
+    # Yelmo-specific: copy the constants parameter file
+    shutil.copy(const_path,rundir)
+
+    ### PARAMETER FILES ###
+
+    # Get list of parameter files to manage
+    #par_paths = list(info["par_paths"].values())
+    par_paths = [par_path]   # Yelmo-specific: only one parameter file, provided at command line 
+
+    # Copy the default parameter files to the rundir 
+    copy_files(par_paths,rundir)
+    
+    # Get list of new parameter file destinations 
+    par_paths_rundir = []
+    for par_path in par_paths:
+        par_path_now = os.path.join(rundir,os.path.basename(par_path))
+        par_paths_rundir.append(par_path_now) 
+    
+    # First modify parameters according to command-line values
+    # "-p key=val key=val ..." argument.
+    if not par is None:
+        
+        # Write parameters to files (in rundir!)
+        param_write_to_files(par,par_paths_rundir,par_paths_rundir,info["grp_aliases"])
+        
+    # Next modify parameters according to command-line values specified
+    # by runner (via `jobrun` "-p key=val [key=val ...]" argument)
+    if with_runner:
+
+        # Read param file runner.json always written by runner to rundir
+        f  = os.path.join(rundir, 'runner.json')
+        js = json.load(open(f))
+        par_runner = js['params'] 
+
+        # Summarize what is to be done
+        param_summary(par_runner,rundir,verbose) 
+
+        # Write parameters to files (in rundir!)
+        param_write_to_files(par_runner,par_paths_rundir,par_paths_rundir,info["grp_aliases"])
+        
+    ### DONE WITH PARAMETER FILES ###
+
+
+    ## Write summary file to rundir 
+
+    run_info = {}
+    run_info['Command'] = " ".join(sys.argv)
+    run_info['Called via runner'] = with_runner 
+    
+    # Write the current git revision information to output directory 
+    if os.path.isdir(".git"):
+        run_info['git hash'] = get_git_revision_hash()
+    else:
+        run_info['git hash'] = "Not under git version control."
+    
+    with open(os.path.join(rundir,"run_info.txt"), 'w') as file:
+        for key, val in run_info.items():
+            file.write("{} : {}\n".format(key,val))
+
+    ##########################################
+    # 2. Run the job
+    ##########################################
+
+    # Generate the appropriate executable command to run job
+    if copy_exec:
+        # Assume executable is running from rundir
+        executable = "{}./{} {}".format(profiler_prefix,exe_fname,exe_args)
+
+    else:
+        # Assume executable will run from current working directory 
+        cwd = os.getcwd()
+        executable = "{}{}/{} {}".format(profiler_prefix,cwd,exe_path,exe_args)
+
+    # Run the job if desired 
+    if run:
+
+        if submit:
+            # Submit job to queue 
+            pid = submitjob(path_jobscript_template,rundir,executable,qos,
+                            wall,partition,group,email,omp,jobname,queues) 
+
+        else:
+            # Run job in background 
+            pid = runjob(rundir,executable,omp)
+
+    return 
+
+
+######### Helper functions ############### 
+
+
+def runjob(rundir,cmd,omp):
+    '''Run a job generated with makejob.'''
+
+    if omp > 0:
+        env_cmd = "&& export OMP_NUM_THREADS={}".format(omp) # && export OMP_THREAD_LIMIT=2"
+    else:
+        env_cmd = ""
+    
+    cmd_job = "cd {} {} && exec {} > {} &".format(rundir,env_cmd,cmd,"out.out")
+    #cmd_job = "cd {} {} && mpiexec -n 2 {} > {} &".format(rundir,env_cmd,executable,"out.out")
+    
+    print("Running job in background: {}".format(cmd_job))
+
+    # Run the command (ie, change to output directory and submit job)
+    # Note: the argument `shell=True` can be a security hazard, but should
+    # be ok in this context, see https://docs.python.org/2/library/subprocess.html#frequently-used-arguments
+    #jobstatus = subp.check_call(cmd_job,shell=True)
+    try:
+        jobstatus = subp.check_output(cmd_job,shell=True,stdin=None,stderr=None)
+    except subp.CalledProcessError as error:
+        print(error)
+        sys.exit() 
+    
+    return jobstatus
+
+def submitjob(path_template,rundir,cmd,qos,wall,partition,group,email,omp,jobname,queues=None):
+    '''Submit a job to a HPC queue (qsub,sbatch)'''
+
+    # Get info about current system
+    username  = os.environ.get('USER')
+    #hostname  = os.environ.get('HOSTNAME')
+    hostname  = socket.getfqdn()             # Returns full domain name
+
+    # Create the jobscript using current info
+    nm_jobscript   = 'job.submit'
+    path_jobscript = "{}/{}".format(rundir,nm_jobscript)
+    
+    if "brigit" in hostname:
+        # Host is the UCM brigit cluster, use the following submit script
+        script  = generate_jobscript(path_template,cmd,jobname,group,email,qos,wall,partition,omp,queues)
+        jobfile = open(path_jobscript,'w').write(script)
+        cmd_job = "cd {} && sbatch {}".format(rundir,nm_jobscript)
+    
+    else:
+        # Host is the PIK 2015 cluster, use the following submit script
+        script  = generate_jobscript(path_template,cmd,jobname,group,email,qos,wall,partition,omp,queues)
+        jobfile = open(path_jobscript,'w').write(script)
+        cmd_job = "cd {} && sbatch {}".format(rundir,nm_jobscript)
+    
+    # Run the command (ie, change to output directory and submit job)
+    # Note: the argument `shell=True` can be a security hazard, but should
+    # be ok in this context, see https://docs.python.org/2/library/subprocess.html#frequently-used-arguments
+    try:
+        out = subp.check_output(cmd_job,shell=True,stderr=subp.STDOUT)
+        jobstatus = out.decode("utf-8").strip() 
+        print(jobstatus)
+    except subp.CalledProcessError as error:
+        print(error)
+        sys.exit() 
+
+    return jobstatus
+
+def make_link(srcname,rundir,target=None):
+    '''Make a link in the output dir.'''
+
+    if target is None: target = srcname 
+
+    # Define destination in rundir
+    dstname = os.path.join(rundir,target)
+    if os.path.islink(dstname): os.unlink(dstname)
+
+    # Make link from srcname to dstname
+    if os.path.islink(srcname):
+        linkto = os.readlink(srcname)
+        os.symlink(linkto, dstname)
+    elif os.path.isdir(srcname):
+        srcpath = os.path.abspath(srcname)
+        os.symlink(srcpath,dstname)
+    else:
+        print("Warning: path does not exist {}".format(srcname))
+
+    return
+
+def copy_dir(path,rundir,target):
+    '''Copy file(s) to run directory.'''
+
+    dst = os.path.join(rundir,target)
+    #shutil.copytree(path,dst,dirs_exist_ok=True)  # Only v3.8+
+    copy_tree(path, dst)
+
+    return 
+
+def copy_file(path,rundir,target):
+    '''Copy file(s) to run directory.'''
+
+    dst = os.path.join(rundir,target)
+    shutil.copy(path,dst)
+
+    return 
+
+def copy_files(paths,rundir):
+    '''Bulk copy file(s) to run directory.'''
+
+    for pnow in paths:
+        shutil.copy(pnow,rundir)
+
+    return 
+
+def makedirs(dirname,remove):
+    '''
+    Make a directory (including sub-directories),
+    but first ensuring that path doesn't already exist
+    or some other error prevents the creation.
+    '''
+
+    try:
+        os.makedirs(dirname)
+        print('Directory created: {}'.format(dirname))
+    except OSError:
+        if os.path.isdir(dirname):
+            print('Directory already exists: {}'.format(dirname))
+            if remove:
+                for f in glob.glob("{}/*.nc".format(dirname)): 
+                    os.remove(f)
+                for f in glob.glob("{}/*.nml".format(dirname)):
+                    os.remove(f)
+                #print('Removed *.nml and *.nc files.')
+            pass
+        else:
+            # There was an error on creation, so make sure we know about it
+            raise
+
+    return
+
+def autofolder(params,outfldr0):
+    '''Given a list of parameters,
+       generate an appropriate folder name.
+    '''
+
+    parts = []
+
+    for p in params:
+        parts.append( p.short() )
+
+    # Join the parts together, combine with the base output dir
+    autofldr = '.'.join(parts)
+    outfldr  = outfldr0 + autofldr + '/'
+
+    return outfldr
+
+def get_git_revision_hash():
+    #githash = subp.check_output(['git', 'describe', '--always', '--long', 'HEAD']).strip()
+    githash = subp.check_output(['git', 'rev-parse', 'HEAD']).strip()
+    return githash.decode("ascii") 
+
+def generate_jobscript(template,cmd,jobname,group,email,qos,wall,partition,omp,queues=None):
+    '''Definition of the job script based on a template file and 
+    fields in < > that can be substituted.'''
+
+# Extra parameter options to consider:
+##SBATCH --partition=ram_gpu
+##SBATCH --mem=50000 
+    
+    # Check queue information if available
+    if not queues == None: 
+
+        # First ensure desired queue is available 
+        if not qos in queues:
+            error_msg = "Error generating jobscript. Desired queue not in available list. \n" \
+                        "{} not in {}".format(qos,"-".join(queues))
+            raise Exception(error_msg)
+
+        # Check that wall time was set properly
+        if wall > queues[qos]['wall']:
+            error_msg = "Error generating jobscript. Wall time too large for desired queue. \n" \
+                        "wall={} greater than limit of {} for queue '{}'".format(wall,queues[qos]['wall'],qos)
+            raise Exception(error_msg)
+
+    # If omp has been set, generate a jobscript string with appropriate settings
+    if omp > 0:
+        # Use openmp settings 
+        # Notes:
+        #    --cpus-per-task=32 on broadwell, 16 on haswell
+        
+        # Read in omp section template
+        omp_script = open(template+"_omp",'r').read()
+
+        # Now make substitutions to match argument choices 
+        omp_script = omp_script.replace('<OMP>',"{}".format(omp))
+        omp_script = omp_script.replace('<PARTITION>',partition)
+    
+    else: 
+        # No openmp 
+        omp_script = "" 
+
+
+    # Read in jobscript template 
+    job_script = open(template,'r').read()
+
+    # Substitute in omp section as needed to make full job script
+    job_script = job_script.replace('<OMPSECTION>',omp_script)
+    
+    # Make additional substitutions to match argument choices 
+    job_script = job_script.replace('<PARTITION>',partition)
+    job_script = job_script.replace('<QOS>',qos)
+    job_script = job_script.replace('<WALL>',"{}".format(wall))
+    job_script = job_script.replace('<JOBNAME>',jobname)
+    job_script = job_script.replace('<GROUP>',group)
+    job_script = job_script.replace('<EMAIL>',email)
+    job_script = job_script.replace('<CMD>',cmd)
+    
+    return job_script
+
+
+if __name__ == "__main__": 
+
+    # Call main function...
+    main()
+
+
+

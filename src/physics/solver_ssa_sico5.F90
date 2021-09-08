@@ -3,6 +3,8 @@ module solver_ssa_sico5
     
     use yelmo_defs, only : sp, dp, wp, prec, rho_ice, rho_sw, g 
 
+    use ncio    ! For diagnostic outputting only 
+
     implicit none 
 
     private 
@@ -12,7 +14,9 @@ module solver_ssa_sico5
     public :: check_vel_convergence_l1rel_matrix
     public :: check_vel_convergence_l2rel
     public :: relax_ssa
-    
+    public :: ssa_diagnostics_write_init
+    public :: ssa_diagnostics_write_step
+
 contains 
 
     subroutine calc_vxy_ssa_matrix(vx_m,vy_m,L2_norm,beta_acx,beta_acy,visc_eff, &
@@ -1747,4 +1751,120 @@ contains
 
     end subroutine limit_vel
 
+    ! === DIAGNOSTIC OUTPUT ROUTINES ===
+
+    subroutine ssa_diagnostics_write_init(filename,nx,ny,time_init)
+
+        implicit none 
+
+        character(len=*),  intent(IN) :: filename 
+        integer,           intent(IN) :: nx 
+        integer,           intent(IN) :: ny
+        real(wp),          intent(IN) :: time_init
+
+        ! Initialize netcdf file and dimensions
+        call nc_create(filename)
+        call nc_write_dim(filename,"xc",     x=0.0_prec,dx=1.0_prec,nx=nx,units="gridpoints")
+        call nc_write_dim(filename,"yc",     x=0.0_prec,dx=1.0_prec,nx=ny,units="gridpoints")
+        call nc_write_dim(filename,"time",   x=time_init,dx=1.0_prec,nx=1,units="iter",unlimited=.TRUE.)
+
+        return
+
+    end subroutine ssa_diagnostics_write_init
+
+    subroutine ssa_diagnostics_write_step(filename,ux,uy,L2_norm,beta_acx,beta_acy,visc_eff_int, &
+                                        ssa_mask_acx,ssa_mask_acy,H_ice,f_ice,taud_acx,taud_acy, &
+                                                            H_grnd,z_sl,z_bed,ux_prev,uy_prev,time)
+
+        implicit none 
+        
+        character(len=*),  intent(IN) :: filename
+        real(wp), intent(IN) :: ux(:,:) 
+        real(wp), intent(IN) :: uy(:,:) 
+        real(wp), intent(IN) :: L2_norm
+        real(wp), intent(IN) :: beta_acx(:,:) 
+        real(wp), intent(IN) :: beta_acy(:,:) 
+        real(wp), intent(IN) :: visc_eff_int(:,:) 
+        integer,  intent(IN) :: ssa_mask_acx(:,:) 
+        integer,  intent(IN) :: ssa_mask_acy(:,:) 
+        real(wp), intent(IN) :: H_ice(:,:) 
+        real(wp), intent(IN) :: f_ice(:,:) 
+        real(wp), intent(IN) :: taud_acx(:,:) 
+        real(wp), intent(IN) :: taud_acy(:,:) 
+        real(wp), intent(IN) :: H_grnd(:,:) 
+        real(wp), intent(IN) :: z_sl(:,:) 
+        real(wp), intent(IN) :: z_bed(:,:) 
+        real(wp), intent(IN) :: ux_prev(:,:) 
+        real(wp), intent(IN) :: uy_prev(:,:) 
+        real(wp), intent(IN) :: time
+
+        ! Local variables
+        integer  :: ncid, n, i, j, nx, ny  
+        real(wp) :: time_prev 
+
+        nx = size(ux,1)
+        ny = size(ux,2) 
+
+        ! Open the file for writing
+        call nc_open(filename,ncid,writable=.TRUE.)
+
+        ! Determine current writing time step 
+        n = nc_size(filename,"time",ncid)
+        call nc_read(filename,"time",time_prev,start=[n],count=[1],ncid=ncid) 
+        if (abs(time-time_prev).gt.1e-5) n = n+1 
+
+        ! Update the time step
+        call nc_write(filename,"time",time,dim1="time",start=[n],count=[1],ncid=ncid)
+
+        ! Write the variables 
+
+        call nc_write(filename,"ux",ux,units="m/yr",long_name="ssa velocity (acx)", &
+                      dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
+        call nc_write(filename,"uy",uy,units="m/yr",long_name="ssa velocity (acy)", &
+                      dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
+        
+        call nc_write(filename,"ux_diff",ux-ux_prev,units="m/yr",long_name="ssa velocity difference (acx)", &
+                      dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
+        call nc_write(filename,"uy_diff",uy-uy_prev,units="m/yr",long_name="ssa velocity difference (acy)", &
+                      dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
+        
+        call nc_write(filename,"L2_norm",L2_norm,dim1="time",start=[n],count=[1],ncid=ncid)
+
+        call nc_write(filename,"beta_acx",beta_acx,units="Pa yr m^-1",long_name="Dragging coefficient (acx)", &
+                      dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
+        call nc_write(filename,"beta_acy",beta_acy,units="Pa yr m^-1",long_name="Dragging coefficient (acy)", &
+                      dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
+        
+        call nc_write(filename,"visc_eff_int",visc_eff_int,units="Pa yr",long_name="Vertically integrated effective viscosity", &
+                      dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
+
+        call nc_write(filename,"ssa_mask_acx",ssa_mask_acx,units="1",long_name="SSA mask (acx)", &
+                      dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
+        call nc_write(filename,"ssa_mask_acy",ssa_mask_acy,units="1",long_name="SSA mask (acy)", &
+                      dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
+
+        call nc_write(filename,"H_ice",H_ice,units="m",long_name="Ice thickness", &
+                      dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
+        call nc_write(filename,"f_ice",f_ice,units="1",long_name="Ice-covered fraction", &
+                      dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
+
+        call nc_write(filename,"taud_acx",taud_acx,units="Pa",long_name="Driving stress (acx)", &
+                      dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
+        call nc_write(filename,"taud_acy",taud_acy,units="Pa",long_name="Driving stress (acy)", &
+                      dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
+        
+        call nc_write(filename,"H_grnd",H_grnd,units="m",long_name="Ice thickness overburden", &
+                      dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
+        call nc_write(filename,"z_sl",z_sl,units="m",long_name="Sea level", &
+                      dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
+        call nc_write(filename,"z_bed",z_bed,units="m",long_name="Bedrock elevation", &
+                      dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
+        
+        ! Close the netcdf file
+        call nc_close(ncid)
+
+        return 
+
+    end subroutine ssa_diagnostics_write_step
+    
 end module solver_ssa_sico5

@@ -126,6 +126,8 @@ contains
          
         integer  :: ntot, ip1, jp1  
 
+        logical, parameter :: write_ssa_diagnostics = .FALSE. 
+
         nx    = size(ux,1)
         ny    = size(ux,2)
         nz_aa = size(ux,3)
@@ -154,6 +156,10 @@ contains
         ! Ensure dynamically inactive cells have no velocity at 
         ! outer margins before starting iterations
         call set_inactive_margins(ux_bar,uy_bar,f_ice)
+
+        if (write_ssa_diagnostics) then 
+            call ssa_diagnostics_write_init("yelmo_ssa.nc",nx,ny,time_init=1.0_wp)
+        end if 
 
         do iter = 1, par%ssa_iter_max 
 
@@ -270,6 +276,12 @@ end if
             ! Store current total iterations for output
             ssa_iter_now = iter 
 
+            if (write_ssa_diagnostics) then  
+                call ssa_diagnostics_write_step("yelmo_ssa.nc",ux_bar,uy_bar,L2_norm,beta_acx,beta_acy,visc_eff_int, &
+                                        ssa_mask_acx,ssa_mask_acy,H_ice,f_ice,taud_acx,taud_acy, &
+                                        H_grnd,z_sl,z_bed,ux_bar_nm1,uy_bar_nm1,time=real(iter,wp))    
+            end if 
+
             ! =========================================================================================
             ! Update additional fields based on output of solver
              
@@ -285,6 +297,10 @@ end if
         end do 
 
         ! Iterations are finished, finalize calculations of 3D velocity field 
+
+        ! if (write_ssa_diagnostics) then 
+        !     stop 
+        ! end if 
 
         ! Calculate the 3D horizontal velocity field
         call calc_vel_horizontal_3D(ux,uy,ux_b,uy_b,taub_acx,taub_acy,visc_eff,H_ice,f_ice,zeta_aa,par%boundaries)

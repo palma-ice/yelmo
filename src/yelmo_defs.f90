@@ -100,6 +100,7 @@ module yelmo_defs
         
         ! Internal parameters 
         real(dp)           :: time 
+        real(dp)           :: time_b 
         integer            :: nx, ny
         real(wp)           :: dx, dy
         character(len=256) :: boundaries 

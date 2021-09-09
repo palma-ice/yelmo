@@ -15,7 +15,7 @@ module solver_advection
 
 contains 
 
-    subroutine calc_advec2D(dvdt,var,f_ice, ux,uy,var_dot,dx,dy,dt,solver)
+    subroutine calc_advec2D(dvdt,var,f_ice,ux,uy,var_dot,dx,dy,dt,solver)
         ! General routine to apply 2D advection equation to variable `var` 
         ! with source term `var_dot`. Various solvers are possible
 

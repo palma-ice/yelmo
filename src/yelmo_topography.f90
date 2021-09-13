@@ -134,7 +134,7 @@ if (mbal_two_steps) then
 end if 
 
 
-if (.FALSE.) then 
+if (.TRUE.) then 
             ! Diagnose potential floating-ice calving rate [m/yr]
             
             select case(trim(tpo%par%calv_flt_method))
@@ -230,8 +230,8 @@ if (.FALSE.) then
             tpo%now%calv_grnd = tpo%now%calv_grnd + calv_sd 
 
 end if
-tpo%now%calv_flt  = 0.0_wp 
-tpo%now%calv_grnd = 0.0_wp 
+! tpo%now%calv_flt  = 0.0_wp 
+! tpo%now%calv_grnd = 0.0_wp 
 
 
 if (mbal_two_steps) then
@@ -258,7 +258,7 @@ end if
             tpo%now%dHicedt = (tpo%now%H_ice - tpo%now%H_ice_n) / dt 
 
 
-if (.FALSE.) then 
+if (.TRUE.) then 
             ! If desired, finally relax solution to reference state
             if (tpo%par%topo_rel .ne. 0) then 
 

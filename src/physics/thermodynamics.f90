@@ -760,7 +760,8 @@ contains
             ip1 = min(i+1,nx)
             jm1 = max(j-1,1)
             jp1 = min(j+1,ny)
-            
+    
+    if (.FALSE.) then 
             ! Get ab-node weighting based on whether ice is present 
             wt_ab = 0.0_wp 
             if (count([f_ice(i,j),f_ice(ip1,j),f_ice(i,jp1),f_ice(ip1,jp1)].lt.1.0_wp) .eq. 0) then 
@@ -775,7 +776,12 @@ contains
             if (count([f_ice(i,j),f_ice(ip1,j),f_ice(i,jm1),f_ice(ip1,jm1)].lt.1.0_wp) .eq. 0) then 
                 wt_ab(4) = 1.0_wp 
             end if 
-            
+    
+    else 
+        ! Take contributions from all cells.
+            wt_ab = 1.0_wp 
+    end if 
+
             wt = sum(wt_ab)
             
             if (f_ice(i,j) .eq. 1.0_wp .and. wt .gt. 0.0_wp) then 

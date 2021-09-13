@@ -384,8 +384,8 @@ contains
 
             end do   ! End iteration loop 
             
-            ! Now finally apply mass balance and calving changes 
-            call calc_ytopo_second_step(dom%tpo,dom%dyn,dom%mat,dom%thrm,dom%bnd,time_now,topo_fixed=dom%tpo%par%topo_fixed)
+            ! ! Now finally apply calving changes 
+            ! call calc_ytopo_second_step(dom%tpo,dom%dyn,dom%mat,dom%thrm,dom%bnd,time_now,topo_fixed=dom%tpo%par%topo_fixed)
             
             ! Calculate model speed for this iteration
             call yelmo_cpu_time(cpu_time1)

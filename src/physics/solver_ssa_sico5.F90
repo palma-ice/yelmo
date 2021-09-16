@@ -542,18 +542,18 @@ contains
                         if (z_sl(i1,j)-z_bed(i1,j) .gt. 0.0) then 
                         ! Bed below sea level
 
-                          H_ocn_now = min(rho_ice/rho_sw*H_ice_now, &       ! Flotation depth 
-                                          z_sl(i1,j)-z_bed(i1,j))           ! Grounded depth 
+                            H_ocn_now = min(rho_ice/rho_sw*H_ice_now, &         ! Flotation depth 
+                                              z_sl(i1,j)-z_bed(i1,j))           ! Grounded depth 
 
                         else 
                         ! Bed above sea level
 
-                        H_ocn_now = 0.0 
+                            H_ocn_now = 0.0 
 
                         end if 
 
                         lgs_b_value(nr) = factor_rhs_3a*H_ice_now*H_ice_now &
-                                      - factor_rhs_3b*H_ocn_now*H_ocn_now
+                                        - factor_rhs_3b*H_ocn_now*H_ocn_now
 
 !                         if (i .eq. 80 .and. j .eq. 70) then 
 !                             ! Margin point

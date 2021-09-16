@@ -741,8 +741,8 @@ contains
 
                         ! ====== Calculate cross terms from intermediate values (dxy,dxz,dyz) ====== 
 
-                        strn%dxz(i,j,k) = 0.5*(lxz+lzx)
-                        strn%dyz(i,j,k) = 0.5*(lyz+lzy)
+                        strn%dxz(i,j,k) = 0.5_wp*(lxz+lzx)
+                        strn%dyz(i,j,k) = 0.5_wp*(lyz+lzy)
 
                         ! Avoid underflows 
                         if (abs(strn%dxz(i,j,k)) .lt. tol_underflow) strn%dxz(i,j,k) = 0.0 

@@ -576,7 +576,7 @@ end if
         real(wp) :: dudx_ab, dvdy_ab
         real(wp) :: dudy, dvdx
         real(wp) :: duxdz_ab, duydz_ab  
-        real(wp) :: p1, p2, eps_0_sq  
+        real(wp) :: p1, p2, eps_0_sq, eps_max_sq  
         real(wp) :: eps_sq                            ! [1/a^2]
         real(wp) :: ATT_ab
         real(wp) :: visc_eff_ab_now(4)
@@ -584,6 +584,8 @@ end if
         real(wp) :: wt  
 
         real(wp), allocatable :: visc_eff_ab(:,:,:)
+
+        real(wp), parameter :: eps_max = 0.5_wp 
 
         nx = size(visc_eff,1)
         ny = size(visc_eff,2)
@@ -601,7 +603,8 @@ end if
         p2 = -1.0_prec/n_glen
 
         ! Calculate squared minimum strain rate 
-        eps_0_sq = eps_0*eps_0 
+        eps_0_sq   = eps_0*eps_0 
+        eps_max_sq = eps_max*eps_max 
 
         do j = 1, ny 
         do i = 1, nx 
@@ -618,7 +621,7 @@ end if
             ! Calculate of cross terms on ab-nodes
             dudy = (ux(i,jp1) - ux(i,j)) / dx 
             dvdx = (uy(ip1,j) - uy(i,j)) / dy 
-
+            
             ! Loop over column
             do k = 1, nz 
 
@@ -633,6 +636,8 @@ end if
                 eps_sq = dudx_ab**2 + dvdy_ab**2 + dudx_ab*dvdy_ab + 0.25_prec*(dudy+dvdx)**2 &
                        + 0.25_prec*duxdz_ab**2 + 0.25_prec*duydz_ab**2 + eps_0_sq
                 
+                if (eps_sq .gt. eps_max_sq) eps_sq = eps_max_sq 
+
                 ATT_ab = 0.25_prec*(ATT(i,j,k)+ATT(ip1,j,k)+ATT(i,jp1,k)+ATT(ip1,jp1,k)) 
                 
                 ! Calculate effective viscosity on ab-nodes

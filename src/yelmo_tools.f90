@@ -57,7 +57,7 @@ contains
 
         return
 
-    end function calc_magnitude 
+    end function calc_magnitude
     
     function calc_magnitude_from_staggered(u,v,boundaries) result(umag)
         ! Calculate the centered (aa-nodes) magnitude of a vector 
@@ -234,7 +234,7 @@ contains
 
     end function stagger_aa_ab
     
-    function stagger_aa_ab_ice(u,H_ice) result(ustag)
+    function stagger_aa_ab_ice(u,H_ice,f_ice) result(ustag)
         ! Stagger from Aa => Ab
         ! Four point average from corner Aa nodes to central Ab node 
 
@@ -242,6 +242,7 @@ contains
 
         real(prec), intent(IN)  :: u(:,:) 
         real(prec), intent(IN)  :: H_ice(:,:) 
+        real(prec), intent(IN)  :: f_ice(:,:) 
         real(prec) :: ustag(size(u,1),size(u,2)) 
 
         ! Local variables 
@@ -261,22 +262,22 @@ contains
 
             k = 0 
             ustag(i,j) = 0.0 
-            if (H_ice(i,j) .gt. 0.0) then 
+            if (f_ice(i,j) .eq. 0.0) then 
                 ustag(i,j) = ustag(i,j) + u(i,j) 
                 k = k+1
             end if 
 
-            if (H_ice(ip1,j) .gt. 0.0) then 
+            if (f_ice(ip1,j) .eq. 0.0) then 
                 ustag(i,j) = ustag(i,j) + u(ip1,j) 
                 k = k+1 
             end if 
             
-            if (H_ice(i,jp1) .gt. 0.0) then 
+            if (f_ice(i,jp1) .eq. 0.0) then 
                 ustag(i,j) = ustag(i,j) + u(i,jp1) 
                 k = k+1 
             end if 
             
-            if (H_ice(ip1,jp1) .gt. 0.0) then 
+            if (f_ice(ip1,jp1) .eq. 0.0) then 
                 ustag(i,j) = ustag(i,j) + u(ip1,jp1) 
                 k = k+1 
             end if 

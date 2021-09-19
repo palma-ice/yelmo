@@ -343,7 +343,7 @@ contains
 
     end subroutine calc_uz_advec_corr_3D
 
-    subroutine calc_driving_stress(taud_acx,taud_acy,H_ice,dzsdx,dzsdy,dx,taud_lim,boundaries)
+    subroutine calc_driving_stress(taud_acx,taud_acy,H_ice,f_ice,dzsdx,dzsdy,dx,taud_lim,boundaries)
         ! Calculate driving stress on staggered grid points
         ! Units: taud [Pa] == [kg m-1 s-2]
         ! taud = rho_ice*g*H_ice*dzs/dx
@@ -360,6 +360,7 @@ contains
         real(prec), intent(OUT) :: taud_acx(:,:)    ! [Pa]
         real(prec), intent(OUT) :: taud_acy(:,:)    ! [Pa]
         real(prec), intent(IN)  :: H_ice(:,:)       ! [m]
+        real(prec), intent(IN)  :: f_ice(:,:)       ! [--]
         real(prec), intent(IN)  :: dzsdx(:,:)       ! [--]
         real(prec), intent(IN)  :: dzsdy(:,:)       ! [--]
         real(prec), intent(IN)  :: dx               ! [m] 
@@ -371,9 +372,14 @@ contains
         integer    :: im1, ip1, jm1, jp1 
         real(prec) :: dy, rhog 
         real(prec) :: H_mid
-        
+
+        ! real(prec), allocatable :: H_ab(:,:)
+
         nx = size(H_ice,1)
         ny = size(H_ice,2) 
+
+        ! allocate(H_ab(nx,ny))
+
 
         ! Define shortcut parameter 
         rhog = rho_ice * g 
@@ -391,11 +397,23 @@ contains
             jp1 = min(ny,j+1)
 
             ! x-direction
-            H_mid         = 0.5_prec*(H_ice(i,j)+H_ice(ip1,j)) 
+            if (f_ice(i,j) .eq. 1.0 .and. f_ice(ip1,j) .lt. 1.0) then 
+                H_mid = H_ice(i,j) 
+            else if (f_ice(i,j) .lt. 1.0 .and. f_ice(ip1,j) .eq. 1.0) then 
+                H_mid = H_ice(ip1,j)
+            else  
+                H_mid = 0.5_prec*(H_ice(i,j)+H_ice(ip1,j)) 
+            end if
             taud_acx(i,j) = rhog * H_mid * dzsdx(i,j) 
 
             ! y-direction 
-            H_mid         = 0.5_prec*(H_ice(i,j)+H_ice(i,jp1))
+            if (f_ice(i,j) .eq. 1.0 .and. f_ice(i,jp1) .lt. 1.0) then 
+                H_mid = H_ice(i,j) 
+            else if (f_ice(i,j) .lt. 1.0 .and. f_ice(i,jp1) .eq. 1.0) then 
+                H_mid = H_ice(i,jp1)
+            else  
+                H_mid = 0.5_prec*(H_ice(i,j)+H_ice(i,jp1)) 
+            end if
             taud_acy(i,j) = rhog * H_mid * dzsdy(i,j) 
 
         end do

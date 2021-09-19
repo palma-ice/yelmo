@@ -86,7 +86,7 @@ contains
         ! ===== Calculate general variables ========================================
 
         ! Calculate driving stress 
-        call calc_driving_stress(dyn%now%taud_acx,dyn%now%taud_acy,tpo%now%H_ice,tpo%now%dzsdx, &
+        call calc_driving_stress(dyn%now%taud_acx,dyn%now%taud_acy,tpo%now%H_ice,tpo%now%f_ice,tpo%now%dzsdx, &
                                         tpo%now%dzsdy,dyn%par%dx,dyn%par%taud_lim,dyn%par%boundaries)
 
         if (dyn%par%taud_gl_method .ne. 0) then 

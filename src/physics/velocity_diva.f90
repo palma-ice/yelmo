@@ -621,7 +621,7 @@ end if
             ! Calculate of cross terms on ab-nodes
             dudy = (ux(i,jp1) - ux(i,j)) / dx 
             dvdx = (uy(ip1,j) - uy(i,j)) / dy 
-            
+
             ! Loop over column
             do k = 1, nz 
 
@@ -636,7 +636,8 @@ end if
                 eps_sq = dudx_ab**2 + dvdy_ab**2 + dudx_ab*dvdy_ab + 0.25_prec*(dudy+dvdx)**2 &
                        + 0.25_prec*duxdz_ab**2 + 0.25_prec*duydz_ab**2 + eps_0_sq
                 
-                if (eps_sq .gt. eps_max_sq) eps_sq = eps_max_sq 
+                ! ajr: needs further testing, but did not make model more stable at 4km resolution
+                !if (eps_sq .gt. eps_max_sq) eps_sq = eps_max_sq 
 
                 ATT_ab = 0.25_prec*(ATT(i,j,k)+ATT(ip1,j,k)+ATT(i,jp1,k)+ATT(ip1,jp1,k)) 
                 

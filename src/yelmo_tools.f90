@@ -325,7 +325,7 @@ contains
 
     end function stagger_ab_aa
     
-    function stagger_ab_aa_ice(u,H_ice) result(ustag)
+    function stagger_ab_aa_ice(u,H_ice,f_ice) result(ustag)
         ! Stagger from ab => aa
         ! Four point average from corner ab-nodes to central aa-node 
 
@@ -333,6 +333,7 @@ contains
 
         real(prec), intent(IN)  :: u(:,:) 
         real(prec), intent(IN)  :: H_ice(:,:) 
+        real(prec), intent(IN)  :: f_ice(:,:) 
         real(prec) :: ustag(size(u,1),size(u,2)) 
 
         ! Local variables 
@@ -345,7 +346,7 @@ contains
 
         allocate(H_ice_ab(nx,ny))
 
-        H_ice_ab = stagger_aa_ab(H_ice) 
+        H_ice_ab = stagger_aa_ab_ice(H_ice,H_ice,f_ice) 
 
         ustag = 0.0_prec 
 

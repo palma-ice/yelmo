@@ -85,7 +85,7 @@ contains
 
         ! Calculate the strain rate tensor
 
-if (.TRUE.) then 
+if (.FALSE.) then 
         ! Calculate strain rate tensor on ab-nodes, then average 
 
         call calc_strain_rate_tensor(mat%now%strn,mat%now%strn2D,dyn%now%ux,dyn%now%uy,dyn%now%uz, &

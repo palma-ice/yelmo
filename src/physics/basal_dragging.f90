@@ -612,11 +612,12 @@ contains
                 ! Normalize weighting 
                 wt_ab = wt_ab / wt 
 
-                cb_ab(1) = 0.25_wp*(c_bed(i,j)+c_bed(ip1,j)+c_bed(i,jp1)+c_bed(ip1,jp1))
-                cb_ab(2) = 0.25_wp*(c_bed(i,j)+c_bed(im1,j)+c_bed(i,jp1)+c_bed(im1,jp1))
-                cb_ab(3) = 0.25_wp*(c_bed(i,j)+c_bed(im1,j)+c_bed(i,jm1)+c_bed(im1,jm1))
-                cb_ab(4) = 0.25_wp*(c_bed(i,j)+c_bed(ip1,j)+c_bed(i,jm1)+c_bed(ip1,jm1))
-                
+                ! cb_ab(1) = 0.25_wp*(c_bed(i,j)+c_bed(ip1,j)+c_bed(i,jp1)+c_bed(ip1,jp1))
+                ! cb_ab(2) = 0.25_wp*(c_bed(i,j)+c_bed(im1,j)+c_bed(i,jp1)+c_bed(im1,jp1))
+                ! cb_ab(3) = 0.25_wp*(c_bed(i,j)+c_bed(im1,j)+c_bed(i,jm1)+c_bed(im1,jm1))
+                ! cb_ab(4) = 0.25_wp*(c_bed(i,j)+c_bed(ip1,j)+c_bed(i,jm1)+c_bed(ip1,jm1))
+                cb_ab(1:4) = c_bed(i,j) 
+
                 if (q .eq. 1.0_wp) then 
                     ! Linear law, no f(ub) term
 

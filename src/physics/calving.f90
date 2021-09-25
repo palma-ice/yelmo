@@ -403,7 +403,7 @@ end if
                     flux_yu = uy(i,j)*H_ice(i,jp1) 
                 end if 
 
-                if (uy(i,jp1) .gt. 0.0) then 
+                if (uy(i,jm1) .gt. 0.0) then 
                     flux_yd = uy(i,jp1)*H_ice(i,jm1)
                 else
                     flux_yd = uy(i,jp1)*H_ice(i,j) 

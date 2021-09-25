@@ -115,7 +115,7 @@ contains
         ! Post processing of H_ice ================
 
         ! Also ensure tiny numeric ice thicknesses are removed
-        where (H_ice .lt. 1e-5) H_ice = 0.0 
+        where (H_ice .lt. TOL_UNDERFLOW) H_ice = 0.0 
 
         return 
 
@@ -178,7 +178,7 @@ contains
         H_ice = H_ice + dt*mb_applied
 
         ! Ensure tiny numeric ice thicknesses are removed
-        where (H_ice .lt. 1e-5) H_ice = 0.0 
+        where (H_ice .lt. TOL_UNDERFLOW) H_ice = 0.0 
 
         return 
 

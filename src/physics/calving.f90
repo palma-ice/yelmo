@@ -465,7 +465,7 @@ end if
 
                 if (f_ice(i,jm1).eq.1.0.and.H_diff(i,jm1).gt.0.0.and.uy(i,jm1).gt.0.0) then
                     !flux_yd = max( (dHdt(i,jm1)+H_diff(i,jm1))/tau,0.0_wp) 
-                    flux_yd = uy(i,jp1)*H_diff(i,jm1)
+                    flux_yd = uy(i,jm1)*H_diff(i,jm1)
                 end if
 
                 if (f_ice(i,jp1).eq.1.0.and.H_diff(i,jp1).gt.0.0.and.uy(i,j).lt.0.0) then

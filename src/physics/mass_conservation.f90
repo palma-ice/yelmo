@@ -121,14 +121,15 @@ contains
 
     end subroutine calc_ice_thickness_dyn
 
-    subroutine calc_ice_thickness_mbal(H_ice,mb_applied,calv,f_grnd,H_ocn, &
-                                       mbal,calv_flt,calv_grnd,dx,dt,reset)
+    subroutine calc_ice_thickness_mbal(H_ice,f_ice,mb_applied,calv,f_grnd,H_ocn, &
+                                       mbal,calv_flt,calv_grnd,dx,dt)
         ! Interface subroutine to update ice thickness through application
         ! of advection, vertical mass balance terms and calving 
 
         implicit none 
 
         real(wp),       intent(INOUT) :: H_ice(:,:)             ! [m]   Ice thickness 
+        real(wp),       intent(INOUT) :: f_ice(:,:)             ! [--]  Ice cover fraction 
         real(wp),       intent(INOUT) :: mb_applied(:,:)        ! [m/a] Actual mass balance applied to real ice points
         real(wp),       intent(INOUT) :: calv(:,:)              ! [m/a] Actual calving rate 
         real(wp),       intent(IN)    :: f_grnd(:,:)            ! [--]  Grounded fraction 
@@ -137,8 +138,7 @@ contains
         real(wp),       intent(IN)    :: calv_flt(:,:)          ! [m/a] Potential calving rate (floating)
         real(wp),       intent(IN)    :: calv_grnd(:,:)         ! [m/a] Potential calving rate (grounded)
         real(wp),       intent(IN)    :: dx                     ! [m]   Horizontal resolution
-        real(wp),       intent(IN)    :: dt                     ! [a]   Timestep 
-        logical,        intent(IN)    :: reset 
+        real(wp),       intent(IN)    :: dt                     ! [a]   Timestep  
 
         ! Local variables 
         integer :: i, j, nx, ny 
@@ -147,29 +147,28 @@ contains
         nx = size(H_ice,1)
         ny = size(H_ice,2) 
 
-        if (reset) then 
-            ! Make sure to first initialize calv and mb_applied to 
-            ! zero 
-
-            calv        = 0.0_wp 
-            mb_applied  = 0.0_wp 
-
-        end if 
-
         ! ===== CALVING ======
         ! Limit calving contributions to margin points 
         ! (for now assume this was done well externally)
 
         ! Combine grounded and floating calving into one field for output
-        calv = calv + (calv_flt + calv_grnd) 
+        ! (ensure that grounded and floating calving cannot happen in the
+        ! same cell - this should be true, but for safety apply the where statement)
+        calv = calv_flt
+        where (calv_flt .eq. 0.0_wp) calv = calv + calv_grnd
 
         ! ==== MASS BALANCE =====
 
-        ! First apply mass balance 
-        mb_applied = mb_applied + mbal - calv 
+        ! Combine mass balance and calving into one field, mb_applied.
+        ! Ensure that mb_applied is scaled by the partially covered area of margin points
+        where (f_ice .gt. 0.0 .and. f_ice .lt. 1.0) 
+            mb_applied = f_ice*(mbal-calv)
+        elsewhere 
+            mb_applied = mbal - calv
+        end where 
 
-        ! Ensure ice cannot form in open ocean 
-        where(f_grnd .eq. 0.0 .and. H_ice .eq. 0.0)  mb_applied = 0.0  
+        ! Additionally ensure ice cannot form in open ocean 
+        where(f_grnd .eq. 0.0 .and. f_ice .eq. 0.0)  mb_applied = 0.0  
 
         ! Ensure melt is limited to amount of available ice to melt  
         where((H_ice+dt*mb_applied) .lt. 0.0) mb_applied = -H_ice/dt
@@ -184,13 +183,13 @@ contains
 
     end subroutine calc_ice_thickness_mbal
 
-    subroutine apply_ice_thickness_boundaries(H_ice,mb_resid,f_ice,f_grnd,uxy_b,ice_allowed,boundaries,H_ice_ref, &
-                                                H_min_flt,H_min_grnd,dt,reset)
+    subroutine apply_ice_thickness_boundaries(mb_resid,H_ice,f_ice,f_grnd,uxy_b,ice_allowed,boundaries,H_ice_ref, &
+                                                H_min_flt,H_min_grnd,dt)
 
         implicit none
 
-        real(wp),           intent(INOUT)   :: H_ice(:,:)               ! [m] Ice thickness 
         real(wp),           intent(OUT)     :: mb_resid(:,:)            ! [m/yr] Residual mass balance
+        real(wp),           intent(INOUT)   :: H_ice(:,:)               ! [m] Ice thickness 
         real(wp),           intent(IN)      :: f_ice(:,:)               ! [--] Fraction of ice cover
         real(wp),           intent(IN)      :: f_grnd(:,:)              ! [--] Grounded ice fraction
         real(wp),           intent(IN)      :: uxy_b(:,:)               ! [m/a] Basal sliding speed, aa-nodes
@@ -200,7 +199,6 @@ contains
         real(wp),           intent(IN)      :: H_min_flt                ! [m] Minimum allowed floating ice thickness 
         real(wp),           intent(IN)      :: H_min_grnd               ! [m] Minimum allowed grounded ice thickness 
         real(wp),           intent(IN)      :: dt                       ! [yr] Timestep
-        logical,            intent(IN)      :: reset 
 
         ! Local variables 
         integer :: i, j, nx, ny 
@@ -348,13 +346,9 @@ end if
                 stop 
 
         end select 
-        
-        if (reset) then
-            mb_resid = 0.0_wp 
-        end if 
 
         ! Determine mass balance related to changes applied here 
-        mb_resid = mb_resid + (H_ice_new - H_ice) / dt 
+        mb_resid = (H_ice_new - H_ice) / dt 
 
         ! Reset actual ice thickness to new values 
         H_ice = H_ice_new 

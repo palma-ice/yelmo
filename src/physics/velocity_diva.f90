@@ -732,6 +732,7 @@ else
 
 end if 
 
+if (.FALSE.) then 
         ! Extrapolate viscosity to bordering ice-free or partially ice-covered cells
         do j=1, ny
         do i=1, nx
@@ -775,6 +776,8 @@ end if
 
         end do 
         end do 
+
+end if 
 
         ! Treat the corners to avoid extremes
         visc_eff(1,1,:)   = 0.5*(visc_eff(2,1,:)+visc_eff(1,2,:))

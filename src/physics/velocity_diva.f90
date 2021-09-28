@@ -649,6 +649,28 @@ end if
         end do  
         end do 
 
+if (.TRUE.) then 
+
+        ! Unstagger from ab-nodes to aa-nodes 
+        ! only using contributions from ice covered neighbors
+        do j = 1, ny 
+        do i = 1, nx 
+
+            im1 = max(i-1,1) 
+            ip1 = min(i+1,nx) 
+            jm1 = max(j-1,1) 
+            jp1 = min(j+1,ny) 
+
+            ! Loop over column
+            do k = 1, nz 
+                visc_eff(i,j,k) = 0.25_prec*(visc_eff_ab(i,j,k)+visc_eff_ab(im1,j,k) &
+                                            +visc_eff_ab(i,jm1,k)+visc_eff_ab(im1,jm1,k))
+            end do 
+
+        end do  
+        end do 
+
+else 
         ! Unstagger from ab-nodes to aa-nodes 
         ! only using contributions from ice covered neighbors
         do j = 1, ny 
@@ -707,7 +729,9 @@ end if
 
         end do 
         end do 
-        
+
+end if 
+
         ! Extrapolate viscosity to bordering ice-free or partially ice-covered cells
         do j=1, ny
         do i=1, nx

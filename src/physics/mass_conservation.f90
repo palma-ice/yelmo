@@ -148,24 +148,16 @@ contains
         ny = size(H_ice,2) 
 
         ! ===== CALVING ======
-        ! Limit calving contributions to margin points 
-        ! (for now assume this was done well externally)
 
-        ! Combine grounded and floating calving into one field for output
-        ! (ensure that grounded and floating calving cannot happen in the
-        ! same cell - this should be true, but for safety apply the where statement)
-        calv = calv_flt
-        where (calv_flt .eq. 0.0_wp) calv = calv + calv_grnd
+        ! Combine grounded and floating calving into one field for output,
+        ! scale by area of ice in cell.
+        calv = f_ice*(calv + calv_grnd)
 
         ! ==== MASS BALANCE =====
 
         ! Combine mass balance and calving into one field, mb_applied.
-        ! Ensure that mb_applied is scaled by the partially covered area of margin points
-        where (f_ice .gt. 0.0 .and. f_ice .lt. 1.0) 
-            mb_applied = f_ice*(mbal-calv)
-        elsewhere 
-            mb_applied = mbal - calv
-        end where 
+        ! mbal is not scaled by f_ice, since it does not depend on ice thickness. 
+        mb_applied = mbal - calv
 
         ! Additionally ensure ice cannot form in open ocean 
         where(f_grnd .eq. 0.0 .and. f_ice .eq. 0.0)  mb_applied = 0.0  
@@ -243,11 +235,7 @@ contains
 
             if (is_margin) then
                 ! Ice covered point at the margin
-
-if (.TRUE.) then 
-    ! ajr: not clear whether this should be done with effective ice thickness 
-    ! or simply ice thickness. H_eff seems like the better choice.
-
+                
                 ! Calculate current ice thickness 
                 if (f_ice(i,j) .gt. 0.0) then 
                     H_eff = H_ice(i,j) / f_ice(i,j) 
@@ -258,14 +246,7 @@ if (.TRUE.) then
                 ! Remove ice that is too thin 
                 if (f_grnd(i,j) .eq. 0.0_wp .and. H_eff .lt. H_min_flt)  H_ice_new(i,j) = 0.0_wp 
                 if (f_grnd(i,j) .gt. 0.0_wp .and. H_eff .lt. H_min_grnd) H_ice_new(i,j) = 0.0_wp 
-else 
-
-                ! Remove ice that is too thin 
-                if (f_grnd(i,j) .eq. 0.0_wp .and. H_ice(i,j) .lt. H_min_flt)  H_ice_new(i,j) = 0.0_wp 
-                if (f_grnd(i,j) .gt. 0.0_wp .and. H_ice(i,j) .lt. H_min_grnd) H_ice_new(i,j) = 0.0_wp 
-
-end if 
-
+ 
             end if 
 
             ! Check for ice islands

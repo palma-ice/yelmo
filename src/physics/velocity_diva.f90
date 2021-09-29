@@ -956,19 +956,19 @@ end if
 
         implicit none 
         
-        real(wp), intent(OUT) :: visc_eff(:,:,:)      ! aa-nodes
-        real(wp), intent(IN)  :: ux(:,:)              ! [m/a] Vertically averaged horizontal velocity, x-component
-        real(wp), intent(IN)  :: uy(:,:)              ! [m/a] Vertically averaged horizontal velocity, y-component
-        real(wp), intent(IN)  :: duxdz(:,:,:)         ! [1/a] Vertical shearing, x-component
-        real(wp), intent(IN)  :: duydz(:,:,:)         ! [1/a] Vertical shearing, x-component
-        real(wp), intent(IN)  :: ATT(:,:,:)           ! aa-nodes
+        real(wp), intent(OUT) :: visc_eff(:,:,:)        ! aa-nodes
+        real(wp), intent(IN)  :: ux(:,:)                ! [m/yr] Vertically averaged horizontal velocity, x-component
+        real(wp), intent(IN)  :: uy(:,:)                ! [m/yr] Vertically averaged horizontal velocity, y-component
+        real(wp), intent(IN)  :: duxdz(:,:,:)           ! [1/yr] Vertical shearing, x-component
+        real(wp), intent(IN)  :: duydz(:,:,:)           ! [1/yr] Vertical shearing, x-component
+        real(wp), intent(IN)  :: ATT(:,:,:)             ! aa-nodes
         real(wp), intent(IN)  :: H_ice(:,:) 
         real(wp), intent(IN)  :: f_ice(:,:)
-        real(wp), intent(IN)  :: zeta_aa(:)           ! Vertical axis (sigma-coordinates from 0 to 1)
+        real(wp), intent(IN)  :: zeta_aa(:)             ! Vertical axis (sigma-coordinates from 0 to 1)
         real(wp), intent(IN)  :: dx
         real(wp), intent(IN)  :: dy
         real(wp), intent(IN)  :: n_glen   
-        real(wp), intent(IN)  :: eps_0                ! [1/a] Regularization constant (minimum strain rate, ~1e-8)
+        real(wp), intent(IN)  :: eps_0                  ! [1/yr] Regularization constant (minimum strain rate, ~1e-8)
         
         ! Local variables 
         integer  :: i, j, k
@@ -977,7 +977,7 @@ end if
         integer  :: nx, ny, nz  
         real(wp) :: inv_4dx, inv_4dy 
         real(wp) :: p1, p2, eps_0_sq  
-        real(wp) :: eps_sq                          ! [1/a^2]
+        real(wp) :: eps_sq                              ! [1/yr^2]
         real(wp) :: dudx_ab(4)
         real(wp) :: dvdy_ab(4)
         real(wp) :: dudy_ab(4)
@@ -1024,24 +1024,21 @@ end if
             jm2 = max(j-2,1) 
             jp2 = min(j+2,ny) 
 
-if (.FALSE.) then 
             ! Get ab-node weighting based on whether ice is present 
             wt_ab = 0.0_wp 
-            if (count([f_ice(i,j),f_ice(ip1,j),f_ice(i,jp1),f_ice(ip1,jp1)].lt.1.0_wp) .eq. 0) then 
+            if (count([f_ice(i,j),f_ice(ip1,j),f_ice(i,jp1),f_ice(ip1,jp1)].eq.1.0_wp) .gt. 0) then 
                 wt_ab(1) = 1.0_wp
             end if
-            if (count([f_ice(i,j),f_ice(im1,j),f_ice(i,jp1),f_ice(im1,jp1)].lt.1.0_wp) .eq. 0) then 
+            if (count([f_ice(i,j),f_ice(im1,j),f_ice(i,jp1),f_ice(im1,jp1)].eq.1.0_wp) .gt. 0) then 
                 wt_ab(2) = 1.0_wp 
             end if 
-            if (count([f_ice(i,j),f_ice(im1,j),f_ice(i,jm1),f_ice(im1,jm1)].lt.1.0_wp) .eq. 0) then 
+            if (count([f_ice(i,j),f_ice(im1,j),f_ice(i,jm1),f_ice(im1,jm1)].eq.1.0_wp) .gt. 0) then 
                 wt_ab(3) = 1.0_wp
             end if 
-            if (count([f_ice(i,j),f_ice(ip1,j),f_ice(i,jm1),f_ice(ip1,jm1)].lt.1.0_wp) .eq. 0) then 
+            if (count([f_ice(i,j),f_ice(ip1,j),f_ice(i,jm1),f_ice(ip1,jm1)].eq.1.0_wp) .gt. 0) then 
                 wt_ab(4) = 1.0_wp 
             end if 
-else 
-            wt_ab = 1.0 
-end if
+
             wt = sum(wt_ab)
             
             if (f_ice(i,j) .eq. 1.0_wp .and. wt .gt. 0.0_wp) then 
@@ -1209,67 +1206,24 @@ end if
         ! Local variables 
         integer :: i, j, nx, ny
         integer :: im1, ip1, jm1, jp1  
-        real(wp) :: H_now
+        real(wp) :: H_eff
         real(wp) :: visc_eff_mean 
         real(wp) :: wt 
 
         nx = size(visc_eff_int,1)
         ny = size(visc_eff_int,2)
-
-
+        
         do j = 1, ny 
         do i = 1, nx
 
             ! Calculate the vertically averaged viscosity for this point
             visc_eff_mean = integrate_trapezoid1D_pt(visc_eff(i,j,:),zeta_aa) 
             
-            if (f_ice(i,j) .eq. 1.0) then 
-                visc_eff_int(i,j) = visc_eff_mean*H_ice(i,j) 
+            if (f_ice(i,j) .gt. 0.0) then 
+                H_eff = H_ice(i,j) / f_ice(i,j) 
+                visc_eff_int(i,j) = visc_eff_mean*H_eff
             else
                 visc_eff_int(i,j) = visc_eff_mean 
-            end if 
-
-        end do 
-        end do 
-
-        
-        ! Now extrapolate to ice-free or partially ice-free neighbors
-        do j = 1, ny 
-        do i = 1, nx
-
-            im1 = max(i-1,1) 
-            ip1 = min(i+1,nx) 
-            jm1 = max(j-1,1) 
-            jp1 = min(j+1,ny) 
-
-            if ( f_ice(i,j) .lt. 1.0 .and. &
-                count([f_ice(im1,j),f_ice(ip1,j),f_ice(i,jm1),f_ice(i,jp1)] .eq. 1.0) .gt. 0) then 
-                ! Ice-free or partially ice-free point at ice margin
-
-                visc_eff_int(i,j) = 0.0_wp 
-                wt = 0.0_wp 
-
-                if (f_ice(im1,j).eq.1.0) then 
-                    visc_eff_int(i,j) = visc_eff_int(i,j) + visc_eff_int(im1,j) 
-                    wt = wt + 1.0 
-                end if 
-                if (f_ice(ip1,j).eq.1.0) then 
-                    visc_eff_int(i,j) = visc_eff_int(i,j) + visc_eff_int(ip1,j) 
-                    wt = wt + 1.0 
-                end if 
-                if (f_ice(i,jm1).eq.1.0) then 
-                    visc_eff_int(i,j) = visc_eff_int(i,j) + visc_eff_int(i,jm1) 
-                    wt = wt + 1.0 
-                end if 
-                if (f_ice(i,jp1).eq.1.0) then 
-                    visc_eff_int(i,j) = visc_eff_int(i,j) + visc_eff_int(i,jp1) 
-                    wt = wt + 1.0 
-                end if 
-                
-                if (wt .gt. 0.0) then 
-                    visc_eff_int(i,j) = visc_eff_int(i,j) / wt 
-                end if 
-
             end if 
 
         end do 

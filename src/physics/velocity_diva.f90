@@ -205,10 +205,6 @@ contains
             ! Note L19 uses eta_bar*H in the ssa equation. Yelmo uses eta_int=eta_bar*H directly.
             call calc_visc_eff_int(visc_eff_int,visc_eff,H_ice,f_ice,zeta_aa)
             
-            ! Smooth the viscosity at the ice margins if it is too low
-            ! to avoid singularities (mainly for EISMINT/dome experiments)
-            !call smooth_visc_eff_int_margin(visc_eff_int,H_ice)
-
             ! Calculate beta (at the ice base)
             call calc_beta(beta,c_bed,ux_b,uy_b,H_ice,f_ice,H_grnd,f_grnd,z_bed,z_sl,par%beta_method, &
                                 par%beta_const,par%beta_q,par%beta_u0,par%beta_gl_scale,par%beta_gl_f, &
@@ -630,10 +626,10 @@ end if
 
                 ! Un-stagger shear terms to central aa-nodes in horizontal
                 !duxdz_ab = 0.5_prec*(duxdz(i,j,k) + duxdz(i,jp1,k))
-                duxdz_ab = calc_staggered_margin(duxdz(i,j,k),duxdz(i,jp1,k),H_ice(i,j),H_ice(i,jp1))
+                duxdz_ab = calc_staggered_margin(duxdz(i,j,k),duxdz(i,jp1,k),f_ice(i,j),f_ice(i,jp1))
             
                 !duydz_ab = 0.5_prec*(duydz(i,j,k) + duydz(ip1,j,k))
-                duydz_ab = calc_staggered_margin(duydz(i,j,k),duydz(ip1,j,k),H_ice(i,j),H_ice(ip1,j))
+                duydz_ab = calc_staggered_margin(duydz(i,j,k),duydz(ip1,j,k),f_ice(i,j),f_ice(ip1,j))
             
                 ! Calculate the total effective strain rate from L19, Eq. 21 
                 eps_sq = dudx_ab**2 + dvdy_ab**2 + dudx_ab*dvdy_ab + 0.25_prec*(dudy+dvdx)**2 &
@@ -1212,7 +1208,7 @@ end if
 
         nx = size(visc_eff_int,1)
         ny = size(visc_eff_int,2)
-        
+
         do j = 1, ny 
         do i = 1, nx
 
@@ -1264,86 +1260,6 @@ end if
         return 
 
     end function calc_staggered_margin
-
-    subroutine smooth_visc_eff_int_margin(visc_eff_int,H_ice)
-        ! ajr: not currently, used, needs to be updated with f_ice if 
-        ! it will be used in the future...
-        ! (most likely we should delete this routine and solve visc_eff
-        ! properly at the margin) 
-
-        implicit none 
-
-        real(wp), intent(INOUT) :: visc_eff_int(:,:) 
-        real(wp), intent(IN)    :: H_ice(:,:) 
-        
-        ! Local variables 
-        integer    :: i, j, nx, ny 
-        integer    :: im1, ip1, jm1, jp1 
-        integer    :: n_ice 
-        real(wp) :: H_neighb(4) 
-        real(wp) :: visc_neighb(4) 
-        logical    :: mask_neighb(4) 
-        real(wp) :: visc_mean 
-        logical    :: is_margin 
-        logical    :: is_low_visc 
-
-        real(wp), allocatable :: visc_eff_int_ref(:,:) 
-
-        real(wp), parameter :: visc_ratio_lim = 1e-1      ! visc / mean(visc_neighb) > visc_ratio_lim 
-
-        nx = size(visc_eff_int,1) 
-        ny = size(visc_eff_int,2) 
-
-        ! Allocate local arrays 
-        allocate(visc_eff_int_ref(nx,ny)) 
-
-        visc_eff_int_ref = visc_eff_int 
-
-        ! Check margin for extreme viscosity values, smooth them as necessary
-        do j = 1, ny 
-        do i = 1, nx 
-
-            im1 = max(i-1,1) 
-            ip1 = min(i+1,nx) 
-            jm1 = max(j-1,1) 
-            jp1 = min(j+1,ny) 
-
-            if (H_ice(i,j) .gt. 0.0) then 
-                ! Ice-covered point 
-
-                H_neighb    = [H_ice(im1,j),H_ice(ip1,j),H_ice(i,jm1),H_ice(i,jp1)]
-                mask_neighb = H_neighb .gt. 0.0_wp 
-                n_ice       = count(mask_neighb)
-                is_margin   = n_ice .lt. 4
-                
-                if (n_ice .gt. 0) then 
-                    ! Some neighbors are ice covered too 
-                    visc_neighb = [visc_eff_int_ref(im1,j),visc_eff_int_ref(ip1,j),visc_eff_int_ref(i,jm1),visc_eff_int_ref(i,jp1)]
-                    visc_mean   = sum(visc_neighb,mask=mask_neighb) / real(n_ice,wp)
-                else 
-                    ! Just set neighbor mean == to current visc to move on to next point 
-                    visc_mean   = visc_eff_int_ref(i,j) 
-                end if 
-
-                ! Check if this point has a low viscosity relative to its neighbors 
-                is_low_visc = visc_eff_int_ref(i,j) / visc_mean .lt. visc_ratio_lim 
-
-                if (is_margin .and. is_low_visc) then 
-                    ! If this is an ice-margin point, and the viscosity is *much*
-                    ! lower than ice-covered neighbors, then smooth viscosity here. 
-
-                    visc_eff_int(i,j) = visc_mean 
-
-                end if 
-
-            end if 
-                    
-        end do 
-        end do  
-
-        return 
-
-    end subroutine smooth_visc_eff_int_margin
 
     subroutine calc_F_integral(F_int,visc,H_ice,f_ice,zeta_aa,n)
         ! Useful integrals, following Arthern et al. (2015) Eq. 7,

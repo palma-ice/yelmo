@@ -184,14 +184,14 @@ contains
                 case(1) 
                     ! Calculate effective viscosity, using velocity solution from previous iteration
                     
+                    call calc_visc_eff_3D(visc_eff,ux_bar,uy_bar,duxdz,duydz,ATT,H_ice,f_ice, &
+                                                                zeta_aa,dx,dy,n_glen,par%eps_0)
+
                     ! call calc_visc_eff_3D_aa(visc_eff,ux_bar,uy_bar,duxdz,duydz,ATT,H_ice,f_ice, &
                     !                                             zeta_aa,dx,dy,n_glen,par%eps_0)
 
-                    ! call calc_visc_eff_3D(visc_eff,ux_bar,uy_bar,duxdz,duydz,ATT,H_ice,f_ice, &
+                    ! call calc_visc_eff_3D_new(visc_eff,ux_bar,uy_bar,duxdz,duydz,ATT,H_ice,f_ice, &
                     !                                             zeta_aa,dx,dy,n_glen,par%eps_0)
-
-                    call calc_visc_eff_3D_new(visc_eff,ux_bar,uy_bar,duxdz,duydz,ATT,H_ice,f_ice, &
-                                                                zeta_aa,dx,dy,n_glen,par%eps_0)
 
                 case DEFAULT 
 
@@ -554,29 +554,29 @@ end if
 
         implicit none 
         
-        real(wp), intent(OUT) :: visc_eff(:,:,:)      ! aa-nodes
-        real(wp), intent(IN)  :: ux(:,:)              ! [m/a] Vertically averaged horizontal velocity, x-component
-        real(wp), intent(IN)  :: uy(:,:)              ! [m/a] Vertically averaged horizontal velocity, y-component
-        real(wp), intent(IN)  :: duxdz(:,:,:)         ! [1/a] Vertical shearing, x-component
-        real(wp), intent(IN)  :: duydz(:,:,:)         ! [1/a] Vertical shearing, x-component
-        real(wp), intent(IN)  :: ATT(:,:,:)           ! aa-nodes
+        real(wp), intent(OUT) :: visc_eff(:,:,:)        ! aa-nodes
+        real(wp), intent(IN)  :: ux(:,:)                ! [m/yr] Vertically averaged horizontal velocity, x-component
+        real(wp), intent(IN)  :: uy(:,:)                ! [m/yr] Vertically averaged horizontal velocity, y-component
+        real(wp), intent(IN)  :: duxdz(:,:,:)           ! [1/yr] Vertical shearing, x-component
+        real(wp), intent(IN)  :: duydz(:,:,:)           ! [1/yr] Vertical shearing, x-component
+        real(wp), intent(IN)  :: ATT(:,:,:)             ! aa-nodes
         real(wp), intent(IN)  :: H_ice(:,:) 
         real(wp), intent(IN)  :: f_ice(:,:)
-        real(wp), intent(IN)  :: zeta_aa(:)           ! Vertical axis (sigma-coordinates from 0 to 1)
+        real(wp), intent(IN)  :: zeta_aa(:)             ! Vertical axis (sigma-coordinates from 0 to 1)
         real(wp), intent(IN)  :: dx
         real(wp), intent(IN)  :: dy
         real(wp), intent(IN)  :: n_glen   
-        real(wp), intent(IN)  :: eps_0                ! [1/a] Regularization constant (minimum strain rate, ~1e-8)
+        real(wp), intent(IN)  :: eps_0                  ! [1/yr] Regularization constant (minimum strain rate, ~1e-8)
         
         ! Local variables 
-        integer    :: i, j, k, nx, ny, nz
-        integer    :: ip1, jp1, im1, jm1   
+        integer  :: i, j, k, nx, ny, nz
+        integer  :: ip1, jp1, im1, jm1   
         real(wp) :: inv_4dx, inv_4dy 
         real(wp) :: dudx_ab, dvdy_ab
         real(wp) :: dudy, dvdx
         real(wp) :: duxdz_ab, duydz_ab  
         real(wp) :: p1, p2, eps_0_sq, eps_max_sq  
-        real(wp) :: eps_sq                            ! [1/a^2]
+        real(wp) :: eps_sq                              ! [1/yr^2]
         real(wp) :: ATT_ab
         real(wp) :: visc_eff_ab_now(4)
         real(wp) :: wt_ab(4)
@@ -594,12 +594,12 @@ end if
         allocate(visc_eff_ab(nx,ny,nz)) 
 
         ! Calculate scaling factors
-        inv_4dx = 1.0_prec / (4.0_prec*dx) 
-        inv_4dy = 1.0_prec / (4.0_prec*dy) 
+        inv_4dx = 1.0_wp / (4.0_wp*dx) 
+        inv_4dy = 1.0_wp / (4.0_wp*dy) 
 
         ! Calculate exponents 
-        p1 = (1.0_prec - n_glen)/(2.0_prec*n_glen)
-        p2 = -1.0_prec/n_glen
+        p1 = (1.0_wp - n_glen)/(2.0_wp*n_glen)
+        p2 = -1.0_wp/n_glen
 
         ! Calculate squared minimum strain rate 
         eps_0_sq   = eps_0*eps_0 
@@ -625,23 +625,23 @@ end if
             do k = 1, nz 
 
                 ! Un-stagger shear terms to central aa-nodes in horizontal
-                !duxdz_ab = 0.5_prec*(duxdz(i,j,k) + duxdz(i,jp1,k))
+                !duxdz_ab = 0.5_wp*(duxdz(i,j,k) + duxdz(i,jp1,k))
                 duxdz_ab = calc_staggered_margin(duxdz(i,j,k),duxdz(i,jp1,k),f_ice(i,j),f_ice(i,jp1))
             
-                !duydz_ab = 0.5_prec*(duydz(i,j,k) + duydz(ip1,j,k))
+                !duydz_ab = 0.5_wp*(duydz(i,j,k) + duydz(ip1,j,k))
                 duydz_ab = calc_staggered_margin(duydz(i,j,k),duydz(ip1,j,k),f_ice(i,j),f_ice(ip1,j))
             
                 ! Calculate the total effective strain rate from L19, Eq. 21 
-                eps_sq = dudx_ab**2 + dvdy_ab**2 + dudx_ab*dvdy_ab + 0.25_prec*(dudy+dvdx)**2 &
-                       + 0.25_prec*duxdz_ab**2 + 0.25_prec*duydz_ab**2 + eps_0_sq
+                eps_sq = dudx_ab**2 + dvdy_ab**2 + dudx_ab*dvdy_ab + 0.25_wp*(dudy+dvdx)**2 &
+                       + 0.25_wp*duxdz_ab**2 + 0.25_wp*duydz_ab**2 + eps_0_sq
                 
                 ! ajr: needs further testing, but did not make model more stable at 4km resolution
                 !if (eps_sq .gt. eps_max_sq) eps_sq = eps_max_sq 
 
-                ATT_ab = 0.25_prec*(ATT(i,j,k)+ATT(ip1,j,k)+ATT(i,jp1,k)+ATT(ip1,jp1,k)) 
+                ATT_ab = 0.25_wp*(ATT(i,j,k)+ATT(ip1,j,k)+ATT(i,jp1,k)+ATT(ip1,jp1,k)) 
                 
                 ! Calculate effective viscosity on ab-nodes
-                visc_eff_ab(i,j,k) = 0.5_prec*(eps_sq)**(p1) * ATT_ab**(p2)
+                visc_eff_ab(i,j,k) = 0.5_wp*(eps_sq)**(p1) * ATT_ab**(p2)
 
             end do 
 
@@ -651,7 +651,6 @@ end if
 if (.TRUE.) then 
 
         ! Unstagger from ab-nodes to aa-nodes 
-        ! only using contributions from ice covered neighbors
         do j = 1, ny 
         do i = 1, nx 
 
@@ -662,7 +661,7 @@ if (.TRUE.) then
 
             ! Loop over column
             do k = 1, nz 
-                visc_eff(i,j,k) = 0.25_prec*(visc_eff_ab(i,j,k)+visc_eff_ab(im1,j,k) &
+                visc_eff(i,j,k) = 0.25_wp*(visc_eff_ab(i,j,k)+visc_eff_ab(im1,j,k) &
                                             +visc_eff_ab(i,jm1,k)+visc_eff_ab(im1,jm1,k))
             end do 
 
@@ -720,7 +719,7 @@ else
 
                 ! Loop over column
                 do k = 1, nz 
-                    visc_eff(i,j,k) = 0.25_prec*(visc_eff_ab(i,j,k)+visc_eff_ab(im1,j,k) &
+                    visc_eff(i,j,k) = 0.25_wp*(visc_eff_ab(i,j,k)+visc_eff_ab(im1,j,k) &
                                                 +visc_eff_ab(i,jm1,k)+visc_eff_ab(im1,jm1,k))
                 end do 
 
@@ -835,14 +834,14 @@ end if
         allocate(visc_eff_ab(nx,ny,nz)) 
 
         ! Calculate scaling factors
-        inv_2dx = 1.0_prec / (2.0_prec*dx) 
-        inv_2dy = 1.0_prec / (2.0_prec*dy) 
-        inv_4dx = 1.0_prec / (4.0_prec*dx) 
-        inv_4dy = 1.0_prec / (4.0_prec*dy) 
+        inv_2dx = 1.0_wp / (2.0_wp*dx) 
+        inv_2dy = 1.0_wp / (2.0_wp*dy) 
+        inv_4dx = 1.0_wp / (4.0_wp*dx) 
+        inv_4dy = 1.0_wp / (4.0_wp*dy) 
 
         ! Calculate exponents 
-        p1 = (1.0_prec - n_glen)/(2.0_prec*n_glen)
-        p2 = -1.0_prec/n_glen
+        p1 = (1.0_wp - n_glen)/(2.0_wp*n_glen)
+        p2 = -1.0_wp/n_glen
 
         ! Calculate squared minimum strain rate 
         eps_0_sq   = eps_0*eps_0 
@@ -868,18 +867,18 @@ end if
             do k = 1, nz 
 
                 ! Un-stagger shear terms to central aa-nodes in horizontal
-                !duxdz_ab = 0.5_prec*(duxdz(i,j,k) + duxdz(i,jp1,k))
+                !duxdz_ab = 0.5_wp*(duxdz(i,j,k) + duxdz(i,jp1,k))
                 duxdz_aa = calc_staggered_margin(duxdz(i,j,k),duxdz(im1,j,k),f_ice(i,j),f_ice(im1,j))
             
-                !duydz_ab = 0.5_prec*(duydz(i,j,k) + duydz(ip1,j,k))
+                !duydz_ab = 0.5_wp*(duydz(i,j,k) + duydz(ip1,j,k))
                 duydz_aa = calc_staggered_margin(duydz(i,j,k),duydz(i,jm1,k),f_ice(i,j),f_ice(i,jm1))
             
                 ! Calculate the total effective strain rate from L19, Eq. 21 
-                eps_sq = dudx_aa**2 + dvdy_aa**2 + dudx_aa*dvdy_aa + 0.25_prec*(dudy_aa+dvdx_aa)**2 &
-                       + 0.25_prec*duxdz_aa**2 + 0.25_prec*duydz_aa**2 + eps_0_sq
+                eps_sq = dudx_aa**2 + dvdy_aa**2 + dudx_aa*dvdy_aa + 0.25_wp*(dudy_aa+dvdx_aa)**2 &
+                       + 0.25_wp*duxdz_aa**2 + 0.25_wp*duydz_aa**2 + eps_0_sq
                 
                 ! Calculate effective viscosity on ab-nodes
-                visc_eff(i,j,k) = 0.5_prec*(eps_sq)**(p1) * ATT(i,j,k)**(p2)
+                visc_eff(i,j,k) = 0.5_wp*(eps_sq)**(p1) * ATT(i,j,k)**(p2)
 
             end do 
 

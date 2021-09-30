@@ -366,7 +366,7 @@ end select
 
             end if 
 
-            if (f_ice(i,j) .eq. 1.0 .and. H_ice_now .gt. H_ice_thin) then 
+            if (H_ice_now .gt. H_ice_thin) then 
                 ! Thick ice exists, call thermodynamic solver for the column
 
                 if (trim(solver) .eq. "enth") then 
@@ -417,7 +417,7 @@ end select
         do j = 2, ny-1
         do i = 2, nx-1 
             
-            if (f_ice(i,j) .lt. 1.0) then 
+            if (f_ice(i,j) .eq. 0.0) then 
 
                 wt_neighb = 0.0 
                 where (f_ice(i-1:i+1,j-1:j+1) .eq. 1.0) wt_neighb = 1.0 

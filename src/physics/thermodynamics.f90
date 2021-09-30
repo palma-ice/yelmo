@@ -839,7 +839,7 @@ contains
             Q_b(i,j) = beta1*Q_b_now + beta2*Q_b(i,j) 
 
             ! Ensure Q_b is strictly positive 
-            if (Q_b(i,j) .lt. 0.0_prec) Q_b(i,j) = 0.0_prec 
+            if (Q_b(i,j) .lt. 0.0_wp) Q_b(i,j) = 0.0_wp 
             
         end do 
         end do 

@@ -299,9 +299,7 @@ end if
                         ! faster calving timescale for more exposed fronts
                         ! (multiply by f_ice to convert to a horizontal calving rate)
                         
-                        ! calv(i,j) = f_ice(i,j) * (H_calv-H_eff) / tau                        
-                        !calv(i,j) = f_ice(i,j) * (H_calv-H_eff) * wt / tau
-                        calv(i,j) = (H_calv-H_eff) * wt / tau
+                        calv(i,j) = f_ice(i,j) * (H_calv-H_eff) * wt / tau
                         
                     end if 
 
@@ -487,7 +485,7 @@ end if
 
                 ! Diagnose calving rate not accounting for upstream flux
                 !calv(i,j) = f_ice(i,j) * max(H_calv - H_eff,0.0_wp) / tau
-                calv(i,j) = max(H_calv - H_eff,0.0_wp) / tau
+                calv(i,j) = f_ice(i,j) * max(H_calv - H_eff,0.0_wp) / tau
                 
 
                 ! Adjust calving rate for upstream flux 
@@ -682,7 +680,7 @@ end if
                     end if 
 
                     !calv(i,j) = f_ice(i,j) * max(H_calv - H_eff,0.0) / tau
-                    calv(i,j) = max(H_calv - H_eff,0.0) / tau
+                    calv(i,j) = f_ice(i,j) * max(H_calv - H_eff,0.0) / tau
 
                 end if  
 
@@ -771,7 +769,7 @@ end if
                     H_eff = H_ice(i,j)
                 end if 
 
-                calv(i,j) = (H_eff*calv_ref) / sqrt(dx*dy)
+                calv(i,j) = f_ice(i,j) * (H_eff*calv_ref) / sqrt(dx*dy)
 
             end if
 

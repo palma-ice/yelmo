@@ -149,9 +149,9 @@ contains
 
         ! ===== CALVING ======
 
-        ! Combine grounded and floating calving into one field for output,
-        ! scale by area of ice in cell.
-        calv = f_ice*(calv + calv_grnd)
+        ! Combine grounded and floating calving into one field for output.
+        ! It has already been scaled by area of ice in cell (f_ice).
+        calv = (calv + calv_grnd)
 
         ! ==== MASS BALANCE =====
 
@@ -235,7 +235,7 @@ contains
 
             if (is_margin) then
                 ! Ice covered point at the margin
-                
+
                 ! Calculate current ice thickness 
                 if (f_ice(i,j) .gt. 0.0) then 
                     H_eff = H_ice(i,j) / f_ice(i,j) 

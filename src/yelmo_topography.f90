@@ -196,7 +196,7 @@ contains
                     ! Use simple threshold method
 
                     call calc_calving_ground_rate_stress_b12(tpo%now%calv_grnd,tpo%now%H_ice,tpo%now%f_ice, &
-                                                    tpo%now%f_grnd,bnd%z_sl-bnd%z_bed,tpo%par%calv_tau)
+                                                    tpo%now%f_grnd,bnd%z_bed,bnd%z_sl-bnd%z_bed,tpo%par%calv_tau)
 
                 case DEFAULT 
 

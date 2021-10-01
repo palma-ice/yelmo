@@ -880,7 +880,7 @@ end if
 !
 ! ===================================================================
 
-    subroutine calc_calving_ground_rate_stress_b12(calv,H_ice,f_ice,f_grnd,H_ocn,tau)
+    subroutine calc_calving_ground_rate_stress_b12(calv,H_ice,f_ice,f_grnd,z_bed,H_ocn,tau)
         ! Remove marginal ice that exceeds a stress threshold following
         ! Bassis and Walker (2012), Eq. 2.12 
 
@@ -890,6 +890,7 @@ end if
         real(wp), intent(IN)  :: H_ice(:,:)             ! [m] Ice thickness 
         real(wp), intent(IN)  :: f_ice(:,:)             ! [--] Ice area fraction 
         real(wp), intent(IN)  :: f_grnd(:,:)            ! [-] Grounded fraction
+        real(wp), intent(IN)  :: z_bed(:,:)             ! [m] Bedrock elevation 
         real(wp), intent(IN)  :: H_ocn(:,:)             ! [m] Ocean thickness (depth)
         real(wp), intent(IN)  :: tau                    ! [yr] Calving timescale 
 
@@ -904,6 +905,8 @@ end if
         real(wp), parameter :: alpha = 0.0                ! [--] Friction coefficient for Bassis and Walker (2012), Eq. 2.13
         real(wp), parameter :: r     = 0.0                ! [--] Crevasse fraction 
         
+        logical  :: mask_neighb(4) 
+
         rho_ice_g  = rho_ice * g 
         rho_sw_ice = rho_sw / rho_ice 
         rho_ice_sw = rho_ice / rho_sw 
@@ -923,12 +926,16 @@ end if
             jm1 = max(j-1,1) 
             jp1 = min(j+1,ny) 
 
+            ! Check if neighbors are ice free and not at higher bedrock elevation
+            mask_neighb = ([f_ice(im1,j),f_ice(ip1,j),f_ice(i,jm1),f_ice(i,jp1)] .eq. 0.0) .and. &
+                          ([z_bed(im1,j),z_bed(ip1,j),z_bed(i,jm1),z_bed(i,jp1)] .le. z_bed(i,j))
+
             ! Determine if grounded, ice-covered point has an ice-free neighbor (ie, at the grounded ice margin)
             is_grnd_margin = (f_ice(i,j) .gt. 0.0 .and. f_grnd(i,j) .gt. 0.0 &
-                .and. count([f_ice(im1,j),f_ice(ip1,j),f_ice(i,jm1),f_ice(i,jp1)] .eq. 0.0) .gt. 0)
+                                                  .and. count(mask_neighb) .gt. 0)
 
             if (is_grnd_margin) then 
-                ! Margin point
+                ! Margin point with potential for grounded stress calving
 
                 ! Get effective ice thickness 
                 if (f_ice(i,j) .gt. 0.0) then 

@@ -869,17 +869,17 @@ end if
             ip1 = min(i+1,nx)
             jp1 = min(j+1,ny)
 
-            if (f_ice(i,j) .lt. 1.0 .and. f_ice(ip1,j) .eq. 0.0 .and. ux(i,j) .ne. 0.0) then 
+            if (f_ice(i,j) .lt. 1.0 .and. f_ice(ip1,j) .eq. 0.0) then 
                 ux(i,j) = 0.0 
             end if
-            if (f_ice(i,j) .eq. 0.0 .and. f_ice(ip1,j) .lt. 1.0 .and. ux(i,j) .ne. 0.0) then 
+            if (f_ice(i,j) .eq. 0.0 .and. f_ice(ip1,j) .lt. 1.0) then 
                 ux(i,j) = 0.0
             end if 
 
-            if (f_ice(i,j) .lt. 1.0 .and. f_ice(i,jp1) .eq. 0.0 .and. uy(i,j) .ne. 0.0) then 
+            if (f_ice(i,j) .lt. 1.0 .and. f_ice(i,jp1) .eq. 0.0) then 
                 uy(i,j) = 0.0 
             end if
-            if (f_ice(i,j) .eq. 0.0 .and. f_ice(i,jp1) .lt. 1.0 .and. uy(i,j) .ne. 0.0) then 
+            if (f_ice(i,j) .eq. 0.0 .and. f_ice(i,jp1) .lt. 1.0) then 
                 uy(i,j) = 0.0 
             end if
 

@@ -11,7 +11,7 @@ module deformation
 
     use yelmo_defs,  only : sp, dp, wp, prec, TOL_UNDERFLOW, T0, rho_ice, g, &
                         strain_2D_class, strain_3D_class, stress_2D_class, stress_3D_class
-    use yelmo_tools, only : calc_vertical_integrated_2D, integrate_trapezoid1D_1D, &
+    use yelmo_tools, only : calc_vertical_integrated_2D, integrate_trapezoid1D_1D, integrate_trapezoid1D_pt, &
                     stagger_nodes_aa_ab_ice, stagger_nodes_acx_ab_ice, stagger_nodes_acy_ab_ice, &
                     staggerdiff_nodes_acx_ab_ice, staggerdiff_nodes_acy_ab_ice, &
                     staggerdiffcross_nodes_acx_ab_ice, staggerdiffcross_nodes_acy_ab_ice
@@ -25,6 +25,7 @@ module deformation
     public :: define_enhancement_factor_2D
     public :: calc_viscosity_glen
     public :: calc_viscosity_glen_2D
+    public :: calc_visc_int
     public :: calc_rate_factor
     public :: calc_rate_factor_eismint
     public :: scale_rate_factor_water
@@ -162,7 +163,7 @@ contains
 
     end function define_enhancement_factor_2D
 
-    function calc_viscosity_glen(de,ATT,n_glen,visc_min) result(visc)
+    function calc_viscosity_glen(de,ATT,H_ice,f_ice,n_glen,visc_min) result(visc)
         ! Calculate viscosity based on Glen's flow law 
         ! ATT [a^-1 Pa^-n] is the "depth dependent ice stiffness parameter based on
         !     vertical variations in temperature, chemistry and crystal fabric" (MacAyeal, 1989, JGR)
@@ -178,6 +179,8 @@ contains
         
         real(prec), intent(IN)  :: de(:,:,:)        ! [a^-1] second-invariant of the strain rate tensor
         real(prec), intent(IN)  :: ATT(:,:,:)       ! [a^-1 Pa^-3] Rate factor 
+        real(prec), intent(IN)  :: H_ice(:,:)
+        real(prec), intent(IN)  :: f_ice(:,:)
         real(prec), intent(IN)  :: n_glen           ! Glen's flow law exponent
         real(prec), intent(IN)  :: visc_min         ! [Pa a] Minimum allowed viscosity (for stability, ~1e3)
         
@@ -199,6 +202,10 @@ contains
 
         ! Limit viscosity to above minimum value 
         where(visc .lt. visc_min) visc = visc_min 
+
+        do k = 1, nz 
+            where(f_ice .lt. 1.0) visc(:,:,k) = 0.0_wp 
+        end do 
 
         return
         
@@ -247,6 +254,47 @@ contains
         return
         
     end function calc_viscosity_glen_2D
+
+    subroutine calc_visc_int(visc_eff_int,visc_eff,H_ice,f_ice,zeta_aa)
+
+        implicit none 
+
+        real(wp), intent(OUT) :: visc_eff_int(:,:)
+        real(wp), intent(IN)  :: visc_eff(:,:,:)
+        real(wp), intent(IN)  :: H_ice(:,:)
+        real(wp), intent(IN)  :: f_ice(:,:)
+        real(wp), intent(IN)  :: zeta_aa(:)
+
+        ! Local variables 
+        integer :: i, j, nx, ny
+        integer :: im1, ip1, jm1, jp1  
+        real(wp) :: H_eff
+        real(wp) :: visc_eff_mean 
+        real(wp) :: wt 
+
+        nx = size(visc_eff_int,1)
+        ny = size(visc_eff_int,2)
+
+        do j = 1, ny 
+        do i = 1, nx
+
+            ! Calculate the vertically averaged viscosity for this point
+            visc_eff_mean = integrate_trapezoid1D_pt(visc_eff(i,j,:),zeta_aa) 
+            
+            if (f_ice(i,j) .gt. 0.0) then 
+                H_eff = H_ice(i,j) / f_ice(i,j) 
+                visc_eff_int(i,j) = visc_eff_mean*H_eff
+            else
+                !visc_eff_int(i,j) = visc_eff_mean 
+                visc_eff_int(i,j) = 0.0_wp
+            end if 
+
+        end do 
+        end do 
+
+        return
+
+    end subroutine calc_visc_int
 
     elemental function calc_rate_factor(T_ice,T_pmp,enh) result(ATT)
         ! Greve and Blatter (2009): Chapter 4, page 54 
@@ -716,7 +764,7 @@ contains
                         ! === lyz ================================
 
                         ! ajr: todo: need to see about ab-node staggering and f_ice treatment 
-                        
+
                         if (k .eq. 1) then 
                             ! Basal layer
                             ! Gradient from first aa-node above base to base 

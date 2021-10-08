@@ -13,7 +13,10 @@ module basal_dragging
     use yelmo_defs, only : sp, dp, wp, prec, pi, g, rho_sw, rho_ice, rho_w, &
                            TOL_UNDERFLOW  
 
-    use yelmo_tools, only : stagger_aa_acx, stagger_aa_acy
+    use yelmo_tools, only : stagger_aa_acx, stagger_aa_acy, &
+                    stagger_nodes_aa_ab_ice, stagger_nodes_acx_ab_ice, stagger_nodes_acy_ab_ice, &
+                    staggerdiff_nodes_acx_ab_ice, staggerdiff_nodes_acy_ab_ice, &
+                    staggerdiffcross_nodes_acx_ab_ice, staggerdiffcross_nodes_acy_ab_ice
 
     implicit none 
 
@@ -590,23 +593,24 @@ contains
             jp1 = min(j+1,ny)
             
             ! Get ab-node weighting based on whether ice is present 
-            wt_ab = 0.0_wp 
-            if (count([f_ice(i,j),f_ice(ip1,j),f_ice(i,jp1),f_ice(ip1,jp1)].eq.1.0_wp) .gt. 0) then 
-                wt_ab(1) = 1.0_wp
-            end if
-            if (count([f_ice(i,j),f_ice(im1,j),f_ice(i,jp1),f_ice(im1,jp1)].eq.1.0_wp) .gt. 0) then 
-                wt_ab(2) = 1.0_wp 
-            end if 
-            if (count([f_ice(i,j),f_ice(im1,j),f_ice(i,jm1),f_ice(im1,jm1)].eq.1.0_wp) .gt. 0) then 
-                wt_ab(3) = 1.0_wp
-            end if 
-            if (count([f_ice(i,j),f_ice(ip1,j),f_ice(i,jm1),f_ice(ip1,jm1)].eq.1.0_wp) .gt. 0) then 
-                wt_ab(4) = 1.0_wp 
-            end if 
+            ! wt_ab = 0.0_wp 
+            ! if (count([f_ice(i,j),f_ice(ip1,j),f_ice(i,jp1),f_ice(ip1,jp1)].eq.1.0_wp) .gt. 0) then 
+            !     wt_ab(1) = 1.0_wp
+            ! end if
+            ! if (count([f_ice(i,j),f_ice(im1,j),f_ice(i,jp1),f_ice(im1,jp1)].eq.1.0_wp) .gt. 0) then 
+            !     wt_ab(2) = 1.0_wp 
+            ! end if 
+            ! if (count([f_ice(i,j),f_ice(im1,j),f_ice(i,jm1),f_ice(im1,jm1)].eq.1.0_wp) .gt. 0) then 
+            !     wt_ab(3) = 1.0_wp
+            ! end if 
+            ! if (count([f_ice(i,j),f_ice(ip1,j),f_ice(i,jm1),f_ice(ip1,jm1)].eq.1.0_wp) .gt. 0) then 
+            !     wt_ab(4) = 1.0_wp 
+            ! end if 
             
+            wt_ab = 1.0_wp 
             wt = sum(wt_ab)
             
-            if (f_ice(i,j) .eq. 1.0_wp .and. wt .gt. 0.0_wp) then 
+            if (f_ice(i,j) .eq. 1.0_wp) then 
                 ! Fully ice-covered point with some fully ice-covered neighbors 
 
                 ! Normalize weighting 
@@ -616,7 +620,9 @@ contains
                 ! cb_ab(2) = 0.25_wp*(c_bed(i,j)+c_bed(im1,j)+c_bed(i,jp1)+c_bed(im1,jp1))
                 ! cb_ab(3) = 0.25_wp*(c_bed(i,j)+c_bed(im1,j)+c_bed(i,jm1)+c_bed(im1,jm1))
                 ! cb_ab(4) = 0.25_wp*(c_bed(i,j)+c_bed(ip1,j)+c_bed(i,jm1)+c_bed(ip1,jm1))
-                cb_ab(1:4) = c_bed(i,j) 
+                call stagger_nodes_aa_ab_ice(cb_ab,c_bed,f_ice,i,j)
+
+                ! cb_ab(1:4) = c_bed(i,j) 
 
                 if (q .eq. 1.0_wp) then 
                     ! Linear law, no f(ub) term
@@ -628,16 +634,20 @@ contains
 
                     ! Calculate magnitude of basal velocity on aa-node 
                     ! from ab-nodes (quadrature points)
-                    ux_ab(1) = 0.5_wp*(ux_b(i,j)+ux_b(i,jp1))
-                    ux_ab(2) = 0.5_wp*(ux_b(im1,j)+ux_b(im1,jp1))
-                    ux_ab(3) = 0.5_wp*(ux_b(im1,jm1)+ux_b(im1,j))
-                    ux_ab(4) = 0.5_wp*(ux_b(i,jm1)+ux_b(i,j))
+                    ! ux_ab(1) = 0.5_wp*(ux_b(i,j)+ux_b(i,jp1))
+                    ! ux_ab(2) = 0.5_wp*(ux_b(im1,j)+ux_b(im1,jp1))
+                    ! ux_ab(3) = 0.5_wp*(ux_b(im1,jm1)+ux_b(im1,j))
+                    ! ux_ab(4) = 0.5_wp*(ux_b(i,jm1)+ux_b(i,j))
 
-                    uy_ab(1) = 0.5_wp*(uy_b(i,j)+uy_b(ip1,j))
-                    uy_ab(2) = 0.5_wp*(uy_b(i,j)+uy_b(im1,j))
-                    uy_ab(3) = 0.5_wp*(uy_b(i,jm1)+uy_b(im1,jm1))
-                    uy_ab(4) = 0.5_wp*(uy_b(i,jm1)+uy_b(ip1,jm1))
+                    call stagger_nodes_acx_ab_ice(ux_ab,ux_b,f_ice,i,j)
 
+                    ! uy_ab(1) = 0.5_wp*(uy_b(i,j)+uy_b(ip1,j))
+                    ! uy_ab(2) = 0.5_wp*(uy_b(i,j)+uy_b(im1,j))
+                    ! uy_ab(3) = 0.5_wp*(uy_b(i,jm1)+uy_b(im1,jm1))
+                    ! uy_ab(4) = 0.5_wp*(uy_b(i,jm1)+uy_b(ip1,jm1))
+
+                    call stagger_nodes_acy_ab_ice(uy_ab,uy_b,f_ice,i,j)
+                    
                     uxy_ab = sqrt(ux_ab**2 + uy_ab**2 + ub_sq_min)
                     
                     beta_ab = cb_ab * (uxy_ab / u_0)**q * (1.0_prec / uxy_ab)
@@ -764,46 +774,53 @@ contains
             jp1 = min(j+1,ny)
             
             ! Get ab-node weighting based on whether ice is present 
-            wt_ab = 0.0_wp 
-            if (count([f_ice(i,j),f_ice(ip1,j),f_ice(i,jp1),f_ice(ip1,jp1)].lt.1.0_wp) .eq. 0) then 
-                wt_ab(1) = 1.0_wp
-            end if
-            if (count([f_ice(i,j),f_ice(im1,j),f_ice(i,jp1),f_ice(im1,jp1)].lt.1.0_wp) .eq. 0) then 
-                wt_ab(2) = 1.0_wp 
-            end if 
-            if (count([f_ice(i,j),f_ice(im1,j),f_ice(i,jm1),f_ice(im1,jm1)].lt.1.0_wp) .eq. 0) then 
-                wt_ab(3) = 1.0_wp
-            end if 
-            if (count([f_ice(i,j),f_ice(ip1,j),f_ice(i,jm1),f_ice(ip1,jm1)].lt.1.0_wp) .eq. 0) then 
-                wt_ab(4) = 1.0_wp 
-            end if 
+            ! wt_ab = 0.0_wp 
+            ! if (count([f_ice(i,j),f_ice(ip1,j),f_ice(i,jp1),f_ice(ip1,jp1)].lt.1.0_wp) .eq. 0) then 
+            !     wt_ab(1) = 1.0_wp
+            ! end if
+            ! if (count([f_ice(i,j),f_ice(im1,j),f_ice(i,jp1),f_ice(im1,jp1)].lt.1.0_wp) .eq. 0) then 
+            !     wt_ab(2) = 1.0_wp 
+            ! end if 
+            ! if (count([f_ice(i,j),f_ice(im1,j),f_ice(i,jm1),f_ice(im1,jm1)].lt.1.0_wp) .eq. 0) then 
+            !     wt_ab(3) = 1.0_wp
+            ! end if 
+            ! if (count([f_ice(i,j),f_ice(ip1,j),f_ice(i,jm1),f_ice(ip1,jm1)].lt.1.0_wp) .eq. 0) then 
+            !     wt_ab(4) = 1.0_wp 
+            ! end if 
             
+            wt_ab = 1.0_wp
             wt = sum(wt_ab)
             
-            if (f_ice(i,j) .eq. 1.0_wp .and. wt .gt. 0.0_wp) then 
+            if (f_ice(i,j) .eq. 1.0_wp) then 
                 ! Fully ice-covered point with some fully ice-covered neighbors 
 
                 ! Normalize weighting 
                 wt_ab = wt_ab / wt 
 
-                cb_ab(1) = 0.25_wp*(c_bed(i,j)+c_bed(ip1,j)+c_bed(i,jp1)+c_bed(ip1,jp1))
-                cb_ab(2) = 0.25_wp*(c_bed(i,j)+c_bed(im1,j)+c_bed(i,jp1)+c_bed(im1,jp1))
-                cb_ab(3) = 0.25_wp*(c_bed(i,j)+c_bed(im1,j)+c_bed(i,jm1)+c_bed(im1,jm1))
-                cb_ab(4) = 0.25_wp*(c_bed(i,j)+c_bed(ip1,j)+c_bed(i,jm1)+c_bed(ip1,jm1))
+                ! cb_ab(1) = 0.25_wp*(c_bed(i,j)+c_bed(ip1,j)+c_bed(i,jp1)+c_bed(ip1,jp1))
+                ! cb_ab(2) = 0.25_wp*(c_bed(i,j)+c_bed(im1,j)+c_bed(i,jp1)+c_bed(im1,jp1))
+                ! cb_ab(3) = 0.25_wp*(c_bed(i,j)+c_bed(im1,j)+c_bed(i,jm1)+c_bed(im1,jm1))
+                ! cb_ab(4) = 0.25_wp*(c_bed(i,j)+c_bed(ip1,j)+c_bed(i,jm1)+c_bed(ip1,jm1))
 
+                call stagger_nodes_aa_ab_ice(cb_ab,c_bed,f_ice,i,j)
+                
                 ! Calculate magnitude of basal velocity on aa-node 
                 ! from ab-nodes (quadrature points)
-                ux_ab(1) = 0.5_wp*(ux_b(i,j)+ux_b(i,jp1))
-                ux_ab(2) = 0.5_wp*(ux_b(im1,j)+ux_b(im1,jp1))
-                ux_ab(3) = 0.5_wp*(ux_b(im1,jm1)+ux_b(im1,j))
-                ux_ab(4) = 0.5_wp*(ux_b(i,jm1)+ux_b(i,j))
-                where( abs(ux_ab) .lt. TOL_UNDERFLOW) ux_ab = 0.0_wp 
+                ! ux_ab(1) = 0.5_wp*(ux_b(i,j)+ux_b(i,jp1))
+                ! ux_ab(2) = 0.5_wp*(ux_b(im1,j)+ux_b(im1,jp1))
+                ! ux_ab(3) = 0.5_wp*(ux_b(im1,jm1)+ux_b(im1,j))
+                ! ux_ab(4) = 0.5_wp*(ux_b(i,jm1)+ux_b(i,j))
+                ! where( abs(ux_ab) .lt. TOL_UNDERFLOW) ux_ab = 0.0_wp 
 
-                uy_ab(1) = 0.5_wp*(uy_b(i,j)+uy_b(ip1,j))
-                uy_ab(2) = 0.5_wp*(uy_b(i,j)+uy_b(im1,j))
-                uy_ab(3) = 0.5_wp*(uy_b(i,jm1)+uy_b(im1,jm1))
-                uy_ab(4) = 0.5_wp*(uy_b(i,jm1)+uy_b(ip1,jm1))
-                where( abs(uy_ab) .lt. TOL_UNDERFLOW) uy_ab = 0.0_wp 
+                call stagger_nodes_acx_ab_ice(ux_ab,ux_b,f_ice,i,j)
+
+                ! uy_ab(1) = 0.5_wp*(uy_b(i,j)+uy_b(ip1,j))
+                ! uy_ab(2) = 0.5_wp*(uy_b(i,j)+uy_b(im1,j))
+                ! uy_ab(3) = 0.5_wp*(uy_b(i,jm1)+uy_b(im1,jm1))
+                ! uy_ab(4) = 0.5_wp*(uy_b(i,jm1)+uy_b(ip1,jm1))
+                ! where( abs(uy_ab) .lt. TOL_UNDERFLOW) uy_ab = 0.0_wp 
+
+                call stagger_nodes_acy_ab_ice(uy_ab,uy_b,f_ice,i,j)
 
                 uxy_ab    = sqrt(ux_ab**2 + uy_ab**2 + ub_sq_min)
 

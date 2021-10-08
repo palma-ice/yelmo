@@ -21,6 +21,15 @@ module yelmo_tools
     public :: stagger_acy_aa
     public :: stagger_ab_acx
     public :: stagger_ab_acy 
+
+    public :: stagger_nodes_aa_ab_ice
+    public :: stagger_nodes_acx_ab_ice
+    public :: stagger_nodes_acy_ab_ice
+    public :: staggerdiff_nodes_acx_ab_ice
+    public :: staggerdiff_nodes_acy_ab_ice
+    public :: staggerdiffcross_nodes_acx_ab_ice
+    public :: staggerdiffcross_nodes_acy_ab_ice
+
     public :: calc_gradient_ac
     public :: calc_gradient_ac_ice
     public :: calc_gradient_ac_gl
@@ -390,7 +399,710 @@ contains
         return
 
     end function stagger_ab_aa_ice
+
+! ===== NEW =======================
     
+    subroutine stagger_nodes_aa_ab_ice(u_ab,u_aa,f_ice,i,j,check_underflow)
+        ! Stagger from acx nodes to ab node for index [i,j]
+
+        implicit none 
+
+        real(wp), intent(OUT) :: u_ab(4)
+        real(wp), intent(IN)  :: u_aa(:,:) 
+        real(wp), intent(IN)  :: f_ice(:,:) 
+        integer,  intent(IN)  :: i 
+        integer,  intent(IN)  :: j
+        logical, optional :: check_underflow
+
+        ! Local variables 
+        integer  :: nx, ny 
+        integer  :: im1, jm1, ip1, jp1 
+        real(wp) :: wt 
+
+        nx = size(f_ice,1) 
+        ny = size(f_ice,2) 
+
+        ! Define neighbor indices
+        im1 = max(i-1,1)
+        ip1 = min(i+1,nx)
+        jm1 = max(j-1,1)
+        jp1 = min(j+1,ny)
+        
+        ! Initialize to zero 
+        u_ab = 0.0_wp 
+
+        ! (1) Upper-right node average
+        wt = 0.0_wp 
+        if (f_ice(i,j) .eq. 1.0_wp) then 
+            u_ab(1) = u_ab(1) + u_aa(i,j) 
+            wt = wt + 1.0_wp 
+        end if 
+        if (f_ice(ip1,j) .eq. 1.0_wp) then 
+            u_ab(1) = u_ab(1) + u_aa(ip1,j) 
+            wt = wt + 1.0_wp 
+        end if 
+        if (f_ice(i,jp1) .eq. 1.0_wp) then 
+            u_ab(1) = u_ab(1) + u_aa(i,jp1) 
+            wt = wt + 1.0_wp 
+        end if 
+        if (f_ice(ip1,jp1) .eq. 1.0_wp) then 
+            u_ab(1) = u_ab(1) + u_aa(ip1,jp1) 
+            wt = wt + 1.0_wp 
+        end if 
+        
+        if (wt .gt. 0.0_wp) then 
+            u_ab(1) = u_ab(1) / wt 
+        end if 
+
+        ! (2) Upper-left node average
+        wt = 0.0_wp 
+        if (f_ice(i,j) .eq. 1.0_wp) then 
+            u_ab(2) = u_ab(2) + u_aa(i,j) 
+            wt = wt + 1.0_wp 
+        end if 
+        if (f_ice(i,jp1) .eq. 1.0_wp) then 
+            u_ab(2) = u_ab(2) + u_aa(i,jp1) 
+            wt = wt + 1.0_wp 
+        end if 
+        if (f_ice(im1,jp1) .eq. 1.0_wp) then 
+            u_ab(2) = u_ab(2) + u_aa(im1,jp1) 
+            wt = wt + 1.0_wp 
+        end if 
+        if (f_ice(im1,j) .eq. 1.0_wp) then 
+            u_ab(2) = u_ab(2) + u_aa(im1,j) 
+            wt = wt + 1.0_wp 
+        end if 
+        
+        if (wt .gt. 0.0_wp) then 
+            u_ab(2) = u_ab(2) / wt 
+        end if 
+
+        ! (3) Lower-left node average
+        wt = 0.0_wp 
+        if (f_ice(i,j) .eq. 1.0_wp) then 
+            u_ab(3) = u_ab(3) + u_aa(i,j) 
+            wt = wt + 1.0_wp 
+        end if 
+        if (f_ice(im1,j) .eq. 1.0_wp) then 
+            u_ab(3) = u_ab(3) + u_aa(im1,j) 
+            wt = wt + 1.0_wp 
+        end if 
+        if (f_ice(im1,jm1) .eq. 1.0_wp) then 
+            u_ab(3) = u_ab(3) + u_aa(im1,jm1) 
+            wt = wt + 1.0_wp 
+        end if 
+        if (f_ice(i,jm1) .eq. 1.0_wp) then 
+            u_ab(3) = u_ab(3) + u_aa(i,jm1) 
+            wt = wt + 1.0_wp 
+        end if 
+        
+        if (wt .gt. 0.0_wp) then 
+            u_ab(3) = u_ab(3) / wt 
+        end if 
+
+        ! (4) Lower-left node average
+        wt = 0.0_wp 
+        if (f_ice(i,j) .eq. 1.0_wp) then 
+            u_ab(4) = u_ab(4) + u_aa(i,j) 
+            wt = wt + 1.0_wp 
+        end if 
+        if (f_ice(i,jm1) .eq. 1.0_wp) then 
+            u_ab(4) = u_ab(4) + u_aa(i,jm1) 
+            wt = wt + 1.0_wp 
+        end if 
+        if (f_ice(ip1,jm1) .eq. 1.0_wp) then 
+            u_ab(4) = u_ab(4) + u_aa(ip1,jm1) 
+            wt = wt + 1.0_wp 
+        end if 
+        if (f_ice(ip1,j) .eq. 1.0_wp) then 
+            u_ab(4) = u_ab(4) + u_aa(ip1,j) 
+            wt = wt + 1.0_wp 
+        end if 
+        
+        if (wt .gt. 0.0_wp) then 
+            u_ab(4) = u_ab(4) / wt 
+        end if 
+
+        if (present(check_underflow)) then 
+            if (check_underflow) then 
+                where (abs(u_ab) .lt. TOL_UNDERFLOW) u_ab = 0.0_wp 
+            end if 
+        end if 
+        
+        return 
+
+    end subroutine stagger_nodes_aa_ab_ice
+
+    subroutine stagger_nodes_acx_ab_ice(u_ab,u_acx,f_ice,i,j)
+        ! Stagger from acx nodes to ab node for index [i,j]
+
+        implicit none 
+
+        real(wp), intent(OUT) :: u_ab(4)
+        real(wp), intent(IN)  :: u_acx(:,:) 
+        real(wp), intent(IN)  :: f_ice(:,:) 
+        integer,  intent(IN)  :: i 
+        integer,  intent(IN)  :: j
+        
+        ! Local variables 
+        integer  :: nx, ny 
+        integer  :: im1, jm1, ip1, jp1 
+        real(wp) :: wt 
+
+        nx = size(f_ice,1) 
+        ny = size(f_ice,2) 
+
+        ! Define neighbor indices
+        im1 = max(i-1,1)
+        ip1 = min(i+1,nx)
+        jm1 = max(j-1,1)
+        jp1 = min(j+1,ny)
+        
+        ! Initialize to zero 
+        u_ab = 0.0_wp 
+
+        ! (1) Upper-right node average
+        wt = 0.0_wp 
+        if (f_ice(i,j) .eq. 1.0_wp .or. f_ice(ip1,j) .eq. 1.0_wp) then 
+            u_ab(1) = u_ab(1) + u_acx(i,j) 
+            wt = wt + 1.0_wp 
+        end if 
+        if (f_ice(i,jp1) .eq. 1.0_wp .or. f_ice(ip1,jp1) .eq. 1.0_wp) then 
+            u_ab(1) = u_ab(1) + u_acx(i,jp1) 
+            wt = wt + 1.0_wp 
+        end if 
+        
+        if (wt .gt. 0.0_wp) then 
+            u_ab(1) = u_ab(1) / wt 
+        end if 
+
+        ! (2) Upper-left node average
+        wt = 0.0_wp 
+        if (f_ice(i,j) .eq. 1.0_wp .or. f_ice(im1,j) .eq. 1.0_wp) then 
+            u_ab(2) = u_ab(2) + u_acx(im1,j) 
+            wt = wt + 1.0_wp 
+        end if 
+        if (f_ice(i,jp1) .eq. 1.0_wp .or. f_ice(im1,jp1) .eq. 1.0_wp) then 
+            u_ab(2) = u_ab(2) + u_acx(im1,jp1) 
+            wt = wt + 1.0_wp 
+        end if 
+        
+        if (wt .gt. 0.0_wp) then 
+            u_ab(2) = u_ab(2) / wt 
+        end if 
+        
+        ! (3) Lower-left node average
+        wt = 0.0_wp 
+        if (f_ice(i,j) .eq. 1.0_wp .or. f_ice(im1,j) .eq. 1.0_wp) then 
+            u_ab(3) = u_ab(3) + u_acx(im1,j) 
+            wt = wt + 1.0_wp 
+        end if 
+        if (f_ice(i,jm1) .eq. 1.0_wp .or. f_ice(im1,jm1) .eq. 1.0_wp) then 
+            u_ab(3) = u_ab(3) + u_acx(im1,jm1) 
+            wt = wt + 1.0_wp 
+        end if 
+        
+        if (wt .gt. 0.0_wp) then 
+            u_ab(3) = u_ab(3) / wt 
+        end if 
+        
+        ! (4) Lower-left node average
+        wt = 0.0_wp 
+        if (f_ice(i,j) .eq. 1.0_wp .or. f_ice(ip1,j) .eq. 1.0_wp) then 
+            u_ab(4) = u_ab(4) + u_acx(i,j) 
+            wt = wt + 1.0_wp 
+        end if 
+        if (f_ice(i,jm1) .eq. 1.0_wp .or. f_ice(ip1,jm1) .eq. 1.0_wp) then 
+            u_ab(4) = u_ab(4) + u_acx(i,jm1) 
+            wt = wt + 1.0_wp 
+        end if 
+        
+        if (wt .gt. 0.0_wp) then 
+            u_ab(4) = u_ab(4) / wt 
+        end if 
+        
+        where (abs(u_ab) .lt. TOL_UNDERFLOW) u_ab = 0.0_wp 
+        
+        return 
+
+    end subroutine stagger_nodes_acx_ab_ice
+
+    subroutine stagger_nodes_acy_ab_ice(u_ab,u_acy,f_ice,i,j)
+        ! Stagger from acx nodes to ab node for index [i,j]
+
+        implicit none 
+
+        real(wp), intent(OUT) :: u_ab(4)
+        real(wp), intent(IN)  :: u_acy(:,:) 
+        real(wp), intent(IN)  :: f_ice(:,:) 
+        integer,  intent(IN)  :: i 
+        integer,  intent(IN)  :: j
+        
+        ! Local variables 
+        integer  :: nx, ny 
+        integer  :: im1, jm1, ip1, jp1 
+        real(wp) :: wt 
+
+        nx = size(f_ice,1) 
+        ny = size(f_ice,2) 
+
+        ! Define neighbor indices
+        im1 = max(i-1,1)
+        ip1 = min(i+1,nx)
+        jm1 = max(j-1,1)
+        jp1 = min(j+1,ny)
+        
+        ! Initialize to zero 
+        u_ab = 0.0_wp 
+
+        ! (1) Upper-right node average
+        wt = 0.0_wp 
+        if (f_ice(i,j) .eq. 1.0_wp .or. f_ice(i,jp1) .eq. 1.0_wp) then 
+            u_ab(1) = u_ab(1) + u_acy(i,j) 
+            wt = wt + 1.0_wp 
+        end if 
+        if (f_ice(ip1,j) .eq. 1.0_wp .or. f_ice(ip1,jp1) .eq. 1.0_wp) then 
+            u_ab(1) = u_ab(1) + u_acy(ip1,j) 
+            wt = wt + 1.0_wp 
+        end if 
+        
+        if (wt .gt. 0.0_wp) then 
+            u_ab(1) = u_ab(1) / wt 
+        end if 
+
+        ! (2) Upper-left node average
+        wt = 0.0_wp 
+        if (f_ice(i,j) .eq. 1.0_wp .or. f_ice(i,jp1) .eq. 1.0_wp) then 
+            u_ab(2) = u_ab(2) + u_acy(i,j) 
+            wt = wt + 1.0_wp 
+        end if 
+        if (f_ice(im1,j) .eq. 1.0_wp .or. f_ice(im1,jp1) .eq. 1.0_wp) then 
+            u_ab(2) = u_ab(2) + u_acy(im1,j) 
+            wt = wt + 1.0_wp 
+        end if 
+        
+        if (wt .gt. 0.0_wp) then 
+            u_ab(2) = u_ab(2) / wt 
+        end if 
+        
+        ! (3) Lower-left node average
+        wt = 0.0_wp 
+        if (f_ice(i,j) .eq. 1.0_wp .or. f_ice(i,jm1) .eq. 1.0_wp) then 
+            u_ab(3) = u_ab(3) + u_acy(i,jm1) 
+            wt = wt + 1.0_wp 
+        end if 
+        if (f_ice(im1,j) .eq. 1.0_wp .or. f_ice(im1,jm1) .eq. 1.0_wp) then 
+            u_ab(3) = u_ab(3) + u_acy(im1,jm1) 
+            wt = wt + 1.0_wp 
+        end if 
+        
+        if (wt .gt. 0.0_wp) then 
+            u_ab(3) = u_ab(3) / wt 
+        end if 
+        
+        ! (4) Lower-left node average
+        wt = 0.0_wp 
+        if (f_ice(i,j) .eq. 1.0_wp .or. f_ice(i,jm1) .eq. 1.0_wp) then 
+            u_ab(4) = u_ab(4) + u_acy(i,jm1) 
+            wt = wt + 1.0_wp 
+        end if 
+        if (f_ice(ip1,j) .eq. 1.0_wp .or. f_ice(ip1,jm1) .eq. 1.0_wp) then 
+            u_ab(4) = u_ab(4) + u_acy(ip1,jm1) 
+            wt = wt + 1.0_wp 
+        end if 
+        
+        if (wt .gt. 0.0_wp) then 
+            u_ab(4) = u_ab(4) / wt 
+        end if 
+        
+        where (abs(u_ab) .lt. TOL_UNDERFLOW) u_ab = 0.0_wp 
+        
+        return 
+
+    end subroutine stagger_nodes_acy_ab_ice
+
+    subroutine staggerdiff_nodes_acx_ab_ice(du_ab,u_acx,f_ice,i,j,dx)
+        ! Stagger from acx nodes to ab node for index [i,j]
+
+        implicit none 
+
+        real(wp), intent(OUT) :: du_ab(4)
+        real(wp), intent(IN)  :: u_acx(:,:) 
+        real(wp), intent(IN)  :: f_ice(:,:) 
+        integer,  intent(IN)  :: i 
+        integer,  intent(IN)  :: j
+        real(wp), intent(IN)  :: dx 
+        
+        ! Local variables 
+        integer  :: nx, ny 
+        integer  :: im1, jm1, ip1, jp1 
+        integer  :: im2, jm2, ip2, jp2
+        real(wp) :: du_aa(4) 
+        real(wp) :: wt_aa(4) 
+
+        nx = size(f_ice,1) 
+        ny = size(f_ice,2) 
+
+        ! Define neighbor indices
+        im1 = max(i-1,1)
+        ip1 = min(i+1,nx)
+        jm1 = max(j-1,1)
+        jp1 = min(j+1,ny)
+        
+        im2 = max(i-2,1) 
+        ip2 = min(i+2,nx) 
+        jm2 = max(j-2,1) 
+        jp2 = min(j+2,ny) 
+
+        ! Initialize to zero 
+        du_ab = 0.0_wp 
+
+        ! (1) Upper-right node average
+        wt_aa = 0.0_wp 
+        if (f_ice(i,j) .eq. 1.0_wp) then 
+            du_aa(1) = (u_acx(i,j) - u_acx(im1,j)) / dx 
+            wt_aa(1) = 1.0_wp 
+        end if
+        if (f_ice(ip1,j) .eq. 1.0_wp) then 
+            du_aa(2) = (u_acx(ip1,j) - u_acx(i,j)) / dx 
+            wt_aa(2) = 1.0_wp 
+        end if
+        if (f_ice(ip1,jp1) .eq. 1.0_wp) then 
+            du_aa(3) = (u_acx(ip1,jp1) - u_acx(i,jp1)) / dx 
+            wt_aa(3) = 1.0_wp 
+        end if
+        if (f_ice(i,jp1) .eq. 1.0_wp) then 
+            du_aa(4) = (u_acx(i,jp1) - u_acx(im1,jp1)) / dx 
+            wt_aa(4) = 1.0_wp 
+        end if
+        
+        if (sum(wt_aa) .gt. 0.0_wp) then 
+            du_ab(1) = sum(du_aa*wt_aa) / sum(wt_aa)
+        end if 
+
+        ! (2) Upper-left node average
+        wt_aa = 0.0_wp 
+        if (f_ice(i,j) .eq. 1.0_wp) then 
+            du_aa(1) = (u_acx(i,j) - u_acx(im1,j)) / dx 
+            wt_aa(1) = 1.0_wp 
+        end if
+        if (f_ice(i,jp1) .eq. 1.0_wp) then 
+            du_aa(2) = (u_acx(i,jp1) - u_acx(im1,j)) / dx 
+            wt_aa(2) = 1.0_wp 
+        end if
+        if (f_ice(im1,jp1) .eq. 1.0_wp) then 
+            du_aa(3) = (u_acx(im1,jp1) - u_acx(im2,jp1)) / dx 
+            wt_aa(3) = 1.0_wp 
+        end if
+        if (f_ice(im1,j) .eq. 1.0_wp) then 
+            du_aa(4) = (u_acx(im1,j) - u_acx(im2,j)) / dx 
+            wt_aa(4) = 1.0_wp 
+        end if
+        
+        if (sum(wt_aa) .gt. 0.0_wp) then 
+            du_ab(2) = sum(du_aa*wt_aa) / sum(wt_aa)
+        end if 
+        
+        ! (3) Lower-left node average
+        wt_aa = 0.0_wp 
+        if (f_ice(i,j) .eq. 1.0_wp) then 
+            du_aa(1) = (u_acx(i,j) - u_acx(im1,j)) / dx 
+            wt_aa(1) = 1.0_wp 
+        end if
+        if (f_ice(im1,j) .eq. 1.0_wp) then 
+            du_aa(2) = (u_acx(im1,j) - u_acx(im2,j)) / dx 
+            wt_aa(2) = 1.0_wp 
+        end if
+        if (f_ice(im1,jm1) .eq. 1.0_wp) then 
+            du_aa(3) = (u_acx(im1,jm1) - u_acx(im2,jm1)) / dx 
+            wt_aa(3) = 1.0_wp 
+        end if
+        if (f_ice(i,jm1) .eq. 1.0_wp) then 
+            du_aa(4) = (u_acx(i,jm1) - u_acx(im1,jm1)) / dx 
+            wt_aa(4) = 1.0_wp 
+        end if
+        
+        if (sum(wt_aa) .gt. 0.0_wp) then 
+            du_ab(3) = sum(du_aa*wt_aa) / sum(wt_aa)
+        end if 
+        
+        ! (4) Lower-right node average
+        wt_aa = 0.0_wp 
+        if (f_ice(i,j) .eq. 1.0_wp) then 
+            du_aa(1) = (u_acx(i,j) - u_acx(im1,j)) / dx 
+            wt_aa(1) = 1.0_wp 
+        end if
+        if (f_ice(i,jm1) .eq. 1.0_wp) then 
+            du_aa(2) = (u_acx(i,jm1) - u_acx(im1,jm1)) / dx 
+            wt_aa(2) = 1.0_wp 
+        end if
+        if (f_ice(ip1,jm1) .eq. 1.0_wp) then 
+            du_aa(3) = (u_acx(ip1,jm1) - u_acx(i,jm1)) / dx 
+            wt_aa(3) = 1.0_wp 
+        end if
+        if (f_ice(ip1,j) .eq. 1.0_wp) then 
+            du_aa(4) = (u_acx(ip1,j) - u_acx(i,j)) / dx 
+            wt_aa(4) = 1.0_wp 
+        end if
+        
+        if (sum(wt_aa) .gt. 0.0_wp) then 
+            du_ab(4) = sum(du_aa*wt_aa) / sum(wt_aa)
+        end if 
+        
+        where (abs(du_ab) .lt. TOL_UNDERFLOW) du_ab = 0.0_wp 
+        
+        return 
+
+    end subroutine staggerdiff_nodes_acx_ab_ice
+
+    subroutine staggerdiff_nodes_acy_ab_ice(du_ab,u_acy,f_ice,i,j,dy)
+        ! Stagger from acx nodes to ab node for index [i,j]
+
+        implicit none 
+
+        real(wp), intent(OUT) :: du_ab(4)
+        real(wp), intent(IN)  :: u_acy(:,:) 
+        real(wp), intent(IN)  :: f_ice(:,:) 
+        integer,  intent(IN)  :: i 
+        integer,  intent(IN)  :: j
+        real(wp), intent(IN)  :: dy
+
+        ! Local variables 
+        integer  :: nx, ny 
+        integer  :: im1, jm1, ip1, jp1 
+        integer  :: im2, jm2, ip2, jp2
+        real(wp) :: du_aa(4) 
+        real(wp) :: wt_aa(4) 
+        
+        nx = size(f_ice,1) 
+        ny = size(f_ice,2) 
+
+        ! Define neighbor indices
+        im1 = max(i-1,1)
+        ip1 = min(i+1,nx)
+        jm1 = max(j-1,1)
+        jp1 = min(j+1,ny)
+        
+        im2 = max(i-2,1) 
+        ip2 = min(i+2,nx) 
+        jm2 = max(j-2,1) 
+        jp2 = min(j+2,ny) 
+
+        ! Initialize to zero 
+        du_ab = 0.0_wp 
+
+        ! (1) Upper-right node average
+        wt_aa = 0.0_wp 
+        if (f_ice(i,j) .eq. 1.0_wp) then 
+            du_aa(1) = (u_acy(i,j) - u_acy(i,jm1)) / dy 
+            wt_aa(1) = 1.0_wp 
+        end if
+        if (f_ice(ip1,j) .eq. 1.0_wp) then 
+            du_aa(2) = (u_acy(ip1,j) - u_acy(ip1,jm1)) / dy 
+            wt_aa(2) = 1.0_wp 
+        end if
+        if (f_ice(ip1,jp1) .eq. 1.0_wp) then 
+            du_aa(3) = (u_acy(ip1,jp1) - u_acy(ip1,j)) / dy 
+            wt_aa(3) = 1.0_wp 
+        end if
+        if (f_ice(i,jp1) .eq. 1.0_wp) then 
+            du_aa(4) = (u_acy(i,jp1) - u_acy(i,j)) / dy 
+            wt_aa(4) = 1.0_wp 
+        end if
+        
+        if (sum(wt_aa) .gt. 0.0_wp) then 
+            du_ab(1) = sum(du_aa*wt_aa) / sum(wt_aa)
+        end if 
+
+        ! (2) Upper-left node average
+        wt_aa = 0.0_wp 
+        if (f_ice(i,j) .eq. 1.0_wp) then 
+            du_aa(1) = (u_acy(i,j) - u_acy(i,jm1)) / dy 
+            wt_aa(1) = 1.0_wp 
+        end if
+        if (f_ice(i,jp1) .eq. 1.0_wp) then 
+            du_aa(2) = (u_acy(i,jp1) - u_acy(i,j)) / dy 
+            wt_aa(2) = 1.0_wp 
+        end if
+        if (f_ice(im1,jp1) .eq. 1.0_wp) then 
+            du_aa(3) = (u_acy(im1,jp1) - u_acy(im1,j)) / dy 
+            wt_aa(3) = 1.0_wp 
+        end if
+        if (f_ice(im1,j) .eq. 1.0_wp) then 
+            du_aa(4) = (u_acy(im1,j) - u_acy(im1,jm1)) / dy 
+            wt_aa(4) = 1.0_wp 
+        end if
+        
+        if (sum(wt_aa) .gt. 0.0_wp) then 
+            du_ab(2) = sum(du_aa*wt_aa) / sum(wt_aa)
+        end if 
+        
+        ! (3) Lower-left node average
+        wt_aa = 0.0_wp 
+        if (f_ice(i,j) .eq. 1.0_wp) then 
+            du_aa(1) = (u_acy(i,j) - u_acy(i,jm1)) / dy 
+            wt_aa(1) = 1.0_wp 
+        end if
+        if (f_ice(im1,j) .eq. 1.0_wp) then 
+            du_aa(2) = (u_acy(im1,j) - u_acy(im1,jm1)) / dy 
+            wt_aa(2) = 1.0_wp 
+        end if
+        if (f_ice(im1,jm1) .eq. 1.0_wp) then 
+            du_aa(3) = (u_acy(im1,jm1) - u_acy(im1,jm2)) / dy 
+            wt_aa(3) = 1.0_wp 
+        end if
+        if (f_ice(i,jm1) .eq. 1.0_wp) then 
+            du_aa(4) = (u_acy(i,jm1) - u_acy(i,jm2)) / dy 
+            wt_aa(4) = 1.0_wp 
+        end if
+        
+        if (sum(wt_aa) .gt. 0.0_wp) then 
+            du_ab(3) = sum(du_aa*wt_aa) / sum(wt_aa)
+        end if 
+        
+        ! (4) Lower-right node average
+        wt_aa = 0.0_wp 
+        if (f_ice(i,j) .eq. 1.0_wp) then 
+            du_aa(1) = (u_acy(i,j) - u_acy(i,jm1)) / dy 
+            wt_aa(1) = 1.0_wp 
+        end if
+        if (f_ice(i,jm1) .eq. 1.0_wp) then 
+            du_aa(2) = (u_acy(i,jm1) - u_acy(i,jm2)) / dy 
+            wt_aa(2) = 1.0_wp 
+        end if
+        if (f_ice(ip1,jm1) .eq. 1.0_wp) then 
+            du_aa(3) = (u_acy(ip1,jm1) - u_acy(ip1,jm2)) / dy 
+            wt_aa(3) = 1.0_wp 
+        end if
+        if (f_ice(ip1,j) .eq. 1.0_wp) then 
+            du_aa(4) = (u_acy(ip1,j) - u_acy(ip1,jm1)) / dy 
+            wt_aa(4) = 1.0_wp 
+        end if
+        
+        if (sum(wt_aa) .gt. 0.0_wp) then 
+            du_ab(4) = sum(du_aa*wt_aa) / sum(wt_aa)
+        end if 
+        
+        where (abs(du_ab) .lt. TOL_UNDERFLOW) du_ab = 0.0_wp 
+        
+        return 
+
+    end subroutine staggerdiff_nodes_acy_ab_ice
+
+    subroutine staggerdiffcross_nodes_acx_ab_ice(du_ab,u_acx,f_ice,i,j,dy)
+        ! Stagger from acx nodes to ab node for index [i,j]
+
+        implicit none 
+
+        real(wp), intent(OUT) :: du_ab(4)
+        real(wp), intent(IN)  :: u_acx(:,:) 
+        real(wp), intent(IN)  :: f_ice(:,:) 
+        integer,  intent(IN)  :: i 
+        integer,  intent(IN)  :: j
+        real(wp), intent(IN)  :: dy
+        
+        ! Local variables 
+        integer  :: nx, ny 
+        integer  :: im1, jm1, ip1, jp1 
+        real(wp) :: du_aa(4) 
+
+        nx = size(f_ice,1) 
+        ny = size(f_ice,2) 
+
+        ! Define neighbor indices
+        im1 = max(i-1,1)
+        ip1 = min(i+1,nx)
+        jm1 = max(j-1,1)
+        jp1 = min(j+1,ny)
+        
+        ! Initialize to zero 
+        du_ab = 0.0_wp 
+
+        ! (1) Upper-right node average
+        if (f_ice(i,j) .eq. 1.0_wp .and. f_ice(i,jp1) .eq. 1.0_wp) then 
+            du_ab(1) = (u_acx(i,jp1)-u_acx(i,j)) / dy 
+        end if 
+
+        ! (2) Upper-left node average
+        if (f_ice(i,j) .eq. 1.0_wp .and. f_ice(i,jp1) .eq. 1.0_wp) then 
+            du_ab(2) = (u_acx(im1,jp1)-u_acx(im1,j)) / dy 
+        end if 
+        
+        ! (3) Lower-left node average
+        if (f_ice(i,j) .eq. 1.0_wp .and. f_ice(i,jm1) .eq. 1.0_wp) then 
+            du_ab(3) = (u_acx(im1,j)-u_acx(im1,jm1)) / dy 
+        end if 
+        
+        ! (4) Lower-right node average
+        if (f_ice(i,j) .eq. 1.0_wp .and. f_ice(i,jm1) .eq. 1.0_wp) then 
+            du_ab(4) = (u_acx(i,j)-u_acx(i,jm1)) / dy 
+        end if 
+        
+        where (abs(du_ab) .lt. TOL_UNDERFLOW) du_ab = 0.0_wp 
+        
+        return 
+
+    end subroutine staggerdiffcross_nodes_acx_ab_ice
+
+    subroutine staggerdiffcross_nodes_acy_ab_ice(du_ab,u_acy,f_ice,i,j,dx)
+        ! Stagger from acx nodes to ab node for index [i,j]
+
+        implicit none 
+
+        real(wp), intent(OUT) :: du_ab(4)
+        real(wp), intent(IN)  :: u_acy(:,:) 
+        real(wp), intent(IN)  :: f_ice(:,:) 
+        integer,  intent(IN)  :: i 
+        integer,  intent(IN)  :: j
+        real(wp), intent(IN)  :: dx
+
+        ! Local variables 
+        integer  :: nx, ny 
+        integer  :: im1, jm1, ip1, jp1 
+        real(wp) :: du_aa(4) 
+
+        nx = size(f_ice,1) 
+        ny = size(f_ice,2) 
+
+        ! Define neighbor indices
+        im1 = max(i-1,1)
+        ip1 = min(i+1,nx)
+        jm1 = max(j-1,1)
+        jp1 = min(j+1,ny)
+        
+        ! Initialize to zero 
+        du_ab = 0.0_wp 
+
+        ! (1) Upper-right node average
+        if (f_ice(i,j) .eq. 1.0_wp .and. f_ice(ip1,j) .eq. 1.0_wp) then 
+            du_ab(1) = (u_acy(ip1,j)-u_acy(i,j)) / dx 
+        end if 
+
+        ! (2) Upper-left node average
+        if (f_ice(i,j) .eq. 1.0_wp .and. f_ice(im1,j) .eq. 1.0_wp) then 
+            du_ab(2) = (u_acy(i,j)-u_acy(im1,j)) / dx 
+        end if 
+        
+        ! (3) Lower-left node average
+        if (f_ice(i,j) .eq. 1.0_wp .and. f_ice(im1,j) .eq. 1.0_wp) then 
+            du_ab(3) = (u_acy(i,jm1)-u_acy(im1,jm1)) / dx 
+        end if 
+        
+        ! (4) Lower-right node average
+        if (f_ice(i,j) .eq. 1.0_wp .and. f_ice(ip1,j) .eq. 1.0_wp) then 
+            du_ab(4) = (u_acy(ip1,jm1)-u_acy(i,jm1)) / dx 
+        end if 
+        
+        where (abs(du_ab) .lt. TOL_UNDERFLOW) du_ab = 0.0_wp 
+        
+        return 
+
+    end subroutine staggerdiffcross_nodes_acy_ab_ice
+
+! ===== end NEW =======================
+
+
+
     function stagger_aa_acx(u) result(ustag)
         ! Stagger from Aa => Ac, x-direction 
 

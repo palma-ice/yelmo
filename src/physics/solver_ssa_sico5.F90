@@ -1,7 +1,7 @@
 module solver_ssa_sico5
     ! This ssa solver code was adapted from SICOPOLIS (v5-dev, svn revision 1421) module calc_vxy_m.F90. 
     
-    use yelmo_defs, only : sp, dp, wp, prec, rho_ice, rho_sw, g 
+    use yelmo_defs, only : sp, dp, wp, prec, TOL_UNDERFLOW, rho_ice, rho_sw, g 
 
     use ncio    ! For diagnostic outputting only 
 
@@ -1739,7 +1739,7 @@ contains
         real(prec), intent(INOUT) :: u  
         real(prec), intent(IN)    :: u_lim
 
-        real(prec), parameter :: tol = 1e-5
+        real(prec), parameter :: tol = TOL_UNDERFLOW
 
         u = min(u, u_lim)
         u = max(u,-u_lim)

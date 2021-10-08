@@ -8,6 +8,7 @@ module thermodynamics
                            rho_sw, rho_w, rho_rock, L_ice, T_pmp_beta, &
                            TOL_UNDERFLOW 
 
+    use yelmo_tools, only : stagger_nodes_acx_ab_ice, stagger_nodes_acy_ab_ice
     implicit none 
 
     private  
@@ -735,8 +736,8 @@ contains
         real(prec), intent(IN)    :: beta2              ! Timestepping weighting parameter
         
         ! Local variables
-        integer    :: i, j, nx, ny, n 
-        integer    :: im1, ip1, jm1, jp1 
+        integer  :: i, j, nx, ny, n 
+        integer  :: im1, ip1, jm1, jp1 
         real(wp) :: uxb_ab(4) 
         real(wp) :: uyb_ab(4) 
         real(wp) :: taubx_ab(4) 
@@ -749,6 +750,8 @@ contains
         nx = size(Q_b,1)
         ny = size(Q_b,2)
 
+        wt_ab = 1.0_wp / 4.0_wp 
+
         ! Calculate current basal frictional heating at ab-nodes
         ! following quadrature method, and then average to get 
         ! the grid center (using contributions from ice-covered nodes)
@@ -760,80 +763,19 @@ contains
             ip1 = min(i+1,nx)
             jm1 = max(j-1,1)
             jp1 = min(j+1,ny)
-    
-    if (.FALSE.) then 
-            ! Get ab-node weighting based on whether ice is present 
-            wt_ab = 0.0_wp 
-            if (count([f_ice(i,j),f_ice(ip1,j),f_ice(i,jp1),f_ice(ip1,jp1)].lt.1.0_wp) .eq. 0) then 
-                wt_ab(1) = 1.0_wp
-            end if
-            if (count([f_ice(i,j),f_ice(im1,j),f_ice(i,jp1),f_ice(im1,jp1)].lt.1.0_wp) .eq. 0) then 
-                wt_ab(2) = 1.0_wp 
-            end if 
-            if (count([f_ice(i,j),f_ice(im1,j),f_ice(i,jm1),f_ice(im1,jm1)].lt.1.0_wp) .eq. 0) then 
-                wt_ab(3) = 1.0_wp
-            end if 
-            if (count([f_ice(i,j),f_ice(ip1,j),f_ice(i,jm1),f_ice(ip1,jm1)].lt.1.0_wp) .eq. 0) then 
-                wt_ab(4) = 1.0_wp 
-            end if 
-    
-    else 
-        ! Take contributions from all cells.
-            wt_ab = 1.0_wp 
-    end if 
-
-            wt = sum(wt_ab)
             
-            if (f_ice(i,j) .eq. 1.0_wp .and. wt .gt. 0.0_wp) then 
-                ! Fully ice-covered point with some fully ice-covered neighbors 
+            call stagger_nodes_acx_ab_ice(uxb_ab,ux_b,f_ice,i,j)
+            call stagger_nodes_acy_ab_ice(uyb_ab,uy_b,f_ice,i,j)
 
-                ! Normalize weighting 
-                wt_ab = wt_ab / wt 
+            call stagger_nodes_acx_ab_ice(taubx_ab,taub_acx,f_ice,i,j)
+            call stagger_nodes_acy_ab_ice(tauby_ab,taub_acy,f_ice,i,j)
+            
+            ! Calculate Qb at quadrature points [Pa m a-1] == [J a-1 m-2]
+            Qb_ab = abs( sqrt(uxb_ab**2+uyb_ab**2) &
+                          * sqrt(taubx_ab**2+tauby_ab**2) )
 
-                ! === ux =========
-
-                uxb_ab(1) = 0.5_wp*(ux_b(i,j)+ux_b(i,jp1))
-                uxb_ab(2) = 0.5_wp*(ux_b(im1,j)+ux_b(im1,jp1))
-                uxb_ab(3) = 0.5_wp*(ux_b(im1,jm1)+ux_b(im1,j))
-                uxb_ab(4) = 0.5_wp*(ux_b(i,jm1)+ux_b(i,j))
-                where (abs(uxb_ab) .lt. TOL_UNDERFLOW) uxb_ab = 0.0_wp 
-
-                ! === uy =========
-
-                uyb_ab(1) = 0.5_wp*(uy_b(i,j)+uy_b(ip1,j))
-                uyb_ab(2) = 0.5_wp*(uy_b(i,j)+uy_b(im1,j))
-                uyb_ab(3) = 0.5_wp*(uy_b(i,jm1)+uy_b(im1,jm1))
-                uyb_ab(4) = 0.5_wp*(uy_b(i,jm1)+uy_b(ip1,jm1))
-                where (abs(uyb_ab) .lt. TOL_UNDERFLOW) uyb_ab = 0.0_wp 
-
-                ! === taubx =========
-
-                taubx_ab(1) = 0.5_wp*(taub_acx(i,j)+taub_acx(i,jp1))
-                taubx_ab(2) = 0.5_wp*(taub_acx(im1,j)+taub_acx(im1,jp1))
-                taubx_ab(3) = 0.5_wp*(taub_acx(im1,jm1)+taub_acx(im1,j))
-                taubx_ab(4) = 0.5_wp*(taub_acx(i,jm1)+taub_acx(i,j))
-                where (abs(taubx_ab) .lt. TOL_UNDERFLOW) taubx_ab = 0.0_wp 
-
-                ! === tauby =========
-
-                tauby_ab(1) = 0.5_wp*(taub_acy(i,j)+taub_acy(ip1,j))
-                tauby_ab(2) = 0.5_wp*(taub_acy(i,j)+taub_acy(im1,j))
-                tauby_ab(3) = 0.5_wp*(taub_acy(i,jm1)+taub_acy(im1,jm1))
-                tauby_ab(4) = 0.5_wp*(taub_acy(i,jm1)+taub_acy(ip1,jm1))
-                where (abs(tauby_ab) .lt. TOL_UNDERFLOW) tauby_ab = 0.0_wp 
-
-                ! Calculate Qb at quadrature points [Pa m a-1] == [J a-1 m-2]
-                Qb_ab = abs( sqrt(uxb_ab**2+uyb_ab**2) &
-                              * sqrt(taubx_ab**2+tauby_ab**2) )
-
-                ! Get weighted average using only ice-covered nodes
-                Q_b_now = sum(wt_ab*Qb_ab)     
-
-            else 
-
-                Q_b_now = 0.0_wp 
-
-            end if 
+            ! Get weighted average using only ice-covered nodes
+            Q_b_now = sum(wt_ab*Qb_ab)
 
             ! Get weighted average of Q_b with timestepping factors
             Q_b(i,j) = beta1*Q_b_now + beta2*Q_b(i,j) 

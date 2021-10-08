@@ -9,9 +9,13 @@ module deformation
 
     ! Note: 3D arrays defined such that first index (k=1) == base, and max index (k=nk) == surface 
 
-    use yelmo_defs,  only : sp, dp, wp, prec, tol_underflow, T0, rho_ice, g, &
+    use yelmo_defs,  only : sp, dp, wp, prec, TOL_UNDERFLOW, T0, rho_ice, g, &
                         strain_2D_class, strain_3D_class, stress_2D_class, stress_3D_class
-    use yelmo_tools, only : calc_vertical_integrated_2D, integrate_trapezoid1D_1D   
+    use yelmo_tools, only : calc_vertical_integrated_2D, integrate_trapezoid1D_1D, &
+                    stagger_nodes_aa_ab_ice, stagger_nodes_acx_ab_ice, stagger_nodes_acy_ab_ice, &
+                    staggerdiff_nodes_acx_ab_ice, staggerdiff_nodes_acy_ab_ice, &
+                    staggerdiffcross_nodes_acx_ab_ice, staggerdiffcross_nodes_acy_ab_ice
+                    
 
     implicit none 
     
@@ -481,20 +485,22 @@ contains
                 jp2 = min(j+2,ny) 
                 
                 ! Get ab-node weighting based on whether ice is present 
-                wt_ab = 0.0_wp 
-                if (count([f_ice(i,j),f_ice(ip1,j),f_ice(i,jp1),f_ice(ip1,jp1)].eq.1.0_wp) .gt. 0) then 
-                    wt_ab(1) = 1.0_wp
-                end if
-                if (count([f_ice(i,j),f_ice(im1,j),f_ice(i,jp1),f_ice(im1,jp1)].eq.1.0_wp) .gt. 0) then 
-                    wt_ab(2) = 1.0_wp 
-                end if 
-                if (count([f_ice(i,j),f_ice(im1,j),f_ice(i,jm1),f_ice(im1,jm1)].eq.1.0_wp) .gt. 0) then 
-                    wt_ab(3) = 1.0_wp
-                end if 
-                if (count([f_ice(i,j),f_ice(ip1,j),f_ice(i,jm1),f_ice(ip1,jm1)].eq.1.0_wp) .gt. 0) then 
-                    wt_ab(4) = 1.0_wp 
-                end if 
-            
+                ! wt_ab = 0.0_wp 
+                ! if (count([f_ice(i,j),f_ice(ip1,j),f_ice(i,jp1),f_ice(ip1,jp1)].eq.1.0_wp) .gt. 0) then 
+                !     wt_ab(1) = 1.0_wp
+                ! end if
+                ! if (count([f_ice(i,j),f_ice(im1,j),f_ice(i,jp1),f_ice(im1,jp1)].eq.1.0_wp) .gt. 0) then 
+                !     wt_ab(2) = 1.0_wp 
+                ! end if 
+                ! if (count([f_ice(i,j),f_ice(im1,j),f_ice(i,jm1),f_ice(im1,jm1)].eq.1.0_wp) .gt. 0) then 
+                !     wt_ab(3) = 1.0_wp
+                ! end if 
+                ! if (count([f_ice(i,j),f_ice(ip1,j),f_ice(i,jm1),f_ice(ip1,jm1)].eq.1.0_wp) .gt. 0) then 
+                !     wt_ab(4) = 1.0_wp 
+                ! end if 
+                
+                wt_ab = 1.0_wp 
+
                 wt = sum(wt_ab)
                 if (wt .eq. 0.0_wp) then 
                     ! Something probably went wrong, skip calculation of strain rate here
@@ -512,72 +518,81 @@ contains
 
                         ! === dxx =================================
 
-                        dd_ab(1) = 0.5_wp*( (vx(ip1,j,k)-vx(im1,j,k))*dx_2_inv &
-                                          + (vx(ip1,jp1,k)-vx(im1,jp1,k))*dx_2_inv )
+                        ! dd_ab(1) = 0.5_wp*( (vx(ip1,j,k)-vx(im1,j,k))*dx_2_inv &
+                        !                   + (vx(ip1,jp1,k)-vx(im1,jp1,k))*dx_2_inv )
 
-                        dd_ab(2) = 0.5_wp*( (vx(i,j,k)-vx(im2,j,k))*dx_2_inv &
-                                          + (vx(i,jp1,k)-vx(im2,jp1,k))*dx_2_inv )
+                        ! dd_ab(2) = 0.5_wp*( (vx(i,j,k)-vx(im2,j,k))*dx_2_inv &
+                        !                   + (vx(i,jp1,k)-vx(im2,jp1,k))*dx_2_inv )
 
-                        dd_ab(3) = 0.5_wp*( (vx(i,j,k)-vx(im2,j,k))*dx_2_inv &
-                                          + (vx(i,jm1,k)-vx(im2,jm1,k))*dx_2_inv )
+                        ! dd_ab(3) = 0.5_wp*( (vx(i,j,k)-vx(im2,j,k))*dx_2_inv &
+                        !                   + (vx(i,jm1,k)-vx(im2,jm1,k))*dx_2_inv )
 
-                        dd_ab(4) = 0.5_wp*( (vx(ip1,j,k)-vx(im1,j,k))*dx_2_inv &
-                                          + (vx(ip1,jm1,k)-vx(im1,jm1,k))*dx_2_inv )
+                        ! dd_ab(4) = 0.5_wp*( (vx(ip1,j,k)-vx(im1,j,k))*dx_2_inv &
+                        !                   + (vx(ip1,jm1,k)-vx(im1,jm1,k))*dx_2_inv )
 
+                        call staggerdiff_nodes_acx_ab_ice(dd_ab,vx(:,:,k),f_ice,i,j,dx)
 
                         strn%dxx(i,j,k) = sum(wt_ab*dd_ab)
-                        if (abs(strn%dxx(i,j,k)) .lt. tol_underflow) strn%dxx(i,j,k) = 0.0 
+                        if (abs(strn%dxx(i,j,k)) .lt. TOL_UNDERFLOW) strn%dxx(i,j,k) = 0.0 
                         
                         ! === dyy =================================
 
-                        dd_ab(1) = 0.5_wp*( (vy(i,jp1,k)-vy(i,jm1,k))*dy_2_inv &
-                                          + (vy(ip1,jp1,k)-vy(ip1,jm1,k))*dy_2_inv )
+                        ! dd_ab(1) = 0.5_wp*( (vy(i,jp1,k)-vy(i,jm1,k))*dy_2_inv &
+                        !                   + (vy(ip1,jp1,k)-vy(ip1,jm1,k))*dy_2_inv )
 
-                        dd_ab(2) = 0.5_wp*( (vy(i,jp1,k)-vy(i,jm1,k))*dy_2_inv &
-                                          + (vy(im1,jp1,k)-vy(im1,jm1,k))*dy_2_inv )
+                        ! dd_ab(2) = 0.5_wp*( (vy(i,jp1,k)-vy(i,jm1,k))*dy_2_inv &
+                        !                   + (vy(im1,jp1,k)-vy(im1,jm1,k))*dy_2_inv )
 
-                        dd_ab(3) = 0.5_wp*( (vy(i,j,k)-vy(i,jm2,k))*dy_2_inv &
-                                          + (vy(im1,j,k)-vy(im1,jm2,k))*dy_2_inv )
+                        ! dd_ab(3) = 0.5_wp*( (vy(i,j,k)-vy(i,jm2,k))*dy_2_inv &
+                        !                   + (vy(im1,j,k)-vy(im1,jm2,k))*dy_2_inv )
 
-                        dd_ab(4) = 0.5_wp*( (vy(i,j,k)-vy(i,jm2,k))*dy_2_inv &
-                                          + (vy(ip1,j,k)-vy(ip1,jm2,k))*dy_2_inv )
+                        ! dd_ab(4) = 0.5_wp*( (vy(i,j,k)-vy(i,jm2,k))*dy_2_inv &
+                        !                   + (vy(ip1,j,k)-vy(ip1,jm2,k))*dy_2_inv )
+
+                        call staggerdiff_nodes_acy_ab_ice(dd_ab,vy(:,:,k),f_ice,i,j,dy)
 
                         strn%dyy(i,j,k) = sum(wt_ab*dd_ab)
-                        if (abs(strn%dyy(i,j,k)) .lt. tol_underflow) strn%dyy(i,j,k) = 0.0 
+                        if (abs(strn%dyy(i,j,k)) .lt. TOL_UNDERFLOW) strn%dyy(i,j,k) = 0.0 
 
                         ! === lxy =================================
 
-                        dd_ab(1) = (vx(i,jp1,k)-vx(i,j,k))*dy_inv
+                        ! dd_ab(1) = (vx(i,jp1,k)-vx(i,j,k))*dy_inv
 
-                        dd_ab(2) = (vx(im1,jp1,k)-vx(im1,j,k))*dy_inv 
+                        ! dd_ab(2) = (vx(im1,jp1,k)-vx(im1,j,k))*dy_inv 
 
-                        dd_ab(3) = (vx(im1,j,k)-vx(im1,jm1,k))*dy_inv 
+                        ! dd_ab(3) = (vx(im1,j,k)-vx(im1,jm1,k))*dy_inv 
 
-                        dd_ab(4) = (vx(i,j,k)-vx(i,jm1,k))*dy_inv 
+                        ! dd_ab(4) = (vx(i,j,k)-vx(i,jm1,k))*dy_inv 
+
+                        call staggerdiffcross_nodes_acx_ab_ice(dd_ab,vx(:,:,k),f_ice,i,j,dy)
 
                         lxy = sum(wt_ab*dd_ab)
 
                         ! === lyx =================================
 
-                        dd_ab(1) = (vy(ip1,j,k)-vy(i,j,k))*dx_inv 
+                        ! dd_ab(1) = (vy(ip1,j,k)-vy(i,j,k))*dx_inv 
 
-                        dd_ab(2) = (vy(i,j,k)-vy(im1,j,k))*dx_inv 
+                        ! dd_ab(2) = (vy(i,j,k)-vy(im1,j,k))*dx_inv 
                         
-                        dd_ab(3) = (vy(i,jm1,k)-vy(im1,jm1,k))*dx_inv 
+                        ! dd_ab(3) = (vy(i,jm1,k)-vy(im1,jm1,k))*dx_inv 
                         
-                        dd_ab(4) = (vy(ip1,jm1,k)-vy(i,jm1,k))*dx_inv 
+                        ! dd_ab(4) = (vy(ip1,jm1,k)-vy(i,jm1,k))*dx_inv 
                         
+                        call staggerdiffcross_nodes_acx_ab_ice(dd_ab,vy(:,:,k),f_ice,i,j,dx)
+
                         lyx = sum(wt_ab*dd_ab)
 
                         ! === dxy ================================= 
 
                         strn%dxy(i,j,k) = 0.5_wp*(lxy+lyx)
-                        if (abs(strn%dxy(i,j,k)) .lt. tol_underflow) strn%dxy(i,j,k) = 0.0 
+                        if (abs(strn%dxy(i,j,k)) .lt. TOL_UNDERFLOW) strn%dxy(i,j,k) = 0.0 
                         
 
                         ! ====== Vertical cross terms (lzx,lzy) ====== 
 
                         ! === lzx ================================
+
+                        ! ajr: todo: need to see about ab-node staggering and f_ice treatment 
 
                         if (k .eq. 1) then
                             ! Basal layer 
@@ -613,6 +628,8 @@ contains
                         lzx = sum(wt_ab*dd_ab)
 
                         ! === lzy ================================
+
+                        ! ajr: todo: need to see about ab-node staggering and f_ice treatment 
 
                         if (k .eq. 1) then
                             ! Basal layer 
@@ -650,6 +667,8 @@ contains
                         ! ====== Shear terms (lxz,lyz) ================= 
 
                         ! === lxz ================================
+
+                        ! ajr: todo: need to see about ab-node staggering and f_ice treatment 
 
                         if (k .eq. 1) then 
                             ! Basal layer
@@ -696,6 +715,8 @@ contains
 
                         ! === lyz ================================
 
+                        ! ajr: todo: need to see about ab-node staggering and f_ice treatment 
+                        
                         if (k .eq. 1) then 
                             ! Basal layer
                             ! Gradient from first aa-node above base to base 
@@ -745,8 +766,8 @@ contains
                         strn%dyz(i,j,k) = 0.5_wp*(lyz+lzy)
 
                         ! Avoid underflows 
-                        if (abs(strn%dxz(i,j,k)) .lt. tol_underflow) strn%dxz(i,j,k) = 0.0 
-                        if (abs(strn%dyz(i,j,k)) .lt. tol_underflow) strn%dyz(i,j,k) = 0.0 
+                        if (abs(strn%dxz(i,j,k)) .lt. TOL_UNDERFLOW) strn%dxz(i,j,k) = 0.0 
+                        if (abs(strn%dyz(i,j,k)) .lt. TOL_UNDERFLOW) strn%dyz(i,j,k) = 0.0 
         
                         ! ====== Finished calculating individual strain rate terms ====== 
                         
@@ -1044,8 +1065,8 @@ contains
                     strn%dyy(i,j,k) = (vy(i,j,k)-vy(i,jm1,k))*fact_y(i,j)
 
                     ! Avoid underflows 
-                    if (abs(strn%dxx(i,j,k)) .lt. tol_underflow) strn%dxx(i,j,k) = 0.0 
-                    if (abs(strn%dyy(i,j,k)) .lt. tol_underflow) strn%dyy(i,j,k) = 0.0 
+                    if (abs(strn%dxx(i,j,k)) .lt. TOL_UNDERFLOW) strn%dxx(i,j,k) = 0.0 
+                    if (abs(strn%dyy(i,j,k)) .lt. TOL_UNDERFLOW) strn%dyy(i,j,k) = 0.0 
                     
                     lxy = (  (vx(i,jp1,k)+vx(im1,jp1,k))   &
                            - (vx(i,jm1,k)+vx(im1,jm1,k)) ) &
@@ -1129,9 +1150,9 @@ contains
                     strn%dyz(i,j,k) = 0.5*(lyz+lzy)
 
                     ! Avoid underflows 
-                    if (abs(strn%dxy(i,j,k)) .lt. tol_underflow) strn%dxy(i,j,k) = 0.0 
-                    if (abs(strn%dxz(i,j,k)) .lt. tol_underflow) strn%dxz(i,j,k) = 0.0 
-                    if (abs(strn%dyz(i,j,k)) .lt. tol_underflow) strn%dyz(i,j,k) = 0.0 
+                    if (abs(strn%dxy(i,j,k)) .lt. TOL_UNDERFLOW) strn%dxy(i,j,k) = 0.0 
+                    if (abs(strn%dxz(i,j,k)) .lt. TOL_UNDERFLOW) strn%dxz(i,j,k) = 0.0 
+                    if (abs(strn%dyz(i,j,k)) .lt. TOL_UNDERFLOW) strn%dyz(i,j,k) = 0.0 
     
                     ! ====== Finished calculating individual strain rate terms ====== 
                     

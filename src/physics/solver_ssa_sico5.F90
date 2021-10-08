@@ -1773,7 +1773,7 @@ contains
     end subroutine ssa_diagnostics_write_init
 
     subroutine ssa_diagnostics_write_step(filename,ux,uy,L2_norm,beta_acx,beta_acy,visc_eff_int, &
-                                        ssa_mask_acx,ssa_mask_acy,H_ice,f_ice,taud_acx,taud_acy, &
+                                        ssa_mask_acx,ssa_mask_acy,ssa_err_acx,ssa_err_acy,H_ice,f_ice,taud_acx,taud_acy, &
                                                             H_grnd,z_sl,z_bed,ux_prev,uy_prev,time)
 
         implicit none 
@@ -1787,6 +1787,8 @@ contains
         real(wp), intent(IN) :: visc_eff_int(:,:) 
         integer,  intent(IN) :: ssa_mask_acx(:,:) 
         integer,  intent(IN) :: ssa_mask_acy(:,:) 
+        real(wp), intent(IN) :: ssa_err_acx(:,:) 
+        real(wp), intent(IN) :: ssa_err_acy(:,:) 
         real(wp), intent(IN) :: H_ice(:,:) 
         real(wp), intent(IN) :: f_ice(:,:) 
         real(wp), intent(IN) :: taud_acx(:,:) 
@@ -1841,6 +1843,11 @@ contains
         call nc_write(filename,"ssa_mask_acx",ssa_mask_acx,units="1",long_name="SSA mask (acx)", &
                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
         call nc_write(filename,"ssa_mask_acy",ssa_mask_acy,units="1",long_name="SSA mask (acy)", &
+                      dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
+
+        call nc_write(filename,"ssa_err_acx",ssa_err_acx,units="1",long_name="SSA err (acx)", &
+                      dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
+        call nc_write(filename,"ssa_err_acy",ssa_err_acy,units="1",long_name="SSA err (acy)", &
                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
 
         call nc_write(filename,"H_ice",H_ice,units="m",long_name="Ice thickness", &

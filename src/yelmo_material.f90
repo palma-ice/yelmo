@@ -277,6 +277,7 @@ end if
                                                                     mat%par%n_glen,mat%par%visc_min)
         
         ! Calculate visc_bar and visc_int (vertically integrated visc) as diagnostic quantities
+        mat%now%visc_bar = calc_vertical_integrated_2D(mat%now%visc,mat%par%zeta_aa)
         call calc_visc_int(mat%now%visc_int,mat%now%visc,tpo%now%H_ice,tpo%now%f_ice,mat%par%zeta_aa)
         
         return

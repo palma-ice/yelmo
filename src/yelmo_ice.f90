@@ -484,6 +484,11 @@ contains
                                             maxval(dt_save(1:n)), minval(dt_save(1:n)), n_dtmin
             
         end if 
+        
+        ! ! ajr: diagnostics 
+        ! if (time .gt. 100.0 .and. dom%dyn%par%ssa_iter_now .ge. 5) then 
+        !     stop 
+        ! end if 
 
         return
 

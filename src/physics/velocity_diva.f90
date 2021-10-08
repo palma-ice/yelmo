@@ -280,7 +280,7 @@ end if
 
             if (write_ssa_diagnostics) then  
                 call ssa_diagnostics_write_step("yelmo_ssa.nc",ux_bar,uy_bar,L2_norm,beta_acx,beta_acy,visc_eff_int, &
-                                        ssa_mask_acx,ssa_mask_acy,H_ice,f_ice,taud_acx,taud_acy, &
+                                        ssa_mask_acx,ssa_mask_acy,ssa_err_acx,ssa_err_acy,H_ice,f_ice,taud_acx,taud_acy, &
                                         H_grnd,z_sl,z_bed,ux_bar_nm1,uy_bar_nm1,time=real(iter,wp))    
             end if 
 
@@ -1211,7 +1211,7 @@ end if
             ! Calculate the vertically averaged viscosity for this point
             visc_eff_mean = integrate_trapezoid1D_pt(visc_eff(i,j,:),zeta_aa) 
             
-            if (f_ice(i,j) .gt. 0.0) then 
+            if (f_ice(i,j) .eq. 1.0) then 
                 H_eff = H_ice(i,j) / f_ice(i,j) 
                 visc_eff_int(i,j) = visc_eff_mean*H_eff
             else
@@ -1274,7 +1274,6 @@ end if
 
         ! Local variables 
         integer :: i, j, nx, ny, nz_aa, np
-        integer :: im1, jm1, ip1, jp1
         real(wp) :: H_eff  
         real(wp) :: F_int_min 
         real(wp), parameter :: visc_min = 1e4_wp
@@ -1294,12 +1293,7 @@ end if
         do j = 1, ny 
         do i = 1, nx
 
-            im1 = max(i-1,1)
-            jm1 = max(j-1,1)
-            ip1 = min(i+1,nx)
-            jp1 = min(j+1,ny)
-
-            if (f_ice(i,j) .gt. 0.0) then 
+            if (f_ice(i,j) .eq. 1.0) then 
                 ! Viscosity should be nonzero here, perform integration 
 
                 H_eff = H_ice(i,j) / f_ice(i,j) 

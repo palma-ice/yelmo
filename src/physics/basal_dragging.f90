@@ -340,23 +340,33 @@ contains
 
     end subroutine stagger_beta
 
-    elemental function calc_effective_pressure_overburden(H_ice,f_grnd) result(N_eff)
+    elemental function calc_effective_pressure_overburden(H_ice,f_ice,f_grnd) result(N_eff)
         ! Effective pressure as overburden pressure N_eff = rho*g*H_ice 
 
         implicit none 
 
         real(wp), intent(IN) :: H_ice 
+        real(wp), intent(IN) :: f_ice
         real(wp), intent(IN) :: f_grnd 
         real(wp) :: N_eff                 ! [Pa]
 
+        ! Local variables 
+        real(wp) :: H_eff 
+
+        if (f_ice .gt. 0.0_wp) then 
+            H_eff = H_ice / f_ice
+        else
+            H_eff = 0.0_wp 
+        end if 
+
         ! Calculate effective pressure [Pa] (overburden pressure)
-        N_eff = f_grnd * (rho_ice*g*H_ice)
+        N_eff = f_grnd * (rho_ice*g*H_eff)
 
         return 
 
     end function calc_effective_pressure_overburden
 
-    elemental function calc_effective_pressure_marine(H_ice,z_bed,z_sl,H_w,p) result(N_eff)
+    elemental function calc_effective_pressure_marine(H_ice,f_ice,z_bed,z_sl,H_w,p) result(N_eff)
         ! Effective pressure as a function of connectivity to the ocean
         ! as defined by Leguy et al. (2014), Eq. 14, and modified
         ! by Robinson and Alvarez-Solas to account for basal water pressure (to do!)
@@ -367,13 +377,15 @@ contains
         implicit none 
 
         real(wp), intent(IN) :: H_ice 
+        real(wp), intent(IN) :: f_ice 
         real(wp), intent(IN) :: z_bed 
         real(wp), intent(IN) :: z_sl 
         real(wp), intent(IN) :: H_w 
         real(wp), intent(IN) :: p       ! [0:1], 0: no ocean connectivity, 1: full ocean connectivity
         real(wp) :: N_eff               ! [Pa]
 
-        ! Local variables  
+        ! Local variables 
+        real(wp) :: H_eff  
         real(wp) :: H_float     ! Maximum ice thickness to allow floating ice
         real(wp) :: p_w         ! Pressure of water at the base of the ice sheet
         real(wp) :: x 
@@ -384,49 +396,57 @@ contains
         ! Determine the maximum ice thickness to allow floating ice
         H_float = max(0.0_prec, rho_sw_ice*(z_sl-z_bed))
 
+        if (f_ice .gt. 0.0_wp) then 
+            H_eff = H_ice / f_ice
+        else
+            H_eff = 0.0_wp 
+        end if 
+
         ! Calculate basal water pressure 
-        if (H_ice .eq. 0.0) then
+        if (H_eff .eq. 0.0) then
             ! No water pressure for ice-free points
 
             p_w = 0.0 
 
-        else if (H_ice .lt. H_float) then 
+        else if (H_eff .lt. H_float) then 
             ! Floating ice: water pressure equals ice pressure 
 
-            p_w   = (rho_ice*g*H_ice)
+            p_w   = (rho_ice*g*H_eff)
 
         else
             ! Determine water pressure based on marine connectivity (Leguy et al., 2014, Eq. 14)
 
-            x     = min(1.0_prec, H_float/H_ice)
-            p_w   = (rho_ice*g*H_ice)*(1.0_prec - (1.0_prec-x)**p)
+            x     = min(1.0_prec, H_float/H_eff)
+            p_w   = (rho_ice*g*H_eff)*(1.0_prec - (1.0_prec-x)**p)
 
         end if 
 
         ! Calculate effective pressure [Pa] (overburden pressure minus basal water pressure)
-        N_eff = (rho_ice*g*H_ice) - p_w 
+        N_eff = (rho_ice*g*H_eff) - p_w 
 
         return 
 
     end function calc_effective_pressure_marine
 
-    elemental function calc_effective_pressure_till(H_w,H_ice,f_grnd,H_w_max,N0,delta,e0,Cc) result(N_eff)
+    elemental function calc_effective_pressure_till(H_w,H_ice,f_ice,f_grnd,H_w_max,N0,delta,e0,Cc) result(N_eff)
         ! Calculate the effective pressure of the till
         ! following van Pelt and Bueler (2015), Eq. 23.
         
         implicit none 
         
-        real(wp), intent(IN)    :: H_w
-        real(wp), intent(IN)    :: H_ice
-        real(wp), intent(IN)    :: f_grnd  
-        real(wp), intent(IN)    :: H_w_max            ! [m] Maximum allowed water depth 
-        real(wp), intent(IN)    :: N0                 ! [Pa] Reference effective pressure 
-        real(wp), intent(IN)    :: delta              ! [--] Fraction of overburden pressure for saturated till
-        real(wp), intent(IN)    :: e0                 ! [--] Reference void ratio at N0 
-        real(wp), intent(IN)    :: Cc                 ! [--] Till compressibility 
-        real(wp)                :: N_eff              ! [Pa] Effective pressure 
+        real(wp), intent(IN) :: H_w
+        real(wp), intent(IN) :: H_ice
+        real(wp), intent(IN) :: f_ice 
+        real(wp), intent(IN) :: f_grnd  
+        real(wp), intent(IN) :: H_w_max             ! [m] Maximum allowed water depth 
+        real(wp), intent(IN) :: N0                  ! [Pa] Reference effective pressure 
+        real(wp), intent(IN) :: delta               ! [--] Fraction of overburden pressure for saturated till
+        real(wp), intent(IN) :: e0                  ! [--] Reference void ratio at N0 
+        real(wp), intent(IN) :: Cc                  ! [--] Till compressibility 
+        real(wp)             :: N_eff               ! [Pa] Effective pressure 
         
         ! Local variables 
+        real(wp) :: H_eff
         real(wp) :: P0, s 
         real(wp) :: N_eff_maxHw
 
@@ -437,8 +457,14 @@ contains
 
         else 
 
+            if (f_ice .gt. 0.0_wp) then 
+                H_eff = H_ice / f_ice
+            else
+                H_eff = 0.0_wp 
+            end if 
+
             ! Get overburden pressure 
-            P0 = rho_ice*g*H_ice
+            P0 = rho_ice*g*H_eff
 
             ! Get ratio of water layer thickness to maximum
             s  = min(H_w/H_w_max,1.0)  
@@ -616,10 +642,7 @@ contains
                 ! Normalize weighting 
                 wt_ab = wt_ab / wt 
 
-                ! cb_ab(1) = 0.25_wp*(c_bed(i,j)+c_bed(ip1,j)+c_bed(i,jp1)+c_bed(ip1,jp1))
-                ! cb_ab(2) = 0.25_wp*(c_bed(i,j)+c_bed(im1,j)+c_bed(i,jp1)+c_bed(im1,jp1))
-                ! cb_ab(3) = 0.25_wp*(c_bed(i,j)+c_bed(im1,j)+c_bed(i,jm1)+c_bed(im1,jm1))
-                ! cb_ab(4) = 0.25_wp*(c_bed(i,j)+c_bed(ip1,j)+c_bed(i,jm1)+c_bed(ip1,jm1))
+                ! Get c_bed on ab-nodes
                 call stagger_nodes_aa_ab_ice(cb_ab,c_bed,f_ice,i,j)
 
                 ! cb_ab(1:4) = c_bed(i,j) 
@@ -797,13 +820,9 @@ contains
                 ! Normalize weighting 
                 wt_ab = wt_ab / wt 
 
-                ! cb_ab(1) = 0.25_wp*(c_bed(i,j)+c_bed(ip1,j)+c_bed(i,jp1)+c_bed(ip1,jp1))
-                ! cb_ab(2) = 0.25_wp*(c_bed(i,j)+c_bed(im1,j)+c_bed(i,jp1)+c_bed(im1,jp1))
-                ! cb_ab(3) = 0.25_wp*(c_bed(i,j)+c_bed(im1,j)+c_bed(i,jm1)+c_bed(im1,jm1))
-                ! cb_ab(4) = 0.25_wp*(c_bed(i,j)+c_bed(ip1,j)+c_bed(i,jm1)+c_bed(ip1,jm1))
-
+                ! Get c_bed on ab-nodes
                 call stagger_nodes_aa_ab_ice(cb_ab,c_bed,f_ice,i,j)
-                
+
                 ! Calculate magnitude of basal velocity on aa-node 
                 ! from ab-nodes (quadrature points)
                 ! ux_ab(1) = 0.5_wp*(ux_b(i,j)+ux_b(i,jp1))

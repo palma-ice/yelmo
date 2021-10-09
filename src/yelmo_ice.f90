@@ -299,6 +299,10 @@ contains
                 ! (elevation, ice thickness, calving, etc.)
                 call calc_ytopo(dom%tpo,dom%dyn,dom%mat,dom%thrm,dom%bnd,time_now,topo_fixed=dom%tpo%par%topo_fixed)    
                 
+                ! ajr: testing recalculation of dynamics for stability
+                dom%dyn%par%time = dom_ref%tpo%par%time 
+                call calc_ydyn(dom%dyn,dom%tpo,dom%mat,dom%thrm,dom%bnd,time_now)
+
                 ! Store corrected ice thickness for later use 
                 ! Do it here to ensure all changes to H_ice are accounted for (mb, calving, etc)
                 dom%tpo%now%H_ice_corr = dom%tpo%now%H_ice 
@@ -484,7 +488,7 @@ contains
                                             maxval(dt_save(1:n)), minval(dt_save(1:n)), n_dtmin
             
         end if 
-        
+
         ! ! ajr: diagnostics 
         ! if (time .gt. 100.0 .and. dom%dyn%par%ssa_iter_now .ge. 5) then 
         !     stop 

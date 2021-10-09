@@ -14,7 +14,8 @@ module deformation
     use yelmo_tools, only : calc_vertical_integrated_2D, integrate_trapezoid1D_1D, integrate_trapezoid1D_pt, &
                     stagger_nodes_aa_ab_ice, stagger_nodes_acx_ab_ice, stagger_nodes_acy_ab_ice, &
                     staggerdiff_nodes_acx_ab_ice, staggerdiff_nodes_acy_ab_ice, &
-                    staggerdiffcross_nodes_acx_ab_ice, staggerdiffcross_nodes_acy_ab_ice
+                    staggerdiffcross_nodes_acx_ab_ice, staggerdiffcross_nodes_acy_ab_ice, &
+                    staggerdiff_nodes_acz_dx_ab_ice, staggerdiff_nodes_acz_dy_ab_ice
                     
 
     implicit none 
@@ -644,33 +645,42 @@ contains
 
                         if (k .eq. 1) then
                             ! Basal layer 
-                            dd_ab(1) = ( 0.5_wp*(vz(ip1,j,k)+vz(ip1,jp1,k)) - 0.5_wp*(vz(i,j,k)+vz(i,jp1,k)) ) * dx_inv 
-                            dd_ab(2) = ( 0.5_wp*(vz(i,j,k)+vz(i,jp1,k)) - 0.5_wp*(vz(im1,j,k)+vz(im1,jp1,k)) ) * dx_inv 
-                            dd_ab(3) = ( 0.5_wp*(vz(i,j,k)+vz(i,jm1,k)) - 0.5_wp*(vz(im1,j,k)+vz(im1,jm1,k)) ) * dx_inv 
-                            dd_ab(4) = ( 0.5_wp*(vz(ip1,j,k)+vz(ip1,jm1,k)) - 0.5_wp*(vz(i,j,k)+vz(i,jm1,k)) ) * dx_inv 
+                            call staggerdiff_nodes_acz_dx_ab_ice(dd_ab,vz(:,:,k),f_ice,i,j,dx)
+
+                            ! dd_ab(1) = ( 0.5_wp*(vz(ip1,j,k)+vz(ip1,jp1,k)) - 0.5_wp*(vz(i,j,k)+vz(i,jp1,k)) ) * dx_inv 
+                            ! dd_ab(2) = ( 0.5_wp*(vz(i,j,k)+vz(i,jp1,k)) - 0.5_wp*(vz(im1,j,k)+vz(im1,jp1,k)) ) * dx_inv 
+                            ! dd_ab(3) = ( 0.5_wp*(vz(i,j,k)+vz(i,jm1,k)) - 0.5_wp*(vz(im1,j,k)+vz(im1,jm1,k)) ) * dx_inv 
+                            ! dd_ab(4) = ( 0.5_wp*(vz(ip1,j,k)+vz(ip1,jm1,k)) - 0.5_wp*(vz(i,j,k)+vz(i,jm1,k)) ) * dx_inv 
                         else if (k .eq. nz_aa) then
                             ! Surface layer 
-                            dd_ab(1) = ( 0.5_wp*(vz(ip1,j,k+1)+vz(ip1,jp1,k+1)) - 0.5_wp*(vz(i,j,k+1)+vz(i,jp1,k+1)) ) * dx_inv 
-                            dd_ab(2) = ( 0.5_wp*(vz(i,j,k+1)+vz(i,jp1,k+1)) - 0.5_wp*(vz(im1,j,k+1)+vz(im1,jp1,k+1)) ) * dx_inv 
-                            dd_ab(3) = ( 0.5_wp*(vz(i,j,k+1)+vz(i,jm1,k+1)) - 0.5_wp*(vz(im1,j,k+1)+vz(im1,jm1,k+1)) ) * dx_inv 
-                            dd_ab(4) = ( 0.5_wp*(vz(ip1,j,k+1)+vz(ip1,jm1,k+1)) - 0.5_wp*(vz(i,j,k+1)+vz(i,jm1,k+1)) ) * dx_inv 
+                            call staggerdiff_nodes_acz_dx_ab_ice(dd_ab,vz(:,:,k+1),f_ice,i,j,dx)
+                            
+                            ! dd_ab(1) = ( 0.5_wp*(vz(ip1,j,k+1)+vz(ip1,jp1,k+1)) - 0.5_wp*(vz(i,j,k+1)+vz(i,jp1,k+1)) ) * dx_inv 
+                            ! dd_ab(2) = ( 0.5_wp*(vz(i,j,k+1)+vz(i,jp1,k+1)) - 0.5_wp*(vz(im1,j,k+1)+vz(im1,jp1,k+1)) ) * dx_inv 
+                            ! dd_ab(3) = ( 0.5_wp*(vz(i,j,k+1)+vz(i,jm1,k+1)) - 0.5_wp*(vz(im1,j,k+1)+vz(im1,jm1,k+1)) ) * dx_inv 
+                            ! dd_ab(4) = ( 0.5_wp*(vz(ip1,j,k+1)+vz(ip1,jm1,k+1)) - 0.5_wp*(vz(i,j,k+1)+vz(i,jm1,k+1)) ) * dx_inv 
                         else 
                             ! Intermediate layers
-                            dd_ab(1) = 0.5_wp*( &
-                                        ( 0.5_wp*(vz(ip1,j,k)+vz(ip1,jp1,k)) - 0.5_wp*(vz(i,j,k)+vz(i,jp1,k)) ) * dx_inv &
-                                      + ( 0.5_wp*(vz(ip1,j,k+1)+vz(ip1,jp1,k+1)) - 0.5_wp*(vz(i,j,k+1)+vz(i,jp1,k+1)) ) * dx_inv )
-                        
-                            dd_ab(2) = 0.5_wp*( &
-                                        ( 0.5_wp*(vz(i,j,k)+vz(i,jp1,k)) - 0.5_wp*(vz(im1,j,k)+vz(im1,jp1,k)) ) * dx_inv &
-                                      + ( 0.5_wp*(vz(i,j,k+1)+vz(i,jp1,k+1)) - 0.5_wp*(vz(im1,j,k+1)+vz(im1,jp1,k+1)) ) * dx_inv )
-
-                            dd_ab(3) = 0.5_wp*( &
-                                        ( 0.5_wp*(vz(i,j,k)+vz(i,jm1,k)) - 0.5_wp*(vz(im1,j,k)+vz(im1,jm1,k)) ) * dx_inv &
-                                      + ( 0.5_wp*(vz(i,j,k+1)+vz(i,jm1,k+1)) - 0.5_wp*(vz(im1,j,k+1)+vz(im1,jm1,k+1)) ) * dx_inv )
+                            call staggerdiff_nodes_acz_dx_ab_ice(dd_ab_up,vz(:,:,k+1),f_ice,i,j,dx)
+                            call staggerdiff_nodes_acz_dx_ab_ice(dd_ab_dn,vz(:,:,k),  f_ice,i,j,dx)
                             
-                            dd_ab(4) = 0.5_wp*( &
-                                        ( 0.5_wp*(vz(ip1,j,k)+vz(ip1,jm1,k)) - 0.5_wp*(vz(i,j,k)+vz(i,jm1,k)) ) * dx_inv &
-                                      + ( 0.5_wp*(vz(ip1,j,k+1)+vz(ip1,jm1,k+1)) - 0.5_wp*(vz(i,j,k+1)+vz(i,jm1,k+1)) ) * dx_inv )
+                            dd_ab = 0.5_wp*(dd_ab_dn+dd_ab_up)
+
+                            ! dd_ab(1) = 0.5_wp*( &
+                            !             ( 0.5_wp*(vz(ip1,j,k)+vz(ip1,jp1,k)) - 0.5_wp*(vz(i,j,k)+vz(i,jp1,k)) ) * dx_inv &
+                            !           + ( 0.5_wp*(vz(ip1,j,k+1)+vz(ip1,jp1,k+1)) - 0.5_wp*(vz(i,j,k+1)+vz(i,jp1,k+1)) ) * dx_inv )
+                        
+                            ! dd_ab(2) = 0.5_wp*( &
+                            !             ( 0.5_wp*(vz(i,j,k)+vz(i,jp1,k)) - 0.5_wp*(vz(im1,j,k)+vz(im1,jp1,k)) ) * dx_inv &
+                            !           + ( 0.5_wp*(vz(i,j,k+1)+vz(i,jp1,k+1)) - 0.5_wp*(vz(im1,j,k+1)+vz(im1,jp1,k+1)) ) * dx_inv )
+
+                            ! dd_ab(3) = 0.5_wp*( &
+                            !             ( 0.5_wp*(vz(i,j,k)+vz(i,jm1,k)) - 0.5_wp*(vz(im1,j,k)+vz(im1,jm1,k)) ) * dx_inv &
+                            !           + ( 0.5_wp*(vz(i,j,k+1)+vz(i,jm1,k+1)) - 0.5_wp*(vz(im1,j,k+1)+vz(im1,jm1,k+1)) ) * dx_inv )
+                            
+                            ! dd_ab(4) = 0.5_wp*( &
+                            !             ( 0.5_wp*(vz(ip1,j,k)+vz(ip1,jm1,k)) - 0.5_wp*(vz(i,j,k)+vz(i,jm1,k)) ) * dx_inv &
+                            !           + ( 0.5_wp*(vz(ip1,j,k+1)+vz(ip1,jm1,k+1)) - 0.5_wp*(vz(i,j,k+1)+vz(i,jm1,k+1)) ) * dx_inv )
                         end if 
 
                         lzx = sum(wt_ab*dd_ab)
@@ -681,33 +691,43 @@ contains
 
                         if (k .eq. 1) then
                             ! Basal layer 
-                            dd_ab(1) = ( 0.5_wp*(vz(i,jp1,k)+vz(ip1,jp1,k)) - 0.5_wp*(vz(i,j,k)+vz(ip1,j,k)) ) * dy_inv
-                            dd_ab(2) = ( 0.5_wp*(vz(i,jp1,k)+vz(im1,jp1,k)) - 0.5_wp*(vz(i,j,k)+vz(im1,j,k)) ) * dy_inv
-                            dd_ab(3) = ( 0.5_wp*(vz(i,j,k)+vz(im1,j,k)) - 0.5_wp*(vz(i,jm1,k)+vz(im1,jm1,k)) ) * dy_inv
-                            dd_ab(4) = ( 0.5_wp*(vz(i,j,k)+vz(ip1,j,k)) - 0.5_wp*(vz(i,jm1,k)+vz(ip1,jm1,k)) ) * dy_inv
+                            call staggerdiff_nodes_acz_dy_ab_ice(dd_ab,vz(:,:,k),f_ice,i,j,dy)
+
+                            ! dd_ab(1) = ( 0.5_wp*(vz(i,jp1,k)+vz(ip1,jp1,k)) - 0.5_wp*(vz(i,j,k)+vz(ip1,j,k)) ) * dy_inv
+                            ! dd_ab(2) = ( 0.5_wp*(vz(i,jp1,k)+vz(im1,jp1,k)) - 0.5_wp*(vz(i,j,k)+vz(im1,j,k)) ) * dy_inv
+                            ! dd_ab(3) = ( 0.5_wp*(vz(i,j,k)+vz(im1,j,k)) - 0.5_wp*(vz(i,jm1,k)+vz(im1,jm1,k)) ) * dy_inv
+                            ! dd_ab(4) = ( 0.5_wp*(vz(i,j,k)+vz(ip1,j,k)) - 0.5_wp*(vz(i,jm1,k)+vz(ip1,jm1,k)) ) * dy_inv
                         else if (k .eq. nz_aa) then 
                             ! Surface layer
-                            dd_ab(1) = ( 0.5_wp*(vz(i,jp1,k+1)+vz(ip1,jp1,k+1)) - 0.5_wp*(vz(i,j,k+1)+vz(ip1,j,k+1)) ) * dy_inv
-                            dd_ab(2) = ( 0.5_wp*(vz(i,jp1,k+1)+vz(im1,jp1,k+1)) - 0.5_wp*(vz(i,j,k+1)+vz(im1,j,k+1)) ) * dy_inv
-                            dd_ab(3) = ( 0.5_wp*(vz(i,j,k+1)+vz(im1,j,k+1)) - 0.5_wp*(vz(i,jm1,k+1)+vz(im1,jm1,k+1)) ) * dy_inv
-                            dd_ab(4) = ( 0.5_wp*(vz(i,j,k+1)+vz(ip1,j,k+1)) - 0.5_wp*(vz(i,jm1,k+1)+vz(ip1,jm1,k+1)) ) * dy_inv
+                            call staggerdiff_nodes_acz_dy_ab_ice(dd_ab,vz(:,:,k+1),f_ice,i,j,dy)
+
+                            ! dd_ab(1) = ( 0.5_wp*(vz(i,jp1,k+1)+vz(ip1,jp1,k+1)) - 0.5_wp*(vz(i,j,k+1)+vz(ip1,j,k+1)) ) * dy_inv
+                            ! dd_ab(2) = ( 0.5_wp*(vz(i,jp1,k+1)+vz(im1,jp1,k+1)) - 0.5_wp*(vz(i,j,k+1)+vz(im1,j,k+1)) ) * dy_inv
+                            ! dd_ab(3) = ( 0.5_wp*(vz(i,j,k+1)+vz(im1,j,k+1)) - 0.5_wp*(vz(i,jm1,k+1)+vz(im1,jm1,k+1)) ) * dy_inv
+                            ! dd_ab(4) = ( 0.5_wp*(vz(i,j,k+1)+vz(ip1,j,k+1)) - 0.5_wp*(vz(i,jm1,k+1)+vz(ip1,jm1,k+1)) ) * dy_inv
                         else 
                             ! Intermediate layers
-                            dd_ab(1) = 0.5_wp*( &
-                                        ( 0.5_wp*(vz(i,jp1,k)+vz(ip1,jp1,k)) - 0.5_wp*(vz(i,j,k)+vz(ip1,j,k)) ) * dy_inv &
-                                      + ( 0.5_wp*(vz(i,jp1,k+1)+vz(ip1,jp1,k+1)) - 0.5_wp*(vz(i,j,k+1)+vz(ip1,j,k+1)) ) * dy_inv )
-                        
-                            dd_ab(2) = 0.5_wp*( &
-                                        ( 0.5_wp*(vz(i,jp1,k)+vz(im1,jp1,k)) - 0.5_wp*(vz(i,j,k)+vz(im1,j,k)) ) * dy_inv &
-                                      + ( 0.5_wp*(vz(i,jp1,k+1)+vz(im1,jp1,k+1)) - 0.5_wp*(vz(i,j,k+1)+vz(im1,j,k+1)) ) * dy_inv )
 
-                            dd_ab(3) = 0.5_wp*( &
-                                        ( 0.5_wp*(vz(i,j,k)+vz(im1,j,k)) - 0.5_wp*(vz(i,jm1,k)+vz(im1,jm1,k)) ) * dy_inv &
-                                      + ( 0.5_wp*(vz(i,j,k+1)+vz(im1,j,k+1)) - 0.5_wp*(vz(i,jm1,k+1)+vz(im1,jm1,k+1)) ) * dy_inv )
+                            call staggerdiff_nodes_acz_dy_ab_ice(dd_ab_up,vz(:,:,k+1),f_ice,i,j,dy)
+                            call staggerdiff_nodes_acz_dy_ab_ice(dd_ab_dn,vz(:,:,k),  f_ice,i,j,dy)
                             
-                            dd_ab(4) = 0.5_wp*( &
-                                        ( 0.5_wp*(vz(i,j,k)+vz(ip1,j,k)) - 0.5_wp*(vz(i,jm1,k)+vz(ip1,jm1,k)) ) * dy_inv &
-                                      + ( 0.5_wp*(vz(i,j,k+1)+vz(ip1,j,k+1)) - 0.5_wp*(vz(i,jm1,k+1)+vz(ip1,jm1,k+1)) ) * dy_inv )
+                            dd_ab = 0.5_wp*(dd_ab_dn+dd_ab_up)
+
+                            ! dd_ab(1) = 0.5_wp*( &
+                            !             ( 0.5_wp*(vz(i,jp1,k)+vz(ip1,jp1,k)) - 0.5_wp*(vz(i,j,k)+vz(ip1,j,k)) ) * dy_inv &
+                            !           + ( 0.5_wp*(vz(i,jp1,k+1)+vz(ip1,jp1,k+1)) - 0.5_wp*(vz(i,j,k+1)+vz(ip1,j,k+1)) ) * dy_inv )
+                        
+                            ! dd_ab(2) = 0.5_wp*( &
+                            !             ( 0.5_wp*(vz(i,jp1,k)+vz(im1,jp1,k)) - 0.5_wp*(vz(i,j,k)+vz(im1,j,k)) ) * dy_inv &
+                            !           + ( 0.5_wp*(vz(i,jp1,k+1)+vz(im1,jp1,k+1)) - 0.5_wp*(vz(i,j,k+1)+vz(im1,j,k+1)) ) * dy_inv )
+
+                            ! dd_ab(3) = 0.5_wp*( &
+                            !             ( 0.5_wp*(vz(i,j,k)+vz(im1,j,k)) - 0.5_wp*(vz(i,jm1,k)+vz(im1,jm1,k)) ) * dy_inv &
+                            !           + ( 0.5_wp*(vz(i,j,k+1)+vz(im1,j,k+1)) - 0.5_wp*(vz(i,jm1,k+1)+vz(im1,jm1,k+1)) ) * dy_inv )
+                            
+                            ! dd_ab(4) = 0.5_wp*( &
+                            !             ( 0.5_wp*(vz(i,j,k)+vz(ip1,j,k)) - 0.5_wp*(vz(i,jm1,k)+vz(ip1,jm1,k)) ) * dy_inv &
+                            !           + ( 0.5_wp*(vz(i,j,k+1)+vz(ip1,j,k+1)) - 0.5_wp*(vz(i,jm1,k+1)+vz(ip1,jm1,k+1)) ) * dy_inv )
                         end if 
 
                         lzy = sum(wt_ab*dd_ab)

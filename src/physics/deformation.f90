@@ -460,10 +460,10 @@ contains
         real(wp), allocatable :: fact_x(:,:), fact_y(:,:)
         real(wp), allocatable :: fact_z(:)
 
-        logical :: is_margin 
-        real(wp) :: div_free, dxx_free, dyy_free 
         real(wp) :: wt 
         real(wp) :: dd_ab(4) 
+        real(wp) :: dd_ab_up(4)
+        real(wp) :: dd_ab_dn(4)
         real(wp) :: wt_ab(4) 
 
         ! Define dy 
@@ -626,7 +626,7 @@ contains
                         
                         ! dd_ab(4) = (vy(ip1,jm1,k)-vy(i,jm1,k))*dx_inv 
                         
-                        call staggerdiffcross_nodes_acx_ab_ice(dd_ab,vy(:,:,k),f_ice,i,j,dx)
+                        call staggerdiffcross_nodes_acy_ab_ice(dd_ab,vy(:,:,k),f_ice,i,j,dx)
 
                         lyx = sum(wt_ab*dd_ab)
 
@@ -722,40 +722,55 @@ contains
                             ! Basal layer
                             ! Gradient from first aa-node above base to base 
 
-                            dd_ab(1) =  ( 0.5_wp*(vx(i,j,k+1)+vx(i,jp1,k+1)) &
-                                        - 0.5_wp*(vx(i,j,k)+vx(i,jp1,k)) )*fact_z(k)*H_ice_inv
-                            dd_ab(2) =  ( 0.5_wp*(vx(im1,j,k+1)+vx(im1,jp1,k+1)) &
-                                        - 0.5_wp*(vx(im1,j,k)+vx(im1,jp1,k)) )*fact_z(k)*H_ice_inv
-                            dd_ab(3) =  ( 0.5_wp*(vx(im1,j,k+1)+vx(im1,jm1,k+1)) &
-                                        - 0.5_wp*(vx(im1,j,k)+vx(im1,jm1,k)) )*fact_z(k)*H_ice_inv
-                            dd_ab(4) =  ( 0.5_wp*(vx(i,j,k+1)+vx(i,jm1,k+1)) &
-                                        - 0.5_wp*(vx(i,j,k)+vx(i,jm1,k)) )*fact_z(k)*H_ice_inv
+                            call stagger_nodes_acx_ab_ice(dd_ab_up,vx(:,:,k+1),f_ice,i,j)
+                            call stagger_nodes_acx_ab_ice(dd_ab_dn,vx(:,:,k),  f_ice,i,j)
+
+                            dd_ab = (dd_ab_up - dd_ab_dn)*fact_z(k)*H_ice_inv
+
+                            ! dd_ab(1) =  ( 0.5_wp*(vx(i,j,k+1)+vx(i,jp1,k+1)) &
+                            !             - 0.5_wp*(vx(i,j,k)+vx(i,jp1,k)) )*fact_z(k)*H_ice_inv
+                            ! dd_ab(2) =  ( 0.5_wp*(vx(im1,j,k+1)+vx(im1,jp1,k+1)) &
+                            !             - 0.5_wp*(vx(im1,j,k)+vx(im1,jp1,k)) )*fact_z(k)*H_ice_inv
+                            ! dd_ab(3) =  ( 0.5_wp*(vx(im1,j,k+1)+vx(im1,jm1,k+1)) &
+                            !             - 0.5_wp*(vx(im1,j,k)+vx(im1,jm1,k)) )*fact_z(k)*H_ice_inv
+                            ! dd_ab(4) =  ( 0.5_wp*(vx(i,j,k+1)+vx(i,jm1,k+1)) &
+                            !             - 0.5_wp*(vx(i,j,k)+vx(i,jm1,k)) )*fact_z(k)*H_ice_inv
 
                         else if (k .eq. nz_aa) then 
                             ! Surface layer
                             ! Gradient from surface to first aa-node below surface 
 
-                            dd_ab(1) =  ( 0.5_wp*(vx(i,j,k)+vx(i,jp1,k)) &
-                                        - 0.5_wp*(vx(i,j,k-1)+vx(i,jp1,k-1)) )*fact_z(k)*H_ice_inv
-                            dd_ab(2) =  ( 0.5_wp*(vx(im1,j,k)+vx(im1,jp1,k)) &
-                                        - 0.5_wp*(vx(im1,j,k-1)+vx(im1,jp1,k-1)) )*fact_z(k)*H_ice_inv
-                            dd_ab(3) =  ( 0.5_wp*(vx(im1,j,k)+vx(im1,jm1,k)) &
-                                        - 0.5_wp*(vx(im1,j,k-1)+vx(im1,jm1,k-1)) )*fact_z(k)*H_ice_inv
-                            dd_ab(4) =  ( 0.5_wp*(vx(i,j,k)+vx(i,jm1,k)) &
-                                        - 0.5_wp*(vx(i,j,k-1)+vx(i,jm1,k-1)) )*fact_z(k)*H_ice_inv
+                            call stagger_nodes_acx_ab_ice(dd_ab_up,vx(:,:,k),  f_ice,i,j)
+                            call stagger_nodes_acx_ab_ice(dd_ab_dn,vx(:,:,k-1),f_ice,i,j)
+
+                            dd_ab = (dd_ab_up - dd_ab_dn)*fact_z(k)*H_ice_inv
+                            
+                            ! dd_ab(1) =  ( 0.5_wp*(vx(i,j,k)+vx(i,jp1,k)) &
+                            !             - 0.5_wp*(vx(i,j,k-1)+vx(i,jp1,k-1)) )*fact_z(k)*H_ice_inv
+                            ! dd_ab(2) =  ( 0.5_wp*(vx(im1,j,k)+vx(im1,jp1,k)) &
+                            !             - 0.5_wp*(vx(im1,j,k-1)+vx(im1,jp1,k-1)) )*fact_z(k)*H_ice_inv
+                            ! dd_ab(3) =  ( 0.5_wp*(vx(im1,j,k)+vx(im1,jm1,k)) &
+                            !             - 0.5_wp*(vx(im1,j,k-1)+vx(im1,jm1,k-1)) )*fact_z(k)*H_ice_inv
+                            ! dd_ab(4) =  ( 0.5_wp*(vx(i,j,k)+vx(i,jm1,k)) &
+                            !             - 0.5_wp*(vx(i,j,k-1)+vx(i,jm1,k-1)) )*fact_z(k)*H_ice_inv
                             
                         else 
                             ! Intermediate layers
                             ! Gradient from aa-node above to aa-node below
 
-                            dd_ab(1) =  ( 0.5_wp*(vx(i,j,k+1)+vx(i,jp1,k+1)) &
-                                        - 0.5_wp*(vx(i,j,k-1)+vx(i,jp1,k-1)) )*fact_z(k)*H_ice_inv
-                            dd_ab(2) =  ( 0.5_wp*(vx(im1,j,k+1)+vx(im1,jp1,k+1)) &
-                                        - 0.5_wp*(vx(im1,j,k-1)+vx(im1,jp1,k-1)) )*fact_z(k)*H_ice_inv
-                            dd_ab(3) =  ( 0.5_wp*(vx(im1,j,k+1)+vx(im1,jm1,k+1)) &
-                                        - 0.5_wp*(vx(im1,j,k-1)+vx(im1,jm1,k-1)) )*fact_z(k)*H_ice_inv
-                            dd_ab(4) =  ( 0.5_wp*(vx(i,j,k+1)+vx(i,jm1,k+1)) &
-                                        - 0.5_wp*(vx(i,j,k-1)+vx(i,jm1,k-1)) )*fact_z(k)*H_ice_inv
+                            call stagger_nodes_acx_ab_ice(dd_ab_up,vx(:,:,k+1),f_ice,i,j)
+                            call stagger_nodes_acx_ab_ice(dd_ab_dn,vx(:,:,k-1),f_ice,i,j)
+
+                            dd_ab = (dd_ab_up - dd_ab_dn)*fact_z(k)*H_ice_inv
+                            
+                            ! dd_ab(1) =  ( 0.5_wp*(vx(i,j,k+1)+vx(i,jp1,k+1)) &
+                            !             - 0.5_wp*(vx(i,j,k-1)+vx(i,jp1,k-1)) )*fact_z(k)*H_ice_inv
+                            ! dd_ab(2) =  ( 0.5_wp*(vx(im1,j,k+1)+vx(im1,jp1,k+1)) &
+                            !             - 0.5_wp*(vx(im1,j,k-1)+vx(im1,jp1,k-1)) )*fact_z(k)*H_ice_inv
+                            ! dd_ab(3) =  ( 0.5_wp*(vx(im1,j,k+1)+vx(im1,jm1,k+1)) &
+                            !             - 0.5_wp*(vx(im1,j,k-1)+vx(im1,jm1,k-1)) )*fact_z(k)*H_ice_inv
+                            ! dd_ab(4) =  ( 0.5_wp*(vx(i,j,k+1)+vx(i,jm1,k+1)) &
+                            !             - 0.5_wp*(vx(i,j,k-1)+vx(i,jm1,k-1)) )*fact_z(k)*H_ice_inv
                             
                         end if 
 
@@ -769,40 +784,55 @@ contains
                             ! Basal layer
                             ! Gradient from first aa-node above base to base 
 
-                            dd_ab(1) =  ( 0.5_wp*(vy(i,j,k+1)+vy(ip1,j,k+1)) &
-                                        - 0.5_wp*(vy(i,j,k)+vy(ip1,j,k)) )*fact_z(k)*H_ice_inv
-                            dd_ab(2) =  ( 0.5_wp*(vy(i,j,k+1)+vy(im1,j,k+1)) &
-                                        - 0.5_wp*(vy(i,j,k)+vy(im1,j,k)) )*fact_z(k)*H_ice_inv
-                            dd_ab(3) =  ( 0.5_wp*(vy(i,jm1,k+1)+vy(im1,jm1,k+1)) &
-                                        - 0.5_wp*(vy(i,jm1,k)+vy(im1,jm1,k)) )*fact_z(k)*H_ice_inv
-                            dd_ab(4) =  ( 0.5_wp*(vy(i,jm1,k+1)+vy(ip1,jm1,k+1)) &
-                                        - 0.5_wp*(vy(i,jm1,k)+vy(ip1,jm1,k)) )*fact_z(k)*H_ice_inv
+                            call stagger_nodes_acy_ab_ice(dd_ab_up,vy(:,:,k+1),f_ice,i,j)
+                            call stagger_nodes_acy_ab_ice(dd_ab_dn,vy(:,:,k),  f_ice,i,j)
+
+                            dd_ab = (dd_ab_up - dd_ab_dn)*fact_z(k)*H_ice_inv
+                            
+                            ! dd_ab(1) =  ( 0.5_wp*(vy(i,j,k+1)+vy(ip1,j,k+1)) &
+                            !             - 0.5_wp*(vy(i,j,k)+vy(ip1,j,k)) )*fact_z(k)*H_ice_inv
+                            ! dd_ab(2) =  ( 0.5_wp*(vy(i,j,k+1)+vy(im1,j,k+1)) &
+                            !             - 0.5_wp*(vy(i,j,k)+vy(im1,j,k)) )*fact_z(k)*H_ice_inv
+                            ! dd_ab(3) =  ( 0.5_wp*(vy(i,jm1,k+1)+vy(im1,jm1,k+1)) &
+                            !             - 0.5_wp*(vy(i,jm1,k)+vy(im1,jm1,k)) )*fact_z(k)*H_ice_inv
+                            ! dd_ab(4) =  ( 0.5_wp*(vy(i,jm1,k+1)+vy(ip1,jm1,k+1)) &
+                            !             - 0.5_wp*(vy(i,jm1,k)+vy(ip1,jm1,k)) )*fact_z(k)*H_ice_inv
 
                         else if (k .eq. nz_aa) then 
                             ! Surface layer
                             ! Gradient from surface to first aa-node below surface 
 
-                            dd_ab(1) =  ( 0.5_wp*(vy(i,j,k)+vy(ip1,j,k)) &
-                                        - 0.5_wp*(vy(i,j,k-1)+vy(ip1,j,k-1)) )*fact_z(k)*H_ice_inv
-                            dd_ab(2) =  ( 0.5_wp*(vy(i,j,k)+vy(im1,j,k)) &
-                                        - 0.5_wp*(vy(i,j,k-1)+vy(im1,j,k-1)) )*fact_z(k)*H_ice_inv
-                            dd_ab(3) =  ( 0.5_wp*(vy(i,jm1,k)+vy(im1,jm1,k)) &
-                                        - 0.5_wp*(vy(i,jm1,k-1)+vy(im1,jm1,k-1)) )*fact_z(k)*H_ice_inv
-                            dd_ab(4) =  ( 0.5_wp*(vy(i,jm1,k)+vy(ip1,jm1,k)) &
-                                        - 0.5_wp*(vy(i,jm1,k-1)+vy(ip1,jm1,k-1)) )*fact_z(k)*H_ice_inv
+                            call stagger_nodes_acy_ab_ice(dd_ab_up,vy(:,:,k),  f_ice,i,j)
+                            call stagger_nodes_acy_ab_ice(dd_ab_dn,vy(:,:,k-1),f_ice,i,j)
+
+                            dd_ab = (dd_ab_up - dd_ab_dn)*fact_z(k)*H_ice_inv
+                            
+                            ! dd_ab(1) =  ( 0.5_wp*(vy(i,j,k)+vy(ip1,j,k)) &
+                            !             - 0.5_wp*(vy(i,j,k-1)+vy(ip1,j,k-1)) )*fact_z(k)*H_ice_inv
+                            ! dd_ab(2) =  ( 0.5_wp*(vy(i,j,k)+vy(im1,j,k)) &
+                            !             - 0.5_wp*(vy(i,j,k-1)+vy(im1,j,k-1)) )*fact_z(k)*H_ice_inv
+                            ! dd_ab(3) =  ( 0.5_wp*(vy(i,jm1,k)+vy(im1,jm1,k)) &
+                            !             - 0.5_wp*(vy(i,jm1,k-1)+vy(im1,jm1,k-1)) )*fact_z(k)*H_ice_inv
+                            ! dd_ab(4) =  ( 0.5_wp*(vy(i,jm1,k)+vy(ip1,jm1,k)) &
+                            !             - 0.5_wp*(vy(i,jm1,k-1)+vy(ip1,jm1,k-1)) )*fact_z(k)*H_ice_inv
 
                         else 
                             ! Intermediate layers
                             ! Gradient from aa-node above to aa-node below
 
-                            dd_ab(1) =  ( 0.5_wp*(vy(i,j,k+1)+vy(ip1,j,k+1)) &
-                                        - 0.5_wp*(vy(i,j,k-1)+vy(ip1,j,k-1)) )*fact_z(k)*H_ice_inv
-                            dd_ab(2) =  ( 0.5_wp*(vy(i,j,k+1)+vy(im1,j,k+1)) &
-                                        - 0.5_wp*(vy(i,j,k-1)+vy(im1,j,k-1)) )*fact_z(k)*H_ice_inv
-                            dd_ab(3) =  ( 0.5_wp*(vy(i,jm1,k+1)+vy(im1,jm1,k+1)) &
-                                        - 0.5_wp*(vy(i,jm1,k-1)+vy(im1,jm1,k-1)) )*fact_z(k)*H_ice_inv
-                            dd_ab(4) =  ( 0.5_wp*(vy(i,jm1,k+1)+vy(ip1,jm1,k+1)) &
-                                        - 0.5_wp*(vy(i,jm1,k-1)+vy(ip1,jm1,k-1)) )*fact_z(k)*H_ice_inv
+                            call stagger_nodes_acy_ab_ice(dd_ab_up,vy(:,:,k+1),f_ice,i,j)
+                            call stagger_nodes_acy_ab_ice(dd_ab_dn,vy(:,:,k-1),f_ice,i,j)
+
+                            dd_ab = (dd_ab_up - dd_ab_dn)*fact_z(k)*H_ice_inv
+                            
+                            ! dd_ab(1) =  ( 0.5_wp*(vy(i,j,k+1)+vy(ip1,j,k+1)) &
+                            !             - 0.5_wp*(vy(i,j,k-1)+vy(ip1,j,k-1)) )*fact_z(k)*H_ice_inv
+                            ! dd_ab(2) =  ( 0.5_wp*(vy(i,j,k+1)+vy(im1,j,k+1)) &
+                            !             - 0.5_wp*(vy(i,j,k-1)+vy(im1,j,k-1)) )*fact_z(k)*H_ice_inv
+                            ! dd_ab(3) =  ( 0.5_wp*(vy(i,jm1,k+1)+vy(im1,jm1,k+1)) &
+                            !             - 0.5_wp*(vy(i,jm1,k-1)+vy(im1,jm1,k-1)) )*fact_z(k)*H_ice_inv
+                            ! dd_ab(4) =  ( 0.5_wp*(vy(i,jm1,k+1)+vy(ip1,jm1,k+1)) &
+                            !             - 0.5_wp*(vy(i,jm1,k-1)+vy(ip1,jm1,k-1)) )*fact_z(k)*H_ice_inv
 
                         end if 
 
@@ -813,6 +843,10 @@ contains
                         strn%dxz(i,j,k) = 0.5_wp*(lxz+lzx)
                         strn%dyz(i,j,k) = 0.5_wp*(lyz+lzy)
 
+                        ! Avoid extreme values (can happen at margins)
+                        if (abs(strn%dxz(i,j,k)) .gt. de_max) strn%dxz(i,j,k) = de_max 
+                        if (abs(strn%dyz(i,j,k)) .gt. de_max) strn%dyz(i,j,k) = de_max 
+        
                         ! Avoid underflows 
                         if (abs(strn%dxz(i,j,k)) .lt. TOL_UNDERFLOW) strn%dxz(i,j,k) = 0.0 
                         if (abs(strn%dyz(i,j,k)) .lt. TOL_UNDERFLOW) strn%dyz(i,j,k) = 0.0 

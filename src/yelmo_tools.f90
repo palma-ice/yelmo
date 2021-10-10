@@ -760,7 +760,8 @@ contains
         du_ab = 0.0_wp 
 
         ! (1) Upper-right node average
-        wt_aa = 0.0_wp 
+        wt_aa = 0.0_wp
+        du_aa = 0.0_wp  
         if (f_ice(i,j) .eq. 1.0_wp) then 
             du_aa(1) = (u_acx(i,j) - u_acx(im1,j)) / dx 
             wt_aa(1) = 1.0_wp 
@@ -784,6 +785,7 @@ contains
 
         ! (2) Upper-left node average
         wt_aa = 0.0_wp 
+        du_aa = 0.0_wp 
         if (f_ice(i,j) .eq. 1.0_wp) then 
             du_aa(1) = (u_acx(i,j) - u_acx(im1,j)) / dx 
             wt_aa(1) = 1.0_wp 
@@ -807,6 +809,7 @@ contains
         
         ! (3) Lower-left node average
         wt_aa = 0.0_wp 
+        du_aa = 0.0_wp 
         if (f_ice(i,j) .eq. 1.0_wp) then 
             du_aa(1) = (u_acx(i,j) - u_acx(im1,j)) / dx 
             wt_aa(1) = 1.0_wp 
@@ -830,6 +833,7 @@ contains
         
         ! (4) Lower-right node average
         wt_aa = 0.0_wp 
+        du_aa = 0.0_wp 
         if (f_ice(i,j) .eq. 1.0_wp) then 
             du_aa(1) = (u_acx(i,j) - u_acx(im1,j)) / dx 
             wt_aa(1) = 1.0_wp 
@@ -852,7 +856,7 @@ contains
         end if 
         
         where (abs(du_ab) .lt. TOL_UNDERFLOW) du_ab = 0.0_wp 
-        
+
         return 
 
     end subroutine staggerdiff_nodes_acx_ab_ice
@@ -894,7 +898,8 @@ contains
         du_ab = 0.0_wp 
 
         ! (1) Upper-right node average
-        wt_aa = 0.0_wp 
+        wt_aa = 0.0_wp
+        du_aa = 0.0_wp
         if (f_ice(i,j) .eq. 1.0_wp) then 
             du_aa(1) = (u_acy(i,j) - u_acy(i,jm1)) / dy 
             wt_aa(1) = 1.0_wp 
@@ -918,6 +923,7 @@ contains
 
         ! (2) Upper-left node average
         wt_aa = 0.0_wp 
+        du_aa = 0.0_wp
         if (f_ice(i,j) .eq. 1.0_wp) then 
             du_aa(1) = (u_acy(i,j) - u_acy(i,jm1)) / dy 
             wt_aa(1) = 1.0_wp 
@@ -941,6 +947,7 @@ contains
         
         ! (3) Lower-left node average
         wt_aa = 0.0_wp 
+        du_aa = 0.0_wp
         if (f_ice(i,j) .eq. 1.0_wp) then 
             du_aa(1) = (u_acy(i,j) - u_acy(i,jm1)) / dy 
             wt_aa(1) = 1.0_wp 
@@ -964,6 +971,7 @@ contains
         
         ! (4) Lower-right node average
         wt_aa = 0.0_wp 
+        du_aa = 0.0_wp
         if (f_ice(i,j) .eq. 1.0_wp) then 
             du_aa(1) = (u_acy(i,j) - u_acy(i,jm1)) / dy 
             wt_aa(1) = 1.0_wp 
@@ -1139,6 +1147,7 @@ contains
 
         ! (1) Upper-right node average
         wt_ac = 0.0_wp 
+        du_ac = 0.0_wp
         if (f_ice(i,j) .eq. 1.0_wp .and. f_ice(ip1,j) .eq. 1.0_wp) then 
             du_ac(1) = (u_acz(ip1,j) - u_acz(i,j)) / dx 
             wt_ac(1) = 1.0_wp 
@@ -1154,6 +1163,7 @@ contains
 
         ! (2) Upper-left node average
         wt_ac = 0.0_wp 
+        du_ac = 0.0_wp
         if (f_ice(i,j) .eq. 1.0_wp .and. f_ice(im1,j) .eq. 1.0_wp) then 
             du_ac(1) = (u_acz(i,j) - u_acz(im1,j)) / dx 
             wt_ac(1) = 1.0_wp 
@@ -1169,6 +1179,7 @@ contains
 
         ! (3) Lower-left node average
         wt_ac = 0.0_wp 
+        du_ac = 0.0_wp
         if (f_ice(i,j) .eq. 1.0_wp .and. f_ice(im1,j) .eq. 1.0_wp) then 
             du_ac(1) = (u_acz(i,j) - u_acz(im1,j)) / dx 
             wt_ac(1) = 1.0_wp 
@@ -1182,8 +1193,9 @@ contains
             du_ab(3) = sum(du_ac*wt_ac) / sum(wt_ac)
         end if
 
-        ! (1) Lower-right node average
-        wt_ac = 0.0_wp 
+        ! (4) Lower-right node average
+        wt_ac = 0.0_wp
+        du_ac = 0.0_wp 
         if (f_ice(i,j) .eq. 1.0_wp .and. f_ice(ip1,j) .eq. 1.0_wp) then 
             du_ac(1) = (u_acz(ip1,j) - u_acz(i,j)) / dx 
             wt_ac(1) = 1.0_wp 
@@ -1241,6 +1253,7 @@ contains
 
         ! (1) Upper-right node average
         wt_ac = 0.0_wp 
+        du_ac = 0.0_wp
         if (f_ice(i,j) .eq. 1.0_wp .and. f_ice(i,jp1) .eq. 1.0_wp) then 
             du_ac(1) = (u_acz(i,jp1) - u_acz(i,j)) / dy 
             wt_ac(1) = 1.0_wp 
@@ -1256,6 +1269,7 @@ contains
 
         ! (2) Upper-left node average
         wt_ac = 0.0_wp 
+        du_ac = 0.0_wp
         if (f_ice(i,j) .eq. 1.0_wp .and. f_ice(i,jp1) .eq. 1.0_wp) then 
             du_ac(1) = (u_acz(i,jp1) - u_acz(i,j)) / dy 
             wt_ac(1) = 1.0_wp 
@@ -1271,6 +1285,7 @@ contains
 
         ! (3) Lower-left node average
         wt_ac = 0.0_wp 
+        du_ac = 0.0_wp
         if (f_ice(i,j) .eq. 1.0_wp .and. f_ice(i,jm1) .eq. 1.0_wp) then 
             du_ac(1) = (u_acz(i,j) - u_acz(i,jm1)) / dy 
             wt_ac(1) = 1.0_wp 
@@ -1284,8 +1299,9 @@ contains
             du_ab(3) = sum(du_ac*wt_ac) / sum(wt_ac)
         end if
 
-        ! (1) Lower-right node average
+        ! (4) Lower-right node average
         wt_ac = 0.0_wp 
+        du_ac = 0.0_wp
         if (f_ice(i,j) .eq. 1.0_wp .and. f_ice(i,jm1) .eq. 1.0_wp) then 
             du_ac(1) = (u_acz(i,j) - u_acz(i,jm1)) / dy 
             wt_ac(1) = 1.0_wp 

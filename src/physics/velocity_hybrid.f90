@@ -3,8 +3,12 @@ module velocity_hybrid
     ! using the 'hybrid' (SIA+SSA) approximation. 
 
     use yelmo_defs ,only  : sp, dp, wp, prec, tol_underflow, rho_ice, rho_sw, rho_w, g
-    use yelmo_tools, only : stagger_aa_ab, stagger_aa_ab_ice, integrate_trapezoid1D_pt, calc_vertical_integrated_2D
-    
+    use yelmo_tools, only : stagger_aa_ab, stagger_aa_ab_ice, stagger_ab_aa_ice, & 
+                    stagger_nodes_aa_ab_ice, stagger_nodes_acx_ab_ice, stagger_nodes_acy_ab_ice, &
+                    staggerdiff_nodes_acx_ab_ice, staggerdiff_nodes_acy_ab_ice, &
+                    staggerdiffcross_nodes_acx_ab_ice, staggerdiffcross_nodes_acy_ab_ice, &
+                    integrate_trapezoid1D_1D, integrate_trapezoid1D_pt, minmax
+
     use basal_dragging 
     use solver_ssa_sico5 
     use velocity_general, only : set_inactive_margins
@@ -93,6 +97,8 @@ contains
 
         real(prec) :: L2_norm 
 
+        logical, parameter :: write_ssa_diagnostics = .FALSE. 
+
         nx    = size(ux_b,1)
         ny    = size(ux_b,2)
         nz_aa = size(zeta_aa,1)
@@ -115,6 +121,10 @@ contains
         ! outer margins before starting iterations
         call set_inactive_margins(ux_b,uy_b,f_ice)
 
+        if (write_ssa_diagnostics) then 
+            call ssa_diagnostics_write_init("yelmo_ssa.nc",nx,ny,time_init=1.0_wp)
+        end if 
+
         do iter = 1, par%ssa_iter_max 
 
             ! Store solution from previous iteration (nm1 == n minus 1) 
@@ -136,7 +146,9 @@ contains
                 case(1) 
                     ! Calculate 3D effective viscosity, using velocity solution from previous iteration
                     
-                    call calc_visc_eff_3D(visc_eff,ux_b,uy_b,ATT,H_ice,f_ice,zeta_aa,dx,dy,n_glen,par%eps_0)
+                    ! call calc_visc_eff_3D(visc_eff,ux_b,uy_b,ATT,H_ice,f_ice,zeta_aa,dx,dy,n_glen,par%eps_0)
+
+                    call calc_visc_eff_3D_new(visc_eff,ux_b,uy_b,ATT,H_ice,f_ice,zeta_aa,dx,dy,n_glen,par%eps_0)
 
                 case DEFAULT 
 
@@ -192,6 +204,12 @@ end if
             ! Store current total iterations for output
             ssa_iter_now = iter 
 
+            if (write_ssa_diagnostics) then  
+                call ssa_diagnostics_write_step("yelmo_ssa.nc",ux_b,uy_b,L2_norm,beta_acx,beta_acy,visc_eff_int, &
+                                        ssa_mask_acx,ssa_mask_acy,ssa_err_acx,ssa_err_acy,H_ice,f_ice,taud_acx,taud_acy, &
+                                        H_grnd,z_sl,z_bed,ux_b_nm1,uy_b_nm1,time=real(iter,wp))    
+            end if 
+
             ! =========================================================================================
             ! Update additional fields based on output of solver
              
@@ -203,6 +221,9 @@ end if
 
         ! Iterations are finished, finalize calculations
 
+        ! if (write_ssa_diagnostics) then 
+        !     stop 
+        ! end if 
 
         ! Diagnose basal stress 
         call calc_basal_stress(taub_acx,taub_acy,beta_acx,beta_acy,ux_b,uy_b)
@@ -439,17 +460,17 @@ end if
 
         implicit none 
         
-        real(wp), intent(OUT) :: visc_eff(:,:,:)      ! aa-nodes
-        real(wp), intent(IN)  :: ux(:,:)              ! [m/a] Vertically averaged horizontal velocity, x-component
-        real(wp), intent(IN)  :: uy(:,:)              ! [m/a] Vertically averaged horizontal velocity, y-component
-        real(wp), intent(IN)  :: ATT(:,:,:)           ! aa-nodes
+        real(wp), intent(OUT) :: visc_eff(:,:,:)        ! aa-nodes
+        real(wp), intent(IN)  :: ux(:,:)                ! [m/yr] Vertically averaged horizontal velocity, x-component
+        real(wp), intent(IN)  :: uy(:,:)                ! [m/yr] Vertically averaged horizontal velocity, y-component
+        real(wp), intent(IN)  :: ATT(:,:,:)             ! aa-nodes
         real(wp), intent(IN)  :: H_ice(:,:) 
         real(wp), intent(IN)  :: f_ice(:,:)
-        real(wp), intent(IN)  :: zeta_aa(:)           ! Vertical axis (sigma-coordinates from 0 to 1)
+        real(wp), intent(IN)  :: zeta_aa(:)             ! Vertical axis (sigma-coordinates from 0 to 1)
         real(wp), intent(IN)  :: dx
         real(wp), intent(IN)  :: dy
         real(wp), intent(IN)  :: n_glen   
-        real(wp), intent(IN)  :: eps_0                ! [1/a] Regularization constant (minimum strain rate, ~1e-8)
+        real(wp), intent(IN)  :: eps_0                  ! [1/yr] Regularization constant (minimum strain rate, ~1e-8)
         
         ! Local variables 
         integer  :: i, j, k
@@ -458,7 +479,7 @@ end if
         integer  :: nx, ny, nz  
         real(wp) :: inv_4dx, inv_4dy 
         real(wp) :: p1, p2, eps_0_sq  
-        real(wp) :: eps_sq                          ! [1/a^2]
+        real(wp) :: eps_sq                              ! [1/yr^2]
         real(wp) :: dudx_ab(4)
         real(wp) :: dvdy_ab(4)
         real(wp) :: dudy_ab(4)
@@ -475,16 +496,10 @@ end if
         real(wp) :: ux_aa, uy_aa 
         logical  :: is_margin 
 
-        !real(wp), allocatable :: ATT_bar(:,:) 
-
         nx = size(visc_eff,1)
         ny = size(visc_eff,2)
         nz = size(visc_eff,3)
         
-        ! Get vertically averaged value 
-        !allocate(ATT_bar(nx,ny))
-        !ATT_bar = calc_vertical_integrated_2D(ATT,zeta_aa)
-            
         ! Calculate scaling factors
         inv_4dx = 1.0_wp / (4.0_wp*dx) 
         inv_4dy = 1.0_wp / (4.0_wp*dy) 
@@ -511,66 +526,59 @@ end if
             jm2 = max(j-2,1) 
             jp2 = min(j+2,ny) 
 
-            ! Get ab-node weighting based on whether ice is present 
-            wt_ab = 0.0_wp 
-            if (count([f_ice(i,j),f_ice(ip1,j),f_ice(i,jp1),f_ice(ip1,jp1)].lt.1.0_wp) .eq. 0) then 
-                wt_ab(1) = 1.0_wp
-            end if
-            if (count([f_ice(i,j),f_ice(im1,j),f_ice(i,jp1),f_ice(im1,jp1)].lt.1.0_wp) .eq. 0) then 
-                wt_ab(2) = 1.0_wp 
-            end if 
-            if (count([f_ice(i,j),f_ice(im1,j),f_ice(i,jm1),f_ice(im1,jm1)].lt.1.0_wp) .eq. 0) then 
-                wt_ab(3) = 1.0_wp
-            end if 
-            if (count([f_ice(i,j),f_ice(ip1,j),f_ice(i,jm1),f_ice(ip1,jm1)].lt.1.0_wp) .eq. 0) then 
-                wt_ab(4) = 1.0_wp 
-            end if 
-            
+            wt_ab = 1.0_wp 
             wt = sum(wt_ab)
             
-            if (f_ice(i,j) .eq. 1.0_wp .and. wt .gt. 0.0_wp) then 
-                ! Fully ice-covered point with some fully ice-covered neighbors 
+            if (f_ice(i,j) .eq. 1.0_wp) then 
+                ! Fully ice-covered point
 
                 ! Normalize weighting 
                 wt_ab = wt_ab / wt 
 
                 ! === dudx ======================
 
-                dudx_ab(1) = ( (ux(ip1,j) - ux(im1,j)) + (ux(ip1,jp1) - ux(im1,jp1)) ) *inv_4dx
-                dudx_ab(2) = ( (ux(i,j)   - ux(im2,j)) + (ux(i,jp1)   - ux(im2,jp1)) ) *inv_4dx
-                dudx_ab(3) = ( (ux(i,j)   - ux(im2,j)) + (ux(i,jm1)   - ux(im2,jm1)) ) *inv_4dx
-                dudx_ab(4) = ( (ux(ip1,j) - ux(im1,j)) + (ux(ip1,jm1) - ux(im1,jm1)) ) *inv_4dx
-                where(abs(dudx_ab) .lt. TOL_UNDERFLOW) dudx_ab = 0.0_wp
+                ! dudx_ab(1) = ( (ux(ip1,j) - ux(im1,j)) + (ux(ip1,jp1) - ux(im1,jp1)) ) *inv_4dx
+                ! dudx_ab(2) = ( (ux(i,j)   - ux(im2,j)) + (ux(i,jp1)   - ux(im2,jp1)) ) *inv_4dx
+                ! dudx_ab(3) = ( (ux(i,j)   - ux(im2,j)) + (ux(i,jm1)   - ux(im2,jm1)) ) *inv_4dx
+                ! dudx_ab(4) = ( (ux(ip1,j) - ux(im1,j)) + (ux(ip1,jm1) - ux(im1,jm1)) ) *inv_4dx
+                ! where(abs(dudx_ab) .lt. TOL_UNDERFLOW) dudx_ab = 0.0_wp
                 
+                call staggerdiff_nodes_acx_ab_ice(dudx_ab,ux,f_ice,i,j,dx) 
+
                 ! === dvdy ======================
 
-                dvdy_ab(1) = ( (uy(i,jp1) - uy(i,jm1)) + (uy(ip1,jp1) - uy(ip1,jm1)) ) *inv_4dy 
-                dvdy_ab(2) = ( (uy(i,jp1) - uy(i,jm1)) + (uy(im1,jp1) - uy(im1,jm1)) ) *inv_4dy 
-                dvdy_ab(3) = ( (uy(i,j)   - uy(i,jm2)) + (uy(im1,j)   - uy(im1,jm2)) ) *inv_4dy 
-                dvdy_ab(4) = ( (uy(i,j)   - uy(i,jm2)) + (uy(ip1,j)   - uy(ip1,jm2)) ) *inv_4dy 
-                where(abs(dvdy_ab) .lt. TOL_UNDERFLOW) dvdy_ab = 0.0_wp
+                ! dvdy_ab(1) = ( (uy(i,jp1) - uy(i,jm1)) + (uy(ip1,jp1) - uy(ip1,jm1)) ) *inv_4dy 
+                ! dvdy_ab(2) = ( (uy(i,jp1) - uy(i,jm1)) + (uy(im1,jp1) - uy(im1,jm1)) ) *inv_4dy 
+                ! dvdy_ab(3) = ( (uy(i,j)   - uy(i,jm2)) + (uy(im1,j)   - uy(im1,jm2)) ) *inv_4dy 
+                ! dvdy_ab(4) = ( (uy(i,j)   - uy(i,jm2)) + (uy(ip1,j)   - uy(ip1,jm2)) ) *inv_4dy 
+                ! where(abs(dvdy_ab) .lt. TOL_UNDERFLOW) dvdy_ab = 0.0_wp
                 
+                call staggerdiff_nodes_acy_ab_ice(dvdy_ab,uy,f_ice,i,j,dy) 
 
                 ! === dudy ======================
 
-                dudy_ab(1) = (ux(i,jp1)   - ux(i,j))     / dy 
-                dudy_ab(2) = (ux(im1,jp1) - ux(im1,j))   / dy 
-                dudy_ab(3) = (ux(im1,j)   - ux(im1,jm1)) / dy 
-                dudy_ab(4) = (ux(i,j)     - ux(i,jm1))   / dy 
-                where(abs(dudy_ab) .lt. TOL_UNDERFLOW) dudy_ab = 0.0_wp
+                ! dudy_ab(1) = (ux(i,jp1)   - ux(i,j))     / dy 
+                ! dudy_ab(2) = (ux(im1,jp1) - ux(im1,j))   / dy 
+                ! dudy_ab(3) = (ux(im1,j)   - ux(im1,jm1)) / dy 
+                ! dudy_ab(4) = (ux(i,j)     - ux(i,jm1))   / dy 
+                ! where(abs(dudy_ab) .lt. TOL_UNDERFLOW) dudy_ab = 0.0_wp
                 
+                call staggerdiffcross_nodes_acx_ab_ice(dudy_ab,ux,f_ice,i,j,dy)
+
                 ! === dvdx ======================
 
-                dvdx_ab(1) = (uy(ip1,j)   - uy(i,j))     / dx 
-                dvdx_ab(2) = (uy(i,j)     - uy(im1,j))   / dx 
-                dvdx_ab(3) = (uy(i,jm1)   - uy(im1,jm1)) / dx
-                dvdx_ab(4) = (uy(ip1,jm1) - uy(i,jm1))   / dx
-                where(abs(dvdx_ab) .lt. TOL_UNDERFLOW) dvdx_ab = 0.0_wp
+                ! dvdx_ab(1) = (uy(ip1,j)   - uy(i,j))     / dx 
+                ! dvdx_ab(2) = (uy(i,j)     - uy(im1,j))   / dx 
+                ! dvdx_ab(3) = (uy(i,jm1)   - uy(im1,jm1)) / dx
+                ! dvdx_ab(4) = (uy(ip1,jm1) - uy(i,jm1))   / dx
+                ! where(abs(dvdx_ab) .lt. TOL_UNDERFLOW) dvdx_ab = 0.0_wp
 
+                call staggerdiffcross_nodes_acx_ab_ice(dvdx_ab,uy,f_ice,i,j,dx)
+                
                 ! Loop over column
                 do k = 1, nz 
 
-                    ! No vertical shear terms here 
+                    ! No vertical strain here 
                     duxdz_ab = 0.0_wp 
                     duydz_ab = 0.0_wp 
 
@@ -585,20 +593,13 @@ end if
 ! and center it, then multiply with the centered ATT value to get visc. 
 ! So that is why the central ATT value is used below. This should be 
 ! investigated further in the future perhaps.
-if (.FALSE.) then  
+if (.TRUE.) then  
                     ! Get the rate factor on ab-nodes too
-                    ATT_ab(1) = 0.25_wp*(ATT(i,j,k)+ATT(ip1,j,k)+ATT(i,jp1,k)+ATT(ip1,jp1,k)) 
-                    ATT_ab(2) = 0.25_wp*(ATT(i,j,k)+ATT(im1,j,k)+ATT(i,jp1,k)+ATT(im1,jp1,k)) 
-                    ATT_ab(3) = 0.25_wp*(ATT(i,j,k)+ATT(im1,j,k)+ATT(i,jm1,k)+ATT(im1,jm1,k)) 
-                    ATT_ab(4) = 0.25_wp*(ATT(i,j,k)+ATT(ip1,j,k)+ATT(i,jm1,k)+ATT(ip1,jm1,k)) 
-                    ! ATT_ab(1) = 0.25_wp*(ATT_bar(i,j)+ATT_bar(ip1,j)+ATT_bar(i,jp1)+ATT_bar(ip1,jp1)) 
-                    ! ATT_ab(2) = 0.25_wp*(ATT_bar(i,j)+ATT_bar(im1,j)+ATT_bar(i,jp1)+ATT_bar(im1,jp1)) 
-                    ! ATT_ab(3) = 0.25_wp*(ATT_bar(i,j)+ATT_bar(im1,j)+ATT_bar(i,jm1)+ATT_bar(im1,jm1)) 
-                    ! ATT_ab(4) = 0.25_wp*(ATT_bar(i,j)+ATT_bar(ip1,j)+ATT_bar(i,jm1)+ATT_bar(ip1,jm1)) 
+                    call stagger_nodes_aa_ab_ice(ATT_ab,ATT(:,:,k),f_ice,i,j)
 else
                     ! Just use the aa-node central value of ATT 
                     ATT_ab = ATT(i,j,k)
-                    !ATT_ab = ATT_bar(i,j)
+
 end if
 
                     ! Calculate effective viscosity on ab-nodes
@@ -614,7 +615,6 @@ end if
 
                 do k = 1, nz
                     visc_eff(i,j,k) = 0.5_wp*(eps_0_sq)**(p1) * ATT(i,j,k)**(p2)
-                    !visc_eff(i,j,k) = 0.5_wp*(eps_0_sq)**(p1) * ATT_bar(i,j)**(p2)
                 end do 
 
             end if 
@@ -633,7 +633,7 @@ end if
             jm1 = max(j-1,1) 
             jp1 = min(j+1,ny) 
             
-            if ( f_ice(i,j) .lt. 1.0 .and. &
+            if ( f_ice(i,j) .lt. 1.0 .and. f_ice(i,j) .gt. 0.0 .and. &
                 count([f_ice(im1,j),f_ice(ip1,j),f_ice(i,jm1),f_ice(i,jp1)] .eq. 1.0_wp) .gt. 0 ) then 
                 ! Ice-free (or partially ice-free) with ice-covered neighbors
 
@@ -690,13 +690,12 @@ end if
         ! Local variables 
         integer :: i, j, nx, ny
         integer :: im1, ip1, jm1, jp1  
-        real(wp) :: H_now
+        real(wp) :: H_eff
         real(wp) :: visc_eff_mean 
         real(wp) :: wt 
 
         nx = size(visc_eff_int,1)
         ny = size(visc_eff_int,2)
-
 
         do j = 1, ny 
         do i = 1, nx
@@ -705,52 +704,11 @@ end if
             visc_eff_mean = integrate_trapezoid1D_pt(visc_eff(i,j,:),zeta_aa) 
             
             if (f_ice(i,j) .eq. 1.0) then 
-                visc_eff_int(i,j) = visc_eff_mean*H_ice(i,j) 
+                H_eff = H_ice(i,j) / f_ice(i,j) 
+                visc_eff_int(i,j) = visc_eff_mean*H_eff
             else
-                visc_eff_int(i,j) = visc_eff_mean 
-            end if 
-
-        end do 
-        end do 
-
-        
-        ! Now extrapolate to ice-free or partially ice-free neighbors
-        do j = 1, ny 
-        do i = 1, nx
-
-            im1 = max(i-1,1) 
-            ip1 = min(i+1,nx) 
-            jm1 = max(j-1,1) 
-            jp1 = min(j+1,ny) 
-
-            if ( f_ice(i,j) .lt. 1.0 .and. &
-                count([f_ice(im1,j),f_ice(ip1,j),f_ice(i,jm1),f_ice(i,jp1)] .eq. 1.0) .gt. 0) then 
-                ! Ice-free or partially ice-free point at ice margin
-
-                visc_eff_int(i,j) = 0.0_wp 
-                wt = 0.0_wp 
-
-                if (f_ice(im1,j).eq.1.0) then 
-                    visc_eff_int(i,j) = visc_eff_int(i,j) + visc_eff_int(im1,j) 
-                    wt = wt + 1.0 
-                end if 
-                if (f_ice(ip1,j).eq.1.0) then 
-                    visc_eff_int(i,j) = visc_eff_int(i,j) + visc_eff_int(ip1,j) 
-                    wt = wt + 1.0 
-                end if 
-                if (f_ice(i,jm1).eq.1.0) then 
-                    visc_eff_int(i,j) = visc_eff_int(i,j) + visc_eff_int(i,jm1) 
-                    wt = wt + 1.0 
-                end if 
-                if (f_ice(i,jp1).eq.1.0) then 
-                    visc_eff_int(i,j) = visc_eff_int(i,j) + visc_eff_int(i,jp1) 
-                    wt = wt + 1.0 
-                end if 
-                
-                if (wt .gt. 0.0) then 
-                    visc_eff_int(i,j) = visc_eff_int(i,j) / wt 
-                end if 
-
+                !visc_eff_int(i,j) = visc_eff_mean 
+                visc_eff_int(i,j) = 0.0_wp
             end if 
 
         end do 

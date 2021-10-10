@@ -298,10 +298,12 @@ contains
                 ! Step 3: Finally, calculate topography corrector step
                 ! (elevation, ice thickness, calving, etc.)
                 call calc_ytopo(dom%tpo,dom%dyn,dom%mat,dom%thrm,dom%bnd,time_now,topo_fixed=dom%tpo%par%topo_fixed)    
-                
+
+if (.TRUE.) then                
                 ! ajr: testing recalculation of dynamics for stability
                 dom%dyn%par%time = dom_ref%tpo%par%time 
                 call calc_ydyn(dom%dyn,dom%tpo,dom%mat,dom%thrm,dom%bnd,time_now)
+end if 
 
                 ! Store corrected ice thickness for later use 
                 ! Do it here to ensure all changes to H_ice are accounted for (mb, calving, etc)

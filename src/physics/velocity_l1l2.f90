@@ -1,9 +1,12 @@
 module velocity_l1l2
 
     use yelmo_defs ,only  : wp, prec, rho_ice, rho_sw, rho_w, g, TOL_UNDERFLOW
-    use yelmo_tools, only : stagger_aa_ab, stagger_aa_ab_ice, stagger_ab_aa_ice, &
-                    calc_vertical_integrated_2D, & 
-                    integrate_trapezoid1D_1D, integrate_trapezoid1D_pt, minmax
+    use yelmo_tools, only : stagger_aa_ab, stagger_aa_ab_ice, stagger_ab_aa_ice, & 
+                    stagger_nodes_aa_ab_ice, stagger_nodes_acx_ab_ice, stagger_nodes_acy_ab_ice, &
+                    staggerdiff_nodes_acx_ab_ice, staggerdiff_nodes_acy_ab_ice, &
+                    staggerdiffcross_nodes_acx_ab_ice, staggerdiffcross_nodes_acy_ab_ice, &
+                    integrate_trapezoid1D_1D, integrate_trapezoid1D_pt, minmax, &
+                    calc_vertical_integrated_2D
 
     use basal_dragging 
     use solver_ssa_sico5 
@@ -319,6 +322,12 @@ end if
         real(prec) :: dzeta 
         real(wp)   :: depth 
 
+        real(wp)   :: dudx_ab4(4) 
+        real(wp)   :: dvdy_ab4(4) 
+        real(wp)   :: dudy_ab4(4)
+        real(wp)   :: dvdx_ab4(4)
+        real(wp)   :: H_ice_ab4(4)
+
         nx    = size(ux,1)
         ny    = size(ux,2) 
         nz_aa = size(ux,3) 
@@ -364,10 +373,22 @@ end if
             dudx_ab(i,j) = ( (ux_b(ip1,j) - ux_b(im1,j)) + (ux_b(ip1,jp1) - ux_b(im1,jp1)) ) *inv_4dx
             dvdy_ab(i,j) = ( (uy_b(i,jp1) - uy_b(i,jm1)) + (uy_b(ip1,jp1) - uy_b(ip1,jm1)) ) *inv_4dy 
 
+            ! call staggerdiff_nodes_acx_ab_ice(dudx_ab4,ux_b,f_ice,i,j,dx)
+            ! dudx_ab(i,j) = dudx_ab4(1)
+            
+            ! call staggerdiff_nodes_acy_ab_ice(dvdy_ab4,uy_b,f_ice,i,j,dy)
+            ! dvdy_ab(i,j) = dvdx_ab4(1) 
+
             ! Calculate cross terms on ab-nodes
             dudy_ab(i,j) = (ux_b(i,jp1) - ux_b(i,j)) / dy 
             dvdx_ab(i,j) = (uy_b(ip1,j) - uy_b(i,j)) / dx 
 
+            ! call staggerdiffcross_nodes_acx_ab_ice(dudy_ab4,ux_b,f_ice,i,j,dy)
+            ! dudy_ab(i,j) = dudy_ab4(1)
+
+            ! call staggerdiffcross_nodes_acy_ab_ice(dvdx_ab4,uy_b,f_ice,i,j,dx)
+            ! dvdx_ab(i,j) = dvdx_ab4(1)
+            
             ! Calculate the 'parallel' effective strain rate from P12, Eq. 17
             eps_par_sq = dudx_ab(i,j)**2 + dvdy_ab(i,j)**2 + dudx_ab(i,j)*dvdy_ab(i,j) &
                         + 0.25_prec*(dudy_ab(i,j)+dvdx_ab(i,j))**2 + eps_0_sq
@@ -385,11 +406,15 @@ end if
 
             H_ice_ab = 0.25_prec*(H_ice(i,j)+H_ice(ip1,j)+H_ice(i,jp1)+H_ice(ip1,jp1))
             
+            ! call stagger_nodes_aa_ab_ice(H_ice_ab4,H_ice,f_ice,i,j)
+            ! H_ice_ab = H_ice_ab4(1) 
+
             ! Start at the surface
             zeta_ac1 = zeta_aa(nz_aa)
             zeta_ac0 = 0.5_prec*(zeta_aa(nz_aa)+zeta_aa(nz_aa-1))
             visc_eff_ab_now = 0.25_prec*(visc_eff_ab(i,j,nz_aa)+visc_eff_ab(ip1,j,nz_aa)+ &
                                 visc_eff_ab(i,jp1,nz_aa)+visc_eff_ab(ip1,jp1,nz_aa))
+            ! visc_eff_ab_now = visc_eff_ab(i,j,nz_aa)
             visc_eff_int3D_ab(i,j,nz_aa) = visc_eff_ab_now &
                                             * (zeta_ac1-zeta_ac0)*H_ice_ab
 
@@ -399,6 +424,7 @@ end if
                 zeta_ac0 = 0.5_prec*(zeta_aa(k)+zeta_aa(k-1))
                 visc_eff_ab_now = 0.25_prec*(visc_eff_ab(i,j,k)+visc_eff_ab(ip1,j,k)+ &
                                 visc_eff_ab(i,jp1,k)+visc_eff_ab(ip1,jp1,k))
+                ! visc_eff_ab_now = visc_eff_ab(i,j,k)
                 visc_eff_int3D_ab(i,j,k) = visc_eff_int3D_ab(i,j,k+1) &
                                         + visc_eff_ab_now * (zeta_ac1-zeta_ac0)*H_ice_ab
             end do 
@@ -408,6 +434,7 @@ end if
             zeta_ac0 = zeta_aa(1)
             visc_eff_ab_now = 0.25_prec*(visc_eff_ab(i,j,1)+visc_eff_ab(ip1,j,1)+ &
                                 visc_eff_ab(i,jp1,1)+visc_eff_ab(ip1,jp1,1))
+            ! visc_eff_ab_now = visc_eff_ab(i,j,1)
             visc_eff_int3D_ab(i,j,1) = visc_eff_int3D_ab(i,j,2) &
                                         + visc_eff_ab_now * (zeta_ac1-zeta_ac0)*H_ice_ab
             
@@ -615,6 +642,12 @@ end if
         real(prec) :: a, b, c, rootA, rootB, np  
         real(prec) :: wt 
 
+        real(wp) :: dudx_ab4(4)
+        real(wp) :: dvdy_ab4(4)
+        real(wp) :: dudy_ab4(4)
+        real(wp) :: dvdx_ab4(4) 
+        real(wp) :: ATT_ab4(4) 
+        
         integer :: n_iter 
 
         nx    = size(ux_b,1)
@@ -648,10 +681,22 @@ end if
             dudx_ab = ( (ux_b(ip1,j) - ux_b(im1,j)) + (ux_b(ip1,jp1) - ux_b(im1,jp1)) ) *inv_4dx
             dvdy_ab = ( (uy_b(i,jp1) - uy_b(i,jm1)) + (uy_b(ip1,jp1) - uy_b(ip1,jm1)) ) *inv_4dy 
 
-            ! Calculate of cross terms on ab-nodes
-            dudy_ab = (ux_b(i,jp1) - ux_b(i,j)) / dx 
-            dvdx_ab = (uy_b(ip1,j) - uy_b(i,j)) / dy 
+            ! call staggerdiff_nodes_acx_ab_ice(dudx_ab4,ux_b,f_ice,i,j,dx)
+            ! dudx_ab = dudx_ab4(1)
+            
+            ! call staggerdiff_nodes_acy_ab_ice(dvdy_ab4,uy_b,f_ice,i,j,dy)
+            ! dvdy_ab = dvdx_ab4(1) 
 
+            ! Calculate cross terms on ab-nodes
+            dudy_ab = (ux_b(i,jp1) - ux_b(i,j)) / dy 
+            dvdx_ab = (uy_b(ip1,j) - uy_b(i,j)) / dx 
+
+            ! call staggerdiffcross_nodes_acx_ab_ice(dudy_ab4,ux_b,f_ice,i,j,dy)
+            ! dudy_ab = dudy_ab4(1)
+
+            ! call staggerdiffcross_nodes_acy_ab_ice(dvdx_ab4,uy_b,f_ice,i,j,dx)
+            ! dvdx_ab = dvdx_ab4(1)
+            
             ! Calculate the 'parallel' effective strain rate from P12, Eq. 17
             eps_par_sq = dudx_ab**2 + dvdy_ab**2 + dudx_ab*dvdy_ab &
                         + 0.25_prec*(dudy_ab+dvdx_ab)**2 + eps_0_sq
@@ -672,6 +717,9 @@ end if
                 
                 ATT_ab = 0.25_prec*(ATT(i,j,k)+ATT(ip1,j,k)+ATT(i,jp1,k)+ATT(ip1,jp1,k))
                 
+                ! call stagger_nodes_aa_ab_ice(ATT_ab4,ATT(:,:,k),f_ice,i,j)
+                ! ATT_ab = ATT_ab4(1)
+
                 tau_perp_ab = taud_ab*(1.0_prec-zeta_aa(k))
 
 if (.TRUE.) then 

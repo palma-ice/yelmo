@@ -32,12 +32,13 @@ module yelmo_ice
 
 contains
 
-    subroutine yelmo_update(dom,time)
+    subroutine yelmo_update(dom,time,file_diagnostics)
         ! Advance yelmo by calling yelmo_step n-times until new time is reached,
         ! using the predictor-corrector method (Cheng et al., 2017) 
 
         type(yelmo_class), intent(INOUT) :: dom
         real(prec), intent(IN) :: time
+        character(len=*), intent(IN), optional :: file_diagnostics
 
         ! Local variables 
         type(yelmo_class)  :: dom_ref 
@@ -390,9 +391,13 @@ end if
 
             end do   ! End iteration loop 
             
-            ! ! Now finally apply calving changes 
-            ! call calc_ytopo_second_step(dom%tpo,dom%dyn,dom%mat,dom%thrm,dom%bnd,time_now,topo_fixed=dom%tpo%par%topo_fixed)
-            
+            ! Output diagnostic file if desired 
+            if (present(file_diagnostics)) then 
+                ! Write step of continuous restart file 
+                ! (initialized externally)
+                call yelmo_restart_write(dom,file_diagnostics,time_now,init=.FALSE.)
+            end if 
+
             ! Calculate model speed for this iteration
             call yelmo_cpu_time(cpu_time1)
             call yelmo_calc_speed(speed,model_time0,time_now,cpu_time0,cpu_time1)

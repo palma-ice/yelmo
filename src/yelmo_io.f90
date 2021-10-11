@@ -106,251 +106,284 @@ contains
 
     end subroutine yelmo_write_step_pd_metrics
 
-    subroutine yelmo_restart_write(dom,filename,time)
+    subroutine yelmo_restart_write(dom,filename,time,init)
 
         implicit none 
 
         type(yelmo_class), intent(IN) :: dom
         character(len=*),  intent(IN) :: filename 
         real(wp),          intent(IN) :: time 
-        
+        logical, optional, intent(IN) :: init 
+
         ! Local variables
-        integer :: ncid 
-        
+        integer  :: ncid, n, nx, ny, nz, nz_ac, nz_r   
+        logical  :: initialize_file 
+        real(wp) :: time_prev 
+
+        initialize_file = .TRUE. 
+        if (present(init)) initialize_file = init
+
+        nx    = dom%grd%nx
+        ny    = dom%grd%ny 
+        nz    = size(dom%par%zeta_aa,1)
+        nz_ac = size(dom%par%zeta_ac,1)
+        nz_r  = size(dom%thrm%par%zr%zeta_aa,1)
+
         ! Write all yelmo data to file, so that it can be
         ! read later to restart a simulation.
         
         ! == Initialize netcdf file ==============================================
 
-        call nc_create(filename)
-        call nc_write_dim(filename,"xc",       x=dom%grd%xc*1e-3,       units="kilometers")
-        call nc_write_dim(filename,"yc",       x=dom%grd%yc*1e-3,       units="kilometers")
-        call nc_write_dim(filename,"zeta",     x=dom%par%zeta_aa,       units="1")
-        call nc_write_dim(filename,"zeta_ac",  x=dom%par%zeta_ac,       units="1")
-        call nc_write_dim(filename,"zeta_rock",x=dom%thrm%par%zr%zeta_aa,units="1")
-        call nc_write_dim(filename,"age_iso",  x=dom%mat%par%age_iso,   units="kyr")
-        call nc_write_dim(filename,"time",     x=time,dx=1.0_prec,nx=1, units="years ago")
- 
+        if (initialize_file) then
+
+            call nc_create(filename)
+            call nc_write_dim(filename,"xc",       x=dom%grd%xc*1e-3,       units="kilometers")
+            call nc_write_dim(filename,"yc",       x=dom%grd%yc*1e-3,       units="kilometers")
+            call nc_write_dim(filename,"zeta",     x=dom%par%zeta_aa,       units="1")
+            call nc_write_dim(filename,"zeta_ac",  x=dom%par%zeta_ac,       units="1")
+            call nc_write_dim(filename,"zeta_rock",x=dom%thrm%par%zr%zeta_aa,units="1")
+            call nc_write_dim(filename,"age_iso",  x=dom%mat%par%age_iso,   units="kyr")
+            call nc_write_dim(filename,"time",     x=time,dx=1.0_prec,nx=1, units="years ago")
+        
+        end if 
+        
         ! == Begin writing data ==============================================
         
         ! Open the file for writing
         call nc_open(filename,ncid,writable=.TRUE.)
         
+        if (initialize_file) then 
+
+            ! Current time index to write will be the first and only one 
+            n = 1 
+
+        else 
+
+            ! Determine current writing time step 
+            n = nc_size(filename,"time",ncid)
+            call nc_read(filename,"time",time_prev,start=[n],count=[1],ncid=ncid) 
+            if (abs(time-time_prev).gt.1e-5) n = n+1 
+
+            ! Update the time step
+            call nc_write(filename,"time",time,dim1="time",start=[n],count=[1],ncid=ncid)
+
+        end if 
+
         ! == Predictor-corrector (pc) variables ===
         ! (these will not be read in by yelmo_restart_read, but can be useful to output for diagnostics)
 
-        call nc_write(filename,"pc_tau",      dom%time%pc_tau,     units="m/yr",dim1="xc",dim2="yc",ncid=ncid)
-        call nc_write(filename,"pc_tau_masked",dom%time%pc_tau_masked,units="m/yr",dim1="xc",dim2="yc",ncid=ncid)
-        call nc_write(filename,"pc_tau_max",  dom%time%pc_tau_max, units="m/yr",dim1="xc",dim2="yc",ncid=ncid)
+        call nc_write(filename,"pc_tau",       dom%time%pc_tau,        units="m/yr",dim1="xc",dim2="yc",dim3="time",ncid=ncid,start=[1,1,n],count=[nx,ny,1])
+        call nc_write(filename,"pc_tau_masked",dom%time%pc_tau_masked, units="m/yr",dim1="xc",dim2="yc",dim3="time",ncid=ncid,start=[1,1,n],count=[nx,ny,1])
+        call nc_write(filename,"pc_tau_max",   dom%time%pc_tau_max,    units="m/yr",dim1="xc",dim2="yc",dim3="time",ncid=ncid,start=[1,1,n],count=[nx,ny,1])
         
         
         ! == ytopo variables ===
-        call nc_write(filename,"H_ice",       dom%tpo%now%H_ice,      units="m",  dim1="xc",dim2="yc",ncid=ncid)
-        call nc_write(filename,"z_srf",       dom%tpo%now%z_srf,      units="m",  dim1="xc",dim2="yc",ncid=ncid)
+        call nc_write(filename,"H_ice",       dom%tpo%now%H_ice,       units="m",  dim1="xc",dim2="yc",dim3="time",ncid=ncid,start=[1,1,n],count=[nx,ny,1])
+        call nc_write(filename,"z_srf",       dom%tpo%now%z_srf,       units="m",  dim1="xc",dim2="yc",dim3="time",ncid=ncid,start=[1,1,n],count=[nx,ny,1])
 
-        call nc_write(filename,"dzsrfdt",     dom%tpo%now%dzsrfdt,     units="m/yr",dim1="xc",dim2="yc",ncid=ncid)
-        call nc_write(filename,"dHicedt",     dom%tpo%now%dHicedt,     units="m/yr",dim1="xc",dim2="yc",ncid=ncid)
-        call nc_write(filename,"fmb",         dom%tpo%now%fmb,         units="m/yr",dim1="xc",dim2="yc",ncid=ncid)
-        call nc_write(filename,"bmb",         dom%tpo%now%bmb,         units="m/yr",dim1="xc",dim2="yc",ncid=ncid)
-        call nc_write(filename,"mb_applied",  dom%tpo%now%mb_applied,  units="m/yr",dim1="xc",dim2="yc",ncid=ncid)
-        call nc_write(filename,"mb_resid",    dom%tpo%now%mb_resid,    units="m/yr",dim1="xc",dim2="yc",ncid=ncid)
-        call nc_write(filename,"calv_flt",    dom%tpo%now%calv_flt,    units="m/yr",dim1="xc",dim2="yc",ncid=ncid)
-        call nc_write(filename,"calv_grnd",   dom%tpo%now%calv_grnd,   units="m/yr",dim1="xc",dim2="yc",ncid=ncid)
-        call nc_write(filename,"calv",        dom%tpo%now%calv,        units="m/yr",dim1="xc",dim2="yc",ncid=ncid)
-        call nc_write(filename,"dzsdx",       dom%tpo%now%dzsdx,       units="m/m", dim1="xc",dim2="yc",ncid=ncid)  
-        call nc_write(filename,"dzsdy",       dom%tpo%now%dzsdy,       units="m/m", dim1="xc",dim2="yc",ncid=ncid)  
-        call nc_write(filename,"dHicedx",     dom%tpo%now%dHicedx,     units="m/m", dim1="xc",dim2="yc",ncid=ncid)
-        call nc_write(filename,"dHicedy",     dom%tpo%now%dHicedy,     units="m/m", dim1="xc",dim2="yc",ncid=ncid)
-        call nc_write(filename,"H_eff",       dom%tpo%now%H_eff,      units="m",    dim1="xc",dim2="yc",ncid=ncid)
-        call nc_write(filename,"H_grnd",      dom%tpo%now%H_grnd,      units="b",   dim1="xc",dim2="yc",ncid=ncid)
-        call nc_write(filename,"f_grnd",      dom%tpo%now%f_grnd,      units="1",   dim1="xc",dim2="yc",ncid=ncid)  
-        call nc_write(filename,"f_grnd_acx",  dom%tpo%now%f_grnd_acx,  units="1",   dim1="xc",dim2="yc",ncid=ncid)
-        call nc_write(filename,"f_grnd_acy",  dom%tpo%now%f_grnd_acy,  units="1",   dim1="xc",dim2="yc",ncid=ncid)
-        call nc_write(filename,"f_ice",       dom%tpo%now%f_ice,       units="1",   dim1="xc",dim2="yc",ncid=ncid)  
-        call nc_write(filename,"dist_margin", dom%tpo%now%dist_margin, units="m",   dim1="xc",dim2="yc",ncid=ncid)
-        call nc_write(filename,"dist_grline", dom%tpo%now%dist_grline, units="m",   dim1="xc",dim2="yc",ncid=ncid)
-        call nc_write(filename,"mask_bed",    dom%tpo%now%mask_bed,    units="1",   dim1="xc",dim2="yc",ncid=ncid)  
-        call nc_write(filename,"is_grline",   dom%tpo%now%is_grline,   units="1",   dim1="xc",dim2="yc",ncid=ncid)  
-        call nc_write(filename,"is_grz",      dom%tpo%now%is_grz,      units="1",   dim1="xc",dim2="yc",ncid=ncid)  
+        call nc_write(filename,"dzsrfdt",     dom%tpo%now%dzsrfdt,     units="m/yr",dim1="xc",dim2="yc",dim3="time",ncid=ncid,start=[1,1,n],count=[nx,ny,1])
+        call nc_write(filename,"dHicedt",     dom%tpo%now%dHicedt,     units="m/yr",dim1="xc",dim2="yc",dim3="time",ncid=ncid,start=[1,1,n],count=[nx,ny,1])
+        call nc_write(filename,"fmb",         dom%tpo%now%fmb,         units="m/yr",dim1="xc",dim2="yc",dim3="time",ncid=ncid,start=[1,1,n],count=[nx,ny,1])
+        call nc_write(filename,"bmb",         dom%tpo%now%bmb,         units="m/yr",dim1="xc",dim2="yc",dim3="time",ncid=ncid,start=[1,1,n],count=[nx,ny,1])
+        call nc_write(filename,"mb_applied",  dom%tpo%now%mb_applied,  units="m/yr",dim1="xc",dim2="yc",dim3="time",ncid=ncid,start=[1,1,n],count=[nx,ny,1])
+        call nc_write(filename,"mb_resid",    dom%tpo%now%mb_resid,    units="m/yr",dim1="xc",dim2="yc",dim3="time",ncid=ncid,start=[1,1,n],count=[nx,ny,1])
+        call nc_write(filename,"calv_flt",    dom%tpo%now%calv_flt,    units="m/yr",dim1="xc",dim2="yc",dim3="time",ncid=ncid,start=[1,1,n],count=[nx,ny,1])
+        call nc_write(filename,"calv_grnd",   dom%tpo%now%calv_grnd,   units="m/yr",dim1="xc",dim2="yc",dim3="time",ncid=ncid,start=[1,1,n],count=[nx,ny,1])
+        call nc_write(filename,"calv",        dom%tpo%now%calv,        units="m/yr",dim1="xc",dim2="yc",dim3="time",ncid=ncid,start=[1,1,n],count=[nx,ny,1])
+        call nc_write(filename,"dzsdx",       dom%tpo%now%dzsdx,       units="m/m", dim1="xc",dim2="yc",dim3="time",ncid=ncid,start=[1,1,n],count=[nx,ny,1])  
+        call nc_write(filename,"dzsdy",       dom%tpo%now%dzsdy,       units="m/m", dim1="xc",dim2="yc",dim3="time",ncid=ncid,start=[1,1,n],count=[nx,ny,1])  
+        call nc_write(filename,"dHicedx",     dom%tpo%now%dHicedx,     units="m/m", dim1="xc",dim2="yc",dim3="time",ncid=ncid,start=[1,1,n],count=[nx,ny,1])
+        call nc_write(filename,"dHicedy",     dom%tpo%now%dHicedy,     units="m/m", dim1="xc",dim2="yc",dim3="time",ncid=ncid,start=[1,1,n],count=[nx,ny,1])
+        call nc_write(filename,"H_eff",       dom%tpo%now%H_eff,       units="m",   dim1="xc",dim2="yc",dim3="time",ncid=ncid,start=[1,1,n],count=[nx,ny,1])
+        call nc_write(filename,"H_grnd",      dom%tpo%now%H_grnd,      units="b",   dim1="xc",dim2="yc",dim3="time",ncid=ncid,start=[1,1,n],count=[nx,ny,1])
+        call nc_write(filename,"f_grnd",      dom%tpo%now%f_grnd,      units="1",   dim1="xc",dim2="yc",dim3="time",ncid=ncid,start=[1,1,n],count=[nx,ny,1])  
+        call nc_write(filename,"f_grnd_acx",  dom%tpo%now%f_grnd_acx,  units="1",   dim1="xc",dim2="yc",dim3="time",ncid=ncid,start=[1,1,n],count=[nx,ny,1])
+        call nc_write(filename,"f_grnd_acy",  dom%tpo%now%f_grnd_acy,  units="1",   dim1="xc",dim2="yc",dim3="time",ncid=ncid,start=[1,1,n],count=[nx,ny,1])
+        call nc_write(filename,"f_ice",       dom%tpo%now%f_ice,       units="1",   dim1="xc",dim2="yc",dim3="time",ncid=ncid,start=[1,1,n],count=[nx,ny,1])  
+        call nc_write(filename,"dist_margin", dom%tpo%now%dist_margin, units="m",   dim1="xc",dim2="yc",dim3="time",ncid=ncid,start=[1,1,n],count=[nx,ny,1])
+        call nc_write(filename,"dist_grline", dom%tpo%now%dist_grline, units="m",   dim1="xc",dim2="yc",dim3="time",ncid=ncid,start=[1,1,n],count=[nx,ny,1])
+        call nc_write(filename,"mask_bed",    dom%tpo%now%mask_bed,    units="1",   dim1="xc",dim2="yc",dim3="time",ncid=ncid,start=[1,1,n],count=[nx,ny,1])  
+        call nc_write(filename,"is_grline",   dom%tpo%now%is_grline,   units="1",   dim1="xc",dim2="yc",dim3="time",ncid=ncid,start=[1,1,n],count=[nx,ny,1])  
+        call nc_write(filename,"is_grz",      dom%tpo%now%is_grz,      units="1",   dim1="xc",dim2="yc",dim3="time",ncid=ncid,start=[1,1,n],count=[nx,ny,1])  
 
         
-        call nc_write(filename,"dHdt_n",      dom%tpo%now%dHdt_n,      units="m/yr",dim1="xc",dim2="yc",ncid=ncid)
-        call nc_write(filename,"H_ice_n",     dom%tpo%now%H_ice_n,     units="m",   dim1="xc",dim2="yc",ncid=ncid)
-        call nc_write(filename,"H_ice_pred",  dom%tpo%now%H_ice_pred,  units="m",   dim1="xc",dim2="yc",ncid=ncid)
-        call nc_write(filename,"H_ice_corr",  dom%tpo%now%H_ice_corr,  units="m",   dim1="xc",dim2="yc",ncid=ncid)
+        call nc_write(filename,"dHdt_n",      dom%tpo%now%dHdt_n,      units="m/yr",dim1="xc",dim2="yc",dim3="time",ncid=ncid,start=[1,1,n],count=[nx,ny,1])
+        call nc_write(filename,"H_ice_n",     dom%tpo%now%H_ice_n,     units="m",   dim1="xc",dim2="yc",dim3="time",ncid=ncid,start=[1,1,n],count=[nx,ny,1])
+        call nc_write(filename,"H_ice_pred",  dom%tpo%now%H_ice_pred,  units="m",   dim1="xc",dim2="yc",dim3="time",ncid=ncid,start=[1,1,n],count=[nx,ny,1])
+        call nc_write(filename,"H_ice_corr",  dom%tpo%now%H_ice_corr,  units="m",   dim1="xc",dim2="yc",dim3="time",ncid=ncid,start=[1,1,n],count=[nx,ny,1])
         
-        call nc_write(filename,"z_srf_n",     dom%tpo%now%z_srf_n,     units="m",  dim1="xc",dim2="yc",ncid=ncid)
+        call nc_write(filename,"z_srf_n",     dom%tpo%now%z_srf_n,     units="m",  dim1="xc",dim2="yc",dim3="time",ncid=ncid,start=[1,1,n],count=[nx,ny,1])
         
         ! == ydyn variables ===
 
-        call nc_write(filename,"ux",            dom%dyn%now%ux,     units="m/a",dim1="xc",dim2="yc",dim3="zeta",ncid=ncid) 
-        call nc_write(filename,"uy",            dom%dyn%now%uy,     units="m/a",dim1="xc",dim2="yc",dim3="zeta",ncid=ncid) 
-        call nc_write(filename,"uxy",           dom%dyn%now%uxy,    units="m/a",dim1="xc",dim2="yc",dim3="zeta",ncid=ncid) 
-        call nc_write(filename,"uz",            dom%dyn%now%uz,     units="m/a",dim1="xc",dim2="yc",dim3="zeta_ac",ncid=ncid) 
+        call nc_write(filename,"ux",            dom%dyn%now%ux,     units="m/a",dim1="xc",dim2="yc",dim3="zeta",dim4="time",ncid=ncid,start=[1,1,1,n],count=[nx,ny,nz,1]) 
+        call nc_write(filename,"uy",            dom%dyn%now%uy,     units="m/a",dim1="xc",dim2="yc",dim3="zeta",dim4="time",ncid=ncid,start=[1,1,1,n],count=[nx,ny,nz,1]) 
+        call nc_write(filename,"uxy",           dom%dyn%now%uxy,    units="m/a",dim1="xc",dim2="yc",dim3="zeta",dim4="time",ncid=ncid,start=[1,1,1,n],count=[nx,ny,nz,1]) 
+        call nc_write(filename,"uz",            dom%dyn%now%uz,     units="m/a",dim1="xc",dim2="yc",dim3="zeta_ac",dim4="time",ncid=ncid,start=[1,1,1,n],count=[nx,ny,nz_ac,1]) 
       
-        call nc_write(filename,"ux_bar",        dom%dyn%now%ux_bar, units="m/a",dim1="xc",dim2="yc",ncid=ncid) 
-        call nc_write(filename,"uy_bar",        dom%dyn%now%uy_bar, units="m/a",dim1="xc",dim2="yc",ncid=ncid) 
-        call nc_write(filename,"uxy_bar",       dom%dyn%now%uxy_bar,units="m/a",dim1="xc",dim2="yc",ncid=ncid) 
+        call nc_write(filename,"ux_bar",        dom%dyn%now%ux_bar, units="m/a",dim1="xc",dim2="yc",dim3="time",ncid=ncid,start=[1,1,n],count=[nx,ny,1]) 
+        call nc_write(filename,"uy_bar",        dom%dyn%now%uy_bar, units="m/a",dim1="xc",dim2="yc",dim3="time",ncid=ncid,start=[1,1,n],count=[nx,ny,1]) 
+        call nc_write(filename,"uxy_bar",       dom%dyn%now%uxy_bar,units="m/a",dim1="xc",dim2="yc",dim3="time",ncid=ncid,start=[1,1,n],count=[nx,ny,1]) 
 
-        call nc_write(filename,"ux_bar_prev",   dom%dyn%now%ux_bar_prev, units="m/a",dim1="xc",dim2="yc",ncid=ncid) 
-        call nc_write(filename,"uy_bar_prev",   dom%dyn%now%uy_bar_prev, units="m/a",dim1="xc",dim2="yc",ncid=ncid) 
+        call nc_write(filename,"ux_bar_prev",   dom%dyn%now%ux_bar_prev, units="m/a",dim1="xc",dim2="yc",dim3="time",ncid=ncid,start=[1,1,n],count=[nx,ny,1]) 
+        call nc_write(filename,"uy_bar_prev",   dom%dyn%now%uy_bar_prev, units="m/a",dim1="xc",dim2="yc",dim3="time",ncid=ncid,start=[1,1,n],count=[nx,ny,1]) 
         
-        call nc_write(filename,"ux_b",          dom%dyn%now%ux_b,   units="m/a",dim1="xc",dim2="yc",ncid=ncid) 
-        call nc_write(filename,"uy_b",          dom%dyn%now%uy_b,   units="m/a",dim1="xc",dim2="yc",ncid=ncid) 
-        call nc_write(filename,"uxy_b",         dom%dyn%now%uxy_b,  units="m/a",dim1="xc",dim2="yc",ncid=ncid) 
+        call nc_write(filename,"ux_b",          dom%dyn%now%ux_b,   units="m/a",dim1="xc",dim2="yc",dim3="time",ncid=ncid,start=[1,1,n],count=[nx,ny,1]) 
+        call nc_write(filename,"uy_b",          dom%dyn%now%uy_b,   units="m/a",dim1="xc",dim2="yc",dim3="time",ncid=ncid,start=[1,1,n],count=[nx,ny,1]) 
+        call nc_write(filename,"uxy_b",         dom%dyn%now%uxy_b,  units="m/a",dim1="xc",dim2="yc",dim3="time",ncid=ncid,start=[1,1,n],count=[nx,ny,1]) 
 
-        call nc_write(filename,"ux_s",          dom%dyn%now%ux_s,     units="m/a",dim1="xc",dim2="yc",ncid=ncid) 
-        call nc_write(filename,"uy_s",          dom%dyn%now%uy_s,     units="m/a",dim1="xc",dim2="yc",ncid=ncid) 
-        call nc_write(filename,"uxy_s",         dom%dyn%now%uxy_s,    units="m/a",dim1="xc",dim2="yc",ncid=ncid) 
+        call nc_write(filename,"ux_s",          dom%dyn%now%ux_s,     units="m/a",dim1="xc",dim2="yc",dim3="time",ncid=ncid,start=[1,1,n],count=[nx,ny,1]) 
+        call nc_write(filename,"uy_s",          dom%dyn%now%uy_s,     units="m/a",dim1="xc",dim2="yc",dim3="time",ncid=ncid,start=[1,1,n],count=[nx,ny,1]) 
+        call nc_write(filename,"uxy_s",         dom%dyn%now%uxy_s,    units="m/a",dim1="xc",dim2="yc",dim3="time",ncid=ncid,start=[1,1,n],count=[nx,ny,1]) 
 
-        call nc_write(filename,"ux_i",          dom%dyn%now%ux_i,     units="m/a",dim1="xc",dim2="yc",dim3="zeta",ncid=ncid) 
-        call nc_write(filename,"uy_i",          dom%dyn%now%uy_i,     units="m/a",dim1="xc",dim2="yc",dim3="zeta",ncid=ncid) 
-        call nc_write(filename,"ux_i_bar",      dom%dyn%now%ux_i_bar, units="m/a",dim1="xc",dim2="yc",ncid=ncid) 
-        call nc_write(filename,"uy_i_bar",      dom%dyn%now%uy_i_bar, units="m/a",dim1="xc",dim2="yc",ncid=ncid) 
-        call nc_write(filename,"uxy_i_bar",     dom%dyn%now%uxy_i_bar,units="m/a",dim1="xc",dim2="yc",ncid=ncid) 
+        call nc_write(filename,"ux_i",          dom%dyn%now%ux_i,     units="m/a",dim1="xc",dim2="yc",dim3="zeta",dim4="time",ncid=ncid,start=[1,1,1,n],count=[nx,ny,nz,1]) 
+        call nc_write(filename,"uy_i",          dom%dyn%now%uy_i,     units="m/a",dim1="xc",dim2="yc",dim3="zeta",dim4="time",ncid=ncid,start=[1,1,1,n],count=[nx,ny,nz,1]) 
+        call nc_write(filename,"ux_i_bar",      dom%dyn%now%ux_i_bar, units="m/a",dim1="xc",dim2="yc",dim3="time",ncid=ncid,start=[1,1,n],count=[nx,ny,1]) 
+        call nc_write(filename,"uy_i_bar",      dom%dyn%now%uy_i_bar, units="m/a",dim1="xc",dim2="yc",dim3="time",ncid=ncid,start=[1,1,n],count=[nx,ny,1]) 
+        call nc_write(filename,"uxy_i_bar",     dom%dyn%now%uxy_i_bar,units="m/a",dim1="xc",dim2="yc",dim3="time",ncid=ncid,start=[1,1,n],count=[nx,ny,1]) 
 
-        call nc_write(filename,"duxydt",        dom%dyn%now%duxydt,   units="m/a^2",dim1="xc",dim2="yc",ncid=ncid) 
+        call nc_write(filename,"duxydt",        dom%dyn%now%duxydt,   units="m/a^2",dim1="xc",dim2="yc",dim3="time",ncid=ncid,start=[1,1,n],count=[nx,ny,1]) 
 
-        call nc_write(filename,"dd_ab",         dom%dyn%now%dd_ab,    units="",dim1="xc",dim2="yc",dim3="zeta",ncid=ncid) 
-        call nc_write(filename,"dd_ab_bar",     dom%dyn%now%dd_ab_bar,units="",dim1="xc",dim2="yc",ncid=ncid) 
+        call nc_write(filename,"dd_ab",         dom%dyn%now%dd_ab,    units="",dim1="xc",dim2="yc",dim3="zeta",dim4="time",ncid=ncid,start=[1,1,1,n],count=[nx,ny,nz,1]) 
+        call nc_write(filename,"dd_ab_bar",     dom%dyn%now%dd_ab_bar,units="",dim1="xc",dim2="yc",dim3="time",ncid=ncid,start=[1,1,n],count=[nx,ny,1]) 
 
-        call nc_write(filename,"duxdz",         dom%dyn%now%duxdz,     units="",dim1="xc",dim2="yc",dim3="zeta",ncid=ncid) 
-        call nc_write(filename,"duydz",         dom%dyn%now%duydz,     units="",dim1="xc",dim2="yc",dim3="zeta",ncid=ncid) 
-        call nc_write(filename,"duxdz_bar",     dom%dyn%now%duxdz_bar, units="",dim1="xc",dim2="yc",ncid=ncid) 
-        call nc_write(filename,"duydz_bar",     dom%dyn%now%duydz_bar, units="",dim1="xc",dim2="yc",ncid=ncid) 
+        call nc_write(filename,"duxdz",         dom%dyn%now%duxdz,     units="",dim1="xc",dim2="yc",dim3="zeta",dim4="time",ncid=ncid,start=[1,1,1,n],count=[nx,ny,nz,1]) 
+        call nc_write(filename,"duydz",         dom%dyn%now%duydz,     units="",dim1="xc",dim2="yc",dim3="zeta",dim4="time",ncid=ncid,start=[1,1,1,n],count=[nx,ny,nz,1]) 
+        call nc_write(filename,"duxdz_bar",     dom%dyn%now%duxdz_bar, units="",dim1="xc",dim2="yc",dim3="time",ncid=ncid,start=[1,1,n],count=[nx,ny,1]) 
+        call nc_write(filename,"duydz_bar",     dom%dyn%now%duydz_bar, units="",dim1="xc",dim2="yc",dim3="time",ncid=ncid,start=[1,1,n],count=[nx,ny,1]) 
 
-        call nc_write(filename,"taud_acx",      dom%dyn%now%taud_acx, units="",dim1="xc",dim2="yc",ncid=ncid) 
-        call nc_write(filename,"taud_acy",      dom%dyn%now%taud_acy, units="",dim1="xc",dim2="yc",ncid=ncid) 
-        call nc_write(filename,"taud",          dom%dyn%now%taud,     units="",dim1="xc",dim2="yc",ncid=ncid) 
+        call nc_write(filename,"taud_acx",      dom%dyn%now%taud_acx, units="",dim1="xc",dim2="yc",dim3="time",ncid=ncid,start=[1,1,n],count=[nx,ny,1]) 
+        call nc_write(filename,"taud_acy",      dom%dyn%now%taud_acy, units="",dim1="xc",dim2="yc",dim3="time",ncid=ncid,start=[1,1,n],count=[nx,ny,1]) 
+        call nc_write(filename,"taud",          dom%dyn%now%taud,     units="",dim1="xc",dim2="yc",dim3="time",ncid=ncid,start=[1,1,n],count=[nx,ny,1]) 
 
-        call nc_write(filename,"taub_acx",      dom%dyn%now%taub_acx, units="",dim1="xc",dim2="yc",ncid=ncid) 
-        call nc_write(filename,"taub_acy",      dom%dyn%now%taub_acy, units="",dim1="xc",dim2="yc",ncid=ncid) 
-        call nc_write(filename,"taub",          dom%dyn%now%taub,     units="",dim1="xc",dim2="yc",ncid=ncid) 
+        call nc_write(filename,"taub_acx",      dom%dyn%now%taub_acx, units="",dim1="xc",dim2="yc",dim3="time",ncid=ncid,start=[1,1,n],count=[nx,ny,1]) 
+        call nc_write(filename,"taub_acy",      dom%dyn%now%taub_acy, units="",dim1="xc",dim2="yc",dim3="time",ncid=ncid,start=[1,1,n],count=[nx,ny,1]) 
+        call nc_write(filename,"taub",          dom%dyn%now%taub,     units="",dim1="xc",dim2="yc",dim3="time",ncid=ncid,start=[1,1,n],count=[nx,ny,1]) 
 
-        call nc_write(filename,"qq_gl_acx",     dom%dyn%now%qq_gl_acx,units="",dim1="xc",dim2="yc",ncid=ncid) 
-        call nc_write(filename,"qq_gl_acy",     dom%dyn%now%qq_gl_acy,units="",dim1="xc",dim2="yc",ncid=ncid) 
+        call nc_write(filename,"qq_gl_acx",     dom%dyn%now%qq_gl_acx,units="",dim1="xc",dim2="yc",dim3="time",ncid=ncid,start=[1,1,n],count=[nx,ny,1]) 
+        call nc_write(filename,"qq_gl_acy",     dom%dyn%now%qq_gl_acy,units="",dim1="xc",dim2="yc",dim3="time",ncid=ncid,start=[1,1,n],count=[nx,ny,1]) 
         
-        call nc_write(filename,"qq_acx",        dom%dyn%now%qq_acx,   units="",dim1="xc",dim2="yc",ncid=ncid) 
-        call nc_write(filename,"qq_acy",        dom%dyn%now%qq_acy,   units="",dim1="xc",dim2="yc",ncid=ncid) 
-        call nc_write(filename,"qq",            dom%dyn%now%qq,       units="",dim1="xc",dim2="yc",ncid=ncid) 
+        call nc_write(filename,"qq_acx",        dom%dyn%now%qq_acx,   units="",dim1="xc",dim2="yc",dim3="time",ncid=ncid,start=[1,1,n],count=[nx,ny,1]) 
+        call nc_write(filename,"qq_acy",        dom%dyn%now%qq_acy,   units="",dim1="xc",dim2="yc",dim3="time",ncid=ncid,start=[1,1,n],count=[nx,ny,1]) 
+        call nc_write(filename,"qq",            dom%dyn%now%qq,       units="",dim1="xc",dim2="yc",dim3="time",ncid=ncid,start=[1,1,n],count=[nx,ny,1]) 
 
-        call nc_write(filename,"visc_eff",      dom%dyn%now%visc_eff,    units="",dim1="xc",dim2="yc",dim3="zeta",ncid=ncid) 
-        call nc_write(filename,"visc_eff_int",  dom%dyn%now%visc_eff_int,units="",dim1="xc",dim2="yc",ncid=ncid) 
+        call nc_write(filename,"visc_eff",      dom%dyn%now%visc_eff,    units="",dim1="xc",dim2="yc",dim3="zeta",dim4="time",ncid=ncid,start=[1,1,1,n],count=[nx,ny,nz,1]) 
+        call nc_write(filename,"visc_eff_int",  dom%dyn%now%visc_eff_int,units="",dim1="xc",dim2="yc",dim3="time",ncid=ncid,start=[1,1,n],count=[nx,ny,1]) 
 
-        call nc_write(filename,"N_eff",         dom%dyn%now%N_eff,    units="",dim1="xc",dim2="yc",ncid=ncid)        
-        call nc_write(filename,"cf_ref",        dom%dyn%now%cf_ref,   units="",dim1="xc",dim2="yc",ncid=ncid) 
-        call nc_write(filename,"c_bed",         dom%dyn%now%c_bed,    units="",dim1="xc",dim2="yc",ncid=ncid) 
-        call nc_write(filename,"beta_acx",      dom%dyn%now%beta_acx, units="",dim1="xc",dim2="yc",ncid=ncid) 
-        call nc_write(filename,"beta_acy",      dom%dyn%now%beta_acy, units="",dim1="xc",dim2="yc",ncid=ncid) 
-        call nc_write(filename,"beta",          dom%dyn%now%beta,     units="",dim1="xc",dim2="yc",ncid=ncid) 
+        call nc_write(filename,"N_eff",         dom%dyn%now%N_eff,    units="",dim1="xc",dim2="yc",dim3="time",ncid=ncid,start=[1,1,n],count=[nx,ny,1])        
+        call nc_write(filename,"cf_ref",        dom%dyn%now%cf_ref,   units="",dim1="xc",dim2="yc",dim3="time",ncid=ncid,start=[1,1,n],count=[nx,ny,1]) 
+        call nc_write(filename,"c_bed",         dom%dyn%now%c_bed,    units="",dim1="xc",dim2="yc",dim3="time",ncid=ncid,start=[1,1,n],count=[nx,ny,1]) 
+        call nc_write(filename,"beta_acx",      dom%dyn%now%beta_acx, units="",dim1="xc",dim2="yc",dim3="time",ncid=ncid,start=[1,1,n],count=[nx,ny,1]) 
+        call nc_write(filename,"beta_acy",      dom%dyn%now%beta_acy, units="",dim1="xc",dim2="yc",dim3="time",ncid=ncid,start=[1,1,n],count=[nx,ny,1]) 
+        call nc_write(filename,"beta",          dom%dyn%now%beta,     units="",dim1="xc",dim2="yc",dim3="time",ncid=ncid,start=[1,1,n],count=[nx,ny,1]) 
 
-        call nc_write(filename,"beta_eff",      dom%dyn%now%beta_eff, units="",dim1="xc",dim2="yc",ncid=ncid) 
+        call nc_write(filename,"beta_eff",      dom%dyn%now%beta_eff, units="",dim1="xc",dim2="yc",dim3="time",ncid=ncid,start=[1,1,n],count=[nx,ny,1]) 
         
-        call nc_write(filename,"f_vbvs",        dom%dyn%now%f_vbvs,   units="",dim1="xc",dim2="yc",ncid=ncid) 
+        call nc_write(filename,"f_vbvs",        dom%dyn%now%f_vbvs,   units="",dim1="xc",dim2="yc",dim3="time",ncid=ncid,start=[1,1,n],count=[nx,ny,1]) 
 
-        call nc_write(filename,"ssa_mask_acx",  dom%dyn%now%ssa_mask_acx, units="",dim1="xc",dim2="yc",ncid=ncid) 
-        call nc_write(filename,"ssa_mask_acy",  dom%dyn%now%ssa_mask_acy, units="",dim1="xc",dim2="yc",ncid=ncid) 
-        call nc_write(filename,"ssa_err_acx",   dom%dyn%now%ssa_err_acx,  units="",dim1="xc",dim2="yc",ncid=ncid) 
-        call nc_write(filename,"ssa_err_acy",   dom%dyn%now%ssa_err_acy,  units="",dim1="xc",dim2="yc",ncid=ncid) 
+        call nc_write(filename,"ssa_mask_acx",  dom%dyn%now%ssa_mask_acx, units="",dim1="xc",dim2="yc",dim3="time",ncid=ncid,start=[1,1,n],count=[nx,ny,1]) 
+        call nc_write(filename,"ssa_mask_acy",  dom%dyn%now%ssa_mask_acy, units="",dim1="xc",dim2="yc",dim3="time",ncid=ncid,start=[1,1,n],count=[nx,ny,1]) 
+        call nc_write(filename,"ssa_err_acx",   dom%dyn%now%ssa_err_acx,  units="",dim1="xc",dim2="yc",dim3="time",ncid=ncid,start=[1,1,n],count=[nx,ny,1]) 
+        call nc_write(filename,"ssa_err_acy",   dom%dyn%now%ssa_err_acy,  units="",dim1="xc",dim2="yc",dim3="time",ncid=ncid,start=[1,1,n],count=[nx,ny,1]) 
 
         ! == ymat variables === 
 
-        call nc_write(filename,"strn2D_dxx", dom%mat%now%strn2D%dxx,  units="",dim1="xc",dim2="yc",ncid=ncid) 
-        call nc_write(filename,"strn2D_dyy", dom%mat%now%strn2D%dyy,  units="",dim1="xc",dim2="yc",ncid=ncid) 
-        call nc_write(filename,"strn2D_dxy", dom%mat%now%strn2D%dxy,  units="",dim1="xc",dim2="yc",ncid=ncid) 
-        call nc_write(filename,"strn2D_dxz", dom%mat%now%strn2D%dxz,  units="",dim1="xc",dim2="yc",ncid=ncid) 
-        call nc_write(filename,"strn2D_dyz", dom%mat%now%strn2D%dyz,  units="",dim1="xc",dim2="yc",ncid=ncid) 
-        call nc_write(filename,"strn2D_de",  dom%mat%now%strn2D%de,   units="",dim1="xc",dim2="yc", ncid=ncid) 
-        call nc_write(filename,"strn2D_div", dom%mat%now%strn2D%div,  units="",dim1="xc",dim2="yc", ncid=ncid) 
-        call nc_write(filename,"strn2D_f_shear",dom%mat%now%strn2D%f_shear,units="",dim1="xc",dim2="yc", ncid=ncid) 
+        call nc_write(filename,"strn2D_dxx", dom%mat%now%strn2D%dxx,  units="",dim1="xc",dim2="yc",dim3="time",ncid=ncid,start=[1,1,n],count=[nx,ny,1]) 
+        call nc_write(filename,"strn2D_dyy", dom%mat%now%strn2D%dyy,  units="",dim1="xc",dim2="yc",dim3="time",ncid=ncid,start=[1,1,n],count=[nx,ny,1]) 
+        call nc_write(filename,"strn2D_dxy", dom%mat%now%strn2D%dxy,  units="",dim1="xc",dim2="yc",dim3="time",ncid=ncid,start=[1,1,n],count=[nx,ny,1]) 
+        call nc_write(filename,"strn2D_dxz", dom%mat%now%strn2D%dxz,  units="",dim1="xc",dim2="yc",dim3="time",ncid=ncid,start=[1,1,n],count=[nx,ny,1]) 
+        call nc_write(filename,"strn2D_dyz", dom%mat%now%strn2D%dyz,  units="",dim1="xc",dim2="yc",dim3="time",ncid=ncid,start=[1,1,n],count=[nx,ny,1]) 
+        call nc_write(filename,"strn2D_de",  dom%mat%now%strn2D%de,   units="",dim1="xc",dim2="yc",dim3="time",ncid=ncid,start=[1,1,n],count=[nx,ny,1]) 
+        call nc_write(filename,"strn2D_div", dom%mat%now%strn2D%div,  units="",dim1="xc",dim2="yc",dim3="time",ncid=ncid,start=[1,1,n],count=[nx,ny,1]) 
+        call nc_write(filename,"strn2D_f_shear",dom%mat%now%strn2D%f_shear,units="",dim1="xc",dim2="yc",dim3="time",ncid=ncid,start=[1,1,n],count=[nx,ny,1]) 
         
-        call nc_write(filename,"strn_dxx",     dom%mat%now%strn%dxx,        units="",dim1="xc",dim2="yc",dim3="zeta",ncid=ncid) 
-        call nc_write(filename,"strn_dyy",     dom%mat%now%strn%dyy,        units="",dim1="xc",dim2="yc",dim3="zeta",ncid=ncid) 
-        call nc_write(filename,"strn_dxy",     dom%mat%now%strn%dxy,        units="",dim1="xc",dim2="yc",dim3="zeta",ncid=ncid) 
-        call nc_write(filename,"strn_dxz",     dom%mat%now%strn%dxz,        units="",dim1="xc",dim2="yc",dim3="zeta", ncid=ncid) 
-        call nc_write(filename,"strn_dyz",     dom%mat%now%strn%dyz,        units="",dim1="xc",dim2="yc",dim3="zeta",ncid=ncid) 
-        call nc_write(filename,"strn_de",      dom%mat%now%strn%de,         units="",dim1="xc",dim2="yc",dim3="zeta",ncid=ncid) 
-        call nc_write(filename,"strn_div",     dom%mat%now%strn%div,        units="",dim1="xc",dim2="yc",dim3="zeta",ncid=ncid) 
-        call nc_write(filename,"strn_f_shear", dom%mat%now%strn%f_shear,    units="",dim1="xc",dim2="yc",dim3="zeta",ncid=ncid) 
+        call nc_write(filename,"strn_dxx",     dom%mat%now%strn%dxx,        units="",dim1="xc",dim2="yc",dim3="zeta",dim4="time",ncid=ncid,start=[1,1,1,n],count=[nx,ny,nz,1]) 
+        call nc_write(filename,"strn_dyy",     dom%mat%now%strn%dyy,        units="",dim1="xc",dim2="yc",dim3="zeta",dim4="time",ncid=ncid,start=[1,1,1,n],count=[nx,ny,nz,1]) 
+        call nc_write(filename,"strn_dxy",     dom%mat%now%strn%dxy,        units="",dim1="xc",dim2="yc",dim3="zeta",dim4="time",ncid=ncid,start=[1,1,1,n],count=[nx,ny,nz,1]) 
+        call nc_write(filename,"strn_dxz",     dom%mat%now%strn%dxz,        units="",dim1="xc",dim2="yc",dim3="zeta",dim4="time",ncid=ncid,start=[1,1,1,n],count=[nx,ny,nz,1]) 
+        call nc_write(filename,"strn_dyz",     dom%mat%now%strn%dyz,        units="",dim1="xc",dim2="yc",dim3="zeta",dim4="time",ncid=ncid,start=[1,1,1,n],count=[nx,ny,nz,1]) 
+        call nc_write(filename,"strn_de",      dom%mat%now%strn%de,         units="",dim1="xc",dim2="yc",dim3="zeta",dim4="time",ncid=ncid,start=[1,1,1,n],count=[nx,ny,nz,1]) 
+        call nc_write(filename,"strn_div",     dom%mat%now%strn%div,        units="",dim1="xc",dim2="yc",dim3="zeta",dim4="time",ncid=ncid,start=[1,1,1,n],count=[nx,ny,nz,1]) 
+        call nc_write(filename,"strn_f_shear", dom%mat%now%strn%f_shear,    units="",dim1="xc",dim2="yc",dim3="zeta",dim4="time",ncid=ncid,start=[1,1,1,n],count=[nx,ny,nz,1]) 
 
-        call nc_write(filename,"strs2D_txx", dom%mat%now%strs2D%txx,  units="",dim1="xc",dim2="yc",ncid=ncid) 
-        call nc_write(filename,"strs2D_tyy", dom%mat%now%strs2D%tyy,  units="",dim1="xc",dim2="yc",ncid=ncid) 
-        call nc_write(filename,"strs2D_txy", dom%mat%now%strs2D%txy,  units="",dim1="xc",dim2="yc",ncid=ncid) 
-        call nc_write(filename,"strs2D_txz", dom%mat%now%strs2D%txz,  units="",dim1="xc",dim2="yc",ncid=ncid) 
-        call nc_write(filename,"strs2D_tyz", dom%mat%now%strs2D%tyz,  units="",dim1="xc",dim2="yc",ncid=ncid) 
-        call nc_write(filename,"strs2D_te",  dom%mat%now%strs2D%te,   units="",dim1="xc",dim2="yc", ncid=ncid) 
-        call nc_write(filename,"strs2D_teig1",dom%mat%now%strs2D%teig1,units="",dim1="xc",dim2="yc", ncid=ncid) 
-        call nc_write(filename,"strs2D_teig2",dom%mat%now%strs2D%teig2,units="",dim1="xc",dim2="yc", ncid=ncid) 
+        call nc_write(filename,"strs2D_txx", dom%mat%now%strs2D%txx,  units="",dim1="xc",dim2="yc",dim3="time",ncid=ncid,start=[1,1,n],count=[nx,ny,1]) 
+        call nc_write(filename,"strs2D_tyy", dom%mat%now%strs2D%tyy,  units="",dim1="xc",dim2="yc",dim3="time",ncid=ncid,start=[1,1,n],count=[nx,ny,1]) 
+        call nc_write(filename,"strs2D_txy", dom%mat%now%strs2D%txy,  units="",dim1="xc",dim2="yc",dim3="time",ncid=ncid,start=[1,1,n],count=[nx,ny,1]) 
+        call nc_write(filename,"strs2D_txz", dom%mat%now%strs2D%txz,  units="",dim1="xc",dim2="yc",dim3="time",ncid=ncid,start=[1,1,n],count=[nx,ny,1]) 
+        call nc_write(filename,"strs2D_tyz", dom%mat%now%strs2D%tyz,  units="",dim1="xc",dim2="yc",dim3="time",ncid=ncid,start=[1,1,n],count=[nx,ny,1]) 
+        call nc_write(filename,"strs2D_te",  dom%mat%now%strs2D%te,   units="",dim1="xc",dim2="yc",dim3="time",ncid=ncid,start=[1,1,n],count=[nx,ny,1]) 
+        call nc_write(filename,"strs2D_teig1",dom%mat%now%strs2D%teig1,units="",dim1="xc",dim2="yc",dim3="time",ncid=ncid,start=[1,1,n],count=[nx,ny,1]) 
+        call nc_write(filename,"strs2D_teig2",dom%mat%now%strs2D%teig2,units="",dim1="xc",dim2="yc",dim3="time",ncid=ncid,start=[1,1,n],count=[nx,ny,1]) 
         
-        call nc_write(filename,"strs_txx",     dom%mat%now%strs%txx,        units="",dim1="xc",dim2="yc",dim3="zeta",ncid=ncid) 
-        call nc_write(filename,"strs_tyy",     dom%mat%now%strs%tyy,        units="",dim1="xc",dim2="yc",dim3="zeta",ncid=ncid) 
-        call nc_write(filename,"strs_txy",     dom%mat%now%strs%txy,        units="",dim1="xc",dim2="yc",dim3="zeta",ncid=ncid) 
-        call nc_write(filename,"strs_txz",     dom%mat%now%strs%txz,        units="",dim1="xc",dim2="yc",dim3="zeta", ncid=ncid) 
-        call nc_write(filename,"strs_tyz",     dom%mat%now%strs%tyz,        units="",dim1="xc",dim2="yc",dim3="zeta",ncid=ncid) 
-        call nc_write(filename,"strs_te",      dom%mat%now%strs%te,         units="",dim1="xc",dim2="yc",dim3="zeta",ncid=ncid) 
+        call nc_write(filename,"strs_txx",     dom%mat%now%strs%txx,        units="",dim1="xc",dim2="yc",dim3="zeta",dim4="time",ncid=ncid,start=[1,1,1,n],count=[nx,ny,nz,1]) 
+        call nc_write(filename,"strs_tyy",     dom%mat%now%strs%tyy,        units="",dim1="xc",dim2="yc",dim3="zeta",dim4="time",ncid=ncid,start=[1,1,1,n],count=[nx,ny,nz,1]) 
+        call nc_write(filename,"strs_txy",     dom%mat%now%strs%txy,        units="",dim1="xc",dim2="yc",dim3="zeta",dim4="time",ncid=ncid,start=[1,1,1,n],count=[nx,ny,nz,1]) 
+        call nc_write(filename,"strs_txz",     dom%mat%now%strs%txz,        units="",dim1="xc",dim2="yc",dim3="zeta",dim4="time",ncid=ncid,start=[1,1,1,n],count=[nx,ny,nz,1]) 
+        call nc_write(filename,"strs_tyz",     dom%mat%now%strs%tyz,        units="",dim1="xc",dim2="yc",dim3="zeta",dim4="time",ncid=ncid,start=[1,1,1,n],count=[nx,ny,nz,1]) 
+        call nc_write(filename,"strs_te",      dom%mat%now%strs%te,         units="",dim1="xc",dim2="yc",dim3="zeta",dim4="time",ncid=ncid,start=[1,1,1,n],count=[nx,ny,nz,1]) 
 
-        call nc_write(filename,"enh",         dom%mat%now%enh,           units="",dim1="xc",dim2="yc",dim3="zeta",ncid=ncid) 
-        call nc_write(filename,"enh_bnd",     dom%mat%now%enh_bnd,       units="",dim1="xc",dim2="yc",dim3="zeta",ncid=ncid) 
-        call nc_write(filename,"enh_bar",     dom%mat%now%enh_bar,       units="",dim1="xc",dim2="yc",ncid=ncid) 
-        call nc_write(filename,"ATT",         dom%mat%now%ATT,           units="",dim1="xc",dim2="yc",dim3="zeta",ncid=ncid) 
-        call nc_write(filename,"ATT_bar",     dom%mat%now%ATT_bar,       units="",dim1="xc",dim2="yc",ncid=ncid) 
-        call nc_write(filename,"visc",        dom%mat%now%visc,          units="",dim1="xc",dim2="yc",dim3="zeta",ncid=ncid) 
-        call nc_write(filename,"visc_int",    dom%mat%now%visc_int,      units="",dim1="xc",dim2="yc",ncid=ncid) 
+        call nc_write(filename,"enh",         dom%mat%now%enh,           units="",dim1="xc",dim2="yc",dim3="zeta",dim4="time",ncid=ncid,start=[1,1,1,n],count=[nx,ny,nz,1]) 
+        call nc_write(filename,"enh_bnd",     dom%mat%now%enh_bnd,       units="",dim1="xc",dim2="yc",dim3="zeta",dim4="time",ncid=ncid,start=[1,1,1,n],count=[nx,ny,nz,1]) 
+        call nc_write(filename,"enh_bar",     dom%mat%now%enh_bar,       units="",dim1="xc",dim2="yc",dim3="time",ncid=ncid,start=[1,1,n],count=[nx,ny,1]) 
+        call nc_write(filename,"ATT",         dom%mat%now%ATT,           units="",dim1="xc",dim2="yc",dim3="zeta",dim4="time",ncid=ncid,start=[1,1,1,n],count=[nx,ny,nz,1]) 
+        call nc_write(filename,"ATT_bar",     dom%mat%now%ATT_bar,       units="",dim1="xc",dim2="yc",dim3="time",ncid=ncid,start=[1,1,n],count=[nx,ny,1]) 
+        call nc_write(filename,"visc",        dom%mat%now%visc,          units="",dim1="xc",dim2="yc",dim3="zeta",dim4="time",ncid=ncid,start=[1,1,1,n],count=[nx,ny,nz,1]) 
+        call nc_write(filename,"visc_int",    dom%mat%now%visc_int,      units="",dim1="xc",dim2="yc",dim3="time",ncid=ncid,start=[1,1,n],count=[nx,ny,1]) 
 
-        call nc_write(filename,"f_shear_bar", dom%mat%now%f_shear_bar,   units="",dim1="xc",dim2="yc",ncid=ncid) 
+        call nc_write(filename,"f_shear_bar", dom%mat%now%f_shear_bar,   units="",dim1="xc",dim2="yc",dim3="time",ncid=ncid,start=[1,1,n],count=[nx,ny,1]) 
 
-        call nc_write(filename,"dep_time",    dom%mat%now%dep_time,      units="",dim1="xc",dim2="yc",dim3="zeta",ncid=ncid)     
-        call nc_write(filename,"depth_iso",   dom%mat%now%depth_iso,     units="",dim1="xc",dim2="yc",dim3="age_iso",ncid=ncid)     
+        call nc_write(filename,"dep_time",    dom%mat%now%dep_time,      units="",dim1="xc",dim2="yc",dim3="zeta",dim4="time",ncid=ncid,start=[1,1,1,n],count=[nx,ny,nz,1])     
+        call nc_write(filename,"depth_iso",   dom%mat%now%depth_iso,     units="",dim1="xc",dim2="yc",dim3="age_iso",dim4="time",ncid=ncid,start=[1,1,1,n],count=[nx,ny,size(dom%mat%now%depth_iso,3),1])     
         
         ! == ytherm variables ===
 
-        call nc_write(filename,"enth",        dom%thrm%now%enth,       units="",dim1="xc",dim2="yc",dim3="zeta",ncid=ncid)      
-        call nc_write(filename,"T_ice",       dom%thrm%now%T_ice,      units="",dim1="xc",dim2="yc",dim3="zeta",ncid=ncid)      
-        call nc_write(filename,"omega",       dom%thrm%now%omega,      units="",dim1="xc",dim2="yc",dim3="zeta",ncid=ncid)      
-        call nc_write(filename,"T_pmp",       dom%thrm%now%T_pmp,      units="",dim1="xc",dim2="yc",dim3="zeta",ncid=ncid)      
+        call nc_write(filename,"enth",        dom%thrm%now%enth,       units="",dim1="xc",dim2="yc",dim3="zeta",dim4="time",ncid=ncid,start=[1,1,1,n],count=[nx,ny,nz,1])      
+        call nc_write(filename,"T_ice",       dom%thrm%now%T_ice,      units="",dim1="xc",dim2="yc",dim3="zeta",dim4="time",ncid=ncid,start=[1,1,1,n],count=[nx,ny,nz,1])      
+        call nc_write(filename,"omega",       dom%thrm%now%omega,      units="",dim1="xc",dim2="yc",dim3="zeta",dim4="time",ncid=ncid,start=[1,1,1,n],count=[nx,ny,nz,1])      
+        call nc_write(filename,"T_pmp",       dom%thrm%now%T_pmp,      units="",dim1="xc",dim2="yc",dim3="zeta",dim4="time",ncid=ncid,start=[1,1,1,n],count=[nx,ny,nz,1])      
         
-        call nc_write(filename,"f_pmp",       dom%thrm%now%f_pmp,      units="",dim1="xc",dim2="yc",ncid=ncid)        
-        call nc_write(filename,"bmb_grnd",    dom%thrm%now%bmb_grnd,   units="",dim1="xc",dim2="yc",ncid=ncid)     
-        call nc_write(filename,"Q_strn",      dom%thrm%now%Q_strn,     units="",dim1="xc",dim2="yc",dim3="zeta",ncid=ncid)     
-        call nc_write(filename,"Q_b",         dom%thrm%now%Q_b,        units="",dim1="xc",dim2="yc",ncid=ncid)          
-        call nc_write(filename,"Q_ice_b",     dom%thrm%now%Q_ice_b,    units="",dim1="xc",dim2="yc",ncid=ncid)          
-        call nc_write(filename,"T_prime_b",   dom%thrm%now%T_prime_b,  units="",dim1="xc",dim2="yc",ncid=ncid)    
-        call nc_write(filename,"H_w",         dom%thrm%now%H_w,        units="",dim1="xc",dim2="yc",ncid=ncid)
-        call nc_write(filename,"dHwdt",       dom%thrm%now%dHwdt,      units="",dim1="xc",dim2="yc",ncid=ncid)
+        call nc_write(filename,"f_pmp",       dom%thrm%now%f_pmp,      units="",dim1="xc",dim2="yc",dim3="time",ncid=ncid,start=[1,1,n],count=[nx,ny,1])        
+        call nc_write(filename,"bmb_grnd",    dom%thrm%now%bmb_grnd,   units="",dim1="xc",dim2="yc",dim3="time",ncid=ncid,start=[1,1,n],count=[nx,ny,1])     
+        call nc_write(filename,"Q_strn",      dom%thrm%now%Q_strn,     units="",dim1="xc",dim2="yc",dim3="zeta",dim4="time",ncid=ncid,start=[1,1,1,n],count=[nx,ny,nz,1])     
+        call nc_write(filename,"Q_b",         dom%thrm%now%Q_b,        units="",dim1="xc",dim2="yc",dim3="time",ncid=ncid,start=[1,1,n],count=[nx,ny,1])          
+        call nc_write(filename,"Q_ice_b",     dom%thrm%now%Q_ice_b,    units="",dim1="xc",dim2="yc",dim3="time",ncid=ncid,start=[1,1,n],count=[nx,ny,1])          
+        call nc_write(filename,"T_prime_b",   dom%thrm%now%T_prime_b,  units="",dim1="xc",dim2="yc",dim3="time",ncid=ncid,start=[1,1,n],count=[nx,ny,1])    
+        call nc_write(filename,"H_w",         dom%thrm%now%H_w,        units="",dim1="xc",dim2="yc",dim3="time",ncid=ncid,start=[1,1,n],count=[nx,ny,1])
+        call nc_write(filename,"dHwdt",       dom%thrm%now%dHwdt,      units="",dim1="xc",dim2="yc",dim3="time",ncid=ncid,start=[1,1,n],count=[nx,ny,1])
         
-        call nc_write(filename,"cp",          dom%thrm%now%cp,         units="",dim1="xc",dim2="yc",dim3="zeta",ncid=ncid)         
-        call nc_write(filename,"kt",          dom%thrm%now%kt,         units="",dim1="xc",dim2="yc",dim3="zeta",ncid=ncid)         
-        call nc_write(filename,"H_cts",       dom%thrm%now%H_cts,      units="",dim1="xc",dim2="yc",ncid=ncid)      
+        call nc_write(filename,"cp",          dom%thrm%now%cp,         units="",dim1="xc",dim2="yc",dim3="zeta",dim4="time",ncid=ncid,start=[1,1,1,n],count=[nx,ny,nz,1])         
+        call nc_write(filename,"kt",          dom%thrm%now%kt,         units="",dim1="xc",dim2="yc",dim3="zeta",dim4="time",ncid=ncid,start=[1,1,1,n],count=[nx,ny,nz,1])         
+        call nc_write(filename,"H_cts",       dom%thrm%now%H_cts,      units="",dim1="xc",dim2="yc",dim3="time",ncid=ncid,start=[1,1,n],count=[nx,ny,1])      
         
-        call nc_write(filename,"advecxy",     dom%thrm%now%advecxy,    units="",dim1="xc",dim2="yc",dim3="zeta",ncid=ncid)      
+        call nc_write(filename,"advecxy",     dom%thrm%now%advecxy,    units="",dim1="xc",dim2="yc",dim3="zeta",dim4="time",ncid=ncid,start=[1,1,1,n],count=[nx,ny,nz,1])      
         
-        call nc_write(filename,"Q_rock",      dom%thrm%now%Q_rock,     units="mW m-2",dim1="xc",dim2="yc",ncid=ncid)        
-        call nc_write(filename,"enth_rock",   dom%thrm%now%enth_rock,  units="J m-3", dim1="xc",dim2="yc",dim3="zeta_rock",ncid=ncid)      
-        call nc_write(filename,"T_rock",      dom%thrm%now%T_rock,     units="K",     dim1="xc",dim2="yc",dim3="zeta_rock",ncid=ncid)      
+        call nc_write(filename,"Q_rock",      dom%thrm%now%Q_rock,     units="mW m-2",dim1="xc",dim2="yc",dim3="time",ncid=ncid,start=[1,1,n],count=[nx,ny,1])        
+        call nc_write(filename,"enth_rock",   dom%thrm%now%enth_rock,  units="J m-3", dim1="xc",dim2="yc",dim3="zeta_rock",dim4="time",ncid=ncid,start=[1,1,1,n],count=[nx,ny,nz_r,1])      
+        call nc_write(filename,"T_rock",      dom%thrm%now%T_rock,     units="K",     dim1="xc",dim2="yc",dim3="zeta_rock",dim4="time",ncid=ncid,start=[1,1,1,n],count=[nx,ny,nz_r,1])      
 
         ! == ybound variables ===
 
-        call nc_write(filename,"z_bed",       dom%bnd%z_bed,       units="",dim1="xc",dim2="yc",ncid=ncid)
-        call nc_write(filename,"z_bed_sd",    dom%bnd%z_bed_sd,    units="",dim1="xc",dim2="yc",ncid=ncid)
-        call nc_write(filename,"z_sl",        dom%bnd%z_sl,        units="",dim1="xc",dim2="yc",ncid=ncid)
-        call nc_write(filename,"H_sed",       dom%bnd%H_sed,       units="",dim1="xc",dim2="yc",ncid=ncid)
-        call nc_write(filename,"smb",         dom%bnd%smb,         units="",dim1="xc",dim2="yc",ncid=ncid)
-        call nc_write(filename,"T_srf",       dom%bnd%T_srf,       units="",dim1="xc",dim2="yc",ncid=ncid)
-        call nc_write(filename,"bmb_shlf",    dom%bnd%bmb_shlf,    units="",dim1="xc",dim2="yc",ncid=ncid)
-        call nc_write(filename,"T_shlf",      dom%bnd%T_shlf,      units="",dim1="xc",dim2="yc",ncid=ncid)
-        call nc_write(filename,"Q_geo",       dom%bnd%Q_geo,       units="",dim1="xc",dim2="yc",ncid=ncid)
+        call nc_write(filename,"z_bed",       dom%bnd%z_bed,       units="",dim1="xc",dim2="yc",dim3="time",ncid=ncid,start=[1,1,n],count=[nx,ny,1])
+        call nc_write(filename,"z_bed_sd",    dom%bnd%z_bed_sd,    units="",dim1="xc",dim2="yc",dim3="time",ncid=ncid,start=[1,1,n],count=[nx,ny,1])
+        call nc_write(filename,"z_sl",        dom%bnd%z_sl,        units="",dim1="xc",dim2="yc",dim3="time",ncid=ncid,start=[1,1,n],count=[nx,ny,1])
+        call nc_write(filename,"H_sed",       dom%bnd%H_sed,       units="",dim1="xc",dim2="yc",dim3="time",ncid=ncid,start=[1,1,n],count=[nx,ny,1])
+        call nc_write(filename,"smb",         dom%bnd%smb,         units="",dim1="xc",dim2="yc",dim3="time",ncid=ncid,start=[1,1,n],count=[nx,ny,1])
+        call nc_write(filename,"T_srf",       dom%bnd%T_srf,       units="",dim1="xc",dim2="yc",dim3="time",ncid=ncid,start=[1,1,n],count=[nx,ny,1])
+        call nc_write(filename,"bmb_shlf",    dom%bnd%bmb_shlf,    units="",dim1="xc",dim2="yc",dim3="time",ncid=ncid,start=[1,1,n],count=[nx,ny,1])
+        call nc_write(filename,"T_shlf",      dom%bnd%T_shlf,      units="",dim1="xc",dim2="yc",dim3="time",ncid=ncid,start=[1,1,n],count=[nx,ny,1])
+        call nc_write(filename,"Q_geo",       dom%bnd%Q_geo,       units="",dim1="xc",dim2="yc",dim3="time",ncid=ncid,start=[1,1,n],count=[nx,ny,1])
 
-        call nc_write(filename,"enh_srf",     dom%bnd%enh_srf,     units="",dim1="xc",dim2="yc",ncid=ncid)
+        call nc_write(filename,"enh_srf",     dom%bnd%enh_srf,     units="",dim1="xc",dim2="yc",dim3="time",ncid=ncid,start=[1,1,n],count=[nx,ny,1])
 
-        call nc_write(filename,"basins",      dom%bnd%basins,      units="",dim1="xc",dim2="yc",ncid=ncid)
-        call nc_write(filename,"basin_mask",  dom%bnd%basin_mask,  units="",dim1="xc",dim2="yc",ncid=ncid)
-        call nc_write(filename,"regions",     dom%bnd%regions,     units="",dim1="xc",dim2="yc",ncid=ncid)
-        call nc_write(filename,"region_mask", dom%bnd%region_mask, units="",dim1="xc",dim2="yc",ncid=ncid)
+        call nc_write(filename,"basins",      dom%bnd%basins,      units="",dim1="xc",dim2="yc",dim3="time",ncid=ncid,start=[1,1,n],count=[nx,ny,1])
+        call nc_write(filename,"basin_mask",  dom%bnd%basin_mask,  units="",dim1="xc",dim2="yc",dim3="time",ncid=ncid,start=[1,1,n],count=[nx,ny,1])
+        call nc_write(filename,"regions",     dom%bnd%regions,     units="",dim1="xc",dim2="yc",dim3="time",ncid=ncid,start=[1,1,n],count=[nx,ny,1])
+        call nc_write(filename,"region_mask", dom%bnd%region_mask, units="",dim1="xc",dim2="yc",dim3="time",ncid=ncid,start=[1,1,n],count=[nx,ny,1])
 
-        call nc_write(filename,"ice_allowed", dom%bnd%ice_allowed, units="",dim1="xc",dim2="yc",ncid=ncid)
-        call nc_write(filename,"calv_mask",   dom%bnd%calv_mask,   units="",dim1="xc",dim2="yc",ncid=ncid)
-        call nc_write(filename,"H_ice_ref",   dom%bnd%H_ice_ref,   units="",dim1="xc",dim2="yc",ncid=ncid)
-        call nc_write(filename,"z_bed_ref",   dom%bnd%z_bed_ref,   units="",dim1="xc",dim2="yc",ncid=ncid)
+        call nc_write(filename,"ice_allowed", dom%bnd%ice_allowed, units="",dim1="xc",dim2="yc",dim3="time",ncid=ncid,start=[1,1,n],count=[nx,ny,1])
+        call nc_write(filename,"calv_mask",   dom%bnd%calv_mask,   units="",dim1="xc",dim2="yc",dim3="time",ncid=ncid,start=[1,1,n],count=[nx,ny,1])
+        call nc_write(filename,"H_ice_ref",   dom%bnd%H_ice_ref,   units="",dim1="xc",dim2="yc",dim3="time",ncid=ncid,start=[1,1,n],count=[nx,ny,1])
+        call nc_write(filename,"z_bed_ref",   dom%bnd%z_bed_ref,   units="",dim1="xc",dim2="yc",dim3="time",ncid=ncid,start=[1,1,n],count=[nx,ny,1])
 
         ! == ydata variables ===
 

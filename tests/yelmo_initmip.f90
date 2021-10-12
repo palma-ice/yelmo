@@ -256,7 +256,7 @@ end if
     end if 
 
     ! Initialize continuous restart file 
-    call yelmo_restart_write(yelmo1,"yelmo_heavy.nc",time_init,init=.TRUE.)
+    ! call yelmo_restart_write(yelmo1,"yelmo_heavy.nc",time_init,init=.TRUE.)
 
     ! Advance timesteps
     do n = 1, ceiling((time_end-time_init)/dtt)
@@ -279,7 +279,8 @@ end if
 !         end if 
         
         ! Update ice sheet 
-        call yelmo_update(yelmo1,time,"yelmo_heavy.nc")
+        call yelmo_update(yelmo1,time)
+        ! call yelmo_update(yelmo1,time,"yelmo_heavy.nc")
 
         ! == MODEL OUTPUT =======================================================
 

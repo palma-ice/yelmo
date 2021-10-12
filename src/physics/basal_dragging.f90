@@ -221,6 +221,10 @@ contains
         ! Finally ensure that beta for grounded ice is higher than the lower allowed limit
         where(beta .gt. 0.0 .and. beta .lt. beta_min) beta = beta_min 
 
+
+        ! Extra stability step
+        call clean_beta_min(beta,beta_min)
+
         ! ================================================================
         ! Note: At this point the beta_aa field is available with beta=0 
         ! for floating points and beta > 0 for non-floating points
@@ -229,6 +233,60 @@ contains
         return 
 
     end subroutine calc_beta
+
+    subroutine clean_beta_min(beta,beta_min)
+
+        implicit none
+
+        real(wp), intent(INOUT) :: beta(:,:) 
+        real(wp), intent(IN)    :: beta_min 
+
+        ! Local variables 
+        integer :: i, j, nx, ny, ntot 
+        integer :: im1, ip1, jm1, jp1 
+        real(wp) :: beta4(4) 
+        logical  :: mask4(4) 
+
+        real(wp), allocatable :: beta_ref(:,:) 
+
+        nx = size(beta,1)
+        ny = size(beta,2) 
+
+        allocate(beta_ref(nx,ny))
+        beta_ref = beta
+        
+        do j = 1, ny 
+        do i = 1, nx 
+
+            if (beta(i,j) .eq. beta_min) then 
+
+                ! Get neighbor indices 
+                im1 = max(i-1,1)
+                ip1 = min(i+1,nx)
+                jm1 = max(j-1,1) 
+                jp1 = min(j+1,ny)
+                
+                ! Calculate beta of four neighbors and determine how many 
+                ! have values above beta_min
+                beta4 = [beta_ref(im1,j),beta_ref(ip1,j),beta_ref(i,jm1),beta_ref(i,jp1)]
+                mask4 = (beta4 .gt. beta_min)
+                ntot  = count(mask4)
+
+                ! If neighbors exist with values above beta_min, 
+                ! calculate the average with the current point to smooth field
+                if (ntot .gt.0) then 
+                    beta(i,j) = (beta_ref(i,j)+sum(beta4,mask=mask4))/real(ntot+1,wp)
+                end if 
+
+            end if 
+
+        end do 
+        end do 
+
+
+        return 
+
+    end subroutine clean_beta_min
 
     subroutine stagger_beta(beta_acx,beta_acy,beta,H_ice,f_ice,ux,uy,f_grnd,f_grnd_acx,f_grnd_acy,beta_gl_stag,boundaries)
 

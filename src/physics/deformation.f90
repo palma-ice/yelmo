@@ -863,10 +863,13 @@ contains
                         strn%dxz(i,j,k) = 0.5_wp*(lxz+lzx)
                         strn%dyz(i,j,k) = 0.5_wp*(lyz+lzy)
 
-                        ! Avoid extreme values (can happen at margins)
-                        if (abs(strn%dxz(i,j,k)) .gt. de_max) strn%dxz(i,j,k) = de_max 
-                        if (abs(strn%dyz(i,j,k)) .gt. de_max) strn%dyz(i,j,k) = de_max 
-        
+                        ! Avoid extreme values (can happen towards the margins - bug??)
+                        if (strn%dxz(i,j,k) .lt. -de_max) strn%dxz(i,j,k) = -de_max 
+                        if (strn%dxz(i,j,k) .gt. de_max)  strn%dxz(i,j,k) =  de_max 
+
+                        if (strn%dyz(i,j,k) .lt. -de_max) strn%dyz(i,j,k) = -de_max 
+                        if (strn%dyz(i,j,k) .gt. de_max)  strn%dyz(i,j,k) =  de_max 
+                        
                         ! Avoid underflows 
                         if (abs(strn%dxz(i,j,k)) .lt. TOL_UNDERFLOW) strn%dxz(i,j,k) = 0.0 
                         if (abs(strn%dyz(i,j,k)) .lt. TOL_UNDERFLOW) strn%dyz(i,j,k) = 0.0 

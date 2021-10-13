@@ -249,41 +249,45 @@ contains
 
         real(wp), allocatable :: beta_ref(:,:) 
 
-        nx = size(beta,1)
-        ny = size(beta,2) 
+        if (beta_min .gt. 0.0_wp) then 
+            ! Only apply this routine if beta_min is greater than zero 
 
-        allocate(beta_ref(nx,ny))
-        beta_ref = beta
-        
-        do j = 1, ny 
-        do i = 1, nx 
+            nx = size(beta,1)
+            ny = size(beta,2) 
 
-            if (beta(i,j) .eq. beta_min) then 
+            allocate(beta_ref(nx,ny))
+            beta_ref = beta
 
-                ! Get neighbor indices 
-                im1 = max(i-1,1)
-                ip1 = min(i+1,nx)
-                jm1 = max(j-1,1) 
-                jp1 = min(j+1,ny)
-                
-                ! Calculate beta of four neighbors and determine how many 
-                ! have values above beta_min
-                beta4 = [beta_ref(im1,j),beta_ref(ip1,j),beta_ref(i,jm1),beta_ref(i,jp1)]
-                mask4 = (beta4 .gt. beta_min)
-                ntot  = count(mask4)
+            do j = 1, ny 
+            do i = 1, nx 
 
-                ! If neighbors exist with values above beta_min, 
-                ! calculate the average with the current point to smooth field
-                if (ntot .gt.0) then 
-                    beta(i,j) = (beta_ref(i,j)+sum(beta4,mask=mask4))/real(ntot+1,wp)
+                if (beta(i,j) .eq. beta_min) then 
+
+                    ! Get neighbor indices 
+                    im1 = max(i-1,1)
+                    ip1 = min(i+1,nx)
+                    jm1 = max(j-1,1) 
+                    jp1 = min(j+1,ny)
+                    
+                    ! Calculate beta of four neighbors and determine how many 
+                    ! have values above beta_min
+                    beta4 = [beta_ref(im1,j),beta_ref(ip1,j),beta_ref(i,jm1),beta_ref(i,jp1)]
+                    mask4 = (beta4 .gt. beta_min)
+                    ntot  = count(mask4)
+
+                    ! If neighbors exist with values above beta_min, 
+                    ! calculate the average with the current point to smooth field
+                    if (ntot .gt.0) then 
+                        beta(i,j) = (beta_ref(i,j)+sum(beta4,mask=mask4))/real(ntot+1,wp)
+                    end if 
+
                 end if 
 
-            end if 
+            end do 
+            end do 
 
-        end do 
-        end do 
-
-
+        end if 
+        
         return 
 
     end subroutine clean_beta_min

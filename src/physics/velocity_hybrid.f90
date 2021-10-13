@@ -593,7 +593,7 @@ end if
 ! and center it, then multiply with the centered ATT value to get visc. 
 ! So that is why the central ATT value is used below. This should be 
 ! investigated further in the future perhaps.
-if (.TRUE.) then  
+if (.FALSE.) then  
                     ! Get the rate factor on ab-nodes too
                     call stagger_nodes_aa_ab_ice(ATT_ab,ATT(:,:,k),f_ice,i,j)
 else

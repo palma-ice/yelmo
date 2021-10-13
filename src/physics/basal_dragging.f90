@@ -303,7 +303,7 @@ contains
 
             end do 
             end do 
-            
+
         end if 
 
         return 
@@ -698,21 +698,6 @@ contains
             jm1 = max(j-1,1) 
             jp1 = min(j+1,ny)
             
-            ! Get ab-node weighting based on whether ice is present 
-            ! wt_ab = 0.0_wp 
-            ! if (count([f_ice(i,j),f_ice(ip1,j),f_ice(i,jp1),f_ice(ip1,jp1)].eq.1.0_wp) .gt. 0) then 
-            !     wt_ab(1) = 1.0_wp
-            ! end if
-            ! if (count([f_ice(i,j),f_ice(im1,j),f_ice(i,jp1),f_ice(im1,jp1)].eq.1.0_wp) .gt. 0) then 
-            !     wt_ab(2) = 1.0_wp 
-            ! end if 
-            ! if (count([f_ice(i,j),f_ice(im1,j),f_ice(i,jm1),f_ice(im1,jm1)].eq.1.0_wp) .gt. 0) then 
-            !     wt_ab(3) = 1.0_wp
-            ! end if 
-            ! if (count([f_ice(i,j),f_ice(ip1,j),f_ice(i,jm1),f_ice(ip1,jm1)].eq.1.0_wp) .gt. 0) then 
-            !     wt_ab(4) = 1.0_wp 
-            ! end if 
-            
             wt_ab = 1.0_wp 
             wt = sum(wt_ab)
             
@@ -723,9 +708,10 @@ contains
                 wt_ab = wt_ab / wt 
 
                 ! Get c_bed on ab-nodes
-                call stagger_nodes_aa_ab_ice(cb_ab,c_bed,f_ice,i,j)
+                ! call stagger_nodes_aa_ab_ice(cb_ab,c_bed,f_ice,i,j)
 
-                ! cb_ab(1:4) = c_bed(i,j) 
+                ! Use central value of c_bed
+                cb_ab(1:4) = c_bed(i,j) 
 
                 if (q .eq. 1.0_wp) then 
                     ! Linear law, no f(ub) term

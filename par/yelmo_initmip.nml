@@ -151,7 +151,7 @@
     rf_with_water           = False         ! Only applied for rf_method=1, scale rf by water content?
     n_glen                  = 3.0           ! Glen flow law exponent
     visc_min                = 1e3           ! [Pa a] Minimum allowed viscosity 
-    de_max                  = 0.5           ! [a-1]  Maximum allowed effective strain rate
+    de_max                  = 5.0           ! [a-1]  Maximum allowed effective strain rate
     enh_method              = "shear3D"     ! "simple","shear2D", "shear3D", "paleo-shear" 
     enh_shear               = 2.0
     enh_stream              = 2.0

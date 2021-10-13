@@ -242,12 +242,19 @@ contains
         real(wp), intent(IN)    :: beta_min 
 
         ! Local variables 
-        integer :: i, j, nx, ny, ntot 
+        integer :: i, j, nx, ny, ntot
+        integer :: n_iter 
         integer :: im1, ip1, jm1, jp1 
         real(wp) :: beta4(4) 
         logical  :: mask4(4) 
 
         real(wp), allocatable :: beta_ref(:,:) 
+
+        ! Perform this cleaning routine for multiple iterations
+        ! to ensure smooth transition to beta_min values. The more
+        ! iterations are performed, the less beta_min values will
+        ! exist in the field. 
+        integer, parameter :: n_iter_max = 3 
 
         if (beta_min .gt. 0.0_wp) then 
             ! Only apply this routine if beta_min is greater than zero 
@@ -256,38 +263,45 @@ contains
             ny = size(beta,2) 
 
             allocate(beta_ref(nx,ny))
-            beta_ref = beta
 
-            do j = 1, ny 
-            do i = 1, nx 
+            do n_iter = 1, n_iter_max
+                
+                ! Store current version of beta
+                beta_ref = beta
 
-                if (beta(i,j) .eq. beta_min) then 
+                ! Find values of beta_min and check neighborhood average
+                do j = 1, ny 
+                do i = 1, nx 
 
-                    ! Get neighbor indices 
-                    im1 = max(i-1,1)
-                    ip1 = min(i+1,nx)
-                    jm1 = max(j-1,1) 
-                    jp1 = min(j+1,ny)
-                    
-                    ! Calculate beta of four neighbors and determine how many 
-                    ! have values above beta_min
-                    beta4 = [beta_ref(im1,j),beta_ref(ip1,j),beta_ref(i,jm1),beta_ref(i,jp1)]
-                    mask4 = (beta4 .gt. beta_min)
-                    ntot  = count(mask4)
+                    if (beta(i,j) .eq. beta_min) then 
 
-                    ! If neighbors exist with values above beta_min, 
-                    ! calculate the average with the current point to smooth field
-                    if (ntot .gt.0) then 
-                        beta(i,j) = (beta_ref(i,j)+sum(beta4,mask=mask4))/real(ntot+1,wp)
+                        ! Get neighbor indices 
+                        im1 = max(i-1,1)
+                        ip1 = min(i+1,nx)
+                        jm1 = max(j-1,1) 
+                        jp1 = min(j+1,ny)
+                        
+                        ! Calculate beta of four neighbors and determine how many 
+                        ! have values above beta_min
+                        beta4 = [beta_ref(im1,j),beta_ref(ip1,j),beta_ref(i,jm1),beta_ref(i,jp1)]
+                        mask4 = (beta4 .gt. beta_min)
+                        ntot  = count(mask4)
+
+                        ! If neighbors exist with values above beta_min, 
+                        ! calculate the average with the current point to smooth field
+                        if (ntot .gt.0) then 
+                            beta(i,j) = (beta_ref(i,j)+sum(beta4,mask=mask4))/real(ntot+1,wp)
+                        end if 
+
                     end if 
 
-                end if 
+                end do 
+                end do 
 
-            end do 
             end do 
 
         end if 
-        
+
         return 
 
     end subroutine clean_beta_min

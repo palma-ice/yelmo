@@ -250,12 +250,6 @@ contains
 
         real(wp), allocatable :: beta_ref(:,:) 
 
-        ! Perform this cleaning routine for multiple iterations
-        ! to ensure smooth transition to beta_min values. The more
-        ! iterations are performed, the less beta_min values will
-        ! exist in the field. 
-        integer, parameter :: n_iter_max = 3 
-
         if (beta_min .gt. 0.0_wp) then 
             ! Only apply this routine if beta_min is greater than zero 
 
@@ -264,42 +258,52 @@ contains
 
             allocate(beta_ref(nx,ny))
 
-            do n_iter = 1, n_iter_max
+            ! Store current version of beta
+            beta_ref = beta
+
+            do j = 1, ny 
+            do i = 1, nx 
+
+                ! Get neighbor indices 
+                im1 = max(i-1,1)
+                ip1 = min(i+1,nx)
+                jm1 = max(j-1,1) 
+                jp1 = min(j+1,ny)
                 
-                ! Store current version of beta
-                beta_ref = beta
+                ! Calculate beta of four neighbors and set mask
+                beta4 = [beta_ref(im1,j),beta_ref(ip1,j),beta_ref(i,jm1),beta_ref(i,jp1)]
 
-                ! Find values of beta_min and check neighborhood average
-                do j = 1, ny 
-                do i = 1, nx 
+                if (beta_ref(i,j) .eq. beta_min) then 
+                    ! Find values of beta_min and set neighborhood average
 
-                    if (beta(i,j) .eq. beta_min) then 
+                    ! Determine how many neighbors have values above beta_min 
+                    mask4 = (beta4 .gt. beta_min)
+                    ntot  = count(mask4)
 
-                        ! Get neighbor indices 
-                        im1 = max(i-1,1)
-                        ip1 = min(i+1,nx)
-                        jm1 = max(j-1,1) 
-                        jp1 = min(j+1,ny)
-                        
-                        ! Calculate beta of four neighbors and determine how many 
-                        ! have values above beta_min
-                        beta4 = [beta_ref(im1,j),beta_ref(ip1,j),beta_ref(i,jm1),beta_ref(i,jp1)]
-                        mask4 = (beta4 .gt. beta_min)
-                        ntot  = count(mask4)
-
-                        ! If neighbors exist with values above beta_min, 
-                        ! calculate the average with the current point to smooth field
-                        if (ntot .gt.0) then 
-                            beta(i,j) = (beta_ref(i,j)+sum(beta4,mask=mask4))/real(ntot+1,wp)
-                        end if 
-
+                    ! If neighbors exist with values above beta_min, 
+                    ! calculate the average with the current point to smooth field
+                    if (ntot .gt. 0) then 
+                        beta(i,j) = (beta_ref(i,j)+sum(beta4,mask=mask4))/real(ntot+1,wp)
                     end if 
 
-                end do 
-                end do 
+                else if (beta_ref(i,j) .gt. beta_min) then 
+                    ! Find neighbors of beta_min points and set neighborhood average
+
+                    ! Determine how many neighbors have values equal to beta_min 
+                    mask4 = (beta4 .eq. beta_min)
+                    ntot = count(mask4)
+
+                    ! If neighbors exist with values equal to beta_min,
+                    ! calculate the average with the current point to smooth field
+                    if (ntot .gt. 0) then 
+                        beta(i,j) = (beta_ref(i,j)+sum(beta4,mask=mask4))/real(ntot+1,wp)
+                    end if 
+
+                end if 
 
             end do 
-
+            end do 
+            
         end if 
 
         return 

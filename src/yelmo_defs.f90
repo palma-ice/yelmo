@@ -746,8 +746,9 @@ module yelmo_defs
         real(wp)            :: cfl_diff_max 
         character (len=56)  :: pc_method
         character (len=56)  :: pc_controller
-        logical             :: pc_filter_vel 
         logical             :: pc_use_H_pred 
+        logical             :: pc_filter_vel 
+        logical             :: pc_corr_vel 
         integer             :: pc_n_redo 
         real(wp)            :: pc_tol 
         real(wp)            :: pc_eps  

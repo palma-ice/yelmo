@@ -146,9 +146,7 @@ contains
                 case(1) 
                     ! Calculate 3D effective viscosity, using velocity solution from previous iteration
                     
-                    ! call calc_visc_eff_3D(visc_eff,ux_b,uy_b,ATT,H_ice,f_ice,zeta_aa,dx,dy,n_glen,par%eps_0)
-
-                    call calc_visc_eff_3D_new(visc_eff,ux_b,uy_b,ATT,H_ice,f_ice,zeta_aa,dx,dy,n_glen,par%eps_0)
+                    call calc_visc_eff_3D(visc_eff,ux_b,uy_b,ATT,H_ice,f_ice,zeta_aa,dx,dy,n_glen,par%eps_0)
 
                 case DEFAULT 
 
@@ -248,218 +246,6 @@ end if
 
         implicit none 
         
-        real(wp), intent(OUT) :: visc_eff(:,:,:)      ! aa-nodes
-        real(wp), intent(IN)  :: ux(:,:)              ! [m/a] Vertically averaged horizontal velocity, x-component
-        real(wp), intent(IN)  :: uy(:,:)              ! [m/a] Vertically averaged horizontal velocity, y-component
-        real(wp), intent(IN)  :: ATT(:,:,:)           ! aa-nodes
-        real(wp), intent(IN)  :: H_ice(:,:) 
-        real(wp), intent(IN)  :: f_ice(:,:)
-        real(wp), intent(IN)  :: zeta_aa(:)           ! Vertical axis (sigma-coordinates from 0 to 1)
-        real(wp), intent(IN)  :: dx
-        real(wp), intent(IN)  :: dy
-        real(wp), intent(IN)  :: n_glen   
-        real(wp), intent(IN)  :: eps_0                ! [1/a] Regularization constant (minimum strain rate, ~1e-8)
-        
-        ! Local variables 
-        integer    :: i, j, k, nx, ny, nz
-        integer    :: ip1, jp1, im1, jm1   
-        real(wp) :: inv_4dx, inv_4dy 
-        real(wp) :: dudx_ab, dvdy_ab
-        real(wp) :: dudy, dvdx
-        real(wp) :: duxdz_ab, duydz_ab  
-        real(wp) :: p1, p2, eps_0_sq  
-        real(wp) :: eps_sq                            ! [1/a^2]
-        real(wp) :: ATT_ab
-        real(wp) :: visc_eff_ab_now(4)
-        real(wp) :: wt_ab(4)
-        real(wp) :: wt  
-
-        real(wp), allocatable :: visc_eff_ab(:,:,:)
-
-        nx = size(visc_eff,1)
-        ny = size(visc_eff,2)
-        nz = size(visc_eff,3)
-        
-        ! Allocate local arrays 
-        allocate(visc_eff_ab(nx,ny,nz)) 
-
-        ! Calculate scaling factors
-        inv_4dx = 1.0_prec / (4.0_prec*dx) 
-        inv_4dy = 1.0_prec / (4.0_prec*dy) 
-
-        ! Calculate exponents 
-        p1 = (1.0_prec - n_glen)/(2.0_prec*n_glen)
-        p2 = -1.0_prec/n_glen
-
-        ! Calculate squared minimum strain rate 
-        eps_0_sq = eps_0*eps_0 
-
-        do j = 1, ny 
-        do i = 1, nx 
-
-            im1 = max(i-1,1) 
-            ip1 = min(i+1,nx) 
-            jm1 = max(j-1,1) 
-            jp1 = min(j+1,ny) 
-
-            ! Calculate effective strain components from horizontal stretching on ab-nodes
-            dudx_ab = ( (ux(ip1,j) - ux(im1,j)) + (ux(ip1,jp1) - ux(im1,jp1)) ) *inv_4dx
-            dvdy_ab = ( (uy(i,jp1) - uy(i,jm1)) + (uy(ip1,jp1) - uy(ip1,jm1)) ) *inv_4dy 
-
-            ! Calculate of cross terms on ab-nodes
-            dudy = (ux(i,jp1) - ux(i,j)) / dx 
-            dvdx = (uy(ip1,j) - uy(i,j)) / dy 
-
-            ! Loop over column
-            do k = 1, nz 
-
-                ! No vertical shear terms here 
-                duxdz_ab = 0.0_wp 
-                duydz_ab = 0.0_wp 
-
-                ! Calculate the total effective strain rate from L19, Eq. 21 
-                eps_sq = dudx_ab**2 + dvdy_ab**2 + dudx_ab*dvdy_ab + 0.25_prec*(dudy+dvdx)**2 &
-                       + 0.25_prec*duxdz_ab**2 + 0.25_prec*duydz_ab**2 + eps_0_sq
-                
-                ATT_ab = 0.25_prec*(ATT(i,j,k)+ATT(ip1,j,k)+ATT(i,jp1,k)+ATT(ip1,jp1,k)) 
-                
-                ! Calculate effective viscosity on ab-nodes
-                visc_eff_ab(i,j,k) = 0.5_prec*(eps_sq)**(p1) * ATT_ab**(p2)
-
-            end do 
-
-        end do  
-        end do 
-
-        ! Unstagger from ab-nodes to aa-nodes 
-        ! only using contributions from ice covered neighbors
-        do j = 1, ny 
-        do i = 1, nx 
-
-            im1 = max(i-1,1) 
-            ip1 = min(i+1,nx) 
-            jm1 = max(j-1,1) 
-            jp1 = min(j+1,ny) 
-
-            ! Get ab-node weighting based on whether ice is present 
-            wt_ab = 0.0_wp 
-            if (count([f_ice(i,j),f_ice(ip1,j),f_ice(i,jp1),f_ice(ip1,jp1)].lt.1.0_wp) .eq. 0) then 
-                wt_ab(1) = 1.0_wp
-            end if
-            if (count([f_ice(i,j),f_ice(im1,j),f_ice(i,jp1),f_ice(im1,jp1)].lt.1.0_wp) .eq. 0) then 
-                wt_ab(2) = 1.0_wp 
-            end if 
-            if (count([f_ice(i,j),f_ice(im1,j),f_ice(i,jm1),f_ice(im1,jm1)].lt.1.0_wp) .eq. 0) then 
-                wt_ab(3) = 1.0_wp
-            end if 
-            if (count([f_ice(i,j),f_ice(ip1,j),f_ice(i,jm1),f_ice(ip1,jm1)].lt.1.0_wp) .eq. 0) then 
-                wt_ab(4) = 1.0_wp 
-            end if 
-            
-            wt = sum(wt_ab)
-            
-            if (f_ice(i,j) .eq. 1.0_wp .and. wt .gt. 0.0_wp) then 
-                ! Fully ice-covered point with some fully ice-covered neighbors 
-
-                ! Normalize weighting 
-                wt_ab = wt_ab / wt 
-
-                do k = 1, nz
-
-                    visc_eff_ab_now(1) = visc_eff_ab(i,j,k) 
-                    visc_eff_ab_now(2) = visc_eff_ab(im1,j,k) 
-                    visc_eff_ab_now(3) = visc_eff_ab(im1,jm1,k) 
-                    visc_eff_ab_now(4) = visc_eff_ab(i,jm1,k) 
-
-                    ! Calcualte effective viscosity on aa-nodes
-                    visc_eff(i,j,k) = sum(wt_ab*visc_eff_ab_now)
-
-                end do 
-                
-            else 
-                ! Just get simple average for ice free points 
-
-                ! Loop over column
-                do k = 1, nz 
-                    visc_eff(i,j,k) = 0.25_prec*(visc_eff_ab(i,j,k)+visc_eff_ab(im1,j,k) &
-                                                +visc_eff_ab(i,jm1,k)+visc_eff_ab(im1,jm1,k))
-                end do 
-
-            end if 
-
-        end do 
-        end do 
-        
-        ! Extrapolate viscosity to bordering ice-free or partially ice-covered cells
-        do j=1, ny
-        do i=1, nx
-
-            ! Get neighbor indices
-            im1 = max(i-1,1) 
-            ip1 = min(i+1,nx) 
-            jm1 = max(j-1,1) 
-            jp1 = min(j+1,ny) 
-            
-            if ( f_ice(i,j) .lt. 1.0 .and. &
-                count([f_ice(im1,j),f_ice(ip1,j),f_ice(i,jm1),f_ice(i,jp1)] .eq. 1.0_wp) .gt. 0 ) then 
-                ! Ice-free (or partially ice-free) with ice-covered neighbors
-
-                visc_eff(i,j,:) = 0.0 
-                wt = 0.0 
-
-                if (f_ice(im1,j).eq.1.0) then 
-                    visc_eff(i,j,:) = visc_eff(i,j,:) + visc_eff(im1,j,:) 
-                    wt = wt + 1.0 
-                end if 
-                if (f_ice(ip1,j).eq.1.0) then 
-                    visc_eff(i,j,:) = visc_eff(i,j,:) + visc_eff(ip1,j,:) 
-                    wt = wt + 1.0 
-                end if 
-                if (f_ice(i,jm1).eq.1.0) then 
-                    visc_eff(i,j,:) = visc_eff(i,j,:) + visc_eff(i,jm1,:) 
-                    wt = wt + 1.0 
-                end if 
-                if (f_ice(i,jp1).eq.1.0) then 
-                    visc_eff(i,j,:) = visc_eff(i,j,:) + visc_eff(i,jp1,:) 
-                    wt = wt + 1.0 
-                end if 
-                
-                if (wt .gt. 0.0) then 
-                    visc_eff(i,j,:) = visc_eff(i,j,:) / wt 
-
-                end if 
-
-            end if 
-
-        end do 
-        end do 
-
-        ! Treat the corners to avoid extremes
-        visc_eff(1,1,:)   = 0.5*(visc_eff(2,1,:)+visc_eff(1,2,:))
-        visc_eff(1,ny,:)  = 0.5*(visc_eff(2,ny,:)+visc_eff(1,ny-1,:))
-        visc_eff(nx,1,:)  = 0.5*(visc_eff(nx,2,:)+visc_eff(nx-1,1,:))
-        visc_eff(nx,ny,:) = 0.5*(visc_eff(nx-1,ny,:)+visc_eff(nx,ny-1,:))
-
-        return 
-
-    end subroutine calc_visc_eff_3D
-
-    subroutine calc_visc_eff_3D_new(visc_eff,ux,uy,ATT,H_ice,f_ice,zeta_aa,dx,dy,n_glen,eps_0)
-        ! Calculate 3D effective viscosity following L19, Eq. 2
-        ! Use of eps_0 ensures non-zero positive viscosity value everywhere 
-        ! Note: viscosity is first calculated on ab-nodes, then 
-        ! unstaggered back to aa-nodes. This ensures more stability for 
-        ! visc_eff (less likely to blow up for low strain rates). 
-
-        ! Note: this routine is identical to that of velocity_diva, except
-        ! the shear strain terms duxdz/duydz are set to zero. Although most
-        ! equations for effective viscosity in SSA are given in 2D, the 
-        ! 3D rate factor implies a calculation in 3D first, then vertical integration
-        ! (the integral could be performed on B=A^(-1/n), but we make use of the available 3D visc_eff
-        ! variable and maintain the analogy with the DIVA solver)
-
-        implicit none 
-        
         real(wp), intent(OUT) :: visc_eff(:,:,:)        ! aa-nodes
         real(wp), intent(IN)  :: ux(:,:)                ! [m/yr] Vertically averaged horizontal velocity, x-component
         real(wp), intent(IN)  :: uy(:,:)                ! [m/yr] Vertically averaged horizontal velocity, y-component
@@ -511,6 +297,11 @@ end if
         ! Calculate squared minimum strain rate 
         eps_0_sq = eps_0*eps_0 
 
+        ! Get weighting for ab-nodes
+        wt_ab = 1.0_wp 
+        wt    = sum(wt_ab)
+        wt_ab = wt_ab / wt 
+
         ! Calculate visc_eff on quadrature points (ab-nodes),
         ! and then average to get grid-centered value (aa-node)
         do j = 1, ny 
@@ -526,59 +317,20 @@ end if
             jm2 = max(j-2,1) 
             jp2 = min(j+2,ny) 
 
-            wt_ab = 1.0_wp 
-            wt = sum(wt_ab)
             
             if (f_ice(i,j) .eq. 1.0_wp) then 
                 ! Fully ice-covered point
-
-                ! Normalize weighting 
-                wt_ab = wt_ab / wt 
-
-                ! === dudx ======================
-
-                ! dudx_ab(1) = ( (ux(ip1,j) - ux(im1,j)) + (ux(ip1,jp1) - ux(im1,jp1)) ) *inv_4dx
-                ! dudx_ab(2) = ( (ux(i,j)   - ux(im2,j)) + (ux(i,jp1)   - ux(im2,jp1)) ) *inv_4dx
-                ! dudx_ab(3) = ( (ux(i,j)   - ux(im2,j)) + (ux(i,jm1)   - ux(im2,jm1)) ) *inv_4dx
-                ! dudx_ab(4) = ( (ux(ip1,j) - ux(im1,j)) + (ux(ip1,jm1) - ux(im1,jm1)) ) *inv_4dx
-                ! where(abs(dudx_ab) .lt. TOL_UNDERFLOW) dudx_ab = 0.0_wp
                 
+                ! Get strain rate terms
                 call staggerdiff_nodes_acx_ab_ice(dudx_ab,ux,f_ice,i,j,dx) 
-
-                ! === dvdy ======================
-
-                ! dvdy_ab(1) = ( (uy(i,jp1) - uy(i,jm1)) + (uy(ip1,jp1) - uy(ip1,jm1)) ) *inv_4dy 
-                ! dvdy_ab(2) = ( (uy(i,jp1) - uy(i,jm1)) + (uy(im1,jp1) - uy(im1,jm1)) ) *inv_4dy 
-                ! dvdy_ab(3) = ( (uy(i,j)   - uy(i,jm2)) + (uy(im1,j)   - uy(im1,jm2)) ) *inv_4dy 
-                ! dvdy_ab(4) = ( (uy(i,j)   - uy(i,jm2)) + (uy(ip1,j)   - uy(ip1,jm2)) ) *inv_4dy 
-                ! where(abs(dvdy_ab) .lt. TOL_UNDERFLOW) dvdy_ab = 0.0_wp
-                
                 call staggerdiff_nodes_acy_ab_ice(dvdy_ab,uy,f_ice,i,j,dy) 
-
-                ! === dudy ======================
-
-                ! dudy_ab(1) = (ux(i,jp1)   - ux(i,j))     / dy 
-                ! dudy_ab(2) = (ux(im1,jp1) - ux(im1,j))   / dy 
-                ! dudy_ab(3) = (ux(im1,j)   - ux(im1,jm1)) / dy 
-                ! dudy_ab(4) = (ux(i,j)     - ux(i,jm1))   / dy 
-                ! where(abs(dudy_ab) .lt. TOL_UNDERFLOW) dudy_ab = 0.0_wp
-                
                 call staggerdiffcross_nodes_acx_ab_ice(dudy_ab,ux,f_ice,i,j,dy)
-
-                ! === dvdx ======================
-
-                ! dvdx_ab(1) = (uy(ip1,j)   - uy(i,j))     / dx 
-                ! dvdx_ab(2) = (uy(i,j)     - uy(im1,j))   / dx 
-                ! dvdx_ab(3) = (uy(i,jm1)   - uy(im1,jm1)) / dx
-                ! dvdx_ab(4) = (uy(ip1,jm1) - uy(i,jm1))   / dx
-                ! where(abs(dvdx_ab) .lt. TOL_UNDERFLOW) dvdx_ab = 0.0_wp
-
                 call staggerdiffcross_nodes_acx_ab_ice(dvdx_ab,uy,f_ice,i,j,dx)
                 
                 ! Loop over column
                 do k = 1, nz 
 
-                    ! No vertical strain here 
+                    ! No vertical shearing terms for this solver
                     duxdz_ab = 0.0_wp 
                     duydz_ab = 0.0_wp 
 
@@ -675,7 +427,7 @@ end if
 
         return 
 
-    end subroutine calc_visc_eff_3D_new
+    end subroutine calc_visc_eff_3D
 
     subroutine calc_visc_eff_int(visc_eff_int,visc_eff,H_ice,f_ice,zeta_aa)
 

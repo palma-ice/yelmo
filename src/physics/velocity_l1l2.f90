@@ -296,41 +296,12 @@ end if
         integer    :: ip1, jp1, im1, jm1 
         real(prec) :: inv_4dx, inv_4dy 
         real(prec) :: zeta_ac1, zeta_ac0 
-        real(prec) :: H_ice_ac 
         real(prec) :: dw1dx, dw2dx, dw3dx 
         real(prec) :: dw1dy, dw2dy, dw3dy 
         real(prec) :: tau_xz_ab, tau_yz_ab 
         real(prec) :: tau_eff_sq_ab, ATT_ab, depth_ab 
         real(prec) :: fact_ac 
         real(wp)   :: H_ice_ab
-
-
-        real(wp) :: dudx_ab(4)
-        real(wp) :: dvdy_ab(4)
-        real(wp) :: dudy_ab(4)
-        real(wp) :: dvdx_ab(4)
-        real(wp) :: eps_par_sq(4)
-        real(wp) :: eps_par 
-
-        
-        real(wp), allocatable :: dudx_aa(:,:)
-        real(wp), allocatable :: dvdy_aa(:,:)
-        real(wp), allocatable :: dudy_aa(:,:)
-        real(wp), allocatable :: dvdx_aa(:,:)
-        real(wp), allocatable :: visc_eff_int(:,:,:) 
-        real(wp), allocatable :: tau_par_ab(:,:,:) 
-
-        real(wp), allocatable :: work1_aa(:,:)
-        real(wp), allocatable :: work2_aa(:,:)
-        real(wp), allocatable :: work3_aa(:,:)
-        real(wp), allocatable :: tau_xz(:,:,:) 
-        real(wp), allocatable :: tau_yz(:,:,:) 
-        real(wp), allocatable :: fact_ab(:,:) 
-
-        
-        real(prec) :: p1, eps_0_sq 
-        real(prec) :: dzeta 
-        real(wp)   :: depth 
 
         real(wp)   :: dudx_ab4(4) 
         real(wp)   :: dvdy_ab4(4) 
@@ -347,6 +318,25 @@ end if
         real(wp)   :: wt_ab(4) 
         real(wp)   :: wt 
 
+        real(wp), allocatable :: dudx_aa(:,:)
+        real(wp), allocatable :: dvdy_aa(:,:)
+        real(wp), allocatable :: dudy_aa(:,:)
+        real(wp), allocatable :: dvdx_aa(:,:)
+        real(wp), allocatable :: visc_eff_int(:,:,:) 
+        real(wp), allocatable :: tau_par_ab(:,:,:) 
+
+        real(wp), allocatable :: work1_aa(:,:)
+        real(wp), allocatable :: work2_aa(:,:)
+        real(wp), allocatable :: work3_aa(:,:)
+        real(wp), allocatable :: tau_xz(:,:,:) 
+        real(wp), allocatable :: tau_yz(:,:,:) 
+        real(wp), allocatable :: fact_ab(:,:) 
+
+        real(prec) :: p1, eps_0_sq 
+        real(prec) :: dzeta 
+        real(wp)   :: depth 
+
+        
         nx    = size(ux,1)
         ny    = size(ux,2) 
         nz_aa = size(ux,3) 

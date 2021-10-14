@@ -299,12 +299,15 @@ contains
                 ! Step 3: Finally, calculate topography corrector step
                 ! (elevation, ice thickness, calving, etc.)
                 call calc_ytopo(dom%tpo,dom%dyn,dom%mat,dom%thrm,dom%bnd,time_now,topo_fixed=dom%tpo%par%topo_fixed)    
+                
+                if (dom%par%pc_corr_vel) then 
 
-if (.TRUE.) then                
-                ! ajr: testing recalculation of dynamics for stability
-                dom%dyn%par%time = dom_ref%tpo%par%time 
-                call calc_ydyn(dom%dyn,dom%tpo,dom%mat,dom%thrm,dom%bnd,time_now)
-end if 
+                    ! Recalculate dynamics to increase stability
+                    ! (extra cost typically small compared to benefit of larger timesteps)
+                    dom%dyn%par%time = dom_ref%tpo%par%time 
+                    call calc_ydyn(dom%dyn,dom%tpo,dom%mat,dom%thrm,dom%bnd,time_now)
+
+                end if 
 
                 ! Store corrected ice thickness for later use 
                 ! Do it here to ensure all changes to H_ice are accounted for (mb, calving, etc)
@@ -1009,8 +1012,9 @@ end if
         call nml_read(filename,"yelmo","cfl_diff_max",  par%cfl_diff_max)
         call nml_read(filename,"yelmo","pc_method",     par%pc_method)
         call nml_read(filename,"yelmo","pc_controller", par%pc_controller)
-        call nml_read(filename,"yelmo","pc_filter_vel", par%pc_filter_vel)
         call nml_read(filename,"yelmo","pc_use_H_pred", par%pc_use_H_pred)
+        call nml_read(filename,"yelmo","pc_filter_vel", par%pc_filter_vel)
+        call nml_read(filename,"yelmo","pc_corr_vel",   par%pc_corr_vel)
         call nml_read(filename,"yelmo","pc_n_redo",     par%pc_n_redo)
         call nml_read(filename,"yelmo","pc_tol",        par%pc_tol)
         call nml_read(filename,"yelmo","pc_eps",        par%pc_eps)

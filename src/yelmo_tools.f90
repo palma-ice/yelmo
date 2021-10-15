@@ -728,7 +728,8 @@ contains
     end subroutine stagger_nodes_acy_ab_ice
 
     subroutine staggerdiffx_nodes_aa_ab_ice(du_ab,u_aa,f_ice,i,j,dx)
-        ! Stagger from acx nodes to ab node for index [i,j]
+        ! Calculate gradient in x-direction using values on aa-nodes,
+        ! obtain values of gradient on ab-nodes.
 
         implicit none 
 
@@ -766,11 +767,11 @@ contains
         ! (1) Upper-right node average
         wt_ac = 0.0_wp
         du_ac = 0.0_wp  
-        if (f_ice(i,j) .eq. 1.0_wp .and. f_ice(ip1,j) .eq. 1.0_wp) then 
+        if (f_ice(ip1,j) .eq. 1.0_wp .and. f_ice(i,j) .eq. 1.0_wp) then 
             du_ac(1) = (u_aa(ip1,j) - u_aa(i,j)) / dx 
             wt_ac(1) = 1.0_wp 
         end if
-        if (f_ice(i,jp1) .eq. 1.0_wp .and. f_ice(ip1,jp1) .eq. 1.0_wp) then 
+        if (f_ice(ip1,jp1) .eq. 1.0_wp .and. f_ice(i,jp1) .eq. 1.0_wp) then 
             du_ac(2) = (u_aa(ip1,jp1) - u_aa(i,jp1)) / dx 
             wt_ac(2) = 1.0_wp 
         end if
@@ -814,11 +815,11 @@ contains
         ! (4) Lower-right node average
         wt_ac = 0.0_wp
         du_ac = 0.0_wp  
-        if (f_ice(i,j) .eq. 1.0_wp .and. f_ice(ip1,j) .eq. 1.0_wp) then 
+        if (f_ice(ip1,j) .eq. 1.0_wp .and. f_ice(i,j) .eq. 1.0_wp) then 
             du_ac(1) = (u_aa(ip1,j) - u_aa(i,j)) / dx 
             wt_ac(1) = 1.0_wp 
         end if
-        if (f_ice(i,jm1) .eq. 1.0_wp .and. f_ice(ip1,jm1) .eq. 1.0_wp) then 
+        if (f_ice(ip1,jm1) .eq. 1.0_wp .and. f_ice(i,jm1) .eq. 1.0_wp) then 
             du_ac(2) = (u_aa(ip1,jm1) - u_aa(i,jm1)) / dx 
             wt_ac(2) = 1.0_wp 
         end if
@@ -835,7 +836,8 @@ contains
     end subroutine staggerdiffx_nodes_aa_ab_ice
 
     subroutine staggerdiffy_nodes_aa_ab_ice(du_ab,u_aa,f_ice,i,j,dy)
-        ! Stagger from acx nodes to ab node for index [i,j]
+        ! Calculate gradient in y-direction using values on aa-nodes,
+        ! obtain values of gradient on ab-nodes.
 
         implicit none 
 
@@ -873,11 +875,11 @@ contains
         ! (1) Upper-right node average
         wt_ac = 0.0_wp
         du_ac = 0.0_wp  
-        if (f_ice(i,j) .eq. 1.0_wp .and. f_ice(i,jp1) .eq. 1.0_wp) then 
+        if (f_ice(i,jp1) .eq. 1.0_wp .and. f_ice(i,j) .eq. 1.0_wp) then 
             du_ac(1) = (u_aa(i,jp1) - u_aa(i,j)) / dy 
             wt_ac(1) = 1.0_wp 
         end if
-        if (f_ice(ip1,j) .eq. 1.0_wp .and. f_ice(ip1,jp1) .eq. 1.0_wp) then 
+        if (f_ice(ip1,jp1) .eq. 1.0_wp .and. f_ice(ip1,j) .eq. 1.0_wp) then 
             du_ac(2) = (u_aa(ip1,jp1) - u_aa(ip1,j)) / dy 
             wt_ac(2) = 1.0_wp 
         end if
@@ -889,11 +891,11 @@ contains
         ! (2) Upper-left node average
         wt_ac = 0.0_wp
         du_ac = 0.0_wp  
-        if (f_ice(i,j) .eq. 1.0_wp .and. f_ice(i,jp1) .eq. 1.0_wp) then 
+        if (f_ice(i,jp1) .eq. 1.0_wp .and. f_ice(i,j) .eq. 1.0_wp) then 
             du_ac(1) = (u_aa(i,jp1) - u_aa(i,j)) / dy 
             wt_ac(1) = 1.0_wp 
         end if
-        if (f_ice(im1,j) .eq. 1.0_wp .and. f_ice(im1,jp1) .eq. 1.0_wp) then 
+        if (f_ice(im1,jp1) .eq. 1.0_wp .and. f_ice(im1,j) .eq. 1.0_wp) then 
             du_ac(2) = (u_aa(im1,jp1) - u_aa(im1,j)) / dy 
             wt_ac(2) = 1.0_wp 
         end if
@@ -942,7 +944,8 @@ contains
     end subroutine staggerdiffy_nodes_aa_ab_ice
 
     subroutine staggerdiff_nodes_acx_ab_ice(du_ab,u_acx,f_ice,i,j,dx)
-        ! Stagger from acx nodes to ab node for index [i,j]
+        ! Calculate gradient in x-direction from values on acx-nodes,
+        ! obtain values on ab-nodes.
 
         implicit none 
 
@@ -1009,7 +1012,7 @@ contains
             wt_aa(1) = 1.0_wp 
         end if
         if (f_ice(i,jp1) .eq. 1.0_wp) then 
-            du_aa(2) = (u_acx(i,jp1) - u_acx(im1,j)) / dx 
+            du_aa(2) = (u_acx(i,jp1) - u_acx(im1,jp1)) / dx 
             wt_aa(2) = 1.0_wp 
         end if
         if (f_ice(im1,jp1) .eq. 1.0_wp) then 
@@ -1080,7 +1083,8 @@ contains
     end subroutine staggerdiff_nodes_acx_ab_ice
 
     subroutine staggerdiff_nodes_acy_ab_ice(du_ab,u_acy,f_ice,i,j,dy)
-        ! Stagger from acx nodes to ab node for index [i,j]
+        ! Calculate gradient in y-direction from values on acy-nodes,
+        ! obtain values on ab-nodes.
 
         implicit none 
 
@@ -1218,7 +1222,8 @@ contains
     end subroutine staggerdiff_nodes_acy_ab_ice
 
     subroutine staggerdiffcross_nodes_acx_ab_ice(du_ab,u_acx,f_ice,i,j,dy)
-        ! Stagger from acx nodes to ab node for index [i,j]
+        ! Calculate gradient in y-direction from values on acx-nodes,
+        ! obtain values on ab-nodes.
 
         implicit none 
 
@@ -1273,7 +1278,8 @@ contains
     end subroutine staggerdiffcross_nodes_acx_ab_ice
 
     subroutine staggerdiffcross_nodes_acy_ab_ice(du_ab,u_acy,f_ice,i,j,dx)
-        ! Stagger from acx nodes to ab node for index [i,j]
+        ! Calculate gradient in y-direction from values on acy-nodes,
+        ! obtain values on ab-nodes.
 
         implicit none 
 
@@ -1328,7 +1334,8 @@ contains
     end subroutine staggerdiffcross_nodes_acy_ab_ice
 
     subroutine staggerdiffcross_aa_acx_ice(du_acx,u_aa,f_ice,i,j,dy)
-        ! Stagger from acx nodes to ab node for index [i,j]
+        ! Calculate gradient in y-direction from values on aa-nodes,
+        ! obtain values on acx-nodes.
 
         implicit none 
 
@@ -1396,7 +1403,8 @@ contains
     end subroutine staggerdiffcross_aa_acx_ice
 
     subroutine staggerdiffcross_aa_acy_ice(du_acy,u_aa,f_ice,i,j,dx)
-        ! Stagger from acx nodes to ab node for index [i,j]
+        ! Calculate gradient in x-direction from values on aa-nodes,
+        ! obtain values on acy-nodes.
 
         implicit none 
 

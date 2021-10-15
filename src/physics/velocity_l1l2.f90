@@ -307,7 +307,7 @@ end if
         real(prec) :: inv_4dx, inv_4dy 
         real(prec) :: zeta_ac1, zeta_ac0 
         real(prec) :: dw1dx, dw2dy, dw3dx, dw4dy
-        real(prec) :: tau_eff_sq_ab, depth_ab 
+        real(prec) :: depth_ab 
         real(prec) :: fact_ac 
 
         real(wp)   :: dudx_ab4(4) 
@@ -457,9 +457,11 @@ end if
             ! Compute the 'parallel' shear stress for each layer (tau_parallel)
             do k = 1, nz_aa 
 
-                call stagger_nodes_aa_ab_ice(visc_eff_ab4,visc_eff(:,:,k),f_ice,i,j)
-                tau_par_ab4 = 2.0_wp * visc_eff_ab4 * eps_par4
-                tau_par(i,j,k) = sum(tau_par_ab4*wt_ab)
+                ! call stagger_nodes_aa_ab_ice(visc_eff_ab4,visc_eff(:,:,k),f_ice,i,j)
+                ! tau_par_ab4 = 2.0_wp * visc_eff_ab4 * eps_par4
+                ! tau_par(i,j,k) = sum(tau_par_ab4*wt_ab)
+
+                tau_par(i,j,k) = 2.0_wp * visc_eff(i,j,k) * sum(eps_par4*wt_ab)
 
             end do 
 
@@ -474,8 +476,8 @@ end if
 
             ! Calculate working arrays for this layer 
             work1_aa = 2.0_wp*visc_eff_int3D(:,:,k) * (2.d0*dudx_aa + dvdy_aa) 
-            work2_aa = 2.0_wp*visc_eff_int3D(:,:,k) *      (dudy_aa)
-            work3_aa = 2.0_wp*visc_eff_int3D(:,:,k) *      (dvdx_aa)
+            work2_aa = 2.0_wp*visc_eff_int3D(:,:,k) *      (dudy_aa + dvdx_aa)
+            work3_aa = 2.0_wp*visc_eff_int3D(:,:,k) *      (dudy_aa + dvdx_aa)
             work4_aa = 2.0_wp*visc_eff_int3D(:,:,k) * (dudx_aa + 2.d0*dvdy_aa) 
             
             do j = 1, ny 
@@ -532,7 +534,7 @@ end if
                 call stagger_nodes_acx_ab_ice(tau_xz_ab4_up,tau_xz(:,:,k),  f_ice,i,j)
                 call stagger_nodes_acx_ab_ice(tau_xz_ab4_dn,tau_xz(:,:,k-1),f_ice,i,j)
                 tau_xz_ab4 = 0.5_wp*(tau_xz_ab4_up+tau_xz_ab4_dn)
-
+                
                 call stagger_nodes_acy_ab_ice(tau_yz_ab4_up,tau_yz(:,:,k),  f_ice,i,j)
                 call stagger_nodes_acy_ab_ice(tau_yz_ab4_dn,tau_yz(:,:,k-1),f_ice,i,j)
                 tau_yz_ab4 = 0.5_wp*(tau_yz_ab4_up+tau_yz_ab4_dn)
@@ -553,7 +555,7 @@ end if
 
                 ! Calculate multiplicative factor on ab-nodes
                 if (p1 .ne. 0.0_wp) then 
-                    fact_ab4 = 2.0_prec * ATT_ab4 * (dzeta*H_ice_ab4) * tau_eff_sq_ab**p1
+                    fact_ab4 = 2.0_prec * ATT_ab4 * (dzeta*H_ice_ab4) * tau_eff_sq_ab4**p1
                 else
                     fact_ab4 = 2.0_prec * ATT_ab4 * (dzeta*H_ice_ab4)
                 end if 

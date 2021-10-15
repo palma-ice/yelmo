@@ -467,8 +467,7 @@ contains
         do k = 2, nz_aa
             
             dzeta = zeta_aa(k) - zeta_aa(k-1) 
-            depth = 1.0_wp - zeta_aa(k) 
-
+            
             ! Calculate integrative factor on ab-nodes
             do i = 1, nx 
             do j = 1, ny 

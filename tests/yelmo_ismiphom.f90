@@ -62,10 +62,10 @@ program yelmo_ismiphom
     
     ! If desired, extend domain by fraction of a period in each direction to avoid edge effects
     if (f_extend .gt. 0.0) then 
-        x0 = -f_extend*L 
+        x0 = -f_extend*L
         nx = L*(1.0+2.0*f_extend) / dx
     else 
-        x0 = 0.0_prec 
+        x0 = 0.0_prec
         nx = L / dx
     end if 
 

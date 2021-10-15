@@ -283,52 +283,52 @@ end if
 
         implicit none 
 
-        real(prec), intent(OUT) :: ux(:,:,:) 
-        real(prec), intent(OUT) :: uy(:,:,:) 
-        real(prec), intent(IN)  :: ux_b(:,:) 
-        real(prec), intent(IN)  :: uy_b(:,:) 
-        real(prec), intent(IN)  :: taud_acx(:,:) 
-        real(prec), intent(IN)  :: taud_acy(:,:)
-        real(prec), intent(IN)  :: visc_eff(:,:,:)      ! on aa-nodes 
-        real(prec), intent(IN)  :: ATT(:,:,:)  
-        real(prec), intent(IN)  :: H_ice(:,:)
-        real(prec), intent(IN)  :: f_ice(:,:)
-        real(prec), intent(IN)  :: zeta_aa(:) 
-        real(prec), intent(IN)  :: zeta_ac(:) 
-        real(prec), intent(IN)  :: dx
-        real(prec), intent(IN)  :: dy
-        real(prec), intent(IN)  :: n_glen   
-        real(prec), intent(IN)  :: eps_0                ! [1/a] Regularization constant (minimum strain rate, ~1e-8)
+        real(wp), intent(OUT) :: ux(:,:,:) 
+        real(wp), intent(OUT) :: uy(:,:,:) 
+        real(wp), intent(IN)  :: ux_b(:,:) 
+        real(wp), intent(IN)  :: uy_b(:,:) 
+        real(wp), intent(IN)  :: taud_acx(:,:) 
+        real(wp), intent(IN)  :: taud_acy(:,:)
+        real(wp), intent(IN)  :: visc_eff(:,:,:)      ! on aa-nodes 
+        real(wp), intent(IN)  :: ATT(:,:,:)  
+        real(wp), intent(IN)  :: H_ice(:,:)
+        real(wp), intent(IN)  :: f_ice(:,:)
+        real(wp), intent(IN)  :: zeta_aa(:) 
+        real(wp), intent(IN)  :: zeta_ac(:) 
+        real(wp), intent(IN)  :: dx
+        real(wp), intent(IN)  :: dy
+        real(wp), intent(IN)  :: n_glen   
+        real(wp), intent(IN)  :: eps_0                ! [1/a] Regularization constant (minimum strain rate, ~1e-8)
         character(len=*), intent(IN) :: boundaries 
 
         ! Local variables
-        integer :: i, j, k, nx, ny, nz_aa, nz_ac   
-        integer    :: ip1, jp1, im1, jm1 
-        real(prec) :: inv_4dx, inv_4dy 
-        real(prec) :: zeta_ac1, zeta_ac0 
-        real(prec) :: dw1dx, dw2dy, dw3dx, dw4dy
-        real(prec) :: depth_ab 
-        real(prec) :: fact_ac 
+        integer  :: i, j, k, nx, ny, nz_aa, nz_ac   
+        integer  :: ip1, jp1, im1, jm1 
+        real(wp) :: inv_4dx, inv_4dy 
+        real(wp) :: zeta_ac1, zeta_ac0 
+        real(wp) :: dw1dx, dw2dy, dw3dx, dw4dy
+        real(wp) :: depth_ab 
+        real(wp) :: fact_ac 
 
-        real(wp)   :: dudx_ab4(4) 
-        real(wp)   :: dvdy_ab4(4) 
-        real(wp)   :: dudy_ab4(4)
-        real(wp)   :: dvdx_ab4(4)
-        real(wp)   :: eps_par_sq4(4)
-        real(wp)   :: eps_par4(4)
-        real(wp)   :: visc_eff_ab4(4)
-        real(wp)   :: tau_par_ab4_up(4)
-        real(wp)   :: tau_par_ab4_dn(4)
-        real(wp)   :: tau_par_ab4(4)
+        real(wp) :: dudx_ab4(4) 
+        real(wp) :: dvdy_ab4(4) 
+        real(wp) :: dudy_ab4(4)
+        real(wp) :: dvdx_ab4(4)
+        real(wp) :: eps_par_sq4(4)
+        real(wp) :: eps_par4(4)
+        real(wp) :: visc_eff_ab4(4)
+        real(wp) :: tau_par_ab4_up(4)
+        real(wp) :: tau_par_ab4_dn(4)
+        real(wp) :: tau_par_ab4(4)
 
-        real(wp)   :: dw1dx_ab(4)
-        real(wp)   :: dw2dy_ab(4)
-        real(wp)   :: dw3dx_ab(4)
-        real(wp)   :: dw4dy_ab(4) 
+        real(wp) :: dw1dx_ab(4)
+        real(wp) :: dw2dy_ab(4)
+        real(wp) :: dw3dx_ab(4)
+        real(wp) :: dw4dy_ab(4) 
 
-        real(wp)   :: H_ice_ab4(4)
-        real(wp)   :: ATT_ab_up(4) 
-        real(wp)   :: ATT_ab_dn(4) 
+        real(wp) :: H_ice_ab4(4)
+        real(wp) :: ATT_ab4_up(4) 
+        real(wp) :: ATT_ab4_dn(4) 
         
         real(wp) :: tau_xz_ab4_up(4)
         real(wp) :: tau_xz_ab4_dn(4)
@@ -340,8 +340,8 @@ end if
         real(wp) :: ATT_ab4(4)
         real(wp) :: fact_ab4(4)
 
-        real(wp)   :: wt_ab(4) 
-        real(wp)   :: wt 
+        real(wp) :: wt_ab(4) 
+        real(wp) :: wt 
 
         real(wp), allocatable :: visc_eff_int3D(:,:,:) 
         real(wp), allocatable :: dudx_aa(:,:)
@@ -359,9 +359,8 @@ end if
         real(wp), allocatable :: tau_yz(:,:,:) 
         real(wp), allocatable :: fact_ab(:,:) 
 
-        real(prec) :: p1, eps_0_sq 
-        real(prec) :: dzeta 
-        real(wp)   :: depth 
+        real(wp) :: p1, eps_0_sq 
+        real(wp) :: dzeta 
 
         nx    = size(ux,1)
         ny    = size(ux,2) 
@@ -476,13 +475,13 @@ end if
 
             ! Calculate working arrays for this layer 
             work1_aa = 2.0_wp*visc_eff_int3D(:,:,k) * (2.d0*dudx_aa + dvdy_aa) 
-            work2_aa = 2.0_wp*visc_eff_int3D(:,:,k) *      (dudy_aa + dvdx_aa)
-            work3_aa = 2.0_wp*visc_eff_int3D(:,:,k) *      (dudy_aa + dvdx_aa)
+            work2_aa = 2.0_wp*visc_eff_int3D(:,:,k) *      (dudy_aa)
+            work3_aa = 2.0_wp*visc_eff_int3D(:,:,k) *      (dvdx_aa)
             work4_aa = 2.0_wp*visc_eff_int3D(:,:,k) * (dudx_aa + 2.d0*dvdy_aa) 
             
             do j = 1, ny 
             do i = 1, nx 
-
+                 
                 ! Get derivatives on ab-nodes 
                 call staggerdiffx_nodes_aa_ab_ice(dw1dx_ab,work1_aa,f_ice,i,j,dx)
                 call staggerdiffy_nodes_aa_ab_ice(dw2dy_ab,work2_aa,f_ice,i,j,dy)
@@ -518,7 +517,6 @@ end if
         do k = 2, nz_aa
 
             dzeta = zeta_aa(k) - zeta_aa(k-1) 
-            depth = 1.0_wp - zeta_aa(k) 
 
             ! Calculate tau_perp, tau_eff and factor to calculate velocities,
             ! all on ab-nodes 
@@ -534,21 +532,21 @@ end if
                 call stagger_nodes_acx_ab_ice(tau_xz_ab4_up,tau_xz(:,:,k),  f_ice,i,j)
                 call stagger_nodes_acx_ab_ice(tau_xz_ab4_dn,tau_xz(:,:,k-1),f_ice,i,j)
                 tau_xz_ab4 = 0.5_wp*(tau_xz_ab4_up+tau_xz_ab4_dn)
-                
+
                 call stagger_nodes_acy_ab_ice(tau_yz_ab4_up,tau_yz(:,:,k),  f_ice,i,j)
                 call stagger_nodes_acy_ab_ice(tau_yz_ab4_dn,tau_yz(:,:,k-1),f_ice,i,j)
                 tau_yz_ab4 = 0.5_wp*(tau_yz_ab4_up+tau_yz_ab4_dn)
                 
                 call stagger_nodes_aa_ab_ice(tau_par_ab4_up,tau_par(:,:,k),  f_ice,i,j)
                 call stagger_nodes_aa_ab_ice(tau_par_ab4_dn,tau_par(:,:,k-1),f_ice,i,j)
-                tau_par_ab4 = 0.5_wp*(tau_par_ab4_up+tau_par_ab4_dn)
-                
+                tau_par_ab4 = 0.5_wp*(tau_par_ab4_up+tau_par_ab4_dn) 
+
                 tau_eff_sq_ab4 = tau_xz_ab4**2 + tau_yz_ab4**2 + tau_par_ab4**2
 
                 ! Calculate factor to get velocity components
-                call stagger_nodes_aa_ab_ice(ATT_ab_up,ATT(:,:,k),f_ice,i,j)
-                call stagger_nodes_aa_ab_ice(ATT_ab_dn,ATT(:,:,k-1),f_ice,i,j)
-                ATT_ab4 = 0.5_wp*(ATT_ab_up+ATT_ab_dn)
+                call stagger_nodes_aa_ab_ice(ATT_ab4_up,ATT(:,:,k),f_ice,i,j)
+                call stagger_nodes_aa_ab_ice(ATT_ab4_dn,ATT(:,:,k-1),f_ice,i,j)
+                ATT_ab4 = 0.5_wp*(ATT_ab4_up+ATT_ab4_dn)
 
                 ! Get ice thickness
                 call stagger_nodes_aa_ab_ice(H_ice_ab4,H_ice,f_ice,i,j)

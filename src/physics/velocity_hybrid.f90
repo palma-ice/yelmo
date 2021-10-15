@@ -550,7 +550,7 @@ end if
         ! taub [Pa] 
         ! beta [Pa a m-1]
         ! u    [m a-1]
-        ! taub = -beta*u 
+        ! taub = beta*u (here defined with taub in the same direction as u)
 
         implicit none 
 
@@ -564,8 +564,8 @@ end if
         real(prec), parameter :: tol = 1e-3_prec 
 
         ! Calculate basal stress 
-        taub_acx = -beta_acx * ux_b 
-        taub_acy = -beta_acy * uy_b 
+        taub_acx = beta_acx * ux_b 
+        taub_acy = beta_acy * uy_b 
 
         ! Avoid underflows
         where(abs(taub_acx) .lt. tol) taub_acx = 0.0_prec 

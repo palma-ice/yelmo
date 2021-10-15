@@ -355,6 +355,11 @@ end if
         real(wp), allocatable :: work3_aa(:,:)
         real(wp), allocatable :: work4_aa(:,:)
 
+        real(wp), allocatable :: dw1dx_aa(:,:)
+        real(wp), allocatable :: dw2dy_aa(:,:)
+        real(wp), allocatable :: dw3dx_aa(:,:)
+        real(wp), allocatable :: dw4dy_aa(:,:)
+        
         real(wp), allocatable :: tau_xz(:,:,:) 
         real(wp), allocatable :: tau_yz(:,:,:) 
         real(wp), allocatable :: fact_ab(:,:) 
@@ -379,6 +384,11 @@ end if
         allocate(work2_aa(nx,ny))
         allocate(work3_aa(nx,ny))
         allocate(work4_aa(nx,ny))
+
+        allocate(dw1dx_aa(nx,ny))
+        allocate(dw2dy_aa(nx,ny))
+        allocate(dw3dx_aa(nx,ny))
+        allocate(dw4dy_aa(nx,ny))
 
         allocate(tau_xz(nx,ny,nz_aa))
         allocate(tau_yz(nx,ny,nz_aa))
@@ -475,8 +485,8 @@ end if
 
             ! Calculate working arrays for this layer 
             work1_aa = 2.0_wp*visc_eff_int3D(:,:,k) * (2.d0*dudx_aa + dvdy_aa) 
-            work2_aa = 2.0_wp*visc_eff_int3D(:,:,k) *      (dudy_aa)
-            work3_aa = 2.0_wp*visc_eff_int3D(:,:,k) *      (dvdx_aa)
+            work2_aa = 2.0_wp*visc_eff_int3D(:,:,k) * 0.5*(dudy_aa+dvdx_aa)
+            work3_aa = 2.0_wp*visc_eff_int3D(:,:,k) * 0.5*(dudy_aa+dvdx_aa)
             work4_aa = 2.0_wp*visc_eff_int3D(:,:,k) * (dudx_aa + 2.d0*dvdy_aa) 
             
             do j = 1, ny 
@@ -488,14 +498,34 @@ end if
                 call staggerdiffx_nodes_aa_ab_ice(dw3dx_ab,work3_aa,f_ice,i,j,dx)
                 call staggerdiffy_nodes_aa_ab_ice(dw4dy_ab,work4_aa,f_ice,i,j,dy)
                 
+                ! Get derivatives on aa-nodes 
+                dw1dx_aa(i,j) = sum(dw1dx_ab*wt_ab)
+                dw2dy_aa(i,j) = sum(dw2dy_ab*wt_ab)
+                dw3dx_aa(i,j) = sum(dw3dx_ab*wt_ab)
+                dw4dy_aa(i,j) = sum(dw4dy_ab*wt_ab)
+                
+            end do 
+            end do 
+
+            do j = 1, ny 
+            do i = 1, nx 
+                
+                ! ! Stagger to acx-nodes 
+                ! dw1dx = 0.5_wp*(dw1dx_ab(1)+dw1dx_ab(4))
+                ! dw2dy = 0.5_wp*(dw2dy_ab(1)+dw2dy_ab(4))
+                
+                ! ! Stagger to acy-nodes 
+                ! dw3dx = 0.5_wp*(dw3dx_ab(1)+dw3dx_ab(2))
+                ! dw4dy = 0.5_wp*(dw4dy_ab(1)+dw4dy_ab(2))
+
                 ! Stagger to acx-nodes 
-                dw1dx = 0.5_wp*(dw1dx_ab(1)+dw1dx_ab(4))
-                dw2dy = 0.5_wp*(dw2dy_ab(1)+dw2dy_ab(4))
+                dw1dx = 0.5_wp*(dw1dx_aa(i,j)+dw1dx_aa(ip1,j))
+                dw2dy = 0.5_wp*(dw2dy_aa(i,j)+dw2dy_aa(ip1,j))
                 
                 ! Stagger to acy-nodes 
-                dw3dx = 0.5_wp*(dw3dx_ab(1)+dw3dx_ab(2))
-                dw4dy = 0.5_wp*(dw4dy_ab(1)+dw4dy_ab(2))
-
+                dw1dx = 0.5_wp*(dw3dx_aa(i,j)+dw3dx_aa(i,jp1))
+                dw2dy = 0.5_wp*(dw4dy_aa(i,j)+dw4dy_aa(i,jp1))
+                
                 ! Calculate shear stress on ac-nodes
                 tau_xz(i,j,k) = -(1.0_wp-zeta_aa(k))*taud_acx(i,j) + dw1dx + dw2dy
                 tau_yz(i,j,k) = -(1.0_wp-zeta_aa(k))*taud_acy(i,j) + dw3dx + dw4dy

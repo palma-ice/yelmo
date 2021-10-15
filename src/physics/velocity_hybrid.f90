@@ -158,7 +158,7 @@ contains
                     
             ! Calculate depth-integrated effective viscosity
             ! Note L19 uses eta_bar*H in the ssa equation. Yelmo uses eta_int=eta_bar*H directly.
-            call calc_visc_eff_int(visc_eff_int,visc_eff,H_ice,f_ice,zeta_aa)
+            call calc_visc_eff_int(visc_eff_int,visc_eff,H_ice,f_ice,zeta_aa,par%boundaries)
             
             ! Calculate beta (at the ice base)
             call calc_beta(beta,c_bed,ux_b,uy_b,H_ice,f_ice,H_grnd,f_grnd,z_bed,z_sl,par%beta_method, &
@@ -429,7 +429,7 @@ end if
 
     end subroutine calc_visc_eff_3D
 
-    subroutine calc_visc_eff_int(visc_eff_int,visc_eff,H_ice,f_ice,zeta_aa)
+    subroutine calc_visc_eff_int(visc_eff_int,visc_eff,H_ice,f_ice,zeta_aa,boundaries)
 
         implicit none 
 
@@ -438,16 +438,18 @@ end if
         real(wp), intent(IN)  :: H_ice(:,:)
         real(wp), intent(IN)  :: f_ice(:,:)
         real(wp), intent(IN)  :: zeta_aa(:)
+        character(len=*), intent(IN) :: boundaries 
 
         ! Local variables 
         integer :: i, j, nx, ny
         integer :: im1, ip1, jm1, jp1  
-        real(wp) :: H_eff
+        real(wp) :: H_now
         real(wp) :: visc_eff_mean 
         real(wp) :: wt 
 
         nx = size(visc_eff_int,1)
         ny = size(visc_eff_int,2)
+
 
         do j = 1, ny 
         do i = 1, nx
@@ -456,8 +458,7 @@ end if
             visc_eff_mean = integrate_trapezoid1D_pt(visc_eff(i,j,:),zeta_aa) 
             
             if (f_ice(i,j) .eq. 1.0) then 
-                H_eff = H_ice(i,j) / f_ice(i,j) 
-                visc_eff_int(i,j) = visc_eff_mean*H_eff
+                visc_eff_int(i,j) = visc_eff_mean*H_ice(i,j) 
             else
                 !visc_eff_int(i,j) = visc_eff_mean 
                 visc_eff_int(i,j) = 0.0_wp
@@ -466,9 +467,82 @@ end if
         end do 
         end do 
 
+        ! Now extrapolate to ice-free or partially ice-free neighbors
+        do j = 1, ny 
+        do i = 1, nx
+
+            im1 = max(i-1,1) 
+            ip1 = min(i+1,nx) 
+            jm1 = max(j-1,1) 
+            jp1 = min(j+1,ny) 
+
+            if ( f_ice(i,j) .lt. 1.0 .and. &
+                count([f_ice(im1,j),f_ice(ip1,j),f_ice(i,jm1),f_ice(i,jp1)] .eq. 1.0) .gt. 0) then 
+                ! Ice-free or partially ice-free point at ice margin
+
+                visc_eff_int(i,j) = 0.0_wp 
+                wt = 0.0_wp 
+
+                if (f_ice(im1,j).eq.1.0) then 
+                    visc_eff_int(i,j) = visc_eff_int(i,j) + visc_eff_int(im1,j) 
+                    wt = wt + 1.0 
+                end if 
+                if (f_ice(ip1,j).eq.1.0) then 
+                    visc_eff_int(i,j) = visc_eff_int(i,j) + visc_eff_int(ip1,j) 
+                    wt = wt + 1.0 
+                end if 
+                if (f_ice(i,jm1).eq.1.0) then 
+                    visc_eff_int(i,j) = visc_eff_int(i,j) + visc_eff_int(i,jm1) 
+                    wt = wt + 1.0 
+                end if 
+                if (f_ice(i,jp1).eq.1.0) then 
+                    visc_eff_int(i,j) = visc_eff_int(i,j) + visc_eff_int(i,jp1) 
+                    wt = wt + 1.0 
+                end if 
+                
+                if (wt .gt. 0.0) then 
+                    visc_eff_int(i,j) = visc_eff_int(i,j) / wt 
+                end if 
+
+            end if 
+
+        end do 
+        end do 
+
+        ! Apply boundary conditions as needed 
+        if (trim(boundaries) .eq. "periodic") then
+
+            visc_eff_int(1,:)    = visc_eff_int(nx-1,:) 
+            visc_eff_int(nx-1,:) = visc_eff_int(2,:) 
+            visc_eff_int(:,1)    = visc_eff_int(:,ny-1)
+            visc_eff_int(:,ny)   = visc_eff_int(:,2) 
+
+        else if (trim(boundaries) .eq. "periodic-x") then 
+            
+            visc_eff_int(1,:)    = visc_eff_int(nx-1,:) 
+            visc_eff_int(nx-1,:) = visc_eff_int(2,:) 
+            visc_eff_int(:,1)    = visc_eff_int(:,2)
+            visc_eff_int(:,ny)   = visc_eff_int(:,ny-1) 
+
+        else if (trim(boundaries) .eq. "infinite") then 
+            
+            visc_eff_int(1,:)    = visc_eff_int(2,:) 
+            visc_eff_int(nx,:)   = visc_eff_int(nx-1,:) 
+            visc_eff_int(:,1)    = visc_eff_int(:,2)
+            visc_eff_int(:,ny)   = visc_eff_int(:,ny-1) 
+
+        end if 
+
+        ! Treat the corners to avoid extremes
+        visc_eff_int(1,1)   = 0.5*(visc_eff_int(2,1)+visc_eff_int(1,2))
+        visc_eff_int(1,ny)  = 0.5*(visc_eff_int(2,ny)+visc_eff_int(1,ny-1))
+        visc_eff_int(nx,1)  = 0.5*(visc_eff_int(nx,2)+visc_eff_int(nx-1,1))
+        visc_eff_int(nx,ny) = 0.5*(visc_eff_int(nx-1,ny)+visc_eff_int(nx,ny-1))
+
         return
 
     end subroutine calc_visc_eff_int
+    
 
     subroutine calc_basal_stress(taub_acx,taub_acy,beta_acx,beta_acy,ux_b,uy_b)
         ! Calculate the basal stress resulting from sliding (friction times velocity)

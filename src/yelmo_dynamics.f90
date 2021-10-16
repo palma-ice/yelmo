@@ -655,7 +655,7 @@ contains
 
             ! Stagger beta
             call stagger_beta(dyn%now%beta_acx,dyn%now%beta_acy,dyn%now%beta,tpo%now%H_ice,tpo%now%f_ice,dyn%now%ux_b,dyn%now%uy_b,tpo%now%f_grnd, &
-                            tpo%now%f_grnd_acx,tpo%now%f_grnd_acy,dyn%par%beta_gl_stag,dyn%par%boundaries)
+                            tpo%now%f_grnd_acx,tpo%now%f_grnd_acy,dyn%par%beta_gl_stag,dyn%par%beta_min,dyn%par%boundaries)
 
             !   2. Calculate effective viscosity
             

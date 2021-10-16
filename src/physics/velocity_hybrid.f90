@@ -167,7 +167,7 @@ contains
 
             ! Stagger beta
             call stagger_beta(beta_acx,beta_acy,beta,H_ice,f_ice,ux_b,uy_b, &
-                        f_grnd,f_grnd_acx,f_grnd_acy,par%beta_gl_stag,par%boundaries)
+                        f_grnd,f_grnd_acx,f_grnd_acy,par%beta_gl_stag,par%beta_min,par%boundaries)
 
 
             ! =========================================================================================

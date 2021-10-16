@@ -193,7 +193,7 @@ contains
 
             ! Stagger beta and beta_eff 
             call stagger_beta(beta_acx,beta_acy,beta,H_ice,f_ice,ux_b,uy_b, &
-                        f_grnd,f_grnd_acx,f_grnd_acy,par%beta_gl_stag,par%boundaries)
+                        f_grnd,f_grnd_acx,f_grnd_acy,par%beta_gl_stag,par%beta_min,par%boundaries)
 
             ! =========================================================================================
             ! Step 2: determine the basal velocity ux_b/uy_b 
@@ -483,7 +483,8 @@ end if
         ! Loop over layers 
         do k = 1, nz_aa
 
-            ! Calculate working arrays for this layer 
+            ! Calculate working arrays for this layer (terms in parentheses in
+            ! Perego et al, 2012, Eq. 27)
             work1_aa = 2.0_wp*visc_eff_int3D(:,:,k) * (2.d0*dudx_aa + dvdy_aa) 
             work2_aa = 2.0_wp*visc_eff_int3D(:,:,k) * 0.5*(dudy_aa+dvdx_aa)
             work3_aa = 2.0_wp*visc_eff_int3D(:,:,k) * 0.5*(dudy_aa+dvdx_aa)

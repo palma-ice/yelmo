@@ -310,7 +310,7 @@ contains
 
     end subroutine clean_beta_min
 
-    subroutine stagger_beta(beta_acx,beta_acy,beta,H_ice,f_ice,ux,uy,f_grnd,f_grnd_acx,f_grnd_acy,beta_gl_stag,boundaries)
+    subroutine stagger_beta(beta_acx,beta_acy,beta,H_ice,f_ice,ux,uy,f_grnd,f_grnd_acx,f_grnd_acy,beta_gl_stag,beta_min,boundaries)
 
         implicit none 
 
@@ -325,6 +325,7 @@ contains
         real(wp), intent(IN)    :: f_grnd_acx(:,:) 
         real(wp), intent(IN)    :: f_grnd_acy(:,:) 
         integer,  intent(IN)    :: beta_gl_stag 
+        real(wp), intent(IN)    :: beta_min 
         character(len=*), intent(IN) :: boundaries 
 
         ! Local variables 
@@ -416,6 +417,10 @@ contains
 
         end if 
 
+        ! Finally ensure that beta for grounded ice is higher than the lower allowed limit
+        where(beta_acx .gt. 0.0 .and. beta_acx .lt. beta_min) beta_acx = beta_min 
+        where(beta_acy .gt. 0.0 .and. beta_acy .lt. beta_min) beta_acy = beta_min 
+        
         return 
 
     end subroutine stagger_beta

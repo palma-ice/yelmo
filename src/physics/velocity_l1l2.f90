@@ -489,6 +489,9 @@ end if
             work3_aa = 2.0_wp*visc_eff_int3D(:,:,k) * 0.5*(dudy_aa+dvdx_aa)
             work4_aa = 2.0_wp*visc_eff_int3D(:,:,k) * (dudx_aa + 2.d0*dvdy_aa) 
             
+            ! Calculate derivatives of work arrays, first on ab-nodes
+            ! then averaged to aa-nodes. This helps with solver stability
+            ! (eg, to avoid singularities in vel solution for ISMIPHOM-C)
             do j = 1, ny 
             do i = 1, nx 
                  
@@ -507,17 +510,10 @@ end if
             end do 
             end do 
 
+            ! Calcaluate vertical shear stress
             do j = 1, ny 
             do i = 1, nx 
                 
-                ! ! Stagger to acx-nodes 
-                ! dw1dx = 0.5_wp*(dw1dx_ab(1)+dw1dx_ab(4))
-                ! dw2dy = 0.5_wp*(dw2dy_ab(1)+dw2dy_ab(4))
-                
-                ! ! Stagger to acy-nodes 
-                ! dw3dx = 0.5_wp*(dw3dx_ab(1)+dw3dx_ab(2))
-                ! dw4dy = 0.5_wp*(dw4dy_ab(1)+dw4dy_ab(2))
-
                 ! Stagger to acx-nodes 
                 dw1dx = 0.5_wp*(dw1dx_aa(i,j)+dw1dx_aa(ip1,j))
                 dw2dy = 0.5_wp*(dw2dy_aa(i,j)+dw2dy_aa(ip1,j))

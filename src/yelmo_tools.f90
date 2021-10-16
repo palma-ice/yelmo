@@ -33,6 +33,8 @@ module yelmo_tools
     public :: staggerdiffcross_nodes_acy_ab_ice
     public :: staggerdiffcross_aa_acx_ice
     public :: staggerdiffcross_aa_acy_ice
+    public :: staggerdiffx_aa_aa_ice
+    public :: staggerdiffy_aa_aa_ice
     public :: staggerdiff_nodes_acz_dx_ab_ice
     public :: staggerdiff_nodes_acz_dy_ab_ice
 
@@ -1555,6 +1557,112 @@ contains
 
     end subroutine staggerdiffcross_nodes_acy_ab_ice
 
+    subroutine staggerdiffx_aa_aa_ice(du_aa,u_aa,f_ice,i,j,dx)
+        ! Calculate gradient in x-direction from values on aa-nodes,
+        ! obtain values on aa-nodes.
+
+        implicit none 
+
+        real(wp), intent(OUT) :: du_aa
+        real(wp), intent(IN)  :: u_aa(:,:) 
+        real(wp), intent(IN)  :: f_ice(:,:) 
+        integer,  intent(IN)  :: i 
+        integer,  intent(IN)  :: j
+        real(wp), intent(IN)  :: dx
+        
+        ! Local variables 
+        integer  :: nx, ny 
+        integer  :: im1, jm1, ip1, jp1 
+        real(wp) :: du_ac(2) 
+        real(wp) :: wt_ac(2) 
+        real(wp) :: wt 
+
+        nx = size(f_ice,1) 
+        ny = size(f_ice,2) 
+
+        ! Define neighbor indices
+        im1 = max(i-1,1)
+        ip1 = min(i+1,nx)
+        jm1 = max(j-1,1)
+        jp1 = min(j+1,ny)
+        
+        ! Initialize to zero 
+        du_ac = 0.0_wp 
+        wt_ac = 0.0_wp 
+
+        if (f_ice(ip1,j) .eq. 1.0_wp .and. f_ice(i,j) .eq. 1.0_wp) then 
+            du_ac(1) = (u_aa(ip1,j)-u_aa(i,j)) / dx 
+            wt_ac(1) = 1.0_wp
+        end if 
+
+        if (f_ice(i,j) .eq. 1.0_wp .and. f_ice(im1,j) .eq. 1.0_wp) then 
+            du_ac(2) = (u_aa(i,j)-u_aa(im1,j)) / dx 
+            wt_ac(2) = 1.0_wp
+        end if 
+        
+        if (sum(wt_ac) .gt. 0.0_wp) then 
+            du_aa = sum(du_ac*wt_ac)/sum(wt_ac)
+        end if 
+        
+        if (abs(du_aa) .lt. TOL_UNDERFLOW) du_aa = 0.0_wp 
+        
+        return 
+
+    end subroutine staggerdiffx_aa_aa_ice
+
+    subroutine staggerdiffy_aa_aa_ice(du_aa,u_aa,f_ice,i,j,dy)
+        ! Calculate gradient in x-direction from values on aa-nodes,
+        ! obtain values on aa-nodes.
+
+        implicit none 
+
+        real(wp), intent(OUT) :: du_aa
+        real(wp), intent(IN)  :: u_aa(:,:) 
+        real(wp), intent(IN)  :: f_ice(:,:) 
+        integer,  intent(IN)  :: i 
+        integer,  intent(IN)  :: j
+        real(wp), intent(IN)  :: dy
+        
+        ! Local variables 
+        integer  :: nx, ny 
+        integer  :: im1, jm1, ip1, jp1 
+        real(wp) :: du_ac(2) 
+        real(wp) :: wt_ac(2) 
+        real(wp) :: wt 
+
+        nx = size(f_ice,1) 
+        ny = size(f_ice,2) 
+
+        ! Define neighbor indices
+        im1 = max(i-1,1)
+        ip1 = min(i+1,nx)
+        jm1 = max(j-1,1)
+        jp1 = min(j+1,ny)
+        
+        ! Initialize to zero 
+        du_ac = 0.0_wp 
+        wt_ac = 0.0_wp 
+
+        if (f_ice(i,jp1) .eq. 1.0_wp .and. f_ice(i,j) .eq. 1.0_wp) then 
+            du_ac(1) = (u_aa(i,jp1)-u_aa(i,j)) / dy 
+            wt_ac(1) = 1.0_wp
+        end if 
+
+        if (f_ice(i,j) .eq. 1.0_wp .and. f_ice(i,jm1) .eq. 1.0_wp) then 
+            du_ac(2) = (u_aa(i,j)-u_aa(i,jm1)) / dy 
+            wt_ac(2) = 1.0_wp
+        end if 
+        
+        if (sum(wt_ac) .gt. 0.0_wp) then 
+            du_aa = sum(du_ac*wt_ac)/sum(wt_ac)
+        end if 
+        
+        if (abs(du_aa) .lt. TOL_UNDERFLOW) du_aa = 0.0_wp 
+        
+        return 
+
+    end subroutine staggerdiffy_aa_aa_ice
+
     subroutine staggerdiffcross_aa_acx_ice(du_acx,u_aa,f_ice,i,j,dy)
         ! Calculate gradient in y-direction from values on aa-nodes,
         ! obtain values on acx-nodes.
@@ -2150,42 +2258,12 @@ contains
             
             jm1 = max(1, j-1)
             jp1 = min(ny,j+1)
-
-if (.TRUE.) then
+            
             ! Slope in x-direction
             dvardx(i,j) = (var(ip1,j)-var(i,j))/dx 
 
             ! Slope in y-direction
             dvardy(i,j) = (var(i,jp1)-var(i,j))/dy
-
-else
-            ! ajr: Note, the strategy below does seem to improve 
-            ! stability, but with a very strong and undesirable
-            ! diffusion of the gradient. Not currently recommended...
-            
-            ! First get slope on ab nodes 
-            dvardx_ab(1) = 0.5_wp*(var(ip1,jp1)-var(i,jp1))   /dx &
-                         + 0.5_wp*(var(ip1,j)  -var(i,j))     /dx
-            dvardx_ab(2) = 0.5_wp*(var(i,jp1)  -var(im1,jp1)) /dx &
-                         + 0.5_wp*(var(i,j)    -var(im1,j))   /dx
-            dvardx_ab(3) = 0.5_wp*(var(i,j)    -var(im1,j))   /dx &
-                         + 0.5_wp*(var(i,jm1)  -var(im1,jm1)) /dx
-            dvardx_ab(4) = 0.5_wp*(var(ip1,j)  -var(i,j))     /dx &
-                         + 0.5_wp*(var(ip1,jm1)-var(i,jm1))   /dx
-
-            ! First get slope on ab nodes 
-            dvardy_ab(1) = 0.5_wp*(var(ip1,jp1)-var(ip1,j))   /dy &
-                         + 0.5_wp*(var(i,jp1)  -var(i,j))     /dy
-            dvardy_ab(2) = 0.5_wp*(var(i,jp1)  -var(i,j))     /dy &
-                         + 0.5_wp*(var(im1,jp1)-var(im1,j))   /dy
-            dvardy_ab(3) = 0.5_wp*(var(i,j)    -var(i,jm1))   /dy &
-                         + 0.5_wp*(var(im1,j)  -var(im1,jm1)) /dy
-            dvardy_ab(4) = 0.5_wp*(var(ip1,j)  -var(ip1,jm1)) /dy &
-                         + 0.5_wp*(var(i,j)    -var(i,jm1))   /dy
-            
-            dvardx(i,j) = sum(wt_ab*dvardx_ab)
-            dvardy(i,j) = sum(wt_ab*dvardy_ab)
-end if 
 
         end do 
         end do 

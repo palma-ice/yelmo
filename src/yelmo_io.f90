@@ -244,9 +244,6 @@ contains
 
         call nc_write(filename,"duxydt",        dom%dyn%now%duxydt,   units="m/a^2",dim1="xc",dim2="yc",dim3="time",ncid=ncid,start=[1,1,n],count=[nx,ny,1]) 
 
-        call nc_write(filename,"dd_ab",         dom%dyn%now%dd_ab,    units="",dim1="xc",dim2="yc",dim3="zeta",dim4="time",ncid=ncid,start=[1,1,1,n],count=[nx,ny,nz,1]) 
-        call nc_write(filename,"dd_ab_bar",     dom%dyn%now%dd_ab_bar,units="",dim1="xc",dim2="yc",dim3="time",ncid=ncid,start=[1,1,n],count=[nx,ny,1]) 
-
         call nc_write(filename,"duxdz",         dom%dyn%now%duxdz,     units="",dim1="xc",dim2="yc",dim3="zeta",dim4="time",ncid=ncid,start=[1,1,1,n],count=[nx,ny,nz,1]) 
         call nc_write(filename,"duydz",         dom%dyn%now%duydz,     units="",dim1="xc",dim2="yc",dim3="zeta",dim4="time",ncid=ncid,start=[1,1,1,n],count=[nx,ny,nz,1]) 
         call nc_write(filename,"duxdz_bar",     dom%dyn%now%duxdz_bar, units="",dim1="xc",dim2="yc",dim3="time",ncid=ncid,start=[1,1,n],count=[nx,ny,1]) 
@@ -536,9 +533,6 @@ contains
         call nc_read(filename,"uxy_i_bar",     dom%dyn%now%uxy_i_bar,ncid=ncid) 
 
         call nc_read(filename,"duxydt",        dom%dyn%now%duxydt,ncid=ncid) 
-
-        call nc_read(filename,"dd_ab",         dom%dyn%now%dd_ab,ncid=ncid) 
-        call nc_read(filename,"dd_ab_bar",     dom%dyn%now%dd_ab_bar,ncid=ncid) 
         
         call nc_read(filename,"duxdz",         dom%dyn%now%duxdz,ncid=ncid) 
         call nc_read(filename,"duydz",         dom%dyn%now%duydz,ncid=ncid) 

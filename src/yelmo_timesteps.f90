@@ -479,7 +479,7 @@ contains
     end function calc_pi_rho_PID1
 
     subroutine set_adaptive_timestep(dt,dt_adv,dt_diff,dt_adv3D, &
-                        ux,uy,uz,ux_bar,uy_bar,D2D,H_ice,dHicedt,zeta_ac, &
+                        ux,uy,uz,ux_bar,uy_bar,H_ice,dHicedt,zeta_ac, &
                         dx,dtmin,dtmax,cfl_max,cfl_diff_max)
         ! Determine value of adaptive timestep to be consistent with 
         ! min/max timestep range and maximum allowed step of model 
@@ -496,7 +496,6 @@ contains
         real(prec), intent(IN)  :: uz(:,:,:)       ! [m a-1]
         real(prec), intent(IN)  :: ux_bar(:,:)     ! [m a-1]
         real(prec), intent(IN)  :: uy_bar(:,:)     ! [m a-1]
-        real(prec), intent(IN)  :: D2D(:,:)        ! [m2 a-1]
         real(prec), intent(IN)  :: H_ice(:,:)      ! [m]
         real(prec), intent(IN)  :: dHicedt(:,:)    ! [m a-1]
         real(prec), intent(IN)  :: zeta_ac(:)      ! [--] 
@@ -518,7 +517,10 @@ contains
         ! (adapted from Bueler et al., 2007)
 
         dt_adv   = calc_adv2D_timestep1(ux_bar,uy_bar,dx,dx,cfl_max)
-        dt_diff  = calc_diff2D_timestep(D2D,dx,dx,cfl_diff_max) 
+        !dt_diff  = calc_diff2D_timestep(D2D,dx,dx,cfl_diff_max) 
+        dt_diff = 1000.0     ! Prescribe something just to avoid compiler warnings 
+        ! ajr: diffusivity D2D is not available right now (SIA solver does not calculate it)
+        ! So, diffusivity needs to be diagnosed, to be able to estimate dt_diff properly. 
 
 !         dt_adv3D = calc_adv3D_timestep1(ux,uy,uz,dx,dx,H_ice,zeta_ac,cfl_max)
 !         dt_adv3D = calc_adv3D_timestep(ux,uy,uz,H_ice,zeta_ac,dx,dx,cfl_max)
@@ -617,7 +619,7 @@ contains
         
         return 
 
-    end function calc_diff2D_timestep 
+    end function calc_diff2D_timestep
     
     function calc_adv2D_timestep1(ux,uy,dx,dy,cfl_max) result(dt)
         ! Calculate maximum advective time step based
@@ -745,7 +747,7 @@ contains
 
         return 
 
-    end function calc_adv3D_timestep1 
+    end function calc_adv3D_timestep1
     
     elemental function calc_adv2D_timestep(ux,uy,dx,dy,cfl_max) result(dt)
         ! Calculate maximum advective time step based
@@ -770,7 +772,7 @@ contains
 
         return 
 
-    end function calc_adv2D_timestep 
+    end function calc_adv2D_timestep
     
     subroutine calc_adv2D_velocity(ux,uy,dx,dy,dt,cfl_max)
         ! Calculate maximum velocity given a known time step
@@ -826,7 +828,7 @@ contains
 
         return 
 
-    end subroutine calc_adv2D_velocity 
+    end subroutine calc_adv2D_velocity
     
     function calc_adv3D_timestep(ux,uy,uz,H_ice,zeta_ac,dx,dy,cfl_max) result(dt)
         ! Calculate maximum advective time step based
@@ -1037,7 +1039,7 @@ contains
         
         return 
 
-    end subroutine yelmo_timestep_write_init 
+    end subroutine yelmo_timestep_write_init
 
     subroutine yelmo_timestep_write(filename,time,dt_now,dt_adv,dt_pi,pc_eta,pc_tau, &
                                                 speed,speed_tpo,speed_dyn,ssa_iter,iter_redo)

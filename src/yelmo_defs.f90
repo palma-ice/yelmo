@@ -290,9 +290,6 @@ module yelmo_defs
         real(wp), allocatable :: uxy_i_bar(:,:) 
         
         real(wp), allocatable :: duxydt(:,:) 
-
-        real(wp), allocatable :: dd_ab(:,:,:)  
-        real(wp), allocatable :: dd_ab_bar(:,:)  
         
         real(wp), allocatable :: duxdz(:,:,:) 
         real(wp), allocatable :: duydz(:,:,:)

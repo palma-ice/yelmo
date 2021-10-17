@@ -272,7 +272,7 @@ contains
             call calc_velocity_sia(dyn%now%ux_i,dyn%now%uy_i,dyn%now%ux_i_bar,dyn%now%uy_i_bar,tpo%now%H_ice, &
                                     tpo%now%f_ice,dyn%now%taud_acx,dyn%now%taud_acy,mat%now%ATT,dyn%par%zeta_aa, &
                                     dyn%par%dx,mat%par%n_glen,rho_ice,g,dyn%par%boundaries)
-            
+
         else 
             ! Set all SIA terms to zero 
 
@@ -1105,9 +1105,6 @@ end if
 
         allocate(now%duxydt(nx,ny))
 
-        allocate(now%dd_ab(nx,ny,nz_aa))
-        allocate(now%dd_ab_bar(nx,ny))
-
         allocate(now%duxdz(nx,ny,nz_aa)) 
         allocate(now%duydz(nx,ny,nz_aa))
         allocate(now%duxdz_bar(nx,ny)) 
@@ -1177,9 +1174,6 @@ end if
         
         now%duxydt            = 0.0
 
-        now%dd_ab             = 0.0
-        now%dd_ab_bar         = 0.0
-        
         now%duxdz             = 0.0 
         now%duydz             = 0.0
         now%duxdz_bar         = 0.0 
@@ -1258,9 +1252,6 @@ end if
         if (allocated(now%uxy_i_bar))       deallocate(now%uxy_i_bar)
         
         if (allocated(now%duxydt ))         deallocate(now%duxydt)
-        
-        if (allocated(now%dd_ab))           deallocate(now%dd_ab)
-        if (allocated(now%dd_ab_bar))       deallocate(now%dd_ab_bar)
         
         if (allocated(now%duxdz))           deallocate(now%duxdz) 
         if (allocated(now%duydz))           deallocate(now%duydz)

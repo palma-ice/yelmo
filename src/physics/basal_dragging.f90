@@ -733,7 +733,7 @@ contains
                     
                     uxy_ab = sqrt(ux_ab**2 + uy_ab**2 + ub_sq_min)
                     
-                    beta_ab = cb_ab * (uxy_ab / u_0)**q * (1.0_prec / uxy_ab)
+                    beta_ab = cb_ab * (uxy_ab / u_0)**q * (1.0_wp / uxy_ab)
 
                 end if 
 
@@ -750,7 +750,7 @@ contains
                 else
                     
                     uxy_b  = ub_min 
-                    beta(i,j) = c_bed(i,j) * (uxy_b / u_0)**q * (1.0_prec / uxy_b)
+                    beta(i,j) = c_bed(i,j) * (uxy_b / u_0)**q * (1.0_wp / uxy_b)
 
                 end if 
 
@@ -878,7 +878,7 @@ contains
 
                 uxy_ab    = sqrt(ux_ab**2 + uy_ab**2 + ub_sq_min)
 
-                beta_ab   = cb_ab * (uxy_ab / u_0)**q * (1.0_prec / uxy_ab)
+                beta_ab   = cb_ab * (uxy_ab / u_0)**q * (1.0_wp / uxy_ab)
 
                 beta(i,j) = sum(wt_ab*beta_ab)
 

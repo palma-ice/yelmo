@@ -51,10 +51,12 @@ contains
         logical  :: get_fractional_cover 
 
         real(wp) :: H_neighb(4)
+        real(wp) :: f_neighb(4)
         integer  :: n_neighb(4)
         logical  :: mask(4) 
         integer  :: n_now
         integer, allocatable  :: n_ice(:,:) 
+        integer, allocatable  :: n_grnd(:,:)
 
         real(wp), parameter :: f_ice_island = 1.0_wp 
         
@@ -62,7 +64,10 @@ contains
         ny = size(H_ice,2)
 
         allocate(n_ice(nx,ny))
-        n_ice = 0
+        allocate(n_grnd(nx,ny))
+        
+        n_ice  = 0
+        n_grnd = 0
         
         ! By default, fractional cover will be determined
         get_fractional_cover = .TRUE. 
@@ -92,12 +97,19 @@ contains
             else 
                 f_ice(i,j) = 0.0 
             end if 
+                 
+            if (get_fractional_cover) then
 
-            ! Also count how many neighbors are ice covered 
-            if (get_fractional_cover) then 
+                ! Count how many neighbors are ice covered  
                 H_neighb   = [H_ice(im1,j),H_ice(ip1,j),H_ice(i,jm1),H_ice(i,jp1)]
                 mask       = H_neighb .gt. 0.0_wp 
                 n_ice(i,j) = count(mask) 
+
+                ! Count how many neighbors are grounded 
+                f_neighb    = [f_grnd(im1,j),f_grnd(ip1,j),f_grnd(i,jm1),f_grnd(i,jp1)]
+                mask        = f_neighb .gt. 0.0_wp 
+                n_grnd(i,j) = count(mask) 
+
             end if 
         end do 
         end do
@@ -136,8 +148,9 @@ contains
                         ! Some neighbors have full ice coverage
 
                         ! Determine height to give to potentially partially filled cell
-                        if (f_grnd(i,j) .eq. 0.0) then 
-                            ! Floating point, set H_eff = minimum of neighbors
+                        if (f_grnd(i,j) .eq. 0.0 .and. n_grnd(i,j) .eq. 0.0) then 
+                            ! Floating point away from grounding line, 
+                            ! set H_eff = minimum of neighbors
 
                             H_eff = minval(H_neighb,mask=mask)
 

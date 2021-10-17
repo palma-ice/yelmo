@@ -130,8 +130,8 @@ contains
 
         real(wp),       intent(INOUT) :: H_ice(:,:)             ! [m]   Ice thickness 
         real(wp),       intent(INOUT) :: f_ice(:,:)             ! [--]  Ice cover fraction 
-        real(wp),       intent(INOUT) :: mb_applied(:,:)        ! [m/a] Actual mass balance applied to real ice points
-        real(wp),       intent(INOUT) :: calv(:,:)              ! [m/a] Actual calving rate 
+        real(wp),       intent(OUT)   :: mb_applied(:,:)        ! [m/a] Actual mass balance applied to real ice points
+        real(wp),       intent(OUT)   :: calv(:,:)              ! [m/a] Actual calving rate 
         real(wp),       intent(IN)    :: f_grnd(:,:)            ! [--]  Grounded fraction 
         real(wp),       intent(IN)    :: H_ocn(:,:)             ! [m]   Ocean thickness (ie, depth)
         real(wp),       intent(IN)    :: mbal(:,:)              ! [m/a] Net mass balance; mbal = smb+bmb (calving separate) 

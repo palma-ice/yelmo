@@ -56,19 +56,16 @@ contains
         logical  :: mask(4) 
         integer  :: n_now
         integer, allocatable  :: n_ice(:,:) 
-        integer, allocatable  :: n_grnd(:,:)
-
+        
         real(wp), parameter :: f_ice_island = 1.0_wp 
         
         nx = size(H_ice,1)
         ny = size(H_ice,2)
 
         allocate(n_ice(nx,ny))
-        allocate(n_grnd(nx,ny))
-        
+
         n_ice  = 0
-        n_grnd = 0
-        
+
         ! By default, fractional cover will be determined
         get_fractional_cover = .TRUE. 
 
@@ -104,11 +101,6 @@ contains
                 H_neighb   = [H_ice(im1,j),H_ice(ip1,j),H_ice(i,jm1),H_ice(i,jp1)]
                 mask       = H_neighb .gt. 0.0_wp 
                 n_ice(i,j) = count(mask) 
-
-                ! Count how many neighbors are grounded 
-                f_neighb    = [f_grnd(im1,j),f_grnd(ip1,j),f_grnd(i,jm1),f_grnd(i,jp1)]
-                mask        = f_neighb .gt. 0.0_wp 
-                n_grnd(i,j) = count(mask) 
 
             end if 
         end do 
@@ -148,9 +140,8 @@ contains
                         ! Some neighbors have full ice coverage
 
                         ! Determine height to give to potentially partially filled cell
-                        if (f_grnd(i,j) .eq. 0.0 .and. n_grnd(i,j) .eq. 0.0) then 
-                            ! Floating point away from grounding line, 
-                            ! set H_eff = minimum of neighbors
+                        if (f_grnd(i,j) .eq. 0.0) then 
+                            ! Floating point, set H_eff = minimum of neighbors
 
                             H_eff = minval(H_neighb,mask=mask)
 
@@ -162,7 +153,7 @@ contains
                             H_eff = H_ice(i,j) 
 
                             ! Alternative approach:
-                        ! H_eff = 0.5*minval(H_neighb,mask=mask)
+                            ! H_eff = 0.5*minval(H_neighb,mask=mask)
 
                         end if
                     
@@ -216,9 +207,8 @@ contains
                     where(mask) H_neighb = [H_ice(im1,j),H_ice(ip1,j),H_ice(i,jm1),H_ice(i,jp1)] &
                                         / [f_ice(im1,j),f_ice(ip1,j),f_ice(i,jm1),f_ice(i,jp1)]
                     
-                    if (f_grnd(i,j) .eq. 0.0 .and. n_grnd(i,j) .eq. 0.0) then 
-                            ! Floating point away from grounding line, 
-                            ! set H_eff = minimum of neighbors
+                    if (f_grnd(i,j) .eq. 0.0) then 
+                        ! Floating point away, set H_eff = minimum of neighbors
 
                         H_eff = minval(H_neighb,mask=mask)
 
@@ -230,7 +220,7 @@ contains
                         H_eff = H_ice(i,j) 
 
                         ! Alternative approach:
-                    ! H_eff = 0.5*minval(H_neighb,mask=mask)
+                        ! H_eff = 0.5*minval(H_neighb,mask=mask)
 
                     end if
                     

@@ -281,7 +281,7 @@ contains
                     uy(i,j,k) = uy(i,j,k-1) &
                                 + fact_ac*0.5_wp*(tau_yz(i,j,k)+tau_yz(i,j,k-1))
                 end if 
-
+                
             end do 
             end do 
 

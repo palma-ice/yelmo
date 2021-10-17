@@ -22,6 +22,10 @@ module yelmo_tools
     public :: stagger_ab_acx
     public :: stagger_ab_acy 
 
+    public :: stagger_node_aa_ab_ice 
+    public :: stagger_node_acx_ab_ice
+    public :: stagger_node_acy_ab_ice
+
     public :: stagger_nodes_aa_ab_ice
     public :: stagger_nodes_acx_ab_ice
     public :: stagger_nodes_acy_ab_ice
@@ -410,6 +414,166 @@ contains
 
 ! ===== NEW =======================
     
+    subroutine stagger_node_aa_ab_ice(u_ab,u_aa,f_ice,i,j,check_underflow)
+        ! Stagger from aa nodes to ab node for index [i,j]
+
+        implicit none 
+
+        real(wp), intent(OUT) :: u_ab
+        real(wp), intent(IN)  :: u_aa(:,:) 
+        real(wp), intent(IN)  :: f_ice(:,:) 
+        integer,  intent(IN)  :: i 
+        integer,  intent(IN)  :: j
+        logical, optional :: check_underflow
+
+        ! Local variables 
+        integer  :: nx, ny 
+        integer  :: im1, jm1, ip1, jp1 
+        real(wp) :: wt 
+
+        nx = size(f_ice,1) 
+        ny = size(f_ice,2) 
+
+        ! Define neighbor indices
+        im1 = max(i-1,1)
+        ip1 = min(i+1,nx)
+        jm1 = max(j-1,1)
+        jp1 = min(j+1,ny)
+        
+        ! Initialize to zero 
+        u_ab = 0.0_wp 
+
+        ! (1) Upper-right node average
+        wt = 0.0_wp 
+        if (f_ice(i,j) .eq. 1.0_wp) then 
+            u_ab = u_ab + u_aa(i,j) 
+            wt = wt + 1.0_wp 
+        end if 
+        if (f_ice(ip1,j) .eq. 1.0_wp) then 
+            u_ab = u_ab + u_aa(ip1,j) 
+            wt = wt + 1.0_wp 
+        end if 
+        if (f_ice(i,jp1) .eq. 1.0_wp) then 
+            u_ab = u_ab + u_aa(i,jp1) 
+            wt = wt + 1.0_wp 
+        end if 
+        if (f_ice(ip1,jp1) .eq. 1.0_wp) then 
+            u_ab = u_ab + u_aa(ip1,jp1) 
+            wt = wt + 1.0_wp 
+        end if 
+        
+        if (wt .gt. 0.0_wp) then 
+            u_ab = u_ab / wt 
+        end if 
+
+        if (present(check_underflow)) then 
+            if (check_underflow) then 
+                if (abs(u_ab) .lt. TOL_UNDERFLOW) u_ab = 0.0_wp 
+            end if 
+        end if 
+        
+        return 
+
+    end subroutine stagger_node_aa_ab_ice
+
+    subroutine stagger_node_acx_ab_ice(u_ab,u_acx,f_ice,i,j)
+        ! Stagger from acx nodes to ab node for index [i,j]
+
+        implicit none 
+
+        real(wp), intent(OUT) :: u_ab
+        real(wp), intent(IN)  :: u_acx(:,:) 
+        real(wp), intent(IN)  :: f_ice(:,:) 
+        integer,  intent(IN)  :: i 
+        integer,  intent(IN)  :: j
+        
+        ! Local variables 
+        integer  :: nx, ny 
+        integer  :: im1, jm1, ip1, jp1 
+        real(wp) :: wt 
+
+        nx = size(f_ice,1) 
+        ny = size(f_ice,2) 
+
+        ! Define neighbor indices
+        im1 = max(i-1,1)
+        ip1 = min(i+1,nx)
+        jm1 = max(j-1,1)
+        jp1 = min(j+1,ny)
+        
+        ! Initialize to zero 
+        u_ab = 0.0_wp 
+
+        ! (1) Upper-right node average
+        wt = 0.0_wp 
+        if (f_ice(i,j) .eq. 1.0_wp .or. f_ice(ip1,j) .eq. 1.0_wp) then 
+            u_ab = u_ab + u_acx(i,j) 
+            wt = wt + 1.0_wp 
+        end if 
+        if (f_ice(i,jp1) .eq. 1.0_wp .or. f_ice(ip1,jp1) .eq. 1.0_wp) then 
+            u_ab = u_ab + u_acx(i,jp1) 
+            wt = wt + 1.0_wp 
+        end if 
+        
+        if (wt .gt. 0.0_wp) then 
+            u_ab = u_ab / wt 
+        end if 
+
+        if (abs(u_ab) .lt. TOL_UNDERFLOW) u_ab = 0.0_wp 
+        
+        return 
+
+    end subroutine stagger_node_acx_ab_ice
+
+    subroutine stagger_node_acy_ab_ice(u_ab,u_acy,f_ice,i,j)
+        ! Stagger from acy nodes to ab node for index [i,j]
+
+        implicit none 
+
+        real(wp), intent(OUT) :: u_ab
+        real(wp), intent(IN)  :: u_acy(:,:) 
+        real(wp), intent(IN)  :: f_ice(:,:) 
+        integer,  intent(IN)  :: i 
+        integer,  intent(IN)  :: j
+        
+        ! Local variables 
+        integer  :: nx, ny 
+        integer  :: im1, jm1, ip1, jp1 
+        real(wp) :: wt 
+
+        nx = size(f_ice,1) 
+        ny = size(f_ice,2) 
+
+        ! Define neighbor indices
+        im1 = max(i-1,1)
+        ip1 = min(i+1,nx)
+        jm1 = max(j-1,1)
+        jp1 = min(j+1,ny)
+        
+        ! Initialize to zero 
+        u_ab = 0.0_wp 
+
+        ! (1) Upper-right node average
+        wt = 0.0_wp 
+        if (f_ice(i,j) .eq. 1.0_wp .or. f_ice(i,jp1) .eq. 1.0_wp) then 
+            u_ab = u_ab + u_acy(i,j) 
+            wt = wt + 1.0_wp 
+        end if 
+        if (f_ice(ip1,j) .eq. 1.0_wp .or. f_ice(ip1,jp1) .eq. 1.0_wp) then 
+            u_ab = u_ab + u_acy(ip1,j) 
+            wt = wt + 1.0_wp 
+        end if 
+        
+        if (wt .gt. 0.0_wp) then 
+            u_ab = u_ab / wt 
+        end if 
+
+        if (abs(u_ab) .lt. TOL_UNDERFLOW) u_ab = 0.0_wp 
+        
+        return 
+
+    end subroutine stagger_node_acy_ab_ice
+
     subroutine stagger_nodes_aa_ab_ice(u_ab,u_aa,f_ice,i,j,check_underflow)
         ! Stagger from acx nodes to ab node for index [i,j]
 
@@ -2258,7 +2422,7 @@ contains
             
             jm1 = max(1, j-1)
             jp1 = min(ny,j+1)
-            
+
             ! Slope in x-direction
             dvardx(i,j) = (var(ip1,j)-var(i,j))/dx 
 

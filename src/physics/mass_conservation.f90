@@ -151,7 +151,7 @@ contains
 
         ! Combine grounded and floating calving into one field for output.
         ! It has already been scaled by area of ice in cell (f_ice).
-        calv = (calv + calv_grnd)
+        calv = (calv_flt + calv_grnd)
 
         ! ==== MASS BALANCE =====
 

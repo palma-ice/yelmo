@@ -216,8 +216,9 @@ contains
                     where(mask) H_neighb = [H_ice(im1,j),H_ice(ip1,j),H_ice(i,jm1),H_ice(i,jp1)] &
                                         / [f_ice(im1,j),f_ice(ip1,j),f_ice(i,jm1),f_ice(i,jp1)]
                     
-                    if (f_grnd(i,j) .eq. 0.0) then 
-                            ! Floating point, set H_eff = minimum of neighbors
+                    if (f_grnd(i,j) .eq. 0.0 .and. n_grnd(i,j) .eq. 0.0) then 
+                            ! Floating point away from grounding line, 
+                            ! set H_eff = minimum of neighbors
 
                         H_eff = minval(H_neighb,mask=mask)
 

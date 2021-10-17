@@ -7,8 +7,6 @@ module velocity_sia
 
     private
     public :: calc_velocity_sia
-    public :: calc_velocity_sia_0
-    public :: calc_velocity_basal_sia_00
     public :: calc_velocity_basal_sia       ! Not ready yet, needs checking that it is consistent with Weertman sliding law 
     
 contains 
@@ -62,243 +60,6 @@ contains
 
     end subroutine calc_velocity_sia
 
-    subroutine calc_velocity_sia_0(ux_i,uy_i,ux_i_bar,uy_i_bar,H_ice,f_ice,taud_acx,taud_acy,ATT,zeta_aa,dx,n_glen,rho_ice,g,boundaries)
-
-        implicit none 
-
-        real(prec),         intent(OUT) :: ux_i(:,:,:) 
-        real(prec),         intent(OUT) :: uy_i(:,:,:) 
-        real(prec),         intent(OUT) :: ux_i_bar(:,:) 
-        real(prec),         intent(OUT) :: uy_i_bar(:,:) 
-        real(prec),         intent(IN)  :: H_ice(:,:) 
-        real(prec),         intent(IN)  :: f_ice(:,:)
-        real(prec),         intent(IN)  :: taud_acx(:,:) 
-        real(prec),         intent(IN)  :: taud_acy(:,:) 
-        real(prec),         intent(IN)  :: ATT(:,:,:)
-        real(prec),         intent(IN)  :: zeta_aa(:) 
-        real(prec),         intent(IN)  :: dx 
-        real(prec),         intent(IN)  :: n_glen 
-        real(prec),         intent(IN)  :: rho_ice 
-        real(prec),         intent(IN)  :: g 
-        character(len=*),   intent(IN)  :: boundaries 
-
-        ! Local variables 
-        integer :: nx, ny, nz_aa 
-        real(prec), allocatable :: dd_ab(:,:,:) 
-
-        nx    = size(ux_i,1)
-        ny    = size(ux_i,2)
-        nz_aa = size(ux_i,3)
-        
-        allocate(dd_ab(nx,ny,nz_aa))
-
-        ! Calculate diffusivity constant on ab-nodes
-        call calc_dd_ab_3D(dd_ab,H_ice,f_ice,taud_acx,taud_acy,ATT, &
-                                zeta_aa,dx,n_glen,rho_ice,g,boundaries)
-
-        ! Calculate the 3D horizontal shear velocity fields
-        call calc_uxy_sia_3D_0(ux_i,uy_i,dd_ab,taud_acx,taud_acy,f_ice,boundaries)
-        
-        ! Calculate the depth-averaged horizontal shear velocity fields too
-        call calc_uxy_sia_2D(ux_i_bar,uy_i_bar,dd_ab,taud_acx,taud_acy,f_ice,zeta_aa,boundaries)
-
-!         Or, simply integrate from 3D velocity field to get depth-averaged field (slower)
-!         ux_i_bar = calc_vertical_integrated_2D(ux_i,zeta_aa)
-!         uy_i_bar = calc_vertical_integrated_2D(uy_i,zeta_aa)
-        
-        return 
-
-    end subroutine calc_velocity_sia_0
-
-    subroutine calc_velocity_basal_sia(ux_b,uy_b,taub_acx,taub_acy,dd_ab_3D,H_ice,taud_acx,taud_acy,f_pmp,zeta_aa,dx,cf_sia,rho_ice,g)
-        ! Calculate the parameterized basal velocity for use with SIA
-        ! (following a Weertman-type sliding law)
-        
-        ! H_ice, ATT are on aa-nodes
-        ! ux, uy, dzsdx, dzsdy are on ac-nodes 
-        ! Intermediate values: Diffusivity calculated on B nodes
-        ! Outputs are staggered (defined at boundaries of cell, ARAWAKA-C grid)
-
-        ! Note: This routine works, but is outdated. It should use taud_acx/acy 
-        ! instead of dzsdx/dy, as with calc_uxy_sia_2D/3D.
-        
-        implicit none
-
-        real(prec), intent(OUT) :: ux_b(:,:)            ! [m/a] SIA basal velocity x-direction, acx-nodes
-        real(prec), intent(OUT) :: uy_b(:,:)            ! [m/a] SIA basal velocity y-direction, acy-nodes
-        real(prec), intent(OUT) :: taub_acx(:,:)        ! [Pa]  Basal stress, x-direction
-        real(prec), intent(OUT) :: taub_acy(:,:)        ! [Pa]  Basal stress, y-direction
-        real(prec), intent(IN)  :: dd_ab_3D(:,:,:)      ! [m^2/a] SIA diffusivity, ab-nodes
-        real(prec), intent(IN)  :: H_ice(:,:)           ! [m]   Ice thickness
-        real(prec), intent(IN)  :: taud_acx(:,:)        ! [Pa]  Driving stress, x-direction 
-        real(prec), intent(IN)  :: taud_acy(:,:)        ! [Pa]  Driving stress, y-direction
-        real(prec), intent(IN)  :: f_pmp(:,:)           ! [--]  Fraction of grid point at pressure melting point
-        real(prec), intent(IN)  :: zeta_aa(:)           ! [--]  Height vector 0:1 
-        real(prec), intent(IN)  :: dx                   ! [m]
-        real(prec), intent(IN)  :: cf_sia               ! [m/a Pa-1]
-        real(prec), intent(IN)  :: rho_ice              ! [kg m-3] Ice density 
-        real(prec), intent(IN)  :: g                    ! [m s-2]  Gravity acceleration  
-
-        ! Local variables
-        integer :: i, j, k, nx, ny, nz_aa 
-        real(prec) :: dd_acx, dd_acy 
-        real(prec), allocatable :: dd_ab(:,:)           ! [m^2/a] SIA diffusivity, ab-nodes
-        real(prec), allocatable :: f_pmp_ab(:,:)
-        real(prec) :: H_ac 
-        real(prec), parameter :: cf_sia_frozen = 0.0    ! No sliding for purely frozen points 
-
-        nx    = size(H_ice,1)
-        ny    = size(H_ice,2)
-        nz_aa = size(zeta_aa,1) 
-
-        allocate(dd_ab(nx,ny))
-        allocate(f_pmp_ab(nx,ny)) 
-
-        ! Get pressure melting point fraction on ab-nodes 
-        f_pmp_ab = stagger_aa_ab(f_pmp)
-
-        f_pmp_ab(nx,:) = f_pmp_ab(nx-1,:) 
-        f_pmp_ab(:,ny) = f_pmp_ab(:,ny-1)
-        
-        ! Calculate vertically integrated diffusivity constant
-        dd_ab = calc_vertical_integrated_2D(dd_ab_3D,zeta_aa)
-
-        ! Scale by fraction of point at pressure melting point 
-        dd_ab = (f_pmp_ab*cf_sia + (1.0-f_pmp_ab)*cf_sia_frozen) * dd_ab
-
-        ! Stagger diffusivity constant back from ab- to ac-nodes
-        ! and calculate velocity components on ac-nodes 
-        ux_b = 0.0 
-        do j=2,ny
-        do i=1,nx
-            dd_acx    = 0.5*(dd_ab(i,j-1)+dd_ab(i,j))
-            ux_b(i,j) = -dd_acx*taud_acx(i,j)
-        end do
-        end do
-        ux_b(:,1) = ux_b(:,2)
-
-        uy_b = 0.0 
-        do j=1,ny
-        do i=2,nx
-            dd_acy    = 0.5*(dd_ab(i-1,j)+dd_ab(i,j))
-            uy_b(i,j) = -dd_acy*taud_acy(i,j)
-        end do
-        end do
-        uy_b(1,:) = uy_b(2,:) 
-
-        ! ajr: to do!!
-        ! Diagnose basal stress 
-        !call calc_basal_stress(taub_acx,taub_acy,beta_acx,beta_acy,ux_b,uy_b)
-        taub_acx = 0.0_prec 
-        taub_acy = 0.0_prec 
-
-        return
-        
-    end subroutine calc_velocity_basal_sia
-    
-    subroutine calc_velocity_basal_sia_00(ux_b,uy_b,taub_acx,taub_acy,H_ice,dzsdx,dzsdy,f_pmp,zeta_aa,dx,cf_sia,rho_ice,g)
-        ! Calculate the parameterized basal velocity for use with SIA
-        ! (following a Weertman-type sliding law)
-        
-        ! H_ice, ATT are on aa-nodes
-        ! ux, uy, dzsdx, dzsdy are on ac-nodes 
-        ! Intermediate values: Diffusivity calculated on B nodes
-        ! Outputs are staggered (defined at boundaries of cell, ARAWAKA-C grid)
-
-        ! Note: This routine works, but is outdated. It should use taud_acx/acy 
-        ! instead of dzsdx/dy, as with calc_uxy_sia_2D/3D.
-        
-        implicit none
-
-        real(prec), intent(OUT) :: ux_b(:,:)            ! [m/a] SIA basal velocity x-direction, acx-nodes
-        real(prec), intent(OUT) :: uy_b(:,:)            ! [m/a] SIA basal velocity y-direction, acy-nodes
-        real(prec), intent(OUT) :: taub_acx(:,:)        ! [Pa]  Basal stress, x-direction
-        real(prec), intent(OUT) :: taub_acy(:,:)        ! [Pa]  Basal stress, y-direction
-        real(prec), intent(IN)  :: H_ice(:,:)           ! [m]   Ice thickness
-        real(prec), intent(IN)  :: dzsdx(:,:)           ! [m/m] Surface gradient x-direction 
-        real(prec), intent(IN)  :: dzsdy(:,:)           ! [m/m] Surface gradient y-direction
-        real(prec), intent(IN)  :: f_pmp(:,:)           ! [--]  Fraction of grid point at pressure melting point
-        real(prec), intent(IN)  :: zeta_aa(:)           ! [--]  Height vector 0:1 
-        real(prec), intent(IN)  :: dx                   ! [m]
-        real(prec), intent(IN)  :: cf_sia               ! [m/a Pa-1]
-        real(prec), intent(IN)  :: rho_ice              ! [kg m-3] Ice density 
-        real(prec), intent(IN)  :: g                    ! [m s-2]  Gravity acceleration  
-
-        ! Local variables
-        integer :: i, j, k, nx, ny, nz_aa 
-        real(prec) :: dd_acx, dd_acy 
-        real(prec), allocatable :: H_ice_ab(:,:) 
-        real(prec), allocatable :: slope_ab(:,:) 
-        real(prec), allocatable :: dd_ab(:,:)           ! [m^2/a] SIA diffusivity, ab-nodes
-        real(prec), allocatable :: f_pmp_ab(:,:)
-        real(prec) :: H_ac 
-        real(prec), parameter :: cf_sia_frozen = 0.0    ! No sliding for purely frozen points 
-
-        nx    = size(H_ice,1)
-        ny    = size(H_ice,2)
-        nz_aa = size(zeta_aa,1) 
-
-        allocate(H_ice_ab(nx,ny))
-        allocate(slope_ab(nx,ny))
-        allocate(dd_ab(nx,ny))
-        allocate(f_pmp_ab(nx,ny)) 
-
-        ! Calculate the ice thickness onto the ab-nodes 
-        H_ice_ab = stagger_aa_ab(H_ice)
-
-        H_ice_ab(nx,:) = H_ice_ab(nx-1,:) 
-        H_ice_ab(:,ny) = H_ice_ab(:,ny-1)
-        
-        ! Get magnitude of slope on ab-nodes
-        slope_ab = 0.0 
-        do j=1,ny-1
-        do i=1,nx-1
-            slope_ab(i,j) = sqrt( (0.5*(dzsdx(i,j)+dzsdx(i,j+1)))**2 &
-                                + (0.5*(dzsdy(i,j)+dzsdy(i+1,j)))**2 )
-        end do 
-        end do 
-        slope_ab(nx,:) = slope_ab(nx-1,:) 
-        slope_ab(:,ny) = slope_ab(:,ny-1)
-        
-        ! Get pressure melting point fraction on ab-nodes 
-        f_pmp_ab = stagger_aa_ab(f_pmp)
-
-        f_pmp_ab(nx,:) = f_pmp_ab(nx-1,:) 
-        f_pmp_ab(:,ny) = f_pmp_ab(:,ny-1)
-        
-        ! Calculate diffusivity coefficient 
-        dd_ab = (f_pmp_ab*cf_sia + (1.0-f_pmp_ab)*cf_sia_frozen) * (rho_ice*g*H_ice_ab) * slope_ab**2
-
-        ! Stagger diffusivity coefficient back from ab- to ac-nodes
-        ! and calculate velocity components on ac-nodes 
-        ux_b = 0.0 
-        do j=2,ny
-        do i=1,nx
-            dd_acx  = 0.5*(dd_ab(i,j-1)+dd_ab(i,j))
-            ux_b(i,j) = -dd_acx*dzsdx(i,j)
-        end do
-        end do
-        ux_b(:,1) = ux_b(:,2)
-
-        uy_b = 0.0 
-        do j=1,ny
-        do i=2,nx
-            dd_acy  = 0.5*(dd_ab(i-1,j)+dd_ab(i,j))
-            uy_b(i,j) = -dd_acy*dzsdy(i,j)
-        end do
-        end do
-        uy_b(1,:) = uy_b(2,:) 
-
-        ! ajr: to do!!
-        ! Diagnose basal stress 
-        !call calc_basal_stress(taub_acx,taub_acy,beta_acx,beta_acy,ux_b,uy_b)
-        taub_acx = 0.0_prec 
-        taub_acy = 0.0_prec 
-
-        return
-        
-    end subroutine calc_velocity_basal_sia_00
-    
     subroutine calc_shear_stress_3D(tau_xz,tau_yz,taud_acx,taud_acy,f_ice,zeta_aa,boundaries)
         ! Calculate the shear stress (x/y) components at each vertical level, as an input 
         ! to the SIA calculation. 
@@ -574,404 +335,195 @@ contains
         return
         
     end subroutine calc_uxy_sia_3D
-
-    subroutine calc_dd_ab_3D(dd_ab_3D,H_ice,f_ice,taud_acx,taud_acy,ATT,zeta_aa,dx,n_glen,rho_ice,g,boundaries)
-        ! Calculate the 3D diffusivity helper field on ab-nodes, as an input 
-        ! to the SIA calculation. 
-
-        !$ use omp_lib
-
-        implicit none
+subroutine calc_velocity_basal_sia(ux_b,uy_b,taub_acx,taub_acy,dd_ab_3D,H_ice,taud_acx,taud_acy,f_pmp,zeta_aa,dx,cf_sia,rho_ice,g)
+        ! Calculate the parameterized basal velocity for use with SIA
+        ! (following a Weertman-type sliding law)
         
-        real(wp),           intent(OUT) :: dd_ab_3D(:,:,:)    ! nx,ny,nz_aa [m/a] Diffusivity helper, ab-nodes
-        real(wp),           intent(IN)  :: H_ice(:,:)         ! [m] Ice thickness 
-        real(wp),           intent(IN)  :: f_ice(:,:)         ! [--] Ice area fraction 
-        real(wp),           intent(IN)  :: taud_acx(:,:)      ! [Pa] Driving stress x-direction 
-        real(wp),           intent(IN)  :: taud_acy(:,:)      ! [Pa] Driving stress y-direction 
-        real(wp),           intent(IN)  :: ATT(:,:,:)         ! nx,ny,nz_aa [a-1 Pa-3] Rate factor
-        real(wp),           intent(IN)  :: zeta_aa(:)         ! [--] Height axis 0:1, layer centers (aa-nodes)
-        real(wp),           intent(IN)  :: dx                 ! [m] Horizontal resolution 
-        real(wp),           intent(IN)  :: n_glen
-        real(wp),           intent(IN)  :: rho_ice            ! [kg m-3] Ice density 
-        real(wp),           intent(IN)  :: g                  ! [m s-2] Gravitational acceleration
-        character(len=*),   intent(IN)  :: boundaries 
+        ! H_ice, ATT are on aa-nodes
+        ! ux, uy, dzsdx, dzsdy are on ac-nodes 
+        ! Intermediate values: Diffusivity calculated on B nodes
+        ! Outputs are staggered (defined at boundaries of cell, ARAWAKA-C grid)
+
+        ! Note: This routine works, but is outdated. It should use taud_acx/acy 
+        ! instead of dzsdx/dy, as with calc_uxy_sia_2D/3D.
+        
+        implicit none
+
+        real(prec), intent(OUT) :: ux_b(:,:)            ! [m/a] SIA basal velocity x-direction, acx-nodes
+        real(prec), intent(OUT) :: uy_b(:,:)            ! [m/a] SIA basal velocity y-direction, acy-nodes
+        real(prec), intent(OUT) :: taub_acx(:,:)        ! [Pa]  Basal stress, x-direction
+        real(prec), intent(OUT) :: taub_acy(:,:)        ! [Pa]  Basal stress, y-direction
+        real(prec), intent(IN)  :: dd_ab_3D(:,:,:)      ! [m^2/a] SIA diffusivity, ab-nodes
+        real(prec), intent(IN)  :: H_ice(:,:)           ! [m]   Ice thickness
+        real(prec), intent(IN)  :: taud_acx(:,:)        ! [Pa]  Driving stress, x-direction 
+        real(prec), intent(IN)  :: taud_acy(:,:)        ! [Pa]  Driving stress, y-direction
+        real(prec), intent(IN)  :: f_pmp(:,:)           ! [--]  Fraction of grid point at pressure melting point
+        real(prec), intent(IN)  :: zeta_aa(:)           ! [--]  Height vector 0:1 
+        real(prec), intent(IN)  :: dx                   ! [m]
+        real(prec), intent(IN)  :: cf_sia               ! [m/a Pa-1]
+        real(prec), intent(IN)  :: rho_ice              ! [kg m-3] Ice density 
+        real(prec), intent(IN)  :: g                    ! [m s-2]  Gravity acceleration  
 
         ! Local variables
-        integer  :: i, j, k, nx, ny, nz_aa
-        integer  :: im1, ip1, jm1, jp1
-        real(wp) :: H_ice_ab
-        real(wp) :: sigma_tot_ab
-        real(wp) :: ATT_ab 
-        real(wp) :: ATT_ab_km1 
-        real(wp) :: ATT_ab_k
-        real(wp) :: ATT_int_ab 
-
-        logical  :: is_ice_or_margin 
+        integer :: i, j, k, nx, ny, nz_aa 
+        real(prec) :: dd_acx, dd_acy 
+        real(prec), allocatable :: dd_ab(:,:)           ! [m^2/a] SIA diffusivity, ab-nodes
+        real(prec), allocatable :: f_pmp_ab(:,:)
+        real(prec) :: H_ac 
+        real(prec), parameter :: cf_sia_frozen = 0.0    ! No sliding for purely frozen points 
 
         nx    = size(H_ice,1)
         ny    = size(H_ice,2)
-        nz_aa = size(zeta_aa,1)
-
-        !allocate(ATT_ab(nz_aa))
-        !allocate(ATT_int_ab(nz_aa))
-
-        ! Reset dd_ab_3D
-        dd_ab_3D = 0.0 
-
-        !$omp parallel do 
-        do j = 1, ny 
-        do i = 1, nx 
-
-            ! Define neighbor indices
-            im1 = max(1,i-1)
-            ip1 = min(nx,i+1)
-            jm1 = max(1,j-1)
-            jp1 = min(ny,j+1)
-            
-            ! Determine if current point is part of the ice sheet or nearby
-            is_ice_or_margin = (count([f_ice(i,j),f_ice(im1,j),f_ice(ip1,j), &
-                                       f_ice(i,jm1),f_ice(i,jp1),f_ice(im1,jp1), &
-                                       f_ice(im1,jm1),f_ice(ip1,jp1),f_ice(ip1,jm1)].gt.0.0_wp) .gt. 0)
-
-            if (is_ice_or_margin) then 
-                ! Ice covered, or nearby (to include all ab-nodes)
-
-                ! Calculate staggered magnitude of driving stress
-                sigma_tot_ab = sqrt( (0.5*(taud_acx(i,j)+taud_acx(i,jp1)))**2 &
-                                   + (0.5*(taud_acy(i,j)+taud_acy(ip1,j)))**2 )
-                if (abs(sigma_tot_ab) .lt. TOL_UNDERFLOW) sigma_tot_ab = 0.0_wp 
-
-                ! Calculate staggered ice thickness 
-                H_ice_ab   = 0.25_wp*(H_ice(i,j)+H_ice(ip1,j)+H_ice(i,jp1)+H_ice(ip1,jp1))
-
-                
-                ! Basal value of dd and ATT_int is zero 
-                dd_ab_3D(i,j,1) = 0.0_wp 
-                ATT_int_ab      = 0.0_wp 
-
-                do k = 2, nz_aa 
-
-                    ! Calculate staggered column of ATT and integrated ATT
-                    ! (integrate using trapezoid method - done by hand here for speed)
-                    ATT_ab_km1 = 0.25_wp*(ATT(i,j,k-1)+ATT(ip1,j,k-1)+ATT(i,jp1,k-1)+ATT(ip1,jp1,k-1))*(1.0-zeta_aa(k-1))**n_glen
-                    ATT_ab_k   = 0.25_wp*(ATT(i,j,k)  +ATT(ip1,j,k)  +ATT(i,jp1,k)  +ATT(ip1,jp1,k))  *(1.0-zeta_aa(k))**n_glen
-                    ATT_ab     = 0.5_wp*(ATT_ab_k+ATT_ab_km1)
-                    ATT_int_ab = ATT_int_ab + ATT_ab*(zeta_aa(k) - zeta_aa(k-1))
-
-                    ! Calculate quasi-diffusivity for this layer
-                    if (n_glen .ne. 1.0_wp) then 
-                        dd_ab_3D(i,j,k) = 2.0_wp * H_ice_ab * ATT_int_ab * sigma_tot_ab**(n_glen-1.0) 
-                    else
-                        dd_ab_3D(i,j,k) = 2.0_wp * H_ice_ab * ATT_int_ab
-                    end if 
-
-                end do 
-
-            end if 
-
-        end do 
-        end do 
-        !$omp end parallel do 
-
-        select case(trim(boundaries))
-
-            ! case("zeros","EISMINT")
-
-            !     ! Set border values to zero
-            !     H_ice_new(1,:)  = 0.0
-            !     H_ice_new(nx,:) = 0.0
-
-            !     H_ice_new(:,1)  = 0.0
-            !     H_ice_new(:,ny) = 0.0
-
-            case("periodic","periodic-xy") 
-
-                dd_ab_3D(1:2,:,:)     = dd_ab_3D(nx-3:nx-2,:,:) 
-                dd_ab_3D(nx-1:nx,:,:) = dd_ab_3D(2:3,:,:) 
-
-                dd_ab_3D(:,1:2,:)     = dd_ab_3D(:,ny-3:ny-2,:) 
-                dd_ab_3D(:,ny-1:ny,:) = dd_ab_3D(:,2:3,:) 
-            
-            case("periodic-x") 
-
-                ! Periodic x 
-                dd_ab_3D(1:2,:,:)     = dd_ab_3D(nx-3:nx-2,:,:) 
-                dd_ab_3D(nx-1:nx,:,:) = dd_ab_3D(2:3,:,:) 
-                
-                ! Infinite (free-slip too)
-                dd_ab_3D(:,1,:)  = dd_ab_3D(:,2,:)
-                dd_ab_3D(:,ny,:) = dd_ab_3D(:,ny-1,:)
-
-            ! case("MISMIP3D")
-
-            !     ! === MISMIP3D =====
-            !     H_ice_new(1,:)    = H_ice_new(2,:)       ! x=0, Symmetry 
-            !     H_ice_new(nx,:)   = 0.0              ! x=800km, no ice
-                
-            !     H_ice_new(:,1)    = H_ice_new(:,2)       ! y=-50km, Free-slip condition
-            !     H_ice_new(:,ny)   = H_ice_new(:,ny-1)    ! y= 50km, Free-slip condition
-
-            case("infinite")
-                ! Set border points equal to inner neighbors 
-
-                call fill_borders_3D(dd_ab_3D,nfill=1)
-
-            case DEFAULT 
-
-                write(*,*) "apply_ice_thickness_boundaries:: error: boundary method not recognized: "//trim(boundaries)
-                stop 
-
-        end select 
-
-        return
-        
-    end subroutine calc_dd_ab_3D
-
-    subroutine calc_uxy_sia_2D(ux,uy,dd_ab_3D,taud_acx,taud_acy,f_ice,zeta_aa,boundaries)
-        ! Calculate the 2D horizontal velocity field using SIA
-
-        implicit none
-
-        real(prec),         intent(OUT) :: ux(:,:)              ! [m/a] SIA velocity x-direction, acx-nodes
-        real(prec),         intent(OUT) :: uy(:,:)              ! [m/a] SIA velocity y-direction, acy-nodes
-        real(prec),         intent(IN)  :: dd_ab_3D(:,:,:)      ! Diffusivity constant 
-        real(prec),         intent(IN)  :: taud_acx(:,:)        ! [Pa] Driving stress x-direction 
-        real(prec),         intent(IN)  :: taud_acy(:,:)        ! [Pa] Driving stress y-direction
-        real(prec),         intent(IN)  :: f_ice(:,:)           ! [--] Ice area fraction
-        real(prec),         intent(IN)  :: zeta_aa(:)           ! [--]  Height vector 0:1 
-        character(len=*),   intent(IN)  :: boundaries 
-
-        ! Local variables
-        integer :: i, j, k, nx, ny
-        integer :: im1, ip1, jm1, jp1 
-        real(prec) :: dd_acx, dd_acy 
-        real(prec), allocatable :: dd_ab(:,:)           ! [m^2/a] SIA diffusivity, ab-nodes
-
-        nx    = size(ux,1)
-        ny    = size(ux,2)
+        nz_aa = size(zeta_aa,1) 
 
         allocate(dd_ab(nx,ny))
+        allocate(f_pmp_ab(nx,ny)) 
 
+        ! Get pressure melting point fraction on ab-nodes 
+        f_pmp_ab = stagger_aa_ab(f_pmp)
+
+        f_pmp_ab(nx,:) = f_pmp_ab(nx-1,:) 
+        f_pmp_ab(:,ny) = f_pmp_ab(:,ny-1)
+        
+        ! Calculate vertically integrated diffusivity constant
         dd_ab = calc_vertical_integrated_2D(dd_ab_3D,zeta_aa)
+
+        ! Scale by fraction of point at pressure melting point 
+        dd_ab = (f_pmp_ab*cf_sia + (1.0-f_pmp_ab)*cf_sia_frozen) * dd_ab
 
         ! Stagger diffusivity constant back from ab- to ac-nodes
         ! and calculate velocity components on ac-nodes 
-        ux = 0.0 
-        uy = 0.0 
-
-        do j=1,ny
+        ux_b = 0.0 
+        do j=2,ny
         do i=1,nx
-
-            ! Define neighbor indices
-            im1 = max(1,i-1)
-            ip1 = min(nx,i+1)
-            jm1 = max(1,j-1)
-            jp1 = min(ny,j+1)
-            
-            ! x-direction 
-            if (f_ice(i,j) .eq. 1.0 .or. f_ice(ip1,j) .eq. 1.0) then 
-                dd_acx  = 0.5*(dd_ab(i,jm1)+dd_ab(i,j))
-                ux(i,j) = -dd_acx*taud_acx(i,j)
-            end if 
-
-            ! y-direction
-            if (f_ice(i,j) .eq. 1.0 .or. f_ice(i,jp1) .eq. 1.0) then 
-                dd_acy  = 0.5*(dd_ab(im1,j)+dd_ab(i,j))
-                uy(i,j) = -dd_acy*taud_acy(i,j)
-            end if
-
+            dd_acx    = 0.5*(dd_ab(i,j-1)+dd_ab(i,j))
+            ux_b(i,j) = -dd_acx*taud_acx(i,j)
         end do
         end do
+        ux_b(:,1) = ux_b(:,2)
 
-        ! Apply boundary conditions as needed 
-        if (trim(boundaries) .eq. "periodic") then
+        uy_b = 0.0 
+        do j=1,ny
+        do i=2,nx
+            dd_acy    = 0.5*(dd_ab(i-1,j)+dd_ab(i,j))
+            uy_b(i,j) = -dd_acy*taud_acy(i,j)
+        end do
+        end do
+        uy_b(1,:) = uy_b(2,:) 
 
-            ux(1,:)    = ux(nx-2,:) 
-            ux(nx-1,:) = ux(2,:) 
-            ux(nx,:)   = ux(3,:) 
-            ux(:,1)    = ux(:,ny-1)
-            ux(:,ny)   = ux(:,2) 
-
-            uy(1,:)    = uy(nx-1,:) 
-            uy(nx,:)   = uy(2,:) 
-            uy(:,1)    = uy(:,ny-2)
-            uy(:,ny-1) = uy(:,2) 
-            uy(:,ny)   = uy(:,3)
-
-        else if (trim(boundaries) .eq. "periodic-x") then 
-            
-            ux(1,:)    = ux(nx-2,:) 
-            ux(nx-1,:) = ux(2,:) 
-            ux(nx,:)   = ux(3,:) 
-            ux(:,1)    = ux(:,2)
-            ux(:,ny)   = ux(:,ny-1) 
-
-            uy(1,:)    = uy(nx-1,:) 
-            uy(nx,:)   = uy(2,:) 
-            uy(:,1)    = uy(:,2)
-            uy(:,ny-1) = uy(:,ny-2) 
-            uy(:,ny)   = uy(:,ny-1)
-
-        else if (trim(boundaries) .eq. "infinite") then 
-            
-            ux(1,:)    = ux(2,:) 
-            ux(nx-1,:) = ux(nx-2,:) 
-            ux(nx,:)   = ux(nx-1,:) 
-            ux(:,1)    = ux(:,2)
-            ux(:,ny)   = ux(:,ny-1) 
-
-            uy(1,:)    = uy(2,:) 
-            uy(nx,:)   = uy(nx-1,:) 
-            uy(:,1)    = uy(:,2)
-            uy(:,ny-1) = uy(:,ny-2) 
-            uy(:,ny)   = uy(:,ny-1)
-
-        end if 
+        ! ajr: to do!!
+        ! Diagnose basal stress 
+        !call calc_basal_stress(taub_acx,taub_acy,beta_acx,beta_acy,ux_b,uy_b)
+        taub_acx = 0.0_prec 
+        taub_acy = 0.0_prec 
 
         return
         
-    end subroutine calc_uxy_sia_2D
-
-    subroutine calc_uxy_sia_3D_0(ux,uy,dd_ab_3D,taud_acx,taud_acy,f_ice,boundaries)
-        ! Calculate the 3D horizontal velocity field using SIA
-
-        implicit none
+    end subroutine calc_velocity_basal_sia
+    
+    subroutine calc_velocity_basal_sia_00(ux_b,uy_b,taub_acx,taub_acy,H_ice,dzsdx,dzsdy,f_pmp,zeta_aa,dx,cf_sia,rho_ice,g)
+        ! Calculate the parameterized basal velocity for use with SIA
+        ! (following a Weertman-type sliding law)
         
-        real(prec),         intent(OUT) :: ux(:,:,:)        ! nx,ny,nz_aa [m/a] SIA velocity x-direction, acx-nodes
-        real(prec),         intent(OUT) :: uy(:,:,:)        ! nx,ny,nz_aa [m/a] SIA velocity y-direction, acy-nodes
-        real(prec),         intent(IN)  :: dd_ab_3D(:,:,:)  ! Diffusivity constant
-        real(prec),         intent(IN)  :: taud_acx(:,:)    ! [Pa] Driving stress x-direction 
-        real(prec),         intent(IN)  :: taud_acy(:,:)    ! [Pa] Driving stress y-direction
-        real(prec),         intent(IN)  :: f_ice(:,:)       ! [--] Ice area fraction 
-        character(len=*),   intent(IN)  :: boundaries 
+        ! H_ice, ATT are on aa-nodes
+        ! ux, uy, dzsdx, dzsdy are on ac-nodes 
+        ! Intermediate values: Diffusivity calculated on B nodes
+        ! Outputs are staggered (defined at boundaries of cell, ARAWAKA-C grid)
+
+        ! Note: This routine works, but is outdated. It should use taud_acx/acy 
+        ! instead of dzsdx/dy, as with calc_uxy_sia_2D/3D.
+        
+        implicit none
+
+        real(prec), intent(OUT) :: ux_b(:,:)            ! [m/a] SIA basal velocity x-direction, acx-nodes
+        real(prec), intent(OUT) :: uy_b(:,:)            ! [m/a] SIA basal velocity y-direction, acy-nodes
+        real(prec), intent(OUT) :: taub_acx(:,:)        ! [Pa]  Basal stress, x-direction
+        real(prec), intent(OUT) :: taub_acy(:,:)        ! [Pa]  Basal stress, y-direction
+        real(prec), intent(IN)  :: H_ice(:,:)           ! [m]   Ice thickness
+        real(prec), intent(IN)  :: dzsdx(:,:)           ! [m/m] Surface gradient x-direction 
+        real(prec), intent(IN)  :: dzsdy(:,:)           ! [m/m] Surface gradient y-direction
+        real(prec), intent(IN)  :: f_pmp(:,:)           ! [--]  Fraction of grid point at pressure melting point
+        real(prec), intent(IN)  :: zeta_aa(:)           ! [--]  Height vector 0:1 
+        real(prec), intent(IN)  :: dx                   ! [m]
+        real(prec), intent(IN)  :: cf_sia               ! [m/a Pa-1]
+        real(prec), intent(IN)  :: rho_ice              ! [kg m-3] Ice density 
+        real(prec), intent(IN)  :: g                    ! [m s-2]  Gravity acceleration  
 
         ! Local variables
-        integer :: i, j, k, nx, ny, nz_aa
-        integer :: im1, ip1, jm1, jp1
-        real(prec) :: dd_acx, dd_acy  
+        integer :: i, j, k, nx, ny, nz_aa 
+        real(prec) :: dd_acx, dd_acy 
+        real(prec), allocatable :: H_ice_ab(:,:) 
+        real(prec), allocatable :: slope_ab(:,:) 
+        real(prec), allocatable :: dd_ab(:,:)           ! [m^2/a] SIA diffusivity, ab-nodes
+        real(prec), allocatable :: f_pmp_ab(:,:)
+        real(prec) :: H_ac 
+        real(prec), parameter :: cf_sia_frozen = 0.0    ! No sliding for purely frozen points 
 
-        nx    = size(ux,1)
-        ny    = size(ux,2)
-        nz_aa = size(ux,3) 
+        nx    = size(H_ice,1)
+        ny    = size(H_ice,2)
+        nz_aa = size(zeta_aa,1) 
 
-        ! Reset velocity solution to zero everywhere 
-        ux = 0.0 
-        uy = 0.0 
+        allocate(H_ice_ab(nx,ny))
+        allocate(slope_ab(nx,ny))
+        allocate(dd_ab(nx,ny))
+        allocate(f_pmp_ab(nx,ny)) 
 
-        ! Stagger diffusivity back from Ab to Ac nodes
-        ! and calculate velocity components on ac-nodes 
+        ! Calculate the ice thickness onto the ab-nodes 
+        H_ice_ab = stagger_aa_ab(H_ice)
 
-        do j=1,ny
-        do i=1,nx
-
-            ! Define neighbor indices
-            im1 = max(1,i-1)
-            ip1 = min(nx,i+1)
-            jm1 = max(1,j-1)
-            jp1 = min(ny,j+1)
-            
-            ! Loop over each vertical layer 
-            do k = 1, nz_aa 
-
-                ! x-direction 
-                if (f_ice(i,j) .eq. 1.0 .or. f_ice(ip1,j) .eq. 1.0) then 
-                    dd_acx    = 0.5*(dd_ab_3D(i,jm1,k)+dd_ab_3D(i,j,k))
-                    ux(i,j,k) = -dd_acx*taud_acx(i,j)
-                end if 
-
-                ! y-direction
-                if (f_ice(i,j) .eq. 1.0 .or. f_ice(i,jp1) .eq. 1.0) then 
-                    dd_acy    = 0.5*(dd_ab_3D(im1,j,k)+dd_ab_3D(i,j,k))
-                    uy(i,j,k) = -dd_acy*taud_acy(i,j)
-                end if
-            
-            end do 
-
-        end do
+        H_ice_ab(nx,:) = H_ice_ab(nx-1,:) 
+        H_ice_ab(:,ny) = H_ice_ab(:,ny-1)
+        
+        ! Get magnitude of slope on ab-nodes
+        slope_ab = 0.0 
+        do j=1,ny-1
+        do i=1,nx-1
+            slope_ab(i,j) = sqrt( (0.5*(dzsdx(i,j)+dzsdx(i,j+1)))**2 &
+                                + (0.5*(dzsdy(i,j)+dzsdy(i+1,j)))**2 )
         end do 
+        end do 
+        slope_ab(nx,:) = slope_ab(nx-1,:) 
+        slope_ab(:,ny) = slope_ab(:,ny-1)
+        
+        ! Get pressure melting point fraction on ab-nodes 
+        f_pmp_ab = stagger_aa_ab(f_pmp)
 
-                ! Apply boundary conditions as needed 
-        if (trim(boundaries) .eq. "periodic") then
+        f_pmp_ab(nx,:) = f_pmp_ab(nx-1,:) 
+        f_pmp_ab(:,ny) = f_pmp_ab(:,ny-1)
+        
+        ! Calculate diffusivity coefficient 
+        dd_ab = (f_pmp_ab*cf_sia + (1.0-f_pmp_ab)*cf_sia_frozen) * (rho_ice*g*H_ice_ab) * slope_ab**2
 
-            ux(1,:,:)    = ux(nx-2,:,:) 
-            ux(nx-1,:,:) = ux(2,:,:) 
-            ux(nx,:,:)   = ux(3,:,:) 
-            ux(:,1,:)    = ux(:,ny-1,:)
-            ux(:,ny,:)   = ux(:,2,:) 
+        ! Stagger diffusivity coefficient back from ab- to ac-nodes
+        ! and calculate velocity components on ac-nodes 
+        ux_b = 0.0 
+        do j=2,ny
+        do i=1,nx
+            dd_acx  = 0.5*(dd_ab(i,j-1)+dd_ab(i,j))
+            ux_b(i,j) = -dd_acx*dzsdx(i,j)
+        end do
+        end do
+        ux_b(:,1) = ux_b(:,2)
 
-            uy(1,:,:)    = uy(nx-1,:,:) 
-            uy(nx,:,:)   = uy(2,:,:) 
-            uy(:,1,:)    = uy(:,ny-2,:)
-            uy(:,ny-1,:) = uy(:,2,:) 
-            uy(:,ny,:)   = uy(:,3,:)
+        uy_b = 0.0 
+        do j=1,ny
+        do i=2,nx
+            dd_acy  = 0.5*(dd_ab(i-1,j)+dd_ab(i,j))
+            uy_b(i,j) = -dd_acy*dzsdy(i,j)
+        end do
+        end do
+        uy_b(1,:) = uy_b(2,:) 
 
-        else if (trim(boundaries) .eq. "periodic-x") then 
-            
-            ux(1,:,:)    = ux(nx-2,:,:) 
-            ux(nx-1,:,:) = ux(2,:,:) 
-            ux(nx,:,:)   = ux(3,:,:) 
-            ux(:,1,:)    = ux(:,2,:)
-            ux(:,ny,:)   = ux(:,ny-1,:) 
-
-            uy(1,:,:)    = uy(nx-1,:,:) 
-            uy(nx,:,:)   = uy(2,:,:) 
-            uy(:,1,:)    = uy(:,2,:)
-            uy(:,ny-1,:) = uy(:,ny-2,:) 
-            uy(:,ny,:)   = uy(:,ny-1,:)
-
-        else if (trim(boundaries) .eq. "infinite") then 
-            
-            ux(1,:,:)    = ux(2,:,:) 
-            ux(nx-1,:,:) = ux(nx-2,:,:) 
-            ux(nx,:,:)   = ux(nx-1,:,:) 
-            ux(:,1,:)    = ux(:,2,:)
-            ux(:,ny,:)   = ux(:,ny-1,:) 
-
-            uy(1,:,:)    = uy(2,:,:) 
-            uy(nx,:,:)   = uy(nx-1,:,:) 
-            uy(:,1,:)    = uy(:,2,:)
-            uy(:,ny-1,:) = uy(:,ny-2,:) 
-            uy(:,ny,:)   = uy(:,ny-1,:)
-
-        end if 
+        ! ajr: to do!!
+        ! Diagnose basal stress 
+        !call calc_basal_stress(taub_acx,taub_acy,beta_acx,beta_acy,ux_b,uy_b)
+        taub_acx = 0.0_prec 
+        taub_acy = 0.0_prec 
 
         return
         
-    end subroutine calc_uxy_sia_3D_0
+    end subroutine calc_velocity_basal_sia_00
 
-    function calc_rate_factor_integrated(ATT,zeta,n_glen) result(ATT_int)
-        ! Greve and Blatter (2009), Chpt 5, page 82
-
-        !$ use omp_lib
-
-        implicit none 
-
-        real(prec), intent(IN) :: ATT(:,:,:)
-        real(prec), intent(IN) :: zeta(:) 
-        real(prec), intent(IN) :: n_glen 
-        real(prec) :: ATT_int(size(ATT,1),size(ATT,2),size(ATT,3))
-
-        ! Local variables 
-        integer :: i, j, nx, ny
-
-        nx = size(ATT,1)
-        ny = size(ATT,2) 
-
-        ! Vertically integrated values of ATT to each vertical level
-
-        !!!$omp parallel do shared(nx,ny,ATT,zeta,n_glen) private(i,j,ATT_int)
-        !!!$omp parallel do 
-        do j = 1, ny 
-        do i = 1, nx 
-            ATT_int(i,j,:) = integrate_trapezoid1D_1D(ATT(i,j,:)*(1.0-zeta)**n_glen,zeta)
-        end do 
-        end do 
-        !!!$omp end parallel do
-
-        return
-
-    end function calc_rate_factor_integrated
-    
     ! Functions from yelmo_tools are duplicated as private functions here
     ! to ensure velocity_sia is a stand-alone module. 
     

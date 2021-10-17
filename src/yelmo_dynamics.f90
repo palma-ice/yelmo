@@ -272,9 +272,6 @@ contains
             call calc_velocity_sia(dyn%now%ux_i,dyn%now%uy_i,dyn%now%ux_i_bar,dyn%now%uy_i_bar,tpo%now%H_ice, &
                                     tpo%now%f_ice,dyn%now%taud_acx,dyn%now%taud_acy,mat%now%ATT,dyn%par%zeta_aa, &
                                     dyn%par%dx,mat%par%n_glen,rho_ice,g,dyn%par%boundaries)
-            ! call calc_velocity_sia_0(dyn%now%ux_i,dyn%now%uy_i,dyn%now%ux_i_bar,dyn%now%uy_i_bar,tpo%now%H_ice, &
-            !                         tpo%now%f_ice,dyn%now%taud_acx,dyn%now%taud_acy,mat%now%ATT,dyn%par%zeta_aa, &
-            !                         dyn%par%dx,mat%par%n_glen,rho_ice,g,dyn%par%boundaries)
             
         else 
             ! Set all SIA terms to zero 
@@ -338,9 +335,9 @@ contains
         if ( (use_sia .and. .not. use_ssa) .and. dyn%par%cb_sia .gt. 0.0) then 
             ! Calculate basal velocity from Weertman sliding law (Greve 1997)
                     
-            call calc_velocity_basal_sia_00(dyn%now%ux_b,dyn%now%uy_b,dyn%now%taub_acx,dyn%now%taub_acy, &
-                                            tpo%now%H_ice,tpo%now%dzsdx,tpo%now%dzsdy,thrm%now%f_pmp, &
-                                            dyn%par%zeta_aa,dyn%par%dx,dyn%par%cb_sia,rho_ice,g)
+            ! call calc_velocity_basal_sia_00(dyn%now%ux_b,dyn%now%uy_b,dyn%now%taub_acx,dyn%now%taub_acy, &
+            !                                 tpo%now%H_ice,tpo%now%dzsdx,tpo%now%dzsdy,thrm%now%f_pmp, &
+            !                                 dyn%par%zeta_aa,dyn%par%dx,dyn%par%cb_sia,rho_ice,g)
             
         end if 
 

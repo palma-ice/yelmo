@@ -1,7 +1,11 @@
 module velocity_sia 
     
     use yelmo_defs, only : sp, dp, wp, prec, yelmo_use_omp, TOL_UNDERFLOW 
-    use yelmo_tools, only : fill_borders_3D
+
+    use yelmo_tools, only : stagger_aa_ab, stagger_aa_ab_ice, stagger_ab_aa_ice, & 
+                    stagger_node_aa_ab_ice, stagger_node_acx_ab_ice, stagger_node_acy_ab_ice, &
+                    integrate_trapezoid1D_1D, integrate_trapezoid1D_pt, minmax, &
+                    calc_vertical_integrated_2D, calc_vertical_integrated_3D
 
     implicit none 
 
@@ -49,9 +53,6 @@ contains
         ! Calculate the 3D horizontal shear velocity fields
         call calc_uxy_sia_3D(ux_i,uy_i,tau_xz,tau_yz,taud_acx,taud_acy,H_ice,f_ice,ATT,n_glen,zeta_aa,boundaries)
         
-        ! Calculate the depth-averaged horizontal shear velocity fields too
-        ! call calc_uxy_sia_2D(ux_i_bar,uy_i_bar,dd_ab,taud_acx,taud_acy,f_ice,zeta_aa,boundaries)
-
         ! Or, simply integrate from 3D velocity field to get depth-averaged field (slower)
         ux_i_bar = calc_vertical_integrated_2D(ux_i,zeta_aa)
         uy_i_bar = calc_vertical_integrated_2D(uy_i,zeta_aa)
@@ -78,13 +79,6 @@ contains
 
         ! Local variables
         integer  :: i, j, k, nx, ny, nz_aa
-        integer  :: im1, ip1, jm1, jp1
-        real(wp) :: H_ice_ab
-        real(wp) :: ATT_ab_km1 
-        real(wp) :: ATT_ab_k
-        real(wp) :: ATT_int_ab 
-
-        logical  :: is_ice_or_margin 
 
         nx    = size(f_ice,1)
         ny    = size(f_ice,2)
@@ -93,36 +87,22 @@ contains
         tau_xz = 0.0_wp 
         tau_yz = 0.0_wp 
 
-        !$omp parallel do 
-        do j = 1, ny 
-        do i = 1, nx 
+        ! Calculate shear stress on ac-nodes at each level (vertical aa-nodes) 
+        do k = 1, nz_aa
 
-            ! Define neighbor indices
-            im1 = max(1,i-1)
-            ip1 = min(nx,i+1)
-            jm1 = max(1,j-1)
-            jp1 = min(ny,j+1)
-            
-            ! Determine if current point is part of the ice sheet or nearby
-            is_ice_or_margin = (count([f_ice(i,j),f_ice(im1,j),f_ice(ip1,j), &
-                                       f_ice(i,jm1),f_ice(i,jp1),f_ice(im1,jp1), &
-                                       f_ice(im1,jm1),f_ice(ip1,jp1),f_ice(ip1,jm1)].gt.0.0_wp) .gt. 0)
+            !$omp parallel do 
+            do j = 1, ny 
+            do i = 1, nx 
 
-            if (is_ice_or_margin) then 
-                ! Ice covered, or nearby (to include all ab-nodes)
-
-                ! Calculate shear stress on ac-nodes at each level
-                do k = 1, nz_aa 
                     tau_xz(i,j,k) = -(1.0_prec-zeta_aa(k))*taud_acx(i,j)
                     tau_yz(i,j,k) = -(1.0_prec-zeta_aa(k))*taud_acy(i,j)
-                end do 
 
-            end if 
+            end do 
+            end do 
+            !$omp end parallel do 
 
         end do 
-        end do 
-        !$omp end parallel do 
-
+        
         ! Apply boundary conditions as needed 
         select case(trim(boundaries))
             
@@ -195,71 +175,86 @@ contains
         ! Local variables
         integer  :: i, j, k, nx, ny, nz_aa
         integer  :: im1, ip1, jm1, jp1
-        real(wp) :: tau_xz_ab
-        real(wp) :: tau_yz_ab
-        real(wp) :: tau_eff_sq_ab
-        real(wp) :: p1   
-        real(wp) :: ATT_ab 
-        real(wp) :: H_ice_ab 
+        real(wp) :: p1    
         real(wp) :: H_ice_ac
         real(wp) :: fact_ac
         real(wp) :: depth 
         real(wp) :: dzeta 
 
-        real(wp), allocatable :: fact_ab(:,:) 
+        real(wp) :: tau_xz_ab_up
+        real(wp) :: tau_xz_ab_dn
+        real(wp) :: tau_xz_ab
+        real(wp) :: tau_yz_ab_up
+        real(wp) :: tau_yz_ab_dn
+        real(wp) :: tau_yz_ab
+        real(wp) :: tau_eff_sq_ab
+        real(wp) :: ATT_ab_up
+        real(wp) :: ATT_ab_dn
+        real(wp) :: ATT_ab
+        real(wp) :: H_ice_ab
+
+        real(wp), allocatable :: fact_ab(:,:)
 
         nx    = size(ux,1)
         ny    = size(ux,2)
         nz_aa = size(ux,3) 
 
-        allocate(fact_ab(nx,ny)) 
-        
+        allocate(fact_ab(nx,ny))
+        fact_ab = 0.0_wp 
+
         ! Define exponent 
         p1 = (n_glen-1.0_wp)/2.0_wp
 
-        ! Initialize velocity solution to zero everywhere 
-        ux = 0.0 
-        uy = 0.0 
-
-        ! Set integrative factor to zero everywhere too
-        fact_ab = 0.0_prec 
-
+        ! Intialize velocity field to zero 
+        ux = 0.0_wp 
+        uy = 0.0_wp
+        
         ! Loop over layers starting from first layer above the base to surface 
         do k = 2, nz_aa
-            
+    
+            ! Get non-dimensional thickness of vertical layer between aa-nodes
             dzeta = zeta_aa(k) - zeta_aa(k-1) 
-            
-            ! Calculate integrative factor on ab-nodes
-            do i = 1, nx 
+
+            ! Calculate tau_perp, tau_eff and factor to calculate velocities,
+            ! all on ab-nodes 
+            !$omp parallel do
             do j = 1, ny 
+            do i = 1, nx 
+                
+                ! Calculate shear stress on horizontal ab-nodes 
+                ! and vertical ac-node (center of dzeta layer)
+                call stagger_node_acx_ab_ice(tau_xz_ab_up,tau_xz(:,:,k),  f_ice,i,j)
+                call stagger_node_acx_ab_ice(tau_xz_ab_dn,tau_xz(:,:,k-1),f_ice,i,j)
+                tau_xz_ab = 0.5_wp*(tau_xz_ab_up+tau_xz_ab_dn)
 
-                im1 = max(i-1,1) 
-                ip1 = min(i+1,nx) 
-                jm1 = max(j-1,1) 
-                jp1 = min(j+1,ny) 
+                call stagger_node_acy_ab_ice(tau_yz_ab_up,tau_yz(:,:,k),  f_ice,i,j)
+                call stagger_node_acy_ab_ice(tau_yz_ab_dn,tau_yz(:,:,k-1),f_ice,i,j)
+                tau_yz_ab = 0.5_wp*(tau_yz_ab_up+tau_yz_ab_dn)
 
-                ! Calculate effective stress on horizontal ab-nodes and vertical ac-node
-                tau_xz_ab     = 0.25_prec*(  tau_xz(i,j,k)+tau_xz(i,jp1,k) &
-                                           + tau_xz(i,j,k-1)+tau_xz(i,jp1,k-1))
-                tau_yz_ab     = 0.25_prec*(  tau_yz(i,j,k)+tau_yz(ip1,j,k) &
-                                           + tau_yz(i,j,k-1)+tau_yz(ip1,j,k-1))
+                ! Calculate effective stress
                 tau_eff_sq_ab = tau_xz_ab**2 + tau_yz_ab**2
 
-                ATT_ab   = 0.5_wp*( 0.25_prec*(ATT(i,j,k)+ATT(ip1,j,k)+ATT(i,jp1,k)+ATT(ip1,jp1,k)) &
-                                   +0.25_prec*(ATT(i,j,k-1)+ATT(ip1,j,k-1)+ATT(i,jp1,k-1)+ATT(ip1,jp1,k-1)) )
+                ! Calculate factor on ab-nodes
+                call stagger_node_aa_ab_ice(ATT_ab_up,ATT(:,:,k),f_ice,i,j)
+                call stagger_node_aa_ab_ice(ATT_ab_dn,ATT(:,:,k-1),f_ice,i,j)
+                ATT_ab = 0.5_wp*(ATT_ab_up+ATT_ab_dn)
 
-                H_ice_ab = 0.25_prec*(H_ice(i,j)+H_ice(ip1,j)+H_ice(i,jp1)+H_ice(ip1,jp1))
+                ! Get ice thickness on ab-nodes
+                call stagger_node_aa_ab_ice(H_ice_ab,H_ice,f_ice,i,j)
 
+                ! Calculate multiplicative factor on ab-nodes
                 if (p1 .ne. 0.0_wp) then 
-                    fact_ab(i,j) = 2.0_prec * ATT_ab * (dzeta*H_ice_ab) * tau_eff_sq_ab**p1
+                    fact_ab(i,j) = 2.0_wp * ATT_ab * (dzeta*H_ice_ab) * tau_eff_sq_ab**p1
                 else
-                    fact_ab(i,j) = 2.0_prec * ATT_ab * (dzeta*H_ice_ab)
+                    fact_ab(i,j) = 2.0_wp * ATT_ab * (dzeta*H_ice_ab)
                 end if 
 
             end do 
             end do 
+            !$omp end parallel do 
 
             ! Calculate 3D horizontal velocity components on acx/acy nodes
+            !$omp parallel do
             do j = 1, ny 
             do i = 1, nx 
             
@@ -267,26 +262,27 @@ contains
                 ip1 = min(i+1,nx) 
                 jm1 = max(j-1,1) 
                 jp1 = min(j+1,ny) 
-
+                
                 ! stagger factor to acx-nodes to calculate velocity
                 if (f_ice(i,j) .eq. 1.0 .or. f_ice(ip1,j) .eq. 1.0) then 
-                    fact_ac   = 0.5_prec*(fact_ab(i,j)+fact_ab(i,jm1))
+                    fact_ac   = 0.5_wp*(fact_ab(i,j)+fact_ab(i,jm1))
                     ux(i,j,k) = ux(i,j,k-1) &
                                 + fact_ac*0.5_wp*(tau_xz(i,j,k)+tau_xz(i,j,k-1))
                 end if 
 
                 ! stagger factor to acy-nodes to calculate velocity
                 if (f_ice(i,j) .eq. 1.0 .or. f_ice(i,jp1) .eq. 1.0) then
-                    fact_ac   = 0.5_prec*(fact_ab(i,j)+fact_ab(im1,j)) 
+                    fact_ac   = 0.5_wp*(fact_ab(i,j)+fact_ab(im1,j))
                     uy(i,j,k) = uy(i,j,k-1) &
                                 + fact_ac*0.5_wp*(tau_yz(i,j,k)+tau_yz(i,j,k-1))
-                end if 
-                
+                end if  
+
             end do 
             end do 
+            !$omp end parallel do 
 
-        end do 
-
+        end do
+        
         ! Apply boundary conditions as needed 
         if (trim(boundaries) .eq. "periodic") then
 
@@ -335,7 +331,8 @@ contains
         return
         
     end subroutine calc_uxy_sia_3D
-subroutine calc_velocity_basal_sia(ux_b,uy_b,taub_acx,taub_acy,dd_ab_3D,H_ice,taud_acx,taud_acy,f_pmp,zeta_aa,dx,cf_sia,rho_ice,g)
+
+    subroutine calc_velocity_basal_sia(ux_b,uy_b,taub_acx,taub_acy,dd_ab_3D,H_ice,taud_acx,taud_acy,f_pmp,zeta_aa,dx,cf_sia,rho_ice,g)
         ! Calculate the parameterized basal velocity for use with SIA
         ! (following a Weertman-type sliding law)
         
@@ -524,187 +521,13 @@ subroutine calc_velocity_basal_sia(ux_b,uy_b,taub_acx,taub_acy,dd_ab_3D,H_ice,ta
         
     end subroutine calc_velocity_basal_sia_00
 
-    ! Functions from yelmo_tools are duplicated as private functions here
-    ! to ensure velocity_sia is a stand-alone module. 
-    
-    function calc_vertical_integrated_2D(var,zeta) result(var_int)
-        ! Vertically integrate a field 3D field (nx,ny,nz) 
-        ! to the surface, return a 2D array (nx,ny)
-        
-        implicit none
-
-        real(prec), intent(IN) :: var(:,:,:)
-        real(prec), intent(IN) :: zeta(:)
-        real(prec) :: var_int(size(var,1),size(var,2))
-
-        ! Local variables 
-        integer :: i, j, nx, ny
-
-        nx = size(var,1)
-        ny = size(var,2)
-
-        do j = 1, ny
-        do i = 1, nx
-            var_int(i,j) = integrate_trapezoid1D_pt(var(i,j,:),zeta)
-        end do
-        end do
-
-        return
-
-    end function calc_vertical_integrated_2D
-    
-    function integrate_trapezoid1D_1D(var,sig) result(var_int)
-        ! Integrate a variable from the base to each layer zeta of the ice column.
-        ! Note this is designed assuming indices 1 = base, nk = surface 
-        ! The value of the integral using the trapezium rule can be found using
-        ! integral = (b - a)*((f(a) +f(b))/2 + Σ_1_n-1(f(k)) )/n 
-        ! Returns a 1D array with integrated value at each level 
-
-        implicit none
-
-        real(prec), intent(IN) :: var(:)
-        real(prec), intent(IN) :: sig(:)
-        real(prec) :: var_int(size(var,1))
-
-        ! Local variables 
-        integer :: k, nk
-
-        nk = size(var,1)
-
-        ! Initial value is zero
-        var_int(1:nk) = 0.0_prec 
-
-        ! Intermediate values include sum of all previous values 
-        ! Take current value as average between points
-        do k = 2, nk
-             var_int(k:nk) = var_int(k:nk) + 0.5_prec*(var(k)+var(k-1))*(sig(k) - sig(k-1))
-        end do
-        
-        return
-
-    end function integrate_trapezoid1D_1D
-
-    function integrate_trapezoid1D_pt(var,zeta) result(var_int)
-        ! Integrate a variable from the base to height zeta(nk) in the ice column.
-        ! The value of the integral using the trapezium rule can be found using
-        ! integral = (b - a)*((f(a) +f(b))/2 + Σ_1_n-1(f(k)) )/n 
-        ! Returns a point of integrated value of var at level zeta(nk).
-
-        implicit none
-
-        real(prec), intent(IN) :: var(:)
-        real(prec), intent(IN) :: zeta(:)
-        real(prec) :: var_int
-        
-        ! Local variables 
-        integer :: k, nk
-        real(prec) :: var_mid
-        
-        nk = size(var,1)
-
-        ! Initial value is zero
-        var_int = 0.0_prec 
-
-        ! Intermediate values include sum of all previous values 
-        ! Take current value as average between points
-        do k = 2, nk
-            var_mid = 0.5_prec*(var(k)+var(k-1))
-            if (abs(var_mid) .lt. TOL_UNDERFLOW) var_mid = 0.0_prec 
-            var_int = var_int + var_mid*(zeta(k) - zeta(k-1))
-        end do
-
-        return
-
-    end function integrate_trapezoid1D_pt
-
-    function stagger_aa_ab(u) result(ustag)
-        ! Stagger from Aa => Ab
-        ! Four point average from corner aa-nodes to central ab-node 
-
-        implicit none 
-
-        real(prec), intent(IN)  :: u(:,:) 
-        real(prec) :: ustag(size(u,1),size(u,2)) 
-
-        ! Local variables 
-        integer :: i, j, nx, ny  
-
-        nx = size(u,1)
-        ny = size(u,2) 
-
-        ustag = 0.0_prec 
-
-        do j = 1, ny-1 
-        do i = 1, nx-1
-            ustag(i,j) = 0.25_prec*(u(i+1,j+1)+u(i+1,j)+u(i,j+1)+u(i,j))
-        end do 
-        end do 
-
-        return
-
-    end function stagger_aa_ab
-    
-    function stagger_aa_ab_ice(u,H_ice) result(ustag)
-        ! Stagger from Aa => Ab
-        ! Four point average from corner Aa nodes to central Ab node 
-
-        implicit none 
-
-        real(prec), intent(IN)  :: u(:,:) 
-        real(prec), intent(IN)  :: H_ice(:,:) 
-        real(prec) :: ustag(size(u,1),size(u,2)) 
-
-        ! Local variables 
-        integer :: i, j, nx, ny, k   
-
-        nx = size(u,1)
-        ny = size(u,2) 
-
-        ustag = 0.0_prec 
-
-        do j = 1, ny-1 
-        do i = 1, nx-1
-            k = 0 
-            ustag(i,j) = 0.0 
-            if (H_ice(i,j) .gt. 0.0) then 
-                ustag(i,j) = ustag(i,j) + u(i,j) 
-                k = k+1
-            end if 
-
-            if (H_ice(i+1,j) .gt. 0.0) then 
-                ustag(i,j) = ustag(i,j) + u(i+1,j) 
-                k = k+1 
-            end if 
-            
-            if (H_ice(i,j+1) .gt. 0.0) then 
-                ustag(i,j) = ustag(i,j) + u(i,j+1) 
-                k = k+1 
-            end if 
-            
-            if (H_ice(i+1,j+1) .gt. 0.0) then 
-                ustag(i,j) = ustag(i,j) + u(i+1,j+1) 
-                k = k+1 
-            end if 
-            
-            if (k .gt. 0) then 
-                ustag(i,j) = ustag(i,j) / real(k,prec)
-            end if 
-
-            !ustag(i,j) = 0.25_prec*(u(i+1,j+1)+u(i+1,j)+u(i,j+1)+u(i,j))
-        end do 
-        end do 
-
-        return
-
-    end function stagger_aa_ab_ice
-    
     subroutine calc_basal_stress(taub_acx,taub_acy,beta_acx,beta_acy,ux_b,uy_b)
         ! Calculate the basal stress resulting from sliding (friction times velocity)
         ! Note: calculated on ac-nodes.
         ! taub [Pa] 
         ! beta [Pa a m-1]
         ! u    [m a-1]
-        ! taub = -beta*u 
+        ! taub = beta*u (here defined with taub in the same direction as u)
 
         implicit none 
 
@@ -718,8 +541,8 @@ subroutine calc_velocity_basal_sia(ux_b,uy_b,taub_acx,taub_acy,dd_ab_3D,H_ice,ta
         real(prec), parameter :: tol = 1e-3_prec 
 
         ! Calculate basal stress 
-        taub_acx = -beta_acx * ux_b 
-        taub_acy = -beta_acy * uy_b 
+        taub_acx = beta_acx * ux_b 
+        taub_acy = beta_acy * uy_b 
 
         ! Avoid underflows
         where(abs(taub_acx) .lt. tol) taub_acx = 0.0_prec 

@@ -56,7 +56,7 @@ contains
         logical  :: mask(4) 
         integer  :: n_now
         integer, allocatable  :: n_ice(:,:) 
-        
+
         real(wp), parameter :: f_ice_island = 1.0_wp 
         
         nx = size(H_ice,1)
@@ -146,15 +146,11 @@ contains
                             H_eff = minval(H_neighb,mask=mask)
 
                         else 
-                            ! Grounded point, set H_eff < H_min arbitrarily (0.5 works well)
+                            ! Grounded point, set H_eff = H_ice following CISM
+                            ! (do not allow partially filled cells for grounded ice)
 
-                            ! ajr: following CISM, do not allow partially filled cells
-                            ! for grounded ice 
                             H_eff = H_ice(i,j) 
-
-                            ! Alternative approach:
-                            ! H_eff = 0.5*minval(H_neighb,mask=mask)
-
+                            
                         end if
                     
                         ! Determine the cell ice fraction

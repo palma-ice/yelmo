@@ -128,17 +128,17 @@ contains
 
         implicit none 
 
-        real(wp),       intent(INOUT) :: H_ice(:,:)             ! [m]   Ice thickness 
-        real(wp),       intent(INOUT) :: f_ice(:,:)             ! [--]  Ice cover fraction 
-        real(wp),       intent(OUT)   :: mb_applied(:,:)        ! [m/a] Actual mass balance applied to real ice points
-        real(wp),       intent(OUT)   :: calv(:,:)              ! [m/a] Actual calving rate 
-        real(wp),       intent(IN)    :: f_grnd(:,:)            ! [--]  Grounded fraction 
-        real(wp),       intent(IN)    :: H_ocn(:,:)             ! [m]   Ocean thickness (ie, depth)
-        real(wp),       intent(IN)    :: mbal(:,:)              ! [m/a] Net mass balance; mbal = smb+bmb (calving separate) 
-        real(wp),       intent(IN)    :: calv_flt(:,:)          ! [m/a] Potential calving rate (floating)
-        real(wp),       intent(IN)    :: calv_grnd(:,:)         ! [m/a] Potential calving rate (grounded)
-        real(wp),       intent(IN)    :: dx                     ! [m]   Horizontal resolution
-        real(wp),       intent(IN)    :: dt                     ! [a]   Timestep  
+        real(wp), intent(INOUT) :: H_ice(:,:)           ! [m]   Ice thickness 
+        real(wp), intent(INOUT) :: f_ice(:,:)           ! [--]  Ice cover fraction 
+        real(wp), intent(OUT)   :: mb_applied(:,:)      ! [m/a] Actual mass balance applied to real ice points
+        real(wp), intent(OUT)   :: calv(:,:)            ! [m/a] Actual calving rate 
+        real(wp), intent(IN)    :: f_grnd(:,:)          ! [--]  Grounded fraction 
+        real(wp), intent(IN)    :: H_ocn(:,:)           ! [m]   Ocean thickness (ie, depth)
+        real(wp), intent(IN)    :: mbal(:,:)            ! [m/a] Net mass balance; mbal = smb+bmb (calving separate) 
+        real(wp), intent(IN)    :: calv_flt(:,:)        ! [m/a] Potential calving rate (floating)
+        real(wp), intent(IN)    :: calv_grnd(:,:)       ! [m/a] Potential calving rate (grounded)
+        real(wp), intent(IN)    :: dx                   ! [m]   Horizontal resolution
+        real(wp), intent(IN)    :: dt                   ! [a]   Timestep  
 
         ! Local variables 
         integer :: i, j, nx, ny 
@@ -348,13 +348,13 @@ contains
         real(wp), intent(INOUT) :: H_ice(:,:) 
         real(wp), intent(IN)    :: f_grnd(:,:)  
         real(wp), intent(IN)    :: H_ref(:,:) 
-        integer,    intent(IN)    :: topo_rel 
+        integer,  intent(IN)    :: topo_rel 
         real(wp), intent(IN)    :: tau
         real(wp), intent(IN)    :: dt 
 
         ! Local variables 
-        integer    :: i, j, nx, ny 
-        logical    :: apply_relax 
+        integer  :: i, j, nx, ny 
+        logical  :: apply_relax 
         real(wp) :: dHdt 
 
         nx = size(H_ice,1)

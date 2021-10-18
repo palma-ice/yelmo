@@ -397,22 +397,22 @@ contains
             jp1 = min(ny,j+1)
 
             ! x-direction
-            if (f_ice(i,j) .eq. 1.0 .and. f_ice(ip1,j) .lt. 1.0) then 
-                H_mid = H_ice(i,j) 
-            else if (f_ice(i,j) .lt. 1.0 .and. f_ice(ip1,j) .eq. 1.0) then 
-                H_mid = H_ice(ip1,j)
+            if (f_ice(i,j) .eq. 1.0_wp .and. f_ice(ip1,j) .lt. 1.0_wp) then 
+                H_mid = 0.5_wp*(H_ice(i,j)+0.0_wp)
+            else if (f_ice(i,j) .lt. 1.0_wp .and. f_ice(ip1,j) .eq. 1.0_wp) then 
+                H_mid = 0.5_wp*(0.0_wp+H_ice(ip1,j))
             else  
-                H_mid = 0.5_prec*(H_ice(i,j)+H_ice(ip1,j)) 
+                H_mid = 0.5_wp*(H_ice(i,j)+H_ice(ip1,j)) 
             end if
             taud_acx(i,j) = rhog * H_mid * dzsdx(i,j) 
 
             ! y-direction 
-            if (f_ice(i,j) .eq. 1.0 .and. f_ice(i,jp1) .lt. 1.0) then 
-                H_mid = H_ice(i,j) 
-            else if (f_ice(i,j) .lt. 1.0 .and. f_ice(i,jp1) .eq. 1.0) then 
-                H_mid = H_ice(i,jp1)
+            if (f_ice(i,j) .eq. 1.0_wp .and. f_ice(i,jp1) .lt. 1.0_wp) then 
+                H_mid = 0.5_wp*(H_ice(i,j)+0.0_wp)
+            else if (f_ice(i,j) .lt. 1.0_wp .and. f_ice(i,jp1) .eq. 1.0_wp) then 
+                H_mid = 0.5_wp*(0.0_wp+H_ice(i,jp1))
             else  
-                H_mid = 0.5_prec*(H_ice(i,j)+H_ice(i,jp1)) 
+                H_mid = 0.5_wp*(H_ice(i,j)+H_ice(i,jp1)) 
             end if
             taud_acy(i,j) = rhog * H_mid * dzsdy(i,j) 
 
@@ -856,7 +856,7 @@ end if
 
         ! Local variables 
         integer :: i, j, nx, ny 
-        integer :: im1, ip1, jm1, jp1 
+        integer :: ip1, jp1 
 
         nx = size(f_ice,1) 
         ny = size(f_ice,2) 
@@ -869,18 +869,18 @@ end if
             ip1 = min(i+1,nx)
             jp1 = min(j+1,ny)
 
-            if (f_ice(i,j) .lt. 1.0 .and. f_ice(ip1,j) .eq. 0.0) then 
-                ux(i,j) = 0.0 
+            if (f_ice(i,j) .lt. 1.0_wp .and. f_ice(ip1,j) .eq. 0.0_wp) then 
+                ux(i,j) = 0.0_wp 
             end if
-            if (f_ice(i,j) .eq. 0.0 .and. f_ice(ip1,j) .lt. 1.0) then 
-                ux(i,j) = 0.0
+            if (f_ice(i,j) .eq. 0.0_wp .and. f_ice(ip1,j) .lt. 1.0_wp) then 
+                ux(i,j) = 0.0_wp
             end if 
 
-            if (f_ice(i,j) .lt. 1.0 .and. f_ice(i,jp1) .eq. 0.0) then 
-                uy(i,j) = 0.0 
+            if (f_ice(i,j) .lt. 1.0_wp .and. f_ice(i,jp1) .eq. 0.0_wp) then 
+                uy(i,j) = 0.0_wp 
             end if
-            if (f_ice(i,j) .eq. 0.0 .and. f_ice(i,jp1) .lt. 1.0) then 
-                uy(i,j) = 0.0 
+            if (f_ice(i,j) .eq. 0.0_wp .and. f_ice(i,jp1) .lt. 1.0_wp) then 
+                uy(i,j) = 0.0_wp 
             end if
 
         end do

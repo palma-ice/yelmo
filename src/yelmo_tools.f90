@@ -428,23 +428,21 @@ contains
 
         ! Local variables 
         integer  :: nx, ny 
-        integer  :: im1, jm1, ip1, jp1 
+        integer  :: ip1, jp1 
         real(wp) :: wt 
 
         nx = size(f_ice,1) 
         ny = size(f_ice,2) 
 
         ! Define neighbor indices
-        im1 = max(i-1,1)
         ip1 = min(i+1,nx)
-        jm1 = max(j-1,1)
         jp1 = min(j+1,ny)
         
         ! Initialize to zero 
         u_ab = 0.0_wp 
+        wt   = 0.0_wp
 
         ! (1) Upper-right node average
-        wt = 0.0_wp 
         if (f_ice(i,j) .eq. 1.0_wp) then 
             u_ab = u_ab + u_aa(i,j) 
             wt = wt + 1.0_wp 
@@ -489,23 +487,21 @@ contains
         
         ! Local variables 
         integer  :: nx, ny 
-        integer  :: im1, jm1, ip1, jp1 
+        integer  :: ip1, jp1 
         real(wp) :: wt 
 
         nx = size(f_ice,1) 
         ny = size(f_ice,2) 
 
         ! Define neighbor indices
-        im1 = max(i-1,1)
         ip1 = min(i+1,nx)
-        jm1 = max(j-1,1)
         jp1 = min(j+1,ny)
         
         ! Initialize to zero 
         u_ab = 0.0_wp 
+        wt   = 0.0_wp 
 
         ! (1) Upper-right node average
-        wt = 0.0_wp 
         if (f_ice(i,j) .eq. 1.0_wp .or. f_ice(ip1,j) .eq. 1.0_wp) then 
             u_ab = u_ab + u_acx(i,j) 
             wt = wt + 1.0_wp 
@@ -538,23 +534,21 @@ contains
         
         ! Local variables 
         integer  :: nx, ny 
-        integer  :: im1, jm1, ip1, jp1 
+        integer  :: ip1, jp1 
         real(wp) :: wt 
 
         nx = size(f_ice,1) 
         ny = size(f_ice,2) 
 
         ! Define neighbor indices
-        im1 = max(i-1,1)
         ip1 = min(i+1,nx)
-        jm1 = max(j-1,1)
         jp1 = min(j+1,ny)
         
         ! Initialize to zero 
         u_ab = 0.0_wp 
+        wt   = 0.0_wp 
 
         ! (1) Upper-right node average
-        wt = 0.0_wp 
         if (f_ice(i,j) .eq. 1.0_wp .or. f_ice(i,jp1) .eq. 1.0_wp) then 
             u_ab = u_ab + u_acy(i,j) 
             wt = wt + 1.0_wp 
@@ -2399,10 +2393,6 @@ contains
         integer    :: im1, ip1, jm1, jp1 
         real(prec) :: dy 
         real(prec) :: H0, H1, H2 
-        real(prec) :: dvardx_ab(4) 
-        real(prec) :: dvardy_ab(4) 
-        real(prec) :: wt_ab(4) 
-        real(prec) :: wt 
 
         nx = size(var,1)
         ny = size(var,2)
@@ -2410,25 +2400,37 @@ contains
         ! Assume y-resolution is identical to x-resolution 
         dy = dx 
 
-        wt_ab = 1.0 
-        wt    = sum(wt_ab)
-        wt_ab = wt_ab / wt 
-
         do j = 1, ny 
         do i = 1, nx 
 
-            im1 = max(1, i-1)
             ip1 = min(nx,i+1)
-            
-            jm1 = max(1, j-1)
             jp1 = min(ny,j+1)
 
+            if (f_ice(i,j) .eq. 1.0_wp) then 
+                H0 = var(i,j) 
+            else 
+                H0 = 0.0_wp 
+            end if 
+
             ! Slope in x-direction
-            dvardx(i,j) = (var(ip1,j)-var(i,j))/dx 
+            if (f_ice(ip1,j) .eq. 1.0_wp) then 
+                H1 = var(ip1,j) 
+            else 
+                H1 = 0.0_wp 
+            end if 
+            
+            dvardx(i,j) = (H1-H0)/dx 
 
+  
             ! Slope in y-direction
-            dvardy(i,j) = (var(i,jp1)-var(i,j))/dy
-
+            if (f_ice(i,jp1) .eq. 1.0_wp) then 
+                H1 = var(i,jp1) 
+            else 
+                H1 = 0.0_wp 
+            end if 
+            
+            dvardy(i,j) = (H1-H0)/dy 
+            
         end do 
         end do 
 

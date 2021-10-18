@@ -91,8 +91,7 @@ contains
                      count(f_ice_corr(im1:ip1,jm1:jp1).lt.1.0) .gt. 0) then 
                     ! Point is at (or near) ice-margin point 
 
-                    !mask(i,j) = .FALSE. 
-                    ! ajr: testing: do nothing 
+                    mask(i,j) = .FALSE. 
                     
                 else if (f_grnd(i,j) .lt. 1.0_prec) then 
                     ! Grounding-line or floating ice point 

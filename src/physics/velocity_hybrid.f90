@@ -276,11 +276,7 @@ end if
         real(wp) :: visc_eff_ab(4)
         real(wp) :: ATT_ab(4)
         real(wp) :: wt_ab(4)
-        real(wp) :: wt  
-        real(wp) :: visc_eff_now 
-
-        real(wp) :: ux_aa, uy_aa 
-        logical  :: is_margin 
+        real(wp) :: wt
 
         nx = size(visc_eff,1)
         ny = size(visc_eff,2)
@@ -297,10 +293,8 @@ end if
         ! Calculate squared minimum strain rate 
         eps_0_sq = eps_0*eps_0 
 
-        ! Get weighting for ab-nodes
-        wt_ab = 1.0_wp 
-        wt    = sum(wt_ab)
-        wt_ab = wt_ab / wt 
+        ! Set equal weighting for all four ab-nodes
+        wt_ab = 0.25_wp 
 
         ! Calculate visc_eff on quadrature points (ab-nodes),
         ! and then average to get grid-centered value (aa-node)
@@ -312,31 +306,22 @@ end if
             jm1 = max(j-1,1) 
             jp1 = min(j+1,ny) 
 
-            im2 = max(i-2,1) 
-            ip2 = min(i+2,nx) 
-            jm2 = max(j-2,1) 
-            jp2 = min(j+2,ny) 
-
+            ! Get strain rate terms
+            call staggerdiff_nodes_acx_ab_ice(dudx_ab,ux,f_ice,i,j,dx) 
+            call staggerdiff_nodes_acy_ab_ice(dvdy_ab,uy,f_ice,i,j,dy) 
+            call staggerdiffcross_nodes_acx_ab_ice(dudy_ab,ux,f_ice,i,j,dy)
+            call staggerdiffcross_nodes_acx_ab_ice(dvdx_ab,uy,f_ice,i,j,dx)
             
-            if (f_ice(i,j) .eq. 1.0_wp) then 
-                ! Fully ice-covered point
-                
-                ! Get strain rate terms
-                call staggerdiff_nodes_acx_ab_ice(dudx_ab,ux,f_ice,i,j,dx) 
-                call staggerdiff_nodes_acy_ab_ice(dvdy_ab,uy,f_ice,i,j,dy) 
-                call staggerdiffcross_nodes_acx_ab_ice(dudy_ab,ux,f_ice,i,j,dy)
-                call staggerdiffcross_nodes_acx_ab_ice(dvdx_ab,uy,f_ice,i,j,dx)
-                
-                ! Loop over column
-                do k = 1, nz 
+            ! Loop over column
+            do k = 1, nz 
 
-                    ! No vertical shearing terms for this solver
-                    duxdz_ab = 0.0_wp 
-                    duydz_ab = 0.0_wp 
+                ! No vertical shear strain rate for this solver
+                duxdz_ab = 0.0_wp 
+                duydz_ab = 0.0_wp 
 
-                    ! Calculate the total effective strain rate from L19, Eq. 21 
-                    eps_sq_ab = dudx_ab**2 + dvdy_ab**2 + dudx_ab*dvdy_ab + 0.25_wp*(dudy_ab+dvdx_ab)**2 &
-                                + 0.25_wp*duxdz_ab**2 + 0.25_wp*duydz_ab**2 + eps_0_sq
+                ! Calculate the total effective strain rate from L19, Eq. 21 
+                eps_sq_ab = dudx_ab**2 + dvdy_ab**2 + dudx_ab*dvdy_ab + 0.25_wp*(dudy_ab+dvdx_ab)**2 &
+                            + 0.25_wp*duxdz_ab**2 + 0.25_wp*duydz_ab**2 + eps_0_sq
 
 ! ajr: Although logically I would choose to use the ab-node values 
 ! of ATT, calculate viscosity at each ab node and then average, this 
@@ -346,30 +331,21 @@ end if
 ! So that is why the central ATT value is used below. This should be 
 ! investigated further in the future perhaps.
 if (.TRUE.) then  
-                    ! Get the rate factor on ab-nodes too
-                    call stagger_nodes_aa_ab_ice(ATT_ab,ATT(:,:,k),f_ice,i,j)
+                ! Get the rate factor on ab-nodes too
+                call stagger_nodes_aa_ab_ice(ATT_ab,ATT(:,:,k),f_ice,i,j)
 else
-                    ! Just use the aa-node central value of ATT 
-                    ATT_ab = ATT(i,j,k)
+                ! Just use the aa-node central value of ATT 
+                ATT_ab = ATT(i,j,k)
 
 end if
 
-                    ! Calculate effective viscosity on ab-nodes
-                    visc_eff_ab = 0.5_wp*(eps_sq_ab)**(p1) * ATT_ab**(p2)
+                ! Calculate effective viscosity on ab-nodes
+                visc_eff_ab = 0.5_wp*(eps_sq_ab)**(p1) * ATT_ab**(p2)
 
-                    ! Calcualte effective viscosity on aa-nodes
-                    visc_eff(i,j,k) = sum(wt_ab*visc_eff_ab)
+                ! Calcualte effective viscosity on aa-nodes
+                visc_eff(i,j,k) = sum(wt_ab*visc_eff_ab)
 
-                end do 
-
-            else  
-                ! Get simple effective viscosity ignoring staggering
-
-                do k = 1, nz
-                    visc_eff(i,j,k) = 0.5_wp*(eps_0_sq)**(p1) * ATT(i,j,k)**(p2)
-                end do 
-
-            end if 
+            end do 
 
         end do  
         end do 
@@ -428,7 +404,7 @@ end if
         return 
 
     end subroutine calc_visc_eff_3D
-
+    
     subroutine calc_visc_eff_int(visc_eff_int,visc_eff,H_ice,f_ice,zeta_aa,boundaries)
 
         implicit none 

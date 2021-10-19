@@ -274,11 +274,12 @@ end if
         ! different than the visocity calculated locally in the dynamics module
         
         mat%now%visc = calc_viscosity_glen(mat%now%strn%de,mat%now%ATT,tpo%now%H_ice,tpo%now%f_ice, &
-                                                                    mat%par%n_glen,mat%par%visc_min)
+                                                            mat%par%n_glen,mat%par%visc_min,dyn%par%eps_0)
         
         ! Calculate visc_bar and visc_int (vertically integrated visc) as diagnostic quantities
         mat%now%visc_bar = calc_vertical_integrated_2D(mat%now%visc,mat%par%zeta_aa)
-        call calc_visc_int(mat%now%visc_int,mat%now%visc,tpo%now%H_ice,tpo%now%f_ice,mat%par%zeta_aa)
+        call calc_visc_int(mat%now%visc_int,mat%now%visc,tpo%now%H_ice,tpo%now%f_ice, &
+                                                    mat%par%zeta_aa,dyn%par%boundaries)
         
         return
         

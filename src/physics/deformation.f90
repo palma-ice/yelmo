@@ -164,7 +164,7 @@ contains
 
     end function define_enhancement_factor_2D
 
-    function calc_viscosity_glen(de,ATT,H_ice,f_ice,n_glen,visc_min) result(visc)
+    function calc_viscosity_glen(de,ATT,H_ice,f_ice,n_glen,visc_min,eps_0) result(visc)
         ! Calculate viscosity based on Glen's flow law 
         ! ATT [a^-1 Pa^-n] is the "depth dependent ice stiffness parameter based on
         !     vertical variations in temperature, chemistry and crystal fabric" (MacAyeal, 1989, JGR)
@@ -178,46 +178,70 @@ contains
 
         implicit none
         
-        real(prec), intent(IN)  :: de(:,:,:)        ! [a^-1] second-invariant of the strain rate tensor
-        real(prec), intent(IN)  :: ATT(:,:,:)       ! [a^-1 Pa^-3] Rate factor 
-        real(prec), intent(IN)  :: H_ice(:,:)
-        real(prec), intent(IN)  :: f_ice(:,:)
-        real(prec), intent(IN)  :: n_glen           ! Glen's flow law exponent
-        real(prec), intent(IN)  :: visc_min         ! [Pa a] Minimum allowed viscosity (for stability, ~1e3)
-        
-        real(prec) :: visc(size(ATT,1),size(ATT,2),size(ATT,3)) ! [Pa a] 3D viscosity field
+        real(wp), intent(IN)  :: de(:,:,:)          ! [a^-1] second-invariant of the strain rate tensor
+        real(wp), intent(IN)  :: ATT(:,:,:)         ! [a^-1 Pa^-3] Rate factor 
+        real(wp), intent(IN)  :: H_ice(:,:)
+        real(wp), intent(IN)  :: f_ice(:,:)
+        real(wp), intent(IN)  :: n_glen             ! Glen's flow law exponent
+        real(wp), intent(IN)  :: visc_min           ! [Pa a] Minimum allowed viscosity (for stability, ~1e3)
+        real(wp), intent(IN)  :: eps_0              ! [1/yr] Regularization constant (minimum strain rate, ~1e-6)
+
+        real(wp) :: visc(size(ATT,1),size(ATT,2),size(ATT,3)) ! [Pa a] 3D viscosity field
 
         ! Local variables
-        integer :: k, nz  
-        real(prec) :: exp1, exp2  
-        real(prec), parameter :: de_0 = 1.0e-6      ! [a^-1] Bueler and Brown (2009), Eq. 26
+        integer :: i, j, k, nx, ny, nz
+        integer :: im1, ip1, jm1, jp1  
+        real(wp) :: exp1, exp2
+        real(wp) :: eps_0_sq, de_now 
+        real(wp) :: wt
 
+        nx = size(visc,1)
+        ny = size(visc,2)
         nz = size(visc,3)
 
         ! Determine exponent values 
         exp1 = -1.0/n_glen
         exp2 = (1.0 - n_glen)/n_glen 
 
-        ! Calculate viscosity at each layer 
-        visc = 0.5 * ATT**exp1 * (de + de_0)**exp2 
+        eps_0_sq = eps_0*eps_0
 
-        ! Limit viscosity to above minimum value 
-        where(visc .lt. visc_min) visc = visc_min 
-
+        !$omp parallel do
         do k = 1, nz 
-            where(f_ice .lt. 1.0) visc(:,:,k) = 0.0_wp 
+        do j = 1, ny 
+        do i = 1, nx 
+
+            if (f_ice(i,j) .eq. 1.0_wp) then 
+
+                ! Calculate regularized strain rate 
+                de_now = sqrt(de(i,j,k)**2 + eps_0_sq)
+
+                ! Calculate viscosity at each aa-node
+                visc(i,j,k) = 0.5_wp * ATT(i,j,k)**exp1 * (de_now)**exp2 
+
+                ! Limit viscosity to above minimum value 
+                if (visc(i,j,k) .lt. visc_min) visc(i,j,k) = visc_min 
+
+            else 
+
+                visc(i,j,k) = 0.0_wp 
+
+            end if 
+
         end do 
+        end do 
+        end do
+        !$omp end parallel do
 
         return
         
     end function calc_viscosity_glen
 
-    function calc_viscosity_glen_2D(de,ATT,n_glen,visc_min) result(visc)
+        function calc_viscosity_glen_2D(de,ATT,H_ice,f_ice,n_glen,visc_min,eps_0) result(visc)
         ! Calculate viscosity based on Glen's flow law 
-        ! ATT [a^-1 Pa^-3] is the "depth dependent ice stiffness parameter based on
+        ! ATT [a^-1 Pa^-n] is the "depth dependent ice stiffness parameter based on
         !     vertical variations in temperature, chemistry and crystal fabric" (MacAyeal, 1989, JGR)
         ! de [a^-1] is the second-invariant of the strain rate tensor 
-        ! visc [Pa a] is the 2D, temperature dependent viscosity field 
+        ! visc [Pa a] is the 3D, temperature dependent viscosity field 
 
         ! Equation: visc = 0.5 * ATT^(-1/n_glen) * (de)^((1-n_glen)/n_glen)
         ! ATT  => from Greve and Blatter (2009), Eq. 4.15 (written as `A(T_prime)`)
@@ -225,38 +249,67 @@ contains
         ! visc => from Greve and Blatter (2009), Eq. 4.22 
 
         implicit none
-           
-        real(prec), intent(IN)  :: de(:,:)          ! [a^-1] second-invariant of the strain rate tensor
-        real(prec), intent(IN)  :: ATT(:,:,:)       ! [a^-1 Pa^-3] Rate factor 
-        real(prec), intent(IN)  :: n_glen           ! Glen's flow law exponent
-        real(prec), intent(IN)  :: visc_min         ! [Pa a] Minimum allowed viscosity (for stability, ~1e3)
         
-        real(prec) :: visc(size(ATT,1),size(ATT,2),size(ATT,3)) ! [Pa a] 3D viscosity field
+        real(wp), intent(IN)  :: de(:,:)            ! [a^-1] second-invariant of the strain rate tensor
+        real(wp), intent(IN)  :: ATT(:,:,:)         ! [a^-1 Pa^-3] Rate factor 
+        real(wp), intent(IN)  :: H_ice(:,:)
+        real(wp), intent(IN)  :: f_ice(:,:)
+        real(wp), intent(IN)  :: n_glen             ! Glen's flow law exponent
+        real(wp), intent(IN)  :: visc_min           ! [Pa a] Minimum allowed viscosity (for stability, ~1e3)
+        real(wp), intent(IN)  :: eps_0              ! [1/yr] Regularization constant (minimum strain rate, ~1e-6)
+
+        real(wp) :: visc(size(ATT,1),size(ATT,2),size(ATT,3)) ! [Pa a] 3D viscosity field
 
         ! Local variables
-        integer :: k, nz_aa  
-        real(prec) :: exp1, exp2  
-        real(prec), parameter :: de_0 = 1.0e-6    ! [a^-1] Bueler and Brown (2009), Eq. 26
-        
-        nz_aa = size(visc,3)
+        integer :: i, j, k, nx, ny, nz
+        integer :: im1, ip1, jm1, jp1  
+        real(wp) :: exp1, exp2
+        real(wp) :: eps_0_sq, de_now 
+        real(wp) :: wt
+
+        nx = size(visc,1)
+        ny = size(visc,2)
+        nz = size(visc,3)
 
         ! Determine exponent values 
         exp1 = -1.0/n_glen
         exp2 = (1.0 - n_glen)/n_glen 
 
-        ! Calculate viscosity at each layer 
-        do k = 1, nz_aa 
-            visc(:,:,k) = 0.5 * ATT(:,:,k)**exp1 * (de+de_0)**exp2
-        end do 
+        eps_0_sq = eps_0*eps_0
 
-        ! Limit viscosity to above minimum value 
-        where(visc .lt. visc_min) visc = visc_min 
+        !$omp parallel do
+        do k = 1, nz 
+        do j = 1, ny 
+        do i = 1, nx 
+
+            if (f_ice(i,j) .eq. 1.0_wp) then 
+
+                ! Calculate regularized strain rate 
+                de_now = sqrt(de(i,j)**2 + eps_0_sq)
+
+                ! Calculate viscosity at each aa-node
+                visc(i,j,k) = 0.5_wp * ATT(i,j,k)**exp1 * (de_now)**exp2 
+
+                ! Limit viscosity to above minimum value 
+                if (visc(i,j,k) .lt. visc_min) visc(i,j,k) = visc_min 
+
+            else 
+
+                visc(i,j,k) = 0.0_wp 
+
+            end if 
+
+        end do 
+        end do 
+        end do
+        !$omp end parallel do
 
         return
         
     end function calc_viscosity_glen_2D
 
-    subroutine calc_visc_int(visc_eff_int,visc_eff,H_ice,f_ice,zeta_aa)
+
+    subroutine calc_visc_int(visc_eff_int,visc_eff,H_ice,f_ice,zeta_aa,boundaries)
 
         implicit none 
 
@@ -265,16 +318,18 @@ contains
         real(wp), intent(IN)  :: H_ice(:,:)
         real(wp), intent(IN)  :: f_ice(:,:)
         real(wp), intent(IN)  :: zeta_aa(:)
+        character(len=*), intent(IN) :: boundaries 
 
         ! Local variables 
         integer :: i, j, nx, ny
         integer :: im1, ip1, jm1, jp1  
-        real(wp) :: H_eff
+        real(wp) :: H_now
         real(wp) :: visc_eff_mean 
         real(wp) :: wt 
 
         nx = size(visc_eff_int,1)
         ny = size(visc_eff_int,2)
+
 
         do j = 1, ny 
         do i = 1, nx
@@ -282,9 +337,8 @@ contains
             ! Calculate the vertically averaged viscosity for this point
             visc_eff_mean = integrate_trapezoid1D_pt(visc_eff(i,j,:),zeta_aa) 
             
-            if (f_ice(i,j) .gt. 0.0) then 
-                H_eff = H_ice(i,j) / f_ice(i,j) 
-                visc_eff_int(i,j) = visc_eff_mean*H_eff
+            if (f_ice(i,j) .eq. 1.0) then 
+                visc_eff_int(i,j) = visc_eff_mean*H_ice(i,j) 
             else
                 !visc_eff_int(i,j) = visc_eff_mean 
                 visc_eff_int(i,j) = 0.0_wp
@@ -292,6 +346,30 @@ contains
 
         end do 
         end do 
+
+        ! Apply boundary conditions as needed 
+        if (trim(boundaries) .eq. "periodic") then
+
+            visc_eff_int(1,:)    = visc_eff_int(nx-1,:) 
+            visc_eff_int(nx-1,:) = visc_eff_int(2,:) 
+            visc_eff_int(:,1)    = visc_eff_int(:,ny-1)
+            visc_eff_int(:,ny)   = visc_eff_int(:,2) 
+
+        else if (trim(boundaries) .eq. "periodic-x") then 
+            
+            visc_eff_int(1,:)    = visc_eff_int(nx-1,:) 
+            visc_eff_int(nx-1,:) = visc_eff_int(2,:) 
+            visc_eff_int(:,1)    = visc_eff_int(:,2)
+            visc_eff_int(:,ny)   = visc_eff_int(:,ny-1) 
+
+        else if (trim(boundaries) .eq. "infinite") then 
+            
+            visc_eff_int(1,:)    = visc_eff_int(2,:) 
+            visc_eff_int(nx,:)   = visc_eff_int(nx-1,:) 
+            visc_eff_int(:,1)    = visc_eff_int(:,2)
+            visc_eff_int(:,ny)   = visc_eff_int(:,ny-1) 
+
+        end if 
 
         return
 
@@ -533,387 +611,216 @@ contains
                 jm2 = max(j-2,1) 
                 jp2 = min(j+2,ny) 
                 
-                ! Get ab-node weighting based on whether ice is present 
-                ! wt_ab = 0.0_wp 
-                ! if (count([f_ice(i,j),f_ice(ip1,j),f_ice(i,jp1),f_ice(ip1,jp1)].eq.1.0_wp) .gt. 0) then 
-                !     wt_ab(1) = 1.0_wp
-                ! end if
-                ! if (count([f_ice(i,j),f_ice(im1,j),f_ice(i,jp1),f_ice(im1,jp1)].eq.1.0_wp) .gt. 0) then 
-                !     wt_ab(2) = 1.0_wp 
-                ! end if 
-                ! if (count([f_ice(i,j),f_ice(im1,j),f_ice(i,jm1),f_ice(im1,jm1)].eq.1.0_wp) .gt. 0) then 
-                !     wt_ab(3) = 1.0_wp
-                ! end if 
-                ! if (count([f_ice(i,j),f_ice(ip1,j),f_ice(i,jm1),f_ice(ip1,jm1)].eq.1.0_wp) .gt. 0) then 
-                !     wt_ab(4) = 1.0_wp 
-                ! end if 
-                
-                wt_ab = 1.0_wp 
+                ! Get equal weighting for each ab-node
+                wt_ab = 0.25_wp 
 
-                wt = sum(wt_ab)
-                if (wt .eq. 0.0_wp) then 
-                    ! Something probably went wrong, skip calculation of strain rate here
+                ! ====== Loop over each column ====== 
 
-                    ! PASS 
+                do k = 1, nz_aa 
 
-                else 
+                    ! === dxx =================================
 
-                    ! Normalize weighting 
-                    wt_ab = wt_ab / wt 
+                    call staggerdiff_nodes_acx_ab_ice(dd_ab,vx(:,:,k),f_ice,i,j,dx)
 
-                    ! ====== Loop over each column ====== 
+                    strn%dxx(i,j,k) = sum(wt_ab*dd_ab)
+                    if (abs(strn%dxx(i,j,k)) .lt. TOL_UNDERFLOW) strn%dxx(i,j,k) = 0.0 
+                    
+                    ! === dyy =================================
 
-                    do k = 1, nz_aa 
+                    call staggerdiff_nodes_acy_ab_ice(dd_ab,vy(:,:,k),f_ice,i,j,dy)
 
-                        ! === dxx =================================
+                    strn%dyy(i,j,k) = sum(wt_ab*dd_ab)
+                    if (abs(strn%dyy(i,j,k)) .lt. TOL_UNDERFLOW) strn%dyy(i,j,k) = 0.0 
 
-                        ! dd_ab(1) = 0.5_wp*( (vx(ip1,j,k)-vx(im1,j,k))*dx_2_inv &
-                        !                   + (vx(ip1,jp1,k)-vx(im1,jp1,k))*dx_2_inv )
+                    ! === lxy =================================
 
-                        ! dd_ab(2) = 0.5_wp*( (vx(i,j,k)-vx(im2,j,k))*dx_2_inv &
-                        !                   + (vx(i,jp1,k)-vx(im2,jp1,k))*dx_2_inv )
+                    call staggerdiffcross_nodes_acx_ab_ice(dd_ab,vx(:,:,k),f_ice,i,j,dy)
 
-                        ! dd_ab(3) = 0.5_wp*( (vx(i,j,k)-vx(im2,j,k))*dx_2_inv &
-                        !                   + (vx(i,jm1,k)-vx(im2,jm1,k))*dx_2_inv )
+                    lxy = sum(wt_ab*dd_ab)
 
-                        ! dd_ab(4) = 0.5_wp*( (vx(ip1,j,k)-vx(im1,j,k))*dx_2_inv &
-                        !                   + (vx(ip1,jm1,k)-vx(im1,jm1,k))*dx_2_inv )
+                    ! === lyx =================================
 
-                        call staggerdiff_nodes_acx_ab_ice(dd_ab,vx(:,:,k),f_ice,i,j,dx)
+                    call staggerdiffcross_nodes_acy_ab_ice(dd_ab,vy(:,:,k),f_ice,i,j,dx)
 
-                        strn%dxx(i,j,k) = sum(wt_ab*dd_ab)
-                        if (abs(strn%dxx(i,j,k)) .lt. TOL_UNDERFLOW) strn%dxx(i,j,k) = 0.0 
+                    lyx = sum(wt_ab*dd_ab)
+
+                    ! === dxy ================================= 
+
+                    strn%dxy(i,j,k) = 0.5_wp*(lxy+lyx)
+                    if (abs(strn%dxy(i,j,k)) .lt. TOL_UNDERFLOW) strn%dxy(i,j,k) = 0.0 
+                    
+
+                    ! ====== Vertical cross terms (lzx,lzy) ====== 
+
+                    ! === lzx ================================
+
+                    if (k .eq. 1) then
+                        ! Basal layer 
+
+                        call staggerdiff_nodes_acz_dx_ab_ice(dd_ab,vz(:,:,k),f_ice,i,j,dx)
+                    
+                    else if (k .eq. nz_aa) then
+                        ! Surface layer 
+
+                        call staggerdiff_nodes_acz_dx_ab_ice(dd_ab,vz(:,:,k+1),f_ice,i,j,dx)
+                    
+                    else 
+                        ! Intermediate layers
+
+                        call staggerdiff_nodes_acz_dx_ab_ice(dd_ab_up,vz(:,:,k+1),f_ice,i,j,dx)
+                        call staggerdiff_nodes_acz_dx_ab_ice(dd_ab_dn,vz(:,:,k),  f_ice,i,j,dx)
                         
-                        ! === dyy =================================
+                        dd_ab = 0.5_wp*(dd_ab_dn+dd_ab_up)
 
-                        ! dd_ab(1) = 0.5_wp*( (vy(i,jp1,k)-vy(i,jm1,k))*dy_2_inv &
-                        !                   + (vy(ip1,jp1,k)-vy(ip1,jm1,k))*dy_2_inv )
+                    end if 
 
-                        ! dd_ab(2) = 0.5_wp*( (vy(i,jp1,k)-vy(i,jm1,k))*dy_2_inv &
-                        !                   + (vy(im1,jp1,k)-vy(im1,jm1,k))*dy_2_inv )
+                    lzx = sum(wt_ab*dd_ab)
 
-                        ! dd_ab(3) = 0.5_wp*( (vy(i,j,k)-vy(i,jm2,k))*dy_2_inv &
-                        !                   + (vy(im1,j,k)-vy(im1,jm2,k))*dy_2_inv )
+                    ! === lzy ================================
 
-                        ! dd_ab(4) = 0.5_wp*( (vy(i,j,k)-vy(i,jm2,k))*dy_2_inv &
-                        !                   + (vy(ip1,j,k)-vy(ip1,jm2,k))*dy_2_inv )
+                    if (k .eq. 1) then
+                        ! Basal layer
 
-                        call staggerdiff_nodes_acy_ab_ice(dd_ab,vy(:,:,k),f_ice,i,j,dy)
+                        call staggerdiff_nodes_acz_dy_ab_ice(dd_ab,vz(:,:,k),f_ice,i,j,dy)
 
-                        strn%dyy(i,j,k) = sum(wt_ab*dd_ab)
-                        if (abs(strn%dyy(i,j,k)) .lt. TOL_UNDERFLOW) strn%dyy(i,j,k) = 0.0 
+                    else if (k .eq. nz_aa) then 
+                        ! Surface layer
 
-                        ! === lxy =================================
+                        call staggerdiff_nodes_acz_dy_ab_ice(dd_ab,vz(:,:,k+1),f_ice,i,j,dy)
 
-                        ! dd_ab(1) = (vx(i,jp1,k)-vx(i,j,k))*dy_inv
+                    else 
+                        ! Intermediate layers
 
-                        ! dd_ab(2) = (vx(im1,jp1,k)-vx(im1,j,k))*dy_inv 
-
-                        ! dd_ab(3) = (vx(im1,j,k)-vx(im1,jm1,k))*dy_inv 
-
-                        ! dd_ab(4) = (vx(i,j,k)-vx(i,jm1,k))*dy_inv 
-
-                        call staggerdiffcross_nodes_acx_ab_ice(dd_ab,vx(:,:,k),f_ice,i,j,dy)
-
-                        lxy = sum(wt_ab*dd_ab)
-
-                        ! === lyx =================================
-
-                        ! dd_ab(1) = (vy(ip1,j,k)-vy(i,j,k))*dx_inv 
-
-                        ! dd_ab(2) = (vy(i,j,k)-vy(im1,j,k))*dx_inv 
+                        call staggerdiff_nodes_acz_dy_ab_ice(dd_ab_up,vz(:,:,k+1),f_ice,i,j,dy)
+                        call staggerdiff_nodes_acz_dy_ab_ice(dd_ab_dn,vz(:,:,k),  f_ice,i,j,dy)
                         
-                        ! dd_ab(3) = (vy(i,jm1,k)-vy(im1,jm1,k))*dx_inv 
+                        dd_ab = 0.5_wp*(dd_ab_dn+dd_ab_up)
+                    end if 
+
+                    lzy = sum(wt_ab*dd_ab)
+
+                    ! ====== Shear terms (lxz,lyz) ================= 
+
+                    ! === lxz ================================
+
+                    if (k .eq. 1) then 
+                        ! Basal layer
+                        ! Gradient from first aa-node above base to base 
+
+                        call stagger_nodes_acx_ab_ice(dd_ab_up,vx(:,:,k+1),f_ice,i,j)
+                        call stagger_nodes_acx_ab_ice(dd_ab_dn,vx(:,:,k),  f_ice,i,j)
+
+                        dd_ab = (dd_ab_up - dd_ab_dn)*fact_z(k)*H_ice_inv
+
+                    else if (k .eq. nz_aa) then 
+                        ! Surface layer
+                        ! Gradient from surface to first aa-node below surface 
+
+                        call stagger_nodes_acx_ab_ice(dd_ab_up,vx(:,:,k),  f_ice,i,j)
+                        call stagger_nodes_acx_ab_ice(dd_ab_dn,vx(:,:,k-1),f_ice,i,j)
+
+                        dd_ab = (dd_ab_up - dd_ab_dn)*fact_z(k)*H_ice_inv
                         
-                        ! dd_ab(4) = (vy(ip1,jm1,k)-vy(i,jm1,k))*dx_inv 
+                    else 
+                        ! Intermediate layers
+                        ! Gradient from aa-node above to aa-node below
+
+                        call stagger_nodes_acx_ab_ice(dd_ab_up,vx(:,:,k+1),f_ice,i,j)
+                        call stagger_nodes_acx_ab_ice(dd_ab_dn,vx(:,:,k-1),f_ice,i,j)
+
+                        dd_ab = (dd_ab_up - dd_ab_dn)*fact_z(k)*H_ice_inv
                         
-                        call staggerdiffcross_nodes_acy_ab_ice(dd_ab,vy(:,:,k),f_ice,i,j,dx)
+                    end if 
 
-                        lyx = sum(wt_ab*dd_ab)
+                    lxz = sum(wt_ab*dd_ab)
 
-                        ! === dxy ================================= 
+                    ! === lyz ================================
 
-                        strn%dxy(i,j,k) = 0.5_wp*(lxy+lyx)
-                        if (abs(strn%dxy(i,j,k)) .lt. TOL_UNDERFLOW) strn%dxy(i,j,k) = 0.0 
+                    if (k .eq. 1) then 
+                        ! Basal layer
+                        ! Gradient from first aa-node above base to base 
+
+                        call stagger_nodes_acy_ab_ice(dd_ab_up,vy(:,:,k+1),f_ice,i,j)
+                        call stagger_nodes_acy_ab_ice(dd_ab_dn,vy(:,:,k),  f_ice,i,j)
+
+                        dd_ab = (dd_ab_up - dd_ab_dn)*fact_z(k)*H_ice_inv
                         
+                    else if (k .eq. nz_aa) then 
+                        ! Surface layer
+                        ! Gradient from surface to first aa-node below surface 
 
-                        ! ====== Vertical cross terms (lzx,lzy) ====== 
+                        call stagger_nodes_acy_ab_ice(dd_ab_up,vy(:,:,k),  f_ice,i,j)
+                        call stagger_nodes_acy_ab_ice(dd_ab_dn,vy(:,:,k-1),f_ice,i,j)
 
-                        ! === lzx ================================
-
-                        ! ajr: todo: need to see about ab-node staggering and f_ice treatment 
-
-                        if (k .eq. 1) then
-                            ! Basal layer 
-                            call staggerdiff_nodes_acz_dx_ab_ice(dd_ab,vz(:,:,k),f_ice,i,j,dx)
-
-                            ! dd_ab(1) = ( 0.5_wp*(vz(ip1,j,k)+vz(ip1,jp1,k)) - 0.5_wp*(vz(i,j,k)+vz(i,jp1,k)) ) * dx_inv 
-                            ! dd_ab(2) = ( 0.5_wp*(vz(i,j,k)+vz(i,jp1,k)) - 0.5_wp*(vz(im1,j,k)+vz(im1,jp1,k)) ) * dx_inv 
-                            ! dd_ab(3) = ( 0.5_wp*(vz(i,j,k)+vz(i,jm1,k)) - 0.5_wp*(vz(im1,j,k)+vz(im1,jm1,k)) ) * dx_inv 
-                            ! dd_ab(4) = ( 0.5_wp*(vz(ip1,j,k)+vz(ip1,jm1,k)) - 0.5_wp*(vz(i,j,k)+vz(i,jm1,k)) ) * dx_inv 
-                        else if (k .eq. nz_aa) then
-                            ! Surface layer 
-                            call staggerdiff_nodes_acz_dx_ab_ice(dd_ab,vz(:,:,k+1),f_ice,i,j,dx)
-                            
-                            ! dd_ab(1) = ( 0.5_wp*(vz(ip1,j,k+1)+vz(ip1,jp1,k+1)) - 0.5_wp*(vz(i,j,k+1)+vz(i,jp1,k+1)) ) * dx_inv 
-                            ! dd_ab(2) = ( 0.5_wp*(vz(i,j,k+1)+vz(i,jp1,k+1)) - 0.5_wp*(vz(im1,j,k+1)+vz(im1,jp1,k+1)) ) * dx_inv 
-                            ! dd_ab(3) = ( 0.5_wp*(vz(i,j,k+1)+vz(i,jm1,k+1)) - 0.5_wp*(vz(im1,j,k+1)+vz(im1,jm1,k+1)) ) * dx_inv 
-                            ! dd_ab(4) = ( 0.5_wp*(vz(ip1,j,k+1)+vz(ip1,jm1,k+1)) - 0.5_wp*(vz(i,j,k+1)+vz(i,jm1,k+1)) ) * dx_inv 
-                        else 
-                            ! Intermediate layers
-                            call staggerdiff_nodes_acz_dx_ab_ice(dd_ab_up,vz(:,:,k+1),f_ice,i,j,dx)
-                            call staggerdiff_nodes_acz_dx_ab_ice(dd_ab_dn,vz(:,:,k),  f_ice,i,j,dx)
-                            
-                            dd_ab = 0.5_wp*(dd_ab_dn+dd_ab_up)
-
-                            ! dd_ab(1) = 0.5_wp*( &
-                            !             ( 0.5_wp*(vz(ip1,j,k)+vz(ip1,jp1,k)) - 0.5_wp*(vz(i,j,k)+vz(i,jp1,k)) ) * dx_inv &
-                            !           + ( 0.5_wp*(vz(ip1,j,k+1)+vz(ip1,jp1,k+1)) - 0.5_wp*(vz(i,j,k+1)+vz(i,jp1,k+1)) ) * dx_inv )
+                        dd_ab = (dd_ab_up - dd_ab_dn)*fact_z(k)*H_ice_inv
                         
-                            ! dd_ab(2) = 0.5_wp*( &
-                            !             ( 0.5_wp*(vz(i,j,k)+vz(i,jp1,k)) - 0.5_wp*(vz(im1,j,k)+vz(im1,jp1,k)) ) * dx_inv &
-                            !           + ( 0.5_wp*(vz(i,j,k+1)+vz(i,jp1,k+1)) - 0.5_wp*(vz(im1,j,k+1)+vz(im1,jp1,k+1)) ) * dx_inv )
+                    else 
+                        ! Intermediate layers
+                        ! Gradient from aa-node above to aa-node below
 
-                            ! dd_ab(3) = 0.5_wp*( &
-                            !             ( 0.5_wp*(vz(i,j,k)+vz(i,jm1,k)) - 0.5_wp*(vz(im1,j,k)+vz(im1,jm1,k)) ) * dx_inv &
-                            !           + ( 0.5_wp*(vz(i,j,k+1)+vz(i,jm1,k+1)) - 0.5_wp*(vz(im1,j,k+1)+vz(im1,jm1,k+1)) ) * dx_inv )
-                            
-                            ! dd_ab(4) = 0.5_wp*( &
-                            !             ( 0.5_wp*(vz(ip1,j,k)+vz(ip1,jm1,k)) - 0.5_wp*(vz(i,j,k)+vz(i,jm1,k)) ) * dx_inv &
-                            !           + ( 0.5_wp*(vz(ip1,j,k+1)+vz(ip1,jm1,k+1)) - 0.5_wp*(vz(i,j,k+1)+vz(i,jm1,k+1)) ) * dx_inv )
-                        end if 
+                        call stagger_nodes_acy_ab_ice(dd_ab_up,vy(:,:,k+1),f_ice,i,j)
+                        call stagger_nodes_acy_ab_ice(dd_ab_dn,vy(:,:,k-1),f_ice,i,j)
 
-                        lzx = sum(wt_ab*dd_ab)
-
-                        ! === lzy ================================
-
-                        ! ajr: todo: need to see about ab-node staggering and f_ice treatment 
-
-                        if (k .eq. 1) then
-                            ! Basal layer 
-                            call staggerdiff_nodes_acz_dy_ab_ice(dd_ab,vz(:,:,k),f_ice,i,j,dy)
-
-                            ! dd_ab(1) = ( 0.5_wp*(vz(i,jp1,k)+vz(ip1,jp1,k)) - 0.5_wp*(vz(i,j,k)+vz(ip1,j,k)) ) * dy_inv
-                            ! dd_ab(2) = ( 0.5_wp*(vz(i,jp1,k)+vz(im1,jp1,k)) - 0.5_wp*(vz(i,j,k)+vz(im1,j,k)) ) * dy_inv
-                            ! dd_ab(3) = ( 0.5_wp*(vz(i,j,k)+vz(im1,j,k)) - 0.5_wp*(vz(i,jm1,k)+vz(im1,jm1,k)) ) * dy_inv
-                            ! dd_ab(4) = ( 0.5_wp*(vz(i,j,k)+vz(ip1,j,k)) - 0.5_wp*(vz(i,jm1,k)+vz(ip1,jm1,k)) ) * dy_inv
-                        else if (k .eq. nz_aa) then 
-                            ! Surface layer
-                            call staggerdiff_nodes_acz_dy_ab_ice(dd_ab,vz(:,:,k+1),f_ice,i,j,dy)
-
-                            ! dd_ab(1) = ( 0.5_wp*(vz(i,jp1,k+1)+vz(ip1,jp1,k+1)) - 0.5_wp*(vz(i,j,k+1)+vz(ip1,j,k+1)) ) * dy_inv
-                            ! dd_ab(2) = ( 0.5_wp*(vz(i,jp1,k+1)+vz(im1,jp1,k+1)) - 0.5_wp*(vz(i,j,k+1)+vz(im1,j,k+1)) ) * dy_inv
-                            ! dd_ab(3) = ( 0.5_wp*(vz(i,j,k+1)+vz(im1,j,k+1)) - 0.5_wp*(vz(i,jm1,k+1)+vz(im1,jm1,k+1)) ) * dy_inv
-                            ! dd_ab(4) = ( 0.5_wp*(vz(i,j,k+1)+vz(ip1,j,k+1)) - 0.5_wp*(vz(i,jm1,k+1)+vz(ip1,jm1,k+1)) ) * dy_inv
-                        else 
-                            ! Intermediate layers
-
-                            call staggerdiff_nodes_acz_dy_ab_ice(dd_ab_up,vz(:,:,k+1),f_ice,i,j,dy)
-                            call staggerdiff_nodes_acz_dy_ab_ice(dd_ab_dn,vz(:,:,k),  f_ice,i,j,dy)
-                            
-                            dd_ab = 0.5_wp*(dd_ab_dn+dd_ab_up)
-
-                            ! dd_ab(1) = 0.5_wp*( &
-                            !             ( 0.5_wp*(vz(i,jp1,k)+vz(ip1,jp1,k)) - 0.5_wp*(vz(i,j,k)+vz(ip1,j,k)) ) * dy_inv &
-                            !           + ( 0.5_wp*(vz(i,jp1,k+1)+vz(ip1,jp1,k+1)) - 0.5_wp*(vz(i,j,k+1)+vz(ip1,j,k+1)) ) * dy_inv )
+                        dd_ab = (dd_ab_up - dd_ab_dn)*fact_z(k)*H_ice_inv
                         
-                            ! dd_ab(2) = 0.5_wp*( &
-                            !             ( 0.5_wp*(vz(i,jp1,k)+vz(im1,jp1,k)) - 0.5_wp*(vz(i,j,k)+vz(im1,j,k)) ) * dy_inv &
-                            !           + ( 0.5_wp*(vz(i,jp1,k+1)+vz(im1,jp1,k+1)) - 0.5_wp*(vz(i,j,k+1)+vz(im1,j,k+1)) ) * dy_inv )
+                    end if 
 
-                            ! dd_ab(3) = 0.5_wp*( &
-                            !             ( 0.5_wp*(vz(i,j,k)+vz(im1,j,k)) - 0.5_wp*(vz(i,jm1,k)+vz(im1,jm1,k)) ) * dy_inv &
-                            !           + ( 0.5_wp*(vz(i,j,k+1)+vz(im1,j,k+1)) - 0.5_wp*(vz(i,jm1,k+1)+vz(im1,jm1,k+1)) ) * dy_inv )
-                            
-                            ! dd_ab(4) = 0.5_wp*( &
-                            !             ( 0.5_wp*(vz(i,j,k)+vz(ip1,j,k)) - 0.5_wp*(vz(i,jm1,k)+vz(ip1,jm1,k)) ) * dy_inv &
-                            !           + ( 0.5_wp*(vz(i,j,k+1)+vz(ip1,j,k+1)) - 0.5_wp*(vz(i,jm1,k+1)+vz(ip1,jm1,k+1)) ) * dy_inv )
-                        end if 
+                    lyz = sum(wt_ab*dd_ab)
 
-                        lzy = sum(wt_ab*dd_ab)
+                    ! ====== Calculate cross terms from intermediate values (dxy,dxz,dyz) ====== 
 
-                        ! ====== Shear terms (lxz,lyz) ================= 
+                    strn%dxz(i,j,k) = 0.5_wp*(lxz+lzx)
+                    strn%dyz(i,j,k) = 0.5_wp*(lyz+lzy)
 
-                        ! === lxz ================================
+                    ! Avoid extreme values
+                    if (strn%dxz(i,j,k) .lt. -de_max) strn%dxz(i,j,k) = -de_max 
+                    if (strn%dxz(i,j,k) .gt.  de_max) strn%dxz(i,j,k) =  de_max 
 
-                        ! ajr: todo: need to see about ab-node staggering and f_ice treatment 
+                    if (strn%dyz(i,j,k) .lt. -de_max) strn%dyz(i,j,k) = -de_max 
+                    if (strn%dyz(i,j,k) .gt.  de_max) strn%dyz(i,j,k) =  de_max 
+                    
+                    ! Avoid underflows 
+                    if (abs(strn%dxz(i,j,k)) .lt. TOL_UNDERFLOW) strn%dxz(i,j,k) = 0.0 
+                    if (abs(strn%dyz(i,j,k)) .lt. TOL_UNDERFLOW) strn%dyz(i,j,k) = 0.0 
+    
+                    ! ====== Finished calculating individual strain rate terms ====== 
+                    
+                    strn%de(i,j,k) =  sqrt(  strn%dxx(i,j,k)*strn%dxx(i,j,k) &
+                                           + strn%dyy(i,j,k)*strn%dyy(i,j,k) &
+                                           + strn%dxx(i,j,k)*strn%dyy(i,j,k) &
+                                           + strn%dxy(i,j,k)*strn%dxy(i,j,k) &
+                                           + strn%dxz(i,j,k)*strn%dxz(i,j,k) &
+                                           + strn%dyz(i,j,k)*strn%dyz(i,j,k) )
+                    
+                    if (strn%de(i,j,k) .gt. de_max) strn%de(i,j,k) = de_max 
 
-                        if (k .eq. 1) then 
-                            ! Basal layer
-                            ! Gradient from first aa-node above base to base 
+                    ! Calculate the horizontal divergence too 
+                    strn%div(i,j,k) = strn%dxx(i,j,k) + strn%dyy(i,j,k) 
 
-                            call stagger_nodes_acx_ab_ice(dd_ab_up,vx(:,:,k+1),f_ice,i,j)
-                            call stagger_nodes_acx_ab_ice(dd_ab_dn,vx(:,:,k),  f_ice,i,j)
+                    ! Note: Using only the below should be equivalent to applying
+                    ! the SIA approximation to calculate `de`
+                    !strn%de(i,j,k)    =  sqrt( shear_squared(k) )
 
-                            dd_ab = (dd_ab_up - dd_ab_dn)*fact_z(k)*H_ice_inv
+                    if (strn%de(i,j,k) .gt. 0.0) then 
+                        ! Calculate the shear-based strain, stretching and the shear-fraction
+                        shear_squared  =   strn%dxz(i,j,k)*strn%dxz(i,j,k) &
+                                         + strn%dyz(i,j,k)*strn%dyz(i,j,k)
+                        strn%f_shear(i,j,k) = sqrt(shear_squared)/strn%de(i,j,k)
+                    else 
+                        strn%f_shear(i,j,k) = 1.0   ! Shearing by default for low strain rates
+                    end if 
 
-                            ! dd_ab(1) =  ( 0.5_wp*(vx(i,j,k+1)+vx(i,jp1,k+1)) &
-                            !             - 0.5_wp*(vx(i,j,k)+vx(i,jp1,k)) )*fact_z(k)*H_ice_inv
-                            ! dd_ab(2) =  ( 0.5_wp*(vx(im1,j,k+1)+vx(im1,jp1,k+1)) &
-                            !             - 0.5_wp*(vx(im1,j,k)+vx(im1,jp1,k)) )*fact_z(k)*H_ice_inv
-                            ! dd_ab(3) =  ( 0.5_wp*(vx(im1,j,k+1)+vx(im1,jm1,k+1)) &
-                            !             - 0.5_wp*(vx(im1,j,k)+vx(im1,jm1,k)) )*fact_z(k)*H_ice_inv
-                            ! dd_ab(4) =  ( 0.5_wp*(vx(i,j,k+1)+vx(i,jm1,k+1)) &
-                            !             - 0.5_wp*(vx(i,j,k)+vx(i,jm1,k)) )*fact_z(k)*H_ice_inv
+                    !  ------ Modification of the shear fraction for floating ice (ice shelves)
 
-                        else if (k .eq. nz_aa) then 
-                            ! Surface layer
-                            ! Gradient from surface to first aa-node below surface 
+                    if (f_grnd(i,j) .eq. 0.0) then 
+                        strn%f_shear(i,j,k) = 0.0    ! Assume ice shelf is only stretching, no shear 
+                    end if 
 
-                            call stagger_nodes_acx_ab_ice(dd_ab_up,vx(:,:,k),  f_ice,i,j)
-                            call stagger_nodes_acx_ab_ice(dd_ab_dn,vx(:,:,k-1),f_ice,i,j)
+                    !  ------ Constrain the shear fraction to reasonable [0,1] interval
 
-                            dd_ab = (dd_ab_up - dd_ab_dn)*fact_z(k)*H_ice_inv
-                            
-                            ! dd_ab(1) =  ( 0.5_wp*(vx(i,j,k)+vx(i,jp1,k)) &
-                            !             - 0.5_wp*(vx(i,j,k-1)+vx(i,jp1,k-1)) )*fact_z(k)*H_ice_inv
-                            ! dd_ab(2) =  ( 0.5_wp*(vx(im1,j,k)+vx(im1,jp1,k)) &
-                            !             - 0.5_wp*(vx(im1,j,k-1)+vx(im1,jp1,k-1)) )*fact_z(k)*H_ice_inv
-                            ! dd_ab(3) =  ( 0.5_wp*(vx(im1,j,k)+vx(im1,jm1,k)) &
-                            !             - 0.5_wp*(vx(im1,j,k-1)+vx(im1,jm1,k-1)) )*fact_z(k)*H_ice_inv
-                            ! dd_ab(4) =  ( 0.5_wp*(vx(i,j,k)+vx(i,jm1,k)) &
-                            !             - 0.5_wp*(vx(i,j,k-1)+vx(i,jm1,k-1)) )*fact_z(k)*H_ice_inv
-                            
-                        else 
-                            ! Intermediate layers
-                            ! Gradient from aa-node above to aa-node below
+                    strn%f_shear(i,j,k) = min(max(strn%f_shear(i,j,k), 0.0), 1.0)
 
-                            call stagger_nodes_acx_ab_ice(dd_ab_up,vx(:,:,k+1),f_ice,i,j)
-                            call stagger_nodes_acx_ab_ice(dd_ab_dn,vx(:,:,k-1),f_ice,i,j)
-
-                            dd_ab = (dd_ab_up - dd_ab_dn)*fact_z(k)*H_ice_inv
-                            
-                            ! dd_ab(1) =  ( 0.5_wp*(vx(i,j,k+1)+vx(i,jp1,k+1)) &
-                            !             - 0.5_wp*(vx(i,j,k-1)+vx(i,jp1,k-1)) )*fact_z(k)*H_ice_inv
-                            ! dd_ab(2) =  ( 0.5_wp*(vx(im1,j,k+1)+vx(im1,jp1,k+1)) &
-                            !             - 0.5_wp*(vx(im1,j,k-1)+vx(im1,jp1,k-1)) )*fact_z(k)*H_ice_inv
-                            ! dd_ab(3) =  ( 0.5_wp*(vx(im1,j,k+1)+vx(im1,jm1,k+1)) &
-                            !             - 0.5_wp*(vx(im1,j,k-1)+vx(im1,jm1,k-1)) )*fact_z(k)*H_ice_inv
-                            ! dd_ab(4) =  ( 0.5_wp*(vx(i,j,k+1)+vx(i,jm1,k+1)) &
-                            !             - 0.5_wp*(vx(i,j,k-1)+vx(i,jm1,k-1)) )*fact_z(k)*H_ice_inv
-                            
-                        end if 
-
-                        lxz = sum(wt_ab*dd_ab)
-
-                        ! === lyz ================================
-
-                        ! ajr: todo: need to see about ab-node staggering and f_ice treatment 
-
-                        if (k .eq. 1) then 
-                            ! Basal layer
-                            ! Gradient from first aa-node above base to base 
-
-                            call stagger_nodes_acy_ab_ice(dd_ab_up,vy(:,:,k+1),f_ice,i,j)
-                            call stagger_nodes_acy_ab_ice(dd_ab_dn,vy(:,:,k),  f_ice,i,j)
-
-                            dd_ab = (dd_ab_up - dd_ab_dn)*fact_z(k)*H_ice_inv
-                            
-                            ! dd_ab(1) =  ( 0.5_wp*(vy(i,j,k+1)+vy(ip1,j,k+1)) &
-                            !             - 0.5_wp*(vy(i,j,k)+vy(ip1,j,k)) )*fact_z(k)*H_ice_inv
-                            ! dd_ab(2) =  ( 0.5_wp*(vy(i,j,k+1)+vy(im1,j,k+1)) &
-                            !             - 0.5_wp*(vy(i,j,k)+vy(im1,j,k)) )*fact_z(k)*H_ice_inv
-                            ! dd_ab(3) =  ( 0.5_wp*(vy(i,jm1,k+1)+vy(im1,jm1,k+1)) &
-                            !             - 0.5_wp*(vy(i,jm1,k)+vy(im1,jm1,k)) )*fact_z(k)*H_ice_inv
-                            ! dd_ab(4) =  ( 0.5_wp*(vy(i,jm1,k+1)+vy(ip1,jm1,k+1)) &
-                            !             - 0.5_wp*(vy(i,jm1,k)+vy(ip1,jm1,k)) )*fact_z(k)*H_ice_inv
-
-                        else if (k .eq. nz_aa) then 
-                            ! Surface layer
-                            ! Gradient from surface to first aa-node below surface 
-
-                            call stagger_nodes_acy_ab_ice(dd_ab_up,vy(:,:,k),  f_ice,i,j)
-                            call stagger_nodes_acy_ab_ice(dd_ab_dn,vy(:,:,k-1),f_ice,i,j)
-
-                            dd_ab = (dd_ab_up - dd_ab_dn)*fact_z(k)*H_ice_inv
-                            
-                            ! dd_ab(1) =  ( 0.5_wp*(vy(i,j,k)+vy(ip1,j,k)) &
-                            !             - 0.5_wp*(vy(i,j,k-1)+vy(ip1,j,k-1)) )*fact_z(k)*H_ice_inv
-                            ! dd_ab(2) =  ( 0.5_wp*(vy(i,j,k)+vy(im1,j,k)) &
-                            !             - 0.5_wp*(vy(i,j,k-1)+vy(im1,j,k-1)) )*fact_z(k)*H_ice_inv
-                            ! dd_ab(3) =  ( 0.5_wp*(vy(i,jm1,k)+vy(im1,jm1,k)) &
-                            !             - 0.5_wp*(vy(i,jm1,k-1)+vy(im1,jm1,k-1)) )*fact_z(k)*H_ice_inv
-                            ! dd_ab(4) =  ( 0.5_wp*(vy(i,jm1,k)+vy(ip1,jm1,k)) &
-                            !             - 0.5_wp*(vy(i,jm1,k-1)+vy(ip1,jm1,k-1)) )*fact_z(k)*H_ice_inv
-
-                        else 
-                            ! Intermediate layers
-                            ! Gradient from aa-node above to aa-node below
-
-                            call stagger_nodes_acy_ab_ice(dd_ab_up,vy(:,:,k+1),f_ice,i,j)
-                            call stagger_nodes_acy_ab_ice(dd_ab_dn,vy(:,:,k-1),f_ice,i,j)
-
-                            dd_ab = (dd_ab_up - dd_ab_dn)*fact_z(k)*H_ice_inv
-                            
-                            ! dd_ab(1) =  ( 0.5_wp*(vy(i,j,k+1)+vy(ip1,j,k+1)) &
-                            !             - 0.5_wp*(vy(i,j,k-1)+vy(ip1,j,k-1)) )*fact_z(k)*H_ice_inv
-                            ! dd_ab(2) =  ( 0.5_wp*(vy(i,j,k+1)+vy(im1,j,k+1)) &
-                            !             - 0.5_wp*(vy(i,j,k-1)+vy(im1,j,k-1)) )*fact_z(k)*H_ice_inv
-                            ! dd_ab(3) =  ( 0.5_wp*(vy(i,jm1,k+1)+vy(im1,jm1,k+1)) &
-                            !             - 0.5_wp*(vy(i,jm1,k-1)+vy(im1,jm1,k-1)) )*fact_z(k)*H_ice_inv
-                            ! dd_ab(4) =  ( 0.5_wp*(vy(i,jm1,k+1)+vy(ip1,jm1,k+1)) &
-                            !             - 0.5_wp*(vy(i,jm1,k-1)+vy(ip1,jm1,k-1)) )*fact_z(k)*H_ice_inv
-
-                        end if 
-
-                        lyz = sum(wt_ab*dd_ab)
-
-                        ! ====== Calculate cross terms from intermediate values (dxy,dxz,dyz) ====== 
-
-                        strn%dxz(i,j,k) = 0.5_wp*(lxz+lzx)
-                        strn%dyz(i,j,k) = 0.5_wp*(lyz+lzy)
-
-                        ! Avoid extreme values (can happen towards the margins - bug??)
-                        if (strn%dxz(i,j,k) .lt. -de_max) strn%dxz(i,j,k) = -de_max 
-                        if (strn%dxz(i,j,k) .gt. de_max)  strn%dxz(i,j,k) =  de_max 
-
-                        if (strn%dyz(i,j,k) .lt. -de_max) strn%dyz(i,j,k) = -de_max 
-                        if (strn%dyz(i,j,k) .gt. de_max)  strn%dyz(i,j,k) =  de_max 
-                        
-                        ! Avoid underflows 
-                        if (abs(strn%dxz(i,j,k)) .lt. TOL_UNDERFLOW) strn%dxz(i,j,k) = 0.0 
-                        if (abs(strn%dyz(i,j,k)) .lt. TOL_UNDERFLOW) strn%dyz(i,j,k) = 0.0 
-        
-                        ! ====== Finished calculating individual strain rate terms ====== 
-                        
-                        strn%de(i,j,k) =  sqrt(  strn%dxx(i,j,k)*strn%dxx(i,j,k) &
-                                               + strn%dyy(i,j,k)*strn%dyy(i,j,k) &
-                                               + strn%dxx(i,j,k)*strn%dyy(i,j,k) &
-                                               + strn%dxy(i,j,k)*strn%dxy(i,j,k) &
-                                               + strn%dxz(i,j,k)*strn%dxz(i,j,k) &
-                                               + strn%dyz(i,j,k)*strn%dyz(i,j,k) )
-                        
-                        if (strn%de(i,j,k) .gt. de_max) strn%de(i,j,k) = de_max 
-
-                        ! Calculate the horizontal divergence too 
-                        strn%div(i,j,k) = strn%dxx(i,j,k) + strn%dyy(i,j,k) 
-
-                        ! Note: Using only the below should be equivalent to applying
-                        ! the SIA approximation to calculate `de`
-                        !strn%de(i,j,k)    =  sqrt( shear_squared(k) )
-
-                        if (strn%de(i,j,k) .gt. 0.0) then 
-                            ! Calculate the shear-based strain, stretching and the shear-fraction
-                            shear_squared  =   strn%dxz(i,j,k)*strn%dxz(i,j,k) &
-                                             + strn%dyz(i,j,k)*strn%dyz(i,j,k)
-                            strn%f_shear(i,j,k) = sqrt(shear_squared)/strn%de(i,j,k)
-                        else 
-                            strn%f_shear(i,j,k) = 1.0   ! Shearing by default for low strain rates
-                        end if 
-
-                        !  ------ Modification of the shear fraction for floating ice (ice shelves)
-
-                        if (f_grnd(i,j) .eq. 0.0) then 
-                            strn%f_shear(i,j,k) = 0.0    ! Assume ice shelf is only stretching, no shear 
-                        end if 
-
-                        !  ------ Constrain the shear fraction to reasonable [0,1] interval
-
-                        strn%f_shear(i,j,k) = min(max(strn%f_shear(i,j,k), 0.0), 1.0)
-
-                    end do 
-
-                end if ! Neighbor weights > 0 
+                end do 
 
             end if ! ice-free or ice-covered 
 

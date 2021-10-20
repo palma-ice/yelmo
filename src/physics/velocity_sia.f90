@@ -102,7 +102,7 @@ contains
             !$omp end parallel do 
 
         end do 
-        
+
         ! Apply boundary conditions as needed 
         select case(trim(boundaries))
             
@@ -331,6 +331,171 @@ contains
         return
         
     end subroutine calc_uxy_sia_3D
+
+    subroutine calc_uxy_sia_3D_alt(ux,uy,tau_xz,tau_yz,taud_acx,taud_acy,H_ice,f_ice,ATT,n_glen,zeta_aa,boundaries)
+        ! Calculate the 3D horizontal velocity field using SIA
+
+        implicit none
+        
+        real(wp),           intent(OUT) :: ux(:,:,:)        ! nx,ny,nz_aa [m/a] SIA velocity x-direction, acx-nodes
+        real(wp),           intent(OUT) :: uy(:,:,:)        ! nx,ny,nz_aa [m/a] SIA velocity y-direction, acy-nodes
+        real(wp),           intent(IN)  :: tau_xz(:,:,:)    ! [Pa] Shear stress, x-direction
+        real(wp),           intent(IN)  :: tau_yz(:,:,:)    ! [Pa] Shear stress, y-direction
+        real(wp),           intent(IN)  :: taud_acx(:,:)    ! [Pa] Driving stress x-direction 
+        real(wp),           intent(IN)  :: taud_acy(:,:)    ! [Pa] Driving stress y-direction
+        real(wp),           intent(IN)  :: H_ice(:,:)       ! [m] Ice thickness 
+        real(wp),           intent(IN)  :: f_ice(:,:)       ! [--] Ice area fraction 
+        real(wp),           intent(IN)  :: ATT(:,:,:)       ! nx,ny,nz_aa [a-1 Pa-3] Rate factor
+        real(wp),           intent(IN)  :: n_glen 
+        real(wp),           intent(IN)  :: zeta_aa(:) 
+        character(len=*),   intent(IN)  :: boundaries 
+
+        ! Local variables
+        integer  :: i, j, k, nx, ny, nz_aa
+        integer  :: im1, ip1, jm1, jp1
+        real(wp) :: p1    
+        real(wp) :: H_ice_ac
+        real(wp) :: fact_ac
+        real(wp) :: depth 
+        real(wp) :: dzeta 
+
+        real(wp) :: tau_xz_ab4_up(4)
+        real(wp) :: tau_xz_ab4_dn(4)
+        real(wp) :: tau_xz_ab4(4)
+        real(wp) :: tau_yz_ab4_up(4)
+        real(wp) :: tau_yz_ab4_dn(4)
+        real(wp) :: tau_yz_ab4(4)
+        real(wp) :: tau_eff_sq_ab4(4)
+        real(wp) :: ATT_ab4_up(4)
+        real(wp) :: ATT_ab4_dn(4)
+        real(wp) :: ATT_ab4(4)
+        real(wp) :: H_ice_ab4(4)
+        real(wp) :: fact_ab4(4)
+
+        nx    = size(ux,1)
+        ny    = size(ux,2)
+        nz_aa = size(ux,3) 
+
+        ! Define exponent 
+        p1 = (n_glen-1.0_wp)/2.0_wp
+
+        ! Intialize velocity field to zero 
+        ux = 0.0_wp 
+        uy = 0.0_wp
+                
+        ! Calculate tau_perp, tau_eff and factor to calculate velocities,
+        ! all on ab-nodes 
+        do i = 1, nx 
+        do j = 1, ny 
+
+            im1 = max(i-1,1) 
+            ip1 = min(i+1,nx) 
+            jm1 = max(j-1,1) 
+            jp1 = min(j+1,ny) 
+
+            ! Loop over layers starting from first layer above the base to surface 
+            do k = 2, nz_aa
+
+                ! Get non-dimensional thickness of vertical layer between aa-nodes
+                dzeta = zeta_aa(k) - zeta_aa(k-1) 
+
+                ! Calculate shear stress on horizontal ab-nodes 
+                ! and vertical ac-node (center of dzeta layer)
+                call stagger_nodes_acx_ab_ice(tau_xz_ab4_up,tau_xz(:,:,k),  f_ice,i,j)
+                call stagger_nodes_acx_ab_ice(tau_xz_ab4_dn,tau_xz(:,:,k-1),f_ice,i,j)
+                tau_xz_ab4 = 0.5_wp*(tau_xz_ab4_up+tau_xz_ab4_dn)
+
+                call stagger_nodes_acy_ab_ice(tau_yz_ab4_up,tau_yz(:,:,k),  f_ice,i,j)
+                call stagger_nodes_acy_ab_ice(tau_yz_ab4_dn,tau_yz(:,:,k-1),f_ice,i,j)
+                tau_yz_ab4 = 0.5_wp*(tau_yz_ab4_up+tau_yz_ab4_dn)
+                
+                ! Calculate effective stress
+                tau_eff_sq_ab4 = tau_xz_ab4**2 + tau_yz_ab4**2
+
+                ! Calculate factor on ab-nodes
+                call stagger_nodes_aa_ab_ice(ATT_ab4_up,ATT(:,:,k),f_ice,i,j)
+                call stagger_nodes_aa_ab_ice(ATT_ab4_dn,ATT(:,:,k-1),f_ice,i,j)
+                ATT_ab4 = 0.5_wp*(ATT_ab4_up+ATT_ab4_dn)
+
+                ! Get ice thickness on ab-nodes
+                call stagger_nodes_aa_ab_ice(H_ice_ab4,H_ice,f_ice,i,j)
+
+                ! Calculate multiplicative factor on ab-nodes
+                if (p1 .ne. 0.0_wp) then 
+                    fact_ab4 = 2.0_prec * ATT_ab4 * (dzeta*H_ice_ab4) * tau_eff_sq_ab4**p1
+                else
+                    fact_ab4 = 2.0_prec * ATT_ab4 * (dzeta*H_ice_ab4)
+                end if 
+
+                ! Calculate 3D horizontal velocity components on acx/acy nodes
+
+                ! stagger factor to acx-nodes to calculate velocity
+                if (f_ice(i,j) .eq. 1.0 .or. f_ice(ip1,j) .eq. 1.0) then 
+                    fact_ac   = 0.5_prec*(fact_ab4(1)+fact_ab4(4))
+                    ux(i,j,k) = ux(i,j,k-1) &
+                                + fact_ac*0.5_wp*(tau_xz(i,j,k)+tau_xz(i,j,k-1))
+                end if 
+
+                ! stagger factor to acy-nodes to calculate velocity
+                if (f_ice(i,j) .eq. 1.0 .or. f_ice(i,jp1) .eq. 1.0) then
+                    fact_ac   = 0.5_prec*(fact_ab4(1)+fact_ab4(2)) 
+                    uy(i,j,k) = uy(i,j,k-1) &
+                                + fact_ac*0.5_wp*(tau_yz(i,j,k)+tau_yz(i,j,k-1))
+                end if 
+
+                end do 
+
+        end do 
+        end do 
+        
+        ! Apply boundary conditions as needed 
+        if (trim(boundaries) .eq. "periodic") then
+
+            ux(1,:,:)    = ux(nx-2,:,:) 
+            ux(nx-1,:,:) = ux(2,:,:) 
+            ux(nx,:,:)   = ux(3,:,:) 
+            ux(:,1,:)    = ux(:,ny-1,:)
+            ux(:,ny,:)   = ux(:,2,:) 
+
+            uy(1,:,:)    = uy(nx-1,:,:) 
+            uy(nx,:,:)   = uy(2,:,:) 
+            uy(:,1,:)    = uy(:,ny-2,:)
+            uy(:,ny-1,:) = uy(:,2,:) 
+            uy(:,ny,:)   = uy(:,3,:)
+
+        else if (trim(boundaries) .eq. "periodic-x") then 
+            
+            ux(1,:,:)    = ux(nx-2,:,:) 
+            ux(nx-1,:,:) = ux(2,:,:) 
+            ux(nx,:,:)   = ux(3,:,:) 
+            ux(:,1,:)    = ux(:,2,:)
+            ux(:,ny,:)   = ux(:,ny-1,:) 
+
+            uy(1,:,:)    = uy(nx-1,:,:) 
+            uy(nx,:,:)   = uy(2,:,:) 
+            uy(:,1,:)    = uy(:,2,:)
+            uy(:,ny-1,:) = uy(:,ny-2,:) 
+            uy(:,ny,:)   = uy(:,ny-1,:)
+
+        else if (trim(boundaries) .eq. "infinite") then 
+            
+            ux(1,:,:)    = ux(2,:,:) 
+            ux(nx-1,:,:) = ux(nx-2,:,:) 
+            ux(nx,:,:)   = ux(nx-1,:,:) 
+            ux(:,1,:)    = ux(:,2,:)
+            ux(:,ny,:)   = ux(:,ny-1,:) 
+
+            uy(1,:,:)    = uy(2,:,:) 
+            uy(nx,:,:)   = uy(nx-1,:,:) 
+            uy(:,1,:)    = uy(:,2,:)
+            uy(:,ny-1,:) = uy(:,ny-2,:) 
+            uy(:,ny,:)   = uy(:,ny-1,:)
+
+        end if 
+
+        return
+        
+    end subroutine calc_uxy_sia_3D_alt
 
     subroutine calc_velocity_basal_sia(ux_b,uy_b,taub_acx,taub_acy,dd_ab_3D,H_ice,taud_acx,taud_acy,f_pmp,zeta_aa,dx,cf_sia,rho_ice,g)
         ! Calculate the parameterized basal velocity for use with SIA

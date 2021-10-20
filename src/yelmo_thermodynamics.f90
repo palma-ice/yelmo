@@ -260,7 +260,8 @@ end select
         thrm%now%T_prime_b = thrm%now%T_ice(:,:,1) - thrm%now%T_pmp(:,:,1) 
         
         ! Calculate gridpoint fraction at the pressure melting point
-        thrm%now%f_pmp = calc_f_pmp(thrm%now%T_ice(:,:,1),thrm%now%T_pmp(:,:,1),thrm%par%gamma,tpo%now%f_grnd)
+        call calc_f_pmp(thrm%now%f_pmp,thrm%now%T_ice(:,:,1),thrm%now%T_pmp(:,:,1), &
+                                                        tpo%now%f_grnd,thrm%par%gamma)
 
 !         if (yelmo_log) then 
 !             if (count(tpo%now%H_ice.gt.0.0) .gt. 0) then 

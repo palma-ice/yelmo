@@ -174,7 +174,7 @@ contains
 
         ! Make sure base is below pmp too (mass/energy balance handled via bmb_grnd calculation externally)
         if (T_ice(1) .gt. T_pmp(1)) T_ice(1) = T_pmp(1)
-
+        
         ! Also set omega to constant value where ice is temperate just for some consistency 
         omega = 0.0 
 !             where (T_ice .ge. T_pmp) omega = omega_max 

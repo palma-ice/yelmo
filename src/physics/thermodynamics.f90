@@ -1124,51 +1124,67 @@ end if
 
     end function calc_T_pmp
 
-    elemental function calc_f_pmp(T_ice,T_pmp,gamma,f_grnd) result(f_pmp)
+    subroutine calc_f_pmp(f_pmp,T_ice,T_pmp,f_grnd,gamma)
         ! Calculate the fraction of gridpoint at the pressure melting point (pmp),
         ! ie, when T_ice >= T_pmp. Facilitates a smooth transition between
         ! frozen and temperate ice. (Greve, 2005; Hindmarsh and Le Meur, 2001)
 
         implicit none 
 
-        real(prec), intent(IN) :: T_ice
-        real(prec), intent(IN) :: T_pmp
-        real(prec), intent(IN) :: gamma
-        real(prec), intent(IN) :: f_grnd  
-        real(prec) :: f_pmp 
+        real(wp), intent(OUT) :: f_pmp(:,:)
+        real(wp), intent(IN)  :: T_ice(:,:)
+        real(wp), intent(IN)  :: T_pmp(:,:)
+        real(wp), intent(IN)  :: f_grnd(:,:)  
+        real(wp), intent(IN)  :: gamma
 
-        if (f_grnd .eq. 0.0_prec) then
-            ! Floating points are temperate by default
-            f_pmp = 1.0_prec 
+        ! Local variables
+        integer :: i, j, nx, ny
+        real(wp) :: dT
 
-        else 
-            ! Calculate the fraction at the pressure melting point 
+        nx = size(T_ice,1) 
+        ny = size(T_ice,2) 
+         
+        do j = 1, ny 
+        do i = 1, nx 
 
-            if (gamma .eq. 0.0_prec) then
-                ! No decay function, binary pmp fraction
+            if (f_grnd(i,j) .eq. 0.0_prec) then
+                ! Floating points are temperate by default
+                f_pmp(i,j) = 1.0_prec 
 
-                if (T_ice .ge. T_pmp) then 
-                    f_pmp = 1.0_prec
-                else 
-                    f_pmp = 0.0_prec 
+            else 
+                ! Calculate the fraction at the pressure melting point 
+
+                if (gamma .eq. 0.0_prec) then
+                    ! No decay function, binary pmp fraction
+
+                    if (T_ice(i,j) .ge. T_pmp(i,j)) then 
+                        f_pmp(i,j) = 1.0_prec
+                    else 
+                        f_pmp(i,j) = 0.0_prec 
+                    end if  
+
+                else
+
+                    ! Apply decay function and calculate fraction in range of 0 to 1.
+                    dT    = min(T_ice(i,j) - T_pmp(i,j),0.0_wp)
+                    dT    = max(dT,-50.0_wp)            ! Also avoid too low temps
+                    write(*,*) "xyz: ", T_ice(i,j), T_pmp(i,j), dT, gamma 
+                    f_pmp(i,j) = exp(dT/gamma)
+
+                    ! Ensure pure values of 0.0 and 1.0 beyond a threshold 
+                    if (f_pmp(i,j) .lt. 1e-2)        f_pmp(i,j) = 0.0_prec 
+                    if (f_pmp(i,j) .gt. (1.0-1e-2))  f_pmp(i,j) = 1.0_prec 
+
                 end if 
 
-            else
-
-                ! Apply decay function 
-                f_pmp = min(1.0_prec, exp((T_ice-T_pmp)/gamma) )
-
-                ! Ensure pure values of 0.0 and 1.0 beyond a threshold 
-                if (f_pmp .lt. 1e-2)        f_pmp = 0.0_prec 
-                if (f_pmp .gt. (1.0-1e-2))  f_pmp = 1.0_prec 
-
             end if 
-
-        end if 
+         
+        end do 
+        end do 
 
         return 
 
-    end function calc_f_pmp
+    end subroutine calc_f_pmp
     
     elemental function calc_T_base_shlf_approx(H_ice,T_pmp,H_grnd) result(T_base_shlf)
         ! Calculate the basal shelf temperature for floating ice

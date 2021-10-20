@@ -398,6 +398,10 @@ contains
         ! Calculate T_prime following Greve and Blatter (2009), Eq. 4.14 
         T_prime = T_ice - T_pmp + T0
 
+        ! Limit T_prime to avoid under/overflows 
+        T_prime = max(T_prime,220.0_wp)
+        T_prime = min(T_prime,T_pmp)
+        
         if (T_prime <= T_prime_lim) then 
             ATT = enh * A0_1 * exp(-Q_1/(R*T_prime))
         else 

@@ -803,9 +803,9 @@ end if
                            + (1.0_prec - thrm%now%f_pmp)*dyn%par%cf_frozen 
 
             else 
-                ! Only use cf_stream everywhere
+                ! Only use cf_frozen everywhere
 
-                cf_ref = dyn%par%cf_stream
+                cf_ref = dyn%par%cf_frozen
 
             end if 
 

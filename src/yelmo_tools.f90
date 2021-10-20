@@ -2638,7 +2638,7 @@ contains
             end if 
             
             dvardy(i,j) = (H1-H0)/dy 
-
+            
         end do 
         end do 
 

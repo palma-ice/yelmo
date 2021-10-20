@@ -846,7 +846,7 @@ contains
                 H_mid = 0.5_wp*(H_ice(i,j)+H_ice(i,jp1)) 
             end if
             taud_acy(i,j) = rhog * H_mid * dzsdy(i,j) 
-
+            
         end do
         end do 
 

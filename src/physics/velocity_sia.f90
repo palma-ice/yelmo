@@ -4,6 +4,7 @@ module velocity_sia
 
     use yelmo_tools, only : stagger_aa_ab, stagger_aa_ab_ice, stagger_ab_aa_ice, & 
                     stagger_node_aa_ab_ice, stagger_node_acx_ab_ice, stagger_node_acy_ab_ice, &
+                    stagger_nodes_aa_ab_ice, stagger_nodes_acx_ab_ice, stagger_nodes_acy_ab_ice, &
                     integrate_trapezoid1D_1D, integrate_trapezoid1D_pt, minmax, &
                     calc_vertical_integrated_2D, calc_vertical_integrated_3D
 

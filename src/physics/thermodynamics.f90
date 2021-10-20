@@ -1167,8 +1167,7 @@ end if
 
                     ! Apply decay function and calculate fraction in range of 0 to 1.
                     dT    = min(T_ice(i,j) - T_pmp(i,j),0.0_wp)
-                    dT    = max(dT,-50.0_wp)            ! Also avoid too low temps
-                    write(*,*) "xyz: ", T_ice(i,j), T_pmp(i,j), dT, gamma 
+                    dT    = max(dT,-20.0_wp)            ! Also avoid too low temps
                     f_pmp(i,j) = exp(dT/gamma)
 
                     ! Ensure pure values of 0.0 and 1.0 beyond a threshold 

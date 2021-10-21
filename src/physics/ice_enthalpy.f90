@@ -77,8 +77,8 @@ contains
         real(prec), allocatable :: kappa_aa(:)    ! aa-nodes
         real(prec), allocatable :: Q_strn_now(:)  ! aa-nodes
         
-        real(prec), parameter   :: T_ref = 273.15_prec   
-
+        real(prec), parameter   :: T_ref     = 273.15_prec   
+        real(prec), parameter   :: T_min_lim = 200.00_prec 
 
         nz_aa = size(zeta_aa,1)
 
@@ -174,6 +174,9 @@ contains
 
         ! Make sure base is below pmp too (mass/energy balance handled via bmb_grnd calculation externally)
         if (T_ice(1) .gt. T_pmp(1)) T_ice(1) = T_pmp(1)
+
+        ! Also ensure there are no crazy low values (can happen with bad initialization)
+        where (T_ice(:) .lt. T_min_lim) T_ice(:) = T_min_lim
         
         ! Also set omega to constant value where ice is temperate just for some consistency 
         omega = 0.0 

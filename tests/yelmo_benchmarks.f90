@@ -285,7 +285,7 @@ program yelmo_benchmarks
             ! Set conditions similar to EISMINT2-EXPA with smaller radius 
             call dome_boundaries(yelmo1%bnd%T_srf,yelmo1%bnd%smb,yelmo1%bnd%Q_geo, &
                             yelmo1%grd%x,yelmo1%grd%y,yelmo1%tpo%now%H_ice, &
-                            experiment="dome",time=time,smb_max=0.3_prec,rad_el=700.0_prec,period=period,dT_test=dT_test)
+                            experiment="dome",time=time,smb_max=0.3_prec,rad_el=800.0_prec,period=period,dT_test=dT_test)
                 
         case("mismip-stnd") 
 
@@ -427,7 +427,7 @@ program yelmo_benchmarks
                 ! Set conditions similar to EISMINT2-EXPA with smaller radius 
                 call dome_boundaries(yelmo1%bnd%T_srf,yelmo1%bnd%smb,yelmo1%bnd%Q_geo, &
                                 yelmo1%grd%x,yelmo1%grd%y,yelmo1%tpo%now%H_ice, &
-                                experiment="dome",time=time,smb_max=0.3_prec,rad_el=700.0_prec,period=period,dT_test=dT_test)
+                                experiment="dome",time=time,smb_max=0.3_prec,rad_el=800.0_prec,period=period,dT_test=dT_test)
                 
             case("mismip-stnd") 
 

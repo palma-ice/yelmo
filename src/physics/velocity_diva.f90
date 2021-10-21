@@ -624,26 +624,18 @@ end if
                 jp1 = min(j+1,ny) 
 
                 ! Get strain rate terms
-                ! call staggerdiff_nodes_acx_ab_ice(dudx_ab,ux,f_ice,i,j,dx) 
-                ! call staggerdiff_nodes_acy_ab_ice(dvdy_ab,uy,f_ice,i,j,dy) 
-                ! call staggerdiffcross_nodes_acx_ab_ice(dudy_ab,ux,f_ice,i,j,dy)
-                ! call staggerdiffcross_nodes_acx_ab_ice(dvdx_ab,uy,f_ice,i,j,dx)
+                call staggerdiff_nodes_acx_ab_ice(dudx_ab,ux,f_ice,i,j,dx) 
+                call staggerdiff_nodes_acy_ab_ice(dvdy_ab,uy,f_ice,i,j,dy) 
+                call staggerdiffcross_nodes_acx_ab_ice(dudy_ab,ux,f_ice,i,j,dy)
+                call staggerdiffcross_nodes_acx_ab_ice(dvdx_ab,uy,f_ice,i,j,dx)
                 
-                dudx_ab = 0.0 
-                dvdy_ab = 0.0 
-                dudy_ab = 0.0 
-                dvdx_ab = 0.0 
-
                 ! Loop over column
                 do k = 1, nz 
 
                     ! Get vertical shear strain rate terms
                     call stagger_nodes_acx_ab_ice(duxdz_ab,duxdz(:,:,k),f_ice,i,j)
-                    ! call stagger_nodes_acy_ab_ice(duydz_ab,duydz(:,:,k),f_ice,i,j)
-
-                    ! duxdz_ab = 0.0 
-                    duydz_ab = 0.0 
-
+                    call stagger_nodes_acy_ab_ice(duydz_ab,duydz(:,:,k),f_ice,i,j)
+                    
                     ! Calculate the total effective strain rate from L19, Eq. 21 
                     eps_sq_ab = dudx_ab**2 + dvdy_ab**2 + dudx_ab*dvdy_ab + 0.25_wp*(dudy_ab+dvdx_ab)**2 &
                                 + 0.25_wp*duxdz_ab**2 + 0.25_wp*duydz_ab**2 + eps_0_sq

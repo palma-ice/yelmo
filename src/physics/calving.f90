@@ -297,9 +297,8 @@ end if
                     if (H_eff .lt. H_calv) then 
                         ! If ice is too thin, diagnose calving rate, with
                         ! faster calving timescale for more exposed fronts
-                        ! (multiply by f_ice to convert to a horizontal calving rate)
                         
-                        calv(i,j) = f_ice(i,j) * (H_calv-H_eff) * wt / tau
+                        calv(i,j) = (H_calv-H_eff) * wt / tau
                         
                     end if 
 
@@ -485,7 +484,7 @@ end if
 
                 ! Diagnose calving rate not accounting for upstream flux
                 !calv(i,j) = f_ice(i,j) * max(H_calv - H_eff,0.0_wp) / tau
-                calv(i,j) = f_ice(i,j) * max(H_calv - H_eff,0.0_wp) / tau
+                calv(i,j) = max(H_calv - H_eff,0.0_wp) / tau
                 
 
                 ! Adjust calving rate for upstream flux 
@@ -680,7 +679,7 @@ end if
                     end if 
 
                     !calv(i,j) = f_ice(i,j) * max(H_calv - H_eff,0.0) / tau
-                    calv(i,j) = f_ice(i,j) * max(H_calv - H_eff,0.0) / tau
+                    calv(i,j) = max(H_calv - H_eff,0.0) / tau
 
                 end if  
 
@@ -747,7 +746,7 @@ end if
             
             ! Ice-shelf floating margin: floating ice point with open ocean neighbor 
             ! If this point is an ice front, calculate calving
-            is_margin =  (f_grnd(i,j) .eq. 0.0 .and. H_ice(i,j) .gt. 0.0) .and. &
+            is_margin =  (f_grnd(i,j)   .eq. 0.0 .and. H_ice(i,j) .gt. 0.0) .and. &
                        ( (f_grnd(im1,j) .eq. 0.0 .and. H_ice(im1,j).eq.0.0) .or. &
                          (f_grnd(ip1,j) .eq. 0.0 .and. H_ice(ip1,j).eq.0.0) .or. &
                          (f_grnd(i,jm1) .eq. 0.0 .and. H_ice(i,jm1).eq.0.0) .or. &
@@ -769,7 +768,7 @@ end if
                     H_eff = H_ice(i,j)
                 end if 
 
-                calv(i,j) = f_ice(i,j) * (H_eff*calv_ref) / sqrt(dx*dy)
+                calv(i,j) = (H_eff*calv_ref) / sqrt(dx*dy)
 
             end if
 

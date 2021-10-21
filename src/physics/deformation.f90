@@ -591,6 +591,7 @@ contains
         strn%dxz          = 0.0_wp
         strn%dyz          = 0.0_wp
         strn%de           = 0.0_wp
+        strn%div          = 0.0_wp 
         strn%f_shear      = 0.0_wp
 
         !-------- Computation --------
@@ -848,7 +849,6 @@ contains
                 count([f_ice(im1,j),f_ice(ip1,j),f_ice(i,jm1),f_ice(i,jp1)] .eq. 1.0_wp) .gt. 0 ) then 
                 ! Ice-free (or partially ice-free) with ice-covered neighbors
 
-
                 strn%dxx(i,j,:) = 0.0 
                 strn%dyy(i,j,:) = 0.0
                 strn%dxy(i,j,:) = 0.0
@@ -918,7 +918,7 @@ contains
 
                     ! Note: Using only the below should be equivalent to applying
                     ! the SIA approximation to calculate `de`
-                    !strn%de(i,j,k)    =  sqrt( shear_squared(k) )
+                    !strn%de(i,j,k)    =  sqrt( shear_squared )
 
                     if (strn%de(i,j,k) .gt. 0.0) then 
                         ! Calculate the shear-based strain, stretching and the shear-fraction
@@ -1491,7 +1491,7 @@ contains
                 strn2D%div(i,j) = strn2D%dxx(i,j) + strn2D%dyy(i,j) 
 
                 ! No shearing estimated from 2D components
-                strn2D%f_shear(i,j) = 0.0
+                strn2D%f_shear(i,j) = 0.0_wp 
 
             end if 
 
@@ -1595,7 +1595,7 @@ contains
         real(wp) :: a, b, c, root
         real(wp) :: lambda1, lambda2 
 
-        ! compute the eigenvalues of the vertically integrated stress tensor
+        ! compute the eigenvalues of the vertically averaged stress tensor
         a = 1.0_wp
         b = -(txx + tyy)
         c = txx*tyy - txy*txy

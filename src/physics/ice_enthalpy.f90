@@ -77,9 +77,9 @@ contains
         real(prec), allocatable :: kappa_aa(:)    ! aa-nodes
         real(prec), allocatable :: Q_strn_now(:)  ! aa-nodes
         
-        real(prec), parameter   :: T_ref     = 273.15_prec   
-        real(prec), parameter   :: T_min_lim = 200.00_prec 
-
+        real(prec), parameter   :: T_ref        = 273.15_prec   
+        real(prec), parameter   :: T_min_lim    = 200.00_prec 
+        real(prec), parameter   :: bmb_grnd_lim = 10.0_prec     ! [m/yr]
         nz_aa = size(zeta_aa,1)
 
         allocate(kappa_aa(nz_aa))
@@ -178,6 +178,17 @@ contains
         ! Also ensure there are no crazy low values (can happen with bad initialization)
         where (T_ice(:) .lt. T_min_lim) T_ice(:) = T_min_lim
         
+
+        ! Finally check temperature gradient near the base to avoid potential instabilities 
+        if (T_ice(1) .eq. T_pmp(1) .and. T_ice(3) .gt. T_ice(2)) then 
+            ! Change in slope of T_ice profile detected near base - likely
+            ! the temperature solver did not converge properly. Correct
+            ! temperature just above the base with linear interpolation
+
+            dz = (zeta_aa(2)-zeta_aa(1))
+            T_ice(2) = T_ice(1) + dz*((T_ice(3)-T_ice(1))/(zeta_aa(3)-zeta_aa(1)))
+        end if
+
         ! Also set omega to constant value where ice is temperate just for some consistency 
         omega = 0.0 
 !             where (T_ice .ge. T_pmp) omega = omega_max 
@@ -207,7 +218,10 @@ contains
         
         ! Include internal melting in bmb_grnd 
         bmb_grnd = bmb_grnd - melt_internal 
-
+        
+        ! Safety: limit bmb_grnd to reasonable values to avoid problems
+        ! (grounded ice melt should be much less than this limit, eg 10 m/yr)
+        if (bmb_grnd .gt. bmb_grnd_lim) bmb_grnd = bmb_grnd_lim
 
         ! Finally, calculate the CTS height 
         H_cts = calc_cts_height(enth,T_ice,omega,T_pmp,cp,H_ice,zeta_aa)

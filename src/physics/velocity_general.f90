@@ -54,7 +54,6 @@ contains
         integer :: im2, jm2    
         real(prec) :: H_now
         real(prec) :: H_inv
-        real(prec) :: bmb_now 
         real(prec) :: dzbdx_aa
         real(prec) :: dzbdy_aa
         real(prec) :: dzsdx_aa
@@ -90,8 +89,8 @@ contains
         real(wp) :: duydz_ab(4) 
         
         real(prec), parameter :: dzbdt        = 0.0     ! For posterity, keep dzbdt variable, but set to zero 
-        real(prec), parameter :: bmb_grnd_min = -10.0   ! Lower limit on bmb to avoid high negative velocities
-        real(prec), parameter :: uz_min       = -20.0   ! [m/yr] Minimum allowed vertical velocity downwards for stability
+        real(prec), parameter :: uz_min       = -10.0   ! [m/yr] Minimum allowed vertical velocity downwards for stability
+        
         nx    = size(ux,1)
         ny    = size(ux,2)
         nz_aa = size(zeta_aa,1)
@@ -159,22 +158,18 @@ contains
 !                             - ( (1.0_prec-zeta_ac(1))*dHdt(i,j) + ux_aa*dHdx_aa + uy_aa*dHdy_aa )
                 uz_grid = 0.0_prec 
 
-                ! Set current value of bmb 
-                bmb_now = bmb(i,j) 
-                if (f_grnd(i,j) .eq. 1.0 .and. bmb_now .lt. bmb_grnd_min) bmb_now = bmb_grnd_min 
-
                 ! ===================================================================
                 ! Greve and Blatter (2009) style:
 
                 ! Determine basal vertical velocity for this grid point 
                 ! Following Eq. 5.31 of Greve and Blatter (2009)
-                uz(i,j,1) = dzbdt + uz_grid + bmb_now + ux_aa*dzbdx_aa + uy_aa*dzbdy_aa
+                uz(i,j,1) = dzbdt + uz_grid + bmb(i,j) + ux_aa*dzbdx_aa + uy_aa*dzbdy_aa
                 if (abs(uz(i,j,1)) .lt. TOL_UNDERFLOW) uz(i,j,1) = 0.0_prec 
                 
-                ! Set stability limit on basal uz value 
+                ! Set stability limit on basal uz value for grounded ice.
                 ! This only gets applied in rare cases when something
                 ! is going wrong in the model. 
-                if (uz(i,j,1) .lt. uz_min) uz(i,j,1) = uz_min 
+                if (f_grnd(i,j) .eq. 1.0 .and. uz(i,j,1) .lt. uz_min) uz(i,j,1) = uz_min 
 
                 ! Determine surface vertical velocity following kinematic boundary condition 
                 ! Glimmer, Eq. 3.10 [or Folwer, Chpt 10, Eq. 10.8]
@@ -494,7 +489,6 @@ contains
         integer :: im2, jm2    
         real(prec) :: H_now
         real(prec) :: H_inv
-        real(prec) :: bmb_now 
         real(prec) :: dzbdx_aa
         real(prec) :: dzbdy_aa
         real(prec) :: dzsdx_aa
@@ -514,7 +508,7 @@ contains
         real(prec) :: c_y 
 
         real(prec), parameter :: dzbdt        = 0.0     ! For posterity, keep dzbdt variable, but set to zero 
-        real(prec), parameter :: bmb_grnd_min = -10.0   ! Lower limit on bmb to avoid high negative velocities
+        real(prec), parameter :: uz_min       = -10.0   ! [m/yr] Minimum allowed vertical velocity downwards for stability
         
         nx    = size(ux,1)
         ny    = size(ux,2)
@@ -572,18 +566,19 @@ contains
 !                             - ( (1.0_prec-zeta_ac(1))*dHdt(i,j) + ux_aa*dHdx_aa + uy_aa*dHdy_aa )
                 uz_grid = 0.0_prec 
 
-                ! Set current value of bmb 
-                bmb_now = bmb(i,j) 
-                if (f_grnd(i,j) .eq. 1.0 .and. bmb_now .lt. bmb_grnd_min) bmb_now = bmb_grnd_min 
-
                 ! ===================================================================
                 ! Greve and Blatter (2009) style:
 
                 ! Determine basal vertical velocity for this grid point 
                 ! Following Eq. 5.31 of Greve and Blatter (2009)
-                uz(i,j,1) = dzbdt + uz_grid + bmb_now + ux_aa*dzbdx_aa + uy_aa*dzbdy_aa
+                uz(i,j,1) = dzbdt + uz_grid + bmb(i,j) + ux_aa*dzbdx_aa + uy_aa*dzbdy_aa
                 if (abs(uz(i,j,1)) .lt. TOL_UNDERFLOW) uz(i,j,1) = 0.0_prec 
                 
+                ! Set stability limit on basal uz value for grounded ice.
+                ! This only gets applied in rare cases when something
+                ! is going wrong in the model. 
+                if (f_grnd(i,j) .eq. 1.0 .and. uz(i,j,1) .lt. uz_min) uz(i,j,1) = uz_min 
+
                 ! Determine surface vertical velocity following kinematic boundary condition 
                 ! Glimmer, Eq. 3.10 [or Folwer, Chpt 10, Eq. 10.8]
                 !uz_srf = dzsdt(i,j) + ux_aa*dzsdx_aa + uy_aa*dzsdy_aa - smb(i,j) 

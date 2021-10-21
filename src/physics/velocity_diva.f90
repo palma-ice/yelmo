@@ -493,7 +493,7 @@ end if
                 visc_eff_ac  = calc_staggered_margin(visc_eff(i,j,k),visc_eff(i,jp1,k),f_ice(i,j),f_ice(i,jp1))
                 duydz(i,j,k) = (taub_acy(i,j)/visc_eff_ac) * (1.0-zeta_aa(k))
             else
-                duxdz(i,j,k) = 0.0_wp 
+                duydz(i,j,k) = 0.0_wp 
             end if 
                 
         end do 
@@ -618,23 +618,31 @@ end if
 
             if (f_ice(i,j) .eq. 1.0_wp) then 
 
-                im1 = max(i-1,1) 
+                im1 = max(i-1,1)    
                 ip1 = min(i+1,nx) 
                 jm1 = max(j-1,1) 
                 jp1 = min(j+1,ny) 
 
                 ! Get strain rate terms
-                call staggerdiff_nodes_acx_ab_ice(dudx_ab,ux,f_ice,i,j,dx) 
-                call staggerdiff_nodes_acy_ab_ice(dvdy_ab,uy,f_ice,i,j,dy) 
-                call staggerdiffcross_nodes_acx_ab_ice(dudy_ab,ux,f_ice,i,j,dy)
-                call staggerdiffcross_nodes_acx_ab_ice(dvdx_ab,uy,f_ice,i,j,dx)
+                ! call staggerdiff_nodes_acx_ab_ice(dudx_ab,ux,f_ice,i,j,dx) 
+                ! call staggerdiff_nodes_acy_ab_ice(dvdy_ab,uy,f_ice,i,j,dy) 
+                ! call staggerdiffcross_nodes_acx_ab_ice(dudy_ab,ux,f_ice,i,j,dy)
+                ! call staggerdiffcross_nodes_acx_ab_ice(dvdx_ab,uy,f_ice,i,j,dx)
                 
+                dudx_ab = 0.0 
+                dvdy_ab = 0.0 
+                dudy_ab = 0.0 
+                dvdx_ab = 0.0 
+
                 ! Loop over column
                 do k = 1, nz 
 
                     ! Get vertical shear strain rate terms
                     call stagger_nodes_acx_ab_ice(duxdz_ab,duxdz(:,:,k),f_ice,i,j)
-                    call stagger_nodes_acy_ab_ice(duydz_ab,duydz(:,:,k),f_ice,i,j)
+                    ! call stagger_nodes_acy_ab_ice(duydz_ab,duydz(:,:,k),f_ice,i,j)
+
+                    ! duxdz_ab = 0.0 
+                    duydz_ab = 0.0 
 
                     ! Calculate the total effective strain rate from L19, Eq. 21 
                     eps_sq_ab = dudx_ab**2 + dvdy_ab**2 + dudx_ab*dvdy_ab + 0.25_wp*(dudy_ab+dvdx_ab)**2 &

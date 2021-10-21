@@ -980,7 +980,7 @@ contains
             u_ab(3) = u_ab(3) / wt 
         end if 
         
-        ! (4) Lower-left node average
+        ! (4) Lower-right node average
         wt = 0.0_wp 
         if (f_ice(i,j) .eq. 1.0_wp .or. f_ice(ip1,j) .eq. 1.0_wp) then 
             u_ab(4) = u_ab(4) + u_acx(i,j) 
@@ -1074,7 +1074,7 @@ contains
             u_ab(3) = u_ab(3) / wt 
         end if 
         
-        ! (4) Lower-left node average
+        ! (4) Lower-right node average
         wt = 0.0_wp 
         if (f_ice(i,j) .eq. 1.0_wp .or. f_ice(i,jm1) .eq. 1.0_wp) then 
             u_ab(4) = u_ab(4) + u_acy(i,jm1) 
@@ -2638,7 +2638,7 @@ contains
             end if 
             
             dvardy(i,j) = (H1-H0)/dy 
-            
+
         end do 
         end do 
 

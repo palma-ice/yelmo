@@ -280,10 +280,18 @@ program yelmo_benchmarks
             yelmo1%tpo%now%H_ice  = buel%H_ice
             yelmo1%tpo%now%z_srf  = yelmo1%bnd%z_bed + yelmo1%tpo%now%H_ice
         
-        case("mismip") 
+        case("mismip")
+
+            ! Set conditions similar to EISMINT2-EXPA with smaller radius 
+            call dome_boundaries(yelmo1%bnd%T_srf,yelmo1%bnd%smb,yelmo1%bnd%Q_geo, &
+                            yelmo1%grd%x,yelmo1%grd%y,yelmo1%tpo%now%H_ice, &
+                            experiment="dome",time=time,smb_max=0.3_prec,rad_el=700.0_prec,period=period,dT_test=dT_test)
+                
+        case("mismip-stnd") 
 
             ! Initialize mismip boundary values 
             call mismip3D_boundaries(yelmo1%bnd%T_srf,yelmo1%bnd%smb,yelmo1%bnd%Q_geo,experiment="Stnd") 
+
 
         case("dome") 
             ! Boundary conditions are free to be chosen here 
@@ -414,7 +422,14 @@ program yelmo_benchmarks
                 call bueler_test_BC(buel%H_ice,buel%mbal,buel%u_b,yelmo1%grd%x,yelmo1%grd%y, &
                             time=time,R0=100.0_prec,H0=800.0_prec,lambda=0.0_prec,n=3.0_prec,A=1e-16_prec,rho_ice=rho_ice,g=g)
             
-            case("mismip") 
+            case("mismip")
+
+                ! Set conditions similar to EISMINT2-EXPA with smaller radius 
+                call dome_boundaries(yelmo1%bnd%T_srf,yelmo1%bnd%smb,yelmo1%bnd%Q_geo, &
+                                yelmo1%grd%x,yelmo1%grd%y,yelmo1%tpo%now%H_ice, &
+                                experiment="dome",time=time,smb_max=0.3_prec,rad_el=700.0_prec,period=period,dT_test=dT_test)
+                
+            case("mismip-stnd") 
 
                 ! Initialize mismip boundary values 
                 call mismip3D_boundaries(yelmo1%bnd%T_srf,yelmo1%bnd%smb,yelmo1%bnd%Q_geo,experiment="Stnd") 

@@ -22,7 +22,7 @@ module velocity_general
 
 contains 
     
-    subroutine calc_uz_3D(uz,ux,uy,H_ice,f_ice,z_bed,z_srf,smb,bmb,dHdt,dzsdt,zeta_aa,zeta_ac,dx,dy)
+    subroutine calc_uz_3D(uz,ux,uy,H_ice,f_ice,f_grnd,z_bed,z_srf,smb,bmb,dHdt,dzsdt,zeta_aa,zeta_ac,dx,dy)
         ! Following algorithm outlined by the Glimmer ice sheet model:
         ! https://www.geos.ed.ac.uk/~mhagdorn/glide/glide-doc/glimmer_htmlse9.html#x17-660003.1.5
 
@@ -36,6 +36,7 @@ contains
         real(prec), intent(IN)  :: uy(:,:,:)        ! nx,ny,nz_aa
         real(prec), intent(IN)  :: H_ice(:,:)
         real(prec), intent(IN)  :: f_ice(:,:)
+        real(prec), intent(IN)  :: f_grnd(:,:)
         real(prec), intent(IN)  :: z_bed(:,:) 
         real(prec), intent(IN)  :: z_srf(:,:) 
         real(prec), intent(IN)  :: smb(:,:) 
@@ -53,6 +54,7 @@ contains
         integer :: im2, jm2    
         real(prec) :: H_now
         real(prec) :: H_inv
+        real(prec) :: bmb_now 
         real(prec) :: dzbdx_aa
         real(prec) :: dzbdy_aa
         real(prec) :: dzsdx_aa
@@ -87,8 +89,9 @@ contains
         real(wp) :: duxdz_ab(4) 
         real(wp) :: duydz_ab(4) 
         
-        real(prec), parameter :: dzbdt = 0.0   ! For posterity, keep dzbdt variable, but set to zero 
-
+        real(prec), parameter :: dzbdt        = 0.0     ! For posterity, keep dzbdt variable, but set to zero 
+        real(prec), parameter :: bmb_grnd_min = -10.0   ! Lower limit on bmb to avoid high negative velocities
+        
         nx    = size(ux,1)
         ny    = size(ux,2)
         nz_aa = size(zeta_aa,1)
@@ -156,12 +159,16 @@ contains
 !                             - ( (1.0_prec-zeta_ac(1))*dHdt(i,j) + ux_aa*dHdx_aa + uy_aa*dHdy_aa )
                 uz_grid = 0.0_prec 
 
+                ! Set current value of bmb 
+                bmb_now = bmb(i,j) 
+                if (f_grnd(i,j) .eq. 1.0 .and. bmb_now .lt. bmb_grnd_min) bmb_now = bmb_grnd_min 
+                
                 ! ===================================================================
                 ! Greve and Blatter (2009) style:
 
                 ! Determine basal vertical velocity for this grid point 
                 ! Following Eq. 5.31 of Greve and Blatter (2009)
-                uz(i,j,1) = dzbdt + uz_grid + bmb(i,j) + ux_aa*dzbdx_aa + uy_aa*dzbdy_aa
+                uz(i,j,1) = dzbdt + uz_grid + bmb_now + ux_aa*dzbdx_aa + uy_aa*dzbdy_aa
                 if (abs(uz(i,j,1)) .lt. TOL_UNDERFLOW) uz(i,j,1) = 0.0_prec 
                 
                 ! Determine surface vertical velocity following kinematic boundary condition 
@@ -450,7 +457,7 @@ contains
 
 
 
-    subroutine calc_uz_3D_aa(uz,ux,uy,H_ice,f_ice,z_bed,z_srf,smb,bmb,dHdt,dzsdt,zeta_aa,zeta_ac,dx,dy)
+    subroutine calc_uz_3D_aa(uz,ux,uy,H_ice,f_ice,f_grnd,z_bed,z_srf,smb,bmb,dHdt,dzsdt,zeta_aa,zeta_ac,dx,dy)
         ! Following algorithm outlined by the Glimmer ice sheet model:
         ! https://www.geos.ed.ac.uk/~mhagdorn/glide/glide-doc/glimmer_htmlse9.html#x17-660003.1.5
 
@@ -464,6 +471,7 @@ contains
         real(prec), intent(IN)  :: uy(:,:,:)        ! nx,ny,nz_aa
         real(prec), intent(IN)  :: H_ice(:,:)
         real(prec), intent(IN)  :: f_ice(:,:)
+        real(prec), intent(IN)  :: f_grnd(:,:)
         real(prec), intent(IN)  :: z_bed(:,:) 
         real(prec), intent(IN)  :: z_srf(:,:) 
         real(prec), intent(IN)  :: smb(:,:) 
@@ -481,6 +489,7 @@ contains
         integer :: im2, jm2    
         real(prec) :: H_now
         real(prec) :: H_inv
+        real(prec) :: bmb_now 
         real(prec) :: dzbdx_aa
         real(prec) :: dzbdy_aa
         real(prec) :: dzsdx_aa
@@ -499,8 +508,9 @@ contains
         real(prec) :: c_x 
         real(prec) :: c_y 
 
-        real(prec), parameter :: dzbdt = 0.0   ! For posterity, keep dzbdt variable, but set to zero 
-
+        real(prec), parameter :: dzbdt        = 0.0     ! For posterity, keep dzbdt variable, but set to zero 
+        real(prec), parameter :: bmb_grnd_min = -10.0   ! Lower limit on bmb to avoid high negative velocities
+        
         nx    = size(ux,1)
         ny    = size(ux,2)
         nz_aa = size(zeta_aa,1)
@@ -557,12 +567,16 @@ contains
 !                             - ( (1.0_prec-zeta_ac(1))*dHdt(i,j) + ux_aa*dHdx_aa + uy_aa*dHdy_aa )
                 uz_grid = 0.0_prec 
 
+                ! Set current value of bmb 
+                bmb_now = bmb(i,j) 
+                if (f_grnd(i,j) .eq. 1.0 .and. bmb_now .lt. bmb_grnd_min) bmb_now = bmb_grnd_min 
+
                 ! ===================================================================
                 ! Greve and Blatter (2009) style:
 
                 ! Determine basal vertical velocity for this grid point 
                 ! Following Eq. 5.31 of Greve and Blatter (2009)
-                uz(i,j,1) = dzbdt + uz_grid + bmb(i,j) + ux_aa*dzbdx_aa + uy_aa*dzbdy_aa
+                uz(i,j,1) = dzbdt + uz_grid + bmb_now + ux_aa*dzbdx_aa + uy_aa*dzbdy_aa
                 if (abs(uz(i,j,1)) .lt. TOL_UNDERFLOW) uz(i,j,1) = 0.0_prec 
                 
                 ! Determine surface vertical velocity following kinematic boundary condition 
@@ -846,7 +860,7 @@ contains
                 H_mid = 0.5_wp*(H_ice(i,j)+H_ice(i,jp1)) 
             end if
             taud_acy(i,j) = rhog * H_mid * dzsdy(i,j) 
-            
+
         end do
         end do 
 

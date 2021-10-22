@@ -51,6 +51,7 @@
     fmb_method          = 0                 ! 0: prescribe boundary field fmb_shlf; 1: calculate proportional fmb~bmb_shlf.
     surf_gl_method      = 0                 ! 0: binary (max grnd/flt elevation), 1: subgrid average elevation
     margin2nd           = False             ! Apply second-order upwind approximation to gradients at the margin
+    margin_flt_subgrid  = False             ! Allow fractional ice area for floating margins
     use_bmb             = False             ! Use basal mass balance in mass conservation equation
     topo_fixed          = False             ! Keep ice thickness fixed, perform other ytopo calculations
     topo_rel            = 0                 ! 0: No relaxation; 1: relax shelf; 2: relax shelf + gl; 3: all points 

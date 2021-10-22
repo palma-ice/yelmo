@@ -104,7 +104,7 @@ contains
                                         solver=tpo%par%solver,dx=tpo%par%dx,dt=dt,beta=tpo%par%dt_beta,pc_step=tpo%par%pc_step)
 
             ! Update ice fraction mask 
-            call calc_ice_fraction(tpo%now%f_ice,tpo%now%H_ice,tpo%now%f_grnd)
+            call calc_ice_fraction(tpo%now%f_ice,tpo%now%H_ice,tpo%now%f_grnd,tpo%par%margin_flt_subgrid)
             
             ! === Step 2: ice thickness evolution from vertical column mass balance ===
 
@@ -219,7 +219,7 @@ contains
                                          tpo%now%calv_flt,tpo%now%calv_grnd,tpo%par%dx,dt)
 
             ! Update ice fraction mask 
-            call calc_ice_fraction(tpo%now%f_ice,tpo%now%H_ice,tpo%now%f_grnd)
+            call calc_ice_fraction(tpo%now%f_ice,tpo%now%H_ice,tpo%now%f_grnd,tpo%par%margin_flt_subgrid)
             
             ! Finally, apply all additional (generally artificial) ice thickness adjustments 
             ! and store changes in residual mass balance field. 
@@ -261,7 +261,7 @@ contains
         end if 
 
         ! Final update of ice fraction mask (or define it now for fixed topography)
-        call calc_ice_fraction(tpo%now%f_ice,tpo%now%H_ice,tpo%now%f_grnd)
+        call calc_ice_fraction(tpo%now%f_ice,tpo%now%H_ice,tpo%now%f_grnd,tpo%par%margin_flt_subgrid)
             
         ! 2. Calculate additional topographic properties ------------------
 
@@ -473,6 +473,7 @@ contains
         call nml_read(filename,"ytopo","calv_grnd_method",  par%calv_grnd_method, init=init_pars)
         call nml_read(filename,"ytopo","fmb_method",        par%fmb_method,       init=init_pars)
         call nml_read(filename,"ytopo","margin2nd",         par%margin2nd,        init=init_pars)
+        call nml_read(filename,"ytopo","margin_flt_subgrid",par%margin_flt_subgrid,init=init_pars)
         call nml_read(filename,"ytopo","use_bmb",           par%use_bmb,          init=init_pars)
         call nml_read(filename,"ytopo","topo_fixed",        par%topo_fixed,       init=init_pars)
         call nml_read(filename,"ytopo","topo_rel",          par%topo_rel,         init=init_pars)

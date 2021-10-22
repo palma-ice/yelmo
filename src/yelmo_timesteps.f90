@@ -31,7 +31,7 @@ module yelmo_timesteps
 
 contains
 
-    subroutine set_pc_mask(mask,pc_tau,H_ice_pred,H_ice_corr,f_grnd)
+    subroutine set_pc_mask(mask,pc_tau,H_ice_pred,H_ice_corr,f_grnd,margin_flt_subgrid)
 
         implicit none 
 
@@ -40,6 +40,7 @@ contains
         real(prec), intent(IN) :: H_ice_pred(:,:) 
         real(prec), intent(IN) :: H_ice_corr(:,:) 
         real(prec), intent(IN) :: f_grnd(:,:) 
+        logical,    intent(IN) :: margin_flt_subgrid 
 
         ! Local variables 
         integer :: i, j, nx, ny 
@@ -57,8 +58,8 @@ contains
         allocate(f_ice_corr(nx,ny))
         
         ! Get the ice area fraction mask for each ice thickness map 
-        call calc_ice_fraction(f_ice_pred,H_ice_pred,f_grnd)
-        call calc_ice_fraction(f_ice_corr,H_ice_corr,f_grnd)
+        call calc_ice_fraction(f_ice_pred,H_ice_pred,f_grnd,margin_flt_subgrid)
+        call calc_ice_fraction(f_ice_corr,H_ice_corr,f_grnd,margin_flt_subgrid)
 
         ! Initially set all points to True 
         mask = .TRUE. 
@@ -92,7 +93,7 @@ contains
                     ! Point is at (or near) ice-margin point 
 
                     mask(i,j) = .FALSE. 
-                    
+
                 else if (f_grnd(i,j) .lt. 1.0_prec) then 
                     ! Grounding-line or floating ice point 
 

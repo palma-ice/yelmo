@@ -78,6 +78,7 @@ module yelmo_defs
         integer            :: fmb_method  
         integer            :: surf_gl_method 
         logical            :: margin2nd 
+        logical            :: margin_flt_subgrid 
         logical            :: use_bmb  
         logical            :: topo_fixed
         integer            :: topo_rel
@@ -290,7 +291,7 @@ module yelmo_defs
         real(wp), allocatable :: uxy_i_bar(:,:) 
         
         real(wp), allocatable :: duxydt(:,:) 
-        
+
         real(wp), allocatable :: duxdz(:,:,:) 
         real(wp), allocatable :: duydz(:,:,:)
         real(wp), allocatable :: duxdz_bar(:,:) 

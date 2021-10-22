@@ -32,7 +32,7 @@ contains
     !
     ! ============================================================
 
-    subroutine calc_ice_fraction(f_ice,H_ice,f_grnd)
+    subroutine calc_ice_fraction(f_ice,H_ice,f_grnd,flt_subgrid)
         ! Determine the area fraction of a grid cell
         ! that is ice-covered. Assume that marginal points
         ! have equal thickness to inland neighbors 
@@ -42,11 +42,10 @@ contains
         real(wp), intent(OUT) :: f_ice(:,:)             ! [--] Ice covered fraction (aa-nodes)
         real(wp), intent(IN)  :: H_ice(:,:)             ! [m] Ice thickness on standard grid (aa-nodes)
         real(wp), intent(IN)  :: f_grnd(:,:)            ! [--] Grounded fraction (aa-nodes)
-
+        logical, optional     :: flt_subgrid            ! Option to allow fractions for floating ice margins             
         ! Local variables 
         integer  :: i, j, nx, ny
-        integer  :: im1, ip1, jm1, jp1
-        real(wp) :: H_ice_x, H_ice_y 
+        integer  :: im1, ip1, jm1, jp1 
         real(wp) :: H_eff  
         logical  :: get_fractional_cover 
 
@@ -54,6 +53,7 @@ contains
         real(wp) :: f_neighb(4)
         integer  :: n_neighb(4)
         logical  :: mask(4) 
+        logical  :: mask_grnd(4)
         integer  :: n_now
         integer, allocatable  :: n_ice(:,:) 
 
@@ -68,6 +68,7 @@ contains
 
         ! By default, fractional cover will be determined
         get_fractional_cover = .TRUE. 
+        if (present(flt_subgrid)) get_fractional_cover = flt_subgrid 
 
         ! ajr: see if we can avoid this without relying on "boundaries"
         ! if (trim(boundaries) .eq. "MISMIP3D") then
@@ -102,7 +103,8 @@ contains
                 mask       = H_neighb .gt. 0.0_wp 
                 n_ice(i,j) = count(mask) 
 
-            end if 
+            end if
+
         end do 
         end do
 
@@ -120,8 +122,8 @@ contains
                 
                 if (H_ice(i,j) .gt. 0.0_wp .and. n_ice(i,j) .eq. 0) then 
                     ! First, treat a special case:
-                    ! Island point, assume the cell is not full to ensure it
-                    ! is not dynamically active.
+                    ! Island point, assume the cell is fully covered to ensure it
+                    ! is dynamically active.
 
                     f_ice(i,j) = f_ice_island
 
@@ -139,9 +141,12 @@ contains
                     if (n_now .ge. 1) then 
                         ! Some neighbors have full ice coverage
 
+                        f_neighb = [f_grnd(im1,j),f_grnd(ip1,j),f_grnd(i,jm1),f_grnd(i,jp1)]
+                        mask_grnd = f_neighb .gt. 0.0 .and. H_neighb .gt. 0.0 
+
                         ! Determine height to give to potentially partially filled cell
-                        if (f_grnd(i,j) .eq. 0.0) then 
-                            ! Floating point, set H_eff = minimum of neighbors
+                        if (f_grnd(i,j) .eq. 0.0 .and. count(mask_grnd) .eq. 0) then 
+                            ! Floating point away from grounding line, set H_eff = minimum of neighbors
 
                             H_eff = minval(H_neighb,mask=mask)
 
@@ -150,7 +155,7 @@ contains
                             ! (do not allow partially filled cells for grounded ice)
 
                             H_eff = H_ice(i,j) 
-                            
+
                         end if
                     
                         ! Determine the cell ice fraction
@@ -180,7 +185,7 @@ contains
 
             end do 
             end do 
-
+ 
             ! Treat special cases where f_ice = -1.0
             do j = 1, ny
             do i = 1, nx 

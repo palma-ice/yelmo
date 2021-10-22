@@ -147,8 +147,8 @@ program yelmo_benchmarks
         
             yelmo1%bnd%z_bed  = 720.0 - 778.50*(sqrt((yelmo1%grd%x*1e-3)**2+(yelmo1%grd%y*1e-3)**2))/750.0
             
-            yelmo1%tpo%now%H_ice  = 100.0
-            !call dome_init(yelmo1%tpo%now%H_ice,yelmo1%grd%x,yelmo1%grd%y,R0=0.5_prec,H0=2000.0_prec)
+            !yelmo1%tpo%now%H_ice  = 100.0
+            call dome_init(yelmo1%tpo%now%H_ice,yelmo1%grd%x,yelmo1%grd%y,R0=0.5_prec,H0=2000.0_prec)
 
             yelmo1%tpo%now%z_srf  = yelmo1%bnd%z_bed + yelmo1%tpo%now%H_ice
 

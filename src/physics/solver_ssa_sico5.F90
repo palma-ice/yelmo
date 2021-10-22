@@ -554,7 +554,7 @@ contains
 
                         lgs_b_value(nr) = factor_rhs_3a*H_ice_now*H_ice_now &
                                         - factor_rhs_3b*H_ocn_now*H_ocn_now
-
+                                        
 !                         if (i .eq. 80 .and. j .eq. 70) then 
 !                             ! Margin point
 !                             write(*,*) "front ", vx_m(i1,j), vx_m(i1-1,j), vy_m(i1,j), vy_m(i1,j-1)
@@ -925,7 +925,7 @@ contains
                         j1 = j+1   ! ice-front marker
                     end if
 
-                    if ( (.not. is_front_2(i,j1-1)) .and. (.not. is_front_2(i,j1+1)) ) then
+                    if ( (.not. is_front_2(i,j1-1)) .or. (.not. is_front_2(i,j1+1)) ) then
                         ! Inland ice exists,
                         ! discretization of the y-component of the BC
 
@@ -973,7 +973,7 @@ contains
                         end if 
 
                         lgs_b_value(nr) = factor_rhs_3a*H_ice_now*H_ice_now &
-                                        - factor_rhs_3b*H_ocn_now*H_ocn_now  
+                                        - factor_rhs_3b*H_ocn_now*H_ocn_now   
 
                         ! =========================================================
               

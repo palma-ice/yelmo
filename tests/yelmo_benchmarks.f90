@@ -146,7 +146,10 @@ program yelmo_benchmarks
             ! Add a marine bed for testing ice shelves following MISMIP
         
             yelmo1%bnd%z_bed  = 720.0 - 778.50*(sqrt((yelmo1%grd%x*1e-3)**2+(yelmo1%grd%y*1e-3)**2))/750.0
+            
             yelmo1%tpo%now%H_ice  = 100.0
+            !call dome_init(yelmo1%tpo%now%H_ice,yelmo1%grd%x,yelmo1%grd%y,R0=0.5_prec,H0=2000.0_prec)
+
             yelmo1%tpo%now%z_srf  = yelmo1%bnd%z_bed + yelmo1%tpo%now%H_ice
 
 !             where(yelmo1%bnd%z_bed .lt. 0.0) yelmo1%bnd%smb = 0.0 
@@ -285,7 +288,7 @@ program yelmo_benchmarks
             ! Set conditions similar to EISMINT2-EXPA with smaller radius 
             call dome_boundaries(yelmo1%bnd%T_srf,yelmo1%bnd%smb,yelmo1%bnd%Q_geo, &
                             yelmo1%grd%x,yelmo1%grd%y,yelmo1%tpo%now%H_ice, &
-                            experiment="dome",time=time,smb_max=0.3_prec,rad_el=800.0_prec,period=period,dT_test=dT_test)
+                            experiment="dome",time=time,smb_max=0.5_prec,rad_el=1200.0_prec,period=period,dT_test=dT_test)
                 
         case("mismip-stnd") 
 
@@ -345,8 +348,7 @@ program yelmo_benchmarks
                         experiment="dome",time=time,smb_max=0.3_prec,rad_el=300.0_prec,period=period,dT_test=dT_test)
 
         call yelmo_update_equil(yelmo1,time_init,time_tot=real(5e3,prec), &
-                                                dt=5.0_prec,topo_fixed=.FALSE.)
-
+                                                dt=5.0_prec,topo_fixed=.FALSE.)  
     end if 
 
     ! == Write initial state ==
@@ -427,7 +429,7 @@ program yelmo_benchmarks
                 ! Set conditions similar to EISMINT2-EXPA with smaller radius 
                 call dome_boundaries(yelmo1%bnd%T_srf,yelmo1%bnd%smb,yelmo1%bnd%Q_geo, &
                                 yelmo1%grd%x,yelmo1%grd%y,yelmo1%tpo%now%H_ice, &
-                                experiment="dome",time=time,smb_max=0.3_prec,rad_el=800.0_prec,period=period,dT_test=dT_test)
+                                experiment="dome",time=time,smb_max=0.5_prec,rad_el=1200.0_prec,period=period,dT_test=dT_test)
                 
             case("mismip-stnd") 
 

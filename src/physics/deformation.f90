@@ -543,8 +543,6 @@ contains
         real(wp), allocatable :: fact_x(:,:), fact_y(:,:)
         real(wp), allocatable :: fact_z(:)
 
-        real(wp) :: f_ice_neighb(4) 
-
         real(wp) :: wt 
         real(wp) :: dd_ab(4) 
         real(wp) :: dd_ab_up(4)
@@ -608,13 +606,6 @@ contains
             jm1 = max(j-1,1) 
             jp1 = min(j+1,ny) 
             
-            f_ice_neighb = [f_ice(ip1,j),f_ice(im1,j),f_ice(i,jp1),f_ice(i,jm1)]
-
-            ! if (f_ice(i,j) .eq. 1.0_wp .or. &
-            !         count(f_ice_neighb .eq. 1.0_wp) .gt. 0) then
-            !     ! Grounded or floating ice, or margin point beyond full ice coverage,
-            !     ! calculate strain rate here
-
             if (f_ice(i,j) .eq. 1.0_wp) then 
 
                 H_ice_inv = 1.0_wp/H_ice(i,j)
@@ -897,8 +888,6 @@ contains
         real(wp), allocatable :: fact_x(:,:), fact_y(:,:)
         real(wp), allocatable :: fact_z(:)
 
-        real(wp) :: f_ice_neighb(4)
-
         real(wp) :: wt 
 
         ! Define dy 
@@ -954,13 +943,6 @@ contains
             jm1 = max(j-1,1) 
             jp1 = min(j+1,ny) 
             
-            f_ice_neighb = [f_ice(ip1,j),f_ice(im1,j),f_ice(i,jp1),f_ice(i,jm1)]
-
-            ! if (f_ice(i,j) .eq. 1.0_wp .or. &
-            !         count(f_ice_neighb .eq. 1.0_wp) .gt. 0) then
-            !     ! Grounded or floating ice, or margin point beyond full ice coverage,
-            !     ! calculate strain rate here
-
             if (f_ice(i,j) .eq. 1.0_wp) then 
 
                 H_ice_inv = 1.0_wp/H_ice(i,j)
@@ -1153,8 +1135,6 @@ contains
         integer  :: nx, ny
         real(wp) :: dy 
 
-        real(wp) :: f_ice_neighb(4) 
-
         real(wp) :: lxy, lyx 
         real(wp) :: wt_ab(4) 
         real(wp) :: dd_ab(4) 
@@ -1184,13 +1164,6 @@ contains
             jm1 = max(j-1,1) 
             jp1 = min(j+1,ny) 
             
-            f_ice_neighb = [f_ice(ip1,j),f_ice(im1,j),f_ice(i,jp1),f_ice(i,jm1)]
-
-            ! if (f_ice(i,j) .eq. 1.0_wp .or. &
-            !         count(f_ice_neighb .eq. 1.0_wp) .gt. 0) then
-            !     ! Grounded or floating ice, or margin point beyond full ice coverage,
-            !     ! calculate strain rate here
-
             if (f_ice(i,j) .eq. 1.0_wp) then 
 
                 ! Get equal weighting for each ab-node

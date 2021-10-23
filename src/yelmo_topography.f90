@@ -10,8 +10,6 @@ module yelmo_topography
     use mass_conservation
     use calving
     use topography 
-    use deformation, only : strain_2D_alloc, stress_2D_alloc, & 
-            calc_strain_rate_tensor_2D, calc_stress_tensor_2D
 
     implicit none
     
@@ -61,9 +59,6 @@ contains
         real(prec), allocatable :: calv_sd(:,:) 
         real(prec), allocatable :: H_ref(:,:) 
 
-        type(strain_2D_class)   :: strn2D
-        type(stress_2D_class)   :: strs2D
-        
         real(8)    :: cpu_time0, cpu_time1
         real(prec) :: model_time0, model_time1 
         real(prec) :: speed 
@@ -74,10 +69,6 @@ contains
         allocate(mbal(nx,ny))
         allocate(calv_sd(nx,ny))
         allocate(H_ref(nx,ny))
-
-        ! Allocate local strain rate and stress tensors 
-        call strain_2D_alloc(strn2D,nx,ny) 
-        call stress_2D_alloc(strs2D,nx,ny) 
 
         ! Initialize time if necessary 
         if (tpo%par%time .gt. dble(time)) then 
@@ -184,14 +175,7 @@ contains
                         stop "Program stopped."
 
                     end if 
-                        
-                    ! First, calculate local version of 2D strain rate and stress tensors for diagnosing calving
-
-                    ! call calc_strain_rate_tensor_2D(strn2D,dyn%now%ux_bar,dyn%now%uy_bar,tpo%now%H_ice,tpo%now%f_ice, &
-                    !                                         tpo%now%f_grnd,mat%par%dx,mat%par%de_max,mat%par%n_glen)
-
-                    ! call calc_stress_tensor_2D(strs2D,mat%now%visc_bar,strn2D)
-
+                    
                     ! Next, diagnose calving
                     call calc_calving_rate_vonmises_l19(tpo%now%calv_flt,tpo%now%H_ice,tpo%now%f_ice,tpo%now%f_grnd, &
                                                         mat%now%strs2D%teig1,mat%now%strs2D%teig2,mat%now%ATT_bar, &

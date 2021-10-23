@@ -90,14 +90,14 @@ if (.TRUE.) then
 
         call calc_strain_rate_tensor(mat%now%strn,mat%now%strn2D,dyn%now%ux,dyn%now%uy,dyn%now%uz, &
                                  tpo%now%H_ice,tpo%now%f_ice,tpo%now%f_grnd,mat%par%zeta_aa, &
-                                 mat%par%zeta_ac,mat%par%dx,mat%par%de_max,mat%now%ATT_bar,mat%par%n_glen)
+                                 mat%par%zeta_ac,mat%par%dx,mat%par%de_max,mat%par%n_glen)
 
 else 
         ! Calculate strain rate tensor on aa-nodes directly
 
         call calc_strain_rate_tensor_aa(mat%now%strn,mat%now%strn2D,dyn%now%ux,dyn%now%uy,dyn%now%uz, &
                                  tpo%now%H_ice,tpo%now%f_ice,tpo%now%f_grnd,mat%par%zeta_aa, &
-                                 mat%par%zeta_ac,mat%par%dx,mat%par%de_max,mat%now%ATT_bar,mat%par%n_glen)
+                                 mat%par%zeta_ac,mat%par%dx,mat%par%de_max,mat%par%n_glen)
 
 end if 
 
@@ -245,7 +245,8 @@ end if
             
             case(2)
                 ! Calculate rate factor from viscosity and effective strain rate 
-                ! (only works when dyn%par%visc_method=0 and visc_const is prescribed)
+                ! (only works when dyn%par%visc_method=0 with visc_const prescribed,
+                ! and n_glen=1)
 
                 if (dyn%par%visc_method .ne. 0 .or. mat%par%n_glen .ne. 1.0_wp) then 
                     write(*,*) "calc_ymat:: Error: rf_method=2 only works when viscosity &
@@ -379,6 +380,7 @@ end if
         allocate(now%strn2D%dyz(nx,ny))
         allocate(now%strn2D%div(nx,ny))
         allocate(now%strn2D%de(nx,ny))
+        allocate(now%strn2D%f_shear(nx,ny))
         
         allocate(now%strn%dxx(nx,ny,nz_aa))
         allocate(now%strn%dyy(nx,ny,nz_aa))

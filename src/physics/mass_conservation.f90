@@ -11,6 +11,7 @@ module mass_conservation
     private
     public :: calc_ice_thickness_dyn
     public :: calc_ice_thickness_mbal
+    public :: calc_ice_thickness_calving
     public :: apply_ice_thickness_boundaries
     public :: relax_ice_thickness
 
@@ -121,8 +122,7 @@ contains
 
     end subroutine calc_ice_thickness_dyn
 
-    subroutine calc_ice_thickness_mbal(H_ice,f_ice,mb_applied,calv,f_grnd,H_ocn, &
-                                       mbal,calv_flt,calv_grnd,dx,dt)
+    subroutine calc_ice_thickness_mbal(H_ice,f_ice,mb_applied,f_grnd,H_ocn,mbal,dx,dt)
         ! Interface subroutine to update ice thickness through application
         ! of advection, vertical mass balance terms and calving 
 
@@ -131,10 +131,53 @@ contains
         real(wp), intent(INOUT) :: H_ice(:,:)           ! [m]   Ice thickness 
         real(wp), intent(INOUT) :: f_ice(:,:)           ! [--]  Ice cover fraction 
         real(wp), intent(OUT)   :: mb_applied(:,:)      ! [m/a] Actual mass balance applied to real ice points
-        real(wp), intent(OUT)   :: calv(:,:)            ! [m/a] Actual calving rate 
         real(wp), intent(IN)    :: f_grnd(:,:)          ! [--]  Grounded fraction 
         real(wp), intent(IN)    :: H_ocn(:,:)           ! [m]   Ocean thickness (ie, depth)
         real(wp), intent(IN)    :: mbal(:,:)            ! [m/a] Net mass balance; mbal = smb+bmb (calving separate) 
+        real(wp), intent(IN)    :: dx                   ! [m]   Horizontal resolution
+        real(wp), intent(IN)    :: dt                   ! [a]   Timestep  
+
+        ! Local variables 
+        integer :: i, j, nx, ny 
+        integer :: im1, ip1, jm1, jp1 
+
+        nx = size(H_ice,1)
+        ny = size(H_ice,2) 
+
+        ! ==== MASS BALANCE =====
+
+        ! Combine mass balance and calving into one field, mb_applied.
+        ! mbal is not scaled by f_ice, since it does not depend on ice thickness. 
+        mb_applied = mbal
+
+        ! Additionally ensure ice cannot form in open ocean 
+        where(f_grnd .eq. 0.0 .and. H_ice .eq. 0.0)  mb_applied = 0.0  
+
+        ! Ensure melt is limited to amount of available ice to melt  
+        where((H_ice+dt*mb_applied) .lt. 0.0) mb_applied = -H_ice/dt
+
+        ! Apply modified mass balance to update the ice thickness 
+        H_ice = H_ice + dt*mb_applied
+
+        ! Ensure tiny numeric ice thicknesses are removed
+        where (H_ice .lt. TOL_UNDERFLOW) H_ice = 0.0 
+
+        return 
+
+    end subroutine calc_ice_thickness_mbal
+
+    subroutine calc_ice_thickness_calving(H_ice,f_ice,calv_applied,f_grnd,H_ocn, &
+                                       calv_flt,calv_grnd,dx,dt)
+        ! Interface subroutine to update ice thickness through application
+        ! of advection, vertical mass balance terms and calving 
+
+        implicit none 
+
+        real(wp), intent(INOUT) :: H_ice(:,:)           ! [m]   Ice thickness 
+        real(wp), intent(INOUT) :: f_ice(:,:)           ! [--]  Ice cover fraction 
+        real(wp), intent(OUT)   :: calv_applied(:,:)    ! [m/a] Actual calving applied to real ice points
+        real(wp), intent(IN)    :: f_grnd(:,:)          ! [--]  Grounded fraction 
+        real(wp), intent(IN)    :: H_ocn(:,:)           ! [m]   Ocean thickness (ie, depth)
         real(wp), intent(IN)    :: calv_flt(:,:)        ! [m/a] Potential calving rate (floating)
         real(wp), intent(IN)    :: calv_grnd(:,:)       ! [m/a] Potential calving rate (grounded)
         real(wp), intent(IN)    :: dx                   ! [m]   Horizontal resolution
@@ -151,29 +194,20 @@ contains
 
         ! Combine grounded and floating calving into one field for output.
         ! It has already been scaled by area of ice in cell (f_ice).
-        calv = (calv_flt + calv_grnd)
+        calv_applied = (calv_flt + calv_grnd)
 
-        ! ==== MASS BALANCE =====
-
-        ! Combine mass balance and calving into one field, mb_applied.
-        ! mbal is not scaled by f_ice, since it does not depend on ice thickness. 
-        mb_applied = mbal - calv
-
-        ! Additionally ensure ice cannot form in open ocean 
-        where(f_grnd .eq. 0.0 .and. f_ice .eq. 0.0)  mb_applied = 0.0  
-
-        ! Ensure melt is limited to amount of available ice to melt  
-        where((H_ice+dt*mb_applied) .lt. 0.0) mb_applied = -H_ice/dt
+        ! Ensure applied calving is limited to amount of available ice to calve
+        where((H_ice-dt*calv_applied) .lt. 0.0) calv_applied = H_ice/dt
 
         ! Apply modified mass balance to update the ice thickness 
-        H_ice = H_ice + dt*mb_applied
-
+        H_ice = H_ice - dt*calv_applied
+        
         ! Ensure tiny numeric ice thicknesses are removed
         where (H_ice .lt. TOL_UNDERFLOW) H_ice = 0.0 
 
         return 
 
-    end subroutine calc_ice_thickness_mbal
+    end subroutine calc_ice_thickness_calving
 
     subroutine apply_ice_thickness_boundaries(mb_resid,H_ice,f_ice,f_grnd,uxy_b,ice_allowed,boundaries,H_ice_ref, &
                                                 H_min_flt,H_min_grnd,dt)

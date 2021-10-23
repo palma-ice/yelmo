@@ -37,7 +37,9 @@ module deformation
     public :: calc_stress_tensor 
     public :: calc_stress_tensor_2D
     public :: calc_stress_eigen_values
-    
+    public :: strain_2D_alloc 
+    public :: stress_2D_alloc
+
 contains 
 
     subroutine modify_enhancement_factor_bnd(enh,f_grnd,uxy_bar,enh_stream,enh_shlf,umin,umax)
@@ -492,7 +494,7 @@ contains
     end function calc_rate_factor_integrated
     
     subroutine calc_strain_rate_tensor(strn, strn2D, vx, vy, vz, H_ice, f_ice, f_grnd,  &
-                    zeta_aa, zeta_ac, dx, de_max, ATT_bar, n_glen)
+                    zeta_aa, zeta_ac, dx, de_max, n_glen)
         ! -------------------------------------------------------------------------------
         !  Computation of all components of the strain-rate tensor, the full
         !  effective strain rate and the shear fraction.
@@ -524,13 +526,11 @@ contains
         real(wp), intent(IN) :: zeta_ac(:) 
         real(wp), intent(IN) :: dx
         real(wp), intent(IN) :: de_max                          ! [yr^-1] Maximum allowed effective strain rate
-        real(wp), intent(IN) :: ATT_bar(:,:)
         real(wp), intent(IN) :: n_glen
 
         ! Local variables 
         integer  :: i, j, k
         integer  :: im1, ip1, jm1, jp1 
-        integer  :: im2, ip2, jm2, jp2 
         integer  :: nx, ny, nz_aa, nz_ac  
         real(wp) :: dxi, deta, dzeta
         real(wp) :: dy  
@@ -542,6 +542,8 @@ contains
         real(wp) :: ux_aa, uy_aa 
         real(wp), allocatable :: fact_x(:,:), fact_y(:,:)
         real(wp), allocatable :: fact_z(:)
+
+        real(wp) :: f_ice_neighb(4) 
 
         real(wp) :: wt 
         real(wp) :: dd_ab(4) 
@@ -600,22 +602,23 @@ contains
         do j=1, ny
         do i=1, nx
 
+            ! Get neighbor indices
+            im1 = max(i-1,1) 
+            ip1 = min(i+1,nx) 
+            jm1 = max(j-1,1) 
+            jp1 = min(j+1,ny) 
+            
+            f_ice_neighb = [f_ice(ip1,j),f_ice(im1,j),f_ice(i,jp1),f_ice(i,jm1)]
+
+            ! if (f_ice(i,j) .eq. 1.0_wp .or. &
+            !         count(f_ice_neighb .eq. 1.0_wp) .gt. 0) then
+            !     ! Grounded or floating ice, or margin point beyond full ice coverage,
+            !     ! calculate strain rate here
+
             if (f_ice(i,j) .eq. 1.0_wp) then 
-                ! Ice-covered grid point 
 
                 H_ice_inv = 1.0_wp/H_ice(i,j)
 
-                ! Get neighbor indices
-                im1 = max(i-1,1) 
-                ip1 = min(i+1,nx) 
-                jm1 = max(j-1,1) 
-                jp1 = min(j+1,ny) 
-                
-                im2 = max(i-2,1) 
-                ip2 = min(i+2,nx) 
-                jm2 = max(j-2,1) 
-                jp2 = min(j+2,ny) 
-                
                 ! Get equal weighting for each ab-node
                 wt_ab = 0.25_wp 
 
@@ -833,120 +836,6 @@ contains
         end do
         !$omp end parallel do
 
-
-        ! === Extrapolate to ice-free neighbors === 
-        ! (in case ice gets advected there)
-        do j=1, ny
-        do i=1, nx
-
-            ! Get neighbor indices
-            im1 = max(i-1,1) 
-            ip1 = min(i+1,nx) 
-            jm1 = max(j-1,1) 
-            jp1 = min(j+1,ny) 
-                
-            if ( f_ice(i,j) .lt. 1.0 .and. &
-                count([f_ice(im1,j),f_ice(ip1,j),f_ice(i,jm1),f_ice(i,jp1)] .eq. 1.0_wp) .gt. 0 ) then 
-                ! Ice-free (or partially ice-free) with ice-covered neighbors
-
-                strn%dxx(i,j,:) = 0.0 
-                strn%dyy(i,j,:) = 0.0
-                strn%dxy(i,j,:) = 0.0
-                strn%dxz(i,j,:) = 0.0 
-                strn%dyz(i,j,:) = 0.0
-
-                wt = 0.0 
-
-                if (f_ice(im1,j) .eq. 1.0) then 
-                    strn%dxx(i,j,:) = strn%dxx(i,j,:) + strn%dxx(im1,j,:)
-                    strn%dyy(i,j,:) = strn%dyy(i,j,:) + strn%dyy(im1,j,:)
-                    strn%dxy(i,j,:) = strn%dxy(i,j,:) + strn%dxy(im1,j,:)
-                    strn%dxz(i,j,:) = strn%dxz(i,j,:) + strn%dxz(im1,j,:)
-                    strn%dyz(i,j,:) = strn%dyz(i,j,:) + strn%dyz(im1,j,:)
-                    wt = wt + 1.0 
-                end if 
-                if (f_ice(ip1,j) .eq. 1.0) then 
-                    strn%dxx(i,j,:) = strn%dxx(i,j,:) + strn%dxx(ip1,j,:)
-                    strn%dyy(i,j,:) = strn%dyy(i,j,:) + strn%dyy(ip1,j,:)
-                    strn%dxy(i,j,:) = strn%dxy(i,j,:) + strn%dxy(ip1,j,:)
-                    strn%dxz(i,j,:) = strn%dxz(i,j,:) + strn%dxz(ip1,j,:)
-                    strn%dyz(i,j,:) = strn%dyz(i,j,:) + strn%dyz(ip1,j,:)
-                    wt = wt + 1.0 
-                end if
-                if (f_ice(i,jm1) .eq. 1.0) then 
-                    strn%dxx(i,j,:) = strn%dxx(i,j,:) + strn%dxx(i,jm1,:)
-                    strn%dyy(i,j,:) = strn%dyy(i,j,:) + strn%dyy(i,jm1,:)
-                    strn%dxy(i,j,:) = strn%dxy(i,j,:) + strn%dxy(i,jm1,:)
-                    strn%dxz(i,j,:) = strn%dxz(i,j,:) + strn%dxz(i,jm1,:)
-                    strn%dyz(i,j,:) = strn%dyz(i,j,:) + strn%dyz(i,jm1,:)
-                    wt = wt + 1.0 
-                end if
-                if (f_ice(i,jp1) .eq. 1.0) then 
-                    strn%dxx(i,j,:) = strn%dxx(i,j,:) + strn%dxx(i,jp1,:)
-                    strn%dyy(i,j,:) = strn%dyy(i,j,:) + strn%dyy(i,jp1,:)
-                    strn%dxy(i,j,:) = strn%dxy(i,j,:) + strn%dxy(i,jp1,:)
-                    strn%dxz(i,j,:) = strn%dxz(i,j,:) + strn%dxz(i,jp1,:)
-                    strn%dyz(i,j,:) = strn%dyz(i,j,:) + strn%dyz(i,jp1,:)
-                    wt = wt + 1.0 
-                end if
-
-                if (wt .gt. 0.0) then 
-                    strn%dxx(i,j,:) = strn%dxx(i,j,:) / wt
-                    strn%dyy(i,j,:) = strn%dyy(i,j,:) / wt
-                    strn%dxy(i,j,:) = strn%dxy(i,j,:) / wt
-                    strn%dxz(i,j,:) = strn%dxz(i,j,:) / wt
-                    strn%dyz(i,j,:) = strn%dyz(i,j,:) / wt
-                end if 
-
-
-                ! Obtain effective strain rate and divergence
-
-                do k = 1, nz_aa 
-                    ! ====== Finished calculating individual strain rate terms ====== 
-                    
-                    strn%de(i,j,k) =  sqrt(  strn%dxx(i,j,k)*strn%dxx(i,j,k) &
-                                           + strn%dyy(i,j,k)*strn%dyy(i,j,k) &
-                                           + strn%dxx(i,j,k)*strn%dyy(i,j,k) &
-                                           + strn%dxy(i,j,k)*strn%dxy(i,j,k) &
-                                           + strn%dxz(i,j,k)*strn%dxz(i,j,k) &
-                                           + strn%dyz(i,j,k)*strn%dyz(i,j,k) )
-                    
-                    if (strn%de(i,j,k) .gt. de_max) strn%de(i,j,k) = de_max 
-
-                    ! Calculate the horizontal divergence too 
-                    strn%div(i,j,k) = strn%dxx(i,j,k) + strn%dyy(i,j,k) 
-
-                    ! Note: Using only the below should be equivalent to applying
-                    ! the SIA approximation to calculate `de`
-                    !strn%de(i,j,k)    =  sqrt( shear_squared )
-
-                    if (strn%de(i,j,k) .gt. 0.0) then 
-                        ! Calculate the shear-based strain, stretching and the shear-fraction
-                        shear_squared  =   strn%dxz(i,j,k)*strn%dxz(i,j,k) &
-                                         + strn%dyz(i,j,k)*strn%dyz(i,j,k)
-                        strn%f_shear(i,j,k) = sqrt(shear_squared)/strn%de(i,j,k)
-                    else 
-                        strn%f_shear(i,j,k) = 1.0   ! Shearing by default for low strain rates
-                    end if 
-
-                    !  ------ Modification of the shear fraction for floating ice (ice shelves)
-
-                    if (f_grnd(i,j) .eq. 0.0) then 
-                        strn%f_shear(i,j,k) = 0.0    ! Assume ice shelf is only stretching, no shear 
-                    end if 
-
-                    !  ------ Constrain the shear fraction to reasonable [0,1] interval
-
-                    strn%f_shear(i,j,k) = min(max(strn%f_shear(i,j,k), 0.0), 1.0) 
-                end do 
-
-
-            end if 
-
-        end do
-        end do
-
-
         ! === Also calculate vertically averaged strain rate tensor ===
         
         ! Get the 2D average of strain rate in case it is needed 
@@ -964,7 +853,7 @@ contains
     end subroutine calc_strain_rate_tensor
 
     subroutine calc_strain_rate_tensor_aa(strn, strn2D, vx, vy, vz, H_ice, f_ice, f_grnd, &
-                    zeta_aa, zeta_ac, dx, de_max, ATT_bar, n_glen)
+                    zeta_aa, zeta_ac, dx, de_max, n_glen)
         ! -------------------------------------------------------------------------------
         !  Computation of all components of the strain-rate tensor, the full
         !  effective strain rate and the shear fraction.
@@ -992,7 +881,6 @@ contains
         real(wp), intent(IN) :: zeta_ac(:) 
         real(wp), intent(IN) :: dx
         real(wp), intent(IN) :: de_max                          ! [yr^-1] Maximum allowed effective strain rate
-        real(wp), intent(IN) :: ATT_bar(:,:)
         real(wp), intent(IN) :: n_glen
 
         ! Local variables 
@@ -1009,7 +897,8 @@ contains
         real(wp), allocatable :: fact_x(:,:), fact_y(:,:)
         real(wp), allocatable :: fact_z(:)
 
-        logical :: is_margin 
+        real(wp) :: f_ice_neighb(4)
+
         real(wp) :: wt 
 
         ! Define dy 
@@ -1059,17 +948,24 @@ contains
         do j=1, ny
         do i=1, nx
 
-            if (f_ice(i,j) .eq. 1.0_wp) then
-                ! Grounded or floating ice, calculate strain rate here
+            ! Get neighbor indices
+            im1 = max(i-1,1) 
+            ip1 = min(i+1,nx) 
+            jm1 = max(j-1,1) 
+            jp1 = min(j+1,ny) 
+            
+            f_ice_neighb = [f_ice(ip1,j),f_ice(im1,j),f_ice(i,jp1),f_ice(i,jm1)]
+
+            ! if (f_ice(i,j) .eq. 1.0_wp .or. &
+            !         count(f_ice_neighb .eq. 1.0_wp) .gt. 0) then
+            !     ! Grounded or floating ice, or margin point beyond full ice coverage,
+            !     ! calculate strain rate here
+
+            if (f_ice(i,j) .eq. 1.0_wp) then 
 
                 H_ice_inv = 1.0_wp/H_ice(i,j)
 
-                ! Get neighbor indices
-                im1 = max(i-1,1) 
-                ip1 = min(i+1,nx) 
-                jm1 = max(j-1,1) 
-                jp1 = min(j+1,ny) 
-                
+            
                 ! ====== Loop over each column ====== 
 
                 do k = 1, nz_aa 
@@ -1215,121 +1111,6 @@ contains
         end do
         !$omp end parallel do
 
-
-        ! === Extrapolate to ice-free neighbors === 
-        ! (in case ice gets advected there)
-        do j=1, ny
-        do i=1, nx
-
-            ! Get neighbor indices
-            im1 = max(i-1,1) 
-            ip1 = min(i+1,nx) 
-            jm1 = max(j-1,1) 
-            jp1 = min(j+1,ny) 
-                
-            if ( f_ice(i,j) .lt. 1.0 .and. &
-                count([f_ice(im1,j),f_ice(ip1,j),f_ice(i,jm1),f_ice(i,jp1)] .eq. 1.0_wp) .gt. 0 ) then 
-                ! Ice-free (or partially ice-free) with ice-covered neighbors
-
-
-                strn%dxx(i,j,:) = 0.0 
-                strn%dyy(i,j,:) = 0.0
-                strn%dxy(i,j,:) = 0.0
-                strn%dxz(i,j,:) = 0.0 
-                strn%dyz(i,j,:) = 0.0
-
-                wt = 0.0 
-
-                if (f_ice(im1,j) .eq. 1.0) then 
-                    strn%dxx(i,j,:) = strn%dxx(i,j,:) + strn%dxx(im1,j,:)
-                    strn%dyy(i,j,:) = strn%dyy(i,j,:) + strn%dyy(im1,j,:)
-                    strn%dxy(i,j,:) = strn%dxy(i,j,:) + strn%dxy(im1,j,:)
-                    strn%dxz(i,j,:) = strn%dxz(i,j,:) + strn%dxz(im1,j,:)
-                    strn%dyz(i,j,:) = strn%dyz(i,j,:) + strn%dyz(im1,j,:)
-                    wt = wt + 1.0 
-                end if 
-                if (f_ice(ip1,j) .eq. 1.0) then 
-                    strn%dxx(i,j,:) = strn%dxx(i,j,:) + strn%dxx(ip1,j,:)
-                    strn%dyy(i,j,:) = strn%dyy(i,j,:) + strn%dyy(ip1,j,:)
-                    strn%dxy(i,j,:) = strn%dxy(i,j,:) + strn%dxy(ip1,j,:)
-                    strn%dxz(i,j,:) = strn%dxz(i,j,:) + strn%dxz(ip1,j,:)
-                    strn%dyz(i,j,:) = strn%dyz(i,j,:) + strn%dyz(ip1,j,:)
-                    wt = wt + 1.0 
-                end if
-                if (f_ice(i,jm1) .eq. 1.0) then 
-                    strn%dxx(i,j,:) = strn%dxx(i,j,:) + strn%dxx(i,jm1,:)
-                    strn%dyy(i,j,:) = strn%dyy(i,j,:) + strn%dyy(i,jm1,:)
-                    strn%dxy(i,j,:) = strn%dxy(i,j,:) + strn%dxy(i,jm1,:)
-                    strn%dxz(i,j,:) = strn%dxz(i,j,:) + strn%dxz(i,jm1,:)
-                    strn%dyz(i,j,:) = strn%dyz(i,j,:) + strn%dyz(i,jm1,:)
-                    wt = wt + 1.0 
-                end if
-                if (f_ice(i,jp1) .eq. 1.0) then 
-                    strn%dxx(i,j,:) = strn%dxx(i,j,:) + strn%dxx(i,jp1,:)
-                    strn%dyy(i,j,:) = strn%dyy(i,j,:) + strn%dyy(i,jp1,:)
-                    strn%dxy(i,j,:) = strn%dxy(i,j,:) + strn%dxy(i,jp1,:)
-                    strn%dxz(i,j,:) = strn%dxz(i,j,:) + strn%dxz(i,jp1,:)
-                    strn%dyz(i,j,:) = strn%dyz(i,j,:) + strn%dyz(i,jp1,:)
-                    wt = wt + 1.0 
-                end if
-
-                if (wt .gt. 0.0) then 
-                    strn%dxx(i,j,:) = strn%dxx(i,j,:) / wt
-                    strn%dyy(i,j,:) = strn%dyy(i,j,:) / wt
-                    strn%dxy(i,j,:) = strn%dxy(i,j,:) / wt
-                    strn%dxz(i,j,:) = strn%dxz(i,j,:) / wt
-                    strn%dyz(i,j,:) = strn%dyz(i,j,:) / wt
-                end if 
-
-
-                ! Obtain effective strain rate and divergence
-
-                do k = 1, nz_aa 
-                    ! ====== Finished calculating individual strain rate terms ====== 
-                    
-                    strn%de(i,j,k) =  sqrt(  strn%dxx(i,j,k)*strn%dxx(i,j,k) &
-                                           + strn%dyy(i,j,k)*strn%dyy(i,j,k) &
-                                           + strn%dxx(i,j,k)*strn%dyy(i,j,k) &
-                                           + strn%dxy(i,j,k)*strn%dxy(i,j,k) &
-                                           + strn%dxz(i,j,k)*strn%dxz(i,j,k) &
-                                           + strn%dyz(i,j,k)*strn%dyz(i,j,k) )
-                    
-                    if (strn%de(i,j,k) .gt. de_max) strn%de(i,j,k) = de_max 
-
-                    ! Calculate the horizontal divergence too 
-                    strn%div(i,j,k) = strn%dxx(i,j,k) + strn%dyy(i,j,k) 
-
-                    ! Note: Using only the below should be equivalent to applying
-                    ! the SIA approximation to calculate `de`
-                    !strn%de(i,j,k)    =  sqrt( shear_squared(k) )
-
-                    if (strn%de(i,j,k) .gt. 0.0) then 
-                        ! Calculate the shear-based strain, stretching and the shear-fraction
-                        shear_squared  =   strn%dxz(i,j,k)*strn%dxz(i,j,k) &
-                                         + strn%dyz(i,j,k)*strn%dyz(i,j,k)
-                        strn%f_shear(i,j,k) = sqrt(shear_squared)/strn%de(i,j,k)
-                    else 
-                        strn%f_shear(i,j,k) = 1.0   ! Shearing by default for low strain rates
-                    end if 
-
-                    !  ------ Modification of the shear fraction for floating ice (ice shelves)
-
-                    if (f_grnd(i,j) .eq. 0.0) then 
-                        strn%f_shear(i,j,k) = 0.0    ! Assume ice shelf is only stretching, no shear 
-                    end if 
-
-                    !  ------ Constrain the shear fraction to reasonable [0,1] interval
-
-                    strn%f_shear(i,j,k) = min(max(strn%f_shear(i,j,k), 0.0), 1.0) 
-                end do 
-
-
-            end if 
-
-        end do
-        end do
-
-
         ! === Also calculate vertically averaged strain rate tensor ===
         
         ! Get the 2D average of strain rate in case it is needed 
@@ -1346,7 +1127,7 @@ contains
 
     end subroutine calc_strain_rate_tensor_aa
 
-    subroutine calc_strain_rate_tensor_2D(strn2D,ux_bar,uy_bar,H_ice,f_ice,f_grnd,dx,dy,de_max,ATT_bar,n_glen)
+    subroutine calc_strain_rate_tensor_2D(strn2D,vx,vy,H_ice,f_ice,f_grnd,dx,de_max,n_glen)
         ! Calculate the 2D (vertically averaged) strain rate tensor,
         ! assuming a constant vertical velocity profile. 
 
@@ -1356,29 +1137,33 @@ contains
 
         implicit none
 
-        type(strain_2D_class), intent(OUT) :: strn2D            ! [yr^-1] Strain rate tensor
-        real(wp), intent(IN) :: ux_bar(:,:)                     ! [m/yr] Vertically averaged vel., x
-        real(wp), intent(IN) :: uy_bar(:,:)                     ! [m/yr] Vertically averaged vel., y
+        type(strain_2D_class), intent(INOUT) :: strn2D          ! [yr^-1] Strain rate tensor
+        real(wp), intent(IN) :: vx(:,:)                         ! [m/yr] Vertically averaged vel., x
+        real(wp), intent(IN) :: vy(:,:)                         ! [m/yr] Vertically averaged vel., y
         real(wp), intent(IN) :: H_ice(:,:)                      ! [m] Ice thickness 
         real(wp), intent(IN) :: f_ice(:,:)
         real(wp), intent(IN) :: f_grnd(:,:)
-        real(wp), intent(IN) :: dx, dy                          ! [m] Resolution
+        real(wp), intent(IN) :: dx                              ! [m] Resolution
         real(wp), intent(IN) :: de_max                          ! [yr^-1] Maximum allowed effective strain rate
-        real(wp), intent(IN) :: ATT_bar(:,:) 
         real(wp), intent(IN) :: n_glen 
 
         ! Local variables
         integer  :: i, j, k
         integer  :: im1, ip1, jm1, jp1
         integer  :: nx, ny
-        real(wp) :: dvdx, dudy
-        real(wp) :: ux_aa, uy_aa 
-        logical  :: is_margin 
+        real(wp) :: dy 
 
-        real(wp) :: wt 
+        real(wp) :: f_ice_neighb(4) 
 
-        nx = size(ux_bar,1)
-        ny = size(ux_bar,2)
+        real(wp) :: lxy, lyx 
+        real(wp) :: wt_ab(4) 
+        real(wp) :: dd_ab(4) 
+
+        nx = size(vx,1)
+        ny = size(vy,2)
+
+        ! Assume square grid 
+        dy = dx 
 
         strn2D%dxx      = 0.0 
         strn2D%dyy      = 0.0 
@@ -1386,43 +1171,10 @@ contains
         strn2D%dxz      = 0.0       ! Always zero in this case
         strn2D%dyz      = 0.0       ! Always zero in this case
         strn2D%de       = 0.0 
+        strn2D%div      = 0.0 
         strn2D%f_shear  = 0.0       ! Always zero in this case
 
-        do j = 1, ny
-        do i = 1, nx
-            
-            ! Get neighbor indices
-            im1 = max(i-1,1) 
-            ip1 = min(i+1,nx) 
-            jm1 = max(j-1,1) 
-            jp1 = min(j+1,ny) 
-            
-            if (f_ice(i,j) .eq. 1.0) then 
-                ! Grounded or floating ice, calculate strain rate here (aa-nodes)
-
-                ! aa-nodes
-                strn2D%dxx(i,j) = (ux_bar(i,j) - ux_bar(im1,j))/dx
-                strn2D%dyy(i,j) = (uy_bar(i,j) - uy_bar(i,jm1))/dy
-
-                ! Calculation of cross terms on central aa-nodes (symmetrical results)
-                dudy = ((ux_bar(i,jp1)   - ux_bar(i,jm1))    &
-                      + (ux_bar(im1,jp1) - ux_bar(im1,jm1))) /(4.0*dy)
-                dvdx = ((uy_bar(ip1,j)   - uy_bar(im1,j))    &
-                      + (uy_bar(ip1,jm1) - uy_bar(im1,jm1))) /(4.0*dx)
-
-                strn2D%dxy(i,j) = 0.5*(dudy+dvdx)
-
-                ! Calculate the effective strain rate from the trace 
-                strn2D%de(i,j) = sqrt( strn2D%dxx(i,j)**2 + strn2D%dyy(i,j)**2 &
-                            + strn2D%dxx(i,j)*strn2D%dyy(i,j) + strn2D%dxy(i,j)**2 )
-                
-            end if 
-
-        end do
-        end do
-
-        ! === Extrapolate to ice-free neighbors === 
-        ! (in case ice gets advected there)
+        !$omp parallel do
         do j=1, ny
         do i=1, nx
 
@@ -1431,72 +1183,67 @@ contains
             ip1 = min(i+1,nx) 
             jm1 = max(j-1,1) 
             jp1 = min(j+1,ny) 
+            
+            f_ice_neighb = [f_ice(ip1,j),f_ice(im1,j),f_ice(i,jp1),f_ice(i,jm1)]
+
+            ! if (f_ice(i,j) .eq. 1.0_wp .or. &
+            !         count(f_ice_neighb .eq. 1.0_wp) .gt. 0) then
+            !     ! Grounded or floating ice, or margin point beyond full ice coverage,
+            !     ! calculate strain rate here
+
+            if (f_ice(i,j) .eq. 1.0_wp) then 
+
+                ! Get equal weighting for each ab-node
+                wt_ab = 0.25_wp 
+
+                ! === dxx =================================
+
+                call staggerdiff_nodes_acx_ab_ice(dd_ab,vx,f_ice,i,j,dx)
+
+                strn2D%dxx(i,j) = sum(wt_ab*dd_ab)
+                if (abs(strn2D%dxx(i,j)) .lt. TOL_UNDERFLOW) strn2D%dxx(i,j) = 0.0 
                 
-            if ( f_ice(i,j) .lt. 1.0 .and. &
-                count([f_ice(im1,j),f_ice(ip1,j),f_ice(i,jm1),f_ice(i,jp1)] .eq. 1.0_wp) .gt. 0 ) then 
-                ! Ice-free (or partially ice-free) with ice-covered neighbors
+                ! === dyy =================================
 
+                call staggerdiff_nodes_acy_ab_ice(dd_ab,vy,f_ice,i,j,dy)
 
-                strn2D%dxx(i,j) = 0.0 
-                strn2D%dyy(i,j) = 0.0
-                strn2D%dxy(i,j) = 0.0
-                strn2D%dxz(i,j) = 0.0 
-                strn2D%dyz(i,j) = 0.0
+                strn2D%dyy(i,j) = sum(wt_ab*dd_ab)
+                if (abs(strn2D%dyy(i,j)) .lt. TOL_UNDERFLOW) strn2D%dyy(i,j) = 0.0 
 
-                wt = 0.0 
+                ! === lxy =================================
 
-                if (f_ice(im1,j) .eq. 1.0) then 
-                    strn2D%dxx(i,j) = strn2D%dxx(i,j) + strn2D%dxx(im1,j)
-                    strn2D%dyy(i,j) = strn2D%dyy(i,j) + strn2D%dyy(im1,j)
-                    strn2D%dxy(i,j) = strn2D%dxy(i,j) + strn2D%dxy(im1,j)
-                    wt = wt + 1.0 
-                end if 
-                if (f_ice(ip1,j) .eq. 1.0) then 
-                    strn2D%dxx(i,j) = strn2D%dxx(i,j) + strn2D%dxx(ip1,j)
-                    strn2D%dyy(i,j) = strn2D%dyy(i,j) + strn2D%dyy(ip1,j)
-                    strn2D%dxy(i,j) = strn2D%dxy(i,j) + strn2D%dxy(ip1,j)
-                    wt = wt + 1.0 
-                end if
-                if (f_ice(i,jm1) .eq. 1.0) then 
-                    strn2D%dxx(i,j) = strn2D%dxx(i,j) + strn2D%dxx(i,jm1)
-                    strn2D%dyy(i,j) = strn2D%dyy(i,j) + strn2D%dyy(i,jm1)
-                    strn2D%dxy(i,j) = strn2D%dxy(i,j) + strn2D%dxy(i,jm1)
-                    wt = wt + 1.0 
-                end if
-                if (f_ice(i,jp1) .eq. 1.0) then 
-                    strn2D%dxx(i,j) = strn2D%dxx(i,j) + strn2D%dxx(i,jp1)
-                    strn2D%dyy(i,j) = strn2D%dyy(i,j) + strn2D%dyy(i,jp1)
-                    strn2D%dxy(i,j) = strn2D%dxy(i,j) + strn2D%dxy(i,jp1)
-                    wt = wt + 1.0 
-                end if
+                call staggerdiffcross_nodes_acx_ab_ice(dd_ab,vx,f_ice,i,j,dy)
 
-                if (wt .gt. 0.0) then 
-                    strn2D%dxx(i,j) = strn2D%dxx(i,j) / wt
-                    strn2D%dyy(i,j) = strn2D%dyy(i,j) / wt
-                    strn2D%dxy(i,j) = strn2D%dxy(i,j) / wt
-                end if 
+                lxy = sum(wt_ab*dd_ab)
 
+                ! === lyx =================================
+
+                call staggerdiffcross_nodes_acy_ab_ice(dd_ab,vy,f_ice,i,j,dx)
+
+                lyx = sum(wt_ab*dd_ab)
+
+                ! === dxy ================================= 
+
+                strn2D%dxy(i,j) = 0.5_wp*(lxy+lyx)
+                if (abs(strn2D%dxy(i,j)) .lt. TOL_UNDERFLOW) strn2D%dxy(i,j) = 0.0 
+                
                 ! ====== Finished calculating individual strain rate terms ====== 
                 
                 strn2D%de(i,j) =  sqrt(  strn2D%dxx(i,j)*strn2D%dxx(i,j) &
                                        + strn2D%dyy(i,j)*strn2D%dyy(i,j) &
                                        + strn2D%dxx(i,j)*strn2D%dyy(i,j) &
-                                       + strn2D%dxy(i,j)*strn2D%dxy(i,j) &
-                                       + strn2D%dxz(i,j)*strn2D%dxz(i,j) &
-                                       + strn2D%dyz(i,j)*strn2D%dyz(i,j) )
+                                       + strn2D%dxy(i,j)*strn2D%dxy(i,j) )
                 
                 if (strn2D%de(i,j) .gt. de_max) strn2D%de(i,j) = de_max 
 
                 ! Calculate the horizontal divergence too 
                 strn2D%div(i,j) = strn2D%dxx(i,j) + strn2D%dyy(i,j) 
 
-                ! No shearing estimated from 2D components
-                strn2D%f_shear(i,j) = 0.0_wp 
-
-            end if 
+            end if ! ice-free or ice-covered 
 
         end do
         end do
+        !$omp end parallel do
 
         return
         
@@ -1621,6 +1368,72 @@ contains
     end subroutine calc_stress_eigen_values
 
 
+    subroutine strain_2D_alloc(strn2D,nx,ny)
+
+        implicit none 
+
+        type(strain_2D_class), intent(INOUT) :: strn2D 
+        integer :: nx, ny 
+
+        ! First make sure fields are deallocated
+        ! TO DO 
+
+        ! Allocate fields to desired dimensions 
+        allocate(strn2D%dxx(nx,ny))
+        allocate(strn2D%dyy(nx,ny))
+        allocate(strn2D%dxy(nx,ny))
+        allocate(strn2D%dxz(nx,ny))
+        allocate(strn2D%dyz(nx,ny))
+        allocate(strn2D%div(nx,ny))
+        allocate(strn2D%de(nx,ny))
+        allocate(strn2D%f_shear(nx,ny))
+
+        strn2D%dxx     = 0.0 
+        strn2D%dyy     = 0.0 
+        strn2D%dxy     = 0.0
+        strn2D%dxz     = 0.0
+        strn2D%dyz     = 0.0
+        strn2D%div     = 0.0
+        strn2D%de      = 0.0 
+        strn2D%f_shear = 0.0 
+
+        return 
+
+    end subroutine strain_2D_alloc
+
+    subroutine stress_2D_alloc(strs2D,nx,ny)
+
+        implicit none 
+
+        type(stress_2D_class), intent(INOUT) :: strs2D 
+        integer :: nx, ny 
+
+        ! First make sure fields are deallocated
+        ! TO DO 
+
+        ! Allocate fields to desired dimensions 
+        allocate(strs2D%txx(nx,ny))
+        allocate(strs2D%tyy(nx,ny))
+        allocate(strs2D%txy(nx,ny))
+        allocate(strs2D%txz(nx,ny))
+        allocate(strs2D%tyz(nx,ny))
+        allocate(strs2D%te(nx,ny))
+        allocate(strs2D%teig1(nx,ny))
+        allocate(strs2D%teig2(nx,ny))
+        
+        strs2D%txx   = 0.0 
+        strs2D%tyy   = 0.0 
+        strs2D%txy   = 0.0
+        strs2D%txz   = 0.0
+        strs2D%tyz   = 0.0
+        strs2D%te    = 0.0 
+        strs2D%teig1 = 0.0 
+        strs2D%teig2 = 0.0 
+        
+        return 
+
+    end subroutine stress_2D_alloc
+    
 end module deformation
 
 

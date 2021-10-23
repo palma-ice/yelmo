@@ -10,7 +10,8 @@ module yelmo_topography
     use mass_conservation
     use calving
     use topography 
-    use deformation 
+    use deformation, only : strain_2D_alloc, stress_2D_alloc, & 
+            calc_strain_rate_tensor_2D, calc_stress_tensor_2D
 
     implicit none
     
@@ -60,6 +61,9 @@ contains
         real(prec), allocatable :: calv_sd(:,:) 
         real(prec), allocatable :: H_ref(:,:) 
 
+        type(strain_2D_class)   :: strn2D
+        type(stress_2D_class)   :: strs2D
+        
         real(8)    :: cpu_time0, cpu_time1
         real(prec) :: model_time0, model_time1 
         real(prec) :: speed 
@@ -70,6 +74,10 @@ contains
         allocate(mbal(nx,ny))
         allocate(calv_sd(nx,ny))
         allocate(H_ref(nx,ny))
+
+        ! Allocate local strain rate and stress tensors 
+        call strain_2D_alloc(strn2D,nx,ny) 
+        call stress_2D_alloc(strs2D,nx,ny) 
 
         ! Initialize time if necessary 
         if (tpo%par%time .gt. dble(time)) then 
@@ -96,19 +104,7 @@ contains
 
         if ( .not. topo_fixed .and. dt .gt. 0.0 ) then 
 
-            ! === Step 1: ice thickness evolution from dynamics alone ===
-
-            ! Calculate the ice thickness conservation from dynamics only -----
-            call calc_ice_thickness_dyn(tpo%now%H_ice,tpo%now%dHdt_n,tpo%now%H_ice_n,tpo%now%H_ice_pred, &
-                                        tpo%now%f_ice,tpo%now%f_grnd,dyn%now%ux_bar,dyn%now%uy_bar, &
-                                        solver=tpo%par%solver,dx=tpo%par%dx,dt=dt,beta=tpo%par%dt_beta,pc_step=tpo%par%pc_step)
-
-            ! Update ice fraction mask 
-            call calc_ice_fraction(tpo%now%f_ice,tpo%now%H_ice,tpo%now%f_grnd,tpo%par%margin_flt_subgrid)
-            
-            ! === Step 2: ice thickness evolution from vertical column mass balance ===
-
-            ! Also, define temporary variable for total column mass balance (without calving)
+            ! === Step 0: define temporary variable for total column mass balance (without calving)
            
             mbal = bnd%smb + tpo%now%bmb + tpo%now%fmb 
             
@@ -117,7 +113,28 @@ contains
                 mbal = bnd%smb  
             end if 
 
+            ! === Step 1: ice thickness evolution from dynamics alone ===
 
+
+            ! Calculate the ice thickness conservation from dynamics only -----
+            call calc_ice_thickness_dyn(tpo%now%H_ice,tpo%now%dHdt_n,tpo%now%H_ice_n,tpo%now%H_ice_pred, &
+                                        tpo%now%f_ice,tpo%now%f_grnd,dyn%now%ux_bar,dyn%now%uy_bar, &
+                                        solver=tpo%par%solver,dx=tpo%par%dx,dt=dt,beta=tpo%par%dt_beta,pc_step=tpo%par%pc_step)
+
+            ! ! Update ice fraction mask 
+            ! call calc_ice_fraction(tpo%now%f_ice,tpo%now%H_ice,tpo%now%f_grnd,tpo%par%margin_flt_subgrid)
+            
+            ! === Step 2: ice thickness evolution from vertical column mass balance ===
+
+            
+            ! Apply mass-conservation step (mbal)
+            call calc_ice_thickness_mbal(tpo%now%H_ice,tpo%now%f_ice,tpo%now%mb_applied, &
+                                         tpo%now%f_grnd,bnd%z_sl-bnd%z_bed,mbal,tpo%par%dx,dt)
+
+            ! Update ice fraction mask 
+            call calc_ice_fraction(tpo%now%f_ice,tpo%now%H_ice,tpo%now%f_grnd,tpo%par%margin_flt_subgrid)
+            
+            
             ! Diagnose potential floating-ice calving rate [m/yr]
             
             select case(trim(tpo%par%calv_flt_method))
@@ -157,6 +174,25 @@ contains
                 case("vm-l19")
                     ! Use von Mises calving as defined by Lipscomb et al. (2019)
 
+                    if (.not. tpo%par%margin_flt_subgrid) then 
+
+                        write(io_unit_err,*) ""
+                        write(io_unit_err,*) ""
+                        write(io_unit_err,*) "calv_flt_method='vm-l19' must be used with margin_flt_subgrid=True."
+                        write(io_unit_err,*) "calv_flt_method    = ", trim(tpo%par%calv_flt_method)
+                        write(io_unit_err,*) "margin_flt_subgrid = ", tpo%par%margin_flt_subgrid
+                        stop "Program stopped."
+
+                    end if 
+                        
+                    ! First, calculate local version of 2D strain rate and stress tensors for diagnosing calving
+
+                    ! call calc_strain_rate_tensor_2D(strn2D,dyn%now%ux_bar,dyn%now%uy_bar,tpo%now%H_ice,tpo%now%f_ice, &
+                    !                                         tpo%now%f_grnd,mat%par%dx,mat%par%de_max,mat%par%n_glen)
+
+                    ! call calc_stress_tensor_2D(strs2D,mat%now%visc_bar,strn2D)
+
+                    ! Next, diagnose calving
                     call calc_calving_rate_vonmises_l19(tpo%now%calv_flt,tpo%now%H_ice,tpo%now%f_ice,tpo%now%f_grnd, &
                                                         mat%now%strs2D%teig1,mat%now%strs2D%teig2,mat%now%ATT_bar, &
                                                         mat%now%visc_bar,tpo%par%dx,tpo%par%dx,tpo%par%kt,tpo%par%w2,mat%par%n_glen)
@@ -212,11 +248,10 @@ contains
                                             bnd%z_bed_sd,tpo%par%sd_min,tpo%par%sd_max,tpo%par%calv_max,tpo%par%calv_tau)
             tpo%now%calv_grnd = tpo%now%calv_grnd + calv_sd 
 
-
-            ! Apply mass-conservation step (mbal and calving together)
-            call calc_ice_thickness_mbal(tpo%now%H_ice,tpo%now%f_ice,tpo%now%mb_applied,tpo%now%calv, &
-                                         tpo%now%f_grnd,bnd%z_sl-bnd%z_bed,mbal, &
-                                         tpo%now%calv_flt,tpo%now%calv_grnd,tpo%par%dx,dt)
+            ! Apply calving step 
+            call calc_ice_thickness_calving(tpo%now%H_ice,tpo%now%f_ice,tpo%now%calv, &
+                                            tpo%now%f_grnd,bnd%z_sl-bnd%z_bed, &
+                                            tpo%now%calv_flt,tpo%now%calv_grnd,tpo%par%dx,dt)            
 
             ! Update ice fraction mask 
             call calc_ice_fraction(tpo%now%f_ice,tpo%now%H_ice,tpo%now%f_grnd,tpo%par%margin_flt_subgrid)

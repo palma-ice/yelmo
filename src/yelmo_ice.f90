@@ -1,9 +1,7 @@
 
 
 module yelmo_ice
-
-    use, intrinsic :: iso_fortran_env, only : input_unit, output_unit, error_unit
-
+    
     use nml 
     use ncio 
     
@@ -107,7 +105,7 @@ contains
             
             case("RALSTON")
                 
-                write(error_unit,*) "This method does not work yet - the truncation error is incorrect."
+                write(io_unit_err,*) "This method does not work yet - the truncation error is incorrect."
                 stop 
 
                 ! Order of the method 
@@ -121,8 +119,8 @@ contains
             
             case DEFAULT 
 
-                write(error_unit,*) "yelmo_udpate:: Error: pc_method does not match available options [FE-SBE, AB-SAM, HEUN]."
-                write(error_unit,*) "pc_method = ", trim(dom%par%pc_method)
+                write(io_unit_err,*) "yelmo_udpate:: Error: pc_method does not match available options [FE-SBE, AB-SAM, HEUN]."
+                write(io_unit_err,*) "pc_method = ", trim(dom%par%pc_method)
                 stop 
 
         end select 
@@ -153,8 +151,8 @@ contains
 
             case DEFAULT 
 
-                write(error_unit,*) "yelmo_update:: Error: thermodynamics dt_method does not match available options [FE, SBE, AB, SAM]."
-                write(error_unit,*) "thrm:: dt_method = ", trim(dom%thrm%par%dt_method)
+                write(io_unit_err,*) "yelmo_update:: Error: thermodynamics dt_method does not match available options [FE, SBE, AB, SAM]."
+                write(io_unit_err,*) "thrm:: dt_method = ", trim(dom%thrm%par%dt_method)
                 stop 
 
         end select 
@@ -217,8 +215,8 @@ contains
                     
                 case DEFAULT 
 
-                    write(error_unit,*) "yelmo_update:: Error: dt_method not recognized."
-                    write(error_unit,*) "dt_method = ", dom%par%dt_method 
+                    write(io_unit_err,*) "yelmo_update:: Error: dt_method not recognized."
+                    write(io_unit_err,*) "dt_method = ", dom%par%dt_method 
                     stop 
 
             end select 
@@ -618,15 +616,15 @@ contains
 
             case DEFAULT 
 
-                write(error_unit,*) "yelmo_init:: Error: parameter grid_def not recognized: "//trim(grid_def)
+                write(io_unit_err,*) "yelmo_init:: Error: parameter grid_def not recognized: "//trim(grid_def)
                 stop 
 
         end select 
 
         ! Check that grid has been defined properly 
         if (.not. allocated(dom%grd%x)) then 
-            write(error_unit,*) "yelmo_init:: Error: ygrid has not been properly defined yet."
-            write(error_unit,*) "(Either use yelmo_init_grid externally with desired grid parameters &
+            write(io_unit_err,*) "yelmo_init:: Error: ygrid has not been properly defined yet."
+            write(io_unit_err,*) "(Either use yelmo_init_grid externally with desired grid parameters &
                        &or set grid_def=['name','file'])"
             stop 
         end if 
@@ -693,7 +691,7 @@ contains
 
                 ! Consistency check 
                 if (trim(dom%tpo%par%solver) .ne. "impl-upwind") then 
-                    write(error_unit,*) "yelmo_init:: Error: the mass conservation solver for MISMIP3D experiments &
+                    write(io_unit_err,*) "yelmo_init:: Error: the mass conservation solver for MISMIP3D experiments &
                     &must be 'impl-upwind' for stability. The 'expl' solver has not yet been designed to &
                     &handle ice advected at the border point nx-1, and thus oscillations can be produced. &
                     &Please set 'solver=impl-upwind'."
@@ -869,8 +867,8 @@ contains
 
                     case DEFAULT 
 
-                        write(error_unit,*) "yelmo_init_topo:: Error: init_topo_state choice not recognized."
-                        write(error_unit,*) "init_topo_state = ", init_topo_state 
+                        write(io_unit_err,*) "yelmo_init_topo:: Error: init_topo_state choice not recognized."
+                        write(io_unit_err,*) "init_topo_state = ", init_topo_state 
                         stop 
 
                 end select
@@ -934,7 +932,7 @@ contains
             ! Consistency check 
             if (trim(thrm_method) .ne. "linear" .and. trim(thrm_method) .ne. "robin" &
                 .and. trim(thrm_method) .ne. "robin-cold") then 
-                write(error_unit,*) "yelmo_init_state:: Error: temperature initialization must be &
+                write(io_unit_err,*) "yelmo_init_state:: Error: temperature initialization must be &
                            &'linear', 'robin' or 'robin-cold' in order to properly prescribe &
                            &initial temperatures."
                 stop 
@@ -1045,8 +1043,8 @@ contains
         end if 
 
         if (par%pc_eps .gt. par%pc_tol) then 
-            write(error_unit,*) "yelmo_par_load:: error: pc_eps must be greater than pc_tol."
-            write(error_unit,*) "pc_eps, pc_tol: ", par%pc_eps, par%pc_tol 
+            write(io_unit_err,*) "yelmo_par_load:: error: pc_eps must be greater than pc_tol."
+            write(io_unit_err,*) "pc_eps, pc_tol: ", par%pc_eps, par%pc_tol 
             stop 
         end if
 
@@ -1199,32 +1197,32 @@ contains
         if (kill_it .and. (.not. dom%par%disable_kill)) then 
             ! Model is not running properly, kill it. 
 
-            write(error_unit,*) 
-            write(error_unit,*) 
-            write(error_unit,"(a)") "yelmo_check_kill:: Error: model is not running properly:"
-            write(error_unit,"(a)") trim(kill_msg) 
-            write(error_unit,*) 
-            write(error_unit,"(a11,f15.3)")  "timestep    = ", time
-            write(error_unit,*) 
-            write(error_unit,"(a,2g12.4)")   "pc_eps, tol = ", dom%par%pc_eps, dom%par%pc_tol 
-            write(error_unit,"(a,g12.4)")    "pc_eta_avg  = ", pc_eta_avg
+            write(io_unit_err,*) 
+            write(io_unit_err,*) 
+            write(io_unit_err,"(a)") "yelmo_check_kill:: Error: model is not running properly:"
+            write(io_unit_err,"(a)") trim(kill_msg) 
+            write(io_unit_err,*) 
+            write(io_unit_err,"(a11,f15.3)")  "timestep    = ", time
+            write(io_unit_err,*) 
+            write(io_unit_err,"(a,2g12.4)")   "pc_eps, tol = ", dom%par%pc_eps, dom%par%pc_tol 
+            write(io_unit_err,"(a,g12.4)")    "pc_eta_avg  = ", pc_eta_avg
             
-            write(error_unit,"(a4,1x,2a12)") "iter", "pc_dt", "pc_eta"
+            write(io_unit_err,"(a4,1x,2a12)") "iter", "pc_dt", "pc_eta"
             do k = 1, size(dom%time%pc_eta,1)
-                write(error_unit,"(a4,1x,2g12.4)") trim(pc_iter_str(k)), dom%time%pc_dt(k), dom%time%pc_eta(k) 
+                write(io_unit_err,"(a4,1x,2g12.4)") trim(pc_iter_str(k)), dom%time%pc_dt(k), dom%time%pc_eta(k) 
             end do 
 
-            write(error_unit,*) 
-            write(error_unit,"(a16,2g14.4)") "range(H_ice):   ", minval(dom%tpo%now%H_ice), maxval(dom%tpo%now%H_ice)
-            write(error_unit,"(a16,2g14.4)") "range(uxy_bar): ", minval(dom%dyn%now%uxy_bar), maxval(dom%dyn%now%uxy_bar)
-            write(error_unit,*) 
+            write(io_unit_err,*) 
+            write(io_unit_err,"(a16,2g14.4)") "range(H_ice):   ", minval(dom%tpo%now%H_ice), maxval(dom%tpo%now%H_ice)
+            write(io_unit_err,"(a16,2g14.4)") "range(uxy_bar): ", minval(dom%dyn%now%uxy_bar), maxval(dom%dyn%now%uxy_bar)
+            write(io_unit_err,*) 
 
             call yelmo_restart_write(dom,"yelmo_killed.nc",time=time) 
 
-            write(error_unit,*) "Restart file written: "//"yelmo_killed.nc"
-            write(error_unit,*) 
-            write(error_unit,"(a,f15.3,a)") "Time =", time, ": stopping model (killed)." 
-            write(error_unit,*) 
+            write(io_unit_err,*) "Restart file written: "//"yelmo_killed.nc"
+            write(io_unit_err,*) 
+            write(io_unit_err,"(a,f15.3,a)") "Time =", time, ": stopping model (killed)." 
+            write(io_unit_err,*) 
 
             stop "yelmo_check_kill error, see log."
 

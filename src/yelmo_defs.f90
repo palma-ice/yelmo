@@ -1,6 +1,8 @@
 
 module yelmo_defs
     
+    use, intrinsic :: iso_fortran_env, only : input_unit, output_unit, error_unit
+
     use nml 
 
     implicit none 
@@ -36,6 +38,8 @@ module yelmo_defs
     real(wp), parameter :: pi  = real(2._dp*acos(0.0_dp),wp)
     real(wp), parameter :: degrees_to_radians = real(pi / 180._dp,wp)  ! Conversion factor between radians and degrees
     real(wp), parameter :: radians_to_degrees = real(180._dp / pi,wp)  ! Conversion factor between degrees and radians
+    
+    integer, parameter :: io_unit_err = error_unit 
     
     ! The constants below should be loaded using the global subroutine
     ! defined below `yelmo_constants_load`.
@@ -129,35 +133,35 @@ module yelmo_defs
     type ytopo_state_class
         ! Model variables that the define the state of the domain 
 
-        real(wp), allocatable   :: H_ice(:,:)      ! Ice thickness [m] 
-        real(wp), allocatable   :: z_srf(:,:)      ! Surface elevation [m]
-        real(wp), allocatable   :: dzsrfdt(:,:)    ! Surface elevation rate of change [m/a] 
-        real(wp), allocatable   :: dHicedt(:,:)    ! Ice thickness rate of change [m/a] 
-        real(wp), allocatable   :: bmb(:,:)        ! Combined field of bmb_grnd and bmb_shlf 
-        real(wp), allocatable   :: fmb(:,:)        ! Combined field of fmb_grnd and fmb_shlf 
-        real(wp), allocatable   :: mb_applied(:,:) ! Actual mass balance applied [m/a], for mass balance accounting
-        real(wp), allocatable   :: mb_resid(:,:)   ! Residual mass balance from boundary conditions, cleanup
+        real(wp), allocatable   :: H_ice(:,:)       ! Ice thickness [m] 
+        real(wp), allocatable   :: z_srf(:,:)       ! Surface elevation [m]
+        real(wp), allocatable   :: dzsrfdt(:,:)     ! Surface elevation rate of change [m/a] 
+        real(wp), allocatable   :: dHicedt(:,:)     ! Ice thickness rate of change [m/a] 
+        real(wp), allocatable   :: bmb(:,:)         ! Combined field of bmb_grnd and bmb_shlf 
+        real(wp), allocatable   :: fmb(:,:)         ! Combined field of fmb_grnd and fmb_shlf 
+        real(wp), allocatable   :: mb_applied(:,:)  ! Actual mass balance applied [m/a], for mass balance accounting
+        real(wp), allocatable   :: mb_resid(:,:)    ! Residual mass balance from boundary conditions, cleanup
         
-        real(wp), allocatable   :: calv(:,:)       ! Calving rate (applied) [m/a]
-        real(wp), allocatable   :: calv_flt(:,:)   ! Reference floating calving rate [m/a]
-        real(wp), allocatable   :: calv_grnd(:,:)  ! Reference grounded calving rate [m/a]
+        real(wp), allocatable   :: calv(:,:)        ! Calving rate (applied) [m/a]
+        real(wp), allocatable   :: calv_flt(:,:)    ! Reference floating calving rate [m/a]
+        real(wp), allocatable   :: calv_grnd(:,:)   ! Reference grounded calving rate [m/a]
         
-        real(wp), allocatable   :: dzsdx(:,:)      ! Surface elevation slope [m m-1], Ac x nodes
-        real(wp), allocatable   :: dzsdy(:,:)      ! Surface elevation slope [m m-1], Ac y nodes
-        real(wp), allocatable   :: dHicedx(:,:)    ! Ice thickness gradient slope [m m-1], Ac x nodes
-        real(wp), allocatable   :: dHicedy(:,:)    ! Ice thickness gradient slope [m m-1], Ac y nodes
+        real(wp), allocatable   :: dzsdx(:,:)       ! Surface elevation slope [m m-1], Ac x nodes
+        real(wp), allocatable   :: dzsdy(:,:)       ! Surface elevation slope [m m-1], Ac y nodes
+        real(wp), allocatable   :: dHicedx(:,:)     ! Ice thickness gradient slope [m m-1], Ac x nodes
+        real(wp), allocatable   :: dHicedy(:,:)     ! Ice thickness gradient slope [m m-1], Ac y nodes
         
-        real(wp), allocatable   :: H_eff(:,:)        ! Effective ice thickness (margin-corrected) [m]
-        real(wp), allocatable   :: H_grnd(:,:)       ! Ice thickness overburden [m]
+        real(wp), allocatable   :: H_eff(:,:)       ! Effective ice thickness (margin-corrected) [m]
+        real(wp), allocatable   :: H_grnd(:,:)      ! Ice thickness overburden [m]
         
         ! Masks 
-        real(wp), allocatable   :: f_grnd(:,:)       ! Grounded fraction (grounding line fraction between 0 and 1)
-        real(wp), allocatable   :: f_grnd_acx(:,:)   ! Grounded fraction (acx nodes)
-        real(wp), allocatable   :: f_grnd_acy(:,:)   ! Grounded fraction (acy nodes)
-        real(wp), allocatable   :: f_ice(:,:)        ! Ice-covered fraction 
+        real(wp), allocatable   :: f_grnd(:,:)      ! Grounded fraction (grounding line fraction between 0 and 1)
+        real(wp), allocatable   :: f_grnd_acx(:,:)  ! Grounded fraction (acx nodes)
+        real(wp), allocatable   :: f_grnd_acy(:,:)  ! Grounded fraction (acy nodes)
+        real(wp), allocatable   :: f_ice(:,:)       ! Ice-covered fraction 
 
-        real(wp), allocatable   :: dist_margin(:,:)  ! Distance to nearest margin point 
-        real(wp), allocatable   :: dist_grline(:,:)  ! Distance to nearest grounding-line point 
+        real(wp), allocatable   :: dist_margin(:,:) ! Distance to nearest margin point 
+        real(wp), allocatable   :: dist_grline(:,:) ! Distance to nearest grounding-line point 
         
         ! Additional masks 
         integer,    allocatable :: mask_bed(:,:)    ! Multi-valued bed mask

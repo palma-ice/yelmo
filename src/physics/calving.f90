@@ -276,7 +276,7 @@ end if
             if ( (f_grnd(i,j) .eq. 0.0 .and. f_ice(i,j) .gt. 0.0) ) then 
                 ! Floating ice point
 
-                ! How many calving-front neighbors?
+                ! How many calving-fronts for this cell?
                 wt = 0.0 
                 if (f_grnd(im1,j) .eq. 0.0 .and. f_ice(im1,j).eq.0.0) wt = wt + 1.0_wp
                 if (f_grnd(ip1,j) .eq. 0.0 .and. f_ice(ip1,j).eq.0.0) wt = wt + 1.0_wp
@@ -296,9 +296,10 @@ end if
 
                     if (H_eff .lt. H_calv) then 
                         ! If ice is too thin, diagnose calving rate, with
-                        ! faster calving timescale for more exposed fronts
+                        ! faster calving timescale for more exposed fronts.
+                        ! Scale by f_ice to apply to whole cell (following Lipscomb et al., 2019)
                         
-                        calv(i,j) = (H_calv-H_eff) * wt / tau
+                        calv(i,j) = f_ice(i,j) * ( (H_calv-H_eff) * wt / tau )
                         
                     end if 
 
@@ -483,8 +484,8 @@ end if
 
 
                 ! Diagnose calving rate not accounting for upstream flux
-                !calv(i,j) = f_ice(i,j) * max(H_calv - H_eff,0.0_wp) / tau
-                calv(i,j) = max(H_calv - H_eff,0.0_wp) / tau
+                ! Scale by f_ice to apply to whole cell (following Lipscomb et al., 2019)
+                calv(i,j) = f_ice(i,j) * (max(H_calv - H_eff,0.0_wp) / tau)
                 
 
                 ! Adjust calving rate for upstream flux 
@@ -678,8 +679,9 @@ end if
                         H_eff = H_ice(i,j)  ! == 0.0
                     end if 
 
-                    !calv(i,j) = f_ice(i,j) * max(H_calv - H_eff,0.0) / tau
-                    calv(i,j) = max(H_calv - H_eff,0.0) / tau
+                    ! Calculate calving rate.
+                    ! Scale by f_ice to apply to whole cell (following Lipscomb et al., 2019)
+                    calv(i,j) = f_ice(i,j) * (max(H_calv - H_eff,0.0) / tau)
 
                 end if  
 
@@ -728,6 +730,8 @@ end if
         real(wp) :: txx, tyy, txy
         real(wp) :: teig1_now, teig2_now
 
+        real(wp) :: tau_eff_neighb(4)
+        
         real(wp) :: wt
         
         nx = size(H_ice,1)
@@ -744,31 +748,58 @@ end if
             jm1 = max(j-1,1) 
             jp1 = min(j+1,ny) 
             
-            ! Ice-shelf floating margin: floating ice point with open ocean neighbor 
-            ! If this point is an ice front, calculate calving
-            is_margin =  (f_grnd(i,j)   .eq. 0.0 .and. H_ice(i,j) .gt. 0.0) .and. &
-                       ( (f_grnd(im1,j) .eq. 0.0 .and. H_ice(im1,j).eq.0.0) .or. &
-                         (f_grnd(ip1,j) .eq. 0.0 .and. H_ice(ip1,j).eq.0.0) .or. &
-                         (f_grnd(i,jm1) .eq. 0.0 .and. H_ice(i,jm1).eq.0.0) .or. &
-                         (f_grnd(i,jp1) .eq. 0.0 .and. H_ice(i,jp1).eq.0.0) ) 
+            if ( (f_grnd(i,j) .eq. 0.0 .and. f_ice(i,j) .gt. 0.0) ) then 
+                ! Floating ice point
 
-            if (is_margin) then 
-                ! Calculate calving rate here 
+                ! How many calving-fronts for this cell?
+                wt = 0.0 
+                if (f_grnd(im1,j) .eq. 0.0 .and. f_ice(im1,j).eq.0.0) wt = wt + 1.0_wp
+                if (f_grnd(ip1,j) .eq. 0.0 .and. f_ice(ip1,j).eq.0.0) wt = wt + 1.0_wp
+                if (f_grnd(i,jm1) .eq. 0.0 .and. f_ice(i,jm1).eq.0.0) wt = wt + 1.0_wp
+                if (f_grnd(i,jp1) .eq. 0.0 .and. f_ice(i,jp1).eq.0.0) wt = wt + 1.0_wp
 
-                ! Calculate the effective stress
-                tau_eff = calc_tau_eff(teig1(i,j),teig2(i,j),w2)
-                                 
-                ! Calculate lateral calving rate 
-                calv_ref = kt*tau_eff 
+                if (wt .gt. 0.0_wp) then 
+                    ! Point is at calving front 
 
-                ! Convert to horizontal volume change 
-                if (f_ice(i,j) .gt. 0.0) then 
-                    H_eff = H_ice(i,j) / f_ice(i,j)
-                else 
-                    H_eff = H_ice(i,j)
+                    if (teig1(i,j) .eq. 0.0 .and. teig2(i,j) .eq. 0.0) then 
+                        ! Margin point was likely just advected, no stresses available, 
+                        ! use maximum value of tau_eff from upstream neighbors.
+
+                        tau_eff_neighb = 0.0_wp 
+
+                        if (f_ice(im1,j).gt.0.0) tau_eff_neighb(1) = calc_tau_eff(teig1(im1,j),teig2(im1,j),w2)
+                        if (f_ice(ip1,j).gt.0.0) tau_eff_neighb(2) = calc_tau_eff(teig1(ip1,j),teig2(ip1,j),w2)
+                        if (f_ice(i,jm1).gt.0.0) tau_eff_neighb(3) = calc_tau_eff(teig1(i,jm1),teig2(i,jm1),w2)
+                        if (f_ice(i,jp1).gt.0.0) tau_eff_neighb(4) = calc_tau_eff(teig1(i,jp1),teig2(i,jp1),w2)
+
+                        tau_eff = maxval(tau_eff_neighb)
+
+                    else 
+                        ! Stresses are available at this margin point. 
+                        ! Calculate the effective stress directly.
+                        
+                        tau_eff = calc_tau_eff(teig1(i,j),teig2(i,j),w2)
+                    
+                    end if 
+
+                    ! Calculate lateral calving rate 
+                    calv_ref = kt*tau_eff 
+
+                    ! Get effective ice thickness
+                    if (f_ice(i,j) .gt. 0.0) then 
+                        H_eff = H_ice(i,j) / f_ice(i,j)
+                    else 
+                        H_eff = H_ice(i,j)
+                    end if 
+
+                    ! Convert to horizontal volume change, weighted
+                    ! by number of exposed faces.
+                    calv(i,j) = wt * (H_eff*calv_ref) / sqrt(dx*dy)
+
+                    ! write(*,*) "calv", tau_eff, calv_ref,  &
+                    !             H_eff, wt*H_eff/sqrt(dx*dy), calv(i,j) 
+                    
                 end if 
-
-                calv(i,j) = (H_eff*calv_ref) / sqrt(dx*dy)
 
             end if
 

@@ -112,8 +112,9 @@ contains
                                         tpo%now%f_ice,tpo%now%f_grnd,dyn%now%ux_bar,dyn%now%uy_bar, &
                                         solver=tpo%par%solver,dx=tpo%par%dx,dt=dt,beta=tpo%par%dt_beta,pc_step=tpo%par%pc_step)
 
-            ! ! Update ice fraction mask 
-            ! call calc_ice_fraction(tpo%now%f_ice,tpo%now%H_ice,tpo%now%f_grnd,tpo%par%margin_flt_subgrid)
+            ! Update ice fraction mask 
+            call calc_ice_fraction(tpo%now%f_ice,tpo%now%H_ice,tpo%now%f_grnd,tpo%par%margin_flt_subgrid)
+            
             
             ! === Step 2: ice thickness evolution from vertical column mass balance ===
 
@@ -124,6 +125,15 @@ contains
 
             ! Update ice fraction mask 
             call calc_ice_fraction(tpo%now%f_ice,tpo%now%H_ice,tpo%now%f_grnd,tpo%par%margin_flt_subgrid)
+            
+            
+            ! Also apply all additional (generally artificial) ice thickness adjustments 
+            ! and store changes in residual mass balance field. 
+            call apply_ice_thickness_boundaries(tpo%now%mb_resid,tpo%now%H_ice,tpo%now%f_ice,tpo%now%f_grnd, &
+                                                dyn%now%uxy_b,bnd%ice_allowed,tpo%par%boundaries,bnd%H_ice_ref, &
+                                                tpo%par%H_min_flt,tpo%par%H_min_grnd,dt)
+
+            ! === Step 3: ice thickness evolution from calving ===
             
             
             ! Diagnose potential floating-ice calving rate [m/yr]
@@ -178,8 +188,7 @@ contains
                     
                     ! Next, diagnose calving
                     call calc_calving_rate_vonmises_l19(tpo%now%calv_flt,tpo%now%H_ice,tpo%now%f_ice,tpo%now%f_grnd, &
-                                                        mat%now%strs2D%teig1,mat%now%strs2D%teig2,mat%now%ATT_bar, &
-                                                        mat%now%visc_bar,tpo%par%dx,tpo%par%dx,tpo%par%kt,tpo%par%w2,mat%par%n_glen)
+                                                        mat%now%strs2D%teig1,mat%now%strs2D%teig2,tpo%par%dx,tpo%par%kt,tpo%par%w2)
 
                     call calc_calving_residual(tpo%now%calv_flt,tpo%now%H_ice,tpo%now%f_ice,dt)
 
@@ -203,6 +212,10 @@ contains
 
             end select
             
+            ! Additionally ensure higher calving rate for floating tongues of
+            ! one grid-point width.
+            call calc_calving_tongues(tpo%now%calv_flt,tpo%now%H_ice,tpo%now%f_ice,tpo%now%f_grnd,tpo%par%calv_tau)
+
 
             ! Diagnose potential grounded-ice calving rate [m/yr]
 
@@ -240,11 +253,7 @@ contains
             ! Update ice fraction mask 
             call calc_ice_fraction(tpo%now%f_ice,tpo%now%H_ice,tpo%now%f_grnd,tpo%par%margin_flt_subgrid)
             
-            ! Finally, apply all additional (generally artificial) ice thickness adjustments 
-            ! and store changes in residual mass balance field. 
-            call apply_ice_thickness_boundaries(tpo%now%mb_resid,tpo%now%H_ice,tpo%now%f_ice,tpo%now%f_grnd, &
-                                                dyn%now%uxy_b,bnd%ice_allowed,tpo%par%boundaries,bnd%H_ice_ref, &
-                                                tpo%par%H_min_flt,tpo%par%H_min_grnd,dt)
+            
 
             ! Save the rate of change of ice thickness in output variable [m/a]
             tpo%now%dHicedt = (tpo%now%H_ice - tpo%now%H_ice_n) / dt 

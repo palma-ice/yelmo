@@ -9,7 +9,7 @@ module calving
 
     private 
 
-    public :: apply_calving     ! ajr: currently not used...
+    public :: calc_calving_tongues
     public :: calc_calving_residual
     public :: calc_calving_rate_kill 
     
@@ -26,33 +26,40 @@ module calving
 
 contains 
 
-    subroutine apply_calving(H_ice,calv,f_grnd,H_min_flt,dt)
-        ! Given a diagnosed calving rate, make additional modifications
-        ! as needed and apply the calving rate to the ice thickness for this timestep
+    subroutine calc_calving_tongues(calv_flt,H_ice,f_ice,f_grnd,tau)
+        ! Increase calving for floating margin points with 3+ calving
+        ! fronts to avoid protruding ice tongues. 
 
         implicit none 
 
-        real(wp), intent(INOUT) :: H_ice(:,:) 
-        real(wp), intent(INOUT) :: calv(:,:) 
-        real(wp), intent(IN)    :: f_grnd(:,:) 
-        real(wp), intent(IN)    :: H_min_flt
-        real(wp), intent(IN)    :: dt  
-        
-        ! Local variables 
-        integer :: i, j, nx, ny 
-        integer :: n_mrgn 
+        real(wp), intent(INOUT) :: calv_flt(:,:) 
+        real(wp), intent(IN)    :: H_ice(:,:) 
+        real(wp), intent(IN)    :: f_ice(:,:) 
+        real(wp), intent(IN)    :: f_grnd(:,:)  
+        real(wp), intent(IN)    :: tau 
 
-        real(wp), parameter :: tau_mrgn = 5.0         ! [a] Time scale for calving of points with many ice-free neighbors
+        ! Local variables 
+        integer  :: i, j, nx, ny
+        integer  :: im1, ip1, jm1, jp1 
+        integer  :: n_mrgn 
+        real(wp) :: H_eff 
+
         nx = size(H_ice,1)
         ny = size(H_ice,2) 
 
-        do j = 2, ny-1 
-        do i = 2, nx-1
+        do j = 1, ny 
+        do i = 1, nx
 
-            if (f_grnd(i,j) .eq. 0.0 .and. H_ice(i,j) .gt. 0.0) then 
+            ! Define neighbor indices
+            im1 = max(i-1,1)
+            ip1 = min(i+1,nx)
+            jm1 = max(j-1,1)
+            jp1 = min(j+1,ny)
+            
+            if (f_grnd(i,j) .eq. 0.0 .and. f_ice(i,j) .gt. 0.0) then 
                 ! Floating point, diagnose number of ice-free neighbors 
 
-                n_mrgn = count([H_ice(i-1,j),H_ice(i+1,j),H_ice(i,j-1),H_ice(i,j+1)].eq.0.0 )
+                n_mrgn = count([H_ice(im1,j),H_ice(ip1,j),H_ice(i,jm1),H_ice(i,jp1)].eq.0.0 )
 
             else 
 
@@ -65,28 +72,23 @@ contains
                 ! (this is designed to handle rare, ice peninsulas that can protrude
                 !  from the main ice body)
                 
-                calv(i,j) = calv(i,j) + max(1000.0-H_ice(i,j),0.0)/tau_mrgn 
+                ! Calculate effective ice thickness for current cell
+                if (f_ice(i,j) .gt. 0.0_prec) then 
+                    H_eff = H_ice(i,j) / f_ice(i,j) 
+                else
+                    H_eff = H_ice(i,j) 
+                end if 
+
+                calv_flt(i,j) = calv_flt(i,j) + max(1000.0-H_eff,0.0)/tau 
 
             end if 
 
-            ! Additionally modify calving to remove any margin ice less than H_min_flt 
-            if (n_mrgn .gt. 0 .and. H_ice(i,j) .lt. H_min_flt) calv(i,j) = H_ice(i,j)/dt
-            
-            ! Ensure calving is limited to amount of available ice to calve  
-            if(f_grnd(i,j) .eq. 0.0 .and. (H_ice(i,j)-dt*calv(i,j)) .lt. 0.0) calv(i,j) = H_ice(i,j)/dt
-
-            ! Apply modified mass balance to update the ice thickness 
-            H_ice(i,j) = H_ice(i,j) - dt*calv(i,j)
-            
         end do 
         end do 
 
-        ! Also ensure tiny numeric ice thicknesses are removed
-        where (f_grnd .eq. 0.0 .and. H_ice .lt. 1e-5) H_ice = 0.0 
-            
         return 
         
-    end subroutine apply_calving
+    end subroutine calc_calving_tongues
 
     subroutine calc_calving_residual(calv,H_ice,f_ice,dt,resid_lim)
 
@@ -694,7 +696,7 @@ end if
 
     end subroutine calc_calving_rate_flux_grisli
     
-    subroutine calc_calving_rate_vonmises_l19(calv,H_ice,f_ice,f_grnd,teig1,teig2,ATT_bar,visc_bar,dx,dy,kt,w2,n_glen)
+    subroutine calc_calving_rate_vonmises_l19(calv,H_ice,f_ice,f_grnd,teig1,teig2,dx,kt,w2)
         ! Calculate the 'horizontal' calving rate [m/yr] based on the 
         ! von Mises stress approach, as outlined by Lipscomb et al. (2019)
         ! Eqs. 73-75.
@@ -708,12 +710,9 @@ end if
         real(wp), intent(IN)  :: f_grnd(:,:)  
         real(wp), intent(IN)  :: teig1(:,:)
         real(wp), intent(IN)  :: teig2(:,:)
-        real(wp), intent(IN)  :: ATT_bar(:,:)
-        real(wp), intent(IN)  :: visc_bar(:,:)
-        real(wp), intent(IN)  :: dx, dy 
+        real(wp), intent(IN)  :: dx
         real(wp), intent(IN)  :: kt
-        real(wp), intent(IN)  :: w2
-        real(wp), intent(IN)  :: n_glen 
+        real(wp), intent(IN)  :: w2 
 
         ! Local variables 
         integer  :: i, j
@@ -721,6 +720,7 @@ end if
         integer  :: nx, ny
         integer  :: n_ocean 
         logical  :: is_margin 
+        real(wp) :: dy 
         real(wp) :: tau1, tau2 
         real(wp) :: tau_eff 
         real(wp) :: calv_ref
@@ -737,6 +737,9 @@ end if
         nx = size(H_ice,1)
         ny = size(H_ice,2)
 
+        ! Assume square grid cells 
+        dy = dx 
+        
         calv = 0.0_wp
 
         do j = 1, ny
@@ -777,7 +780,7 @@ end if
                     else 
                         ! Stresses are available at this margin point. 
                         ! Calculate the effective stress directly.
-                        
+
                         tau_eff = calc_tau_eff(teig1(i,j),teig2(i,j),w2)
                     
                     end if 

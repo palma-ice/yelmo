@@ -947,7 +947,7 @@ contains
 
                 H_ice_inv = 1.0_wp/H_ice(i,j)
 
-            
+                
                 ! ====== Loop over each column ====== 
 
                 do k = 1, nz_aa 

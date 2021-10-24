@@ -255,6 +255,9 @@ contains
             
             
 
+
+
+
             ! Save the rate of change of ice thickness in output variable [m/a]
             tpo%now%dHicedt = (tpo%now%H_ice - tpo%now%H_ice_n) / dt 
 
@@ -308,12 +311,12 @@ contains
                 ! Note: two functions that should give the same results
                 
                 !call calc_z_srf(tpo%now%z_srf,tpo%now%H_ice,tpo%now%H_grnd,bnd%z_bed,bnd%z_sl)
-                call calc_z_srf_max(tpo%now%z_srf,tpo%now%H_ice,bnd%z_bed,bnd%z_sl)
+                call calc_z_srf_max(tpo%now%z_srf,tpo%now%H_ice,tpo%now%f_ice,bnd%z_bed,bnd%z_sl)
             
             case(1)
                 ! Subgrid z_srf calculations at the grounding line 
 
-                call calc_z_srf_subgrid_area(tpo%now%z_srf,tpo%now%f_grnd,tpo%now%H_ice,bnd%z_bed,bnd%z_sl,tpo%par%gl_sep_nx)
+                call calc_z_srf_subgrid_area(tpo%now%z_srf,tpo%now%f_grnd,tpo%now%H_ice,tpo%now%f_ice,bnd%z_bed,bnd%z_sl,tpo%par%gl_sep_nx)
 
         end select 
 
@@ -336,7 +339,7 @@ contains
         ! 3. Calculate new masks ------------------------------
 
         ! Calculate grounding overburden ice thickness 
-        call calc_H_grnd(tpo%now%H_grnd,tpo%now%H_ice,bnd%z_bed,bnd%z_sl)
+        call calc_H_grnd(tpo%now%H_grnd,tpo%now%H_ice,tpo%now%f_ice,bnd%z_bed,bnd%z_sl)
 
 
         ! Calculate the grounded fraction and grounding line mask of each grid cell

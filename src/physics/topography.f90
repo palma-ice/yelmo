@@ -275,7 +275,7 @@ contains
 
     end subroutine calc_z_srf
 
-    subroutine calc_z_srf_max(z_srf,H_ice,z_bed,z_sl)
+    subroutine calc_z_srf_max(z_srf,H_ice,f_ice,z_bed,z_sl)
         ! Calculate surface elevation
         ! Adapted from Pattyn (2017), Eq. 1
         
@@ -283,23 +283,37 @@ contains
 
         real(prec), intent(INOUT) :: z_srf(:,:) 
         real(prec), intent(IN)    :: H_ice(:,:)
+        real(prec), intent(IN)    :: f_ice(:,:)
         real(prec), intent(IN)    :: z_bed(:,:)
         real(prec), intent(IN)    :: z_sl(:,:)
 
         ! Local variables
+        integer :: i, j, nx, ny 
         real(prec) :: rho_ice_sw
-        real(prec) :: H_mrgn 
+        real(prec) :: H_eff 
+
+        nx = size(z_srf,1) 
+        ny = size(z_srf,2) 
 
         rho_ice_sw = rho_ice/rho_sw ! Ratio of density of ice to seawater [--]
         
-        ! Initially calculate surface elevation everywhere 
-        z_srf = max(z_bed + H_ice, z_sl + (1.0-rho_ice_sw)*H_ice)
+        do j = 1, ny 
+        do i = 1, nx 
+
+            ! Get effective ice thickness 
+            call calc_H_eff(H_eff,H_ice(i,j),f_ice(i,j))
+
+            ! Initially calculate surface elevation everywhere 
+            z_srf(i,j) = max(z_bed(i,j) + H_ice(i,j), z_sl(i,j) + (1.0-rho_ice_sw)*H_eff)
         
+        end do 
+        end do 
+
         return 
 
     end subroutine calc_z_srf_max
 
-    subroutine calc_z_srf_subgrid_area(z_srf,f_grnd,H_ice,z_bed,z_sl,gl_sep_nx)
+    subroutine calc_z_srf_subgrid_area(z_srf,f_grnd,H_ice,f_ice,z_bed,z_sl,gl_sep_nx)
         ! Interpolate variables at grounding line to subgrid level to 
         ! calculate the average z_srf value for the aa-node cell
 
@@ -308,22 +322,25 @@ contains
         real(prec), intent(OUT) :: z_srf(:,:)       ! aa-nodes 
         real(prec), intent(IN)  :: f_grnd(:,:)      ! aa-nodes
         real(prec), intent(IN)  :: H_ice(:,:)
+        real(prec), intent(IN)  :: f_ice(:,:)
         real(prec), intent(IN)  :: z_bed(:,:)
         real(prec), intent(IN)  :: z_sl(:,:)
         integer,    intent(IN)  :: gl_sep_nx        ! Number of interpolation points per side (nx*nx)
 
         ! Local variables
-        integer    :: i, j, nx, ny
-        real(prec) :: v1, v2, v3, v4 
-        integer    :: im1, ip1, jm1, jp1
-        real(prec) :: rho_ice_sw
+        integer  :: i, j, nx, ny
+        real(wp) :: v1, v2, v3, v4 
+        integer  :: im1, ip1, jm1, jp1
+        real(wp) :: rho_ice_sw
+        real(wp) :: H_eff 
 
         real(prec), allocatable :: z_srf_int(:,:) 
-        real(prec), allocatable :: H_ice_int(:,:) 
+        real(prec), allocatable :: H_ice_int(:,:)
+        real(prec), allocatable :: f_ice_int(:,:)  
         real(prec), allocatable :: z_bed_int(:,:) 
         real(prec), allocatable :: z_sl_int(:,:) 
         real(prec), allocatable :: H_grnd_int(:,:) 
-
+        
         rho_ice_sw = rho_ice/rho_sw ! Ratio of density of ice to seawater [--]
 
         nx = size(z_srf,1)
@@ -332,9 +349,17 @@ contains
         ! Allocate the subgrid arrays 
         allocate(z_srf_int(gl_sep_nx,gl_sep_nx))
         allocate(H_ice_int(gl_sep_nx,gl_sep_nx))
+        allocate(f_ice_int(gl_sep_nx,gl_sep_nx))
         allocate(z_bed_int(gl_sep_nx,gl_sep_nx))
         allocate(z_sl_int(gl_sep_nx,gl_sep_nx))
         allocate(H_grnd_int(gl_sep_nx,gl_sep_nx))
+        
+        ! ajr: assume f_ice_int=1 everywhere this is used for now. 
+        ! Needs to be fixed in the future potentially. 
+        f_ice_int = 1.0_wp 
+
+        write(*,*) "calc_z_srf_subgrid_area:: routine not ready for f_ice values. Fix!"
+        stop 
         
         ! Calculate the surface elevation based on whole grid values,
         ! except at the grounding line which is treated with subgrid interpolations. 
@@ -386,7 +411,7 @@ contains
                 
                 
                 ! Now calculate H_grnd and z_srf for each subgrid point 
-                call calc_H_grnd(H_grnd_int,H_ice_int,z_bed_int,z_sl_int)
+                call calc_H_grnd(H_grnd_int,H_ice_int,f_ice_int,z_bed_int,z_sl_int)
 
                 where (H_grnd_int .gt. 0.0)
                     ! Fully grounded ice or ice-free land 
@@ -431,7 +456,7 @@ contains
 
     end subroutine calc_H_eff
 
-    elemental subroutine calc_H_grnd(H_grnd,H_ice,z_bed,z_sl)
+    elemental subroutine calc_H_grnd(H_grnd,H_ice,f_ice,z_bed,z_sl)
         ! Calculate ice thickness overburden, H_grnd
         ! When H_grnd >= 0, grounded, when H_grnd < 0, floating 
         ! Also calculate rate of change for diagnostic related to grounding line 
@@ -440,18 +465,23 @@ contains
         
         implicit none 
 
-        real(prec), intent(INOUT) :: H_grnd
-        real(prec), intent(IN)    :: H_ice
-        real(prec), intent(IN)    :: z_bed
-        real(prec), intent(IN)    :: z_sl 
+        real(wp), intent(INOUT) :: H_grnd
+        real(wp), intent(IN)    :: H_ice
+        real(wp), intent(IN)    :: f_ice
+        real(wp), intent(IN)    :: z_bed
+        real(wp), intent(IN)    :: z_sl 
 
         ! Local variables   
-        real(prec) :: rho_sw_ice 
-        
+        real(wp) :: rho_sw_ice 
+        real(wp) :: H_eff 
+
         rho_sw_ice = rho_sw/rho_ice ! Ratio of density of seawater to ice [--]
         
+        ! Get effective ice thickness 
+        call calc_H_eff(H_eff,H_ice,f_ice)
+
         ! Calculate new H_grnd (ice thickness overburden)
-        H_grnd = H_ice - rho_sw_ice*max(z_sl-z_bed,0.0_prec)
+        H_grnd = H_eff - rho_sw_ice*max(z_sl-z_bed,0.0_prec)
 
         return 
 

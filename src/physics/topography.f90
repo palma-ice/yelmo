@@ -410,21 +410,21 @@ contains
         
     end subroutine calc_z_srf_subgrid_area
 
-    elemental subroutine calc_H_eff(H_corr,H_ice,f_ice)
+    elemental subroutine calc_H_eff(H_eff,H_ice,f_ice)
         ! Calculate ice-thickness, scaled at margins to actual thickness
         ! but as if it covered the whole grid cell.
         
         implicit none
 
-        real(prec), intent(OUT) :: H_corr 
+        real(prec), intent(OUT) :: H_eff 
         real(prec), intent(IN)  :: H_ice 
         real(prec), intent(IN)  :: f_ice 
 
         
         if (f_ice .gt. 0.0) then 
-            H_corr = H_ice / f_ice
+            H_eff = H_ice / f_ice
         else 
-            H_corr = H_ice 
+            H_eff = H_ice 
         end if
 
         return
@@ -949,7 +949,7 @@ end if
         ! Local variables
         integer    :: i, j, nx, ny, n_margin
         integer    :: im1, ip1, jm1, jp1
-        real(wp) :: H_ref, dz  
+        real(wp) :: H_eff, dz  
         real(wp) :: area_flt
         real(wp) :: area_tot
         real(wp) :: bmb_eff 
@@ -997,24 +997,19 @@ end if
                                             n_margin .gt. 0) then 
                         ! Cell is ice-covered, [grounded below sea level or floating] and at the ice margin
 
-                        ! Get margin-scaled ice thickness (f_ice > 0 since H_ice > 0, except on first timestep, be safe!)
-                        if (f_ice(i,j) .eq. 0.0_wp) then 
-                            ! f_ice not yet defined, assume point covers cell 
-                            H_ref = H_ice(i,j) 
-                        else 
-                            H_ref = H_ice(i,j) / f_ice(i,j) 
-                        end if 
-                        
+                        ! Get margin-scaled ice thickness
+                        call calc_H_eff(H_eff,H_ice(i,j),f_ice(i,j))
+
                         ! Determine depth of adjacent water using centered cell information
                         if (H_grnd(i,j) .lt. 0.0_wp) then 
                             ! Cell is floating, calculate submerged ice thickness 
                             
-                            dz = (H_ref*rho_ice_sw)
+                            dz = (H_eff*rho_ice_sw)
                             
                         else 
                             ! Cell is grounded, recover depth of seawater
 
-                            dz = max( (H_ref - H_grnd(i,j)) * rho_ice_sw, 0.0_wp)
+                            dz = max( (H_eff - H_grnd(i,j)) * rho_ice_sw, 0.0_wp)
 
                         end if 
 

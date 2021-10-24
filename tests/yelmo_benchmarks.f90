@@ -149,6 +149,7 @@ program yelmo_benchmarks
             
             !yelmo1%tpo%now%H_ice  = 100.0
             call dome_init(yelmo1%tpo%now%H_ice,yelmo1%grd%x,yelmo1%grd%y,R0=0.5_prec,H0=2000.0_prec)
+            where(yelmo1%tpo%now%H_ice .lt. 300.0) yelmo1%tpo%now%H_ice = 300.0 
 
             yelmo1%tpo%now%z_srf  = yelmo1%bnd%z_bed + yelmo1%tpo%now%H_ice
 
@@ -564,7 +565,7 @@ contains
                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
         call nc_write(filename,"mb_applied",ylmo%tpo%now%mb_applied,units="m/a",long_name="Actual ice mass balance applied", &
                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-        call nc_write(filename,"mb_resid",ylmo%tpo%now%mb_resid,units="m",long_name="Residual mass balance", &
+        call nc_write(filename,"mb_resid",ylmo%tpo%now%mb_resid,units="m/a",long_name="Residual mass balance", &
                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
         
         call nc_write(filename,"dzsrfdt",ylmo%tpo%now%dzsrfdt,units="m/a",long_name="Surface elevation change", &
@@ -679,7 +680,7 @@ contains
             call nc_write(filename,"teig2",ylmo%mat%now%strs2D%teig2,units="Pa",long_name="Eigen stress 1", &
                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
         end if 
-        
+
         ! == yelmo_dynamics ==
 
         call nc_write(filename,"ssa_mask_acx",ylmo%dyn%now%ssa_mask_acx,units="1",long_name="SSA mask (acx)", &

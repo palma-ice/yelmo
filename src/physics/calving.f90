@@ -2,7 +2,7 @@ module calving
     ! Definitions for various calving laws 
 
     use yelmo_defs, only : sp, dp, wp, prec, TOL_UNDERFLOW, rho_ice, rho_sw, g  
-    use deformation, only : calc_stress_eigen_values
+    use topography, only : calc_H_eff 
 
     implicit none 
 
@@ -134,7 +134,7 @@ contains
 
                 if (embayed) then 
 
-                    !calv_flt(i,j) = 0.5_wp * calv_flt(i,j)
+                    ! calv_flt(i,j) = 0.5_wp * calv_flt(i,j)
                 
                 end if 
 
@@ -346,12 +346,7 @@ end if
                     ! Point is at calving front 
 
                     ! Calculate current ice thickness (H_eff = H_ice/f_ice)
-                    ! Check f_ice==0 for safety, but this should never happen for an ice-covered point
-                    if (f_ice(i,j) .gt. 0.0_prec) then 
-                        H_eff = H_ice(i,j) / f_ice(i,j) 
-                    else
-                        H_eff = H_ice(i,j) 
-                    end if 
+                    call calc_H_eff(H_eff,H_ice(i,j),f_ice(i,j))
 
                     if (H_eff .lt. H_calv) then 
                         ! If ice is too thin, diagnose calving rate, with
@@ -425,12 +420,8 @@ end if
             jp1 = min(j+1,ny)
 
             ! Get effective ice thickness
-            if (f_ice(i,j) .gt. 0.0) then 
-                H_eff = H_ice(i,j) / f_ice(i,j) 
-            else 
-                H_eff = H_ice(i,j) 
-            end if 
-            
+            call calc_H_eff(H_eff,H_ice(i,j),f_ice(i,j))
+
             ! Calculate ice thickness relative to the calving threshold 
             H_diff(i,j) = H_eff - H_calv
 
@@ -668,11 +659,7 @@ end if
             end if 
 
             ! Margin points 
-            if (f_ice(i,j) .gt. 0.0) then 
-                H_eff = H_ice(i,j) / f_ice(i,j) 
-            else 
-                H_eff = H_ice(i,j)  ! == 0.0
-            end if 
+            call calc_H_eff(H_eff,H_ice(i,j),f_ice(i,j))
 
             ! Calculate thickness change via conservation
             dHdt(i,j) = mbal(i,j) - H_eff*ddiv(i,j)
@@ -732,11 +719,8 @@ end if
                     ! This point is not sustained from neighbors, determine calving rate 
                     ! f_ice ensures rate is adjusted to size of grid cell 
 
-                    if (f_ice(i,j) .gt. 0.0) then 
-                        H_eff = H_ice(i,j) / f_ice(i,j) 
-                    else 
-                        H_eff = H_ice(i,j)  ! == 0.0
-                    end if 
+                    ! Get effective ice thickness
+                    call calc_H_eff(H_eff,H_ice(i,j),f_ice(i,j))
 
                     ! Calculate calving rate.
                     ! Scale by f_ice to apply to whole cell (following Lipscomb et al., 2019)
@@ -846,11 +830,7 @@ end if
                     calv_ref = kt*tau_eff 
 
                     ! Get effective ice thickness
-                    if (f_ice(i,j) .gt. 0.0) then 
-                        H_eff = H_ice(i,j) / f_ice(i,j)
-                    else 
-                        H_eff = H_ice(i,j)
-                    end if 
+                    call calc_H_eff(H_eff,H_ice(i,j),f_ice(i,j))
 
                     ! Convert to horizontal volume change, weighted
                     ! by number of exposed faces.
@@ -1026,11 +1006,7 @@ end if
                 ! Margin point with potential for grounded stress calving
 
                 ! Get effective ice thickness 
-                if (f_ice(i,j) .gt. 0.0) then 
-                    H_eff = H_ice(i,j) / f_ice(i,j)
-                else 
-                    H_eff = H_ice(i,j)
-                end if 
+                call calc_H_eff(H_eff,H_ice(i,j),f_ice(i,j))
 
                 ! Calculate depth of seawater (limited by ice thickness and flotation criterion)
                 if (H_ocn(i,j) .gt. 0.0) then 
@@ -1086,6 +1062,7 @@ end if
         integer  :: i, j, nx, ny  
         integer  :: im1, ip1, jm1, jp1 
         real(wp) :: f_scale 
+        real(wp) :: H_eff
         logical  :: is_grnd_margin 
 
         nx = size(H_ice,1)
@@ -1117,9 +1094,12 @@ end if
                     if (f_scale .lt. 0.0) f_scale = 0.0 
                     if (f_scale .gt. 1.0) f_scale = 1.0 
 
+                    ! Get effective ice thickness 
+                    call calc_H_eff(H_eff,H_ice(i,j),f_ice(i,j))
+
                     ! Calculate calving rate from linear function, 
-                    ! limited to available ice thickness 
-                    calv(i,j) = min(f_scale*calv_max, H_ice(i,j)/tau) 
+                    ! limited to available (effective) ice thickness 
+                    calv(i,j) = min(f_scale*calv_max, H_eff/tau) 
                     
                 end if 
 

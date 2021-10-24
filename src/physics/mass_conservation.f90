@@ -5,7 +5,8 @@ module mass_conservation
 
     use solver_advection, only : calc_advec2D  
     use velocity_general, only : set_inactive_margins 
-
+    use topography, only : calc_H_eff
+    
     implicit none 
 
     private
@@ -201,7 +202,7 @@ contains
 
         ! Apply modified mass balance to update the ice thickness 
         H_ice = H_ice - dt*calv_applied
-        
+
         ! Ensure tiny numeric ice thicknesses are removed
         where (H_ice .lt. TOL_UNDERFLOW) H_ice = 0.0 
 
@@ -210,11 +211,11 @@ contains
     end subroutine calc_ice_thickness_calving
 
     subroutine apply_ice_thickness_boundaries(mb_resid,H_ice,f_ice,f_grnd,uxy_b,ice_allowed,boundaries,H_ice_ref, &
-                                                H_min_flt,H_min_grnd,dt)
+                                                H_min_flt,H_min_grnd,dt,reset)
 
         implicit none
 
-        real(wp),           intent(OUT)     :: mb_resid(:,:)            ! [m/yr] Residual mass balance
+        real(wp),           intent(INOUT)   :: mb_resid(:,:)            ! [m/yr] Residual mass balance
         real(wp),           intent(INOUT)   :: H_ice(:,:)               ! [m] Ice thickness 
         real(wp),           intent(IN)      :: f_ice(:,:)               ! [--] Fraction of ice cover
         real(wp),           intent(IN)      :: f_grnd(:,:)              ! [--] Grounded ice fraction
@@ -225,6 +226,7 @@ contains
         real(wp),           intent(IN)      :: H_min_flt                ! [m] Minimum allowed floating ice thickness 
         real(wp),           intent(IN)      :: H_min_grnd               ! [m] Minimum allowed grounded ice thickness 
         real(wp),           intent(IN)      :: dt                       ! [yr] Timestep
+        logical, optional,  intent(IN)      :: reset                    ! Reset mb_resid to zero? 
 
         ! Local variables 
         integer :: i, j, nx, ny 
@@ -271,11 +273,7 @@ contains
                 ! Ice covered point at the margin
 
                 ! Calculate current ice thickness 
-                if (f_ice(i,j) .gt. 0.0) then 
-                    H_eff = H_ice(i,j) / f_ice(i,j) 
-                else 
-                    H_eff = H_ice(i,j) 
-                end if 
+                call calc_H_eff(H_eff,H_ice(i,j),f_ice(i,j))
 
                 ! Remove ice that is too thin 
                 if (f_grnd(i,j) .eq. 0.0_wp .and. H_eff .lt. H_min_flt)  H_ice_new(i,j) = 0.0_wp 
@@ -362,8 +360,13 @@ contains
 
         end select 
 
-        ! Determine mass balance related to changes applied here 
-        mb_resid = (H_ice_new - H_ice) / dt 
+        ! Determine mass balance related to changes applied here
+
+        if (reset) then  
+            mb_resid = 0.0_wp 
+        end if 
+
+        mb_resid = mb_resid + (H_ice_new - H_ice) / dt 
 
         ! Reset actual ice thickness to new values 
         H_ice = H_ice_new 

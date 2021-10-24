@@ -57,7 +57,7 @@ contains
         integer :: i, j, nx, ny  
         real(prec), allocatable :: mbal(:,:) 
         real(prec), allocatable :: calv_sd(:,:) 
-        real(prec), allocatable :: H_ref(:,:) 
+        logical :: reset_mb_resid 
 
         real(8)    :: cpu_time0, cpu_time1
         real(prec) :: model_time0, model_time1 
@@ -68,7 +68,6 @@ contains
 
         allocate(mbal(nx,ny))
         allocate(calv_sd(nx,ny))
-        allocate(H_ref(nx,ny))
 
         ! Initialize time if necessary 
         if (tpo%par%time .gt. dble(time)) then 
@@ -123,6 +122,20 @@ contains
             call calc_ice_thickness_mbal(tpo%now%H_ice,tpo%now%f_ice,tpo%now%mb_applied, &
                                          tpo%now%f_grnd,bnd%z_sl-bnd%z_bed,mbal,tpo%par%dx,dt)
 
+            ! If subgrid ice margin is not being used, then tiny ice 
+            ! thicknesses should be removed before calving step.             
+            if (.not. tpo%par%margin_flt_subgrid) then 
+
+                call apply_ice_thickness_boundaries(tpo%now%mb_resid,tpo%now%H_ice,tpo%now%f_ice,tpo%now%f_grnd, &
+                                                dyn%now%uxy_b,bnd%ice_allowed,tpo%par%boundaries,bnd%H_ice_ref, &
+                                                H_min_flt=5.0_wp,H_min_grnd=0.0_wp,dt=dt,reset=.TRUE.)
+
+                reset_mb_resid = .FALSE.
+            else
+                reset_mb_resid = .TRUE. 
+            end if 
+
+
             ! Update ice fraction mask 
             call calc_ice_fraction(tpo%now%f_ice,tpo%now%H_ice,tpo%now%f_grnd,tpo%par%margin_flt_subgrid)
             
@@ -168,16 +181,16 @@ contains
                 case("vm-l19")
                     ! Use von Mises calving as defined by Lipscomb et al. (2019)
 
-                    if (.not. tpo%par%margin_flt_subgrid) then 
+                    ! if (.not. tpo%par%margin_flt_subgrid) then 
 
-                        write(io_unit_err,*) ""
-                        write(io_unit_err,*) ""
-                        write(io_unit_err,*) "calv_flt_method='vm-l19' must be used with margin_flt_subgrid=True."
-                        write(io_unit_err,*) "calv_flt_method    = ", trim(tpo%par%calv_flt_method)
-                        write(io_unit_err,*) "margin_flt_subgrid = ", tpo%par%margin_flt_subgrid
-                        stop "Program stopped."
+                    !     write(io_unit_err,*) ""
+                    !     write(io_unit_err,*) ""
+                    !     write(io_unit_err,*) "calv_flt_method='vm-l19' must be used with margin_flt_subgrid=True."
+                    !     write(io_unit_err,*) "calv_flt_method    = ", trim(tpo%par%calv_flt_method)
+                    !     write(io_unit_err,*) "margin_flt_subgrid = ", tpo%par%margin_flt_subgrid
+                    !     stop "Program stopped."
 
-                    end if 
+                    ! end if 
                     
                     ! Next, diagnose calving
                     call calc_calving_rate_vonmises_l19(tpo%now%calv_flt,tpo%now%H_ice,tpo%now%f_ice,tpo%now%f_grnd, &
@@ -252,7 +265,7 @@ contains
             ! and store changes in residual mass balance field. 
             call apply_ice_thickness_boundaries(tpo%now%mb_resid,tpo%now%H_ice,tpo%now%f_ice,tpo%now%f_grnd, &
                                                 dyn%now%uxy_b,bnd%ice_allowed,tpo%par%boundaries,bnd%H_ice_ref, &
-                                                tpo%par%H_min_flt,tpo%par%H_min_grnd,dt)
+                                                tpo%par%H_min_flt,tpo%par%H_min_grnd,dt,reset_mb_resid)
 
 
 

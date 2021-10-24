@@ -18,6 +18,8 @@ module basal_dragging
                     staggerdiff_nodes_acx_ab_ice, staggerdiff_nodes_acy_ab_ice, &
                     staggerdiffcross_nodes_acx_ab_ice, staggerdiffcross_nodes_acy_ab_ice
 
+    use topography, only : calc_H_eff 
+
     implicit none 
 
 
@@ -164,7 +166,7 @@ contains
                 ! norm==.TRUE., so that zstar-scaling is bounded between 0 and 1, and thus won't affect 
                 ! choice of c_bed value that is independent of this scaling. 
                 
-                call scale_beta_gl_zstar(beta,H_ice,z_bed,z_sl,norm=.TRUE.)
+                call scale_beta_gl_zstar(beta,H_ice,f_ice,z_bed,z_sl,norm=.TRUE.)
 
             case DEFAULT 
                 ! No scaling
@@ -438,11 +440,8 @@ contains
         ! Local variables 
         real(wp) :: H_eff 
 
-        if (f_ice .gt. 0.0_wp) then 
-            H_eff = H_ice / f_ice
-        else
-            H_eff = 0.0_wp 
-        end if 
+        ! Get effective ice thickness 
+        call calc_H_eff(H_eff,H_ice,f_ice)
 
         ! Calculate effective pressure [Pa] (overburden pressure)
         N_eff = f_grnd * (rho_ice*g*H_eff)
@@ -481,11 +480,8 @@ contains
         ! Determine the maximum ice thickness to allow floating ice
         H_float = max(0.0_prec, rho_sw_ice*(z_sl-z_bed))
 
-        if (f_ice .gt. 0.0_wp) then 
-            H_eff = H_ice / f_ice
-        else
-            H_eff = 0.0_wp 
-        end if 
+        ! Get effective ice thickness 
+        call calc_H_eff(H_eff,H_ice,f_ice)
 
         ! Calculate basal water pressure 
         if (H_eff .eq. 0.0) then
@@ -542,11 +538,8 @@ contains
 
         else 
 
-            if (f_ice .gt. 0.0_wp) then 
-                H_eff = H_ice / f_ice
-            else
-                H_eff = 0.0_wp 
-            end if 
+            ! Get effective ice thickness 
+            call calc_H_eff(H_eff,H_ice,f_ice)
 
             ! Get overburden pressure 
             P0 = rho_ice*g*H_eff
@@ -758,7 +751,7 @@ contains
 
         end do
         end do
-        
+
         return
         
     end subroutine calc_beta_aa_power_plastic
@@ -916,8 +909,8 @@ contains
         
         implicit none
         
-        real(wp), intent(INOUT) :: beta(:,:)     ! aa-nodes
-        real(wp), intent(IN)    :: H_grnd(:,:)  ! aa-nodes
+        real(wp), intent(INOUT) :: beta(:,:)        ! aa-nodes
+        real(wp), intent(IN)    :: H_grnd(:,:)      ! aa-nodes
         real(wp), intent(IN)    :: H_grnd_lim       
 
         ! Local variables
@@ -948,22 +941,24 @@ contains
         
     end subroutine scale_beta_gl_Hgrnd
     
-    subroutine scale_beta_gl_zstar(beta,H_ice,z_bed,z_sl,norm)
+    subroutine scale_beta_gl_zstar(beta,H_ice,f_ice,z_bed,z_sl,norm)
         ! Calculate scalar between 0 and 1 to modify basal friction coefficient
         ! as ice approaches and achieves floatation, and apply.
         ! Following "Zstar" approach of Gladstone et al. (2017) 
         
         implicit none
         
-        real(wp), intent(INOUT) :: beta(:,:)     ! aa-nodes
-        real(wp), intent(IN)    :: H_ice(:,:)     ! aa-nodes
-        real(wp), intent(IN)    :: z_bed(:,:)     ! aa-nodes        
-        real(wp), intent(IN)    :: z_sl(:,:)      ! aa-nodes        
+        real(wp), intent(INOUT) :: beta(:,:)        ! aa-nodes
+        real(wp), intent(IN)    :: H_ice(:,:)       ! aa-nodes
+        real(wp), intent(IN)    :: f_ice(:,:)       ! aa-nodes
+        real(wp), intent(IN)    :: z_bed(:,:)       ! aa-nodes        
+        real(wp), intent(IN)    :: z_sl(:,:)        ! aa-nodes        
         logical,    intent(IN)    :: norm           ! Normalize by H_ice? 
 
         ! Local variables
         integer    :: i, j, nx, ny
         real(wp) :: rho_sw_ice 
+        real(wp) :: H_eff
         real(wp) :: f_scale 
 
         rho_sw_ice = rho_sw / rho_ice 
@@ -975,18 +970,25 @@ contains
         do j = 1, ny 
         do i = 1, nx
 
-            if (z_bed(i,j) > z_sl(i,j)) then 
-                ! Land based above sea level 
-                f_scale = H_ice(i,j) 
-            else
-                ! Marine based 
-                f_scale = max(0.0_prec, H_ice(i,j) - (z_sl(i,j)-z_bed(i,j))*rho_sw_ice)
+            if (f_ice(i,j) .gt. 0.0_wp) then 
+
+                ! Get effective ice thickness 
+                call calc_H_eff(H_eff,H_ice(i,j),f_ice(i,j))
+
+                if (z_bed(i,j) > z_sl(i,j)) then 
+                    ! Land based above sea level 
+                    f_scale = H_eff 
+                else
+                    ! Marine based 
+                    f_scale = max(0.0_prec, H_eff - (z_sl(i,j)-z_bed(i,j))*rho_sw_ice)
+                end if 
+
+                if (norm .and. H_ice(i,j) .gt. 0.0) f_scale = f_scale / H_eff
+
+                beta(i,j) = beta(i,j) * f_scale 
+            
             end if 
 
-            if (norm .and. H_ice(i,j) .gt. 0.0) f_scale = f_scale / H_ice(i,j) 
-
-            beta(i,j) = beta(i,j) * f_scale 
-            
         end do 
         end do  
 

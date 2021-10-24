@@ -126,13 +126,6 @@ contains
             ! Update ice fraction mask 
             call calc_ice_fraction(tpo%now%f_ice,tpo%now%H_ice,tpo%now%f_grnd,tpo%par%margin_flt_subgrid)
             
-            
-            ! Also apply all additional (generally artificial) ice thickness adjustments 
-            ! and store changes in residual mass balance field. 
-            call apply_ice_thickness_boundaries(tpo%now%mb_resid,tpo%now%H_ice,tpo%now%f_ice,tpo%now%f_grnd, &
-                                                dyn%now%uxy_b,bnd%ice_allowed,tpo%par%boundaries,bnd%H_ice_ref, &
-                                                tpo%par%H_min_flt,tpo%par%H_min_grnd,dt)
-
             ! === Step 3: ice thickness evolution from calving ===
             
             
@@ -254,6 +247,12 @@ contains
             call calc_ice_fraction(tpo%now%f_ice,tpo%now%H_ice,tpo%now%f_grnd,tpo%par%margin_flt_subgrid)
             
             
+
+            ! Finally apply all additional (generally artificial) ice thickness adjustments 
+            ! and store changes in residual mass balance field. 
+            call apply_ice_thickness_boundaries(tpo%now%mb_resid,tpo%now%H_ice,tpo%now%f_ice,tpo%now%f_grnd, &
+                                                dyn%now%uxy_b,bnd%ice_allowed,tpo%par%boundaries,bnd%H_ice_ref, &
+                                                tpo%par%H_min_flt,tpo%par%H_min_grnd,dt)
 
 
 

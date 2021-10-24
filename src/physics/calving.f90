@@ -43,6 +43,7 @@ contains
         integer  :: im1, ip1, jm1, jp1 
         integer  :: n_mrgn 
         real(wp) :: H_eff 
+        logical  :: embayed 
 
         nx = size(H_ice,1)
         ny = size(H_ice,2) 
@@ -80,6 +81,62 @@ contains
                 end if 
 
                 calv_flt(i,j) = calv_flt(i,j) + max(1000.0-H_eff,0.0)/tau 
+
+            end if 
+
+
+            ! Also check for points with an ice-free direct neighbor
+            ! but two ice-covered neighbors in the corners. Assume that this
+            ! should reduce the calving rate. 
+            if (f_grnd(i,j) .eq. 0.0 .and. f_ice(i,j) .eq. 1.0) then 
+                ! Floating point with full ice coverage
+
+                embayed = .FALSE.
+
+                ! Embayed to the right?
+                if (   (f_grnd(ip1,j)   .eq. 0.0 .and. f_ice(ip1,j)   .eq. 0.0) &
+                 .and. (f_grnd(ip1,jm1) .eq. 0.0 .and. f_ice(ip1,jm1) .eq. 1.0) &
+                 .and. (f_grnd(ip1,jp1) .eq. 0.0 .and. f_ice(ip1,jp1) .eq. 1.0) ) then 
+
+                    embayed = .TRUE. 
+
+                end if 
+
+                ! Embayed to the left?
+                if (   (f_grnd(im1,j)   .eq. 0.0 .and. f_ice(im1,j)   .eq. 0.0) &
+                 .and. (f_grnd(im1,jm1) .eq. 0.0 .and. f_ice(im1,jm1) .eq. 1.0) &
+                 .and. (f_grnd(im1,jp1) .eq. 0.0 .and. f_ice(im1,jp1) .eq. 1.0) ) then 
+
+                    embayed = .TRUE. 
+
+                end if 
+
+                ! Embayed to the top?
+                if (   (f_grnd(i,jp1)   .eq. 0.0 .and. f_ice(i,jp1)   .eq. 0.0) &
+                 .and. (f_grnd(im1,jp1) .eq. 0.0 .and. f_ice(im1,jp1) .eq. 1.0) &
+                 .and. (f_grnd(ip1,jp1) .eq. 0.0 .and. f_ice(ip1,jp1) .eq. 1.0) ) then 
+
+                    embayed = .TRUE. 
+
+                end if 
+
+                ! Embayed to the bottom?
+                if (   (f_grnd(i,jp1)   .eq. 0.0 .and. f_ice(i,jp1)   .eq. 0.0) &
+                 .and. (f_grnd(im1,jm1) .eq. 0.0 .and. f_ice(im1,jm1) .eq. 1.0) &
+                 .and. (f_grnd(ip1,jm1) .eq. 0.0 .and. f_ice(ip1,jm1) .eq. 1.0) ) then 
+
+                    embayed = .TRUE. 
+
+                end if 
+
+
+                ! ajr: this code needs testing in realistic setting - not activated yet!
+
+                if (embayed) then 
+
+                    !calv_flt(i,j) = 0.5_wp * calv_flt(i,j)
+                
+                end if 
 
             end if 
 
@@ -739,7 +796,7 @@ end if
 
         ! Assume square grid cells 
         dy = dx 
-        
+
         calv = 0.0_wp
 
         do j = 1, ny

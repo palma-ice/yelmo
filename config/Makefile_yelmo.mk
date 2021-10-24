@@ -33,7 +33,7 @@ $(objdir)/root_finder.o: $(libdir)/root_finder.f90 $(objdir)/yelmo_defs.o
 ## INTERNAL PHYSICS LIBRARIES ###############################
 
 $(objdir)/basal_dragging.o: $(srcdir)/physics/basal_dragging.f90 $(objdir)/yelmo_defs.o \
-							$(objdir)/yelmo_tools.o
+							$(objdir)/yelmo_tools.o $(objdir)/topography.o
 	$(FC) $(DFLAGS) $(FFLAGS) -c -o $@ $<
 
 $(objdir)/grounding_line_flux.o: $(srcdir)/physics/grounding_line_flux.f90 $(objdir)/yelmo_defs.o \

@@ -758,50 +758,7 @@ contains
 
         end do
         end do
-
-        ! === Extrapolate to ice-free neighbors === 
-        do j=1, ny
-        do i=1, nx
-
-            ! Get neighbor indices
-            im1 = max(i-1,1) 
-            ip1 = min(i+1,nx) 
-            jm1 = max(j-1,1) 
-            jp1 = min(j+1,ny) 
-                
-            if ( f_ice(i,j) .lt. 1.0 .and. &
-                count([f_ice(im1,j),f_ice(ip1,j),f_ice(i,jm1),f_ice(i,jp1)] .eq. 1.0_wp) .gt. 0 ) then 
-                ! Ice-free (or partially ice-free) with ice-covered neighbors
-
-                beta_now = 0.0 
-                wt       = 0.0 
-
-                if (f_ice(im1,j) .eq. 1.0) then 
-                    beta_now = beta_now + beta(im1,j)
-                    wt = wt + 1.0 
-                end if 
-                if (f_ice(ip1,j) .eq. 1.0) then 
-                    beta_now = beta_now + beta(ip1,j)
-                    wt = wt + 1.0 
-                end if
-                if (f_ice(i,jm1) .eq. 1.0) then 
-                    beta_now = beta_now + beta(i,jm1)
-                    wt = wt + 1.0 
-                end if
-                if (f_ice(i,jp1) .eq. 1.0) then 
-                    beta_now = beta_now + beta(i,jp1)
-                    wt = wt + 1.0 
-                end if
-
-                if (wt .gt. 0.0) then 
-                    beta(i,j) = beta_now / wt
-                end if 
-
-            end if 
-
-        end do 
-        end do
-
+        
         return
         
     end subroutine calc_beta_aa_power_plastic
@@ -893,49 +850,6 @@ contains
         end do
         end do 
         
-        ! === Extrapolate to ice-free neighbors === 
-        do j=1, ny
-        do i=1, nx
-
-            ! Get neighbor indices
-            im1 = max(i-1,1) 
-            ip1 = min(i+1,nx) 
-            jm1 = max(j-1,1) 
-            jp1 = min(j+1,ny) 
-                
-            if ( f_ice(i,j) .lt. 1.0 .and. &
-                count([f_ice(im1,j),f_ice(ip1,j),f_ice(i,jm1),f_ice(i,jp1)] .eq. 1.0_wp) .gt. 0 ) then 
-                ! Ice-free (or partially ice-free) with ice-covered neighbors
-
-                beta_now = 0.0 
-                wt       = 0.0 
-
-                if (f_ice(im1,j) .eq. 1.0) then 
-                    beta_now = beta_now + beta(im1,j)
-                    wt = wt + 1.0 
-                end if 
-                if (f_ice(ip1,j) .eq. 1.0) then 
-                    beta_now = beta_now + beta(ip1,j)
-                    wt = wt + 1.0 
-                end if
-                if (f_ice(i,jm1) .eq. 1.0) then 
-                    beta_now = beta_now + beta(i,jm1)
-                    wt = wt + 1.0 
-                end if
-                if (f_ice(i,jp1) .eq. 1.0) then 
-                    beta_now = beta_now + beta(i,jp1)
-                    wt = wt + 1.0 
-                end if
-
-                if (wt .gt. 0.0) then 
-                    beta(i,j) = beta_now / wt
-                end if 
-
-            end if 
-
-        end do 
-        end do
-
         return
         
     end subroutine calc_beta_aa_reg_coulomb

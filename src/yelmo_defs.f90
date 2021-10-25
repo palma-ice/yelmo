@@ -381,8 +381,8 @@ module yelmo_defs
         real(wp), allocatable :: tyz(:,:)
         real(wp), allocatable :: te(:,:) 
 
-        real(wp), allocatable :: teig1(:,:) 
-        real(wp), allocatable :: teig2(:,:) 
+        real(wp), allocatable :: tau_eig_1(:,:) 
+        real(wp), allocatable :: tau_eig_2(:,:) 
         
     end type 
 

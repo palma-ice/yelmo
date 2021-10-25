@@ -194,7 +194,7 @@ contains
                     
                     ! Next, diagnose calving
                     call calc_calving_rate_vonmises_l19(tpo%now%calv_flt,tpo%now%tau_eff,tpo%now%H_ice,tpo%now%f_ice,tpo%now%f_grnd, &
-                                                        mat%now%strs2D%teig1,mat%now%strs2D%teig2,tpo%par%dx,tpo%par%kt,tpo%par%w2)
+                                            mat%now%strs2D%tau_eig_1,mat%now%strs2D%tau_eig_2,tpo%par%dx,tpo%par%kt,tpo%par%w2)
 
                     call calc_calving_residual(tpo%now%calv_flt,tpo%now%H_ice,tpo%now%f_ice,dt)
 

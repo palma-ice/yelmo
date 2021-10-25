@@ -190,6 +190,7 @@ contains
         call nc_write(filename,"calv_flt",    dom%tpo%now%calv_flt,    units="m/yr",dim1="xc",dim2="yc",dim3="time",ncid=ncid,start=[1,1,n],count=[nx,ny,1])
         call nc_write(filename,"calv_grnd",   dom%tpo%now%calv_grnd,   units="m/yr",dim1="xc",dim2="yc",dim3="time",ncid=ncid,start=[1,1,n],count=[nx,ny,1])
         call nc_write(filename,"calv",        dom%tpo%now%calv,        units="m/yr",dim1="xc",dim2="yc",dim3="time",ncid=ncid,start=[1,1,n],count=[nx,ny,1])
+        call nc_write(filename,"tau_eff",     dom%tpo%now%tau_eff,     units="Pa",  dim1="xc",dim2="yc",dim3="time",ncid=ncid,start=[1,1,n],count=[nx,ny,1])
         call nc_write(filename,"dzsdx",       dom%tpo%now%dzsdx,       units="m/m", dim1="xc",dim2="yc",dim3="time",ncid=ncid,start=[1,1,n],count=[nx,ny,1])  
         call nc_write(filename,"dzsdy",       dom%tpo%now%dzsdy,       units="m/m", dim1="xc",dim2="yc",dim3="time",ncid=ncid,start=[1,1,n],count=[nx,ny,1])  
         call nc_write(filename,"dHicedx",     dom%tpo%now%dHicedx,     units="m/m", dim1="xc",dim2="yc",dim3="time",ncid=ncid,start=[1,1,n],count=[nx,ny,1])
@@ -309,8 +310,8 @@ contains
         call nc_write(filename,"strs2D_txz", dom%mat%now%strs2D%txz,  units="",dim1="xc",dim2="yc",dim3="time",ncid=ncid,start=[1,1,n],count=[nx,ny,1]) 
         call nc_write(filename,"strs2D_tyz", dom%mat%now%strs2D%tyz,  units="",dim1="xc",dim2="yc",dim3="time",ncid=ncid,start=[1,1,n],count=[nx,ny,1]) 
         call nc_write(filename,"strs2D_te",  dom%mat%now%strs2D%te,   units="",dim1="xc",dim2="yc",dim3="time",ncid=ncid,start=[1,1,n],count=[nx,ny,1]) 
-        call nc_write(filename,"strs2D_teig1",dom%mat%now%strs2D%teig1,units="",dim1="xc",dim2="yc",dim3="time",ncid=ncid,start=[1,1,n],count=[nx,ny,1]) 
-        call nc_write(filename,"strs2D_teig2",dom%mat%now%strs2D%teig2,units="",dim1="xc",dim2="yc",dim3="time",ncid=ncid,start=[1,1,n],count=[nx,ny,1]) 
+        call nc_write(filename,"strs2D_tau_eig_1",dom%mat%now%strs2D%tau_eig_1,units="",dim1="xc",dim2="yc",dim3="time",ncid=ncid,start=[1,1,n],count=[nx,ny,1]) 
+        call nc_write(filename,"strs2D_tau_eig_2",dom%mat%now%strs2D%tau_eig_2,units="",dim1="xc",dim2="yc",dim3="time",ncid=ncid,start=[1,1,n],count=[nx,ny,1]) 
         
         call nc_write(filename,"strs_txx",     dom%mat%now%strs%txx,        units="",dim1="xc",dim2="yc",dim3="zeta",dim4="time",ncid=ncid,start=[1,1,1,n],count=[nx,ny,nz,1]) 
         call nc_write(filename,"strs_tyy",     dom%mat%now%strs%tyy,        units="",dim1="xc",dim2="yc",dim3="zeta",dim4="time",ncid=ncid,start=[1,1,1,n],count=[nx,ny,nz,1]) 
@@ -446,6 +447,7 @@ contains
         call nc_read(filename,"calv_flt",    dom%tpo%now%calv_flt,ncid=ncid)
         call nc_read(filename,"calv_grnd",   dom%tpo%now%calv_grnd,ncid=ncid)
         call nc_read(filename,"calv",        dom%tpo%now%calv,ncid=ncid)
+        call nc_read(filename,"tau_eff",     dom%tpo%now%tau_eff,ncid=ncid)
         call nc_read(filename,"dzsdx",       dom%tpo%now%dzsdx,ncid=ncid)  
         call nc_read(filename,"dzsdy",       dom%tpo%now%dzsdy,ncid=ncid)  
         call nc_read(filename,"dHicedx",     dom%tpo%now%dHicedx,ncid=ncid)
@@ -533,7 +535,7 @@ contains
         call nc_read(filename,"uxy_i_bar",     dom%dyn%now%uxy_i_bar,ncid=ncid) 
 
         call nc_read(filename,"duxydt",        dom%dyn%now%duxydt,ncid=ncid) 
-        
+
         call nc_read(filename,"duxdz",         dom%dyn%now%duxdz,ncid=ncid) 
         call nc_read(filename,"duydz",         dom%dyn%now%duydz,ncid=ncid) 
         call nc_read(filename,"duxdz_bar",     dom%dyn%now%duxdz_bar,ncid=ncid) 
@@ -599,8 +601,8 @@ contains
         call nc_read(filename,"strs2D_txz", dom%mat%now%strs2D%txz,ncid=ncid) 
         call nc_read(filename,"strs2D_tyz", dom%mat%now%strs2D%tyz,ncid=ncid) 
         call nc_read(filename,"strs2D_te",  dom%mat%now%strs2D%te,ncid=ncid) 
-        call nc_read(filename,"strs2D_teig1",dom%mat%now%strs2D%teig1,ncid=ncid) 
-        call nc_read(filename,"strs2D_teig2",dom%mat%now%strs2D%teig2,ncid=ncid) 
+        call nc_read(filename,"strs2D_tau_eig_1",dom%mat%now%strs2D%tau_eig_1,ncid=ncid) 
+        call nc_read(filename,"strs2D_tau_eig_2",dom%mat%now%strs2D%tau_eig_2,ncid=ncid) 
         
         call nc_read(filename,"strs_txx", dom%mat%now%strs%txx,ncid=ncid) 
         call nc_read(filename,"strs_tyy", dom%mat%now%strs%tyy,ncid=ncid) 

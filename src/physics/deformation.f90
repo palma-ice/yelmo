@@ -1260,7 +1260,7 @@ contains
         strs2D%te  = calc_vertical_integrated_2D(strs%te, zeta_aa)
         
         ! Finally, calculate the first two eigenvectors for 2D stress tensor 
-        call calc_stress_eigen_values(strs2D%teig1,strs2D%teig2, &
+        call calc_stress_eigen_values(strs2D%tau_eig_1,strs2D%tau_eig_2, &
                                         strs2D%txx,strs2D%tyy,strs2D%txy)
 
         return 
@@ -1293,20 +1293,20 @@ contains
                         + strs2D%tyz*strs2D%tyz )
 
         ! Finally, calculate the first two eigenvectors for 2D stress tensor 
-        call calc_stress_eigen_values(strs2D%teig1,strs2D%teig2, &
+        call calc_stress_eigen_values(strs2D%tau_eig_1,strs2D%tau_eig_2, &
                                     strs2D%txx,strs2D%tyy,strs2D%txy)
 
         return 
 
     end subroutine calc_stress_tensor_2D
     
-    elemental subroutine calc_stress_eigen_values(teig1,teig2,txx,tyy,txy)
+    elemental subroutine calc_stress_eigen_values(tau_eig_1,tau_eig_2,txx,tyy,txy)
         ! Calculate the first two eigenvectors of 2D deviatoric stress tensor 
 
         implicit none
 
-        real(wp), intent(OUT) :: teig1              ! [Pa] Eigenvalue 1
-        real(wp), intent(OUT) :: teig2              ! [Pa] Eigenvalue 2
+        real(wp), intent(OUT) :: tau_eig_1              ! [Pa] Eigenvalue 1
+        real(wp), intent(OUT) :: tau_eig_2              ! [Pa] Eigenvalue 2
         real(wp), intent(IN)  :: txx
         real(wp), intent(IN)  :: tyy
         real(wp), intent(IN)  :: txy
@@ -1324,16 +1324,16 @@ contains
             lambda1 = (-b + root) / (2.0_wp*a)
             lambda2 = (-b - root) / (2.0_wp*a)
             if (lambda1 > lambda2) then
-                teig1 = lambda1
-                teig2 = lambda2
+                tau_eig_1 = lambda1
+                tau_eig_2 = lambda2
             else
-                teig1 = lambda2
-                teig2 = lambda1
+                tau_eig_1 = lambda2
+                tau_eig_2 = lambda1
             end if
         else 
             ! No eigenvalues, set to zero 
-            teig1 = 0.0_wp 
-            teig2 = 0.0_wp 
+            tau_eig_1 = 0.0_wp 
+            tau_eig_2 = 0.0_wp 
         end if  ! b^2 - 4ac > 0
 
         return
@@ -1391,8 +1391,8 @@ contains
         allocate(strs2D%txz(nx,ny))
         allocate(strs2D%tyz(nx,ny))
         allocate(strs2D%te(nx,ny))
-        allocate(strs2D%teig1(nx,ny))
-        allocate(strs2D%teig2(nx,ny))
+        allocate(strs2D%tau_eig_1(nx,ny))
+        allocate(strs2D%tau_eig_2(nx,ny))
         
         strs2D%txx   = 0.0 
         strs2D%tyy   = 0.0 
@@ -1400,8 +1400,8 @@ contains
         strs2D%txz   = 0.0
         strs2D%tyz   = 0.0
         strs2D%te    = 0.0 
-        strs2D%teig1 = 0.0 
-        strs2D%teig2 = 0.0 
+        strs2D%tau_eig_1 = 0.0 
+        strs2D%tau_eig_2 = 0.0 
         
         return 
 

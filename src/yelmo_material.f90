@@ -381,7 +381,7 @@ end if
         allocate(now%strn2D%div(nx,ny))
         allocate(now%strn2D%de(nx,ny))
         allocate(now%strn2D%f_shear(nx,ny))
-        
+
         allocate(now%strn%dxx(nx,ny,nz_aa))
         allocate(now%strn%dyy(nx,ny,nz_aa))
         allocate(now%strn%dxy(nx,ny,nz_aa))
@@ -397,8 +397,8 @@ end if
         allocate(now%strs2D%txz(nx,ny))
         allocate(now%strs2D%tyz(nx,ny))
         allocate(now%strs2D%te(nx,ny))
-        allocate(now%strs2D%teig1(nx,ny))
-        allocate(now%strs2D%teig2(nx,ny))
+        allocate(now%strs2D%tau_eig_1(nx,ny))
+        allocate(now%strs2D%tau_eig_2(nx,ny))
         
         allocate(now%strs%txx(nx,ny,nz_aa))
         allocate(now%strs%tyy(nx,ny,nz_aa))
@@ -445,8 +445,8 @@ end if
         now%strs2D%txz   = 0.0
         now%strs2D%tyz   = 0.0
         now%strs2D%te    = 0.0 
-        now%strs2D%teig1 = 0.0 
-        now%strs2D%teig2 = 0.0 
+        now%strs2D%tau_eig_1 = 0.0 
+        now%strs2D%tau_eig_2 = 0.0 
         
         now%strs%txx     = 0.0 
         now%strs%tyy     = 0.0 
@@ -502,8 +502,8 @@ end if
         if (allocated(now%strs2D%txz))      deallocate(now%strs2D%txz)
         if (allocated(now%strs2D%tyz))      deallocate(now%strs2D%tyz)
         if (allocated(now%strs2D%te))       deallocate(now%strs2D%te)
-        if (allocated(now%strs2D%teig1))    deallocate(now%strs2D%teig1)
-        if (allocated(now%strs2D%teig2))    deallocate(now%strs2D%teig2)
+        if (allocated(now%strs2D%tau_eig_1)) deallocate(now%strs2D%tau_eig_1)
+        if (allocated(now%strs2D%tau_eig_2)) deallocate(now%strs2D%tau_eig_2)
         
         if (allocated(now%strs%txx))        deallocate(now%strs%txx)
         if (allocated(now%strs%tyy))        deallocate(now%strs%tyy)

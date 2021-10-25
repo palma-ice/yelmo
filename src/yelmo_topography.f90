@@ -193,7 +193,7 @@ contains
                     ! end if 
                     
                     ! Next, diagnose calving
-                    call calc_calving_rate_vonmises_l19(tpo%now%calv_flt,tpo%now%H_ice,tpo%now%f_ice,tpo%now%f_grnd, &
+                    call calc_calving_rate_vonmises_l19(tpo%now%calv_flt,tpo%now%tau_eff,tpo%now%H_ice,tpo%now%f_ice,tpo%now%f_grnd, &
                                                         mat%now%strs2D%teig1,mat%now%strs2D%teig2,tpo%par%dx,tpo%par%kt,tpo%par%w2)
 
                     call calc_calving_residual(tpo%now%calv_flt,tpo%now%H_ice,tpo%now%f_ice,dt)
@@ -587,6 +587,7 @@ contains
         allocate(now%mb_applied(nx,ny))
         allocate(now%mb_resid(nx,ny))
         
+        allocate(now%tau_eff(nx,ny))
         allocate(now%calv(nx,ny))
         allocate(now%calv_flt(nx,ny))
         allocate(now%calv_grnd(nx,ny))
@@ -628,6 +629,7 @@ contains
         now%fmb         = 0.0
         now%mb_applied  = 0.0 
         now%mb_resid    = 0.0
+        now%tau_eff     = 0.0
         now%calv        = 0.0
         now%calv_flt    = 0.0
         now%calv_grnd   = 0.0
@@ -675,6 +677,7 @@ contains
         if (allocated(now%mb_applied))  deallocate(now%mb_applied)
         if (allocated(now%mb_resid))    deallocate(now%mb_resid)
         
+        if (allocated(now%tau_eff))     deallocate(now%tau_eff)
         if (allocated(now%calv))        deallocate(now%calv)
         if (allocated(now%calv_flt))    deallocate(now%calv_flt)
         if (allocated(now%calv_grnd))   deallocate(now%calv_grnd)

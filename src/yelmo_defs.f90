@@ -40,7 +40,7 @@ module yelmo_defs
     real(wp), parameter :: radians_to_degrees = real(180._dp / pi,wp)  ! Conversion factor between degrees and radians
     
     integer, parameter :: io_unit_err = error_unit 
-    
+
     ! The constants below should be loaded using the global subroutine
     ! defined below `yelmo_constants_load`.
     ! Note: The key limitation imposed by defining the parameters defined 
@@ -142,6 +142,7 @@ module yelmo_defs
         real(wp), allocatable   :: mb_applied(:,:)  ! Actual mass balance applied [m/a], for mass balance accounting
         real(wp), allocatable   :: mb_resid(:,:)    ! Residual mass balance from boundary conditions, cleanup
         
+        real(wp), allocatable   :: tau_eff(:,:)     ! Effective stress [Pa]
         real(wp), allocatable   :: calv(:,:)        ! Calving rate (applied) [m/a]
         real(wp), allocatable   :: calv_flt(:,:)    ! Reference floating calving rate [m/a]
         real(wp), allocatable   :: calv_grnd(:,:)   ! Reference grounded calving rate [m/a]

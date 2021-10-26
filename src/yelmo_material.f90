@@ -381,7 +381,9 @@ end if
         allocate(now%strn2D%div(nx,ny))
         allocate(now%strn2D%de(nx,ny))
         allocate(now%strn2D%f_shear(nx,ny))
-
+        allocate(now%strn2D%eps_eig_1(nx,ny))
+        allocate(now%strn2D%eps_eig_2(nx,ny))
+        
         allocate(now%strn%dxx(nx,ny,nz_aa))
         allocate(now%strn%dyy(nx,ny,nz_aa))
         allocate(now%strn%dxy(nx,ny,nz_aa))
@@ -429,6 +431,8 @@ end if
         now%strn2D%dyz   = 0.0
         now%strn2D%div   = 0.0
         now%strn2D%de    = 0.0 
+        now%strn2D%eps_eig_1 = 0.0 
+        now%strn2D%eps_eig_2 = 0.0 
         
         now%strn%dxx     = 0.0 
         now%strn%dyy     = 0.0 
@@ -486,6 +490,8 @@ end if
         if (allocated(now%strn2D%dyz))      deallocate(now%strn2D%dyz)
         if (allocated(now%strn2D%div))      deallocate(now%strn2D%div)
         if (allocated(now%strn2D%de))       deallocate(now%strn2D%de)
+        if (allocated(now%strn2D%eps_eig_1)) deallocate(now%strn2D%eps_eig_1)
+        if (allocated(now%strn2D%eps_eig_2)) deallocate(now%strn2D%eps_eig_2)
         
         if (allocated(now%strn%dxx))        deallocate(now%strn%dxx)
         if (allocated(now%strn%dyy))        deallocate(now%strn%dyy)

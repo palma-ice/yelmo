@@ -86,6 +86,7 @@
     fmb_scale           = 10.0              ! Scaling of fmb ~ scale*bmb, scale=10 suggested by Pollard and DeConto (2016)
     kt                  = 0.0025            ! [m yr-1 Pa-1] vm-l19 calving scaling parameter
     w2                  = 25                ! [-] vm-l19 calving eigenvalue weighting coefficient
+    k2                  = 3e9               ! [m yr] eigen calving scaling factor (Albrecht et al, 2021 recommend 1e17 m s == 3.2e9 m yr)
 /
 
 &ydyn

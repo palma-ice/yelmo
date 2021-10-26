@@ -13,6 +13,10 @@ module calving
     public :: calc_calving_residual
     public :: calc_calving_rate_kill 
     
+    ! Calving related stress/strain routines 
+    public :: calc_eps_eff
+    public :: calc_tau_eff
+
     ! Floating calving routines 
     public :: calc_calving_rate_simple
     public :: calc_calving_rate_flux 
@@ -736,7 +740,7 @@ end if
 
     end subroutine calc_calving_rate_flux_grisli
     
-    subroutine calc_calving_rate_vonmises_l19(calv,tau_eff,H_ice,f_ice,f_grnd,tau_eig1,tau_eig2,dx,kt,w2)
+    subroutine calc_calving_rate_vonmises_l19(calv,tau_eff,H_ice,f_ice,f_grnd,dx,kt)
         ! Calculate the 'horizontal' calving rate [m/yr] based on the 
         ! von Mises stress approach, as outlined by Lipscomb et al. (2019)
         ! Eqs. 73-75.
@@ -745,32 +749,20 @@ end if
         implicit none 
 
         real(wp), intent(OUT) :: calv(:,:)
-        real(wp), intent(OUT) :: tau_eff(:,:)
         real(wp), intent(IN)  :: H_ice(:,:)
         real(wp), intent(IN)  :: f_ice(:,:)
         real(wp), intent(IN)  :: f_grnd(:,:)  
-        real(wp), intent(IN)  :: tau_eig1(:,:)
-        real(wp), intent(IN)  :: tau_eig2(:,:)
+        real(wp), intent(IN)  :: tau_eff(:,:)
         real(wp), intent(IN)  :: dx
         real(wp), intent(IN)  :: kt
-        real(wp), intent(IN)  :: w2 
 
         ! Local variables 
         integer  :: i, j
         integer  :: im1, jm1, ip1, jp1
-        integer  :: nx, ny
-        integer  :: n_ocean 
-        logical  :: is_margin 
+        integer  :: nx, ny 
         real(wp) :: dy   
         real(wp) :: calv_ref
         real(wp) :: H_eff 
-
-        real(wp) :: ddiv, dxx, dyy, dxy 
-        real(wp) :: txx, tyy, txy
-        real(wp) :: tau_eig1_now, tau_eig2_now
-
-        real(wp) :: tau_eff_neighb(4)
-        
         real(wp) :: wt
         
         nx = size(H_ice,1)
@@ -791,32 +783,7 @@ end if
             jp1 = min(j+1,ny) 
             
             if ( (f_grnd(i,j) .eq. 0.0 .and. f_ice(i,j) .gt. 0.0) ) then 
-                ! Floating ice point
-
-                ! 1. Calculate effective stress for all floating points
-
-                if (tau_eig1(i,j) .eq. 0.0 .and. tau_eig2(i,j) .eq. 0.0) then 
-                    ! Margin point was likely just advected, no stresses available, 
-                    ! use maximum value of tau_eff from upstream neighbors.
-
-                    tau_eff_neighb = 0.0_wp 
-
-                    if (f_ice(im1,j).gt.0.0) tau_eff_neighb(1) = calc_tau_eff(tau_eig1(im1,j),tau_eig2(im1,j),w2)
-                    if (f_ice(ip1,j).gt.0.0) tau_eff_neighb(2) = calc_tau_eff(tau_eig1(ip1,j),tau_eig2(ip1,j),w2)
-                    if (f_ice(i,jm1).gt.0.0) tau_eff_neighb(3) = calc_tau_eff(tau_eig1(i,jm1),tau_eig2(i,jm1),w2)
-                    if (f_ice(i,jp1).gt.0.0) tau_eff_neighb(4) = calc_tau_eff(tau_eig1(i,jp1),tau_eig2(i,jp1),w2)
-
-                    tau_eff(i,j) = maxval(tau_eff_neighb)
-
-                else 
-                    ! Stresses are available at this margin point. 
-                    ! Calculate the effective stress directly.
-
-                    tau_eff(i,j) = calc_tau_eff(tau_eig1(i,j),tau_eig2(i,j),w2)
-                
-                end if 
-                
-                ! 2. Calculate calving rate at the margin 
+                ! Floating ice point, calculate calving rate at the margin 
 
                 ! How many calving-fronts for this cell?
                 wt = 0.0 
@@ -851,8 +818,226 @@ end if
         return 
 
     end subroutine calc_calving_rate_vonmises_l19
+       
+    subroutine calc_calving_rate_eigen(calv,eps_eff,H_ice,f_ice,f_grnd,dx,k2)
+        ! Calculate the 'horizontal' calving rate [m/yr] based on the 
+        ! von Mises stress approach, as outlined by Lipscomb et al. (2019)
+        ! Eqs. 73-75.
+        ! L19: kt = 0.0025 m yr-1 Pa-1, w2=25
 
-    elemental function calc_tau_eff(teig1,teig2,w2) result(tau_eff) 
+        implicit none 
+
+        real(wp), intent(OUT) :: calv(:,:)
+        real(wp), intent(IN)  :: H_ice(:,:)
+        real(wp), intent(IN)  :: f_ice(:,:)
+        real(wp), intent(IN)  :: f_grnd(:,:)  
+        real(wp), intent(IN)  :: eps_eff(:,:)
+        real(wp), intent(IN)  :: dx
+        real(wp), intent(IN)  :: k2
+
+        ! Local variables 
+        integer  :: i, j
+        integer  :: im1, jm1, ip1, jp1
+        integer  :: nx, ny
+        integer  :: n_ocean 
+        logical  :: is_margin 
+        real(wp) :: dy   
+        real(wp) :: calv_ref
+        real(wp) :: H_eff 
+
+        real(wp) :: dxx, dyy, dxy 
+        real(wp) :: eps_eig_1_now, eps_eig_2_now
+
+        real(wp) :: eps_eff_neighb(4)
+        
+        real(wp) :: wt
+        
+        nx = size(H_ice,1)
+        ny = size(H_ice,2)
+
+        ! Assume square grid cells 
+        dy = dx 
+
+        calv = 0.0_wp
+
+        do j = 1, ny
+        do i = 1, nx  
+            
+            ! Get neighbor indices
+            im1 = max(i-1,1) 
+            ip1 = min(i+1,nx) 
+            jm1 = max(j-1,1) 
+            jp1 = min(j+1,ny) 
+            
+            if ( (f_grnd(i,j) .eq. 0.0 .and. f_ice(i,j) .gt. 0.0) ) then 
+                ! Floating ice point, calculate calving rate at the margin 
+
+                ! How many calving-fronts for this cell?
+                wt = 0.0 
+                if (f_grnd(im1,j) .eq. 0.0 .and. f_ice(im1,j).eq.0.0) wt = wt + 1.0_wp
+                if (f_grnd(ip1,j) .eq. 0.0 .and. f_ice(ip1,j).eq.0.0) wt = wt + 1.0_wp
+                if (f_grnd(i,jm1) .eq. 0.0 .and. f_ice(i,jm1).eq.0.0) wt = wt + 1.0_wp
+                if (f_grnd(i,jp1) .eq. 0.0 .and. f_ice(i,jp1).eq.0.0) wt = wt + 1.0_wp
+
+                if (wt .gt. 0.0_wp) then 
+                    ! Point is at calving front 
+
+                    ! Calculate lateral calving rate 
+                    calv_ref = max( k2*eps_eff(i,j), 0.0_wp )
+
+                    ! Get effective ice thickness
+                    call calc_H_eff(H_eff,H_ice(i,j),f_ice(i,j))
+
+                    ! Convert to horizontal volume change, weighted
+                    ! by number of exposed faces.
+                    calv(i,j) = (H_eff*calv_ref) / sqrt(dx*dy)
+
+                    ! write(*,*) "calv", tau_eff, calv_ref,  &
+                    !             H_eff, wt*H_eff/sqrt(dx*dy), calv(i,j) 
+                    
+                end if 
+
+            end if
+
+        end do
+        end do
+
+        return 
+
+    end subroutine calc_calving_rate_eigen
+
+    subroutine calc_eps_eff(eps_eff,eps_eig_1,eps_eig_2,f_ice)
+
+        implicit none 
+
+        real(wp), intent(OUT) :: eps_eff(:,:)
+        real(wp), intent(IN)  :: eps_eig_1(:,:)
+        real(wp), intent(IN)  :: eps_eig_2(:,:) 
+        real(wp), intent(IN)  :: f_ice(:,:) 
+
+        ! Local variables 
+        integer  :: i, j, nx, ny, n  
+        integer  :: im1, jm1, ip1, jp1 
+        real(wp) :: eps_eff_neighb(4)
+
+        nx = size(eps_eff,1)
+        ny = size(eps_eff,2) 
+
+        do j = 1, ny 
+        do i = 1, nx 
+
+            ! Get neighbor indices
+            im1 = max(i-1,1) 
+            ip1 = min(i+1,nx) 
+            jm1 = max(j-1,1) 
+            jp1 = min(j+1,ny) 
+            
+            if (f_ice(i,j) .eq. 0.0_wp) then 
+                ! Ice-free point, no strain
+
+                eps_eff(i,j) = 0.0_wp 
+
+            else if (eps_eig_1(i,j) .eq. 0.0 .and. eps_eig_2(i,j) .eq. 0.0) then 
+                ! Margin point was likely just advected, no stresses available, 
+                ! use maximum value of eps_eff from upstream neighbors.
+
+                eps_eff_neighb = 0.0_wp 
+
+                if (f_ice(im1,j).gt.0.0) eps_eff_neighb(1) = eps_eig_1(im1,j) * eps_eig_2(im1,j)
+                if (f_ice(ip1,j).gt.0.0) eps_eff_neighb(2) = eps_eig_1(ip1,j) * eps_eig_2(ip1,j)
+                if (f_ice(i,jm1).gt.0.0) eps_eff_neighb(3) = eps_eig_1(i,jm1) * eps_eig_2(i,jm1)
+                if (f_ice(i,jp1).gt.0.0) eps_eff_neighb(4) = eps_eig_1(i,jp1) * eps_eig_2(i,jp1)
+
+                n = count(eps_eff_neighb.ne.0.0_wp)
+
+                if (n .gt. 0) then 
+                    eps_eff(i,j) = sum(eps_eff_neighb,mask=eps_eff_neighb.ne.0.0_wp) / real(n,wp)
+                else 
+                    eps_eff(i,j) = 0.0_wp
+                end if 
+
+            else 
+                ! Stresses are available at this margin point. 
+                ! Calculate the effective strain rate directly.
+
+                eps_eff(i,j) = eps_eig_1(i,j) * eps_eig_2(i,j)
+                
+            end if 
+            
+        end do 
+        end do 
+
+        return 
+
+    end subroutine calc_eps_eff
+    
+    subroutine calc_tau_eff(tau_eff,tau_eig_1,tau_eig_2,f_ice,w2)
+
+        implicit none 
+
+        real(wp), intent(OUT) :: tau_eff(:,:)
+        real(wp), intent(IN)  :: tau_eig_1(:,:)
+        real(wp), intent(IN)  :: tau_eig_2(:,:) 
+        real(wp), intent(IN)  :: f_ice(:,:) 
+        real(wp), intent(IN)  :: w2 
+
+        ! Local variables 
+        integer  :: i, j, nx, ny, n  
+        integer  :: im1, jm1, ip1, jp1 
+        real(wp) :: tau_eff_neighb(4) 
+
+        nx = size(tau_eff,1)
+        ny = size(tau_eff,2) 
+        
+        do j = 1, ny 
+        do i = 1, nx 
+
+            ! Get neighbor indices
+            im1 = max(i-1,1) 
+            ip1 = min(i+1,nx) 
+            jm1 = max(j-1,1) 
+            jp1 = min(j+1,ny) 
+            
+            if (f_ice(i,j) .eq. 0.0_wp) then 
+                ! Ice-free point, no stress
+
+                tau_eff(i,j) = 0.0_wp 
+
+            else if (tau_eig_1(i,j) .eq. 0.0 .and. tau_eig_2(i,j) .eq. 0.0) then 
+                ! Margin point was likely just advected, no stresses available, 
+                ! use maximum value of tau_eff from upstream neighbors.
+
+                tau_eff_neighb = 0.0_wp 
+
+                if (f_ice(im1,j).gt.0.0) tau_eff_neighb(1) = calc_tau_eff_now(tau_eig_1(im1,j),tau_eig_2(im1,j),w2)
+                if (f_ice(ip1,j).gt.0.0) tau_eff_neighb(2) = calc_tau_eff_now(tau_eig_1(ip1,j),tau_eig_2(ip1,j),w2)
+                if (f_ice(i,jm1).gt.0.0) tau_eff_neighb(3) = calc_tau_eff_now(tau_eig_1(i,jm1),tau_eig_2(i,jm1),w2)
+                if (f_ice(i,jp1).gt.0.0) tau_eff_neighb(4) = calc_tau_eff_now(tau_eig_1(i,jp1),tau_eig_2(i,jp1),w2)
+
+                n = count(tau_eff_neighb.ne.0.0_wp)
+
+                if (n .gt. 0) then 
+                    tau_eff(i,j) = sum(tau_eff_neighb,mask=tau_eff_neighb.ne.0.0_wp) / real(n,wp)
+                else 
+                    tau_eff(i,j) = 0.0_wp 
+                end if 
+
+            else 
+                ! Stresses are available at this margin point. 
+                ! Calculate the effective strain rate directly.
+
+                tau_eff(i,j) = calc_tau_eff_now(tau_eig_1(i,j),tau_eig_2(i,j),w2)
+            
+            end if 
+
+        end do 
+        end do 
+
+        return 
+
+    end subroutine calc_tau_eff
+    
+    elemental function calc_tau_eff_now(teig1,teig2,w2) result(tau_eff) 
 
         implicit none 
 
@@ -870,80 +1055,8 @@ end if
 
         return 
 
-    end function calc_tau_eff
-        
-    subroutine calc_calving_rate_eigen(calv,H_ice,f_grnd,f_ice,ux_bar,uy_bar,dx,dy,H_calv,k_calv)
-        ! Calculate the calving rate [m/a] based on the "eigencalving" law
-        ! from Levermann et al. (2012)
-
-        ! Note: this routine is untested and incorrect. strain rate must be projected onto 
-        ! principal direction of flow. 
-
-        implicit none 
-
-        real(wp), intent(OUT) :: calv(:,:)
-        real(wp), intent(IN)  :: H_ice(:,:)
-        real(wp), intent(IN)  :: f_grnd(:,:)  
-        real(wp), intent(IN)  :: f_ice(:,:)
-        real(wp), intent(IN)  :: ux_bar(:,:)
-        real(wp), intent(IN)  :: uy_bar(:,:)
-        real(wp), intent(IN)  :: dx, dy 
-        real(wp), intent(IN)  :: H_calv 
-        real(wp), intent(IN)  :: k_calv
-
-        ! Local variables 
-        integer :: i, j, nx, ny
-        real(wp), allocatable :: eps_xx(:,:), eps_yy(:,:) 
-        real(wp) :: eps_xx_max, eps_yy_max 
-        integer :: imax_xx, jmax_xx, imax_yy, jmax_yy                                          
-
-        logical, allocatable :: is_front(:,:)   
-        integer :: n_ocean 
-
-        nx = size(H_ice,1)
-        ny = size(H_ice,2)
-
-        allocate(is_front(nx,ny))
-
-        do j = 2, ny
-        do i = 2, nx
-            ! Calculate strain rate locally (aa-node)
-            eps_xx(i,j) = (ux_bar(i,j) - ux_bar(i-1,j))/dx
-            eps_yy(i,j) = (uy_bar(i,j) - uy_bar(i,j-1))/dy            
-        end do
-        end do
-        
-
-        calv = 0.0
-
-        do j = 2, ny-1
-        do i = 2, nx-1  
-            
-            if ( (f_grnd(i,j) .eq. 0.0 .and. H_ice(i,j) .gt. 0.0) .and. &
-                   ( (f_grnd(i-1,j) .eq. 0.0 .and. H_ice(i-1,j).eq.0.0) .or. &
-                     (f_grnd(i+1,j) .eq. 0.0 .and. H_ice(i+1,j).eq.0.0) .or. &
-                     (f_grnd(i,j-1) .eq. 0.0 .and. H_ice(i,j-1).eq.0.0) .or. &
-                     (f_grnd(i,j+1) .eq. 0.0 .and. H_ice(i,j+1).eq.0.0) ) ) then 
-                ! Ice-shelf floating margin: floating ice point with open ocean neighbor 
-                ! If this point is an ice front, check for calving
-
-                if ((eps_xx(i,j).gt.0.0).and.(eps_yy(i,j).gt.0.0)) then                   
-                    ! Divergence in both directions, apply calving law 
-                    ! Flux condition + calving rate with spreading:       
-
-                    calv(i,j) = k_calv * eps_xx(i,j)*eps_yy(i,j)                                       
-                
-                end if
-
-            end if
-
-        end do
-        end do
-
-        return 
-
-    end subroutine calc_calving_rate_eigen
-
+    end function calc_tau_eff_now
+     
 ! ===================================================================
 !
 ! Calving - grounded ice 

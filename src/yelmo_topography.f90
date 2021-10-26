@@ -141,6 +141,20 @@ contains
             
             ! === Step 3: ice thickness evolution from calving ===
             
+            ! Diagnose strains and stresses relevant to calving 
+
+            ! eps_eff = effective strain = eigencalving e+*e- following Levermann et al. (2012)
+            call calc_eps_eff(tpo%now%eps_eff,mat%now%strn2D%eps_eig_1,mat%now%strn2D%eps_eig_2,tpo%now%f_ice)
+
+            ! tau_eff = effective stress ~ von Mises stress following Lipscomb et al. (2019)
+            call calc_tau_eff(tpo%now%tau_eff,mat%now%strs2D%tau_eig_1,mat%now%strs2D%tau_eig_2,tpo%now%f_ice,tpo%par%w2)
+            
+            ! For now, mask eps_eff and tau_eff to floating points 
+            ! for easier visualization. If quantities will be used
+            ! for grounded ice in the future, then this masking can 
+            ! be removed. 
+            where (tpo%now%f_grnd .eq. 1.0_wp) tpo%now%eps_eff = 0.0_wp 
+            where (tpo%now%f_grnd .eq. 1.0_wp) tpo%now%tau_eff = 0.0_wp 
             
             ! Diagnose potential floating-ice calving rate [m/yr]
             
@@ -156,9 +170,6 @@ contains
                     call calc_calving_rate_simple(tpo%now%calv_flt,tpo%now%H_ice,tpo%now%f_ice,tpo%now%f_grnd, &
                                                     tpo%par%calv_H_lim,tpo%par%calv_tau)
                     
-                    !call calc_calving_residual(tpo%now%calv_flt,tpo%now%H_ice,tpo%now%f_ice,dt,resid_lim=0.01_wp)
-                    call calc_calving_residual(tpo%now%calv_flt,tpo%now%H_ice,tpo%now%f_ice,dt)
-                    
                 case("flux") 
                     ! Use threshold+flux method from Peyaud et al. (2007), ie, GRISLI,
                     ! but reformulated. 
@@ -166,18 +177,12 @@ contains
                     call calc_calving_rate_flux(tpo%now%calv_flt,tpo%now%H_ice,tpo%now%f_ice,tpo%now%f_grnd,mbal, &
                                                 dyn%now%ux_bar,dyn%now%uy_bar,tpo%par%dx,tpo%par%calv_H_lim,tpo%par%calv_tau)
                     
-                    !call calc_calving_residual(tpo%now%calv_flt,tpo%now%H_ice,tpo%now%f_ice,dt,resid_lim=0.01_wp)
-                    call calc_calving_residual(tpo%now%calv_flt,tpo%now%H_ice,tpo%now%f_ice,dt)
-                    
                 case("flux-grisli")
                     ! Use threshold+flux method from Peyaud et al. (2007), ie, GRISLI
 
                     call calc_calving_rate_flux_grisli(tpo%now%calv_flt,tpo%now%H_ice,tpo%now%f_ice,tpo%now%f_grnd,mbal, &
                                                 dyn%now%ux_bar,dyn%now%uy_bar,tpo%par%dx,tpo%par%calv_H_lim,tpo%par%calv_tau)
                     
-                    !call calc_calving_residual(tpo%now%calv_flt,tpo%now%H_ice,tpo%now%f_ice,dt,resid_lim=0.01_wp)
-                    call calc_calving_residual(tpo%now%calv_flt,tpo%now%H_ice,tpo%now%f_ice,dt)
-
                 case("vm-l19")
                     ! Use von Mises calving as defined by Lipscomb et al. (2019)
 
@@ -193,10 +198,25 @@ contains
                     ! end if 
                     
                     ! Next, diagnose calving
-                    call calc_calving_rate_vonmises_l19(tpo%now%calv_flt,tpo%now%tau_eff,tpo%now%H_ice,tpo%now%f_ice,tpo%now%f_grnd, &
-                                            mat%now%strs2D%tau_eig_1,mat%now%strs2D%tau_eig_2,tpo%par%dx,tpo%par%kt,tpo%par%w2)
+                    call calc_calving_rate_vonmises_l19(tpo%now%calv_flt,tpo%now%H_ice,tpo%now%f_ice,tpo%now%f_grnd, &
+                                                                                tpo%now%tau_eff,tpo%par%dx,tpo%par%kt)
+                case("eigen")
+                    ! Use Eigen calving as defined by Levermann et al. (2012)
 
-                    call calc_calving_residual(tpo%now%calv_flt,tpo%now%H_ice,tpo%now%f_ice,dt)
+                    ! if (.not. tpo%par%margin_flt_subgrid) then 
+
+                    !     write(io_unit_err,*) ""
+                    !     write(io_unit_err,*) ""
+                    !     write(io_unit_err,*) "calv_flt_method='eigen' must be used with margin_flt_subgrid=True."
+                    !     write(io_unit_err,*) "calv_flt_method    = ", trim(tpo%par%calv_flt_method)
+                    !     write(io_unit_err,*) "margin_flt_subgrid = ", tpo%par%margin_flt_subgrid
+                    !     stop "Program stopped."
+
+                    ! end if 
+                    
+                    ! Next, diagnose calving
+                    call calc_calving_rate_eigen(tpo%now%calv_flt,tpo%now%H_ice,tpo%now%f_ice,tpo%now%f_grnd, &
+                                                                                tpo%now%eps_eff,tpo%par%dx,tpo%par%k2)
 
                 case("kill") 
                     ! Delete all floating ice (using characteristic time parameter)
@@ -218,6 +238,11 @@ contains
 
             end select
             
+            ! Adjust calving so that any excess is distributed to upstream neighbors
+            ! (note: no excess should be available for 'kill' and 'kill-pos' methods) 
+            call calc_calving_residual(tpo%now%calv_flt,tpo%now%H_ice,tpo%now%f_ice,dt)
+            
+
             ! Additionally ensure higher calving rate for floating tongues of
             ! one grid-point width.
             call calc_calving_tongues(tpo%now%calv_flt,tpo%now%H_ice,tpo%now%f_ice,tpo%now%f_grnd,tpo%par%calv_tau)
@@ -536,6 +561,7 @@ contains
         call nml_read(filename,"ytopo","fmb_scale",         par%fmb_scale,        init=init_pars)
         call nml_read(filename,"ytopo","kt",                par%kt,               init=init_pars)
         call nml_read(filename,"ytopo","w2",                par%w2,               init=init_pars)
+        call nml_read(filename,"ytopo","k2",                par%k2,               init=init_pars)
         
         ! === Set internal parameters =====
 
@@ -587,6 +613,7 @@ contains
         allocate(now%mb_applied(nx,ny))
         allocate(now%mb_resid(nx,ny))
         
+        allocate(now%eps_eff(nx,ny))
         allocate(now%tau_eff(nx,ny))
         allocate(now%calv(nx,ny))
         allocate(now%calv_flt(nx,ny))
@@ -629,6 +656,7 @@ contains
         now%fmb         = 0.0
         now%mb_applied  = 0.0 
         now%mb_resid    = 0.0
+        now%eps_eff     = 0.0
         now%tau_eff     = 0.0
         now%calv        = 0.0
         now%calv_flt    = 0.0
@@ -677,6 +705,7 @@ contains
         if (allocated(now%mb_applied))  deallocate(now%mb_applied)
         if (allocated(now%mb_resid))    deallocate(now%mb_resid)
         
+        if (allocated(now%eps_eff))     deallocate(now%eps_eff)
         if (allocated(now%tau_eff))     deallocate(now%tau_eff)
         if (allocated(now%calv))        deallocate(now%calv)
         if (allocated(now%calv_flt))    deallocate(now%calv_flt)

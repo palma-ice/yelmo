@@ -102,6 +102,7 @@ module yelmo_defs
         real(wp)           :: fmb_scale
         real(wp)           :: kt 
         real(wp)           :: w2  
+        real(wp)           :: k2
         
         ! Internal parameters 
         real(dp)           :: time 
@@ -142,6 +143,7 @@ module yelmo_defs
         real(wp), allocatable   :: mb_applied(:,:)  ! Actual mass balance applied [m/a], for mass balance accounting
         real(wp), allocatable   :: mb_resid(:,:)    ! Residual mass balance from boundary conditions, cleanup
         
+        real(wp), allocatable   :: eps_eff(:,:)     ! Effective strain [1/yr]
         real(wp), allocatable   :: tau_eff(:,:)     ! Effective stress [Pa]
         real(wp), allocatable   :: calv(:,:)        ! Calving rate (applied) [m/a]
         real(wp), allocatable   :: calv_flt(:,:)    ! Reference floating calving rate [m/a]
@@ -360,6 +362,10 @@ module yelmo_defs
         real(wp), allocatable :: de(:,:)
         real(wp), allocatable :: div(:,:) 
         real(wp), allocatable :: f_shear(:,:) 
+
+        real(wp), allocatable :: eps_eig_1(:,:) 
+        real(wp), allocatable :: eps_eig_2(:,:) 
+
     end type 
 
     type strain_3D_class 

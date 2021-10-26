@@ -36,7 +36,7 @@ module deformation
     public :: calc_strain_rate_tensor_2D
     public :: calc_stress_tensor 
     public :: calc_stress_tensor_2D
-    public :: calc_stress_eigen_values
+    public :: calc_2D_eigen_values
     public :: strain_2D_alloc 
     public :: stress_2D_alloc
 
@@ -839,6 +839,10 @@ contains
         strn2D%de      = calc_vertical_integrated_2D(strn%de,  zeta_aa)
         strn2D%f_shear = calc_vertical_integrated_2D(strn%f_shear,zeta_aa) 
         
+        ! Finally, calculate the first two eigenvectors for 2D strain rate tensor 
+        call calc_2D_eigen_values(strn2D%eps_eig_1,strn2D%eps_eig_2, &
+                                    strn2D%dxx,strn2D%dyy,strn2D%dxy)
+
         return 
 
     end subroutine calc_strain_rate_tensor
@@ -1105,6 +1109,9 @@ contains
         strn2D%de      = calc_vertical_integrated_2D(strn%de,  zeta_aa)
         strn2D%f_shear = calc_vertical_integrated_2D(strn%f_shear,zeta_aa) 
         
+        ! Finally, calculate the first two eigenvectors for 2D strain rate tensor 
+        call calc_2D_eigen_values(strn2D%eps_eig_1,strn2D%eps_eig_2, &
+                                    strn2D%dxx,strn2D%dyy,strn2D%dxy)
         return 
 
     end subroutine calc_strain_rate_tensor_aa
@@ -1218,6 +1225,10 @@ contains
         end do
         !$omp end parallel do
 
+        ! Finally, calculate the first two eigenvectors for 2D strain rate tensor 
+        call calc_2D_eigen_values(strn2D%eps_eig_1,strn2D%eps_eig_2, &
+                                    strn2D%dxx,strn2D%dyy,strn2D%dxy)
+
         return
         
     end subroutine calc_strain_rate_tensor_2D
@@ -1260,7 +1271,7 @@ contains
         strs2D%te  = calc_vertical_integrated_2D(strs%te, zeta_aa)
         
         ! Finally, calculate the first two eigenvectors for 2D stress tensor 
-        call calc_stress_eigen_values(strs2D%tau_eig_1,strs2D%tau_eig_2, &
+        call calc_2D_eigen_values(strs2D%tau_eig_1,strs2D%tau_eig_2, &
                                         strs2D%txx,strs2D%tyy,strs2D%txy)
 
         return 
@@ -1293,20 +1304,35 @@ contains
                         + strs2D%tyz*strs2D%tyz )
 
         ! Finally, calculate the first two eigenvectors for 2D stress tensor 
-        call calc_stress_eigen_values(strs2D%tau_eig_1,strs2D%tau_eig_2, &
+        call calc_2D_eigen_values(strs2D%tau_eig_1,strs2D%tau_eig_2, &
                                     strs2D%txx,strs2D%tyy,strs2D%txy)
 
         return 
 
     end subroutine calc_stress_tensor_2D
     
-    elemental subroutine calc_stress_eigen_values(tau_eig_1,tau_eig_2,txx,tyy,txy)
-        ! Calculate the first two eigenvectors of 2D deviatoric stress tensor 
+    elemental subroutine calc_2D_eigen_values(eigen_1,eigen_2,txx,tyy,txy)
+        ! Calculate the first two eigenvectors of 2D tensor 
+        ! Given A = [txx txy 
+        !            tyx tyy], and txy = tyx 
+        ! calculate det[A - lambda I]
+        ! == det( [txx-lambda txy 
+        !          tyx tyy-lambda] )
+        !  det[A-lambdaI] = (txx-lambda)* (tyy-lambda) - txy*tyx = 0 
+        !    = lambda^2 -lambda txx -lambda tyy + txx * tyy - txy * tyx = 0
+        !    = lambda^2 -(txx+tyy)lambda + (txx * tyy - txy * tyx) = 0 
+        !
+        !    a = 1 
+        !    b = -(txx+tyy)
+        !    c = (txx * tyy - txy * tyx)
+        !
+        ! Solver for roots using quadratic formula 
+        !
 
         implicit none
 
-        real(wp), intent(OUT) :: tau_eig_1              ! [Pa] Eigenvalue 1
-        real(wp), intent(OUT) :: tau_eig_2              ! [Pa] Eigenvalue 2
+        real(wp), intent(OUT) :: eigen_1              ! [Pa] Eigenvalue 1
+        real(wp), intent(OUT) :: eigen_2              ! [Pa] Eigenvalue 2
         real(wp), intent(IN)  :: txx
         real(wp), intent(IN)  :: tyy
         real(wp), intent(IN)  :: txy
@@ -1324,21 +1350,21 @@ contains
             lambda1 = (-b + root) / (2.0_wp*a)
             lambda2 = (-b - root) / (2.0_wp*a)
             if (lambda1 > lambda2) then
-                tau_eig_1 = lambda1
-                tau_eig_2 = lambda2
+                eigen_1 = lambda1
+                eigen_2 = lambda2
             else
-                tau_eig_1 = lambda2
-                tau_eig_2 = lambda1
+                eigen_1 = lambda2
+                eigen_2 = lambda1
             end if
         else 
             ! No eigenvalues, set to zero 
-            tau_eig_1 = 0.0_wp 
-            tau_eig_2 = 0.0_wp 
+            eigen_1 = 0.0_wp 
+            eigen_2 = 0.0_wp 
         end if  ! b^2 - 4ac > 0
 
         return
 
-    end subroutine calc_stress_eigen_values
+    end subroutine calc_2D_eigen_values
 
 
     subroutine strain_2D_alloc(strn2D,nx,ny)
@@ -1361,6 +1387,9 @@ contains
         allocate(strn2D%de(nx,ny))
         allocate(strn2D%f_shear(nx,ny))
 
+        allocate(strn2D%eps_eig_1(nx,ny))
+        allocate(strn2D%eps_eig_2(nx,ny))
+        
         strn2D%dxx     = 0.0 
         strn2D%dyy     = 0.0 
         strn2D%dxy     = 0.0
@@ -1370,6 +1399,9 @@ contains
         strn2D%de      = 0.0 
         strn2D%f_shear = 0.0 
 
+        strn2D%eps_eig_1 = 0.0 
+        strn2D%eps_eig_2 = 0.0 
+        
         return 
 
     end subroutine strain_2D_alloc

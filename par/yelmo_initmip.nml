@@ -1,15 +1,18 @@
 &ctrl    
     time_init       = 0.0               ! [yr] Starting time 
-    time_end        = 5e3               ! [yr] Ending time
-    time_equil      = 1e2               ! [yr] Equilibration time 
+    time_end        = 4e3               ! [yr] Ending time
+    time_equil      = 1e3               ! [yr] Equilibration time 
     dtt             = 10.0              ! [yr] Main loop timestep 
     dtt_equil       = 0.05              ! [yr] Timestep to use for dynamic equilibration (if dt_method=0)
     dt1D_out        = 50.0              ! [yr] Frequency of writing 1D output files 
     dt2D_out        = 200.0             ! [yr] Frequency of writing 2D output files 
     
+    transient_clim  = False             ! Transient forcing? (not used for now)
+    with_ice_sheet  = True              ! Active ice-sheet component? 
+    optimize        = False             ! Optimize cf_ref initially? 
+    
     clim_nm         = "clim_pd_grl"     ! "clim_pd_grl", "clim_pd_ant" or "clim_lgm"
-    with_anom       = False             ! Apply anomaly at start of sim but after equilibration?
-
+    
     load_cf_ref     = False             ! Load cf_ref from file? Otherwise define from cf_stream + inline tuning
     file_cf_ref     = "ice_data/{domain}/{grid_name}/{grid_name}_cf_ref_opt.nc"  ! Filename holding cf_ref to load 
 
@@ -36,6 +39,23 @@
     z_sl            = -120.0            ! [m] Sea level relative to present-day 
 /
 
+&opt_L21
+    cf_init         = 0.2               ! Initial value of cf_ref everywhere
+    cf_min          = 1e-4              ! [--] Minimum allowed cf value
+    cf_max          = 1.0               ! [--] Maximum allowed cf value
+    tau_c           = 500.0             ! [yr] L21: Optimization relaxation timescale 
+    H0              = 100.0             ! [m]  L21: Optimization ice-thickness error scaling 
+    
+    sigma_err       = 1.5               ! [--] Smoothing radius for error to calculate correction in cf_ref (in multiples of dx)
+    sigma_vel       = 200.0             ! [m/a] Speed at which smoothing diminishes to zero
+    
+    rel_tau1        = 10.0              ! [yr] Relaxation timescale in time period 1
+    rel_tau2        = 1000.0            ! [yr] Relaxation timescale in time period 2
+    rel_time1       = 5e3               ! [yr] Time limit for time period 1
+    rel_time2       = 10e3              ! [yr] Time limit for time period 2
+    rel_m           = 2.0               ! [--] Non-linear exponent to scale interpolation of rel_tau between time1 and time2 
+
+/
 &yelmo
     domain          = "Greenland"
     grid_name       = "GRL-16KM"
@@ -73,6 +93,7 @@
     topo_fixed          = False             ! Keep ice thickness fixed, perform other ytopo calculations
     topo_rel            = 0                 ! 0: No relaxation; 1: relax shelf; 2: relax shelf + gl 
     topo_rel_tau        = 10.0              ! [a] Time scale for relaxation 
+    topo_rel_field      = "H_ref"           ! "H_ref" or "H_ice_n"
     calv_H_lim          = 200.0             ! [m] Calving limit in ice thickness (thinner ice calves)
     calv_tau            = 1.0               ! [a] Characteristic calving time
     H_min_grnd          = 5.0               ! [m] Minimum ice thickness at grounded margin (thinner ice is ablated) - helps with stability

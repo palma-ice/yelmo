@@ -8,6 +8,8 @@ program yelmo_test
     use basal_dragging 
     use yelmo_tools, only : gauss_values
     
+    use ice_optimization 
+
     use omp_lib
 
     implicit none 
@@ -15,22 +17,58 @@ program yelmo_test
     type(yelmo_class)       :: yelmo1 
     
     character(len=256) :: outfldr, file1D, file2D, file_restart, domain 
-    character(len=512) :: path_par, path_const, clim_nm  
-    real(prec) :: time_init, time_end, time_equil, time, dtt, dtt_equil, dt1D_out, dt2D_out 
-    real(prec) :: dtt_equil_now 
-    real(prec) :: bmb_shlf_const, dT_ann, z_sl    
+    character(len=512) :: path_par, path_const  
+    real(wp) :: time   
     integer    :: n
-    logical    :: with_anom 
     
-    real(prec), allocatable :: cf_ref(:,:) 
+    real(wp), allocatable :: cf_ref(:,:) 
+    logical,  allocatable :: mask_noice(:,:)  
 
-    ! No-ice mask (to impose additional melting)
-    logical, allocatable :: mask_noice(:,:)  
+    type ctrl_params
+        character(len=56) :: run_step
+        real(wp) :: time_init
+        real(wp) :: time_end
+        real(wp) :: time_equil      ! Only for spinup
+        real(wp) :: dtt
+        real(wp) :: dt1D_out
+        real(wp) :: dt2D_out
 
-    ! cf_ref, bmelt  
-    logical :: load_cf_ref, load_bmelt
-    character(len=256) :: file_cf_ref 
-    character(len=256) :: file_bmelt 
+        logical  :: transient_clim
+        logical  :: with_ice_sheet 
+        logical  :: optimize
+        
+        character(len=512) :: clim_nm
+          
+        logical :: load_cf_ref 
+        character(len=256) :: file_cf_ref 
+
+        logical :: load_bmelt
+        character(len=256) :: file_bmelt 
+
+        real(wp) :: bmb_shlf_const
+        real(wp) :: dT_ann
+        real(wp) :: z_sl 
+    end type 
+
+    type opt_params
+        real(wp) :: cf_init
+        real(wp) :: cf_min
+        real(wp) :: cf_max 
+        real(wp) :: tau_c 
+        real(wp) :: H0
+        real(wp) :: sigma_err 
+        real(wp) :: sigma_vel 
+
+        real(wp) :: rel_tau 
+        real(wp) :: rel_tau1 
+        real(wp) :: rel_tau2
+        real(wp) :: rel_time1
+        real(wp) :: rel_time2
+        real(wp) :: rel_m 
+    end type 
+
+    type(ctrl_params)   :: ctl
+    type(opt_params)    :: opt  
 
     real(8) :: cpu_start_time, cpu_end_time, cpu_dtime  
     
@@ -41,27 +79,45 @@ program yelmo_test
     call yelmo_load_command_line_args(path_par)
 
     ! Timing and other parameters 
-    call nml_read(path_par,"ctrl","time_init",       time_init)                 ! [yr] Starting time
-    call nml_read(path_par,"ctrl","time_end",        time_end)                  ! [yr] Ending time
-    call nml_read(path_par,"ctrl","time_equil",      time_equil)                ! [yr] Years to equilibrate first
-    call nml_read(path_par,"ctrl","dtt",             dtt)                       ! [yr] Main loop time step 
-    call nml_read(path_par,"ctrl","dtt_equil",       dtt_equil)                 ! [yr] Timestep to use for dynamic equilibration (if dt_method=0)
-    call nml_read(path_par,"ctrl","dt1D_out",        dt1D_out)                  ! [yr] Frequency of 1D output 
-    call nml_read(path_par,"ctrl","dt2D_out",        dt2D_out)                  ! [yr] Frequency of 2D output 
+    call nml_read(path_par,"ctrl","time_init",      ctl%time_init)          ! [yr] Starting time
+    call nml_read(path_par,"ctrl","time_end",       ctl%time_end)           ! [yr] Ending time
+    call nml_read(path_par,"ctrl","time_equil",     ctl%time_equil)         ! [yr] Years to equilibrate first
+    call nml_read(path_par,"ctrl","dtt",            ctl%dtt)                ! [yr] Main loop time step 
+    call nml_read(path_par,"ctrl","dt1D_out",       ctl%dt1D_out)           ! [yr] Frequency of 1D output 
+    call nml_read(path_par,"ctrl","dt2D_out",       ctl%dt2D_out)           ! [yr] Frequency of 2D output 
+    call nml_read(path_par,"ctrl","transient_clim", ctl%transient_clim)     ! Calculate transient climate? 
+    call nml_read(path_par,"ctrl","with_ice_sheet", ctl%with_ice_sheet)     ! Include an active ice sheet 
+    call nml_read(path_par,"ctrl","optimize",       ctl%optimize)           ! Optimize basal friction cf_ref field
+    call nml_read(path_par,"ctrl","clim_nm",        ctl%clim_nm)                   ! Namelist group holding climate information
     
-    call nml_read(path_par,"ctrl","clim_nm",         clim_nm)                   ! Namelist group holding climate information
-    call nml_read(path_par,"ctrl","with_anom",       with_anom)                 ! Apply anomaly at the start of the simulation (after equilibration)
-    
-    call nml_read(path_par,"ctrl","load_cf_ref",     load_cf_ref)               ! Load cf_ref from file? Otherwise define from cf_stream + inline tuning
-    call nml_read(path_par,"ctrl","file_cf_ref",     file_cf_ref)               ! Filename holding cf_ref to load 
+    call nml_read(path_par,"ctrl","load_cf_ref",    ctl%load_cf_ref)               ! Load cf_ref from file? Otherwise define from cf_stream + inline tuning
+    call nml_read(path_par,"ctrl","file_cf_ref",    ctl%file_cf_ref)               ! Filename holding cf_ref to load 
 
-    call nml_read(path_par,"ctrl","load_bmelt",      load_bmelt)                ! Load bmelt from file?
-    call nml_read(path_par,"ctrl","file_bmelt",      file_bmelt)                ! Filename holding bmelt field to load 
-
+    call nml_read(path_par,"ctrl","load_bmelt",     ctl%load_bmelt)                ! Load bmelt from file?
+    call nml_read(path_par,"ctrl","file_bmelt",     ctl%file_bmelt)                ! Filename holding bmelt field to load 
+        
     ! Load climate (eg, clim_pd or clim_lgm)
-    call nml_read(path_par,clim_nm,  "bmb_shlf_const",  bmb_shlf_const)            ! [yr] Constant imposed bmb_shlf value
-    call nml_read(path_par,clim_nm,  "dT_ann",          dT_ann)                    ! [K] Temperature anomaly (atm)
-    call nml_read(path_par,clim_nm,  "z_sl",            z_sl)                      ! [m] Sea level relative to present-day
+    call nml_read(path_par,ctl%clim_nm,  "bmb_shlf_const",  ctl%bmb_shlf_const)            ! [yr] Constant imposed bmb_shlf value
+    call nml_read(path_par,ctl%clim_nm,  "dT_ann",          ctl%dT_ann)                    ! [K] Temperature anomaly (atm)
+    call nml_read(path_par,ctl%clim_nm,  "z_sl",            ctl%z_sl)                      ! [m] Sea level relative to present-day
+
+    if (ctl%optimize) then 
+        ! Load optimization parameters 
+
+        call nml_read(path_par,"opt_L21","cf_init",     opt%cf_init)
+        call nml_read(path_par,"opt_L21","cf_min",      opt%cf_min)
+        call nml_read(path_par,"opt_L21","cf_max",      opt%cf_max)
+        call nml_read(path_par,"opt_L21","tau_c",       opt%tau_c)
+        call nml_read(path_par,"opt_L21","H0",          opt%H0)
+        call nml_read(path_par,"opt_L21","sigma_err",   opt%sigma_err)   
+        call nml_read(path_par,"opt_L21","sigma_vel",   opt%sigma_vel)   
+        
+        call nml_read(path_par,"opt_L21","rel_tau1",    opt%rel_tau1)   
+        call nml_read(path_par,"opt_L21","rel_tau2",    opt%rel_tau2)  
+        call nml_read(path_par,"opt_L21","rel_time1",   opt%rel_time1)    
+        call nml_read(path_par,"opt_L21","rel_time2",   opt%rel_time2) 
+        call nml_read(path_par,"opt_L21","rel_m",       opt%rel_m)
+    end if 
 
     ! Assume program is running from the output folder
     outfldr = "./"
@@ -78,50 +134,43 @@ program yelmo_test
     call yelmo_global_init(path_const)
 
     ! Initialize data objects and load initial topography
-    call yelmo_init(yelmo1,filename=path_par,grid_def="file",time=time_init)
+    call yelmo_init(yelmo1,filename=path_par,grid_def="file",time=ctl%time_init)
 
-    ! Determine maximum timestep to use with equilibration step 
-    if (yelmo1%par%dt_method .eq. 0) then 
-        dtt_equil_now = dtt_equil 
-    else 
-        dtt_equil_now = dtt 
-    end if 
-    
     ! === Set initial boundary conditions for current time and yelmo state =====
     ! ybound: z_bed, z_sl, H_sed, smb, T_srf, bmb_shlf , Q_geo
 
-    yelmo1%bnd%z_sl     = z_sl              ! [m]
+    yelmo1%bnd%z_sl     = ctl%z_sl          ! [m]
     yelmo1%bnd%H_sed    = 0.0               ! [m]
     yelmo1%bnd%Q_geo    = 50.0              ! [mW/m2]
     
     ! Impose present-day surface mass balance and present-day temperature field plus any anomaly
-    yelmo1%bnd%smb      = yelmo1%dta%pd%smb             ! [m.i.e./a]
-    yelmo1%bnd%T_srf    = yelmo1%dta%pd%T_srf + dT_ann  ! [K]
+    yelmo1%bnd%smb      = yelmo1%dta%pd%smb                 ! [m.i.e./a]
+    yelmo1%bnd%T_srf    = yelmo1%dta%pd%T_srf + ctl%dT_ann  ! [K]
     
-    if (load_bmelt) then
+    if (ctl%load_bmelt) then
 
         ! Parse filenames with grid information
-        call yelmo_parse_path(file_bmelt,yelmo1%par%domain,yelmo1%par%grid_name)
+        call yelmo_parse_path(ctl%file_bmelt,yelmo1%par%domain,yelmo1%par%grid_name)
  
-        call nc_read(file_bmelt,"bm_ac_reese",yelmo1%bnd%bmb_shlf)
-        yelmo1%bnd%bmb_shlf = -yelmo1%bnd%bmb_shlf                  ! Negative because bmb = -bmelt 
+        call nc_read(ctl%file_bmelt,"bm_ac_reese",yelmo1%bnd%bmb_shlf)
+        yelmo1%bnd%bmb_shlf = -yelmo1%bnd%bmb_shlf      ! Negative because bmb = -bmelt 
     else 
-        yelmo1%bnd%bmb_shlf = bmb_shlf_const    ! [m.i.e./a]
+        yelmo1%bnd%bmb_shlf = ctl%bmb_shlf_const        ! [m.i.e./a]
     end if 
 
     yelmo1%bnd%T_shlf   = T0                ! [K]   
 
-    if (dT_ann .lt. 0.0) yelmo1%bnd%T_shlf   = T0 + dT_ann*0.25_prec  ! [K] Oceanic temp anomaly
+    if (ctl%dT_ann .lt. 0.0) yelmo1%bnd%T_shlf   = T0 + ctl%dT_ann*0.25_wp      ! [K] Oceanic temp anomaly
     
     call yelmo_print_bound(yelmo1%bnd)
 
-    time = time_init 
+    time = ctl%time_init 
 
     ! Define no-ice mask from present-day data
     allocate(mask_noice(yelmo1%grd%nx,yelmo1%grd%ny))
     mask_noice = .FALSE. 
     ! Present-day
-    if (dT_ann .ge. 0.0) then
+    if (ctl%dT_ann .ge. 0.0) then
         where(yelmo1%dta%pd%H_ice .le. 0.0) mask_noice = .TRUE. 
     end if 
 
@@ -129,7 +178,7 @@ program yelmo_test
     if (trim(yelmo1%par%domain) .eq. "Greenland") then 
         
         ! Present-day
-        if (dT_ann .ge. 0.0) then 
+        if (ctl%dT_ann .ge. 0.0) then 
             ! Impose additional negative mass balance to no ice points of 2 [m.i.e./a] melting
             where(mask_noice) yelmo1%bnd%smb = yelmo1%dta%pd%smb - 2.0 
         end if 
@@ -140,12 +189,12 @@ program yelmo_test
     if (trim(yelmo1%par%domain) .eq. "Antarctica") then 
         
         ! Present-day
-        if (dT_ann .ge. 0.0) then 
+        if (ctl%dT_ann .ge. 0.0) then 
             where(mask_noice) yelmo1%bnd%bmb_shlf = -2.0                ! [m/a]        
         end if 
 
         ! LGM
-        if (dT_ann .lt. 0.0) then 
+        if (ctl%dT_ann .lt. 0.0) then 
             where(yelmo1%bnd%smb .le. 0.1) yelmo1%bnd%smb = 0.1         ! [m/a]
         end if 
 
@@ -156,113 +205,86 @@ program yelmo_test
 
     ! Initialize state variables (dyn,therm,mat)
     ! (initialize temps with robin method with a cold base)
-    call yelmo_init_state(yelmo1,time=time_init,thrm_method="robin-cold")
+    call yelmo_init_state(yelmo1,time=ctl%time_init,thrm_method="robin-cold")
 
-    ! ============================================================
-    ! Load or define cf_ref 
+    ! ===== basal friction optimization ======
+    if (ctl%optimize) then 
+        
+        ! Ensure that cf_ref will be optimized (cb_method == set externally) 
+        yelmo1%dyn%par%cb_method = -1  
 
-    ! Allocate cf_ref and set it to cf_stream by default 
-    allocate(cf_ref(yelmo1%grd%nx,yelmo1%grd%ny))
-    cf_ref = yelmo1%dyn%par%cf_stream  
+        ! If not using restart, prescribe cf_ref to initial guess 
+        if (.not. yelmo1%par%use_restart) then
+            yelmo1%dyn%now%cf_ref = opt%cf_init 
+        end if 
 
-    if (load_cf_ref) then 
+    else 
 
-        ! Parse filename with grid information
-        call yelmo_parse_path(file_cf_ref,yelmo1%par%domain,yelmo1%par%grid_name)
+        ! ============================================================
+        ! Load or define cf_ref 
 
-        ! Load cf_ref from specified file 
-        call nc_read(file_cf_ref,"cf_ref",cf_ref)
-
-        ! Make sure that present-day shelves have minimal cf_ref values 
-        where(yelmo1%tpo%now%f_grnd .eq. 0.0) cf_ref = 0.05 
-
-    else
-        ! Define cf_ref inline 
-
+        ! Allocate cf_ref and set it to cf_stream by default 
+        allocate(cf_ref(yelmo1%grd%nx,yelmo1%grd%ny))
         cf_ref = yelmo1%dyn%par%cf_stream  
 
+        if (ctl%load_cf_ref) then 
+
+            ! Parse filename with grid information
+            call yelmo_parse_path(ctl%file_cf_ref,yelmo1%par%domain,yelmo1%par%grid_name)
+
+            ! Load cf_ref from specified file 
+            call nc_read(ctl%file_cf_ref,"cf_ref",cf_ref)
+
+            ! Make sure that present-day shelves have minimal cf_ref values 
+            where(yelmo1%tpo%now%f_grnd .eq. 0.0) cf_ref = 0.05 
+
+        else
+            ! Define cf_ref inline 
+
+            cf_ref = yelmo1%dyn%par%cf_frozen 
+
+        end if 
+
+        ! Define cf_ref initially
+        call calc_ydyn_cfref_external(yelmo1%dyn,yelmo1%tpo,yelmo1%thrm,yelmo1%bnd,yelmo1%grd,yelmo1%par%domain, &
+                                        mask_noice,cf_ref)
+
     end if 
-
     ! ============================================================
-
-
-    ! Define cf_ref initially
-    call calc_ydyn_cfref_external(yelmo1%dyn,yelmo1%tpo,yelmo1%thrm,yelmo1%bnd,yelmo1%grd,yelmo1%par%domain, &
-                                    mask_noice,cf_ref)
-
-    ! Impose a colder boundary temperature for equilibration step 
-    ! -5 [K] for mimicking glacial times
-!     yelmo1%bnd%T_srf = yelmo1%dta%pd%T_srf - 10.0  
-
-if (.FALSE.) then 
-    ! Run yelmo for several years with constant boundary conditions and topo
-    ! to equilibrate thermodynamics and dynamics
-    yelmo1%par%dt_method        = 0 
-    yelmo1%tpo%par%topo_rel     = 2
-    yelmo1%tpo%par%topo_rel_tau = 10.0 
-    write(*,*) "timelog, tau = ", yelmo1%tpo%par%topo_rel_tau
-    call yelmo_update_equil(yelmo1,time,time_tot=1.0_prec,dt=0.05,topo_fixed=.FALSE.)
-    yelmo1%tpo%par%topo_rel_tau = 100.0 
-    write(*,*) "timelog, tau = ", yelmo1%tpo%par%topo_rel_tau
-    call yelmo_update_equil(yelmo1,time,time_tot=2.0_prec,dt=0.05,topo_fixed=.FALSE.)
-    yelmo1%tpo%par%topo_rel_tau = 1000.0 
-    write(*,*) "timelog, tau = ", yelmo1%tpo%par%topo_rel_tau
-    call yelmo_update_equil(yelmo1,time,time_tot=5.0_prec,dt=0.05,topo_fixed=.FALSE.)
-    yelmo1%tpo%par%topo_rel     = 0
-    write(*,*) "timelog, no relaxation..."
-    call yelmo_update_equil(yelmo1,time,time_tot=5.0_prec,dt=0.05,topo_fixed=.FALSE.)
-    yelmo1%par%dt_method        = 2
-    write(*,*) "timelog, adaptive timestepping..."
-    call yelmo_update_equil(yelmo1,time,time_tot=10.0_prec,dt=min(1.0_prec,dtt_equil_now),topo_fixed=.FALSE.)
-
-    ! Next equilibrate thermodynamics and maintain constant ice topopgraphy (for speed)
-    call yelmo_update_equil(yelmo1,time,time_tot=time_equil,dt=1.0_prec,topo_fixed=.TRUE.)
-
-    ! Finally allow further dynamic equilibrium (therm + dyn) to ensure 
-    ! everything is in sync
-    call yelmo_update_equil(yelmo1,time,time_tot=100.0_prec,dt=dtt_equil_now,topo_fixed=.FALSE.)
-
-else 
-    ! Just testing...
-
-    ! Run full dynamics (tpo,dyn,thrm) to smooth initial topo
+    
+    ! Run full model (tpo,dyn,thrm) with SIA to smooth initial topo
     call yelmo_update_equil(yelmo1,time,time_tot=10.0_prec,dt=0.2_prec,topo_fixed=.FALSE.,dyn_solver="sia")
 
-    ! Next equilibrate thermodynamics and maintain constant ice topopgraphy (for speed)
-    ! again with SIA only for now
-    ! call yelmo_update_equil(yelmo1,time,time_tot=1e3,dt=1.0_prec,topo_fixed=.TRUE.,dyn_solver="sia")
-    
-    ! Run full dynamics with correct solver (tpo,dyn,thrm)
+    ! Run full model with correct solver (tpo,dyn,thrm)
     call yelmo_update_equil(yelmo1,time,time_tot=1.0_prec,dt=0.2_prec,topo_fixed=.FALSE.)
 
     ! Next equilibrate thermodynamics further and maintain constant ice topopgraphy (for speed)
     ! call yelmo_update_equil(yelmo1,time,time_tot=1e2,dt=1.0_prec,topo_fixed=.TRUE.)
 
-end if 
-
+    
     ! 2D file 
     call yelmo_write_init(yelmo1,file2D,time_init=time,units="years")  
     call write_step_2D(yelmo1,file2D,time=time,cf_ref=cf_ref)
     
     ! 1D file 
-    call yelmo_write_reg_init(yelmo1,file1D,time_init=time_init,units="years",mask=yelmo1%bnd%ice_allowed)
+    call yelmo_write_reg_init(yelmo1,file1D,time_init=time,units="years",mask=yelmo1%bnd%ice_allowed)
     call yelmo_write_reg_step(yelmo1,file1D,time=time)  
     
-    if (with_anom) then 
-        ! Warm up the ice sheet to impose some changes 
-        yelmo1%bnd%T_srf    = yelmo1%dta%pd%T_srf + 5.0
-        yelmo1%bnd%bmb_shlf = -10.0 
-        where (yelmo1%dta%pd%smb .lt. 0.0) yelmo1%bnd%smb = yelmo1%dta%pd%smb - 1.0 
-    end if 
+    ! if (with_anom) then 
+    !     ! Warm up the ice sheet to impose some changes 
+    !     yelmo1%bnd%T_srf    = yelmo1%dta%pd%T_srf + 5.0
+    !     yelmo1%bnd%bmb_shlf = -10.0 
+    !     where (yelmo1%dta%pd%smb .lt. 0.0) yelmo1%bnd%smb = yelmo1%dta%pd%smb - 1.0 
+    ! end if 
 
     ! Initialize continuous restart file 
-    !call yelmo_restart_write(yelmo1,"yelmo_heavy.nc",time_init,init=.TRUE.)
+    !call yelmo_restart_write(yelmo1,"yelmo_heavy.nc",time,init=.TRUE.)
 
     ! Advance timesteps
-    do n = 1, ceiling((time_end-time_init)/dtt)
+    do n = 1, ceiling((ctl%time_end-ctl%time_init)/ctl%dtt)
 
         ! Get current time 
-        time = time_init + n*dtt
+        time = ctl%time_init + n*ctl%dtt
 
 !         ! Update temperature and smb as needed in time (ISMIP6)
 !         if (time .ge. -10e6 .and. time .lt. -10e3) then 
@@ -278,8 +300,56 @@ end if
 !             yelmo1%bnd%T_srf = yelmo1%dta%pd%T_srf
 !         end if 
         
+        ! Spin-up procedure...
+        if (ctl%with_ice_sheet .and. (time-ctl%time_init) .lt. ctl%time_equil) then 
+            
+            if (ctl%optimize) then 
+                ! ===== basal friction optimization ==================
+
+                ! === Optimization parameters =========
+                
+                ! Update model relaxation time scale and error scaling (in [m])
+                opt%rel_tau = get_opt_param(time,time1=opt%rel_time1,time2=opt%rel_time2, &
+                                                p1=opt%rel_tau1,p2=opt%rel_tau2,m=opt%rel_m)
+                
+                ! Set model tau, and set yelmo relaxation switch (2: gl-line and shelves relaxing; 0: no relaxation)
+                yelmo1%tpo%par%topo_rel_tau = opt%rel_tau 
+                yelmo1%tpo%par%topo_rel     = 2
+                if (time .gt. opt%rel_time2) yelmo1%tpo%par%topo_rel = 0 
+                
+                ! === Optimization update step =========
+
+                ! Update cf_ref based on error metric(s) 
+                call update_cf_ref_errscaling_l21(yelmo1%dyn%now%cf_ref,yelmo1%tpo%now%H_ice, &
+                                    yelmo1%tpo%now%dHicedt,yelmo1%bnd%z_bed,yelmo1%bnd%z_sl,yelmo1%dyn%now%ux_s,yelmo1%dyn%now%uy_s, &
+                                    yelmo1%dta%pd%H_ice,yelmo1%dta%pd%uxy_s,yelmo1%dta%pd%H_grnd.le.0.0_prec, &
+                                    yelmo1%tpo%par%dx,opt%cf_min,opt%cf_max,opt%sigma_err,opt%sigma_vel,opt%tau_c,opt%H0, &
+                                    fill_dist=80.0_prec,dt=ctl%dtt)
+            
+            else 
+                ! ===== relaxation spinup ==================
+
+                ! Turn on relaxation for now, to let thermodynamics equilibrate
+                ! without changing the topography too much. Important when 
+                ! effective pressure = f(thermodynamics).
+
+                yelmo1%tpo%par%topo_rel     = 2
+                yelmo1%tpo%par%topo_rel_tau = 20.0 
+                write(*,*) "timelog, tau = ", yelmo1%tpo%par%topo_rel_tau
+
+            end if 
+
+        else if ( (time-ctl%time_init) .eq. ctl%time_equil) then
+            ! Finally, ensure all relaxation is disabled and continue as normal.
+
+                yelmo1%tpo%par%topo_rel     = 0
+                write(*,*) "timelog, relation off..."
+              
+        end if 
+        ! ====================================================
+
         ! Update ice sheet 
-        call yelmo_update(yelmo1,time)
+        if (ctl%with_ice_sheet) call yelmo_update(yelmo1,time)
 
         ! if (time .lt. 130.0) then 
         !     call yelmo_update(yelmo1,time)
@@ -289,11 +359,11 @@ end if
 
         ! == MODEL OUTPUT =======================================================
 
-        if (mod(nint(time*100),nint(dt2D_out*100))==0) then
+        if (mod(nint(time*100),nint(ctl%dt2D_out*100))==0) then
             call write_step_2D(yelmo1,file2D,time=time,cf_ref=cf_ref)
         end if 
 
-        if (mod(nint(time*100),nint(dt1D_out*100))==0) then 
+        if (mod(nint(time*100),nint(ctl%dt1D_out*100))==0) then 
             call yelmo_write_reg_step(yelmo1,file1D,time=time) 
         end if 
 
@@ -314,7 +384,7 @@ end if
     call yelmo_cpu_time(cpu_end_time,cpu_start_time,cpu_dtime)
 
     write(*,"(a,f12.3,a)") "Time  = ",cpu_dtime/60.0 ," min"
-    write(*,"(a,f12.1,a)") "Speed = ",(1e-3*(time_end-time_init))/(cpu_dtime/3600.0), " kiloyears / hr"
+    write(*,"(a,f12.1,a)") "Speed = ",(1e-3*(ctl%time_end-ctl%time_init))/(cpu_dtime/3600.0), " kiloyears / hr"
 
 contains
 
@@ -443,7 +513,7 @@ contains
                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
         
         ! Strain-rate and stress tensors 
-        if (.TRUE.) then
+        if (.FALSE.) then
 
             call nc_write(filename,"de",ylmo%mat%now%strn%de,units="a^-1",long_name="Effective strain rate", &
                       dim1="xc",dim2="yc",dim3="zeta",dim4="time",start=[1,1,1,n],ncid=ncid)
@@ -738,7 +808,7 @@ end if
 
     end subroutine scale_cf_gaussian
 
-end program yelmo_test 
+end program yelmo_test
 
 
 

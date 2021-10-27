@@ -148,7 +148,7 @@ contains
 
             ! tau_eff = effective stress ~ von Mises stress following Lipscomb et al. (2019)
             call calc_tau_eff(tpo%now%tau_eff,mat%now%strs2D%tau_eig_1,mat%now%strs2D%tau_eig_2,tpo%now%f_ice,tpo%par%w2)
-            
+
             ! For now, mask eps_eff and tau_eff to floating points 
             ! for easier visualization. If quantities will be used
             ! for grounded ice in the future, then this masking can 
@@ -238,10 +238,15 @@ contains
 
             end select
             
-            ! Adjust calving so that any excess is distributed to upstream neighbors
-            ! (note: no excess should be available for 'kill' and 'kill-pos' methods) 
-            call calc_calving_residual(tpo%now%calv_flt,tpo%now%H_ice,tpo%now%f_ice,dt)
+            select case(trim(tpo%par%calv_flt_method))
+                
+                case("vm-l19","eigen")
+                    ! Adjust calving so that any excess is distributed to upstream neighbors
+                    
+                    call calc_calving_residual(tpo%now%calv_flt,tpo%now%H_ice,tpo%now%f_ice,dt)
             
+            end select 
+
 
             ! Additionally ensure higher calving rate for floating tongues of
             ! one grid-point width.

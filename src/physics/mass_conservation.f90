@@ -6,7 +6,7 @@ module mass_conservation
     use solver_advection, only : calc_advec2D  
     use velocity_general, only : set_inactive_margins 
     use topography, only : calc_H_eff
-    
+
     implicit none 
 
     private
@@ -148,8 +148,12 @@ contains
         ! ==== MASS BALANCE =====
 
         ! Combine mass balance and calving into one field, mb_applied.
-        ! mbal is not scaled by f_ice, since it does not depend on ice thickness. 
-        mb_applied = mbal
+        ! negative mbal is scaled by f_ice, to account for available surface area. 
+        where(mbal .lt. 0.0_wp)
+            mb_applied = f_ice*mbal
+        elsewhere 
+            mb_applied = mbal
+        end where
 
         ! Additionally ensure ice cannot form in open ocean 
         where(f_grnd .eq. 0.0 .and. H_ice .eq. 0.0)  mb_applied = 0.0  

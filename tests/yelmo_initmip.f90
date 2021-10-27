@@ -334,7 +334,7 @@ program yelmo_test
                 ! effective pressure = f(thermodynamics).
 
                 yelmo1%tpo%par%topo_rel     = 2
-                yelmo1%tpo%par%topo_rel_tau = 20.0 
+                yelmo1%tpo%par%topo_rel_tau = 50.0 
                 write(*,*) "timelog, tau = ", yelmo1%tpo%par%topo_rel_tau
 
             end if 

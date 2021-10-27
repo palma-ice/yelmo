@@ -1,7 +1,7 @@
 &ctrl    
     time_init       = 0.0               ! [yr] Starting time 
-    time_end        = 4e3               ! [yr] Ending time
-    time_equil      = 1e3               ! [yr] Equilibration time 
+    time_end        = 3e3               ! [yr] Ending time
+    time_equil      = 0e3               ! [yr] Equilibration time 
     dtt             = 10.0              ! [yr] Main loop timestep 
     dtt_equil       = 0.05              ! [yr] Timestep to use for dynamic equilibration (if dt_method=0)
     dt1D_out        = 50.0              ! [yr] Frequency of writing 1D output files 
@@ -83,8 +83,8 @@
 
 &ytopo
     solver              = "impl-upwind"     ! "expl", "impl-upwind"
-    calv_flt_method     = "vm-l19"          ! "zero", "simple", "flux", "vm-l19", "kill"
-    calv_grnd_method    = "stress-b12"      ! "zero", "stress-b12"
+    calv_flt_method     = "zero"            ! "zero", "simple", "flux", "vm-l19", "kill"
+    calv_grnd_method    = "zero"            ! "zero", "stress-b12"
     fmb_method          = 1                 ! 0: prescribe boundary field fmb_shlf; 1: calculate proportional fmb~bmb_shlf.
     surf_gl_method      = 0                 ! 0: binary (max grnd/flt elevation), 1: subgrid average elevation
     margin_flt_subgrid  = True              ! Allow fractional ice area for floating margins
@@ -101,7 +101,7 @@
     sd_min              = 100.0             ! [m] calv_grnd(z_bed_sd <= sd_min) = 0.0 
     sd_max              = 500.0             ! [m] calv_grnd(z_bed_sd >= sd_max) = calv_max  
     calv_max            = 10.0              ! [m/a] Maximum grounded calving rate from high stdev(z_bed)
-    grad_lim            = 0.1               ! [m/m] Maximum allowed sloped in gradient calculations (dz/dx,dH/dx)
+    grad_lim            = 0.5               ! [m/m] Maximum allowed sloped in gradient calculations (dz/dx,dH/dx)
     gl_sep              = 1                 ! 1: Linear f_grnd_acx/acy and binary f_grnd, 2: area f_grnd, average to acx/acy
     gl_sep_nx           = 15                ! [-] Number of interpolation points (nx*nx) to calculate grounded area at grounding line
     diffuse_bmb_shlf    = False             ! Allow bmb_shlf to permeate inland at the grounding line 
@@ -129,13 +129,13 @@
     cb_with_pmp         = False           ! Weighted cf_frozen/cf_stream as a function of f_pmp 
     cb_margin_pmp       = False           ! If using cb_with_pmp, additionally impose cf_stream at ice margins 
     cb_scale            = "exp_zb"        ! "none", "lin_zb", "exp_zb", "till_const", "till_zb", scaling of cb spatially
-    cb_z0               = -600.0          ! [m] Bedrock elevation at which scaling goes to f_scale=e(-1)
-    cb_z1               = 400.0           ! [m] Bedrock elevation above which scaling goes to f_scale=1
-    cb_min              = 0.05            ! [--] Minimum allowed value of f_scale for grounded ice
-    cf_frozen           = 1.0             ! [--] Bed critical stress factor, frozen 
-    cf_stream           = 0.8             ! [--] Bed critical stress factor, stream  
+    cb_z0               = -300.0          ! [m] Bedrock elevation at which scaling goes to f_scale=e(-1)
+    cb_z1               = 200.0           ! [m] Bedrock elevation above which scaling goes to f_scale=1
+    cb_min              = 0.1             ! [--] Minimum allowed value of f_scale for grounded ice
+    cf_frozen           = 0.4             ! [--] Bed critical stress factor, frozen 
+    cf_stream           = 0.4             ! [--] Bed critical stress factor, stream  
     n_sm_beta           = 0               ! [-] Standard deviation in gridpoints for Gaussian smoothing of beta (0==no smoothing)
-    beta_min            = 0.0             ! [Pa a m-1] Minimum value of beta allowed for grounded ice (for stability)
+    beta_min            = 100.0           ! [Pa a m-1] Minimum value of beta allowed for grounded ice (for stability)
     eps_0               = 1e-6            ! [1/a] Regularization term for effective viscosity - minimum strain rate
     ssa_lis_opt         = "-i minres -p jacobi -maxiter 100 -tol 1.0e-2 -initx_zeros false"  ! See Lis library !-omp_num_threads 2
     ssa_beta_max        = 1e20            ! [Pa a m-1] Maximum value of beta for which ssa should be calculated 
@@ -177,8 +177,8 @@
     visc_min                = 1e3           ! [Pa a] Minimum allowed viscosity 
     de_max                  = 2.0           ! [a-1]  Maximum allowed effective strain rate
     enh_method              = "shear3D"     ! "simple","shear2D", "shear3D", "paleo-shear" 
-    enh_shear               = 2.0
-    enh_stream              = 2.0
+    enh_shear               = 3.0
+    enh_stream              = 3.0
     enh_shlf                = 0.7
     enh_umin                = 50.0          ! [m/yr] Minimum transition velocity to enh_stream (enh_method="paleo-shear")
     enh_umax                = 500.0         ! [m/yr] Maximum transition velocity to enh_stream (enh_method="paleo-shear")

@@ -740,7 +740,7 @@ end if
 
     end subroutine calc_calving_rate_flux_grisli
     
-    subroutine calc_calving_rate_vonmises_l19(calv,tau_eff,H_ice,f_ice,f_grnd,dx,kt)
+    subroutine calc_calving_rate_vonmises_l19(calv,H_ice,f_ice,f_grnd,tau_eff,dx,kt)
         ! Calculate the 'horizontal' calving rate [m/yr] based on the 
         ! von Mises stress approach, as outlined by Lipscomb et al. (2019)
         ! Eqs. 73-75.
@@ -805,8 +805,8 @@ end if
                     ! by number of exposed faces.
                     calv(i,j) = (H_eff*calv_ref) / sqrt(dx*dy)
 
-                    ! write(*,*) "calv", tau_eff, calv_ref,  &
-                    !             H_eff, wt*H_eff/sqrt(dx*dy), calv(i,j) 
+                    ! write(*,*) "calv", i, j, tau_eff(i,j), calv_ref,  &
+                    !             H_eff, H_eff/sqrt(dx*dy), calv(i,j) 
                     
                 end if 
 
@@ -819,7 +819,7 @@ end if
 
     end subroutine calc_calving_rate_vonmises_l19
        
-    subroutine calc_calving_rate_eigen(calv,eps_eff,H_ice,f_ice,f_grnd,dx,k2)
+    subroutine calc_calving_rate_eigen(calv,H_ice,f_ice,f_grnd,eps_eff,dx,k2)
         ! Calculate the 'horizontal' calving rate [m/yr] based on the 
         ! von Mises stress approach, as outlined by Lipscomb et al. (2019)
         ! Eqs. 73-75.

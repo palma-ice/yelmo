@@ -159,6 +159,26 @@ contains
             ! Diagnose potential floating-ice calving rate [m/yr]
             
             select case(trim(tpo%par%calv_flt_method))
+                
+                case("vm-l19","eigen")
+                    ! Consistency check
+
+                    if (.not. tpo%par%margin_flt_subgrid) then 
+
+                        write(io_unit_err,*) ""
+                        write(io_unit_err,*) ""
+                        write(io_unit_err,*) "calv_flt_method=['vm-l19','eigen'] must be used with margin_flt_subgrid=True."
+                        write(io_unit_err,*) "calv_flt_method    = ", trim(tpo%par%calv_flt_method)
+                        write(io_unit_err,*) "margin_flt_subgrid = ", tpo%par%margin_flt_subgrid
+                        stop "Program stopped."
+
+                    end if 
+                    
+            end select 
+
+
+
+            select case(trim(tpo%par%calv_flt_method))
 
                 case("zero","none")
 
@@ -186,33 +206,11 @@ contains
                 case("vm-l19")
                     ! Use von Mises calving as defined by Lipscomb et al. (2019)
 
-                    ! if (.not. tpo%par%margin_flt_subgrid) then 
-
-                    !     write(io_unit_err,*) ""
-                    !     write(io_unit_err,*) ""
-                    !     write(io_unit_err,*) "calv_flt_method='vm-l19' must be used with margin_flt_subgrid=True."
-                    !     write(io_unit_err,*) "calv_flt_method    = ", trim(tpo%par%calv_flt_method)
-                    !     write(io_unit_err,*) "margin_flt_subgrid = ", tpo%par%margin_flt_subgrid
-                    !     stop "Program stopped."
-
-                    ! end if 
-                    
                     ! Next, diagnose calving
                     call calc_calving_rate_vonmises_l19(tpo%now%calv_flt,tpo%now%H_ice,tpo%now%f_ice,tpo%now%f_grnd, &
                                                                                 tpo%now%tau_eff,tpo%par%dx,tpo%par%kt)
                 case("eigen")
                     ! Use Eigen calving as defined by Levermann et al. (2012)
-
-                    ! if (.not. tpo%par%margin_flt_subgrid) then 
-
-                    !     write(io_unit_err,*) ""
-                    !     write(io_unit_err,*) ""
-                    !     write(io_unit_err,*) "calv_flt_method='eigen' must be used with margin_flt_subgrid=True."
-                    !     write(io_unit_err,*) "calv_flt_method    = ", trim(tpo%par%calv_flt_method)
-                    !     write(io_unit_err,*) "margin_flt_subgrid = ", tpo%par%margin_flt_subgrid
-                    !     stop "Program stopped."
-
-                    ! end if 
                     
                     ! Next, diagnose calving
                     call calc_calving_rate_eigen(tpo%now%calv_flt,tpo%now%H_ice,tpo%now%f_ice,tpo%now%f_grnd, &
@@ -239,7 +237,7 @@ contains
             end select
             
             select case(trim(tpo%par%calv_flt_method))
-                
+
                 case("vm-l19","eigen")
                     ! Adjust calving so that any excess is distributed to upstream neighbors
                     

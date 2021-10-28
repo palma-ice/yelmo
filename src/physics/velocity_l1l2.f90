@@ -458,6 +458,7 @@ end if
             dudy_aa(i,j) = sum(dudy_ab4*wt_ab)
             dvdx_aa(i,j) = sum(dvdx_ab4*wt_ab)
             
+
             ! Calculate the 'parallel' effective strain rate from P12, Eq. 17
             eps_par_sq4 = dudx_ab4**2 + dvdy_ab4**2 + dudx_ab4*dvdy_ab4 &
                         + 0.25_wp*(dudy_ab4+dvdx_ab4)**2 + eps_0_sq
@@ -488,7 +489,7 @@ end if
             work1_aa = 2.0_wp*visc_eff_int3D(:,:,k) * (2.d0*dudx_aa + dvdy_aa) 
             work2_aa = 2.0_wp*visc_eff_int3D(:,:,k) * 0.5*(dudy_aa+dvdx_aa)
             work3_aa = 2.0_wp*visc_eff_int3D(:,:,k) * 0.5*(dudy_aa+dvdx_aa)
-            work4_aa = 2.0_wp*visc_eff_int3D(:,:,k) * (dudx_aa + 2.d0*dvdy_aa) 
+            work4_aa = 2.0_wp*visc_eff_int3D(:,:,k) * (dudx_aa + 2.d0*dvdy_aa)  
             
             ! Calculate derivatives of work arrays, first on ab-nodes
             ! then averaged to aa-nodes. This helps with solver stability

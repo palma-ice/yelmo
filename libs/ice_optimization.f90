@@ -34,7 +34,7 @@ contains
         real(wp), intent(IN)    :: uy(:,:) 
         real(wp), intent(IN)    :: H_obs(:,:) 
         real(wp), intent(IN)    :: uxy_obs(:,:) 
-        logical,    intent(IN)    :: is_float_obs(:,:) 
+        logical,  intent(IN)    :: is_float_obs(:,:) 
         real(wp), intent(IN)    :: dx 
         real(wp), intent(IN)    :: cf_min 
         real(wp), intent(IN)    :: cf_max
@@ -123,8 +123,10 @@ end if
             
             uxy_aa = sqrt(ux_aa**2+uy_aa**2)
 
-            if ( uxy(i,j) .ne. 0.0 .and. uxy_err(i,j) .ne. MV ) then 
-                ! Update coefficient where velocity exists
+            if ( uxy(i,j) .ne. 0.0 .and. uxy_err(i,j) .ne. MV &
+                            .and. (.not. is_float_obs(i,j)) ) then 
+                ! Update coefficient where velocity exists and 
+                ! observations are not floating.
 
                 ! Determine upstream node(s) 
 

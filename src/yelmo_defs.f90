@@ -17,6 +17,11 @@ module yelmo_defs
 
     ! Choose the precision of the library (sp,dp)
     integer,  parameter :: prec = sp 
+    
+    ! Define more conventional wp = working precision 
+    ! ajr: slowly transition from 'prec' to 'wp' 
+    integer,  parameter :: wp = prec 
+
 
     ! Missing value and aliases
     real(prec), parameter :: MISSING_VALUE_DEFAULT = real(-9999.0,prec)
@@ -167,6 +172,8 @@ module yelmo_defs
         integer    :: mix_method            ! Method for mixing sia and ssa velocity solutions
         logical    :: calc_diffusivity      ! Calculate diagnostic diffusivity field
         logical    :: diva_no_slip 
+        integer    :: visc_method 
+        real(wp)   :: visc_const
         integer    :: beta_method
         real(prec) :: beta_const
         real(prec) :: beta_q                ! Friction law exponent

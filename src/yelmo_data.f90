@@ -175,6 +175,8 @@ contains
         character(len=56)   :: nms(4) 
         real(prec), allocatable :: tmp(:,:,:) 
 
+        real(wp), parameter :: z_sl_pd = 0.0_wp     ! [m] Define present day relative sea level as zero
+
         ! Allocate temporary array for loading monthly data 
         allocate(tmp(size(dta%pd%H_ice,1),size(dta%pd%H_ice,2),12))
 
@@ -200,8 +202,8 @@ contains
             end where 
             
             ! Calculate H_grnd (ice thickness overburden)
-            ! (extracted from `calc_H_grnd` in yelmo_topography)
-            dta%pd%H_grnd = dta%pd%H_ice - (rho_sw/rho_ice)*(0.0_prec-dta%pd%z_bed)
+            ! (extracted from `calc_H_grnd` in topography)
+            dta%pd%H_grnd = dta%pd%H_ice - (rho_sw/rho_ice)*max(z_sl_pd-dta%pd%z_bed,0.0_wp)
 
         end if 
 

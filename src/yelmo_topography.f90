@@ -211,7 +211,7 @@ contains
                                                                                 tpo%now%tau_eff,tpo%par%dx,tpo%par%kt)
                 case("eigen")
                     ! Use Eigen calving as defined by Levermann et al. (2012)
-                    
+
                     ! Next, diagnose calving
                     call calc_calving_rate_eigen(tpo%now%calv_flt,tpo%now%H_ice,tpo%now%f_ice,tpo%now%f_grnd, &
                                                                                 tpo%now%eps_eff,tpo%par%dx,tpo%par%k2)
@@ -235,12 +235,16 @@ contains
                     stop 
 
             end select
-            
+                        
             select case(trim(tpo%par%calv_flt_method))
 
                 case("vm-l19","eigen")
-                    ! Adjust calving so that any excess is distributed to upstream neighbors
                     
+                    ! Scale calving with 'thin' calving rate to ensure 
+                    ! small ice thicknesses are removed.
+                    call apply_thin_calving_rate(tpo%now%calv_flt,tpo%now%H_ice,tpo%now%f_ice,tpo%now%f_grnd,tpo%par%calv_thin)
+
+                    ! Adjust calving so that any excess is distributed to upstream neighbors
                     call calc_calving_residual(tpo%now%calv_flt,tpo%now%H_ice,tpo%now%f_ice,dt)
             
             end select 
@@ -552,6 +556,7 @@ contains
         call nml_read(filename,"ytopo","topo_rel_field",    par%topo_rel_field,   init=init_pars)
         call nml_read(filename,"ytopo","calv_H_lim",        par%calv_H_lim,       init=init_pars)
         call nml_read(filename,"ytopo","calv_tau",          par%calv_tau,         init=init_pars)
+        call nml_read(filename,"ytopo","calv_thin",         par%calv_thin,        init=init_pars)
         call nml_read(filename,"ytopo","H_min_grnd",        par%H_min_grnd,       init=init_pars)
         call nml_read(filename,"ytopo","H_min_flt",         par%H_min_flt,        init=init_pars)
         call nml_read(filename,"ytopo","sd_min",            par%sd_min,           init=init_pars)

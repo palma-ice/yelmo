@@ -9,6 +9,8 @@ module calving
 
     private 
 
+    public :: apply_thin_calving_rate
+
     public :: calc_calving_tongues
     public :: calc_calving_residual
     public :: calc_calving_rate_kill 
@@ -29,6 +31,75 @@ module calving
     public :: calc_calving_ground_rate_stdev
 
 contains 
+    
+    subroutine apply_thin_calving_rate(calv_flt,H_ice,f_ice,f_grnd,calv_thin)
+        ! Adjust calving rate based on ice thickness 
+        ! to ensure that thin ice (calv_thin*1yr=Xm) is removed
+        ! following Pattyn (2017), Eq. 24. Typical parameters 
+        ! calv_thin = 30 m/yr 
+        ! H_ref     = 200 m 
+
+        implicit none 
+
+        real(wp), intent(INOUT) :: calv_flt(:,:) 
+        real(wp), intent(IN)    :: H_ice(:,:) 
+        real(wp), intent(IN)    :: f_ice(:,:) 
+        real(wp), intent(IN)    :: f_grnd(:,:) 
+        real(wp), intent(IN)    :: calv_thin
+        
+        ! Local variables
+        integer  :: i, j, nx, ny, n_mrgn 
+        integer  :: im1, ip1, jm1, jp1
+        real(wp) :: H_eff 
+        real(wp) :: wt 
+
+        real(wp), parameter :: H_ref = 200.0_wp     ! [m] Thickness below which to scale calving rate
+
+        nx = size(calv_flt,1)
+        ny = size(calv_flt,2) 
+
+        do j = 1, ny 
+        do i = 1, nx 
+
+            ! Define neighbor indices
+            im1 = max(i-1,1)
+            ip1 = min(i+1,nx)
+            jm1 = max(j-1,1)
+            jp1 = min(j+1,ny)
+            
+            ! Determine if point is at the floating margin 
+            if (f_grnd(i,j) .eq. 0.0 .and. f_ice(i,j) .gt. 0.0) then 
+                ! Floating point, diagnose number of ice-free neighbors 
+
+                n_mrgn = count([f_ice(im1,j),f_ice(ip1,j),f_ice(i,jm1),f_ice(i,jp1)].eq.0.0 )
+
+            else 
+
+                n_mrgn = 0 
+
+            end if 
+
+            if (n_mrgn .gt. 0) then 
+                ! Floating ice margin point
+
+                ! Calculate current ice thickness (H_eff = H_ice/f_ice)
+                call calc_H_eff(H_eff,H_ice(i,j),f_ice(i,j))
+
+                ! Get weighting factor based on effective ice thickness 
+                wt = min(1.0_wp,H_eff/H_ref)
+
+                ! Calculate adjusted calving rate, weighted
+                ! between minimum rate and actual value 
+                calv_flt(i,j) = calv_thin*(1.0_wp-wt) + calv_flt(i,j)*wt 
+
+            end if 
+
+        end do 
+        end do  
+
+        return 
+
+    end subroutine apply_thin_calving_rate
 
     subroutine calc_calving_tongues(calv_flt,H_ice,f_ice,f_grnd,tau)
         ! Increase calving for floating margin points with 3+ calving

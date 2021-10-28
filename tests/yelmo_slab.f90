@@ -298,7 +298,7 @@ contains
         ! =======================================================
 
         ! Initialize the yelmo state (dyn,therm,mat)
-        call yelmo_init_state(yelmo1,time=time,thrm_method="robin-cold")
+        call yelmo_init_state(yelmo1,path_par,time=time,thrm_method="robin-cold")
 
         yelmo1%tpo%par%topo_fixed = .TRUE. 
 

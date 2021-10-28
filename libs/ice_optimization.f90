@@ -7,8 +7,8 @@ module ice_optimization
     implicit none 
 
     private 
-    public :: update_cf_ref_errscaling
     public :: update_cf_ref_errscaling_l21
+    public :: update_cf_ref_errscaling
     public :: update_cf_ref_thickness_ratio
     public :: update_mb_corr
     public :: guess_cf_ref
@@ -189,7 +189,7 @@ end if
 
         ! Also where no ice exists, set cf_ref = cf_min 
         where(H_obs .eq. 0.0) cf_ref = cf_min 
-
+        
         return 
 
     end subroutine update_cf_ref_errscaling_l21

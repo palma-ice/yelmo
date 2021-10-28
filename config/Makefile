@@ -114,6 +114,13 @@ trough : yelmo-static
 		@echo "    yelmo_trough.x is ready."
 		@echo " "
 
+slab : yelmo-static
+		$(FC) $(DFLAGS) $(FFLAGS) $(INC_LIS) -o $(bindir)/yelmo_slab.x tests/yelmo_slab.f90 \
+			-L${CURDIR}/libyelmo/include -lyelmo $(LFLAGS) $(objdir)/nml.o
+		@echo " "
+		@echo "    yelmo_slab.x is ready."
+		@echo " "
+
 check_sim : $(objdir)/ncio.o
 		$(FC) $(DFLAGS) $(FFLAGS) -o ./check_sim.x check_sim.f90 \
 			$(LFLAGS) $(objdir)/ncio.o

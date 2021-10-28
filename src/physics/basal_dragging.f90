@@ -352,6 +352,8 @@ contains
                 case(-1,0) 
 
                     ! Do nothing, staggering has already been computed properly 
+                    ! -1: beta_acx and beta_acy have been defined externally 
+                    !  0: beta_acx and beta_acy have been defined with simple staggering above 
 
                 case(1) 
                     ! Apply upstream beta_aa value at ac-node with at least one neighbor H_grnd_aa > 0
@@ -422,6 +424,10 @@ contains
         ! Finally ensure that beta for grounded ice is higher than the lower allowed limit
         where(beta_acx .gt. 0.0 .and. beta_acx .lt. beta_min) beta_acx = beta_min 
         where(beta_acy .gt. 0.0 .and. beta_acy .lt. beta_min) beta_acy = beta_min 
+        
+        ! ! Testing set beta to a small value 
+        ! where(beta_acx .eq. 0.0) beta_acx = 1e-2 
+        ! where(beta_acy .eq. 0.0) beta_acy = 1e-2 
         
         return 
 

@@ -22,7 +22,7 @@ program yelmo_benchmarks
     character(len=256) :: file_restart
     character(len=512) :: path_par, path_const 
     character(len=56)  :: experiment
-    logical    :: topo_fixed, dyn_fixed, with_bumps 
+    logical    :: topo_fixed, dyn_fixed, with_bumps, low_z_sl 
     character(len=256) :: topo_fixed_file 
     real(prec) :: time_init, time_end, time, dtt, dt2D_out, dt1D_out
     real(prec) :: period, dt_test, alpha, omega, L, amp 
@@ -79,6 +79,7 @@ program yelmo_benchmarks
     ! call nml_read(path_par,"ctrl","bumps_L",bumps_L)             ! [km] Length scale of bumps
     ! call nml_read(path_par,"ctrl","bumps_A",bumps_A)             ! [m]  Amplitude of bumps
     with_bumps = .FALSE. 
+    low_z_sl   = .FALSE. 
 
     ! Define the model domain based on the experiment we are running
     select case(trim(experiment))
@@ -149,7 +150,7 @@ program yelmo_benchmarks
             
             !yelmo1%tpo%now%H_ice  = 100.0
             call dome_init(yelmo1%tpo%now%H_ice,yelmo1%grd%x,yelmo1%grd%y,R0=0.5_prec,H0=2000.0_prec)
-            where(yelmo1%tpo%now%H_ice .lt. 300.0) yelmo1%tpo%now%H_ice = 300.0 
+            where(yelmo1%tpo%now%H_ice .lt. 500.0) yelmo1%tpo%now%H_ice = 500.0 
 
             yelmo1%tpo%now%z_srf  = yelmo1%bnd%z_bed + yelmo1%tpo%now%H_ice
 
@@ -210,7 +211,7 @@ program yelmo_benchmarks
     yelmo1%bnd%T_shlf   = T0  
     yelmo1%bnd%H_sed    = 0.0 
 
-    if (with_bumps) then 
+    if (with_bumps .or. low_z_sl) then 
         yelmo1%bnd%z_sl     = -5000.0
     end if 
 
@@ -705,6 +706,12 @@ contains
                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
         call nc_write(filename,"beta",ylmo%dyn%now%beta,units="Pa a m-1",long_name="Basal friction coefficient", &
                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
+        call nc_write(filename,"beta_acx",ylmo%dyn%now%beta_acx,units="Pa a m-1",long_name="Basal friction coefficient (acx)", &
+                      dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
+        call nc_write(filename,"beta_acy",ylmo%dyn%now%beta_acy,units="Pa a m-1",long_name="Basal friction coefficient (acy)", &
+                      dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
+        
+
         call nc_write(filename,"visc_eff_int",ylmo%dyn%now%visc_eff_int,units="Pa a m",long_name="Depth-integrated effective viscosity (SSA)", &
                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
 

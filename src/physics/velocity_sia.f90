@@ -53,6 +53,7 @@ contains
 
         ! Calculate the 3D horizontal shear velocity fields
         call calc_uxy_sia_3D(ux_i,uy_i,tau_xz,tau_yz,taud_acx,taud_acy,H_ice,f_ice,ATT,n_glen,zeta_aa,boundaries)
+        !call calc_uxy_sia_3D_alt(ux_i,uy_i,tau_xz,tau_yz,taud_acx,taud_acy,H_ice,f_ice,ATT,n_glen,zeta_aa,boundaries)
         
         ! Or, simply integrate from 3D velocity field to get depth-averaged field (slower)
         ux_i_bar = calc_vertical_integrated_2D(ux_i,zeta_aa)

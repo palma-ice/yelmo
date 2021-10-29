@@ -21,6 +21,7 @@
     experiment      = "ISMIPHOM"         ! "None", "EISMINT", "MISMIP3D", "BUELER", "ISMIPHOM"  to apply special boundary conditions   
     restart         = "no"
     log_timestep    = True 
+    disable_kill    = False             ! Disable automatic kill if unstable
     zeta_scale      = "linear"             ! "linear", "exp", "tanh"
     zeta_exp        = 2.0  
     nz_aa           = 10                ! Vertical resolution in ice
@@ -62,6 +63,8 @@
 
 &ydyn
     solver              = "l1l2"          ! "fixed", "sia", "ssa", "hybrid", "diva", "diva-noslip", l1l2", "l1l2-noslip"
+    visc_method         = 1               ! 0: constant visc=visc_const, 1: dynamic viscosity
+    visc_const          = 1e5             ! [Pa a] Constant value for viscosity (if visc_method=0)
     beta_method         = 0               ! 0: constant beta; 1: linear (beta=cb/u0); 2: psuedo-plastic-power; 3: Regularized Coulomb
     beta_const          = 1e3             ! [Pa a m−1] Constant value of basal friction coefficient to be used
     beta_q              = 1.0             ! Dragging law exponent 

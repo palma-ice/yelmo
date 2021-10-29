@@ -761,6 +761,12 @@ contains
 
                 dom%tpo%par%boundaries = "periodic"
                 dom%dyn%par%boundaries = "periodic"
+            
+            case("slab") 
+
+                dom%tpo%par%boundaries = "periodic" 
+                dom%dyn%par%boundaries = "periodic"
+                
 
             case("infinite") 
                 ! Set border points equal to interior neighbors 
@@ -980,6 +986,7 @@ contains
         call nml_read(filename,"yelmo","experiment",    par%experiment)
         call nml_read(filename,"yelmo","restart",       par%restart)
         call nml_read(filename,"yelmo","log_timestep",  par%log_timestep)
+        call nml_read(filename,"yelmo","disable_kill",  par%disable_kill)
         call nml_read(filename,"yelmo","zeta_scale",    par%zeta_scale)
         call nml_read(filename,"yelmo","zeta_exp",      par%zeta_exp)
         call nml_read(filename,"yelmo","nz_aa",         par%nz_aa)
@@ -1233,7 +1240,7 @@ contains
             kill_msg = trim(kill_request)
         end if 
 
-        if (kill_it) then 
+        if (kill_it .and. (.not. dom%par%disable_kill)) then 
             ! Model is not running properly, kill it. 
 
             write(*,*) 

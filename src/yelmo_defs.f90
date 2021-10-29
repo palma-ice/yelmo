@@ -666,6 +666,7 @@ module yelmo_defs
 
         ! Data logging 
         logical             :: log_timestep 
+        logical             :: disable_kill
 
         ! Vertical dimension definition
         character (len=56)  :: zeta_scale 

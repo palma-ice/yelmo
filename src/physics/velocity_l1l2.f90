@@ -237,10 +237,10 @@ end if
         ! Iterations are finished, finalize calculations of 3D velocity field 
 
         ! Calculate the 3D horizontal velocity field
-        ! call calc_vel_horizontal_3D(ux,uy,ux_b,uy_b,taud_acx,taud_acy,visc_eff_ab,ATT,H_ice, &
-        !                                     zeta_aa,dx,dy,n_glen,par%eps_0,par%boundaries)
-        call calc_vel_horizontal_3D_0(ux,uy,ux_b,uy_b,taud_acx,taud_acy,visc_eff_ab,ATT,H_ice, &
+        call calc_vel_horizontal_3D(ux,uy,ux_b,uy_b,taud_acx,taud_acy,visc_eff_ab,ATT,H_ice, &
                                             zeta_aa,dx,dy,n_glen,par%eps_0,par%boundaries)
+        ! call calc_vel_horizontal_3D_0(ux,uy,ux_b,uy_b,taud_acx,taud_acy,visc_eff_ab,ATT,H_ice, &
+        !                                     zeta_aa,dx,dy,n_glen,par%eps_0,par%boundaries)
 
         ! Calculate depth-averaged horizontal velocity 
         ux_bar = calc_vertical_integrated_2D(ux,zeta_aa)
@@ -766,12 +766,12 @@ end if
                 jm1 = max(j-1,1) 
                 jp1 = min(j+1,ny) 
 
+if (.FALSE.) then 
                 ! Calculate effective stress 
                 tau_xz_ab = 0.5_prec*(tau_xz(i,j,k)+tau_xz(i,jp1,k))
                 tau_yz_ab = 0.5_prec*(tau_yz(i,j,k)+tau_yz(ip1,j,k))
-                !tau_eff_sq_ab = tau_par_ab(i,j,k)**2 + tau_xz_ab**2 + tau_yz_ab**2
-                tau_eff_sq_ab = (0.5_wp*(tau_par_ab(i,j,k)+tau_par_ab(i,j,k-1)))**2 + tau_xz_ab**2 + tau_yz_ab**2
-
+                tau_eff_sq_ab = tau_xz_ab**2 + tau_yz_ab**2 + tau_par_ab(i,j,k)**2
+                
                 ! Calculate factor to get velocity components
                 ATT_ab   = 0.25_prec*(ATT(i,j,k)+ATT(ip1,j,k)+ATT(i,jp1,k)+ATT(ip1,jp1,k))
                 !depth_ab = H_ice_ab(i,j)*(1.0_prec-zeta_aa(k))
@@ -781,7 +781,31 @@ end if
                 
                 fact_ab(i,j) = fact_ab(i,j) &
                     - 2.0_prec * ATT_ab * depth_ab * tau_eff_sq_ab * (dzeta*H_ice_ab(i,j))
-                
+
+else 
+! ajr: testing modifications to get closer to other solution 
+
+                ! Get everything on vertical ac-nodes
+                tau_xz_ab = 0.25_prec*(tau_xz(i,j,k)+tau_xz(i,jp1,k)+tau_xz(i,j,k-1)+tau_xz(i,jp1,k-1))
+                tau_yz_ab = 0.25_prec*(tau_yz(i,j,k)+tau_yz(ip1,j,k)+tau_yz(i,j,k-1)+tau_yz(ip1,j,k-1))
+                tau_eff_sq_ab = tau_xz_ab**2 + tau_yz_ab**2 + (0.5_wp*(tau_par_ab(i,j,k)+tau_par_ab(i,j,k-1)))**2
+
+                ATT_ab   = 0.125_prec*(ATT(i,j,k)+ATT(ip1,j,k)+ATT(i,jp1,k)+ATT(ip1,jp1,k) &
+                                      +ATT(i,j,k-1)+ATT(ip1,j,k-1)+ATT(i,jp1,k-1)+ATT(ip1,jp1,k-1))
+                depth_ab = (1.0_prec-0.5*(zeta_aa(k)+zeta_aa(k-1)))
+
+                ! fact_ab(i,j) = fact_ab(i,j) &
+                !     - 2.0_prec * ATT_ab * depth_ab * tau_eff_sq_ab * (dzeta*H_ice_ab(i,j))
+
+                ! Calculate multiplicative factor on ab-nodes
+                if (p1 .ne. 0.0_wp) then 
+                    fact_ab(i,j) = 2.0_prec * ATT_ab * (dzeta*H_ice_ab(i,j)) * tau_eff_sq_ab**p1
+                else
+                    fact_ab(i,j) = 2.0_prec * ATT_ab * (dzeta*H_ice_ab(i,j))
+                end if 
+
+end if 
+
             end do 
             end do 
 
@@ -791,7 +815,8 @@ end if
 
                 im1 = max(i-1,1) 
                 jm1 = max(j-1,1) 
-                
+
+if (.FALSE.) then 
                 ! stagger factor to acx-nodes and calculate velocity
                 fact_ac   = 0.5_prec*(fact_ab(i,j)+fact_ab(i,jm1))
                 ux(i,j,k) = ux(i,j,1) + fact_ac*taud_acx(i,j)
@@ -799,6 +824,20 @@ end if
                 ! stagger factor to acy-nodes and calculate velocity
                 fact_ac   = 0.5_prec*(fact_ab(i,j)+fact_ab(im1,j))
                 uy(i,j,k) = uy(i,j,1) + fact_ac*taud_acy(i,j)
+
+else 
+! ajr: testing modifications to get closer to other solution 
+
+                ! stagger factor to acx-nodes to calculate velocity 
+                fact_ac   = 0.5_prec*(fact_ab(i,j)+fact_ab(i,jm1))
+                ux(i,j,k) = ux(i,j,k-1) &
+                            + fact_ac*0.5_wp*(tau_xz(i,j,k)+tau_xz(i,j,k-1))
+
+                ! stagger factor to acy-nodes to calculate velocity
+                fact_ac   = 0.5_prec*(fact_ab(i,j)+fact_ab(im1,j))
+                uy(i,j,k) = uy(i,j,k-1) &
+                            + fact_ac*0.5_wp*(tau_yz(i,j,k)+tau_yz(i,j,k-1)) 
+end if 
 
             end do 
             end do 

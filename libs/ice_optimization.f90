@@ -185,10 +185,10 @@ end if
         !call filter_gaussian(var=cf_ref,sigma=dx_km*0.2,dx=dx_km)     !,mask=err_z_srf .ne. 0.0)
         
         ! Ensure where obs are floating, set cf_ref = cf_min 
-        ! where(is_float_obs) cf_ref = cf_min 
+        where(is_float_obs) cf_ref = cf_min 
 
         ! Also where no ice exists, set cf_ref = cf_min 
-        ! where(H_obs .eq. 0.0) cf_ref = cf_min 
+        where(H_obs .eq. 0.0) cf_ref = cf_min 
         
         return 
 

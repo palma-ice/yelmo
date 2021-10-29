@@ -273,6 +273,8 @@ contains
             ! Set diva parameters from Yelmo settings 
             hybrid_par%ssa_lis_opt    = dyn%par%ssa_lis_opt 
             hybrid_par%boundaries     = dyn%par%boundaries  
+            hybrid_par%visc_method    = dyn%par%visc_method 
+            hybrid_par%visc_const     = dyn%par%visc_const 
             hybrid_par%beta_method    = dyn%par%beta_method 
             hybrid_par%beta_const     = dyn%par%beta_const 
             hybrid_par%beta_q         = dyn%par%beta_q 
@@ -396,6 +398,8 @@ contains
         diva_par%ssa_lis_opt    = dyn%par%ssa_lis_opt 
         diva_par%boundaries     = dyn%par%boundaries 
         diva_par%no_slip        = no_slip 
+        diva_par%visc_method    = dyn%par%visc_method 
+        diva_par%visc_const     = dyn%par%visc_const 
         diva_par%beta_method    = dyn%par%beta_method 
         diva_par%beta_const     = dyn%par%beta_const 
         diva_par%beta_q         = dyn%par%beta_q 
@@ -487,6 +491,8 @@ contains
         l1l2_par%ssa_lis_opt    = dyn%par%ssa_lis_opt 
         l1l2_par%boundaries     = dyn%par%boundaries 
         l1l2_par%no_slip        = no_slip 
+        l1l2_par%visc_method    = dyn%par%visc_method 
+        l1l2_par%visc_const     = dyn%par%visc_const 
         l1l2_par%beta_method    = dyn%par%beta_method 
         l1l2_par%beta_const     = dyn%par%beta_const 
         l1l2_par%beta_q         = dyn%par%beta_q 

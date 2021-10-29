@@ -254,6 +254,24 @@ contains
                 ! Get vertically averaged value 
                 mat%now%ATT_bar = calc_vertical_integrated_2D(mat%now%ATT,mat%par%zeta_aa)
             
+            case(2)
+                ! Calculate rate factor from viscosity and effective strain rate 
+                ! (only works when dyn%par%visc_method=0 with visc_const prescribed,
+                ! and n_glen=1)
+
+                if (dyn%par%visc_method .ne. 0 .or. mat%par%n_glen .ne. 1.0_wp) then 
+                    write(*,*) "calc_ymat:: Error: rf_method=2 only works when viscosity &
+                    &is prescribed (ydyn.visc_method=0) and ymat.n_glen=1.0."
+                    write(*,*) "ydyn.visc_method = ", dyn%par%visc_method 
+                    write(*,*) "ymat.n_glen      = ", mat%par%n_glen 
+                    stop 
+                end if 
+
+                ! ATT = (2.0*visc_eff)^(-1) 
+                
+                mat%now%ATT     = 1.0_wp / (2.0_wp*dyn%par%visc_const)
+                mat%now%ATT_bar = 1.0_wp / (2.0_wp*dyn%par%visc_const)
+            
             case DEFAULT 
                 ! Not recognized 
 

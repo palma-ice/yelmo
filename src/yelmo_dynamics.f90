@@ -948,6 +948,8 @@ end if
         
         call nml_read(filename,"ydyn","solver",             par%solver,             init=init_pars)
         call nml_read(filename,"ydyn","calc_diffusivity",   par%calc_diffusivity,   init=init_pars)
+        call nml_read(filename,"ydyn","visc_method",        par%visc_method,        init=init_pars)
+        call nml_read(filename,"ydyn","visc_const",         par%visc_const,         init=init_pars)
         call nml_read(filename,"ydyn","beta_method",        par%beta_method,        init=init_pars)
         call nml_read(filename,"ydyn","beta_const",         par%beta_const,         init=init_pars)
         call nml_read(filename,"ydyn","beta_q",             par%beta_q,             init=init_pars)

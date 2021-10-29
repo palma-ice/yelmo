@@ -237,9 +237,11 @@ end if
         ! Iterations are finished, finalize calculations of 3D velocity field 
 
         ! Calculate the 3D horizontal velocity field
-        call calc_vel_horizontal_3D(ux,uy,ux_b,uy_b,taud_acx,taud_acy,visc_eff_ab,ATT,H_ice, &
+        ! call calc_vel_horizontal_3D(ux,uy,ux_b,uy_b,taud_acx,taud_acy,visc_eff_ab,ATT,H_ice, &
+        !                                     zeta_aa,dx,dy,n_glen,par%eps_0,par%boundaries)
+        call calc_vel_horizontal_3D_0(ux,uy,ux_b,uy_b,taud_acx,taud_acy,visc_eff_ab,ATT,H_ice, &
                                             zeta_aa,dx,dy,n_glen,par%eps_0,par%boundaries)
-        
+
         ! Calculate depth-averaged horizontal velocity 
         ux_bar = calc_vertical_integrated_2D(ux,zeta_aa)
         uy_bar = calc_vertical_integrated_2D(uy,zeta_aa)
@@ -767,7 +769,8 @@ end if
                 ! Calculate effective stress 
                 tau_xz_ab = 0.5_prec*(tau_xz(i,j,k)+tau_xz(i,jp1,k))
                 tau_yz_ab = 0.5_prec*(tau_yz(i,j,k)+tau_yz(ip1,j,k))
-                tau_eff_sq_ab = tau_par_ab(i,j,k)**2 + tau_xz_ab**2 + tau_yz_ab**2
+                !tau_eff_sq_ab = tau_par_ab(i,j,k)**2 + tau_xz_ab**2 + tau_yz_ab**2
+                tau_eff_sq_ab = (0.5_wp*(tau_par_ab(i,j,k)+tau_par_ab(i,j,k-1)))**2 + tau_xz_ab**2 + tau_yz_ab**2
 
                 ! Calculate factor to get velocity components
                 ATT_ab   = 0.25_prec*(ATT(i,j,k)+ATT(ip1,j,k)+ATT(i,jp1,k)+ATT(ip1,jp1,k))

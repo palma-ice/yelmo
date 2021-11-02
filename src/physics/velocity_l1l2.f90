@@ -106,6 +106,7 @@ contains
         integer,    allocatable :: ssa_mask_acy_ref(:,:)
 
         real(prec), allocatable :: visc_eff_ab(:,:,:) 
+        real(prec), allocatable :: f_ice(:,:)
 
         real(prec) :: L2_norm 
 
@@ -123,6 +124,10 @@ contains
         allocate(ssa_mask_acy_ref(nx,ny))
 
         allocate(visc_eff_ab(nx,ny,nz_aa)) 
+        allocate(f_ice(nx,ny))
+
+        f_ice = 0.0 
+        where(H_ice .gt. 0.0) f_ice = 1.0 
 
         ! Store original ssa mask before iterations
         ssa_mask_acx_ref = ssa_mask_acx
@@ -237,8 +242,10 @@ end if
         ! Iterations are finished, finalize calculations of 3D velocity field 
 
         ! Calculate the 3D horizontal velocity field
-        call calc_vel_horizontal_3D(ux,uy,ux_b,uy_b,taud_acx,taud_acy,visc_eff_ab,ATT,H_ice, &
-                                            zeta_aa,dx,dy,n_glen,par%eps_0,par%boundaries)
+        call calc_vel_horizontal_3D(ux,uy,ux_b,uy_b,taud_acx,taud_acy,visc_eff,ATT,H_ice, &
+                                    f_ice,zeta_aa,dx,dy,n_glen,par%eps_0,par%boundaries)
+        ! call calc_vel_horizontal_3D_0(ux,uy,ux_b,uy_b,taud_acx,taud_acy,visc_eff_ab,ATT,H_ice, &
+        !                                     zeta_aa,dx,dy,n_glen,par%eps_0,par%boundaries)
 
         ! Calculate depth-averaged horizontal velocity 
         ux_bar = calc_vertical_integrated_2D(ux,zeta_aa)
@@ -254,7 +261,388 @@ end if
 
     end subroutine calc_velocity_l1l2
 
-    subroutine calc_vel_horizontal_3D(ux,uy,ux_b,uy_b,taud_acx,taud_acy,visc_eff_ab,ATT,H_ice,zeta_aa,dx,dy,n_glen,eps_0,boundaries)
+    subroutine calc_vel_horizontal_3D(ux,uy,ux_b,uy_b,taud_acx,taud_acy, &
+                        visc_eff,ATT,H_ice,f_ice,zeta_aa, &
+                        dx,dy,n_glen,eps_0,boundaries)
+        ! Caluculate the 3D horizontal velocity field (ux,uy)
+        ! for the L1L2 solver following Perego et al. (2012)
+        ! and the blueprint by Lipscomb et al. (2019) in CISM
+
+        implicit none 
+
+        real(wp), intent(OUT) :: ux(:,:,:) 
+        real(wp), intent(OUT) :: uy(:,:,:) 
+        real(wp), intent(IN)  :: ux_b(:,:) 
+        real(wp), intent(IN)  :: uy_b(:,:) 
+        real(wp), intent(IN)  :: taud_acx(:,:) 
+        real(wp), intent(IN)  :: taud_acy(:,:)
+        real(wp), intent(IN)  :: visc_eff(:,:,:)      ! on aa-nodes 
+        real(wp), intent(IN)  :: ATT(:,:,:)  
+        real(wp), intent(IN)  :: H_ice(:,:)
+        real(wp), intent(IN)  :: f_ice(:,:)
+        real(wp), intent(IN)  :: zeta_aa(:) 
+        real(wp), intent(IN)  :: dx
+        real(wp), intent(IN)  :: dy
+        real(wp), intent(IN)  :: n_glen   
+        real(wp), intent(IN)  :: eps_0                ! [1/a] Regularization constant (minimum strain rate, ~1e-8)
+        character(len=*), intent(IN) :: boundaries 
+
+        ! Local variables
+        integer  :: i, j, k, nx, ny, nz_aa, nz_ac   
+        integer  :: ip1, jp1, im1, jm1 
+        real(wp) :: inv_4dx, inv_4dy 
+        real(wp) :: zeta_ac1, zeta_ac0 
+        real(wp) :: dw1dx, dw2dy, dw3dx, dw4dy
+        real(wp) :: depth_ab 
+        real(wp) :: fact_ac 
+
+        real(wp) :: dudx_ab4(4) 
+        real(wp) :: dvdy_ab4(4) 
+        real(wp) :: dudy_ab4(4)
+        real(wp) :: dvdx_ab4(4)
+        real(wp) :: eps_par_sq4(4)
+        real(wp) :: eps_par4(4)
+        real(wp) :: visc_eff_ab4(4)
+        real(wp) :: tau_par_ab4_up(4)
+        real(wp) :: tau_par_ab4_dn(4)
+        real(wp) :: tau_par_ab4(4)
+
+        real(wp) :: dw1dx_ab(4)
+        real(wp) :: dw2dy_ab(4)
+        real(wp) :: dw3dx_ab(4)
+        real(wp) :: dw4dy_ab(4) 
+
+        real(wp) :: H_ice_ab4(4)
+        real(wp) :: ATT_ab4_up(4) 
+        real(wp) :: ATT_ab4_dn(4) 
+        
+        real(wp) :: tau_xz_ab4_up(4)
+        real(wp) :: tau_xz_ab4_dn(4)
+        real(wp) :: tau_xz_ab4(4)
+        real(wp) :: tau_yz_ab4_up(4)
+        real(wp) :: tau_yz_ab4_dn(4)
+        real(wp) :: tau_yz_ab4(4)
+        real(wp) :: tau_eff_sq_ab4(4)
+        real(wp) :: ATT_ab4(4)
+        real(wp) :: fact_ab4(4)
+
+        real(wp) :: wt_ab(4) 
+        real(wp) :: wt 
+
+        real(wp), allocatable :: visc_eff_int3D(:,:,:) 
+        real(wp), allocatable :: dudx_aa(:,:)
+        real(wp), allocatable :: dvdy_aa(:,:)
+        real(wp), allocatable :: dudy_aa(:,:)
+        real(wp), allocatable :: dvdx_aa(:,:)
+        real(wp), allocatable :: tau_par(:,:,:)
+
+        real(wp), allocatable :: work1_aa(:,:)
+        real(wp), allocatable :: work2_aa(:,:)
+        real(wp), allocatable :: work3_aa(:,:)
+        real(wp), allocatable :: work4_aa(:,:)
+
+        real(wp), allocatable :: dw1dx_aa(:,:)
+        real(wp), allocatable :: dw2dy_aa(:,:)
+        real(wp), allocatable :: dw3dx_aa(:,:)
+        real(wp), allocatable :: dw4dy_aa(:,:)
+        
+        real(wp), allocatable :: tau_xz(:,:,:) 
+        real(wp), allocatable :: tau_yz(:,:,:) 
+        real(wp), allocatable :: fact_ab(:,:) 
+
+        real(wp) :: p1, eps_0_sq 
+        real(wp) :: dzeta 
+
+        nx    = size(ux,1)
+        ny    = size(ux,2) 
+        nz_aa = size(ux,3) 
+        nz_ac = nz_aa+1
+
+        ! Allocate local arrays 
+        allocate(visc_eff_int3D(nx,ny,nz_aa)) 
+        allocate(dudx_aa(nx,ny))
+        allocate(dvdy_aa(nx,ny))
+        allocate(dudy_aa(nx,ny))
+        allocate(dvdx_aa(nx,ny))
+        allocate(tau_par(nx,ny,nz_aa))
+
+        allocate(work1_aa(nx,ny))
+        allocate(work2_aa(nx,ny))
+        allocate(work3_aa(nx,ny))
+        allocate(work4_aa(nx,ny))
+
+        allocate(dw1dx_aa(nx,ny))
+        allocate(dw2dy_aa(nx,ny))
+        allocate(dw3dx_aa(nx,ny))
+        allocate(dw4dy_aa(nx,ny))
+
+        allocate(tau_xz(nx,ny,nz_aa))
+        allocate(tau_yz(nx,ny,nz_aa))
+        allocate(fact_ab(nx,ny))
+
+        ! Calculate scaling factors
+        inv_4dx = 1.0_prec / (4.0_prec*dx) 
+        inv_4dy = 1.0_prec / (4.0_prec*dy) 
+
+        ! Calculate an exponent 
+        p1 = (n_glen-1.0_wp)/2.0_wp
+
+        ! Calculate squared minimum strain rate 
+        eps_0_sq = eps_0*eps_0 
+
+        wt_ab = 1.0 
+        wt = sum(wt_ab)
+        wt_ab = wt_ab / wt 
+
+        ! Step 0: 
+        ! Compute the integral of visc_eff from each layer to the surface (P12, Eq. 28)
+        do j = 1, ny 
+        do i = 1, nx 
+
+            ! Start at the surface
+            zeta_ac1 = zeta_aa(nz_aa)
+            zeta_ac0 = 0.5_wp*(zeta_aa(nz_aa)+zeta_aa(nz_aa-1))
+            visc_eff_int3D(i,j,nz_aa) = visc_eff(i,j,nz_aa) * (zeta_ac1-zeta_ac0)*H_ice(i,j)
+
+            ! Integrate down to near the base 
+            do k = nz_aa-1, 2, -1 
+                zeta_ac1 = 0.5_wp*(zeta_aa(k+1)+zeta_aa(k))
+                zeta_ac0 = 0.5_wp*(zeta_aa(k)+zeta_aa(k-1))
+                visc_eff_int3D(i,j,k) = visc_eff_int3D(i,j,k+1) &
+                                        + visc_eff(i,j,k) * (zeta_ac1-zeta_ac0)*H_ice(i,j)
+            end do 
+            
+            ! Get basal value
+            zeta_ac1 = 0.5_wp*(zeta_aa(2)+zeta_aa(1))
+            zeta_ac0 = zeta_aa(1)
+            visc_eff_int3D(i,j,1) = visc_eff_int3D(i,j,2) &
+                                        + visc_eff(i,j,1) * (zeta_ac1-zeta_ac0)*H_ice(i,j)
+        
+        end do 
+        end do  
+
+        ! Step 1: compute basal strain rates on ab-nodes and viscosity       
+        do j = 1, ny 
+        do i = 1, nx 
+
+            im1 = max(i-1,1) 
+            ip1 = min(i+1,nx) 
+            jm1 = max(j-1,1) 
+            jp1 = min(j+1,ny) 
+
+            ! Calculate effective strain components from horizontal stretching on ab-nodes
+            call staggerdiff_nodes_acx_ab_ice(dudx_ab4,ux_b,f_ice,i,j,dx)
+            call staggerdiff_nodes_acy_ab_ice(dvdy_ab4,uy_b,f_ice,i,j,dy)
+
+            ! Calculate cross terms on ab-nodes
+            call staggerdiffcross_nodes_acx_ab_ice(dudy_ab4,ux_b,f_ice,i,j,dy)
+            call staggerdiffcross_nodes_acy_ab_ice(dvdx_ab4,uy_b,f_ice,i,j,dx)
+            
+            ! Store on aa-nodes for later use 
+            dudx_aa(i,j) = sum(dudx_ab4*wt_ab)
+            dvdy_aa(i,j) = sum(dvdy_ab4*wt_ab)
+            dudy_aa(i,j) = sum(dudy_ab4*wt_ab)
+            dvdx_aa(i,j) = sum(dvdx_ab4*wt_ab)
+            
+
+            ! Calculate the 'parallel' effective strain rate from P12, Eq. 17
+            eps_par_sq4 = dudx_ab4**2 + dvdy_ab4**2 + dudx_ab4*dvdy_ab4 &
+                        + 0.25_wp*(dudy_ab4+dvdx_ab4)**2 + eps_0_sq
+            eps_par4    = sqrt(eps_par_sq4) 
+
+            ! Compute the 'parallel' shear stress for each layer (tau_parallel)
+            do k = 1, nz_aa 
+
+                ! call stagger_nodes_aa_ab_ice(visc_eff_ab4,visc_eff(:,:,k),f_ice,i,j)
+                ! tau_par_ab4 = 2.0_wp * visc_eff_ab4 * eps_par4
+                ! tau_par(i,j,k) = sum(tau_par_ab4*wt_ab)
+
+                tau_par(i,j,k) = 2.0_wp * visc_eff(i,j,k) * sum(eps_par4*wt_ab)
+
+            end do 
+
+            ! Note: above, eps_par and thus tau_par should be zero when no_slip=True 
+            ! and the basal velocity components are zero (effectively zero because eps_0 ensures nonzero value). 
+
+        end do 
+        end do
+
+        ! Loop over layers 
+        do k = 1, nz_aa
+
+            ! Calculate working arrays for this layer (terms in parentheses in
+            ! Perego et al, 2012, Eq. 27)
+            work1_aa = 2.0_wp*visc_eff_int3D(:,:,k) * (2.d0*dudx_aa + dvdy_aa) 
+            work2_aa = 2.0_wp*visc_eff_int3D(:,:,k) * 0.5*(dudy_aa+dvdx_aa)
+            work3_aa = 2.0_wp*visc_eff_int3D(:,:,k) * 0.5*(dudy_aa+dvdx_aa)
+            work4_aa = 2.0_wp*visc_eff_int3D(:,:,k) * (dudx_aa + 2.d0*dvdy_aa)  
+            
+            ! Calculate derivatives of work arrays, first on ab-nodes
+            ! then averaged to aa-nodes. This helps with solver stability
+            ! (eg, to avoid singularities in vel solution for ISMIPHOM-C)
+            do j = 1, ny 
+            do i = 1, nx 
+                 
+                ! Get derivatives on ab-nodes 
+                call staggerdiffx_nodes_aa_ab_ice(dw1dx_ab,work1_aa,f_ice,i,j,dx)
+                call staggerdiffy_nodes_aa_ab_ice(dw2dy_ab,work2_aa,f_ice,i,j,dy)
+                call staggerdiffx_nodes_aa_ab_ice(dw3dx_ab,work3_aa,f_ice,i,j,dx)
+                call staggerdiffy_nodes_aa_ab_ice(dw4dy_ab,work4_aa,f_ice,i,j,dy)
+                
+                ! Get derivatives on aa-nodes 
+                dw1dx_aa(i,j) = sum(dw1dx_ab*wt_ab)
+                dw2dy_aa(i,j) = sum(dw2dy_ab*wt_ab)
+                dw3dx_aa(i,j) = sum(dw3dx_ab*wt_ab)
+                dw4dy_aa(i,j) = sum(dw4dy_ab*wt_ab)
+                
+            end do 
+            end do 
+
+            ! Calcaluate vertical shear stress
+            do j = 1, ny 
+            do i = 1, nx 
+                
+                ! Stagger to acx-nodes 
+                dw1dx = 0.5_wp*(dw1dx_aa(i,j)+dw1dx_aa(ip1,j))
+                dw2dy = 0.5_wp*(dw2dy_aa(i,j)+dw2dy_aa(ip1,j))
+                
+                ! Stagger to acy-nodes 
+                dw1dx = 0.5_wp*(dw3dx_aa(i,j)+dw3dx_aa(i,jp1))
+                dw2dy = 0.5_wp*(dw4dy_aa(i,j)+dw4dy_aa(i,jp1))
+                
+                ! Calculate shear stress on ac-nodes
+                tau_xz(i,j,k) = -(1.0_wp-zeta_aa(k))*taud_acx(i,j) + dw1dx + dw2dy
+                tau_yz(i,j,k) = -(1.0_wp-zeta_aa(k))*taud_acy(i,j) + dw3dx + dw4dy
+
+            end do 
+            end do 
+
+        end do 
+
+        ux = 0.0_wp 
+        uy = 0.0_wp
+
+        ! Assign basal velocity value 
+        ux(:,:,1)    = ux_b 
+        uy(:,:,1)    = uy_b 
+        fact_ab(:,:) = 0.0_prec 
+
+        ! Loop over layers starting from first layer above the base to surface 
+        do k = 2, nz_aa
+
+            dzeta = zeta_aa(k) - zeta_aa(k-1) 
+
+            ! Calculate tau_perp, tau_eff and factor to calculate velocities,
+            ! all on ab-nodes 
+            do i = 1, nx 
+            do j = 1, ny 
+
+                im1 = max(i-1,1) 
+                ip1 = min(i+1,nx) 
+                jm1 = max(j-1,1) 
+                jp1 = min(j+1,ny) 
+
+                ! Calculate effective stress on horizontal ab-nodes and vertical ac-node
+                call stagger_nodes_acx_ab_ice(tau_xz_ab4_up,tau_xz(:,:,k),  f_ice,i,j)
+                call stagger_nodes_acx_ab_ice(tau_xz_ab4_dn,tau_xz(:,:,k-1),f_ice,i,j)
+                tau_xz_ab4 = 0.5_wp*(tau_xz_ab4_up+tau_xz_ab4_dn)
+
+                call stagger_nodes_acy_ab_ice(tau_yz_ab4_up,tau_yz(:,:,k),  f_ice,i,j)
+                call stagger_nodes_acy_ab_ice(tau_yz_ab4_dn,tau_yz(:,:,k-1),f_ice,i,j)
+                tau_yz_ab4 = 0.5_wp*(tau_yz_ab4_up+tau_yz_ab4_dn)
+                
+                call stagger_nodes_aa_ab_ice(tau_par_ab4_up,tau_par(:,:,k),  f_ice,i,j)
+                call stagger_nodes_aa_ab_ice(tau_par_ab4_dn,tau_par(:,:,k-1),f_ice,i,j)
+                tau_par_ab4 = 0.5_wp*(tau_par_ab4_up+tau_par_ab4_dn) 
+
+                tau_eff_sq_ab4 = tau_xz_ab4**2 + tau_yz_ab4**2 + tau_par_ab4**2
+
+                ! Calculate factor to get velocity components
+                call stagger_nodes_aa_ab_ice(ATT_ab4_up,ATT(:,:,k),f_ice,i,j)
+                call stagger_nodes_aa_ab_ice(ATT_ab4_dn,ATT(:,:,k-1),f_ice,i,j)
+                ATT_ab4 = 0.5_wp*(ATT_ab4_up+ATT_ab4_dn)
+
+                ! Get ice thickness
+                call stagger_nodes_aa_ab_ice(H_ice_ab4,H_ice,f_ice,i,j)
+
+                ! Calculate multiplicative factor on ab-nodes
+                if (p1 .ne. 0.0_wp) then 
+                    fact_ab4 = 2.0_prec * ATT_ab4 * (dzeta*H_ice_ab4) * tau_eff_sq_ab4**p1
+                else
+                    fact_ab4 = 2.0_prec * ATT_ab4 * (dzeta*H_ice_ab4)
+                end if 
+
+                ! Calculate 3D horizontal velocity components on acx/acy nodes
+
+                ! stagger factor to acx-nodes to calculate velocity
+                if (f_ice(i,j) .eq. 1.0 .or. f_ice(ip1,j) .eq. 1.0) then 
+                    fact_ac   = 0.5_prec*(fact_ab4(1)+fact_ab4(4))
+                    ux(i,j,k) = ux(i,j,k-1) &
+                                + fact_ac*0.5_wp*(tau_xz(i,j,k)+tau_xz(i,j,k-1))
+                end if 
+
+                ! stagger factor to acy-nodes to calculate velocity
+                if (f_ice(i,j) .eq. 1.0 .or. f_ice(i,jp1) .eq. 1.0) then
+                    fact_ac   = 0.5_prec*(fact_ab4(1)+fact_ab4(2)) 
+                    uy(i,j,k) = uy(i,j,k-1) &
+                                + fact_ac*0.5_wp*(tau_yz(i,j,k)+tau_yz(i,j,k-1))
+                end if 
+
+            end do 
+            end do 
+               
+        end do 
+
+        ! Apply boundary conditions as needed 
+        if (trim(boundaries) .eq. "periodic") then
+
+            ux(1,:,:)    = ux(nx-2,:,:) 
+            ux(nx-1,:,:) = ux(2,:,:) 
+            ux(nx,:,:)   = ux(3,:,:) 
+            ux(:,1,:)    = ux(:,ny-1,:)
+            ux(:,ny,:)   = ux(:,2,:) 
+
+            uy(1,:,:)    = uy(nx-1,:,:) 
+            uy(nx,:,:)   = uy(2,:,:) 
+            uy(:,1,:)    = uy(:,ny-2,:)
+            uy(:,ny-1,:) = uy(:,2,:) 
+            uy(:,ny,:)   = uy(:,3,:)
+
+        else if (trim(boundaries) .eq. "periodic-x") then 
+            
+            ux(1,:,:)    = ux(nx-2,:,:) 
+            ux(nx-1,:,:) = ux(2,:,:) 
+            ux(nx,:,:)   = ux(3,:,:) 
+            ux(:,1,:)    = ux(:,2,:)
+            ux(:,ny,:)   = ux(:,ny-1,:) 
+
+            uy(1,:,:)    = uy(nx-1,:,:) 
+            uy(nx,:,:)   = uy(2,:,:) 
+            uy(:,1,:)    = uy(:,2,:)
+            uy(:,ny-1,:) = uy(:,ny-2,:) 
+            uy(:,ny,:)   = uy(:,ny-1,:)
+
+        else if (trim(boundaries) .eq. "infinite") then 
+            
+            ux(1,:,:)    = ux(2,:,:) 
+            ux(nx-1,:,:) = ux(nx-2,:,:) 
+            ux(nx,:,:)   = ux(nx-1,:,:) 
+            ux(:,1,:)    = ux(:,2,:)
+            ux(:,ny,:)   = ux(:,ny-1,:) 
+
+            uy(1,:,:)    = uy(2,:,:) 
+            uy(nx,:,:)   = uy(nx-1,:,:) 
+            uy(:,1,:)    = uy(:,2,:)
+            uy(:,ny-1,:) = uy(:,ny-2,:) 
+            uy(:,ny,:)   = uy(:,ny-1,:)
+
+        end if 
+
+        return 
+
+    end subroutine calc_vel_horizontal_3D
+
+    subroutine calc_vel_horizontal_3D_0(ux,uy,ux_b,uy_b,taud_acx,taud_acy,visc_eff_ab,ATT,H_ice,zeta_aa,dx,dy,n_glen,eps_0,boundaries)
         ! Caluculate the 3D horizontal velocity field (ux,uy)
         ! for the L1L2 solver following Perego et al. (2012)
         ! and the blueprint by Lipscomb et al. (2019) in CISM
@@ -560,7 +948,7 @@ end if
 
         return 
 
-    end subroutine calc_vel_horizontal_3D
+    end subroutine calc_vel_horizontal_3D_0
 
     subroutine calc_visc_eff_3D(visc_eff,visc_eff_ab,ux_b,uy_b,taud_acx,taud_acy,ATT,H_ice,zeta_aa,dx,dy,n_glen,eps_0,boundaries)
         ! Caluculate the 3D effective viscosity field

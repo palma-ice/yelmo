@@ -252,7 +252,7 @@ end if
 
         ! Calculate the 3D horizontal velocity field
         call calc_vel_horizontal_3D(ux,uy,ux_b,uy_b,taud_acx,taud_acy,visc_eff,ATT,H_ice, &
-                                    f_ice,zeta_aa,zeta_ac,dx,dy,n_glen,par%eps_0,par%boundaries)
+                                    f_ice,zeta_aa,dx,dy,n_glen,par%eps_0,par%boundaries)
         ! call calc_vel_horizontal_3D_0(ux,uy,ux_b,uy_b,taud_acx,taud_acy,visc_eff,visc_eff_ab,ATT,H_ice, &
         !                             f_ice,zeta_aa,zeta_ac,dx,dy,n_glen,par%eps_0,par%boundaries)
 
@@ -275,7 +275,7 @@ end if
     end subroutine calc_velocity_l1l2
 
     subroutine calc_vel_horizontal_3D(ux,uy,ux_b,uy_b,taud_acx,taud_acy, &
-                        visc_eff,ATT,H_ice,f_ice,zeta_aa,zeta_ac, &
+                        visc_eff,ATT,H_ice,f_ice,zeta_aa, &
                         dx,dy,n_glen,eps_0,boundaries)
         ! Caluculate the 3D horizontal velocity field (ux,uy)
         ! for the L1L2 solver following Perego et al. (2012)
@@ -294,7 +294,6 @@ end if
         real(wp), intent(IN)  :: H_ice(:,:)
         real(wp), intent(IN)  :: f_ice(:,:)
         real(wp), intent(IN)  :: zeta_aa(:) 
-        real(wp), intent(IN)  :: zeta_ac(:) 
         real(wp), intent(IN)  :: dx
         real(wp), intent(IN)  :: dy
         real(wp), intent(IN)  :: n_glen   
@@ -370,7 +369,7 @@ end if
         nx    = size(ux,1)
         ny    = size(ux,2) 
         nz_aa = size(ux,3) 
-        nz_ac = size(zeta_ac,1)
+        nz_ac = nz_aa + 1
 
         ! Allocate local arrays 
         allocate(visc_eff_int3D(nx,ny,nz_aa)) 

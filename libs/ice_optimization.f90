@@ -7,6 +7,8 @@ module ice_optimization
     implicit none 
 
     private 
+
+    public :: update_tf_corr_l21
     public :: update_cf_ref_errscaling_l21
     public :: update_cf_ref_errscaling
     public :: update_cf_ref_thickness_ratio
@@ -18,6 +20,106 @@ module ice_optimization
     public :: get_opt_param
 
 contains 
+    
+    subroutine update_tf_corr_l21(tf_corr,H_ice,H_grnd,dHicedt,H_obs,basins,H_grnd_lim, &
+                                    tau_m,m_temp,tf_min,tf_max,dt)
+
+        implicit none 
+
+        real(wp), intent(INOUT) :: tf_corr(:,:) 
+        real(wp), intent(IN)    :: H_ice(:,:)
+        real(wp), intent(IN)    :: H_grnd(:,:)
+        real(wp), intent(IN)    :: dHicedt(:,:)
+        real(wp), intent(IN)    :: H_obs(:,:)
+        real(wp), intent(IN)    :: basins(:,:) 
+        real(wp), intent(IN)    :: H_grnd_lim 
+        real(wp), intent(IN)    :: tau_m 
+        real(wp), intent(IN)    :: m_temp
+        real(wp), intent(IN)    :: tf_min 
+        real(wp), intent(IN)    :: tf_max 
+        real(wp), intent(IN)    :: dt 
+
+        ! Local variables
+        integer :: i, j, nx, ny, n  
+        integer :: b, nb  
+        real(wp) :: f_damp 
+        real(wp) :: H_obs_now 
+        real(wp) :: H_now 
+        real(wp) :: H_err_now 
+        real(wp) :: dHdt_now
+        real(wp) :: tf_corr_dot
+        real(wp), allocatable :: basin_list(:) 
+        logical,  allocatable :: mask(:,:) 
+
+        ! Internal parameters 
+        f_damp = 2.0 
+
+        nx = size(tf_corr,1)
+        ny = size(tf_corr,2) 
+
+        allocate(mask(nx,ny)) 
+
+        ! Determine unique basin numbers 
+        call unique(basin_list,reshape(basins,[nx*ny]))
+        nb = size(basin_list,1) 
+
+        ! Loop over each basin
+        do b = 1, nb 
+            
+            ! Get a mask of points of interest:
+            ! 1. Points within the current basin 
+            ! 2. Points with overburden thickness near flotation
+            mask = basins .eq. basin_list(b) .and. &
+                    abs(H_grnd) .lt. H_grnd_lim 
+
+            ! Calculate averages
+
+            n = count(mask .and. H_obs .gt. 0.0)
+            if (n .gt. 0) then 
+                H_obs_now = sum(H_obs,mask=mask) / real(n,wp)
+            else 
+                H_obs_now = missing_value 
+            end if 
+
+            n = count(mask)
+            if (n .gt. 0) then 
+                H_now    = sum(H_ice,mask=mask) / real(n,wp)
+                dHdt_now = sum(dHicedt,mask=mask) / real(n,wp)
+            else 
+                H_now    = 0.0_wp
+                dHdt_now = 0.0_wp 
+            end if 
+
+            if (H_obs_now .ne. missing_value) then 
+                ! Observed ice exists in basin, proceed with calculations
+                                
+                ! Get mean error for this basin
+                H_err_now = H_now - H_obs_now 
+
+                ! Get adjustment rate given error in ice thickness  =========
+
+                tf_corr_dot = -1.0_wp/(tau_m*m_temp) *( (H_err_now / tau_m) + f_damp*dHdt_now )
+
+                ! Apply correction to all points in basin =========
+
+                where(basins .eq. basin_list(b))
+
+                    tf_corr = tf_corr + tf_corr_dot*dt 
+
+                end where 
+
+            end if 
+
+        end do 
+
+
+        ! Ensure tf_corr is not below lower or upper limit 
+        where (tf_corr .lt. tf_min) tf_corr = tf_min 
+        where (tf_corr .gt. tf_max) tf_corr = tf_max 
+
+        return 
+
+    end subroutine update_tf_corr_l21
 
     subroutine update_cf_ref_errscaling_l21(cf_ref,H_ice,dHdt,z_bed,z_sl,ux,uy,H_obs,uxy_obs,is_float_obs, &
                                         dx,cf_min,cf_max,sigma_err,sigma_vel,tau_c,H0,fill_dist,dt)
@@ -189,7 +291,7 @@ end if
 
         ! Also where no ice exists, set cf_ref = cf_min 
         where(H_obs .eq. 0.0) cf_ref = cf_min 
-        
+
         return 
 
     end subroutine update_cf_ref_errscaling_l21
@@ -966,5 +1068,48 @@ end if
         return 
 
     end function gauss_values
+
+    subroutine unique(xu,x)
+        ! Return only the unique values of a vector
+        ! http://rosettacode.org/wiki/Remove_duplicate_elements#Fortran
+
+        implicit none 
+
+        real(wp), allocatable :: xu(:)      ! The output 
+        real(wp) :: x(:)                    ! The input
+        
+        ! Local variables 
+        integer :: i, j, n
+        real(wp) :: res(size(x))            ! The unique values
+        logical :: found 
+
+        real(wp), parameter :: tol = 1e-5_wp
+        
+        n = 1
+        res(1) = x(1)
+        do i=2,size(x)
+            found = .FALSE.
+            do j=1,n
+                if (abs(res(j)-x(i)) .le. tol) then 
+                   ! Found a match so start looking again
+                   found = .TRUE. 
+                   cycle 
+                end if
+            end do
+            ! No match found so add it to the output
+            if (.not. found) then 
+                n = n + 1
+                res(n) = x(i)
+            end if 
+        end do
+
+        ! Store output in properly sized output vector
+        if(allocated(xu)) deallocate(xu)
+        allocate(xu(n))
+        xu = res(1:n)
+
+        return 
+
+    end subroutine unique
 
 end module ice_optimization

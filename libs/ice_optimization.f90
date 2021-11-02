@@ -40,8 +40,8 @@ contains
         real(wp), intent(IN)    :: dt 
 
         ! Local variables
-        integer :: i, j, nx, ny, n  
-        integer :: b, nb  
+        integer  :: i, j, nx, ny, n  
+        integer  :: b, nb  
         real(wp) :: f_damp 
         real(wp) :: H_obs_now 
         real(wp) :: H_now 
@@ -50,6 +50,8 @@ contains
         real(wp) :: tf_corr_dot
         real(wp), allocatable :: basin_list(:) 
         logical,  allocatable :: mask(:,:) 
+
+        real(wp), parameter :: tol = 1e-5_wp
 
         ! Internal parameters 
         f_damp = 2.0 
@@ -69,18 +71,22 @@ contains
             ! Get a mask of points of interest:
             ! 1. Points within the current basin 
             ! 2. Points with overburden thickness near flotation
-            mask = basins .eq. basin_list(b) .and. &
-                    abs(H_grnd) .lt. H_grnd_lim 
+            ! 3. Points with observed ice thickness present
+            mask =  abs(basins-basin_list(b)) .lt. tol .and. &
+                    abs(H_grnd) .lt. H_grnd_lim .and. & 
+                    H_obs .gt. 0.0 
 
-            ! Calculate averages
+            ! How many points available 
+            n = count(mask)
 
-            n = count(mask .and. H_obs .gt. 0.0)
+            ! Calculate average observed thickness for masked region
             if (n .gt. 0) then 
                 H_obs_now = sum(H_obs,mask=mask) / real(n,wp)
             else 
                 H_obs_now = missing_value 
             end if 
 
+            ! Calculate average thickness and rate of change for masked region
             n = count(mask)
             if (n .gt. 0) then 
                 H_now    = sum(H_ice,mask=mask) / real(n,wp)
@@ -89,7 +95,7 @@ contains
                 H_now    = 0.0_wp
                 dHdt_now = 0.0_wp 
             end if 
-
+            
             if (H_obs_now .ne. missing_value) then 
                 ! Observed ice exists in basin, proceed with calculations
                                 

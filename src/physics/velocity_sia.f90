@@ -68,8 +68,9 @@ contains
         allocate(tau_yz(nx,ny,nz_aa))
 
         ! Define local f_ice 
-        f_ice = 0.0 
-        where(H_ice .gt. 0.0) f_ice = 1.0 
+        !f_ice = 0.0 
+        !where(H_ice .gt. 0.0) f_ice = 1.0 
+        f_ice = 1.0 
         
         ! Calculate diffusivity constant on ab-nodes
         ! call calc_dd_ab_3D_serial(dd_ab,H_ice,taud_acx,taud_acy,ATT,zeta_aa,dx,n_glen,rho_ice,g)

@@ -346,8 +346,36 @@ end if
             uy(:,ny-1,:) = uy(:,2,:) 
             uy(:,ny,:)   = uy(:,3,:)
 
-        end if 
+        else if (trim(boundaries) .eq. "periodic-x") then 
+            
+            ux(1,:,:)    = ux(nx-2,:,:) 
+            ux(nx-1,:,:) = ux(2,:,:) 
+            ux(nx,:,:)   = ux(3,:,:) 
+            ux(:,1,:)    = ux(:,2,:)
+            ux(:,ny,:)   = ux(:,ny-1,:) 
 
+            uy(1,:,:)    = uy(nx-1,:,:) 
+            uy(nx,:,:)   = uy(2,:,:) 
+            uy(:,1,:)    = uy(:,2,:)
+            uy(:,ny-1,:) = uy(:,ny-2,:) 
+            uy(:,ny,:)   = uy(:,ny-1,:)
+
+        else if (trim(boundaries) .eq. "infinite") then 
+            
+            ux(1,:,:)    = ux(2,:,:) 
+            ux(nx-1,:,:) = ux(nx-2,:,:) 
+            ux(nx,:,:)   = ux(nx-1,:,:) 
+            ux(:,1,:)    = ux(:,2,:)
+            ux(:,ny,:)   = ux(:,ny-1,:) 
+
+            uy(1,:,:)    = uy(2,:,:) 
+            uy(nx,:,:)   = uy(nx-1,:,:) 
+            uy(:,1,:)    = uy(:,2,:)
+            uy(:,ny-1,:) = uy(:,ny-2,:) 
+            uy(:,ny,:)   = uy(:,ny-1,:)
+
+        end if 
+        
         return 
 
     end subroutine calc_vel_horizontal_3D
@@ -414,8 +442,36 @@ end if
             duydz(:,ny-1,:) = duydz(:,2,:) 
             duydz(:,ny,:)   = duydz(:,3,:)
 
-        end if 
+        else if (trim(boundaries) .eq. "periodic-x") then 
+                
+            duxdz(1,:,:)    = duxdz(nx-2,:,:) 
+            duxdz(nx-1,:,:) = duxdz(2,:,:) 
+            duxdz(nx,:,:)   = duxdz(3,:,:) 
+            duxdz(:,1,:)    = duxdz(:,2,:)
+            duxdz(:,ny,:)   = duxdz(:,ny-1,:) 
 
+            duydz(1,:,:)    = duydz(nx-1,:,:) 
+            duydz(nx,:,:)   = duydz(2,:,:) 
+            duydz(:,1,:)    = duydz(:,2,:)
+            duydz(:,ny-1,:) = duydz(:,ny-2,:) 
+            duydz(:,ny,:)   = duydz(:,ny-1,:)
+
+        else if (trim(boundaries) .eq. "infinite") then 
+                
+            duxdz(1,:,:)    = duxdz(2,:,:) 
+            duxdz(nx-1,:,:) = duxdz(nx-2,:,:) 
+            duxdz(nx,:,:)   = duxdz(nx-1,:,:) 
+            duxdz(:,1,:)    = duxdz(:,2,:)
+            duxdz(:,ny,:)   = duxdz(:,ny-1,:) 
+
+            duydz(1,:,:)    = duydz(2,:,:) 
+            duydz(nx,:,:)   = duydz(nx-1,:,:) 
+            duydz(:,1,:)    = duydz(:,2,:)
+            duydz(:,ny-1,:) = duydz(:,ny-2,:) 
+            duydz(:,ny,:)   = duydz(:,ny-1,:)
+
+        end if 
+        
         return 
 
     end subroutine calc_vertical_shear_3D
@@ -861,6 +917,34 @@ end if
                 uy_b(:,1)    = uy_b(:,ny-2)
                 uy_b(:,ny-1) = uy_b(:,2) 
                 uy_b(:,ny)   = uy_b(:,3)
+
+            else if (trim(boundaries) .eq. "periodic-x") then 
+                
+                ux_b(1,:)    = ux_b(nx-2,:) 
+                ux_b(nx-1,:) = ux_b(2,:) 
+                ux_b(nx,:)   = ux_b(3,:) 
+                ux_b(:,1)    = ux_b(:,2)
+                ux_b(:,ny)   = ux_b(:,ny-1) 
+
+                uy_b(1,:)    = uy_b(nx-1,:) 
+                uy_b(nx,:)   = uy_b(2,:) 
+                uy_b(:,1)    = uy_b(:,2)
+                uy_b(:,ny-1) = uy_b(:,ny-2) 
+                uy_b(:,ny)   = uy_b(:,ny-1)
+
+            else if (trim(boundaries) .eq. "infinite") then 
+                
+                ux_b(1,:)    = ux_b(2,:) 
+                ux_b(nx-1,:) = ux_b(nx-2,:) 
+                ux_b(nx,:)   = ux_b(nx-1,:) 
+                ux_b(:,1)    = ux_b(:,2)
+                ux_b(:,ny)   = ux_b(:,ny-1) 
+
+                uy_b(1,:)    = uy_b(2,:) 
+                uy_b(nx,:)   = uy_b(nx-1,:) 
+                uy_b(:,1)    = uy_b(:,2)
+                uy_b(:,ny-1) = uy_b(:,ny-2) 
+                uy_b(:,ny)   = uy_b(:,ny-1)
 
             end if 
 

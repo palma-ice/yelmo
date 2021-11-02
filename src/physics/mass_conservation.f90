@@ -195,49 +195,54 @@ contains
 
         select case(trim(boundaries))
 
-            case("zeros")
+            case("zeros","EISMINT")
 
                 ! Set border values to zero
                 H_ice(1,:)  = 0.0
                 H_ice(nx,:) = 0.0
+
                 H_ice(:,1)  = 0.0
                 H_ice(:,ny) = 0.0
 
-            case("periodic") 
+            case("periodic","periodic-xy") 
 
-                H_ice(1,:)  = H_ice(nx-1,:) 
-                H_ice(nx,:) = H_ice(2,:) 
-                H_ice(:,1)  = H_ice(:,ny-1) 
-                H_ice(:,ny) = H_ice(:,2) 
-                
-            case("EISMINT")
+                H_ice(1:2,:)     = H_ice(nx-3:nx-2,:) 
+                H_ice(nx-1:nx,:) = H_ice(2:3,:) 
 
-                ! Set border values to zero
-                H_ice(1,:)  = 0.0
-                H_ice(nx,:) = 0.0
-                H_ice(:,1)  = 0.0
-                H_ice(:,ny) = 0.0
+                H_ice(:,1:2)     = H_ice(:,ny-3:ny-2) 
+                H_ice(:,ny-1:ny) = H_ice(:,2:3) 
+            
+            case("periodic-x") 
+
+                ! Periodic x 
+                H_ice(1:2,:)     = H_ice(nx-3:nx-2,:) 
+                H_ice(nx-1:nx,:) = H_ice(2:3,:) 
                 
+                ! Infinite (free-slip too)
+                H_ice(:,1)  = H_ice(:,2)
+                H_ice(:,ny) = H_ice(:,ny-1)
+
             case("MISMIP3D")
 
                 ! === MISMIP3D =====
                 H_ice(1,:)    = H_ice(2,:)       ! x=0, Symmetry 
                 H_ice(nx,:)   = 0.0              ! x=800km, no ice
+                
                 H_ice(:,1)    = H_ice(:,2)       ! y=-50km, Free-slip condition
                 H_ice(:,ny)   = H_ice(:,ny-1)    ! y= 50km, Free-slip condition
 
             case("infinite")
-                ! ajr: we should check setting border H values equal to inner neighbors
-                
-                call fill_borders_2D(H_ice,nfill=1)
+                ! Set border points equal to inner neighbors 
 
+                call fill_borders_2D(H_ice,nfill=1)
+                
             case DEFAULT 
 
-                write(*,*) "calc_ice_thickness:: error: boundary method not recognized: "//trim(boundaries)
+                write(*,*) "apply_ice_thickness_boundaries:: error: boundary method not recognized: "//trim(boundaries)
                 stop 
 
         end select 
-        
+
         return 
 
     end subroutine calc_ice_thickness

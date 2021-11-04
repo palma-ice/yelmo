@@ -234,7 +234,6 @@
     smooth_H_ice    = True                          ! Smooth ice thickness field at loading time, with sigma=2*dx
 /
 
-
 &yelmo_data 
     pd_topo_load      = True 
     pd_topo_path      = "ice_data/{domain}/{grid_name}/{grid_name}_TOPO.nc"

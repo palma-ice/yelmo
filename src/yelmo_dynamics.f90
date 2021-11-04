@@ -987,7 +987,6 @@ end if
         call nml_read(filename,"ydyn","beta_q",             par%beta_q,             init=init_pars)
         call nml_read(filename,"ydyn","beta_u0",            par%beta_u0,            init=init_pars)
         call nml_read(filename,"ydyn","beta_gl_scale",      par%beta_gl_scale,      init=init_pars)
-        call nml_read(filename,"ydyn","beta_gl_sep",        par%beta_gl_sep,        init=init_pars)
         call nml_read(filename,"ydyn","beta_gl_stag",       par%beta_gl_stag,       init=init_pars)
         call nml_read(filename,"ydyn","beta_gl_f",          par%beta_gl_f,          init=init_pars)
         call nml_read(filename,"ydyn","taud_gl_method",     par%taud_gl_method,     init=init_pars)

@@ -56,6 +56,7 @@
     topo_fixed          = False             ! Keep ice thickness fixed, perform other ytopo calculations
     topo_rel            = 0                 ! 0: No relaxation; 1: relax shelf; 2: relax shelf + gl; 3: all points 
     topo_rel_tau        = 10.0              ! [a] Time scale for relaxation 
+    topo_rel_field      = "H_ref"           ! "H_ref" or "H_ice_n"
     calv_H_lim          = 200.0             ! [m] Calving limit in ice thickness (thinner ice calves)
     calv_tau            = 10.0              ! [a] Characteristic calving time
     calv_thin           = 0.0               ! [m/yr] Calving rate to apply to very thin ice
@@ -213,5 +214,8 @@
     pd_vel_load       = False 
     pd_vel_path       = "none"
     pd_vel_names      = "ux_srf" "uy_srf"            ! Surface velocity 
+    pd_age_load       = False 
+    pd_age_path       = "none"
+    pd_age_names      = "age_iso" "depth_iso"        ! ages of isochrones; depth of isochrones 
 
 /

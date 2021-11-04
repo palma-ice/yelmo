@@ -1,10 +1,14 @@
 
 module nml 
 
+    use, intrinsic :: iso_fortran_env, only : input_unit, output_unit, error_unit
 
     implicit none 
 
-    logical :: VERBOSE = .FALSE. !!  should freshly read namelist be printed to screen?
+    logical :: VERBOSE = .FALSE.            !!  should freshly read namelist be printed to screen?
+    logical :: ERROR_NO_PARAM = .TRUE.      !! Should error be thrown if parameter isn't found? 
+
+    integer, parameter :: io_unit_err = error_unit 
 
     interface nml_read 
         module procedure nml_read_string, nml_read_double, nml_read_float 
@@ -46,7 +50,7 @@ contains
 
         return 
 
-    end subroutine nml_set_verbose 
+    end subroutine nml_set_verbose
 
     subroutine nml_replace(s,text,rep,outs)
         ! Adapted from FUNCTION Replace_Text:
@@ -90,10 +94,12 @@ contains
         character(len=*), intent(IN)    :: filename, group, name 
         character(len=*), intent(INOUT), optional :: comment   
 
+        ! Local variables
         integer :: io, file_unit 
         integer :: iostat, l, ltype 
         character(len=1000) :: line, name1, value1, comment1 
         logical :: ingroup
+        logical :: found_param 
 
         ! Open the nml filename to be read, or get file units if already open
         inquire(file=trim(filename),NUMBER=file_unit)
@@ -111,7 +117,8 @@ contains
         end if 
  
         
-        ingroup = .FALSE. 
+        ingroup     = .FALSE. 
+        found_param = .FALSE. 
 
         do l = 1, 5000
             read(io,"(a1000)",iostat=iostat) line 
@@ -121,8 +128,9 @@ contains
             ! Check if the parameter has been found
             if (ingroup .and. ltype == 3) then 
                 if (trim(name1) == trim(name)) then 
-                    value   = trim(value1)
-                    comment = trim(comment1)
+                    value       = trim(value1)
+                    comment     = trim(comment1)
+                    found_param = .TRUE. 
                     exit 
                 end if 
             end if 
@@ -140,6 +148,14 @@ contains
             ! Close the file that was opened here
             close(io)
         endif
+
+        if (ERROR_NO_PARAM .and. (.not. found_param)) then 
+            write(io_unit_err,*) ""
+            write(io_unit_err,*) "nml:: Error: parameter not found."
+            write(io_unit_err,*) "Filename:  ", trim(filename)
+            write(io_unit_err,*) "Parameter: ", trim(name)
+            stop "Program stopped."
+        end if 
 
         return 
 
@@ -170,7 +186,7 @@ contains
 
         return 
 
-    end subroutine nml_read_string 
+    end subroutine nml_read_string
 
     subroutine nml_read_double(filename,group,name,value,comment,init)
 

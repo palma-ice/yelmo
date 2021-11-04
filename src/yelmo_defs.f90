@@ -842,6 +842,31 @@ contains
         character(len=*), intent(INOUT) :: path 
         character(len=*), intent(IN)    :: domain, grid_name 
 
+        ! Local variables 
+        character(len=1024) :: cwd 
+        character(len=1024) :: rundir 
+        integer :: n0, n1 
+
+        ! 1. Determine current working directory (full path)
+        ! and trim to the directory name (head of the current path)
+
+        call getcwd(cwd)
+        cwd = trim(adjustl(cwd))
+
+        ! Remove trailing slash if present
+        n1 = len_trim(cwd)
+        if (cwd(n1:n1) .eq. "/") then 
+            cwd = cwd(1:n1-1)
+        end if 
+
+        ! Find last slash and extract current directory basename only
+        n0 = scan(cwd,'/',back=.true.) + 1 
+        n1 = len_trim(cwd)
+        rundir = cwd(n0:n1)
+
+        ! 2. Replace keywords as needed
+
+        call nml_replace(path,"{rundir}",   trim(rundir))
         call nml_replace(path,"{domain}",   trim(domain))
         call nml_replace(path,"{grid_name}",trim(grid_name))
         

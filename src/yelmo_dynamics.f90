@@ -353,7 +353,6 @@ contains
 
 
         ! 4. Set other variables to zero that are not treated with this solver =====
-        dyn%now%visc_eff  = 0.0_prec 
         dyn%now%duxdz     = 0.0_prec 
         dyn%now%duydz     = 0.0_prec 
         dyn%now%beta_eff  = 0.0_prec 

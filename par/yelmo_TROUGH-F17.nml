@@ -28,6 +28,7 @@
 &yelmo
     domain          = "TROUGH-F17"
     grid_name       = "TROUGH-F17"
+    grid_path       = "none"
     experiment      = "TROUGH-F17"
     restart         = "no"
     log_timestep    = False 

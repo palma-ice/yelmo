@@ -15,6 +15,7 @@
 &yelmo
     domain          = "MISMIP3D"
     grid_name       = "MISMIP3D"
+    grid_path       = "none"
     experiment      = "MISMIP3D"        ! "None", "EISMINT", "MISMIP3D", "BUELER"  to apply special boundary conditions   
     restart         = "no"
     log_timestep    = False 

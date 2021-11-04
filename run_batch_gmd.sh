@@ -1,6 +1,6 @@
 #!/bin/bash
 
-fldr='tmp/yelmo1.41'
+fldr='tmp/c6faf5b8'
 
 
 ### BENCHMARK TESTS ###
@@ -17,7 +17,7 @@ make benchmarks
 
 # Ensemble of HALFAR simulations with various values of 
 # dx to test numerical convergence with analytical solution
-jobrun ./runylmo -s -e benchmarks -n par-gmd/yelmo_HALFAR.nml -- -o ${fldr}/halfar -p eismint.dx=0.5,1.0,2.0,3.0,4.0,5.0,8.0
+jobrun ./runylmo -s -e benchmarks -n par-gmd/yelmo_HALFAR.nml -- -o ${fldr}/halfar -p ctrl.dx=0.5,1.0,2.0,3.0,4.0,5.0,8.0
 
 # Ensemble of EISMINT1-moving simulations with various values of 
 # dx and pc_eps to test adaptive timestepping
@@ -30,8 +30,8 @@ jobrun ./runylmo -s -e benchmarks -n par-gmd/yelmo_EISMINT_moving.nml -p eismint
 make initmip
 
 # Antarctica present-day and LGM simulations (now with ydyn.solver='diva' by default)
-./runylmo -s -e initmip -o ${fldr}/ant-pd  -n par-gmd/yelmo_Antarctica.nml -p ctrl.clim_nm="clim_pd"
-./runylmo -s -e initmip -o ${fldr}/ant-lgm -n par-gmd/yelmo_Antarctica.nml -p ctrl.clim_nm="clim_lgm"
+./runylmo -s -q short -w 5 -e initmip -o ${fldr}/ant-pd  -n par-gmd/yelmo_Antarctica.nml -p ctrl.clim_nm="clim_pd"
+./runylmo -s -q short -w 5 -e initmip -o ${fldr}/ant-lgm -n par-gmd/yelmo_Antarctica.nml -p ctrl.clim_nm="clim_lgm"
 
 # Or to run via batch call:
 jobrun ./runylmo -s -e initmip -n par-gmd/yelmo_Antarctica.nml -- -a -o ${fldr}/ant -p ctrl.clim_nm="clim_pd","clim_lgm"

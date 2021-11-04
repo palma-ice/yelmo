@@ -90,7 +90,7 @@ $(objdir)/velocity_sia.o: $(srcdir)/physics/velocity_sia.f90 \
 						  	$(objdir)/yelmo_defs.o $(objdir)/velocity_general.o
 	$(FC) $(DFLAGS) $(FFLAGS) -c -o $@ $<
 
-$(objdir)/velocity_hybrid.o: $(srcdir)/physics/velocity_hybrid.f90 \
+$(objdir)/velocity_ssa.o: $(srcdir)/physics/velocity_ssa.f90 \
 						  	$(objdir)/yelmo_defs.o $(objdir)/yelmo_tools.o $(objdir)/basal_dragging.o \
 						  	$(objdir)/solver_ssa_sico5.o $(objdir)/velocity_general.o
 	$(FC) $(DFLAGS) $(FFLAGS) -c -o $@ $<
@@ -104,12 +104,6 @@ $(objdir)/velocity_l1l2.o: $(srcdir)/physics/velocity_l1l2.f90 \
 						  	$(objdir)/yelmo_defs.o $(objdir)/yelmo_tools.o $(objdir)/basal_dragging.o \
 						  	$(objdir)/solver_ssa_sico5.o $(objdir)/velocity_general.o
 	$(FC) $(DFLAGS) $(FFLAGS) -c -o $@ $<
-
-$(objdir)/velocity_hybrid_pd12.o: $(srcdir)/physics/velocity_hybrid_pd12.f90 \
-						  	$(objdir)/yelmo_defs.o $(objdir)/yelmo_tools.o
-	$(FC) $(DFLAGS) $(FFLAGS) -c -o $@ $<
-
-
 
 ## YELMO BASE ###############################################
 
@@ -138,10 +132,9 @@ $(objdir)/yelmo_topography.o: $(srcdir)/yelmo_topography.f90 $(objdir)/yelmo_def
 $(objdir)/yelmo_dynamics.o: $(srcdir)/yelmo_dynamics.f90 $(objdir)/yelmo_defs.o \
 							$(objdir)/velocity_general.o \
 							$(objdir)/velocity_sia.o \
-							$(objdir)/velocity_hybrid.o \
+							$(objdir)/velocity_ssa.o \
 							$(objdir)/velocity_diva.o \
 							$(objdir)/velocity_l1l2.o \
-							$(objdir)/velocity_hybrid_pd12.o \
 							$(objdir)/solver_ssa_sico5.o \
 							$(objdir)/basal_dragging.o
 	$(FC) $(DFLAGS) $(FFLAGS) -c -o $@ $<
@@ -175,7 +168,6 @@ $(objdir)/yelmo_ice.o: $(srcdir)/yelmo_ice.f90 $(objdir)/yelmo_defs.o  \
 				   	   $(objdir)/yelmo_timesteps.o \
 				   	   $(objdir)/yelmo_topography.o \
 	                   $(objdir)/yelmo_dynamics.o \
-	                   $(objdir)/velocity_hybrid_pd12.o \
 	                   $(objdir)/velocity_sia.o \
 	                   $(objdir)/yelmo_material.o \
 	                   $(objdir)/yelmo_thermodynamics.o \
@@ -227,10 +219,9 @@ yelmo_physics =  	   $(objdir)/basal_dragging.o \
 					   $(objdir)/topography.o \
 					   $(objdir)/velocity_general.o \
 					   $(objdir)/velocity_sia.o \
-					   $(objdir)/velocity_hybrid.o \
+					   $(objdir)/velocity_ssa.o \
 					   $(objdir)/velocity_diva.o \
-					   $(objdir)/velocity_l1l2.o \
-					   $(objdir)/velocity_hybrid_pd12.o
+					   $(objdir)/velocity_l1l2.o
 					   
 					   
 

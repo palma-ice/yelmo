@@ -176,26 +176,21 @@ contains
                 !uz_srf = dzsdt(i,j) + ux_aa*dzsdx_aa + uy_aa*dzsdy_aa - smb(i,j) 
                 
                 ! Integrate upward to each point above base until just below surface is reached 
+                ! Integrate on vertical ac-nodes (ie, vertical cell borders between aa-node centers)
                 do k = 2, nz_ac 
 
                     ! Greve and Blatter (2009), Eq. 5.72
                     ! Bueler and Brown  (2009), Eq. 4
-                    if (k .eq. nz_ac) then
-                        call staggerdiff_nodes_acx_ab_ice(duxdx_ab,ux(:,:,k-1),f_ice,i,j,dx)
-                        duxdx_aa = sum(duxdx_ab*wt_ab)
+                    call staggerdiff_nodes_acx_ab_ice(duxdx_ab,ux(:,:,k-1),f_ice,i,j,dx)
+                    duxdx_aa = sum(duxdx_ab*wt_ab)
 
-                        call staggerdiff_nodes_acy_ab_ice(duydy_ab,uy(:,:,k-1),f_ice,i,j,dy)
-                        duydy_aa = sum(duydy_ab*wt_ab)
-                    else
-                        call staggerdiff_nodes_acx_ab_ice(duxdx_ab,ux(:,:,k),  f_ice,i,j,dx)
-                        duxdx_aa = sum(duxdx_ab*wt_ab)
+                    call staggerdiff_nodes_acy_ab_ice(duydy_ab,uy(:,:,k-1),f_ice,i,j,dy)
+                    duydy_aa = sum(duydy_ab*wt_ab) 
 
-                        call staggerdiff_nodes_acy_ab_ice(duydy_ab,uy(:,:,k),  f_ice,i,j,dy)
-                        duydy_aa = sum(duydy_ab*wt_ab)
-                    end if 
-
-                    ! Note: nz_aa = nz_ac - 1
-                    if (k .eq. nz_ac-1) then
+                    ! Get duxdz/duydz values at vertical aa-nodes, in order
+                    ! to vertically integrate each cell up to ac-node border.
+                    ! Note: nz_ac = nz_aa + 1
+                    if (k .eq. 2) then 
                         call stagger_nodes_acx_ab_ice(ux_ab_up,ux(:,:,k),  f_ice,i,j)
                         call stagger_nodes_acx_ab_ice(ux_ab_dn,ux(:,:,k-1),f_ice,i,j)
                         
@@ -208,7 +203,8 @@ contains
                         duydz_ab = (uy_ab_up - uy_ab_dn) / (zeta_aa(k)-zeta_aa(k-1))
                         duydz_aa = sum(duydz_ab*wt_ab)
 
-                    else if (k .eq. nz_ac) then
+                    else if (k .eq. nz_ac) then 
+
                         call stagger_nodes_acx_ab_ice(ux_ab_up,ux(:,:,k-1),f_ice,i,j)
                         call stagger_nodes_acx_ab_ice(ux_ab_dn,ux(:,:,k-2),f_ice,i,j)
                         
@@ -220,22 +216,23 @@ contains
                         
                         duydz_ab = (uy_ab_up - uy_ab_dn) / (zeta_aa(k-1)-zeta_aa(k-2))
                         duydz_aa = sum(duydz_ab*wt_ab)
+
+                    else 
+                        ! Centered on k-1 
+
+                        call stagger_nodes_acx_ab_ice(ux_ab_up,ux(:,:,k),  f_ice,i,j)
+                        call stagger_nodes_acx_ab_ice(ux_ab_dn,ux(:,:,k-2),f_ice,i,j)
                         
-                    else
-                        ! Centered difference vertically
-                        call stagger_nodes_acx_ab_ice(ux_ab_up,ux(:,:,k+1),f_ice,i,j)
-                        call stagger_nodes_acx_ab_ice(ux_ab_dn,ux(:,:,k-1),f_ice,i,j)
-                        
-                        duxdz_ab = (ux_ab_up - ux_ab_dn) / (zeta_aa(k+1)-zeta_aa(k-1))
+                        duxdz_ab = (ux_ab_up - ux_ab_dn) / (zeta_aa(k)-zeta_aa(k-2))
                         duxdz_aa = sum(duxdz_ab*wt_ab)
 
-                        call stagger_nodes_acy_ab_ice(uy_ab_up,uy(:,:,k+1),f_ice,i,j)
-                        call stagger_nodes_acy_ab_ice(uy_ab_dn,uy(:,:,k-1),f_ice,i,j)
+                        call stagger_nodes_acy_ab_ice(uy_ab_up,uy(:,:,k),  f_ice,i,j)
+                        call stagger_nodes_acy_ab_ice(uy_ab_dn,uy(:,:,k-2),f_ice,i,j)
                         
-                        duydz_ab = (uy_ab_up - uy_ab_dn) / (zeta_aa(k+1)-zeta_aa(k-1))
+                        duydz_ab = (uy_ab_up - uy_ab_dn) / (zeta_aa(k)-zeta_aa(k-2))
                         duydz_aa = sum(duydz_ab*wt_ab)
                         
-                    end if 
+                    end if
 
                     ! Calculate sigma-coordinate derivative correction factors
                     ! (Greve and Blatter, 2009, Eqs. 5.131 and 5.132)
@@ -254,7 +251,7 @@ contains
                     ! Apply correction to match kinematic boundary condition at surface 
                     !uz(i,j,k) = uz(i,j,k) - zeta_ac(k)*(uz(i,j,k)-uz_srf)
 
-                    if (abs(uz(i,j,k)) .lt. TOL_UNDERFLOW) uz(i,j,k) = 0.0_prec 
+                    if (abs(uz(i,j,k)) .lt. TOL_UNDERFLOW) uz(i,j,k) = 0.0_wp 
                     
                 end do 
                 
@@ -263,7 +260,7 @@ contains
 
                 do k = 1, nz_ac 
                     uz(i,j,k) = dzbdt - max(smb(i,j),0.0)
-                    if (abs(uz(i,j,k)) .lt. TOL_UNDERFLOW) uz(i,j,k) = 0.0_prec 
+                    if (abs(uz(i,j,k)) .lt. TOL_UNDERFLOW) uz(i,j,k) = 0.0_wp 
                end do 
 
             end if 
@@ -384,14 +381,6 @@ contains
                         call stagger_nodes_acy_ab_ice(uy_ab,uy(:,:,k),f_ice,i,j)
                         uy_aa = sum(uy_ab*wt_ab)
                         
-                    else if (k .eq. nz_ac-1) then  
-                        
-                        call stagger_nodes_acx_ab_ice(ux_ab,ux(:,:,k),f_ice,i,j)
-                        ux_aa = sum(ux_ab*wt_ab)
-                        
-                        call stagger_nodes_acy_ab_ice(uy_ab,uy(:,:,k),f_ice,i,j)
-                        uy_aa = sum(uy_ab*wt_ab)
-                        
                     else if (k .eq. nz_ac) then 
                         
                         call stagger_nodes_acx_ab_ice(ux_ab,ux(:,:,k-1),f_ice,i,j)
@@ -402,13 +391,13 @@ contains
                         
                     else
                         
-                        call stagger_nodes_acx_ab_ice(ux_ab_up,ux(:,:,k+1),f_ice,i,j)
-                        call stagger_nodes_acx_ab_ice(ux_ab_dn,ux(:,:,k),  f_ice,i,j)
+                        call stagger_nodes_acx_ab_ice(ux_ab_up,ux(:,:,k),  f_ice,i,j)
+                        call stagger_nodes_acx_ab_ice(ux_ab_dn,ux(:,:,k-1),f_ice,i,j)
                         ux_ab = 0.5_wp*(ux_ab_up+ux_ab_dn)
                         ux_aa = sum(ux_ab*wt_ab)
                         
-                        call stagger_nodes_acy_ab_ice(uy_ab_up,uy(:,:,k+1),f_ice,i,j)
-                        call stagger_nodes_acy_ab_ice(uy_ab_dn,uy(:,:,k),  f_ice,i,j)
+                        call stagger_nodes_acy_ab_ice(uy_ab_up,uy(:,:,k),  f_ice,i,j)
+                        call stagger_nodes_acy_ab_ice(uy_ab_dn,uy(:,:,k-1),f_ice,i,j)
                         uy_ab = 0.5_wp*(uy_ab_up+uy_ab_dn)
                         uy_aa = sum(uy_ab*wt_ab)
                         
@@ -433,7 +422,7 @@ contains
                     ! (e.g., Greve and Blatter, 2009, Eq. 5.148)
                     uz_star(i,j,k) = uz(i,j,k) + c_x + c_y + c_t 
 
-                    if (abs(uz_star(i,j,k)) .lt. TOL_UNDERFLOW) uz_star(i,j,k) = 0.0_prec 
+                    if (abs(uz_star(i,j,k)) .lt. TOL_UNDERFLOW) uz_star(i,j,k) = 0.0_wp
                     
                 end do 
                 

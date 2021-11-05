@@ -14,7 +14,6 @@ module thermodynamics
     private  
 
     public :: calc_bmb_grounded
-    public :: calc_bmb_grounded_enth
     public :: calc_advec_vertical_column
     public :: calc_advec_horizontal_3D
     public :: calc_advec_horizontal_column
@@ -48,13 +47,8 @@ module thermodynamics
 
 contains
 
-    subroutine calc_bmb_grounded(bmb_grnd,T_prime_b,Q_ice_b_now,Q_b_now,Q_rock_now,f_grnd,rho_ice)
-        ! Calculate everywhere there is at least some grounded ice 
-        ! (centered aa node calculation)
-
-        ! Note: calculated bmb_grounded here as if the ice point is fully grounded, 
-        ! bmb_grnd and bmb_shlf will then be weighted average using f_grnd externally
-        ! (to allow ice topography to evolve with different time steps)
+    subroutine calc_bmb_grounded(bmb_grnd,T_prime_b,Q_ice_b_now,Q_b_now,Q_rock_now,rho_ice)
+        ! Calculate basal mass balance of grounded ice points
 
         implicit none 
         
@@ -63,7 +57,6 @@ contains
         real(prec), intent(IN)  :: Q_ice_b_now       ! [J a-1 m-2] Ice basal heat flux (positive up)
         real(prec), intent(IN)  :: Q_b_now           ! [J a-1 m-2] Basal heat production from friction and strain heating
         real(prec), intent(IN)  :: Q_rock_now        ! [J a-1 m-2] Geothermal heat flux 
-        real(prec), intent(IN)  :: f_grnd            ! [--] Grounded fraction (centered aa node)                 
         real(prec), intent(IN)  :: rho_ice           ! [kg m-3] Ice density 
         
         ! Local variables
@@ -72,81 +65,26 @@ contains
 
         ! Calculate the grounded basal mass balance following 
         ! Cuffey and Patterson (2010), Eq. 9.38 (Page 420)
-        if ( f_grnd .gt. 0.0) then 
-            ! Bed is grounded and temperate, calculate basal mass balance  
-            ! Classic Cuffey and Patterson (2010) formula
-            
-            ! Calculate net energy flux at the base [J a-1 m-2]
-            Q_net = Q_rock_now + Q_b_now - Q_ice_b_now
-            
-            bmb_grnd = -Q_net /(rho_ice*L_ice)
 
-            if (T_prime_b .lt. -1.0_prec .and. bmb_grnd .lt. 0.0_prec) then 
-                ! Only allow melting for a near-temperate base 
-                ! This is a safety-check to prevent strange things from
-                ! happening, mainly during initialization when temperatures
-                ! are not well defined.
-                bmb_grnd = 0.0_prec 
-            end if 
+        ! Calculate net energy flux at the base [J a-1 m-2]
+        Q_net = Q_rock_now + Q_b_now - Q_ice_b_now
+        
+        bmb_grnd = -Q_net /(rho_ice*L_ice)
 
-        else 
-            ! No basal mass change possible if bed is not temperate 
-
+        if (T_prime_b .lt. -1.0_prec .and. bmb_grnd .lt. 0.0_prec) then 
+            ! Only allow melting for a near-temperate base 
+            ! This is a safety-check to prevent strange things from
+            ! happening, mainly during initialization when temperatures
+            ! are not well defined.
             bmb_grnd = 0.0_prec 
-
         end if 
 
         ! Limit small values to avoid underflow errors 
         if (abs(bmb_grnd) .lt. tol) bmb_grnd = 0.0_prec 
-
+                  
         return 
 
     end subroutine calc_bmb_grounded
-
-    elemental subroutine calc_bmb_grounded_enth(bmb_grnd,T_prime_b,omega,Q_ice_b_now,Q_b_now,Q_rock_now,f_grnd,rho_ice)
-        ! Calculate everywhere there is at least some grounded ice 
-        ! (centered aa node calculation)
-
-        ! Note: calculated bmb_grounded here as if the ice point is fully grounded, 
-        ! bmb_grnd and bmb_shlf will then be weighted average using f_grnd externally
-        ! (to allow ice topography to evolve with different time steps)
-
-        implicit none 
-        
-        real(prec), intent(OUT) :: bmb_grnd          ! [m/a ice equiv.] Basal mass balance, grounded
-        real(prec), intent(IN)  :: T_prime_b         ! [K] Basal ice temp relative to pressure melting point (ie T_prime_b=0 K == temperate)
-        real(prec), intent(IN)  :: omega 
-        real(prec), intent(IN)  :: Q_ice_b_now       ! [J a-1 m-2] Conductive heat flux to the base (positive down)
-        real(prec), intent(IN)  :: Q_b_now           ! [J a-1 m-2] Basal heat production from friction and strain heating (postive up)
-        real(prec), intent(IN)  :: Q_rock_now        ! [J a-1 m-2] Geothermal heat flux (positive up)
-        real(prec), intent(IN)  :: f_grnd            ! [--] Grounded fraction (centered aa node)                 
-        real(prec), intent(IN)  :: rho_ice           ! [kg m-3] Ice density 
-        
-        ! Local variables
-        real(prec) :: Q_net  
-        real(prec), parameter :: tol = 1e-5  
-        
-        if (f_grnd .gt. 0.0) then 
-            ! Grounded point 
-
-            ! Calculate net energy flux at the base [J a-1 m-2]
-            Q_net = Q_rock_now + Q_b_now - Q_ice_b_now
-            
-            bmb_grnd = -Q_net /(rho_ice*L_ice)
-
-        else 
-            ! Floating point, no grounded bmb 
-
-            bmb_grnd = 0.0_prec 
-
-        end if 
-
-        ! Limit small values to avoid underflow errors 
-        if (abs(bmb_grnd) .lt. tol) bmb_grnd = 0.0_prec 
-
-        return 
-
-    end subroutine calc_bmb_grounded_enth
 
     subroutine calc_advec_vertical_column(advecz,Q,uz,H_ice,zeta_aa)
         ! Calculate vertical advection term advecz, which enters

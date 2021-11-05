@@ -3,7 +3,7 @@ module ice_enthalpy
 
     use yelmo_defs, only : prec, wp, pi, g, sec_year, rho_ice, rho_sw, rho_w, rho_rock, L_ice  
     use solver_tridiagonal, only : solve_tridiag 
-    use thermodynamics, only : calc_bmb_grounded, calc_bmb_grounded_enth, calc_advec_vertical_column, &
+    use thermodynamics, only : calc_bmb_grounded, calc_advec_vertical_column, &
                                convert_to_enthalpy, convert_from_enthalpy_column
 
     !use interp1D 
@@ -215,16 +215,27 @@ contains
         ! Calculate Q_ice_b for global output 
         Q_ice_b = Q_ice_b_now*1e3/sec_year      ! [J a-1 m-2] => [mW m-2]
 
-        ! Calculate basal mass balance (valid for grounded ice only)
-        call calc_bmb_grounded(bmb_grnd,T_ice(1)-T_pmp(1),Q_ice_b_now,Q_b_now,Q_rock_now,f_grnd,rho_ice)
         
-        ! Include internal melting in bmb_grnd 
+        if (f_grnd .gt. 0.0) then 
+            ! Calculate basal mass balance (valid for grounded ice only)
+
+            call calc_bmb_grounded(bmb_grnd,T_ice(1)-T_pmp(1),Q_ice_b_now,Q_b_now,Q_rock_now,rho_ice)
+        
+        else 
+            ! No grounded bmb allowed for floating ice 
+
+            bmb_grnd = 0.0_wp 
+
+        end if 
+
+        ! Include internal melting in bmb_grnd (allowed for floating ice too)
         bmb_grnd = bmb_grnd - melt_internal 
 
         ! Safety: limit bmb_grnd to reasonable values to avoid problems
         ! (grounded ice melt should be much less than this limit, eg 10 m/yr)
         if (bmb_grnd .gt. bmb_grnd_lim) bmb_grnd = bmb_grnd_lim
 
+        
         ! Finally, calculate the CTS height 
         H_cts = calc_cts_height(enth,T_ice,omega,T_pmp,cp,H_ice,zeta_aa)
 
@@ -663,7 +674,10 @@ contains
         end if 
 
         ! Calculate basal mass balance 
-        call calc_bmb_grounded(bmb_grnd,T_ice(1)-T_pmp(1),Q_ice_b,Q_b,Q_lith,f_grnd,rho_ice) 
+        write(*,*) "calc_enth_column:: routine needs to be updated with Q_rock etc."
+        stop 
+
+        ! call calc_bmb_grounded(bmb_grnd,T_ice(1)-T_pmp(1),Q_ice_b,Q_b,Q_lith,f_grnd,rho_ice) 
 !         call calc_bmb_grounded_enth(bmb_grnd,T_ice(1)-T_pmp(1),omega(1),Q_ice_b,Q_b,Q_lith,f_grnd,rho_ice) 
         
         ! Include internal melting in bmb_grnd 
@@ -1112,9 +1126,12 @@ contains
 !         else
 !             Q_ice_b = 0.0 
 !         end if 
-
+    
         ! Calculate basal mass balance 
-        call calc_bmb_grounded_enth(bmb_grnd,T_ice(1)-T_pmp(1),omega(1),Q_ice_b,Q_b,Q_lith,f_grnd,rho_ice)
+        write(*,*) "calc_enth_column:: routine needs to be updated with Q_rock etc."
+        stop 
+
+        ! call calc_bmb_grounded_enth(bmb_grnd,T_ice(1)-T_pmp(1),omega(1),Q_ice_b,Q_b,Q_lith,f_grnd,rho_ice)
         
         ! Include internal melting in bmb_grnd 
         bmb_grnd = bmb_grnd - melt_internal 

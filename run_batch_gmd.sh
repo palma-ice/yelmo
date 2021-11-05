@@ -72,7 +72,7 @@ jobrun ./runylmo -s -q priority -w 5 -e trough -n par/yelmo_MISMIP+.nml -- -o ${
 
 
 # F17
-./runylmo -s -e trough -o ${fldr}/trough -n par/yelmo_TROUGH-F17.nml
+./runylmo -s -e trough -n par/yelmo_TROUGH-F17.nml -o ${fldr}/trough
 
 ### AGE TESTS ###
 

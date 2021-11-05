@@ -16,7 +16,7 @@ program yelmo_mismip
     character(len=56)  :: domain, grid_name  
     character(len=256) :: outfldr, file2D, file1D, file_restart
     character(len=512) :: path_par, path_const 
-    character(len=56)  :: experiment, exp_now, res  
+    character(len=56)  :: experiment, res  
     real(prec) :: time_init, time_end, time, dtt, dt2D_out   
     integer    :: n  
 
@@ -72,7 +72,7 @@ program yelmo_mismip
         ! When to apply time modifications
         time_mod_1 = 15000.0   ! Switch from Stnd => P75S
         time_mod_2 = 15100.0   ! Switch back from P75S => Stnd 
-        time_end   = time_mod_2 + 200.0 
+        time_end   = time_mod_2 + 1000.0 
 
         !time_mod_1 = 20000.0
         !time_mod_2 = time_mod_1
@@ -183,13 +183,75 @@ program yelmo_mismip
         ! Get current time 
         time = time_init + n*dtt
 
-        ! ajr: P75S is broken following changes to basal dragging formulation, 2019-07-24
-!         if (trim(experiment) .eq. "P75S") then 
-!             ! Set C_bed externally and perturb it following P75S scaling (Pattyn et al, 2012)
-!             yelmo1%dyn%par%Cb_method = -1 
-!             yelmo1%dyn%now%C_bed = yelmo1%dyn%par%cf_stream 
-!             call perturb_C_bed(yelmo1%dyn%now%C_bed,yelmo1%grd%x*1e-3,yelmo1%grd%y*1e-3,x_gl=x_gl_stnd)
-!         end if
+        select case(trim(experiment))
+
+            case("RF")
+                ! Simply step rate factor every ATT_dt amount of time 
+
+                if (time .gt. ATT_time+ATT_dt) then
+                    q_att = min(q_att+1,n_att)
+                    yelmo1%mat%par%rf_const = ATT_values(q_att)
+                    ATT_time = time
+                end if 
+
+            case("RF-converge")
+                ! Apply convergence criteria to step rate factor 
+
+                is_converged = .FALSE. 
+                err = sqrt(sum(yelmo1%tpo%now%dHicedt**2)/yelmo1%grd%npts)
+                if (err .lt. 1e-2) is_converged =.TRUE. 
+
+                if (time .gt. ATT_time+ATT_dt) then 
+                    ! Ensure minimum time per step has been reached before checking convergence
+
+                    write(*,*) "err: ", time, ATT_time, err, yelmo1%mat%par%rf_const, q_att 
+                
+                    if (is_converged .and. q_att == n_att) then 
+                        ! If output timestep also reached,
+                        ! then time to kill simulation 
+                        if (mod(time,dt2D_out)==0) exit_loop = .TRUE. 
+                    else if (is_converged) then
+                        ! Time to step ATT_value 
+                        q_att = min(q_att+1,n_att)
+                        yelmo1%mat%par%rf_const = ATT_values(q_att)
+                        ATT_time = time 
+                        dt2D_out = 500.0
+                    end if   
+
+                end if 
+
+            case("Stnd")
+                ! Stnd + P75S 
+
+                ! Define grounding line at moment of P75S perturbation
+                if (time .eq. time_mod_1) x_gl_stnd = x_gl 
+
+                if (time .le. time_mod_1) then
+                    ! Stnd conditions - no perturbation 
+
+                    yelmo1%dyn%par%cb_method = -1
+                    yelmo1%dyn%now%cf_ref = yelmo1%dyn%par%cf_stream 
+
+                else if (time .le. time_mod_2) then 
+                    ! P75S conditions - Gaussian friction perturbation 
+
+                    yelmo1%dyn%par%cb_method = -1 
+                    yelmo1%dyn%now%cf_ref = yelmo1%dyn%par%cf_stream 
+                    call perturb_friction(yelmo1%dyn%now%cf_ref,yelmo1%grd%x*1e-3,yelmo1%grd%y*1e-3,x_gl=x_gl_stnd)
+            
+                else
+                    ! Return to Stnd conditions - no perturbation 
+
+                    yelmo1%dyn%par%cb_method = -1
+                    yelmo1%dyn%now%cf_ref = yelmo1%dyn%par%cf_stream 
+
+                end if 
+
+                ! Ensure high-resolution output during perturbation phase 
+                if (time .gt. time_mod_1-50.0) dt2D_out = 10.0 
+                
+        end select  
+
 
 
         ! == Yelmo ice sheet ===================================================
@@ -198,58 +260,8 @@ program yelmo_mismip
         x_gl = find_x_gl(yelmo1%grd%x*1e-3,yelmo1%grd%y*1e-3,yelmo1%tpo%now%H_grnd)
         
         ! == Update boundaries 
-            
-        if (trim(experiment) .eq. "RF") then 
-
-            exp_now = "RF" 
-
-            is_converged = .FALSE. 
-            err = sqrt(sum(yelmo1%tpo%now%dHicedt**2)/yelmo1%grd%npts)
-            if (err .lt. 1e-2) is_converged =.TRUE. 
-
-if (.FALSE.) then 
-    ! Apply convergence criteria to step rate factor 
-
-            if (time .gt. ATT_time+ATT_dt) then 
-                ! Ensure minimum time per step has been reached before checking convergence
-
-                write(*,*) "err: ", time, ATT_time, err, yelmo1%mat%par%rf_const, q_att 
-            
-                if (is_converged .and. q_att == n_att) then 
-                    ! If output timestep also reached,
-                    ! then time to kill simulation 
-                    if (mod(time,dt2D_out)==0) exit_loop = .TRUE. 
-                else if (is_converged) then
-                    ! Time to step ATT_value 
-                    q_att = min(q_att+1,n_att)
-                    yelmo1%mat%par%rf_const = ATT_values(q_att)
-                    ATT_time = time 
-                    dt2D_out = 500.0
-                end if   
-
-            end if 
-
-else
-    ! Simply step rate factor every ATT_dt amount of time 
-
-            if (time .gt. ATT_time+ATT_dt) then
-                q_att = min(q_att+1,n_att)
-                yelmo1%mat%par%rf_const = ATT_values(q_att)
-                ATT_time = time
-            end if 
-
-end if 
-
-        else ! Stnd + P75S 
-            exp_now = trim(experiment)
-            if (time .gt. time_mod_1) exp_now = "P75S"
-            if (time .gt. time_mod_2) exp_now = trim(experiment)
-            if (time .gt. time_mod_1-50.0) dt2D_out = 10.0 
-            if (time .eq. time_mod_1) x_gl_stnd = x_gl 
-
-        end if  
-
-        call mismip3D_boundaries(yelmo1%bnd%T_srf,yelmo1%bnd%smb,yelmo1%bnd%Q_geo,experiment=exp_now)
+        
+        call mismip3D_boundaries(yelmo1%bnd%T_srf,yelmo1%bnd%smb,yelmo1%bnd%Q_geo,experiment=experiment)
 
         ! == MODEL OUTPUT =======================================================
         if (mod(nint(time*100),nint(dt2D_out*100))==0) then  
@@ -258,7 +270,7 @@ end if
 
         if (mod(nint(time*100),nint((5.0*dtt)*100))==0) then
             write(*,"(a,2f14.4,a10,g14.3,f10.2)") "time = ",  &
-                time, maxval(yelmo1%tpo%now%H_ice), trim(exp_now), yelmo1%mat%par%rf_const, x_gl 
+                time, maxval(yelmo1%tpo%now%H_ice), trim(experiment), yelmo1%mat%par%rf_const, x_gl 
         end if 
 
         if (exit_loop) exit 

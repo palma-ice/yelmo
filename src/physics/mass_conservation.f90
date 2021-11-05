@@ -341,11 +341,11 @@ contains
             case("MISMIP3D")
 
                 ! === MISMIP3D =====
-                H_ice_new(1,:)    = H_ice_new(2,:)       ! x=0, Symmetry 
-                H_ice_new(nx,:)   = 0.0              ! x=800km, no ice
+                H_ice_new(1,:)    = H_ice_new(2,:)          ! x=0, Symmetry 
+                H_ice_new(nx,:)   = 0.0                     ! x=800km, no ice
                 
-                H_ice_new(:,1)    = H_ice_new(:,2)       ! y=-50km, Free-slip condition
-                H_ice_new(:,ny)   = H_ice_new(:,ny-1)    ! y= 50km, Free-slip condition
+                H_ice_new(:,1)    = H_ice_new(:,2)          ! y=-50km, Free-slip condition
+                H_ice_new(:,ny)   = H_ice_new(:,ny-1)       ! y= 50km, Free-slip condition
 
             case("infinite")
                 ! Set border points equal to inner neighbors 

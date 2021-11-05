@@ -69,14 +69,7 @@ contains
         ! By default, fractional cover will be determined
         get_fractional_cover = .TRUE. 
         if (present(flt_subgrid)) get_fractional_cover = flt_subgrid 
-
-        ! ajr: see if we can avoid this without relying on "boundaries"
-        ! if (trim(boundaries) .eq. "MISMIP3D") then
-        !     ! Do not use f_ice treatment for MISMIP3D, it is problematic
-        !     ! at the domain boundaries.
-        !     get_fractional_cover = .FALSE. 
-        ! end if 
-
+        
         ! For ice-covered points with ice-free neighbors (ie, at the floating or grounded margin),
         ! determine the fraction of grid point that should be ice covered. 
 

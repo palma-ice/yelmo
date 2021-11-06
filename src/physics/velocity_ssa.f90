@@ -7,7 +7,8 @@ module velocity_ssa
                     stagger_nodes_aa_ab_ice, stagger_nodes_acx_ab_ice, stagger_nodes_acy_ab_ice, &
                     staggerdiff_nodes_acx_ab_ice, staggerdiff_nodes_acy_ab_ice, &
                     staggerdiffcross_nodes_acx_ab_ice, staggerdiffcross_nodes_acy_ab_ice, &
-                    integrate_trapezoid1D_1D, integrate_trapezoid1D_pt, minmax
+                    integrate_trapezoid1D_1D, integrate_trapezoid1D_pt, minmax, &
+                    set_boundaries_2D_aa 
 
     use basal_dragging 
     use solver_ssa_sico5 
@@ -401,29 +402,31 @@ end if
         end do 
         end do 
 
-        ! Apply boundary conditions as needed 
-        if (trim(boundaries) .eq. "periodic") then
+        ! Apply boundary conditions as needed
+        call set_boundaries_2D_aa(visc_eff_int,boundaries) 
+        
+        ! if (trim(boundaries) .eq. "periodic") then
 
-            visc_eff_int(1,:)    = visc_eff_int(nx-1,:) 
-            visc_eff_int(nx-1,:) = visc_eff_int(2,:) 
-            visc_eff_int(:,1)    = visc_eff_int(:,ny-1)
-            visc_eff_int(:,ny)   = visc_eff_int(:,2) 
+        !     visc_eff_int(1,:)    = visc_eff_int(nx-1,:) 
+        !     visc_eff_int(nx-1,:) = visc_eff_int(2,:) 
+        !     visc_eff_int(:,1)    = visc_eff_int(:,ny-1)
+        !     visc_eff_int(:,ny)   = visc_eff_int(:,2) 
 
-        else if (trim(boundaries) .eq. "periodic-x") then 
+        ! else if (trim(boundaries) .eq. "periodic-x") then 
             
-            visc_eff_int(1,:)    = visc_eff_int(nx-1,:) 
-            visc_eff_int(nx-1,:) = visc_eff_int(2,:) 
-            visc_eff_int(:,1)    = visc_eff_int(:,2)
-            visc_eff_int(:,ny)   = visc_eff_int(:,ny-1) 
+        !     visc_eff_int(1,:)    = visc_eff_int(nx-1,:) 
+        !     visc_eff_int(nx-1,:) = visc_eff_int(2,:) 
+        !     visc_eff_int(:,1)    = visc_eff_int(:,2)
+        !     visc_eff_int(:,ny)   = visc_eff_int(:,ny-1) 
 
-        else if (trim(boundaries) .eq. "infinite") then 
+        ! else if (trim(boundaries) .eq. "infinite") then 
             
-            visc_eff_int(1,:)    = visc_eff_int(2,:) 
-            visc_eff_int(nx,:)   = visc_eff_int(nx-1,:) 
-            visc_eff_int(:,1)    = visc_eff_int(:,2)
-            visc_eff_int(:,ny)   = visc_eff_int(:,ny-1) 
+        !     visc_eff_int(1,:)    = visc_eff_int(2,:) 
+        !     visc_eff_int(nx,:)   = visc_eff_int(nx-1,:) 
+        !     visc_eff_int(:,1)    = visc_eff_int(:,2)
+        !     visc_eff_int(:,ny)   = visc_eff_int(:,ny-1) 
 
-        end if 
+        ! end if 
 
         return
 

@@ -10,7 +10,7 @@ module yelmo_thermodynamics
     use thermodynamics 
     use ice_enthalpy
     use solver_advection, only : calc_advec2D  
-    use velocity_general, only : calc_uz_advec_corr_3D
+    use velocity_general, only : calc_uz_advec_corr_3D, calc_uz_advec_corr_3D_aa
 
     implicit none
     
@@ -172,7 +172,6 @@ end select
                     call calc_uz_advec_corr_3D(thrm%now%uz_star,dyn%now%uz,dyn%now%ux,dyn%now%uy,tpo%now%f_ice,bnd%z_bed,tpo%now%z_srf, &
                                             tpo%now%dzsrfdt,thrm%par%z%zeta_aa,thrm%par%z%zeta_ac,thrm%par%dx,thrm%par%dx)
                     
-
                     ! Now calculate the thermodynamics:
 
                     call calc_ytherm_enthalpy_3D(thrm%now%enth,thrm%now%T_ice,thrm%now%omega,thrm%now%bmb_grnd,thrm%now%Q_ice_b, &

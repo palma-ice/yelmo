@@ -2,7 +2,8 @@ module yelmo_tools
     ! Generic functions and subroutines that could be used in many contexts:
     ! math, vectors, sorting, etc. 
 
-    use yelmo_defs, only : sp, dp, wp, prec, missing_value, TOL_UNDERFLOW, pi
+    use yelmo_defs, only : sp, dp, wp, prec, missing_value, TOL_UNDERFLOW, pi, &
+                            io_unit_err
     
     implicit none 
 
@@ -53,6 +54,8 @@ module yelmo_tools
 
     public :: mean_mask
     public :: minmax
+
+    public :: set_boundaries_2D_aa
     public :: fill_borders_2D
     public :: fill_borders_3D 
     
@@ -2614,30 +2617,8 @@ contains
             ip1 = min(nx,i+1)
             jp1 = min(ny,j+1)
 
-            if (f_ice(i,j) .eq. 1.0_wp) then 
-                H0 = var(i,j) 
-            else 
-                H0 = 0.0_wp 
-            end if 
-
-            ! Slope in x-direction
-            if (f_ice(ip1,j) .eq. 1.0_wp) then 
-                H1 = var(ip1,j) 
-            else 
-                H1 = 0.0_wp 
-            end if 
-            
-            dvardx(i,j) = (H1-H0)/dx 
-
-  
-            ! Slope in y-direction
-            if (f_ice(i,jp1) .eq. 1.0_wp) then 
-                H1 = var(i,jp1) 
-            else 
-                H1 = 0.0_wp 
-            end if 
-            
-            dvardy(i,j) = (H1-H0)/dy 
+            dvardx(i,j) = (var(ip1,j)-var(i,j))/dx 
+            dvardy(i,j) = (var(i,jp1)-var(i,j))/dy 
 
         end do 
         end do 
@@ -2920,6 +2901,80 @@ contains
         return 
 
     end subroutine minmax
+
+    subroutine set_boundaries_2D_aa(var,boundaries,var_ref)
+
+        implicit none 
+
+        real(wp), intent(INOUT) :: var(:,:) 
+        character(len=*), intent(IN) :: boundaries 
+        real(wp), intent(IN), optional :: var_ref(:,:) 
+
+        ! Local variables 
+        integer :: nx, ny  
+
+        nx = size(var,1) 
+        ny = size(var,2) 
+
+        select case(trim(boundaries))
+
+            case("zeros","EISMINT")
+
+                ! Set border values to zero
+                var(1,:)  = 0.0
+                var(nx,:) = 0.0
+
+                var(:,1)  = 0.0
+                var(:,ny) = 0.0
+
+            case("periodic","periodic-xy") 
+
+                var(1:2,:)     = var(nx-3:nx-2,:) 
+                var(nx-1:nx,:) = var(2:3,:) 
+
+                var(:,1:2)     = var(:,ny-3:ny-2) 
+                var(:,ny-1:ny) = var(:,2:3) 
+            
+            case("periodic-x") 
+
+                ! Periodic x 
+                var(1:2,:)     = var(nx-3:nx-2,:) 
+                var(nx-1:nx,:) = var(2:3,:) 
+                
+                ! Infinite (free-slip too)
+                var(:,1)  = var(:,2)
+                var(:,ny) = var(:,ny-1)
+
+            case("MISMIP3D")
+
+                ! === MISMIP3D =====
+                var(1,:)    = var(2,:)          ! x=0, Symmetry 
+                var(nx,:)   = 0.0               ! x=800km, no ice
+                
+                var(:,1)    = var(:,2)          ! y=-50km, Free-slip condition
+                var(:,ny)   = var(:,ny-1)       ! y= 50km, Free-slip condition
+
+            case("infinite")
+                ! Set border points equal to inner neighbors 
+
+                call fill_borders_2D(var,nfill=1)
+
+            case("fixed") 
+                ! Set border points equal to prescribed values from array
+
+                call fill_borders_2D(var,nfill=1,fill=var_ref)
+
+            case DEFAULT 
+
+                write(io_unit_err,*) "set_boundaries_2D_aa:: error: boundary method not recognized."
+                write(io_unit_err,*) "boundaries = ", trim(boundaries)
+                stop 
+
+        end select 
+
+        return
+
+    end subroutine set_boundaries_2D_aa
 
     subroutine fill_borders_2D(var,nfill,fill)
 

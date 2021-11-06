@@ -354,7 +354,7 @@ contains
                 ! Binary (grounded elevation or floating elevation via archemedes)
                 ! Note: two functions that should give the same results
                 
-                !call calc_z_srf(tpo%now%z_srf,tpo%now%H_ice,tpo%now%H_grnd,bnd%z_bed,bnd%z_sl)
+                !call calc_z_srf(tpo%now%z_srf,tpo%now%H_ice,tpo%now%f_ice,tpo%now%H_grnd,bnd%z_bed,bnd%z_sl)
                 call calc_z_srf_max(tpo%now%z_srf,tpo%now%H_ice,tpo%now%f_ice,bnd%z_bed,bnd%z_sl)
             
             case(1)

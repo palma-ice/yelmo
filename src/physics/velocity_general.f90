@@ -13,6 +13,8 @@ module velocity_general
     private 
     public :: calc_uz_3D
     public :: calc_uz_advec_corr_3D
+    public :: calc_uz_3D_aa
+    public :: calc_uz_advec_corr_3D_aa
     public :: calc_driving_stress
     public :: calc_driving_stress_gl
     public :: set_inactive_margins
@@ -577,16 +579,18 @@ contains
 
                     ! Greve and Blatter (2009), Eq. 5.72
                     ! Bueler and Brown  (2009), Eq. 4
-                    if (k .eq. nz_ac) then 
-                        duxdx_aa  = (ux(i,j,k-1)   - ux(im1,j,k-1)  )/dx
-                        duydy_aa  = (uy(i,j,k-1)   - uy(i,jm1,k-1)  )/dy
-                    else
-                        duxdx_aa  = (ux(i,j,k)   - ux(im1,j,k)  )/dx
-                        duydy_aa  = (uy(i,j,k)   - uy(i,jm1,k)  )/dy
-                    end if 
+                    ! if (k .eq. nz_ac) then 
+                    !     duxdx_aa  = (ux(i,j,k-1)   - ux(im1,j,k-1)  )/dx
+                    !     duydy_aa  = (uy(i,j,k-1)   - uy(i,jm1,k-1)  )/dy
+                    ! else
+                    !     duxdx_aa  = (ux(i,j,k)   - ux(im1,j,k)  )/dx
+                    !     duydy_aa  = (uy(i,j,k)   - uy(i,jm1,k)  )/dy
+                    ! end if 
+                    duxdx_aa  = (ux(i,j,k-1)   - ux(im1,j,k-1)  )/dx
+                    duydy_aa  = (uy(i,j,k-1)   - uy(i,jm1,k-1)  )/dy
 
-                    ! Note: nz_aa = nz_ac - 1
-                    if (k .eq. nz_ac-1) then
+                    ! Note: nz_ac = nz_aa + 1
+                    if (k .eq. 2) then
                         duxdz_aa  = ( 0.5*(ux(i,j,k)+ux(im1,j,k)) &
                             - 0.5*(ux(i,j,k-1)+ux(im1,j,k-1)) ) / (zeta_aa(k)-zeta_aa(k-1))
                         duydz_aa  = ( 0.5*(uy(i,j,k)+uy(i,jm1,k)) &
@@ -597,11 +601,11 @@ contains
                         duydz_aa  = ( 0.5*(uy(i,j,k-1)+uy(i,jm1,k-1)) &
                             - 0.5*(uy(i,j,k-2)+uy(i,jm1,k-2)) ) / (zeta_aa(k-1)-zeta_aa(k-2))
                     else
-                        ! Centered difference vertically
-                        duxdz_aa  = ( 0.5*(ux(i,j,k+1)+ux(im1,j,k+1)) &
-                            - 0.5*(ux(i,j,k-1)+ux(im1,j,k-1)) ) / (zeta_aa(k+1)-zeta_aa(k-1))
-                        duydz_aa  = ( 0.5*(uy(i,j,k+1)+uy(i,jm1,k+1)) &
-                            - 0.5*(uy(i,j,k-1)+uy(i,jm1,k-1)) ) / (zeta_aa(k+1)-zeta_aa(k-1))
+                        ! Centered difference vertically, centered on k-1
+                        duxdz_aa  = ( 0.5*(ux(i,j,k)+ux(im1,j,k)) &
+                            - 0.5*(ux(i,j,k-2)+ux(im1,j,k-2)) ) / (zeta_aa(k)-zeta_aa(k-2))
+                        duydz_aa  = ( 0.5*(uy(i,j,k)+uy(i,jm1,k)) &
+                            - 0.5*(uy(i,j,k-2)+uy(i,jm1,k-2)) ) / (zeta_aa(k)-zeta_aa(k-2))
                     end if 
 
                     ! Calculate sigma-coordinate derivative correction factors
@@ -726,15 +730,12 @@ contains
                     if (k .eq. 1) then 
                         ux_aa = 0.5_wp* (ux(im1,j,k) + ux(i,j,k))
                         uy_aa = 0.5_wp* (uy(i,jm1,k) + uy(i,j,k))
-                    else if (k .eq. nz_ac-1) then  
-                        ux_aa = 0.5_wp* (ux(im1,j,k) + ux(i,j,k))
-                        uy_aa = 0.5_wp* (uy(i,jm1,k) + uy(i,j,k))
-                    else if (k .eq. nz_ac) then 
+                    else if (k .eq. nz_ac) then  
                         ux_aa = 0.5_wp* (ux(im1,j,k-1) + ux(i,j,k-1))
                         uy_aa = 0.5_wp* (uy(i,jm1,k-1) + uy(i,j,k-1))
                     else
-                        ux_aa = 0.25_wp* (ux(im1,j,k) + ux(i,j,k) + ux(im1,j,k+1) + ux(i,j,k+1))
-                        uy_aa = 0.25_wp* (uy(i,jm1,k) + uy(i,j,k) + uy(i,jm1,k+1) + uy(i,j,k+1))
+                        ux_aa = 0.25_wp* (ux(im1,j,k) + ux(i,j,k) + ux(im1,j,k-1) + ux(i,j,k-1))
+                        uy_aa = 0.25_wp* (uy(i,jm1,k) + uy(i,j,k) + uy(i,jm1,k-1) + uy(i,j,k-1))
                     end if 
 
                     ! Calculate sigma-coordinate derivative correction factors

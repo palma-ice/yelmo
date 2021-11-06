@@ -22,6 +22,7 @@
 
 module ncio
 
+    use ieee_arithmetic
     use netcdf
 
     implicit none
@@ -381,6 +382,8 @@ contains
         integer, optional :: iostat
         integer :: i, status
 
+        double precision, parameter :: missing_value_default = -9999.0
+
         ! Open the file.
         call nc_check_open(filename, ncid, nf90_nowrite, nc_id)
 
@@ -440,6 +443,15 @@ contains
         if (.not. present(ncid)) call nc_check( nf90_close(nc_id) )
 
         if (v%missing_set) then
+
+            ! === SPECIAL CASE: missing_value == NaN ==== 
+
+            ! Replace NaNs with internal missing value to avoid crashes
+            where ( ieee_is_nan(dat) ) dat = missing_value_default
+            v%missing_value = missing_value_default 
+
+            ! ===========================================
+            
             where( dabs(dat-v%missing_value) .gt. NC_TOL ) dat = dat*v%scale_factor + v%add_offset
 
             ! Fill with user-desired missing value

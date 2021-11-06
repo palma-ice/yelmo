@@ -409,30 +409,7 @@ end if
 
         ! Apply boundary conditions as needed
         call set_boundaries_2D_aa(visc_eff_int,boundaries) 
-
-        ! if (trim(boundaries) .eq. "periodic") then
-
-        !     visc_eff_int(1,:)    = visc_eff_int(nx-1,:) 
-        !     visc_eff_int(nx-1,:) = visc_eff_int(2,:) 
-        !     visc_eff_int(:,1)    = visc_eff_int(:,ny-1)
-        !     visc_eff_int(:,ny)   = visc_eff_int(:,2) 
-
-        ! else if (trim(boundaries) .eq. "periodic-x") then 
-            
-        !     visc_eff_int(1,:)    = visc_eff_int(nx-1,:) 
-        !     visc_eff_int(nx-1,:) = visc_eff_int(2,:) 
-        !     visc_eff_int(:,1)    = visc_eff_int(:,2)
-        !     visc_eff_int(:,ny)   = visc_eff_int(:,ny-1) 
-
-        ! else if (trim(boundaries) .eq. "infinite") then 
-            
-        !     visc_eff_int(1,:)    = visc_eff_int(2,:) 
-        !     visc_eff_int(nx,:)   = visc_eff_int(nx-1,:) 
-        !     visc_eff_int(:,1)    = visc_eff_int(:,2)
-        !     visc_eff_int(:,ny)   = visc_eff_int(:,ny-1) 
-
-        ! end if 
-
+        
         return
 
     end subroutine calc_visc_eff_int

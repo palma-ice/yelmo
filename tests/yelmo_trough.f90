@@ -88,7 +88,7 @@ program yelmo_trough
 
     ! Load boundary values
 
-    yelmo1%bnd%z_sl     = -10000.0
+    yelmo1%bnd%z_sl     = 0.0
     yelmo1%bnd%bmb_shlf = 0.0 
     yelmo1%bnd%T_shlf   = T0  
     yelmo1%bnd%H_sed    = 0.0 

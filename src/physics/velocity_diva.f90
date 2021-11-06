@@ -5,7 +5,8 @@ module velocity_diva
                     stagger_nodes_aa_ab_ice, stagger_nodes_acx_ab_ice, stagger_nodes_acy_ab_ice, &
                     staggerdiff_nodes_acx_ab_ice, staggerdiff_nodes_acy_ab_ice, &
                     staggerdiffcross_nodes_acx_ab_ice, staggerdiffcross_nodes_acy_ab_ice, &
-                    integrate_trapezoid1D_1D, integrate_trapezoid1D_pt, minmax
+                    integrate_trapezoid1D_1D, integrate_trapezoid1D_pt, minmax, &
+                    set_boundaries_2D_aa, set_boundaries_3D_aa
 
     use basal_dragging 
     use solver_ssa_sico5 
@@ -184,8 +185,8 @@ contains
                 case(1) 
                     ! Calculate effective viscosity, using velocity solution from previous iteration
                     
-                    call calc_visc_eff_3D(visc_eff,ux_bar,uy_bar,duxdz,duydz,ATT,H_ice,f_ice, &
-                                                                zeta_aa,dx,dy,n_glen,par%eps_0)
+                    call calc_visc_eff_3D(visc_eff,ux_bar,uy_bar,duxdz,duydz,ATT,H_ice,f_ice,zeta_aa, &
+                                                            dx,dy,n_glen,par%eps_0,par%boundaries)
 
                 case DEFAULT 
 
@@ -285,7 +286,7 @@ end if
             call calc_basal_stress(taub_acx,taub_acy,beta_eff_acx,beta_eff_acy,ux_bar,uy_bar)
 
             ! Calculate basal velocity from depth-averaged solution and basal stress
-            call calc_vel_basal(ux_b,uy_b,ux_bar,uy_bar,F2,taub_acx,taub_acy,H_ice,f_ice,par%no_slip,par%boundaries)
+            call calc_vel_basal(ux_b,uy_b,ux_bar,uy_bar,F2,taub_acx,taub_acy,H_ice,f_ice,par%no_slip)
 
             ! Exit iterations if ssa solution has converged
             if (is_converged) exit 
@@ -544,13 +545,27 @@ end if
             duydz(:,ny-1,:) = duydz(:,ny-2,:) 
             duydz(:,ny,:)   = duydz(:,ny-1,:)
 
+        else if (trim(boundaries) .eq. "MISMIP3D") then 
+
+            duxdz(1,:,:)    = duxdz(2,:,:) 
+            duxdz(nx-1,:,:) = duxdz(nx-2,:,:) 
+            duxdz(nx,:,:)   = duxdz(nx-1,:,:) 
+            duxdz(:,1,:)    = duxdz(:,2,:)
+            duxdz(:,ny,:)   = duxdz(:,ny-1,:) 
+
+            duydz(1,:,:)    = duydz(2,:,:) 
+            duydz(nx,:,:)   = duydz(nx-1,:,:) 
+            duydz(:,1,:)    = duydz(:,2,:)
+            duydz(:,ny-1,:) = duydz(:,ny-2,:) 
+            duydz(:,ny,:)   = duydz(:,ny-1,:)
+            
         end if 
 
         return 
 
     end subroutine calc_vertical_shear_3D
 
-    subroutine calc_visc_eff_3D(visc_eff,ux,uy,duxdz,duydz,ATT,H_ice,f_ice,zeta_aa,dx,dy,n_glen,eps_0)
+    subroutine calc_visc_eff_3D(visc_eff,ux,uy,duxdz,duydz,ATT,H_ice,f_ice,zeta_aa,dx,dy,n_glen,eps_0,boundaries)
         ! Calculate 3D effective viscosity following L19, Eq. 2
         ! Use of eps_0 ensures non-zero positive viscosity value everywhere 
         ! Note: viscosity is first calculated on ab-nodes, then 
@@ -572,7 +587,8 @@ end if
         real(wp), intent(IN)  :: dy
         real(wp), intent(IN)  :: n_glen   
         real(wp), intent(IN)  :: eps_0                  ! [1/yr] Regularization constant (minimum strain rate, ~1e-6)
-        
+        character(len=*), intent(IN) :: boundaries 
+
         ! Local variables 
         integer  :: i, j, k
         integer  :: ip1, jp1, im1, jm1 
@@ -675,6 +691,9 @@ end if
         end do  
         end do 
 
+        ! Set boundaries 
+        call set_boundaries_3D_aa(visc_eff,boundaries)
+
         return 
 
     end subroutine calc_visc_eff_3D
@@ -700,7 +719,6 @@ end if
         nx = size(visc_eff_int,1)
         ny = size(visc_eff_int,2)
 
-
         do j = 1, ny 
         do i = 1, nx
 
@@ -717,29 +735,8 @@ end if
         end do 
         end do 
 
-        ! Apply boundary conditions as needed 
-        if (trim(boundaries) .eq. "periodic") then
-
-            visc_eff_int(1,:)    = visc_eff_int(nx-1,:) 
-            visc_eff_int(nx-1,:) = visc_eff_int(2,:) 
-            visc_eff_int(:,1)    = visc_eff_int(:,ny-1)
-            visc_eff_int(:,ny)   = visc_eff_int(:,2) 
-
-        else if (trim(boundaries) .eq. "periodic-x") then 
-            
-            visc_eff_int(1,:)    = visc_eff_int(nx-1,:) 
-            visc_eff_int(nx-1,:) = visc_eff_int(2,:) 
-            visc_eff_int(:,1)    = visc_eff_int(:,2)
-            visc_eff_int(:,ny)   = visc_eff_int(:,ny-1) 
-
-        else if (trim(boundaries) .eq. "infinite") then 
-            
-            visc_eff_int(1,:)    = visc_eff_int(2,:) 
-            visc_eff_int(nx,:)   = visc_eff_int(nx-1,:) 
-            visc_eff_int(:,1)    = visc_eff_int(:,2)
-            visc_eff_int(:,ny)   = visc_eff_int(:,ny-1) 
-
-        end if 
+        ! Apply boundary conditions as needed
+        call set_boundaries_2D_aa(visc_eff_int,boundaries) 
 
         return
 
@@ -859,7 +856,7 @@ end if
 
     end subroutine calc_beta_eff
 
-    subroutine calc_vel_basal(ux_b,uy_b,ux_bar,uy_bar,F2,taub_acx,taub_acy,H_ice,f_ice,no_slip,boundaries)
+    subroutine calc_vel_basal(ux_b,uy_b,ux_bar,uy_bar,F2,taub_acx,taub_acy,H_ice,f_ice,no_slip)
         ! Calculate basal sliding following Goldberg (2011), Eq. 34
         ! (or it can also be obtained from L19, Eq. 32 given ub*beta=taub)
 
@@ -875,7 +872,6 @@ end if
         real(wp), intent(IN)  :: H_ice(:,:)
         real(wp), intent(IN)  :: f_ice(:,:)
         logical,    intent(IN)  :: no_slip
-        character(len=*), intent(IN) :: boundaries 
 
         ! Local variables 
         integer    :: i, j, nx, ny 
@@ -933,50 +929,7 @@ end if
             end do 
             end do  
 
-            ! Apply boundary conditions as needed 
-            if (trim(boundaries) .eq. "periodic") then 
-
-                ux_b(1,:)    = ux_b(nx-2,:) 
-                ux_b(nx-1,:) = ux_b(2,:) 
-                ux_b(nx,:)   = ux_b(3,:) 
-                ux_b(:,1)    = ux_b(:,ny-1)
-                ux_b(:,ny)   = ux_b(:,2) 
-                
-                uy_b(1,:)    = uy_b(nx-1,:) 
-                uy_b(nx,:)   = uy_b(2,:) 
-                uy_b(:,1)    = uy_b(:,ny-2)
-                uy_b(:,ny-1) = uy_b(:,2) 
-                uy_b(:,ny)   = uy_b(:,3)
-
-            else if (trim(boundaries) .eq. "periodic-x") then 
-                
-                ux_b(1,:)    = ux_b(nx-2,:) 
-                ux_b(nx-1,:) = ux_b(2,:) 
-                ux_b(nx,:)   = ux_b(3,:) 
-                ux_b(:,1)    = ux_b(:,2)
-                ux_b(:,ny)   = ux_b(:,ny-1) 
-
-                uy_b(1,:)    = uy_b(nx-1,:) 
-                uy_b(nx,:)   = uy_b(2,:) 
-                uy_b(:,1)    = uy_b(:,2)
-                uy_b(:,ny-1) = uy_b(:,ny-2) 
-                uy_b(:,ny)   = uy_b(:,ny-1)
-
-            else if (trim(boundaries) .eq. "infinite") then 
-                
-                ux_b(1,:)    = ux_b(2,:) 
-                ux_b(nx-1,:) = ux_b(nx-2,:) 
-                ux_b(nx,:)   = ux_b(nx-1,:) 
-                ux_b(:,1)    = ux_b(:,2)
-                ux_b(:,ny)   = ux_b(:,ny-1) 
-
-                uy_b(1,:)    = uy_b(2,:) 
-                uy_b(nx,:)   = uy_b(nx-1,:) 
-                uy_b(:,1)    = uy_b(:,2)
-                uy_b(:,ny-1) = uy_b(:,ny-2) 
-                uy_b(:,ny)   = uy_b(:,ny-1)
-
-            end if 
+            ! No treatment of boundary conditions needed since ux_b/uy_b are derived.
 
         end if 
 

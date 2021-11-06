@@ -63,7 +63,8 @@ contains
 
         ! Initially set all points to True 
         mask = .TRUE. 
-        
+    
+if (.FALSE.) then 
         do j = 1, ny 
         do i = 1, nx
 
@@ -111,6 +112,8 @@ contains
 
         end do 
         end do  
+
+end if 
 
         return 
 

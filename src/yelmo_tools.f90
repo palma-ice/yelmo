@@ -57,6 +57,9 @@ module yelmo_tools
 
     public :: set_boundaries_2D_aa
     public :: set_boundaries_3D_aa
+    public :: set_boundaries_2D_acx
+    public :: set_boundaries_2D_acy 
+
     public :: fill_borders_2D
     public :: fill_borders_3D 
     
@@ -3030,82 +3033,111 @@ contains
 
     end subroutine set_boundaries_3D_aa
 
-    subroutine set_boundaries_2D_acx(var,boundaries,var_ref)
+    subroutine set_boundaries_2D_acx(var_acx,boundaries)
 
         implicit none 
 
-        real(wp), intent(INOUT) :: var(:,:) 
+        real(wp), intent(INOUT) :: var_acx(:,:) 
         character(len=*), intent(IN) :: boundaries 
-        real(wp), intent(IN), optional :: var_ref(:,:) 
 
         ! Local variables 
         integer :: nx, ny  
 
-        nx = size(var,1) 
-        ny = size(var,2) 
-
-        write(*,*) "TO DO! set_boundaries_2D_acx"
-        stop 
+        nx = size(var_acx,1) 
+        ny = size(var_acx,2) 
 
         select case(trim(boundaries))
 
-            case("zeros","EISMINT")
+            case("periodic") 
 
-                ! Set border values to zero
-                var(1,:)  = 0.0
-                var(nx,:) = 0.0
-
-                var(:,1)  = 0.0
-                var(:,ny) = 0.0
-
-            case("periodic","periodic-xy") 
-
-                var(1:2,:)     = var(nx-3:nx-2,:) 
-                var(nx-1:nx,:) = var(2:3,:) 
-
-                var(:,1:2)     = var(:,ny-3:ny-2) 
-                var(:,ny-1:ny) = var(:,2:3) 
-            
+                var_acx(1,:)    = var_acx(nx-2,:) 
+                var_acx(nx-1,:) = var_acx(2,:) 
+                var_acx(nx,:)   = var_acx(3,:) 
+                var_acx(:,1)    = var_acx(:,ny-1)
+                var_acx(:,ny)   = var_acx(:,2) 
+                
             case("periodic-x") 
-
-                ! Periodic x 
-                var(1:2,:)     = var(nx-3:nx-2,:) 
-                var(nx-1:nx,:) = var(2:3,:) 
                 
-                ! Infinite (free-slip too)
-                var(:,1)  = var(:,2)
-                var(:,ny) = var(:,ny-1)
+                var_acx(1,:)    = var_acx(nx-2,:) 
+                var_acx(nx-1,:) = var_acx(2,:) 
+                var_acx(nx,:)   = var_acx(3,:) 
+                var_acx(:,1)    = var_acx(:,2)
+                var_acx(:,ny)   = var_acx(:,ny-1) 
 
-            case("MISMIP3D")
-
-                ! === MISMIP3D =====
-                var(1,:)    = var(2,:)          ! x=0, Symmetry 
-                var(nx,:)   = 0.0               ! x=800km, no ice
+            case("infinite") 
                 
-                var(:,1)    = var(:,2)          ! y=-50km, Free-slip condition
-                var(:,ny)   = var(:,ny-1)       ! y= 50km, Free-slip condition
+                var_acx(1,:)    = var_acx(2,:) 
+                var_acx(nx-1,:) = var_acx(nx-2,:) 
+                var_acx(nx,:)   = var_acx(nx-1,:) 
+                var_acx(:,1)    = var_acx(:,2)
+                var_acx(:,ny)   = var_acx(:,ny-1) 
 
-            case("infinite")
-                ! Set border points equal to inner neighbors 
-
-                call fill_borders_2D(var,nfill=1)
-
-            case("fixed") 
-                ! Set border points equal to prescribed values from array
-
-                call fill_borders_2D(var,nfill=1,fill=var_ref)
-
-            case DEFAULT 
-
-                write(io_unit_err,*) "set_boundaries_2D_acx:: error: boundary method not recognized."
-                write(io_unit_err,*) "boundaries = ", trim(boundaries)
-                stop 
+            case("MISMIP3D") 
+                
+                var_acx(1,:)    = var_acx(2,:) 
+                var_acx(nx-1,:) = var_acx(nx-2,:) 
+                var_acx(nx,:)   = var_acx(nx-1,:) 
+                var_acx(:,1)    = var_acx(:,2)
+                var_acx(:,ny)   = var_acx(:,ny-1) 
 
         end select 
 
-        return
+        return 
 
     end subroutine set_boundaries_2D_acx
+
+    subroutine set_boundaries_2D_acy(var_acy,boundaries)
+
+        implicit none 
+
+        real(wp), intent(INOUT) :: var_acy(:,:) 
+        character(len=*), intent(IN) :: boundaries 
+
+        ! Local variables 
+        integer :: nx, ny  
+
+        nx = size(var_acy,1) 
+        ny = size(var_acy,2) 
+
+        select case(trim(boundaries))
+
+            case("periodic") 
+
+                var_acy(1,:)    = var_acy(nx-1,:) 
+                var_acy(nx,:)   = var_acy(2,:) 
+                var_acy(:,1)    = var_acy(:,ny-2)
+                var_acy(:,ny-1) = var_acy(:,2) 
+                var_acy(:,ny)   = var_acy(:,3)
+
+            case("periodic-x") 
+                
+                var_acy(1,:)    = var_acy(nx-1,:) 
+                var_acy(nx,:)   = var_acy(2,:) 
+                var_acy(:,1)    = var_acy(:,2)
+                var_acy(:,ny-1) = var_acy(:,ny-2) 
+                var_acy(:,ny)   = var_acy(:,ny-1)
+
+            case("infinite") 
+                
+                var_acy(1,:)    = var_acy(2,:) 
+                var_acy(nx,:)   = var_acy(nx-1,:) 
+                var_acy(:,1)    = var_acy(:,2)
+                var_acy(:,ny-1) = var_acy(:,ny-2) 
+                var_acy(:,ny)   = var_acy(:,ny-1)
+
+            case("MISMIP3D") 
+                
+                var_acy(1,:)    = var_acy(2,:) 
+                var_acy(nx,:)   = var_acy(nx-1,:) 
+                var_acy(:,1)    = var_acy(:,2)
+                var_acy(:,ny-1) = var_acy(:,ny-2) 
+                var_acy(:,ny)   = var_acy(:,ny-1)
+
+        end select 
+
+        return 
+
+    end subroutine set_boundaries_2D_acy
 
     subroutine fill_borders_2D(var,nfill,fill)
 

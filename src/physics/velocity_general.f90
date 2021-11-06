@@ -6,7 +6,9 @@ module velocity_general
                     stagger_nodes_aa_ab_ice, stagger_nodes_acx_ab_ice, stagger_nodes_acy_ab_ice, &
                     staggerdiff_nodes_acx_ab_ice, staggerdiff_nodes_acy_ab_ice, &
                     staggerdiffx_nodes_aa_ab_ice, staggerdiffy_nodes_aa_ab_ice, &
-                    integrate_trapezoid1D_1D, integrate_trapezoid1D_pt, minmax
+                    integrate_trapezoid1D_1D, integrate_trapezoid1D_pt, minmax, &
+                    set_boundaries_2D_aa, set_boundaries_3D_aa, &
+                    set_boundaries_2D_acx, set_boundaries_2D_acy
 
     implicit none 
 
@@ -52,8 +54,7 @@ contains
 
         ! Local variables 
         integer :: i, j, k, nx, ny, nz_aa, nz_ac
-        integer :: im1, ip1, jm1, jp1
-        integer :: im2, jm2    
+        integer :: im1, ip1, jm1, jp1   
         real(prec) :: H_now
         real(prec) :: H_inv
         real(prec) :: dzbdx_aa
@@ -90,6 +91,8 @@ contains
         real(wp) :: duxdz_ab(4) 
         real(wp) :: duydz_ab(4) 
         
+        real(wp), allocatable :: z_base(:,:) 
+
         real(prec), parameter :: dzbdt        = 0.0     ! For posterity, keep dzbdt variable, but set to zero 
         real(prec), parameter :: uz_min       = -10.0   ! [m/yr] Minimum allowed vertical velocity downwards for stability
         
@@ -97,6 +100,14 @@ contains
         ny    = size(ux,2)
         nz_aa = size(zeta_aa,1)
         nz_ac = size(zeta_ac,1) 
+
+        allocate(z_base(nx,ny)) 
+
+        ! Define z_base as the elevation at the base of the ice sheet 
+        ! This is used for the basal derivative instead of bedrock so
+        ! that it is valid for both grounded and floating ice. Note, 
+        ! for grounded ice, z_base==z_bed. 
+        z_base = z_srf - H_ice
 
         ! Initialize vertical velocity to zero 
         uz = 0.0 
@@ -116,9 +127,6 @@ contains
             jm1 = max(j-1,1)
             jp1 = min(j+1,ny)
             
-            im2 = max(i-2,1)
-            jm2 = max(j-2,1) 
-
             if (f_ice(i,j) .eq. 1.0) then
 
                 ! Get weighted ice thickness for stability
@@ -128,11 +136,11 @@ contains
                 H_now  = H_ice(i,j) 
                 H_inv = 1.0/H_now 
 
-                ! Get the centered bedrock gradient
-                call staggerdiffx_nodes_aa_ab_ice(dzbdx_ab,z_bed,f_ice,i,j,dx)
+                ! Get the centered ice-base gradient
+                call staggerdiffx_nodes_aa_ab_ice(dzbdx_ab,z_base,f_ice,i,j,dx)
                 dzbdx_aa = sum(dzbdx_ab*wt_ab)
                 
-                call staggerdiffy_nodes_aa_ab_ice(dzbdy_ab,z_bed,f_ice,i,j,dy)
+                call staggerdiffy_nodes_aa_ab_ice(dzbdy_ab,z_base,f_ice,i,j,dy)
                 dzbdy_aa = sum(dzbdy_ab*wt_ab)
                 
                 ! Get the centered surface gradient 
@@ -275,7 +283,7 @@ contains
 
     end subroutine calc_uz_3D
 
-    subroutine calc_uz_advec_corr_3D(uz_star,uz,ux,uy,f_ice,z_bed,z_srf,dzsdt,zeta_aa,zeta_ac,dx,dy)
+    subroutine calc_uz_advec_corr_3D(uz_star,uz,ux,uy,H_ice,f_ice,f_grnd,z_bed,z_srf,dzsdt,zeta_aa,zeta_ac,dx,dy)
         ! Following algorithm outlined by the Glimmer ice sheet model:
         ! https://www.geos.ed.ac.uk/~mhagdorn/glide/glide-doc/glimmer_htmlse9.html#x17-660003.1.5
 
@@ -288,7 +296,9 @@ contains
         real(prec), intent(IN)  :: uz(:,:,:)        ! nx,ny,nz_ac
         real(prec), intent(IN)  :: ux(:,:,:)        ! nx,ny,nz_aa
         real(prec), intent(IN)  :: uy(:,:,:)        ! nx,ny,nz_aa
+        real(prec), intent(IN)  :: H_ice(:,:)
         real(prec), intent(IN)  :: f_ice(:,:)
+        real(prec), intent(IN)  :: f_grnd(:,:)
         real(prec), intent(IN)  :: z_bed(:,:) 
         real(prec), intent(IN)  :: z_srf(:,:) 
         real(prec), intent(IN)  :: dzsdt(:,:) 
@@ -323,12 +333,22 @@ contains
         real(wp) :: uy_ab_dn(4) 
         real(wp) :: uy_ab(4)
 
+        real(wp), allocatable :: z_base(:,:) 
+
         real(prec), parameter :: dzbdt = 0.0   ! For posterity, keep dzbdt variable, but set to zero 
 
         nx    = size(ux,1)
         ny    = size(ux,2)
         nz_aa = size(zeta_aa,1)
-        nz_ac = size(zeta_ac,1) 
+        nz_ac = size(zeta_ac,1)
+
+        allocate(z_base(nx,ny)) 
+
+        ! Define z_base as the elevation at the base of the ice sheet 
+        ! This is used for the basal derivative instead of bedrock so
+        ! that it is valid for both grounded and floating ice. Note, 
+        ! for grounded ice, z_base==z_bed. 
+        z_base = z_srf - H_ice
 
         ! Initialize adjusted vertical velocity to zero 
         uz_star = 0.0 
@@ -350,13 +370,13 @@ contains
             
             if (f_ice(i,j) .eq. 1.0) then
 
-                ! Get the centered bedrock gradient
-                call staggerdiffx_nodes_aa_ab_ice(dzbdx_ab,z_bed,f_ice,i,j,dx)
+                ! Get the centered ice-base gradient
+                call staggerdiffx_nodes_aa_ab_ice(dzbdx_ab,z_base,f_ice,i,j,dx)
                 dzbdx_aa = sum(dzbdx_ab*wt_ab)
                 
-                call staggerdiffy_nodes_aa_ab_ice(dzbdy_ab,z_bed,f_ice,i,j,dy)
+                call staggerdiffy_nodes_aa_ab_ice(dzbdy_ab,z_base,f_ice,i,j,dy)
                 dzbdy_aa = sum(dzbdy_ab*wt_ab)
-                
+
                 ! Get the centered surface gradient 
                 call staggerdiffx_nodes_aa_ab_ice(dzsdx_ab,z_srf,f_ice,i,j,dx)
                 dzsdx_aa = sum(dzsdx_ab*wt_ab)
@@ -476,8 +496,7 @@ contains
 
         ! Local variables 
         integer :: i, j, k, nx, ny, nz_aa, nz_ac
-        integer :: im1, ip1, jm1, jp1
-        integer :: im2, jm2    
+        integer :: im1, ip1, jm1, jp1    
         real(prec) :: H_now
         real(prec) :: H_inv
         real(prec) :: dzbdx_aa
@@ -521,9 +540,6 @@ contains
             jm1 = max(j-1,1)
             jp1 = min(j+1,ny)
             
-            im2 = max(i-2,1)
-            jm2 = max(j-2,1) 
-
             if (f_ice(i,j) .eq. 1.0) then
 
                 ! Get weighted ice thickness for stability
@@ -858,35 +874,9 @@ contains
         where(abs(taud_acx) .gt. taud_lim) taud_acx = sign(taud_lim,taud_acx)
         where(abs(taud_acy) .gt. taud_lim) taud_acy = sign(taud_lim,taud_acy)
         
-        if (trim(boundaries) .eq. "periodic") then 
-
-            taud_acx(1,:)    = taud_acx(nx-2,:) 
-            taud_acx(nx-1,:) = taud_acx(2,:) 
-            taud_acx(nx,:)   = taud_acx(3,:) 
-            taud_acx(:,1)    = taud_acx(:,ny-1)
-            taud_acx(:,ny)   = taud_acx(:,2) 
-
-            taud_acy(1,:)    = taud_acy(nx-1,:) 
-            taud_acy(nx,:)   = taud_acy(2,:) 
-            taud_acy(:,1)    = taud_acy(:,ny-2)
-            taud_acy(:,ny-1) = taud_acy(:,2) 
-            taud_acy(:,ny)   = taud_acy(:,3)
-
-        else if (trim(boundaries) .eq. "infinite") then 
-
-            taud_acx(1,:)    = taud_acx(2,:) 
-            taud_acx(nx-1,:) = taud_acx(nx-2,:) 
-            taud_acx(nx,:)   = taud_acx(nx-2,:) 
-            taud_acx(:,1)    = taud_acx(:,2)
-            taud_acx(:,ny)   = taud_acx(:,ny-1) 
-
-            taud_acy(1,:)    = taud_acy(2,:) 
-            taud_acy(nx,:)   = taud_acy(nx-1,:) 
-            taud_acy(:,1)    = taud_acy(:,2)
-            taud_acy(:,ny-1) = taud_acy(:,ny-2) 
-            taud_acy(:,ny)   = taud_acy(:,ny-2)
-
-        end if 
+        ! Apply boundary conditions 
+        call set_boundaries_2D_acx(taud_acx,boundaries)
+        call set_boundaries_2D_acy(taud_acy,boundaries)
 
         return 
 

@@ -3025,10 +3025,20 @@ contains
         ny = size(var,2) 
         nz = size(var,3) 
 
-        do k = 1, nz 
-            call set_boundaries_2D_aa(var(:,:,k),boundaries,var_ref(:,:,k))
-        end do 
+        if (present(var_ref)) then
 
+            do k = 1, nz 
+                call set_boundaries_2D_aa(var(:,:,k),boundaries,var_ref(:,:,k))
+            end do 
+        
+        else 
+        
+            do k = 1, nz 
+                call set_boundaries_2D_aa(var(:,:,k),boundaries)
+            end do 
+        
+        end if 
+        
         return
 
     end subroutine set_boundaries_3D_aa

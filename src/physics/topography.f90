@@ -249,26 +249,23 @@ contains
 
         ! Local variables 
         real(prec) :: rho_ice_sw
-        real(wp)   :: H_now 
-        
+        real(wp)   :: H_eff 
+
         rho_ice_sw = rho_ice/rho_sw ! Ratio of density of ice to seawater [--]
         
-        if (f_ice .eq. 1.0_wp) then 
-            H_now = H_ice 
-        else 
-            H_now = 0.0_wp 
-        end if 
-        
+        ! Get effective ice thickness
+        call calc_H_eff(H_eff,H_ice,f_ice,set_frac_zero=.TRUE.)
+
         ! Update the surface elevation based on z_bed, H_ice and overburden ice thickness 
         if (H_grnd .gt. 0.0) then 
             ! Grounded ice or ice-free land
 
-            z_srf = z_bed + H_now 
+            z_srf = z_bed + H_eff 
 
         else
             ! Floating ice or open ocean
 
-            z_srf = z_sl + (1.0-rho_ice_sw)*H_now
+            z_srf = z_sl + (1.0-rho_ice_sw)*H_eff
 
         end if 
         
@@ -291,7 +288,7 @@ contains
         ! Local variables
         integer :: i, j, nx, ny 
         real(prec) :: rho_ice_sw
-        real(prec) :: H_now 
+        real(prec) :: H_eff
 
         nx = size(z_srf,1) 
         ny = size(z_srf,2) 
@@ -301,14 +298,11 @@ contains
         do j = 1, ny 
         do i = 1, nx 
 
-            if (f_ice(i,j) .eq. 1.0_wp) then 
-                H_now = H_ice(i,j) 
-            else 
-                H_now = 0.0_wp 
-            end if 
+            ! Get effective ice thickness
+            call calc_H_eff(H_eff,H_ice(i,j),f_ice(i,j),set_frac_zero=.TRUE.)
 
             ! Initially calculate surface elevation everywhere 
-            z_srf(i,j) = max(z_bed(i,j) + H_now, z_sl(i,j) + (1.0-rho_ice_sw)*H_now)
+            z_srf(i,j) = max(z_bed(i,j) + H_eff, z_sl(i,j) + (1.0-rho_ice_sw)*H_eff)
         
         end do 
         end do 
@@ -439,7 +433,7 @@ contains
         
     end subroutine calc_z_srf_subgrid_area
 
-    elemental subroutine calc_H_eff(H_eff,H_ice,f_ice)
+    elemental subroutine calc_H_eff(H_eff,H_ice,f_ice,set_frac_zero)
         ! Calculate ice-thickness, scaled at margins to actual thickness
         ! but as if it covered the whole grid cell.
         
@@ -448,6 +442,7 @@ contains
         real(prec), intent(OUT) :: H_eff 
         real(prec), intent(IN)  :: H_ice 
         real(prec), intent(IN)  :: f_ice 
+        logical,    intent(IN), optional :: set_frac_zero 
 
         if (f_ice .gt. 0.0) then 
             H_eff = H_ice / f_ice
@@ -455,6 +450,10 @@ contains
             H_eff = H_ice 
         end if
 
+        if (present(set_frac_zero)) then 
+            if (set_frac_zero .and. f_ice .lt. 1.0) H_eff = 0.0_wp 
+        end if 
+        
         return
 
     end subroutine calc_H_eff
@@ -476,18 +475,15 @@ contains
 
         ! Local variables   
         real(wp) :: rho_sw_ice 
-        real(wp) :: H_now 
+        real(wp) :: H_eff 
 
         rho_sw_ice = rho_sw/rho_ice ! Ratio of density of seawater to ice [--]
         
-        if (f_ice .eq. 1.0_wp) then 
-            H_now = H_ice 
-        else 
-            H_now = 0.0_wp 
-        end if 
+        ! Get effective ice thickness
+        call calc_H_eff(H_eff,H_ice,f_ice,set_frac_zero=.TRUE.)
 
         ! Calculate new H_grnd (ice thickness overburden)
-        H_grnd = H_now - rho_sw_ice*max(z_sl-z_bed,0.0_prec)
+        H_grnd = H_eff - rho_sw_ice*max(z_sl-z_bed,0.0_prec)
 
         return 
 
@@ -1033,7 +1029,7 @@ end if
                                             n_margin .gt. 0) then 
                         ! Cell is ice-covered, [grounded below sea level or floating] and at the ice margin
 
-                        ! Get margin-scaled ice thickness
+                        ! Get effective ice thickness
                         call calc_H_eff(H_eff,H_ice(i,j),f_ice(i,j))
 
                         ! Determine depth of adjacent water using centered cell information

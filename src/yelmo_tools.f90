@@ -56,6 +56,7 @@ module yelmo_tools
     public :: minmax
 
     public :: set_boundaries_2D_aa
+    public :: set_boundaries_3D_aa
     public :: fill_borders_2D
     public :: fill_borders_3D 
     
@@ -2584,9 +2585,8 @@ contains
 
     end subroutine calc_gradient_ac
     
-    subroutine calc_gradient_ac_ice(dvardx,dvardy,var,f_ice,dx,margin2nd,grad_lim,boundaries)
-        ! Calculate gradient on ac nodes 
-        ! for an ice sheet, only using non-zero thickness points
+    subroutine calc_gradient_ac_ice(dvardx,dvardy,var,f_ice,dx,margin2nd,grad_lim,boundaries,zero_outside)
+        ! Calculate gradient on ac nodes, accounting for ice margin if needed
 
         implicit none 
 
@@ -2598,12 +2598,18 @@ contains
         logical,    intent(IN)  :: margin2nd 
         real(prec), intent(IN)  :: grad_lim 
         character(len=*), intent(IN) :: boundaries  ! Boundary conditions to apply 
+        logical,    intent(IN), optional :: zero_outside 
 
         ! Local variables 
         integer    :: i, j, nx, ny 
         integer    :: im1, ip1, jm1, jp1 
         real(prec) :: dy 
         real(prec) :: H0, H1, H2 
+        logical    :: use_zeros_outside 
+
+
+        use_zeros_outside = .FALSE. 
+        if (present(zero_outside)) use_zeros_outside = zero_outside 
 
         nx = size(var,1)
         ny = size(var,2)
@@ -2617,8 +2623,32 @@ contains
             ip1 = min(nx,i+1)
             jp1 = min(ny,j+1)
 
-            dvardx(i,j) = (var(ip1,j)-var(i,j))/dx 
-            dvardy(i,j) = (var(i,jp1)-var(i,j))/dy 
+            ! x-direction 
+            H0 = var(i,j) 
+            H1 = var(ip1,j) 
+
+            if (use_zeros_outside) then 
+
+                if (f_ice(i,j)   .lt. 1.0) H0 = 0.0 
+                if (f_ice(ip1,j) .lt. 1.0) H1 = 0.0 
+                
+            end if 
+
+            dvardx(i,j) = (H1-H0)/dx 
+
+
+            ! y-direction 
+            H0 = var(i,j) 
+            H1 = var(i,jp1) 
+
+            if (use_zeros_outside) then 
+
+                if (f_ice(i,j)   .lt. 1.0) H0 = 0.0 
+                if (f_ice(i,jp1) .lt. 1.0) H1 = 0.0 
+                
+            end if 
+
+            dvardy(i,j) = (H1-H0)/dy
 
         end do 
         end do 
@@ -2975,6 +3005,107 @@ contains
         return
 
     end subroutine set_boundaries_2D_aa
+
+    subroutine set_boundaries_3D_aa(var,boundaries,var_ref)
+
+        implicit none 
+
+        real(wp), intent(INOUT) :: var(:,:,:) 
+        character(len=*), intent(IN) :: boundaries 
+        real(wp), intent(IN), optional :: var_ref(:,:,:) 
+
+        ! Local variables 
+        integer :: nx, ny, nz  
+        integer :: k 
+
+        nx = size(var,1) 
+        ny = size(var,2) 
+        nz = size(var,3) 
+
+        do k = 1, nz 
+            call set_boundaries_2D_aa(var(:,:,k),boundaries,var_ref(:,:,k))
+        end do 
+
+        return
+
+    end subroutine set_boundaries_3D_aa
+
+    subroutine set_boundaries_2D_acx(var,boundaries,var_ref)
+
+        implicit none 
+
+        real(wp), intent(INOUT) :: var(:,:) 
+        character(len=*), intent(IN) :: boundaries 
+        real(wp), intent(IN), optional :: var_ref(:,:) 
+
+        ! Local variables 
+        integer :: nx, ny  
+
+        nx = size(var,1) 
+        ny = size(var,2) 
+
+        write(*,*) "TO DO! set_boundaries_2D_acx"
+        stop 
+
+        select case(trim(boundaries))
+
+            case("zeros","EISMINT")
+
+                ! Set border values to zero
+                var(1,:)  = 0.0
+                var(nx,:) = 0.0
+
+                var(:,1)  = 0.0
+                var(:,ny) = 0.0
+
+            case("periodic","periodic-xy") 
+
+                var(1:2,:)     = var(nx-3:nx-2,:) 
+                var(nx-1:nx,:) = var(2:3,:) 
+
+                var(:,1:2)     = var(:,ny-3:ny-2) 
+                var(:,ny-1:ny) = var(:,2:3) 
+            
+            case("periodic-x") 
+
+                ! Periodic x 
+                var(1:2,:)     = var(nx-3:nx-2,:) 
+                var(nx-1:nx,:) = var(2:3,:) 
+                
+                ! Infinite (free-slip too)
+                var(:,1)  = var(:,2)
+                var(:,ny) = var(:,ny-1)
+
+            case("MISMIP3D")
+
+                ! === MISMIP3D =====
+                var(1,:)    = var(2,:)          ! x=0, Symmetry 
+                var(nx,:)   = 0.0               ! x=800km, no ice
+                
+                var(:,1)    = var(:,2)          ! y=-50km, Free-slip condition
+                var(:,ny)   = var(:,ny-1)       ! y= 50km, Free-slip condition
+
+            case("infinite")
+                ! Set border points equal to inner neighbors 
+
+                call fill_borders_2D(var,nfill=1)
+
+            case("fixed") 
+                ! Set border points equal to prescribed values from array
+
+                call fill_borders_2D(var,nfill=1,fill=var_ref)
+
+            case DEFAULT 
+
+                write(io_unit_err,*) "set_boundaries_2D_acx:: error: boundary method not recognized."
+                write(io_unit_err,*) "boundaries = ", trim(boundaries)
+                stop 
+
+        end select 
+
+        return
+
+    end subroutine set_boundaries_2D_acx
 
     subroutine fill_borders_2D(var,nfill,fill)
 

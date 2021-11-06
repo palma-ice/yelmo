@@ -373,7 +373,7 @@ contains
         call calc_gradient_ac_ice(tpo%now%dzsdx,tpo%now%dzsdy,tpo%now%z_srf,tpo%now%f_ice,tpo%par%dx, &
                                                 tpo%par%margin2nd,tpo%par%grad_lim,tpo%par%boundaries)
         call calc_gradient_ac_ice(tpo%now%dHicedx,tpo%now%dHicedy,tpo%now%H_ice,tpo%now%f_ice,tpo%par%dx, &
-                                                tpo%par%margin2nd,tpo%par%grad_lim,tpo%par%boundaries)
+                                                tpo%par%margin2nd,tpo%par%grad_lim,tpo%par%boundaries,zero_outside=.TRUE.)
         
         ! ajr: experimental, doesn't seem to work properly yet! ===>
         ! Modify surface slope gradient at the grounding line if desired 

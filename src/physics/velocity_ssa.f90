@@ -8,7 +8,7 @@ module velocity_ssa
                     staggerdiff_nodes_acx_ab_ice, staggerdiff_nodes_acy_ab_ice, &
                     staggerdiffcross_nodes_acx_ab_ice, staggerdiffcross_nodes_acy_ab_ice, &
                     integrate_trapezoid1D_1D, integrate_trapezoid1D_pt, minmax, &
-                    set_boundaries_2D_aa 
+                    set_boundaries_2D_aa, set_boundaries_3D_aa
 
     use basal_dragging 
     use solver_ssa_sico5 
@@ -146,7 +146,8 @@ contains
                 case(1) 
                     ! Calculate 3D effective viscosity, using velocity solution from previous iteration
                     
-                    call calc_visc_eff_3D(visc_eff,ux_b,uy_b,ATT,H_ice,f_ice,zeta_aa,dx,dy,n_glen,par%eps_0)
+                    call calc_visc_eff_3D(visc_eff,ux_b,uy_b,ATT,H_ice,f_ice,zeta_aa, &
+                                                    dx,dy,n_glen,par%eps_0,par%boundaries)
 
                 case DEFAULT 
 
@@ -230,7 +231,7 @@ end if
 
     end subroutine calc_velocity_ssa
 
-    subroutine calc_visc_eff_3D(visc_eff,ux,uy,ATT,H_ice,f_ice,zeta_aa,dx,dy,n_glen,eps_0)
+    subroutine calc_visc_eff_3D(visc_eff,ux,uy,ATT,H_ice,f_ice,zeta_aa,dx,dy,n_glen,eps_0,boundaries)
         ! Calculate 3D effective viscosity following L19, Eq. 2
         ! Use of eps_0 ensures non-zero positive viscosity value everywhere 
         ! Note: viscosity is first calculated on ab-nodes, then 
@@ -257,7 +258,8 @@ end if
         real(wp), intent(IN)  :: dy
         real(wp), intent(IN)  :: n_glen   
         real(wp), intent(IN)  :: eps_0                  ! [1/yr] Regularization constant (minimum strain rate, ~1e-6)
-        
+        character(len=*), intent(IN) :: boundaries 
+
         ! Local variables 
         integer  :: i, j, k
         integer  :: ip1, jp1, im1, jm1 
@@ -360,6 +362,9 @@ end if
         end do  
         end do 
 
+        ! Set boundaries 
+        call set_boundaries_3D_aa(visc_eff,boundaries)
+
         return 
 
     end subroutine calc_visc_eff_3D
@@ -404,7 +409,7 @@ end if
 
         ! Apply boundary conditions as needed
         call set_boundaries_2D_aa(visc_eff_int,boundaries) 
-        
+
         ! if (trim(boundaries) .eq. "periodic") then
 
         !     visc_eff_int(1,:)    = visc_eff_int(nx-1,:) 

@@ -113,7 +113,7 @@ contains
                 boundaries_vy(1:4) = "periodic" 
 
             case("periodic-x")
-                
+
                 boundaries_vx(1) = "periodic"
                 boundaries_vx(2) = "infinite"
                 boundaries_vx(3) = "periodic"
@@ -384,6 +384,22 @@ contains
                         stop
 
                 end select 
+
+            else if (i .eq. nx-1 .and. trim(boundaries_vx(1)) .eq. "infinite") then 
+                ! Right boundary, staggered one point further inward 
+                ! (only needed for periodic conditions, otherwise
+                ! this point should be treated as normal)
+                
+                ! Periodic boundary condition, take velocity from one point
+                ! interior to the left-border, as nx-1 will be set to value
+                ! at the left-border 
+
+                k = k+1
+                lgs_a_value(k)  = 1.0   ! diagonal element only
+                lgs_a_index(k)  = nr
+
+                lgs_b_value(nr) = vx_m(nx-2,j)
+                lgs_x_value(nr) = vx_m(nx-2,j)
 
             else if (i .eq. nx-1 .and. trim(boundaries_vx(1)) .eq. "periodic") then 
                 ! Right boundary, staggered one point further inward 
@@ -811,6 +827,20 @@ contains
 
                 end select 
             
+            else if (j .eq. ny-1 .and. trim(boundaries_vy(2)) .eq. "infinite") then
+                ! Upper boundary, inward by one point
+                ! (only needed for periodic conditions, otherwise
+                ! this point should be treated as normal)
+                
+                ! Periodic boundary, take velocity from the lower boundary
+                
+                k = k+1
+                lgs_a_value(k)  = 1.0   ! diagonal element only
+                lgs_a_index(k)  = nr
+
+                lgs_b_value(nr) = vy_m(i,ny-2)
+                lgs_x_value(nr) = vy_m(i,ny-2)
+                   
             else if (j .eq. ny-1 .and. trim(boundaries_vy(2)) .eq. "periodic") then
                 ! Upper boundary, inward by one point
                 ! (only needed for periodic conditions, otherwise

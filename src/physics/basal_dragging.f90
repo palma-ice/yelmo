@@ -199,10 +199,13 @@ contains
             !     beta(i,j) = 0.25*(beta(i-1,j)+beta(i+1,j)+beta(i,j-1)+beta(i,j+1))
             
             case("MISMIP3D") 
+
                 ! Redefine beta at the summit to reduce singularity
                 ! in MISMIP symmetric experiments
-                
                 beta(1,:) = beta(2,:) 
+
+                beta(:,1)  = beta(:,2)
+                beta(:,ny) = beta(:,ny-1) 
 
             case("periodic") 
             
@@ -225,7 +228,7 @@ contains
 
 
         ! Extra stability step
-        call clean_beta_min(beta,beta_min)
+        !call clean_beta_min(beta,beta_min)
 
         ! ================================================================
         ! Note: At this point the beta_aa field is available with beta=0 
@@ -390,36 +393,37 @@ contains
 
         end if 
 
+        select case(trim(boundaries))
 
-        if (trim(boundaries) .eq. "periodic") then 
+            case("periodic")
 
-            beta_acx(1,:)    = beta_acx(nx-2,:) 
-            beta_acx(nx-1,:) = beta_acx(2,:) 
-            beta_acx(nx,:)   = beta_acx(3,:) 
-            beta_acx(:,1)    = beta_acx(:,ny-1)
-            beta_acx(:,ny)   = beta_acx(:,2) 
+                beta_acx(1,:)    = beta_acx(nx-2,:) 
+                beta_acx(nx-1,:) = beta_acx(2,:) 
+                beta_acx(nx,:)   = beta_acx(3,:) 
+                beta_acx(:,1)    = beta_acx(:,ny-1)
+                beta_acx(:,ny)   = beta_acx(:,2) 
 
-            beta_acy(1,:)    = beta_acy(nx-1,:) 
-            beta_acy(nx,:)   = beta_acy(2,:) 
-            beta_acy(:,1)    = beta_acy(:,ny-2)
-            beta_acy(:,ny-1) = beta_acy(:,2) 
-            beta_acy(:,ny)   = beta_acy(:,3)
+                beta_acy(1,:)    = beta_acy(nx-1,:) 
+                beta_acy(nx,:)   = beta_acy(2,:) 
+                beta_acy(:,1)    = beta_acy(:,ny-2)
+                beta_acy(:,ny-1) = beta_acy(:,2) 
+                beta_acy(:,ny)   = beta_acy(:,3)
 
-        else if (trim(boundaries) .eq. "infinite") then 
+            case("infinite","MISMIP3D") 
 
-            beta_acx(1,:)    = beta_acx(2,:) 
-            beta_acx(nx-1,:) = beta_acx(nx-2,:) 
-            beta_acx(nx,:)   = beta_acx(nx-2,:) 
-            beta_acx(:,1)    = beta_acx(:,2)
-            beta_acx(:,ny)   = beta_acx(:,ny-1) 
+                beta_acx(1,:)    = beta_acx(2,:) 
+                beta_acx(nx-1,:) = beta_acx(nx-2,:) 
+                beta_acx(nx,:)   = beta_acx(nx-2,:) 
+                beta_acx(:,1)    = beta_acx(:,2)
+                beta_acx(:,ny)   = beta_acx(:,ny-1) 
 
-            beta_acy(1,:)    = beta_acy(2,:) 
-            beta_acy(nx,:)   = beta_acy(nx-1,:) 
-            beta_acy(:,1)    = beta_acy(:,2)
-            beta_acy(:,ny-1) = beta_acy(:,ny-2) 
-            beta_acy(:,ny)   = beta_acy(:,ny-2)
+                beta_acy(1,:)    = beta_acy(2,:) 
+                beta_acy(nx,:)   = beta_acy(nx-1,:) 
+                beta_acy(:,1)    = beta_acy(:,2)
+                beta_acy(:,ny-1) = beta_acy(:,ny-2) 
+                beta_acy(:,ny)   = beta_acy(:,ny-2)
 
-        end if 
+        end select 
 
         ! Finally ensure that beta for grounded ice is higher than the lower allowed limit
         where(beta_acx .gt. 0.0 .and. beta_acx .lt. beta_min) beta_acx = beta_min 
@@ -447,7 +451,7 @@ contains
         real(wp) :: H_eff 
 
         ! Get effective ice thickness 
-        call calc_H_eff(H_eff,H_ice,f_ice)
+        call calc_H_eff(H_eff,H_ice,f_ice,set_frac_zero=.TRUE.)
 
         ! Calculate effective pressure [Pa] (overburden pressure)
         N_eff = f_grnd * (rho_ice*g*H_eff)
@@ -487,7 +491,7 @@ contains
         H_float = max(0.0_prec, rho_sw_ice*(z_sl-z_bed))
 
         ! Get effective ice thickness 
-        call calc_H_eff(H_eff,H_ice,f_ice)
+        call calc_H_eff(H_eff,H_ice,f_ice,set_frac_zero=.TRUE.)
 
         ! Calculate basal water pressure 
         if (H_eff .eq. 0.0) then
@@ -545,7 +549,7 @@ contains
         else 
 
             ! Get effective ice thickness 
-            call calc_H_eff(H_eff,H_ice,f_ice)
+            call calc_H_eff(H_eff,H_ice,f_ice,set_frac_zero=.TRUE.)
 
             ! Get overburden pressure 
             P0 = rho_ice*g*H_eff
@@ -979,7 +983,7 @@ contains
             if (f_ice(i,j) .gt. 0.0_wp) then 
 
                 ! Get effective ice thickness 
-                call calc_H_eff(H_eff,H_ice(i,j),f_ice(i,j))
+                call calc_H_eff(H_eff,H_ice(i,j),f_ice(i,j),set_frac_zero=.TRUE.)
 
                 if (z_bed(i,j) > z_sl(i,j)) then 
                     ! Land based above sea level 

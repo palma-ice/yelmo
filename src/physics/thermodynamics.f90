@@ -8,7 +8,8 @@ module thermodynamics
                            rho_sw, rho_w, rho_rock, L_ice, T_pmp_beta, &
                            TOL_UNDERFLOW 
 
-    use yelmo_tools, only : stagger_nodes_acx_ab_ice, stagger_nodes_acy_ab_ice
+    use yelmo_tools, only : stagger_nodes_acx_ab_ice, stagger_nodes_acy_ab_ice, &
+                            set_boundaries_3D_aa
     implicit none 
 
     private  
@@ -381,7 +382,7 @@ contains
 
     end subroutine calc_advec_horizontal_column
     
-    subroutine calc_advec_horizontal_3D(advecxy,var,H_ice,z_srf,ux,uy,zeta_aa,dx,beta1,beta2)
+    subroutine calc_advec_horizontal_3D(advecxy,var,H_ice,z_srf,ux,uy,zeta_aa,dx,beta1,beta2,boundaries)
 
         implicit none 
 
@@ -395,6 +396,7 @@ contains
         real(prec), intent(IN)    :: dx  
         real(prec), intent(IN)    :: beta1              ! Weighting term for multistep advection scheme
         real(prec), intent(IN)    :: beta2              ! Weighting term for multistep advection scheme
+        character(len=*), intent(IN) :: boundaries 
 
         ! Local variables 
         integer :: i, j 
@@ -420,43 +422,8 @@ contains
         end do 
         end do 
 
-        ! Fill in boundaries 
-        j = 1 
-        do i = 2, nx-1 
-            if(H_ice(i,j) .gt. 0.0_prec) advecxy(i,j,:) = advecxy(i,j+1,:) 
-        end do 
-
-        j = ny 
-        do i = 2, nx-1 
-            if(H_ice(i,j) .gt. 0.0_prec) advecxy(i,j,:) = advecxy(i,j-1,:) 
-        end do 
-        
-        i = 1 
-        do j = 2, ny-1 
-            if(H_ice(i,j) .gt. 0.0_prec) advecxy(i,j,:) = advecxy(i+1,j,:) 
-        end do 
-
-        i = nx 
-        do j = 2, ny-1 
-            if(H_ice(i,j) .gt. 0.0_prec) advecxy(i,j,:) = advecxy(i-1,j,:) 
-        end do 
-
-        i = 1
-        j = 1 
-        if(H_ice(i,j) .gt. 0.0_prec) advecxy(i,j,:) = 0.5_prec*(advecxy(i+1,j,:)+advecxy(i,j+1,:))
-
-        i = nx
-        j = 1 
-        if(H_ice(i,j) .gt. 0.0_prec) advecxy(i,j,:) = 0.5_prec*(advecxy(i-1,j,:)+advecxy(i,j+1,:))
-
-        i = nx
-        j = ny
-        if(H_ice(i,j) .gt. 0.0_prec) advecxy(i,j,:) = 0.5_prec*(advecxy(i-1,j,:)+advecxy(i,j-1,:))
-
-        i = 1
-        j = ny
-        if(H_ice(i,j) .gt. 0.0_prec) advecxy(i,j,:) = 0.5_prec*(advecxy(i+1,j,:)+advecxy(i,j-1,:))
-        
+        ! Set boundaries 
+        call set_boundaries_3D_aa(advecxy,boundaries)
 
         ! Calculate weighted average between current and previous solution following 
         ! timestepping method desired 

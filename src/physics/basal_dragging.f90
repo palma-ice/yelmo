@@ -1056,7 +1056,7 @@ contains
                 else if (f_ice(i,j) .lt. 1.0 .and. f_ice(ip1,j) .eq. 1.0) then
                     beta_acx(i,j) = beta(ip1,j)  
                 else 
-                    beta_acx(i,j) = 0.5_prec*(beta(i,j)+beta(ip1,j))
+                    beta_acx(i,j) = 0.5_wp*(beta(i,j)+beta(ip1,j))
                 end if 
 
             end if 
@@ -1075,7 +1075,7 @@ contains
                 else if (f_ice(i,j) .lt. 1.0 .and. f_ice(i,jp1) .eq. 1.0) then
                     beta_acy(i,j) = beta(i,jp1)  
                 else 
-                    beta_acy(i,j) = 0.5_prec*(beta(i,j)+beta(i,jp1))
+                    beta_acy(i,j) = 0.5_wp*(beta(i,j)+beta(i,jp1))
                 end if 
             
             end if 

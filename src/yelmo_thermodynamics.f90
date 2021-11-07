@@ -156,13 +156,15 @@ end select
 
                         ! Calculate the explicit horizontal advection term using enthalpy from previous timestep
                         call calc_advec_horizontal_3D(thrm%now%advecxy,thrm%now%enth,tpo%now%H_ice,tpo%now%z_srf, &
-                                            dyn%now%ux,dyn%now%uy,thrm%par%z%zeta_aa,thrm%par%dx,thrm%par%dt_beta(1),thrm%par%dt_beta(2))
+                                            dyn%now%ux,dyn%now%uy,thrm%par%z%zeta_aa,thrm%par%dx, &
+                                            thrm%par%dt_beta(1),thrm%par%dt_beta(2),thrm%par%boundaries)
                     
                     else 
 
                         ! Calculate the explicit horizontal advection term using temperature from previous timestep
                         call calc_advec_horizontal_3D(thrm%now%advecxy,thrm%now%T_ice,tpo%now%H_ice,tpo%now%z_srf, &
-                                            dyn%now%ux,dyn%now%uy,thrm%par%z%zeta_aa,thrm%par%dx,thrm%par%dt_beta(1),thrm%par%dt_beta(2))
+                                            dyn%now%ux,dyn%now%uy,thrm%par%z%zeta_aa,thrm%par%dx, &
+                                            thrm%par%dt_beta(1),thrm%par%dt_beta(2),thrm%par%boundaries)
                     
                     end if 
 
@@ -624,6 +626,11 @@ end select
         par%dt_beta(1)  = 1.0 
         par%dt_beta(2)  = 0.0 
 
+        ! Define how boundaries of grid should be treated 
+        ! This should only be modified by the dom%par%experiment variable
+        ! in yelmo_init. By default set boundaries to zero 
+        par%boundaries = "zeros" 
+        
         return
 
     end subroutine ytherm_par_load

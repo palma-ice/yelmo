@@ -512,6 +512,8 @@ module yelmo_defs
         real(wp)            :: cp_rock
         real(wp)            :: kt_rock
         
+        ! Internal parameters
+        character(len=256) :: boundaries 
         real(dp)   :: time
         real(wp)   :: dt_zeta, dt_beta(2)
 

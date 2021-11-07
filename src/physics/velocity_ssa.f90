@@ -314,7 +314,7 @@ end if
                 call staggerdiff_nodes_acx_ab_ice(dudx_ab,ux,f_ice,i,j,dx) 
                 call staggerdiff_nodes_acy_ab_ice(dvdy_ab,uy,f_ice,i,j,dy) 
                 call staggerdiffcross_nodes_acx_ab_ice(dudy_ab,ux,f_ice,i,j,dy)
-                call staggerdiffcross_nodes_acx_ab_ice(dvdx_ab,uy,f_ice,i,j,dx)
+                call staggerdiffcross_nodes_acy_ab_ice(dvdx_ab,uy,f_ice,i,j,dx)
                 
                 ! Loop over column
                 do k = 1, nz 
@@ -409,7 +409,7 @@ end if
 
         ! Apply boundary conditions as needed
         call set_boundaries_2D_aa(visc_eff_int,boundaries) 
-        
+
         return
 
     end subroutine calc_visc_eff_int

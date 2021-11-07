@@ -1638,7 +1638,7 @@ contains
 
         end do
         end do
-
+        
         return 
 
     end subroutine stagger_visc_aa_ab

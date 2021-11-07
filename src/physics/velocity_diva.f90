@@ -307,6 +307,13 @@ end if
             ux_i(:,:,k) = ux(:,:,k) - ux_b 
             uy_i(:,:,k) = uy(:,:,k) - uy_b 
         end do
+        
+
+        if (par%visc_method .eq. 0) then 
+            ! Diagnose viscosity for visc_method=0 (not used prognostically)
+            call calc_visc_eff_3D(visc_eff,ux_bar,uy_bar,duxdz,duydz,ATT,H_ice,f_ice,zeta_aa, &
+                                                            dx,dy,n_glen,par%eps_0,par%boundaries)
+        end if 
 
         return 
 
@@ -558,7 +565,7 @@ end if
             duydz(:,1,:)    = duydz(:,2,:)
             duydz(:,ny-1,:) = duydz(:,ny-2,:) 
             duydz(:,ny,:)   = duydz(:,ny-1,:)
-            
+
         end if 
 
         return 
@@ -643,7 +650,7 @@ end if
                 call staggerdiff_nodes_acx_ab_ice(dudx_ab,ux,f_ice,i,j,dx) 
                 call staggerdiff_nodes_acy_ab_ice(dvdy_ab,uy,f_ice,i,j,dy) 
                 call staggerdiffcross_nodes_acx_ab_ice(dudy_ab,ux,f_ice,i,j,dy)
-                call staggerdiffcross_nodes_acx_ab_ice(dvdx_ab,uy,f_ice,i,j,dx)
+                call staggerdiffcross_nodes_acy_ab_ice(dvdx_ab,uy,f_ice,i,j,dx)
                 
                 ! Loop over column
                 do k = 1, nz 
@@ -651,7 +658,7 @@ end if
                     ! Get vertical shear strain rate terms
                     call stagger_nodes_acx_ab_ice(duxdz_ab,duxdz(:,:,k),f_ice,i,j)
                     call stagger_nodes_acy_ab_ice(duydz_ab,duydz(:,:,k),f_ice,i,j)
-                    
+
                     ! Calculate the total effective strain rate from L19, Eq. 21 
                     eps_sq_ab = dudx_ab**2 + dvdy_ab**2 + dudx_ab*dvdy_ab + 0.25_wp*(dudy_ab+dvdx_ab)**2 &
                                 + 0.25_wp*duxdz_ab**2 + 0.25_wp*duydz_ab**2 + eps_0_sq

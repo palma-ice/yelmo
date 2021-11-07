@@ -308,8 +308,11 @@ contains
                 ! Flow to the right - inner points
 
                 ! 2nd order
-                advecx = dx_inv2 * ux(i-1,j,k)*(-(4.0*var_ice(i-1,j,k)-var_ice(i-2,j,k)-3.0*var_ice(i,j,k)))
+                !advecx = dx_inv2 * ux(i-1,j,k)*(-(4.0*var_ice(i-1,j,k)-var_ice(i-2,j,k)-3.0*var_ice(i,j,k)))
 
+                ! 1st order
+                advecx = dx_inv * ux(i-1,j,k)*(-(var_ice(i-1,j,k)-var_ice(i,j,k)))
+                
             else if (ux_aa .gt. 0.0 .and. i .eq. 2) then  
                 ! Flow to the right - border points
 
@@ -320,8 +323,11 @@ contains
                 ! Flow to the left
 
                 ! 2nd order
-                advecx = dx_inv2 * ux(i,j,k)*((4.0*var_ice(i+1,j,k)-var_ice(i+2,j,k)-3.0*var_ice(i,j,k)))
+                !advecx = dx_inv2 * ux(i,j,k)*((4.0*var_ice(i+1,j,k)-var_ice(i+2,j,k)-3.0*var_ice(i,j,k)))
 
+                ! 1st order 
+                advecx = dx_inv * ux(i,j,k)*((var_ice(i+1,j,k)-var_ice(i,j,k)))
+                
             else if (ux_aa .lt. 0.0 .and. i .eq. nx-1) then 
                 ! Flow to the left
 
@@ -347,8 +353,11 @@ contains
                 ! Flow to the right  - inner points
 
                 ! 2nd order
-                advecy = dx_inv2 * uy(i,j-1,k)*(-(4.0*var_ice(i,j-1,k)-var_ice(i,j-2,k)-3.0*var_ice(i,j,k)))
+                !advecy = dx_inv2 * uy(i,j-1,k)*(-(4.0*var_ice(i,j-1,k)-var_ice(i,j-2,k)-3.0*var_ice(i,j,k)))
 
+                ! 1st order
+                advecy = dx_inv * uy(i,j-1,k)*(-(var_ice(i,j-1,k)-var_ice(i,j,k)))
+                
             else if (uy_aa .gt. 0.0 .and. j .eq. 2) then   
                 ! Flow to the right - border points
 
@@ -359,8 +368,11 @@ contains
                 ! Flow to the left
 
                 ! 2nd order
-                advecy = dx_inv2 * uy(i,j,k)*((4.0*var_ice(i,j+1,k)-var_ice(i,j+2,k)-3.0*var_ice(i,j,k)))
-            
+                !advecy = dx_inv2 * uy(i,j,k)*((4.0*var_ice(i,j+1,k)-var_ice(i,j+2,k)-3.0*var_ice(i,j,k)))
+                
+                ! 1st order
+                advecy = dx_inv * uy(i,j,k)*((var_ice(i,j+1,k)-var_ice(i,j,k)))
+                
             else if (uy_aa .lt. 0.0 .and. j .eq. ny-1) then 
                 ! Flow to the left
 

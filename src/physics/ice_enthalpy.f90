@@ -231,9 +231,7 @@ contains
         ! Include internal melting in bmb_grnd (allowed for floating ice too)
         bmb_grnd = bmb_grnd - melt_internal 
 
-        ! ajr: testing
-        if (f_grnd .eq. 0.0) bmb_grnd = 0.0_wp 
-
+        
         ! Safety: limit bmb_grnd to reasonable values to avoid problems
         ! (grounded ice melt should be much less than this limit, eg 10 m/yr)
         if (bmb_grnd .gt. bmb_grnd_lim) bmb_grnd = bmb_grnd_lim

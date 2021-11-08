@@ -269,7 +269,7 @@ program yelmo_test
         ! call yelmo_update_equil(yelmo1,time,time_tot=1e2,dt=1.0_prec,topo_fixed=.TRUE.)
 
     end if 
-    
+
     ! Initialize output files 
     call yelmo_write_init(yelmo1,file2D,time_init=time,units="years")  
     call yelmo_write_reg_init(yelmo1,file1D,time_init=time,units="years",mask=yelmo1%bnd%ice_allowed)
@@ -290,44 +290,48 @@ program yelmo_test
         ! Get current time 
         time = ctl%time_init + n*ctl%dtt
 
-        if (test_restart .and. time .eq. time_r+ctl%dtt) then 
+        if (test_restart) then 
 
-            file1D_r       = trim(outfldr)//"yelmo1D_r.nc"
-            file2D_r       = trim(outfldr)//"yelmo2D_r.nc"
-            file_restart_r = trim(outfldr)//"yelmo_restart_r.nc"
+            if (time .eq. time_r+ctl%dtt) then 
 
-            ctl%dt2D_out = ctl%dtt 
-            ctl%dt1D_out = ctl%dtt 
+                file1D_r       = trim(outfldr)//"yelmo1D_r.nc"
+                file2D_r       = trim(outfldr)//"yelmo2D_r.nc"
+                file_restart_r = trim(outfldr)//"yelmo_restart_r.nc"
 
-            ! Initialize data objects and load initial topography
-            call yelmo_init(yelmo_r,filename=path_par,grid_def="file",time=time_r)
+                ctl%dt2D_out = ctl%dtt 
+                ctl%dt1D_out = ctl%dtt 
 
-            yelmo_r%par%restart     = "yelmo_restart.nc"
-            yelmo_r%par%use_restart = .TRUE. 
-            yelmo_r%bnd = yelmo1%bnd
+                ! Initialize data objects and load initial topography
+                call yelmo_init(yelmo_r,filename=path_par,grid_def="file",time=time_r)
 
-            ! Initialize state variables (dyn,therm,mat)
-            ! (initialize temps with robin method with a cold base)
-            call yelmo_init_topo(yelmo_r,path_par,time_r)
-            call yelmo_init_state(yelmo_r,time=time_r,thrm_method="robin-cold")
+                yelmo_r%par%restart     = "yelmo_restart.nc"
+                yelmo_r%par%use_restart = .TRUE. 
+                yelmo_r%bnd = yelmo1%bnd
 
-            ! Write restart file to compare with expected 
-            call yelmo_restart_write(yelmo_r,file_restart_r,time_r)
+                ! Initialize state variables (dyn,therm,mat)
+                ! (initialize temps with robin method with a cold base)
+                call yelmo_init_topo(yelmo_r,path_par,time_r)
+                call yelmo_init_state(yelmo_r,time=time_r,thrm_method="robin-cold")
 
-            ! 2D file 
-            call yelmo_write_init(yelmo_r,file2D_r,time_init=time_r,units="years")  
-            
-            ! 1D file 
-            call yelmo_write_reg_init(yelmo_r,file1D_r,time_init=time_r,units="years",mask=yelmo_r%bnd%ice_allowed)
-            
-            call write_step_2D(yelmo_r,file2D_r,time=time_r,cf_ref=cf_ref)
-            call yelmo_write_reg_step(yelmo_r,file1D_r,time=time_r)  
+                ! Write restart file to compare with expected 
+                call yelmo_restart_write(yelmo_r,file_restart_r,time_r)
 
-        end if 
+                ! 2D file 
+                call yelmo_write_init(yelmo_r,file2D_r,time_init=time_r,units="years")  
+                
+                ! 1D file 
+                call yelmo_write_reg_init(yelmo_r,file1D_r,time_init=time_r,units="years",mask=yelmo_r%bnd%ice_allowed)
+                
+                call write_step_2D(yelmo_r,file2D_r,time=time_r,cf_ref=cf_ref)
+                call yelmo_write_reg_step(yelmo_r,file1D_r,time=time_r)  
 
-        if (test_restart .and. time .gt. time_r) then 
-            ! Update restarted model
-            call yelmo_update(yelmo_r,time)
+            end if 
+
+            if (time .gt. time_r) then
+                ! Update restarted model
+                call yelmo_update(yelmo_r,time)
+            end if 
+
         end if 
 
 !         ! Update temperature and smb as needed in time (ISMIP6)
@@ -405,23 +409,30 @@ program yelmo_test
 
         if (mod(nint(time*100),nint(ctl%dt2D_out*100))==0) then
             call write_step_2D(yelmo1,file2D,time=time,cf_ref=cf_ref)
-
-            if (test_restart .and. time .gt. time_r) call write_step_2D(yelmo_r,file2D_r,time=time,cf_ref=cf_ref)
-            
         end if 
 
         if (mod(nint(time*100),nint(ctl%dt1D_out*100))==0) then 
             call yelmo_write_reg_step(yelmo1,file1D,time=time) 
-
-            if (test_restart .and. time .gt. time_r) call yelmo_write_reg_step(yelmo_r,file1D_r,time=time)  
-            
         end if 
 
-        if (test_restart .and. time .eq. time_r) then 
+        if (test_restart) then 
 
-            ! Write restart file to load from
-            call yelmo_restart_write(yelmo1,file_restart,time)
-            
+            if (time .eq. time_r) then
+                ! Write restart file to load from
+                call yelmo_restart_write(yelmo1,file_restart,time)
+            end if 
+
+            if (time .gt. time_r) then
+                ! Write restarted output files 
+                if (mod(nint(time*100),nint(ctl%dt2D_out*100))==0) then
+                    call write_step_2D(yelmo_r,file2D_r,time=time,cf_ref=cf_ref)
+                end if 
+
+                if (mod(nint(time*100),nint(ctl%dt1D_out*100))==0) then 
+                    call yelmo_write_reg_step(yelmo_r,file1D_r,time=time)  
+                end if
+            end if 
+
         end if 
 
         if (mod(time,10.0)==0 .and. (.not. yelmo_log)) then

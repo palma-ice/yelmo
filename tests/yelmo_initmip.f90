@@ -24,7 +24,7 @@ program yelmo_test
     real(wp), allocatable :: cf_ref(:,:) 
     logical,  allocatable :: mask_noice(:,:)  
 
-    logical, parameter  :: test_restart = .TRUE. 
+    logical, parameter  :: test_restart = .FALSE. 
     real(wp), parameter :: time_r       = 50.0_wp 
     type(yelmo_class)   :: yelmo_r
     character(len=256)  :: file1D_r, file2D_r, file_restart_r
@@ -257,15 +257,18 @@ program yelmo_test
     end if 
     ! ============================================================
     
-    ! Run full model (tpo,dyn,thrm) with SIA to smooth initial topo
-    call yelmo_update_equil(yelmo1,time,time_tot=10.0_prec,dt=0.2_prec,topo_fixed=.FALSE.,dyn_solver="sia")
+    if (.not. yelmo1%par%use_restart) then
 
-    ! Run full model with correct solver (tpo,dyn,thrm)
-    call yelmo_update_equil(yelmo1,time,time_tot=1.0_prec,dt=0.2_prec,topo_fixed=.FALSE.)
+        ! Run full model (tpo,dyn,thrm) with SIA to smooth initial topo
+        call yelmo_update_equil(yelmo1,time,time_tot=10.0_prec,dt=0.2_prec,topo_fixed=.FALSE.,dyn_solver="sia")
 
-    ! Next equilibrate thermodynamics further and maintain constant ice topopgraphy (for speed)
-    ! call yelmo_update_equil(yelmo1,time,time_tot=1e2,dt=1.0_prec,topo_fixed=.TRUE.)
+        ! Run full model with correct solver (tpo,dyn,thrm)
+        call yelmo_update_equil(yelmo1,time,time_tot=1.0_prec,dt=0.2_prec,topo_fixed=.FALSE.)
 
+        ! Next equilibrate thermodynamics further and maintain constant ice topopgraphy (for speed)
+        ! call yelmo_update_equil(yelmo1,time,time_tot=1e2,dt=1.0_prec,topo_fixed=.TRUE.)
+
+    end if 
     
     ! Initialize output files 
     call yelmo_write_init(yelmo1,file2D,time_init=time,units="years")  

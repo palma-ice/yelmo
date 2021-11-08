@@ -63,6 +63,15 @@ contains
 
         integer :: ij(2) 
 
+        ! Safety: check status of model object, 
+        ! Has it been initialized?
+        if (.not. allocated(dom%tpo%now%H_ice)) then 
+            write(io_unit_err,*) 
+            write(io_unit_err,*) "yelmo_update:: Error: Yelmo object does not appear to be initialized/allocated."
+            write(io_unit_err,*) "is_allocated(dom%tpo%now%H_ice) = ", allocated(dom%tpo%now%H_ice)
+            stop 
+        end if 
+
         ! Determine which predictor-corrector (pc) method we are using for timestepping,
         ! assign scheme order and weights 
         select case(trim(dom%par%pc_method))
@@ -119,7 +128,7 @@ contains
             
             case DEFAULT 
 
-                write(io_unit_err,*) "yelmo_udpate:: Error: pc_method does not match available options [FE-SBE, AB-SAM, HEUN]."
+                write(io_unit_err,*) "yelmo_update:: Error: pc_method does not match available options [FE-SBE, AB-SAM, HEUN]."
                 write(io_unit_err,*) "pc_method = ", trim(dom%par%pc_method)
                 stop 
 

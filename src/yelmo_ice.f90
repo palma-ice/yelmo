@@ -496,14 +496,17 @@ contains
                 T_mean = 0.0_prec
             end if 
 
-            n       = count(dt_save .ne. missing_value)
-            n_dtmin = count( abs(dt_save(1:n)-dom%par%dt_min) .lt. dom%par%dt_min*1e-3 )
+            if (size(dt_save) .gt. 0.0) then 
 
-            write(*,"(a,f13.2,f10.2,f10.1,f8.1,2G10.3,1i6)") &
-                        !"yelmo:: [time,speed,H,T,max(dt),min(dt),n(dt==dt_min)]:", &
-                        "yelmo:: timelog:", &
-                            time_now, dom%time%model_speed, H_mean, T_mean,  &
-                                            maxval(dt_save(1:n)), minval(dt_save(1:n)), n_dtmin
+                n       = count(dt_save .ne. missing_value)
+                n_dtmin = count( abs(dt_save(1:n)-dom%par%dt_min) .lt. dom%par%dt_min*1e-3 )
+
+                write(*,"(a,f13.2,f10.2,f10.1,f8.1,2G10.3,1i6)") &
+                            "yelmo:: timelog:", &
+                                time_now, dom%time%model_speed, H_mean, T_mean,  &
+                                                maxval(dt_save(1:n)), minval(dt_save(1:n)), n_dtmin
+            
+            end if 
             
         end if 
 

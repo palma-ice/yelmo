@@ -110,18 +110,17 @@ contains
             call calc_ice_thickness_dyn(tpo%now%H_ice,tpo%now%dHdt_n,tpo%now%H_ice_n,tpo%now%H_ice_pred, &
                                         tpo%now%f_ice,tpo%now%f_grnd,dyn%now%ux_bar,dyn%now%uy_bar, &
                                         solver=tpo%par%solver,dx=tpo%par%dx,dt=dt,beta=tpo%par%dt_beta,pc_step=tpo%par%pc_step)
-
-            ! Update ice fraction mask 
-            call calc_ice_fraction(tpo%now%f_ice,tpo%now%H_ice,tpo%now%f_grnd,tpo%par%margin_flt_subgrid)
-            
             
             ! === Step 2: ice thickness evolution from vertical column mass balance ===
 
+            ! Update ice fraction mask 
+            call calc_ice_fraction(tpo%now%f_ice,tpo%now%H_ice,tpo%now%f_grnd,tpo%par%margin_flt_subgrid)
             
             ! Apply mass-conservation step (mbal)
             call calc_ice_thickness_mbal(tpo%now%H_ice,tpo%now%f_ice,tpo%now%mb_applied, &
                                          tpo%now%f_grnd,bnd%z_sl-bnd%z_bed,mbal,tpo%par%dx,dt)
 
+            
             ! If subgrid ice margin is not being used, then tiny ice 
             ! thicknesses should be removed before calving step.             
             if (.not. tpo%par%margin_flt_subgrid) then 
@@ -157,7 +156,8 @@ contains
             where (tpo%now%f_grnd .eq. 1.0_wp) tpo%now%tau_eff = 0.0_wp 
             
             ! Diagnose potential floating-ice calving rate [m/yr]
-            
+
+if (.TRUE.) then 
             select case(trim(tpo%par%calv_flt_method))
                 
                 case("vm-l19","eigen")
@@ -175,7 +175,7 @@ contains
                     end if 
                     
             end select 
-
+end if
 
 
             select case(trim(tpo%par%calv_flt_method))

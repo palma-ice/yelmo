@@ -62,6 +62,8 @@ contains
         character(len=1012) :: kill_txt
 
         integer :: ij(2) 
+        integer :: max_dt_used 
+        integer :: min_dt_used 
 
         ! Safety: check status of model object, 
         ! Has it been initialized?
@@ -497,17 +499,19 @@ contains
             end if 
 
             if (size(dt_save) .gt. 0.0) then 
-
-                n       = count(dt_save .ne. missing_value)
-                n_dtmin = count( abs(dt_save(1:n)-dom%par%dt_min) .lt. dom%par%dt_min*1e-3 )
-
-                write(*,"(a,f13.2,f10.2,f10.1,f8.1,2G10.3,1i6)") &
-                            "yelmo:: timelog:", &
-                                time_now, dom%time%model_speed, H_mean, T_mean,  &
-                                                maxval(dt_save(1:n)), minval(dt_save(1:n)), n_dtmin
-            
+                max_dt_used = maxval(dt_save(1:n))
+                min_dt_used = minval(dt_save(1:n))
             end if 
+
+            n       = count(dt_save .ne. missing_value)
+            n_dtmin = count( abs(dt_save(1:n)-dom%par%dt_min) .lt. dom%par%dt_min*1e-3 )
+
+            write(*,"(a,f13.2,f10.2,f10.1,f8.1,2G10.3,1i6)") &
+                        "yelmo:: timelog:", &
+                            time_now, dom%time%model_speed, H_mean, T_mean,  &
+                                            max_dt_used, min_dt_used, n_dtmin
             
+
         end if 
 
         ! ! ajr: diagnostics 

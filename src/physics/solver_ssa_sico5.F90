@@ -21,7 +21,7 @@ contains
 
     subroutine calc_vxy_ssa_matrix(vx_m,vy_m,L2_norm,beta_acx,beta_acy,visc_eff, &
                     ssa_mask_acx,ssa_mask_acy,H_ice,f_ice,taud_acx,taud_acy,H_grnd,z_sl,z_bed, &
-                    dx,dy,ulim,boundaries,lis_settings)
+                    z_srf,dx,dy,ulim,boundaries,lis_settings)
         ! Solution of the system of linear equations for the horizontal velocities
         ! vx_m, vy_m in the shallow shelf approximation.
         ! Adapted from sicopolis version 5-dev (svn revision 1421)
@@ -44,6 +44,7 @@ contains
         real(prec), intent(IN)    :: H_grnd(:,:)  
         real(prec), intent(IN)    :: z_sl(:,:) 
         real(prec), intent(IN)    :: z_bed(:,:) 
+        real(prec), intent(IN)    :: z_srf(:,:)
         real(prec), intent(IN)    :: dx, dy
         real(prec), intent(IN)    :: ulim 
         character(len=*), intent(IN) :: boundaries 
@@ -80,6 +81,9 @@ contains
         character(len=56) :: boundaries_vy(4)
 
         integer :: im1, ip1, jm1, jp1 
+
+        real(wp) :: p_av 
+
 
 ! Include header for lis solver fortran interface
 #include "lisf.h"
@@ -197,7 +201,8 @@ contains
 
         ! Set maske and grounding line / calving front flags
 
-        call set_sico_masks(maske,is_front_1,is_front_2,is_grline_1,is_grline_2, H_ice, f_ice, H_grnd)
+        call set_sico_masks(maske,is_front_1,is_front_2,is_grline_1,is_grline_2, &
+                                            H_ice, f_ice, H_grnd, z_bed, z_sl)
         
 
         ! ! ajr:testing 
@@ -556,22 +561,20 @@ contains
 
                         H_ice_now = H_ice(i1,j)         ! No f_ice scaling since all points treated have f_ice=0/1
 
-                        if (z_sl(i1,j)-z_bed(i1,j) .gt. 0.0) then 
-                            ! Bed below sea level
+                        ! Using CISM formula 
 
-                            H_ocn_now = min(rho_ice/rho_sw*H_ice_now, &         ! Flotation depth 
-                                                z_sl(i1,j)-z_bed(i1,j))         ! Grounded depth 
+                        ! This formula works not just for floating ice, but for any edge between
+                        !  an ice-covered marine-based cell and an ocean cell.
+                        p_av = 0.5d0*rho_ice*g*H_ice_now &                                                  ! p_out
+                             - 0.5d0*rho_sw *g*H_ice_now * (1.d0 - min(z_srf(i1,j)/H_ice_now,1.d0))**2      ! p_in
 
-                        else 
-                            ! Bed above sea level
+                        ! This formula works for floating ice.
+                        ! It can be derived from the formula above using Archimedes: rhoi*h = rhoo*(h-s) 
+                        ! p_av = 0.5d0*rhoi*grav*h_qp * (1.d0 - rhoi/rhoo)
 
-                            H_ocn_now = 0.0 
+                        ! Convert to [Pa m] and store
+                        lgs_b_value(nr) = p_av*H_ice_now
 
-                        end if 
-
-                        lgs_b_value(nr) = factor_rhs_3a*H_ice_now*H_ice_now &
-                                        - factor_rhs_3b*H_ocn_now*H_ocn_now
-                                        
 !                         if (i .eq. 80 .and. j .eq. 70) then 
 !                             ! Margin point
 !                             write(*,*) "front ", vx_m(i1,j), vx_m(i1-1,j), vy_m(i1,j), vy_m(i1,j-1)
@@ -1000,20 +1003,20 @@ contains
             
                         H_ice_now = H_ice(i,j1)     ! No f_ice scaling since all points treated have f_ice=0/1
                         
-                        if (z_sl(i,j1)-z_bed(i,j1) .gt. 0.0) then 
-                            ! Bed below sea level 
-                            H_ocn_now = min(rho_ice/rho_sw*H_ice_now, &     ! Flotation depth 
-                                                z_sl(i,j1)-z_bed(i,j1))     ! Grounded depth 
+                        ! Using CISM v2.0 formula 
 
-                        else 
-                            ! Bed above sea level 
-                            H_ocn_now = 0.0 
+                        ! This formula works not just for floating ice, but for any edge between
+                        !  an ice-covered marine-based cell and an ocean cell.
+                        p_av = 0.5d0*rho_ice*g*H_ice_now &                                                  ! p_out
+                             - 0.5d0*rho_sw *g*H_ice_now * (1.d0 - min(z_srf(i,j1)/H_ice_now,1.d0))**2      ! p_in
 
-                        end if 
+                        ! This formula works for floating ice only.
+                        ! It can be derived from the formula above using Archimedes: rhoi*h = rhoo*(h-s) 
+                        ! p_av = 0.5d0*rhoi*grav*h_qp * (1.d0 - rhoi/rhoo)
 
-                        lgs_b_value(nr) = factor_rhs_3a*H_ice_now*H_ice_now &
-                                        - factor_rhs_3b*H_ocn_now*H_ocn_now   
-
+                        ! Convert to [Pa m] and store
+                        lgs_b_value(nr) = p_av*H_ice_now
+                        
                         ! =========================================================
               
                         lgs_x_value(nr) = vy_m(i,j)
@@ -1660,7 +1663,7 @@ contains
 
     end subroutine stagger_visc_aa_ab
 
-    subroutine set_sico_masks(maske,front1,front2,gl1,gl2,H_ice,f_ice,H_grnd)
+    subroutine set_sico_masks(maske,front1,front2,gl1,gl2,H_ice,f_ice,H_grnd,z_bed,z_sl)
         ! Define where ssa calculations should be performed
         ! Note: could be binary, but perhaps also distinguish 
         ! grounding line/zone to use this mask for later gl flux corrections
@@ -1681,12 +1684,15 @@ contains
         real(prec), intent(IN)  :: H_ice(:,:)
         real(prec), intent(IN)  :: f_ice(:,:)
         real(prec), intent(IN)  :: H_grnd(:,:)
-        
+        real(prec), intent(IN)  :: z_bed(:,:)
+        real(prec), intent(IN)  :: z_sl(:,:)
+
         ! Local variables
         integer    :: i, j, nx, ny
         integer    :: im1, ip1, jm1, jp1 
         logical    :: is_float 
-        
+        real(prec) :: H_ocn_now 
+
         logical, parameter :: disable_grounded_fronts = .TRUE. 
 
         nx = size(maske,1)
@@ -1768,8 +1774,13 @@ contains
             ! Disable detection of grounded fronts for now,
             ! because it is more stable this way...
 
-            if ( front1(i,j) .and. maske(i,j) .eq. 0 ) front1(i,j) = .FALSE. 
+            ! if ( front1(i,j) .and. maske(i,j) .eq. 0 ) front1(i,j) = .FALSE. 
 
+            H_ocn_now = z_sl(i,j)-z_bed(i,j)
+
+            if ( front1(i,j) .and. maske(i,j) .eq. 0 .and. &
+                                    H_ocn_now .eq. 0.0 ) front1(i,j) = .FALSE. 
+            
           end if 
 
         end do

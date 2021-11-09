@@ -59,7 +59,7 @@ contains
                                   beta,beta_acx,beta_acy,beta_eff,visc_eff,visc_eff_int,duxdz,duydz, &
                                   ssa_mask_acx,ssa_mask_acy,ssa_err_acx,ssa_err_acy,ssa_iter_now, &
                                   c_bed,taud_acx,taud_acy,H_ice,f_ice,H_grnd,f_grnd, &
-                                  f_grnd_acx,f_grnd_acy,ATT,zeta_aa,z_sl,z_bed,dx,dy,n_glen,par)
+                                  f_grnd_acx,f_grnd_acy,ATT,zeta_aa,z_sl,z_bed,z_srf,dx,dy,n_glen,par)
         ! This subroutine is used to solve the horizontal velocity system (ux,uy)
         ! following the Depth-Integrated Viscosity Approximation (DIVA),
         ! as outlined by Lipscomb et al. (2019). Method originally 
@@ -104,6 +104,7 @@ contains
         real(wp), intent(IN)    :: zeta_aa(:)         ! [-]
         real(wp), intent(IN)    :: z_sl(:,:)          ! [m]
         real(wp), intent(IN)    :: z_bed(:,:)         ! [m]
+        real(wp), intent(IN)    :: z_srf(:,:)         ! [m]
         real(wp), intent(IN)    :: dx                 ! [m]
         real(wp), intent(IN)    :: dy                 ! [m]
         real(wp), intent(IN)    :: n_glen 
@@ -257,7 +258,7 @@ end if
             ! Call ssa solver
             call calc_vxy_ssa_matrix(ux_bar,uy_bar,L2_norm,beta_eff_acx,beta_eff_acy,visc_eff_int,  &
                                      ssa_mask_acx,ssa_mask_acy,H_ice,f_ice,taud_acx,taud_acy,H_grnd,z_sl, &
-                                     z_bed,dx,dy,par%ssa_vel_max,par%boundaries,par%ssa_lis_opt)
+                                     z_bed,z_srf,dx,dy,par%ssa_vel_max,par%boundaries,par%ssa_lis_opt)
 
 
             ! Apply relaxation to keep things stable

@@ -51,7 +51,7 @@ contains
                                   beta,beta_acx,beta_acy,visc_eff,visc_eff_int,  &
                                   ssa_mask_acx,ssa_mask_acy,ssa_err_acx,ssa_err_acy,ssa_iter_now, &
                                   c_bed,taud_acx,taud_acy,H_ice,f_ice,H_grnd,f_grnd, &
-                                  f_grnd_acx,f_grnd_acy,ATT,zeta_aa,zeta_ac,z_sl,z_bed,dx,dy,n_glen,par)
+                                  f_grnd_acx,f_grnd_acy,ATT,zeta_aa,zeta_ac,z_sl,z_bed,z_srf,dx,dy,n_glen,par)
         ! This subroutine is used to solve the horizontal velocity system (ux,uy)
         ! following the L1L2 solver formulation (ie, depth-integrated solver
         ! that reduces to SIA in the limit of zero sliding), as outlined 
@@ -94,6 +94,7 @@ contains
         real(prec), intent(IN)    :: zeta_ac(:)         ! [-]
         real(prec), intent(IN)    :: z_sl(:,:)          ! [m]
         real(prec), intent(IN)    :: z_bed(:,:)         ! [m]
+        real(prec), intent(IN)    :: z_srf(:,:)         ! [m]
         real(prec), intent(IN)    :: dx                 ! [m]
         real(prec), intent(IN)    :: dy                 ! [m]
         real(prec), intent(IN)    :: n_glen 
@@ -218,7 +219,7 @@ end if
                 ! Call ssa solver
                 call calc_vxy_ssa_matrix(ux_b,uy_b,L2_norm,beta_acx,beta_acy,visc_eff_int,  &
                                          ssa_mask_acx,ssa_mask_acy,H_ice,f_ice,taud_acx,taud_acy,H_grnd,z_sl, &
-                                         z_bed,dx,dy,par%ssa_vel_max,par%boundaries,par%ssa_lis_opt)
+                                         z_bed,z_srf,dx,dy,par%ssa_vel_max,par%boundaries,par%ssa_lis_opt)
 
 
                 ! Apply relaxation to keep things stable

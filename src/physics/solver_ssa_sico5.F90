@@ -56,7 +56,8 @@ contains
         integer    :: i1, j1, i00, j00
         real(prec) :: inv_dxi, inv_deta, inv_dxi_deta, inv_dxi2, inv_deta2
         real(prec) :: factor_rhs_2, factor_rhs_3a, factor_rhs_3b
-        real(prec) :: rho_sw_ice, H_ice_now, beta_now, taud_now, H_ocn_now    
+        real(prec) :: rho_sw_ice, H_ice_now, beta_now, taud_now, H_ocn_now
+        real(prec) :: vis_int_g_ip1, vis_int_g_jp1     
         integer    :: IMAX, JMAX 
 
         integer, allocatable    :: n2i(:), n2j(:)
@@ -553,17 +554,16 @@ contains
                         ! =========================================================
                         ! Generalized solution for all ice fronts (floating and grounded)
 
-                        H_ice_now = H_ice(i1,j)
-                        !H_ice_now = H_ice(i1,j)/f_ice(i1,j)
+                        H_ice_now = H_ice(i1,j)         ! No f_ice scaling since all points treated have f_ice=0/1
 
                         if (z_sl(i1,j)-z_bed(i1,j) .gt. 0.0) then 
-                        ! Bed below sea level
+                            ! Bed below sea level
 
                             H_ocn_now = min(rho_ice/rho_sw*H_ice_now, &         ! Flotation depth 
-                                              z_sl(i1,j)-z_bed(i1,j))           ! Grounded depth 
+                                                z_sl(i1,j)-z_bed(i1,j))         ! Grounded depth 
 
                         else 
-                        ! Bed above sea level
+                            ! Bed above sea level
 
                             H_ocn_now = 0.0 
 
@@ -638,7 +638,16 @@ contains
                 ! === Proceed with normal ssa solution =================
                 ! inner point on the staggered grid in x-direction
                 ! ie, if ( (i /= nx).and.(j /= 1).and.(j /= ny) ) then
-             
+                    
+                    ! Get neighbor viscosity on aa-nodes, but 
+                    ! make sure it is ice covered (could be important 
+                    ! when disable_grounded_fronts==.TRUE.)
+                    if (f_ice(i,ip1) .eq. 1.0) then 
+                        vis_int_g_ip1 = vis_int_g(i+1,j)
+                    else
+                        vis_int_g_ip1 = vis_int_g(i,j) 
+                    end if 
+
                     ! inner shelfy stream or floating ice 
 
                     nc = 2*ij2n(i-1,j)-1
@@ -669,7 +678,7 @@ contains
 !                     end if
                     k = k+1
                     lgs_a_value(k) = -4.0_prec*inv_dxi2 &
-                                            *(vis_int_g(i+1,j)+vis_int_g(i,j)) &
+                                            *(vis_int_g_ip1+vis_int_g(i,j)) &
                                      -inv_deta2 &
                                             *(vis_int_sgxy(i,j)+vis_int_sgxy(i,j-1)) &
                                      -beta_now
@@ -692,20 +701,20 @@ contains
                         ! next nc (column counter), for vy_m(i+1,j-1)
                     k  = k+1
                     lgs_a_value(k) = -inv_dxi_deta &
-                                  *(2.0_prec*vis_int_g(i+1,j)+vis_int_sgxy(i,j-1))
+                                  *(2.0_prec*vis_int_g_ip1+vis_int_sgxy(i,j-1))
                     lgs_a_index(k) = nc
 
                     nc = 2*ij2n(i+1,j)-1
                         ! next nc (column counter), for vx_m(i+1,j)
                     k = k+1
-                    lgs_a_value(k) = 4.0_prec*inv_dxi2*vis_int_g(i+1,j)
+                    lgs_a_value(k) = 4.0_prec*inv_dxi2*vis_int_g_ip1
                     lgs_a_index(k) = nc
 
                     nc = 2*ij2n(i+1,j)
                         ! largest nc (column counter), for vy_m(i+1,j)
                     k  = k+1
                     lgs_a_value(k) = inv_dxi_deta &
-                                    *(2.0_prec*vis_int_g(i+1,j)+vis_int_sgxy(i,j))
+                                    *(2.0_prec*vis_int_g_ip1+vis_int_sgxy(i,j))
                     lgs_a_index(k) = nc
 
                     lgs_b_value(nr) = taud_now
@@ -989,13 +998,12 @@ contains
                         ! =========================================================
                         ! Generalized solution for all ice fronts (floating and grounded)
             
-                        H_ice_now = H_ice(i,j1)
-                        !H_ice_now = H_ice(i,j1)/f_ice(i,j1)
-
+                        H_ice_now = H_ice(i,j1)     ! No f_ice scaling since all points treated have f_ice=0/1
+                        
                         if (z_sl(i,j1)-z_bed(i,j1) .gt. 0.0) then 
                             ! Bed below sea level 
                             H_ocn_now = min(rho_ice/rho_sw*H_ice_now, &     ! Flotation depth 
-                                          z_sl(i,j1)-z_bed(i,j1))           ! Grounded depth 
+                                                z_sl(i,j1)-z_bed(i,j1))     ! Grounded depth 
 
                         else 
                             ! Bed above sea level 
@@ -1050,7 +1058,16 @@ contains
                 ! === Proceed with normal ssa solution =================
                 ! inner point on the staggered grid in y-direction
                 ! ie, if ( (j /= ny).and.(i /= 1).and.(i /= nx) ) then
-             
+                    
+                    ! Get neighbor viscosity on aa-nodes, but 
+                    ! make sure it is ice covered (could be important 
+                    ! when disable_grounded_fronts==.TRUE.)
+                    if (f_ice(i,jp1) .eq. 1.0) then 
+                        vis_int_g_jp1 = vis_int_g(i,j+1)
+                    else
+                        vis_int_g_jp1 = vis_int_g(i,j) 
+                    end if 
+
                     ! inner shelfy stream or floating ice 
 
                     nc = 2*ij2n(i-1,j)-1
@@ -1070,7 +1087,7 @@ contains
                         ! next nc (column counter), for vx_m(i-1,j+1)
                     k = k+1
                     lgs_a_value(k) = -inv_dxi_deta &
-                                          *(2.0_prec*vis_int_g(i,j+1)+vis_int_sgxy(i-1,j))
+                                          *(2.0_prec*vis_int_g_jp1+vis_int_sgxy(i-1,j))
                     lgs_a_index(k) = nc
 
                     if (j .eq. 1) then  ! ajr: filler to avoid LIS errors 
@@ -1101,7 +1118,7 @@ contains
 !                     end if
                     k = k+1
                     lgs_a_value(k) = -4.0_prec*inv_deta2 &
-                                        *(vis_int_g(i,j+1)+vis_int_g(i,j)) &
+                                        *(vis_int_g_jp1+vis_int_g(i,j)) &
                                      -inv_dxi2 &
                                         *(vis_int_sgxy(i,j)+vis_int_sgxy(i-1,j)) &
                                      -beta_now
@@ -1111,13 +1128,13 @@ contains
                         ! next nc (column counter), for vx_m(i,j+1)
                     k = k+1
                     lgs_a_value(k) = inv_dxi_deta &
-                                    *(2.0_prec*vis_int_g(i,j+1)+vis_int_sgxy(i,j))
+                                    *(2.0_prec*vis_int_g_jp1+vis_int_sgxy(i,j))
                     lgs_a_index(k) = nc
 
                     nc = 2*ij2n(i,j+1)
                         ! next nc (column counter), for vy_m(i,j+1)
                     k = k+1
-                    lgs_a_value(k) = 4.0_prec*inv_deta2*vis_int_g(i,j+1)
+                    lgs_a_value(k) = 4.0_prec*inv_deta2*vis_int_g_jp1
                     lgs_a_index(k) = nc
 
                     nc = 2*ij2n(i+1,j)
@@ -1638,7 +1655,7 @@ contains
 
         end do
         end do
-        
+
         return 
 
     end subroutine stagger_visc_aa_ab

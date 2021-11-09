@@ -61,9 +61,9 @@ contains
 
         character(len=1012) :: kill_txt
 
-        integer :: ij(2) 
-        integer :: max_dt_used 
-        integer :: min_dt_used 
+        integer  :: ij(2) 
+        real(wp) :: max_dt_used 
+        real(wp) :: min_dt_used 
 
         ! Safety: check status of model object, 
         ! Has it been initialized?
@@ -498,6 +498,9 @@ contains
                 T_mean = 0.0_prec
             end if 
 
+            n       = count(dt_save .ne. missing_value)
+            n_dtmin = count( abs(dt_save(1:n)-dom%par%dt_min) .lt. dom%par%dt_min*1e-3 )
+
             if (n .gt. 0) then 
                 max_dt_used = maxval(dt_save(1:n))
                 min_dt_used = minval(dt_save(1:n))
@@ -505,9 +508,6 @@ contains
                 max_dt_used = 0.0 
                 min_dt_used = 0.0 
             end if 
-
-            n       = count(dt_save .ne. missing_value)
-            n_dtmin = count( abs(dt_save(1:n)-dom%par%dt_min) .lt. dom%par%dt_min*1e-3 )
 
             write(*,"(a,f13.2,f10.2,f10.1,f8.1,2G10.3,1i6)") &
                         "yelmo:: timelog:", &

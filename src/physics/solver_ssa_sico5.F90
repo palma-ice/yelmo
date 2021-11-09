@@ -645,7 +645,7 @@ contains
                     ! Get neighbor viscosity on aa-nodes, but 
                     ! make sure it is ice covered (could be important 
                     ! when disable_grounded_fronts==.TRUE.)
-                    if (f_ice(i,ip1) .eq. 1.0) then 
+                    if (f_ice(i,i+1) .eq. 1.0) then 
                         vis_int_g_ip1 = vis_int_g(i+1,j)
                     else
                         vis_int_g_ip1 = vis_int_g(i,j) 
@@ -1065,7 +1065,7 @@ contains
                     ! Get neighbor viscosity on aa-nodes, but 
                     ! make sure it is ice covered (could be important 
                     ! when disable_grounded_fronts==.TRUE.)
-                    if (f_ice(i,jp1) .eq. 1.0) then 
+                    if (f_ice(i,j+1) .eq. 1.0) then 
                         vis_int_g_jp1 = vis_int_g(i,j+1)
                     else
                         vis_int_g_jp1 = vis_int_g(i,j) 

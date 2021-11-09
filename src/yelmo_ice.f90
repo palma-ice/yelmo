@@ -498,9 +498,12 @@ contains
                 T_mean = 0.0_prec
             end if 
 
-            if (size(dt_save) .gt. 0.0) then 
+            if (n .gt. 0) then 
                 max_dt_used = maxval(dt_save(1:n))
                 min_dt_used = minval(dt_save(1:n))
+            else 
+                max_dt_used = 0.0 
+                min_dt_used = 0.0 
             end if 
 
             n       = count(dt_save .ne. missing_value)

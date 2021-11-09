@@ -58,7 +58,9 @@ module yelmo_tools
     public :: set_boundaries_2D_aa
     public :: set_boundaries_3D_aa
     public :: set_boundaries_2D_acx
+    public :: set_boundaries_3D_acx
     public :: set_boundaries_2D_acy 
+    public :: set_boundaries_3D_acy 
 
     public :: fill_borders_2D
     public :: fill_borders_3D 
@@ -3096,6 +3098,59 @@ contains
 
     end subroutine set_boundaries_2D_acx
 
+    subroutine set_boundaries_3D_acx(var_acx,boundaries)
+
+        implicit none 
+
+        real(wp), intent(INOUT) :: var_acx(:,:,:) 
+        character(len=*), intent(IN) :: boundaries 
+
+        ! Local variables 
+        integer :: nx, ny  
+
+        nx = size(var_acx,1) 
+        ny = size(var_acx,2) 
+
+        select case(trim(boundaries))
+
+            case("periodic") 
+
+                var_acx(1,:,:)    = var_acx(nx-2,:,:) 
+                var_acx(nx-1,:,:) = var_acx(2,:,:) 
+                var_acx(nx,:,:)   = var_acx(3,:,:) 
+                var_acx(:,1,:)    = var_acx(:,ny-1,:)
+                var_acx(:,ny,:)   = var_acx(:,2,:) 
+                
+            case("periodic-x") 
+                
+                var_acx(1,:,:)    = var_acx(nx-2,:,:) 
+                var_acx(nx-1,:,:) = var_acx(2,:,:) 
+                var_acx(nx,:,:)   = var_acx(3,:,:) 
+                var_acx(:,1,:)    = var_acx(:,2,:)
+                var_acx(:,ny,:)   = var_acx(:,ny-1,:) 
+
+            case("infinite") 
+                
+                var_acx(1,:,:)    = var_acx(2,:,:) 
+                var_acx(nx-1,:,:) = var_acx(nx-2,:,:) 
+                var_acx(nx,:,:)   = var_acx(nx-1,:,:) 
+                var_acx(:,1,:)    = var_acx(:,2,:)
+                var_acx(:,ny,:)   = var_acx(:,ny-1,:) 
+
+            case("MISMIP3D") 
+                
+                var_acx(1,:,:)    = var_acx(2,:,:) 
+                var_acx(nx-1,:,:) = var_acx(nx-2,:,:) 
+                var_acx(nx,:,:)   = var_acx(nx-1,:,:) 
+                var_acx(:,1,:)    = var_acx(:,2,:)
+                var_acx(:,ny,:)   = var_acx(:,ny-1,:) 
+
+        end select 
+
+        return 
+
+    end subroutine set_boundaries_3D_acx
+    
     subroutine set_boundaries_2D_acy(var_acy,boundaries)
 
         implicit none 
@@ -3148,6 +3203,59 @@ contains
         return 
 
     end subroutine set_boundaries_2D_acy
+
+    subroutine set_boundaries_3D_acy(var_acy,boundaries)
+
+        implicit none 
+
+        real(wp), intent(INOUT) :: var_acy(:,:,:) 
+        character(len=*), intent(IN) :: boundaries 
+
+        ! Local variables 
+        integer :: nx, ny  
+
+        nx = size(var_acy,1) 
+        ny = size(var_acy,2) 
+
+        select case(trim(boundaries))
+
+            case("periodic") 
+
+                var_acy(1,:,:)    = var_acy(nx-1,:,:) 
+                var_acy(nx,:,:)   = var_acy(2,:,:) 
+                var_acy(:,1,:)    = var_acy(:,ny-2,:)
+                var_acy(:,ny-1,:) = var_acy(:,2,:) 
+                var_acy(:,ny,:)   = var_acy(:,3,:)
+
+            case("periodic-x") 
+                
+                var_acy(1,:,:)    = var_acy(nx-1,:,:) 
+                var_acy(nx,:,:)   = var_acy(2,:,:) 
+                var_acy(:,1,:)    = var_acy(:,2,:)
+                var_acy(:,ny-1,:) = var_acy(:,ny-2,:) 
+                var_acy(:,ny,:)   = var_acy(:,ny-1,:)
+
+            case("infinite") 
+                
+                var_acy(1,:,:)    = var_acy(2,:,:) 
+                var_acy(nx,:,:)   = var_acy(nx-1,:,:) 
+                var_acy(:,1,:)    = var_acy(:,2,:)
+                var_acy(:,ny-1,:) = var_acy(:,ny-2,:) 
+                var_acy(:,ny,:)   = var_acy(:,ny-1,:)
+
+            case("MISMIP3D") 
+                
+                var_acy(1,:,:)    = var_acy(2,:,:) 
+                var_acy(nx,:,:)   = var_acy(nx-1,:,:) 
+                var_acy(:,1,:)    = var_acy(:,2,:)
+                var_acy(:,ny-1,:) = var_acy(:,ny-2,:) 
+                var_acy(:,ny,:)   = var_acy(:,ny-1,:)
+
+        end select 
+
+        return 
+
+    end subroutine set_boundaries_3D_acy
 
     subroutine fill_borders_2D(var,nfill,fill)
 

@@ -6,7 +6,8 @@ module velocity_diva
                     staggerdiff_nodes_acx_ab_ice, staggerdiff_nodes_acy_ab_ice, &
                     staggerdiffcross_nodes_acx_ab_ice, staggerdiffcross_nodes_acy_ab_ice, &
                     integrate_trapezoid1D_1D, integrate_trapezoid1D_pt, minmax, &
-                    set_boundaries_2D_aa, set_boundaries_3D_aa
+                    set_boundaries_2D_aa, set_boundaries_3D_aa, set_boundaries_3D_acx, &
+                    set_boundaries_3D_acy
 
     use basal_dragging 
     use solver_ssa_sico5 
@@ -405,50 +406,9 @@ end if
         end do
 
         ! Apply boundary conditions as needed 
-        if (trim(boundaries) .eq. "periodic") then
-
-            ux(1,:,:)    = ux(nx-2,:,:) 
-            ux(nx-1,:,:) = ux(2,:,:) 
-            ux(nx,:,:)   = ux(3,:,:) 
-            ux(:,1,:)    = ux(:,ny-1,:)
-            ux(:,ny,:)   = ux(:,2,:) 
-
-            uy(1,:,:)    = uy(nx-1,:,:) 
-            uy(nx,:,:)   = uy(2,:,:) 
-            uy(:,1,:)    = uy(:,ny-2,:)
-            uy(:,ny-1,:) = uy(:,2,:) 
-            uy(:,ny,:)   = uy(:,3,:)
-
-        else if (trim(boundaries) .eq. "periodic-x") then 
-            
-            ux(1,:,:)    = ux(nx-2,:,:) 
-            ux(nx-1,:,:) = ux(2,:,:) 
-            ux(nx,:,:)   = ux(3,:,:) 
-            ux(:,1,:)    = ux(:,2,:)
-            ux(:,ny,:)   = ux(:,ny-1,:) 
-
-            uy(1,:,:)    = uy(nx-1,:,:) 
-            uy(nx,:,:)   = uy(2,:,:) 
-            uy(:,1,:)    = uy(:,2,:)
-            uy(:,ny-1,:) = uy(:,ny-2,:) 
-            uy(:,ny,:)   = uy(:,ny-1,:)
-
-        else if (trim(boundaries) .eq. "infinite") then 
-            
-            ux(1,:,:)    = ux(2,:,:) 
-            ux(nx-1,:,:) = ux(nx-2,:,:) 
-            ux(nx,:,:)   = ux(nx-1,:,:) 
-            ux(:,1,:)    = ux(:,2,:)
-            ux(:,ny,:)   = ux(:,ny-1,:) 
-
-            uy(1,:,:)    = uy(2,:,:) 
-            uy(nx,:,:)   = uy(nx-1,:,:) 
-            uy(:,1,:)    = uy(:,2,:)
-            uy(:,ny-1,:) = uy(:,ny-2,:) 
-            uy(:,ny,:)   = uy(:,ny-1,:)
-
-        end if 
-
+        call set_boundaries_3D_acx(ux,boundaries)
+        call set_boundaries_3D_acy(uy,boundaries)
+        
         return 
 
     end subroutine calc_vel_horizontal_3D
@@ -510,64 +470,9 @@ end if
         !$omp end parallel do
 
         ! Apply boundary conditions as needed 
-        if (trim(boundaries) .eq. "periodic") then
-
-            duxdz(1,:,:)    = duxdz(nx-2,:,:) 
-            duxdz(nx-1,:,:) = duxdz(2,:,:) 
-            duxdz(nx,:,:)   = duxdz(3,:,:) 
-            duxdz(:,1,:)    = duxdz(:,ny-1,:)
-            duxdz(:,ny,:)   = duxdz(:,2,:) 
-
-            duydz(1,:,:)    = duydz(nx-1,:,:) 
-            duydz(nx,:,:)   = duydz(2,:,:) 
-            duydz(:,1,:)    = duydz(:,ny-2,:)
-            duydz(:,ny-1,:) = duydz(:,2,:) 
-            duydz(:,ny,:)   = duydz(:,3,:)
-
-        else if (trim(boundaries) .eq. "periodic-x") then 
-                
-            duxdz(1,:,:)    = duxdz(nx-2,:,:) 
-            duxdz(nx-1,:,:) = duxdz(2,:,:) 
-            duxdz(nx,:,:)   = duxdz(3,:,:) 
-            duxdz(:,1,:)    = duxdz(:,2,:)
-            duxdz(:,ny,:)   = duxdz(:,ny-1,:) 
-
-            duydz(1,:,:)    = duydz(nx-1,:,:) 
-            duydz(nx,:,:)   = duydz(2,:,:) 
-            duydz(:,1,:)    = duydz(:,2,:)
-            duydz(:,ny-1,:) = duydz(:,ny-2,:) 
-            duydz(:,ny,:)   = duydz(:,ny-1,:)
-
-        else if (trim(boundaries) .eq. "infinite") then 
-                
-            duxdz(1,:,:)    = duxdz(2,:,:) 
-            duxdz(nx-1,:,:) = duxdz(nx-2,:,:) 
-            duxdz(nx,:,:)   = duxdz(nx-1,:,:) 
-            duxdz(:,1,:)    = duxdz(:,2,:)
-            duxdz(:,ny,:)   = duxdz(:,ny-1,:) 
-
-            duydz(1,:,:)    = duydz(2,:,:) 
-            duydz(nx,:,:)   = duydz(nx-1,:,:) 
-            duydz(:,1,:)    = duydz(:,2,:)
-            duydz(:,ny-1,:) = duydz(:,ny-2,:) 
-            duydz(:,ny,:)   = duydz(:,ny-1,:)
-
-        else if (trim(boundaries) .eq. "MISMIP3D") then 
-
-            duxdz(1,:,:)    = duxdz(2,:,:) 
-            duxdz(nx-1,:,:) = duxdz(nx-2,:,:) 
-            duxdz(nx,:,:)   = duxdz(nx-1,:,:) 
-            duxdz(:,1,:)    = duxdz(:,2,:)
-            duxdz(:,ny,:)   = duxdz(:,ny-1,:) 
-
-            duydz(1,:,:)    = duydz(2,:,:) 
-            duydz(nx,:,:)   = duydz(nx-1,:,:) 
-            duydz(:,1,:)    = duydz(:,2,:)
-            duydz(:,ny-1,:) = duydz(:,ny-2,:) 
-            duydz(:,ny,:)   = duydz(:,ny-1,:)
-
-        end if 
-
+        call set_boundaries_3D_acx(duxdz,boundaries)
+        call set_boundaries_3D_acy(duydz,boundaries)
+        
         return 
 
     end subroutine calc_vertical_shear_3D

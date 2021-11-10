@@ -75,15 +75,16 @@ contains
         ! Boundary conditions counterclockwise unit circle 
         ! 1: x, right-border
         ! 2: y, upper-border 
-        ! 3: x, left-border 
+        ! 3: x, left--border 
         ! 4: y, lower-border 
         character(len=56) :: boundaries_vx(4)
         character(len=56) :: boundaries_vy(4)
 
         integer :: im1, ip1, jm1, jp1 
 
-        real(wp) :: p_av 
-
+        real(wp) :: f_submerged
+        real(wp) :: tau_bc_int 
+        real(wp) :: tau_bc_sign
 
 ! Include header for lis solver fortran interface
 #include "lisf.h"
@@ -522,8 +523,10 @@ contains
 
                     if (is_front_1(i,j)) then
                         i1 = i     ! ice-front marker
+                        tau_bc_sign = 1.0 
                     else   ! is_front_1(i+1,j)==.true.
                         i1 = i+1   ! ice-front marker 
+                        tau_bc_sign = -1.0 
                     end if
     
                     if ( (.not. is_front_2(i1-1,j)) .or. (.not. is_front_2(i1+1,j)) ) then
@@ -554,27 +557,36 @@ contains
                         lgs_a_value(k) = 2.0_prec*inv_deta*vis_int_g(i1,j)
                         lgs_a_index(k) = nc
 
+                        ! Old formulation from sicopolis, only valid for 
+                        ! floating ice margins:
                         !lgs_b_value(nr) = factor_rhs_2*H_ice(i1,j)*H_ice(i1,j)
 
                         ! =========================================================
                         ! Generalized solution for all ice fronts (floating and grounded)
+                        ! See Lipscomb et al. (2019), Eqs. 11 & 12, and 
+                        ! Winkelmann et al. (2011), Eq. 27 
 
-                        H_ice_now = H_ice(i1,j)         ! No f_ice scaling since all points treated have f_ice=0/1
+                        ! Get current ice thickness
+                        ! (No f_ice scaling since all points treated have f_ice=0/1)
+                        H_ice_now = H_ice(i1,j)     
 
-                        ! Using CISM formula 
+                        ! Get current ocean thickness bordering ice sheet
+                        ! (for bedrock above sea level, this will give zero)
+                        f_submerged = 1.d0 - min((z_srf(i1,j)-z_sl(i1,j))/H_ice_now,1.d0)
+                        H_ocn_now   = H_ice_now*f_submerged
+                        
+                        tau_bc_int = 0.5d0*rho_ice*g*H_ice_now**2 &         ! tau_out_int                                                ! p_out
+                                   - 0.5d0*rho_sw *g*H_ocn_now**2           ! tau_in_int
 
-                        ! This formula works not just for floating ice, but for any edge between
-                        !  an ice-covered marine-based cell and an ocean cell.
-                        p_av = 0.5d0*rho_ice*g*H_ice_now &                                                  ! p_out
-                             - 0.5d0*rho_sw *g*H_ice_now * (1.d0 - min(z_srf(i1,j)/H_ice_now,1.d0))**2      ! p_in
+                        ! =========================================================
+              
+                        ! Assign matrix values
+                        !lgs_b_value(nr) = tau_bc_sign*tau_bc_int
+                        lgs_b_value(nr) = tau_bc_int
+                        lgs_x_value(nr) = vx_m(i,j)
+                
 
-                        ! This formula works for floating ice.
-                        ! It can be derived from the formula above using Archimedes: rhoi*h = rhoo*(h-s) 
-                        ! p_av = 0.5d0*rhoi*grav*h_qp * (1.d0 - rhoi/rhoo)
-
-                        ! Convert to [Pa m] and store
-                        lgs_b_value(nr) = p_av*H_ice_now
-
+                        ! ajr: diagnostic tests!!
 !                         if (i .eq. 80 .and. j .eq. 70) then 
 !                             ! Margin point
 !                             write(*,*) "front ", vx_m(i1,j), vx_m(i1-1,j), vy_m(i1,j), vy_m(i1,j-1)
@@ -598,9 +610,7 @@ contains
 !                         end if 
 
                         ! =========================================================
-              
-                        lgs_x_value(nr) = vx_m(i,j)
-              
+
                     else    ! (is_front_2(i1-1,j)==.true.).and.(is_front_2(i1+1,j)==.true.);
                             ! velocity assumed to be zero
 
@@ -642,14 +652,11 @@ contains
                 ! inner point on the staggered grid in x-direction
                 ! ie, if ( (i /= nx).and.(j /= 1).and.(j /= ny) ) then
                     
-                    ! Get neighbor viscosity on aa-nodes, but 
-                    ! make sure it is ice covered (could be important 
-                    ! when disable_grounded_fronts==.TRUE.)
-                    if (f_ice(i,i+1) .eq. 1.0) then 
-                        vis_int_g_ip1 = vis_int_g(i+1,j)
-                    else
-                        vis_int_g_ip1 = vis_int_g(i,j) 
-                    end if 
+                    ! ajr: this value needs to be checked if some boundary
+                    ! cases are not handled via front-checking (could be 
+                    ! using viscosity from an ice-free point). See 
+                    ! limit_lateral_bc in set_sico_masks.
+                    vis_int_g_ip1 = vis_int_g(i+1,j)
 
                     ! inner shelfy stream or floating ice 
 
@@ -964,8 +971,10 @@ contains
 
                     if (is_front_1(i,j)) then
                         j1 = j     ! ice-front marker
+                        tau_bc_sign = 1.0 
                     else   ! is_front_1(i,j+1)==.true.
                         j1 = j+1   ! ice-front marker
+                        tau_bc_sign = -1.0 
                     end if
 
                     if ( (.not. is_front_2(i,j1-1)) .or. (.not. is_front_2(i,j1+1)) ) then
@@ -996,29 +1005,32 @@ contains
                         lgs_a_value(k) = 4.0_prec*inv_deta*vis_int_g(i,j1)
                         lgs_a_index(k) = nc
 
+                        ! Old formulation from sicopolis, only valid for 
+                        ! floating ice margins:
 !                         lgs_b_value(nr) = factor_rhs_2*H_ice(i,j1)*H_ice(i,j1)
 
                         ! =========================================================
                         ! Generalized solution for all ice fronts (floating and grounded)
-            
-                        H_ice_now = H_ice(i,j1)     ! No f_ice scaling since all points treated have f_ice=0/1
-                        
-                        ! Using CISM v2.0 formula 
+                        ! See Lipscomb et al. (2019), Eqs. 11 & 12, and 
+                        ! Winkelmann et al. (2011), Eq. 27 
 
-                        ! This formula works not just for floating ice, but for any edge between
-                        !  an ice-covered marine-based cell and an ocean cell.
-                        p_av = 0.5d0*rho_ice*g*H_ice_now &                                                  ! p_out
-                             - 0.5d0*rho_sw *g*H_ice_now * (1.d0 - min(z_srf(i,j1)/H_ice_now,1.d0))**2      ! p_in
+                        ! Get current ice thickness
+                        ! (No f_ice scaling since all points treated have f_ice=0/1)
+                        H_ice_now = H_ice(i,j1)     
 
-                        ! This formula works for floating ice only.
-                        ! It can be derived from the formula above using Archimedes: rhoi*h = rhoo*(h-s) 
-                        ! p_av = 0.5d0*rhoi*grav*h_qp * (1.d0 - rhoi/rhoo)
+                        ! Get current ocean thickness bordering ice sheet
+                        ! (for bedrock above sea level, this will give zero)
+                        f_submerged = 1.d0 - min((z_srf(i,j1)-z_sl(i,j1))/H_ice_now,1.d0)
+                        H_ocn_now   = H_ice_now*f_submerged
 
-                        ! Convert to [Pa m] and store
-                        lgs_b_value(nr) = p_av*H_ice_now
-                        
+                        tau_bc_int = 0.5d0*rho_ice*g*H_ice_now**2 &         ! tau_out_int                                                ! p_out
+                                   - 0.5d0*rho_sw *g*H_ocn_now**2           ! tau_in_int
+
                         ! =========================================================
               
+                        ! Assign matrix values
+                        !lgs_b_value(nr) = tau_bc_sign*tau_bc_int
+                        lgs_b_value(nr) = tau_bc_int
                         lgs_x_value(nr) = vy_m(i,j)
              
                     else    ! (is_front_2(i,j1-1)==.true.).and.(is_front_2(i,j1+1)==.true.);
@@ -1062,14 +1074,11 @@ contains
                 ! inner point on the staggered grid in y-direction
                 ! ie, if ( (j /= ny).and.(i /= 1).and.(i /= nx) ) then
                     
-                    ! Get neighbor viscosity on aa-nodes, but 
-                    ! make sure it is ice covered (could be important 
-                    ! when disable_grounded_fronts==.TRUE.)
-                    if (f_ice(i,j+1) .eq. 1.0) then 
-                        vis_int_g_jp1 = vis_int_g(i,j+1)
-                    else
-                        vis_int_g_jp1 = vis_int_g(i,j) 
-                    end if 
+                    ! ajr: this value needs to be checked if some boundary
+                    ! cases are not handled via front-checking (could be 
+                    ! using viscosity from an ice-free point). See 
+                    ! limit_lateral_bc in set_sico_masks.
+                    vis_int_g_jp1 = vis_int_g(i,j+1)
 
                     ! inner shelfy stream or floating ice 
 
@@ -1241,9 +1250,14 @@ contains
         deallocate(lgs_a_value, lgs_a_index, lgs_a_ptr)
         deallocate(lgs_b_value, lgs_x_value)
 
+        ! Limit the velocity at the grounded margin for safety 
+        ! to be x-times the upstream neighbor (eg, not more than 2x the upstream neighbor)
+        !call limit_vel_grounded_margin(vx_m,vy_m,is_front_1,is_front_2,H_grnd)
+        
         ! Limit the velocity generally =====================
         call limit_vel(vx_m,ulim)
         call limit_vel(vy_m,ulim)
+
 
         return 
 
@@ -1699,6 +1713,7 @@ contains
         ! "marine"   : only apply at floating ice margins and 
         !              grounded marine ice margins (grounded ice next to open ocean)
         ! "off"      : apply at all ice margins 
+        ! "none"     : do not apply boundary condition (for testing mainly)
         character(len=56), parameter :: limit_lateral_bc = "marine"
 
         nx = size(maske,1)
@@ -1780,6 +1795,11 @@ contains
           ! Disable some regions depending on choice above. 
           select case(trim(limit_lateral_bc))
 
+            case("none")
+                ! Disable front detection 
+
+                if (front1(i,j)) front1(i,j) = .FALSE. 
+
             case("floating")
                 ! Limit application of lateral bc to floating ice fronts only.
                 ! Ie, disable detection of grounded fronts for now.
@@ -1806,6 +1826,95 @@ contains
         
     end subroutine set_sico_masks
     
+    subroutine limit_vel_grounded_margin(ux,uy,front1,front2,H_grnd)
+        ! Apply a velocity limit (for stability)
+
+        implicit none 
+
+        real(wp), intent(INOUT) :: ux(:,:)  
+        real(wp), intent(INOUT) :: uy(:,:)
+        logical,  intent(IN)    :: front1(:,:)  
+        logical,  intent(IN)    :: front2(:,:)
+        real(wp), intent(IN)    :: H_grnd(:,:)
+
+        ! Local variables 
+        integer  :: i, j, nx, ny 
+        integer  :: im1, ip1, jm1, jp1 
+        integer  :: if, jf, iu, ju 
+        real(wp) :: ulim, umag 
+
+        real(wp), parameter :: f_upstream = 2.0 
+
+        nx = size(ux,1)
+        ny = size(ux,2) 
+
+        do j = 1, ny 
+        do i = 1, nx 
+
+            ! Define neighbor indices
+            im1 = max(i-1,1)
+            ip1 = min(i+1,nx)
+            jm1 = max(j-1,1)
+            jp1 = min(j+1,ny)
+            
+            if (front1(i,j) .and. H_grnd(i,j) .gt. 0.0) then 
+                ! This aa-node is a grounded ice front
+
+                ! === x-direction ===
+
+                ! Get index of the acx node of the front
+                if (front2(ip1,j)) then 
+                    if = i 
+                    iu = im1
+                else if (front2(im1,j)) then 
+                    if = im1 
+                    iu = i 
+                else
+                    if = 0
+                end if 
+
+                if (if .ne. 0) then 
+                    ! Margin acx node index found
+
+                    ulim = f_upstream*abs(ux(iu,j))
+                    umag = min(abs(ux(if,j)),ulim)
+
+                    ux(if,j) = sign(umag,ux(if,j))
+
+                end if 
+
+                ! === y-direction ===
+
+                ! Get index of the acy node of the front
+                if (front2(i,jp1)) then 
+                    jf = j 
+                    ju = jm1
+                else if (front2(i,jm1)) then 
+                    jf = jm1 
+                    ju = j 
+                else
+                    jf = 0
+                end if 
+
+                if (jf .ne. 0) then 
+                    ! Margin acy node index found
+
+                    ulim = f_upstream*abs(uy(i,ju))
+                    umag = min(abs(ux(i,jf)),ulim)
+
+                    ux(i,jf) = sign(umag,ux(i,jf))
+
+                end if 
+
+            end if 
+
+        end do 
+        end do 
+
+        return 
+
+    end subroutine limit_vel_grounded_margin
+
     elemental subroutine limit_vel(u,u_lim)
         ! Apply a velocity limit (for stability)
 

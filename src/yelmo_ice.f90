@@ -526,7 +526,7 @@ contains
 
     end subroutine yelmo_update
 
-    subroutine yelmo_update_equil(dom,time,time_tot,dt,topo_fixed,dyn_solver)
+    subroutine yelmo_update_equil(dom,time,time_tot,dt,topo_fixed,tpo_solver,dyn_solver)
         ! Iterate yelmo solutions to equilibrate without updating boundary conditions
 
         type(yelmo_class), intent(INOUT) :: dom
@@ -534,6 +534,7 @@ contains
         real(prec),        intent(IN)    :: time_tot          ! [yr] Equilibration time 
         real(prec),        intent(IN)    :: dt                ! Local dt to be used for all modules
         logical,           intent(IN)    :: topo_fixed        ! Should topography be fixed? 
+        character(len=*),  intent(IN), optional :: tpo_solver
         character(len=*),  intent(IN), optional :: dyn_solver
         
         ! Local variables 
@@ -551,6 +552,7 @@ contains
             ! Set new, temporary parameter values from arguments 
             dom%tpo%par%topo_fixed = topo_fixed 
 
+            if (present(tpo_solver)) dom%tpo%par%solver = tpo_solver 
             if (present(dyn_solver)) dom%dyn%par%solver = dyn_solver 
 
             ! Ensure during equilibration that at least 5 ssa iterations

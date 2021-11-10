@@ -41,6 +41,10 @@ contains
         select case(trim(solver))
             ! Choose solver to use 
 
+            case("none") 
+
+                ! Do nothing: no advection considered. 
+
             case("expl")
 
                 call calc_adv2D_expl(var_now,ux,uy,var_dot,dx,dy,dt)

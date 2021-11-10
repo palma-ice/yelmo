@@ -259,14 +259,14 @@ program yelmo_test
     
     if (.not. yelmo1%par%use_restart) then
 
-        ! Run full model (tpo,dyn,thrm) with SIA to smooth initial topo
-        call yelmo_update_equil(yelmo1,time,time_tot=10.0_prec,dt=0.2_prec,topo_fixed=.FALSE.,dyn_solver="sia")
+        ! Run full model (tpo,dyn,thrm) without advection to clean initial topo via mass balance
+        call yelmo_update_equil(yelmo1,time,time_tot=10.0_prec,dt=1.0_prec,topo_fixed=.FALSE.,tpo_solver="none")
 
         ! Run full model with correct solver (tpo,dyn,thrm)
         call yelmo_update_equil(yelmo1,time,time_tot=1.0_prec,dt=0.2_prec,topo_fixed=.FALSE.)
 
         ! Next equilibrate thermodynamics further and maintain constant ice topopgraphy (for speed)
-        ! call yelmo_update_equil(yelmo1,time,time_tot=1e2,dt=1.0_prec,topo_fixed=.TRUE.)
+        call yelmo_update_equil(yelmo1,time,time_tot=1e3,dt=10.0_wp,topo_fixed=.TRUE.)
 
     end if 
 

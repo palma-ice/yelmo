@@ -1693,7 +1693,13 @@ contains
         logical    :: is_float 
         real(prec) :: H_ocn_now 
 
-        logical, parameter :: disable_grounded_fronts = .TRUE. 
+        ! Use this to determine where to apply generalized lateral bc
+        ! equation.
+        ! "floating" : only apply at floating ice margins 
+        ! "marine"   : only apply at floating ice margins and 
+        !              grounded marine ice margins (grounded ice next to open ocean)
+        ! "off"      : apply at all ice margins 
+        character(len=56), parameter :: limit_lateral_bc = "marine"
 
         nx = size(maske,1)
         ny = size(maske,2)
@@ -1770,18 +1776,28 @@ contains
 
           end if 
 
-          if (disable_grounded_fronts) then 
-            ! Disable detection of grounded fronts for now,
-            ! because it is more stable this way...
+          ! So far all margins have been diagnosed (marine and grounded on land)
+          ! Disable some regions depending on choice above. 
+          select case(trim(limit_lateral_bc))
 
-            ! if ( front1(i,j) .and. maske(i,j) .eq. 0 ) front1(i,j) = .FALSE. 
+            case("floating")
+                ! Limit application of lateral bc to floating ice fronts only.
+                ! Ie, disable detection of grounded fronts for now.
+                ! Model is generally more stable this way.
 
-            H_ocn_now = z_sl(i,j)-z_bed(i,j)
+                if ( front1(i,j) .and. maske(i,j) .eq. 0 ) front1(i,j) = .FALSE. 
 
-            if ( front1(i,j) .and. maske(i,j) .eq. 0 .and. &
+            case("marine")
+                ! Limit application of lateral bc to floating ice fronts 
+                ! and grounded marine fronts. 
+                ! Only disable detection of ice fronts grounded above sea level.
+            
+                H_ocn_now = max(z_sl(i,j)-z_bed(i,j),0.0_wp)
+
+                if ( front1(i,j) .and. maske(i,j) .eq. 0 .and. &
                                     H_ocn_now .eq. 0.0 ) front1(i,j) = .FALSE. 
             
-          end if 
+           end select
 
         end do
         end do

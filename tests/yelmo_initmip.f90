@@ -266,7 +266,7 @@ program yelmo_test
         call yelmo_update_equil(yelmo1,time,time_tot=1.0_prec,dt=0.2_prec,topo_fixed=.FALSE.)
 
         ! Next equilibrate thermodynamics further and maintain constant ice topopgraphy (for speed)
-        call yelmo_update_equil(yelmo1,time,time_tot=1e3,dt=10.0_wp,topo_fixed=.TRUE.)
+        !call yelmo_update_equil(yelmo1,time,time_tot=1e3,dt=10.0_wp,topo_fixed=.TRUE.)
 
     end if 
 

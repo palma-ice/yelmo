@@ -657,7 +657,7 @@ contains
                     ! using viscosity from an ice-free point). See 
                     ! limit_lateral_bc in set_sico_masks.
                     vis_int_g_ip1 = vis_int_g(i+1,j)
-
+                    
                     ! inner shelfy stream or floating ice 
 
                     nc = 2*ij2n(i-1,j)-1
@@ -1817,6 +1817,10 @@ contains
                 if ( front1(i,j) .and. maske(i,j) .eq. 0 .and. &
                                     H_ocn_now .eq. 0.0 ) front1(i,j) = .FALSE. 
             
+            case DEFAULT ! (eg, limit_lateral_bc="all")
+
+                ! Do nothing - all fronts have been accurately diagnosed. 
+
            end select
 
         end do

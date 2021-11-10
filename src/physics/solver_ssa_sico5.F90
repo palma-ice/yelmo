@@ -58,7 +58,8 @@ contains
         real(prec) :: inv_dxi, inv_deta, inv_dxi_deta, inv_dxi2, inv_deta2
         real(prec) :: factor_rhs_2, factor_rhs_3a, factor_rhs_3b
         real(prec) :: rho_sw_ice, H_ice_now, beta_now, taud_now, H_ocn_now
-        real(prec) :: vis_int_g_ip1, vis_int_g_jp1     
+        real(prec) :: vis_int_g_ip1, vis_int_g_jp1
+        real(wp)   :: vis_int_g_mid 
         integer    :: IMAX, JMAX 
 
         integer, allocatable    :: n2i(:), n2j(:)
@@ -656,7 +657,16 @@ contains
                     ! cases are not handled via front-checking (could be 
                     ! using viscosity from an ice-free point). See 
                     ! limit_lateral_bc in set_sico_masks.
-                    vis_int_g_ip1 = vis_int_g(i+1,j)
+                    vis_int_g_ip1 = vis_int_g(i+1,j)    ! Original 
+                    !vis_int_g_ip1 = vis_int_g(i,j)      ! ajr test
+
+                    if (f_ice(i,j) .eq. 1.0 .and. f_ice(i+1,j) .lt. 1.0) then 
+                        vis_int_g_mid = vis_int_g(i,j) 
+                    else if (f_ice(i,j) .eq. 1.0 .and. f_ice(i+1,j) .lt. 1.0) then 
+                        vis_int_g_mid = vis_int_g(i+1,j) 
+                    else 
+                        vis_int_g_mid = 0.5*(vis_int_g(i,j)+vis_int_g(i+1,j))
+                    end if 
                     
                     ! inner shelfy stream or floating ice 
 
@@ -686,9 +696,16 @@ contains
 !                                      //'Check for diagonal element failed!'
 !                         call error(errormsg)
 !                     end if
+                    ! k = k+1
+                    ! lgs_a_value(k) = -4.0_prec*inv_dxi2 &
+                    !                         *(vis_int_g_ip1+vis_int_g(i,j)) &
+                    !                  -inv_deta2 &
+                    !                         *(vis_int_sgxy(i,j)+vis_int_sgxy(i,j-1)) &
+                    !                  -beta_now
+                    ! lgs_a_index(k) = nc
                     k = k+1
-                    lgs_a_value(k) = -4.0_prec*inv_dxi2 &
-                                            *(vis_int_g_ip1+vis_int_g(i,j)) &
+                    lgs_a_value(k) = -4.0_prec*inv_dxi &
+                                            *(vis_int_g_mid) &
                                      -inv_deta2 &
                                             *(vis_int_sgxy(i,j)+vis_int_sgxy(i,j-1)) &
                                      -beta_now
@@ -1078,7 +1095,16 @@ contains
                     ! cases are not handled via front-checking (could be 
                     ! using viscosity from an ice-free point). See 
                     ! limit_lateral_bc in set_sico_masks.
-                    vis_int_g_jp1 = vis_int_g(i,j+1)
+                    vis_int_g_jp1 = vis_int_g(i,j+1)    ! Original
+                    !vis_int_g_jp1 = vis_int_g(i,j)      ! ajr test
+
+                    if (f_ice(i,j) .eq. 1.0 .and. f_ice(i,j+1) .lt. 1.0) then 
+                        vis_int_g_mid = vis_int_g(i,j) 
+                    else if (f_ice(i,j) .eq. 1.0 .and. f_ice(i,j+1) .lt. 1.0) then 
+                        vis_int_g_mid = vis_int_g(i,j+1) 
+                    else 
+                        vis_int_g_mid = 0.5*(vis_int_g(i,j)+vis_int_g(i,j+1))
+                    end if 
 
                     ! inner shelfy stream or floating ice 
 
@@ -1128,9 +1154,16 @@ contains
 !                                     //'Check for diagonal element failed!'
 !                         call error(errormsg)
 !                     end if
+                    ! k = k+1
+                    ! lgs_a_value(k) = -4.0_prec*inv_deta2 &
+                    !                     *(vis_int_g_jp1+vis_int_g(i,j)) &
+                    !                  -inv_dxi2 &
+                    !                     *(vis_int_sgxy(i,j)+vis_int_sgxy(i-1,j)) &
+                    !                  -beta_now
+                    ! lgs_a_index(k) = nc
                     k = k+1
-                    lgs_a_value(k) = -4.0_prec*inv_deta2 &
-                                        *(vis_int_g_jp1+vis_int_g(i,j)) &
+                    lgs_a_value(k) = -4.0_prec*inv_deta &
+                                        *(vis_int_g_mid) &
                                      -inv_dxi2 &
                                         *(vis_int_sgxy(i,j)+vis_int_sgxy(i-1,j)) &
                                      -beta_now

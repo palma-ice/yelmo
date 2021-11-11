@@ -58,8 +58,6 @@ contains
         real(prec) :: inv_dxi, inv_deta, inv_dxi_deta, inv_dxi2, inv_deta2
         real(prec) :: factor_rhs_2, factor_rhs_3a, factor_rhs_3b
         real(prec) :: rho_sw_ice, H_ice_now, beta_now, taud_now, H_ocn_now
-        real(prec) :: vis_int_g_ip1, vis_int_g_jp1
-        real(wp)   :: vis_int_g_mid 
         integer    :: IMAX, JMAX 
 
         integer, allocatable    :: n2i(:), n2j(:)
@@ -167,9 +165,13 @@ contains
         dxi          = dx 
         deta         = dy 
 
+        rho_sw_ice   = rho_sw/rho_ice ! Ratio of density of seawater to ice [--]
+
         vis_int_g    = visc_eff 
 
-        rho_sw_ice   = rho_sw/rho_ice ! Ratio of density of seawater to ice [--]
+        ! Also ensure that vis_int_g has values extended to ice-free neighbors 
+        ! outside of ice sheet. 
+        call extrapolate_to_icefree_aa(vis_int_g,f_ice)
 
         ! ===== Consistency checks ==========================
 
@@ -653,21 +655,6 @@ contains
                 ! inner point on the staggered grid in x-direction
                 ! ie, if ( (i /= nx).and.(j /= 1).and.(j /= ny) ) then
                     
-                    ! ajr: this value needs to be checked if some boundary
-                    ! cases are not handled via front-checking (could be 
-                    ! using viscosity from an ice-free point). See 
-                    ! limit_lateral_bc in set_sico_masks.
-                    vis_int_g_ip1 = vis_int_g(i+1,j)    ! Original 
-                    !vis_int_g_ip1 = vis_int_g(i,j)      ! ajr test
-
-                    if (f_ice(i,j) .eq. 1.0 .and. f_ice(i+1,j) .lt. 1.0) then 
-                        vis_int_g_mid = vis_int_g(i,j) 
-                    else if (f_ice(i,j) .eq. 1.0 .and. f_ice(i+1,j) .lt. 1.0) then 
-                        vis_int_g_mid = vis_int_g(i+1,j) 
-                    else 
-                        vis_int_g_mid = 0.5*(vis_int_g(i,j)+vis_int_g(i+1,j))
-                    end if 
-                    
                     ! inner shelfy stream or floating ice 
 
                     nc = 2*ij2n(i-1,j)-1
@@ -696,16 +683,9 @@ contains
 !                                      //'Check for diagonal element failed!'
 !                         call error(errormsg)
 !                     end if
-                    ! k = k+1
-                    ! lgs_a_value(k) = -4.0_prec*inv_dxi2 &
-                    !                         *(vis_int_g_ip1+vis_int_g(i,j)) &
-                    !                  -inv_deta2 &
-                    !                         *(vis_int_sgxy(i,j)+vis_int_sgxy(i,j-1)) &
-                    !                  -beta_now
-                    ! lgs_a_index(k) = nc
                     k = k+1
-                    lgs_a_value(k) = -4.0_prec*inv_dxi &
-                                            *(vis_int_g_mid) &
+                    lgs_a_value(k) = -4.0_prec*inv_dxi2 &
+                                            *(vis_int_g(i+1,j)+vis_int_g(i,j)) &
                                      -inv_deta2 &
                                             *(vis_int_sgxy(i,j)+vis_int_sgxy(i,j-1)) &
                                      -beta_now
@@ -728,20 +708,20 @@ contains
                         ! next nc (column counter), for vy_m(i+1,j-1)
                     k  = k+1
                     lgs_a_value(k) = -inv_dxi_deta &
-                                  *(2.0_prec*vis_int_g_ip1+vis_int_sgxy(i,j-1))
+                                  *(2.0_prec*vis_int_g(i+1,j)+vis_int_sgxy(i,j-1))
                     lgs_a_index(k) = nc
 
                     nc = 2*ij2n(i+1,j)-1
                         ! next nc (column counter), for vx_m(i+1,j)
                     k = k+1
-                    lgs_a_value(k) = 4.0_prec*inv_dxi2*vis_int_g_ip1
+                    lgs_a_value(k) = 4.0_prec*inv_dxi2*vis_int_g(i+1,j)
                     lgs_a_index(k) = nc
 
                     nc = 2*ij2n(i+1,j)
                         ! largest nc (column counter), for vy_m(i+1,j)
                     k  = k+1
                     lgs_a_value(k) = inv_dxi_deta &
-                                    *(2.0_prec*vis_int_g_ip1+vis_int_sgxy(i,j))
+                                    *(2.0_prec*vis_int_g(i+1,j)+vis_int_sgxy(i,j))
                     lgs_a_index(k) = nc
 
                     lgs_b_value(nr) = taud_now
@@ -1091,21 +1071,6 @@ contains
                 ! inner point on the staggered grid in y-direction
                 ! ie, if ( (j /= ny).and.(i /= 1).and.(i /= nx) ) then
                     
-                    ! ajr: this value needs to be checked if some boundary
-                    ! cases are not handled via front-checking (could be 
-                    ! using viscosity from an ice-free point). See 
-                    ! limit_lateral_bc in set_sico_masks.
-                    vis_int_g_jp1 = vis_int_g(i,j+1)    ! Original
-                    !vis_int_g_jp1 = vis_int_g(i,j)      ! ajr test
-
-                    if (f_ice(i,j) .eq. 1.0 .and. f_ice(i,j+1) .lt. 1.0) then 
-                        vis_int_g_mid = vis_int_g(i,j) 
-                    else if (f_ice(i,j) .eq. 1.0 .and. f_ice(i,j+1) .lt. 1.0) then 
-                        vis_int_g_mid = vis_int_g(i,j+1) 
-                    else 
-                        vis_int_g_mid = 0.5*(vis_int_g(i,j)+vis_int_g(i,j+1))
-                    end if 
-
                     ! inner shelfy stream or floating ice 
 
                     nc = 2*ij2n(i-1,j)-1
@@ -1125,7 +1090,7 @@ contains
                         ! next nc (column counter), for vx_m(i-1,j+1)
                     k = k+1
                     lgs_a_value(k) = -inv_dxi_deta &
-                                          *(2.0_prec*vis_int_g_jp1+vis_int_sgxy(i-1,j))
+                                          *(2.0_prec*vis_int_g(i,j+1)+vis_int_sgxy(i-1,j))
                     lgs_a_index(k) = nc
 
                     if (j .eq. 1) then  ! ajr: filler to avoid LIS errors 
@@ -1154,16 +1119,9 @@ contains
 !                                     //'Check for diagonal element failed!'
 !                         call error(errormsg)
 !                     end if
-                    ! k = k+1
-                    ! lgs_a_value(k) = -4.0_prec*inv_deta2 &
-                    !                     *(vis_int_g_jp1+vis_int_g(i,j)) &
-                    !                  -inv_dxi2 &
-                    !                     *(vis_int_sgxy(i,j)+vis_int_sgxy(i-1,j)) &
-                    !                  -beta_now
-                    ! lgs_a_index(k) = nc
                     k = k+1
-                    lgs_a_value(k) = -4.0_prec*inv_deta &
-                                        *(vis_int_g_mid) &
+                    lgs_a_value(k) = -4.0_prec*inv_deta2 &
+                                        *(vis_int_g(i,j+1)+vis_int_g(i,j)) &
                                      -inv_dxi2 &
                                         *(vis_int_sgxy(i,j)+vis_int_sgxy(i-1,j)) &
                                      -beta_now
@@ -1173,13 +1131,13 @@ contains
                         ! next nc (column counter), for vx_m(i,j+1)
                     k = k+1
                     lgs_a_value(k) = inv_dxi_deta &
-                                    *(2.0_prec*vis_int_g_jp1+vis_int_sgxy(i,j))
+                                    *(2.0_prec*vis_int_g(i,j+1)+vis_int_sgxy(i,j))
                     lgs_a_index(k) = nc
 
                     nc = 2*ij2n(i,j+1)
                         ! next nc (column counter), for vy_m(i,j+1)
                     k = k+1
-                    lgs_a_value(k) = 4.0_prec*inv_deta2*vis_int_g_jp1
+                    lgs_a_value(k) = 4.0_prec*inv_deta2*vis_int_g(i,j+1)
                     lgs_a_index(k) = nc
 
                     nc = 2*ij2n(i+1,j)
@@ -2095,4 +2053,72 @@ contains
 
     end subroutine ssa_diagnostics_write_step
     
+
+    subroutine extrapolate_to_icefree_aa(var,f_ice)
+        ! Extrapolate variable to ice-free margin neighbors 
+
+        implicit none 
+
+        real(wp), intent(INOUT) :: var(:,:)
+        real(wp), intent(IN)    :: f_ice(:,:) 
+
+        ! Local variables 
+        integer :: i, j, nx, ny 
+        integer :: im1, ip1, jm1, jp1 
+        real(wp) :: wt4(4) 
+        real(wp) :: var4(4) 
+        real(wp) :: wt4_tot 
+
+        nx = size(var,1) 
+        ny = size(var,2) 
+
+        do j = 1, ny 
+        do i = 1, nx 
+            ! Get neighbor indices
+            im1 = max(i-1,1) 
+            ip1 = min(i+1,nx) 
+            jm1 = max(j-1,1) 
+            jp1 = min(j+1,ny)
+
+            var4 = 0.0 
+            wt4  = 0.0 
+
+            if (f_ice(i,j) .lt. 1.0) then 
+                ! Ice-free point 
+
+                if (f_ice(ip1,j) .eq. 1.0) then 
+                    var4(1) = var(ip1,j) 
+                    wt4(1)  = 1.0 
+                end if 
+
+                if (f_ice(i,jp1) .eq. 1.0) then 
+                    var4(2) = var(i,jp1) 
+                    wt4(2)  = 1.0 
+                end if 
+                
+                if (f_ice(im1,j) .eq. 1.0) then 
+                    var4(3) = var(im1,j) 
+                    wt4(3)  = 1.0 
+                end if 
+                
+                if (f_ice(i,jm1) .eq. 1.0) then 
+                    var4(4) = var(i,jm1) 
+                    wt4(4)  = 1.0 
+                end if 
+                
+                wt4_tot = sum(wt4) 
+
+                if (wt4_tot .gt. 0.0) then 
+                    wt4 = wt4 / wt4_tot 
+                    var(i,j) = sum(var4*wt4)
+                end if 
+            end if 
+
+        end do 
+        end do
+
+        return 
+
+    end subroutine extrapolate_to_icefree_aa
+
 end module solver_ssa_sico5

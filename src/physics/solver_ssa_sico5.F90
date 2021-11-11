@@ -1705,7 +1705,7 @@ contains
         !              grounded marine ice margins (grounded ice next to open ocean)
         ! "off"      : apply at all ice margins 
         ! "none"     : do not apply boundary condition (for testing mainly)
-        character(len=56), parameter :: limit_lateral_bc = "marine"
+        character(len=56), parameter :: limit_lateral_bc = "floating"
 
         nx = size(maske,1)
         ny = size(maske,2)
@@ -1808,7 +1808,7 @@ contains
                 if ( front1(i,j) .and. maske(i,j) .eq. 0 .and. &
                                     H_ocn_now .eq. 0.0 ) front1(i,j) = .FALSE. 
             
-            case DEFAULT ! (eg, limit_lateral_bc="all")
+            case DEFAULT ! (eg, limit_lateral_bc="off")
 
                 ! Do nothing - all fronts have been accurately diagnosed. 
 

@@ -517,6 +517,96 @@ contains
 
                 end select 
 
+! #if (defined(OLDCODE))
+!             else if (  ( is_front_1(i,j).and.is_front_2(i+1,j) ) &
+!                       .or. &
+!                       ( is_front_2(i,j).and.is_front_1(i+1,j) ) &
+!                     ) then
+!                     ! one neighbour is ice-covered and the other is ice-free
+!                     ! (calving front, grounded ice front)
+
+!                     if (is_front_1(i,j)) then
+!                         i1 = i     ! ice-front marker
+!                         tau_bc_sign = 1.0 
+!                     else   ! is_front_1(i+1,j)==.true.
+!                         i1 = i+1   ! ice-front marker 
+!                         tau_bc_sign = -1.0 
+!                     end if
+    
+!                     if ( (.not. is_front_2(i1-1,j)) .or. (.not. is_front_2(i1+1,j)) ) then
+!                         ! Ice exists inland too,
+!                         ! discretization of the x-component of the BC
+
+!                         nc = 2*ij2n(i1-1,j)-1
+!                                ! smallest nc (column counter), for vx_m(i1-1,j)
+!                         k  = k+1
+!                         lgs_a_value(k) = -4.0_prec*inv_dxi*vis_int_g(i1,j)
+!                         lgs_a_index(k) = nc
+
+!                         nc = 2*ij2n(i1,j-1)
+!                                ! next nc (column counter), for vy_m(i1,j-1)
+!                         k  = k+1
+!                         lgs_a_value(k) = -2.0_prec*inv_deta*vis_int_g(i1,j)
+!                         lgs_a_index(k) = nc
+
+!                         nc = 2*ij2n(i1,j)-1
+!                                ! next nc (column counter), for vx_m(i1,j)
+!                         k  = k+1
+!                         lgs_a_value(k) = 4.0_prec*inv_dxi*vis_int_g(i1,j)
+!                         lgs_a_index(k) = nc
+
+!                         nc = 2*ij2n(i1,j)
+!                                ! largest nc (column counter), for vy_m(i1,j)
+!                         k  = k+1
+!                         lgs_a_value(k) = 2.0_prec*inv_deta*vis_int_g(i1,j)
+!                         lgs_a_index(k) = nc
+
+!                         ! Old formulation from sicopolis, only valid for 
+!                         ! floating ice margins:
+!                         !lgs_b_value(nr) = factor_rhs_2*H_ice(i1,j)*H_ice(i1,j)
+
+!                         ! =========================================================
+!                         ! Generalized solution for all ice fronts (floating and grounded)
+!                         ! See Lipscomb et al. (2019), Eqs. 11 & 12, and 
+!                         ! Winkelmann et al. (2011), Eq. 27 
+
+!                         ! Get current ice thickness
+!                         ! (No f_ice scaling since all points treated have f_ice=0/1)
+!                         H_ice_now = H_ice(i1,j)     
+
+!                         ! Get current ocean thickness bordering ice sheet
+!                         ! (for bedrock above sea level, this will give zero)
+!                         f_submerged = 1.d0 - min((z_srf(i1,j)-z_sl(i1,j))/H_ice_now,1.d0)
+!                         H_ocn_now   = H_ice_now*f_submerged
+                        
+!                         tau_bc_int = 0.5d0*rho_ice*g*H_ice_now**2 &         ! tau_out_int                                                ! p_out
+!                                    - 0.5d0*rho_sw *g*H_ocn_now**2           ! tau_in_int
+
+!                         ! =========================================================
+              
+!                         ! Assign matrix values
+!                         !lgs_b_value(nr) = tau_bc_sign*tau_bc_int
+!                         lgs_b_value(nr) = tau_bc_int
+!                         lgs_x_value(nr) = vx_m(i,j)
+                        
+!                         ! =========================================================
+
+!                     else    ! (is_front_2(i1-1,j)==.true.).and.(is_front_2(i1+1,j)==.true.);
+!                             ! velocity assumed to be zero
+
+!                         k = k+1
+!                         lgs_a_value(k)  = 1.0_prec   ! diagonal element only
+!                         lgs_a_index(k)  = nr
+
+!                         lgs_b_value(nr) = 0.0_prec
+!                         lgs_x_value(nr) = 0.0_prec
+
+!                     end if 
+! #else
+
+
+            ! NEW TEST 
+
             else if (  ( is_front_1(i,j).and.is_front_2(i+1,j) ) &
                       .or. &
                       ( is_front_2(i,j).and.is_front_1(i+1,j) ) &
@@ -531,38 +621,10 @@ contains
                         i1 = i+1   ! ice-front marker 
                         tau_bc_sign = -1.0 
                     end if
-    
+                    
                     if ( (.not. is_front_2(i1-1,j)) .or. (.not. is_front_2(i1+1,j)) ) then
-                        ! Ice exists inland too,
-                        ! discretization of the x-component of the BC
-
-                        nc = 2*ij2n(i1-1,j)-1
-                               ! smallest nc (column counter), for vx_m(i1-1,j)
-                        k  = k+1
-                        lgs_a_value(k) = -4.0_prec*inv_dxi*vis_int_g(i1,j)
-                        lgs_a_index(k) = nc
-
-                        nc = 2*ij2n(i1,j-1)
-                               ! next nc (column counter), for vy_m(i1,j-1)
-                        k  = k+1
-                        lgs_a_value(k) = -2.0_prec*inv_deta*vis_int_g(i1,j)
-                        lgs_a_index(k) = nc
-
-                        nc = 2*ij2n(i1,j)-1
-                               ! next nc (column counter), for vx_m(i1,j)
-                        k  = k+1
-                        lgs_a_value(k) = 4.0_prec*inv_dxi*vis_int_g(i1,j)
-                        lgs_a_index(k) = nc
-
-                        nc = 2*ij2n(i1,j)
-                               ! largest nc (column counter), for vy_m(i1,j)
-                        k  = k+1
-                        lgs_a_value(k) = 2.0_prec*inv_deta*vis_int_g(i1,j)
-                        lgs_a_index(k) = nc
-
-                        ! Old formulation from sicopolis, only valid for 
-                        ! floating ice margins:
-                        !lgs_b_value(nr) = factor_rhs_2*H_ice(i1,j)*H_ice(i1,j)
+                        ! There is inland ice on one side of the current cell, proceed
+                        ! with calving front boundary conditions 
 
                         ! =========================================================
                         ! Generalized solution for all ice fronts (floating and grounded)
@@ -582,37 +644,88 @@ contains
                                    - 0.5d0*rho_sw *g*H_ocn_now**2           ! tau_in_int
 
                         ! =========================================================
-              
-                        ! Assign matrix values
-                        !lgs_b_value(nr) = tau_bc_sign*tau_bc_int
-                        lgs_b_value(nr) = tau_bc_int
-                        lgs_x_value(nr) = vx_m(i,j)
-                
+                        
+                        if (is_front_1(i,j).and.is_front_2(i+1,j)) then 
+                            ! === Case 1: ice-free to the right ===
 
-                        ! ajr: diagnostic tests!!
-!                         if (i .eq. 80 .and. j .eq. 70) then 
-!                             ! Margin point
-!                             write(*,*) "front ", vx_m(i1,j), vx_m(i1-1,j), vy_m(i1,j), vy_m(i1,j-1)
-!                             write(*,*) "front ",vx_m(i1,j)-vx_m(i1-1,j), vy_m(i1,j)-vy_m(i1,j-1)
-!                             write(*,*) "front ",4.0_prec*inv_dxi*vis_int_g(i1,j)*(vx_m(i1,j)-vx_m(i1-1,j))
-!                             write(*,*) "front ",2.0_prec*inv_deta*vis_int_g(i1,j)*(vy_m(i1,j)-vy_m(i1,j-1))
-!                             write(*,*) "front ",lgs_b_value(nr), &
-!                             4.0_prec*inv_dxi*vis_int_g(i1,j)*(vx_m(i1,j)-vx_m(i1-1,j)) &
-!                             + 2.0_prec*inv_deta*vis_int_g(i1,j)*(vy_m(i1,j)-vy_m(i1,j-1)) &
-!                             - lgs_b_value(nr)
-!                             write(*,*) "front ", H_ice(i1-1,j+1), H_ice(i1,j+1), H_ice(i1+1,j+1)
-!                             write(*,*) "front ", H_ice(i1-1,j),   H_ice(i1,j),   H_ice(i1+1,j)
-!                             write(*,*) "front ", H_ice(i1-1,j-1), H_ice(i1,j-1), H_ice(i1+1,j-1)
-!                             write(*,*) "front "  
-!                         end if 
+                            ! ajr: yes
+                            nc = 2*ij2n(i-1,j)-1
+                                ! smallest nc (column counter), for vx_m(i-1,j)
+                            k = k+1
+                            lgs_a_value(k) = -4.0_prec*inv_dxi*vis_int_g(i1,j)
+                            lgs_a_index(k) = nc 
 
-!                         if (abs(vx_m(i,j)) .gt. 4e3) then 
-!                             write(*,*) "ssaxcf:", H_ice(i1,j), H_ocn_now/H_ice(i1,j), vx_m(i,j), vis_int_g(i1,j)
-!                         else if (abs(vx_m(i,j)) .lt. 0.5e3) then 
-!                             write(*,*) "ssaxcs:", H_ice(i1,j), H_ocn_now/H_ice(i1,j), vx_m(i,j), vis_int_g(i1,j)
-!                         end if 
+                            ! ajr: yes
+                            nc = 2*ij2n(i,j-1)
+                                ! next nc (column counter), for vy_m(i,j-1)
+                            k = k+1
+                            lgs_a_value(k) = -2.0_prec*inv_deta*vis_int_g(i1,j)
+                            lgs_a_index(k) = nc
 
-                        ! =========================================================
+                            ! ajr: yes
+                            nc = 2*ij2n(i,j)-1
+                                ! next nc (column counter), for vx_m(i,j)
+        !                     if (nc /= nr) then   ! (diagonal element)
+        !                         errormsg = ' >>> calc_vxy_ssa_matrix: ' &
+        !                                      //'Check for diagonal element failed!'
+        !                         call error(errormsg)
+        !                     end if
+                            k = k+1
+                            lgs_a_value(k) = 4.0_prec*inv_dxi*vis_int_g(i1,j)
+                            lgs_a_index(k) = nc
+
+                            ! ajr: yes
+                            nc = 2*ij2n(i,j)
+                                ! next nc (column counter), for vy_m(i,j)
+                            k = k+1
+                            lgs_a_value(k) = 2.0_prec*inv_deta*vis_int_g(i1,j)
+                            lgs_a_index(k) = nc
+
+                            ! Assign matrix values
+                            lgs_b_value(nr) = tau_bc_int
+                            lgs_x_value(nr) = vx_m(i,j)
+                        
+                        else 
+                            ! Case 2: ice-free to the left
+
+                            ! ajr: yes 
+                            nc = 2*ij2n(i,j)-1
+                                ! next nc (column counter), for vx_m(i,j)
+        !                     if (nc /= nr) then   ! (diagonal element)
+        !                         errormsg = ' >>> calc_vxy_ssa_matrix: ' &
+        !                                      //'Check for diagonal element failed!'
+        !                         call error(errormsg)
+        !                     end if
+                            k = k+1
+                            lgs_a_value(k) = -4.0_prec*inv_dxi*vis_int_g(i1,j)
+                            lgs_a_index(k) = nc
+
+                            ! ajr: yes
+                            nc = 2*ij2n(i+1,j-1)
+                                ! next nc (column counter), for vy_m(i+1,j-1)
+                            k  = k+1
+                            lgs_a_value(k) = -2.0_prec*inv_deta*vis_int_g(i1,j)
+                            lgs_a_index(k) = nc
+
+                            ! ajr: yes
+                            nc = 2*ij2n(i+1,j)-1
+                                ! next nc (column counter), for vx_m(i+1,j)
+                            k = k+1
+                            lgs_a_value(k) = 4.0_prec*inv_dxi*vis_int_g(i1,j)
+                            lgs_a_index(k) = nc
+
+                            ! ajr: yes 
+                            nc = 2*ij2n(i+1,j)
+                                ! largest nc (column counter), for vy_m(i+1,j)
+                            k  = k+1
+                            lgs_a_value(k) = 2.0_prec*inv_deta*vis_int_g(i1,j)
+                            lgs_a_index(k) = nc
+
+                            ! Assign matrix values
+                            lgs_b_value(nr) = tau_bc_int
+                            lgs_x_value(nr) = vx_m(i,j)
+                        
+                        end if 
 
                     else    ! (is_front_2(i1-1,j)==.true.).and.(is_front_2(i1+1,j)==.true.);
                             ! velocity assumed to be zero
@@ -624,7 +737,11 @@ contains
                         lgs_b_value(nr) = 0.0_prec
                         lgs_x_value(nr) = 0.0_prec
 
-                    end if 
+                    end if
+
+
+
+! #endif
 
             else if ( ( (maske(i,j)==3).and.(maske(i+1,j)==1) ) &
                       .or. &
@@ -958,8 +1075,94 @@ contains
                         stop
 
                 end select 
-            
-            else if (  ( is_front_1(i,j).and.is_front_2(i,j+1) ) &
+
+! #if (defined(OLDCODE))
+!             else if (  ( is_front_1(i,j).and.is_front_2(i,j+1) ) &
+!                       .or. &
+!                       ( is_front_2(i,j).and.is_front_1(i,j+1) ) &
+!                     ) then
+!                     ! one neighbour is ice-covered and the other is ice-free
+!                     ! (calving front, grounded ice front)
+
+!                     if (is_front_1(i,j)) then
+!                         j1 = j     ! ice-front marker
+!                         tau_bc_sign = 1.0 
+!                     else   ! is_front_1(i,j+1)==.true.
+!                         j1 = j+1   ! ice-front marker
+!                         tau_bc_sign = -1.0 
+!                     end if
+
+!                     if ( (.not. is_front_2(i,j1-1)) .or. (.not. is_front_2(i,j1+1)) ) then
+!                         ! Inland ice exists,
+!                         ! discretization of the y-component of the BC
+
+!                         nc = 2*ij2n(i-1,j1)-1
+!                             ! smallest nc (column counter), for vx_m(i-1,j1)
+!                         k = k+1
+!                         lgs_a_value(k) = -2.0_prec*inv_dxi*vis_int_g(i,j1)
+!                         lgs_a_index(k) = nc
+
+!                         nc = 2*ij2n(i,j1-1)
+!                             ! next nc (column counter), for vy_m(i,j1-1)
+!                         k = k+1
+!                         lgs_a_value(k) = -4.0_prec*inv_deta*vis_int_g(i,j1)
+!                         lgs_a_index(k) = nc
+
+!                         nc = 2*ij2n(i,j1)-1
+!                             ! next nc (column counter), for vx_m(i,j1)
+!                         k = k+1
+!                         lgs_a_value(k) = 2.0_prec*inv_dxi*vis_int_g(i,j1)
+!                         lgs_a_index(k) = nc
+
+!                         nc = 2*ij2n(i,j1)
+!                             ! largest nc (column counter), for vy_m(i,j1)
+!                         k = k+1
+!                         lgs_a_value(k) = 4.0_prec*inv_deta*vis_int_g(i,j1)
+!                         lgs_a_index(k) = nc
+
+!                         ! Old formulation from sicopolis, only valid for 
+!                         ! floating ice margins:
+! !                         lgs_b_value(nr) = factor_rhs_2*H_ice(i,j1)*H_ice(i,j1)
+
+!                         ! =========================================================
+!                         ! Generalized solution for all ice fronts (floating and grounded)
+!                         ! See Lipscomb et al. (2019), Eqs. 11 & 12, and 
+!                         ! Winkelmann et al. (2011), Eq. 27 
+
+!                         ! Get current ice thickness
+!                         ! (No f_ice scaling since all points treated have f_ice=0/1)
+!                         H_ice_now = H_ice(i,j1)     
+
+!                         ! Get current ocean thickness bordering ice sheet
+!                         ! (for bedrock above sea level, this will give zero)
+!                         f_submerged = 1.d0 - min((z_srf(i,j1)-z_sl(i,j1))/H_ice_now,1.d0)
+!                         H_ocn_now   = H_ice_now*f_submerged
+
+!                         tau_bc_int = 0.5d0*rho_ice*g*H_ice_now**2 &         ! tau_out_int                                                ! p_out
+!                                    - 0.5d0*rho_sw *g*H_ocn_now**2           ! tau_in_int
+
+!                         ! =========================================================
+              
+!                         ! Assign matrix values
+!                         !lgs_b_value(nr) = tau_bc_sign*tau_bc_int
+!                         lgs_b_value(nr) = tau_bc_int
+!                         lgs_x_value(nr) = vy_m(i,j)
+             
+!                     else    ! (is_front_2(i,j1-1)==.true.).and.(is_front_2(i,j1+1)==.true.);
+!                             ! velocity assumed to be zero
+
+!                         k = k+1
+!                         lgs_a_value(k)  = 1.0_prec   ! diagonal element only
+!                         lgs_a_index(k)  = nr
+
+!                         lgs_b_value(nr) = 0.0_prec
+!                         lgs_x_value(nr) = 0.0_prec
+
+!                     end if
+! #else
+                    ! === NEW CODE ===
+
+                    else if (  ( is_front_1(i,j).and.is_front_2(i,j+1) ) &
                       .or. &
                       ( is_front_2(i,j).and.is_front_1(i,j+1) ) &
                     ) then
@@ -975,36 +1178,8 @@ contains
                     end if
 
                     if ( (.not. is_front_2(i,j1-1)) .or. (.not. is_front_2(i,j1+1)) ) then
-                        ! Inland ice exists,
-                        ! discretization of the y-component of the BC
-
-                        nc = 2*ij2n(i-1,j1)-1
-                            ! smallest nc (column counter), for vx_m(i-1,j1)
-                        k = k+1
-                        lgs_a_value(k) = -2.0_prec*inv_dxi*vis_int_g(i,j1)
-                        lgs_a_index(k) = nc
-
-                        nc = 2*ij2n(i,j1-1)
-                            ! next nc (column counter), for vy_m(i,j1-1)
-                        k = k+1
-                        lgs_a_value(k) = -4.0_prec*inv_deta*vis_int_g(i,j1)
-                        lgs_a_index(k) = nc
-
-                        nc = 2*ij2n(i,j1)-1
-                            ! next nc (column counter), for vx_m(i,j1)
-                        k = k+1
-                        lgs_a_value(k) = 2.0_prec*inv_dxi*vis_int_g(i,j1)
-                        lgs_a_index(k) = nc
-
-                        nc = 2*ij2n(i,j1)
-                            ! largest nc (column counter), for vy_m(i,j1)
-                        k = k+1
-                        lgs_a_value(k) = 4.0_prec*inv_deta*vis_int_g(i,j1)
-                        lgs_a_index(k) = nc
-
-                        ! Old formulation from sicopolis, only valid for 
-                        ! floating ice margins:
-!                         lgs_b_value(nr) = factor_rhs_2*H_ice(i,j1)*H_ice(i,j1)
+                        ! There is inland ice on one side of the current cell, proceed
+                        ! with calving front boundary conditions 
 
                         ! =========================================================
                         ! Generalized solution for all ice fronts (floating and grounded)
@@ -1024,12 +1199,89 @@ contains
                                    - 0.5d0*rho_sw *g*H_ocn_now**2           ! tau_in_int
 
                         ! =========================================================
-              
-                        ! Assign matrix values
-                        !lgs_b_value(nr) = tau_bc_sign*tau_bc_int
-                        lgs_b_value(nr) = tau_bc_int
-                        lgs_x_value(nr) = vy_m(i,j)
-             
+                        
+                        if (is_front_1(i,j).and.is_front_2(i,j+1)) then 
+                            ! === Case 1: ice-free to the top ===
+
+                            ! ajr: yes 
+                            nc = 2*ij2n(i-1,j)-1
+                                ! smallest nc (column counter), for vx_m(i-1,j)
+                            k = k+1
+                            lgs_a_value(k) = -2.0_prec*inv_dxi*vis_int_g(i,j1)
+                            lgs_a_index(k) = nc
+
+                            ! ajr: yes
+                            nc = 2*ij2n(i,j-1)
+                                ! next nc (column counter), for vy_m(i,j-1)
+                            k = k+1
+                            lgs_a_value(k) = -4.0_prec*inv_deta*vis_int_g(i,j1)
+                            lgs_a_index(k) = nc
+
+                            ! ajr: yes
+                            nc = 2*ij2n(i,j)-1
+                                ! next nc (column counter), for vx_m(i,j)
+                            k = k+1
+                            lgs_a_value(k) = 2.0_prec*inv_dxi*vis_int_g(i,j1)
+                            lgs_a_index(k) = nc
+
+                            ! ajr: yes
+                            nc = 2*ij2n(i,j)
+                                ! next nc (column counter), for vy_m(i,j)
+        !                     if (nc /= nr) then   ! (diagonal element)
+        !                         errormsg = ' >>> calc_vxy_ssa_matrix: ' &
+        !                                     //'Check for diagonal element failed!'
+        !                         call error(errormsg)
+        !                     end if
+                            k = k+1
+                            lgs_a_value(k) = 4.0_prec*inv_deta*vis_int_g(i,j1)
+                            lgs_a_index(k) = nc
+
+                            ! Assign matrix values
+                            lgs_b_value(nr) = tau_bc_int
+                            lgs_x_value(nr) = vy_m(i,j)
+                            
+                        else
+                            ! === Case 2: ice-free to the bottom ===
+
+                            ! ajr: yes 
+                            nc = 2*ij2n(i-1,j+1)-1
+                                ! next nc (column counter), for vx_m(i-1,j+1)
+                            k = k+1
+                            lgs_a_value(k) = -2.0_prec*inv_dxi*vis_int_g(i,j1)
+                            lgs_a_index(k) = nc
+
+                            ! ajr: yes 
+                            nc = 2*ij2n(i,j)
+                                ! next nc (column counter), for vy_m(i,j)
+        !                     if (nc /= nr) then   ! (diagonal element)
+        !                         errormsg = ' >>> calc_vxy_ssa_matrix: ' &
+        !                                     //'Check for diagonal element failed!'
+        !                         call error(errormsg)
+        !                     end if
+                            k = k+1
+                            lgs_a_value(k) = -4.0_prec*inv_deta*vis_int_g(i,j1)
+                            lgs_a_index(k) = nc
+
+                            ! ajr: yes 
+                            nc = 2*ij2n(i,j+1)-1
+                                ! next nc (column counter), for vx_m(i,j+1)
+                            k = k+1
+                            lgs_a_value(k) = 2.0_prec*inv_dxi*vis_int_g(i,j1)
+                            lgs_a_index(k) = nc
+
+                            ! ajr: yes 
+                            nc = 2*ij2n(i,j+1)
+                                ! next nc (column counter), for vy_m(i,j+1)
+                            k = k+1
+                            lgs_a_value(k) = 4.0_prec*inv_deta*vis_int_g(i,j1)
+                            lgs_a_index(k) = nc
+
+                            ! Assign matrix values
+                            lgs_b_value(nr) = tau_bc_int
+                            lgs_x_value(nr) = vy_m(i,j)
+                 
+                        end if 
+
                     else    ! (is_front_2(i,j1-1)==.true.).and.(is_front_2(i,j1+1)==.true.);
                             ! velocity assumed to be zero
 
@@ -1042,6 +1294,7 @@ contains
 
                     end if
 
+! #endif
             else if ( ( (maske(i,j)==3).and.(maske(i,j+1)==1) ) &
                         .or. &
                         ( (maske(i,j)==1).and.(maske(i,j+1)==3) ) &
@@ -1093,17 +1346,11 @@ contains
                                           *(2.0_prec*vis_int_g(i,j+1)+vis_int_sgxy(i-1,j))
                     lgs_a_index(k) = nc
 
-                    if (j .eq. 1) then  ! ajr: filler to avoid LIS errors 
-                        k  = k+1
-                        lgs_a_value(k) = 1.0   ! diagonal element only
-                        lgs_a_index(k) = nr
-                    else
-                        nc = 2*ij2n(i,j-1)
-                            ! next nc (column counter), for vy_m(i,j-1)
-                        k = k+1
-                        lgs_a_value(k) = 4.0_prec*inv_deta2*vis_int_g(i,j)
-                        lgs_a_index(k) = nc
-                    end if 
+                    nc = 2*ij2n(i,j-1)
+                        ! next nc (column counter), for vy_m(i,j-1)
+                    k = k+1
+                    lgs_a_value(k) = 4.0_prec*inv_deta2*vis_int_g(i,j)
+                    lgs_a_index(k) = nc
 
                     nc = 2*ij2n(i,j)-1
                         ! next nc (column counter), for vx_m(i,j)
@@ -1705,7 +1952,7 @@ contains
         !              grounded marine ice margins (grounded ice next to open ocean)
         ! "off"      : apply at all ice margins 
         ! "none"     : do not apply boundary condition (for testing mainly)
-        character(len=56), parameter :: limit_lateral_bc = "floating"
+        character(len=56), parameter :: limit_lateral_bc = "off"
 
         nx = size(maske,1)
         ny = size(maske,2)
@@ -1785,6 +2032,7 @@ contains
           ! So far all margins have been diagnosed (marine and grounded on land)
           ! Disable some regions depending on choice above. 
           select case(trim(limit_lateral_bc))
+            ! Limit the lateral boundary condition to what? 
 
             case("none")
                 ! Disable front detection 

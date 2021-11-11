@@ -6,28 +6,28 @@ module ice_benchmarks
 
     ! It also implements the EISMINT1 and EISMINT2 boundary conditions 
     
-    use yelmo_defs, only : prec, pi  
+    use yelmo_defs, only : prec, wp, pi  
 
     implicit none
 
 
     type bueler_test_type 
 
-        real(prec), allocatable :: H_ice(:,:) 
-        real(prec), allocatable :: mbal(:,:) 
-        real(prec), allocatable :: u_b(:,:) 
-        real(prec), allocatable :: mbal_c(:,:)   ! [m a-1] Compensatory mass balance
-        real(prec), allocatable :: Q_c(:,:)      ! [K a-1] Compensatory heating 
+        real(wp), allocatable :: H_ice(:,:) 
+        real(wp), allocatable :: mbal(:,:) 
+        real(wp), allocatable :: u_b(:,:) 
+        real(wp), allocatable :: mbal_c(:,:)   ! [m a-1] Compensatory mass balance
+        real(wp), allocatable :: Q_c(:,:)      ! [K a-1] Compensatory heating 
         
         ! Comparison values
-        real(prec), allocatable :: err_H_ice(:,:)
-        real(prec) :: err_H0
-        real(prec) :: err_max_H_ice
-        real(prec) :: rmse_H_ice 
+        real(wp), allocatable :: err_H_ice(:,:)
+        real(wp) :: err_H0
+        real(wp) :: err_max_H_ice
+        real(wp) :: rmse_H_ice 
 
-        real(prec) :: V_ice_mod 
-        real(prec) :: V_ice_target
-        real(prec) :: err_V_ice 
+        real(wp) :: V_ice_mod 
+        real(wp) :: V_ice_target
+        real(wp) :: err_V_ice 
         
     end type 
 
@@ -82,8 +82,8 @@ contains
         implicit none 
 
         type(bueler_test_type), intent(INOUT) :: buel
-        real(prec), intent(IN) :: H_ice(:,:)            ! [m]
-        real(prec), intent(IN) :: dx                    ! [m]
+        real(wp), intent(IN) :: H_ice(:,:)            ! [m]
+        real(wp), intent(IN) :: dx                    ! [m]
 
         ! Local variables 
         logical, allocatable :: msk(:,:) 
@@ -115,24 +115,24 @@ contains
 
         implicit none 
 
-        real(prec), intent(OUT) :: H_ice(:,:) 
-        real(prec), intent(OUT) :: mbal(:,:) 
-        real(prec), intent(OUT) :: u_b(:,:) 
-        real(prec), intent(IN)  :: xx(:,:)      ! [m]
-        real(prec), intent(IN)  :: yy(:,:)      ! [m]
-        real(prec), intent(IN)  :: A 
-        real(prec), intent(IN)  :: L 
-        real(prec), intent(IN)  :: mbal0 
-        real(prec), intent(IN)  :: n
-        real(prec), intent(IN)  :: rho_ice 
-        real(prec), intent(IN)  :: g 
-        real(prec), intent(IN)  :: mu_max  
+        real(wp), intent(OUT) :: H_ice(:,:) 
+        real(wp), intent(OUT) :: mbal(:,:) 
+        real(wp), intent(OUT) :: u_b(:,:) 
+        real(wp), intent(IN)  :: xx(:,:)      ! [m]
+        real(wp), intent(IN)  :: yy(:,:)      ! [m]
+        real(wp), intent(IN)  :: A 
+        real(wp), intent(IN)  :: L 
+        real(wp), intent(IN)  :: mbal0 
+        real(wp), intent(IN)  :: n
+        real(wp), intent(IN)  :: rho_ice 
+        real(wp), intent(IN)  :: g 
+        real(wp), intent(IN)  :: mu_max  
          
         ! Local variables 
         integer :: nx, ny 
-        real(prec), allocatable :: r(:,:) 
-        real(prec), allocatable :: gamma(:,:) 
-        real(prec)  :: L_meters
+        real(wp), allocatable :: r(:,:) 
+        real(wp), allocatable :: gamma(:,:) 
+        real(wp)  :: L_meters
 
         nx = size(H_ice,1)
         ny = size(H_ice,2) 
@@ -168,28 +168,28 @@ contains
 
         implicit none 
 
-        real(prec), intent(OUT) :: H_ice(:,:) 
-        real(prec), intent(OUT) :: mbal(:,:) 
-        real(prec), intent(OUT) :: u_b(:,:) 
-        real(prec), intent(IN)  :: xx(:,:)      ! [m] 
-        real(prec), intent(IN)  :: yy(:,:)      ! [m] 
-        real(prec), intent(IN)  :: time         ! [a] Time relative to t0 
-        real(prec), intent(IN)  :: R0 
-        real(prec), intent(IN)  :: H0 
-        real(prec), intent(IN)  :: lambda  
-        real(prec), intent(IN)  :: n
-        real(prec), intent(IN)  :: A            ! [Pa3 a m-1] 
-        real(prec), intent(IN)  :: rho_ice 
-        real(prec), intent(IN)  :: g   
+        real(wp), intent(OUT) :: H_ice(:,:) 
+        real(wp), intent(OUT) :: mbal(:,:) 
+        real(wp), intent(OUT) :: u_b(:,:) 
+        real(wp), intent(IN)  :: xx(:,:)      ! [m] 
+        real(wp), intent(IN)  :: yy(:,:)      ! [m] 
+        real(wp), intent(IN)  :: time         ! [a] Time relative to t0 
+        real(wp), intent(IN)  :: R0 
+        real(wp), intent(IN)  :: H0 
+        real(wp), intent(IN)  :: lambda  
+        real(wp), intent(IN)  :: n
+        real(wp), intent(IN)  :: A            ! [Pa3 a m-1] 
+        real(wp), intent(IN)  :: rho_ice 
+        real(wp), intent(IN)  :: g   
          
         ! Local variables 
         integer    :: i, j, k, nx, ny 
-        real(prec) :: r_now  
-        real(prec) :: R0_meters
-        real(prec) :: alpha, beta, gamma, t0, time1  
-        real(prec) :: fac 
+        real(wp) :: r_now  
+        real(wp) :: R0_meters
+        real(wp) :: alpha, beta, gamma, t0, time1  
+        real(wp) :: fac 
         
-        real(prec), parameter :: f = 0.0        ! isostasy fraction 
+        real(wp), parameter :: f = 0.0        ! isostasy fraction 
 
         nx = size(H_ice,1)
         ny = size(H_ice,2) 
@@ -234,11 +234,11 @@ contains
 
         implicit none 
 
-        real(prec), intent(IN) :: A 
-        real(prec), intent(IN) :: n 
-        real(prec), intent(IN) :: rho_ice
-        real(prec), intent(IN) :: g 
-        real(prec) :: gamma 
+        real(wp), intent(IN) :: A 
+        real(wp), intent(IN) :: n 
+        real(wp), intent(IN) :: rho_ice
+        real(wp), intent(IN) :: g 
+        real(wp) :: gamma 
 
         gamma = 2.0_prec * A * (rho_ice*g)**n / (n+2.0_prec)
 
@@ -250,28 +250,28 @@ contains
 
         implicit none 
 
-        real(prec), intent(OUT) :: T_srf(:,:) 
-        real(prec), intent(OUT) :: smb(:,:) 
-        real(prec), intent(OUT) :: ghf(:,:) 
-        real(prec), intent(IN)  :: xx(:,:)      ! [m] 
-        real(prec), intent(IN)  :: yy(:,:)      ! [m] 
-        real(prec), intent(IN)  :: H_ice(:,:) 
+        real(wp), intent(OUT) :: T_srf(:,:) 
+        real(wp), intent(OUT) :: smb(:,:) 
+        real(wp), intent(OUT) :: ghf(:,:) 
+        real(wp), intent(IN)  :: xx(:,:)      ! [m] 
+        real(wp), intent(IN)  :: yy(:,:)      ! [m] 
+        real(wp), intent(IN)  :: H_ice(:,:) 
         character(len=*), intent(IN) :: experiment 
-        real(prec), intent(IN) :: time 
-        real(prec), intent(IN) :: period 
-        real(prec), intent(IN), optional :: rad_el 
-        real(prec), intent(IN), optional :: dT_test 
-        real(prec), intent(IN), optional :: dsmb_test  
+        real(wp), intent(IN) :: time 
+        real(wp), intent(IN) :: period 
+        real(wp), intent(IN), optional :: rad_el 
+        real(wp), intent(IN), optional :: dT_test 
+        real(wp), intent(IN), optional :: dsmb_test  
 
-        real(prec), parameter :: x_summit = 0.0 
-        real(prec), parameter :: y_summit = 0.0 
+        real(wp), parameter :: x_summit = 0.0 
+        real(wp), parameter :: y_summit = 0.0 
         
         ! Local variables 
         integer    :: i, j, nx, ny 
-        real(prec) :: dist
-        real(prec) :: R_el, s  
-        real(prec) :: dT, dR_el, dsmb 
-        real(prec) :: Tmin 
+        real(wp) :: dist
+        real(wp) :: R_el, s  
+        real(wp) :: dT, dR_el, dsmb 
+        real(wp) :: Tmin 
 
         nx = size(T_srf,1)
         ny = size(T_srf,2)
@@ -424,23 +424,26 @@ contains
 
         return 
 
-    end subroutine eismint_boundaries  
+    end subroutine eismint_boundaries
     
-    subroutine dome_init(H_ice,xx,yy,R0,H0)
+    subroutine dome_init(H_ice,xx,yy,R0,H0,H0_shlf,rmax_shlf)
 
         implicit none 
 
-        real(prec), intent(OUT) :: H_ice(:,:)  
-        real(prec), intent(IN)  :: xx(:,:)      ! [m] 
-        real(prec), intent(IN)  :: yy(:,:)      ! [m] 
-        real(prec), intent(IN)  :: R0           ! Normalized radius (in range 0:1), default=0.5
-        real(prec), intent(IN)  :: H0   
-         
+        real(wp), intent(OUT) :: H_ice(:,:)  
+        real(wp), intent(IN)  :: xx(:,:)      ! [m] 
+        real(wp), intent(IN)  :: yy(:,:)      ! [m] 
+        real(wp), intent(IN)  :: R0           ! Normalized radius (in range 0:1), default=0.5
+        real(wp), intent(IN)  :: H0  
+        real(wp),   intent(IN), optional :: H0_shlf  
+        real(wp),   intent(IN), optional :: rmax_shlf  
+
         ! Local variables 
         integer    :: i, j, k, nx, ny 
-        real(prec) :: r_sq_now, r0_sq 
-        real(prec) :: xmax, ymax 
-        
+        real(wp) :: r_sq_now, r0_sq, r_now 
+        real(wp) :: xmax, ymax 
+        logical :: with_shlf 
+
         nx = size(H_ice,1)
         ny = size(H_ice,2) 
 
@@ -452,14 +455,24 @@ contains
         ! Initially set all points to zero ice thickness 
         H_ice     = 0.0_prec 
 
+        with_shlf = .FALSE. 
+        if (present(H0_shlf) .and. present(rmax_shlf)) with_shlf = .TRUE. 
+
         do j = 1, ny
         do i = 1, nx 
 
             ! Calculate the squared-radius value as a function of xx and yy [m]
             r_sq_now = (xx(i,j)/xmax)**2 + (yy(i,j)/ymax)**2
+            r_now    = sqrt(r_sq_now)
 
             if (r_sq_now .lt. r0_sq) then 
                 H_ice(i,j) = H0 * sqrt(r0_sq - r_sq_now)
+            end if 
+
+            if (with_shlf) then 
+                if (r_now .ge. r0 .and. r_now .lt. rmax_shlf) then 
+                    H_ice(i,j) = H0_shlf * (1.0 - (r_now-r0)/(rmax_shlf-r0))
+                end if 
             end if 
 
         end do 
@@ -467,35 +480,35 @@ contains
 
         return 
 
-    end subroutine dome_init 
+    end subroutine dome_init
 
     subroutine dome_boundaries(T_srf,smb,ghf,xx,yy,H_ice,experiment,time,smb_max,period,rad_el,dT_test,dsmb_test)
 
         implicit none 
 
-        real(prec), intent(OUT) :: T_srf(:,:) 
-        real(prec), intent(OUT) :: smb(:,:) 
-        real(prec), intent(OUT) :: ghf(:,:) 
-        real(prec), intent(IN)  :: xx(:,:)      ! [m] 
-        real(prec), intent(IN)  :: yy(:,:)      ! [m] 
-        real(prec), intent(IN)  :: H_ice(:,:) 
+        real(wp), intent(OUT) :: T_srf(:,:) 
+        real(wp), intent(OUT) :: smb(:,:) 
+        real(wp), intent(OUT) :: ghf(:,:) 
+        real(wp), intent(IN)  :: xx(:,:)      ! [m] 
+        real(wp), intent(IN)  :: yy(:,:)      ! [m] 
+        real(wp), intent(IN)  :: H_ice(:,:) 
         character(len=*), intent(IN) :: experiment 
-        real(prec), intent(IN) :: time 
-        real(prec), intent(IN) :: smb_max
-        real(prec), intent(IN) :: period 
-        real(prec), intent(IN), optional :: rad_el 
-        real(prec), intent(IN), optional :: dT_test 
-        real(prec), intent(IN), optional :: dsmb_test  
+        real(wp), intent(IN) :: time 
+        real(wp), intent(IN) :: smb_max
+        real(wp), intent(IN) :: period 
+        real(wp), intent(IN), optional :: rad_el 
+        real(wp), intent(IN), optional :: dT_test 
+        real(wp), intent(IN), optional :: dsmb_test  
 
-        real(prec), parameter :: x_summit = 0.0 
-        real(prec), parameter :: y_summit = 0.0 
+        real(wp), parameter :: x_summit = 0.0 
+        real(wp), parameter :: y_summit = 0.0 
         
         ! Local variables 
         integer    :: i, j, nx, ny 
-        real(prec) :: dist
-        real(prec) :: R_el, s  
-        real(prec) :: dT, dR_el, dsmb 
-        real(prec) :: Tmin 
+        real(wp) :: dist
+        real(wp) :: R_el, s  
+        real(wp) :: dT, dR_el, dsmb 
+        real(wp) :: Tmin 
 
         nx = size(T_srf,1)
         ny = size(T_srf,2)
@@ -570,6 +583,6 @@ contains
 
         return 
 
-    end subroutine dome_boundaries  
+    end subroutine dome_boundaries
     
 end module ice_benchmarks  

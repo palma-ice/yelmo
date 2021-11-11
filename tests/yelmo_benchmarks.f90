@@ -149,8 +149,8 @@ program yelmo_benchmarks
             yelmo1%bnd%z_bed  = 720.0 - 778.50*(sqrt((yelmo1%grd%x*1e-3)**2+(yelmo1%grd%y*1e-3)**2))/750.0
             
             !yelmo1%tpo%now%H_ice  = 100.0
-            call dome_init(yelmo1%tpo%now%H_ice,yelmo1%grd%x,yelmo1%grd%y,R0=0.5_prec,H0=2000.0_prec)
-            where(yelmo1%tpo%now%H_ice .lt. 500.0) yelmo1%tpo%now%H_ice = 500.0 
+            call dome_init(yelmo1%tpo%now%H_ice,yelmo1%grd%x,yelmo1%grd%y,R0=0.5_wp,H0=2000.0_wp, &
+                                H0_shlf=150.0_wp,rmax_shlf=0.8_wp) 
 
             yelmo1%tpo%now%z_srf  = yelmo1%bnd%z_bed + yelmo1%tpo%now%H_ice
 
@@ -187,15 +187,7 @@ program yelmo_benchmarks
     end if 
 
     ! ==== READ STEADY-STATE TOPOGRAPHY FROM HEIKO'S RUN
-    if (topo_fixed) then
-
-        ! Consistency check 
-        if (trim(experiment) .ne. "moving") then 
-            write(*,*) "yelmo_benchmarks:: Error: topo_fixed=True can only be used&
-            & for the EISMINT1 'moving' experiment."
-            write(*,*) "experiment = ", trim(experiment)
-            stop 
-        end if 
+    if (topo_fixed .and. trim(experiment) .eq. "moving") then
 
         yelmo1%bnd%z_bed  = 0.0 
         call nc_read(topo_fixed_file,"Hi",yelmo1%tpo%now%H_ice)
@@ -339,7 +331,6 @@ program yelmo_benchmarks
 
     ! Initialize state variables (dyn,therm,mat)
     call yelmo_init_state(yelmo1,time=time_init,thrm_method="robin")
-
 
     ! For dome experiment, let it equilibrate for several thousand years
     if (trim(experiment) .eq. "dome") then 

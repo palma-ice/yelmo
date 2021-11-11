@@ -179,6 +179,9 @@ contains
         allocate(dt_save(nstep))
         dt_save = missing_value 
 
+        dom%time%eta_avg      = missing_value
+        dom%time%ssa_iter_avg = missing_value
+
         allocate(pc_mask(dom%grd%nx,dom%grd%ny))
 
         ! Iteration of yelmo component updates until external timestep is reached

@@ -132,7 +132,8 @@ contains
          
         integer  :: ntot, ip1, jp1  
 
-        logical, parameter :: write_ssa_diagnostics = .FALSE. 
+        logical, parameter :: write_ssa_diagnostics      = .FALSE. 
+        logical, parameter :: write_ssa_diagnostics_stop = .FALSE.   ! Stop simulation after completing iterations?
 
         nx    = size(ux,1)
         ny    = size(ux,2)
@@ -297,9 +298,9 @@ end if
 
         ! Iterations are finished, finalize calculations of 3D velocity field 
 
-        ! if (write_ssa_diagnostics) then 
-        !     stop 
-        ! end if 
+        if (write_ssa_diagnostics .and. write_ssa_diagnostics_stop) then 
+            stop 
+        end if 
 
         ! Calculate the 3D horizontal velocity field
         call calc_vel_horizontal_3D(ux,uy,ux_b,uy_b,taub_acx,taub_acy,visc_eff,H_ice,f_ice,zeta_aa,par%boundaries)

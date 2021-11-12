@@ -1486,7 +1486,6 @@ contains
         call limit_vel(vx_m,ulim)
         call limit_vel(vy_m,ulim)
 
-
         return 
 
     end subroutine calc_vxy_ssa_matrix
@@ -1959,18 +1958,7 @@ contains
             ! Check if this point would be floating
             is_float = H_grnd(i,j) .le. 0.0 
 
-            if (f_ice(i,j) .lt. 1.0) then 
-                ! Ice-free point, or only partially-covered (consider ice free)
-
-                if (is_float) then 
-                    ! Open ocean 
-                    maske(i,j) = 2
-                else 
-                    ! Ice-free land 
-                    maske(i,j) = 1 
-                end if 
-
-            else 
+            if (f_ice(i,j) .eq. 1.0) then
                 ! Ice-covered point
 
                 if (is_float) then 
@@ -1981,6 +1969,17 @@ contains
                     maske(i,j) = 0 
                 end if 
                 
+            else 
+                ! Ice-free point, or only partially-covered (consider ice free)
+
+                if (is_float) then 
+                    ! Open ocean 
+                    maske(i,j) = 2
+                else 
+                    ! Ice-free land 
+                    maske(i,j) = 1 
+                end if 
+
             end if 
 
         end do 

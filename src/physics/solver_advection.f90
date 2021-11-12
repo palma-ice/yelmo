@@ -1,7 +1,7 @@
 module solver_advection
     
     use yelmo_defs, only : sp, dp, wp, prec, tol_underflow
-    use yelmo_tools, only : stagger_aa_ab
+    use yelmo_tools, only : stagger_aa_ab, stagger_nodes_aa_ab_ice
     use solver_advection_sico, only : calc_adv2D_expl_sico, calc_adv2D_impl_sico
 
     implicit none 
@@ -47,7 +47,7 @@ contains
 
             case("expl")
 
-                call calc_adv2D_expl(var_now,ux,uy,var_dot,dx,dy,dt)
+                call calc_adv2D_expl(var_now,f_ice,ux,uy,var_dot,dx,dy,dt)
 
             case("expl-new")
 
@@ -265,7 +265,7 @@ end if
 
     end subroutine calc_adv2D_expl_new
 
-    subroutine calc_adv2D_expl(H_ice, ux, uy, mdot, dx, dy, dt)
+    subroutine calc_adv2D_expl(H_ice, f_ice, ux, uy, mdot, dx, dy, dt)
         ! Solve 2D advection equation for ice sheet thickness via explicit flux divergence:
         ! d[H]/dt = -grad[H*(ux,uy)] + mdot 
         !
@@ -275,26 +275,26 @@ end if
 
         implicit none 
 
-        real(wp), intent(INOUT) :: H_ice(:,:)             ! [m] aa-nodes, Ice thickness 
-        real(wp), intent(IN)    :: ux(:,:)                ! [m a^-1] ac-nodes, Horizontal velocity, x-direction
-        real(wp), intent(IN)    :: uy(:,:)                ! [m a^-1] ac-nodes, Horizontal velocity, y-direction
-        real(wp), intent(IN)    :: mdot(:,:)              ! [m a^-1] aa-nodes, Source term, net rate of change at top and bottom of cell (no vertical advection) 
-        real(wp), intent(IN)    :: dx                     ! [m] Horizontal grid spacing, x-direction
-        real(wp), intent(IN)    :: dy                     ! [m] Horizontal grid spacing, y-direction
-        real(wp), intent(IN)    :: dt                     ! [a] Timestep 
+        real(wp), intent(INOUT) :: H_ice(:,:)               ! [m] aa-nodes, Ice thickness 
+        real(wp), intent(IN)    :: f_ice(:,:)               ! Ice fraction
+        real(wp), intent(IN)    :: ux(:,:)                  ! [m a^-1] ac-nodes, Horizontal velocity, x-direction
+        real(wp), intent(IN)    :: uy(:,:)                  ! [m a^-1] ac-nodes, Horizontal velocity, y-direction
+        real(wp), intent(IN)    :: mdot(:,:)                ! [m a^-1] aa-nodes, Source term, net rate of change at top and bottom of cell (no vertical advection) 
+        real(wp), intent(IN)    :: dx                       ! [m] Horizontal grid spacing, x-direction
+        real(wp), intent(IN)    :: dy                       ! [m] Horizontal grid spacing, y-direction
+        real(wp), intent(IN)    :: dt                       ! [a] Timestep 
 
         ! Local variables:
         integer  :: i, j, nx, ny 
         integer  :: im1, ip1, jm1, jp1
-        real(wp) :: ux_now, uy_now  
         real(wp) :: H_ab(4)
-        real(wp) :: flux_xr                               ! [m^2 a^-1] ac-nodes, Flux in the x-direction to the right
-        real(wp) :: flux_xl                               ! [m^2 a^-1] ac-nodes, Flux in the x-direction to the left
-        real(wp) :: flux_yu                               ! [m^2 a^-1] ac-nodes, Flux in the y-direction upwards
-        real(wp) :: flux_yd                               ! [m^2 a^-1] ac-nodes, Flux in the y-direction downwards
-        real(wp), allocatable :: dHdt(:,:)                ! [m] aa-nodes, Total change this timestep due to fluxes divergence and mdot 
-        
-        real(wp), parameter :: dHdt_lim = 1e3             ! [m a-1] Maximum rate of change allowed (high value for extreme changes)
+        real(wp) :: flux_xr                                 ! [m^2 a^-1] ac-nodes, Flux in the x-direction to the right
+        real(wp) :: flux_xl                                 ! [m^2 a^-1] ac-nodes, Flux in the x-direction to the left
+        real(wp) :: flux_yu                                 ! [m^2 a^-1] ac-nodes, Flux in the y-direction upwards
+        real(wp) :: flux_yd                                 ! [m^2 a^-1] ac-nodes, Flux in the y-direction downwards
+        real(wp), allocatable :: dHdt(:,:)                  ! [m] aa-nodes, Total change this timestep due to fluxes divergence and mdot 
+        real(wp), allocatable :: f_ice_now(:,:)
+        real(wp), parameter :: dHdt_lim = 1e3               ! [m a-1] Maximum rate of change allowed (high value for extreme changes)
 
         nx = size(H_ice,1)
         ny = size(H_ice,2)
@@ -303,38 +303,26 @@ end if
         allocate(dHdt(nx,ny))
         dHdt = 0.0_prec 
 
-        do i = 1, nx
-        do j = 1, ny
+        allocate(f_ice_now(nx,ny))
+        f_ice_now = 1.0 
 
+        do j = 1, ny
+        do i = 1, nx
+        
             ! Define neighbor indices
             im1 = max(i-1,1)
             ip1 = min(i+1,nx)
             jm1 = max(j-1,1)
             jp1 = min(j+1,ny)
             
-            ! Get H on four ab-nodes
-            H_ab(1) = 0.25_wp*(H_ice(i,j)+H_ice(ip1,j)+H_ice(i,jp1)+H_ice(ip1,jp1)) 
-            H_ab(2) = 0.25_wp*(H_ice(i,j)+H_ice(im1,j)+H_ice(i,jp1)+H_ice(im1,jp1)) 
-            H_ab(3) = 0.25_wp*(H_ice(i,j)+H_ice(im1,j)+H_ice(i,jm1)+H_ice(im1,jm1)) 
-            H_ab(4) = 0.25_wp*(H_ice(i,j)+H_ice(ip1,j)+H_ice(i,jm1)+H_ice(ip1,jm1)) 
+            ! Get the ice thickness on ab-nodes
+            call stagger_nodes_aa_ab_ice(H_ab,H_ice,f_ice_now,i,j)
 
             ! Calculate the flux across each boundary [m^2 a^-1]
-            ux_now = ux(i,j)
-            flux_xr = ux_now * 0.5*(H_ab(1)+H_ab(4))
-
-            ux_now = ux(im1,j)
-            flux_xl = ux_now * 0.5*(H_ab(2)+H_ab(3))
-            
-            uy_now = uy(i,j)
-            flux_yu = uy_now * 0.5*(H_ab(1)+H_ab(2))
-
-            uy_now = uy(i,jm1)
-            flux_yd = uy_now * 0.5*(H_ab(3)+H_ab(4))
-
-            ! flux_xr = ux(i,j)   * 0.5*(H_ab(1) + H_ab(4))
-            ! flux_xl = ux(im1,j) * 0.5*(H_ab(2) + H_ab(3))
-            ! flux_yu = uy(i,j)   * 0.5*(1) + H_ab(2))
-            ! flux_yd = uy(i,jm1) * 0.5*(H_ab(3) + H_ab(4))
+            flux_xr = ux(i,j)   * 0.5*(H_ab(1)+H_ab(4))
+            flux_xl = ux(im1,j) * 0.5*(H_ab(2)+H_ab(3))
+            flux_yu = uy(i,j)   * 0.5*(H_ab(1)+H_ab(2))
+            flux_yd = uy(i,jm1) * 0.5*(H_ab(3)+H_ab(4))
 
             ! Calculate flux divergence on aa-nodes 
             dHdt(i,j) = (1.0 / dx) * (flux_xl - flux_xr) + (1.0 / dy) * (flux_yd - flux_yu)
@@ -370,7 +358,8 @@ end if
         real(prec), intent(IN)    :: dt                     ! [a] Timestep 
 
         ! Local variables:
-        integer    :: i, j, nx, ny 
+        integer    :: i, j, nx, ny
+        integer    :: im1, ip1, jm1, jp1 
         real(prec) :: H_now 
         real(prec) :: flux_xr                               ! [m^2 a^-1] ac-nodes, Flux in the x-direction to the right
         real(prec) :: flux_xl                               ! [m^2 a^-1] ac-nodes, Flux in the x-direction to the left
@@ -387,32 +376,38 @@ end if
         allocate(dHdt(nx,ny))
         dHdt = 0.0_prec 
 
-        do i = 2,nx-1
-        do j = 2,ny-1
-
+        do j = 1, ny
+        do i = 1, nx
+        
+            ! Define neighbor indices
+            im1 = max(i-1,1)
+            ip1 = min(i+1,nx)
+            jm1 = max(j-1,1)
+            jp1 = min(j+1,ny)
+            
             ! Calculate the flux across each boundary [m^2 a^-1]
             if (ux(i,j) .gt. 0.0) then 
                 flux_xr = ux(i,j)*H_ice(i,j)
             else
-                flux_xr = ux(i,j)*H_ice(i+1,j) 
+                flux_xr = ux(i,j)*H_ice(ip1,j) 
             end if 
 
-            if (ux(i-1,j) .gt. 0.0) then 
-                flux_xl = ux(i-1,j)*H_ice(i-1,j)
+            if (ux(im1,j) .gt. 0.0) then 
+                flux_xl = ux(im1,j)*H_ice(im1,j)
             else
-                flux_xl = ux(i-1,j)*H_ice(i,j) 
+                flux_xl = ux(im1,j)*H_ice(i,j) 
             end if 
 
             if (uy(i,j) .gt. 0.0) then 
                 flux_yu = uy(i,j)*H_ice(i,j)
             else
-                flux_yu = uy(i,j)*H_ice(i,j+1) 
+                flux_yu = uy(i,j)*H_ice(i,jp1) 
             end if 
 
-            if (uy(i,j-1) .gt. 0.0) then 
-                flux_yd = uy(i,j-1)*H_ice(i,j-1)
+            if (uy(i,jm1) .gt. 0.0) then 
+                flux_yd = uy(i,jm1)*H_ice(i,jm1)
             else
-                flux_yd = uy(i,j-1)*H_ice(i,j) 
+                flux_yd = uy(i,jm1)*H_ice(i,j) 
             end if 
 
             ! Calculate flux divergence on aa-nodes 
@@ -427,16 +422,6 @@ end if
 
         ! Update H_ice:
         H_ice = H_ice + dt*dHdt + dt*mdot 
-
-        ! Corners
-        ! BL
-        H_ice(1,1)   = H_ice(2,1)+H_ice(1,2)-H_ice(2,2)
-        ! BR
-        H_ice(nx,1)  = H_ice(nx-1,1)+H_ice(nx,2)-H_ice(nx-1,2)
-        ! TL
-        H_ice(1,ny)  = H_ice(2,ny)+H_ice(1,ny-1)-H_ice(2,ny-1)
-        ! BL
-        H_ice(nx,ny) = H_ice(nx-1,ny)+H_ice(nx,ny-1)-H_ice(nx-1,ny-1)
 
         return 
 

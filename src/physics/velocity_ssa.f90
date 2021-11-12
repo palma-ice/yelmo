@@ -98,7 +98,8 @@ contains
 
         real(prec) :: L2_norm 
 
-        logical, parameter :: write_ssa_diagnostics = .FALSE. 
+        logical, parameter :: write_ssa_diagnostics      = .FALSE. 
+        logical, parameter :: write_ssa_diagnostics_stop = .FALSE.   ! Stop simulation after completing iterations?
 
         nx    = size(ux_b,1)
         ny    = size(ux_b,2)
@@ -221,9 +222,9 @@ end if
 
         ! Iterations are finished, finalize calculations
 
-        ! if (write_ssa_diagnostics) then 
-        !     stop 
-        ! end if 
+        if (write_ssa_diagnostics .and. write_ssa_diagnostics_stop) then 
+            stop 
+        end if 
 
         ! Diagnose basal stress 
         call calc_basal_stress(taub_acx,taub_acy,beta_acx,beta_acy,ux_b,uy_b)

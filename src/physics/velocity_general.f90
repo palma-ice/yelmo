@@ -1287,7 +1287,8 @@ end if
         ny = size(f_ice,2) 
 
         ! Find partially-filled outer margins and set velocity to zero
-
+        ! (this will also treat all other ice-free points too) 
+        
         do j = 1, ny 
         do i = 1, nx 
 

@@ -101,11 +101,11 @@ contains
         LIS_INTEGER, allocatable, dimension(:) :: lgs_a_ptr, lgs_a_index
         LIS_SCALAR,  allocatable, dimension(:) :: lgs_a_value, lgs_b_value, lgs_x_value
 
-#if (defined(OLDCODE))
-        write(*,*) "ssa: OLDCODE lateral BCs!"
-#else
-        write(*,*) "ssa: NEWCODE lateral BCs!"
-#endif
+! #if (defined(OLDCODE))
+!         write(*,*) "ssa: OLDCODE lateral BCs!"
+! #else
+!         write(*,*) "ssa: NEWCODE lateral BCs!"
+! #endif
 
         ! Define border conditions (zeros, infinite, periodic)
         select case(trim(boundaries)) 
@@ -1939,9 +1939,9 @@ contains
         ! "floating" : only apply at floating ice margins 
         ! "marine"   : only apply at floating ice margins and 
         !              grounded marine ice margins (grounded ice next to open ocean)
-        ! "off"      : apply at all ice margins 
+        ! "all"      : apply at all ice margins 
         ! "none"     : do not apply boundary condition (for testing mainly)
-        character(len=56), parameter :: limit_lateral_bc = "off"
+        character(len=56), parameter :: apply_lateral_bc = "floating"
 
         nx = size(maske,1)
         ny = size(maske,2)
@@ -2020,32 +2020,36 @@ contains
 
           ! So far all margins have been diagnosed (marine and grounded on land)
           ! Disable some regions depending on choice above. 
-          select case(trim(limit_lateral_bc))
-            ! Limit the lateral boundary condition to what? 
+          select case(trim(apply_lateral_bc))
+            ! Apply the lateral boundary condition to what? 
 
             case("none")
-                ! Disable front detection 
+                ! Do not apply lateral bc anywhere. Ie, disable front detection.
+                ! This is mainly for testing, as the 'inner' ssa section
+                ! is used and may take information from neighbors outside
+                ! the ice sheet margin.
 
                 if (front1(i,j)) front1(i,j) = .FALSE. 
 
             case("floating")
-                ! Limit application of lateral bc to floating ice fronts only.
-                ! Ie, disable detection of grounded fronts for now.
+                ! Only apply lateral bc to floating ice fronts.
+                ! Ie, disable detection of all grounded fronts for now.
                 ! Model is generally more stable this way.
 
                 if ( front1(i,j) .and. maske(i,j) .eq. 0 ) front1(i,j) = .FALSE. 
 
             case("marine")
-                ! Limit application of lateral bc to floating ice fronts 
-                ! and grounded marine fronts. 
-                ! Only disable detection of ice fronts grounded above sea level.
+                ! Only apply lateral bc to floating ice fronts and
+                ! and grounded marine fronts. Disable detection 
+                ! of ice fronts grounded above sea level.
             
                 H_ocn_now = max(z_sl(i,j)-z_bed(i,j),0.0_wp)
 
                 if ( front1(i,j) .and. maske(i,j) .eq. 0 .and. &
                                     H_ocn_now .eq. 0.0 ) front1(i,j) = .FALSE. 
             
-            case DEFAULT ! (eg, limit_lateral_bc="off")
+            case DEFAULT ! (eg, apply_lateral_bc="all")
+                ! Apply lateral bc to all ice-sheet fronts. 
 
                 ! Do nothing - all fronts have been accurately diagnosed. 
 

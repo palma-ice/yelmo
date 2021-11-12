@@ -64,7 +64,7 @@ contains
         real(prec) :: model_time0, model_time1 
         real(prec) :: speed 
 
-        real(wp), parameter :: dt_calv_min = 0.0_wp 
+        real(wp), parameter :: dt_calv_min = 0.1_wp 
 
         nx = size(tpo%now%H_ice,1)
         ny = size(tpo%now%H_ice,2)
@@ -87,7 +87,7 @@ contains
 
         call_calving = .FALSE. 
         if (dt_calv .ge. dt_calv_min) call_calving = .TRUE. 
-        
+
         ! Store initial cpu time and model time for metrics later
         call yelmo_cpu_time(cpu_time0)
         model_time0 = tpo%par%time 

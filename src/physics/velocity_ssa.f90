@@ -208,7 +208,7 @@ end if
             if (write_ssa_diagnostics) then  
                 call ssa_diagnostics_write_step("yelmo_ssa.nc",ux_b,uy_b,L2_norm,beta_acx,beta_acy,visc_eff_int, &
                                         ssa_mask_acx,ssa_mask_acy,ssa_err_acx,ssa_err_acy,H_ice,f_ice,taud_acx,taud_acy, &
-                                        H_grnd,z_sl,z_bed,ux_b_nm1,uy_b_nm1,time=real(iter,wp))    
+                                        H_grnd,z_sl,z_bed,z_srf,ux_b_nm1,uy_b_nm1,time=real(iter,wp))    
             end if 
 
             ! =========================================================================================

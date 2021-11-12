@@ -2190,7 +2190,7 @@ contains
 
     subroutine ssa_diagnostics_write_step(filename,ux,uy,L2_norm,beta_acx,beta_acy,visc_eff_int, &
                                         ssa_mask_acx,ssa_mask_acy,ssa_err_acx,ssa_err_acy,H_ice,f_ice,taud_acx,taud_acy, &
-                                                            H_grnd,z_sl,z_bed,ux_prev,uy_prev,time)
+                                                            H_grnd,z_sl,z_bed,z_srf,ux_prev,uy_prev,time)
 
         implicit none 
         
@@ -2212,6 +2212,7 @@ contains
         real(wp), intent(IN) :: H_grnd(:,:) 
         real(wp), intent(IN) :: z_sl(:,:) 
         real(wp), intent(IN) :: z_bed(:,:) 
+        real(wp), intent(IN) :: z_srf(:,:)
         real(wp), intent(IN) :: ux_prev(:,:) 
         real(wp), intent(IN) :: uy_prev(:,:) 
         real(wp), intent(IN) :: time
@@ -2281,6 +2282,8 @@ contains
         call nc_write(filename,"z_sl",z_sl,units="m",long_name="Sea level", &
                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
         call nc_write(filename,"z_bed",z_bed,units="m",long_name="Bedrock elevation", &
+                      dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
+        call nc_write(filename,"z_srf",z_srf,units="m",long_name="Surface elevation", &
                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
         
         ! Close the netcdf file

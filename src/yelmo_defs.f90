@@ -18,12 +18,12 @@ module yelmo_defs
     integer,  parameter :: sp  = kind(1.0)
 
     ! Choose the precision of the library (sp,dp)
-    integer,  parameter :: prec = sp 
+    integer,  parameter :: wp = sp 
 
-    ! Define more conventional wp = working precision 
+    ! Define legacy deprecated kind parameter 'prec'
     ! ajr: slowly transition from 'prec' to 'wp' 
-    integer,  parameter :: wp = prec 
-
+    integer,  parameter :: prec = wp 
+    
     ! Missing value and aliases
     real(wp), parameter :: MISSING_VALUE_DEFAULT = real(-9999.0,wp)
     real(wp), parameter :: MISSING_VALUE = MISSING_VALUE_DEFAULT
@@ -107,7 +107,7 @@ module yelmo_defs
         
         ! Internal parameters 
         real(dp)           :: time 
-        real(dp)           :: time_b 
+        real(dp)           :: time_calv
         integer            :: nx, ny
         real(wp)           :: dx, dy
         character(len=256) :: boundaries 

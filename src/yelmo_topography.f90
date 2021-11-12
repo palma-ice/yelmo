@@ -53,15 +53,18 @@ contains
         logical,            intent(IN)    :: topo_fixed 
 
         ! Local variables 
-        real(prec) :: dx, dt   
+        real(prec) :: dx, dt, dt_calv   
         integer :: i, j, nx, ny  
         real(prec), allocatable :: mbal(:,:) 
         real(prec), allocatable :: calv_sd(:,:) 
         logical :: reset_mb_resid 
+        logical :: call_calving 
 
         real(8)    :: cpu_time0, cpu_time1
         real(prec) :: model_time0, model_time1 
         real(prec) :: speed 
+
+        real(wp), parameter :: dt_calv_min = 0.0_wp 
 
         nx = size(tpo%now%H_ice,1)
         ny = size(tpo%now%H_ice,2)
@@ -71,11 +74,16 @@ contains
 
         ! Initialize time if necessary 
         if (tpo%par%time .gt. dble(time)) then 
-            tpo%par%time = dble(time) 
+            tpo%par%time      = dble(time)
+            tpo%par%time_calv = dble(time)  
         end if 
         
         ! Get time step
-        dt = dble(time) - tpo%par%time 
+        dt      = dble(time) - tpo%par%time 
+        dt_calv = dble(time) - tpo%par%time_calv 
+
+        call_calving = .FALSE. 
+        if (dt_calv .ge. dt_calv_min) call_calving = .TRUE. 
 
         ! Store initial cpu time and model time for metrics later
         call yelmo_cpu_time(cpu_time0)
@@ -120,7 +128,7 @@ contains
             call calc_ice_thickness_mbal(tpo%now%H_ice,tpo%now%f_ice,tpo%now%mb_applied, &
                                          tpo%now%f_grnd,bnd%z_sl-bnd%z_bed,mbal,tpo%par%dx,dt)
 
-            
+
             ! If subgrid ice margin is not being used, then tiny ice 
             ! thicknesses should be removed before calving step.             
             if (.not. tpo%par%margin_flt_subgrid) then 
@@ -235,7 +243,7 @@ end if
                     stop 
 
             end select
-                        
+            
             select case(trim(tpo%par%calv_flt_method))
 
                 case("vm-l19","eigen")
@@ -248,7 +256,6 @@ end if
                     call calc_calving_residual(tpo%now%calv_flt,tpo%now%H_ice,tpo%now%f_ice,dt)
             
             end select 
-
 
             ! Additionally ensure higher calving rate for floating tongues of
             ! one grid-point width.
@@ -284,12 +291,15 @@ end if
             tpo%now%calv_grnd = tpo%now%calv_grnd + calv_sd 
 
             ! Apply calving step 
-            call calc_ice_thickness_calving(tpo%now%H_ice,tpo%now%f_ice,tpo%now%calv, &
-                                            tpo%now%f_grnd,bnd%z_sl-bnd%z_bed, &
-                                            tpo%now%calv_flt,tpo%now%calv_grnd,tpo%par%dx,dt)            
+            if (call_calving) then 
+                call calc_ice_thickness_calving(tpo%now%H_ice,tpo%now%f_ice,tpo%now%calv, &
+                                                tpo%now%f_grnd,bnd%z_sl-bnd%z_bed, &
+                                                tpo%now%calv_flt,tpo%now%calv_grnd,tpo%par%dx,dt)            
 
-            ! Update ice fraction mask 
-            call calc_ice_fraction(tpo%now%f_ice,tpo%now%H_ice,tpo%now%f_grnd,tpo%par%margin_flt_subgrid)
+                ! Update ice fraction mask 
+                call calc_ice_fraction(tpo%now%f_ice,tpo%now%H_ice,tpo%now%f_grnd,tpo%par%margin_flt_subgrid)
+            
+            end if
             
             
 
@@ -442,6 +452,7 @@ end if
 
             tpo%par%time = dble(time)
             
+            if (call_calving) tpo%par%time_calv = dble(time)
         end if 
 
 !         if (yelmo_log) then 
@@ -584,8 +595,8 @@ end if
         par%boundaries = "zeros" 
         
         ! Define current time as unrealistic value
-        par%time = 1000000000   ! [a] 1 billion years in the future 
-        par%time_b = par%time 
+        par%time      = 1000000000   ! [a] 1 billion years in the future 
+        par%time_calv = par%time 
 
         ! Intialize timestepping parameters to Forward Euler (beta2=beta4=0: no contribution from previous timestep)
         par%dt_zeta     = 1.0 

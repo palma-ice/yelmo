@@ -64,7 +64,7 @@ contains
         ! Initially set all points to True 
         mask = .TRUE. 
     
-if (.FALSE.) then 
+if (.TRUE.) then 
         do j = 1, ny 
         do i = 1, nx
 

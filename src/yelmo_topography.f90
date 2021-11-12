@@ -74,17 +74,20 @@ contains
 
         ! Initialize time if necessary 
         if (tpo%par%time .gt. dble(time)) then 
-            tpo%par%time      = dble(time)
-            tpo%par%time_calv = dble(time)  
+            tpo%par%time = dble(time) 
         end if 
         
+        if (tpo%par%time_calv .gt. dble(time)) then 
+            tpo%par%time_calv = dble(time)  
+        end if 
+
         ! Get time step
         dt      = dble(time) - tpo%par%time 
         dt_calv = dble(time) - tpo%par%time_calv 
 
         call_calving = .FALSE. 
         if (dt_calv .ge. dt_calv_min) call_calving = .TRUE. 
-
+        
         ! Store initial cpu time and model time for metrics later
         call yelmo_cpu_time(cpu_time0)
         model_time0 = tpo%par%time 
@@ -113,17 +116,16 @@ contains
 
             ! === Step 1: ice thickness evolution from dynamics alone ===
 
-
             ! Calculate the ice thickness conservation from dynamics only -----
             call calc_ice_thickness_dyn(tpo%now%H_ice,tpo%now%dHdt_n,tpo%now%H_ice_n,tpo%now%H_ice_pred, &
                                         tpo%now%f_ice,tpo%now%f_grnd,dyn%now%ux_bar,dyn%now%uy_bar, &
                                         solver=tpo%par%solver,dx=tpo%par%dx,dt=dt,beta=tpo%par%dt_beta,pc_step=tpo%par%pc_step)
             
-            ! === Step 2: ice thickness evolution from vertical column mass balance ===
-
             ! Update ice fraction mask 
             call calc_ice_fraction(tpo%now%f_ice,tpo%now%H_ice,tpo%now%f_grnd,tpo%par%margin_flt_subgrid)
             
+            ! === Step 2: ice thickness evolution from vertical column mass balance ===
+
             ! Apply mass-conservation step (mbal)
             call calc_ice_thickness_mbal(tpo%now%H_ice,tpo%now%f_ice,tpo%now%mb_applied, &
                                          tpo%now%f_grnd,bnd%z_sl-bnd%z_bed,mbal,tpo%par%dx,dt)
@@ -141,7 +143,6 @@ contains
             else
                 reset_mb_resid = .TRUE. 
             end if 
-
 
             ! Update ice fraction mask 
             call calc_ice_fraction(tpo%now%f_ice,tpo%now%H_ice,tpo%now%f_grnd,tpo%par%margin_flt_subgrid)
@@ -299,6 +300,11 @@ end if
                 ! Update ice fraction mask 
                 call calc_ice_fraction(tpo%now%f_ice,tpo%now%H_ice,tpo%now%f_grnd,tpo%par%margin_flt_subgrid)
             
+            else
+                ! Calving was diagnosed but not applied 
+
+                tpo%now%calv = 0.0_wp 
+
             end if
             
             

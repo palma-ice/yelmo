@@ -767,8 +767,10 @@ contains
 
             else
                 ! === Proceed with normal ssa solution =================
-                ! inner point on the staggered grid in x-direction
-                ! ie, if ( (i /= nx).and.(j /= 1).and.(j /= ny) ) then
+                ! inner shelfy-stream, x-direction: point in the interior
+                ! of the ice sheet (surrounded by ice-covered points), or  
+                ! at the land-terminating glacier front depending on choice 
+                ! of apply_lateral_bc in routine set_sico_masks.
                     
                     ! inner shelfy stream or floating ice 
 
@@ -1311,8 +1313,10 @@ contains
 
             else
                 ! === Proceed with normal ssa solution =================
-                ! inner point on the staggered grid in y-direction
-                ! ie, if ( (j /= ny).and.(i /= 1).and.(i /= nx) ) then
+                ! inner shelfy-stream, y-direction: point in the interior
+                ! of the ice sheet (surrounded by ice-covered points), or  
+                ! at the land-terminating glacier front depending on choice 
+                ! of apply_lateral_bc in routine set_sico_masks.
                     
                     ! inner shelfy stream or floating ice 
 

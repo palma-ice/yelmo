@@ -92,8 +92,8 @@ contains
 
 ! Only one at a time!!
 !#define LAT_BC_OLDCODE
-!#define LAT_BC_NEWCODE      
-#define LAT_BC_NEWCODE2 
+#define LAT_BC_NEWCODE      
+!#define LAT_BC_NEWCODE2 
 
 ! Include header for lis solver fortran interface
 #include "lisf.h"

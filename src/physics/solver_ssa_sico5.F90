@@ -1718,40 +1718,73 @@ if (.TRUE.) then
                                 ! next nc (column counter), for vy_m(i,j)
                             k = k+1
                             lgs_a_value(k) = -2.0_wp*inv_deta2*vis_int_acy_jp1 &
-                                             -0.5_wp*beta_acy(i,j)
+                                             -0.5_wp*beta_acy(i,j) &
+                                             -0.5_wp*inv_dxi2*vis_int_acx_ip1 &
+                                             -0.5_wp*inv_dxi2*vis_int_acx_im1
                             lgs_a_index(k) = nc
 
                             nc = 2*ij2n(i,j+1)
                                 ! next nc (column counter), for vy_m(i,j+1)
                             k = k+1
-                            lgs_a_value(k) = -0.5_wp*beta_acy(i,j+1)
+                            lgs_a_value(k) = -0.5_wp*beta_acy(i,j+1) &
+                                             -0.5_wp*inv_dxi2*vis_int_acx_ip1 &
+                                             -0.5_wp*inv_dxi2*vis_int_acx_im1
                             lgs_a_index(k) = nc
 
                             
                             nc = 2*ij2n(i,j+1)-1
                                 ! next nc (column counter), for vx_m(i,j+1)
                             k = k+1
-                            lgs_a_value(k) =  inv_dxi_deta*vis_int_acy_jp1
+                            lgs_a_value(k) =  inv_dxi_deta*vis_int_acy_jp1 &
+                                             +inv_dxi_deta*vis_int_acx_ip1
                             lgs_a_index(k) = nc
 
                             nc = 2*ij2n(i-1,j+1)-1
                                 ! next nc (column counter), for vx_m(i-1,j+1)
                             k = k+1
-                            lgs_a_value(k) = -inv_dxi_deta*vis_int_acy_jp1
+                            lgs_a_value(k) = -inv_dxi_deta*vis_int_acy_jp1 &
+                                             +inv_dxi_deta*vis_int_acx_im1
                             lgs_a_index(k) = nc
 
                             nc = 2*ij2n(i,j+2)-1
                                 ! next nc (column counter), for vx_m(i,j+2)
                             k = k+1
-                            lgs_a_value(k) =  inv_dxi_deta*vis_int_acy_jp1
+                            lgs_a_value(k) =  inv_dxi_deta*vis_int_acy_jp1 &
+                                             +inv_dxi_deta*vis_int_acx_ip1
                             lgs_a_index(k) = nc
 
                             nc = 2*ij2n(i-1,j+2)-1
                                 ! next nc (column counter), for vx_m(i-1,j+2)
                             k = k+1
-                            lgs_a_value(k) = -inv_dxi_deta*vis_int_acy_jp1
+                            lgs_a_value(k) = -inv_dxi_deta*vis_int_acy_jp1 &
+                                             -inv_dxi_deta*vis_int_acx_im1
                             lgs_a_index(k) = nc
 
+                            ! Term 17:
+                            nc = 2*ij2n(i+1,j+1)
+                                ! next nc (column counter), for vy_m(i+1,j+1)
+                            k = k+1
+                            lgs_a_value(k) = -0.5_wp*inv_dxi2*vis_int_acx_ip1
+                            lgs_a_index(k) = nc
+
+                            nc = 2*ij2n(i+1,j)
+                                ! next nc (column counter), for vy_m(i+1,j)
+                            k = k+1
+                            lgs_a_value(k) = 0.5_wp*inv_dxi2*vis_int_acx_ip1
+                            lgs_a_index(k) = nc
+
+                            nc = 2*ij2n(i-1,j+1)
+                                ! next nc (column counter), for vy_m(i-1,j+1)
+                            k = k+1
+                            lgs_a_value(k) = 0.5_wp*inv_dxi2*vis_int_acx_im1
+                            lgs_a_index(k) = nc
+
+                            nc = 2*ij2n(i-1,j)
+                                ! next nc (column counter), for vy_m(i-1,j)
+                            k = k+1
+                            lgs_a_value(k) = 0.5_wp*inv_dxi2*vis_int_acx_im1
+                            lgs_a_index(k) = nc
+                            
 
                             lgs_b_value(nr) = taud_aa + inv_deta*tau_bc_int 
                             lgs_x_value(nr) = vy_m(i,j)

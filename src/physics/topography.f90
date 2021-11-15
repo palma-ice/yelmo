@@ -32,7 +32,7 @@ contains
     !
     ! ============================================================
 
-    subroutine calc_ice_fraction(f_ice,H_ice,f_grnd,flt_subgrid)
+    subroutine calc_ice_fraction(f_ice,H_ice,H_grnd,flt_subgrid)
         ! Determine the area fraction of a grid cell
         ! that is ice-covered. Assume that marginal points
         ! have equal thickness to inland neighbors 
@@ -41,8 +41,9 @@ contains
 
         real(wp), intent(OUT) :: f_ice(:,:)             ! [--] Ice covered fraction (aa-nodes)
         real(wp), intent(IN)  :: H_ice(:,:)             ! [m] Ice thickness on standard grid (aa-nodes)
-        real(wp), intent(IN)  :: f_grnd(:,:)            ! [--] Grounded fraction (aa-nodes)
+        real(wp), intent(IN)  :: H_grnd(:,:)            ! [m] Thickness until flotation - floating if H_grnd<=0 (aa-nodes)
         logical, optional     :: flt_subgrid            ! Option to allow fractions for floating ice margins             
+        
         ! Local variables 
         integer  :: i, j, nx, ny
         integer  :: im1, ip1, jm1, jp1 
@@ -50,7 +51,7 @@ contains
         logical  :: get_fractional_cover 
 
         real(wp) :: H_neighb(4)
-        real(wp) :: f_neighb(4)
+        logical  :: float_neighb(4)
         integer  :: n_neighb(4)
         logical  :: mask(4) 
         logical  :: mask_grnd(4)
@@ -134,11 +135,11 @@ contains
                     if (n_now .ge. 1) then 
                         ! Some neighbors have full ice coverage
 
-                        f_neighb = [f_grnd(im1,j),f_grnd(ip1,j),f_grnd(i,jm1),f_grnd(i,jp1)]
-                        mask_grnd = f_neighb .gt. 0.0 .and. H_neighb .gt. 0.0 
+                        float_neighb = [H_grnd(im1,j),H_grnd(ip1,j),H_grnd(i,jm1),H_grnd(i,jp1)] .le. 0.0
+                        mask_grnd    = (.not. float_neighb) .and. H_neighb .gt. 0.0 
 
                         ! Determine height to give to potentially partially filled cell
-                        if (f_grnd(i,j) .eq. 0.0 .and. count(mask_grnd) .eq. 0) then 
+                        if (H_grnd(i,j) .le. 0.0 .and. count(mask_grnd) .eq. 0) then 
                             ! Floating point away from grounding line, set H_eff = minimum of neighbors
 
                             H_eff = minval(H_neighb,mask=mask)
@@ -201,8 +202,8 @@ contains
                     where(mask) H_neighb = [H_ice(im1,j),H_ice(ip1,j),H_ice(i,jm1),H_ice(i,jp1)] &
                                         / [f_ice(im1,j),f_ice(ip1,j),f_ice(i,jm1),f_ice(i,jp1)]
                     
-                    if (f_grnd(i,j) .eq. 0.0) then 
-                        ! Floating point away, set H_eff = minimum of neighbors
+                    if (H_grnd(i,j) .le. 0.0) then 
+                        ! Floating point away from grounding line, set H_eff = minimum of neighbors
 
                         H_eff = minval(H_neighb,mask=mask)
 
@@ -453,12 +454,12 @@ contains
         if (present(set_frac_zero)) then 
             if (set_frac_zero .and. f_ice .lt. 1.0) H_eff = 0.0_wp 
         end if 
-        
+
         return
 
     end subroutine calc_H_eff
 
-    elemental subroutine calc_H_grnd(H_grnd,H_ice,f_ice,z_bed,z_sl)
+    elemental subroutine calc_H_grnd(H_grnd,H_ice,f_ice,z_bed,z_sl,use_f_ice)
         ! Calculate ice thickness overburden, H_grnd
         ! When H_grnd >= 0, grounded, when H_grnd < 0, floating 
         ! Also calculate rate of change for diagnostic related to grounding line 
@@ -472,15 +473,25 @@ contains
         real(wp), intent(IN)    :: f_ice
         real(wp), intent(IN)    :: z_bed
         real(wp), intent(IN)    :: z_sl 
+        logical,  intent(IN), optional :: use_f_ice
 
         ! Local variables   
         real(wp) :: rho_sw_ice 
         real(wp) :: H_eff 
+        logical  :: use_f_ice_now 
+
+        ! By default use f_ice to set points with f_ice < 1 to H_eff=0.0 
+        use_f_ice_now = .TRUE. 
+        if (present(use_f_ice)) use_f_ice_now = use_f_ice 
 
         rho_sw_ice = rho_sw/rho_ice ! Ratio of density of seawater to ice [--]
         
         ! Get effective ice thickness
-        call calc_H_eff(H_eff,H_ice,f_ice,set_frac_zero=.TRUE.)
+        if (use_f_ice_now) then 
+            call calc_H_eff(H_eff,H_ice,f_ice,set_frac_zero=.TRUE.)
+        else 
+            H_eff = H_ice 
+        end if 
 
         ! Calculate new H_grnd (ice thickness overburden)
         H_grnd = H_eff - rho_sw_ice*max(z_sl-z_bed,0.0_prec)

@@ -122,7 +122,7 @@ contains
                                         solver=tpo%par%solver,dx=tpo%par%dx,dt=dt,beta=tpo%par%dt_beta,pc_step=tpo%par%pc_step)
             
             ! Update ice fraction mask 
-            call calc_ice_fraction(tpo%now%f_ice,tpo%now%H_ice,tpo%now%f_grnd,tpo%par%margin_flt_subgrid)
+            call calc_ice_fraction(tpo%now%f_ice,tpo%now%H_ice,tpo%now%H_grnd,tpo%par%margin_flt_subgrid)
             
             ! === Step 2: ice thickness evolution from vertical column mass balance ===
 
@@ -145,7 +145,7 @@ contains
             end if 
 
             ! Update ice fraction mask 
-            call calc_ice_fraction(tpo%now%f_ice,tpo%now%H_ice,tpo%now%f_grnd,tpo%par%margin_flt_subgrid)
+            call calc_ice_fraction(tpo%now%f_ice,tpo%now%H_ice,tpo%now%H_grnd,tpo%par%margin_flt_subgrid)
             
             ! === Step 3: ice thickness evolution from calving ===
             
@@ -298,7 +298,7 @@ end if
                                                 tpo%now%calv_flt,tpo%now%calv_grnd,tpo%par%dx,dt)            
 
                 ! Update ice fraction mask 
-                call calc_ice_fraction(tpo%now%f_ice,tpo%now%H_ice,tpo%now%f_grnd,tpo%par%margin_flt_subgrid)
+                call calc_ice_fraction(tpo%now%f_ice,tpo%now%H_ice,tpo%now%H_grnd,tpo%par%margin_flt_subgrid)
             
             else
                 ! Calving was diagnosed but not applied 
@@ -351,8 +351,12 @@ end if
 
         end if 
 
+        ! Calculate temporary grounding overburden ice thickness without accounting for f_ice
+        ! (used as input to calc_ice_fraction just below)
+        call calc_H_grnd(tpo%now%H_grnd,tpo%now%H_ice,tpo%now%f_ice,bnd%z_bed,bnd%z_sl,use_f_ice=.FALSE.)
+
         ! Final update of ice fraction mask (or define it now for fixed topography)
-        call calc_ice_fraction(tpo%now%f_ice,tpo%now%H_ice,tpo%now%f_grnd,tpo%par%margin_flt_subgrid)
+        call calc_ice_fraction(tpo%now%f_ice,tpo%now%H_ice,tpo%now%H_grnd,tpo%par%margin_flt_subgrid)
             
         ! 2. Calculate additional topographic properties ------------------
 

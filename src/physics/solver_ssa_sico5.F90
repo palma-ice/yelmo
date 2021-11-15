@@ -1478,8 +1478,6 @@ end if
 #if (defined(LAT_BC_NEWCODE2))
                     ! === NEWCODE2 ====================================
 
-
-
             else if (  ( is_front_1(i,j).and.is_front_2(i,j+1) ) &
                       .or. &
                       ( is_front_2(i,j).and.is_front_1(i,j+1) ) &

@@ -785,7 +785,7 @@ contains
                         if (is_front_1(i,j).and.is_front_2(i+1,j)) then 
                             ! === Case 1: ice-free to the right ===
 
-if (.TRUE.) then 
+if (.FALSE.) then 
                             ! Get viscosity on interior acx-node
                             vis_int_acx_im1 = 0.5_wp*(vis_int_sgxy(i-1,j)+vis_int_sgxy(i-1,j-1))
                             
@@ -887,7 +887,7 @@ end if
                         else 
                             ! Case 2: ice-free to the left
  
-if (.TRUE.) then 
+if (.FALSE.) then 
                             ! Get viscosity on interior acx-node
                             vis_int_acx_ip1 = 0.5_wp*(vis_int_sgxy(i+1,j)+vis_int_sgxy(i+1,j-1))
                             
@@ -1590,7 +1590,7 @@ end if
                         if (is_front_1(i,j).and.is_front_2(i,j+1)) then 
                             ! === Case 1: ice-free to the top ===
 
-if (.TRUE.) then
+if (.FALSE.) then
                             ! Get viscosity on interior acy-node
                             vis_int_acy_jm1 = 0.5_wp*(vis_int_sgxy(i,j-1) + vis_int_sgxy(i-1,j-1))
                             
@@ -1606,13 +1606,17 @@ if (.TRUE.) then
                                 ! next nc (column counter), for vy_m(i,j)
                             k = k+1
                             lgs_a_value(k) = -2.0_wp*inv_deta2*vis_int_acy_jm1 &
-                                             -0.5_wp*beta_acy(i,j)
+                                             -0.5_wp*beta_acy(i,j) &
+                                             -0.5_wp*inv_dxi2*vis_int_acx_ip1 &
+                                             -0.5_wp*inv_dxi2*vis_int_acx_im1
                             lgs_a_index(k) = nc
 
                             nc = 2*ij2n(i,j-1)
                                 ! next nc (column counter), for vy_m(i,j-1)
                             k = k+1
-                            lgs_a_value(k) = -0.5_wp*beta_acy(i,j-1)
+                            lgs_a_value(k) = -0.5_wp*beta_acy(i,j-1) &
+                                             -0.5_wp*inv_dxi2*vis_int_acx_ip1 &
+                                             -0.5_wp*inv_dxi2*vis_int_acx_im1
                             lgs_a_index(k) = nc
 
                             nc = 2*ij2n(i,j-2)
@@ -1621,28 +1625,59 @@ if (.TRUE.) then
                             lgs_a_value(k) =  2.0_wp*inv_deta2*vis_int_acy_jm1
                             lgs_a_index(k) = nc
 
+                            ! Term 9,10:
                             nc = 2*ij2n(i,j)-1
                                 ! next nc (column counter), for vx_m(i,j)
                             k = k+1
-                            lgs_a_value(k) = -inv_dxi_deta*vis_int_acy_jm1
+                            lgs_a_value(k) = -inv_dxi_deta*vis_int_acy_jm1 &
+                                             +inv_dxi_deta*vis_int_acx_ip1
                             lgs_a_index(k) = nc
 
                             nc = 2*ij2n(i-1,j)-1
                                 ! next nc (column counter), for vx_m(i-1,j)
                             k = k+1
-                            lgs_a_value(k) =  inv_dxi_deta*vis_int_acy_jm1
+                            lgs_a_value(k) =  inv_dxi_deta*vis_int_acy_jm1 &
+                                             -inv_dxi_deta*vis_int_acx_im1
                             lgs_a_index(k) = nc
 
+                            ! Term 13,14:
                             nc = 2*ij2n(i,j-1)-1
                                 ! next nc (column counter), for vx_m(i,j-1)
                             k = k+1
-                            lgs_a_value(k) = -inv_dxi_deta*vis_int_acy_jm1
+                            lgs_a_value(k) = -inv_dxi_deta*vis_int_acy_jm1 &
+                                             -inv_dxi_deta*vis_int_acx_ip1
                             lgs_a_index(k) = nc
 
                             nc = 2*ij2n(i-1,j-1)-1
                                 ! next nc (column counter), for vx_m(i-1,j-1)
                             k = k+1
-                            lgs_a_value(k) = inv_dxi_deta*vis_int_acy_jm1
+                            lgs_a_value(k) = inv_dxi_deta*vis_int_acy_jm1 &
+                                            +inv_dxi_deta*vis_int_acx_im1
+                            lgs_a_index(k) = nc
+
+                            ! Term 17:
+                            nc = 2*ij2n(i+1,j)
+                                ! next nc (column counter), for vy_m(i+1,j)
+                            k = k+1
+                            lgs_a_value(k) =  2.0_wp*inv_dxi2*vis_int_acx_ip1
+                            lgs_a_index(k) = nc
+
+                            nc = 2*ij2n(i+1,j-1)
+                                ! next nc (column counter), for vy_m(i+1,j-1)
+                            k = k+1
+                            lgs_a_value(k) =  2.0_wp*inv_dxi2*vis_int_acx_ip1
+                            lgs_a_index(k) = nc
+
+                            nc = 2*ij2n(i-1,j)
+                                ! next nc (column counter), for vy_m(i-1,j)
+                            k = k+1
+                            lgs_a_value(k) =  2.0_wp*inv_dxi2*vis_int_acx_im1
+                            lgs_a_index(k) = nc
+
+                            nc = 2*ij2n(i-1,j-1)
+                                ! next nc (column counter), for vy_m(i-1,j-1)
+                            k = k+1
+                            lgs_a_value(k) =  2.0_wp*inv_dxi2*vis_int_acx_im1
                             lgs_a_index(k) = nc
 
 
@@ -1661,7 +1696,7 @@ end if
                         else
                             ! === Case 2: ice-free to the bottom ===
 
-if (.FALSE.) then 
+if (.TRUE.) then 
                             ! Get viscosity on interior acy-node
                             vis_int_acy_jp1 = 0.5_wp*(vis_int_sgxy(i,j+1) + vis_int_sgxy(i-1,j+1))
                             

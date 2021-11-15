@@ -23,7 +23,7 @@ module yelmo_defs
     ! Define legacy deprecated kind parameter 'prec'
     ! ajr: slowly transition from 'prec' to 'wp' 
     integer,  parameter :: prec = wp 
-    
+
     ! Missing value and aliases
     real(wp), parameter :: MISSING_VALUE_DEFAULT = real(-9999.0,wp)
     real(wp), parameter :: MISSING_VALUE = MISSING_VALUE_DEFAULT
@@ -227,6 +227,7 @@ module yelmo_defs
         real(wp)   :: beta_min              ! Minimum allowed value of beta
         real(wp)   :: eps_0                 ! Minimum assumed strain rate for effective viscosity regularization
         character(len=256) :: ssa_lis_opt 
+        character(len=256) :: ssa_lat_bc
         real(wp)   :: ssa_beta_max          ! Maximum value of beta for which ssa should be calculated
         real(wp)   :: ssa_vel_max
         integer    :: ssa_iter_max 

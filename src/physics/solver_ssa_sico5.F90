@@ -21,7 +21,7 @@ contains
 
     subroutine calc_vxy_ssa_matrix(vx_m,vy_m,L2_norm,beta_acx,beta_acy,visc_eff, &
                     ssa_mask_acx,ssa_mask_acy,H_ice,f_ice,taud_acx,taud_acy,H_grnd,z_sl,z_bed, &
-                    z_srf,dx,dy,ulim,boundaries,lis_settings)
+                    z_srf,dx,dy,ulim,boundaries,lateral_bc,lis_settings)
         ! Solution of the system of linear equations for the horizontal velocities
         ! vx_m, vy_m in the shallow shelf approximation.
         ! Adapted from sicopolis version 5-dev (svn revision 1421)
@@ -48,6 +48,7 @@ contains
         real(prec), intent(IN)    :: dx, dy
         real(prec), intent(IN)    :: ulim 
         character(len=*), intent(IN) :: boundaries 
+        character(len=*), intent(IN) :: lateral_bc
         character(len=*), intent(IN) :: lis_settings
 
         ! Local variables
@@ -215,7 +216,7 @@ contains
         ! Set maske and grounding line / calving front flags
 
         call set_sico_masks(maske,is_front_1,is_front_2,is_grline_1,is_grline_2, &
-                                            H_ice, f_ice, H_grnd, z_bed, z_sl)
+                                H_ice, f_ice, H_grnd, z_bed, z_sl, lateral_bc)
         
 
         ! ! ajr:testing 
@@ -2287,7 +2288,7 @@ end if
 
     end subroutine stagger_visc_aa_ab
 
-    subroutine set_sico_masks(maske,front1,front2,gl1,gl2,H_ice,f_ice,H_grnd,z_bed,z_sl)
+    subroutine set_sico_masks(maske,front1,front2,gl1,gl2,H_ice,f_ice,H_grnd,z_bed,z_sl,apply_lateral_bc)
         ! Define where ssa calculations should be performed
         ! Note: could be binary, but perhaps also distinguish 
         ! grounding line/zone to use this mask for later gl flux corrections
@@ -2310,6 +2311,7 @@ end if
         real(prec), intent(IN)  :: H_grnd(:,:)
         real(prec), intent(IN)  :: z_bed(:,:)
         real(prec), intent(IN)  :: z_sl(:,:)
+        character(len=*), intent(IN) :: apply_lateral_bc 
 
         ! Local variables
         integer    :: i, j, nx, ny
@@ -2317,14 +2319,13 @@ end if
         logical    :: is_float 
         real(prec) :: H_ocn_now 
 
-        ! Use this to determine where to apply generalized lateral bc
-        ! equation.
+        ! Use 'apply_lateral_bc' to determine where to apply generalized
+        ! lateral bc equation.
         ! "floating" : only apply at floating ice margins 
         ! "marine"   : only apply at floating ice margins and 
         !              grounded marine ice margins (grounded ice next to open ocean)
         ! "all"      : apply at all ice margins 
         ! "none"     : do not apply boundary condition (for testing mainly)
-        character(len=56), parameter :: apply_lateral_bc = "all"
 
         nx = size(maske,1)
         ny = size(maske,2)

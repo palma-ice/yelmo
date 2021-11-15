@@ -294,6 +294,7 @@ contains
             ! Set diva parameters from Yelmo settings 
             ssa_par%ssa_lis_opt    = dyn%par%ssa_lis_opt 
             ssa_par%boundaries     = dyn%par%boundaries  
+            ssa_par%ssa_lateral_bc = dyn%par%ssa_lat_bc  
             ssa_par%visc_method    = dyn%par%visc_method 
             ssa_par%visc_const     = dyn%par%visc_const 
             ssa_par%beta_method    = dyn%par%beta_method 
@@ -423,6 +424,7 @@ contains
         ! Set diva parameters from Yelmo settings 
         diva_par%ssa_lis_opt    = dyn%par%ssa_lis_opt 
         diva_par%boundaries     = dyn%par%boundaries 
+        diva_par%ssa_lateral_bc = dyn%par%ssa_lat_bc 
         diva_par%no_slip        = no_slip 
         diva_par%visc_method    = dyn%par%visc_method 
         diva_par%visc_const     = dyn%par%visc_const 
@@ -515,6 +517,7 @@ contains
 
         ! Set diva parameters from Yelmo settings 
         l1l2_par%ssa_lis_opt    = dyn%par%ssa_lis_opt 
+        l1l2_par%ssa_lateral_bc = dyn%par%ssa_lat_bc 
         l1l2_par%boundaries     = dyn%par%boundaries 
         l1l2_par%no_slip        = no_slip 
         l1l2_par%visc_method    = dyn%par%visc_method 
@@ -1002,6 +1005,7 @@ contains
         call nml_read(filename,"ydyn","beta_min",           par%beta_min,           init=init_pars)
         call nml_read(filename,"ydyn","eps_0",              par%eps_0,              init=init_pars)
         call nml_read(filename,"ydyn","ssa_lis_opt",        par%ssa_lis_opt,        init=init_pars)
+        call nml_read(filename,"ydyn","ssa_lat_bc",         par%ssa_lat_bc,         init=init_pars)
         call nml_read(filename,"ydyn","ssa_beta_max",       par%ssa_beta_max,       init=init_pars)
         call nml_read(filename,"ydyn","ssa_vel_max",        par%ssa_vel_max,        init=init_pars)
         call nml_read(filename,"ydyn","ssa_iter_max",       par%ssa_iter_max,       init=init_pars)

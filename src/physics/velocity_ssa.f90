@@ -18,7 +18,8 @@ module velocity_ssa
 
     type ssa_param_class
 
-        character(len=256) :: ssa_lis_opt 
+        character(len=256) :: ssa_lis_opt
+        character(len=256) :: ssa_lateral_bc 
         character(len=256) :: boundaries  
         integer    :: visc_method
         real(prec) :: visc_const
@@ -186,8 +187,8 @@ end if
             
             ! Call ssa solver
             call calc_vxy_ssa_matrix(ux_b,uy_b,L2_norm,beta_acx,beta_acy,visc_eff_int,  &
-                                     ssa_mask_acx,ssa_mask_acy,H_ice,f_ice,taud_acx,taud_acy,H_grnd,z_sl, &
-                                     z_bed,z_srf,dx,dy,par%ssa_vel_max,par%boundaries,par%ssa_lis_opt)
+                                ssa_mask_acx,ssa_mask_acy,H_ice,f_ice,taud_acx,taud_acy,H_grnd,z_sl,z_bed, &
+                                z_srf,dx,dy,par%ssa_vel_max,par%boundaries,par%ssa_lateral_bc,par%ssa_lis_opt)
 
 
             ! Apply relaxation to keep things stable

@@ -91,8 +91,7 @@ contains
 
 ! Only one at a time!!
 !#define LAT_BC_OLDCODE
-!#define LAT_BC_NEWCODE
-!#define LAT_BC_NEWCODE1       
+!#define LAT_BC_NEWCODE      
 #define LAT_BC_NEWCODE2 
 
 ! Include header for lis solver fortran interface
@@ -743,257 +742,6 @@ contains
 
 
 #endif 
-#if (defined(LAT_BC_NEWCODE1))
-                    ! === NEWCODE1 ====================================
-
-            else if (  ( is_front_1(i,j).and.is_front_2(i+1,j) ) &
-                      .or. &
-                      ( is_front_2(i,j).and.is_front_1(i+1,j) ) &
-                    ) then
-                    ! one neighbour is ice-covered and the other is ice-free
-                    ! (calving front, grounded ice front)
-
-                    if (is_front_1(i,j)) then
-                        i1 = i     ! ice-front marker 
-                    else   ! is_front_1(i+1,j)==.true.
-                        i1 = i+1   ! ice-front marker 
-                    end if
-                    
-                    if ( (.not. is_front_2(i1-1,j)) .or. (.not. is_front_2(i1+1,j)) ) then
-                        ! There is inland ice on one side of the current cell, proceed
-                        ! with calving front boundary conditions 
-
-                        ! =========================================================
-                        ! Generalized solution for all ice fronts (floating and grounded)
-                        ! See Lipscomb et al. (2019), Eqs. 11 & 12, and 
-                        ! Winkelmann et al. (2011), Eq. 27 
-
-                        ! Get current ice thickness
-                        ! (No f_ice scaling since all points treated have f_ice=0/1)
-                        H_ice_now = H_ice(i1,j)     
-
-                        ! Get current ocean thickness bordering ice sheet
-                        ! (for bedrock above sea level, this will give zero)
-                        f_submerged = 1.d0 - min((z_srf(i1,j)-z_sl(i1,j))/H_ice_now,1.d0)
-                        H_ocn_now   = H_ice_now*f_submerged
-                        
-                        tau_bc_int = 0.5d0*rho_ice*g*H_ice_now**2 &         ! tau_out_int                                                ! p_out
-                                   - 0.5d0*rho_sw *g*H_ocn_now**2           ! tau_in_int
-
-                        ! =========================================================
-                        
-                        if (is_front_1(i,j).and.is_front_2(i+1,j)) then 
-                            ! === Case 1: ice-free to the right ===
-
-if (.FALSE.) then 
-                            ! Get viscosity on acy-nodes 
-                            vis_int_acy     = 0.5_wp*(vis_int_sgxy(i,j)+vis_int_sgxy(i-1,j))
-                            vis_int_acy_jm1 = 0.5_wp*(vis_int_sgxy(i,j-1)+vis_int_sgxy(i-1,j-1))
-                            
-                            ! Get driving stress on aa-node 
-                            taud_aa = 0.5_wp*(taud_acx(i,j)+taud_acx(i-1,j)) 
-
-
-                            ! ajr: yes 
-                            nc = 2*ij2n(i,j-1)-1
-                                ! next nc (column counter), for vx_m(i,j-1)
-                            k = k+1
-                            lgs_a_value(k) = 0.5_wp*inv_deta2*vis_int_acy_jm1
-                            lgs_a_index(k) = nc
-
-                            ! ajr: yes 
-                            nc = 2*ij2n(i,j-1)
-                                ! next nc (column counter), for vy_m(i,j-1)
-                            k = k+1
-                            lgs_a_value(k) = -inv_dxi_deta*vis_int_acy_jm1
-                            lgs_a_index(k) = nc
-
-                            ! ajr: yes 
-                            nc = 2*ij2n(i,j)-1
-                                ! next nc (column counter), for vx_m(i,j)
-                            k = k+1
-                            lgs_a_value(k) = -0.5_wp*inv_deta2*vis_int_acy     &
-                                             -0.5_wp*inv_deta2*vis_int_acy_jm1 &
-                                             -0.5_wp*beta_acx(i,j)
-                            lgs_a_index(k) = nc
-
-                            ! ajr: yes 
-                            nc = 2*ij2n(i,j)
-                                ! next nc (column counter), for vy_m(i,j)
-                            k = k+1
-                            lgs_a_value(k) = inv_dxi_deta*vis_int_acy
-                            lgs_a_index(k) = nc
-
-                            ! ajr: yes 
-                            nc = 2*ij2n(i,j+1)-1
-                                ! next nc (column counter), for vx_m(i,j+1)
-                            k = k+1
-                            lgs_a_value(k) = 0.5_wp*inv_deta2*vis_int_acy
-                            lgs_a_index(k) = nc
-
-                            ! ajr: yes 
-                            nc = 2*ij2n(i-1,j)
-                                ! next nc (column counter), for vy_m(i-1,j)
-                            k = k+1
-                            lgs_a_value(k) = -inv_dxi_deta*vis_int_acy
-                            lgs_a_index(k) = nc
-
-                            ! ajr: yes 
-                            nc = 2*ij2n(i-1,j)-1
-                                ! next nc (column counter), for vx_m(i-1,j)
-                            k = k+1
-                            lgs_a_value(k) = -0.5_wp*inv_deta2*vis_int_acy      &
-                                             -0.5_wp*inv_deta2*vis_int_acy_jm1  &
-                                             -0.5_wp*beta_acx(i-1,j)
-                            lgs_a_index(k) = nc
-
-                            ! ajr: yes
-                            nc = 2*ij2n(i-1,j+1)-1
-                                ! next nc (column counter), for vx_m(i-1,j+1)
-                            k = k+1
-                            lgs_a_value(k) = 0.5_wp*inv_deta2*vis_int_acy
-                            lgs_a_index(k) = nc
-
-                            ! ajr: yes 
-                            nc = 2*ij2n(i-1,j-1)-1
-                                ! next nc (column counter), for vx_m(i-1,j-1)
-                            k = k+1
-                            lgs_a_value(k) = 0.5_wp*inv_deta2*vis_int_acy_jm1
-                            lgs_a_index(k) = nc
-
-                            ! ajr: yes 
-                            nc = 2*ij2n(i-1,j-1)
-                                ! ajr: new nc (column counter), for vy_m(i-1,j-1)
-                            k  = k+1
-                            lgs_a_value(k) = inv_dxi_deta*vis_int_acy_jm1
-                            lgs_a_index(k) = nc
-
-
-                            lgs_b_value(nr) = taud_aa + inv_dxi*tau_bc_int
-                            lgs_x_value(nr) = vx_m(i,j)
-
-else
-
-                            k = k+1
-                            lgs_a_value(k)  = 1.0_prec   ! diagonal element only
-                            lgs_a_index(k)  = nr
-
-                            lgs_b_value(nr) = 0.0_prec
-                            lgs_x_value(nr) = 0.0_prec
-end if 
-
-                        else 
-                            ! Case 2: ice-free to the left
- 
-if (.FALSE.) then 
-                            ! Get viscosity on acy-nodes 
-                            vis_int_acy     = 0.5_wp*(vis_int_sgxy(i,j)+vis_int_sgxy(i+1,j))
-                            vis_int_acy_jm1 = 0.5_wp*(vis_int_sgxy(i,j-1)+vis_int_sgxy(i+1,j-1))
-                            
-                            ! Get driving stress on aa-node 
-                            taud_aa = 0.5_wp*(taud_acx(i,j)+taud_acx(i+1,j)) 
-
-
-                            ! ajr: yes 
-                            nc = 2*ij2n(i,j-1)-1
-                                ! next nc (column counter), for vx_m(i,j-1)
-                            k = k+1
-                            lgs_a_value(k) = 0.5_wp*inv_deta2*vis_int_acy_jm1
-                            lgs_a_index(k) = nc
-
-                            ! ajr: yes 
-                            nc = 2*ij2n(i,j)-1
-                                ! next nc (column counter), for vx_m(i,j)
-                            k = k+1
-                            lgs_a_value(k) = -0.5_wp*inv_deta2*vis_int_acy     &
-                                             -0.5_wp*inv_deta2*vis_int_acy_jm1 &
-                                             -0.5_wp*beta_acx(i,j)
-                            lgs_a_index(k) = nc
-
-                            ! ajr: yes 
-                            nc = 2*ij2n(i,j+1)-1
-                                ! next nc (column counter), for vx_m(i,j+1)
-                            k = k+1
-                            lgs_a_value(k) = 0.5_wp*inv_deta2*vis_int_acy
-                            lgs_a_index(k) = nc
-
-                            ! ajr: yes 
-                            nc = 2*ij2n(i+1,j-1)
-                                ! next nc (column counter), for vy_m(i+1,j-1)
-                            k  = k+1
-                            lgs_a_value(k) = inv_dxi_deta*vis_int_acy_jm1
-                            lgs_a_index(k) = nc
-
-                            ! ajr: yes 
-                            nc = 2*ij2n(i+1,j)-1
-                                ! next nc (column counter), for vx_m(i+1,j)
-                            k = k+1
-                            lgs_a_value(k) = -0.5_wp*inv_deta2*vis_int_acy      &
-                                             -0.5_wp*inv_deta2*vis_int_acy_jm1  &
-                                             -0.5_wp*beta_acx(i+1,j)
-                            lgs_a_index(k) = nc
-
-                            ! ajr: yes 
-                            nc = 2*ij2n(i+1,j)
-                                ! largest nc (column counter), for vy_m(i+1,j)
-                            k  = k+1
-                            lgs_a_value(k) = -inv_dxi_deta*vis_int_acy
-                            lgs_a_index(k) = nc
-
-                            ! ajr: yes 
-                            nc = 2*ij2n(i+1,j+1)-1
-                                ! ajr: new nc (column counter), for vx_m(i+1,j+1)
-                            k = k+1
-                            lgs_a_value(k) = 0.5_wp*inv_deta2*vis_int_acy
-                            lgs_a_index(k) = nc
-
-                            ! ajr: yes 
-                            nc = 2*ij2n(i+1,j-1)-1
-                                ! ajr: new nc (column counter), for vx_m(i+1,j-1)
-                            k = k+1
-                            lgs_a_value(k) = 0.5_wp*inv_deta2*vis_int_acy_jm1
-                            lgs_a_index(k) = nc
-
-                            ! ajr: yes 
-                            nc = 2*ij2n(i+2,j)
-                                ! ajr: new nc (column counter), for vy_m(i+2,j)
-                            k  = k+1
-                            lgs_a_value(k) = inv_dxi_deta*vis_int_acy
-                            lgs_a_index(k) = nc
-                            
-                            ! ajr: yes 
-                            nc = 2*ij2n(i+2,j-1)
-                                ! ajr: new nc (column counter), for vy_m(i+2,j-1)
-                            k  = k+1
-                            lgs_a_value(k) = -inv_dxi_deta*vis_int_acy_jm1
-                            lgs_a_index(k) = nc
-
-
-                            lgs_b_value(nr) = taud_aa + inv_dxi*tau_bc_int
-                            lgs_x_value(nr) = vx_m(i,j)
-else
-                            k = k+1
-                            lgs_a_value(k)  = 1.0_prec   ! diagonal element only
-                            lgs_a_index(k)  = nr
-
-                            lgs_b_value(nr) = 0.0_prec
-                            lgs_x_value(nr) = 0.0_prec
-end if
-                        end if 
-
-                    else    ! (is_front_2(i1-1,j)==.true.).and.(is_front_2(i1+1,j)==.true.);
-                            ! velocity assumed to be zero
-
-                        k = k+1
-                        lgs_a_value(k)  = 1.0_prec   ! diagonal element only
-                        lgs_a_index(k)  = nr
-
-                        lgs_b_value(nr) = 0.0_prec
-                        lgs_x_value(nr) = 0.0_prec
-
-                    end if
-                    
-#endif
 #if (defined(LAT_BC_NEWCODE2))
                     ! === NEWCODE2 ====================================
 
@@ -1727,259 +1475,6 @@ end if
                     end if
 
 #endif 
-#if (defined(LAT_BC_NEWCODE1))
-                    ! === NEWCODE1 ====================================
-
-
-
-            else if (  ( is_front_1(i,j).and.is_front_2(i,j+1) ) &
-                      .or. &
-                      ( is_front_2(i,j).and.is_front_1(i,j+1) ) &
-                    ) then
-                    ! one neighbour is ice-covered and the other is ice-free
-                    ! (calving front, grounded ice front)
-
-                    if (is_front_1(i,j)) then
-                        j1 = j     ! ice-front marker
-                    else   ! is_front_1(i,j+1)==.true.
-                        j1 = j+1   ! ice-front marker
-                    end if
-
-                    if ( (.not. is_front_2(i,j1-1)) .or. (.not. is_front_2(i,j1+1)) ) then
-                        ! There is inland ice on one side of the current cell, proceed
-                        ! with calving front boundary conditions 
-
-                        ! =========================================================
-                        ! Generalized solution for all ice fronts (floating and grounded)
-                        ! See Lipscomb et al. (2019), Eqs. 11 & 12, and 
-                        ! Winkelmann et al. (2011), Eq. 27 
-
-                        ! Get current ice thickness
-                        ! (No f_ice scaling since all points treated have f_ice=0/1)
-                        H_ice_now = H_ice(i,j1)     
-
-                        ! Get current ocean thickness bordering ice sheet
-                        ! (for bedrock above sea level, this will give zero)
-                        f_submerged = 1.d0 - min((z_srf(i,j1)-z_sl(i,j1))/H_ice_now,1.d0)
-                        H_ocn_now   = H_ice_now*f_submerged
-
-                        tau_bc_int = 0.5d0*rho_ice*g*H_ice_now**2 &         ! tau_out_int                                                ! p_out
-                                   - 0.5d0*rho_sw *g*H_ocn_now**2           ! tau_in_int
-
-                        ! =========================================================
-                        
-                        if (is_front_1(i,j).and.is_front_2(i,j+1)) then 
-                            ! === Case 1: ice-free to the top ===
-
-if (.FALSE.) then
-                            ! Get viscosity on acx-nodes 
-                            vis_int_acx     = 0.5_wp*(vis_int_sgxy(i,j-1)   + vis_int_sgxy(i,j))
-                            vis_int_acx_im1 = 0.5_wp*(vis_int_sgxy(i-1,j-1) + vis_int_sgxy(i-1,j))
-                            
-                            ! Get driving stress on aa-node 
-                            taud_aa = 0.5_wp*(taud_acy(i,j)+taud_acy(i,j-1)) 
-
-
-                            ! ajr: yes 
-                            nc = 2*ij2n(i-1,j)-1
-                                ! smallest nc (column counter), for vx_m(i-1,j)
-                            k = k+1
-                            lgs_a_value(k) = -inv_dxi_deta*vis_int_acx_im1
-                            lgs_a_index(k) = nc
-
-                            ! ajr: yes 
-                            nc = 2*ij2n(i-1,j)
-                                ! next nc (column counter), for vy_m(i-1,j)
-                            k = k+1
-                            lgs_a_value(k) = inv_dxi2*vis_int_acx_im1
-                            lgs_a_index(k) = nc
-
-                            ! ajr: yes 
-                            nc = 2*ij2n(i,j-1)
-                                ! next nc (column counter), for vy_m(i,j-1)
-                            k = k+1
-                            lgs_a_value(k) = -0.5_wp*inv_dxi2*vis_int_acx       &
-                                             -0.5_wp*inv_dxi2*vis_int_acx_im1   &
-                                             -0.5_wp*beta_acy(i,j-1)
-                            lgs_a_index(k) = nc
-
-                            ! ajr: yes 
-                            nc = 2*ij2n(i,j)-1
-                                ! next nc (column counter), for vx_m(i,j)
-                            k = k+1
-                            lgs_a_value(k) = inv_dxi_deta*vis_int_acx
-                            lgs_a_index(k) = nc
-
-                            ! ajr: yes 
-                            nc = 2*ij2n(i,j)
-                                ! next nc (column counter), for vy_m(i,j)
-                            k = k+1
-                            lgs_a_value(k) = -0.5_wp*inv_dxi2*vis_int_acx       &
-                                             -0.5_wp*inv_dxi2*vis_int_acx_im1   &
-                                             -0.5_wp*beta_acy(i,j)
-                            lgs_a_index(k) = nc
-
-                            ! ajr: yes 
-                            nc = 2*ij2n(i,j-1)-1
-                                ! ajr: new nc (column counter), for vx_m(i,j-1)
-                            k = k+1
-                            lgs_a_value(k) = -inv_dxi_deta*vis_int_acx
-                            lgs_a_index(k) = nc
-
-                            ! ajr: yes 
-                            nc = 2*ij2n(i-1,j-1)-1
-                                ! ajr: new nc (column counter), for vx_m(i-1,j-1)
-                            k = k+1
-                            lgs_a_value(k) = inv_dxi_deta*vis_int_acx_im1
-                            lgs_a_index(k) = nc
-
-                            ! ajr: yes 
-                            nc = 2*ij2n(i+1,j)
-                                ! largest nc (column counter), for vy_m(i+1,j)
-                            k = k+1
-                            lgs_a_value(k)  = 0.5_wp*inv_dxi2*vis_int_acx
-                            lgs_a_index(k)  = nc
-
-                            ! ajr: yes 
-                            nc = 2*ij2n(i+1,j-1)
-                                ! ajr: new nc (column counter), for vy_m(i+1,j-1)
-                            k = k+1
-                            lgs_a_value(k)  = 0.5_wp*inv_dxi2*vis_int_acx
-                            lgs_a_index(k)  = nc
-
-                            ! ajr: yes 
-                            nc = 2*ij2n(i-1,j-1)
-                                ! ajr: new nc (column counter), for vy_m(i-1,j-1)
-                            k = k+1
-                            lgs_a_value(k)  = 0.5_wp*inv_dxi2*vis_int_acx_im1
-                            lgs_a_index(k)  = nc
-
-                            lgs_b_value(nr) = taud_aa + inv_deta*tau_bc_int 
-                            lgs_x_value(nr) = vy_m(i,j)
-else
-
-                            k = k+1
-                            lgs_a_value(k)  = 1.0_prec   ! diagonal element only
-                            lgs_a_index(k)  = nr
-
-                            lgs_b_value(nr) = 0.0_prec
-                            lgs_x_value(nr) = 0.0_prec
-
-end if
-                        else
-                            ! === Case 2: ice-free to the bottom ===
-
-if (.FALSE.) then 
-                            ! Get viscosity on acx-nodes 
-                            vis_int_acx     = 0.5_wp*(vis_int_sgxy(i,j+1)  + vis_int_sgxy(i,j))
-                            vis_int_acx_im1 = 0.5_wp*(vis_int_sgxy(i-1,j+1)+ vis_int_sgxy(i-1,j))
-                            
-                            ! Get driving stress on aa-node 
-                            taud_aa = 0.5_wp*(taud_acy(i,j)+taud_acy(i,j-1)) 
-
-
-                            ! ajr: yes 
-                            nc = 2*ij2n(i-1,j)
-                                ! next nc (column counter), for vy_m(i-1,j)
-                            k = k+1
-                            lgs_a_value(k) = 0.5_wp*inv_dxi2*vis_int_acx_im1
-                            lgs_a_index(k) = nc
-
-                            ! ajr: yes 
-                            nc = 2*ij2n(i-1,j+1)-1
-                                ! next nc (column counter), for vx_m(i-1,j+1)
-                            k = k+1
-                            lgs_a_value(k) = inv_dxi_deta*vis_int_acx_im1
-                            lgs_a_index(k) = nc
-
-                            ! ajr: yes 
-                            nc = 2*ij2n(i,j)
-                                ! next nc (column counter), for vy_m(i,j)
-                            k = k+1
-                            lgs_a_value(k) = -0.5_wp*inv_dxi2*vis_int_acx       &
-                                             -0.5_wp*inv_dxi2*vis_int_acx_im1   &
-                                             -0.5_wp*beta_acy(i,j)
-                            lgs_a_index(k) = nc
-
-                            ! ajr: yes 
-                            nc = 2*ij2n(i,j+1)-1
-                                ! next nc (column counter), for vx_m(i,j+1)
-                            k = k+1
-                            lgs_a_value(k) = -inv_dxi_deta*vis_int_acx
-                            lgs_a_index(k) = nc
-
-                            ! ajr: yes 
-                            nc = 2*ij2n(i,j+1)
-                                ! next nc (column counter), for vy_m(i,j+1)
-                            k = k+1
-                            lgs_a_value(k) = -0.5_wp*inv_dxi2*vis_int_acx       &
-                                             -0.5_wp*inv_dxi2*vis_int_acx_im1   &
-                                             -0.5_wp*beta_acy(i,j+1)
-                            lgs_a_index(k) = nc
-
-                            ! ajr: yes 
-                            nc = 2*ij2n(i+1,j)
-                                ! largest nc (column counter), for vy_m(i+1,j)
-                            k = k+1
-                            lgs_a_value(k)  = 0.5_wp*inv_dxi2*vis_int_acx
-                            lgs_a_index(k)  = nc
-
-                            ! ajr: yes 
-                            nc = 2*ij2n(i+1,j+1)
-                                ! largest nc (column counter), for vy_m(i+1,j+1)
-                            k = k+1
-                            lgs_a_value(k)  = 0.5_wp*inv_dxi2*vis_int_acx
-                            lgs_a_index(k)  = nc
-
-                            ! ajr: yes 
-                            nc = 2*ij2n(i-1,j+1)
-                                ! ajr: new nc (column counter), for vy_m(i-1,j+1)
-                            k = k+1
-                            lgs_a_value(k)  = 0.5_wp*inv_dxi2*vis_int_acx_im1
-                            lgs_a_index(k)  = nc
-
-                            ! ajr: yes 
-                            nc = 2*ij2n(i,j+2)-1
-                                ! ajr: new nc (column counter), for vx_m(i,j+2)
-                            k = k+1
-                            lgs_a_value(k) = inv_dxi_deta*vis_int_acx
-                            lgs_a_index(k) = nc
-
-                            ! ajr: yes 
-                            nc = 2*ij2n(i-1,j+2)-1
-                                ! ajr: new nc (column counter), for vx_m(i-1,j+2)
-                            k = k+1
-                            lgs_a_value(k) = -inv_dxi_deta*vis_int_acx_im1
-                            lgs_a_index(k) = nc
-
-                            lgs_b_value(nr) = taud_aa + inv_deta*tau_bc_int 
-                            lgs_x_value(nr) = vy_m(i,j)
-else
-                            k = k+1
-                            lgs_a_value(k)  = 1.0_prec   ! diagonal element only
-                            lgs_a_index(k)  = nr
-
-                            lgs_b_value(nr) = 0.0_prec
-                            lgs_x_value(nr) = 0.0_prec
-end if
-                        end if 
-
-                    else    ! (is_front_2(i,j1-1)==.true.).and.(is_front_2(i,j1+1)==.true.);
-                            ! velocity assumed to be zero
-
-                        k = k+1
-                        lgs_a_value(k)  = 1.0_prec   ! diagonal element only
-                        lgs_a_index(k)  = nr
-
-                        lgs_b_value(nr) = 0.0_prec
-                        lgs_x_value(nr) = 0.0_prec
-
-                    end if
-
-
-
-
-#endif
 #if (defined(LAT_BC_NEWCODE2))
                     ! === NEWCODE2 ====================================
 
@@ -2024,90 +1519,59 @@ end if
                         if (is_front_1(i,j).and.is_front_2(i,j+1)) then 
                             ! === Case 1: ice-free to the top ===
 
-if (.FALSE.) then
-                            ! Get viscosity on acx-nodes 
-                            vis_int_acx     = 0.5_wp*(vis_int_sgxy(i,j-1)   + vis_int_sgxy(i,j))
-                            vis_int_acx_im1 = 0.5_wp*(vis_int_sgxy(i-1,j-1) + vis_int_sgxy(i-1,j))
+if (.TRUE.) then
+                            ! Get viscosity on interior acy-node
+                            vis_int_acy_jm1 = 0.5_wp*(vis_int_sgxy(i,j-1) + vis_int_sgxy(i-1,j-1))
                             
                             ! Get driving stress on aa-node 
                             taud_aa = 0.5_wp*(taud_acy(i,j)+taud_acy(i,j-1)) 
 
 
-                            ! ajr: yes 
-                            nc = 2*ij2n(i-1,j)-1
-                                ! smallest nc (column counter), for vx_m(i-1,j)
-                            k = k+1
-                            lgs_a_value(k) = -inv_dxi_deta*vis_int_acx_im1
-                            lgs_a_index(k) = nc
-
-                            ! ajr: yes 
-                            nc = 2*ij2n(i-1,j)
-                                ! next nc (column counter), for vy_m(i-1,j)
-                            k = k+1
-                            lgs_a_value(k) = inv_dxi2*vis_int_acx_im1
-                            lgs_a_index(k) = nc
-
-                            ! ajr: yes 
-                            nc = 2*ij2n(i,j-1)
-                                ! next nc (column counter), for vy_m(i,j-1)
-                            k = k+1
-                            lgs_a_value(k) = -0.5_wp*inv_dxi2*vis_int_acx       &
-                                             -0.5_wp*inv_dxi2*vis_int_acx_im1   &
-                                             -0.5_wp*beta_acy(i,j-1)
-                            lgs_a_index(k) = nc
-
-                            ! ajr: yes 
-                            nc = 2*ij2n(i,j)-1
-                                ! next nc (column counter), for vx_m(i,j)
-                            k = k+1
-                            lgs_a_value(k) = inv_dxi_deta*vis_int_acx
-                            lgs_a_index(k) = nc
-
-                            ! ajr: yes 
                             nc = 2*ij2n(i,j)
                                 ! next nc (column counter), for vy_m(i,j)
                             k = k+1
-                            lgs_a_value(k) = -0.5_wp*inv_dxi2*vis_int_acx       &
-                                             -0.5_wp*inv_dxi2*vis_int_acx_im1   &
+                            lgs_a_value(k) = -2.0_wp*inv_deta2*vis_int_acy_jm1 &
                                              -0.5_wp*beta_acy(i,j)
                             lgs_a_index(k) = nc
 
-                            ! ajr: yes 
+                            nc = 2*ij2n(i,j-1)
+                                ! next nc (column counter), for vy_m(i,j-1)
+                            k = k+1
+                            lgs_a_value(k) = -0.5_wp*beta_acy(i,j-1)
+                            lgs_a_index(k) = nc
+
+                            nc = 2*ij2n(i,j-2)
+                                ! next nc (column counter), for vy_m(i,j-2)
+                            k = k+1
+                            lgs_a_value(k) =  2.0_wp*inv_deta2*vis_int_acy_jm1
+                            lgs_a_index(k) = nc
+
+                            nc = 2*ij2n(i,j)-1
+                                ! next nc (column counter), for vx_m(i,j)
+                            k = k+1
+                            lgs_a_value(k) = -inv_dxi_deta*vis_int_acy_jm1
+                            lgs_a_index(k) = nc
+
+                            nc = 2*ij2n(i-1,j)-1
+                                ! next nc (column counter), for vx_m(i-1,j)
+                            k = k+1
+                            lgs_a_value(k) =  inv_dxi_deta*vis_int_acy_jm1
+                            lgs_a_index(k) = nc
+
                             nc = 2*ij2n(i,j-1)-1
-                                ! ajr: new nc (column counter), for vx_m(i,j-1)
+                                ! next nc (column counter), for vx_m(i,j-1)
                             k = k+1
-                            lgs_a_value(k) = -inv_dxi_deta*vis_int_acx
+                            lgs_a_value(k) = -inv_dxi_deta*vis_int_acy_jm1
                             lgs_a_index(k) = nc
 
-                            ! ajr: yes 
                             nc = 2*ij2n(i-1,j-1)-1
-                                ! ajr: new nc (column counter), for vx_m(i-1,j-1)
+                                ! next nc (column counter), for vx_m(i-1,j-1)
                             k = k+1
-                            lgs_a_value(k) = inv_dxi_deta*vis_int_acx_im1
+                            lgs_a_value(k) = inv_dxi_deta*vis_int_acy_jm1
                             lgs_a_index(k) = nc
 
-                            ! ajr: yes 
-                            nc = 2*ij2n(i+1,j)
-                                ! largest nc (column counter), for vy_m(i+1,j)
-                            k = k+1
-                            lgs_a_value(k)  = 0.5_wp*inv_dxi2*vis_int_acx
-                            lgs_a_index(k)  = nc
 
-                            ! ajr: yes 
-                            nc = 2*ij2n(i+1,j-1)
-                                ! ajr: new nc (column counter), for vy_m(i+1,j-1)
-                            k = k+1
-                            lgs_a_value(k)  = 0.5_wp*inv_dxi2*vis_int_acx
-                            lgs_a_index(k)  = nc
-
-                            ! ajr: yes 
-                            nc = 2*ij2n(i-1,j-1)
-                                ! ajr: new nc (column counter), for vy_m(i-1,j-1)
-                            k = k+1
-                            lgs_a_value(k)  = 0.5_wp*inv_dxi2*vis_int_acx_im1
-                            lgs_a_index(k)  = nc
-
-                            lgs_b_value(nr) = taud_aa + inv_deta*tau_bc_int 
+                            lgs_b_value(nr) = taud_aa - inv_deta*tau_bc_int 
                             lgs_x_value(nr) = vy_m(i,j)
 else
 
@@ -2122,91 +1586,62 @@ end if
                         else
                             ! === Case 2: ice-free to the bottom ===
 
-if (.FALSE.) then 
-                            ! Get viscosity on acx-nodes 
-                            vis_int_acx     = 0.5_wp*(vis_int_sgxy(i,j+1)  + vis_int_sgxy(i,j))
-                            vis_int_acx_im1 = 0.5_wp*(vis_int_sgxy(i-1,j+1)+ vis_int_sgxy(i-1,j))
+if (.TRUE.) then 
+                            ! Get viscosity on interior acy-node
+                            vis_int_acy_jp1 = 0.5_wp*(vis_int_sgxy(i,j+1) + vis_int_sgxy(i-1,j+1))
                             
                             ! Get driving stress on aa-node 
-                            taud_aa = 0.5_wp*(taud_acy(i,j)+taud_acy(i,j-1)) 
+                            taud_aa = 0.5_wp*(taud_acy(i,j)+taud_acy(i,j+1)) 
 
 
-                            ! ajr: yes 
-                            nc = 2*ij2n(i-1,j)
-                                ! next nc (column counter), for vy_m(i-1,j)
+                            nc = 2*ij2n(i,j+2)
+                                ! next nc (column counter), for vy_m(i,j+2)
                             k = k+1
-                            lgs_a_value(k) = 0.5_wp*inv_dxi2*vis_int_acx_im1
+                            lgs_a_value(k) =  2.0_wp*inv_deta2*vis_int_acy_jp1
                             lgs_a_index(k) = nc
 
-                            ! ajr: yes 
-                            nc = 2*ij2n(i-1,j+1)-1
-                                ! next nc (column counter), for vx_m(i-1,j+1)
-                            k = k+1
-                            lgs_a_value(k) = inv_dxi_deta*vis_int_acx_im1
-                            lgs_a_index(k) = nc
-
-                            ! ajr: yes 
                             nc = 2*ij2n(i,j)
                                 ! next nc (column counter), for vy_m(i,j)
                             k = k+1
-                            lgs_a_value(k) = -0.5_wp*inv_dxi2*vis_int_acx       &
-                                             -0.5_wp*inv_dxi2*vis_int_acx_im1   &
+                            lgs_a_value(k) = -2.0_wp*inv_deta2*vis_int_acy_jp1 &
                                              -0.5_wp*beta_acy(i,j)
                             lgs_a_index(k) = nc
 
-                            ! ajr: yes 
-                            nc = 2*ij2n(i,j+1)-1
-                                ! next nc (column counter), for vx_m(i,j+1)
-                            k = k+1
-                            lgs_a_value(k) = -inv_dxi_deta*vis_int_acx
-                            lgs_a_index(k) = nc
-
-                            ! ajr: yes 
                             nc = 2*ij2n(i,j+1)
                                 ! next nc (column counter), for vy_m(i,j+1)
                             k = k+1
-                            lgs_a_value(k) = -0.5_wp*inv_dxi2*vis_int_acx       &
-                                             -0.5_wp*inv_dxi2*vis_int_acx_im1   &
-                                             -0.5_wp*beta_acy(i,j+1)
+                            lgs_a_value(k) = -0.5_wp*beta_acy(i,j+1)
                             lgs_a_index(k) = nc
 
-                            ! ajr: yes 
-                            nc = 2*ij2n(i+1,j)
-                                ! largest nc (column counter), for vy_m(i+1,j)
+                            
+                            nc = 2*ij2n(i,j+1)-1
+                                ! next nc (column counter), for vx_m(i,j+1)
                             k = k+1
-                            lgs_a_value(k)  = 0.5_wp*inv_dxi2*vis_int_acx
-                            lgs_a_index(k)  = nc
+                            lgs_a_value(k) =  inv_dxi_deta*vis_int_acy_jp1
+                            lgs_a_index(k) = nc
 
-                            ! ajr: yes 
-                            nc = 2*ij2n(i+1,j+1)
-                                ! largest nc (column counter), for vy_m(i+1,j+1)
+                            nc = 2*ij2n(i-1,j+1)-1
+                                ! next nc (column counter), for vx_m(i-1,j+1)
                             k = k+1
-                            lgs_a_value(k)  = 0.5_wp*inv_dxi2*vis_int_acx
-                            lgs_a_index(k)  = nc
+                            lgs_a_value(k) = -inv_dxi_deta*vis_int_acy_jp1
+                            lgs_a_index(k) = nc
 
-                            ! ajr: yes 
-                            nc = 2*ij2n(i-1,j+1)
-                                ! ajr: new nc (column counter), for vy_m(i-1,j+1)
-                            k = k+1
-                            lgs_a_value(k)  = 0.5_wp*inv_dxi2*vis_int_acx_im1
-                            lgs_a_index(k)  = nc
-
-                            ! ajr: yes 
                             nc = 2*ij2n(i,j+2)-1
-                                ! ajr: new nc (column counter), for vx_m(i,j+2)
+                                ! next nc (column counter), for vx_m(i,j+2)
                             k = k+1
-                            lgs_a_value(k) = inv_dxi_deta*vis_int_acx
+                            lgs_a_value(k) =  inv_dxi_deta*vis_int_acy_jp1
                             lgs_a_index(k) = nc
 
-                            ! ajr: yes 
                             nc = 2*ij2n(i-1,j+2)-1
-                                ! ajr: new nc (column counter), for vx_m(i-1,j+2)
+                                ! next nc (column counter), for vx_m(i-1,j+2)
                             k = k+1
-                            lgs_a_value(k) = -inv_dxi_deta*vis_int_acx_im1
+                            lgs_a_value(k) = -inv_dxi_deta*vis_int_acy_jp1
                             lgs_a_index(k) = nc
+
 
                             lgs_b_value(nr) = taud_aa + inv_deta*tau_bc_int 
                             lgs_x_value(nr) = vy_m(i,j)
+
 else
                             k = k+1
                             lgs_a_value(k)  = 1.0_prec   ! diagonal element only
@@ -2891,7 +2326,7 @@ end if
         !              grounded marine ice margins (grounded ice next to open ocean)
         ! "all"      : apply at all ice margins 
         ! "none"     : do not apply boundary condition (for testing mainly)
-        character(len=56), parameter :: apply_lateral_bc = "floating"
+        character(len=56), parameter :: apply_lateral_bc = "all"
 
         nx = size(maske,1)
         ny = size(maske,2)

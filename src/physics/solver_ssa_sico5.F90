@@ -1,7 +1,7 @@
 module solver_ssa_sico5
     ! This ssa solver code was adapted from SICOPOLIS (v5-dev, svn revision 1421) module calc_vxy_m.F90. 
     
-    use yelmo_defs, only : sp, dp, wp, prec, TOL_UNDERFLOW, rho_ice, rho_sw, g 
+    use yelmo_defs, only : sp, dp, wp, prec, io_unit_err, TOL_UNDERFLOW, rho_ice, rho_sw, g 
 
     use ncio    ! For diagnostic outputting only 
 
@@ -1590,10 +1590,14 @@ end if
                         if (is_front_1(i,j).and.is_front_2(i,j+1)) then 
                             ! === Case 1: ice-free to the top ===
 
-if (.FALSE.) then
+if (.TRUE.) then
                             ! Get viscosity on interior acy-node
                             vis_int_acy_jm1 = 0.5_wp*(vis_int_sgxy(i,j-1) + vis_int_sgxy(i-1,j-1))
                             
+                            ! Get viscosity on interior acx-nodes (left and right)
+                            vis_int_acx_im1 = 0.5_wp*(vis_int_sgxy(i-1,j) + vis_int_sgxy(i-1,j-1))
+                            vis_int_acx_ip1 = 0.5_wp*(vis_int_sgxy(i,j)   + vis_int_sgxy(i,j-1))
+
                             ! Get driving stress on aa-node 
                             taud_aa = 0.5_wp*(taud_acy(i,j)+taud_acy(i,j-1)) 
 
@@ -1660,6 +1664,10 @@ end if
 if (.FALSE.) then 
                             ! Get viscosity on interior acy-node
                             vis_int_acy_jp1 = 0.5_wp*(vis_int_sgxy(i,j+1) + vis_int_sgxy(i-1,j+1))
+                            
+                            ! Get viscosity on interior acx-nodes (left and right)
+                            vis_int_acx_im1 = 0.5_wp*(vis_int_sgxy(i,j)   + vis_int_sgxy(i,j+1))
+                            vis_int_acx_ip1 = 0.5_wp*(vis_int_sgxy(i-1,j) + vis_int_sgxy(i-1,j+1))
                             
                             ! Get driving stress on aa-node 
                             taud_aa = 0.5_wp*(taud_acy(i,j)+taud_acy(i,j+1)) 
@@ -2504,10 +2512,16 @@ end if
                 if ( front1(i,j) .and. maske(i,j) .eq. 0 .and. &
                                     H_ocn_now .eq. 0.0 ) front1(i,j) = .FALSE. 
             
-            case DEFAULT ! (eg, apply_lateral_bc="all")
+            case("all")
                 ! Apply lateral bc to all ice-sheet fronts. 
 
                 ! Do nothing - all fronts have been accurately diagnosed. 
+
+            case DEFAULT
+                
+                write(io_unit_err,*) "set_sico_masks:: error: ssa_lat_bc parameter value not recognized."
+                write(io_unit_err,*) "ydyn.ssa_lat_bc = ", apply_lateral_bc
+                stop 
 
            end select
 

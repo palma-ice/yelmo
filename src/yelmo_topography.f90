@@ -357,7 +357,10 @@ end if
 
         ! Final update of ice fraction mask (or define it now for fixed topography)
         call calc_ice_fraction(tpo%now%f_ice,tpo%now%H_ice,tpo%now%H_grnd,tpo%par%margin_flt_subgrid)
-            
+        
+        ! Re-calculate grounding overburden ice thickness 
+        call calc_H_grnd(tpo%now%H_grnd,tpo%now%H_ice,tpo%now%f_ice,bnd%z_bed,bnd%z_sl)
+
         ! 2. Calculate additional topographic properties ------------------
 
         ! Store previous surface elevation on predictor step for calculating
@@ -366,21 +369,23 @@ end if
             tpo%now%z_srf_n = tpo%now%z_srf 
         end if 
 
-        ! Calculate the surface elevation 
+        ! Calculate the surface elevation
+        ! Note: two functions that should give the same results
+        !call calc_z_srf(tpo%now%z_srf,tpo%now%H_ice,tpo%now%f_ice,tpo%now%H_grnd,bnd%z_bed,bnd%z_sl)
+        call calc_z_srf_max(tpo%now%z_srf,tpo%now%H_ice,tpo%now%f_ice,bnd%z_bed,bnd%z_sl)
+         
         select case(tpo%par%surf_gl_method)
             ! Choose method to treat grounding line points when calculating surface elevation
 
             case(0)
                 ! Binary (grounded elevation or floating elevation via archemedes)
-                ! Note: two functions that should give the same results
                 
-                !call calc_z_srf(tpo%now%z_srf,tpo%now%H_ice,tpo%now%f_ice,tpo%now%H_grnd,bnd%z_bed,bnd%z_sl)
-                call calc_z_srf_max(tpo%now%z_srf,tpo%now%H_ice,tpo%now%f_ice,bnd%z_bed,bnd%z_sl)
-            
+                ! Do nothing - surface elevation has already been properly diagnosed.
+                
             case(1)
                 ! Subgrid z_srf calculations at the grounding line 
 
-                call calc_z_srf_subgrid_area(tpo%now%z_srf,tpo%now%f_grnd,tpo%now%H_ice,tpo%now%f_ice,bnd%z_bed,bnd%z_sl,tpo%par%gl_sep_nx)
+                call calc_z_srf_gl_subgrid_area(tpo%now%z_srf,tpo%now%f_grnd,tpo%now%H_ice,tpo%now%f_ice,bnd%z_bed,bnd%z_sl,tpo%par%gl_sep_nx)
 
         end select 
 
@@ -401,10 +406,6 @@ end if
 !                                       tpo%now%f_grnd_acx,tpo%now%f_grnd_acy,tpo%par%dx,method=2,grad_lim=tpo%par%grad_lim)
         
         ! 3. Calculate new masks ------------------------------
-
-        ! Calculate grounding overburden ice thickness 
-        call calc_H_grnd(tpo%now%H_grnd,tpo%now%H_ice,tpo%now%f_ice,bnd%z_bed,bnd%z_sl)
-
 
         ! Calculate the grounded fraction and grounding line mask of each grid cell
         select case(tpo%par%gl_sep)

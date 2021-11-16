@@ -9,7 +9,7 @@ module topography
     public :: calc_ice_fraction
     public :: calc_z_srf
     public :: calc_z_srf_max
-    public :: calc_z_srf_subgrid_area
+    public :: calc_z_srf_gl_subgrid_area
     public :: calc_H_eff
     public :: calc_H_grnd
     public :: calc_f_grnd_subgrid_area
@@ -274,45 +274,36 @@ contains
 
     end subroutine calc_z_srf
 
-    subroutine calc_z_srf_max(z_srf,H_ice,f_ice,z_bed,z_sl)
+    elemental subroutine calc_z_srf_max(z_srf,H_ice,f_ice,z_bed,z_sl)
         ! Calculate surface elevation
         ! Adapted from Pattyn (2017), Eq. 1
         
         implicit none 
 
-        real(prec), intent(INOUT) :: z_srf(:,:) 
-        real(prec), intent(IN)    :: H_ice(:,:)
-        real(prec), intent(IN)    :: f_ice(:,:)
-        real(prec), intent(IN)    :: z_bed(:,:)
-        real(prec), intent(IN)    :: z_sl(:,:)
+        real(prec), intent(INOUT) :: z_srf 
+        real(prec), intent(IN)    :: H_ice
+        real(prec), intent(IN)    :: f_ice
+        real(prec), intent(IN)    :: z_bed
+        real(prec), intent(IN)    :: z_sl
 
         ! Local variables
         integer :: i, j, nx, ny 
         real(prec) :: rho_ice_sw
         real(prec) :: H_eff
 
-        nx = size(z_srf,1) 
-        ny = size(z_srf,2) 
-
         rho_ice_sw = rho_ice/rho_sw ! Ratio of density of ice to seawater [--]
         
-        do j = 1, ny 
-        do i = 1, nx 
+        ! Get effective ice thickness
+        call calc_H_eff(H_eff,H_ice,f_ice,set_frac_zero=.TRUE.)
 
-            ! Get effective ice thickness
-            call calc_H_eff(H_eff,H_ice(i,j),f_ice(i,j),set_frac_zero=.TRUE.)
-
-            ! Initially calculate surface elevation everywhere 
-            z_srf(i,j) = max(z_bed(i,j) + H_eff, z_sl(i,j) + (1.0-rho_ice_sw)*H_eff)
+        ! Initially calculate surface elevation everywhere 
+        z_srf = max(z_bed + H_eff, z_sl + (1.0-rho_ice_sw)*H_eff)
         
-        end do 
-        end do 
-
         return 
 
     end subroutine calc_z_srf_max
 
-    subroutine calc_z_srf_subgrid_area(z_srf,f_grnd,H_ice,f_ice,z_bed,z_sl,gl_sep_nx)
+    subroutine calc_z_srf_gl_subgrid_area(z_srf,f_grnd,H_ice,f_ice,z_bed,z_sl,gl_sep_nx)
         ! Interpolate variables at grounding line to subgrid level to 
         ! calculate the average z_srf value for the aa-node cell
 
@@ -330,18 +321,16 @@ contains
         integer  :: i, j, nx, ny
         real(wp) :: v1, v2, v3, v4 
         integer  :: im1, ip1, jm1, jp1
-        real(wp) :: rho_ice_sw
         real(wp) :: H_eff 
+        real(wp) :: f_grnd_neighb(4) 
+        logical  :: is_grline 
 
         real(prec), allocatable :: z_srf_int(:,:) 
         real(prec), allocatable :: H_ice_int(:,:)
         real(prec), allocatable :: f_ice_int(:,:)  
         real(prec), allocatable :: z_bed_int(:,:) 
         real(prec), allocatable :: z_sl_int(:,:) 
-        real(prec), allocatable :: H_grnd_int(:,:) 
         
-        rho_ice_sw = rho_ice/rho_sw ! Ratio of density of ice to seawater [--]
-
         nx = size(z_srf,1)
         ny = size(z_srf,2) 
 
@@ -351,13 +340,12 @@ contains
         allocate(f_ice_int(gl_sep_nx,gl_sep_nx))
         allocate(z_bed_int(gl_sep_nx,gl_sep_nx))
         allocate(z_sl_int(gl_sep_nx,gl_sep_nx))
-        allocate(H_grnd_int(gl_sep_nx,gl_sep_nx))
         
         ! ajr: assume f_ice_int=1 everywhere this is used for now. 
         ! Needs to be fixed in the future potentially. 
         f_ice_int = 1.0_wp 
 
-        write(*,*) "calc_z_srf_subgrid_area:: routine not ready for f_ice values. Fix!"
+        write(*,*) "calc_z_srf_gl_subgrid_area:: routine not ready for f_ice values. Fix!"
         stop 
         
         ! Calculate the surface elevation based on whole grid values,
@@ -365,26 +353,26 @@ contains
         do j = 1, ny 
         do i = 1, nx
 
-            if (f_grnd(i,j) .eq. 1.0) then 
-                ! Fully grounded grid point 
+            ! Get neighbor indices
+            im1 = max(i-1,1) 
+            ip1 = min(i+1,nx) 
+            jm1 = max(j-1,1) 
+            jp1 = min(j+1,ny) 
+            
+            f_grnd_neighb = [f_grnd(im1,j),f_grnd(ip1,j),f_grnd(i,jm1),f_grnd(i,jp1)]
 
-                z_srf(i,j) = z_bed(i,j) + H_ice(i,j)
-
-            else if (f_grnd(i,j) .eq. 0.0) then 
-                ! Fully floating grid point 
-
-                z_srf(i,j) = z_sl(i,j) + (1.0-rho_ice_sw)*H_ice(i,j)
-
+            if (f_grnd(i,j) .eq. 0.0 .and. count(f_grnd_neighb .gt. 0.0).gt.0) then
+                is_grline = .TRUE. 
+            else if (f_grnd(i,j) .gt. 0.0 .and. count(f_grnd_neighb .eq. 0.0).gt.0) then
+                is_grline = .TRUE. 
             else 
-                ! Partially grounded and floating (ie, grounding line) 
+                is_grline = .FALSE. 
+            end if 
+
+            if (is_grline .and. f_ice(i,j) .eq. 1.0) then 
+                ! Only treat grounding line points that are fully ice-covered:  
                 ! Perform subgrid calculations 
 
-                ! Get neighbor indices
-                im1 = max(i-1,1) 
-                ip1 = min(i+1,nx) 
-                jm1 = max(j-1,1) 
-                jp1 = min(j+1,ny) 
-                
                 ! Calculate values at corners (ab-nodes) and interpolate
                 
                 ! == H_ice == 
@@ -408,19 +396,8 @@ contains
                 v4 = 0.25_prec*(z_sl(i,j) + z_sl(ip1,j) + z_sl(ip1,jm1) + z_sl(i,jm1))
                 call calc_subgrid_array(z_sl_int,v1,v2,v3,v4,gl_sep_nx)
                 
-                
-                ! Now calculate H_grnd and z_srf for each subgrid point 
-                call calc_H_grnd(H_grnd_int,H_ice_int,f_ice_int,z_bed_int,z_sl_int)
-
-                where (H_grnd_int .gt. 0.0)
-                    ! Fully grounded ice or ice-free land 
-                    z_srf_int = z_bed_int + H_ice_int 
-
-                elsewhere 
-                    ! Fully floating ice or open ocean
-                    z_srf_int = z_sl_int + (1.0-rho_ice_sw)*H_ice_int 
-
-                end where 
+                ! Calculate subgrid surface elevations
+                call calc_z_srf_max(z_srf_int,H_ice_int,f_ice_int,z_bed_int,z_sl_int)
 
                 ! Calculate full grid z_srf value as the mean of subgrid values 
                 z_srf(i,j) = sum(z_srf_int) / real(gl_sep_nx*gl_sep_nx,prec)
@@ -432,7 +409,7 @@ contains
 
         return
         
-    end subroutine calc_z_srf_subgrid_area
+    end subroutine calc_z_srf_gl_subgrid_area
 
     elemental subroutine calc_H_eff(H_eff,H_ice,f_ice,set_frac_zero)
         ! Calculate ice-thickness, scaled at margins to actual thickness

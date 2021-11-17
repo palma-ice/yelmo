@@ -328,16 +328,22 @@ end if
         nx = size(cf_ref,1) 
         ny = size(cf_ref,2) 
 
-        nlev = 10
+        nlev = 9
         allocate(z_bnd(nlev+1))
         allocate(z_lev(nlev))
         allocate(cf_lev(nlev))
 
         allocate(mask(nx,ny)) 
 
+        z_bnd = missing_value
+        z_lev = missing_value
+
         ! Determine z_bed bin boundaries and bin centers
         z_bnd = [-2000.0,-1000.0,-500.0,-400.0,-300.0,-200.0,-100.0,0.0,100.0,200.0]
 
+        ! Make sure nlev is correct 
+        nlev = count(z_bnd .ne. missing_value)-1 
+        
         do k = 1, nlev 
             z_lev(k) = 0.5_wp*(z_bnd(k) + z_bnd(k+1))
         end do 

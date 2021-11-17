@@ -153,6 +153,7 @@ contains
             write(io_unit_err,*) ""
             write(io_unit_err,*) "nml:: Error: parameter not found."
             write(io_unit_err,*) "Filename:  ", trim(filename)
+            write(io_unit_err,*) "Group:     ", trim(group)
             write(io_unit_err,*) "Parameter: ", trim(name)
             stop "Program stopped."
         end if 

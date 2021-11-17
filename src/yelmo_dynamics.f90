@@ -919,7 +919,7 @@ contains
             ! Use boundary water thickness field
             H_w = thrm%now%H_w 
         end if 
-
+        
         ! Calculate effective pressure N_eff [Pa]
         select case(dyn%par%neff_method)
 
@@ -947,7 +947,7 @@ contains
                 ! Effective pressure as basal till pressure
                 ! following van Pelt and Bueler (2015)
 
-                dyn%now%N_eff = calc_effective_pressure_till(H_w,tpo%now%H_ice,tpo%now%f_ice,tpo%now%f_grnd, &
+                call calc_effective_pressure_till(dyn%now%N_eff,H_w,tpo%now%H_ice,tpo%now%f_ice,tpo%now%f_grnd, &
                                   thrm%par%H_w_max,dyn%par%neff_N0,dyn%par%neff_delta,dyn%par%neff_e0,dyn%par%neff_Cc) 
 
             case DEFAULT 

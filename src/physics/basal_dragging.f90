@@ -519,52 +519,70 @@ contains
 
     end function calc_effective_pressure_marine
 
-    elemental function calc_effective_pressure_till(H_w,H_ice,f_ice,f_grnd,H_w_max,N0,delta,e0,Cc) result(N_eff)
+    subroutine calc_effective_pressure_till(N_eff,H_w,H_ice,f_ice,f_grnd,H_w_max,N0,delta,e0,Cc)
         ! Calculate the effective pressure of the till
         ! following van Pelt and Bueler (2015), Eq. 23.
         
         implicit none 
         
-        real(wp), intent(IN) :: H_w
-        real(wp), intent(IN) :: H_ice
-        real(wp), intent(IN) :: f_ice 
-        real(wp), intent(IN) :: f_grnd  
-        real(wp), intent(IN) :: H_w_max             ! [m] Maximum allowed water depth 
-        real(wp), intent(IN) :: N0                  ! [Pa] Reference effective pressure 
-        real(wp), intent(IN) :: delta               ! [--] Fraction of overburden pressure for saturated till
-        real(wp), intent(IN) :: e0                  ! [--] Reference void ratio at N0 
-        real(wp), intent(IN) :: Cc                  ! [--] Till compressibility 
-        real(wp)             :: N_eff               ! [Pa] Effective pressure 
+        real(wp), intent(OUT) :: N_eff(:,:)         ! [Pa] Effective pressure 
+        real(wp), intent(IN)  :: H_w(:,:)
+        real(wp), intent(IN)  :: H_ice(:,:)
+        real(wp), intent(IN)  :: f_ice(:,:) 
+        real(wp), intent(IN)  :: f_grnd(:,:)  
+        real(wp), intent(IN)  :: H_w_max            ! [m] Maximum allowed water depth 
+        real(wp), intent(IN)  :: N0                 ! [Pa] Reference effective pressure 
+        real(wp), intent(IN)  :: delta              ! [--] Fraction of overburden pressure for saturated till
+        real(wp), intent(IN)  :: e0                 ! [--] Reference void ratio at N0 
+        real(wp), intent(IN)  :: Cc                 ! [--] Till compressibility 
         
-        ! Local variables 
+        ! Local variables
+        integer :: i, j, nx, ny  
         real(wp) :: H_eff
         real(wp) :: P0, s 
-        real(wp) :: N_eff_maxHw
+        real(wp) :: q1 
 
-        if (f_grnd .eq. 0.0_prec) then 
-            ! No effective pressure at base for floating ice
-        
-            N_eff = 0.0_prec 
+        nx = size(N_eff,1)
+        ny = size(N_eff,2) 
 
-        else 
 
-            ! Get effective ice thickness 
-            call calc_H_eff(H_eff,H_ice,f_ice,set_frac_zero=.TRUE.)
+        do j = 1, ny 
+        do i = 1, nx 
 
-            ! Get overburden pressure 
-            P0 = rho_ice*g*H_eff
+            if (f_grnd(i,j) .eq. 0.0_prec) then 
+                ! No effective pressure at base for floating ice
+            
+                N_eff(i,j) = 0.0_prec 
 
-            ! Get ratio of water layer thickness to maximum
-            s  = min(H_w/H_w_max,1.0)  
+            else 
 
-            ! Calculate the effective pressure in the till [Pa] (van Pelt and Bueler, 2015, Eq. 23-24)
-            N_eff = f_grnd * min( N0*(delta*P0/N0)**s * 10**((e0/Cc)*(1-s)), P0 ) 
+                ! Get effective ice thickness 
+                call calc_H_eff(H_eff,H_ice(i,j),f_ice(i,j),set_frac_zero=.TRUE.)
 
-        end if  
+                ! Get overburden pressure 
+                P0 = rho_ice*g*H_eff
+
+                ! Get ratio of water layer thickness to maximum
+                s  = min(H_w(i,j)/H_w_max,1.0)  
+
+                ! Calculate exponent in expression 
+                q1 = (e0/Cc)*(1-s)
+
+                ! Limit exponent to reasonable values to avoid an explosion 
+                ! (eg s=1, e0=0.52, Cc=0.014 => q1=37,14)
+                q1 = min(q1,10.0_wp) 
+
+                ! Calculate the effective pressure in the till [Pa] (van Pelt and Bueler, 2015, Eq. 23-24)
+                 N_eff(i,j) = f_grnd(i,j) * min( N0*(delta*P0/N0)**s * 10**q1, P0 ) 
+
+            end if  
+
+        end do 
+        end do
 
         return 
 
-    end function calc_effective_pressure_till
+    end subroutine calc_effective_pressure_till
     
     elemental function calc_lambda_bed_lin(z_bed,z0,z1) result(lambda)
         ! Calculate scaling function: linear 
@@ -963,7 +981,7 @@ contains
         real(wp), intent(IN)    :: f_ice(:,:)       ! aa-nodes
         real(wp), intent(IN)    :: z_bed(:,:)       ! aa-nodes        
         real(wp), intent(IN)    :: z_sl(:,:)        ! aa-nodes        
-        logical,    intent(IN)    :: norm           ! Normalize by H_ice? 
+        logical,  intent(IN)    :: norm             ! Normalize by H_ice? 
 
         ! Local variables
         integer    :: i, j, nx, ny
@@ -992,8 +1010,8 @@ contains
                     ! Marine based 
                     f_scale = max(0.0_prec, H_eff - (z_sl(i,j)-z_bed(i,j))*rho_sw_ice)
                 end if 
-
-                if (norm .and. H_ice(i,j) .gt. 0.0) f_scale = f_scale / H_eff
+                
+                if (norm .and. H_eff .gt. 0.0) f_scale = f_scale / H_eff
 
                 beta(i,j) = beta(i,j) * f_scale 
             

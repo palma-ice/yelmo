@@ -993,7 +993,7 @@ contains
                 dom%dyn%now%c_bed  = dom%dyn%now%cf_ref*1e5
                 dom%dyn%now%beta   = dom%dyn%now%c_bed
             end if
-             
+            
             call calc_ydyn(dom%dyn,dom%tpo,dom%mat,dom%thrm,dom%bnd,time)
 
             ! Calculate material information again with updated dynamics

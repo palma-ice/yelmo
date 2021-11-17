@@ -283,6 +283,8 @@ end if
         real(wp) :: wt_ab(4)
         real(wp) :: wt
 
+        real(wp), parameter :: visc_min = 1e4_wp        ! Just for safety 
+
         nx = size(visc_eff,1)
         ny = size(visc_eff,2)
         nz = size(visc_eff,3)
@@ -368,6 +370,22 @@ end if
         ! Set boundaries 
         call set_boundaries_3D_aa(visc_eff,boundaries)
 
+        ! Final safety check (mainly for grid boundaries)
+        ! Ensure non-zero visc value everywhere there is ice. 
+        do j = 1, ny 
+        do i = 1, nx 
+
+            if (f_ice(i,j) .eq. 1.0_wp) then
+
+                do k = 1, nz 
+                    if (visc_eff(i,j,k) .lt. visc_min) visc_eff(i,j,k) = visc_min
+                end do 
+
+            end if 
+
+        end do
+        end do
+        
         return 
 
     end subroutine calc_visc_eff_3D

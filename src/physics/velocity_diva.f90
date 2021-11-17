@@ -200,13 +200,13 @@ contains
 
             end select
             
-            ! Calculate the 3D vertical shear fields using viscosity estimated from the previous iteration 
-            call calc_vertical_shear_3D(duxdz,duydz,taub_acx,taub_acy,visc_eff,H_ice,f_ice,zeta_aa,par%boundaries)
-
             ! Calculate depth-integrated effective viscosity
             ! Note L19 uses eta_bar*H in the ssa equation. Yelmo uses eta_int=eta_bar*H directly.
             call calc_visc_eff_int(visc_eff_int,visc_eff,H_ice,f_ice,zeta_aa,par%boundaries)
             
+            ! Calculate the 3D vertical shear fields using viscosity estimated from the previous iteration 
+            call calc_vertical_shear_3D(duxdz,duydz,taub_acx,taub_acy,visc_eff,H_ice,f_ice,zeta_aa,par%boundaries)
+
             ! Calculate beta (at the ice base)
             call calc_beta(beta,c_bed,ux_b,uy_b,H_ice,f_ice,H_grnd,f_grnd,z_bed,z_sl,par%beta_method, &
                                 par%beta_const,par%beta_q,par%beta_u0,par%beta_gl_scale,par%beta_gl_f, &
@@ -436,11 +436,11 @@ end if
         integer  :: ip1, jp1 
         real(wp) :: visc_eff_ac
 
-        !real(wp), parameter :: visc_min = 1e4_wp 
+        ! real(wp), parameter :: visc_min = 1e4_wp 
 
-        nx    = size(duxdz,1)
-        ny    = size(duxdz,2)
-        nz_aa = size(duxdz,3) 
+        nx    = size(H_ice,1)
+        ny    = size(H_ice,2)
+        nz_aa = size(zeta_aa,1) 
         
         !$omp parallel do
         do k = 1, nz_aa 
@@ -454,7 +454,7 @@ end if
             ! Calculate shear strain, acx-nodes
             if (f_ice(i,j) .eq. 1.0_wp .or. f_ice(ip1,j) .eq. 1.0_wp) then 
                 visc_eff_ac  = calc_staggered_margin(visc_eff(i,j,k),visc_eff(ip1,j,k),f_ice(i,j),f_ice(ip1,j))
-                duxdz(i,j,k) = (taub_acx(i,j)/visc_eff_ac) * (1.0-zeta_aa(k))
+                duxdz(i,j,k) = (taub_acx(i,j)/visc_eff_ac) * (1.0_wp-zeta_aa(k))
             else
                 duxdz(i,j,k) = 0.0_wp 
             end if 
@@ -462,7 +462,7 @@ end if
             ! Calculate shear strain, acy-nodes
             if (f_ice(i,j) .eq. 1.0_wp .or. f_ice(i,jp1) .eq. 1.0_wp) then 
                 visc_eff_ac  = calc_staggered_margin(visc_eff(i,j,k),visc_eff(i,jp1,k),f_ice(i,j),f_ice(i,jp1))
-                duydz(i,j,k) = (taub_acy(i,j)/visc_eff_ac) * (1.0-zeta_aa(k))
+                duydz(i,j,k) = (taub_acy(i,j)/visc_eff_ac) * (1.0_wp-zeta_aa(k))
             else
                 duydz(i,j,k) = 0.0_wp 
             end if 
@@ -523,6 +523,8 @@ end if
         real(wp) :: ATT_ab(4)
         real(wp) :: wt_ab(4)
         real(wp) :: wt
+
+        real(wp), parameter :: visc_min = 1e4_wp        ! Just for safety 
 
         nx = size(visc_eff,1)
         ny = size(visc_eff,2)
@@ -592,7 +594,7 @@ end if
 
                     ! Calcualte effective viscosity on aa-nodes
                     visc_eff(i,j,k) = sum(wt_ab*visc_eff_ab)
-
+                     
                 end do 
 
             else 
@@ -608,6 +610,22 @@ end if
 
         ! Set boundaries 
         call set_boundaries_3D_aa(visc_eff,boundaries)
+
+        ! Final safety check (mainly for grid boundaries)
+        ! Ensure non-zero visc value everywhere there is ice. 
+        do j = 1, ny 
+        do i = 1, nx 
+
+            if (f_ice(i,j) .eq. 1.0_wp) then
+
+                do k = 1, nz 
+                    if (visc_eff(i,j,k) .lt. visc_min) visc_eff(i,j,k) = visc_min
+                end do 
+
+            end if 
+
+        end do
+        end do
 
         return 
 
@@ -719,7 +737,7 @@ end if
                 ! Viscosity should be nonzero here, perform integration 
 
                 H_eff = H_ice(i,j) / f_ice(i,j) 
-                F_int(i,j) = integrate_trapezoid1D_pt((H_eff/visc(i,j,:) )*(1.0_wp-zeta_aa)**n,zeta_aa)
+                F_int(i,j) = integrate_trapezoid1D_pt( (H_eff/visc(i,j,:) )*(1.0_wp-zeta_aa)**n,zeta_aa)
 
             else 
 

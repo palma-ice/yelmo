@@ -714,7 +714,10 @@ contains
         
         ! Initially set friction to zero everywhere
         beta = 0.0_prec 
-                 
+        
+        ! Set equal weighting to all ab-nodes
+        wt_ab = 0.25_wp
+        
         do j = 1, ny
         do i = 1, nx
 
@@ -724,15 +727,9 @@ contains
             jm1 = max(j-1,1) 
             jp1 = min(j+1,ny)
             
-            wt_ab = 1.0_wp 
-            wt = sum(wt_ab)
-            
             if (f_ice(i,j) .eq. 1.0_wp) then 
                 ! Fully ice-covered point with some fully ice-covered neighbors 
-
-                ! Normalize weighting 
-                wt_ab = wt_ab / wt 
-
+                
                 ! Get c_bed on ab-nodes
                 call stagger_nodes_aa_ab_ice(cb_ab,c_bed,f_ice,i,j)
 
@@ -755,7 +752,7 @@ contains
                     uxy_ab = sqrt(ux_ab**2 + uy_ab**2 + ub_sq_min)
                     
                     beta_ab = cb_ab * (uxy_ab / u_0)**q * (1.0_wp / uxy_ab)
-
+                    
                 end if 
 
                 beta(i,j) = sum(wt_ab*beta_ab)
@@ -813,7 +810,6 @@ contains
         real(wp) :: cb_ab(4)
         real(wp) :: beta_ab(4)
         real(wp) :: wt_ab(4) 
-        real(wp) :: wt 
         real(wp) :: beta_now
 
         real(wp), parameter :: ub_min    = 1e-1_wp          ! [m/a] Minimum velocity is positive small value to avoid divide by zero
@@ -825,6 +821,9 @@ contains
         ! Initially set friction to zero everywhere
         beta = 0.0_prec 
 
+        ! Set equal weighting to all ab-nodes
+        wt_ab = 0.25_wp
+            
         do j = 1, ny
         do i = 1, nx
 
@@ -834,14 +833,8 @@ contains
             jm1 = max(j-1,1) 
             jp1 = min(j+1,ny)
             
-            wt_ab = 1.0_wp
-            wt = sum(wt_ab)
-            
             if (f_ice(i,j) .eq. 1.0_wp) then 
                 ! Fully ice-covered point with some fully ice-covered neighbors 
-
-                ! Normalize weighting 
-                wt_ab = wt_ab / wt 
 
                 ! Get c_bed on ab-nodes
                 call stagger_nodes_aa_ab_ice(cb_ab,c_bed,f_ice,i,j)
@@ -856,7 +849,7 @@ contains
 
                 uxy_ab    = sqrt(ux_ab**2 + uy_ab**2 + ub_sq_min)
 
-                beta_ab   = cb_ab * (uxy_ab / u_0)**q * (1.0_wp / uxy_ab)
+                beta_ab   = cb_ab * (uxy_ab / (uxy_ab+u_0))**q * (1.0_wp / uxy_ab)
 
                 beta(i,j) = sum(wt_ab*beta_ab)
 

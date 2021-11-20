@@ -786,13 +786,24 @@ contains
                             ! === Case 1: ice-free to the right ===
 
 if (.TRUE.) then 
-                            ! Get viscosity on interior acx-node
-                            vis_int_acx_im1 = 0.5_wp*(vis_int_sgxy(i-1,j)+vis_int_sgxy(i-1,j-1))
                             
-                            ! Get viscosity on interior acy-nodes (upper border and lower border)
-                            vis_int_acy_jp1 = 0.5_wp*(vis_int_sgxy(i,j)+vis_int_sgxy(i-1,j))
-                            vis_int_acy_jm1 = 0.5_wp*(vis_int_sgxy(i,j-1)+vis_int_sgxy(i-1,j-1))
-                            
+
+                            if (.TRUE.) then 
+                                ! Get viscosity on interior acx-node
+                                vis_int_acx_im1 = 0.5_wp*(vis_int_sgxy(i-1,j)+vis_int_sgxy(i-1,j-1))
+                                
+                                ! Get viscosity on interior acy-nodes (upper border and lower border)
+                                vis_int_acy_jp1 = 0.5_wp*(vis_int_sgxy(i,j)+vis_int_sgxy(i-1,j))
+                                vis_int_acy_jm1 = 0.5_wp*(vis_int_sgxy(i,j-1)+vis_int_sgxy(i-1,j-1))
+                            else
+                                ! Get viscosity on interior acx-node
+                                vis_int_acx_im1 = 0.5_wp*(vis_int_g(i,j)+vis_int_g(i-1,j))
+                                
+                                ! Get viscosity on interior acy-nodes (upper border and lower border)
+                                vis_int_acy_jp1 = 0.5_wp*(vis_int_g(i,j)+vis_int_g(i,j+1))
+                                vis_int_acy_jm1 = 0.5_wp*(vis_int_g(i,j)+vis_int_g(i,j-1))
+                            end if 
+
                             ! Get driving stress on aa-node 
                             taud_aa = 0.5_wp*(taud_acx(i,j)+taud_acx(i-1,j)) 
 
@@ -904,13 +915,22 @@ end if
                             ! Case 2: ice-free to the left
  
 if (.TRUE.) then 
-                            ! Get viscosity on interior acx-node
-                            vis_int_acx_ip1 = 0.5_wp*(vis_int_sgxy(i+1,j)+vis_int_sgxy(i+1,j-1))
-                            
-                            ! Get viscosity on interior acy-nodes (upper border and lower border)
-                            vis_int_acy_jp1 = 0.5_wp*(vis_int_sgxy(i,j)+vis_int_sgxy(i+1,j))
-                            vis_int_acy_jm1 = 0.5_wp*(vis_int_sgxy(i,j-1)+vis_int_sgxy(i+1,j-1))
-                            
+                            if (.TRUE.) then 
+                                ! Get viscosity on interior acx-node
+                                vis_int_acx_ip1 = 0.5_wp*(vis_int_sgxy(i+1,j)+vis_int_sgxy(i+1,j-1))
+                                
+                                ! Get viscosity on interior acy-nodes (upper border and lower border)
+                                vis_int_acy_jp1 = 0.5_wp*(vis_int_sgxy(i,j)+vis_int_sgxy(i+1,j))
+                                vis_int_acy_jm1 = 0.5_wp*(vis_int_sgxy(i,j-1)+vis_int_sgxy(i+1,j-1))
+                            else
+                                ! Get viscosity on interior acx-node
+                                vis_int_acx_ip1 = 0.5_wp*(vis_int_g(i+1,j)+vis_int_g(i+2,j))
+                                
+                                ! Get viscosity on interior acy-nodes (upper border and lower border)
+                                vis_int_acy_jp1 = 0.5_wp*(vis_int_g(i+1,j)+vis_int_g(i+1,j+1))
+                                vis_int_acy_jm1 = 0.5_wp*(vis_int_g(i+1,j)+vis_int_g(i+1,j-1))
+                            end if
+
                             ! Get driving stress on aa-node 
                             taud_aa = 0.5_wp*(taud_acx(i,j)+taud_acx(i+1,j)) 
 
@@ -1623,12 +1643,21 @@ end if
                             ! === Case 1: ice-free to the top ===
 
 if (.TRUE.) then
-                            ! Get viscosity on interior acy-node
-                            vis_int_acy_jm1 = 0.5_wp*(vis_int_sgxy(i,j-1) + vis_int_sgxy(i-1,j-1))
-                            
-                            ! Get viscosity on interior acx-nodes (left and right)
-                            vis_int_acx_im1 = 0.5_wp*(vis_int_sgxy(i-1,j) + vis_int_sgxy(i-1,j-1))
-                            vis_int_acx_i   = 0.5_wp*(vis_int_sgxy(i,j)   + vis_int_sgxy(i,j-1))
+                            if (.TRUE.) then
+                                ! Get viscosity on interior acy-node
+                                vis_int_acy_jm1 = 0.5_wp*(vis_int_sgxy(i,j-1) + vis_int_sgxy(i-1,j-1))
+                                
+                                ! Get viscosity on interior acx-nodes (left and right)
+                                vis_int_acx_im1 = 0.5_wp*(vis_int_sgxy(i-1,j) + vis_int_sgxy(i-1,j-1))
+                                vis_int_acx_i   = 0.5_wp*(vis_int_sgxy(i,j)   + vis_int_sgxy(i,j-1))
+                            else
+                                ! Get viscosity on interior acy-node
+                                vis_int_acy_jm1 = 0.5_wp*(vis_int_g(i,j) + vis_int_g(i,j-1))
+                                
+                                ! Get viscosity on interior acx-nodes (left and right)
+                                vis_int_acx_im1 = 0.5_wp*(vis_int_g(i,j) + vis_int_g(i-1,j))
+                                vis_int_acx_i   = 0.5_wp*(vis_int_g(i,j) + vis_int_g(i+1,j))
+                            end if 
 
                             ! Get driving stress on aa-node 
                             taud_aa = 0.5_wp*(taud_acy(i,j)+taud_acy(i,j-1)) 
@@ -1751,13 +1780,22 @@ end if
                             ! === Case 2: ice-free to the bottom ===
 
 if (.TRUE.) then 
-                            ! Get viscosity on interior acy-node
-                            vis_int_acy_jp1 = 0.5_wp*(vis_int_sgxy(i,j+1) + vis_int_sgxy(i-1,j+1))
-                            
-                            ! Get viscosity on interior acx-nodes (left and right)
-                            vis_int_acx_im1 = 0.5_wp*(vis_int_sgxy(i-1,j) + vis_int_sgxy(i-1,j+1))
-                            vis_int_acx_i   = 0.5_wp*(vis_int_sgxy(i,j)   + vis_int_sgxy(i,j+1))
-                            
+                            if (.TRUE.) then
+                                ! Get viscosity on interior acy-node
+                                vis_int_acy_jp1 = 0.5_wp*(vis_int_sgxy(i,j+1) + vis_int_sgxy(i-1,j+1))
+                                
+                                ! Get viscosity on interior acx-nodes (left and right)
+                                vis_int_acx_im1 = 0.5_wp*(vis_int_sgxy(i-1,j) + vis_int_sgxy(i-1,j+1))
+                                vis_int_acx_i   = 0.5_wp*(vis_int_sgxy(i,j)   + vis_int_sgxy(i,j+1))
+                            else
+                                ! Get viscosity on interior acy-node
+                                vis_int_acy_jp1 = 0.5_wp*(vis_int_g(i,j+1) + vis_int_g(i,j+2))
+                                
+                                ! Get viscosity on interior acx-nodes (left and right)
+                                vis_int_acx_im1 = 0.5_wp*(vis_int_g(i,j+1) + vis_int_g(i-1,j+1))
+                                vis_int_acx_i   = 0.5_wp*(vis_int_g(i,j+1) + vis_int_g(i+1,j+1))
+                            end if 
+
                             ! Get driving stress on aa-node 
                             taud_aa = 0.5_wp*(taud_acy(i,j)+taud_acy(i,j+1)) 
 

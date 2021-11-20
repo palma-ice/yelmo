@@ -26,7 +26,7 @@ module yelmo_dynamics
 
     public :: ydyn_par_load, ydyn_alloc, ydyn_dealloc
     public :: calc_ydyn
-    public :: calc_ydyn_neff, calc_ydyn_cfref
+    public :: calc_ydyn_neff, calc_ydyn_cbref
     
 contains
 
@@ -101,9 +101,9 @@ contains
         ! Calculate effective pressure 
         call calc_ydyn_neff(dyn,tpo,thrm,bnd)
 
-        ! Update bed roughness coefficients cf_ref and c_bed (which are independent of velocity)
-        call calc_ydyn_cfref(dyn,tpo,thrm,bnd)
-        call calc_c_bed(dyn%now%c_bed,dyn%now%cf_ref,dyn%now%N_eff)
+        ! Update bed roughness coefficients cb_ref and c_bed (which are independent of velocity)
+        call calc_ydyn_cbref(dyn,tpo,thrm,bnd)
+        call calc_c_bed(dyn%now%c_bed,dyn%now%cb_ref,dyn%now%N_eff)
 
         ! ===== Calculate the 3D velocity field and helper variables =======================
         ! The variables to be obtained from these routines are:
@@ -764,8 +764,8 @@ contains
 
 !     end subroutine calc_ydyn_ssa
 
-    subroutine calc_ydyn_cfref(dyn,tpo,thrm,bnd)
-        ! Update cf_ref [--] based on parameter choices
+    subroutine calc_ydyn_cbref(dyn,tpo,thrm,bnd)
+        ! Update cb_ref [--] based on parameter choices
 
         implicit none
         
@@ -777,35 +777,35 @@ contains
         integer :: i, j, nx, ny 
         integer :: im1, ip1, jm1, jp1
         real(prec) :: f_scale 
-        real(prec), allocatable :: cf_ref(:,:) 
+        real(prec), allocatable :: cb_ref(:,:) 
         real(prec), allocatable :: lambda_bed(:,:)  
 
-        nx = size(dyn%now%cf_ref,1)
-        ny = size(dyn%now%cf_ref,2)
+        nx = size(dyn%now%cb_ref,1)
+        ny = size(dyn%now%cb_ref,2)
         
-        allocate(cf_ref(nx,ny))
+        allocate(cb_ref(nx,ny))
         allocate(lambda_bed(nx,ny))
         
         if (dyn%par%cb_method .eq. -1) then 
-            ! Do nothing - cf_ref defined externally
+            ! Do nothing - cb_ref defined externally
 
         else 
-            ! Calculate cf_ref following parameter choices 
+            ! Calculate cb_ref following parameter choices 
 
             ! =============================================================================
-            ! Step 1: calculate the cf_ref field only determined by 
+            ! Step 1: calculate the cb_ref field only determined by 
             ! cf_frozen, cf_stream and temperate character of the bed 
 
             if (dyn%par%cb_with_pmp) then 
-                ! Smooth transition between temperate and frozen cf_ref
+                ! Smooth transition between temperate and frozen cb_ref
 
-                cf_ref = (thrm%now%f_pmp)*dyn%par%cf_stream &
+                cb_ref = (thrm%now%f_pmp)*dyn%par%cf_stream &
                            + (1.0_prec - thrm%now%f_pmp)*dyn%par%cf_frozen 
 
             else 
                 ! Only use cf_frozen everywhere
 
-                cf_ref = dyn%par%cf_frozen
+                cb_ref = dyn%par%cf_frozen
 
             end if 
 
@@ -830,7 +830,7 @@ contains
                          tpo%now%H_ice(i,jm1) .le. 0.0 .or. &
                          tpo%now%H_ice(i,jp1) .le. 0.0)) then 
                         
-                        cf_ref(i,j) = dyn%par%cf_stream
+                        cb_ref(i,j) = dyn%par%cf_stream
 
                     end if 
 
@@ -840,12 +840,12 @@ contains
                 ! Also ensure that grounding line is also considered streaming
                 ! Note: this was related to cold ocean temps at floating-grounded interface,
                 ! which is likely solved. Left here for safety. ajr, 2019-07-24
-                where(tpo%now%is_grline) cf_ref = dyn%par%cf_stream
+                where(tpo%now%is_grline) cb_ref = dyn%par%cf_stream
 
             end if
 
             ! =============================================================================
-            ! Step 2: calculate lambda functions to scale cf_ref from default value 
+            ! Step 2: calculate lambda functions to scale cb_ref from default value 
             
             !------------------------------------------------------------------------------
             ! lambda_bed: scaling as a function of bedrock elevation
@@ -885,15 +885,15 @@ contains
 
 
             ! =============================================================================
-            ! Step 3: calculate cf_ref [--]
+            ! Step 3: calculate cb_ref [--]
             
-            dyn%now%cf_ref = (cf_ref*lambda_bed)
+            dyn%now%cb_ref = (cb_ref*lambda_bed)
             
         end if 
 
         return 
 
-    end subroutine calc_ydyn_cfref
+    end subroutine calc_ydyn_cbref
 
     subroutine calc_ydyn_neff(dyn,tpo,thrm,bnd)
         ! Update N_eff based on parameter choices
@@ -1128,7 +1128,7 @@ contains
         allocate(now%visc_eff(nx,ny,nz_aa))  
         allocate(now%visc_eff_int(nx,ny))
 
-        allocate(now%cf_ref(nx,ny))
+        allocate(now%cb_ref(nx,ny))
         allocate(now%c_bed(nx,ny)) 
         
         allocate(now%N_eff(nx,ny))
@@ -1197,7 +1197,7 @@ contains
         now%visc_eff          = 1e3  
         now%visc_eff_int      = 1e3  
         
-        now%cf_ref            = 0.0
+        now%cb_ref            = 0.0
         now%c_bed             = 0.0 
         
         now%N_eff             = 0.0 
@@ -1276,7 +1276,7 @@ contains
         if (allocated(now%visc_eff))        deallocate(now%visc_eff) 
         if (allocated(now%visc_eff_int))    deallocate(now%visc_eff_int) 
         
-        if (allocated(now%cf_ref))          deallocate(now%cf_ref) 
+        if (allocated(now%cb_ref))          deallocate(now%cb_ref) 
         if (allocated(now%c_bed))           deallocate(now%c_bed) 
         
         if (allocated(now%N_eff))           deallocate(now%N_eff)

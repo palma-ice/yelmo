@@ -987,10 +987,10 @@ contains
             ! thus here it is called after initializing ytherm and ymat variables)
 
             ! Impose [high] beta value in case it hasn't been initialized (eg, in the case of cb_method=-1/beta_method=-1)
-            ! This will be overwritten when cf_ref/beta are calculated internally
+            ! This will be overwritten when cb_ref/beta are calculated internally
             if (maxval(dom%dyn%now%beta) .eq. 0.0_prec) then 
-                dom%dyn%now%cf_ref = 1.0
-                dom%dyn%now%c_bed  = dom%dyn%now%cf_ref*1e5
+                dom%dyn%now%cb_ref = 1.0
+                dom%dyn%now%c_bed  = dom%dyn%now%cb_ref*1e5
                 dom%dyn%now%beta   = dom%dyn%now%c_bed
             end if
             

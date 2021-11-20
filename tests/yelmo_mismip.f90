@@ -230,20 +230,20 @@ program yelmo_mismip
                     ! Stnd conditions - no perturbation 
 
                     yelmo1%dyn%par%cb_method = -1
-                    yelmo1%dyn%now%cf_ref = yelmo1%dyn%par%cf_stream 
+                    yelmo1%dyn%now%cb_ref = yelmo1%dyn%par%cf_stream 
 
                 else if (time .le. time_mod_2) then 
                     ! P75S conditions - Gaussian friction perturbation 
 
                     yelmo1%dyn%par%cb_method = -1 
-                    yelmo1%dyn%now%cf_ref = yelmo1%dyn%par%cf_stream 
-                    call perturb_friction(yelmo1%dyn%now%cf_ref,yelmo1%grd%x*1e-3,yelmo1%grd%y*1e-3,x_gl=x_gl_stnd)
+                    yelmo1%dyn%now%cb_ref = yelmo1%dyn%par%cf_stream 
+                    call perturb_friction(yelmo1%dyn%now%cb_ref,yelmo1%grd%x*1e-3,yelmo1%grd%y*1e-3,x_gl=x_gl_stnd)
             
                 else
                     ! Return to Stnd conditions - no perturbation 
 
                     yelmo1%dyn%par%cb_method = -1
-                    yelmo1%dyn%now%cf_ref = yelmo1%dyn%par%cf_stream 
+                    yelmo1%dyn%now%cb_ref = yelmo1%dyn%par%cf_stream 
 
                 end if 
 

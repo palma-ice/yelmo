@@ -43,7 +43,7 @@ program yelmo_test
 
     character(len=12) :: optvar 
     logical           :: reset_model
-    character(len=56) :: cf_ref_init_method
+    character(len=56) :: cb_ref_init_method
 
     real(prec), allocatable :: mb_corr(:,:) 
 
@@ -62,8 +62,8 @@ program yelmo_test
     ! Load general parameters 
 
     call nml_read(path_par,"ctrl","opt_method", opt_method)                 ! Total number of iterations
-    call nml_read(path_par,"ctrl","cf_ref_init_method", cf_ref_init_method)  ! How should cf_ref be initialized (guess, restart, none)
-    call nml_read(path_par,"ctrl","sigma_err",       sigma_err)              ! [--] Smoothing radius for error to calculate correction in cf_ref (in multiples of dx)
+    call nml_read(path_par,"ctrl","cb_ref_init_method", cb_ref_init_method)  ! How should cb_ref be initialized (guess, restart, none)
+    call nml_read(path_par,"ctrl","sigma_err",       sigma_err)              ! [--] Smoothing radius for error to calculate correction in cb_ref (in multiples of dx)
     call nml_read(path_par,"ctrl","sigma_vel",       sigma_vel)              ! [m/a] Speed at which smoothing diminishes to zero
     call nml_read(path_par,"ctrl","cf_min",          cf_min)                 ! [--] Minimum allowed cf value 
     call nml_read(path_par,"ctrl","cf_max",          cf_max)                 ! [--] Maximum allowed cf value 
@@ -91,7 +91,7 @@ program yelmo_test
             call nml_read(path_par,"opt_P12","rel_tau1",    rel_tau1)             ! [yr] Initial relaxation tau, fixed until rel_time1 
             call nml_read(path_par,"opt_P12","rel_tau2",    rel_tau2)             ! [yr] Final tau, reached at rel_time2, when relaxation disabled 
             call nml_read(path_par,"opt_P12","scale_ftime", scale_ftime)          ! [-]  Fraction of time_iter_tot at which to start transition from scale_err1 to scale_err2
-            call nml_read(path_par,"opt_P12","scale_err1",  scale_err1)           ! [m]  Initial value for err_scale parameter in cf_ref optimization 
+            call nml_read(path_par,"opt_P12","scale_err1",  scale_err1)           ! [m]  Initial value for err_scale parameter in cb_ref optimization 
             call nml_read(path_par,"opt_P12","scale_err2",  scale_err2)           ! [m]  Final value for err_scale parameter reached at scale_time2   
 
             ! Optimization parameters 
@@ -127,7 +127,7 @@ program yelmo_test
             call nml_read(path_par,"opt_L21","rel_time1",       rel_time1)           
             call nml_read(path_par,"opt_L21","rel_time2",       rel_time2)           
             
-            call nml_read(path_par,"opt_L21","tau_c",  tau_c)    ! [yr] L21: Relaxation time scale for cf_ref adjustment 
+            call nml_read(path_par,"opt_L21","tau_c",  tau_c)    ! [yr] L21: Relaxation time scale for cb_ref adjustment 
             call nml_read(path_par,"opt_L21","H0",     H0)       ! [m]  L21: Error scaling
 
             dtt                 = 5.0               ! [yr] Time step for time loop 
@@ -208,12 +208,12 @@ program yelmo_test
     call yelmo_init_state(yelmo1,time=time_init,thrm_method="robin-cold")
 
 
-    select case(trim(cf_ref_init_method))
+    select case(trim(cb_ref_init_method))
 
         case("guess")
 
-            ! Calculate new initial guess of cf_ref using info from dyn
-            call guess_cf_ref(yelmo1%dyn%now%cf_ref,yelmo1%dyn%now%taud,yelmo1%dta%pd%uxy_s, &
+            ! Calculate new initial guess of cb_ref using info from dyn
+            call guess_cb_ref(yelmo1%dyn%now%cb_ref,yelmo1%dyn%now%taud,yelmo1%dta%pd%uxy_s, &
                                 yelmo1%dta%pd%H_ice,yelmo1%dta%pd%H_grnd,yelmo1%dyn%par%beta_u0,cf_min,cf_max)
 
             ! Update ice sheet to get everything in sync
@@ -221,16 +221,16 @@ program yelmo_test
 
         case("restart")
 
-            ! Pass, cf_ref obtained from restart file 
+            ! Pass, cb_ref obtained from restart file 
             if (.not. yelmo1%par%use_restart) then 
-                write(*,*) "yelmo_opt:: Error: cf_ref_init_method='restart' can only be used &
+                write(*,*) "yelmo_opt:: Error: cb_ref_init_method='restart' can only be used &
                 &in conjunction with a restart file being loaded."
                 stop 
             end if 
 
         case DEFAULT  ! "none"
 
-            yelmo1%dyn%now%cf_ref = cf_init 
+            yelmo1%dyn%now%cb_ref = cf_init 
     
     end select  
 
@@ -330,13 +330,13 @@ program yelmo_test
                 ! Diagnose mass balance correction term 
                 call update_mb_corr(mb_corr,yelmo1%tpo%now%H_ice,yelmo1%dta%pd%H_ice,tau)
                 
-                ! === Update cf_ref and reset model ===================
+                ! === Update cb_ref and reset model ===================
 
                 if (q .gt. 1) then
                     ! Perform optimization after first iteration
 
-                    ! Update cf_ref based on error metric(s) 
-                    call update_cf_ref_errscaling(yelmo1%dyn%now%cf_ref,yelmo1%tpo%now%H_ice, &
+                    ! Update cb_ref based on error metric(s) 
+                    call update_cb_ref_errscaling(yelmo1%dyn%now%cb_ref,yelmo1%tpo%now%H_ice, &
                                         yelmo1%bnd%z_bed,yelmo1%dyn%now%ux_s,yelmo1%dyn%now%uy_s, &
                                         yelmo1%dta%pd%H_ice,yelmo1%dta%pd%uxy_s,yelmo1%dta%pd%H_grnd.le.0.0_prec, &
                                         yelmo1%tpo%par%dx,cf_min,cf_max,sigma_err,sigma_vel,err_scale, &
@@ -345,9 +345,9 @@ program yelmo_test
                 end if 
                 
                 if (reset_model) then
-                    ! Reset model to reference state with updated cf_ref 
+                    ! Reset model to reference state with updated cb_ref 
 
-                    yelmo_ref%dyn%now%cf_ref = yelmo1%dyn%now%cf_ref
+                    yelmo_ref%dyn%now%cb_ref = yelmo1%dyn%now%cb_ref
                     call yelmo_set_time(yelmo_ref,time)
 
                     if (time_iter_therm .gt. 0.0) then
@@ -393,7 +393,7 @@ program yelmo_test
         case("L21") 
             ! Lipscomb et al. (2021)
             
-            ! Perform transient simulation with cf_ref nudging  
+            ! Perform transient simulation with cb_ref nudging  
             do n = 1, ceiling((time_end-time_init)/dtt)
 
                 ! Get current time 
@@ -415,8 +415,8 @@ program yelmo_test
 
                 ! === Optimization update step =========
 
-                ! Update cf_ref based on error metric(s) 
-                call update_cf_ref_errscaling_l21(yelmo1%dyn%now%cf_ref,yelmo1%tpo%now%H_ice, &
+                ! Update cb_ref based on error metric(s) 
+                call update_cb_ref_errscaling_l21(yelmo1%dyn%now%cb_ref,yelmo1%tpo%now%H_ice, &
                                     yelmo1%tpo%now%dHicedt,yelmo1%bnd%z_bed,yelmo1%bnd%z_sl,yelmo1%dyn%now%ux_s,yelmo1%dyn%now%uy_s, &
                                     yelmo1%dta%pd%H_ice,yelmo1%dta%pd%uxy_s,yelmo1%dta%pd%H_grnd.le.0.0_prec, &
                                     yelmo1%tpo%par%dx,cf_min,cf_max,sigma_err,sigma_vel,tau_c,H0, &
@@ -459,7 +459,7 @@ program yelmo_test
                     call yelmo_update(yelmo1,time)
 
                     ! Update c_bed based on error metric(s) 
-                    call update_cf_ref_thickness_ratio(yelmo1%dyn%now%cf_ref,yelmo1%tpo%now%H_ice, &
+                    call update_cb_ref_thickness_ratio(yelmo1%dyn%now%cb_ref,yelmo1%tpo%now%H_ice, &
                                     yelmo1%bnd%z_bed,yelmo1%dyn%now%ux_bar,yelmo1%dyn%now%uy_bar, &
                                     yelmo1%dyn%now%uxy_i_bar,yelmo1%dyn%now%uxy_b,yelmo1%dta%pd%H_ice, &
                                     yelmo1%tpo%par%dx,cf_min,cf_max=cf_max)
@@ -567,7 +567,7 @@ contains
         call nc_write(filename,"c_bed",ylmo%dyn%now%c_bed,units="Pa",long_name="Bed friction coefficient", &
                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
         
-        call nc_write(filename,"cf_ref",yelmo1%dyn%now%cf_ref,units="",long_name="Bed friction scalar", &
+        call nc_write(filename,"cb_ref",yelmo1%dyn%now%cb_ref,units="",long_name="Bed friction scalar", &
                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
         
         call nc_write(filename,"N_eff",ylmo%dyn%now%N_eff,units="Pa",long_name="Effective pressure", &

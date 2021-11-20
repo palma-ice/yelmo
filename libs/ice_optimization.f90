@@ -9,13 +9,13 @@ module ice_optimization
     private 
 
     public :: update_tf_corr_l21
-    public :: update_cf_ref_errscaling_l21
-    public :: update_cf_ref_errscaling
-    public :: update_cf_ref_thickness_ratio
+    public :: update_cb_ref_errscaling_l21
+    public :: update_cb_ref_errscaling
+    public :: update_cb_ref_thickness_ratio
     public :: update_mb_corr
-    public :: guess_cf_ref
+    public :: guess_cb_ref
     public :: fill_nearest
-    public :: fill_cf_ref
+    public :: fill_cb_ref
     public :: wtd_mean
     public :: get_opt_param
 
@@ -127,13 +127,13 @@ contains
 
     end subroutine update_tf_corr_l21
 
-    subroutine update_cf_ref_errscaling_l21(cf_ref,H_ice,dHdt,z_bed,z_sl,ux,uy,H_obs,uxy_obs,is_float_obs, &
+    subroutine update_cb_ref_errscaling_l21(cb_ref,H_ice,dHdt,z_bed,z_sl,ux,uy,H_obs,uxy_obs,is_float_obs, &
                                         dx,cf_min,cf_max,sigma_err,sigma_vel,tau_c,H0,fill_dist,dt)
         ! Update method following Lipscomb et al. (2021, tc)
 
         implicit none 
 
-        real(wp), intent(INOUT) :: cf_ref(:,:) 
+        real(wp), intent(INOUT) :: cb_ref(:,:) 
         real(wp), intent(IN)    :: H_ice(:,:) 
         real(wp), intent(IN)    :: dHdt(:,:) 
         real(wp), intent(IN)    :: z_bed(:,:) 
@@ -167,10 +167,10 @@ contains
         real(wp), allocatable   :: uxy(:,:)
         real(wp), allocatable   :: uxy_err(:,:)
         real(wp), allocatable   :: cf_prev(:,:) 
-        real(wp), allocatable   :: cf_ref_dot(:,:)
+        real(wp), allocatable   :: cb_ref_dot(:,:)
 
-        nx = size(cf_ref,1)
-        ny = size(cf_ref,2) 
+        nx = size(cb_ref,1)
+        ny = size(cb_ref,2) 
 
         dx_km = dx*1e-3  
         
@@ -179,13 +179,13 @@ contains
         allocate(uxy(nx,ny))
         allocate(uxy_err(nx,ny))
         allocate(cf_prev(nx,ny))
-        allocate(cf_ref_dot(nx,ny)) 
+        allocate(cb_ref_dot(nx,ny)) 
         
         ! Internal parameters 
         f_damp = 2.0 
 
-        ! Store initial cf_ref solution 
-        cf_prev = cf_ref 
+        ! Store initial cb_ref solution 
+        cf_prev = cb_ref 
 
         ! Calculate ice thickness error 
         H_err = H_ice - H_obs 
@@ -215,7 +215,7 @@ if (.TRUE.) then
 end if 
 
         ! Initially set cf to missing value for now where no correction possible
-        cf_ref = MV 
+        cb_ref = MV 
 
         do j = 1, ny 
         do i = 1, nx 
@@ -268,47 +268,47 @@ end if
 
                 ! Get adjustment rate given error in ice thickness  =========
 
-                cf_ref_dot(i,j) = -(cf_prev(i,j)/H0)*((H_err_now / tau_c) + f_damp*dHdt_now)
+                cb_ref_dot(i,j) = -(cf_prev(i,j)/H0)*((H_err_now / tau_c) + f_damp*dHdt_now)
 
                 ! Apply correction to current node =========
 
-                cf_ref(i,j) = cf_prev(i,j) + cf_ref_dot(i,j)*dt 
+                cb_ref(i,j) = cf_prev(i,j) + cb_ref_dot(i,j)*dt 
 
             end if 
 
         end do 
         end do 
 
-        ! Fill in cf_ref for floating points using bed analogy method
-        call fill_cf_ref(cf_ref,H_ice,z_bed,z_sl,is_float_obs,cf_min)
+        ! Fill in cb_ref for floating points using bed analogy method
+        call fill_cb_ref(cb_ref,H_ice,z_bed,z_sl,is_float_obs,cf_min)
 
         ! Fill in remaining missing values with nearest neighbor or cf_min when none available
-        call fill_nearest(cf_ref,missing_value=MV,fill_value=cf_min,fill_dist=fill_dist,n=5,dx=dx)
+        call fill_nearest(cb_ref,missing_value=MV,fill_value=cf_min,fill_dist=fill_dist,n=5,dx=dx)
 
-        ! Ensure cf_ref is not below lower or upper limit 
-        where (cf_ref .lt. cf_min) cf_ref = cf_min 
-        where (cf_ref .gt. cf_max) cf_ref = cf_max 
+        ! Ensure cb_ref is not below lower or upper limit 
+        where (cb_ref .lt. cf_min) cb_ref = cf_min 
+        where (cb_ref .gt. cf_max) cb_ref = cf_max 
 
-        ! Additionally, apply a Gaussian filter to cf_ref to ensure smooth transitions
-        !call filter_gaussian(var=cf_ref,sigma=dx_km*0.2,dx=dx_km)     !,mask=err_z_srf .ne. 0.0)
+        ! Additionally, apply a Gaussian filter to cb_ref to ensure smooth transitions
+        !call filter_gaussian(var=cb_ref,sigma=dx_km*0.2,dx=dx_km)     !,mask=err_z_srf .ne. 0.0)
         
-        ! Ensure where obs are floating, set cf_ref = cf_min 
-        where(is_float_obs) cf_ref = cf_min 
+        ! Ensure where obs are floating, set cb_ref = cf_min 
+        where(is_float_obs) cb_ref = cf_min 
 
-        ! Also where no ice exists, set cf_ref = cf_min 
-        where(H_obs .eq. 0.0) cf_ref = cf_min 
+        ! Also where no ice exists, set cb_ref = cf_min 
+        where(H_obs .eq. 0.0) cb_ref = cf_min 
 
         return 
 
-    end subroutine update_cf_ref_errscaling_l21
+    end subroutine update_cb_ref_errscaling_l21
 
-    subroutine fill_cf_ref(cf_ref,H_ice,z_bed,z_sl,is_float_obs,cf_min)
+    subroutine fill_cb_ref(cb_ref,H_ice,z_bed,z_sl,is_float_obs,cf_min)
         ! Fill points that cannot be optimized with 
         ! analagous values from similar bed elevations 
 
         implicit none 
 
-        real(wp), intent(INOUT) :: cf_ref(:,:) 
+        real(wp), intent(INOUT) :: cb_ref(:,:) 
         real(wp), intent(IN)    :: H_ice(:,:) 
         real(wp), intent(IN)    :: z_bed(:,:) 
         real(wp), intent(IN)    :: z_sl(:,:) 
@@ -325,8 +325,8 @@ end if
         real(wp), allocatable :: cf_lev(:) 
         logical,  allocatable :: mask(:,:) 
 
-        nx = size(cf_ref,1) 
-        ny = size(cf_ref,2) 
+        nx = size(cb_ref,1) 
+        ny = size(cb_ref,2) 
 
         nlev = 9
         allocate(z_bnd(nlev+1))
@@ -349,9 +349,9 @@ end if
         end do 
 
         ! Define mask 
-        mask = (H_ice .gt. 0.0_wp) .and. (.not. is_float_obs) .and. (cf_ref .ne. mv)
+        mask = (H_ice .gt. 0.0_wp) .and. (.not. is_float_obs) .and. (cb_ref .ne. mv)
 
-        ! Determine mean values of cf_ref for each bin based 
+        ! Determine mean values of cb_ref for each bin based 
         ! on values available for grounded ice 
         cf_lev(1) = cf_min 
         do k = 2, nlev 
@@ -359,7 +359,7 @@ end if
             n = count(z_bed .ge. z_bnd(k-1) .and. z_bed .lt. z_bnd(k) .and. mask)
 
             if (n .gt. 0) then 
-                cf_lev(k) = sum(cf_ref, &
+                cf_lev(k) = sum(cb_ref, &
                             mask=z_bed .ge. z_bnd(k-1) .and. z_bed .lt. z_bnd(k) .and. mask) &
                                     / real(n,wp)
             else 
@@ -380,7 +380,7 @@ end if
 
             if (is_float) then 
 
-                cf_ref(i,j) = interp_linear(z_lev,cf_lev,xout=z_bed(i,j))
+                cb_ref(i,j) = interp_linear(z_lev,cf_lev,xout=z_bed(i,j))
 
             end if 
 
@@ -389,7 +389,7 @@ end if
         
         return 
 
-    end subroutine fill_cf_ref
+    end subroutine fill_cb_ref
 
     function interp_linear(x,y,xout) result(yout)
         ! Simple linear interpolation of a point
@@ -427,12 +427,12 @@ end if
 
     end function interp_linear
     
-    subroutine update_cf_ref_errscaling(cf_ref,H_ice,z_bed,ux,uy,H_obs,uxy_obs,is_float_obs, &
+    subroutine update_cb_ref_errscaling(cb_ref,H_ice,z_bed,ux,uy,H_obs,uxy_obs,is_float_obs, &
                                         dx,cf_min,cf_max,sigma_err,sigma_vel,err_scale,fill_dist,optvar)
 
         implicit none 
 
-        real(wp), intent(INOUT) :: cf_ref(:,:) 
+        real(wp), intent(INOUT) :: cb_ref(:,:) 
         real(wp), intent(IN)    :: H_ice(:,:) 
         real(wp), intent(IN)    :: z_bed(:,:) 
         real(wp), intent(IN)    :: ux(:,:) 
@@ -463,8 +463,8 @@ end if
         real(wp), allocatable   :: uxy_err(:,:)
         real(wp), allocatable   :: cf_prev(:,:) 
 
-        nx = size(cf_ref,1)
-        ny = size(cf_ref,2) 
+        nx = size(cb_ref,1)
+        ny = size(cb_ref,2) 
 
         dx_km = dx*1e-3  
         
@@ -477,8 +477,8 @@ end if
         ! Optimization parameters 
         f_err_lim = 1.5              ! [--] 
 
-        ! Store initial cf_ref solution 
-        cf_prev = cf_ref 
+        ! Store initial cb_ref solution 
+        cf_prev = cb_ref 
 
         ! Calculate ice thickness error 
         H_err = H_ice - H_obs 
@@ -506,7 +506,7 @@ end if
         end if 
 
         ! Initially set cf to missing value for now where no correction possible
-        cf_ref = MV 
+        cb_ref = MV 
 
         do j = 3, ny-2 
         do i = 3, nx-2 
@@ -581,7 +581,7 @@ end if
 
                 ! Apply correction to current node =========
 
-                cf_ref(i,j) = f_scale * cf_prev(i,j) 
+                cb_ref(i,j) = f_scale * cf_prev(i,j) 
 
             end if 
 
@@ -589,30 +589,30 @@ end if
         end do 
 
         ! Fill in missing values with nearest neighbor or cf_min when none available
-        call fill_nearest(cf_ref,missing_value=MV,fill_value=cf_min,fill_dist=fill_dist,n=5,dx=dx)
+        call fill_nearest(cb_ref,missing_value=MV,fill_value=cf_min,fill_dist=fill_dist,n=5,dx=dx)
 
-        ! Ensure cf_ref is not below lower or upper limit 
-        where (cf_ref .lt. cf_min) cf_ref = cf_min 
-        where (cf_ref .gt. cf_max) cf_ref = cf_max 
+        ! Ensure cb_ref is not below lower or upper limit 
+        where (cb_ref .lt. cf_min) cb_ref = cf_min 
+        where (cb_ref .gt. cf_max) cb_ref = cf_max 
 
-        ! Additionally, apply a Gaussian filter to cf_ref to ensure smooth transitions
-        !call filter_gaussian(var=cf_ref,sigma=dx_km*0.2,dx=dx_km)     !,mask=err_z_srf .ne. 0.0)
+        ! Additionally, apply a Gaussian filter to cb_ref to ensure smooth transitions
+        !call filter_gaussian(var=cb_ref,sigma=dx_km*0.2,dx=dx_km)     !,mask=err_z_srf .ne. 0.0)
         
-        ! Ensure where obs are floating, set cf_ref = cf_min 
-        !where(is_float_obs) cf_ref = cf_min 
+        ! Ensure where obs are floating, set cb_ref = cf_min 
+        !where(is_float_obs) cb_ref = cf_min 
 
-        ! Also where no ice exists, set cf_ref = cf_min 
-        !where(H_obs .eq. 0.0) cf_ref = cf_min 
+        ! Also where no ice exists, set cb_ref = cf_min 
+        !where(H_obs .eq. 0.0) cb_ref = cf_min 
 
         return 
 
-    end subroutine update_cf_ref_errscaling
+    end subroutine update_cb_ref_errscaling
 
-    subroutine update_cf_ref_thickness_ratio(cf_ref,H_ice,z_bed,ux,uy,uxy_i,uxy_b,H_obs,dx,cf_min,cf_max)
+    subroutine update_cb_ref_thickness_ratio(cb_ref,H_ice,z_bed,ux,uy,uxy_i,uxy_b,H_obs,dx,cf_min,cf_max)
 
         implicit none 
 
-        real(wp), intent(INOUT) :: cf_ref(:,:) 
+        real(wp), intent(INOUT) :: cb_ref(:,:) 
         real(wp), intent(IN)    :: H_ice(:,:) 
         real(wp), intent(IN)    :: z_bed(:,:) 
         real(wp), intent(IN)    :: ux(:,:)        ! Depth-averaged velocity (ux_bar)
@@ -635,8 +635,8 @@ end if
 
         real(wp),parameter :: exp1 = 2.0
 
-        nx = size(cf_ref,1)
-        ny = size(cf_ref,2) 
+        nx = size(cb_ref,1)
+        ny = size(cb_ref,2) 
 
         dx_km = dx*1e-3  
         
@@ -650,8 +650,8 @@ end if
 !         end do 
 !         stop 
 
-        ! Store initial cf_ref solution 
-        cf_prev = cf_ref 
+        ! Store initial cb_ref solution 
+        cf_prev = cb_ref 
 
         do j = 3, ny-2 
         do i = 3, nx-2 
@@ -717,27 +717,27 @@ end if
                 ! Calculate correction factor (beta_old / beta_new)
                 f_corr = ( max( f_err + f_vel*(f_err-1.0_prec), 1e-1) )**exp1
 
-                ! Apply correction to update cf_ref
-                cf_ref(i1,j1) = cf_prev(i1,j1) * f_corr**(-1.0)
+                ! Apply correction to update cb_ref
+                cb_ref(i1,j1) = cf_prev(i1,j1) * f_corr**(-1.0)
 
             end if 
 
         end do 
         end do 
 
-        ! Ensure cf_ref is not below lower or upper limit 
-        where (cf_ref .lt. cf_min) cf_ref = cf_min 
-        where (cf_ref .gt. cf_max) cf_ref = cf_max 
+        ! Ensure cb_ref is not below lower or upper limit 
+        where (cb_ref .lt. cf_min) cb_ref = cf_min 
+        where (cb_ref .gt. cf_max) cb_ref = cf_max 
 
-        ! Additionally, apply a Gaussian filter to cf_ref to ensure smooth transitions
-        call filter_gaussian(var=cf_ref,sigma=dx_km*0.25,dx=dx_km)     !,mask=err_z_srf .ne. 0.0)
+        ! Additionally, apply a Gaussian filter to cb_ref to ensure smooth transitions
+        call filter_gaussian(var=cb_ref,sigma=dx_km*0.25,dx=dx_km)     !,mask=err_z_srf .ne. 0.0)
         
-        ! Also where no ice exists, set cf_ref = cf_min 
-        where(H_ice .eq. 0.0) cf_ref = cf_min 
+        ! Also where no ice exists, set cb_ref = cf_min 
+        where(H_ice .eq. 0.0) cb_ref = cf_min 
 
         return 
 
-    end subroutine update_cf_ref_thickness_ratio
+    end subroutine update_cb_ref_thickness_ratio
 
     subroutine update_mb_corr(mb_corr,H_ice,H_obs,tau)
 
@@ -754,18 +754,18 @@ end if
 
     end subroutine update_mb_corr
 
-    subroutine guess_cf_ref(cf_ref,tau_d,uxy_obs,H_obs,H_grnd,u0,cf_min,cf_max)
+    subroutine guess_cb_ref(cb_ref,tau_d,uxy_obs,H_obs,H_grnd,u0,cf_min,cf_max)
         ! Use suggestion by Morlighem et al. (2013) to guess friction
         ! assuming tau_b ~ tau_d, and u_b = u_obs:
         !
         ! For a linear law, tau_b = beta * u_b, so 
         ! beta = tau_b / u_b = tau_d / (u_obs+ebs), ebs=0.1 to avoid divide by zero 
-        ! beta = cf_ref/u0 * N_eff, so:
-        ! cf_ref = (tau_d/(u_obs+ebs)) * (u0/N_eff)
+        ! beta = cb_ref/u0 * N_eff, so:
+        ! cb_ref = (tau_d/(u_obs+ebs)) * (u0/N_eff)
 
         implicit none 
 
-        real(wp), intent(OUT) :: cf_ref(:,:) 
+        real(wp), intent(OUT) :: cb_ref(:,:) 
         real(wp), intent(IN)  :: tau_d(:,:) 
         real(wp), intent(IN)  :: uxy_obs(:,:) 
         real(wp), intent(IN)  :: H_obs(:,:)
@@ -779,21 +779,21 @@ end if
 
         where (H_obs .eq. 0.0_prec .or. H_grnd .eq. 0.0_prec) 
             ! Set floating or ice-free points to minimum 
-            cf_ref = cf_min 
+            cb_ref = cf_min 
 
         elsewhere 
             ! Apply equation 
 
             ! Linear law: 
-            cf_ref = (tau_d / (uxy_obs + ebs)) * (u0 / (rho_ice*g*H_obs + 1.0_prec))
+            cb_ref = (tau_d / (uxy_obs + ebs)) * (u0 / (rho_ice*g*H_obs + 1.0_prec))
 
         end where 
 
-        where (cf_ref .gt. cf_max) cf_ref = cf_max 
+        where (cb_ref .gt. cf_max) cb_ref = cf_max 
 
         return 
 
-    end subroutine guess_cf_ref
+    end subroutine guess_cb_ref
 
     
 

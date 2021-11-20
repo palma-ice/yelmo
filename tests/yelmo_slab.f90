@@ -469,7 +469,7 @@ contains
         
         ! == yelmo_dynamics ==
 
-        ! call nc_write(filename,"cf_ref",ylmo%dyn%now%cf_ref,units="--",long_name="Bed friction scalar", &
+        ! call nc_write(filename,"cb_ref",ylmo%dyn%now%cb_ref,units="--",long_name="Bed friction scalar", &
         !               dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
         ! call nc_write(filename,"c_bed",ylmo%dyn%now%c_bed,units="Pa",long_name="Bed friction coefficient", &
         !               dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)

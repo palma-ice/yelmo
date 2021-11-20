@@ -325,7 +325,7 @@ module yelmo_defs
         real(wp), allocatable :: visc_eff_int(:,:)
 
         real(wp), allocatable :: N_eff(:,:)       ! Effective pressure
-        real(wp), allocatable :: cf_ref(:,:)
+        real(wp), allocatable :: cb_ref(:,:)
         real(wp), allocatable :: c_bed(:,:)  
         real(wp), allocatable :: beta_acx(:,:) 
         real(wp), allocatable :: beta_acy(:,:) 

@@ -58,15 +58,15 @@ module basal_dragging
     public :: stagger_beta_aa_gl_subgrid_flux 
 contains 
 
-    subroutine calc_c_bed(c_bed,cf_ref,N_eff)
+    subroutine calc_c_bed(c_bed,cb_ref,N_eff)
 
         implicit none 
 
         real(wp), intent(OUT) :: c_bed(:,:)       ! [Pa]
-        real(wp), intent(IN)  :: cf_ref(:,:)      ! [-]
+        real(wp), intent(IN)  :: cb_ref(:,:)      ! [-]
         real(wp), intent(IN)  :: N_eff(:,:)       ! [Pa] 
 
-        c_bed = cf_ref*N_eff 
+        c_bed = cb_ref*N_eff 
 
         return 
 
@@ -729,7 +729,7 @@ contains
             
             if (f_ice(i,j) .eq. 1.0_wp) then 
                 ! Fully ice-covered point with some fully ice-covered neighbors 
-                
+
                 ! Get c_bed on ab-nodes
                 call stagger_nodes_aa_ab_ice(cb_ab,c_bed,f_ice,i,j)
 
@@ -752,7 +752,7 @@ contains
                     uxy_ab = sqrt(ux_ab**2 + uy_ab**2 + ub_sq_min)
                     
                     beta_ab = cb_ab * (uxy_ab / u_0)**q * (1.0_wp / uxy_ab)
-                    
+
                 end if 
 
                 beta(i,j) = sum(wt_ab*beta_ab)

@@ -270,7 +270,7 @@ contains
         call nc_write(filename,"visc_eff_int",  dom%dyn%now%visc_eff_int,units="",dim1="xc",dim2="yc",dim3="time",ncid=ncid,start=[1,1,n],count=[nx,ny,1]) 
 
         call nc_write(filename,"N_eff",         dom%dyn%now%N_eff,    units="",dim1="xc",dim2="yc",dim3="time",ncid=ncid,start=[1,1,n],count=[nx,ny,1])        
-        call nc_write(filename,"cf_ref",        dom%dyn%now%cf_ref,   units="",dim1="xc",dim2="yc",dim3="time",ncid=ncid,start=[1,1,n],count=[nx,ny,1]) 
+        call nc_write(filename,"cb_ref",        dom%dyn%now%cb_ref,   units="",dim1="xc",dim2="yc",dim3="time",ncid=ncid,start=[1,1,n],count=[nx,ny,1]) 
         call nc_write(filename,"c_bed",         dom%dyn%now%c_bed,    units="",dim1="xc",dim2="yc",dim3="time",ncid=ncid,start=[1,1,n],count=[nx,ny,1]) 
         call nc_write(filename,"beta_acx",      dom%dyn%now%beta_acx, units="",dim1="xc",dim2="yc",dim3="time",ncid=ncid,start=[1,1,n],count=[nx,ny,1]) 
         call nc_write(filename,"beta_acy",      dom%dyn%now%beta_acy, units="",dim1="xc",dim2="yc",dim3="time",ncid=ncid,start=[1,1,n],count=[nx,ny,1]) 
@@ -562,7 +562,7 @@ contains
         call nc_read(filename,"visc_eff_int",  dom%dyn%now%visc_eff_int,ncid=ncid) 
 
         call nc_read(filename,"N_eff",         dom%dyn%now%N_eff,ncid=ncid)        
-        call nc_read(filename,"cf_ref",        dom%dyn%now%cf_ref,ncid=ncid) 
+        call nc_read(filename,"cb_ref",        dom%dyn%now%cb_ref,ncid=ncid) 
         call nc_read(filename,"c_bed",         dom%dyn%now%c_bed,ncid=ncid) 
         call nc_read(filename,"beta_acx",      dom%dyn%now%beta_acx,ncid=ncid) 
         call nc_read(filename,"beta_acy",      dom%dyn%now%beta_acy,ncid=ncid) 

@@ -1,6 +1,6 @@
 module ice_optimization
 
-    use yelmo_defs, only : sp, dp, wp, prec, pi, missing_value, mv, tol_underflow, rho_ice, rho_sw, g 
+    use yelmo_defs, only : sp, dp, wp, prec, io_unit_err, pi, missing_value, mv, tol_underflow, rho_ice, rho_sw, g 
 
     use gaussian_filter 
     
@@ -128,7 +128,7 @@ contains
     end subroutine update_tf_corr_l21
 
     subroutine update_cb_ref_errscaling_l21(cb_ref,H_ice,dHdt,z_bed,z_sl,ux,uy,H_obs,uxy_obs,is_float_obs, &
-                                        dx,cf_min,cf_max,sigma_err,sigma_vel,tau_c,H0,fill_dist,dt)
+                                        dx,cf_min,cf_max,sigma_err,sigma_vel,tau_c,H0,dt,fill_method,fill_dist)
         ! Update method following Lipscomb et al. (2021, tc)
 
         implicit none 
@@ -150,8 +150,9 @@ contains
         real(wp), intent(IN)    :: sigma_vel
         real(wp), intent(IN)    :: tau_c                  ! [yr]
         real(wp), intent(IN)    :: H0                     ! [m]
-        real(wp), intent(IN)    :: fill_dist              ! [km] Distance over which to smooth between nearest neighbor and minimum value
         real(wp), intent(IN)    :: dt 
+        character(len=*), intent(IN) :: fill_method         ! How should missing values outside obs be filled?
+        real(wp), intent(IN)    :: fill_dist                ! [km] Distance over which to smooth between nearest neighbor and minimum value
 
         ! Local variables 
         integer  :: i, j, nx, ny, i1, j1 
@@ -279,30 +280,47 @@ end if
         end do 
         end do 
 
-        ! Fill in cb_ref for floating points using bed analogy method
-        call fill_cb_ref(cb_ref,H_ice,z_bed,z_sl,is_float_obs,cf_min)
+        select case(trim(fill_method))
 
-        ! Fill in remaining missing values with nearest neighbor or cf_min when none available
-        call fill_nearest(cb_ref,missing_value=MV,fill_value=cf_min,fill_dist=fill_dist,n=5,dx=dx)
+            case("analog")
+                
+                ! Fill in cb_ref for floating points using bed analogy method
+                call fill_cb_ref(cb_ref,H_ice,z_bed,z_sl,is_float_obs,cf_min,cf_max)
 
+                ! Fill in remaining missing values with nearest neighbor or cf_min when none available
+                call fill_nearest(cb_ref,missing_value=MV,fill_value=cf_min,fill_dist=fill_dist,n=5,dx=dx)
+
+            case("nearest")
+
+                ! Fill in remaining missing values with nearest neighbor or cf_min when none available
+                call fill_nearest(cb_ref,missing_value=MV,fill_value=cf_min,fill_dist=fill_dist,n=5,dx=dx)
+
+            case("cf_min")
+
+                ! Ensure where obs are floating, set cb_ref = cf_min 
+                where(is_float_obs) cb_ref = cf_min 
+
+                ! Also where no ice exists, set cb_ref = cf_min 
+                where(H_obs .eq. 0.0) cb_ref = cf_min 
+
+            case DEFAULT 
+
+                write(io_unit_err,*)
+                write(io_unit_err,*) "update_cb_ref_errscaling_l21:: Error: fill_method not recognized."
+                write(io_unit_err,*) "fill_method = ", trim(fill_method)
+                stop 
+
+        end select
+        
         ! Ensure cb_ref is not below lower or upper limit 
         where (cb_ref .lt. cf_min) cb_ref = cf_min 
         where (cb_ref .gt. cf_max) cb_ref = cf_max 
-
-        ! Additionally, apply a Gaussian filter to cb_ref to ensure smooth transitions
-        !call filter_gaussian(var=cb_ref,sigma=dx_km*0.2,dx=dx_km)     !,mask=err_z_srf .ne. 0.0)
-        
-        ! Ensure where obs are floating, set cb_ref = cf_min 
-        where(is_float_obs) cb_ref = cf_min 
-
-        ! Also where no ice exists, set cb_ref = cf_min 
-        where(H_obs .eq. 0.0) cb_ref = cf_min 
 
         return 
 
     end subroutine update_cb_ref_errscaling_l21
 
-    subroutine fill_cb_ref(cb_ref,H_ice,z_bed,z_sl,is_float_obs,cf_min)
+    subroutine fill_cb_ref(cb_ref,H_ice,z_bed,z_sl,is_float_obs,cf_min,cf_max)
         ! Fill points that cannot be optimized with 
         ! analagous values from similar bed elevations 
 
@@ -314,10 +332,11 @@ end if
         real(wp), intent(IN)    :: z_sl(:,:) 
         logical,  intent(IN)    :: is_float_obs(:,:) 
         real(wp), intent(IN)    :: cf_min 
+        real(wp), intent(IN)    :: cf_max
 
         ! Local variables 
         integer :: i, j, nx, ny 
-        integer :: k, nlev, n 
+        integer :: k, nbnd, nlev, n 
         logical :: is_float 
         real(wp) :: rho_sw_ice
         real(wp), allocatable :: z_bnd(:) 
@@ -328,8 +347,9 @@ end if
         nx = size(cb_ref,1) 
         ny = size(cb_ref,2) 
 
-        nlev = 9
-        allocate(z_bnd(nlev+1))
+        nbnd = 11
+        nlev = nbnd-1
+        allocate(z_bnd(nbnd))
         allocate(z_lev(nlev))
         allocate(cf_lev(nlev))
 
@@ -338,18 +358,20 @@ end if
         z_bnd = missing_value
         z_lev = missing_value
 
-        ! Determine z_bed bin boundaries and bin centers
-        z_bnd = [-2000.0,-1000.0,-500.0,-400.0,-300.0,-200.0,-100.0,0.0,100.0,200.0]
+        ! Determine z_bed bin boundaries
+        z_bnd = [-2500.0,-2000.0,-1000.0,-500.0,-400.0, &
+                            -300.0,-200.0,-100.0,0.0,100.0,200.0]
 
-        ! Make sure nlev is correct 
-        nlev = count(z_bnd .ne. missing_value)-1 
-        
+        ! Calculate z_bed bin centers
         do k = 1, nlev 
             z_lev(k) = 0.5_wp*(z_bnd(k) + z_bnd(k+1))
         end do 
 
         ! Define mask 
-        mask = (H_ice .gt. 0.0_wp) .and. (.not. is_float_obs) .and. (cb_ref .ne. mv)
+        mask =  (H_ice .gt. 0.0_wp)  .and. &
+                (.not. is_float_obs) .and. &
+                (cb_ref .ne. mv)     .and. &
+                (cb_ref .ne. cf_max)
 
         ! Determine mean values of cb_ref for each bin based 
         ! on values available for grounded ice 
@@ -378,7 +400,7 @@ end if
             ! Determine if current point is floating 
             is_float = H_ice(i,j) - rho_sw_ice*max(z_sl(i,j)-z_bed(i,j),0.0_wp) .le. 0.0_wp 
 
-            if (is_float) then 
+            if (is_float .or. is_float_obs(i,j)) then 
 
                 cb_ref(i,j) = interp_linear(z_lev,cf_lev,xout=z_bed(i,j))
 

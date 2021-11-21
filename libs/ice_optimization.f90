@@ -345,12 +345,13 @@ end if
         logical,  allocatable :: mask(:,:) 
 
         logical,  allocatable :: mask_now(:,:) 
+        real(wp), allocatable :: H_grnd(:,:) 
         real(wp), allocatable :: wts_now(:,:) 
 
         nx = size(cb_ref,1) 
         ny = size(cb_ref,2) 
 
-        nbnd = 11
+        nbnd = 13
         nlev = nbnd-1
         allocate(z_bnd(nbnd))
         allocate(z_lev(nlev))
@@ -358,6 +359,7 @@ end if
 
         allocate(mask(nx,ny)) 
         allocate(mask_now(nx,ny))
+        allocate(H_grnd(nx,ny)) 
         allocate(wts_now(nx,ny)) 
 
         z_bnd = missing_value
@@ -365,7 +367,7 @@ end if
 
         ! Determine z_bed bin boundaries
         z_bnd = [-2500.0,-2000.0,-1000.0,-500.0,-400.0, &
-                            -300.0,-200.0,-100.0,0.0,100.0,200.0]
+                            -300.0,-200.0,-100.0,0.0,100.0,200.0,300.0,500.0]
 
         ! Calculate z_bed bin centers
         do k = 1, nlev 
@@ -378,6 +380,9 @@ end if
                 (cb_ref .ne. mv)     .and. &
                 (cb_ref .ne. cf_max)
 
+        ! Calculate H_grnd (distance to flotation)
+        H_grnd = H_ice - rho_sw_ice*max(z_sl-z_bed,0.0_wp)
+
         ! Determine mean values of cb_ref for each bin based 
         ! on values available for grounded ice 
         cf_lev(1) = cf_min 
@@ -386,19 +391,19 @@ end if
             ! Restrict mask to points within current bin 
             mask_now = (z_bed .ge. z_bnd(k-1) .and. z_bed .lt. z_bnd(k) .and. mask)
 
-            n = count(mask_now)
+            ! Set weighting as a function of distance to floating (ie, H_grnd)
+            wts_now = H_grnd 
+            where (wts_now .lt. 0.0_wp)    wts_now = 0.0_wp 
+            where (wts_now .gt. 2000.0_wp) wts_now = 2000.0_wp 
+            wts_now = 2000.0_wp - wts_now 
+
+            ! Limit to masked area too 
+            where (.not. mask_now) wts_now = 0.0_wp 
+
+            n = count(wts_now .gt. 0.0_wp)
 
             if (n .gt. 0) then
                 ! Analog points exist for this bin
-
-                ! Get weighting values adjusted so that 
-                ! thinner ice is weighted more heavily 
-                ! (saturating to no weight above 1000m thickness)
-                where(mask_now .and. H_ice .gt. 0.0_wp)
-                    wts_now = max( 1000.0_wp-H_ice, 0.0_wp) 
-                elsewhere
-                    wts_now = 0.0_wp 
-                end where 
 
                 ! Normalize weights 
                 wts_now = wts_now / sum(wts_now)
@@ -414,7 +419,7 @@ end if
             end if 
 
         end do 
-
+        
         ! Perform linear interpolation at points of interest 
 
         rho_sw_ice = rho_sw/rho_ice ! Ratio of density of seawater to ice [--]

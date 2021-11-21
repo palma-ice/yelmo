@@ -344,6 +344,9 @@ end if
         real(wp), allocatable :: cf_lev(:) 
         logical,  allocatable :: mask(:,:) 
 
+        logical,  allocatable :: mask_now(:,:) 
+        real(wp), allocatable :: wts_now(:,:) 
+
         nx = size(cb_ref,1) 
         ny = size(cb_ref,2) 
 
@@ -354,6 +357,8 @@ end if
         allocate(cf_lev(nlev))
 
         allocate(mask(nx,ny)) 
+        allocate(mask_now(nx,ny))
+        allocate(wts_now(nx,ny)) 
 
         z_bnd = missing_value
         z_lev = missing_value
@@ -378,14 +383,34 @@ end if
         cf_lev(1) = cf_min 
         do k = 2, nlev 
 
-            n = count(z_bed .ge. z_bnd(k-1) .and. z_bed .lt. z_bnd(k) .and. mask)
+            ! Restrict mask to points within current bin 
+            mask_now = (z_bed .ge. z_bnd(k-1) .and. z_bed .lt. z_bnd(k) .and. mask)
 
-            if (n .gt. 0) then 
-                cf_lev(k) = sum(cb_ref, &
-                            mask=z_bed .ge. z_bnd(k-1) .and. z_bed .lt. z_bnd(k) .and. mask) &
-                                    / real(n,wp)
-            else 
-                cf_lev(k) = cf_min 
+            n = count(mask_now)
+
+            if (n .gt. 0) then
+                ! Analog points exist for this bin
+
+                ! Get weighting values adjusted so that 
+                ! thinner ice is weighted more heavily 
+                ! (saturating to no weight above 1000m thickness)
+                where(mask_now .and. H_ice .gt. 0.0_wp)
+                    wts_now = max( 1000.0_wp-H_ice, 0.0_wp) 
+                elsewhere
+                    wts_now = 0.0_wp 
+                end where 
+
+                ! Normalize weights 
+                wts_now = wts_now / sum(wts_now)
+                
+                ! Get weighted average of cb_ref for this bin
+                cf_lev(k) = sum(cb_ref*wts_now)
+
+            else
+                ! No analog points available, assign the minimum value
+
+                cf_lev(k) = cf_min
+
             end if 
 
         end do 

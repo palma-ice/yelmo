@@ -1567,16 +1567,16 @@ end if
 
     ! ==== BASAL HYDROLOGY PHYSICS ===============================
 
-    subroutine calc_basal_water_local(H_w,dHwdt,H_ice,bmb_w,f_grnd,dt,till_rate,H_w_max)
+    subroutine calc_basal_water_local(H_w,dHwdt,f_ice,f_grnd,bmb_w,dt,till_rate,H_w_max)
         ! Calculate the basal water layer thickness based on a simple local 
         ! water balance: dHw/dt = bmb_w - till_rate
         implicit none 
          
         real(prec), intent(INOUT) :: H_w(:,:)         ! [m] Water layer thickness
         real(prec), intent(INOUT) :: dHwdt(:,:)       ! [m/a] Water layer thickness change
-        real(prec), intent(IN)    :: H_ice(:,:)       ! [m] Ice thickness 
-        real(prec), intent(IN)    :: bmb_w(:,:)       ! [m/a] Basal water mass balance
+        real(prec), intent(IN)    :: f_ice(:,:)       ! [m] Ice cell fraction
         real(prec), intent(IN)    :: f_grnd(:,:)      ! [-] Grounded fraction
+        real(prec), intent(IN)    :: bmb_w(:,:)       ! [m/a] Basal water mass balance
         real(prec), intent(IN)    :: dt               ! [a] Timestep 
         real(prec), intent(IN)    :: till_rate        ! [m/a] Till drainage rate 
         real(prec), intent(IN)    :: H_w_max          ! [m] Maximum allowed water depth 
@@ -1585,38 +1585,16 @@ end if
         integer :: i, j, nx, ny 
         integer :: im1, ip1, jm1, jp1 
         
-        nx = size(H_ice,1)
-        ny = size(H_ice,2)
+        nx = size(f_ice,1)
+        ny = size(f_ice,2)
 
         ! Store initial H_w field  
         dHwdt   = H_w 
 
-        where (f_grnd .gt. 0.0 .and. H_ice .gt. 0.0)
-            ! Grounded ice point
 
-            ! Update mass balance of H_w
-            H_w = H_w + dt*(bmb_w-till_rate)
-
-            ! Restrict H_w to values within limits
-            H_w = max(H_w,0.0)
-            H_w = min(H_w,H_w_max)
-
-        else where (f_grnd .gt. 0.0) 
-            ! Ice-free land above sea level 
-
-            H_w = 0.0 
-
-        elsewhere
-            ! Set water layer thickness to maximum layer thickness
-
-            H_w = H_w_max 
-
-        end where 
-
-        ! Additionally set points at the grounding line to
-        ! the maximum water thickness 
+        ! Calculate the basal water balance at each grid point
         do j = 1, ny 
-        do i = 1, nx
+        do i = 1, nx 
 
             ! Define neighbor indices
             im1 = max(i-1,1)
@@ -1624,24 +1602,46 @@ end if
             jm1 = max(j-1,1)
             jp1 = min(j+1,ny)
             
-            ! Grounded point or partially floating point with floating neighbors
-            if (H_ice(i,j) .gt. 0.0 .and. f_grnd(i,j) .gt. 0.0 .and. &
-                (f_grnd(im1,j) .eq. 0.0 .or. f_grnd(ip1,j) .eq. 0.0 .or. &
-                 f_grnd(i,jm1) .eq. 0.0 .or. f_grnd(i,jp1) .eq. 0.0) ) then 
+            ! Check cases...
+
+            if (f_grnd(i,j) .eq. 0.0_wp) then 
+                ! Floating or ice-free ocean point - set water layer to maximum
+
+                H_w(i,j)       = H_w_max 
+
+            else if (f_grnd(i,j) .gt. 0.0_wp .and. f_ice(i,j) .eq. 1.0_wp .and.  &
+                      (f_grnd(im1,j) .eq. 0.0_wp .or. f_grnd(ip1,j) .eq. 0.0_wp .or. &
+                       f_grnd(i,jm1) .eq. 0.0_wp .or. f_grnd(i,jp1) .eq. 0.0_wp) ) then 
+                ! Grounded- or partially-floating point with floating neighbors
                 
-                H_w(i,j) = H_w_max
+                H_w(i,j)       = H_w_max
+
+            else if (f_grnd(i,j) .gt. 0.0_wp .and. f_ice(i,j) .lt. 1.0_wp) then 
+                ! Grounded ice-free point - set water layer to zero
+
+                H_w(i,j)       = 0.0_wp 
+
+            else
+                ! Grounded ice-covered point - evolve H_w as normal
+
+                ! Update mass balance of H_w
+                H_w(i,j) = H_w(i,j) + dt*(bmb_w(i,j)-till_rate)
+
+                ! Restrict H_w to values within limits
+                H_w(i,j) = max(H_w(i,j),0.0_wp)
+                H_w(i,j) = min(H_w(i,j),H_w_max)
 
             end if 
 
-        end do 
-        end do  
+            ! Finally, determine rate of change 
+            if (dt .ne. 0.0_wp) then 
+                dHwdt(i,j)   = (dHwdt(i,j) - H_w(i,j)) / dt
+            else 
+                dHwdt(i,j)   = 0.0_wp
+            end if 
 
-        ! Determine rate of change 
-        if (dt .ne. 0.0_prec) then 
-            dHwdt   = (dHwdt - H_w) / dt
-        else 
-            dHwdt   = 0.0_prec
-        end if 
+        end do 
+        end do
 
         return 
 
@@ -1729,5 +1729,5 @@ end if
         return 
 
     end subroutine convert_from_enthalpy_column
-
+    
 end module thermodynamics

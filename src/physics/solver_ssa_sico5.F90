@@ -92,8 +92,8 @@ contains
 
 ! Only one at a time!!
 !#define LAT_BC_OLDCODE
-!#define LAT_BC_NEWCODE      
-#define LAT_BC_NEWCODE_UP
+#define LAT_BC_NEWCODE      
+!#define LAT_BC_NEWCODE_UP
 !#define LAT_BC_NEWCODE2 
 
 ! Include header for lis solver fortran interface
@@ -786,27 +786,28 @@ contains
                         if (is_front_1(i,j).and.is_front_2(i+1,j)) then 
                             ! === Case 1: ice-free to the right ===
 
-                            nc = 2*ij2n(i-1,j)-1
-                                ! smallest nc (column counter), for vx_m(i-1,j)
+                            nc = 2*ij2n(i,j)-1
+                                ! next nc (column counter), for vx_m(i,j)
                             k = k+1
-                            lgs_a_value(k) = -4.0_prec*inv_dxi*vis_int_g(i1,j)
+                            lgs_a_value(k) =  6.0_prec*inv_dxi*vis_int_g(i1,j)
+                            lgs_a_index(k) = nc 
+
+                            nc = 2*ij2n(i-1,j)-1
+                                ! next nc (column counter), for vx_m(i-1,j)
+                            k = k+1
+                            lgs_a_value(k) = -8.0_prec*inv_dxi*vis_int_g(i1,j)
+                            lgs_a_index(k) = nc 
+
+                            nc = 2*ij2n(i-2,j)-1
+                                ! next nc (column counter), for vx_m(i-2,j)
+                            k = k+1
+                            lgs_a_value(k) =  2.0_prec*inv_dxi*vis_int_g(i1,j)
                             lgs_a_index(k) = nc 
 
                             nc = 2*ij2n(i,j-1)
                                 ! next nc (column counter), for vy_m(i,j-1)
                             k = k+1
                             lgs_a_value(k) = -2.0_prec*inv_deta*vis_int_g(i1,j)
-                            lgs_a_index(k) = nc
-
-                            nc = 2*ij2n(i,j)-1
-                                ! next nc (column counter), for vx_m(i,j)
-        !                     if (nc /= nr) then   ! (diagonal element)
-        !                         errormsg = ' >>> calc_vxy_ssa_matrix: ' &
-        !                                      //'Check for diagonal element failed!'
-        !                         call error(errormsg)
-        !                     end if
-                            k = k+1
-                            lgs_a_value(k) = 4.0_prec*inv_dxi*vis_int_g(i1,j)
                             lgs_a_index(k) = nc
 
                             nc = 2*ij2n(i,j)
@@ -824,27 +825,28 @@ contains
  
                             nc = 2*ij2n(i,j)-1
                                 ! next nc (column counter), for vx_m(i,j)
-        !                     if (nc /= nr) then   ! (diagonal element)
-        !                         errormsg = ' >>> calc_vxy_ssa_matrix: ' &
-        !                                      //'Check for diagonal element failed!'
-        !                         call error(errormsg)
-        !                     end if
                             k = k+1
-                            lgs_a_value(k) = -4.0_prec*inv_dxi*vis_int_g(i1,j)
+                            lgs_a_value(k) = -6.0_prec*inv_dxi*vis_int_g(i1,j)
                             lgs_a_index(k) = nc
-
+                            
+                            nc = 2*ij2n(i+1,j)-1
+                                ! next nc (column counter), for vx_m(i+1,j)
+                            k = k+1
+                            lgs_a_value(k) =  8.0_prec*inv_dxi*vis_int_g(i1,j)
+                            lgs_a_index(k) = nc
+                            
+                            nc = 2*ij2n(i+2,j)-1
+                                ! next nc (column counter), for vx_m(i+2,j)
+                            k = k+1
+                            lgs_a_value(k) = -2.0_prec*inv_dxi*vis_int_g(i1,j)
+                            lgs_a_index(k) = nc
+                            
                             nc = 2*ij2n(i+1,j-1)
                                 ! next nc (column counter), for vy_m(i+1,j-1)
                             k  = k+1
                             lgs_a_value(k) = -2.0_prec*inv_deta*vis_int_g(i1,j)
                             lgs_a_index(k) = nc
 
-                            nc = 2*ij2n(i+1,j)-1
-                                ! next nc (column counter), for vx_m(i+1,j)
-                            k = k+1
-                            lgs_a_value(k) = 4.0_prec*inv_dxi*vis_int_g(i1,j)
-                            lgs_a_index(k) = nc
- 
                             nc = 2*ij2n(i+1,j)
                                 ! largest nc (column counter), for vy_m(i+1,j)
                             k  = k+1
@@ -1770,33 +1772,35 @@ end if
                         if (is_front_1(i,j).and.is_front_2(i,j+1)) then 
                             ! === Case 1: ice-free to the top ===
 
+                            nc = 2*ij2n(i,j)
+                                ! next nc (column counter), for vy_m(i,j)
+                            k = k+1
+                            lgs_a_value(k) =  6.0_prec*inv_deta*vis_int_g(i,j1)
+                            lgs_a_index(k) = nc
+
+                            nc = 2*ij2n(i,j-1)
+                                ! next nc (column counter), for vy_m(i,j-1)
+                            k = k+1
+                            lgs_a_value(k) = -8.0_prec*inv_deta*vis_int_g(i,j1)
+                            lgs_a_index(k) = nc
+
+                            nc = 2*ij2n(i,j-2)
+                                ! next nc (column counter), for vy_m(i,j-2)
+                            k = k+1
+                            lgs_a_value(k) =  2.0_prec*inv_deta*vis_int_g(i,j1)
+                            lgs_a_index(k) = nc
+
                             nc = 2*ij2n(i-1,j)-1
                                 ! smallest nc (column counter), for vx_m(i-1,j)
                             k = k+1
                             lgs_a_value(k) = -2.0_prec*inv_dxi*vis_int_g(i,j1)
                             lgs_a_index(k) = nc
 
-                            nc = 2*ij2n(i,j-1)
-                                ! next nc (column counter), for vy_m(i,j-1)
-                            k = k+1
-                            lgs_a_value(k) = -4.0_prec*inv_deta*vis_int_g(i,j1)
-                            lgs_a_index(k) = nc
-
+                            
                             nc = 2*ij2n(i,j)-1
                                 ! next nc (column counter), for vx_m(i,j)
                             k = k+1
                             lgs_a_value(k) = 2.0_prec*inv_dxi*vis_int_g(i,j1)
-                            lgs_a_index(k) = nc
-
-                            nc = 2*ij2n(i,j)
-                                ! next nc (column counter), for vy_m(i,j)
-        !                     if (nc /= nr) then   ! (diagonal element)
-        !                         errormsg = ' >>> calc_vxy_ssa_matrix: ' &
-        !                                     //'Check for diagonal element failed!'
-        !                         call error(errormsg)
-        !                     end if
-                            k = k+1
-                            lgs_a_value(k) = 4.0_prec*inv_deta*vis_int_g(i,j1)
                             lgs_a_index(k) = nc
 
                             ! Assign matrix values
@@ -1805,36 +1809,37 @@ end if
                             
                         else
                             ! === Case 2: ice-free to the bottom ===
- 
+    
+                            nc = 2*ij2n(i,j)
+                                ! next nc (column counter), for vy_m(i,j)
+                            k = k+1
+                            lgs_a_value(k) = -6.0_prec*inv_deta*vis_int_g(i,j1)
+                            lgs_a_index(k) = nc
+
+                            nc = 2*ij2n(i,j+1)
+                                ! next nc (column counter), for vy_m(i,j+1)
+                            k = k+1
+                            lgs_a_value(k) =  8.0_prec*inv_deta*vis_int_g(i,j1)
+                            lgs_a_index(k) = nc
+
+                            nc = 2*ij2n(i,j+2)
+                                ! next nc (column counter), for vy_m(i,j+2)
+                            k = k+1
+                            lgs_a_value(k) = -2.0_prec*inv_deta*vis_int_g(i,j1)
+                            lgs_a_index(k) = nc
+
                             nc = 2*ij2n(i-1,j+1)-1
                                 ! next nc (column counter), for vx_m(i-1,j+1)
                             k = k+1
                             lgs_a_value(k) = -2.0_prec*inv_dxi*vis_int_g(i,j1)
                             lgs_a_index(k) = nc
- 
-                            nc = 2*ij2n(i,j)
-                                ! next nc (column counter), for vy_m(i,j)
-        !                     if (nc /= nr) then   ! (diagonal element)
-        !                         errormsg = ' >>> calc_vxy_ssa_matrix: ' &
-        !                                     //'Check for diagonal element failed!'
-        !                         call error(errormsg)
-        !                     end if
-                            k = k+1
-                            lgs_a_value(k) = -4.0_prec*inv_deta*vis_int_g(i,j1)
-                            lgs_a_index(k) = nc
- 
+    
                             nc = 2*ij2n(i,j+1)-1
                                 ! next nc (column counter), for vx_m(i,j+1)
                             k = k+1
                             lgs_a_value(k) = 2.0_prec*inv_dxi*vis_int_g(i,j1)
                             lgs_a_index(k) = nc
- 
-                            nc = 2*ij2n(i,j+1)
-                                ! next nc (column counter), for vy_m(i,j+1)
-                            k = k+1
-                            lgs_a_value(k) = 4.0_prec*inv_deta*vis_int_g(i,j1)
-                            lgs_a_index(k) = nc
-
+                            
                             ! Assign matrix values
                             lgs_b_value(nr) = tau_bc_int
                             lgs_x_value(nr) = vy_m(i,j)

@@ -1,6 +1,6 @@
 module yelmo_timesteps
 
-    use yelmo_defs, only : sp, dp, wp, prec, ytime_class, MV, TOL_UNDERFLOW   
+    use yelmo_defs, only : sp, dp, wp, prec, io_unit_err, ytime_class, MV, TOL_UNDERFLOW   
     use ncio 
 
     use topography, only : calc_ice_fraction
@@ -8,6 +8,8 @@ module yelmo_timesteps
     implicit none 
 
     private
+
+    public :: set_pc_beta_coefficients
 
     public :: set_pc_mask
     public :: calc_pc_eta
@@ -30,6 +32,127 @@ module yelmo_timesteps
     public :: ytime_init 
 
 contains
+
+    subroutine set_pc_beta_coefficients(beta,pc_k,zeta,pc_method)
+
+        implicit none 
+
+        real(wp),         intent(OUT) :: beta(:)        ! Vector of 2 or 4 values 
+        integer,          intent(OUT) :: pc_k           ! Order of the method
+        real(wp),         intent(IN)  :: zeta           ! Ratio of current to previous timestep
+        character(len=*), intent(IN)  :: pc_method 
+
+        ! Determine which predictor-corrector (pc) method we are using for timestepping,
+        ! assign scheme order and weights 
+
+        if (size(beta,1) .eq. 4) then 
+            ! ======== TWO-STEP METHODS with 4 beta values ========
+
+            select case(trim(pc_method))
+
+                case("FE-SBE")
+                    
+                    ! Order of the method 
+                    pc_k = 2 
+
+                    beta(1) = 1.0_wp 
+                    beta(2) = 0.0_wp 
+                    
+                    beta(3) = 1.0_wp 
+                    beta(4) = 0.0_wp 
+                    
+                case("AB-SAM")
+                    
+                    ! Order of the method 
+                    pc_k = 2 
+
+                    beta(1) = 1.0_wp + zeta/2.0_wp 
+                    beta(2) = -zeta/2.0_wp 
+
+                    beta(3) = 0.5_wp 
+                    beta(4) = 0.5_wp 
+                
+                case("HEUN")
+                    
+                    ! Order of the method 
+                    pc_k = 2 
+
+                    beta(1) = 1.0_wp 
+                    beta(2) = 0.0_wp 
+                    
+                    beta(3) = 0.5_wp 
+                    beta(4) = 0.5_wp 
+                
+                case("RALSTON")
+                    
+                    write(io_unit_err,*) "This method does not work yet - the truncation error is incorrect."
+                    stop 
+
+                    ! Order of the method 
+                    pc_k = 2 
+
+                    beta(1) = 2.0_prec / 3.0_prec
+                    beta(2) = 0.0_prec 
+                    
+                    beta(3) = 0.25_prec 
+                    beta(4) = 0.75_prec 
+                
+                case DEFAULT 
+
+                    write(io_unit_err,*) "set_pc_beta_coefficients:: &
+                        &Error: two-step pc_method does not match available options [FE-SBE, AB-SAM, HEUN]."
+                    write(io_unit_err,*) "pc_method = ", trim(pc_method)
+                    stop 
+
+            end select 
+            
+        else 
+            ! ======== ONE-STEP METHODS with 4 beta values ========
+            ! Note: also set pc_k here for consistency, but order 
+            ! of method is not critical here since PC adaptive timestepping
+            ! is not used with one-step methods. 
+            
+            select case(trim(pc_method))
+
+                case("FE")
+                    ! Forward Euler 
+
+                    pc_k = 1
+
+                    beta(1) = 1.0_prec  
+                    beta(2) = 0.0_prec  
+
+                case("AB") 
+                    ! Adams-Bashforth
+
+                    pc_k = 2
+                    
+                    beta(1) = 1.0_prec + zeta/2.0_prec 
+                    beta(2) = -zeta/2.0_prec 
+
+                case("SAM") 
+                    ! Semi-implicit Adams–Moulton
+
+                    pc_k = 2
+                    
+                    beta(1) = 0.5
+                    beta(2) = 0.5 
+
+                case DEFAULT 
+
+                    write(io_unit_err,*) "set_pc_beta_coefficients:: &
+                        &Error: one-step pc_method does not match available options [FE, SBE, AB, SAM]."
+                    write(io_unit_err,*) "thrm:: dt_method = ", trim(pc_method)
+                    stop 
+
+            end select 
+
+        end if 
+
+        return
+
+    end subroutine set_pc_beta_coefficients
+
 
     subroutine set_pc_mask(mask,pc_tau,H_ice_pred,H_ice_corr,H_grnd,margin_flt_subgrid)
 
@@ -139,7 +262,7 @@ end if
 
         return 
 
-    end function calc_pc_eta 
+    end function calc_pc_eta
     
     elemental subroutine calc_pc_tau_fe_sbe(tau,var_corr,var_pred,dt_n)
         ! Calculate truncation error for the FE-SBE timestepping method
@@ -374,7 +497,7 @@ end if
 
         return 
 
-    end function calc_pi_rho_pi42 
+    end function calc_pi_rho_pi42
 
     function calc_pi_rho_H312b(eta_n,eta_nm1,eta_nm2,rho_nm1,rho_nm2,eps,k,b) result(rho_n)
 
@@ -406,7 +529,7 @@ end if
 
         return 
 
-    end function calc_pi_rho_H312b 
+    end function calc_pi_rho_H312b
 
     function calc_pi_rho_H312PID(eta_n,eta_nm1,eta_nm2,eps,k_i) result(rho_n)
 
@@ -431,7 +554,7 @@ end if
 
         return 
 
-    end function calc_pi_rho_H312PID 
+    end function calc_pi_rho_H312PID
 
     function calc_pi_rho_H321PID(eta_n,eta_nm1,eta_nm2,dt_n,dt_nm1,eps,k_i,k_p) result(rho_n)
 
@@ -922,7 +1045,7 @@ end if
 
         return 
 
-    end function calc_adv3D_timestep 
+    end function calc_adv3D_timestep
     
     subroutine calc_checkerboard(var_check,var,mask)
 
@@ -1145,6 +1268,10 @@ end if
         ytime%dt_avg        = MV
         ytime%eta_avg       = MV
         ytime%ssa_iter_avg  = MV
+
+        ! Initially, since we don't know pc_dt and pc_eta for
+        ! previous timesteps, we should not use this information. 
+        ytime%pc_active = .FALSE. 
 
         return
 

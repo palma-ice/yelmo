@@ -64,7 +64,7 @@ contains
         real(prec) :: model_time0, model_time1 
         real(prec) :: speed 
 
-        real(wp), parameter :: dt_calv_min = 0.1_wp 
+        real(wp), parameter :: dt_calv_min = 0.0_wp 
 
         nx = size(tpo%now%H_ice,1)
         ny = size(tpo%now%H_ice,2)
@@ -119,8 +119,8 @@ contains
             ! Calculate the ice thickness conservation from dynamics only -----
             call calc_ice_thickness_dyn(tpo%now%H_ice,tpo%now%dHdt_n,tpo%now%H_ice_n,tpo%now%H_ice_pred, &
                                         tpo%now%f_ice,tpo%now%f_grnd,dyn%now%ux_bar,dyn%now%uy_bar, &
-                                        solver=tpo%par%solver,dx=tpo%par%dx,dt=dt,beta=tpo%par%dt_beta,pc_step=tpo%par%pc_step)
-            
+                                        solver=tpo%par%solver,dx=tpo%par%dx,dt=dt,beta=tpo%par%dt_beta,pc_step=tpo%par%pc_step) 
+
             ! Update ice fraction mask 
             call calc_ice_fraction(tpo%now%f_ice,tpo%now%H_ice,tpo%now%H_grnd,tpo%par%margin_flt_subgrid)
             
@@ -129,7 +129,6 @@ contains
             ! Apply mass-conservation step (mbal)
             call calc_ice_thickness_mbal(tpo%now%H_ice,tpo%now%f_ice,tpo%now%mb_applied, &
                                          tpo%now%f_grnd,bnd%z_sl-bnd%z_bed,mbal,tpo%par%dx,dt)
-
 
             ! If subgrid ice margin is not being used, then tiny ice 
             ! thicknesses should be removed before calving step.             
@@ -185,8 +184,7 @@ if (.TRUE.) then
                     
             end select 
 end if
-
-
+            
             select case(trim(tpo%par%calv_flt_method))
 
                 case("zero","none")
@@ -261,8 +259,7 @@ end if
             ! Additionally ensure higher calving rate for floating tongues of
             ! one grid-point width.
             call calc_calving_tongues(tpo%now%calv_flt,tpo%now%H_ice,tpo%now%f_ice,tpo%now%f_grnd,tpo%par%calv_tau)
-
-
+            
             ! Diagnose potential grounded-ice calving rate [m/yr]
 
             select case(trim(tpo%par%calv_grnd_method))
@@ -307,15 +304,11 @@ end if
 
             end if
             
-            
-
             ! Finally apply all additional (generally artificial) ice thickness adjustments 
             ! and store changes in residual mass balance field. 
             call apply_ice_thickness_boundaries(tpo%now%mb_resid,tpo%now%H_ice,tpo%now%f_ice,tpo%now%f_grnd, &
                                                 dyn%now%uxy_b,bnd%ice_allowed,tpo%par%boundaries,bnd%H_ice_ref, &
                                                 tpo%par%H_min_flt,tpo%par%H_min_grnd,dt,reset_mb_resid)
-
-
 
 
             ! Save the rate of change of ice thickness in output variable [m/a]

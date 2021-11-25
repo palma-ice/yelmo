@@ -114,6 +114,7 @@ module yelmo_defs
         
         character(len=256) :: pc_step 
         real(wp)   :: dt_zeta, dt_beta(4)
+        integer    :: pc_k 
 
         real(wp)   :: speed, speed_pred, speed_corr 
 
@@ -517,7 +518,8 @@ module yelmo_defs
         character(len=256) :: boundaries 
         real(dp)   :: time
         real(wp)   :: dt_zeta, dt_beta(2)
-
+        integer    :: pc_k 
+        
         real(wp)   :: speed 
 
     end type
@@ -802,6 +804,8 @@ module yelmo_defs
         real(wp), allocatable :: pc_tau_max(:,:)
 
         character(len=512)   :: log_timestep_file 
+
+        logical :: pc_active 
 
     end type 
 

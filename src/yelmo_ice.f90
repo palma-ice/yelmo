@@ -7,9 +7,9 @@ module yelmo_ice
     
     use yelmo_defs
     use yelmo_grid, only : yelmo_init_grid, calc_zeta
-    use yelmo_timesteps, only : ytime_init, set_adaptive_timestep, set_adaptive_timestep_pc, set_pc_mask, calc_pc_eta,  &
-                                calc_pc_tau_fe_sbe,calc_pc_tau_ab_sam, calc_pc_tau_heun, limit_adaptive_timestep, &
-                                yelmo_timestep_write_init, yelmo_timestep_write, calc_adv3D_timestep1
+    use yelmo_timesteps, only : ytime_init, set_pc_beta_coefficients, set_adaptive_timestep, set_adaptive_timestep_pc,   &
+                                set_pc_mask, calc_pc_eta, calc_pc_tau_fe_sbe,calc_pc_tau_ab_sam, calc_pc_tau_heun,  &
+                                limit_adaptive_timestep, yelmo_timestep_write_init, yelmo_timestep_write, calc_adv3D_timestep1
     use yelmo_tools, only : smooth_gauss_2D
     use yelmo_io 
 
@@ -55,7 +55,7 @@ contains
         real(prec), allocatable :: dt_save(:) 
         real(prec) :: dt_adv_min, dt_pi
         real(prec) :: eta_now, rho_now 
-        integer    :: iter_redo, pc_k, iter_redo_tot 
+        integer    :: iter_redo, iter_redo_tot 
         real(prec) :: ab_zeta 
         logical, allocatable :: pc_mask(:,:) 
 
@@ -74,99 +74,18 @@ contains
             stop 
         end if 
 
+        ! Assume ratio zeta=dt_n/dt_nm1=1.0 to start
+        dom%tpo%par%dt_zeta  = 1.0_wp
+        dom%thrm%par%dt_zeta = dom%tpo%par%dt_zeta
+
         ! Determine which predictor-corrector (pc) method we are using for timestepping,
         ! assign scheme order and weights 
-        select case(trim(dom%par%pc_method))
+        call set_pc_beta_coefficients(dom%tpo%par%dt_beta,dom%tpo%par%pc_k, &
+                                            dom%tpo%par%dt_zeta,dom%par%pc_method)
 
-            case("FE-SBE")
-                
-                ! Order of the method 
-                pc_k = 2 
-
-                dom%tpo%par%dt_beta(1) = 1.0_prec 
-                dom%tpo%par%dt_beta(2) = 0.0_prec 
-                
-                dom%tpo%par%dt_beta(3) = 1.0_prec 
-                dom%tpo%par%dt_beta(4) = 0.0_prec 
-            
-            case("AB-SAM")
-                
-                ! Order of the method 
-                pc_k = 2 
-
-                ! Assume ratio zeta=dt_n/dt_nm1=1.0 to start
-                dom%tpo%par%dt_zeta  = 1.0_prec
-                
-                dom%tpo%par%dt_beta(1) = 1.0_prec + dom%tpo%par%dt_zeta/2.0_prec 
-                dom%tpo%par%dt_beta(2) = -dom%tpo%par%dt_zeta/2.0_prec 
-
-                dom%tpo%par%dt_beta(3) = 0.5_prec 
-                dom%tpo%par%dt_beta(4) = 0.5_prec 
-            
-            case("HEUN")
-                
-                ! Order of the method 
-                pc_k = 2 
-
-                dom%tpo%par%dt_beta(1) = 1.0_prec 
-                dom%tpo%par%dt_beta(2) = 0.0_prec 
-                
-                dom%tpo%par%dt_beta(3) = 0.5_prec 
-                dom%tpo%par%dt_beta(4) = 0.5_prec 
-            
-            case("RALSTON")
-                
-                write(io_unit_err,*) "This method does not work yet - the truncation error is incorrect."
-                stop 
-
-                ! Order of the method 
-                pc_k = 2 
-
-                dom%tpo%par%dt_beta(1) = 2.0_prec / 3.0_prec
-                dom%tpo%par%dt_beta(2) = 0.0_prec 
-                
-                dom%tpo%par%dt_beta(3) = 0.25_prec 
-                dom%tpo%par%dt_beta(4) = 0.75_prec 
-            
-            case DEFAULT 
-
-                write(io_unit_err,*) "yelmo_update:: Error: pc_method does not match available options [FE-SBE, AB-SAM, HEUN]."
-                write(io_unit_err,*) "pc_method = ", trim(dom%par%pc_method)
-                stop 
-
-        end select 
-        
         ! Calculate timestepping factors for thermodynamics horizontal advection term too 
-        select case(trim(dom%thrm%par%dt_method))
-
-            case("FE")
-                ! Forward Euler 
-
-                dom%thrm%par%dt_beta(1) = 1.0_prec  
-                dom%thrm%par%dt_beta(2) = 0.0_prec  
-
-            case("AB") 
-                ! Adams-Bashforth (with default weights assuming dt_n/dt_nm1=1.0)
-
-                ! Assume ratio zeta=dt_n/dt_nm1=1.0 to start
-                dom%thrm%par%dt_zeta = dom%tpo%par%dt_zeta
-
-                dom%thrm%par%dt_beta(1) = 1.0_prec + dom%thrm%par%dt_zeta/2.0_prec 
-                dom%thrm%par%dt_beta(2) = -dom%thrm%par%dt_zeta/2.0_prec 
-
-            case("SAM") 
-                ! Semi-implicit Adams–Moulton
-
-                dom%thrm%par%dt_beta(1) = 0.5
-                dom%thrm%par%dt_beta(2) = 0.5 
-
-            case DEFAULT 
-
-                write(io_unit_err,*) "yelmo_update:: Error: thermodynamics dt_method does not match available options [FE, SBE, AB, SAM]."
-                write(io_unit_err,*) "thrm:: dt_method = ", trim(dom%thrm%par%dt_method)
-                stop 
-
-        end select 
+        call set_pc_beta_coefficients(dom%thrm%par%dt_beta,dom%thrm%par%pc_k, &
+                                            dom%thrm%par%dt_zeta,dom%thrm%par%dt_method)
 
         ! Load last model time (from dom%tpo, should be equal to dom%thrm)
         time_now = dom%tpo%par%time
@@ -207,7 +126,7 @@ contains
             
             ! Calculate adaptive timestep using proportional-integral (PI) methods
             call set_adaptive_timestep_pc(dt_pi,dom%time%pc_dt,dom%time%pc_eta,dom%par%pc_eps,dom%par%dt_min,dt_max, &
-                                    dom%dyn%now%ux_bar,dom%dyn%now%uy_bar,dom%tpo%par%dx,pc_k,dom%par%pc_controller)
+                                    dom%dyn%now%ux_bar,dom%dyn%now%uy_bar,dom%tpo%par%dx,dom%tpo%par%pc_k,dom%par%pc_controller)
 
             ! Determine current time step to be used based on method of choice 
             select case(dom%par%dt_method) 
@@ -226,7 +145,7 @@ contains
                     ! Use PI adaptive timestep
 
                     dt_now = dt_pi
-                    
+
                 case DEFAULT 
 
                     write(io_unit_err,*) "yelmo_update:: Error: dt_method not recognized."
@@ -235,6 +154,13 @@ contains
 
             end select 
 
+            if (.not. dom%time%pc_active) then 
+                ! Override timestep choice and simply use a very small value for 
+                ! first timestep. 
+
+                dt_now = dom%par%dt_min 
+
+            end if 
 
             do iter_redo=1, dom%par%pc_n_redo 
                 ! Prepare to potentially perform several iterations of the same timestep.
@@ -252,19 +178,41 @@ contains
                 dom%tpo%par%dt_zeta  = dt_now / dom%time%pc_dt(1) 
                 dom%thrm%par%dt_zeta = dom%tpo%par%dt_zeta
 
-                if (trim(dom%par%pc_method) .eq. "AB-SAM") then 
+
+                if (trim(dom%par%pc_method) .eq. "AB-SAM") then
                     ! Update the predictor weights, since they depend on the timestep 
 
-                    dom%tpo%par%dt_beta(1) = 1.0_prec + dom%tpo%par%dt_zeta/2.0_prec 
-                    dom%tpo%par%dt_beta(2) = -dom%tpo%par%dt_zeta/2.0_prec 
+                    if (.not. dom%time%pc_active) then 
+                        ! Only FE-SBE is available 
+
+                        call set_pc_beta_coefficients(dom%tpo%par%dt_beta,dom%tpo%par%pc_k, &
+                                                            dom%tpo%par%dt_zeta,"FE-SBE")
+
+                    else 
+
+                        call set_pc_beta_coefficients(dom%tpo%par%dt_beta,dom%tpo%par%pc_k, &
+                                                            dom%tpo%par%dt_zeta,dom%par%pc_method)
+
+                    end if 
 
                 end if 
 
                 if (trim(dom%thrm%par%dt_method) .eq. "AB") then 
                     ! Update the predictor weights, since they depend on the timestep 
 
-                    dom%thrm%par%dt_beta(1) = 1.0_prec + dom%thrm%par%dt_zeta/2.0_prec 
-                    dom%thrm%par%dt_beta(2) = -dom%thrm%par%dt_zeta/2.0_prec 
+                    if (.not. dom%time%pc_active) then 
+                        ! Only FE is available 
+
+                        call set_pc_beta_coefficients(dom%thrm%par%dt_beta,dom%thrm%par%pc_k, &
+                                                                dom%thrm%par%dt_zeta,"FE")
+
+                    else 
+                        ! Update the weights like normal
+                        
+                        call set_pc_beta_coefficients(dom%thrm%par%dt_beta,dom%thrm%par%pc_k, &
+                                                    dom%thrm%par%dt_zeta,dom%thrm%par%dt_method)
+                        
+                    end if 
 
                 end if 
 
@@ -428,7 +376,10 @@ contains
 
             dom%time%pc_eta = cshift(dom%time%pc_eta,shift=-1)
             dom%time%pc_eta(1) = eta_now
-        
+            
+            ! Activate pc method if not already active
+            if (.not. dom%time%pc_active) dom%time%pc_active = .TRUE. 
+
             ! Save the current timestep and other data for log and for running mean 
             n_now = n_now + 1 
             dt_save(n_now) = dt_now 
@@ -518,6 +469,8 @@ contains
                                             max_dt_used, min_dt_used, n_dtmin
             
 
+            ! write(*,*) "time2: ", time, time_now, dom%tpo%par%time, dom%tpo%par%time_calv, &
+            !                                     dom%thrm%par%time, dom%mat%par%time, dom%dyn%par%time
         end if 
 
         ! ! ajr: diagnostics 

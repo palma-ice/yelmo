@@ -11,6 +11,7 @@ module yelmo_io
 
     private 
     public :: yelmo_write_init
+    public :: yelmo_write_step
     public :: yelmo_write_step_model_metrics
     public :: yelmo_write_step_pd_metrics
     public :: yelmo_restart_write
@@ -51,6 +52,148 @@ contains
         return
 
     end subroutine yelmo_write_init
+
+    subroutine yelmo_write_step(ylmo,filename,time,nms,compare_pd)
+
+        implicit none 
+        
+        type(yelmo_class), intent(IN) :: ylmo        
+        character(len=*),  intent(IN) :: filename
+        real(prec),        intent(IN) :: time
+        character(len=*),  optional, intent(IN) :: nms(:)
+        logical, optional, intent(IN) :: compare_pd
+
+        ! Local variables
+        integer    :: ncid, n, q, qtot
+        real(prec) :: time_prev 
+        character(len=56), allocatable :: names(:) 
+        logical ::  write_pd_metrics 
+
+        if (present(nms)) then 
+            qtot = size(nms,1)
+            allocate(names(qtot))
+            do q = 1, qtot 
+                names(q) = trim(nms(q))
+            end do 
+        else 
+            qtot = 10 
+            allocate(names(qtot))
+            names(1)  = "H_ice"
+            names(2)  = "z_srf"
+            names(3)  = "z_bed"
+            names(4)  = "mask_bed"
+            names(5)  = "uxy_b"
+            names(6)  = "uxy_s"
+            names(7)  = "T_prime_b"
+            names(8)  = "smb"
+            names(9)  = "bmb"
+            names(10) = "z_sl"
+
+        end if 
+
+        write_pd_metrics = .TRUE. 
+        if (present(compare_pd)) write_pd_metrics = compare_pd
+
+        ! Open the file for writing
+        call nc_open(filename,ncid,writable=.TRUE.)
+
+        ! Determine current writing time step 
+        n = nc_size(filename,"time",ncid)
+        call nc_read(filename,"time",time_prev,start=[n],count=[1],ncid=ncid) 
+        if (abs(time-time_prev).gt.1e-5) n = n+1 
+
+        ! Update the time step
+        call nc_write(filename,"time",time,dim1="time",start=[n],count=[1],ncid=ncid)
+
+        ! Write model metrics (model speed, dt, eta)
+        call yelmo_write_step_model_metrics(filename,ylmo,n,ncid)
+ 
+        if (write_pd_metrics) then 
+            ! Write present-day data metrics (rmse[H],etc)
+            call yelmo_write_step_pd_metrics(filename,ylmo,n,ncid)
+        end if  
+        
+        ! Determine number of variables to write 
+        qtot = size(names) 
+
+        ! Loop over variables and apply the appropriate write statement
+        do q = 1, qtot 
+
+            select case(trim(names(q)))
+
+                case("H_ice")
+                    call nc_write(filename,"H_ice",ylmo%tpo%now%H_ice,units="m",long_name="Ice thickness", &
+                      dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
+                case("z_srf")
+                    call nc_write(filename,"z_srf",ylmo%tpo%now%z_srf,units="m",long_name="Surface elevation", &
+                                  dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
+                case("z_bed")
+                    call nc_write(filename,"z_bed",ylmo%bnd%z_bed,units="m",long_name="Bedrock elevation", &
+                                  dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid) 
+                case("mask_bed")
+                    call nc_write(filename,"mask_bed",ylmo%tpo%now%mask_bed,units="",long_name="Bed mask", &
+                                  dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
+                case("uxy_b")
+                    call nc_write(filename,"uxy_b",ylmo%dyn%now%uxy_b,units="m/yr",long_name="Basal sliding velocity magnitude", &
+                                 dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
+                case("uxy_s")
+                    call nc_write(filename,"uxy_s",ylmo%dyn%now%uxy_s,units="m/yr",long_name="Surface velocity magnitude", &
+                                 dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
+                case("beta")
+                    call nc_write(filename,"beta",ylmo%dyn%now%beta,units="Pa yr m-1",long_name="Basal friction coefficient", &
+                                  dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
+                case("T_prime_b")
+                    call nc_write(filename,"T_prime_b",ylmo%thrm%now%T_prime_b,units="K",long_name="Basal homologous ice temperature", &
+                                  dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
+                case("smb")
+                    call nc_write(filename,"smb",ylmo%bnd%smb,units="m/yr ice equiv.",long_name="Surface mass balance", &
+                                  dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
+                case("bmb")
+                    call nc_write(filename,"bmb",ylmo%tpo%now%bmb,units="m/yr ice equiv.",long_name="Basal mass balance", &
+                                  dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
+                case("z_sl")
+                    call nc_write(filename,"z_sl",ylmo%bnd%z_sl,units="m",long_name="Sea level rel. to present", &
+                                  dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
+                
+                case DEFAULT 
+
+                    write(io_unit_err,*) 
+                    write(io_unit_err,*) "yelmo_write_step:: Error: variable not yet supported."
+                    write(io_unit_err,*) "variable = ", trim(names(q))
+                    write(io_unit_err,*) "filename = ", trim(filename)
+                    stop 
+                    
+            end select
+
+
+        end do 
+            
+        ! External data
+        ! call nc_write(filename,"dzbdt",isos%now%dzbdt,units="m/a",long_name="Bedrock uplift rate", &
+        !               dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
+        
+        ! call nc_write(filename,"Ta_ann",snp%now%ta_ann,units="K",long_name="Near-surface air temperature (ann)", &
+        !               dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
+        ! call nc_write(filename,"Ta_sum",snp%now%ta_sum,units="K",long_name="Near-surface air temperature (sum)", &
+        !               dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
+        ! call nc_write(filename,"Pr_ann",snp%now%pr_ann*1e-3,units="m/a water equiv.",long_name="Precipitation (ann)", &
+        !               dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
+
+        ! call nc_write(filename,"dTa_ann",snp%now%ta_ann-snp%clim0%ta_ann,units="K",long_name="Near-surface air temperature anomaly (ann)", &
+        !               dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
+        ! call nc_write(filename,"dTa_sum",snp%now%ta_sum-snp%clim0%ta_sum,units="K",long_name="Near-surface air temperature anomaly (sum)", &
+        !               dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
+        ! call nc_write(filename,"dPr_ann",(snp%now%pr_ann-snp%clim0%pr_ann)*1e-3,units="m/a water equiv.",long_name="Precipitation anomaly (ann)", &
+        !               dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
+        ! call nc_write(filename,"dT_shlf",mshlf%now%dT_shlf,units="K",long_name="Shelf temperature anomaly", &
+        !               dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
+
+        ! Close the netcdf file
+        call nc_close(ncid)
+
+        return 
+
+    end subroutine yelmo_write_step
 
     subroutine yelmo_write_step_model_metrics(filename,ylmo,n,ncid)
         ! Write model performance metrics (speed, dt, eta) 

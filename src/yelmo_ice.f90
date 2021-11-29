@@ -869,8 +869,11 @@ contains
         write(*,*) "yelmo_init_topo:: range(z_bed):     ", minval(dom%bnd%z_bed),     maxval(dom%bnd%z_bed)
         write(*,*) "yelmo_init_topo:: range(z_bed_sd):  ", minval(dom%bnd%z_bed_sd),  maxval(dom%bnd%z_bed_sd)
         write(*,*) "yelmo_init_topo:: range(H_ice):     ", minval(dom%tpo%now%H_ice), maxval(dom%tpo%now%H_ice)
-        write(*,*) "yelmo_init_topo:: scaling fac z_bed_f_sd: ", z_bed_f_sd 
-
+        
+        if (.not. dom%par%use_restart) then 
+            write(*,*) "yelmo_init_topo:: scaling fac z_bed_f_sd: ", z_bed_f_sd 
+        end if 
+        
         return 
 
     end subroutine yelmo_init_topo

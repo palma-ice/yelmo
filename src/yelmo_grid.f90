@@ -211,6 +211,7 @@ contains
         grd%x_e    = 0.0 
         grd%y_n    = 0.0
 
+if (.FALSE.) then 
         if (grd%is_projection) then 
             ! Load additional projection information if available
 
@@ -232,7 +233,8 @@ contains
             end if 
 
         end if 
-        
+end if 
+
         ! Write grid summary 
         write(*,*) "== Yelmo grid summary =="
         write(*,*) "grid_mapping: ",                            trim(grd%mtype)

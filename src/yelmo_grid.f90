@@ -122,16 +122,40 @@ contains
 
     end subroutine calc_zeta
     
-    subroutine yelmo_init_grid_fromfile(grd,filename,grid_name)
+    subroutine yelmo_init_grid_fromfile(grd,filename,grid_name,xnm,ynm,lonnm,latnm)
 
         implicit none 
 
         type(ygrid_class), intent(INOUT) :: grd 
         character(len=*),  intent(IN)    :: filename  
         character(len=*),  intent(IN)    :: grid_name
-
+        character(len=*),  intent(IN), optional :: xnm 
+        character(len=*),  intent(IN), optional :: ynm 
+        character(len=*),  intent(IN), optional :: lonnm 
+        character(len=*),  intent(IN), optional :: latnm 
+        
         ! Local variables
+        integer :: i, j 
         character(len=56) :: units 
+        character(len=56) :: x_name
+        character(len=56) :: y_name
+        character(len=56) :: lon_name
+        character(len=56) :: lat_name
+        character(len=56) :: crs_name 
+
+        ! Get arguments 
+        x_name = "xc"
+        if (present(xnm)) x_name = trim(xnm)
+
+        y_name = "yc"
+        if (present(ynm)) y_name = trim(ynm)
+        
+        lon_name = "lon2D"
+        if (present(lonnm)) lon_name = trim(lonnm)
+        
+        lat_name = "lat2D"
+        if (present(latnm)) lat_name = trim(latnm)
+        
 
         ! Deallocate grid object to start 
         call ygrid_dealloc(grd)
@@ -140,8 +164,8 @@ contains
         grd%name = trim(grid_name)
 
         ! Determine grid axis sizes
-        grd%nx = nc_size(filename,"xc")
-        grd%ny = nc_size(filename,"yc")
+        grd%nx = nc_size(filename,x_name)
+        grd%ny = nc_size(filename,y_name)
         
         ! Total number of points 
         grd%npts = grd%nx * grd%ny 
@@ -150,10 +174,6 @@ contains
         allocate(grd%xc(grd%nx))
         allocate(grd%yc(grd%ny))
         
-        ! Load axes from file
-        call nc_read(filename,"xc",grd%xc)
-        call nc_read(filename,"yc",grd%yc)
-
         ! Allocate grid arrays
         allocate(grd%x(grd%nx,grd%ny))
         allocate(grd%y(grd%nx,grd%ny))
@@ -161,38 +181,67 @@ contains
         allocate(grd%lat(grd%nx,grd%ny))
         allocate(grd%area(grd%nx,grd%ny))
         
-        ! Load variables 
-        call nc_read(filename,"x2D",  grd%x)
-        call nc_read(filename,"y2D",  grd%y)
-        call nc_read(filename,"lon2D",grd%lon)
-        call nc_read(filename,"lat2D",grd%lat)
-        call nc_read(filename,"area", grd%area)
-
         ! Determine axis units 
-        call nc_read_attr(filename,"xc","units",units)
+        call nc_read_attr(filename,x_name,"units",units)
+
+        ! Load axes from file
+        call nc_read(filename,x_name,grd%xc)
+        call nc_read(filename,y_name,grd%yc)
 
         ! Modify axis values as needed to get units of [m]
-        if (trim(units) .eq. "kilometers") then 
+        select case(trim(units))
 
-            grd%xc   = grd%xc *1e3
-            grd%yc   = grd%yc *1e3
-            grd%x    = grd%x  *1e3
-            grd%y    = grd%y  *1e3
+            case("kilometers","km") 
 
-            grd%area = grd%area *1e3*1e3 
+                grd%xc   = grd%xc *1e3
+                grd%yc   = grd%yc *1e3
 
-        else if (trim(units) .eq. "meters") then 
-            ! Pass - do nothing
+            case("meters","m")
 
-        else 
-            write(*,*) "yelmo_init_grid_fromfile:: &
-            &Error grid axis units not recognized: "//trim(units)
-            stop 
-        end if
+                ! Pass - do nothing
+
+            case DEFAULT 
+                write(*,*) "yelmo_init_grid_fromfile:: &
+                &Error grid axis units not recognized: "//trim(units)
+                stop 
+        
+        end select 
 
         ! Determine grid resolution [m]
         grd%dx = grd%xc(2) - grd%xc(1) 
         grd%dy = grd%yc(2) - grd%yc(1)  
+        
+        ! Populate x and y 2D arrays from axis values 
+        do j = 1, grd%ny 
+            grd%x(:,j) = grd%xc 
+        end do 
+        do i = 1, grd%nx 
+            grd%y(i,:) = grd%yc 
+        end do 
+
+        ! Determine cell area
+        if (nc_exists_var(filename,"area")) then 
+            ! Load cell area from file
+            call nc_read(filename,"area", grd%area)
+
+            select case(trim(units))
+            
+                case("kilometers","km") 
+
+                    grd%area = grd%area *1e3*1e3
+
+            end select
+
+        else
+            ! Calculate cell area directly [m^2]
+            grd%area = grd%dx * grd%dy 
+        end if 
+
+
+        ! Load latitude and longitude values
+        call nc_read(filename,lon_name,grd%lon)
+        call nc_read(filename,lat_name,grd%lat)
+
         
         ! Determine whether this is a projected grid 
         if (minval(grd%lon) .ne. maxval(grd%lon)) then 
@@ -203,47 +252,97 @@ contains
 
         ! Assign default values to projection parameters, then 
         ! determine if actual projection parameters can be loaded
-        grd%mtype = "cartesian"
-        grd%lambda = 0.0 
-        grd%phi    = 0.0 
-        grd%alpha  = 0.0 
-        grd%scale  = 1.0 
-        grd%x_e    = 0.0 
-        grd%y_n    = 0.0
-
-if (.FALSE.) then 
+        grd%mtype               = "cartesian"
+        grd%lambda              = 0.0 
+        grd%phi                 = 0.0 
+        grd%alpha               = 0.0 
+        grd%scale               = 1.0 
+        grd%x_e                 = 0.0 
+        grd%y_n                 = 0.0
+        grd%semi_major_axis     = 0.0 
+        grd%inverse_flattening  = 0.0
+        grd%is_sphere           = .TRUE. 
+        
         if (grd%is_projection) then 
             ! Load additional projection information if available
 
-            if ( nc_exists_attr(filename,"lon2D","grid_mapping") ) then
+            if ( nc_exists_attr(filename,lon_name,"grid_mapping") ) then
 
                 ! Read grid map name (projection name, eg "polar_stereographic")
-                call nc_read_attr(filename,"lon2D","grid_mapping",grd%mtype)
+                call nc_read_attr(filename,lon_name,"grid_mapping",crs_name)
 
-                if ( nc_exists_var(filename,trim(grd%mtype)) ) then
+                if ( nc_exists_var(filename,crs_name) .and. trim(crs_name) .eq. "crs" ) then
                     ! If projection variable exists, load attributes 
-                    call nc_read_attr(filename,trim(grd%mtype),"straight_vertical_longitude_from_pole",grd%lambda)
-                    call nc_read_attr(filename,trim(grd%mtype),"latitude_of_projection_origin",        grd%phi)
-                    call nc_read_attr(filename,trim(grd%mtype),"angle_of_oblique_tangent",             grd%alpha)
-                    call nc_read_attr(filename,trim(grd%mtype),"scale_factor_at_projection_origin",    grd%scale)
-                    call nc_read_attr(filename,trim(grd%mtype),"false_easting",                        grd%x_e)
-                    call nc_read_attr(filename,trim(grd%mtype),"false_northing",                       grd%y_n) 
+                    ! ajr: checking crs_name=="crs" ensures that projection info
+                    ! is only loaded from newer files that have the right projection
+                    ! attributes defined. Older files have crs_name=="polar_stereographic"
+                    ! for example, and do not contain parameters following cf-conventions. 
+
+                    ! Load projection name (polar_stereographic,stereographic,etc)
+                    call nc_read_attr(filename,crs_name,"grid_mapping_name",grd%mtype)
+                    
+                    select case(trim(grd%mtype))
+                    
+                        case("polar_stereographic")
+                            call nc_read_attr(filename,crs_name,"straight_vertical_longitude_from_pole",grd%lambda)
+                            !call nc_read_attr(filename,crs_name,"latitude_of_projection_origin",grd%phi_proj_orig)
+                            !   ajr: latitude_of_projection_origin not needed as it is -90 or 90. 
+                            call nc_read_attr(filename,crs_name,"standard_parallel",grd%phi)
+                            call nc_read_attr(filename,crs_name,"false_easting",grd%x_e)
+                            call nc_read_attr(filename,crs_name,"false_northing",grd%y_n) 
+                            call nc_read_attr(filename,crs_name,"semi_major_axis",grd%semi_major_axis)
+                            call nc_read_attr(filename,crs_name,"inverse_flattening",grd%inverse_flattening)
+
+                            ! Define alpha too - just in case
+                            grd%alpha = 90.0_wp - abs(grd%phi)
+
+                        case("stereographic")
+                            call nc_read_attr(filename,crs_name,"longitude_of_projection_origin",grd%lambda)
+                            call nc_read_attr(filename,crs_name,"latitude_of_projection_origin",grd%phi)
+                            call nc_read_attr(filename,crs_name,"angle_of_oblique_tangent",grd%alpha)
+                            call nc_read_attr(filename,crs_name,"scale_factor_at_projection_origin",grd%scale)
+                            call nc_read_attr(filename,crs_name,"false_easting",grd%x_e)
+                            call nc_read_attr(filename,crs_name,"false_northing",grd%y_n) 
+                            call nc_read_attr(filename,crs_name,"semi_major_axis",grd%semi_major_axis)
+                            call nc_read_attr(filename,crs_name,"inverse_flattening",grd%inverse_flattening)
+
+                        case DEFAULT 
+
+                            write(*,*) "yelmo_init_grid_fromfile:: Warning: unsupported grid projection. &
+                                    &Projection parameters not loaded."
+                            write(*,*) "map type: ", trim(grd%mtype)
+                    
+                    end select
+
+                    ! Check whether working on a sphere 
+                    if (grd%inverse_flattening .ne. 0.0) then 
+                        grd%is_sphere = .FALSE. 
+                    end if 
+
                 end if                    
 
             end if 
 
-        end if 
-end if 
+        end if  
 
         ! Write grid summary 
         write(*,*) "== Yelmo grid summary =="
-        write(*,*) "grid_mapping: ",                            trim(grd%mtype)
-        write(*,*) "straight_vertical_longitude_from_pole: ",   grd%lambda
-        write(*,*) "latitude_of_projection_origin: ",           grd%phi
-        write(*,*) "angle_of_oblique_tangent: ",                grd%alpha
-        write(*,*) "scale_factor_at_projection_origin: ",       grd%scale
-        write(*,*) "false_easting: ",                           grd%x_e
-        write(*,*) "false_northing: ",                          grd%y_n
+        write(*,*) "grid_mapping:                           ",  trim(grd%mtype)
+        write(*,*) "straight_vertical_longitude_from_pole:  ",  grd%lambda
+        write(*,*) "standard_parallel:                      ",  grd%phi
+        write(*,*) "angle_of_oblique_tangent:               ",  grd%alpha
+        write(*,*) "scale_factor_at_projection_origin:      ",  grd%scale
+        write(*,*) "false_easting:                          ",  grd%x_e
+        write(*,*) "false_northing:                         ",  grd%y_n
+        write(*,*) "semi_major_axis:                        ",  grd%semi_major_axis
+        write(*,*) "inverse_flattening:                     ",  grd%inverse_flattening
+        write(*,*) 
+        write(*,"(a16,i8)")        "Total points = ",   grd%npts
+        write(*,"(a16,2g12.5)")    "range(xc) = ",      minval(grd%xc),maxval(grd%xc)
+        write(*,"(a16,2g12.5)")    "range(yc) = ",      minval(grd%yc),maxval(grd%yc)
+        write(*,"(a16,2g12.5)")    "range(lon) = ",     minval(grd%lon),maxval(grd%lon)
+        write(*,"(a16,2g12.5)")    "range(lat) = ",     minval(grd%lat),maxval(grd%lat)
+        write(*,"(a16,2g12.5)")    "range(area) = ",    minval(grd%area),maxval(grd%area)
 
         return 
 
@@ -283,13 +382,17 @@ end if
 
         ! Assign default values to projection parameters
         ! (no projection information available with this method so far)
-        grd%mtype = "cartesian"
-        grd%lambda = 0.0 
-        grd%phi    = 0.0 
-        grd%alpha  = 0.0 
-        grd%scale  = 1.0 
-        grd%x_e    = 0.0 
-        grd%y_n    = 0.0
+        grd%mtype               = "cartesian"
+        grd%lambda              = 0.0 
+        grd%phi                 = 0.0 
+        grd%alpha               = 0.0 
+        grd%scale               = 1.0 
+        grd%x_e                 = 0.0 
+        grd%y_n                 = 0.0
+        grd%semi_major_axis     = 0.0 
+        grd%inverse_flattening  = 0.0
+        grd%is_sphere           = .TRUE. 
+ 
 
         return 
 
@@ -308,7 +411,7 @@ end if
         real(prec) :: x0, y0, dx, dy 
 
         ! Set units of grid parameters defined below
-        units = "kilometers" 
+        units = "km" 
 
         select case(trim(grid_name))
 
@@ -521,13 +624,17 @@ end if
 
         ! Assign default values to projection parameters
         ! (no projection information available with this method so far)
-        grd%mtype = "cartesian"
-        grd%lambda = 0.0 
-        grd%phi    = 0.0 
-        grd%alpha  = 0.0 
-        grd%scale  = 1.0 
-        grd%x_e    = 0.0 
-        grd%y_n    = 0.0
+        grd%mtype               = "cartesian"
+        grd%lambda              = 0.0 
+        grd%phi                 = 0.0 
+        grd%alpha               = 0.0 
+        grd%scale               = 1.0 
+        grd%x_e                 = 0.0 
+        grd%y_n                 = 0.0
+        grd%semi_major_axis     = 0.0 
+        grd%inverse_flattening  = 0.0
+        grd%is_sphere           = .TRUE. 
+ 
 
         return 
 
@@ -654,13 +761,17 @@ end if
         
         ! Assign default values to projection parameters
         ! (no projection information available with this method so far)
-        grd%mtype = "cartesian"
-        grd%lambda = 0.0 
-        grd%phi    = 0.0 
-        grd%alpha  = 0.0 
-        grd%scale  = 1.0 
-        grd%x_e    = 0.0 
-        grd%y_n    = 0.0
+        grd%mtype               = "cartesian"
+        grd%lambda              = 0.0 
+        grd%phi                 = 0.0 
+        grd%alpha               = 0.0 
+        grd%scale               = 1.0 
+        grd%x_e                 = 0.0 
+        grd%y_n                 = 0.0
+        grd%semi_major_axis     = 0.0 
+        grd%inverse_flattening  = 0.0
+        grd%is_sphere           = .TRUE. 
+ 
 
         return 
 
@@ -728,7 +839,8 @@ end if
 
             case DEFAULT 
 
-                write(*,*) "yelmo_init_grid:: Error: units of input grid parameters must be 'kilometers' or 'meters'."
+                write(*,*) "yelmo_init_grid:: Error: units of input grid parameters &
+                            &must be one of: 'kilometers', 'km', 'meters', 'm'."
                 write(*,*) "units: ", trim(units)
                 stop 
 
@@ -771,13 +883,17 @@ end if
         
         ! Assign default values to projection parameters
         ! (no projection information available with this method so far)
-        grd%mtype = "cartesian"
-        grd%lambda = 0.0 
-        grd%phi    = 0.0 
-        grd%alpha  = 0.0 
-        grd%scale  = 1.0 
-        grd%x_e    = 0.0 
-        grd%y_n    = 0.0
+        grd%mtype               = "cartesian"
+        grd%lambda              = 0.0 
+        grd%phi                 = 0.0 
+        grd%alpha               = 0.0 
+        grd%scale               = 1.0 
+        grd%x_e                 = 0.0 
+        grd%y_n                 = 0.0
+        grd%semi_major_axis     = 0.0 
+        grd%inverse_flattening  = 0.0
+        grd%is_sphere           = .TRUE. 
+ 
 
         return 
 
@@ -854,33 +970,37 @@ end if
             call nc_create(fnm)
         
             ! Add grid axis variables to netcdf file
-            call nc_write_dim(fnm,xnm,x=grid%xc*1e-3,units="kilometers")
-            call nc_write_attr(fnm,xnm,"_CoordinateAxisType","GeoX")
-
-            call nc_write_dim(fnm,ynm,x=grid%yc*1e-3,units="kilometers")
-            call nc_write_attr(fnm,ynm,"_CoordinateAxisType","GeoY")
+            call nc_write_dim(fnm,xnm,x=grid%xc*1e-3,units="km")
+            call nc_write_dim(fnm,ynm,x=grid%yc*1e-3,units="km")
             
+            if (grid%is_projection) then 
+                call nc_write_attr(fnm,xnm,"standard_name","projection_x_coordinate")
+                call nc_write_attr(fnm,ynm,"standard_name","projection_y_coordinate")
+            end if 
+
         end if 
 
         ! Add projection information if needed
         if (grid%is_projection) then
             call nc_write_map(fnm,grid%mtype,dble(grid%lambda),phi=dble(grid%phi), &
-                              alpha=dble(grid%alpha),x_e=dble(grid%x_e),y_n=dble(grid%y_n))
+                              alpha=dble(grid%alpha),x_e=dble(grid%x_e),y_n=dble(grid%y_n), &
+                              is_sphere=grid%is_sphere,semi_major_axis=dble(grid%semi_major_axis),& 
+                              inverse_flattening=dble(grid%inverse_flattening))
         end if 
 
-        call nc_write(fnm,"x2D",grid%x*1e-3,dim1=xnm,dim2=ynm,units="kilometers",grid_mapping=grid%mtype)
-        call nc_write(fnm,"y2D",grid%y*1e-3,dim1=xnm,dim2=ynm,units="kilometers",grid_mapping=grid%mtype)
+        call nc_write(fnm,"x2D",grid%x*1e-3,dim1=xnm,dim2=ynm,units="km",grid_mapping="crs")
+        call nc_write(fnm,"y2D",grid%y*1e-3,dim1=xnm,dim2=ynm,units="km",grid_mapping="crs")
 
         if (grid%is_projection) then 
-            call nc_write(fnm,"lon2D",grid%lon,dim1=xnm,dim2=ynm,grid_mapping=grid%mtype)
-            call nc_write_attr(fnm,"lon2D","_CoordinateAxisType","Lon")
-            call nc_write(fnm,"lat2D",grid%lat,dim1=xnm,dim2=ynm,grid_mapping=grid%mtype)
-            call nc_write_attr(fnm,"lat2D","_CoordinateAxisType","Lat")
+            call nc_write(fnm,"lon2D",grid%lon,dim1=xnm,dim2=ynm,grid_mapping="crs")
+            call nc_write_attr(fnm,"lon2D","units","degrees_east")
+            call nc_write(fnm,"lat2D",grid%lat,dim1=xnm,dim2=ynm,grid_mapping="crs")
+            call nc_write_attr(fnm,"lat2D","units","degrees_north")
         end if 
 
-        call nc_write(fnm,"area",  grid%area*1e-6,  dim1=xnm,dim2=ynm,grid_mapping=grid%mtype,units="km^2")
+        call nc_write(fnm,"area",  grid%area*1e-6,  dim1=xnm,dim2=ynm,grid_mapping="crs",units="km^2")
         if (grid%is_projection) call nc_write_attr(fnm,"area","coordinates","lat2D lon2D")
-        !call nc_write(fnm,"border",grid%border,dim1=xnm,dim2=ynm,grid_mapping=grid%mtype)
+        !call nc_write(fnm,"border",grid%border,dim1=xnm,dim2=ynm,grid_mapping="crs")
         !if (grid%is_projection) call nc_write_attr(fnm,"border","coordinates","lat2D lon2D")
 
         return

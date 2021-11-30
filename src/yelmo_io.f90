@@ -283,9 +283,13 @@ contains
 
         if (initialize_file) then
 
-            call nc_create(filename)
-            call nc_write_dim(filename,"xc",       x=dom%grd%xc*1e-3,       units="kilometers")
-            call nc_write_dim(filename,"yc",       x=dom%grd%yc*1e-3,       units="kilometers")
+            ! call nc_create(filename)
+
+            ! Initialize file by writing grid info
+            call yelmo_grid_write(dom%grd,filename,create=.TRUE.)
+
+            ! call nc_write_dim(filename,"xc",       x=dom%grd%xc*1e-3,       units="kilometer")
+            ! call nc_write_dim(filename,"yc",       x=dom%grd%yc*1e-3,       units="kilometer")
             call nc_write_dim(filename,"zeta",     x=dom%par%zeta_aa,       units="1")
             call nc_write_dim(filename,"zeta_ac",  x=dom%par%zeta_ac,       units="1")
             call nc_write_dim(filename,"zeta_rock",x=dom%thrm%par%zr%zeta_aa,units="1")
@@ -327,8 +331,15 @@ contains
         
         ! == time variables ===
 
-        call nc_write(filename,"pc_dt",        dom%time%pc_dt,         units="yr",  dim1="pc_steps",dim2="time",ncid=ncid,start=[1,n],count=[3,1])
-        call nc_write(filename,"pc_eta",       dom%time%pc_eta,        units="m/yr",dim1="pc_steps",dim2="time",ncid=ncid,start=[1,n],count=[3,1])
+        ! Note: these variables are not defined on the 2D grid, so they 
+        ! will give interpolation errors to `cdo remapcon`. They 
+        ! are currently not used by a restarted simulation, so they 
+        ! are commented out here. However, it could be useful in the future
+        ! to have these variables in the restart file, and potentially 
+        ! others that do not depend on the grid.
+        
+        ! call nc_write(filename,"pc_dt",        dom%time%pc_dt,         units="yr",  dim1="pc_steps",dim2="time",ncid=ncid,start=[1,n],count=[3,1],grid_mapping="")
+        ! call nc_write(filename,"pc_eta",       dom%time%pc_eta,        units="m/yr",dim1="pc_steps",dim2="time",ncid=ncid,start=[1,n],count=[3,1],grid_mapping="")
         
         ! == ytopo variables ===
         call nc_write(filename,"H_ice",       dom%tpo%now%H_ice,       units="m",  dim1="xc",dim2="yc",dim3="time",ncid=ncid,start=[1,1,n],count=[nx,ny,1])

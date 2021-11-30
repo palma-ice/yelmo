@@ -711,6 +711,9 @@ module yelmo_defs
         real(wp)   :: scale
         real(wp)   :: x_e
         real(wp)   :: y_n
+        real(wp)   :: semi_major_axis
+        real(wp)   :: inverse_flattening
+        logical    :: is_sphere 
         logical    :: is_projection 
 
         ! Axes

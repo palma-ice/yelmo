@@ -37,6 +37,8 @@ module ncio
 
     character(len=NC_STRLEN), parameter :: NC_CHARDIM = "strlen"
 
+    character(len=3), parameter :: GRID_MAPPING_NAME_DEFAULT = "crs" 
+
     type ncvar
         character (len=NC_STRLEN) :: name, long_name, standard_name, units
         character (len=NC_STRLEN) :: axis, calendar, grid_mapping
@@ -560,7 +562,7 @@ contains
         v%xtype = "NF90_DOUBLE"
         v%coord = .FALSE.
 
-        v%grid_mapping  = ""
+        v%grid_mapping  = GRID_MAPPING_NAME_DEFAULT
 
         ! If args are present, reassign these variables
         if ( present(long_name) )     v%long_name      = trim(long_name)
@@ -1443,10 +1445,6 @@ contains
         ! CF map conventions can be found here:
         ! http://cfconventions.org/Data/cf-conventions/cf-conventions-1.6/build/cf-conventions.html#appendix-grid-mappings
         
-        ! ajr: note this is deprecated, as it won't work for generating 
-        ! a grid description file using eg, cdo -griddes. Better to use 
-        ! the projection specific functions below nc_write_map_stereographic, etc...
-
         implicit none
 
         character(len=*), intent(IN) :: filename, grid_mapping_name
@@ -1850,6 +1848,10 @@ contains
         endif
 
         call nc_v_init(v,name=trim(name),xtype=xtype,coord=.TRUE.)
+
+        ! Ensure grid_mapping is set to blank since a dimension cannot 
+        ! have a grid mapping. 
+        v%grid_mapping = "" 
 
         !! Now fill in values of arguments that are present
         if ( present(long_name) )     v%long_name     = trim(long_name)

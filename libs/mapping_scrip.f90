@@ -79,6 +79,7 @@ module coordinates_mapping_scrip
         module procedure map_scrip_field_double
         module procedure map_scrip_field_float
         module procedure map_scrip_field_integer 
+        module procedure map_scrip_field_logical
     end interface 
 
     private 
@@ -90,6 +91,53 @@ module coordinates_mapping_scrip
     public :: map_scrip_end
 
 contains 
+    
+    subroutine map_scrip_field_logical(map,var_name,var1,var2,mask2,method,reset,missing_value, &
+                                        mask_pack,fill_method,filt_method,filt_par,verbose)
+        ! Map a variable field var1 from a src_grid to variable field var2 on dst_grid 
+
+        ! Note: method='mean' is analogous to the method normalize_opt='fracarea' 
+        ! desribed in the SCRIP documention (Fig. 2.4 in scripusers.pdf). The 
+        ! other methods normalize_opt=['destarea','none'] have not been implemented.
+
+        implicit none 
+
+        type(map_scrip_class),  intent(IN), target :: map 
+        character(len=*),       intent(IN)    :: var_name 
+        logical,                intent(IN)    :: var1(:,:) 
+        logical,                intent(INOUT) :: var2(:,:) 
+        integer,                intent(OUT), optional :: mask2(:,:) 
+        character(len=*),       intent(IN),  optional :: method
+        logical,                intent(IN),  optional :: reset           ! Fill cells with no available values?
+        double precision,       intent(IN),  optional :: missing_value   ! Points not included in mapping
+        logical,                intent(IN),  optional :: mask_pack(:,:)  ! Mask for where to interpolate
+        character(len=*),       intent(IN),  optional :: fill_method     ! Method to fill in remaining missing values
+        character(len=*),       intent(IN),  optional :: filt_method     ! Method to use for filtering
+        double precision,       intent(IN),  optional :: filt_par(:)     ! gaussian=[sigma,dx]; poisson=[tol]
+        logical,                intent(IN),  optional :: verbose         ! Print information
+        
+        ! Local variables 
+        real(dp), allocatable :: var1dp(:,:) 
+        real(dp), allocatable :: var2dp(:,:) 
+        
+        allocate(var1dp(size(var1,1),size(var1,2)))
+        allocate(var2dp(size(var2,1),size(var2,2)))
+        
+        var1dp = 0.0_dp 
+        where(var1) var1dp = 1.0_dp 
+
+        var2dp = 0.0_dp 
+        where(var2) var2dp = 1.0_dp 
+        
+        call map_scrip_field(map,var_name,var1dp,var2dp,mask2,method,reset,missing_value, &
+                                            mask_pack,fill_method,filt_method,filt_par)
+
+        var2 = .FALSE. 
+        where(int(var2dp) .eq. 1.0_dp) var2 = .TRUE. 
+
+        return 
+
+    end subroutine map_scrip_field_logical
     
     subroutine map_scrip_field_integer(map,var_name,var1,var2,mask2,method,reset,missing_value, &
                                         mask_pack,fill_method,filt_method,filt_par,verbose)

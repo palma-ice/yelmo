@@ -13,14 +13,45 @@ use, intrinsic :: iso_fortran_env, only: error_unit
 
 implicit none
 
+! === coord_constants ===================================
+
+    ! Internal constants
+    integer,  parameter :: dp  = kind(1.d0)
+    integer,  parameter :: sp  = kind(1.0)
+
+    ! Choose the precision of the coord library (sp,dp)
+    integer,  parameter :: wp = sp 
+
+
+    ! Missing value and aliases
+    real(dp), parameter :: MISSING_VALUE_DEFAULT = -9999.0_dp 
+    real(dp), parameter :: mv = MISSING_VALUE_DEFAULT
+    
+    ! Error distance (very large) and error index 
+    real(dp), parameter :: ERR_DIST = 1E8_dp 
+    integer,  parameter :: ERR_IND  = -1 
+
+    ! Mathematical constants
+    real(dp), parameter  :: pi  = 2._dp*acos(0._dp)
+    real(dp), parameter  :: degrees_to_radians = pi / 180._dp  ! Conversion factor between radians and degrees
+    real(dp), parameter  :: radians_to_degrees = 180._dp / pi  ! Conversion factor between degrees and radians
+     
+    ! ======================================================
+    
 interface filter_gaussian
     module procedure filter_gaussian_float
     module procedure filter_gaussian_dble 
 end interface 
 
+interface filter_gaussian_fast
+    module procedure filter_gaussian_fast_float
+    module procedure filter_gaussian_fast_dble 
+end interface 
+
 private
 
 public :: filter_gaussian
+public :: filter_gaussian_fast
 public :: gaussian_kernel
 public :: convolve 
 
@@ -28,6 +59,247 @@ public :: hgrad
 public :: diffuse2D, diff2D_timestep
 
 contains
+
+! ================================================================
+
+! Newer approach (not so flexible, but faster):
+ 
+    subroutine filter_gaussian_fast_dble(var,sigma,dx,mask)
+        ! Wrapper for input as doubles
+        real(kind=8), intent(inout) :: var(:,:)
+        real(kind=8), intent(in)    :: sigma
+        real(kind=8), intent(in)    :: dx 
+        logical,      intent(in), optional :: mask(:,:) 
+
+        real(kind=4), allocatable :: kernel(:,:)
+        real(kind=4) :: sigmap 
+        integer :: nx, ny 
+
+        real(kind=4), allocatable :: output4(:,:)
+
+        ! Allocate local output array 
+        allocate(output4(size(var,1),size(var,2)))
+
+        output4 = real(var) 
+
+        call filter_gaussian_fast_float(output4,real(sigma),real(dx),mask)
+        
+        ! Return a double array
+        var = dble(output4)
+
+        return 
+
+    end subroutine filter_gaussian_fast_dble
+    
+    subroutine filter_gaussian_fast_float(var,sigma,dx,mask)
+
+        real(kind=4), intent(inout) :: var(:,:)
+        real(kind=4), intent(in)    :: sigma
+        real(kind=4), intent(in)    :: dx 
+        logical,      intent(in), optional :: mask(:,:)
+
+        ! Local variables
+        integer :: nx, ny, i, j, iref, jref 
+        integer :: nk, nk2
+        real(kind=4), allocatable :: kernel_ref(:,:) 
+        real(kind=4), allocatable :: kernel(:,:) 
+        real(kind=4), allocatable :: varext(:,:) 
+        logical,      allocatable :: maskext(:,:) 
+        real(4) :: kern_tot 
+
+        real(4), parameter :: n_sigma_truncate = 1.5
+        
+        nx = size(var,1)
+        ny = size(var,2) 
+
+        ! Consistency check: sigma must be smaller than 0.5*nx*dx 
+        if (sigma .gt. 0.5*nx*dx .or. sigma .gt. 0.5*ny*dx) then 
+            write(*,*) "filter_gaussian:: Error: sigma must be less &
+                       &than half of the grid width."
+            write(*,*) "sigma, nx, ny, dx: ", sigma, nx, ny, dx 
+            stop 
+        end if 
+
+        ! Calculate kernel 
+        nk2 = ceiling( (sigma*n_sigma_truncate) / dx )
+        nk  = 2*nk2+1 
+        allocate(kernel_ref(nk,nk))
+        allocate(kernel(nk,nk))
+        call calc_gauss_values(kernel_ref,dx,dx,sigma,nk)
+
+        ! Get output array with buffer on sides 
+        allocate(varext(nx+2*nk2, ny+2*nk2))
+        allocate(maskext(nx+2*nk2,ny+2*nk2))
+
+        varext  = -9999.0 
+        maskext = .FALSE. 
+
+        ! Fill in values 
+        varext(nk2+1:(nk2+nx),nk2+1:(nk2+ny))  = var 
+
+        if (present(mask)) then 
+            maskext(nk2+1:(nk2+nx),nk2+1:(nk2+ny)) = mask 
+        end if 
+
+        ! Fill in borders, except corners that won't be used for simplicity
+        do i = 1, nk2
+            varext(i,nk2+1:nk2+ny)           = var(nk2-i+1,:) 
+            varext((nk2+nx+i),nk2+1:nk2+ny)  = var(nx-i+1,:)
+            varext(nk2+1:nk2+nx,i)           = var(:,nk2-i+1) 
+            varext(nk2+1:nk2+nx,(nk2+ny+i))  = var(:,ny-i+1)
+
+            if (present(mask)) then 
+                maskext(i,nk2+1:nk2+ny)          = mask(nk2-i+1,:) 
+                maskext((nk2+nx+i),nk2+1:nk2+ny) = mask(nx-i+1,:)
+                maskext(nk2+1:nk2+nx,i)          = mask(:,nk2-i+1) 
+                maskext(nk2+1:nk2+nx,(nk2+ny+i)) = mask(:,ny-i+1)
+            end if 
+        end do 
+        
+        ! Loop over points corresponding to actual var array 
+        ! (ie, over internal points of varext)
+        do j = nk2+1,nk2+ny 
+        do i = nk2+1,nk2+nx
+
+            ! Get current kernel 
+            kernel = kernel_ref 
+            where(.not. maskext(i-nk2:i+nk2,j-nk2:j+nk2)) kernel = 0.0 
+            kern_tot = sum(kernel)
+
+            ! If weights exist, convolve filter to get new value of var
+            if (kern_tot .gt. 0.0) then 
+                iref = i-nk2 
+                jref = j-nk2
+                var(iref,jref) = sum(kernel*varext(i-nk2:i+nk2,j-nk2:j+nk2)) / kern_tot
+            end if 
+
+        end do 
+        end do
+
+        return 
+
+    end subroutine filter_gaussian_fast_float
+
+
+    ! subroutine smooth_gauss_2D(var,mask_apply,dx,n_smooth,mask_use)
+    !     ! Smooth out a field to avoid noise 
+    !     ! mask_apply designates where smoothing should be applied 
+    !     ! mask_use   designates which points can be considered in the smoothing filter 
+
+    !     implicit none
+
+    !     real(prec), intent(INOUT) :: var(:,:)      ! [nx,ny] 2D variable
+    !     logical,    intent(IN)    :: mask_apply(:,:) 
+    !     real(prec), intent(IN)    :: dx 
+    !     integer,    intent(IN)    :: n_smooth  
+    !     logical,    intent(IN), optional :: mask_use(:,:) 
+
+    !     ! Local variables
+    !     integer :: i, j, nx, ny, n, n2
+    !     real(prec) :: sigma    
+    !     real(prec), allocatable :: filter0(:,:), filter(:,:) 
+    !     real(prec), allocatable :: var_old(:,:) 
+    !     logical,    allocatable :: mask_use_local(:,:) 
+
+    !     nx    = size(var,1)
+    !     ny    = size(var,2)
+    !     n     = 7 
+    !     n2    = (n-1)/2 
+
+    !     sigma = dx*n_smooth 
+
+    !     allocate(var_old(nx,ny))
+    !     allocate(mask_use_local(nx,ny))
+    !     allocate(filter0(n,n))
+    !     allocate(filter(n,n))
+
+    !     ! Check whether mask_use is available 
+    !     if (present(mask_use)) then 
+    !         ! use mask_use to define neighborhood points
+            
+    !         mask_use_local = mask_use 
+
+    !     else
+    !         ! Assume that mask_apply also gives the points to use for smoothing 
+
+    !         mask_use_local = mask_apply
+        
+    !     end if
+
+    !     ! Calculate default 2D Gaussian smoothing kernel
+    !     filter0 = gauss_values(dx,dx,sigma=sigma,n=n)
+
+    !     var_old = var 
+
+    !     do j = n2+1, ny-n2
+    !     do i = n2+1, nx-n2
+
+    !         if (mask_apply(i,j)) then 
+    !             ! Apply smoothing to this point 
+
+    !             filter = filter0 
+    !             where(.not. mask_use_local(i-n2:i+n2,j-n2:j+n2)) filter = 0.0
+    !             if (sum(filter) .gt. 0.0) then
+    !                 ! If neighbors are available, perform smoothing   
+    !                 filter = filter/sum(filter)
+    !                 var(i,j) = sum(var_old(i-n2:i+n2,j-n2:j+n2)*filter) 
+    !             end if  
+
+    !         end if 
+
+    !     end do 
+    !     end do 
+
+    !     return 
+
+    ! end subroutine smooth_gauss_2D
+
+    subroutine calc_gauss_values(filt,dx,dy,sigma,n)
+        ! Calculate 2D Gaussian smoothing kernel
+        ! https://en.wikipedia.org/wiki/Gaussian_blur
+
+        implicit none 
+
+        real(4),    intent(OUT) :: filt(n,n) 
+        real(4),    intent(IN)  :: dx 
+        real(4),    intent(IN)  :: dy 
+        real(4),    intent(IN)  :: sigma 
+        integer,    intent(IN)  :: n 
+        
+        ! Local variables 
+        real(4)    :: x, y  
+        integer    :: n2, i, j, i1, j1  
+
+        if (mod(n,2) .ne. 1) then 
+            write(*,*) "calc_gauss_values:: error: n can only be odd."
+            write(*,*) "n = ", n 
+        end if 
+
+        n2 = (n-1)/2 
+
+        do j = -n2, n2 
+        do i = -n2, n2 
+            
+            x = i*dx 
+            y = j*dy 
+
+            i1 = i+1+n2 
+            j1 = j+1+n2 
+            filt(i1,j1) = 1.0/(2.0*pi*sigma**2)*exp(-(x**2+y**2)/(2*sigma**2))
+
+        end do 
+        end do 
+        
+        ! Normalize to ensure sum to 1
+        filt = filt / sum(filt)
+
+        return 
+
+    end subroutine calc_gauss_values
+
+! ================================================================
+
+! Older approach (works well, robust, but slower):
 
     subroutine filter_gaussian_dble(var,sigma,dx,mask,truncate)
         ! Wrapper for input as doubles

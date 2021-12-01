@@ -580,7 +580,7 @@ contains
 
     end subroutine yelmo_restart_write
 
-    subroutine yelmo_restart_read_topo(dom,filename,time)  
+        subroutine yelmo_restart_read_topo(dom,filename,time)  
         ! Load yelmo variables from restart file: [tpo] 
         ! [dyn,therm,mat] variables loaded using yelmo_restart_read
         
@@ -590,6 +590,69 @@ contains
         character(len=*),  intent(IN)    :: filename 
         real(wp),          intent(IN)    :: time 
         
+        ! Local variables
+        integer  :: ncid, n, nx, ny, nz, nz_ac 
+        real(wp) :: time_of_restart_file 
+        character(len=56) :: restart_domain 
+        character(len=56) :: restart_grid_name 
+        type(map_scrip_class) :: mps 
+        logical :: is_same_grid 
+
+
+        is_same_grid = .TRUE. 
+
+
+
+        if (is_same_grid) then 
+            call yelmo_restart_read_topo_internal(dom,filename,time)
+        else
+            call yelmo_restart_read_topo_internal(dom,filename,time,mps) 
+        end if 
+
+        return 
+
+    end subroutine yelmo_restart_read_topo
+
+    subroutine yelmo_restart_read(dom,filename,time)
+        ! Load yelmo variables from restart file: [dyn,therm,mat] 
+        ! [tpo] variables loaded using yelmo_restart_read_topo
+
+        implicit none 
+
+        type(yelmo_class), intent(INOUT) :: dom 
+        character(len=*),  intent(IN)    :: filename 
+        real(wp),          intent(IN)    :: time 
+        
+        ! Local variables 
+        character(len=56) :: restart_domain 
+        character(len=56) :: restart_grid_name 
+        type(map_scrip_class) :: mps 
+        logical :: is_same_grid 
+
+
+        is_same_grid = .TRUE. 
+
+        if (is_same_grid) then 
+            call yelmo_restart_read_internal(dom,filename,time)
+        else
+            call yelmo_restart_read_internal(dom,filename,time,mps) 
+        end if 
+
+        return 
+
+    end subroutine yelmo_restart_read
+    
+    subroutine yelmo_restart_read_topo_internal(dom,filename,time,mps)  
+        ! Load yelmo variables from restart file: [tpo] 
+        ! [dyn,therm,mat] variables loaded using yelmo_restart_read
+        
+        implicit none 
+
+        type(yelmo_class), intent(INOUT) :: dom 
+        character(len=*),  intent(IN)    :: filename 
+        real(wp),          intent(IN)    :: time 
+        type(map_scrip_class), optional, intent(IN) :: mps 
+
         ! Local variables
         integer  :: ncid, n, nx, ny, nz, nz_ac 
         real(wp) :: time_of_restart_file 
@@ -680,10 +743,10 @@ contains
         
         return 
 
-    end subroutine yelmo_restart_read_topo
+    end subroutine yelmo_restart_read_topo_internal
 
 
-    subroutine yelmo_restart_read(dom,filename,time)
+    subroutine yelmo_restart_read_internal(dom,filename,time,mps)
         ! Load yelmo variables from restart file: [dyn,therm,mat] 
         ! [tpo] variables loaded using yelmo_restart_read_topo
 
@@ -692,7 +755,8 @@ contains
         type(yelmo_class), intent(INOUT) :: dom 
         character(len=*),  intent(IN)    :: filename 
         real(wp),          intent(IN)    :: time 
-        
+        type(map_scrip_class), optional, intent(IN) :: mps
+
         ! Local variables
         integer :: ncid, n, nx, ny, nz, nz_ac, nz_r, n_iso 
         
@@ -896,7 +960,7 @@ contains
         
         return 
 
-    end subroutine yelmo_restart_read
+    end subroutine yelmo_restart_read_internal
     
     subroutine nc_read_interp_wp_2D(filename,vnm,var2D,var2D_in,ncid,start,count,mps,method)
         ! Read in a 2D field and interpolate it using scrip map

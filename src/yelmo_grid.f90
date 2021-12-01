@@ -338,11 +338,11 @@ contains
         write(*,*) "inverse_flattening:                     ",  grd%inverse_flattening
         write(*,*) 
         write(*,"(a16,i8)")        "Total points = ",   grd%npts
-        write(*,"(a16,2g12.5)")    "range(xc) = ",      minval(grd%xc),maxval(grd%xc)
-        write(*,"(a16,2g12.5)")    "range(yc) = ",      minval(grd%yc),maxval(grd%yc)
-        write(*,"(a16,2g12.5)")    "range(lon) = ",     minval(grd%lon),maxval(grd%lon)
-        write(*,"(a16,2g12.5)")    "range(lat) = ",     minval(grd%lat),maxval(grd%lat)
-        write(*,"(a16,2g12.5)")    "range(area) = ",    minval(grd%area),maxval(grd%area)
+        write(*,"(a16,2g15.5)")    "range(xc) = ",      minval(grd%xc),maxval(grd%xc)
+        write(*,"(a16,2g15.5)")    "range(yc) = ",      minval(grd%yc),maxval(grd%yc)
+        write(*,"(a16,2g15.5)")    "range(lon) = ",     minval(grd%lon),maxval(grd%lon)
+        write(*,"(a16,2g15.5)")    "range(lat) = ",     minval(grd%lat),maxval(grd%lat)
+        write(*,"(a16,2g15.5)")    "range(area) = ",    minval(grd%area),maxval(grd%area)
 
         return 
 
@@ -949,28 +949,40 @@ contains
 
     end subroutine ygrid_dealloc
 
-    subroutine yelmo_grid_write(grid,fnm,create)
+    subroutine yelmo_grid_write(grid,fnm,domain,grid_name,create)
         ! Write grid info to netcdf file respecting coordinate conventions
         ! for easier interpretation/plotting etc. 
 
         implicit none 
         type(ygrid_class), intent(IN) :: grid 
         character(len=*),  intent(IN) :: fnm
+        character(len=*),  intent(IN) :: domain
+        character(len=*),  intent(IN) :: grid_name
         logical,           intent(IN) :: create  
 
         ! Local variables 
         character(len=16) :: xnm 
         character(len=16) :: ynm 
-        
+        character(len=16) :: grid_mapping_name
+
         xnm = "xc"
         ynm = "yc" 
+        grid_mapping_name = "crs" 
 
         ! Create the netcdf file if desired
         if (create) then 
+            
+            ! Create the empty netcdf file
             call nc_create(fnm)
-        
+
+            ! Write some general attributes that can be useful (e.g., for interpolation etc)
+            call nc_write_attr(fnm, "domain",    trim(domain))
+            call nc_write_attr(fnm, "grid_name", trim(grid_name))
+
+
             ! Add grid axis variables to netcdf file
             call nc_write_dim(fnm,xnm,x=grid%xc*1e-3,units="km")
+
             call nc_write_dim(fnm,ynm,x=grid%yc*1e-3,units="km")
             
             if (grid%is_projection) then 
@@ -988,19 +1000,19 @@ contains
                               inverse_flattening=dble(grid%inverse_flattening))
         end if 
 
-        call nc_write(fnm,"x2D",grid%x*1e-3,dim1=xnm,dim2=ynm,units="km",grid_mapping="crs")
-        call nc_write(fnm,"y2D",grid%y*1e-3,dim1=xnm,dim2=ynm,units="km",grid_mapping="crs")
+        call nc_write(fnm,"x2D",grid%x*1e-3,dim1=xnm,dim2=ynm,units="km",grid_mapping=grid_mapping_name)
+        call nc_write(fnm,"y2D",grid%y*1e-3,dim1=xnm,dim2=ynm,units="km",grid_mapping=grid_mapping_name)
 
         if (grid%is_projection) then 
-            call nc_write(fnm,"lon2D",grid%lon,dim1=xnm,dim2=ynm,grid_mapping="crs")
+            call nc_write(fnm,"lon2D",grid%lon,dim1=xnm,dim2=ynm,grid_mapping=grid_mapping_name)
             call nc_write_attr(fnm,"lon2D","units","degrees_east")
-            call nc_write(fnm,"lat2D",grid%lat,dim1=xnm,dim2=ynm,grid_mapping="crs")
+            call nc_write(fnm,"lat2D",grid%lat,dim1=xnm,dim2=ynm,grid_mapping=grid_mapping_name)
             call nc_write_attr(fnm,"lat2D","units","degrees_north")
         end if 
 
-        call nc_write(fnm,"area",  grid%area*1e-6,  dim1=xnm,dim2=ynm,grid_mapping="crs",units="km^2")
+        call nc_write(fnm,"area",  grid%area*1e-6,  dim1=xnm,dim2=ynm,grid_mapping=grid_mapping_name,units="km^2")
         if (grid%is_projection) call nc_write_attr(fnm,"area","coordinates","lat2D lon2D")
-        !call nc_write(fnm,"border",grid%border,dim1=xnm,dim2=ynm,grid_mapping="crs")
+        !call nc_write(fnm,"border",grid%border,dim1=xnm,dim2=ynm,grid_mapping=grid_mapping_name)
         !if (grid%is_projection) call nc_write_attr(fnm,"border","coordinates","lat2D lon2D")
 
         return

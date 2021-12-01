@@ -393,7 +393,7 @@ program yelmo_test
             ! Finally, ensure all relaxation is disabled and continue as normal.
 
                 yelmo1%tpo%par%topo_rel     = 0
-                write(*,*) "timelog, relation off..."
+                write(*,*) "timelog, relaxation off..."
               
         end if 
         ! ====================================================

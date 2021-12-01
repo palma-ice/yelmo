@@ -7,6 +7,9 @@ module yelmo_io
     use yelmo_defs 
     use yelmo_grid 
 
+    use interp2D
+    use coordinates_mapping_scrip
+
     implicit none
 
     private 
@@ -882,6 +885,135 @@ contains
 
     end subroutine yelmo_restart_read
     
+    subroutine nc_read_interp_2D(filename,vnm,var2D,var2D_in,ncid,start,count,mps,method)
+        ! Read in a 2D field and interpolate it using scrip map
+        ! as needed. 
+
+        implicit none
+
+        character(len=*),   intent(IN)  :: filename 
+        character(len=*),   intent(IN)  :: vnm 
+        real(wp),           intent(OUT) :: var2D(:,:) 
+        real(wp),optional,  intent(IN)  :: var2D_in(:,:) 
+        integer, optional,  intent(IN)  :: ncid 
+        integer, optional,  intent(IN)  :: start(:) 
+        integer, optional,  intent(IN)  :: count(:) 
+        type(map_scrip_class), optional, intent(IN) :: mps
+        character(len=*),      optional, intent(IN) :: method 
+
+        ! Local variables 
+        integer :: nx, ny 
+        integer,  allocatable :: dims(:) 
+        real(wp), allocatable :: var2D_src(:,:) 
+        character(len=56) :: mapping_method 
+
+        if (present(var2D_in)) then 
+            ! Get source array from argument (useful for handling 3D arrays with this routine)
+
+            nx = size(var2D_in,1)
+            ny = size(var2D_in,2) 
+
+            allocate(var2D_src(nx,ny))
+
+            var2D_src = var2D_in 
+
+        else 
+            ! Load 2D array from file 
+
+            ! Determine dimensions of current variable in the source file
+            call nc_dims(filename,vnm,dims=dims)
+
+            nx = dims(1)
+            ny = dims(2) 
+
+            allocate(var2D_src(nx,ny))
+
+            ! Load the variable from the file to the local 2D array
+            call nc_read(filename,vnm,var2D_src,ncid=ncid,start=start,count=count,missing_value=MV)
+        
+        end if 
+
+
+        if (nx .eq. size(var2D,1) .and. ny .eq. size(var2D,2)) then 
+            ! Assume no interpolation needed, copy variable for output directly
+
+            var2D = var2D_src 
+
+        else 
+            ! Map local source array it to our target array 
+
+            ! Determine mapping method for this variable 
+            mapping_method = "mean"
+            if (present(method)) mapping_method = trim(method) 
+
+            ! Perform conservative interpolation 
+            var2D = MV 
+            call map_scrip_field(mps,vnm,var2D_src,var2D,method=mapping_method, &
+                                        missing_value=MV,fill_method="nn")
+
+        end if 
+
+        return
+
+    end subroutine nc_read_interp_2D
+
+    subroutine nc_read_interp_3D(filename,vnm,var3D,ncid,start,count,mps,method)
+        ! Read in a 2D field and interpolate it using scrip map
+        ! as needed. 
+
+        implicit none
+
+        character(len=*),   intent(IN)  :: filename 
+        character(len=*),   intent(IN)  :: vnm 
+        real(wp),           intent(OUT) :: var3D(:,:,:) 
+        integer, optional,  intent(IN)  :: ncid 
+        integer, optional,  intent(IN)  :: start(:) 
+        integer, optional,  intent(IN)  :: count(:) 
+        type(map_scrip_class), optional, intent(IN) :: mps
+        character(len=*),      optional, intent(IN) :: method 
+
+        ! Local variables 
+        integer :: nx, ny, nz, k  
+        integer,  allocatable :: dims(:) 
+        real(wp), allocatable :: var3D_src(:,:,:) 
+
+        ! Determine dimensions of current variable in the source file
+        call nc_dims(filename,vnm,dims=dims)
+
+        nx = dims(1)
+        ny = dims(2) 
+        nz = dims(3) 
+
+        allocate(var3D_src(nx,ny,nz))
+
+        ! Safety check 
+        if (nz .ne. size(var3D,3)) then 
+
+            write(io_unit_err,*) ""
+            write(io_unit_err,*) "nc_read_interp_3D:: Error: vertical dimension of variable in &
+                    &input file does not match vertical dimension of yelmo object. Vertical &
+                    & interpolation is not yet supported."
+            write(io_unit_err,*) "filename  = ", trim(filename)
+            write(io_unit_err,*) "variable  = ", trim(vnm)
+            write(io_unit_err,*) "nz[file]  = ", nz
+            write(io_unit_err,*) "nz[yelmo] = ", size(var3D,3) 
+            stop 
+        end if 
+            
+        ! Read in full 3D variable of interest 
+        call nc_read(filename,vnm,var3D_src,ncid=ncid,start=start,count=count,missing_value=MV)
+        
+        ! Loop over vertical dimension and apply interpolation 
+        do k = 1, nz 
+            
+            call nc_read_interp_2D(filename,vnm,var3D(:,:,k),var3D_src(:,:,k),ncid, &
+                                                                start,count,mps,method)
+
+        end do 
+
+        return
+
+    end subroutine nc_read_interp_3D
 
 end module yelmo_io
 

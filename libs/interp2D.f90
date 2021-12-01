@@ -55,6 +55,7 @@ module interp2D
     interface fill_nearest
         module procedure fill_nearest_dble, fill_nearest_int  
         module procedure fill_nearest_dble_new
+        module procedure fill_nearest_float
     end interface
 
     interface fill_bilinear
@@ -1342,6 +1343,26 @@ contains
         return 
 
     end subroutine fill_nearest_int
+
+    subroutine fill_nearest_float(z,missing_value,fill_value,mask,n)
+
+        implicit none 
+        
+        real(sp) :: z(:,:) 
+        real(sp) :: missing_value 
+        double precision, optional :: fill_value
+        logical, optional :: mask(:,:) 
+        integer, optional :: n
+
+        double precision, dimension(size(z,1),size(z,2)) :: z_dble 
+
+        z_dble = dble(z) 
+        call fill_nearest_dble(z_dble,dble(missing_value),fill_value,mask,n)
+        z = real(z_dble,sp)
+
+        return 
+
+    end subroutine fill_nearest_float
 
     subroutine diffuse(z,iter,missing_value,mask)
 

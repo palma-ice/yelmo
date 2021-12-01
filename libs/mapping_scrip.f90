@@ -129,8 +129,8 @@ contains
         var2dp = 0.0_dp 
         where(var2) var2dp = 1.0_dp 
         
-        call map_scrip_field(map,var_name,var1dp,var2dp,mask2,method,reset,missing_value, &
-                                            mask_pack,fill_method,filt_method,filt_par)
+        call map_scrip_field_double(map,var_name,var1dp,var2dp,mask2,method,reset,dble(missing_value), &
+                                            mask_pack,fill_method,filt_method,dble(filt_par))
 
         var2 = .FALSE. 
         where(int(var2dp) .eq. 1.0_dp) var2 = .TRUE. 
@@ -156,11 +156,11 @@ contains
         integer,                intent(OUT), optional :: mask2(:,:) 
         character(len=*),       intent(IN),  optional :: method
         logical,                intent(IN),  optional :: reset           ! Fill cells with no available values?
-        double precision,       intent(IN),  optional :: missing_value   ! Points not included in mapping
+        integer,                intent(IN),  optional :: missing_value   ! Points not included in mapping
         logical,                intent(IN),  optional :: mask_pack(:,:)  ! Mask for where to interpolate
         character(len=*),       intent(IN),  optional :: fill_method     ! Method to fill in remaining missing values
         character(len=*),       intent(IN),  optional :: filt_method     ! Method to use for filtering
-        double precision,       intent(IN),  optional :: filt_par(:)     ! gaussian=[sigma,dx]; poisson=[tol]
+        integer,                intent(IN),  optional :: filt_par(:)     ! gaussian=[sigma,dx]; poisson=[tol]
         logical,                intent(IN),  optional :: verbose         ! Print information
         
         ! Local variables 
@@ -173,8 +173,8 @@ contains
         var1dp = real(var1,dp)
         var2dp = real(var2,dp)
         
-        call map_scrip_field(map,var_name,var1dp,var2dp,mask2,method,reset,missing_value, &
-                                            mask_pack,fill_method,filt_method,filt_par)
+        call map_scrip_field_double(map,var_name,var1dp,var2dp,mask2,method,reset,dble(missing_value), &
+                                            mask_pack,fill_method,filt_method,dble(filt_par))
 
         var2 = int(var2dp) 
 
@@ -199,11 +199,11 @@ contains
         integer,                intent(OUT), optional :: mask2(:,:) 
         character(len=*),       intent(IN),  optional :: method
         logical,                intent(IN),  optional :: reset           ! Reset var2 initially to missing_value?
-        double precision,       intent(IN),  optional :: missing_value   ! Points not included in mapping
+        real(sp),               intent(IN),  optional :: missing_value   ! Points not included in mapping
         logical,                intent(IN),  optional :: mask_pack(:,:)  ! Mask for where to interpolate
         character(len=*),       intent(IN),  optional :: fill_method     ! Method to fill in remaining missing values
         character(len=*),       intent(IN),  optional :: filt_method     ! Method to use for filtering
-        double precision,       intent(IN),  optional :: filt_par(:)     ! gaussian=[sigma,dx]; poisson=[tol]
+        real(sp),               intent(IN),  optional :: filt_par(:)     ! gaussian=[sigma,dx]; poisson=[tol]
         logical,                intent(IN),  optional :: verbose         ! Print information
         
         ! Local variables 
@@ -216,8 +216,8 @@ contains
         var1dp = real(var1,dp)
         var2dp = real(var2,dp)
         
-        call map_scrip_field(map,var_name,var1dp,var2dp,mask2,method,reset,missing_value, &
-                                            mask_pack,fill_method,filt_method,filt_par)
+        call map_scrip_field_double(map,var_name,var1dp,var2dp,mask2,method,reset,dble(missing_value), &
+                                            mask_pack,fill_method,filt_method,dble(filt_par))
 
         var2 = real(var2dp,sp) 
 

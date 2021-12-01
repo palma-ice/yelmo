@@ -17,6 +17,7 @@ module yelmo_io
         module procedure    nc_read_interp_int_3D
         module procedure    nc_read_interp_wp_2D
         module procedure    nc_read_interp_wp_3D
+        module procedure    nc_read_interp_logical_2D
     end interface
 
     private 
@@ -638,6 +639,9 @@ contains
             call yelmo_restart_read_internal(dom,filename,time,mps) 
         end if 
 
+        ! ajr: testing
+        call yelmo_restart_write(dom,"yelmo_restart_init.nc",time)
+        
         return 
 
     end subroutine yelmo_restart_read
@@ -694,41 +698,41 @@ contains
         
         ! == ytopo variables ===
 
-        call nc_read(filename,"H_ice",       dom%tpo%now%H_ice,ncid=ncid,start=[1,1,n],count=[nx,ny,1])
-        call nc_read(filename,"z_srf",       dom%tpo%now%z_srf,ncid=ncid,start=[1,1,n],count=[nx,ny,1])
-        call nc_read(filename,"dzsrfdt",     dom%tpo%now%dzsrfdt,ncid=ncid,start=[1,1,n],count=[nx,ny,1])
-        call nc_read(filename,"dHicedt",     dom%tpo%now%dHicedt,ncid=ncid,start=[1,1,n],count=[nx,ny,1])
-        call nc_read(filename,"fmb",         dom%tpo%now%fmb,ncid=ncid,start=[1,1,n],count=[nx,ny,1])
-        call nc_read(filename,"bmb",         dom%tpo%now%bmb,ncid=ncid,start=[1,1,n],count=[nx,ny,1])
-        call nc_read(filename,"mb_applied",  dom%tpo%now%mb_applied,ncid=ncid,start=[1,1,n],count=[nx,ny,1])
-        call nc_read(filename,"mb_resid",    dom%tpo%now%mb_resid,ncid=ncid,start=[1,1,n],count=[nx,ny,1])
-        call nc_read(filename,"calv_flt",    dom%tpo%now%calv_flt,ncid=ncid,start=[1,1,n],count=[nx,ny,1])
-        call nc_read(filename,"calv_grnd",   dom%tpo%now%calv_grnd,ncid=ncid,start=[1,1,n],count=[nx,ny,1])
-        call nc_read(filename,"calv",        dom%tpo%now%calv,ncid=ncid,start=[1,1,n],count=[nx,ny,1])
-        call nc_read(filename,"eps_eff",     dom%tpo%now%eps_eff,ncid=ncid,start=[1,1,n],count=[nx,ny,1])
-        call nc_read(filename,"tau_eff",     dom%tpo%now%tau_eff,ncid=ncid,start=[1,1,n],count=[nx,ny,1])
-        call nc_read(filename,"dzsdx",       dom%tpo%now%dzsdx,ncid=ncid,start=[1,1,n],count=[nx,ny,1])  
-        call nc_read(filename,"dzsdy",       dom%tpo%now%dzsdy,ncid=ncid,start=[1,1,n],count=[nx,ny,1])  
-        call nc_read(filename,"dHicedx",     dom%tpo%now%dHicedx,ncid=ncid,start=[1,1,n],count=[nx,ny,1])
-        call nc_read(filename,"dHicedy",     dom%tpo%now%dHicedy,ncid=ncid,start=[1,1,n],count=[nx,ny,1])
-        call nc_read(filename,"H_eff",       dom%tpo%now%H_eff,ncid=ncid,start=[1,1,n],count=[nx,ny,1])
-        call nc_read(filename,"H_grnd",      dom%tpo%now%H_grnd,ncid=ncid,start=[1,1,n],count=[nx,ny,1])
-        call nc_read(filename,"f_grnd",      dom%tpo%now%f_grnd,ncid=ncid,start=[1,1,n],count=[nx,ny,1])  
-        call nc_read(filename,"f_grnd_acx",  dom%tpo%now%f_grnd_acx,ncid=ncid,start=[1,1,n],count=[nx,ny,1]) 
-        call nc_read(filename,"f_grnd_acy",  dom%tpo%now%f_grnd_acy,ncid=ncid,start=[1,1,n],count=[nx,ny,1]) 
-        call nc_read(filename,"f_ice",       dom%tpo%now%f_ice,ncid=ncid,start=[1,1,n],count=[nx,ny,1])  
-        call nc_read(filename,"dist_margin", dom%tpo%now%dist_margin,ncid=ncid,start=[1,1,n],count=[nx,ny,1]) 
-        call nc_read(filename,"dist_grline", dom%tpo%now%dist_grline,ncid=ncid,start=[1,1,n],count=[nx,ny,1]) 
-        call nc_read(filename,"mask_bed",    dom%tpo%now%mask_bed,ncid=ncid,start=[1,1,n],count=[nx,ny,1])
-        call nc_read(filename,"is_grline",   dom%tpo%now%is_grline,ncid=ncid,start=[1,1,n],count=[nx,ny,1])
-        call nc_read(filename,"is_grz",      dom%tpo%now%is_grz,ncid=ncid,start=[1,1,n],count=[nx,ny,1])
+        call nc_read_interp(filename,"H_ice",       dom%tpo%now%H_ice,ncid=ncid,start=[1,1,n],count=[nx,ny,1])
+        call nc_read_interp(filename,"z_srf",       dom%tpo%now%z_srf,ncid=ncid,start=[1,1,n],count=[nx,ny,1])
+        call nc_read_interp(filename,"dzsrfdt",     dom%tpo%now%dzsrfdt,ncid=ncid,start=[1,1,n],count=[nx,ny,1])
+        call nc_read_interp(filename,"dHicedt",     dom%tpo%now%dHicedt,ncid=ncid,start=[1,1,n],count=[nx,ny,1])
+        call nc_read_interp(filename,"fmb",         dom%tpo%now%fmb,ncid=ncid,start=[1,1,n],count=[nx,ny,1])
+        call nc_read_interp(filename,"bmb",         dom%tpo%now%bmb,ncid=ncid,start=[1,1,n],count=[nx,ny,1])
+        call nc_read_interp(filename,"mb_applied",  dom%tpo%now%mb_applied,ncid=ncid,start=[1,1,n],count=[nx,ny,1])
+        call nc_read_interp(filename,"mb_resid",    dom%tpo%now%mb_resid,ncid=ncid,start=[1,1,n],count=[nx,ny,1])
+        call nc_read_interp(filename,"calv_flt",    dom%tpo%now%calv_flt,ncid=ncid,start=[1,1,n],count=[nx,ny,1])
+        call nc_read_interp(filename,"calv_grnd",   dom%tpo%now%calv_grnd,ncid=ncid,start=[1,1,n],count=[nx,ny,1])
+        call nc_read_interp(filename,"calv",        dom%tpo%now%calv,ncid=ncid,start=[1,1,n],count=[nx,ny,1])
+        call nc_read_interp(filename,"eps_eff",     dom%tpo%now%eps_eff,ncid=ncid,start=[1,1,n],count=[nx,ny,1])
+        call nc_read_interp(filename,"tau_eff",     dom%tpo%now%tau_eff,ncid=ncid,start=[1,1,n],count=[nx,ny,1])
+        call nc_read_interp(filename,"dzsdx",       dom%tpo%now%dzsdx,ncid=ncid,start=[1,1,n],count=[nx,ny,1])  
+        call nc_read_interp(filename,"dzsdy",       dom%tpo%now%dzsdy,ncid=ncid,start=[1,1,n],count=[nx,ny,1])  
+        call nc_read_interp(filename,"dHicedx",     dom%tpo%now%dHicedx,ncid=ncid,start=[1,1,n],count=[nx,ny,1])
+        call nc_read_interp(filename,"dHicedy",     dom%tpo%now%dHicedy,ncid=ncid,start=[1,1,n],count=[nx,ny,1])
+        call nc_read_interp(filename,"H_eff",       dom%tpo%now%H_eff,ncid=ncid,start=[1,1,n],count=[nx,ny,1])
+        call nc_read_interp(filename,"H_grnd",      dom%tpo%now%H_grnd,ncid=ncid,start=[1,1,n],count=[nx,ny,1])
+        call nc_read_interp(filename,"f_grnd",      dom%tpo%now%f_grnd,ncid=ncid,start=[1,1,n],count=[nx,ny,1])  
+        call nc_read_interp(filename,"f_grnd_acx",  dom%tpo%now%f_grnd_acx,ncid=ncid,start=[1,1,n],count=[nx,ny,1]) 
+        call nc_read_interp(filename,"f_grnd_acy",  dom%tpo%now%f_grnd_acy,ncid=ncid,start=[1,1,n],count=[nx,ny,1]) 
+        call nc_read_interp(filename,"f_ice",       dom%tpo%now%f_ice,ncid=ncid,start=[1,1,n],count=[nx,ny,1])  
+        call nc_read_interp(filename,"dist_margin", dom%tpo%now%dist_margin,ncid=ncid,start=[1,1,n],count=[nx,ny,1]) 
+        call nc_read_interp(filename,"dist_grline", dom%tpo%now%dist_grline,ncid=ncid,start=[1,1,n],count=[nx,ny,1]) 
+        call nc_read_interp(filename,"mask_bed",    dom%tpo%now%mask_bed,ncid=ncid,start=[1,1,n],count=[nx,ny,1])
+        call nc_read_interp(filename,"is_grline",   dom%tpo%now%is_grline,ncid=ncid,start=[1,1,n],count=[nx,ny,1])
+        call nc_read_interp(filename,"is_grz",      dom%tpo%now%is_grz,ncid=ncid,start=[1,1,n],count=[nx,ny,1])
         
-        call nc_read(filename,"dHdt_n",      dom%tpo%now%dHdt_n,ncid=ncid,start=[1,1,n],count=[nx,ny,1])
-        call nc_read(filename,"H_ice_n",     dom%tpo%now%H_ice_n,ncid=ncid,start=[1,1,n],count=[nx,ny,1])
-        call nc_read(filename,"H_ice_pred",  dom%tpo%now%H_ice_pred,ncid=ncid,start=[1,1,n],count=[nx,ny,1])
-        call nc_read(filename,"H_ice_corr",  dom%tpo%now%H_ice_corr,ncid=ncid,start=[1,1,n],count=[nx,ny,1])
+        call nc_read_interp(filename,"dHdt_n",      dom%tpo%now%dHdt_n,ncid=ncid,start=[1,1,n],count=[nx,ny,1])
+        call nc_read_interp(filename,"H_ice_n",     dom%tpo%now%H_ice_n,ncid=ncid,start=[1,1,n],count=[nx,ny,1])
+        call nc_read_interp(filename,"H_ice_pred",  dom%tpo%now%H_ice_pred,ncid=ncid,start=[1,1,n],count=[nx,ny,1])
+        call nc_read_interp(filename,"H_ice_corr",  dom%tpo%now%H_ice_corr,ncid=ncid,start=[1,1,n],count=[nx,ny,1])
         
-        call nc_read(filename,"z_srf_n",     dom%tpo%now%z_srf_n,ncid=ncid,start=[1,1,n],count=[nx,ny,1])
+        call nc_read_interp(filename,"z_srf_n",     dom%tpo%now%z_srf_n,ncid=ncid,start=[1,1,n],count=[nx,ny,1])
         
         ! Close the netcdf file
         call nc_close(ncid)
@@ -780,171 +784,171 @@ contains
         
         ! == ydyn variables ===
 
-        call nc_read(filename,"ux",            dom%dyn%now%ux,ncid=ncid,start=[1,1,1,n],count=[nx,ny,nz,1]) 
-        call nc_read(filename,"uy",            dom%dyn%now%uy,ncid=ncid,start=[1,1,1,n],count=[nx,ny,nz,1]) 
-        call nc_read(filename,"uxy",           dom%dyn%now%uxy,ncid=ncid,start=[1,1,1,n],count=[nx,ny,nz,1]) 
-        call nc_read(filename,"uz",            dom%dyn%now%uz,ncid=ncid,start=[1,1,1,n],count=[nx,ny,nz_ac,1]) 
+        call nc_read_interp(filename,"ux",            dom%dyn%now%ux,ncid=ncid,start=[1,1,1,n],count=[nx,ny,nz,1]) 
+        call nc_read_interp(filename,"uy",            dom%dyn%now%uy,ncid=ncid,start=[1,1,1,n],count=[nx,ny,nz,1]) 
+        call nc_read_interp(filename,"uxy",           dom%dyn%now%uxy,ncid=ncid,start=[1,1,1,n],count=[nx,ny,nz,1]) 
+        call nc_read_interp(filename,"uz",            dom%dyn%now%uz,ncid=ncid,start=[1,1,1,n],count=[nx,ny,nz_ac,1]) 
       
-        call nc_read(filename,"ux_bar",        dom%dyn%now%ux_bar,ncid=ncid,start=[1,1,n],count=[nx,ny,1]) 
-        call nc_read(filename,"uy_bar",        dom%dyn%now%uy_bar,ncid=ncid,start=[1,1,n],count=[nx,ny,1]) 
-        call nc_read(filename,"uxy_bar",       dom%dyn%now%uxy_bar,ncid=ncid,start=[1,1,n],count=[nx,ny,1]) 
+        call nc_read_interp(filename,"ux_bar",        dom%dyn%now%ux_bar,ncid=ncid,start=[1,1,n],count=[nx,ny,1]) 
+        call nc_read_interp(filename,"uy_bar",        dom%dyn%now%uy_bar,ncid=ncid,start=[1,1,n],count=[nx,ny,1]) 
+        call nc_read_interp(filename,"uxy_bar",       dom%dyn%now%uxy_bar,ncid=ncid,start=[1,1,n],count=[nx,ny,1]) 
 
-        call nc_read(filename,"ux_bar_prev",   dom%dyn%now%ux_bar_prev,ncid=ncid,start=[1,1,n],count=[nx,ny,1]) 
-        call nc_read(filename,"uy_bar_prev",   dom%dyn%now%uy_bar_prev,ncid=ncid,start=[1,1,n],count=[nx,ny,1]) 
+        call nc_read_interp(filename,"ux_bar_prev",   dom%dyn%now%ux_bar_prev,ncid=ncid,start=[1,1,n],count=[nx,ny,1]) 
+        call nc_read_interp(filename,"uy_bar_prev",   dom%dyn%now%uy_bar_prev,ncid=ncid,start=[1,1,n],count=[nx,ny,1]) 
         
-        call nc_read(filename,"ux_b",          dom%dyn%now%ux_b,ncid=ncid,start=[1,1,n],count=[nx,ny,1]) 
-        call nc_read(filename,"uy_b",          dom%dyn%now%uy_b,ncid=ncid,start=[1,1,n],count=[nx,ny,1]) 
-        call nc_read(filename,"uxy_b",         dom%dyn%now%uxy_b,ncid=ncid,start=[1,1,n],count=[nx,ny,1]) 
+        call nc_read_interp(filename,"ux_b",          dom%dyn%now%ux_b,ncid=ncid,start=[1,1,n],count=[nx,ny,1]) 
+        call nc_read_interp(filename,"uy_b",          dom%dyn%now%uy_b,ncid=ncid,start=[1,1,n],count=[nx,ny,1]) 
+        call nc_read_interp(filename,"uxy_b",         dom%dyn%now%uxy_b,ncid=ncid,start=[1,1,n],count=[nx,ny,1]) 
 
-        call nc_read(filename,"ux_s",          dom%dyn%now%ux_s,ncid=ncid,start=[1,1,n],count=[nx,ny,1]) 
-        call nc_read(filename,"uy_s",          dom%dyn%now%uy_s,ncid=ncid,start=[1,1,n],count=[nx,ny,1]) 
-        call nc_read(filename,"uxy_s",         dom%dyn%now%uxy_s,ncid=ncid,start=[1,1,n],count=[nx,ny,1]) 
+        call nc_read_interp(filename,"ux_s",          dom%dyn%now%ux_s,ncid=ncid,start=[1,1,n],count=[nx,ny,1]) 
+        call nc_read_interp(filename,"uy_s",          dom%dyn%now%uy_s,ncid=ncid,start=[1,1,n],count=[nx,ny,1]) 
+        call nc_read_interp(filename,"uxy_s",         dom%dyn%now%uxy_s,ncid=ncid,start=[1,1,n],count=[nx,ny,1]) 
 
-        call nc_read(filename,"ux_i",          dom%dyn%now%ux_i,ncid=ncid,start=[1,1,1,n],count=[nx,ny,nz,1]) 
-        call nc_read(filename,"uy_i",          dom%dyn%now%uy_i,ncid=ncid,start=[1,1,1,n],count=[nx,ny,nz,1]) 
-        call nc_read(filename,"ux_i_bar",      dom%dyn%now%ux_i_bar,ncid=ncid,start=[1,1,n],count=[nx,ny,1]) 
-        call nc_read(filename,"uy_i_bar",      dom%dyn%now%uy_i_bar,ncid=ncid,start=[1,1,n],count=[nx,ny,1]) 
-        call nc_read(filename,"uxy_i_bar",     dom%dyn%now%uxy_i_bar,ncid=ncid,start=[1,1,n],count=[nx,ny,1]) 
+        call nc_read_interp(filename,"ux_i",          dom%dyn%now%ux_i,ncid=ncid,start=[1,1,1,n],count=[nx,ny,nz,1]) 
+        call nc_read_interp(filename,"uy_i",          dom%dyn%now%uy_i,ncid=ncid,start=[1,1,1,n],count=[nx,ny,nz,1]) 
+        call nc_read_interp(filename,"ux_i_bar",      dom%dyn%now%ux_i_bar,ncid=ncid,start=[1,1,n],count=[nx,ny,1]) 
+        call nc_read_interp(filename,"uy_i_bar",      dom%dyn%now%uy_i_bar,ncid=ncid,start=[1,1,n],count=[nx,ny,1]) 
+        call nc_read_interp(filename,"uxy_i_bar",     dom%dyn%now%uxy_i_bar,ncid=ncid,start=[1,1,n],count=[nx,ny,1]) 
 
-        call nc_read(filename,"duxydt",        dom%dyn%now%duxydt,ncid=ncid,start=[1,1,n],count=[nx,ny,1]) 
+        call nc_read_interp(filename,"duxydt",        dom%dyn%now%duxydt,ncid=ncid,start=[1,1,n],count=[nx,ny,1]) 
 
-        call nc_read(filename,"duxdz",         dom%dyn%now%duxdz,ncid=ncid,start=[1,1,1,n],count=[nx,ny,nz,1]) 
-        call nc_read(filename,"duydz",         dom%dyn%now%duydz,ncid=ncid,start=[1,1,1,n],count=[nx,ny,nz,1]) 
-        call nc_read(filename,"duxdz_bar",     dom%dyn%now%duxdz_bar,ncid=ncid,start=[1,1,n],count=[nx,ny,1]) 
-        call nc_read(filename,"duydz_bar",     dom%dyn%now%duydz_bar,ncid=ncid,start=[1,1,n],count=[nx,ny,1]) 
+        call nc_read_interp(filename,"duxdz",         dom%dyn%now%duxdz,ncid=ncid,start=[1,1,1,n],count=[nx,ny,nz,1]) 
+        call nc_read_interp(filename,"duydz",         dom%dyn%now%duydz,ncid=ncid,start=[1,1,1,n],count=[nx,ny,nz,1]) 
+        call nc_read_interp(filename,"duxdz_bar",     dom%dyn%now%duxdz_bar,ncid=ncid,start=[1,1,n],count=[nx,ny,1]) 
+        call nc_read_interp(filename,"duydz_bar",     dom%dyn%now%duydz_bar,ncid=ncid,start=[1,1,n],count=[nx,ny,1]) 
 
-        call nc_read(filename,"taud_acx",      dom%dyn%now%taud_acx,ncid=ncid,start=[1,1,n],count=[nx,ny,1]) 
-        call nc_read(filename,"taud_acy",      dom%dyn%now%taud_acy,ncid=ncid,start=[1,1,n],count=[nx,ny,1]) 
-        call nc_read(filename,"taud",          dom%dyn%now%taud,ncid=ncid,start=[1,1,n],count=[nx,ny,1]) 
+        call nc_read_interp(filename,"taud_acx",      dom%dyn%now%taud_acx,ncid=ncid,start=[1,1,n],count=[nx,ny,1]) 
+        call nc_read_interp(filename,"taud_acy",      dom%dyn%now%taud_acy,ncid=ncid,start=[1,1,n],count=[nx,ny,1]) 
+        call nc_read_interp(filename,"taud",          dom%dyn%now%taud,ncid=ncid,start=[1,1,n],count=[nx,ny,1]) 
 
-        call nc_read(filename,"taub_acx",      dom%dyn%now%taub_acx,ncid=ncid,start=[1,1,n],count=[nx,ny,1]) 
-        call nc_read(filename,"taub_acy",      dom%dyn%now%taub_acy,ncid=ncid,start=[1,1,n],count=[nx,ny,1]) 
-        call nc_read(filename,"taub",          dom%dyn%now%taub,ncid=ncid,start=[1,1,n],count=[nx,ny,1]) 
+        call nc_read_interp(filename,"taub_acx",      dom%dyn%now%taub_acx,ncid=ncid,start=[1,1,n],count=[nx,ny,1]) 
+        call nc_read_interp(filename,"taub_acy",      dom%dyn%now%taub_acy,ncid=ncid,start=[1,1,n],count=[nx,ny,1]) 
+        call nc_read_interp(filename,"taub",          dom%dyn%now%taub,ncid=ncid,start=[1,1,n],count=[nx,ny,1]) 
 
-        call nc_read(filename,"qq_gl_acx",     dom%dyn%now%qq_gl_acx,ncid=ncid,start=[1,1,n],count=[nx,ny,1]) 
-        call nc_read(filename,"qq_gl_acy",     dom%dyn%now%qq_gl_acy,ncid=ncid,start=[1,1,n],count=[nx,ny,1]) 
+        call nc_read_interp(filename,"qq_gl_acx",     dom%dyn%now%qq_gl_acx,ncid=ncid,start=[1,1,n],count=[nx,ny,1]) 
+        call nc_read_interp(filename,"qq_gl_acy",     dom%dyn%now%qq_gl_acy,ncid=ncid,start=[1,1,n],count=[nx,ny,1]) 
         
-        call nc_read(filename,"qq_acx",        dom%dyn%now%qq_acx,ncid=ncid,start=[1,1,n],count=[nx,ny,1]) 
-        call nc_read(filename,"qq_acy",        dom%dyn%now%qq_acy,ncid=ncid,start=[1,1,n],count=[nx,ny,1]) 
-        call nc_read(filename,"qq",            dom%dyn%now%qq,ncid=ncid,start=[1,1,n],count=[nx,ny,1]) 
+        call nc_read_interp(filename,"qq_acx",        dom%dyn%now%qq_acx,ncid=ncid,start=[1,1,n],count=[nx,ny,1]) 
+        call nc_read_interp(filename,"qq_acy",        dom%dyn%now%qq_acy,ncid=ncid,start=[1,1,n],count=[nx,ny,1]) 
+        call nc_read_interp(filename,"qq",            dom%dyn%now%qq,ncid=ncid,start=[1,1,n],count=[nx,ny,1]) 
 
-        call nc_read(filename,"visc_eff",      dom%dyn%now%visc_eff,ncid=ncid,start=[1,1,1,n],count=[nx,ny,nz,1]) 
-        call nc_read(filename,"visc_eff_int",  dom%dyn%now%visc_eff_int,ncid=ncid,start=[1,1,n],count=[nx,ny,1]) 
+        call nc_read_interp(filename,"visc_eff",      dom%dyn%now%visc_eff,ncid=ncid,start=[1,1,1,n],count=[nx,ny,nz,1]) 
+        call nc_read_interp(filename,"visc_eff_int",  dom%dyn%now%visc_eff_int,ncid=ncid,start=[1,1,n],count=[nx,ny,1]) 
 
-        call nc_read(filename,"N_eff",         dom%dyn%now%N_eff,ncid=ncid,start=[1,1,n],count=[nx,ny,1])        
-        call nc_read(filename,"cb_ref",        dom%dyn%now%cb_ref,ncid=ncid,start=[1,1,n],count=[nx,ny,1]) 
-        call nc_read(filename,"c_bed",         dom%dyn%now%c_bed,ncid=ncid,start=[1,1,n],count=[nx,ny,1]) 
-        call nc_read(filename,"beta_acx",      dom%dyn%now%beta_acx,ncid=ncid,start=[1,1,n],count=[nx,ny,1]) 
-        call nc_read(filename,"beta_acy",      dom%dyn%now%beta_acy,ncid=ncid,start=[1,1,n],count=[nx,ny,1]) 
-        call nc_read(filename,"beta",          dom%dyn%now%beta,ncid=ncid,start=[1,1,n],count=[nx,ny,1]) 
+        call nc_read_interp(filename,"N_eff",         dom%dyn%now%N_eff,ncid=ncid,start=[1,1,n],count=[nx,ny,1])        
+        call nc_read_interp(filename,"cb_ref",        dom%dyn%now%cb_ref,ncid=ncid,start=[1,1,n],count=[nx,ny,1]) 
+        call nc_read_interp(filename,"c_bed",         dom%dyn%now%c_bed,ncid=ncid,start=[1,1,n],count=[nx,ny,1]) 
+        call nc_read_interp(filename,"beta_acx",      dom%dyn%now%beta_acx,ncid=ncid,start=[1,1,n],count=[nx,ny,1]) 
+        call nc_read_interp(filename,"beta_acy",      dom%dyn%now%beta_acy,ncid=ncid,start=[1,1,n],count=[nx,ny,1]) 
+        call nc_read_interp(filename,"beta",          dom%dyn%now%beta,ncid=ncid,start=[1,1,n],count=[nx,ny,1]) 
 
-        call nc_read(filename,"beta_eff",      dom%dyn%now%beta_eff,ncid=ncid,start=[1,1,n],count=[nx,ny,1]) 
+        call nc_read_interp(filename,"beta_eff",      dom%dyn%now%beta_eff,ncid=ncid,start=[1,1,n],count=[nx,ny,1]) 
 
-        call nc_read(filename,"f_vbvs",        dom%dyn%now%f_vbvs,ncid=ncid,start=[1,1,n],count=[nx,ny,1]) 
+        call nc_read_interp(filename,"f_vbvs",        dom%dyn%now%f_vbvs,ncid=ncid,start=[1,1,n],count=[nx,ny,1]) 
 
-        call nc_read(filename,"ssa_mask_acx",  dom%dyn%now%ssa_mask_acx,ncid=ncid,start=[1,1,n],count=[nx,ny,1]) 
-        call nc_read(filename,"ssa_mask_acy",  dom%dyn%now%ssa_mask_acy,ncid=ncid,start=[1,1,n],count=[nx,ny,1]) 
-        call nc_read(filename,"ssa_err_acx",   dom%dyn%now%ssa_err_acx,ncid=ncid,start=[1,1,n],count=[nx,ny,1]) 
-        call nc_read(filename,"ssa_err_acy",   dom%dyn%now%ssa_err_acy,ncid=ncid,start=[1,1,n],count=[nx,ny,1]) 
+        call nc_read_interp(filename,"ssa_mask_acx",  dom%dyn%now%ssa_mask_acx,ncid=ncid,start=[1,1,n],count=[nx,ny,1]) 
+        call nc_read_interp(filename,"ssa_mask_acy",  dom%dyn%now%ssa_mask_acy,ncid=ncid,start=[1,1,n],count=[nx,ny,1]) 
+        call nc_read_interp(filename,"ssa_err_acx",   dom%dyn%now%ssa_err_acx,ncid=ncid,start=[1,1,n],count=[nx,ny,1]) 
+        call nc_read_interp(filename,"ssa_err_acy",   dom%dyn%now%ssa_err_acy,ncid=ncid,start=[1,1,n],count=[nx,ny,1]) 
 
         ! == ymat variables ===
 
-        call nc_read(filename,"strn2D_dxx", dom%mat%now%strn2D%dxx,ncid=ncid,start=[1,1,n],count=[nx,ny,1]) 
-        call nc_read(filename,"strn2D_dyy", dom%mat%now%strn2D%dyy,ncid=ncid,start=[1,1,n],count=[nx,ny,1]) 
-        call nc_read(filename,"strn2D_dxy", dom%mat%now%strn2D%dxy,ncid=ncid,start=[1,1,n],count=[nx,ny,1]) 
-        call nc_read(filename,"strn2D_dxz", dom%mat%now%strn2D%dxz,ncid=ncid,start=[1,1,n],count=[nx,ny,1]) 
-        call nc_read(filename,"strn2D_dyz", dom%mat%now%strn2D%dyz,ncid=ncid,start=[1,1,n],count=[nx,ny,1]) 
-        call nc_read(filename,"strn2D_de",  dom%mat%now%strn2D%de, ncid=ncid,start=[1,1,n],count=[nx,ny,1]) 
-        call nc_read(filename,"strn2D_div", dom%mat%now%strn2D%div,ncid=ncid,start=[1,1,n],count=[nx,ny,1]) 
-        call nc_read(filename,"strn2D_f_shear",dom%mat%now%strn2D%f_shear,ncid=ncid,start=[1,1,n],count=[nx,ny,1]) 
+        call nc_read_interp(filename,"strn2D_dxx", dom%mat%now%strn2D%dxx,ncid=ncid,start=[1,1,n],count=[nx,ny,1]) 
+        call nc_read_interp(filename,"strn2D_dyy", dom%mat%now%strn2D%dyy,ncid=ncid,start=[1,1,n],count=[nx,ny,1]) 
+        call nc_read_interp(filename,"strn2D_dxy", dom%mat%now%strn2D%dxy,ncid=ncid,start=[1,1,n],count=[nx,ny,1]) 
+        call nc_read_interp(filename,"strn2D_dxz", dom%mat%now%strn2D%dxz,ncid=ncid,start=[1,1,n],count=[nx,ny,1]) 
+        call nc_read_interp(filename,"strn2D_dyz", dom%mat%now%strn2D%dyz,ncid=ncid,start=[1,1,n],count=[nx,ny,1]) 
+        call nc_read_interp(filename,"strn2D_de",  dom%mat%now%strn2D%de, ncid=ncid,start=[1,1,n],count=[nx,ny,1]) 
+        call nc_read_interp(filename,"strn2D_div", dom%mat%now%strn2D%div,ncid=ncid,start=[1,1,n],count=[nx,ny,1]) 
+        call nc_read_interp(filename,"strn2D_f_shear",dom%mat%now%strn2D%f_shear,ncid=ncid,start=[1,1,n],count=[nx,ny,1]) 
         
-        call nc_read(filename,"strn_dxx",     dom%mat%now%strn%dxx,ncid=ncid,start=[1,1,1,n],count=[nx,ny,nz,1]) 
-        call nc_read(filename,"strn_dyy",     dom%mat%now%strn%dyy,ncid=ncid,start=[1,1,1,n],count=[nx,ny,nz,1]) 
-        call nc_read(filename,"strn_dxy",     dom%mat%now%strn%dxy,ncid=ncid,start=[1,1,1,n],count=[nx,ny,nz,1]) 
-        call nc_read(filename,"strn_dxz",     dom%mat%now%strn%dxz,ncid=ncid,start=[1,1,1,n],count=[nx,ny,nz,1]) 
-        call nc_read(filename,"strn_dyz",     dom%mat%now%strn%dyz,ncid=ncid,start=[1,1,1,n],count=[nx,ny,nz,1]) 
-        call nc_read(filename,"strn_de",      dom%mat%now%strn%de,ncid=ncid,start=[1,1,1,n],count=[nx,ny,nz,1]) 
-        call nc_read(filename,"strn_div",     dom%mat%now%strn%div,ncid=ncid,start=[1,1,1,n],count=[nx,ny,nz,1]) 
-        call nc_read(filename,"strn_f_shear", dom%mat%now%strn%f_shear,ncid=ncid,start=[1,1,1,n],count=[nx,ny,nz,1]) 
+        call nc_read_interp(filename,"strn_dxx",     dom%mat%now%strn%dxx,ncid=ncid,start=[1,1,1,n],count=[nx,ny,nz,1]) 
+        call nc_read_interp(filename,"strn_dyy",     dom%mat%now%strn%dyy,ncid=ncid,start=[1,1,1,n],count=[nx,ny,nz,1]) 
+        call nc_read_interp(filename,"strn_dxy",     dom%mat%now%strn%dxy,ncid=ncid,start=[1,1,1,n],count=[nx,ny,nz,1]) 
+        call nc_read_interp(filename,"strn_dxz",     dom%mat%now%strn%dxz,ncid=ncid,start=[1,1,1,n],count=[nx,ny,nz,1]) 
+        call nc_read_interp(filename,"strn_dyz",     dom%mat%now%strn%dyz,ncid=ncid,start=[1,1,1,n],count=[nx,ny,nz,1]) 
+        call nc_read_interp(filename,"strn_de",      dom%mat%now%strn%de,ncid=ncid,start=[1,1,1,n],count=[nx,ny,nz,1]) 
+        call nc_read_interp(filename,"strn_div",     dom%mat%now%strn%div,ncid=ncid,start=[1,1,1,n],count=[nx,ny,nz,1]) 
+        call nc_read_interp(filename,"strn_f_shear", dom%mat%now%strn%f_shear,ncid=ncid,start=[1,1,1,n],count=[nx,ny,nz,1]) 
 
-        call nc_read(filename,"strs2D_txx", dom%mat%now%strs2D%txx,ncid=ncid,start=[1,1,n],count=[nx,ny,1]) 
-        call nc_read(filename,"strs2D_tyy", dom%mat%now%strs2D%tyy,ncid=ncid,start=[1,1,n],count=[nx,ny,1]) 
-        call nc_read(filename,"strs2D_txy", dom%mat%now%strs2D%txy,ncid=ncid,start=[1,1,n],count=[nx,ny,1]) 
-        call nc_read(filename,"strs2D_txz", dom%mat%now%strs2D%txz,ncid=ncid,start=[1,1,n],count=[nx,ny,1]) 
-        call nc_read(filename,"strs2D_tyz", dom%mat%now%strs2D%tyz,ncid=ncid,start=[1,1,n],count=[nx,ny,1]) 
-        call nc_read(filename,"strs2D_te",  dom%mat%now%strs2D%te,ncid=ncid,start=[1,1,n],count=[nx,ny,1]) 
-        call nc_read(filename,"strs2D_tau_eig_1",dom%mat%now%strs2D%tau_eig_1,ncid=ncid,start=[1,1,n],count=[nx,ny,1]) 
-        call nc_read(filename,"strs2D_tau_eig_2",dom%mat%now%strs2D%tau_eig_2,ncid=ncid,start=[1,1,n],count=[nx,ny,1]) 
+        call nc_read_interp(filename,"strs2D_txx", dom%mat%now%strs2D%txx,ncid=ncid,start=[1,1,n],count=[nx,ny,1]) 
+        call nc_read_interp(filename,"strs2D_tyy", dom%mat%now%strs2D%tyy,ncid=ncid,start=[1,1,n],count=[nx,ny,1]) 
+        call nc_read_interp(filename,"strs2D_txy", dom%mat%now%strs2D%txy,ncid=ncid,start=[1,1,n],count=[nx,ny,1]) 
+        call nc_read_interp(filename,"strs2D_txz", dom%mat%now%strs2D%txz,ncid=ncid,start=[1,1,n],count=[nx,ny,1]) 
+        call nc_read_interp(filename,"strs2D_tyz", dom%mat%now%strs2D%tyz,ncid=ncid,start=[1,1,n],count=[nx,ny,1]) 
+        call nc_read_interp(filename,"strs2D_te",  dom%mat%now%strs2D%te,ncid=ncid,start=[1,1,n],count=[nx,ny,1]) 
+        call nc_read_interp(filename,"strs2D_tau_eig_1",dom%mat%now%strs2D%tau_eig_1,ncid=ncid,start=[1,1,n],count=[nx,ny,1]) 
+        call nc_read_interp(filename,"strs2D_tau_eig_2",dom%mat%now%strs2D%tau_eig_2,ncid=ncid,start=[1,1,n],count=[nx,ny,1]) 
         
-        call nc_read(filename,"strs_txx", dom%mat%now%strs%txx,ncid=ncid,start=[1,1,1,n],count=[nx,ny,nz,1]) 
-        call nc_read(filename,"strs_tyy", dom%mat%now%strs%tyy,ncid=ncid,start=[1,1,1,n],count=[nx,ny,nz,1]) 
-        call nc_read(filename,"strs_txy", dom%mat%now%strs%txy,ncid=ncid,start=[1,1,1,n],count=[nx,ny,nz,1]) 
-        call nc_read(filename,"strs_txz", dom%mat%now%strs%txz,ncid=ncid,start=[1,1,1,n],count=[nx,ny,nz,1]) 
-        call nc_read(filename,"strs_tyz", dom%mat%now%strs%tyz,ncid=ncid,start=[1,1,1,n],count=[nx,ny,nz,1]) 
-        call nc_read(filename,"strs_te",  dom%mat%now%strs%te,ncid=ncid,start=[1,1,1,n],count=[nx,ny,nz,1]) 
+        call nc_read_interp(filename,"strs_txx", dom%mat%now%strs%txx,ncid=ncid,start=[1,1,1,n],count=[nx,ny,nz,1]) 
+        call nc_read_interp(filename,"strs_tyy", dom%mat%now%strs%tyy,ncid=ncid,start=[1,1,1,n],count=[nx,ny,nz,1]) 
+        call nc_read_interp(filename,"strs_txy", dom%mat%now%strs%txy,ncid=ncid,start=[1,1,1,n],count=[nx,ny,nz,1]) 
+        call nc_read_interp(filename,"strs_txz", dom%mat%now%strs%txz,ncid=ncid,start=[1,1,1,n],count=[nx,ny,nz,1]) 
+        call nc_read_interp(filename,"strs_tyz", dom%mat%now%strs%tyz,ncid=ncid,start=[1,1,1,n],count=[nx,ny,nz,1]) 
+        call nc_read_interp(filename,"strs_te",  dom%mat%now%strs%te,ncid=ncid,start=[1,1,1,n],count=[nx,ny,nz,1]) 
 
-        call nc_read(filename,"enh",         dom%mat%now%enh,ncid=ncid,start=[1,1,1,n],count=[nx,ny,nz,1]) 
-        call nc_read(filename,"enh_bnd",     dom%mat%now%enh_bnd,ncid=ncid,start=[1,1,n],count=[nx,ny,1]) 
-        call nc_read(filename,"enh_bar",     dom%mat%now%enh_bar,ncid=ncid,start=[1,1,n],count=[nx,ny,1]) 
-        call nc_read(filename,"ATT",         dom%mat%now%ATT,ncid=ncid,start=[1,1,1,n],count=[nx,ny,nz,1]) 
-        call nc_read(filename,"ATT_bar",     dom%mat%now%ATT_bar,ncid=ncid,start=[1,1,n],count=[nx,ny,1]) 
-        call nc_read(filename,"visc",        dom%mat%now%visc,ncid=ncid,start=[1,1,1,n],count=[nx,ny,nz,1]) 
-        call nc_read(filename,"visc_int",    dom%mat%now%visc_int,ncid=ncid,start=[1,1,n],count=[nx,ny,1]) 
+        call nc_read_interp(filename,"enh",         dom%mat%now%enh,ncid=ncid,start=[1,1,1,n],count=[nx,ny,nz,1]) 
+        call nc_read_interp(filename,"enh_bnd",     dom%mat%now%enh_bnd,ncid=ncid,start=[1,1,n],count=[nx,ny,1]) 
+        call nc_read_interp(filename,"enh_bar",     dom%mat%now%enh_bar,ncid=ncid,start=[1,1,n],count=[nx,ny,1]) 
+        call nc_read_interp(filename,"ATT",         dom%mat%now%ATT,ncid=ncid,start=[1,1,1,n],count=[nx,ny,nz,1]) 
+        call nc_read_interp(filename,"ATT_bar",     dom%mat%now%ATT_bar,ncid=ncid,start=[1,1,n],count=[nx,ny,1]) 
+        call nc_read_interp(filename,"visc",        dom%mat%now%visc,ncid=ncid,start=[1,1,1,n],count=[nx,ny,nz,1]) 
+        call nc_read_interp(filename,"visc_int",    dom%mat%now%visc_int,ncid=ncid,start=[1,1,n],count=[nx,ny,1]) 
 
-        call nc_read(filename,"f_shear_bar", dom%mat%now%f_shear_bar,ncid=ncid,start=[1,1,n],count=[nx,ny,1]) 
+        call nc_read_interp(filename,"f_shear_bar", dom%mat%now%f_shear_bar,ncid=ncid,start=[1,1,n],count=[nx,ny,1]) 
 
-        call nc_read(filename,"dep_time",    dom%mat%now%dep_time,ncid=ncid,start=[1,1,1,n],count=[nx,ny,nz,1]) 
-        call nc_read(filename,"depth_iso",   dom%mat%now%depth_iso,ncid=ncid,start=[1,1,1,n],count=[nx,ny,n_iso,1]) 
+        call nc_read_interp(filename,"dep_time",    dom%mat%now%dep_time,ncid=ncid,start=[1,1,1,n],count=[nx,ny,nz,1]) 
+        call nc_read_interp(filename,"depth_iso",   dom%mat%now%depth_iso,ncid=ncid,start=[1,1,1,n],count=[nx,ny,n_iso,1]) 
         
         ! == ytherm variables ===
 
-        call nc_read(filename,"enth",        dom%thrm%now%enth,ncid=ncid,start=[1,1,1,n],count=[nx,ny,nz,1])   
-        call nc_read(filename,"T_ice",       dom%thrm%now%T_ice,ncid=ncid,start=[1,1,1,n],count=[nx,ny,nz,1])    
-        call nc_read(filename,"omega",       dom%thrm%now%omega,ncid=ncid,start=[1,1,1,n],count=[nx,ny,nz,1]) 
-        call nc_read(filename,"T_pmp",       dom%thrm%now%T_pmp,ncid=ncid,start=[1,1,1,n],count=[nx,ny,nz,1]) 
+        call nc_read_interp(filename,"enth",        dom%thrm%now%enth,ncid=ncid,start=[1,1,1,n],count=[nx,ny,nz,1])   
+        call nc_read_interp(filename,"T_ice",       dom%thrm%now%T_ice,ncid=ncid,start=[1,1,1,n],count=[nx,ny,nz,1])    
+        call nc_read_interp(filename,"omega",       dom%thrm%now%omega,ncid=ncid,start=[1,1,1,n],count=[nx,ny,nz,1]) 
+        call nc_read_interp(filename,"T_pmp",       dom%thrm%now%T_pmp,ncid=ncid,start=[1,1,1,n],count=[nx,ny,nz,1]) 
         
-        call nc_read(filename,"f_pmp",       dom%thrm%now%f_pmp,ncid=ncid,start=[1,1,n],count=[nx,ny,1]) 
-        call nc_read(filename,"bmb_grnd",    dom%thrm%now%bmb_grnd,ncid=ncid,start=[1,1,n],count=[nx,ny,1])    
-        call nc_read(filename,"Q_strn",      dom%thrm%now%Q_strn,ncid=ncid,start=[1,1,1,n],count=[nx,ny,nz,1])      
-        call nc_read(filename,"Q_b",         dom%thrm%now%Q_b,ncid=ncid,start=[1,1,n],count=[nx,ny,1])         
-        call nc_read(filename,"Q_ice_b",     dom%thrm%now%Q_ice_b,ncid=ncid,start=[1,1,n],count=[nx,ny,1])         
-        call nc_read(filename,"T_prime_b",   dom%thrm%now%T_prime_b,ncid=ncid,start=[1,1,n],count=[nx,ny,1])  
-        call nc_read(filename,"H_w",         dom%thrm%now%H_w,ncid=ncid,start=[1,1,n],count=[nx,ny,1]) 
-        call nc_read(filename,"dHwdt",       dom%thrm%now%dHwdt,ncid=ncid,start=[1,1,n],count=[nx,ny,1]) 
+        call nc_read_interp(filename,"f_pmp",       dom%thrm%now%f_pmp,ncid=ncid,start=[1,1,n],count=[nx,ny,1]) 
+        call nc_read_interp(filename,"bmb_grnd",    dom%thrm%now%bmb_grnd,ncid=ncid,start=[1,1,n],count=[nx,ny,1])    
+        call nc_read_interp(filename,"Q_strn",      dom%thrm%now%Q_strn,ncid=ncid,start=[1,1,1,n],count=[nx,ny,nz,1])      
+        call nc_read_interp(filename,"Q_b",         dom%thrm%now%Q_b,ncid=ncid,start=[1,1,n],count=[nx,ny,1])         
+        call nc_read_interp(filename,"Q_ice_b",     dom%thrm%now%Q_ice_b,ncid=ncid,start=[1,1,n],count=[nx,ny,1])         
+        call nc_read_interp(filename,"T_prime_b",   dom%thrm%now%T_prime_b,ncid=ncid,start=[1,1,n],count=[nx,ny,1])  
+        call nc_read_interp(filename,"H_w",         dom%thrm%now%H_w,ncid=ncid,start=[1,1,n],count=[nx,ny,1]) 
+        call nc_read_interp(filename,"dHwdt",       dom%thrm%now%dHwdt,ncid=ncid,start=[1,1,n],count=[nx,ny,1]) 
         
-        call nc_read(filename,"cp",          dom%thrm%now%cp,ncid=ncid,start=[1,1,1,n],count=[nx,ny,nz,1]) 
-        call nc_read(filename,"kt",          dom%thrm%now%kt,ncid=ncid,start=[1,1,1,n],count=[nx,ny,nz,1])      
-        call nc_read(filename,"H_cts",       dom%thrm%now%H_cts,ncid=ncid,start=[1,1,n],count=[nx,ny,1])       
+        call nc_read_interp(filename,"cp",          dom%thrm%now%cp,ncid=ncid,start=[1,1,1,n],count=[nx,ny,nz,1]) 
+        call nc_read_interp(filename,"kt",          dom%thrm%now%kt,ncid=ncid,start=[1,1,1,n],count=[nx,ny,nz,1])      
+        call nc_read_interp(filename,"H_cts",       dom%thrm%now%H_cts,ncid=ncid,start=[1,1,n],count=[nx,ny,1])       
         
-        call nc_read(filename,"advecxy",     dom%thrm%now%advecxy,ncid=ncid,start=[1,1,1,n],count=[nx,ny,nz,1])   
+        call nc_read_interp(filename,"advecxy",     dom%thrm%now%advecxy,ncid=ncid,start=[1,1,1,n],count=[nx,ny,nz,1])   
         
-        call nc_read(filename,"Q_rock",      dom%thrm%now%Q_rock,     ncid=ncid,start=[1,1,n],count=[nx,ny,1])        
-        call nc_read(filename,"enth_rock",   dom%thrm%now%enth_rock,  ncid=ncid,start=[1,1,1,n],count=[nx,ny,nz_r,1])      
-        call nc_read(filename,"T_rock",      dom%thrm%now%T_rock,     ncid=ncid,start=[1,1,1,n],count=[nx,ny,nz_r,1])      
+        call nc_read_interp(filename,"Q_rock",      dom%thrm%now%Q_rock,     ncid=ncid,start=[1,1,n],count=[nx,ny,1])        
+        call nc_read_interp(filename,"enth_rock",   dom%thrm%now%enth_rock,  ncid=ncid,start=[1,1,1,n],count=[nx,ny,nz_r,1])      
+        call nc_read_interp(filename,"T_rock",      dom%thrm%now%T_rock,     ncid=ncid,start=[1,1,1,n],count=[nx,ny,nz_r,1])      
 
         ! == ybound variables ===
 
-        call nc_read(filename,"z_bed",       dom%bnd%z_bed,ncid=ncid,start=[1,1,n],count=[nx,ny,1]) 
-        call nc_read(filename,"z_bed_sd",    dom%bnd%z_bed_sd,ncid=ncid,start=[1,1,n],count=[nx,ny,1]) 
-        call nc_read(filename,"z_sl",        dom%bnd%z_sl,ncid=ncid,start=[1,1,n],count=[nx,ny,1]) 
-        call nc_read(filename,"H_sed",       dom%bnd%H_sed,ncid=ncid,start=[1,1,n],count=[nx,ny,1]) 
-        call nc_read(filename,"smb",         dom%bnd%smb,ncid=ncid,start=[1,1,n],count=[nx,ny,1]) 
-        call nc_read(filename,"T_srf",       dom%bnd%T_srf,ncid=ncid,start=[1,1,n],count=[nx,ny,1]) 
-        call nc_read(filename,"bmb_shlf",    dom%bnd%bmb_shlf,ncid=ncid,start=[1,1,n],count=[nx,ny,1]) 
-        call nc_read(filename,"T_shlf",      dom%bnd%T_shlf,ncid=ncid,start=[1,1,n],count=[nx,ny,1]) 
-        call nc_read(filename,"Q_geo",       dom%bnd%Q_geo,ncid=ncid,start=[1,1,n],count=[nx,ny,1]) 
+        call nc_read_interp(filename,"z_bed",       dom%bnd%z_bed,ncid=ncid,start=[1,1,n],count=[nx,ny,1]) 
+        call nc_read_interp(filename,"z_bed_sd",    dom%bnd%z_bed_sd,ncid=ncid,start=[1,1,n],count=[nx,ny,1]) 
+        call nc_read_interp(filename,"z_sl",        dom%bnd%z_sl,ncid=ncid,start=[1,1,n],count=[nx,ny,1]) 
+        call nc_read_interp(filename,"H_sed",       dom%bnd%H_sed,ncid=ncid,start=[1,1,n],count=[nx,ny,1]) 
+        call nc_read_interp(filename,"smb",         dom%bnd%smb,ncid=ncid,start=[1,1,n],count=[nx,ny,1]) 
+        call nc_read_interp(filename,"T_srf",       dom%bnd%T_srf,ncid=ncid,start=[1,1,n],count=[nx,ny,1]) 
+        call nc_read_interp(filename,"bmb_shlf",    dom%bnd%bmb_shlf,ncid=ncid,start=[1,1,n],count=[nx,ny,1]) 
+        call nc_read_interp(filename,"T_shlf",      dom%bnd%T_shlf,ncid=ncid,start=[1,1,n],count=[nx,ny,1]) 
+        call nc_read_interp(filename,"Q_geo",       dom%bnd%Q_geo,ncid=ncid,start=[1,1,n],count=[nx,ny,1]) 
 
-        call nc_read(filename,"enh_srf",     dom%bnd%enh_srf,ncid=ncid,start=[1,1,n],count=[nx,ny,1]) 
+        call nc_read_interp(filename,"enh_srf",     dom%bnd%enh_srf,ncid=ncid,start=[1,1,n],count=[nx,ny,1]) 
 
-        call nc_read(filename,"basins",      dom%bnd%basins,ncid=ncid,start=[1,1,n],count=[nx,ny,1]) 
-        call nc_read(filename,"basin_mask",  dom%bnd%basin_mask,ncid=ncid,start=[1,1,n],count=[nx,ny,1]) 
-        call nc_read(filename,"regions",     dom%bnd%regions,ncid=ncid,start=[1,1,n],count=[nx,ny,1]) 
-        call nc_read(filename,"region_mask", dom%bnd%region_mask,ncid=ncid,start=[1,1,n],count=[nx,ny,1]) 
+        call nc_read_interp(filename,"basins",      dom%bnd%basins,ncid=ncid,start=[1,1,n],count=[nx,ny,1]) 
+        call nc_read_interp(filename,"basin_mask",  dom%bnd%basin_mask,ncid=ncid,start=[1,1,n],count=[nx,ny,1]) 
+        call nc_read_interp(filename,"regions",     dom%bnd%regions,ncid=ncid,start=[1,1,n],count=[nx,ny,1]) 
+        call nc_read_interp(filename,"region_mask", dom%bnd%region_mask,ncid=ncid,start=[1,1,n],count=[nx,ny,1]) 
 
-        call nc_read(filename,"ice_allowed", dom%bnd%ice_allowed,ncid=ncid,start=[1,1,n],count=[nx,ny,1]) 
-        call nc_read(filename,"calv_mask",   dom%bnd%calv_mask,ncid=ncid,start=[1,1,n],count=[nx,ny,1]) 
-        call nc_read(filename,"H_ice_ref",   dom%bnd%H_ice_ref,ncid=ncid,start=[1,1,n],count=[nx,ny,1]) 
-        call nc_read(filename,"z_bed_ref",   dom%bnd%z_bed_ref,ncid=ncid,start=[1,1,n],count=[nx,ny,1]) 
+        call nc_read_interp(filename,"ice_allowed", dom%bnd%ice_allowed,ncid=ncid,start=[1,1,n],count=[nx,ny,1]) 
+        call nc_read_interp(filename,"calv_mask",   dom%bnd%calv_mask,ncid=ncid,start=[1,1,n],count=[nx,ny,1]) 
+        call nc_read_interp(filename,"H_ice_ref",   dom%bnd%H_ice_ref,ncid=ncid,start=[1,1,n],count=[nx,ny,1]) 
+        call nc_read_interp(filename,"z_bed_ref",   dom%bnd%z_bed_ref,ncid=ncid,start=[1,1,n],count=[nx,ny,1]) 
         
         ! Close the netcdf file
         call nc_close(ncid)
@@ -1083,7 +1087,7 @@ contains
         ! Loop over vertical dimension and apply interpolation 
         do k = 1, nz 
             
-            call nc_read_interp_2D(filename,vnm,var3D(:,:,k),var3D_src(:,:,k),ncid, &
+            call nc_read_interp_wp_2D(filename,vnm,var3D(:,:,k),var3D_src(:,:,k),ncid, &
                                                                 start,count,mps,method)
 
         end do 
@@ -1221,6 +1225,85 @@ contains
         return
 
     end subroutine nc_read_interp_int_3D
+
+    subroutine nc_read_interp_logical_2D(filename,vnm,var2D,var2D_in,ncid,start,count,mps,method)
+        ! Read in a 2D field and interpolate it using scrip map
+        ! as needed. 
+
+        implicit none
+
+        character(len=*),   intent(IN)  :: filename 
+        character(len=*),   intent(IN)  :: vnm 
+        logical,            intent(OUT) :: var2D(:,:) 
+        logical, optional,  intent(IN)  :: var2D_in(:,:) 
+        integer, optional,  intent(IN)  :: ncid 
+        integer, optional,  intent(IN)  :: start(:) 
+        integer, optional,  intent(IN)  :: count(:) 
+        type(map_scrip_class), optional, intent(IN) :: mps
+        character(len=*),      optional, intent(IN) :: method 
+
+        ! Local variables 
+        integer :: nx, ny 
+        integer,  allocatable :: dims(:) 
+        integer,  allocatable :: var2D_src(:,:) 
+        integer,  allocatable :: var2D_int(:,:) 
+        character(len=56) :: mapping_method 
+
+        if (present(var2D_in)) then 
+            ! Get source array from argument (useful for handling 3D arrays with this routine)
+
+            nx = size(var2D_in,1)
+            ny = size(var2D_in,2) 
+
+            allocate(var2D_src(nx,ny))
+
+            var2D_src = 0 
+            where (var2D_in) var2D_src = 1 
+
+        else 
+            ! Load 2D array from file 
+
+            ! Determine dimensions of current variable in the source file
+            call nc_dims(filename,vnm,dims=dims)
+
+            nx = dims(1)
+            ny = dims(2) 
+
+            allocate(var2D_src(nx,ny))
+
+            ! Load the variable from the file to the local 2D array
+            call nc_read(filename,vnm,var2D_src,ncid=ncid,start=start,count=count,missing_value=int(MV))
+        
+        end if 
+
+
+        if (nx .eq. size(var2D,1) .and. ny .eq. size(var2D,2)) then 
+            ! Assume no interpolation needed, copy variable for output directly
+
+            var2D = .FALSE. 
+            where(var2D_src .eq. 1) var2D = .TRUE.  
+
+        else 
+            ! Map local source array it to our target array 
+
+            ! Determine mapping method for this variable 
+            mapping_method = "count"
+            if (present(method)) mapping_method = trim(method) 
+
+            ! Perform conservative interpolation 
+            allocate(var2D_int(size(var2D,1),size(var2D,2)))
+            var2D_int = int(MV)
+            call map_scrip_field(mps,vnm,var2D_src,var2D_int,method=mapping_method, &
+                                        missing_value=int(MV),fill_method="nn")
+
+            var2D = .FALSE. 
+            where(var2D_int .eq. 1) var2D = .TRUE.  
+
+        end if 
+
+        return
+
+    end subroutine nc_read_interp_logical_2D
 
 end module yelmo_io
 

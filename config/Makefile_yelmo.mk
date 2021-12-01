@@ -12,10 +12,13 @@ $(objdir)/ncio.o: $(libdir)/ncio.f90
 $(objdir)/nml.o: $(libdir)/nml.f90
 	$(FC) $(DFLAGS) $(FFLAGS) -c -o $@ $<
 
-$(objdir)/gaussian_filter.o: $(libdir)/gaussian_filter.f90
+$(objdir)/gaussian_filter.o: $(libdir)/coordinates-light/gaussian_filter.f90
 	$(FC) $(DFLAGS) $(FFLAGS) -c -o $@ $<
 
 $(objdir)/climate_adjustments.o: $(libdir)/climate_adjustments.f90 $(objdir)/yelmo_defs.o
+	$(FC) $(DFLAGS) $(FFLAGS) -c -o $@ $<
+
+$(objdir)/grid_to_cdo.o: $(libdir)/coordinates-light/grid_to_cdo.f90
 	$(FC) $(DFLAGS) $(FFLAGS) -c -o $@ $<
 
 $(objdir)/ice_enhancement.o: $(libdir)/ice_enhancement.f90 $(objdir)/yelmo_defs.o $(objdir)/nml.o
@@ -24,20 +27,20 @@ $(objdir)/ice_enhancement.o: $(libdir)/ice_enhancement.f90 $(objdir)/yelmo_defs.
 $(objdir)/ice_optimization.o: $(libdir)/ice_optimization.f90 $(objdir)/yelmo_defs.o $(objdir)/gaussian_filter.o
 	$(FC) $(DFLAGS) $(FFLAGS) -c -o $@ $<
 
-$(objdir)/index.o: $(libdir)/index.f90
+$(objdir)/index.o: $(libdir)/coordinates-light/index.f90
 	$(FC) $(DFLAGS) $(FFLAGS) -c -o $@ $<
 
-$(objdir)/interp1D.o: $(libdir)/interp1D.f90 $(objdir)/yelmo_defs.o
+$(objdir)/interp1D.o: $(libdir)/coordinates-light/interp1D.f90 $(objdir)/yelmo_defs.o
 	$(FC) $(DFLAGS) $(FFLAGS) -c -o $@ $<
 
-$(objdir)/interp2D.o: $(libdir)/interp2D.f90
+$(objdir)/interp2D.o: $(libdir)/coordinates-light/interp2D.f90
 	$(FC) $(DFLAGS) $(FFLAGS) -c -o $@ $<
 
 $(objdir)/root_finder.o: $(libdir)/root_finder.f90 $(objdir)/yelmo_defs.o
 	$(FC) $(DFLAGS) $(FFLAGS) -c -o $@ $<
 
-$(objdir)/mapping_scrip.o: $(libdir)/mapping_scrip.f90 $(objdir)/ncio.o $(objdir)/interp2D.o \
-								$(objdir)/gaussian_filter.o $(objdir)/index.o
+$(objdir)/mapping_scrip.o: $(libdir)/coordinates-light/mapping_scrip.f90 $(objdir)/ncio.o $(objdir)/interp2D.o \
+								$(objdir)/gaussian_filter.o $(objdir)/index.o $(objdir)/grid_to_cdo.o
 	$(FC) $(DFLAGS) $(FFLAGS) -c -o $@ $<
 
 ## INTERNAL PHYSICS LIBRARIES ###############################
@@ -209,6 +212,7 @@ yelmo_libs = 		   $(objdir)/gaussian_filter.o \
 					   $(objdir)/climate_adjustments.o \
 					   $(objdir)/ice_enhancement.o \
 					   $(objdir)/ice_optimization.o \
+					   $(objdir)/grid_to_cdo.o \
 					   $(objdir)/index.o \
 					   $(objdir)/interp1D.o \
 					   $(objdir)/interp2D.o \

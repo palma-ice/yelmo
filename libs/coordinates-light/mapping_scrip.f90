@@ -7,6 +7,7 @@ module coordinates_mapping_scrip
     use index 
     use interp2D
     use gaussian_filter, only : filter_gaussian, filter_gaussian_fast 
+    use grid_to_cdo, only : call_system_cdo
 
     implicit none 
 

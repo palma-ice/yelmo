@@ -765,6 +765,9 @@ contains
         integer :: ij(2)
         logical, allocatable :: mask_apply(:,:) 
 
+        nx = size(z,1)
+        ny = size(z,2) 
+        
         allocate(mask_apply(nx,ny)) 
 
         mask_apply = .TRUE. 

@@ -9,6 +9,8 @@ module coordinates_mapping_scrip
     use gaussian_filter, only : filter_gaussian, filter_gaussian_fast 
     use grid_to_cdo, only : call_system_cdo
 
+    use, intrinsic :: iso_fortran_env, only: error_unit
+
     implicit none 
 
 
@@ -91,6 +93,8 @@ module coordinates_mapping_scrip
     public :: map_scrip_load 
     public :: map_scrip_end
 
+    public :: gen_map_filename
+
 contains 
     
     subroutine map_scrip_field_logical(map,var_name,var1,var2,mask2,method,reset,missing_value, &
@@ -118,9 +122,18 @@ contains
         logical,                intent(IN),  optional :: verbose         ! Print information
         
         ! Local variables 
+        real(dp) :: missing_val
+        real(dp) :: filt_pars(2)
         real(dp), allocatable :: var1dp(:,:) 
         real(dp), allocatable :: var2dp(:,:) 
         
+        ! By defualt missing value is the coordinates package default value
+        missing_val = mv 
+        if (present(missing_value)) missing_val = dble(missing_value)
+
+        filt_pars = [1.0_dp,1.0_dp] 
+        if (present(filt_par)) filt_pars = dble(filt_par) 
+
         allocate(var1dp(size(var1,1),size(var1,2)))
         allocate(var2dp(size(var2,1),size(var2,2)))
         
@@ -130,8 +143,8 @@ contains
         var2dp = 0.0_dp 
         where(var2) var2dp = 1.0_dp 
         
-        call map_scrip_field_double(map,var_name,var1dp,var2dp,mask2,method,reset,dble(missing_value), &
-                                            mask_pack,fill_method,filt_method,dble(filt_par))
+        call map_scrip_field_double(map,var_name,var1dp,var2dp,mask2,method,reset,missing_val, &
+                                            mask_pack,fill_method,filt_method,filt_pars)
 
         var2 = .FALSE. 
         where(int(var2dp) .eq. 1.0_dp) var2 = .TRUE. 
@@ -165,17 +178,26 @@ contains
         logical,                intent(IN),  optional :: verbose         ! Print information
         
         ! Local variables 
+        real(dp) :: missing_val
+        real(dp) :: filt_pars(2)
         real(dp), allocatable :: var1dp(:,:) 
         real(dp), allocatable :: var2dp(:,:) 
         
+        ! By defualt missing value is the coordinates package default value
+        missing_val = mv 
+        if (present(missing_value)) missing_val = dble(missing_value)
+
+        filt_pars = [1.0_dp,1.0_dp] 
+        if (present(filt_par)) filt_pars = dble(filt_par) 
+
         allocate(var1dp(size(var1,1),size(var1,2)))
         allocate(var2dp(size(var2,1),size(var2,2)))
         
         var1dp = real(var1,dp)
         var2dp = real(var2,dp)
         
-        call map_scrip_field_double(map,var_name,var1dp,var2dp,mask2,method,reset,dble(missing_value), &
-                                            mask_pack,fill_method,filt_method,dble(filt_par))
+        call map_scrip_field_double(map,var_name,var1dp,var2dp,mask2,method,reset,missing_val, &
+                                            mask_pack,fill_method,filt_method,filt_pars)
 
         var2 = int(var2dp) 
 
@@ -208,17 +230,26 @@ contains
         logical,                intent(IN),  optional :: verbose         ! Print information
         
         ! Local variables 
+        real(dp) :: missing_val
+        real(dp) :: filt_pars(2) 
         real(dp), allocatable :: var1dp(:,:) 
         real(dp), allocatable :: var2dp(:,:) 
         
+        ! By defualt missing value is the coordinates package default value
+        missing_val = mv 
+        if (present(missing_value)) missing_val = dble(missing_value)
+
+        filt_pars = [1.0_dp,1.0_dp] 
+        if (present(filt_par)) filt_pars = dble(filt_par) 
+
         allocate(var1dp(size(var1,1),size(var1,2)))
         allocate(var2dp(size(var2,1),size(var2,2)))
         
         var1dp = real(var1,dp)
         var2dp = real(var2,dp)
         
-        call map_scrip_field_double(map,var_name,var1dp,var2dp,mask2,method,reset,dble(missing_value), &
-                                            mask_pack,fill_method,filt_method,dble(filt_par))
+        call map_scrip_field_double(map,var_name,var1dp,var2dp,mask2,method,reset,missing_val, &
+                                            mask_pack,fill_method,filt_method,filt_pars)
 
         var2 = real(var2dp,sp) 
 
@@ -605,6 +636,11 @@ contains
             ! included in this standalone module. For now, it is only possible
             ! to load a scrip map that has already been generated externally. 
 
+            write(error_unit,*) ""
+            write(error_unit,*) "map_scrip_init:: Error: scrip map file not found. &
+                        &This file should be pregenerated using cdo before running Yelmo. &
+                        &See maps/readme.md in the main Yelmo directory for details."
+            write(error_unit,*) "scrip map filename: ", trim(filename)
         end if 
 
         return 
@@ -761,8 +797,8 @@ contains
         ! Determine filename from grid names and folder 
         map%map_fname = gen_map_filename(src_name,dst_name,fldr,method)
         
-        !write(*,*) "Loading SCRIP map from file: "//trim(filename) 
-        !write(*,*) "" 
+        ! write(*,*) "Loading SCRIP map from file: "//trim(map%map_fname) 
+        ! write(*,*) "" 
 
         call nc_dims(map%map_fname,"src_grid_center_lat",dim_names,dims)
         map%src_grid_size = dims(1) 

@@ -12,3 +12,4 @@ tests/.DS_Store
 *.pytest_cache
 runylmo.js
 tmp
+maps/scrip*.nc

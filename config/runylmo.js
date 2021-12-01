@@ -31,7 +31,7 @@
     "dir-special" : {},
 
     "links" : 
-        ["input","ice_data"],
+        ["input","ice_data","maps"],
 
     "const_paths" : 
         {   "EISMINT"  : "par/yelmo_const_EISMINT.nml",

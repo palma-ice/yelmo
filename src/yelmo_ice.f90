@@ -779,100 +779,141 @@ contains
         real(prec)          :: z_bed_f_sd 
         logical             :: smooth_H_ice
 
-        ! Initialize variables
-         
+        real(wp), allocatable :: H_ice(:,:) 
+        real(wp), allocatable :: z_bed(:,:) 
+        real(wp), allocatable :: z_bed_sd(:,:) 
+        
+        ! Allocate local arrays
+        allocate(H_ice(dom%grd%nx,dom%grd%ny))
+        allocate(z_bed(dom%grd%nx,dom%grd%ny))
+        allocate(z_bed_sd(dom%grd%nx,dom%grd%ny))
+        
+        ! Set to zero to start 
+        H_ice    = 0.0_wp 
+        z_bed    = 0.0_wp 
+        z_bed_sd = 0.0_wp 
+
+        ! Step 1: load topography variables from a file, if desired.
+        ! Store in the temporary local arrays for now. 
+
+        ! Load parameters related to topography initiaization 
+        call nml_read(filename,"yelmo_init_topo","init_topo_load",  init_topo_load)
+        call nml_read(filename,"yelmo_init_topo","init_topo_path",  init_topo_path)
+        call nml_read(filename,"yelmo_init_topo","init_topo_names", init_topo_names)
+        call nml_read(filename,"yelmo_init_topo","init_topo_state", init_topo_state)
+        call nml_read(filename,"yelmo_init_topo","z_bed_f_sd",      z_bed_f_sd)
+        call nml_read(filename,"yelmo_init_topo","smooth_H_ice",    smooth_H_ice)
+
+        call yelmo_parse_path(init_topo_path,dom%par%domain,dom%par%grid_name)
+            
+        ! Override parameter choice if command-line argument present 
+        if (present(load_topo)) init_topo_load = load_topo 
+
+        if (init_topo_load) then 
+            ! =========================================
+            ! Load topography data from netcdf file 
+
+            call nc_read(init_topo_path,init_topo_names(1), H_ice, missing_value=mv)
+            call nc_read(init_topo_path,init_topo_names(2), z_bed, missing_value=mv) 
+
+            if (trim(init_topo_names(3)) .ne. ""     .and. &
+                trim(init_topo_names(3)) .ne. "none" .and. &
+                trim(init_topo_names(3)) .ne. "None") then 
+
+                call nc_read(init_topo_path,init_topo_names(3),z_bed_sd)
+
+                ! Apply scaling to adjust z_bed depending on standard deviation
+                z_bed = z_bed + z_bed_f_sd*z_bed_sd 
+
+            else
+                z_bed_sd = 0.0_prec 
+            end if 
+
+            ! Clean up ice thickness field 
+            where (.not. dom%bnd%ice_allowed)  H_ice = 0.0_wp
+            where (H_ice  .lt. 1.0)            H_ice = 0.0_wp
+
+            ! Smooth ice thickness field, if desired 
+            if (smooth_H_ice) then 
+                call smooth_gauss_2D(H_ice,dx=dom%grd%dx,n_smooth=2)
+            end if 
+
+            ! Additionally modify initial topographic state 
+            select case(init_topo_state)
+
+                case(0) 
+
+                    ! Pass, use topography as loaded 
+
+                case(1) 
+                    ! Remove ice, but do not adjust bedrock 
+
+                    H_ice = 0.0_prec 
+
+                case(2)
+                    ! Remove ice, set bedrock to isostatically rebounded state 
+
+                    z_bed = z_bed + (rho_ice/rho_a)*H_ice
+                    H_ice = 0.0_prec
+
+                case DEFAULT 
+
+                    write(io_unit_err,*) "yelmo_init_topo:: Error: init_topo_state choice not recognized."
+                    write(io_unit_err,*) "init_topo_state = ", init_topo_state 
+                    stop 
+
+            end select
+
+            ! Store in Yelmo object 
+            dom%tpo%now%H_ice = H_ice 
+            dom%bnd%z_bed     = z_bed 
+            dom%bnd%z_bed_sd  = z_bed_sd 
+
+        end if 
+
+        ! Step 2: load topo variables from a restart file if desired 
+
         if (dom%par%use_restart) then 
-            ! Load variables from a restart file
+            ! Load variables from a restart file. Note: this will
+            ! overwrite all information stored in yelmo object from above.
 
             call yelmo_restart_read_topo(dom,trim(dom%par%restart),time)
 
-        else
-
-            ! Load parameters related to topography initiaization 
-            call nml_read(filename,"yelmo_init_topo","init_topo_load",  init_topo_load)
-            call nml_read(filename,"yelmo_init_topo","init_topo_path",  init_topo_path)
-            call nml_read(filename,"yelmo_init_topo","init_topo_names", init_topo_names)
-            call nml_read(filename,"yelmo_init_topo","init_topo_state", init_topo_state)
-            call nml_read(filename,"yelmo_init_topo","z_bed_f_sd",      z_bed_f_sd)
-            call nml_read(filename,"yelmo_init_topo","smooth_H_ice",    smooth_H_ice)
-
-            call yelmo_parse_path(init_topo_path,dom%par%domain,dom%par%grid_name)
+            ! Now determine which values should be used from restart.
             
-            ! Override parameter choice if command-line argument present 
-            if (present(load_topo)) init_topo_load = load_topo 
-
-            if (init_topo_load) then 
-                ! =========================================
-                ! Load topography data from netcdf file 
-
-                call nc_read(init_topo_path,init_topo_names(1), dom%tpo%now%H_ice, missing_value=mv)
-                call nc_read(init_topo_path,init_topo_names(2), dom%bnd%z_bed, missing_value=mv) 
-
-                if (trim(init_topo_names(3)) .ne. ""     .and. &
-                    trim(init_topo_names(3)) .ne. "none" .and. &
-                    trim(init_topo_names(3)) .ne. "None") then 
-
-                    call nc_read(init_topo_path,init_topo_names(3),dom%bnd%z_bed_sd)
-
-                    ! Apply scaling to adjust z_bed depending on standard deviation
-                    dom%bnd%z_bed = dom%bnd%z_bed + z_bed_f_sd*dom%bnd%z_bed_sd 
-
-                else
-                    dom%bnd%z_bed_sd = 0.0_prec 
-                end if 
-
-                ! Clean up ice thickness field 
-                where (.not. dom%bnd%ice_allowed)  dom%tpo%now%H_ice = 0.0_prec 
-                where(dom%tpo%now%H_ice  .lt. 1.0) dom%tpo%now%H_ice = 0.0_prec 
-
-                ! Smooth ice thickness field, if desired 
-                if (smooth_H_ice) then 
-                    call smooth_gauss_2D(dom%tpo%now%H_ice,dx=dom%grd%dx,n_smooth=2)
-                end if 
-
-                ! Additionally modify initial topographic state 
-                select case(init_topo_state)
-
-                    case(0) 
-
-                        ! Pass, use topography as loaded 
-
-                    case(1) 
-                        ! Remove ice, but do not adjust bedrock 
-
-                        dom%tpo%now%H_ice = 0.0_prec 
-
-                    case(2)
-                        ! Remove ice, set bedrock to isostatically rebounded state 
-
-                        dom%bnd%z_bed     = dom%bnd%z_bed + (rho_ice/rho_a)*dom%tpo%now%H_ice
-                        dom%tpo%now%H_ice = 0.0_prec
-
-                    case DEFAULT 
-
-                        write(io_unit_err,*) "yelmo_init_topo:: Error: init_topo_state choice not recognized."
-                        write(io_unit_err,*) "init_topo_state = ", init_topo_state 
-                        stop 
-
-                end select
-
+            if (.not. dom%par%restart_H_ice) then 
+                ! Use externally loaded field
+                dom%tpo%now%H_ice = H_ice 
             end if 
 
-            ! Calculate topographic information (masks, etc)
-            call calc_ytopo(dom%tpo,dom%dyn,dom%mat,dom%thrm,dom%bnd,time,topo_fixed=.TRUE.)
-            
-            ! Update regional calculations (for entire domain)
-            call calc_yregions(dom%reg,dom%tpo,dom%dyn,dom%thrm,dom%mat,dom%bnd,mask=dom%bnd%ice_allowed)
+            if (.not. dom%par%restart_z_bed) then 
+                ! Use externally loaded fields
+                dom%bnd%z_bed     = z_bed 
+                dom%bnd%z_bed_sd  = z_bed_sd 
+            end if 
 
         end if 
+
+        ! ajr: WARNING: the above will not work properly if z_bed from the restart file has
+        ! been affected by isostatic rebound. In that case, the new z_bed should be adjusted
+        ! so that it reflects the same amount of isostatic rebound. 
+        
+        ! Step 3: update remaining topogaphic info to be consistent with initial fields 
+
+
+        ! Calculate topographic information (masks, etc)
+        call calc_ytopo(dom%tpo,dom%dyn,dom%mat,dom%thrm,dom%bnd,time,topo_fixed=.TRUE.)
+        
+        ! Update regional calculations (for entire domain)
+        call calc_yregions(dom%reg,dom%tpo,dom%dyn,dom%thrm,dom%mat,dom%bnd,mask=dom%bnd%ice_allowed)
+
+
+        ! Summary for log file: 
 
         write(*,*) "yelmo_init_topo:: range(z_bed):     ", minval(dom%bnd%z_bed),     maxval(dom%bnd%z_bed)
         write(*,*) "yelmo_init_topo:: range(z_bed_sd):  ", minval(dom%bnd%z_bed_sd),  maxval(dom%bnd%z_bed_sd)
-        write(*,*) "yelmo_init_topo:: range(H_ice):     ", minval(dom%tpo%now%H_ice), maxval(dom%tpo%now%H_ice)
-        
-        if (.not. dom%par%use_restart) then 
-            write(*,*) "yelmo_init_topo:: scaling fac z_bed_f_sd: ", z_bed_f_sd 
-        end if 
+        write(*,*) "yelmo_init_topo:: range(H_ice):     ", minval(dom%tpo%now%H_ice), maxval(dom%tpo%now%H_ice) 
+        write(*,*) "yelmo_init_topo:: scaling fac z_bed_f_sd: ", z_bed_f_sd  
         
         return 
 
@@ -986,6 +1027,8 @@ contains
         call nml_read(filename,"yelmo","grid_path",     par%grid_path)
         call nml_read(filename,"yelmo","experiment",    par%experiment)
         call nml_read(filename,"yelmo","restart",       par%restart)
+        call nml_read(filename,"yelmo","restart_z_bed", par%restart_z_bed)
+        call nml_read(filename,"yelmo","restart_H_ice", par%restart_H_ice)
         call nml_read(filename,"yelmo","log_timestep",  par%log_timestep)
         call nml_read(filename,"yelmo","disable_kill",  par%disable_kill)
         call nml_read(filename,"yelmo","zeta_scale",    par%zeta_scale)

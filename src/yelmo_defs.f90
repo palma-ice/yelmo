@@ -745,6 +745,10 @@ module yelmo_defs
         character (len=256) :: experiment
         character (len=512) :: restart
 
+        ! Restart options 
+        logical             :: restart_z_bed 
+        logical             :: restart_H_ice 
+        
         ! Data logging 
         logical             :: log_timestep 
 

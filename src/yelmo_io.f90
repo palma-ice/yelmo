@@ -598,8 +598,18 @@ contains
         type(map_scrip_class) :: mps 
 
         ! Load restart file grid attributes 
-        call nc_read_attr(filename,"domain",    restart_domain)
-        call nc_read_attr(filename,"grid_name", restart_grid_name)
+        if (nc_exists_attr(filename,"domain")) then 
+            call nc_read_attr(filename,"domain",    restart_domain)
+        else 
+            restart_domain = trim(dom%par%domain)
+        end if 
+
+        if (nc_exists_attr(filename,"grid_name")) then 
+            call nc_read_attr(filename,"grid_name", restart_grid_name)
+        else 
+            restart_grid_name = trim(dom%par%grid_name)
+        end if 
+
 
         if (trim(restart_grid_name) .eq. trim(dom%par%grid_name) ) then 
             ! Restart file grid and yelmo grid are the same
@@ -638,9 +648,19 @@ contains
         type(map_scrip_class) :: mps 
         
         ! Load restart file grid attributes 
-        call nc_read_attr(filename,"domain",    restart_domain)
-        call nc_read_attr(filename,"grid_name", restart_grid_name)
+        if (nc_exists_attr(filename,"domain")) then 
+            call nc_read_attr(filename,"domain",    restart_domain)
+        else 
+            restart_domain = trim(dom%par%domain)
+        end if 
 
+        if (nc_exists_attr(filename,"grid_name")) then 
+            call nc_read_attr(filename,"grid_name", restart_grid_name)
+        else 
+            restart_grid_name = trim(dom%par%grid_name)
+        end if 
+        
+        
         if (trim(restart_grid_name) .eq. trim(dom%par%grid_name) ) then 
             ! Restart file grid and yelmo grid are the same
 

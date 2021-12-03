@@ -812,7 +812,7 @@ contains
         if (init_topo_load) then 
             ! =========================================
             ! Load topography data from netcdf file 
-
+            
             call nc_read(init_topo_path,init_topo_names(1), H_ice, missing_value=mv)
             call nc_read(init_topo_path,init_topo_names(2), z_bed, missing_value=mv) 
 
@@ -871,13 +871,13 @@ contains
 
         end if 
 
-        ! Step 2: load topo variables from a restart file if desired 
+        ! Step 2: load topo and bnd variables from a restart file if desired 
 
         if (dom%par%use_restart) then 
             ! Load variables from a restart file. Note: this will
             ! overwrite all information stored in yelmo object from above.
 
-            call yelmo_restart_read_topo(dom,trim(dom%par%restart),time)
+            call yelmo_restart_read_topo_bnd(dom,dom%par%restart,time)
 
             ! Now determine which values should be used from restart.
             
@@ -890,6 +890,11 @@ contains
                 ! Use externally loaded fields
                 dom%bnd%z_bed     = z_bed 
                 dom%bnd%z_bed_sd  = z_bed_sd 
+
+                write(*,*) "yelmo_init_topo: z_bed taken from input file, remaining &
+                            &topo data from restart file."
+                write(*,*) "yelmo.restart: ", trim(dom%par%restart)
+                write(*,*) "yelmo_init_topo.init_topo_path: ", trim(init_topo_path)
             end if 
 
         end if 
@@ -898,8 +903,8 @@ contains
         ! been affected by isostatic rebound. In that case, the new z_bed should be adjusted
         ! so that it reflects the same amount of isostatic rebound. 
         
-        ! Step 3: update remaining topogaphic info to be consistent with initial fields 
 
+        ! Step 3: update remaining topogaphic info to be consistent with initial fields 
 
         ! Calculate topographic information (masks, etc)
         call calc_ytopo(dom%tpo,dom%dyn,dom%mat,dom%thrm,dom%bnd,time,topo_fixed=.TRUE.)

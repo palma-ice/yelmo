@@ -27,7 +27,7 @@ module yelmo_io
     public :: yelmo_write_step_model_metrics
     public :: yelmo_write_step_pd_metrics
     public :: yelmo_restart_write
-    public :: yelmo_restart_read_topo
+    public :: yelmo_restart_read_topo_bnd
     public :: yelmo_restart_read
 
 
@@ -582,7 +582,7 @@ contains
 
     end subroutine yelmo_restart_write
 
-        subroutine yelmo_restart_read_topo(dom,filename,time)  
+        subroutine yelmo_restart_read_topo_bnd(dom,filename,time)  
         ! Load yelmo variables from restart file: [tpo] 
         ! [dyn,therm,mat] variables loaded using yelmo_restart_read
         
@@ -615,7 +615,7 @@ contains
             ! Restart file grid and yelmo grid are the same
 
             ! Load the data without interpolation (by not specifying mps argument)
-            call yelmo_restart_read_topo_internal(dom,filename,time)
+            call yelmo_restart_read_topo_bnd_internal(dom,filename,time)
 
         else 
             ! Restart grid is different than Yelmo grid 
@@ -624,13 +624,13 @@ contains
             call map_scrip_init(mps,restart_grid_name,dom%par%grid_name, &
                                     method="con",fldr="maps",load=.TRUE.)
 
-            call yelmo_restart_read_topo_internal(dom,filename,time,mps) 
+            call yelmo_restart_read_topo_bnd_internal(dom,filename,time,mps) 
 
         end if 
 
         return 
 
-    end subroutine yelmo_restart_read_topo
+    end subroutine yelmo_restart_read_topo_bnd
 
     subroutine yelmo_restart_read(dom,filename,time)
         ! Load yelmo variables from restart file: [dyn,therm,mat] 
@@ -685,7 +685,7 @@ contains
 
     end subroutine yelmo_restart_read
     
-    subroutine yelmo_restart_read_topo_internal(dom,filename,time,mps)  
+    subroutine yelmo_restart_read_topo_bnd_internal(dom,filename,time,mps)  
         ! Load yelmo variables from restart file: [tpo] 
         ! [dyn,therm,mat] variables loaded using yelmo_restart_read
         
@@ -773,6 +773,30 @@ contains
         
         call nc_read_interp(filename,"z_srf_n",     dom%tpo%now%z_srf_n,ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps)
         
+        ! == ybound variables ===
+
+        call nc_read_interp(filename,"z_bed",       dom%bnd%z_bed,ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps) 
+        call nc_read_interp(filename,"z_bed_sd",    dom%bnd%z_bed_sd,ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps) 
+        call nc_read_interp(filename,"z_sl",        dom%bnd%z_sl,ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps) 
+        call nc_read_interp(filename,"H_sed",       dom%bnd%H_sed,ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps) 
+        call nc_read_interp(filename,"ice_allowed", dom%bnd%ice_allowed,ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps) 
+        call nc_read_interp(filename,"calv_mask",   dom%bnd%calv_mask,ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps) 
+        call nc_read_interp(filename,"H_ice_ref",   dom%bnd%H_ice_ref,ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps) 
+        call nc_read_interp(filename,"z_bed_ref",   dom%bnd%z_bed_ref,ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps) 
+
+        call nc_read_interp(filename,"smb",         dom%bnd%smb,ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps) 
+        call nc_read_interp(filename,"T_srf",       dom%bnd%T_srf,ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps) 
+        call nc_read_interp(filename,"bmb_shlf",    dom%bnd%bmb_shlf,ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps) 
+        call nc_read_interp(filename,"T_shlf",      dom%bnd%T_shlf,ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps) 
+        call nc_read_interp(filename,"Q_geo",       dom%bnd%Q_geo,ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps) 
+
+        call nc_read_interp(filename,"enh_srf",     dom%bnd%enh_srf,ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps) 
+
+        call nc_read_interp(filename,"basins",      dom%bnd%basins,ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps) 
+        call nc_read_interp(filename,"basin_mask",  dom%bnd%basin_mask,ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps) 
+        call nc_read_interp(filename,"regions",     dom%bnd%regions,ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps) 
+        call nc_read_interp(filename,"region_mask", dom%bnd%region_mask,ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps) 
+        
         ! Close the netcdf file
         call nc_close(ncid)
 
@@ -786,12 +810,12 @@ contains
         
         return 
 
-    end subroutine yelmo_restart_read_topo_internal
+    end subroutine yelmo_restart_read_topo_bnd_internal
 
 
     subroutine yelmo_restart_read_internal(dom,filename,time,mps)
         ! Load yelmo variables from restart file: [dyn,therm,mat] 
-        ! [tpo] variables loaded using yelmo_restart_read_topo
+        ! [tpo] variables loaded using yelmo_restart_read_topo_bnd
 
         implicit none 
 
@@ -965,30 +989,6 @@ contains
         call nc_read_interp(filename,"enth_rock",   dom%thrm%now%enth_rock,  ncid=ncid,start=[1,1,1,n],count=[nx,ny,nz_r,1],mps=mps)      
         call nc_read_interp(filename,"T_rock",      dom%thrm%now%T_rock,     ncid=ncid,start=[1,1,1,n],count=[nx,ny,nz_r,1],mps=mps)      
 
-        ! == ybound variables ===
-
-        call nc_read_interp(filename,"z_bed",       dom%bnd%z_bed,ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps) 
-        call nc_read_interp(filename,"z_bed_sd",    dom%bnd%z_bed_sd,ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps) 
-        call nc_read_interp(filename,"z_sl",        dom%bnd%z_sl,ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps) 
-        call nc_read_interp(filename,"H_sed",       dom%bnd%H_sed,ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps) 
-        call nc_read_interp(filename,"smb",         dom%bnd%smb,ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps) 
-        call nc_read_interp(filename,"T_srf",       dom%bnd%T_srf,ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps) 
-        call nc_read_interp(filename,"bmb_shlf",    dom%bnd%bmb_shlf,ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps) 
-        call nc_read_interp(filename,"T_shlf",      dom%bnd%T_shlf,ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps) 
-        call nc_read_interp(filename,"Q_geo",       dom%bnd%Q_geo,ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps) 
-
-        call nc_read_interp(filename,"enh_srf",     dom%bnd%enh_srf,ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps) 
-
-        call nc_read_interp(filename,"basins",      dom%bnd%basins,ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps) 
-        call nc_read_interp(filename,"basin_mask",  dom%bnd%basin_mask,ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps) 
-        call nc_read_interp(filename,"regions",     dom%bnd%regions,ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps) 
-        call nc_read_interp(filename,"region_mask", dom%bnd%region_mask,ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps) 
-
-        call nc_read_interp(filename,"ice_allowed", dom%bnd%ice_allowed,ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps) 
-        call nc_read_interp(filename,"calv_mask",   dom%bnd%calv_mask,ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps) 
-        call nc_read_interp(filename,"H_ice_ref",   dom%bnd%H_ice_ref,ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps) 
-        call nc_read_interp(filename,"z_bed_ref",   dom%bnd%z_bed_ref,ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps) 
-        
         ! Close the netcdf file
         call nc_close(ncid)
 

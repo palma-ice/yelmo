@@ -778,6 +778,7 @@ contains
         integer             :: init_topo_state
         real(prec)          :: z_bed_f_sd 
         logical             :: smooth_H_ice
+        logical             :: smooth_z_bed
 
         real(wp), allocatable :: H_ice(:,:) 
         real(wp), allocatable :: z_bed(:,:) 
@@ -803,6 +804,7 @@ contains
         call nml_read(filename,"yelmo_init_topo","init_topo_state", init_topo_state)
         call nml_read(filename,"yelmo_init_topo","z_bed_f_sd",      z_bed_f_sd)
         call nml_read(filename,"yelmo_init_topo","smooth_H_ice",    smooth_H_ice)
+        call nml_read(filename,"yelmo_init_topo","smooth_z_bed",    smooth_z_bed)
 
         call yelmo_parse_path(init_topo_path,dom%par%domain,dom%par%grid_name)
             
@@ -812,7 +814,7 @@ contains
         if (init_topo_load) then 
             ! =========================================
             ! Load topography data from netcdf file 
-            
+
             call nc_read(init_topo_path,init_topo_names(1), H_ice, missing_value=mv)
             call nc_read(init_topo_path,init_topo_names(2), z_bed, missing_value=mv) 
 
@@ -836,6 +838,11 @@ contains
             ! Smooth ice thickness field, if desired 
             if (smooth_H_ice) then 
                 call smooth_gauss_2D(H_ice,dx=dom%grd%dx,n_smooth=2)
+            end if 
+
+            ! Smooth z_bed field, if desired 
+            if (smooth_z_bed) then 
+                call smooth_gauss_2D(z_bed,dx=dom%grd%dx,n_smooth=2)
             end if 
 
             ! Additionally modify initial topographic state 

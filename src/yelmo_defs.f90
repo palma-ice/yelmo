@@ -781,6 +781,7 @@ module yelmo_defs
         
         ! Other internal parameters
         logical :: use_restart 
+        logical :: restart_interpolated
         
     end type
 

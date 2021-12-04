@@ -617,6 +617,9 @@ contains
             ! Load the data without interpolation (by not specifying mps argument)
             call yelmo_restart_read_topo_bnd_internal(dom,filename,time)
 
+            ! Set yelmo flag too
+            dom%par%restart_interpolated = .FALSE. 
+
         else 
             ! Restart grid is different than Yelmo grid 
 
@@ -626,6 +629,9 @@ contains
 
             call yelmo_restart_read_topo_bnd_internal(dom,filename,time,mps) 
 
+            ! Set yelmo flag too
+            dom%par%restart_interpolated = .TRUE. 
+            
         end if 
 
         return 

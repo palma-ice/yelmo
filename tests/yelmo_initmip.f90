@@ -272,6 +272,18 @@ program yelmo_test
 
     end if 
 
+
+    if (yelmo1%par%use_restart .and. yelmo1%par%restart_interpolated) then 
+
+        write(*,*) "Running restart topo smoothing step..."
+
+        ! Run full model (tpo,dyn,thrm) with DIVA solver very briefly to smooth it out
+        call yelmo_update_equil(yelmo1,time,time_tot=1.0_prec,dt=0.2_prec, &
+                                                topo_fixed=.FALSE.,dyn_solver="diva")
+
+    
+    end if 
+
     ! Initialize output files 
     call yelmo_write_init(yelmo1,file2D,time_init=time,units="years")  
     call yelmo_write_reg_init(yelmo1,file1D,time_init=time,units="years",mask=yelmo1%bnd%ice_allowed)

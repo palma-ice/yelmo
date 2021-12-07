@@ -102,7 +102,7 @@ end select
         
         ! Smooth basal frictional heating 
         if (thrm%par%n_sm_qb .gt. 0) then 
-            call smooth_gauss_2D(thrm%now%Q_b,thrm%par%dx,thrm%par%n_sm_qb, &
+            call smooth_gauss_2D(thrm%now%Q_b,thrm%par%dx,real(thrm%par%n_sm_qb,wp), &
                                     tpo%now%H_ice.gt.0.0,tpo%now%H_ice.gt.0.0)
         end if 
 
@@ -124,7 +124,7 @@ end select
         
         ! Smooth strain heating 
         if (thrm%par%n_sm_qstrn .gt. 0) then 
-            call smooth_gauss_3D(thrm%now%Q_strn,thrm%par%dx,thrm%par%n_sm_qstrn, &
+            call smooth_gauss_3D(thrm%now%Q_strn,thrm%par%dx,real(thrm%par%n_sm_qstrn,wp), &
                                         tpo%now%H_ice.gt.0.0,tpo%now%H_ice.gt.0.0)
         end if 
 

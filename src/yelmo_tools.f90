@@ -3325,15 +3325,15 @@ contains
 
     end subroutine fill_borders_3D
 
-    subroutine smooth_gauss_3D(var,dx,n_smooth,mask_apply,mask_use)
+    subroutine smooth_gauss_3D(var,dx,f_sigma,mask_apply,mask_use)
 
         ! Smooth out strain heating to avoid noise 
 
         implicit none
 
-        real(prec), intent(INOUT) :: var(:,:,:)      ! nx,ny,nz_aa: 3D variable
-        real(prec), intent(IN)    :: dx 
-        integer,    intent(IN)    :: n_smooth  
+        real(wp),   intent(INOUT) :: var(:,:,:)      ! nx,ny,nz_aa: 3D variable
+        real(wp),   intent(IN)    :: dx 
+        real(wp),   intent(IN)    :: f_sigma  
         logical,    intent(IN), optional :: mask_apply(:,:) 
         logical,    intent(IN), optional :: mask_use(:,:) 
 
@@ -3343,41 +3343,55 @@ contains
         nz_aa = size(var,3)
 
         do k = 1, nz_aa 
-             call smooth_gauss_2D(var(:,:,k),dx,n_smooth,mask_apply,mask_use)
+             call smooth_gauss_2D(var(:,:,k),dx,f_sigma,mask_apply,mask_use)
         end do 
 
         return 
 
     end subroutine smooth_gauss_3D
     
-    subroutine smooth_gauss_2D(var,dx,n_smooth,mask_apply,mask_use)
+    subroutine smooth_gauss_2D(var,dx,f_sigma,mask_apply,mask_use)
         ! Smooth out a field to avoid noise 
         ! mask_apply designates where smoothing should be applied 
         ! mask_use   designates which points can be considered in the smoothing filter 
 
         implicit none
 
-        real(prec), intent(INOUT) :: var(:,:)      ! [nx,ny] 2D variable
-        real(prec), intent(IN)    :: dx 
-        integer,    intent(IN)    :: n_smooth  
+        real(wp),   intent(INOUT) :: var(:,:)      ! [nx,ny] 2D variable
+        real(wp),   intent(IN)    :: dx 
+        real(wp),   intent(IN)    :: f_sigma  
         logical,    intent(IN), optional :: mask_apply(:,:) 
         logical,    intent(IN), optional :: mask_use(:,:) 
 
         ! Local variables
-        integer :: i, j, nx, ny, n, n2
-        real(prec) :: sigma    
-        real(prec), allocatable :: filter0(:,:), filter(:,:) 
-        real(prec), allocatable :: var_old(:,:) 
-        logical,    allocatable :: mask_apply_local(:,:) 
-        logical,    allocatable :: mask_use_local(:,:) 
+        integer  :: i, j, nx, ny, n, n2
+        real(wp) :: sigma    
+        real(wp), allocatable :: filter0(:,:), filter(:,:) 
+        real(wp), allocatable :: var_old(:,:) 
+        logical,  allocatable :: mask_apply_local(:,:) 
+        logical,  allocatable :: mask_use_local(:,:) 
 
         nx    = size(var,1)
         ny    = size(var,2)
-        n     = 7 
-        n2    = (n-1)/2 
 
-        sigma = dx*n_smooth 
+        ! Safety check
+        if (f_sigma .lt. 1.0_wp) then 
+            write(io_unit_err,*) ""
+            write(io_unit_err,*) "smooth_gauss_2D:: Error: f_sigma must be >= 1."
+            write(io_unit_err,*) "f_sigma: ", f_sigma 
+            write(io_unit_err,*) "dx:      ", dx 
+            stop 
+        end if 
 
+        ! Get smoothing radius as standard devation of Gaussian function
+        sigma = dx*f_sigma 
+
+        ! Determine half-width of filter as 2-sigma
+        n2 = 2*ceiling(f_sigma)
+
+        ! Get total number of points for filter window in each direction
+        n = 2*n2+1
+        
         allocate(var_old(nx,ny))
         allocate(mask_apply_local(nx,ny))
         allocate(mask_use_local(nx,ny))
@@ -3421,10 +3435,12 @@ contains
             if (mask_apply_local(i,j)) then 
                 ! Apply smoothing to this point 
 
+                ! Limit filter input to neighbors of interest
                 filter = filter0 
                 where(.not. mask_use_local(i-n2:i+n2,j-n2:j+n2)) filter = 0.0
-                if (sum(filter) .gt. 0.0) then
-                    ! If neighbors are available, perform smoothing   
+
+                ! If neighbors are available, normalize and perform smoothing  
+                if (sum(filter) .gt. 0.0) then 
                     filter = filter/sum(filter)
                     var(i,j) = sum(var_old(i-n2:i+n2,j-n2:j+n2)*filter) 
                 end if  
@@ -3546,8 +3562,8 @@ contains
         end do 
 
         ! Now apply Gaussian smoothing to bad points, with a wide radius 
-        call smooth_gauss_2D(var,mask_apply=bad_pts,dx=dx,n_smooth=5, &
-                                mask_use=H_ice.gt.0.0_prec .and. (.not. bad_pts))
+        call smooth_gauss_2D(var,mask_apply=bad_pts,dx=dx,f_sigma=5.0_wp, &
+                                mask_use=H_ice.gt.0.0_wp .and. (.not. bad_pts))
 
         return 
 

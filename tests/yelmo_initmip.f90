@@ -278,11 +278,11 @@ program yelmo_test
         write(*,*) "Running restart topo smoothing step..."
 
         ! Run thermodynamics with DIVA solver very briefly to smooth it out
-        call yelmo_update_equil(yelmo1,time,time_tot=10.0_prec,dt=0.2_prec, &
+        call yelmo_update_equil(yelmo1,time,time_tot=10.0_prec,dt=1.0_wp, &
                                                 topo_fixed=.TRUE.,dyn_solver="diva")
 
         ! Run full model (tpo,dyn,thrm) with DIVA solver very briefly to smooth it out
-        call yelmo_update_equil(yelmo1,time,time_tot=1.0_prec,dt=0.2_prec, &
+        call yelmo_update_equil(yelmo1,time,time_tot=1.0_prec,dt=0.2_wp, &
                                                 topo_fixed=.FALSE.,dyn_solver="diva")
 
     

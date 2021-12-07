@@ -768,7 +768,7 @@ contains
 
         type(yelmo_class), intent(INOUT) :: dom
         character(len=*),  intent(IN)    :: filename
-        real(prec),        intent(IN)    :: time 
+        real(wp),          intent(IN)    :: time 
         logical, optional, intent(IN)    :: load_topo 
 
         ! Local variables 
@@ -776,9 +776,9 @@ contains
         character(len=1028) :: init_topo_path
         character(len=56)   :: init_topo_names(3)
         integer             :: init_topo_state
-        real(prec)          :: z_bed_f_sd 
-        logical             :: smooth_H_ice
-        logical             :: smooth_z_bed
+        real(wp)            :: z_bed_f_sd 
+        real(wp)            :: smooth_H_ice
+        real(wp)            :: smooth_z_bed
 
         real(wp), allocatable :: H_ice(:,:) 
         real(wp), allocatable :: z_bed(:,:) 
@@ -836,13 +836,13 @@ contains
             where (H_ice  .lt. 1.0)            H_ice = 0.0_wp
 
             ! Smooth ice thickness field, if desired 
-            if (smooth_H_ice) then 
-                call smooth_gauss_2D(H_ice,dx=dom%grd%dx,n_smooth=2)
+            if (smooth_H_ice .ge. 1.0_wp) then 
+                call smooth_gauss_2D(H_ice,dx=dom%grd%dx,f_sigma=smooth_H_ice)
             end if 
 
             ! Smooth z_bed field, if desired 
-            if (smooth_z_bed) then 
-                call smooth_gauss_2D(z_bed,dx=dom%grd%dx,n_smooth=2)
+            if (smooth_z_bed .ge. 1.0_wp) then 
+                call smooth_gauss_2D(z_bed,dx=dom%grd%dx,f_sigma=smooth_z_bed)
             end if 
 
             ! Additionally modify initial topographic state 

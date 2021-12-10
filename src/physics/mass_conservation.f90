@@ -261,7 +261,7 @@ contains
         ! Artificially delete ice from locations that are not allowed
         ! according to boundary mask (ie, EISMINT, BUELER-A, open ocean)
         where (.not. ice_allowed) H_ice_new = 0.0 
-
+        
         do j = 1, ny 
         do i = 1, nx 
 
@@ -271,8 +271,8 @@ contains
             jm1 = max(j-1,1)
             jp1 = min(j+1,ny)
 
-            is_margin = f_ice(i,j) .gt. 0.0 .and. &
-                count([f_ice(im1,j),f_ice(ip1,j),f_ice(i,jm1),f_ice(i,jp1)].eq.0.0) .gt. 0
+            is_margin = H_ice_new(i,j) .gt. 0.0 .and. &
+                count([H_ice_new(im1,j),H_ice_new(ip1,j),H_ice_new(i,jm1),H_ice_new(i,jp1)].eq.0.0) .gt. 0
 
             if (is_margin) then
                 ! Ice covered point at the margin

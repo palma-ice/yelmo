@@ -89,7 +89,7 @@ contains
                 names(q) = trim(nms(q))
             end do 
         else 
-            qtot = 11 
+            qtot = 13 
             allocate(names(qtot))
             names(1)  = "H_ice"
             names(2)  = "z_srf"
@@ -97,11 +97,13 @@ contains
             names(4)  = "mask_bed"
             names(5)  = "uxy_b"
             names(6)  = "uxy_s"
-            names(7)  = "T_prime_b"
-            names(8)  = "H_w"
-            names(9)  = "smb"
-            names(10) = "bmb"
-            names(11) = "z_sl"
+            names(7)  = "beta"
+            names(8)  = "visc_bar"
+            names(9)  = "T_prime_b"
+            names(10) = "H_w"
+            names(11) = "smb"
+            names(12) = "bmb"
+            names(13) = "z_sl"
 
         end if 
 
@@ -155,6 +157,9 @@ contains
                                     dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
                 case("beta")
                     call nc_write(filename,"beta",ylmo%dyn%now%beta,units="Pa yr m-1",long_name="Basal friction coefficient", &
+                                    dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
+                case("visc_bar")
+                    call nc_write(filename,"visc_bar",ylmo%mat%now%visc_bar,units="Pa yr",long_name="Vertically averaged viscosity", &
                                     dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
                 case("T_prime_b")
                     call nc_write(filename,"T_prime_b",ylmo%thrm%now%T_prime_b,units="K",long_name="Basal homologous ice temperature", &

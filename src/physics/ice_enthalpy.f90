@@ -234,7 +234,8 @@ contains
         
         ! Safety: limit bmb_grnd to reasonable values to avoid problems
         ! (grounded ice melt should be much less than this limit, eg 10 m/yr)
-        if (bmb_grnd .gt. bmb_grnd_lim) bmb_grnd = bmb_grnd_lim
+        if (bmb_grnd .gt. bmb_grnd_lim)  bmb_grnd =  bmb_grnd_lim
+        if (bmb_grnd .lt. -bmb_grnd_lim) bmb_grnd = -bmb_grnd_lim
 
 
         ! Finally, calculate the CTS height 

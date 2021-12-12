@@ -278,7 +278,7 @@ contains
                 ! Ice covered point at the margin
 
                 ! Calculate current ice thickness 
-                call calc_H_eff(H_eff,H_ice(i,j),f_ice(i,j))
+                call calc_H_eff(H_eff,H_ice_new(i,j),f_ice(i,j))
 
                 ! Remove ice that is too thin 
                 if (f_grnd(i,j) .eq. 0.0_wp .and. H_eff .lt. H_min_flt)  H_ice_new(i,j) = 0.0_wp 
@@ -308,7 +308,7 @@ contains
         ! nextdoor, grows indefinitely, until the model is killed. A 
         ! solution is needed, but limiting the ice thickness at least 
         ! ensures the simulation continues. 
-        where (H_ice .gt. 5e3) H_ice_new = 5e3 
+        where (H_ice_new .gt. 5e3) H_ice_new = 5e3 
 
         ! ajr: the above situation may be related to poor treatment of
         ! grounded ice-front boundary conditions (in ssa solver). It
@@ -323,12 +323,12 @@ contains
             jm1 = max(j-1,1)
             jp1 = min(j+1,ny)
 
-            is_margin = f_ice(i,j) .gt. 0.0 .and. &
-                count([f_ice(im1,j),f_ice(ip1,j),f_ice(i,jm1),f_ice(i,jp1)].eq.0.0) .gt. 0
+            is_margin = H_ice_new(i,j) .gt. 0.0 .and. &
+                count([H_ice_new(im1,j),H_ice_new(ip1,j),H_ice_new(i,jm1),H_ice_new(i,jp1)].eq.0.0) .gt. 0
 
             if (is_margin) then
                 ! Ice covered point at the margin
-
+                
                 ! Calculate current ice thickness 
                 call calc_H_eff(H_eff,H_ice_new(i,j),f_ice(i,j))
 

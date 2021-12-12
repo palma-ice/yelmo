@@ -3,7 +3,7 @@ module yelmo_timesteps
     use yelmo_defs, only : sp, dp, wp, prec, io_unit_err, ytime_class, MV, TOL_UNDERFLOW   
     use ncio 
 
-    use topography, only : calc_ice_fraction
+    use topography, only : calc_ice_fraction, calc_H_grnd
 
     implicit none 
 
@@ -154,7 +154,7 @@ contains
     end subroutine set_pc_beta_coefficients
 
 
-    subroutine set_pc_mask(mask,pc_tau,H_ice_pred,H_ice_corr,H_grnd,margin_flt_subgrid)
+    subroutine set_pc_mask(mask,pc_tau,H_ice_pred,H_ice_corr,z_bed,z_sl,margin_flt_subgrid)
 
         implicit none 
 
@@ -162,7 +162,8 @@ contains
         real(prec), intent(IN) :: pc_tau(:,:) 
         real(prec), intent(IN) :: H_ice_pred(:,:) 
         real(prec), intent(IN) :: H_ice_corr(:,:) 
-        real(prec), intent(IN) :: H_grnd(:,:) 
+        real(prec), intent(IN) :: z_bed(:,:) 
+        real(prec), intent(IN) :: z_sl(:,:) 
         logical,    intent(IN) :: margin_flt_subgrid 
 
         ! Local variables 
@@ -171,7 +172,9 @@ contains
 
         real(prec), allocatable :: f_ice_pred(:,:) 
         real(prec), allocatable :: f_ice_corr(:,:) 
-            
+        real(prec), allocatable :: H_grnd_pred(:,:) 
+        real(prec), allocatable :: H_grnd_corr(:,:) 
+
         real(prec), parameter :: H_lim = 10.0      ! [m] 
         
         nx = size(mask,1)
@@ -179,10 +182,16 @@ contains
 
         allocate(f_ice_pred(nx,ny))
         allocate(f_ice_corr(nx,ny))
+        allocate(H_grnd_pred(nx,ny))
+        allocate(H_grnd_corr(nx,ny))
         
         ! Get the ice area fraction mask for each ice thickness map 
-        call calc_ice_fraction(f_ice_pred,H_ice_pred,H_grnd,margin_flt_subgrid)
-        call calc_ice_fraction(f_ice_corr,H_ice_corr,H_grnd,margin_flt_subgrid)
+        call calc_ice_fraction(f_ice_pred,H_ice_pred,z_bed,z_sl,margin_flt_subgrid)
+        call calc_ice_fraction(f_ice_corr,H_ice_corr,z_bed,z_sl,margin_flt_subgrid)
+
+        ! Get the grounded ice distance to flotation 
+        call calc_H_grnd(H_grnd_pred,H_ice_pred,f_ice_pred,z_bed,z_sl)
+        call calc_H_grnd(H_grnd_corr,H_ice_corr,f_ice_corr,z_bed,z_sl)
 
         ! Initially set all points to True 
         mask = .TRUE. 
@@ -218,7 +227,7 @@ if (.TRUE.) then
 
                     mask(i,j) = .FALSE. 
 
-                else if (H_grnd(i,j) .le. 0.0_prec) then 
+                else if (H_grnd_pred(i,j) .le. 0.0_prec .or. H_grnd_corr(i,j) .le. 0.0_prec) then 
                     ! Grounding-line or floating ice point 
 
                     mask(i,j) = .FALSE. 

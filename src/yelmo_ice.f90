@@ -313,7 +313,7 @@ contains
 
                 ! Calculate eta for this timestep 
                 call set_pc_mask(pc_mask,dom%time%pc_tau,dom%tpo%now%H_ice_pred,dom%tpo%now%H_ice_corr, &
-                                                        dom%tpo%now%H_grnd,dom%tpo%par%margin_flt_subgrid)
+                                                    dom%bnd%z_bed,dom%bnd%z_sl,dom%tpo%par%margin_flt_subgrid)
                 eta_now = calc_pc_eta(dom%time%pc_tau,mask=pc_mask)
 
                 ! Save masked pc_tau for output too 

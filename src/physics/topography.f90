@@ -32,7 +32,7 @@ contains
     !
     ! ============================================================
 
-    subroutine calc_ice_fraction(f_ice,H_ice,H_grnd,flt_subgrid)
+    subroutine calc_ice_fraction(f_ice,H_ice,z_bed,z_sl,flt_subgrid)
         ! Determine the area fraction of a grid cell
         ! that is ice-covered. Assume that marginal points
         ! have equal thickness to inland neighbors 
@@ -41,7 +41,8 @@ contains
 
         real(wp), intent(OUT) :: f_ice(:,:)             ! [--] Ice covered fraction (aa-nodes)
         real(wp), intent(IN)  :: H_ice(:,:)             ! [m] Ice thickness on standard grid (aa-nodes)
-        real(wp), intent(IN)  :: H_grnd(:,:)            ! [m] Thickness until flotation - floating if H_grnd<=0 (aa-nodes)
+        real(wp), intent(IN)  :: z_bed(:,:)             ! [m] Bedrock elevation
+        real(wp), intent(IN)  :: z_sl(:,:)              ! [m] Sea-level elevation
         logical, optional     :: flt_subgrid            ! Option to allow fractions for floating ice margins             
         
         ! Local variables 
@@ -57,19 +58,26 @@ contains
         logical  :: mask_grnd(4)
         integer  :: n_now
         integer, allocatable  :: n_ice(:,:) 
-
+        real(wp), allocatable :: H_grnd(:,:)            ! [m] Thickness until flotation - floating if H_grnd<=0 (aa-nodes)
+        
         real(wp), parameter :: f_ice_island = 1.0_wp 
         
         nx = size(H_ice,1)
         ny = size(H_ice,2)
 
         allocate(n_ice(nx,ny))
+        allocate(H_grnd(nx,ny))
 
         n_ice  = 0
 
         ! By default, fractional cover will be determined
         get_fractional_cover = .TRUE. 
         if (present(flt_subgrid)) get_fractional_cover = flt_subgrid 
+
+        if (get_fractional_cover) then 
+            ! Calculate H_grnd, without accounting for fractional ice cover
+            call calc_H_grnd(H_grnd,H_ice,f_ice,z_bed,z_sl,use_f_ice=.FALSE.)
+        end if 
 
         ! For ice-covered points with ice-free neighbors (ie, at the floating or grounded margin),
         ! determine the fraction of grid point that should be ice covered. 

@@ -278,16 +278,24 @@ program yelmo_test
         write(*,*) "Running restart topo smoothing step..."
 
         ! Run model with no advection
-        call yelmo_update_equil(yelmo1,time,time_tot=10.0_prec,dt=0.2_wp, &
-                              tpo_solver="none",topo_fixed=.FALSE.,dyn_solver="diva")
-
-        ! Run thermodynamics with DIVA solver very briefly to smooth it out
         call yelmo_update_equil(yelmo1,time,time_tot=10.0_prec,dt=1.0_wp, &
-                                                topo_fixed=.TRUE.,dyn_solver="diva")
-        
-        ! Run full model (tpo,dyn,thrm) with DIVA solver very briefly to smooth it out
+                              tpo_solver="none",topo_fixed=.FALSE.,dyn_solver="ssa")
+
+        ! Run thermodynamics with SSA solver very briefly to smooth it out
+        call yelmo_update_equil(yelmo1,time,time_tot=10.0_prec,dt=1.0_wp, &
+                                                topo_fixed=.TRUE.,dyn_solver="ssa")
+
+        ! Run full model (tpo,dyn,thrm) with SSA solver very briefly to smooth it out
         call yelmo_update_equil(yelmo1,time,time_tot=1.0_prec,dt=0.2_wp, &
-                                                topo_fixed=.FALSE.,dyn_solver="diva")
+                                                topo_fixed=.FALSE.,dyn_solver="ssa")
+
+        if (yelmo1%grd%dx .le. 8e3_wp) then 
+            ! Perform additional ssa smoothing step for higher resolution simulations
+
+            call yelmo_update_equil(yelmo1,time,time_tot=100.0_prec,dt=1.0_wp, &
+                                                topo_fixed=.FALSE.,dyn_solver="ssa")
+
+        end if 
 
     
     end if 

@@ -383,12 +383,13 @@ end if
             tpo%now%dzsrfdt = (tpo%now%z_srf-tpo%now%z_srf_n) / dt 
         end if 
         
-        ! Calculate the surface slope (on staggered acx/y nodes)
-        call calc_gradient_ac_ice(tpo%now%dzsdx,tpo%now%dzsdy,tpo%now%z_srf,tpo%now%f_ice,tpo%par%dx, &
-                                                tpo%par%margin2nd,tpo%par%grad_lim,tpo%par%boundaries)
+        ! Calculate the ice thickness gradient (on staggered acx/y nodes)
         call calc_gradient_ac_ice(tpo%now%dHicedx,tpo%now%dHicedy,tpo%now%H_ice,tpo%now%f_ice,tpo%par%dx, &
                                                 tpo%par%margin2nd,tpo%par%grad_lim,tpo%par%boundaries,zero_outside=.TRUE.)
         
+        ! Calculate the surface slope
+        call calc_gradient_ac(tpo%now%dzsdx,tpo%now%dzsdy,tpo%now%z_srf,tpo%par%dx)
+
         ! ajr: experimental, doesn't seem to work properly yet! ===>
         ! Modify surface slope gradient at the grounding line if desired 
 !         call calc_gradient_ac_gl(tpo%now%dzsdx,tpo%now%dzsdy,tpo%now%z_srf,tpo%now%H_ice, &
@@ -405,7 +406,7 @@ end if
                 call calc_f_grnd_subgrid_linear(tpo%now%f_grnd,tpo%now%f_grnd_acx,tpo%now%f_grnd_acy,tpo%now%H_grnd)
 
             case(2)
-                ! Grounded area f_gnrd, average to f_grnd_acx/acy 
+                ! Grounded area f_grnd, average to f_grnd_acx/acy 
 
                 call calc_f_grnd_subgrid_area(tpo%now%f_grnd,tpo%now%f_grnd_acx,tpo%now%f_grnd_acy,tpo%now%H_grnd,tpo%par%gl_sep_nx)
             

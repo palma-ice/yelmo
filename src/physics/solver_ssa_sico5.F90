@@ -19,8 +19,8 @@ module solver_ssa_sico5
 
 contains 
 
-    subroutine calc_vxy_ssa_matrix(vx_m,vy_m,L2_norm,beta_acx,beta_acy,visc_eff, &
-                    ssa_mask_acx,ssa_mask_acy,H_ice,f_ice,taud_acx,taud_acy,H_grnd,z_sl,z_bed, &
+    subroutine calc_vxy_ssa_matrix(vx_m,vy_m,L2_norm,beta_acx,beta_acy,visc_eff_in, &
+                    ssa_mask_acx_in,ssa_mask_acy_in,H_ice_in,f_ice_in,taud_acx,taud_acy,H_grnd,z_sl,z_bed, &
                     z_srf,dx,dy,ulim,boundaries,lateral_bc,lis_settings)
         ! Solution of the system of linear equations for the horizontal velocities
         ! vx_m, vy_m in the shallow shelf approximation.
@@ -34,11 +34,11 @@ contains
         real(prec), intent(OUT)   :: L2_norm              ! L2 norm convergence check from solver
         real(prec), intent(IN)    :: beta_acx(:,:)        ! [Pa a m^-1] Basal friction (acx-nodes)
         real(prec), intent(IN)    :: beta_acy(:,:)        ! [Pa a m^-1] Basal friction (acy-nodes)
-        real(prec), intent(IN)    :: visc_eff(:,:)        ! [Pa a m] Vertically integrated viscosity (aa-nodes)
-        integer,    intent(IN)    :: ssa_mask_acx(:,:)    ! [--] Mask to determine ssa solver actions (acx-nodes)
-        integer,    intent(IN)    :: ssa_mask_acy(:,:)    ! [--] Mask to determine ssa solver actions (acy-nodes)
-        real(prec), intent(IN)    :: H_ice(:,:)           ! [m]  Ice thickness (aa-nodes)
-        real(prec), intent(IN)    :: f_ice(:,:)
+        real(prec), intent(IN)    :: visc_eff_in(:,:)     ! [Pa a m] Vertically integrated viscosity (aa-nodes)
+        integer,    intent(IN)    :: ssa_mask_acx_in(:,:) ! [--] Mask to determine ssa solver actions (acx-nodes)
+        integer,    intent(IN)    :: ssa_mask_acy_in(:,:) ! [--] Mask to determine ssa solver actions (acy-nodes)
+        real(prec), intent(IN)    :: H_ice_in(:,:)        ! [m]  Ice thickness (aa-nodes)
+        real(prec), intent(IN)    :: f_ice_in(:,:)
         real(prec), intent(IN)    :: taud_acx(:,:)        ! [Pa] Driving stress (acx nodes)
         real(prec), intent(IN)    :: taud_acy(:,:)        ! [Pa] Driving stress (acy nodes)
         real(prec), intent(IN)    :: H_grnd(:,:)  
@@ -71,6 +71,15 @@ contains
         real(prec), allocatable :: vis_int_g(:,:) 
         real(prec), allocatable :: vis_int_sgxy(:,:)  
         integer :: n_check 
+
+
+        real(wp), allocatable :: H_ice(:,:) 
+        real(wp), allocatable :: f_ice(:,:)
+        real(wp), allocatable :: visc_eff(:,:)  
+        integer,  allocatable :: ssa_mask_acx(:,:)
+        integer,  allocatable :: ssa_mask_acy(:,:)
+        real(wp), allocatable :: f_grnd_acx(:,:)
+        real(wp), allocatable :: f_grnd_acy(:,:)
 
         ! Boundary conditions counterclockwise unit circle 
         ! 1: x, right-border
@@ -154,8 +163,8 @@ contains
                 
         end select 
 
-        nx = size(H_ice,1)
-        ny = size(H_ice,2)
+        nx = size(H_ice_in,1)
+        ny = size(H_ice_in,2)
         
         nmax   =  2*nx*ny 
         n_sprs = 20*nx*ny 
@@ -171,6 +180,39 @@ contains
         
         allocate(vis_int_g(nx,ny))
         allocate(vis_int_sgxy(nx,ny))
+
+
+        allocate(H_ice(nx,ny))
+        allocate(f_ice(nx,ny)) 
+        allocate(visc_eff(nx,ny)) 
+        allocate(ssa_mask_acx(nx,ny))
+        allocate(ssa_mask_acy(nx,ny))
+        allocate(f_grnd_acx(nx,ny)) 
+        allocate(f_grnd_acy(nx,ny))
+
+        H_ice        = H_ice_in
+        f_ice        = f_ice_in 
+        visc_eff     = visc_eff_in 
+        ssa_mask_acx = ssa_mask_acx_in 
+        ssa_mask_acy = ssa_mask_acy_in
+
+        ! Set dummy arrays to floating everywhere. This is ok
+        ! for now since values of ssa_mask_acx/acy are not used
+        ! except for knowing if it is -1 (prescribed) or not -1 (active).
+        f_grnd_acx = 1.0_wp 
+        f_grnd_acy = 1.0_wp 
+
+        if (.FALSE.) then 
+            ! Extend ice coverage artificially to ensure all marine margins 
+            ! have floating neighbors. 
+
+            call extend_marine_margin(H_ice,f_ice,visc_eff,H_grnd)
+
+            ! Update ssa masks too 
+            call set_ssa_masks(ssa_mask_acx,ssa_mask_acy,beta_acx,beta_acy,H_ice,f_ice, &
+                        f_grnd_acx,f_grnd_acy,beta_max=real(1e8,wp),use_ssa=.TRUE.)
+
+        end if 
 
         !--- External yelmo arguments => local sicopolis variable names ---
         dxi          = dx 
@@ -3277,5 +3319,60 @@ end if
         return 
 
     end subroutine extrapolate_to_icefree_aa
+
+    subroutine extend_marine_margin(H_ice,f_ice,visc_eff,H_grnd)
+
+        implicit none 
+
+        real(wp), intent(INOUT) :: H_ice(:,:) 
+        real(wp), intent(INOUT) :: f_ice(:,:) 
+        real(wp), intent(INOUT) :: visc_eff(:,:) 
+        real(wp), intent(IN)    :: H_grnd(:,:) 
+
+        ! Local variables 
+        integer :: i, j, nx, ny 
+        integer :: im1, ip1, jm1, jp1 
+        logical :: is_margin
+
+        nx = size(H_ice,1) 
+        ny = size(H_ice,2) 
+
+        do j = 1, ny 
+        do i = 1, nx 
+
+            ! Get neighbor indices
+            im1 = max(i-1,1) 
+            ip1 = min(i+1,nx) 
+            jm1 = max(j-1,1) 
+            jp1 = min(j+1,ny)
+
+            if (f_ice(i,j) .lt. 1.0_wp .and. H_grnd(i,j) .le. 0.0_wp) then 
+                ! Potential marine margin point with no ice or only partial ice coverage 
+
+                ! Determine if at least one neighbor is fully ice-covered and grounded
+                is_margin = .FALSE. 
+                if (f_ice(im1,j) .eq. 1.0_wp .and. H_grnd(im1,j) .gt. 0.0_wp) is_margin = .TRUE. 
+                if (f_ice(ip1,j) .eq. 1.0_wp .and. H_grnd(ip1,j) .gt. 0.0_wp) is_margin = .TRUE. 
+                if (f_ice(i,jm1) .eq. 1.0_wp .and. H_grnd(i,jm1) .gt. 0.0_wp) is_margin = .TRUE. 
+                if (f_ice(i,jp1) .eq. 1.0_wp .and. H_grnd(i,jp1) .gt. 0.0_wp) is_margin = .TRUE. 
+                
+                if (is_margin) then 
+                    ! This is the ice-free (or partial ice) neighbor to a marine margin.
+                    ! Populate with artificial ice. 
+
+                    f_ice(i,j) = 1.0_wp 
+                    H_ice(i,j) = 10.0_wp 
+                    visc_eff(i,j) = 1e5 
+
+                end if 
+
+            end if 
+
+        end do 
+        end do  
+
+        return 
+
+    end subroutine extend_marine_margin
 
 end module solver_ssa_sico5

@@ -347,20 +347,29 @@ end if
 
         real(wp), intent(OUT) :: calv(:,:)
         real(wp), intent(IN)  :: H_ice(:,:)
-        logical,    intent(IN)  :: mask(:,:) 
+        logical,  intent(IN)  :: mask(:,:) 
         real(wp), intent(IN)  :: tau 
         real(wp), intent(IN)  :: dt 
 
-        if (tau .eq. 0.0_prec) then 
-            ! Kill all ice immediately 
+        ! Kill all ice immediately 
+        where (mask) calv = H_ice / dt
 
-            where (mask) calv = H_ice / dt
+        ! ajr: in principle, we could make use of a timescale as below,
+        ! however, for most 'kill' applications, this added complexity is
+        ! not helpful (ie, shelves might not be fully killed when they are
+        ! expected to be). This needs further development, so far now,
+        ! the lines above are active where all ice is calved immediately.
+        
+        ! if (tau .eq. 0.0_wp) then 
+        !     ! Kill all ice immediately 
 
-        else 
-            ! Kill using characteristic timescale 
-            where (mask) calv = H_ice / tau 
+        !     where (mask) calv = H_ice / dt
 
-        end if 
+        ! else 
+        !     ! Kill using characteristic timescale 
+        !     where (mask) calv = H_ice / tau 
+
+        ! end if 
 
         return 
 

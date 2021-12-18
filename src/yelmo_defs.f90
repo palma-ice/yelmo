@@ -179,7 +179,6 @@ module yelmo_defs
         real(prec) :: beta_q                ! Friction law exponent
         real(prec) :: beta_u0               ! [m/a] Friction law velocity threshold 
         integer    :: beta_gl_scale         ! Beta grounding-line scaling method (beta => 0 at gl?)
-        integer    :: beta_gl_sep           ! Beta grounding-line sub-element (subgrid) parameterization
         integer    :: beta_gl_stag          ! Beta grounding-line staggering method 
         real(prec) :: beta_gl_f             ! Fraction of beta at gl 
         integer    :: taud_gl_method        ! Driving stress grounding line treatment 

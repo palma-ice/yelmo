@@ -42,7 +42,7 @@ contains
 
         ! Define the ygrid name
         grd%name = trim(grid_name)
-
+        
         ! Determine grid axis sizes
         grd%nx = nc_size(filename,"xc")
         grd%ny = nc_size(filename,"yc")
@@ -71,7 +71,7 @@ contains
         call nc_read(filename,"lon2D",grd%lon)
         call nc_read(filename,"lat2D",grd%lat)
         call nc_read(filename,"area", grd%area)
-
+        
         ! Determine axis units 
         call nc_read_attr(filename,"xc","units",units)
 
@@ -118,7 +118,7 @@ contains
         if (grd%is_projection) then 
             ! Load additional projection information if available
 
-            if ( nc_exists_attr(filename,"lon2D","grid_mapping") ) then
+            if (.FALSE. .and. nc_exists_attr(filename,"lon2D","grid_mapping") ) then
 
                 ! Read grid map name (projection name, eg "polar_stereographic")
                 call nc_read_attr(filename,"lon2D","grid_mapping",grd%mtype)

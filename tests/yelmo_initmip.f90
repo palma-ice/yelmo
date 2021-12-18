@@ -232,6 +232,9 @@ else
     ! Note: run this with SIA only dynamics for now
     yelmo1%dyn%par%solver = "sia"
 
+    call yelmo_update_equil(yelmo1,time,time_tot=0.1_prec,topo_fixed=.FALSE., &
+            dt=0.01_prec,ssa_vel_max=5000.0_prec)
+
     call yelmo_update_equil(yelmo1,time,time_tot=10.0_prec,topo_fixed=.FALSE., &
             dt=0.2_prec,ssa_vel_max=5000.0_prec)
 

@@ -48,7 +48,7 @@ contains
         real(wp), intent(IN)    :: calv_thin
         
         ! Local variables
-        integer  :: i, j, nx, ny, n_mrgn 
+        integer  :: i, j, nx, ny, n_mrgn, n_grnd 
         integer  :: im1, ip1, jm1, jp1
         real(wp) :: H_eff 
         real(wp) :: wt 
@@ -67,8 +67,12 @@ contains
             jm1 = max(j-1,1)
             jp1 = min(j+1,ny)
             
-            ! Determine if point is at the floating margin 
-            if (f_grnd(i,j) .eq. 0.0 .and. f_ice(i,j) .gt. 0.0) then 
+            ! Count number of grounded ice-covered neighbors
+            n_grnd = count([f_ice(im1,j),f_ice(ip1,j),f_ice(i,jm1),f_ice(i,jp1)].gt.0.0 .and. &
+                           [f_grnd(im1,j),f_grnd(ip1,j),f_grnd(i,jm1),f_grnd(i,jp1)].gt.0.0)
+
+            ! Determine if point is at the floating margin with no grounded neighbors
+            if (f_grnd(i,j) .eq. 0.0 .and. f_ice(i,j) .gt. 0.0 .and. n_grnd .eq. 0) then 
                 ! Floating point, diagnose number of ice-free neighbors 
 
                 n_mrgn = count([f_ice(im1,j),f_ice(ip1,j),f_ice(i,jm1),f_ice(i,jp1)].eq.0.0 )
@@ -116,7 +120,7 @@ contains
         ! Local variables 
         integer  :: i, j, nx, ny
         integer  :: im1, ip1, jm1, jp1 
-        integer  :: n_mrgn 
+        integer  :: n_mrgn, n_grnd
         real(wp) :: H_eff 
         logical  :: embayed 
 
@@ -132,16 +136,21 @@ contains
             jm1 = max(j-1,1)
             jp1 = min(j+1,ny)
             
-            if (f_grnd(i,j) .eq. 0.0 .and. f_ice(i,j) .gt. 0.0) then 
-                ! Floating point, diagnose number of ice-free neighbors 
+            ! Count number of grounded ice-covered neighbors
+            n_grnd = count([f_ice(im1,j),f_ice(ip1,j),f_ice(i,jm1),f_ice(i,jp1)].gt.0.0 .and. &
+                           [f_grnd(im1,j),f_grnd(ip1,j),f_grnd(i,jm1),f_grnd(i,jp1)].gt.0.0)
 
-                n_mrgn = count([H_ice(im1,j),H_ice(ip1,j),H_ice(i,jm1),H_ice(i,jp1)].eq.0.0 )
+            if (f_grnd(i,j) .eq. 0.0 .and. f_ice(i,j) .gt. 0.0 .and. n_grnd .eq. 0) then 
+                ! Floating point with no grounded neighbors, diagnose number of ice-free neighbors 
+
+                n_mrgn = count([f_ice(im1,j),f_ice(ip1,j),f_ice(i,jm1),f_ice(i,jp1)].eq.0.0 )
 
             else 
 
                 n_mrgn = 0 
 
             end if 
+
 
             if (n_mrgn .gt. 2) then 
                 ! For points with more than two ice-free neighbors, increase calving rate 
@@ -209,7 +218,7 @@ contains
 
                 if (embayed) then 
 
-                    ! calv_flt(i,j) = 0.5_wp * calv_flt(i,j)
+                    calv_flt(i,j) = 0.5_wp * calv_flt(i,j)
                 
                 end if 
 

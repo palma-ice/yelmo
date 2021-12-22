@@ -3334,8 +3334,15 @@ end if
         integer :: im1, ip1, jm1, jp1 
         logical :: is_margin
 
+        real(wp), allocatable :: f_old(:,:) 
+
         nx = size(H_ice,1) 
         ny = size(H_ice,2) 
+
+
+        allocate(f_old(nx,ny)) 
+
+        f_old = f_ice
 
         do j = 1, ny 
         do i = 1, nx 
@@ -3346,15 +3353,15 @@ end if
             jm1 = max(j-1,1) 
             jp1 = min(j+1,ny)
 
-            if (f_ice(i,j) .lt. 1.0_wp .and. H_grnd(i,j) .le. 0.0_wp) then 
+            if (f_old(i,j) .lt. 1.0_wp .and. H_grnd(i,j) .le. 0.0_wp) then 
                 ! Potential marine margin point with no ice or only partial ice coverage 
 
                 ! Determine if at least one neighbor is fully ice-covered and grounded
                 is_margin = .FALSE. 
-                if (f_ice(im1,j) .eq. 1.0_wp .and. H_grnd(im1,j) .gt. 0.0_wp) is_margin = .TRUE. 
-                if (f_ice(ip1,j) .eq. 1.0_wp .and. H_grnd(ip1,j) .gt. 0.0_wp) is_margin = .TRUE. 
-                if (f_ice(i,jm1) .eq. 1.0_wp .and. H_grnd(i,jm1) .gt. 0.0_wp) is_margin = .TRUE. 
-                if (f_ice(i,jp1) .eq. 1.0_wp .and. H_grnd(i,jp1) .gt. 0.0_wp) is_margin = .TRUE. 
+                if (f_old(im1,j) .eq. 1.0_wp .and. H_grnd(im1,j) .gt. 0.0_wp) is_margin = .TRUE. 
+                if (f_old(ip1,j) .eq. 1.0_wp .and. H_grnd(ip1,j) .gt. 0.0_wp) is_margin = .TRUE. 
+                if (f_old(i,jm1) .eq. 1.0_wp .and. H_grnd(i,jm1) .gt. 0.0_wp) is_margin = .TRUE. 
+                if (f_old(i,jp1) .eq. 1.0_wp .and. H_grnd(i,jp1) .gt. 0.0_wp) is_margin = .TRUE. 
                 
                 if (is_margin) then 
                     ! This is the ice-free (or partial ice) neighbor to a marine margin.

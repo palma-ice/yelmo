@@ -19,6 +19,7 @@ module velocity_general
     public :: calc_uz_advec_corr_3D_aa
     public :: calc_driving_stress
     public :: calc_driving_stress_gl
+    public :: adjust_visc_eff_margin
     public :: set_inactive_margins
     public :: calc_ice_flux
     public :: calc_vel_ratio
@@ -1198,6 +1199,214 @@ end if
         return 
 
     end subroutine calc_driving_stress_gl
+
+    subroutine adjust_visc_eff_margin(visc_int,ux,uy,f_ice,f_grnd)
+        ! This does not help, yet...
+        
+        implicit none 
+
+        real(wp), intent(INOUT) :: visc_int(:,:) 
+        real(wp), intent(IN)    :: ux(:,:)
+        real(wp), intent(IN)    :: uy(:,:)
+        real(wp), intent(IN)    :: f_ice(:,:)
+        real(wp), intent(IN)    :: f_grnd(:,:)
+        
+        ! Local variables 
+        integer  :: i, j, nx, ny, n  
+        integer  :: im1, ip1, jm1, jp1 
+        real(wp) :: visc_aa5(5) 
+        real(wp) :: wt_aa5(5) 
+
+        real(wp), allocatable :: visc_int_in(:,:) 
+
+        nx = size(visc_int,1) 
+        ny = size(visc_int,2) 
+
+        allocate(visc_int_in(nx,ny))
+        visc_int_in = visc_int
+
+        do j = 1, ny 
+        do i = 1, nx 
+
+            ! Define neighbor indices
+            im1 = max(i-1,1)
+            ip1 = min(i+1,nx)
+            jm1 = max(j-1,1)
+            jp1 = min(j+1,ny)
+            
+            if (f_ice(i,j) .gt. 0.0_wp) then 
+                ! Ice-covered point 
+
+                visc_aa5 = visc_int_in(i,j) 
+                wt_aa5   = 0.0_wp
+
+                if (f_ice(ip1,j) .eq. 1.0_wp ) then 
+                    visc_aa5(1) = visc_int_in(ip1,j) 
+                    wt_aa5(1)   = 1.0_wp 
+                end if 
+
+                if (f_ice(im1,j) .eq. 1.0_wp ) then 
+                    visc_aa5(2) = visc_int_in(im1,j) 
+                    wt_aa5(2)   = 1.0_wp 
+                end if 
+
+                if (f_ice(i,jp1) .eq. 1.0_wp ) then 
+                    visc_aa5(3) = visc_int_in(i,jp1) 
+                    wt_aa5(3)   = 1.0_wp 
+                end if 
+
+                if (f_ice(i,jm1) .eq. 1.0_wp ) then 
+                    visc_aa5(4) = visc_int_in(i,jm1) 
+                    wt_aa5(4)   = 1.0_wp 
+                end if 
+
+                ! Fill in last value with central point 
+                visc_aa5(5) = visc_int_in(i,j) 
+                wt_aa5(5)   = 1.0_wp 
+
+                ! How many fully ice-covered neighbors
+                n = sum(wt_aa5) 
+
+                if (n .gt. 1 .and. n .lt. 5) then 
+                    ! Margin point with some ice-covered neighbors,
+                    ! smooth viscosity. 
+
+                    visc_int(i,j) = sum(visc_aa5*wt_aa5)/sum(wt_aa5)
+
+                end if 
+
+            end if 
+
+        end do 
+        end do  
+
+        return 
+
+    end subroutine adjust_visc_eff_margin
+
+    subroutine adjust_visc_eff_margin_2(visc_eff,ux,uy,f_ice,f_grnd)
+        ! This doesn't seem to work...
+
+        implicit none 
+
+        real(wp), intent(INOUT) :: visc_eff(:,:,:) 
+        real(wp), intent(IN)    :: ux(:,:)
+        real(wp), intent(IN)    :: uy(:,:)
+        real(wp), intent(IN)    :: f_ice(:,:)
+        real(wp), intent(IN)    :: f_grnd(:,:)
+        
+        ! Local variables 
+        integer :: i, j, nx, ny 
+        integer :: im1, ip1, jm1, jp1 
+        real(wp) :: vel_now, vel_up_now 
+        real(wp) :: f_visc(4) 
+        real(wp) :: f_visc_now 
+
+        real(wp), parameter :: vel_lim_0    = 1000.0_wp 
+        real(wp), parameter :: vel_lim_1    = 5000.0_wp 
+        real(wp), parameter :: vel_lim_diff = 100.0_wp
+
+        nx = size(visc_eff,1) 
+        ny = size(visc_eff,2) 
+
+        do j = 1, ny 
+        do i = 1, nx 
+
+            ! Define neighbor indices
+            im1 = max(i-1,1)
+            ip1 = min(i+1,nx)
+            jm1 = max(j-1,1)
+            jp1 = min(j+1,ny)
+            
+            ! Assume viscosity should remain the same at first 
+            f_visc = 1.0_wp 
+
+            ! Find points at the ice front (four cases to check)
+            ! For stability increase viscosity in border point if 
+            ! ice-front velocity magnitude is too high. 
+
+            ! Ice-free to the right
+            if (f_ice(i,j) .eq. 1.0_wp .and. f_ice(ip1,j) .lt. 1.0_wp ) then 
+
+                vel_now    = abs(ux(i,j))
+                vel_up_now = abs(ux(im1,j))
+
+                if (abs(vel_now) .gt. vel_lim_0 .and. abs(vel_now-vel_up_now) .gt. vel_lim_diff) then 
+
+                    f_visc(1) = 1.0_wp + 1.0_wp*min((vel_now-vel_lim_0)/(vel_lim_1-vel_lim_0),1.0_wp)
+
+                end if
+
+                write(*,*) "visc: 1 :", vel_now, vel_up_now, f_visc(1) 
+
+            end if 
+
+            ! Ice-free to the left
+            if (f_ice(i,j) .eq. 1.0_wp .and. f_ice(im1,j) .eq. 1.0_wp ) then 
+
+                vel_now    = abs(ux(im1,j))
+                vel_up_now = abs(ux(i,j))
+
+                if (abs(vel_now) .gt. vel_lim_0 .and. abs(vel_now-vel_up_now) .gt. vel_lim_diff) then 
+
+                    f_visc(2) = 1.0_wp + 1.0_wp*min((vel_now-vel_lim_0)/(vel_lim_1-vel_lim_0),1.0_wp)
+                    
+                end if
+
+                write(*,*) "visc: 2 :", vel_now, vel_up_now, f_visc(2) 
+                
+            end if 
+
+            ! Ice-free to the top
+            if (f_ice(i,j) .eq. 1.0_wp .and. f_ice(i,jp1) .lt. 1.0_wp ) then 
+
+                vel_now    = abs(uy(i,j))
+                vel_up_now = abs(uy(i,jm1))
+
+                if (abs(vel_now) .gt. vel_lim_0 .and. abs(vel_now-vel_up_now) .gt. vel_lim_diff) then 
+
+                    f_visc(3) = 1.0_wp + 1.0_wp*min((vel_now-vel_lim_0)/(vel_lim_1-vel_lim_0),1.0_wp)
+                    
+                end if
+
+                write(*,*) "visc: 3 :", vel_now, vel_up_now, f_visc(3) 
+                
+            end if 
+
+            ! Ice-free to the bottom
+            if (f_ice(i,j) .eq. 1.0_wp .and. f_ice(i,jm1) .lt. 1.0_wp ) then 
+
+                vel_now    = abs(uy(i,jm1))
+                vel_up_now = abs(uy(i,j))
+
+                if (abs(vel_now) .gt. vel_lim_0 .and. abs(vel_now-vel_up_now) .gt. vel_lim_diff) then 
+
+                    f_visc(4) = 1.0_wp + 1.0_wp*min((vel_now-vel_lim_0)/(vel_lim_1-vel_lim_0),1.0_wp)
+                    
+                end if
+
+                write(*,*) "visc: 4 :", vel_now, vel_up_now, f_visc(4) 
+                
+            end if 
+
+            ! Get maximum value of viscosity scalar 
+            f_visc_now = maxval(f_visc) 
+
+            !write(*,*) "visc: ", f_visc
+            
+            ! Adjust viscosity for this column as needed 
+            if (f_visc_now .gt. 1.0_wp) then 
+
+                !write(*,*) "visc: ", f_visc_now
+                visc_eff(i,j,:) = visc_eff(i,j,:)*f_visc_now
+            end if 
+
+        end do 
+        end do  
+
+        return 
+
+    end subroutine adjust_visc_eff_margin_2
 
     subroutine integrate_gl_driving_stress_linear(taud,H_a,H_b,zb_a,zb_b,z_sl_a,z_sl_b,dx)
         ! Compute the driving stress for the grounding line more precisely (subgrid)

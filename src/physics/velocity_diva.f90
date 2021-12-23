@@ -11,7 +11,7 @@ module velocity_diva
 
     use basal_dragging 
     use solver_ssa_sico5 
-    use velocity_general, only : set_inactive_margins
+    use velocity_general, only : set_inactive_margins, adjust_visc_eff_margin
 
     implicit none 
 
@@ -200,10 +200,16 @@ contains
 
             end select
             
+            ! Apply adjustment to margin viscosity values to improve stability 
+            ! call adjust_visc_eff_margin_2(visc_eff,ux_bar,uy_bar,f_ice,f_grnd)
+
             ! Calculate depth-integrated effective viscosity
             ! Note L19 uses eta_bar*H in the ssa equation. Yelmo uses eta_int=eta_bar*H directly.
             call calc_visc_eff_int(visc_eff_int,visc_eff,H_ice,f_ice,zeta_aa,par%boundaries)
             
+            ! Apply adjustment to margin viscosity values to improve stability 
+            ! call adjust_visc_eff_margin(visc_eff_int,ux_bar,uy_bar,f_ice,f_grnd)
+
             ! Calculate the 3D vertical shear fields using viscosity estimated from the previous iteration 
             call calc_vertical_shear_3D(duxdz,duydz,taub_acx,taub_acy,visc_eff,H_ice,f_ice,zeta_aa,par%boundaries)
 

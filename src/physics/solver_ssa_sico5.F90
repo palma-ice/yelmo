@@ -91,13 +91,16 @@ contains
 
         integer :: im1, ip1, jm1, jp1 
 
-        real(wp) :: f_submerged
+        real(wp) :: f_submerged, f_visc
+        real(wp) :: vis_int_g_now
         real(wp) :: tau_bc_int 
         real(wp) :: tau_bc_sign
 
         real(wp) :: vis_int_acy_j, vis_int_acy_jm1, vis_int_acy_jp1
         real(wp) :: vis_int_acx_i, vis_int_acx_im1, vis_int_acx_ip1 
         real(wp) :: taud_aa 
+
+        real(wp), parameter :: f_submerged_min = 0.0_wp 
 
 ! Only one at a time!!
 !#define LAT_BC_OLDCODE
@@ -259,7 +262,7 @@ contains
         ! Set maske and grounding line / calving front flags
 
         call set_sico_masks(maske,is_front_1,is_front_2,is_grline_1,is_grline_2, &
-                                H_ice, f_ice, H_grnd, z_bed, z_sl, lateral_bc)
+                                H_ice, f_ice, H_grnd, z_srf, z_bed, z_sl, lateral_bc)
         
 
         ! ! ajr:testing 
@@ -691,6 +694,7 @@ contains
                         ! Get current ocean thickness bordering ice sheet
                         ! (for bedrock above sea level, this will give zero)
                         f_submerged = 1.d0 - min((z_srf(i1,j)-z_sl(i1,j))/H_ice_now,1.d0)
+                        f_submerged = max(f_submerged,f_submerged_min)
                         H_ocn_now   = H_ice_now*f_submerged
                         
                         tau_bc_int = 0.5d0*rho_ice*g*H_ice_now**2 &         ! tau_out_int                                                ! p_out
@@ -701,16 +705,19 @@ contains
                         if (is_front_1(i,j).and.is_front_2(i+1,j)) then 
                             ! === Case 1: ice-free to the right ===
 
+                            vis_int_g_now = vis_int_g(i1,j)
+                            !vis_int_g_now = 0.5_wp*(vis_int_g(i,j)+vis_int_g(i-1,j))
+
                             nc = 2*ij2n(i-1,j)-1
                                 ! smallest nc (column counter), for vx_m(i-1,j)
                             k = k+1
-                            lgs_a_value(k) = -4.0_prec*inv_dxi*vis_int_g(i1,j)
+                            lgs_a_value(k) = -4.0_prec*inv_dxi*vis_int_g_now
                             lgs_a_index(k) = nc 
 
                             nc = 2*ij2n(i,j-1)
                                 ! next nc (column counter), for vy_m(i,j-1)
                             k = k+1
-                            lgs_a_value(k) = -2.0_prec*inv_deta*vis_int_g(i1,j)
+                            lgs_a_value(k) = -2.0_prec*inv_deta*vis_int_g_now
                             lgs_a_index(k) = nc
 
                             nc = 2*ij2n(i,j)-1
@@ -721,22 +728,27 @@ contains
         !                         call error(errormsg)
         !                     end if
                             k = k+1
-                            lgs_a_value(k) = 4.0_prec*inv_dxi*vis_int_g(i1,j)
+                            lgs_a_value(k) = 4.0_prec*inv_dxi*vis_int_g_now
                             lgs_a_index(k) = nc
 
                             nc = 2*ij2n(i,j)
                                 ! next nc (column counter), for vy_m(i,j)
                             k = k+1
-                            lgs_a_value(k) = 2.0_prec*inv_deta*vis_int_g(i1,j)
+                            lgs_a_value(k) = 2.0_prec*inv_deta*vis_int_g_now
                             lgs_a_index(k) = nc
 
                             ! Assign matrix values
                             lgs_b_value(nr) = tau_bc_int
                             lgs_x_value(nr) = vx_m(i,j)
-                        
+                            
+                            !write(*,*) "ssabc", i, j, f_submerged, H_ocn_now, H_ice_now, vx_m(i,j), vx_m(i-1,j)
+                            
                         else 
                             ! Case 2: ice-free to the left
- 
+                            
+                            vis_int_g_now = vis_int_g(i1,j)
+                            vis_int_g_now = 0.5_wp*(vis_int_g(i,j)+vis_int_g(i+1,j))
+
                             nc = 2*ij2n(i,j)-1
                                 ! next nc (column counter), for vx_m(i,j)
         !                     if (nc /= nr) then   ! (diagonal element)
@@ -745,25 +757,25 @@ contains
         !                         call error(errormsg)
         !                     end if
                             k = k+1
-                            lgs_a_value(k) = -4.0_prec*inv_dxi*vis_int_g(i1,j)
+                            lgs_a_value(k) = -4.0_prec*inv_dxi*vis_int_g_now
                             lgs_a_index(k) = nc
 
                             nc = 2*ij2n(i+1,j-1)
                                 ! next nc (column counter), for vy_m(i+1,j-1)
                             k  = k+1
-                            lgs_a_value(k) = -2.0_prec*inv_deta*vis_int_g(i1,j)
+                            lgs_a_value(k) = -2.0_prec*inv_deta*vis_int_g_now
                             lgs_a_index(k) = nc
 
                             nc = 2*ij2n(i+1,j)-1
                                 ! next nc (column counter), for vx_m(i+1,j)
                             k = k+1
-                            lgs_a_value(k) = 4.0_prec*inv_dxi*vis_int_g(i1,j)
+                            lgs_a_value(k) = 4.0_prec*inv_dxi*vis_int_g_now
                             lgs_a_index(k) = nc
  
                             nc = 2*ij2n(i+1,j)
                                 ! largest nc (column counter), for vy_m(i+1,j)
                             k  = k+1
-                            lgs_a_value(k) = 2.0_prec*inv_deta*vis_int_g(i1,j)
+                            lgs_a_value(k) = 2.0_prec*inv_deta*vis_int_g_now
                             lgs_a_index(k) = nc
 
                             ! Assign matrix values
@@ -1678,6 +1690,7 @@ end if
                         ! Get current ocean thickness bordering ice sheet
                         ! (for bedrock above sea level, this will give zero)
                         f_submerged = 1.d0 - min((z_srf(i,j1)-z_sl(i,j1))/H_ice_now,1.d0)
+                        f_submerged = max(f_submerged,f_submerged_min)
                         H_ocn_now   = H_ice_now*f_submerged
 
                         tau_bc_int = 0.5d0*rho_ice*g*H_ice_now**2 &         ! tau_out_int                                                ! p_out
@@ -1688,22 +1701,25 @@ end if
                         if (is_front_1(i,j).and.is_front_2(i,j+1)) then 
                             ! === Case 1: ice-free to the top ===
 
+                            vis_int_g_now = vis_int_g(i,j1)
+                            !vis_int_g_now = 0.5_wp*(vis_int_g(i,j)+vis_int_g(i,j-1))
+
                             nc = 2*ij2n(i-1,j)-1
                                 ! smallest nc (column counter), for vx_m(i-1,j)
                             k = k+1
-                            lgs_a_value(k) = -2.0_prec*inv_dxi*vis_int_g(i,j1)
+                            lgs_a_value(k) = -2.0_prec*inv_dxi*vis_int_g_now
                             lgs_a_index(k) = nc
 
                             nc = 2*ij2n(i,j-1)
                                 ! next nc (column counter), for vy_m(i,j-1)
                             k = k+1
-                            lgs_a_value(k) = -4.0_prec*inv_deta*vis_int_g(i,j1)
+                            lgs_a_value(k) = -4.0_prec*inv_deta*vis_int_g_now
                             lgs_a_index(k) = nc
 
                             nc = 2*ij2n(i,j)-1
                                 ! next nc (column counter), for vx_m(i,j)
                             k = k+1
-                            lgs_a_value(k) = 2.0_prec*inv_dxi*vis_int_g(i,j1)
+                            lgs_a_value(k) = 2.0_prec*inv_dxi*vis_int_g_now
                             lgs_a_index(k) = nc
 
                             nc = 2*ij2n(i,j)
@@ -1714,7 +1730,7 @@ end if
         !                         call error(errormsg)
         !                     end if
                             k = k+1
-                            lgs_a_value(k) = 4.0_prec*inv_deta*vis_int_g(i,j1)
+                            lgs_a_value(k) = 4.0_prec*inv_deta*vis_int_g_now
                             lgs_a_index(k) = nc
 
                             ! Assign matrix values
@@ -1723,11 +1739,14 @@ end if
                             
                         else
                             ! === Case 2: ice-free to the bottom ===
- 
+                            
+                            vis_int_g_now = vis_int_g(i,j1)
+                            !vis_int_g_now = 0.5_wp*(vis_int_g(i,j)+vis_int_g(i,j+1))
+
                             nc = 2*ij2n(i-1,j+1)-1
                                 ! next nc (column counter), for vx_m(i-1,j+1)
                             k = k+1
-                            lgs_a_value(k) = -2.0_prec*inv_dxi*vis_int_g(i,j1)
+                            lgs_a_value(k) = -2.0_prec*inv_dxi*vis_int_g_now
                             lgs_a_index(k) = nc
  
                             nc = 2*ij2n(i,j)
@@ -1738,19 +1757,19 @@ end if
         !                         call error(errormsg)
         !                     end if
                             k = k+1
-                            lgs_a_value(k) = -4.0_prec*inv_deta*vis_int_g(i,j1)
+                            lgs_a_value(k) = -4.0_prec*inv_deta*vis_int_g_now
                             lgs_a_index(k) = nc
  
                             nc = 2*ij2n(i,j+1)-1
                                 ! next nc (column counter), for vx_m(i,j+1)
                             k = k+1
-                            lgs_a_value(k) = 2.0_prec*inv_dxi*vis_int_g(i,j1)
+                            lgs_a_value(k) = 2.0_prec*inv_dxi*vis_int_g_now
                             lgs_a_index(k) = nc
  
                             nc = 2*ij2n(i,j+1)
                                 ! next nc (column counter), for vy_m(i,j+1)
                             k = k+1
-                            lgs_a_value(k) = 4.0_prec*inv_deta*vis_int_g(i,j1)
+                            lgs_a_value(k) = 4.0_prec*inv_deta*vis_int_g_now
                             lgs_a_index(k) = nc
 
                             ! Assign matrix values
@@ -2853,7 +2872,7 @@ end if
 
     end subroutine stagger_visc_aa_ab
 
-    subroutine set_sico_masks(maske,front1,front2,gl1,gl2,H_ice,f_ice,H_grnd,z_bed,z_sl,apply_lateral_bc)
+    subroutine set_sico_masks(maske,front1,front2,gl1,gl2,H_ice,f_ice,H_grnd,z_srf,z_bed,z_sl,apply_lateral_bc)
         ! Define where ssa calculations should be performed
         ! Note: could be binary, but perhaps also distinguish 
         ! grounding line/zone to use this mask for later gl flux corrections
@@ -2874,15 +2893,17 @@ end if
         real(prec), intent(IN)  :: H_ice(:,:)
         real(prec), intent(IN)  :: f_ice(:,:)
         real(prec), intent(IN)  :: H_grnd(:,:)
+        real(prec), intent(IN)  :: z_srf(:,:)
         real(prec), intent(IN)  :: z_bed(:,:)
         real(prec), intent(IN)  :: z_sl(:,:)
         character(len=*), intent(IN) :: apply_lateral_bc 
 
         ! Local variables
-        integer    :: i, j, nx, ny
-        integer    :: im1, ip1, jm1, jp1 
-        logical    :: is_float 
-        real(prec) :: H_ocn_now 
+        integer  :: i, j, nx, ny
+        integer  :: im1, ip1, jm1, jp1 
+        logical  :: is_float 
+        real(wp) :: f_submerged
+        real(wp) :: H_ocn_now 
 
         ! Use 'apply_lateral_bc' to determine where to apply generalized
         ! lateral bc equation.
@@ -2991,11 +3012,17 @@ end if
                 ! Only apply lateral bc to floating ice fronts and
                 ! and grounded marine fronts. Disable detection 
                 ! of ice fronts grounded above sea level.
-            
-                H_ocn_now = max(z_sl(i,j)-z_bed(i,j),0.0_wp)
+                
+                ! Get current ocean thickness bordering ice sheet
+                ! (for bedrock above sea level, this will give zero)
+                f_submerged = 1.d0 - min((z_srf(i,j)-z_sl(i,j))/H_ice(i,j),1.d0)
+                H_ocn_now   = H_ice(i,j)*f_submerged
 
+                ! if ( front1(i,j) .and. maske(i,j) .eq. 0 .and. &
+                !                     H_ocn_now .eq. 0.0 ) front1(i,j) = .FALSE. 
+                
                 if ( front1(i,j) .and. maske(i,j) .eq. 0 .and. &
-                                    H_ocn_now .eq. 0.0 ) front1(i,j) = .FALSE. 
+                                    f_submerged .eq. 0.0_wp ) front1(i,j) = .FALSE. 
             
             case("all")
                 ! Apply lateral bc to all ice-sheet fronts. 

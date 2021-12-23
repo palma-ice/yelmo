@@ -1213,7 +1213,7 @@ contains
         now%ssa_mask_acy      = 0.0 
         now%ssa_err_acx       = 0.0 
         now%ssa_err_acy       = 0.0 
-
+        
         return 
 
     end subroutine ydyn_alloc 
@@ -1295,7 +1295,7 @@ contains
 
         return 
 
-    end subroutine ydyn_dealloc 
+    end subroutine ydyn_dealloc
     
     subroutine ydyn_set_borders(ux,uy,boundaries)
 

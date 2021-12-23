@@ -25,6 +25,11 @@ module velocity_general
     public :: calc_vel_ratio
     public :: limit_vel
 
+    public :: picard_calc_error 
+    public :: picard_calc_error_angle 
+    public :: picard_calc_convergence_l2
+    public :: picard_relax 
+    
 contains 
     
     subroutine calc_uz_3D(uz,ux,uy,H_ice,f_ice,f_grnd,z_bed,z_srf,smb,bmb,dHdt,dzsdt,zeta_aa,zeta_ac,dx,dy)
@@ -1202,7 +1207,7 @@ end if
 
     subroutine adjust_visc_eff_margin(visc_int,ux,uy,f_ice,f_grnd)
         ! This does not help, yet...
-        
+
         implicit none 
 
         real(wp), intent(INOUT) :: visc_int(:,:) 
@@ -1612,4 +1617,217 @@ end if
 
     end subroutine limit_vel
     
+    subroutine picard_calc_error(corr,ux,uy,ux_prev,uy_prev)
+        ! Calculate the current error, ie, the 'correction vector'
+        ! as defined by De Smedt et al. (2010):
+        ! corr = U_now - U_prev.
+
+        implicit none
+
+        real(wp), intent(OUT) :: corr(:) 
+        real(wp), intent(IN)  :: ux(:,:) 
+        real(wp), intent(IN)  :: uy(:,:) 
+        real(wp), intent(IN)  :: ux_prev(:,:)
+        real(wp), intent(IN)  :: uy_prev(:,:) 
+        
+        ! Local variables 
+        integer :: i, j, nx, ny, k  
+
+        nx = size(ux,1)
+        ny = size(ux,2) 
+
+        ! Consistency check 
+        if (size(corr,1) .ne. 2*nx*ny) then 
+            write(*,*) "calc_convergence_angle:: Error: corr(N) must have N=2*nx*ny."
+            stop 
+        end if 
+
+        k = 0
+
+        do j = 1, ny 
+        do i = 1, nx  
+
+            k = k+1 
+            corr(k) = ux(i,j) - ux_prev(i,j) 
+
+            k = k+1 
+            corr(k) = uy(i,j) - uy_prev(i,j) 
+
+        end do 
+        end do 
+
+        return
+
+    end subroutine picard_calc_error
+
+    subroutine picard_calc_error_angle(theta,corr_nm1,corr_nm2)
+        ! Calculate the current error, ie, the 'correction vector'
+        ! as defined by De Smedt et al. (2010):
+        ! corr = U_now - U_prev.
+
+        implicit none
+
+        real(wp), intent(OUT) :: theta
+        real(wp), intent(IN)  :: corr_nm1(:) 
+        real(wp), intent(IN)  :: corr_nm2(:) 
+        
+        
+        ! Local variables   
+        real(dp) :: val 
+
+        real(dp), parameter :: tol = 1e-10 
+
+        val = sum(corr_nm1*corr_nm2) / &
+                (sqrt(sum(corr_nm1**2))*sqrt(sum(corr_nm2**2))+tol)
+
+        theta = acos(val) 
+
+        return
+
+    end subroutine picard_calc_error_angle
+
+    subroutine picard_calc_convergence_l2(is_converged,resid,ux,uy,ux_prev,uy_prev, &
+                                                mask_acx,mask_acy,resid_tol,iter,iter_max,log)
+
+        ! Calculate the current level of convergence using the 
+        ! L2 relative error norm between the current and previous
+        ! velocity solutions.
+
+        ! Note for parameter norm_method defined below: 
+
+        ! norm_method=1: as defined by De Smedt et al. (2010):
+        ! conv = ||U_now - U_prev||/||U_prev||.
+
+        ! norm_method=2: as defined by Gagliardini et al., GMD, 2013, Eq. 65:
+        ! conv = 2*||U_now - U_prev||/||U_now+U_prev||.
+        
+        implicit none 
+
+        logical,  intent(OUT) :: is_converged
+        real(wp), intent(OUT) :: resid 
+        real(wp), intent(IN) :: ux(:,:) 
+        real(wp), intent(IN) :: uy(:,:) 
+        real(wp), intent(IN) :: ux_prev(:,:) 
+        real(wp), intent(IN) :: uy_prev(:,:)  
+        logical,  intent(IN) :: mask_acx(:,:) 
+        logical,  intent(IN) :: mask_acy(:,:) 
+        real(wp), intent(IN) :: resid_tol 
+        integer,  intent(IN) :: iter 
+        integer,  intent(IN) :: iter_max 
+        logical,  intent(IN) :: log 
+
+        ! Local variables
+        integer :: i, j, nx, ny, k  
+        real(dp) :: res1, res2
+        
+        real(wp) :: ux_resid_max 
+        real(wp) :: uy_resid_max 
+        integer  :: nx_check, ny_check  
+        character(len=1) :: converged_txt 
+
+        real(dp), parameter :: du_reg  = 1e-10              ! [m/yr] Small regularization factor to avoid divide-by-zero
+        real(wp), parameter :: vel_tol = 1e-5               ! [m/yr] only consider points with velocity above this tolerance limit
+        integer,  parameter :: norm_method = 1              ! See note above.
+        
+        ! Count how many points should be checked for convergence
+        nx_check = count(abs(ux).gt.vel_tol .and. mask_acx)
+        ny_check = count(abs(uy).gt.vel_tol .and. mask_acy)
+
+        if ( (nx_check+ny_check) .gt. 0 ) then
+
+            select case(norm_method)
+
+                case(1)
+                    
+                    res1 = sqrt( sum((ux-ux_prev)*(ux-ux_prev),mask=abs(ux).gt.vel_tol .and. mask_acx) &
+                               + sum((uy-uy_prev)*(uy-uy_prev),mask=abs(uy).gt.vel_tol .and. mask_acy) )
+
+                    res2 = sqrt( sum((ux_prev)*(ux_prev),mask=abs(ux).gt.vel_tol .and. mask_acx) &
+                               + sum((uy_prev)*(uy_prev),mask=abs(uy).gt.vel_tol .and. mask_acy) )
+
+                    resid = res1/(res2+du_reg)
+
+                case(2)
+
+                    res1 = sqrt( sum((ux-ux_prev)*(ux-ux_prev),mask=abs(ux).gt.vel_tol .and. mask_acx) &
+                               + sum((uy-uy_prev)*(uy-uy_prev),mask=abs(uy).gt.vel_tol .and. mask_acy) )
+
+                    res2 = sqrt( sum((ux+ux_prev)*(ux+ux_prev),mask=abs(ux).gt.vel_tol .and. mask_acx) &
+                               + sum((uy+uy_prev)*(uy+uy_prev),mask=abs(uy).gt.vel_tol .and. mask_acy) )
+
+                    resid = 2.0_prec*res1/(res2+du_reg)
+
+            end select 
+
+             
+
+        else 
+            ! No points available for comparison, set residual equal to zero 
+
+            resid = 0.0_prec 
+
+        end if
+
+        ! Check for convergence
+        if (resid .lt. resid_tol) then 
+            is_converged = .TRUE. 
+            converged_txt = "C"
+        else if (iter .eq. iter_max) then 
+            is_converged = .TRUE. 
+            converged_txt = "X" 
+        else 
+            is_converged = .FALSE. 
+            converged_txt = ""
+        end if 
+
+        if (log .and. is_converged) then
+            ! Write summary to log if desired and iterations have completed
+
+            ! Also calculate maximum error magnitude for perspective
+            if (nx_check .gt. 0) then 
+                ux_resid_max = maxval(abs(ux-ux_prev),mask=abs(ux).gt.vel_tol .and. mask_acx)
+            else 
+                ux_resid_max = 0.0 
+            end if 
+
+            if (ny_check .gt. 0) then 
+                uy_resid_max = maxval(abs(uy-uy_prev),mask=abs(uy).gt.vel_tol .and. mask_acy)
+            else 
+                uy_resid_max = 0.0 
+            end if 
+
+            ! Write summary to log
+            write(*,"(a,a2,i4,g12.4,a3,2i8,2g12.4)") &
+                "ssa: ", trim(converged_txt), iter, resid, " | ", nx_check, ny_check, ux_resid_max, uy_resid_max 
+
+        end if 
+        
+        return 
+
+    end subroutine picard_calc_convergence_l2
+
+    elemental subroutine picard_relax(ux,uy,ux_prev,uy_prev,rel)
+        ! Relax velocity solution with previous iteration 
+
+        implicit none 
+
+        real(prec), intent(INOUT) :: ux
+        real(prec), intent(INOUT) :: uy
+        real(prec), intent(IN)    :: ux_prev
+        real(prec), intent(IN)    :: uy_prev
+        real(prec), intent(IN)    :: rel
+
+        ! Apply relaxation 
+        ux = ux_prev + rel*(ux-ux_prev)
+        uy = uy_prev + rel*(uy-uy_prev)
+        
+        return 
+
+    end subroutine picard_relax
+
+
+
+
+    
+
 end module velocity_general

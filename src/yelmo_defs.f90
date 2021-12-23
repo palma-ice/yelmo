@@ -339,7 +339,7 @@ module yelmo_defs
         integer,  allocatable :: ssa_mask_acy(:,:) 
         real(wp), allocatable :: ssa_err_acx(:,:) 
         real(wp), allocatable :: ssa_err_acy(:,:) 
-
+        
     end type
 
     ! ydyn class

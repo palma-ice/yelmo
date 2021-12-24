@@ -14,7 +14,7 @@ module velocity_diva
     use velocity_general, only : set_inactive_margins, adjust_visc_eff_margin, &
                         picard_calc_error, picard_calc_error_angle, picard_relax, &
                         picard_calc_convergence_l2 
-    
+
     implicit none 
 
     type diva_param_class
@@ -298,7 +298,7 @@ end if
                 corr_rel = 0.5_wp 
             end if 
 
-            write(*,*) "pic: ", iter, corr_theta, corr_rel
+            !write(*,*) "pic: ", iter, corr_theta, corr_rel
 
             ! Apply relaxation to keep things stable
             !call relax_ssa(ux_bar,uy_bar,ux_bar_nm1,uy_bar_nm1,rel=par%ssa_iter_rel)

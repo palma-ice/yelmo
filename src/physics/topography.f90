@@ -1004,6 +1004,8 @@ end if
                 ! Calculate fmb as proportional to local bmb_shlf value and 
                 ! scaled to the area of the grid cell itself where it will be applied
 
+                ! Note: fmb_scale=10 suggested by DeConto and Pollard (2016, nat) based
+                ! on plume modeling work of Slater et al. (2015, grl)
 
                 do j = 1, ny 
                 do i = 1, nx 

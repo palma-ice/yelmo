@@ -340,6 +340,12 @@ end if
 
                 end select
 
+                ! Again apply ice thickness boundaries to ensure relaxed fields are consistent 
+                ! with desired limitations. 
+                call apply_ice_thickness_boundaries(tpo%now%mb_resid,tpo%now%H_ice,tpo%now%f_ice,tpo%now%f_grnd, &
+                                                    dyn%now%uxy_b,bnd%ice_allowed,tpo%par%boundaries,bnd%H_ice_ref, &
+                                                    tpo%par%H_min_flt,tpo%par%H_min_grnd,dt,reset=.FALSE.)
+
             end if
 
         end if 

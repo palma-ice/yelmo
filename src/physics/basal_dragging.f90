@@ -1247,8 +1247,9 @@ contains
         real(wp), intent(IN)    :: f_grnd_acy(:,:)      ! ac-nodes     
         
         ! Local variables
-        integer :: i, j, nx, ny 
-        integer :: im1, ip1, jm1, jp1
+        integer  :: i, j, nx, ny 
+        integer  :: im1, ip1, jm1, jp1
+        real(wp) :: wt 
 
         nx = size(beta_acx,1)
         ny = size(beta_acx,2) 
@@ -1267,12 +1268,16 @@ contains
             if (f_ice(i,j) .eq. 1.0 .and. f_ice(ip1,j) .eq. 1.0) then 
                 ! Both aa-nodes are ice covered 
 
+                ! Get weighting term as a function of grounded fraction 
+                !wt = f_grnd_acx(i,j) 
+                wt = f_grnd_acx(i,j)**2 
+
                 if (f_grnd(i,j) .gt. 0.0 .and. f_grnd(ip1,j) .eq. 0.0) then 
                     ! Floating to the right 
-                    beta_acx(i,j) = f_grnd_acx(i,j)*beta(i,j) + (1.0-f_grnd_acx(i,j))*beta(ip1,j)
+                    beta_acx(i,j) = wt*beta(i,j) + (1.0-wt)*beta(ip1,j)
                 else if (f_grnd(i,j) .eq. 0.0 .and. f_grnd(ip1,j) .gt. 0.0) then 
                     ! Floating to the left 
-                    beta_acx(i,j) = (1.0-f_grnd_acx(i,j))*beta(i,j) + f_grnd_acx(i,j)*beta(ip1,j)
+                    beta_acx(i,j) = (1.0-wt)*beta(i,j) + wt*beta(ip1,j)
                 end if 
 
             end if 
@@ -1281,12 +1286,16 @@ contains
             if (f_ice(i,j) .eq. 1.0 .and. f_ice(i,jp1) .eq. 1.0) then 
                 ! Both aa-nodes are ice covered 
 
+                ! Get weighting term as a function of grounded fraction 
+                !wt = f_grnd_acy(i,j) 
+                wt = f_grnd_acy(i,j)**2 
+
                 if (f_grnd(i,j) .gt. 0.0 .and. f_grnd(i,jp1) .eq. 0.0) then 
                     ! Floating to the top 
-                    beta_acy(i,j) = f_grnd_acy(i,j)*beta(i,j) + (1.0-f_grnd_acy(i,j))*beta(i,jp1)
+                    beta_acy(i,j) = wt*beta(i,j) + (1.0-wt)*beta(i,jp1)
                 else if (f_grnd(i,j) .eq. 0.0 .and. f_grnd(i,jp1) .gt. 0.0) then 
                     ! Floating to the bottom 
-                    beta_acy(i,j) = (1.0-f_grnd_acy(i,j))*beta(i,j) + f_grnd_acy(i,j)*beta(i,jp1)
+                    beta_acy(i,j) = (1.0-wt)*beta(i,j) + wt*beta(i,jp1)
                 end if 
 
             end if

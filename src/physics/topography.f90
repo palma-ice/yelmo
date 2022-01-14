@@ -147,8 +147,10 @@ contains
                         mask_grnd    = (.not. float_neighb) .and. H_neighb .gt. 0.0 
 
                         ! Determine height to give to potentially partially filled cell
-                        if (H_grnd(i,j) .le. 0.0 .and. count(mask_grnd) .eq. 0) then 
-                            ! Floating point away from grounding line, set H_eff = minimum of neighbors
+                        !if (H_grnd(i,j) .le. 0.0 .and. count(mask_grnd) .eq. 0) then 
+                        !    ! Floating point away from grounding line, set H_eff = minimum of neighbors
+                        if (H_grnd(i,j) .le. 0.0) then 
+                            ! Floating point 
 
                             H_eff = minval(H_neighb,mask=mask)
 
@@ -211,7 +213,7 @@ contains
                                         / [f_ice(im1,j),f_ice(ip1,j),f_ice(i,jm1),f_ice(i,jp1)]
                     
                     if (H_grnd(i,j) .le. 0.0) then 
-                        ! Floating point away from grounding line, set H_eff = minimum of neighbors
+                        ! Floating point, set H_eff = minimum of neighbors
 
                         H_eff = minval(H_neighb,mask=mask)
 

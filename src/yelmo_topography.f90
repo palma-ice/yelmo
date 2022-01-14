@@ -124,6 +124,10 @@ contains
             ! Update ice fraction mask 
             call calc_ice_fraction(tpo%now%f_ice,tpo%now%H_ice,bnd%z_bed,bnd%z_sl,tpo%par%margin_flt_subgrid)
             
+            ! Delete ice where f_ice=-1
+            where(tpo%now%f_ice .eq. -1.0_wp) tpo%now%H_ice = 0.0_wp 
+            call calc_ice_fraction(tpo%now%f_ice,tpo%now%H_ice,bnd%z_bed,bnd%z_sl,tpo%par%margin_flt_subgrid)
+        
             ! === Step 2: ice thickness evolution from vertical column mass balance ===
 
             ! Apply mass-conservation step (mbal)
@@ -146,6 +150,10 @@ contains
             ! Update ice fraction mask 
             call calc_ice_fraction(tpo%now%f_ice,tpo%now%H_ice,bnd%z_bed,bnd%z_sl,tpo%par%margin_flt_subgrid)
             
+            ! Delete ice where f_ice=-1
+            where(tpo%now%f_ice .eq. -1.0_wp) tpo%now%H_ice = 0.0_wp 
+            call calc_ice_fraction(tpo%now%f_ice,tpo%now%H_ice,bnd%z_bed,bnd%z_sl,tpo%par%margin_flt_subgrid)
+        
             ! === Step 3: ice thickness evolution from calving ===
             
             ! Diagnose strains and stresses relevant to calving 
@@ -304,6 +312,10 @@ end if
             ! Update ice fraction mask 
             call calc_ice_fraction(tpo%now%f_ice,tpo%now%H_ice,bnd%z_bed,bnd%z_sl,tpo%par%margin_flt_subgrid)
             
+            ! Delete ice where f_ice=-1
+            where(tpo%now%f_ice .eq. -1.0_wp) tpo%now%H_ice = 0.0_wp 
+            call calc_ice_fraction(tpo%now%f_ice,tpo%now%H_ice,bnd%z_bed,bnd%z_sl,tpo%par%margin_flt_subgrid)
+        
             ! Finally apply all additional (generally artificial) ice thickness adjustments 
             ! and store changes in residual mass balance field. 
             call apply_ice_thickness_boundaries(tpo%now%mb_resid,tpo%now%H_ice,tpo%now%f_ice,tpo%now%f_grnd, &
@@ -351,6 +363,10 @@ end if
         end if 
 
         ! Final update of ice fraction mask (or define it now for fixed topography)
+        call calc_ice_fraction(tpo%now%f_ice,tpo%now%H_ice,bnd%z_bed,bnd%z_sl,tpo%par%margin_flt_subgrid)
+        
+        ! Delete ice where f_ice=-1
+        where(tpo%now%f_ice .eq. -1.0_wp) tpo%now%H_ice = 0.0_wp 
         call calc_ice_fraction(tpo%now%f_ice,tpo%now%H_ice,bnd%z_bed,bnd%z_sl,tpo%par%margin_flt_subgrid)
         
         ! Calculate grounding overburden ice thickness 

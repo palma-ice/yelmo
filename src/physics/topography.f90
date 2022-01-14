@@ -201,38 +201,49 @@ contains
                 jp1 = min(j+1,ny) 
                 
                 if (f_ice(i,j) .eq. -1.0_wp) then 
-                    ! This point is at the corner of an ice sheet, 
+                    ! This point is probably at the corner of an ice sheet, 
                     ! so it was not possible to define H_eff well. 
                     ! This should now be done from available neighbors.
 
-                    H_neighb = [H_ice(im1,j),H_ice(ip1,j),H_ice(i,jm1),H_ice(i,jp1)]
-                    mask     = H_neighb .gt. 0.0_wp 
-                    
-                    ! Get H_eff of the neighbors 
-                    where(mask) H_neighb = [H_ice(im1,j),H_ice(ip1,j),H_ice(i,jm1),H_ice(i,jp1)] &
-                                        / [f_ice(im1,j),f_ice(ip1,j),f_ice(i,jm1),f_ice(i,jp1)]
-                    
-                    if (H_grnd(i,j) .le. 0.0) then 
-                        ! Floating point, set H_eff = minimum of neighbors
+                    mask     = [H_ice(im1,j),H_ice(ip1,j),H_ice(i,jm1),H_ice(i,jp1)] .gt.  0.0_wp .and. &
+                               [f_ice(im1,j),f_ice(ip1,j),f_ice(i,jm1),f_ice(i,jp1)] .ne. -1.0_wp
+                    n_now    = count(mask)
 
-                        H_eff = minval(H_neighb,mask=mask)
+                    if (n_now .ge. 1) then 
+                        ! Some neighbors exist 
+
+                        ! Get H_eff of the neighbors 
+                        H_neighb = 0.0_wp
+                        where(mask) H_neighb = [H_ice(im1,j),H_ice(ip1,j),H_ice(i,jm1),H_ice(i,jp1)] &
+                                            / [f_ice(im1,j),f_ice(ip1,j),f_ice(i,jm1),f_ice(i,jp1)]
+                        
+                        if (H_grnd(i,j) .le. 0.0) then 
+                            ! Floating point, set H_eff = minimum of neighbors
+
+                            H_eff = minval(H_neighb,mask=mask)
+
+                        else 
+                            ! Grounded point, set H_eff < H_min arbitrarily (0.5 works well)
+
+                            ! ajr: following CISM, do not allow partially filled cells
+                            ! for grounded ice 
+                            H_eff = H_ice(i,j) 
+
+                            ! Alternative approach:
+                            ! H_eff = 0.5*minval(H_neighb,mask=mask)
+
+                        end if
+                        
+                        if (H_eff .gt. 0.0_wp) then 
+                            f_ice(i,j) = min( H_ice(i,j) / H_eff, 1.0_wp ) 
+                        else 
+                            f_ice(i,j) = 1.0_wp 
+                        end if 
 
                     else 
-                        ! Grounded point, set H_eff < H_min arbitrarily (0.5 works well)
 
-                        ! ajr: following CISM, do not allow partially filled cells
-                        ! for grounded ice 
-                        H_eff = H_ice(i,j) 
-
-                        ! Alternative approach:
-                        ! H_eff = 0.5*minval(H_neighb,mask=mask)
-
-                    end if
-                    
-                    if (H_eff .gt. 0.0_wp) then 
-                        f_ice(i,j) = min( H_ice(i,j) / H_eff, 1.0_wp ) 
-                    else 
-                        f_ice(i,j) = 1.0_wp 
+                        write(*,*) "calc_ice_fraction:: -1!", i, j 
+                        
                     end if 
 
                 end if 

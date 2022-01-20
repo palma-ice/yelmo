@@ -250,7 +250,7 @@ contains
 
     end subroutine calc_advec_horizontal_column_quick
     
-    subroutine calc_advec_horizontal_column(advecxy,var_ice,H_ice,z_srf,ux,uy,zeta,dx,i,j)
+    subroutine calc_advec_horizontal_column(advecxy,var_ice,H_ice,z_srf,ux,uy,dx,i,j)
         ! Newly implemented advection algorithms (ajr)
         ! Output: [K a-1]
 
@@ -263,8 +263,7 @@ contains
         real(prec), intent(IN)  :: H_ice(:,:)       ! nx,ny 
         real(prec), intent(IN)  :: z_srf(:,:)       ! nx,ny 
         real(prec), intent(IN)  :: ux(:,:,:)        ! nx,ny,nz_aa
-        real(prec), intent(IN)  :: uy(:,:,:)        ! nx,ny,nz_aa
-        real(prec), intent(IN)  :: zeta(:)          ! nz_aa 
+        real(prec), intent(IN)  :: uy(:,:,:)        ! nx,ny,nz_aa 
         real(prec), intent(IN)  :: dx  
         integer,    intent(IN)  :: i, j 
 
@@ -273,8 +272,6 @@ contains
         real(prec) :: ux_aa, uy_aa 
         real(prec) :: dx_inv, dx_inv2
         real(prec) :: advecx, advecy, advec_rev 
-
-        real(prec) :: c_x, c_y, dvardz 
 
         ! Define some constants 
         dx_inv  = 1.0_prec / dx 
@@ -299,9 +296,14 @@ contains
             if (ux(i-1,j,k) .gt. 0.0_prec .and. ux(i,j,k) .lt. 0.0_prec .and. i .ge. 3 .and. i .le. nx-2) then 
                 ! Convergent flow - take the mean 
 
-                advecx    = dx_inv2 * ux(i-1,j,k)*(-(4.0*var_ice(i-1,j,k)-var_ice(i-2,j,k)-3.0*var_ice(i,j,k)))
-                advec_rev = dx_inv2 * ux(i,j,k)*((4.0*var_ice(i+1,j,k)-var_ice(i+2,j,k)-3.0*var_ice(i,j,k)))
+                ! 2nd order
+                !advecx    = dx_inv2 * ux(i-1,j,k)*(-(4.0*var_ice(i-1,j,k)-var_ice(i-2,j,k)-3.0*var_ice(i,j,k)))
+                !advec_rev = dx_inv2 * ux(i,j,k)*((4.0*var_ice(i+1,j,k)-var_ice(i+2,j,k)-3.0*var_ice(i,j,k)))
 
+                ! 1st order
+                advecx    = dx_inv * ux(i-1,j,k)*(-(var_ice(i-1,j,k)-var_ice(i,j,k)))
+                advec_rev = dx_inv * ux(i,j,k)*((var_ice(i+1,j,k)-var_ice(i,j,k)))
+                
                 advecx    = 0.5_prec * (advecx + advec_rev) 
 
             else if (ux_aa .gt. 0.0 .and. i .ge. 3) then  
@@ -344,8 +346,13 @@ contains
             if (uy(i,j-1,k) .gt. 0.0_prec .and. uy(i,j,k) .lt. 0.0_prec .and. j .ge. 3 .and. j .le. ny-2) then 
                 ! Convergent flow - take the mean 
 
-                advecy    = dx_inv2 * uy(i,j-1,k)*(-(4.0*var_ice(i,j-1,k)-var_ice(i,j-2,k)-3.0*var_ice(i,j,k)))
-                advec_rev = dx_inv2 * uy(i,j,k)*((4.0*var_ice(i,j+1,k)-var_ice(i,j+2,k)-3.0*var_ice(i,j,k)))
+                ! 2nd order
+                !advecy    = dx_inv2 * uy(i,j-1,k)*(-(4.0*var_ice(i,j-1,k)-var_ice(i,j-2,k)-3.0*var_ice(i,j,k)))
+                !advec_rev = dx_inv2 * uy(i,j,k)*((4.0*var_ice(i,j+1,k)-var_ice(i,j+2,k)-3.0*var_ice(i,j,k)))
+                
+                ! 1st order
+                advecy    = dx_inv * uy(i,j-1,k)*(-(var_ice(i,j-1,k)-var_ice(i,j,k)))
+                advec_rev = dx_inv * uy(i,j,k)*((var_ice(i,j+1,k)-var_ice(i,j,k)))
                 
                 advecy    = 0.5_prec * (advecy + advec_rev) 
 
@@ -430,7 +437,7 @@ contains
          
         do j = 2, ny-1
         do i = 2, nx-1 
-            call calc_advec_horizontal_column(advecxy(i,j,:),var,H_ice,z_srf,ux,uy,zeta_aa,dx,i,j)
+            call calc_advec_horizontal_column(advecxy(i,j,:),var,H_ice,z_srf,ux,uy,dx,i,j)
         end do 
         end do 
 

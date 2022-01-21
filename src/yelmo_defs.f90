@@ -182,6 +182,9 @@ module yelmo_defs
         
         type(ytopo_amc_class)   :: amc
         
+        real(wp), allocatable   :: H_ice_dyn(:,:) 
+        real(wp), allocatable   :: f_ice_dyn(:,:) 
+        
     end type
 
     ! ytopo class

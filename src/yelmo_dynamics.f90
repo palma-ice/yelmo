@@ -84,7 +84,7 @@ contains
         ! ===== Calculate general variables ========================================
 
         ! Calculate driving stress 
-        call calc_driving_stress(dyn%now%taud_acx,dyn%now%taud_acy,tpo%now%H_ice,tpo%now%f_ice,tpo%now%dzsdx, &
+        call calc_driving_stress(dyn%now%taud_acx,dyn%now%taud_acy,tpo%now%H_ice_dyn,tpo%now%f_ice_dyn,tpo%now%dzsdx, &
                                         tpo%now%dzsdy,dyn%par%dx,dyn%par%taud_lim,dyn%par%boundaries)
 
         if (dyn%par%taud_gl_method .ne. 0) then 
@@ -92,7 +92,7 @@ contains
             ! via method of choice. 
 
             call calc_driving_stress_gl(dyn%now%taud_acx,dyn%now%taud_acy, &
-                        tpo%now%H_ice,tpo%now%z_srf,bnd%z_bed,bnd%z_sl,tpo%now%H_grnd, &
+                        tpo%now%H_ice_dyn,tpo%now%z_srf,bnd%z_bed,bnd%z_sl,tpo%now%H_grnd, &
                                       tpo%now%f_grnd,tpo%now%f_grnd_acx,tpo%now%f_grnd_acy, &
                                       dyn%par%dx,dyn%par%taud_gl_method,beta_gl_stag=1)
 
@@ -413,7 +413,7 @@ contains
 
         ! Define grid points with ssa active (uses beta from previous timestep)
         call set_ssa_masks(dyn%now%ssa_mask_acx,dyn%now%ssa_mask_acy,dyn%now%beta_acx,dyn%now%beta_acy, &
-                           tpo%now%H_ice,tpo%now%f_ice,tpo%now%f_grnd_acx,tpo%now%f_grnd_acy,dyn%par%ssa_beta_max,use_ssa=.TRUE.)
+                           tpo%now%H_ice_dyn,tpo%now%f_ice_dyn,tpo%now%f_grnd_acx,tpo%now%f_grnd_acy,dyn%par%ssa_beta_max,use_ssa=.TRUE.)
 
         ! ajr: add these two statements for testing 2D flow (no flow in y-direction)
         ! Should consider whether this should be made into a parameter option of some kind,
@@ -450,7 +450,7 @@ contains
                                 dyn%now%beta_acy,dyn%now%beta_eff,dyn%now%visc_eff,dyn%now%visc_eff_int,    &
                                 dyn%now%duxdz,dyn%now%duydz,dyn%now%ssa_mask_acx,dyn%now%ssa_mask_acy,      &
                                 dyn%now%ssa_err_acx,dyn%now%ssa_err_acy,dyn%par%ssa_iter_now,dyn%now%c_bed, &
-                                dyn%now%taud_acx,dyn%now%taud_acy,tpo%now%H_ice,tpo%now%f_ice,tpo%now%H_grnd,   &
+                                dyn%now%taud_acx,dyn%now%taud_acy,tpo%now%H_ice_dyn,tpo%now%f_ice_dyn,tpo%now%H_grnd,   &
                                 tpo%now%f_grnd,tpo%now%f_grnd_acx,tpo%now%f_grnd_acy,mat%now%ATT, &
                                 dyn%par%zeta_aa,bnd%z_sl,bnd%z_bed,tpo%now%z_srf,dyn%par%dx,dyn%par%dy,mat%par%n_glen,diva_par)
          
@@ -466,7 +466,7 @@ contains
             bmb = 0.0 
         end if 
 
-        call calc_uz_3D(dyn%now%uz,dyn%now%ux,dyn%now%uy,tpo%now%H_ice,tpo%now%f_ice,tpo%now%f_grnd,bnd%z_bed,tpo%now%z_srf, &
+        call calc_uz_3D(dyn%now%uz,dyn%now%ux,dyn%now%uy,tpo%now%H_ice_dyn,tpo%now%f_ice_dyn,tpo%now%f_grnd,bnd%z_bed,tpo%now%z_srf, &
                         bnd%smb,bmb,tpo%now%dHicedt,tpo%now%dzsrfdt,dyn%par%zeta_aa,dyn%par%zeta_ac,dyn%par%dx,dyn%par%dy)
         
         
@@ -934,20 +934,20 @@ contains
             case(1)
                 ! Effective pressure == overburden pressure 
 
-                dyn%now%N_eff = calc_effective_pressure_overburden(tpo%now%H_ice,tpo%now%f_ice,tpo%now%f_grnd)
+                dyn%now%N_eff = calc_effective_pressure_overburden(tpo%now%H_ice_dyn,tpo%now%f_ice_dyn,tpo%now%f_grnd)
 
             case(2) 
                 ! Effective pressure diminishes with marine character
                 ! following Leguy et al. (2014) 
 
-                dyn%now%N_eff = calc_effective_pressure_marine(tpo%now%H_ice,tpo%now%f_ice,bnd%z_bed,bnd%z_sl, &
+                dyn%now%N_eff = calc_effective_pressure_marine(tpo%now%H_ice_dyn,tpo%now%f_ice_dyn,bnd%z_bed,bnd%z_sl, &
                                                                                             H_w,p=dyn%par%neff_p)
 
             case(3)
                 ! Effective pressure as basal till pressure
                 ! following van Pelt and Bueler (2015)
 
-                call calc_effective_pressure_till(dyn%now%N_eff,H_w,tpo%now%H_ice,tpo%now%f_ice,tpo%now%f_grnd, &
+                call calc_effective_pressure_till(dyn%now%N_eff,H_w,tpo%now%H_ice_dyn,tpo%now%f_ice_dyn,tpo%now%f_grnd, &
                                   thrm%par%H_w_max,dyn%par%neff_N0,dyn%par%neff_delta,dyn%par%neff_e0,dyn%par%neff_Cc) 
 
             case DEFAULT 
@@ -1216,7 +1216,7 @@ contains
         
         return 
 
-    end subroutine ydyn_alloc 
+    end subroutine ydyn_alloc
 
     subroutine ydyn_dealloc(now)
 

@@ -553,6 +553,138 @@ end if
         real(wp) :: inv_4dx, inv_4dy 
         real(wp) :: p1, p2, eps_0_sq  
         real(wp) :: eps_sq                              ! [1/yr^2]
+
+        real(wp) :: dudx_aa, dvdy_aa 
+        real(wp) :: dudy_aa_1, dudy_aa_2, dudy_aa 
+        real(wp) :: dvdx_aa_1, dvdx_aa_2, dvdx_aa 
+        real(wp) :: duxdz_aa, duydz_aa
+        real(wp) :: eps_sq_aa, ATT_aa
+        
+        real(wp), parameter :: visc_min = 1e4_wp        ! Just for safety 
+
+        nx = size(visc_eff,1)
+        ny = size(visc_eff,2)
+        nz = size(visc_eff,3)
+        
+        ! Calculate scaling factors
+        inv_4dx = 1.0_wp / (4.0_wp*dx) 
+        inv_4dy = 1.0_wp / (4.0_wp*dy) 
+
+        ! Calculate exponents 
+        p1 = (1.0_wp - n_glen)/(2.0_wp*n_glen)
+        p2 = -1.0_wp/n_glen
+
+        ! Calculate squared minimum strain rate 
+        eps_0_sq = eps_0*eps_0 
+
+        ! Calculate visc_eff on aa-nodes
+        do j = 1, ny 
+        do i = 1, nx 
+
+            if (f_ice(i,j) .eq. 1.0_wp) then 
+
+                im1 = max(i-1,1)    
+                ip1 = min(i+1,nx) 
+                jm1 = max(j-1,1) 
+                jp1 = min(j+1,ny) 
+
+                ! Get strain rate terms
+                dudx_aa = (ux(i,j)-ux(im1,j))/dx 
+                dvdy_aa = (uy(i,j)-uy(i,jm1))/dy 
+                
+                dudy_aa_1 = (ux(i,jp1)-ux(i,jm1))/(2.0_wp*dy)
+                dudy_aa_2 = (ux(im1,jp1)-ux(im1,jm1))/(2.0_wp*dy)
+                dudy_aa   = 0.5_wp*(dudy_aa_1+dudy_aa_2)
+
+                dvdx_aa_1 = (uy(ip1,j)-uy(im1,j))/(2.0_wp*dx)
+                dvdx_aa_2 = (uy(ip1,jm1)-uy(im1,jm1))/(2.0_wp*dx)
+                dvdx_aa   = 0.5_wp*(dvdx_aa_1+dvdx_aa_2)
+
+                ! Loop over column
+                do k = 1, nz 
+
+                    ! Get vertical shear strain rate terms
+                    duxdz_aa = 0.5_wp*(duxdz(i,j,k)+duxdz(im1,j,k))
+                    duydz_aa = 0.5_wp*(duydz(i,j,k)+duydz(i,jm1,k))
+
+                    ! Calculate the total effective strain rate from L19, Eq. 21 
+                    eps_sq_aa = dudx_aa**2 + dvdy_aa**2 + dudx_aa*dvdy_aa + 0.25_wp*(dudy_aa+dvdx_aa)**2 &
+                                + 0.25_wp*duxdz_aa**2 + 0.25_wp*duydz_aa**2 + eps_0_sq
+
+                    ! Get rate factor on central node
+                    ATT_aa = ATT(i,j,k)
+
+                    ! Calculate effective viscosity on ab-nodes
+                    visc_eff(i,j,k) = 0.5_wp*(eps_sq_aa)**(p1) * ATT_aa**(p2)
+
+                end do 
+
+            else 
+
+                do k = 1, nz 
+                    visc_eff(i,j,k) = 0.0_wp 
+                end do 
+
+            end if 
+
+        end do  
+        end do 
+
+        ! Set boundaries 
+        call set_boundaries_3D_aa(visc_eff,boundaries)
+
+        ! Final safety check (mainly for grid boundaries)
+        ! Ensure non-zero visc value everywhere there is ice. 
+        do j = 1, ny 
+        do i = 1, nx 
+
+            if (f_ice(i,j) .eq. 1.0_wp) then
+
+                do k = 1, nz 
+                    if (visc_eff(i,j,k) .lt. visc_min) visc_eff(i,j,k) = visc_min
+                end do 
+
+            end if 
+
+        end do
+        end do
+
+        return 
+
+    end subroutine calc_visc_eff_3D
+
+    subroutine calc_visc_eff_3D_ab_aa(visc_eff,ux,uy,duxdz,duydz,ATT,H_ice,f_ice,zeta_aa,dx,dy,n_glen,eps_0,boundaries)
+        ! Calculate 3D effective viscosity following L19, Eq. 2
+        ! Use of eps_0 ensures non-zero positive viscosity value everywhere 
+        ! Note: viscosity is first calculated on ab-nodes, then 
+        ! unstaggered back to aa-nodes. This ensures more stability for 
+        ! visc_eff (less likely to blow up for low strain rates). 
+
+        implicit none 
+        
+        real(wp), intent(OUT) :: visc_eff(:,:,:)        ! aa-nodes
+        real(wp), intent(IN)  :: ux(:,:)                ! [m/yr] Vertically averaged horizontal velocity, x-component
+        real(wp), intent(IN)  :: uy(:,:)                ! [m/yr] Vertically averaged horizontal velocity, y-component
+        real(wp), intent(IN)  :: duxdz(:,:,:)           ! [1/yr] Vertical shearing, x-component
+        real(wp), intent(IN)  :: duydz(:,:,:)           ! [1/yr] Vertical shearing, x-component
+        real(wp), intent(IN)  :: ATT(:,:,:)             ! aa-nodes
+        real(wp), intent(IN)  :: H_ice(:,:) 
+        real(wp), intent(IN)  :: f_ice(:,:)
+        real(wp), intent(IN)  :: zeta_aa(:)             ! Vertical axis (sigma-coordinates from 0 to 1)
+        real(wp), intent(IN)  :: dx
+        real(wp), intent(IN)  :: dy
+        real(wp), intent(IN)  :: n_glen   
+        real(wp), intent(IN)  :: eps_0                  ! [1/yr] Regularization constant (minimum strain rate, ~1e-6)
+        character(len=*), intent(IN) :: boundaries 
+
+        ! Local variables 
+        integer  :: i, j, k
+        integer  :: ip1, jp1, im1, jm1 
+        integer  :: ip2, jp2, im2, jm2
+        integer  :: nx, ny, nz  
+        real(wp) :: inv_4dx, inv_4dy 
+        real(wp) :: p1, p2, eps_0_sq  
+        real(wp) :: eps_sq                              ! [1/yr^2]
         real(wp) :: dudx_ab(4)
         real(wp) :: dvdy_ab(4)
         real(wp) :: dudy_ab(4)
@@ -670,7 +802,7 @@ end if
 
         return 
 
-    end subroutine calc_visc_eff_3D
+    end subroutine calc_visc_eff_3D_ab_aa
 
     subroutine calc_visc_eff_int(visc_eff_int,visc_eff,H_ice,f_ice,zeta_aa,boundaries)
 

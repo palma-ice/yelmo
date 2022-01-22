@@ -12,6 +12,7 @@ module topography
     public :: calc_z_srf_gl_subgrid_area
     public :: calc_H_eff
     public :: calc_H_grnd
+    public :: calc_f_grnd_subgrid_area_aa
     public :: calc_f_grnd_subgrid_area
     public :: calc_f_grnd_subgrid_linear
     public :: filter_f_grnd
@@ -174,7 +175,7 @@ contains
                     end if 
                 
                 end if 
-                      
+
             end do 
             end do 
 
@@ -685,6 +686,59 @@ end if
 
     end subroutine calc_H_grnd
 
+    subroutine calc_f_grnd_subgrid_area_aa(f_grnd,H_grnd,gl_sep_nx)
+        ! Use H_grnd to determined grounded area fraction of grid point.
+
+        implicit none
+        
+        real(prec), intent(OUT) :: f_grnd(:,:)      ! aa-nodes 
+        real(prec), intent(IN)  :: H_grnd(:,:)      ! aa-nodes
+        integer,    intent(IN)  :: gl_sep_nx        ! Number of interpolation points per side (nx*nx)
+
+        ! Local variables
+        integer    :: i, j, nx, ny
+        real(prec) :: Hg_1, Hg_2, Hg_3, Hg_4, Hg_mid  
+        integer    :: im1, ip1, jm1, jp1 
+
+        !integer, parameter :: nx_interp = 15
+
+        nx = size(H_grnd,1)
+        ny = size(H_grnd,2) 
+
+        ! First binary estimate of f_grnd based on aa-nodes
+        f_grnd = 1.0
+        where (H_grnd .lt. 0.0) f_grnd = 0.0
+        
+        ! Find grounding line cells and determine fraction 
+        do j = 1, ny 
+        do i = 1, nx
+
+            ! Get neighbor indices
+            im1 = max(i-1,1) 
+            ip1 = min(i+1,nx) 
+            jm1 = max(j-1,1) 
+            jp1 = min(j+1,ny) 
+                
+            ! Calculate Hg at corners (ab-nodes)
+            Hg_1 = 0.25_prec*(H_grnd(i,j) + H_grnd(ip1,j) + H_grnd(ip1,jp1) + H_grnd(i,jp1))
+            Hg_2 = 0.25_prec*(H_grnd(i,j) + H_grnd(im1,j) + H_grnd(im1,jp1) + H_grnd(i,jp1))
+            Hg_3 = 0.25_prec*(H_grnd(i,j) + H_grnd(im1,j) + H_grnd(im1,jm1) + H_grnd(i,jm1))
+            Hg_4 = 0.25_prec*(H_grnd(i,j) + H_grnd(ip1,j) + H_grnd(ip1,jm1) + H_grnd(i,jm1))
+            
+            if (max(Hg_1,Hg_2,Hg_3,Hg_4) .ge. 0.0 .and. min(Hg_1,Hg_2,Hg_3,Hg_4) .lt. 0.0) then 
+                ! Point contains grounding line, get grounded area  
+                
+                call calc_grounded_fraction_cell(f_grnd(i,j),Hg_1,Hg_2,Hg_3,Hg_4,gl_sep_nx)
+
+            end if 
+
+        end do 
+        end do 
+
+        return
+        
+    end subroutine calc_f_grnd_subgrid_area_aa
+    
     subroutine calc_f_grnd_subgrid_area(f_grnd,f_grnd_acx,f_grnd_acy,H_grnd,gl_sep_nx)
         ! Use H_grnd to determined grounded area fraction of grid point.
 
@@ -1104,10 +1158,10 @@ end if
             ! Comine bmb_grnd and bmb_shlf 
 
             ! Add the two fields for now to avoid complications with f_grnd
-            bmb = bmb_grnd + bmb_shlf 
+            !bmb = bmb_grnd + bmb_shlf 
 
             ! Weighted average
-            !bmb = f_grnd*bmb_grnd + (1.0-f_grnd)*bmb_shlf
+            bmb = f_grnd*bmb_grnd + (1.0-f_grnd)*bmb_shlf
 
         end where 
 

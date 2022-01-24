@@ -706,7 +706,7 @@ contains
         real(wp) :: wt 
         real(wp) :: beta_now 
 
-        real(wp), parameter :: ub_min    = 1e-1_wp          ! [m/a] Minimum velocity is positive small value to avoid divide by zero
+        real(wp), parameter :: ub_min    = 1e-2_wp          ! [m/yr] Minimum velocity is positive small value to avoid divide by zero
         real(wp), parameter :: ub_sq_min = ub_min**2
 
         nx = size(beta,1)
@@ -716,8 +716,8 @@ contains
         beta = 0.0_prec 
         
         ! Set equal weighting to all ab-nodes
-        wt_ab = 0.25_wp
-        
+        wt_ab = 0.25_wp 
+
         do j = 1, ny
         do i = 1, nx
 
@@ -734,7 +734,7 @@ contains
                 call stagger_nodes_aa_ab_ice(cb_ab,c_bed,f_ice,i,j)
 
                 ! Use central value of c_bed
-                ! cb_ab(1:4) = c_bed(i,j) 
+                !cb_ab(1:4) = c_bed(i,j) 
 
                 if (q .eq. 1.0_wp) then 
                     ! Linear law, no f(ub) term
@@ -749,10 +749,22 @@ contains
                     call stagger_nodes_acx_ab_ice(ux_ab,ux_b,f_ice,i,j)
                     call stagger_nodes_acy_ab_ice(uy_ab,uy_b,f_ice,i,j)
                     
+                    !ux_ab = 0.5*(ux_b(i,j)+ux_b(im1,j))
+                    !uy_ab = 0.5*(uy_b(i,j)+uy_b(i,jm1))
+                    
                     uxy_ab = sqrt(ux_ab**2 + uy_ab**2 + ub_sq_min)
                     
-                    beta_ab = cb_ab * (uxy_ab / u_0)**q * (1.0_wp / uxy_ab)
+                    if (q .eq. 0.0_wp) then 
+                        ! Plastic law
 
+                        beta_ab = cb_ab * (1.0_wp / uxy_ab)
+
+                    else
+
+                        beta_ab = cb_ab * (uxy_ab / u_0)**q * (1.0_wp / uxy_ab)
+                    
+                    end if 
+                    
                 end if 
 
                 beta(i,j) = sum(wt_ab*beta_ab)
@@ -767,8 +779,18 @@ contains
 
                 else
                     
-                    uxy_b  = ub_min 
-                    beta(i,j) = c_bed(i,j) * (uxy_b / u_0)**q * (1.0_wp / uxy_b)
+                    uxy_b  = ub_min
+
+                    if (q .eq. 0.0_wp) then 
+                        ! Plastic law
+ 
+                        beta(i,j) = c_bed(i,j) * (1.0_wp / uxy_b)
+
+                    else
+
+                        beta(i,j) = c_bed(i,j) * (uxy_b / u_0)**q * (1.0_wp / uxy_b)
+
+                    end if 
 
                 end if 
 
@@ -812,7 +834,7 @@ contains
         real(wp) :: wt_ab(4) 
         real(wp) :: beta_now
 
-        real(wp), parameter :: ub_min    = 1e-1_wp          ! [m/a] Minimum velocity is positive small value to avoid divide by zero
+        real(wp), parameter :: ub_min    = 1e-2_wp          ! [m/yr] Minimum velocity is positive small value to avoid divide by zero
         real(wp), parameter :: ub_sq_min = ub_min**2
 
         nx = size(beta,1)

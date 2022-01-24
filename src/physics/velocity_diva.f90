@@ -521,7 +521,7 @@ end if
 
     end subroutine calc_vertical_shear_3D
 
-    subroutine calc_visc_eff_3D(visc_eff,ux,uy,duxdz,duydz,ATT,H_ice,f_ice,zeta_aa,dx,dy,n_glen,eps_0,boundaries)
+    subroutine calc_visc_eff_3D_aa(visc_eff,ux,uy,duxdz,duydz,ATT,H_ice,f_ice,zeta_aa,dx,dy,n_glen,eps_0,boundaries)
         ! Calculate 3D effective viscosity following L19, Eq. 2
         ! Use of eps_0 ensures non-zero positive viscosity value everywhere 
         ! Note: viscosity is first calculated on ab-nodes, then 
@@ -651,9 +651,9 @@ end if
 
         return 
 
-    end subroutine calc_visc_eff_3D
+    end subroutine calc_visc_eff_3D_aa
 
-    subroutine calc_visc_eff_3D_ab_aa(visc_eff,ux,uy,duxdz,duydz,ATT,H_ice,f_ice,zeta_aa,dx,dy,n_glen,eps_0,boundaries)
+    subroutine calc_visc_eff_3D(visc_eff,ux,uy,duxdz,duydz,ATT,H_ice,f_ice,zeta_aa,dx,dy,n_glen,eps_0,boundaries)
         ! Calculate 3D effective viscosity following L19, Eq. 2
         ! Use of eps_0 ensures non-zero positive viscosity value everywhere 
         ! Note: viscosity is first calculated on ab-nodes, then 
@@ -802,7 +802,7 @@ end if
 
         return 
 
-    end subroutine calc_visc_eff_3D_ab_aa
+    end subroutine calc_visc_eff_3D
 
     subroutine calc_visc_eff_int(visc_eff_int,visc_eff,H_ice,f_ice,zeta_aa,boundaries)
 

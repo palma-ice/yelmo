@@ -285,7 +285,7 @@ contains
 
         ! Define grid points with ssa active (uses beta from previous timestep)
         call set_ssa_masks(dyn%now%ssa_mask_acx,dyn%now%ssa_mask_acy,dyn%now%beta_acx,dyn%now%beta_acy, &
-                           tpo%now%H_ice,tpo%now%f_ice,tpo%now%f_grnd_acx,tpo%now%f_grnd_acy,dyn%par%ssa_beta_max,use_ssa=.TRUE.)
+                           tpo%now%H_ice_dyn,tpo%now%f_ice_dyn,tpo%now%f_grnd_acx,tpo%now%f_grnd_acy,dyn%par%ssa_beta_max,use_ssa=.TRUE.)
 
         if (use_ssa .and. dyn%par%use_ssa .and. &
                 maxval(dyn%now%ssa_mask_acx+dyn%now%ssa_mask_acy) .gt. 0) then 
@@ -317,7 +317,7 @@ contains
                                       dyn%now%visc_eff,dyn%now%visc_eff_int,dyn%now%ssa_mask_acx,dyn%now%ssa_mask_acy, &
                                       dyn%now%ssa_err_acx,dyn%now%ssa_err_acy,dyn%par%ssa_iter_now,dyn%now%beta, &
                                       dyn%now%beta_acx,dyn%now%beta_acy,dyn%now%c_bed,dyn%now%taud_acx,dyn%now%taud_acy, &
-                                      tpo%now%H_ice,tpo%now%f_ice,tpo%now%H_grnd,tpo%now%f_grnd,tpo%now%f_grnd_acx,tpo%now%f_grnd_acy, &
+                                      tpo%now%H_ice_dyn,tpo%now%f_ice_dyn,tpo%now%H_grnd,tpo%now%f_grnd,tpo%now%f_grnd_acx,tpo%now%f_grnd_acy, &
                                       mat%now%ATT,dyn%par%zeta_aa,bnd%z_sl,bnd%z_bed,tpo%now%z_srf,dyn%par%dx,dyn%par%dy,mat%par%n_glen,ssa_par)
 
         else 
@@ -366,7 +366,7 @@ contains
             bmb = 0.0 
         end if 
 
-        call calc_uz_3D(dyn%now%uz,dyn%now%ux,dyn%now%uy,tpo%now%H_ice,tpo%now%f_ice,tpo%now%f_grnd,bnd%z_bed,tpo%now%z_srf, &
+        call calc_uz_3D(dyn%now%uz,dyn%now%ux,dyn%now%uy,tpo%now%H_ice_dyn,tpo%now%f_ice_dyn,tpo%now%f_grnd,bnd%z_bed,tpo%now%z_srf, &
                         bnd%smb,bmb,tpo%now%dHicedt,tpo%now%dzsrfdt,dyn%par%zeta_aa,dyn%par%zeta_ac,dyn%par%dx,dyn%par%dy)
         
         
@@ -513,7 +513,7 @@ contains
 
         ! Define grid points with ssa active (uses beta from previous timestep)
         call set_ssa_masks(dyn%now%ssa_mask_acx,dyn%now%ssa_mask_acy,dyn%now%beta_acx,dyn%now%beta_acy, &
-                           tpo%now%H_ice,tpo%now%f_ice,tpo%now%f_grnd_acx,tpo%now%f_grnd_acy,dyn%par%ssa_beta_max,use_ssa=.TRUE.)
+                           tpo%now%H_ice_dyn,tpo%now%f_ice_dyn,tpo%now%f_grnd_acx,tpo%now%f_grnd_acy,dyn%par%ssa_beta_max,use_ssa=.TRUE.)
 
         ! Set diva parameters from Yelmo settings 
         l1l2_par%ssa_lis_opt    = dyn%par%ssa_lis_opt 
@@ -544,7 +544,7 @@ contains
                                 dyn%now%beta_acy,dyn%now%visc_eff,dyn%now%visc_eff_int, &
                                 dyn%now%ssa_mask_acx,dyn%now%ssa_mask_acy,dyn%now%ssa_err_acx, &
                                 dyn%now%ssa_err_acy,dyn%par%ssa_iter_now,dyn%now%c_bed, &
-                                dyn%now%taud_acx,dyn%now%taud_acy,tpo%now%H_ice,tpo%now%f_ice,tpo%now%H_grnd, &
+                                dyn%now%taud_acx,dyn%now%taud_acy,tpo%now%H_ice_dyn,tpo%now%f_ice_dyn,tpo%now%H_grnd, &
                                 tpo%now%f_grnd,tpo%now%f_grnd_acx,tpo%now%f_grnd_acy,mat%now%ATT, &
                                 dyn%par%zeta_aa,dyn%par%zeta_ac,bnd%z_sl,bnd%z_bed,tpo%now%z_srf,dyn%par%dx,dyn%par%dy,mat%par%n_glen,l1l2_par)
         
@@ -560,7 +560,7 @@ contains
             bmb = 0.0 
         end if 
 
-        call calc_uz_3D(dyn%now%uz,dyn%now%ux,dyn%now%uy,tpo%now%H_ice,tpo%now%f_ice,tpo%now%f_grnd,bnd%z_bed,tpo%now%z_srf, &
+        call calc_uz_3D(dyn%now%uz,dyn%now%ux,dyn%now%uy,tpo%now%H_ice_dyn,tpo%now%f_ice_dyn,tpo%now%f_grnd,bnd%z_bed,tpo%now%z_srf, &
                         bnd%smb,bmb,tpo%now%dHicedt,tpo%now%dzsrfdt,dyn%par%zeta_aa,dyn%par%zeta_ac,dyn%par%dx,dyn%par%dy)
         
         

@@ -39,6 +39,7 @@
             "dome"     : "par/yelmo_const_EISMINT.nml",
             "MISMIP3D" : "par/yelmo_const_MISMIP3D.nml",
             "TROUGH"   : "par/yelmo_const_TROUGH.nml",
+            "SLAB-S06" : "par/yelmo_const_TROUGH.nml",
             "MISMIP+"  : "par/yelmo_const_TROUGH.nml",
             "ISMIPHOM" : "par/yelmo_const_EISMINT.nml", 
             "slab"     : "par/yelmo_const_EISMINT.nml" 

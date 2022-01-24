@@ -677,7 +677,7 @@ contains
                     stop 
                 end if 
             
-            case("ISMIPHOM","periodic","periodic-xy") 
+            case("ISMIPHOM","periodic","periodic-xy","SLAB-S06") 
                 ! Periodic boundary conditions in x and y, eg: X_1 = X_n-1; X_n = X_2
 
                 dom%tpo%par%boundaries  = "periodic"
@@ -998,7 +998,9 @@ contains
             ! Impose [high] beta value in case it hasn't been initialized (eg, in the case of cb_method=-1/beta_method=-1)
             ! This will be overwritten when cb_ref/beta are calculated internally
             if (maxval(dom%dyn%now%beta) .eq. 0.0_prec) then 
-                dom%dyn%now%cb_ref = 1.0
+                if (maxval(dom%dyn%now%cb_ref) .eq. 0.0_prec) then 
+                    dom%dyn%now%cb_ref = 1.0
+                end if 
                 dom%dyn%now%c_bed  = dom%dyn%now%cb_ref*1e5
                 dom%dyn%now%beta   = dom%dyn%now%c_bed
             end if

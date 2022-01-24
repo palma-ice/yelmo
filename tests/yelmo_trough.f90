@@ -143,8 +143,10 @@ program yelmo_trough
 
             ! Determine constant L 
             L = s06_W / ((1.0_wp+s06_m)**(1.0_wp/s06_m))
-            
+
             yelmo1%dyn%now%cb_ref = (rho_ice*g*s06_H0*s06_alpha) * abs(yelmo1%grd%y/L)**s06_m
+
+            yelmo1%dyn%now%cb_ref = yelmo1%dyn%now%cb_ref 
 
             write(*,*) "SLAB-S06: f      = ", (rho_ice*g*s06_H0)
             write(*,*) "SLAB-S06: m      = ", s06_m 

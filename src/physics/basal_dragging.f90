@@ -123,17 +123,23 @@ contains
                 ! Calculate beta from a linear law (simply set beta=c_bed/u0)
                 ! (use power-plastic function to ensure proper staggering)
 
-                call calc_beta_aa_power_plastic(beta,ux_b,uy_b,c_bed,f_ice,1.0_wp,beta_u0)
+                call calc_beta_aa_power_plastic(beta,ux_b,uy_b,c_bed,f_ice,1.0_wp,beta_u0,simple_stagger=.FALSE.)
                 
             case(2)
                 ! Calculate beta from the quasi-plastic power-law as defined by Bueler and van Pelt (2015)
 
-                call calc_beta_aa_power_plastic(beta,ux_b,uy_b,c_bed,f_ice,beta_q,beta_u0)
+                call calc_beta_aa_power_plastic(beta,ux_b,uy_b,c_bed,f_ice,beta_q,beta_u0,simple_stagger=.FALSE.)
                 
             case(3)
                 ! Calculate beta from regularized Coulomb law (Joughin et al., GRL, 2019)
 
                 call calc_beta_aa_reg_coulomb(beta,ux_b,uy_b,c_bed,f_ice,beta_q,beta_u0)
+            
+            case(4) 
+                ! Calculate beta from the quasi-plastic power-law as defined by Bueler and van Pelt (2015)
+                ! Use simple-staggering to aa-nodes - useful for Schoof (2006) slab test.
+
+                call calc_beta_aa_power_plastic(beta,ux_b,uy_b,c_bed,f_ice,beta_q,beta_u0,simple_stagger=.TRUE.)
                 
             case DEFAULT 
                 ! Not recognized 
@@ -678,7 +684,7 @@ contains
     !
     ! ================================================================================
 
-    subroutine calc_beta_aa_power_plastic(beta,ux_b,uy_b,c_bed,f_ice,q,u_0)
+    subroutine calc_beta_aa_power_plastic(beta,ux_b,uy_b,c_bed,f_ice,q,u_0,simple_stagger)
         ! Calculate basal friction coefficient (beta) that
         ! enters the SSA solver as a function of basal velocity
         ! using a power-law form following Bueler and van Pelt (2015)
@@ -692,6 +698,7 @@ contains
         real(wp), intent(IN)  :: f_ice(:,:)       ! aa-nodes
         real(wp), intent(IN)  :: q
         real(wp), intent(IN)  :: u_0              ! [m/a] 
+        logical,  intent(IN)  :: simple_stagger 
 
         ! Local variables
         integer    :: i, j, nx, ny
@@ -730,12 +737,18 @@ contains
             if (f_ice(i,j) .eq. 1.0_wp) then 
                 ! Fully ice-covered point with some fully ice-covered neighbors 
 
-                ! Get c_bed on ab-nodes
-                call stagger_nodes_aa_ab_ice(cb_ab,c_bed,f_ice,i,j)
+                if (simple_stagger) then 
+                    ! Use central value of c_bed
+                    
+                    cb_ab(1:4) = c_bed(i,j) 
 
-                ! Use central value of c_bed
-                !cb_ab(1:4) = c_bed(i,j) 
+                else 
+                    ! Get c_bed on ab-nodes
+                    
+                    call stagger_nodes_aa_ab_ice(cb_ab,c_bed,f_ice,i,j)
 
+                end if 
+                
                 if (q .eq. 1.0_wp) then 
                     ! Linear law, no f(ub) term
 
@@ -744,14 +757,21 @@ contains
                 else
                     ! Non-linear law with f(ub) term 
 
-                    ! Calculate magnitude of basal velocity on aa-node 
-                    ! from ab-nodes (quadrature points)
-                    call stagger_nodes_acx_ab_ice(ux_ab,ux_b,f_ice,i,j)
-                    call stagger_nodes_acy_ab_ice(uy_ab,uy_b,f_ice,i,j)
+                    if (simple_stagger) then 
+                        ! Unstagger velocity components to aa-nodes 
+
+                        ux_ab = 0.5*(ux_b(i,j)+ux_b(im1,j))
+                        uy_ab = 0.5*(uy_b(i,j)+uy_b(i,jm1))
                     
-                    !ux_ab = 0.5*(ux_b(i,j)+ux_b(im1,j))
-                    !uy_ab = 0.5*(uy_b(i,j)+uy_b(i,jm1))
+                    else
+                        ! Calculate magnitude of basal velocity on aa-node 
+                        ! from ab-nodes (quadrature points)
+                        
+                        call stagger_nodes_acx_ab_ice(ux_ab,ux_b,f_ice,i,j)
+                        call stagger_nodes_acy_ab_ice(uy_ab,uy_b,f_ice,i,j)
                     
+                    end if 
+
                     uxy_ab = sqrt(ux_ab**2 + uy_ab**2 + ub_sq_min)
                     
                     if (q .eq. 0.0_wp) then 

@@ -25,6 +25,8 @@ program yelmo_trough
 
     real(prec) :: s06_alpha, s06_H0, s06_W, s06_m
     real(prec) :: B, L  
+    real(prec), allocatable :: ux_ref(:,:) 
+    real(prec), allocatable :: tau_c_ref(:,:)
 
     real(prec) :: xmax, ymin, ymax 
     integer    :: i, j, nx, ny 
@@ -148,13 +150,26 @@ program yelmo_trough
 
             yelmo1%dyn%now%cb_ref = yelmo1%dyn%now%cb_ref 
 
+            ! Calculate IMAU-ICE function 
+            allocate(ux_ref(yelmo1%grd%nx,yelmo1%grd%ny))
+            allocate(tau_c_ref(yelmo1%grd%nx,yelmo1%grd%ny))
+            
+            call SSA_Schoof2006_analytical_solution(ux_ref, tau_c_ref, yelmo1%grd%y, &
+                                    s06_alpha,s06_H0,yelmo1%mat%par%rf_const,L,s06_m, &
+                                    yelmo1%mat%par%n_glen,rho_ice, g)
+
             write(*,*) "SLAB-S06: f      = ", (rho_ice*g*s06_H0)
             write(*,*) "SLAB-S06: m      = ", s06_m 
             write(*,*) "SLAB-S06: H0     = ", s06_H0 
             write(*,*) "SLAB-S06: W      = ", s06_W 
             write(*,*) "SLAB-S06: L      = ", L 
             write(*,*) "SLAB-S06: ATT    = ", yelmo1%mat%now%ATT(1,1,1)
-            write(*,*) "SLAB-S06: cb_ref = ", yelmo1%dyn%now%cb_ref(1,1)
+            write(*,*) "SLAB-S06: cb_ref      = ", yelmo1%dyn%now%cb_ref(1,1)
+            write(*,*) "SLAB-S06: tau_c_ref   = ", tau_c_ref(1,1)
+            write(*,*) "SLAB-S06: max(ux_ref) = ", maxval(ux_ref)
+
+            ! Use IMAU-ICE function
+            yelmo1%dyn%now%cb_ref = tau_c_ref
 
         case("TROUGH-F17")
             ! Feldmann and Levermann (2017) domain 
@@ -586,7 +601,54 @@ contains
         return 
 
     end subroutine write_step_2D
+
+  ! == Analytical solution by Schoof 2006 for the "SSA_icestream" benchmark experiment
+  ELEMENTAL SUBROUTINE SSA_Schoof2006_analytical_solution(U, tauc, y, tantheta, h0, A_flow, L, m,  &
+                            n_glen,ice_density, grav)
+      
+    IMPLICIT NONE
     
+    ! In/output variables:
+    REAL(wp),                            INTENT(OUT)   :: U             ! Ice velocity in the x-direction
+    REAL(wp),                            INTENT(OUT)   :: tauc          ! Till yield stress
+    REAL(wp),                            INTENT(IN)    :: y             ! y-coordinate
+    REAL(wp),                            INTENT(IN)    :: tantheta      ! Surface slope in the x-direction
+    REAL(wp),                            INTENT(IN)    :: h0            ! Ice thickness
+    REAL(wp),                            INTENT(IN)    :: A_flow        ! Ice flow factor
+    REAL(wp),                            INTENT(IN)    :: L             ! Ice-stream width (m), default 40e3
+    REAL(wp),                            INTENT(IN)    :: m             ! Ice stream exponent
+    REAL(wp),                            INTENT(IN)    :: n_glen
+    REAL(wp),                            INTENT(IN)    :: ice_density
+    REAL(wp),                            INTENT(IN)    :: grav
+    
+    ! Local variables:
+    REAL(wp)                                           :: B, f, W, ua, ub, uc, ud, ue   
+    
+    ! Calculate the gravitational driving stress f
+    f = ice_density * grav * h0 * tantheta
+    
+    ! Calculate the ice hardness factor B
+    B = A_flow**(-1._dp/n_glen)
+    
+    ! Calculate the "ice stream half-width" W
+    W = L * (m+1._dp)**(1._dp/m)
+    
+    ! Calculate the till yield stress across the stream
+    tauc = f * ABS(y/L)**m
+    
+    ! Calculate the analytical solution for u
+    ua = -2._dp * f**3 * L**4 / (B**3 * h0**3)
+    ub = ( 1._dp / 4._dp                           ) * (   (y/L)**     4._dp  - (m+1._dp)**(       4._dp/m) )
+    uc = (-3._dp / ((m+1._dp)    * (      m+4._dp))) * (ABS(y/L)**(  m+4._dp) - (m+1._dp)**(1._dp+(4._dp/m)))
+    ud = ( 3._dp / ((m+1._dp)**2 * (2._dp*m+4._dp))) * (ABS(y/L)**(2*m+4._dp) - (m+1._dp)**(2._dp+(4._dp/m)))
+    ue = (-1._dp / ((m+1._dp)**3 * (3._dp*m+4._dp))) * (ABS(y/L)**(3*m+4._dp) - (m+1._dp)**(3._dp+(4._dp/m)))
+    u = ua * (ub + uc + ud + ue)
+    
+    ! Outside the ice-stream, velocity is zero
+    IF (ABS(y) > w) U = 0._dp
+    
+  END SUBROUTINE SSA_Schoof2006_analytical_solution
+
 end program yelmo_trough
 
 

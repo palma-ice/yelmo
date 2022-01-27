@@ -269,7 +269,7 @@ contains
 
 
 
-if (.TRUE.) then 
+if (.FALSE.) then 
             if (iter .gt. 1) then
                 ! Update ssa mask based on convergence with previous step to reduce area being solved 
                 call update_ssa_mask_convergence(ssa_mask_acx,ssa_mask_acy,ssa_err_acx,ssa_err_acy,err_lim=real(1e-5,wp))
@@ -297,7 +297,7 @@ end if
             else 
                 corr_rel = 0.5_wp 
             end if 
-            
+
             !write(*,*) "pic: ", iter, corr_theta, corr_rel
 
             ! Apply relaxation to keep things stable

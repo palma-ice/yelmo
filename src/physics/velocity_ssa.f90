@@ -162,10 +162,10 @@ contains
                 case(1) 
                     ! Calculate 3D effective viscosity, using velocity solution from previous iteration
                     
-                    ! call calc_visc_eff_3D_aa(visc_eff,ux_b,uy_b,ATT,H_ice,f_ice,zeta_aa, &
-                    !                                 dx,dy,n_glen,par%eps_0,par%boundaries)
-                    call calc_visc_eff_3D(visc_eff,ux_b,uy_b,ATT,H_ice,f_ice,zeta_aa, &
+                    call calc_visc_eff_3D_aa(visc_eff,ux_b,uy_b,ATT,H_ice,f_ice,zeta_aa, &
                                                     dx,dy,n_glen,par%eps_0,par%boundaries)
+                    ! call calc_visc_eff_3D(visc_eff,ux_b,uy_b,ATT,H_ice,f_ice,zeta_aa, &
+                    !                                 dx,dy,n_glen,par%eps_0,par%boundaries)
 
                 case DEFAULT 
 

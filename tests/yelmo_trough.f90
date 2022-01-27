@@ -137,9 +137,9 @@ program yelmo_trough
             yelmo1%dyn%now%cb_ref = 5.2e3 
             where(abs(yelmo1%grd%y) .gt. s06_W) yelmo1%dyn%now%cb_ref = 70e3 
 
-            write(*,*) "SLAB-S06: W      = ", s06_W 
-            write(*,*) "SLAB-S06: ATT    = ", yelmo1%mat%now%ATT(1,1,1)
-            write(*,*) "SLAB-S06: cb_ref = ", yelmo1%dyn%now%cb_ref(1,1)
+            write(*,*) "RAYMOND: W      = ", s06_W 
+            write(*,*) "RAYMOND: ATT    = ", yelmo1%mat%now%ATT(1,1,1)
+            write(*,*) "RAYMOND: cb_ref = ", yelmo1%dyn%now%cb_ref(1,1)
 
             ! Initialiaze ux values to be safe too 
             yelmo1%dyn%now%ux_b   = 500.0 

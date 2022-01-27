@@ -713,7 +713,7 @@ contains
         real(wp) :: wt 
         real(wp) :: beta_now 
 
-        real(wp), parameter :: ub_min    = 1e-2_wp          ! [m/yr] Minimum velocity is positive small value to avoid divide by zero
+        real(wp), parameter :: ub_min    = 1e-3_wp          ! [m/yr] Minimum velocity is positive small value to avoid divide by zero
         real(wp), parameter :: ub_sq_min = ub_min**2
 
         nx = size(beta,1)

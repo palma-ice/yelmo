@@ -1424,7 +1424,7 @@ end if
         deallocate(lgs_a_value, lgs_a_index, lgs_a_ptr)
         deallocate(lgs_b_value, lgs_x_value)
 
-        
+
         ! Limit the velocity generally =====================
         call limit_vel(vx_m,ulim)
         call limit_vel(vy_m,ulim)
@@ -2024,11 +2024,11 @@ end if
 
         implicit none 
 
-        real(prec), intent(INOUT) :: u  
-        real(prec), intent(IN)    :: u_lim
+        real(wp), intent(INOUT) :: u  
+        real(wp), intent(IN)    :: u_lim
 
-        real(prec), parameter :: tol = TOL_UNDERFLOW
-
+        real(wp), parameter :: tol = TOL_UNDERFLOW
+        
         u = min(u, u_lim)
         u = max(u,-u_lim)
 

@@ -2,7 +2,7 @@ module velocity_ssa
     ! This module solves for the ice sheet's horizontal velocity field (ux,uy)
     ! using the shallow-shelf approximation (SSA). 
 
-    use yelmo_defs ,only  : sp, dp, wp, prec, tol_underflow, rho_ice, rho_sw, rho_w, g
+    use yelmo_defs ,only  : sp, dp, wp, prec, tol_underflow, pi, rho_ice, rho_sw, rho_w, g
     use yelmo_tools, only : stagger_aa_ab, stagger_aa_ab_ice, stagger_ab_aa_ice, & 
                     stagger_nodes_aa_ab_ice, stagger_nodes_acx_ab_ice, stagger_nodes_acy_ab_ice, &
                     staggerdiff_nodes_acx_ab_ice, staggerdiff_nodes_acy_ab_ice, &
@@ -12,8 +12,9 @@ module velocity_ssa
 
     use basal_dragging 
     use solver_ssa_sico5 
-    use velocity_general, only : set_inactive_margins
-    
+    use velocity_general, only : set_inactive_margins, &
+                        picard_calc_error, picard_calc_error_angle, picard_relax, &
+                        picard_calc_convergence_l2 
     implicit none 
 
     type ssa_param_class
@@ -97,7 +98,13 @@ contains
         integer,    allocatable :: ssa_mask_acx_ref(:,:)
         integer,    allocatable :: ssa_mask_acy_ref(:,:)
 
-        real(prec) :: L2_norm 
+        real(wp), allocatable :: corr_nm1(:) 
+        real(wp), allocatable :: corr_nm2(:) 
+        
+        real(wp) :: corr_theta
+        real(wp) :: corr_rel 
+        real(wp) :: L2_norm 
+        real(wp) :: ssa_resid 
 
         logical, parameter :: write_ssa_diagnostics      = .FALSE. 
         logical, parameter :: write_ssa_diagnostics_stop = .FALSE.   ! Stop simulation after completing iterations?
@@ -112,6 +119,9 @@ contains
         allocate(ssa_mask_acx_ref(nx,ny))
         allocate(ssa_mask_acy_ref(nx,ny))
 
+        allocate(corr_nm1(2*nx*ny))
+        allocate(corr_nm2(2*nx*ny))
+
         ! Store original ssa mask before iterations
         ssa_mask_acx_ref = ssa_mask_acx
         ssa_mask_acy_ref = ssa_mask_acy
@@ -120,6 +130,9 @@ contains
         ssa_err_acx = 1.0_prec 
         ssa_err_acy = 1.0_prec 
         
+        corr_nm1 = 0.0_wp 
+        corr_nm2 = 0.0_wp 
+
         ! Ensure dynamically inactive cells have no velocity at 
         ! outer margins before starting iterations
         call set_inactive_margins(ux_b,uy_b,f_ice)
@@ -190,13 +203,34 @@ end if
                                 ssa_mask_acx,ssa_mask_acy,H_ice,f_ice,taud_acx,taud_acy,H_grnd,z_sl,z_bed, &
                                 z_srf,dx,dy,par%ssa_vel_max,par%boundaries,par%ssa_lateral_bc,par%ssa_lis_opt)
 
+            ! Calculate errors 
+            corr_nm2 = corr_nm1 
+            call picard_calc_error(corr_nm1,ux_b,uy_b,ux_b_nm1,uy_b_nm1)
+
+            ! Calculate error angle 
+            call picard_calc_error_angle(corr_theta,corr_nm1,corr_nm2) 
+
+            if (corr_theta .le. pi/8.0_wp) then 
+                corr_rel = 2.5_wp 
+            else if (corr_theta .lt. 19.0_wp*pi/20.0_wp) then 
+                corr_rel = 1.0_wp 
+            else 
+                corr_rel = 0.5_wp 
+            end if 
+            
+
             ! Apply relaxation to keep things stable
-            call relax_ssa(ux_b,uy_b,ux_b_nm1,uy_b_nm1,rel=par%ssa_iter_rel)
+            !call relax_ssa(ux_b,uy_b,ux_b_nm1,uy_b_nm1,rel=par%ssa_iter_rel)
+            call picard_relax(ux_b,uy_b,ux_b_nm1,uy_b_nm1,rel=corr_rel)
             
             ! Check for convergence
-            is_converged = check_vel_convergence_l2rel(ux_b,uy_b,ux_b_nm1,uy_b_nm1,ssa_mask_acx.gt.0,     &
-                                                       ssa_mask_acy.gt.0,par%ssa_iter_conv,iter,par%ssa_iter_max, &
-                                                       par%ssa_write_log,use_L2_norm=.FALSE.,L2_norm=L2_norm)
+            ! is_converged = check_vel_convergence_l2rel(ux_b,uy_b,ux_b_nm1,uy_b_nm1,ssa_mask_acx.gt.0,     &
+            !                                            ssa_mask_acy.gt.0,par%ssa_iter_conv,iter,par%ssa_iter_max, &
+            !                                            par%ssa_write_log,use_L2_norm=.FALSE.,L2_norm=L2_norm)
+            call picard_calc_convergence_l2(is_converged,ssa_resid,ux_b,uy_b,ux_b_nm1,uy_b_nm1, &
+                                                ssa_mask_acx.gt.0,ssa_mask_acy.gt.0,par%ssa_iter_conv,  &
+                                                iter,par%ssa_iter_max,par%ssa_write_log)
+
 
             ! Calculate an L1 error metric over matrix for diagnostics
             call check_vel_convergence_l1rel_matrix(ssa_err_acx,ssa_err_acy,ux_b,uy_b,ux_b_nm1,uy_b_nm1)

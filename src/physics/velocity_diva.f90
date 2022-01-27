@@ -297,7 +297,7 @@ end if
             else 
                 corr_rel = 0.5_wp 
             end if 
-
+            
             !write(*,*) "pic: ", iter, corr_theta, corr_rel
 
             ! Apply relaxation to keep things stable

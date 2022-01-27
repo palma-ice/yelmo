@@ -677,20 +677,14 @@ contains
                     stop 
                 end if 
             
-            case("ISMIPHOM","periodic","periodic-xy") 
+            case("ISMIPHOM","slab","periodic","periodic-xy") 
                 ! Periodic boundary conditions in x and y, eg: X_1 = X_n-1; X_n = X_2
 
                 dom%tpo%par%boundaries  = "periodic"
                 dom%dyn%par%boundaries  = "periodic"
                 dom%thrm%par%boundaries = "periodic"
-
-            case("slab") 
-
-                dom%tpo%par%boundaries  = "periodic" 
-                dom%dyn%par%boundaries  = "periodic"
-                dom%thrm%par%boundaries = "periodic"
-
-            case("infinite","SLAB-S06") 
+                
+            case("infinite") 
                 ! Set border points equal to interior neighbors 
                 ! (ajr: not fully implemented yet)
 

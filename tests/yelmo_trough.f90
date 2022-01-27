@@ -117,6 +117,35 @@ program yelmo_trough
     ! Intialize topography 
     select case(trim(domain)) 
 
+        case("RAYMOND")
+            ! Raymond (2000) domain - constant slope slab
+
+            ! ===== Intialize topography and set parameters =========
+        
+            yelmo1%bnd%z_bed = 10000.0_wp - s06_alpha*(yelmo1%grd%x)
+
+            yelmo1%tpo%now%H_ice = s06_H0
+
+            ! Define surface elevation 
+            yelmo1%tpo%now%z_srf = yelmo1%bnd%z_bed + yelmo1%tpo%now%H_ice
+
+            ! Define reference ice thickness (for prescribing boundary values, potentially)
+            yelmo1%bnd%H_ice_ref = s06_H0 
+
+            ! Define basal friction 
+            
+            yelmo1%dyn%now%cb_ref = 5.2e3 
+            where(abs(yelmo1%grd%y) .gt. s06_W) yelmo1%dyn%now%cb_ref = 70e3 
+
+            write(*,*) "SLAB-S06: W      = ", s06_W 
+            write(*,*) "SLAB-S06: ATT    = ", yelmo1%mat%now%ATT(1,1,1)
+            write(*,*) "SLAB-S06: cb_ref = ", yelmo1%dyn%now%cb_ref(1,1)
+
+            ! Initialiaze ux values to be safe too 
+            yelmo1%dyn%now%ux_b   = 500.0 
+            yelmo1%dyn%now%ux_bar = 500.0 
+            yelmo1%dyn%now%ux_s   = 500.0 
+            
         case("SLAB-S06")
             ! Schoof (2006) domain - constant slope slab
 
@@ -134,20 +163,10 @@ program yelmo_trough
 
             ! Define basal friction 
 
-            ! B = 3.7e8   ! [Pa s^(-1/3)]
-            ! B = 3.7e8 * [s^(1/3) / yr^(1/3)] = 3.7e8 [ (s/yr)^(1/3)]
-            ! B = 3.7e8   ! [Pa s^(1/3)]
-            ! B = 3.7e8 * [yr^(1/3) / s^(1/3) ] = 3.7e8 [ (yr/s)^(1/3)]
-            !B = 3.7e8 * sec_year**(1.0/3.0)
-            !B = 3.7e8 * sec_year**(-1.0/3.0)
-            !yelmo1%mat%now%ATT     = B**(-yelmo1%mat%par%n_glen)
-            !yelmo1%mat%now%ATT_bar = B**(-yelmo1%mat%par%n_glen)
-
             ! Determine constant L 
             L = s06_W / ((1.0_wp+s06_m)**(1.0_wp/s06_m))
 
             yelmo1%dyn%now%cb_ref = (rho_ice*g*s06_H0*s06_alpha) * abs(yelmo1%grd%y/L)**s06_m
-
             yelmo1%dyn%now%cb_ref = yelmo1%dyn%now%cb_ref 
 
             ! Calculate IMAU-ICE function 

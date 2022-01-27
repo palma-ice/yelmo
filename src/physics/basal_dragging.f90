@@ -778,7 +778,7 @@ contains
                         ! Plastic law
 
                         beta_ab = cb_ab * (1.0_wp / uxy_ab)
-
+                        
                     else
 
                         beta_ab = cb_ab * (uxy_ab / u_0)**q * (1.0_wp / uxy_ab)

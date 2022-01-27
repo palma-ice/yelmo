@@ -190,7 +190,6 @@ end if
                                 ssa_mask_acx,ssa_mask_acy,H_ice,f_ice,taud_acx,taud_acy,H_grnd,z_sl,z_bed, &
                                 z_srf,dx,dy,par%ssa_vel_max,par%boundaries,par%ssa_lateral_bc,par%ssa_lis_opt)
 
-
             ! Apply relaxation to keep things stable
             call relax_ssa(ux_b,uy_b,ux_b_nm1,uy_b_nm1,rel=par%ssa_iter_rel)
             
@@ -411,7 +410,6 @@ end if
         nx = size(visc_eff_int,1)
         ny = size(visc_eff_int,2)
 
-
         do j = 1, ny 
         do i = 1, nx
 
@@ -452,7 +450,7 @@ end if
         real(prec), intent(IN)  :: ux_b(:,:)       ! [m a-1] Basal velocity (acx nodes)
         real(prec), intent(IN)  :: uy_b(:,:)       ! [m a-1] Basal velocity (acy nodes)
         
-        real(prec), parameter :: tol = 1e-3_prec 
+        real(prec), parameter :: tol = 1e-5_prec 
 
         ! Calculate basal stress 
         taub_acx = beta_acx * ux_b 

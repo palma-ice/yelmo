@@ -1424,9 +1424,6 @@ end if
         deallocate(lgs_a_value, lgs_a_index, lgs_a_ptr)
         deallocate(lgs_b_value, lgs_x_value)
 
-        ! Limit the velocity at the grounded margin for safety 
-        ! to be x-times the upstream neighbor (eg, not more than 2x the upstream neighbor)
-        !call limit_vel_grounded_margin(vx_m,vy_m,is_front_1,is_front_2,H_grnd)
         
         ! Limit the velocity generally =====================
         call limit_vel(vx_m,ulim)
@@ -2022,95 +2019,6 @@ end if
         
     end subroutine set_sico_masks
     
-    subroutine limit_vel_grounded_margin(ux,uy,front1,front2,H_grnd)
-        ! Apply a velocity limit (for stability)
-
-        implicit none 
-
-        real(wp), intent(INOUT) :: ux(:,:)  
-        real(wp), intent(INOUT) :: uy(:,:)
-        logical,  intent(IN)    :: front1(:,:)  
-        logical,  intent(IN)    :: front2(:,:)
-        real(wp), intent(IN)    :: H_grnd(:,:)
-
-        ! Local variables 
-        integer  :: i, j, nx, ny 
-        integer  :: im1, ip1, jm1, jp1 
-        integer  :: if, jf, iu, ju 
-        real(wp) :: ulim, umag 
-
-        real(wp), parameter :: f_upstream = 2.0 
-
-        nx = size(ux,1)
-        ny = size(ux,2) 
-
-        do j = 1, ny 
-        do i = 1, nx 
-
-            ! Define neighbor indices
-            im1 = max(i-1,1)
-            ip1 = min(i+1,nx)
-            jm1 = max(j-1,1)
-            jp1 = min(j+1,ny)
-            
-            if (front1(i,j) .and. H_grnd(i,j) .gt. 0.0) then 
-                ! This aa-node is a grounded ice front
-
-                ! === x-direction ===
-
-                ! Get index of the acx node of the front
-                if (front2(ip1,j)) then 
-                    if = i 
-                    iu = im1
-                else if (front2(im1,j)) then 
-                    if = im1 
-                    iu = i 
-                else
-                    if = 0
-                end if 
-
-                if (if .ne. 0) then 
-                    ! Margin acx node index found
-
-                    ulim = f_upstream*abs(ux(iu,j))
-                    umag = min(abs(ux(if,j)),ulim)
-
-                    ux(if,j) = sign(umag,ux(if,j))
-
-                end if 
-
-                ! === y-direction ===
-
-                ! Get index of the acy node of the front
-                if (front2(i,jp1)) then 
-                    jf = j 
-                    ju = jm1
-                else if (front2(i,jm1)) then 
-                    jf = jm1 
-                    ju = j 
-                else
-                    jf = 0
-                end if 
-
-                if (jf .ne. 0) then 
-                    ! Margin acy node index found
-
-                    ulim = f_upstream*abs(uy(i,ju))
-                    umag = min(abs(ux(i,jf)),ulim)
-
-                    ux(i,jf) = sign(umag,ux(i,jf))
-
-                end if 
-
-            end if 
-
-        end do 
-        end do 
-
-        return 
-
-    end subroutine limit_vel_grounded_margin
-
     elemental subroutine limit_vel(u,u_lim)
         ! Apply a velocity limit (for stability)
 

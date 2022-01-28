@@ -1976,11 +1976,13 @@ end if
 
                 if (front1(i,j)) front1(i,j) = .FALSE. 
 
-            case("floating","float")
+            case("floating","float","slab")
                 ! Only apply lateral bc to floating ice fronts.
                 ! Ie, disable detection of all grounded fronts for now.
                 ! Model is generally more stable this way.
-
+                ! This method is also used for the 'infinite slab' approach,
+                ! where a thin ice shelf is extended everywhere over the domain. 
+                
                 if ( front1(i,j) .and. maske(i,j) .eq. 0 ) front1(i,j) = .FALSE. 
 
             case("marine")
@@ -2028,7 +2030,7 @@ end if
         real(wp), intent(IN)    :: u_lim
 
         real(wp), parameter :: tol = TOL_UNDERFLOW
-        
+
         u = min(u, u_lim)
         u = max(u,-u_lim)
 

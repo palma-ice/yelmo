@@ -230,10 +230,6 @@ contains
                 ! (Update elevation, ice thickness, calving, etc.)
                 call calc_ytopo(dom%tpo,dom%dyn,dom%mat,dom%thrm,dom%bnd,time_now,topo_fixed=dom%tpo%par%topo_fixed)
                 
-                ! Store predicted ice thickness for later use 
-                ! Do it here to ensure all changes to H_ice are accounted for (mb, calving, etc)
-                dom%tpo%now%H_ice_pred = dom%tpo%now%H_ice 
-
                 ! Step 2: Update other variables using predicted ice thickness 
                 
                 ! Calculate dynamics (velocities and stresses) 
@@ -268,10 +264,6 @@ contains
                     call calc_ydyn(dom%dyn,dom%tpo,dom%mat,dom%thrm,dom%bnd,time_now)
 
                 end if 
-
-                ! Store corrected ice thickness for later use 
-                ! Do it here to ensure all changes to H_ice are accounted for (mb, calving, etc)
-                dom%tpo%now%H_ice_corr = dom%tpo%now%H_ice 
 
                 if (dom%par%pc_use_H_pred) then 
                     ! Experimental: continue using H_ice_pred as main H_ice variable 
@@ -683,7 +675,7 @@ contains
                 dom%tpo%par%boundaries  = "periodic"
                 dom%dyn%par%boundaries  = "periodic"
                 dom%thrm%par%boundaries = "periodic"
-                
+
             case("infinite") 
                 ! Set border points equal to interior neighbors 
                 ! (ajr: not fully implemented yet)

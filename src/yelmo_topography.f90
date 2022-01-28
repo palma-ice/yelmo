@@ -435,12 +435,29 @@ end if
         !tpo%now%dist_grline = distance_to_grline(tpo%now%is_grline,tpo%now%f_grnd,tpo%par%dx)
 
 
-        ! Calculate extended ice thickness fields for use with dynamics solver
-        tpo%now%H_ice_dyn = tpo%now%H_ice
-        where (tpo%now%f_ice .lt. 1.0) tpo%now%H_ice_dyn = 1.0_wp 
+        ! Determine ice thickness for use exclusively with the dynamics solver
 
+        if (dyn%par%ssa_lat_bc .eq. "slab") then 
+            ! Calculate extended ice thickness fields for use with dynamics solver
+            tpo%now%H_ice_dyn = tpo%now%H_ice
+            where (tpo%now%f_ice .lt. 1.0) tpo%now%H_ice_dyn = 1.0_wp 
+        else
+            ! Set standard ice thickness field for use with dynamics 
+            tpo%now%H_ice_dyn = tpo%now%H_ice
+        end if 
+
+        ! Calculate the ice fraction mask for use with the dynamics solver
         call calc_ice_fraction(tpo%now%f_ice_dyn,tpo%now%H_ice_dyn,bnd%z_bed,bnd%z_sl,flt_subgrid=.FALSE.)
         
+
+
+        ! Store predicted/corrected ice thickness for later use 
+        ! Do it here to ensure all changes to H_ice are accounted for (mb, calving, etc)
+        if (trim(tpo%par%pc_step) .eq. "predictor") then 
+            tpo%now%H_ice_pred = tpo%now%H_ice 
+        else
+            tpo%now%H_ice_corr = tpo%now%H_ice 
+        end if 
 
         ! ================================
 

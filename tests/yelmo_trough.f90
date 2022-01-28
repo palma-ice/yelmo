@@ -190,6 +190,11 @@ program yelmo_trough
             ! Use IMAU-ICE function
             yelmo1%dyn%now%cb_ref = tau_c_ref
 
+            ! Assign initial velocity values too to get quicker convergence...
+            yelmo1%dyn%now%ux_b   = ux_ref 
+            yelmo1%dyn%now%ux_bar = ux_ref 
+            yelmo1%dyn%now%ux_s   = ux_ref 
+
         case("TROUGH-F17")
             ! Feldmann and Levermann (2017) domain 
 

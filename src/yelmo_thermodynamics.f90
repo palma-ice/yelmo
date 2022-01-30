@@ -167,7 +167,7 @@ end select
                                             thrm%par%dt_beta(1),thrm%par%dt_beta(2),thrm%par%boundaries)
                     
                     end if 
-
+                    
                     ! First calculate corrected vertical velocity to account 
                     ! for sigma-coordinate grid stretching (horizontal derivatives
                     ! lead to vertical advection adjusment)

@@ -67,6 +67,8 @@ contains
         real(prec) :: dzbdy_aa
         real(prec) :: dzsdx_aa
         real(prec) :: dzsdy_aa
+        real(prec) :: dHdx_aa 
+        real(prec) :: dHdy_aa 
         real(prec) :: duxdx_aa
         real(prec) :: duydy_aa
         real(prec) :: duxdz_aa 
@@ -86,6 +88,8 @@ contains
         real(wp) :: dzbdy_ab(4)
         real(wp) :: dzsdx_ab(4)
         real(wp) :: dzsdy_ab(4)
+        real(wp) :: dHdx_ab(4)
+        real(wp) :: dHdy_ab(4)
         real(wp) :: duxdx_ab(4) 
         real(wp) :: duydy_ab(4) 
         real(wp) :: ux_ab_up(4) 
@@ -156,16 +160,19 @@ contains
                 call staggerdiffy_nodes_aa_ab_ice(dzsdy_ab,z_srf,f_ice,i,j,dy)
                 dzsdy_aa = sum(dzsdy_ab*wt_ab)
                 
+                ! Get the centered ice thickness gradient 
+                call staggerdiffx_nodes_aa_ab_ice(dHdx_ab,H_ice,f_ice,i,j,dx)
+                dHdx_aa = sum(dHdx_ab*wt_ab)
+                
+                call staggerdiffy_nodes_aa_ab_ice(dHdy_ab,H_ice,f_ice,i,j,dy)
+                dHdy_aa = sum(dHdy_ab*wt_ab)
+                
                 ! Get the centered horizontal velocity at the base
                 call stagger_nodes_acx_ab_ice(ux_ab,ux(:,:,1),f_ice,i,j)
                 ux_aa = sum(ux_ab*wt_ab)
                 
                 call stagger_nodes_acy_ab_ice(uy_ab,uy(:,:,1),f_ice,i,j)
                 uy_aa = sum(uy_ab*wt_ab)
-                
-!                 ! Get the centered ice thickness gradient 
-!                 dHdx_aa = (H_ice(ip1,j)-H_ice(im1,j))/(2.0_prec*dx)
-!                 dHdy_aa = (H_ice(i,jp1)-H_ice(i,jm1))/(2.0_prec*dy)
                 
                 ! Determine grid vertical velocity at the base due to sigma-coordinates 
                 ! Glimmer, Eq. 3.35 
@@ -251,9 +258,19 @@ contains
                     end if
 
                     ! Calculate sigma-coordinate derivative correction factors
-                    ! (Greve and Blatter, 2009, Eqs. 5.131 and 5.132)
+                    ! (Greve and Blatter, 2009, Eqs. 5.131 and 5.132, 
+                    !  also shown in 1D with Eq. 5.145)
                     c_x = -H_inv * ( (1.0-zeta_ac(k))*dzbdx_aa + zeta_ac(k)*dzsdx_aa )
                     c_y = -H_inv * ( (1.0-zeta_ac(k))*dzbdy_aa + zeta_ac(k)*dzsdy_aa )
+
+                    
+if (.FALSE.) then   
+    ! Using IMAU-ICE method
+
+                    c_x = ((dzsdx_aa - zeta_aa(k)*dHdx_aa)) / H_now
+                    c_y = ((dzsdy_aa - zeta_aa(k)*dHdy_aa)) / H_now
+
+end if 
 
                     ! Calculate derivatives
                     duxdx_now = duxdx_aa + c_x*duxdz_aa 
@@ -263,6 +280,7 @@ contains
                     ! (Greve and Blatter, 2009, Eq. 5.95)
                     uz(i,j,k) = uz(i,j,k-1) & 
                         - H_now*(zeta_ac(k)-zeta_ac(k-1))*(duxdx_now+duydy_now)
+
 
                     ! Apply correction to match kinematic boundary condition at surface 
                     !uz(i,j,k) = uz(i,j,k) - zeta_ac(k)*(uz(i,j,k)-uz_srf)
@@ -432,7 +450,8 @@ contains
                     end if 
 
                     ! Calculate sigma-coordinate derivative correction factors
-                    ! (Greve and Blatter, 2009, Eqs. 5.131 and 5.132)
+                    ! (Greve and Blatter, 2009, Eqs. 5.131 and 5.132,
+                    ! (see also in 1D Eq. 5.148)
                     ! Not dividing by H here, since this is done in the thermodynamics advection step
                     c_x = -ux_aa * ( (1.0_wp-zeta_ac(k))*dzbdx_aa + zeta_ac(k)*dzsdx_aa )
                     c_y = -uy_aa * ( (1.0_wp-zeta_ac(k))*dzbdy_aa + zeta_ac(k)*dzsdy_aa )
@@ -445,10 +464,18 @@ contains
                     c_t = -( (1.0_wp-zeta_ac(k))*dzbdt + zeta_ac(k)*dzsdt_now )
                     
 
+if (.TRUE.) then 
                     ! Calculate adjusted vertical velocity for advection 
                     ! of this layer
                     ! (e.g., Greve and Blatter, 2009, Eq. 5.148)
                     uz_star(i,j,k) = uz(i,j,k) + c_x + c_y + c_t 
+
+else 
+                    ! Apply no adjustment - for testing!!!
+
+                    uz_star(i,j,k) = uz(i,j,k) 
+
+end if 
 
                     if (abs(uz_star(i,j,k)) .lt. TOL_UNDERFLOW) uz_star(i,j,k) = 0.0_wp
                     

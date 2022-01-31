@@ -260,22 +260,18 @@ contains
                     ! Calculate sigma-coordinate derivative correction factors
                     ! (Greve and Blatter, 2009, Eqs. 5.131 and 5.132, 
                     !  also shown in 1D with Eq. 5.145)
-                    ! Note 1: GB2009 derivation shows a minus sign whose origin
-                    ! is not clear. After re-deriving correction factors, and 
-                    ! comparing with documenation of eg IMAU-ICE, it seems
-                    ! correct that c_x and c_y should be positive as below. 
 
-                    ! Note 2: Below are three different ways to calculate correction
+                    ! Note 1: Below are three different ways to calculate correction
                     ! factors. All give the same result for EISMINT1-moving, as they should. 
 
-                    ! c_x = H_inv * ( (1.0-zeta_ac(k))*dzbdx_aa + zeta_ac(k)*dzsdx_aa )
-                    ! c_y = H_inv * ( (1.0-zeta_ac(k))*dzbdy_aa + zeta_ac(k)*dzsdy_aa )
+                    ! c_x = -H_inv * ( (1.0-zeta_aa(k))*dzbdx_aa + zeta_aa(k)*dzsdx_aa )
+                    ! c_y = -H_inv * ( (1.0-zeta_aa(k))*dzbdy_aa + zeta_aa(k)*dzsdy_aa )
 
-                    ! c_x =  H_inv * (dzbdx_aa + zeta_aa(k)*dHdx_aa)
-                    ! c_y =  H_inv * (dzbdy_aa + zeta_aa(k)*dHdy_aa)
+                    ! c_x =  -H_inv * (dzbdx_aa + zeta_aa(k)*dHdx_aa)
+                    ! c_y =  -H_inv * (dzbdy_aa + zeta_aa(k)*dHdy_aa)
 
-                    c_x =  H_inv * (dzsdx_aa - (1.0-zeta_aa(k))*dHdx_aa)
-                    c_y =  H_inv * (dzsdy_aa - (1.0-zeta_aa(k))*dHdy_aa)
+                    c_x =  -H_inv * (dzsdx_aa - (1.0-zeta_aa(k))*dHdx_aa)
+                    c_y =  -H_inv * (dzsdy_aa - (1.0-zeta_aa(k))*dHdy_aa)
 
                     ! Calculate sigma-corrected derivatives
                     duxdx_now = duxdx_aa + c_x*duxdz_aa 
@@ -453,25 +449,20 @@ contains
                     ! Calculate sigma-coordinate derivative correction factors
                     ! (Greve and Blatter, 2009, Eqs. 5.131 and 5.132, 
                     !  also shown in 1D with Eq. 5.145)
-                    ! Note 1: GB2009 derivation shows a minus sign whose origin
-                    ! is not clear. After re-deriving correction factors, and 
-                    ! comparing with documenation of eg IMAU-ICE, it seems
-                    ! correct that c_x and c_y should be positive as below. 
-
-                    ! Note 2: Below are three different ways to calculate correction
+                    ! Note 1: Below are three different ways to calculate correction
                     ! factors. All give the same result for EISMINT1-moving, as they should. 
 
-                    ! Note: not dividing by H here, since this is done in the thermodynamics advection step
+                    ! Note 2: not dividing by H here, since this is done in the thermodynamics advection step
 
-                    ! c_x = ( (1.0-zeta_ac(k))*dzbdx_aa + zeta_ac(k)*dzsdx_aa )
-                    ! c_y = ( (1.0-zeta_ac(k))*dzbdy_aa + zeta_ac(k)*dzsdy_aa )
+                    ! c_x = -( (1.0-zeta_aa(k))*dzbdx_aa + zeta_aa(k)*dzsdx_aa )
+                    ! c_y = -( (1.0-zeta_aa(k))*dzbdy_aa + zeta_aa(k)*dzsdy_aa )
 
-                    ! c_x = (dzbdx_aa + zeta_aa(k)*dHdx_aa)
-                    ! c_y = (dzbdy_aa + zeta_aa(k)*dHdy_aa)
+                    ! c_x = -(dzbdx_aa + zeta_aa(k)*dHdx_aa)
+                    ! c_y = -(dzbdy_aa + zeta_aa(k)*dHdy_aa)
 
-                    c_x = (dzsdx_aa  - (1.0-zeta_aa(k))*dHdx_aa)
-                    c_y = (dzsdy_aa  - (1.0-zeta_aa(k))*dHdy_aa)
-                    c_t = (dzsdt_now - (1.0-zeta_aa(k))*dhdt_now)
+                    c_x = -(dzsdx_aa  - (1.0-zeta_aa(k))*dHdx_aa)
+                    c_y = -(dzsdy_aa  - (1.0-zeta_aa(k))*dHdy_aa)
+                    c_t = -(dzsdt_now - (1.0-zeta_aa(k))*dhdt_now)
                     
                     ! ! Calculate sigma-coordinate derivative correction factors
                     ! ! (Greve and Blatter, 2009, Eqs. 5.131 and 5.132,

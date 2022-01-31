@@ -167,12 +167,12 @@ end select
                                             thrm%par%dt_beta(1),thrm%par%dt_beta(2),thrm%par%boundaries)
                     
                     end if 
-                    
+
                     ! First calculate corrected vertical velocity to account 
                     ! for sigma-coordinate grid stretching (horizontal derivatives
                     ! lead to vertical advection adjusment)
-                    call calc_uz_advec_corr_3D(thrm%now%uz_star,dyn%now%uz,dyn%now%ux,dyn%now%uy,tpo%now%H_ice,tpo%now%f_ice,tpo%now%f_grnd,bnd%z_bed, &
-                                            tpo%now%z_srf,tpo%now%dzsrfdt,thrm%par%z%zeta_aa,thrm%par%z%zeta_ac,thrm%par%dx,thrm%par%dx)
+                    call calc_uz_advec_corr_3D(thrm%now%uz_star,dyn%now%uz,dyn%now%ux,dyn%now%uy,tpo%now%H_ice,tpo%now%f_ice,tpo%now%f_grnd,tpo%now%z_srf, &
+                                                tpo%now%dzsrfdt,tpo%now%dHicedt,thrm%par%z%zeta_aa,thrm%par%z%zeta_ac,thrm%par%dx,thrm%par%dx)
                     
                     ! Now calculate the thermodynamics:
 

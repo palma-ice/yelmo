@@ -36,9 +36,10 @@ contains
         ! Following algorithm outlined by the Glimmer ice sheet model:
         ! https://www.geos.ed.ac.uk/~mhagdorn/glide/glide-doc/glimmer_htmlse9.html#x17-660003.1.5
 
-        ! Note: rate of bedrock uplift (dzbdt) no longer considered, since the rate is 
-        ! very small and now z_bed is updated externally (ie, now assume dzbdt = 0.0 here)
-
+        ! Note: rate of ice base elevation change (dzbdt) is deduced from dzbdt = dzsdt - dhdt. 
+        ! This formulation does not depend on rate of bedrock uplift (which is implicit in dzsdt),
+        ! and is valid for both grounded and floating ice. 
+        
         implicit none 
 
         real(prec), intent(OUT) :: uz(:,:,:)        ! nx,ny,nz_ac
@@ -83,6 +84,8 @@ contains
         real(prec) :: c_y 
 
         real(wp) :: wt_ab(4) 
+        real(wp) :: dzsdt_ab(4)
+        real(wp) :: dhdt_ab(4)
         real(wp) :: dzbdx_ab(4)
         real(wp) :: dzbdy_ab(4)
         real(wp) :: dzsdx_ab(4)
@@ -102,7 +105,7 @@ contains
         
         real(wp) :: dzsdt_now
         real(wp) :: dhdt_now
-        real(wp) :: dzbdt 
+        real(wp) :: dzbdt_now 
 
         real(wp), allocatable :: z_base(:,:) 
 
@@ -185,26 +188,28 @@ contains
 
                 ! Get a locally smoothed value of dzsdt and dhdt to avoid spurious oscillations
                 ! (eg in EISMINT-EXPA dhdt field)
-                dzsdt_now = 0.5_wp*dzsdt(i,j) &
-                          + 0.125_wp*( dzsdt(im1,j)+dzsdt(ip1,j)+dzsdt(i,jm1)+dzsdt(i,jp1) )
-                dhdt_now = 0.5_wp*dhdt(i,j) &
-                          + 0.125_wp*( dhdt(im1,j)+dhdt(ip1,j)+dhdt(i,jm1)+dhdt(i,jp1) )
-                    
+                call staggerdiffy_nodes_aa_ab_ice(dzsdt_ab,dzsdt,f_ice,i,j,dy)
+                dzsdt_now = sum(dzsdt_ab*wt_ab)
+                
+                call staggerdiffy_nodes_aa_ab_ice(dhdt_ab,dhdt,f_ice,i,j,dy)
+                dhdt_now = sum(dhdt_ab*wt_ab)
+                
+
                 ! Diagnose rate of basal elevation change 
-                dzbdt = dzsdt_now - dhdt_now
+                dzbdt_now = dzsdt_now - dhdt_now
 
                 ! ===================================================================
                 ! Greve and Blatter (2009) style:
 
                 ! Determine basal vertical velocity for this grid point 
                 ! Following Eq. 5.31 of Greve and Blatter (2009)
-                uz(i,j,1) = dzbdt + uz_grid + bmb(i,j) + ux_aa*dzbdx_aa + uy_aa*dzbdy_aa
+                uz(i,j,1) = dzbdt_now + uz_grid + bmb(i,j) + ux_aa*dzbdx_aa + uy_aa*dzbdy_aa
                 if (abs(uz(i,j,1)) .lt. TOL_UNDERFLOW) uz(i,j,1) = 0.0_prec 
                 
-                ! Set stability limit on basal uz value for grounded ice.
+                ! Set stability limit on basal uz value.
                 ! This only gets applied in rare cases when something
                 ! is going wrong in the model. 
-                if (f_grnd(i,j) .eq. 1.0 .and. uz(i,j,1) .lt. uz_min) uz(i,j,1) = uz_min 
+                if (uz(i,j,1) .lt. uz_min) uz(i,j,1) = uz_min 
 
                 ! Determine surface vertical velocity following kinematic boundary condition 
                 ! Glimmer, Eq. 3.10 [or Folwer, Chpt 10, Eq. 10.8]
@@ -306,7 +311,7 @@ contains
                 ! No ice here, set vertical velocity equal to negative accum and bedrock change 
 
                 do k = 1, nz_ac 
-                    uz(i,j,k) = dzbdt - max(smb(i,j),0.0)
+                    uz(i,j,k) = dzbdt_now - max(smb(i,j),0.0)
                     if (abs(uz(i,j,k)) .lt. TOL_UNDERFLOW) uz(i,j,k) = 0.0_wp 
                end do 
 
@@ -324,8 +329,9 @@ contains
         ! Following algorithm outlined by the Glimmer ice sheet model:
         ! https://www.geos.ed.ac.uk/~mhagdorn/glide/glide-doc/glimmer_htmlse9.html#x17-660003.1.5
 
-        ! Note: rate of bedrock uplift (dzbdt) no longer considered, since the rate is 
-        ! very small and now z_bed is updated externally (ie, now assume dzbdt = 0.0 here)
+        ! Note: rate of ice base elevation change (dzbdt) is deduced from dzbdt = dzsdt - dhdt. 
+        ! This formulation does not depend on rate of bedrock uplift (which is implicit in dzsdt),
+        ! and is valid for both grounded and floating ice. 
 
         implicit none 
 
@@ -360,9 +366,11 @@ contains
         real(prec) :: c_t 
         real(wp)   :: dzsdt_now 
         real(wp)   :: dhdt_now 
-        real(wp)   :: dzbdt 
+        real(wp)   :: dzbdt_now 
 
         real(wp) :: wt_ab(4) 
+        real(wp) :: dzsdt_ab(4)
+        real(wp) :: dhdt_ab(4)
         real(wp) :: dzbdx_ab(4)
         real(wp) :: dzbdy_ab(4)
         real(wp) :: dzsdx_ab(4)
@@ -436,13 +444,15 @@ contains
                 
                 ! Get a locally smoothed value of dzsdt and dhdt to avoid spurious oscillations
                 ! (eg in EISMINT-EXPA dhdt field)
-                dzsdt_now = 0.5_wp*dzsdt(i,j) &
-                          + 0.125_wp*( dzsdt(im1,j)+dzsdt(ip1,j)+dzsdt(i,jm1)+dzsdt(i,jp1) )
-                dhdt_now = 0.5_wp*dhdt(i,j) &
-                          + 0.125_wp*( dhdt(im1,j)+dhdt(ip1,j)+dhdt(i,jm1)+dhdt(i,jp1) )
+                call staggerdiffy_nodes_aa_ab_ice(dzsdt_ab,dzsdt,f_ice,i,j,dy)
+                dzsdt_now = sum(dzsdt_ab*wt_ab)
                 
+                call staggerdiffy_nodes_aa_ab_ice(dhdt_ab,dhdt,f_ice,i,j,dy)
+                dhdt_now = sum(dhdt_ab*wt_ab)
+                
+
                 ! Diagnose rate of basal elevation change 
-                dzbdt = dzsdt_now - dhdt_now
+                dzbdt_now = dzsdt_now - dhdt_now
 
 
                 ! Calculate adjusted vertical velocity for each layer
@@ -489,39 +499,20 @@ contains
                     ! Calculate sigma-coordinate derivative correction factors
                     ! (Greve and Blatter, 2009, Eqs. 5.131 and 5.132, 
                     !  also shown in 1D with Eq. 5.145)
-                    ! Note 1: Below are three different ways to calculate correction
-                    ! factors. All give the same result for EISMINT1-moving, as they should. 
-
-                    ! Note 2: not dividing by H here, since this is done in the thermodynamics advection step
 
                     ! Take zeta directly at vertical cell edge where uz is calculated
                     ! (this is also where ux_aa and uy_aa are calculated above)
                     zeta_now = zeta_ac(k)
 
-                    c_x = -( (1.0-zeta_now)*dzbdx_aa + zeta_now*dzsdx_aa )
-                    c_y = -( (1.0-zeta_now)*dzbdy_aa + zeta_now*dzsdy_aa )
-                    c_t = -( (1.0-zeta_now)*dzbdt    + zeta_now*dzsdt_now )
+                    ! Note: not dividing by H here, since this is done in the thermodynamics advection step
+                    c_x = -( (1.0-zeta_now)*dzbdx_aa  + zeta_now*dzsdx_aa )
+                    c_y = -( (1.0-zeta_now)*dzbdy_aa  + zeta_now*dzsdy_aa )
+                    c_t = -( (1.0-zeta_now)*dzbdt_now + zeta_now*dzsdt_now )
                     
-                    ! c_x = -(dzbdx_aa + zeta_now*dHdx_aa)
-                    ! c_y = -(dzbdy_aa + zeta_now*dHdy_aa)
-                    ! c_t = -(           zeta_now*dhdt_now) 
-
-                    ! c_x = -(dzsdx_aa  - (1.0-zeta_now)*dHdx_aa)
-                    ! c_y = -(dzsdy_aa  - (1.0-zeta_now)*dHdy_aa)
-                    ! c_t = -(dzsdt_now - (1.0-zeta_now)*dhdt_now)
-                    
-if (.TRUE.) then 
                     ! Calculate adjusted vertical velocity for advection 
                     ! of this layer
                     ! (e.g., Greve and Blatter, 2009, Eq. 5.148)
                     uz_star(i,j,k) = uz(i,j,k) + ux_aa*c_x + uy_aa*c_y + c_t 
-
-else 
-                    ! Apply no adjustment - for testing!!!
-
-                    uz_star(i,j,k) = uz(i,j,k) 
-
-end if 
 
                     if (abs(uz_star(i,j,k)) .lt. TOL_UNDERFLOW) uz_star(i,j,k) = 0.0_wp
                     

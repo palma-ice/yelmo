@@ -1,6 +1,6 @@
 #!/bin/bash
 
-fldr='tmp/6e6e95c'
+fldr='tmp/e572ac0'
 
 
 ### BENCHMARK TESTS ###
@@ -8,9 +8,9 @@ fldr='tmp/6e6e95c'
 make benchmarks
 
 # EISMINT1 moving margin, EXPA and EXPF
-./runylmo -s -e benchmarks -o ${fldr}/moving -n par-gmd/yelmo_EISMINT_moving.nml
-./runylmo -s -e benchmarks -o ${fldr}/expa   -n par-gmd/yelmo_EISMINT_expa.nml
-./runylmo -s -e benchmarks -o ${fldr}/expf   -n par-gmd/yelmo_EISMINT_expf.nml
+./runylmo -s -q priority -w 1 -e benchmarks -o ${fldr}/moving -n par-gmd/yelmo_EISMINT_moving.nml
+./runylmo -s -q priority -w 1 -e benchmarks -o ${fldr}/expa   -n par-gmd/yelmo_EISMINT_expa.nml
+./runylmo -s -q priority -w 1 -e benchmarks -o ${fldr}/expf   -n par-gmd/yelmo_EISMINT_expf.nml
 
 # EISMINT1 EXPA with SSA velocity turned on for testing symmetry (not part of GMD suite of tests)
 ./runylmo -s -e benchmarks -o ${fldr}/expssa -n par/yelmo_EISMINT_ssa.nml
@@ -30,8 +30,8 @@ jobrun ./runylmo -s -e benchmarks -n par-gmd/yelmo_EISMINT_moving.nml -p eismint
 make initmip
 
 # Antarctica present-day and LGM simulations (now with ydyn.solver='diva' by default)
-./runylmo -s -q short -w 5 -e initmip -o ${fldr}/ant-pd  -n par-gmd/yelmo_Antarctica.nml -p ctrl.clim_nm="clim_pd"
-./runylmo -s -q short -w 5 -e initmip -o ${fldr}/ant-lgm -n par-gmd/yelmo_Antarctica.nml -p ctrl.clim_nm="clim_lgm"
+./runylmo -s -q priority -w 5 -e initmip -o ${fldr}/ant-pd  -n par-gmd/yelmo_Antarctica.nml -p ctrl.clim_nm="clim_pd"
+./runylmo -s -q priority -w 5 -e initmip -o ${fldr}/ant-lgm -n par-gmd/yelmo_Antarctica.nml -p ctrl.clim_nm="clim_lgm"
 
 # Or to run via batch call:
 jobrun ./runylmo -s -e initmip -n par-gmd/yelmo_Antarctica.nml -- -a -o ${fldr}/ant -p ctrl.clim_nm="clim_pd","clim_lgm"

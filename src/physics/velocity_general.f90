@@ -100,6 +100,8 @@ contains
         real(wp) :: duxdz_ab(4) 
         real(wp) :: duydz_ab(4) 
         
+        real(wp) :: dzsdt_now
+        real(wp) :: dhdt_now
         real(wp) :: dzbdt 
 
         real(wp), allocatable :: z_base(:,:) 
@@ -181,8 +183,15 @@ contains
 !                             - ( (1.0_prec-zeta_ac(1))*dHdt(i,j) + ux_aa*dHdx_aa + uy_aa*dHdy_aa )
                 uz_grid = 0.0_prec 
 
+                ! Get a locally smoothed value of dzsdt and dhdt to avoid spurious oscillations
+                ! (eg in EISMINT-EXPA dhdt field)
+                dzsdt_now = 0.5_wp*dzsdt(i,j) &
+                          + 0.125_wp*( dzsdt(im1,j)+dzsdt(ip1,j)+dzsdt(i,jm1)+dzsdt(i,jp1) )
+                dhdt_now = 0.5_wp*dhdt(i,j) &
+                          + 0.125_wp*( dhdt(im1,j)+dhdt(ip1,j)+dhdt(i,jm1)+dhdt(i,jp1) )
+                    
                 ! Diagnose rate of basal elevation change 
-                dzbdt = dzsdt(i,j) - dHdt(i,j) 
+                dzbdt = dzsdt_now - dhdt_now
 
                 ! ===================================================================
                 ! Greve and Blatter (2009) style:
@@ -267,21 +276,14 @@ contains
                     ! Note 1: Below are three different ways to calculate correction
                     ! factors. All give the same result for EISMINT1-moving, as they should. 
 
-                    ! c_x = -H_inv * ( (1.0-zeta_aa(k-1))*dzbdx_aa + zeta_aa(k-1)*dzsdx_aa )
-                    ! c_y = -H_inv * ( (1.0-zeta_aa(k-1))*dzbdy_aa + zeta_aa(k-1)*dzsdy_aa )
+                    c_x = -H_inv * ( (1.0-zeta_aa(k-1))*dzbdx_aa + zeta_aa(k-1)*dzsdx_aa )
+                    c_y = -H_inv * ( (1.0-zeta_aa(k-1))*dzbdy_aa + zeta_aa(k-1)*dzsdy_aa )
 
-                    c_x =  -H_inv * (dzbdx_aa + zeta_aa(k-1)*dHdx_aa)
-                    c_y =  -H_inv * (dzbdy_aa + zeta_aa(k-1)*dHdy_aa)
+                    ! c_x =  -H_inv * (dzbdx_aa + zeta_aa(k-1)*dHdx_aa)
+                    ! c_y =  -H_inv * (dzbdy_aa + zeta_aa(k-1)*dHdy_aa)
 
                     ! c_x =  -H_inv * (dzsdx_aa - (1.0-zeta_aa(k-1))*dHdx_aa)
                     ! c_y =  -H_inv * (dzsdy_aa - (1.0-zeta_aa(k-1))*dHdy_aa)
-
-                    ! Calculate sigma-coordinate derivative correction factors
-                    ! (Greve and Blatter, 2009, Eqs. 5.131 and 5.132,
-                    ! (see also in 1D Eq. 5.148)
-                    ! Not dividing by H here, since this is done in the thermodynamics advection step
-                    ! c_x = -H_inv * ( (1.0_wp-zeta_ac(k))*dzbdx_aa + zeta_ac(k)*dzsdx_aa  )
-                    ! c_y = -H_inv * ( (1.0_wp-zeta_ac(k))*dzbdy_aa + zeta_ac(k)*dzsdy_aa  )
 
                     ! Calculate sigma-corrected derivatives
                     duxdx_now = duxdx_aa + c_x*duxdz_aa 
@@ -358,6 +360,7 @@ contains
         real(prec) :: c_t 
         real(wp)   :: dzsdt_now 
         real(wp)   :: dhdt_now 
+        real(wp)   :: dzbdt 
 
         real(wp) :: wt_ab(4) 
         real(wp) :: dzbdx_ab(4)
@@ -372,6 +375,8 @@ contains
         real(wp) :: uy_ab_up(4) 
         real(wp) :: uy_ab_dn(4) 
         real(wp) :: uy_ab(4)
+
+        real(wp) :: zeta_now 
 
         real(wp), allocatable :: z_base(:,:) 
 
@@ -429,6 +434,17 @@ contains
                 call staggerdiffy_nodes_aa_ab_ice(dHdy_ab,H_ice,f_ice,i,j,dy)
                 dHdy_aa = sum(dHdy_ab*wt_ab)
                 
+                ! Get a locally smoothed value of dzsdt and dhdt to avoid spurious oscillations
+                ! (eg in EISMINT-EXPA dhdt field)
+                dzsdt_now = 0.5_wp*dzsdt(i,j) &
+                          + 0.125_wp*( dzsdt(im1,j)+dzsdt(ip1,j)+dzsdt(i,jm1)+dzsdt(i,jp1) )
+                dhdt_now = 0.5_wp*dhdt(i,j) &
+                          + 0.125_wp*( dhdt(im1,j)+dhdt(ip1,j)+dhdt(i,jm1)+dhdt(i,jp1) )
+                
+                ! Diagnose rate of basal elevation change 
+                dzbdt = dzsdt_now - dhdt_now
+
+
                 ! Calculate adjusted vertical velocity for each layer
                 do k = 1, nz_ac 
 
@@ -470,13 +486,6 @@ contains
                         
                     end if 
 
-                    ! Get a locally smoothed value of dzsdt and dhdt to avoid spurious oscillations
-                    ! (eg in EISMINT-EXPA dhdt field)
-                    dzsdt_now = 0.5_wp*dzsdt(i,j) &
-                              + 0.125_wp*( dzsdt(im1,j)+dzsdt(ip1,j)+dzsdt(i,jm1)+dzsdt(i,jp1) )
-                    dhdt_now = 0.5_wp*dhdt(i,j) &
-                              + 0.125_wp*( dhdt(im1,j)+dhdt(ip1,j)+dhdt(i,jm1)+dhdt(i,jp1) )
-                    
                     ! Calculate sigma-coordinate derivative correction factors
                     ! (Greve and Blatter, 2009, Eqs. 5.131 and 5.132, 
                     !  also shown in 1D with Eq. 5.145)
@@ -485,26 +494,22 @@ contains
 
                     ! Note 2: not dividing by H here, since this is done in the thermodynamics advection step
 
-                    ! c_x = -( (1.0-zeta_ac(k))*dzbdx_aa + zeta_ac(k)*dzsdx_aa )
-                    ! c_y = -( (1.0-zeta_ac(k))*dzbdy_aa + zeta_ac(k)*dzsdy_aa )
+                    ! Take zeta directly at vertical cell edge where uz is calculated
+                    ! (this is also where ux_aa and uy_aa are calculated above)
+                    zeta_now = zeta_ac(k)
 
-                    c_x = -(dzbdx_aa + zeta_ac(k)*dHdx_aa)
-                    c_y = -(dzbdy_aa + zeta_ac(k)*dHdy_aa)
-                    c_t = -(           zeta_ac(k)*dhdt_now) 
-
-                    ! c_x = -(dzsdx_aa  - (1.0-zeta_ac(k))*dHdx_aa)
-                    ! c_y = -(dzsdy_aa  - (1.0-zeta_ac(k))*dHdy_aa)
-                    ! c_t = -(dzsdt_now - (1.0-zeta_ac(k))*dhdt_now)
+                    c_x = -( (1.0-zeta_now)*dzbdx_aa + zeta_now*dzsdx_aa )
+                    c_y = -( (1.0-zeta_now)*dzbdy_aa + zeta_now*dzsdy_aa )
+                    c_t = -( (1.0-zeta_now)*dzbdt    + zeta_now*dzsdt_now )
                     
-                    ! Calculate sigma-coordinate derivative correction factors
-                    ! (Greve and Blatter, 2009, Eqs. 5.131 and 5.132,
-                    ! (see also in 1D Eq. 5.148)
-                    ! Not dividing by H here, since this is done in the thermodynamics advection step
-                    ! c_x = -( (1.0_wp-zeta_ac(k))*dzbdx_aa + zeta_ac(k)*dzsdx_aa  )
-                    ! c_y = -( (1.0_wp-zeta_ac(k))*dzbdy_aa + zeta_ac(k)*dzsdy_aa  )
-                    ! c_t = -( (1.0_wp-zeta_ac(k))*dzbdt    + zeta_ac(k)*dzsdt_now )
-                    
+                    ! c_x = -(dzbdx_aa + zeta_now*dHdx_aa)
+                    ! c_y = -(dzbdy_aa + zeta_now*dHdy_aa)
+                    ! c_t = -(           zeta_now*dhdt_now) 
 
+                    ! c_x = -(dzsdx_aa  - (1.0-zeta_now)*dHdx_aa)
+                    ! c_y = -(dzsdy_aa  - (1.0-zeta_now)*dHdy_aa)
+                    ! c_t = -(dzsdt_now - (1.0-zeta_now)*dhdt_now)
+                    
 if (.TRUE.) then 
                     ! Calculate adjusted vertical velocity for advection 
                     ! of this layer

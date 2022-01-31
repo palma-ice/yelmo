@@ -32,7 +32,7 @@ module velocity_general
     
 contains 
     
-    subroutine calc_uz_3D(uz,ux,uy,H_ice,f_ice,f_grnd,z_bed,z_srf,smb,bmb,dHdt,dzsdt,zeta_aa,zeta_ac,dx,dy)
+    subroutine calc_uz_3D(uz,ux,uy,H_ice,f_ice,f_grnd,z_srf,smb,bmb,dHdt,dzsdt,zeta_aa,zeta_ac,dx,dy)
         ! Following algorithm outlined by the Glimmer ice sheet model:
         ! https://www.geos.ed.ac.uk/~mhagdorn/glide/glide-doc/glimmer_htmlse9.html#x17-660003.1.5
 
@@ -47,7 +47,6 @@ contains
         real(prec), intent(IN)  :: H_ice(:,:)
         real(prec), intent(IN)  :: f_ice(:,:)
         real(prec), intent(IN)  :: f_grnd(:,:)
-        real(prec), intent(IN)  :: z_bed(:,:) 
         real(prec), intent(IN)  :: z_srf(:,:) 
         real(prec), intent(IN)  :: smb(:,:) 
         real(prec), intent(IN)  :: bmb(:,:) 
@@ -101,9 +100,10 @@ contains
         real(wp) :: duxdz_ab(4) 
         real(wp) :: duydz_ab(4) 
         
+        real(wp) :: dzbdt 
+
         real(wp), allocatable :: z_base(:,:) 
 
-        real(prec), parameter :: dzbdt        = 0.0     ! For posterity, keep dzbdt variable, but set to zero 
         real(prec), parameter :: uz_min       = -10.0   ! [m/yr] Minimum allowed vertical velocity downwards for stability
         
         nx    = size(ux,1)
@@ -180,6 +180,9 @@ contains
 !                 uz_grid = dzsdt(i,j) + (ux_aa*dzsdx_aa + uy_aa*dzsdy_aa) &
 !                             - ( (1.0_prec-zeta_ac(1))*dHdt(i,j) + ux_aa*dHdx_aa + uy_aa*dHdy_aa )
                 uz_grid = 0.0_prec 
+
+                ! Diagnose rate of basal elevation change 
+                dzbdt = dzsdt(i,j) - dHdt(i,j) 
 
                 ! ===================================================================
                 ! Greve and Blatter (2009) style:
@@ -264,14 +267,21 @@ contains
                     ! Note 1: Below are three different ways to calculate correction
                     ! factors. All give the same result for EISMINT1-moving, as they should. 
 
-                    ! c_x = -H_inv * ( (1.0-zeta_aa(k))*dzbdx_aa + zeta_aa(k)*dzsdx_aa )
-                    ! c_y = -H_inv * ( (1.0-zeta_aa(k))*dzbdy_aa + zeta_aa(k)*dzsdy_aa )
+                    ! c_x = -H_inv * ( (1.0-zeta_aa(k-1))*dzbdx_aa + zeta_aa(k-1)*dzsdx_aa )
+                    ! c_y = -H_inv * ( (1.0-zeta_aa(k-1))*dzbdy_aa + zeta_aa(k-1)*dzsdy_aa )
 
-                    ! c_x =  -H_inv * (dzbdx_aa + zeta_aa(k)*dHdx_aa)
-                    ! c_y =  -H_inv * (dzbdy_aa + zeta_aa(k)*dHdy_aa)
+                    c_x =  -H_inv * (dzbdx_aa + zeta_aa(k-1)*dHdx_aa)
+                    c_y =  -H_inv * (dzbdy_aa + zeta_aa(k-1)*dHdy_aa)
 
-                    c_x =  -H_inv * (dzsdx_aa - (1.0-zeta_aa(k))*dHdx_aa)
-                    c_y =  -H_inv * (dzsdy_aa - (1.0-zeta_aa(k))*dHdy_aa)
+                    ! c_x =  -H_inv * (dzsdx_aa - (1.0-zeta_aa(k-1))*dHdx_aa)
+                    ! c_y =  -H_inv * (dzsdy_aa - (1.0-zeta_aa(k-1))*dHdy_aa)
+
+                    ! Calculate sigma-coordinate derivative correction factors
+                    ! (Greve and Blatter, 2009, Eqs. 5.131 and 5.132,
+                    ! (see also in 1D Eq. 5.148)
+                    ! Not dividing by H here, since this is done in the thermodynamics advection step
+                    ! c_x = -H_inv * ( (1.0_wp-zeta_ac(k))*dzbdx_aa + zeta_ac(k)*dzsdx_aa  )
+                    ! c_y = -H_inv * ( (1.0_wp-zeta_ac(k))*dzbdy_aa + zeta_ac(k)*dzsdy_aa  )
 
                     ! Calculate sigma-corrected derivatives
                     duxdx_now = duxdx_aa + c_x*duxdz_aa 
@@ -335,6 +345,8 @@ contains
         ! Local variables 
         integer :: i, j, k, nx, ny, nz_aa, nz_ac
         integer :: im1, ip1, jm1, jp1
+        real(prec) :: dzbdx_aa
+        real(prec) :: dzbdy_aa
         real(prec) :: dzsdx_aa
         real(prec) :: dzsdy_aa
         real(prec) :: dhdx_aa
@@ -348,6 +360,8 @@ contains
         real(wp)   :: dhdt_now 
 
         real(wp) :: wt_ab(4) 
+        real(wp) :: dzbdx_ab(4)
+        real(wp) :: dzbdy_ab(4)
         real(wp) :: dzsdx_ab(4)
         real(wp) :: dzsdy_ab(4)
         real(wp) :: dHdx_ab(4)
@@ -359,10 +373,20 @@ contains
         real(wp) :: uy_ab_dn(4) 
         real(wp) :: uy_ab(4)
 
+        real(wp), allocatable :: z_base(:,:) 
+
         nx    = size(ux,1)
         ny    = size(ux,2)
         nz_aa = size(zeta_aa,1)
         nz_ac = size(zeta_ac,1)
+
+        allocate(z_base(nx,ny)) 
+
+        ! Define z_base as the elevation at the base of the ice sheet 
+        ! This is used for the basal derivative instead of bedrock so
+        ! that it is valid for both grounded and floating ice. Note, 
+        ! for grounded ice, z_base==z_bed. 
+        z_base = z_srf - H_ice
 
         ! Initialize adjusted vertical velocity to zero 
         uz_star = 0.0 
@@ -384,6 +408,13 @@ contains
             
             if (f_ice(i,j) .eq. 1.0) then
 
+                ! Get the centered ice-base gradient
+                call staggerdiffx_nodes_aa_ab_ice(dzbdx_ab,z_base,f_ice,i,j,dx)
+                dzbdx_aa = sum(dzbdx_ab*wt_ab)
+                
+                call staggerdiffy_nodes_aa_ab_ice(dzbdy_ab,z_base,f_ice,i,j,dy)
+                dzbdy_aa = sum(dzbdy_ab*wt_ab)
+                
                 ! Get the centered surface gradient 
                 call staggerdiffx_nodes_aa_ab_ice(dzsdx_ab,z_srf,f_ice,i,j,dx)
                 dzsdx_aa = sum(dzsdx_ab*wt_ab)
@@ -454,23 +485,24 @@ contains
 
                     ! Note 2: not dividing by H here, since this is done in the thermodynamics advection step
 
-                    ! c_x = -( (1.0-zeta_aa(k))*dzbdx_aa + zeta_aa(k)*dzsdx_aa )
-                    ! c_y = -( (1.0-zeta_aa(k))*dzbdy_aa + zeta_aa(k)*dzsdy_aa )
+                    ! c_x = -( (1.0-zeta_ac(k))*dzbdx_aa + zeta_ac(k)*dzsdx_aa )
+                    ! c_y = -( (1.0-zeta_ac(k))*dzbdy_aa + zeta_ac(k)*dzsdy_aa )
 
-                    ! c_x = -(dzbdx_aa + zeta_aa(k)*dHdx_aa)
-                    ! c_y = -(dzbdy_aa + zeta_aa(k)*dHdy_aa)
+                    c_x = -(dzbdx_aa + zeta_ac(k)*dHdx_aa)
+                    c_y = -(dzbdy_aa + zeta_ac(k)*dHdy_aa)
+                    c_t = -(           zeta_ac(k)*dhdt_now) 
 
-                    c_x = -(dzsdx_aa  - (1.0-zeta_aa(k))*dHdx_aa)
-                    c_y = -(dzsdy_aa  - (1.0-zeta_aa(k))*dHdy_aa)
-                    c_t = -(dzsdt_now - (1.0-zeta_aa(k))*dhdt_now)
+                    ! c_x = -(dzsdx_aa  - (1.0-zeta_ac(k))*dHdx_aa)
+                    ! c_y = -(dzsdy_aa  - (1.0-zeta_ac(k))*dHdy_aa)
+                    ! c_t = -(dzsdt_now - (1.0-zeta_ac(k))*dhdt_now)
                     
-                    ! ! Calculate sigma-coordinate derivative correction factors
-                    ! ! (Greve and Blatter, 2009, Eqs. 5.131 and 5.132,
-                    ! ! (see also in 1D Eq. 5.148)
-                    ! ! Not dividing by H here, since this is done in the thermodynamics advection step
-                    ! c_x = -ux_aa * ( (1.0_wp-zeta_ac(k))*dzbdx_aa + zeta_ac(k)*dzsdx_aa )
-                    ! c_y = -uy_aa * ( (1.0_wp-zeta_ac(k))*dzbdy_aa + zeta_ac(k)*dzsdy_aa )
-                    ! c_t = -( (1.0_wp-zeta_ac(k))*dzbdt + zeta_ac(k)*dzsdt_now )
+                    ! Calculate sigma-coordinate derivative correction factors
+                    ! (Greve and Blatter, 2009, Eqs. 5.131 and 5.132,
+                    ! (see also in 1D Eq. 5.148)
+                    ! Not dividing by H here, since this is done in the thermodynamics advection step
+                    ! c_x = -( (1.0_wp-zeta_ac(k))*dzbdx_aa + zeta_ac(k)*dzsdx_aa  )
+                    ! c_y = -( (1.0_wp-zeta_ac(k))*dzbdy_aa + zeta_ac(k)*dzsdy_aa  )
+                    ! c_t = -( (1.0_wp-zeta_ac(k))*dzbdt    + zeta_ac(k)*dzsdt_now )
                     
 
 if (.TRUE.) then 

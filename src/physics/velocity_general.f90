@@ -39,7 +39,7 @@ contains
         ! Note: rate of ice base elevation change (dzbdt) is deduced from dzbdt = dzsdt - dhdt. 
         ! This formulation does not depend on rate of bedrock uplift (which is implicit in dzsdt),
         ! and is valid for both grounded and floating ice. 
-        
+
         implicit none 
 
         real(prec), intent(OUT) :: uz(:,:,:)        ! nx,ny,nz_ac
@@ -109,7 +109,7 @@ contains
 
         real(wp), allocatable :: z_base(:,:) 
 
-        real(prec), parameter :: uz_min       = -10.0   ! [m/yr] Minimum allowed vertical velocity downwards for stability
+        real(prec), parameter :: uz_min = -10.0     ! [m/yr] Minimum allowed vertical velocity downwards for stability
         
         nx    = size(ux,1)
         ny    = size(ux,2)

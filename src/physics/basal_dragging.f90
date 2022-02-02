@@ -174,6 +174,12 @@ contains
                 
                 call scale_beta_gl_zstar(beta,H_ice,f_ice,z_bed,z_sl,norm=.TRUE.)
 
+            case(3)
+                ! Apply f_grnd scaling on aa-nodes 
+                ! Note: should be used with simple staggering
+                
+                beta = f_grnd*beta 
+
             case DEFAULT 
                 ! No scaling
 
@@ -184,7 +190,7 @@ contains
         end select 
 
         ! 3. Ensure beta==0 for purely floating ice 
-        ! Note: since f_grnd_aa is binary, this does not affect any subgrid gl parameterization
+        ! Note: assume a binary f_grnd_aa, this does not affect any subgrid gl parameterization
         ! that may be applied during the staggering step.
 
         !  Simply set beta to zero where purely floating
@@ -238,7 +244,7 @@ contains
 
         ! ================================================================
         ! Note: At this point the beta_aa field is available with beta=0 
-        ! for floating points and beta > 0 for non-floating points
+        ! for purely floating points and beta > 0 for non-floating points
         ! ================================================================
         
         return 
@@ -376,8 +382,6 @@ contains
 
                 case(3)
                     ! Apply subgrid scaling fraction at the grounding line when staggering 
-
-                    ! Note: now subgrid treatment is handled on aa-nodes above (using beta_gl_sep)
 
                     call stagger_beta_aa_gl_subgrid(beta_acx,beta_acy,beta,f_ice,f_grnd, &
                                                     f_grnd_acx,f_grnd_acy)

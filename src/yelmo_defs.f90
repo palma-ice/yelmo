@@ -78,7 +78,8 @@ module yelmo_defs
     type ytopo_param_class
         character(len=256) :: solver
         character(len=256) :: calv_flt_method  
-        character(len=256) :: calv_grnd_method  
+        character(len=256) :: calv_grnd_method
+        character(len=56)  :: bmb_gl_method
         integer            :: fmb_method  
         integer            :: surf_gl_method 
         logical            :: margin2nd 
@@ -163,6 +164,7 @@ module yelmo_defs
         real(wp), allocatable   :: f_grnd(:,:)      ! Grounded fraction (grounding line fraction between 0 and 1)
         real(wp), allocatable   :: f_grnd_acx(:,:)  ! Grounded fraction (acx nodes)
         real(wp), allocatable   :: f_grnd_acy(:,:)  ! Grounded fraction (acy nodes)
+        real(wp), allocatable   :: f_grnd_ab(:,:)   ! Grounded fraction (ab nodes)
         real(wp), allocatable   :: f_ice(:,:)       ! Ice-covered fraction 
 
         real(wp), allocatable   :: dist_margin(:,:) ! Distance to nearest margin point 

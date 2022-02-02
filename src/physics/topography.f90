@@ -1,6 +1,6 @@
 module topography 
 
-    use yelmo_defs, only : wp, prec, sec_year, pi, T0, g, rho_ice, rho_sw, rho_w 
+    use yelmo_defs, only : wp, dp, prec, io_unit_err, sec_year, pi, T0, g, rho_ice, rho_sw, rho_w 
 
     implicit none 
 
@@ -22,6 +22,7 @@ module topography
     public :: distance_to_grline
     public :: distance_to_margin
     
+    public :: determine_grounded_fractions
 
 contains 
 
@@ -682,6 +683,9 @@ end if
         ! Calculate new H_grnd (ice thickness overburden)
         H_grnd = H_eff - rho_sw_ice*max(z_sl-z_bed,0.0_prec)
 
+        ! ajr: to test eventually, more closely follows Gladstone et al (2010), Leguy etl (2021)
+        !H_grnd = -( (z_sl-z_bed) - rho_ice_sw*H_eff )
+
         return 
 
     end subroutine calc_H_grnd
@@ -744,26 +748,28 @@ end if
 
         implicit none
         
-        real(prec), intent(OUT) :: f_grnd(:,:)      ! aa-nodes 
-        real(prec), intent(OUT) :: f_grnd_acx(:,:)  ! ac-nodes
-        real(prec), intent(OUT) :: f_grnd_acy(:,:)  ! ac-nodes
-        real(prec), intent(IN)  :: H_grnd(:,:)      ! aa-nodes
-        integer,    intent(IN)  :: gl_sep_nx        ! Number of interpolation points per side (nx*nx)
+        real(wp), intent(OUT) :: f_grnd(:,:)        ! aa-nodes 
+        real(wp), intent(OUT) :: f_grnd_acx(:,:)    ! ac-nodes
+        real(wp), intent(OUT) :: f_grnd_acy(:,:)    ! ac-nodes
+        real(wp), intent(IN)  :: H_grnd(:,:)        ! aa-nodes
+        integer,  intent(IN)  :: gl_sep_nx          ! Number of interpolation points per side (nx*nx)
 
         ! Local variables
-        integer    :: i, j, nx, ny
-        real(prec) :: Hg_1, Hg_2, Hg_3, Hg_4, Hg_mid  
-        integer    :: im1, ip1, jm1, jp1 
+        integer  :: i, j, nx, ny
+        real(wp) :: Hg_1, Hg_2, Hg_3, Hg_4
+        real(wp) :: Hg_min, Hg_max  
+        integer  :: im1, ip1, jm1, jp1 
 
         !integer, parameter :: nx_interp = 15
 
         nx = size(H_grnd,1)
         ny = size(H_grnd,2) 
 
-        ! First binary estimate of f_grnd based on aa-nodes
-        f_grnd = 1.0
-        where (H_grnd .lt. 0.0) f_grnd = 0.0
-        
+        ! Initialize all masks to zero (fully floating) to start
+        f_grnd     = 0.0_wp 
+        f_grnd_acx = 0.0_wp 
+        f_grnd_acy = 0.0_wp 
+
         ! Find grounding line cells and determine fraction 
         do j = 1, ny 
         do i = 1, nx
@@ -773,25 +779,82 @@ end if
             ip1 = min(i+1,nx) 
             jm1 = max(j-1,1) 
             jp1 = min(j+1,ny) 
-                
-            ! Calculate Hg at corners (ab-nodes)
-            Hg_1 = 0.25_prec*(H_grnd(i,j) + H_grnd(ip1,j) + H_grnd(ip1,jp1) + H_grnd(i,jp1))
-            Hg_2 = 0.25_prec*(H_grnd(i,j) + H_grnd(im1,j) + H_grnd(im1,jp1) + H_grnd(i,jp1))
-            Hg_3 = 0.25_prec*(H_grnd(i,j) + H_grnd(im1,j) + H_grnd(im1,jm1) + H_grnd(i,jm1))
-            Hg_4 = 0.25_prec*(H_grnd(i,j) + H_grnd(ip1,j) + H_grnd(ip1,jm1) + H_grnd(i,jm1))
             
-            if (max(Hg_1,Hg_2,Hg_3,Hg_4) .ge. 0.0 .and. min(Hg_1,Hg_2,Hg_3,Hg_4) .lt. 0.0) then 
+            ! === f_grnd at aa-nodes ===
+
+            ! Calculate Hg at corners (ab-nodes)
+            Hg_1 = 0.25_wp*(H_grnd(i,j) + H_grnd(ip1,j) + H_grnd(ip1,jp1) + H_grnd(i,jp1))
+            Hg_2 = 0.25_wp*(H_grnd(i,j) + H_grnd(im1,j) + H_grnd(im1,jp1) + H_grnd(i,jp1))
+            Hg_3 = 0.25_wp*(H_grnd(i,j) + H_grnd(im1,j) + H_grnd(im1,jm1) + H_grnd(i,jm1))
+            Hg_4 = 0.25_wp*(H_grnd(i,j) + H_grnd(ip1,j) + H_grnd(ip1,jm1) + H_grnd(i,jm1))
+            
+            Hg_min = min(Hg_1,Hg_2,Hg_3,Hg_4)
+            Hg_max = max(Hg_1,Hg_2,Hg_3,Hg_4)
+
+            if (Hg_max .ge. 0.0 .and. Hg_min .lt. 0.0) then 
                 ! Point contains grounding line, get grounded area  
                 
                 call calc_grounded_fraction_cell(f_grnd(i,j),Hg_1,Hg_2,Hg_3,Hg_4,gl_sep_nx)
 
+            else if (Hg_max .ge. 0.0 .and. Hg_min .ge. 0.0) then 
+                ! Fully grounded point
+
+                f_grnd(i,j) = 1.0_wp 
+
+            end if 
+
+            ! === f_grnd at acx nodes === 
+
+            ! First, calculate Hg at corners (acy-nodes)
+            Hg_1 = 0.5_wp*(H_grnd(ip1,j) + H_grnd(ip1,jp1))
+            Hg_2 = 0.5_wp*(H_grnd(i,j)   + H_grnd(i,jp1))
+            Hg_3 = 0.5_wp*(H_grnd(i,j)   + H_grnd(i,jm1))
+            Hg_4 = 0.5_wp*(H_grnd(ip1,j) + H_grnd(ip1,jm1))
+            
+            Hg_min = min(Hg_1,Hg_2,Hg_3,Hg_4)
+            Hg_max = max(Hg_1,Hg_2,Hg_3,Hg_4)
+
+            if (Hg_max .ge. 0.0 .and. Hg_min .lt. 0.0) then 
+                ! Point contains grounding line, get grounded area  
+                
+                call calc_grounded_fraction_cell(f_grnd_acx(i,j),Hg_1,Hg_2,Hg_3,Hg_4,gl_sep_nx)
+
+            else if (Hg_max .ge. 0.0 .and. Hg_min .ge. 0.0) then
+                ! Purely grounded point 
+
+                f_grnd_acx(i,j) = 1.0_wp 
+
+            end if 
+
+            ! === f_grnd at acy-nodes ===
+        
+            ! First, calculate Hg at corners (acx-nodes)
+            Hg_1 = 0.5_wp*(H_grnd(i,jp1)   + H_grnd(ip1,jp1))
+            Hg_2 = 0.5_wp*(H_grnd(im1,jp1) + H_grnd(i,jp1))
+            Hg_3 = 0.5_wp*(H_grnd(im1,j)   + H_grnd(i,j))
+            Hg_4 = 0.5_wp*(H_grnd(ip1,j)   + H_grnd(i,j))
+            
+            Hg_min = min(Hg_1,Hg_2,Hg_3,Hg_4)
+            Hg_max = max(Hg_1,Hg_2,Hg_3,Hg_4)
+
+            if (Hg_max .ge. 0.0 .and. Hg_min .lt. 0.0) then 
+                ! Point contains grounding line, get grounded area  
+                
+                call calc_grounded_fraction_cell(f_grnd_acy(i,j),Hg_1,Hg_2,Hg_3,Hg_4,gl_sep_nx)
+
+            else if (Hg_max .ge. 0.0 .and. Hg_min .ge. 0.0) then 
+                ! Purely grounded point 
+                    
+                f_grnd_acy(i,j) = 1.0_wp 
+                
             end if 
 
         end do 
         end do 
 
+
 if (.TRUE.) then 
-        ! Linear average to ac-nodes 
+    ! Replace subgrid acx/acy estimates with linear average to ac-nodes 
 
         ! acx-nodes 
         do j = 1, ny 
@@ -808,74 +871,6 @@ if (.TRUE.) then
         end do 
         end do
         f_grnd_acy(:,ny) = f_grnd_acy(:,ny-1) 
-
-else 
-        ! Subgrid area calcs centered on ac-nodes directly
-
-        ! acx-nodes 
-        do j = 1, ny 
-        do i = 1, nx
-
-            ! Get neighbor indices
-            im1 = max(i-1,1) 
-            ip1 = min(i+1,nx) 
-            jm1 = max(j-1,1) 
-            jp1 = min(j+1,ny) 
-            
-            ! === acy nodes === 
-
-            ! First, calculate Hg at corners (acy-nodes)
-            Hg_1 = 0.5_prec*(H_grnd(ip1,j) + H_grnd(ip1,jp1))
-            Hg_2 = 0.5_prec*(H_grnd(i,j)   + H_grnd(i,jp1))
-            Hg_3 = 0.5_prec*(H_grnd(i,j)   + H_grnd(i,jm1))
-            Hg_4 = 0.5_prec*(H_grnd(ip1,j) + H_grnd(ip1,jm1))
-            
-            if (max(Hg_1,Hg_2,Hg_3,Hg_4) .ge. 0.0 .and. min(Hg_1,Hg_2,Hg_3,Hg_4) .lt. 0.0) then 
-                ! Point contains grounding line, get grounded area  
-                
-                call calc_grounded_fraction_cell(f_grnd_acx(i,j),Hg_1,Hg_2,Hg_3,Hg_4,gl_sep_nx)
-
-            else 
-                ! Purely grounded or floating point 
-
-                Hg_mid = 0.5_prec*(H_grnd(i,j)  + H_grnd(ip1,j))
-
-                if (Hg_mid .lt. 0.0) then 
-                    f_grnd_acx(i,j) = 0.0_prec 
-                else 
-                    f_grnd_acx(i,j) = 1.0_prec 
-                end if 
-
-            end if 
-
-            ! === acy nodes === 
-
-            ! First, calculate Hg at corners (acx-nodes)
-            Hg_1 = 0.5_prec*(H_grnd(i,jp1)   + H_grnd(ip1,jp1))
-            Hg_2 = 0.5_prec*(H_grnd(im1,jp1) + H_grnd(i,jp1))
-            Hg_3 = 0.5_prec*(H_grnd(im1,j)   + H_grnd(i,j))
-            Hg_4 = 0.5_prec*(H_grnd(ip1,j)   + H_grnd(i,j))
-            
-            if (max(Hg_1,Hg_2,Hg_3,Hg_4) .ge. 0.0 .and. min(Hg_1,Hg_2,Hg_3,Hg_4) .lt. 0.0) then 
-                ! Point contains grounding line, get grounded area  
-                
-                call calc_grounded_fraction_cell(f_grnd_acy(i,j),Hg_1,Hg_2,Hg_3,Hg_4,gl_sep_nx)
-
-            else 
-                ! Purely grounded or floating point 
-                
-                Hg_mid = 0.5_prec*(H_grnd(i,j)  + H_grnd(i,jp1))
-                
-                if (Hg_mid .lt. 0.0) then 
-                    f_grnd_acy(i,j) = 0.0_prec 
-                else 
-                    f_grnd_acy(i,j) = 1.0_prec 
-                end if 
-                
-            end if 
-
-        end do 
-        end do
 
 end if 
 
@@ -1130,15 +1125,17 @@ end if
 
     end subroutine calc_grline
     
-    subroutine calc_bmb_total(bmb,bmb_grnd,bmb_shlf,f_grnd,diffuse_bmb_shlf)
+    subroutine calc_bmb_total(bmb,bmb_grnd,bmb_shlf,H_grnd,f_grnd,bmb_gl_method,diffuse_bmb_shlf)
 
         implicit none 
 
-        real(prec), intent(OUT) :: bmb(:,:) 
-        real(prec), intent(IN)  :: bmb_grnd(:,:) 
-        real(prec), intent(IN)  :: bmb_shlf(:,:) 
-        real(prec), intent(IN)  :: f_grnd(:,:) 
-        logical,    intent(IN)  :: diffuse_bmb_shlf 
+        real(prec),       intent(OUT) :: bmb(:,:) 
+        real(prec),       intent(IN)  :: bmb_grnd(:,:) 
+        real(prec),       intent(IN)  :: bmb_shlf(:,:) 
+        real(prec),       intent(IN)  :: H_grnd(:,:)
+        real(prec),       intent(IN)  :: f_grnd(:,:) 
+        character(len=*), intent(IN)  :: bmb_gl_method 
+        logical,          intent(IN)  :: diffuse_bmb_shlf 
 
         ! Local variables
         integer    :: i, j, nx, ny
@@ -1149,21 +1146,58 @@ end if
         ny = size(bmb,2) 
 
         ! Combine floating and grounded parts into one field =========================
-        ! (Note: use of where-statement allows bmb_shlf to be set negative everywhere,
-        ! but only be applied where it is relevant.)
-        where (f_grnd .eq. 1.0) 
-            ! Purely grounded, use only bmb_grnd 
-            bmb = bmb_grnd 
-        elsewhere
-            ! Comine bmb_grnd and bmb_shlf 
 
-            ! Add the two fields for now to avoid complications with f_grnd
-            !bmb = bmb_grnd + bmb_shlf 
+        ! Initialize bmb to zero everywhere to start and apply bmb_grnd to grounded ice 
+        bmb = 0.0_wp 
+        where(f_grnd .eq. 1.0) bmb = bmb_grnd 
 
-            ! Weighted average
-            bmb = f_grnd*bmb_grnd + (1.0-f_grnd)*bmb_shlf
+        ! Apply the floating basal mass balance according 
+        ! to different subgridding options at the grounding line
+        ! (following the notation of Leguy et al., 2021 - see Fig. 3)
+        select case(bmb_gl_method)
 
-        end where 
+            case("fcmp")
+                ! Flotation criterion melt parameterization 
+                ! Apply full bmb_shlf value where flotation criterion is met 
+
+                where(H_grnd .le. 0.0_wp)
+                    
+                    bmb = bmb_shlf
+
+                end where 
+
+            case("fmp")
+                ! Full melt parameterization
+                ! Apply full bmb_shlf value to any cell that is at least
+                ! partially floating. Perhaps unrealistic.
+
+                where(f_grnd .lt. 1.0_wp)
+
+                    bmb = bmb_shlf 
+
+                end where 
+
+            case("pmp")
+                ! Partial melt parameterization
+                ! Apply bmb_shlf to floating fraction of cell 
+
+                where(f_grnd .lt. 1.0_wp)
+
+                    bmb = f_grnd*bmb_grnd + (1.0_wp-f_grnd)*bmb_shlf 
+
+                end where 
+
+            case("nmp")
+                ! No melt parameterization
+                ! Apply bmb_shlf only where fully floating diagnosed
+
+                where(f_grnd .eq. 0.0_wp)
+
+                    bmb = bmb_shlf 
+
+                end where 
+
+        end select
 
 
         if (diffuse_bmb_shlf) then 
@@ -1177,7 +1211,7 @@ end if
                     ! Grounded point, look for floating neighbors 
 
                     if (.FALSE.) then
-                        ! 9-neighbours method
+                        ! 9-neighbor method
 
                         n_float = count(f_grnd(i-1:i+1,j-1:j+1) .lt. 1.0)
 
@@ -1189,7 +1223,7 @@ end if
                         end if
 
                     else 
-                        ! 5-neighbors method 
+                        ! 5-neighbor method 
 
                         n_float = count([f_grnd(i-1,j),f_grnd(i+1,j),f_grnd(i,j-1),f_grnd(i,j+1)].lt. 1.0)
 
@@ -1367,17 +1401,24 @@ end if
     subroutine calc_grounded_fraction_cell(f_g,Hg_1,Hg_2,Hg_3,Hg_4,nx)
         ! Given the four corners of a cell in quadrants 1,2,3,4,
         ! calculate the grounded fraction (ie area with Hg>0)
+        !
+        ! Convention:
+        !   
+        !  Hg_2---Hg_1
+        !    |     |
+        !    |     |
+        !  Hg_3---Hg_4
 
         implicit none 
 
-        real(prec), intent(OUT) :: f_g 
-        real(prec), intent(IN)  :: Hg_1,Hg_2,Hg_3,Hg_4
+        real(wp), intent(OUT) :: f_g 
+        real(wp), intent(IN)  :: Hg_1, Hg_2, Hg_3, Hg_4
         integer,    intent(IN)  :: nx                    ! Number of interpolation points 
 
         ! Local variables 
-        integer :: i, j 
-        real(prec) :: x(nx), y(nx) 
-        real(prec) :: Hg_int(nx,nx)  
+        integer  :: i, j 
+        real(wp) :: x(nx), y(nx) 
+        real(wp) :: Hg_int(nx,nx)  
 
         ! Populate x,y axes for interpolation points (between 0 and 1)
         do i = 1, nx 
@@ -1385,8 +1426,7 @@ end if
         end do 
         y = x 
 
-
-        ! Calculate interpolation heights
+        ! Perform interpolation of Hg onto fine grid
         Hg_int = 0.0 
         do i = 1, nx 
         do j = 1, nx 
@@ -1397,7 +1437,7 @@ end if
         end do 
 
         ! Calculate weighted fraction (assume all points have equal weight)
-        f_g = real(count(Hg_int .ge. 0.0),prec) / real(nx*nx,prec)
+        f_g = real(count(Hg_int .ge. 0.0),wp) / real(nx*nx,wp)
 
         return 
 
@@ -1555,6 +1595,427 @@ end if
         return 
 
     end function distance_to_grline
+
+
+!! f_grnd calculations from IMAU-ICE / CISM 
+
+! == Routines for determining the grounded fraction on all four grids
+  
+  subroutine determine_grounded_fractions(f_grnd,f_grnd_acx,f_grnd_acy,f_grnd_ab,H_grnd)
+    ! Determine the grounded fraction of centered and staggered grid points
+    ! Uses the bilinear interpolation scheme (with analytical solutions) 
+    ! from CISM (Leguy et al., 2021), as adapted from IMAU-ICE v2.0 code (rev. 4776833b)
+    
+    implicit none
+    
+    real(wp), intent(OUT) :: f_grnd(:,:) 
+    real(wp), intent(OUT) :: f_grnd_acx(:,:) 
+    real(wp), intent(OUT) :: f_grnd_acy(:,:) 
+    real(wp), intent(OUT) :: f_grnd_ab(:,:) 
+    real(wp), intent(IN)  :: H_grnd(:,:) 
+    
+    ! Local variables
+    integer :: i, j, nx, ny 
+    integer :: im1, ip1, jm1, jp1
+
+    real(wp), allocatable :: f_grnd_NW(:,:)
+    real(wp), allocatable :: f_grnd_NE(:,:)
+    real(wp), allocatable :: f_grnd_SW(:,:)
+    real(wp), allocatable :: f_grnd_SE(:,:)
+    real(wp), allocatable :: f_flt(:,:) 
+
+    nx = size(f_grnd,1)
+    ny = size(f_grnd,2) 
+
+    allocate(f_grnd_NW(nx,ny))
+    allocate(f_grnd_NE(nx,ny))
+    allocate(f_grnd_SW(nx,ny))
+    allocate(f_grnd_SE(nx,ny))
+    
+    allocate(f_flt(nx,ny))
+
+    ! Define aa-node variable f_flt as the flotation function
+    ! following Leguy et al. (2021), Eq. 6. 
+    ! Note: -H_grnd is not exactly the same, since it is in ice thickness,
+    ! whereas the L21 equation is in water equivalent thickness, and it includes
+    ! bedrock above sea level. But test this as it is first. 
+    f_flt = -H_grnd
+
+    ! Calculate grounded fractions of all four quadrants of each a-grid cell
+    call determine_grounded_fractions_CISM_quads(f_grnd_NW,f_grnd_NE,f_grnd_SW,f_grnd_SE,f_flt)
+    
+    ! Get grounded fractions on all four grids by averaging over the quadrants
+    do j = 1, ny
+    do i = 1, nx 
+        
+      ! Get neighbor indices
+      im1 = max(i-1,1) 
+      ip1 = min(i+1,nx) 
+      jm1 = max(j-1,1) 
+      jp1 = min(j+1,ny) 
+
+      ! aa-nodes
+      f_grnd(i,j)     = 0.25_wp * (f_grnd_NW(i,j) + f_grnd_NE(i,j) + f_grnd_SW(i,j) + f_grnd_SE(i,j))
+      
+      ! acx-nodes
+      f_grnd_acx(i,j) = 0.25_wp * (f_grnd_NE(i,j) + f_grnd_SE(i,j) + f_grnd_NW(ip1,j) + f_grnd_SW(ip1,j))
+      
+      ! acy-nodes
+      f_grnd_acy(i,j) = 0.25_wp * (f_grnd_NE(i,j) + f_grnd_NW(i,j) + f_grnd_SE(i,jp1) + f_grnd_SW(i,jp1))
+      
+      ! ab-nodes
+      f_grnd_ab(i,j)  = 0.25_wp * (f_grnd_NE(i,j) + f_grnd_NW(ip1,j) + f_grnd_SE(i,jp1) + f_grnd_SW(ip1,jp1))
+  
+    end do
+    end do
+    
+    return 
+
+  end subroutine determine_grounded_fractions
+
+  subroutine determine_grounded_fractions_CISM_quads(f_grnd_NW,f_grnd_NE,f_grnd_SW,f_grnd_SE,f_flt)
+    ! Calculate grounded fractions of all four quadrants of each a-grid cell
+    ! (using the approach from CISM, where grounded fractions are calculated
+    !  based on analytical solutions to the bilinear interpolation)
+    
+    implicit none
+    
+    real(wp), intent(OUT) :: f_grnd_NW(:,:)
+    real(wp), intent(OUT) :: f_grnd_NE(:,:)
+    real(wp), intent(OUT) :: f_grnd_SW(:,:)
+    real(wp), intent(OUT) :: f_grnd_SE(:,:)
+    real(wp), intent(IN)  :: f_flt(:,:) 
+
+    ! Local variables:
+    integer  :: i, j, ii, jj, nx, ny
+    integer  :: im1, ip1, jm1, jp1  
+    real(wp) :: f_NW, f_N, f_NE, f_W, f_m, f_E, f_SW, f_S, f_SE
+    real(wp) :: fq_NW, fq_NE, fq_SW, fq_SE
+    
+    nx = size(f_flt,1)
+    ny = size(f_flt,2)
+
+    ! Calculate grounded fractions of all four quadrants of each a-grid cell
+    do j = 1, ny
+    do i = 1, nx
+        
+      ! Get neighbor indices
+      im1 = max(i-1,1) 
+      ip1 = min(i+1,nx) 
+      jm1 = max(j-1,1) 
+      jp1 = min(j+1,ny) 
+
+      f_NW = 0.25_wp * (f_flt(im1,jp1) + f_flt(i,jp1)   + f_flt(im1,j)   + f_flt(i,j))
+      f_N  = 0.50_wp * (f_flt(i,jp1)   + f_flt(i,j))
+      f_NE = 0.25_wp * (f_flt(i,jp1)   + f_flt(ip1,jp1) + f_flt(i,j)     + f_flt(ip1,j))
+      f_W  = 0.50_wp * (f_flt(im1,j)   + f_flt(i,j))
+      f_m  = f_flt(i,j) 
+      f_E  = 0.50_wp * (f_flt(i,j)     + f_flt(ip1,j))
+      f_SW = 0.25_wp * (f_flt(im1,j)   + f_flt(i,j)     + f_flt(im1,jm1) + f_flt(i,jm1))
+      f_S  = 0.50_wp * (f_flt(i,j)     + f_flt(i,jm1))
+      f_SE = 0.25_wp * (f_flt(i,j)     + f_flt(ip1,j)   + f_flt(i,jm1)   + f_flt(ip1,jm1))
+
+      ! NW
+      fq_NW = f_NW
+      fq_NE = f_N
+      fq_SW = f_W
+      fq_SE = f_m
+      call calc_fraction_above_zero( fq_NW, fq_NE,  fq_SW,  fq_SE,  f_grnd_NW(i,j) )
+      
+      ! NE
+      fq_NW = f_N
+      fq_NE = f_NE
+      fq_SW = f_m
+      fq_SE = f_E
+      call calc_fraction_above_zero( fq_NW, fq_NE,  fq_SW,  fq_SE,  f_grnd_NE(i,j) )
+      
+      ! SW
+      fq_NW = f_W
+      fq_NE = f_m
+      fq_SW = f_SW
+      fq_SE = f_S
+      call calc_fraction_above_zero( fq_NW, fq_NE,  fq_SW,  fq_SE,  f_grnd_SW(i,j) )
+      
+      ! SE
+      fq_NW = f_m
+      fq_NE = f_E
+      fq_SW = f_S
+      fq_SE = f_SE
+      call calc_fraction_above_zero( fq_NW, fq_NE,  fq_SW,  fq_SE,  f_grnd_SE(i,j) )
+      
+    end do
+    end do
+    
+    return 
+
+  end subroutine determine_grounded_fractions_CISM_quads
+
+  subroutine calc_fraction_above_zero( f_NW, f_NE, f_SW, f_SE, phi)
+    ! Given a square with function values at the four corners,
+    ! calculate the fraction phi of the square where the function is larger than zero.
+    
+    ! Note: calculations below require double precision!! 
+    
+    implicit none
+    
+    ! In/output variables:
+    real(wp), intent(IN)    :: f_NW, f_NE, f_SW, f_SE
+    real(wp), intent(OUT)   :: phi
+    
+    ! Local variables:
+    real(dp) :: f_NWp, f_NEp, f_SWp, f_SEp
+    real(dp) :: aa,bb,cc,dd,x,f1,f2
+    integer  :: scen
+
+    real(wp), parameter :: ftol = 1e-4_dp
+    
+    ! The analytical solutions sometime give problems when one or more of the corner
+    ! values is VERY close to zero; avoid this.
+    if (f_NW == 0.0_dp) then
+      f_NWp = ftol
+    else if (f_NW > 0.0_dp) then
+      f_NWp = MAX(  ftol, f_NW)
+    else if (f_NW < 0.0_dp) then
+      f_NWp = MIN( -ftol, f_NW)
+    else
+      f_NWp = f_NW
+    end if
+    if (f_NE == 0.0_dp) then
+      f_NEp = ftol
+    else if (f_NE > 0.0_dp) then
+      f_NEp = MAX(  ftol, f_NE)
+    else if (f_NE < 0.0_dp) then
+      f_NEp = MIN( -ftol, f_NE)
+    else
+      f_NEp = f_NE
+    end if
+    if (f_SW == 0.0_dp) then
+      f_SWp = ftol
+    else if (f_SW > 0.0_dp) then
+      f_SWp = MAX(  ftol, f_SW)
+    else if (f_SW < 0.0_dp) then
+      f_SWp = MIN( -ftol, f_SW)
+    else
+      f_SWp = f_SW
+    end if
+    if (f_SE == 0.0_dp) then
+      f_SEp = ftol
+    else if (f_SE > 0.0_dp) then
+      f_SEp = MAX(  ftol, f_SE)
+    else if (f_SE < 0.0_dp) then
+      f_SEp = MIN( -ftol, f_SE)
+    else
+      f_SEp = f_SE
+    end if
+    
+    if (f_NWp <= 0.0_dp .AND. f_NEp <= 0.0_dp .AND. f_SWp <= 0.0_dp .AND. f_SEp <= 0.0_dp) then
+      ! All four corners are grounded.
+      
+      phi = 1.0_wp
+      
+    else if (f_NWp >= 0.0_dp .AND. f_NEp >= 0.0_dp .AND. f_SWp >= 0.0_dp .AND. f_SEp >= 0.0_dp) then
+      ! All four corners are floating
+      
+      phi = 0.0_wp
+      
+    else
+      ! At least one corner is grounded and at least one is floating;
+      ! the grounding line must pass through this square!
+      
+      ! Only four "scenarios" exist (with rotational symmetries):
+      ! 1: SW grounded, rest floating
+      ! 2: SW floating, rest grounded
+      ! 3: south grounded, north floating
+      ! 4: SW & NE grounded, SE & NW floating
+      ! Rotate the four-corner world until it matches one of these scenarios.
+      call rotate_quad_until_match( f_NWp, f_NEp, f_SWp, f_SEp, scen)
+    
+      ! Calculate initial values of coefficients, and make correction
+      ! for when d=0 (to avoid problems)
+
+      aa  = f_SWp
+      bb  = f_SEp - f_SWp
+      cc  = f_NWp - f_SWp
+      dd  = f_NEp + f_SWp - f_NWp - f_SEp
+
+      ! Exception for when d=0
+      if (ABS(dd) < 1e-4_dp) then
+        if (f_SWp > 0.0_dp) then
+          f_SWp = f_SWp + 0.1_dp
+        else
+          f_SWp = f_SWp - 0.1_dp
+        end if
+        aa  = f_SWp
+        bb  = f_SEp - f_SWp
+        cc  = f_NWp - f_SWp
+        dd  = f_NEp + f_SWp - f_NWp - f_SEp
+      end if
+        
+      if (scen == 1) then
+        ! 1: SW grounded, rest floating
+        
+        phi = ((bb*cc - aa*dd) * log(abs(1.0_dp - (aa*dd)/(bb*cc))) + aa*dd) / (dd**2)
+         
+      else if (scen == 2) then
+        ! 2: SW floating, rest grounded
+        ! Assign negative coefficients to calculate floating fraction,
+        ! then get complement to obtain grounded fraction. 
+
+        aa  = -(f_SWp)
+        bb  = -(f_SEp - f_SWp)
+        cc  = -(f_NWp - f_SWp)
+        dd  = -(f_NEp + f_SWp - f_NWp - f_SEp)
+
+        ! Exception for when d=0
+        if (ABS(dd) < 1e-4_dp) then
+          if (f_SWp > 0.0_dp) then
+            f_SWp = f_SWp + 0.1_dp
+          else
+            f_SWp = f_SWp - 0.1_dp
+          end if
+          aa  = -(f_SWp)
+          bb  = -(f_SEp - f_SWp)
+          cc  = -(f_NWp - f_SWp)
+          dd  = -(f_NEp + f_SWp - f_NWp - f_SEp)
+        end if
+        
+        phi = 1.0_dp - ((bb*cc - aa*dd) * log(abs(1.0_dp - (aa*dd)/(bb*cc))) + aa*dd) / (dd**2)
+        
+      else if (scen == 3) then
+        ! 3: south grounded, north floating
+        
+        ! Exception for when the GL runs parallel to the x-axis
+        if (abs( 1.0_dp - f_NWp/f_NEp) < 1e-6_dp .and. abs( 1.0_dp - f_SWp/f_SEp) < 1e-6_dp) then
+          
+          phi = f_SWp / (f_SWp - f_NWp)
+          
+        else
+            
+          x   = 0.0_dp
+          f1  = ((bb*cc - aa*dd) * log(abs(cc+dd*x)) - bb*dd*x) / (dd**2)
+          x   = 1.0_dp
+          f2  = ((bb*cc - aa*dd) * log(abs(cc+dd*x)) - bb*dd*x) / (dd**2)
+          phi = f2-f1
+                  
+        end if
+        
+      else if (scen == 4) then
+        ! 4: SW & NE grounded, SE & NW floating
+        ! (recalculate coefficients here explicitly for two cases)
+
+        ! SW corner
+        aa  = f_SWp
+        bb  = f_SEp - f_SWp
+        cc  = f_NWp - f_SWp
+        dd  = f_NEp + f_SWp - f_NWp - f_SEp
+        phi = ((bb*cc - aa*dd) * log(abs(1.0_dp - (aa*dd)/(bb*cc))) + aa*dd) / (dd**2)
+        
+        ! NE corner
+        call rotate_quad( f_NWp, f_NEp, f_SWp, f_SEp)
+        call rotate_quad( f_NWp, f_NEp, f_SWp, f_SEp)
+        aa  = f_SWp
+        bb  = f_SEp - f_SWp
+        cc  = f_NWp - f_SWp
+        dd  = f_NEp + f_SWp - f_NWp - f_SEp
+        phi = phi + ((bb*cc - aa*dd) * log(abs(1.0_dp - (aa*dd)/(bb*cc))) + aa*dd) / (dd**2)
+        
+      else
+        write(io_unit_err,*) 'determine_grounded_fractions_CISM_quads - calc_fraction_above_zero - ERROR: unknown scenario [', scen, ']!'
+        stop
+      end if
+      
+    end if
+    
+    if (pi < -0.01_wp .OR. phi > 1.01_wp .OR. phi /= phi) then
+      write(io_unit_err,*) 'calc_fraction_above_zero - ERROR: phi = ', phi
+      write(io_unit_err,*) 'scen = ', scen
+      write(io_unit_err,*) 'f = [', f_NWp, ',', f_NEp, ',', f_SWp, ',', f_SEp, ']'
+      write(io_unit_err,*) 'aa = ', aa, ', bb = ', bb, ', cc = ', cc, ', dd = ', dd, ', f1 = ', f1, ',f2 = ', f2
+      stop
+    end if
+    
+    phi = MAX( 0.0_wp, MIN( 1.0_wp, phi))
+    
+    return
+
+  end subroutine calc_fraction_above_zero
+
+  subroutine rotate_quad_until_match( f_NW, f_NE, f_SW, f_SE, scen)
+    ! Rotate the four corners until one of the four possible scenarios is found.
+    ! 1: SW grounded, rest floating
+    ! 2: SW floating, rest grounded
+    ! 3: south grounded, north floating
+    ! 4: SW & NE grounded, SE & NW floating
+    
+    implicit none
+    
+    ! In/output variables:
+    real(dp), intent(INOUT) :: f_NW, f_NE, f_SW, f_SE
+    integer,  intent(OUT)   :: scen
+    
+    ! Local variables:
+    logical :: found_match
+    integer :: nit
+    
+    found_match = .FALSE.
+    scen        = 0
+    nit         = 0
+    
+    do while (.not. found_match)
+      
+      nit = nit+1
+      
+      call rotate_quad( f_NW, f_NE, f_SW, f_SE)
+      
+      if     (f_SW < 0.0_wp .AND. f_SE > 0.0_wp .AND. f_NE > 0.0_wp .AND. f_NW > 0.0_wp) then
+        ! 1: SW grounded, rest floating
+        scen = 1
+        found_match = .TRUE.
+      else if (f_SW > 0.0_wp .AND. f_SE < 0.0_wp .AND. f_NE < 0.0_wp .AND. f_NW < 0.0_wp) then
+        ! 2: SW floating, rest grounded
+        scen = 2
+        found_match = .TRUE.
+      else if (f_SW < 0.0_wp .AND. f_SE < 0.0_wp .AND. f_NE > 0.0_wp .AND. f_NW > 0.0_wp) then
+        ! 3: south grounded, north floating
+        scen = 3
+        found_match = .TRUE.
+      else if (f_SW < 0.0_wp .AND. f_SE > 0.0_wp .AND. f_NE < 0.0_wp .AND. f_NW > 0.0_wp) then
+        ! 4: SW & NE grounded, SE & NW floating
+        scen = 4
+        found_match = .TRUE.
+      end if
+      
+      if (nit > 4) then
+        write(io_unit_err,*) 'determine_grounded_fractions_CISM_quads - rotate_quad_until_match - ERROR: couldnt find matching scenario!'
+        stop 
+      end if
+      
+    end do
+    
+    return 
+
+  end subroutine rotate_quad_until_match
+
+  subroutine rotate_quad( f_NW, f_NE, f_SW, f_SE)
+    ! Rotate the four corners anticlockwise by 90 degrees
+    
+    implicit none
+    
+    ! In/output variables:
+    real(dp), intent(INOUT) :: f_NW, f_NE, f_SW, f_SE
+    
+    ! Local variables:
+    real(dp) :: fvals(4)
+    
+    fvals = [f_NW,f_NE,f_SE,f_SW]
+    f_NW = fvals( 2)
+    f_NE = fvals( 3)
+    f_SE = fvals( 4)
+    f_SW = fvals( 1)
+    
+    return 
+
+  end subroutine rotate_quad
 
 end module topography
 

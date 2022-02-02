@@ -94,7 +94,8 @@ contains
 
         ! Combine basal mass balance into one field accounting for 
         ! grounded/floating fraction of grid cells 
-        call calc_bmb_total(tpo%now%bmb,thrm%now%bmb_grnd,bnd%bmb_shlf,tpo%now%f_grnd,tpo%par%diffuse_bmb_shlf)
+        call calc_bmb_total(tpo%now%bmb,thrm%now%bmb_grnd,bnd%bmb_shlf,tpo%now%H_grnd, &
+                            tpo%now%f_grnd,tpo%par%bmb_gl_method,tpo%par%diffuse_bmb_shlf)
         
         ! Combine frontal mass balance into one field, and 
         ! calculate as needed 
@@ -414,8 +415,15 @@ end if
             case(2)
                 ! Grounded area f_grnd, average to f_grnd_acx/acy 
 
-                call calc_f_grnd_subgrid_area(tpo%now%f_grnd,tpo%now%f_grnd_acx,tpo%now%f_grnd_acy,tpo%now%H_grnd,tpo%par%gl_sep_nx)
+                call calc_f_grnd_subgrid_area(tpo%now%f_grnd,tpo%now%f_grnd_acx,tpo%now%f_grnd_acy, &
+                                                                            tpo%now%H_grnd,tpo%par%gl_sep_nx)
             
+            case(3) 
+                ! Grounded area using analytical solutions of Leguy et al. (2021)
+
+                call determine_grounded_fractions(tpo%now%f_grnd,tpo%now%f_grnd_acx,tpo%now%f_grnd_acy, &
+                                                                            tpo%now%f_grnd_ab,tpo%now%H_grnd)
+
         end select
         
 !         ! Filter f_grnd to avoid lakes of one grid point inside of grounded ice 
@@ -589,6 +597,7 @@ end if
         call nml_read(filename,"ytopo","surf_gl_method",    par%surf_gl_method,   init=init_pars)
         call nml_read(filename,"ytopo","calv_flt_method",   par%calv_flt_method,  init=init_pars)
         call nml_read(filename,"ytopo","calv_grnd_method",  par%calv_grnd_method, init=init_pars)
+        call nml_read(filename,"ytopo","bmb_gl_method",     par%bmb_gl_method,    init=init_pars)
         call nml_read(filename,"ytopo","fmb_method",        par%fmb_method,       init=init_pars)
         call nml_read(filename,"ytopo","margin2nd",         par%margin2nd,        init=init_pars)
         call nml_read(filename,"ytopo","margin_flt_subgrid",par%margin_flt_subgrid,init=init_pars)
@@ -683,6 +692,7 @@ end if
         allocate(now%f_grnd(nx,ny))
         allocate(now%f_grnd_acx(nx,ny))
         allocate(now%f_grnd_acy(nx,ny))
+        allocate(now%f_grnd_ab(nx,ny))
         allocate(now%f_ice(nx,ny))
 
         allocate(now%dist_margin(nx,ny))
@@ -724,6 +734,7 @@ end if
         now%f_grnd      = 0.0  
         now%f_grnd_acx  = 0.0  
         now%f_grnd_acy  = 0.0  
+        now%f_grnd_ab   = 0.0
         now%f_ice       = 0.0  
         now%dist_margin = 0.0
         now%dist_grline = 0.0 
@@ -779,6 +790,7 @@ end if
         if (allocated(now%f_grnd))      deallocate(now%f_grnd)
         if (allocated(now%f_grnd_acx))  deallocate(now%f_grnd_acx)
         if (allocated(now%f_grnd_acy))  deallocate(now%f_grnd_acy)
+        if (allocated(now%f_grnd_ab))   deallocate(now%f_grnd_ab)
         
         if (allocated(now%f_ice))       deallocate(now%f_ice)
 

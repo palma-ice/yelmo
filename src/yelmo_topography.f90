@@ -447,14 +447,11 @@ end if
 
         if (dyn%par%ssa_lat_bc .eq. "slab") then 
             ! Calculate extended ice thickness fields for use with dynamics solver
+            ! Note: should not be used with MISMIP, TROUGH, etc. 
+            
             tpo%now%H_ice_dyn = tpo%now%H_ice
             where (tpo%now%f_ice .lt. 1.0) tpo%now%H_ice_dyn = 1.0_wp
             
-            where (tpo%now%f_grnd(1,:)  .eq. 0.0) tpo%now%H_ice_dyn(1,:)  = 0.0_wp
-            where (tpo%now%f_grnd(nx,:) .eq. 0.0) tpo%now%H_ice_dyn(nx,:) = 0.0_wp
-            where (tpo%now%f_grnd(:,1)  .eq. 0.0) tpo%now%H_ice_dyn(:,1)  = 0.0_wp
-            where (tpo%now%f_grnd(:,ny) .eq. 0.0) tpo%now%H_ice_dyn(:,ny) = 0.0_wp
-    
             ! Calculate the ice fraction mask for use with the dynamics solver
             call calc_ice_fraction(tpo%now%f_ice_dyn,tpo%now%H_ice_dyn,bnd%z_bed,bnd%z_sl,flt_subgrid=.FALSE.)
             

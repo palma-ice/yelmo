@@ -454,15 +454,17 @@ end if
             where (tpo%now%f_grnd(nx,:) .eq. 0.0) tpo%now%H_ice_dyn(nx,:) = 0.0_wp
             where (tpo%now%f_grnd(:,1)  .eq. 0.0) tpo%now%H_ice_dyn(:,1)  = 0.0_wp
             where (tpo%now%f_grnd(:,ny) .eq. 0.0) tpo%now%H_ice_dyn(:,ny) = 0.0_wp
- 
+    
+            ! Calculate the ice fraction mask for use with the dynamics solver
+            call calc_ice_fraction(tpo%now%f_ice_dyn,tpo%now%H_ice_dyn,bnd%z_bed,bnd%z_sl,flt_subgrid=.FALSE.)
+            
         else
             ! Set standard ice thickness field for use with dynamics 
             tpo%now%H_ice_dyn = tpo%now%H_ice
+            tpo%now%f_ice_dyn = tpo%now%f_ice 
         end if 
 
-        ! Calculate the ice fraction mask for use with the dynamics solver
-        call calc_ice_fraction(tpo%now%f_ice_dyn,tpo%now%H_ice_dyn,bnd%z_bed,bnd%z_sl,flt_subgrid=.FALSE.)
-        
+            
 
 
         ! Store predicted/corrected ice thickness for later use 

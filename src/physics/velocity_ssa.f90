@@ -211,6 +211,13 @@ end if
                                 ssa_mask_acx,ssa_mask_acy,H_ice,f_ice,taud_acx,taud_acy,H_grnd,z_sl,z_bed, &
                                 z_srf,dx,dy,par%ssa_vel_max,par%boundaries,par%ssa_lateral_bc,par%ssa_lis_opt)
 
+
+! ajr: note that for MISMIP3D experiments to converge well,
+! a value of par%ssa_iter_conv <= 1e-3 is needed if also
+! using the adaptive relaxation scheme with corr_theta below.
+! If using a constant relaxation of par%ssa_iter_rel=0.7,
+! then par%ssa_iter_conv = 1e-2 is sufficient for proper performance.
+if (.TRUE.) then
             ! Calculate errors 
             corr_nm2 = corr_nm1 
             call picard_calc_error(corr_nm1,ux_b,uy_b,ux_b_nm1,uy_b_nm1)
@@ -225,7 +232,9 @@ end if
             else 
                 corr_rel = 0.5_wp 
             end if 
-            
+else
+            corr_rel = par%ssa_iter_rel
+end if
 
             ! Apply relaxation to keep things stable
             !call relax_ssa(ux_b,uy_b,ux_b_nm1,uy_b_nm1,rel=par%ssa_iter_rel)

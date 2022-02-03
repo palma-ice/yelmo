@@ -194,7 +194,7 @@ contains
         ! that may be applied during the staggering step.
 
         !  Simply set beta to zero where purely floating
-        !where (f_grnd .eq. 0.0) beta = 0.0 
+        where (f_grnd .eq. 0.0) beta = 0.0 
         
 
         ! Apply additional condition for particular experiments
@@ -255,7 +255,7 @@ contains
 
         real(wp), intent(INOUT) :: beta_acx(:,:) 
         real(wp), intent(INOUT) :: beta_acy(:,:) 
-        real(wp), intent(INOUT) :: beta(:,:)
+        real(wp), intent(IN)    :: beta(:,:)
         real(wp), intent(IN)    :: H_ice(:,:)
         real(wp), intent(IN)    :: f_ice(:,:)
         real(wp), intent(IN)    :: ux(:,:)
@@ -360,10 +360,6 @@ contains
         ! Finally ensure that beta for grounded ice is higher than the lower allowed limit
         where(beta_acx .gt. 0.0 .and. beta_acx .lt. beta_min) beta_acx = beta_min 
         where(beta_acy .gt. 0.0 .and. beta_acy .lt. beta_min) beta_acy = beta_min 
-        
-        
-        ! Finally ensure that beta on aa-nodes is zero for purely floating cells
-        !where (f_grnd .eq. 0.0) beta = 0.0 
         
         return 
 

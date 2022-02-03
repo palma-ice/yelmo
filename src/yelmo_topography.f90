@@ -448,7 +448,13 @@ end if
         if (dyn%par%ssa_lat_bc .eq. "slab") then 
             ! Calculate extended ice thickness fields for use with dynamics solver
             tpo%now%H_ice_dyn = tpo%now%H_ice
-            where (tpo%now%f_ice .lt. 1.0) tpo%now%H_ice_dyn = 1.0_wp 
+            where (tpo%now%f_ice .lt. 1.0) tpo%now%H_ice_dyn = 1.0_wp
+            
+            where (tpo%now%f_grnd(1,:)  .eq. 0.0) tpo%now%H_ice_dyn(1,:)  = 0.0_wp
+            where (tpo%now%f_grnd(nx,:) .eq. 0.0) tpo%now%H_ice_dyn(nx,:) = 0.0_wp
+            where (tpo%now%f_grnd(:,1)  .eq. 0.0) tpo%now%H_ice_dyn(:,1)  = 0.0_wp
+            where (tpo%now%f_grnd(:,ny) .eq. 0.0) tpo%now%H_ice_dyn(:,ny) = 0.0_wp
+ 
         else
             ! Set standard ice thickness field for use with dynamics 
             tpo%now%H_ice_dyn = tpo%now%H_ice

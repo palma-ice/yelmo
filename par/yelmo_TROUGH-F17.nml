@@ -57,6 +57,7 @@
     solver              = "impl-upwind"     ! "expl", "impl-upwind"
     calv_flt_method     = "kill-pos"        ! "zero", "simple", "flux", "vm-l19", "kill"
     calv_grnd_method    = "zero"            ! "zero", "stress-b12"
+    bmb_gl_method       = "pmp"             ! "fcmp": flotation; "fmp": full melt; "pmp": partial melt; "nmp": no melt
     fmb_method          = 0                 ! 0: prescribe boundary field fmb_shlf; 1: calculate proportional fmb~bmb_shlf.
     surf_gl_method      = 0                 ! 0: binary (max grnd/flt elevation), 1: subgrid average elevation
     margin2nd           = False             ! Apply second-order upwind approximation to gradients at the margin

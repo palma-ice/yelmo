@@ -23,6 +23,8 @@ program check_sim
     real(wp), allocatable :: rmse_iso(:) 
     character(len=256) :: fldr_path_root, fldr_sim 
 
+    character(len=56) :: fmt
+
     real(wp), allocatable :: H_ice(:,:) 
     real(wp), allocatable :: H_ice_pd_err(:,:) 
     logical,  allocatable :: mask(:,:) 
@@ -69,7 +71,12 @@ program check_sim
     allocate(rmse_iso(n_iso))
     call nc_read(file_path,"rmse_iso",rmse_iso,start=[1,nt],count=[n_iso,1])
 
-    write(*,"(a,f10.2,3f8.1,f8.2,50f8.1)") trim(fldr_sim), time, rmse_H, rmse_H2000, rmse_uxy, rmse_uxy_log, rmse_iso 
+    fmt = "(a5,f10.2,3f8.1,f8.2,50f8.1)"
+    if (len_trim(fldr_sim) .gt. 4) then 
+        write(fmt,*) "(a",len_trim(fldr_sim),",f10.2,3f8.1,f8.2,50f8.1)"
+    end if 
+
+    write(*,fmt) trim(fldr_sim), time, rmse_H, rmse_H2000, rmse_uxy, rmse_uxy_log, rmse_iso 
 
 contains 
 

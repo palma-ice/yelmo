@@ -1052,7 +1052,7 @@ end if
                     ! probability to have points at or higher than z,
                     ! which would be grounded. 
 
-                    f_grnd(i,j) = cdf_inv(x,mu,sigma)
+                    f_grnd(i,j) = cdf(x,mu,sigma,inv=.TRUE.)
 
                 end if 
 
@@ -2147,11 +2147,12 @@ end if
   end subroutine rotate_quad
 
 
-    elemental function cdf_inv(x,mu,sigma) result(Q)
-        ! Solve for cumulative probability above 
-        ! value x given a normal distribution N(mu,sigma)
+    elemental function cdf(x,mu,sigma,inv) result(F)
+        ! Solve for cumulative probability below (cdf)
+        ! or above (cdf(inv=TRUE)) the value x
+        ! given a normal distribution N(mu,sigma)
 
-        ! See equation for F(x) in, e.g.:
+        ! See equation for F(x) and Q(x) in, e.g.:
         ! https://en.wikipedia.org/wiki/Normal_distribution
 
         implicit none
@@ -2159,22 +2160,24 @@ end if
         real(wp), intent(IN)  :: x
         real(wp), intent(IN)  :: mu
         real(wp), intent(IN)  :: sigma
-        real(wp) :: Q
+        logical,  intent(IN), optional :: inv
+        real(wp) :: F
         
-        ! Local variables
-        real(wp) :: F 
-
         real(wp), parameter :: sqrt2 = sqrt(2.0_wp)
 
         ! Calculate CDF at value x
         F = 0.5_wp*( 1.0_wp + error_function((x-mu)/(sqrt2*sigma)) )
 
-        ! Calculate inverse CDF at value x 
-        Q = 1.0_wp - F 
+        if (present(inv)) then 
+            if (inv) then 
+                ! Calculate inverse CDF at value x 
+                F = 1.0_wp - F 
+            end if 
+        end if 
 
         return
 
-    end function cdf_inv
+    end function cdf
 
     elemental function error_function(X) result(ERR)
         ! Purpose: Compute error function erf(x)

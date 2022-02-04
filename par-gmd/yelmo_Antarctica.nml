@@ -209,7 +209,7 @@
 &yelmo_init_topo
     init_topo_load  = True 
     init_topo_path  = "input/{domain}/{grid_name}/{grid_name}_TOPO-RTOPO-2.0.1.nc"
-    init_topo_names = "H_ice" "z_bed" "z_bed_sd" "z_srf"    ! Ice thickness, Bedrock elevation, bedrock noise
+    init_topo_names = "H_ice" "z_bed" "z_bed_sd" "z_srf"    ! Ice thickness, bedrock elevation, bedrock noise, surface elevation
     init_topo_state = 0                                     ! 0: from file, 1: ice-free, 2: ice-free, rebounded 
     z_bed_f_sd      = -1.0                                  ! Scaling fraction to modify z_bed = z_bed + f_sd*z_bed_sd
     smooth_H_ice    = 0.0                                   ! Smooth ice thickness field at loading time, with sigma=N*dx
@@ -220,7 +220,7 @@
 &yelmo_data 
     pd_topo_load      = True 
     pd_topo_path      = "input/{domain}/{grid_name}/{grid_name}_TOPO-RTOPO-2.0.1.nc"
-    pd_topo_names     = "H_ice" "z_bed" "z_bed_sd" "z_srf"  ! Ice thickness, Surface elevation, Bedrock elevation
+    pd_topo_names     = "H_ice" "z_bed" "z_bed_sd" "z_srf"  ! Ice thickness, bedrock elevation, bedrock noise, surface elevation
     pd_tsrf_load      = True 
     pd_tsrf_path      = "input/{domain}/{grid_name}/{grid_name}_RACMO23-ERAINT-HYBRID_1981-2010.nc"
     pd_tsrf_name      = "T_srf"                      ! Surface temperature (or near-surface temperature)

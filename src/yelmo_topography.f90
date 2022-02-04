@@ -426,6 +426,10 @@ end if
 
         end select
         
+        ! Calculate grounded fraction due to pinning points 
+        call calc_f_grnd_pinning_points(tpo%now%f_grnd_pin,tpo%now%H_ice,tpo%now%f_ice, &
+                                                            bnd%z_bed,bnd%z_bed_sd,bnd%z_sl)
+
 !         ! Filter f_grnd to avoid lakes of one grid point inside of grounded ice 
 !         ! ajr: note, this should be improved to treat ac-nodes too 
 !         call filter_f_grnd(tpo%now%f_grnd)
@@ -448,7 +452,7 @@ end if
         if (dyn%par%ssa_lat_bc .eq. "slab") then 
             ! Calculate extended ice thickness fields for use with dynamics solver
             ! Note: should not be used with MISMIP, TROUGH, etc. 
-            
+
             tpo%now%H_ice_dyn = tpo%now%H_ice
             where (tpo%now%f_ice .lt. 1.0) tpo%now%H_ice_dyn = 1.0_wp
             
@@ -700,6 +704,8 @@ end if
         allocate(now%f_grnd_ab(nx,ny))
         allocate(now%f_ice(nx,ny))
 
+        allocate(now%f_grnd_pin(nx,ny))
+
         allocate(now%dist_margin(nx,ny))
         allocate(now%dist_grline(nx,ny))
         
@@ -740,6 +746,7 @@ end if
         now%f_grnd_acx  = 0.0  
         now%f_grnd_acy  = 0.0  
         now%f_grnd_ab   = 0.0
+        now%f_grnd_pin  = 0.0
         now%f_ice       = 0.0  
         now%dist_margin = 0.0
         now%dist_grline = 0.0 
@@ -796,7 +803,8 @@ end if
         if (allocated(now%f_grnd_acx))  deallocate(now%f_grnd_acx)
         if (allocated(now%f_grnd_acy))  deallocate(now%f_grnd_acy)
         if (allocated(now%f_grnd_ab))   deallocate(now%f_grnd_ab)
-        
+        if (allocated(now%f_grnd_pin))  deallocate(now%f_grnd_pin)
+
         if (allocated(now%f_ice))       deallocate(now%f_ice)
 
         if (allocated(now%dist_margin)) deallocate(now%dist_margin)

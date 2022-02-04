@@ -15,6 +15,7 @@ module topography
     public :: calc_f_grnd_subgrid_area_aa
     public :: calc_f_grnd_subgrid_area
     public :: calc_f_grnd_subgrid_linear
+    public :: calc_f_grnd_pinning_points
     public :: remove_englacial_lakes
     public :: filter_f_grnd
     public :: calc_grline
@@ -991,6 +992,78 @@ end if
 
     end subroutine calc_f_grnd_subgrid_linear
     
+    subroutine calc_f_grnd_pinning_points(f_grnd,H_ice,f_ice,z_bed,z_bed_sd,z_sl)
+        ! For floating points, determine how much of bed could be
+        ! touching the base of the ice shelf due to subgrid pinning
+        ! points following the distribution z = N(z_bed,z_bed_sd)
+
+        implicit none
+
+        real(wp), intent(OUT) :: f_grnd(:,:) 
+        real(wp), intent(IN)  :: H_ice(:,:) 
+        real(wp), intent(IN)  :: f_ice(:,:) 
+        real(wp), intent(IN)  :: z_bed(:,:) 
+        real(wp), intent(IN)  :: z_bed_sd(:,:) 
+        real(wp), intent(IN)  :: z_sl(:,:) 
+
+        ! Local variables 
+        integer :: i, j, nx, ny 
+        real(wp) :: x, mu, sigma
+        real(wp) :: rho_ice_sw
+        real(wp) :: z_base_now
+        real(wp) :: H_eff_now
+
+        nx = size(f_grnd,1) 
+        ny = size(f_grnd,2) 
+
+        rho_ice_sw = rho_ice/rho_sw ! Ratio of density of ice to seawater [--]
+        
+        ! Initialize f_grnd to zero everywhere
+        f_grnd = 0.0_wp 
+
+        do j = 1, ny 
+        do i = 1, nx 
+
+            ! Get effective ice thickness
+            call calc_H_eff(H_eff_now,H_ice(i,j),f_ice(i,j))
+
+            ! Determine depth of base of ice shelf, assuming
+            ! for now that it is floating. 
+            z_base_now = z_sl(i,j) - rho_ice_sw*H_eff_now
+
+            ! Check if it is actually floating: 
+
+            if (z_base_now .gt. z_bed(i,j)) then 
+                ! Floating point, calculate pinning fraction 
+
+                ! Define parameters to calculate inverse CDF
+                x     = z_base_now 
+                mu    = z_bed(i,j) 
+                sigma = z_bed_sd(i,j) 
+
+                if (sigma .eq. 0.0_wp) then 
+                    ! sigma not available, set f_grnd to zero 
+
+                    f_grnd(i,j) = 0.0_wp 
+
+                else
+
+                    ! Calculate inverse cdf at z = ice_base, ie,
+                    ! probability to have points at or higher than z,
+                    ! which would be grounded. 
+
+                    f_grnd(i,j) = cdf_inv(x,mu,sigma)
+
+                end if 
+
+            end if
+            
+        end do 
+        end do 
+
+        return
+
+    end subroutine calc_f_grnd_pinning_points
 
     subroutine remove_englacial_lakes(H_ice,z_bed,z_srf,z_sl)
         ! Diagnose where ice should be grounded, but a gap exists.
@@ -2072,6 +2145,86 @@ end if
     return 
 
   end subroutine rotate_quad
+
+
+    elemental function cdf_inv(x,mu,sigma) result(Q)
+        ! Solve for cumulative probability above 
+        ! value x given a normal distribution N(mu,sigma)
+
+        ! See equation for F(x) in, e.g.:
+        ! https://en.wikipedia.org/wiki/Normal_distribution
+
+        implicit none
+
+        real(wp), intent(IN)  :: x
+        real(wp), intent(IN)  :: mu
+        real(wp), intent(IN)  :: sigma
+        real(wp) :: Q
+        
+        ! Local variables
+        real(wp) :: F 
+
+        real(wp), parameter :: sqrt2 = sqrt(2.0_wp)
+
+        ! Calculate CDF at value x
+        F = 0.5_wp*( 1.0_wp + error_function((x-mu)/(sqrt2*sigma)) )
+
+        ! Calculate inverse CDF at value x 
+        Q = 1.0_wp - F 
+
+        return
+
+    end function cdf_inv
+
+    elemental function error_function(X) result(ERR)
+        ! Purpose: Compute error function erf(x)
+        ! Input:   x   --- Argument of erf(x)
+        ! Output:  ERR --- erf(x)
+        
+        ! Note: also separately defined in thermodynamics.f90
+
+        implicit none 
+
+        real(prec), intent(IN)  :: X
+        real(prec) :: ERR
+        
+        ! Local variables:
+        real(prec)              :: EPS
+        real(prec)              :: X2
+        real(prec)              :: ER
+        real(prec)              :: R
+        real(prec)              :: C0
+        integer                 :: k
+        
+        EPS = 1.0e-15
+        X2  = X * X
+        if (abs(X) < 3.5) then
+            ER = 1.0
+            R  = 1.0
+            do k = 1, 50
+                R  = R * X2 / (real(k, prec) + 0.5)
+                ER = ER+R
+                if(abs(R) < abs(ER) * EPS) then
+                    C0  = 2.0 / sqrt(pi) * X * exp(-X2)
+                    ERR = C0 * ER
+                    EXIT
+                end if
+            end do
+        else
+            ER = 1.0
+            R  = 1.0
+            do k = 1, 12
+                R  = -R * (real(k, prec) - 0.5) / X2
+                ER = ER + R
+                C0  = EXP(-X2) / (abs(X) * sqrt(pi))
+                ERR = 1.0 - C0 * ER
+                if(X < 0.0) ERR = -ERR
+            end do
+        end if
+
+        return
+
+    end function error_function
 
 end module topography
 

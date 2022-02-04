@@ -1052,7 +1052,12 @@ end if
                     ! probability to have points at or higher than z,
                     ! which would be grounded. 
 
-                    f_grnd(i,j) = cdf(x,mu,sigma,inv=.TRUE.)
+                    !f_grnd(i,j) = cdf(x,mu,sigma,inv=.TRUE.)
+
+                    ! Alternatively, use approximation given by
+                    ! Pollard and DeConto (2012), Eq. 13:
+
+                    f_grnd(i,j) = 0.5_wp*max(0.0_wp,(1.0_wp-(x-mu)/sigma))
 
                 end if 
 

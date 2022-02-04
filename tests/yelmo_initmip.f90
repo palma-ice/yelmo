@@ -57,8 +57,8 @@ program yelmo_test
 
     type opt_params
         real(wp) :: cf_init
-        real(wp) :: cf_min
-        real(wp) :: cf_max 
+        real(wp) :: cf_min_par
+        real(wp) :: cf_max_par 
         real(wp) :: tau_c 
         real(wp) :: H0
         real(wp) :: sigma_err 
@@ -71,6 +71,10 @@ program yelmo_test
         real(wp) :: rel_time1
         real(wp) :: rel_time2
         real(wp) :: rel_m 
+
+        real(wp), allocatable :: cf_min(:,:) 
+        real(wp), allocatable :: cf_max(:,:) 
+        
     end type 
 
     type(ctrl_params)   :: ctl
@@ -111,8 +115,8 @@ program yelmo_test
         ! Load optimization parameters 
 
         call nml_read(path_par,"opt_L21","cf_init",     opt%cf_init)
-        call nml_read(path_par,"opt_L21","cf_min",      opt%cf_min)
-        call nml_read(path_par,"opt_L21","cf_max",      opt%cf_max)
+        call nml_read(path_par,"opt_L21","cf_min",      opt%cf_min_par)
+        call nml_read(path_par,"opt_L21","cf_max",      opt%cf_max_par)
         call nml_read(path_par,"opt_L21","tau_c",       opt%tau_c)
         call nml_read(path_par,"opt_L21","H0",          opt%H0)
         call nml_read(path_par,"opt_L21","sigma_err",   opt%sigma_err)   
@@ -142,6 +146,13 @@ program yelmo_test
 
     ! Initialize data objects and load initial topography
     call yelmo_init(yelmo1,filename=path_par,grid_def="file",time=ctl%time_init)
+
+
+    ! Ensure optimization fields are allocated
+    allocate(opt%cf_min(yelmo1%grd%nx,yelmo1%grd%ny))
+    allocate(opt%cf_max(yelmo1%grd%nx,yelmo1%grd%ny))
+    opt%cf_min = opt%cf_min_par 
+    opt%cf_max = opt%cf_max_par 
 
     ! === Set initial boundary conditions for current time and yelmo state =====
     ! ybound: z_bed, z_sl, H_sed, smb, T_srf, bmb_shlf , Q_geo
@@ -401,7 +412,7 @@ program yelmo_test
                 call update_cb_ref_errscaling_l21(yelmo1%dyn%now%cb_ref,yelmo1%tpo%now%H_ice, &
                                     yelmo1%tpo%now%dHicedt,yelmo1%bnd%z_bed,yelmo1%bnd%z_sl,yelmo1%dyn%now%ux_s,yelmo1%dyn%now%uy_s, &
                                     yelmo1%dta%pd%H_ice,yelmo1%dta%pd%uxy_s,yelmo1%dta%pd%H_grnd.le.0.0_prec, &
-                                    yelmo1%tpo%par%dx,opt%cf_min,opt%cf_max,opt%sigma_err,opt%sigma_vel,opt%tau_c,opt%H0, &
+                                    opt%cf_min,opt%cf_max,yelmo1%tpo%par%dx,opt%sigma_err,opt%sigma_vel,opt%tau_c,opt%H0, &
                                     dt=ctl%dtt,fill_method=opt%fill_method,fill_dist=80.0_prec)
             
             else 

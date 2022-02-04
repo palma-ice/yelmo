@@ -128,7 +128,7 @@ contains
     end subroutine update_tf_corr_l21
 
     subroutine update_cb_ref_errscaling_l21(cb_ref,H_ice,dHdt,z_bed,z_sl,ux,uy,H_obs,uxy_obs,is_float_obs, &
-                                        dx,cf_min,cf_max,sigma_err,sigma_vel,tau_c,H0,dt,fill_method,fill_dist)
+                                        cf_min,cf_max,dx,sigma_err,sigma_vel,tau_c,H0,dt,fill_method,fill_dist)
         ! Update method following Lipscomb et al. (2021, tc)
 
         implicit none 
@@ -143,9 +143,9 @@ contains
         real(wp), intent(IN)    :: H_obs(:,:) 
         real(wp), intent(IN)    :: uxy_obs(:,:) 
         logical,  intent(IN)    :: is_float_obs(:,:) 
+        real(wp), intent(IN)    :: cf_min(:,:) 
+        real(wp), intent(IN)    :: cf_max(:,:) 
         real(wp), intent(IN)    :: dx 
-        real(wp), intent(IN)    :: cf_min 
-        real(wp), intent(IN)    :: cf_max
         real(wp), intent(IN)    :: sigma_err 
         real(wp), intent(IN)    :: sigma_vel
         real(wp), intent(IN)    :: tau_c                  ! [yr]
@@ -284,16 +284,34 @@ end if
 
             case("analog")
                 
+                write(io_unit_err,*)
+                write(io_unit_err,*) "update_cb_ref_errscaling_l21:: Error: &
+                &fill_method='analog' is not working right now!"
+                write(io_unit_err,*)
+                stop 
+
+                ! ajr: Need to adapt fill_cb_ref and fill_nearest for 2D fields
+                ! of cf_min and cf_max, instead of just single values. 
+
                 ! Fill in cb_ref for floating points using bed analogy method
-                call fill_cb_ref(cb_ref,H_ice,z_bed,z_sl,is_float_obs,cf_min,cf_max)
+                !call fill_cb_ref(cb_ref,H_ice,z_bed,z_sl,is_float_obs,cf_min,cf_max)
 
                 ! Fill in remaining missing values with nearest neighbor or cf_min when none available
-                call fill_nearest(cb_ref,missing_value=MV,fill_value=cf_min,fill_dist=fill_dist,n=5,dx=dx)
+                !call fill_nearest(cb_ref,missing_value=MV,fill_value=cf_min,fill_dist=fill_dist,n=5,dx=dx)
 
             case("nearest")
 
+                write(io_unit_err,*)
+                write(io_unit_err,*) "update_cb_ref_errscaling_l21:: Error: &
+                &fill_method='nearest' is not working right now!"
+                write(io_unit_err,*)
+                stop 
+
+                ! ajr: Need to adapt fill_cb_ref and fill_nearest for 2D fields
+                ! of cf_min and cf_max, instead of just single values. 
+                
                 ! Fill in remaining missing values with nearest neighbor or cf_min when none available
-                call fill_nearest(cb_ref,missing_value=MV,fill_value=cf_min,fill_dist=fill_dist,n=5,dx=dx)
+                !call fill_nearest(cb_ref,missing_value=MV,fill_value=cf_min,fill_dist=fill_dist,n=5,dx=dx)
 
             case("cf_min")
 

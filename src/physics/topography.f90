@@ -15,6 +15,7 @@ module topography
     public :: calc_f_grnd_subgrid_area_aa
     public :: calc_f_grnd_subgrid_area
     public :: calc_f_grnd_subgrid_linear
+    public :: remove_englacial_lakes
     public :: filter_f_grnd
     public :: calc_grline
     public :: calc_bmb_total
@@ -990,6 +991,61 @@ end if
 
     end subroutine calc_f_grnd_subgrid_linear
     
+
+    subroutine remove_englacial_lakes(H_ice,z_bed,z_srf,z_sl)
+        ! Diagnose where ice should be grounded, but a gap exists.
+        ! In these locations, increase ice thickness in order
+        ! to fill in the englacial lake. 
+        ! Also check if ice thickness is below bedrock, in these
+        ! places reduce ice thickness. 
+        ! Used when loading datasets. 
+
+        implicit none
+
+        real(wp), intent(INOUT) :: H_ice(:,:) 
+        real(wp), intent(IN)    :: z_bed(:,:) 
+        real(wp), intent(IN)    :: z_srf(:,:) 
+        real(wp), intent(IN)    :: z_sl(:,:) 
+        
+        ! Local variables 
+        integer :: i, j, nx , ny 
+        real(wp) :: H_grnd_now 
+        real(wp) :: rho_sw_ice
+        
+        rho_sw_ice = rho_sw/rho_ice ! Ratio of density of seawater to ice [--]
+        
+        nx = size(H_ice,1)
+        ny = size(H_ice,2)
+
+        ! Surface elevation is available, use to remove englacial lakes
+        ! from ice thickness field. 
+        do j = 1, ny 
+        do i = 1, nx 
+
+            ! Calculate H_grnd (ice thickness overburden)
+            ! (ie, diagnose whether ice is grounded or floating)
+            H_grnd_now = H_ice(i,j) - rho_sw_ice*max(z_sl(i,j)-z_bed(i,j),0.0_wp)
+
+            if (H_grnd_now .gt. 0.0_wp .and. z_srf(i,j) - H_ice(i,j) .gt. z_bed(i,j)) then 
+                ! Ice should be grounded, but a gap exists, 
+                ! so a subglacial lake exists, increase thickness.
+
+                H_ice(i,j) = z_srf(i,j) - z_bed(i,j) 
+
+            else if (z_srf(i,j) - H_ice(i,j) .lt. z_bed(i,j)) then 
+                ! Ice is erroneously thick, reduce it
+
+                H_ice(i,j) = z_srf(i,j) - z_bed(i,j) 
+
+            end if 
+
+        end do 
+        end do
+
+        return
+
+    end subroutine remove_englacial_lakes
+
     subroutine filter_f_grnd(f_grnd)
         ! Remove isolated floating points inside of grounded ice 
 

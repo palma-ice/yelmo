@@ -163,21 +163,25 @@ contains
 
     end subroutine ydata_compare
 
-    subroutine ydata_load(dta,ice_allowed)
+    subroutine ydata_load(dta,ice_allowed,par_path)
 
         implicit none 
 
-        type(ydata_class), intent(INOUT) :: dta 
-        logical,           intent(IN)    :: ice_allowed(:,:) 
+        type(ydata_class),  intent(INOUT) :: dta 
+        logical,            intent(IN)    :: ice_allowed(:,:)  
+        character(len=*),   intent(IN)    :: par_path 
 
         ! Local variables 
         character(len=1028) :: filename 
         character(len=56)   :: nms(4) 
+        real(wp)            :: z_bed_f_sd
+        real(prec), allocatable :: z_bed_sd(:,:) 
         real(prec), allocatable :: tmp(:,:,:) 
 
         real(wp), parameter :: z_sl_pd = 0.0_wp     ! [m] Define present day relative sea level as zero
 
         ! Allocate temporary array for loading monthly data 
+        allocate(z_bed_sd(size(dta%pd%H_ice,1),size(dta%pd%H_ice,2)))
         allocate(tmp(size(dta%pd%H_ice,1),size(dta%pd%H_ice,2),12))
 
         if (dta%par%pd_topo_load) then 
@@ -186,11 +190,49 @@ contains
             ! =========================================
             ! Load topography data from netcdf file 
             filename = dta%par%pd_topo_path
-            nms(1:3) = dta%par%pd_topo_names 
+            nms(1:4) = dta%par%pd_topo_names 
 
             call nc_read(filename,nms(1), dta%pd%H_ice, missing_value=mv)
-            call nc_read(filename,nms(2), dta%pd%z_srf, missing_value=mv)
-            call nc_read(filename,nms(3), dta%pd%z_bed, missing_value=mv) 
+            call nc_read(filename,nms(2), dta%pd%z_bed, missing_value=mv) 
+            
+            ! If available read in bedrock standard deviation field
+            if (trim(nms(3)) .ne. ""     .and. &
+                trim(nms(3)) .ne. "none" .and. &
+                trim(nms(3)) .ne. "None") then 
+
+                ! Read in z_bed_sd
+                call nc_read(filename,nms(3),z_bed_sd)
+
+                ! Determine scaling factor from yelmo_init_topo parameter choice
+                ! Note: reading from "yelmo_init_topo" section is not optimal,
+                ! but it is important to keep the choice of z_bed_f_sd consistent
+                ! between data loaded for initializing the model, and data loaded
+                ! as the reference present day topography. This ensures that the
+                ! parameter choice is the same for both cases. Perhaps this can
+                ! be improved though.
+
+                call nml_read(par_path,"yelmo_init_topo","z_bed_f_sd",z_bed_f_sd)
+
+                ! Apply scaling to adjust z_bed depending on standard deviation
+                ! Use scaling suppied as input argument
+                dta%pd%z_bed = dta%pd%z_bed + z_bed_f_sd*z_bed_sd 
+
+            else 
+                ! No scaling loaded or applied
+
+                z_bed_f_sd = 0.0_wp
+                z_bed_sd   = 0.0_wp 
+
+            end if 
+            
+            call nc_read(filename,nms(4), dta%pd%z_srf, missing_value=mv)
+            
+            ! Remove englacial lakes for better comparison with model
+            ! Assume sea level is present day level of 0.
+            call remove_englacial_lakes(dta%pd%H_ice,dta%pd%z_bed, &
+                                        dta%pd%z_srf,z_sl=dta%pd%z_srf*0.0_wp)
+
+            write(*,*) "ydata_load:: removed englacial lakes from PD reference ice thickness."
 
             ! Clean up field 
             where(dta%pd%H_ice  .lt. 1.0) dta%pd%H_ice = 0.0 
@@ -304,6 +346,8 @@ contains
         write(*,*) "ydata_load:: range(H_ice):     ",   minval(dta%pd%H_ice),   maxval(dta%pd%H_ice)
         write(*,*) "ydata_load:: range(z_srf):     ",   minval(dta%pd%z_srf),   maxval(dta%pd%z_srf)
         write(*,*) "ydata_load:: range(z_bed):     ",   minval(dta%pd%z_bed),   maxval(dta%pd%z_bed)
+        write(*,*) "ydata_load:: range(z_bed_sd):  ",   minval(z_bed_sd),       maxval(z_bed_sd)
+        write(*,*) "ydata_load:: scaling fac z_bed_f_sd: ", z_bed_f_sd  
         write(*,*) "ydata_load:: range(T_srf):     ",   minval(dta%pd%T_srf),   maxval(dta%pd%T_srf)
         write(*,*) "ydata_load:: range(smb):       ",   minval(dta%pd%smb,dta%pd%smb .ne. mv), &
                                                         maxval(dta%pd%smb,dta%pd%smb .ne. mv)

@@ -21,6 +21,8 @@ module yelmo_ice
     use yelmo_data 
     use yelmo_regions 
 
+    use topography, only : remove_englacial_lakes
+
     implicit none 
 
     private
@@ -704,7 +706,7 @@ contains
         ! Update the ice_allowed mask based on domain definition 
         call ybound_define_ice_allowed(dom%bnd,dom%par%domain)
         
-        write(*,*) "yelmo_init:: boundary intialized (loaded masks, set ref. topography)."
+        write(*,*) "yelmo_init:: boundary initialized (loaded masks, set ref. topography)."
         
         ! == data == 
         
@@ -712,7 +714,7 @@ contains
         call ydata_alloc(dom%dta%pd,dom%grd%nx,dom%grd%ny,dom%par%nz_aa,dom%dta%par%pd_age_n_iso)
 
         ! Load data objects   
-        call ydata_load(dom%dta,dom%bnd%ice_allowed)
+        call ydata_load(dom%dta,dom%bnd%ice_allowed,filename)
 
         ! Set H_ice_ref and z_bed_ref to present-day ice thickness by default 
         dom%bnd%H_ice_ref = dom%dta%pd%H_ice 
@@ -760,7 +762,7 @@ contains
         ! Local variables 
         logical :: init_topo_load 
         character(len=1028) :: init_topo_path
-        character(len=56)   :: init_topo_names(3)
+        character(len=56)   :: init_topo_names(4)
         integer             :: init_topo_state
         real(wp)            :: z_bed_f_sd 
         real(wp)            :: smooth_H_ice
@@ -769,16 +771,19 @@ contains
         real(wp), allocatable :: H_ice(:,:) 
         real(wp), allocatable :: z_bed(:,:) 
         real(wp), allocatable :: z_bed_sd(:,:) 
-        
+        real(wp), allocatable :: z_srf(:,:) 
+
         ! Allocate local arrays
         allocate(H_ice(dom%grd%nx,dom%grd%ny))
         allocate(z_bed(dom%grd%nx,dom%grd%ny))
         allocate(z_bed_sd(dom%grd%nx,dom%grd%ny))
-        
+        allocate(z_srf(dom%grd%nx,dom%grd%ny))
+
         ! Set to zero to start 
         H_ice    = 0.0_wp 
         z_bed    = 0.0_wp 
         z_bed_sd = 0.0_wp 
+        z_srf    = 0.0_wp 
 
         ! Step 1: load topography variables from a file, if desired.
         ! Store in the temporary local arrays for now. 
@@ -816,6 +821,23 @@ contains
             else
                 z_bed_sd = 0.0_prec 
             end if 
+
+            ! If desired and available, read surface elevation field
+            ! too, in order to correct for englacial lakes.
+            if (trim(init_topo_names(4)) .ne. ""     .and. &
+                trim(init_topo_names(4)) .ne. "none" .and. &
+                trim(init_topo_names(4)) .ne. "None") then 
+
+                call nc_read(init_topo_path,init_topo_names(4),z_srf)
+
+                ! Note: this routine uses z_sl, that is likely still set to zero
+                ! here. This routine is mainly for fixing present-day datasets,
+                ! so this is probably ok.
+                call remove_englacial_lakes(H_ice,z_bed,z_srf,dom%bnd%z_sl)
+
+                write(*,*) "yelmo_init_topo:: removed englacial lakes."
+
+            end if
 
             ! Clean up ice thickness field 
             where (.not. dom%bnd%ice_allowed)  H_ice = 0.0_wp

@@ -865,6 +865,7 @@ contains
             if (q == 0) then 
                 write(*,*) "nml:: Error reading namelist file."
                 write(*,*) "No '=' found on parameter line."
+                write(*,*) "line: ", trim(line1)
                 stop 
             end if 
 

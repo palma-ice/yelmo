@@ -621,7 +621,7 @@ module yelmo_defs
     type ydata_param_class 
         logical             :: pd_topo_load 
         character(len=1028) :: pd_topo_path 
-        character(len=56)   :: pd_topo_names(3)
+        character(len=56)   :: pd_topo_names(4)
         logical             :: pd_tsrf_load  
         character(len=1028) :: pd_tsrf_path 
         character(len=56)   :: pd_tsrf_name

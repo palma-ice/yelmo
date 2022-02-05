@@ -101,12 +101,9 @@ contains
 
         ! Local variables 
         integer :: i, j, nx, ny 
-        real(wp), allocatable :: logbeta(:,:) 
         
         nx = size(beta,1)
         ny = size(beta,2)
-        allocate(logbeta(nx,ny))
-        logbeta = 0.0_prec 
 
         ! 1. Apply beta method of choice 
         select case(beta_method)

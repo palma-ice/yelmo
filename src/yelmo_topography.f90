@@ -92,22 +92,6 @@ contains
         call yelmo_cpu_time(cpu_time0)
         model_time0 = tpo%par%time 
 
-
-        ! Calulate grounded fraction on aa-nodes
-        ! (only to be used with basal mass balance, later all
-        !  f_grnd arrays will be calculated according to use choices)
-        call determine_grounded_fractions(tpo%now%f_grnd_bmb,H_grnd=tpo%now%H_grnd)
-
-        ! Combine basal mass balance into one field accounting for 
-        ! grounded/floating fraction of grid cells 
-        call calc_bmb_total(tpo%now%bmb,thrm%now%bmb_grnd,bnd%bmb_shlf,tpo%now%H_grnd, &
-                            tpo%now%f_grnd_bmb,tpo%par%bmb_gl_method,tpo%par%diffuse_bmb_shlf)
-        
-        ! Combine frontal mass balance into one field, and 
-        ! calculate as needed 
-        call calc_fmb_total(tpo%now%fmb,bnd%fmb_shlf,bnd%bmb_shlf,tpo%now%H_ice, &
-                        tpo%now%H_grnd,tpo%now%f_ice,tpo%par%fmb_method,tpo%par%fmb_scale,tpo%par%dx)
-
         ! 1. Perform topography calculations ------------------
 
         if ( .not. topo_fixed .and. dt .gt. 0.0 ) then 
@@ -130,7 +114,27 @@ contains
 
             ! Update ice fraction mask 
             call calc_ice_fraction(tpo%now%f_ice,tpo%now%H_ice,bnd%z_bed,bnd%z_sl,tpo%par%margin_flt_subgrid)
-            
+        
+        end if 
+
+        ! Calculate grounded fraction on aa-nodes
+        ! (only to be used with basal mass balance, later all
+        !  f_grnd arrays will be calculated according to use choices)
+        call determine_grounded_fractions(tpo%now%f_grnd_bmb,H_grnd=tpo%now%H_grnd)
+
+        ! Combine basal mass balance into one field accounting for 
+        ! grounded/floating fraction of grid cells 
+        call calc_bmb_total(tpo%now%bmb,thrm%now%bmb_grnd,bnd%bmb_shlf,tpo%now%H_grnd, &
+                            tpo%now%f_grnd_bmb,tpo%par%bmb_gl_method,tpo%par%diffuse_bmb_shlf)
+        
+        ! Combine frontal mass balance into one field, and 
+        ! calculate as needed 
+        call calc_fmb_total(tpo%now%fmb,bnd%fmb_shlf,bnd%bmb_shlf,tpo%now%H_ice, &
+                        tpo%now%H_grnd,tpo%now%f_ice,tpo%par%fmb_method,tpo%par%fmb_scale,tpo%par%dx)
+
+
+        if ( .not. topo_fixed .and. dt .gt. 0.0 ) then
+
             ! === Step 2: ice thickness evolution from vertical column mass balance ===
 
             ! Apply mass-conservation step (mbal)
@@ -152,23 +156,29 @@ contains
 
             ! Update ice fraction mask 
             call calc_ice_fraction(tpo%now%f_ice,tpo%now%H_ice,bnd%z_bed,bnd%z_sl,tpo%par%margin_flt_subgrid)
-            
+        
+        end if 
+
+        
+        ! Diagnose strains and stresses relevant to calving 
+
+        ! eps_eff = effective strain = eigencalving e+*e- following Levermann et al. (2012)
+        call calc_eps_eff(tpo%now%eps_eff,mat%now%strn2D%eps_eig_1,mat%now%strn2D%eps_eig_2,tpo%now%f_ice)
+
+        ! tau_eff = effective stress ~ von Mises stress following Lipscomb et al. (2019)
+        call calc_tau_eff(tpo%now%tau_eff,mat%now%strs2D%tau_eig_1,mat%now%strs2D%tau_eig_2,tpo%now%f_ice,tpo%par%w2)
+
+        ! For now, mask eps_eff and tau_eff to floating points 
+        ! for easier visualization. If quantities will be used
+        ! for grounded ice in the future, then this masking can 
+        ! be removed. 
+        where (tpo%now%f_grnd .eq. 1.0_wp) tpo%now%eps_eff = 0.0_wp 
+        where (tpo%now%f_grnd .eq. 1.0_wp) tpo%now%tau_eff = 0.0_wp 
+        
+
+        if ( .not. topo_fixed .and. dt .gt. 0.0 ) then
+
             ! === Step 3: ice thickness evolution from calving ===
-            
-            ! Diagnose strains and stresses relevant to calving 
-
-            ! eps_eff = effective strain = eigencalving e+*e- following Levermann et al. (2012)
-            call calc_eps_eff(tpo%now%eps_eff,mat%now%strn2D%eps_eig_1,mat%now%strn2D%eps_eig_2,tpo%now%f_ice)
-
-            ! tau_eff = effective stress ~ von Mises stress following Lipscomb et al. (2019)
-            call calc_tau_eff(tpo%now%tau_eff,mat%now%strs2D%tau_eig_1,mat%now%strs2D%tau_eig_2,tpo%now%f_ice,tpo%par%w2)
-
-            ! For now, mask eps_eff and tau_eff to floating points 
-            ! for easier visualization. If quantities will be used
-            ! for grounded ice in the future, then this masking can 
-            ! be removed. 
-            where (tpo%now%f_grnd .eq. 1.0_wp) tpo%now%eps_eff = 0.0_wp 
-            where (tpo%now%f_grnd .eq. 1.0_wp) tpo%now%tau_eff = 0.0_wp 
             
             ! Diagnose potential floating-ice calving rate [m/yr]
 

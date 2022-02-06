@@ -18,7 +18,7 @@ module mass_conservation
 
 contains 
 
-    subroutine calc_ice_thickness_dyn(H_ice,dHdt_n,H_ice_n,H_ice_pred,f_ice,f_grnd,ux,uy, &
+    subroutine calc_ice_thickness_dyn(H_ice,dHdt_n,H_ice_n,H_ice_pred,f_ice,ux,uy, &
                                       solver,dx,dt,beta,pc_step)
         ! Interface subroutine to update ice thickness through application
         ! of advection, vertical mass balance terms and calving 
@@ -30,7 +30,6 @@ contains
         real(wp),         intent(INOUT) :: H_ice_n(:,:)         ! [m]   Ice thickness from previous=>current timestep 
         real(wp),         intent(INOUT) :: H_ice_pred(:,:)      ! [m]   Ice thickness from predicted timestep 
         real(wp),         intent(IN)    :: f_ice(:,:)           ! [--]  Ice area fraction 
-        real(wp),         intent(IN)    :: f_grnd(:,:)          ! [--]  Fraction of grounded ice 
         real(wp),         intent(IN)    :: ux(:,:)              ! [m/a] Depth-averaged velocity, x-direction (ac-nodes)
         real(wp),         intent(IN)    :: uy(:,:)              ! [m/a] Depth-averaged velocity, y-direction (ac-nodes)
         character(len=*), intent(IN)    :: solver               ! Solver to use for the ice thickness advection equation
@@ -77,7 +76,7 @@ contains
                 
                 ! Store ice thickness from time=n
                 H_ice_n   = H_ice 
-                
+
                 ! Store advective rate of change from saved from previous timestep (now represents time=n-1)
                 dHdt_advec = dHdt_n 
 
@@ -171,7 +170,7 @@ contains
 
     end subroutine calc_ice_thickness_mbal
 
-    subroutine calc_ice_thickness_calving(H_ice,f_ice,calv_applied,f_grnd,H_ocn, &
+    subroutine calc_ice_thickness_calving(H_ice,f_ice,calv_applied, &
                                        calv_flt,calv_grnd,dx,dt)
         ! Interface subroutine to update ice thickness through application
         ! of advection, vertical mass balance terms and calving 
@@ -181,8 +180,6 @@ contains
         real(wp), intent(INOUT) :: H_ice(:,:)           ! [m]   Ice thickness 
         real(wp), intent(INOUT) :: f_ice(:,:)           ! [--]  Ice cover fraction 
         real(wp), intent(OUT)   :: calv_applied(:,:)    ! [m/a] Actual calving applied to real ice points
-        real(wp), intent(IN)    :: f_grnd(:,:)          ! [--]  Grounded fraction 
-        real(wp), intent(IN)    :: H_ocn(:,:)           ! [m]   Ocean thickness (ie, depth)
         real(wp), intent(IN)    :: calv_flt(:,:)        ! [m/a] Potential calving rate (floating)
         real(wp), intent(IN)    :: calv_grnd(:,:)       ! [m/a] Potential calving rate (grounded)
         real(wp), intent(IN)    :: dx                   ! [m]   Horizontal resolution

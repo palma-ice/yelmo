@@ -93,16 +93,15 @@ contains
         model_time0 = tpo%par%time 
 
 
-        ! ajr: testing!!!
-        ! Update grounded fractions using CISM method so that fractions exist on aa-nodes too
-        ! At the end of calc_ytopo, grounded fractions will be determined by user choice
-        call determine_grounded_fractions(tpo%now%f_grnd,tpo%now%f_grnd_acx,tpo%now%f_grnd_acy, &
-                                                                            tpo%now%f_grnd_ab,tpo%now%H_grnd)
+        ! Calulate grounded fraction on aa-nodes
+        ! (only to be used with basal mass balance, later all
+        !  f_grnd arrays will be calculated according to use choices)
+        call determine_grounded_fractions(tpo%now%f_grnd_bmb,H_grnd=tpo%now%H_grnd)
 
         ! Combine basal mass balance into one field accounting for 
         ! grounded/floating fraction of grid cells 
         call calc_bmb_total(tpo%now%bmb,thrm%now%bmb_grnd,bnd%bmb_shlf,tpo%now%H_grnd, &
-                            tpo%now%f_grnd,tpo%par%bmb_gl_method,tpo%par%diffuse_bmb_shlf)
+                            tpo%now%f_grnd_bmb,tpo%par%bmb_gl_method,tpo%par%diffuse_bmb_shlf)
         
         ! Combine frontal mass balance into one field, and 
         ! calculate as needed 
@@ -126,7 +125,7 @@ contains
 
             ! Calculate the ice thickness conservation from dynamics only -----
             call calc_ice_thickness_dyn(tpo%now%H_ice,tpo%now%dHdt_n,tpo%now%H_ice_n,tpo%now%H_ice_pred, &
-                                        tpo%now%f_ice,tpo%now%f_grnd,dyn%now%ux_bar,dyn%now%uy_bar, &
+                                        tpo%now%f_ice,dyn%now%ux_bar,dyn%now%uy_bar, &
                                         solver=tpo%par%solver,dx=tpo%par%dx,dt=dt,beta=tpo%par%dt_beta,pc_step=tpo%par%pc_step) 
 
             ! Update ice fraction mask 
@@ -299,7 +298,6 @@ end if
             ! Apply calving step 
             if (call_calving) then 
                 call calc_ice_thickness_calving(tpo%now%H_ice,tpo%now%f_ice,tpo%now%calv, &
-                                                tpo%now%f_grnd,bnd%z_sl-bnd%z_bed, &
                                                 tpo%now%calv_flt,tpo%now%calv_grnd,tpo%par%dx,dt)            
 
             else
@@ -711,6 +709,7 @@ end if
         allocate(now%f_grnd_ab(nx,ny))
         allocate(now%f_ice(nx,ny))
 
+        allocate(now%f_grnd_bmb(nx,ny))
         allocate(now%f_grnd_pin(nx,ny))
 
         allocate(now%dist_margin(nx,ny))
@@ -753,6 +752,7 @@ end if
         now%f_grnd_acx  = 0.0  
         now%f_grnd_acy  = 0.0  
         now%f_grnd_ab   = 0.0
+        now%f_grnd_bmb  = 0.0
         now%f_grnd_pin  = 0.0
         now%f_ice       = 0.0  
         now%dist_margin = 0.0
@@ -810,6 +810,7 @@ end if
         if (allocated(now%f_grnd_acx))  deallocate(now%f_grnd_acx)
         if (allocated(now%f_grnd_acy))  deallocate(now%f_grnd_acy)
         if (allocated(now%f_grnd_ab))   deallocate(now%f_grnd_ab)
+        if (allocated(now%f_grnd_bmb))  deallocate(now%f_grnd_bmb)
         if (allocated(now%f_grnd_pin))  deallocate(now%f_grnd_pin)
 
         if (allocated(now%f_ice))       deallocate(now%f_ice)

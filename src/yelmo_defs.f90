@@ -167,6 +167,7 @@ module yelmo_defs
         real(wp), allocatable   :: f_grnd_ab(:,:)   ! Grounded fraction (ab nodes)
         real(wp), allocatable   :: f_ice(:,:)       ! Ice-covered fraction 
 
+        real(wp), allocatable   :: f_grnd_bmb(:,:)  ! Grounded fraction due to be used with basal mass balance
         real(wp), allocatable   :: f_grnd_pin(:,:)  ! Grounded fraction due to subgrid pinning points 
         
         real(wp), allocatable   :: dist_margin(:,:) ! Distance to nearest margin point 

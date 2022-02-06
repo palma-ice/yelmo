@@ -1743,9 +1743,9 @@ end if
     implicit none
     
     real(wp), intent(OUT) :: f_grnd(:,:) 
-    real(wp), intent(OUT) :: f_grnd_acx(:,:) 
-    real(wp), intent(OUT) :: f_grnd_acy(:,:) 
-    real(wp), intent(OUT) :: f_grnd_ab(:,:) 
+    real(wp), intent(OUT), optional :: f_grnd_acx(:,:) 
+    real(wp), intent(OUT), optional :: f_grnd_acy(:,:) 
+    real(wp), intent(OUT), optional :: f_grnd_ab(:,:) 
     real(wp), intent(IN)  :: H_grnd(:,:) 
     
     ! Local variables
@@ -1791,15 +1791,21 @@ end if
       ! aa-nodes
       f_grnd(i,j)     = 0.25_wp * (f_grnd_NW(i,j) + f_grnd_NE(i,j) + f_grnd_SW(i,j) + f_grnd_SE(i,j))
       
-      ! acx-nodes
-      f_grnd_acx(i,j) = 0.25_wp * (f_grnd_NE(i,j) + f_grnd_SE(i,j) + f_grnd_NW(ip1,j) + f_grnd_SW(ip1,j))
-      
-      ! acy-nodes
-      f_grnd_acy(i,j) = 0.25_wp * (f_grnd_NE(i,j) + f_grnd_NW(i,j) + f_grnd_SE(i,jp1) + f_grnd_SW(i,jp1))
-      
-      ! ab-nodes
-      f_grnd_ab(i,j)  = 0.25_wp * (f_grnd_NE(i,j) + f_grnd_NW(ip1,j) + f_grnd_SE(i,jp1) + f_grnd_SW(ip1,jp1))
-  
+      if (present(f_grnd_acx)) then
+        ! acx-nodes
+        f_grnd_acx(i,j) = 0.25_wp * (f_grnd_NE(i,j) + f_grnd_SE(i,j) + f_grnd_NW(ip1,j) + f_grnd_SW(ip1,j))
+      end if 
+
+      if (present(f_grnd_acy)) then
+        ! acy-nodes
+        f_grnd_acy(i,j) = 0.25_wp * (f_grnd_NE(i,j) + f_grnd_NW(i,j) + f_grnd_SE(i,jp1) + f_grnd_SW(i,jp1))
+      end if 
+
+      if (present(f_grnd_ab)) then
+        ! ab-nodes
+        f_grnd_ab(i,j)  = 0.25_wp * (f_grnd_NE(i,j) + f_grnd_NW(ip1,j) + f_grnd_SE(i,jp1) + f_grnd_SW(ip1,jp1))
+      end if
+
     end do
     end do
     

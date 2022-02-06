@@ -98,7 +98,7 @@ contains
         ! At the end of calc_ytopo, grounded fractions will be determined by user choice
         call determine_grounded_fractions(tpo%now%f_grnd,tpo%now%f_grnd_acx,tpo%now%f_grnd_acy, &
                                                                             tpo%now%f_grnd_ab,tpo%now%H_grnd)
-                
+
         ! Combine basal mass balance into one field accounting for 
         ! grounded/floating fraction of grid cells 
         call calc_bmb_total(tpo%now%bmb,thrm%now%bmb_grnd,bnd%bmb_shlf,tpo%now%H_grnd, &
@@ -479,7 +479,7 @@ end if
         ! Do it here to ensure all changes to H_ice are accounted for (mb, calving, etc)
         if (trim(tpo%par%pc_step) .eq. "predictor") then 
             tpo%now%H_ice_pred = tpo%now%H_ice 
-        else
+        else if (trim(tpo%par%pc_step) .eq. "corrector") then
             tpo%now%H_ice_corr = tpo%now%H_ice 
         end if 
 

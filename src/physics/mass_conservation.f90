@@ -77,7 +77,7 @@ contains
                 
                 ! Store ice thickness from time=n
                 H_ice_n   = H_ice 
-
+                
                 ! Store advective rate of change from saved from previous timestep (now represents time=n-1)
                 dHdt_advec = dHdt_n 
 

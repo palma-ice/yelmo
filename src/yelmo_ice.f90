@@ -275,8 +275,13 @@ contains
                     dom%tpo%now%H_ice = dom%tpo%now%H_ice_pred 
 
                     ! Also recalculate z_srf and masks for consistency
+                    ! Ensure pc_step is not defined as 'predictor' or 'corrector'
+                    dom%tpo%par%pc_step = "none" 
                     call calc_ytopo(dom%tpo,dom%dyn,dom%mat,dom%thrm,dom%bnd,time_now,topo_fixed=.TRUE.)    
                     
+                    ! Restore correct definition of pc_step for safety
+                    dom%tpo%par%pc_step = "corrector"
+
                 end if 
 
                 ! Determine truncation error for ice thickness 
@@ -309,7 +314,7 @@ contains
                 call set_pc_mask(pc_mask,dom%time%pc_tau,dom%tpo%now%H_ice_pred,dom%tpo%now%H_ice_corr, &
                                                     dom%bnd%z_bed,dom%bnd%z_sl,dom%tpo%par%margin_flt_subgrid)
                 eta_now = calc_pc_eta(dom%time%pc_tau,mask=pc_mask)
-
+                
                 ! Save masked pc_tau for output too 
                 dom%time%pc_tau_masked = dom%time%pc_tau 
                 where( .not. pc_mask) dom%time%pc_tau_masked = 0.0_prec 

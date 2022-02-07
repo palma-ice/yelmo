@@ -392,10 +392,8 @@ contains
         call nc_write(filename,"dist_margin", dom%tpo%now%dist_margin, units="m",   dim1="xc",dim2="yc",dim3="time",ncid=ncid,start=[1,1,n],count=[nx,ny,1])
         call nc_write(filename,"dist_grline", dom%tpo%now%dist_grline, units="m",   dim1="xc",dim2="yc",dim3="time",ncid=ncid,start=[1,1,n],count=[nx,ny,1])
         call nc_write(filename,"mask_bed",    dom%tpo%now%mask_bed,    units="1",   dim1="xc",dim2="yc",dim3="time",ncid=ncid,start=[1,1,n],count=[nx,ny,1])  
-        call nc_write(filename,"is_grline",   dom%tpo%now%is_grline,   units="1",   dim1="xc",dim2="yc",dim3="time",ncid=ncid,start=[1,1,n],count=[nx,ny,1])  
-        call nc_write(filename,"is_grz",      dom%tpo%now%is_grz,      units="1",   dim1="xc",dim2="yc",dim3="time",ncid=ncid,start=[1,1,n],count=[nx,ny,1])  
-
-        
+        call nc_write(filename,"mask_grz",    dom%tpo%now%mask_grz,    units="1",   dim1="xc",dim2="yc",dim3="time",ncid=ncid,start=[1,1,n],count=[nx,ny,1])  
+            
         call nc_write(filename,"dHdt_n",      dom%tpo%now%dHdt_n,      units="m/yr",dim1="xc",dim2="yc",dim3="time",ncid=ncid,start=[1,1,n],count=[nx,ny,1])
         call nc_write(filename,"H_ice_n",     dom%tpo%now%H_ice_n,     units="m",   dim1="xc",dim2="yc",dim3="time",ncid=ncid,start=[1,1,n],count=[nx,ny,1])
         call nc_write(filename,"H_ice_pred",  dom%tpo%now%H_ice_pred,  units="m",   dim1="xc",dim2="yc",dim3="time",ncid=ncid,start=[1,1,n],count=[nx,ny,1])
@@ -774,8 +772,7 @@ contains
         call nc_read_interp(filename,"dist_margin", dom%tpo%now%dist_margin,ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps) 
         call nc_read_interp(filename,"dist_grline", dom%tpo%now%dist_grline,ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps) 
         call nc_read_interp(filename,"mask_bed",    dom%tpo%now%mask_bed,ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps)
-        call nc_read_interp(filename,"is_grline",   dom%tpo%now%is_grline,ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps)
-        call nc_read_interp(filename,"is_grz",      dom%tpo%now%is_grz,ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps)
+        call nc_read_interp(filename,"mask_grz",    dom%tpo%now%mask_grz,ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps)
         
         call nc_read_interp(filename,"dHdt_n",      dom%tpo%now%dHdt_n,ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps)
         call nc_read_interp(filename,"H_ice_n",     dom%tpo%now%H_ice_n,ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps)

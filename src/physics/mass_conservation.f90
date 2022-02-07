@@ -415,7 +415,7 @@ contains
 
     end subroutine apply_ice_thickness_boundaries
 
-    subroutine relax_ice_thickness(H_ice,f_grnd,H_ref,topo_rel,tau,dt)
+    subroutine relax_ice_thickness(H_ice,f_grnd,mask_grz,H_ref,topo_rel,tau,dt)
         ! This routines allows ice within a given mask to be
         ! relaxed to a reference state with certain timescale tau 
         ! (if tau=0), then H_ice = H_ice_ref directly 
@@ -424,6 +424,7 @@ contains
 
         real(wp), intent(INOUT) :: H_ice(:,:) 
         real(wp), intent(IN)    :: f_grnd(:,:)  
+        integer,  intent(IN)    :: mask_grz(:,:) 
         real(wp), intent(IN)    :: H_ref(:,:) 
         integer,  intent(IN)    :: topo_rel 
         real(wp), intent(IN)    :: tau
@@ -464,7 +465,16 @@ contains
                         ! Relax all points
                         
                         apply_relax = .TRUE. 
-                
+                    
+                    case(4) 
+                        ! Relax all grounding zone points 
+
+                        if (abs(mask_grz(i,j)) .le. 1) then 
+
+                            apply_relax = .TRUE. 
+
+                        end if 
+
                     case DEFAULT
                         ! No relaxation
 

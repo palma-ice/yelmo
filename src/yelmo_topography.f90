@@ -159,7 +159,7 @@ contains
         
         end if 
 
-        
+
         ! Diagnose strains and stresses relevant to calving 
 
         ! eps_eff = effective strain = eigencalving e+*e- following Levermann et al. (2012)
@@ -338,15 +338,16 @@ end if
                     case("H_ref")
                         ! Relax towards reference ice thickness field H_ref
 
-                        call relax_ice_thickness(tpo%now%H_ice,tpo%now%f_grnd,bnd%H_ice_ref, &
-                                                    tpo%par%topo_rel,tpo%par%topo_rel_tau,dt)
+                        call relax_ice_thickness(tpo%now%H_ice,tpo%now%f_grnd,tpo%now%mask_grz, &
+                                            bnd%H_ice_ref,tpo%par%topo_rel,tpo%par%topo_rel_tau,dt)
+                    
                     case("H_ice_n")
                         ! Relax towards previous iteration ice thickness 
                         ! (ie slow down changes)
                         ! ajr: needs testing, not sure if this works well or helps anything.
 
-                        call relax_ice_thickness(tpo%now%H_ice,tpo%now%f_grnd,tpo%now%H_ice_n, &
-                                                    tpo%par%topo_rel,tpo%par%topo_rel_tau,dt)
+                        call relax_ice_thickness(tpo%now%H_ice,tpo%now%f_grnd,tpo%now%mask_grz, &
+                                            tpo%now%H_ice_n,tpo%par%topo_rel,tpo%par%topo_rel_tau,dt)
                     
                     case DEFAULT 
 
@@ -445,21 +446,19 @@ end if
         call calc_f_grnd_pinning_points(tpo%now%f_grnd_pin,tpo%now%H_ice,tpo%now%f_ice, &
                                                             bnd%z_bed,bnd%z_bed_sd,bnd%z_sl)
 
-!         ! Filter f_grnd to avoid lakes of one grid point inside of grounded ice 
-!         ! ajr: note, this should be improved to treat ac-nodes too 
-!         call filter_f_grnd(tpo%now%f_grnd)
+        ! Calculate the grounding-line distance
+        call calc_distance_to_grounding_line(tpo%now%dist_grline,tpo%now%f_grnd,tpo%par%dx)
 
-        ! Calculate the grounding line mask 
-        call calc_grline(tpo%now%is_grline,tpo%now%is_grz,tpo%now%f_grnd)
+        ! Define the grounding-zone mask too 
+        call calc_grounding_line_zone(tpo%now%mask_grz,tpo%now%dist_grline,tpo%par%dist_grz)
 
-        ! Calculate the bed mask
-        call gen_mask_bed(tpo%now%mask_bed,tpo%now%f_ice,thrm%now%f_pmp,tpo%now%f_grnd,tpo%now%is_grline)
+        ! ajr: do not calculate distance to margin unless it is needed (costs some computational time)
+        ! Calculate distance to the ice margin
+        !call calc_distance_to_ice_margin(tpo%now%dist_margin,tpo%now%f_ice,tpo%par%dx)
 
-        ! Calculate distance to ice margin (really slow if always on)
-        !tpo%now%dist_margin = distance_to_margin(tpo%now%H_ice,tpo%par%dx)
-
-        ! Calculate distance to grounding line (really slow if always on)
-        !tpo%now%dist_grline = distance_to_grline(tpo%now%is_grline,tpo%now%f_grnd,tpo%par%dx)
+        ! Calculate the general bed mask
+        call gen_mask_bed(tpo%now%mask_bed,tpo%now%f_ice,thrm%now%f_pmp, &
+                                            tpo%now%f_grnd,tpo%now%mask_grz)
 
 
         ! Determine ice thickness for use exclusively with the dynamics solver
@@ -534,7 +533,7 @@ end if
 
     end subroutine calc_ytopo
 
-    elemental subroutine gen_mask_bed(mask,f_ice,f_pmp,f_grnd,is_grline)
+    elemental subroutine gen_mask_bed(mask,f_ice,f_pmp,f_grnd,mask_grz)
         ! Generate an output mask for model conditions at bed
         ! based on input masks 
         ! 0: ocean, 1: land, 2: sia, 3: streams, grline: 4, floating: 5, islands: 6
@@ -544,9 +543,9 @@ end if
 
         integer,    intent(OUT) :: mask 
         real(prec), intent(IN)  :: f_ice, f_pmp, f_grnd
-        logical,    intent(IN)  :: is_grline
+        integer,    intent(IN)  :: mask_grz
 
-        if (is_grline) then
+        if (mask_grz .eq. 0) then
             ! Grounding line
 
             mask = mask_bed_grline
@@ -639,6 +638,7 @@ end if
         call nml_read(filename,"ytopo","sd_max",            par%sd_max,           init=init_pars)
         call nml_read(filename,"ytopo","calv_max",          par%calv_max,         init=init_pars)
         call nml_read(filename,"ytopo","grad_lim",          par%grad_lim,         init=init_pars)
+        call nml_read(filename,"ytopo","dist_grz",          par%dist_grz,         init=init_pars)
         call nml_read(filename,"ytopo","gl_sep",            par%gl_sep,           init=init_pars)
         call nml_read(filename,"ytopo","gl_sep_nx",         par%gl_sep_nx,        init=init_pars)
         call nml_read(filename,"ytopo","diffuse_bmb_shlf",  par%diffuse_bmb_shlf, init=init_pars)
@@ -726,8 +726,7 @@ end if
         allocate(now%dist_grline(nx,ny))
         
         allocate(now%mask_bed(nx,ny))
-        allocate(now%is_grline(nx,ny))
-        allocate(now%is_grz(nx,ny))
+        allocate(now%mask_grz(nx,ny))
 
         allocate(now%dHdt_n(nx,ny))
         allocate(now%H_ice_n(nx,ny))
@@ -769,9 +768,7 @@ end if
         now%dist_grline = 0.0 
         
         now%mask_bed    = 0.0 
-        now%is_grline   = .FALSE. 
-        now%is_grz      = .FALSE. 
-         
+        now%mask_grz    = 0.0 
         now%dHdt_n      = 0.0  
         now%H_ice_n     = 0.0 
         now%H_ice_pred  = 0.0 
@@ -829,9 +826,8 @@ end if
         if (allocated(now%dist_grline)) deallocate(now%dist_grline)
         
         if (allocated(now%mask_bed))    deallocate(now%mask_bed)
-        if (allocated(now%is_grline))   deallocate(now%is_grline)
-        if (allocated(now%is_grz))      deallocate(now%is_grz)
-
+        if (allocated(now%mask_grz))    deallocate(now%mask_grz)
+        
         if (allocated(now%dHdt_n))      deallocate(now%dHdt_n)
         if (allocated(now%H_ice_n))     deallocate(now%H_ice_n)
         if (allocated(now%H_ice_pred))  deallocate(now%H_ice_pred)

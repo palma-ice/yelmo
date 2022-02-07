@@ -840,7 +840,7 @@ contains
                 ! Also ensure that grounding line is also considered streaming
                 ! Note: this was related to cold ocean temps at floating-grounded interface,
                 ! which is likely solved. Left here for safety. ajr, 2019-07-24
-                where(tpo%now%is_grline) cb_ref = dyn%par%cf_stream
+                where(tpo%now%mask_grz .eq. 0) cb_ref = dyn%par%cf_stream
 
             end if
 

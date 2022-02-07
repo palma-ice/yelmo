@@ -26,8 +26,10 @@ module yelmo_defs
 
     ! Missing value and aliases
     real(wp), parameter :: MISSING_VALUE_DEFAULT = real(-9999.0,wp)
-    real(wp), parameter :: MISSING_VALUE = MISSING_VALUE_DEFAULT
-    real(wp), parameter :: MV = MISSING_VALUE_DEFAULT
+    real(wp), parameter :: MISSING_VALUE         = MISSING_VALUE_DEFAULT
+    real(wp), parameter :: MV                    = MISSING_VALUE_DEFAULT
+    integer,  parameter :: MISSING_VALUE_INT     = int(MISSING_VALUE)
+    integer,  parameter :: MV_INT                = int(MISSING_VALUE)
     
     ! Error distance (very large), error index, and smallest number epsilon 
     real(wp), parameter :: ERR_DIST = real(1E8,wp) 
@@ -98,6 +100,7 @@ module yelmo_defs
         real(wp)           :: sd_max 
         real(wp)           :: calv_max  
         real(wp)           :: grad_lim 
+        real(wp)           :: dist_grz
         integer            :: gl_sep 
         integer            :: gl_sep_nx 
         logical            :: diffuse_bmb_shlf 
@@ -175,9 +178,8 @@ module yelmo_defs
         
         ! Additional masks 
         integer,    allocatable :: mask_bed(:,:)    ! Multi-valued bed mask
-        logical,    allocatable :: is_grline(:,:)   ! Grounding line points
-        logical,    allocatable :: is_grz(:,:)      ! Grounding line plus grounded neighbors
-        
+        integer,    allocatable :: mask_grz(:,:)    ! Multi-valued mask for the grounding-line zone
+
         real(wp), allocatable   :: dHdt_n(:,:)      ! [m/a] Ice thickness change due to advection only
         real(wp), allocatable   :: H_ice_n(:,:)     ! [m] Ice thickness from the previous timestep 
         real(wp), allocatable   :: H_ice_pred(:,:)  ! [m] Ice thickness, predicted, for time=n+1

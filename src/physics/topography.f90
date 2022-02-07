@@ -17,12 +17,15 @@ module topography
     public :: calc_f_grnd_subgrid_linear
     public :: calc_f_grnd_pinning_points
     public :: remove_englacial_lakes
-    public :: filter_f_grnd
-    public :: calc_grline
+    public :: calc_distance_to_ice_margin
+    public :: calc_distance_to_grounding_line
+    public :: calc_grounding_line_zone
     public :: calc_bmb_total
     public :: calc_fmb_total
-    public :: distance_to_grline
-    public :: distance_to_margin
+    
+    ! ajr: these routines are slow, do not use...
+    !public :: distance_to_grline
+    !public :: distance_to_margin
     
     public :: determine_grounded_fractions
 
@@ -1124,104 +1127,69 @@ end if
 
     end subroutine remove_englacial_lakes
 
-    subroutine filter_f_grnd(f_grnd)
-        ! Remove isolated floating points inside of grounded ice 
+    subroutine calc_distance_to_ice_margin(dist_mrgn,f_ice,dx)
+        ! Calculate distance to the ice margin
+        
+        ! Note: this subroutine is a wrapper that calls the
+        ! grounding-line distance routine, since the algorithm
+        ! works the same way. Simply substitute f_ice for f_grnd. 
 
         implicit none 
 
-        real(prec), intent(INOUT) :: f_grnd(:,:)
-        
-        ! Local variables 
-        integer :: i, j, nx, ny 
-        real(prec), allocatable :: f_grnd_old(:,:) 
-        logical, allocatable :: is_grline(:,:) 
-        logical, allocatable :: is_grz(:,:) 
-        
-        nx = size(f_grnd,1)
-        ny = size(f_grnd,2)
+        real(wp), intent(OUT) :: dist_mrgn(:,:) ! [km] Distance to grounding line
+        real(wp), intent(IN)  :: f_ice(:,:)     ! [1]  Fraction of grid-cell ice coverage 
+        real(wp), intent(IN)  :: dx             ! [m]  Grid resolution (assume dy=dx)
 
-        allocate(f_grnd_old(nx,ny))
-        allocate(is_grline(nx,ny))
-        allocate(is_grz(nx,ny))
-        
-        ! == LAKES ==
-        f_grnd_old = f_grnd
-        do i = 2, nx-1 
-        do j = 2, ny-1 
-
-            if (f_grnd_old(i,j) .lt. 1.0) then 
-                ! Check partially floating points 
-
-                if (f_grnd_old(i-1,j)+f_grnd_old(i+1,j)+f_grnd_old(i,j-1)+f_grnd_old(i,j+1) .eq. 4.0) then 
-                    ! Point is surrounded by fully grounded ice (ie, a lake),
-                    ! so treat it as grounded ice for now 
-                    f_grnd(i,j) = 1.0 
-
-                end if 
-
-            end if 
-
-        end do 
-        end do 
-
-        ! == GRLINE ISLANDS == 
-        f_grnd_old = f_grnd 
-
-        ! Calculate intermediate grounding line estimate 
-        call calc_grline(is_grline,is_grz,f_grnd)
-
-        do i = 2, nx-1 
-        do j = 2, ny-1 
-
-            if (is_grline(i,j)) then 
-                ! Grounding line defined point 
-
-                if ( (f_grnd_old(i-1,j) .eq. 0.0 .or. is_grline(i-1,j)) .and. &
-                     (f_grnd_old(i+1,j) .eq. 0.0 .or. is_grline(i+1,j)) .and. &
-                     (f_grnd_old(i,j-1) .eq. 0.0 .or. is_grline(i,j-1)) .and. &
-                     (f_grnd_old(i,j+1) .eq. 0.0 .or. is_grline(i,j+1)) ) then   
-                    ! Point is surrounded by floating or grounding-line ice,
-                    ! so treat it as floating ice for now 
-                    f_grnd(i,j) = 0.0 
-
-                end if 
-
-            end if 
-
-        end do 
-        end do 
+        call calc_distance_to_grounding_line(dist_mrgn,f_ice,dx)
 
         return 
 
-    end subroutine filter_f_grnd
-
-    subroutine calc_grline(is_grline,is_grz,f_grnd)
-
+    end subroutine calc_distance_to_ice_margin
+    
+    subroutine calc_distance_to_grounding_line(dist_gl,f_grnd,dx)
+        ! Calculate distance to the grounding line 
+        
         implicit none 
 
-        logical,    intent(OUT) :: is_grline(:,:)   ! grounding line 
-        logical,    intent(OUT) :: is_grz(:,:)      ! grounding zone 
-        real(prec), intent(IN)  :: f_grnd(:,:)
+        real(wp), intent(OUT) :: dist_gl(:,:)   ! [km] Distance to grounding line
+        real(wp), intent(IN)  :: f_grnd(:,:)    ! [1]  Grounded grid-cell fraction 
+        real(wp), intent(IN)  :: dx             ! [m]  Grid resolution (assume dy=dx)
 
         ! Local variables 
-        integer :: i, j, nx, ny 
-        integer :: im1, ip1, jm1, jp1 
+        integer  :: i, j, nx, ny, q
+        integer  :: im1, ip1, jm1, jp1
+        real(wp) :: dist_direct_min 
+        real(wp) :: dist_corners_min
+        real(wp) :: dx_km 
+        real(wp) :: dists(8) 
 
-        nx = size(is_grline,1)
-        ny = size(is_grline,2)
+        real(wp), parameter :: dist_max = 1e10          ! [km]
+        real(wp), parameter :: sqrt_2   = sqrt(2.0_wp) 
+        integer,  parameter :: iter_max = 1000
 
+        real(wp), allocatable :: dist_gl_ref(:,:) 
 
-        ! 1. Determine grounding line ===========================================
+        nx = size(dist_gl,1)
+        ny = size(dist_gl,2)
 
-        is_grline = .FALSE. 
- 
+        allocate(dist_gl_ref(nx,ny)) 
+
+        ! Units
+        dx_km = dx*1e-3 
+
+        ! 0: Assign a big distance to all points to start  ======================
+
+        dist_gl  = dist_max
+
+        ! 1. Next, determine grounding line =====================================
+
         do j = 1, ny 
         do i = 1, nx
 
-            im1 = max(1, i-1)
+            ! Get neighbor indices
+            im1 = max(1,i-1)
             ip1 = min(nx,i+1)
-            
-            jm1 = max(1, j-1)
+            jm1 = max(1,j-1)
             jp1 = min(ny,j+1)
 
             ! Grounded point or partially floating point with floating neighbors
@@ -1229,36 +1197,119 @@ end if
                 (f_grnd(im1,j) .eq. 0.0 .or. f_grnd(ip1,j) .eq. 0.0 .or. &
                  f_grnd(i,jm1) .eq. 0.0 .or. f_grnd(i,jp1) .eq. 0.0) ) then 
                 
-                is_grline(i,j) = .TRUE. 
+                dist_gl(i,j)  = 0.0_wp 
 
             end if 
 
         end do 
         end do 
 
-        ! 2. Determine grounding line zone ===========================================
+        ! 2. Next, determine distances to grounding line ======================
         
-        is_grz = .FALSE. 
- 
-        do j = 1, ny 
-        do i = 1, nx
+        do q = 1, iter_max  
+            ! Iterate distance of one neighbor at a time until grid is filled in
 
-            im1 = max(1, i-1)
-            ip1 = min(nx,i+1)
+            dist_gl_ref = dist_gl
+
+            do j = 1, ny 
+            do i = 1, nx
+
+                if (dist_gl(i,j) .eq. dist_max) then 
+                    ! Distance needs to be determined for this point 
+
+                    ! Get neighbor indices
+                    im1 = max(1, i-1)
+                    ip1 = min(nx,i+1)
+                    jm1 = max(1, j-1)
+                    jp1 = min(ny,j+1)
+
+                    ! Get distances to direct and corner neighbors
+                    dists = [dist_gl_ref(im1,j),dist_gl_ref(ip1,j), &       ! Direct neighbors
+                             dist_gl_ref(i,jm1),dist_gl_ref(i,jp1), &       ! Direct neighbors
+                             dist_gl_ref(im1,jp1),dist_gl_ref(ip1,jp1), &   ! Corner neighbors
+                             dist_gl_ref(im1,jm1),dist_gl_ref(ip1,jm1)]     ! Corner neighbors
+
+                    if (count(dists .lt. dist_max) .ge. 2) then 
+                        ! Some neighbors have been calculated already 
+                        ! Note: check for at least 2 neighbors already
+                        ! calculated to reduce errors in points with 
+                        ! neighbors on both sides with similar distances. This 
+                        ! Waiting for even more neighbors would reduce errors
+                        ! further but greatly increases iterations. 
+
+                        ! Determine minimum distance to grounding line for 
+                        ! direct and diagonal neighbors, separately.
+                        dist_direct_min  = minval(dists(1:4))
+                        dist_corners_min = minval(dists(5:8))
+
+                        if (dist_direct_min .le. dist_corners_min) then 
+                            ! Assume nearest path to grounding line is along
+                            ! direct neighbor path - add dx to dist for this point 
+
+                            dist_gl(i,j) = dist_direct_min + dx_km 
+
+                        else
+                            ! Assume nearest path to grounding line is via 
+                            ! a diagonal neighbor - add sqrt(2) to dist for this point
+
+                            dist_gl(i,j) = dist_corners_min + sqrt_2*dx_km
+
+                        end if 
+
+                    end if 
+                end if
+
+            end do 
+            end do 
             
-            jm1 = max(1, j-1)
-            jp1 = min(ny,j+1)
+            if (count(dist_gl .eq. dist_max) .eq. 0) then 
+                ! No more points to check 
+                exit 
+            end if 
 
-            ! Neighbor with the grounding line, or grounding line 
-            is_grz(i,j) = ( count(is_grline(im1:ip1,jm1:jp1)) .gt. 0 )
+        end do
 
-        end do 
-        end do 
+        ! Set all floating-point distances to negative values 
+        where (f_grnd .eq. 0.0_wp) 
+            dist_gl  = -dist_gl
+        end where
+
         
         return 
 
-    end subroutine calc_grline
+    end subroutine calc_distance_to_grounding_line
     
+    subroutine calc_grounding_line_zone(mask_grz,dist_gl,dist_grz)
+        ! Define a mask of the grounding-zone region 
+        ! mask_grz == -2: floating-point out of grounding zone
+        ! mask_grz == -1: floating-point in grounding zone
+        ! mask_grz ==  0: grounding line 
+        ! mask_grz ==  1: grounded-point in grounding zone
+        ! mask_grz ==  2: grounded-point out of grounding zone
+
+        implicit none
+
+        integer,  intent(OUT) :: mask_grz(:,:)  ! [1]  Grounding-zone mask 
+        real(wp), intent(IN)  :: dist_gl(:,:)   ! [km] Distance to grounding line
+        real(wp), intent(IN)  :: dist_grz       ! [km] Distance to define as grounding zone
+
+        ! Finally define the grounding-zone mask too
+        where(dist_gl .eq. 0.0_wp)
+            mask_grz =  0 
+        else where(dist_gl .lt. 0.0_wp .and. abs(dist_gl) .le. dist_grz)
+            mask_grz = -1
+        else where(dist_gl .gt. 0.0_wp .and.     dist_gl  .le. dist_grz)
+            mask_grz =  1
+        else where(dist_gl .lt. 0.0_wp)
+            mask_grz = -2
+        elsewhere
+            mask_grz =  2
+        end where
+
+        return
+
+    end subroutine calc_grounding_line_zone
+
     subroutine calc_bmb_total(bmb,bmb_grnd,bmb_shlf,H_grnd,f_grnd,bmb_gl_method,diffuse_bmb_shlf)
 
         implicit none 
@@ -1611,6 +1662,8 @@ end if
     end function interp_bilin_pt
 
     function distance_to_margin(H_ice,dx) result(dist)
+        ! ajr: very slow and obsolete routine - do not use! 
+        ! instead, use calc_distance_to_margin above
 
         implicit none 
 
@@ -1667,7 +1720,9 @@ end if
     end function distance_to_margin
     
     function distance_to_grline(is_grline,f_grnd,dx) result(dist)
-
+        ! ajr: very slow and obsolete routine - do not use! 
+        ! instead, use calc_distance_to_grounding_line above
+        
         implicit none 
          
         logical,    intent(IN) :: is_grline(:,:)

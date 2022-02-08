@@ -467,9 +467,9 @@ contains
                         apply_relax = .TRUE. 
                     
                     case(4) 
-                        ! Relax all grounding zone points 
+                        ! Relax all grounded grounding-zone points 
 
-                        if (abs(mask_grz(i,j)) .le. 1) then 
+                        if (mask_grz(i,j) .eq. 0 .or. mask_grz(i,j) .eq. 1) then 
 
                             apply_relax = .TRUE. 
 

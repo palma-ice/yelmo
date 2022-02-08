@@ -110,7 +110,7 @@ contains
 
                 ! Get adjustment rate given error in ice thickness  =========
 
-                tf_corr_dot = -1.0_wp/(tau_m*m_temp) *( (H_err_now / tau_m) + f_damp*dHdt_now )
+                tf_corr_dot = 1.0_wp/(tau_m*m_temp) *( (H_err_now / tau_m) + f_damp*dHdt_now )
 
                 ! Apply correction to all points in basin =========
 

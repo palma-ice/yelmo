@@ -43,14 +43,17 @@ contains
         integer  :: i, j, nx, ny, n  
         integer  :: b, nb  
         real(wp) :: f_damp 
-        real(wp) :: H_obs_now 
-        real(wp) :: H_now 
-        real(wp) :: H_err_now 
-        real(wp) :: dHdt_now
+        real(wp) :: H_obs_bar 
+        real(wp) :: H_bar 
+        real(wp) :: H_bar_err
+        real(wp) :: dHdt_bar
         real(wp) :: tf_corr_dot
-        real(wp), allocatable :: basin_list(:) 
-        logical,  allocatable :: mask(:,:) 
 
+        logical,  allocatable :: mask(:,:) 
+        real(wp), allocatable :: H_err(:,:)
+        
+        real(wp), allocatable :: basin_list(:) 
+        
         real(wp), parameter :: tol = 1e-5_wp
 
         ! Internal parameters 
@@ -60,6 +63,7 @@ contains
         ny = size(tf_corr,2) 
 
         allocate(mask(nx,ny)) 
+        allocate(H_err(nx,ny)) 
 
         ! Determine unique basin numbers 
         call unique(basin_list,reshape(basins,[nx*ny]))
@@ -75,7 +79,7 @@ contains
             ! 3. Points with observed ice thickness present
             mask =  abs(basins-basin_list(b)) .lt. tol .and. &
                     abs(H_grnd) .lt. H_grnd_lim .and. & 
-                    H_obs .gt. 0.0 
+                    (H_obs .gt. 0.0 .or. H_ice .gt. 0.0)
 
             ! How many points available 
             n = count(mask)
@@ -85,32 +89,33 @@ contains
                 ! Points are available for averaging 
 
                 ! Calculate average observed thickness for masked region
-                H_obs_now = sum(H_obs,mask=mask) / real(n,wp)
+                H_obs_bar = sum(H_obs,mask=mask)   / real(n,wp)
 
                 ! Calculate average thickness and rate of change for masked region
-                H_now     = sum(H_ice,mask=mask) / real(n,wp)
-                dHdt_now  = sum(dHicedt,mask=mask) / real(n,wp)
+                H_bar     = sum(H_ice,mask=mask)   / real(n,wp)
+                dHdt_bar  = sum(dHicedt,mask=mask) / real(n,wp)
 
             else 
                 ! Quantities are not defined
 
-                H_obs_now = missing_value 
+                H_obs_bar = missing_value 
 
-                H_now     = 0.0_wp
-                dHdt_now  = 0.0_wp 
+                H_bar     = 0.0_wp
+                dHdt_bar  = 0.0_wp 
             
             end if 
 
             
-            if (H_obs_now .ne. missing_value) then 
+            if (H_obs_bar .ne. missing_value) then 
                 ! Observed ice exists in basin, proceed with calculations
                                 
                 ! Get mean error for this basin
-                H_err_now = H_now - H_obs_now 
+                H_bar_err = H_bar - H_obs_bar 
 
                 ! Get adjustment rate given error in ice thickness  =========
 
-                tf_corr_dot = 1.0_wp/(tau_m*m_temp) *( (H_err_now / tau_m) + f_damp*dHdt_now )
+                tf_corr_dot = &
+                     1.0_wp/(tau_m*m_temp) *( (H_bar_err / tau_m) + f_damp*dHdt_bar )
 
                 ! Apply correction to all points in basin =========
 

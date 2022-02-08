@@ -98,7 +98,7 @@ contains
         mask = (tpo%now%H_ice .ne. 0.0 .or. dta%pd%H_ice .ne. 0.0) .and. mask_region 
         
         if (count(mask) .gt. 0) then 
-            dta%pd%rmse_H = sqrt(sum(tmp**2)/count(mask))
+            dta%pd%rmse_H = sqrt(sum(tmp**2,mask=mask)/count(mask))
         else 
             dta%pd%rmse_H = mv 
         end if 
@@ -112,7 +112,7 @@ contains
         mask = tmp .ne. 0.0 .and. mask_region 
          
         if (count(mask) .gt. 0) then 
-            dta%pd%rmse_zsrf = sqrt(sum(tmp**2)/count(mask))
+            dta%pd%rmse_zsrf = sqrt(sum(tmp**2,mask=mask)/count(mask))
         else 
             dta%pd%rmse_zsrf = mv 
         end if 
@@ -125,7 +125,7 @@ contains
         mask = tmp .ne. 0.0 .and. mask_region 
          
         if (count(mask) .gt. 0) then
-            dta%pd%rmse_uxy = sqrt(sum(tmp**2)/count(mask))
+            dta%pd%rmse_uxy = sqrt(sum(tmp**2,mask=mask)/count(mask))
         else
             dta%pd%rmse_uxy = mv
         end if 
@@ -141,7 +141,7 @@ contains
         mask = (tmp .ne. 0.0 .or. tmp1 .ne. 0.0) .and. mask_region 
         
         if (count(mask) .gt. 0) then 
-            dta%pd%rmse_loguxy = sqrt(sum((tmp1-tmp)**2)/count(mask))
+            dta%pd%rmse_loguxy = sqrt(sum((tmp1-tmp)**2,mask=mask)/count(mask))
         else
             dta%pd%rmse_loguxy = mv
         end if 

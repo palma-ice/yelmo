@@ -70,7 +70,8 @@ contains
             
             ! Get a mask of points of interest:
             ! 1. Points within the current basin 
-            ! 2. Points with overburden thickness near flotation
+            ! 2. Points with overburden thickness near flotation,
+            !    with magnitude less than H_grnd_lim
             ! 3. Points with observed ice thickness present
             mask =  abs(basins-basin_list(b)) .lt. tol .and. &
                     abs(H_grnd) .lt. H_grnd_lim .and. & 
@@ -79,22 +80,27 @@ contains
             ! How many points available 
             n = count(mask)
 
-            ! Calculate average observed thickness for masked region
+                
             if (n .gt. 0) then 
+                ! Points are available for averaging 
+
+                ! Calculate average observed thickness for masked region
                 H_obs_now = sum(H_obs,mask=mask) / real(n,wp)
+
+                ! Calculate average thickness and rate of change for masked region
+                H_now     = sum(H_ice,mask=mask) / real(n,wp)
+                dHdt_now  = sum(dHicedt,mask=mask) / real(n,wp)
+
             else 
+                ! Quantities are not defined
+
                 H_obs_now = missing_value 
+
+                H_now     = 0.0_wp
+                dHdt_now  = 0.0_wp 
+            
             end if 
 
-            ! Calculate average thickness and rate of change for masked region
-            n = count(mask)
-            if (n .gt. 0) then 
-                H_now    = sum(H_ice,mask=mask) / real(n,wp)
-                dHdt_now = sum(dHicedt,mask=mask) / real(n,wp)
-            else 
-                H_now    = 0.0_wp
-                dHdt_now = 0.0_wp 
-            end if 
             
             if (H_obs_now .ne. missing_value) then 
                 ! Observed ice exists in basin, proceed with calculations

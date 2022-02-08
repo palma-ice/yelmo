@@ -50,7 +50,6 @@ contains
         real(wp) :: tf_corr_dot
 
         logical,  allocatable :: mask(:,:) 
-        real(wp), allocatable :: H_err(:,:)
         
         real(wp), allocatable :: basin_list(:) 
         
@@ -63,7 +62,6 @@ contains
         ny = size(tf_corr,2) 
 
         allocate(mask(nx,ny)) 
-        allocate(H_err(nx,ny)) 
 
         ! Determine unique basin numbers 
         call unique(basin_list,reshape(basins,[nx*ny]))
@@ -76,7 +74,7 @@ contains
             ! 1. Points within the current basin 
             ! 2. Points with overburden thickness near flotation,
             !    with magnitude less than H_grnd_lim
-            ! 3. Points with observed ice thickness present
+            ! 3. Points with observed or modeled ice thickness
             mask =  abs(basins-basin_list(b)) .lt. tol .and. &
                     abs(H_grnd) .lt. H_grnd_lim .and. & 
                     (H_obs .gt. 0.0 .or. H_ice .gt. 0.0)

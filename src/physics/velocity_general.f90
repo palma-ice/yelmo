@@ -1,7 +1,7 @@
 module velocity_general 
     ! This module contains general routines that are used by several solvers. 
     
-    use yelmo_defs ,only  : sp, dp, wp, prec, tol_underflow, rho_ice, rho_sw, rho_w, g
+    use yelmo_defs ,only  : sp, dp, wp, prec, tol_underflow, io_unit_err, rho_ice, rho_sw, rho_w, g
     use yelmo_tools, only : stagger_aa_ab, stagger_aa_ab_ice, &
                     stagger_nodes_aa_ab_ice, stagger_nodes_acx_ab_ice, stagger_nodes_acy_ab_ice, &
                     staggerdiff_nodes_acx_ab_ice, staggerdiff_nodes_acy_ab_ice, &
@@ -9,6 +9,8 @@ module velocity_general
                     integrate_trapezoid1D_1D, integrate_trapezoid1D_pt, minmax, &
                     set_boundaries_2D_aa, set_boundaries_3D_aa, &
                     set_boundaries_2D_acx, set_boundaries_2D_acy
+
+    use solver_ssa_sico5, only : ssa_diagnostics_write_init, ssa_diagnostics_write_step
 
     implicit none 
 
@@ -1739,7 +1741,7 @@ end if
         ! Local variables   
         real(dp) :: val 
 
-        real(dp), parameter :: tol = 1e-10 
+        real(dp), parameter :: tol = 1e-5 
 
         val = sum(corr_nm1*corr_nm2) / &
                 (sqrt(sum(corr_nm1**2))*sqrt(sum(corr_nm2**2))+tol)
@@ -1863,6 +1865,29 @@ end if
             ! Write summary to log
             write(*,"(a,a2,i4,g12.4,a3,2i8,2g12.4)") &
                 "ssa: ", trim(converged_txt), iter, resid, " | ", nx_check, ny_check, ux_resid_max, uy_resid_max 
+
+if (.TRUE.) then
+            if (ux_resid_max .ge. 9999.0_wp .or. uy_resid_max .ge. 9999.0_wp) then 
+                ! Strange case is occurring. Poor convergence with high error, investigate
+
+                write(io_unit_err,*) "ssa: Error: strange case occurring."
+                write(io_unit_err,"(a,a2,i4,g12.4,a3,2i8,2g12.4)") &
+                "ssa: ", trim(converged_txt), iter, resid, " | ", nx_check, ny_check, ux_resid_max, uy_resid_max 
+
+                write(io_unit_err,*) "Writing diagnostic file: ssa_check.nc."
+
+                ! Initialize output file 
+                call ssa_diagnostics_write_init("ssa_check.nc",nx=size(ux,1),ny=size(ux,2),time_init=real(iter,wp))
+
+                ! Write file with dummy zero values for variables we don't have
+                call ssa_diagnostics_write_step("ssa_check.nc",ux,uy,resid,ux*0.0_wp,ux*0.0_wp,ux*0.0_wp, &
+                                        int(ux*0.0_wp),int(ux*0.0_wp),ux-ux_prev,uy-uy_prev,ux*0.0_wp,ux*0.0_wp,ux*0.0_wp,ux*0.0_wp, &
+                                        ux*0.0_wp,ux*0.0_wp,ux*0.0_wp,ux*0.0_wp,ux_prev,uy_prev,time=real(iter,wp))
+
+                stop 
+
+            end if 
+end if 
 
         end if 
         

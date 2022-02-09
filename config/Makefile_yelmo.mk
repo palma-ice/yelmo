@@ -96,7 +96,8 @@ $(objdir)/solver_advection_new.o: $(srcdir)/physics/solver_advection_new.f90 $(o
 $(objdir)/topography.o: $(srcdir)/physics/topography.f90 $(objdir)/yelmo_defs.o
 	$(FC) $(DFLAGS) $(FFLAGS) -c -o $@ $<
 
-$(objdir)/velocity_general.o: $(srcdir)/physics/velocity_general.f90 $(objdir)/yelmo_defs.o
+$(objdir)/velocity_general.o: $(srcdir)/physics/velocity_general.f90 $(objdir)/yelmo_defs.o \
+								$(objdir)/solver_ssa_sico5.o
 	$(FC) $(DFLAGS) $(FFLAGS) -c -o $@ $<
 
 $(objdir)/velocity_sia.o: $(srcdir)/physics/velocity_sia.f90 \

@@ -291,6 +291,10 @@ end if
                                 z_srf,dx,dy,par%ssa_vel_max,par%boundaries,par%ssa_lateral_bc,par%ssa_lis_opt)
 
 
+! ajr: use adapative ssa relaxation or use parameter value
+! For Antarctica, the adaptive method can give some strange
+! convergence issues. It has been disabled for now (2022-02-09).
+if (.FALSE.) then
             ! Calculate errors 
             corr_nm2 = corr_nm1 
             call picard_calc_error(corr_nm1,ux_bar,uy_bar,ux_bar_nm1,uy_bar_nm1)
@@ -305,7 +309,9 @@ end if
             else 
                 corr_rel = 0.5_wp 
             end if 
-
+else
+            corr_rel = par%ssa_iter_rel
+end if
             !write(*,*) "pic: ", iter, corr_theta, corr_rel
 
             ! Apply relaxation to keep things stable

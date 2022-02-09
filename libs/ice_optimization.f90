@@ -21,6 +21,122 @@ module ice_optimization
 
 contains 
     
+    ! subroutine update_calving_kt(kt,H_ice,H_grnd,dHicedt,H_obs,H_grnd_obs,basins, &
+    !                                 tau,m,kt_min,kt_max,dt)
+
+    !     implicit none 
+
+    !     real(wp), intent(INOUT) :: kt(:,:) 
+    !     real(wp), intent(IN)    :: H_ice(:,:)
+    !     real(wp), intent(IN)    :: f_grnd(:,:)
+    !     real(wp), intent(IN)    :: dHicedt(:,:)
+    !     real(wp), intent(IN)    :: H_obs(:,:)
+    !     real(wp), intent(IN)    :: H_grnd_obs(:,:)
+    !     real(wp), intent(IN)    :: basins(:,:) 
+    !     real(wp), intent(IN)    :: H_grnd_lim 
+    !     real(wp), intent(IN)    :: tau
+    !     real(wp), intent(IN)    :: m
+    !     real(wp), intent(IN)    :: kt_min 
+    !     real(wp), intent(IN)    :: kt_max 
+    !     real(wp), intent(IN)    :: dt 
+
+    !     ! Local variables
+    !     integer  :: i, j, nx, ny, n  
+    !     integer  :: b, nb  
+    !     real(wp) :: f_damp 
+    !     real(wp) :: H_obs_bar 
+    !     real(wp) :: H_bar 
+    !     real(wp) :: H_bar_err
+    !     real(wp) :: A_obs 
+    !     real(wp) :: A_mod
+    !     real(wp) :: A_err
+    !     real(wp) :: dHdt_bar
+    !     real(wp) :: tf_corr_dot
+
+    !     logical,  allocatable :: mask(:,:) 
+    !     real(wp), allocatable :: basin_list(:) 
+        
+    !     real(wp), parameter :: tol = 1e-5_wp
+
+    !     ! Internal parameters 
+    !     f_damp = 2.0 
+
+    !     nx = size(kt,1)
+    !     ny = size(kt,2) 
+
+    !     allocate(mask(nx,ny)) 
+
+    !     ! Determine unique basin numbers 
+    !     call unique(basin_list,reshape(basins,[nx*ny]))
+    !     nb = size(basin_list,1) 
+
+    !     ! Loop over each basin
+    !     do b = 1, nb 
+            
+    !         ! Calculate the floating ice area for this basin
+
+    !         mask =  abs(basins-basin_list(b)) .lt. tol .and. &
+    !                 f_grnd .eq. 0.0
+
+    !         if (count(mask) .gt. 0) then 
+
+    !         ! How many points available 
+    !         n = count(mask)
+
+                
+    !         if (n .gt. 0) then 
+    !             ! Points are available for averaging 
+
+    !             ! Calculate average observed thickness for masked region
+    !             H_obs_bar = sum(H_obs,mask=mask)   / real(n,wp)
+
+    !             ! Calculate average thickness and rate of change for masked region
+    !             H_bar     = sum(H_ice,mask=mask)   / real(n,wp)
+    !             dHdt_bar  = sum(dHicedt,mask=mask) / real(n,wp)
+
+    !         else 
+    !             ! Quantities are not defined
+
+    !             H_obs_bar = missing_value 
+
+    !             H_bar     = 0.0_wp
+    !             dHdt_bar  = 0.0_wp 
+            
+    !         end if 
+
+            
+    !         if (H_obs_bar .ne. missing_value) then 
+    !             ! Observed ice exists in basin, proceed with calculations
+                                
+    !             ! Get mean error for this basin
+    !             H_bar_err = H_bar - H_obs_bar 
+
+
+    !             ! Get adjustment rate given error in floating ice area  =========
+                
+    !             kt_dot = -(cf_prev(i,j)/H0)*((H_err_now / tau_c) + f_damp*dHdt_now)
+
+    !             ! Apply correction to all points in basin =========
+
+    !             where(basins .eq. basin_list(b))
+
+    !                 kt = kt + kt_dot*dt 
+
+    !             end where 
+
+    !         end if 
+
+    !     end do 
+
+
+    !     ! Ensure tf_corr is not below lower or upper limit 
+    !     where (tf_corr .lt. tf_min) tf_corr = tf_min 
+    !     where (tf_corr .gt. tf_max) tf_corr = tf_max 
+
+    !     return 
+
+    ! end subroutine update_calving_kt
+
     subroutine update_tf_corr_l21(tf_corr,H_ice,H_grnd,dHicedt,H_obs,basins,H_grnd_lim, &
                                     tau_m,m_temp,tf_min,tf_max,dt)
 

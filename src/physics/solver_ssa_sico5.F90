@@ -1755,7 +1755,7 @@ end if
             ! Write summary to log
             write(*,"(a,a2,i4,g12.4,a3,2i8,2g12.4)") &
                 "ssa: ", trim(converged_txt), iter, resid, " | ", nx_check, ny_check, ux_resid_max, uy_resid_max 
-
+                
         end if 
         
         return 

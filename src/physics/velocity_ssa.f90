@@ -217,7 +217,9 @@ end if
 ! using the adaptive relaxation scheme with corr_theta below.
 ! If using a constant relaxation of par%ssa_iter_rel=0.7,
 ! then par%ssa_iter_conv = 1e-2 is sufficient for proper performance.
-if (.TRUE.) then
+! For Antarctica, the adaptive method can give some strange
+! convergence issues. It has been disabled for now (2022-02-09).
+if (.FALSE.) then
             ! Calculate errors 
             corr_nm2 = corr_nm1 
             call picard_calc_error(corr_nm1,ux_b,uy_b,ux_b_nm1,uy_b_nm1)

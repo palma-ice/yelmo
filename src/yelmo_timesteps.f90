@@ -482,7 +482,7 @@ end if
 
         ! Finally, ensure timestep is within prescribed limits
         call limit_adaptive_timestep(dt_new,dtmin,dtmax_now)
-
+        
         return 
 
     end subroutine set_adaptive_timestep_pc
@@ -710,12 +710,12 @@ end if
         real(prec), parameter :: n_decimal   = 6          ! Maximum decimals to treat for timestep
         real(prec), parameter :: dt_half_lim = 0.5_prec   ! Should be 0.5 or greater to make sense
 
-        ! Ensure timestep is also within parameter limits 
-        dt = max(dtmin,dt)  ! dt >= dtmin
-        dt = min(dtmax,dt)  ! dt <= dtmax
-
         ! Check to avoid lopsided timesteps (1 big, 1 tiny) to arrive at time_max  
         if (dtmax .gt. 0.0) then 
+
+            ! Ensure timestep is also within parameter limits 
+            dt = max(dtmin,dt)  ! dt >= dtmin
+            dt = min(dtmax,dt)  ! dt <= dtmax
 
             if (dt/dtmax .gt. dt_half_lim .and. dt .lt. dtmax) then 
                 ! Current adaptive timestep is greater than ~0.5 of the total
@@ -731,6 +731,11 @@ end if
                 dt = real(floor(dt*10.0_prec**n_decimal)*10.0_prec**(-n_decimal), prec)
                 
             end if 
+
+        else 
+            ! dt is simply zero 
+
+            dt = dtmax 
 
         end if 
 

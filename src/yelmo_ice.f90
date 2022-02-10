@@ -92,8 +92,12 @@ contains
         ! Load last model time (from dom%tpo, should be equal to dom%thrm)
         time_now = dom%tpo%par%time
 
-        ! Determine maximum number of time steps to be iterated through   
+        ! Determine maximum number of time steps to be iterated through 
+        ! Note: ensure at least one step will be performed, so that even 
+        ! if the time is already up-to-date, masks etc can be calculated
+        ! if desired. 
         nstep   = ceiling( (time-time_now) / dom%par%dt_min )
+        nstep   = max(nstep,1)  
         n_now   = 0  ! Number of timesteps saved 
 
         iter_redo_tot = 0   ! Number of times total this loop 
@@ -163,6 +167,17 @@ contains
                 dt_now = dom%par%dt_min 
 
             end if 
+
+
+            ! Finally, override all cases if time is already up-to-date.
+            ! This is done here, to let all PC timestepping algorithms etc
+            ! update themselves with dt_now>0. 
+            if (dt_max .eq. 0.0) then 
+
+                dt_now = 0.0_wp 
+
+            end if 
+
 
             do iter_redo=1, dom%par%pc_n_redo 
                 ! Prepare to potentially perform several iterations of the same timestep.
@@ -314,7 +329,7 @@ contains
                 call set_pc_mask(pc_mask,dom%time%pc_tau,dom%tpo%now%H_ice_pred,dom%tpo%now%H_ice_corr, &
                                                     dom%bnd%z_bed,dom%bnd%z_sl,dom%tpo%par%margin_flt_subgrid)
                 eta_now = calc_pc_eta(dom%time%pc_tau,mask=pc_mask)
-                
+
                 ! Save masked pc_tau for output too 
                 dom%time%pc_tau_masked = dom%time%pc_tau 
                 where( .not. pc_mask) dom%time%pc_tau_masked = 0.0_prec 
@@ -371,7 +386,7 @@ contains
             
             ! Update dt and eta vectors for last N timesteps (first index becomes latest value)
             dom%time%pc_dt = cshift(dom%time%pc_dt,shift=-1)
-            dom%time%pc_dt(1) = dt_now 
+            dom%time%pc_dt(1) = max(dt_now,dom%par%dt_min) 
 
             dom%time%pc_eta = cshift(dom%time%pc_eta,shift=-1)
             dom%time%pc_eta(1) = eta_now

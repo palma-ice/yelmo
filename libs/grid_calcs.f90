@@ -41,6 +41,14 @@ module grid_calcs
     public :: ddy_cy_to_b_2D 
     public :: ddx_cy_to_b_2D 
     public :: ddy_cx_to_b_2D
+    public :: map_a_to_cx_2D
+    public :: map_a_to_cy_2D
+    public :: map_a_to_cx_3D
+    public :: map_a_to_cy_3D
+    public :: map_cx_to_a_2D 
+    public :: map_cy_to_a_2D 
+    public :: map_cx_to_a_3D 
+    public :: map_cy_to_a_3D 
 
 contains
 
@@ -1341,215 +1349,227 @@ contains
 ! ! ===== Mapping between (staggered) grids =====
 ! ! =============================================
 
-!   ! Aa to Acx/Acy
+    ! Aa to Acx/Acy
+
+    ! 2D
+    subroutine map_a_to_cx_2D( d_cx, d_a )
+        ! Input:  scalar on the Aa grid
+        ! Output: the same on the Acx grid
+
+        implicit none
+
+        ! In/output variables:
+
+        real(wp),  intent(OUT)   :: d_cx(:,:)
+        real(wp),  intent(IN)    :: d_a(:,:)
+        
+        ! Local variables:
+        integer :: i, j, nx, ny
+
+        nx = size(d_a,1)
+        ny = size(d_a,2) 
+
+        do j = 1, ny
+        do i = 1, nx-1
+            d_cx(i,j) = (d_a(i,j) + d_a(i+1,j)) / 2.0_wp
+        end do
+        end do
+
+        ! Fill in border
+        d_cx(nx,:) = d_cx(nx-1,:)
+
+        return 
+
+    end subroutine map_a_to_cx_2D
+
+    subroutine map_a_to_cy_2D( d_cy, d_a )
+        ! Input:  scalar on the Aa grid
+        ! Output: the same on the Acy grid
+
+        implicit none
+
+        ! In/output variables:
+
+        real(wp),  intent(OUT)   :: d_cy(:,:)
+        real(wp),  intent(IN)    :: d_a(:,:)
+        
+        ! Local variables:
+        integer :: i, j, nx, ny
+
+        nx = size(d_a,1)
+        ny = size(d_a,2) 
+
+        do j = 1, ny-1
+        do i = 1, nx
+          d_cy(i,j) = (d_a(i,j) + d_a(i,j+1)) / 2.0_wp
+        end do
+        end do
+
+        ! Fill in border
+        d_cy(:,ny) = d_cy(:,ny-1)
+
+        return
+
+    end subroutine map_a_to_cy_2D
+
+    ! 3D
+    subroutine map_a_to_cx_3D( d_cx, d_a )
+        ! Input:  scalar on the Aa grid
+        ! Output: the same on the Acx grid
+
+        implicit none
+
+        ! In/output variables:
+
+        real(wp),  intent(OUT)   :: d_cx(:,:,:)
+        real(wp),  intent(IN)    :: d_a(:,:,:)
+        
+        ! Local variables:
+        integer :: k, nz 
+
+        nz = size(d_a,3)
+
+        do k = 1, nz 
+            call map_a_to_cx_2D(d_cx(:,:,k),d_a(:,:,k))
+        end do
+
+        return
+
+    end subroutine map_a_to_cx_3D
+
+    subroutine map_a_to_cy_3D( d_cy, d_a )
+        ! Input:  scalar on the Aa grid
+        ! Output: the same on the Acy grid
+
+        implicit none
+
+        ! In/output variables:
+
+        real(wp),  intent(OUT)   :: d_cy(:,:,:)
+        real(wp),  intent(IN)    :: d_a(:,:,:)
+        
+        ! Local variables:
+        integer :: k, nz 
+
+        nz = size(d_a,3)
+
+        do k = 1, nz 
+            call map_a_to_cy_2D(d_cy(:,:,k),d_a(:,:,k))
+        end do
+
+        return 
+
+    end subroutine map_a_to_cy_3D
   
-!   ! 2D
-!   subroutine map_a_to_cx_2D( d_a, d_cx)
-!     ! Input:  scalar on the Aa grid
-!     ! Output: the same on the Acx grid
-    
-!     implicit none
-    
-!     ! In/output variables:
-    
-!     real(wp), intent(IN)    :: d_a
-!     real(wp),  intent(OUT)   :: d_cx
-    
-!     ! Local variables:
-!     integer :: i, j, nx, ny
-    
-!     do i = 1, nx-1
-!     do j = 1, ny
-!       d_cx(i,j) = (d_a(i,j) + d_a(i+1,j)) / 2.0_wp
-!     end do
-!     end do
-    
-    
-!   end subroutine map_a_to_cx_2D
-!   subroutine map_a_to_cy_2D( d_a, d_cy)
-!     ! Input:  scalar on the Aa grid
-!     ! Output: the same on the Acy grid
-    
-!     implicit none
-    
-!     ! In/output variables:
-    
-!     real(wp), intent(IN)    :: d_a
-!     real(wp),  intent(OUT)   :: d_cy
-    
-!     ! Local variables:
-!     integer :: i, j, nx, ny
-    
-!     do i = 1, nx
-!     do j = 1, ny-1
-!       d_cy(i,j) = (d_a(i,j) + d_a(i,j+1)) / 2.0_wp
-!     end do
-!     end do
-    
-    
-!   end subroutine map_a_to_cy_2D
-!   ! 3D
-!   subroutine map_a_to_cx_3D( d_a, d_cx)
-!     ! Input:  scalar on the Aa grid
-!     ! Output: the same on the Acx grid
-    
-!     implicit none
-    
-!     ! In/output variables:
-    
-!     real(wp),  intent(IN)    :: d_a
-!     real(wp),  intent(OUT)   :: d_cx
-    
-!     ! Local variables:
-!     integer :: i, j, nx, ny,k
-    
-!     do i = 1, nx-1
-!     do j = 1, ny
-!     do k = 1, C%nZ
-!       d_cx(i,j,k) = (d_a(i,j,k) + d_a(i+1,j,k)) / 2.0_wp
-!     end do
-!     end do
-!     end do
-    
-    
-!   end subroutine map_a_to_cx_3D
-!   subroutine map_a_to_cy_3D( d_a, d_cy)
-!     ! Input:  scalar on the Aa grid
-!     ! Output: the same on the Acy grid
-    
-!     implicit none
-    
-!     ! In/output variables:
-    
-!     real(wp),  intent(IN)    :: d_a
-!     real(wp),  intent(OUT)   :: d_cy
-    
-!     ! Local variables:
-!     integer :: i, j, nx, ny,k
-    
-!     do i = 1, nx
-!     do j = 1, ny-1
-!     do k = 1, C%nZ
-!       d_cy(i,j,k) = (d_a(i,j,k) + d_a(i,j+1,k)) / 2.0_wp
-!     end do
-!     end do
-!     end do
-    
-    
-!   end subroutine map_a_to_cy_3D
-  
-!   ! Acx/Acy to Aa
-  
-!   ! 2D
-!   subroutine map_cx_to_a_2D( d_cx, d_a)
-!     ! Input:  scalar on the Acx grid
-!     ! Output: the same on the Aa grid
-    
-!     implicit none
-    
-!     ! In/output variables:
-    
-!     real(wp),  intent(IN)    :: d_cx
-!     real(wp), intent(OUT)   :: d_a
-    
-!     ! Local variables:
-!     integer :: i, j, nx, ny
-    
-!     do i = 2, nx-1
-!     do j = 1, ny
-!       d_a(i,j) = (d_cx(i-1,j) + d_cx(i,j)) / 2.0_wp
-!     end do
-!     end do
-    
-    
-!     d_a(1,:) = d_cx(1,:)
-!     d_a(nx,:) = d_cx(nx-1,:)
-    
-    
-!   end subroutine map_cx_to_a_2D
-!   subroutine map_cy_to_a_2D( d_cy, d_a)
-!     ! Input:  scalar on the Acy grid
-!     ! Output: the same on the Aa grid
-    
-!     implicit none
-    
-!     ! In/output variables:
-    
-!     real(wp),  intent(IN)    :: d_cy
-!     real(wp), intent(OUT)   :: d_a
-    
-!     ! Local variables:
-!     integer :: i, j, nx, ny
-    
-!     do i = 1, nx
-!     do j = 2, ny-1
-!       d_a(i,j) = (d_cy(i,j-1) + d_cy(i,j)) / 2.0_wp
-!     end do
-!     end do
-    
-    
-!     d_a(:,1) = d_cy(:,1)
-!     d_a(:,ny) = d_cy(:,ny-1)
-    
-    
-!   end subroutine map_cy_to_a_2D
-!   ! 3D
-!   subroutine map_cx_to_a_3D( d_cx, d_a)
-!     ! Input:  scalar on the Acx grid
-!     ! Output: the same on the Aa grid
-    
-!     implicit none
-    
-!     ! In/output variables:
-    
-!     real(wp),  intent(IN)    :: d_cx
-!     real(wp),  intent(OUT)   :: d_a
-    
-!     ! Local variables:
-!     integer :: i, j, nx, ny,k
-    
-!     do i = 2, nx-1
-!     do j = 1, ny
-!     do k = 1, C%nZ
-!       d_a(i,j,k) = (d_cx(i-1,j,k) + d_cx(i,j,k)) / 2.0_wp
-!     end do
-!     end do
-!     end do
-    
-    
-!     d_a(1,:,:) = d_cx( :,grid%j1:grid%j2,1        )
-!     d_a(nx,:,:) = d_cx( :,grid%j1:grid%j2,nx-1)
-    
-    
-!   end subroutine map_cx_to_a_3D
-!   subroutine map_cy_to_a_3D( d_cy, d_a)
-!     ! Input:  scalar on the Acy grid
-!     ! Output: the same on the Aa grid
-    
-!     implicit none
-    
-!     ! In/output variables:
-    
-!     real(wp),  intent(IN)    :: d_cy
-!     real(wp),  intent(OUT)   :: d_a
-    
-!     ! Local variables:
-!     integer :: i, j, nx, ny,k
-    
-!     do i = 1, nx
-!     do j = 2, ny-1
-!     do k = 1, C%nZ
-!       d_a(i,j,k) = (d_cy(i,j-1,k) + d_cy(i,j,k)) / 2.0_wp
-!     end do
-!     end do
-!     end do
-    
-    
-!     d_a(:,1,:) = d_cy( :,1        ,grid%i1:grid%i2)
-!     d_a(:,ny,:) = d_cy( :,ny-1,grid%i1:grid%i2)
-    
-    
-!   end subroutine map_cy_to_a_3D
+    ! Acx/Acy to Aa
+
+    ! 2D
+    subroutine map_cx_to_a_2D( d_a, d_cx )
+        ! Input:  scalar on the Acx grid
+        ! Output: the same on the Aa grid
+
+        implicit none
+
+        ! In/output variables:
+
+        real(wp),  intent(OUT)   :: d_a(:,:)
+        real(wp),  intent(IN)    :: d_cx(:,:)
+        
+        ! Local variables:
+        integer :: i, j, nx, ny
+
+        nx = size(d_a,1)
+        ny = size(d_a,2) 
+
+        do i = 2, nx
+        do j = 1, ny
+            d_a(i,j) = (d_cx(i-1,j) + d_cx(i,j)) / 2.0_wp
+        end do
+        end do
+
+        d_a(1,:) = d_cx(1,:)
+
+        return 
+
+    end subroutine map_cx_to_a_2D
+
+    subroutine map_cy_to_a_2D( d_a, d_cy )
+        ! Input:  scalar on the Acy grid
+        ! Output: the same on the Aa grid
+
+        implicit none
+
+        ! In/output variables:
+
+        real(wp),  intent(OUT)   :: d_a(:,:)
+        real(wp),  intent(IN)    :: d_cy(:,:)
+        
+        ! Local variables:
+        integer :: i, j, nx, ny
+
+        nx = size(d_a,1)
+        ny = size(d_a,2) 
+
+        do i = 1, nx
+        do j = 2, ny
+            d_a(i,j) = (d_cy(i,j-1) + d_cy(i,j)) / 2.0_wp
+        end do
+        end do
+
+        d_a(:,1) = d_cy(:,1)
+
+        return
+
+    end subroutine map_cy_to_a_2D
+
+    ! 3D
+    subroutine map_cx_to_a_3D( d_a, d_cx )
+        ! Input:  scalar on the Acx grid
+        ! Output: the same on the Aa grid
+
+        implicit none
+
+        ! In/output variables:
+
+        real(wp),  intent(OUT)   :: d_a(:,:,:)
+        real(wp),  intent(IN)    :: d_cx(:,:,:)
+        
+        ! Local variables:
+        integer :: k, nz 
+
+        nz = size(d_a,3) 
+
+        do k = 1, nz 
+          call map_cx_to_a_2D(d_a(:,:,k),d_cx(:,:,k))
+        end do
+
+        return 
+
+    end subroutine map_cx_to_a_3D
+
+    subroutine map_cy_to_a_3D( d_a, d_cy )
+        ! Input:  scalar on the Acy grid
+        ! Output: the same on the Aa grid
+        
+        implicit none
+
+        ! In/output variables:
+
+        real(wp),  intent(OUT)   :: d_a(:,:,:)
+        real(wp),  intent(IN)    :: d_cy(:,:,:)
+        
+        ! Local variables:
+        integer :: k, nz 
+
+        nz = size(d_a,3) 
+
+        do k = 1, nz 
+          call map_cy_to_a_2D(d_a(:,:,k),d_cy(:,:,k))
+        end do
+
+        return 
+
+    end subroutine map_cy_to_a_3D
   
 !   ! Acx/Acy to Acy/Acx
 !   subroutine map_cx_to_cy_2D( d_cx, d_cy)

@@ -17,6 +17,7 @@ module deformation
                     staggerdiffcross_nodes_acx_ab_ice, staggerdiffcross_nodes_acy_ab_ice, &
                     staggerdiff_nodes_acz_dx_ab_ice, staggerdiff_nodes_acz_dy_ab_ice
                     
+    use grid_calcs 
 
     implicit none 
     
@@ -31,6 +32,7 @@ module deformation
     public :: calc_rate_factor_eismint
     public :: scale_rate_factor_water
     public :: calc_rate_factor_integrated
+    public :: calc_strain_rate_tensor_new 
     public :: calc_strain_rate_tensor
     public :: calc_strain_rate_tensor_aa
     public :: calc_strain_rate_tensor_2D
@@ -493,6 +495,184 @@ contains
 
     end function calc_rate_factor_integrated
     
+    subroutine calc_strain_rate_tensor_new(strn, strn2D, ux, uy, uz, H_ice, f_ice, f_grnd,  &
+                    zeta_aa, zeta_ac, dx, de_max, n_glen)
+        ! -------------------------------------------------------------------------------
+        !  Computation of all components of the strain-rate tensor, the full
+        !  effective strain rate and the shear fraction.
+        !  Alexander Robinson: Adapted from sicopolis5-dev::calc_dxyz 
+        ! ------------------------------------------------------------------------------
+
+        ! Note: ux, uy are staggered on ac-nodes in the horizontal, but are on the zeta_aa nodes (ie layer-centered)
+        ! in the vertical. uz is centered on aa-nodes in the horizontal, but staggered on zeta_ac nodes
+        ! in the vertical. 
+
+        ! Note: first calculate each tensor component on ab-nodes, then interpolate to aa-nodes)
+        ! This is a quadrature approach and is generally more stable. 
+        ! The temperorary variable dd_ab(1:4) is used to hold the values 
+        ! calculated at each corner (ab-node), starting from dd_ab(1)==upper-right, and
+        ! moving counter-clockwise. The average of dd_ab(1:4) gives the cell-centered
+        ! (aa-node) value.
+
+        implicit none
+        
+        type(strain_3D_class), intent(INOUT) :: strn            ! [yr^-1] on aa-nodes (3D)
+        type(strain_2D_class), intent(INOUT) :: strn2D          ! [yr^-1] on aa-nodes (2D)
+        real(wp), intent(IN) :: ux(:,:,:)                       ! nx,ny,nz_aa
+        real(wp), intent(IN) :: uy(:,:,:)                       ! nx,ny,nz_aa
+        real(wp), intent(IN) :: uz(:,:,:)                       ! nx,ny,nz_ac
+        real(wp), intent(IN) :: H_ice(:,:)
+        real(wp), intent(IN) :: f_ice(:,:)
+        real(wp), intent(IN) :: f_grnd(:,:)
+        real(wp), intent(IN) :: zeta_aa(:) 
+        real(wp), intent(IN) :: zeta_ac(:) 
+        real(wp), intent(IN) :: dx
+        real(wp), intent(IN) :: de_max                          ! [yr^-1] Maximum allowed effective strain rate
+        real(wp), intent(IN) :: n_glen
+
+        ! Local variables 
+        integer  :: i, j, k
+        integer  :: im1, ip1, jm1, jp1 
+        integer  :: nx, ny, nz_aa, nz_ac  
+        real(wp) :: dxi, deta, dzeta
+        real(wp) :: dy  
+        real(wp) :: dx_inv, dy_inv
+        real(wp) :: dx_2_inv, dy_2_inv
+        real(wp) :: H_ice_inv
+        real(wp) :: lxz, lzx, lyz, lzy
+        real(wp) :: shear_squared 
+        real(wp) :: ux_aa, uy_aa 
+        real(wp), allocatable :: fact_x(:,:), fact_y(:,:)
+        real(wp), allocatable :: fact_z(:)
+        real(wp), allocatable :: lxy(:,:,:)
+        real(wp), allocatable :: lyx(:,:,:)
+
+        ! Determine sizes and allocate local variables 
+        nx    = size(ux,1)
+        ny    = size(ux,2)
+        nz_aa = size(zeta_aa,1)
+
+        allocate(lxy(nx,ny,nz_aa))
+        allocate(lyx(nx,ny,nz_aa))
+        
+        !-------- Initialisation --------
+
+        strn%dxx          = 0.0_wp
+        strn%dyy          = 0.0_wp
+        strn%dxy          = 0.0_wp
+        strn%dxz          = 0.0_wp
+        strn%dyz          = 0.0_wp
+        strn%de           = 0.0_wp
+        strn%div          = 0.0_wp 
+        strn%f_shear      = 0.0_wp
+
+        !-------- Computation --------
+
+        call ddx_cx_to_a_3D(strn%dxx,ux,dx) 
+        call ddy_cy_to_a_3D(strn%dyy,uy,dx) 
+        
+        call ddy_cx_to_a_3D(lxy,ux,dx)
+        call ddx_cy_to_a_3D(lyx,uy,dx)
+
+        strn%dxy = 0.5_wp*(lxy+lyx)
+
+        call ddz_cx_to_a_3D(strn%dxz,ux,H_ice,zeta_aa)
+        call ddz_cy_to_a_3D(strn%dyz,uy,H_ice,zeta_aa)
+
+        ! In fact, we need additional cross terms for zx and zy, but
+        ! not implemented yet. Assume it is small for now.
+
+        ! call ddz_cx_to_a_3D(lxz,ux,zeta_aa)
+        ! call ddz_cy_to_a_3D(lyz,uy,zeta_aa)
+
+        ! call ddx_cz_to_a_3D(lzx,ux,zeta_aa)
+        ! call ddy_cz_to_a_3D(lzy,uy,zeta_aa)
+
+        ! strn%dxz = 0.5_wp*(lxz+lzx)
+        ! strn%dyz = 0.5_wp*(lyz+lzy)
+
+
+        !$omp parallel do
+        do j=1, ny
+        do i=1, nx
+
+            do k = 1, nz_aa 
+
+                ! Avoid extreme values
+                if (strn%dxz(i,j,k) .lt. -de_max) strn%dxz(i,j,k) = -de_max 
+                if (strn%dxz(i,j,k) .gt.  de_max) strn%dxz(i,j,k) =  de_max 
+
+                if (strn%dyz(i,j,k) .lt. -de_max) strn%dyz(i,j,k) = -de_max 
+                if (strn%dyz(i,j,k) .gt.  de_max) strn%dyz(i,j,k) =  de_max 
+                
+                ! Avoid underflows 
+                if (abs(strn%dxz(i,j,k)) .lt. TOL_UNDERFLOW) strn%dxz(i,j,k) = 0.0 
+                if (abs(strn%dyz(i,j,k)) .lt. TOL_UNDERFLOW) strn%dyz(i,j,k) = 0.0 
+
+                ! ====== Finished calculating individual strain rate terms ====== 
+                
+                strn%de(i,j,k) =  sqrt(  strn%dxx(i,j,k)*strn%dxx(i,j,k) &
+                                       + strn%dyy(i,j,k)*strn%dyy(i,j,k) &
+                                       + strn%dxx(i,j,k)*strn%dyy(i,j,k) &
+                                       + strn%dxy(i,j,k)*strn%dxy(i,j,k) &
+                                       + strn%dxz(i,j,k)*strn%dxz(i,j,k) &
+                                       + strn%dyz(i,j,k)*strn%dyz(i,j,k) )
+                
+                if (strn%de(i,j,k) .gt. de_max) strn%de(i,j,k) = de_max 
+
+                ! Calculate the horizontal divergence too 
+                strn%div(i,j,k) = strn%dxx(i,j,k) + strn%dyy(i,j,k) 
+
+                ! Note: Using only the below should be equivalent to applying
+                ! the SIA approximation to calculate `de`
+                !strn%de(i,j,k)    =  sqrt( shear_squared(k) )
+
+                if (strn%de(i,j,k) .gt. 0.0) then 
+                    ! Calculate the shear-based strain, stretching and the shear-fraction
+                    shear_squared  =   strn%dxz(i,j,k)*strn%dxz(i,j,k) &
+                                     + strn%dyz(i,j,k)*strn%dyz(i,j,k)
+                    strn%f_shear(i,j,k) = sqrt(shear_squared)/strn%de(i,j,k)
+                else 
+                    strn%f_shear(i,j,k) = 1.0   ! Shearing by default for low strain rates
+                end if 
+
+                !  ------ Modification of the shear fraction for floating ice (ice shelves)
+
+                if (f_grnd(i,j) .eq. 0.0) then 
+                    strn%f_shear(i,j,k) = 0.0    ! Assume ice shelf is only stretching, no shear 
+                end if 
+
+                !  ------ Constrain the shear fraction to reasonable [0,1] interval
+
+                strn%f_shear(i,j,k) = min(max(strn%f_shear(i,j,k), 0.0), 1.0)
+
+            end do 
+
+        end do
+        end do
+        !$omp end parallel do
+
+
+        ! === Also calculate vertically averaged strain rate tensor ===
+        
+        ! Get the 2D average of strain rate in case it is needed 
+        strn2D%dxx     = calc_vertical_integrated_2D(strn%dxx, zeta_aa)
+        strn2D%dyy     = calc_vertical_integrated_2D(strn%dyy, zeta_aa)
+        strn2D%dxy     = calc_vertical_integrated_2D(strn%dxy, zeta_aa)
+        strn2D%dxz     = calc_vertical_integrated_2D(strn%dxz, zeta_aa)
+        strn2D%dyz     = calc_vertical_integrated_2D(strn%dyz, zeta_aa)
+        strn2D%div     = calc_vertical_integrated_2D(strn%div, zeta_aa)
+        strn2D%de      = calc_vertical_integrated_2D(strn%de,  zeta_aa)
+        strn2D%f_shear = calc_vertical_integrated_2D(strn%f_shear,zeta_aa) 
+        
+        ! Finally, calculate the first two eigenvectors for 2D strain rate tensor 
+        call calc_2D_eigen_values(strn2D%eps_eig_1,strn2D%eps_eig_2, &
+                                    strn2D%dxx,strn2D%dyy,strn2D%dxy)
+
+        return
+
+    end subroutine calc_strain_rate_tensor_new
+
     subroutine calc_strain_rate_tensor(strn, strn2D, vx, vy, vz, H_ice, f_ice, f_grnd,  &
                     zeta_aa, zeta_ac, dx, de_max, n_glen)
         ! -------------------------------------------------------------------------------
@@ -770,7 +950,7 @@ contains
 
                     strn%dxz(i,j,k) = 0.5_wp*(lxz+lzx)
                     strn%dyz(i,j,k) = 0.5_wp*(lyz+lzy)
-                    
+
                     ! ajr: testing 
                     ! Note: when dxz=dyz=0, the model is more stable. This is clearly
                     ! not correct, but it indicates that these terms are important

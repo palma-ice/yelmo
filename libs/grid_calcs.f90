@@ -30,6 +30,8 @@ module grid_calcs
     public :: ddx_cy_to_a_2D
     public :: ddx_cx_to_a_3D
     public :: ddy_cy_to_a_3D
+    public :: ddx_cy_to_a_3D
+    public :: ddy_cx_to_a_3D
     public :: ddy_cx_to_cx_2D
     public :: ddx_cy_to_cy_2D 
     public :: ddy_cy_to_cy_2D 
@@ -54,7 +56,11 @@ module grid_calcs
     public :: map_a_to_b_2D 
     public :: map_cx_to_b_2D
     public :: map_cy_to_b_2D
-    
+
+    ! Vertical derivatives 
+    public :: ddz_cx_to_a_3D
+    public :: ddz_cy_to_a_3D
+
 contains
 
 ! ======================
@@ -924,6 +930,56 @@ contains
 
     end subroutine ddy_cy_to_a_3D
 
+    subroutine ddx_cy_to_a_3D( dx_a, d_cy, dx )
+        ! Input:  scalar on the Acy grid
+        ! Output: its x-derivative on the Aa grid
+        
+        implicit none
+
+        ! In/output variables:
+
+        real(wp),  intent(OUT)   :: dx_a(:,:,:)
+        real(wp),  intent(IN)    :: d_cy(:,:,:)
+        real(wp),  intent(IN)    :: dx 
+
+        ! Local variables:
+        integer :: k, nz
+
+        nz = size(d_cy,3) 
+
+        do k = 1, nz 
+            call ddx_cy_to_a_2D(dx_a(:,:,k),d_cy(:,:,k),dx)
+        end do
+
+        return
+
+    end subroutine ddx_cy_to_a_3D
+    
+    subroutine ddy_cx_to_a_3D( dy_a, d_cx, dx )
+        ! Input:  scalar on the Acx grid
+        ! Output: its y-derivative on the Aa grid
+        
+        implicit none
+
+        ! In/output variables:
+
+        real(wp),  intent(OUT)   :: dy_a(:,:,:)
+        real(wp),  intent(IN)    :: d_cx(:,:,:)
+        real(wp),  intent(IN)    :: dx 
+
+        ! Local variables:
+        integer :: k, nz
+
+        nz = size(d_cx,3) 
+
+        do k = 1, nz 
+            call ddy_cx_to_a_2D(dy_a(:,:,k),d_cx(:,:,k),dx)
+        end do
+
+        return
+
+    end subroutine ddy_cx_to_a_3D
+    
     ! Acx/Acy to Acx/Acy
     subroutine ddx_cx_to_cx_2D( dx_cx, d_cx, dx )
         ! Input:  scalar on the Acx grid
@@ -1350,9 +1406,124 @@ contains
 
     end subroutine ddy_cx_to_b_2D
 
-! ! =============================================
-! ! ===== Mapping between (staggered) grids =====
-! ! =============================================
+
+    ! Vertical derivatives 
+
+    subroutine ddz_cx_to_a_3D( dz_a, d_cx, Hi, zeta )
+        ! Input:  scalar on the Acx grid
+        ! Output: its z-derivative on the Aa grid (Aa vertically too)
+
+        implicit none
+
+        real(wp), intent(OUT) :: dz_a(:,:,:) 
+        real(wp), intent(IN)  :: d_cx(:,:,:) 
+        real(wp), intent(IN)  :: Hi(:,:)
+        real(wp), intent(IN)  :: zeta(:) 
+
+        ! Local variables:
+        integer :: i, j, k, nx, ny, nz 
+        real(wp), allocatable :: dz(:) 
+        real(wp), allocatable :: d_a(:,:,:) 
+
+        nx = size(d_cx,1)
+        ny = size(d_cx,2) 
+        nz = size(d_cx,3) 
+
+        allocate(dz(nz))
+        allocate(d_a(nx,ny,nz))
+
+        ! Get dz for each layer, centered differences
+        ! for middle layers, one-sided differences for 
+        ! upper and lower layers
+
+        dz(1) = zeta(2)-zeta(1)
+        do k = 2, nz-1 
+            dz(k) = zeta(k+1)-zeta(k-1)
+        end do 
+        dz(nz) = zeta(nz)-zeta(nz-1) 
+
+        ! Get d_cx variable on aa-nodes for each layer
+        do k = 1, nz 
+            call map_cx_to_a_2D(d_a(:,:,k),d_cx(:,:,k))
+        end do 
+
+        do j = 1, ny 
+        do i = 1, nx 
+
+            dz_a(i,j,1) = (d_a(i,j,2) - d_a(i,j,1)) / (Hi(i,j)*dz(1))
+
+            do k = 2, nz-1 
+                dz_a(i,j,1) = (d_a(i,j,k+1) - d_a(i,j,k-1)) / (Hi(i,j)*dz(k))
+            end do 
+
+            dz_a(i,j,nz) = (d_a(i,j,nz) - d_a(i,j,nz-1)) / (Hi(i,j)*dz(nz))
+
+        end do
+        end do  
+
+        return
+
+    end subroutine ddz_cx_to_a_3D
+
+    subroutine ddz_cy_to_a_3D( dz_a, d_cy, Hi, zeta )
+        ! Input:  scalar on the Acx grid
+        ! Output: its z-derivative on the Aa grid (Aa vertically too)
+
+        implicit none
+
+        real(wp), intent(OUT) :: dz_a(:,:,:) 
+        real(wp), intent(IN)  :: d_cy(:,:,:) 
+        real(wp), intent(IN)  :: Hi(:,:)
+        real(wp), intent(IN)  :: zeta(:) 
+
+        ! Local variables:
+        integer :: i, j, k, nx, ny, nz 
+        real(wp), allocatable :: dz(:) 
+        real(wp), allocatable :: d_a(:,:,:) 
+
+        nx = size(d_cy,1)
+        ny = size(d_cy,2) 
+        nz = size(d_cy,3) 
+
+        allocate(dz(nz))
+        allocate(d_a(nx,ny,nz))
+
+        ! Get dz for each layer, centered differences
+        ! for middle layers, one-sided differences for 
+        ! upper and lower layers
+
+        dz(1) = zeta(2)-zeta(1)
+        do k = 2, nz-1 
+            dz(k) = zeta(k+1)-zeta(k-1)
+        end do 
+        dz(nz) = zeta(nz)-zeta(nz-1) 
+
+        ! Get d_cy variable on aa-nodes for each layer
+        do k = 1, nz 
+            call map_cy_to_a_2D(d_a(:,:,k),d_cy(:,:,k))
+        end do 
+
+        do j = 1, ny 
+        do i = 1, nx 
+
+            dz_a(i,j,1) = (d_a(i,j,2) - d_a(i,j,1)) / (Hi(i,j)*dz(1))
+
+            do k = 2, nz-1 
+                dz_a(i,j,1) = (d_a(i,j,k+1) - d_a(i,j,k-1)) / (Hi(i,j)*dz(k))
+            end do 
+
+            dz_a(i,j,nz) = (d_a(i,j,nz) - d_a(i,j,nz-1)) / (Hi(i,j)*dz(nz))
+
+        end do
+        end do  
+        
+        return
+
+    end subroutine ddz_cy_to_a_3D
+
+! =============================================
+! ===== Mapping between (staggered) grids =====
+! =============================================
 
     ! Aa to Acx/Acy
 

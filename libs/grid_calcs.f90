@@ -6,6 +6,16 @@ module grid_calcs
   use yelmo_defs, only : wp, dp, io_unit_err
 
   public 
+  public :: ddx_a_to_a_2D 
+  public :: ddy_a_to_a_2D 
+  public :: ddxx_a_to_a_2D 
+  public :: ddyy_a_to_a_2D 
+  public :: ddxy_a_to_a_2D 
+  public :: ddx_a_to_a_3D
+  public :: ddy_a_to_a_3D
+  public :: ddxx_a_to_a_3D
+  public :: ddyy_a_to_a_3D
+  public :: ddxy_a_to_a_3D
 
 contains
 
@@ -175,7 +185,6 @@ contains
         end do
         end do
         
-        
         ! One-sided differencing on the boundaries
         ! NO IDEA HOW TO do THIS...
         dxy_a(1,:)  = 0.0_wp
@@ -207,7 +216,7 @@ contains
         ny = size(d_a,2) 
         nz = size(d_a,3) 
 
-        ! Loop over vertical layers and calculate horizotal derivatives 
+        ! Loop over vertical layers and calculate horizontal derivatives 
         do k = 1, nz 
             call ddx_a_to_a_2D(dx_a(:,:,k),d_a(:,:,k),dx)
         end do 
@@ -235,7 +244,7 @@ contains
         ny = size(d_a,2) 
         nz = size(d_a,3) 
 
-        ! Loop over vertical layers and calculate horizotal derivatives 
+        ! Loop over vertical layers and calculate horizontal derivatives 
         do k = 1, nz 
             call ddy_a_to_a_2D(dy_a(:,:,k),d_a(:,:,k),dx)
         end do 
@@ -244,100 +253,89 @@ contains
 
     end subroutine ddy_a_to_a_3D
 
-!   subroutine ddxx_a_to_a_3D( d_a, dxx_a)
-!     ! Input:  scalar on the Aa grid
-!     ! Output: its xx-derivative on the Aa grid
-    
-!     implicit none
-    
-!     ! In/output variables:
-    
-!     real(wp),  intent(IN)    :: d_a
-!     real(wp),  intent(OUT)   :: dxx_a
-    
-!     ! Local variables:
-!     integer :: i, j, nx, ny,k
-    
-!     ! Central differencing in the interior
-!     do i = 2, nx-1
-!     do j = 1, ny
-!     do k = 1, C%nZ
-!       dxx_a( k,j,i) = (d_a( k,j,i+1) + d_a( k,j,i-1) - 2.0_wp * d_a( k,j,i)) / dx**2
-!     end do
-!     end do
-!     end do
-    
-    
-!     ! One-sided differencing on the boundaries
-!     dxx_a( :,grid%j1:grid%j2,1      ) = (d_a( :,grid%j1:grid%j2,3      ) + d_a( :,grid%j1:grid%j2,1        ) - 2.0_wp * d_a( :,grid%j1:grid%j2,2        )) / dx**2
-!     dxx_a( :,grid%j1:grid%j2,grid%nx) = (d_a( :,grid%j1:grid%j2,grid%nx) + d_a( :,grid%j1:grid%j2,grid%nx-2) - 2.0_wp * d_a( :,grid%j1:grid%j2,grid%nx-1)) / dx**2
-    
-    
-!   end subroutine ddxx_a_to_a_3D
-!   subroutine ddyy_a_to_a_3D( d_a, dyy_a)
-!     ! Input:  scalar on the Aa grid
-!     ! Output: its yy-derivative on the Aa grid
-    
-!     implicit none
-    
-!     ! In/output variables:
-    
-!     real(wp),  intent(IN)    :: d_a
-!     real(wp),  intent(OUT)   :: dyy_a
-    
-!     ! Local variables:
-!     integer :: i, j, nx, ny,k
-    
-!     ! Central differencing in the interior
-!     do i = 1, nx
-!     do j = 2, ny-1
-!     do k = 1, C%nZ
-!       dyy_a( k,j,i) = (d_a( k,j+1,i) + d_a( k,j-1,i) - 2.0_wp * d_a( k,j,i)) / dx**2
-!     end do
-!     end do
-!     end do
-    
-    
-!     ! One-sided differencing on the boundaries
-!     dyy_a( :,1      ,grid%i1:grid%i2) = (d_a( :,3      ,grid%i1:grid%i2) + d_a( :,1        ,grid%i1:grid%i2) - 2.0_wp * d_a( :,2        ,grid%i1:grid%i2)) / dx**2
-!     dyy_a( :,grid%ny,grid%i1:grid%i2) = (d_a( :,grid%ny,grid%i1:grid%i2) + d_a( :,grid%ny-2,grid%i1:grid%i2) - 2.0_wp * d_a( :,grid%ny-1,grid%i1:grid%i2)) / dx**2
-    
-    
-!   end subroutine ddyy_a_to_a_3D
-!   subroutine ddxy_a_to_a_3D( d_a, dxy_a)
-!     ! Input:  scalar on the Aa grid
-!     ! Output: its xy-derivative on the Aa grid
-    
-!     implicit none
-    
-!     ! In/output variables:
-    
-!     real(wp),  intent(IN)    :: d_a
-!     real(wp),  intent(OUT)   :: dxy_a
-    
-!     ! Local variables:
-!     integer :: i, j, nx, ny,k
-    
-!     ! Central differencing in the interior
-!     do i = 2, nx-1
-!     do j = 2, ny-1
-!     do k = 1, C%nZ
-!       dxy_a( k,j,i) = (d_a( k,j+1,i+1) + d_a( k,j-1,i-1) - d_a( k,j+1,i-1) - d_a( k,j-1,i+1)) / (4.0_wp * dx * dx)
-!     end do
-!     end do
-!     end do
-    
-    
-!     ! One-sided differencing on the boundaries
-!     ! NO IDEA HOW TO do THIS...
-!     dxy_a( :,1              ,grid%i1:grid%i2) = 0.0_wp
-!     dxy_a( :,grid%ny        ,grid%i1:grid%i2) = 0.0_wp
-!     dxy_a( :,grid%j1:grid%j2,1              ) = 0.0_wp
-!     dxy_a( :,grid%j1:grid%j2,grid%nx        ) = 0.0_wp
-    
-    
-!   end subroutine ddxy_a_to_a_3D
+    subroutine ddxx_a_to_a_3D( dxx_a, d_a, dx )
+        ! Input:  scalar on the Aa grid
+        ! Output: its xx-derivative on the Aa grid
+        
+        implicit none
+        
+        ! In/output variables:
+        
+        real(wp),  intent(OUT)   :: dxx_a(:,:,:)
+        real(wp),  intent(IN)    :: d_a(:,:,:)
+        real(wp),  intent(IN)    :: dx 
 
+        ! Local variables:
+        integer :: i, j, k, nx, ny, nz 
+
+        nx = size(d_a,1)
+        ny = size(d_a,2) 
+        nz = size(d_a,3) 
+
+        ! Loop over vertical layers and calculate horizontal derivatives 
+        do k = 1, nz 
+            call ddxx_a_to_a_2D(dxx_a(:,:,k),d_a(:,:,k),dx)
+        end do 
+
+        return 
+
+    end subroutine ddxx_a_to_a_3D
+
+    subroutine ddyy_a_to_a_3D( dyy_a, d_a, dx )
+        ! Input:  scalar on the Aa grid
+        ! Output: its yy-derivative on the Aa grid
+        
+        implicit none
+        
+        ! In/output variables:
+        
+        real(wp),  intent(OUT)   :: dyy_a(:,:,:)
+        real(wp),  intent(IN)    :: d_a(:,:,:)
+        real(wp),  intent(IN)    :: dx 
+
+        ! Local variables:
+        integer :: i, j, k, nx, ny, nz 
+
+        nx = size(d_a,1)
+        ny = size(d_a,2) 
+        nz = size(d_a,3) 
+
+        ! Loop over vertical layers and calculate horizontal derivatives 
+        do k = 1, nz 
+            call ddyy_a_to_a_2D(dyy_a(:,:,k),d_a(:,:,k),dx)
+        end do 
+
+        return 
+
+    end subroutine ddyy_a_to_a_3D
+
+    subroutine ddxy_a_to_a_3D( dxy_a, d_a, dx )
+        ! Input:  scalar on the Aa grid
+        ! Output: its xy-derivative on the Aa grid
+        
+        implicit none
+        
+        ! In/output variables:
+        
+        real(wp),  intent(OUT)   :: dxy_a(:,:,:)
+        real(wp),  intent(IN)    :: d_a(:,:,:)
+        real(wp),  intent(IN)    :: dx 
+
+        ! Local variables:
+        integer :: i, j, k, nx, ny, nz 
+
+        nx = size(d_a,1)
+        ny = size(d_a,2) 
+        nz = size(d_a,3) 
+
+        ! Loop over vertical layers and calculate horizontal derivatives 
+        do k = 1, nz 
+            call ddxy_a_to_a_2D(dxy_a(:,:,k),d_a(:,:,k),dx)
+        end do 
+
+        return 
+
+    end subroutine ddxy_a_to_a_3D
 
 !   ! 3D upwind, for thermodynamics
 !   subroutine ddx_a_to_a_3D_upwind( d_a, dx_a, U_3D_a)

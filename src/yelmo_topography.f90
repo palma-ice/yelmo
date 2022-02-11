@@ -11,6 +11,8 @@ module yelmo_topography
     use calving
     use topography 
 
+    use grid_calcs 
+
     implicit none
     
     ! Key for matching bed types given by mask_bed 
@@ -408,12 +410,22 @@ end if
         
         ! Calculate the ice thickness gradient (on staggered acx/y nodes)
         !call calc_gradient_ac(tpo%now%dHicedx,tpo%now%dHicedy,tpo%now%H_ice,tpo%par%dx)
-        call calc_gradient_ac_ice(tpo%now%dHicedx,tpo%now%dHicedy,tpo%now%H_ice,tpo%now%f_ice,tpo%par%dx, &
-                                                tpo%par%margin2nd,tpo%par%grad_lim,tpo%par%boundaries,zero_outside=.TRUE.)
+        ! call calc_gradient_ac_ice(tpo%now%dHicedx,tpo%now%dHicedy,tpo%now%H_ice,tpo%now%f_ice,tpo%par%dx, &
+        !                                         tpo%par%margin2nd,tpo%par%grad_lim,tpo%par%boundaries,zero_outside=.TRUE.)
         
         ! Calculate the surface slope
-        call calc_gradient_ac(tpo%now%dzsdx,tpo%now%dzsdy,tpo%now%z_srf,tpo%par%dx)
+        ! call calc_gradient_ac(tpo%now%dzsdx,tpo%now%dzsdy,tpo%now%z_srf,tpo%par%dx)
 
+
+        ! New routines 
+        call map_a_to_b_2D(tpo%now%H_ice_ab,tpo%now%H_ice)
+
+        call ddx_a_to_cx_2D(tpo%now%dHicedx,tpo%now%H_ice,tpo%par%dx)
+        call ddy_a_to_cy_2D(tpo%now%dHicedy,tpo%now%H_ice,tpo%par%dx)
+        
+        call ddx_a_to_cx_2D(tpo%now%dzsdx,tpo%now%z_srf,tpo%par%dx)
+        call ddy_a_to_cy_2D(tpo%now%dzsdy,tpo%now%z_srf,tpo%par%dx)
+        
         ! ajr: experimental, doesn't seem to work properly yet! ===>
         ! Modify surface slope gradient at the grounding line if desired 
 !         call calc_gradient_ac_gl(tpo%now%dzsdx,tpo%now%dzsdy,tpo%now%z_srf,tpo%now%H_ice, &
@@ -713,6 +725,10 @@ end if
         allocate(now%H_eff(nx,ny))
         allocate(now%H_grnd(nx,ny))
 
+
+        allocate(now%H_ice_ab(nx,ny))
+
+
         ! Masks 
         allocate(now%f_grnd(nx,ny))
         allocate(now%f_grnd_acx(nx,ny))
@@ -758,6 +774,9 @@ end if
         now%dHicedy     = 0.0
         now%H_eff       = 0.0 
         now%H_grnd      = 0.0  
+
+        now%H_ice_ab    = 0.0 
+
         now%f_grnd      = 0.0  
         now%f_grnd_acx  = 0.0  
         now%f_grnd_acy  = 0.0  
@@ -814,6 +833,8 @@ end if
         if (allocated(now%H_eff))       deallocate(now%H_eff)
         if (allocated(now%H_grnd))      deallocate(now%H_grnd)
 
+        if (allocated(now%H_ice_ab))     deallocate(now%H_ice_ab)
+        
         if (allocated(now%f_grnd))      deallocate(now%f_grnd)
         if (allocated(now%f_grnd_acx))  deallocate(now%f_grnd_acx)
         if (allocated(now%f_grnd_acy))  deallocate(now%f_grnd_acy)

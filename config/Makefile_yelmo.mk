@@ -143,7 +143,7 @@ $(objdir)/yelmo_timesteps.o : $(srcdir)/yelmo_timesteps.f90 $(objdir)/yelmo_defs
 $(objdir)/yelmo_topography.o: $(srcdir)/yelmo_topography.f90 $(objdir)/yelmo_defs.o \
 							  $(objdir)/yelmo_grid.o $(objdir)/yelmo_tools.o  \
  							  $(objdir)/mass_conservation.o $(objdir)/calving.o \
- 							  $(objdir)/topography.o
+ 							  $(objdir)/topography.o $(objdir)/grid_calcs.o
 	$(FC) $(DFLAGS) $(FFLAGS) -c -o $@ $<
 
 $(objdir)/yelmo_dynamics.o: $(srcdir)/yelmo_dynamics.f90 $(objdir)/yelmo_defs.o \

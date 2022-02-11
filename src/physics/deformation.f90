@@ -770,6 +770,13 @@ contains
 
                     strn%dxz(i,j,k) = 0.5_wp*(lxz+lzx)
                     strn%dyz(i,j,k) = 0.5_wp*(lyz+lzy)
+                    
+                    ! ajr: testing 
+                    ! Note: when dxz=dyz=0, the model is more stable. This is clearly
+                    ! not correct, but it indicates that these terms are important
+                    ! for stability, as expected. Keep in mind for future work. 
+                    !strn%dxz(i,j,k) = 0.0_wp
+                    !strn%dyz(i,j,k) = 0.0_wp
 
                     ! Avoid extreme values
                     if (strn%dxz(i,j,k) .lt. -de_max) strn%dxz(i,j,k) = -de_max 

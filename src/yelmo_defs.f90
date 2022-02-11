@@ -162,6 +162,8 @@ module yelmo_defs
         
         real(wp), allocatable   :: H_eff(:,:)       ! Effective ice thickness (margin-corrected) [m]
         real(wp), allocatable   :: H_grnd(:,:)      ! Ice thickness overburden [m]
+            
+        real(wp), allocatable   :: H_ice_ab(:,:)  
         
         ! Masks 
         real(wp), allocatable   :: f_grnd(:,:)      ! Grounded fraction (grounding line fraction between 0 and 1)

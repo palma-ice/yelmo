@@ -16,6 +16,8 @@ module grid_calcs
   public :: ddxx_a_to_a_3D
   public :: ddyy_a_to_a_3D
   public :: ddxy_a_to_a_3D
+  public :: ddx_a_to_a_3D_upwind
+  public :: ddy_a_to_a_3D_upwind
 
 contains
 
@@ -337,75 +339,90 @@ contains
 
     end subroutine ddxy_a_to_a_3D
 
-!   ! 3D upwind, for thermodynamics
-!   subroutine ddx_a_to_a_3D_upwind( d_a, dx_a, U_3D_a)
-!     ! Input:  scalar on the Aa grid
-!     ! Output: its x-derivative on the Aa grid, using upwind one-sided differencing
-    
-!     implicit none
-    
-!     ! In/output variables:
-    
-!     real(wp),  intent(IN)    :: d_a
-!     real(wp),  intent(OUT)   :: dx_a
-!     real(wp),  intent(IN)    :: U_3D_a
-    
-!     ! Local variables:
-!     integer :: i, j, nx, ny,k
-    
-!     ! Upwind one-sided differencing
-!     do i = 2, nx-1
-!     do j = 1, ny
-!     do k = 1, C%nZ
-!       IF (U_3D_a( k,j,i) > 0.0_wp) THEN
-!         dx_a( k,j,i) = (d_a( k,j,i  ) - d_a( k,j,i-1)) / dx
-!       ELSE
-!         dx_a( k,j,i) = (d_a( k,j,i+1) - d_a( k,j,i  )) / dx
-!       end IF
-!     end do
-!     end do
-!     end do
-    
-    
-!     dx_a( :,grid%j1:grid%j2,1      ) = 0.0_wp
-!     dx_a( :,grid%j1:grid%j2,grid%nx) = 0.0_wp
-    
-    
-!   end subroutine ddx_a_to_a_3D_upwind
-!   subroutine ddy_a_to_a_3D_upwind( d_a, dy_a, V_3D_a)
-!     ! Input:  scalar on the Aa grid
-!     ! Output: its y-derivative on the Aa grid, using upwind one-sided differencing
-    
-!     implicit none
-    
-!     ! In/output variables:
-    
-!     real(wp),  intent(IN)    :: d_a
-!     real(wp),  intent(OUT)   :: dy_a
-!     real(wp),  intent(IN)    :: V_3D_a
-    
-!     ! Local variables:
-!     integer :: i, j, nx, ny,k
-    
-!     ! Upwind one-sided differencing
-!     do i = 1, nx
-!     do j = 2, ny-1
-!     do k = 1, C%nZ
-!       IF (V_3D_a( k,j,i) > 0.0_wp) THEN
-!         dy_a( k,j,i) = (d_a( k,j  ,i) - d_a( k,j-1,i)) / dx
-!       ELSE
-!         dy_a( k,j,i) = (d_a( k,j+1,i) - d_a( k,j  ,i)) / dx
-!       end IF
-!     end do
-!     end do
-!     end do
-    
-    
-!     dy_a( :,1      ,grid%i1:grid%i2) = 0.0_wp
-!     dy_a( :,grid%ny,grid%i1:grid%i2) = 0.0_wp
-    
-    
-!   end subroutine ddy_a_to_a_3D_upwind
+    ! 3D upwind, for thermodynamics
+    subroutine ddx_a_to_a_3D_upwind( dx_a, d_a, U_3D_a, dx )
+        ! Input:  scalar on the Aa grid
+        ! Output: its x-derivative on the Aa grid, using upwind one-sided differencing
+
+        implicit none
+
+        ! In/output variables:
+
+        real(wp),  intent(OUT)   :: dx_a(:,:,:)
+        real(wp),  intent(IN)    :: d_a(:,:,:)
+        real(wp),  intent(IN)    :: U_3D_a(:,:,:)
+        real(wp),  intent(IN)    :: dx 
+
+        ! Local variables:
+        integer :: i, j, k, nx, ny, nz 
+
+        nx = size(d_a,1)
+        ny = size(d_a,2) 
+        nz = size(d_a,3) 
+
+        ! Upwind one-sided differencing
+        do k = 1, nz
+        do j = 1, ny
+        do i = 2, nx-1
+        
+          if (U_3D_a(i,j,k) > 0.0_wp) then
+            dx_a(i,j,k) = (d_a(i,j,k) - d_a(i-1,j,k)) / dx
+          else
+            dx_a(i,j,k) = (d_a(i+1,j,k) - d_a(i,j,k)) / dx
+          end if
+
+        end do
+        end do
+        end do
+
+        dx_a(1,:,:)  = 0.0_wp
+        dx_a(nx,:,:) = 0.0_wp
+
+        return 
+
+    end subroutine ddx_a_to_a_3D_upwind
+
+    subroutine ddy_a_to_a_3D_upwind( dy_a, d_a, V_3D_a, dx)
+        ! Input:  scalar on the Aa grid
+        ! Output: its y-derivative on the Aa grid, using upwind one-sided differencing
+
+        implicit none
+
+        ! In/output variables:
+
+        real(wp),  intent(OUT)   :: dy_a(:,:,:)
+        real(wp),  intent(IN)    :: d_a(:,:,:)
+        real(wp),  intent(IN)    :: V_3D_a(:,:,:)
+        real(wp),  intent(IN)    :: dx 
+
+        ! Local variables:
+        integer :: i, j, k, nx, ny, nz 
+
+        nx = size(d_a,1)
+        ny = size(d_a,2) 
+        nz = size(d_a,3) 
+
+        ! Upwind one-sided differencing
+        do k = 1, nz
+        do j = 2, ny-1
+        do i = 1, nx
+        
+            if (V_3D_a(i,j,k) > 0.0_wp) then
+                dy_a(i,j,k) = (d_a(i,j,k) - d_a(i,j-1,k)) / dx
+            else
+                dy_a(i,j,k) = (d_a(i,j+1,k) - d_a(i,j,k)) / dx
+            end if
+
+        end do
+        end do
+        end do
+
+        dy_a(:,1,:)  = 0.0_wp
+        dy_a(:,ny,:) = 0.0_wp
+
+        return
+
+    end subroutine ddy_a_to_a_3D_upwind
   
 !   ! Aa to Acx/Acy
   
@@ -532,7 +549,7 @@ contains
 !     do i = grid%i1, MIN(grid%nx-1,grid%i2)
 !     do j = 1, ny
 !     do k = 1, C%nZ
-!       dx_cx( k,j,i) = (d_a( k,j,i+1) - d_a( k,j,i)) / dx
+!       dx_cx(i,j,k) = (d_a(i+1,j,k) - d_a(i,j,k)) / dx
 !     end do
 !     end do
 !     end do
@@ -556,7 +573,7 @@ contains
 !     do i = 1, nx
 !     do j = 1, ny-1
 !     do k = 1, C%nZ
-!       dy_cy( k,j,i) = (d_a( k,j+1,i) - d_a( k,j,i)) / dx
+!       dy_cy(i,j,k) = (d_a(i,j+1,k) - d_a(i,j,k)) / dx
 !     end do
 !     end do
 !     end do
@@ -581,7 +598,7 @@ contains
 !     do i = 2, nx-1
 !     do j = 1, ny-1
 !     do k = 1, C%nZ
-!       dx_cy( k,j,i) = (d_a( k,j,i+1) + d_a( k,j+1,i+1) - d_a( k,j,i-1) - d_a( k,j+1,i-1)) / (4.0_wp * dx)
+!       dx_cy(i,j,k) = (d_a(i+1,j,k) + d_a( k,j+1,i+1) - d_a(i-1,j,k) - d_a( k,j+1,i-1)) / (4.0_wp * dx)
 !     end do
 !     end do
 !     end do
@@ -613,7 +630,7 @@ contains
 !     do i = grid%i1, MIN(grid%nx-1,grid%i2)
 !     do j = 2, ny-1
 !     do k = 1, C%nZ
-!       dy_cx( k,j,i) = (d_a( k,j+1,i) + d_a( k,j+1,i+1) - d_a( k,j-1,i) - d_a( k,j-1,i+1)) / (4.0_wp * dx)
+!       dy_cx(i,j,k) = (d_a(i,j+1,k) + d_a( k,j+1,i+1) - d_a(i,j-1,k) - d_a( k,j-1,i+1)) / (4.0_wp * dx)
 !     end do
 !     end do
 !     end do
@@ -726,12 +743,12 @@ contains
     
     
 !     ! Corners
-!     IF (par%master) THEN
+!     if (par%master) then
 !     dy_a( 1      ,1      ) = (d_cx( 2      ,1        ) - d_cx( 1        ,1        )) / dx
 !     dy_a( 1      ,grid%nx) = (d_cx( 2      ,grid%nx-1) - d_cx( 1        ,grid%nx-1)) / dx
 !     dy_a( grid%ny,1      ) = (d_cx( grid%ny,1        ) - d_cx( grid%ny-1,1        )) / dx
 !     dy_a( grid%ny,grid%nx) = (d_cx( grid%ny,grid%nx-1) - d_cx( grid%ny-1,grid%nx-1)) / dx
-!     end IF
+!     end if
     
     
 !   end subroutine ddy_cx_to_a_2D
@@ -778,12 +795,12 @@ contains
     
     
 !     ! Corners
-!     IF (par%master) THEN
+!     if (par%master) then
 !     dx_a( 1      ,      1) = (d_cy( 1        ,2      ) - d_cy( 1        ,1        )) / dx
 !     dx_a( 1      ,grid%nx) = (d_cy( 1        ,grid%nx) - d_cy( 1        ,grid%nx-1)) / dx
 !     dx_a( grid%ny,1      ) = (d_cy( grid%ny-1,2      ) - d_cy( grid%ny-1,1        )) / dx
 !     dx_a( grid%ny,grid%nx) = (d_cy( grid%ny-1,grid%nx) - d_cy( grid%ny-1,grid%nx-1)) / dx
-!     end IF
+!     end if
     
     
 !   end subroutine ddx_cy_to_a_2D
@@ -805,7 +822,7 @@ contains
 !     do i = 2, nx-1
 !     do j = 1, ny
 !     do k = 1, C%nZ
-!       dx_a( k,j,i) = (d_cx( k,j,i) - d_cx( k,j,i-1)) / dx
+!       dx_a(i,j,k) = (d_cx(i,j,k) - d_cx(i-1,j,k)) / dx
 !     end do
 !     end do
 !     end do
@@ -829,7 +846,7 @@ contains
 !     do i = 1, nx
 !     do j = 2, ny-1
 !     do k = 1, C%nZ
-!       dy_a( k,j,i) = (d_cy( k,j,i) - d_cy( k,j-1,i)) / dx
+!       dy_a(i,j,k) = (d_cy(i,j,k) - d_cy(i,j-1,k)) / dx
 !     end do
 !     end do
 !     end do
@@ -1266,7 +1283,7 @@ contains
 !     do i = grid%i1, MIN(grid%nx-1,grid%i2)
 !     do j = 1, ny
 !     do k = 1, C%nZ
-!       d_cx( k,j,i) = (d_a( k,j,i) + d_a( k,j,i+1)) / 2.0_wp
+!       d_cx(i,j,k) = (d_a(i,j,k) + d_a(i+1,j,k)) / 2.0_wp
 !     end do
 !     end do
 !     end do
@@ -1290,7 +1307,7 @@ contains
 !     do i = 1, nx
 !     do j = 1, ny-1
 !     do k = 1, C%nZ
-!       d_cy( k,j,i) = (d_a( k,j,i) + d_a( k,j+1,i)) / 2.0_wp
+!       d_cy(i,j,k) = (d_a(i,j,k) + d_a(i,j+1,k)) / 2.0_wp
 !     end do
 !     end do
 !     end do
@@ -1371,14 +1388,14 @@ contains
 !     do i = 2, nx-1
 !     do j = 1, ny
 !     do k = 1, C%nZ
-!       d_a( k,j,i) = (d_cx( k,j,i-1) + d_cx( k,j,i)) / 2.0_wp
+!       d_a(i,j,k) = (d_cx(i-1,j,k) + d_cx(i,j,k)) / 2.0_wp
 !     end do
 !     end do
 !     end do
     
     
-!     d_a( :,grid%j1:grid%j2,1      ) = d_cx( :,grid%j1:grid%j2,1        )
-!     d_a( :,grid%j1:grid%j2,grid%nx) = d_cx( :,grid%j1:grid%j2,grid%nx-1)
+!     d_a(1,:,:) = d_cx( :,grid%j1:grid%j2,1        )
+!     d_a(nx,:,:) = d_cx( :,grid%j1:grid%j2,grid%nx-1)
     
     
 !   end subroutine map_cx_to_a_3D
@@ -1399,14 +1416,14 @@ contains
 !     do i = 1, nx
 !     do j = 2, ny-1
 !     do k = 1, C%nZ
-!       d_a( k,j,i) = (d_cy( k,j-1,i) + d_cy( k,j,i)) / 2.0_wp
+!       d_a(i,j,k) = (d_cy(i,j-1,k) + d_cy(i,j,k)) / 2.0_wp
 !     end do
 !     end do
 !     end do
     
     
-!     d_a( :,1      ,grid%i1:grid%i2) = d_cy( :,1        ,grid%i1:grid%i2)
-!     d_a( :,grid%ny,grid%i1:grid%i2) = d_cy( :,grid%ny-1,grid%i1:grid%i2)
+!     d_a(:,1,:) = d_cy( :,1        ,grid%i1:grid%i2)
+!     d_a(:,ny,:) = d_cy( :,grid%ny-1,grid%i1:grid%i2)
     
     
 !   end subroutine map_cy_to_a_3D

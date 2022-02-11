@@ -15,6 +15,8 @@ module velocity_diva
                         picard_calc_error, picard_calc_error_angle, picard_relax, &
                         picard_calc_convergence_l2 
 
+    use grid_calcs 
+
     implicit none 
 
     type diva_param_class
@@ -213,7 +215,7 @@ contains
 
                     call calc_visc_eff_3D_aa(visc_eff,ux_bar,uy_bar,duxdz,duydz,ATT,H_ice,f_ice,zeta_aa, &
                                                             dx,dy,n_glen,par%eps_0,par%boundaries)
-
+                    
                 case DEFAULT 
 
                     write(*,*) "calc_velocity_diva:: Error: visc_method not recognized."
@@ -817,7 +819,7 @@ end if
         return 
 
     end subroutine calc_visc_eff_3D_aa
-    
+
     subroutine calc_visc_eff_int(visc_eff_int,visc_eff,H_ice,f_ice,zeta_aa,boundaries)
 
         implicit none 

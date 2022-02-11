@@ -114,7 +114,8 @@ $(objdir)/velocity_ssa.o: $(srcdir)/physics/velocity_ssa.f90 \
 
 $(objdir)/velocity_diva.o: $(srcdir)/physics/velocity_diva.f90 \
 						  	$(objdir)/yelmo_defs.o $(objdir)/yelmo_tools.o $(objdir)/basal_dragging.o \
-						  	$(objdir)/solver_ssa_sico5.o $(objdir)/velocity_general.o
+						  	$(objdir)/solver_ssa_sico5.o $(objdir)/velocity_general.o \
+						  	$(objdir)/grid_calcs.o
 	$(FC) $(DFLAGS) $(FFLAGS) -c -o $@ $<
 
 $(objdir)/velocity_l1l2.o: $(srcdir)/physics/velocity_l1l2.f90 \

@@ -574,23 +574,24 @@ contains
 
         !-------- Computation --------
 
+        ! Horizontal terms 
+
         call ddx_cx_to_a_3D(strn%dxx,ux,dx) 
         call ddy_cy_to_a_3D(strn%dyy,uy,dx) 
         
+        ! Cross terms 
+
         call ddy_cx_to_a_3D(lxy,ux,dx)
         call ddx_cy_to_a_3D(lyx,uy,dx)
 
         strn%dxy = 0.5_wp*(lxy+lyx)
 
-        ! call ddz_cx_to_a_3D(strn%dxz,ux,H_ice,zeta_aa)
-        ! call ddz_cy_to_a_3D(strn%dyz,uy,H_ice,zeta_aa)
-
-        ! In fact, we need additional cross terms for zx and zy, but
-        ! not implemented yet. Assume it is small for now.
+        ! Shearing terms
 
         call ddz_cx_to_a_3D(lxz,ux,H_ice,zeta_aa)
         call ddz_cy_to_a_3D(lyz,uy,H_ice,zeta_aa)
 
+        ! Vertical cross terms (from vertical acz => aa nodes too)
 
         call ddx_a_to_a_3D(lzx_acz,uz,dx)
         call ddy_a_to_a_3D(lzy_acz,uz,dx)
@@ -622,6 +623,8 @@ contains
         ! strn%dxz = lzx 
         ! strn%dyz = lzy 
 
+        ! Calculate further quantities...
+        
         !$omp parallel do
         do j=1, ny
         do i=1, nx

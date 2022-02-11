@@ -30,6 +30,13 @@ module grid_calcs
     public :: ddx_cy_to_a_2D
     public :: ddx_cx_to_a_3D
     public :: ddy_cy_to_a_3D
+    public :: ddy_cx_to_cx_2D
+    public :: ddx_cy_to_cy_2D 
+    public :: ddy_cy_to_cy_2D 
+    public :: ddx_cx_to_cy_2D 
+    public :: ddy_cx_to_cy_2D 
+    public :: ddx_cy_to_cx_2D 
+    public :: ddy_cy_to_cx_2D 
 
 contains
 
@@ -899,254 +906,298 @@ contains
         return
 
     end subroutine ddy_cy_to_a_3D
-    
-!   ! Acx/Acy to Acx/Acy
-!   subroutine ddx_cx_to_cx_2D( d_cx, dx_cx)
-!     ! Input:  scalar on the Acx grid
-!     ! Output: its x-derivative on the Acx grid
-    
-!     implicit none
-    
-!     ! In/output variables:
-    
-!     real(wp),  intent(IN)    :: d_cx
-!     real(wp),  intent(OUT)   :: dx_cx
-    
-!     ! Local variables:
-!     integer :: i, j, nx, ny
-    
-!     ! Central differencing in the interior
-!     do i = 2, nx-2
-!     do j = 1, ny
-!       dx_cx(i,j) = (d_cx(i+1,j) - d_cx(i-1,j)) / (2 * dx)
-!     end do
-!     end do
-    
-    
-!     ! One-sided differencing on the boundaries
-!     dx_cx( grid%j1:grid%j2,1        ) = (d_cx(2,:) - d_cx( grid%j1:grid%j2,1        )) / dx
-!     dx_cx(nx-1,:) = (d_cx(nx-1,:) - d_cx( grid%j1:grid%j2,nx-2)) / dx
-    
-    
-!   end subroutine ddx_cx_to_cx_2D
-!   subroutine ddy_cx_to_cx_2D( d_cx, dy_cx)
-!     ! Input:  scalar on the Acx grid
-!     ! Output: its y-derivative on the Acx grid
-    
-!     implicit none
-    
-!     ! In/output variables:
-    
-!     real(wp),  intent(IN)    :: d_cx
-!     real(wp),  intent(OUT)   :: dy_cx
-    
-!     ! Local variables:
-!     integer :: i, j, nx, ny
-    
-!     ! Central differencing in the interior
-!     do i = 1, nx-1
-!     do j = 2, ny-1
-!       dy_cx(i,j) = (d_cx(i,j+1) - d_cx(i,j-1)) / (2 * dx)
-!     end do
-!     end do
-    
-    
-!     ! One-sided differencing on the boundaries
-!     dy_cx(:,1) = (d_cx( 2      ,grid%i1:grid%i2) - d_cx( 1        ,grid%i1:grid%i2)) / dx
-!     dy_cx(:,ny) = (d_cx(:,ny) - d_cx( ny-1,grid%i1:grid%i2)) / dx
-    
-    
-!   end subroutine ddy_cx_to_cx_2D
-!   subroutine ddx_cy_to_cy_2D( d_cy, dx_cy)
-!     ! Input:  scalar on the Acy grid
-!     ! Output: its x-derivative on the Acy grid
-    
-!     implicit none
-    
-!     ! In/output variables:
-    
-!     real(wp),  intent(IN)    :: d_cy
-!     real(wp),  intent(OUT)   :: dx_cy
-    
-!     ! Local variables:
-!     integer :: i, j, nx, ny
-    
-!     ! Central differencing in the interior
-!     do i = 2, nx-1
-!     do j = 1, ny-1
-!       dx_cy(i,j) = (d_cy(i+1,j) - d_cy(i-1,j)) / (2 * dx)
-!     end do
-!     end do
-    
-    
-!     ! One-sided differencing on the boundaries
-!     dx_cy( grid%j1:MIN(grid%j2,ny-1),1      ) = (d_cy( grid%j1:MIN(grid%j2,ny-1),2      ) - d_cy( grid%j1:MIN(grid%j2,ny-1),1        )) / dx
-!     dx_cy( grid%j1:MIN(grid%j2,ny-1),nx) = (d_cy( grid%j1:MIN(grid%j2,ny-1),nx) - d_cy( grid%j1:MIN(grid%j2,ny-1),nx-1)) / dx
-    
-    
-!   end subroutine ddx_cy_to_cy_2D
-!   subroutine ddy_cy_to_cy_2D( d_cy, dy_cy)
-!     ! Input:  scalar on the Acy grid
-!     ! Output: its y-derivative on the Acy grid
-    
-!     implicit none
-    
-!     ! In/output variables:
-    
-!     real(wp),  intent(IN)    :: d_cy
-!     real(wp),  intent(OUT)   :: dy_cy
-    
-!     ! Local variables:
-!     integer :: i, j, nx, ny
-    
-!     ! Central differencing in the interior
-!     do i = 1, nx
-!     do j = 2, ny-2
-!       dy_cy(i,j) = (d_cy(i,j+1) - d_cy(i,j-1)) / (2 * dx)
-!     end do
-!     end do
-    
-    
-!     ! One-sided differencing on the boundaries
-!     dy_cy( 1        ,grid%i1:grid%i2) = (d_cy(:,2) - d_cy( 1        ,grid%i1:grid%i2)) / dx
-!     dy_cy( ny-1,grid%i1:grid%i2) = (d_cy( ny-1,grid%i1:grid%i2) - d_cy( ny-2,grid%i1:grid%i2)) / dx
-    
-    
-!   end subroutine ddy_cy_to_cy_2D
-!   subroutine ddx_cx_to_cy_2D( d_cx, dx_cy)
-!     ! Input:  scalar on the Acx grid
-!     ! Output: its x-derivative on the Acy grid
-    
-!     implicit none
-    
-!     ! In/output variables:
-    
-!     real(wp),  intent(IN)    :: d_cx
-!     real(wp),  intent(OUT)   :: dx_cy
-    
-!     ! Local variables:
-!     integer :: i, j, nx, ny
-    
-!     ! Interior
-!     do i = 2, nx-1
-!     do j = 1, ny-1
-!       dx_cy(i,j) = (d_cx( j,i  ) + d_cx(i,j+1) - d_cx(i-1,j) - d_cx(i-1,j+1)) / (2.0_wp * dx)
-!     end do
-!     end do
-    
-    
-!     ! Boundaries
-!     do j = 1, ny-1
-!       ! West
-!       dx_cy(1,j) = dx_cy( j,2        )
-!       ! East
-!       dx_cy(nx,j) = dx_cy(nx-1,j)
-!     end do
-    
-    
-!   end subroutine ddx_cx_to_cy_2D
-!   subroutine ddy_cx_to_cy_2D( d_cx, dy_cy)
-!     ! Input:  scalar on the Acx grid
-!     ! Output: its y-derivative on the Acy grid
-    
-!     implicit none
-    
-!     ! In/output variables:
-    
-!     real(wp),  intent(IN)    :: d_cx
-!     real(wp),  intent(OUT)   :: dy_cy
-    
-!     ! Local variables:
-!     integer :: i, j, nx, ny
-    
-!     ! Interior
-!     do i = 2, nx-1
-!     do j = 1, ny-1
-!       dy_cy(i,j) = (d_cx(i-1,j+1) + d_cx(i,j+1) - d_cx(i-1,j) - d_cx(i,j)) / (2.0_wp * dx)
-!     end do
-!     end do
-    
-    
-!     ! Boundaries
-!     do j = 1, ny-1
-!       ! West
-!       i = 1
-!       dy_cy(i,j) = (d_cx( j,i  ) - d_cx( j,i  )) / dx
-!       ! East
-!       i = nx
-!       dy_cy(i,j) = (d_cx(i-1,j) - d_cx(i-1,j)) / dx
-!     end do
-    
-    
-!   end subroutine ddy_cx_to_cy_2D
-!   subroutine ddx_cy_to_cx_2D( d_cy, dx_cx)
-!     ! Input:  scalar on the Acy grid
-!     ! Output: its x-derivative on the Acx grid
-    
-!     implicit none
-    
-!     ! In/output variables:
-    
-!     real(wp),  intent(IN)    :: d_cy
-!     real(wp),  intent(OUT)   :: dx_cx
-    
-!     ! Local variables:
-!     integer :: i, j, nx, ny
-    
-!     ! Interior
-!     do i = 1, nx-1
-!     do j = 2, ny-1
-!       dx_cx(i,j) = (d_cy(i+1,j-1) + d_cy(i+1,j) - d_cy(i,j-1) - d_cy(i,j)) / (2.0_wp * dx)
-!     end do
-!     end do
-    
-    
-!     ! Boundaries
-!     do i = 1, nx-1
-!       ! South
-!       j = 1
-!       dx_cx(i,j) = (d_cy(i+1,j) - d_cy(i,j)) / dx
-!       ! North
-!       j = ny
-!       dx_cx(i,j) = (d_cy(i+1,j-1) - d_cy(i,j-1)) / dx
-!     end do
-    
-    
-!   end subroutine ddx_cy_to_cx_2D
-!   subroutine ddy_cy_to_cx_2D( d_cy, dy_cx)
-!     ! Input:  scalar on the Acy grid
-!     ! Output: its y-derivative on the Acx grid
-    
-!     implicit none
-    
-!     ! In/output variables:
-    
-!     real(wp),  intent(IN)    :: d_cy
-!     real(wp),  intent(OUT)   :: dy_cx
-    
-!     ! Local variables:
-!     integer :: i, j, nx, ny
-    
-!     ! Interior
-!     do i = 1, nx-1
-!     do j = 2, ny-1
-!       dy_cx(i,j) = (d_cy(i,j) + d_cy(i+1,j) - d_cy(i,j-1) - d_cy(i+1,j-1)) / (2.0_wp * dx)
-!     end do
-!     end do
-    
-    
-!     ! Boundaries
-!     do i = 1, nx-1
-!       ! South
-!       j = 1
-!       dy_cx(i,j) = (d_cy(i,j+1) + d_cy(j+1,i+1) - d_cy(i,j) - d_cy(i+1,j)) / (2.0_wp * dx)
-!       ! North
-!       j = ny
-!       dy_cx(i,j) = (d_cy(i,j-1) + d_cy(j-1,i+1) - d_cy( j-2,i  ) - d_cy( j-2,i+1)) / (2.0_wp * dx)
-!     end do
-    
-    
-!   end subroutine ddy_cy_to_cx_2D
+
+    ! Acx/Acy to Acx/Acy
+    subroutine ddx_cx_to_cx_2D( dx_cx, d_cx, dx )
+        ! Input:  scalar on the Acx grid
+        ! Output: its x-derivative on the Acx grid
+
+        implicit none
+
+        ! In/output variables:
+
+        real(wp),  intent(OUT)   :: dx_cx(:,:)
+        real(wp),  intent(IN)    :: d_cx(:,:)
+        real(wp),  intent(IN)    :: dx 
+
+        ! Local variables:
+        integer :: i, j, nx, ny
+
+        nx = size(d_cx,1)
+        ny = size(d_cx,2) 
+        
+        ! Central differencing in the interior
+        do j = 1, ny
+        do i = 2, nx-1
+          dx_cx(i,j) = (d_cx(i+1,j) - d_cx(i-1,j)) / (2 * dx)
+        end do
+        end do
+
+        ! One-sided differencing on the boundaries
+        dx_cx(1,:)    = (d_cx(2,:) - d_cx(1,:)) / dx
+        dx_cx(nx-1,:) = (d_cx(nx-1,:) - d_cx(nx-2,:)) / dx
+        dx_cx(nx,:)   = d_cx(nx-1,:)
+
+        return
+
+    end subroutine ddx_cx_to_cx_2D
+
+    subroutine ddy_cx_to_cx_2D( dy_cx, d_cx, dx )
+        ! Input:  scalar on the Acx grid
+        ! Output: its y-derivative on the Acx grid
+
+        implicit none
+
+        ! In/output variables:
+
+        real(wp),  intent(OUT)   :: dy_cx(:,:)
+        real(wp),  intent(IN)    :: d_cx(:,:)
+        real(wp),  intent(IN)    :: dx 
+
+        ! Local variables:
+        integer :: i, j, nx, ny
+
+        nx = size(d_cx,1)
+        ny = size(d_cx,2) 
+        
+        ! Central differencing in the interior
+        do j = 2, ny-1
+        do i = 1, nx
+          dy_cx(i,j) = (d_cx(i,j+1) - d_cx(i,j-1)) / (2 * dx)
+        end do
+        end do
+
+        ! One-sided differencing on the boundaries
+        dy_cx(:,1)  = (d_cx(:,2) - d_cx(:,1)) / dx
+        dy_cx(:,ny) = (d_cx(:,ny) - d_cx(:,ny-1)) / dx
+
+        return
+
+    end subroutine ddy_cx_to_cx_2D
+
+    subroutine ddx_cy_to_cy_2D( dx_cy, d_cy, dx )
+        ! Input:  scalar on the Acy grid
+        ! Output: its x-derivative on the Acy grid
+
+        implicit none
+
+        ! In/output variables:
+
+        real(wp),  intent(OUT)   :: dx_cy(:,:)
+        real(wp),  intent(IN)    :: d_cy(:,:)
+        real(wp),  intent(IN)    :: dx 
+
+        ! Local variables:
+        integer :: i, j, nx, ny
+
+        nx = size(d_cy,1)
+        ny = size(d_cy,2) 
+        
+        ! Central differencing in the interior
+        do j = 1, ny
+        do i = 2, nx-1
+        dx_cy(i,j) = (d_cy(i+1,j) - d_cy(i-1,j)) / (2 * dx)
+        end do
+        end do
+
+        ! One-sided differencing on the boundaries
+        dx_cy(1,:)  = (d_cy(2,:) - d_cy(1,:)) / dx
+        dx_cy(nx,:) = (d_cy(nx,:) - d_cy(nx-1,:)) / dx
+
+        return
+
+    end subroutine ddx_cy_to_cy_2D
+
+    subroutine ddy_cy_to_cy_2D( dy_cy, d_cy, dx )
+        ! Input:  scalar on the Acy grid
+        ! Output: its y-derivative on the Acy grid
+
+        implicit none
+
+        ! In/output variables:
+
+        real(wp),  intent(OUT)   :: dy_cy(:,:)
+        real(wp),  intent(IN)    :: d_cy(:,:)
+        real(wp),  intent(IN)    :: dx 
+
+        ! Local variables:
+        integer :: i, j, nx, ny
+
+        nx = size(d_cy,1)
+        ny = size(d_cy,2) 
+
+        ! Central differencing in the interior
+        do j = 2, ny-1
+        do i = 1, nx
+            dy_cy(i,j) = (d_cy(i,j+1) - d_cy(i,j-1)) / (2 * dx)
+        end do
+        end do
+
+
+        ! One-sided differencing on the boundaries
+        dy_cy(:,1)    = (d_cy(:,2) - d_cy(:,1)) / dx
+        dy_cy(:,ny-1) = (d_cy(:,ny-1) - d_cy(:,ny-2)) / dx
+
+        return
+
+    end subroutine ddy_cy_to_cy_2D
+
+    subroutine ddx_cx_to_cy_2D( dx_cy, d_cx, dx )
+        ! Input:  scalar on the Acx grid
+        ! Output: its x-derivative on the Acy grid
+
+        implicit none
+
+        ! In/output variables:
+
+        real(wp),  intent(OUT)   :: dx_cy(:,:)
+        real(wp),  intent(IN)    :: d_cx(:,:)
+        real(wp),  intent(IN)    :: dx
+
+        ! Local variables:
+        integer :: i, j, nx, ny
+
+        nx = size(d_cx,1)
+        ny = size(d_cx,2) 
+
+        ! Interior
+        do j = 1, ny-1
+        do i = 2, nx-1
+            dx_cy(i,j) = (d_cx(i,j) + d_cx(i,j+1) - d_cx(i-1,j) - d_cx(i-1,j+1)) / (2.0_wp * dx)
+        end do
+        end do
+
+        ! Boundaries
+        do j = 1, ny
+            ! West
+            dx_cy(1,j)  = dx_cy(2,j)
+            ! East
+            dx_cy(nx,j) = dx_cy(nx-1,j)
+        end do
+
+        return 
+
+    end subroutine ddx_cx_to_cy_2D
+
+    subroutine ddy_cx_to_cy_2D( dy_cy, d_cx, dx )
+        ! Input:  scalar on the Acx grid
+        ! Output: its y-derivative on the Acy grid
+
+        implicit none
+
+        ! In/output variables:
+
+        real(wp),  intent(OUT)   :: dy_cy(:,:)
+        real(wp),  intent(IN)    :: d_cx(:,:)
+        real(wp),  intent(IN)    :: dx 
+
+        ! Local variables:
+        integer :: i, j, nx, ny
+
+        nx = size(d_cx,1)
+        ny = size(d_cx,2) 
+
+        ! Interior
+        do j = 1, ny-1
+        do i = 2, nx-1
+            dy_cy(i,j) = (d_cx(i-1,j+1) + d_cx(i,j+1) - d_cx(i-1,j) - d_cx(i,j)) / (2.0_wp * dx)
+        end do
+        end do
+
+
+        ! Boundaries
+        do j = 1, ny
+            ! West
+            i = 1
+            dy_cy(i,j) = (d_cx(i,j) - d_cx(i,j)) / dx
+            ! East
+            i = nx
+            dy_cy(i,j) = (d_cx(i-1,j) - d_cx(i-1,j)) / dx
+        end do
+
+        return
+
+    end subroutine ddy_cx_to_cy_2D
+
+    subroutine ddx_cy_to_cx_2D( dx_cx, d_cy, dx )
+        ! Input:  scalar on the Acy grid
+        ! Output: its x-derivative on the Acx grid
+
+        implicit none
+
+        ! In/output variables:
+
+        real(wp),  intent(OUT)   :: dx_cx(:,:)
+        real(wp),  intent(IN)    :: d_cy(:,:)
+        real(wp),  intent(IN)    :: dx 
+
+        ! Local variables:
+        integer :: i, j, nx, ny
+
+        nx = size(d_cy,1)
+        ny = size(d_cy,2) 
+
+        ! Interior
+        do j = 2, ny
+        do i = 1, nx-1
+            dx_cx(i,j) = (d_cy(i+1,j-1) + d_cy(i+1,j) - d_cy(i,j-1) - d_cy(i,j)) / (2.0_wp * dx)
+        end do
+        end do
+
+
+        ! Boundaries
+        do i = 1, nx-1
+            ! South
+            j = 1
+            dx_cx(i,j) = (d_cy(i+1,j) - d_cy(i,j)) / dx
+            ! North
+            j = ny
+            dx_cx(i,j) = (d_cy(i+1,j-1) - d_cy(i,j-1)) / dx
+        end do
+
+        return 
+
+    end subroutine ddx_cy_to_cx_2D
+
+    subroutine ddy_cy_to_cx_2D( dy_cx, d_cy, dx )
+        ! Input:  scalar on the Acy grid
+        ! Output: its y-derivative on the Acx grid
+
+        implicit none
+
+        ! In/output variables:
+
+        real(wp),  intent(OUT)   :: dy_cx(:,:)
+        real(wp),  intent(IN)    :: d_cy(:,:)
+        real(wp),  intent(IN)    :: dx
+
+        ! Local variables:
+        integer :: i, j, nx, ny
+
+        nx = size(d_cy,1)
+        ny = size(d_cy,2) 
+
+        ! Interior
+        do j = 2, ny
+        do i = 1, nx-1
+            dy_cx(i,j) = (d_cy(i,j) + d_cy(i+1,j) - d_cy(i,j-1) - d_cy(i+1,j-1)) / (2.0_wp * dx)
+        end do
+        end do
+
+
+        ! Boundaries
+        do i = 1, nx-1
+            ! South
+            j = 1
+            dy_cx(i,j) = (d_cy(i,j+1) + d_cy(i+1,j+1) - d_cy(i,j) - d_cy(i+1,j)) / (2.0_wp * dx)
+            ! North
+            j = ny
+            dy_cx(i,j) = (d_cy(i,j-1) + d_cy(i+1,j-1) - d_cy( j-2,i  ) - d_cy(i+1,j-2)) / (2.0_wp * dx)
+        end do
+
+        return
+
+    end subroutine ddy_cy_to_cx_2D
   
 !   ! Acx to Ab
 !   subroutine ddx_cx_to_b_2D( d_cx, dx_b)
@@ -1385,7 +1436,7 @@ contains
 !     end do
     
     
-!     d_a(1,:) = d_cx( grid%j1:grid%j2,1        )
+!     d_a(1,:) = d_cx(1,:)
 !     d_a(nx,:) = d_cx(nx-1,:)
     
     
@@ -1411,8 +1462,8 @@ contains
 !     end do
     
     
-!     d_a(:,1) = d_cy( 1        ,grid%i1:grid%i2)
-!     d_a(:,ny) = d_cy( ny-1,grid%i1:grid%i2)
+!     d_a(:,1) = d_cy(:,1)
+!     d_a(:,ny) = d_cy(:,ny-1)
     
     
 !   end subroutine map_cy_to_a_2D

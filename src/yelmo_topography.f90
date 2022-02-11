@@ -407,6 +407,7 @@ end if
         end if 
         
         ! Calculate the ice thickness gradient (on staggered acx/y nodes)
+        !call calc_gradient_ac(tpo%now%dHicedx,tpo%now%dHicedy,tpo%now%H_ice,tpo%par%dx)
         call calc_gradient_ac_ice(tpo%now%dHicedx,tpo%now%dHicedy,tpo%now%H_ice,tpo%now%f_ice,tpo%par%dx, &
                                                 tpo%par%margin2nd,tpo%par%grad_lim,tpo%par%boundaries,zero_outside=.TRUE.)
         

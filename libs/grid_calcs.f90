@@ -18,6 +18,12 @@ module grid_calcs
   public :: ddxy_a_to_a_3D
   public :: ddx_a_to_a_3D_upwind
   public :: ddy_a_to_a_3D_upwind
+  public :: ddx_a_to_cx_2D 
+  public :: ddy_a_to_cy_2D
+  public :: ddx_a_to_cy_2D 
+  public :: ddy_a_to_cx_2D 
+  public :: ddx_a_to_cx_3D 
+  public :: ddy_a_to_cy_3D
 
 contains
 
@@ -424,138 +430,194 @@ contains
 
     end subroutine ddy_a_to_a_3D_upwind
   
-!   ! Aa to Acx/Acy
-  
-!   ! 2D
-!   subroutine ddx_a_to_cx_2D( d_a, dx_cx)
-!     ! Input:  scalar on the Aa grid
-!     ! Output: its x-derivative on the Acx grid
-    
-!     implicit none
-    
-!     ! In/output variables:
-    
-!     real(wp), intent(IN)    :: d_a
-!     real(wp), DIMENSION(       grid%ny  , grid%nx-1), intent(OUT)   :: dx_cx
-    
-!     ! Local variables:
-!     integer :: i, j, nx, ny
-    
-!     do i = grid%i1, MIN(grid%nx-1,grid%i2)
-!     do j = 1, ny
-!       dx_cx(i,j) = (d_a(i+1,j) - d_a(i,j)) / dx
-!     end do
-!     end do
-    
-    
-!   end subroutine ddx_a_to_cx_2D
-!   subroutine ddy_a_to_cy_2D( d_a, dy_cy)
-!     ! Input:  scalar on the Aa grid
-!     ! Output: its y-derivative on the Acy grid
-    
-!     implicit none
-    
-!     ! In/output variables:
-    
-!     real(wp), intent(IN)    :: d_a
-!     real(wp), DIMENSION(       grid%ny-1, grid%nx  ), intent(OUT)   :: dy_cy
-    
-!     ! Local variables:
-!     integer :: i, j, nx, ny
-    
-!     do i = 1, nx
-!     do j = 1, ny-1
-!       dy_cy(i,j) = (d_a(i,j+1) - d_a(i,j)) / dx
-!     end do
-!     end do
-    
-    
-!   end subroutine ddy_a_to_cy_2D
-!   subroutine ddx_a_to_cy_2D( d_a, dx_cy)
-!     ! Input:  scalar on the Aa grid
-!     ! Output: its x-derivative on the Acy grid
-    
-!     implicit none
-    
-!     ! In/output variables:
-    
-!     real(wp), intent(IN)    :: d_a
-!     real(wp), DIMENSION(       grid%ny-1, grid%nx  ), intent(OUT)   :: dx_cy
-    
-!     ! Local variables:
-!     integer :: i, j, nx, ny
-    
-!     ! Central differencing in the interior
-!     do i = 2, nx-1
-!     do j = 1, ny-1
-!       dx_cy(i,j) = (d_a(i+1,j) + d_a(i+1,j+1) - d_a(i-1,j) - d_a(i-1,j+1)) / (4.0_wp * dx)
-!     end do
-!     end do
-    
-    
-!     ! One-sided differencing on the boundary
-!     do j = grid%j1, MIN(grid%ny-1,grid%j2)
-!       dx_cy( j,1      ) = (d_a( j,2      ) + d_a( j+1,2      ) - d_a( j,1        ) - d_a( j+1,1        )) / (2.0_wp * dx)
-!       dx_cy( j,grid%nx) = (d_a( j,grid%nx) + d_a( j+1,grid%nx) - d_a( j,grid%nx-1) - d_a( j+1,grid%nx-1)) / (2.0_wp * dx)
-!     end do
-    
-    
-!   end subroutine ddx_a_to_cy_2D
-!   subroutine ddy_a_to_cx_2D( d_a, dy_cx)
-!     ! Input:  scalar on the Aa grid
-!     ! Output: its y-derivative on the Acx grid
-    
-!     implicit none
-    
-!     ! In/output variables:
-    
-!     real(wp), intent(IN)    :: d_a
-!     real(wp), DIMENSION(       grid%ny  , grid%nx-1), intent(OUT)   :: dy_cx
-    
-!     ! Local variables:
-!     integer :: i, j, nx, ny
-    
-!     ! Central differencing in the interior
-!     do i = grid%i1, MIN(grid%nx-1,grid%i2)
-!     do j = 2, ny-1
-!       dy_cx(i,j) = (d_a(i,j+1) + d_a(i+1,j+1) - d_a(i,j-1) - d_a(i+1,j-1)) / (4.0_wp * dx)
-!     end do
-!     end do
-    
-    
-!     ! One-sided differencing on the boundary
-!     do i = grid%i1, MIN(grid%nx-1,grid%i2)
-!       dy_cx( 1      ,i) = (d_a( 2,      i) + d_a( 2,      i+1) - d_a( 1,        i) - d_a( 1,        i+1)) / (2.0_wp * dx)
-!       dy_cx( grid%ny,i) = (d_a( grid%ny,i) + d_a( grid%ny,i+1) - d_a( grid%ny-1,i) - d_a( grid%ny-1,i+1)) / (2.0_wp * dx)
-!     end do
-    
-    
-!   end subroutine ddy_a_to_cx_2D
-!   ! 3D
-!   subroutine ddx_a_to_cx_3D( d_a, dx_cx)
-!     ! Input:  scalar on the Aa grid
-!     ! Output: its x-derivative on the Acx grid
-    
-!     implicit none
-    
-!     ! In/output variables:
-    
-!     real(wp),  intent(IN)    :: d_a
-!     real(wp), DIMENSION( C%nZ, grid%ny  , grid%nx-1), intent(OUT)   :: dx_cx
-    
-!     ! Local variables:
-!     integer :: i, j, nx, ny,k
-    
-!     do i = grid%i1, MIN(grid%nx-1,grid%i2)
-!     do j = 1, ny
-!     do k = 1, C%nZ
-!       dx_cx(i,j,k) = (d_a(i+1,j,k) - d_a(i,j,k)) / dx
-!     end do
-!     end do
-!     end do
-    
-    
-!   end subroutine ddx_a_to_cx_3D
+    ! Aa to Acx/Acy
+
+    ! 2D
+    subroutine ddx_a_to_cx_2D( dx_cx, d_a, dx )
+        ! Input:  scalar on the Aa grid
+        ! Output: its x-derivative on the Acx grid
+
+        implicit none
+
+        ! In/output variables:
+
+        real(wp), intent(OUT)   :: dx_cx(:,:)
+        real(wp), intent(IN)    :: d_a(:,:)
+        real(wp), intent(IN)    :: dx 
+
+        ! Local variables:
+        integer :: i, j, nx, ny
+
+        nx = size(d_a,1)
+        ny = size(d_a,2) 
+        
+        dx_cx = 0.0_wp 
+
+        do j = 1, ny
+        do i = 1, nx-1
+            dx_cx(i,j) = (d_a(i+1,j) - d_a(i,j)) / dx
+        end do
+        end do
+
+        return 
+
+    end subroutine ddx_a_to_cx_2D
+
+    subroutine ddy_a_to_cy_2D( dy_cy, d_a, dx )
+        ! Input:  scalar on the Aa grid
+        ! Output: its y-derivative on the Acy grid
+
+        implicit none
+
+        ! In/output variables:
+
+        real(wp), intent(OUT)   :: dy_cy(:,:)
+        real(wp), intent(IN)    :: d_a(:,:)
+        real(wp), intent(IN)    :: dx 
+
+        ! Local variables:
+        integer :: i, j, nx, ny
+
+        nx = size(d_a,1)
+        ny = size(d_a,2) 
+        
+        dy_cy = 0.0_wp 
+
+        do j = 1, ny-1
+        do i = 1, nx
+          dy_cy(i,j) = (d_a(i,j+1) - d_a(i,j)) / dx
+        end do
+        end do
+
+        return
+
+    end subroutine ddy_a_to_cy_2D
+
+    subroutine ddx_a_to_cy_2D( dx_cy, d_a, dx )
+        ! Input:  scalar on the Aa grid
+        ! Output: its x-derivative on the Acy grid
+
+        implicit none
+
+        ! In/output variables:
+
+        real(wp),  intent(OUT)   :: dx_cy(:,:)
+        real(wp),  intent(IN)    :: d_a(:,:)
+        real(wp),  intent(IN)    :: dx 
+
+        ! Local variables:
+        integer :: i, j, nx, ny
+
+        nx = size(d_a,1)
+        ny = size(d_a,2) 
+        
+        dx_cy = 0.0_wp 
+
+        ! Central differencing in the interior
+        do j = 1, ny-1
+        do i = 2, nx-1
+          dx_cy(i,j) = (d_a(i+1,j) + d_a(i+1,j+1) - d_a(i-1,j) - d_a(i-1,j+1)) / (4.0_wp * dx)
+        end do
+        end do
+
+        ! One-sided differencing on the boundary
+        do j = 1, ny-1
+          dx_cy(1,j) = (d_a(2,j) + d_a(2,j+1) - d_a(1,j) - d_a(1,j+1)) / (2.0_wp * dx)
+          dx_cy(nx,j) = (d_a(nx,j) + d_a(nx,j+1) - d_a(nx-1,j) - d_a(nx-1,j+1)) / (2.0_wp * dx)
+        end do
+
+        return
+
+    end subroutine ddx_a_to_cy_2D
+
+    subroutine ddy_a_to_cx_2D( dy_cx, d_a, dx )
+        ! Input:  scalar on the Aa grid
+        ! Output: its y-derivative on the Acx grid
+
+        implicit none
+
+        ! In/output variables:
+
+        real(wp),  intent(OUT)   :: dy_cx(:,:)
+        real(wp),  intent(IN)    :: d_a(:,:)
+        real(wp),  intent(IN)    :: dx 
+
+        ! Local variables:
+        integer :: i, j, nx, ny
+
+        nx = size(d_a,1)
+        ny = size(d_a,2) 
+        
+        dy_cx = 0.0_wp 
+
+        ! Central differencing in the interior
+        do j = 2, ny-1
+        do i = 1, nx-1
+            dy_cx(i,j) = (d_a(i,j+1) + d_a(i+1,j+1) - d_a(i,j-1) - d_a(i+1,j-1)) / (4.0_wp * dx)
+        end do
+        end do
+
+        ! One-sided differencing on the boundary
+        do i = 1, nx-1
+            dy_cx(i,1)  = (d_a(i,2) + d_a(i+1,2) - d_a(i,1) - d_a(i+1,1)) / (2.0_wp * dx)
+            dy_cx(i,ny) = (d_a(i,ny) + d_a(i+1,ny) - d_a(i,ny-1) - d_a(i+1,ny-1)) / (2.0_wp * dx)
+        end do
+
+        return
+
+    end subroutine ddy_a_to_cx_2D
+
+    ! 3D
+    subroutine ddx_a_to_cx_3D( dx_cx, d_a, dx )
+        ! Input:  scalar on the Aa grid
+        ! Output: its x-derivative on the Acx grid
+
+        implicit none
+
+        ! In/output variables:
+
+        real(wp),  intent(OUT)   :: dx_cx(:,:,:)
+        real(wp),  intent(IN)    :: d_a(:,:,:)
+        real(wp),  intent(IN)    :: dx 
+
+        ! Local variables:
+        integer :: k, nz 
+
+        nz = size(d_a,3) 
+
+        do k = 1, nz 
+            call ddx_a_to_cx_2D(dx_cx(:,:,k),d_a(:,:,k),dx)
+        end do
+
+        return 
+
+    end subroutine ddx_a_to_cx_3D
+
+    subroutine ddy_a_to_cy_3D( dy_cy, d_a, dx )
+        ! Input:  scalar on the Aa grid
+        ! Output: its y-derivative on the Acy grid
+
+        implicit none
+
+        ! In/output variables:
+
+        real(wp),  intent(OUT)   :: dy_cy(:,:,:)
+        real(wp),  intent(IN)    :: d_a(:,:,:)
+        real(wp),  intent(IN)    :: dx 
+
+        ! Local variables:
+        integer :: k, nz 
+
+        nz = size(d_a,3) 
+
+        do k = 1, nz 
+            call ddy_a_to_cy_2D(dy_cy(:,:,k),d_a(:,:,k),dx)
+        end do
+
+        return 
+
+    end subroutine ddy_a_to_cy_3D
+
 !   subroutine ddy_a_to_cy_3D( d_a, dy_cy)
 !     ! Input:  scalar on the Aa grid
 !     ! Output: its y-derivative on the Acy grid
@@ -565,7 +627,7 @@ contains
 !     ! In/output variables:
     
 !     real(wp),  intent(IN)    :: d_a
-!     real(wp), DIMENSION( C%nZ, grid%ny-1, grid%nx  ), intent(OUT)   :: dy_cy
+!     real(wp), DIMENSION( C%nZ, ny-1, nx  ), intent(OUT)   :: dy_cy
     
 !     ! Local variables:
 !     integer :: i, j, nx, ny,k
@@ -589,7 +651,7 @@ contains
 !     ! In/output variables:
     
 !     real(wp),  intent(IN)    :: d_a
-!     real(wp), DIMENSION( C%nZ, grid%ny-1, grid%nx  ), intent(OUT)   :: dx_cy
+!     real(wp), DIMENSION( C%nZ, ny-1, nx  ), intent(OUT)   :: dx_cy
     
 !     ! Local variables:
 !     integer :: i, j, nx, ny,k
@@ -605,9 +667,9 @@ contains
     
     
 !     ! One-sided differencing on the boundary
-!     do j = grid%j1, MIN(grid%ny-1,grid%j2)
+!     do j = 1, ny-1
 !       dx_cy( :,j,1      ) = (d_a( :,j,2      ) + d_a( :,j+1,2      ) - d_a( :,j,1        ) - d_a( :,j+1,1        )) / (2.0_wp * dx)
-!       dx_cy( :,j,grid%nx) = (d_a( :,j,grid%nx) + d_a( :,j+1,grid%nx) - d_a( :,j,grid%nx-1) - d_a( :,j+1,grid%nx-1)) / (2.0_wp * dx)
+!       dx_cy( :,j,nx) = (d_a( :,j,nx) + d_a( :,j+1,nx) - d_a( :,j,nx-1) - d_a( :,j+1,nx-1)) / (2.0_wp * dx)
 !     end do
     
     
@@ -621,13 +683,13 @@ contains
 !     ! In/output variables:
     
 !     real(wp),  intent(IN)    :: d_a
-!     real(wp), DIMENSION( C%nZ, grid%ny  , grid%nx-1), intent(OUT)   :: dy_cx
+!     real(wp),  intent(OUT)   :: dy_cx
     
 !     ! Local variables:
 !     integer :: i, j, nx, ny,k
     
 !     ! Central differencing in the interior
-!     do i = grid%i1, MIN(grid%nx-1,grid%i2)
+!     do i = 1, nx-1
 !     do j = 2, ny-1
 !     do k = 1, C%nZ
 !       dy_cx(i,j,k) = (d_a(i,j+1,k) + d_a( k,j+1,i+1) - d_a(i,j-1,k) - d_a( k,j-1,i+1)) / (4.0_wp * dx)
@@ -637,9 +699,9 @@ contains
     
     
 !     ! One-sided differencing on the boundary
-!     do i = grid%i1, MIN(grid%nx-1,grid%i2)
+!     do i = 1, nx-1
 !       dy_cx( :,1      ,i) = (d_a( :,2,      i) + d_a( :,2,      i+1) - d_a( :,1,        i) - d_a( :,1,        i+1)) / (2.0_wp * dx)
-!       dy_cx( :,grid%nx,i) = (d_a( :,grid%nx,i) + d_a( :,grid%nx,i+1) - d_a( :,grid%nx-1,i) - d_a( :,grid%nx-1,i+1)) / (2.0_wp * dx)
+!       dy_cx( :,nx,i) = (d_a( :,nx,i) + d_a( :,nx,i+1) - d_a( :,nx-1,i) - d_a( :,nx-1,i+1)) / (2.0_wp * dx)
 !     end do
     
     
@@ -656,7 +718,7 @@ contains
     
 !     ! In/output variables:
     
-!     real(wp), DIMENSION(       grid%ny  , grid%nx-1), intent(IN)    :: d_cx
+!     real(wp),  intent(IN)    :: d_cx
 !     real(wp), intent(OUT)   :: dx_a
     
 !     ! Local variables:
@@ -670,7 +732,7 @@ contains
     
     
 !     dx_a(1,:) = dx_a( grid%j1:grid%j2,2        )
-!     dx_a(nx,:) = dx_a( grid%j1:grid%j2,grid%nx-1)
+!     dx_a(nx,:) = dx_a( grid%j1:grid%j2,nx-1)
     
     
 !   end subroutine ddx_cx_to_a_2D
@@ -682,7 +744,7 @@ contains
     
 !     ! In/output variables:
     
-!     real(wp), DIMENSION(       grid%ny-1, grid%nx  ), intent(IN)    :: d_cy
+!     real(wp),  intent(IN)    :: d_cy
 !     real(wp), intent(OUT)   :: dy_a
     
 !     ! Local variables:
@@ -696,7 +758,7 @@ contains
     
     
 !     dy_a(:,1) = dy_a( 2        ,grid%i1:grid%i2)
-!     dy_a(:,ny) = dy_a( grid%ny-1,grid%i1:grid%i2)
+!     dy_a(:,ny) = dy_a( ny-1,grid%i1:grid%i2)
     
     
 !   end subroutine ddy_cy_to_a_2D
@@ -708,7 +770,7 @@ contains
     
 !     ! In/output variables:
     
-!     real(wp), DIMENSION(       grid%ny  , grid%nx-1), intent(IN)    :: d_cx
+!     real(wp),  intent(IN)    :: d_cx
 !     real(wp), intent(OUT)   :: dy_a
     
 !     ! Local variables:
@@ -727,17 +789,17 @@ contains
 !       j = 1
 !       dy_a(i,j) = (d_cx(i-1,j+1) + d_cx(i,j+1) - d_cx( j  ,i-1) - d_cx( j  ,i)) / (4.0_wp * dx)
 !       ! North ex. corners
-!       j = grid%ny
+!       j = ny
 !       dy_a(i,j) = (d_cx( j  ,i-1) + d_cx( j  ,i) - d_cx(i-1,j-1) - d_cx(i,j-1)) / (4.0_wp * dx)
 !     end do
     
     
-!     do j = MAX(2,grid%j1), MIN(grid%ny-1,grid%j2)
+!     do j = MAX(2,grid%j1), MIN(ny-1,grid%j2)
 !       ! West ex. corners
 !       i = 1
 !       dy_a(i,j) = (d_cx( j+1,i  ) - d_cx( j-1,i  )) / (2.0_wp * dx)
 !       ! East ex. corners
-!       i = grid%nx
+!       i = nx
 !       dy_a(i,j) = (d_cx(i-1,j+1) - d_cx(i-1,j-1)) / (2.0_wp * dx)
 !     end do
     
@@ -745,9 +807,9 @@ contains
 !     ! Corners
 !     if (par%master) then
 !     dy_a( 1      ,1      ) = (d_cx( 2      ,1        ) - d_cx( 1        ,1        )) / dx
-!     dy_a( 1      ,grid%nx) = (d_cx( 2      ,grid%nx-1) - d_cx( 1        ,grid%nx-1)) / dx
-!     dy_a( grid%ny,1      ) = (d_cx( grid%ny,1        ) - d_cx( grid%ny-1,1        )) / dx
-!     dy_a( grid%ny,grid%nx) = (d_cx( grid%ny,grid%nx-1) - d_cx( grid%ny-1,grid%nx-1)) / dx
+!     dy_a( 1      ,nx) = (d_cx( 2      ,nx-1) - d_cx( 1        ,nx-1)) / dx
+!     dy_a( ny,1      ) = (d_cx( ny,1        ) - d_cx( ny-1,1        )) / dx
+!     dy_a( ny,nx) = (d_cx( ny,nx-1) - d_cx( ny-1,nx-1)) / dx
 !     end if
     
     
@@ -760,7 +822,7 @@ contains
     
 !     ! In/output variables:
     
-!     real(wp), DIMENSION(       grid%ny-1, grid%nx  ), intent(IN)    :: d_cy
+!     real(wp),  intent(IN)    :: d_cy
 !     real(wp), intent(OUT)   :: dx_a
     
 !     ! Local variables:
@@ -774,12 +836,12 @@ contains
 !     end do
     
     
-!     do j = MAX(2,grid%j1), MIN(grid%ny-1,grid%j2)
+!     do j = MAX(2,grid%j1), MIN(ny-1,grid%j2)
 !       ! West ex. corners
 !       i = 1
 !       dx_a(i,j) = (d_cy(i+1,j-1) + d_cy( j  ,i+1) - d_cy( j-1,i  ) - d_cy( j  ,i  )) / (4.0_wp * dx)
 !       ! East ex. corners
-!       i = grid%nx
+!       i = nx
 !       dx_a(i,j) = (d_cy( j-1,i  ) + d_cy( j  ,i  ) - d_cy(i-1,j-1) - d_cy( j  ,i-1)) / (4.0_wp * dx)
 !     end do
     
@@ -789,7 +851,7 @@ contains
 !       j = 1
 !       dx_a(i,j) = (d_cy( j  ,i+1) - d_cy( j  ,i-1)) / (2.0_wp * dx)
 !       ! North ex. corners
-!       j = grid%ny
+!       j = ny
 !       dx_a(i,j) = (d_cy(i+1,j-1) - d_cy(i-1,j-1)) / (2.0_wp * dx)
 !     end do
     
@@ -797,9 +859,9 @@ contains
 !     ! Corners
 !     if (par%master) then
 !     dx_a( 1      ,      1) = (d_cy( 1        ,2      ) - d_cy( 1        ,1        )) / dx
-!     dx_a( 1      ,grid%nx) = (d_cy( 1        ,grid%nx) - d_cy( 1        ,grid%nx-1)) / dx
-!     dx_a( grid%ny,1      ) = (d_cy( grid%ny-1,2      ) - d_cy( grid%ny-1,1        )) / dx
-!     dx_a( grid%ny,grid%nx) = (d_cy( grid%ny-1,grid%nx) - d_cy( grid%ny-1,grid%nx-1)) / dx
+!     dx_a( 1      ,nx) = (d_cy( 1        ,nx) - d_cy( 1        ,nx-1)) / dx
+!     dx_a( ny,1      ) = (d_cy( ny-1,2      ) - d_cy( ny-1,1        )) / dx
+!     dx_a( ny,nx) = (d_cy( ny-1,nx) - d_cy( ny-1,nx-1)) / dx
 !     end if
     
     
@@ -813,7 +875,7 @@ contains
     
 !     ! In/output variables:
     
-!     real(wp), DIMENSION( C%nZ, grid%ny  , grid%nx-1), intent(IN)    :: d_cx
+!     real(wp),  intent(IN)    :: d_cx
 !     real(wp),  intent(OUT)   :: dx_a
     
 !     ! Local variables:
@@ -837,7 +899,7 @@ contains
     
 !     ! In/output variables:
     
-!     real(wp), DIMENSION( C%nZ, grid%ny-1, grid%nx  ), intent(IN)    :: d_cy
+!     real(wp), DIMENSION( C%nZ, ny-1, nx  ), intent(IN)    :: d_cy
 !     real(wp),  intent(OUT)   :: dy_a
     
 !     ! Local variables:
@@ -863,14 +925,14 @@ contains
     
 !     ! In/output variables:
     
-!     real(wp), DIMENSION(       grid%ny  , grid%nx-1), intent(IN)    :: d_cx
-!     real(wp), DIMENSION(       grid%ny  , grid%nx-1), intent(OUT)   :: dx_cx
+!     real(wp),  intent(IN)    :: d_cx
+!     real(wp),  intent(OUT)   :: dx_cx
     
 !     ! Local variables:
 !     integer :: i, j, nx, ny
     
 !     ! Central differencing in the interior
-!     do i = 2, grid%nx-2
+!     do i = 2, nx-2
 !     do j = 1, ny
 !       dx_cx(i,j) = (d_cx(i+1,j) - d_cx(i-1,j)) / (2 * dx)
 !     end do
@@ -879,7 +941,7 @@ contains
     
 !     ! One-sided differencing on the boundaries
 !     dx_cx( grid%j1:grid%j2,1        ) = (d_cx( grid%j1:grid%j2,2        ) - d_cx( grid%j1:grid%j2,1        )) / dx
-!     dx_cx( grid%j1:grid%j2,grid%nx-1) = (d_cx( grid%j1:grid%j2,grid%nx-1) - d_cx( grid%j1:grid%j2,grid%nx-2)) / dx
+!     dx_cx( grid%j1:grid%j2,nx-1) = (d_cx( grid%j1:grid%j2,nx-1) - d_cx( grid%j1:grid%j2,nx-2)) / dx
     
     
 !   end subroutine ddx_cx_to_cx_2D
@@ -891,14 +953,14 @@ contains
     
 !     ! In/output variables:
     
-!     real(wp), DIMENSION(       grid%ny  , grid%nx-1), intent(IN)    :: d_cx
-!     real(wp), DIMENSION(       grid%ny  , grid%nx-1), intent(OUT)   :: dy_cx
+!     real(wp),  intent(IN)    :: d_cx
+!     real(wp),  intent(OUT)   :: dy_cx
     
 !     ! Local variables:
 !     integer :: i, j, nx, ny
     
 !     ! Central differencing in the interior
-!     do i = grid%i1, MIN(grid%nx-1,grid%i2)
+!     do i = 1, nx-1
 !     do j = 2, ny-1
 !       dy_cx(i,j) = (d_cx(i,j+1) - d_cx(i,j-1)) / (2 * dx)
 !     end do
@@ -907,7 +969,7 @@ contains
     
 !     ! One-sided differencing on the boundaries
 !     dy_cx(:,1) = (d_cx( 2      ,grid%i1:grid%i2) - d_cx( 1        ,grid%i1:grid%i2)) / dx
-!     dy_cx(:,ny) = (d_cx(:,ny) - d_cx( grid%ny-1,grid%i1:grid%i2)) / dx
+!     dy_cx(:,ny) = (d_cx(:,ny) - d_cx( ny-1,grid%i1:grid%i2)) / dx
     
     
 !   end subroutine ddy_cx_to_cx_2D
@@ -919,8 +981,8 @@ contains
     
 !     ! In/output variables:
     
-!     real(wp), DIMENSION(       grid%ny-1, grid%nx  ), intent(IN)    :: d_cy
-!     real(wp), DIMENSION(       grid%ny-1, grid%nx  ), intent(OUT)   :: dx_cy
+!     real(wp),  intent(IN)    :: d_cy
+!     real(wp),  intent(OUT)   :: dx_cy
     
 !     ! Local variables:
 !     integer :: i, j, nx, ny
@@ -934,8 +996,8 @@ contains
     
     
 !     ! One-sided differencing on the boundaries
-!     dx_cy( grid%j1:MIN(grid%j2,grid%ny-1),1      ) = (d_cy( grid%j1:MIN(grid%j2,grid%ny-1),2      ) - d_cy( grid%j1:MIN(grid%j2,grid%ny-1),1        )) / dx
-!     dx_cy( grid%j1:MIN(grid%j2,grid%ny-1),grid%nx) = (d_cy( grid%j1:MIN(grid%j2,grid%ny-1),grid%nx) - d_cy( grid%j1:MIN(grid%j2,grid%ny-1),grid%nx-1)) / dx
+!     dx_cy( grid%j1:MIN(grid%j2,ny-1),1      ) = (d_cy( grid%j1:MIN(grid%j2,ny-1),2      ) - d_cy( grid%j1:MIN(grid%j2,ny-1),1        )) / dx
+!     dx_cy( grid%j1:MIN(grid%j2,ny-1),nx) = (d_cy( grid%j1:MIN(grid%j2,ny-1),nx) - d_cy( grid%j1:MIN(grid%j2,ny-1),nx-1)) / dx
     
     
 !   end subroutine ddx_cy_to_cy_2D
@@ -947,15 +1009,15 @@ contains
     
 !     ! In/output variables:
     
-!     real(wp), DIMENSION(       grid%ny-1, grid%nx  ), intent(IN)    :: d_cy
-!     real(wp), DIMENSION(       grid%ny-1, grid%nx  ), intent(OUT)   :: dy_cy
+!     real(wp),  intent(IN)    :: d_cy
+!     real(wp),  intent(OUT)   :: dy_cy
     
 !     ! Local variables:
 !     integer :: i, j, nx, ny
     
 !     ! Central differencing in the interior
 !     do i = 1, nx
-!     do j = 2, grid%ny-2
+!     do j = 2, ny-2
 !       dy_cy(i,j) = (d_cy(i,j+1) - d_cy(i,j-1)) / (2 * dx)
 !     end do
 !     end do
@@ -963,7 +1025,7 @@ contains
     
 !     ! One-sided differencing on the boundaries
 !     dy_cy( 1        ,grid%i1:grid%i2) = (d_cy( 2        ,grid%i1:grid%i2) - d_cy( 1        ,grid%i1:grid%i2)) / dx
-!     dy_cy( grid%ny-1,grid%i1:grid%i2) = (d_cy( grid%ny-1,grid%i1:grid%i2) - d_cy( grid%ny-2,grid%i1:grid%i2)) / dx
+!     dy_cy( ny-1,grid%i1:grid%i2) = (d_cy( ny-1,grid%i1:grid%i2) - d_cy( ny-2,grid%i1:grid%i2)) / dx
     
     
 !   end subroutine ddy_cy_to_cy_2D
@@ -975,8 +1037,8 @@ contains
     
 !     ! In/output variables:
     
-!     real(wp), DIMENSION(       grid%ny  , grid%nx-1), intent(IN)    :: d_cx
-!     real(wp), DIMENSION(       grid%ny-1, grid%nx  ), intent(OUT)   :: dx_cy
+!     real(wp),  intent(IN)    :: d_cx
+!     real(wp),  intent(OUT)   :: dx_cy
     
 !     ! Local variables:
 !     integer :: i, j, nx, ny
@@ -990,11 +1052,11 @@ contains
     
     
 !     ! Boundaries
-!     do j = grid%j1, MIN(grid%ny-1,grid%j2)
+!     do j = 1, ny-1
 !       ! West
-!       dx_cy( j,1      ) = dx_cy( j,2        )
+!       dx_cy(1,j) = dx_cy( j,2        )
 !       ! East
-!       dx_cy( j,grid%nx) = dx_cy( j,grid%nx-1)
+!       dx_cy(nx,j) = dx_cy(nx-1,j)
 !     end do
     
     
@@ -1007,8 +1069,8 @@ contains
     
 !     ! In/output variables:
     
-!     real(wp), DIMENSION(       grid%ny  , grid%nx-1), intent(IN)    :: d_cx
-!     real(wp), DIMENSION(       grid%ny-1, grid%nx  ), intent(OUT)   :: dy_cy
+!     real(wp),  intent(IN)    :: d_cx
+!     real(wp),  intent(OUT)   :: dy_cy
     
 !     ! Local variables:
 !     integer :: i, j, nx, ny
@@ -1022,12 +1084,12 @@ contains
     
     
 !     ! Boundaries
-!     do j = grid%j1, MIN(grid%ny-1,grid%j2)
+!     do j = 1, ny-1
 !       ! West
 !       i = 1
 !       dy_cy(i,j) = (d_cx( j,i  ) - d_cx( j,i  )) / dx
 !       ! East
-!       i = grid%nx
+!       i = nx
 !       dy_cy(i,j) = (d_cx(i-1,j) - d_cx(i-1,j)) / dx
 !     end do
     
@@ -1041,14 +1103,14 @@ contains
     
 !     ! In/output variables:
     
-!     real(wp), DIMENSION(       grid%ny-1, grid%nx  ), intent(IN)    :: d_cy
-!     real(wp), DIMENSION(       grid%ny  , grid%nx-1), intent(OUT)   :: dx_cx
+!     real(wp),  intent(IN)    :: d_cy
+!     real(wp),  intent(OUT)   :: dx_cx
     
 !     ! Local variables:
 !     integer :: i, j, nx, ny
     
 !     ! Interior
-!     do i = grid%i1, MIN(grid%nx-1,grid%i2)
+!     do i = 1, nx-1
 !     do j = 2, ny-1
 !       dx_cx(i,j) = (d_cy(i+1,j-1) + d_cy( j  ,i+1) - d_cy( j-1,i  ) - d_cy( j  ,i  )) / (2.0_wp * dx)
 !     end do
@@ -1056,12 +1118,12 @@ contains
     
     
 !     ! Boundaries
-!     do i = grid%i1, MIN(grid%nx-1,grid%i2)
+!     do i = 1, nx-1
 !       ! South
 !       j = 1
 !       dx_cx(i,j) = (d_cy( j  ,i+1) - d_cy( j  ,i  )) / dx
 !       ! North
-!       j = grid%ny
+!       j = ny
 !       dx_cx(i,j) = (d_cy(i+1,j-1) - d_cy( j-1,i  )) / dx
 !     end do
     
@@ -1075,14 +1137,14 @@ contains
     
 !     ! In/output variables:
     
-!     real(wp), DIMENSION(       grid%ny-1, grid%nx  ), intent(IN)    :: d_cy
-!     real(wp), DIMENSION(       grid%ny  , grid%nx-1), intent(OUT)   :: dy_cx
+!     real(wp),  intent(IN)    :: d_cy
+!     real(wp),  intent(OUT)   :: dy_cx
     
 !     ! Local variables:
 !     integer :: i, j, nx, ny
     
 !     ! Interior
-!     do i = grid%i1, MIN(grid%nx-1,grid%i2)
+!     do i = 1, nx-1
 !     do j = 2, ny-1
 !       dy_cx(i,j) = (d_cy( j  ,i  ) + d_cy( j  ,i+1) - d_cy( j-1,i  ) - d_cy(i+1,j-1)) / (2.0_wp * dx)
 !     end do
@@ -1090,12 +1152,12 @@ contains
     
     
 !     ! Boundaries
-!     do i = grid%i1, MIN(grid%nx-1,grid%i2)
+!     do i = 1, nx-1
 !       ! South
 !       j = 1
 !       dy_cx(i,j) = (d_cy( j+1,i  ) + d_cy(j+1,i+1) - d_cy( j  ,i  ) - d_cy( j  ,i+1)) / (2.0_wp * dx)
 !       ! North
-!       j = grid%ny
+!       j = ny
 !       dy_cx(i,j) = (d_cy( j-1,i  ) + d_cy(j-1,i+1) - d_cy( j-2,i  ) - d_cy( j-2,i+1)) / (2.0_wp * dx)
 !     end do
     
@@ -1111,14 +1173,14 @@ contains
     
 !     ! In/output variables:
     
-!     real(wp), DIMENSION(       grid%ny  , grid%nx-1), intent(IN)    :: d_cx
-!     real(wp), DIMENSION(       grid%ny-1, grid%nx-1), intent(OUT)   :: dx_b
+!     real(wp),  intent(IN)    :: d_cx
+!     real(wp), DIMENSION(       ny-1, nx-1), intent(OUT)   :: dx_b
     
 !     ! Local variables:
 !     integer :: i, j, nx, ny
     
 !     ! Interior
-!     do i = MAX(2,grid%i1), MIN(grid%nx-2,grid%i2)
+!     do i = MAX(2,grid%i1), MIN(nx-2,grid%i2)
 !     do j = 1, ny-1
 !       dx_b(i,j) = (d_cx(i+1,j+1) + d_cx( j  ,i+1) - d_cx(i-1,j+1) - d_cx( j  ,i-1)) / (4.0_wp * dx)
 !     end do
@@ -1126,10 +1188,10 @@ contains
     
     
 !     ! Boundaries
-!     do j = grid%j1, MIN(grid%ny-1,grid%j2)
+!     do j = 1, ny-1
 !       i = 1
 !       dx_b(i,j) = (d_cx(i+1,j+1) + d_cx( j  ,i+1) - d_cx( j+1,i  ) - d_cx( j  ,i  )) / (2.0_wp * dx)
-!       i = grid%nx-1
+!       i = nx-1
 !       dx_b(i,j) = (d_cx( j+1,i  ) + d_cx( j  ,i  ) - d_cx(i-1,j+1) - d_cx( j  ,i-1)) / (2.0_wp * dx)
 !     end do
     
@@ -1143,25 +1205,25 @@ contains
     
 !     ! In/output variables:
     
-!     real(wp), DIMENSION(       grid%ny-1, grid%nx  ), intent(IN)    :: d_cy
-!     real(wp), DIMENSION(       grid%ny-1, grid%nx-1), intent(OUT)   :: dy_b
+!     real(wp),  intent(IN)    :: d_cy
+!     real(wp), DIMENSION(       ny-1, nx-1), intent(OUT)   :: dy_b
     
 !     ! Local variables:
 !     integer :: i, j, nx, ny
     
 !     ! Interior
-!     do i = MAX(2,grid%i1), MIN(grid%nx-2,grid%i2)
-!     do j = 2, grid%ny-2
+!     do i = MAX(2,grid%i1), MIN(nx-2,grid%i2)
+!     do j = 2, ny-2
 !       dy_b(i,j) = (d_cy(i+1,j+1) + d_cy( j+1,i  ) - d_cy(i+1,j-1) - d_cy( j-1,i  )) / (4.0_wp * dx)
 !     end do
 !     end do
     
     
 !     ! Boundaries
-!     do i = grid%i1, MIN(grid%nx-1,grid%i2)
+!     do i = 1, nx-1
 !       j = 1
 !       dy_b(i,j) = (d_cy(i+1,j+1) + d_cy( j+1,i  ) - d_cy( j  ,i+1) - d_cy( j  ,i  )) / (2.0_wp * dx)
-!       j = grid%ny-1
+!       j = ny-1
 !       dy_b(i,j) = (d_cy( j  ,i+1) + d_cy( j  ,i  ) - d_cy(i+1,j-1) - d_cy( j-1,i  )) / (2.0_wp * dx)
 !     end do
     
@@ -1175,14 +1237,14 @@ contains
     
 !     ! In/output variables:
     
-!     real(wp), DIMENSION(       grid%ny-1, grid%nx  ), intent(IN)    :: d_cy
-!     real(wp), DIMENSION(       grid%ny-1, grid%nx-1), intent(OUT)   :: dx_b
+!     real(wp),  intent(IN)    :: d_cy
+!     real(wp), DIMENSION(       ny-1, nx-1), intent(OUT)   :: dx_b
     
 !     ! Local variables:
 !     integer :: i, j, nx, ny
     
 !     ! Interior
-!     do i = grid%i1, MIN(grid%nx-1,grid%i2)
+!     do i = 1, nx-1
 !     do j = 1, ny-1
 !       dx_b(i,j) = (d_cy(i+1,j) - d_cy(i,j)) / dx
 !     end do
@@ -1198,14 +1260,14 @@ contains
     
 !     ! In/output variables:
     
-!     real(wp), DIMENSION(       grid%ny  , grid%nx-1), intent(IN)    :: d_cx
-!     real(wp), DIMENSION(       grid%ny-1, grid%nx-1), intent(OUT)   :: dy_b
+!     real(wp),  intent(IN)    :: d_cx
+!     real(wp), DIMENSION(       ny-1, nx-1), intent(OUT)   :: dy_b
     
 !     ! Local variables:
 !     integer :: i, j, nx, ny
     
 !     ! Interior
-!     do i = grid%i1, MIN(grid%nx-1,grid%i2)
+!     do i = 1, nx-1
 !     do j = 1, ny-1
 !       dy_b(i,j) = (d_cx(i,j+1) - d_cx(i,j)) / dx
 !     end do
@@ -1230,12 +1292,12 @@ contains
 !     ! In/output variables:
     
 !     real(wp), intent(IN)    :: d_a
-!     real(wp), DIMENSION(       grid%ny  , grid%nx-1), intent(OUT)   :: d_cx
+!     real(wp),  intent(OUT)   :: d_cx
     
 !     ! Local variables:
 !     integer :: i, j, nx, ny
     
-!     do i = grid%i1, MIN(grid%nx-1,grid%i2)
+!     do i = 1, nx-1
 !     do j = 1, ny
 !       d_cx(i,j) = (d_a(i,j) + d_a(i+1,j)) / 2.0_wp
 !     end do
@@ -1252,7 +1314,7 @@ contains
 !     ! In/output variables:
     
 !     real(wp), intent(IN)    :: d_a
-!     real(wp), DIMENSION(       grid%ny-1, grid%nx  ), intent(OUT)   :: d_cy
+!     real(wp),  intent(OUT)   :: d_cy
     
 !     ! Local variables:
 !     integer :: i, j, nx, ny
@@ -1275,12 +1337,12 @@ contains
 !     ! In/output variables:
     
 !     real(wp),  intent(IN)    :: d_a
-!     real(wp), DIMENSION( C%nZ, grid%ny  , grid%nx-1), intent(OUT)   :: d_cx
+!     real(wp),  intent(OUT)   :: d_cx
     
 !     ! Local variables:
 !     integer :: i, j, nx, ny,k
     
-!     do i = grid%i1, MIN(grid%nx-1,grid%i2)
+!     do i = 1, nx-1
 !     do j = 1, ny
 !     do k = 1, C%nZ
 !       d_cx(i,j,k) = (d_a(i,j,k) + d_a(i+1,j,k)) / 2.0_wp
@@ -1299,7 +1361,7 @@ contains
 !     ! In/output variables:
     
 !     real(wp),  intent(IN)    :: d_a
-!     real(wp), DIMENSION( C%nZ, grid%ny-1, grid%nx  ), intent(OUT)   :: d_cy
+!     real(wp), DIMENSION( C%nZ, ny-1, nx  ), intent(OUT)   :: d_cy
     
 !     ! Local variables:
 !     integer :: i, j, nx, ny,k
@@ -1326,7 +1388,7 @@ contains
     
 !     ! In/output variables:
     
-!     real(wp), DIMENSION(       grid%ny  , grid%nx-1), intent(IN)    :: d_cx
+!     real(wp),  intent(IN)    :: d_cx
 !     real(wp), intent(OUT)   :: d_a
     
 !     ! Local variables:
@@ -1340,7 +1402,7 @@ contains
     
     
 !     d_a(1,:) = d_cx( grid%j1:grid%j2,1        )
-!     d_a(nx,:) = d_cx( grid%j1:grid%j2,grid%nx-1)
+!     d_a(nx,:) = d_cx( grid%j1:grid%j2,nx-1)
     
     
 !   end subroutine map_cx_to_a_2D
@@ -1352,7 +1414,7 @@ contains
     
 !     ! In/output variables:
     
-!     real(wp), DIMENSION(       grid%ny-1, grid%nx  ), intent(IN)    :: d_cy
+!     real(wp),  intent(IN)    :: d_cy
 !     real(wp), intent(OUT)   :: d_a
     
 !     ! Local variables:
@@ -1366,7 +1428,7 @@ contains
     
     
 !     d_a(:,1) = d_cy( 1        ,grid%i1:grid%i2)
-!     d_a(:,ny) = d_cy( grid%ny-1,grid%i1:grid%i2)
+!     d_a(:,ny) = d_cy( ny-1,grid%i1:grid%i2)
     
     
 !   end subroutine map_cy_to_a_2D
@@ -1379,7 +1441,7 @@ contains
     
 !     ! In/output variables:
     
-!     real(wp), DIMENSION( C%nZ, grid%ny  , grid%nx-1), intent(IN)    :: d_cx
+!     real(wp),  intent(IN)    :: d_cx
 !     real(wp),  intent(OUT)   :: d_a
     
 !     ! Local variables:
@@ -1395,7 +1457,7 @@ contains
     
     
 !     d_a(1,:,:) = d_cx( :,grid%j1:grid%j2,1        )
-!     d_a(nx,:,:) = d_cx( :,grid%j1:grid%j2,grid%nx-1)
+!     d_a(nx,:,:) = d_cx( :,grid%j1:grid%j2,nx-1)
     
     
 !   end subroutine map_cx_to_a_3D
@@ -1407,7 +1469,7 @@ contains
     
 !     ! In/output variables:
     
-!     real(wp), DIMENSION( C%nZ, grid%ny-1, grid%nx  ), intent(IN)    :: d_cy
+!     real(wp), DIMENSION( C%nZ, ny-1, nx  ), intent(IN)    :: d_cy
 !     real(wp),  intent(OUT)   :: d_a
     
 !     ! Local variables:
@@ -1423,7 +1485,7 @@ contains
     
     
 !     d_a(:,1,:) = d_cy( :,1        ,grid%i1:grid%i2)
-!     d_a(:,ny,:) = d_cy( :,grid%ny-1,grid%i1:grid%i2)
+!     d_a(:,ny,:) = d_cy( :,ny-1,grid%i1:grid%i2)
     
     
 !   end subroutine map_cy_to_a_3D
@@ -1437,8 +1499,8 @@ contains
     
 !     ! In/output variables:
     
-!     real(wp), DIMENSION(       grid%ny  , grid%nx-1), intent(IN)    :: d_cx
-!     real(wp), DIMENSION(       grid%ny-1, grid%nx  ), intent(OUT)   :: d_cy
+!     real(wp),  intent(IN)    :: d_cx
+!     real(wp),  intent(OUT)   :: d_cy
     
 !     ! Local variables:
 !     integer :: i, j, nx, ny
@@ -1452,10 +1514,10 @@ contains
     
     
 !     ! Boundaries
-!     do j = grid%j1, MIN(grid%ny-1,grid%j2)
+!     do j = 1, ny-1
 !       i = 1
 !       d_cy(i,j) = (d_cx( j  ,i  ) + d_cx( j+1,i  )) / 2.0_wp
-!       i = grid%nx
+!       i = nx
 !       d_cy(i,j) = (d_cx( j  ,i-1) + d_cx(i-1,j+1)) / 2.0_wp
 !     end do
     
@@ -1469,14 +1531,14 @@ contains
     
 !     ! In/output variables:
     
-!     real(wp), DIMENSION(       grid%ny-1, grid%nx  ), intent(IN)    :: d_cy
-!     real(wp), DIMENSION(       grid%ny  , grid%nx-1), intent(OUT)   :: d_cx
+!     real(wp),  intent(IN)    :: d_cy
+!     real(wp),  intent(OUT)   :: d_cx
     
 !     ! Local variables:
 !     integer :: i, j, nx, ny
     
 !     ! Interior
-!     do i = grid%i1, MIN(grid%nx-1,grid%i2)
+!     do i = 1, nx-1
 !     do j = 2, ny-1
 !       d_cx(i,j) = (d_cy( j-1,i  ) + d_cy(i+1,j-1) + d_cy( j  ,i  ) + d_cy( j  ,i+1)) / 4.0_wp
 !     end do
@@ -1484,10 +1546,10 @@ contains
     
     
 !     ! Boundaries
-!     do i = grid%i1, MIN(grid%nx-1,grid%i2)
+!     do i = 1, nx-1
 !       j = 1
 !       d_cx(i,j) = (d_cy( j  ,i  ) + d_cy( j  ,i+1)) / 2.0_wp
-!       j = grid%ny
+!       j = ny
 !       d_cx(i,j) = (d_cy( j-1,i  ) + d_cy(i+1,j-1)) / 2.0_wp
 !     end do
     
@@ -1504,12 +1566,12 @@ contains
 !     ! In/output variables:
     
 !     real(wp), intent(IN)    :: d_a
-!     real(wp), DIMENSION(       grid%ny-1, grid%nx-1), intent(OUT)   :: d_b
+!     real(wp), DIMENSION(       ny-1, nx-1), intent(OUT)   :: d_b
     
 !     ! Local variables:
 !     integer :: i, j, nx, ny
     
-!     do i = grid%i1, MIN(grid%nx-1,grid%i2)
+!     do i = 1, nx-1
 !     do j = 1, ny-1
 !       d_b(i,j) = (d_a(i,j) + d_a(i+1,j) + d_a(i,j+1) + d_a(i+1,j+1)) / 4.0_wp
 !     end do
@@ -1527,13 +1589,13 @@ contains
     
 !     ! In/output variables:
     
-!     real(wp), DIMENSION(       grid%ny  , grid%nx-1), intent(IN)    :: d_cx
-!     real(wp), DIMENSION(       grid%ny-1, grid%nx-1), intent(OUT)   :: d_b
+!     real(wp),  intent(IN)    :: d_cx
+!     real(wp), DIMENSION(       ny-1, nx-1), intent(OUT)   :: d_b
     
 !     ! Local variables:
 !     integer :: i, j, nx, ny
     
-!     do i = grid%i1, MIN(grid%nx-1,grid%i2)
+!     do i = 1, nx-1
 !     do j = 1, ny-1
 !       d_b(i,j) = (d_cx(i,j) + d_cx(i,j+1)) / 2.0_wp
 !     end do
@@ -1549,13 +1611,13 @@ contains
     
 !     ! In/output variables:
     
-!     real(wp), DIMENSION(       grid%ny-1, grid%nx  ), intent(IN)    :: d_cy
-!     real(wp), DIMENSION(       grid%ny-1, grid%nx-1), intent(OUT)   :: d_b
+!     real(wp),  intent(IN)    :: d_cy
+!     real(wp), DIMENSION(       ny-1, nx-1), intent(OUT)   :: d_b
     
 !     ! Local variables:
 !     integer :: i, j, nx, ny
     
-!     do i = grid%i1, MIN(grid%nx-1,grid%i2)
+!     do i = 1, nx-1
 !     do j = 1, ny-1
 !       d_b(i,j) = (d_cy(i,j) + d_cy(i+1,j)) / 2.0_wp
 !     end do

@@ -12,6 +12,9 @@ $(objdir)/ncio.o: $(libdir)/ncio.f90
 $(objdir)/nml.o: $(libdir)/nml.f90
 	$(FC) $(DFLAGS) $(FFLAGS) -c -o $@ $<
 
+$(objdir)/grid_calcs.o: $(libdir)/grid_calcs.f90 $(objdir)/yelmo_defs.o
+	$(FC) $(DFLAGS) $(FFLAGS) -c -o $@ $<
+
 $(objdir)/gaussian_filter.o: $(libdir)/coordinates-light/gaussian_filter.f90
 	$(FC) $(DFLAGS) $(FFLAGS) -c -o $@ $<
 
@@ -214,6 +217,7 @@ yelmo_libs = 		   $(objdir)/gaussian_filter.o \
 					   $(objdir)/ice_enhancement.o \
 					   $(objdir)/ice_optimization.o \
 					   $(objdir)/grid_to_cdo.o \
+					   $(objdir)/grid_calcs.o \
 					   $(objdir)/index.o \
 					   $(objdir)/interp1D.o \
 					   $(objdir)/interp2D.o \

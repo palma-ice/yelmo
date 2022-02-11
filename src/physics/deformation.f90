@@ -534,27 +534,33 @@ contains
         integer  :: i, j, k
         integer  :: im1, ip1, jm1, jp1 
         integer  :: nx, ny, nz_aa, nz_ac  
-        real(wp) :: dxi, deta, dzeta
-        real(wp) :: dy  
-        real(wp) :: dx_inv, dy_inv
-        real(wp) :: dx_2_inv, dy_2_inv
-        real(wp) :: H_ice_inv
-        real(wp) :: lxz, lzx, lyz, lzy
-        real(wp) :: shear_squared 
-        real(wp) :: ux_aa, uy_aa 
-        real(wp), allocatable :: fact_x(:,:), fact_y(:,:)
-        real(wp), allocatable :: fact_z(:)
+        real(wp) :: shear_squared  
         real(wp), allocatable :: lxy(:,:,:)
         real(wp), allocatable :: lyx(:,:,:)
+        real(wp), allocatable :: lxz(:,:,:)
+        real(wp), allocatable :: lyz(:,:,:)
+        real(wp), allocatable :: lzx(:,:,:)
+        real(wp), allocatable :: lzy(:,:,:)
+
+        real(wp), allocatable :: lzx_acz(:,:,:)
+        real(wp), allocatable :: lzy_acz(:,:,:)
 
         ! Determine sizes and allocate local variables 
         nx    = size(ux,1)
         ny    = size(ux,2)
         nz_aa = size(zeta_aa,1)
+        nz_ac = size(zeta_ac,1) 
 
         allocate(lxy(nx,ny,nz_aa))
         allocate(lyx(nx,ny,nz_aa))
-        
+        allocate(lxz(nx,ny,nz_aa))
+        allocate(lyz(nx,ny,nz_aa))
+        allocate(lzx(nx,ny,nz_aa))
+        allocate(lzy(nx,ny,nz_aa))
+
+        allocate(lzx_acz(nx,ny,nz_ac))
+        allocate(lzy_acz(nx,ny,nz_ac))
+
         !-------- Initialisation --------
 
         strn%dxx          = 0.0_wp
@@ -576,27 +582,51 @@ contains
 
         strn%dxy = 0.5_wp*(lxy+lyx)
 
-        call ddz_cx_to_a_3D(strn%dxz,ux,H_ice,zeta_aa)
-        call ddz_cy_to_a_3D(strn%dyz,uy,H_ice,zeta_aa)
+        ! call ddz_cx_to_a_3D(strn%dxz,ux,H_ice,zeta_aa)
+        ! call ddz_cy_to_a_3D(strn%dyz,uy,H_ice,zeta_aa)
 
         ! In fact, we need additional cross terms for zx and zy, but
         ! not implemented yet. Assume it is small for now.
 
-        ! call ddz_cx_to_a_3D(lxz,ux,zeta_aa)
-        ! call ddz_cy_to_a_3D(lyz,uy,zeta_aa)
+        call ddz_cx_to_a_3D(lxz,ux,H_ice,zeta_aa)
+        call ddz_cy_to_a_3D(lyz,uy,H_ice,zeta_aa)
 
-        ! call ddx_cz_to_a_3D(lzx,ux,zeta_aa)
-        ! call ddy_cz_to_a_3D(lzy,uy,zeta_aa)
 
-        ! strn%dxz = 0.5_wp*(lxz+lzx)
-        ! strn%dyz = 0.5_wp*(lyz+lzy)
+        call ddx_a_to_a_3D(lzx_acz,uz,dx)
+        call ddy_a_to_a_3D(lzy_acz,uz,dx)
+        
+        ! Remember: nz_ac=nz_aa+1
+        ! There is one more cell-edge than cell-centers
 
+        lzx(:,:,1) = lzx_acz(:,:,1)
+        do k = 2, nz_aa-1
+            lzx(:,:,k) = 0.5_wp*(lzx_acz(:,:,k)+lzx_acz(:,:,k+1))
+        end do 
+        lzx(:,:,nz_aa) = lzx_acz(:,:,nz_ac)
+        
+        lzy(:,:,1) = lzy_acz(:,:,1)
+        do k = 2, nz_aa-1
+            lzy(:,:,k) = 0.5_wp*(lzy_acz(:,:,k)+lzy_acz(:,:,k+1))
+        end do 
+        lzy(:,:,nz_aa) = lzy_acz(:,:,nz_ac)
+
+        strn%dxz = 0.5_wp*(lxz+lzx)
+        strn%dyz = 0.5_wp*(lyz+lzy)
+            
+        ! ajr: testing 
+        ! Note: when dxz=dyz=0, the model is more stable. This is clearly
+        ! not correct, but it indicates that these terms are important
+        ! for stability, as expected. Keep in mind for future work. 
+        ! strn%dxz = 0.0_wp 
+        ! strn%dyz = 0.0_wp 
+        ! strn%dxz = lzx 
+        ! strn%dyz = lzy 
 
         !$omp parallel do
         do j=1, ny
         do i=1, nx
 
-            do k = 1, nz_aa 
+            do k = 1, nz_aa
 
                 ! Avoid extreme values
                 if (strn%dxz(i,j,k) .lt. -de_max) strn%dxz(i,j,k) = -de_max 
@@ -718,8 +748,7 @@ contains
         real(wp) :: dx_2_inv, dy_2_inv
         real(wp) :: H_ice_inv
         real(wp) :: lxy, lyx, lxz, lzx, lyz, lzy
-        real(wp) :: shear_squared 
-        real(wp) :: ux_aa, uy_aa 
+        real(wp) :: shear_squared  
         real(wp), allocatable :: fact_x(:,:), fact_y(:,:)
         real(wp), allocatable :: fact_z(:)
 
@@ -1074,8 +1103,7 @@ contains
         real(wp) :: dx_inv, dy_inv
         real(wp) :: H_ice_inv
         real(wp) :: lxy, lyx, lxz, lzx, lyz, lzy
-        real(wp) :: shear_squared 
-        real(wp) :: ux_aa, uy_aa 
+        real(wp) :: shear_squared  
         real(wp), allocatable :: fact_x(:,:), fact_y(:,:)
         real(wp), allocatable :: fact_z(:)
 

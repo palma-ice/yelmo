@@ -1450,13 +1450,23 @@ contains
         do j = 1, ny 
         do i = 1, nx 
 
-            dz_a(i,j,1) = (d_a(i,j,2) - d_a(i,j,1)) / (Hi(i,j)*dz(1))
+            if (Hi(i,j) .gt. 0.0_wp) then
 
-            do k = 2, nz-1 
-                dz_a(i,j,1) = (d_a(i,j,k+1) - d_a(i,j,k-1)) / (Hi(i,j)*dz(k))
-            end do 
+                dz_a(i,j,1) = (d_a(i,j,2) - d_a(i,j,1)) / (Hi(i,j)*dz(1))
 
-            dz_a(i,j,nz) = (d_a(i,j,nz) - d_a(i,j,nz-1)) / (Hi(i,j)*dz(nz))
+                do k = 2, nz-1 
+                    dz_a(i,j,k) = (d_a(i,j,k+1) - d_a(i,j,k-1)) / (Hi(i,j)*dz(k))
+                end do 
+
+                dz_a(i,j,nz) = (d_a(i,j,nz) - d_a(i,j,nz-1)) / (Hi(i,j)*dz(nz))
+            
+            else 
+                
+                do k = 1, nz 
+                    dz_a(i,j,k) = 0.0_wp 
+                end do 
+            
+            end if 
 
         end do
         end do  
@@ -1506,13 +1516,23 @@ contains
         do j = 1, ny 
         do i = 1, nx 
 
-            dz_a(i,j,1) = (d_a(i,j,2) - d_a(i,j,1)) / (Hi(i,j)*dz(1))
+            if (Hi(i,j) .gt. 0.0_wp) then
+                
+                dz_a(i,j,1) = (d_a(i,j,2) - d_a(i,j,1)) / (Hi(i,j)*dz(1))
 
-            do k = 2, nz-1 
-                dz_a(i,j,1) = (d_a(i,j,k+1) - d_a(i,j,k-1)) / (Hi(i,j)*dz(k))
-            end do 
+                do k = 2, nz-1 
+                    dz_a(i,j,k) = (d_a(i,j,k+1) - d_a(i,j,k-1)) / (Hi(i,j)*dz(k))
+                end do 
 
-            dz_a(i,j,nz) = (d_a(i,j,nz) - d_a(i,j,nz-1)) / (Hi(i,j)*dz(nz))
+                dz_a(i,j,nz) = (d_a(i,j,nz) - d_a(i,j,nz-1)) / (Hi(i,j)*dz(nz))
+            
+            else 
+                
+                do k = 1, nz 
+                    dz_a(i,j,k) = 0.0_wp 
+                end do 
+            
+            end if
 
         end do
         end do  

@@ -33,7 +33,7 @@ contains
     
     subroutine calc_zeta(zeta_aa,zeta_ac,nz_ac,nz_aa,zeta_scale,zeta_exp)
         ! Calculate the vertical axis cell-centers first (aa-nodes),
-        ! including a cell centered at the base on the surface. 
+        ! including a cell centered at the base and the surface. 
         ! Then calculate the vertical axis cell-edges (ac-nodes).
         ! The base and surface ac-nodes coincide with the cell centers.
         ! There is one more cell-edge than cell-centers (nz_ac=nz_aa+1)

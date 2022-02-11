@@ -618,95 +618,56 @@ contains
 
     end subroutine ddy_a_to_cy_3D
 
-!   subroutine ddy_a_to_cy_3D( d_a, dy_cy)
-!     ! Input:  scalar on the Aa grid
-!     ! Output: its y-derivative on the Acy grid
+    subroutine ddx_a_to_cy_3D( dx_cy, d_a, dx )
+        ! Input:  scalar on the Aa grid
+        ! Output: its x-derivative on the Acy grid
+
+        implicit none
+
+        ! In/output variables:
+
+        real(wp),  intent(OUT)   :: dx_cy(:,:,:)
+        real(wp),  intent(IN)    :: d_a(:,:,:)
+        real(wp),  intent(IN)    :: dx 
+
+        ! Local variables:
+        integer :: k, nz 
+
+        nz = size(d_a,3) 
+
+        do k = 1, nz 
+            call ddx_a_to_cy_2D(dx_cy(:,:,k),d_a(:,:,k),dx)
+        end do
+
+        return 
+
+    end subroutine ddx_a_to_cy_3D
+
+    subroutine ddy_a_to_cx_3D( dy_cx, d_a, dx )
+        ! Input:  scalar on the Aa grid
+        ! Output: its y-derivative on the Acx grid
+
+        implicit none
+
+        ! In/output variables:
+
+        real(wp),  intent(OUT)   :: dy_cx(:,:,:)
+        real(wp),  intent(IN)    :: d_a(:,:,:)
+        real(wp),  intent(IN)    :: dx 
+
+        ! Local variables:
+        integer :: k, nz 
+
+        nz = size(d_a,3) 
+
+        do k = 1, nz 
+            call ddy_a_to_cx_2D(dy_cx(:,:,k),d_a(:,:,k),dx)
+        end do
+
+        return 
+
+    end subroutine ddy_a_to_cx_3D
     
-!     implicit none
-    
-!     ! In/output variables:
-    
-!     real(wp),  intent(IN)    :: d_a
-!     real(wp), DIMENSION( C%nZ, ny-1, nx  ), intent(OUT)   :: dy_cy
-    
-!     ! Local variables:
-!     integer :: i, j, nx, ny,k
-    
-!     do i = 1, nx
-!     do j = 1, ny-1
-!     do k = 1, C%nZ
-!       dy_cy(i,j,k) = (d_a(i,j+1,k) - d_a(i,j,k)) / dx
-!     end do
-!     end do
-!     end do
-    
-    
-!   end subroutine ddy_a_to_cy_3D
-!   subroutine ddx_a_to_cy_3D( d_a, dx_cy)
-!     ! Input:  scalar on the Aa grid
-!     ! Output: its x-derivative on the Acy grid
-    
-!     implicit none
-    
-!     ! In/output variables:
-    
-!     real(wp),  intent(IN)    :: d_a
-!     real(wp), DIMENSION( C%nZ, ny-1, nx  ), intent(OUT)   :: dx_cy
-    
-!     ! Local variables:
-!     integer :: i, j, nx, ny,k
-    
-!     ! Central differencing in the interior
-!     do i = 2, nx-1
-!     do j = 1, ny-1
-!     do k = 1, C%nZ
-!       dx_cy(i,j,k) = (d_a(i+1,j,k) + d_a( k,j+1,i+1) - d_a(i-1,j,k) - d_a( k,j+1,i-1)) / (4.0_wp * dx)
-!     end do
-!     end do
-!     end do
-    
-    
-!     ! One-sided differencing on the boundary
-!     do j = 1, ny-1
-!       dx_cy( :,j,1      ) = (d_a( :,j,2      ) + d_a( :,j+1,2      ) - d_a( :,j,1        ) - d_a( :,j+1,1        )) / (2.0_wp * dx)
-!       dx_cy( :,j,nx) = (d_a( :,j,nx) + d_a( :,j+1,nx) - d_a( :,j,nx-1) - d_a( :,j+1,nx-1)) / (2.0_wp * dx)
-!     end do
-    
-    
-!   end subroutine ddx_a_to_cy_3D
-!   subroutine ddy_a_to_cx_3D( d_a, dy_cx)
-!     ! Input:  scalar on the Aa grid
-!     ! Output: its y-derivative on the Acx grid
-    
-!     implicit none
-    
-!     ! In/output variables:
-    
-!     real(wp),  intent(IN)    :: d_a
-!     real(wp),  intent(OUT)   :: dy_cx
-    
-!     ! Local variables:
-!     integer :: i, j, nx, ny,k
-    
-!     ! Central differencing in the interior
-!     do i = 1, nx-1
-!     do j = 2, ny-1
-!     do k = 1, C%nZ
-!       dy_cx(i,j,k) = (d_a(i,j+1,k) + d_a( k,j+1,i+1) - d_a(i,j-1,k) - d_a( k,j-1,i+1)) / (4.0_wp * dx)
-!     end do
-!     end do
-!     end do
-    
-    
-!     ! One-sided differencing on the boundary
-!     do i = 1, nx-1
-!       dy_cx( :,1      ,i) = (d_a( :,2,      i) + d_a( :,2,      i+1) - d_a( :,1,        i) - d_a( :,1,        i+1)) / (2.0_wp * dx)
-!       dy_cx( :,nx,i) = (d_a( :,nx,i) + d_a( :,nx,i+1) - d_a( :,nx-1,i) - d_a( :,nx-1,i+1)) / (2.0_wp * dx)
-!     end do
-    
-    
-!   end subroutine ddy_a_to_cx_3D
-  
 !   ! Acx/Acy to Aa
   
 !   ! 2D
@@ -899,7 +860,7 @@ contains
     
 !     ! In/output variables:
     
-!     real(wp), DIMENSION( C%nZ, ny-1, nx  ), intent(IN)    :: d_cy
+!     real(wp),  intent(IN)    :: d_cy
 !     real(wp),  intent(OUT)   :: dy_a
     
 !     ! Local variables:
@@ -1361,7 +1322,7 @@ contains
 !     ! In/output variables:
     
 !     real(wp),  intent(IN)    :: d_a
-!     real(wp), DIMENSION( C%nZ, ny-1, nx  ), intent(OUT)   :: d_cy
+!     real(wp),  intent(OUT)   :: d_cy
     
 !     ! Local variables:
 !     integer :: i, j, nx, ny,k
@@ -1469,7 +1430,7 @@ contains
     
 !     ! In/output variables:
     
-!     real(wp), DIMENSION( C%nZ, ny-1, nx  ), intent(IN)    :: d_cy
+!     real(wp),  intent(IN)    :: d_cy
 !     real(wp),  intent(OUT)   :: d_a
     
 !     ! Local variables:

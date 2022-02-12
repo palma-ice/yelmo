@@ -10,6 +10,9 @@ module thermodynamics
 
     use yelmo_tools, only : stagger_nodes_acx_ab_ice, stagger_nodes_acy_ab_ice, &
                             set_boundaries_3D_aa
+    
+    use grid_calcs 
+
     implicit none 
 
     private  
@@ -645,6 +648,68 @@ contains
  
     end subroutine calc_basal_heating_fromaa
 
+    subroutine calc_basal_heating_fromab_new(Q_b,ux_b,uy_b,taub_acx,taub_acy,f_ice,beta1,beta2)
+         ! Qb [J a-1 m-2] == [m a-1] * [J m-3]
+         ! Note: grounded ice fraction f_grnd_acx/y not used here, because taub_acx/y already accounts
+         ! for the grounded fraction via beta_acx/y: Q_b = tau_b*u = -beta*u*u.
+
+        real(prec), intent(INOUT) :: Q_b(:,:)           ! [mW m-2] Basal heat production (friction), aa-nodes
+        real(prec), intent(IN)    :: ux_b(:,:)          ! Basal velocity, x-component (acx)
+        real(prec), intent(IN)    :: uy_b(:,:)          ! Basal velocity, y-compenent (acy)
+        real(prec), intent(IN)    :: taub_acx(:,:)      ! Basal friction (acx)
+        real(prec), intent(IN)    :: taub_acy(:,:)      ! Basal friction (acy) 
+        real(prec), intent(IN)    :: f_ice(:,:)         ! [--] Ice area fraction
+        real(prec), intent(IN)    :: beta1              ! Timestepping weighting parameter
+        real(prec), intent(IN)    :: beta2              ! Timestepping weighting parameter
+        
+        ! Local variables
+        integer  :: i, j, nx, ny, n 
+        integer  :: im1, ip1, jm1, jp1  
+
+        real(wp), allocatable :: uxb_ab(:,:) 
+        real(wp), allocatable :: uyb_ab(:,:) 
+        real(wp), allocatable :: taubx_ab(:,:) 
+        real(wp), allocatable :: tauby_ab(:,:) 
+        real(wp), allocatable :: Qb_ab(:,:) 
+        real(wp), allocatable :: Qb_aa(:,:)
+
+        nx = size(Q_b,1)
+        ny = size(Q_b,2)
+
+        allocate(uxb_ab(nx,ny))
+        allocate(uyb_ab(nx,ny))
+        allocate(taubx_ab(nx,ny))
+        allocate(tauby_ab(nx,ny))
+        allocate(Qb_ab(nx,ny))
+        allocate(Qb_aa(nx,ny))
+        
+        call map_cx_to_b_2D(uxb_ab,ux_b)
+        call map_cx_to_b_2D(uyb_ab,uy_b)
+        call map_cx_to_b_2D(taubx_ab,taub_acx)
+        call map_cx_to_b_2D(tauby_ab,taub_acy)
+        
+        ! Calculate Qb at quadrature points [Pa m a-1] == [J a-1 m-2]
+        Qb_ab = abs( sqrt(uxb_ab**2+uyb_ab**2) &
+                        * sqrt(taubx_ab**2+tauby_ab**2) )
+
+        ! Map to aa-nodes 
+        call map_b_to_a_2D(Qb_aa,Qb_ab)
+
+        ! Ensure Q_b is strictly positive 
+        where (Qb_aa .lt. 0.0_wp) Qb_aa = 0.0_wp 
+
+        
+        ! Get weighted average of Q_b with timestepping factors
+        Q_b = beta1*Qb_aa + beta2*Q_b
+
+
+        ! Finally convert to [mW m-2]
+        Q_b = Q_b * 1e3 / sec_year      ! [J a-1 m-2] => [mW m-2]
+
+        return 
+ 
+    end subroutine calc_basal_heating_fromab_new
+
     subroutine calc_basal_heating_fromab(Q_b,ux_b,uy_b,taub_acx,taub_acy,f_ice,beta1,beta2)
          ! Qb [J a-1 m-2] == [m a-1] * [J m-3]
          ! Note: grounded ice fraction f_grnd_acx/y not used here, because taub_acx/y already accounts
@@ -701,6 +766,9 @@ contains
             ! Get weighted average using only ice-covered nodes
             Q_b_now = sum(wt_ab*Qb_ab)
 
+            ! Convert to [mW m-2]
+            Q_b_now = Q_b_now * 1e3 / sec_year      ! [J a-1 m-2] => [mW m-2]
+
             ! Get weighted average of Q_b with timestepping factors
             Q_b(i,j) = beta1*Q_b_now + beta2*Q_b(i,j) 
 
@@ -709,10 +777,7 @@ contains
             
         end do 
         end do 
-
-        ! Finally convert to [mW m-2]
-        Q_b = Q_b * 1e3 / sec_year      ! [J a-1 m-2] => [mW m-2]
-
+        
         return 
  
     end subroutine calc_basal_heating_fromab

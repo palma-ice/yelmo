@@ -54,6 +54,7 @@ module grid_calcs
     public :: map_cx_to_cy_2D
     public :: map_cy_to_cx_2D 
     public :: map_a_to_b_2D 
+    public :: map_b_to_a_2D 
     public :: map_cx_to_b_2D
     public :: map_cy_to_b_2D
 
@@ -1873,6 +1874,36 @@ contains
         return
 
     end subroutine map_a_to_b_2D
+    
+    ! Ab to Aa
+    subroutine map_b_to_a_2D( d_a, d_b )
+        ! Input:  scalar on the Ab grid
+        ! Output: the same on the Aa grid
+
+        implicit none
+
+        ! In/output variables:
+
+        real(wp),  intent(OUT)   :: d_a(:,:)
+        real(wp),  intent(IN)    :: d_b(:,:)
+        
+        ! Local variables:
+        integer :: i, j, nx, ny
+
+        nx = size(d_b,1)
+        ny = size(d_b,2) 
+
+        d_a = 0.0_wp 
+
+        do j = 2, ny
+        do i = 2, nx
+            d_a(i,j) = (d_b(i,j) + d_b(i-1,j) + d_b(i,j-1) + d_b(i-1,j-1)) / 4.0_wp
+        end do
+        end do
+
+        return
+
+    end subroutine map_b_to_a_2D
     
     ! Acx/Acy to Ab
     subroutine map_cx_to_b_2D( d_b, d_cx )

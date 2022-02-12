@@ -632,6 +632,10 @@ contains
             
             Q_b_now = abs(uxy_aa*taub_aa)      ! [Pa m a-1] == [J a-1 m-2]
 
+            ! Get weighted average using only ice-covered nodes
+            ! and convert to [mW m-2]
+            Q_b_now = Q_b_now * 1e3 / sec_year      ! [J a-1 m-2] => [mW m-2]
+
             ! Get weighted average of Q_b with timestepping factors
             Q_b(i,j) = beta1*Q_b_now + beta2*Q_b(i,j) 
 
@@ -640,10 +644,7 @@ contains
             
         end do 
         end do 
-
-        ! Finally convert to [mW m-2]
-        Q_b = Q_b * 1e3 / sec_year      ! [J a-1 m-2] => [mW m-2]
-
+        
         return 
  
     end subroutine calc_basal_heating_fromaa
@@ -698,13 +699,11 @@ contains
         ! Ensure Q_b is strictly positive 
         where (Qb_aa .lt. 0.0_wp) Qb_aa = 0.0_wp 
 
-        
+        ! Convert to [mW m-2]
+        Qb_aa = Qb_aa * 1e3 / sec_year          ! [J a-1 m-2] => [mW m-2]
+            
         ! Get weighted average of Q_b with timestepping factors
         Q_b = beta1*Qb_aa + beta2*Q_b
-
-
-        ! Finally convert to [mW m-2]
-        Q_b = Q_b * 1e3 / sec_year      ! [J a-1 m-2] => [mW m-2]
 
         return 
  
@@ -764,10 +763,8 @@ contains
                           * sqrt(taubx_ab**2+tauby_ab**2) )
 
             ! Get weighted average using only ice-covered nodes
-            Q_b_now = sum(wt_ab*Qb_ab)
-
-            ! Convert to [mW m-2]
-            Q_b_now = Q_b_now * 1e3 / sec_year      ! [J a-1 m-2] => [mW m-2]
+            ! and convert to [mW m-2]
+            Q_b_now = sum(wt_ab*Qb_ab) * 1e3 / sec_year      ! [J a-1 m-2] => [mW m-2]
 
             ! Get weighted average of Q_b with timestepping factors
             Q_b(i,j) = beta1*Q_b_now + beta2*Q_b(i,j) 
@@ -777,7 +774,7 @@ contains
             
         end do 
         end do 
-        
+
         return 
  
     end subroutine calc_basal_heating_fromab
@@ -828,6 +825,9 @@ contains
             ! Average from ac-nodes to aa-node
             Q_b_now = 0.25*(Qb_acx(i,j)+Qb_acx(im1,j)+Qb_acy(i,j)+Qb_acy(i,jm1))
 
+            ! Convert to [mW m-2]
+            Q_b_now = Q_b_now * 1e3 / sec_year      ! [J a-1 m-2] => [mW m-2]
+            
 if (.FALSE.) then 
             ! Reduction of Q_b with f_pmp (ajr: this is an open question)
             Q_b_now = Q_b_now*f_pmp(i,j)  
@@ -842,9 +842,6 @@ end if
         end do 
         end do 
         
-        ! Finally convert to [mW m-2]
-        Q_b = Q_b * 1e3 / sec_year      ! [J a-1 m-2] => [mW m-2]
-
         return 
  
     end subroutine calc_basal_heating_fromac
@@ -961,6 +958,9 @@ end if
 
             end if 
 
+            ! Convert to [mW m-2]
+            Q_b_now = Q_b_now * 1e3 / sec_year      ! [J a-1 m-2] => [mW m-2]
+            
             ! Get weighted average of Q_b with timestepping factors
             Q_b(i,j) = beta1*Q_b_now + beta2*Q_b(i,j) 
 
@@ -969,9 +969,6 @@ end if
             
         end do 
         end do 
-
-        ! Finally convert to [mW m-2]
-        Q_b = Q_b * 1e3 / sec_year      ! [J a-1 m-2] => [mW m-2]
 
         return 
  

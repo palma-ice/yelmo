@@ -85,19 +85,23 @@ contains
 
         ! Calculate the strain rate tensor
 
-if (.TRUE.) then 
+if (.FALSE.) then 
         ! Calculate strain rate tensor on ab-nodes, then average 
 
-        call calc_strain_rate_tensor_new(mat%now%strn,mat%now%strn2D,dyn%now%ux,dyn%now%uy,dyn%now%uz, &
+        call calc_strain_rate_tensor(mat%now%strn,mat%now%strn2D,dyn%now%ux,dyn%now%uy,dyn%now%uz, &
                                  tpo%now%H_ice,tpo%now%f_ice,tpo%now%f_grnd,mat%par%zeta_aa, &
                                  mat%par%zeta_ac,mat%par%dx,mat%par%de_max,mat%par%n_glen)
 
 else 
         ! Calculate strain rate tensor on aa-nodes directly
 
-        call calc_strain_rate_tensor_aa(mat%now%strn,mat%now%strn2D,dyn%now%ux,dyn%now%uy,dyn%now%uz, &
+        call calc_strain_rate_tensor_new_aa(mat%now%strn,mat%now%strn2D,dyn%now%ux,dyn%now%uy,dyn%now%uz, &
                                  tpo%now%H_ice,tpo%now%f_ice,tpo%now%f_grnd,mat%par%zeta_aa, &
                                  mat%par%zeta_ac,mat%par%dx,mat%par%de_max,mat%par%n_glen)
+
+        ! call calc_strain_rate_tensor_aa(mat%now%strn,mat%now%strn2D,dyn%now%ux,dyn%now%uy,dyn%now%uz, &
+        !                          tpo%now%H_ice,tpo%now%f_ice,tpo%now%f_grnd,mat%par%zeta_aa, &
+        !                          mat%par%zeta_ac,mat%par%dx,mat%par%de_max,mat%par%n_glen)
 
 end if 
 

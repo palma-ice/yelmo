@@ -32,7 +32,7 @@ module deformation
     public :: calc_rate_factor_eismint
     public :: scale_rate_factor_water
     public :: calc_rate_factor_integrated
-    public :: calc_strain_rate_tensor_new 
+    public :: calc_strain_rate_tensor_new_aa 
     public :: calc_strain_rate_tensor
     public :: calc_strain_rate_tensor_aa
     public :: calc_strain_rate_tensor_2D
@@ -495,7 +495,7 @@ contains
 
     end function calc_rate_factor_integrated
     
-    subroutine calc_strain_rate_tensor_new(strn, strn2D, ux, uy, uz, H_ice, f_ice, f_grnd,  &
+    subroutine calc_strain_rate_tensor_new_aa(strn, strn2D, ux, uy, uz, H_ice, f_ice, f_grnd,  &
                     zeta_aa, zeta_ac, dx, de_max, n_glen)
         ! -------------------------------------------------------------------------------
         !  Computation of all components of the strain-rate tensor, the full
@@ -624,62 +624,66 @@ contains
         ! strn%dyz = lzy 
 
         ! Calculate further quantities...
-        
+
         !$omp parallel do
         do j=1, ny
         do i=1, nx
 
-            do k = 1, nz_aa
+            if (f_ice(i,j) .eq. 1.0_wp) then 
 
-                ! Avoid extreme values
-                if (strn%dxz(i,j,k) .lt. -de_max) strn%dxz(i,j,k) = -de_max 
-                if (strn%dxz(i,j,k) .gt.  de_max) strn%dxz(i,j,k) =  de_max 
+                do k = 1, nz_aa
 
-                if (strn%dyz(i,j,k) .lt. -de_max) strn%dyz(i,j,k) = -de_max 
-                if (strn%dyz(i,j,k) .gt.  de_max) strn%dyz(i,j,k) =  de_max 
-                
-                ! Avoid underflows 
-                if (abs(strn%dxz(i,j,k)) .lt. TOL_UNDERFLOW) strn%dxz(i,j,k) = 0.0 
-                if (abs(strn%dyz(i,j,k)) .lt. TOL_UNDERFLOW) strn%dyz(i,j,k) = 0.0 
+                    ! Avoid extreme values
+                    if (strn%dxz(i,j,k) .lt. -de_max) strn%dxz(i,j,k) = -de_max 
+                    if (strn%dxz(i,j,k) .gt.  de_max) strn%dxz(i,j,k) =  de_max 
 
-                ! ====== Finished calculating individual strain rate terms ====== 
-                
-                strn%de(i,j,k) =  sqrt(  strn%dxx(i,j,k)*strn%dxx(i,j,k) &
-                                       + strn%dyy(i,j,k)*strn%dyy(i,j,k) &
-                                       + strn%dxx(i,j,k)*strn%dyy(i,j,k) &
-                                       + strn%dxy(i,j,k)*strn%dxy(i,j,k) &
-                                       + strn%dxz(i,j,k)*strn%dxz(i,j,k) &
-                                       + strn%dyz(i,j,k)*strn%dyz(i,j,k) )
-                
-                if (strn%de(i,j,k) .gt. de_max) strn%de(i,j,k) = de_max 
+                    if (strn%dyz(i,j,k) .lt. -de_max) strn%dyz(i,j,k) = -de_max 
+                    if (strn%dyz(i,j,k) .gt.  de_max) strn%dyz(i,j,k) =  de_max 
+                    
+                    ! Avoid underflows 
+                    if (abs(strn%dxz(i,j,k)) .lt. TOL_UNDERFLOW) strn%dxz(i,j,k) = 0.0 
+                    if (abs(strn%dyz(i,j,k)) .lt. TOL_UNDERFLOW) strn%dyz(i,j,k) = 0.0 
 
-                ! Calculate the horizontal divergence too 
-                strn%div(i,j,k) = strn%dxx(i,j,k) + strn%dyy(i,j,k) 
+                    ! ====== Finished calculating individual strain rate terms ====== 
+                    
+                    strn%de(i,j,k) =  sqrt(  strn%dxx(i,j,k)*strn%dxx(i,j,k) &
+                                           + strn%dyy(i,j,k)*strn%dyy(i,j,k) &
+                                           + strn%dxx(i,j,k)*strn%dyy(i,j,k) &
+                                           + strn%dxy(i,j,k)*strn%dxy(i,j,k) &
+                                           + strn%dxz(i,j,k)*strn%dxz(i,j,k) &
+                                           + strn%dyz(i,j,k)*strn%dyz(i,j,k) )
+                    
+                    if (strn%de(i,j,k) .gt. de_max) strn%de(i,j,k) = de_max 
 
-                ! Note: Using only the below should be equivalent to applying
-                ! the SIA approximation to calculate `de`
-                !strn%de(i,j,k)    =  sqrt( shear_squared(k) )
+                    ! Calculate the horizontal divergence too 
+                    strn%div(i,j,k) = strn%dxx(i,j,k) + strn%dyy(i,j,k) 
 
-                if (strn%de(i,j,k) .gt. 0.0) then 
-                    ! Calculate the shear-based strain, stretching and the shear-fraction
-                    shear_squared  =   strn%dxz(i,j,k)*strn%dxz(i,j,k) &
-                                     + strn%dyz(i,j,k)*strn%dyz(i,j,k)
-                    strn%f_shear(i,j,k) = sqrt(shear_squared)/strn%de(i,j,k)
-                else 
-                    strn%f_shear(i,j,k) = 1.0   ! Shearing by default for low strain rates
-                end if 
+                    ! Note: Using only the below should be equivalent to applying
+                    ! the SIA approximation to calculate `de`
+                    !strn%de(i,j,k)    =  sqrt( shear_squared(k) )
 
-                !  ------ Modification of the shear fraction for floating ice (ice shelves)
+                    if (strn%de(i,j,k) .gt. 0.0) then 
+                        ! Calculate the shear-based strain, stretching and the shear-fraction
+                        shear_squared  =   strn%dxz(i,j,k)*strn%dxz(i,j,k) &
+                                         + strn%dyz(i,j,k)*strn%dyz(i,j,k)
+                        strn%f_shear(i,j,k) = sqrt(shear_squared)/strn%de(i,j,k)
+                    else 
+                        strn%f_shear(i,j,k) = 1.0   ! Shearing by default for low strain rates
+                    end if 
 
-                if (f_grnd(i,j) .eq. 0.0) then 
-                    strn%f_shear(i,j,k) = 0.0    ! Assume ice shelf is only stretching, no shear 
-                end if 
+                    !  ------ Modification of the shear fraction for floating ice (ice shelves)
 
-                !  ------ Constrain the shear fraction to reasonable [0,1] interval
+                    if (f_grnd(i,j) .eq. 0.0) then 
+                        strn%f_shear(i,j,k) = 0.0    ! Assume ice shelf is only stretching, no shear 
+                    end if 
 
-                strn%f_shear(i,j,k) = min(max(strn%f_shear(i,j,k), 0.0), 1.0)
+                    !  ------ Constrain the shear fraction to reasonable [0,1] interval
 
-            end do 
+                    strn%f_shear(i,j,k) = min(max(strn%f_shear(i,j,k), 0.0), 1.0)
+
+                end do 
+
+            end if 
 
         end do
         end do
@@ -704,7 +708,7 @@ contains
 
         return
 
-    end subroutine calc_strain_rate_tensor_new
+    end subroutine calc_strain_rate_tensor_new_aa
 
     subroutine calc_strain_rate_tensor(strn, strn2D, vx, vy, vz, H_ice, f_ice, f_grnd,  &
                     zeta_aa, zeta_ac, dx, de_max, n_glen)

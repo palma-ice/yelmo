@@ -1,6 +1,6 @@
 #!/bin/bash
 
-fldr='tmp/f0783e5'
+fldr='tmp/a835110'
 
 
 ### BENCHMARK TESTS ###
@@ -30,8 +30,8 @@ jobrun ./runylmo -s -e benchmarks -n par-gmd/yelmo_EISMINT_moving.nml -p eismint
 make initmip
 
 # Antarctica present-day and LGM simulations (now with ydyn.solver='diva' by default)
-./runylmo -s -q priority -w 5 -e initmip -o ${fldr}/ant-pd  -n par-gmd/yelmo_Antarctica.nml -p ctrl.clim_nm="clim_pd"
-./runylmo -s -q priority -w 5 -e initmip -o ${fldr}/ant-lgm -n par-gmd/yelmo_Antarctica.nml -p ctrl.clim_nm="clim_lgm"
+./runylmo -s -q short -w 5 -e initmip -o ${fldr}/ant-pd  -n par-gmd/yelmo_Antarctica.nml -p ctrl.clim_nm="clim_pd"
+./runylmo -s -q short -w 5 -e initmip -o ${fldr}/ant-lgm -n par-gmd/yelmo_Antarctica.nml -p ctrl.clim_nm="clim_lgm"
 
 # Or to run via batch call:
 jobrun ./runylmo -s -e initmip -n par-gmd/yelmo_Antarctica.nml -- -a -o ${fldr}/ant -p ctrl.clim_nm="clim_pd","clim_lgm"

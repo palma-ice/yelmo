@@ -1136,7 +1136,7 @@ contains
 
         ! Interior
         do j = 1, ny-1
-        do i = 2, nx-1
+        do i = 2, nx
             dx_cy(i,j) = (d_cx(i,j) + d_cx(i,j+1) - d_cx(i-1,j) - d_cx(i-1,j+1)) / (2.0_wp * dx)
         end do
         end do
@@ -1173,7 +1173,7 @@ contains
 
         ! Interior
         do j = 1, ny-1
-        do i = 2, nx-1
+        do i = 2, nx
             dy_cy(i,j) = (d_cx(i-1,j+1) + d_cx(i,j+1) - d_cx(i-1,j) - d_cx(i,j)) / (2.0_wp * dx)
         end do
         end do
@@ -1294,7 +1294,7 @@ contains
 
         ! Interior
         do j = 1, ny-1
-        do i = 2, nx-2 
+        do i = 2, nx-1 
             dx_b(i,j) = (d_cx(i+1,j+1) + d_cx(i+1,j) - d_cx(i-1,j+1) - d_cx(i-1,j)) / (4.0_wp * dx)
         end do
         end do
@@ -1331,8 +1331,8 @@ contains
         ny = size(d_cy,2) 
 
         ! Interior
-        do i = 2, nx-2 
-        do j = 2, ny-2
+        do i = 1, nx-1 
+        do j = 2, ny-1
             dy_b(i,j) = (d_cy(i+1,j+1) + d_cy(i,j+1) - d_cy(i+1,j-1) - d_cy(i,j-1)) / (4.0_wp * dx)
         end do
         end do
@@ -1846,7 +1846,7 @@ contains
     end subroutine map_cy_to_cx_2D
   
     ! Aa to Ab
-    subroutine map_a_to_b_2D( d_b, d_a )
+    subroutine map_a_to_b_2D( d_b, d_a, mask )
         ! Input:  scalar on the Aa grid
         ! Output: the same on the Ab grid
 
@@ -1856,27 +1856,74 @@ contains
 
         real(wp),  intent(OUT)   :: d_b(:,:)
         real(wp),  intent(IN)    :: d_a(:,:)
+        logical,   intent(IN), optional :: mask(:,:) 
         
         ! Local variables:
-        integer :: i, j, nx, ny
+        integer  :: i, j, nx, ny
+        real(wp) :: val, wt 
 
         nx = size(d_a,1)
         ny = size(d_a,2) 
 
         d_b = 0.0_wp 
 
-        do j = 1, ny-1
-        do i = 1, nx-1
-            d_b(i,j) = (d_a(i,j) + d_a(i+1,j) + d_a(i,j+1) + d_a(i+1,j+1)) / 4.0_wp
-        end do
-        end do
+        if (present(mask)) then
 
+            do j = 1, ny-1
+            do i = 1, nx-1
+            
+                val = 0.0_wp 
+                wt  = 0.0_wp 
+
+                if (mask(i,j)) then 
+                    val = val + d_a(i,j) 
+                    wt  = wt  + 1.0_wp 
+                end if 
+
+                if (mask(i+1,j)) then 
+                    val = val + d_a(i+1,j) 
+                    wt  = wt  + 1.0_wp 
+                end if 
+                
+                if (mask(i,j+1)) then 
+                    val = val + d_a(i,j+1) 
+                    wt  = wt  + 1.0_wp 
+                end if 
+                
+                if (mask(i,j)) then 
+                    val = val + d_a(i+1,j+1) 
+                    wt  = wt  + 1.0_wp 
+                end if 
+                
+                if (wt .gt. 0.0_wp) then 
+                    d_b(i,j) = val / wt 
+                else 
+                    d_b(i,j) = (d_a(i,j) + d_a(i+1,j) + d_a(i,j+1) + d_a(i+1,j+1)) / 4.0_wp
+                end if 
+
+            end do
+            end do
+
+        else
+
+            do j = 1, ny-1
+            do i = 1, nx-1
+                d_b(i,j) = (d_a(i,j) + d_a(i+1,j) + d_a(i,j+1) + d_a(i+1,j+1)) / 4.0_wp
+            end do
+            end do
+
+        end if 
+
+        ! Fill in border 
+        d_b(nx,:) = d_b(nx-1,:)
+        d_b(:,ny) = d_b(:,ny-1)
+        
         return
 
     end subroutine map_a_to_b_2D
     
     ! Ab to Aa
-    subroutine map_b_to_a_2D( d_a, d_b )
+    subroutine map_b_to_a_2D( d_a, d_b, mask )
         ! Input:  scalar on the Ab grid
         ! Output: the same on the Aa grid
 
@@ -1886,27 +1933,74 @@ contains
 
         real(wp),  intent(OUT)   :: d_a(:,:)
         real(wp),  intent(IN)    :: d_b(:,:)
+        logical,   intent(IN), optional :: mask(:,:)    ! Mask from aa-nodes
         
         ! Local variables:
-        integer :: i, j, nx, ny
+        integer  :: i, j, nx, ny
+        real(wp) :: val, wt 
 
         nx = size(d_b,1)
         ny = size(d_b,2) 
 
         d_a = 0.0_wp 
 
-        do j = 2, ny
-        do i = 2, nx
-            d_a(i,j) = (d_b(i,j) + d_b(i-1,j) + d_b(i,j-1) + d_b(i-1,j-1)) / 4.0_wp
-        end do
-        end do
+        if (present(mask)) then 
 
+            do j = 2, ny
+            do i = 2, nx
+                
+                val = 0.0_wp 
+                wt  = 0.0_wp 
+
+                if (mask(i,j)) then 
+                    val = val + d_b(i,j) 
+                    wt  = wt  + 1.0_wp 
+                end if 
+
+                if (mask(i,j)) then 
+                    val = val + d_b(i-1,j) 
+                    wt  = wt  + 1.0_wp 
+                end if 
+                
+                if (mask(i,j)) then 
+                    val = val + d_b(i,j-1) 
+                    wt  = wt  + 1.0_wp 
+                end if 
+                
+                if (mask(i,j)) then 
+                    val = val + d_b(i-1,j-1) 
+                    wt  = wt  + 1.0_wp 
+                end if 
+                
+                if (wt .gt. 0.0_wp) then 
+                    d_a(i,j) = val / wt
+                else 
+                    d_a(i,j) = (d_b(i,j) + d_b(i-1,j) + d_b(i,j-1) + d_b(i-1,j-1)) / 4.0_wp
+                end if 
+
+            end do
+            end do
+
+        else 
+
+            do j = 2, ny
+            do i = 2, nx
+                d_a(i,j) = (d_b(i,j) + d_b(i-1,j) + d_b(i,j-1) + d_b(i-1,j-1)) / 4.0_wp
+            end do
+            end do
+        
+        end if 
+
+        ! Fill in border 
+        d_a(1,:) = d_a(2,:)
+        d_a(:,1) = d_a(:,2)
+        
         return
 
     end subroutine map_b_to_a_2D
     
     ! Acx/Acy to Ab
-    subroutine map_cx_to_b_2D( d_b, d_cx )
+    subroutine map_cx_to_b_2D( d_b, d_cx, mask )
         ! Input:  scalar on the Acx grid
         ! Output: the same on the Ab grid
 
@@ -1916,7 +2010,8 @@ contains
 
         real(wp),  intent(OUT)   :: d_b(:,:)
         real(wp),  intent(IN)    :: d_cx(:,:)
-        
+        logical,   intent(IN), optional :: mask(:,:) 
+
         ! Local variables:
         integer :: i, j, nx, ny
 
@@ -1925,17 +2020,39 @@ contains
 
         d_b = 0.0_wp 
 
-        do j = 1, ny-1
-        do i = 1, nx
-            d_b(i,j) = (d_cx(i,j) + d_cx(i,j+1)) / 2.0_wp
-        end do
-        end do
+        if (present(mask)) then 
+
+            do j = 1, ny-1
+            do i = 1, nx
+                if (mask(i,j) .and. (.not. mask(i,j+1))) then 
+                    d_b(i,j) = d_cx(i,j) 
+                else if ((.not. mask(i,j)) .and. mask(i,j+1)) then 
+                    d_b(i,j) = d_cx(i,j+1)
+                else
+                    d_b(i,j) = (d_cx(i,j) + d_cx(i,j+1)) / 2.0_wp
+                end if
+            end do
+            end do
+
+
+        else 
+
+            do j = 1, ny-1
+            do i = 1, nx
+                d_b(i,j) = (d_cx(i,j) + d_cx(i,j+1)) / 2.0_wp
+            end do
+            end do
+
+        end if 
+
+        ! Fill in border 
+        d_b(:,ny) = d_b(:,ny-1)
 
         return 
 
     end subroutine map_cx_to_b_2D
 
-    subroutine map_cy_to_b_2D( d_b, d_cy )
+    subroutine map_cy_to_b_2D( d_b, d_cy, mask )
         ! Input:  scalar on the Acy grid
         ! Output: the same on the Ab grid
 
@@ -1945,7 +2062,8 @@ contains
 
         real(wp),  intent(OUT)   :: d_b(:,:)
         real(wp),  intent(IN)    :: d_cy(:,:)
-        
+        logical,   intent(IN), optional :: mask(:,:) 
+
         ! Local variables:
         integer :: i, j, nx, ny
 
@@ -1954,12 +2072,33 @@ contains
 
         d_b = 0.0_wp 
 
-        do i = 1, nx-1
-        do j = 1, ny
-            d_b(i,j) = (d_cy(i,j) + d_cy(i+1,j)) / 2.0_wp
-        end do
-        end do
+        if (present(mask)) then 
 
+            do j = 1, ny
+            do i = 1, nx-1
+                if (mask(i,j) .and. (.not. mask(i+1,j))) then
+                    d_b(i,j) = d_cy(i,j)
+                else if ((.not. mask(i,j)) .and. mask(i+1,j)) then 
+                    d_b(i,j) = d_cy(i+1,j)
+                else
+                    d_b(i,j) = (d_cy(i,j) + d_cy(i+1,j)) / 2.0_wp
+                end if
+            end do
+            end do
+
+        else 
+
+            do j = 1, ny
+            do i = 1, nx-1
+                d_b(i,j) = (d_cy(i,j) + d_cy(i+1,j)) / 2.0_wp
+            end do
+            end do
+
+        end if
+
+        ! Fill in border 
+        d_b(nx,:) = d_b(nx-1,:)
+        
         return 
 
     end subroutine map_cy_to_b_2D

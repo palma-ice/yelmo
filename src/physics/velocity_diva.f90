@@ -61,7 +61,7 @@ contains
     ! 
     
     subroutine calc_velocity_diva(ux,uy,ux_bar,uy_bar,ux_b,uy_b,ux_i,uy_i,taub_acx,taub_acy, &
-                                  beta,beta_acx,beta_acy,beta_eff,visc_eff,visc_eff_int,duxdz,duydz, &
+                                  beta,beta_acx,beta_acy,beta_eff,de_eff,visc_eff,visc_eff_int,duxdz,duydz, &
                                   ssa_mask_acx,ssa_mask_acy,ssa_err_acx,ssa_err_acy,ssa_iter_now, &
                                   c_bed,taud_acx,taud_acy,H_ice,f_ice,H_grnd,f_grnd, &
                                   f_grnd_acx,f_grnd_acy,ATT,zeta_aa,z_sl,z_bed,z_srf,dx,dy,n_glen,par)
@@ -86,13 +86,14 @@ contains
         real(wp), intent(INOUT) :: beta(:,:)          ! [Pa a/m]
         real(wp), intent(INOUT) :: beta_acx(:,:)      ! [Pa a/m]
         real(wp), intent(INOUT) :: beta_acy(:,:)      ! [Pa a/m]
-        real(wp), intent(OUT)   :: beta_eff(:,:)      ! [Pa a/m]
+        real(wp), intent(INOUT) :: beta_eff(:,:)      ! [Pa a/m]
+        real(wp), intent(INOUT) :: de_eff(:,:,:)      ! [1/a]
         real(wp), intent(INOUT) :: visc_eff(:,:,:)    ! [Pa a]
-        real(wp), intent(OUT)   :: visc_eff_int(:,:)  ! [Pa a m]
-        real(wp), intent(OUT)   :: duxdz(:,:,:)       ! [1/a]
-        real(wp), intent(OUT)   :: duydz(:,:,:)       ! [1/a]
-        integer,  intent(OUT)   :: ssa_mask_acx(:,:)  ! [-]
-        integer,  intent(OUT)   :: ssa_mask_acy(:,:)  ! [-]
+        real(wp), intent(INOUT) :: visc_eff_int(:,:)  ! [Pa a m]
+        real(wp), intent(INOUT) :: duxdz(:,:,:)       ! [1/a]
+        real(wp), intent(INOUT) :: duydz(:,:,:)       ! [1/a]
+        integer,  intent(INOUT) :: ssa_mask_acx(:,:)  ! [-]
+        integer,  intent(INOUT) :: ssa_mask_acy(:,:)  ! [-]
         real(wp), intent(OUT)   :: ssa_err_acx(:,:)
         real(wp), intent(OUT)   :: ssa_err_acy(:,:)
         integer,  intent(OUT)   :: ssa_iter_now 

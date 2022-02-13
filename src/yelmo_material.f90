@@ -462,11 +462,11 @@ end if
         now%enh          = 1.0 
         now%enh_bnd      = 1.0 
         now%enh_bar      = 0.0 
-        now%ATT          = 0.0 
-        now%ATT_bar      = 0.0    
-        now%visc         = 0.0 
-        now%visc_bar     = 0.0 
-        now%visc_int     = 0.0 
+        now%ATT          = 1e-18 
+        now%ATT_bar      = 1e-18  
+        now%visc         = 1e4 
+        now%visc_bar     = 1e4 
+        now%visc_int     = 1e4 
 
         now%f_shear_bar  = 0.0 
 

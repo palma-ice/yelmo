@@ -447,7 +447,8 @@ contains
         call calc_velocity_diva(dyn%now%ux,dyn%now%uy,dyn%now%ux_bar,dyn%now%uy_bar, &
                                 dyn%now%ux_b,dyn%now%uy_b,dyn%now%ux_i,dyn%now%uy_i, &
                                 dyn%now%taub_acx,dyn%now%taub_acy,dyn%now%beta,dyn%now%beta_acx, &
-                                dyn%now%beta_acy,dyn%now%beta_eff,dyn%now%visc_eff,dyn%now%visc_eff_int,    &
+                                dyn%now%beta_acy,dyn%now%beta_eff,dyn%now%de_eff,dyn%now%visc_eff, &
+                                dyn%now%visc_eff_int,    &
                                 dyn%now%duxdz,dyn%now%duydz,dyn%now%ssa_mask_acx,dyn%now%ssa_mask_acy,      &
                                 dyn%now%ssa_err_acx,dyn%now%ssa_err_acy,dyn%par%ssa_iter_now,dyn%now%c_bed, &
                                 dyn%now%taud_acx,dyn%now%taud_acy,tpo%now%H_ice_dyn,tpo%now%f_ice_dyn,tpo%now%H_grnd,   &
@@ -1125,6 +1126,7 @@ contains
         allocate(now%qq_acy(nx,ny)) 
         allocate(now%qq(nx,ny)) 
 
+        allocate(now%de_eff(nx,ny,nz_aa))  
         allocate(now%visc_eff(nx,ny,nz_aa))  
         allocate(now%visc_eff_int(nx,ny))
 
@@ -1194,6 +1196,7 @@ contains
         now%qq_acy            = 0.0 
         now%qq                = 0.0 
         
+        now%de_eff            = 0.0 
         now%visc_eff          = 1e3  
         now%visc_eff_int      = 1e3  
         
@@ -1273,6 +1276,7 @@ contains
         if (allocated(now%qq_acy))          deallocate(now%qq_acy) 
         if (allocated(now%qq))              deallocate(now%qq) 
         
+        if (allocated(now%de_eff))          deallocate(now%de_eff) 
         if (allocated(now%visc_eff))        deallocate(now%visc_eff) 
         if (allocated(now%visc_eff_int))    deallocate(now%visc_eff_int) 
         

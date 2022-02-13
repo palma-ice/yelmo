@@ -69,6 +69,7 @@
     sd_max              = 500.0             ! [m] calv_grnd(z_bed_sd >= sd_max) = calv_max  
     calv_max            = 10.0              ! [m/a] Maximum grounded calving rate from high stdev(z_bed)
     grad_lim            = 0.5               ! [m/m] Maximum allowed sloped in gradient calculations (dz/dx,dH/dx)
+    dist_grz            = 200.0             ! [km] Radius to consider part of "grounding-line zone" (grz)
     gl_sep              = 1                 ! 1: Linear f_grnd_acx/acy and binary f_grnd, 2: area f_grnd, average to acx/acy
     gl_sep_nx           = 15                ! [-] Number of interpolation points (nx*nx) to calculate grounded area at grounding line
     diffuse_bmb_shlf    = False             ! Allow bmb_shlf to permeate inland at the grounding line 

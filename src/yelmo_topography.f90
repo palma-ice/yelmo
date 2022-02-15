@@ -497,6 +497,9 @@ end if
                 call extend_floating_slab(tpo%now%H_ice_dyn,tpo%now%f_grnd, &
                                                             H_slab=1.0_wp,n_ext=2)
 
+                ! Calculate the ice fraction mask for use with the dynamics solver
+                call calc_ice_fraction(tpo%now%f_ice_dyn,tpo%now%H_ice_dyn,bnd%z_bed,bnd%z_sl,flt_subgrid=.FALSE.)
+                
             case DEFAULT 
                 ! No modification of ice thickness for dynamics solver 
                 ! Set standard ice thickness field for use with dynamics 
@@ -506,7 +509,7 @@ end if
 
         end select
 
-        
+
         ! Store predicted/corrected ice thickness for later use 
         ! Do it here to ensure all changes to H_ice are accounted for (mb, calving, etc)
         if (trim(tpo%par%pc_step) .eq. "predictor") then 

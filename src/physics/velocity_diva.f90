@@ -494,7 +494,7 @@ end if
         integer  :: ip1, jp1 
         real(wp) :: visc_eff_ac
 
-        ! real(wp), parameter :: visc_min = 1e4_wp 
+        ! real(wp), parameter :: visc_min = 1e5_wp 
 
         nx    = size(H_ice,1)
         ny    = size(H_ice,2)
@@ -582,7 +582,7 @@ end if
         real(wp) :: wt_ab(4)
         real(wp) :: wt
 
-        real(wp), parameter :: visc_min = 1e4_wp        ! Just for safety 
+        real(wp), parameter :: visc_min = 1e5_wp        ! Just for safety 
 
         nx = size(visc_eff,1)
         ny = size(visc_eff,2)
@@ -728,7 +728,7 @@ end if
         real(wp) :: duxdz_aa, duydz_aa
         real(wp) :: eps_sq_aa, ATT_aa
         
-        real(wp), parameter :: visc_min = 1e4_wp        ! Just for safety 
+        real(wp), parameter :: visc_min = 1e5_wp        ! Just for safety 
 
         nx = size(visc_eff,1)
         ny = size(visc_eff,2)
@@ -851,8 +851,7 @@ end if
             if (f_ice(i,j) .eq. 1.0) then 
                 visc_eff_int(i,j) = visc_eff_mean*H_ice(i,j) 
             else
-                !visc_eff_int(i,j) = visc_eff_mean 
-                visc_eff_int(i,j) = 0.0_wp
+                visc_eff_int(i,j) = visc_eff_mean 
             end if 
 
         end do 

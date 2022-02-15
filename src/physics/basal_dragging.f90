@@ -11,7 +11,7 @@ module basal_dragging
     ! directly on the ac nodes (acx,acy). 
 
     use yelmo_defs, only : sp, dp, wp, prec, pi, g, rho_sw, rho_ice, rho_w, &
-                           TOL_UNDERFLOW  
+                           TOL_UNDERFLOW, degrees_to_radians
 
     use yelmo_tools, only : stagger_aa_acx, stagger_aa_acy, &
                     stagger_nodes_aa_ab_ice, stagger_nodes_acx_ab_ice, stagger_nodes_acy_ab_ice, &
@@ -63,14 +63,43 @@ contains
         implicit none 
 
         real(wp), intent(OUT) :: c_bed(:,:)       ! [Pa]
-        real(wp), intent(IN)  :: cb_ref(:,:)      ! [-]
+        real(wp), intent(IN)  :: cb_ref(:,:)      ! [-] or [degrees]
         real(wp), intent(IN)  :: N_eff(:,:)       ! [Pa] 
 
         c_bed = cb_ref*N_eff 
-
+        
         return 
 
     end subroutine calc_c_bed
+
+    ! subroutine calc_c_bed(c_bed,cb_ref,N_eff,method)
+
+    !     implicit none 
+
+    !     real(wp), intent(OUT) :: c_bed(:,:)       ! [Pa]
+    !     real(wp), intent(IN)  :: cb_ref(:,:)      ! [-] or [degrees]
+    !     real(wp), intent(IN)  :: N_eff(:,:)       ! [Pa] 
+    !     character(len=*), intent(IN) :: method      ! 'scalar' or 'tan'
+
+    !     select case(trim(method))
+
+    !         case("scalar")
+    !             ! Treat cb_ref as a normal scalar field
+
+    !             c_bed = cb_ref*N_eff 
+
+    !         case("tan")
+    !             ! Transform cb_ref by tangent to make 
+    !             ! c_bed = tau_c == critical bed stress
+    !             ! e.g., Bueler and van Pelt (2015); Albrecht et al (2020a)
+
+    !             c_bed = tan(cb_ref*degrees_to_radians)*N_eff 
+
+    !     end select 
+
+    !     return 
+
+    ! end subroutine calc_c_bed
 
     subroutine calc_beta(beta,c_bed,ux_b,uy_b,H_ice,f_ice,H_grnd,f_grnd,z_bed,z_sl,beta_method, &
                          beta_const,beta_q,beta_u0,beta_gl_scale,beta_gl_f,H_grnd_lim,beta_min,boundaries)
@@ -101,7 +130,7 @@ contains
 
         ! Local variables 
         integer :: i, j, nx, ny 
-        
+
         nx = size(beta,1)
         ny = size(beta,2)
 

@@ -475,26 +475,38 @@ end if
 
 
         ! Determine ice thickness for use exclusively with the dynamics solver
+        select case(trim(dyn%par%ssa_lat_bc))
 
-        if (dyn%par%ssa_lat_bc .eq. "slab") then 
-            ! Calculate extended ice thickness fields for use with dynamics solver
-            ! Note: should not be used with MISMIP, TROUGH, etc. 
+            case("slab")
+                ! Calculate extended ice thickness fields over whole domain
+                ! for use with dynamics solver.
+                ! Note: should not be used with MISMIP, TROUGH, etc. 
 
-            tpo%now%H_ice_dyn = tpo%now%H_ice
-            where (tpo%now%f_ice .lt. 1.0) tpo%now%H_ice_dyn = 1.0_wp
+                tpo%now%H_ice_dyn = tpo%now%H_ice
+                where (tpo%now%f_ice .lt. 1.0) tpo%now%H_ice_dyn = 1.0_wp
+                
+                ! Calculate the ice fraction mask for use with the dynamics solver
+                call calc_ice_fraction(tpo%now%f_ice_dyn,tpo%now%H_ice_dyn,bnd%z_bed,bnd%z_sl,flt_subgrid=.FALSE.)
             
-            ! Calculate the ice fraction mask for use with the dynamics solver
-            call calc_ice_fraction(tpo%now%f_ice_dyn,tpo%now%H_ice_dyn,bnd%z_bed,bnd%z_sl,flt_subgrid=.FALSE.)
+            case("slab-ext")
+                ! Calculate extended ice thickness fields n_ext points
+                ! away from grounded margin. 
+
+                tpo%now%H_ice_dyn = tpo%now%H_ice
+                
+                call extend_floating_slab(tpo%now%H_ice_dyn,tpo%now%f_grnd, &
+                                                            H_slab=1.0_wp,n_ext=2)
+
+            case DEFAULT 
+                ! No modification of ice thickness for dynamics solver 
+                ! Set standard ice thickness field for use with dynamics 
             
-        else
-            ! Set standard ice thickness field for use with dynamics 
-            tpo%now%H_ice_dyn = tpo%now%H_ice
-            tpo%now%f_ice_dyn = tpo%now%f_ice 
-        end if 
+                tpo%now%H_ice_dyn = tpo%now%H_ice
+                tpo%now%f_ice_dyn = tpo%now%f_ice 
 
-            
+        end select
 
-
+        
         ! Store predicted/corrected ice thickness for later use 
         ! Do it here to ensure all changes to H_ice are accounted for (mb, calving, etc)
         if (trim(tpo%par%pc_step) .eq. "predictor") then 

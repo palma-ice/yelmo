@@ -585,7 +585,65 @@ contains
 
     end subroutine yelmo_restart_write
 
-        subroutine yelmo_restart_read_topo_bnd(dom,filename,time)  
+    subroutine yelmo_read_interp_2D(var2D,filename,vname,domain,grid_name)  
+        ! Load a variable from a file.
+        ! Interpolate to current grid as needed. 
+        
+        implicit none 
+
+        real(wp), intent(OUT) :: var2D(:,:)  
+        character(len=*),  intent(IN)    :: filename 
+        character(len=*),  intent(IN)    :: vname
+        character(len=*),  intent(IN)    :: domain 
+        character(len=*),  intent(IN)    :: grid_name  
+        
+        ! Local variables
+        integer :: nx, ny, n 
+        character(len=56) :: file_domain 
+        character(len=56) :: file_grid_name 
+        type(map_scrip_class) :: mps 
+
+        nx = size(var2D,1)
+        ny = size(var2D,2) 
+
+        ! Load restart file grid attributes 
+        if (nc_exists_attr(filename,"domain")) then 
+            call nc_read_attr(filename,"domain",    file_domain)
+        else 
+            file_domain = trim(domain)
+        end if 
+
+        if (nc_exists_attr(filename,"grid_name")) then 
+            call nc_read_attr(filename,"grid_name", file_grid_name)
+        else 
+            file_grid_name = trim(grid_name)
+        end if 
+
+        ! Determine which slice to get (last one)
+        n = nc_size(filename,"time")
+
+        if (trim(file_grid_name) .eq. trim(grid_name) ) then 
+            ! File's grid and yelmo grid are the same
+
+            ! Load the data without interpolation (by not specifying mps argument)
+            call nc_read(filename,vname,var2D,start=[1,1,n],count=[nx,ny,1])
+
+        else 
+            ! Restart grid is different than Yelmo grid 
+
+            ! ! Load the scrip map from file (should already have been generated via cdo externally)
+            ! call map_scrip_init(mps,restart_grid_name,dom%par%grid_name, &
+            !                         method="con",fldr="maps",load=.TRUE.)
+
+            ! call yelmo_read_interp_internal(dom,filename,time,mps) 
+            
+        end if 
+
+        return 
+
+    end subroutine yelmo_read_interp_2D
+
+    subroutine yelmo_restart_read_topo_bnd(dom,filename,time)  
         ! Load yelmo variables from restart file: [tpo] 
         ! [dyn,therm,mat] variables loaded using yelmo_restart_read
         
@@ -773,7 +831,7 @@ contains
         call nc_read_interp(filename,"dist_grline", dom%tpo%now%dist_grline,ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps) 
         call nc_read_interp(filename,"mask_bed",    dom%tpo%now%mask_bed,ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps)
         call nc_read_interp(filename,"mask_grz",    dom%tpo%now%mask_grz,ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps)
-        
+
         call nc_read_interp(filename,"dHdt_n",      dom%tpo%now%dHdt_n,ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps)
         call nc_read_interp(filename,"H_ice_n",     dom%tpo%now%H_ice_n,ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps)
         call nc_read_interp(filename,"H_ice_pred",  dom%tpo%now%H_ice_pred,ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps)

@@ -6,6 +6,8 @@ module topography
 
     private  
 
+    public :: extend_floating_slab
+    
     public :: calc_ice_fraction
     public :: calc_z_srf
     public :: calc_z_srf_max
@@ -31,13 +33,82 @@ module topography
 
 contains 
 
+    subroutine extend_floating_slab(H_ice,f_grnd,H_slab,n_ext)
+        ! Extend ice field so that there is always 
+        ! floating ice next to grounded marine margins
+        ! Extended ice should be very thin, will 
+        ! be assigned value H_slab. Slab will be extended
+        ! n_ext points away from marine margin
 
+        implicit none 
 
-    ! ============================================================
-    !
-    ! Calculations
-    !
-    ! ============================================================
+        real(wp), intent(INOUT) :: H_ice(:,:) 
+        real(wp), intent(IN)    :: f_grnd(:,:) 
+        real(wp), intent(IN)    :: H_slab       ! Typically 1 or 0.1 m. 
+        integer,  intent(IN)    :: n_ext        ! Number of points to extend slab
+        ! Local variables 
+        integer :: i, j, nx, ny, iter 
+        integer :: im1, ip1, jm1, jp1
+        logical :: is_marine 
+
+        logical  :: ms4(4)
+        real(wp) :: Hi4(4) 
+        real(wp) :: fg4(4)
+        
+        logical,  allocatable :: mask_slab(:,:)
+        real(wp), allocatable :: H_new(:,:) 
+
+        nx = size(H_ice,1) 
+        ny = size(H_ice,2) 
+
+        allocate(mask_slab(nx,ny)) 
+        allocate(H_new(nx,ny)) 
+
+        mask_slab = .FALSE. 
+        H_new     = H_ice 
+
+        do iter = 1, n_ext
+
+            do j = 1, ny 
+            do i = 1, nx 
+
+                ! Get neighbor indices
+                im1 = max(i-1,1) 
+                ip1 = min(i+1,nx) 
+                jm1 = max(j-1,1) 
+                jp1 = min(j+1,ny) 
+                
+                if ( f_grnd(i,j) .eq. 0.0 .and. H_ice(i,j) .eq. 0.0 ) then 
+                    ! Floating ice-free ocean point
+                    
+                    ! Get neighbor values in convenient arrays
+                    fg4 = [f_grnd(im1,j),f_grnd(ip1,j),f_grnd(i,jm1),f_grnd(i,jp1)]
+                    Hi4 = [H_ice(im1,j),H_ice(ip1,j),H_ice(i,jm1),H_ice(i,jp1)]
+                    ms4 = [mask_slab(im1,j),mask_slab(ip1,j),mask_slab(i,jm1),mask_slab(i,jp1)]
+
+                    if ( (count(fg4 .gt. 0.0 .and. Hi4 .gt. 0.0) .gt. 0) .or. &
+                         (count(ms4) .gt. 0) ) then 
+                        ! At least one neighbors is either a grounded point
+                        ! or an extended slab point - make this point extended slab.
+
+                        H_new(i,j)     = H_slab 
+                        mask_slab(i,j) = .TRUE. 
+
+                    end if
+
+                end if 
+
+            end do 
+            end do 
+
+            ! Update H_ice to current array 
+            H_ice = H_new 
+
+        end do 
+
+        return
+
+    end subroutine extend_floating_slab
 
     subroutine calc_ice_fraction(f_ice,H_ice,z_bed,z_sl,flt_subgrid)
         ! Determine the area fraction of a grid cell

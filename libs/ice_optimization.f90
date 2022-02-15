@@ -138,7 +138,7 @@ contains
     ! end subroutine update_calving_kt
 
     subroutine update_tf_corr_l21(tf_corr,H_ice,H_grnd,dHicedt,H_obs,basins,H_grnd_lim, &
-                                    tau_m,m_temp,tf_min,tf_max,dt)
+                                    tau_m,m_temp,tf_min,tf_max,tf_basins,dt)
 
         implicit none 
 
@@ -153,6 +153,7 @@ contains
         real(wp), intent(IN)    :: m_temp
         real(wp), intent(IN)    :: tf_min 
         real(wp), intent(IN)    :: tf_max 
+        integer,  intent(IN)    :: tf_basins(:) 
         real(wp), intent(IN)    :: dt 
 
         ! Local variables
@@ -166,7 +167,7 @@ contains
         real(wp) :: tf_corr_dot
 
         logical,  allocatable :: mask(:,:) 
-        
+        real(wp), allocatable :: basin_list_ref(:)
         real(wp), allocatable :: basin_list(:) 
         
         real(wp), parameter :: tol = 1e-5_wp
@@ -179,10 +180,36 @@ contains
 
         allocate(mask(nx,ny)) 
 
-        ! Determine unique basin numbers 
-        call unique(basin_list,reshape(basins,[nx*ny]))
-        nb = size(basin_list,1) 
+        ! Determine unique basin numbers that are available
+        call unique(basin_list_ref,reshape(basins,[nx*ny]))
 
+        ! Check if we are optimizing all basins
+        
+        if (tf_basins(1) .lt. 0) then 
+            ! Optimizing all basins, set 
+            ! basin list to reference list
+
+            allocate(basin_list(size(basin_list_ref)))
+
+            basin_list = basin_list_ref 
+
+            nb = size(basin_list,1) 
+
+        else
+
+            nb = count(tf_basins .gt. 0)
+            allocate(basin_list(nb))
+
+            n = 0 
+            do b = 1, size(tf_basins)
+                if (tf_basins(b) .gt. 0) then 
+                    n = n+1
+                    basin_list(n) = tf_basins(b)
+                end if
+            end do
+
+        end if 
+         
         ! Loop over each basin
         do b = 1, nb 
             

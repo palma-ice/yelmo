@@ -1976,7 +1976,7 @@ end if
 
                 if (front1(i,j)) front1(i,j) = .FALSE. 
 
-            case("floating","float","slab")
+            case("floating","float","slab","slab-ext")
                 ! Only apply lateral bc to floating ice fronts.
                 ! Ie, disable detection of all grounded fronts for now.
                 ! Model is generally more stable this way.

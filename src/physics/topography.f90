@@ -46,6 +46,7 @@ contains
         real(wp), intent(IN)    :: f_grnd(:,:) 
         real(wp), intent(IN)    :: H_slab       ! Typically 1 or 0.1 m. 
         integer,  intent(IN)    :: n_ext        ! Number of points to extend slab
+        
         ! Local variables 
         integer :: i, j, nx, ny, iter 
         integer :: im1, ip1, jm1, jp1
@@ -92,8 +93,7 @@ contains
                         ! or an extended slab point - make this point extended slab.
 
                         H_new(i,j)     = H_slab 
-                        mask_slab(i,j) = .TRUE. 
-
+                        
                     end if
 
                 end if 
@@ -104,6 +104,13 @@ contains
             ! Update H_ice to current array 
             H_ice = H_new 
 
+            ! Update mask_slab
+            where(H_ice .eq. H_slab) 
+                mask_slab = .TRUE. 
+            elsewhere
+                mask_slab = .FALSE.
+            end where
+            
         end do 
 
         return

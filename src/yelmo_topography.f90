@@ -494,8 +494,7 @@ end if
 
                 tpo%now%H_ice_dyn = tpo%now%H_ice
                 
-                call extend_floating_slab(tpo%now%H_ice_dyn,tpo%now%f_grnd, &
-                                                            H_slab=1.0_wp,n_ext=2)
+                call extend_floating_slab(tpo%now%H_ice_dyn,tpo%now%f_grnd,H_slab=1.0_wp,n_ext=2)
 
                 ! Calculate the ice fraction mask for use with the dynamics solver
                 call calc_ice_fraction(tpo%now%f_ice_dyn,tpo%now%H_ice_dyn,bnd%z_bed,bnd%z_sl,flt_subgrid=.FALSE.)

@@ -17,6 +17,7 @@ module solver_ssa_sico5
     public :: ssa_diagnostics_write_init
     public :: ssa_diagnostics_write_step
 
+    
 contains 
 
     subroutine calc_vxy_ssa_matrix(vx_m,vy_m,L2_norm,beta_acx,beta_acy,visc_int, &

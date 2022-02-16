@@ -305,12 +305,20 @@ contains
                         ! Infinite boundary condition, take 
                         ! value from one point inward
 
-                        k = k+1
-                        lgs_a_value(k)  = 1.0   ! diagonal element only
-                        lgs_a_index(k)  = nr
+                        ! k = k+1
+                        ! lgs_a_value(k)  = 1.0   ! diagonal element only
+                        ! lgs_a_index(k)  = nr
 
-                        lgs_b_value(nr) = vx_m(2,j)
-                        lgs_x_value(nr) = vx_m(2,j)
+                        ! lgs_b_value(nr) = vx_m(2,j)
+                        ! lgs_x_value(nr) = vx_m(2,j)
+
+                        nc = 2*ij2n(i+1,j)-1        ! column counter for vx_m(i+1,j)
+                        k = k+1
+                        lgs_a_value(k) =  1.0_wp*vis_int_sgxy(i+1,j)
+                        lgs_a_index(k) = nc
+
+                        lgs_b_value(nr) = 0.0_wp
+                        lgs_x_value(nr) = vx_m(i,j)
 
                     case("periodic")
                         ! Periodic boundary, take velocity from the right boundary

@@ -493,8 +493,10 @@ end if
                 ! away from grounded margin. 
 
                 tpo%now%H_ice_dyn = tpo%now%H_ice
-                
-                call extend_floating_slab(tpo%now%H_ice_dyn,tpo%now%f_grnd,H_slab=1.0_wp,n_ext=2)
+                where(tpo%now%H_ice_dyn .gt. 0.0 .and. tpo%now%H_ice_dyn .lt. 1.0) &
+                        tpo%now%H_ice_dyn = 1.0_wp 
+                        
+                call extend_floating_slab(tpo%now%H_ice_dyn,tpo%now%f_grnd,H_slab=1.0_wp,n_ext=4)
 
                 ! Calculate the ice fraction mask for use with the dynamics solver
                 call calc_ice_fraction(tpo%now%f_ice_dyn,tpo%now%H_ice_dyn,bnd%z_bed,bnd%z_sl,flt_subgrid=.FALSE.)

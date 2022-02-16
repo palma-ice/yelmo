@@ -87,8 +87,8 @@ program yelmo_trough
 
     ! Define the domain and grid
     xmax =  lx 
-    ymax =  ly/2.0_prec 
-    ymin = -ly/2.0_prec 
+    ymax =  ly/2.0_wp
+    ymin = -ly/2.0_wp
     call yelmo_init_grid(yelmo1%grd,grid_name,units="km",x0=0.0,dx=dx,nx=int(xmax/dx)+1,y0=ymin,dy=dx,ny=int((ymax-ymin)/dx)+1)
 
     ! === Initialize ice sheet model =====
@@ -444,7 +444,7 @@ contains
         
         call nc_write(filename,"bmb",ylmo%tpo%now%bmb,units="m/a",long_name="Basal mass balance", &
                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-        
+
         call nc_write(filename,"f_grnd",ylmo%tpo%now%f_grnd,units="1",long_name="Grounded fraction", &
                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
         call nc_write(filename,"f_grnd_acx",ylmo%tpo%now%f_grnd_acx,units="1",long_name="Grounded fraction (acx)", &

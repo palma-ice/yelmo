@@ -305,16 +305,14 @@ contains
                         ! Infinite boundary condition, take 
                         ! value from one point inward
 
-                        ! k = k+1
-                        ! lgs_a_value(k)  = 1.0   ! diagonal element only
-                        ! lgs_a_index(k)  = nr
-
-                        ! lgs_b_value(nr) = vx_m(2,j)
-                        ! lgs_x_value(nr) = vx_m(2,j)
+                        nc = 2*ij2n(i,j)-1          ! column counter for vx_m(i,j)
+                        k = k+1
+                        lgs_a_value(k) =  1.0_wp
+                        lgs_a_index(k) = nc
 
                         nc = 2*ij2n(i+1,j)-1        ! column counter for vx_m(i+1,j)
                         k = k+1
-                        lgs_a_value(k) =  1.0_wp*vis_int_sgxy(i+1,j)
+                        lgs_a_value(k) = -1.0_wp
                         lgs_a_index(k) = nc
 
                         lgs_b_value(nr) = 0.0_wp
@@ -323,13 +321,19 @@ contains
                     case("periodic")
                         ! Periodic boundary, take velocity from the right boundary
                         
+                        nc = 2*ij2n(i,j)-1          ! column counter for vx_m(i,j)
                         k = k+1
-                        lgs_a_value(k)  = 1.0   ! diagonal element only
-                        lgs_a_index(k)  = nr
+                        lgs_a_value(k) =  1.0_wp
+                        lgs_a_index(k) = nc
 
-                        lgs_b_value(nr) = vx_m(nx-2,j)
-                        lgs_x_value(nr) = vx_m(nx-2,j)
-                
+                        nc = 2*ij2n(nx-2,j)-1        ! column counter for vx_m(nx-2,j)
+                        k = k+1
+                        lgs_a_value(k) = -1.0_wp
+                        lgs_a_index(k) = nc
+
+                        lgs_b_value(nr) = 0.0_wp
+                        lgs_x_value(nr) = vx_m(i,j)
+
                     case DEFAULT 
 
                         write(*,*) "calc_vxy_ssa_matrix:: Error: left-border condition not &
@@ -358,25 +362,37 @@ contains
                         ! Infinite boundary condition, take 
                         ! value from two points inward (one point inward will also be prescribed)
 
+                        nc = 2*ij2n(i,j)-1          ! column counter for vx_m(i,j)
                         k = k+1
-                        lgs_a_value(k)  = 1.0   ! diagonal element only
-                        lgs_a_index(k)  = nr
+                        lgs_a_value(k) =  1.0_wp
+                        lgs_a_index(k) = nc
 
-                        lgs_b_value(nr) = vx_m(nx-2,j)
-                        lgs_x_value(nr) = vx_m(nx-2,j)
-                    
+                        nc = 2*ij2n(nx-2,j)-1       ! column counter for vx_m(nx-2,j)
+                        k = k+1
+                        lgs_a_value(k) = -1.0_wp
+                        lgs_a_index(k) = nc
+
+                        lgs_b_value(nr) = 0.0_wp
+                        lgs_x_value(nr) = vx_m(i,j)
+
                     case("periodic")
                         ! Periodic boundary condition, take velocity from one point
                         ! interior to the left-border, as nx-1 will be set to value
                         ! at the left-border 
 
+                        nc = 2*ij2n(i,j)-1          ! column counter for vx_m(i,j)
                         k = k+1
-                        lgs_a_value(k)  = 1.0   ! diagonal element only
-                        lgs_a_index(k)  = nr
+                        lgs_a_value(k) =  1.0_wp
+                        lgs_a_index(k) = nc
 
-                        lgs_b_value(nr) = vx_m(3,j)
-                        lgs_x_value(nr) = vx_m(3,j)
-                    
+                        nc = 2*ij2n(3,j)-1          ! column counter for vx_m(3,j)
+                        k = k+1
+                        lgs_a_value(k) = -1.0_wp
+                        lgs_a_index(k) = nc
+
+                        lgs_b_value(nr) = 0.0_wp
+                        lgs_x_value(nr) = vx_m(i,j)
+
                     case DEFAULT 
 
                         write(*,*) "calc_vxy_ssa_matrix:: Error: right-border condition not &
@@ -395,12 +411,18 @@ contains
                 ! interior to the left-border, as nx-1 will be set to value
                 ! at the left-border 
 
+                nc = 2*ij2n(i,j)-1          ! column counter for vx_m(i,j)
                 k = k+1
-                lgs_a_value(k)  = 1.0   ! diagonal element only
-                lgs_a_index(k)  = nr
+                lgs_a_value(k) =  1.0_wp
+                lgs_a_index(k) = nc
 
-                lgs_b_value(nr) = vx_m(nx-2,j)
-                lgs_x_value(nr) = vx_m(nx-2,j)
+                nc = 2*ij2n(nx-2,j)-1       ! column counter for vx_m(nx-2,j)
+                k = k+1
+                lgs_a_value(k) = -1.0_wp
+                lgs_a_index(k) = nc
+
+                lgs_b_value(nr) = 0.0_wp
+                lgs_x_value(nr) = vx_m(i,j)
 
             else if (i .eq. nx-1 .and. trim(boundaries_vx(1)) .eq. "periodic") then 
                 ! Right boundary, staggered one point further inward 
@@ -411,12 +433,18 @@ contains
                 ! interior to the left-border, as nx-1 will be set to value
                 ! at the left-border 
 
+                nc = 2*ij2n(i,j)-1          ! column counter for vx_m(i,j)
                 k = k+1
-                lgs_a_value(k)  = 1.0   ! diagonal element only
-                lgs_a_index(k)  = nr
+                lgs_a_value(k) =  1.0_wp
+                lgs_a_index(k) = nc
 
-                lgs_b_value(nr) = vx_m(2,j)
-                lgs_x_value(nr) = vx_m(2,j)
+                nc = 2*ij2n(2,j)-1          ! column counter for vx_m(2,j)
+                k = k+1
+                lgs_a_value(k) = -1.0_wp
+                lgs_a_index(k) = nc
+
+                lgs_b_value(nr) = 0.0_wp
+                lgs_x_value(nr) = vx_m(i,j)
 
             else if (j .eq. 1) then 
                 ! Lower boundary 
@@ -437,22 +465,34 @@ contains
                         ! Infinite boundary condition, take 
                         ! value from one point inward
 
+                        nc = 2*ij2n(i,j)-1          ! column counter for vx_m(i,j)
                         k = k+1
-                        lgs_a_value(k)  = 1.0   ! diagonal element only
-                        lgs_a_index(k)  = nr
+                        lgs_a_value(k) =  1.0_wp
+                        lgs_a_index(k) = nc
 
-                        lgs_b_value(nr) = vx_m(i,j+1)
-                        lgs_x_value(nr) = vx_m(i,j+1)
-                
+                        nc = 2*ij2n(i,j+1)-1        ! column counter for vx_m(i,j+1)
+                        k = k+1
+                        lgs_a_value(k) = -1.0_wp
+                        lgs_a_index(k) = nc
+
+                        lgs_b_value(nr) = 0.0_wp
+                        lgs_x_value(nr) = vx_m(i,j)
+
                     case("periodic")
                         ! Periodic boundary, take velocity from the upper boundary
-                    
+                        
+                        nc = 2*ij2n(i,j)-1          ! column counter for vx_m(i,j)
                         k = k+1
-                        lgs_a_value(k)  = 1.0   ! diagonal element only
-                        lgs_a_index(k)  = nr
+                        lgs_a_value(k) =  1.0_wp
+                        lgs_a_index(k) = nc
 
-                        lgs_b_value(nr) = vx_m(i,ny-1)
-                        lgs_x_value(nr) = vx_m(i,ny-1)
+                        nc = 2*ij2n(i,ny-1)-1        ! column counter for vx_m(i,ny-1)
+                        k = k+1
+                        lgs_a_value(k) = -1.0_wp
+                        lgs_a_index(k) = nc
+
+                        lgs_b_value(nr) = 0.0_wp
+                        lgs_x_value(nr) = vx_m(i,j)
 
                     case DEFAULT 
 
@@ -482,22 +522,34 @@ contains
                         ! Infinite boundary condition, take 
                         ! value from one point inward
 
+                        nc = 2*ij2n(i,j)-1          ! column counter for vx_m(i,j)
                         k = k+1
-                        lgs_a_value(k)  = 1.0   ! diagonal element only
-                        lgs_a_index(k)  = nr
+                        lgs_a_value(k) =  1.0_wp
+                        lgs_a_index(k) = nc
 
-                        lgs_b_value(nr) = vx_m(i,j-1)
-                        lgs_x_value(nr) = vx_m(i,j-1)
+                        nc = 2*ij2n(i,j-1)-1        ! column counter for vx_m(i,j-1)
+                        k = k+1
+                        lgs_a_value(k) = -1.0_wp
+                        lgs_a_index(k) = nc
+
+                        lgs_b_value(nr) = 0.0_wp
+                        lgs_x_value(nr) = vx_m(i,j)
 
                     case("periodic")
                         ! Periodic boundary, take velocity from the lower boundary
-                    
+                        
+                        nc = 2*ij2n(i,j)-1          ! column counter for vx_m(i,j)
                         k = k+1
-                        lgs_a_value(k)  = 1.0   ! diagonal element only
-                        lgs_a_index(k)  = nr
+                        lgs_a_value(k) =  1.0_wp
+                        lgs_a_index(k) = nc
 
-                        lgs_b_value(nr) = vx_m(i,2)
-                        lgs_x_value(nr) = vx_m(i,2)
+                        nc = 2*ij2n(i,2)-1          ! column counter for vx_m(i,2)
+                        k = k+1
+                        lgs_a_value(k) = -1.0_wp
+                        lgs_a_index(k) = nc
+
+                        lgs_b_value(nr) = 0.0_wp
+                        lgs_x_value(nr) = vx_m(i,j)
 
                     case DEFAULT 
 
@@ -855,23 +907,35 @@ end if
                     case("infinite")
                         ! Infinite boundary, take velocity from one point inward
                         
+                        nc = 2*ij2n(i,j)            ! column counter for vy_m(i,j)
                         k = k+1
-                        lgs_a_value(k)  = 1.0   ! diagonal element only
-                        lgs_a_index(k)  = nr
+                        lgs_a_value(k) =  1.0_wp
+                        lgs_a_index(k) = nc
 
-                        lgs_b_value(nr) = vy_m(i,2)
-                        lgs_x_value(nr) = vy_m(i,2)
-                        
+                        nc = 2*ij2n(i,2)            ! column counter for vy_m(i,2)
+                        k = k+1
+                        lgs_a_value(k) = -1.0_wp
+                        lgs_a_index(k) = nc
+
+                        lgs_b_value(nr) = 0.0_wp
+                        lgs_x_value(nr) = vy_m(i,j)
+
                     case("periodic")
                         ! Periodic boundary, take velocity from the opposite boundary
                         
+                        nc = 2*ij2n(i,j)            ! column counter for vy_m(i,j)
                         k = k+1
-                        lgs_a_value(k)  = 1.0   ! diagonal element only
-                        lgs_a_index(k)  = nr
+                        lgs_a_value(k) =  1.0_wp
+                        lgs_a_index(k) = nc
 
-                        lgs_b_value(nr) = vy_m(i,ny-2)
-                        lgs_x_value(nr) = vy_m(i,ny-2)
-                        
+                        nc = 2*ij2n(i,ny-2)         ! column counter for vy_m(i,ny-2)
+                        k = k+1
+                        lgs_a_value(k) = -1.0_wp
+                        lgs_a_index(k) = nc
+
+                        lgs_b_value(nr) = 0.0_wp
+                        lgs_x_value(nr) = vy_m(i,j)
+
                     case DEFAULT 
 
                         write(*,*) "calc_vxy_ssa_matrix:: Error: lower-border condition not &
@@ -900,23 +964,35 @@ end if
                         ! Infinite boundary, take velocity from two points inward
                         ! (to account for staggering)
 
+                        nc = 2*ij2n(i,j)            ! column counter for vy_m(i,j)
                         k = k+1
-                        lgs_a_value(k)  = 1.0   ! diagonal element only
-                        lgs_a_index(k)  = nr
+                        lgs_a_value(k) =  1.0_wp
+                        lgs_a_index(k) = nc
 
-                        lgs_b_value(nr) = vy_m(i,ny-2)
-                        lgs_x_value(nr) = vy_m(i,ny-2)
-                        
+                        nc = 2*ij2n(i,ny-2)          ! column counter for vy_m(i,ny-2)
+                        k = k+1
+                        lgs_a_value(k) = -1.0_wp
+                        lgs_a_index(k) = nc
+
+                        lgs_b_value(nr) = 0.0_wp
+                        lgs_x_value(nr) = vy_m(i,j)
+
                     case("periodic")
                         ! Periodic boundary, take velocity from the right boundary
                         
+                        nc = 2*ij2n(i,j)            ! column counter for vy_m(i,j)
                         k = k+1
-                        lgs_a_value(k)  = 1.0   ! diagonal element only
-                        lgs_a_index(k)  = nr
+                        lgs_a_value(k) =  1.0_wp
+                        lgs_a_index(k) = nc
 
-                        lgs_b_value(nr) = vy_m(i,3)
-                        lgs_x_value(nr) = vy_m(i,3)
-                        
+                        nc = 2*ij2n(i,3)            ! column counter for vy_m(i,3)
+                        k = k+1
+                        lgs_a_value(k) = -1.0_wp
+                        lgs_a_index(k) = nc
+
+                        lgs_b_value(nr) = 0.0_wp
+                        lgs_x_value(nr) = vy_m(i,j)
+
                     case DEFAULT 
 
                         write(*,*) "calc_vxy_ssa_matrix:: Error: upper-border condition not &
@@ -932,14 +1008,20 @@ end if
                 ! this point should be treated as normal)
                 
                 ! Periodic boundary, take velocity from the lower boundary
-                
-                k = k+1
-                lgs_a_value(k)  = 1.0   ! diagonal element only
-                lgs_a_index(k)  = nr
 
-                lgs_b_value(nr) = vy_m(i,ny-2)
-                lgs_x_value(nr) = vy_m(i,ny-2)
-                   
+                nc = 2*ij2n(i,j)            ! column counter for vy_m(i,j)
+                k = k+1
+                lgs_a_value(k) =  1.0_wp
+                lgs_a_index(k) = nc
+
+                nc = 2*ij2n(i,ny-2)         ! column counter for vy_m(i,ny-2)
+                k = k+1
+                lgs_a_value(k) = -1.0_wp
+                lgs_a_index(k) = nc
+
+                lgs_b_value(nr) = 0.0_wp
+                lgs_x_value(nr) = vy_m(i,j)
+
             else if (j .eq. ny-1 .and. trim(boundaries_vy(2)) .eq. "periodic") then
                 ! Upper boundary, inward by one point
                 ! (only needed for periodic conditions, otherwise
@@ -947,13 +1029,19 @@ end if
                 
                 ! Periodic boundary, take velocity from the lower boundary
                 
+                nc = 2*ij2n(i,j)            ! column counter for vy_m(i,j)
                 k = k+1
-                lgs_a_value(k)  = 1.0   ! diagonal element only
-                lgs_a_index(k)  = nr
+                lgs_a_value(k) =  1.0_wp
+                lgs_a_index(k) = nc
 
-                lgs_b_value(nr) = vy_m(i,2)
-                lgs_x_value(nr) = vy_m(i,2)
-                    
+                nc = 2*ij2n(i,2)            ! column counter for vy_m(i,2)
+                k = k+1
+                lgs_a_value(k) = -1.0_wp
+                lgs_a_index(k) = nc
+
+                lgs_b_value(nr) = 0.0_wp
+                lgs_x_value(nr) = vy_m(i,j)
+  
             else if (i .eq. 1) then 
                 ! Left boundary 
 
@@ -972,23 +1060,35 @@ end if
                     case("infinite")
                         ! Infinite boundary, take velocity from one point inward
 
+                        nc = 2*ij2n(i,j)            ! column counter for vy_m(i,j)
                         k = k+1
-                        lgs_a_value(k)  = 1.0   ! diagonal element only
-                        lgs_a_index(k)  = nr
+                        lgs_a_value(k) =  1.0_wp
+                        lgs_a_index(k) = nc
 
-                        lgs_b_value(nr) = vy_m(i,2)
-                        lgs_x_value(nr) = vy_m(i,2)
-                        
+                        nc = 2*ij2n(2,j)            ! column counter for vy_m(2,j)
+                        k = k+1
+                        lgs_a_value(k) = -1.0_wp
+                        lgs_a_index(k) = nc
+
+                        lgs_b_value(nr) = 0.0_wp
+                        lgs_x_value(nr) = vy_m(i,j)
+
                     case("periodic")
                         ! Periodic boundary, take velocity from the right boundary
                         
+                        nc = 2*ij2n(i,j)            ! column counter for vy_m(i,j)
                         k = k+1
-                        lgs_a_value(k)  = 1.0   ! diagonal element only
-                        lgs_a_index(k)  = nr
+                        lgs_a_value(k) =  1.0_wp
+                        lgs_a_index(k) = nc
 
-                        lgs_b_value(nr) = vy_m(nx-1,j)
-                        lgs_x_value(nr) = vy_m(nx-1,j)
-                        
+                        nc = 2*ij2n(nx-1,j)         ! column counter for vy_m(nx-1,j)
+                        k = k+1
+                        lgs_a_value(k) = -1.0_wp
+                        lgs_a_index(k) = nc
+
+                        lgs_b_value(nr) = 0.0_wp
+                        lgs_x_value(nr) = vy_m(i,j)
+
                     case DEFAULT 
 
                         write(*,*) "calc_vxy_ssa_matrix:: Error: left-border condition not &
@@ -1016,23 +1116,35 @@ end if
                     case("infinite")
                         ! Infinite boundary, take velocity from one point inward
 
+                        nc = 2*ij2n(i,j)            ! column counter for vy_m(i,j)
                         k = k+1
-                        lgs_a_value(k)  = 1.0   ! diagonal element only
-                        lgs_a_index(k)  = nr
+                        lgs_a_value(k) =  1.0_wp
+                        lgs_a_index(k) = nc
 
-                        lgs_b_value(nr) = vy_m(nx-1,j)
-                        lgs_x_value(nr) = vy_m(nx-1,j)
-                        
+                        nc = 2*ij2n(nx-1,j)         ! column counter for vy_m(nx-1,j)
+                        k = k+1
+                        lgs_a_value(k) = -1.0_wp
+                        lgs_a_index(k) = nc
+
+                        lgs_b_value(nr) = 0.0_wp
+                        lgs_x_value(nr) = vy_m(i,j)
+
                     case("periodic")
                         ! Periodic boundary, take velocity from the right boundary
                         
+                        nc = 2*ij2n(i,j)            ! column counter for vy_m(i,j)
                         k = k+1
-                        lgs_a_value(k)  = 1.0   ! diagonal element only
-                        lgs_a_index(k)  = nr
+                        lgs_a_value(k) =  1.0_wp
+                        lgs_a_index(k) = nc
 
-                        lgs_b_value(nr) = vy_m(2,j)
-                        lgs_x_value(nr) = vy_m(2,j)
-                        
+                        nc = 2*ij2n(2,j)            ! column counter for vy_m(2,j)
+                        k = k+1
+                        lgs_a_value(k) = -1.0_wp
+                        lgs_a_index(k) = nc
+
+                        lgs_b_value(nr) = 0.0_wp
+                        lgs_x_value(nr) = vy_m(i,j)
+
                     case DEFAULT 
 
                         write(*,*) "calc_vxy_ssa_matrix:: Error: right-border condition not &

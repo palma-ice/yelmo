@@ -9,6 +9,7 @@ module topography
     public :: extend_floating_slab
     
     public :: calc_ice_fraction
+    public :: remove_fractional_ice
     public :: calc_z_srf
     public :: calc_z_srf_max
     public :: calc_z_srf_gl_subgrid_area
@@ -110,7 +111,7 @@ contains
             elsewhere
                 mask_slab = .FALSE.
             end where
-            
+
         end do 
 
         return
@@ -269,6 +270,60 @@ contains
 
     end subroutine calc_ice_fraction
     
+    subroutine remove_fractional_ice(H_ice,f_ice)
+        ! Eliminate fractional ice covered points that only 
+        ! have fractional ice neighbors. 
+
+        implicit none 
+
+        real(wp), intent(INOUT) :: H_ice(:,:) 
+        real(wp), intent(INOUT) :: f_ice(:,:) 
+        
+        ! Local variables 
+        integer :: i, j, nx, ny 
+        integer :: im1, ip1, jm1, jp1 
+        real(wp), allocatable :: H_new(:,:) 
+
+        nx = size(H_ice,1) 
+        ny = size(H_ice,2) 
+
+        allocate(H_new(nx,ny)) 
+
+        H_new = H_ice 
+
+        do j = 1, ny 
+        do i = 1, nx 
+
+            ! Get neighbor indices
+            im1 = max(i-1,1) 
+            ip1 = min(i+1,nx) 
+            jm1 = max(j-1,1) 
+            jp1 = min(j+1,ny) 
+            
+            if (f_ice(i,j) .gt. 0.0 .and. f_ice(i,j) .lt. 1.0) then 
+                ! Fractional ice-covered point 
+
+                if ( count([f_ice(im1,j),f_ice(ip1,j), &
+                        f_ice(i,jm1),f_ice(i,jp1)] .eq. 1.0) .eq. 0) then 
+                    ! No fully ice-covered neighbors available.
+                    ! Point should be removed. 
+
+                    H_new(i,j) = 0.0_wp 
+
+                end if
+
+            end if
+
+        end do 
+        end do
+
+        ! Update ice thickness 
+        H_ice = H_new 
+
+        return
+
+    end subroutine remove_fractional_ice
+
     subroutine calc_ice_fraction_0(f_ice,H_ice,z_bed,z_sl,flt_subgrid)
         ! Determine the area fraction of a grid cell
         ! that is ice-covered. Assume that marginal points

@@ -10,6 +10,10 @@ module mass_conservation
     implicit none 
 
     private
+
+    public :: calc_G_advec 
+    public :: calc_G_mbal
+
     public :: calc_ice_thickness_dyn
     public :: calc_ice_thickness_mbal
     public :: calc_ice_thickness_calving
@@ -17,6 +21,144 @@ module mass_conservation
     public :: relax_ice_thickness
 
 contains 
+    
+    subroutine calc_G_advec(G_adv,dHdt_n,H_ice_n,H_ice_pred,H_ice,f_ice,ux,uy, &
+                                      solver,dx,dt,beta,pc_step)
+        ! Interface subroutine to update ice thickness through application
+        ! of advection, vertical mass balance terms and calving 
+
+        implicit none 
+
+        real(wp),         intent(OUT)   :: G_adv(:,:)           ! [m/yr] Tendency due to advection
+        real(wp),         intent(INOUT) :: dHdt_n(:,:)          ! [m/a] Advective rate of ice thickness change from previous=>current timestep 
+        real(wp),         intent(INOUT) :: H_ice_n(:,:)         ! [m]   Ice thickness from previous=>current timestep 
+        real(wp),         intent(IN)    :: H_ice_pred(:,:)      ! [m]   Ice thickness from predicted timestep 
+        real(wp),         intent(IN)    :: H_ice(:,:)           ! [m]   Ice thickness 
+        real(wp),         intent(IN)    :: f_ice(:,:)           ! [--]  Ice area fraction 
+        real(wp),         intent(IN)    :: ux(:,:)              ! [m/a] Depth-averaged velocity, x-direction (ac-nodes)
+        real(wp),         intent(IN)    :: uy(:,:)              ! [m/a] Depth-averaged velocity, y-direction (ac-nodes)
+        character(len=*), intent(IN)    :: solver               ! Solver to use for the ice thickness advection equation
+        real(wp),         intent(IN)    :: dx                   ! [m]   Horizontal resolution
+        real(wp),         intent(IN)    :: dt                   ! [a]   Timestep 
+        real(wp),         intent(IN)    :: beta(4)              ! Timestep weighting parameters
+        character(len=*), intent(IN)    :: pc_step              ! Current predictor-corrector step ('predictor' or 'corrector')
+
+        ! Local variables 
+        integer :: i, j, nx, ny
+        integer :: im1, ip1, jm1, jp1  
+        real(wp), allocatable :: mbal_zero(:,:) 
+        real(wp), allocatable :: dHdt_advec(:,:) 
+        real(wp), allocatable :: ux_tmp(:,:) 
+        real(wp), allocatable :: uy_tmp(:,:) 
+
+        real(wp), parameter :: dHdt_advec_lim = 10.0_wp     ! [m/a] Hard limit on advection rate
+
+        nx = size(H_ice,1)
+        ny = size(H_ice,2)
+
+        allocate(mbal_zero(nx,ny))
+        mbal_zero = 0.0_wp 
+
+        allocate(ux_tmp(nx,ny))
+        allocate(uy_tmp(nx,ny))
+        allocate(dHdt_advec(nx,ny))
+
+        dHdt_advec = 0.0_wp 
+
+        ! Set local velocity fields with no margin treatment intially
+        ux_tmp = ux
+        uy_tmp = uy
+        
+        ! Ensure that no velocity is defined for outer boundaries of partially-filled margin points
+        call set_inactive_margins(ux_tmp,uy_tmp,f_ice)
+
+        ! ===================================================================================
+        ! Resolve the dynamic part (ice advection) using multistep method
+
+        select case(trim(pc_step))
+        
+            case("predictor") 
+                
+                ! Store ice thickness from time=n
+                H_ice_n   = H_ice 
+
+                ! Store advective rate of change from saved from previous timestep (now represents time=n-1)
+                dHdt_advec = dHdt_n 
+
+                ! Determine current advective rate of change (time=n)
+                call calc_advec2D(dHdt_n,H_ice,f_ice,ux_tmp,uy_tmp,mbal_zero,dx,dx,dt,solver)
+
+                ! Calculate rate of change using weighted advective rates of change 
+                dHdt_advec = beta(1)*dHdt_n + beta(2)*dHdt_advec 
+                
+                ! Calculate predicted ice thickness (time=n+1,pred)
+                !H_ice = H_ice_n + dt*dHdt_advec 
+
+            case("corrector") ! corrector 
+
+                ! Determine advective rate of change based on predicted H,ux/y fields (time=n+1,pred)
+                call calc_advec2D(dHdt_advec,H_ice_pred,f_ice,ux_tmp,uy_tmp,mbal_zero,dx,dx,dt,solver)
+
+                ! Calculate rate of change using weighted advective rates of change 
+                dHdt_advec = beta(3)*dHdt_advec + beta(4)*dHdt_n 
+                
+                ! Calculate corrected ice thickness (time=n+1)
+                !H_ice = H_ice_n + dt*dHdt_advec 
+
+                ! Finally, update dHdt_n with correct term to use as n-1 on next iteration
+                dHdt_n = dHdt_advec 
+
+        end select
+        
+        ! Store advective tendency 
+        G_adv = dHdt_advec 
+
+        return 
+
+    end subroutine calc_G_advec
+
+    subroutine calc_G_mbal(G_mb,H_ice,f_grnd,mbal,dt)
+        ! Interface subroutine to update ice thickness through application
+        ! of advection, vertical mass balance terms and calving 
+
+        implicit none 
+
+        real(wp), intent(OUT)   :: G_mb(:,:)            ! [m/yr] Actual tendency due to mass balance
+        real(wp), intent(IN)    :: H_ice(:,:)           ! [m]   Ice thickness 
+        real(wp), intent(IN)    :: f_grnd(:,:)          ! [--]  Grounded fraction 
+        real(wp), intent(IN)    :: mbal(:,:)            ! [m/yr] Net mass balance; mbal = smb+bmb+fmb+calv
+        real(wp), intent(IN)    :: dt                   ! [a]   Timestep  
+
+        ! Local variables 
+        integer :: i, j, nx, ny 
+        integer :: im1, ip1, jm1, jp1 
+
+        nx = size(H_ice,1)
+        ny = size(H_ice,2) 
+
+        ! ==== MASS BALANCE =====
+
+        ! Initialize G_mb object with diagnosed mass balance everywhere
+        G_mb = mbal
+
+        ! Ensure melting is only counted where ice exists 
+        where(G_mb .lt. 0.0 .and. H_ice .eq. 0.0) G_mb = 0.0 
+
+        ! Additionally ensure ice cannot form in open ocean 
+        where(f_grnd .eq. 0.0 .and. H_ice .eq. 0.0)  G_mb = 0.0  
+
+        ! Ensure melt is limited to amount of available ice to melt  
+        where((H_ice+dt*G_mb) .lt. 0.0) G_mb = -H_ice/dt
+
+        ! Apply modified mass balance to update the ice thickness 
+        ! H_ice = H_ice + dt*G_mb
+
+        ! ! Ensure tiny numeric ice thicknesses are removed
+        ! where (H_ice .lt. TOL_UNDERFLOW) H_ice = 0.0 
+
+        return 
+
+    end subroutine calc_G_mbal
 
     subroutine calc_ice_thickness_dyn(H_ice,dHdt_n,H_ice_n,H_ice_pred,f_ice,ux,uy, &
                                       solver,dx,dt,beta,pc_step)
@@ -146,13 +288,19 @@ contains
 
         ! ==== MASS BALANCE =====
 
-        ! Combine mass balance and calving into one field, mb_applied.
-        ! negative mbal is scaled by f_ice, to account for available surface area. 
-        where(mbal .lt. 0.0_wp)
-            mb_applied = f_ice*mbal
-        elsewhere 
-            mb_applied = mbal
-        end where
+        ! ! Combine mass balance and calving into one field, mb_applied.
+        ! ! negative mbal is scaled by f_ice, to account for available surface area. 
+        ! where(mbal .lt. 0.0_wp)
+        !     mb_applied = f_ice*mbal
+        ! elsewhere 
+        !     mb_applied = mbal
+        ! end where
+
+        ! ajr: testing, ensure f_ice scaling is already applied externally 
+        mb_applied = mbal
+
+        ! Ensure melting is only counted where ice exists 
+        where(mb_applied .lt. 0.0 .and. H_ice .eq. 0.0) mb_applied = 0.0 
 
         ! Additionally ensure ice cannot form in open ocean 
         where(f_grnd .eq. 0.0 .and. H_ice .eq. 0.0)  mb_applied = 0.0  

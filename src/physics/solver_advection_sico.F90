@@ -1,6 +1,6 @@
 module solver_advection_sico
 
-    use yelmo_defs, only : sp, dp, prec 
+    use yelmo_defs, only : sp, dp, wp 
 
     implicit none 
     
@@ -19,17 +19,17 @@ contains
 
         implicit none 
 
-        real(prec), intent(OUT)   :: uu(:,:)  ! [X] Variable of interest (aa nodes)
-        real(prec), intent(IN)    :: ux(:,:)  ! [m a-1] Horizontal velocity x-direction (ac nodes)
-        real(prec), intent(IN)    :: uy(:,:)  ! [m a-1] Horizontal velocity y-direction (ac nodes)
-        real(prec), intent(IN)    :: F(:,:)   ! [m a-1] Source term (aa nodes)
-        real(prec), intent(IN)    :: dx       ! [m] Horizontal step x-direction
-        real(prec), intent(IN)    :: dy       ! [m] Horizontal step y-direction 
-        real(prec), intent(IN)    :: dt       ! [a] Time step 
+        real(wp), intent(OUT)   :: uu(:,:)  ! [X] Variable of interest (aa nodes)
+        real(wp), intent(IN)    :: ux(:,:)  ! [m a-1] Horizontal velocity x-direction (ac nodes)
+        real(wp), intent(IN)    :: uy(:,:)  ! [m a-1] Horizontal velocity y-direction (ac nodes)
+        real(wp), intent(IN)    :: F(:,:)   ! [m a-1] Source term (aa nodes)
+        real(wp), intent(IN)    :: dx       ! [m] Horizontal step x-direction
+        real(wp), intent(IN)    :: dy       ! [m] Horizontal step y-direction 
+        real(wp), intent(IN)    :: dt       ! [a] Time step 
 
         ! Local variables  
         integer    :: i, j, nx, ny 
-        real(prec), allocatable :: uu_adv(:,:)
+        real(wp), allocatable :: uu_adv(:,:)
         
         nx = size(uu,1)
         ny = size(uu,2) 
@@ -52,7 +52,7 @@ contains
         
         return
 
-    end subroutine calc_adv2D_expl_sico 
+    end subroutine calc_adv2D_expl_sico
 
     subroutine calc_advec_horizontal_point_expl(advecxy,var,ux,uy,dx,dy,i,j)
         ! Newly implemented advection algorithms (ajr)
@@ -64,17 +64,17 @@ contains
 
         implicit none
 
-        real(prec), intent(OUT) :: advecxy
-        real(prec), intent(IN)  :: var(:,:)   ! Enth, T, age, H_ice, etc...
-        real(prec), intent(IN)  :: ux(:,:) 
-        real(prec), intent(IN)  :: uy(:,:)
-        real(prec), intent(IN)  :: dx, dy   
-        integer,    intent(IN)  :: i, j 
+        real(wp), intent(OUT) :: advecxy
+        real(wp), intent(IN)  :: var(:,:)   ! Enth, T, age, H_ice, etc...
+        real(wp), intent(IN)  :: ux(:,:) 
+        real(wp), intent(IN)  :: uy(:,:)
+        real(wp), intent(IN)  :: dx, dy   
+        integer,  intent(IN)  :: i, j 
 
         ! Local variables 
-        integer :: k, nx, ny, nz 
-        real(prec) :: ux_1, ux_2, uy_1, uy_2
-        real(prec) :: up_x_1, up_x_2, up_y_1, up_y_2 
+        integer  :: k, nx, ny, nz 
+        real(wp) :: ux_1, ux_2, uy_1, uy_2
+        real(wp) :: up_x_1, up_x_2, up_y_1, up_y_2 
 
         nx = size(var,1)
         ny = size(var,2)
@@ -136,28 +136,28 @@ contains
 
         implicit none
 
-        real(prec), intent(INOUT)   :: uu(:,:)  ! [X] Variable of interest (aa nodes)
-        real(prec), intent(IN)      :: ux(:,:)  ! [m a-1] Horizontal velocity x-direction (ac nodes)
-        real(prec), intent(IN)      :: uy(:,:)  ! [m a-1] Horizontal velocity y-direction (ac nodes)
-        real(prec), intent(IN)      :: F(:,:)   ! [m a-1] Net source/sink terms (aa nodes)
-        real(prec), intent(IN)      :: dx       ! [m] Horizontal step x-direction
-        real(prec), intent(IN)      :: dy       ! [m] Horizontal step y-direction 
-        real(prec), intent(IN)      :: dt       ! [a] Time step 
-        logical,    intent(IN)      :: use_lis  ! use_lis or sor? 
+        real(wp), intent(INOUT)   :: uu(:,:)  ! [X] Variable of interest (aa nodes)
+        real(wp), intent(IN)      :: ux(:,:)  ! [m a-1] Horizontal velocity x-direction (ac nodes)
+        real(wp), intent(IN)      :: uy(:,:)  ! [m a-1] Horizontal velocity y-direction (ac nodes)
+        real(wp), intent(IN)      :: F(:,:)   ! [m a-1] Net source/sink terms (aa nodes)
+        real(wp), intent(IN)      :: dx       ! [m] Horizontal step x-direction
+        real(wp), intent(IN)      :: dy       ! [m] Horizontal step y-direction 
+        real(wp), intent(IN)      :: dt       ! [a] Time step 
+        logical,  intent(IN)      :: use_lis  ! use_lis or sor? 
 
         ! Local variables  
-        integer    :: i, j, nx, ny 
+        integer :: i, j, nx, ny 
         integer :: IMAX, JMAX
         integer :: n, m, k, nnz
-        real(prec), allocatable  :: ux_1(:,:), ux_2(:,:)
-        real(prec), allocatable  :: uy_1(:,:), uy_2(:,:)
-        real(prec), allocatable  :: up_x_1(:,:), up_x_2(:,:)
-        real(prec), allocatable  :: up_y_1(:,:), up_y_2(:,:)
-        integer,    allocatable  :: ii(:), jj(:), nn(:,:) 
-        real(prec) :: dt_darea
-        real(prec), parameter    :: EPS_SOR    = 1e-3 ! [m] Error tolerance
-        real(prec), parameter    :: OVI_WEIGHT = 1.5  ! Weighing parameter for the over-implicit scheme 
-        real(prec), parameter    :: OMEGA_SOR  = 1.0  ! Relaxation parameter for the iterative SOR solver (0 < OMEGA_SOR < 2)
+        real(wp), allocatable  :: ux_1(:,:), ux_2(:,:)
+        real(wp), allocatable  :: uy_1(:,:), uy_2(:,:)
+        real(wp), allocatable  :: up_x_1(:,:), up_x_2(:,:)
+        real(wp), allocatable  :: up_y_1(:,:), up_y_2(:,:)
+        integer,  allocatable  :: ii(:), jj(:), nn(:,:) 
+        real(wp) :: dt_darea
+        real(wp), parameter    :: EPS_SOR    = 1e-3 ! [m] Error tolerance
+        real(wp), parameter    :: OVI_WEIGHT = 1.5  ! Weighing parameter for the over-implicit scheme 
+        real(wp), parameter    :: OMEGA_SOR  = 1.0  ! Relaxation parameter for the iterative SOR solver (0 < OMEGA_SOR < 2)
         
 ! Include header for lis solver fortran interface
 #include "lisf.h"
@@ -449,7 +449,7 @@ contains
         integer,    intent(in)    :: lgs_a_diag_index(:)    ! size=nmax
         integer,    intent(in)    :: lgs_a_ptr(:)           ! size=nmax+1
         real(dp),   intent(in)    :: lgs_b_value(:)         ! size=nmax
-        real(prec), intent(in)    :: omega, eps_sor
+        real(wp),   intent(in)    :: omega, eps_sor
         real(dp),   intent(inout) :: lgs_x_value(:)         ! size=nmax
         integer,    intent(out)   :: iter
         integer,    intent(out)   :: ierr
@@ -457,9 +457,9 @@ contains
         ! Local variables 
         integer    :: nnz, nmax
         integer    :: nr, k
-        real(prec) :: b_nr
+        real(wp) :: b_nr
         logical    :: flag_convergence
-        real(prec), allocatable :: lgs_x_value_prev(:)
+        real(wp), allocatable :: lgs_x_value_prev(:)
         
         nnz  = size(lgs_a_value)
         nmax = size(lgs_x_value) 
@@ -511,5 +511,5 @@ contains
 
     end subroutine sor_sprs
 
-end module solver_advection_sico 
+end module solver_advection_sico
 

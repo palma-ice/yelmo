@@ -1,8 +1,7 @@
 module solver_advection_new 
 
-    use yelmo_defs, only : sp, dp, prec, tol_underflow
-    use yelmo_tools, only : stagger_aa_ab
-    
+    use yelmo_defs, only : sp, dp, wp, tol_underflow
+
     implicit none 
 
 
@@ -18,17 +17,17 @@ contains
         implicit none 
 
 
-        real(prec), intent(OUT)   :: dXdt(:,:) 
-        real(prec), intent(INOUT) :: X(:,:) 
-        real(prec), intent(IN)    :: ux(:,:) 
-        real(prec), intent(IN)    :: uy(:,:) 
-        real(prec), intent(IN)    :: dx 
-        real(prec), intent(IN)    :: dy 
-        real(prec), intent(IN)    :: dt 
+        real(wp), intent(OUT)   :: dXdt(:,:) 
+        real(wp), intent(IN)    :: X(:,:) 
+        real(wp), intent(IN)    :: ux(:,:) 
+        real(wp), intent(IN)    :: uy(:,:) 
+        real(wp), intent(IN)    :: dx 
+        real(wp), intent(IN)    :: dy 
+        real(wp), intent(IN)    :: dt 
         
         ! Local variables 
-        real(prec), allocatable   :: Fx(:,:) 
-        real(prec), allocatable   :: Fy(:,:) 
+        real(wp), allocatable   :: Fx(:,:) 
+        real(wp), allocatable   :: Fy(:,:) 
 
 
 
@@ -36,19 +35,19 @@ contains
 
         return 
 
-    end subroutine calc_advec2D 
+    end subroutine calc_advec2D
 
     subroutine calc_flux2D_expl_2nd(Fx,Fy,X,ux,uy,dx,dy)
 
         implicit none
 
-        real(prec), intent(OUT)   :: Fx(:,:) 
-        real(prec), intent(OUT)   :: Fy(:,:) 
-        real(prec), intent(INOUT) :: X(:,:) 
-        real(prec), intent(IN)    :: ux(:,:) 
-        real(prec), intent(IN)    :: uy(:,:) 
-        real(prec), intent(IN)    :: dx 
-        real(prec), intent(IN)    :: dy
+        real(wp), intent(OUT)   :: Fx(:,:) 
+        real(wp), intent(OUT)   :: Fy(:,:) 
+        real(wp), intent(IN   ) :: X(:,:) 
+        real(wp), intent(IN)    :: ux(:,:) 
+        real(wp), intent(IN)    :: uy(:,:) 
+        real(wp), intent(IN)    :: dx 
+        real(wp), intent(IN)    :: dy
 
         
         return 

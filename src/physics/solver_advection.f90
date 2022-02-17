@@ -638,7 +638,7 @@ end if
             ! criterion.
 !             delh = maxval(abs(deltaH))
             
-            if ( delh .lt. 1e-4) then
+            if ( delh .lt. 1e-6) then
                 ! Solution has converged, exit  
                 ierr = 0 
                 exit 

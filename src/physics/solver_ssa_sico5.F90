@@ -17,7 +17,7 @@ module solver_ssa_sico5
     public :: ssa_diagnostics_write_init
     public :: ssa_diagnostics_write_step
 
-    
+
 contains 
 
     subroutine calc_vxy_ssa_matrix(vx_m,vy_m,L2_norm,beta_acx,beta_acy,visc_int, &
@@ -219,7 +219,7 @@ contains
         !                                       [at (i+1/2,j+1/2)] --------
 
         call stagger_visc_aa_ab(vis_int_sgxy,vis_int_g,H_ice,f_ice)
-
+        
         !-------- Basal drag parameter (for shelfy stream) --------
 
         !  (now provided as input matrix)

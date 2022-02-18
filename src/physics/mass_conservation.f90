@@ -13,6 +13,7 @@ module mass_conservation
 
     public :: calc_G_advec 
     public :: calc_G_mbal
+    public :: calc_G_calv
 
     public :: calc_ice_thickness_dyn
     public :: calc_ice_thickness_mbal
@@ -23,7 +24,7 @@ module mass_conservation
 contains 
     
     subroutine calc_G_advec(G_adv,dHdt_n,H_ice_n,H_ice_pred,H_ice,f_ice,ux,uy, &
-                                      solver,dx,dt,beta,pc_step)
+                        mask_pred_new,mask_corr_new,solver,dx,dt,beta,pc_step)
         ! Interface subroutine to update ice thickness through application
         ! of advection, vertical mass balance terms and calving 
 
@@ -37,6 +38,8 @@ contains
         real(wp),         intent(IN)    :: f_ice(:,:)           ! [--]  Ice area fraction 
         real(wp),         intent(IN)    :: ux(:,:)              ! [m/a] Depth-averaged velocity, x-direction (ac-nodes)
         real(wp),         intent(IN)    :: uy(:,:)              ! [m/a] Depth-averaged velocity, y-direction (ac-nodes)
+        integer,          intent(IN)    :: mask_pred_new(:,:)   
+        integer,          intent(IN)    :: mask_corr_new(:,:)   
         character(len=*), intent(IN)    :: solver               ! Solver to use for the ice thickness advection equation
         real(wp),         intent(IN)    :: dx                   ! [m]   Horizontal resolution
         real(wp),         intent(IN)    :: dt                   ! [a]   Timestep 
@@ -69,9 +72,6 @@ contains
         ux_tmp = ux
         uy_tmp = uy
         
-        ! Ensure that no velocity is defined for outer boundaries of partially-filled margin points
-        call set_inactive_margins(ux_tmp,uy_tmp,f_ice)
-
         ! ===================================================================================
         ! Resolve the dynamic part (ice advection) using multistep method
 
@@ -79,6 +79,12 @@ contains
         
             case("predictor") 
                 
+                ! Fill velocity field for new cells 
+                call fill_vel_new_cells(ux_tmp,uy_tmp,mask_corr_new)
+
+                ! Ensure that no velocity is defined for outer boundaries of partially-filled margin points
+                call set_inactive_margins(ux_tmp,uy_tmp,f_ice)
+
                 ! Store ice thickness from time=n
                 H_ice_n   = H_ice 
 
@@ -95,6 +101,12 @@ contains
                 !H_ice = H_ice_n + dt*dHdt_advec 
 
             case("corrector") ! corrector 
+
+                ! Fill velocity field for new cells 
+                call fill_vel_new_cells(ux_tmp,uy_tmp,mask_pred_new)
+
+                ! Ensure that no velocity is defined for outer boundaries of partially-filled margin points
+                call set_inactive_margins(ux_tmp,uy_tmp,f_ice)
 
                 ! Determine advective rate of change based on predicted H,ux/y fields (time=n+1,pred)
                 call calc_advec2D(dHdt_advec,H_ice_pred,f_ice,ux_tmp,uy_tmp,mbal_zero,dx,dx,dt,solver)
@@ -116,6 +128,59 @@ contains
         return 
 
     end subroutine calc_G_advec
+
+    subroutine fill_vel_new_cells(ux,uy,mask)
+
+        implicit none
+
+        real(wp), intent(INOUT) :: ux(:,:) 
+        real(wp), intent(INOUT) :: uy(:,:) 
+        integer,  intent(IN)    :: mask(:,:) 
+
+        ! Local variables 
+        integer :: i, j, nx, ny 
+        integer :: im1, ip1, jm1, jp1 
+
+        nx = size(mask,1)
+        ny = size(mask,2) 
+
+        do j = 1, ny
+        do i = 1, nx 
+
+            ! Get neighbor indices 
+            im1 = max(i-1,1)
+            ip1 = min(i+1,nx)
+            jm1 = max(j-1,1)
+            jp1 = min(j+1,ny)
+
+            if (mask(i,j) .eq. 2) then 
+                ! This site just filled with ice, so 
+                ! velocity may not be defined on borders
+                ! Check borders and fill in empty velocities
+
+                ! x-direction
+                if (ux(i,j) .eq. 0.0_wp .and. ux(im1,j) .ne. 0.0_wp) then 
+                    ux(i,j) = ux(im1,j) 
+                else if (ux(i,j) .ne. 0.0_wp .and. ux(im1,j) .eq. 0.0_wp) then
+                    ux(im1,j) = ux(i,j)
+                end if 
+
+                ! y-direction
+                if (uy(i,j) .eq. 0.0_wp .and. uy(i,jm1) .ne. 0.0_wp) then 
+                    uy(i,j) = uy(i,jm1) 
+                else if (uy(i,j) .ne. 0.0_wp .and. uy(i,jm1) .eq. 0.0_wp) then
+                    uy(i,jm1) = uy(i,j)
+                end if 
+                
+            end if 
+
+        end do 
+        end do
+
+
+        return
+
+    end subroutine fill_vel_new_cells
 
     subroutine calc_G_mbal(G_mb,H_ice,f_grnd,mbal,dt)
         ! Interface subroutine to update ice thickness through application
@@ -159,6 +224,81 @@ contains
         return 
 
     end subroutine calc_G_mbal
+
+    subroutine calc_G_calv(G_calv,H_ice,calv_flt,calv_grnd,dt,pc_step)
+        ! Interface subroutine to update ice thickness through application
+        ! of advection, vertical mass balance terms and calving 
+
+        implicit none 
+
+        real(wp), intent(OUT)   :: G_calv(:,:)          ! [m/yr] Actual calving rate applied to real ice points
+        real(wp), intent(IN)    :: H_ice(:,:)           ! [m]   Ice thickness 
+        real(wp), intent(IN)    :: calv_flt(:,:)        ! [m/a] Potential calving rate (floating)
+        real(wp), intent(IN)    :: calv_grnd(:,:)       ! [m/a] Potential calving rate (grounded)
+        real(wp), intent(IN)    :: dt                   ! [a]   Timestep  
+        character(len=*), intent(IN) :: pc_step 
+
+        ! Local variables 
+        integer :: i, j, nx, ny 
+        integer :: im1, ip1, jm1, jp1 
+        logical :: is_margin
+
+        real(wp) :: factor 
+
+        factor = 1.0_wp 
+        !if (trim(pc_step) .eq. "predictor") factor = 0.8_wp 
+
+        nx = size(H_ice,1)
+        ny = size(H_ice,2) 
+
+        ! ===== CALVING ======
+
+        ! Combine grounded and floating calving into one field for output.
+        ! It has already been scaled by area of ice in cell (f_ice).
+        G_calv = (calv_flt + calv_grnd)
+
+        ! Only allow calving at the current margin 
+        ! If ice has retreated before applying calving, then H_ice is 
+        ! zero and so G_calv will also be zero. But if ice has advanced,
+        ! then calving should also go to zero. 
+        do j = 1, ny 
+        do i = 1, nx 
+
+            ! Get neighbor indices 
+            im1 = max(i-1,1)
+            ip1 = min(i+1,nx)
+            jm1 = max(j-1,1)
+            jp1 = min(j+1,ny)
+
+            is_margin = H_ice(i,j) .gt. 0.0 .and. &
+                count([H_ice(im1,j),H_ice(ip1,j),H_ice(i,jm1),H_ice(i,jp1)].eq.0.0) .gt. 0
+
+            if (.not. is_margin) then
+                ! Not an ice covered point at the margin
+
+                G_calv(i,j) = 0.0
+
+            end if 
+
+        end do 
+        end do
+
+        ! Ensure applied calving is limited to amount of available ice to calve
+        ! Note: on predictor step, make sure that calving doesn't reduce
+        ! thickness to zero. This ensures velocity will be diagnosed for this 
+        ! point.
+        where((H_ice-dt*G_calv) .lt. 0.0) G_calv = H_ice/dt * factor 
+
+        ! ! Apply modified mass balance to update the ice thickness 
+        ! H_ice = H_ice - dt*G_calv
+
+        ! ! Ensure tiny numeric ice thicknesses are removed
+        ! where (H_ice .lt. TOL_UNDERFLOW) H_ice = 0.0 
+
+        return 
+
+    end subroutine calc_G_calv
+
 
     subroutine calc_ice_thickness_dyn(H_ice,dHdt_n,H_ice_n,H_ice_pred,f_ice,ux,uy, &
                                       solver,dx,dt,beta,pc_step)

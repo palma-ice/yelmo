@@ -149,6 +149,11 @@ module yelmo_defs
         real(wp), allocatable   :: mb_applied(:,:)  ! Actual mass balance applied [m/a], for mass balance accounting
         real(wp), allocatable   :: mb_resid(:,:)    ! Residual mass balance from boundary conditions, cleanup
         
+        real(wp), allocatable   :: G_advec(:,:)     ! [m/yr] Ice thickness tendency due to advection
+
+        integer,  allocatable   :: mask_pred_new(:,:) 
+        integer,  allocatable   :: mask_corr_new(:,:) 
+        
         real(wp), allocatable   :: eps_eff(:,:)     ! Effective strain [1/yr]
         real(wp), allocatable   :: tau_eff(:,:)     ! Effective stress [Pa]
         real(wp), allocatable   :: calv(:,:)        ! Calving rate (applied) [m/a]

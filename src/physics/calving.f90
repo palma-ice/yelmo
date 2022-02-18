@@ -1216,10 +1216,11 @@ end if
                 if (H_ocn(i,j) .gt. 0.0) then 
                     H_ocn_now = min(rho_ice_sw*H_eff,H_ocn(i,j))
                 else 
+                    ! Bedrock is above sea level, ocean depth is zero
                     H_ocn_now = 0.0 
                 end if 
 
-                ! Get depth-averaged shear-stress in ice, Bassis and Walker (2012), Eq. 2.13 vertically integrated
+                ! Get depth-averaged shear-stress in ice, Bassis and Walker (2012), Eq. 2.13 vertically averaged
                 ! alpha = 0.65: model S1 validated for cold ice 
                 ! alpha = 0.4 : model S2 for warmer ice 
                 ! alpha = 0.0 : model S3 for purely plastic yielding (default)

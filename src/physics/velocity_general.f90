@@ -144,6 +144,18 @@ contains
             jm1 = max(j-1,1)
             jp1 = min(j+1,ny)
             
+            ! Get a locally smoothed value of dzsdt and dhdt to avoid spurious oscillations
+            ! (eg in EISMINT-EXPA dhdt field)
+            call staggerdiffy_nodes_aa_ab_ice(dzsdt_ab,dzsdt,f_ice,i,j,dx)
+            dzsdt_now = sum(dzsdt_ab*wt_ab)
+            
+            call staggerdiffy_nodes_aa_ab_ice(dhdt_ab,dhdt,f_ice,i,j,dx)
+            dhdt_now = sum(dhdt_ab*wt_ab)
+            
+            ! Diagnose rate of basal elevation change (needed for all points)
+            dzbdt_now = dzsdt_now - dhdt_now
+
+
             if (f_ice(i,j) .eq. 1.0) then
 
                 ! Get weighted ice thickness for stability
@@ -187,18 +199,6 @@ contains
 !                 uz_grid = dzsdt(i,j) + (ux_aa*dzsdx_aa + uy_aa*dzsdy_aa) &
 !                             - ( (1.0_prec-zeta_ac(1))*dHdt(i,j) + ux_aa*dHdx_aa + uy_aa*dHdy_aa )
                 uz_grid = 0.0_prec 
-
-                ! Get a locally smoothed value of dzsdt and dhdt to avoid spurious oscillations
-                ! (eg in EISMINT-EXPA dhdt field)
-                call staggerdiffy_nodes_aa_ab_ice(dzsdt_ab,dzsdt,f_ice,i,j,dy)
-                dzsdt_now = sum(dzsdt_ab*wt_ab)
-                
-                call staggerdiffy_nodes_aa_ab_ice(dhdt_ab,dhdt,f_ice,i,j,dy)
-                dhdt_now = sum(dhdt_ab*wt_ab)
-                
-
-                ! Diagnose rate of basal elevation change 
-                dzbdt_now = dzsdt_now - dhdt_now
 
                 ! ===================================================================
                 ! Greve and Blatter (2009) style:

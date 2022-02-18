@@ -243,6 +243,10 @@ contains
                 
                 dom%tpo%par%pc_step = "predictor" 
 
+                ! Calculate material (ice properties, viscosity, etc.)
+                ! (to get stresses consistent with predictor field)
+                call calc_ymat(dom%mat,dom%tpo,dom%dyn,dom%thrm,dom%bnd,time_now)
+
                 ! Step 1: Perform predictor step for topography
                 ! (Update elevation, ice thickness, calving, etc.)
                 call calc_ytopo(dom%tpo,dom%dyn,dom%mat,dom%thrm,dom%bnd,time_now,topo_fixed=dom%tpo%par%topo_fixed)

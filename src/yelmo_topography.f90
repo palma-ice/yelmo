@@ -59,22 +59,24 @@ contains
         integer  :: i, j, nx, ny  
         real(wp), allocatable :: mbal(:,:) 
         real(wp), allocatable :: calv_sd(:,:) 
-        real(wp), allocatable :: G_advec(:,:) 
         real(wp), allocatable :: G_mb(:,:) 
+        real(wp), allocatable :: G_calv(:,:) 
         logical  :: reset_mb_resid 
 
         real(8)  :: cpu_time0, cpu_time1
         real(wp) :: model_time0, model_time1 
         real(wp) :: speed 
 
+        logical, parameter :: calving_separate_step = .TRUE. 
+
         nx = size(tpo%now%H_ice,1)
         ny = size(tpo%now%H_ice,2)
 
         allocate(mbal(nx,ny))
         allocate(calv_sd(nx,ny))
-        allocate(G_advec(nx,ny))
         allocate(G_mb(nx,ny))
-        
+        allocate(G_calv(nx,ny))
+
         ! Store initial cpu time and model time for metrics later
         call yelmo_cpu_time(cpu_time0)
         model_time0 = tpo%par%time 
@@ -238,15 +240,33 @@ contains
 
         ! Store total calving field 
         tpo%now%calv = tpo%now%calv_flt + tpo%now%calv_grnd
-        
-        ! Define temporary variable for total column mass balance
-        mbal = bnd%smb + tpo%now%bmb + tpo%now%fmb - &
-                                tpo%now%calv_flt - tpo%now%calv_grnd
+
+if (calving_separate_step) then 
+    ! ajr: don't include calving in the mass balance term, apply
+    ! it explicitly separately. Later if-statement should be set to true. 
+
+        ! Define temporary variable for total column mass balance (without calving)
+        mbal = bnd%smb + tpo%now%bmb + tpo%now%fmb
         
         ! WHEN RUNNING EISMINT1 ensure bmb and fmb are not accounted for here !!!
         if (.not. tpo%par%use_bmb) then
-            mbal = bnd%smb - tpo%now%calv_flt - tpo%now%calv_grnd
+            mbal = bnd%smb
         end if
+
+else
+    ! ajr: include calving as just another mass balance term,
+    ! proceed as normal. This means that the exact amount of
+    ! calving cannot be deduced. 
+
+        ! Define temporary variable for total column mass balance (without calving)
+        mbal = bnd%smb + tpo%now%bmb + tpo%now%fmb - tpo%now%calv 
+        
+        ! WHEN RUNNING EISMINT1 ensure bmb and fmb are not accounted for here !!!
+        if (.not. tpo%par%use_bmb) then
+            mbal = bnd%smb - tpo%now%calv
+        end if
+
+end if 
 
         ! 1. Perform topography calculations ------------------
 
@@ -254,17 +274,18 @@ contains
 
             ! === Step 1: ice thickness evolution from dynamics alone ===
 
-            ! Diagnose advection tendency (G_adv = dHdt_advec)
+            ! Diagnose advection tendency (G_advec = dHdt_advec)
 
-            call calc_G_advec(G_advec,tpo%now%dHdt_n,tpo%now%H_ice_n,tpo%now%H_ice_pred, &
+            call calc_G_advec(tpo%now%G_advec,tpo%now%dHdt_n,tpo%now%H_ice_n,tpo%now%H_ice_pred, &
                                 tpo%now%H_ice,tpo%now%f_ice,dyn%now%ux_bar,dyn%now%uy_bar, &
+                                tpo%now%mask_pred_new,tpo%now%mask_corr_new, &
                                         solver=tpo%par%solver,dx=tpo%par%dx,dt=dt, &
                                         beta=tpo%par%dt_beta,pc_step=tpo%par%pc_step) 
 
             ! Now update ice thickness with advection tendency
-            tpo%now%H_ice = tpo%now%H_ice_n + dt*G_advec
+            tpo%now%H_ice = tpo%now%H_ice_n + dt*tpo%now%G_advec
 
-            ! Diagnose mass balance (forcing) tendency
+            ! Diagnose actual mass balance (forcing) tendency
             call calc_G_mbal(G_mb,tpo%now%H_ice,tpo%now%f_grnd,mbal,dt)
 
             ! Store for output too 
@@ -276,11 +297,30 @@ contains
             ! Ensure tiny numeric ice thicknesses are removed
             where (tpo%now%H_ice .lt. TOL_UNDERFLOW) tpo%now%H_ice = 0.0 
 
+if (calving_separate_step) then
+    ! ajr: alternative formulation for calving. Apply it after applying 
+    ! G_mb and adjusting H_ice. That way it can be limited to the available
+    ! amount of ice and be diagnosed.
+
+            ! Diagnose actual calving (forcing) tendency
+            call calc_G_calv(G_calv,tpo%now%H_ice,tpo%now%calv_flt,tpo%now%calv_grnd,dt,tpo%par%pc_step)
+
+            ! Store for output too
+            tpo%now%calv = G_calv 
+
+            ! Now update ice thickness with all tendencies for this timestep 
+            tpo%now%H_ice = tpo%now%H_ice - dt*G_calv  
+
+            ! Ensure tiny numeric ice thicknesses are removed
+            where (tpo%now%H_ice .lt. TOL_UNDERFLOW) tpo%now%H_ice = 0.0 
+
+end if 
+
             ! Update ice fraction mask 
             call calc_ice_fraction(tpo%now%f_ice,tpo%now%H_ice,bnd%z_bed,bnd%z_sl,tpo%par%margin_flt_subgrid)
         
 
-            ! Treat fractional points 
+            ! Treat fractional points that are not connected to full ice-covered points
             call remove_fractional_ice(tpo%now%H_ice,tpo%now%f_ice)
             call calc_ice_fraction(tpo%now%f_ice,tpo%now%H_ice,bnd%z_bed,bnd%z_sl,tpo%par%margin_flt_subgrid)
             
@@ -475,13 +515,40 @@ end if
 
         end select
 
-
+        if (trim(tpo%par%pc_step) .eq. "corrector") then 
+            
+            ! Additionally make sure dynamics ice thickness includes all points from predictor step 
+            where(tpo%now%H_ice_dyn.eq.0.0 .and. tpo%now%H_ice_pred .gt. 0.0) tpo%now%H_ice_dyn = 1.0 
+            
+            ! Calculate the ice fraction mask for use with the dynamics solver
+            call calc_ice_fraction(tpo%now%f_ice_dyn,tpo%now%H_ice_dyn,bnd%z_bed,bnd%z_sl,flt_subgrid=.FALSE.)
+                
+        end if 
+        
         ! Store predicted/corrected ice thickness for later use 
         ! Do it here to ensure all changes to H_ice are accounted for (mb, calving, etc)
         if (trim(tpo%par%pc_step) .eq. "predictor") then 
+            
             tpo%now%H_ice_pred = tpo%now%H_ice 
+
+            ! Compare previous and current ice field
+            tpo%now%mask_pred_new = 0 
+            where(tpo%now%H_ice_pred .gt. 0.0) tpo%now%mask_pred_new = 1
+            where(tpo%now%H_ice_pred .gt. 0.0 .and. tpo%now%H_ice_n .eq. 0.0)
+                tpo%now%mask_pred_new = 2
+            end where
+            
         else if (trim(tpo%par%pc_step) .eq. "corrector") then
+
             tpo%now%H_ice_corr = tpo%now%H_ice 
+
+            ! Compare previous and current ice field
+            tpo%now%mask_corr_new = 0 
+            where(tpo%now%H_ice_corr .gt. 0.0) tpo%now%mask_corr_new = 1
+            where(tpo%now%H_ice_corr .gt. 0.0 .and. tpo%now%H_ice_pred .eq. 0.0)
+                tpo%now%mask_corr_new = 2
+            end where
+            
         end if 
 
         ! ================================
@@ -1213,6 +1280,11 @@ end if
         allocate(now%mb_applied(nx,ny))
         allocate(now%mb_resid(nx,ny))
         
+        allocate(now%G_advec(nx,ny))
+        
+        allocate(now%mask_pred_new(nx,ny))
+        allocate(now%mask_corr_new(nx,ny))
+        
         allocate(now%eps_eff(nx,ny))
         allocate(now%tau_eff(nx,ny))
         allocate(now%calv(nx,ny))
@@ -1266,6 +1338,12 @@ end if
         now%fmb         = 0.0
         now%mb_applied  = 0.0 
         now%mb_resid    = 0.0
+
+        now%G_advec     = 0.0
+
+        now%mask_pred_new = 0 
+        now%mask_corr_new = 0 
+
         now%eps_eff     = 0.0
         now%tau_eff     = 0.0
         now%calv        = 0.0
@@ -1321,6 +1399,11 @@ end if
         if (allocated(now%fmb))         deallocate(now%fmb)
         if (allocated(now%mb_applied))  deallocate(now%mb_applied)
         if (allocated(now%mb_resid))    deallocate(now%mb_resid)
+        
+        if (allocated(now%G_advec))     deallocate(now%G_advec)
+        
+        if (allocated(now%mask_pred_new)) deallocate(now%mask_pred_new)
+        if (allocated(now%mask_corr_new)) deallocate(now%mask_corr_new)
         
         if (allocated(now%eps_eff))     deallocate(now%eps_eff)
         if (allocated(now%tau_eff))     deallocate(now%tau_eff)

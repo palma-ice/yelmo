@@ -854,6 +854,8 @@ end if
         real(wp) :: H_eff 
         real(wp) :: wt
         
+        real(wp), parameter :: calv_lim = 2000.0_wp     ! To avoid really high calving values
+        
         nx = size(H_ice,1)
         ny = size(H_ice,2)
 
@@ -897,6 +899,9 @@ end if
                     ! write(*,*) "calv", i, j, tau_eff(i,j), calv_ref,  &
                     !             H_eff, H_eff/sqrt(dx*dy), calv(i,j) 
                     
+                    ! Apply calving limit
+                    calv(i,j) = min(calv(i,j),calv_lim)
+                    
                 end if 
 
             end if
@@ -936,11 +941,11 @@ end if
 
         real(wp) :: dxx, dyy, dxy 
         real(wp) :: eps_eig_1_now, eps_eig_2_now
-
         real(wp) :: eps_eff_neighb(4)
-        
         real(wp) :: wt
         
+        real(wp), parameter :: calv_lim = 2000.0_wp     ! To avoid really high calving values
+
         nx = size(H_ice,1)
         ny = size(H_ice,2)
 
@@ -984,6 +989,9 @@ end if
                     ! write(*,*) "calv", tau_eff, calv_ref,  &
                     !             H_eff, wt*H_eff/sqrt(dx*dy), calv(i,j) 
                     
+                    ! Apply calving limit
+                    calv(i,j) = min(calv(i,j),calv_lim)
+
                 end if 
 
             end if

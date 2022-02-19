@@ -55,7 +55,7 @@ contains
         logical,            intent(IN)    :: topo_fixed 
 
         ! Local variables 
-        real(wp) :: dx, dt, dt_kill   
+        real(wp) :: dx, dt  
         integer  :: i, j, nx, ny  
         real(wp), allocatable :: mbal(:,:) 
         real(wp), allocatable :: calv_sd(:,:) 
@@ -168,22 +168,16 @@ contains
                 ! Delete all floating ice (using characteristic time parameter)
                 ! Make sure dt is a postive number
 
-                dt_kill = dt 
-                if (dt_kill .eq. 0.0) dt_kill = 1.0_wp 
-
-                call calc_calving_rate_kill(tpo%now%calv_flt,tpo%now%H_ice,tpo%now%f_grnd.eq.0.0_prec, &
-                                                                    tpo%par%calv_tau,dt=dt_kill)
+                call calc_calving_rate_kill(tpo%now%calv_flt,tpo%now%H_ice,tpo%now%f_grnd.eq.0.0_wp, &
+                                                                    tpo%par%calv_tau,dt)
 
             case("kill-pos")
                 ! Delete all floating ice beyond a given location (using characteristic time parameter)
 
-                dt_kill = dt 
-                if (dt_kill .eq. 0.0) dt_kill = 1.0_wp 
-                
                 call calc_calving_rate_kill(tpo%now%calv_flt,tpo%now%H_ice, &
                                                 ( tpo%now%f_grnd .eq. 0.0_wp .and. &
                                                   tpo%now%H_ice  .gt. 0.0_wp .and. &
-                                                  bnd%calv_mask ), tau=0.0_wp, dt=dt_kill )
+                                                  bnd%calv_mask ), tau=0.0_wp, dt=dt )
 
             case DEFAULT 
 
@@ -303,7 +297,8 @@ if (calving_separate_step) then
     ! amount of ice and be diagnosed.
 
             ! Diagnose actual calving (forcing) tendency
-            call calc_G_calv(G_calv,tpo%now%H_ice,tpo%now%calv_flt,tpo%now%calv_grnd,dt,tpo%par%pc_step)
+            call calc_G_calv(G_calv,tpo%now%H_ice,tpo%now%calv_flt,tpo%now%calv_grnd,dt, &
+                                                tpo%par%pc_step,trim(tpo%par%calv_flt_method))
 
             ! Store for output too
             tpo%now%calv = G_calv 
@@ -524,7 +519,7 @@ end if
             call calc_ice_fraction(tpo%now%f_ice_dyn,tpo%now%H_ice_dyn,bnd%z_bed,bnd%z_sl,flt_subgrid=.FALSE.)
                 
         end if 
-        
+
         ! Store predicted/corrected ice thickness for later use 
         ! Do it here to ensure all changes to H_ice are accounted for (mb, calving, etc)
         if (trim(tpo%par%pc_step) .eq. "predictor") then 

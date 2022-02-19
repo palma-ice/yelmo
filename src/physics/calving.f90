@@ -360,8 +360,17 @@ end if
         real(wp), intent(IN)  :: tau 
         real(wp), intent(IN)  :: dt 
 
+        ! Local variables
+        real(wp) :: dt_kill 
+
+        ! Make sure dt is not zero
+        dt_kill = dt 
+        if (dt_kill .eq. 0.0) dt_kill = 1.0_wp 
+
         ! Kill all ice immediately 
-        where (mask) calv = H_ice / dt
+        ! Ensure all ice calves by imposing a higher rate than ice exists
+
+        where (mask) calv = H_ice / dt_kill * 1.1
 
         ! ajr: in principle, we could make use of a timescale as below,
         ! however, for most 'kill' applications, this added complexity is
@@ -855,7 +864,7 @@ end if
         real(wp) :: wt
         
         real(wp), parameter :: calv_lim = 2000.0_wp     ! To avoid really high calving values
-        
+
         nx = size(H_ice,1)
         ny = size(H_ice,2)
 

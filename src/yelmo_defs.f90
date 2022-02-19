@@ -66,10 +66,13 @@ module yelmo_defs
     real(wp)   :: T_pmp_beta     ! [K Pa-1] Melt point pressure slope
 
     ! Internal parameters 
-    real(wp)   :: conv_we_ie        ! Conversion water equiv. => m/a ice equiv. 
-    real(wp)   :: conv_mmdwe_maie   ! Conversion mm/d water equiv. => m/a ice equiv.
-    real(wp)   :: conv_mmawe_maie   ! Conversion mm/a water equiv. => m/a ice equiv. 
-    
+    real(wp)   :: conv_we_ie            ! Conversion water equiv. => m/a ice equiv. 
+    real(wp)   :: conv_mmdwe_maie       ! Conversion mm/d water equiv. => m/a ice equiv.
+    real(wp)   :: conv_mmawe_maie       ! Conversion mm/a water equiv. => m/a ice equiv. 
+    real(wp)   :: conv_m3_Gt            ! Conversion m^3 ice to Gt of ice 
+    real(wp)   :: conv_km3_Gt           ! Conversion kmm^3 ice to Gt of ice 
+    real(wp)   :: conv_millionkm3_Gt    ! Conversion million km^3 ice to Gt of ice 
+
     ! =========================================================================
     !
     ! YELMO objects: ytopo 
@@ -980,9 +983,13 @@ contains
 
         ! Define conversion factors too
 
-        conv_we_ie  = rho_w/rho_ice
-        conv_mmdwe_maie = 1e-3*365*conv_we_ie
-        conv_mmawe_maie = 1e-3*conv_we_ie
+        conv_we_ie          = rho_w/rho_ice
+        conv_mmdwe_maie     = 1e-3*365*conv_we_ie
+        conv_mmawe_maie     = 1e-3*conv_we_ie
+        
+        conv_m3_Gt          = rho_ice *1e-12            ! [kg/m3] * [Gigaton/1e12kg]
+        conv_km3_Gt         = (1e9) * conv_m3_Gt        ! [1e9m^3/km^3]
+        conv_millionkm3_Gt  = (1e6) * (1e9) *conv_m3_Gt ! [1e6km3/1] * [1e9m^3/km^3] * conv
         
         return
 

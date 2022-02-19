@@ -225,7 +225,7 @@ contains
 
     end subroutine calc_G_mbal
 
-    subroutine calc_G_calv(G_calv,H_ice,calv_flt,calv_grnd,dt,pc_step)
+    subroutine calc_G_calv(G_calv,H_ice,calv_flt,calv_grnd,dt,pc_step,calv_flt_method)
         ! Interface subroutine to update ice thickness through application
         ! of advection, vertical mass balance terms and calving 
 
@@ -237,30 +237,43 @@ contains
         real(wp), intent(IN)    :: calv_grnd(:,:)       ! [m/a] Potential calving rate (grounded)
         real(wp), intent(IN)    :: dt                   ! [a]   Timestep  
         character(len=*), intent(IN) :: pc_step 
+        character(len=*), intent(IN) :: calv_flt_method
 
         ! Local variables 
         integer :: i, j, nx, ny 
         integer :: im1, ip1, jm1, jp1 
         logical :: is_margin
+        logical :: kill_floating
+        real(wp) :: calv_flt_now 
+        real(wp) :: calv_grnd_now 
 
-        real(wp) :: factor 
-
-        factor = 1.0_wp 
-        !if (trim(pc_step) .eq. "predictor") factor = 0.8_wp 
 
         nx = size(H_ice,1)
         ny = size(H_ice,2) 
+
+        ! Determine whether a kill method is being applied
+        kill_floating = .FALSE. 
+        if (trim(calv_flt_method) .eq. "kill" .or. &
+            trim(calv_flt_method) .eq. "kill-pos") then 
+
+            kill_floating = .TRUE. 
+
+        end if 
 
         ! ===== CALVING ======
 
         ! Combine grounded and floating calving into one field for output.
         ! It has already been scaled by area of ice in cell (f_ice).
-        G_calv = (calv_flt + calv_grnd)
 
-        ! Only allow calving at the current margin 
+        ! Note 1: Only allow calving at the current margin 
         ! If ice has retreated before applying calving, then H_ice is 
         ! zero and so G_calv will also be zero. But if ice has advanced,
         ! then calving should also go to zero. 
+
+        ! Note 2: for floating ice, allow calving everywhere if kill_floating is active.
+
+        G_calv = 0.0_wp 
+        
         do j = 1, ny 
         do i = 1, nx 
 
@@ -273,13 +286,20 @@ contains
             is_margin = H_ice(i,j) .gt. 0.0 .and. &
                 count([H_ice(im1,j),H_ice(ip1,j),H_ice(i,jm1),H_ice(i,jp1)].eq.0.0) .gt. 0
 
-            if (.not. is_margin) then
-                ! Not an ice covered point at the margin
-
-                G_calv(i,j) = 0.0
-
+            if (is_margin .or. kill_floating) then
+                calv_flt_now = calv_flt(i,j)
+            else
+                calv_flt_now = 0.0_wp
             end if 
 
+            if (is_margin) then
+                calv_grnd_now = calv_grnd(i,j) 
+            else
+                calv_grnd_now = 0.0_wp
+            end if
+
+            G_calv(i,j) = calv_flt_now + calv_grnd_now
+            
         end do 
         end do
 
@@ -287,7 +307,7 @@ contains
         ! Note: on predictor step, make sure that calving doesn't reduce
         ! thickness to zero. This ensures velocity will be diagnosed for this 
         ! point.
-        where((H_ice-dt*G_calv) .lt. 0.0) G_calv = H_ice/dt * factor 
+        where((H_ice-dt*G_calv) .lt. 0.0) G_calv = H_ice/dt
 
         ! ! Apply modified mass balance to update the ice thickness 
         ! H_ice = H_ice - dt*G_calv

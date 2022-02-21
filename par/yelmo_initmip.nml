@@ -22,7 +22,7 @@
 /
 
 &clim_pd_grl 
-    bmb_shlf_const  = -10.0             ! [m/a] Basal mass balance of ice shelves
+    bmb_shlf_const  = -1.0              ! [m/a] Basal mass balance of ice shelves
     dT_ann          = 0.0               ! [K]  Temperature anomaly (atm)
     z_sl            = 0.0               ! [m] Sea level relative to present-day 
 /
@@ -104,7 +104,7 @@
     H_min_flt           = 5.0               ! [m] Minimum ice thickness at floating margin (thinner ice is ablated) - helps with stability
     sd_min              = 100.0             ! [m] calv_grnd(z_bed_sd <= sd_min) = 0.0 
     sd_max              = 500.0             ! [m] calv_grnd(z_bed_sd >= sd_max) = calv_max  
-    calv_max            = 10.0              ! [m/a] Maximum grounded calving rate from high stdev(z_bed)
+    calv_max            = 0.0               ! [m/a] Maximum grounded calving rate from high stdev(z_bed)
     grad_lim            = 0.5               ! [m/m] Maximum allowed sloped in gradient calculations (dz/dx,dH/dx)
     dist_grz            = 200.0             ! [km] Radius to consider part of "grounding-line zone" (grz)
     gl_sep              = 1                 ! 1: Linear f_grnd_acx/acy and binary f_grnd, 2: area f_grnd, average to acx/acy

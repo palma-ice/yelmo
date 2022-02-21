@@ -161,7 +161,7 @@ contains
                     ! and store changes in residual mass balance field. 
                     call apply_ice_thickness_boundaries(tpo%now%mb_resid,tpo%now%H_ice_pred,f_ice_now,tpo%now%f_grnd, &
                                                         dyn%now%uxy_b,bnd%ice_allowed,tpo%par%boundaries,bnd%H_ice_ref, &
-                                                        tpo%par%H_min_flt,tpo%par%H_min_grnd,dt,reset=.FALSE.)
+                                                        tpo%par%H_min_flt,tpo%par%H_min_grnd,dt,reset=.TRUE.)
                     
                     ! Also store this ice thickness in main field for 
                     ! calculation of dynamics 
@@ -218,7 +218,7 @@ contains
                     ! and store changes in residual mass balance field. 
                     call apply_ice_thickness_boundaries(tpo%now%mb_resid,tpo%now%H_ice_corr,f_ice_now,tpo%now%f_grnd, &
                                                         dyn%now%uxy_b,bnd%ice_allowed,tpo%par%boundaries,bnd%H_ice_ref, &
-                                                        tpo%par%H_min_flt,tpo%par%H_min_grnd,dt,reset=.FALSE.)
+                                                        tpo%par%H_min_flt,tpo%par%H_min_grnd,dt,reset=.TRUE.)
                     
                     ! Restore main ice thickness field to original 
                     ! value at the beginning of the timestep for 
@@ -247,7 +247,7 @@ contains
                         tpo%now%H_ice = tpo%now%H_ice_corr
                     end if 
 
-                    ! Get ice-fraction mask for predicted ice thickness  
+                    ! Get ice-fraction mask for current ice thickness  
                     call calc_ice_fraction(tpo%now%f_ice,tpo%now%H_ice,bnd%z_bed,bnd%z_sl,tpo%par%margin_flt_subgrid)
                     
 

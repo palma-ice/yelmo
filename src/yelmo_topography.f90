@@ -196,7 +196,7 @@ contains
                     
                     ! Store dHdt_corr as dHdt_n now for use with next timestep 
                     tpo%now%dHdt_n = tpo%now%dHdt_corr 
-                    
+
                     ! Diagnose actual mass balance (forcing) tendency
                     call calc_G_mbal(G_mb,tpo%now%H_ice_corr,tpo%now%f_grnd,mbal,dt)
 
@@ -392,6 +392,41 @@ contains
                     call remove_fractional_ice(tpo%now%H_ice,tpo%now%f_ice)
                     call calc_ice_fraction(tpo%now%f_ice,tpo%now%H_ice,bnd%z_bed,bnd%z_sl,tpo%par%margin_flt_subgrid)
                     
+                    ! If desired, finally relax solution to reference state
+                    if (tpo%par%topo_rel .ne. 0) then 
+
+                        select case(trim(tpo%par%topo_rel_field))
+
+                            case("H_ref")
+                                ! Relax towards reference ice thickness field H_ref
+
+                                call relax_ice_thickness(tpo%now%H_ice,tpo%now%f_grnd,tpo%now%mask_grz, &
+                                                    bnd%H_ice_ref,tpo%par%topo_rel,tpo%par%topo_rel_tau,dt)
+                            
+                            case("H_ice_n")
+                                ! Relax towards previous iteration ice thickness 
+                                ! (ie slow down changes)
+                                ! ajr: needs testing, not sure if this works well or helps anything.
+
+                                call relax_ice_thickness(tpo%now%H_ice,tpo%now%f_grnd,tpo%now%mask_grz, &
+                                                    tpo%now%H_ice_n,tpo%par%topo_rel,tpo%par%topo_rel_tau,dt)
+                            
+                            case DEFAULT 
+
+                                write(*,*) "calc_ytopo:: Error: topo_rel_field not recognized."
+                                write(*,*) "topo_rel_field = ", trim(tpo%par%topo_rel_field)
+                                stop 
+
+                        end select
+
+                        ! Again apply ice thickness boundaries to ensure relaxed fields are consistent 
+                        ! with desired limitations. 
+                        call apply_ice_thickness_boundaries(tpo%now%mb_resid,tpo%now%H_ice,tpo%now%f_ice,tpo%now%f_grnd, &
+                                                            dyn%now%uxy_b,bnd%ice_allowed,tpo%par%boundaries,bnd%H_ice_ref, &
+                                                            tpo%par%H_min_flt,tpo%par%H_min_grnd,dt,reset=.FALSE.)
+
+                    end if
+
                     ! Compare previous and current ice field
                     tpo%now%mask_new = 0 
                     where(tpo%now%H_ice .gt. 0.0) tpo%now%mask_new = 1

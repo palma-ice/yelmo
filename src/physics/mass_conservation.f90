@@ -11,7 +11,8 @@ module mass_conservation
 
     private
 
-    public :: calc_G_advec 
+    public :: calc_G_advec_simple
+    public :: calc_G_advec
     public :: calc_G_mbal
     public :: calc_G_calv
 
@@ -23,6 +24,55 @@ module mass_conservation
 
 contains 
     
+    subroutine calc_G_advec_simple(G_advec,H_ice,f_ice,ux,uy, &
+                                            mask_new,solver,dx,dt)
+        ! Interface subroutine to update ice thickness through application
+        ! of advection, vertical mass balance terms and calving 
+
+        implicit none 
+
+        real(wp),         intent(OUT)   :: G_advec(:,:)         ! [m/yr] Tendency due to advection
+        real(wp),         intent(IN)    :: H_ice(:,:)           ! [m]   Ice thickness 
+        real(wp),         intent(IN)    :: f_ice(:,:)           ! [--]  Ice area fraction 
+        real(wp),         intent(IN)    :: ux(:,:)              ! [m/a] Depth-averaged velocity, x-direction (ac-nodes)
+        real(wp),         intent(IN)    :: uy(:,:)              ! [m/a] Depth-averaged velocity, y-direction (ac-nodes)
+        integer,          intent(IN)    :: mask_new(:,:)        ! Mask indicating newly ice-covered points
+        character(len=*), intent(IN)    :: solver               ! Solver to use for the ice thickness advection equation
+        real(wp),         intent(IN)    :: dx                   ! [m]   Horizontal resolution
+        real(wp),         intent(IN)    :: dt                   ! [a]   Timestep 
+
+        ! Local variables 
+        integer :: i, j, nx, ny
+        real(wp), allocatable :: mbal_zero(:,:) 
+        real(wp), allocatable :: ux_tmp(:,:) 
+        real(wp), allocatable :: uy_tmp(:,:) 
+
+        nx = size(H_ice,1)
+        ny = size(H_ice,2)
+
+        allocate(mbal_zero(nx,ny))
+        mbal_zero = 0.0_wp 
+
+        allocate(ux_tmp(nx,ny))
+        allocate(uy_tmp(nx,ny))
+
+        ! Set local velocity fields with no margin treatment intially
+        ux_tmp = ux
+        uy_tmp = uy
+        
+        ! Fill velocity field for new cells 
+        call fill_vel_new_cells(ux_tmp,uy_tmp,mask_new)
+
+        ! Ensure that no velocity is defined for outer boundaries of partially-filled margin points
+        call set_inactive_margins(ux_tmp,uy_tmp,f_ice)
+
+        ! Determine current advective rate of change (time=n)
+        call calc_advec2D(G_advec,H_ice,f_ice,ux_tmp,uy_tmp,mbal_zero,dx,dx,dt,solver)
+
+        return 
+
+    end subroutine calc_G_advec_simple
+
     subroutine calc_G_advec(G_adv,dHdt_n,H_ice_n,H_ice_pred,H_ice,f_ice,ux,uy, &
                         mask_pred_new,mask_corr_new,solver,dx,dt,beta,pc_step)
         ! Interface subroutine to update ice thickness through application

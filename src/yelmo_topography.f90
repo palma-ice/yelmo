@@ -28,7 +28,10 @@ module yelmo_topography
     private
     public :: calc_ytopo
     public :: ytopo_par_load, ytopo_alloc, ytopo_dealloc
-     
+    
+    public :: calc_ytopo_pc 
+    public :: calc_ytopo_masks 
+
     ! Integers
     public :: mask_bed_ocean  
     public :: mask_bed_land  
@@ -40,6 +43,510 @@ module yelmo_topography
     
 contains
     
+    subroutine calc_ytopo_pc(tpo,dyn,mat,thrm,bnd,time,topo_fixed,pc_step)
+
+        implicit none 
+
+        type(ytopo_class),  intent(INOUT) :: tpo
+        type(ydyn_class),   intent(IN)    :: dyn
+        type(ymat_class),   intent(IN)    :: mat
+        type(ytherm_class), intent(IN)    :: thrm  
+        type(ybound_class), intent(IN)    :: bnd 
+        real(wp),           intent(IN)    :: time
+        logical,            intent(IN)    :: topo_fixed  
+        character(len=*),   intent(IN)    :: pc_step 
+
+        ! Local variables 
+        integer  :: i, j, nx, ny
+        real(wp) :: dt  
+        real(wp), allocatable :: mbal(:,:) 
+        real(wp), allocatable :: dHdt_now(:,:) 
+        real(wp), allocatable :: G_mb(:,:) 
+        real(wp), allocatable :: f_ice_now(:,:) 
+        real(wp), allocatable :: calv_sd(:,:) 
+
+        logical, parameter :: use_H_pred = .FALSE. 
+
+        nx = size(tpo%now%H_ice,1)
+        ny = size(tpo%now%H_ice,2)
+
+        allocate(mbal(nx,ny))
+        allocate(dHdt_now(nx,ny))
+        allocate(G_mb(nx,ny))
+        allocate(f_ice_now(nx,ny))
+        allocate(calv_sd(nx,ny))
+        
+        ! Initialize time if necessary 
+        if (tpo%par%time .gt. dble(time)) then 
+            tpo%par%time = dble(time) 
+        end if 
+        
+        ! Get time step
+        dt = dble(time) - tpo%par%time 
+
+        ! Step 0: Get some diagnostic quantities for mass balance calculation --------
+
+        ! Calculate grounded fraction on aa-nodes
+        ! (only to be used with basal mass balance, later all
+        !  f_grnd arrays will be calculated according to use choices)
+        call determine_grounded_fractions(tpo%now%f_grnd_bmb,H_grnd=tpo%now%H_grnd)
+        
+        ! Combine basal mass balance into one field accounting for 
+        ! grounded/floating fraction of grid cells 
+        call calc_bmb_total(tpo%now%bmb,thrm%now%bmb_grnd,bnd%bmb_shlf,tpo%now%H_grnd, &
+                            tpo%now%f_grnd_bmb,tpo%par%bmb_gl_method,tpo%par%diffuse_bmb_shlf)
+        
+        ! Combine frontal mass balance into one field, and 
+        ! calculate as needed 
+        call calc_fmb_total(tpo%now%fmb,bnd%fmb_shlf,bnd%bmb_shlf,tpo%now%H_ice, &
+                        tpo%now%H_grnd,tpo%now%f_ice,tpo%par%fmb_method,tpo%par%fmb_scale,tpo%par%dx)
+
+
+        ! Define temporary variable for total column mass balance (without calving)
+        mbal = bnd%smb + tpo%now%bmb + tpo%now%fmb
+        
+        ! WHEN RUNNING EISMINT1 ensure bmb and fmb are not accounted for here !!!
+        if (.not. tpo%par%use_bmb) then
+            mbal = bnd%smb
+        end if
+
+
+        ! Step 1: Go through predictor-corrector-advance steps
+
+        if ( .not. topo_fixed .and. dt .gt. 0.0 ) then 
+
+            ! Ice thickness evolution from dynamics alone
+
+            select case(trim(pc_step))
+
+                case("predictor") 
+                    ! Determine predicted ice thickness 
+
+                    ! Store ice thickness from previous timestep 
+                    tpo%now%H_ice_n = tpo%now%H_ice 
+
+                    ! Store previous surface elevation too (for calculating rate of change)
+                    tpo%now%z_srf_n = tpo%now%z_srf 
+
+                    call calc_G_advec_simple(dHdt_now,tpo%now%H_ice,tpo%now%f_ice,dyn%now%ux_bar, &
+                                dyn%now%uy_bar,tpo%now%mask_new,tpo%par%solver,tpo%par%dx,dt)
+
+                    ! Calculate rate of change using weighted advective rates of change 
+                    ! depending on timestepping method chosen 
+                    tpo%now%dHdt_pred = tpo%par%dt_beta(1)*dHdt_now + tpo%par%dt_beta(2)*tpo%now%dHdt_n 
+                    
+                    ! Calculate predicted ice thickness
+                    tpo%now%H_ice_pred = tpo%now%H_ice_n + dt*tpo%now%dHdt_pred
+
+                    
+
+                    ! Diagnose actual mass balance (forcing) tendency
+                    call calc_G_mbal(G_mb,tpo%now%H_ice_pred,tpo%now%f_grnd,mbal,dt)
+
+                    ! Store for output too 
+                    tpo%now%mb_applied = G_mb 
+
+                    ! Now update ice thickness with all tendencies for this timestep 
+                    tpo%now%H_ice_pred = tpo%now%H_ice_pred + dt*G_mb  
+
+                    ! Ensure tiny numeric ice thicknesses are removed
+                    where (tpo%now%H_ice_pred .lt. TOL_UNDERFLOW) tpo%now%H_ice_pred = 0.0 
+
+                    
+                    ! Get ice-fraction mask for predicted ice thickness  
+                    call calc_ice_fraction(f_ice_now,tpo%now%H_ice_pred,bnd%z_bed,bnd%z_sl,tpo%par%margin_flt_subgrid)
+                    
+
+                    ! Finally apply all additional (generally artificial) ice thickness adjustments 
+                    ! and store changes in residual mass balance field. 
+                    call apply_ice_thickness_boundaries(tpo%now%mb_resid,tpo%now%H_ice_pred,f_ice_now,tpo%now%f_grnd, &
+                                                        dyn%now%uxy_b,bnd%ice_allowed,tpo%par%boundaries,bnd%H_ice_ref, &
+                                                        tpo%par%H_min_flt,tpo%par%H_min_grnd,dt,reset=.FALSE.)
+                    
+                    ! Also store this ice thickness in main field for 
+                    ! calculation of dynamics 
+                    tpo%now%H_ice = tpo%now%H_ice_pred 
+
+                    ! Get ice-fraction mask for ice thickness  
+                    call calc_ice_fraction(tpo%now%f_ice,tpo%now%H_ice,bnd%z_bed,bnd%z_sl,tpo%par%margin_flt_subgrid)
+                    
+                    ! Compare previous and current ice field
+                    tpo%now%mask_pred_new = 0 
+                    where(tpo%now%H_ice_pred .gt. 0.0) tpo%now%mask_pred_new = 1
+                    where(tpo%now%H_ice_pred .gt. 0.0 .and. tpo%now%H_ice_n .eq. 0.0)
+                        tpo%now%mask_pred_new = 2
+                    end where
+            
+
+                case("corrector")
+                    ! Determine corrected ice thickness 
+
+                    ! Get ice-fraction mask for predicted ice thickness  
+                    call calc_ice_fraction(f_ice_now,tpo%now%H_ice_pred,bnd%z_bed,bnd%z_sl,tpo%par%margin_flt_subgrid)
+            
+                    call calc_G_advec_simple(dHdt_now,tpo%now%H_ice_pred,f_ice_now, &
+                            dyn%now%ux_bar,dyn%now%uy_bar,tpo%now%mask_pred_new,tpo%par%solver,tpo%par%dx,dt)
+
+                    ! Calculate rate of change using weighted advective rates of change 
+                    ! depending on timestepping method chosen 
+                    tpo%now%dHdt_corr = tpo%par%dt_beta(3)*dHdt_now + tpo%par%dt_beta(4)*tpo%now%dHdt_n 
+                    
+                    ! Calculate corrected ice thickness
+                    tpo%now%H_ice_corr = tpo%now%H_ice_n + dt*tpo%now%dHdt_corr
+                    
+                    ! Store dHdt_corr as dHdt_n now for use with next timestep 
+                    tpo%now%dHdt_n = tpo%now%dHdt_corr 
+                    
+                    ! Diagnose actual mass balance (forcing) tendency
+                    call calc_G_mbal(G_mb,tpo%now%H_ice_corr,tpo%now%f_grnd,mbal,dt)
+
+                    ! Store for output too 
+                    tpo%now%mb_applied = G_mb 
+
+                    ! Now update ice thickness with all tendencies for this timestep 
+                    tpo%now%H_ice_corr = tpo%now%H_ice_corr + dt*G_mb  
+
+                    ! Ensure tiny numeric ice thicknesses are removed
+                    where (tpo%now%H_ice_corr .lt. TOL_UNDERFLOW) tpo%now%H_ice_corr = 0.0 
+
+                    
+                    ! Get ice-fraction mask for predicted ice thickness  
+                    call calc_ice_fraction(f_ice_now,tpo%now%H_ice_corr,bnd%z_bed,bnd%z_sl,tpo%par%margin_flt_subgrid)
+                    
+                    
+                    ! Finally apply all additional (generally artificial) ice thickness adjustments 
+                    ! and store changes in residual mass balance field. 
+                    call apply_ice_thickness_boundaries(tpo%now%mb_resid,tpo%now%H_ice_corr,f_ice_now,tpo%now%f_grnd, &
+                                                        dyn%now%uxy_b,bnd%ice_allowed,tpo%par%boundaries,bnd%H_ice_ref, &
+                                                        tpo%par%H_min_flt,tpo%par%H_min_grnd,dt,reset=.FALSE.)
+                    
+                    ! Restore main ice thickness field to original 
+                    ! value at the beginning of the timestep for 
+                    ! calculation of remaining quantities (thermo, material)
+                    tpo%now%H_ice = tpo%now%H_ice_n 
+
+                    ! Get ice-fraction mask for ice thickness  
+                    call calc_ice_fraction(tpo%now%f_ice,tpo%now%H_ice,bnd%z_bed,bnd%z_sl,tpo%par%margin_flt_subgrid)
+                    
+                    ! Compare previous and current ice field
+                    tpo%now%mask_corr_new = 0 
+                    where(tpo%now%H_ice_corr .gt. 0.0) tpo%now%mask_corr_new = 1
+                    where(tpo%now%H_ice_corr .gt. 0.0 .and. tpo%now%H_ice_n .eq. 0.0)
+                        tpo%now%mask_corr_new = 2
+                    end where
+            
+                case("advance")
+                    ! Now let's actually advance the ice thickness field
+
+                    ! Calculate diagnostic quantities
+
+                    ! Determine which ice thickness to use going forward
+                    if (use_H_pred) then 
+                        tpo%now%H_ice = tpo%now%H_ice_pred
+                    else
+                        tpo%now%H_ice = tpo%now%H_ice_corr
+                    end if 
+
+                    ! Get ice-fraction mask for predicted ice thickness  
+                    call calc_ice_fraction(tpo%now%f_ice,tpo%now%H_ice,bnd%z_bed,bnd%z_sl,tpo%par%margin_flt_subgrid)
+                    
+
+                    ! === CALVING ===
+
+                    ! Diagnose strains and stresses relevant to calving 
+
+                    ! eps_eff = effective strain = eigencalving e+*e- following Levermann et al. (2012)
+                    call calc_eps_eff(tpo%now%eps_eff,mat%now%strn2D%eps_eig_1,mat%now%strn2D%eps_eig_2,tpo%now%f_ice)
+
+                    ! tau_eff = effective stress ~ von Mises stress following Lipscomb et al. (2019)
+                    call calc_tau_eff(tpo%now%tau_eff,mat%now%strs2D%tau_eig_1,mat%now%strs2D%tau_eig_2,tpo%now%f_ice,tpo%par%w2)
+
+                    ! For now, mask eps_eff and tau_eff to floating points 
+                    ! for easier visualization. If quantities will be used
+                    ! for grounded ice in the future, then this masking can 
+                    ! be removed. 
+                    where (tpo%now%f_grnd .eq. 1.0_wp) tpo%now%eps_eff = 0.0_wp 
+                    where (tpo%now%f_grnd .eq. 1.0_wp) tpo%now%tau_eff = 0.0_wp 
+                    
+                    select case(trim(tpo%par%calv_flt_method))
+
+                        case("zero","none")
+
+                            tpo%now%calv_flt = 0.0 
+
+                        case("simple") 
+                            ! Use simple threshold method
+
+                            call calc_calving_rate_simple(tpo%now%calv_flt,tpo%now%H_ice,tpo%now%f_ice,tpo%now%f_grnd, &
+                                                            tpo%par%calv_H_lim,tpo%par%calv_tau)
+                            
+                        case("flux") 
+                            ! Use threshold+flux method from Peyaud et al. (2007), ie, GRISLI,
+                            ! but reformulated. 
+
+                            call calc_calving_rate_flux(tpo%now%calv_flt,tpo%now%H_ice,tpo%now%f_ice,tpo%now%f_grnd,mbal, &
+                                                        dyn%now%ux_bar,dyn%now%uy_bar,tpo%par%dx,tpo%par%calv_H_lim,tpo%par%calv_tau)
+                            
+                        case("flux-grisli")
+                            ! Use threshold+flux method from Peyaud et al. (2007), ie, GRISLI
+
+                            call calc_calving_rate_flux_grisli(tpo%now%calv_flt,tpo%now%H_ice,tpo%now%f_ice,tpo%now%f_grnd,mbal, &
+                                                        dyn%now%ux_bar,dyn%now%uy_bar,tpo%par%dx,tpo%par%calv_H_lim,tpo%par%calv_tau)
+                            
+                        case("vm-l19")
+                            ! Use von Mises calving as defined by Lipscomb et al. (2019)
+
+                            ! Next, diagnose calving
+                            call calc_calving_rate_vonmises_l19(tpo%now%calv_flt,tpo%now%H_ice,tpo%now%f_ice,tpo%now%f_grnd, &
+                                                                                        tpo%now%tau_eff,tpo%par%dx,tpo%par%kt)
+                        case("eigen")
+                            ! Use Eigen calving as defined by Levermann et al. (2012)
+
+                            ! Next, diagnose calving
+                            call calc_calving_rate_eigen(tpo%now%calv_flt,tpo%now%H_ice,tpo%now%f_ice,tpo%now%f_grnd, &
+                                                                                        tpo%now%eps_eff,tpo%par%dx,tpo%par%k2)
+
+                        case("kill") 
+                            ! Delete all floating ice (using characteristic time parameter)
+                            ! Make sure dt is a postive number
+
+                            call calc_calving_rate_kill(tpo%now%calv_flt,tpo%now%H_ice,tpo%now%f_grnd.eq.0.0_wp, &
+                                                                                tpo%par%calv_tau,dt)
+
+                        case("kill-pos")
+                            ! Delete all floating ice beyond a given location (using characteristic time parameter)
+
+                            call calc_calving_rate_kill(tpo%now%calv_flt,tpo%now%H_ice, &
+                                                            ( tpo%now%f_grnd .eq. 0.0_wp .and. &
+                                                              tpo%now%H_ice  .gt. 0.0_wp .and. &
+                                                              bnd%calv_mask ), tau=0.0_wp, dt=dt )
+
+                        case DEFAULT 
+
+                            write(*,*) "calc_ytopo:: Error: floating calving method not recognized."
+                            write(*,*) "calv_flt_method = ", trim(tpo%par%calv_flt_method)
+                            stop 
+
+                    end select
+                    
+                    select case(trim(tpo%par%calv_flt_method))
+
+                        case("vm-l19","eigen")
+                            
+                            ! Scale calving with 'thin' calving rate to ensure 
+                            ! small ice thicknesses are removed.
+                            call apply_thin_calving_rate(tpo%now%calv_flt,tpo%now%H_ice,tpo%now%f_ice,tpo%now%f_grnd,tpo%par%calv_thin)
+
+                            ! Adjust calving so that any excess is distributed to upstream neighbors
+                            !call calc_calving_residual(tpo%now%calv_flt,tpo%now%H_ice,tpo%now%f_ice,dt)
+                    
+                    end select 
+
+                    ! Additionally ensure higher calving rate for floating tongues of
+                    ! one grid-point width.
+                    call calc_calving_tongues(tpo%now%calv_flt,tpo%now%H_ice,tpo%now%f_ice,tpo%now%f_grnd,tpo%par%calv_tau)
+                    
+                    ! Diagnose potential grounded-ice calving rate [m/yr]
+
+                    select case(trim(tpo%par%calv_grnd_method))
+
+                        case("zero","none")
+
+                            tpo%now%calv_grnd = 0.0 
+
+                        case("stress-b12") 
+                            ! Use simple threshold method
+
+                            call calc_calving_ground_rate_stress_b12(tpo%now%calv_grnd,tpo%now%H_ice,tpo%now%f_ice, &
+                                                            tpo%now%f_grnd,bnd%z_bed,bnd%z_sl-bnd%z_bed,tpo%par%calv_tau)
+
+                        case DEFAULT 
+
+                            write(*,*) "calc_ytopo:: Error: grounded calving method not recognized."
+                            write(*,*) "calv_grnd_method = ", trim(tpo%par%calv_grnd_method)
+                            stop 
+
+                    end select
+                    
+                    ! Additionally include parameterized grounded calving 
+                    ! to account for grid resolution 
+                    call calc_calving_ground_rate_stdev(calv_sd,tpo%now%H_ice,tpo%now%f_ice,tpo%now%f_grnd, &
+                                                    bnd%z_bed_sd,tpo%par%sd_min,tpo%par%sd_max,tpo%par%calv_max,tpo%par%calv_tau)
+                    tpo%now%calv_grnd = tpo%now%calv_grnd + calv_sd 
+
+
+                    ! Diagnose actual calving (forcing) tendency
+                    call calc_G_calv(tpo%now%calv,tpo%now%H_ice,tpo%now%calv_flt,tpo%now%calv_grnd,dt, &
+                                                        tpo%par%pc_step,trim(tpo%par%calv_flt_method))
+
+                    ! Now update ice thickness with all tendencies for this timestep 
+                    tpo%now%H_ice = tpo%now%H_ice - dt*tpo%now%calv  
+
+                    ! Ensure tiny numeric ice thicknesses are removed
+                    where (tpo%now%H_ice .lt. TOL_UNDERFLOW) tpo%now%H_ice = 0.0 
+
+                    ! Update ice fraction mask 
+                    call calc_ice_fraction(tpo%now%f_ice,tpo%now%H_ice,bnd%z_bed,bnd%z_sl,tpo%par%margin_flt_subgrid)
+                
+                    ! Treat fractional points that are not connected to full ice-covered points
+                    call remove_fractional_ice(tpo%now%H_ice,tpo%now%f_ice)
+                    call calc_ice_fraction(tpo%now%f_ice,tpo%now%H_ice,bnd%z_bed,bnd%z_sl,tpo%par%margin_flt_subgrid)
+                    
+                    ! Compare previous and current ice field
+                    tpo%now%mask_new = 0 
+                    where(tpo%now%H_ice .gt. 0.0) tpo%now%mask_new = 1
+                    where(tpo%now%H_ice .gt. 0.0 .and. tpo%now%H_ice_n .eq. 0.0)
+                        tpo%now%mask_new = 2
+                    end where
+            
+                    ! Update ytopo time to current time 
+                    tpo%par%time = dble(time)
+
+            end select
+
+        end if 
+
+        ! Calculate the surface elevation
+        call calc_z_srf_max(tpo%now%z_srf,tpo%now%H_ice,tpo%now%f_ice,bnd%z_bed,bnd%z_sl)
+        
+        ! Determine rates of change
+        if ( .not. topo_fixed .and. dt .gt. 0.0 ) then 
+
+            tpo%now%dHicedt = (tpo%now%H_ice - tpo%now%H_ice_n) / dt 
+            tpo%now%dzsrfdt = (tpo%now%z_srf-tpo%now%z_srf_n) / dt 
+        
+        end if 
+
+        return
+
+    end subroutine calc_ytopo_pc
+
+    subroutine calc_ytopo_masks(tpo,dyn,mat,thrm,bnd)
+        ! Calculate adjustments to surface elevation, bedrock elevation
+        ! and ice thickness 
+
+        implicit none 
+
+        type(ytopo_class),  intent(INOUT) :: tpo
+        type(ydyn_class),   intent(IN)    :: dyn
+        type(ymat_class),   intent(IN)    :: mat
+        type(ytherm_class), intent(IN)    :: thrm  
+        type(ybound_class), intent(IN)    :: bnd 
+
+        ! Final update of ice fraction mask (or define it now for fixed topography)
+        call calc_ice_fraction(tpo%now%f_ice,tpo%now%H_ice,bnd%z_bed,bnd%z_sl,tpo%par%margin_flt_subgrid)
+        
+        ! Calculate grounding overburden ice thickness 
+        call calc_H_grnd(tpo%now%H_grnd,tpo%now%H_ice,tpo%now%f_ice,bnd%z_bed,bnd%z_sl)
+
+        ! 2. Calculate additional topographic properties ------------------
+
+        ! Calculate the ice thickness gradient (on staggered acx/y nodes)
+        !call calc_gradient_ac(tpo%now%dHicedx,tpo%now%dHicedy,tpo%now%H_ice,tpo%par%dx)
+        ! call calc_gradient_ac_ice(tpo%now%dHicedx,tpo%now%dHicedy,tpo%now%H_ice,tpo%now%f_ice,tpo%par%dx, &
+        !                                         tpo%par%margin2nd,tpo%par%grad_lim,tpo%par%boundaries,zero_outside=.TRUE.)
+        
+        ! Calculate the surface slope
+        ! call calc_gradient_ac(tpo%now%dzsdx,tpo%now%dzsdy,tpo%now%z_srf,tpo%par%dx)
+
+
+        ! New routines 
+        call map_a_to_b_2D(tpo%now%H_ice_ab,tpo%now%H_ice)
+
+        call ddx_a_to_cx_2D(tpo%now%dHicedx,tpo%now%H_ice,tpo%par%dx)
+        call ddy_a_to_cy_2D(tpo%now%dHicedy,tpo%now%H_ice,tpo%par%dx)
+        
+        call ddx_a_to_cx_2D(tpo%now%dzsdx,tpo%now%z_srf,tpo%par%dx)
+        call ddy_a_to_cy_2D(tpo%now%dzsdy,tpo%now%z_srf,tpo%par%dx)
+        
+        ! ajr: experimental, doesn't seem to work properly yet! ===>
+        ! Modify surface slope gradient at the grounding line if desired 
+!         call calc_gradient_ac_gl(tpo%now%dzsdx,tpo%now%dzsdy,tpo%now%z_srf,tpo%now%H_ice, &
+!                                       tpo%now%f_grnd_acx,tpo%now%f_grnd_acy,tpo%par%dx,method=2,grad_lim=tpo%par%grad_lim)
+        
+        ! 3. Calculate new masks ------------------------------
+
+        ! Calculate the grounded fraction and grounding line mask of each grid cell
+        select case(tpo%par%gl_sep)
+
+            case(1) 
+                ! Binary f_grnd, linear f_grnd_acx/acy based on H_grnd
+
+                call calc_f_grnd_subgrid_linear(tpo%now%f_grnd,tpo%now%f_grnd_acx,tpo%now%f_grnd_acy,tpo%now%H_grnd)
+
+            case(2)
+                ! Grounded area f_grnd, average to f_grnd_acx/acy 
+
+                call calc_f_grnd_subgrid_area(tpo%now%f_grnd,tpo%now%f_grnd_acx,tpo%now%f_grnd_acy, &
+                                                                            tpo%now%H_grnd,tpo%par%gl_sep_nx)
+            
+            case(3) 
+                ! Grounded area using analytical solutions of Leguy et al. (2021)
+
+                call determine_grounded_fractions(tpo%now%f_grnd,tpo%now%f_grnd_acx,tpo%now%f_grnd_acy, &
+                                                                            tpo%now%f_grnd_ab,tpo%now%H_grnd)
+
+        end select
+        
+        ! Calculate grounded fraction due to pinning points 
+        call calc_f_grnd_pinning_points(tpo%now%f_grnd_pin,tpo%now%H_ice,tpo%now%f_ice, &
+                                                            bnd%z_bed,bnd%z_bed_sd,bnd%z_sl)
+
+        ! Calculate the grounding-line distance
+        call calc_distance_to_grounding_line(tpo%now%dist_grline,tpo%now%f_grnd,tpo%par%dx)
+
+        ! Define the grounding-zone mask too 
+        call calc_grounding_line_zone(tpo%now%mask_grz,tpo%now%dist_grline,tpo%par%dist_grz)
+
+        ! ajr: do not calculate distance to margin unless it is needed (costs some computational time)
+        ! Calculate distance to the ice margin
+        !call calc_distance_to_ice_margin(tpo%now%dist_margin,tpo%now%f_ice,tpo%par%dx)
+
+        ! Calculate the general bed mask
+        call gen_mask_bed(tpo%now%mask_bed,tpo%now%f_ice,thrm%now%f_pmp, &
+                                            tpo%now%f_grnd,tpo%now%mask_grz)
+
+
+        ! Determine ice thickness for use exclusively with the dynamics solver
+        select case(trim(dyn%par%ssa_lat_bc))
+
+            case("slab")
+                ! Calculate extended ice thickness fields over whole domain
+                ! for use with dynamics solver.
+                ! Note: should not be used with MISMIP, TROUGH, etc. 
+
+                tpo%now%H_ice_dyn = tpo%now%H_ice
+                where (tpo%now%f_ice .lt. 1.0) tpo%now%H_ice_dyn = 1.0_wp
+                
+                ! Calculate the ice fraction mask for use with the dynamics solver
+                call calc_ice_fraction(tpo%now%f_ice_dyn,tpo%now%H_ice_dyn,bnd%z_bed,bnd%z_sl,flt_subgrid=.FALSE.)
+            
+            case("slab-ext")
+                ! Calculate extended ice thickness fields n_ext points
+                ! away from grounded margin. 
+
+                tpo%now%H_ice_dyn = tpo%now%H_ice
+                where(tpo%now%H_ice_dyn .gt. 0.0 .and. tpo%now%H_ice_dyn .lt. 1.0) &
+                        tpo%now%H_ice_dyn = 1.0_wp 
+
+                call extend_floating_slab(tpo%now%H_ice_dyn,tpo%now%f_grnd,H_slab=1.0_wp,n_ext=4)
+
+                ! Calculate the ice fraction mask for use with the dynamics solver
+                call calc_ice_fraction(tpo%now%f_ice_dyn,tpo%now%H_ice_dyn,bnd%z_bed,bnd%z_sl,flt_subgrid=.FALSE.)
+                
+            case DEFAULT 
+                ! No modification of ice thickness for dynamics solver 
+                ! Set standard ice thickness field for use with dynamics 
+            
+                tpo%now%H_ice_dyn = tpo%now%H_ice
+                tpo%now%f_ice_dyn = tpo%now%f_ice 
+
+        end select
+
+        return 
+
+    end subroutine calc_ytopo_masks
+
     subroutine calc_ytopo(tpo,dyn,mat,thrm,bnd,time,topo_fixed)
         ! Calculate adjustments to surface elevation, bedrock elevation
         ! and ice thickness 
@@ -1277,6 +1784,7 @@ end if
         
         allocate(now%G_advec(nx,ny))
         
+        allocate(now%mask_new(nx,ny))
         allocate(now%mask_pred_new(nx,ny))
         allocate(now%mask_corr_new(nx,ny))
         
@@ -1316,6 +1824,8 @@ end if
         allocate(now%mask_grz(nx,ny))
 
         allocate(now%dHdt_n(nx,ny))
+        allocate(now%dHdt_pred(nx,ny))
+        allocate(now%dHdt_corr(nx,ny))
         allocate(now%H_ice_n(nx,ny))
         allocate(now%H_ice_pred(nx,ny))
         allocate(now%H_ice_corr(nx,ny))
@@ -1336,6 +1846,7 @@ end if
 
         now%G_advec     = 0.0
 
+        now%mask_new      = 0 
         now%mask_pred_new = 0 
         now%mask_corr_new = 0 
 
@@ -1366,6 +1877,8 @@ end if
         now%mask_bed    = 0.0 
         now%mask_grz    = 0.0 
         now%dHdt_n      = 0.0  
+        now%dHdt_pred   = 0.0
+        now%dHdt_corr   = 0.0
         now%H_ice_n     = 0.0 
         now%H_ice_pred  = 0.0 
         now%H_ice_corr  = 0.0 
@@ -1397,6 +1910,7 @@ end if
         
         if (allocated(now%G_advec))     deallocate(now%G_advec)
         
+        if (allocated(now%mask_new))      deallocate(now%mask_new)
         if (allocated(now%mask_pred_new)) deallocate(now%mask_pred_new)
         if (allocated(now%mask_corr_new)) deallocate(now%mask_corr_new)
         
@@ -1432,6 +1946,8 @@ end if
         if (allocated(now%mask_grz))    deallocate(now%mask_grz)
         
         if (allocated(now%dHdt_n))      deallocate(now%dHdt_n)
+        if (allocated(now%dHdt_pred))   deallocate(now%dHdt_pred)
+        if (allocated(now%dHdt_corr))   deallocate(now%dHdt_corr)
         if (allocated(now%H_ice_n))     deallocate(now%H_ice_n)
         if (allocated(now%H_ice_pred))  deallocate(now%H_ice_pred)
         if (allocated(now%H_ice_corr))  deallocate(now%H_ice_corr)

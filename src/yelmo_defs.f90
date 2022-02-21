@@ -154,6 +154,7 @@ module yelmo_defs
         
         real(wp), allocatable   :: G_advec(:,:)     ! [m/yr] Ice thickness tendency due to advection
 
+        integer,  allocatable   :: mask_new(:,:) 
         integer,  allocatable   :: mask_pred_new(:,:) 
         integer,  allocatable   :: mask_corr_new(:,:) 
         
@@ -191,6 +192,8 @@ module yelmo_defs
         integer,    allocatable :: mask_grz(:,:)    ! Multi-valued mask for the grounding-line zone
 
         real(wp), allocatable   :: dHdt_n(:,:)      ! [m/a] Ice thickness change due to advection only
+        real(wp), allocatable   :: dHdt_pred(:,:)   ! [m/a] Ice thickness change due to advection only
+        real(wp), allocatable   :: dHdt_corr(:,:)   ! [m/a] Ice thickness change due to advection only
         real(wp), allocatable   :: H_ice_n(:,:)     ! [m] Ice thickness from the previous timestep 
         real(wp), allocatable   :: H_ice_pred(:,:)  ! [m] Ice thickness, predicted, for time=n+1
         real(wp), allocatable   :: H_ice_corr(:,:)  ! [m] Ice thickness, corrected, for time=n+1 

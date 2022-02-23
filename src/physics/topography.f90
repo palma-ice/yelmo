@@ -7,9 +7,10 @@ module topography
     private  
 
     public :: extend_floating_slab
+    public :: remove_fractional_ice
     
     public :: calc_ice_fraction
-    public :: remove_fractional_ice
+
     public :: calc_z_srf
     public :: calc_z_srf_max
     public :: calc_z_srf_gl_subgrid_area
@@ -118,158 +119,6 @@ contains
 
     end subroutine extend_floating_slab
 
-    subroutine calc_ice_fraction(f_ice,H_ice,z_bed,z_sl,flt_subgrid)
-        ! Determine the area fraction of a grid cell
-        ! that is ice-covered. Assume that marginal points
-        ! have equal thickness to inland neighbors 
-
-        implicit none 
-
-        real(wp), intent(OUT) :: f_ice(:,:)             ! [--] Ice covered fraction (aa-nodes)
-        real(wp), intent(IN)  :: H_ice(:,:)             ! [m] Ice thickness on standard grid (aa-nodes)
-        real(wp), intent(IN)  :: z_bed(:,:)             ! [m] Bedrock elevation
-        real(wp), intent(IN)  :: z_sl(:,:)              ! [m] Sea-level elevation
-        logical, optional     :: flt_subgrid            ! Option to allow fractions for floating ice margins             
-        
-        ! Local variables 
-        integer  :: i, j, nx, ny
-        integer  :: im1, ip1, jm1, jp1 
-        real(wp) :: H_eff  
-        logical  :: get_fractional_cover 
-
-        real(wp) :: H_neighb(4)
-        logical  :: float_neighb(4)
-        integer  :: n_neighb(4)
-        logical  :: mask(4) 
-        logical  :: mask_grnd(4)
-        integer  :: n_now
-        integer, allocatable  :: n_ice(:,:) 
-        real(wp), allocatable :: H_grnd(:,:)            ! [m] Thickness until flotation - floating if H_grnd<=0 (aa-nodes)
-        
-        real(wp), parameter :: f_ice_island = 1.0_wp 
-        real(wp), parameter :: H_lim        = 100.0_wp 
-
-        nx = size(H_ice,1)
-        ny = size(H_ice,2)
-
-        allocate(n_ice(nx,ny))
-        allocate(H_grnd(nx,ny))
-
-        n_ice  = 0
-
-        ! By default, fractional cover will be determined
-        get_fractional_cover = .TRUE. 
-        if (present(flt_subgrid)) get_fractional_cover = flt_subgrid 
-
-        if (get_fractional_cover) then 
-            ! Calculate H_grnd, without accounting for fractional ice cover
-            call calc_H_grnd(H_grnd,H_ice,f_ice,z_bed,z_sl,use_f_ice=.FALSE.)
-        end if 
-
-        ! For ice-covered points with ice-free neighbors (ie, at the floating or grounded margin),
-        ! determine the fraction of grid point that should be ice covered. 
-
-        do j = 1, ny
-        do i = 1, nx 
-
-            ! Get neighbor indices
-            im1 = max(i-1,1) 
-            ip1 = min(i+1,nx) 
-            jm1 = max(j-1,1) 
-            jp1 = min(j+1,ny) 
-            
-            ! Initially set any point with ice to f_ice=1
-            if (H_ice(i,j) .gt. 0.0) then 
-                f_ice(i,j) = 1.0 
-            else 
-                f_ice(i,j) = 0.0 
-            end if 
-                 
-            if (get_fractional_cover) then
-
-                ! Count how many neighbors are ice covered  
-                H_neighb   = [H_ice(im1,j),H_ice(ip1,j),H_ice(i,jm1),H_ice(i,jp1)]
-                mask       = H_neighb .gt. 0.0_wp 
-                n_ice(i,j) = count(mask) 
-
-            end if
-
-        end do 
-        end do
-
-        if (get_fractional_cover) then 
-            ! Determine ice fractional cover for margin points 
-
-            do j = 1, ny
-            do i = 1, nx 
-
-                ! Get neighbor indices
-                im1 = max(i-1,1) 
-                ip1 = min(i+1,nx) 
-                jm1 = max(j-1,1) 
-                jp1 = min(j+1,ny) 
-                
-                if (H_ice(i,j) .gt. 0.0_wp .and. n_ice(i,j) .eq. 0) then 
-                    ! First, treat a special case:
-                    ! Island point, assume the cell is fully covered to ensure it
-                    ! is dynamically active.
-
-                    f_ice(i,j) = f_ice_island
-
-                else if (H_ice(i,j) .gt. 0.0_wp .and. n_ice(i,j) .lt. 4) then
-                    ! This point is ice-covered, but is at the ice margin 
-
-                    ! Get neighbor ice thicknesses and border-ice counts
-                    H_neighb = [H_ice(im1,j),H_ice(ip1,j),H_ice(i,jm1),H_ice(i,jp1)]
-                    n_neighb = [n_ice(im1,j),n_ice(ip1,j),n_ice(i,jm1),n_ice(i,jp1)]
-                    
-                    ! Get mask indicating neighbors that both have ice and are surrounded by ice
-                    mask     = H_neighb .gt. 0.0_wp .and. n_neighb .eq. 4
-                    n_now    = count(mask)
-
-                    if (H_grnd(i,j) .le. 0.0) then 
-                        ! Floating point 
-
-                        if (n_now .gt. 0) then 
-                            H_eff = minval(H_neighb,mask=mask)
-                        else 
-                            H_eff = max(H_ice(i,j),H_lim)
-                        end if
-
-                    else 
-                        ! Grounded point, set H_eff = H_ice following CISM
-                        ! (do not allow partially filled cells for grounded ice)
-
-                        H_eff = H_ice(i,j) 
-
-                    end if
-                
-                    ! Determine the cell ice fraction
-                    ! Note: fraction is determined as a ratio of 
-                    ! thicknesses, derived from volume conservation 
-                    ! vol = H_ice*dx*dy = H_eff*area_frac 
-                    ! f_ice = area_frac / (dx*dy)
-                    ! f_ice = H_ice/H_eff 
-                    ! Note: H_eff == 0.0 probably won't happen, but keep if-statement 
-                    ! for safety 
-
-                    if (H_eff .gt. 0.0_wp) then 
-                        f_ice(i,j) = min( H_ice(i,j) / H_eff, 1.0_wp ) 
-                    else 
-                        f_ice(i,j) = 1.0_wp 
-                    end if 
-                
-                end if 
-
-            end do 
-            end do 
-
-        end if 
-
-        return 
-
-    end subroutine calc_ice_fraction
-    
     subroutine remove_fractional_ice(H_ice,f_ice)
         ! Eliminate fractional ice covered points that only 
         ! have fractional ice neighbors. 
@@ -324,7 +173,7 @@ contains
 
     end subroutine remove_fractional_ice
 
-    subroutine calc_ice_fraction_0(f_ice,H_ice,z_bed,z_sl,flt_subgrid)
+    subroutine calc_ice_fraction(f_ice,H_ice,z_bed,z_sl,flt_subgrid)
         ! Determine the area fraction of a grid cell
         ! that is ice-covered. Assume that marginal points
         ! have equal thickness to inland neighbors 
@@ -344,24 +193,16 @@ contains
         logical  :: get_fractional_cover 
 
         real(wp) :: H_neighb(4)
-        logical  :: float_neighb(4)
-        integer  :: n_neighb(4)
+        logical  :: cf_neighb(4) 
         logical  :: mask(4) 
-        logical  :: mask_grnd(4)
-        integer  :: n_now
-        integer, allocatable  :: n_ice(:,:) 
         real(wp), allocatable :: H_grnd(:,:)            ! [m] Thickness until flotation - floating if H_grnd<=0 (aa-nodes)
-        
-        real(wp), parameter :: f_ice_island = 1.0_wp 
-        real(wp), parameter :: H_lim        = 100.0_wp 
-
+        logical, allocatable :: mask_cf(:,:) 
+                
         nx = size(H_ice,1)
         ny = size(H_ice,2)
 
-        allocate(n_ice(nx,ny))
         allocate(H_grnd(nx,ny))
-
-        n_ice  = 0
+        allocate(mask_cf(nx,ny)) 
 
         ! By default, fractional cover will be determined
         get_fractional_cover = .TRUE. 
@@ -372,11 +213,24 @@ contains
             call calc_H_grnd(H_grnd,H_ice,f_ice,z_bed,z_sl,use_f_ice=.FALSE.)
         end if 
 
-        ! For ice-covered points with ice-free neighbors (ie, at the floating or grounded margin),
-        ! determine the fraction of grid point that should be ice covered. 
+        ! Initialize mask_cf to False 
+        mask_cf = .FALSE. 
 
-        do j = 1, ny
-        do i = 1, nx 
+        ! Initialize f_ice to binary values first 
+        where(H_ice .gt. 0.0_wp)
+            f_ice = 1.0_wp 
+        elsewhere
+            f_ice = 0.0_wp 
+        end where
+
+        if (get_fractional_cover) then 
+            ! For floating ice-covered points with ice-free neighbors (ie, at the floating calving margin),
+            ! determine the fraction of grid point that should be ice covered. 
+
+            ! First determine which points are at the floating calving front.
+
+            do j = 1, ny
+            do i = 1, nx 
 
             ! Get neighbor indices
             im1 = max(i-1,1) 
@@ -384,205 +238,84 @@ contains
             jm1 = max(j-1,1) 
             jp1 = min(j+1,ny) 
             
-            ! Initially set any point with ice to f_ice=1
-            if (H_ice(i,j) .gt. 0.0) then 
-                f_ice(i,j) = 1.0 
-            else 
-                f_ice(i,j) = 0.0 
-            end if 
-                 
-            if (get_fractional_cover) then
+                ! Determine calving front mask 
+                if (H_ice(i,j) .gt. 0.0 .and. H_grnd(i,j) .lt. 0.0) then 
+                    ! Current point is floating 
 
-                ! Count how many neighbors are ice covered  
-                H_neighb   = [H_ice(im1,j),H_ice(ip1,j),H_ice(i,jm1),H_ice(i,jp1)]
-                mask       = H_neighb .gt. 0.0_wp 
-                n_ice(i,j) = count(mask) 
-
-            end if
-
-        end do 
-        end do
-
-        if (get_fractional_cover) then 
-            ! Determine ice fractional cover for margin points 
-
-            do j = 1, ny
-            do i = 1, nx 
-
-                ! Get neighbor indices
-                im1 = max(i-1,1) 
-                ip1 = min(i+1,nx) 
-                jm1 = max(j-1,1) 
-                jp1 = min(j+1,ny) 
-                
-                if (H_ice(i,j) .gt. 0.0_wp .and. n_ice(i,j) .eq. 0) then 
-                    ! First, treat a special case:
-                    ! Island point, assume the cell is fully covered to ensure it
-                    ! is dynamically active.
-
-                    f_ice(i,j) = f_ice_island
-
-                else if (H_ice(i,j) .gt. 0.0_wp .and. n_ice(i,j) .lt. 4) then
-                    ! This point is ice-covered, but is at the ice margin 
-
-                    ! Get neighbor ice thicknesses and border-ice counts
-                    H_neighb = [H_ice(im1,j),H_ice(ip1,j),H_ice(i,jm1),H_ice(i,jp1)]
-                    n_neighb = [n_ice(im1,j),n_ice(ip1,j),n_ice(i,jm1),n_ice(i,jp1)]
-                    
-                    ! Get mask indicating neighbors that both have ice and are surrounded by ice
-                    mask     = H_neighb .gt. 0.0_wp .and. n_neighb .eq. 4
-                    n_now    = count(mask)
-
-                    if (n_now .ge. 1) then 
-                        ! Some neighbors have full ice coverage
-
-                        float_neighb = [H_grnd(im1,j),H_grnd(ip1,j),H_grnd(i,jm1),H_grnd(i,jp1)] .le. 0.0
-                        mask_grnd    = (.not. float_neighb) .and. H_neighb .gt. 0.0 
-
-                        ! Determine height to give to potentially partially filled cell
-                        !if (H_grnd(i,j) .le. 0.0 .and. count(mask_grnd) .eq. 0) then 
-                        !    ! Floating point away from grounding line, set H_eff = minimum of neighbors
-                        if (H_grnd(i,j) .le. 0.0) then 
-                            ! Floating point 
-
-                            H_eff = minval(H_neighb,mask=mask)
-
-                        else 
-                            ! Grounded point, set H_eff = H_ice following CISM
-                            ! (do not allow partially filled cells for grounded ice)
-
-                            H_eff = H_ice(i,j) 
-
-                        end if
-                    
-                        ! Determine the cell ice fraction
-                        ! Note: fraction is determined as a ratio of 
-                        ! thicknesses, derived from volume conservation 
-                        ! vol = H_ice*dx*dy = H_eff*area_frac 
-                        ! f_ice = area_frac / (dx*dy)
-                        ! f_ice = H_ice/H_eff 
-                        ! Note: H_eff == 0.0 probably won't happen, but keep if-statement 
-                        ! for safety 
-
-                        if (H_eff .gt. 0.0_wp) then 
-                            f_ice(i,j) = min( H_ice(i,j) / H_eff, 1.0_wp ) 
-                        else 
-                            f_ice(i,j) = 1.0_wp 
-                        end if 
-
-                    else 
-                        ! No neighbors have full ice coverage, 
-                        ! set point to negative value for now to correct later.
-
-                        ! f_ice(i,j) = -1.0_wp
-
-                        ! Determine height to give to potentially partially filled cell
-                        !if (H_grnd(i,j) .le. 0.0 .and. count(mask_grnd) .eq. 0) then 
-                        !    ! Floating point away from grounding line, set H_eff = minimum of neighbors
-                        if (H_grnd(i,j) .le. 0.0) then 
-                            ! Floating point 
-
-                            H_eff = max(H_ice(i,j),H_lim)
-
-                        else 
-                            ! Grounded point, set H_eff = H_ice following CISM
-                            ! (do not allow partially filled cells for grounded ice)
-
-                            H_eff = H_ice(i,j) 
-
-                        end if
-                    
-                        ! Determine the cell ice fraction
-                        ! Note: fraction is determined as a ratio of 
-                        ! thicknesses, derived from volume conservation 
-                        ! vol = H_ice*dx*dy = H_eff*area_frac 
-                        ! f_ice = area_frac / (dx*dy)
-                        ! f_ice = H_ice/H_eff 
-                        ! Note: H_eff == 0.0 probably won't happen, but keep if-statement 
-                        ! for safety 
-
-                        if (H_eff .gt. 0.0_wp) then 
-                            f_ice(i,j) = min( H_ice(i,j) / H_eff, 1.0_wp ) 
-                        else 
-                            f_ice(i,j) = 1.0_wp 
-                        end if 
-
-                    end if 
-
-                end if 
-
-            end do 
-            end do 
-
-if (.FALSE.) then 
-            ! Treat special cases where f_ice = -1.0
-            do j = 1, ny
-            do i = 1, nx 
-
-                ! Get neighbor indices
-                im1 = max(i-1,1) 
-                ip1 = min(i+1,nx) 
-                jm1 = max(j-1,1) 
-                jp1 = min(j+1,ny) 
-                
-                if (f_ice(i,j) .eq. -1.0_wp) then 
-                    ! This point is probably at the corner of an ice sheet, 
-                    ! so it was not possible to define H_eff well. 
-                    ! This should now be done from available neighbors.
-
-                    mask     = [H_ice(im1,j),H_ice(ip1,j),H_ice(i,jm1),H_ice(i,jp1)] .gt.  0.0_wp .and. &
-                               [f_ice(im1,j),f_ice(ip1,j),f_ice(i,jm1),f_ice(i,jp1)] .ne. -1.0_wp
-                    n_now    = count(mask)
-
-                    if (n_now .ge. 1) then 
-                        ! Some neighbors exist 
-
-                        ! Get H_eff of the neighbors 
-                        H_neighb = 0.0_wp
-                        where(mask) H_neighb = [H_ice(im1,j),H_ice(ip1,j),H_ice(i,jm1),H_ice(i,jp1)] &
-                                            / [f_ice(im1,j),f_ice(ip1,j),f_ice(i,jm1),f_ice(i,jp1)]
-                        
-                        if (H_grnd(i,j) .le. 0.0) then 
-                            ! Floating point, set H_eff = minimum of neighbors
-
-                            H_eff = minval(H_neighb,mask=mask)
-
-                        else 
-                            ! Grounded point, set H_eff < H_min arbitrarily (0.5 works well)
-
-                            ! ajr: following CISM, do not allow partially filled cells
-                            ! for grounded ice 
-                            H_eff = H_ice(i,j) 
-
-                            ! Alternative approach:
-                            ! H_eff = 0.5*minval(H_neighb,mask=mask)
-
-                        end if
-                        
-                        if (H_eff .gt. 0.0_wp) then 
-                            f_ice(i,j) = min( H_ice(i,j) / H_eff, 1.0_wp ) 
-                        else 
-                            f_ice(i,j) = 1.0_wp 
-                        end if 
-
-                    else 
-
-                        write(*,*) "calc_ice_fraction_0:: -1!", i, j 
-
-                    end if 
+                    ! If any neighbor is ice-free ocean (ie, is grounded below sea level),
+                    ! then this point is a calving front point.
+                    mask_cf(i,j) = .FALSE. 
+                    if (H_ice(im1,j) .eq. 0.0 .and. H_grnd(im1,j) .lt. 0.0) mask_cf(i,j) = .TRUE.
+                    if (H_ice(ip1,j) .eq. 0.0 .and. H_grnd(ip1,j) .lt. 0.0) mask_cf(i,j) = .TRUE.
+                    if (H_ice(i,jm1) .eq. 0.0 .and. H_grnd(i,jm1) .lt. 0.0) mask_cf(i,j) = .TRUE.
+                    if (H_ice(i,jp1) .eq. 0.0 .and. H_grnd(i,jp1) .lt. 0.0) mask_cf(i,j) = .TRUE.
 
                 end if 
 
             end do 
             end do
-end if 
 
+            ! Next calculate the effective ice thickness of points at the 
+            ! calving front and determine f_ice. 
+
+            do j = 1, ny
+            do i = 1, nx 
+
+                ! Get neighbor indices
+                im1 = max(i-1,1) 
+                ip1 = min(i+1,nx) 
+                jm1 = max(j-1,1) 
+                jp1 = min(j+1,ny) 
+                
+                if (mask_cf(i,j)) then 
+                    ! This is a calving front point 
+
+                    H_neighb  = [H_ice(im1,j),H_ice(ip1,j),H_ice(i,jm1),H_ice(i,jp1)]
+                    cf_neighb = [mask_cf(im1,j),mask_cf(ip1,j),mask_cf(i,jm1),mask_cf(i,jp1)]
+                    
+                    ! Get a mask of available ice-covered neighbors that are not
+                    ! at the calving front. 
+                    mask = H_neighb .gt. 0.0 .and. (.not. cf_neighb)
+                    
+                    if ( count(mask) .eq. 0 ) then 
+                        ! This point does not have any upstream ice-covered neighbors,
+                        ! simply assign a fraction of 1.0.
+
+                        f_ice(i,j) = 1.0_wp 
+
+                    else
+                        ! This point does have upstream ice-covered neighbors,
+                        ! determine fraction.
+
+                        H_eff = minval(H_neighb,mask=mask)
+
+                        ! If thickest upstream ice is thinner than current
+                        ! point, then set effective ice thickness equal
+                        ! to that of current point. This ensures
+                        ! f_ice below will be bounded 0 < f_ice <= 1
+                        if (H_eff .lt. H_ice(i,j)) H_eff = H_ice(i,j) 
+
+                        ! Determine the cell ice fraction
+                        ! Note: fraction is determined as a ratio of 
+                        ! thicknesses, derived from volume conservation 
+                        ! vol = H_ice*dx*dy = H_eff*area_frac 
+                        ! f_ice = area_frac / (dx*dy)
+                        ! f_ice = H_ice/H_eff 
+                        
+                        f_ice(i,j) = H_ice(i,j) / H_eff
+                        
+                    end if 
+
+                end if 
+
+            end do 
+            end do 
 
         end if 
 
         return 
 
-    end subroutine calc_ice_fraction_0
+    end subroutine calc_ice_fraction
     
     elemental subroutine calc_z_srf(z_srf,H_ice,f_ice,H_grnd,z_bed,z_sl)
         ! Calculate surface elevation

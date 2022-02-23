@@ -335,7 +335,7 @@ end if
         real(wp) :: wt_ab(4)
         real(wp) :: wt
 
-        real(wp), parameter :: visc_min = 1e4_wp        ! Just for safety 
+        real(wp), parameter :: visc_min = 1e5_wp        ! Just for safety 
 
         nx = size(visc_eff,1)
         ny = size(visc_eff,2)
@@ -479,7 +479,7 @@ end if
         real(wp) :: duxdz_aa, duydz_aa
         real(wp) :: eps_sq_aa, ATT_aa
         
-        real(wp), parameter :: visc_min = 1e4_wp        ! Just for safety 
+        real(wp), parameter :: visc_min = 1e5_wp        ! Just for safety 
 
         nx = size(visc_eff,1)
         ny = size(visc_eff,2)

@@ -178,6 +178,9 @@ contains
         ! that is ice-covered. Assume that marginal points
         ! have equal thickness to inland neighbors 
 
+        ! Note: routine works well, but apparently not as stable as routine below
+        ! for GRL-16KM initmip tests. Reasons are not really clear (ajr, 2022-02-24)
+
         implicit none 
 
         real(wp), intent(OUT) :: f_ice(:,:)             ! [--] Ice covered fraction (aa-nodes)
@@ -346,7 +349,6 @@ contains
         integer, allocatable  :: n_ice(:,:) 
         real(wp), allocatable :: H_grnd(:,:)            ! [m] Thickness until flotation - floating if H_grnd<=0 (aa-nodes)
         
-        real(wp), parameter :: f_ice_island = 1.0_wp 
         real(wp), parameter :: H_lim        = 100.0_wp 
 
         nx = size(H_ice,1)
@@ -389,7 +391,9 @@ contains
                 mask       = H_neighb .gt. 0.0_wp 
                 n_ice(i,j) = count(mask) 
 
-                ! ! Count how many neighbors are ice covered and floating
+                ! ajr: test.
+                ! Count how many neighbors are ice covered and floating
+                ! This appears to perform worse.
                 ! H_neighb   = [H_ice(im1,j),H_ice(ip1,j),H_ice(i,jm1),H_ice(i,jp1)]
                 ! Hg_neighb  = [H_grnd(im1,j),H_grnd(ip1,j),H_grnd(i,jm1),H_grnd(i,jp1)]
                 ! mask       = H_neighb .gt. 0.0_wp .and. Hg_neighb .le. 0.0_wp 
@@ -411,10 +415,10 @@ contains
                 
                 if (H_ice(i,j) .gt. 0.0_wp .and. n_ice(i,j) .eq. 0) then 
                     ! First, treat a special case:
-                    ! Island point, assume the cell is fully covered to ensure it
-                    ! is dynamically active.
+                    ! Island point, assume the cell is fully covered
+                    ! to ensure it is dynamically active.
 
-                    f_ice(i,j) = f_ice_island
+                    f_ice(i,j) = 1.0_wp
 
                 else if (H_ice(i,j) .gt. 0.0_wp .and. n_ice(i,j) .lt. 4) then
                     ! This point is ice-covered, but is at the ice margin 
@@ -431,8 +435,12 @@ contains
                         ! Floating point 
 
                         if (n_now .gt. 0) then 
+                            ! Get minimum value of upstream neighbors
                             H_eff = minval(H_neighb,mask=mask)
                         else 
+                            ! No upstream neighbors available, compare
+                            ! ice thickness against minimum allowed
+                            ! 'full' ice thickness value H_lim.
                             H_eff = max(H_ice(i,j),H_lim)
                         end if
 

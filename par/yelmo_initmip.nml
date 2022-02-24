@@ -22,7 +22,7 @@
 /
 
 &clim_pd_grl 
-    bmb_shlf_const  = -1.0              ! [m/a] Basal mass balance of ice shelves
+    bmb_shlf_const  = -10.0             ! [m/a] Basal mass balance of ice shelves
     dT_ann          = 0.0               ! [K]  Temperature anomaly (atm)
     z_sl            = 0.0               ! [m] Sea level relative to present-day 
 /

@@ -141,9 +141,8 @@
     is_angle        = False             ! cb_ref is a till strength angle?
     z0              = -200.0            ! [m] Bedrock rel. to sea level, lower limit
     z1              =    0.0            ! [m] Bedrock rel. to sea level, upper limit
-    cf0             =  0.01             ! [-- or deg] Minimum value of cf
-    cf1             =  0.1              ! [-- or deg] Maximum value of cf
-    cf_ref          =  0.1              ! [-- or deg] Reference/const value of cf
+    cf_min          =  0.01             ! [-- or deg] Minimum value of cf
+    cf_ref          =  0.1              ! [-- or deg] Reference/const/max value of cf
 /
 
 &yneff 

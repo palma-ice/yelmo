@@ -807,14 +807,14 @@ contains
                     lambda_bed = calc_lambda_bed_lin(bnd%z_bed,bnd%z_sl,dyn%par%till_z0,dyn%par%till_z1)
 
                     ! Calculate cb_ref 
-                    dyn%now%cb_ref = dyn%par%till_cf0 + (dyn%par%till_cf1-dyn%par%till_cf0)*lambda_bed
+                    dyn%now%cb_ref = dyn%par%till_cf_min + (dyn%par%till_cf_ref-dyn%par%till_cf_min)*lambda_bed
 
                 case("exp") 
 
                     lambda_bed = calc_lambda_bed_exp(bnd%z_bed,bnd%z_sl,dyn%par%till_z0,dyn%par%till_z1)
 
-                    dyn%now%cb_ref = dyn%par%till_cf1 * lambda_bed 
-                    where(dyn%now%cb_ref .lt. dyn%par%till_cf0) dyn%now%cb_ref = dyn%par%till_cf0 
+                    dyn%now%cb_ref = dyn%par%till_cf_ref * lambda_bed 
+                    where(dyn%now%cb_ref .lt. dyn%par%till_cf_min) dyn%now%cb_ref = dyn%par%till_cf_min 
 
                 case DEFAULT
                     ! Scaling not recognized.
@@ -946,8 +946,7 @@ contains
         call nml_read(filename,"ytill","is_angle",          par%till_is_angle,      init=init_pars)
         call nml_read(filename,"ytill","z0",                par%till_z0,            init=init_pars)
         call nml_read(filename,"ytill","z1",                par%till_z1,            init=init_pars)
-        call nml_read(filename,"ytill","cf0",               par%till_cf0,           init=init_pars)
-        call nml_read(filename,"ytill","cf1",               par%till_cf1,           init=init_pars)
+        call nml_read(filename,"ytill","cf_min",            par%till_cf_min,        init=init_pars)
         call nml_read(filename,"ytill","cf_ref",            par%till_cf_ref,        init=init_pars)
         
         call nml_read(filename,"yneff","method",            par%neff_method,        init=init_pars)

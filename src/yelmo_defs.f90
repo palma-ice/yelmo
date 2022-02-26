@@ -256,8 +256,7 @@ module yelmo_defs
         logical    :: till_is_angle
         real(wp)   :: till_z0 
         real(wp)   :: till_z1 
-        real(wp)   :: till_cf0 
-        real(wp)   :: till_cf1 
+        real(wp)   :: till_cf_min
         real(wp)   :: till_cf_ref 
 
         ! Effective pressure parameters

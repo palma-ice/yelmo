@@ -8,7 +8,8 @@ module topography
 
     public :: extend_floating_slab
     public :: remove_fractional_ice
-    
+    public :: remove_icebergs 
+
     public :: calc_ice_fraction
 
     public :: calc_z_srf
@@ -173,6 +174,106 @@ contains
 
     end subroutine remove_fractional_ice
 
+    subroutine remove_icebergs(H_ice)
+
+        implicit none 
+
+        real(wp), intent(INOUT) :: H_ice(:,:) 
+
+        return
+
+    end subroutine remove_icebergs
+
+    subroutine find_connected_mask(mask,mask_ref,mask_now)
+        ! Brute-force routine to find all points 
+        ! that touch or are connected with other points in a mask.
+        ! Here use to find any floating ice points that are
+        ! not connected to grounded ice or ice-free land. 
+
+        ! AJR: TO DO, this routine is not ready!!!
+
+        implicit none 
+
+        logical, intent(INOUT) :: mask(:,:)         ! Connected points of interest
+        logical, intent(IN)    :: mask_ref(:,:)     ! Points to be connected to
+        logical, intent(IN)    :: mask_now(:,:)     ! Points of interest
+
+        ! Local variables 
+        integer :: i, j, q, nx, ny
+        integer :: im1, ip1, jm1, jp1 
+        integer :: n_unfilled 
+
+        logical, allocatable :: mask0(:,:) 
+
+        integer, parameter :: qmax = 1000 
+
+        nx = size(mask,1)
+        ny = size(mask,2) 
+
+        ! Allocate local mask object for diagnosing points of interest
+        allocate(mask0(nx,ny))
+
+        ! Initially assume all points are unconnected
+        mask = .FALSE. 
+
+        ! Set purely land points to zero 
+        where (mask_ref .and. mask_now) mask = .TRUE. 
+
+        ! Iteratively fill in open-ocean points that are found
+        ! next to known open-ocean points
+        do q = 1, qmax 
+
+            n_unfilled = 0 
+
+            do j = 1, ny 
+            do i = 1, nx 
+
+                ! Get neighbor indices 
+                im1 = max(i-1,1)
+                ip1 = min(i+1,nx)
+                jm1 = max(j-1,1)
+                jp1 = min(j+1,ny)
+                
+                if (mask_now(i,j)) then 
+                    ! This is a point of interest
+                    ! Define any neighbor points of interest as connected
+
+                    if (mask_now(im1,j)) then 
+                        mask(im1,j) = .TRUE.
+                        n_unfilled = n_unfilled + 1
+                    end if 
+
+                    if (mask_now(ip1,j)) then 
+                        mask(ip1,j) = .TRUE. 
+                        n_unfilled = n_unfilled + 1
+                    end if
+
+                    if (mask_now(i,jm1)) then 
+                        mask(i,jm1) = .TRUE.
+                        n_unfilled = n_unfilled + 1
+                    end if 
+
+                    if (mask_now(i,jp1)) then 
+                        mask(i,jp1) = .TRUE.
+                        n_unfilled = n_unfilled + 1
+                    end if 
+
+                end if
+                    
+            end do 
+            end do  
+
+            !write(*,*) q, n_unfilled, count(mask .eq. -1) 
+
+            ! Exit loop if no more open-ocean points are found 
+            if (n_unfilled .eq. 0) exit 
+
+        end do 
+
+        return 
+
+    end subroutine find_connected_mask
+    
     subroutine calc_ice_fraction_new(f_ice,H_ice,z_bed,z_sl,flt_subgrid)
         ! Determine the area fraction of a grid cell
         ! that is ice-covered. Assume that marginal points
@@ -724,7 +825,7 @@ contains
             ! Grounded above sea level, simply sum elevation above sea level and ice thickness
             H_grnd = H_eff + (z_bed-z_sl)
         end if 
-        
+
         ! ajr: to test eventually, more closely follows Gladstone et al (2010), Leguy etl (2021)
         !H_grnd = -( (z_sl-z_bed) - rho_ice_sw*H_eff )
 

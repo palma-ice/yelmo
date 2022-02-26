@@ -70,8 +70,10 @@ module yelmo_defs
     real(wp)   :: conv_mmdwe_maie       ! Conversion mm/d water equiv. => m/a ice equiv.
     real(wp)   :: conv_mmawe_maie       ! Conversion mm/a water equiv. => m/a ice equiv. 
     real(wp)   :: conv_m3_Gt            ! Conversion m^3 ice to Gt of ice 
-    real(wp)   :: conv_km3_Gt           ! Conversion kmm^3 ice to Gt of ice 
+    real(wp)   :: conv_km3_Gt           ! Conversion km^3 ice to Gt of ice 
     real(wp)   :: conv_millionkm3_Gt    ! Conversion million km^3 ice to Gt of ice 
+    real(wp)   :: area_seasurf          ! Global present-day sea-surface area
+    real(wp)   :: conv_km3_sle          ! Conversion km^3 ice to m sle
 
     ! =========================================================================
     !
@@ -694,7 +696,7 @@ module yelmo_defs
 
         ! ===== Total ice variables =====
         real(wp)   :: H_ice, z_srf, dHicedt, H_ice_max, dzsrfdt
-        real(wp)   :: V_ice, A_ice, dVicedt, fwf, V_sl 
+        real(wp)   :: V_ice, A_ice, dVicedt, fwf, V_sl, V_sle
         real(wp)   :: uxy_bar, uxy_s, uxy_b, z_bed, smb, T_srf, bmb
 
         ! ===== Grounded ice variables =====
@@ -988,6 +990,9 @@ contains
         conv_km3_Gt         = (1e9) * conv_m3_Gt        ! [1e9m^3/km^3]
         conv_millionkm3_Gt  = (1e6) * (1e9) *conv_m3_Gt ! [1e6km3/1] * [1e9m^3/km^3] * conv
         
+        area_seasurf        = 3.618e8                   ! [km^2]
+        conv_km3_sle        = (1e-3) / 394.7            ! [m/mm] / [km^3 to raise ocean by 1mm] => m sle, see https://sealevel.info/conversion_factors.html
+
         return
 
     end subroutine yelmo_global_init

@@ -4,6 +4,8 @@ module yelmo_regions
     use ncio 
     use yelmo_defs 
 
+    use topography, only : calc_H_af 
+
     implicit none
     
     private
@@ -46,17 +48,19 @@ contains
         logical,              intent(IN)    :: mask(:,:) 
 
         ! Local variables
-        integer    :: nx, ny
-        real(prec) :: npts_tot, npts_grnd, npts_flt 
+        integer  :: nx, ny
+        real(wp) :: npts_tot, npts_grnd, npts_flt 
 
-        real(prec) :: m3_km3 = 1e-9 
-        real(prec) :: m2_km2 = 1e-6 
-        real(prec) :: conv_km3a_Sv
+        real(wp) :: m3_km3 = 1e-9 
+        real(wp) :: m2_km2 = 1e-6 
+        real(wp) :: conv_km3a_Sv
 
         logical, allocatable :: mask_tot(:,:) 
         logical, allocatable :: mask_grnd(:,:) 
         logical, allocatable :: mask_flt(:,:) 
         
+        real(wp), allocatable :: H_af(:,:) 
+
         ! Conversion parameter 
         conv_km3a_Sv = 1e-6*(1e9*rho_w/rho_ice)/sec_year
 
@@ -69,12 +73,16 @@ contains
         allocate(mask_grnd(nx,ny))
         allocate(mask_flt(nx,ny))
         
+        allocate(H_af(nx,ny)) 
+
         ! Define masks 
         mask_tot  = (mask .and. tpo%now%H_ice .gt. 0.0) 
         mask_grnd = (mask .and. tpo%now%H_ice .gt. 0.0 .and. tpo%now%f_grnd .gt. 0.0)
         mask_flt  = (mask .and. tpo%now%H_ice .gt. 0.0 .and. tpo%now%f_grnd .eq. 0.0)
          
-        
+        ! Calculate ice thickness above flotation 
+        call calc_H_af(H_af,tpo%now%H_ice,tpo%now%f_ice,bnd%z_bed,bnd%z_sl,use_f_ice=.FALSE.)
+
         npts_tot  = real(count(mask_tot),prec)
         npts_grnd = real(count(mask_grnd),prec)
         npts_flt  = real(count(mask_flt),prec)
@@ -84,19 +92,20 @@ contains
         if (npts_tot .gt. 0) then 
 
             ! ytopo variables 
-            reg%H_ice      = sum(tpo%now%H_ice,mask=mask_tot)/npts_tot      ! [m]
-            reg%z_srf      = sum(tpo%now%z_srf,mask=mask_tot)/npts_tot      ! [m]
-            reg%dHicedt    = sum(tpo%now%dHicedt,mask=mask_tot)/npts_tot    ! [m/a]
-            reg%H_ice_max  = maxval(tpo%now%H_ice,mask=mask_tot)            ! [m]
-            reg%dzsrfdt    = sum(tpo%now%dzsrfdt,mask=mask_tot)/npts_tot    ! [m/a]
+            reg%H_ice      = sum(tpo%now%H_ice,mask=mask_tot)/npts_tot        ! [m]
+            reg%z_srf      = sum(tpo%now%z_srf,mask=mask_tot)/npts_tot        ! [m]
+            reg%dHicedt    = sum(tpo%now%dHicedt,mask=mask_tot)/npts_tot      ! [m/a]
+            reg%H_ice_max  = maxval(tpo%now%H_ice,mask=mask_tot)              ! [m]
+            reg%dzsrfdt    = sum(tpo%now%dzsrfdt,mask=mask_tot)/npts_tot      ! [m/a]
             
             reg%V_ice      = sum(tpo%now%H_ice,mask=mask_tot)*tpo%par%dx*tpo%par%dy*m3_km3              ! [km^3]
             reg%A_ice      = count(tpo%now%H_ice .gt. 0.0 .and. mask_tot)*tpo%par%dx*tpo%par%dy*m2_km2  ! [km^2]
             reg%dVicedt    = sum(tpo%now%dHicedt,mask=mask_tot)*tpo%par%dx*tpo%par%dy*m3_km3            ! [km^3/a]
-            reg%fwf        = -reg%dVicedt*conv_km3a_Sv                      ! [Sv]
+            reg%fwf        = -reg%dVicedt*conv_km3a_Sv                        ! [Sv]
 
             ! Volume above sea level
-            reg%V_sl       = sum(tpo%now%H_grnd,mask=tpo%now%H_grnd.gt.0.0_prec)*tpo%par%dx*tpo%par%dy*m3_km3   ! [km^3]
+            reg%V_sl       = sum(H_af,mask=mask_tot)*tpo%par%dx*tpo%par%dy*m3_km3   ! [km^3]
+            reg%V_sle      = reg%V_sl * conv_km3_sle                          ! [km^3] => [m sle]
             
             ! ydyn variables 
             reg%uxy_bar    = sum(dyn%now%uxy_bar,mask=mask_tot)/npts_tot      ! [m/a]
@@ -112,28 +121,29 @@ contains
         else 
 
             ! ytopo variables 
-            reg%H_ice      = 0.0_prec 
-            reg%z_srf      = 0.0_prec 
-            reg%dHicedt    = 0.0_prec 
-            reg%H_ice_max  = 0.0_prec 
-            reg%dzsrfdt    = 0.0_prec 
+            reg%H_ice      = 0.0_wp 
+            reg%z_srf      = 0.0_wp 
+            reg%dHicedt    = 0.0_wp 
+            reg%H_ice_max  = 0.0_wp 
+            reg%dzsrfdt    = 0.0_wp 
             
-            reg%V_ice      = 0.0_prec 
-            reg%A_ice      = 0.0_prec 
-            reg%dVicedt    = 0.0_prec 
-            reg%fwf        = 0.0_prec 
-            reg%V_sl       = 0.0_prec 
+            reg%V_ice      = 0.0_wp 
+            reg%A_ice      = 0.0_wp 
+            reg%dVicedt    = 0.0_wp 
+            reg%fwf        = 0.0_wp 
+            reg%V_sl       = 0.0_wp 
+            reg%V_sle      = 0.0_wp 
 
             ! ydyn variables 
-            reg%uxy_bar    = 0.0_prec 
-            reg%uxy_s      = 0.0_prec 
-            reg%uxy_b      = 0.0_prec 
+            reg%uxy_bar    = 0.0_wp 
+            reg%uxy_s      = 0.0_wp 
+            reg%uxy_b      = 0.0_wp 
             
             ! Boundary variables
-            reg%z_bed      = 0.0_prec 
-            reg%smb        = 0.0_prec 
-            reg%T_srf      = 0.0_prec 
-            reg%bmb        = 0.0_prec 
+            reg%z_bed      = 0.0_wp 
+            reg%smb        = 0.0_wp 
+            reg%T_srf      = 0.0_wp 
+            reg%bmb        = 0.0_wp 
             
         end if 
 
@@ -161,21 +171,21 @@ contains
         else 
 
             ! ytopo variables 
-            reg%H_ice_g      = 0.0_prec 
-            reg%z_srf_g      = 0.0_prec 
+            reg%H_ice_g      = 0.0_wp 
+            reg%z_srf_g      = 0.0_wp 
 
-            reg%V_ice_g      = 0.0_prec 
-            reg%A_ice_g      = 0.0_prec 
+            reg%V_ice_g      = 0.0_wp 
+            reg%A_ice_g      = 0.0_wp 
 
             ! ydyn variables 
-            reg%uxy_bar_g    = 0.0_prec 
-            reg%uxy_s_g      = 0.0_prec 
-            reg%uxy_b_g      = 0.0_prec 
+            reg%uxy_bar_g    = 0.0_wp 
+            reg%uxy_s_g      = 0.0_wp 
+            reg%uxy_b_g      = 0.0_wp 
             
             ! ythrm variables 
-            reg%f_pmp        = 0.0_prec 
-            reg%H_w          = 0.0_prec 
-            reg%bmb_g        = 0.0_prec 
+            reg%f_pmp        = 0.0_wp 
+            reg%H_w          = 0.0_wp 
+            reg%bmb_g        = 0.0_wp 
             
         end if 
         
@@ -201,20 +211,20 @@ contains
         else 
 
             ! ytopo variables 
-            reg%H_ice_f      = 0.0_prec 
+            reg%H_ice_f      = 0.0_wp 
 
-            reg%V_ice_f      = 0.0_prec 
-            reg%A_ice_f      = 0.0_prec 
+            reg%V_ice_f      = 0.0_wp 
+            reg%A_ice_f      = 0.0_wp 
 
             ! ydyn variables 
-            reg%uxy_bar_f    = 0.0_prec 
-            reg%uxy_s_f      = 0.0_prec 
-            reg%uxy_b_f      = 0.0_prec 
+            reg%uxy_bar_f    = 0.0_wp 
+            reg%uxy_s_f      = 0.0_wp 
+            reg%uxy_b_f      = 0.0_wp 
             
             ! Boundary variables
-            reg%z_sl         = 0.0_prec 
-            reg%bmb_shlf     = 0.0_prec 
-            reg%T_shlf       = 0.0_prec 
+            reg%z_sl         = 0.0_wp 
+            reg%bmb_shlf     = 0.0_wp 
+            reg%T_shlf       = 0.0_wp 
             
         end if 
         
@@ -228,7 +238,7 @@ contains
 
         type(yelmo_class), intent(IN) :: dom 
         character(len=*),  intent(IN) :: filename, units 
-        real(prec),        intent(IN) :: time_init
+        real(wp),          intent(IN) :: time_init
         logical,           intent(IN) :: mask(:,:) 
 
         ! Initialize netcdf file and dimensions
@@ -236,7 +246,7 @@ contains
         call nc_write_dim(filename,"xc",        x=dom%grd%xc*1e-3,      units="kilometers")
         call nc_write_dim(filename,"yc",        x=dom%grd%yc*1e-3,      units="kilometers")
         call nc_write_dim(filename,"zeta",      x=dom%par%zeta_aa,      units="1")
-        call nc_write_dim(filename,"time",      x=time_init,dx=1.0_prec,nx=1,units=trim(units),unlimited=.TRUE.)
+        call nc_write_dim(filename,"time",      x=time_init,dx=1.0_wp,nx=1,units=trim(units),unlimited=.TRUE.)
         
         ! Static information
         call nc_write(filename,"mask", mask,  units="1",long_name="Region mask",dim1="xc",dim2="yc")
@@ -251,13 +261,13 @@ contains
         
         type(yelmo_class),    intent(IN) :: dom 
         character(len=*),     intent(IN) :: filename
-        real(prec),           intent(IN) :: time
+        real(wp),             intent(IN) :: time
         logical, intent(IN), optional    :: mask(:,:) 
         type(yregions_class), intent(IN), optional :: reg_now 
 
         ! Local variables
         integer    :: ncid, n
-        real(prec) :: time_prev 
+        real(wp) :: time_prev 
         type(yregions_class) :: reg
         
         ! 1. Determine regional values of variables 
@@ -324,6 +334,8 @@ contains
         call nc_write(filename,"fwf",reg%fwf,units="Sv",long_name="Rate volume change", &
                       dim1="time",start=[n],ncid=ncid)
         call nc_write(filename,"V_sl",reg%V_sl*1e-6,units="1e6 km^3",long_name="Ice volume above flotation", &
+                      dim1="time",start=[n],ncid=ncid)
+        call nc_write(filename,"V_sle",reg%V_sle,units="m sle",long_name="Sea-level equivalent volume", &
                       dim1="time",start=[n],ncid=ncid)
 
         call nc_write(filename,"uxy_bar",reg%uxy_bar,units="m/a",long_name="Mean depth-ave velocity", &

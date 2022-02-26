@@ -17,6 +17,7 @@ module topography
     public :: calc_z_srf_gl_subgrid_area
     public :: calc_H_eff
     public :: calc_H_grnd
+    public :: calc_H_af
     public :: calc_f_grnd_subgrid_area_aa
     public :: calc_f_grnd_subgrid_area
     public :: calc_f_grnd_subgrid_linear
@@ -784,8 +785,9 @@ contains
         ! When H_grnd >= 0, grounded, when H_grnd < 0, floating 
         ! Also calculate rate of change for diagnostic related to grounding line 
 
-        ! Note that thickness above flotation H_sl is therefore max(H_grnd,0)
-        
+        ! Note that this will not be identical to thickness above flotation,
+        ! since it accounts for height above the water via z_bed too. 
+
         implicit none 
 
         real(wp), intent(INOUT) :: H_grnd
@@ -826,12 +828,53 @@ contains
             H_grnd = H_eff + (z_bed-z_sl)
         end if 
 
-        ! ajr: to test eventually, more closely follows Gladstone et al (2010), Leguy etl (2021)
+        ! ajr: to test somewhere eventually, more closely follows Gladstone et al (2010), Leguy etl (2021)
         !H_grnd = -( (z_sl-z_bed) - rho_ice_sw*H_eff )
 
         return 
 
     end subroutine calc_H_grnd
+
+    elemental subroutine calc_H_af(H_af,H_ice,f_ice,z_bed,z_sl,use_f_ice)
+        ! Calculate ice thickness above flotation, H_af
+
+        implicit none 
+
+        real(wp), intent(INOUT) :: H_af
+        real(wp), intent(IN)    :: H_ice
+        real(wp), intent(IN)    :: f_ice
+        real(wp), intent(IN)    :: z_bed
+        real(wp), intent(IN)    :: z_sl 
+        logical,  intent(IN), optional :: use_f_ice
+
+        ! Local variables   
+        real(wp) :: rho_sw_ice 
+        real(wp) :: H_eff 
+        logical  :: use_f_ice_now 
+
+        ! By default use f_ice to set points with f_ice < 1 to H_eff=0.0 
+        use_f_ice_now = .TRUE. 
+        if (present(use_f_ice)) use_f_ice_now = use_f_ice 
+
+        rho_sw_ice = rho_sw/rho_ice ! Ratio of density of seawater to ice [--]
+        
+        ! Get effective ice thickness
+        if (use_f_ice_now) then 
+            call calc_H_eff(H_eff,H_ice,f_ice,set_frac_zero=.TRUE.)
+        else 
+            H_eff = H_ice 
+        end if 
+
+        ! Calculate ice thickness above flotation 
+        ! ie, total ice column thickness minus the corresponding depth of seawater
+        H_af = H_eff - rho_sw_ice*max(z_sl-z_bed,0.0_wp)
+
+        ! Limit to positive values, since when it is negative, it is completely floating
+        H_af = max(H_af,0.0_wp)
+
+        return 
+
+    end subroutine calc_H_af
 
     subroutine calc_f_grnd_subgrid_area_aa(f_grnd,H_grnd,gl_sep_nx)
         ! Use H_grnd to determined grounded area fraction of grid point.

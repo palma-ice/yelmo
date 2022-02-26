@@ -103,7 +103,7 @@ contains
 
         ! Update bed roughness coefficients cb_ref and c_bed (which are independent of velocity)
         call calc_ydyn_cbref(dyn,tpo,thrm,bnd)
-        call calc_c_bed(dyn%now%c_bed,dyn%now%cb_ref,dyn%now%N_eff)
+        call calc_c_bed(dyn%now%c_bed,dyn%now%cb_ref,dyn%now%N_eff,dyn%par%till_is_angle)
 
         ! ===== Calculate the 3D velocity field and helper variables =======================
         ! The variables to be obtained from these routines are:
@@ -787,108 +787,44 @@ contains
         allocate(cb_ref(nx,ny))
         allocate(lambda_bed(nx,ny))
         
-        if (dyn%par%cb_method .eq. -1) then 
+        if (dyn%par%till_method .eq. -1) then 
             ! Do nothing - cb_ref defined externally
 
         else 
             ! Calculate cb_ref following parameter choices 
-
-            ! =============================================================================
-            ! Step 1: calculate the cb_ref field only determined by 
-            ! cf_frozen, cf_stream and temperate character of the bed 
-
-            if (dyn%par%cb_with_pmp) then 
-                ! Smooth transition between temperate and frozen cb_ref
-
-                cb_ref = (thrm%now%f_pmp)*dyn%par%cf_stream &
-                           + (1.0_prec - thrm%now%f_pmp)*dyn%par%cf_frozen 
-
-            else 
-                ! Only use cf_frozen everywhere
-
-                cb_ref = dyn%par%cf_frozen
-
-            end if 
-
-            if (dyn%par%cb_with_pmp .and. dyn%par%cb_margin_pmp) then 
-                ! Ensure that both the margin points and the grounding line
-                ! are always considered streaming, independent of their
-                ! thermodynamic character (as sometimes these can incorrectly become frozen)
-
-            
-                ! Ensure any marginal point is also treated as streaming 
-                do j = 1, ny 
-                do i = 1, nx 
-
-                    im1 = max(i-1,1)
-                    ip1 = min(i+1,nx)
-                    jm1 = max(j-1,1)
-                    jp1 = min(j+1,ny)
-
-                    if (tpo%now%H_ice(i,j) .gt. 0.0 .and. &
-                        (tpo%now%H_ice(im1,j) .le. 0.0 .or. &
-                         tpo%now%H_ice(ip1,j) .le. 0.0 .or. &
-                         tpo%now%H_ice(i,jm1) .le. 0.0 .or. &
-                         tpo%now%H_ice(i,jp1) .le. 0.0)) then 
-                        
-                        cb_ref(i,j) = dyn%par%cf_stream
-
-                    end if 
-
-                end do 
-                end do 
-
-                ! Also ensure that grounding line is also considered streaming
-                ! Note: this was related to cold ocean temps at floating-grounded interface,
-                ! which is likely solved. Left here for safety. ajr, 2019-07-24
-                where(tpo%now%mask_grz .eq. 0) cb_ref = dyn%par%cf_stream
-
-            end if
-
-            ! =============================================================================
-            ! Step 2: calculate lambda functions to scale cb_ref from default value 
-            
-            !------------------------------------------------------------------------------
             ! lambda_bed: scaling as a function of bedrock elevation
 
-            select case(trim(dyn%par%cb_scale))
+            select case(trim(dyn%par%till_scale))
 
-                case("lin_zb")
+                case("none")
+                    ! No scaling with elevation, set reference value 
+
+                    dyn%now%cb_ref = dyn%par%till_cf_ref
+                    
+                case("lin")
                     ! Linear scaling function with bedrock elevation
-                    
-                    lambda_bed = calc_lambda_bed_lin(bnd%z_bed,dyn%par%cb_z0,dyn%par%cb_z1)
 
-                case("exp_zb")
-                    ! Exponential scaling function with bedrock elevation
-                    
-                    lambda_bed = calc_lambda_bed_exp(bnd%z_bed,dyn%par%cb_z0,dyn%par%cb_z1)
+                    lambda_bed = calc_lambda_bed_lin(bnd%z_bed,bnd%z_sl,dyn%par%till_z0,dyn%par%till_z1)
 
-                case("till_const")
-                    ! Constant till friction angle
+                    ! Calculate cb_ref 
+                    dyn%now%cb_ref = dyn%par%till_cf0 + (dyn%par%till_cf1-dyn%par%till_cf0)*lambda_bed
 
-                    lambda_bed = calc_lambda_till_const(dyn%par%till_phi_const)
+                case("exp") 
 
-                case("till_zb")
-                    ! Linear till friction angle versus elevation
+                    lambda_bed = calc_lambda_bed_exp(bnd%z_bed,bnd%z_sl,dyn%par%till_z0,dyn%par%till_z1)
 
-                    lambda_bed = calc_lambda_till_linear(bnd%z_bed,bnd%z_sl,dyn%par%till_phi_min,dyn%par%till_phi_max, &
-                                                            dyn%par%till_phi_zmin,dyn%par%till_phi_zmax)
+                    dyn%now%cb_ref = dyn%par%till_cf1 * lambda_bed 
+                    where(dyn%now%cb_ref .lt. dyn%par%till_cf0) dyn%now%cb_ref = dyn%par%till_cf0 
 
                 case DEFAULT
-                    ! No scaling
+                    ! Scaling not recognized.
 
-                    lambda_bed = 1.0_prec
+                    write(io_unit_err,*) "calc_ydyn_cbref:: Error: scaling of cb_ref with &
+                    &elevation not recognized."
+                    write(io_unit_err,*) "ydyn.till_scale = ", dyn%par%till_scale 
+                    stop 
 
             end select 
-            
-            ! Ensure lambda_bed is not below lower limit [default range 0:1] 
-            where (lambda_bed .lt. dyn%par%cb_min) lambda_bed = dyn%par%cb_min
-
-
-            ! =============================================================================
-            ! Step 3: calculate cb_ref [--]
-            
-            dyn%now%cb_ref = (cb_ref*lambda_bed)
             
         end if 
 
@@ -992,16 +928,6 @@ contains
         call nml_read(filename,"ydyn","beta_gl_f",          par%beta_gl_f,          init=init_pars)
         call nml_read(filename,"ydyn","taud_gl_method",     par%taud_gl_method,     init=init_pars)
         call nml_read(filename,"ydyn","H_grnd_lim",         par%H_grnd_lim,         init=init_pars)
-        call nml_read(filename,"ydyn","H_sed_sat",          par%H_sed_sat,          init=init_pars)
-        call nml_read(filename,"ydyn","cb_method",          par%cb_method,          init=init_pars)
-        call nml_read(filename,"ydyn","cb_with_pmp",        par%cb_with_pmp,        init=init_pars)
-        call nml_read(filename,"ydyn","cb_margin_pmp",      par%cb_margin_pmp,      init=init_pars)
-        call nml_read(filename,"ydyn","cb_scale",           par%cb_scale,           init=init_pars)
-        call nml_read(filename,"ydyn","cb_z0",              par%cb_z0,              init=init_pars)
-        call nml_read(filename,"ydyn","cb_z1",              par%cb_z1,              init=init_pars)
-        call nml_read(filename,"ydyn","cb_min",             par%cb_min,             init=init_pars)
-        call nml_read(filename,"ydyn","cf_frozen",          par%cf_frozen,          init=init_pars)
-        call nml_read(filename,"ydyn","cf_stream",          par%cf_stream,          init=init_pars)
         call nml_read(filename,"ydyn","n_sm_beta",          par%n_sm_beta,          init=init_pars)
         call nml_read(filename,"ydyn","beta_min",           par%beta_min,           init=init_pars)
         call nml_read(filename,"ydyn","eps_0",              par%eps_0,              init=init_pars)
@@ -1015,20 +941,23 @@ contains
         call nml_read(filename,"ydyn","taud_lim",           par%taud_lim,           init=init_pars)
         call nml_read(filename,"ydyn","cb_sia",             par%cb_sia,             init=init_pars)
         
-        call nml_read(filename,"ydyn_till","till_phi_const",par%till_phi_const,     init=init_pars)
-        call nml_read(filename,"ydyn_till","till_phi_min",  par%till_phi_min,       init=init_pars)
-        call nml_read(filename,"ydyn_till","till_phi_max",  par%till_phi_max,       init=init_pars)
-        call nml_read(filename,"ydyn_till","till_phi_zmin", par%till_phi_zmin,      init=init_pars)
-        call nml_read(filename,"ydyn_till","till_phi_zmax", par%till_phi_zmax,      init=init_pars)
+        call nml_read(filename,"ytill","method",            par%till_method,        init=init_pars)
+        call nml_read(filename,"ytill","scale",             par%till_scale,        init=init_pars)
+        call nml_read(filename,"ytill","is_angle",          par%till_is_angle,      init=init_pars)
+        call nml_read(filename,"ytill","z0",                par%till_z0,            init=init_pars)
+        call nml_read(filename,"ytill","z1",                par%till_z1,            init=init_pars)
+        call nml_read(filename,"ytill","cf0",               par%till_cf0,           init=init_pars)
+        call nml_read(filename,"ytill","cf1",               par%till_cf1,           init=init_pars)
+        call nml_read(filename,"ytill","cf_ref",            par%till_cf_ref,        init=init_pars)
         
-        call nml_read(filename,"ydyn_neff","neff_method",   par%neff_method,        init=init_pars)
-        call nml_read(filename,"ydyn_neff","neff_const",    par%neff_const,         init=init_pars)
-        call nml_read(filename,"ydyn_neff","neff_p",        par%neff_p,             init=init_pars)
-        call nml_read(filename,"ydyn_neff","neff_set_water",par%neff_set_water,     init=init_pars)
-        call nml_read(filename,"ydyn_neff","neff_N0",       par%neff_N0,            init=init_pars)
-        call nml_read(filename,"ydyn_neff","neff_delta",    par%neff_delta,         init=init_pars)
-        call nml_read(filename,"ydyn_neff","neff_e0",       par%neff_e0,            init=init_pars)
-        call nml_read(filename,"ydyn_neff","neff_Cc",       par%neff_Cc,            init=init_pars)
+        call nml_read(filename,"yneff","method",            par%neff_method,        init=init_pars)
+        call nml_read(filename,"yneff","const",             par%neff_const,         init=init_pars)
+        call nml_read(filename,"yneff","p",                 par%neff_p,             init=init_pars)
+        call nml_read(filename,"yneff","set_water",         par%neff_set_water,     init=init_pars)
+        call nml_read(filename,"yneff","N0",                par%neff_N0,            init=init_pars)
+        call nml_read(filename,"yneff","delta",             par%neff_delta,         init=init_pars)
+        call nml_read(filename,"yneff","e0",                par%neff_e0,            init=init_pars)
+        call nml_read(filename,"yneff","Cc",                par%neff_Cc,            init=init_pars)
 
         ! === Set internal parameters ======
 

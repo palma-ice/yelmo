@@ -713,8 +713,18 @@ contains
         end if 
 
         ! Calculate new H_grnd (ice thickness overburden)
-        H_grnd = H_eff - rho_sw_ice*max(z_sl-z_bed,0.0_prec)
+        !H_grnd = H_eff - rho_sw_ice*max(z_sl-z_bed,0.0_prec)
 
+        ! ajr: testing. This ensures that ice-free ground above sea level
+        ! also has H_grnd > 0.
+        if (z_sl-z_bed .gt. 0.0) then 
+            ! Grounded below sea level, diagnose overburden minus water thickness
+            H_grnd = H_eff - rho_sw_ice*(z_sl-z_bed)
+        else
+            ! Grounded above sea level, simply sum elevation above sea level and ice thickness
+            H_grnd = H_eff + (z_bed-z_sl)
+        end if 
+        
         ! ajr: to test eventually, more closely follows Gladstone et al (2010), Leguy etl (2021)
         !H_grnd = -( (z_sl-z_bed) - rho_ice_sw*H_eff )
 
@@ -1337,13 +1347,14 @@ end if
 
     end subroutine calc_grounding_line_zone
 
-    subroutine calc_bmb_total(bmb,bmb_grnd,bmb_shlf,H_grnd,f_grnd,bmb_gl_method,diffuse_bmb_shlf)
+    subroutine calc_bmb_total(bmb,bmb_grnd,bmb_shlf,H_ice,H_grnd,f_grnd,bmb_gl_method,diffuse_bmb_shlf)
 
         implicit none 
 
         real(prec),       intent(OUT) :: bmb(:,:) 
         real(prec),       intent(IN)  :: bmb_grnd(:,:) 
         real(prec),       intent(IN)  :: bmb_shlf(:,:) 
+        real(prec),       intent(IN)  :: H_ice(:,:)
         real(prec),       intent(IN)  :: H_grnd(:,:)
         real(prec),       intent(IN)  :: f_grnd(:,:) 
         character(len=*), intent(IN)  :: bmb_gl_method 
@@ -1411,6 +1422,8 @@ end if
 
         end select
 
+        ! For aesthetics, also make sure that bmb is zero on ice-free land
+        where (H_grnd .gt. 0.0_wp .and. H_ice .eq. 0.0_wp) bmb = 0.0_wp 
 
         if (diffuse_bmb_shlf) then 
             ! Allow marine melt (bmb_shlf) to permeate inland at the grounding line,

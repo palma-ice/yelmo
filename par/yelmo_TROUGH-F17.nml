@@ -106,16 +106,6 @@
     beta_gl_f           = 1.0             ! [-] Scaling of beta at the grounding line (for beta_gl_scale=0)
     taud_gl_method      = 0               !  0: binary, no subgrid, 1: Two-sided gradient
     H_grnd_lim          = 500.0           ! [m] For beta_gl_scale=1, reduce beta linearly between H_grnd=0 and H_grnd_lim 
-    H_sed_sat           = 250.0           ! [m] Sediment thickness at which sediment effect is saturated
-    cb_method           = 1               ! -1: set externally; 1: calculate cb online  
-    cb_with_pmp         = False           ! Weighted cf_frozen/cf_stream as a function of f_pmp 
-    cb_margin_pmp       = False           ! If using cb_with_pmp, additionally impose cf_stream at ice margins 
-    cb_scale            = "till_const"    ! "none", "lin_zb", "exp_zb", "till_const", "till_zb", scaling of cb spatially
-    cb_z0               = -200.0          ! [m] Bedrock elevation at which scaling goes to f_scale=e(-1)
-    cb_z1               = 200.0           ! [m] Bedrock elevation above which scaling goes to f_scale=1
-    cb_min              = 0.0             ! [--] Minimum allowed value of f_scale for grounded ice
-    cf_frozen           = 1.0             ! [--] Bed critical stress factor, frozen 
-    cf_stream           = 1.0             ! [--] Bed critical stress factor, stream  
     n_sm_beta           = 0               ! [-] Standard deviation in gridpoints for Gaussian smoothing of beta (0==no smoothing)
     beta_min            = 0.0             ! [Pa a m-1] Minimum value of beta allowed for grounded ice (for stability)
     eps_0               = 1e-6            ! [1/a] Regularization term for effective viscosity - minimum strain rate
@@ -131,23 +121,26 @@
     
 /
 
-&ydyn_neff 
-    neff_method     = 3                 ! -1: external N_eff, 0: neff_const, 1: overburden pressure, 2: Leguy param., 3: Till pressure
-    neff_const      = 1.0               ! == rho_ice*g*(eg 1000 m ice thickness)
-    neff_p          = 1.0               ! *neff_method=2* marine connectivity exponent (0: none, 1: full)
-    neff_set_water  = False             ! *neff_method=3* Prescribe H_w = H_w_max for temperate ice instead of using H_w field?
-    neff_N0         = 1000.0            ! [Pa] *neff_method=3* Reference effective pressure 
-    neff_delta      = 0.02              ! [--] *neff_method=3* Fraction of overburden pressure for saturated till
-    neff_e0         = 0.69              ! [--] *neff_method=3* Reference void ratio at N0 
-    neff_Cc         = 0.12              ! [--] *neff_method=3* Till compressibility    
+&ytill
+    method          = 1                 ! -1: set externally; 1: calculate cb_ref online  
+    scale           = "none"            ! "none", "lin", or "exp" : scaling with elevation 
+    is_angle        = True              ! cb_ref is a till strength angle?
+    z0              = -300.0            ! [m] Bedrock rel. to sea level, lower limit
+    z1              =  200.0            ! [m] Bedrock rel. to sea level, upper limit
+    cf0             =  0.1              ! [-- or deg] Minimum value of cf
+    cf1             =  0.8              ! [-- or deg] Maximum value of cf
+    cf_ref          =  10.0             ! [-- or deg] Reference/const value of cf
 /
 
-&ydyn_till
-    till_phi_const  =  10.0                 ! [degrees] Till friction angle, constant
-    till_phi_min    =   5.0                 ! [degrees] Till friction angle, minimum
-    till_phi_max    =  20.0                 ! [degrees] Till friction angle, maximum
-    till_phi_zmin   =   0.0                 ! [m] Bedrock elevation for till_phi_min
-    till_phi_zmax   = 500.0                 ! [m] Bedrock elevation for phi_max 
+&yneff 
+    method          = 3                 ! -1: external N_eff, 0: neff_const, 1: overburden pressure, 2: Leguy param., 3: Till pressure
+    const           = 1e7               ! == rho_ice*g*(eg 1000 m ice thickness)
+    p               = 0.0               ! *neff_method=2* marine connectivity exponent (0: none, 1: full)
+    set_water       = False             ! *neff_method=3* Prescribe H_w = H_w_max for temperate ice instead of using H_w field?
+    N0              = 1000.0            ! [Pa] *neff_method=3* Reference effective pressure 
+    delta           = 0.02              ! [--] *neff_method=3* Fraction of overburden pressure for saturated till
+    e0              = 0.69              ! [--] *neff_method=3* Reference void ratio at N0 
+    Cc              = 0.12              ! [--] *neff_method=3* Till compressibility    
 /
 
 &ymat

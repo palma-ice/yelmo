@@ -93,7 +93,7 @@ contains
         
         ! Combine basal mass balance into one field accounting for 
         ! grounded/floating fraction of grid cells 
-        call calc_bmb_total(tpo%now%bmb,thrm%now%bmb_grnd,bnd%bmb_shlf,tpo%now%H_grnd, &
+        call calc_bmb_total(tpo%now%bmb,thrm%now%bmb_grnd,bnd%bmb_shlf,tpo%now%H_ice,tpo%now%H_grnd, &
                             tpo%now%f_grnd_bmb,tpo%par%bmb_gl_method,tpo%par%diffuse_bmb_shlf)
         
         ! Combine frontal mass balance into one field, and 
@@ -642,7 +642,7 @@ contains
         
         ! Combine basal mass balance into one field accounting for 
         ! grounded/floating fraction of grid cells 
-        call calc_bmb_total(tpo%now%bmb,thrm%now%bmb_grnd,bnd%bmb_shlf,tpo%now%H_grnd, &
+        call calc_bmb_total(tpo%now%bmb,thrm%now%bmb_grnd,bnd%bmb_shlf,tpo%now%H_ice,tpo%now%H_grnd, &
                             tpo%now%f_grnd_bmb,tpo%par%bmb_gl_method,tpo%par%diffuse_bmb_shlf)
         
         ! Combine frontal mass balance into one field, and 
@@ -1217,7 +1217,7 @@ end if
 
         ! Combine basal mass balance into one field accounting for 
         ! grounded/floating fraction of grid cells 
-        call calc_bmb_total(tpo%now%bmb,thrm%now%bmb_grnd,bnd%bmb_shlf,tpo%now%H_grnd, &
+        call calc_bmb_total(tpo%now%bmb,thrm%now%bmb_grnd,bnd%bmb_shlf,tpo%now%H_ice,tpo%now%H_grnd, &
                             tpo%now%f_grnd_bmb,tpo%par%bmb_gl_method,tpo%par%diffuse_bmb_shlf)
         
         ! Combine frontal mass balance into one field, and 

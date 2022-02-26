@@ -38,8 +38,6 @@ module basal_dragging
     ! c_bed functions
     public :: calc_lambda_bed_lin
     public :: calc_lambda_bed_exp
-    public :: calc_lambda_till_const
-    public :: calc_lambda_till_linear
 
     ! beta gl functions 
     public :: scale_beta_gl_fraction 
@@ -56,50 +54,35 @@ module basal_dragging
     public :: stagger_beta_aa_gl_downstream    
     public :: stagger_beta_aa_gl_subgrid
     public :: stagger_beta_aa_gl_subgrid_flux 
+
 contains 
 
-    subroutine calc_c_bed(c_bed,cb_ref,N_eff)
+    subroutine calc_c_bed(c_bed,cb_ref,N_eff,is_angle)
 
         implicit none 
 
-        real(wp), intent(OUT) :: c_bed(:,:)       ! [Pa]
-        real(wp), intent(IN)  :: cb_ref(:,:)      ! [-] or [degrees]
-        real(wp), intent(IN)  :: N_eff(:,:)       ! [Pa] 
+        real(wp), intent(OUT) :: c_bed(:,:)         ! [Pa]
+        real(wp), intent(IN)  :: cb_ref(:,:)        ! [-] or [degrees]
+        real(wp), intent(IN)  :: N_eff(:,:)         ! [Pa] 
+        logical,  intent(IN) :: is_angle            ! Is cb_ref a till strength angle? 
 
-        c_bed = cb_ref*N_eff 
-        
+        if (is_angle) then 
+            ! Transform cb_ref by tangent to make 
+            ! c_bed = tau_c == critical bed stress
+            ! e.g., Bueler and van Pelt (2015); Albrecht et al (2020a)
+
+            c_bed = tan(cb_ref*degrees_to_radians)*N_eff 
+
+        else
+            ! Treat cb_ref as a normal scalar field
+
+            c_bed = cb_ref*N_eff 
+
+        end if 
+
         return 
 
     end subroutine calc_c_bed
-
-    ! subroutine calc_c_bed(c_bed,cb_ref,N_eff,method)
-
-    !     implicit none 
-
-    !     real(wp), intent(OUT) :: c_bed(:,:)       ! [Pa]
-    !     real(wp), intent(IN)  :: cb_ref(:,:)      ! [-] or [degrees]
-    !     real(wp), intent(IN)  :: N_eff(:,:)       ! [Pa] 
-    !     character(len=*), intent(IN) :: method      ! 'scalar' or 'tan'
-
-    !     select case(trim(method))
-
-    !         case("scalar")
-    !             ! Treat cb_ref as a normal scalar field
-
-    !             c_bed = cb_ref*N_eff 
-
-    !         case("tan")
-    !             ! Transform cb_ref by tangent to make 
-    !             ! c_bed = tau_c == critical bed stress
-    !             ! e.g., Bueler and van Pelt (2015); Albrecht et al (2020a)
-
-    !             c_bed = tan(cb_ref*degrees_to_radians)*N_eff 
-
-    !     end select 
-
-    !     return 
-
-    ! end subroutine calc_c_bed
 
     subroutine calc_beta(beta,c_bed,ux_b,uy_b,H_ice,f_ice,H_grnd,f_grnd,z_bed,z_sl,beta_method, &
                          beta_const,beta_q,beta_u0,beta_gl_scale,beta_gl_f,H_grnd_lim,beta_min,boundaries)
@@ -408,7 +391,14 @@ contains
         call calc_H_eff(H_eff,H_ice,f_ice,set_frac_zero=.TRUE.)
 
         ! Calculate effective pressure [Pa] (overburden pressure)
-        N_eff = f_grnd * (rho_ice*g*H_eff)
+        ! Set N_eff to zero for purely floating points, but do not
+        ! scale grounding-line points by f_grnd. This is done on
+        ! the beta-staggering step.
+        if (f_grnd .gt. 0.0) then
+            N_eff = (rho_ice*g*H_eff)
+        else
+            N_eff = 0.0 
+        end if 
 
         return 
 
@@ -442,7 +432,7 @@ contains
         rho_sw_ice = rho_sw/rho_ice 
 
         ! Determine the maximum ice thickness to allow floating ice
-        H_float = max(0.0_prec, rho_sw_ice*(z_sl-z_bed))
+        H_float = max(0.0_wp, rho_sw_ice*(z_sl-z_bed))
 
         ! Get effective ice thickness 
         call calc_H_eff(H_eff,H_ice,f_ice,set_frac_zero=.TRUE.)
@@ -461,12 +451,15 @@ contains
         else
             ! Determine water pressure based on marine connectivity (Leguy et al., 2014, Eq. 14)
 
-            x     = min(1.0_prec, H_float/H_eff)
-            p_w   = (rho_ice*g*H_eff)*(1.0_prec - (1.0_prec-x)**p)
+            x     = min(1.0_wp, H_float/H_eff)
+            p_w   = (rho_ice*g*H_eff)*(1.0_wp - (1.0_wp-x)**p)
 
         end if 
 
         ! Calculate effective pressure [Pa] (overburden pressure minus basal water pressure)
+        ! Note: this will set N_eff to zero for purely floating points, but do not
+        ! scale grounding-line points by f_grnd. This is done on
+        ! the beta-staggering step.
         N_eff = (rho_ice*g*H_eff) - p_w 
 
         return 
@@ -503,10 +496,10 @@ contains
         do j = 1, ny 
         do i = 1, nx 
 
-            if (f_grnd(i,j) .eq. 0.0_prec) then 
+            if (f_grnd(i,j) .eq. 0.0_wp) then 
                 ! No effective pressure at base for floating ice
             
-                N_eff(i,j) = 0.0_prec 
+                N_eff(i,j) = 0.0_wp 
 
             else 
 
@@ -527,7 +520,9 @@ contains
                 q1 = min(q1,10.0_wp) 
 
                 ! Calculate the effective pressure in the till [Pa] (van Pelt and Bueler, 2015, Eq. 23-24)
-                 N_eff(i,j) = f_grnd(i,j) * min( N0*(delta*P0/N0)**s * 10**q1, P0 ) 
+                ! Note: do not scale grounding-line points by f_grnd. This is done on
+                ! the beta-staggering step.
+                N_eff(i,j) = min( N0*(delta*P0/N0)**s * 10**q1, P0 ) 
 
             end if  
 
@@ -538,17 +533,25 @@ contains
 
     end subroutine calc_effective_pressure_till
     
-    elemental function calc_lambda_bed_lin(z_bed,z0,z1) result(lambda)
+    elemental function calc_lambda_bed_lin(z_bed,z_sl,z0,z1) result(lambda)
         ! Calculate scaling function: linear 
         
         implicit none 
         
         real(wp), intent(IN)    :: z_bed  
+        real(wp), intent(IN)    :: z_sl
         real(wp), intent(IN)    :: z0
         real(wp), intent(IN)    :: z1
         real(wp)                :: lambda 
 
-        lambda = (z_bed - z0) / (z1 - z0)
+        ! Local variables 
+        real(wp) :: z_rel 
+        
+        ! Get bedrock elevation relative to sea level 
+        !z_rel = z_sl - z_bed        ! Relative to sea-level evolving in time
+        z_rel = z_bed               ! Relative to present-day sea level 
+
+        lambda = (z_rel - z0) / (z1 - z0)
         
         if (lambda .lt. 0.0) lambda = 0.0 
         if (lambda .gt. 1.0) lambda = 1.0
@@ -557,17 +560,25 @@ contains
 
     end function calc_lambda_bed_lin
 
-    elemental function calc_lambda_bed_exp(z_bed,z0,z1) result(lambda)
+    elemental function calc_lambda_bed_exp(z_bed,z_sl,z0,z1) result(lambda)
         ! Calculate scaling function: exponential 
 
         implicit none 
         
         real(wp), intent(IN)    :: z_bed  
+        real(wp), intent(IN)    :: z_sl
         real(wp), intent(IN)    :: z0
         real(wp), intent(IN)    :: z1
         real(wp)                :: lambda 
 
-        lambda = exp( (z_bed - z1) / (z1 - z0) )
+        ! Local variables 
+        real(wp) :: z_rel 
+
+        ! Get bedrock elevation relative to sea level 
+        !z_rel = z_sl - z_bed        ! Relative to sea-level evolving in time
+        z_rel = z_bed               ! Relative to present-day sea level 
+
+        lambda = exp( (z_rel - z1) / (z1 - z0) )
                 
         if (lambda .gt. 1.0) lambda = 1.0
         
@@ -575,57 +586,6 @@ contains
 
     end function calc_lambda_bed_exp
     
-    elemental function calc_lambda_till_const(phi) result(lambda)
-        ! Calculate scaling function: till friction angle 
-        
-        implicit none 
-        
-        real(wp), intent(IN)    :: phi                ! [deg] Constant till angle  
-        real(wp)                :: lambda 
-
-        ! Calculate bed friction coefficient as the tangent
-        lambda = tan(phi*pi/180.0)
-
-        return 
-
-    end function calc_lambda_till_const
-
-    elemental function calc_lambda_till_linear(z_bed,z_sl,phi_min,phi_max,phi_zmin,phi_zmax) result(lambda)
-        ! Calculate the effective pressure of the till
-        ! following van Pelt and Bueler (2015), Eq. 23.
-        
-        implicit none 
-        
-        real(wp), intent(IN)    :: z_bed              ! [m] Bedrock elevation
-        real(wp), intent(IN)    :: z_sl               ! [m] Sea level 
-        real(wp), intent(IN)    :: phi_min            ! [deg] Minimum till angle 
-        real(wp), intent(IN)    :: phi_max            ! [deg] Maximum till angle 
-        real(wp), intent(IN)    :: phi_zmin           ! [m] C[z=zmin] = tan(phi_min)
-        real(wp), intent(IN)    :: phi_zmax           ! [m] C[z=zmax] = tan(phi_max) 
-        real(wp)                :: lambda 
-
-        ! Local variables 
-        real(wp) :: phi, f_scale, z_rel  
-
-        ! Get bedrock elevation relative to sea level 
-!         z_rel = z_sl - z_bed 
-        z_rel = z_bed               ! Relative to present-day sea level 
-
-        ! Scale till angle phi as a function bedrock elevation 
-        f_scale = (z_rel - phi_zmin) / (phi_zmax - phi_zmin)
-        f_scale = min(f_scale,1.0)
-        f_scale = max(f_scale,0.0)
-
-        ! Linear ramp between phi_min and phi_max 
-        phi = phi_min + f_scale*(phi_max-phi_min)
-
-        ! Calculate bed friction coefficient as the tangent
-        lambda = tan(phi*pi/180.0)
-
-        return 
-
-    end function calc_lambda_till_linear
-
     ! ================================================================================
     !
     ! Beta functions (aa-nodes) 
@@ -668,7 +628,7 @@ contains
         ny = size(beta,2)
         
         ! Initially set friction to zero everywhere
-        beta = 0.0_prec 
+        beta = 0.0_wp 
         
         ! Set equal weighting to all ab-nodes
         wt_ab = 0.25_wp 
@@ -809,7 +769,7 @@ contains
         ny = size(beta,2)
         
         ! Initially set friction to zero everywhere
-        beta = 0.0_prec 
+        beta = 0.0_wp 
 
         ! Set equal weighting to all ab-nodes
         wt_ab = 0.25_wp
@@ -991,7 +951,7 @@ contains
                     f_scale = H_eff 
                 else
                     ! Marine based 
-                    f_scale = max(0.0_prec, H_eff - (z_sl(i,j)-z_bed(i,j))*rho_sw_ice)
+                    f_scale = max(0.0_wp, H_eff - (z_sl(i,j)-z_bed(i,j))*rho_sw_ice)
                 end if 
                 
                 if (norm .and. H_eff .gt. 0.0) f_scale = f_scale / H_eff

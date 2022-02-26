@@ -100,7 +100,7 @@ program yelmo_test
     call nml_read(path_par,"ctrl","optimize",       ctl%optimize)           ! Optimize basal friction cb_ref field
     call nml_read(path_par,"ctrl","clim_nm",        ctl%clim_nm)                   ! Namelist group holding climate information
     
-    call nml_read(path_par,"ctrl","load_cb_ref",    ctl%load_cb_ref)               ! Load cb_ref from file? Otherwise define from cf_stream + inline tuning
+    call nml_read(path_par,"ctrl","load_cb_ref",    ctl%load_cb_ref)               ! Load cb_ref from file? Otherwise define from till_cf_ref + inline tuning
     call nml_read(path_par,"ctrl","file_cb_ref",    ctl%file_cb_ref)               ! Filename holding cb_ref to load 
 
     call nml_read(path_par,"ctrl","load_bmelt",     ctl%load_bmelt)                ! Load bmelt from file?
@@ -228,8 +228,8 @@ program yelmo_test
     ! ===== basal friction optimization ======
     if (ctl%optimize) then 
         
-        ! Ensure that cb_ref will be optimized (cb_method == set externally) 
-        yelmo1%dyn%par%cb_method = -1  
+        ! Ensure that cb_ref will be optimized (till_method == set externally) 
+        yelmo1%dyn%par%till_method = -1  
 
         ! If not using restart, prescribe cb_ref to initial guess 
         if (.not. yelmo1%par%use_restart) then
@@ -241,9 +241,9 @@ program yelmo_test
         ! ============================================================
         ! Load or define cb_ref 
 
-        ! Allocate cb_ref and set it to cf_stream by default 
+        ! Allocate cb_ref and set it to till_cf_ref by default 
         allocate(cb_ref(yelmo1%grd%nx,yelmo1%grd%ny))
-        cb_ref = yelmo1%dyn%par%cf_stream  
+        cb_ref = yelmo1%dyn%par%till_cf_ref  
 
         if (ctl%load_cb_ref) then 
 
@@ -259,13 +259,12 @@ program yelmo_test
         else
             ! Define cb_ref inline 
 
-            cb_ref = yelmo1%dyn%par%cf_frozen 
+            cb_ref = yelmo1%dyn%par%till_cf_ref 
 
         end if 
 
         ! Define cb_ref initially
-        call calc_ydyn_cbref_external(yelmo1%dyn,yelmo1%tpo,yelmo1%thrm,yelmo1%bnd,yelmo1%grd,yelmo1%par%domain, &
-                                        mask_noice,cb_ref)
+        call calc_ydyn_cbref_external(yelmo1%dyn,yelmo1%tpo,yelmo1%thrm,yelmo1%bnd,cb_ref)
 
     end if 
     ! ============================================================
@@ -746,8 +745,8 @@ contains
 
     end subroutine write_step_2D
 
-    subroutine calc_ydyn_cbref_external(dyn,tpo,thrm,bnd,grd,domain,mask_noice,cb_ref)
-        ! Update cfref [Pa] based on parameter choices
+    subroutine calc_ydyn_cbref_external(dyn,tpo,thrm,bnd,cb_ref)
+        ! Update cb_ref [--] based on parameter choices
 
         implicit none
         
@@ -755,94 +754,61 @@ contains
         type(ytopo_class),  intent(IN)    :: tpo 
         type(ytherm_class), intent(IN)    :: thrm
         type(ybound_class), intent(IN)    :: bnd  
-        type(ygrid_class),  intent(IN)    :: grd
-        character(len=*),   intent(IN)    :: domain 
-        logical,            intent(IN)    :: mask_noice(:,:) 
-        real(prec),         intent(INOUT) :: cb_ref(:,:) 
+        real(wp),           intent(INOUT) :: cb_ref(:,:) 
 
         integer :: i, j, nx, ny 
-        integer :: i1, i2, j1, j2 
-        real(prec) :: f_scale 
-        
-        real(prec), allocatable :: lambda_bed(:,:)  
+        integer :: im1, ip1, jm1, jp1
+        real(wp) :: f_scale 
+        real(wp), allocatable :: lambda_bed(:,:)  
 
         nx = size(dyn%now%cb_ref,1)
         ny = size(dyn%now%cb_ref,2)
         
         allocate(lambda_bed(nx,ny))
+        
+        if (dyn%par%till_method .eq. -1) then 
+            ! Do nothing - cb_ref defined externally
 
-            ! cb_ref [unitless] is obtained as input to this routine from optimization or elsewhere
+        else 
+            ! Calculate cb_ref following parameter choices 
+            ! lambda_bed: scaling as a function of bedrock elevation
 
-            ! =============================================================================
-            ! Step 2: calculate lambda functions to scale cb_ref from default value 
-            
-            select case(trim(dyn%par%cb_scale))
+            select case(trim(dyn%par%till_scale))
 
-                case("lin_zb")
+                case("none")
+                    ! No scaling with elevation, set reference value 
+
+                    dyn%now%cb_ref = dyn%par%till_cf_ref
+                    
+                case("lin")
                     ! Linear scaling function with bedrock elevation
-                    
-                    lambda_bed = calc_lambda_bed_lin(bnd%z_bed,dyn%par%cb_z0,dyn%par%cb_z1)
 
-                case("exp_zb")
-                    ! Exponential scaling function with bedrock elevation
-                    
-                    ! Default
-                    lambda_bed = calc_lambda_bed_exp(bnd%z_bed,dyn%par%cb_z0,dyn%par%cb_z1)
+                    lambda_bed = calc_lambda_bed_lin(bnd%z_bed,bnd%z_sl,dyn%par%till_z0,dyn%par%till_z1)
 
-                    if (trim(domain) .eq. "Antarctica") then 
-                        ! Domain-specific modifications to lambda function
+                    ! Calculate cb_ref 
+                    dyn%now%cb_ref = dyn%par%till_cf0 + (dyn%par%till_cf1-dyn%par%till_cf0)*lambda_bed
 
-                        ! Increased friction in Wilkes Land (South - Southeast)
-                        where (bnd%basins .ge. 12 .and. bnd%basins .le. 17) 
-                            lambda_bed = calc_lambda_bed_exp(bnd%z_bed,-400.0_prec,dyn%par%cb_z1)
-                        end where
+                case("exp") 
 
-                        ! Increased friction in WAIS divide area feeding the Ronne
-                        where (bnd%basins .eq.  1 .or. bnd%basins .eq.  2)
-                            lambda_bed = calc_lambda_bed_exp(bnd%z_bed,-2000.0_prec,dyn%par%cb_z1)
-                        end where 
+                    lambda_bed = calc_lambda_bed_exp(bnd%z_bed,bnd%z_sl,dyn%par%till_z0,dyn%par%till_z1)
 
-!                         ! Increased friction in WAIS divide area feeding the Ross
-!                         where (bnd%basins .eq. 21 .or. bnd%basins .eq. 22)
-!                             lambda_bed = calc_lambda_bed_exp(bnd%z_bed,-2000.0,dyn%par%cb_z1)
-!                         end where
-
-                    end if 
-
-                case("till_const")
-                    ! Constant till friction angle
-
-                    lambda_bed = calc_lambda_till_const(dyn%par%till_phi_const)
-
-                case("till_zb")
-                    ! Linear till friction angle versus elevation
-
-                    lambda_bed = calc_lambda_till_linear(bnd%z_bed,bnd%z_sl,dyn%par%till_phi_min,dyn%par%till_phi_max, &
-                                                            dyn%par%till_phi_zmin,dyn%par%till_phi_zmax)
+                    dyn%now%cb_ref = dyn%par%till_cf1 * lambda_bed 
+                    where(dyn%now%cb_ref .lt. dyn%par%till_cf0) dyn%now%cb_ref = dyn%par%till_cf0 
 
                 case DEFAULT
-                    ! No scaling
+                    ! Scaling not recognized.
 
-                    lambda_bed = 1.0
+                    write(io_unit_err,*) "calc_ydyn_cbref_external:: Error: scaling of cb_ref with &
+                    &elevation not recognized."
+                    write(io_unit_err,*) "ydyn.till_scale = ", dyn%par%till_scale 
+                    stop 
 
             end select 
-
-            ! Set lambda_bed to lower limit for regions of noice 
-            where (mask_noice) lambda_bed = dyn%par%cb_min 
             
-            ! Ensure lambda_bed is not below lower limit [default range 0:1] 
-            where (lambda_bed .lt. dyn%par%cb_min) lambda_bed = dyn%par%cb_min
+        end if 
 
-            ! =============================================================================
-            ! Step 3: calculate cb_ref [--]
-            
-            cb_ref = (cb_ref*lambda_bed)
-
-            ! Use location-specific tuning functions to modify cb_ref 
-            call modify_cb_ref(dyn,tpo,thrm,bnd,grd,domain,cb_ref)
-            
-            ! Finally store in dyn object for output
-            dyn%now%cb_ref = cb_ref 
+        ! Store value for output locally too
+        cb_ref = dyn%now%cb_ref 
 
         return 
 
@@ -870,65 +836,65 @@ contains
 
 
                 ! Increase friction - feeding the Ronne ice shelf from the South
-!                 call scale_cf_gaussian(cb_ref,dyn%par%cf_stream*2.0,x0=-800.0, y0= 100.0,sigma=400.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
-!                 call scale_cf_gaussian(cb_ref,dyn%par%cf_stream*2.0,x0=-980.0, y0=-400.0,sigma=200.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
+!                 call scale_cf_gaussian(cb_ref,dyn%par%till_cf_ref*2.0,x0=-800.0, y0= 100.0,sigma=400.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
+!                 call scale_cf_gaussian(cb_ref,dyn%par%till_cf_ref*2.0,x0=-980.0, y0=-400.0,sigma=200.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
                 
                 ! Reduction friction - feeding the Ross ice shelf from the East
-                call scale_cf_gaussian(cb_ref,dyn%par%cf_stream*0.05_prec,x0= 130.0_prec, y0=-550.0_prec, sigma=100.0_prec,xx=grd%x*1e-3_prec,yy=grd%y*1e-3_prec)
-                call scale_cf_gaussian(cb_ref,dyn%par%cf_stream*0.05_prec,x0= 280.0_prec, y0=-760.0_prec, sigma=100.0_prec,xx=grd%x*1e-3_prec,yy=grd%y*1e-3_prec)
-                call scale_cf_gaussian(cb_ref,dyn%par%cf_stream*0.05_prec,x0= 380.0_prec, y0=-960.0_prec, sigma=100.0_prec,xx=grd%x*1e-3_prec,yy=grd%y*1e-3_prec)
-                call scale_cf_gaussian(cb_ref,dyn%par%cf_stream*0.05_prec,x0= 400.0_prec, y0=-1150.0_prec,sigma=100.0_prec,xx=grd%x*1e-3_prec,yy=grd%y*1e-3_prec)
+                call scale_cf_gaussian(cb_ref,dyn%par%till_cf_ref*0.05_prec,x0= 130.0_prec, y0=-550.0_prec, sigma=100.0_prec,xx=grd%x*1e-3_prec,yy=grd%y*1e-3_prec)
+                call scale_cf_gaussian(cb_ref,dyn%par%till_cf_ref*0.05_prec,x0= 280.0_prec, y0=-760.0_prec, sigma=100.0_prec,xx=grd%x*1e-3_prec,yy=grd%y*1e-3_prec)
+                call scale_cf_gaussian(cb_ref,dyn%par%till_cf_ref*0.05_prec,x0= 380.0_prec, y0=-960.0_prec, sigma=100.0_prec,xx=grd%x*1e-3_prec,yy=grd%y*1e-3_prec)
+                call scale_cf_gaussian(cb_ref,dyn%par%till_cf_ref*0.05_prec,x0= 400.0_prec, y0=-1150.0_prec,sigma=100.0_prec,xx=grd%x*1e-3_prec,yy=grd%y*1e-3_prec)
 
 
 if (.FALSE.) then 
                 ! Increase - feeding the Ronne ice shelf from the North
-                call scale_cf_gaussian(cb_ref,dyn%par%cf_stream*4.00_prec,x0=-700.0_prec, y0=    0.0_prec,sigma=200.0_prec,xx=grd%x*1e-3_prec,yy=grd%y*1e-3_prec)
+                call scale_cf_gaussian(cb_ref,dyn%par%till_cf_ref*4.00_prec,x0=-700.0_prec, y0=    0.0_prec,sigma=200.0_prec,xx=grd%x*1e-3_prec,yy=grd%y*1e-3_prec)
                 
                 ! Increase - Southeast Antarctica inland
-                call scale_cf_gaussian(cb_ref,dyn%par%cf_stream*2.00_prec,x0=1500.0_prec, y0= -550.0_prec,sigma=200.0_prec,xx=grd%x*1e-3_prec,yy=grd%y*1e-3_prec)
-                call scale_cf_gaussian(cb_ref,dyn%par%cf_stream*2.00_prec,x0=1700.0_prec, y0=-1000.0_prec,sigma=200.0_prec,xx=grd%x*1e-3_prec,yy=grd%y*1e-3_prec)
+                call scale_cf_gaussian(cb_ref,dyn%par%till_cf_ref*2.00_prec,x0=1500.0_prec, y0= -550.0_prec,sigma=200.0_prec,xx=grd%x*1e-3_prec,yy=grd%y*1e-3_prec)
+                call scale_cf_gaussian(cb_ref,dyn%par%till_cf_ref*2.00_prec,x0=1700.0_prec, y0=-1000.0_prec,sigma=200.0_prec,xx=grd%x*1e-3_prec,yy=grd%y*1e-3_prec)
                 
                 ! Reduction - South pole 
-                call scale_cf_gaussian(cb_ref,dyn%par%cf_stream*0.10_prec,x0=   0.0_prec, y0=   0.0_prec, sigma=400.0_prec,xx=grd%x*1e-3_prec,yy=grd%y*1e-3_prec)
-                call scale_cf_gaussian(cb_ref,dyn%par%cf_stream*0.20_prec,x0=   0.0_prec, y0= 600.0_prec, sigma=300.0_prec,xx=grd%x*1e-3_prec,yy=grd%y*1e-3_prec)
-                call scale_cf_gaussian(cb_ref,dyn%par%cf_stream*0.10_prec,x0= 500.0_prec, y0=-500.0_prec, sigma=400.0_prec,xx=grd%x*1e-3_prec,yy=grd%y*1e-3_prec)
+                call scale_cf_gaussian(cb_ref,dyn%par%till_cf_ref*0.10_prec,x0=   0.0_prec, y0=   0.0_prec, sigma=400.0_prec,xx=grd%x*1e-3_prec,yy=grd%y*1e-3_prec)
+                call scale_cf_gaussian(cb_ref,dyn%par%till_cf_ref*0.20_prec,x0=   0.0_prec, y0= 600.0_prec, sigma=300.0_prec,xx=grd%x*1e-3_prec,yy=grd%y*1e-3_prec)
+                call scale_cf_gaussian(cb_ref,dyn%par%till_cf_ref*0.10_prec,x0= 500.0_prec, y0=-500.0_prec, sigma=400.0_prec,xx=grd%x*1e-3_prec,yy=grd%y*1e-3_prec)
                 
                 ! Reduction - Amery ice shelf
-                call scale_cf_gaussian(cb_ref,dyn%par%cf_stream*0.05_prec,x0=1500.0_prec, y0= 650.0_prec, sigma=300.0_prec,xx=grd%x*1e-3_prec,yy=grd%y*1e-3_prec)
+                call scale_cf_gaussian(cb_ref,dyn%par%till_cf_ref*0.05_prec,x0=1500.0_prec, y0= 650.0_prec, sigma=300.0_prec,xx=grd%x*1e-3_prec,yy=grd%y*1e-3_prec)
                 
                 ! Reduction - feeding the Ross ice shelf from the North
-                call scale_cf_gaussian(cb_ref,dyn%par%cf_stream*0.005_prec,x0=-500.0_prec, y0=-500.0_prec, sigma=300.0_prec,xx=grd%x*1e-3_prec,yy=grd%y*1e-3_prec)
+                call scale_cf_gaussian(cb_ref,dyn%par%till_cf_ref*0.005_prec,x0=-500.0_prec, y0=-500.0_prec, sigma=300.0_prec,xx=grd%x*1e-3_prec,yy=grd%y*1e-3_prec)
 
                 ! Reduction - feeding the Ross ice shelf from the East
-                call scale_cf_gaussian(cb_ref,dyn%par%cf_stream*0.05_prec,x0= 130.0_prec, y0=-550.0_prec, sigma=100.0_prec,xx=grd%x*1e-3_prec,yy=grd%y*1e-3_prec)
-                call scale_cf_gaussian(cb_ref,dyn%par%cf_stream*0.05_prec,x0= 280.0_prec, y0=-760.0_prec, sigma=100.0_prec,xx=grd%x*1e-3_prec,yy=grd%y*1e-3_prec)
-                call scale_cf_gaussian(cb_ref,dyn%par%cf_stream*0.05_prec,x0= 380.0_prec, y0=-960.0_prec, sigma=100.0_prec,xx=grd%x*1e-3_prec,yy=grd%y*1e-3_prec)
-                call scale_cf_gaussian(cb_ref,dyn%par%cf_stream*0.05_prec,x0= 400.0_prec, y0=-1150.0_prec,sigma=100.0_prec,xx=grd%x*1e-3_prec,yy=grd%y*1e-3_prec)
+                call scale_cf_gaussian(cb_ref,dyn%par%till_cf_ref*0.05_prec,x0= 130.0_prec, y0=-550.0_prec, sigma=100.0_prec,xx=grd%x*1e-3_prec,yy=grd%y*1e-3_prec)
+                call scale_cf_gaussian(cb_ref,dyn%par%till_cf_ref*0.05_prec,x0= 280.0_prec, y0=-760.0_prec, sigma=100.0_prec,xx=grd%x*1e-3_prec,yy=grd%y*1e-3_prec)
+                call scale_cf_gaussian(cb_ref,dyn%par%till_cf_ref*0.05_prec,x0= 380.0_prec, y0=-960.0_prec, sigma=100.0_prec,xx=grd%x*1e-3_prec,yy=grd%y*1e-3_prec)
+                call scale_cf_gaussian(cb_ref,dyn%par%till_cf_ref*0.05_prec,x0= 400.0_prec, y0=-1150.0_prec,sigma=100.0_prec,xx=grd%x*1e-3_prec,yy=grd%y*1e-3_prec)
 
 end if 
 
 if (.FALSE.) then
                 ! Reduction 
-                call scale_cf_gaussian(cb_ref,dyn%par%cf_stream*0.25_prec,x0=-2000.0_prec,y0=1000.0_prec, sigma=100.0_prec,xx=grd%x*1e-3_prec,yy=grd%y*1e-3_prec)
-                call scale_cf_gaussian(cb_ref,dyn%par%cf_stream*0.20_prec,x0=-750.0_prec, y0=-900.0_prec, sigma=300.0_prec,xx=grd%x*1e-3_prec,yy=grd%y*1e-3_prec)
-                call scale_cf_gaussian(cb_ref,dyn%par%cf_stream*0.20_prec,x0=-600.0_prec, y0=-600.0_prec, sigma=300.0_prec,xx=grd%x*1e-3_prec,yy=grd%y*1e-3_prec)
-                call scale_cf_gaussian(cb_ref,dyn%par%cf_stream*0.20_prec,x0=-300.0_prec, y0=   0.0_prec, sigma=100.0_prec,xx=grd%x*1e-3_prec,yy=grd%y*1e-3_prec)
-                call scale_cf_gaussian(cb_ref,dyn%par%cf_stream*0.20_prec,x0=-250.0_prec, y0=-500.0_prec, sigma=100.0_prec,xx=grd%x*1e-3_prec,yy=grd%y*1e-3_prec)
-                call scale_cf_gaussian(cb_ref,dyn%par%cf_stream*0.20_prec,x0=-100.0_prec, y0=-600.0_prec, sigma=300.0_prec,xx=grd%x*1e-3_prec,yy=grd%y*1e-3_prec)
-                call scale_cf_gaussian(cb_ref,dyn%par%cf_stream*0.20_prec,x0=-100.0_prec, y0=-300.0_prec, sigma=300.0_prec,xx=grd%x*1e-3_prec,yy=grd%y*1e-3_prec)
-                call scale_cf_gaussian(cb_ref,dyn%par%cf_stream*0.20_prec,x0=   0.0_prec, y0=   0.0_prec, sigma=300.0_prec,xx=grd%x*1e-3_prec,yy=grd%y*1e-3_prec)
-                call scale_cf_gaussian(cb_ref,dyn%par%cf_stream*0.20_prec,x0= 130.0_prec, y0=-550.0_prec, sigma= 50.0_prec,xx=grd%x*1e-3_prec,yy=grd%y*1e-3_prec)
-                call scale_cf_gaussian(cb_ref,dyn%par%cf_stream*0.20_prec,x0= 280.0_prec, y0=-760.0_prec, sigma= 50.0_prec,xx=grd%x*1e-3_prec,yy=grd%y*1e-3_prec)
-                call scale_cf_gaussian(cb_ref,dyn%par%cf_stream*0.20_prec,x0= 380.0_prec, y0=-960.0_prec, sigma= 50.0_prec,xx=grd%x*1e-3_prec,yy=grd%y*1e-3_prec)
-                call scale_cf_gaussian(cb_ref,dyn%par%cf_stream*0.50_prec,x0= 400.0_prec, y0=   0.0_prec, sigma=300.0_prec,xx=grd%x*1e-3_prec,yy=grd%y*1e-3_prec)
-                call scale_cf_gaussian(cb_ref,dyn%par%cf_stream*0.20_prec,x0= 400.0_prec, y0=-1150.0_prec,sigma= 50.0_prec,xx=grd%x*1e-3_prec,yy=grd%y*1e-3_prec)
-                call scale_cf_gaussian(cb_ref,dyn%par%cf_stream*0.25_prec,x0= 700.0_prec, y0= -500.0_prec,sigma=400.0_prec,xx=grd%x*1e-3_prec,yy=grd%y*1e-3_prec)
-                call scale_cf_gaussian(cb_ref,dyn%par%cf_stream*0.20_prec,x0=1500.0_prec, y0= 650.0_prec, sigma=300.0_prec,xx=grd%x*1e-3_prec,yy=grd%y*1e-3_prec)
+                call scale_cf_gaussian(cb_ref,dyn%par%till_cf_ref*0.25_prec,x0=-2000.0_prec,y0=1000.0_prec, sigma=100.0_prec,xx=grd%x*1e-3_prec,yy=grd%y*1e-3_prec)
+                call scale_cf_gaussian(cb_ref,dyn%par%till_cf_ref*0.20_prec,x0=-750.0_prec, y0=-900.0_prec, sigma=300.0_prec,xx=grd%x*1e-3_prec,yy=grd%y*1e-3_prec)
+                call scale_cf_gaussian(cb_ref,dyn%par%till_cf_ref*0.20_prec,x0=-600.0_prec, y0=-600.0_prec, sigma=300.0_prec,xx=grd%x*1e-3_prec,yy=grd%y*1e-3_prec)
+                call scale_cf_gaussian(cb_ref,dyn%par%till_cf_ref*0.20_prec,x0=-300.0_prec, y0=   0.0_prec, sigma=100.0_prec,xx=grd%x*1e-3_prec,yy=grd%y*1e-3_prec)
+                call scale_cf_gaussian(cb_ref,dyn%par%till_cf_ref*0.20_prec,x0=-250.0_prec, y0=-500.0_prec, sigma=100.0_prec,xx=grd%x*1e-3_prec,yy=grd%y*1e-3_prec)
+                call scale_cf_gaussian(cb_ref,dyn%par%till_cf_ref*0.20_prec,x0=-100.0_prec, y0=-600.0_prec, sigma=300.0_prec,xx=grd%x*1e-3_prec,yy=grd%y*1e-3_prec)
+                call scale_cf_gaussian(cb_ref,dyn%par%till_cf_ref*0.20_prec,x0=-100.0_prec, y0=-300.0_prec, sigma=300.0_prec,xx=grd%x*1e-3_prec,yy=grd%y*1e-3_prec)
+                call scale_cf_gaussian(cb_ref,dyn%par%till_cf_ref*0.20_prec,x0=   0.0_prec, y0=   0.0_prec, sigma=300.0_prec,xx=grd%x*1e-3_prec,yy=grd%y*1e-3_prec)
+                call scale_cf_gaussian(cb_ref,dyn%par%till_cf_ref*0.20_prec,x0= 130.0_prec, y0=-550.0_prec, sigma= 50.0_prec,xx=grd%x*1e-3_prec,yy=grd%y*1e-3_prec)
+                call scale_cf_gaussian(cb_ref,dyn%par%till_cf_ref*0.20_prec,x0= 280.0_prec, y0=-760.0_prec, sigma= 50.0_prec,xx=grd%x*1e-3_prec,yy=grd%y*1e-3_prec)
+                call scale_cf_gaussian(cb_ref,dyn%par%till_cf_ref*0.20_prec,x0= 380.0_prec, y0=-960.0_prec, sigma= 50.0_prec,xx=grd%x*1e-3_prec,yy=grd%y*1e-3_prec)
+                call scale_cf_gaussian(cb_ref,dyn%par%till_cf_ref*0.50_prec,x0= 400.0_prec, y0=   0.0_prec, sigma=300.0_prec,xx=grd%x*1e-3_prec,yy=grd%y*1e-3_prec)
+                call scale_cf_gaussian(cb_ref,dyn%par%till_cf_ref*0.20_prec,x0= 400.0_prec, y0=-1150.0_prec,sigma= 50.0_prec,xx=grd%x*1e-3_prec,yy=grd%y*1e-3_prec)
+                call scale_cf_gaussian(cb_ref,dyn%par%till_cf_ref*0.25_prec,x0= 700.0_prec, y0= -500.0_prec,sigma=400.0_prec,xx=grd%x*1e-3_prec,yy=grd%y*1e-3_prec)
+                call scale_cf_gaussian(cb_ref,dyn%par%till_cf_ref*0.20_prec,x0=1500.0_prec, y0= 650.0_prec, sigma=300.0_prec,xx=grd%x*1e-3_prec,yy=grd%y*1e-3_prec)
                 
                 ! Increase
-                call scale_cf_gaussian(cb_ref,dyn%par%cf_stream*4.00_prec,x0=-600.0_prec, y0=    0.0_prec,sigma=200.0_prec,xx=grd%x*1e-3_prec,yy=grd%y*1e-3_prec)
-                call scale_cf_gaussian(cb_ref,dyn%par%cf_stream*2.00_prec,x0=1200.0_prec, y0=-1200.0_prec,sigma=300.0_prec,xx=grd%x*1e-3_prec,yy=grd%y*1e-3_prec)
-                call scale_cf_gaussian(cb_ref,dyn%par%cf_stream*1.50_prec,x0=2000.0_prec, y0=    0.0_prec,sigma=300.0_prec,xx=grd%x*1e-3_prec,yy=grd%y*1e-3_prec)
+                call scale_cf_gaussian(cb_ref,dyn%par%till_cf_ref*4.00_prec,x0=-600.0_prec, y0=    0.0_prec,sigma=200.0_prec,xx=grd%x*1e-3_prec,yy=grd%y*1e-3_prec)
+                call scale_cf_gaussian(cb_ref,dyn%par%till_cf_ref*2.00_prec,x0=1200.0_prec, y0=-1200.0_prec,sigma=300.0_prec,xx=grd%x*1e-3_prec,yy=grd%y*1e-3_prec)
+                call scale_cf_gaussian(cb_ref,dyn%par%till_cf_ref*1.50_prec,x0=2000.0_prec, y0=    0.0_prec,sigma=300.0_prec,xx=grd%x*1e-3_prec,yy=grd%y*1e-3_prec)
 end if 
 
             end if 

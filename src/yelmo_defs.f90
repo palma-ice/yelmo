@@ -237,21 +237,11 @@ module yelmo_defs
         real(wp)   :: beta_gl_f             ! Fraction of beta at gl 
         integer    :: taud_gl_method        ! Driving stress grounding line treatment 
         real(wp)   :: H_grnd_lim 
-        real(wp)   :: H_sed_sat
-        integer    :: cb_method
-        logical    :: cb_with_pmp           ! Scale friction coefficient between frozen and streaming values?
-        logical    :: cb_margin_pmp         ! Ensure margin and grline are considered streaming?
-        character(len=256) :: cb_scale      ! Method for scaling cb with elevation
-        real(wp)   :: cb_z0  
-        real(wp)   :: cb_z1
-        real(wp)   :: cb_min      
-        real(wp)   :: cf_frozen
-        real(wp)   :: cf_stream
         integer    :: n_sm_beta 
         real(wp)   :: beta_min              ! Minimum allowed value of beta
         real(wp)   :: eps_0                 ! Minimum assumed strain rate for effective viscosity regularization
         character(len=256) :: ssa_lis_opt 
-        character(len=256) :: ssa_lat_bc
+        character(len=56)  :: ssa_lat_bc
         real(wp)   :: ssa_beta_max          ! Maximum value of beta for which ssa should be calculated
         real(wp)   :: ssa_vel_max
         integer    :: ssa_iter_max 
@@ -259,7 +249,18 @@ module yelmo_defs
         real(wp)   :: ssa_iter_conv 
         real(wp)   :: taud_lim 
         real(wp)   :: cb_sia
-        
+
+        ! Till-scaling parameters
+        integer    :: till_method 
+        character(len=56) :: till_scale
+        logical    :: till_is_angle
+        real(wp)   :: till_z0 
+        real(wp)   :: till_z1 
+        real(wp)   :: till_cf0 
+        real(wp)   :: till_cf1 
+        real(wp)   :: till_cf_ref 
+
+        ! Effective pressure parameters
         integer    :: neff_method
         real(wp)   :: neff_const
         real(wp)   :: neff_p 
@@ -270,12 +271,6 @@ module yelmo_defs
         real(wp)   :: neff_e0 
         real(wp)   :: neff_Cc 
 
-        real(wp)   :: till_phi_const 
-        real(wp)   :: till_phi_min 
-        real(wp)   :: till_phi_max 
-        real(wp)   :: till_phi_zmin 
-        real(wp)   :: till_phi_zmax 
-        
         ! Internal parameters 
         character(len=256) :: boundaries 
         logical    :: use_ssa                   ! Should ssa be used? 

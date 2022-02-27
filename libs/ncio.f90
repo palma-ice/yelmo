@@ -35,6 +35,8 @@ module ncio
     double precision, parameter :: NC_TOL = 1d-7
     double precision, parameter :: NC_LIM = 1d25
 
+    double precision, parameter :: NCIO_TOL_UNDERFLOW = 1d-36 
+
     character(len=NC_STRLEN), parameter :: NC_CHARDIM = "strlen"
 
     character(len=3), parameter :: GRID_MAPPING_NAME_DEFAULT = "crs" 
@@ -435,7 +437,7 @@ contains
               v%count(i) = size_in(i)
             end do
         end if
-
+        
         ! Read the variable data from the file
         ! (NF90 converts dat to proper type (int, real, dble)
         call nc_check( nf90_get_var(nc_id, v%varid, dat, v%start, v%count) )
@@ -470,7 +472,10 @@ contains
               dat = dat*v%scale_factor + v%add_offset
         end if
 
-        ! Also eliminate crazy values (in case they are not handled by missing_value for some reason)
+        ! Eliminate tiny values that may cause underflow errors
+        where(dabs(dat) .lt. NCIO_TOL_UNDERFLOW) dat = 0.0d0 
+        
+        ! Also eliminate crazy high values (in case they are not handled by missing_value for some reason)
         ! Fill with user-desired missing value
         if (present(missing_value_int)) &
             where( dabs(dat) .ge. NC_LIM ) dat = dble(missing_value_int)

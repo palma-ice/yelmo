@@ -30,12 +30,12 @@ contains
 
         ! Local variables 
         integer :: q, q1, nx, ny 
-        real(prec), allocatable :: tmp(:,:) 
-        real(prec), allocatable :: tmp1(:,:) 
-        logical,    allocatable :: mask_region(:,:)
-        logical,    allocatable :: mask(:,:)
-
-        real(prec), parameter :: tol = 1e-3 
+        logical,  allocatable :: mask_region(:,:)
+        logical,  allocatable :: mask(:,:)
+        real(dp), allocatable :: tmp(:,:) 
+        real(dp), allocatable :: tmp1(:,:) 
+        
+        real(dp), parameter :: tol = 1e-3 
 
         nx = size(tpo%now%H_ice,1)
         ny = size(tpo%now%H_ice,2)
@@ -103,7 +103,7 @@ contains
             dta%pd%rmse_H = mv 
         end if 
 
-        if (dta%pd%rmse_H .eq. 0.0_prec) dta%pd%rmse_H = mv 
+        if (dta%pd%rmse_H .eq. 0.0_wp) dta%pd%rmse_H = mv 
 
         ! == rmse[Surface elevation] ===================
 
@@ -117,7 +117,7 @@ contains
             dta%pd%rmse_zsrf = mv 
         end if 
 
-        if (dta%pd%rmse_zsrf .eq. 0.0_prec) dta%pd%rmse_zsrf = mv 
+        if (dta%pd%rmse_zsrf .eq. 0.0_wp) dta%pd%rmse_zsrf = mv 
         
         ! == rmse[Surface velocity] ===================
         tmp = dta%pd%err_uxy_s
@@ -130,7 +130,7 @@ contains
             dta%pd%rmse_uxy = mv
         end if 
 
-        if (dta%pd%rmse_uxy .eq. 0.0_prec) dta%pd%rmse_uxy = mv 
+        if (dta%pd%rmse_uxy .eq. 0.0_wp) dta%pd%rmse_uxy = mv 
         
         ! == rmse[log(Surface velocity)] ===================
         tmp = dta%pd%uxy_s 
@@ -146,7 +146,7 @@ contains
             dta%pd%rmse_loguxy = mv
         end if 
         
-        if (dta%pd%rmse_loguxy .eq. 0.0_prec) dta%pd%rmse_loguxy = mv 
+        if (dta%pd%rmse_loguxy .eq. 0.0_wp) dta%pd%rmse_loguxy = mv 
         
         ! == rmse[isochronal layer depth] ============
 
@@ -175,8 +175,8 @@ contains
         character(len=1028) :: filename 
         character(len=56)   :: nms(4) 
         real(wp)            :: z_bed_f_sd
-        real(prec), allocatable :: z_bed_sd(:,:) 
-        real(prec), allocatable :: tmp(:,:,:) 
+        real(wp), allocatable :: z_bed_sd(:,:) 
+        real(wp), allocatable :: tmp(:,:,:) 
 
         real(wp), parameter :: z_sl_pd = 0.0_wp     ! [m] Define present day relative sea level as zero
 

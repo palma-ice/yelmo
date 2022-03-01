@@ -34,7 +34,8 @@ module basal_dragging
     public :: calc_effective_pressure_overburden
     public :: calc_effective_pressure_marine
     public :: calc_effective_pressure_till
-
+    public :: calc_effective_pressure_two_value 
+    
     ! c_bed functions
     public :: calc_lambda_bed_lin
     public :: calc_lambda_bed_exp
@@ -533,6 +534,57 @@ contains
 
     end subroutine calc_effective_pressure_till
     
+    subroutine calc_effective_pressure_two_value(N_eff,f_pmp,H_ice,f_ice,f_grnd,delta)
+
+        implicit none 
+
+        real(wp), intent(OUT) :: N_eff(:,:)
+        real(wp), intent(IN)  :: f_pmp(:,:) 
+        real(wp), intent(IN)  :: H_ice(:,:) 
+        real(wp), intent(IN)  :: f_ice(:,:) 
+        real(wp), intent(IN)  :: f_grnd(:,:) 
+        real(wp), intent(IN)  :: delta
+        
+        ! Local variables
+        integer :: i, j, nx, ny  
+        real(wp) :: H_eff
+        real(wp) :: P0, P1
+
+        nx = size(N_eff,1)
+        ny = size(N_eff,2) 
+
+        do j = 1, ny 
+        do i = 1, nx 
+
+            if (f_grnd(i,j) .eq. 0.0_wp) then 
+                ! No effective pressure at base for purely floating ice
+            
+                N_eff(i,j) = 0.0_wp 
+
+            else 
+
+                ! Get effective ice thickness 
+                call calc_H_eff(H_eff,H_ice(i,j),f_ice(i,j),set_frac_zero=.TRUE.)
+
+                ! Get overburden pressure 
+                P0 = rho_ice*g*H_eff
+
+                ! Calculate reduced pressure assuming full application of delta
+                P1 = P0 * delta 
+
+                ! Calculate effective pressure as a weighted average of 
+                ! P0 and P1 via f_pmp 
+                N_eff(i,j) = P0*(1.0_wp-f_pmp(i,j)) + P1*f_pmp(i,j)
+                
+            end if  
+
+        end do 
+        end do
+
+        return
+
+    end subroutine calc_effective_pressure_two_value
+
     elemental function calc_lambda_bed_lin(z_bed,z_sl,z0,z1) result(lambda)
         ! Calculate scaling function: linear 
         

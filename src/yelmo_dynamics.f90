@@ -887,6 +887,12 @@ contains
                 call calc_effective_pressure_till(dyn%now%N_eff,H_w,tpo%now%H_ice_dyn,tpo%now%f_ice_dyn,tpo%now%f_grnd, &
                                   thrm%par%H_w_max,dyn%par%neff_N0,dyn%par%neff_delta,dyn%par%neff_e0,dyn%par%neff_Cc) 
 
+            case(4) 
+                ! Calculate two-valued effective pressure using till parameter neff_delta 
+
+                call calc_effective_pressure_two_value(dyn%now%N_eff,thrm%now%f_pmp,tpo%now%H_ice_dyn,tpo%now%f_ice_dyn, &
+                                                                                        tpo%now%f_grnd,dyn%par%neff_delta)
+                
             case DEFAULT 
 
                 write(*,*) "ydyn_calc_Neff:: Error: neff_method not recognized, must be one of [-1,0,1,2,3]."

@@ -70,7 +70,8 @@ contains
         if (is_angle) then 
             ! Transform cb_ref by tangent to make 
             ! c_bed = tau_c == critical bed stress
-            ! e.g., Bueler and van Pelt (2015); Albrecht et al (2020a)
+            ! e.g., Bueler and van Pelt (2015); Albrecht et al (2020a);
+            ! Zoet and Iverson (2020)
 
             c_bed = tan(cb_ref*degrees_to_radians)*N_eff 
 

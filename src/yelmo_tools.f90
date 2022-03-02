@@ -3407,7 +3407,7 @@ contains
         else
             ! Assume that everywhere should be smoothed
 
-            mask_use_local = .TRUE.
+            mask_apply_local = .TRUE.
         
         end if
 

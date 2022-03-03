@@ -183,7 +183,8 @@ contains
         ! ===== Consistency checks ==========================
 
         ! Ensure beta is defined well 
-        if ( count(H_grnd .gt. 100.0) .gt. 0 .and. count(beta_acx .gt. 0.0 .and. H_grnd .gt. 100.0) .eq. 0 ) then  
+        if ( count(H_grnd .gt. 100.0 .and. H_ice .gt. 0.0) .gt. 0 .and. &
+                count(beta_acx .gt. 0.0 .and. H_grnd .gt. 100.0 .and. H_ice .gt. 0.0) .eq. 0 ) then  
             ! No points found with a non-zero beta for grounded ice,
             ! something was not well-defined/well-initialized
 

@@ -967,14 +967,6 @@ contains
         character(len=256) :: dom_thrm_method 
         character(len=256) :: dom_thrm_rock_method 
         
-        ! Store original model choices locally 
-        dom_thrm_method      = dom%thrm%par%method 
-        dom_thrm_rock_method = dom%thrm%par%rock_method 
-
-        ! Impose initialization choices 
-        dom%thrm%par%method      = thrm_method 
-        dom%thrm%par%rock_method = "equil" 
-
         ! Initialize variables
 
         if (dom%par%use_restart) then 
@@ -993,6 +985,14 @@ contains
                 stop 
             end if
             
+            ! Store original model choices locally 
+            dom_thrm_method      = dom%thrm%par%method 
+            dom_thrm_rock_method = dom%thrm%par%rock_method 
+
+            ! Impose initialization choices 
+            dom%thrm%par%method      = thrm_method 
+            dom%thrm%par%rock_method = "equil" 
+
             ! Run topo and masks to make sure all fields are synchronized (masks, etc)
             call calc_ytopo_pc(dom%tpo,dom%dyn,dom%mat,dom%thrm,dom%bnd,time,topo_fixed=.TRUE.,pc_step="none")
             call calc_ytopo_masks(dom%tpo,dom%dyn,dom%mat,dom%thrm,dom%bnd)
@@ -1027,7 +1027,12 @@ contains
             ! Calculate material information again with updated dynamics
         
             call calc_ymat(dom%mat,dom%tpo,dom%dyn,dom%thrm,dom%bnd,time)
-            
+
+            ! Restore original model choices 
+            ! Impose initialization choices 
+            dom%thrm%par%method      = dom_thrm_method 
+            dom%thrm%par%rock_method = dom_thrm_rock_method
+
         end if 
 
 
@@ -1038,11 +1043,7 @@ contains
         ! Update regional calculations (for now entire domain with ice)
         call calc_yregions(dom%reg,dom%tpo,dom%dyn,dom%thrm,dom%mat,dom%bnd,mask=dom%bnd%ice_allowed)
         
-        ! Restore original model choices 
-        ! Impose initialization choices 
-        dom%thrm%par%method      = dom_thrm_method 
-        dom%thrm%par%rock_method = dom_thrm_rock_method
-
+        
         return 
 
     end subroutine yelmo_init_state

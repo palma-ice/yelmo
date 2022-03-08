@@ -1,6 +1,6 @@
 #!/bin/bash
 
-fldr='tmp/53823a3c'
+fldr='tmp/8880ed'
 
 
 ### BENCHMARK TESTS ###
@@ -65,6 +65,11 @@ jobrun ./runylmo -s -q priority -w 5 -e trough -n par/yelmo_MISMIP+.nml -- -o ${
 
 # F17
 ./runylmo -s -e trough -n par/yelmo_TROUGH-F17.nml -o ${fldr}/trough
+
+# SLAB-S06
+jobrun ./runylmo -r -e trough -n par/yelmo_SLAB-S06.nml -- -o ${fldr}/slab06 -p ctrl.dx=0.5,1,2,4,8 
+
+./runylmo -r -e trough -n par/yelmo_SLAB-S06.nml -o ${fldr}/slab06-test -p ctrl.dx=4 ydyn.visc_method=2
 
 ### AGE TESTS ###
 

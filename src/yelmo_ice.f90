@@ -108,7 +108,7 @@ contains
         dom%time%ssa_iter_avg = missing_value
 
         allocate(pc_mask(dom%grd%nx,dom%grd%ny))
-
+        
         ! Iteration of yelmo component updates until external timestep is reached
         do n = 1, nstep
 
@@ -177,8 +177,7 @@ contains
                 dt_now = 0.0_wp 
 
             end if 
-
-
+            
             do iter_redo=1, dom%par%pc_n_redo 
                 ! Prepare to potentially perform several iterations of the same timestep.
                 ! If at the end of one iteration, the truncation error is too high, then 
@@ -262,8 +261,10 @@ contains
                 ! Step 3: Perform corrector step for topography
                 ! Get corrected ice thickness and store it for later use
                 
+                ! Call corrector step for topography
                 call calc_ytopo_pc(dom%tpo,dom%dyn,dom%mat,dom%thrm,dom%bnd,time_now,dom%tpo%par%topo_fixed,"corrector")
                 call calc_ytopo_masks(dom%tpo,dom%dyn,dom%mat,dom%thrm,dom%bnd)
+
 
                 ! Step 4: Determine truncation error for ice thickness
 
@@ -349,6 +350,7 @@ contains
 
             ! Update topography accounting for advective changes
             ! and mass balance changes and calving.
+
             call calc_ytopo_pc(dom%tpo,dom%dyn,dom%mat,dom%thrm,dom%bnd,time_now,dom%tpo%par%topo_fixed,"advance")
             call calc_ytopo_masks(dom%tpo,dom%dyn,dom%mat,dom%thrm,dom%bnd)
 
@@ -1043,7 +1045,7 @@ contains
         ! Update regional calculations (for now entire domain with ice)
         call calc_yregions(dom%reg,dom%tpo,dom%dyn,dom%thrm,dom%mat,dom%bnd,mask=dom%bnd%ice_allowed)
         
-        
+
         return 
 
     end subroutine yelmo_init_state

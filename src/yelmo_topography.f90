@@ -434,10 +434,7 @@ contains
                     where(tpo%now%H_ice .gt. 0.0 .and. tpo%now%H_ice_n .eq. 0.0)
                         tpo%now%mask_new = 2
                     end where
-            
-                    ! Update ytopo time to current time 
-                    tpo%par%time = dble(time)
-
+                    
             end select
 
         end if 
@@ -452,6 +449,14 @@ contains
             tpo%now%dzsrfdt = (tpo%now%z_srf - tpo%now%z_srf_n) / dt 
         
         end if 
+
+        if (trim(pc_step) .eq. "advance") then 
+            ! Advance timestep here whether topo_fixed was true or not...
+            
+            ! Update ytopo time to current time 
+            tpo%par%time = dble(time)
+            
+        end if
 
         return
 

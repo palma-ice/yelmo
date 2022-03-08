@@ -1283,7 +1283,7 @@ end if
 
     end function define_temp_linear_column
 
-    subroutine define_temp_robin_3D (enth,T_ice,omega,T_pmp,cp,ct,Q_rock,T_srf,H_ice,H_w,smb,bmb,f_grnd,zeta_aa,cold)
+    subroutine define_temp_robin_3D(enth,T_ice,omega,T_pmp,cp,ct,Q_rock,T_srf,H_ice,H_w,smb,bmb,f_grnd,zeta_aa,cold)
         ! Robin solution for thermodynamics for a given column of ice 
         ! Note zeta=height, k=1 base, k=nz surface 
 

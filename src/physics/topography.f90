@@ -1572,7 +1572,9 @@ end if
         if (diffuse_bmb_shlf) then 
             ! Allow marine melt (bmb_shlf) to permeate inland at the grounding line,
             ! to induce more effective retreat in warm periods 
-
+            ! Note: this method is not recommended, especially
+            ! when a subgrid melting parameterization is used above! 
+            
             do j = 1, ny
             do i = 1, nx
 

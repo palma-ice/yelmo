@@ -14,24 +14,24 @@ program yelmo_trough
     character(len=256) :: outfldr, file2D, file1D, file_restart
     character(len=512) :: path_par, path_const 
     character(len=56)  :: experiment, res  
-    real(prec) :: time_init, time_end, time, dtt, dt1D_out, dt2D_out   
+    real(wp) :: time_init, time_end, time, dtt, dt1D_out, dt2D_out   
     integer    :: n  
 
     ! Control parameters 
-    real(prec) :: dx 
-    real(prec) :: lx, ly, fc, dc, wc
-    real(prec) :: x_cf 
-    real(prec) :: Tsrf_const, smb_const, Qgeo_const  
+    real(wp) :: dx 
+    real(wp) :: lx, ly, fc, dc, wc
+    real(wp) :: x_cf 
+    real(wp) :: Tsrf_const, smb_const, Qgeo_const  
 
-    real(prec) :: s06_alpha, s06_H0, s06_W, s06_m
-    real(prec) :: B, L  
-    real(prec), allocatable :: ux_ref(:,:) 
-    real(prec), allocatable :: tau_c_ref(:,:)
+    real(wp) :: s06_alpha, s06_H0, s06_W, s06_m
+    real(wp) :: B, L  
+    real(wp), allocatable :: ux_ref(:,:) 
+    real(wp), allocatable :: tau_c_ref(:,:)
 
-    real(prec) :: xmax, ymin, ymax 
-    integer    :: i, j, nx, ny 
+    real(wp) :: xmax, ymin, ymax 
+    integer  :: i, j, nx, ny 
     
-    real(8) :: cpu_start_time, cpu_end_time, cpu_dtime  
+    real(8)  :: cpu_start_time, cpu_end_time, cpu_dtime  
     
     ! Start timing 
     call yelmo_cpu_time(cpu_start_time)
@@ -122,7 +122,7 @@ program yelmo_trough
 
             ! ===== Intialize topography and set parameters =========
         
-            yelmo1%bnd%z_bed = 10000.0_wp - s06_alpha*(yelmo1%grd%x)
+            yelmo1%bnd%z_bed = 10000.0_wp - s06_alpha*(yelmo1%grd%x - minval(yelmo1%grd%x))
 
             yelmo1%tpo%now%H_ice = s06_H0
 
@@ -133,7 +133,6 @@ program yelmo_trough
             yelmo1%bnd%H_ice_ref = s06_H0 
 
             ! Define basal friction 
-            
             yelmo1%dyn%now%cb_ref = 5.2e3 
             where(abs(yelmo1%grd%y) .gt. s06_W) yelmo1%dyn%now%cb_ref = 70e3 
 
@@ -151,7 +150,7 @@ program yelmo_trough
 
             ! ===== Intialize topography and set parameters =========
         
-            yelmo1%bnd%z_bed = 10000.0_wp - s06_alpha*(yelmo1%grd%x)
+            yelmo1%bnd%z_bed = 10000.0_wp - s06_alpha*(yelmo1%grd%x - minval(yelmo1%grd%x))
 
             yelmo1%tpo%now%H_ice = s06_H0
 
@@ -167,7 +166,6 @@ program yelmo_trough
             L = s06_W / ((1.0_wp+s06_m)**(1.0_wp/s06_m))
 
             yelmo1%dyn%now%cb_ref = (rho_ice*g*s06_H0*s06_alpha) * abs(yelmo1%grd%y/L)**s06_m
-            yelmo1%dyn%now%cb_ref = yelmo1%dyn%now%cb_ref 
 
             ! Calculate IMAU-ICE function 
             allocate(ux_ref(yelmo1%grd%nx,yelmo1%grd%ny))
@@ -189,8 +187,8 @@ program yelmo_trough
 
             ! Use IMAU-ICE function
             yelmo1%dyn%now%cb_ref = tau_c_ref
-
-            ! Assign initial velocity values too to get quicker convergence...
+            
+            ! Assign initial velocity values to help achieve quicker convergence...
             yelmo1%dyn%now%ux_b   = ux_ref 
             yelmo1%dyn%now%ux_bar = ux_ref 
             yelmo1%dyn%now%ux_s   = ux_ref 
@@ -272,22 +270,22 @@ contains
 
         implicit none 
 
-        real(prec), intent(OUT) :: z_bed(:,:) 
-        real(prec), intent(OUT) :: H_ice(:,:) 
-        real(prec), intent(OUT) :: z_srf(:,:) 
-        real(prec), intent(IN)  :: xc(:) 
-        real(prec), intent(IN)  :: yc(:)  
-        real(prec), intent(IN)  :: fc 
-        real(prec), intent(IN)  :: dc 
-        real(prec), intent(IN)  :: wc 
-        real(prec), intent(IN)  :: x_cf 
+        real(wp), intent(OUT) :: z_bed(:,:) 
+        real(wp), intent(OUT) :: H_ice(:,:) 
+        real(wp), intent(OUT) :: z_srf(:,:) 
+        real(wp), intent(IN)  :: xc(:) 
+        real(wp), intent(IN)  :: yc(:)  
+        real(wp), intent(IN)  :: fc 
+        real(wp), intent(IN)  :: dc 
+        real(wp), intent(IN)  :: wc 
+        real(wp), intent(IN)  :: x_cf 
 
         ! Local variables 
         integer :: i, j, nx, ny 
-        real(prec) :: zb_x, zb_y 
-        real(prec) :: e1, e2 
+        real(wp) :: zb_x, zb_y 
+        real(wp) :: e1, e2 
 
-        real(prec), parameter :: zb_deep = -720.0_prec 
+        real(wp), parameter :: zb_deep = -720.0_wp 
 
         nx = size(z_bed,1) 
         ny = size(z_bed,2) 
@@ -299,7 +297,7 @@ contains
         do i = 1, nx 
             
             ! x-direction 
-            zb_x = -150.0_prec - 0.84*abs(xc(i))
+            zb_x = -150.0_wp - 0.84*abs(xc(i))
 
             ! y-direction 
             e1 = -2.0*(yc(j)-wc)/fc 
@@ -313,7 +311,7 @@ contains
         end do  
 
         ! == Ice thickness == 
-        H_ice = 50.0_prec 
+        H_ice = 50.0_wp 
         do j = 1, ny 
             where(xc .gt. x_cf) H_ice(:,j) = 0.0 
         end do 
@@ -331,29 +329,29 @@ contains
 
         implicit none 
 
-        real(prec), intent(OUT) :: z_bed(:,:) 
-        real(prec), intent(OUT) :: H_ice(:,:) 
-        real(prec), intent(OUT) :: z_srf(:,:) 
-        real(prec), intent(IN)  :: xc(:) 
-        real(prec), intent(IN)  :: yc(:)  
-        real(prec), intent(IN)  :: fc 
-        real(prec), intent(IN)  :: dc 
-        real(prec), intent(IN)  :: wc 
-        real(prec), intent(IN)  :: x_cf 
+        real(wp), intent(OUT) :: z_bed(:,:) 
+        real(wp), intent(OUT) :: H_ice(:,:) 
+        real(wp), intent(OUT) :: z_srf(:,:) 
+        real(wp), intent(IN)  :: xc(:) 
+        real(wp), intent(IN)  :: yc(:)  
+        real(wp), intent(IN)  :: fc 
+        real(wp), intent(IN)  :: dc 
+        real(wp), intent(IN)  :: wc 
+        real(wp), intent(IN)  :: x_cf 
 
         ! Local variables 
-        integer :: i, j, nx, ny 
-        real(prec) :: zb_x, zb_y 
-        real(prec) :: e1, e2 
+        integer  :: i, j, nx, ny 
+        real(wp) :: zb_x, zb_y 
+        real(wp) :: e1, e2 
 
-        real(prec) :: x1 
+        real(wp) :: x1 
 
-        real(prec), parameter :: zb_deep = -720.0_prec 
-        real(prec), parameter :: xbar    =   300.0_prec         ! [km] Characteristic along-flow length scale of the bedrock
-        real(prec), parameter :: b0      = -150.00_prec 
-        real(prec), parameter :: b2      = -728.80_prec 
-        real(prec), parameter :: b4      =  343.91_prec 
-        real(prec), parameter :: b6      =  -50.57_prec 
+        real(wp), parameter :: zb_deep = -720.0_wp 
+        real(wp), parameter :: xbar    =  300.0_wp          ! [km] Characteristic along-flow length scale of the bedrock
+        real(wp), parameter :: b0      = -150.00_wp 
+        real(wp), parameter :: b2      = -728.80_wp 
+        real(wp), parameter :: b4      =  343.91_wp 
+        real(wp), parameter :: b6      =  -50.57_wp 
 
 
         nx = size(z_bed,1) 
@@ -381,7 +379,7 @@ contains
         end do  
 
         ! == Ice thickness == 
-        H_ice = 50.0_prec 
+        H_ice = 50.0_wp 
         do j = 1, ny 
             where(xc .gt. x_cf) H_ice(:,j) = 0.0 
         end do 
@@ -401,11 +399,11 @@ contains
         
         type(yelmo_class), intent(IN) :: ylmo
         character(len=*),  intent(IN) :: filename
-        real(prec), intent(IN) :: time
+        real(wp), intent(IN) :: time
 
         ! Local variables
-        integer    :: ncid, n, i, j, nx, ny  
-        real(prec) :: time_prev 
+        integer  :: ncid, n, i, j, nx, ny  
+        real(wp) :: time_prev 
 
         nx = ylmo%tpo%par%nx 
         ny = ylmo%tpo%par%ny 

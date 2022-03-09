@@ -66,10 +66,23 @@ jobrun ./runylmo -s -q priority -w 5 -e trough -n par/yelmo_MISMIP+.nml -- -o ${
 # F17
 ./runylmo -s -e trough -n par/yelmo_TROUGH-F17.nml -o ${fldr}/trough
 
-# SLAB-S06
+### SLAB-S06 ###
+
+# One run for testing
+./runylmo -r -e trough -n par/yelmo_SLAB-S06.nml -o ${fldr}/slab06-test -p ctrl.dx=4 ydyn.visc_method=2
+
+
+# Standard ensemble runs
 jobrun ./runylmo -r -e trough -n par/yelmo_SLAB-S06.nml -- -o ${fldr}/slab06 -p ctrl.dx=0.5,1,2,4,8 
 
-./runylmo -r -e trough -n par/yelmo_SLAB-S06.nml -o ${fldr}/slab06-test -p ctrl.dx=4 ydyn.visc_method=2
+# Constant randomly-chosen fixed viscosity test
+jobrun ./runylmo -r -e trough -n par/yelmo_SLAB-S06.nml -- -o ${fldr}/slab06-1 -p ctrl.dx=1,2,4,8 ydyn.visc_method=0 ydyn.visc_const=2e6
+
+# Constant analytical velocity imposed
+# (make sure to comment out call to ssa solver in velocity_ssa.f90)
+jobrun ./runylmo -r -e trough -n par/yelmo_SLAB-S06.nml -- -o ${fldr}/slab06-2 -p ctrl.dx=0.5,1,2,4,8
+
+
 
 ### AGE TESTS ###
 

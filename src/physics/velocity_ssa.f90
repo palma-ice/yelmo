@@ -205,11 +205,19 @@ if (.FALSE.) then
                 !call update_ssa_mask_convergence(ssa_mask_acx,ssa_mask_acy,ssa_err_acx,ssa_err_acy,err_lim=par%ssa_iter_conv*1e-2)  
             end if 
 end if 
-            
+
+
+if (.TRUE.) then 
+! ajr: testing imposed velocity solution!!
+
+
             ! Call ssa solver
             call calc_vxy_ssa_matrix(ux_b,uy_b,L2_norm,beta_acx,beta_acy,visc_eff_int,  &
                                 ssa_mask_acx,ssa_mask_acy,H_ice,f_ice,taud_acx,taud_acy,H_grnd,z_sl,z_bed, &
                                 z_srf,dx,dy,par%ssa_vel_max,par%boundaries,par%ssa_lateral_bc,par%ssa_lis_opt)
+
+
+end if 
 
 
 ! ajr: note that for MISMIP3D experiments to converge well,
@@ -319,8 +327,7 @@ end if
         integer  :: i, j, k
         integer  :: ip1, jp1, im1, jm1 
         integer  :: ip2, jp2, im2, jm2
-        integer  :: nx, ny, nz  
-        real(wp) :: inv_4dx, inv_4dy 
+        integer  :: nx, ny, nz   
         real(wp) :: p1, p2, eps_0_sq  
         real(wp) :: eps_sq                              ! [1/yr^2]
         real(wp) :: dudx_ab(4)
@@ -341,10 +348,6 @@ end if
         ny = size(visc_eff,2)
         nz = size(visc_eff,3)
         
-        ! Calculate scaling factors
-        inv_4dx = 1.0_wp / (4.0_wp*dx) 
-        inv_4dy = 1.0_wp / (4.0_wp*dy) 
-
         ! Calculate exponents 
         p1 = (1.0_wp - n_glen)/(2.0_wp*n_glen)
         p2 = -1.0_wp/n_glen
@@ -468,8 +471,7 @@ end if
         integer  :: i, j, k
         integer  :: ip1, jp1, im1, jm1 
         integer  :: ip2, jp2, im2, jm2
-        integer  :: nx, ny, nz  
-        real(wp) :: inv_4dx, inv_4dy 
+        integer  :: nx, ny, nz   
         real(wp) :: p1, p2, eps_0_sq  
         real(wp) :: eps_sq                              ! [1/yr^2]
 
@@ -485,10 +487,6 @@ end if
         ny = size(visc_eff,2)
         nz = size(visc_eff,3)
         
-        ! Calculate scaling factors
-        inv_4dx = 1.0_wp / (4.0_wp*dx) 
-        inv_4dy = 1.0_wp / (4.0_wp*dy) 
-
         ! Calculate exponents 
         p1 = (1.0_wp - n_glen)/(2.0_wp*n_glen)
         p2 = -1.0_wp/n_glen

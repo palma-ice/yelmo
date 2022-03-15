@@ -95,6 +95,8 @@ contains
 
         real(prec), allocatable :: ux_b_nm1(:,:) 
         real(prec), allocatable :: uy_b_nm1(:,:)    
+        real(prec), allocatable :: visc_eff_nm1(:,:,:)
+
         integer,    allocatable :: ssa_mask_acx_ref(:,:)
         integer,    allocatable :: ssa_mask_acy_ref(:,:)
 
@@ -116,6 +118,8 @@ contains
         ! Prepare local variables 
         allocate(ux_b_nm1(nx,ny))
         allocate(uy_b_nm1(nx,ny))
+        allocate(visc_eff_nm1(nx,ny,nz_aa))
+
         allocate(ssa_mask_acx_ref(nx,ny))
         allocate(ssa_mask_acy_ref(nx,ny))
 
@@ -146,7 +150,7 @@ contains
             ! Store solution from previous iteration (nm1 == n minus 1) 
             ux_b_nm1 = ux_b 
             uy_b_nm1 = uy_b 
-            
+            visc_eff_nm1 = visc_eff 
 
             ! =========================================================================================
             ! Step 1: Calculate fields needed by ssa solver (visc_eff_int, beta)
@@ -180,7 +184,10 @@ contains
                     stop 
 
             end select
-                    
+            
+            
+            
+            
             ! Calculate depth-integrated effective viscosity
             ! Note L19 uses eta_bar*H in the ssa equation. Yelmo uses eta_int=eta_bar*H directly.
             call calc_visc_eff_int(visc_eff_int,visc_eff,H_ice,f_ice,zeta_aa,par%boundaries)
@@ -208,7 +215,7 @@ end if
 
 
 if (.TRUE.) then 
-! ajr: testing imposed velocity solution!!
+! ajr: set to False to impose fixed velocity solution (stream-s06 testing)!!
 
 
             ! Call ssa solver

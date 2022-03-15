@@ -67,6 +67,8 @@ contains
         real(wp) :: max_dt_used 
         real(wp) :: min_dt_used 
 
+        logical, parameter :: update_others_pc = .TRUE. 
+
         ! Safety: check status of model object, 
         ! Has it been initialized?
         if (.not. allocated(dom%tpo%now%H_ice)) then 
@@ -177,7 +179,7 @@ contains
                 dt_now = 0.0_wp 
 
             end if 
-            
+
             do iter_redo=1, dom%par%pc_n_redo 
                 ! Prepare to potentially perform several iterations of the same timestep.
                 ! If at the end of one iteration, the truncation error is too high, then 
@@ -258,6 +260,16 @@ contains
                     
                 end if 
                 
+if (update_others_pc) then
+                ! Now, using old topography still, update additional fields.
+
+                ! Calculate material (ice properties, viscosity, etc.)
+                call calc_ymat(dom%mat,dom%tpo,dom%dyn,dom%thrm,dom%bnd,time_now)
+
+                ! Calculate thermodynamics (temperatures and enthalpy)
+                call calc_ytherm(dom%thrm,dom%tpo,dom%dyn,dom%mat,dom%bnd,time_now)
+end if 
+
                 ! Step 3: Perform corrector step for topography
                 ! Get corrected ice thickness and store it for later use
                 
@@ -340,6 +352,7 @@ contains
 
             ! === Predictor-corrector completed successfully ===
 
+if (.not. update_others_pc) then
             ! Now, using old topography still, update additional fields.
 
             ! Calculate material (ice properties, viscosity, etc.)
@@ -347,6 +360,8 @@ contains
 
             ! Calculate thermodynamics (temperatures and enthalpy)
             call calc_ytherm(dom%thrm,dom%tpo,dom%dyn,dom%mat,dom%bnd,time_now)
+
+end if 
 
             ! Update topography accounting for advective changes
             ! and mass balance changes and calving.

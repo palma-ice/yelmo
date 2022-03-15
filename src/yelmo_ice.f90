@@ -67,7 +67,7 @@ contains
         real(wp) :: max_dt_used 
         real(wp) :: min_dt_used 
 
-        logical, parameter :: update_others_pc = .TRUE. 
+        logical, parameter :: update_others_pc = .FALSE. 
 
         ! Safety: check status of model object, 
         ! Has it been initialized?

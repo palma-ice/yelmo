@@ -2899,6 +2899,56 @@ contains
 
     end subroutine calc_gradient_ac_gl
 
+    subroutine find_upstream_neighbor(i0,j0,i,j,ux,uy)
+        ! From point [i,j], determine the indices
+        ! of the best defined upstream point, as 
+        ! determined from the velocity components ux and uy. 
+
+        implicit none 
+
+        integer, intent(OUT) :: i0 
+        integer, intent(OUT) :: j0
+        integer, intent(IN)  :: i 
+        integer, intent(IN)  :: j
+        integer, intent(IN)  :: ux(:,:) 
+        integer, intent(IN)  :: uy(:,:) 
+
+        ! Local variables
+        integer :: im1, ip1, jm1, jp1 
+        integer :: nx, ny 
+        real(wp) :: ux_aa
+        real(wp) :: uy_aa
+        
+        nx = size(ux,1) 
+        ny = size(ux,2) 
+
+        ! Define neighbor indices
+        im1 = max(i-1,1)
+        ip1 = min(i+1,nx)
+        jm1 = max(j-1,1)
+        jp1 = min(j+1,ny)
+        
+        ! Determine upstream node(s) 
+
+        ux_aa = 0.5*(ux(i,j)+ux(im1,j))
+        uy_aa = 0.5*(uy(i,j)+uy(i,jm1))
+        
+        if (ux_aa .ge. 0.0) then 
+            i0 = im1
+        else 
+            i0 = ip1 
+        end if 
+
+        if (uy_aa .ge. 0.0) then 
+            j0 = jm1
+        else 
+            j0 = jp1  
+        end if 
+        
+        return 
+
+    end subroutine find_upstream_neighbor
+
     function mean_mask(var,mask) result(ave)
 
         implicit none 

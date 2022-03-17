@@ -57,6 +57,8 @@ module grid_calcs
     public :: map_b_to_a_2D 
     public :: map_cx_to_b_2D
     public :: map_cy_to_b_2D
+    public :: map_b_to_cx_2D
+    public :: map_b_to_cy_2D
 
     ! Vertical derivatives 
     public :: ddz_cx_to_a_3D
@@ -2102,7 +2104,94 @@ contains
         return 
 
     end subroutine map_cy_to_b_2D
-  
+
+    ! Ab to Acx/Acy
+    subroutine map_b_to_cx_2D( d_cx, d_b, mask )
+        ! Input:  scalar on the Ab grid
+        ! Output: the same on the Acx grid
+
+        implicit none
+
+        ! In/output variables:
+
+        real(wp),  intent(OUT)   :: d_cx(:,:)
+        real(wp),  intent(IN)    :: d_b(:,:)
+        logical,   intent(IN), optional :: mask(:,:) 
+
+        ! Local variables:
+        integer :: i, j, nx, ny
+
+        nx = size(d_cx,1)
+        ny = size(d_cx,2) 
+
+        d_cx = 0.0_wp 
+
+        if (present(mask)) then 
+
+            ! To do 
+            write(*,*) "map_b_to_cx_2D:: masking not implemented."
+            stop 
+
+        else 
+
+            do j = 2, ny
+            do i = 1, nx
+                d_cx(i,j) = (d_b(i,j) + d_b(i,j-1)) / 2.0_wp
+            end do
+            end do
+
+        end if 
+
+        ! Fill in border 
+        d_cx(:,1) = d_cx(:,2)
+
+        return 
+
+    end subroutine map_b_to_cx_2D
+
+    subroutine map_b_to_cy_2D( d_cy, d_b, mask )
+        ! Input:  scalar on the Ab grid
+        ! Output: the same on the Cy grid
+
+        implicit none
+
+        ! In/output variables:
+
+        real(wp),  intent(OUT)   :: d_cy(:,:)
+        real(wp),  intent(IN)    :: d_b(:,:)
+        logical,   intent(IN), optional :: mask(:,:) 
+
+        ! Local variables:
+        integer :: i, j, nx, ny
+
+        nx = size(d_cy,1)
+        ny = size(d_cy,2) 
+
+        d_cy = 0.0_wp 
+
+        if (present(mask)) then 
+
+            ! To do 
+            write(*,*) "map_b_to_cy_2D:: masking not implemented."
+            stop 
+
+        else 
+
+            do j = 1, ny
+            do i = 2, nx
+                d_cy(i,j) = (d_b(i,j) + d_b(i-1,j)) / 2.0_wp
+            end do
+            end do
+
+        end if
+
+        ! Fill in border 
+        d_cy(1,:) = d_cy(2,:)
+        
+        return 
+
+    end subroutine map_b_to_cy_2D
+
 end module grid_calcs
 
 

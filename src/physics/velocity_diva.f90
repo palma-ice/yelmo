@@ -195,6 +195,9 @@ contains
             ! =========================================================================================
             ! Step 1: Calculate fields needed by ssa solver (visc_eff_int, beta_eff)
 
+            ! Calculate the 3D vertical shear fields using viscosity estimated from the previous iteration 
+            call calc_vertical_shear_3D(duxdz,duydz,taub_acx,taub_acy,visc_eff,H_ice,f_ice,zeta_aa,par%boundaries)
+            
             ! Calculate 3D effective viscosity
             select case(par%visc_method)
 
@@ -234,9 +237,6 @@ contains
             
             ! Apply adjustment to margin viscosity values to improve stability 
             ! call adjust_visc_eff_margin(visc_eff_int,ux_bar,uy_bar,f_ice,f_grnd)
-
-            ! Calculate the 3D vertical shear fields using viscosity estimated from the previous iteration 
-            call calc_vertical_shear_3D(duxdz,duydz,taub_acx,taub_acy,visc_eff,H_ice,f_ice,zeta_aa,par%boundaries)
 
             ! Calculate beta (at the ice base)
             call calc_beta(beta,c_bed,ux_b,uy_b,H_ice,f_ice,H_grnd,f_grnd,z_bed,z_sl,par%beta_method, &

@@ -69,7 +69,7 @@ jobrun ./runylmo -s -q priority -w 5 -e trough -n par/yelmo_MISMIP+.nml -- -o ${
 ### SLAB-S06 ###
 
 # One run for testing
-./runylmo -r -e trough -n par/yelmo_SLAB-S06.nml -o ${fldr}/slab06-test -p ctrl.dx=4 ydyn.visc_method=2
+./runylmo -r -e trough -n par/yelmo_SLAB-S06.nml -o ${fldr}/slab06-test -p ctrl.dx=4 ydyn.ssa_iter_max=20
 
 
 # Standard ensemble runs
@@ -82,6 +82,8 @@ jobrun ./runylmo -r -e trough -n par/yelmo_SLAB-S06.nml -- -o ${fldr}/slab06-1 -
 # (make sure to comment out call to ssa solver in velocity_ssa.f90)
 jobrun ./runylmo -r -e trough -n par/yelmo_SLAB-S06.nml -- -o ${fldr}/slab06-2 -p ctrl.dx=0.5,1,2,4,8
 
+# Standard ensemble, but different flow law exponent 
+jobrun ./runylmo -r -e trough -n par/yelmo_SLAB-S06.nml -- -o ${fldr}/slab06-3 -p ctrl.dx=0.5,1,2,4,8 ydyn.beta_q=0.5
 
 
 ### AGE TESTS ###

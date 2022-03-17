@@ -291,6 +291,9 @@ module yelmo_defs
     type ydyn_state_class
         ! Model variables that the define the state of the domain 
 
+        real(wp), allocatable :: ux_bar_ab(:,:) 
+        real(wp), allocatable :: uy_bar_ab(:,:)
+
         real(wp), allocatable :: ux(:,:,:) 
         real(wp), allocatable :: uy(:,:,:) 
         real(wp), allocatable :: uxy(:,:,:)

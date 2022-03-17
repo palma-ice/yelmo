@@ -11,8 +11,10 @@ module yelmo_dynamics
     use velocity_general
     use velocity_sia 
     use velocity_ssa 
-    use velocity_diva
     use velocity_l1l2 
+
+    !use velocity_diva
+    use velocity_diva_ab 
 
     use solver_ssa_sico5
     use basal_dragging  
@@ -444,10 +446,22 @@ contains
         diva_par%ssa_iter_conv  = dyn%par%ssa_iter_conv 
         diva_par%ssa_write_log  = yelmo_log
 
-        call calc_velocity_diva(dyn%now%ux,dyn%now%uy,dyn%now%ux_bar,dyn%now%uy_bar, &
+        ! call calc_velocity_diva(dyn%now%ux,dyn%now%uy,dyn%now%ux_bar,dyn%now%uy_bar, &
+        !                         dyn%now%ux_b,dyn%now%uy_b,dyn%now%ux_i,dyn%now%uy_i, &
+        !                         dyn%now%taub_acx,dyn%now%taub_acy,dyn%now%beta,dyn%now%beta_acx, &
+        !                         dyn%now%beta_acy,dyn%now%beta_eff,dyn%now%de_eff,dyn%now%visc_eff, &
+        !                         dyn%now%visc_eff_int,    &
+        !                         dyn%now%duxdz,dyn%now%duydz,dyn%now%ssa_mask_acx,dyn%now%ssa_mask_acy,      &
+        !                         dyn%now%ssa_err_acx,dyn%now%ssa_err_acy,dyn%par%ssa_iter_now,dyn%now%c_bed, &
+        !                         dyn%now%taud_acx,dyn%now%taud_acy,tpo%now%H_ice_dyn,tpo%now%f_ice_dyn,tpo%now%H_grnd,   &
+        !                         tpo%now%f_grnd,tpo%now%f_grnd_acx,tpo%now%f_grnd_acy,mat%now%ATT, &
+        !                         dyn%par%zeta_aa,bnd%z_sl,bnd%z_bed,tpo%now%z_srf,dyn%par%dx,dyn%par%dy,mat%par%n_glen,diva_par)
+        call calc_velocity_diva_ab(dyn%now%ux,dyn%now%uy,dyn%now%ux_bar,dyn%now%uy_bar, &
                                 dyn%now%ux_b,dyn%now%uy_b,dyn%now%ux_i,dyn%now%uy_i, &
                                 dyn%now%taub_acx,dyn%now%taub_acy,dyn%now%beta,dyn%now%beta_acx, &
-                                dyn%now%beta_acy,dyn%now%beta_eff,dyn%now%de_eff,dyn%now%visc_eff, &
+                                dyn%now%beta_acy, &
+                                dyn%now%ux_bar_ab,dyn%now%uy_bar_ab, &
+                                dyn%now%beta_eff,dyn%now%de_eff,dyn%now%visc_eff, &
                                 dyn%now%visc_eff_int,    &
                                 dyn%now%duxdz,dyn%now%duydz,dyn%now%ssa_mask_acx,dyn%now%ssa_mask_acy,      &
                                 dyn%now%ssa_err_acx,dyn%now%ssa_err_acy,dyn%par%ssa_iter_now,dyn%now%c_bed, &
@@ -1012,6 +1026,9 @@ contains
 
         call ydyn_dealloc(now)
 
+        allocate(now%ux_bar_ab(nx,ny)) 
+        allocate(now%uy_bar_ab(nx,ny))
+
         allocate(now%ux(nx,ny,nz_aa)) 
         allocate(now%uy(nx,ny,nz_aa)) 
         allocate(now%uxy(nx,ny,nz_aa)) 
@@ -1082,6 +1099,9 @@ contains
         allocate(now%ssa_err_acy(nx,ny)) 
         
         ! Set all variables to zero intially
+        now%ux_bar_ab         = 0.0 
+        now%uy_bar_ab         = 0.0
+
         now%ux                = 0.0 
         now%uy                = 0.0 
         now%uxy               = 0.0 
@@ -1161,6 +1181,9 @@ contains
 
         type(ydyn_state_class), intent(INOUT) :: now
 
+        if (allocated(now%ux_bar_ab))       deallocate(now%ux_bar_ab) 
+        if (allocated(now%uy_bar_ab))       deallocate(now%uy_bar_ab)
+        
         if (allocated(now%ux))              deallocate(now%ux) 
         if (allocated(now%uy))              deallocate(now%uy) 
         if (allocated(now%uxy))             deallocate(now%uxy) 

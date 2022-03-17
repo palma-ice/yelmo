@@ -29,6 +29,7 @@ module velocity_general
 
     public :: picard_calc_error 
     public :: picard_calc_error_angle 
+    public :: picard_calc_convergence_l1rel_matrix
     public :: picard_calc_convergence_l2
     public :: picard_relax 
     
@@ -1751,6 +1752,40 @@ end if
         return
 
     end subroutine picard_calc_error_angle
+
+    subroutine picard_calc_convergence_l1rel_matrix(err_x,err_y,ux,uy,ux_prev,uy_prev)
+
+        implicit none 
+
+        real(prec), intent(OUT) :: err_x(:,:)
+        real(prec), intent(OUT) :: err_y(:,:)
+        real(prec), intent(IN)  :: ux(:,:) 
+        real(prec), intent(IN)  :: uy(:,:) 
+        real(prec), intent(IN)  :: ux_prev(:,:) 
+        real(prec), intent(IN)  :: uy_prev(:,:)  
+
+        ! Local variables
+
+        real(prec), parameter :: ssa_vel_tolerance = 1e-2   ! [m/a] only consider points with velocity above this tolerance limit
+        real(prec), parameter :: tol = 1e-5 
+
+        ! Error in x-direction
+        where (abs(ux) .gt. ssa_vel_tolerance) 
+            err_x = 2.0_prec * abs(ux - ux_prev) / abs(ux + ux_prev + tol)
+        elsewhere 
+            err_x = 0.0_prec
+        end where 
+
+        ! Error in y-direction 
+        where (abs(uy) .gt. ssa_vel_tolerance) 
+            err_y = 2.0_prec * abs(uy - uy_prev) / abs(uy + uy_prev + tol)
+        elsewhere 
+            err_y = 0.0_prec
+        end where 
+
+        return 
+
+    end subroutine picard_calc_convergence_l1rel_matrix
 
     subroutine picard_calc_convergence_l2(is_converged,resid,ux,uy,ux_prev,uy_prev, &
                                                 mask_acx,mask_acy,resid_tol,iter,iter_max,log)

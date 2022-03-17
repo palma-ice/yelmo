@@ -14,7 +14,7 @@ module velocity_ssa
     use solver_ssa_sico5 
     use velocity_general, only : set_inactive_margins, &
                         picard_calc_error, picard_calc_error_angle, picard_relax, &
-                        picard_calc_convergence_l2 
+                        picard_calc_convergence_l1rel_matrix, picard_calc_convergence_l2 
     implicit none 
 
     type ssa_param_class
@@ -185,9 +185,9 @@ contains
 
             end select
             
-            
-            
-            
+
+
+
             ! Calculate depth-integrated effective viscosity
             ! Note L19 uses eta_bar*H in the ssa equation. Yelmo uses eta_int=eta_bar*H directly.
             call calc_visc_eff_int(visc_eff_int,visc_eff,H_ice,f_ice,zeta_aa,par%boundaries)
@@ -267,7 +267,7 @@ end if
 
 
             ! Calculate an L1 error metric over matrix for diagnostics
-            call check_vel_convergence_l1rel_matrix(ssa_err_acx,ssa_err_acy,ux_b,uy_b,ux_b_nm1,uy_b_nm1)
+            call picard_calc_convergence_l1rel_matrix(ssa_err_acx,ssa_err_acy,ux_b,uy_b,ux_b_nm1,uy_b_nm1)
 
             
             ! Store current total iterations for output

@@ -14,7 +14,7 @@ module velocity_l1l2
     use solver_ssa_sico5 
     use velocity_general, only : set_inactive_margins, &
                         picard_calc_error, picard_calc_error_angle, picard_relax, &
-                        picard_calc_convergence_l2 
+                        picard_calc_convergence_l1rel_matrix, picard_calc_convergence_l2 
     
     implicit none 
 
@@ -285,7 +285,7 @@ end if
                                                 iter,par%ssa_iter_max,par%ssa_write_log)
 
             ! Calculate an L1 error metric over matrix for diagnostics
-            call check_vel_convergence_l1rel_matrix(ssa_err_acx,ssa_err_acy,ux_b,uy_b,ux_b_nm1,uy_b_nm1)
+            call picard_calc_convergence_l1rel_matrix(ssa_err_acx,ssa_err_acy,ux_b,uy_b,ux_b_nm1,uy_b_nm1)
 
             ! Store current total iterations for output
             ssa_iter_now = iter 

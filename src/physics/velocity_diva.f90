@@ -510,16 +510,16 @@ end if
             jp1 = min(j+1,ny) 
             
             ! Calculate shear strain, acx-nodes
-            if (f_ice(i,j) .eq. 1.0_wp .or. f_ice(ip1,j) .eq. 1.0_wp) then 
-                visc_eff_ac  = calc_staggered_margin(visc_eff(i,j,k),visc_eff(ip1,j,k),f_ice(i,j),f_ice(ip1,j))
+            visc_eff_ac  = calc_staggered_margin(visc_eff(i,j,k),visc_eff(ip1,j,k),f_ice(i,j),f_ice(ip1,j))
+            if (visc_eff_ac .ne. 0.0_wp) then 
                 duxdz(i,j,k) = (taub_acx(i,j)/visc_eff_ac) * (1.0_wp-zeta_aa(k))
             else
                 duxdz(i,j,k) = 0.0_wp 
             end if 
 
             ! Calculate shear strain, acy-nodes
-            if (f_ice(i,j) .eq. 1.0_wp .or. f_ice(i,jp1) .eq. 1.0_wp) then 
-                visc_eff_ac  = calc_staggered_margin(visc_eff(i,j,k),visc_eff(i,jp1,k),f_ice(i,j),f_ice(i,jp1))
+            visc_eff_ac  = calc_staggered_margin(visc_eff(i,j,k),visc_eff(i,jp1,k),f_ice(i,j),f_ice(i,jp1))
+            if (visc_eff_ac .ne. 0.0_wp) then 
                 duydz(i,j,k) = (taub_acy(i,j)/visc_eff_ac) * (1.0_wp-zeta_aa(k))
             else
                 duydz(i,j,k) = 0.0_wp 

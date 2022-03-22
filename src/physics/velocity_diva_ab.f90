@@ -518,8 +518,13 @@ end if
             jp1 = min(j+1,ny) 
             
             ! Calculate shear strain (ab-nodes)
-            duxdz(i,j,k) = (taubx(i,j)/visc_eff(i,j,k)) * (1.0_wp-zeta_aa(k))
-            duydz(i,j,k) = (tauby(i,j)/visc_eff(i,j,k)) * (1.0_wp-zeta_aa(k))
+            if (visc_eff(i,j,k) .ne. 0.0_wp) then 
+                duxdz(i,j,k) = (taubx(i,j)/visc_eff(i,j,k)) * (1.0_wp-zeta_aa(k))
+                duydz(i,j,k) = (tauby(i,j)/visc_eff(i,j,k)) * (1.0_wp-zeta_aa(k))
+            else 
+                duxdz(i,j,k) = 0.0_wp 
+                duydz(i,j,k) = 0.0_wp
+            end if 
 
         end do 
         end do 

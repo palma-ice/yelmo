@@ -1,6 +1,6 @@
 #!/bin/bash
 
-fldr='tmp/8880ed'
+fldr='tmp/d39fbf'
 
 
 ### BENCHMARK TESTS ###
@@ -69,7 +69,7 @@ jobrun ./runylmo -s -q priority -w 5 -e trough -n par/yelmo_MISMIP+.nml -- -o ${
 ### SLAB-S06 ###
 
 # One run for testing
-./runylmo -r -e trough -n par/yelmo_SLAB-S06.nml -o ${fldr}/slab06-test -p ctrl.dx=4 ydyn.ssa_iter_max=20
+./runylmo -r -e trough -n par/yelmo_SLAB-S06.nml -o ${fldr}/slab06-test -p ctrl.dx=4 ydyn.ssa_iter_max=10
 
 
 # Standard ensemble runs

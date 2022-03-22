@@ -11,7 +11,7 @@ module velocity_diva_ab
 
     use basal_dragging 
     use solver_ssa_ab
-    use velocity_general, only : set_inactive_margins, adjust_visc_eff_margin, &
+    use velocity_general, only : set_inactive_margins, &
                         picard_calc_error, picard_calc_error_angle, picard_relax, &
                         picard_calc_convergence_l1rel_matrix, picard_calc_convergence_l2 
 
@@ -126,8 +126,6 @@ contains
 
         real(wp), allocatable :: ux_bar_nm1(:,:) 
         real(wp), allocatable :: uy_bar_nm1(:,:)  
-        real(wp), allocatable :: beta_eff_acx(:,:)
-        real(wp), allocatable :: beta_eff_acy(:,:)  
         real(wp), allocatable :: F2(:,:)              ! [Pa^-1 a^-1 m == (Pa a/m)^-1]
         integer,  allocatable :: ssa_mask_acx_ref(:,:)
         integer,  allocatable :: ssa_mask_acy_ref(:,:)
@@ -135,10 +133,13 @@ contains
         real(wp), allocatable :: corr_nm1(:) 
         real(wp), allocatable :: corr_nm2(:) 
         
+        real(wp), allocatable :: H_ice_ab(:,:) 
         real(wp), allocatable :: taudx_ab(:,:) 
         real(wp), allocatable :: taudy_ab(:,:) 
-        real(wp), allocatable :: visc_eff_int_ab(:,:) 
-        real(wp), allocatable :: beta_eff_ab(:,:) 
+        real(wp), allocatable :: taubx_ab(:,:) 
+        real(wp), allocatable :: tauby_ab(:,:) 
+        real(wp), allocatable :: ux_b_ab(:,:) 
+        real(wp), allocatable :: uy_b_ab(:,:) 
         
         ! For glf methods 
         logical :: with_glf 
@@ -163,8 +164,6 @@ contains
         ! Prepare local variables 
         allocate(ux_bar_nm1(nx,ny))
         allocate(uy_bar_nm1(nx,ny))
-        allocate(beta_eff_acx(nx,ny))
-        allocate(beta_eff_acy(nx,ny))
         allocate(F2(nx,ny))
 
         allocate(ssa_mask_acx_ref(nx,ny))
@@ -173,11 +172,14 @@ contains
         allocate(corr_nm1(2*nx*ny))
         allocate(corr_nm2(2*nx*ny))
 
+        allocate(H_ice_ab(nx,ny))
         allocate(taudx_ab(nx,ny))
         allocate(taudy_ab(nx,ny))
-        allocate(visc_eff_int_ab(nx,ny))
-        allocate(beta_eff_ab(nx,ny))
-        
+        allocate(taubx_ab(nx,ny))
+        allocate(tauby_ab(nx,ny))
+        allocate(ux_b_ab(nx,ny))
+        allocate(uy_b_ab(nx,ny))
+
         with_glf = .FALSE. 
         if (trim(par%glf_method) .eq. "power") with_glf = .TRUE.
 
@@ -192,29 +194,35 @@ contains
         corr_nm1 = 0.0_wp 
         corr_nm2 = 0.0_wp 
 
+        ! Get ice thickness on ab-nodes 
+        call map_a_to_b_2D(H_ice_ab,H_ice) 
+
         ! Get driving stress on ab-nodes 
         call map_cx_to_b_2D(taudx_ab,taud_acx)
         call map_cy_to_b_2D(taudy_ab,taud_acy)
         
-        ! Ensure dynamically inactive cells have no velocity at 
-        ! outer margins before starting iterations
-        call set_inactive_margins(ux_bar,uy_bar,f_ice)
-
         if (write_ssa_diagnostics) then 
             call ssa_diagnostics_write_init("yelmo_ssa.nc",nx,ny,time_init=1.0_wp)
         end if 
 
+        ! Calculate basal stress again initially since it is only defined locally
+        call calc_basal_stress_ab(taubx_ab,tauby_ab,beta_eff,ux_bar_ab,uy_bar_ab)
+
+        ! Calculate basal velocity initially too
+        call calc_vel_basal_ab(ux_b_ab,uy_b_ab,ux_bar_ab,uy_bar_ab,F2,taubx_ab,tauby_ab,par%no_slip)
+
+
         do iter = 1, par%ssa_iter_max 
 
             ! Store solution from previous iteration (nm1 == n minus 1) 
-            ux_bar_nm1 = ux_bar 
-            uy_bar_nm1 = uy_bar 
+            ux_bar_nm1 = ux_bar_ab 
+            uy_bar_nm1 = uy_bar_ab 
             
             ! =========================================================================================
             ! Step 1: Calculate fields needed by ssa solver (visc_eff_int, beta_eff)
 
             ! Calculate the 3D vertical shear fields using viscosity estimated from the previous iteration 
-            call calc_vertical_shear_3D(duxdz,duydz,taub_acx,taub_acy,visc_eff,H_ice,f_ice,zeta_aa,par%boundaries)
+            call calc_vertical_shear_3D_ab(duxdz,duydz,taubx_ab,tauby_ab,visc_eff,zeta_aa,par%boundaries)
 
             ! Calculate 3D effective viscosity
             select case(par%visc_method)
@@ -228,16 +236,9 @@ contains
                     ! Calculate effective viscosity, using velocity solution from previous iteration
                     ! Use default staggering stencil (to ab-node quadrature points, then average to aa-nodes)
 
-                    call calc_visc_eff_3D(visc_eff,ux_bar,uy_bar,duxdz,duydz,ATT,H_ice,f_ice,zeta_aa, &
+                    call calc_visc_eff_3D_ab(visc_eff,ux_bar_ab,uy_bar_ab,duxdz,duydz,ATT,zeta_aa, &
                                                             dx,dy,n_glen,par%eps_0,par%boundaries)
 
-                case(2) 
-                    ! Calculate effective viscosity, using velocity solution from previous iteration
-                    ! Use minimal staggering stencil (directly to aa-nodes)
-
-                    call calc_visc_eff_3D_aa(visc_eff,ux_bar,uy_bar,duxdz,duydz,ATT,H_ice,f_ice,zeta_aa, &
-                                                            dx,dy,n_glen,par%eps_0,par%boundaries)
-                    
                 case DEFAULT 
 
                     write(*,*) "calc_velocity_diva_ab:: Error: visc_method not recognized."
@@ -246,38 +247,23 @@ contains
 
             end select
             
-            ! Apply adjustment to margin viscosity values to improve stability 
-            ! call adjust_visc_eff_margin_2(visc_eff,ux_bar,uy_bar,f_ice,f_grnd)
-
             ! Calculate depth-integrated effective viscosity
             ! Note L19 uses eta_bar*H in the ssa equation. Yelmo uses eta_int=eta_bar*H directly.
-            call calc_visc_eff_int(visc_eff_int,visc_eff,H_ice,f_ice,zeta_aa,par%boundaries)
+            call calc_visc_eff_int(visc_eff_int,visc_eff,H_ice_ab,zeta_aa,par%boundaries)
             
-            ! Apply adjustment to margin viscosity values to improve stability 
-            ! call adjust_visc_eff_margin(visc_eff_int,ux_bar,uy_bar,f_ice,f_grnd)
-
-            ! Get visc_eff_int on ab-nodes 
-            call map_a_to_b_2D(visc_eff_int_ab,visc_eff_int)
-
             ! Calculate beta (at the ice base)
-            call calc_beta(beta,c_bed,ux_b,uy_b,H_ice,f_ice,H_grnd,f_grnd,z_bed,z_sl,par%beta_method, &
-                                par%beta_const,par%beta_q,par%beta_u0,par%beta_gl_scale,par%beta_gl_f, &
-                                par%H_grnd_lim,par%beta_min,par%boundaries)
+            ! Right now only with power law for ab-node velocities
+            call calc_beta_aa_power_plastic_ab(beta,ux_b_ab,uy_b_ab,c_bed,par%beta_q,par%beta_u0)
 
-            ! Calculate F-integeral (F2) on aa-nodes 
-            call calc_F_integral(F2,visc_eff,H_ice,f_ice,zeta_aa,n=2.0_wp)
+            ! Calculate F-integeral (F2) on ab-nodes 
+            call calc_F_integral(F2,visc_eff,H_ice_ab,zeta_aa,n=2.0_wp)
             
             ! Calculate effective beta 
             call calc_beta_eff(beta_eff,beta,F2,zeta_aa,no_slip=par%no_slip)
             
-            ! Stagger beta and beta_eff 
-            call stagger_beta(beta_acx,beta_acy,beta,H_ice,f_ice,ux_bar,uy_bar, &
-                        f_grnd,f_grnd_acx,f_grnd_acy,par%beta_gl_stag,par%beta_min,par%boundaries)
-            call stagger_beta(beta_eff_acx,beta_eff_acy,beta_eff,H_ice,f_ice,ux_bar,uy_bar, &
-                        f_grnd,f_grnd_acx,f_grnd_acy,par%beta_gl_stag,par%beta_min,par%boundaries)
-            
-            ! Get beta_eff on ab-nodes 
-            call map_a_to_b_2D(beta_eff_ab,beta_eff) 
+            ! Set to zero, not needed:
+            beta_acx = 0.0_wp 
+            beta_acy = 0.0_wp 
 
             ! =========================================================================================
             ! Step 2: Call the SSA solver to obtain new estimate of ux_bar/uy_bar
@@ -303,7 +289,7 @@ contains
             ! ------------------------------------------------------- 
             
             ! Call ssa solver
-            call calc_vxy_ssa_matrix(ux_bar_ab,uy_bar_ab,L2_norm,beta_eff_ab,visc_eff_int_ab,  &
+            call calc_vxy_ssa_matrix(ux_bar_ab,uy_bar_ab,L2_norm,beta_eff,visc_eff_int,  &
                                 ssa_mask_acx,H_ice,f_ice,taudx_ab,taudy_ab,H_grnd,z_sl,z_bed, &
                                 z_srf,dx,dy,par%ssa_vel_max,par%boundaries,par%ssa_lateral_bc,par%ssa_lis_opt)
 
@@ -336,24 +322,24 @@ end if
 
             ! Apply relaxation to keep things stable
             !call relax_ssa(ux_bar,uy_bar,ux_bar_nm1,uy_bar_nm1,rel=par%ssa_iter_rel)
-            call picard_relax(ux_bar,uy_bar,ux_bar_nm1,uy_bar_nm1,rel=corr_rel)
+            call picard_relax(ux_bar_ab,uy_bar_ab,ux_bar_nm1,uy_bar_nm1,rel=corr_rel)
             
             ! Check for convergence
             ! is_converged = check_vel_convergence_l2rel(ux_bar,uy_bar,ux_bar_nm1,uy_bar_nm1,ssa_mask_acx.gt.0,     &
             !                                            ssa_mask_acy.gt.0,par%ssa_iter_conv,iter,par%ssa_iter_max, &
             !                                            par%ssa_write_log,use_L2_norm=.FALSE.,L2_norm=L2_norm)
-            call picard_calc_convergence_l2(is_converged,ssa_resid,ux_bar,uy_bar,ux_bar_nm1,uy_bar_nm1, &
+            call picard_calc_convergence_l2(is_converged,ssa_resid,ux_bar_ab,uy_bar_ab,ux_bar_nm1,uy_bar_nm1, &
                                                 ssa_mask_acx.gt.0,ssa_mask_acy.gt.0,par%ssa_iter_conv,  &
                                                 iter,par%ssa_iter_max,par%ssa_write_log)
 
             ! Calculate an L1 error metric over matrix for diagnostics
-            call picard_calc_convergence_l1rel_matrix(ssa_err_acx,ssa_err_acy,ux_bar,uy_bar,ux_bar_nm1,uy_bar_nm1)
+            call picard_calc_convergence_l1rel_matrix(ssa_err_acx,ssa_err_acy,ux_bar_ab,uy_bar_ab,ux_bar_nm1,uy_bar_nm1)
 
             ! Store current total iterations for output
             ssa_iter_now = iter 
 
             if (write_ssa_diagnostics) then  
-                call ssa_diagnostics_write_step("yelmo_ssa.nc",ux_bar,uy_bar,L2_norm,beta_eff_ab,visc_eff_int_ab, &
+                call ssa_diagnostics_write_step("yelmo_ssa.nc",ux_bar,uy_bar,L2_norm,beta_eff,visc_eff_int, &
                                         ssa_mask_acx,ssa_err_acx,ssa_err_acy,H_ice,f_ice,taudx_ab,taudy_ab, &
                                         H_grnd,z_sl,z_bed,z_srf,ux_bar_nm1,uy_bar_nm1,time=real(iter,wp))    
             end if 
@@ -362,10 +348,10 @@ end if
             ! Update additional fields based on output of solver
              
             ! Calculate basal stress 
-            call calc_basal_stress(taub_acx,taub_acy,beta_eff_acx,beta_eff_acy,ux_bar,uy_bar)
+            call calc_basal_stress_ab(taubx_ab,tauby_ab,beta_eff,ux_bar_ab,uy_bar_ab)
 
             ! Calculate basal velocity from depth-averaged solution and basal stress
-            call calc_vel_basal(ux_b,uy_b,ux_bar,uy_bar,F2,taub_acx,taub_acy,H_ice,f_ice,par%no_slip)
+            call calc_vel_basal_ab(ux_b_ab,uy_b_ab,ux_bar_ab,uy_bar_ab,F2,taubx_ab,tauby_ab,par%no_slip)
 
             ! Exit iterations if ssa solution has converged
             if (is_converged) exit 
@@ -378,6 +364,14 @@ end if
             stop 
         end if 
 
+        ! Calculate velocity on ac-nodes 
+        call map_b_to_cx_2D(ux_b,ux_b_ab)
+        call map_b_to_cy_2D(uy_b,uy_b_ab)
+        call map_b_to_cx_2D(ux_bar,ux_bar_ab)
+        call map_b_to_cy_2D(uy_bar,uy_bar_ab)
+        call map_b_to_cx_2D(taub_acx,taubx_ab)
+        call map_b_to_cy_2D(taub_acy,tauby_ab)
+        
         ! Calculate the 3D horizontal velocity field
         call calc_vel_horizontal_3D(ux,uy,ux_b,uy_b,taub_acx,taub_acy,visc_eff,H_ice,f_ice,zeta_aa,par%boundaries)
 
@@ -390,7 +384,7 @@ end if
 
         if (par%visc_method .eq. 0) then 
             ! Diagnose viscosity for visc_method=0 (not used prognostically)
-            call calc_visc_eff_3D(visc_eff,ux_bar,uy_bar,duxdz,duydz,ATT,H_ice,f_ice,zeta_aa, &
+            call calc_visc_eff_3D_ab(visc_eff,ux_bar_ab,uy_bar_ab,duxdz,duydz,ATT,zeta_aa, &
                                                             dx,dy,n_glen,par%eps_0,par%boundaries)
         end if 
 
@@ -491,30 +485,27 @@ end if
 
     end subroutine calc_vel_horizontal_3D
 
-    subroutine calc_vertical_shear_3D(duxdz,duydz,taub_acx,taub_acy,visc_eff,H_ice,f_ice,zeta_aa,boundaries)
+    subroutine calc_vertical_shear_3D_ab(duxdz,duydz,taubx,tauby,visc_eff,zeta_aa,boundaries)
         ! Calculate vertical shear terms (L19, Eq. 36)
 
         implicit none 
 
-        real(wp), intent(OUT) :: duxdz(:,:,:)         ! [1/a],    ac-nodes horizontal, aa-nodes vertical 
-        real(wp), intent(OUT) :: duydz(:,:,:)         ! [1/a],    ac-nodes horizontal, aa-nodes vertical 
-        real(wp), intent(IN)  :: taub_acx(:,:)        ! [Pa],     ac-nodes
-        real(wp), intent(IN)  :: taub_acy(:,:)        ! [Pa],     ac-nodes
-        real(wp), intent(IN)  :: visc_eff(:,:,:)      ! [Pa a m], aa-nodes
-        real(wp), intent(IN)  :: H_ice(:,:) 
-        real(wp), intent(IN)  :: f_ice(:,:) 
+        real(wp), intent(OUT) :: duxdz(:,:,:)           ! [1/yr],   ab-nodes horizontal, aa-nodes vertical 
+        real(wp), intent(OUT) :: duydz(:,:,:)           ! [1/yr],   ab-nodes horizontal, aa-nodes vertical 
+        real(wp), intent(IN)  :: taubx(:,:)             ! [Pa],     ab-nodes
+        real(wp), intent(IN)  :: tauby(:,:)             ! [Pa],     ab-nodes
+        real(wp), intent(IN)  :: visc_eff(:,:,:)        ! [Pa a m], ab-nodes
         real(wp), intent(IN)  :: zeta_aa(:)           ! [-]
         character(len=*), intent(IN) :: boundaries 
 
         ! Local variables 
         integer  :: i, j, k, nx, ny, nz_aa 
         integer  :: ip1, jp1 
-        real(wp) :: visc_eff_ac
 
         ! real(wp), parameter :: visc_min = 1e5_wp 
 
-        nx    = size(H_ice,1)
-        ny    = size(H_ice,2)
+        nx    = size(visc_eff,1)
+        ny    = size(visc_eff,2)
         nz_aa = size(zeta_aa,1) 
         
         !$omp parallel do
@@ -526,36 +517,20 @@ end if
             ip1 = min(i+1,nx)
             jp1 = min(j+1,ny) 
             
-            ! Calculate shear strain, acx-nodes
-            if (f_ice(i,j) .eq. 1.0_wp .or. f_ice(ip1,j) .eq. 1.0_wp) then 
-                visc_eff_ac  = calc_staggered_margin(visc_eff(i,j,k),visc_eff(ip1,j,k),f_ice(i,j),f_ice(ip1,j))
-                duxdz(i,j,k) = (taub_acx(i,j)/visc_eff_ac) * (1.0_wp-zeta_aa(k))
-            else
-                duxdz(i,j,k) = 0.0_wp 
-            end if 
+            ! Calculate shear strain (ab-nodes)
+            duxdz(i,j,k) = (taubx(i,j)/visc_eff(i,j,k)) * (1.0_wp-zeta_aa(k))
+            duydz(i,j,k) = (tauby(i,j)/visc_eff(i,j,k)) * (1.0_wp-zeta_aa(k))
 
-            ! Calculate shear strain, acy-nodes
-            if (f_ice(i,j) .eq. 1.0_wp .or. f_ice(i,jp1) .eq. 1.0_wp) then 
-                visc_eff_ac  = calc_staggered_margin(visc_eff(i,j,k),visc_eff(i,jp1,k),f_ice(i,j),f_ice(i,jp1))
-                duydz(i,j,k) = (taub_acy(i,j)/visc_eff_ac) * (1.0_wp-zeta_aa(k))
-            else
-                duydz(i,j,k) = 0.0_wp 
-            end if 
-                
         end do 
         end do 
         end do 
         !$omp end parallel do
 
-        ! Apply boundary conditions as needed 
-        call set_boundaries_3D_acx(duxdz,boundaries)
-        call set_boundaries_3D_acy(duydz,boundaries)
-        
         return 
 
-    end subroutine calc_vertical_shear_3D
+    end subroutine calc_vertical_shear_3D_ab
 
-    subroutine calc_visc_eff_3D(visc_eff,ux,uy,duxdz,duydz,ATT,H_ice,f_ice,zeta_aa,dx,dy,n_glen,eps_0,boundaries)
+    subroutine calc_visc_eff_3D_ab(visc_eff,ux,uy,duxdz,duydz,ATT,zeta_aa,dx,dy,n_glen,eps_0,boundaries)
         ! Calculate 3D effective viscosity following L19, Eq. 2
         ! Use of eps_0 ensures non-zero positive viscosity value everywhere 
         ! Note: viscosity is first calculated on ab-nodes, then 
@@ -564,14 +539,12 @@ end if
 
         implicit none 
         
-        real(wp), intent(OUT) :: visc_eff(:,:,:)        ! aa-nodes
+        real(wp), intent(OUT) :: visc_eff(:,:,:)        ! ab-nodes
         real(wp), intent(IN)  :: ux(:,:)                ! [m/yr] Vertically averaged horizontal velocity, x-component
         real(wp), intent(IN)  :: uy(:,:)                ! [m/yr] Vertically averaged horizontal velocity, y-component
         real(wp), intent(IN)  :: duxdz(:,:,:)           ! [1/yr] Vertical shearing, x-component
         real(wp), intent(IN)  :: duydz(:,:,:)           ! [1/yr] Vertical shearing, x-component
         real(wp), intent(IN)  :: ATT(:,:,:)             ! aa-nodes
-        real(wp), intent(IN)  :: H_ice(:,:) 
-        real(wp), intent(IN)  :: f_ice(:,:)
         real(wp), intent(IN)  :: zeta_aa(:)             ! Vertical axis (sigma-coordinates from 0 to 1)
         real(wp), intent(IN)  :: dx
         real(wp), intent(IN)  :: dy
@@ -582,22 +555,18 @@ end if
         ! Local variables 
         integer  :: i, j, k
         integer  :: ip1, jp1, im1, jm1 
-        integer  :: ip2, jp2, im2, jm2
         integer  :: nx, ny, nz  
-        real(wp) :: inv_4dx, inv_4dy 
+        real(wp) :: inv_2dx, inv_2dy 
         real(wp) :: p1, p2, eps_0_sq  
         real(wp) :: eps_sq                              ! [1/yr^2]
-        real(wp) :: dudx_ab(4)
-        real(wp) :: dvdy_ab(4)
-        real(wp) :: dudy_ab(4)
-        real(wp) :: dvdx_ab(4) 
-        real(wp) :: duxdz_ab(4)
-        real(wp) :: duydz_ab(4)
-        real(wp) :: eps_sq_ab(4)
-        real(wp) :: visc_eff_ab(4)
-        real(wp) :: ATT_ab(4)
-        real(wp) :: wt_ab(4)
-        real(wp) :: wt
+        real(wp) :: dudx_ab
+        real(wp) :: dvdy_ab
+        real(wp) :: dudy_ab
+        real(wp) :: dvdx_ab 
+        real(wp) :: duxdz_ab
+        real(wp) :: duydz_ab
+        real(wp) :: eps_sq_ab
+        real(wp) :: ATT_ab
 
         real(wp), parameter :: visc_min = 1e5_wp        ! Just for safety 
 
@@ -606,8 +575,8 @@ end if
         nz = size(visc_eff,3)
         
         ! Calculate scaling factors
-        inv_4dx = 1.0_wp / (4.0_wp*dx) 
-        inv_4dy = 1.0_wp / (4.0_wp*dy) 
+        inv_2dx = 1.0_wp / (2.0_wp*dx) 
+        inv_2dy = 1.0_wp / (2.0_wp*dy) 
 
         ! Calculate exponents 
         p1 = (1.0_wp - n_glen)/(2.0_wp*n_glen)
@@ -615,244 +584,63 @@ end if
 
         ! Calculate squared minimum strain rate 
         eps_0_sq = eps_0*eps_0 
-
-        ! Set equal weighting for all four ab-nodes
-        wt_ab = 0.25_wp 
 
         ! Calculate visc_eff on quadrature points (ab-nodes),
         ! and then average to get grid-centered value (aa-node)
         do j = 1, ny 
         do i = 1, nx 
 
-            if (f_ice(i,j) .eq. 1.0_wp) then 
+            im1 = max(i-1,1)    
+            ip1 = min(i+1,nx) 
+            jm1 = max(j-1,1) 
+            jp1 = min(j+1,ny) 
 
-                im1 = max(i-1,1)    
-                ip1 = min(i+1,nx) 
-                jm1 = max(j-1,1) 
-                jp1 = min(j+1,ny) 
+            ! Get strain rate terms (ab-nodes)
+            dudx_ab = (ux(ip1,j)-ux(im1,j)) * inv_2dx
+            dvdy_ab = (uy(i,jp1)-uy(i,jm1)) * inv_2dy 
+            
+            dudy_ab = (ux(i,jp1)-ux(i,jm1)) * inv_2dy 
+            dvdx_ab = (uy(ip1,j)-uy(im1,j)) * inv_2dx
+            
+            ! Loop over column
+            do k = 1, nz 
 
-                ! Get strain rate terms
-                call staggerdiff_nodes_acx_ab_ice(dudx_ab,ux,f_ice,i,j,dx) 
-                call staggerdiff_nodes_acy_ab_ice(dvdy_ab,uy,f_ice,i,j,dy) 
-                call staggerdiffcross_nodes_acx_ab_ice(dudy_ab,ux,f_ice,i,j,dy)
-                call staggerdiffcross_nodes_acy_ab_ice(dvdx_ab,uy,f_ice,i,j,dx)
+                ! Get vertical shear strain rate terms
+                duxdz_ab = duxdz(i,j,k) 
+                duydz_ab = duydz(i,j,k) 
                 
-                ! Loop over column
-                do k = 1, nz 
+                ! Calculate the total effective strain rate from L19, Eq. 21 
+                eps_sq_ab = dudx_ab**2 + dvdy_ab**2 + dudx_ab*dvdy_ab + 0.25_wp*(dudy_ab+dvdx_ab)**2 &
+                            + 0.25_wp*duxdz_ab**2 + 0.25_wp*duydz_ab**2 + eps_0_sq
+ 
+                ! Get the rate factor on ab-node too
+                ATT_ab = 0.25_wp*(ATT(i,j,k)+ATT(ip1,j,k)+ATT(i,jp1,k)+ATT(ip1,jp1,k))
 
-                    ! Get vertical shear strain rate terms
-                    call stagger_nodes_acx_ab_ice(duxdz_ab,duxdz(:,:,k),f_ice,i,j)
-                    call stagger_nodes_acy_ab_ice(duydz_ab,duydz(:,:,k),f_ice,i,j)
-
-                    ! Calculate the total effective strain rate from L19, Eq. 21 
-                    eps_sq_ab = dudx_ab**2 + dvdy_ab**2 + dudx_ab*dvdy_ab + 0.25_wp*(dudy_ab+dvdx_ab)**2 &
-                                + 0.25_wp*duxdz_ab**2 + 0.25_wp*duydz_ab**2 + eps_0_sq
-
-! ajr: Although logically I would choose to use the ab-node values 
-! of ATT, calculate viscosity at each ab node and then average, this 
-! seems to reduce stability of the model. Rather it seems to work 
-! better by only calculating the effective strain rate at each ab-node,
-! and center it, then multiply with the centered ATT value to get visc. 
-! So that is why the central ATT value is used below. This should be 
-! investigated further in the future perhaps.
-if (.TRUE.) then  
-                    ! Get the rate factor on ab-nodes too
-                    call stagger_nodes_aa_ab_ice(ATT_ab,ATT(:,:,k),f_ice,i,j)
-else
-                    ! Just use the aa-node central value of ATT 
-                    ATT_ab = ATT(i,j,k)
-
-end if
-
-                    ! Calculate effective viscosity on ab-nodes
-                    visc_eff_ab = 0.5_wp*(eps_sq_ab)**(p1) * ATT_ab**(p2)
-
-                    ! Calcualte effective viscosity on aa-nodes
-                    visc_eff(i,j,k) = sum(wt_ab*visc_eff_ab)
-                     
-                end do 
-
-            else 
-
-                do k = 1, nz 
-                    visc_eff(i,j,k) = 0.0_wp 
-                end do 
-
-            end if 
+                ! Calculate effective viscosity on ab-nodes
+                visc_eff(i,j,k) = 0.5_wp*(eps_sq_ab)**(p1) * ATT_ab**(p2)
+                   
+            end do 
 
         end do  
         end do 
 
-        ! Set boundaries 
-        call set_boundaries_3D_aa(visc_eff,boundaries)
-
-        ! Final safety check (mainly for grid boundaries)
-        ! Ensure non-zero visc value everywhere there is ice. 
-        do j = 1, ny 
-        do i = 1, nx 
-
-            if (f_ice(i,j) .eq. 1.0_wp) then
-
-                do k = 1, nz 
-                    if (visc_eff(i,j,k) .lt. visc_min) visc_eff(i,j,k) = visc_min
-                end do 
-
-            end if 
-
-        end do
-        end do
-
         return 
 
-    end subroutine calc_visc_eff_3D
+    end subroutine calc_visc_eff_3D_ab
 
-    subroutine calc_visc_eff_3D_aa(visc_eff,ux,uy,duxdz,duydz,ATT,H_ice,f_ice,zeta_aa,dx,dy,n_glen,eps_0,boundaries)
-        ! Calculate 3D effective viscosity following L19, Eq. 2
-        ! Use of eps_0 ensures non-zero positive viscosity value everywhere 
-        ! Note: viscosity is first calculated on ab-nodes, then 
-        ! unstaggered back to aa-nodes. This ensures more stability for 
-        ! visc_eff (less likely to blow up for low strain rates). 
-
-        implicit none 
-        
-        real(wp), intent(OUT) :: visc_eff(:,:,:)        ! aa-nodes
-        real(wp), intent(IN)  :: ux(:,:)                ! [m/yr] Vertically averaged horizontal velocity, x-component
-        real(wp), intent(IN)  :: uy(:,:)                ! [m/yr] Vertically averaged horizontal velocity, y-component
-        real(wp), intent(IN)  :: duxdz(:,:,:)           ! [1/yr] Vertical shearing, x-component
-        real(wp), intent(IN)  :: duydz(:,:,:)           ! [1/yr] Vertical shearing, x-component
-        real(wp), intent(IN)  :: ATT(:,:,:)             ! aa-nodes
-        real(wp), intent(IN)  :: H_ice(:,:) 
-        real(wp), intent(IN)  :: f_ice(:,:)
-        real(wp), intent(IN)  :: zeta_aa(:)             ! Vertical axis (sigma-coordinates from 0 to 1)
-        real(wp), intent(IN)  :: dx
-        real(wp), intent(IN)  :: dy
-        real(wp), intent(IN)  :: n_glen   
-        real(wp), intent(IN)  :: eps_0                  ! [1/yr] Regularization constant (minimum strain rate, ~1e-6)
-        character(len=*), intent(IN) :: boundaries 
-
-        ! Local variables 
-        integer  :: i, j, k
-        integer  :: ip1, jp1, im1, jm1 
-        integer  :: ip2, jp2, im2, jm2
-        integer  :: nx, ny, nz  
-        real(wp) :: inv_4dx, inv_4dy 
-        real(wp) :: p1, p2, eps_0_sq  
-        real(wp) :: eps_sq                              ! [1/yr^2]
-
-        real(wp) :: dudx_aa, dvdy_aa 
-        real(wp) :: dudy_aa_1, dudy_aa_2, dudy_aa 
-        real(wp) :: dvdx_aa_1, dvdx_aa_2, dvdx_aa 
-        real(wp) :: duxdz_aa, duydz_aa
-        real(wp) :: eps_sq_aa, ATT_aa
-        
-        real(wp), parameter :: visc_min = 1e5_wp        ! Just for safety 
-
-        nx = size(visc_eff,1)
-        ny = size(visc_eff,2)
-        nz = size(visc_eff,3)
-        
-        ! Calculate scaling factors
-        inv_4dx = 1.0_wp / (4.0_wp*dx) 
-        inv_4dy = 1.0_wp / (4.0_wp*dy) 
-
-        ! Calculate exponents 
-        p1 = (1.0_wp - n_glen)/(2.0_wp*n_glen)
-        p2 = -1.0_wp/n_glen
-
-        ! Calculate squared minimum strain rate 
-        eps_0_sq = eps_0*eps_0 
-
-        ! Calculate visc_eff on aa-nodes
-        do j = 1, ny 
-        do i = 1, nx 
-
-            if (f_ice(i,j) .eq. 1.0_wp) then 
-
-                im1 = max(i-1,1)    
-                ip1 = min(i+1,nx) 
-                jm1 = max(j-1,1) 
-                jp1 = min(j+1,ny) 
-
-                ! Get strain rate terms
-                dudx_aa = (ux(i,j)-ux(im1,j))/dx 
-                dvdy_aa = (uy(i,j)-uy(i,jm1))/dy 
-                
-                dudy_aa_1 = (ux(i,jp1)-ux(i,jm1))/(2.0_wp*dy)
-                dudy_aa_2 = (ux(im1,jp1)-ux(im1,jm1))/(2.0_wp*dy)
-                dudy_aa   = 0.5_wp*(dudy_aa_1+dudy_aa_2)
-
-                dvdx_aa_1 = (uy(ip1,j)-uy(im1,j))/(2.0_wp*dx)
-                dvdx_aa_2 = (uy(ip1,jm1)-uy(im1,jm1))/(2.0_wp*dx)
-                dvdx_aa   = 0.5_wp*(dvdx_aa_1+dvdx_aa_2)
-
-                ! Loop over column
-                do k = 1, nz 
-
-                    ! Get vertical shear strain rate terms
-                    duxdz_aa = 0.5_wp*(duxdz(i,j,k)+duxdz(im1,j,k))
-                    duydz_aa = 0.5_wp*(duydz(i,j,k)+duydz(i,jm1,k))
-
-                    ! Calculate the total effective strain rate from L19, Eq. 21 
-                    eps_sq_aa = dudx_aa**2 + dvdy_aa**2 + dudx_aa*dvdy_aa + 0.25_wp*(dudy_aa+dvdx_aa)**2 &
-                                + 0.25_wp*duxdz_aa**2 + 0.25_wp*duydz_aa**2 + eps_0_sq
-
-                    ! Get rate factor on central node
-                    ATT_aa = ATT(i,j,k)
-
-                    ! Calculate effective viscosity on ab-nodes
-                    visc_eff(i,j,k) = 0.5_wp*(eps_sq_aa)**(p1) * ATT_aa**(p2)
-
-                end do 
-
-            else 
-
-                do k = 1, nz 
-                    visc_eff(i,j,k) = 0.0_wp 
-                end do 
-
-            end if 
-
-        end do  
-        end do 
-
-        ! Set boundaries 
-        call set_boundaries_3D_aa(visc_eff,boundaries)
-
-        ! Final safety check (mainly for grid boundaries)
-        ! Ensure non-zero visc value everywhere there is ice. 
-        do j = 1, ny 
-        do i = 1, nx 
-
-            if (f_ice(i,j) .eq. 1.0_wp) then
-
-                do k = 1, nz 
-                    if (visc_eff(i,j,k) .lt. visc_min) visc_eff(i,j,k) = visc_min
-                end do 
-
-            end if 
-
-        end do
-        end do
-
-        return 
-
-    end subroutine calc_visc_eff_3D_aa
-
-    subroutine calc_visc_eff_int(visc_eff_int,visc_eff,H_ice,f_ice,zeta_aa,boundaries)
+    subroutine calc_visc_eff_int(visc_eff_int,visc_eff,H_ice,zeta_aa,boundaries)
 
         implicit none 
 
         real(wp), intent(OUT) :: visc_eff_int(:,:)
         real(wp), intent(IN)  :: visc_eff(:,:,:)
         real(wp), intent(IN)  :: H_ice(:,:)
-        real(wp), intent(IN)  :: f_ice(:,:)
         real(wp), intent(IN)  :: zeta_aa(:)
         character(len=*), intent(IN) :: boundaries 
 
         ! Local variables 
         integer :: i, j, nx, ny
         integer :: im1, ip1, jm1, jp1  
-        real(wp) :: H_now
         real(wp) :: visc_eff_mean 
         real(wp) :: wt 
 
@@ -865,7 +653,7 @@ end if
             ! Calculate the vertically averaged viscosity for this point
             visc_eff_mean = integrate_trapezoid1D_pt(visc_eff(i,j,:),zeta_aa) 
             
-            if (f_ice(i,j) .eq. 1.0) then 
+            if (H_ice(i,j) .gt. 0.0) then 
                 visc_eff_int(i,j) = visc_eff_mean*H_ice(i,j) 
             else
                 visc_eff_int(i,j) = visc_eff_mean 
@@ -873,9 +661,6 @@ end if
 
         end do 
         end do 
-
-        ! Apply boundary conditions as needed
-        call set_boundaries_2D_aa(visc_eff_int,boundaries) 
 
         return
 
@@ -913,7 +698,7 @@ end if
 
     end function calc_staggered_margin
 
-    subroutine calc_F_integral(F_int,visc,H_ice,f_ice,zeta_aa,n)
+    subroutine calc_F_integral(F_int,visc,H_ice,zeta_aa,n)
         ! Useful integrals, following Arthern et al. (2015) Eq. 7,
         ! and Lipscomb et al. (2019), Eq. 30
         ! F_n = int_zb_zs{ 1/visc * ((s-z)/H)**n dz}
@@ -923,7 +708,6 @@ end if
         real(wp), intent(OUT) :: F_int(:,:) 
         real(wp), intent(IN)  :: visc(:,:,:)
         real(wp), intent(IN)  :: H_ice(:,:)
-        real(wp), intent(IN)  :: f_ice(:,:)
         real(wp), intent(IN)  :: zeta_aa(:)
         real(wp), intent(IN)  :: n  
 
@@ -939,10 +723,10 @@ end if
         do j = 1, ny 
         do i = 1, nx
 
-            if (f_ice(i,j) .eq. 1.0) then 
+            if (H_ice(i,j) .gt. 0.0) then 
                 ! Viscosity should be nonzero here, perform integration 
 
-                H_eff = H_ice(i,j) / f_ice(i,j) 
+                H_eff = H_ice(i,j)
                 F_int(i,j) = integrate_trapezoid1D_pt( (H_eff/visc(i,j,:) )*(1.0_wp-zeta_aa)**n,zeta_aa)
 
             else 
@@ -965,9 +749,9 @@ end if
 
         implicit none 
         
-        real(wp), intent(OUT) :: beta_eff(:,:)    ! aa-nodes
-        real(wp), intent(IN)  :: beta(:,:)        ! aa-nodes
-        real(wp), intent(IN)  :: F2(:,:)          ! aa-nodes
+        real(wp), intent(OUT) :: beta_eff(:,:)    ! ab-nodes
+        real(wp), intent(IN)  :: beta(:,:)        ! ab-nodes
+        real(wp), intent(IN)  :: F2(:,:)          ! ab-nodes
         real(wp), intent(IN)  :: zeta_aa(:)       ! aa-nodes
         logical,    intent(IN)  :: no_slip 
 
@@ -995,7 +779,7 @@ end if
 
     end subroutine calc_beta_eff
 
-    subroutine calc_vel_basal(ux_b,uy_b,ux_bar,uy_bar,F2,taub_acx,taub_acy,H_ice,f_ice,no_slip)
+    subroutine calc_vel_basal_ab(ux_b,uy_b,ux_bar,uy_bar,F2,taubx,tauby,no_slip)
         ! Calculate basal sliding following Goldberg (2011), Eq. 34
         ! (or it can also be obtained from L19, Eq. 32 given ub*beta=taub)
 
@@ -1006,10 +790,8 @@ end if
         real(wp), intent(IN)  :: ux_bar(:,:) 
         real(wp), intent(IN)  :: uy_bar(:,:)
         real(wp), intent(IN)  :: F2(:,:)
-        real(wp), intent(IN)  :: taub_acx(:,:) 
-        real(wp), intent(IN)  :: taub_acy(:,:)
-        real(wp), intent(IN)  :: H_ice(:,:)
-        real(wp), intent(IN)  :: f_ice(:,:)
+        real(wp), intent(IN)  :: taubx(:,:) 
+        real(wp), intent(IN)  :: tauby(:,:)
         logical,    intent(IN)  :: no_slip
 
         ! Local variables 
@@ -1034,49 +816,20 @@ end if
             do j = 1, ny 
             do i = 1, nx 
 
-                ip1 = min(i+1,nx)
-                jp1 = min(j+1,ny)
-
-                ! ==== x-direction =====
-
-                ! Stagger the F2 integral to the ac-nodes
-                if (f_ice(i,j) .eq. 1.0 .and. f_ice(ip1,j) .lt. 1.0) then 
-                    F2_ac = F2(i,j) 
-                else if (f_ice(i,j) .lt. 1.0 .and. f_ice(ip1,j) .eq. 1.0) then
-                    F2_ac = F2(ip1,j)
-                else 
-                    F2_ac = 0.5_wp*(F2(i,j) + F2(ip1,j))
-                end if 
-
                 ! Calculate basal velocity component 
-                ux_b(i,j) = ux_bar(i,j) - taub_acx(i,j)*F2_ac 
-
-                ! ==== y-direction =====
-                
-                ! Stagger the F2 integral to the ac-nodes
-                if (f_ice(i,j) .eq. 1.0 .and. f_ice(i,jp1) .lt. 1.0) then 
-                    F2_ac = F2(i,j) 
-                else if (f_ice(i,j) .lt. 1.0 .and. f_ice(i,jp1) .eq. 1.0) then
-                    F2_ac = F2(i,jp1)
-                else 
-                    F2_ac = 0.5_wp*(F2(i,j) + F2(i,jp1))
-                end if 
-                    
-                ! Calculate basal velocity component 
-                uy_b(i,j) = uy_bar(i,j) - taub_acy(i,j)*F2_ac 
+                ux_b(i,j) = ux_bar(i,j) - taubx(i,j)*F2(i,j) 
+                uy_b(i,j) = uy_bar(i,j) - tauby(i,j)*F2(i,j) 
 
             end do 
             end do  
-
-            ! No treatment of boundary conditions needed since ux_b/uy_b are derived.
 
         end if 
 
         return
         
-    end subroutine calc_vel_basal
+    end subroutine calc_vel_basal_ab
 
-    subroutine calc_basal_stress(taub_acx,taub_acy,beta_eff_acx,beta_eff_acy,ux_bar,uy_bar)
+    subroutine calc_basal_stress_ab(taubx,tauby,beta_eff,ux_bar,uy_bar)
         ! Calculate the basal stress resulting from sliding (friction times velocity)
         ! Note: calculated on ac-nodes.
         ! taub [Pa] 
@@ -1086,34 +839,33 @@ end if
 
         implicit none 
 
-        real(wp), intent(OUT) :: taub_acx(:,:)        ! [Pa] Basal stress (acx nodes)
-        real(wp), intent(OUT) :: taub_acy(:,:)        ! [Pa] Basal stress (acy nodes)
-        real(wp), intent(IN)  :: beta_eff_acx(:,:)    ! [Pa a m-1] Effective basal friction (acx nodes)
-        real(wp), intent(IN)  :: beta_eff_acy(:,:)    ! [Pa a m-1] Effective basal friction (acy nodes)
-        real(wp), intent(IN)  :: ux_bar(:,:)          ! [m a-1] depth-ave velocity (acx nodes)
-        real(wp), intent(IN)  :: uy_bar(:,:)          ! [m a-1] depth-ave velocity (acy nodes)
+        real(wp), intent(OUT) :: taubx(:,:)             ! [Pa] Basal stress (ab nodes)
+        real(wp), intent(OUT) :: tauby(:,:)             ! [Pa] Basal stress (ab nodes)
+        real(wp), intent(IN)  :: beta_eff(:,:)          ! [Pa a m-1] Effective basal friction (ab nodes)
+        real(wp), intent(IN)  :: ux_bar(:,:)            ! [m a-1] depth-ave velocity (ab nodes)
+        real(wp), intent(IN)  :: uy_bar(:,:)            ! [m a-1] depth-ave velocity (ab nodes)
         
         ! Local variables 
         integer :: i, j, nx, ny 
 
-        nx = size(taub_acx,1)
-        ny = size(taub_acy,2) 
+        nx = size(beta_eff,1)
+        ny = size(beta_eff,2) 
 
         do j = 1, ny 
         do i = 1, nx 
 
-            taub_acx(i,j) = beta_eff_acx(i,j) * ux_bar(i,j) 
-            if (abs(taub_acx(i,j)) .lt. TOL_UNDERFLOW) taub_acx(i,j) = 0.0_wp 
+            taubx(i,j) = beta_eff(i,j) * ux_bar(i,j) 
+            if (abs(taubx(i,j)) .lt. TOL_UNDERFLOW) taubx(i,j) = 0.0_wp 
 
-            taub_acy(i,j) = beta_eff_acy(i,j) * uy_bar(i,j) 
-            if (abs(taub_acy(i,j)) .lt. TOL_UNDERFLOW) taub_acy(i,j) = 0.0_wp 
+            tauby(i,j) = beta_eff(i,j) * uy_bar(i,j) 
+            if (abs(tauby(i,j)) .lt. TOL_UNDERFLOW) tauby(i,j) = 0.0_wp 
 
         end do 
         end do  
 
         return 
 
-    end subroutine calc_basal_stress
+    end subroutine calc_basal_stress_ab
 
     elemental subroutine limit_vel(u,u_lim)
         ! Apply a velocity limit (for stability)
@@ -1135,4 +887,79 @@ end if
 
     end subroutine limit_vel
     
+    subroutine calc_beta_aa_power_plastic_ab(beta,ux,uy,c_bed,q,u_0)
+        ! Calculate basal friction coefficient (beta) that
+        ! enters the SSA solver as a function of basal velocity
+        ! using a power-law form following Bueler and van Pelt (2015)
+        
+        implicit none
+        
+        real(wp), intent(OUT) :: beta(:,:)          ! ab-nodes
+        real(wp), intent(IN)  :: ux(:,:)            ! ab-nodes
+        real(wp), intent(IN)  :: uy(:,:)            ! ab-nodes
+        real(wp), intent(IN)  :: c_bed(:,:)         ! aa-nodes
+        real(wp), intent(IN)  :: q
+        real(wp), intent(IN)  :: u_0                ! [m/yr]  
+
+        ! Local variables
+        integer  :: i, j, nx, ny
+        integer  :: im1, ip1, jm1, jp1 
+        real(wp) :: uxy
+
+        real(wp), parameter :: ub_min    = 1e-3_wp          ! [m/yr] Minimum velocity is positive small value to avoid divide by zero
+        real(wp), parameter :: ub_sq_min = ub_min**2
+
+        real(wp), allocatable :: c_bed_ab(:,:) 
+
+        nx = size(beta,1)
+        ny = size(beta,2)
+        
+        allocate(c_bed_ab(nx,ny))
+
+        ! Get staggered c_bed 
+        call map_a_to_b_2D(c_bed_ab,c_bed) 
+
+        ! Initially set friction to zero everywhere
+        beta = 0.0_wp 
+        
+        do j = 1, ny
+        do i = 1, nx
+
+            ! Get neighbor indices 
+            im1 = max(i-1,1)
+            ip1 = min(i+1,nx)
+            jm1 = max(j-1,1) 
+            jp1 = min(j+1,ny)
+            
+
+            if (q .eq. 1.0_wp) then 
+                ! Linear law, no f(ub) term
+
+                beta(i,j) = c_bed_ab(i,j) / u_0
+
+            else
+                ! Non-linear law with f(ub) term 
+
+                uxy = sqrt(ux(i,j)**2 + uy(i,j)**2 + ub_sq_min)
+                
+                if (q .eq. 0.0_wp) then 
+                    ! Plastic law
+
+                    beta(i,j) = c_bed_ab(i,j) * (1.0_wp / uxy)
+                    
+                else
+
+                    beta(i,j) = c_bed_ab(i,j) * (uxy / u_0)**q * (1.0_wp / uxy)
+                
+                end if 
+                
+            end if 
+
+        end do
+        end do
+
+        return
+        
+    end subroutine calc_beta_aa_power_plastic_ab
+
 end module velocity_diva_ab

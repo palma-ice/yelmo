@@ -88,9 +88,7 @@ contains
         real(wp) :: tau_bc_sign
 
         real(wp), parameter :: f_submerged_min = 0.0_wp 
-
-        logical, parameter :: STAGGER_SICO = .FALSE. 
-
+        
 ! Include header for lis solver fortran interface
 #include "lisf.h"
         
@@ -720,149 +718,68 @@ contains
                 lgs_x_value(nr) = 0.0_prec
 
             else
+                ! === Inner SSA solution === 
 
+                ! -- vx terms -- 
 
-if (STAGGER_SICO) then 
-                ! === Proceed with normal ssa solution =================
-                ! inner shelfy-stream, x-direction: point in the interior
-                ! of the ice sheet (surrounded by ice-covered points), or  
-                ! at the land-terminating glacier front depending on choice 
-                ! of apply_lateral_bc in routine set_sico_masks.
-                    
-                    ! inner shelfy stream or floating ice 
+                nc = 2*ij2n(i,j)-1          ! column counter for vx_m(i,j)
+                k = k+1
+                lgs_a_value(k) = -4.0_wp*vis_int_g(i+1,j) &
+                                 -4.0_wp*vis_int_g(i,j) &
+                                 -1.0_wp*vis_int_sgxy(i,j) &
+                                 -1.0_wp*vis_int_sgxy(i,j-1) &
+                                 -del_sq*beta_acx(i,j)
+                lgs_a_index(k) = nc
 
-                    nc = 2*ij2n(i-1,j)-1
-                        ! smallest nc (column counter), for vx_m(i-1,j)
-                    k = k+1
-                    lgs_a_value(k) = 4.0_prec*inv_dxi2*vis_int_g(i,j)
-                    lgs_a_index(k) = nc 
+                nc = 2*ij2n(i+1,j)-1        ! column counter for vx_m(i+1,j)
+                k = k+1
+                lgs_a_value(k) =  4.0_wp*vis_int_g(i+1,j)
+                lgs_a_index(k) = nc
 
-                    nc = 2*ij2n(i,j-1)-1
-                        ! next nc (column counter), for vx_m(i,j-1)
-                    k = k+1
-                    lgs_a_value(k) = inv_deta2*vis_int_sgxy(i,j-1)
-                    lgs_a_index(k) = nc
+                nc = 2*ij2n(i-1,j)-1        ! column counter for vx_m(i-1,j)
+                k = k+1
+                lgs_a_value(k) =  4.0_wp*vis_int_g(i,j)
+                lgs_a_index(k) = nc
 
-                    nc = 2*ij2n(i,j-1)
-                        ! next nc (column counter), for vy_m(i,j-1)
-                    k = k+1
-                    lgs_a_value(k) = inv_dxi_deta &
-                                    *(2.0_prec*vis_int_g(i,j)+vis_int_sgxy(i,j-1))
-                    lgs_a_index(k) = nc
+                nc = 2*ij2n(i,j+1)-1        ! column counter for vx_m(i,j+1)
+                k = k+1
+                lgs_a_value(k) =  1.0_wp*vis_int_sgxy(i,j)
+                lgs_a_index(k) = nc
 
-                    nc = 2*ij2n(i,j)-1
-                        ! next nc (column counter), for vx_m(i,j)
-!                     if (nc /= nr) then   ! (diagonal element)
-!                         errormsg = ' >>> calc_vxy_ssa_matrix: ' &
-!                                      //'Check for diagonal element failed!'
-!                         call error(errormsg)
-!                     end if
-                    k = k+1
-                    lgs_a_value(k) = -4.0_prec*inv_dxi2 &
-                                            *(vis_int_g(i+1,j)+vis_int_g(i,j)) &
-                                     -inv_deta2 &
-                                            *(vis_int_sgxy(i,j)+vis_int_sgxy(i,j-1)) &
-                                     -beta_now
-                    lgs_a_index(k) = nc
+                nc = 2*ij2n(i,j-1)-1        ! column counter for vx_m(i,j-1)
+                k = k+1
+                lgs_a_value(k) =  1.0_wp*vis_int_sgxy(i,j-1)
+                lgs_a_index(k) = nc
 
-                    nc = 2*ij2n(i,j)
-                        ! next nc (column counter), for vy_m(i,j)
-                    k = k+1
-                    lgs_a_value(k) = -inv_dxi_deta &
-                                    *(2.0_prec*vis_int_g(i,j)+vis_int_sgxy(i,j))
-                    lgs_a_index(k) = nc
+                ! -- vy terms -- 
+                
+                nc = 2*ij2n(i,j)            ! column counter for vy_m(i,j)
+                k = k+1
+                lgs_a_value(k) = -2.0_wp*vis_int_g(i,j)     &
+                                 -1.0_wp*vis_int_sgxy(i,j)
+                lgs_a_index(k) = nc
 
-                    nc = 2*ij2n(i,j+1)-1
-                        ! next nc (column counter), for vx_m(i,j+1)
-                    k = k+1
-                    lgs_a_value(k) = inv_deta2*vis_int_sgxy(i,j)
-                    lgs_a_index(k) = nc
+                nc = 2*ij2n(i+1,j)          ! column counter for vy_m(i+1,j)
+                k = k+1
+                lgs_a_value(k) =  2.0_wp*vis_int_g(i+1,j)   &
+                                 +1.0_wp*vis_int_sgxy(i,j)
+                lgs_a_index(k) = nc
+                
+                nc = 2*ij2n(i+1,j-1)        ! column counter for vy_m(i+1,j-1)
+                k = k+1
+                lgs_a_value(k) = -2.0_wp*vis_int_g(i+1,j)   &
+                                 -1.0_wp*vis_int_sgxy(i,j-1)
+                lgs_a_index(k) = nc
+                
+                nc = 2*ij2n(i,j-1)          ! column counter for vy_m(i,j-1)
+                k = k+1
+                lgs_a_value(k) =  2.0_wp*vis_int_g(i,j)   &
+                                 +1.0_wp*vis_int_sgxy(i,j-1)
+                lgs_a_index(k) = nc
+                
 
-                    nc = 2*ij2n(i+1,j-1)
-                        ! next nc (column counter), for vy_m(i+1,j-1)
-                    k  = k+1
-                    lgs_a_value(k) = -inv_dxi_deta &
-                                  *(2.0_prec*vis_int_g(i+1,j)+vis_int_sgxy(i,j-1))
-                    lgs_a_index(k) = nc
-
-                    nc = 2*ij2n(i+1,j)-1
-                        ! next nc (column counter), for vx_m(i+1,j)
-                    k = k+1
-                    lgs_a_value(k) = 4.0_prec*inv_dxi2*vis_int_g(i+1,j)
-                    lgs_a_index(k) = nc
-
-                    nc = 2*ij2n(i+1,j)
-                        ! largest nc (column counter), for vy_m(i+1,j)
-                    k  = k+1
-                    lgs_a_value(k) = inv_dxi_deta &
-                                    *(2.0_prec*vis_int_g(i+1,j)+vis_int_sgxy(i,j))
-                    lgs_a_index(k) = nc
-
-                    lgs_b_value(nr) = taud_now
-                    lgs_x_value(nr) = vx_m(i,j)
-
-else
-
-                    nc = 2*ij2n(i,j)-1          ! column counter for vx_m(i,j)
-                    k = k+1
-                    lgs_a_value(k) = -4.0_wp*vis_int_g(i+1,j) &
-                                     -4.0_wp*vis_int_g(i,j) &
-                                     -1.0_wp*vis_int_sgxy(i,j) &
-                                     -1.0_wp*vis_int_sgxy(i,j-1) &
-                                     -del_sq*beta_acx(i,j)
-                    lgs_a_index(k) = nc
-
-                    nc = 2*ij2n(i+1,j)-1        ! column counter for vx_m(i+1,j)
-                    k = k+1
-                    lgs_a_value(k) =  4.0_wp*vis_int_g(i+1,j)
-                    lgs_a_index(k) = nc
-
-                    nc = 2*ij2n(i-1,j)-1        ! column counter for vx_m(i-1,j)
-                    k = k+1
-                    lgs_a_value(k) =  4.0_wp*vis_int_g(i,j)
-                    lgs_a_index(k) = nc
-
-                    nc = 2*ij2n(i,j+1)-1        ! column counter for vx_m(i,j+1)
-                    k = k+1
-                    lgs_a_value(k) =  1.0_wp*vis_int_sgxy(i,j)
-                    lgs_a_index(k) = nc
-
-                    nc = 2*ij2n(i,j-1)-1        ! column counter for vx_m(i,j-1)
-                    k = k+1
-                    lgs_a_value(k) =  1.0_wp*vis_int_sgxy(i,j-1)
-                    lgs_a_index(k) = nc
-
-                    nc = 2*ij2n(i,j)            ! column counter for vy_m(i,j)
-                    k = k+1
-                    lgs_a_value(k) = -2.0_wp*vis_int_g(i,j)     &
-                                     -1.0_wp*vis_int_sgxy(i,j)
-                    lgs_a_index(k) = nc
-
-                    nc = 2*ij2n(i+1,j)          ! column counter for vy_m(i+1,j)
-                    k = k+1
-                    lgs_a_value(k) =  2.0_wp*vis_int_g(i+1,j)   &
-                                     +1.0_wp*vis_int_sgxy(i,j)
-                    lgs_a_index(k) = nc
-                    
-                    nc = 2*ij2n(i+1,j-1)        ! column counter for vy_m(i+1,j-1)
-                    k = k+1
-                    lgs_a_value(k) = -2.0_wp*vis_int_g(i+1,j)   &
-                                     -1.0_wp*vis_int_sgxy(i,j-1)
-                    lgs_a_index(k) = nc
-                    
-                    nc = 2*ij2n(i,j-1)          ! column counter for vy_m(i,j-1)
-                    k = k+1
-                    lgs_a_value(k) =  2.0_wp*vis_int_g(i,j)   &
-                                     +1.0_wp*vis_int_sgxy(i,j-1)
-                    lgs_a_index(k) = nc
-                    
-
-                    lgs_b_value(nr) = del_sq*taud_acx(i,j)
-                    lgs_x_value(nr) = vx_m(i,j)
-
-end if 
-
-
+                lgs_b_value(nr) = del_sq*taud_acx(i,j)
+                lgs_x_value(nr) = vx_m(i,j)
 
             end if
 
@@ -1312,147 +1229,67 @@ end if
                 lgs_x_value(nr) = 0.0_prec
 
             else
-                ! === Proceed with normal ssa solution =================
-                ! inner shelfy-stream, y-direction: point in the interior
-                ! of the ice sheet (surrounded by ice-covered points), or  
-                ! at the land-terminating glacier front depending on choice 
-                ! of apply_lateral_bc in routine set_sico_masks.
-                    
-                    ! inner shelfy stream or floating ice 
+                ! === Inner SSA solution === 
 
+                ! -- vy terms -- 
 
-if (STAGGER_SICO) then 
+                nc = 2*ij2n(i,j)        ! column counter for vy_m(i,j)
+                k = k+1
+                lgs_a_value(k) = -4.0_wp*vis_int_g(i,j+1)   &
+                                 -4.0_wp*vis_int_g(i,j)     &
+                                 -1.0_wp*vis_int_sgxy(i,j)   &
+                                 -1.0_wp*vis_int_sgxy(i-1,j) &
+                                 -del_sq*beta_acy(i,j)
+                lgs_a_index(k) = nc
 
-                    nc = 2*ij2n(i-1,j)-1
-                        ! smallest nc (column counter), for vx_m(i-1,j)
-                    k = k+1
-                    lgs_a_value(k) = inv_dxi_deta &
-                                        *(2.0_prec*vis_int_g(i,j)+vis_int_sgxy(i-1,j))
-                    lgs_a_index(k) = nc
+                nc = 2*ij2n(i,j+1)      ! column counter for vy_m(i,j+1)
+                k = k+1
+                lgs_a_value(k) =  4.0_wp*vis_int_g(i,j+1)
+                lgs_a_index(k) = nc
 
-                    nc = 2*ij2n(i-1,j)
-                        ! next nc (column counter), for vy_m(i-1,j)
-                    k = k+1
-                    lgs_a_value(k) = inv_dxi2*vis_int_sgxy(i-1,j)
-                    lgs_a_index(k) = nc
+                nc = 2*ij2n(i,j-1)      ! column counter for vy_m(i,j-1)
+                k = k+1
+                lgs_a_value(k) =  4.0_wp*vis_int_g(i,j)
+                lgs_a_index(k) = nc
+                
+                nc = 2*ij2n(i+1,j)      ! column counter for vy_m(i+1,j)
+                k = k+1
+                lgs_a_value(k) =  1.0_wp*vis_int_sgxy(i,j)
+                lgs_a_index(k) = nc
+                
+                nc = 2*ij2n(i-1,j)      ! column counter for vy_m(i-1,j)
+                k = k+1
+                lgs_a_value(k) =  1.0_wp*vis_int_sgxy(i-1,j)
+                lgs_a_index(k) = nc
+                
+                ! -- vx terms -- 
 
-                    nc = 2*ij2n(i-1,j+1)-1
-                        ! next nc (column counter), for vx_m(i-1,j+1)
-                    k = k+1
-                    lgs_a_value(k) = -inv_dxi_deta &
-                                          *(2.0_prec*vis_int_g(i,j+1)+vis_int_sgxy(i-1,j))
-                    lgs_a_index(k) = nc
+                nc = 2*ij2n(i,j)-1      ! column counter for vx_m(i,j)
+                k = k+1
+                lgs_a_value(k) = -2.0_wp*vis_int_g(i,j)     &
+                                 -1.0_wp*vis_int_sgxy(i,j)
+                lgs_a_index(k) = nc
 
-                    nc = 2*ij2n(i,j-1)
-                        ! next nc (column counter), for vy_m(i,j-1)
-                    k = k+1
-                    lgs_a_value(k) = 4.0_prec*inv_deta2*vis_int_g(i,j)
-                    lgs_a_index(k) = nc
+                nc = 2*ij2n(i,j+1)-1    ! column counter for vx_m(i,j+1)
+                k = k+1
+                lgs_a_value(k) =  2.0_wp*vis_int_g(i,j+1)     &
+                                 +1.0_wp*vis_int_sgxy(i,j)
+                lgs_a_index(k) = nc
 
-                    nc = 2*ij2n(i,j)-1
-                        ! next nc (column counter), for vx_m(i,j)
-                    k = k+1
-                    lgs_a_value(k) = -inv_dxi_deta &
-                                            *(2.0_prec*vis_int_g(i,j)+vis_int_sgxy(i,j))
-                    lgs_a_index(k) = nc
+                nc = 2*ij2n(i-1,j+1)-1  ! column counter for vx_m(i-1,j+1)
+                k = k+1
+                lgs_a_value(k) = -2.0_wp*vis_int_g(i,j+1)     &
+                                 -1.0_wp*vis_int_sgxy(i-1,j)
+                lgs_a_index(k) = nc
 
-                    nc = 2*ij2n(i,j)
-                        ! next nc (column counter), for vy_m(i,j)
-!                     if (nc /= nr) then   ! (diagonal element)
-!                         errormsg = ' >>> calc_vxy_ssa_matrix: ' &
-!                                     //'Check for diagonal element failed!'
-!                         call error(errormsg)
-!                     end if
-                    k = k+1
-                    lgs_a_value(k) = -4.0_prec*inv_deta2 &
-                                        *(vis_int_g(i,j+1)+vis_int_g(i,j)) &
-                                     -inv_dxi2 &
-                                        *(vis_int_sgxy(i,j)+vis_int_sgxy(i-1,j)) &
-                                     -beta_now
-                    lgs_a_index(k) = nc
+                nc = 2*ij2n(i-1,j)-1  ! column counter for vx_m(i-1,j)
+                k = k+1
+                lgs_a_value(k) =  2.0_wp*vis_int_g(i,j)     &
+                                 +1.0_wp*vis_int_sgxy(i-1,j)
+                lgs_a_index(k) = nc
 
-                    nc = 2*ij2n(i,j+1)-1
-                        ! next nc (column counter), for vx_m(i,j+1)
-                    k = k+1
-                    lgs_a_value(k) = inv_dxi_deta &
-                                    *(2.0_prec*vis_int_g(i,j+1)+vis_int_sgxy(i,j))
-                    lgs_a_index(k) = nc
-
-                    nc = 2*ij2n(i,j+1)
-                        ! next nc (column counter), for vy_m(i,j+1)
-                    k = k+1
-                    lgs_a_value(k) = 4.0_prec*inv_deta2*vis_int_g(i,j+1)
-                    lgs_a_index(k) = nc
-
-                    nc = 2*ij2n(i+1,j)
-                        ! largest nc (column counter), for vy_m(i+1,j)
-                    k = k+1
-                    lgs_a_value(k)  = inv_dxi2*vis_int_sgxy(i,j)
-                    lgs_a_index(k)  = nc
-
-                    lgs_b_value(nr) = taud_now 
-                    lgs_x_value(nr) = vy_m(i,j)
-
-else
-
-                    nc = 2*ij2n(i,j)        ! column counter for vy_m(i,j)
-                    k = k+1
-                    lgs_a_value(k) = -4.0_wp*vis_int_g(i,j+1)   &
-                                     -4.0_wp*vis_int_g(i,j)     &
-                                     -1.0_wp*vis_int_sgxy(i,j)   &
-                                     -1.0_wp*vis_int_sgxy(i-1,j) &
-                                     -del_sq*beta_acy(i,j)
-                    lgs_a_index(k) = nc
-
-                    nc = 2*ij2n(i,j+1)      ! column counter for vy_m(i,j+1)
-                    k = k+1
-                    lgs_a_value(k) =  4.0_wp*vis_int_g(i,j+1)
-                    lgs_a_index(k) = nc
-
-                    nc = 2*ij2n(i,j-1)      ! column counter for vy_m(i,j-1)
-                    k = k+1
-                    lgs_a_value(k) =  4.0_wp*vis_int_g(i,j)
-                    lgs_a_index(k) = nc
-                    
-                    nc = 2*ij2n(i+1,j)      ! column counter for vy_m(i+1,j)
-                    k = k+1
-                    lgs_a_value(k) =  1.0_wp*vis_int_sgxy(i,j)
-                    lgs_a_index(k) = nc
-                    
-                    nc = 2*ij2n(i-1,j)      ! column counter for vy_m(i-1,j)
-                    k = k+1
-                    lgs_a_value(k) =  1.0_wp*vis_int_sgxy(i-1,j)
-                    lgs_a_index(k) = nc
-                    
-                    nc = 2*ij2n(i,j)-1      ! column counter for vx_m(i,j)
-                    k = k+1
-                    lgs_a_value(k) = -2.0_wp*vis_int_g(i,j)     &
-                                     -1.0_wp*vis_int_sgxy(i,j)
-                    lgs_a_index(k) = nc
-
-                    nc = 2*ij2n(i,j+1)-1    ! column counter for vx_m(i,j+1)
-                    k = k+1
-                    lgs_a_value(k) =  2.0_wp*vis_int_g(i,j+1)     &
-                                     +1.0_wp*vis_int_sgxy(i,j)
-                    lgs_a_index(k) = nc
-
-                    nc = 2*ij2n(i-1,j+1)-1  ! column counter for vx_m(i-1,j+1)
-                    k = k+1
-                    lgs_a_value(k) = -2.0_wp*vis_int_g(i,j+1)     &
-                                     -1.0_wp*vis_int_sgxy(i-1,j)
-                    lgs_a_index(k) = nc
-
-                    nc = 2*ij2n(i-1,j)-1  ! column counter for vx_m(i-1,j)
-                    k = k+1
-                    lgs_a_value(k) =  2.0_wp*vis_int_g(i,j)     &
-                                     +1.0_wp*vis_int_sgxy(i-1,j)
-                    lgs_a_index(k) = nc
-
-                    lgs_b_value(nr) = del_sq*taud_acy(i,j)
-                    lgs_x_value(nr) = vy_m(i,j)
-
-end if 
-
+                lgs_b_value(nr) = del_sq*taud_acy(i,j)
+                lgs_x_value(nr) = vy_m(i,j)
 
             end if
 

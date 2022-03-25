@@ -185,13 +185,13 @@ contains
 
             end select
             
-
-
-
             ! Calculate depth-integrated effective viscosity
             ! Note L19 uses eta_bar*H in the ssa equation. Yelmo uses eta_int=eta_bar*H directly.
             call calc_visc_eff_int(visc_eff_int,visc_eff,H_ice,f_ice,zeta_aa,par%boundaries)
             
+            ! Artificially reduce viscosity for low visc values
+            ! call scale_visc_eff_int(visc_eff_int,v0=1e10_wp,fac=0.92_wp)
+
             ! Calculate beta (at the ice base)
             call calc_beta(beta,c_bed,ux_b,uy_b,H_ice,f_ice,H_grnd,f_grnd,z_bed,z_sl,par%beta_method, &
                                 par%beta_const,par%beta_q,par%beta_u0,par%beta_gl_scale,par%beta_gl_f, &
@@ -305,6 +305,20 @@ end if
         return 
 
     end subroutine calc_velocity_ssa
+
+    subroutine scale_visc_eff_int(visc_eff_int,v0,fac)
+
+        implicit none 
+
+        real(wp), intent(INOUT) :: visc_eff_int(:,:) 
+        real(wp), intent(IN) :: v0
+        real(wp), intent(IN) :: fac
+        
+        where(visc_eff_int .lt. v0) visc_eff_int = visc_eff_int*fac 
+
+        return 
+
+    end subroutine scale_visc_eff_int
 
     subroutine calc_visc_eff_3D(visc_eff,ux,uy,ATT,H_ice,f_ice,zeta_aa,dx,dy,n_glen,eps_0,boundaries)
         ! Calculate 3D effective viscosity following L19, Eq. 2

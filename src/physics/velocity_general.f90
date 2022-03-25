@@ -1881,50 +1881,52 @@ end if
             converged_txt = ""
         end if 
 
-        if (log .and. is_converged) then
+        ! Also calculate maximum error magnitude for perspective
+        if (nx_check .gt. 0) then 
+            ux_resid_max = maxval(abs(ux-ux_prev),mask=abs(ux).gt.vel_tol .and. mask_acx)
+        else 
+            ux_resid_max = 0.0 
+        end if 
+
+        if (ny_check .gt. 0) then 
+            uy_resid_max = maxval(abs(uy-uy_prev),mask=abs(uy).gt.vel_tol .and. mask_acy)
+        else 
+            uy_resid_max = 0.0 
+        end if 
+
+        !if (log .and. is_converged) then
+        if (log) then
             ! Write summary to log if desired and iterations have completed
-
-            ! Also calculate maximum error magnitude for perspective
-            if (nx_check .gt. 0) then 
-                ux_resid_max = maxval(abs(ux-ux_prev),mask=abs(ux).gt.vel_tol .and. mask_acx)
-            else 
-                ux_resid_max = 0.0 
-            end if 
-
-            if (ny_check .gt. 0) then 
-                uy_resid_max = maxval(abs(uy-uy_prev),mask=abs(uy).gt.vel_tol .and. mask_acy)
-            else 
-                uy_resid_max = 0.0 
-            end if 
 
             ! Write summary to log
             write(*,"(a,a2,i4,g12.4,a3,2i8,2g12.4)") &
                 "ssa: ", trim(converged_txt), iter, resid, " | ", nx_check, ny_check, ux_resid_max, uy_resid_max 
 
+        end if 
+
+
 if (.TRUE.) then
-            if (ux_resid_max .ge. 9999.0_wp .or. uy_resid_max .ge. 9999.0_wp) then 
-                ! Strange case is occurring. Poor convergence with high error, investigate
+        if (ux_resid_max .ge. 9999.0_wp .or. uy_resid_max .ge. 9999.0_wp) then 
+            ! Strange case is occurring. Poor convergence with high error, investigate
 
-                write(io_unit_err,*) "ssa: Error: strange case occurring."
-                write(io_unit_err,"(a,a2,i4,g12.4,a3,2i8,2g12.4)") &
-                "ssa: ", trim(converged_txt), iter, resid, " | ", nx_check, ny_check, ux_resid_max, uy_resid_max 
+            write(io_unit_err,*) "ssa: Error: strange case occurring."
+            write(io_unit_err,"(a,a2,i4,g12.4,a3,2i8,2g12.4)") &
+            "ssa: ", trim(converged_txt), iter, resid, " | ", nx_check, ny_check, ux_resid_max, uy_resid_max 
 
-                write(io_unit_err,*) "Writing diagnostic file: ssa_check.nc."
+            write(io_unit_err,*) "Writing diagnostic file: ssa_check.nc."
 
-                ! Initialize output file 
-                call ssa_diagnostics_write_init("ssa_check.nc",nx=size(ux,1),ny=size(ux,2),time_init=real(iter,wp))
+            ! Initialize output file 
+            call ssa_diagnostics_write_init("ssa_check.nc",nx=size(ux,1),ny=size(ux,2),time_init=real(iter,wp))
 
-                ! Write file with dummy zero values for variables we don't have
-                call ssa_diagnostics_write_step("ssa_check.nc",ux,uy,resid,ux*0.0_wp,ux*0.0_wp,ux*0.0_wp, &
-                                        int(ux*0.0_wp),int(ux*0.0_wp),ux-ux_prev,uy-uy_prev,ux*0.0_wp,ux*0.0_wp,ux*0.0_wp,ux*0.0_wp, &
-                                        ux*0.0_wp,ux*0.0_wp,ux*0.0_wp,ux*0.0_wp,ux_prev,uy_prev,time=real(iter,wp))
+            ! Write file with dummy zero values for variables we don't have
+            call ssa_diagnostics_write_step("ssa_check.nc",ux,uy,resid,ux*0.0_wp,ux*0.0_wp,ux*0.0_wp, &
+                                    int(ux*0.0_wp),int(ux*0.0_wp),ux-ux_prev,uy-uy_prev,ux*0.0_wp,ux*0.0_wp,ux*0.0_wp,ux*0.0_wp, &
+                                    ux*0.0_wp,ux*0.0_wp,ux*0.0_wp,ux*0.0_wp,ux_prev,uy_prev,time=real(iter,wp))
 
-                stop 
-
-            end if 
-end if 
+            stop 
 
         end if 
+end if 
         
         return 
 

@@ -102,7 +102,9 @@ contains
         
         LIS_INTEGER :: ierr
         LIS_INTEGER :: nc, nr
+        LIS_INTEGER :: lin_iter
         LIS_REAL    :: residual 
+        LIS_REAL    :: solver_time 
         LIS_MATRIX  :: lgs_a
         LIS_VECTOR  :: lgs_b, lgs_x
         LIS_SOLVER  :: solver
@@ -1412,15 +1414,16 @@ contains
         call lis_solve(lgs_a, lgs_b, lgs_x, solver, ierr)
         call CHKERR(ierr)
 
-        !call lis_solver_get_iter(solver, lin_iter, ierr)
-        !write(6,'(a,i0,a)', advance='no') 'lin_iter = ', lin_iter, ', '
-
-        !!! call lis_solver_get_time(solver,solver_time,ierr)
-        !!! print *, 'calc_vxy_ssa_matrix: time (s) = ', solver_time
-
+        ! Get solver solution information
+        call lis_solver_get_iter(solver, lin_iter, ierr)
+        call lis_solver_get_time(solver,solver_time,ierr)
+        
         ! Obtain the relative L2_norm == ||b-Ax||_2 / ||b||_2
         call lis_solver_get_residualnorm(solver,residual,ierr)
-        L2_norm = real(residual,prec) 
+        L2_norm = real(residual,wp) 
+
+        ! Print a summary
+        write(*,*) "calc_vxy_ssa_matrix_ab_ac: [time (s), iter, L2] = ", solver_time, lin_iter, residual
 
         lgs_x_value = 0.0_prec
         call lis_vector_gather(lgs_x, lgs_x_value, ierr)
@@ -1540,7 +1543,9 @@ contains
         
         LIS_INTEGER :: ierr
         LIS_INTEGER :: nc, nr
+        LIS_INTEGER :: lin_iter
         LIS_REAL    :: residual 
+        LIS_REAL    :: solver_time  
         LIS_MATRIX  :: lgs_a
         LIS_VECTOR  :: lgs_b, lgs_x
         LIS_SOLVER  :: solver
@@ -2947,15 +2952,16 @@ end if
         call lis_solve(lgs_a, lgs_b, lgs_x, solver, ierr)
         call CHKERR(ierr)
 
-        !call lis_solver_get_iter(solver, lin_iter, ierr)
-        !write(6,'(a,i0,a)', advance='no') 'lin_iter = ', lin_iter, ', '
-
-        !!! call lis_solver_get_time(solver,solver_time,ierr)
-        !!! print *, 'calc_vxy_ssa_matrix: time (s) = ', solver_time
-
+        ! Get solver solution information
+        call lis_solver_get_iter(solver, lin_iter, ierr)
+        call lis_solver_get_time(solver,solver_time,ierr)
+        
         ! Obtain the relative L2_norm == ||b-Ax||_2 / ||b||_2
         call lis_solver_get_residualnorm(solver,residual,ierr)
-        L2_norm = real(residual,prec) 
+        L2_norm = real(residual,wp) 
+
+        ! Print a summary
+        write(*,*) "calc_vxy_ssa_matrix: [time (s), iter, L2] = ", solver_time, lin_iter, residual
 
         lgs_x_value = 0.0_prec
         call lis_vector_gather(lgs_x, lgs_x_value, ierr)

@@ -1,4 +1,4 @@
-module solver_ssa_ab
+module solver_ssa_aa
     ! This ssa solver code was adapted from SICOPOLIS (v5-dev, svn revision 1421) module calc_vxy_m.F90. 
     
     use yelmo_defs, only : sp, dp, wp, io_unit_err, TOL_UNDERFLOW, rho_ice, rho_sw, g 
@@ -9,7 +9,7 @@ module solver_ssa_ab
     implicit none 
 
     private 
-    public :: calc_vxy_ssa_matrix 
+    public :: calc_vxy_ssa_matrix_aa 
     public :: set_ssa_masks
     public :: ssa_diagnostics_write_init
     public :: ssa_diagnostics_write_step
@@ -17,8 +17,8 @@ module solver_ssa_ab
 
 contains 
 
-    subroutine calc_vxy_ssa_matrix(vx_m,vy_m,L2_norm,beta_ab,visc_int_ab, &
-                    ssa_mask_ab,H_ice,f_ice,taudx_ab,taudy_ab,H_grnd,z_sl,z_bed, &
+    subroutine calc_vxy_ssa_matrix_aa(vx_m,vy_m,L2_norm,beta,visc_int, &
+                    ssa_mask,H_ice,f_ice,taudx_aa,taudy_aa,H_grnd,z_sl,z_bed, &
                     z_srf,dx,dy,ulim,boundaries,lateral_bc,lis_settings)
         ! Solution of the system of linear equations for the horizontal velocities
         ! vx_m, vy_m in the shallow shelf approximation.
@@ -30,13 +30,13 @@ contains
         real(wp), intent(INOUT) :: vx_m(:,:)                ! [m yr^-1] Horizontal velocity x (ab-nodes)
         real(wp), intent(INOUT) :: vy_m(:,:)                ! [m yr^-1] Horizontal velocity y (ab-nodes)
         real(wp), intent(OUT)   :: L2_norm                  ! L2 norm convergence check from solver
-        real(wp), intent(IN)    :: beta_ab(:,:)             ! [Pa yr m^-1] Basal friction (ab-nodes)
-        real(wp), intent(IN)    :: visc_int_ab(:,:)         ! [Pa a m] Vertically integrated viscosity (aa-nodes)
-        integer,  intent(IN)    :: ssa_mask_ab(:,:)         ! [--] Mask to determine ssa solver actions (ab-nodes)
+        real(wp), intent(IN)    :: beta(:,:)                ! [Pa yr m^-1] Basal friction (ab-nodes)
+        real(wp), intent(IN)    :: visc_int(:,:)            ! [Pa a m] Vertically integrated viscosity (aa-nodes)
+        integer,  intent(IN)    :: ssa_mask(:,:)            ! [--] Mask to determine ssa solver actions (ab-nodes)
         real(wp), intent(IN)    :: H_ice(:,:)               ! [m]  Ice thickness (aa-nodes)
         real(wp), intent(IN)    :: f_ice(:,:)
-        real(wp), intent(IN)    :: taudx_ab(:,:)            ! [Pa] Driving stress x (ab nodes)
-        real(wp), intent(IN)    :: taudy_ab(:,:)            ! [Pa] Driving stress y (ab nodes)
+        real(wp), intent(IN)    :: taudx_aa(:,:)            ! [Pa] Driving stress x (ab nodes)
+        real(wp), intent(IN)    :: taudy_aa(:,:)            ! [Pa] Driving stress y (ab nodes)
         real(wp), intent(IN)    :: H_grnd(:,:)  
         real(wp), intent(IN)    :: z_sl(:,:) 
         real(wp), intent(IN)    :: z_bed(:,:) 
@@ -190,8 +190,8 @@ contains
         
         ! Calculate depth-integrated viscosity on acx- and acy-nodes 
 
-        call map_b_to_cx_2D(visc_int_acx,visc_int_ab)
-        call map_b_to_cy_2D(visc_int_acy,visc_int_ab)
+        call map_a_to_cx_2D(visc_int_acx,visc_int)
+        call map_a_to_cy_2D(visc_int_acy,visc_int)
 
         ! =======================================================================
         !-------- Reshaping of a 2-d array (with indices i, j)
@@ -240,7 +240,7 @@ contains
 
             ! == Treat special cases first ==
 
-            if (ssa_mask_ab(i,j) .eq. -1) then 
+            if (ssa_mask(i,j) .eq. -1) then 
                 ! Assign prescribed boundary velocity to this point
                 ! (eg for prescribed velocity corresponding to 
                 ! analytical grounding line flux, or for a regional domain)
@@ -302,7 +302,7 @@ contains
 
                     case DEFAULT 
 
-                        write(*,*) "calc_vxy_ssa_matrix:: Error: left-border condition not &
+                        write(*,*) "calc_vxy_ssa_matrix_aa:: Error: left-border condition not &
                         &recognized: "//trim(boundaries_vx(3))
                         write(*,*) "boundaries parameter set to: "//trim(boundaries)
                         stop
@@ -361,7 +361,7 @@ contains
 
                     case DEFAULT 
 
-                        write(*,*) "calc_vxy_ssa_matrix:: Error: right-border condition not &
+                        write(*,*) "calc_vxy_ssa_matrix_aa:: Error: right-border condition not &
                         &recognized: "//trim(boundaries_vx(1))
                         write(*,*) "boundaries parameter set to: "//trim(boundaries)
                         stop
@@ -462,7 +462,7 @@ contains
 
                     case DEFAULT 
 
-                        write(*,*) "calc_vxy_ssa_matrix:: Error: upper-border condition not &
+                        write(*,*) "calc_vxy_ssa_matrix_aa:: Error: upper-border condition not &
                         &recognized: "//trim(boundaries_vx(4))
                         write(*,*) "boundaries parameter set to: "//trim(boundaries)
                         stop
@@ -519,14 +519,14 @@ contains
 
                     case DEFAULT 
 
-                        write(*,*) "calc_vxy_ssa_matrix:: Error: upper-border condition not &
+                        write(*,*) "calc_vxy_ssa_matrix_aa:: Error: upper-border condition not &
                         &recognized: "//trim(boundaries_vx(2))
                         write(*,*) "boundaries parameter set to: "//trim(boundaries)
                         stop
 
                 end select 
 
-            else if (ssa_mask_ab(i,j) .eq. 0) then    ! neither neighbour is floating or grounded ice,
+            else if (ssa_mask(i,j) .eq. 0) then    ! neither neighbour is floating or grounded ice,
                     ! velocity assumed to be zero
 
                 k = k+1
@@ -543,84 +543,82 @@ contains
 
                 nc = 2*ij2n(i+1,j)-1        ! column counter for vx_m(i+1,j)
                 k = k+1
-                lgs_a_value(k) =  4.0_wp*inv_dxdx*visc_int_acy(i+1,j)
+                lgs_a_value(k) =  4.0_wp*inv_dxdx*visc_int_acx(i,j)
                 lgs_a_index(k) = nc
 
                 nc = 2*ij2n(i,j)-1          ! column counter for vx_m(i,j)
                 k = k+1
-                lgs_a_value(k) = -4.0_wp*inv_dxdx*visc_int_acy(i+1,j) &
-                                 -4.0_wp*inv_dxdx*visc_int_acy(i,j) &
-                                 -1.0_wp*inv_dydy*visc_int_acx(i,j+1) &
-                                 -1.0_wp*inv_dydy*visc_int_acx(i,j) &
-                                 -beta_ab(i,j)
+                lgs_a_value(k) = -4.0_wp*inv_dxdx*visc_int_acx(i,j) &
+                                 -4.0_wp*inv_dxdx*visc_int_acx(i-1,j) &
+                                 -1.0_wp*inv_dydy*visc_int_acy(i,j) &
+                                 -1.0_wp*inv_dydy*visc_int_acy(i,j-1) &
+                                 -beta(i,j)
                 lgs_a_index(k) = nc
                 
                 nc = 2*ij2n(i-1,j)-1        ! column counter for vx_m(i-1,j)
                 k = k+1
-                lgs_a_value(k) =  4.0_wp*inv_dxdx*visc_int_acy(i,j)
+                lgs_a_value(k) =  4.0_wp*inv_dxdx*visc_int_acx(i-1,j)
                 lgs_a_index(k) = nc
 
                 nc = 2*ij2n(i,j+1)-1        ! column counter for vx_m(i,j+1)
                 k = k+1
-                lgs_a_value(k) =  1.0_wp*inv_dydy*visc_int_acx(i,j+1)
+                lgs_a_value(k) =  1.0_wp*inv_dydy*visc_int_acy(i,j)
                 lgs_a_index(k) = nc
 
                 nc = 2*ij2n(i,j-1)-1        ! column counter for vx_m(i,j-1)
                 k = k+1
-                lgs_a_value(k) =  1.0_wp*inv_dydy*visc_int_acx(i,j)
+                lgs_a_value(k) =  1.0_wp*inv_dydy*visc_int_acy(i,j-1)
                 lgs_a_index(k) = nc
 
                 ! -- vy terms -- 
 
                 nc = 2*ij2n(i,j+1)          ! column counter for vy_m(i,j+1)
                 k = k+1
-                lgs_a_value(k) =  1.0_wp*inv_2dxdy*visc_int_acy(i+1,j)     &
-                                 -1.0_wp*inv_2dxdy*visc_int_acy(i,j)
+                lgs_a_value(k) =  1.0_wp*inv_2dxdy*visc_int_acx(i,j)     &
+                                 -1.0_wp*inv_2dxdy*visc_int_acx(i-1,j)
                 lgs_a_index(k) = nc
 
                 nc = 2*ij2n(i,j-1)          ! column counter for vy_m(i,j-1)
                 k = k+1
-                lgs_a_value(k) = -1.0_wp*inv_2dxdy*visc_int_acy(i+1,j)     &
-                                 +1.0_wp*inv_2dxdy*visc_int_acy(i,j)
+                lgs_a_value(k) = -1.0_wp*inv_2dxdy*visc_int_acx(i,j)     &
+                                 +1.0_wp*inv_2dxdy*visc_int_acx(i-1,j)
                 lgs_a_index(k) = nc
 
                 nc = 2*ij2n(i+1,j+1)        ! column counter for vy_m(i+1,j+1)
                 k = k+1
-                lgs_a_value(k) =  1.0_wp*inv_2dxdy*visc_int_acy(i+1,j)     &
-                                 +1.0_wp*inv_4dxdy*visc_int_acx(i,j+1)
+                lgs_a_value(k) =  1.0_wp*inv_2dxdy*visc_int_acx(i,j)     &
+                                 +1.0_wp*inv_4dxdy*visc_int_acy(i,j)
                 lgs_a_index(k) = nc
 
                 nc = 2*ij2n(i+1,j-1)        ! column counter for vy_m(i+1,j-1)
                 k = k+1
-                lgs_a_value(k) = -1.0_wp*inv_2dxdy*visc_int_acy(i+1,j)     &
-                                 -1.0_wp*inv_4dxdy*visc_int_acx(i,j)
+                lgs_a_value(k) = -1.0_wp*inv_2dxdy*visc_int_acx(i,j)     &
+                                 -1.0_wp*inv_4dxdy*visc_int_acy(i,j-1)
                 lgs_a_index(k) = nc
 
                 nc = 2*ij2n(i-1,j+1)        ! column counter for vy_m(i-1,j+1)
                 k = k+1
-                lgs_a_value(k) = -1.0_wp*inv_2dxdy*visc_int_acy(i,j)     &
-                                 -1.0_wp*inv_4dxdy*visc_int_acx(i,j+1)
+                lgs_a_value(k) = -1.0_wp*inv_2dxdy*visc_int_acx(i-1,j)     &
+                                 -1.0_wp*inv_4dxdy*visc_int_acy(i,j)
                 lgs_a_index(k) = nc
 
                 nc = 2*ij2n(i-1,j-1)        ! column counter for vy_m(i-1,j-1)
                 k = k+1
-                lgs_a_value(k) =  1.0_wp*inv_2dxdy*visc_int_acy(i,j)     &
-                                 +1.0_wp*inv_4dxdy*visc_int_acx(i,j)
+                lgs_a_value(k) =  1.0_wp*inv_2dxdy*visc_int_acx(i-1,j)     &
+                                 +1.0_wp*inv_4dxdy*visc_int_acy(i,j-1)
                 lgs_a_index(k) = nc
 
                 nc = 2*ij2n(i+1,j)          ! column counter for vy_m(i+1,j)
                 k = k+1
-                lgs_a_value(k) =  1.0_wp*inv_4dxdy*visc_int_acx(i,j+1)     &
-                                 -1.0_wp*inv_4dxdy*visc_int_acx(i,j)
+                lgs_a_value(k) =  1.0_wp*inv_4dxdy*visc_int_acy(i,j)
                 lgs_a_index(k) = nc
 
                 nc = 2*ij2n(i-1,j)          ! column counter for vy_m(i-1,j)
                 k = k+1
-                lgs_a_value(k) = -1.0_wp*inv_4dxdy*visc_int_acx(i,j+1)     &
-                                 +1.0_wp*inv_4dxdy*visc_int_acx(i,j)
+                lgs_a_value(k) = -1.0_wp*inv_4dxdy*visc_int_acy(i,j)
                 lgs_a_index(k) = nc
 
-                lgs_b_value(nr) = taudx_ab(i,j)
+                lgs_b_value(nr) = taudx_aa(i,j)
                 lgs_x_value(nr) = vx_m(i,j)
 
             end if
@@ -633,7 +631,7 @@ contains
 
             ! == Treat special cases first ==
 
-            if (ssa_mask_ab(i,j) .eq. -1) then 
+            if (ssa_mask(i,j) .eq. -1) then 
                 ! Assign prescribed boundary velocity to this point
                 ! (eg for prescribed velocity corresponding to analytical grounding line flux)
 
@@ -694,7 +692,7 @@ contains
 
                     case DEFAULT 
 
-                        write(*,*) "calc_vxy_ssa_matrix:: Error: lower-border condition not &
+                        write(*,*) "calc_vxy_ssa_matrix_aa:: Error: lower-border condition not &
                         &recognized: "//trim(boundaries_vy(4))
                         write(*,*) "boundaries parameter set to: "//trim(boundaries)
                         stop
@@ -751,7 +749,7 @@ contains
 
                     case DEFAULT 
 
-                        write(*,*) "calc_vxy_ssa_matrix:: Error: upper-border condition not &
+                        write(*,*) "calc_vxy_ssa_matrix_aa:: Error: upper-border condition not &
                         &recognized: "//trim(boundaries_vy(2))
                         write(*,*) "boundaries parameter set to: "//trim(boundaries)
                         stop
@@ -847,7 +845,7 @@ contains
 
                     case DEFAULT 
 
-                        write(*,*) "calc_vxy_ssa_matrix:: Error: left-border condition not &
+                        write(*,*) "calc_vxy_ssa_matrix_aa:: Error: left-border condition not &
                         &recognized: "//trim(boundaries_vy(3))
                         write(*,*) "boundaries parameter set to: "//trim(boundaries)
                         stop
@@ -903,14 +901,14 @@ contains
 
                     case DEFAULT 
 
-                        write(*,*) "calc_vxy_ssa_matrix:: Error: right-border condition not &
+                        write(*,*) "calc_vxy_ssa_matrix_aa:: Error: right-border condition not &
                         &recognized: "//trim(boundaries_vy(1))
                         write(*,*) "boundaries parameter set to: "//trim(boundaries)
                         stop
 
                 end select 
 
-            else if (ssa_mask_ab(i,j) .eq. 0) then    ! neither neighbour is floating or grounded ice,
+            else if (ssa_mask(i,j) .eq. 0) then    ! neither neighbour is floating or grounded ice,
                     ! velocity assumed to be zero
 
                 k = k+1
@@ -925,86 +923,84 @@ contains
 
                 ! -- vy terms -- 
 
-                nc = 2*ij2n(i,j+1)        ! column counter for vy_m(i,j+1)
+                nc = 2*ij2n(i,j+1)          ! column counter for vy_m(i,j+1)
                 k = k+1
-                lgs_a_value(k) =  4.0_wp*inv_dydy*visc_int_acx(i,j+1)
+                lgs_a_value(k) =  4.0_wp*inv_dydy*visc_int_acy(i,j)
                 lgs_a_index(k) = nc
 
-                nc = 2*ij2n(i,j)          ! column counter for vy_m(i,j)
+                nc = 2*ij2n(i,j)            ! column counter for vy_m(i,j)
                 k = k+1
-                lgs_a_value(k) = -4.0_wp*inv_dydy*visc_int_acx(i,j+1) &
-                                 -4.0_wp*inv_dydy*visc_int_acx(i,j) &
-                                 -1.0_wp*inv_dxdx*visc_int_acy(i+1,j) &
-                                 -1.0_wp*inv_dxdx*visc_int_acy(i,j) &
-                                 -beta_ab(i,j)
+                lgs_a_value(k) = -4.0_wp*inv_dydy*visc_int_acy(i,j) &
+                                 -4.0_wp*inv_dydy*visc_int_acy(i,j-1) &
+                                 -1.0_wp*inv_dxdx*visc_int_acx(i,j) &
+                                 -1.0_wp*inv_dxdx*visc_int_acx(i-1,j) &
+                                 -beta(i,j)
                 lgs_a_index(k) = nc
                 
-                nc = 2*ij2n(i,j-1)        ! column counter for vy_m(i,j-1)
+                nc = 2*ij2n(i,j-1)          ! column counter for vy_m(i,j-1)
                 k = k+1
-                lgs_a_value(k) =  4.0_wp*inv_dydy*visc_int_acx(i,j)
+                lgs_a_value(k) =  4.0_wp*inv_dydy*visc_int_acy(i,j-1)
                 lgs_a_index(k) = nc
 
-                nc = 2*ij2n(i+1,j)        ! column counter for vy_m(i+1,j)
+                nc = 2*ij2n(i+1,j)          ! column counter for vy_m(i+1,j)
                 k = k+1
-                lgs_a_value(k) =  1.0_wp*inv_dxdx*visc_int_acy(i+1,j)
+                lgs_a_value(k) =  1.0_wp*inv_dxdx*visc_int_acx(i,j)
                 lgs_a_index(k) = nc
 
-                nc = 2*ij2n(i-1,j)        ! column counter for vy_m(i-1,j)
+                nc = 2*ij2n(i-1,j)          ! column counter for vy_m(i-1,j)
                 k = k+1
-                lgs_a_value(k) =  1.0_wp*inv_dxdx*visc_int_acy(i,j)
+                lgs_a_value(k) =  1.0_wp*inv_dxdx*visc_int_acx(i-1,j)
                 lgs_a_index(k) = nc
 
                 ! -- vx terms -- 
 
-                nc = 2*ij2n(i+1,j)-1          ! column counter for vx_m(i+1,j)
+                nc = 2*ij2n(i+1,j)-1        ! column counter for vx_m(i+1,j)
                 k = k+1
-                lgs_a_value(k) =  1.0_wp*inv_2dxdy*visc_int_acx(i,j+1)     &
-                                 -1.0_wp*inv_2dxdy*visc_int_acx(i,j)
+                lgs_a_value(k) =  1.0_wp*inv_2dxdy*visc_int_acy(i,j)     &
+                                 -1.0_wp*inv_2dxdy*visc_int_acy(i,j-1)
                 lgs_a_index(k) = nc
 
-                nc = 2*ij2n(i-1,j)-1          ! column counter for vx_m(i-1,j)
+                nc = 2*ij2n(i-1,j)-1        ! column counter for vx_m(i-1,j)
                 k = k+1
-                lgs_a_value(k) = -1.0_wp*inv_2dxdy*visc_int_acx(i,j+1)     &
-                                 +1.0_wp*inv_2dxdy*visc_int_acx(i,j)
+                lgs_a_value(k) = -1.0_wp*inv_2dxdy*visc_int_acy(i,j)     &
+                                 +1.0_wp*inv_2dxdy*visc_int_acy(i,j-1)
                 lgs_a_index(k) = nc
 
-                nc = 2*ij2n(i+1,j+1)-1        ! column counter for vx_m(i+1,j+1)
+                nc = 2*ij2n(i+1,j+1)-1      ! column counter for vx_m(i+1,j+1)
                 k = k+1
-                lgs_a_value(k) =  1.0_wp*inv_2dxdy*visc_int_acx(i,j+1)     &
-                                 +1.0_wp*inv_4dxdy*visc_int_acy(i+1,j)
+                lgs_a_value(k) =  1.0_wp*inv_2dxdy*visc_int_acy(i,j)     &
+                                 +1.0_wp*inv_4dxdy*visc_int_acx(i,j)
                 lgs_a_index(k) = nc
 
-                nc = 2*ij2n(i-1,j+1)-1        ! column counter for vx_m(i-1,j+1)
+                nc = 2*ij2n(i-1,j+1)-1      ! column counter for vx_m(i-1,j+1)
                 k = k+1
-                lgs_a_value(k) = -1.0_wp*inv_2dxdy*visc_int_acx(i,j+1)     &
-                                 -1.0_wp*inv_4dxdy*visc_int_acy(i,j)
+                lgs_a_value(k) = -1.0_wp*inv_2dxdy*visc_int_acy(i,j)     &
+                                 -1.0_wp*inv_4dxdy*visc_int_acx(i-1,j)
                 lgs_a_index(k) = nc
 
-                nc = 2*ij2n(i+1,j-1)-1        ! column counter for vx_m(i+1,j-1)
+                nc = 2*ij2n(i+1,j-1)-1      ! column counter for vx_m(i+1,j-1)
                 k = k+1
-                lgs_a_value(k) = -1.0_wp*inv_2dxdy*visc_int_acx(i,j)     &
-                                 -1.0_wp*inv_4dxdy*visc_int_acy(i+1,j)
+                lgs_a_value(k) = -1.0_wp*inv_2dxdy*visc_int_acy(i,j-1)     &
+                                 -1.0_wp*inv_4dxdy*visc_int_acx(i,j)
                 lgs_a_index(k) = nc
 
-                nc = 2*ij2n(i-1,j-1)-1        ! column counter for vx_m(i-1,j-1)
+                nc = 2*ij2n(i-1,j-1)-1      ! column counter for vx_m(i-1,j-1)
                 k = k+1
-                lgs_a_value(k) =  1.0_wp*inv_2dxdy*visc_int_acx(i,j)     &
-                                 +1.0_wp*inv_4dxdy*visc_int_acy(i,j)
+                lgs_a_value(k) =  1.0_wp*inv_2dxdy*visc_int_acy(i,j-1)     &
+                                 +1.0_wp*inv_4dxdy*visc_int_acx(i-1,j)
                 lgs_a_index(k) = nc
 
-                nc = 2*ij2n(i,j+1)-1          ! column counter for vx_m(i,j+1)
+                nc = 2*ij2n(i,j+1)-1        ! column counter for vx_m(i,j+1)
                 k = k+1
-                lgs_a_value(k) =  1.0_wp*inv_4dxdy*visc_int_acy(i+1,j)     &
-                                 -1.0_wp*inv_4dxdy*visc_int_acy(i,j)
+                lgs_a_value(k) =  1.0_wp*inv_4dxdy*visc_int_acx(i,j)
                 lgs_a_index(k) = nc
 
-                nc = 2*ij2n(i,j-1)-1          ! column counter for vx_m(i,j-1)
+                nc = 2*ij2n(i,j-1)-1        ! column counter for vy_m(i,j-1)
                 k = k+1
-                lgs_a_value(k) = -1.0_wp*inv_4dxdy*visc_int_acy(i+1,j)     &
-                                 +1.0_wp*inv_4dxdy*visc_int_acy(i,j)
+                lgs_a_value(k) = -1.0_wp*inv_4dxdy*visc_int_acx(i,j)
                 lgs_a_index(k) = nc
 
-                lgs_b_value(nr) = taudy_ab(i,j)
+                lgs_b_value(nr) = taudy_aa(i,j)
                 lgs_x_value(nr) = vy_m(i,j)
 
             end if
@@ -1067,7 +1063,7 @@ contains
         L2_norm = real(residual,wp) 
 
         ! Print a summary
-        write(*,*) "calc_vxy_ssa_matrix_ab: [time (s), iter, L2] = ", solver_time, lin_iter, residual
+        write(*,*) "calc_vxy_ssa_matrix_aa: [time (s), iter, L2] = ", solver_time, lin_iter, residual
 
 
         lgs_x_value = 0.0_wp
@@ -1108,9 +1104,9 @@ contains
 
         return 
 
-    end subroutine calc_vxy_ssa_matrix
+    end subroutine calc_vxy_ssa_matrix_aa
 
-    subroutine set_ssa_masks(ssa_mask_ab,H_ice,f_ice,f_grnd_ab,use_ssa)
+    subroutine set_ssa_masks(ssa_mask,H_ice,f_ice,f_grnd,use_ssa)
         ! Define where ssa calculations should be performed
         ! Note: could be binary, but perhaps also distinguish 
         ! grounding line/zone to use this mask for later gl flux corrections
@@ -1120,47 +1116,37 @@ contains
 
         implicit none 
         
-        integer,  intent(OUT) :: ssa_mask_ab(:,:)
+        integer,  intent(OUT) :: ssa_mask(:,:)
         real(wp), intent(IN)  :: H_ice(:,:)
         real(wp), intent(IN)  :: f_ice(:,:)
-        real(wp), intent(IN)  :: f_grnd_ab(:,:)
+        real(wp), intent(IN)  :: f_grnd(:,:)
         logical,  intent(IN)  :: use_ssa        ! SSA is actually active now? 
 
         ! Local variables
         integer    :: i, j, nx, ny
-        integer    :: im1, ip1, jm1, jp1
-        real(wp) :: H_ab
-        
+
         nx = size(H_ice,1)
         ny = size(H_ice,2)
         
         ! Initially no active ssa points
-        ssa_mask_ab = 0
+        ssa_mask = 0
         
         if (use_ssa) then 
 
             do j = 1, ny
             do i = 1, nx
 
-                ! Get neighbor indices
-                im1 = max(i-1,1) 
-                ip1 = min(i+1,nx) 
-                jm1 = max(j-1,1) 
-                jp1 = min(j+1,ny)
-
-
                 ! x-direction
-                if (f_ice(i,j) .eq. 1.0 .or. f_ice(ip1,j) .eq. 1.0 .or. &
-                    f_ice(i,jp1) .eq. 1.0 .or. f_ice(ip1,jp1) .eq. 1.0) then
+                if (f_ice(i,j) .eq. 1.0) then
                 
                     ! Ice is present on ab-node
                     
-                    if (f_grnd_ab(i,j) .gt. 0.0) then 
+                    if (f_grnd(i,j) .gt. 0.0) then 
                         ! Grounded ice or grounding line (ie, shelfy-stream)
-                        ssa_mask_ab(i,j) = 1
+                        ssa_mask(i,j) = 1
                     else 
                         ! Shelf ice 
-                        ssa_mask_ab(i,j) = 2
+                        ssa_mask(i,j) = 2
                     end if 
 
                 end if
@@ -1391,8 +1377,8 @@ contains
 
     end subroutine ssa_diagnostics_write_init
 
-    subroutine ssa_diagnostics_write_step(filename,ux,uy,L2_norm,beta_ab,visc_int_ab, &
-                                        ssa_mask_ab,ssa_err_x,ssa_err_y,H_ice,f_ice,taudx_ab,taudy_ab, &
+    subroutine ssa_diagnostics_write_step(filename,ux,uy,L2_norm,beta,visc_int, &
+                                        ssa_mask,ssa_err_x,ssa_err_y,H_ice,f_ice,taudx_aa,taudy_aa, &
                                                             H_grnd,z_sl,z_bed,z_srf,ux_prev,uy_prev,time)
 
         implicit none 
@@ -1401,15 +1387,15 @@ contains
         real(wp), intent(IN) :: ux(:,:) 
         real(wp), intent(IN) :: uy(:,:) 
         real(wp), intent(IN) :: L2_norm
-        real(wp), intent(IN) :: beta_ab(:,:)
-        real(wp), intent(IN) :: visc_int_ab(:,:) 
-        integer,  intent(IN) :: ssa_mask_ab(:,:)
+        real(wp), intent(IN) :: beta(:,:)
+        real(wp), intent(IN) :: visc_int(:,:) 
+        integer,  intent(IN) :: ssa_mask(:,:)
         real(wp), intent(IN) :: ssa_err_x(:,:) 
         real(wp), intent(IN) :: ssa_err_y(:,:) 
         real(wp), intent(IN) :: H_ice(:,:) 
         real(wp), intent(IN) :: f_ice(:,:) 
-        real(wp), intent(IN) :: taudx_ab(:,:) 
-        real(wp), intent(IN) :: taudy_ab(:,:) 
+        real(wp), intent(IN) :: taudx_aa(:,:) 
+        real(wp), intent(IN) :: taudy_aa(:,:) 
         real(wp), intent(IN) :: H_grnd(:,:) 
         real(wp), intent(IN) :: z_sl(:,:) 
         real(wp), intent(IN) :: z_bed(:,:) 
@@ -1450,13 +1436,13 @@ contains
         
         call nc_write(filename,"L2_norm",L2_norm,dim1="time",start=[n],count=[1],ncid=ncid)
 
-        call nc_write(filename,"beta_ab",beta_ab,units="Pa yr m^-1",long_name="Dragging coefficient (ab)", &
+        call nc_write(filename,"beta",beta,units="Pa yr m^-1",long_name="Dragging coefficient (aa)", &
                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
 
-        call nc_write(filename,"visc_int_ab",visc_int_ab,units="Pa yr",long_name="Vertically integrated effective viscosity (ab)", &
+        call nc_write(filename,"visc_int",visc_int,units="Pa yr",long_name="Vertically integrated effective viscosity (aa)", &
                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
 
-        call nc_write(filename,"ssa_mask_ab",ssa_mask_ab,units="1",long_name="SSA mask (ab)", &
+        call nc_write(filename,"ssa_mask",ssa_mask,units="1",long_name="SSA mask (ab)", &
                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
 
         call nc_write(filename,"ssa_err_x",ssa_err_x,units="1",long_name="SSA err (x, ab)", &
@@ -1469,9 +1455,9 @@ contains
         call nc_write(filename,"f_ice",f_ice,units="1",long_name="Ice-covered fraction", &
                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
 
-        call nc_write(filename,"taudx_ab",taudx_ab,units="Pa",long_name="Driving stress (x, ab)", &
+        call nc_write(filename,"taudx_aa",taudx_aa,units="Pa",long_name="Driving stress (x, aa)", &
                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-        call nc_write(filename,"taudy_ab",taudy_ab,units="Pa",long_name="Driving stress (y, ab)", &
+        call nc_write(filename,"taudy_aa",taudy_aa,units="Pa",long_name="Driving stress (y, aa)", &
                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
         
         call nc_write(filename,"H_grnd",H_grnd,units="m",long_name="Ice thickness overburden", &
@@ -1490,4 +1476,4 @@ contains
 
     end subroutine ssa_diagnostics_write_step
     
-end module solver_ssa_ab
+end module solver_ssa_aa

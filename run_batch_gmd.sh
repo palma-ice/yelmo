@@ -1,6 +1,6 @@
 #!/bin/bash
 
-fldr='tmp/d39fbf'
+fldr='tmp/62e625'
 
 
 ### BENCHMARK TESTS ###

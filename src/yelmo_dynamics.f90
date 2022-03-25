@@ -9,12 +9,16 @@ module yelmo_dynamics
         calc_magnitude_from_staggered_ice, calc_vertical_integrated_2D
 
     use velocity_general
+
     use velocity_sia 
+
     use velocity_ssa 
+    ! use velocity_ssa_aa
+    
     use velocity_l1l2 
 
     use velocity_diva
-    !use velocity_diva_ab 
+    ! use velocity_diva_ab 
 
     use solver_ssa_sico5
     use basal_dragging  
@@ -321,6 +325,12 @@ contains
                                       dyn%now%beta_acx,dyn%now%beta_acy,dyn%now%c_bed,dyn%now%taud_acx,dyn%now%taud_acy, &
                                       tpo%now%H_ice_dyn,tpo%now%f_ice_dyn,tpo%now%H_grnd,tpo%now%f_grnd,tpo%now%f_grnd_acx,tpo%now%f_grnd_acy, &
                                       mat%now%ATT,dyn%par%zeta_aa,bnd%z_sl,bnd%z_bed,tpo%now%z_srf,dyn%par%dx,dyn%par%dy,mat%par%n_glen,ssa_par)
+            ! call calc_velocity_ssa_aa(dyn%now%ux_b,dyn%now%uy_b,dyn%now%taub_acx,dyn%now%taub_acy, &
+            !                           dyn%now%visc_eff,dyn%now%visc_eff_int,dyn%now%ssa_mask_acx,dyn%now%ssa_mask_acy, &
+            !                           dyn%now%ssa_err_acx,dyn%now%ssa_err_acy,dyn%par%ssa_iter_now,dyn%now%beta, &
+            !                           dyn%now%beta_acx,dyn%now%beta_acy,dyn%now%c_bed,dyn%now%taud_acx,dyn%now%taud_acy, &
+            !                           tpo%now%H_ice_dyn,tpo%now%f_ice_dyn,tpo%now%H_grnd,tpo%now%f_grnd,tpo%now%f_grnd_acx,tpo%now%f_grnd_acy, &
+            !                           mat%now%ATT,dyn%par%zeta_aa,bnd%z_sl,bnd%z_bed,tpo%now%z_srf,dyn%par%dx,dyn%par%dy,mat%par%n_glen,ssa_par)
 
         else 
             ! Set all SSA terms to zero 

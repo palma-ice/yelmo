@@ -83,6 +83,10 @@ $(objdir)/solver_ssa_sico5.o: $(srcdir)/physics/solver_ssa_sico5.F90 $(objdir)/y
 							$(objdir)/yelmo_tools.o $(objdir)/ncio.o
 	$(FC) $(DFLAGS) $(FFLAGS) $(INC_LIS) -c -o $@ $<
 
+$(objdir)/solver_ssa_aa.o: $(srcdir)/physics/solver_ssa_aa.F90 $(objdir)/yelmo_defs.o \
+							$(objdir)/yelmo_tools.o $(objdir)/ncio.o $(objdir)/grid_calcs.o
+	$(FC) $(DFLAGS) $(FFLAGS) $(INC_LIS) -c -o $@ $<
+
 $(objdir)/solver_ssa_ab.o: $(srcdir)/physics/solver_ssa_ab.F90 $(objdir)/yelmo_defs.o \
 							$(objdir)/yelmo_tools.o $(objdir)/ncio.o $(objdir)/grid_calcs.o
 	$(FC) $(DFLAGS) $(FFLAGS) $(INC_LIS) -c -o $@ $<
@@ -115,6 +119,11 @@ $(objdir)/velocity_sia.o: $(srcdir)/physics/velocity_sia.f90 \
 $(objdir)/velocity_ssa.o: $(srcdir)/physics/velocity_ssa.f90 \
 						  	$(objdir)/yelmo_defs.o $(objdir)/yelmo_tools.o $(objdir)/basal_dragging.o \
 						  	$(objdir)/solver_ssa_sico5.o $(objdir)/velocity_general.o
+	$(FC) $(DFLAGS) $(FFLAGS) -c -o $@ $<
+
+$(objdir)/velocity_ssa_aa.o: $(srcdir)/physics/velocity_ssa_aa.f90 \
+						  	$(objdir)/yelmo_defs.o $(objdir)/yelmo_tools.o $(objdir)/basal_dragging.o \
+						  	$(objdir)/solver_ssa_aa.o $(objdir)/velocity_general.o
 	$(FC) $(DFLAGS) $(FFLAGS) -c -o $@ $<
 
 $(objdir)/velocity_diva.o: $(srcdir)/physics/velocity_diva.f90 \
@@ -162,9 +171,13 @@ $(objdir)/yelmo_dynamics.o: $(srcdir)/yelmo_dynamics.f90 $(objdir)/yelmo_defs.o 
 							$(objdir)/velocity_general.o \
 							$(objdir)/velocity_sia.o \
 							$(objdir)/velocity_ssa.o \
+							$(objdir)/velocity_ssa_aa.o \
 							$(objdir)/velocity_diva.o \
+							$(objdir)/velocity_diva_ab.o \
 							$(objdir)/velocity_l1l2.o \
 							$(objdir)/solver_ssa_sico5.o \
+							$(objdir)/solver_ssa_aa.o \
+							$(objdir)/solver_ssa_ab.o \
 							$(objdir)/basal_dragging.o
 	$(FC) $(DFLAGS) $(FFLAGS) -c -o $@ $<
 
@@ -247,6 +260,7 @@ yelmo_physics =  	   $(objdir)/basal_dragging.o \
 					   $(objdir)/ice_enthalpy.o \
 					   $(objdir)/mass_conservation.o \
 					   $(objdir)/solver_ssa_sico5.o \
+					   $(objdir)/solver_ssa_aa.o \
 					   $(objdir)/solver_ssa_ab.o \
 					   $(objdir)/solver_tridiagonal.o \
 					   $(objdir)/solver_advection.o \
@@ -256,6 +270,7 @@ yelmo_physics =  	   $(objdir)/basal_dragging.o \
 					   $(objdir)/velocity_general.o \
 					   $(objdir)/velocity_sia.o \
 					   $(objdir)/velocity_ssa.o \
+					   $(objdir)/velocity_ssa_aa.o \
 					   $(objdir)/velocity_diva.o \
 					   $(objdir)/velocity_diva_ab.o \
 					   $(objdir)/velocity_l1l2.o

@@ -254,6 +254,7 @@ contains
             ! Calculate beta (at the ice base)
             ! Right now only with power law for ab-node velocities
             call calc_beta_aa_power_plastic_ab(beta,ux_b_ab,uy_b_ab,c_bed,par%beta_q,par%beta_u0)
+            !beta = 1e3 
 
             ! Calculate F-integeral (F2) on ab-nodes 
             call calc_F_integral(F2,visc_eff,H_ice_ab,zeta_aa,n=2.0_wp)

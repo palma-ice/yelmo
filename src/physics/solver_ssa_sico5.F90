@@ -18,7 +18,7 @@ module solver_ssa_sico5
 
 contains 
 
-    subroutine calc_vxy_ssa_matrix(vx_m,vy_m,L2_norm,beta_acx,beta_acy,visc_int, &
+    subroutine calc_vxy_ssa_matrix(vx_m,vy_m,L2_norm,beta_acx,beta_acy,visc_int_aa, &
                     ssa_mask_acx,ssa_mask_acy,H_ice,f_ice,taud_acx,taud_acy,H_grnd,z_sl,z_bed, &
                     z_srf,dx,dy,ulim,boundaries,lateral_bc,lis_settings)
         ! Solution of the system of linear equations for the horizontal velocities
@@ -33,7 +33,7 @@ contains
         real(prec), intent(OUT)   :: L2_norm              ! L2 norm convergence check from solver
         real(prec), intent(IN)    :: beta_acx(:,:)        ! [Pa a m^-1] Basal friction (acx-nodes)
         real(prec), intent(IN)    :: beta_acy(:,:)        ! [Pa a m^-1] Basal friction (acy-nodes)
-        real(prec), intent(IN)    :: visc_int(:,:)        ! [Pa a m] Vertically integrated viscosity (aa-nodes)
+        real(prec), intent(IN)    :: visc_int_aa(:,:)     ! [Pa a m] Vertically integrated viscosity (aa-nodes)
         integer,    intent(IN)    :: ssa_mask_acx(:,:)    ! [--] Mask to determine ssa solver actions (acx-nodes)
         integer,    intent(IN)    :: ssa_mask_acy(:,:)    ! [--] Mask to determine ssa solver actions (acy-nodes)
         real(prec), intent(IN)    :: H_ice(:,:)           ! [m]  Ice thickness (aa-nodes)
@@ -57,8 +57,12 @@ contains
         integer    :: i1, j1, i00, j00
         real(prec) :: inv_dxi, inv_deta, inv_dxi_deta, inv_dxi2, inv_deta2
         real(wp)   :: del_sq, inv_del_sq
-        real(prec) :: factor_rhs_2, factor_rhs_3a, factor_rhs_3b
-        real(prec) :: rho_sw_ice, H_ice_now, beta_now, taud_now, H_ocn_now
+
+        real(wp) :: inv_dx, inv_dxdx 
+        real(wp) :: inv_dy, inv_dydy 
+        real(wp) :: inv_dxdy, inv_2dxdy, inv_4dxdy 
+        
+        real(prec) :: H_ice_now, H_ocn_now
         integer    :: IMAX, JMAX 
 
         integer, allocatable    :: n2i(:), n2j(:)
@@ -68,9 +72,7 @@ contains
         logical, allocatable    :: is_grline_2(:,:) 
         logical, allocatable    :: is_front_1(:,:)
         logical, allocatable    :: is_front_2(:,:)  
-        real(prec), allocatable :: vis_int_g(:,:) 
-        real(prec), allocatable :: vis_int_sgxy(:,:)  
-        integer :: n_check 
+        real(prec), allocatable :: visc_int_ab(:,:)
 
         ! Boundary conditions counterclockwise unit circle 
         ! 1: x, right-border
@@ -83,12 +85,12 @@ contains
         integer :: im1, ip1, jm1, jp1 
 
         real(wp) :: f_submerged, f_visc
-        real(wp) :: vis_int_g_now
+        real(wp) :: visc_int_aa_now
         real(wp) :: tau_bc_int 
         real(wp) :: tau_bc_sign
 
         real(wp), parameter :: f_submerged_min = 0.0_wp 
-        
+
 ! Include header for lis solver fortran interface
 #include "lisf.h"
         
@@ -104,6 +106,25 @@ contains
         LIS_INTEGER :: nmax, n_sprs 
         LIS_INTEGER, allocatable, dimension(:) :: lgs_a_ptr, lgs_a_index
         LIS_SCALAR,  allocatable, dimension(:) :: lgs_a_value, lgs_b_value, lgs_x_value
+
+        ! ===== Consistency checks ==========================
+
+        ! Ensure beta is defined well 
+        if ( count(H_grnd .gt. 100.0 .and. H_ice .gt. 0.0) .gt. 0 .and. &
+                count(beta_acx .gt. 0.0 .and. H_grnd .gt. 100.0 .and. H_ice .gt. 0.0) .eq. 0 ) then  
+            ! No points found with a non-zero beta for grounded ice,
+            ! something was not well-defined/well-initialized
+
+            write(*,*) 
+            write(*,"(a)") "calc_vxy_ssa_matrix:: Error: beta appears to be zero everywhere for grounded ice."
+            write(*,*) "range(beta_acx): ", minval(beta_acx), maxval(beta_acx)
+            write(*,*) "range(beta_acy): ", minval(beta_acy), maxval(beta_acy)
+            write(*,*) "range(H_grnd):   ", minval(H_grnd), maxval(H_grnd)
+            write(*,*) "Stopping."
+            write(*,*) 
+            stop 
+            
+        end if 
 
         ! Define border conditions (zeros, infinite, periodic)
         select case(trim(boundaries)) 
@@ -164,8 +185,7 @@ contains
         allocate(is_front_1(nx,ny))
         allocate(is_front_2(nx,ny))
         
-        allocate(vis_int_g(nx,ny))
-        allocate(vis_int_sgxy(nx,ny))
+        allocate(visc_int_ab(nx,ny))
 
         !--- External yelmo arguments => local sicopolis variable names ---
         dxi          = dx 
@@ -174,29 +194,17 @@ contains
         del_sq       = dx*dx 
         inv_del_sq   = 1.0_wp / del_sq 
 
-        rho_sw_ice   = rho_sw/rho_ice ! Ratio of density of seawater to ice [--]
 
-        vis_int_g    = visc_int 
+        ! Define some factors
 
-        ! ===== Consistency checks ==========================
-
-        ! Ensure beta is defined well 
-        if ( count(H_grnd .gt. 100.0 .and. H_ice .gt. 0.0) .gt. 0 .and. &
-                count(beta_acx .gt. 0.0 .and. H_grnd .gt. 100.0 .and. H_ice .gt. 0.0) .eq. 0 ) then  
-            ! No points found with a non-zero beta for grounded ice,
-            ! something was not well-defined/well-initialized
-
-            write(*,*) 
-            write(*,"(a)") "calc_vxy_ssa_matrix:: Error: beta appears to be zero everywhere for grounded ice."
-            write(*,*) "range(beta_acx): ", minval(beta_acx), maxval(beta_acx)
-            write(*,*) "range(beta_acy): ", minval(beta_acy), maxval(beta_acy)
-            write(*,*) "range(H_grnd):   ", minval(H_grnd), maxval(H_grnd)
-            write(*,*) "Stopping."
-            write(*,*) 
-            stop 
-            
-        end if 
-
+        inv_dx    = 1.0_wp / dx 
+        inv_dxdx  = 1.0_wp / (dx*dx)
+        inv_dy    = 1.0_wp / dy 
+        inv_dydy  = 1.0_wp / (dy*dy)
+        inv_dxdy  = 1.0_wp / (dx*dy)
+        inv_2dxdy = 1.0_wp / (2.0_wp*dx*dy)
+        inv_4dxdy = 1.0_wp / (4.0_wp*dx*dy)
+        
         !-------- Abbreviations --------
 
         inv_dxi       = 1.0_prec/dxi
@@ -204,10 +212,6 @@ contains
         inv_dxi_deta  = 1.0_prec/(dxi*deta)
         inv_dxi2      = 1.0_prec/(dxi*dxi)
         inv_deta2     = 1.0_prec/(deta*deta)
-
-        factor_rhs_2  = 0.5_prec*rho_ice*g*(rho_sw-rho_ice)/rho_sw
-        factor_rhs_3a = 0.5_prec*rho_ice*g
-        factor_rhs_3b = 0.5_prec*rho_sw*g
 
         ! Set maske and grounding line / calving front flags
 
@@ -217,7 +221,7 @@ contains
         !-------- Depth-integrated viscosity on the staggered grid
         !                                       [at (i+1/2,j+1/2)] --------
 
-        call stagger_visc_aa_ab(vis_int_sgxy,vis_int_g,H_ice,f_ice)
+        call stagger_visc_aa_ab(visc_int_ab,visc_int_aa,H_ice,f_ice)
         
         !-------- Basal drag parameter (for shelfy stream) --------
 
@@ -267,10 +271,6 @@ contains
             !  ------ Equations for vx_m (at (i+1/2,j))
 
             nr = n   ! row counter
-
-            ! Set current boundary variables for later access
-            beta_now = beta_acx(i,j) 
-            taud_now = taud_acx(i,j) 
 
             ! == Treat special cases first ==
 
@@ -602,19 +602,19 @@ contains
                         if (is_front_1(i,j).and.is_front_2(i+1,j)) then 
                             ! === Case 1: ice-free to the right ===
 
-                            vis_int_g_now = vis_int_g(i1,j)
-                            !vis_int_g_now = 0.5_wp*(vis_int_g(i,j)+vis_int_g(i-1,j))
+                            visc_int_aa_now = visc_int_aa(i1,j)
+                            !visc_int_aa_now = 0.5_wp*(visc_int_aa(i,j)+visc_int_aa(i-1,j))
 
                             nc = 2*ij2n(i-1,j)-1
                                 ! smallest nc (column counter), for vx_m(i-1,j)
                             k = k+1
-                            lgs_a_value(k) = -4.0_prec*inv_dxi*vis_int_g_now
+                            lgs_a_value(k) = -4.0_prec*inv_dxi*visc_int_aa_now
                             lgs_a_index(k) = nc 
 
                             nc = 2*ij2n(i,j-1)
                                 ! next nc (column counter), for vy_m(i,j-1)
                             k = k+1
-                            lgs_a_value(k) = -2.0_prec*inv_deta*vis_int_g_now
+                            lgs_a_value(k) = -2.0_prec*inv_deta*visc_int_aa_now
                             lgs_a_index(k) = nc
 
                             nc = 2*ij2n(i,j)-1
@@ -625,13 +625,13 @@ contains
         !                         call error(errormsg)
         !                     end if
                             k = k+1
-                            lgs_a_value(k) = 4.0_prec*inv_dxi*vis_int_g_now
+                            lgs_a_value(k) = 4.0_prec*inv_dxi*visc_int_aa_now
                             lgs_a_index(k) = nc
 
                             nc = 2*ij2n(i,j)
                                 ! next nc (column counter), for vy_m(i,j)
                             k = k+1
-                            lgs_a_value(k) = 2.0_prec*inv_deta*vis_int_g_now
+                            lgs_a_value(k) = 2.0_prec*inv_deta*visc_int_aa_now
                             lgs_a_index(k) = nc
 
                             ! Assign matrix values
@@ -643,8 +643,8 @@ contains
                         else 
                             ! Case 2: ice-free to the left
                             
-                            vis_int_g_now = vis_int_g(i1,j)
-                            vis_int_g_now = 0.5_wp*(vis_int_g(i,j)+vis_int_g(i+1,j))
+                            visc_int_aa_now = visc_int_aa(i1,j)
+                            visc_int_aa_now = 0.5_wp*(visc_int_aa(i,j)+visc_int_aa(i+1,j))
 
                             nc = 2*ij2n(i,j)-1
                                 ! next nc (column counter), for vx_m(i,j)
@@ -654,25 +654,25 @@ contains
         !                         call error(errormsg)
         !                     end if
                             k = k+1
-                            lgs_a_value(k) = -4.0_prec*inv_dxi*vis_int_g_now
+                            lgs_a_value(k) = -4.0_prec*inv_dxi*visc_int_aa_now
                             lgs_a_index(k) = nc
 
                             nc = 2*ij2n(i+1,j-1)
                                 ! next nc (column counter), for vy_m(i+1,j-1)
                             k  = k+1
-                            lgs_a_value(k) = -2.0_prec*inv_deta*vis_int_g_now
+                            lgs_a_value(k) = -2.0_prec*inv_deta*visc_int_aa_now
                             lgs_a_index(k) = nc
 
                             nc = 2*ij2n(i+1,j)-1
                                 ! next nc (column counter), for vx_m(i+1,j)
                             k = k+1
-                            lgs_a_value(k) = 4.0_prec*inv_dxi*vis_int_g_now
+                            lgs_a_value(k) = 4.0_prec*inv_dxi*visc_int_aa_now
                             lgs_a_index(k) = nc
  
                             nc = 2*ij2n(i+1,j)
                                 ! largest nc (column counter), for vy_m(i+1,j)
                             k  = k+1
-                            lgs_a_value(k) = 2.0_prec*inv_deta*vis_int_g_now
+                            lgs_a_value(k) = 2.0_prec*inv_deta*visc_int_aa_now
                             lgs_a_index(k) = nc
 
                             ! Assign matrix values
@@ -724,57 +724,57 @@ contains
 
                 nc = 2*ij2n(i,j)-1          ! column counter for vx_m(i,j)
                 k = k+1
-                lgs_a_value(k) = -4.0_wp*vis_int_g(i+1,j) &
-                                 -4.0_wp*vis_int_g(i,j) &
-                                 -1.0_wp*vis_int_sgxy(i,j) &
-                                 -1.0_wp*vis_int_sgxy(i,j-1) &
+                lgs_a_value(k) = -4.0_wp*visc_int_aa(i+1,j) &
+                                 -4.0_wp*visc_int_aa(i,j) &
+                                 -1.0_wp*visc_int_ab(i,j) &
+                                 -1.0_wp*visc_int_ab(i,j-1) &
                                  -del_sq*beta_acx(i,j)
                 lgs_a_index(k) = nc
 
                 nc = 2*ij2n(i+1,j)-1        ! column counter for vx_m(i+1,j)
                 k = k+1
-                lgs_a_value(k) =  4.0_wp*vis_int_g(i+1,j)
+                lgs_a_value(k) =  4.0_wp*visc_int_aa(i+1,j)
                 lgs_a_index(k) = nc
 
                 nc = 2*ij2n(i-1,j)-1        ! column counter for vx_m(i-1,j)
                 k = k+1
-                lgs_a_value(k) =  4.0_wp*vis_int_g(i,j)
+                lgs_a_value(k) =  4.0_wp*visc_int_aa(i,j)
                 lgs_a_index(k) = nc
 
                 nc = 2*ij2n(i,j+1)-1        ! column counter for vx_m(i,j+1)
                 k = k+1
-                lgs_a_value(k) =  1.0_wp*vis_int_sgxy(i,j)
+                lgs_a_value(k) =  1.0_wp*visc_int_ab(i,j)
                 lgs_a_index(k) = nc
 
                 nc = 2*ij2n(i,j-1)-1        ! column counter for vx_m(i,j-1)
                 k = k+1
-                lgs_a_value(k) =  1.0_wp*vis_int_sgxy(i,j-1)
+                lgs_a_value(k) =  1.0_wp*visc_int_ab(i,j-1)
                 lgs_a_index(k) = nc
 
                 ! -- vy terms -- 
                 
                 nc = 2*ij2n(i,j)            ! column counter for vy_m(i,j)
                 k = k+1
-                lgs_a_value(k) = -2.0_wp*vis_int_g(i,j)     &
-                                 -1.0_wp*vis_int_sgxy(i,j)
+                lgs_a_value(k) = -2.0_wp*visc_int_aa(i,j)     &
+                                 -1.0_wp*visc_int_ab(i,j)
                 lgs_a_index(k) = nc
 
                 nc = 2*ij2n(i+1,j)          ! column counter for vy_m(i+1,j)
                 k = k+1
-                lgs_a_value(k) =  2.0_wp*vis_int_g(i+1,j)   &
-                                 +1.0_wp*vis_int_sgxy(i,j)
+                lgs_a_value(k) =  2.0_wp*visc_int_aa(i+1,j)   &
+                                 +1.0_wp*visc_int_ab(i,j)
                 lgs_a_index(k) = nc
                 
                 nc = 2*ij2n(i+1,j-1)        ! column counter for vy_m(i+1,j-1)
                 k = k+1
-                lgs_a_value(k) = -2.0_wp*vis_int_g(i+1,j)   &
-                                 -1.0_wp*vis_int_sgxy(i,j-1)
+                lgs_a_value(k) = -2.0_wp*visc_int_aa(i+1,j)   &
+                                 -1.0_wp*visc_int_ab(i,j-1)
                 lgs_a_index(k) = nc
                 
                 nc = 2*ij2n(i,j-1)          ! column counter for vy_m(i,j-1)
                 k = k+1
-                lgs_a_value(k) =  2.0_wp*vis_int_g(i,j)   &
-                                 +1.0_wp*vis_int_sgxy(i,j-1)
+                lgs_a_value(k) =  2.0_wp*visc_int_aa(i,j)   &
+                                 +1.0_wp*visc_int_ab(i,j-1)
                 lgs_a_index(k) = nc
                 
 
@@ -788,11 +788,6 @@ contains
             !  ------ Equations for vy_m (at (i,j+1/2))
 
             nr = n+1   ! row counter
-
-            
-            ! Set current boundary variables for later access
-            beta_now  = beta_acy(i,j) 
-            taud_now  = taud_acy(i,j) 
 
             ! == Treat special cases first ==
 
@@ -1115,25 +1110,25 @@ contains
                         if (is_front_1(i,j).and.is_front_2(i,j+1)) then 
                             ! === Case 1: ice-free to the top ===
 
-                            vis_int_g_now = vis_int_g(i,j1)
-                            !vis_int_g_now = 0.5_wp*(vis_int_g(i,j)+vis_int_g(i,j-1))
+                            visc_int_aa_now = visc_int_aa(i,j1)
+                            !visc_int_aa_now = 0.5_wp*(visc_int_aa(i,j)+visc_int_aa(i,j-1))
 
                             nc = 2*ij2n(i-1,j)-1
                                 ! smallest nc (column counter), for vx_m(i-1,j)
                             k = k+1
-                            lgs_a_value(k) = -2.0_prec*inv_dxi*vis_int_g_now
+                            lgs_a_value(k) = -2.0_prec*inv_dxi*visc_int_aa_now
                             lgs_a_index(k) = nc
 
                             nc = 2*ij2n(i,j-1)
                                 ! next nc (column counter), for vy_m(i,j-1)
                             k = k+1
-                            lgs_a_value(k) = -4.0_prec*inv_deta*vis_int_g_now
+                            lgs_a_value(k) = -4.0_prec*inv_deta*visc_int_aa_now
                             lgs_a_index(k) = nc
 
                             nc = 2*ij2n(i,j)-1
                                 ! next nc (column counter), for vx_m(i,j)
                             k = k+1
-                            lgs_a_value(k) = 2.0_prec*inv_dxi*vis_int_g_now
+                            lgs_a_value(k) = 2.0_prec*inv_dxi*visc_int_aa_now
                             lgs_a_index(k) = nc
 
                             nc = 2*ij2n(i,j)
@@ -1144,7 +1139,7 @@ contains
         !                         call error(errormsg)
         !                     end if
                             k = k+1
-                            lgs_a_value(k) = 4.0_prec*inv_deta*vis_int_g_now
+                            lgs_a_value(k) = 4.0_prec*inv_deta*visc_int_aa_now
                             lgs_a_index(k) = nc
 
                             ! Assign matrix values
@@ -1154,13 +1149,13 @@ contains
                         else
                             ! === Case 2: ice-free to the bottom ===
                             
-                            vis_int_g_now = vis_int_g(i,j1)
-                            !vis_int_g_now = 0.5_wp*(vis_int_g(i,j)+vis_int_g(i,j+1))
+                            visc_int_aa_now = visc_int_aa(i,j1)
+                            !visc_int_aa_now = 0.5_wp*(visc_int_aa(i,j)+visc_int_aa(i,j+1))
 
                             nc = 2*ij2n(i-1,j+1)-1
                                 ! next nc (column counter), for vx_m(i-1,j+1)
                             k = k+1
-                            lgs_a_value(k) = -2.0_prec*inv_dxi*vis_int_g_now
+                            lgs_a_value(k) = -2.0_prec*inv_dxi*visc_int_aa_now
                             lgs_a_index(k) = nc
  
                             nc = 2*ij2n(i,j)
@@ -1171,19 +1166,19 @@ contains
         !                         call error(errormsg)
         !                     end if
                             k = k+1
-                            lgs_a_value(k) = -4.0_prec*inv_deta*vis_int_g_now
+                            lgs_a_value(k) = -4.0_prec*inv_deta*visc_int_aa_now
                             lgs_a_index(k) = nc
  
                             nc = 2*ij2n(i,j+1)-1
                                 ! next nc (column counter), for vx_m(i,j+1)
                             k = k+1
-                            lgs_a_value(k) = 2.0_prec*inv_dxi*vis_int_g_now
+                            lgs_a_value(k) = 2.0_prec*inv_dxi*visc_int_aa_now
                             lgs_a_index(k) = nc
  
                             nc = 2*ij2n(i,j+1)
                                 ! next nc (column counter), for vy_m(i,j+1)
                             k = k+1
-                            lgs_a_value(k) = 4.0_prec*inv_deta*vis_int_g_now
+                            lgs_a_value(k) = 4.0_prec*inv_deta*visc_int_aa_now
                             lgs_a_index(k) = nc
 
                             ! Assign matrix values
@@ -1235,57 +1230,57 @@ contains
 
                 nc = 2*ij2n(i,j)        ! column counter for vy_m(i,j)
                 k = k+1
-                lgs_a_value(k) = -4.0_wp*vis_int_g(i,j+1)   &
-                                 -4.0_wp*vis_int_g(i,j)     &
-                                 -1.0_wp*vis_int_sgxy(i,j)   &
-                                 -1.0_wp*vis_int_sgxy(i-1,j) &
+                lgs_a_value(k) = -4.0_wp*visc_int_aa(i,j+1)   &
+                                 -4.0_wp*visc_int_aa(i,j)     &
+                                 -1.0_wp*visc_int_ab(i,j)   &
+                                 -1.0_wp*visc_int_ab(i-1,j) &
                                  -del_sq*beta_acy(i,j)
                 lgs_a_index(k) = nc
 
                 nc = 2*ij2n(i,j+1)      ! column counter for vy_m(i,j+1)
                 k = k+1
-                lgs_a_value(k) =  4.0_wp*vis_int_g(i,j+1)
+                lgs_a_value(k) =  4.0_wp*visc_int_aa(i,j+1)
                 lgs_a_index(k) = nc
 
                 nc = 2*ij2n(i,j-1)      ! column counter for vy_m(i,j-1)
                 k = k+1
-                lgs_a_value(k) =  4.0_wp*vis_int_g(i,j)
+                lgs_a_value(k) =  4.0_wp*visc_int_aa(i,j)
                 lgs_a_index(k) = nc
                 
                 nc = 2*ij2n(i+1,j)      ! column counter for vy_m(i+1,j)
                 k = k+1
-                lgs_a_value(k) =  1.0_wp*vis_int_sgxy(i,j)
+                lgs_a_value(k) =  1.0_wp*visc_int_ab(i,j)
                 lgs_a_index(k) = nc
                 
                 nc = 2*ij2n(i-1,j)      ! column counter for vy_m(i-1,j)
                 k = k+1
-                lgs_a_value(k) =  1.0_wp*vis_int_sgxy(i-1,j)
+                lgs_a_value(k) =  1.0_wp*visc_int_ab(i-1,j)
                 lgs_a_index(k) = nc
                 
                 ! -- vx terms -- 
 
                 nc = 2*ij2n(i,j)-1      ! column counter for vx_m(i,j)
                 k = k+1
-                lgs_a_value(k) = -2.0_wp*vis_int_g(i,j)     &
-                                 -1.0_wp*vis_int_sgxy(i,j)
+                lgs_a_value(k) = -2.0_wp*visc_int_aa(i,j)     &
+                                 -1.0_wp*visc_int_ab(i,j)
                 lgs_a_index(k) = nc
 
                 nc = 2*ij2n(i,j+1)-1    ! column counter for vx_m(i,j+1)
                 k = k+1
-                lgs_a_value(k) =  2.0_wp*vis_int_g(i,j+1)     &
-                                 +1.0_wp*vis_int_sgxy(i,j)
+                lgs_a_value(k) =  2.0_wp*visc_int_aa(i,j+1)     &
+                                 +1.0_wp*visc_int_ab(i,j)
                 lgs_a_index(k) = nc
 
                 nc = 2*ij2n(i-1,j+1)-1  ! column counter for vx_m(i-1,j+1)
                 k = k+1
-                lgs_a_value(k) = -2.0_wp*vis_int_g(i,j+1)     &
-                                 -1.0_wp*vis_int_sgxy(i-1,j)
+                lgs_a_value(k) = -2.0_wp*visc_int_aa(i,j+1)     &
+                                 -1.0_wp*visc_int_ab(i-1,j)
                 lgs_a_index(k) = nc
 
                 nc = 2*ij2n(i-1,j)-1  ! column counter for vx_m(i-1,j)
                 k = k+1
-                lgs_a_value(k) =  2.0_wp*vis_int_g(i,j)     &
-                                 +1.0_wp*vis_int_sgxy(i-1,j)
+                lgs_a_value(k) =  2.0_wp*visc_int_aa(i,j)     &
+                                 +1.0_wp*visc_int_ab(i-1,j)
                 lgs_a_index(k) = nc
 
                 lgs_b_value(nr) = del_sq*taud_acy(i,j)

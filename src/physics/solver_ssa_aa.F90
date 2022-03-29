@@ -610,12 +610,14 @@ contains
 
                 nc = 2*ij2n(i+1,j)          ! column counter for vy_m(i+1,j)
                 k = k+1
-                lgs_a_value(k) =  1.0_wp*inv_4dxdy*visc_int_acy(i,j)
+                lgs_a_value(k) =  1.0_wp*inv_4dxdy*visc_int_acy(i,j)    &
+                                 -1.0_wp*inv_4dxdy*visc_int_acy(i,j-1)
                 lgs_a_index(k) = nc
 
                 nc = 2*ij2n(i-1,j)          ! column counter for vy_m(i-1,j)
                 k = k+1
-                lgs_a_value(k) = -1.0_wp*inv_4dxdy*visc_int_acy(i,j)
+                lgs_a_value(k) = -1.0_wp*inv_4dxdy*visc_int_acy(i,j)    &
+                                 +1.0_wp*inv_4dxdy*visc_int_acy(i,j-1)
                 lgs_a_index(k) = nc
 
                 lgs_b_value(nr) = taudx_aa(i,j)
@@ -992,12 +994,14 @@ contains
 
                 nc = 2*ij2n(i,j+1)-1        ! column counter for vx_m(i,j+1)
                 k = k+1
-                lgs_a_value(k) =  1.0_wp*inv_4dxdy*visc_int_acx(i,j)
+                lgs_a_value(k) =  1.0_wp*inv_4dxdy*visc_int_acx(i,j)    &
+                                 -1.0_wp*inv_4dxdy*visc_int_acx(i-1,j)
                 lgs_a_index(k) = nc
 
                 nc = 2*ij2n(i,j-1)-1        ! column counter for vy_m(i,j-1)
                 k = k+1
-                lgs_a_value(k) = -1.0_wp*inv_4dxdy*visc_int_acx(i,j)
+                lgs_a_value(k) = -1.0_wp*inv_4dxdy*visc_int_acx(i,j)    &
+                                 +1.0_wp*inv_4dxdy*visc_int_acx(i-1,j)
                 lgs_a_index(k) = nc
 
                 lgs_b_value(nr) = taudy_aa(i,j)

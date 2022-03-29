@@ -292,10 +292,7 @@ end if
             call calc_vxy_ssa_matrix(ux_bar,uy_bar,L2_norm,beta_eff_acx,beta_eff_acy,visc_eff_int,  &
                                 ssa_mask_acx,ssa_mask_acy,H_ice,f_ice,taud_acx,taud_acy,H_grnd,z_sl,z_bed, &
                                 z_srf,dx,dy,par%ssa_vel_max,par%boundaries,par%ssa_lateral_bc,par%ssa_lis_opt)
-            ! call calc_vxy_ssa_matrix_aa_ac(ux_bar,uy_bar,L2_norm,beta_eff,visc_eff_int,  &
-            !                     ssa_mask_acx,H_ice,f_ice,taud_acx,taud_acy,H_grnd,z_sl,z_bed, &
-            !                     z_srf,dx,dy,par%ssa_vel_max,par%boundaries,par%ssa_lateral_bc,par%ssa_lis_opt)
-
+            
 ! ajr: use adapative ssa relaxation or use parameter value
 ! For Antarctica, the adaptive method can give some strange
 ! convergence issues. It has been disabled for now (2022-02-09).

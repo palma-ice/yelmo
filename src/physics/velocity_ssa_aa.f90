@@ -212,7 +212,7 @@ contains
                                 par%beta_const,par%beta_q,par%beta_u0,par%beta_gl_scale,par%beta_gl_f, &
                                 par%H_grnd_lim,par%beta_min,par%boundaries)
 
-            beta = 1e3 
+            ! beta = 1e3 
 
             ! Stagger beta
             ! call stagger_beta(beta_acx,beta_acy,beta,H_ice,f_ice,ux_b,uy_b, &
@@ -232,11 +232,6 @@ if (.TRUE.) then
                                 ssa_mask,H_ice,f_ice,taudx_aa,taudy_aa,H_grnd,z_sl,z_bed, &
                                 z_srf,dx,dy,par%ssa_vel_max,par%boundaries,par%ssa_lateral_bc,par%ssa_lis_opt)
             
-            ! ajr: experimental, broken
-            ! call calc_vxy_ssa_matrix_aa_ac(ux_b,uy_b,L2_norm,beta,visc_eff_int,  &
-            !                     ssa_mask_acx,H_ice,f_ice,taud_acx,taud_acy,H_grnd,z_sl,z_bed, &
-            !                     z_srf,dx,dy,par%ssa_vel_max,par%boundaries,par%ssa_lateral_bc,par%ssa_lis_opt)
-
 
 end if 
 

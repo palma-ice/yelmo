@@ -41,6 +41,11 @@ module solver_ssa_ac
 contains 
     
     subroutine linear_solver_init(lgs,nx,ny)
+        ! Initialize the lgs object that will hold
+        ! arrays A, x and b needed to solve linear
+        ! equation Ax=b. Arrays are populated in 
+        ! another subroutine below - see
+        ! linear_solver_matrix_ssa_ac_csr_2D. 
 
         implicit none
 
@@ -100,6 +105,172 @@ contains
         return
 
     end subroutine linear_solver_init
+
+    subroutine linear_solver_matrix_solve_lis(lgs,lis_settings)
+        ! Use LIS to solve matrix equation Ax=b. Take
+        ! predefined A, x and b arrays from the lgs object,
+        ! and pass them to lis-specific variables, solve
+        ! for new x and return to lgs object.
+
+        implicit none 
+
+        type(linear_solver_class), intent(INOUT) :: lgs 
+        character(len=*), intent(IN) :: lis_settings        ! LIS solver settings
+
+        ! =========================================================
+        ! LIS-specific variables 
+
+        ! Include header for lis solver fortran interface
+#include "lisf.h"
+        
+        LIS_INTEGER :: ierr
+        LIS_INTEGER :: nr
+        LIS_INTEGER :: nc
+        LIS_INTEGER :: nmax
+        LIS_INTEGER :: lin_iter
+        LIS_REAL    :: residual 
+        LIS_REAL    :: solver_time  
+        LIS_MATRIX  :: lgs_a
+        LIS_VECTOR  :: lgs_b, lgs_x
+        LIS_SOLVER  :: solver
+
+        LIS_INTEGER :: lgs_a_index_now
+        LIS_SCALAR  :: lgs_a_value_now
+        LIS_SCALAR  :: lgs_b_value_now
+        LIS_SCALAR  :: lgs_x_value_now
+        LIS_SCALAR, allocatable :: lgs_x_value_out(:)
+
+        ! =========================================================
+        
+        ! Store nmax in local LIS-specific variable
+        nmax = lgs%nmax
+
+        !-------- Settings for Lis --------
+               
+        call lis_initialize(ierr)           ! Important for parallel computing environments   
+        call CHKERR(ierr)
+
+        call lis_matrix_create(LIS_COMM_WORLD, lgs_a, ierr)
+        call CHKERR(ierr)
+        call lis_vector_create(LIS_COMM_WORLD, lgs_b, ierr)
+        call lis_vector_create(LIS_COMM_WORLD, lgs_x, ierr)
+
+        call lis_matrix_set_size(lgs_a, 0, nmax, ierr)
+        call CHKERR(ierr)
+        call lis_vector_set_size(lgs_b, 0, nmax, ierr)
+        call lis_vector_set_size(lgs_x, 0, nmax, ierr)
+
+        ! === Storage order: compressed sparse row (CSR) ===
+
+        do nr=1, nmax
+
+            do nc=lgs%a_ptr(nr), lgs%a_ptr(nr+1)-1
+
+                ! Use temporary values with LIS data types for use with lis routines
+                lgs_a_index_now = lgs%a_index(nc)
+                lgs_a_value_now = lgs%a_value(nc)
+                
+                call lis_matrix_set_value(LIS_INS_VALUE, nr, lgs_a_index_now, &
+                                                        lgs_a_value_now, lgs_a, ierr)
+            end do
+
+            ! Use temporary values with LIS data types for use with lis routines
+            lgs_b_value_now = lgs%b_value(nr)
+            lgs_x_value_now = lgs%x_value(nr) 
+
+            call lis_vector_set_value(LIS_INS_VALUE, nr, lgs_b_value_now, lgs_b, ierr)
+            call lis_vector_set_value(LIS_INS_VALUE, nr, lgs_x_value_now, lgs_x, ierr)
+
+        end do 
+
+
+        call lis_matrix_set_type(lgs_a, LIS_MATRIX_CSR, ierr)
+        call lis_matrix_assemble(lgs_a, ierr)
+
+        !-------- Solution of the system of linear equations with Lis --------
+
+        call lis_solver_create(solver, ierr)
+
+        ! ch_solver_set_option = '-i bicgsafe -p jacobi '// &
+        !                         '-maxiter 100 -tol 1.0e-4 -initx_zeros false'
+        call lis_solver_set_option(trim(lis_settings), solver, ierr)
+        call CHKERR(ierr)
+
+        call lis_solve(lgs_a, lgs_b, lgs_x, solver, ierr)
+        call CHKERR(ierr)
+
+        ! Get solver solution information
+        call lis_solver_get_iter(solver, lin_iter, ierr)
+        call lis_solver_get_time(solver,solver_time,ierr)
+        
+        ! Obtain the relative L2_norm == ||b-Ax|| / ||b||
+        call lis_solver_get_residualnorm(solver,residual,ierr)
+
+        ! Store in lgs object too
+        lgs%L2_rel_norm = residual
+
+        ! Print a summary
+        write(*,*) "solve_lis: [time (s), iter, L2_rel_norm] = ", solver_time, lin_iter, residual
+
+        ! Gather x values in local array of lis-type
+        allocate(lgs_x_value_out(nmax))
+        lgs_x_value_out = 0.0_prec
+        call lis_vector_gather(lgs_x, lgs_x_value_out, ierr)
+        call CHKERR(ierr)
+        
+        ! Save to lgs object
+        lgs%x_value = lgs_x_value_out
+        
+        ! Destroy all lis variables
+        call lis_matrix_destroy(lgs_a, ierr)
+        call CHKERR(ierr)
+
+        call lis_vector_destroy(lgs_b, ierr)
+        call lis_vector_destroy(lgs_x, ierr)
+        call lis_solver_destroy(solver, ierr)
+        call CHKERR(ierr)
+
+        ! Finalize lis.
+        call lis_finalize(ierr)           ! Important for parallel computing environments
+        call CHKERR(ierr)
+
+        return
+
+    end subroutine linear_solver_matrix_solve_lis
+
+    subroutine linear_solver_save_velocity(ux,uy,lgs,ulim)
+        ! Extract velocity solution from lgs object. 
+
+        implicit none 
+
+        real(wp), intent(OUT) :: ux(:,:)                ! [m yr^-1] Horizontal velocity x
+        real(wp), intent(OUT) :: uy(:,:)                ! [m yr^-1] Horizontal velocity y
+        type(linear_solver_class), intent(IN) :: lgs 
+        real(wp), intent(IN)    :: ulim 
+
+        ! Local variables 
+        integer :: i, j, n, nr 
+
+        do n = 1, lgs%nmax-1, 2
+
+            i = lgs%n2i((n+1)/2)
+            j = lgs%n2j((n+1)/2)
+
+            nr = n
+            ux(i,j) = lgs%x_value(nr)
+
+            nr = n+1
+            uy(i,j) = lgs%x_value(nr)
+
+        end do
+
+        ! Limit the velocity generally =====================
+        call limit_vel(ux,ulim)
+        call limit_vel(uy,ulim)
+
+        return
+
+    end subroutine linear_solver_save_velocity
 
     subroutine linear_solver_matrix_ssa_ac_csr_2D(lgs,ux,uy,beta_acx,beta_acy, &
                             N_aa,ssa_mask_acx,ssa_mask_acy,H_ice,f_ice,taud_acx, &
@@ -258,19 +429,19 @@ contains
         del_sq      = dx*dx 
         inv_del_sq  = 1.0_wp / del_sq 
 
-        ! Set mask and grounding line / calving front flags
 
+        ! Set general ice mask and ice-front flags
         call set_boundary_masks(mask,is_front_1,is_front_2, &
                                 H_ice, f_ice, H_grnd, z_srf, z_bed, z_sl, lateral_bc)
         
-        !-------- Depth-integrated viscosity on the staggered grid
-        !                                       [at (i+1/2,j+1/2)] --------
-
+        
+        ! Calculate the staggered depth-integrated viscosity 
+        ! at the grid-cell corners (ab-nodes). 
         call stagger_visc_aa_ab(N_ab,N_aa,H_ice,f_ice)
         
 
         !-------- Assembly of the system of linear equations
-        !                         (matrix storage: compressed sparse row CSR) --------
+        !             (matrix storage: compressed sparse row CSR) --------
 
         lgs%a_ptr(1) = 1
 
@@ -281,7 +452,7 @@ contains
             i = lgs%n2i((n+1)/2)
             j = lgs%n2j((n+1)/2)
 
-            !  ------ Equations for ux (at (i+1/2,j))
+            ! ------ Equations for ux ---------------------------
 
             nr = n   ! row counter
 
@@ -788,7 +959,7 @@ contains
 
             lgs%a_ptr(nr+1) = k+1   ! row is completed, store index to next row
 
-            !  ------ Equations for uy (at (i,j+1/2))
+            ! ------ Equations for uy ---------------------------
 
             nr = n+1   ! row counter
 
@@ -1285,172 +1456,12 @@ contains
 
         end do
 
+        ! Done: A, x and b matrices in Ax=b have been populated 
+        ! and stored in lgs object. 
+
         return
 
     end subroutine linear_solver_matrix_ssa_ac_csr_2D
-
-    subroutine linear_solver_matrix_solve_lis(lgs,lis_settings)
-        ! Use LIS to solve matrix equation Ax=b. 
-
-        implicit none 
-
-        type(linear_solver_class), intent(INOUT) :: lgs 
-        character(len=*), intent(IN) :: lis_settings        ! LIS solver settings
-
-        ! Local variables 
-
-        ! =========================================================
-        ! LIS-specific variables 
-
-        ! Include header for lis solver fortran interface
-#include "lisf.h"
-        
-        LIS_INTEGER :: ierr
-        LIS_INTEGER :: nr
-        LIS_INTEGER :: nc
-        LIS_INTEGER :: nmax
-        LIS_INTEGER :: lin_iter
-        LIS_REAL    :: residual 
-        LIS_REAL    :: solver_time  
-        LIS_MATRIX  :: lgs_a
-        LIS_VECTOR  :: lgs_b, lgs_x
-        LIS_SOLVER  :: solver
-
-        LIS_INTEGER :: lgs_a_index_now
-        LIS_SCALAR  :: lgs_a_value_now
-        LIS_SCALAR  :: lgs_b_value_now
-        LIS_SCALAR  :: lgs_x_value_now
-        LIS_SCALAR, allocatable :: lgs_x_value_out(:)
-
-! =========================================================
-    
-        nmax = lgs%nmax
-
-        !-------- Settings for Lis --------
-               
-        call lis_initialize(ierr)           ! Important for parallel computing environments   
-        call CHKERR(ierr)
-
-        call lis_matrix_create(LIS_COMM_WORLD, lgs_a, ierr)
-        call CHKERR(ierr)
-        call lis_vector_create(LIS_COMM_WORLD, lgs_b, ierr)
-        call lis_vector_create(LIS_COMM_WORLD, lgs_x, ierr)
-
-        call lis_matrix_set_size(lgs_a, 0, nmax, ierr)
-        call CHKERR(ierr)
-        call lis_vector_set_size(lgs_b, 0, nmax, ierr)
-        call lis_vector_set_size(lgs_x, 0, nmax, ierr)
-
-        ! === Storage order: compressed sparse row (CSR) ===
-
-        do nr=1, nmax
-
-            do nc=lgs%a_ptr(nr), lgs%a_ptr(nr+1)-1
-
-                ! Use temporary values with LIS data types for use with lis routines
-                lgs_a_index_now = lgs%a_index(nc)
-                lgs_a_value_now = lgs%a_value(nc)
-                
-                call lis_matrix_set_value(LIS_INS_VALUE, nr, lgs_a_index_now, &
-                                                        lgs_a_value_now, lgs_a, ierr)
-            end do
-
-            ! Use temporary values with LIS data types for use with lis routines
-            lgs_b_value_now = lgs%b_value(nr)
-            lgs_x_value_now = lgs%x_value(nr) 
-
-            call lis_vector_set_value(LIS_INS_VALUE, nr, lgs_b_value_now, lgs_b, ierr)
-            call lis_vector_set_value(LIS_INS_VALUE, nr, lgs_x_value_now, lgs_x, ierr)
-
-        end do 
-
-
-        call lis_matrix_set_type(lgs_a, LIS_MATRIX_CSR, ierr)
-        call lis_matrix_assemble(lgs_a, ierr)
-
-        !-------- Solution of the system of linear equations with Lis --------
-
-        call lis_solver_create(solver, ierr)
-
-        ! ch_solver_set_option = '-i bicgsafe -p jacobi '// &
-        !                         '-maxiter 100 -tol 1.0e-4 -initx_zeros false'
-        call lis_solver_set_option(trim(lis_settings), solver, ierr)
-        call CHKERR(ierr)
-
-        call lis_solve(lgs_a, lgs_b, lgs_x, solver, ierr)
-        call CHKERR(ierr)
-
-        ! Get solver solution information
-        call lis_solver_get_iter(solver, lin_iter, ierr)
-        call lis_solver_get_time(solver,solver_time,ierr)
-        
-        ! Obtain the relative L2_norm == ||b-Ax||_2 / ||b||_2
-        call lis_solver_get_residualnorm(solver,residual,ierr)
-
-        ! Store in lgs object too
-        lgs%L2_norm = residual
-
-        ! Print a summary
-        write(*,*) "linear_solver_matrix_solve_lis: [time (s), iter, L2] = ", solver_time, lin_iter, residual
-
-        ! Gather x values in local array
-        allocate(lgs_x_value_out(nmax))
-        lgs_x_value_out = 0.0_prec
-        call lis_vector_gather(lgs_x, lgs_x_value_out, ierr)
-        call CHKERR(ierr)
-        
-        ! Save to lgs object
-        lgs%x_value = lgs_x_value_out
-        
-        ! Destroy all lis variables
-        call lis_matrix_destroy(lgs_a, ierr)
-        call CHKERR(ierr)
-
-        call lis_vector_destroy(lgs_b, ierr)
-        call lis_vector_destroy(lgs_x, ierr)
-        call lis_solver_destroy(solver, ierr)
-        call CHKERR(ierr)
-
-        ! Finalize lis.
-        call lis_finalize(ierr)           ! Important for parallel computing environments
-        call CHKERR(ierr)
-
-        return
-
-    end subroutine linear_solver_matrix_solve_lis
-
-    subroutine linear_solver_save_velocity(ux,uy,lgs,ulim)
-
-        implicit none 
-
-        real(wp), intent(INOUT) :: ux(:,:)          ! [m yr^-1] Horizontal velocity x (acx-nodes)
-        real(wp), intent(INOUT) :: uy(:,:)          ! [m yr^-1] Horizontal velocity y (acy-nodes)
-        type(linear_solver_class), intent(IN) :: lgs 
-        real(wp), intent(IN)    :: ulim 
-
-        ! Local variables 
-        integer :: i, j, n, nr 
-
-        do n = 1, lgs%nmax-1, 2
-
-            i = lgs%n2i((n+1)/2)
-            j = lgs%n2j((n+1)/2)
-
-            nr = n
-            ux(i,j) = lgs%x_value(nr)
-
-            nr = n+1
-            uy(i,j) = lgs%x_value(nr)
-
-        end do
-
-        ! Limit the velocity generally =====================
-        call limit_vel(ux,ulim)
-        call limit_vel(uy,ulim)
-
-        return
-
-    end subroutine linear_solver_save_velocity
 
     subroutine set_ssa_masks(ssa_mask_acx,ssa_mask_acy,beta_acx,beta_acy,H_ice,f_ice,f_grnd_acx,f_grnd_acy,beta_max,use_ssa)
         ! Define where ssa calculations should be performed

@@ -102,7 +102,7 @@ contains
     end subroutine linear_solver_init
 
     subroutine linear_solver_matrix_ssa_ac_csr_2D(lgs,ux,uy,beta_acx,beta_acy, &
-                            visc_int_aa,ssa_mask_acx,ssa_mask_acy,H_ice,f_ice,taud_acx, &
+                            N_aa,ssa_mask_acx,ssa_mask_acy,H_ice,f_ice,taud_acx, &
                             taud_acy,H_grnd,z_sl,z_bed,z_srf,dx,dy,boundaries,lateral_bc)
         ! Define sparse matrices A*x=b in format 'compressed sparse row' (csr)
         ! for the SSA momentum balance equations with velocity components
@@ -116,7 +116,7 @@ contains
         real(wp), intent(IN) :: uy(:,:)                 ! [m yr^-1] Horizontal velocity y (acy-nodes)
         real(wp), intent(IN) :: beta_acx(:,:)           ! [Pa yr m^-1] Basal friction (acx-nodes)
         real(wp), intent(IN) :: beta_acy(:,:)           ! [Pa yr m^-1] Basal friction (acy-nodes)
-        real(wp), intent(IN) :: visc_int_aa(:,:)        ! [Pa yr m] Vertically integrated viscosity (aa-nodes)
+        real(wp), intent(IN) :: N_aa(:,:)               ! [Pa yr m] Vertically integrated viscosity (aa-nodes)
         integer,  intent(IN) :: ssa_mask_acx(:,:)       ! [--] Mask to determine ssa solver actions (acx-nodes)
         integer,  intent(IN) :: ssa_mask_acy(:,:)       ! [--] Mask to determine ssa solver actions (acy-nodes)
         real(wp), intent(IN) :: H_ice(:,:)              ! [m]  Ice thickness (aa-nodes)
@@ -133,38 +133,33 @@ contains
 
         ! Local variables
         integer  :: nx, ny
-        real(wp) :: dxi, deta
         integer  :: i, j, k, n, m 
         integer  :: nc, nr
         integer  :: i1, j1, i00, j00
-        real(wp) :: inv_dxi, inv_deta, inv_dxi_deta, inv_dxi2, inv_deta2
         real(wp) :: del_sq, inv_del_sq
-
         real(wp) :: inv_dx, inv_dxdx 
         real(wp) :: inv_dy, inv_dydy 
         real(wp) :: inv_dxdy, inv_2dxdy, inv_4dxdy 
         
         real(wp) :: H_ice_now, H_ocn_now
 
-        integer,  allocatable :: maske(:,:)
-        logical,  allocatable :: is_grline_1(:,:) 
-        logical,  allocatable :: is_grline_2(:,:) 
+        integer,  allocatable :: mask(:,:)
         logical,  allocatable :: is_front_1(:,:)
         logical,  allocatable :: is_front_2(:,:)  
-        real(wp), allocatable :: visc_int_ab(:,:)
+        real(wp), allocatable :: N_ab(:,:)
 
         ! Boundary conditions counterclockwise unit circle 
         ! 1: x, right-border
         ! 2: y, upper-border 
         ! 3: x, left--border 
         ! 4: y, lower-border 
-        character(len=56) :: boundaries_vx(4)
-        character(len=56) :: boundaries_vy(4)
+        character(len=56) :: boundaries_ux(4)
+        character(len=56) :: boundaries_uy(4)
 
         integer :: im1, ip1, jm1, jp1 
 
         real(wp) :: f_submerged, f_visc
-        real(wp) :: visc_int_aa_now
+        real(wp) :: N_aa_now
         real(wp) :: tau_bc_int 
         real(wp) :: tau_bc_sign
 
@@ -188,7 +183,7 @@ contains
             ! something was not well-defined/well-initialized
 
             write(*,*) 
-            write(*,"(a)") "calc_vxy_ssa_matrix:: Error: beta appears to be zero everywhere for grounded ice."
+            write(*,"(a)") "linear_solver_matrix_ssa_ac_csr_2D:: Error: beta appears to be zero everywhere for grounded ice."
             write(*,*) "range(beta_acx): ", minval(beta_acx), maxval(beta_acx)
             write(*,*) "range(beta_acy): ", minval(beta_acy), maxval(beta_acy)
             write(*,*) "range(H_grnd):   ", minval(H_grnd), maxval(H_grnd)
@@ -203,91 +198,75 @@ contains
 
             case("MISMIP3D")
 
-                boundaries_vx(1) = "zeros"
-                boundaries_vx(2) = "infinite"
-                boundaries_vx(3) = "zeros"
-                boundaries_vx(4) = "infinite"
+                boundaries_ux(1) = "zeros"
+                boundaries_ux(2) = "infinite"
+                boundaries_ux(3) = "zeros"
+                boundaries_ux(4) = "infinite"
 
-                boundaries_vy(1:4) = "zeros" 
+                boundaries_uy(1:4) = "zeros" 
 
             case("periodic")
 
-                boundaries_vx(1:4) = "periodic" 
+                boundaries_ux(1:4) = "periodic" 
 
-                boundaries_vy(1:4) = "periodic" 
+                boundaries_uy(1:4) = "periodic" 
 
             case("periodic-x")
 
-                boundaries_vx(1) = "periodic"
-                boundaries_vx(2) = "infinite"
-                boundaries_vx(3) = "periodic"
-                boundaries_vx(4) = "infinite"
+                boundaries_ux(1) = "periodic"
+                boundaries_ux(2) = "infinite"
+                boundaries_ux(3) = "periodic"
+                boundaries_ux(4) = "infinite"
 
-                boundaries_vy(1) = "periodic"
-                boundaries_vy(2) = "infinite"
-                boundaries_vy(3) = "periodic"
-                boundaries_vy(4) = "infinite"
+                boundaries_uy(1) = "periodic"
+                boundaries_uy(2) = "infinite"
+                boundaries_uy(3) = "periodic"
+                boundaries_uy(4) = "infinite"
 
             case("infinite")
 
-                boundaries_vx(1:4) = "infinite" 
+                boundaries_ux(1:4) = "infinite" 
 
-                boundaries_vy(1:4) = "infinite" 
+                boundaries_uy(1:4) = "infinite" 
                 
             case DEFAULT 
 
-                boundaries_vx(1:4) = "zeros" 
+                boundaries_ux(1:4) = "zeros" 
 
-                boundaries_vy(1:4) = "zeros" 
+                boundaries_uy(1:4) = "zeros" 
                 
         end select 
 
         nx = size(H_ice,1)
         ny = size(H_ice,2)
         
-        allocate(maske(nx,ny))
-        allocate(is_grline_1(nx,ny))
-        allocate(is_grline_2(nx,ny))
+        allocate(mask(nx,ny))
         allocate(is_front_1(nx,ny))
         allocate(is_front_2(nx,ny))
-        
-        allocate(visc_int_ab(nx,ny))
-
-        !--- External yelmo arguments => local sicopolis variable names ---
-        dxi          = dx 
-        deta         = dy 
-
-        del_sq       = dx*dx 
-        inv_del_sq   = 1.0_wp / del_sq 
-
+        allocate(N_ab(nx,ny))
 
         ! Define some factors
 
-        inv_dx    = 1.0_wp / dx 
-        inv_dxdx  = 1.0_wp / (dx*dx)
-        inv_dy    = 1.0_wp / dy 
-        inv_dydy  = 1.0_wp / (dy*dy)
-        inv_dxdy  = 1.0_wp / (dx*dy)
-        inv_2dxdy = 1.0_wp / (2.0_wp*dx*dy)
-        inv_4dxdy = 1.0_wp / (4.0_wp*dx*dy)
+        inv_dx      = 1.0_wp / dx 
+        inv_dxdx    = 1.0_wp / (dx*dx)
+        inv_dy      = 1.0_wp / dy 
+        inv_dydy    = 1.0_wp / (dy*dy)
+        inv_dxdy    = 1.0_wp / (dx*dy)
+        inv_2dxdy   = 1.0_wp / (2.0_wp*dx*dy)
+        inv_4dxdy   = 1.0_wp / (4.0_wp*dx*dy)
         
-        !-------- Abbreviations --------
+        del_sq      = dx*dx 
+        inv_del_sq  = 1.0_wp / del_sq 
 
-        inv_dxi       = 1.0_prec/dxi
-        inv_deta      = 1.0_prec/deta
-        inv_dxi_deta  = 1.0_prec/(dxi*deta)
-        inv_dxi2      = 1.0_prec/(dxi*dxi)
-        inv_deta2     = 1.0_prec/(deta*deta)
+        ! Set mask and grounding line / calving front flags
 
-        ! Set maske and grounding line / calving front flags
-
-        call set_sico_masks(maske,is_front_1,is_front_2,is_grline_1,is_grline_2, &
+        call set_boundary_masks(mask,is_front_1,is_front_2, &
                                 H_ice, f_ice, H_grnd, z_srf, z_bed, z_sl, lateral_bc)
         
         !-------- Depth-integrated viscosity on the staggered grid
         !                                       [at (i+1/2,j+1/2)] --------
 
-        call stagger_visc_aa_ab(visc_int_ab,visc_int_aa,H_ice,f_ice)
+        call stagger_visc_aa_ab(N_ab,N_aa,H_ice,f_ice)
         
 
         !-------- Assembly of the system of linear equations
@@ -323,7 +302,7 @@ contains
             else if (i .eq. 1) then 
                 ! Left boundary 
 
-                select case(trim(boundaries_vx(3)))
+                select case(trim(boundaries_ux(3)))
 
                     case("zeros")
                         ! Assume border velocity is zero 
@@ -371,7 +350,7 @@ contains
                     case DEFAULT 
 
                         write(*,*) "linear_solver_matrix_ssa_ac_csr_2D:: Error: left-border condition not &
-                        &recognized: "//trim(boundaries_vx(3))
+                        &recognized: "//trim(boundaries_ux(3))
                         write(*,*) "boundaries parameter set to: "//trim(boundaries)
                         stop
 
@@ -380,7 +359,7 @@ contains
             else if (i .eq. nx) then 
                 ! Right boundary 
                 
-                select case(trim(boundaries_vx(1)))
+                select case(trim(boundaries_ux(1)))
 
                     case("zeros")
                         ! Assume border velocity is zero 
@@ -430,13 +409,13 @@ contains
                     case DEFAULT 
 
                         write(*,*) "linear_solver_matrix_ssa_ac_csr_2D:: Error: right-border condition not &
-                        &recognized: "//trim(boundaries_vx(1))
+                        &recognized: "//trim(boundaries_ux(1))
                         write(*,*) "boundaries parameter set to: "//trim(boundaries)
                         stop
 
                 end select 
 
-            else if (i .eq. nx-1 .and. trim(boundaries_vx(1)) .eq. "infinite") then 
+            else if (i .eq. nx-1 .and. trim(boundaries_ux(1)) .eq. "infinite") then 
                 ! Right boundary, staggered one point further inward 
                 ! (only needed for periodic conditions, otherwise
                 ! this point should be treated as normal)
@@ -458,7 +437,7 @@ contains
                 lgs%b_value(nr) = 0.0_wp
                 lgs%x_value(nr) = ux(i,j)
 
-            else if (i .eq. nx-1 .and. trim(boundaries_vx(1)) .eq. "periodic") then 
+            else if (i .eq. nx-1 .and. trim(boundaries_ux(1)) .eq. "periodic") then 
                 ! Right boundary, staggered one point further inward 
                 ! (only needed for periodic conditions, otherwise
                 ! this point should be treated as normal)
@@ -483,7 +462,7 @@ contains
             else if (j .eq. 1) then 
                 ! Lower boundary 
 
-                select case(trim(boundaries_vx(4)))
+                select case(trim(boundaries_ux(4)))
 
                     case("zeros")
                         ! Assume border velocity is zero 
@@ -531,7 +510,7 @@ contains
                     case DEFAULT 
 
                         write(*,*) "linear_solver_matrix_ssa_ac_csr_2D:: Error: upper-border condition not &
-                        &recognized: "//trim(boundaries_vx(4))
+                        &recognized: "//trim(boundaries_ux(4))
                         write(*,*) "boundaries parameter set to: "//trim(boundaries)
                         stop
 
@@ -540,7 +519,7 @@ contains
             else if (j .eq. ny) then 
                 ! Upper boundary 
 
-                select case(trim(boundaries_vx(2)))
+                select case(trim(boundaries_ux(2)))
 
                     case("zeros")
                         ! Assume border velocity is zero 
@@ -588,7 +567,7 @@ contains
                     case DEFAULT 
 
                         write(*,*) "linear_solver_matrix_ssa_ac_csr_2D:: Error: upper-border condition not &
-                        &recognized: "//trim(boundaries_vx(2))
+                        &recognized: "//trim(boundaries_ux(2))
                         write(*,*) "boundaries parameter set to: "//trim(boundaries)
                         stop
 
@@ -636,31 +615,31 @@ contains
                         if (is_front_1(i,j).and.is_front_2(i+1,j)) then 
                             ! === Case 1: ice-free to the right ===
 
-                            visc_int_aa_now = visc_int_aa(i1,j)
-                            !visc_int_aa_now = 0.5_wp*(visc_int_aa(i,j)+visc_int_aa(i-1,j))
+                            N_aa_now = N_aa(i1,j)
+                            !N_aa_now = 0.5_wp*(N_aa(i,j)+N_aa(i-1,j))
 
                             nc = 2*lgs%ij2n(i-1,j)-1
                                 ! smallest nc (column counter), for ux(i-1,j)
                             k = k+1
-                            lgs%a_value(k) = -4.0_prec*inv_dxi*visc_int_aa_now
+                            lgs%a_value(k) = -4.0_prec*inv_dx*N_aa_now
                             lgs%a_index(k) = nc 
 
                             nc = 2*lgs%ij2n(i,j-1)
                                 ! next nc (column counter), for uy(i,j-1)
                             k = k+1
-                            lgs%a_value(k) = -2.0_prec*inv_deta*visc_int_aa_now
+                            lgs%a_value(k) = -2.0_prec*inv_dy*N_aa_now
                             lgs%a_index(k) = nc
 
                             nc = 2*lgs%ij2n(i,j)-1
                                 ! next nc (column counter), for ux(i,j)
                             k = k+1
-                            lgs%a_value(k) = 4.0_prec*inv_dxi*visc_int_aa_now
+                            lgs%a_value(k) = 4.0_prec*inv_dx*N_aa_now
                             lgs%a_index(k) = nc
 
                             nc = 2*lgs%ij2n(i,j)
                                 ! next nc (column counter), for uy(i,j)
                             k = k+1
-                            lgs%a_value(k) = 2.0_prec*inv_deta*visc_int_aa_now
+                            lgs%a_value(k) = 2.0_prec*inv_dy*N_aa_now
                             lgs%a_index(k) = nc
 
                             ! Assign matrix values
@@ -672,31 +651,31 @@ contains
                         else 
                             ! Case 2: ice-free to the left
                             
-                            visc_int_aa_now = visc_int_aa(i1,j)
-                            visc_int_aa_now = 0.5_wp*(visc_int_aa(i,j)+visc_int_aa(i+1,j))
+                            N_aa_now = N_aa(i1,j)
+                            N_aa_now = 0.5_wp*(N_aa(i,j)+N_aa(i+1,j))
 
                             nc = 2*lgs%ij2n(i,j)-1
                                 ! next nc (column counter), for ux(i,j)
                             k = k+1
-                            lgs%a_value(k) = -4.0_prec*inv_dxi*visc_int_aa_now
+                            lgs%a_value(k) = -4.0_prec*inv_dx*N_aa_now
                             lgs%a_index(k) = nc
 
                             nc = 2*lgs%ij2n(i+1,j-1)
                                 ! next nc (column counter), for uy(i+1,j-1)
                             k  = k+1
-                            lgs%a_value(k) = -2.0_prec*inv_deta*visc_int_aa_now
+                            lgs%a_value(k) = -2.0_prec*inv_dy*N_aa_now
                             lgs%a_index(k) = nc
 
                             nc = 2*lgs%ij2n(i+1,j)-1
                                 ! next nc (column counter), for ux(i+1,j)
                             k = k+1
-                            lgs%a_value(k) = 4.0_prec*inv_dxi*visc_int_aa_now
+                            lgs%a_value(k) = 4.0_prec*inv_dx*N_aa_now
                             lgs%a_index(k) = nc
  
                             nc = 2*lgs%ij2n(i+1,j)
                                 ! largest nc (column counter), for uy(i+1,j)
                             k  = k+1
-                            lgs%a_value(k) = 2.0_prec*inv_deta*visc_int_aa_now
+                            lgs%a_value(k) = 2.0_prec*inv_dy*N_aa_now
                             lgs%a_index(k) = nc
 
                             ! Assign matrix values
@@ -717,9 +696,9 @@ contains
 
                     end if
 
-            else if ( ( (maske(i,j)==3).and.(maske(i+1,j)==1) ) &
+            else if ( ( (mask(i,j)==3).and.(mask(i+1,j)==1) ) &
                       .or. &
-                      ( (maske(i,j)==1).and.(maske(i+1,j)==3) ) &
+                      ( (mask(i,j)==1).and.(mask(i+1,j)==3) ) &
                     ) then
                     ! one neighbour is floating ice and the other is ice-free land;
                     ! velocity assumed to be zero
@@ -748,61 +727,61 @@ contains
 
                 nc = 2*lgs%ij2n(i,j)-1          ! column counter for ux(i,j)
                 k = k+1
-                lgs%a_value(k) = -4.0_wp*visc_int_aa(i+1,j) &
-                                 -4.0_wp*visc_int_aa(i,j) &
-                                 -1.0_wp*visc_int_ab(i,j) &
-                                 -1.0_wp*visc_int_ab(i,j-1) &
-                                 -del_sq*beta_acx(i,j)
+                lgs%a_value(k) = -4.0_wp*inv_dxdx*N_aa(i+1,j) &
+                                 -4.0_wp*inv_dxdx*N_aa(i,j) &
+                                 -1.0_wp*inv_dydy*N_ab(i,j) &
+                                 -1.0_wp*inv_dydy*N_ab(i,j-1) &
+                                 -beta_acx(i,j)
                 lgs%a_index(k) = nc
 
                 nc = 2*lgs%ij2n(i+1,j)-1        ! column counter for ux(i+1,j)
                 k = k+1
-                lgs%a_value(k) =  4.0_wp*visc_int_aa(i+1,j)
+                lgs%a_value(k) =  4.0_wp*inv_dxdx*N_aa(i+1,j)
                 lgs%a_index(k) = nc
 
                 nc = 2*lgs%ij2n(i-1,j)-1        ! column counter for ux(i-1,j)
                 k = k+1
-                lgs%a_value(k) =  4.0_wp*visc_int_aa(i,j)
+                lgs%a_value(k) =  4.0_wp*inv_dxdx*N_aa(i,j)
                 lgs%a_index(k) = nc
 
                 nc = 2*lgs%ij2n(i,j+1)-1        ! column counter for ux(i,j+1)
                 k = k+1
-                lgs%a_value(k) =  1.0_wp*visc_int_ab(i,j)
+                lgs%a_value(k) =  1.0_wp*inv_dydy*N_ab(i,j)
                 lgs%a_index(k) = nc
 
                 nc = 2*lgs%ij2n(i,j-1)-1        ! column counter for ux(i,j-1)
                 k = k+1
-                lgs%a_value(k) =  1.0_wp*visc_int_ab(i,j-1)
+                lgs%a_value(k) =  1.0_wp*inv_dydy*N_ab(i,j-1)
                 lgs%a_index(k) = nc
 
                 ! -- vy terms -- 
                 
                 nc = 2*lgs%ij2n(i,j)            ! column counter for uy(i,j)
                 k = k+1
-                lgs%a_value(k) = -2.0_wp*visc_int_aa(i,j)     &
-                                 -1.0_wp*visc_int_ab(i,j)
+                lgs%a_value(k) = -2.0_wp*inv_dxdy*N_aa(i,j)     &
+                                 -1.0_wp*inv_dxdy*N_ab(i,j)
                 lgs%a_index(k) = nc
 
                 nc = 2*lgs%ij2n(i+1,j)          ! column counter for uy(i+1,j)
                 k = k+1
-                lgs%a_value(k) =  2.0_wp*visc_int_aa(i+1,j)   &
-                                 +1.0_wp*visc_int_ab(i,j)
+                lgs%a_value(k) =  2.0_wp*inv_dxdy*N_aa(i+1,j)   &
+                                 +1.0_wp*inv_dxdy*N_ab(i,j)
                 lgs%a_index(k) = nc
                 
                 nc = 2*lgs%ij2n(i+1,j-1)        ! column counter for uy(i+1,j-1)
                 k = k+1
-                lgs%a_value(k) = -2.0_wp*visc_int_aa(i+1,j)   &
-                                 -1.0_wp*visc_int_ab(i,j-1)
+                lgs%a_value(k) = -2.0_wp*inv_dxdy*N_aa(i+1,j)   &
+                                 -1.0_wp*inv_dxdy*N_ab(i,j-1)
                 lgs%a_index(k) = nc
                 
                 nc = 2*lgs%ij2n(i,j-1)          ! column counter for uy(i,j-1)
                 k = k+1
-                lgs%a_value(k) =  2.0_wp*visc_int_aa(i,j)   &
-                                 +1.0_wp*visc_int_ab(i,j-1)
+                lgs%a_value(k) =  2.0_wp*inv_dxdy*N_aa(i,j)   &
+                                 +1.0_wp*inv_dxdy*N_ab(i,j-1)
                 lgs%a_index(k) = nc
                 
 
-                lgs%b_value(nr) = del_sq*taud_acx(i,j)
+                lgs%b_value(nr) = taud_acx(i,j)
                 lgs%x_value(nr) = ux(i,j)
 
             end if
@@ -830,7 +809,7 @@ contains
             else if (j .eq. 1) then 
                 ! lower boundary 
 
-                select case(trim(boundaries_vy(4)))
+                select case(trim(boundaries_uy(4)))
 
                     case("zeros")
                         ! Assume border vy velocity is zero 
@@ -877,7 +856,7 @@ contains
                     case DEFAULT 
 
                         write(*,*) "linear_solver_matrix_ssa_ac_csr_2D:: Error: lower-border condition not &
-                        &recognized: "//trim(boundaries_vy(4))
+                        &recognized: "//trim(boundaries_uy(4))
                         write(*,*) "boundaries parameter set to: "//trim(boundaries)
                         stop
 
@@ -886,7 +865,7 @@ contains
             else if (j .eq. ny) then 
                 ! Upper boundary 
 
-                select case(trim(boundaries_vy(2)))
+                select case(trim(boundaries_uy(2)))
 
                     case("zeros")
                         ! Assume border velocity is zero 
@@ -934,13 +913,13 @@ contains
                     case DEFAULT 
 
                         write(*,*) "linear_solver_matrix_ssa_ac_csr_2D:: Error: upper-border condition not &
-                        &recognized: "//trim(boundaries_vy(2))
+                        &recognized: "//trim(boundaries_uy(2))
                         write(*,*) "boundaries parameter set to: "//trim(boundaries)
                         stop
 
                 end select 
             
-            else if (j .eq. ny-1 .and. trim(boundaries_vy(2)) .eq. "infinite") then
+            else if (j .eq. ny-1 .and. trim(boundaries_uy(2)) .eq. "infinite") then
                 ! Upper boundary, inward by one point
                 ! (only needed for periodic conditions, otherwise
                 ! this point should be treated as normal)
@@ -960,7 +939,7 @@ contains
                 lgs%b_value(nr) = 0.0_wp
                 lgs%x_value(nr) = uy(i,j)
 
-            else if (j .eq. ny-1 .and. trim(boundaries_vy(2)) .eq. "periodic") then
+            else if (j .eq. ny-1 .and. trim(boundaries_uy(2)) .eq. "periodic") then
                 ! Upper boundary, inward by one point
                 ! (only needed for periodic conditions, otherwise
                 ! this point should be treated as normal)
@@ -983,7 +962,7 @@ contains
             else if (i .eq. 1) then 
                 ! Left boundary 
 
-                select case(trim(boundaries_vy(3)))
+                select case(trim(boundaries_uy(3)))
 
                     case("zeros")
                         ! Assume border velocity is zero 
@@ -1030,7 +1009,7 @@ contains
                     case DEFAULT 
 
                         write(*,*) "linear_solver_matrix_ssa_ac_csr_2D:: Error: left-border condition not &
-                        &recognized: "//trim(boundaries_vy(3))
+                        &recognized: "//trim(boundaries_uy(3))
                         write(*,*) "boundaries parameter set to: "//trim(boundaries)
                         stop
 
@@ -1039,7 +1018,7 @@ contains
             else if (i .eq. nx) then 
                 ! Right boundary 
 
-                select case(trim(boundaries_vy(1)))
+                select case(trim(boundaries_uy(1)))
 
                     case("zeros")
                         ! Assume border velocity is zero 
@@ -1086,7 +1065,7 @@ contains
                     case DEFAULT 
 
                         write(*,*) "linear_solver_matrix_ssa_ac_csr_2D:: Error: right-border condition not &
-                        &recognized: "//trim(boundaries_vy(1))
+                        &recognized: "//trim(boundaries_uy(1))
                         write(*,*) "boundaries parameter set to: "//trim(boundaries)
                         stop
 
@@ -1134,31 +1113,31 @@ contains
                         if (is_front_1(i,j).and.is_front_2(i,j+1)) then 
                             ! === Case 1: ice-free to the top ===
 
-                            visc_int_aa_now = visc_int_aa(i,j1)
-                            !visc_int_aa_now = 0.5_wp*(visc_int_aa(i,j)+visc_int_aa(i,j-1))
+                            N_aa_now = N_aa(i,j1)
+                            !N_aa_now = 0.5_wp*(N_aa(i,j)+N_aa(i,j-1))
 
                             nc = 2*lgs%ij2n(i-1,j)-1
                                 ! smallest nc (column counter), for ux(i-1,j)
                             k = k+1
-                            lgs%a_value(k) = -2.0_prec*inv_dxi*visc_int_aa_now
+                            lgs%a_value(k) = -2.0_prec*inv_dx*N_aa_now
                             lgs%a_index(k) = nc
 
                             nc = 2*lgs%ij2n(i,j-1)
                                 ! next nc (column counter), for uy(i,j-1)
                             k = k+1
-                            lgs%a_value(k) = -4.0_prec*inv_deta*visc_int_aa_now
+                            lgs%a_value(k) = -4.0_prec*inv_dy*N_aa_now
                             lgs%a_index(k) = nc
 
                             nc = 2*lgs%ij2n(i,j)-1
                                 ! next nc (column counter), for ux(i,j)
                             k = k+1
-                            lgs%a_value(k) = 2.0_prec*inv_dxi*visc_int_aa_now
+                            lgs%a_value(k) = 2.0_prec*inv_dx*N_aa_now
                             lgs%a_index(k) = nc
 
                             nc = 2*lgs%ij2n(i,j)
                                 ! next nc (column counter), for uy(i,j)
                             k = k+1
-                            lgs%a_value(k) = 4.0_prec*inv_deta*visc_int_aa_now
+                            lgs%a_value(k) = 4.0_prec*inv_dy*N_aa_now
                             lgs%a_index(k) = nc
 
                             ! Assign matrix values
@@ -1168,31 +1147,31 @@ contains
                         else
                             ! === Case 2: ice-free to the bottom ===
                             
-                            visc_int_aa_now = visc_int_aa(i,j1)
-                            !visc_int_aa_now = 0.5_wp*(visc_int_aa(i,j)+visc_int_aa(i,j+1))
+                            N_aa_now = N_aa(i,j1)
+                            !N_aa_now = 0.5_wp*(N_aa(i,j)+N_aa(i,j+1))
 
                             nc = 2*lgs%ij2n(i-1,j+1)-1
                                 ! next nc (column counter), for ux(i-1,j+1)
                             k = k+1
-                            lgs%a_value(k) = -2.0_prec*inv_dxi*visc_int_aa_now
+                            lgs%a_value(k) = -2.0_prec*inv_dx*N_aa_now
                             lgs%a_index(k) = nc
  
                             nc = 2*lgs%ij2n(i,j)
                                 ! next nc (column counter), for uy(i,j)
                             k = k+1
-                            lgs%a_value(k) = -4.0_prec*inv_deta*visc_int_aa_now
+                            lgs%a_value(k) = -4.0_prec*inv_dy*N_aa_now
                             lgs%a_index(k) = nc
  
                             nc = 2*lgs%ij2n(i,j+1)-1
                                 ! next nc (column counter), for ux(i,j+1)
                             k = k+1
-                            lgs%a_value(k) = 2.0_prec*inv_dxi*visc_int_aa_now
+                            lgs%a_value(k) = 2.0_prec*inv_dx*N_aa_now
                             lgs%a_index(k) = nc
  
                             nc = 2*lgs%ij2n(i,j+1)
                                 ! next nc (column counter), for uy(i,j+1)
                             k = k+1
-                            lgs%a_value(k) = 4.0_prec*inv_deta*visc_int_aa_now
+                            lgs%a_value(k) = 4.0_prec*inv_dy*N_aa_now
                             lgs%a_index(k) = nc
 
                             ! Assign matrix values
@@ -1213,9 +1192,9 @@ contains
 
                     end if
 
-            else if ( ( (maske(i,j)==3).and.(maske(i,j+1)==1) ) &
+            else if ( ( (mask(i,j)==3).and.(mask(i,j+1)==1) ) &
                         .or. &
-                        ( (maske(i,j)==1).and.(maske(i,j+1)==3) ) &
+                        ( (mask(i,j)==1).and.(mask(i,j+1)==3) ) &
                       ) then
                     ! one neighbour is floating ice and the other is ice-free land;
                     ! velocity assumed to be zero
@@ -1244,60 +1223,60 @@ contains
 
                 nc = 2*lgs%ij2n(i,j)        ! column counter for uy(i,j)
                 k = k+1
-                lgs%a_value(k) = -4.0_wp*visc_int_aa(i,j+1)   &
-                                 -4.0_wp*visc_int_aa(i,j)     &
-                                 -1.0_wp*visc_int_ab(i,j)   &
-                                 -1.0_wp*visc_int_ab(i-1,j) &
-                                 -del_sq*beta_acy(i,j)
+                lgs%a_value(k) = -4.0_wp*inv_dydy*N_aa(i,j+1)   &
+                                 -4.0_wp*inv_dydy*N_aa(i,j)     &
+                                 -1.0_wp*inv_dxdx*N_ab(i,j)   &
+                                 -1.0_wp*inv_dxdx*N_ab(i-1,j) &
+                                 -beta_acy(i,j)
                 lgs%a_index(k) = nc
 
                 nc = 2*lgs%ij2n(i,j+1)      ! column counter for uy(i,j+1)
                 k = k+1
-                lgs%a_value(k) =  4.0_wp*visc_int_aa(i,j+1)
+                lgs%a_value(k) =  4.0_wp*inv_dydy*N_aa(i,j+1)
                 lgs%a_index(k) = nc
 
                 nc = 2*lgs%ij2n(i,j-1)      ! column counter for uy(i,j-1)
                 k = k+1
-                lgs%a_value(k) =  4.0_wp*visc_int_aa(i,j)
+                lgs%a_value(k) =  4.0_wp*inv_dydy*N_aa(i,j)
                 lgs%a_index(k) = nc
                 
                 nc = 2*lgs%ij2n(i+1,j)      ! column counter for uy(i+1,j)
                 k = k+1
-                lgs%a_value(k) =  1.0_wp*visc_int_ab(i,j)
+                lgs%a_value(k) =  1.0_wp*inv_dxdx*N_ab(i,j)
                 lgs%a_index(k) = nc
                 
                 nc = 2*lgs%ij2n(i-1,j)      ! column counter for uy(i-1,j)
                 k = k+1
-                lgs%a_value(k) =  1.0_wp*visc_int_ab(i-1,j)
+                lgs%a_value(k) =  1.0_wp*inv_dxdx*N_ab(i-1,j)
                 lgs%a_index(k) = nc
                 
                 ! -- vx terms -- 
 
                 nc = 2*lgs%ij2n(i,j)-1      ! column counter for ux(i,j)
                 k = k+1
-                lgs%a_value(k) = -2.0_wp*visc_int_aa(i,j)     &
-                                 -1.0_wp*visc_int_ab(i,j)
+                lgs%a_value(k) = -2.0_wp*inv_dxdy*N_aa(i,j)     &
+                                 -1.0_wp*inv_dxdy*N_ab(i,j)
                 lgs%a_index(k) = nc
 
                 nc = 2*lgs%ij2n(i,j+1)-1    ! column counter for ux(i,j+1)
                 k = k+1
-                lgs%a_value(k) =  2.0_wp*visc_int_aa(i,j+1)     &
-                                 +1.0_wp*visc_int_ab(i,j)
+                lgs%a_value(k) =  2.0_wp*inv_dxdy*N_aa(i,j+1)     &
+                                 +1.0_wp*inv_dxdy*N_ab(i,j)
                 lgs%a_index(k) = nc
 
                 nc = 2*lgs%ij2n(i-1,j+1)-1  ! column counter for ux(i-1,j+1)
                 k = k+1
-                lgs%a_value(k) = -2.0_wp*visc_int_aa(i,j+1)     &
-                                 -1.0_wp*visc_int_ab(i-1,j)
+                lgs%a_value(k) = -2.0_wp*inv_dxdy*N_aa(i,j+1)     &
+                                 -1.0_wp*inv_dxdy*N_ab(i-1,j)
                 lgs%a_index(k) = nc
 
                 nc = 2*lgs%ij2n(i-1,j)-1  ! column counter for ux(i-1,j)
                 k = k+1
-                lgs%a_value(k) =  2.0_wp*visc_int_aa(i,j)     &
-                                 +1.0_wp*visc_int_ab(i-1,j)
+                lgs%a_value(k) =  2.0_wp*inv_dxdy*N_aa(i,j)     &
+                                 +1.0_wp*inv_dxdy*N_ab(i-1,j)
                 lgs%a_index(k) = nc
 
-                lgs%b_value(nr) = del_sq*taud_acy(i,j)
+                lgs%b_value(nr) = taud_acy(i,j)
                 lgs%x_value(nr) = uy(i,j)
 
             end if
@@ -1724,7 +1703,7 @@ contains
 
     end subroutine stagger_visc_aa_ab
 
-    subroutine set_sico_masks(maske,front1,front2,gl1,gl2,H_ice,f_ice,H_grnd,z_srf,z_bed,z_sl,apply_lateral_bc)
+    subroutine set_boundary_masks(mask,front1,front2,H_ice,f_ice,H_grnd,z_srf,z_bed,z_sl,apply_lateral_bc)
         ! Define where ssa calculations should be performed
         ! Note: could be binary, but perhaps also distinguish 
         ! grounding line/zone to use this mask for later gl flux corrections
@@ -1737,11 +1716,9 @@ contains
         
         implicit none 
         
-        integer,    intent(OUT) :: maske(:,:) 
+        integer,    intent(OUT) :: mask(:,:) 
         logical,    intent(OUT) :: front1(:,:)
         logical,    intent(OUT) :: front2(:,:)  
-        logical,    intent(OUT) :: gl1(:,:)
-        logical,    intent(OUT) :: gl2(:,:) 
         real(wp), intent(IN)  :: H_ice(:,:)
         real(wp), intent(IN)  :: f_ice(:,:)
         real(wp), intent(IN)  :: H_grnd(:,:)
@@ -1765,12 +1742,9 @@ contains
         ! "all"      : apply at all ice margins 
         ! "none"     : do not apply boundary condition (for testing mainly)
 
-        nx = size(maske,1)
-        ny = size(maske,2)
+        nx = size(mask,1)
+        ny = size(mask,2)
         
-        gl1 = .FALSE. 
-        gl2 = .FALSE. 
-
         ! First determine general ice coverage mask 
         ! (land==1,ocean==2,floating_ice==3,grounded_ice==0)
 
@@ -1785,10 +1759,10 @@ contains
 
                 if (is_float) then 
                     ! Ice shelf 
-                    maske(i,j) = 3
+                    mask(i,j) = 3
                 else
                     ! Grounded ice 
-                    maske(i,j) = 0 
+                    mask(i,j) = 0 
                 end if 
                 
             else 
@@ -1796,10 +1770,10 @@ contains
 
                 if (is_float) then 
                     ! Open ocean 
-                    maske(i,j) = 2
+                    mask(i,j) = 2
                 else 
                     ! Ice-free land 
-                    maske(i,j) = 1 
+                    mask(i,j) = 1 
                 end if 
 
             end if 
@@ -1860,7 +1834,7 @@ contains
                 ! This method is also used for the 'infinite slab' approach,
                 ! where a thin ice shelf is extended everywhere over the domain. 
                 
-                if ( front1(i,j) .and. maske(i,j) .eq. 0 ) front1(i,j) = .FALSE. 
+                if ( front1(i,j) .and. mask(i,j) .eq. 0 ) front1(i,j) = .FALSE. 
 
             case("marine")
                 ! Only apply lateral bc to floating ice fronts and
@@ -1872,10 +1846,10 @@ contains
                 f_submerged = 1.d0 - min((z_srf(i,j)-z_sl(i,j))/H_ice(i,j),1.d0)
                 H_ocn_now   = H_ice(i,j)*f_submerged
 
-                ! if ( front1(i,j) .and. maske(i,j) .eq. 0 .and. &
+                ! if ( front1(i,j) .and. mask(i,j) .eq. 0 .and. &
                 !                     H_ocn_now .eq. 0.0 ) front1(i,j) = .FALSE. 
                 
-                if ( front1(i,j) .and. maske(i,j) .eq. 0 .and. &
+                if ( front1(i,j) .and. mask(i,j) .eq. 0 .and. &
                                     f_submerged .eq. 0.0_wp ) front1(i,j) = .FALSE. 
             
             case("all")
@@ -1885,7 +1859,7 @@ contains
 
             case DEFAULT
                 
-                write(io_unit_err,*) "set_sico_masks:: error: ssa_lat_bc parameter value not recognized."
+                write(io_unit_err,*) "set_boundary_masks:: error: ssa_lat_bc parameter value not recognized."
                 write(io_unit_err,*) "ydyn.ssa_lat_bc = ", apply_lateral_bc
                 stop 
 
@@ -1896,7 +1870,7 @@ contains
         
         return
         
-    end subroutine set_sico_masks
+    end subroutine set_boundary_masks
     
     elemental subroutine limit_vel(u,u_lim)
         ! Apply a velocity limit (for stability)

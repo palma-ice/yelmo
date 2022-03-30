@@ -11,7 +11,7 @@ module velocity_l1l2
                     calc_vertical_integrated_2D, calc_vertical_integrated_3D
 
     use basal_dragging 
-    use solver_ssa_sico5 
+    use solver_ssa_ac
     use velocity_general, only : set_inactive_margins, &
                         picard_calc_error, picard_calc_error_angle, picard_relax, &
                         picard_calc_convergence_l1rel_matrix, picard_calc_convergence_l2 
@@ -127,6 +127,9 @@ contains
         logical, parameter :: write_ssa_diagnostics      = .FALSE. 
         logical, parameter :: write_ssa_diagnostics_stop = .FALSE.   ! Stop simulation after completing iterations?
 
+        type(linear_solver_class) :: lgs_prev 
+        type(linear_solver_class) :: lgs_now
+        
         nx    = size(ux,1)
         ny    = size(ux,2)
         nz_aa = size(ux,3)
@@ -161,6 +164,10 @@ contains
         if (write_ssa_diagnostics) then 
             call ssa_diagnostics_write_init("yelmo_ssa.nc",nx,ny,time_init=1.0_wp)
         end if 
+
+        ! Initialize linear solver variables for current and previous iteration
+        call linear_solver_init(lgs_now,nx,ny)
+        lgs_prev = lgs_now 
 
         do iter = 1, par%ssa_iter_max 
 
@@ -237,11 +244,20 @@ if (.FALSE.) then
                     !call update_ssa_mask_convergence(ssa_mask_acx,ssa_mask_acy,ssa_err_acx,ssa_err_acy,err_lim=par%ssa_iter_conv*1e-2)  
                 end if 
 end if 
-            
-                ! Call ssa solver
-                call calc_vxy_ssa_matrix(ux_b,uy_b,L2_norm,beta_acx,beta_acy,visc_eff_int,  &
+                
+                ! Populate ssa matrices Ax=b
+                call linear_solver_matrix_ssa_ac_csr_2D(lgs_now,ux_b,uy_b,beta_acx,beta_acy,visc_eff_int,  &
                                     ssa_mask_acx,ssa_mask_acy,H_ice,f_ice,taud_acx,taud_acy,H_grnd,z_sl,z_bed, &
-                                    z_srf,dx,dy,par%ssa_vel_max,par%boundaries,par%ssa_lateral_bc,par%ssa_lis_opt)
+                                    z_srf,dx,dy,par%boundaries,par%ssa_lateral_bc)
+
+                ! Solve linear equation
+                call linear_solver_matrix_solve_lis(lgs_now,par%ssa_lis_opt)
+
+                ! Save L2_norm locally
+                L2_norm = lgs_now%L2_norm 
+
+                ! Store velocity solution
+                call linear_solver_save_velocity(ux_b,uy_b,lgs_now,par%ssa_vel_max)
 
 
 ! ajr: note that for MISMIP3D experiments to converge well,

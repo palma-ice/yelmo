@@ -10,7 +10,7 @@ module velocity_general
                     set_boundaries_2D_aa, set_boundaries_3D_aa, &
                     set_boundaries_2D_acx, set_boundaries_2D_acy
 
-    use solver_ssa_sico5, only : ssa_diagnostics_write_init, ssa_diagnostics_write_step
+    use solver_ssa_ac, only : ssa_diagnostics_write_init, ssa_diagnostics_write_step
 
     implicit none 
 

@@ -11,7 +11,7 @@ module velocity_ssa
                     set_boundaries_2D_aa, set_boundaries_3D_aa
 
     use basal_dragging 
-    use solver_ssa_sico5 
+    use solver_ssa_ac
     use velocity_general, only : set_inactive_margins, &
                         picard_calc_error, picard_calc_error_angle, picard_relax, &
                         picard_calc_convergence_l1rel_matrix, picard_calc_convergence_l2 

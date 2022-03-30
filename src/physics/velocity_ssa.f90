@@ -56,20 +56,20 @@ contains
 
         implicit none 
 
-        real(prec), intent(INOUT) :: ux_b(:,:)          ! [m/a]
-        real(prec), intent(INOUT) :: uy_b(:,:)          ! [m/a]
+        real(prec), intent(INOUT) :: ux_b(:,:)          ! [m/yr]
+        real(prec), intent(INOUT) :: uy_b(:,:)          ! [m/yr]
         real(prec), intent(INOUT) :: taub_acx(:,:)      ! [Pa]
         real(prec), intent(INOUT) :: taub_acy(:,:)      ! [Pa]
-        real(prec), intent(OUT)   :: visc_eff(:,:,:)    ! [Pa a]
-        real(prec), intent(OUT)   :: visc_eff_int(:,:)  ! [Pa a m]
+        real(prec), intent(OUT)   :: visc_eff(:,:,:)    ! [Pa yr]
+        real(prec), intent(OUT)   :: visc_eff_int(:,:)  ! [Pa yr m]
         integer,    intent(OUT)   :: ssa_mask_acx(:,:)  ! [-]
         integer,    intent(OUT)   :: ssa_mask_acy(:,:)  ! [-]
         real(prec), intent(OUT)   :: ssa_err_acx(:,:)
         real(prec), intent(OUT)   :: ssa_err_acy(:,:)
         integer,    intent(OUT)   :: ssa_iter_now 
-        real(prec), intent(INOUT) :: beta(:,:)          ! [Pa a/m]
-        real(prec), intent(INOUT) :: beta_acx(:,:)      ! [Pa a/m]
-        real(prec), intent(INOUT) :: beta_acy(:,:)      ! [Pa a/m]
+        real(prec), intent(INOUT) :: beta(:,:)          ! [Pa yr/m]
+        real(prec), intent(INOUT) :: beta_acx(:,:)      ! [Pa yr/m]
+        real(prec), intent(INOUT) :: beta_acy(:,:)      ! [Pa yr/m]
         real(prec), intent(IN)    :: c_bed(:,:)         ! [Pa]
         real(prec), intent(IN)    :: taud_acx(:,:)      ! [Pa]
         real(prec), intent(IN)    :: taud_acy(:,:)      ! [Pa]
@@ -79,7 +79,7 @@ contains
         real(prec), intent(IN)    :: f_grnd(:,:)        ! [-]
         real(prec), intent(IN)    :: f_grnd_acx(:,:)    ! [-]
         real(prec), intent(IN)    :: f_grnd_acy(:,:)    ! [-]
-        real(prec), intent(IN)    :: ATT(:,:,:)         ! [a^-1 Pa^-n_glen]
+        real(prec), intent(IN)    :: ATT(:,:,:)         ! [yr^-1 Pa^-n_glen]
         real(prec), intent(IN)    :: zeta_aa(:)         ! [-]
         real(prec), intent(IN)    :: z_sl(:,:)          ! [m]
         real(prec), intent(IN)    :: z_bed(:,:)         ! [m]
@@ -87,7 +87,7 @@ contains
         real(prec), intent(IN)    :: dx                 ! [m]
         real(prec), intent(IN)    :: dy                 ! [m]
         real(prec), intent(IN)    :: n_glen 
-        type(ssa_param_class), intent(IN) :: par       ! List of parameters that should be defined
+        type(ssa_param_class), intent(IN) :: par        ! List of parameters that should be defined
 
         ! Local variables 
         integer :: i, j, k, nx, ny, nz_aa, nz_ac, iter
@@ -107,6 +107,8 @@ contains
         real(wp) :: corr_rel 
         real(wp) :: L2_norm 
         real(wp) :: ssa_resid 
+
+        real(wp) :: ssa_visc_scale 
 
         logical, parameter :: write_ssa_diagnostics      = .FALSE. 
         logical, parameter :: write_ssa_diagnostics_stop = .FALSE.   ! Stop simulation after completing iterations?
@@ -188,9 +190,25 @@ contains
             ! Calculate depth-integrated effective viscosity
             ! Note L19 uses eta_bar*H in the ssa equation. Yelmo uses eta_int=eta_bar*H directly.
             call calc_visc_eff_int(visc_eff_int,visc_eff,H_ice,f_ice,zeta_aa,par%boundaries)
-            
+
+if (.FALSE.) then 
+    ! Apply scaling to viscosity to 'help' convergence.
+
+            !ssa_visc_scale = 1.0_wp 
+
             ! Artificially reduce viscosity for low visc values
-            ! call scale_visc_eff_int(visc_eff_int,v0=1e10_wp,fac=0.92_wp)
+            if (ssa_resid .le. 1.0_wp*par%ssa_iter_conv) then 
+                ssa_visc_scale = 1.0_wp 
+            else if (ssa_resid .le. 10.0_wp*par%ssa_iter_conv) then 
+                ssa_visc_scale = 1.0_wp-0.1_wp*(ssa_resid-par%ssa_iter_conv)/(10.0_wp*par%ssa_iter_conv-par%ssa_iter_conv)
+            else 
+                ssa_visc_scale = 1.0_wp-0.1_wp
+            end if 
+
+            write(*,*) "ssa: visc: ", iter, par%ssa_iter_conv, ssa_resid, ssa_visc_scale
+            
+            call scale_visc_eff_int(visc_eff_int,v0=1e10_wp,fac=ssa_visc_scale)
+end if 
 
             ! Calculate beta (at the ice base)
             call calc_beta(beta,c_bed,ux_b,uy_b,H_ice,f_ice,H_grnd,f_grnd,z_bed,z_sl,par%beta_method, &
@@ -216,18 +234,12 @@ end if
 
 if (.TRUE.) then 
 ! ajr: set to False to impose fixed velocity solution (stream-s06 testing)!!
-
-
+            
             ! Call ssa solver
             call calc_vxy_ssa_matrix(ux_b,uy_b,L2_norm,beta_acx,beta_acy,visc_eff_int,  &
                                 ssa_mask_acx,ssa_mask_acy,H_ice,f_ice,taud_acx,taud_acy,H_grnd,z_sl,z_bed, &
                                 z_srf,dx,dy,par%ssa_vel_max,par%boundaries,par%ssa_lateral_bc,par%ssa_lis_opt)
             
-            ! ajr: experimental, broken
-            ! call calc_vxy_ssa_matrix_aa_ac(ux_b,uy_b,L2_norm,beta,visc_eff_int,  &
-            !                     ssa_mask_acx,H_ice,f_ice,taud_acx,taud_acy,H_grnd,z_sl,z_bed, &
-            !                     z_srf,dx,dy,par%ssa_vel_max,par%boundaries,par%ssa_lateral_bc,par%ssa_lis_opt)
-
 
 end if 
 

@@ -28,51 +28,51 @@ contains
     
         implicit none
 
-        real(prec), intent(INOUT) :: vx_m(:,:)            ! [m a^-1] Horizontal velocity x (acx-nodes)
-        real(prec), intent(INOUT) :: vy_m(:,:)            ! [m a^-1] Horizontal velocity y (acy-nodes)
-        real(prec), intent(OUT)   :: L2_norm              ! L2 norm convergence check from solver
-        real(prec), intent(IN)    :: beta_acx(:,:)        ! [Pa a m^-1] Basal friction (acx-nodes)
-        real(prec), intent(IN)    :: beta_acy(:,:)        ! [Pa a m^-1] Basal friction (acy-nodes)
-        real(prec), intent(IN)    :: visc_int_aa(:,:)     ! [Pa a m] Vertically integrated viscosity (aa-nodes)
-        integer,    intent(IN)    :: ssa_mask_acx(:,:)    ! [--] Mask to determine ssa solver actions (acx-nodes)
-        integer,    intent(IN)    :: ssa_mask_acy(:,:)    ! [--] Mask to determine ssa solver actions (acy-nodes)
-        real(prec), intent(IN)    :: H_ice(:,:)           ! [m]  Ice thickness (aa-nodes)
-        real(prec), intent(IN)    :: f_ice(:,:)
-        real(prec), intent(IN)    :: taud_acx(:,:)        ! [Pa] Driving stress (acx nodes)
-        real(prec), intent(IN)    :: taud_acy(:,:)        ! [Pa] Driving stress (acy nodes)
-        real(prec), intent(IN)    :: H_grnd(:,:)  
-        real(prec), intent(IN)    :: z_sl(:,:) 
-        real(prec), intent(IN)    :: z_bed(:,:) 
-        real(prec), intent(IN)    :: z_srf(:,:)
-        real(prec), intent(IN)    :: dx, dy
-        real(prec), intent(IN)    :: ulim 
+        real(wp), intent(INOUT) :: vx_m(:,:)            ! [m a^-1] Horizontal velocity x (acx-nodes)
+        real(wp), intent(INOUT) :: vy_m(:,:)            ! [m a^-1] Horizontal velocity y (acy-nodes)
+        real(wp), intent(OUT)   :: L2_norm              ! L2 norm convergence check from solver
+        real(wp), intent(IN)    :: beta_acx(:,:)        ! [Pa a m^-1] Basal friction (acx-nodes)
+        real(wp), intent(IN)    :: beta_acy(:,:)        ! [Pa a m^-1] Basal friction (acy-nodes)
+        real(wp), intent(IN)    :: visc_int_aa(:,:)     ! [Pa a m] Vertically integrated viscosity (aa-nodes)
+        integer,  intent(IN)    :: ssa_mask_acx(:,:)    ! [--] Mask to determine ssa solver actions (acx-nodes)
+        integer,  intent(IN)    :: ssa_mask_acy(:,:)    ! [--] Mask to determine ssa solver actions (acy-nodes)
+        real(wp), intent(IN)    :: H_ice(:,:)           ! [m]  Ice thickness (aa-nodes)
+        real(wp), intent(IN)    :: f_ice(:,:)
+        real(wp), intent(IN)    :: taud_acx(:,:)        ! [Pa] Driving stress (acx nodes)
+        real(wp), intent(IN)    :: taud_acy(:,:)        ! [Pa] Driving stress (acy nodes)
+        real(wp), intent(IN)    :: H_grnd(:,:)  
+        real(wp), intent(IN)    :: z_sl(:,:) 
+        real(wp), intent(IN)    :: z_bed(:,:) 
+        real(wp), intent(IN)    :: z_srf(:,:)
+        real(wp), intent(IN)    :: dx, dy
+        real(wp), intent(IN)    :: ulim 
         character(len=*), intent(IN) :: boundaries 
         character(len=*), intent(IN) :: lateral_bc
         character(len=*), intent(IN) :: lis_settings
 
         ! Local variables
-        integer    :: nx, ny
-        real(prec) :: dxi, deta
-        integer    :: i, j, k, n, m 
-        integer    :: i1, j1, i00, j00
-        real(prec) :: inv_dxi, inv_deta, inv_dxi_deta, inv_dxi2, inv_deta2
-        real(wp)   :: del_sq, inv_del_sq
+        integer  :: nx, ny
+        real(wp) :: dxi, deta
+        integer  :: i, j, k, n, m 
+        integer  :: i1, j1, i00, j00
+        real(wp) :: inv_dxi, inv_deta, inv_dxi_deta, inv_dxi2, inv_deta2
+        real(wp) :: del_sq, inv_del_sq
 
         real(wp) :: inv_dx, inv_dxdx 
         real(wp) :: inv_dy, inv_dydy 
         real(wp) :: inv_dxdy, inv_2dxdy, inv_4dxdy 
         
-        real(prec) :: H_ice_now, H_ocn_now
+        real(wp) :: H_ice_now, H_ocn_now
         integer    :: IMAX, JMAX 
 
-        integer, allocatable    :: n2i(:), n2j(:)
-        integer, allocatable    :: ij2n(:,:)
-        integer, allocatable    :: maske(:,:)
-        logical, allocatable    :: is_grline_1(:,:) 
-        logical, allocatable    :: is_grline_2(:,:) 
-        logical, allocatable    :: is_front_1(:,:)
-        logical, allocatable    :: is_front_2(:,:)  
-        real(prec), allocatable :: visc_int_ab(:,:)
+        integer,  allocatable :: n2i(:), n2j(:)
+        integer,  allocatable :: ij2n(:,:)
+        integer,  allocatable :: maske(:,:)
+        logical,  allocatable :: is_grline_1(:,:) 
+        logical,  allocatable :: is_grline_2(:,:) 
+        logical,  allocatable :: is_front_1(:,:)
+        logical,  allocatable :: is_front_2(:,:)  
+        real(wp), allocatable :: visc_int_ab(:,:)
 
         ! Boundary conditions counterclockwise unit circle 
         ! 1: x, right-border
@@ -91,7 +91,17 @@ contains
 
         real(wp), parameter :: f_submerged_min = 0.0_wp 
 
+        ! Linear equation storage arrays
+        ! (not using LIS types here for generality)
+        integer,  allocatable :: lgs_a_ptr(:)
+        integer,  allocatable :: lgs_a_index(:)
+        real(wp), allocatable :: lgs_a_value(:)
+        real(wp), allocatable :: lgs_b_value(:)
+        real(wp), allocatable :: lgs_x_value(:)
+
+! =========================================================
 ! Include header for lis solver fortran interface
+! and define all LIS-specific variables
 #include "lisf.h"
         
         LIS_INTEGER :: ierr
@@ -104,8 +114,13 @@ contains
         LIS_SOLVER  :: solver
 
         LIS_INTEGER :: nmax, n_sprs 
-        LIS_INTEGER, allocatable, dimension(:) :: lgs_a_ptr, lgs_a_index
-        LIS_SCALAR,  allocatable, dimension(:) :: lgs_a_value, lgs_b_value, lgs_x_value
+        LIS_INTEGER :: lgs_a_index_now
+        LIS_SCALAR  :: lgs_a_value_now
+        LIS_SCALAR  :: lgs_b_value_now
+        LIS_SCALAR  :: lgs_x_value_now
+        LIS_SCALAR, allocatable :: lgs_x_value_out(:)
+
+! =========================================================
 
         ! ===== Consistency checks ==========================
 
@@ -251,6 +266,7 @@ contains
 
         allocate(lgs_a_value(n_sprs), lgs_a_index(n_sprs), lgs_a_ptr(nmax+1))
         allocate(lgs_b_value(nmax), lgs_x_value(nmax))
+        allocate(lgs_x_value_out(nmax))
 
         lgs_a_value = 0.0
         lgs_a_index = 0
@@ -258,6 +274,7 @@ contains
 
         lgs_b_value = 0.0
         lgs_x_value = 0.0
+        lgs_x_value_out = 0.0
 
         lgs_a_ptr(1) = 1
 
@@ -1312,12 +1329,21 @@ contains
         do nr=1, nmax
 
             do nc=lgs_a_ptr(nr), lgs_a_ptr(nr+1)-1
-                call lis_matrix_set_value(LIS_INS_VALUE, nr, lgs_a_index(nc), &
-                                                        lgs_a_value(nc), lgs_a, ierr)
+
+                ! Use temporary values with LIS data types for use with lis routines
+                lgs_a_index_now = lgs_a_index(nc)
+                lgs_a_value_now = lgs_a_value(nc)
+                
+                call lis_matrix_set_value(LIS_INS_VALUE, nr, lgs_a_index_now, &
+                                                        lgs_a_value_now, lgs_a, ierr)
             end do
 
-            call lis_vector_set_value(LIS_INS_VALUE, nr, lgs_b_value(nr), lgs_b, ierr)
-            call lis_vector_set_value(LIS_INS_VALUE, nr, lgs_x_value(nr), lgs_x, ierr)
+            ! Use temporary values with LIS data types for use with lis routines
+            lgs_b_value_now = lgs_b_value(nr)
+            lgs_x_value_now = lgs_x_value(nr) 
+
+            call lis_vector_set_value(LIS_INS_VALUE, nr, lgs_b_value_now, lgs_b, ierr)
+            call lis_vector_set_value(LIS_INS_VALUE, nr, lgs_x_value_now, lgs_x, ierr)
 
         end do 
 
@@ -1346,10 +1372,15 @@ contains
         L2_norm = real(residual,wp) 
 
         ! Print a summary
-        write(*,*) "calc_vxy_ssa_matrix: [time (s), iter, L2] = ", solver_time, lin_iter, residual
+        write(*,*) "calc_vxy_ssa_matrix: [time (s), iter, L2] = ", solver_time, lin_iter, L2_norm
 
-        lgs_x_value = 0.0_prec
-        call lis_vector_gather(lgs_x, lgs_x_value, ierr)
+        ! lgs_x_value = 0.0_prec
+        ! call lis_vector_gather(lgs_x, lgs_x_value, ierr)
+        ! call CHKERR(ierr)
+
+        lgs_x_value_out = 0.0_prec
+        call lis_vector_gather(lgs_x, lgs_x_value_out, ierr)
+        lgs_x_value = lgs_x_value_out
         call CHKERR(ierr)
 
         call lis_matrix_destroy(lgs_a, ierr)
@@ -1400,19 +1431,19 @@ contains
         
         integer,    intent(OUT) :: ssa_mask_acx(:,:) 
         integer,    intent(OUT) :: ssa_mask_acy(:,:)
-        real(prec), intent(IN)  :: beta_acx(:,:)
-        real(prec), intent(IN)  :: beta_acy(:,:)
-        real(prec), intent(IN)  :: H_ice(:,:)
-        real(prec), intent(IN)  :: f_ice(:,:)
-        real(prec), intent(IN)  :: f_grnd_acx(:,:)
-        real(prec), intent(IN)  :: f_grnd_acy(:,:)
-        real(prec), intent(IN)  :: beta_max
+        real(wp), intent(IN)  :: beta_acx(:,:)
+        real(wp), intent(IN)  :: beta_acy(:,:)
+        real(wp), intent(IN)  :: H_ice(:,:)
+        real(wp), intent(IN)  :: f_ice(:,:)
+        real(wp), intent(IN)  :: f_grnd_acx(:,:)
+        real(wp), intent(IN)  :: f_grnd_acy(:,:)
+        real(wp), intent(IN)  :: beta_max
         logical,    intent(IN)  :: use_ssa       ! SSA is actually active now? 
 
         ! Local variables
         integer    :: i, j, nx, ny
         integer    :: im1, ip1, jm1, jp1
-        real(prec) :: H_acx, H_acy
+        real(wp) :: H_acx, H_acy
         
         nx = size(H_ice,1)
         ny = size(H_ice,2)
@@ -1531,9 +1562,9 @@ contains
 
         integer, intent(INOUT) :: ssa_mask_acx(:,:) 
         integer, intent(INOUT) :: ssa_mask_acy(:,:) 
-        real(prec), intent(IN) :: err_x(:,:) 
-        real(prec), intent(IN) :: err_y(:,:) 
-        real(prec), intent(IN) :: err_lim 
+        real(wp), intent(IN) :: err_x(:,:) 
+        real(wp), intent(IN) :: err_y(:,:) 
+        real(wp), intent(IN) :: err_lim 
 
         ! Local variables 
         integer :: i, j, nx, ny 
@@ -1581,10 +1612,10 @@ contains
 
         implicit none 
 
-        real(prec), intent(OUT) :: visc_ab(:,:) 
-        real(prec), intent(IN)  :: visc(:,:) 
-        real(prec), intent(IN)  :: H_ice(:,:) 
-        real(prec), intent(IN)  :: f_ice(:,:) 
+        real(wp), intent(OUT) :: visc_ab(:,:) 
+        real(wp), intent(IN)  :: visc(:,:) 
+        real(wp), intent(IN)  :: H_ice(:,:) 
+        real(wp), intent(IN)  :: f_ice(:,:) 
 
         ! Local variables 
         integer :: i, j, k
@@ -1657,12 +1688,12 @@ contains
         logical,    intent(OUT) :: front2(:,:)  
         logical,    intent(OUT) :: gl1(:,:)
         logical,    intent(OUT) :: gl2(:,:) 
-        real(prec), intent(IN)  :: H_ice(:,:)
-        real(prec), intent(IN)  :: f_ice(:,:)
-        real(prec), intent(IN)  :: H_grnd(:,:)
-        real(prec), intent(IN)  :: z_srf(:,:)
-        real(prec), intent(IN)  :: z_bed(:,:)
-        real(prec), intent(IN)  :: z_sl(:,:)
+        real(wp), intent(IN)  :: H_ice(:,:)
+        real(wp), intent(IN)  :: f_ice(:,:)
+        real(wp), intent(IN)  :: H_grnd(:,:)
+        real(wp), intent(IN)  :: z_srf(:,:)
+        real(wp), intent(IN)  :: z_bed(:,:)
+        real(wp), intent(IN)  :: z_sl(:,:)
         character(len=*), intent(IN) :: apply_lateral_bc 
 
         ! Local variables

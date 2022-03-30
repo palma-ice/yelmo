@@ -101,7 +101,7 @@ contains
 
     end subroutine linear_solver_init
 
-    subroutine linear_solver_matrix_ssa_ac_csr_2D(lgs,vx_m,vy_m,beta_acx,beta_acy, &
+    subroutine linear_solver_matrix_ssa_ac_csr_2D(lgs,ux,uy,beta_acx,beta_acy, &
                             visc_int_aa,ssa_mask_acx,ssa_mask_acy,H_ice,f_ice,taud_acx, &
                             taud_acy,H_grnd,z_sl,z_bed,z_srf,dx,dy,boundaries,lateral_bc)
         ! Define sparse matrices A*x=b in format 'compressed sparse row' (csr)
@@ -112,8 +112,8 @@ contains
         implicit none 
 
         type(linear_solver_class), intent(INOUT) :: lgs
-        real(wp), intent(IN) :: vx_m(:,:)               ! [m yr^-1] Horizontal velocity x (acx-nodes)
-        real(wp), intent(IN) :: vy_m(:,:)               ! [m yr^-1] Horizontal velocity y (acy-nodes)
+        real(wp), intent(IN) :: ux(:,:)                 ! [m yr^-1] Horizontal velocity x (acx-nodes)
+        real(wp), intent(IN) :: uy(:,:)                 ! [m yr^-1] Horizontal velocity y (acy-nodes)
         real(wp), intent(IN) :: beta_acx(:,:)           ! [Pa yr m^-1] Basal friction (acx-nodes)
         real(wp), intent(IN) :: beta_acy(:,:)           ! [Pa yr m^-1] Basal friction (acy-nodes)
         real(wp), intent(IN) :: visc_int_aa(:,:)        ! [Pa yr m] Vertically integrated viscosity (aa-nodes)
@@ -302,7 +302,7 @@ contains
             i = lgs%n2i((n+1)/2)
             j = lgs%n2j((n+1)/2)
 
-            !  ------ Equations for vx_m (at (i+1/2,j))
+            !  ------ Equations for ux (at (i+1/2,j))
 
             nr = n   ! row counter
 
@@ -317,8 +317,8 @@ contains
                 lgs%a_value(k)  = 1.0   ! diagonal element only
                 lgs%a_index(k)  = nr
 
-                lgs%b_value(nr) = vx_m(i,j)
-                lgs%x_value(nr) = vx_m(i,j)
+                lgs%b_value(nr) = ux(i,j)
+                lgs%x_value(nr) = ux(i,j)
            
             else if (i .eq. 1) then 
                 ! Left boundary 
@@ -339,34 +339,34 @@ contains
                         ! Infinite boundary condition, take 
                         ! value from one point inward
 
-                        nc = 2*lgs%ij2n(i,j)-1          ! column counter for vx_m(i,j)
+                        nc = 2*lgs%ij2n(i,j)-1          ! column counter for ux(i,j)
                         k = k+1
                         lgs%a_value(k) =  1.0_wp
                         lgs%a_index(k) = nc
 
-                        nc = 2*lgs%ij2n(i+1,j)-1        ! column counter for vx_m(i+1,j)
+                        nc = 2*lgs%ij2n(i+1,j)-1        ! column counter for ux(i+1,j)
                         k = k+1
                         lgs%a_value(k) = -1.0_wp
                         lgs%a_index(k) = nc
 
                         lgs%b_value(nr) = 0.0_wp
-                        lgs%x_value(nr) = vx_m(i,j)
+                        lgs%x_value(nr) = ux(i,j)
 
                     case("periodic")
                         ! Periodic boundary, take velocity from the right boundary
                         
-                        nc = 2*lgs%ij2n(i,j)-1          ! column counter for vx_m(i,j)
+                        nc = 2*lgs%ij2n(i,j)-1          ! column counter for ux(i,j)
                         k = k+1
                         lgs%a_value(k) =  1.0_wp
                         lgs%a_index(k) = nc
 
-                        nc = 2*lgs%ij2n(nx-2,j)-1        ! column counter for vx_m(nx-2,j)
+                        nc = 2*lgs%ij2n(nx-2,j)-1        ! column counter for ux(nx-2,j)
                         k = k+1
                         lgs%a_value(k) = -1.0_wp
                         lgs%a_index(k) = nc
 
                         lgs%b_value(nr) = 0.0_wp
-                        lgs%x_value(nr) = vx_m(i,j)
+                        lgs%x_value(nr) = ux(i,j)
 
                     case DEFAULT 
 
@@ -396,36 +396,36 @@ contains
                         ! Infinite boundary condition, take 
                         ! value from two points inward (one point inward will also be prescribed)
 
-                        nc = 2*lgs%ij2n(i,j)-1          ! column counter for vx_m(i,j)
+                        nc = 2*lgs%ij2n(i,j)-1          ! column counter for ux(i,j)
                         k = k+1
                         lgs%a_value(k) =  1.0_wp
                         lgs%a_index(k) = nc
 
-                        nc = 2*lgs%ij2n(nx-2,j)-1       ! column counter for vx_m(nx-2,j)
+                        nc = 2*lgs%ij2n(nx-2,j)-1       ! column counter for ux(nx-2,j)
                         k = k+1
                         lgs%a_value(k) = -1.0_wp
                         lgs%a_index(k) = nc
 
                         lgs%b_value(nr) = 0.0_wp
-                        lgs%x_value(nr) = vx_m(i,j)
+                        lgs%x_value(nr) = ux(i,j)
 
                     case("periodic")
                         ! Periodic boundary condition, take velocity from one point
                         ! interior to the left-border, as nx-1 will be set to value
                         ! at the left-border 
 
-                        nc = 2*lgs%ij2n(i,j)-1          ! column counter for vx_m(i,j)
+                        nc = 2*lgs%ij2n(i,j)-1          ! column counter for ux(i,j)
                         k = k+1
                         lgs%a_value(k) =  1.0_wp
                         lgs%a_index(k) = nc
 
-                        nc = 2*lgs%ij2n(3,j)-1          ! column counter for vx_m(3,j)
+                        nc = 2*lgs%ij2n(3,j)-1          ! column counter for ux(3,j)
                         k = k+1
                         lgs%a_value(k) = -1.0_wp
                         lgs%a_index(k) = nc
 
                         lgs%b_value(nr) = 0.0_wp
-                        lgs%x_value(nr) = vx_m(i,j)
+                        lgs%x_value(nr) = ux(i,j)
 
                     case DEFAULT 
 
@@ -445,18 +445,18 @@ contains
                 ! interior to the left-border, as nx-1 will be set to value
                 ! at the left-border 
 
-                nc = 2*lgs%ij2n(i,j)-1          ! column counter for vx_m(i,j)
+                nc = 2*lgs%ij2n(i,j)-1          ! column counter for ux(i,j)
                 k = k+1
                 lgs%a_value(k) =  1.0_wp
                 lgs%a_index(k) = nc
 
-                nc = 2*lgs%ij2n(nx-2,j)-1       ! column counter for vx_m(nx-2,j)
+                nc = 2*lgs%ij2n(nx-2,j)-1       ! column counter for ux(nx-2,j)
                 k = k+1
                 lgs%a_value(k) = -1.0_wp
                 lgs%a_index(k) = nc
 
                 lgs%b_value(nr) = 0.0_wp
-                lgs%x_value(nr) = vx_m(i,j)
+                lgs%x_value(nr) = ux(i,j)
 
             else if (i .eq. nx-1 .and. trim(boundaries_vx(1)) .eq. "periodic") then 
                 ! Right boundary, staggered one point further inward 
@@ -467,18 +467,18 @@ contains
                 ! interior to the left-border, as nx-1 will be set to value
                 ! at the left-border 
 
-                nc = 2*lgs%ij2n(i,j)-1          ! column counter for vx_m(i,j)
+                nc = 2*lgs%ij2n(i,j)-1          ! column counter for ux(i,j)
                 k = k+1
                 lgs%a_value(k) =  1.0_wp
                 lgs%a_index(k) = nc
 
-                nc = 2*lgs%ij2n(2,j)-1          ! column counter for vx_m(2,j)
+                nc = 2*lgs%ij2n(2,j)-1          ! column counter for ux(2,j)
                 k = k+1
                 lgs%a_value(k) = -1.0_wp
                 lgs%a_index(k) = nc
 
                 lgs%b_value(nr) = 0.0_wp
-                lgs%x_value(nr) = vx_m(i,j)
+                lgs%x_value(nr) = ux(i,j)
 
             else if (j .eq. 1) then 
                 ! Lower boundary 
@@ -499,34 +499,34 @@ contains
                         ! Infinite boundary condition, take 
                         ! value from one point inward
 
-                        nc = 2*lgs%ij2n(i,j)-1          ! column counter for vx_m(i,j)
+                        nc = 2*lgs%ij2n(i,j)-1          ! column counter for ux(i,j)
                         k = k+1
                         lgs%a_value(k) =  1.0_wp
                         lgs%a_index(k) = nc
 
-                        nc = 2*lgs%ij2n(i,j+1)-1        ! column counter for vx_m(i,j+1)
+                        nc = 2*lgs%ij2n(i,j+1)-1        ! column counter for ux(i,j+1)
                         k = k+1
                         lgs%a_value(k) = -1.0_wp
                         lgs%a_index(k) = nc
 
                         lgs%b_value(nr) = 0.0_wp
-                        lgs%x_value(nr) = vx_m(i,j)
+                        lgs%x_value(nr) = ux(i,j)
 
                     case("periodic")
                         ! Periodic boundary, take velocity from the upper boundary
                         
-                        nc = 2*lgs%ij2n(i,j)-1          ! column counter for vx_m(i,j)
+                        nc = 2*lgs%ij2n(i,j)-1          ! column counter for ux(i,j)
                         k = k+1
                         lgs%a_value(k) =  1.0_wp
                         lgs%a_index(k) = nc
 
-                        nc = 2*lgs%ij2n(i,ny-1)-1        ! column counter for vx_m(i,ny-1)
+                        nc = 2*lgs%ij2n(i,ny-1)-1        ! column counter for ux(i,ny-1)
                         k = k+1
                         lgs%a_value(k) = -1.0_wp
                         lgs%a_index(k) = nc
 
                         lgs%b_value(nr) = 0.0_wp
-                        lgs%x_value(nr) = vx_m(i,j)
+                        lgs%x_value(nr) = ux(i,j)
 
                     case DEFAULT 
 
@@ -556,34 +556,34 @@ contains
                         ! Infinite boundary condition, take 
                         ! value from one point inward
 
-                        nc = 2*lgs%ij2n(i,j)-1          ! column counter for vx_m(i,j)
+                        nc = 2*lgs%ij2n(i,j)-1          ! column counter for ux(i,j)
                         k = k+1
                         lgs%a_value(k) =  1.0_wp
                         lgs%a_index(k) = nc
 
-                        nc = 2*lgs%ij2n(i,j-1)-1        ! column counter for vx_m(i,j-1)
+                        nc = 2*lgs%ij2n(i,j-1)-1        ! column counter for ux(i,j-1)
                         k = k+1
                         lgs%a_value(k) = -1.0_wp
                         lgs%a_index(k) = nc
 
                         lgs%b_value(nr) = 0.0_wp
-                        lgs%x_value(nr) = vx_m(i,j)
+                        lgs%x_value(nr) = ux(i,j)
 
                     case("periodic")
                         ! Periodic boundary, take velocity from the lower boundary
                         
-                        nc = 2*lgs%ij2n(i,j)-1          ! column counter for vx_m(i,j)
+                        nc = 2*lgs%ij2n(i,j)-1          ! column counter for ux(i,j)
                         k = k+1
                         lgs%a_value(k) =  1.0_wp
                         lgs%a_index(k) = nc
 
-                        nc = 2*lgs%ij2n(i,2)-1          ! column counter for vx_m(i,2)
+                        nc = 2*lgs%ij2n(i,2)-1          ! column counter for ux(i,2)
                         k = k+1
                         lgs%a_value(k) = -1.0_wp
                         lgs%a_index(k) = nc
 
                         lgs%b_value(nr) = 0.0_wp
-                        lgs%x_value(nr) = vx_m(i,j)
+                        lgs%x_value(nr) = ux(i,j)
 
                     case DEFAULT 
 
@@ -640,34 +640,34 @@ contains
                             !visc_int_aa_now = 0.5_wp*(visc_int_aa(i,j)+visc_int_aa(i-1,j))
 
                             nc = 2*lgs%ij2n(i-1,j)-1
-                                ! smallest nc (column counter), for vx_m(i-1,j)
+                                ! smallest nc (column counter), for ux(i-1,j)
                             k = k+1
                             lgs%a_value(k) = -4.0_prec*inv_dxi*visc_int_aa_now
                             lgs%a_index(k) = nc 
 
                             nc = 2*lgs%ij2n(i,j-1)
-                                ! next nc (column counter), for vy_m(i,j-1)
+                                ! next nc (column counter), for uy(i,j-1)
                             k = k+1
                             lgs%a_value(k) = -2.0_prec*inv_deta*visc_int_aa_now
                             lgs%a_index(k) = nc
 
                             nc = 2*lgs%ij2n(i,j)-1
-                                ! next nc (column counter), for vx_m(i,j)
+                                ! next nc (column counter), for ux(i,j)
                             k = k+1
                             lgs%a_value(k) = 4.0_prec*inv_dxi*visc_int_aa_now
                             lgs%a_index(k) = nc
 
                             nc = 2*lgs%ij2n(i,j)
-                                ! next nc (column counter), for vy_m(i,j)
+                                ! next nc (column counter), for uy(i,j)
                             k = k+1
                             lgs%a_value(k) = 2.0_prec*inv_deta*visc_int_aa_now
                             lgs%a_index(k) = nc
 
                             ! Assign matrix values
                             lgs%b_value(nr) = tau_bc_int
-                            lgs%x_value(nr) = vx_m(i,j)
+                            lgs%x_value(nr) = ux(i,j)
                             
-                            !write(*,*) "ssabc", i, j, f_submerged, H_ocn_now, H_ice_now, vx_m(i,j), vx_m(i-1,j)
+                            !write(*,*) "ssabc", i, j, f_submerged, H_ocn_now, H_ice_now, ux(i,j), ux(i-1,j)
                             
                         else 
                             ! Case 2: ice-free to the left
@@ -676,32 +676,32 @@ contains
                             visc_int_aa_now = 0.5_wp*(visc_int_aa(i,j)+visc_int_aa(i+1,j))
 
                             nc = 2*lgs%ij2n(i,j)-1
-                                ! next nc (column counter), for vx_m(i,j)
+                                ! next nc (column counter), for ux(i,j)
                             k = k+1
                             lgs%a_value(k) = -4.0_prec*inv_dxi*visc_int_aa_now
                             lgs%a_index(k) = nc
 
                             nc = 2*lgs%ij2n(i+1,j-1)
-                                ! next nc (column counter), for vy_m(i+1,j-1)
+                                ! next nc (column counter), for uy(i+1,j-1)
                             k  = k+1
                             lgs%a_value(k) = -2.0_prec*inv_deta*visc_int_aa_now
                             lgs%a_index(k) = nc
 
                             nc = 2*lgs%ij2n(i+1,j)-1
-                                ! next nc (column counter), for vx_m(i+1,j)
+                                ! next nc (column counter), for ux(i+1,j)
                             k = k+1
                             lgs%a_value(k) = 4.0_prec*inv_dxi*visc_int_aa_now
                             lgs%a_index(k) = nc
  
                             nc = 2*lgs%ij2n(i+1,j)
-                                ! largest nc (column counter), for vy_m(i+1,j)
+                                ! largest nc (column counter), for uy(i+1,j)
                             k  = k+1
                             lgs%a_value(k) = 2.0_prec*inv_deta*visc_int_aa_now
                             lgs%a_index(k) = nc
 
                             ! Assign matrix values
                             lgs%b_value(nr) = tau_bc_int
-                            lgs%x_value(nr) = vx_m(i,j)
+                            lgs%x_value(nr) = ux(i,j)
                         
                         end if 
 
@@ -746,7 +746,7 @@ contains
 
                 ! -- vx terms -- 
 
-                nc = 2*lgs%ij2n(i,j)-1          ! column counter for vx_m(i,j)
+                nc = 2*lgs%ij2n(i,j)-1          ! column counter for ux(i,j)
                 k = k+1
                 lgs%a_value(k) = -4.0_wp*visc_int_aa(i+1,j) &
                                  -4.0_wp*visc_int_aa(i,j) &
@@ -755,47 +755,47 @@ contains
                                  -del_sq*beta_acx(i,j)
                 lgs%a_index(k) = nc
 
-                nc = 2*lgs%ij2n(i+1,j)-1        ! column counter for vx_m(i+1,j)
+                nc = 2*lgs%ij2n(i+1,j)-1        ! column counter for ux(i+1,j)
                 k = k+1
                 lgs%a_value(k) =  4.0_wp*visc_int_aa(i+1,j)
                 lgs%a_index(k) = nc
 
-                nc = 2*lgs%ij2n(i-1,j)-1        ! column counter for vx_m(i-1,j)
+                nc = 2*lgs%ij2n(i-1,j)-1        ! column counter for ux(i-1,j)
                 k = k+1
                 lgs%a_value(k) =  4.0_wp*visc_int_aa(i,j)
                 lgs%a_index(k) = nc
 
-                nc = 2*lgs%ij2n(i,j+1)-1        ! column counter for vx_m(i,j+1)
+                nc = 2*lgs%ij2n(i,j+1)-1        ! column counter for ux(i,j+1)
                 k = k+1
                 lgs%a_value(k) =  1.0_wp*visc_int_ab(i,j)
                 lgs%a_index(k) = nc
 
-                nc = 2*lgs%ij2n(i,j-1)-1        ! column counter for vx_m(i,j-1)
+                nc = 2*lgs%ij2n(i,j-1)-1        ! column counter for ux(i,j-1)
                 k = k+1
                 lgs%a_value(k) =  1.0_wp*visc_int_ab(i,j-1)
                 lgs%a_index(k) = nc
 
                 ! -- vy terms -- 
                 
-                nc = 2*lgs%ij2n(i,j)            ! column counter for vy_m(i,j)
+                nc = 2*lgs%ij2n(i,j)            ! column counter for uy(i,j)
                 k = k+1
                 lgs%a_value(k) = -2.0_wp*visc_int_aa(i,j)     &
                                  -1.0_wp*visc_int_ab(i,j)
                 lgs%a_index(k) = nc
 
-                nc = 2*lgs%ij2n(i+1,j)          ! column counter for vy_m(i+1,j)
+                nc = 2*lgs%ij2n(i+1,j)          ! column counter for uy(i+1,j)
                 k = k+1
                 lgs%a_value(k) =  2.0_wp*visc_int_aa(i+1,j)   &
                                  +1.0_wp*visc_int_ab(i,j)
                 lgs%a_index(k) = nc
                 
-                nc = 2*lgs%ij2n(i+1,j-1)        ! column counter for vy_m(i+1,j-1)
+                nc = 2*lgs%ij2n(i+1,j-1)        ! column counter for uy(i+1,j-1)
                 k = k+1
                 lgs%a_value(k) = -2.0_wp*visc_int_aa(i+1,j)   &
                                  -1.0_wp*visc_int_ab(i,j-1)
                 lgs%a_index(k) = nc
                 
-                nc = 2*lgs%ij2n(i,j-1)          ! column counter for vy_m(i,j-1)
+                nc = 2*lgs%ij2n(i,j-1)          ! column counter for uy(i,j-1)
                 k = k+1
                 lgs%a_value(k) =  2.0_wp*visc_int_aa(i,j)   &
                                  +1.0_wp*visc_int_ab(i,j-1)
@@ -803,13 +803,13 @@ contains
                 
 
                 lgs%b_value(nr) = del_sq*taud_acx(i,j)
-                lgs%x_value(nr) = vx_m(i,j)
+                lgs%x_value(nr) = ux(i,j)
 
             end if
 
             lgs%a_ptr(nr+1) = k+1   ! row is completed, store index to next row
 
-            !  ------ Equations for vy_m (at (i,j+1/2))
+            !  ------ Equations for uy (at (i,j+1/2))
 
             nr = n+1   ! row counter
 
@@ -823,8 +823,8 @@ contains
                 lgs%a_value(k)  = 1.0   ! diagonal element only
                 lgs%a_index(k)  = nr
 
-                lgs%b_value(nr) = vy_m(i,j)
-                lgs%x_value(nr) = vy_m(i,j)
+                lgs%b_value(nr) = uy(i,j)
+                lgs%x_value(nr) = uy(i,j)
            
             
             else if (j .eq. 1) then 
@@ -845,34 +845,34 @@ contains
                     case("infinite")
                         ! Infinite boundary, take velocity from one point inward
                         
-                        nc = 2*lgs%ij2n(i,j)            ! column counter for vy_m(i,j)
+                        nc = 2*lgs%ij2n(i,j)            ! column counter for uy(i,j)
                         k = k+1
                         lgs%a_value(k) =  1.0_wp
                         lgs%a_index(k) = nc
 
-                        nc = 2*lgs%ij2n(i,2)            ! column counter for vy_m(i,2)
+                        nc = 2*lgs%ij2n(i,2)            ! column counter for uy(i,2)
                         k = k+1
                         lgs%a_value(k) = -1.0_wp
                         lgs%a_index(k) = nc
 
                         lgs%b_value(nr) = 0.0_wp
-                        lgs%x_value(nr) = vy_m(i,j)
+                        lgs%x_value(nr) = uy(i,j)
 
                     case("periodic")
                         ! Periodic boundary, take velocity from the opposite boundary
                         
-                        nc = 2*lgs%ij2n(i,j)            ! column counter for vy_m(i,j)
+                        nc = 2*lgs%ij2n(i,j)            ! column counter for uy(i,j)
                         k = k+1
                         lgs%a_value(k) =  1.0_wp
                         lgs%a_index(k) = nc
 
-                        nc = 2*lgs%ij2n(i,ny-2)         ! column counter for vy_m(i,ny-2)
+                        nc = 2*lgs%ij2n(i,ny-2)         ! column counter for uy(i,ny-2)
                         k = k+1
                         lgs%a_value(k) = -1.0_wp
                         lgs%a_index(k) = nc
 
                         lgs%b_value(nr) = 0.0_wp
-                        lgs%x_value(nr) = vy_m(i,j)
+                        lgs%x_value(nr) = uy(i,j)
 
                     case DEFAULT 
 
@@ -902,34 +902,34 @@ contains
                         ! Infinite boundary, take velocity from two points inward
                         ! (to account for staggering)
 
-                        nc = 2*lgs%ij2n(i,j)            ! column counter for vy_m(i,j)
+                        nc = 2*lgs%ij2n(i,j)            ! column counter for uy(i,j)
                         k = k+1
                         lgs%a_value(k) =  1.0_wp
                         lgs%a_index(k) = nc
 
-                        nc = 2*lgs%ij2n(i,ny-2)          ! column counter for vy_m(i,ny-2)
+                        nc = 2*lgs%ij2n(i,ny-2)          ! column counter for uy(i,ny-2)
                         k = k+1
                         lgs%a_value(k) = -1.0_wp
                         lgs%a_index(k) = nc
 
                         lgs%b_value(nr) = 0.0_wp
-                        lgs%x_value(nr) = vy_m(i,j)
+                        lgs%x_value(nr) = uy(i,j)
 
                     case("periodic")
                         ! Periodic boundary, take velocity from the right boundary
                         
-                        nc = 2*lgs%ij2n(i,j)            ! column counter for vy_m(i,j)
+                        nc = 2*lgs%ij2n(i,j)            ! column counter for uy(i,j)
                         k = k+1
                         lgs%a_value(k) =  1.0_wp
                         lgs%a_index(k) = nc
 
-                        nc = 2*lgs%ij2n(i,3)            ! column counter for vy_m(i,3)
+                        nc = 2*lgs%ij2n(i,3)            ! column counter for uy(i,3)
                         k = k+1
                         lgs%a_value(k) = -1.0_wp
                         lgs%a_index(k) = nc
 
                         lgs%b_value(nr) = 0.0_wp
-                        lgs%x_value(nr) = vy_m(i,j)
+                        lgs%x_value(nr) = uy(i,j)
 
                     case DEFAULT 
 
@@ -947,18 +947,18 @@ contains
                 
                 ! Periodic boundary, take velocity from the lower boundary
 
-                nc = 2*lgs%ij2n(i,j)            ! column counter for vy_m(i,j)
+                nc = 2*lgs%ij2n(i,j)            ! column counter for uy(i,j)
                 k = k+1
                 lgs%a_value(k) =  1.0_wp
                 lgs%a_index(k) = nc
 
-                nc = 2*lgs%ij2n(i,ny-2)         ! column counter for vy_m(i,ny-2)
+                nc = 2*lgs%ij2n(i,ny-2)         ! column counter for uy(i,ny-2)
                 k = k+1
                 lgs%a_value(k) = -1.0_wp
                 lgs%a_index(k) = nc
 
                 lgs%b_value(nr) = 0.0_wp
-                lgs%x_value(nr) = vy_m(i,j)
+                lgs%x_value(nr) = uy(i,j)
 
             else if (j .eq. ny-1 .and. trim(boundaries_vy(2)) .eq. "periodic") then
                 ! Upper boundary, inward by one point
@@ -967,18 +967,18 @@ contains
                 
                 ! Periodic boundary, take velocity from the lower boundary
                 
-                nc = 2*lgs%ij2n(i,j)            ! column counter for vy_m(i,j)
+                nc = 2*lgs%ij2n(i,j)            ! column counter for uy(i,j)
                 k = k+1
                 lgs%a_value(k) =  1.0_wp
                 lgs%a_index(k) = nc
 
-                nc = 2*lgs%ij2n(i,2)            ! column counter for vy_m(i,2)
+                nc = 2*lgs%ij2n(i,2)            ! column counter for uy(i,2)
                 k = k+1
                 lgs%a_value(k) = -1.0_wp
                 lgs%a_index(k) = nc
 
                 lgs%b_value(nr) = 0.0_wp
-                lgs%x_value(nr) = vy_m(i,j)
+                lgs%x_value(nr) = uy(i,j)
   
             else if (i .eq. 1) then 
                 ! Left boundary 
@@ -998,34 +998,34 @@ contains
                     case("infinite")
                         ! Infinite boundary, take velocity from one point inward
 
-                        nc = 2*lgs%ij2n(i,j)            ! column counter for vy_m(i,j)
+                        nc = 2*lgs%ij2n(i,j)            ! column counter for uy(i,j)
                         k = k+1
                         lgs%a_value(k) =  1.0_wp
                         lgs%a_index(k) = nc
 
-                        nc = 2*lgs%ij2n(2,j)            ! column counter for vy_m(2,j)
+                        nc = 2*lgs%ij2n(2,j)            ! column counter for uy(2,j)
                         k = k+1
                         lgs%a_value(k) = -1.0_wp
                         lgs%a_index(k) = nc
 
                         lgs%b_value(nr) = 0.0_wp
-                        lgs%x_value(nr) = vy_m(i,j)
+                        lgs%x_value(nr) = uy(i,j)
 
                     case("periodic")
                         ! Periodic boundary, take velocity from the right boundary
                         
-                        nc = 2*lgs%ij2n(i,j)            ! column counter for vy_m(i,j)
+                        nc = 2*lgs%ij2n(i,j)            ! column counter for uy(i,j)
                         k = k+1
                         lgs%a_value(k) =  1.0_wp
                         lgs%a_index(k) = nc
 
-                        nc = 2*lgs%ij2n(nx-1,j)         ! column counter for vy_m(nx-1,j)
+                        nc = 2*lgs%ij2n(nx-1,j)         ! column counter for uy(nx-1,j)
                         k = k+1
                         lgs%a_value(k) = -1.0_wp
                         lgs%a_index(k) = nc
 
                         lgs%b_value(nr) = 0.0_wp
-                        lgs%x_value(nr) = vy_m(i,j)
+                        lgs%x_value(nr) = uy(i,j)
 
                     case DEFAULT 
 
@@ -1054,34 +1054,34 @@ contains
                     case("infinite")
                         ! Infinite boundary, take velocity from one point inward
 
-                        nc = 2*lgs%ij2n(i,j)            ! column counter for vy_m(i,j)
+                        nc = 2*lgs%ij2n(i,j)            ! column counter for uy(i,j)
                         k = k+1
                         lgs%a_value(k) =  1.0_wp
                         lgs%a_index(k) = nc
 
-                        nc = 2*lgs%ij2n(nx-1,j)         ! column counter for vy_m(nx-1,j)
+                        nc = 2*lgs%ij2n(nx-1,j)         ! column counter for uy(nx-1,j)
                         k = k+1
                         lgs%a_value(k) = -1.0_wp
                         lgs%a_index(k) = nc
 
                         lgs%b_value(nr) = 0.0_wp
-                        lgs%x_value(nr) = vy_m(i,j)
+                        lgs%x_value(nr) = uy(i,j)
 
                     case("periodic")
                         ! Periodic boundary, take velocity from the right boundary
                         
-                        nc = 2*lgs%ij2n(i,j)            ! column counter for vy_m(i,j)
+                        nc = 2*lgs%ij2n(i,j)            ! column counter for uy(i,j)
                         k = k+1
                         lgs%a_value(k) =  1.0_wp
                         lgs%a_index(k) = nc
 
-                        nc = 2*lgs%ij2n(2,j)            ! column counter for vy_m(2,j)
+                        nc = 2*lgs%ij2n(2,j)            ! column counter for uy(2,j)
                         k = k+1
                         lgs%a_value(k) = -1.0_wp
                         lgs%a_index(k) = nc
 
                         lgs%b_value(nr) = 0.0_wp
-                        lgs%x_value(nr) = vy_m(i,j)
+                        lgs%x_value(nr) = uy(i,j)
 
                     case DEFAULT 
 
@@ -1138,32 +1138,32 @@ contains
                             !visc_int_aa_now = 0.5_wp*(visc_int_aa(i,j)+visc_int_aa(i,j-1))
 
                             nc = 2*lgs%ij2n(i-1,j)-1
-                                ! smallest nc (column counter), for vx_m(i-1,j)
+                                ! smallest nc (column counter), for ux(i-1,j)
                             k = k+1
                             lgs%a_value(k) = -2.0_prec*inv_dxi*visc_int_aa_now
                             lgs%a_index(k) = nc
 
                             nc = 2*lgs%ij2n(i,j-1)
-                                ! next nc (column counter), for vy_m(i,j-1)
+                                ! next nc (column counter), for uy(i,j-1)
                             k = k+1
                             lgs%a_value(k) = -4.0_prec*inv_deta*visc_int_aa_now
                             lgs%a_index(k) = nc
 
                             nc = 2*lgs%ij2n(i,j)-1
-                                ! next nc (column counter), for vx_m(i,j)
+                                ! next nc (column counter), for ux(i,j)
                             k = k+1
                             lgs%a_value(k) = 2.0_prec*inv_dxi*visc_int_aa_now
                             lgs%a_index(k) = nc
 
                             nc = 2*lgs%ij2n(i,j)
-                                ! next nc (column counter), for vy_m(i,j)
+                                ! next nc (column counter), for uy(i,j)
                             k = k+1
                             lgs%a_value(k) = 4.0_prec*inv_deta*visc_int_aa_now
                             lgs%a_index(k) = nc
 
                             ! Assign matrix values
                             lgs%b_value(nr) = tau_bc_int
-                            lgs%x_value(nr) = vy_m(i,j)
+                            lgs%x_value(nr) = uy(i,j)
                             
                         else
                             ! === Case 2: ice-free to the bottom ===
@@ -1172,32 +1172,32 @@ contains
                             !visc_int_aa_now = 0.5_wp*(visc_int_aa(i,j)+visc_int_aa(i,j+1))
 
                             nc = 2*lgs%ij2n(i-1,j+1)-1
-                                ! next nc (column counter), for vx_m(i-1,j+1)
+                                ! next nc (column counter), for ux(i-1,j+1)
                             k = k+1
                             lgs%a_value(k) = -2.0_prec*inv_dxi*visc_int_aa_now
                             lgs%a_index(k) = nc
  
                             nc = 2*lgs%ij2n(i,j)
-                                ! next nc (column counter), for vy_m(i,j)
+                                ! next nc (column counter), for uy(i,j)
                             k = k+1
                             lgs%a_value(k) = -4.0_prec*inv_deta*visc_int_aa_now
                             lgs%a_index(k) = nc
  
                             nc = 2*lgs%ij2n(i,j+1)-1
-                                ! next nc (column counter), for vx_m(i,j+1)
+                                ! next nc (column counter), for ux(i,j+1)
                             k = k+1
                             lgs%a_value(k) = 2.0_prec*inv_dxi*visc_int_aa_now
                             lgs%a_index(k) = nc
  
                             nc = 2*lgs%ij2n(i,j+1)
-                                ! next nc (column counter), for vy_m(i,j+1)
+                                ! next nc (column counter), for uy(i,j+1)
                             k = k+1
                             lgs%a_value(k) = 4.0_prec*inv_deta*visc_int_aa_now
                             lgs%a_index(k) = nc
 
                             ! Assign matrix values
                             lgs%b_value(nr) = tau_bc_int
-                            lgs%x_value(nr) = vy_m(i,j)
+                            lgs%x_value(nr) = uy(i,j)
                  
                         end if 
 
@@ -1242,7 +1242,7 @@ contains
 
                 ! -- vy terms -- 
 
-                nc = 2*lgs%ij2n(i,j)        ! column counter for vy_m(i,j)
+                nc = 2*lgs%ij2n(i,j)        ! column counter for uy(i,j)
                 k = k+1
                 lgs%a_value(k) = -4.0_wp*visc_int_aa(i,j+1)   &
                                  -4.0_wp*visc_int_aa(i,j)     &
@@ -1251,54 +1251,54 @@ contains
                                  -del_sq*beta_acy(i,j)
                 lgs%a_index(k) = nc
 
-                nc = 2*lgs%ij2n(i,j+1)      ! column counter for vy_m(i,j+1)
+                nc = 2*lgs%ij2n(i,j+1)      ! column counter for uy(i,j+1)
                 k = k+1
                 lgs%a_value(k) =  4.0_wp*visc_int_aa(i,j+1)
                 lgs%a_index(k) = nc
 
-                nc = 2*lgs%ij2n(i,j-1)      ! column counter for vy_m(i,j-1)
+                nc = 2*lgs%ij2n(i,j-1)      ! column counter for uy(i,j-1)
                 k = k+1
                 lgs%a_value(k) =  4.0_wp*visc_int_aa(i,j)
                 lgs%a_index(k) = nc
                 
-                nc = 2*lgs%ij2n(i+1,j)      ! column counter for vy_m(i+1,j)
+                nc = 2*lgs%ij2n(i+1,j)      ! column counter for uy(i+1,j)
                 k = k+1
                 lgs%a_value(k) =  1.0_wp*visc_int_ab(i,j)
                 lgs%a_index(k) = nc
                 
-                nc = 2*lgs%ij2n(i-1,j)      ! column counter for vy_m(i-1,j)
+                nc = 2*lgs%ij2n(i-1,j)      ! column counter for uy(i-1,j)
                 k = k+1
                 lgs%a_value(k) =  1.0_wp*visc_int_ab(i-1,j)
                 lgs%a_index(k) = nc
                 
                 ! -- vx terms -- 
 
-                nc = 2*lgs%ij2n(i,j)-1      ! column counter for vx_m(i,j)
+                nc = 2*lgs%ij2n(i,j)-1      ! column counter for ux(i,j)
                 k = k+1
                 lgs%a_value(k) = -2.0_wp*visc_int_aa(i,j)     &
                                  -1.0_wp*visc_int_ab(i,j)
                 lgs%a_index(k) = nc
 
-                nc = 2*lgs%ij2n(i,j+1)-1    ! column counter for vx_m(i,j+1)
+                nc = 2*lgs%ij2n(i,j+1)-1    ! column counter for ux(i,j+1)
                 k = k+1
                 lgs%a_value(k) =  2.0_wp*visc_int_aa(i,j+1)     &
                                  +1.0_wp*visc_int_ab(i,j)
                 lgs%a_index(k) = nc
 
-                nc = 2*lgs%ij2n(i-1,j+1)-1  ! column counter for vx_m(i-1,j+1)
+                nc = 2*lgs%ij2n(i-1,j+1)-1  ! column counter for ux(i-1,j+1)
                 k = k+1
                 lgs%a_value(k) = -2.0_wp*visc_int_aa(i,j+1)     &
                                  -1.0_wp*visc_int_ab(i-1,j)
                 lgs%a_index(k) = nc
 
-                nc = 2*lgs%ij2n(i-1,j)-1  ! column counter for vx_m(i-1,j)
+                nc = 2*lgs%ij2n(i-1,j)-1  ! column counter for ux(i-1,j)
                 k = k+1
                 lgs%a_value(k) =  2.0_wp*visc_int_aa(i,j)     &
                                  +1.0_wp*visc_int_ab(i-1,j)
                 lgs%a_index(k) = nc
 
                 lgs%b_value(nr) = del_sq*taud_acy(i,j)
-                lgs%x_value(nr) = vy_m(i,j)
+                lgs%x_value(nr) = uy(i,j)
 
             end if
 

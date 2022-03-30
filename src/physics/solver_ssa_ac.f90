@@ -1,11 +1,30 @@
 module solver_ssa_ac
-    
+
     use yelmo_defs, only : sp, dp, wp, prec, io_unit_err, TOL_UNDERFLOW, rho_ice, rho_sw, g 
 
     use grid_calcs  ! For staggering routines 
     use ncio        ! For diagnostic outputting only 
 
     implicit none 
+
+    type linear_solver_class
+
+        integer :: n_sprs
+        integer :: nmax
+
+        integer,  allocatable :: n2i(:)
+        integer,  allocatable :: n2j(:)
+        integer,  allocatable :: ij2n(:,:)
+        
+        integer,  allocatable :: a_ptr(:)
+        integer,  allocatable :: a_index(:)
+        real(wp), allocatable :: a_value(:)
+        real(wp), allocatable :: b_value(:)
+        real(wp), allocatable :: x_value(:)
+
+        real(wp), allocatable :: resid(:)
+        real(wp) :: L1_norm, L2_norm, L2_rel_norm
+    end type
 
     private 
     public :: calc_vxy_ssa_matrix 
@@ -14,8 +33,1446 @@ module solver_ssa_ac
     public :: ssa_diagnostics_write_init
     public :: ssa_diagnostics_write_step
 
+    public :: linear_solver_class
+    public :: linear_solver_init
+    public :: linear_solver_matrix_ssa_ac_csr_2D
+    public :: linear_solver_matrix_solve_lis
+    public :: linear_solver_save_velocity
 
 contains 
+    
+    subroutine linear_solver_init(lgs,nx,ny)
+
+        implicit none
+
+        type(linear_solver_class), intent(INOUT) :: lgs
+        integer, intent(IN) :: nx, ny 
+
+        ! Local variables
+        integer :: i, j, n 
+        integer, parameter :: n_terms = 20
+
+        ! Define array sizes
+        lgs%nmax   =  2*nx*ny 
+        lgs%n_sprs = n_terms*nx*ny 
+
+        ! Ensure all object arrays are deallocated first
+        if (allocated(lgs%n2i))     deallocate(lgs%n2i)
+        if (allocated(lgs%n2j))     deallocate(lgs%n2j)
+        if (allocated(lgs%ij2n))    deallocate(lgs%ij2n)
+        if (allocated(lgs%a_ptr))   deallocate(lgs%a_ptr)
+        if (allocated(lgs%a_index)) deallocate(lgs%a_index)
+        if (allocated(lgs%a_value)) deallocate(lgs%a_value)
+        if (allocated(lgs%b_value)) deallocate(lgs%b_value)
+        if (allocated(lgs%x_value)) deallocate(lgs%x_value)
+        
+        ! Allocate arrays to proper size
+        allocate(lgs%n2i(nx*ny))
+        allocate(lgs%n2j(nx*ny))
+        allocate(lgs%ij2n(nx,ny))
+        allocate(lgs%a_value(lgs%n_sprs))
+        allocate(lgs%a_index(lgs%n_sprs))
+        allocate(lgs%a_ptr(lgs%nmax+1))
+        allocate(lgs%b_value(lgs%nmax))
+        allocate(lgs%x_value(lgs%nmax))
+        
+        ! Initialize array values to zero
+        lgs%a_value = 0.0
+        lgs%a_index = 0
+        lgs%a_ptr   = 0
+
+        lgs%b_value = 0.0
+        lgs%x_value = 0.0
+        
+        ! Define indices for reshaping of a 2-d array (with indices i, j)
+        ! to a vector (with index n)
+
+        n = 1
+
+        do i = 1, nx
+        do j = 1, ny
+            lgs%n2i(n)    = i
+            lgs%n2j(n)    = j
+            lgs%ij2n(i,j) = n
+            n = n+1
+        end do
+        end do
+
+        return
+
+    end subroutine linear_solver_init
+
+    subroutine linear_solver_matrix_ssa_ac_csr_2D(lgs,vx_m,vy_m,beta_acx,beta_acy, &
+                            visc_int_aa,ssa_mask_acx,ssa_mask_acy,H_ice,f_ice,taud_acx, &
+                            taud_acy,H_grnd,z_sl,z_bed,z_srf,dx,dy,boundaries,lateral_bc)
+        ! Define sparse matrices A*x=b in format 'compressed sparse row' (csr)
+        ! for the SSA momentum balance equations with velocity components
+        ! ux and uy defined on ac-nodes (right and top borders of i,j grid cell)
+        ! Store sparse matrices in linear_solver_class object 'lgs' for later use.
+
+        implicit none 
+
+        type(linear_solver_class), intent(INOUT) :: lgs
+        real(wp), intent(IN) :: vx_m(:,:)               ! [m yr^-1] Horizontal velocity x (acx-nodes)
+        real(wp), intent(IN) :: vy_m(:,:)               ! [m yr^-1] Horizontal velocity y (acy-nodes)
+        real(wp), intent(IN) :: beta_acx(:,:)           ! [Pa yr m^-1] Basal friction (acx-nodes)
+        real(wp), intent(IN) :: beta_acy(:,:)           ! [Pa yr m^-1] Basal friction (acy-nodes)
+        real(wp), intent(IN) :: visc_int_aa(:,:)        ! [Pa yr m] Vertically integrated viscosity (aa-nodes)
+        integer,  intent(IN) :: ssa_mask_acx(:,:)       ! [--] Mask to determine ssa solver actions (acx-nodes)
+        integer,  intent(IN) :: ssa_mask_acy(:,:)       ! [--] Mask to determine ssa solver actions (acy-nodes)
+        real(wp), intent(IN) :: H_ice(:,:)              ! [m]  Ice thickness (aa-nodes)
+        real(wp), intent(IN) :: f_ice(:,:)
+        real(wp), intent(IN) :: taud_acx(:,:)           ! [Pa] Driving stress (acx nodes)
+        real(wp), intent(IN) :: taud_acy(:,:)           ! [Pa] Driving stress (acy nodes)
+        real(wp), intent(IN) :: H_grnd(:,:)  
+        real(wp), intent(IN) :: z_sl(:,:) 
+        real(wp), intent(IN) :: z_bed(:,:) 
+        real(wp), intent(IN) :: z_srf(:,:)
+        real(wp), intent(IN) :: dx, dy
+        character(len=*), intent(IN) :: boundaries 
+        character(len=*), intent(IN) :: lateral_bc
+
+        ! Local variables
+        integer  :: nx, ny
+        real(wp) :: dxi, deta
+        integer  :: i, j, k, n, m 
+        integer  :: nc, nr
+        integer  :: i1, j1, i00, j00
+        real(wp) :: inv_dxi, inv_deta, inv_dxi_deta, inv_dxi2, inv_deta2
+        real(wp) :: del_sq, inv_del_sq
+
+        real(wp) :: inv_dx, inv_dxdx 
+        real(wp) :: inv_dy, inv_dydy 
+        real(wp) :: inv_dxdy, inv_2dxdy, inv_4dxdy 
+        
+        real(wp) :: H_ice_now, H_ocn_now
+
+        integer,  allocatable :: maske(:,:)
+        logical,  allocatable :: is_grline_1(:,:) 
+        logical,  allocatable :: is_grline_2(:,:) 
+        logical,  allocatable :: is_front_1(:,:)
+        logical,  allocatable :: is_front_2(:,:)  
+        real(wp), allocatable :: visc_int_ab(:,:)
+
+        ! Boundary conditions counterclockwise unit circle 
+        ! 1: x, right-border
+        ! 2: y, upper-border 
+        ! 3: x, left--border 
+        ! 4: y, lower-border 
+        character(len=56) :: boundaries_vx(4)
+        character(len=56) :: boundaries_vy(4)
+
+        integer :: im1, ip1, jm1, jp1 
+
+        real(wp) :: f_submerged, f_visc
+        real(wp) :: visc_int_aa_now
+        real(wp) :: tau_bc_int 
+        real(wp) :: tau_bc_sign
+
+        real(wp), parameter :: f_submerged_min = 0.0_wp 
+
+        nx = size(H_ice,1)
+        ny = size(H_ice,2) 
+
+        ! Safety check for initialization
+        if (.not. allocated(lgs%x_value)) then 
+            ! Object 'lgs' has not been initialized yet, do so now.
+
+            call linear_solver_init(lgs,nx,ny)
+
+        end if 
+
+        ! Consistency check: ensure beta is defined well 
+        if ( count(H_grnd .gt. 100.0 .and. H_ice .gt. 0.0) .gt. 0 .and. &
+                count(beta_acx .gt. 0.0 .and. H_grnd .gt. 100.0 .and. H_ice .gt. 0.0) .eq. 0 ) then  
+            ! No points found with a non-zero beta for grounded ice,
+            ! something was not well-defined/well-initialized
+
+            write(*,*) 
+            write(*,"(a)") "calc_vxy_ssa_matrix:: Error: beta appears to be zero everywhere for grounded ice."
+            write(*,*) "range(beta_acx): ", minval(beta_acx), maxval(beta_acx)
+            write(*,*) "range(beta_acy): ", minval(beta_acy), maxval(beta_acy)
+            write(*,*) "range(H_grnd):   ", minval(H_grnd), maxval(H_grnd)
+            write(*,*) "Stopping."
+            write(*,*) 
+            stop 
+            
+        end if 
+
+        ! Define border conditions (zeros, infinite, periodic)
+        select case(trim(boundaries)) 
+
+            case("MISMIP3D")
+
+                boundaries_vx(1) = "zeros"
+                boundaries_vx(2) = "infinite"
+                boundaries_vx(3) = "zeros"
+                boundaries_vx(4) = "infinite"
+
+                boundaries_vy(1:4) = "zeros" 
+
+            case("periodic")
+
+                boundaries_vx(1:4) = "periodic" 
+
+                boundaries_vy(1:4) = "periodic" 
+
+            case("periodic-x")
+
+                boundaries_vx(1) = "periodic"
+                boundaries_vx(2) = "infinite"
+                boundaries_vx(3) = "periodic"
+                boundaries_vx(4) = "infinite"
+
+                boundaries_vy(1) = "periodic"
+                boundaries_vy(2) = "infinite"
+                boundaries_vy(3) = "periodic"
+                boundaries_vy(4) = "infinite"
+
+            case("infinite")
+
+                boundaries_vx(1:4) = "infinite" 
+
+                boundaries_vy(1:4) = "infinite" 
+                
+            case DEFAULT 
+
+                boundaries_vx(1:4) = "zeros" 
+
+                boundaries_vy(1:4) = "zeros" 
+                
+        end select 
+
+        nx = size(H_ice,1)
+        ny = size(H_ice,2)
+        
+        allocate(maske(nx,ny))
+        allocate(is_grline_1(nx,ny))
+        allocate(is_grline_2(nx,ny))
+        allocate(is_front_1(nx,ny))
+        allocate(is_front_2(nx,ny))
+        
+        allocate(visc_int_ab(nx,ny))
+
+        !--- External yelmo arguments => local sicopolis variable names ---
+        dxi          = dx 
+        deta         = dy 
+
+        del_sq       = dx*dx 
+        inv_del_sq   = 1.0_wp / del_sq 
+
+
+        ! Define some factors
+
+        inv_dx    = 1.0_wp / dx 
+        inv_dxdx  = 1.0_wp / (dx*dx)
+        inv_dy    = 1.0_wp / dy 
+        inv_dydy  = 1.0_wp / (dy*dy)
+        inv_dxdy  = 1.0_wp / (dx*dy)
+        inv_2dxdy = 1.0_wp / (2.0_wp*dx*dy)
+        inv_4dxdy = 1.0_wp / (4.0_wp*dx*dy)
+        
+        !-------- Abbreviations --------
+
+        inv_dxi       = 1.0_prec/dxi
+        inv_deta      = 1.0_prec/deta
+        inv_dxi_deta  = 1.0_prec/(dxi*deta)
+        inv_dxi2      = 1.0_prec/(dxi*dxi)
+        inv_deta2     = 1.0_prec/(deta*deta)
+
+        ! Set maske and grounding line / calving front flags
+
+        call set_sico_masks(maske,is_front_1,is_front_2,is_grline_1,is_grline_2, &
+                                H_ice, f_ice, H_grnd, z_srf, z_bed, z_sl, lateral_bc)
+        
+        !-------- Depth-integrated viscosity on the staggered grid
+        !                                       [at (i+1/2,j+1/2)] --------
+
+        call stagger_visc_aa_ab(visc_int_ab,visc_int_aa,H_ice,f_ice)
+        
+
+        !-------- Assembly of the system of linear equations
+        !                         (matrix storage: compressed sparse row CSR) --------
+
+        lgs%a_ptr(1) = 1
+
+        k = 0
+
+        do n=1, lgs%nmax-1, 2
+
+            i = lgs%n2i((n+1)/2)
+            j = lgs%n2j((n+1)/2)
+
+            !  ------ Equations for vx_m (at (i+1/2,j))
+
+            nr = n   ! row counter
+
+            ! == Treat special cases first ==
+
+            if (ssa_mask_acx(i,j) .eq. -1) then 
+                ! Assign prescribed boundary velocity to this point
+                ! (eg for prescribed velocity corresponding to 
+                ! analytical grounding line flux, or for a regional domain)
+
+                k = k+1
+                lgs%a_value(k)  = 1.0   ! diagonal element only
+                lgs%a_index(k)  = nr
+
+                lgs%b_value(nr) = vx_m(i,j)
+                lgs%x_value(nr) = vx_m(i,j)
+           
+            else if (i .eq. 1) then 
+                ! Left boundary 
+
+                select case(trim(boundaries_vx(3)))
+
+                    case("zeros")
+                        ! Assume border velocity is zero 
+
+                        k = k+1
+                        lgs%a_value(k)  = 1.0   ! diagonal element only
+                        lgs%a_index(k)  = nr
+
+                        lgs%b_value(nr) = 0.0
+                        lgs%x_value(nr) = 0.0
+
+                    case("infinite")
+                        ! Infinite boundary condition, take 
+                        ! value from one point inward
+
+                        nc = 2*lgs%ij2n(i,j)-1          ! column counter for vx_m(i,j)
+                        k = k+1
+                        lgs%a_value(k) =  1.0_wp
+                        lgs%a_index(k) = nc
+
+                        nc = 2*lgs%ij2n(i+1,j)-1        ! column counter for vx_m(i+1,j)
+                        k = k+1
+                        lgs%a_value(k) = -1.0_wp
+                        lgs%a_index(k) = nc
+
+                        lgs%b_value(nr) = 0.0_wp
+                        lgs%x_value(nr) = vx_m(i,j)
+
+                    case("periodic")
+                        ! Periodic boundary, take velocity from the right boundary
+                        
+                        nc = 2*lgs%ij2n(i,j)-1          ! column counter for vx_m(i,j)
+                        k = k+1
+                        lgs%a_value(k) =  1.0_wp
+                        lgs%a_index(k) = nc
+
+                        nc = 2*lgs%ij2n(nx-2,j)-1        ! column counter for vx_m(nx-2,j)
+                        k = k+1
+                        lgs%a_value(k) = -1.0_wp
+                        lgs%a_index(k) = nc
+
+                        lgs%b_value(nr) = 0.0_wp
+                        lgs%x_value(nr) = vx_m(i,j)
+
+                    case DEFAULT 
+
+                        write(*,*) "linear_solver_matrix_ssa_ac_csr_2D:: Error: left-border condition not &
+                        &recognized: "//trim(boundaries_vx(3))
+                        write(*,*) "boundaries parameter set to: "//trim(boundaries)
+                        stop
+
+                end select 
+                
+            else if (i .eq. nx) then 
+                ! Right boundary 
+                
+                select case(trim(boundaries_vx(1)))
+
+                    case("zeros")
+                        ! Assume border velocity is zero 
+
+                        k = k+1
+                        lgs%a_value(k)  = 1.0   ! diagonal element only
+                        lgs%a_index(k)  = nr
+
+                        lgs%b_value(nr) = 0.0
+                        lgs%x_value(nr) = 0.0
+
+                    case("infinite")
+                        ! Infinite boundary condition, take 
+                        ! value from two points inward (one point inward will also be prescribed)
+
+                        nc = 2*lgs%ij2n(i,j)-1          ! column counter for vx_m(i,j)
+                        k = k+1
+                        lgs%a_value(k) =  1.0_wp
+                        lgs%a_index(k) = nc
+
+                        nc = 2*lgs%ij2n(nx-2,j)-1       ! column counter for vx_m(nx-2,j)
+                        k = k+1
+                        lgs%a_value(k) = -1.0_wp
+                        lgs%a_index(k) = nc
+
+                        lgs%b_value(nr) = 0.0_wp
+                        lgs%x_value(nr) = vx_m(i,j)
+
+                    case("periodic")
+                        ! Periodic boundary condition, take velocity from one point
+                        ! interior to the left-border, as nx-1 will be set to value
+                        ! at the left-border 
+
+                        nc = 2*lgs%ij2n(i,j)-1          ! column counter for vx_m(i,j)
+                        k = k+1
+                        lgs%a_value(k) =  1.0_wp
+                        lgs%a_index(k) = nc
+
+                        nc = 2*lgs%ij2n(3,j)-1          ! column counter for vx_m(3,j)
+                        k = k+1
+                        lgs%a_value(k) = -1.0_wp
+                        lgs%a_index(k) = nc
+
+                        lgs%b_value(nr) = 0.0_wp
+                        lgs%x_value(nr) = vx_m(i,j)
+
+                    case DEFAULT 
+
+                        write(*,*) "linear_solver_matrix_ssa_ac_csr_2D:: Error: right-border condition not &
+                        &recognized: "//trim(boundaries_vx(1))
+                        write(*,*) "boundaries parameter set to: "//trim(boundaries)
+                        stop
+
+                end select 
+
+            else if (i .eq. nx-1 .and. trim(boundaries_vx(1)) .eq. "infinite") then 
+                ! Right boundary, staggered one point further inward 
+                ! (only needed for periodic conditions, otherwise
+                ! this point should be treated as normal)
+                
+                ! Periodic boundary condition, take velocity from one point
+                ! interior to the left-border, as nx-1 will be set to value
+                ! at the left-border 
+
+                nc = 2*lgs%ij2n(i,j)-1          ! column counter for vx_m(i,j)
+                k = k+1
+                lgs%a_value(k) =  1.0_wp
+                lgs%a_index(k) = nc
+
+                nc = 2*lgs%ij2n(nx-2,j)-1       ! column counter for vx_m(nx-2,j)
+                k = k+1
+                lgs%a_value(k) = -1.0_wp
+                lgs%a_index(k) = nc
+
+                lgs%b_value(nr) = 0.0_wp
+                lgs%x_value(nr) = vx_m(i,j)
+
+            else if (i .eq. nx-1 .and. trim(boundaries_vx(1)) .eq. "periodic") then 
+                ! Right boundary, staggered one point further inward 
+                ! (only needed for periodic conditions, otherwise
+                ! this point should be treated as normal)
+                
+                ! Periodic boundary condition, take velocity from one point
+                ! interior to the left-border, as nx-1 will be set to value
+                ! at the left-border 
+
+                nc = 2*lgs%ij2n(i,j)-1          ! column counter for vx_m(i,j)
+                k = k+1
+                lgs%a_value(k) =  1.0_wp
+                lgs%a_index(k) = nc
+
+                nc = 2*lgs%ij2n(2,j)-1          ! column counter for vx_m(2,j)
+                k = k+1
+                lgs%a_value(k) = -1.0_wp
+                lgs%a_index(k) = nc
+
+                lgs%b_value(nr) = 0.0_wp
+                lgs%x_value(nr) = vx_m(i,j)
+
+            else if (j .eq. 1) then 
+                ! Lower boundary 
+
+                select case(trim(boundaries_vx(4)))
+
+                    case("zeros")
+                        ! Assume border velocity is zero 
+
+                        k = k+1
+                        lgs%a_value(k)  = 1.0   ! diagonal element only
+                        lgs%a_index(k)  = nr
+
+                        lgs%b_value(nr) = 0.0
+                        lgs%x_value(nr) = 0.0
+
+                    case("infinite")
+                        ! Infinite boundary condition, take 
+                        ! value from one point inward
+
+                        nc = 2*lgs%ij2n(i,j)-1          ! column counter for vx_m(i,j)
+                        k = k+1
+                        lgs%a_value(k) =  1.0_wp
+                        lgs%a_index(k) = nc
+
+                        nc = 2*lgs%ij2n(i,j+1)-1        ! column counter for vx_m(i,j+1)
+                        k = k+1
+                        lgs%a_value(k) = -1.0_wp
+                        lgs%a_index(k) = nc
+
+                        lgs%b_value(nr) = 0.0_wp
+                        lgs%x_value(nr) = vx_m(i,j)
+
+                    case("periodic")
+                        ! Periodic boundary, take velocity from the upper boundary
+                        
+                        nc = 2*lgs%ij2n(i,j)-1          ! column counter for vx_m(i,j)
+                        k = k+1
+                        lgs%a_value(k) =  1.0_wp
+                        lgs%a_index(k) = nc
+
+                        nc = 2*lgs%ij2n(i,ny-1)-1        ! column counter for vx_m(i,ny-1)
+                        k = k+1
+                        lgs%a_value(k) = -1.0_wp
+                        lgs%a_index(k) = nc
+
+                        lgs%b_value(nr) = 0.0_wp
+                        lgs%x_value(nr) = vx_m(i,j)
+
+                    case DEFAULT 
+
+                        write(*,*) "linear_solver_matrix_ssa_ac_csr_2D:: Error: upper-border condition not &
+                        &recognized: "//trim(boundaries_vx(4))
+                        write(*,*) "boundaries parameter set to: "//trim(boundaries)
+                        stop
+
+                end select 
+
+            else if (j .eq. ny) then 
+                ! Upper boundary 
+
+                select case(trim(boundaries_vx(2)))
+
+                    case("zeros")
+                        ! Assume border velocity is zero 
+
+                        k = k+1
+                        lgs%a_value(k)  = 1.0   ! diagonal element only
+                        lgs%a_index(k)  = nr
+
+                        lgs%b_value(nr) = 0.0
+                        lgs%x_value(nr) = 0.0
+
+                    case("infinite")
+                        ! Infinite boundary condition, take 
+                        ! value from one point inward
+
+                        nc = 2*lgs%ij2n(i,j)-1          ! column counter for vx_m(i,j)
+                        k = k+1
+                        lgs%a_value(k) =  1.0_wp
+                        lgs%a_index(k) = nc
+
+                        nc = 2*lgs%ij2n(i,j-1)-1        ! column counter for vx_m(i,j-1)
+                        k = k+1
+                        lgs%a_value(k) = -1.0_wp
+                        lgs%a_index(k) = nc
+
+                        lgs%b_value(nr) = 0.0_wp
+                        lgs%x_value(nr) = vx_m(i,j)
+
+                    case("periodic")
+                        ! Periodic boundary, take velocity from the lower boundary
+                        
+                        nc = 2*lgs%ij2n(i,j)-1          ! column counter for vx_m(i,j)
+                        k = k+1
+                        lgs%a_value(k) =  1.0_wp
+                        lgs%a_index(k) = nc
+
+                        nc = 2*lgs%ij2n(i,2)-1          ! column counter for vx_m(i,2)
+                        k = k+1
+                        lgs%a_value(k) = -1.0_wp
+                        lgs%a_index(k) = nc
+
+                        lgs%b_value(nr) = 0.0_wp
+                        lgs%x_value(nr) = vx_m(i,j)
+
+                    case DEFAULT 
+
+                        write(*,*) "linear_solver_matrix_ssa_ac_csr_2D:: Error: upper-border condition not &
+                        &recognized: "//trim(boundaries_vx(2))
+                        write(*,*) "boundaries parameter set to: "//trim(boundaries)
+                        stop
+
+                end select 
+
+            ! ===== NEWCODE lateral BCs =====
+
+            else if (  ( is_front_1(i,j).and.is_front_2(i+1,j) ) &
+                      .or. &
+                      ( is_front_2(i,j).and.is_front_1(i+1,j) ) &
+                    ) then
+                    ! one neighbour is ice-covered and the other is ice-free
+                    ! (calving front, grounded ice front)
+
+                    if (is_front_1(i,j)) then
+                        i1 = i     ! ice-front marker 
+                    else   ! is_front_1(i+1,j)==.true.
+                        i1 = i+1   ! ice-front marker 
+                    end if
+                    
+                    if ( (.not. is_front_2(i1-1,j)) .or. (.not. is_front_2(i1+1,j)) ) then
+                        ! There is inland ice on one side of the current cell, proceed
+                        ! with calving front boundary conditions 
+
+                        ! =========================================================
+                        ! Generalized solution for all ice fronts (floating and grounded)
+                        ! See Lipscomb et al. (2019), Eqs. 11 & 12, and 
+                        ! Winkelmann et al. (2011), Eq. 27 
+
+                        ! Get current ice thickness
+                        ! (No f_ice scaling since all points treated have f_ice=0/1)
+                        H_ice_now = H_ice(i1,j)     
+
+                        ! Get current ocean thickness bordering ice sheet
+                        ! (for bedrock above sea level, this will give zero)
+                        f_submerged = 1.d0 - min((z_srf(i1,j)-z_sl(i1,j))/H_ice_now,1.d0)
+                        f_submerged = max(f_submerged,f_submerged_min)
+                        H_ocn_now   = H_ice_now*f_submerged
+                        
+                        tau_bc_int = 0.5d0*rho_ice*g*H_ice_now**2 &         ! tau_out_int                                                ! p_out
+                                   - 0.5d0*rho_sw *g*H_ocn_now**2           ! tau_in_int
+
+                        ! =========================================================
+                        
+                        if (is_front_1(i,j).and.is_front_2(i+1,j)) then 
+                            ! === Case 1: ice-free to the right ===
+
+                            visc_int_aa_now = visc_int_aa(i1,j)
+                            !visc_int_aa_now = 0.5_wp*(visc_int_aa(i,j)+visc_int_aa(i-1,j))
+
+                            nc = 2*lgs%ij2n(i-1,j)-1
+                                ! smallest nc (column counter), for vx_m(i-1,j)
+                            k = k+1
+                            lgs%a_value(k) = -4.0_prec*inv_dxi*visc_int_aa_now
+                            lgs%a_index(k) = nc 
+
+                            nc = 2*lgs%ij2n(i,j-1)
+                                ! next nc (column counter), for vy_m(i,j-1)
+                            k = k+1
+                            lgs%a_value(k) = -2.0_prec*inv_deta*visc_int_aa_now
+                            lgs%a_index(k) = nc
+
+                            nc = 2*lgs%ij2n(i,j)-1
+                                ! next nc (column counter), for vx_m(i,j)
+                            k = k+1
+                            lgs%a_value(k) = 4.0_prec*inv_dxi*visc_int_aa_now
+                            lgs%a_index(k) = nc
+
+                            nc = 2*lgs%ij2n(i,j)
+                                ! next nc (column counter), for vy_m(i,j)
+                            k = k+1
+                            lgs%a_value(k) = 2.0_prec*inv_deta*visc_int_aa_now
+                            lgs%a_index(k) = nc
+
+                            ! Assign matrix values
+                            lgs%b_value(nr) = tau_bc_int
+                            lgs%x_value(nr) = vx_m(i,j)
+                            
+                            !write(*,*) "ssabc", i, j, f_submerged, H_ocn_now, H_ice_now, vx_m(i,j), vx_m(i-1,j)
+                            
+                        else 
+                            ! Case 2: ice-free to the left
+                            
+                            visc_int_aa_now = visc_int_aa(i1,j)
+                            visc_int_aa_now = 0.5_wp*(visc_int_aa(i,j)+visc_int_aa(i+1,j))
+
+                            nc = 2*lgs%ij2n(i,j)-1
+                                ! next nc (column counter), for vx_m(i,j)
+                            k = k+1
+                            lgs%a_value(k) = -4.0_prec*inv_dxi*visc_int_aa_now
+                            lgs%a_index(k) = nc
+
+                            nc = 2*lgs%ij2n(i+1,j-1)
+                                ! next nc (column counter), for vy_m(i+1,j-1)
+                            k  = k+1
+                            lgs%a_value(k) = -2.0_prec*inv_deta*visc_int_aa_now
+                            lgs%a_index(k) = nc
+
+                            nc = 2*lgs%ij2n(i+1,j)-1
+                                ! next nc (column counter), for vx_m(i+1,j)
+                            k = k+1
+                            lgs%a_value(k) = 4.0_prec*inv_dxi*visc_int_aa_now
+                            lgs%a_index(k) = nc
+ 
+                            nc = 2*lgs%ij2n(i+1,j)
+                                ! largest nc (column counter), for vy_m(i+1,j)
+                            k  = k+1
+                            lgs%a_value(k) = 2.0_prec*inv_deta*visc_int_aa_now
+                            lgs%a_index(k) = nc
+
+                            ! Assign matrix values
+                            lgs%b_value(nr) = tau_bc_int
+                            lgs%x_value(nr) = vx_m(i,j)
+                        
+                        end if 
+
+                    else    ! (is_front_2(i1-1,j)==.true.).and.(is_front_2(i1+1,j)==.true.);
+                            ! velocity assumed to be zero
+
+                        k = k+1
+                        lgs%a_value(k)  = 1.0_prec   ! diagonal element only
+                        lgs%a_index(k)  = nr
+
+                        lgs%b_value(nr) = 0.0_prec
+                        lgs%x_value(nr) = 0.0_prec
+
+                    end if
+
+            else if ( ( (maske(i,j)==3).and.(maske(i+1,j)==1) ) &
+                      .or. &
+                      ( (maske(i,j)==1).and.(maske(i+1,j)==3) ) &
+                    ) then
+                    ! one neighbour is floating ice and the other is ice-free land;
+                    ! velocity assumed to be zero
+
+                    k = k+1
+                    lgs%a_value(k)  = 1.0_prec   ! diagonal element only
+                    lgs%a_index(k)  = nr
+
+                    lgs%b_value(nr) = 0.0_prec
+                    lgs%x_value(nr) = 0.0_prec
+
+            else if (ssa_mask_acx(i,j) .eq. 0) then    ! neither neighbour is floating or grounded ice,
+                    ! velocity assumed to be zero
+
+                k = k+1
+                lgs%a_value(k) = 1.0_prec   ! diagonal element only
+                lgs%a_index(k) = nr
+
+                lgs%b_value(nr) = 0.0_prec
+                lgs%x_value(nr) = 0.0_prec
+
+            else
+                ! === Inner SSA solution === 
+
+                ! -- vx terms -- 
+
+                nc = 2*lgs%ij2n(i,j)-1          ! column counter for vx_m(i,j)
+                k = k+1
+                lgs%a_value(k) = -4.0_wp*visc_int_aa(i+1,j) &
+                                 -4.0_wp*visc_int_aa(i,j) &
+                                 -1.0_wp*visc_int_ab(i,j) &
+                                 -1.0_wp*visc_int_ab(i,j-1) &
+                                 -del_sq*beta_acx(i,j)
+                lgs%a_index(k) = nc
+
+                nc = 2*lgs%ij2n(i+1,j)-1        ! column counter for vx_m(i+1,j)
+                k = k+1
+                lgs%a_value(k) =  4.0_wp*visc_int_aa(i+1,j)
+                lgs%a_index(k) = nc
+
+                nc = 2*lgs%ij2n(i-1,j)-1        ! column counter for vx_m(i-1,j)
+                k = k+1
+                lgs%a_value(k) =  4.0_wp*visc_int_aa(i,j)
+                lgs%a_index(k) = nc
+
+                nc = 2*lgs%ij2n(i,j+1)-1        ! column counter for vx_m(i,j+1)
+                k = k+1
+                lgs%a_value(k) =  1.0_wp*visc_int_ab(i,j)
+                lgs%a_index(k) = nc
+
+                nc = 2*lgs%ij2n(i,j-1)-1        ! column counter for vx_m(i,j-1)
+                k = k+1
+                lgs%a_value(k) =  1.0_wp*visc_int_ab(i,j-1)
+                lgs%a_index(k) = nc
+
+                ! -- vy terms -- 
+                
+                nc = 2*lgs%ij2n(i,j)            ! column counter for vy_m(i,j)
+                k = k+1
+                lgs%a_value(k) = -2.0_wp*visc_int_aa(i,j)     &
+                                 -1.0_wp*visc_int_ab(i,j)
+                lgs%a_index(k) = nc
+
+                nc = 2*lgs%ij2n(i+1,j)          ! column counter for vy_m(i+1,j)
+                k = k+1
+                lgs%a_value(k) =  2.0_wp*visc_int_aa(i+1,j)   &
+                                 +1.0_wp*visc_int_ab(i,j)
+                lgs%a_index(k) = nc
+                
+                nc = 2*lgs%ij2n(i+1,j-1)        ! column counter for vy_m(i+1,j-1)
+                k = k+1
+                lgs%a_value(k) = -2.0_wp*visc_int_aa(i+1,j)   &
+                                 -1.0_wp*visc_int_ab(i,j-1)
+                lgs%a_index(k) = nc
+                
+                nc = 2*lgs%ij2n(i,j-1)          ! column counter for vy_m(i,j-1)
+                k = k+1
+                lgs%a_value(k) =  2.0_wp*visc_int_aa(i,j)   &
+                                 +1.0_wp*visc_int_ab(i,j-1)
+                lgs%a_index(k) = nc
+                
+
+                lgs%b_value(nr) = del_sq*taud_acx(i,j)
+                lgs%x_value(nr) = vx_m(i,j)
+
+            end if
+
+            lgs%a_ptr(nr+1) = k+1   ! row is completed, store index to next row
+
+            !  ------ Equations for vy_m (at (i,j+1/2))
+
+            nr = n+1   ! row counter
+
+            ! == Treat special cases first ==
+
+            if (ssa_mask_acy(i,j) .eq. -1) then 
+                ! Assign prescribed boundary velocity to this point
+                ! (eg for prescribed velocity corresponding to analytical grounding line flux)
+
+                k = k+1
+                lgs%a_value(k)  = 1.0   ! diagonal element only
+                lgs%a_index(k)  = nr
+
+                lgs%b_value(nr) = vy_m(i,j)
+                lgs%x_value(nr) = vy_m(i,j)
+           
+            
+            else if (j .eq. 1) then 
+                ! lower boundary 
+
+                select case(trim(boundaries_vy(4)))
+
+                    case("zeros")
+                        ! Assume border vy velocity is zero 
+
+                        k = k+1
+                        lgs%a_value(k)  = 1.0_prec   ! diagonal element only
+                        lgs%a_index(k)  = nr
+
+                        lgs%b_value(nr) = 0.0_prec
+                        lgs%x_value(nr) = 0.0_prec
+
+                    case("infinite")
+                        ! Infinite boundary, take velocity from one point inward
+                        
+                        nc = 2*lgs%ij2n(i,j)            ! column counter for vy_m(i,j)
+                        k = k+1
+                        lgs%a_value(k) =  1.0_wp
+                        lgs%a_index(k) = nc
+
+                        nc = 2*lgs%ij2n(i,2)            ! column counter for vy_m(i,2)
+                        k = k+1
+                        lgs%a_value(k) = -1.0_wp
+                        lgs%a_index(k) = nc
+
+                        lgs%b_value(nr) = 0.0_wp
+                        lgs%x_value(nr) = vy_m(i,j)
+
+                    case("periodic")
+                        ! Periodic boundary, take velocity from the opposite boundary
+                        
+                        nc = 2*lgs%ij2n(i,j)            ! column counter for vy_m(i,j)
+                        k = k+1
+                        lgs%a_value(k) =  1.0_wp
+                        lgs%a_index(k) = nc
+
+                        nc = 2*lgs%ij2n(i,ny-2)         ! column counter for vy_m(i,ny-2)
+                        k = k+1
+                        lgs%a_value(k) = -1.0_wp
+                        lgs%a_index(k) = nc
+
+                        lgs%b_value(nr) = 0.0_wp
+                        lgs%x_value(nr) = vy_m(i,j)
+
+                    case DEFAULT 
+
+                        write(*,*) "linear_solver_matrix_ssa_ac_csr_2D:: Error: lower-border condition not &
+                        &recognized: "//trim(boundaries_vy(4))
+                        write(*,*) "boundaries parameter set to: "//trim(boundaries)
+                        stop
+
+                end select 
+
+            else if (j .eq. ny) then 
+                ! Upper boundary 
+
+                select case(trim(boundaries_vy(2)))
+
+                    case("zeros")
+                        ! Assume border velocity is zero 
+
+                        k = k+1
+                        lgs%a_value(k)  = 1.0_prec   ! diagonal element only
+                        lgs%a_index(k)  = nr
+
+                        lgs%b_value(nr) = 0.0_prec
+                        lgs%x_value(nr) = 0.0_prec
+
+                    case("infinite")
+                        ! Infinite boundary, take velocity from two points inward
+                        ! (to account for staggering)
+
+                        nc = 2*lgs%ij2n(i,j)            ! column counter for vy_m(i,j)
+                        k = k+1
+                        lgs%a_value(k) =  1.0_wp
+                        lgs%a_index(k) = nc
+
+                        nc = 2*lgs%ij2n(i,ny-2)          ! column counter for vy_m(i,ny-2)
+                        k = k+1
+                        lgs%a_value(k) = -1.0_wp
+                        lgs%a_index(k) = nc
+
+                        lgs%b_value(nr) = 0.0_wp
+                        lgs%x_value(nr) = vy_m(i,j)
+
+                    case("periodic")
+                        ! Periodic boundary, take velocity from the right boundary
+                        
+                        nc = 2*lgs%ij2n(i,j)            ! column counter for vy_m(i,j)
+                        k = k+1
+                        lgs%a_value(k) =  1.0_wp
+                        lgs%a_index(k) = nc
+
+                        nc = 2*lgs%ij2n(i,3)            ! column counter for vy_m(i,3)
+                        k = k+1
+                        lgs%a_value(k) = -1.0_wp
+                        lgs%a_index(k) = nc
+
+                        lgs%b_value(nr) = 0.0_wp
+                        lgs%x_value(nr) = vy_m(i,j)
+
+                    case DEFAULT 
+
+                        write(*,*) "linear_solver_matrix_ssa_ac_csr_2D:: Error: upper-border condition not &
+                        &recognized: "//trim(boundaries_vy(2))
+                        write(*,*) "boundaries parameter set to: "//trim(boundaries)
+                        stop
+
+                end select 
+            
+            else if (j .eq. ny-1 .and. trim(boundaries_vy(2)) .eq. "infinite") then
+                ! Upper boundary, inward by one point
+                ! (only needed for periodic conditions, otherwise
+                ! this point should be treated as normal)
+                
+                ! Periodic boundary, take velocity from the lower boundary
+
+                nc = 2*lgs%ij2n(i,j)            ! column counter for vy_m(i,j)
+                k = k+1
+                lgs%a_value(k) =  1.0_wp
+                lgs%a_index(k) = nc
+
+                nc = 2*lgs%ij2n(i,ny-2)         ! column counter for vy_m(i,ny-2)
+                k = k+1
+                lgs%a_value(k) = -1.0_wp
+                lgs%a_index(k) = nc
+
+                lgs%b_value(nr) = 0.0_wp
+                lgs%x_value(nr) = vy_m(i,j)
+
+            else if (j .eq. ny-1 .and. trim(boundaries_vy(2)) .eq. "periodic") then
+                ! Upper boundary, inward by one point
+                ! (only needed for periodic conditions, otherwise
+                ! this point should be treated as normal)
+                
+                ! Periodic boundary, take velocity from the lower boundary
+                
+                nc = 2*lgs%ij2n(i,j)            ! column counter for vy_m(i,j)
+                k = k+1
+                lgs%a_value(k) =  1.0_wp
+                lgs%a_index(k) = nc
+
+                nc = 2*lgs%ij2n(i,2)            ! column counter for vy_m(i,2)
+                k = k+1
+                lgs%a_value(k) = -1.0_wp
+                lgs%a_index(k) = nc
+
+                lgs%b_value(nr) = 0.0_wp
+                lgs%x_value(nr) = vy_m(i,j)
+  
+            else if (i .eq. 1) then 
+                ! Left boundary 
+
+                select case(trim(boundaries_vy(3)))
+
+                    case("zeros")
+                        ! Assume border velocity is zero 
+
+                        k = k+1
+                        lgs%a_value(k)  = 1.0_prec   ! diagonal element only
+                        lgs%a_index(k)  = nr
+
+                        lgs%b_value(nr) = 0.0_prec
+                        lgs%x_value(nr) = 0.0_prec
+
+                    case("infinite")
+                        ! Infinite boundary, take velocity from one point inward
+
+                        nc = 2*lgs%ij2n(i,j)            ! column counter for vy_m(i,j)
+                        k = k+1
+                        lgs%a_value(k) =  1.0_wp
+                        lgs%a_index(k) = nc
+
+                        nc = 2*lgs%ij2n(2,j)            ! column counter for vy_m(2,j)
+                        k = k+1
+                        lgs%a_value(k) = -1.0_wp
+                        lgs%a_index(k) = nc
+
+                        lgs%b_value(nr) = 0.0_wp
+                        lgs%x_value(nr) = vy_m(i,j)
+
+                    case("periodic")
+                        ! Periodic boundary, take velocity from the right boundary
+                        
+                        nc = 2*lgs%ij2n(i,j)            ! column counter for vy_m(i,j)
+                        k = k+1
+                        lgs%a_value(k) =  1.0_wp
+                        lgs%a_index(k) = nc
+
+                        nc = 2*lgs%ij2n(nx-1,j)         ! column counter for vy_m(nx-1,j)
+                        k = k+1
+                        lgs%a_value(k) = -1.0_wp
+                        lgs%a_index(k) = nc
+
+                        lgs%b_value(nr) = 0.0_wp
+                        lgs%x_value(nr) = vy_m(i,j)
+
+                    case DEFAULT 
+
+                        write(*,*) "linear_solver_matrix_ssa_ac_csr_2D:: Error: left-border condition not &
+                        &recognized: "//trim(boundaries_vy(3))
+                        write(*,*) "boundaries parameter set to: "//trim(boundaries)
+                        stop
+
+                end select 
+                
+            else if (i .eq. nx) then 
+                ! Right boundary 
+
+                select case(trim(boundaries_vy(1)))
+
+                    case("zeros")
+                        ! Assume border velocity is zero 
+
+                        k = k+1
+                        lgs%a_value(k)  = 1.0_prec   ! diagonal element only
+                        lgs%a_index(k)  = nr
+
+                        lgs%b_value(nr) = 0.0_prec
+                        lgs%x_value(nr) = 0.0_prec
+
+                    case("infinite")
+                        ! Infinite boundary, take velocity from one point inward
+
+                        nc = 2*lgs%ij2n(i,j)            ! column counter for vy_m(i,j)
+                        k = k+1
+                        lgs%a_value(k) =  1.0_wp
+                        lgs%a_index(k) = nc
+
+                        nc = 2*lgs%ij2n(nx-1,j)         ! column counter for vy_m(nx-1,j)
+                        k = k+1
+                        lgs%a_value(k) = -1.0_wp
+                        lgs%a_index(k) = nc
+
+                        lgs%b_value(nr) = 0.0_wp
+                        lgs%x_value(nr) = vy_m(i,j)
+
+                    case("periodic")
+                        ! Periodic boundary, take velocity from the right boundary
+                        
+                        nc = 2*lgs%ij2n(i,j)            ! column counter for vy_m(i,j)
+                        k = k+1
+                        lgs%a_value(k) =  1.0_wp
+                        lgs%a_index(k) = nc
+
+                        nc = 2*lgs%ij2n(2,j)            ! column counter for vy_m(2,j)
+                        k = k+1
+                        lgs%a_value(k) = -1.0_wp
+                        lgs%a_index(k) = nc
+
+                        lgs%b_value(nr) = 0.0_wp
+                        lgs%x_value(nr) = vy_m(i,j)
+
+                    case DEFAULT 
+
+                        write(*,*) "linear_solver_matrix_ssa_ac_csr_2D:: Error: right-border condition not &
+                        &recognized: "//trim(boundaries_vy(1))
+                        write(*,*) "boundaries parameter set to: "//trim(boundaries)
+                        stop
+
+                end select 
+
+            ! ===== NEWCODE lateral BCs =====
+
+            else if (  ( is_front_1(i,j).and.is_front_2(i,j+1) ) &
+                      .or. &
+                      ( is_front_2(i,j).and.is_front_1(i,j+1) ) &
+                    ) then
+                    ! one neighbour is ice-covered and the other is ice-free
+                    ! (calving front, grounded ice front)
+
+                    if (is_front_1(i,j)) then
+                        j1 = j     ! ice-front marker
+                    else   ! is_front_1(i,j+1)==.true.
+                        j1 = j+1   ! ice-front marker
+                    end if
+
+                    if ( (.not. is_front_2(i,j1-1)) .or. (.not. is_front_2(i,j1+1)) ) then
+                        ! There is inland ice on one side of the current cell, proceed
+                        ! with calving front boundary conditions 
+
+                        ! =========================================================
+                        ! Generalized solution for all ice fronts (floating and grounded)
+                        ! See Lipscomb et al. (2019), Eqs. 11 & 12, and 
+                        ! Winkelmann et al. (2011), Eq. 27 
+
+                        ! Get current ice thickness
+                        ! (No f_ice scaling since all points treated have f_ice=0/1)
+                        H_ice_now = H_ice(i,j1)     
+
+                        ! Get current ocean thickness bordering ice sheet
+                        ! (for bedrock above sea level, this will give zero)
+                        f_submerged = 1.d0 - min((z_srf(i,j1)-z_sl(i,j1))/H_ice_now,1.d0)
+                        f_submerged = max(f_submerged,f_submerged_min)
+                        H_ocn_now   = H_ice_now*f_submerged
+
+                        tau_bc_int = 0.5d0*rho_ice*g*H_ice_now**2 &         ! tau_out_int                                                ! p_out
+                                   - 0.5d0*rho_sw *g*H_ocn_now**2           ! tau_in_int
+
+                        ! =========================================================
+                        
+                        if (is_front_1(i,j).and.is_front_2(i,j+1)) then 
+                            ! === Case 1: ice-free to the top ===
+
+                            visc_int_aa_now = visc_int_aa(i,j1)
+                            !visc_int_aa_now = 0.5_wp*(visc_int_aa(i,j)+visc_int_aa(i,j-1))
+
+                            nc = 2*lgs%ij2n(i-1,j)-1
+                                ! smallest nc (column counter), for vx_m(i-1,j)
+                            k = k+1
+                            lgs%a_value(k) = -2.0_prec*inv_dxi*visc_int_aa_now
+                            lgs%a_index(k) = nc
+
+                            nc = 2*lgs%ij2n(i,j-1)
+                                ! next nc (column counter), for vy_m(i,j-1)
+                            k = k+1
+                            lgs%a_value(k) = -4.0_prec*inv_deta*visc_int_aa_now
+                            lgs%a_index(k) = nc
+
+                            nc = 2*lgs%ij2n(i,j)-1
+                                ! next nc (column counter), for vx_m(i,j)
+                            k = k+1
+                            lgs%a_value(k) = 2.0_prec*inv_dxi*visc_int_aa_now
+                            lgs%a_index(k) = nc
+
+                            nc = 2*lgs%ij2n(i,j)
+                                ! next nc (column counter), for vy_m(i,j)
+                            k = k+1
+                            lgs%a_value(k) = 4.0_prec*inv_deta*visc_int_aa_now
+                            lgs%a_index(k) = nc
+
+                            ! Assign matrix values
+                            lgs%b_value(nr) = tau_bc_int
+                            lgs%x_value(nr) = vy_m(i,j)
+                            
+                        else
+                            ! === Case 2: ice-free to the bottom ===
+                            
+                            visc_int_aa_now = visc_int_aa(i,j1)
+                            !visc_int_aa_now = 0.5_wp*(visc_int_aa(i,j)+visc_int_aa(i,j+1))
+
+                            nc = 2*lgs%ij2n(i-1,j+1)-1
+                                ! next nc (column counter), for vx_m(i-1,j+1)
+                            k = k+1
+                            lgs%a_value(k) = -2.0_prec*inv_dxi*visc_int_aa_now
+                            lgs%a_index(k) = nc
+ 
+                            nc = 2*lgs%ij2n(i,j)
+                                ! next nc (column counter), for vy_m(i,j)
+                            k = k+1
+                            lgs%a_value(k) = -4.0_prec*inv_deta*visc_int_aa_now
+                            lgs%a_index(k) = nc
+ 
+                            nc = 2*lgs%ij2n(i,j+1)-1
+                                ! next nc (column counter), for vx_m(i,j+1)
+                            k = k+1
+                            lgs%a_value(k) = 2.0_prec*inv_dxi*visc_int_aa_now
+                            lgs%a_index(k) = nc
+ 
+                            nc = 2*lgs%ij2n(i,j+1)
+                                ! next nc (column counter), for vy_m(i,j+1)
+                            k = k+1
+                            lgs%a_value(k) = 4.0_prec*inv_deta*visc_int_aa_now
+                            lgs%a_index(k) = nc
+
+                            ! Assign matrix values
+                            lgs%b_value(nr) = tau_bc_int
+                            lgs%x_value(nr) = vy_m(i,j)
+                 
+                        end if 
+
+                    else    ! (is_front_2(i,j1-1)==.true.).and.(is_front_2(i,j1+1)==.true.);
+                            ! velocity assumed to be zero
+
+                        k = k+1
+                        lgs%a_value(k)  = 1.0_prec   ! diagonal element only
+                        lgs%a_index(k)  = nr
+
+                        lgs%b_value(nr) = 0.0_prec
+                        lgs%x_value(nr) = 0.0_prec
+
+                    end if
+
+            else if ( ( (maske(i,j)==3).and.(maske(i,j+1)==1) ) &
+                        .or. &
+                        ( (maske(i,j)==1).and.(maske(i,j+1)==3) ) &
+                      ) then
+                    ! one neighbour is floating ice and the other is ice-free land;
+                    ! velocity assumed to be zero
+
+                    k = k+1
+                    lgs%a_value(k)  = 1.0_prec   ! diagonal element only
+                    lgs%a_index(k)  = nr
+
+                    lgs%b_value(nr) = 0.0_prec
+                    lgs%x_value(nr) = 0.0_prec
+
+            else if (ssa_mask_acy(i,j) .eq. 0) then    ! neither neighbour is floating or grounded ice,
+                    ! velocity assumed to be zero
+
+                k = k+1
+                lgs%a_value(k)  = 1.0_prec   ! diagonal element only
+                lgs%a_index(k)  = nr
+
+                lgs%b_value(nr) = 0.0_prec
+                lgs%x_value(nr) = 0.0_prec
+
+            else
+                ! === Inner SSA solution === 
+
+                ! -- vy terms -- 
+
+                nc = 2*lgs%ij2n(i,j)        ! column counter for vy_m(i,j)
+                k = k+1
+                lgs%a_value(k) = -4.0_wp*visc_int_aa(i,j+1)   &
+                                 -4.0_wp*visc_int_aa(i,j)     &
+                                 -1.0_wp*visc_int_ab(i,j)   &
+                                 -1.0_wp*visc_int_ab(i-1,j) &
+                                 -del_sq*beta_acy(i,j)
+                lgs%a_index(k) = nc
+
+                nc = 2*lgs%ij2n(i,j+1)      ! column counter for vy_m(i,j+1)
+                k = k+1
+                lgs%a_value(k) =  4.0_wp*visc_int_aa(i,j+1)
+                lgs%a_index(k) = nc
+
+                nc = 2*lgs%ij2n(i,j-1)      ! column counter for vy_m(i,j-1)
+                k = k+1
+                lgs%a_value(k) =  4.0_wp*visc_int_aa(i,j)
+                lgs%a_index(k) = nc
+                
+                nc = 2*lgs%ij2n(i+1,j)      ! column counter for vy_m(i+1,j)
+                k = k+1
+                lgs%a_value(k) =  1.0_wp*visc_int_ab(i,j)
+                lgs%a_index(k) = nc
+                
+                nc = 2*lgs%ij2n(i-1,j)      ! column counter for vy_m(i-1,j)
+                k = k+1
+                lgs%a_value(k) =  1.0_wp*visc_int_ab(i-1,j)
+                lgs%a_index(k) = nc
+                
+                ! -- vx terms -- 
+
+                nc = 2*lgs%ij2n(i,j)-1      ! column counter for vx_m(i,j)
+                k = k+1
+                lgs%a_value(k) = -2.0_wp*visc_int_aa(i,j)     &
+                                 -1.0_wp*visc_int_ab(i,j)
+                lgs%a_index(k) = nc
+
+                nc = 2*lgs%ij2n(i,j+1)-1    ! column counter for vx_m(i,j+1)
+                k = k+1
+                lgs%a_value(k) =  2.0_wp*visc_int_aa(i,j+1)     &
+                                 +1.0_wp*visc_int_ab(i,j)
+                lgs%a_index(k) = nc
+
+                nc = 2*lgs%ij2n(i-1,j+1)-1  ! column counter for vx_m(i-1,j+1)
+                k = k+1
+                lgs%a_value(k) = -2.0_wp*visc_int_aa(i,j+1)     &
+                                 -1.0_wp*visc_int_ab(i-1,j)
+                lgs%a_index(k) = nc
+
+                nc = 2*lgs%ij2n(i-1,j)-1  ! column counter for vx_m(i-1,j)
+                k = k+1
+                lgs%a_value(k) =  2.0_wp*visc_int_aa(i,j)     &
+                                 +1.0_wp*visc_int_ab(i-1,j)
+                lgs%a_index(k) = nc
+
+                lgs%b_value(nr) = del_sq*taud_acy(i,j)
+                lgs%x_value(nr) = vy_m(i,j)
+
+            end if
+
+            lgs%a_ptr(nr+1) = k+1   ! row is completed, store index to next row
+
+        end do
+
+        return
+
+    end subroutine linear_solver_matrix_ssa_ac_csr_2D
+
+    subroutine linear_solver_matrix_solve_lis(lgs,lis_settings)
+        ! Use LIS to solve matrix equation Ax=b. 
+
+        implicit none 
+
+        type(linear_solver_class), intent(INOUT) :: lgs 
+        character(len=*), intent(IN) :: lis_settings        ! LIS solver settings
+
+        ! Local variables 
+
+        ! =========================================================
+        ! LIS-specific variables 
+
+        ! Include header for lis solver fortran interface
+#include "lisf.h"
+        
+        LIS_INTEGER :: ierr
+        LIS_INTEGER :: nr
+        LIS_INTEGER :: nc
+        LIS_INTEGER :: nmax
+        LIS_INTEGER :: lin_iter
+        LIS_REAL    :: residual 
+        LIS_REAL    :: solver_time  
+        LIS_MATRIX  :: lgs_a
+        LIS_VECTOR  :: lgs_b, lgs_x
+        LIS_SOLVER  :: solver
+
+        LIS_INTEGER :: lgs_a_index_now
+        LIS_SCALAR  :: lgs_a_value_now
+        LIS_SCALAR  :: lgs_b_value_now
+        LIS_SCALAR  :: lgs_x_value_now
+        LIS_SCALAR, allocatable :: lgs_x_value_out(:)
+
+! =========================================================
+    
+        nmax = lgs%nmax
+
+        !-------- Settings for Lis --------
+               
+        call lis_initialize(ierr)           ! Important for parallel computing environments   
+        call CHKERR(ierr)
+
+        call lis_matrix_create(LIS_COMM_WORLD, lgs_a, ierr)
+        call CHKERR(ierr)
+        call lis_vector_create(LIS_COMM_WORLD, lgs_b, ierr)
+        call lis_vector_create(LIS_COMM_WORLD, lgs_x, ierr)
+
+        call lis_matrix_set_size(lgs_a, 0, nmax, ierr)
+        call CHKERR(ierr)
+        call lis_vector_set_size(lgs_b, 0, nmax, ierr)
+        call lis_vector_set_size(lgs_x, 0, nmax, ierr)
+
+        ! === Storage order: compressed sparse row (CSR) ===
+
+        do nr=1, nmax
+
+            do nc=lgs%a_ptr(nr), lgs%a_ptr(nr+1)-1
+
+                ! Use temporary values with LIS data types for use with lis routines
+                lgs_a_index_now = lgs%a_index(nc)
+                lgs_a_value_now = lgs%a_value(nc)
+                
+                call lis_matrix_set_value(LIS_INS_VALUE, nr, lgs_a_index_now, &
+                                                        lgs_a_value_now, lgs_a, ierr)
+            end do
+
+            ! Use temporary values with LIS data types for use with lis routines
+            lgs_b_value_now = lgs%b_value(nr)
+            lgs_x_value_now = lgs%x_value(nr) 
+
+            call lis_vector_set_value(LIS_INS_VALUE, nr, lgs_b_value_now, lgs_b, ierr)
+            call lis_vector_set_value(LIS_INS_VALUE, nr, lgs_x_value_now, lgs_x, ierr)
+
+        end do 
+
+
+        call lis_matrix_set_type(lgs_a, LIS_MATRIX_CSR, ierr)
+        call lis_matrix_assemble(lgs_a, ierr)
+
+        !-------- Solution of the system of linear equations with Lis --------
+
+        call lis_solver_create(solver, ierr)
+
+        ! ch_solver_set_option = '-i bicgsafe -p jacobi '// &
+        !                         '-maxiter 100 -tol 1.0e-4 -initx_zeros false'
+        call lis_solver_set_option(trim(lis_settings), solver, ierr)
+        call CHKERR(ierr)
+
+        call lis_solve(lgs_a, lgs_b, lgs_x, solver, ierr)
+        call CHKERR(ierr)
+
+        ! Get solver solution information
+        call lis_solver_get_iter(solver, lin_iter, ierr)
+        call lis_solver_get_time(solver,solver_time,ierr)
+        
+        ! Obtain the relative L2_norm == ||b-Ax||_2 / ||b||_2
+        call lis_solver_get_residualnorm(solver,residual,ierr)
+
+        ! Store in lgs object too
+        lgs%L2_norm = residual
+        
+        ! Print a summary
+        write(*,*) "linear_solver_matrix_solve_lis: [time (s), iter, L2] = ", solver_time, lin_iter, residual
+
+        ! Gather x values in local array
+        allocate(lgs_x_value_out(nmax))
+        lgs_x_value_out = 0.0_prec
+        call lis_vector_gather(lgs_x, lgs_x_value_out, ierr)
+        call CHKERR(ierr)
+        
+        ! Save to lgs object
+        lgs%x_value = lgs_x_value_out
+        
+        ! Destroy all lis variables
+        call lis_matrix_destroy(lgs_a, ierr)
+        call CHKERR(ierr)
+
+        call lis_vector_destroy(lgs_b, ierr)
+        call lis_vector_destroy(lgs_x, ierr)
+        call lis_solver_destroy(solver, ierr)
+        call CHKERR(ierr)
+
+        ! Finalize lis.
+        call lis_finalize(ierr)           ! Important for parallel computing environments
+        call CHKERR(ierr)
+
+        return
+
+    end subroutine linear_solver_matrix_solve_lis
+
+    subroutine linear_solver_save_velocity(ux,uy,lgs,ulim)
+
+        implicit none 
+
+        real(wp), intent(INOUT) :: ux(:,:)          ! [m yr^-1] Horizontal velocity x (acx-nodes)
+        real(wp), intent(INOUT) :: uy(:,:)          ! [m yr^-1] Horizontal velocity y (acy-nodes)
+        type(linear_solver_class), intent(IN) :: lgs 
+        real(wp), intent(IN)    :: ulim 
+
+        ! Local variables 
+        integer :: i, j, n, nr 
+
+        do n = 1, lgs%nmax-1, 2
+
+            i = lgs%n2i((n+1)/2)
+            j = lgs%n2j((n+1)/2)
+
+            nr = n
+            ux(i,j) = lgs%x_value(nr)
+
+            nr = n+1
+            uy(i,j) = lgs%x_value(nr)
+
+        end do
+
+        ! Limit the velocity generally =====================
+        call limit_vel(ux,ulim)
+        call limit_vel(uy,ulim)
+
+        return
+
+    end subroutine linear_solver_save_velocity
 
     subroutine calc_vxy_ssa_matrix(vx_m,vy_m,L2_norm,beta_acx,beta_acy,visc_int_aa, &
                     ssa_mask_acx,ssa_mask_acy,H_ice,f_ice,taud_acx,taud_acy,H_grnd,z_sl,z_bed, &
@@ -53,6 +1510,7 @@ contains
         integer  :: nx, ny
         real(wp) :: dxi, deta
         integer  :: i, j, k, n, m 
+        integer  :: nc, nr
         integer  :: i1, j1, i00, j00
         real(wp) :: inv_dxi, inv_deta, inv_dxi_deta, inv_dxi2, inv_deta2
         real(wp) :: del_sq, inv_del_sq
@@ -92,6 +1550,8 @@ contains
 
         ! Linear equation storage arrays
         ! (not using LIS types here for generality)
+        integer :: nmax
+        integer :: n_sprs 
         integer,  allocatable :: lgs_a_ptr(:)
         integer,  allocatable :: lgs_a_index(:)
         real(wp), allocatable :: lgs_a_value(:)
@@ -104,7 +1564,6 @@ contains
 #include "lisf.h"
         
         LIS_INTEGER :: ierr
-        LIS_INTEGER :: nc, nr
         LIS_INTEGER :: lin_iter
         LIS_REAL    :: residual 
         LIS_REAL    :: solver_time  
@@ -112,7 +1571,6 @@ contains
         LIS_VECTOR  :: lgs_b, lgs_x
         LIS_SOLVER  :: solver
 
-        LIS_INTEGER :: nmax, n_sprs 
         LIS_INTEGER :: lgs_a_index_now
         LIS_SCALAR  :: lgs_a_value_now
         LIS_SCALAR  :: lgs_b_value_now
@@ -260,20 +1718,18 @@ contains
 
         ! =======================================================================
 
-        !-------- Assembly of the system of linear equations
-        !                         (matrix storage: compressed sparse row CSR) --------
-
         allocate(lgs_a_value(n_sprs), lgs_a_index(n_sprs), lgs_a_ptr(nmax+1))
         allocate(lgs_b_value(nmax), lgs_x_value(nmax))
-        allocate(lgs_x_value_out(nmax))
-
+        
         lgs_a_value = 0.0
         lgs_a_index = 0
         lgs_a_ptr   = 0
 
         lgs_b_value = 0.0
         lgs_x_value = 0.0
-        lgs_x_value_out = 0.0
+        
+        !-------- Assembly of the system of linear equations
+        !                         (matrix storage: compressed sparse row CSR) --------
 
         lgs_a_ptr(1) = 1
 
@@ -1377,6 +2833,7 @@ contains
         ! call lis_vector_gather(lgs_x, lgs_x_value, ierr)
         ! call CHKERR(ierr)
 
+        allocate(lgs_x_value_out(nmax))
         lgs_x_value_out = 0.0_prec
         call lis_vector_gather(lgs_x, lgs_x_value_out, ierr)
         lgs_x_value = lgs_x_value_out

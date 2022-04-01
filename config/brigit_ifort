@@ -7,6 +7,10 @@ LISROOT = ${HOME}/apps/lis/lis
 INC_LIS = -I${LISROOT}/include 
 LIB_LIS = -L${LISROOT}/lib/ -llis
 
+PETSCROOT = /opt/local/lib/petsc
+INC_PETSC = -I $(PETSC_DIR)/include
+LIB_PETSC = -L${PETSC_DIR}/lib -lpetsc
+
 FFLAGS  = -module $(objdir) -L$(objdir)
 
 ifeq ($(parallel), 1)
@@ -20,7 +24,16 @@ ifeq ($(parallel), 1)
 
 endif 
 
-LFLAGS  = $(LIB_NC) $(LIB_LIS) -Wl,-zmuldefs
+# Define which linear solvers to include (LIS necessary, PETSC optional)
+INC_LINEAR = $(INC_LIS)
+LIB_LINEAR = $(LIB_LIS)
+ifeq ($(petsc), 1)
+    # Add petsc library to flags
+    INC_LINEAR = $(INC_LIS) $(INC_PETSC) 
+    LIB_LINEAR = $(LIB_LIS) $(LIB_PETSC)
+endif
+
+LFLAGS  = $(LIB_NC) $(LIB_LINEAR) -Wl,-zmuldefs
 
 DFLAGS_NODEBUG = -O2 -fp-model precise
 DFLAGS_DEBUG   = -C -traceback -ftrapuv -fpe0 -check all -fp-model precise

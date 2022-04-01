@@ -1,5 +1,11 @@
 module solver_ssa_ac
 
+
+! Uncomment next line if petsc should be used
+!#define USEPETSC 
+
+
+
     use yelmo_defs, only : sp, dp, wp, prec, io_unit_err, TOL_UNDERFLOW, rho_ice, rho_sw, g 
 
     use grid_calcs  ! For staggering routines 
@@ -39,13 +45,6 @@ module solver_ssa_ac
     public :: linear_solver_matrix_ssa_ac_csr_2D
     public :: linear_solver_matrix_solve
     public :: linear_solver_save_velocity
-
-! ==== PETSC SPECIFIC CODE =====
-#ifdef USEPETSC
-
-    public :: linear_solver_matrix_solve_petsc
-
-#endif
 
 contains 
     
@@ -2073,7 +2072,7 @@ contains
 ! ==== PETSC SPECIFIC CODE =====
 #ifdef USEPETSC
 
-    subroutine linear_solver_matrix_solve_petsc(lgs,rtol,abstol,maxits)
+    subroutine linear_solver_matrix_solve_petsc(lgs,rtol,atol,maxits)
         ! Use PETSC Krylov solver to solve matrix equation Ax=b. Take
         ! predefined A, x and b arrays from the lgs object,
         ! and pass them to lis-specific variables, solve
@@ -2088,7 +2087,7 @@ contains
 
         type(linear_solver_class), intent(INOUT) :: lgs 
         real(wp) :: rtol                    ! Input tolerance parameter
-        real(wp) :: abstol                  ! Input tolerance parameter
+        real(wp) :: atol                    ! Input tolerance parameter
         integer  :: maxits                  ! Input iteration parameter 
 
         ! Local variables
@@ -2100,7 +2099,7 @@ contains
         type(tVec)           :: x
         type(tKSP)           :: KSP_solver
         type(PetscReal)      :: PETSc_rtol
-        type(PetscReal)      :: PETSc_abstol
+        type(PetscReal)      :: PETSc_atol
         type(PetscInt)       :: PETSc_maxits
         
         ! Initialise PETSc MPI stuff
@@ -2120,11 +2119,14 @@ contains
 
         ! Iterative solver tolerances
         PETSc_rtol   = rtol         ! The relative convergence tolerance; relative decrease in the (possibly preconditioned) residual norm
-        PETSc_abstol = abstol       ! The absolute convergence tolerance; absolute size of the (possibly preconditioned) residual norm 
+        PETSc_atol   = atol         ! The absolute convergence tolerance; absolute size of the (possibly preconditioned) residual norm 
         PETSc_maxits = maxits       ! Maximum allowed iterations
-        call KSPSetTolerances( KSP_solver, PETSc_rtol, PETSc_abstol, PETSC_DEFAULT_REAL, PETSc_maxits, perr)
+        call KSPSetTolerances( KSP_solver, PETSc_rtol, PETSc_atol, PETSC_DEFAULT_REAL, PETSc_maxits, perr)
         call handle_error( 'KSPSetTolerances', perr)
         
+        ! To start from nonzero guess
+        !call KSPSetInitialGuessNonzero( KSP_solver,PetscBool flg);
+
         ! Set runtime options, e.g.,
         !     -ksp_type <type> -pc_type <type> -ksp_monitor -ksp_rtol <rtol>
         ! These options will override those specified above as long as
@@ -2135,7 +2137,10 @@ contains
         ! Solve the linear system
         call KSPSolve( KSP_solver, b, x, perr)
         call handle_error( 'KSPSolve', perr)
-      
+        
+        ! Check convergence information
+        !call KSPSetConvergenceTest( KSP_solver, PetscErrorCode (*test)(KSP ksp,PetscInt it,PetscReal rnorm, KSPConvergedReason *reason,void *ctx),void *ctx,PetscErrorCode (*destroy)(void *ctx));
+
         ! Find out how many iterations it took
         call KSPGetIterationNumber( KSP_solver, lin_iter, perr)
         call handle_error( 'KSPGetIterationNumber', perr)
@@ -2163,6 +2168,21 @@ contains
         contains
             ! Petsc specific routines 
             
+            ! subroutine parse_solver_settings_petsc(rtol,atol,dtol,maxits,settings)
+            !     -ksp_rtol <rtol> -ksp_atol <atol> -ksp_divtol <dtol> -ksp_max_it <its>
+
+            !     implicit none
+
+            !     real(wp), intent(OUT) :: rtol 
+            !     real(wp), intent(OUT) :: atol 
+            !     real(wp), intent(OUT) :: dtol 
+            !     integer,  intent(OUT) :: matits 
+            !     character(len=*), intent(IN) :: settings 
+
+            !     return
+
+            ! end subroutine parse_solver_settings_petsc
+
             subroutine convert_lgs_to_petsc(A,b,x,lgs)
                 ! Convert lgs storage object to PETSc matrices A, b and x.
                 ! Adapted from IMAU-ICE petsc_module.F90, which was

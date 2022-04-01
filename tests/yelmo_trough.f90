@@ -2,6 +2,8 @@ program yelmo_trough
     ! For mimicking Feldmann and Levermann (2017, TC) 
     ! and for running mismip+ etc. 
 
+    use mpi 
+
     use ncio 
     use yelmo 
     use deformation 
@@ -15,7 +17,7 @@ program yelmo_trough
     character(len=512) :: path_par, path_const 
     character(len=56)  :: experiment, res  
     real(wp) :: time_init, time_end, time, dtt, dt1D_out, dt2D_out   
-    integer    :: n  
+    integer    :: n
 
     ! Control parameters 
     real(wp) :: dx 
@@ -32,7 +34,12 @@ program yelmo_trough
     integer  :: i, j, nx, ny 
     
     real(8)  :: cpu_start_time, cpu_end_time, cpu_dtime  
-    
+    integer  :: perr 
+
+    ! Initialize MPI
+    call MPI_INIT(perr)
+
+
     ! Start timing 
     call yelmo_cpu_time(cpu_start_time)
     
@@ -89,7 +96,9 @@ program yelmo_trough
     xmax =  lx 
     ymax =  ly/2.0_wp
     ymin = -ly/2.0_wp
-    call yelmo_init_grid(yelmo1%grd,grid_name,units="km",x0=0.0,dx=dx,nx=int(xmax/dx)+1,y0=ymin,dy=dx,ny=int((ymax-ymin)/dx)+1)
+    call yelmo_init_grid(yelmo1%grd,grid_name,units="km", &
+                            x0=0.0_wp,dx=dx,nx=int(xmax/dx)+1, &
+                            y0=ymin,dy=dx,ny=int((ymax-ymin)/dx)+1)
 
     ! === Initialize ice sheet model =====
 
@@ -264,6 +273,9 @@ program yelmo_trough
     write(*,"(a,f12.3,a)") "Time  = ",cpu_dtime/60.0 ," min"
     write(*,"(a,f12.1,a)") "Speed = ",(1e-3*(time_end-time_init))/(cpu_dtime/3600.0), " kiloyears / hr"
     
+    ! Finalize MPI
+    call MPI_FINALIZE(perr)
+
 contains
 
     subroutine trough_f17_topo_init(z_bed,H_ice,z_srf,xc,yc,fc,dc,wc,x_cf)

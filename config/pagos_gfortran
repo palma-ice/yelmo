@@ -1,4 +1,4 @@
-FC = gfortran
+FC = mpif90
 
 INC_NC  = -I/opt/local/include
 #LIB_NC  = -L/opt/local/lib -lnetcdff -lnetcdf
@@ -7,6 +7,10 @@ LIB_NC  = -L/opt/local/lib -lnetcdff -L/opt/local/lib -Wl,-headerpad_max_install
 LISROOT = /Users/robinson/apps/lis/lis
 INC_LIS = -I${LISROOT}/include 
 LIB_LIS = -L${LISROOT}/lib/ -llis
+
+PETSCROOT = /opt/local/lib/petsc
+INC_PETSC = -I $(PETSC_DIR)/include
+LIB_PETSC = -L${PETSC_DIR}/lib -lpetsc
 
 FFLAGS = -I$(objdir) -J$(objdir) -m64 -ffree-line-length-none 
 
@@ -21,7 +25,16 @@ ifeq ($(parallel), 1)
 
 endif 
 
-LFLAGS  = $(LIB_NC) $(LIB_LIS) 
+# Define which linear solvers to include (LIS necessary, PETSC optional)
+INC_LINEAR = $(INC_LIS)
+LIB_LINEAR = $(LIB_LIS)
+ifeq ($(petsc), 1)
+    # Add petsc library to flags
+    INC_LINEAR = $(INC_LIS) $(INC_PETSC) 
+    LIB_LINEAR = $(LIB_LIS) $(LIB_PETSC)
+endif
+
+LFLAGS  = $(LIB_NC) $(LIB_LINEAR)
 
 #-L/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/lib
 

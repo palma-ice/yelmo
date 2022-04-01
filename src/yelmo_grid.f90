@@ -785,15 +785,15 @@ contains
         character(len=*),  intent(IN)    :: grid_name 
         character(len=*),  intent(IN)    :: units
 
-        real(prec),        intent(IN), optional :: x0
-        real(prec),        intent(IN) :: dx
+        real(wp),          intent(IN), optional :: x0
+        real(wp),          intent(IN) :: dx
         integer,           intent(IN) :: nx
-        real(prec),        intent(IN), optional :: y0
-        real(prec),        intent(IN) :: dy
+        real(wp),          intent(IN), optional :: y0
+        real(wp),          intent(IN) :: dy
         integer,           intent(IN) :: ny 
-        real(prec),        intent(IN), optional :: lon(:,:) 
-        real(prec),        intent(IN), optional :: lat(:,:) 
-        real(prec),        intent(IN), optional :: area(:,:) 
+        real(wp),          intent(IN), optional :: lon(:,:) 
+        real(wp),          intent(IN), optional :: lat(:,:) 
+        real(wp),          intent(IN), optional :: area(:,:) 
         
         ! Local variables
         integer    :: i, j

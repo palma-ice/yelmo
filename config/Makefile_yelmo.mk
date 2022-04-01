@@ -79,21 +79,17 @@ $(objdir)/mass_conservation.o : $(srcdir)/physics/mass_conservation.f90 $(objdir
 								$(objdir)/topography.o 
 	$(FC) $(DFLAGS) $(FFLAGS) -c -o $@ $<
 
-$(objdir)/solver_ssa_sico5.o: $(srcdir)/physics/solver_ssa_sico5.F90 $(objdir)/yelmo_defs.o \
-							$(objdir)/yelmo_tools.o $(objdir)/ncio.o
-	$(FC) $(DFLAGS) $(FFLAGS) $(INC_LIS) -c -o $@ $<
-
 $(objdir)/solver_ssa_ac.o: $(srcdir)/physics/solver_ssa_ac.F90 $(objdir)/yelmo_defs.o \
 							$(objdir)/yelmo_tools.o $(objdir)/ncio.o
-	$(FC) $(DFLAGS) $(FFLAGS) $(INC_LIS) -c -o $@ $<
+	$(FC) $(DFLAGS) $(FFLAGS) $(INC_LINEAR) -c -o $@ $<
 
 $(objdir)/solver_ssa_aa.o: $(srcdir)/physics/solver_ssa_aa.F90 $(objdir)/yelmo_defs.o \
 							$(objdir)/yelmo_tools.o $(objdir)/ncio.o $(objdir)/grid_calcs.o
-	$(FC) $(DFLAGS) $(FFLAGS) $(INC_LIS) -c -o $@ $<
+	$(FC) $(DFLAGS) $(FFLAGS) $(INC_LINEAR) -c -o $@ $<
 
 $(objdir)/solver_ssa_ab.o: $(srcdir)/physics/solver_ssa_ab.F90 $(objdir)/yelmo_defs.o \
 							$(objdir)/yelmo_tools.o $(objdir)/ncio.o $(objdir)/grid_calcs.o
-	$(FC) $(DFLAGS) $(FFLAGS) $(INC_LIS) -c -o $@ $<
+	$(FC) $(DFLAGS) $(FFLAGS) $(INC_LINEAR) -c -o $@ $<
 
 $(objdir)/solver_tridiagonal.o: $(srcdir)/physics/solver_tridiagonal.f90 $(objdir)/yelmo_defs.o
 	$(FC) $(DFLAGS) $(FFLAGS) -c -o $@ $<
@@ -103,7 +99,7 @@ $(objdir)/solver_advection.o: $(srcdir)/physics/solver_advection.f90 $(objdir)/y
 	$(FC) $(DFLAGS) $(FFLAGS) -c -o $@ $<
 
 $(objdir)/solver_advection_sico.o : $(srcdir)/physics/solver_advection_sico.F90 $(objdir)/yelmo_defs.o
-	$(FC) $(DFLAGS) $(FFLAGS) $(INC_LIS) -c -o $@ $<
+	$(FC) $(DFLAGS) $(FFLAGS) $(INC_LINEAR) -c -o $@ $<
 
 $(objdir)/solver_advection_new.o: $(srcdir)/physics/solver_advection_new.f90 $(objdir)/yelmo_defs.o \
 								$(objdir)/yelmo_tools.o
@@ -144,26 +140,26 @@ $(objdir)/velocity_diva_ab.o: $(srcdir)/physics/velocity_diva_ab.f90 \
 
 $(objdir)/velocity_l1l2.o: $(srcdir)/physics/velocity_l1l2.f90 \
 						  	$(objdir)/yelmo_defs.o $(objdir)/yelmo_tools.o $(objdir)/basal_dragging.o \
-						  	$(objdir)/solver_ssa_sico5.o $(objdir)/velocity_general.o
+						  	$(objdir)/solver_ssa_ac.o $(objdir)/velocity_general.o
 	$(FC) $(DFLAGS) $(FFLAGS) -c -o $@ $<
 
 ## YELMO BASE ###############################################
 
 $(objdir)/yelmo_defs.o: $(srcdir)/yelmo_defs.f90 $(objdir)/nml.o
-	$(FC) $(DFLAGS) $(FFLAGS) $(INC_LIS) -c -o $@ $<
+	$(FC) $(DFLAGS) $(FFLAGS) $(INC_LINEAR) -c -o $@ $<
 
 $(objdir)/yelmo_grid.o: $(srcdir)/yelmo_grid.f90 $(objdir)/yelmo_defs.o $(objdir)/nml.o $(objdir)/ncio.o
 	$(FC) $(DFLAGS) $(FFLAGS) -c -o $@ $<
 
 $(objdir)/yelmo_regridding.o : $(srcdir)/yelmo_regridding.f90 $(objdir)/yelmo_defs.o $(objdir)/ncio.o
-	$(FC) $(DFLAGS) $(FFLAGS) $(INC_LIS) -c -o $@ $<
+	$(FC) $(DFLAGS) $(FFLAGS) $(INC_LINEAR) -c -o $@ $<
 
 $(objdir)/yelmo_tools.o: $(srcdir)/yelmo_tools.f90 $(objdir)/yelmo_defs.o
 	$(FC) $(DFLAGS) $(FFLAGS) -c -o $@ $<
 
 $(objdir)/yelmo_timesteps.o : $(srcdir)/yelmo_timesteps.f90 $(objdir)/yelmo_defs.o $(objdir)/ncio.o \
 							$(objdir)/topography.o 
-	$(FC) $(DFLAGS) $(FFLAGS) $(INC_LIS) -c -o $@ $<
+	$(FC) $(DFLAGS) $(FFLAGS) $(INC_LINEAR) -c -o $@ $<
 
 $(objdir)/yelmo_topography.o: $(srcdir)/yelmo_topography.f90 $(objdir)/yelmo_defs.o \
 							  $(objdir)/yelmo_grid.o $(objdir)/yelmo_tools.o  \
@@ -179,10 +175,6 @@ $(objdir)/yelmo_dynamics.o: $(srcdir)/yelmo_dynamics.f90 $(objdir)/yelmo_defs.o 
 							$(objdir)/velocity_diva.o \
 							$(objdir)/velocity_diva_ab.o \
 							$(objdir)/velocity_l1l2.o \
-							$(objdir)/solver_ssa_ac.o \
-							$(objdir)/solver_ssa_sico5.o \
-							$(objdir)/solver_ssa_aa.o \
-							$(objdir)/solver_ssa_ab.o \
 							$(objdir)/basal_dragging.o
 	$(FC) $(DFLAGS) $(FFLAGS) -c -o $@ $<
 
@@ -264,7 +256,6 @@ yelmo_physics =  	   $(objdir)/basal_dragging.o \
 					   $(objdir)/ice_tracer.o \
 					   $(objdir)/ice_enthalpy.o \
 					   $(objdir)/mass_conservation.o \
-					   $(objdir)/solver_ssa_sico5.o \
 					   $(objdir)/solver_ssa_ac.o \
 					   $(objdir)/solver_ssa_aa.o \
 					   $(objdir)/solver_ssa_ab.o \

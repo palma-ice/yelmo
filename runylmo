@@ -329,7 +329,8 @@ def main():
     # Generate the appropriate executable command to run job
     if copy_exec:
         # Assume executable is running from rundir
-        executable = "{}./{} {}".format(profiler_prefix,exe_fname,exe_args)
+        #executable = "{}./{} {}".format(profiler_prefix,exe_fname,exe_args)
+        executable = "mpirun -n 1 {}./{} {}".format(profiler_prefix,exe_fname,exe_args)
 
     else:
         # Assume executable will run from current working directory 

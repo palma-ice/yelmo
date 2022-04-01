@@ -11,6 +11,7 @@ testdir = tests
 # Command-line options at make call
 debug    ?= 0
 parallel ?= 0 
+petsc    ?= 0 
 
 ## COMPILER CONFIGURATION ##
 # (should be loaded from config directory)

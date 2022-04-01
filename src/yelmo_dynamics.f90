@@ -12,15 +12,17 @@ module yelmo_dynamics
 
     use velocity_sia 
 
-    use velocity_ssa 
+    use velocity_ssa
+    use solver_ssa_ac 
     ! use velocity_ssa_aa
-    
+    ! use solver_ssa_aa
+
     use velocity_l1l2 
 
     use velocity_diva
     ! use velocity_diva_ab 
+    ! use solver_ssa_ab
 
-    use solver_ssa_sico5
     use basal_dragging  
     use grounding_line_flux 
 

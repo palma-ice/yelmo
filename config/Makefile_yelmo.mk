@@ -146,20 +146,20 @@ $(objdir)/velocity_l1l2.o: $(srcdir)/physics/velocity_l1l2.f90 \
 ## YELMO BASE ###############################################
 
 $(objdir)/yelmo_defs.o: $(srcdir)/yelmo_defs.f90 $(objdir)/nml.o
-	$(FC) $(DFLAGS) $(FFLAGS) $(INC_LINEAR) -c -o $@ $<
+	$(FC) $(DFLAGS) $(FFLAGS) -c -o $@ $<
 
 $(objdir)/yelmo_grid.o: $(srcdir)/yelmo_grid.f90 $(objdir)/yelmo_defs.o $(objdir)/nml.o $(objdir)/ncio.o
 	$(FC) $(DFLAGS) $(FFLAGS) -c -o $@ $<
 
 $(objdir)/yelmo_regridding.o : $(srcdir)/yelmo_regridding.f90 $(objdir)/yelmo_defs.o $(objdir)/ncio.o
-	$(FC) $(DFLAGS) $(FFLAGS) $(INC_LINEAR) -c -o $@ $<
+	$(FC) $(DFLAGS) $(FFLAGS) -c -o $@ $<
 
 $(objdir)/yelmo_tools.o: $(srcdir)/yelmo_tools.f90 $(objdir)/yelmo_defs.o
 	$(FC) $(DFLAGS) $(FFLAGS) -c -o $@ $<
 
 $(objdir)/yelmo_timesteps.o : $(srcdir)/yelmo_timesteps.f90 $(objdir)/yelmo_defs.o $(objdir)/ncio.o \
 							$(objdir)/topography.o 
-	$(FC) $(DFLAGS) $(FFLAGS) $(INC_LINEAR) -c -o $@ $<
+	$(FC) $(DFLAGS) $(FFLAGS) -c -o $@ $<
 
 $(objdir)/yelmo_topography.o: $(srcdir)/yelmo_topography.f90 $(objdir)/yelmo_defs.o \
 							  $(objdir)/yelmo_grid.o $(objdir)/yelmo_tools.o  \

@@ -1,4 +1,5 @@
-FC = mpif90
+#FC = mpif90
+FC = gfortran 
 
 INC_NC  = -I/opt/local/include
 #LIB_NC  = -L/opt/local/lib -lnetcdff -lnetcdf

@@ -1,4 +1,5 @@
-FC  = ifort
+FC  = mpiifort
+#FC  = ifort
 
 INC_NC  = -I${NETCDF_FORTRANROOT}/include
 LIB_NC  = -L${NETCDF_FORTRANROOT}/lib -lnetcdff -L${NETCDF_CROOT}/lib -lnetcdf

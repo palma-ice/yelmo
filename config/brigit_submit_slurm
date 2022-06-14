@@ -1,5 +1,6 @@
 #!/bin/bash
 #SBATCH --qos=<QOS>
+#SBATCH --partition=<PARTITION>
 #SBATCH --time=<WALL>:00:00
 #SBATCH --job-name=<JOBNAME>
 #SBATCH --mail-user=<EMAIL>
@@ -23,4 +24,4 @@ ulimit -v unlimited
 ulimit -a
 
 # Run the job
-srun <CMD> 
+<CMD>

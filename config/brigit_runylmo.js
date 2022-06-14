@@ -7,7 +7,7 @@
         "omp"           : 0,
         "wall"          : 24, 
         "qos"           : "normal",
-        "partition"     : "",
+        "partition"     : "short",
         "job_template"  : "config/brigit_submit_slurm"
     },
 

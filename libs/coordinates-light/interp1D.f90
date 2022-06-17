@@ -155,7 +155,7 @@ contains
 
         return
 
-    end function interp_linear_internal 
+    end function interp_linear_internal
 
 
     subroutine interp1D_bins(y,x,y0,x0)
@@ -306,7 +306,7 @@ contains
 
         return
 
-    end function interp_spline 
+    end function interp_spline
 
 subroutine spline (x, y, b, c, d, n)
 !======================================================================

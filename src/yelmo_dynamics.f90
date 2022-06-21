@@ -814,7 +814,8 @@ contains
                     lambda_bed = calc_lambda_bed_exp(bnd%z_bed,bnd%z_sl,dyn%par%till_z0,dyn%par%till_z1)
 
                     dyn%now%cb_ref = dyn%par%till_cf_ref * lambda_bed 
-                    where(dyn%now%cb_ref .lt. dyn%par%till_cf_min) dyn%now%cb_ref = dyn%par%till_cf_min 
+                    where(dyn%now%cb_ref .lt. dyn%par%till_cf_min) dyn%now%cb_ref = dyn%par%till_cf_min * dyn%par%till_cf_negis 
+                    where(bnd%basins .eq. 9) dyn%now%cb_ref = dyn%par%till_cf_ref * dyn%par%till_cf_negis * lambda_bed 
 
                 case DEFAULT
                     ! Scaling not recognized.

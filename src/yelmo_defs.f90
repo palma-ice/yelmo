@@ -260,6 +260,7 @@ module yelmo_defs
         real(wp)   :: till_z1 
         real(wp)   :: till_cf_min
         real(wp)   :: till_cf_ref 
+        real(wp)   :: till_cf_negis
 
         ! Effective pressure parameters
         integer    :: neff_method

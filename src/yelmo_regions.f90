@@ -49,7 +49,7 @@ contains
 
         ! Local variables
         integer  :: nx, ny
-        real(wp) :: npts_tot, npts_grnd, npts_flt 
+        real(wp) :: npts_tot, npts_grnd, npts_flt, npts_grl, npts_frnt 
 
         real(wp) :: m3_km3 = 1e-9 
         real(wp) :: m2_km2 = 1e-6 
@@ -58,7 +58,9 @@ contains
         logical, allocatable :: mask_tot(:,:) 
         logical, allocatable :: mask_grnd(:,:) 
         logical, allocatable :: mask_flt(:,:) 
-        
+        logical, allocatable :: mask_grl(:,:)
+        logical, allocatable :: mask_frnt(:,:)       
+ 
         real(wp), allocatable :: H_af(:,:) 
 
         ! Conversion parameter 
@@ -72,21 +74,27 @@ contains
         allocate(mask_tot(nx,ny))
         allocate(mask_grnd(nx,ny))
         allocate(mask_flt(nx,ny))
-        
+        allocate(mask_grl(nx,ny))
+        allocate(mask_frnt(nx,ny))       
+ 
         allocate(H_af(nx,ny)) 
 
         ! Define masks 
         mask_tot  = (mask .and. tpo%now%H_ice .gt. 0.0) 
         mask_grnd = (mask .and. tpo%now%H_ice .gt. 0.0 .and. tpo%now%f_grnd .gt. 0.0)
         mask_flt  = (mask .and. tpo%now%H_ice .gt. 0.0 .and. tpo%now%f_grnd .eq. 0.0)
-         
+        mask_grl  = (mask .and. tpo%now%f_grnd .gt. 0.0 .and. tpo%now%f_grnd .lt. 1.0)         
+        mask_frnt = (mask .and. tpo%now%calv_flt .gt. 0.0) ! Ice shelf front
+
         ! Calculate ice thickness above flotation 
         call calc_H_af(H_af,tpo%now%H_ice,tpo%now%f_ice,bnd%z_bed,bnd%z_sl,use_f_ice=.FALSE.)
 
         npts_tot  = real(count(mask_tot),prec)
         npts_grnd = real(count(mask_grnd),prec)
         npts_flt  = real(count(mask_flt),prec)
-        
+        npts_grl  = real(count(mask_grl),prec)      
+        npts_frnt = real(count(mask_frnt),prec) 
+ 
         ! ===== Total ice variables =====
 
         if (npts_tot .gt. 0) then 
@@ -119,10 +127,8 @@ contains
             reg%bmb        = sum(tpo%now%bmb,mask=mask_tot)/npts_tot
             
             ! ISMIP6 boundary: jablasco
-            reg%smb_tot     = sum(bnd%smb,mask=mask_tot)
-            reg%bmb_tot     = sum(tpo%now%bmb,mask=mask_tot)
-            reg%bmb_shlf_t  = sum(tpo%now%bmb,mask=mask_flt)         
-
+            reg%smb_tot     = sum(bnd%smb,mask=mask_tot)*reg%A_ice*1e6       ! m^3/yr: flux
+            reg%bmb_tot     = sum(tpo%now%bmb,mask=mask_tot)*(reg%A_ice*1e6) ! m^3/yr: flux
  
         else 
 
@@ -154,7 +160,6 @@ contains
             ! ISMIP6 variables
             reg%smb_tot     = 0.0_wp
             reg%bmb_tot     = 0.0_wp
-            reg%bmb_shlf_t  = 0.0_wp           
  
         end if 
 
@@ -215,10 +220,13 @@ contains
             reg%uxy_b_f      = sum(dyn%now%uxy_b,mask=mask_flt)/npts_flt        ! [m/a]
 
             ! Boundary variables
-            reg%z_sl         = sum(bnd%z_sl,mask=mask_grnd)/npts_grnd             ! [m]
+            reg%z_sl         = sum(bnd%z_sl,mask=mask_grnd)/npts_grnd           ! [m]
             reg%bmb_shlf     = sum(tpo%now%bmb,mask=mask_flt)/npts_flt
             reg%T_shlf       = sum(bnd%T_shlf,mask=mask_flt)/npts_flt
-            
+           
+            ! jablasco: ISMIP6
+            reg%bmb_shlf_t  = sum(tpo%now%bmb,mask=mask_flt)*(reg%A_ice_f*1e6)  ! m^3/yr: flux
+ 
         else 
 
             ! ytopo variables 
@@ -234,11 +242,44 @@ contains
             
             ! Boundary variables
             reg%z_sl         = 0.0_wp 
-            reg%bmb_shlf     = 0.0_wp 
+            reg%bmb_shlf     = 0.0_wp
+            reg%bmb_shlf_t   = 0.0_wp 
             reg%T_shlf       = 0.0_wp 
             
         end if 
-        
+       
+        ! ===== Grounding-line ice variables =====
+
+        if (npts_flt .gt. 0) then
+
+            reg%A_ice_grl = count(tpo%now%H_ice .gt. 0.0 .and. mask_grl)*tpo%par%dx*tpo%par%dy*m2_km2 ! [km^2]
+            reg%flux_grl  = sum(tpo%now%H_ice,mask=mask_grl)*(reg%A_ice_grl*1e6)                      ! m^3/yr: flux
+
+        else
+
+            ! ISMIP&: jablasco
+            reg%A_ice_grl = 0.0_wp
+            reg%flux_grl  = 0.0_wp
+
+        end if
+ 
+        ! ===== Frontal ice-shelves variables =====
+
+        if (npts_frnt .gt. 0) then
+
+            reg%A_ice_frnt = count(tpo%now%H_ice .gt. 0.0 .and. mask_grl)*tpo%par%dx*tpo%par%dy*m2_km2 ! [km^2]
+            reg%calv_flt   = sum(tpo%now%calv_flt,mask=mask_frnt)*(reg%A_ice_frnt*1e6)
+            reg%flux_frnt  = reg%calv_flt+sum(tpo%now%fmb,mask=mask_frnt)*(reg%A_ice_frnt*1e6)         ! m^3/yr: flux [m-1 yr-1]
+
+        else
+
+            ! ISMIP&: jablasco
+            reg%A_ice_frnt = 0.0_wp
+            reg%calv_flt   = 0.0_wp 
+            reg%flux_frnt  = 0.0_wp
+
+        end if
+
         return 
 
     end subroutine calc_yregions
@@ -365,15 +406,6 @@ contains
         call nc_write(filename,"bmb",reg%bmb,units="m/a",long_name="Mean total basal mass balance", &
                       dim1="time",start=[n],ncid=ncid)
         
-        ! ===== ISMIP6 =====
-        call nc_write(filename,"smb_tot",reg%smb_tot,units="m/a",long_name="Total surface mass balance", &
-                      dim1="time",start=[n],ncid=ncid)
-        call nc_write(filename,"bmb_tot",reg%bmb_tot,units="m/a",long_name="Total basal mass balance", &
-                      dim1="time",start=[n],ncid=ncid)
-        call nc_write(filename,"bmb_shlf_t",reg%bmb_shlf_t,units="m/a",long_name="Total floating basal mass balance", &
-                      dim1="time",start=[n],ncid=ncid) 
-
-
         ! ===== Grounded ice variables =====
 
         call nc_write(filename,"H_ice_g",reg%H_ice_g,units="m",long_name="Mean ice thickness (grounded)", &
@@ -423,6 +455,21 @@ contains
                       dim1="time",start=[n],ncid=ncid)
         call nc_write(filename,"T_shlf",reg%T_shlf,units="K",long_name="Mean marine shelf temperature (floating)", &
                       dim1="time",start=[n],ncid=ncid)
+
+        ! ===== ISMIP6 =====
+        call nc_write(filename,"smb_tot",reg%smb_tot,units="m^3 a-1",long_name="Total surface mass balance (flux)", &
+                      dim1="time",start=[n],ncid=ncid)
+        call nc_write(filename,"bmb_tot",reg%bmb_tot,units="m^3 a-1",long_name="Total basal mass balance (flux)", &
+                      dim1="time",start=[n],ncid=ncid)
+        call nc_write(filename,"bmb_shlf_t",reg%bmb_shlf_t,units="m^3 a-1",long_name="Total floating basal mass balance (flux)", &
+                      dim1="time",start=[n],ncid=ncid)
+        call nc_write(filename,"calv_flt",reg%calv_flt,units="m^3 a-1",long_name="Total calving at the ice front (flux)", &
+                      dim1="time",start=[n],ncid=ncid)
+        call nc_write(filename,"flux_grl",reg%flux_grl,units="m^3 a-1",long_name="Grounding-line flux", &
+                      dim1="time",start=[n],ncid=ncid)
+        call nc_write(filename,"flux_frnt",reg%flux_frnt,units="m^3 a-1",long_name="Total calving and frontal melt (flux)", &
+                      dim1="time",start=[n],ncid=ncid)
+
 
         ! Close the netcdf file
         call nc_close(ncid)

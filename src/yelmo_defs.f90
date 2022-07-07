@@ -612,6 +612,9 @@ module yelmo_defs
         real(wp), allocatable :: smb_tot(:,:)
         real(wp), allocatable :: bmb_tot(:,:)
         real(wp), allocatable :: bmb_shlf_t(:,:)
+        real(wp), allocatable :: calv_flt(:,:)
+        real(wp), allocatable :: flux_grl(:,:)
+        real(wp), allocatable :: flux_frnt(:,:)
 
         real(wp), allocatable :: enh_srf(:,:)
 
@@ -709,8 +712,14 @@ module yelmo_defs
         real(wp)   :: f_pmp, H_w, bmb_g 
 
         ! ===== Floating ice variables =====
-        real(wp)   :: H_ice_f, V_ice_f, A_ice_f, uxy_bar_f, uxy_s_f, uxy_b_f, z_sl, bmb_shlf, bmb_shlf_t, T_shlf
-        
+        real(wp)   :: H_ice_f, V_ice_f, A_ice_f, uxy_bar_f, uxy_s_f, uxy_b_f, z_sl, bmb_shlf, bmb_shlf_t, T_shlf, calv_flt
+       
+        ! ===== Grounding-line variables =====
+        real(wp)   :: A_ice_grl, flux_grl
+
+        ! ===== Ice-shelf front variables =====
+        real(wp)   :: A_ice_frnt, flux_frnt 
+
     end type
 
     ! =========================================================================

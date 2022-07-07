@@ -118,6 +118,12 @@ contains
             reg%T_srf      = sum(bnd%T_srf,mask=mask_tot)/npts_tot
             reg%bmb        = sum(tpo%now%bmb,mask=mask_tot)/npts_tot
             
+            ! ISMIP6 boundary: jablasco
+            reg%smb_tot     = sum(bnd%smb,mask=mask_tot)
+            reg%bmb_tot     = sum(tpo%now%bmb,mask=mask_tot)
+            reg%bmb_shlf_t  = sum(tpo%now%bmb,mask=mask_flt)         
+
+ 
         else 
 
             ! ytopo variables 
@@ -145,6 +151,11 @@ contains
             reg%T_srf      = 0.0_wp 
             reg%bmb        = 0.0_wp 
             
+            ! ISMIP6 variables
+            reg%smb_tot     = 0.0_wp
+            reg%bmb_tot     = 0.0_wp
+            reg%bmb_shlf_t  = 0.0_wp           
+ 
         end if 
 
         ! ===== Grounded ice variables =====
@@ -354,6 +365,13 @@ contains
         call nc_write(filename,"bmb",reg%bmb,units="m/a",long_name="Mean total basal mass balance", &
                       dim1="time",start=[n],ncid=ncid)
         
+        ! ===== ISMIP6 =====
+        call nc_write(filename,"smb_tot",reg%smb_tot,units="m/a",long_name="Total surface mass balance", &
+                      dim1="time",start=[n],ncid=ncid)
+        call nc_write(filename,"bmb_tot",reg%bmb_tot,units="m/a",long_name="Total basal mass balance", &
+                      dim1="time",start=[n],ncid=ncid)
+        call nc_write(filename,"bmb_shlf_t",reg%bmb_shlf_t,units="m/a",long_name="Total floating basal mass balance", &
+                      dim1="time",start=[n],ncid=ncid) 
 
 
         ! ===== Grounded ice variables =====

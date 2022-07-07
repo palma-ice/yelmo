@@ -608,6 +608,11 @@ module yelmo_defs
         real(wp), allocatable :: T_shlf(:,:)
         real(wp), allocatable :: Q_geo(:,:)
 
+        ! ISMIP6
+        real(wp), allocatable :: smb_tot(:,:)
+        real(wp), allocatable :: bmb_tot(:,:)
+        real(wp), allocatable :: bmb_shlf_t(:,:)
+
         real(wp), allocatable :: enh_srf(:,:)
 
         ! Useful masks
@@ -697,14 +702,14 @@ module yelmo_defs
         ! ===== Total ice variables =====
         real(wp)   :: H_ice, z_srf, dHicedt, H_ice_max, dzsrfdt
         real(wp)   :: V_ice, A_ice, dVicedt, fwf, V_sl, V_sle
-        real(wp)   :: uxy_bar, uxy_s, uxy_b, z_bed, smb, T_srf, bmb
+        real(wp)   :: uxy_bar, uxy_s, uxy_b, z_bed, smb, smb_tot, T_srf, bmb, bmb_tot
 
         ! ===== Grounded ice variables =====
         real(wp)   :: H_ice_g, z_srf_g, V_ice_g, A_ice_g, uxy_bar_g, uxy_s_g, uxy_b_g
         real(wp)   :: f_pmp, H_w, bmb_g 
 
         ! ===== Floating ice variables =====
-        real(wp)   :: H_ice_f, V_ice_f, A_ice_f, uxy_bar_f, uxy_s_f, uxy_b_f, z_sl, bmb_shlf, T_shlf
+        real(wp)   :: H_ice_f, V_ice_f, A_ice_f, uxy_bar_f, uxy_s_f, uxy_b_f, z_sl, bmb_shlf, bmb_shlf_t, T_shlf
         
     end type
 

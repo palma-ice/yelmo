@@ -199,8 +199,10 @@ contains
         allocate(now%z_sl(nx,ny))
         allocate(now%H_sed(nx,ny))
         allocate(now%smb(nx,ny))
+        allocate(now%smb_tot(nx,ny))
         allocate(now%T_srf(nx,ny))
         allocate(now%bmb_shlf(nx,ny))
+        allocate(now%bmb_shlf_t(nx,ny))
         allocate(now%fmb_shlf(nx,ny))
         allocate(now%T_shlf(nx,ny))
         allocate(now%Q_geo(nx,ny))
@@ -222,9 +224,11 @@ contains
         now%z_bed_sd    = 0.0_prec
         now%z_sl        = 0.0_prec 
         now%H_sed       = 0.0_prec 
-        now%smb         = 0.0_prec 
+        now%smb         = 0.0_prec
+        now%smb_tot     = 0.0_prec 
         now%T_srf       = 0.0_prec 
-        now%bmb_shlf    = 0.0_prec 
+        now%bmb_shlf    = 0.0_prec
+        now%bmb_shlf_t  = 0.0_prec 
         now%fmb_shlf    = 0.0_prec 
         now%T_shlf      = 0.0_prec 
         now%Q_geo       = 0.0_prec 
@@ -257,8 +261,10 @@ contains
         if (allocated(now%z_sl))        deallocate(now%z_sl)
         if (allocated(now%H_sed))       deallocate(now%H_sed)
         if (allocated(now%smb))         deallocate(now%smb)
+        if (allocated(now%smb_tot))         deallocate(now%smb_tot)
         if (allocated(now%T_srf))       deallocate(now%T_srf)
         if (allocated(now%bmb_shlf))    deallocate(now%bmb_shlf)
+        if (allocated(now%bmb_shlf_t))    deallocate(now%bmb_shlf_t)
         if (allocated(now%fmb_shlf))    deallocate(now%fmb_shlf)
         if (allocated(now%T_shlf))      deallocate(now%T_shlf)
         if (allocated(now%Q_geo))       deallocate(now%Q_geo)

@@ -307,7 +307,7 @@ contains
 
     end subroutine yelmo_write_reg_init
 
-    subroutine yelmo_write_reg_step(dom,filename,time,mask,reg_now)
+    subroutine yelmo_write_reg_step(dom,filename,time,mask,reg_now,ismip6)
 
         implicit none 
         
@@ -315,13 +315,24 @@ contains
         character(len=*),     intent(IN) :: filename
         real(wp),             intent(IN) :: time
         logical, intent(IN), optional    :: mask(:,:) 
+        logical, intent(IN), optional    :: ismip6
         type(yregions_class), intent(IN), optional :: reg_now 
 
         ! Local variables
         integer    :: ncid, n
         real(wp) :: time_prev 
         type(yregions_class) :: reg
-        
+        real(wp) :: myr_to_mmd, mmd_to_kgms, yr_to_sec, density_corr, ismip6_correction, rho_ice
+
+        myr_to_mmd   = 10e3/365.0   ! 1 m/yr to mm/d
+        mmd_to_kgms  = 1/86400.0    ! mm/d to kg m^-2 s^-1
+        yr_to_sec    = 31536000.0   ! 1 yr to sec
+        density_corr = 917.0/1000.0 ! ice density correction with pure water
+
+        ismip6_correction = myr_to_mmd*mmd_to_kgms*density_corr
+
+        rho_ice = 917.0 ! ice density kg/m3
+ 
         ! 1. Determine regional values of variables 
 
         if (present(mask) .and. present(reg_now)) then 
@@ -364,112 +375,133 @@ contains
         ! Update the time step
         call nc_write(filename,"time",time,dim1="time",start=[n],count=[1],ncid=ncid)
 
-        ! ===== Total ice variables =====
+        if(present(ismip6) .and. ismip6 .eqv. .TRUE.) then
+            ! ===== ISMIP6 =====
+            call nc_write(filename,"V_sl",reg%V_sl*1e-6,units="1e6 km^3",long_name="Ice volume above flotation", &
+                          dim1="time",start=[n],ncid=ncid)
+            call nc_write(filename,"V_sle",reg%V_sle,units="m sle",long_name="Sea-level equivalent volume", &
+                          dim1="time",start=[n],ncid=ncid)
 
-        call nc_write(filename,"H_ice",reg%H_ice,units="m",long_name="Mean ice thickness", &
-                      dim1="time",start=[n],ncid=ncid)
-        call nc_write(filename,"z_srf",reg%z_srf,units="m",long_name="Mean surface elevation", &
-                      dim1="time",start=[n],ncid=ncid)
-        call nc_write(filename,"dHicedt",reg%dHicedt,units="m/a",long_name="Mean rate ice thickness change", &
-                      dim1="time",start=[n],ncid=ncid)
-        call nc_write(filename,"H_ice_max",reg%H_ice_max,units="m/a",long_name="Max ice thickness", &
-                      dim1="time",start=[n],ncid=ncid)
-        call nc_write(filename,"dzsrfdt",reg%dzsrfdt,units="m/a",long_name="Mean rate surface elevation change", &
-                      dim1="time",start=[n],ncid=ncid)
+            ! ===== Mass ===== 
+            call nc_write(filename,"lim",reg%V_ice*rho_ice*1e9,units="kg",long_name="Total ice mass", &
+                          standard_name="land_ice_mass",dim1="time",start=[n],ncid=ncid)
+            call nc_write(filename,"limnsw",reg%V_sl*rho_ice*1e9,units="kg",long_name="Mass above flotation", &
+                          standard_name="land_ice_mass_not_displacing_sea_water",dim1="time",start=[n],ncid=ncid)
+
+            ! ===== Area ====
+            call nc_write(filename,"iareagr",reg%A_ice_g*1e6,units="m^2",long_name="Grounded ice area", &
+                          standard_name="grounded_ice_sheet_area",dim1="time",start=[n],ncid=ncid)
+            call nc_write(filename,"iareafl",reg%A_ice_f*1e6,units="m^2",long_name="Floating ice area", &
+                          standard_name="floating_ice_shelf_area",dim1="time",start=[n],ncid=ncid)
+
+            ! ==== Flux ====
+            call nc_write(filename,"tendacabf",reg%smb_tot*ismip6_correction,units="kg s-1",long_name="Total SMB flux", &
+                          standard_name="tendency_of_land_ice_mass_due_to_surface_mass_balance",dim1="time",start=[n],ncid=ncid)
+            call nc_write(filename,"tendlibmassbf ",reg%bmb_tot*ismip6_correction,units="kg s-1",long_name="Total BMB flux", &
+                          standard_name="tendency_of_land_ice_mass_due_to_basal_mass_balance",dim1="time",start=[n],ncid=ncid)
+            call nc_write(filename,"tendlibmassbffl",reg%bmb_shlf_t*ismip6_correction,units="kg s-1",long_name="Total BMB flux beneath floating ice", &
+                          standard_name="tendency_of_land_ice_mass_due_to_basal_mass_balance",dim1="time",start=[n],ncid=ncid)
+            call nc_write(filename,"tendlicalvf",reg%calv_flt*ismip6_correction,units="kg s-1",long_name="Total calving flux", &
+                          standard_name="tendency_of_land_ice_mass_due_to_calving",dim1="time",start=[n],ncid=ncid)
+            call nc_write(filename,"tendlifmassbf",reg%flux_frnt*ismip6_correction,units="kg s-1",long_name="Total calving and ice front melting flux", &
+                          standard_name="tendency_of_land_ice_mass_due_to_calving_and_ice_front_melting",dim1="time",start=[n],ncid=ncid)
+            call nc_write(filename,"tendligroundf",reg%flux_grl*ismip6_correction,units="kg s-1",long_name="Total grounding line flux", &
+                          standard_name="tendency_of_grounded_ice_mass",dim1="time",start=[n],ncid=ncid)
+
+        else
+            ! ===== Total ice variables =====
+
+            call nc_write(filename,"H_ice",reg%H_ice,units="m",long_name="Mean ice thickness", &
+                          dim1="time",start=[n],ncid=ncid)
+            call nc_write(filename,"z_srf",reg%z_srf,units="m",long_name="Mean surface elevation", &
+                          dim1="time",start=[n],ncid=ncid)
+            call nc_write(filename,"dHicedt",reg%dHicedt,units="m/a",long_name="Mean rate ice thickness change", &
+                          dim1="time",start=[n],ncid=ncid)
+            call nc_write(filename,"H_ice_max",reg%H_ice_max,units="m/a",long_name="Max ice thickness", &
+                          dim1="time",start=[n],ncid=ncid)
+            call nc_write(filename,"dzsrfdt",reg%dzsrfdt,units="m/a",long_name="Mean rate surface elevation change", &
+                          dim1="time",start=[n],ncid=ncid)
         
-        call nc_write(filename,"V_ice",reg%V_ice*1e-6,units="1e6 km^3",long_name="Ice volume", &
-                      dim1="time",start=[n],ncid=ncid)
-        call nc_write(filename,"A_ice",reg%A_ice*1e-6,units="1e6 km^2",long_name="Ice area", &
-                      dim1="time",start=[n],ncid=ncid)
-        call nc_write(filename,"dVicedt",reg%dVicedt,units="km^3/a",long_name="Rate volume change", &
-                      dim1="time",start=[n],ncid=ncid)
-        call nc_write(filename,"fwf",reg%fwf,units="Sv",long_name="Rate volume change", &
-                      dim1="time",start=[n],ncid=ncid)
-        call nc_write(filename,"V_sl",reg%V_sl*1e-6,units="1e6 km^3",long_name="Ice volume above flotation", &
-                      dim1="time",start=[n],ncid=ncid)
-        call nc_write(filename,"V_sle",reg%V_sle,units="m sle",long_name="Sea-level equivalent volume", &
-                      dim1="time",start=[n],ncid=ncid)
+            call nc_write(filename,"V_ice",reg%V_ice*1e-6,units="1e6 km^3",long_name="Ice volume", &
+                          dim1="time",start=[n],ncid=ncid)
+            call nc_write(filename,"A_ice",reg%A_ice*1e-6,units="1e6 km^2",long_name="Ice area", &
+                          dim1="time",start=[n],ncid=ncid)
+            call nc_write(filename,"dVicedt",reg%dVicedt,units="km^3/a",long_name="Rate volume change", &
+                          dim1="time",start=[n],ncid=ncid)
+            call nc_write(filename,"fwf",reg%fwf,units="Sv",long_name="Rate volume change", &
+                          dim1="time",start=[n],ncid=ncid)
+            call nc_write(filename,"V_sl",reg%V_sl*1e-6,units="1e6 km^3",long_name="Ice volume above flotation", &
+                          dim1="time",start=[n],ncid=ncid)
+            call nc_write(filename,"V_sle",reg%V_sle,units="m sle",long_name="Sea-level equivalent volume", &
+                          dim1="time",start=[n],ncid=ncid)
 
-        call nc_write(filename,"uxy_bar",reg%uxy_bar,units="m/a",long_name="Mean depth-ave velocity", &
-                      dim1="time",start=[n],ncid=ncid)
-        call nc_write(filename,"uxy_s",reg%uxy_s,units="m/a",long_name="Mean surface velocity", &
-                      dim1="time",start=[n],ncid=ncid)
-        call nc_write(filename,"uxy_b",reg%uxy_b,units="m/a",long_name="Mean basal velocity", &
-                      dim1="time",start=[n],ncid=ncid)
+            call nc_write(filename,"uxy_bar",reg%uxy_bar,units="m/a",long_name="Mean depth-ave velocity", &
+                          dim1="time",start=[n],ncid=ncid)
+            call nc_write(filename,"uxy_s",reg%uxy_s,units="m/a",long_name="Mean surface velocity", &
+                          dim1="time",start=[n],ncid=ncid)
+            call nc_write(filename,"uxy_b",reg%uxy_b,units="m/a",long_name="Mean basal velocity", &
+                          dim1="time",start=[n],ncid=ncid)
 
-        call nc_write(filename,"z_bed",reg%z_bed,units="m",long_name="Mean bedrock elevation", &
-                      dim1="time",start=[n],ncid=ncid)
-        call nc_write(filename,"smb",reg%smb,units="m/a",long_name="Mean surface mass balance", &
-                      dim1="time",start=[n],ncid=ncid)
-        call nc_write(filename,"T_srf",reg%T_srf,units="K",long_name="Mean surface temperature", &
-                      dim1="time",start=[n],ncid=ncid)
-        call nc_write(filename,"bmb",reg%bmb,units="m/a",long_name="Mean total basal mass balance", &
-                      dim1="time",start=[n],ncid=ncid)
+            call nc_write(filename,"z_bed",reg%z_bed,units="m",long_name="Mean bedrock elevation", &
+                          dim1="time",start=[n],ncid=ncid)
+            call nc_write(filename,"smb",reg%smb,units="m/a",long_name="Mean surface mass balance", &
+                          dim1="time",start=[n],ncid=ncid)
+            call nc_write(filename,"T_srf",reg%T_srf,units="K",long_name="Mean surface temperature", &
+                          dim1="time",start=[n],ncid=ncid)
+            call nc_write(filename,"bmb",reg%bmb,units="m/a",long_name="Mean total basal mass balance", &
+                          dim1="time",start=[n],ncid=ncid)
         
-        ! ===== Grounded ice variables =====
+            ! ===== Grounded ice variables =====
 
-        call nc_write(filename,"H_ice_g",reg%H_ice_g,units="m",long_name="Mean ice thickness (grounded)", &
-                      dim1="time",start=[n],ncid=ncid)
-        call nc_write(filename,"z_srf_g",reg%z_srf_g,units="m",long_name="Mean surface elevation (grounded)", &
-                      dim1="time",start=[n],ncid=ncid)
-        call nc_write(filename,"V_ice_g",reg%V_ice_g*1e-6,units="1e6 km^3",long_name="Ice volume (grounded)", &
-                      dim1="time",start=[n],ncid=ncid)
-        call nc_write(filename,"A_ice_g",reg%A_ice_g*1e-6,units="1e6 km^2",long_name="Ice area (grounded)", &
-                      dim1="time",start=[n],ncid=ncid)
+            call nc_write(filename,"H_ice_g",reg%H_ice_g,units="m",long_name="Mean ice thickness (grounded)", &
+                          dim1="time",start=[n],ncid=ncid)
+            call nc_write(filename,"z_srf_g",reg%z_srf_g,units="m",long_name="Mean surface elevation (grounded)", &
+                          dim1="time",start=[n],ncid=ncid)
+            call nc_write(filename,"V_ice_g",reg%V_ice_g*1e-6,units="1e6 km^3",long_name="Ice volume (grounded)", &
+                          dim1="time",start=[n],ncid=ncid)
+            call nc_write(filename,"A_ice_g",reg%A_ice_g*1e-6,units="1e6 km^2",long_name="Ice area (grounded)", &
+                          dim1="time",start=[n],ncid=ncid)
 
-        call nc_write(filename,"uxy_bar_g",reg%uxy_bar_g,units="m/a",long_name="Mean depth-ave velocity (grounded)", &
-                      dim1="time",start=[n],ncid=ncid)
-        call nc_write(filename,"uxy_s_g",reg%uxy_s_g,units="m/a",long_name="Mean surface velocity (grounded)", &
-                      dim1="time",start=[n],ncid=ncid)
-        call nc_write(filename,"uxy_b_g",reg%uxy_b_g,units="m/a",long_name="Mean basal velocity (grounded)", &
-                      dim1="time",start=[n],ncid=ncid)
+            call nc_write(filename,"uxy_bar_g",reg%uxy_bar_g,units="m/a",long_name="Mean depth-ave velocity (grounded)", &
+                          dim1="time",start=[n],ncid=ncid)
+            call nc_write(filename,"uxy_s_g",reg%uxy_s_g,units="m/a",long_name="Mean surface velocity (grounded)", &
+                          dim1="time",start=[n],ncid=ncid)
+            call nc_write(filename,"uxy_b_g",reg%uxy_b_g,units="m/a",long_name="Mean basal velocity (grounded)", &
+                          dim1="time",start=[n],ncid=ncid)
         
-        call nc_write(filename,"f_pmp",reg%f_pmp,units="1",long_name="Temperate fraction (grounded)", &
-                      dim1="time",start=[n],ncid=ncid)
+            call nc_write(filename,"f_pmp",reg%f_pmp,units="1",long_name="Temperate fraction (grounded)", &
+                          dim1="time",start=[n],ncid=ncid)
         
-        call nc_write(filename,"H_w",reg%H_w,units="m",long_name="Mean basal water thickness (grounded)", &
-                      dim1="time",start=[n],ncid=ncid)
+            call nc_write(filename,"H_w",reg%H_w,units="m",long_name="Mean basal water thickness (grounded)", &
+                          dim1="time",start=[n],ncid=ncid)
         
-        call nc_write(filename,"bmb_g",reg%bmb_g,units="m/a",long_name="Mean basal mass balance (grounded)", &
-                      dim1="time",start=[n],ncid=ncid)
+            call nc_write(filename,"bmb_g",reg%bmb_g,units="m/a",long_name="Mean basal mass balance (grounded)", &
+                          dim1="time",start=[n],ncid=ncid)
         
-        ! ===== Floating ice variables =====
+            ! ===== Floating ice variables =====
 
-        call nc_write(filename,"H_ice_f",reg%H_ice_f,units="m",long_name="Mean ice thickness (floating)", &
-                      dim1="time",start=[n],ncid=ncid)
-        call nc_write(filename,"V_ice_f",reg%V_ice_f*1e-6,units="1e6 km^3",long_name="Ice volume (floating)", &
-                      dim1="time",start=[n],ncid=ncid)
-        call nc_write(filename,"A_ice_f",reg%A_ice_f*1e-6,units="1e6 km^2",long_name="Ice area (floating)", &
-                      dim1="time",start=[n],ncid=ncid)
+            call nc_write(filename,"H_ice_f",reg%H_ice_f,units="m",long_name="Mean ice thickness (floating)", &
+                          dim1="time",start=[n],ncid=ncid)
+            call nc_write(filename,"V_ice_f",reg%V_ice_f*1e-6,units="1e6 km^3",long_name="Ice volume (floating)", &
+                          dim1="time",start=[n],ncid=ncid)
+            call nc_write(filename,"A_ice_f",reg%A_ice_f*1e-6,units="1e6 km^2",long_name="Ice area (floating)", &
+                          dim1="time",start=[n],ncid=ncid)
 
-        call nc_write(filename,"uxy_bar_f",reg%uxy_bar_f,units="m/a",long_name="Mean depth-ave velocity (floating)", &
-                      dim1="time",start=[n],ncid=ncid)
-        call nc_write(filename,"uxy_s_f",reg%uxy_s_f,units="m/a",long_name="Mean surface velocity (floating)", &
-                      dim1="time",start=[n],ncid=ncid)
-        call nc_write(filename,"uxy_b_f",reg%uxy_b_f,units="m/a",long_name="Mean basal velocity (floating)", &
-                      dim1="time",start=[n],ncid=ncid)
+            call nc_write(filename,"uxy_bar_f",reg%uxy_bar_f,units="m/a",long_name="Mean depth-ave velocity (floating)", &
+                          dim1="time",start=[n],ncid=ncid)
+            call nc_write(filename,"uxy_s_f",reg%uxy_s_f,units="m/a",long_name="Mean surface velocity (floating)", &
+                          dim1="time",start=[n],ncid=ncid)
+            call nc_write(filename,"uxy_b_f",reg%uxy_b_f,units="m/a",long_name="Mean basal velocity (floating)", &
+                          dim1="time",start=[n],ncid=ncid)
         
-        call nc_write(filename,"z_sl",reg%z_sl,units="m",long_name="Mean sea level (floating)", &
-                      dim1="time",start=[n],ncid=ncid)
-        call nc_write(filename,"bmb_shlf",reg%bmb_shlf,units="m/a",long_name="Mean basal mass balance (floating)", &
-                      dim1="time",start=[n],ncid=ncid)
-        call nc_write(filename,"T_shlf",reg%T_shlf,units="K",long_name="Mean marine shelf temperature (floating)", &
-                      dim1="time",start=[n],ncid=ncid)
+            call nc_write(filename,"z_sl",reg%z_sl,units="m",long_name="Mean sea level (floating)", &
+                          dim1="time",start=[n],ncid=ncid)
+            call nc_write(filename,"bmb_shlf",reg%bmb_shlf,units="m/a",long_name="Mean basal mass balance (floating)", &
+                          dim1="time",start=[n],ncid=ncid)
+            call nc_write(filename,"T_shlf",reg%T_shlf,units="K",long_name="Mean marine shelf temperature (floating)", &
+                          dim1="time",start=[n],ncid=ncid)
 
-        ! ===== ISMIP6 =====
-        call nc_write(filename,"smb_tot",reg%smb_tot,units="m^3 a-1",long_name="Total surface mass balance (flux)", &
-                      dim1="time",start=[n],ncid=ncid)
-        call nc_write(filename,"bmb_tot",reg%bmb_tot,units="m^3 a-1",long_name="Total basal mass balance (flux)", &
-                      dim1="time",start=[n],ncid=ncid)
-        call nc_write(filename,"bmb_shlf_t",reg%bmb_shlf_t,units="m^3 a-1",long_name="Total floating basal mass balance (flux)", &
-                      dim1="time",start=[n],ncid=ncid)
-        call nc_write(filename,"calv_flt",reg%calv_flt,units="m^3 a-1",long_name="Total calving at the ice front (flux)", &
-                      dim1="time",start=[n],ncid=ncid)
-        call nc_write(filename,"flux_grl",reg%flux_grl,units="m^3 a-1",long_name="Grounding-line flux", &
-                      dim1="time",start=[n],ncid=ncid)
-        call nc_write(filename,"flux_frnt",reg%flux_frnt,units="m^3 a-1",long_name="Total calving and frontal melt (flux)", &
-                      dim1="time",start=[n],ncid=ncid)
-
+        end if
 
         ! Close the netcdf file
         call nc_close(ncid)

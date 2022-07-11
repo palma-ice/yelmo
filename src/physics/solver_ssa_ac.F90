@@ -699,7 +699,7 @@ contains
                             ! Case 2: ice-free to the left
                             
                             N_aa_now = N_aa(i1,j)
-                            N_aa_now = 0.5_wp*(N_aa(i,j)+N_aa(i+1,j))
+                            !N_aa_now = 0.5_wp*(N_aa(i,j)+N_aa(i+1,j))
 
                             nc = 2*lgs%ij2n(i,j)-1
                                 ! next nc (column counter), for ux(i,j)
@@ -1687,6 +1687,7 @@ contains
                   f_ice(ip1,j) .lt. 1.0 .or. &
                   f_ice(i,jm1) .lt. 1.0 .or. &
                   f_ice(i,jp1) .lt. 1.0 ) ) then
+
             front1(i,j) = .TRUE. 
 
           end if 

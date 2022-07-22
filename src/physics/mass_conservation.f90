@@ -25,7 +25,7 @@ module mass_conservation
 contains 
     
     subroutine calc_G_advec_simple(G_advec,H_ice,f_ice,ux,uy, &
-                                            mask_new,solver,dx,dt)
+                                            mask_new,solver,boundaries,dx,dt)
         ! Interface subroutine to update ice thickness through application
         ! of advection, vertical mass balance terms and calving 
 
@@ -38,6 +38,7 @@ contains
         real(wp),         intent(IN)    :: uy(:,:)              ! [m/a] Depth-averaged velocity, y-direction (ac-nodes)
         integer,          intent(IN)    :: mask_new(:,:)        ! Mask indicating newly ice-covered points
         character(len=*), intent(IN)    :: solver               ! Solver to use for the ice thickness advection equation
+        character(len=*), intent(IN)    :: boundaries
         real(wp),         intent(IN)    :: dx                   ! [m]   Horizontal resolution
         real(wp),         intent(IN)    :: dt                   ! [a]   Timestep 
 
@@ -61,20 +62,20 @@ contains
         uy_tmp = uy
         
         ! Fill velocity field for new cells 
-        call fill_vel_new_cells(ux_tmp,uy_tmp,mask_new)
+        !call fill_vel_new_cells(ux_tmp,uy_tmp,mask_new)
 
         ! Ensure that no velocity is defined for outer boundaries of partially-filled margin points
         call set_inactive_margins(ux_tmp,uy_tmp,f_ice)
 
         ! Determine current advective rate of change (time=n)
-        call calc_advec2D(G_advec,H_ice,f_ice,ux_tmp,uy_tmp,mbal_zero,dx,dx,dt,solver)
+        call calc_advec2D(G_advec,H_ice,f_ice,ux_tmp,uy_tmp,mbal_zero,dx,dx,dt,solver,boundaries)
 
         return 
 
     end subroutine calc_G_advec_simple
 
     subroutine calc_G_advec(G_adv,dHdt_n,H_ice_n,H_ice_pred,H_ice,f_ice,ux,uy, &
-                        mask_pred_new,mask_corr_new,solver,dx,dt,beta,pc_step)
+                        mask_pred_new,mask_corr_new,solver,boundaries,dx,dt,beta,pc_step)
         ! Interface subroutine to update ice thickness through application
         ! of advection, vertical mass balance terms and calving 
 
@@ -91,6 +92,7 @@ contains
         integer,          intent(IN)    :: mask_pred_new(:,:)   
         integer,          intent(IN)    :: mask_corr_new(:,:)   
         character(len=*), intent(IN)    :: solver               ! Solver to use for the ice thickness advection equation
+        character(len=*), intent(IN)    :: boundaries
         real(wp),         intent(IN)    :: dx                   ! [m]   Horizontal resolution
         real(wp),         intent(IN)    :: dt                   ! [a]   Timestep 
         real(wp),         intent(IN)    :: beta(4)              ! Timestep weighting parameters
@@ -142,7 +144,7 @@ contains
                 dHdt_advec = dHdt_n 
 
                 ! Determine current advective rate of change (time=n)
-                call calc_advec2D(dHdt_n,H_ice,f_ice,ux_tmp,uy_tmp,mbal_zero,dx,dx,dt,solver)
+                call calc_advec2D(dHdt_n,H_ice,f_ice,ux_tmp,uy_tmp,mbal_zero,dx,dx,dt,solver,boundaries)
 
                 ! Calculate rate of change using weighted advective rates of change 
                 dHdt_advec = beta(1)*dHdt_n + beta(2)*dHdt_advec 
@@ -159,7 +161,7 @@ contains
                 call set_inactive_margins(ux_tmp,uy_tmp,f_ice)
 
                 ! Determine advective rate of change based on predicted H,ux/y fields (time=n+1,pred)
-                call calc_advec2D(dHdt_advec,H_ice_pred,f_ice,ux_tmp,uy_tmp,mbal_zero,dx,dx,dt,solver)
+                call calc_advec2D(dHdt_advec,H_ice_pred,f_ice,ux_tmp,uy_tmp,mbal_zero,dx,dx,dt,solver,boundaries)
 
                 ! Calculate rate of change using weighted advective rates of change 
                 dHdt_advec = beta(3)*dHdt_advec + beta(4)*dHdt_n 
@@ -265,12 +267,6 @@ contains
         ! Ensure melt is limited to amount of available ice to melt  
         where((H_ice+dt*G_mb) .lt. 0.0) G_mb = -H_ice/dt
 
-        ! Apply modified mass balance to update the ice thickness 
-        ! H_ice = H_ice + dt*G_mb
-
-        ! ! Ensure tiny numeric ice thicknesses are removed
-        ! where (H_ice .lt. TOL_UNDERFLOW) H_ice = 0.0 
-
         return 
 
     end subroutine calc_G_mbal
@@ -350,20 +346,11 @@ contains
 
             G_calv(i,j) = calv_flt_now + calv_grnd_now
             
+            ! Limit calving rate to available ice
+            if (H_ice(i,j)-dt*G_calv(i,j) .lt. 0.0) G_calv(i,j) = H_ice(i,j)/dt
+
         end do 
         end do
-
-        ! Ensure applied calving is limited to amount of available ice to calve
-        ! Note: on predictor step, make sure that calving doesn't reduce
-        ! thickness to zero. This ensures velocity will be diagnosed for this 
-        ! point.
-        where((H_ice-dt*G_calv) .lt. 0.0) G_calv = H_ice/dt
-
-        ! ! Apply modified mass balance to update the ice thickness 
-        ! H_ice = H_ice - dt*G_calv
-
-        ! ! Ensure tiny numeric ice thicknesses are removed
-        ! where (H_ice .lt. TOL_UNDERFLOW) H_ice = 0.0 
 
         return 
 
@@ -371,7 +358,7 @@ contains
 
 
     subroutine calc_ice_thickness_dyn(H_ice,dHdt_n,H_ice_n,H_ice_pred,f_ice,ux,uy, &
-                                      solver,dx,dt,beta,pc_step)
+                                      solver,boundaries,dx,dt,beta,pc_step)
         ! Interface subroutine to update ice thickness through application
         ! of advection, vertical mass balance terms and calving 
 
@@ -385,6 +372,7 @@ contains
         real(wp),         intent(IN)    :: ux(:,:)              ! [m/a] Depth-averaged velocity, x-direction (ac-nodes)
         real(wp),         intent(IN)    :: uy(:,:)              ! [m/a] Depth-averaged velocity, y-direction (ac-nodes)
         character(len=*), intent(IN)    :: solver               ! Solver to use for the ice thickness advection equation
+        character(len=*), intent(IN)    :: boundaries
         real(wp),         intent(IN)    :: dx                   ! [m]   Horizontal resolution
         real(wp),         intent(IN)    :: dt                   ! [a]   Timestep 
         real(wp),         intent(IN)    :: beta(4)              ! Timestep weighting parameters
@@ -433,7 +421,7 @@ contains
                 dHdt_advec = dHdt_n 
 
                 ! Determine current advective rate of change (time=n)
-                call calc_advec2D(dHdt_n,H_ice,f_ice,ux_tmp,uy_tmp,mbal_zero,dx,dx,dt,solver)
+                call calc_advec2D(dHdt_n,H_ice,f_ice,ux_tmp,uy_tmp,mbal_zero,dx,dx,dt,solver,boundaries)
 
                 ! ajr: testing stability fix for spin-up, limit advection rate!
                 ! where(dHdt_n .gt.  dHdt_advec_lim) dHdt_n = dHdt_advec_lim
@@ -448,7 +436,7 @@ contains
             case("corrector") ! corrector 
 
                 ! Determine advective rate of change based on predicted H,ux/y fields (time=n+1,pred)
-                call calc_advec2D(dHdt_advec,H_ice_pred,f_ice,ux_tmp,uy_tmp,mbal_zero,dx,dx,dt,solver)
+                call calc_advec2D(dHdt_advec,H_ice_pred,f_ice,ux_tmp,uy_tmp,mbal_zero,dx,dx,dt,solver,boundaries)
 
                 ! ajr: testing stability fix for spin-up, limit advection rate!
                 ! where(dHdt_advec .gt.  dHdt_advec_lim) dHdt_advec = dHdt_advec_lim
@@ -663,11 +651,13 @@ contains
         ! nextdoor, grows indefinitely, until the model is killed. A 
         ! solution is needed, but limiting the ice thickness at least 
         ! ensures the simulation continues. 
-        where (H_ice_new .gt. 5e3) H_ice_new = 5e3 
+        where (H_ice_new .gt. 6e3) H_ice_new = 6e3 
 
         ! ajr: the above situation may be related to poor treatment of
         ! grounded ice-front boundary conditions (in ssa solver). It
-        ! can also happen in Greenland at the grounded ice front. 
+        ! can also happen in Greenland at the grounded ice front.
+
+
         ! Additional corrections applied here. 
         do j = 1, ny 
         do i = 1, nx 

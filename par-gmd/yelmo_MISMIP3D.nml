@@ -7,7 +7,7 @@
     ! Timing parameters 
     time_init    = 0.0                  ! [yr] Starting time 
     time_end     = 20e3                 ! [yr] Ending time 
-    dtt          = 2.0                  ! [yr] Main loop timestep 
+    dtt          = 5.0                  ! [yr] Main loop timestep 
     dt2D_out     = 100.0                ! [yr] Frequency of writing 2D output files 
 
 /
@@ -35,7 +35,7 @@
     pc_filter_vel   = False             ! Use mean vel. solution of current and previous timestep
     pc_corr_vel     = False             ! Calculate dynamics again for corrected H_ice
     pc_n_redo       = 10                ! How many times can the same iteration be repeated (when high error exists)
-    pc_tol          = 2.0               ! [m/a] Tolerance threshold to redo timestep
+    pc_tol          = 1.0               ! [m/a] Tolerance threshold to redo timestep
     pc_eps          = 1e-1              ! Predictor-corrector tolerance 
     
 /
@@ -77,7 +77,7 @@
     solver              = "ssa"           ! "fixed", "sia", "ssa", "hybrid", "diva", "diva-noslip", l1l2", "l1l2-noslip"
     visc_method         = 1               ! 0: constant visc=visc_const, 1: dynamic viscosity
     visc_const          = 1e7             ! [Pa a] Constant value for viscosity (if visc_method=0)
-    beta_method         = 2               ! 0: constant beta; 1: linear (beta=cb/u0); 2: psuedo-plastic-power; 3: Regularized Coulomb
+    beta_method         = 4               ! 0: constant beta; 1: linear (beta=cb/u0); 2: psuedo-plastic-power; 3: Regularized Coulomb
     beta_const          = 1e3             ! [Pa a m−1] Constant value of basal friction coefficient to be used
     beta_q              = 0.3333333       ! Dragging law exponent 
     beta_u0             = 1.0             ! [m/a] Regularization term for regularized Coulomb law (beta_method=3)

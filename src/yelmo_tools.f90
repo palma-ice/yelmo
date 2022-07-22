@@ -3036,8 +3036,8 @@ contains
                 var(1,:)    = var(2,:)          ! x=0, Symmetry 
                 var(nx,:)   = 0.0               ! x=800km, no ice
                 
-                var(:,1)    = var(:,2)          ! y=-50km, Free-slip condition
-                var(:,ny)   = var(:,ny-1)       ! y= 50km, Free-slip condition
+!                var(:,1)    = var(:,2)          ! y=-50km, Free-slip condition
+!                var(:,ny)   = var(:,ny-1)       ! y= 50km, Free-slip condition
 
             case("infinite")
                 ! Set border points equal to inner neighbors 
@@ -3136,7 +3136,7 @@ contains
 
             case("MISMIP3D") 
                 
-                var_acx(1,:)    = var_acx(2,:) 
+                !var_acx(1,:)    = var_acx(2,:) 
                 var_acx(nx-1,:) = var_acx(nx-2,:) 
                 var_acx(nx,:)   = var_acx(nx-1,:) 
                 var_acx(:,1)    = var_acx(:,2)

@@ -355,11 +355,11 @@ contains
                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
         call nc_write(filename,"f_grnd_acy",ylmo%tpo%now%f_grnd_acy,units="1",long_name="Grounded fraction (acy)", &
                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-!         call nc_write(filename,"f_ice",ylmo%tpo%now%f_ice,units="1",long_name="Ice-covered fraction", &
-!                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
+        call nc_write(filename,"f_ice",ylmo%tpo%now%f_ice,units="1",long_name="Ice-covered fraction", &
+                      dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
 
-!         call nc_write(filename,"calv",ylmo%tpo%now%calv,units="m/a",long_name="Calving rate", &
-!                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
+        call nc_write(filename,"calv",ylmo%tpo%now%calv,units="m/a",long_name="Calving rate", &
+                      dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
 
         ! == yelmo_thermodynamics ==
 !         call nc_write(filename,"T_ice",ylmo%thrm%now%T_ice,units="K",long_name="Ice temperature", &
@@ -381,10 +381,10 @@ contains
 
         ! == yelmo_dynamics ==
 
-!         call nc_write(filename,"ssa_mask_acx",ylmo%dyn%now%ssa_mask_acx,units="1",long_name="SSA mask (acx)", &
-!                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-!         call nc_write(filename,"ssa_mask_acy",ylmo%dyn%now%ssa_mask_acy,units="1",long_name="SSA mask (acy)", &
-!                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
+        call nc_write(filename,"ssa_mask_acx",ylmo%dyn%now%ssa_mask_acx,units="1",long_name="SSA mask (acx)", &
+                      dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
+        call nc_write(filename,"ssa_mask_acy",ylmo%dyn%now%ssa_mask_acy,units="1",long_name="SSA mask (acy)", &
+                      dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
 
         call nc_write(filename,"c_bed",ylmo%dyn%now%c_bed,units="Pa",long_name="Bed friction coefficient", &
                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
@@ -485,7 +485,7 @@ contains
 
     end subroutine write_step_2D
     
-end program yelmo_mismip 
+end program yelmo_mismip
 
 
 

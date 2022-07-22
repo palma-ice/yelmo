@@ -63,8 +63,9 @@ contains
     subroutine calc_velocity_diva(ux,uy,ux_bar,uy_bar,ux_b,uy_b,ux_i,uy_i,taub_acx,taub_acy, &
                                   beta,beta_acx,beta_acy,beta_eff,de_eff,visc_eff,visc_eff_int,duxdz,duydz, &
                                   ssa_mask_acx,ssa_mask_acy,ssa_err_acx,ssa_err_acy,ssa_iter_now, &
-                                  c_bed,taud_acx,taud_acy,H_ice,f_ice,H_grnd,f_grnd, &
-                                  f_grnd_acx,f_grnd_acy,ATT,zeta_aa,z_sl,z_bed,z_srf,dx,dy,n_glen,par)
+                                  c_bed,taud_acx,taud_acy,taul_int_acx,taul_int_acy, &
+                                  H_ice,f_ice,H_grnd,f_grnd, &
+                                  f_grnd_acx,f_grnd_acy,mask_frnt,ATT,zeta_aa,z_sl,z_bed,z_srf,dx,dy,n_glen,par)
         ! This subroutine is used to solve the horizontal velocity system (ux,uy)
         ! following the Depth-Integrated Viscosity Approximation (DIVA),
         ! as outlined by Lipscomb et al. (2019). Method originally 
@@ -100,12 +101,15 @@ contains
         real(wp), intent(IN)    :: c_bed(:,:)         ! [Pa]
         real(wp), intent(IN)    :: taud_acx(:,:)      ! [Pa]
         real(wp), intent(IN)    :: taud_acy(:,:)      ! [Pa]
+        real(wp), intent(IN)    :: taul_int_acx(:,:)  ! [Pa m]
+        real(wp), intent(IN)    :: taul_int_acy(:,:)  ! [Pa m]
         real(wp), intent(IN)    :: H_ice(:,:)         ! [m]
         real(wp), intent(IN)    :: f_ice(:,:)         ! [--]
         real(wp), intent(IN)    :: H_grnd(:,:)        ! [m]
         real(wp), intent(IN)    :: f_grnd(:,:)        ! [-]
         real(wp), intent(IN)    :: f_grnd_acx(:,:)    ! [-]
         real(wp), intent(IN)    :: f_grnd_acy(:,:)    ! [-]
+        integer,  intent(IN)    :: mask_frnt(:,:)     ! [-]
         real(wp), intent(IN)    :: ATT(:,:,:)         ! [a^-1 Pa^-n_glen]
         real(wp), intent(IN)    :: zeta_aa(:)         ! [-]
         real(wp), intent(IN)    :: z_sl(:,:)          ! [m]
@@ -297,8 +301,8 @@ end if
             
             ! Populate ssa matrices Ax=b
             call linear_solver_matrix_ssa_ac_csr_2D(lgs_now,ux_bar,uy_bar,beta_eff_acx,beta_eff_acy,visc_eff_int,  &
-                                ssa_mask_acx,ssa_mask_acy,H_ice,f_ice,taud_acx,taud_acy,H_grnd,z_sl,z_bed, &
-                                z_srf,dx,dy,par%boundaries,par%ssa_lateral_bc)
+                                ssa_mask_acx,ssa_mask_acy,mask_frnt,H_ice,f_ice,taud_acx,taud_acy, &
+                                taul_int_acx,taul_int_acy,dx,dy,par%boundaries,par%ssa_lateral_bc)
 
             ! Solve linear equation
             call linear_solver_matrix_solve(lgs_now,par%ssa_lis_opt)
@@ -353,7 +357,7 @@ end if
             if (write_ssa_diagnostics) then  
                 call ssa_diagnostics_write_step("yelmo_ssa.nc",ux_bar,uy_bar,L2_norm,beta_acx,beta_acy,visc_eff_int, &
                                         ssa_mask_acx,ssa_mask_acy,ssa_err_acx,ssa_err_acy,H_ice,f_ice,taud_acx,taud_acy, &
-                                        H_grnd,z_sl,z_bed,z_srf,ux_bar_nm1,uy_bar_nm1,time=real(iter,wp))    
+                                        taul_int_acx,taul_int_acy,H_grnd,z_sl,z_bed,z_srf,ux_bar_nm1,uy_bar_nm1,time=real(iter,wp))    
             end if 
 
             ! =========================================================================================

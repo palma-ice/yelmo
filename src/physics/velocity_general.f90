@@ -21,6 +21,7 @@ module velocity_general
     public :: calc_uz_advec_corr_3D_aa
     public :: calc_driving_stress
     public :: calc_driving_stress_gl
+    public :: calc_lateral_bc_stress_2D
     public :: adjust_visc_eff_margin
     public :: set_inactive_margins
     public :: calc_ice_flux
@@ -1272,6 +1273,148 @@ end if
 
     end subroutine calc_driving_stress_gl
 
+    subroutine calc_lateral_bc_stress_2D(tau_bc_int_acx,tau_bc_int_acy,mask_frnt,H_ice,f_ice,z_srf,z_sl,rho_ice,rho_sw)
+            ! Calculate the vertically integrated lateral stress [Pa m] boundary condition
+            ! at the ice front. 
+
+        implicit none 
+
+        real(wp), intent(OUT) :: tau_bc_int_acx(:,:) 
+        real(wp), intent(OUT) :: tau_bc_int_acy(:,:) 
+        integer,  intent(IN)  :: mask_frnt(:,:) 
+        real(wp), intent(IN)  :: H_ice(:,:) 
+        real(wp), intent(IN)  :: f_ice(:,:) 
+        real(wp), intent(IN)  :: z_srf(:,:) 
+        real(wp), intent(IN)  :: z_sl(:,:) 
+        real(wp), intent(IN)  :: rho_ice 
+        real(wp), intent(IN)  :: rho_sw 
+
+        ! Local variables 
+        integer  :: i, j, nx, ny
+        integer  :: im1, ip1, jm1, jp1 
+        integer  :: i1, j1  
+        real(wp) :: H_ice_now 
+        real(wp) :: z_srf_now 
+        real(wp) :: z_sl_now 
+        
+        nx = size(tau_bc_int_acx,1) 
+        ny = size(tau_bc_int_acx,2) 
+
+        ! Intialize boundary fields to zero 
+        tau_bc_int_acx = 0.0 
+        tau_bc_int_acy = 0.0 
+
+        do j = 1, ny
+        do i = 1, nx 
+
+            ! Define neighbor indices
+            im1 = max(i-1,1)
+            ip1 = min(i+1,nx)
+            jm1 = max(j-1,1)
+            jp1 = min(j+1,ny)
+            
+            ! == acx nodes == 
+
+            ! if ( (f_ice(i,j) .eq. 1.0 .and. f_ice(ip1,j) .lt. 1.0) .or. &
+            !      (f_ice(i,j) .lt. 1.0 .and. f_ice(ip1,j) .eq. 1.0) ) then 
+            !     ! Ice margin detected, proceed to calculating the boundary stress
+
+            if ( (mask_frnt(i,j) .gt. 0 .and. mask_frnt(ip1,j) .lt. 0) .or. & 
+                 (mask_frnt(i,j) .lt. 0 .and. mask_frnt(ip1,j) .gt. 0) ) then 
+                ! Ice margin detected, proceed to calculating the boundary stress
+
+                ! Determine index of the ice covered cell.
+                if (mask_frnt(i,j) .lt. 0.0) then 
+                    i1 = ip1 
+                else
+                    i1 = i 
+                end if 
+
+                ! Get current ice thickness, surface elevation 
+                ! and sea level at ice front from aa-node values.
+                ! (No f_ice scaling since f_ice=1)
+                H_ice_now = H_ice(i1,j)     
+                z_srf_now = z_srf(i1,j) 
+                z_sl_now  = z_sl(i1,j) 
+
+                ! Calculate the lateral stress bc for this point
+                call calc_lateral_bc_stress(tau_bc_int_acx(i,j),H_ice_now, &
+                                                z_srf_now,z_sl_now,rho_ice,rho_sw)
+
+            end if 
+
+
+            ! == acy nodes == 
+
+            ! if ( (f_ice(i,j) .eq. 1.0 .and. f_ice(i,jp1) .lt. 1.0) .or. &
+            !      (f_ice(i,j) .lt. 1.0 .and. f_ice(i,jp1) .eq. 1.0) ) then 
+            !     ! Ice margin detected, proceed to calculating the boundary stress
+
+            if ( (mask_frnt(i,j) .gt. 0 .and. mask_frnt(i,jp1) .lt. 0) .or. & 
+                 (mask_frnt(i,j) .lt. 0 .and. mask_frnt(i,jp1) .gt. 0) ) then 
+                ! Ice margin detected, proceed to calculating the boundary stress
+                
+                ! Determine index of the ice covered cell.
+                if (mask_frnt(i,j) .lt. 0.0) then 
+                    j1 = jp1 
+                else
+                    j1 = j
+                end if 
+
+                ! Get current ice thickness, surface elevation 
+                ! and sea level at ice front from aa-node values.
+                ! (No f_ice scaling since f_ice=1)
+                H_ice_now = H_ice(i,j1)     
+                z_srf_now = z_srf(i,j1) 
+                z_sl_now  = z_sl(i,j1) 
+
+                ! Calculate the lateral stress bc for this point
+                call calc_lateral_bc_stress(tau_bc_int_acy(i,j),H_ice_now, &
+                                                z_srf_now,z_sl_now,rho_ice,rho_sw)
+
+            end if 
+
+        end do 
+        end do
+
+        return
+
+    end subroutine calc_lateral_bc_stress_2D
+    
+    subroutine calc_lateral_bc_stress(tau_bc_int,H_ice,z_srf,z_sl,rho_ice,rho_sw)
+            ! Calculate the vertically integrated lateral stress [Pa m] boundary condition
+            ! at the ice front for given conditions.
+
+            ! =========================================================
+            ! Generalized solution for all ice fronts (floating and grounded)
+            ! See Lipscomb et al. (2019), Eqs. 11 & 12, and 
+            ! Winkelmann et al. (2011), Eq. 27 
+
+        implicit none 
+
+        real(wp), intent(OUT) :: tau_bc_int
+        real(wp), intent(IN)  :: H_ice 
+        real(wp), intent(IN)  :: z_srf
+        real(wp), intent(IN)  :: z_sl
+        real(wp), intent(IN)  :: rho_ice 
+        real(wp), intent(IN)  :: rho_sw 
+
+        ! Local variables 
+        real(wp) :: f_submerged 
+        real(wp) :: H_ocn 
+
+        ! Get current ocean thickness bordering ice sheet
+        ! (for bedrock above sea level, this will give zero)
+        f_submerged = 1.d0 - min((z_srf-z_sl)/H_ice,1.d0)
+        H_ocn       = H_ice*f_submerged
+        
+        tau_bc_int = 0.5d0*rho_ice*g*H_ice**2 &         ! tau_out_int                                                ! p_out
+                   - 0.5d0*rho_sw *g*H_ocn**2           ! tau_in_int
+
+        return
+
+    end subroutine calc_lateral_bc_stress
+    
     subroutine adjust_visc_eff_margin(visc_int,ux,uy,f_ice,f_grnd)
         ! This does not help, yet...
 
@@ -1921,7 +2064,7 @@ if (.TRUE.) then
             ! Write file with dummy zero values for variables we don't have
             call ssa_diagnostics_write_step("ssa_check.nc",ux,uy,resid,ux*0.0_wp,ux*0.0_wp,ux*0.0_wp, &
                                     int(ux*0.0_wp),int(ux*0.0_wp),ux-ux_prev,uy-uy_prev,ux*0.0_wp,ux*0.0_wp,ux*0.0_wp,ux*0.0_wp, &
-                                    ux*0.0_wp,ux*0.0_wp,ux*0.0_wp,ux*0.0_wp,ux_prev,uy_prev,time=real(iter,wp))
+                                    ux*0.0_wp,ux*0.0_wp,ux*0.0_wp,ux*0.0_wp,ux*0.0_wp,ux*0.0_wp,ux_prev,uy_prev,time=real(iter,wp))
 
             stop 
 

@@ -106,6 +106,10 @@ contains
 
         end if 
 
+        ! Calculate lateral boundary stress 
+        call calc_lateral_bc_stress_2D(dyn%now%taul_int_acx,dyn%now%taul_int_acy,tpo%now%mask_frnt, &
+                        tpo%now%H_ice,tpo%now%f_ice,tpo%now%z_srf,bnd%z_sl,rho_ice,rho_sw)
+
         ! Calculate effective pressure 
         call calc_ydyn_neff(dyn,tpo,thrm,bnd)
 
@@ -292,9 +296,11 @@ contains
         ! 2. Calculate SSA solution =====
 
         ! Define grid points with ssa active (uses beta from previous timestep)
-        call set_ssa_masks(dyn%now%ssa_mask_acx,dyn%now%ssa_mask_acy,dyn%now%beta_acx,dyn%now%beta_acy, &
-                           tpo%now%H_ice_dyn,tpo%now%f_ice_dyn,tpo%now%f_grnd_acx,tpo%now%f_grnd_acy,dyn%par%ssa_beta_max,use_ssa=.TRUE.)
-
+        ! call set_ssa_masks(dyn%now%ssa_mask_acx,dyn%now%ssa_mask_acy,dyn%now%beta_acx,dyn%now%beta_acy, &
+        !                    tpo%now%H_ice_dyn,tpo%now%f_ice_dyn,tpo%now%f_grnd_acx,tpo%now%f_grnd_acy,dyn%par%ssa_beta_max,use_ssa=.TRUE.)
+        call set_ssa_masks(dyn%now%ssa_mask_acx,dyn%now%ssa_mask_acy,tpo%now%mask_frnt,tpo%now%H_ice, &
+                                tpo%now%f_ice,tpo%now%f_grnd,use_ssa=.TRUE.,lateral_bc=dyn%par%ssa_lat_bc)
+        
         if (use_ssa .and. dyn%par%use_ssa .and. &
                 maxval(dyn%now%ssa_mask_acx+dyn%now%ssa_mask_acy) .gt. 0) then 
             ! Calculate SSA as normal 
@@ -325,7 +331,9 @@ contains
                                       dyn%now%visc_eff,dyn%now%visc_eff_int,dyn%now%ssa_mask_acx,dyn%now%ssa_mask_acy, &
                                       dyn%now%ssa_err_acx,dyn%now%ssa_err_acy,dyn%par%ssa_iter_now,dyn%now%beta, &
                                       dyn%now%beta_acx,dyn%now%beta_acy,dyn%now%c_bed,dyn%now%taud_acx,dyn%now%taud_acy, &
+                                      dyn%now%taul_int_acx,dyn%now%taul_int_acy, &
                                       tpo%now%H_ice_dyn,tpo%now%f_ice_dyn,tpo%now%H_grnd,tpo%now%f_grnd,tpo%now%f_grnd_acx,tpo%now%f_grnd_acy, &
+                                      tpo%now%mask_frnt, &
                                       mat%now%ATT,dyn%par%zeta_aa,bnd%z_sl,bnd%z_bed,tpo%now%z_srf,dyn%par%dx,dyn%par%dy,mat%par%n_glen,ssa_par)
             ! call calc_velocity_ssa_aa(dyn%now%ux_b,dyn%now%uy_b,dyn%now%taub_acx,dyn%now%taub_acy, &
             !                           dyn%now%visc_eff,dyn%now%visc_eff_int,dyn%now%ssa_mask_acx,dyn%now%ssa_mask_acy, &
@@ -426,9 +434,11 @@ contains
         ! ===== Calculate 3D horizontal velocity solution via DIVA algorithm ===================
 
         ! Define grid points with ssa active (uses beta from previous timestep)
-        call set_ssa_masks(dyn%now%ssa_mask_acx,dyn%now%ssa_mask_acy,dyn%now%beta_acx,dyn%now%beta_acy, &
-                           tpo%now%H_ice_dyn,tpo%now%f_ice_dyn,tpo%now%f_grnd_acx,tpo%now%f_grnd_acy,dyn%par%ssa_beta_max,use_ssa=.TRUE.)
-
+        ! call set_ssa_masks(dyn%now%ssa_mask_acx,dyn%now%ssa_mask_acy,dyn%now%beta_acx,dyn%now%beta_acy, &
+        !                    tpo%now%H_ice_dyn,tpo%now%f_ice_dyn,tpo%now%f_grnd_acx,tpo%now%f_grnd_acy,dyn%par%ssa_beta_max,use_ssa=.TRUE.)
+        call set_ssa_masks(dyn%now%ssa_mask_acx,dyn%now%ssa_mask_acy,tpo%now%mask_frnt,tpo%now%H_ice, &
+                                tpo%now%f_ice,tpo%now%f_grnd,use_ssa=.TRUE.,lateral_bc=dyn%par%ssa_lat_bc)
+        
         ! ajr: add these two statements for testing 2D flow (no flow in y-direction)
         ! Should consider whether this should be made into a parameter option of some kind,
         ! but it needs to be generalized, here it is hard-coded for diva only...
@@ -465,8 +475,9 @@ contains
                                 dyn%now%visc_eff_int,    &
                                 dyn%now%duxdz,dyn%now%duydz,dyn%now%ssa_mask_acx,dyn%now%ssa_mask_acy,      &
                                 dyn%now%ssa_err_acx,dyn%now%ssa_err_acy,dyn%par%ssa_iter_now,dyn%now%c_bed, &
-                                dyn%now%taud_acx,dyn%now%taud_acy,tpo%now%H_ice_dyn,tpo%now%f_ice_dyn,tpo%now%H_grnd,   &
-                                tpo%now%f_grnd,tpo%now%f_grnd_acx,tpo%now%f_grnd_acy,mat%now%ATT, &
+                                dyn%now%taud_acx,dyn%now%taud_acy,dyn%now%taul_int_acx,dyn%now%taul_int_acy, &
+                                tpo%now%H_ice_dyn,tpo%now%f_ice_dyn,tpo%now%H_grnd,   &
+                                tpo%now%f_grnd,tpo%now%f_grnd_acx,tpo%now%f_grnd_acy,tpo%now%mask_frnt,mat%now%ATT, &
                                 dyn%par%zeta_aa,bnd%z_sl,bnd%z_bed,tpo%now%z_srf,dyn%par%dx,dyn%par%dy,mat%par%n_glen,diva_par)
         ! call calc_velocity_diva_ab(dyn%now%ux,dyn%now%uy,dyn%now%ux_bar,dyn%now%uy_bar, &
         !                         dyn%now%ux_b,dyn%now%uy_b,dyn%now%ux_i,dyn%now%uy_i, &
@@ -539,9 +550,11 @@ contains
         ! ===== Calculate 3D horizontal velocity solution via DIVA algorithm ===================
 
         ! Define grid points with ssa active (uses beta from previous timestep)
-        call set_ssa_masks(dyn%now%ssa_mask_acx,dyn%now%ssa_mask_acy,dyn%now%beta_acx,dyn%now%beta_acy, &
-                           tpo%now%H_ice_dyn,tpo%now%f_ice_dyn,tpo%now%f_grnd_acx,tpo%now%f_grnd_acy,dyn%par%ssa_beta_max,use_ssa=.TRUE.)
-
+        ! call set_ssa_masks(dyn%now%ssa_mask_acx,dyn%now%ssa_mask_acy,dyn%now%beta_acx,dyn%now%beta_acy, &
+        !                    tpo%now%H_ice_dyn,tpo%now%f_ice_dyn,tpo%now%f_grnd_acx,tpo%now%f_grnd_acy,dyn%par%ssa_beta_max,use_ssa=.TRUE.)
+        call set_ssa_masks(dyn%now%ssa_mask_acx,dyn%now%ssa_mask_acy,tpo%now%mask_frnt,tpo%now%H_ice, &
+                                tpo%now%f_ice,tpo%now%f_grnd,use_ssa=.TRUE.,lateral_bc=dyn%par%ssa_lat_bc)
+        
         ! Set diva parameters from Yelmo settings 
         l1l2_par%ssa_lis_opt    = dyn%par%ssa_lis_opt 
         l1l2_par%ssa_lateral_bc = dyn%par%ssa_lat_bc 
@@ -571,8 +584,9 @@ contains
                                 dyn%now%beta_acy,dyn%now%visc_eff,dyn%now%visc_eff_int, &
                                 dyn%now%ssa_mask_acx,dyn%now%ssa_mask_acy,dyn%now%ssa_err_acx, &
                                 dyn%now%ssa_err_acy,dyn%par%ssa_iter_now,dyn%now%c_bed, &
-                                dyn%now%taud_acx,dyn%now%taud_acy,tpo%now%H_ice_dyn,tpo%now%f_ice_dyn,tpo%now%H_grnd, &
-                                tpo%now%f_grnd,tpo%now%f_grnd_acx,tpo%now%f_grnd_acy,mat%now%ATT, &
+                                dyn%now%taud_acx,dyn%now%taud_acy,dyn%now%taul_int_acx,dyn%now%taul_int_acy, &
+                                tpo%now%H_ice_dyn,tpo%now%f_ice_dyn,tpo%now%H_grnd, &
+                                tpo%now%f_grnd,tpo%now%f_grnd_acx,tpo%now%f_grnd_acy,tpo%now%mask_frnt,mat%now%ATT, &
                                 dyn%par%zeta_aa,dyn%par%zeta_ac,bnd%z_sl,bnd%z_bed,tpo%now%z_srf,dyn%par%dx,dyn%par%dy,mat%par%n_glen,l1l2_par)
         
         ! Integrate from 3D shear velocity field to get depth-averaged field
@@ -1082,6 +1096,9 @@ contains
         allocate(now%taub_acy(nx,ny)) 
         allocate(now%taub(nx,ny)) 
 
+        allocate(now%taul_int_acx(nx,ny)) 
+        allocate(now%taul_int_acy(nx,ny)) 
+
         allocate(now%qq_gl_acx(nx,ny)) 
         allocate(now%qq_gl_acy(nx,ny)) 
 
@@ -1155,6 +1172,9 @@ contains
         now%taub_acy          = 0.0 
         now%taub              = 0.0 
         
+        now%taul_int_acx    = 0.0 
+        now%taul_int_acy    = 0.0 
+
         now%qq_gl_acx         = 0.0 
         now%qq_gl_acy         = 0.0 
         
@@ -1237,6 +1257,9 @@ contains
         if (allocated(now%taub_acx))        deallocate(now%taub_acx) 
         if (allocated(now%taub_acy))        deallocate(now%taub_acy) 
         if (allocated(now%taub))            deallocate(now%taub) 
+        
+        if (allocated(now%taul_int_acx))  deallocate(now%taul_int_acx) 
+        if (allocated(now%taul_int_acy))  deallocate(now%taul_int_acy) 
         
         if (allocated(now%qq_gl_acx))       deallocate(now%qq_gl_acx) 
         if (allocated(now%qq_gl_acy))       deallocate(now%qq_gl_acy) 
@@ -1450,7 +1473,12 @@ contains
 !                        dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
 !         call nc_write(filename,"uxy_i_bar",dyn%now%uxy_i_bar,units="m/a",long_name="Internal shear velocity magnitude", &
 !                        dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-
+        
+        call nc_write(filename,"taul_int_acx",dyn%now%taul_int_acx,units="Pa m",long_name="Vertically integrated lateral boundary stress, x-direction", &
+                      dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
+        call nc_write(filename,"taul_int_acy",dyn%now%taul_int_acy,units="Pa m",long_name="Vertically integrated lateral boundary stress, y-direction", &
+                      dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
+        
         call nc_write(filename,"ux_bar",dyn%now%ux_bar,units="m/a",long_name="Depth-averaged velocity (x)", &
                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
         call nc_write(filename,"uy_bar",dyn%now%uy_bar,units="m/a",long_name="Depth-averaged velocity (y)", &

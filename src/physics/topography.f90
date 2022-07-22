@@ -11,6 +11,7 @@ module topography
     public :: remove_icebergs 
 
     public :: calc_ice_fraction
+    public :: calc_ice_front
 
     public :: calc_z_srf
     public :: calc_z_srf_max
@@ -422,7 +423,7 @@ contains
 
     end subroutine calc_ice_fraction_new
     
-        subroutine calc_ice_fraction(f_ice,H_ice,z_bed,z_sl,flt_subgrid)
+    subroutine calc_ice_fraction(f_ice,H_ice,z_bed,z_sl,flt_subgrid)
         ! Determine the area fraction of a grid cell
         ! that is ice-covered. Assume that marginal points
         ! have equal thickness to inland neighbors 
@@ -580,6 +581,84 @@ contains
 
     end subroutine calc_ice_fraction
     
+    subroutine calc_ice_front(mask_frnt,f_ice,f_grnd,z_bed,z_sl)
+        ! Calculate a mask of ice front points that 
+        ! demarcates both the ice front (last ice-covered point)
+        ! and the ice-free front (first ice-free point), 
+        ! and distinguishes between floating, marine and grounded fronts.
+
+        implicit none 
+
+        integer,  intent(OUT) :: mask_frnt(:,:) 
+        real(wp), intent(IN)  :: f_ice(:,:) 
+        real(wp), intent(IN)  :: f_grnd(:,:) 
+        real(wp), intent(IN)  :: z_bed(:,:)
+        real(wp), intent(IN)  :: z_sl(:,:)
+
+        ! Local variables 
+        integer  :: i, j, nx, ny
+        integer  :: im1, ip1, jm1, jp1 
+        integer  :: n 
+        real(wp) :: f_neighb(4) 
+
+        integer, parameter :: val_ice_free  = -1 
+        integer, parameter :: val_flt       = 1
+        integer, parameter :: val_marine    = 2
+        integer, parameter :: val_grnd      = 3
+        
+        nx = size(mask_frnt,1) 
+        ny = size(mask_frnt,2) 
+
+        ! Initialize mask to zero everywhere to start 
+        mask_frnt = 0
+
+        do j = 1, ny
+        do i = 1, nx 
+
+            ! Get neighbor indices
+            im1 = max(i-1,1) 
+            ip1 = min(i+1,nx) 
+            jm1 = max(j-1,1) 
+            jp1 = min(j+1,ny) 
+            
+            f_neighb = [f_ice(im1,j),f_ice(ip1,j),f_ice(i,jm1),f_ice(i,jp1)]
+            n = count(f_neighb .lt. 1.0)
+
+            if (f_ice(i,j) .eq. 1.0 .and. n .gt. 0) then 
+                ! This point is an ice front. 
+
+                if (f_grnd(i,j) .gt. 0.0 .and. (z_sl(i,j) .le. z_bed(i,j)) ) then 
+                    ! Ice front grounded above sea level 
+
+                    mask_frnt(i,j) = val_grnd 
+
+                else if (f_grnd(i,j) .gt. 0.0) then 
+                    ! Ice front grounded below sea level 
+
+                    mask_frnt(i,j) = val_marine 
+
+                else
+                    ! Floating ice front 
+
+                    mask_frnt(i,j) = val_flt 
+
+                end if 
+
+                ! Ensure adjacent ice-free points are marked too
+                if (f_ice(im1,j) .lt. 1.0) mask_frnt(im1,j) = val_ice_free
+                if (f_ice(ip1,j) .lt. 1.0) mask_frnt(ip1,j) = val_ice_free
+                if (f_ice(i,jm1) .lt. 1.0) mask_frnt(i,jm1) = val_ice_free
+                if (f_ice(i,jp1) .lt. 1.0) mask_frnt(i,jp1) = val_ice_free
+
+            end if 
+
+        end do
+        end do 
+
+        return 
+
+    end subroutine calc_ice_front
+
     elemental subroutine calc_z_srf(z_srf,H_ice,f_ice,H_grnd,z_bed,z_sl)
         ! Calculate surface elevation
 

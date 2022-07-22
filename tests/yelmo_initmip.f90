@@ -593,6 +593,8 @@ contains
                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
         call nc_write(filename,"mask_grz",ylmo%tpo%now%mask_grz,units="",long_name="Grounding-zone mask", &
                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
+        call nc_write(filename,"mask_frnt",ylmo%tpo%now%mask_frnt,units="",long_name="Ice-front mask", &
+                      dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
         call nc_write(filename,"f_grnd",ylmo%tpo%now%f_grnd,units="1",long_name="Grounded ice fraction", &
                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
 
@@ -740,11 +742,16 @@ contains
                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
         
         ! Diagnostics 
-!         call nc_write(filename,"taud_acx",ylmo%dyn%now%taud_acx,units="Pa",long_name="Driving stress (x)", &
-!                        dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-!         call nc_write(filename,"taud_acy",ylmo%dyn%now%taud_acy,units="Pa",long_name="Driving stress (y)", &
-!                        dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-        
+        call nc_write(filename,"taud_acx",ylmo%dyn%now%taud_acx,units="Pa",long_name="Driving stress (x)", &
+                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
+        call nc_write(filename,"taud_acy",ylmo%dyn%now%taud_acy,units="Pa",long_name="Driving stress (y)", &
+                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
+
+        call nc_write(filename,"taul_int_acx",ylmo%dyn%now%taul_int_acx,units="Pa m",long_name="Vertically integrated lateral stress (x)", &
+                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
+        call nc_write(filename,"taul_int_acy",ylmo%dyn%now%taul_int_acy,units="Pa m",long_name="Vertically integrated lateral stress (y)", &
+                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
+             
         ! Close the netcdf file
         call nc_close(ncid)
 

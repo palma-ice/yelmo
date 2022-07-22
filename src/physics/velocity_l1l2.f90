@@ -53,8 +53,9 @@ contains
     subroutine calc_velocity_l1l2(ux,uy,ux_bar,uy_bar,ux_b,uy_b,ux_i,uy_i,taub_acx,taub_acy, &
                                   beta,beta_acx,beta_acy,visc_eff,visc_eff_int,  &
                                   ssa_mask_acx,ssa_mask_acy,ssa_err_acx,ssa_err_acy,ssa_iter_now, &
-                                  c_bed,taud_acx,taud_acy,H_ice,f_ice,H_grnd,f_grnd, &
-                                  f_grnd_acx,f_grnd_acy,ATT,zeta_aa,zeta_ac,z_sl,z_bed,z_srf,dx,dy,n_glen,par)
+                                  c_bed,taud_acx,taud_acy,taul_int_acx,taul_int_acy, &
+                                  H_ice,f_ice,H_grnd,f_grnd, &
+                                  f_grnd_acx,f_grnd_acy,mask_frnt,ATT,zeta_aa,zeta_ac,z_sl,z_bed,z_srf,dx,dy,n_glen,par)
         ! This subroutine is used to solve the horizontal velocity system (ux,uy)
         ! following the L1L2 solver formulation (ie, depth-integrated solver
         ! that reduces to SIA in the limit of zero sliding), as outlined 
@@ -86,12 +87,15 @@ contains
         real(prec), intent(IN)    :: c_bed(:,:)         ! [Pa]
         real(prec), intent(IN)    :: taud_acx(:,:)      ! [Pa]
         real(prec), intent(IN)    :: taud_acy(:,:)      ! [Pa]
+        real(wp),   intent(IN)    :: taul_int_acx(:,:)  ! [Pa m]
+        real(wp),   intent(IN)    :: taul_int_acy(:,:)  ! [Pa m]
         real(prec), intent(IN)    :: H_ice(:,:)         ! [m]
         real(prec), intent(IN)    :: f_ice(:,:)         ! [--]
         real(prec), intent(IN)    :: H_grnd(:,:)        ! [m]
         real(prec), intent(IN)    :: f_grnd(:,:)        ! [-]
         real(prec), intent(IN)    :: f_grnd_acx(:,:)    ! [-]
         real(prec), intent(IN)    :: f_grnd_acy(:,:)    ! [-]
+        integer,    intent(IN)    :: mask_frnt(:,:)     ! [-]
         real(prec), intent(IN)    :: ATT(:,:,:)         ! [a^-1 Pa^-n_glen]
         real(prec), intent(IN)    :: zeta_aa(:)         ! [-]
         real(prec), intent(IN)    :: zeta_ac(:)         ! [-]
@@ -247,8 +251,8 @@ end if
                 
                 ! Populate ssa matrices Ax=b
                 call linear_solver_matrix_ssa_ac_csr_2D(lgs_now,ux_b,uy_b,beta_acx,beta_acy,visc_eff_int,  &
-                                    ssa_mask_acx,ssa_mask_acy,H_ice,f_ice,taud_acx,taud_acy,H_grnd,z_sl,z_bed, &
-                                    z_srf,dx,dy,par%boundaries,par%ssa_lateral_bc)
+                                    ssa_mask_acx,ssa_mask_acy,mask_frnt,H_ice,f_ice,taud_acx,taud_acy, &
+                                    taul_int_acx,taul_int_acy,dx,dy,par%boundaries,par%ssa_lateral_bc)
 
                 ! Solve linear equation
                 call linear_solver_matrix_solve(lgs_now,par%ssa_lis_opt)
@@ -309,7 +313,7 @@ end if
             if (write_ssa_diagnostics) then  
                 call ssa_diagnostics_write_step("yelmo_ssa.nc",ux_b,uy_b,L2_norm,beta_acx,beta_acy,visc_eff_int, &
                                         ssa_mask_acx,ssa_mask_acy,ssa_err_acx,ssa_err_acy,H_ice,f_ice,taud_acx,taud_acy, &
-                                        H_grnd,z_sl,z_bed,z_srf,ux_b_nm1,uy_b_nm1,time=real(iter,wp))    
+                                        taul_int_acx,taul_int_acy,H_grnd,z_sl,z_bed,z_srf,ux_b_nm1,uy_b_nm1,time=real(iter,wp))    
             end if 
 
             ! =========================================================================================

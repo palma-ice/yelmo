@@ -423,8 +423,8 @@ end if
 !                 k_p = 3.0_prec / (pc_k*10.0_prec)
 
                 ! Experimental parameter values (minimal oscillations, does not access largest timesteps)
-!                 k_i = 0.5_prec / (pc_k*10.0_prec)
-!                 k_p = 6.5_prec / (pc_k*10.0_prec)
+                ! k_i = 0.5_prec / (pc_k*10.0_prec)
+                ! k_p = 6.5_prec / (pc_k*10.0_prec)
 
                 ! Default parameter values
                 rho_n = calc_pi_rho_pi42(eta_n,eta_nm1,rho_nm1,eps,k_i,k_p,alpha_2=0.0_prec)
@@ -742,6 +742,35 @@ end if
         return 
 
     end subroutine limit_adaptive_timestep
+
+    subroutine set_to_nearest_timestep(dt)
+        ! ajr: limit timestep to specific list of values (for neatness)
+        ! note: routine not used or tested yet! 
+
+        implicit none 
+
+        real(wp), intent(INOUT) :: dt 
+
+        ! Local variables 
+        integer  :: i  
+
+        integer, parameter :: n = 22 
+        real(wp), parameter :: dt_set(n) = &
+        [100.0,50.0,20.0,10.0,5.0,2.0,1.0,0.5,0.2,0.1,0.05,0.02, &
+         0.01,0.005,0.002,0.001,0.0005,0.0002,0.0001,0.00005,0.00002,0.00001]
+
+        do i = 1, n 
+            if (dt_set(i) .le. dt) then 
+                dt = dt_set(i)
+                exit 
+            end if
+        end do 
+
+        return
+
+    end subroutine set_to_nearest_timestep
+
+
 
     elemental function calc_diff2D_timestep(D,dx,dy,cfl_diff_max) result(dt)
         ! Calculate maximum diffusion time step based

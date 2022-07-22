@@ -190,9 +190,9 @@ module yelmo_defs
         real(wp), allocatable   :: dist_grline(:,:) ! Distance to nearest grounding-line point 
         
         ! Additional masks 
-        integer,    allocatable :: mask_bed(:,:)    ! Multi-valued bed mask
-        integer,    allocatable :: mask_grz(:,:)    ! Multi-valued mask for the grounding-line zone
-
+        integer,  allocatable   :: mask_bed(:,:)    ! Multi-valued bed mask
+        integer,  allocatable   :: mask_grz(:,:)    ! Multi-valued mask for the grounding-line zone
+        integer,  allocatable   :: mask_frnt(:,:)   ! Multi-valued mask of ice fronts
         real(wp), allocatable   :: dHdt_n(:,:)      ! [m/a] Ice thickness change due to advection only
         real(wp), allocatable   :: dHdt_pred(:,:)   ! [m/a] Ice thickness change due to advection only
         real(wp), allocatable   :: dHdt_corr(:,:)   ! [m/a] Ice thickness change due to advection only
@@ -337,6 +337,9 @@ module yelmo_defs
         real(wp), allocatable :: taub_acy(:,:) 
         real(wp), allocatable :: taub(:,:)
         
+        real(wp), allocatable :: taul_int_acx(:,:) 
+        real(wp), allocatable :: taul_int_acy(:,:) 
+
         real(wp), allocatable :: qq_gl_acx(:,:) 
         real(wp), allocatable :: qq_gl_acy(:,:) 
         

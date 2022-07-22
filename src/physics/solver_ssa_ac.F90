@@ -149,8 +149,8 @@ contains
     end subroutine linear_solver_save_velocity
 
     subroutine linear_solver_matrix_ssa_ac_csr_2D(lgs,ux,uy,beta_acx,beta_acy, &
-                            N_aa,ssa_mask_acx,ssa_mask_acy,H_ice,f_ice,taud_acx, &
-                            taud_acy,H_grnd,z_sl,z_bed,z_srf,dx,dy,boundaries,lateral_bc)
+                            N_aa,ssa_mask_acx,ssa_mask_acy,mask_frnt,H_ice,f_ice,taud_acx, &
+                            taud_acy,taul_int_acx,taul_int_acy,dx,dy,boundaries,lateral_bc)
         ! Define sparse matrices A*x=b in format 'compressed sparse row' (csr)
         ! for the SSA momentum balance equations with velocity components
         ! ux and uy defined on ac-nodes (right and top borders of i,j grid cell)
@@ -166,14 +166,13 @@ contains
         real(wp), intent(IN) :: N_aa(:,:)               ! [Pa yr m] Vertically integrated viscosity (aa-nodes)
         integer,  intent(IN) :: ssa_mask_acx(:,:)       ! [--] Mask to determine ssa solver actions (acx-nodes)
         integer,  intent(IN) :: ssa_mask_acy(:,:)       ! [--] Mask to determine ssa solver actions (acy-nodes)
+        integer,  intent(IN) :: mask_frnt(:,:)          ! [--] Ice-front mask 
         real(wp), intent(IN) :: H_ice(:,:)              ! [m]  Ice thickness (aa-nodes)
         real(wp), intent(IN) :: f_ice(:,:)
         real(wp), intent(IN) :: taud_acx(:,:)           ! [Pa] Driving stress (acx nodes)
         real(wp), intent(IN) :: taud_acy(:,:)           ! [Pa] Driving stress (acy nodes)
-        real(wp), intent(IN) :: H_grnd(:,:)  
-        real(wp), intent(IN) :: z_sl(:,:) 
-        real(wp), intent(IN) :: z_bed(:,:) 
-        real(wp), intent(IN) :: z_srf(:,:)
+        real(wp), intent(IN) :: taul_int_acx(:,:)       ! [Pa m] Vertically integrated lateral stress (acx nodes)
+        real(wp), intent(IN) :: taul_int_acy(:,:)       ! [Pa m] Vertically integrated lateral stress (acy nodes) 
         real(wp), intent(IN) :: dx, dy
         character(len=*), intent(IN) :: boundaries 
         character(len=*), intent(IN) :: lateral_bc
@@ -182,17 +181,10 @@ contains
         integer  :: nx, ny
         integer  :: i, j, k, n, m 
         integer  :: nc, nr
-        integer  :: i1, j1, i00, j00
-        real(wp) :: del_sq, inv_del_sq
         real(wp) :: inv_dx, inv_dxdx 
         real(wp) :: inv_dy, inv_dydy 
         real(wp) :: inv_dxdy, inv_2dxdy, inv_4dxdy 
         
-        real(wp) :: H_ice_now, H_ocn_now
-
-        integer,  allocatable :: mask(:,:)
-        logical,  allocatable :: is_front_1(:,:)
-        logical,  allocatable :: is_front_2(:,:)  
         real(wp), allocatable :: N_ab(:,:)
 
         ! Boundary conditions counterclockwise unit circle 
@@ -204,13 +196,7 @@ contains
         character(len=56) :: boundaries_uy(4)
 
         integer :: im1, ip1, jm1, jp1 
-
-        real(wp) :: f_submerged, f_visc
         real(wp) :: N_aa_now
-        real(wp) :: tau_bc_int 
-        real(wp) :: tau_bc_sign
-
-        real(wp), parameter :: f_submerged_min = 0.0_wp 
 
         nx = size(H_ice,1)
         ny = size(H_ice,2) 
@@ -224,8 +210,8 @@ contains
         end if 
 
         ! Consistency check: ensure beta is defined well 
-        if ( count(H_grnd .gt. 100.0 .and. H_ice .gt. 0.0) .gt. 0 .and. &
-                count(beta_acx .gt. 0.0 .and. H_grnd .gt. 100.0 .and. H_ice .gt. 0.0) .eq. 0 ) then  
+        if ( ( count(ssa_mask_acx .eq. 1 .and. beta_acx .gt. 0.0) .eq. 0 ) .or. & 
+             ( count(ssa_mask_acy .eq. 1 .and. beta_acy .gt. 0.0) .eq. 0 ) ) then  
             ! No points found with a non-zero beta for grounded ice,
             ! something was not well-defined/well-initialized
 
@@ -233,7 +219,8 @@ contains
             write(*,"(a)") "linear_solver_matrix_ssa_ac_csr_2D:: Error: beta appears to be zero everywhere for grounded ice."
             write(*,*) "range(beta_acx): ", minval(beta_acx), maxval(beta_acx)
             write(*,*) "range(beta_acy): ", minval(beta_acy), maxval(beta_acy)
-            write(*,*) "range(H_grnd):   ", minval(H_grnd), maxval(H_grnd)
+            write(*,*) "range(ssa_mask_acx): ", minval(ssa_mask_acx), maxval(ssa_mask_acx)
+            write(*,*) "range(ssa_mask_acy): ", minval(ssa_mask_acy), maxval(ssa_mask_acy)
             write(*,*) "Stopping."
             write(*,*) 
             stop 
@@ -287,9 +274,6 @@ contains
         nx = size(H_ice,1)
         ny = size(H_ice,2)
         
-        allocate(mask(nx,ny))
-        allocate(is_front_1(nx,ny))
-        allocate(is_front_2(nx,ny))
         allocate(N_ab(nx,ny))
 
         ! Define some factors
@@ -301,19 +285,11 @@ contains
         inv_dxdy    = 1.0_wp / (dx*dy)
         inv_2dxdy   = 1.0_wp / (2.0_wp*dx*dy)
         inv_4dxdy   = 1.0_wp / (4.0_wp*dx*dy)
-        
-        del_sq      = dx*dx 
-        inv_del_sq  = 1.0_wp / del_sq 
 
 
-        ! Set general ice mask and ice-front flags
-        call set_boundary_masks(mask,is_front_1,is_front_2, &
-                                H_ice, f_ice, H_grnd, z_srf, z_bed, z_sl, lateral_bc)
-        
-        
         ! Calculate the staggered depth-integrated viscosity 
         ! at the grid-cell corners (ab-nodes). 
-        call stagger_visc_aa_ab(N_ab,N_aa,H_ice,f_ice)
+        call stagger_visc_aa_ab(N_ab,N_aa,H_ice,f_ice,boundaries)
         
 
         !-------- Assembly of the system of linear equations
@@ -334,7 +310,17 @@ contains
 
             ! == Treat special cases first ==
 
-            if (ssa_mask_acx(i,j) .eq. -1) then 
+            if (ssa_mask_acx(i,j) .eq. 0) then
+                ! SSA set to zero velocity for this point
+
+                k = k+1
+                lgs%a_value(k) = 1.0_prec   ! diagonal element only
+                lgs%a_index(k) = nr
+
+                lgs%b_value(nr) = 0.0_prec
+                lgs%x_value(nr) = 0.0_prec
+            
+            else if (ssa_mask_acx(i,j) .eq. -1) then 
                 ! Assign prescribed boundary velocity to this point
                 ! (eg for prescribed velocity corresponding to 
                 ! analytical grounding line flux, or for a regional domain)
@@ -345,7 +331,7 @@ contains
 
                 lgs%b_value(nr) = ux(i,j)
                 lgs%x_value(nr) = ux(i,j)
-           
+            
             else if (i .eq. 1) then 
                 ! Left boundary 
 
@@ -620,152 +606,76 @@ contains
 
                 end select 
 
-            ! ===== NEWCODE lateral BCs =====
+            else if (ssa_mask_acx(i,j) .eq. 3) then 
+                ! Lateral boundary condition should be applied here 
 
-            else if (  ( is_front_1(i,j).and.is_front_2(i+1,j) ) &
-                      .or. &
-                      ( is_front_2(i,j).and.is_front_1(i+1,j) ) &
-                    ) then
-                    ! one neighbour is ice-covered and the other is ice-free
-                    ! (calving front, grounded ice front)
+                if (f_ice(i,j) .eq. 1.0 .and. f_ice(i+1,j) .lt. 1.0) then 
+                    ! === Case 1: ice-free to the right ===
 
-                    if (is_front_1(i,j)) then
-                        i1 = i     ! ice-front marker 
-                    else   ! is_front_1(i+1,j)==.true.
-                        i1 = i+1   ! ice-front marker 
-                    end if
+                    N_aa_now = N_aa(i,j)
                     
-                    if ( (.not. is_front_2(i1-1,j)) .or. (.not. is_front_2(i1+1,j)) ) then
-                        ! There is inland ice on one side of the current cell, proceed
-                        ! with calving front boundary conditions 
-
-                        ! =========================================================
-                        ! Generalized solution for all ice fronts (floating and grounded)
-                        ! See Lipscomb et al. (2019), Eqs. 11 & 12, and 
-                        ! Winkelmann et al. (2011), Eq. 27 
-
-                        ! Get current ice thickness
-                        ! (No f_ice scaling since all points treated have f_ice=0/1)
-                        H_ice_now = H_ice(i1,j)     
-
-                        ! Get current ocean thickness bordering ice sheet
-                        ! (for bedrock above sea level, this will give zero)
-                        f_submerged = 1.d0 - min((z_srf(i1,j)-z_sl(i1,j))/H_ice_now,1.d0)
-                        f_submerged = max(f_submerged,f_submerged_min)
-                        H_ocn_now   = H_ice_now*f_submerged
-                        
-                        tau_bc_int = 0.5d0*rho_ice*g*H_ice_now**2 &         ! tau_out_int                                                ! p_out
-                                   - 0.5d0*rho_sw *g*H_ocn_now**2           ! tau_in_int
-
-                        ! =========================================================
-                        
-                        if (is_front_1(i,j).and.is_front_2(i+1,j)) then 
-                            ! === Case 1: ice-free to the right ===
-
-                            N_aa_now = N_aa(i1,j)
-                            !N_aa_now = 0.5_wp*(N_aa(i,j)+N_aa(i-1,j))
-
-                            nc = 2*lgs%ij2n(i-1,j)-1
-                                ! smallest nc (column counter), for ux(i-1,j)
-                            k = k+1
-                            lgs%a_value(k) = -4.0_prec*inv_dx*N_aa_now
-                            lgs%a_index(k) = nc 
-
-                            nc = 2*lgs%ij2n(i,j-1)
-                                ! next nc (column counter), for uy(i,j-1)
-                            k = k+1
-                            lgs%a_value(k) = -2.0_prec*inv_dy*N_aa_now
-                            lgs%a_index(k) = nc
-
-                            nc = 2*lgs%ij2n(i,j)-1
-                                ! next nc (column counter), for ux(i,j)
-                            k = k+1
-                            lgs%a_value(k) = 4.0_prec*inv_dx*N_aa_now
-                            lgs%a_index(k) = nc
-
-                            nc = 2*lgs%ij2n(i,j)
-                                ! next nc (column counter), for uy(i,j)
-                            k = k+1
-                            lgs%a_value(k) = 2.0_prec*inv_dy*N_aa_now
-                            lgs%a_index(k) = nc
-
-                            ! Assign matrix values
-                            lgs%b_value(nr) = tau_bc_int
-                            lgs%x_value(nr) = ux(i,j)
-                            
-                            !write(*,*) "ssabc", i, j, f_submerged, H_ocn_now, H_ice_now, ux(i,j), ux(i-1,j)
-                            
-                        else 
-                            ! Case 2: ice-free to the left
-                            
-                            N_aa_now = N_aa(i1,j)
-                            !N_aa_now = 0.5_wp*(N_aa(i,j)+N_aa(i+1,j))
-
-                            nc = 2*lgs%ij2n(i,j)-1
-                                ! next nc (column counter), for ux(i,j)
-                            k = k+1
-                            lgs%a_value(k) = -4.0_prec*inv_dx*N_aa_now
-                            lgs%a_index(k) = nc
-
-                            nc = 2*lgs%ij2n(i+1,j-1)
-                                ! next nc (column counter), for uy(i+1,j-1)
-                            k  = k+1
-                            lgs%a_value(k) = -2.0_prec*inv_dy*N_aa_now
-                            lgs%a_index(k) = nc
-
-                            nc = 2*lgs%ij2n(i+1,j)-1
-                                ! next nc (column counter), for ux(i+1,j)
-                            k = k+1
-                            lgs%a_value(k) = 4.0_prec*inv_dx*N_aa_now
-                            lgs%a_index(k) = nc
- 
-                            nc = 2*lgs%ij2n(i+1,j)
-                                ! largest nc (column counter), for uy(i+1,j)
-                            k  = k+1
-                            lgs%a_value(k) = 2.0_prec*inv_dy*N_aa_now
-                            lgs%a_index(k) = nc
-
-                            ! Assign matrix values
-                            lgs%b_value(nr) = tau_bc_int
-                            lgs%x_value(nr) = ux(i,j)
-                        
-                        end if 
-
-                    else    ! (is_front_2(i1-1,j)==.true.).and.(is_front_2(i1+1,j)==.true.);
-                            ! velocity assumed to be zero
-
-                        k = k+1
-                        lgs%a_value(k)  = 1.0_prec   ! diagonal element only
-                        lgs%a_index(k)  = nr
-
-                        lgs%b_value(nr) = 0.0_prec
-                        lgs%x_value(nr) = 0.0_prec
-
-                    end if
-
-            else if ( ( (mask(i,j)==3).and.(mask(i+1,j)==1) ) &
-                      .or. &
-                      ( (mask(i,j)==1).and.(mask(i+1,j)==3) ) &
-                    ) then
-                    ! one neighbour is floating ice and the other is ice-free land;
-                    ! velocity assumed to be zero
-
+                    nc = 2*lgs%ij2n(i-1,j)-1
+                        ! smallest nc (column counter), for ux(i-1,j)
                     k = k+1
-                    lgs%a_value(k)  = 1.0_prec   ! diagonal element only
-                    lgs%a_index(k)  = nr
+                    lgs%a_value(k) = -4.0_prec*inv_dx*N_aa_now
+                    lgs%a_index(k) = nc 
 
-                    lgs%b_value(nr) = 0.0_prec
-                    lgs%x_value(nr) = 0.0_prec
+                    nc = 2*lgs%ij2n(i,j-1)
+                        ! next nc (column counter), for uy(i,j-1)
+                    k = k+1
+                    lgs%a_value(k) = -2.0_prec*inv_dy*N_aa_now
+                    lgs%a_index(k) = nc
 
-            else if (ssa_mask_acx(i,j) .eq. 0) then    ! neither neighbour is floating or grounded ice,
-                    ! velocity assumed to be zero
+                    nc = 2*lgs%ij2n(i,j)-1
+                        ! next nc (column counter), for ux(i,j)
+                    k = k+1
+                    lgs%a_value(k) = 4.0_prec*inv_dx*N_aa_now
+                    lgs%a_index(k) = nc
 
-                k = k+1
-                lgs%a_value(k) = 1.0_prec   ! diagonal element only
-                lgs%a_index(k) = nr
+                    nc = 2*lgs%ij2n(i,j)
+                        ! next nc (column counter), for uy(i,j)
+                    k = k+1
+                    lgs%a_value(k) = 2.0_prec*inv_dy*N_aa_now
+                    lgs%a_index(k) = nc
 
-                lgs%b_value(nr) = 0.0_prec
-                lgs%x_value(nr) = 0.0_prec
+                    ! Assign matrix values
+                    lgs%b_value(nr) = taul_int_acx(i,j) 
+                    lgs%x_value(nr) = ux(i,j)
+                    
+                else 
+                    ! Case 2: ice-free to the left
+                    
+                    N_aa_now = N_aa(i+1,j)
+                    
+                    nc = 2*lgs%ij2n(i,j)-1
+                        ! next nc (column counter), for ux(i,j)
+                    k = k+1
+                    lgs%a_value(k) = -4.0_prec*inv_dx*N_aa_now
+                    lgs%a_index(k) = nc
+
+                    nc = 2*lgs%ij2n(i+1,j-1)
+                        ! next nc (column counter), for uy(i+1,j-1)
+                    k  = k+1
+                    lgs%a_value(k) = -2.0_prec*inv_dy*N_aa_now
+                    lgs%a_index(k) = nc
+
+                    nc = 2*lgs%ij2n(i+1,j)-1
+                        ! next nc (column counter), for ux(i+1,j)
+                    k = k+1
+                    lgs%a_value(k) = 4.0_prec*inv_dx*N_aa_now
+                    lgs%a_index(k) = nc
+
+                    nc = 2*lgs%ij2n(i+1,j)
+                        ! largest nc (column counter), for uy(i+1,j)
+                    k  = k+1
+                    lgs%a_value(k) = 2.0_prec*inv_dy*N_aa_now
+                    lgs%a_index(k) = nc
+
+                    ! Assign matrix values
+                    lgs%b_value(nr) = taul_int_acx(i,j) 
+                    lgs%x_value(nr) = ux(i,j)
+                
+                end if 
 
             else
                 ! === Inner SSA solution === 
@@ -840,8 +750,18 @@ contains
             nr = n+1   ! row counter
 
             ! == Treat special cases first ==
+            
+            if (ssa_mask_acy(i,j) .eq. 0) then
+                ! SSA not active here, velocity set to zero
 
-            if (ssa_mask_acy(i,j) .eq. -1) then 
+                k = k+1
+                lgs%a_value(k)  = 1.0_prec   ! diagonal element only
+                lgs%a_index(k)  = nr
+
+                lgs%b_value(nr) = 0.0_prec
+                lgs%x_value(nr) = 0.0_prec
+
+            else if (ssa_mask_acy(i,j) .eq. -1) then 
                 ! Assign prescribed boundary velocity to this point
                 ! (eg for prescribed velocity corresponding to analytical grounding line flux)
 
@@ -851,7 +771,6 @@ contains
 
                 lgs%b_value(nr) = uy(i,j)
                 lgs%x_value(nr) = uy(i,j)
-           
             
             else if (j .eq. 1) then 
                 ! lower boundary 
@@ -1118,150 +1037,76 @@ contains
 
                 end select 
 
-            ! ===== NEWCODE lateral BCs =====
+            else if (ssa_mask_acy(i,j) .eq. 3) then 
+                ! Lateral boundary condition should be applied here 
 
-            else if (  ( is_front_1(i,j).and.is_front_2(i,j+1) ) &
-                      .or. &
-                      ( is_front_2(i,j).and.is_front_1(i,j+1) ) &
-                    ) then
-                    ! one neighbour is ice-covered and the other is ice-free
-                    ! (calving front, grounded ice front)
+                if (f_ice(i,j) .eq. 1.0 .and. f_ice(i,j+1) .lt. 1.0) then 
+                    ! === Case 1: ice-free to the top ===
 
-                    if (is_front_1(i,j)) then
-                        j1 = j     ! ice-front marker
-                    else   ! is_front_1(i,j+1)==.true.
-                        j1 = j+1   ! ice-front marker
-                    end if
+                    N_aa_now = N_aa(i,j)
 
-                    if ( (.not. is_front_2(i,j1-1)) .or. (.not. is_front_2(i,j1+1)) ) then
-                        ! There is inland ice on one side of the current cell, proceed
-                        ! with calving front boundary conditions 
-
-                        ! =========================================================
-                        ! Generalized solution for all ice fronts (floating and grounded)
-                        ! See Lipscomb et al. (2019), Eqs. 11 & 12, and 
-                        ! Winkelmann et al. (2011), Eq. 27 
-
-                        ! Get current ice thickness
-                        ! (No f_ice scaling since all points treated have f_ice=0/1)
-                        H_ice_now = H_ice(i,j1)     
-
-                        ! Get current ocean thickness bordering ice sheet
-                        ! (for bedrock above sea level, this will give zero)
-                        f_submerged = 1.d0 - min((z_srf(i,j1)-z_sl(i,j1))/H_ice_now,1.d0)
-                        f_submerged = max(f_submerged,f_submerged_min)
-                        H_ocn_now   = H_ice_now*f_submerged
-
-                        tau_bc_int = 0.5d0*rho_ice*g*H_ice_now**2 &         ! tau_out_int                                                ! p_out
-                                   - 0.5d0*rho_sw *g*H_ocn_now**2           ! tau_in_int
-
-                        ! =========================================================
-                        
-                        if (is_front_1(i,j).and.is_front_2(i,j+1)) then 
-                            ! === Case 1: ice-free to the top ===
-
-                            N_aa_now = N_aa(i,j1)
-                            !N_aa_now = 0.5_wp*(N_aa(i,j)+N_aa(i,j-1))
-
-                            nc = 2*lgs%ij2n(i-1,j)-1
-                                ! smallest nc (column counter), for ux(i-1,j)
-                            k = k+1
-                            lgs%a_value(k) = -2.0_prec*inv_dx*N_aa_now
-                            lgs%a_index(k) = nc
-
-                            nc = 2*lgs%ij2n(i,j-1)
-                                ! next nc (column counter), for uy(i,j-1)
-                            k = k+1
-                            lgs%a_value(k) = -4.0_prec*inv_dy*N_aa_now
-                            lgs%a_index(k) = nc
-
-                            nc = 2*lgs%ij2n(i,j)-1
-                                ! next nc (column counter), for ux(i,j)
-                            k = k+1
-                            lgs%a_value(k) = 2.0_prec*inv_dx*N_aa_now
-                            lgs%a_index(k) = nc
-
-                            nc = 2*lgs%ij2n(i,j)
-                                ! next nc (column counter), for uy(i,j)
-                            k = k+1
-                            lgs%a_value(k) = 4.0_prec*inv_dy*N_aa_now
-                            lgs%a_index(k) = nc
-
-                            ! Assign matrix values
-                            lgs%b_value(nr) = tau_bc_int
-                            lgs%x_value(nr) = uy(i,j)
-                            
-                        else
-                            ! === Case 2: ice-free to the bottom ===
-                            
-                            N_aa_now = N_aa(i,j1)
-                            !N_aa_now = 0.5_wp*(N_aa(i,j)+N_aa(i,j+1))
-
-                            nc = 2*lgs%ij2n(i-1,j+1)-1
-                                ! next nc (column counter), for ux(i-1,j+1)
-                            k = k+1
-                            lgs%a_value(k) = -2.0_prec*inv_dx*N_aa_now
-                            lgs%a_index(k) = nc
- 
-                            nc = 2*lgs%ij2n(i,j)
-                                ! next nc (column counter), for uy(i,j)
-                            k = k+1
-                            lgs%a_value(k) = -4.0_prec*inv_dy*N_aa_now
-                            lgs%a_index(k) = nc
- 
-                            nc = 2*lgs%ij2n(i,j+1)-1
-                                ! next nc (column counter), for ux(i,j+1)
-                            k = k+1
-                            lgs%a_value(k) = 2.0_prec*inv_dx*N_aa_now
-                            lgs%a_index(k) = nc
- 
-                            nc = 2*lgs%ij2n(i,j+1)
-                                ! next nc (column counter), for uy(i,j+1)
-                            k = k+1
-                            lgs%a_value(k) = 4.0_prec*inv_dy*N_aa_now
-                            lgs%a_index(k) = nc
-
-                            ! Assign matrix values
-                            lgs%b_value(nr) = tau_bc_int
-                            lgs%x_value(nr) = uy(i,j)
-                 
-                        end if 
-
-                    else    ! (is_front_2(i,j1-1)==.true.).and.(is_front_2(i,j1+1)==.true.);
-                            ! velocity assumed to be zero
-
-                        k = k+1
-                        lgs%a_value(k)  = 1.0_prec   ! diagonal element only
-                        lgs%a_index(k)  = nr
-
-                        lgs%b_value(nr) = 0.0_prec
-                        lgs%x_value(nr) = 0.0_prec
-
-                    end if
-
-            else if ( ( (mask(i,j)==3).and.(mask(i,j+1)==1) ) &
-                        .or. &
-                        ( (mask(i,j)==1).and.(mask(i,j+1)==3) ) &
-                      ) then
-                    ! one neighbour is floating ice and the other is ice-free land;
-                    ! velocity assumed to be zero
-
+                    nc = 2*lgs%ij2n(i-1,j)-1
+                        ! smallest nc (column counter), for ux(i-1,j)
                     k = k+1
-                    lgs%a_value(k)  = 1.0_prec   ! diagonal element only
-                    lgs%a_index(k)  = nr
+                    lgs%a_value(k) = -2.0_prec*inv_dx*N_aa_now
+                    lgs%a_index(k) = nc
 
-                    lgs%b_value(nr) = 0.0_prec
-                    lgs%x_value(nr) = 0.0_prec
+                    nc = 2*lgs%ij2n(i,j-1)
+                        ! next nc (column counter), for uy(i,j-1)
+                    k = k+1
+                    lgs%a_value(k) = -4.0_prec*inv_dy*N_aa_now
+                    lgs%a_index(k) = nc
 
-            else if (ssa_mask_acy(i,j) .eq. 0) then    ! neither neighbour is floating or grounded ice,
-                    ! velocity assumed to be zero
+                    nc = 2*lgs%ij2n(i,j)-1
+                        ! next nc (column counter), for ux(i,j)
+                    k = k+1
+                    lgs%a_value(k) = 2.0_prec*inv_dx*N_aa_now
+                    lgs%a_index(k) = nc
 
-                k = k+1
-                lgs%a_value(k)  = 1.0_prec   ! diagonal element only
-                lgs%a_index(k)  = nr
+                    nc = 2*lgs%ij2n(i,j)
+                        ! next nc (column counter), for uy(i,j)
+                    k = k+1
+                    lgs%a_value(k) = 4.0_prec*inv_dy*N_aa_now
+                    lgs%a_index(k) = nc
 
-                lgs%b_value(nr) = 0.0_prec
-                lgs%x_value(nr) = 0.0_prec
+                    ! Assign matrix values
+                    lgs%b_value(nr) = taul_int_acy(i,j)
+                    lgs%x_value(nr) = uy(i,j)
+                    
+                else
+                    ! === Case 2: ice-free to the bottom ===
+                    
+                    N_aa_now = N_aa(i,j+1)
+
+                    nc = 2*lgs%ij2n(i-1,j+1)-1
+                        ! next nc (column counter), for ux(i-1,j+1)
+                    k = k+1
+                    lgs%a_value(k) = -2.0_prec*inv_dx*N_aa_now
+                    lgs%a_index(k) = nc
+
+                    nc = 2*lgs%ij2n(i,j)
+                        ! next nc (column counter), for uy(i,j)
+                    k = k+1
+                    lgs%a_value(k) = -4.0_prec*inv_dy*N_aa_now
+                    lgs%a_index(k) = nc
+
+                    nc = 2*lgs%ij2n(i,j+1)-1
+                        ! next nc (column counter), for ux(i,j+1)
+                    k = k+1
+                    lgs%a_value(k) = 2.0_prec*inv_dx*N_aa_now
+                    lgs%a_index(k) = nc
+
+                    nc = 2*lgs%ij2n(i,j+1)
+                        ! next nc (column counter), for uy(i,j+1)
+                    k = k+1
+                    lgs%a_value(k) = 4.0_prec*inv_dy*N_aa_now
+                    lgs%a_index(k) = nc
+
+                    ! Assign matrix values
+                    lgs%b_value(nr) = taul_int_acy(i,j)
+                    lgs%x_value(nr) = uy(i,j)
+         
+                end if 
 
             else
                 ! === Inner SSA solution === 
@@ -1339,41 +1184,119 @@ contains
 
     end subroutine linear_solver_matrix_ssa_ac_csr_2D
 
-    subroutine set_ssa_masks(ssa_mask_acx,ssa_mask_acy,beta_acx,beta_acy,H_ice,f_ice,f_grnd_acx,f_grnd_acy,beta_max,use_ssa)
+    subroutine set_ssa_masks(ssa_mask_acx,ssa_mask_acy,mask_frnt,H_ice,f_ice,f_grnd,use_ssa,lateral_bc)
         ! Define where ssa calculations should be performed
         ! Note: could be binary, but perhaps also distinguish 
         ! grounding line/zone to use this mask for later gl flux corrections
-        ! mask = 0: no ssa calculated
+        ! mask = -1: no ssa calculated, velocity imposed/unchanged
+        ! mask = 0: no ssa calculated, velocity set to zero
         ! mask = 1: shelfy-stream ssa calculated 
         ! mask = 2: shelf ssa calculated 
+        ! mask = 3: ssa lateral boundary condition applied
+        ! mask = 4: ssa lateral boundary, but treated as inner ssa
 
         implicit none 
         
-        integer,    intent(OUT) :: ssa_mask_acx(:,:) 
-        integer,    intent(OUT) :: ssa_mask_acy(:,:)
-        real(wp), intent(IN)  :: beta_acx(:,:)
-        real(wp), intent(IN)  :: beta_acy(:,:)
+        integer,  intent(OUT) :: ssa_mask_acx(:,:) 
+        integer,  intent(OUT) :: ssa_mask_acy(:,:)
+        integer,  intent(IN)  :: mask_frnt(:,:)
         real(wp), intent(IN)  :: H_ice(:,:)
         real(wp), intent(IN)  :: f_ice(:,:)
-        real(wp), intent(IN)  :: f_grnd_acx(:,:)
-        real(wp), intent(IN)  :: f_grnd_acy(:,:)
-        real(wp), intent(IN)  :: beta_max
-        logical,    intent(IN)  :: use_ssa       ! SSA is actually active now? 
+        real(wp), intent(IN)  :: f_grnd(:,:)
+        logical,  intent(IN)  :: use_ssa       ! SSA is actually active now? 
+        character(len=*), intent(IN) :: lateral_bc 
 
         ! Local variables
         integer    :: i, j, nx, ny
         integer    :: im1, ip1, jm1, jp1
         real(wp) :: H_acx, H_acy
         
+        real(wp), allocatable :: mask_frnt_dyn(:,:)
+
+        integer, parameter :: val_ice_free  = -1 
+        integer, parameter :: val_flt       = 1
+        integer, parameter :: val_marine    = 2
+        integer, parameter :: val_grnd      = 3
+        integer, parameter :: val_disabled  = 5 
+
         nx = size(H_ice,1)
         ny = size(H_ice,2)
         
-        ! Initially no active ssa points
+        allocate(mask_frnt_dyn(nx,ny))
+
+        ! Initially no active ssa points, all velocities set to zero
         ssa_mask_acx = 0
         ssa_mask_acy = 0
         
         if (use_ssa) then 
 
+            ! Step 1: define mask_frnt for dynamics, that disables fronts as needed 
+
+            mask_frnt_dyn = mask_frnt
+
+                    
+            ! So far all margins have been diagnosed (marine and grounded on land)
+            ! Disable some regions depending on choice above. 
+            select case(trim(lateral_bc))
+                ! Apply the lateral boundary condition to what? 
+
+                case("none")
+                    ! Do not apply lateral bc anywhere. Ie, disable front detection.
+                    ! Treat all ice points in the domain as 'inner ssa' points.
+
+                    do j = 1, ny
+                    do i = 1, nx
+                    
+                        if (mask_frnt(i,j) .gt. 0) mask_frnt_dyn(i,j) = val_disabled
+
+                    end do
+                    end do
+
+                case("floating","float","slab","slab-ext")
+                    ! Only apply lateral bc to floating ice fronts.
+                    ! Ie, disable detection of all grounded fronts for now.
+                    ! Model is generally more stable this way.
+                    ! This method is also used for the 'infinite slab' approach,
+                    ! where a thin ice shelf is extended everywhere over the domain. 
+                    
+                    do j = 1, ny
+                    do i = 1, nx
+                    
+                        if ( mask_frnt(i,j) .eq. val_grnd .or. &
+                             mask_frnt(i,j) .eq. val_marine ) mask_frnt_dyn(i,j) = val_disabled
+
+                    end do
+                    end do
+
+                case("marine")
+                    ! Only apply lateral bc to floating ice fronts and
+                    ! and grounded marine fronts. Disable detection 
+                    ! of ice fronts grounded above sea level.
+                    
+                    do j = 1, ny
+                    do i = 1, nx
+                    
+                        if ( mask_frnt(i,j) .eq. val_grnd ) mask_frnt_dyn(i,j) = val_disabled
+
+                    end do
+                    end do
+
+                case("all")
+                    ! Apply lateral bc to all ice-sheet fronts. 
+
+                    ! Do nothing - all fronts have been accurately diagnosed. 
+
+                case DEFAULT
+                    
+                    write(io_unit_err,*) "set_ssa_masks:: error: ssa_lat_bc parameter value not recognized."
+                    write(io_unit_err,*) "ydyn.ssa_lat_bc = ", lateral_bc
+                    stop 
+
+            end select
+               
+                    
+            ! Step 2: define ssa solver masks
+
             do j = 1, ny
             do i = 1, nx
 
@@ -1384,12 +1307,13 @@ contains
                 jp1 = min(j+1,ny)
 
 
-                ! x-direction
+                ! == x-direction ===
+
                 if (f_ice(i,j) .eq. 1.0 .or. f_ice(ip1,j) .eq. 1.0) then
                 
-                    ! Ice is present on ac-node
+                    ! Current ac-node is border of an ice covered cell in x-direction
                     
-                    if (f_grnd_acx(i,j) .gt. 0.0) then 
+                    if (f_grnd(i,j) .gt. 0.0 .or. f_grnd(ip1,j) .gt. 0.0) then 
                         ! Grounded ice or grounding line (ie, shelfy-stream)
                         ssa_mask_acx(i,j) = 1
                     else 
@@ -1397,71 +1321,57 @@ contains
                         ssa_mask_acx(i,j) = 2
                     end if 
 
-                    ! Deactivate if dragging is too high and away from grounding line
-                    if ( beta_acx(i,j) .ge. beta_max .and. f_grnd_acx(i,j) .eq. 1.0 ) ssa_mask_acx(i,j) = 0 
-                    
                 end if
 
-                ! y-direction
-                if (f_ice(i,j) .eq. 1.0 .or. f_ice(i,jp1) .eq. 1.0) then
+                ! Overwrite above if this point should be treated via lateral boundary conditions
+                if ( (mask_frnt_dyn(i,j) .gt. 0 .and. mask_frnt_dyn(ip1,j) .lt. 0) .or. &
+                     (mask_frnt_dyn(i,j) .lt. 0 .and. mask_frnt_dyn(ip1,j) .gt. 0) ) then 
+                    ! Lateral boundary point 
 
-                    ! Ice is present on ac-node
-                    
-                    if (f_grnd_acy(i,j) .gt. 0.0) then 
-                        ! Grounded ice or grounding line (ie, shelfy-stream)
-                        ssa_mask_acy(i,j) = 1
-                    else 
-                        ! Shelf ice 
-                        ssa_mask_acy(i,j) = 2
-                    end if 
-
-                    ! Deactivate if dragging is too high and away from grounding line
-                    if ( beta_acy(i,j) .ge. beta_max .and. f_grnd_acy(i,j) .eq. 1.0 ) ssa_mask_acy(i,j) = 0 
-                    
-                end if
-
-            end do 
-            end do
-
-            ! Final check on both masks to avoid isolated non-ssa points
-            do j = 1, ny
-            do i = 1, nx
-
-                ! Get neighbor indices
-                im1 = max(i-1,1) 
-                ip1 = min(i+1,nx) 
-                jm1 = max(j-1,1) 
-                jp1 = min(j+1,ny)
-
-                ! acx-nodes 
-                if ( (f_ice(i,j) .eq. 1.0 .or. f_ice(ip1,j) .eq. 1.0) .and. &
-                      ssa_mask_acx(i,j) .eq. 0 .and. &
-                    ssa_mask_acx(ip1,j) .gt. 0 .and. ssa_mask_acx(im1,j) .gt. 0 .and.  &
-                    ssa_mask_acx(i,jp1) .gt. 0 .and. ssa_mask_acx(i,jm1) .gt. 0 ) then 
-
-                    if (f_grnd_acx(i,j) .gt. 0.0) then 
-                        ! Grounded ice or grounding line (ie, shelfy-stream)
-                        ssa_mask_acx(i,j) = 1
-                    else 
-                        ! Shelf ice 
-                        ssa_mask_acx(i,j) = 2
-                    end if 
+                    ssa_mask_acx(i,j) = 3 
 
                 end if 
 
-                ! acy-nodes 
-                if ( (f_ice(i,j) .eq. 1.0 .or. f_ice(i,jp1) .eq. 1.0) .and. & 
-                      ssa_mask_acy(i,j) .eq. 0 .and. &
-                    ssa_mask_acy(ip1,j) .gt. 0 .and. ssa_mask_acy(im1,j) .gt. 0 .and.  &
-                    ssa_mask_acy(i,jp1) .gt. 0 .and. ssa_mask_acy(i,jm1) .gt. 0 ) then 
+                ! Overwrite again if this front should be deactivated 
+                if ( (mask_frnt_dyn(i,j) .eq. 5 .and. mask_frnt_dyn(ip1,j) .lt. 0) .or. &
+                     (mask_frnt_dyn(i,j) .lt. 0 .and. mask_frnt_dyn(ip1,j) .eq. 5) ) then 
+                    ! Deactivated lateral boundary point 
 
-                    if (f_grnd_acy(i,j) .gt. 0.0) then 
-                        ! Shelfy stream 
+                    ssa_mask_acx(i,j) = 4 
+
+                end if 
+
+                ! == y-direction ===
+
+                if (f_ice(i,j) .eq. 1.0 .or. f_ice(i,jp1) .eq. 1.0) then
+                
+                    ! Current ac-node is border of an ice covered cell in x-direction
+                    
+                    if (f_grnd(i,j) .gt. 0.0 .or. f_grnd(i,jp1) .gt. 0.0) then 
+                        ! Grounded ice or grounding line (ie, shelfy-stream)
                         ssa_mask_acy(i,j) = 1
                     else 
-                        ! Shelf 
+                        ! Shelf ice 
                         ssa_mask_acy(i,j) = 2
                     end if 
+
+                end if
+
+                ! Overwrite above if this point should be treated via lateral boundary conditions
+                if ( (mask_frnt_dyn(i,j) .gt. 0 .and. mask_frnt_dyn(i,jp1) .lt. 0) .or. &
+                     (mask_frnt_dyn(i,j) .lt. 0 .and. mask_frnt_dyn(i,jp1) .gt. 0) ) then 
+                    ! Lateral boundary point 
+
+                    ssa_mask_acy(i,j) = 3 
+
+                end if 
+
+                ! Overwrite again if this front should be deactivated 
+                if ( (mask_frnt_dyn(i,j) .eq. 5 .and. mask_frnt_dyn(i,jp1) .lt. 0) .or. &
+                     (mask_frnt_dyn(i,j) .lt. 0 .and. mask_frnt_dyn(i,jp1) .eq. 5) ) then 
+                    ! Deactivated lateral boundary point 
+
+                    ssa_mask_acy(i,j) = 4 
 
                 end if 
 
@@ -1528,7 +1438,7 @@ contains
 
 ! === INTERNAL ROUTINES ==== 
 
-    subroutine stagger_visc_aa_ab(visc_ab,visc,H_ice,f_ice)
+    subroutine stagger_visc_aa_ab(visc_ab,visc,H_ice,f_ice,boundaries)
 
         implicit none 
 
@@ -1536,7 +1446,8 @@ contains
         real(wp), intent(IN)  :: visc(:,:) 
         real(wp), intent(IN)  :: H_ice(:,:) 
         real(wp), intent(IN)  :: f_ice(:,:) 
-
+        character(len=*), intent(IN) :: boundaries
+        
         ! Local variables 
         integer :: i, j, k
         integer :: im1, ip1, jm1, jp1 
@@ -1558,6 +1469,24 @@ contains
             jm1 = max(j-1,1) 
             jp1 = min(j+1,ny) 
             
+            ! Adjust border indices for specific periodic cases
+            ! (other cases should be ok with choice above?)
+            select case(trim(boundaries)) 
+
+                case("periodic")
+
+                    if (i .eq. 1)  im1 = nx 
+                    if (i .eq. nx) ip1 = 1 
+                    if (j .eq. 1)  jm1 = ny 
+                    if (j .eq. ny) jp1 = 1 
+
+                case("periodic-x")
+
+                    if (i .eq. 1)  im1 = nx 
+                    if (i .eq. nx) ip1 = 1 
+                    
+            end select 
+
             visc_ab(i,j) = 0.0_wp
             k=0
 
@@ -1590,176 +1519,6 @@ contains
 
     end subroutine stagger_visc_aa_ab
 
-    subroutine set_boundary_masks(mask,front1,front2,H_ice,f_ice,H_grnd,z_srf,z_bed,z_sl,apply_lateral_bc)
-        ! Define where ssa calculations should be performed
-        ! Note: could be binary, but perhaps also distinguish 
-        ! grounding line/zone to use this mask for later gl flux corrections
-        ! mask = 0: Grounded ice 
-        ! mask = 1: Ice-free land 
-        ! mask = 2: Open ocean  
-        ! mask = 3: Ice shelf 
-
-        ! Note: this mask is defined on central aa-nodes 
-        
-        implicit none 
-        
-        integer,    intent(OUT) :: mask(:,:) 
-        logical,    intent(OUT) :: front1(:,:)
-        logical,    intent(OUT) :: front2(:,:)  
-        real(wp), intent(IN)  :: H_ice(:,:)
-        real(wp), intent(IN)  :: f_ice(:,:)
-        real(wp), intent(IN)  :: H_grnd(:,:)
-        real(wp), intent(IN)  :: z_srf(:,:)
-        real(wp), intent(IN)  :: z_bed(:,:)
-        real(wp), intent(IN)  :: z_sl(:,:)
-        character(len=*), intent(IN) :: apply_lateral_bc 
-
-        ! Local variables
-        integer  :: i, j, nx, ny
-        integer  :: im1, ip1, jm1, jp1 
-        logical  :: is_float 
-        real(wp) :: f_submerged
-        real(wp) :: H_ocn_now 
-
-        ! Use 'apply_lateral_bc' to determine where to apply generalized
-        ! lateral bc equation.
-        ! "floating" : only apply at floating ice margins 
-        ! "marine"   : only apply at floating ice margins and 
-        !              grounded marine ice margins (grounded ice next to open ocean)
-        ! "all"      : apply at all ice margins 
-        ! "none"     : do not apply boundary condition (for testing mainly)
-
-        nx = size(mask,1)
-        ny = size(mask,2)
-        
-        ! First determine general ice coverage mask 
-        ! (land==1,ocean==2,floating_ice==3,grounded_ice==0)
-
-        do j = 1, ny
-        do i = 1, nx
-            
-            ! Check if this point would be floating
-            is_float = H_grnd(i,j) .le. 0.0 
-
-            if (f_ice(i,j) .eq. 1.0) then
-                ! Ice-covered point
-
-                if (is_float) then 
-                    ! Ice shelf 
-                    mask(i,j) = 3
-                else
-                    ! Grounded ice 
-                    mask(i,j) = 0 
-                end if 
-                
-            else 
-                ! Ice-free point, or only partially-covered (consider ice free)
-
-                if (is_float) then 
-                    ! Open ocean 
-                    mask(i,j) = 2
-                else 
-                    ! Ice-free land 
-                    mask(i,j) = 1 
-                end if 
-
-            end if 
-
-        end do 
-        end do 
-        
-        !-------- Detection of the ice front/margins --------
-
-        front1  = .false. 
-        front2  = .false. 
-
-        do j = 1, ny
-        do i = 1, nx
-
-            ! Get neighbor indices 
-            im1 = max(i-1,1)
-            ip1 = min(i+1,nx)
-            jm1 = max(j-1,1)
-            jp1 = min(j+1,ny)
-            
-          if (  f_ice(i,j) .eq. 1.0 .and. &
-                ( f_ice(im1,j) .lt. 1.0 .or. &
-                  f_ice(ip1,j) .lt. 1.0 .or. &
-                  f_ice(i,jm1) .lt. 1.0 .or. &
-                  f_ice(i,jp1) .lt. 1.0 ) ) then
-
-            front1(i,j) = .TRUE. 
-
-          end if 
-          
-          if (  f_ice(i,j) .lt. 1.0 .and. &
-                ( f_ice(im1,j) .eq. 1.0 .or. &
-                  f_ice(ip1,j) .eq. 1.0 .or. &
-                  f_ice(i,jm1) .eq. 1.0 .or. &
-                  f_ice(i,jp1) .eq. 1.0 ) ) then
-
-            front2(i,j) = .TRUE. 
-
-          end if 
-
-          ! So far all margins have been diagnosed (marine and grounded on land)
-          ! Disable some regions depending on choice above. 
-          select case(trim(apply_lateral_bc))
-            ! Apply the lateral boundary condition to what? 
-
-            case("none")
-                ! Do not apply lateral bc anywhere. Ie, disable front detection.
-                ! This is mainly for testing, as the 'inner' ssa section
-                ! is used and may take information from neighbors outside
-                ! the ice sheet margin.
-
-                if (front1(i,j)) front1(i,j) = .FALSE. 
-
-            case("floating","float","slab","slab-ext")
-                ! Only apply lateral bc to floating ice fronts.
-                ! Ie, disable detection of all grounded fronts for now.
-                ! Model is generally more stable this way.
-                ! This method is also used for the 'infinite slab' approach,
-                ! where a thin ice shelf is extended everywhere over the domain. 
-                
-                if ( front1(i,j) .and. mask(i,j) .eq. 0 ) front1(i,j) = .FALSE. 
-
-            case("marine")
-                ! Only apply lateral bc to floating ice fronts and
-                ! and grounded marine fronts. Disable detection 
-                ! of ice fronts grounded above sea level.
-                
-                ! Get current ocean thickness bordering ice sheet
-                ! (for bedrock above sea level, this will give zero)
-                f_submerged = 1.d0 - min((z_srf(i,j)-z_sl(i,j))/H_ice(i,j),1.d0)
-                H_ocn_now   = H_ice(i,j)*f_submerged
-
-                ! if ( front1(i,j) .and. mask(i,j) .eq. 0 .and. &
-                !                     H_ocn_now .eq. 0.0 ) front1(i,j) = .FALSE. 
-                
-                if ( front1(i,j) .and. mask(i,j) .eq. 0 .and. &
-                                    f_submerged .eq. 0.0_wp ) front1(i,j) = .FALSE. 
-            
-            case("all")
-                ! Apply lateral bc to all ice-sheet fronts. 
-
-                ! Do nothing - all fronts have been accurately diagnosed. 
-
-            case DEFAULT
-                
-                write(io_unit_err,*) "set_boundary_masks:: error: ssa_lat_bc parameter value not recognized."
-                write(io_unit_err,*) "ydyn.ssa_lat_bc = ", apply_lateral_bc
-                stop 
-
-           end select
-
-        end do
-        end do
-        
-        return
-        
-    end subroutine set_boundary_masks
-    
     elemental subroutine limit_vel(u,u_lim)
         ! Apply a velocity limit (for stability)
 
@@ -1803,7 +1562,7 @@ contains
 
     subroutine ssa_diagnostics_write_step(filename,ux,uy,L2_norm,beta_acx,beta_acy,visc_int, &
                                         ssa_mask_acx,ssa_mask_acy,ssa_err_acx,ssa_err_acy,H_ice,f_ice,taud_acx,taud_acy, &
-                                                            H_grnd,z_sl,z_bed,z_srf,ux_prev,uy_prev,time)
+                                     taul_int_acx,taul_int_acy,H_grnd,z_sl,z_bed,z_srf,ux_prev,uy_prev,time)
 
         implicit none 
         
@@ -1822,6 +1581,8 @@ contains
         real(wp), intent(IN) :: f_ice(:,:) 
         real(wp), intent(IN) :: taud_acx(:,:) 
         real(wp), intent(IN) :: taud_acy(:,:) 
+        real(wp), intent(IN) :: taul_int_acx(:,:) 
+        real(wp), intent(IN) :: taul_int_acy(:,:) 
         real(wp), intent(IN) :: H_grnd(:,:) 
         real(wp), intent(IN) :: z_sl(:,:) 
         real(wp), intent(IN) :: z_bed(:,:) 
@@ -1888,6 +1649,11 @@ contains
         call nc_write(filename,"taud_acx",taud_acx,units="Pa",long_name="Driving stress (acx)", &
                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
         call nc_write(filename,"taud_acy",taud_acy,units="Pa",long_name="Driving stress (acy)", &
+                      dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
+        
+        call nc_write(filename,"taul_int_acx",taul_int_acx,units="Pa",long_name="Vertically integrated lateral stress (acx)", &
+                      dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
+        call nc_write(filename,"taul_int_acy",taul_int_acy,units="Pa",long_name="Vertically integrated lateral stress (acy)", &
                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
         
         call nc_write(filename,"H_grnd",H_grnd,units="m",long_name="Ice thickness overburden", &

@@ -209,11 +209,21 @@ program yelmo_trough
                                     yelmo1%grd%xc*1e-3,yelmo1%grd%yc*1e-3,fc,dc,wc,x_cf)
         
         case("MISMIP+") 
-
+            ! MISMIP+ domain 
 
             call trough_mismipp_topo_init(yelmo1%bnd%z_bed,yelmo1%tpo%now%H_ice,yelmo1%tpo%now%z_srf, &
                                     yelmo1%grd%xc*1e-3,yelmo1%grd%yc*1e-3,fc,dc,wc,x_cf)
         
+        case("SLAB-SHELF")
+            ! Constant slab slope with an ice shelf
+
+            ! call trough_f17_topo_init(yelmo1%bnd%z_bed,yelmo1%tpo%now%H_ice,yelmo1%tpo%now%z_srf, &
+            !                         yelmo1%grd%xc*1e-3,yelmo1%grd%yc*1e-3,fc,dc,wc,x_cf)
+            
+            call slab_topo_init(yelmo1%bnd%z_bed,yelmo1%tpo%now%H_ice,yelmo1%tpo%now%z_srf, &
+                                    yelmo1%grd%xc*1e-3,yelmo1%grd%yc*1e-3)
+
+
         case DEFAULT 
 
             write(*,*) "yelmo_trough:: Error: domain not recognized: "//trim(domain)
@@ -223,8 +233,7 @@ program yelmo_trough
 
 
     ! Define calving front 
-    yelmo1%bnd%calv_mask = .FALSE. 
-    where (yelmo1%grd%x*1e-3 .ge. x_cf) yelmo1%bnd%calv_mask = .TRUE. 
+    call define_calving_front(yelmo1%bnd%calv_mask,yelmo1%grd%x*1e-3,x_cf)
 
     ! Initialize the yelmo state (dyn,therm,mat)
     call yelmo_init_state(yelmo1,time=time_init,thrm_method="robin-cold")
@@ -241,6 +250,19 @@ program yelmo_trough
 
         ! Get current time 
         time = time_init + n*dtt
+
+if (.FALSE.) then
+        if (trim(domain) .eq. "SLAB-SHELF" .and. time .ge. 3e3) then 
+
+            ! ! Define calving front 
+            ! x_cf = 540.0_wp 
+            ! call define_calving_front(yelmo1%bnd%calv_mask,yelmo1%grd%x*1e-3,x_cf)
+
+            ! Kill all floating ice now
+            yelmo1%tpo%par%calv_flt_method = "kill"
+
+        end if 
+end if 
 
         ! == Yelmo ice sheet ===================================================
         call yelmo_update(yelmo1,time)
@@ -277,6 +299,57 @@ program yelmo_trough
     call MPI_FINALIZE(perr)
 
 contains
+    
+    subroutine define_calving_front(calv_mask,xx,x_cf)
+        ! Define a calving mask in the x direction where 
+        ! beyond the position x_cf ice will be calved. 
+
+        implicit none 
+
+        logical, intent(OUT) :: calv_mask(:,:) 
+        real(wp), intent(IN) :: xx(:,:) 
+        real(wp), intent(IN) :: x_cf 
+
+        calv_mask = .FALSE. 
+        where (xx .ge. x_cf) calv_mask = .TRUE. 
+    
+        return 
+
+    end subroutine define_calving_front
+
+    subroutine slab_topo_init(z_bed,H_ice,z_srf,xc,yc)
+
+        implicit none 
+
+        real(prec), intent(OUT) :: z_bed(:,:) 
+        real(prec), intent(OUT) :: H_ice(:,:) 
+        real(prec), intent(OUT) :: z_srf(:,:) 
+        real(prec), intent(IN)  :: xc(:)
+        real(prec), intent(IN)  :: yc(:)
+
+        ! Local variables 
+        integer :: i, j, nx, ny 
+
+        nx = size(z_bed,1)
+        ny = size(z_bed,2)
+        
+        ! Define bedrock as a slope
+        do j = 1, ny
+            z_bed(:,j) = -100.0 - xc
+        end do 
+        
+        ! Set ice thickness to 500 m everywhere initially 
+        H_ice = 500.0
+
+        ! Remove ice from deep bed
+        where(z_bed .lt. -500.0) H_ice = 0.0 
+
+        ! Adjust for floating ice later, for now assume fully grounded
+        z_srf = z_bed + H_ice 
+
+        return 
+
+    end subroutine slab_topo_init
 
     subroutine trough_f17_topo_init(z_bed,H_ice,z_srf,xc,yc,fc,dc,wc,x_cf)
 
@@ -444,6 +517,18 @@ contains
         call nc_write(filename,"N_eff",ylmo%dyn%now%N_eff,units="Pa",long_name="Effective pressure", &
                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
         
+        call nc_write(filename,"mask_frnt",ylmo%tpo%now%mask_frnt,units="",long_name="Ice-front mask", &
+                      dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
+        call nc_write(filename,"taul_int_acx",ylmo%dyn%now%taul_int_acx,units="Pa m",long_name="Vertically integrated lateral stress (x)", &
+                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
+        call nc_write(filename,"taul_int_acy",ylmo%dyn%now%taul_int_acy,units="Pa m",long_name="Vertically integrated lateral stress (y)", &
+                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
+        
+        call nc_write(filename,"H_ice_pred",ylmo%tpo%now%H_ice_pred,units="m",long_name="Ice thickness (predicted)", &
+                      dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
+        call nc_write(filename,"H_ice_corr",ylmo%tpo%now%H_ice_corr,units="m",long_name="Ice thickness (corrected)", &
+                      dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
+
         call nc_write(filename,"dzsrfdt",ylmo%tpo%now%dzsrfdt,units="m/a",long_name="Surface elevation change", &
                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
         call nc_write(filename,"dHicedt",ylmo%tpo%now%dHicedt,units="m/a",long_name="Ice thickness change", &
@@ -501,10 +586,10 @@ contains
         
         ! == yelmo_dynamics ==
 
-!         call nc_write(filename,"ssa_mask_acx",ylmo%dyn%now%ssa_mask_acx,units="1",long_name="SSA mask (acx)", &
-!                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-!         call nc_write(filename,"ssa_mask_acy",ylmo%dyn%now%ssa_mask_acy,units="1",long_name="SSA mask (acy)", &
-!                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
+        call nc_write(filename,"ssa_mask_acx",ylmo%dyn%now%ssa_mask_acx,units="1",long_name="SSA mask (acx)", &
+                      dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
+        call nc_write(filename,"ssa_mask_acy",ylmo%dyn%now%ssa_mask_acy,units="1",long_name="SSA mask (acy)", &
+                      dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
         
         call nc_write(filename,"cb_ref",ylmo%dyn%now%cb_ref,units="--",long_name="Bed friction scalar", &
                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)

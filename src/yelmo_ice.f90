@@ -150,7 +150,7 @@ contains
                     dt_now = dt_adv_min 
 
                 case(2) 
-                    ! Use PI adaptive timestep
+                    ! Use minimum of PI adaptive timestep
 
                     dt_now = dt_pi
 
@@ -232,14 +232,6 @@ contains
                         
                     end if 
 
-                end if 
-
-                if (dom%par%pc_filter_vel) then 
-
-                    ! Modify ux/y_bar to use the average between the current and previous velocity solutions
-                    dom%dyn%now%ux_bar = 0.5_prec*dom%dyn%now%ux_bar + 0.5_prec*dom%dyn%now%ux_bar_prev
-                    dom%dyn%now%uy_bar = 0.5_prec*dom%dyn%now%uy_bar + 0.5_prec*dom%dyn%now%uy_bar_prev
-                    
                 end if 
                 
                 ! Step 1: Perform predictor step for topography

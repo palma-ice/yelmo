@@ -49,8 +49,9 @@ module velocity_ssa
 contains 
 
     subroutine calc_velocity_ssa(ux_b,uy_b,taub_acx,taub_acy,visc_eff,visc_eff_int,ssa_mask_acx,ssa_mask_acy, &
-                                  ssa_err_acx,ssa_err_acy,ssa_iter_now,beta,beta_acx,beta_acy,c_bed,taud_acx,taud_acy,H_ice, &
-                                  f_ice,H_grnd,f_grnd,f_grnd_acx,f_grnd_acy,ATT,zeta_aa,z_sl,z_bed,z_srf,dx,dy,n_glen,par)
+                                  ssa_err_acx,ssa_err_acy,ssa_iter_now,beta,beta_acx,beta_acy,c_bed,taud_acx,taud_acy, &
+                                  taul_int_acx,taul_int_acy,H_ice, &
+                                  f_ice,H_grnd,f_grnd,f_grnd_acx,f_grnd_acy,mask_frnt,ATT,zeta_aa,z_sl,z_bed,z_srf,dx,dy,n_glen,par)
         ! This subroutine is used to solve the horizontal velocity system (ux,uy)
         ! following the SSA solution
 
@@ -73,12 +74,15 @@ contains
         real(prec), intent(IN)    :: c_bed(:,:)         ! [Pa]
         real(prec), intent(IN)    :: taud_acx(:,:)      ! [Pa]
         real(prec), intent(IN)    :: taud_acy(:,:)      ! [Pa]
+        real(wp),   intent(IN)    :: taul_int_acx(:,:)  ! [Pa m]
+        real(wp),   intent(IN)    :: taul_int_acy(:,:)  ! [Pa m]
         real(prec), intent(IN)    :: H_ice(:,:)         ! [m]
         real(prec), intent(IN)    :: f_ice(:,:)         ! [--]
         real(prec), intent(IN)    :: H_grnd(:,:)        ! [m]
         real(prec), intent(IN)    :: f_grnd(:,:)        ! [-]
         real(prec), intent(IN)    :: f_grnd_acx(:,:)    ! [-]
         real(prec), intent(IN)    :: f_grnd_acy(:,:)    ! [-]
+        integer,    intent(IN)    :: mask_frnt(:,:)     ! [-]
         real(prec), intent(IN)    :: ATT(:,:,:)         ! [yr^-1 Pa^-n_glen]
         real(prec), intent(IN)    :: zeta_aa(:)         ! [-]
         real(prec), intent(IN)    :: z_sl(:,:)          ! [m]
@@ -198,25 +202,7 @@ contains
             ! Calculate depth-integrated effective viscosity
             ! Note L19 uses eta_bar*H in the ssa equation. Yelmo uses eta_int=eta_bar*H directly.
             call calc_visc_eff_int(visc_eff_int,visc_eff,H_ice,f_ice,zeta_aa,par%boundaries)
-
-if (.FALSE.) then 
-    ! Apply scaling to viscosity to 'help' convergence.
-
-            !ssa_visc_scale = 1.0_wp 
-
-            ! Artificially reduce viscosity for low visc values
-            if (ssa_resid .le. 1.0_wp*par%ssa_iter_conv) then 
-                ssa_visc_scale = 1.0_wp 
-            else if (ssa_resid .le. 10.0_wp*par%ssa_iter_conv) then 
-                ssa_visc_scale = 1.0_wp-0.1_wp*(ssa_resid-par%ssa_iter_conv)/(10.0_wp*par%ssa_iter_conv-par%ssa_iter_conv)
-            else 
-                ssa_visc_scale = 1.0_wp-0.1_wp
-            end if 
-
-            write(*,*) "ssa: visc: ", iter, par%ssa_iter_conv, ssa_resid, ssa_visc_scale
-            
-            call scale_visc_eff_int(visc_eff_int,v0=1e10_wp,fac=ssa_visc_scale)
-end if 
+     
 
             ! Calculate beta (at the ice base)
             call calc_beta(beta,c_bed,ux_b,uy_b,H_ice,f_ice,H_grnd,f_grnd,z_bed,z_sl,par%beta_method, &
@@ -245,8 +231,8 @@ if (.TRUE.) then
             
             ! Populate ssa matrices Ax=b
             call linear_solver_matrix_ssa_ac_csr_2D(lgs_now,ux_b,uy_b,beta_acx,beta_acy,visc_eff_int,  &
-                                ssa_mask_acx,ssa_mask_acy,H_ice,f_ice,taud_acx,taud_acy,H_grnd,z_sl,z_bed, &
-                                z_srf,dx,dy,par%boundaries,par%ssa_lateral_bc)
+                                ssa_mask_acx,ssa_mask_acy,mask_frnt,H_ice,f_ice,taud_acx,taud_acy,  &
+                                taul_int_acx,taul_int_acy,dx,dy,par%boundaries,par%ssa_lateral_bc)
 
             ! Solve linear equation
             call linear_solver_matrix_solve(lgs_now,par%ssa_lis_opt)
@@ -309,7 +295,7 @@ end if
             if (write_ssa_diagnostics) then  
                 call ssa_diagnostics_write_step("yelmo_ssa.nc",ux_b,uy_b,L2_norm,beta_acx,beta_acy,visc_eff_int, &
                                         ssa_mask_acx,ssa_mask_acy,ssa_err_acx,ssa_err_acy,H_ice,f_ice,taud_acx,taud_acy, &
-                                        H_grnd,z_sl,z_bed,z_srf,ux_b_nm1,uy_b_nm1,time=real(iter,wp))    
+                                        taul_int_acx,taul_int_acy,H_grnd,z_sl,z_bed,z_srf,ux_b_nm1,uy_b_nm1,time=real(iter,wp))    
             end if 
 
             ! =========================================================================================

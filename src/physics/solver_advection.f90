@@ -15,7 +15,7 @@ module solver_advection
 
 contains 
 
-    subroutine calc_advec2D(dvdt,var,f_ice,ux,uy,var_dot,dx,dy,dt,solver)
+    subroutine calc_advec2D(dvdt,var,f_ice,ux,uy,var_dot,dx,dy,dt,solver,boundaries)
         ! General routine to apply 2D advection equation to variable `var` 
         ! with source term `var_dot`. Various solvers are possible
 
@@ -29,6 +29,7 @@ contains
         real(prec),       intent(IN)    :: dy                   ! [m]   Horizontal resolution, y-direction
         real(prec),       intent(IN)    :: dt                   ! [a]   Timestep 
         character(len=*), intent(IN)    :: solver               ! Solver to use for the ice thickness advection equation
+        character(len=*), intent(IN)    :: boundaries           ! Boundary conditions to impose
 
         ! Local variables 
         real(prec), allocatable :: var_now(:,:) 
@@ -59,7 +60,8 @@ contains
 
             case("impl-upwind") 
 
-                call calc_adv2D_impl_upwind(var_now,ux,uy,var_dot,dx,dy,dt,f_upwind=1.0_prec)
+                call calc_adv2D_impl_upwind(var_now,ux,uy,var_dot,dx,dy,dt, &
+                                                f_upwind=1.0_prec,boundaries=boundaries)
             
             ! Other solvers below...
             case("expl-sico")
@@ -427,7 +429,7 @@ end if
 
     end subroutine calc_adv2D_expl_upwind
 
-    subroutine  calc_adv2D_impl_upwind(H,ux,uy,mdot,dx,dy,dt,f_upwind)
+    subroutine  calc_adv2D_impl_upwind(H,ux,uy,mdot,dx,dy,dt,f_upwind,boundaries)
         ! To solve the 2D adevection equation:
         ! dH/dt =
         ! M H = Frelax
@@ -443,8 +445,11 @@ end if
         real(prec), intent(IN)    :: dy             ! [m] y-resolution
         real(prec), intent(IN)    :: dt             ! [a] Timestep (assumes dx=dy)
         real(prec), intent(IN)    :: f_upwind       ! [-] Fraction of "upwind-ness" to apply (ajr: experimental!) - between 0.5 and 1.0, default f_upwind=1.0
+        character(len=*), intent(IN) :: boundaries 
+
         ! Local variables
         integer    :: i, j, nx, ny
+        integer    :: im1, ip1, jm1, jp1 
         integer    :: iter, ierr 
         real(prec) :: dtdx, dtdx2
         real(prec) :: reste, delh, tmp 
@@ -558,13 +563,16 @@ end if
         end if
 
         ! Populate diagonals
-        do j=2,ny-1
-        do i=2,nx-1
+        do j = 1, ny
+        do i = 1, nx
+
+            call get_neighbor_i(im1,ip1,i,nx,boundaries) 
+            call get_neighbor_i(jm1,jp1,j,ny,boundaries) 
 
             !  sous diagonale en x
-            ux_im1 = ux(i-1,j)
+            ux_im1 = ux(im1,j)
             if (abs(ux_im1) .lt. TOL_UNDERFLOW) ux_im1 = 0.0
-            arelax(i,j) = -dtdx*c_west(i-1,j)*ux_im1    ! partie advective en x
+            arelax(i,j) = -dtdx*c_west(im1,j)*ux_im1    ! partie advective en x
 
             !  sur diagonale en x
             ux_i = ux(i,j)
@@ -572,9 +580,9 @@ end if
             brelax(i,j) = +dtdx*c_east(i,j)*ux_i        ! partie advective
 
             !  sous diagonale en y
-            uy_jm1 = uy(i,j-1)
+            uy_jm1 = uy(i,jm1)
             if (abs(uy_jm1) .lt. TOL_UNDERFLOW) uy_jm1 = 0.0
-            drelax(i,j) = -dtdx*c_south(i,j-1)*uy_jm1   ! partie advective en y
+            drelax(i,j) = -dtdx*c_south(i,jm1)*uy_jm1   ! partie advective en y
 
             !  sur diagonale en y
             uy_j = uy(i,j)
@@ -584,8 +592,8 @@ end if
 
             ! diagonale
             crelax(i,j) = 1.0 + dtdx* &
-                       ((c_west(i,j)*ux_i - c_east(i-1,j)*ux_im1) &
-                      +(c_south(i,j)*uy_j - c_north(i,j-1)*uy_jm1))
+                       ((c_west(i,j)*ux_i - c_east(im1,j)*ux_im1) &
+                      +(c_south(i,j)*uy_j - c_north(i,jm1)*uy_jm1))
 
             ! Combine all terms
             frelax(i,j) = H(i,j) + dt*mdot(i,j)
@@ -609,11 +617,14 @@ end if
             ! Relaxation loop 
 
             ! Calculate change in H
-            do j=2,ny-1
-            do i=2,nx-1
+            do j = 1, ny
+            do i = 1, nx
 
-                reste = (((arelax(i,j)*H(i-1,j) + drelax(i,j)*H(i,j-1)) &
-                        + (brelax(i,j)*H(i+1,j) + erelax(i,j)*H(i,j+1))) &
+                call get_neighbor_i(im1,ip1,i,nx,boundaries) 
+                call get_neighbor_i(jm1,jp1,j,ny,boundaries) 
+
+                reste = (((arelax(i,j)*H(im1,j) + drelax(i,j)*H(i,jm1)) &
+                        + (brelax(i,j)*H(ip1,j) + erelax(i,j)*H(i,jp1))) &
                         +  crelax(i,j)*H(i,j))  - frelax(i,j)
 
                 deltaH(i,j) = reste/crelax(i,j)
@@ -652,4 +663,54 @@ end if
 
     end subroutine calc_adv2D_impl_upwind
 
+    subroutine get_neighbor_i(im1,ip1,i,nx,boundaries)
+
+        implicit none
+
+        integer, intent(OUT) :: im1 
+        integer, intent(OUT) :: ip1 
+        integer, intent(IN)  :: i 
+        integer, intent(IN)  :: nx 
+
+        character(len=*), intent(IN) :: boundaries
+
+        im1 = max(i-1,1)
+        ip1 = min(i+1,nx) 
+
+        select case(trim(boundaries))
+
+            case("periodic","periodic-x")
+                if (i .eq. 1)  im1 = nx 
+                if (i .eq. nx) ip1 = 1 
+        end select 
+
+        return
+
+    end subroutine get_neighbor_i
+
+    subroutine get_neighbor_j(jm1,jp1,j,ny,boundaries)
+
+        implicit none
+
+        integer, intent(OUT) :: jm1 
+        integer, intent(OUT) :: jp1 
+        integer, intent(IN)  :: j 
+        integer, intent(IN)  :: ny 
+
+        character(len=*), intent(IN) :: boundaries
+
+        jm1 = max(j-1,1)
+        jp1 = min(j+1,ny) 
+
+        select case(trim(boundaries))
+
+            case("periodic")
+                if (j .eq. 1)  jm1 = ny 
+                if (j .eq. ny) jp1 = 1 
+        end select 
+
+        return
+
+    end subroutine get_neighbor_j
+    
 end module solver_advection

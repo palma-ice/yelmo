@@ -114,7 +114,10 @@ contains
         call calc_ydyn_neff(dyn,tpo,thrm,bnd)
 
         ! Update bed roughness coefficients cb_ref and c_bed (which are independent of velocity)
-        call calc_ydyn_cbref(dyn,tpo,thrm,bnd)
+        !call calc_ydyn_cbref(dyn,tpo,thrm,bnd)
+        call calc_cb_ref(dyn%now%cb_ref,bnd%z_bed,bnd%z_sl,dyn%par%till_cf_ref,dyn%par%till_cf_min, &
+                                dyn%par%till_z0,dyn%par%till_z1,dyn%par%till_method,dyn%par%till_scale)
+
         call calc_c_bed(dyn%now%c_bed,dyn%now%cb_ref,dyn%now%N_eff,dyn%par%till_is_angle)
 
         ! ===== Calculate the 3D velocity field and helper variables =======================
@@ -300,7 +303,7 @@ contains
         !                    tpo%now%H_ice_dyn,tpo%now%f_ice_dyn,tpo%now%f_grnd_acx,tpo%now%f_grnd_acy,dyn%par%ssa_beta_max,use_ssa=.TRUE.)
         call set_ssa_masks(dyn%now%ssa_mask_acx,dyn%now%ssa_mask_acy,tpo%now%mask_frnt,tpo%now%H_ice, &
                                 tpo%now%f_ice,tpo%now%f_grnd,use_ssa=.TRUE.,lateral_bc=dyn%par%ssa_lat_bc)
-        
+
         if (use_ssa .and. dyn%par%use_ssa .and. &
                 maxval(dyn%now%ssa_mask_acx+dyn%now%ssa_mask_acy) .gt. 0) then 
             ! Calculate SSA as normal 

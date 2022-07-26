@@ -12,4 +12,6 @@ module yelmo
 !     use yelmo_boundaries 
     use yelmo_regions, only : yelmo_write_reg_init, yelmo_write_reg_step 
     
+    use basal_dragging, only : calc_cb_ref 
+    
 end module yelmo

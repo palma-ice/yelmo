@@ -9,9 +9,9 @@ module basal_dragging
     ! Note that for the stability and correctness of the SSA solver, 
     ! particularly at the grounding line, beta should be defined
     ! directly on the ac nodes (acx,acy). 
-
+    
     use yelmo_defs, only : sp, dp, wp, prec, pi, g, rho_sw, rho_ice, rho_w, &
-                           TOL_UNDERFLOW, degrees_to_radians
+                           TOL_UNDERFLOW, io_unit_err, degrees_to_radians
 
     use yelmo_tools, only : stagger_aa_acx, stagger_aa_acy, &
                     stagger_nodes_aa_ab_ice, stagger_nodes_acx_ab_ice, stagger_nodes_acy_ab_ice, &
@@ -26,6 +26,7 @@ module basal_dragging
     private
 
     ! General functions for beta
+    public :: calc_cb_ref 
     public :: calc_c_bed 
     public :: calc_beta 
     public :: stagger_beta 
@@ -57,6 +58,74 @@ module basal_dragging
     public :: stagger_beta_aa_gl_subgrid_flux 
 
 contains 
+    
+    subroutine calc_cb_ref(cb_ref,z_bed,z_sl,cf_ref,cf_min,z0,z1,till_method,till_scale)
+        ! Update cb_ref [--] based on parameter choices
+
+        implicit none
+        
+        integer :: nx, ny 
+        real(wp), intent(OUT) :: cb_ref(:,:) 
+        real(wp), intent(IN)  :: z_bed(:,:) 
+        real(wp), intent(IN)  :: z_sl(:,:) 
+        real(wp), intent(IN)  :: cf_ref 
+        real(wp), intent(IN)  :: cf_min
+        real(wp), intent(IN)  :: z0 
+        real(wp), intent(IN)  :: z1
+        integer,  intent(IN) :: till_method
+        character(len=*), intent(IN) :: till_scale
+
+        real(prec), allocatable :: lambda_bed(:,:)  
+
+        nx = size(cb_ref,1)
+        ny = size(cb_ref,2)
+        
+        allocate(lambda_bed(nx,ny))
+        
+        if (till_method .eq. -1) then 
+            ! Do nothing - cb_ref defined externally
+
+        else 
+            ! Calculate cb_ref following parameter choices 
+            ! lambda_bed: scaling as a function of bedrock elevation
+
+            select case(trim(till_scale))
+
+                case("none")
+                    ! No scaling with elevation, set reference value 
+
+                    cb_ref = cf_ref
+                    
+                case("lin")
+                    ! Linear scaling function with bedrock elevation
+
+                    lambda_bed = calc_lambda_bed_lin(z_bed,z_sl,z0,z1)
+
+                    ! Calculate cb_ref 
+                    cb_ref = cf_min + (cf_ref-cf_min)*lambda_bed
+
+                case("exp") 
+
+                    lambda_bed = calc_lambda_bed_exp(z_bed,z_sl,z0,z1)
+
+                    cb_ref = cf_ref * lambda_bed 
+                    where(cb_ref .lt. cf_min) cb_ref = cf_min 
+
+                case DEFAULT
+                    ! Scaling not recognized.
+
+                    write(io_unit_err,*) "calc_cb_ref:: Error: scaling of cb_ref with &
+                    &elevation not recognized."
+                    write(io_unit_err,*) "ydyn.till_scale = ", till_scale 
+                    stop 
+                    
+            end select 
+            
+        end if 
+
+        return 
+
+    end subroutine calc_cb_ref
 
     subroutine calc_c_bed(c_bed,cb_ref,N_eff,is_angle)
 

@@ -21,7 +21,6 @@ program yelmo_test
     real(wp) :: time   
     integer    :: n
     
-    real(wp), allocatable :: cb_ref(:,:) 
     logical,  allocatable :: mask_noice(:,:)  
 
     logical, parameter  :: test_restart = .FALSE. 
@@ -246,8 +245,7 @@ program yelmo_test
         ! Load or define cb_ref 
 
         ! Allocate cb_ref and set it to till_cf_ref by default 
-        allocate(cb_ref(yelmo1%grd%nx,yelmo1%grd%ny))
-        cb_ref = yelmo1%dyn%par%till_cf_ref  
+        yelmo1%dyn%now%cb_ref = yelmo1%dyn%par%till_cf_ref  
 
         if (ctl%load_cb_ref) then 
 
@@ -255,20 +253,17 @@ program yelmo_test
             call yelmo_parse_path(ctl%file_cb_ref,yelmo1%par%domain,yelmo1%par%grid_name)
 
             ! Load cb_ref from specified file 
-            call nc_read(ctl%file_cb_ref,"cb_ref",cb_ref)
+            call nc_read(ctl%file_cb_ref,"cb_ref",yelmo1%dyn%now%cb_ref)
 
             ! Make sure that present-day shelves have minimal cb_ref values 
-            where(yelmo1%tpo%now%f_grnd .eq. 0.0) cb_ref = 0.05 
+            where(yelmo1%tpo%now%f_grnd .eq. 0.0) yelmo1%dyn%now%cb_ref = 0.05 
 
         else
             ! Define cb_ref inline 
 
-            cb_ref = yelmo1%dyn%par%till_cf_ref 
+            yelmo1%dyn%now%cb_ref = yelmo1%dyn%par%till_cf_ref 
 
         end if 
-
-        ! Define cb_ref initially
-        call calc_ydyn_cbref_external(yelmo1%dyn,yelmo1%tpo,yelmo1%thrm,yelmo1%bnd,cb_ref)
 
     end if 
     ! ============================================================
@@ -366,7 +361,7 @@ program yelmo_test
                 ! 1D file 
                 call yelmo_write_reg_init(yelmo_r,file1D_r,time_init=time_r,units="years",mask=yelmo_r%bnd%ice_allowed)
                 
-                call write_step_2D(yelmo_r,file2D_r,time=time_r,cb_ref=cb_ref)
+                call write_step_2D(yelmo_r,file2D_r,time=time_r)
                 call yelmo_write_reg_step(yelmo_r,file1D_r,time=time_r)  
 
             end if 
@@ -452,7 +447,7 @@ program yelmo_test
         ! == MODEL OUTPUT =======================================================
 
         if (mod(nint(time*100),nint(ctl%dt2D_out*100))==0) then
-            call write_step_2D(yelmo1,file2D,time=time,cb_ref=cb_ref)
+            call write_step_2D(yelmo1,file2D,time=time)
         end if 
 
         if (mod(nint(time*100),nint(ctl%dt1D_out*100))==0) then 
@@ -469,7 +464,7 @@ program yelmo_test
             if (time .gt. time_r) then
                 ! Write restarted output files 
                 if (mod(nint(time*100),nint(ctl%dt2D_out*100))==0) then
-                    call write_step_2D(yelmo_r,file2D_r,time=time,cb_ref=cb_ref)
+                    call write_step_2D(yelmo_r,file2D_r,time=time)
                 end if 
 
                 if (mod(nint(time*100),nint(ctl%dt1D_out*100))==0) then 
@@ -505,14 +500,13 @@ program yelmo_test
 
 contains
 
-    subroutine write_step_2D(ylmo,filename,time,cb_ref)
+    subroutine write_step_2D(ylmo,filename,time)
 
         implicit none 
         
         type(yelmo_class), intent(IN) :: ylmo
         character(len=*),  intent(IN) :: filename
         real(prec), intent(IN) :: time
-        real(prec), intent(IN) :: cb_ref(:,:) 
 
         ! Local variables
         integer    :: ncid, n
@@ -758,75 +752,6 @@ contains
         return 
 
     end subroutine write_step_2D
-
-    subroutine calc_ydyn_cbref_external(dyn,tpo,thrm,bnd,cb_ref)
-        ! Update cb_ref [--] based on parameter choices
-
-        implicit none
-        
-        type(ydyn_class),   intent(INOUT) :: dyn
-        type(ytopo_class),  intent(IN)    :: tpo 
-        type(ytherm_class), intent(IN)    :: thrm
-        type(ybound_class), intent(IN)    :: bnd  
-        real(wp),           intent(INOUT) :: cb_ref(:,:) 
-
-        integer :: i, j, nx, ny 
-        integer :: im1, ip1, jm1, jp1
-        real(wp) :: f_scale 
-        real(wp), allocatable :: lambda_bed(:,:)  
-
-        nx = size(dyn%now%cb_ref,1)
-        ny = size(dyn%now%cb_ref,2)
-        
-        allocate(lambda_bed(nx,ny))
-        
-        if (dyn%par%till_method .eq. -1) then 
-            ! Do nothing - cb_ref defined externally
-
-        else 
-            ! Calculate cb_ref following parameter choices 
-            ! lambda_bed: scaling as a function of bedrock elevation
-
-            select case(trim(dyn%par%till_scale))
-
-                case("none")
-                    ! No scaling with elevation, set reference value 
-
-                    dyn%now%cb_ref = dyn%par%till_cf_ref
-                    
-                case("lin")
-                    ! Linear scaling function with bedrock elevation
-
-                    lambda_bed = calc_lambda_bed_lin(bnd%z_bed,bnd%z_sl,dyn%par%till_z0,dyn%par%till_z1)
-
-                    ! Calculate cb_ref 
-                    dyn%now%cb_ref = dyn%par%till_cf_min + (dyn%par%till_cf_ref-dyn%par%till_cf_min)*lambda_bed
-
-                case("exp") 
-
-                    lambda_bed = calc_lambda_bed_exp(bnd%z_bed,bnd%z_sl,dyn%par%till_z0,dyn%par%till_z1)
-
-                    dyn%now%cb_ref = dyn%par%till_cf_ref * lambda_bed 
-                    where(dyn%now%cb_ref .lt. dyn%par%till_cf_min) dyn%now%cb_ref = dyn%par%till_cf_min 
-
-                case DEFAULT
-                    ! Scaling not recognized.
-
-                    write(io_unit_err,*) "calc_ydyn_cbref_external:: Error: scaling of cb_ref with &
-                    &elevation not recognized."
-                    write(io_unit_err,*) "ydyn.till_scale = ", dyn%par%till_scale 
-                    stop 
-
-            end select 
-            
-        end if 
-
-        ! Store value for output locally too
-        cb_ref = dyn%now%cb_ref 
-
-        return 
-
-    end subroutine calc_ydyn_cbref_external
 
     subroutine modify_cb_ref(dyn,tpo,thrm,bnd,grd,domain,cb_ref)
         ! Modify cb_ref [unitless] with location specific tuning 

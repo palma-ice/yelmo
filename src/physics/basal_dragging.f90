@@ -102,15 +102,17 @@ contains
                     lambda_bed = calc_lambda_bed_lin(z_bed,z_sl,z0,z1)
 
                     ! Calculate cb_ref 
-                    cb_ref = cf_min + (cf_ref-cf_min)*lambda_bed
-
+                    cb_ref = cf_ref * lambda_bed 
+                    where(cb_ref .lt. cf_min) cb_ref = cf_min 
+                    
                 case("exp") 
 
                     lambda_bed = calc_lambda_bed_exp(z_bed,z_sl,z0,z1)
 
+                    ! Calculate cb_ref 
                     cb_ref = cf_ref * lambda_bed 
                     where(cb_ref .lt. cf_min) cb_ref = cf_min 
-
+                    
                 case DEFAULT
                     ! Scaling not recognized.
 

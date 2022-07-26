@@ -187,11 +187,11 @@ contains
         end select 
 
         ! Limit velocity values to avoid potential underflow errors 
-        where (abs(dyn%now%ux) .lt. 1e-10) dyn%now%ux = 0.0_prec 
-        where (abs(dyn%now%uy) .lt. 1e-10) dyn%now%uy = 0.0_prec 
+        where (abs(dyn%now%ux) .lt. TOL_UNDERFLOW) dyn%now%ux = 0.0_wp 
+        where (abs(dyn%now%uy) .lt. TOL_UNDERFLOW) dyn%now%uy = 0.0_wp 
         
-        where (abs(dyn%now%ux_bar) .lt. 1e-10) dyn%now%ux_bar = 0.0_prec 
-        where (abs(dyn%now%uy_bar) .lt. 1e-10) dyn%now%uy_bar = 0.0_prec 
+        where (abs(dyn%now%ux_bar) .lt. TOL_UNDERFLOW) dyn%now%ux_bar = 0.0_wp 
+        where (abs(dyn%now%uy_bar) .lt. TOL_UNDERFLOW) dyn%now%uy_bar = 0.0_wp 
         
         ! ===== Additional diagnostic variables ====================================
         
@@ -220,10 +220,10 @@ contains
         dyn%now%f_vbvs = calc_vel_ratio(uxy_base=dyn%now%uxy_b,uxy_srf=dyn%now%uxy_s)
 
         ! Finally, determine rate of velocity change 
-        if (dt .ne. 0.0_prec) then 
+        if (dt .ne. 0.0_wp) then 
             dyn%now%duxydt = (dyn%now%uxy_bar - uxy_prev) / dt 
         else 
-            dyn%now%duxydt = 0.0_prec 
+            dyn%now%duxydt = 0.0_wp 
         end if 
 
         ! Advance ydyn timestep 
@@ -266,7 +266,7 @@ contains
         type(ssa_param_class) :: ssa_par 
 
         ! For vertical velocity calculation 
-        real(prec), allocatable :: bmb(:,:)
+        real(wp), allocatable :: bmb(:,:)
 
         nx    = dyn%par%nx 
         ny    = dyn%par%ny 
@@ -289,10 +289,10 @@ contains
         else 
             ! Set all SIA terms to zero 
 
-            dyn%now%ux_i     = 0.0_prec  
-            dyn%now%uy_i     = 0.0_prec  
-            dyn%now%ux_i_bar = 0.0_prec 
-            dyn%now%uy_i_bar = 0.0_prec 
+            dyn%now%ux_i     = 0.0_wp  
+            dyn%now%uy_i     = 0.0_wp  
+            dyn%now%ux_i_bar = 0.0_wp 
+            dyn%now%uy_i_bar = 0.0_wp 
 
         end if 
 
@@ -348,10 +348,10 @@ contains
         else 
             ! Set all SSA terms to zero 
 
-            dyn%now%ux_b     = 0.0_prec 
-            dyn%now%uy_b     = 0.0_prec 
-            dyn%now%taub_acx = 0.0_prec 
-            dyn%now%taub_acy = 0.0_prec 
+            dyn%now%ux_b     = 0.0_wp 
+            dyn%now%uy_b     = 0.0_wp 
+            dyn%now%taub_acx = 0.0_wp 
+            dyn%now%taub_acy = 0.0_wp 
 
         end if 
 
@@ -379,9 +379,9 @@ contains
 
 
         ! 4. Set other variables to zero that are not treated with this solver =====
-        dyn%now%duxdz     = 0.0_prec 
-        dyn%now%duydz     = 0.0_prec 
-        dyn%now%beta_eff  = 0.0_prec 
+        dyn%now%duxdz     = 0.0_wp 
+        dyn%now%duydz     = 0.0_wp 
+        dyn%now%beta_eff  = 0.0_wp 
 
         ! ===== Calculate the vertical velocity through continuity ============================
 
@@ -668,7 +668,7 @@ contains
 ! !             end if 
         
 !         if (write_ssa_diagnostics) then 
-!             call yelmo_write_init_ssa("yelmo_ssa.nc",nx,ny,time_init=1.0_prec)
+!             call yelmo_write_init_ssa("yelmo_ssa.nc",nx,ny,time_init=1.0_wp)
 !         end if 
 
 !         ! Store original ssa mask 
@@ -676,8 +676,8 @@ contains
 !         ssa_mask_acy = dyn%now%ssa_mask_acy
         
 !         ! Initially set error very high 
-!         dyn%now%ssa_err_acx = 1.0_prec 
-!         dyn%now%ssa_err_acy = 1.0_prec 
+!         dyn%now%ssa_err_acx = 1.0_wp 
+!         dyn%now%ssa_err_acy = 1.0_wp 
 
 !         do iter = 1, dyn%par%ssa_iter_max
 
@@ -712,7 +712,7 @@ contains
 !             ! Calculate the analytical grounding-line flux 
 !             call calc_grounding_line_flux(dyn%now%qq_gl_acx,dyn%now%qq_gl_acy,tpo%now%H_ice,mat%now%ATT_bar, &
 !                         dyn%now%c_bed,dyn%now%ux_b,dyn%now%uy_b,tpo%now%f_grnd,tpo%now%f_grnd_acx,tpo%now%f_grnd_acy, &
-!                         mat%par%n_glen,dyn%par%beta_q,Q0=0.61_prec,f_drag=0.6_prec,glf_method="power")
+!                         mat%par%n_glen,dyn%par%beta_q,Q0=0.61_wp,f_drag=0.6_wp,glf_method="power")
 
 !             ! Where qq_gl is present, prescribe velocity and set mask to -1
 
@@ -1382,9 +1382,9 @@ contains
 
         ! Initialize netcdf file and dimensions
         call nc_create(filename)
-        call nc_write_dim(filename,"xc",     x=0.0_prec,dx=1.0_prec,nx=nx,units="gridpoints")
-        call nc_write_dim(filename,"yc",     x=0.0_prec,dx=1.0_prec,nx=ny,units="gridpoints")
-        call nc_write_dim(filename,"time",   x=time_init,dx=1.0_prec,nx=1,units="iter",unlimited=.TRUE.)
+        call nc_write_dim(filename,"xc",     x=0.0_wp,dx=1.0_wp,nx=nx,units="gridpoints")
+        call nc_write_dim(filename,"yc",     x=0.0_wp,dx=1.0_wp,nx=ny,units="gridpoints")
+        call nc_write_dim(filename,"time",   x=time_init,dx=1.0_wp,nx=1,units="iter",unlimited=.TRUE.)
 
         return
 

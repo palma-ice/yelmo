@@ -25,7 +25,7 @@ module mass_conservation
 contains 
     
     subroutine calc_G_advec_simple(G_advec,H_ice,f_ice,ux,uy, &
-                                            mask_new,solver,boundaries,dx,dt)
+                                            solver,boundaries,dx,dt)
         ! Interface subroutine to update ice thickness through application
         ! of advection, vertical mass balance terms and calving 
 
@@ -36,7 +36,6 @@ contains
         real(wp),         intent(IN)    :: f_ice(:,:)           ! [--]  Ice area fraction 
         real(wp),         intent(IN)    :: ux(:,:)              ! [m/a] Depth-averaged velocity, x-direction (ac-nodes)
         real(wp),         intent(IN)    :: uy(:,:)              ! [m/a] Depth-averaged velocity, y-direction (ac-nodes)
-        integer,          intent(IN)    :: mask_new(:,:)        ! Mask indicating newly ice-covered points
         character(len=*), intent(IN)    :: solver               ! Solver to use for the ice thickness advection equation
         character(len=*), intent(IN)    :: boundaries
         real(wp),         intent(IN)    :: dx                   ! [m]   Horizontal resolution
@@ -61,9 +60,6 @@ contains
         ux_tmp = ux
         uy_tmp = uy
         
-        ! Fill velocity field for new cells 
-        !call fill_vel_new_cells(ux_tmp,uy_tmp,mask_new)
-
         ! Ensure that no velocity is defined for outer boundaries of partially-filled margin points
         call set_inactive_margins(ux_tmp,uy_tmp,f_ice)
 

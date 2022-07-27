@@ -11,6 +11,8 @@ module yelmo_topography
     use calving
     use topography 
 
+    use runge_kutta 
+    
     use grid_calcs 
 
     implicit none
@@ -44,7 +46,7 @@ module yelmo_topography
     
 contains
     
-    subroutine calc_ytopo_pc(tpo,dyn,mat,thrm,bnd,time,topo_fixed,pc_step)
+    subroutine calc_ytopo_rk4(tpo,dyn,mat,thrm,bnd,time,topo_fixed,pc_step)
 
         implicit none 
 
@@ -64,8 +66,108 @@ contains
         real(wp), allocatable :: dHdt_now(:,:) 
         real(wp), allocatable :: G_mb(:,:)  
         
-        logical, parameter :: use_H_pred = .FALSE. 
+        real(wp) :: dt_now 
+        real(wp), allocatable :: k1(:,:) 
+        real(wp), allocatable :: k2(:,:) 
+        real(wp), allocatable :: k3(:,:) 
+        real(wp), allocatable :: k4(:,:) 
+        real(wp), allocatable :: y_now(:,:)
 
+        nx = size(tpo%now%H_ice,1)
+        ny = size(tpo%now%H_ice,2)
+
+        allocate(mbal(nx,ny))
+        allocate(dHdt_now(nx,ny))
+        allocate(G_mb(nx,ny))
+
+        allocate(k1(nx,ny))
+        allocate(k2(nx,ny))
+        allocate(k3(nx,ny))
+        allocate(k4(nx,ny))
+        allocate(y_now(nx,ny))
+        
+        ! Initialize time if necessary 
+        if (tpo%par%time .gt. dble(time)) then 
+            tpo%par%time = dble(time) 
+        end if 
+        
+        ! Get time step
+        dt = dble(time) - tpo%par%time 
+
+        ! Step 0: Get some diagnostic quantities for mass balance calculation --------
+
+        ! Calculate grounded fraction on aa-nodes
+        ! (only to be used with basal mass balance, later all
+        !  f_grnd arrays will be calculated according to use choices)
+        call determine_grounded_fractions(tpo%now%f_grnd_bmb,H_grnd=tpo%now%H_grnd)
+        
+        ! Combine basal mass balance into one field accounting for 
+        ! grounded/floating fraction of grid cells 
+        call calc_bmb_total(tpo%now%bmb,thrm%now%bmb_grnd,bnd%bmb_shlf,tpo%now%H_ice,tpo%now%H_grnd, &
+                            tpo%now%f_grnd_bmb,tpo%par%bmb_gl_method,tpo%par%diffuse_bmb_shlf)
+        
+        ! Combine frontal mass balance into one field, and 
+        ! calculate as needed 
+        call calc_fmb_total(tpo%now%fmb,bnd%fmb_shlf,bnd%bmb_shlf,tpo%now%H_ice, &
+                        tpo%now%H_grnd,tpo%now%f_ice,tpo%par%fmb_method,tpo%par%fmb_scale,tpo%par%dx)
+
+
+        ! Define temporary variable for total column mass balance (without calving)
+        mbal = bnd%smb + tpo%now%bmb + tpo%now%fmb
+        
+        ! WHEN RUNNING EISMINT1 ensure bmb and fmb are not accounted for here !!!
+        if (.not. tpo%par%use_bmb) then
+            mbal = bnd%smb
+        end if
+
+        ! Step 1: Go through predictor-corrector-advance steps
+
+        if ( .not. topo_fixed .and. dt .gt. 0.0 ) then 
+
+            ! Ice thickness evolution from dynamics alone
+
+            ! ====== k1 =======
+
+            ! Get ice-fraction mask for current ice thickness  
+            call calc_ice_fraction(tpo%now%f_ice,tpo%now%H_ice,bnd%z_bed,bnd%z_sl,tpo%par%margin_flt_subgrid)
+            
+            call calc_G_advec_simple(dHdt_now,tpo%now%H_ice,tpo%now%f_ice,dyn%now%ux_bar, &
+                        dyn%now%uy_bar,tpo%par%solver,tpo%par%boundaries,tpo%par%dx,dt)
+
+            ! Calculate rate of change using weighted advective rates of change 
+            ! depending on timestepping method chosen 
+            tpo%now%dHdt_pred = tpo%par%dt_beta(1)*dHdt_now + tpo%par%dt_beta(2)*tpo%now%dHdt_n 
+            
+            ! Calculate predicted ice thickness
+            tpo%now%H_ice = tpo%now%H_ice_n + dt*tpo%now%dHdt_pred
+
+        end if 
+
+        return 
+
+    end subroutine calc_ytopo_rk4
+
+    subroutine calc_ytopo_pc(tpo,dyn,mat,thrm,bnd,time,topo_fixed,pc_step,use_H_pred)
+
+        implicit none 
+
+        type(ytopo_class),  intent(INOUT) :: tpo
+        type(ydyn_class),   intent(IN)    :: dyn
+        type(ymat_class),   intent(IN)    :: mat
+        type(ytherm_class), intent(IN)    :: thrm  
+        type(ybound_class), intent(IN)    :: bnd 
+        real(wp),           intent(IN)    :: time
+        logical,            intent(IN)    :: topo_fixed  
+        character(len=*),   intent(IN)    :: pc_step 
+        logical,            intent(IN)    :: use_H_pred
+
+        ! Local variables 
+        integer  :: i, j, nx, ny
+        real(wp) :: dt  
+        real(wp), allocatable :: mbal(:,:) 
+        real(wp), allocatable :: dHdt_now(:,:) 
+        real(wp), allocatable :: G_mb(:,:)  
+        
         nx = size(tpo%now%H_ice,1)
         ny = size(tpo%now%H_ice,2)
 
@@ -127,14 +229,22 @@ contains
 
                     ! Get ice-fraction mask for current ice thickness  
                     call calc_ice_fraction(tpo%now%f_ice,tpo%now%H_ice,bnd%z_bed,bnd%z_sl,tpo%par%margin_flt_subgrid)
-                    
+    
+if (.FALSE.) then
                     call calc_G_advec_simple(dHdt_now,tpo%now%H_ice,tpo%now%f_ice,dyn%now%ux_bar, &
-                                dyn%now%uy_bar,tpo%now%mask_new,tpo%par%solver,tpo%par%boundaries,tpo%par%dx,dt)
+                                dyn%now%uy_bar,tpo%par%solver,tpo%par%boundaries,tpo%par%dx,dt)
 
+else
+
+                    call rk4_2D(tpo%now%H_ice,tpo%now%f_ice,dHdt_now,dyn%now%ux_bar,dyn%now%uy_bar, &
+                                                        tpo%par%dx,dt,tpo%par%solver,tpo%par%boundaries)
+
+end if 
+                    
                     ! Calculate rate of change using weighted advective rates of change 
                     ! depending on timestepping method chosen 
                     tpo%now%dHdt_pred = tpo%par%dt_beta(1)*dHdt_now + tpo%par%dt_beta(2)*tpo%now%dHdt_n 
-                    
+
                     ! Calculate predicted ice thickness
                     tpo%now%H_ice = tpo%now%H_ice_n + dt*tpo%now%dHdt_pred
 
@@ -142,9 +252,19 @@ contains
 
                     ! Get ice-fraction mask for predicted ice thickness  
                     call calc_ice_fraction(tpo%now%f_ice,tpo%now%H_ice_pred,bnd%z_bed,bnd%z_sl,tpo%par%margin_flt_subgrid)
-                    
+
+if (.FALSE.) then
                     call calc_G_advec_simple(dHdt_now,tpo%now%H_ice_pred,tpo%now%f_ice, &
-                            dyn%now%ux_bar,dyn%now%uy_bar,tpo%now%mask_pred_new,tpo%par%solver,tpo%par%boundaries,tpo%par%dx,dt)
+                            dyn%now%ux_bar,dyn%now%uy_bar,tpo%par%solver,tpo%par%boundaries,tpo%par%dx,dt)
+
+else
+
+                    tpo%now%H_ice = tpo%now%H_ice_pred 
+
+                    call rk4_2D(tpo%now%H_ice,tpo%now%f_ice,dHdt_now,dyn%now%ux_bar,dyn%now%uy_bar, &
+                                                        tpo%par%dx,dt,tpo%par%solver,tpo%par%boundaries)
+
+end if
 
                     ! Calculate rate of change using weighted advective rates of change 
                     ! depending on timestepping method chosen 
@@ -157,7 +277,7 @@ contains
                     tpo%now%dHdt_n = tpo%now%dHdt_corr 
 
             end select
-            
+
             ! Diagnose actual mass balance (forcing) tendency
             call calc_G_mbal(G_mb,tpo%now%H_ice_n,tpo%now%f_grnd,mbal,dt)
 
@@ -228,8 +348,8 @@ contains
 
                 case("predictor") 
 
-                    ! Also store this ice thickness in main field for 
-                    ! calculation of dynamics 
+                    ! Save predictor field, proceed with predictor field
+                    ! in the main H_ice variable for calculating dynamics.
                     tpo%now%H_ice_pred = tpo%now%H_ice 
 
                     ! Compare previous and current ice field
@@ -260,8 +380,6 @@ contains
 
                 case("advance")
                     ! Now let's actually advance the ice thickness field
-
-                    ! Calculate diagnostic quantities
 
                     ! Determine which ice thickness to use going forward
                     if (use_H_pred) then 

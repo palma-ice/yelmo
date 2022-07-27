@@ -931,6 +931,10 @@ contains
             end if
             taud_acx(i,j) = rhog * H_mid * dzsdx(i,j) 
 
+            ! Apply limit
+            if (taud_acx(i,j) .gt.  taud_lim) taud_acx(i,j) =  taud_lim 
+            if (taud_acx(i,j) .lt. -taud_lim) taud_acx(i,j) = -taud_lim 
+            
             ! y-direction 
             if (f_ice(i,j) .eq. 1.0_wp .and. f_ice(i,jp1) .lt. 1.0_wp) then 
                 H_mid = 0.5_wp*(H_ice(i,j)+0.0_wp)
@@ -941,13 +945,13 @@ contains
             end if
             taud_acy(i,j) = rhog * H_mid * dzsdy(i,j) 
 
+            ! Apply limit
+            if (taud_acy(i,j) .gt.  taud_lim) taud_acy(i,j) =  taud_lim 
+            if (taud_acy(i,j) .lt. -taud_lim) taud_acy(i,j) = -taud_lim 
+            
         end do
         end do 
 
-        ! Apply limit 
-        where(abs(taud_acx) .gt. taud_lim) taud_acx = sign(taud_lim,taud_acx)
-        where(abs(taud_acy) .gt. taud_lim) taud_acy = sign(taud_lim,taud_acy)
-        
         ! Apply boundary conditions 
         call set_boundaries_2D_acx(taud_acx,boundaries)
         call set_boundaries_2D_acy(taud_acy,boundaries)

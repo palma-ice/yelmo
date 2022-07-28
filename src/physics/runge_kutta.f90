@@ -8,12 +8,13 @@ module runge_kutta
 
 
     private
-    public :: rk4_2D
+    public :: rk4_step_2D
+    public :: rk4_calc_truncation_error_2D
 
 contains
 
 
-    subroutine rk4_2D(var,fvar,dvdt,ux,uy,dx,dt,solver,boundaries)
+    subroutine rk4_step_2D(var,fvar,dvdt,ux,uy,dx,dt,solver,boundaries)
 
         implicit none
 
@@ -90,7 +91,44 @@ contains
 
         return
 
-    end subroutine rk4_2D
+    end subroutine rk4_step_2D
 
+    subroutine rk4_calc_truncation_error_2D(tau,y_np1,y_n,y_nm1,y_nm2, &
+                                f_np1,f_n,f_nm1,f_nm2,dt,dt_nm1,dt_nm2)
+
+        implicit none
+
+        real(wp), intent(OUT) :: tau(:,:) 
+        real(wp), intent(IN)  :: y_np1(:,:) 
+        real(wp), intent(IN)  :: y_n(:,:) 
+        real(wp), intent(IN)  :: y_nm1(:,:) 
+        real(wp), intent(IN)  :: y_nm2(:,:) 
+        real(wp), intent(IN)  :: f_np1(:,:) 
+        real(wp), intent(IN)  :: f_n(:,:) 
+        real(wp), intent(IN)  :: f_nm1(:,:) 
+        real(wp), intent(IN)  :: f_nm2(:,:) 
+        real(wp), intent(IN)  :: dt 
+        real(wp), intent(IN)  :: dt_nm1
+        real(wp), intent(IN)  :: dt_nm2
+         
+        
+        ! Local variables 
+        real(wp) :: d1 
+        real(wp) :: d2 
+
+        d1 = dt_nm1 / dt 
+        d2 = dt_nm2 / dt 
+
+        ! Equation 4.4, simplified for numerical testing 
+
+!        tau = -(    &
+!
+!
+!            )
+
+
+        return
+
+    end subroutine rk4_calc_truncation_error_2D
 
 end module runge_kutta

@@ -12,7 +12,7 @@ module yelmo_topography
     use topography 
 
     use runge_kutta 
-    
+
     use grid_calcs 
 
     implicit none
@@ -236,7 +236,7 @@ if (.FALSE.) then
 
 else
 
-                    call rk4_2D(tpo%now%H_ice,tpo%now%f_ice,dHdt_now,dyn%now%ux_bar,dyn%now%uy_bar, &
+                    call rk4_step_2D(tpo%now%H_ice,tpo%now%f_ice,dHdt_now,dyn%now%ux_bar,dyn%now%uy_bar, &
                                                         tpo%par%dx,dt,tpo%par%solver,tpo%par%boundaries)
 
 end if 
@@ -261,7 +261,7 @@ else
 
                     tpo%now%H_ice = tpo%now%H_ice_pred 
 
-                    call rk4_2D(tpo%now%H_ice,tpo%now%f_ice,dHdt_now,dyn%now%ux_bar,dyn%now%uy_bar, &
+                    call rk4_step_2D(tpo%now%H_ice,tpo%now%f_ice,dHdt_now,dyn%now%ux_bar,dyn%now%uy_bar, &
                                                         tpo%par%dx,dt,tpo%par%solver,tpo%par%boundaries)
 
 end if

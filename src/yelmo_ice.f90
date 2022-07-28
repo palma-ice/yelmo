@@ -269,7 +269,7 @@ end if
                 call calc_ytopo_pc(dom%tpo,dom%dyn,dom%mat,dom%thrm,dom%bnd,time_now,dom%tpo%par%topo_fixed,"corrector",use_H_pred=dom%par%pc_use_H_pred)
                 call calc_ytopo_masks(dom%tpo,dom%dyn,dom%mat,dom%thrm,dom%bnd)
 
-                
+
                 ! Step 4: Determine truncation error for ice thickness
 
                 select case(trim(dom%par%pc_method))
@@ -407,7 +407,7 @@ end if
 
                 call yelmo_timestep_write(dom%time%log_timestep_file,time_now,dt_now,dt_adv_min,dt_pi, &
                             dom%time%pc_eta(1),dom%time%pc_tau_masked,speed,dom%tpo%par%speed,dom%dyn%par%speed, &
-                            dom%dyn%par%ssa_iter_now,iter_redo_tot)
+                            dom%dyn%par%ssa_iter_now,iter_redo-1)
             
             end if 
 

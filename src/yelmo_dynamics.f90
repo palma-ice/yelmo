@@ -200,6 +200,8 @@ contains
         dyn%now%ux_s  = dyn%now%ux(:,:,nz_aa)
         dyn%now%uy_s  = dyn%now%uy(:,:,nz_aa)
         dyn%now%uxy_s = dyn%now%uxy(:,:,nz_aa)
+        dyn%now%uz_s  = dyn%now%uz(:,:,nz_aa)
+        dyn%now%uz_b  = dyn%now%uz(:,:,1)
 
         ! Determine ratio of basal to surface velocity
         dyn%now%f_vbvs = calc_vel_ratio(uxy_base=dyn%now%uxy_b,uxy_srf=dyn%now%uxy_s)
@@ -1021,11 +1023,13 @@ contains
         allocate(now%ux_b(nx,ny)) 
         allocate(now%uy_b(nx,ny))
         allocate(now%uxy_b(nx,ny))
+        allocate(now%uz_b(nx,ny))
 
         allocate(now%ux_s(nx,ny)) 
         allocate(now%uy_s(nx,ny))
         allocate(now%uxy_s(nx,ny))
-        
+        allocate(now%uz_s(nx,ny))       
+ 
         allocate(now%ux_i(nx,ny,nz_aa)) 
         allocate(now%uy_i(nx,ny,nz_aa))
         allocate(now%ux_i_bar(nx,ny)) 
@@ -1091,11 +1095,13 @@ contains
         now%ux_b              = 0.0 
         now%uy_b              = 0.0
         now%uxy_b             = 0.0
+        now%uz_b              = 0.0
 
         now%ux_s              = 0.0 
         now%uy_s              = 0.0
         now%uxy_s             = 0.0
-        
+        now%uz_s              = 0.0       
+ 
         now%ux_i              = 0.0 
         now%uy_i              = 0.0
         now%ux_i_bar          = 0.0 
@@ -1162,19 +1168,21 @@ contains
 
         if (allocated(now%ux_bar))          deallocate(now%ux_bar) 
         if (allocated(now%uy_bar))          deallocate(now%uy_bar)
-        if (allocated(now%uxy_bar))         deallocate(now%uxy_bar)
-        
+        if (allocated(now%uxy_bar))         deallocate(now%uxy_bar)       
+ 
         if (allocated(now%ux_bar_prev))     deallocate(now%ux_bar_prev) 
         if (allocated(now%uy_bar_prev))     deallocate(now%uy_bar_prev)
         
         if (allocated(now%ux_b))            deallocate(now%ux_b) 
         if (allocated(now%uy_b))            deallocate(now%uy_b)
         if (allocated(now%uxy_b))           deallocate(now%uxy_b)
-        
+        if (allocated(now%uz_b))            deallocate(now%uz_b)        
+
         if (allocated(now%ux_s))            deallocate(now%ux_s) 
         if (allocated(now%uy_s))            deallocate(now%uy_s)
         if (allocated(now%uxy_s))           deallocate(now%uxy_s)
-        
+        if (allocated(now%uz_s))            deallocate(now%uz_s)       
+ 
         if (allocated(now%ux_i))            deallocate(now%ux_i) 
         if (allocated(now%uy_i))            deallocate(now%uy_i)
 

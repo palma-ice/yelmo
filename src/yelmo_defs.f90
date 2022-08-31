@@ -181,7 +181,8 @@ module yelmo_defs
         real(wp), allocatable   :: f_grnd_acx(:,:)  ! Grounded fraction (acx nodes)
         real(wp), allocatable   :: f_grnd_acy(:,:)  ! Grounded fraction (acy nodes)
         real(wp), allocatable   :: f_grnd_ab(:,:)   ! Grounded fraction (ab nodes)
-        real(wp), allocatable   :: f_ice(:,:)       ! Ice-covered fraction 
+        real(wp), allocatable   :: f_ice(:,:)       ! Ice-covered fraction
+        !real(wp), allocatable   :: f_flt(:,:)       ! Floating ice mask
 
         real(wp), allocatable   :: f_grnd_bmb(:,:)  ! Grounded fraction due to be used with basal mass balance
         real(wp), allocatable   :: f_grnd_pin(:,:)  ! Grounded fraction due to subgrid pinning points 
@@ -192,6 +193,7 @@ module yelmo_defs
         ! Additional masks 
         integer,    allocatable :: mask_bed(:,:)    ! Multi-valued bed mask
         integer,    allocatable :: mask_grz(:,:)    ! Multi-valued mask for the grounding-line zone
+        integer,    allocatable :: mask_flt(:,:)    ! Floating ice mask
 
         real(wp), allocatable   :: dHdt_n(:,:)      ! [m/a] Ice thickness change due to advection only
         real(wp), allocatable   :: dHdt_pred(:,:)   ! [m/a] Ice thickness change due to advection only
@@ -306,12 +308,14 @@ module yelmo_defs
         real(wp), allocatable :: ux_b(:,:) 
         real(wp), allocatable :: uy_b(:,:)
         real(wp), allocatable :: uxy_b(:,:)
+        real(wp), allocatable :: uz_b(:,:)
 
         ! Surface velocity: eventually these could be pointers since it is simply
         ! the top layer in ux(:,:,:), etc. and only used, not calculated.
         real(wp), allocatable :: ux_s(:,:) 
         real(wp), allocatable :: uy_s(:,:)
         real(wp), allocatable :: uxy_s(:,:)
+        real(wp), allocatable :: uz_s(:,:)
         
         real(wp), allocatable :: ux_i(:,:,:) 
         real(wp), allocatable :: uy_i(:,:,:)

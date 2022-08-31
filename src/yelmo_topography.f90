@@ -540,7 +540,8 @@ contains
         ! Calculate the general bed mask
         call gen_mask_bed(tpo%now%mask_bed,tpo%now%f_ice,thrm%now%f_pmp, &
                                             tpo%now%f_grnd,tpo%now%mask_grz)
-
+        ! jablasco: generate floating ice mask
+        !call flt_mask(tpo%now%f_flt,tpo%now%f_ice,tpo%now%f_grnd)
 
         ! Determine ice thickness for use exclusively with the dynamics solver
         select case(trim(dyn%par%ssa_lat_bc))
@@ -1014,7 +1015,8 @@ end if
         ! Calculate the general bed mask
         call gen_mask_bed(tpo%now%mask_bed,tpo%now%f_ice,thrm%now%f_pmp, &
                                             tpo%now%f_grnd,tpo%now%mask_grz)
-
+        ! jablasco: flt ice mask
+        !call flt_mask(tpo%now%f_flt,tpo%now%f_ice,tpo%now%f_grnd)
 
         ! Determine ice thickness for use exclusively with the dynamics solver
         select case(trim(dyn%par%ssa_lat_bc))
@@ -1563,7 +1565,8 @@ end if
         ! Calculate the general bed mask
         call gen_mask_bed(tpo%now%mask_bed,tpo%now%f_ice,thrm%now%f_pmp, &
                                             tpo%now%f_grnd,tpo%now%mask_grz)
-
+        ! jablasco: flt ice mask
+        !call flt_mask(tpo%now%f_flt,tpo%now%f_ice,tpo%now%f_grnd)
 
         ! Determine ice thickness for use exclusively with the dynamics solver
         select case(trim(dyn%par%ssa_lat_bc))
@@ -1652,6 +1655,29 @@ end if
         return 
 
     end subroutine calc_ytopo_0
+ 
+    ! jablasco
+    elemental subroutine flt_mask(f_flt,f_ice,f_grnd)
+    ! floating ice mask  
+
+        implicit none
+
+        real(wp), intent(OUT) :: f_flt
+        real(wp), intent(IN)  :: f_ice, f_grnd
+
+        if (f_ice .eq. 1.0 .and. f_grnd .eq. 0.0) then
+
+            f_flt = 1.0
+
+        else
+
+            f_flt = 0.0
+
+        end if
+
+    return
+
+    end subroutine flt_mask
 
     elemental subroutine gen_mask_bed(mask,f_ice,f_pmp,f_grnd,mask_grz)
         ! Generate an output mask for model conditions at bed
@@ -1848,6 +1874,7 @@ end if
         allocate(now%f_grnd_acy(nx,ny))
         allocate(now%f_grnd_ab(nx,ny))
         allocate(now%f_ice(nx,ny))
+        !allocate(now%f_flt(nx,ny))
 
         allocate(now%f_grnd_bmb(nx,ny))
         allocate(now%f_grnd_pin(nx,ny))
@@ -1905,7 +1932,8 @@ end if
         now%f_grnd_ab   = 0.0
         now%f_grnd_bmb  = 0.0
         now%f_grnd_pin  = 0.0
-        now%f_ice       = 0.0  
+        now%f_ice       = 0.0
+        !now%f_flt       = 0.0  
         now%dist_margin = 0.0
         now%dist_grline = 0.0 
         
@@ -1973,6 +2001,7 @@ end if
         if (allocated(now%f_grnd_pin))  deallocate(now%f_grnd_pin)
 
         if (allocated(now%f_ice))       deallocate(now%f_ice)
+        !if (allocated(now%f_flt))       deallocate(now%f_flt)
 
         if (allocated(now%dist_margin)) deallocate(now%dist_margin)
         if (allocated(now%dist_grline)) deallocate(now%dist_grline)

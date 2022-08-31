@@ -83,8 +83,8 @@ contains
         mask_tot  = (mask .and. tpo%now%H_ice .gt. 0.0) 
         mask_grnd = (mask .and. tpo%now%H_ice .gt. 0.0 .and. tpo%now%f_grnd .gt. 0.0)
         mask_flt  = (mask .and. tpo%now%H_ice .gt. 0.0 .and. tpo%now%f_grnd .eq. 0.0)
-        mask_grl  = (mask .and. tpo%now%f_grnd .gt. 0.0 .and. tpo%now%f_grnd .lt. 1.0)         
-        mask_frnt = (mask .and. tpo%now%calv_flt .gt. 0.0) ! Ice shelf front
+        mask_grl  = (mask .and. tpo%now%f_grnd_bmb .gt. 0.0 .and. tpo%now%f_grnd_bmb .lt. 1.0)         
+        mask_frnt = (mask .and. tpo%now%calv .gt. 0.0) ! Ice shelf front
 
         ! Calculate ice thickness above flotation 
         call calc_H_af(H_af,tpo%now%H_ice,tpo%now%f_ice,bnd%z_bed,bnd%z_sl,use_f_ice=.FALSE.)
@@ -94,7 +94,11 @@ contains
         npts_flt  = real(count(mask_flt),prec)
         npts_grl  = real(count(mask_grl),prec)      
         npts_frnt = real(count(mask_frnt),prec) 
- 
+
+        !write(*,*) "jablasco"
+        !write(*,*) "n_grl = ", npts_grl
+        !write(*,*) "n_frnt = ", npts_frnt 
+
         ! ===== Total ice variables =====
 
         if (npts_tot .gt. 0) then 
@@ -127,8 +131,8 @@ contains
             reg%bmb        = sum(tpo%now%bmb,mask=mask_tot)/npts_tot
             
             ! ISMIP6 boundary: jablasco
-            reg%smb_tot     = sum(bnd%smb,mask=mask_tot)*reg%A_ice*1e6       ! m^3/yr: flux
-            reg%bmb_tot     = sum(tpo%now%bmb,mask=mask_tot)*(reg%A_ice*1e6) ! m^3/yr: flux
+            reg%smb_tot     = sum(bnd%smb,mask=mask_tot)*(tpo%par%dx*tpo%par%dy)     ! m^3/yr: flux
+            reg%bmb_tot     = sum(tpo%now%bmb,mask=mask_tot)*(tpo%par%dx*tpo%par%dy) ! m^3/yr: flux
  
         else 
 
@@ -225,7 +229,7 @@ contains
             reg%T_shlf       = sum(bnd%T_shlf,mask=mask_flt)/npts_flt
            
             ! jablasco: ISMIP6
-            reg%bmb_shlf_t  = sum(tpo%now%bmb,mask=mask_flt)*(reg%A_ice_f*1e6)  ! m^3/yr: flux
+            reg%bmb_shlf_t  = sum(tpo%now%bmb,mask=mask_flt)*(tpo%par%dx*tpo%par%dy)  ! m^3/yr: flux
  
         else 
 
@@ -250,14 +254,14 @@ contains
        
         ! ===== Grounding-line ice variables =====
 
-        if (npts_flt .gt. 0) then
+        if (npts_grl .gt. 0) then
 
             reg%A_ice_grl = count(tpo%now%H_ice .gt. 0.0 .and. mask_grl)*tpo%par%dx*tpo%par%dy*m2_km2 ! [km^2]
-            reg%flux_grl  = sum(tpo%now%H_ice,mask=mask_grl)*(reg%A_ice_grl*1e6)                      ! m^3/yr: flux
+            reg%flux_grl  = sum(tpo%now%H_ice,mask=mask_grl)*(tpo%par%dx*tpo%par%dy)                      ! m^3/yr: flux
 
         else
 
-            ! ISMIP&: jablasco
+            ! ISMIP6: jablasco
             reg%A_ice_grl = 0.0_wp
             reg%flux_grl  = 0.0_wp
 
@@ -267,9 +271,9 @@ contains
 
         if (npts_frnt .gt. 0) then
 
-            reg%A_ice_frnt = count(tpo%now%H_ice .gt. 0.0 .and. mask_grl)*tpo%par%dx*tpo%par%dy*m2_km2 ! [km^2]
-            reg%calv_flt   = sum(tpo%now%calv_flt,mask=mask_frnt)*(reg%A_ice_frnt*1e6)
-            reg%flux_frnt  = reg%calv_flt+sum(tpo%now%fmb,mask=mask_frnt)*(reg%A_ice_frnt*1e6)         ! m^3/yr: flux [m-1 yr-1]
+            reg%A_ice_frnt = count(tpo%now%H_ice .gt. 0.0 .and. mask_frnt)*tpo%par%dx*tpo%par%dy*m2_km2 ! [km^2]
+            reg%calv_flt   = sum(tpo%now%calv_flt,mask=mask_frnt)*(tpo%par%dx*tpo%par%dy)
+            reg%flux_frnt  = reg%calv_flt+sum(tpo%now%fmb,mask=mask_frnt)*(tpo%par%dx*tpo%par%dy)         ! m^3/yr: flux [m-1 yr-1]
 
         else
 
@@ -322,14 +326,11 @@ contains
         integer    :: ncid, n
         real(wp) :: time_prev 
         type(yregions_class) :: reg
-        real(wp) :: myr_to_mmd, mmd_to_kgms, yr_to_sec, density_corr, ismip6_correction, rho_ice
+        real(wp) :: m3yr_to_kgs, density_corr, ismip6_correction, rho_ice
 
-        myr_to_mmd   = 10e3/365.0   ! 1 m/yr to mm/d
-        mmd_to_kgms  = 1/86400.0    ! mm/d to kg m^-2 s^-1
-        yr_to_sec    = 31536000.0   ! 1 yr to sec
+        m3yr_to_kgs  = 3.2e-5       ! m3/yr to kg/s of pure water
         density_corr = 917.0/1000.0 ! ice density correction with pure water
-
-        ismip6_correction = myr_to_mmd*mmd_to_kgms*density_corr
+        ismip6_correction = m3yr_to_kgs*density_corr
 
         rho_ice = 917.0 ! ice density kg/m3
  

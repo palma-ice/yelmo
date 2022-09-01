@@ -2486,7 +2486,7 @@ end if
 
         implicit none
 
-        logical,  intent(OUT) :: iceberg_mask(:,:) ! Bool if iceberg island
+        real(wp), intent(OUT) :: iceberg_mask(:,:) ! Iceberg island (lonely ice shelves)
         real(wp), intent(IN)  :: f_grnd(:,:)       ! [1]  Grounded grid-cell fraction 
         real(wp), intent(IN)  :: H_ice(:,:)        ! [m]  Ice thickness
 
@@ -2515,8 +2515,8 @@ end if
                 mask_ref(i,j) = 2.0
             else if (f_grnd(i,j) .eq. 0.0 .and. H_ice(i,j) .gt. 0.0) then 
                 mask_ref(i,j) = 1.0
-            else if (f_grnd(i,j) .eq. 0.0 .and. H_ice(i,j) .eq. 0.0) then
-                mask_ref(i,j) = 2.0
+            else
+                mask_ref(i,j) = 0.0
             end if 
 
         end do
@@ -2564,9 +2564,9 @@ end if
 
             ! Grounded point or partially floating point with floating neighbors
             if (iceberg_mask_ref(i,j) .eq. 1.0) then 
-                iceberg_mask(i,j) = .True.
+                iceberg_mask(i,j) = 1.0
             else 
-                iceberg_mask(i,j) = .False.
+                iceberg_mask(i,j) = 0.0
             end if
 
         end do

@@ -177,12 +177,13 @@ module yelmo_defs
         real(wp), allocatable   :: H_ice_ab(:,:)  
 
         ! Masks 
-        real(wp), allocatable   :: f_grnd(:,:)      ! Grounded fraction (grounding line fraction between 0 and 1)
-        real(wp), allocatable   :: f_grnd_acx(:,:)  ! Grounded fraction (acx nodes)
-        real(wp), allocatable   :: f_grnd_acy(:,:)  ! Grounded fraction (acy nodes)
-        real(wp), allocatable   :: f_grnd_ab(:,:)   ! Grounded fraction (ab nodes)
-        real(wp), allocatable   :: f_ice(:,:)       ! Ice-covered fraction
-        !real(wp), allocatable   :: f_flt(:,:)       ! Floating ice mask
+        real(wp), allocatable   :: f_grnd(:,:)       ! Grounded fraction (grounding line fraction between 0 and 1)
+        real(wp), allocatable   :: f_grnd_acx(:,:)   ! Grounded fraction (acx nodes)
+        real(wp), allocatable   :: f_grnd_acy(:,:)   ! Grounded fraction (acy nodes)
+        real(wp), allocatable   :: f_grnd_ab(:,:)    ! Grounded fraction (ab nodes)
+        real(wp), allocatable   :: f_ice(:,:)        ! Ice-covered fraction
+        real(wp), allocatable   :: iceberg_mask(:,:) ! Iceberg mask (unconnected ice shelves)
+        !real(wp), allocatable   :: f_flt(:,:)        ! Floating ice mask
 
         real(wp), allocatable   :: f_grnd_bmb(:,:)  ! Grounded fraction due to be used with basal mass balance
         real(wp), allocatable   :: f_grnd_pin(:,:)  ! Grounded fraction due to subgrid pinning points 

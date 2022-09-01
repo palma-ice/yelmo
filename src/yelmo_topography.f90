@@ -390,8 +390,21 @@ contains
                 
                     ! Treat fractional points that are not connected to full ice-covered points
                     call remove_fractional_ice(tpo%now%H_ice,tpo%now%f_ice)
+                    ! Calc icebergs: jablasco
+                    call calc_iceberg_island(tpo%now%iceberg_mask,tpo%now%f_grnd,tpo%now%H_ice)
+                    ! Remove icebergs
+                    where (tpo%now%iceberg_mask.eq.1.0)
+                        tpo%now%H_ice  = 0.0
+                        tpo%now%f_grnd = 0.0
+                        tpo%now%f_ice  = 0.0
+                    end where
+                    !call calc_calving_rate_kill(tpo%now%calv,tpo%now%H_ice,tpo%now%iceberg_mask.eq.1.0,tpo%par%calv_tau,dt)
+                    ! Calc ice fraction
                     call calc_ice_fraction(tpo%now%f_ice,tpo%now%H_ice,bnd%z_bed,bnd%z_sl,tpo%par%margin_flt_subgrid)
-                    
+                   
+                    ! jablasco: define icebergs
+                    !call calc_iceberg_island(tpo%now%iceberg_mask,tpo%now%f_grnd,tpo%now%H_ice)
+ 
                     ! If desired, finally relax solution to reference state
                     if (tpo%par%topo_rel .ne. 0) then 
 
@@ -860,6 +873,15 @@ end if
 
             ! Treat fractional points that are not connected to full ice-covered points
             call remove_fractional_ice(tpo%now%H_ice,tpo%now%f_ice)
+            ! Define and remove icebergs
+            call calc_iceberg_island(tpo%now%iceberg_mask,tpo%now%f_grnd,tpo%now%H_ice)
+            !call calc_calving_rate_kill(tpo%now%calv,tpo%now%H_ice,tpo%now%iceberg_mask.eq.1.0,tpo%par%calv_tau,dt)
+            ! Remove icebergs
+            where (tpo%now%iceberg_mask.eq.1.0)
+                   tpo%now%H_ice  = 0.0
+                   tpo%now%f_grnd = 0.0
+                   tpo%now%f_ice  = 0.0
+            end where
             call calc_ice_fraction(tpo%now%f_ice,tpo%now%H_ice,bnd%z_bed,bnd%z_sl,tpo%par%margin_flt_subgrid)
             
 
@@ -1884,6 +1906,7 @@ end if
         
         allocate(now%mask_bed(nx,ny))
         allocate(now%mask_grz(nx,ny))
+        allocate(now%iceberg_mask(nx,ny))
 
         allocate(now%dHdt_n(nx,ny))
         allocate(now%dHdt_pred(nx,ny))
@@ -1937,14 +1960,15 @@ end if
         now%dist_margin = 0.0
         now%dist_grline = 0.0 
         
-        now%mask_bed    = 0.0 
-        now%mask_grz    = 0.0 
-        now%dHdt_n      = 0.0  
-        now%dHdt_pred   = 0.0
-        now%dHdt_corr   = 0.0
-        now%H_ice_n     = 0.0 
-        now%H_ice_pred  = 0.0 
-        now%H_ice_corr  = 0.0 
+        now%mask_bed     = 0.0 
+        now%mask_grz     = 0.0
+        now%iceberg_mask = 0.0 
+        now%dHdt_n       = 0.0  
+        now%dHdt_pred    = 0.0
+        now%dHdt_corr    = 0.0
+        now%H_ice_n      = 0.0 
+        now%H_ice_pred   = 0.0 
+        now%H_ice_corr   = 0.0 
         
         now%z_srf_n     = 0.0 
 
@@ -2008,7 +2032,8 @@ end if
         
         if (allocated(now%mask_bed))    deallocate(now%mask_bed)
         if (allocated(now%mask_grz))    deallocate(now%mask_grz)
-        
+        if (allocated(now%iceberg_mask)) deallocate(now%iceberg_mask)       
+ 
         if (allocated(now%dHdt_n))      deallocate(now%dHdt_n)
         if (allocated(now%dHdt_pred))   deallocate(now%dHdt_pred)
         if (allocated(now%dHdt_corr))   deallocate(now%dHdt_corr)

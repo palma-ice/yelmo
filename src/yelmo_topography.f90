@@ -28,6 +28,7 @@ module yelmo_topography
     integer, parameter :: mask_bed_partial = 7
 
     private
+    public :: calc_ytopo_rk4
     public :: calc_ytopo_pc 
     public :: calc_ytopo_masks 
     public :: ytopo_par_load
@@ -46,7 +47,7 @@ module yelmo_topography
     
 contains
     
-    subroutine calc_ytopo_rk4(tpo,dyn,mat,thrm,bnd,time,topo_fixed,pc_step)
+    subroutine calc_ytopo_rk4(tpo,dyn,mat,thrm,bnd,time,topo_fixed)
 
         implicit none 
 
@@ -57,7 +58,6 @@ contains
         type(ybound_class), intent(IN)    :: bnd 
         real(wp),           intent(IN)    :: time
         logical,            intent(IN)    :: topo_fixed  
-        character(len=*),   intent(IN)    :: pc_step 
 
         ! Local variables 
         integer  :: i, j, nx, ny
@@ -66,13 +66,6 @@ contains
         real(wp), allocatable :: dHdt_now(:,:) 
         real(wp), allocatable :: G_mb(:,:)  
         
-        real(wp) :: dt_now 
-        real(wp), allocatable :: k1(:,:) 
-        real(wp), allocatable :: k2(:,:) 
-        real(wp), allocatable :: k3(:,:) 
-        real(wp), allocatable :: k4(:,:) 
-        real(wp), allocatable :: y_now(:,:)
-
         nx = size(tpo%now%H_ice,1)
         ny = size(tpo%now%H_ice,2)
 
@@ -80,15 +73,14 @@ contains
         allocate(dHdt_now(nx,ny))
         allocate(G_mb(nx,ny))
 
-        allocate(k1(nx,ny))
-        allocate(k2(nx,ny))
-        allocate(k3(nx,ny))
-        allocate(k4(nx,ny))
-        allocate(y_now(nx,ny))
-        
         ! Initialize time if necessary 
         if (tpo%par%time .gt. dble(time)) then 
             tpo%par%time = dble(time) 
+        end if 
+        
+        ! Initialize rk4 object if necessary 
+        if (.not. allocated(tpo%rk4%tau)) then 
+            call rk4_2D_init(tpo%rk4,nx,ny,dt_min=1e-3)
         end if 
         
         ! Get time step
@@ -120,30 +112,109 @@ contains
             mbal = bnd%smb
         end if
 
+
         ! Step 1: Go through predictor-corrector-advance steps
 
         if ( .not. topo_fixed .and. dt .gt. 0.0 ) then 
 
-            ! Ice thickness evolution from dynamics alone
+            ! Store ice thickness and surface elevation from previous timestep
+            tpo%now%H_ice_n = tpo%now%H_ice 
+            tpo%now%z_srf_n = tpo%now%z_srf 
 
-            ! ====== k1 =======
-
+            
             ! Get ice-fraction mask for current ice thickness  
             call calc_ice_fraction(tpo%now%f_ice,tpo%now%H_ice,bnd%z_bed,bnd%z_sl,tpo%par%margin_flt_subgrid)
-            
-            call calc_G_advec_simple(dHdt_now,tpo%now%H_ice,tpo%now%f_ice,dyn%now%ux_bar, &
-                        dyn%now%uy_bar,tpo%par%solver,tpo%par%boundaries,tpo%par%dx,dt)
+
+            ! Calculate ice thickness evolution from dynamics alone
+            ! call rk23_2D_step(tpo%rk4,tpo%now%H_ice,tpo%now%f_ice,dHdt_now,dyn%now%ux_bar,dyn%now%uy_bar, &
+            !                                     tpo%par%dx,dt,tpo%par%solver,tpo%par%boundaries)
+            call rk4_2D_step(tpo%rk4,tpo%now%H_ice,tpo%now%f_ice,dHdt_now,dyn%now%ux_bar,dyn%now%uy_bar, &
+                                                tpo%par%dx,dt,tpo%par%solver,tpo%par%boundaries)
 
             ! Calculate rate of change using weighted advective rates of change 
             ! depending on timestepping method chosen 
-            tpo%now%dHdt_pred = tpo%par%dt_beta(1)*dHdt_now + tpo%par%dt_beta(2)*tpo%now%dHdt_n 
-            
-            ! Calculate predicted ice thickness
-            tpo%now%H_ice = tpo%now%H_ice_n + dt*tpo%now%dHdt_pred
+            tpo%now%dHdt_pred  = dHdt_now
+            tpo%now%dHdt_corr  = dHdt_now
 
+            ! Calculate predicted ice thickness
+            !tpo%now%H_ice = tpo%now%H_ice_n + dt*tpo%now%dHdt_pred
+
+            ! Diagnose actual mass balance (forcing) tendency
+            call calc_G_mbal(G_mb,tpo%now%H_ice,tpo%now%f_grnd,mbal,dt)
+
+            ! Store for output too 
+            tpo%now%mb_applied = G_mb 
+
+            ! Now update ice thickness with all tendencies for this timestep 
+            tpo%now%H_ice = tpo%now%H_ice + dt*G_mb  
+
+            ! Ensure tiny numeric ice thicknesses are removed
+            where (tpo%now%H_ice .lt. TOL_UNDERFLOW) tpo%now%H_ice = 0.0 
+
+            ! Calculate and apply calving
+            call calc_ytopo_calving(tpo,dyn,mat,thrm,bnd,mbal,dt)
+
+            ! If desired, finally relax solution to reference state
+            if (tpo%par%topo_rel .ne. 0) then 
+
+                select case(trim(tpo%par%topo_rel_field))
+
+                    case("H_ref")
+                        ! Relax towards reference ice thickness field H_ref
+
+                        call relax_ice_thickness(tpo%now%H_ice,tpo%now%f_grnd,tpo%now%mask_grz, &
+                                            bnd%H_ice_ref,tpo%par%topo_rel,tpo%par%topo_rel_tau,dt)
+                    
+                    case("H_ice_n")
+                        ! Relax towards previous iteration ice thickness 
+                        ! (ie slow down changes)
+                        ! ajr: needs testing, not sure if this works well or helps anything.
+
+                        call relax_ice_thickness(tpo%now%H_ice,tpo%now%f_grnd,tpo%now%mask_grz, &
+                                            tpo%now%H_ice_n,tpo%par%topo_rel,tpo%par%topo_rel_tau,dt)
+                    
+                    case DEFAULT 
+
+                        write(*,*) "calc_ytopo:: Error: topo_rel_field not recognized."
+                        write(*,*) "topo_rel_field = ", trim(tpo%par%topo_rel_field)
+                        stop 
+
+                end select
+
+            end if
+
+            ! Get ice-fraction mask for ice thickness  
+            call calc_ice_fraction(tpo%now%f_ice,tpo%now%H_ice,bnd%z_bed,bnd%z_sl,tpo%par%margin_flt_subgrid)
+            
+            ! Finally apply all additional (generally artificial) ice thickness adjustments 
+            ! and store changes in residual mass balance field. 
+            ! call apply_ice_thickness_boundaries(tpo%now%mb_resid,tpo%now%H_ice,tpo%now%f_ice,tpo%now%f_grnd, &
+            !                                     dyn%now%uxy_b,bnd%ice_allowed,tpo%par%boundaries,bnd%H_ice_ref, &
+            !                                     tpo%par%H_min_flt,tpo%par%H_min_grnd,dt,reset=.TRUE.)
+            
+            tpo%now%H_ice_pred = tpo%now%H_ice 
+            tpo%now%H_ice_corr = tpo%now%H_ice 
+            
         end if 
 
-        return 
+        ! Update masks
+        call calc_ytopo_masks(tpo,dyn,mat,thrm,bnd)
+
+        ! Calculate the surface elevation to be consistent with current H_ice field
+        call calc_z_srf_max(tpo%now%z_srf,tpo%now%H_ice,tpo%now%f_ice,bnd%z_bed,bnd%z_sl)
+        
+        ! Determine rates of change
+        if ( .not. topo_fixed .and. dt .gt. 0.0 ) then 
+
+            tpo%now%dHicedt = (tpo%now%H_ice - tpo%now%H_ice_n) / dt 
+            tpo%now%dzsrfdt = (tpo%now%z_srf - tpo%now%z_srf_n) / dt 
+        
+        end if 
+
+        ! Update ytopo time to current time 
+        tpo%par%time = dble(time)
+
+        return
 
     end subroutine calc_ytopo_rk4
 
@@ -180,6 +251,11 @@ contains
             tpo%par%time = dble(time) 
         end if 
         
+        ! Initialize rk4 object if necessary 
+        if (.not. allocated(tpo%rk4%tau)) then 
+            call rk4_2D_init(tpo%rk4,nx,ny,dt_min=1e-3)
+        end if 
+
         ! Get time step
         dt = dble(time) - tpo%par%time 
 
@@ -236,7 +312,7 @@ if (.FALSE.) then
 
 else
 
-                    call rk4_step_2D(tpo%now%H_ice,tpo%now%f_ice,dHdt_now,dyn%now%ux_bar,dyn%now%uy_bar, &
+                    call rk4_2D_step(tpo%rk4,tpo%now%H_ice,tpo%now%f_ice,dHdt_now,dyn%now%ux_bar,dyn%now%uy_bar, &
                                                         tpo%par%dx,dt,tpo%par%solver,tpo%par%boundaries)
 
 end if 
@@ -261,7 +337,7 @@ else
 
                     tpo%now%H_ice = tpo%now%H_ice_pred 
 
-                    call rk4_step_2D(tpo%now%H_ice,tpo%now%f_ice,dHdt_now,dyn%now%ux_bar,dyn%now%uy_bar, &
+                    call rk4_2D_step(tpo%rk4,tpo%now%H_ice,tpo%now%f_ice,dHdt_now,dyn%now%ux_bar,dyn%now%uy_bar, &
                                                         tpo%par%dx,dt,tpo%par%solver,tpo%par%boundaries)
 
 end if
@@ -569,7 +645,7 @@ end if
 
         ! Diagnose actual calving (forcing) tendency
         call calc_G_calv(tpo%now%calv,tpo%now%H_ice,tpo%now%calv_flt,tpo%now%calv_grnd,dt, &
-                                            tpo%par%pc_step,trim(tpo%par%calv_flt_method))
+                                                                trim(tpo%par%calv_flt_method))
 
         ! Now update ice thickness with all tendencies for this timestep 
         tpo%now%H_ice = tpo%now%H_ice - dt*tpo%now%calv  

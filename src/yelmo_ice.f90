@@ -237,7 +237,8 @@ contains
                 ! Step 1: Perform predictor step for topography
                 ! Get predicted new ice thickness and store it for later use
 
-                call calc_ytopo_pc(dom%tpo,dom%dyn,dom%mat,dom%thrm,dom%bnd,time_now,dom%tpo%par%topo_fixed,"predictor",use_H_pred=dom%par%pc_use_H_pred)
+                call calc_ytopo_rk4(dom%tpo,dom%dyn,dom%mat,dom%thrm,dom%bnd,time,dom%tpo%par%topo_fixed)
+                !call calc_ytopo_pc(dom%tpo,dom%dyn,dom%mat,dom%thrm,dom%bnd,time_now,dom%tpo%par%topo_fixed,"predictor",use_H_pred=dom%par%pc_use_H_pred)
                 call calc_ytopo_masks(dom%tpo,dom%dyn,dom%mat,dom%thrm,dom%bnd)
 
                 ! Step 2: Calculate dynamics for predicted ice thickness 
@@ -266,11 +267,14 @@ end if
                 ! Get corrected ice thickness and store it for later use
                 
                 ! Call corrector step for topography
-                call calc_ytopo_pc(dom%tpo,dom%dyn,dom%mat,dom%thrm,dom%bnd,time_now,dom%tpo%par%topo_fixed,"corrector",use_H_pred=dom%par%pc_use_H_pred)
-                call calc_ytopo_masks(dom%tpo,dom%dyn,dom%mat,dom%thrm,dom%bnd)
+                !call calc_ytopo_pc(dom%tpo,dom%dyn,dom%mat,dom%thrm,dom%bnd,time_now,dom%tpo%par%topo_fixed,"corrector",use_H_pred=dom%par%pc_use_H_pred)
+                !call calc_ytopo_masks(dom%tpo,dom%dyn,dom%mat,dom%thrm,dom%bnd)
 
 
                 ! Step 4: Determine truncation error for ice thickness
+
+if (.FALSE.) then 
+    ! not rk4...
 
                 select case(trim(dom%par%pc_method))
                     ! No default case necessary, handled earlier 
@@ -296,6 +300,11 @@ end if
                         call calc_pc_tau_fe_sbe(dom%time%pc_tau,dom%tpo%now%H_ice_corr,dom%tpo%now%H_ice_pred,dt_now)
 
                 end select 
+
+else 
+    ! rk4 
+                dom%time%pc_tau = dom%tpo%rk4%tau 
+end if 
 
                 ! Calculate eta for this timestep 
                 call set_pc_mask(pc_mask,dom%time%pc_tau,dom%tpo%now%H_ice_pred,dom%tpo%now%H_ice_corr, &
@@ -358,8 +367,8 @@ end if
             ! Update topography accounting for advective changes
             ! and mass balance changes and calving.
 
-            call calc_ytopo_pc(dom%tpo,dom%dyn,dom%mat,dom%thrm,dom%bnd,time_now,dom%tpo%par%topo_fixed,"advance",use_H_pred=dom%par%pc_use_H_pred)
-            call calc_ytopo_masks(dom%tpo,dom%dyn,dom%mat,dom%thrm,dom%bnd)
+            !call calc_ytopo_pc(dom%tpo,dom%dyn,dom%mat,dom%thrm,dom%bnd,time_now,dom%tpo%par%topo_fixed,"advance",use_H_pred=dom%par%pc_use_H_pred)
+            !call calc_ytopo_masks(dom%tpo,dom%dyn,dom%mat,dom%thrm,dom%bnd)
 
 
             ! === Done, Yelmo fields are fully consistent with time=time_now 
@@ -938,7 +947,8 @@ end if
         ! Step 3: update remaining topogaphic info to be consistent with initial fields 
 
         ! Run topo and masks to make sure all fields are synchronized (masks, etc)
-        call calc_ytopo_pc(dom%tpo,dom%dyn,dom%mat,dom%thrm,dom%bnd,time,topo_fixed=.TRUE.,pc_step="none",use_H_pred=dom%par%pc_use_H_pred)
+        call calc_ytopo_rk4(dom%tpo,dom%dyn,dom%mat,dom%thrm,dom%bnd,time,topo_fixed=.TRUE.)
+        !call calc_ytopo_pc(dom%tpo,dom%dyn,dom%mat,dom%thrm,dom%bnd,time,topo_fixed=.TRUE.,pc_step="none",use_H_pred=dom%par%pc_use_H_pred)
         call calc_ytopo_masks(dom%tpo,dom%dyn,dom%mat,dom%thrm,dom%bnd)
 
         ! Update regional calculations (for entire domain)
@@ -1003,7 +1013,8 @@ end if
             dom%thrm%par%rock_method = "equil" 
 
             ! Run topo and masks to make sure all fields are synchronized (masks, etc)
-            call calc_ytopo_pc(dom%tpo,dom%dyn,dom%mat,dom%thrm,dom%bnd,time,topo_fixed=.TRUE.,pc_step="none",use_H_pred=dom%par%pc_use_H_pred)
+            call calc_ytopo_rk4(dom%tpo,dom%dyn,dom%mat,dom%thrm,dom%bnd,time,topo_fixed=.TRUE.)
+            !call calc_ytopo_pc(dom%tpo,dom%dyn,dom%mat,dom%thrm,dom%bnd,time,topo_fixed=.TRUE.,pc_step="none",use_H_pred=dom%par%pc_use_H_pred)
             call calc_ytopo_masks(dom%tpo,dom%dyn,dom%mat,dom%thrm,dom%bnd)
 
             ! Calculate initial thermodynamic information
@@ -1046,7 +1057,8 @@ end if
 
 
         ! Re-run topo again to make sure all fields are synchronized (masks, etc)
-        call calc_ytopo_pc(dom%tpo,dom%dyn,dom%mat,dom%thrm,dom%bnd,time,topo_fixed=.TRUE.,pc_step="none",use_H_pred=dom%par%pc_use_H_pred)
+        call calc_ytopo_rk4(dom%tpo,dom%dyn,dom%mat,dom%thrm,dom%bnd,time,topo_fixed=.TRUE.)
+        !call calc_ytopo_pc(dom%tpo,dom%dyn,dom%mat,dom%thrm,dom%bnd,time,topo_fixed=.TRUE.,pc_step="none",use_H_pred=dom%par%pc_use_H_pred)
         call calc_ytopo_masks(dom%tpo,dom%dyn,dom%mat,dom%thrm,dom%bnd)
 
         ! Update regional calculations (for now entire domain with ice)

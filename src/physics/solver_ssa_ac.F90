@@ -1321,6 +1321,24 @@ contains
                         ssa_mask_acx(i,j) = 2
                     end if 
 
+                    ! Check for special case of floating ice next to ice-free land,
+                    ! then set ssa mask to zero (ie, set velocity to zero)
+                    if (ssa_mask_acx(i,j) .eq. 2) then 
+
+                        if ( f_grnd(i,j) .eq. 0.0 .and. &
+                               (f_grnd(ip1,j) .gt. 0.0 .and. H_ice(ip1,j) .eq. 0.0) ) then 
+
+                            ssa_mask_acx(i,j) = 0
+
+                        else if ( (f_grnd(i,j) .gt. 0.0 .and. H_ice(i,j) .eq. 0.0) .and. &
+                                    f_grnd(ip1,j) .eq. 0.0 ) then
+
+                            ssa_mask_acx(i,j) = 0 
+
+                        end if 
+
+                    end if 
+
                 end if
 
                 ! Overwrite above if this point should be treated via lateral boundary conditions
@@ -1355,6 +1373,24 @@ contains
                         ssa_mask_acy(i,j) = 2
                     end if 
 
+                    ! Check for special case of floating ice next to ice-free land,
+                    ! then set ssa mask to zero (ie, set velocity to zero)
+                    if (ssa_mask_acy(i,j) .eq. 2) then 
+
+                        if ( f_grnd(i,j) .eq. 0.0 .and. &
+                               (f_grnd(i,jp1) .gt. 0.0 .and. H_ice(i,jp1) .eq. 0.0) ) then 
+
+                            ssa_mask_acy(i,j) = 0
+
+                        else if ( (f_grnd(i,j) .gt. 0.0 .and. H_ice(i,j) .eq. 0.0) .and. &
+                                    f_grnd(i,jp1) .eq. 0.0 ) then
+
+                            ssa_mask_acy(i,j) = 0 
+
+                        end if 
+
+                    end if 
+                    
                 end if
 
                 ! Overwrite above if this point should be treated via lateral boundary conditions

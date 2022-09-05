@@ -141,6 +141,21 @@ module yelmo_defs
         
     end type
 
+    type rk4_class
+        real(wp), allocatable  :: tau(:,:) 
+        real(wp), allocatable  :: y_np1(:,:) 
+        real(wp), allocatable  :: y_n(:,:) 
+        real(wp), allocatable  :: y_nm1(:,:) 
+        real(wp), allocatable  :: y_nm2(:,:) 
+        real(wp), allocatable  :: f_np1(:,:) 
+        real(wp), allocatable  :: f_n(:,:) 
+        real(wp), allocatable  :: f_nm1(:,:) 
+        real(wp), allocatable  :: f_nm2(:,:) 
+        real(wp) :: dt 
+        real(wp) :: dt_nm1
+        real(wp) :: dt_nm2
+    end type
+
     ! ytopo state variables
     type ytopo_state_class
         ! Model variables that the define the state of the domain 
@@ -214,7 +229,8 @@ module yelmo_defs
 
         type(ytopo_param_class) :: par          ! Parameters
         type(ytopo_state_class) :: now          ! Variables
-
+        type(rk4_class)         :: rk4 
+        
     end type
 
     ! =========================================================================

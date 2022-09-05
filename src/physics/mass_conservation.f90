@@ -25,7 +25,7 @@ module mass_conservation
 contains 
     
     subroutine calc_G_advec_simple(G_advec,H_ice,f_ice,ux,uy, &
-                                            solver,boundaries,dx,dt)
+                                        solver,boundaries,dx,dt,F)
         ! Interface subroutine to update ice thickness through application
         ! of advection, vertical mass balance terms and calving 
 
@@ -40,19 +40,18 @@ contains
         character(len=*), intent(IN)    :: boundaries
         real(wp),         intent(IN)    :: dx                   ! [m]   Horizontal resolution
         real(wp),         intent(IN)    :: dt                   ! [a]   Timestep 
+        real(wp),         intent(IN), optional :: F(:,:) 
 
         ! Local variables 
         integer :: i, j, nx, ny
-        real(wp), allocatable :: mbal_zero(:,:) 
+        real(wp), allocatable :: F_now(:,:) 
         real(wp), allocatable :: ux_tmp(:,:) 
         real(wp), allocatable :: uy_tmp(:,:) 
 
         nx = size(H_ice,1)
         ny = size(H_ice,2)
 
-        allocate(mbal_zero(nx,ny))
-        mbal_zero = 0.0_wp 
-
+        allocate(F_now(nx,ny))
         allocate(ux_tmp(nx,ny))
         allocate(uy_tmp(nx,ny))
 
@@ -60,18 +59,22 @@ contains
         ux_tmp = ux
         uy_tmp = uy
         
+        F_now = 0.0_wp 
+        if (present(F)) F_now = F 
+
         ! Ensure that no velocity is defined for outer boundaries of partially-filled margin points
         call set_inactive_margins(ux_tmp,uy_tmp,f_ice)
 
         ! Determine current advective rate of change (time=n)
-        call calc_advec2D(G_advec,H_ice,f_ice,ux_tmp,uy_tmp,mbal_zero,dx,dx,dt,solver,boundaries)
+        call calc_advec2D(G_advec,H_ice,f_ice,ux_tmp,uy_tmp,F_now,dx,dx,dt,solver,boundaries)
 
         return 
 
     end subroutine calc_G_advec_simple
 
     subroutine calc_G_advec(G_adv,dHdt_n,H_ice_n,H_ice_pred,H_ice,f_ice,ux,uy, &
-                        mask_pred_new,mask_corr_new,solver,boundaries,dx,dt,beta,pc_step)
+                        mask_pred_new,mask_corr_new,solver,boundaries, &
+                        dx,dt,beta,pc_step,F)
         ! Interface subroutine to update ice thickness through application
         ! of advection, vertical mass balance terms and calving 
 
@@ -93,11 +96,12 @@ contains
         real(wp),         intent(IN)    :: dt                   ! [a]   Timestep 
         real(wp),         intent(IN)    :: beta(4)              ! Timestep weighting parameters
         character(len=*), intent(IN)    :: pc_step              ! Current predictor-corrector step ('predictor' or 'corrector')
-
+        real(wp),         intent(IN), optional :: F(:,:) 
+        
         ! Local variables 
         integer :: i, j, nx, ny
         integer :: im1, ip1, jm1, jp1  
-        real(wp), allocatable :: mbal_zero(:,:) 
+        real(wp), allocatable :: F_now(:,:) 
         real(wp), allocatable :: dHdt_advec(:,:) 
         real(wp), allocatable :: ux_tmp(:,:) 
         real(wp), allocatable :: uy_tmp(:,:) 
@@ -107,14 +111,15 @@ contains
         nx = size(H_ice,1)
         ny = size(H_ice,2)
 
-        allocate(mbal_zero(nx,ny))
-        mbal_zero = 0.0_wp 
-
+        allocate(F_now(nx,ny))
         allocate(ux_tmp(nx,ny))
         allocate(uy_tmp(nx,ny))
         allocate(dHdt_advec(nx,ny))
 
         dHdt_advec = 0.0_wp 
+
+        F_now = 0.0_wp 
+        if (present(F)) F_now = F 
 
         ! Set local velocity fields with no margin treatment intially
         ux_tmp = ux
@@ -140,7 +145,7 @@ contains
                 dHdt_advec = dHdt_n 
 
                 ! Determine current advective rate of change (time=n)
-                call calc_advec2D(dHdt_n,H_ice,f_ice,ux_tmp,uy_tmp,mbal_zero,dx,dx,dt,solver,boundaries)
+                call calc_advec2D(dHdt_n,H_ice,f_ice,ux_tmp,uy_tmp,F_now,dx,dx,dt,solver,boundaries)
 
                 ! Calculate rate of change using weighted advective rates of change 
                 dHdt_advec = beta(1)*dHdt_n + beta(2)*dHdt_advec 
@@ -157,7 +162,7 @@ contains
                 call set_inactive_margins(ux_tmp,uy_tmp,f_ice)
 
                 ! Determine advective rate of change based on predicted H,ux/y fields (time=n+1,pred)
-                call calc_advec2D(dHdt_advec,H_ice_pred,f_ice,ux_tmp,uy_tmp,mbal_zero,dx,dx,dt,solver,boundaries)
+                call calc_advec2D(dHdt_advec,H_ice_pred,f_ice,ux_tmp,uy_tmp,F_now,dx,dx,dt,solver,boundaries)
 
                 ! Calculate rate of change using weighted advective rates of change 
                 dHdt_advec = beta(3)*dHdt_advec + beta(4)*dHdt_n 
@@ -267,7 +272,7 @@ contains
 
     end subroutine calc_G_mbal
 
-    subroutine calc_G_calv(G_calv,H_ice,calv_flt,calv_grnd,dt,pc_step,calv_flt_method)
+    subroutine calc_G_calv(G_calv,H_ice,calv_flt,calv_grnd,dt,calv_flt_method)
         ! Interface subroutine to update ice thickness through application
         ! of advection, vertical mass balance terms and calving 
 
@@ -277,8 +282,7 @@ contains
         real(wp), intent(IN)    :: H_ice(:,:)           ! [m]   Ice thickness 
         real(wp), intent(IN)    :: calv_flt(:,:)        ! [m/a] Potential calving rate (floating)
         real(wp), intent(IN)    :: calv_grnd(:,:)       ! [m/a] Potential calving rate (grounded)
-        real(wp), intent(IN)    :: dt                   ! [a]   Timestep  
-        character(len=*), intent(IN) :: pc_step 
+        real(wp), intent(IN)    :: dt                   ! [a]   Timestep   
         character(len=*), intent(IN) :: calv_flt_method
 
         ! Local variables 

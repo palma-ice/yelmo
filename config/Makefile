@@ -101,9 +101,9 @@ roots : $(objdir)/root_finder.o tests/test_roots.f90
 		@echo "    test_roots.x is ready."
 		@echo " "
 
-levelset : $(objdir)/root_finder.o $(objdir)/nml.o tests/test_levelset.f90
+levelset : yelmo-static tests/test_levelset.f90
 		$(FC) $(DFLAGS) $(FFLAGS) -o $(bindir)/test_levelset.x tests/test_levelset.f90 \
-			$(LFLAGS) $(objdir)/nml.o
+			-L${CURDIR}/libyelmo/include -lyelmo $(LFLAGS) $(objdir)/nml.o
 		@echo " "
 		@echo "    test_levelset.x is ready."
 		@echo " "

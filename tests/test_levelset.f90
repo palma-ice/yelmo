@@ -46,6 +46,12 @@ program test_levelset
 
     type(levelset_class) :: lev1 
 
+    real(wp) :: time_init 
+    real(wp) :: time_end 
+    real(wp) :: dt 
+    integer  :: n, nt 
+    real(wp) :: time 
+
     real(8) :: cpu_start_time, cpu_end_time, cpu_dtime  
 
     ! Start timing 
@@ -104,28 +110,40 @@ program test_levelset
     write(*,*) "y: ", lev1%ny, lev1%dy, minval(lev1%y), maxval(lev1%y)
     write(*,*) "z: ", lev1%nz, lev1%dz, minval(lev1%z), maxval(lev1%z)
     
+    time_init = 100.0_wp 
+    time_end  = 500.0_wp 
+    dt        = 10.0_wp 
+    nt        = ceiling( (time_end-time_init) / dt ) + 1
 
-    ! Initialize Halfar ice sheet profile 
-    call calc_halfar(lev1%H_ice,lev1%x,lev1%y,time=100.0_wp,R0=750.0_wp,H0=3600.0_wp, &
-                            lambda=0.0_wp,n=3.0_wp,A=1e-16_wp,rho_ice=rho_ice,g=g)
+    ! Initialize output file 
+    call levelset_write_init(lev1,file2D,time_init=time_init,units="years")
+    
+    do n = 1, nt 
 
-    ! Get other quantities 
-    lev1%z_bed = 0.0_wp 
-    lev1%z_srf = lev1%z_bed + lev1%H_ice 
+        time = time_init + dt*(n-1)
 
-    lev1%ATT = 1e-16_wp
+        ! Initialize Halfar ice sheet profile 
+        call calc_halfar(lev1%H_ice,lev1%x,lev1%y,time=time,R0=750.0_wp,H0=3600.0_wp, &
+                                lambda=0.0_wp,n=3.0_wp,A=1e-16_wp,rho_ice=rho_ice,g=g)
 
-    ! Calculate SIA velocity profile too 
-    call calc_vel_sia_2D(lev1%u(:,1,:),lev1%w(:,1,:),lev1%x,lev1%z,lev1%H_ice(:,1), &
-                    lev1%z_srf(:,1),lev1%z_bed(:,1),lev1%ATT(:,1,:),rho_ice,g,n=3.0_wp)
+        ! Get other quantities 
+        lev1%z_bed = 0.0_wp 
+        lev1%z_srf = lev1%z_bed + lev1%H_ice 
 
-    write(*,*) "H (t=100): ", minval(lev1%H_ice), maxval(lev1%H_ice)
-    write(*,*) "u (t=100): ", minval(lev1%u), maxval(lev1%u)
-    write(*,*) "w (t=100): ", minval(lev1%w), maxval(lev1%w)
+        lev1%ATT   = 1e-16_wp
 
-    ! Initialize and write output
-    call levelset_write_init(lev1,file2D,time_init=100.0_wp,units="years")
-    call levelset_write_step(lev1,file2D,time=100.0_wp)
+        ! Calculate SIA velocity profile too 
+        call calc_vel_sia_2D(lev1%u(:,1,:),lev1%w(:,1,:),lev1%x,lev1%z,lev1%H_ice(:,1), &
+                        lev1%z_srf(:,1),lev1%z_bed(:,1),lev1%ATT(:,1,:),rho_ice,g,n=3.0_wp)
+
+        ! Initialize and write output
+        call levelset_write_step(lev1,file2D,time=time)
+
+        write(*,*) time, "H: ", minval(lev1%H_ice), maxval(lev1%H_ice)
+        write(*,*) time, "u: ", minval(lev1%u), maxval(lev1%u)
+        write(*,*) time, "w: ", minval(lev1%w), maxval(lev1%w)
+
+    end do 
 
 contains
     
@@ -451,11 +469,11 @@ contains
                       dim1="x",dim2="time",start=[1,n],ncid=ncid)
 
         call nc_write(filename,"u",lev%u(:,1,:),units="m",long_name="Velocity, x", &
-                      dim1="x",dim2="z",dim3="time",start=[1,n],ncid=ncid)
+                      dim1="x",dim2="z",dim3="time",start=[1,1,n],ncid=ncid)
         ! call nc_write(filename,"v",lev%v(:,1,:),units="m",long_name="Velocity, y", &
-        !               dim1="x",dim2="z",dim3="time",start=[1,n],ncid=ncid)
+        !               dim1="x",dim2="z",dim3="time",start=[1,1,n],ncid=ncid)
         call nc_write(filename,"w",lev%w(:,1,:),units="m",long_name="Velocity, z", &
-                      dim1="x",dim2="z",dim3="time",start=[1,n],ncid=ncid)
+                      dim1="x",dim2="z",dim3="time",start=[1,1,n],ncid=ncid)
 
         ! Close the netcdf file
         call nc_close(ncid)

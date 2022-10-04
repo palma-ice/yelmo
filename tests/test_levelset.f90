@@ -34,13 +34,17 @@ program test_levelset
         ! Variables 
         real(wp), allocatable :: H_ice(:,:) 
         real(wp), allocatable :: z_srf(:,:)
+        real(wp), allocatable :: z_base(:,:)
         real(wp), allocatable :: z_bed(:,:)
-        
+        real(wp), allocatable :: z_sl(:,:)
+
         real(wp), allocatable :: ATT(:,:,:) 
 
         real(wp), allocatable :: u(:,:,:)
         real(wp), allocatable :: v(:,:,:)
         real(wp), allocatable :: w(:,:,:)
+
+        real(wp), allocatable :: phi(:,:,:)
 
     end type
 
@@ -111,9 +115,17 @@ program test_levelset
     write(*,*) "z: ", lev1%nz, lev1%dz, minval(lev1%z), maxval(lev1%z)
     
     time_init = 100.0_wp 
-    time_end  = 500.0_wp 
+    time_end  = 100.0_wp 
     dt        = 10.0_wp 
     nt        = ceiling( (time_end-time_init) / dt ) + 1
+
+    ! Set sea level and bed elevation
+    lev1%z_bed = 0.0_wp 
+    lev1%z_sl  = 0.0_wp 
+
+    ! Set rate factor 
+    lev1%ATT   = 1e-16_wp
+
 
     ! Initialize output file 
     call levelset_write_init(lev1,file2D,time_init=time_init,units="years")
@@ -126,11 +138,13 @@ program test_levelset
         call calc_halfar(lev1%H_ice,lev1%x,lev1%y,time=time,R0=750.0_wp,H0=3600.0_wp, &
                                 lambda=0.0_wp,n=3.0_wp,A=1e-16_wp,rho_ice=rho_ice,g=g)
 
-        ! Get other quantities 
-        lev1%z_bed = 0.0_wp 
-        lev1%z_srf = lev1%z_bed + lev1%H_ice 
+        if (n .eq. 1) then 
+            ! Calculate the initial levelset function
+            call levelset_phi_set(lev1,rho_ice,rho_sw)
+        else 
+            ! Update levelset (TO DO)
 
-        lev1%ATT   = 1e-16_wp
+        end if 
 
         ! Calculate SIA velocity profile too 
         call calc_vel_sia_2D(lev1%u(:,1,:),lev1%w(:,1,:),lev1%x,lev1%z,lev1%H_ice(:,1), &
@@ -156,12 +170,12 @@ contains
         integer, intent(IN) :: ny 
         integer, intent(IN) :: nz 
         
+        ! === Axes ===
 
         if (allocated(lev%x)) deallocate(lev%x)
         if (allocated(lev%y)) deallocate(lev%y)
         if (allocated(lev%z)) deallocate(lev%z)
 
-        
         allocate(lev%x(nx))
         allocate(lev%y(ny))
         allocate(lev%z(nz))
@@ -169,41 +183,148 @@ contains
         lev%nx = size(lev%x)
         lev%ny = size(lev%y)
         lev%nz = size(lev%z)
-        
 
-        ! Variables 
-
+        ! === Variables ===
 
         if (allocated(lev%H_ice))   deallocate(lev%H_ice)
         if (allocated(lev%z_srf))   deallocate(lev%z_srf)
+        if (allocated(lev%z_base))  deallocate(lev%z_base)
         if (allocated(lev%z_bed))   deallocate(lev%z_bed)
+        if (allocated(lev%z_sl))    deallocate(lev%z_sl)
         
         if (allocated(lev%ATT))     deallocate(lev%ATT)
         if (allocated(lev%u))       deallocate(lev%u)
         if (allocated(lev%v))       deallocate(lev%v)
         if (allocated(lev%w))       deallocate(lev%w)
 
+        if (allocated(lev%phi))     deallocate(lev%phi)
+        
         allocate(lev%H_ice(nx,ny))
         allocate(lev%z_srf(nx,ny))
+        allocate(lev%z_base(nx,ny))
         allocate(lev%z_bed(nx,ny))
+        allocate(lev%z_sl(nx,ny))
 
         allocate(lev%ATT(nx,ny,nz))
         allocate(lev%u(nx,ny,nz))
         allocate(lev%v(nx,ny,nz))
         allocate(lev%w(nx,ny,nz))
         
+        allocate(lev%phi(nx,ny,nz))
+        
         lev%H_ice   = 0.0_wp 
         lev%z_srf   = 0.0_wp 
+        lev%z_base  = 0.0_wp 
         lev%z_bed   = 0.0_wp 
+        lev%z_sl    = 0.0_wp 
         lev%ATT     = 0.0_wp 
         lev%u       = 0.0_wp 
         lev%v       = 0.0_wp 
         lev%w       = 0.0_wp 
         
+        lev%phi     = 1.0_wp 
+
         return
 
     end subroutine levelset_init
 
+
+    subroutine levelset_phi_set(lev,rho_ice,rho_sw)
+
+        implicit none
+
+        type(levelset_class), intent(INOUT) :: lev 
+        real(wp), intent(IN) :: rho_ice 
+        real(wp), intent(IN) :: rho_sw 
+        
+        ! Local variables
+        integer :: i, j, k
+        integer :: nx, ny, nz 
+
+        nx = size(lev%phi,1)
+        ny = size(lev%phi,2)
+        nz = size(lev%phi,3)
+
+        ! Assume z_bed and H_ice are well defined. 
+
+        ! First calculate surface elevation 
+        call calc_z_srf_max(lev%z_srf,lev%H_ice,lev%z_bed,lev%z_sl,rho_ice,rho_sw)
+
+        ! Now get ice base elevation
+        lev%z_base = lev%z_srf-lev%H_ice
+
+        ! Now use H_ice, z_bed and z_srf to define zero-surface
+        ! For now set points outside ice body to arbitrary postive/negative
+        ! values, later these will be replaced by the signed distance function. 
+
+        do i = 1, nx 
+        do j = 1, ny 
+                
+            do k = 1, nz 
+
+                if (lev%H_ice(i,j) .eq. 0.0_wp) then 
+                    ! No ice present in this column, point is outside ice body (phi > 0)
+
+                    lev%phi(i,j,k) = 1.0_wp 
+
+                else if ( lev%z(k) .gt. lev%z_base(i,j) .and. &
+                          lev%z(k) .lt. lev%z_srf(i,j) ) then 
+                    ! Point is inside ice body (phi < 0)
+
+                    lev%phi(i,j,k) = -1.0_wp 
+
+                else if (lev%z(k) .eq. lev%z_srf(i,j) .or. &
+                         lev%z(k) .eq. lev%z_base(i,j)) then 
+                    ! Point is on the zero surface (phi = 0)
+
+                    lev%phi(i,j,k) = 0.0_wp 
+
+                else 
+                    ! Point is outside the ice body (phi > 0)
+                
+                    lev%phi(i,j,k) = 1.0_wp 
+
+                end if 
+
+            end do 
+                
+        end do
+        end do
+
+        return
+
+    end subroutine levelset_phi_set
+
+
+    elemental subroutine calc_z_srf_max(z_srf,H_ice,z_bed,z_sl,rho_ice,rho_sw)
+        ! Calculate surface elevation
+        ! Adapted from Pattyn (2017), Eq. 1
+        
+        implicit none 
+
+        real(prec), intent(INOUT) :: z_srf 
+        real(prec), intent(IN)    :: H_ice
+        real(prec), intent(IN)    :: z_bed
+        real(prec), intent(IN)    :: z_sl
+        real(prec), intent(IN)    :: rho_ice
+        real(prec), intent(IN)    :: rho_sw
+
+        ! Local variables
+        integer :: i, j, nx, ny 
+        real(prec) :: rho_ice_sw
+        real(prec) :: H_eff
+
+        rho_ice_sw = rho_ice/rho_sw ! Ratio of density of ice to seawater [--]
+        
+        ! Get effective ice thickness (for now assume grid ice thickness is correct)
+        H_eff = H_ice
+
+        ! Initially calculate surface elevation everywhere 
+        z_srf = max(z_bed + H_eff, z_sl + (1.0-rho_ice_sw)*H_eff)
+        
+        return 
+
+    end subroutine calc_z_srf_max
 
     subroutine calc_halfar(H_ice,x,y,time,R0,H0,lambda,n,A,rho_ice,g)
         ! Equivalent to bueler_test_BC in ice_benchmarks.f90 
@@ -465,6 +586,8 @@ contains
                       dim1="x",dim2="time",start=[1,n],ncid=ncid)
         call nc_write(filename,"z_srf",lev%z_srf(:,1),units="m",long_name="Surface elevation", &
                       dim1="x",dim2="time",start=[1,n],ncid=ncid)
+        call nc_write(filename,"z_base",lev%z_base(:,1),units="m",long_name="Ice base elevation", &
+                      dim1="x",dim2="time",start=[1,n],ncid=ncid)
         call nc_write(filename,"z_bed",lev%z_bed(:,1),units="m",long_name="Bedrock elevation", &
                       dim1="x",dim2="time",start=[1,n],ncid=ncid)
 
@@ -473,6 +596,9 @@ contains
         ! call nc_write(filename,"v",lev%v(:,1,:),units="m",long_name="Velocity, y", &
         !               dim1="x",dim2="z",dim3="time",start=[1,1,n],ncid=ncid)
         call nc_write(filename,"w",lev%w(:,1,:),units="m",long_name="Velocity, z", &
+                      dim1="x",dim2="z",dim3="time",start=[1,1,n],ncid=ncid)
+
+        call nc_write(filename,"phi",lev%phi(:,1,:),units="1",long_name="Levelset function", &
                       dim1="x",dim2="z",dim3="time",start=[1,1,n],ncid=ncid)
 
         ! Close the netcdf file

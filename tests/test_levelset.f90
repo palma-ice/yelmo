@@ -24,6 +24,9 @@ program test_levelset
 
     type levelset_class
 
+        ! General information 
+        real(wp) :: missing_value
+
         ! Axis information 
         real(wp) :: dx, dy, dz
         integer  :: nx, ny, nz  
@@ -45,7 +48,8 @@ program test_levelset
         real(wp), allocatable :: w(:,:,:)
 
         real(wp), allocatable :: phi(:,:,:)
-
+        integer,  allocatable :: G(:,:,:)
+        
     end type
 
     type(levelset_class) :: lev1 
@@ -146,6 +150,9 @@ program test_levelset
 
         end if 
 
+        ! Calculate signed distance everywhere
+        call levelset_calc_signed_distance(lev1)
+
         ! Calculate SIA velocity profile too 
         call calc_vel_sia_2D(lev1%u(:,1,:),lev1%w(:,1,:),lev1%x,lev1%z,lev1%H_ice(:,1), &
                         lev1%z_srf(:,1),lev1%z_bed(:,1),lev1%ATT(:,1,:),rho_ice,g,n=3.0_wp)
@@ -198,6 +205,7 @@ contains
         if (allocated(lev%w))       deallocate(lev%w)
 
         if (allocated(lev%phi))     deallocate(lev%phi)
+        if (allocated(lev%G))       deallocate(lev%G)
         
         allocate(lev%H_ice(nx,ny))
         allocate(lev%z_srf(nx,ny))
@@ -211,6 +219,7 @@ contains
         allocate(lev%w(nx,ny,nz))
         
         allocate(lev%phi(nx,ny,nz))
+        allocate(lev%G(nx,ny,nz))
         
         lev%H_ice   = 0.0_wp 
         lev%z_srf   = 0.0_wp 
@@ -223,6 +232,9 @@ contains
         lev%w       = 0.0_wp 
         
         lev%phi     = 1.0_wp 
+        lev%G       = 2.0_wp 
+        
+        lev%missing_value = 1e10_wp
 
         return
 
@@ -245,7 +257,7 @@ contains
         ny = size(lev%phi,2)
         nz = size(lev%phi,3)
 
-        ! Assume z_bed and H_ice are well defined. 
+        ! Assume H_ice, z_bed and z_sl are well defined. 
 
         ! First calculate surface elevation 
         call calc_z_srf_max(lev%z_srf,lev%H_ice,lev%z_bed,lev%z_sl,rho_ice,rho_sw)
@@ -295,6 +307,370 @@ contains
 
     end subroutine levelset_phi_set
 
+    subroutine levelset_calc_signed_distance(lev)
+
+        implicit none
+
+        type(levelset_class), intent(INOUT) :: lev  
+        
+        ! Local variables
+        integer :: q
+
+        integer, parameter :: q_max = 1000
+
+        ! First specify check matrix, points are either
+        ! 0: accepted 
+        ! 1: close 
+        ! 2: far 
+
+        ! Initially set all points as far
+        lev%G = 2 
+
+        ! Now find points that surround the boundary (accepted)
+        call find_accepted_cells(lev%G,lev%z_srf,lev%z_base,lev%z)
+
+        ! Assign initial values (phi_0 = 0)
+        where(lev%G .eq. 0) lev%phi = 0.0 
+
+        ! Assign high values for other points
+        where(lev%G .ne. 0) lev%phi = lev%missing_value
+
+        ! Perform several loops until all points labeled 'far' are eliminated
+        do q = 1, q_max
+
+            ! Now find points near the boundary (close)
+            call find_close_cells(lev%G)
+        
+            ! Calculate signed distance of points labeled 'close'
+            call levelset_calc_signed_distance_close_points(lev)
+
+            write(*,*) q, count(lev%G .eq. 0), count(lev%G .eq. 2)
+            if (maxval(lev%G) .eq. 0) exit
+
+        end do 
+
+
+        return
+
+    end subroutine levelset_calc_signed_distance
+
+    subroutine levelset_calc_signed_distance_close_points(lev)
+
+        implicit none
+
+        type(levelset_class), intent(INOUT) :: lev 
+
+        ! Local variables 
+        integer :: i, j, k, l, m, n
+        integer :: nx, ny, nz 
+        real(wp) :: phi_temp 
+
+        nx = size(lev%phi,1)
+        ny = size(lev%phi,2)
+        nz = size(lev%phi,3) 
+
+        do l = 1, nx 
+        do m = 1, ny 
+        do n = 1, nz 
+
+
+            if (lev%G(l,m,n) .eq. 1) then 
+                
+                ! Solve quadratic distance function
+                call levelset_solve_quadratic(phi_temp,lev,l,m,n)
+                
+                if (phi_temp .ne. lev%missing_value) then 
+
+                    ! Assign value
+                    lev%phi(l,m,n) = phi_temp 
+
+                    ! Label point as 'accepted'
+                    lev%G(l,m,n) = 0 
+
+                end if 
+
+            end if 
+
+        end do
+        end do
+        end do
+
+        return
+
+    end subroutine levelset_calc_signed_distance_close_points
+
+
+    subroutine levelset_solve_quadratic(phi_temp,lev,l,m,n)
+        ! Following algorithm 2.3 of Yang (preprint, https://arxiv.org/abs/1811.00009v1)
+
+        implicit none 
+
+        real(wp), intent(OUT) :: phi_temp 
+        type(levelset_class), intent(IN) :: lev 
+        integer, intent(IN) :: l 
+        integer, intent(IN) :: m 
+        integer, intent(IN) :: n 
+
+        ! Local variables
+        integer :: nx, ny, nz
+        integer :: lm1, lp1, mm1, mp1, nm1, np1, lpd, mpd, npd
+        integer :: id, nd, d
+
+        real(wp) :: phi(3) 
+        real(wp) :: dx(3) 
+        integer  :: idx(3) 
+        real(wp) :: a, b, c 
+
+        nx = size(lev%phi,1)
+        ny = size(lev%phi,2)
+        nz = size(lev%phi,3) 
+
+        ! Initially, set all values of phi buffer to missing,
+        ! dx buffer to zero and and sort order indices to zeros
+        phi = 9999.0 
+        dx  = 0.0 
+        idx = 0
+
+        ! Define neighbor indices 
+        lm1 = max(1,l-1)
+        lp1 = min(nx,l+1)
+        mm1 = max(1,m-1)
+        mp1 = min(ny,m+1)
+        nm1 = max(1,n-1)
+        np1 = min(nz,n+1)
+        
+        nd = 0 
+
+        ! Check for upwind neighbor, x-direction ===
+        
+        d = 0 
+        if (lev%G(lm1,m,n) .eq. 0 .and. lev%phi(l,m,n) .gt. lev%phi(lm1,m,n)) then 
+            d = -1
+        end if 
+        if (lev%G(lp1,m,n) .eq. 0 .and. lev%phi(l,m,n) .gt. lev%phi(lp1,m,n)) then
+            if (d .eq. 0 .or. lev%phi(lp1,m,n) .lt. lev%phi(lm1,m,n)) then 
+                d = 1
+            end if
+        end if 
+
+        if (d .ne. 0) then 
+            nd = nd + 1 
+            lpd = max(min(l+d,nx),1)
+            phi(nd) = lev%phi(lpd,m,n)
+            dx(nd)  = abs(lev%x(l)-lev%x(lpd))
+        end if 
+
+        ! Check for upwind neighbor, y-direction ===
+        
+        d = 0 
+        if (lev%G(l,mm1,n) .eq. 0 .and. lev%phi(l,m,n) .gt. lev%phi(l,mm1,n)) then 
+            d = -1
+        end if 
+        if (lev%G(l,mp1,n) .eq. 0 .and. lev%phi(l,m,n) .gt. lev%phi(l,mp1,n)) then
+            if (d .eq. 0 .or. lev%phi(l,mp1,n) .lt. lev%phi(l,mm1,n)) then 
+                d = 1
+            end if
+        end if 
+
+        if (d .ne. 0) then 
+            nd = nd + 1 
+            mpd = max(min(m+d,ny),1)
+            phi(nd) = lev%phi(l,mpd,n)
+            dx(nd)  = abs(lev%y(m)-lev%y(mpd))
+        end if 
+
+        ! Check for upwind neighbor, z-direction ===
+        
+        d = 0 
+        if (lev%G(l,m,nm1) .eq. 0 .and. lev%phi(l,m,n) .gt. lev%phi(l,m,nm1)) then 
+            d = -1
+        end if 
+        if (lev%G(l,m,np1) .eq. 0 .and. lev%phi(l,m,n) .gt. lev%phi(l,m,np1)) then
+            if (d .eq. 0 .or. lev%phi(l,m,np1) .lt. lev%phi(l,m,nm1)) then 
+                d = 1
+            end if
+        end if 
+
+        if (d .ne. 0) then 
+            nd = nd + 1 
+            npd = max(min(n+d,nz),1)
+            phi(nd) = lev%phi(l,m,npd)
+            dx(nd)  = abs(lev%z(n)-lev%z(npd))
+        end if 
+
+        if (nd .gt. 0) then 
+            ! Some phi values found, proceed
+
+            ! Get order of phi values from least to greatest 
+            if (nd .eq. 1) then 
+                idx(1) = 1 
+            else if (nd .eq. 2) then 
+                idx(nd) = maxloc(phi(1:nd),1)
+                idx(1)  = minloc(phi(1:nd),1)
+            else ! nd .eq. 3
+                idx(nd) = maxloc(phi(1:nd),1)
+                idx(1)  = minloc(phi(1:nd),1)
+                if ( (idx(1) .eq. 1 .and. idx(nd) .eq. 3) .or. &
+                     (idx(1) .eq. 3 .and. idx(nd) .eq. 1) ) then 
+                    idx(2)  = 2
+                else if ( (idx(1) .eq. 1 .and. idx(nd) .eq. 2) .or. &
+                          (idx(1) .eq. 2 .and. idx(nd) .eq. 1) ) then 
+                    idx(2)  = 3 
+                else
+                    idx(2)  = 1
+                end if 
+            end if 
+
+            ! Sort phi and dx 
+            phi = phi(idx)
+            dx  = dx(idx) 
+
+            do id = 1, nd
+
+                a = real(id,wp)
+                b = sum(phi(1:id))
+                c = sum(phi(1:id)**2 - dx(1:id)**2)
+
+                if (b**2 - a*c .ge. 0.0) then 
+                    phi_temp = b + sqrt(b**2-a*c) / a
+                    if (id .lt. nd .and. phi_temp .gt. phi(id+1)) then 
+                        ! Do nothing
+                    else
+                        ! Exit loop, smallest phi found
+                        exit
+                    end if
+                end if 
+
+            end do 
+
+        else
+            ! Set output phi value to a really high number
+            
+            phi_temp = lev%missing_value
+
+        end if 
+
+        return 
+
+    end subroutine levelset_solve_quadratic
+
+
+    subroutine find_accepted_cells(check,z_srf,z_base,z)
+        ! Update check array, setting boundary
+        ! cells to 'accepted'
+
+        implicit none
+
+        integer, intent(INOUT) :: check(:,:,:) 
+        real(wp), intent(IN)   :: z_srf(:,:) 
+        real(wp), intent(IN)   :: z_base(:,:) 
+        real(wp), intent(IN)   :: z(:) 
+
+        ! Local variables 
+        integer :: i, j, k, n  
+        integer :: nx, ny, nz
+        integer :: im1, ip1, jm1, jp1, km1, kp1
+
+        nx = size(check,1)
+        ny = size(check,2) 
+        nz = size(check,3) 
+
+        do i = 1, nx 
+        do j = 1, ny
+
+            if (z_base(i,j) .ne. z_srf(i,j)) then 
+
+                do k = 1, nz
+
+                    kp1 = min(k+1,nz)
+
+                    if (z(k)   .le. z_base(i,j) .and. &
+                        z(kp1) .gt. z_base(i,j) ) then 
+
+                        check(i,j,k) = 0  
+
+                    else if (z(k)   .le. z_srf(i,j) .and. &
+                             z(kp1) .gt. z_srf(i,j) ) then 
+
+                        check(i,j,k) = 0 
+
+                    end if 
+
+                end do 
+
+            end if 
+
+        end do
+        end do
+
+        return 
+
+    end subroutine find_accepted_cells
+
+    subroutine find_close_cells(check)
+        ! Update check array, setting neighbors
+        ! of 'accepted' points to 'close'
+
+        implicit none
+
+        integer, intent(INOUT) :: check(:,:,:) 
+
+        ! Local variables 
+        integer :: i, j, k, n  
+        integer :: nx, ny, nz
+        integer :: im1, ip1, jm1, jp1, km1, kp1
+
+        nx = size(check,1)
+        ny = size(check,2) 
+        nz = size(check,3) 
+
+        do i = 1, nx 
+        do j = 1, ny 
+        do k = 1, nz
+
+            im1 = max(i-1,1)
+            ip1 = min(i+1,nx)
+            jm1 = max(j-1,1)
+            jp1 = min(j+1,ny)
+            km1 = max(k-1,1)
+            kp1 = min(k+1,nz)
+
+            if (check(i,j,k) .ne. 0) then 
+
+                ! Count how many direct neighbors are 'accepted'
+                n =   count(check(im1:ip1,j,k) .eq. 0) &
+                    + count(check(i,jm1:jp1,k) .eq. 0) &
+                    + count(check(i,j,km1:kp1) .eq. 0)
+
+                if (n .gt. 0) then 
+
+                    check(i,j,k) = 1
+
+                end if 
+
+            end if 
+
+        end do 
+        end do
+        end do
+
+        return 
+
+    end subroutine find_close_cells
+
+    elemental subroutine calc_dist_squared(d,x0,x1)
+
+        implicit none
+
+        real(wp), intent(OUT) :: d
+        real(wp), intent(IN)  :: x0
+        real(wp), intent(IN)  :: x1
+
+        d = (x1-x0)**2
+
+        return
+
+    end subroutine calc_dist_squared
 
     elemental subroutine calc_z_srf_max(z_srf,H_ice,z_bed,z_sl,rho_ice,rho_sw)
         ! Calculate surface elevation
@@ -599,6 +975,8 @@ contains
                       dim1="x",dim2="z",dim3="time",start=[1,1,n],ncid=ncid)
 
         call nc_write(filename,"phi",lev%phi(:,1,:),units="1",long_name="Levelset function", &
+                      dim1="x",dim2="z",dim3="time",start=[1,1,n],ncid=ncid,missing_value=lev%missing_value)
+        call nc_write(filename,"G",lev%G(:,1,:),units="1",long_name="Levelset status (0: accepted, 1: close, 2: far)", &
                       dim1="x",dim2="z",dim3="time",start=[1,1,n],ncid=ncid)
 
         ! Close the netcdf file

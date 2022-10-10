@@ -230,7 +230,7 @@ contains
         real(wp),           intent(IN)    :: time
         logical,            intent(IN)    :: topo_fixed  
         character(len=*),   intent(IN)    :: pc_step 
-        logical,            intent(IN)    :: use_H_pred
+        logical, optional,  intent(IN)    :: use_H_pred
 
         ! Local variables 
         integer  :: i, j, nx, ny
@@ -306,7 +306,7 @@ contains
                     ! Get ice-fraction mask for current ice thickness  
                     call calc_ice_fraction(tpo%now%f_ice,tpo%now%H_ice,bnd%z_bed,bnd%z_sl,tpo%par%margin_flt_subgrid)
     
-if (.FALSE.) then
+if (.TRUE.) then
                     call calc_G_advec_simple(dHdt_now,tpo%now%H_ice,tpo%now%f_ice,dyn%now%ux_bar, &
                                 dyn%now%uy_bar,tpo%par%solver,tpo%par%boundaries,tpo%par%dx,dt)
 
@@ -326,16 +326,17 @@ end if
 
                 case("corrector") 
 
-                    ! Get ice-fraction mask for predicted ice thickness  
-                    call calc_ice_fraction(tpo%now%f_ice,tpo%now%H_ice_pred,bnd%z_bed,bnd%z_sl,tpo%par%margin_flt_subgrid)
+                    ! Set current thickness to predicted thickness
+                    tpo%now%H_ice = tpo%now%H_ice_pred 
 
-if (.FALSE.) then
-                    call calc_G_advec_simple(dHdt_now,tpo%now%H_ice_pred,tpo%now%f_ice, &
+                    ! Get ice-fraction mask for predicted ice thickness  
+                    call calc_ice_fraction(tpo%now%f_ice,tpo%now%H_ice,bnd%z_bed,bnd%z_sl,tpo%par%margin_flt_subgrid)
+
+if (.TRUE.) then
+                    call calc_G_advec_simple(dHdt_now,tpo%now%H_ice,tpo%now%f_ice, &
                             dyn%now%ux_bar,dyn%now%uy_bar,tpo%par%solver,tpo%par%boundaries,tpo%par%dx,dt)
 
 else
-
-                    tpo%now%H_ice = tpo%now%H_ice_pred 
 
                     call rk4_2D_step(tpo%rk4,tpo%now%H_ice,tpo%now%f_ice,dHdt_now,dyn%now%ux_bar,dyn%now%uy_bar, &
                                                         tpo%par%dx,dt,tpo%par%solver,tpo%par%boundaries)
@@ -377,7 +378,7 @@ end if
             call apply_ice_thickness_boundaries(tpo%now%mb_resid,tpo%now%H_ice,tpo%now%f_ice,tpo%now%f_grnd, &
                                                 dyn%now%uxy_b,bnd%ice_allowed,tpo%par%boundaries,bnd%H_ice_ref, &
                                                 tpo%par%H_min_flt,tpo%par%H_min_grnd,dt,reset=.TRUE.)
-            
+
             ! If desired, finally relax solution to reference state
             if (tpo%par%topo_rel .ne. 0) then 
 
@@ -456,6 +457,13 @@ end if
 
                 case("advance")
                     ! Now let's actually advance the ice thickness field
+
+                    if (.not. present(use_H_pred)) then 
+                        write(*,*) "calc_ytopo_pc:: Error: &
+                        & For step='advance', the argument use_H_pred&
+                        & must be provided."
+                        stop 
+                    end if 
 
                     ! Determine which ice thickness to use going forward
                     if (use_H_pred) then 

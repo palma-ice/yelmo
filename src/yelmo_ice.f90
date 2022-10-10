@@ -237,8 +237,8 @@ contains
                 ! Step 1: Perform predictor step for topography
                 ! Get predicted new ice thickness and store it for later use
 
-                call calc_ytopo_rk4(dom%tpo,dom%dyn,dom%mat,dom%thrm,dom%bnd,time,dom%tpo%par%topo_fixed)
-                !call calc_ytopo_pc(dom%tpo,dom%dyn,dom%mat,dom%thrm,dom%bnd,time_now,dom%tpo%par%topo_fixed,"predictor",use_H_pred=dom%par%pc_use_H_pred)
+                ! call calc_ytopo_rk4(dom%tpo,dom%dyn,dom%mat,dom%thrm,dom%bnd,time,dom%tpo%par%topo_fixed)
+                call calc_ytopo_pc(dom%tpo,dom%dyn,dom%mat,dom%thrm,dom%bnd,time_now,dom%tpo%par%topo_fixed,"predictor")
                 call calc_ytopo_masks(dom%tpo,dom%dyn,dom%mat,dom%thrm,dom%bnd)
 
                 ! Step 2: Calculate dynamics for predicted ice thickness 
@@ -267,13 +267,13 @@ end if
                 ! Get corrected ice thickness and store it for later use
                 
                 ! Call corrector step for topography
-                !call calc_ytopo_pc(dom%tpo,dom%dyn,dom%mat,dom%thrm,dom%bnd,time_now,dom%tpo%par%topo_fixed,"corrector",use_H_pred=dom%par%pc_use_H_pred)
-                !call calc_ytopo_masks(dom%tpo,dom%dyn,dom%mat,dom%thrm,dom%bnd)
+                call calc_ytopo_pc(dom%tpo,dom%dyn,dom%mat,dom%thrm,dom%bnd,time_now,dom%tpo%par%topo_fixed,"corrector")
+                call calc_ytopo_masks(dom%tpo,dom%dyn,dom%mat,dom%thrm,dom%bnd)
 
 
                 ! Step 4: Determine truncation error for ice thickness
 
-if (.FALSE.) then 
+if (.TRUE.) then 
     ! not rk4...
 
                 select case(trim(dom%par%pc_method))
@@ -367,10 +367,17 @@ end if
             ! Update topography accounting for advective changes
             ! and mass balance changes and calving.
 
-            !call calc_ytopo_pc(dom%tpo,dom%dyn,dom%mat,dom%thrm,dom%bnd,time_now,dom%tpo%par%topo_fixed,"advance",use_H_pred=dom%par%pc_use_H_pred)
-            !call calc_ytopo_masks(dom%tpo,dom%dyn,dom%mat,dom%thrm,dom%bnd)
+            call calc_ytopo_pc(dom%tpo,dom%dyn,dom%mat,dom%thrm,dom%bnd,time_now,dom%tpo%par%topo_fixed,"advance",use_H_pred=dom%par%pc_use_H_pred)
+            call calc_ytopo_masks(dom%tpo,dom%dyn,dom%mat,dom%thrm,dom%bnd)
 
-
+            ! if (time_now .ge. 10.0) then 
+            !     write(*,*) time_now
+            !     write(*,*) maxval(dom%tpo%now%H_ice_pred)
+            !     write(*,*) maxval(dom%tpo%now%H_ice_corr)
+            !     write(*,*) maxval(dom%tpo%now%H_ice)
+            !     stop 
+            ! end if 
+                
             ! === Done, Yelmo fields are fully consistent with time=time_now 
 
 

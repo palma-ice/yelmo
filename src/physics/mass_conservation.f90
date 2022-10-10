@@ -579,6 +579,7 @@ contains
         integer :: i, j, nx, ny 
         integer :: im1, ip1, jm1, jp1 
         real(wp), allocatable :: H_ice_new(:,:)
+        real(wp), allocatable :: H_tmp(:,:)
         real(wp) :: H_eff
         real(wp) :: H_max 
         logical  :: is_margin 
@@ -589,6 +590,7 @@ contains
         nx = size(H_ice,1)
         ny = size(H_ice,2) 
 
+        allocate(H_tmp(nx,ny)) 
         allocate(H_ice_new(nx,ny)) 
         H_ice_new = H_ice 
 
@@ -605,6 +607,11 @@ contains
         ! according to boundary mask (ie, EISMINT, BUELER-A, open ocean)
         where (.not. ice_allowed) H_ice_new = 0.0 
         
+
+        ! Remove margin points that are too thin ====
+
+        H_tmp = H_ice_new 
+
         do j = 1, ny 
         do i = 1, nx 
 
@@ -614,14 +621,14 @@ contains
             jm1 = max(j-1,1)
             jp1 = min(j+1,ny)
 
-            is_margin = H_ice_new(i,j) .gt. 0.0 .and. &
-                count([H_ice_new(im1,j),H_ice_new(ip1,j),H_ice_new(i,jm1),H_ice_new(i,jp1)].eq.0.0) .gt. 0
+            is_margin = H_tmp(i,j) .gt. 0.0 .and. &
+                count([H_tmp(im1,j),H_tmp(ip1,j),H_tmp(i,jm1),H_tmp(i,jp1)].eq.0.0) .gt. 0
 
             if (is_margin) then
                 ! Ice covered point at the margin
 
                 ! Calculate current ice thickness 
-                call calc_H_eff(H_eff,H_ice_new(i,j),f_ice(i,j))
+                call calc_H_eff(H_eff,H_ice_new(i,j),f_ice(i,j)) 
 
                 ! Remove ice that is too thin 
                 if (f_grnd(i,j) .eq. 0.0_wp .and. H_eff .lt. H_min_flt)  H_ice_new(i,j) = 0.0_wp 
@@ -629,9 +636,25 @@ contains
  
             end if 
 
+        end do 
+        end do 
+
+        ! Remove ice islands =====
+
+        H_tmp = H_ice_new 
+
+        do j = 1, ny 
+        do i = 1, nx 
+
+            ! Get neighbor indices 
+            im1 = max(i-1,1)
+            ip1 = min(i+1,nx)
+            jm1 = max(j-1,1)
+            jp1 = min(j+1,ny)
+
             ! Check for ice islands
-            is_island = H_ice_new(i,j) .gt. 0.0 .and. &
-                count([H_ice_new(im1,j),H_ice_new(ip1,j),H_ice_new(i,jm1),H_ice_new(i,jp1)].gt.0.0) .eq. 0
+            is_island = H_tmp(i,j) .gt. 0.0 .and. &
+                count([H_tmp(im1,j),H_tmp(ip1,j),H_tmp(i,jm1),H_tmp(i,jp1)].gt.0.0) .eq. 0
 
             if (is_island) then 
                 ! Ice-covered island
@@ -658,7 +681,11 @@ contains
         ! can also happen in Greenland at the grounded ice front.
 
 
-        ! Additional corrections applied here. 
+        ! Reduce ice thickness for margin points that are thicker 
+        ! than inland neighbors ====
+
+        H_tmp = H_ice_new
+
         do j = 1, ny 
         do i = 1, nx 
 
@@ -668,8 +695,8 @@ contains
             jm1 = max(j-1,1)
             jp1 = min(j+1,ny)
 
-            is_margin = H_ice_new(i,j) .gt. 0.0 .and. &
-                count([H_ice_new(im1,j),H_ice_new(ip1,j),H_ice_new(i,jm1),H_ice_new(i,jp1)].eq.0.0) .gt. 0
+            is_margin = H_tmp(i,j) .gt. 0.0 .and. &
+                count([H_tmp(im1,j),H_tmp(ip1,j),H_tmp(i,jm1),H_tmp(i,jp1)].eq.0.0) .gt. 0
 
             if (is_margin) then
                 ! Ice covered point at the margin
@@ -678,19 +705,18 @@ contains
                 call calc_H_eff(H_eff,H_ice_new(i,j),f_ice(i,j))
 
                 ! Calculate maximum thickness of neighbors 
-                H_max = maxval([H_ice_new(im1,j),H_ice_new(ip1,j), &
-                                H_ice_new(i,jm1),H_ice_new(i,jp1)])
+                H_max = maxval([H_tmp(im1,j),H_tmp(ip1,j), &
+                                H_tmp(i,jm1),H_tmp(i,jp1)])
 
                 if ( H_eff .gt. H_max) then 
                     H_ice_new(i,j) = H_max 
                 end if
-
+                
             end if
             
         end do 
         end do
-
-
+                
         call set_boundaries_2D_aa(H_ice_new,boundaries,H_ice_ref)
 
         ! select case(trim(boundaries))

@@ -1843,7 +1843,7 @@ contains
         lgs%L2_rel_norm = residual
 
         ! Print a summary
-        write(*,*) "solve_lis: [time (s), iter, L2_rel_norm] = ", solver_time, lin_iter, residual
+        !write(*,*) "solve_lis: [time (s), iter, L2_rel_norm] = ", solver_time, lin_iter, residual
 
         ! Gather x values in local array of lis-type
         allocate(lgs_x_value_out(nmax))

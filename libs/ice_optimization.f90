@@ -279,7 +279,7 @@ contains
 
     end subroutine update_tf_corr_l21
 
-    subroutine update_cb_ref_errscaling_l21(cb_ref,H_ice,dHdt,z_bed,z_sl,ux,uy,H_obs,uxy_obs,is_float_obs, &
+    subroutine update_cb_ref_errscaling_l21(cb_ref,H_ice,dHdt,z_bed,z_sl,ux,uy,H_obs,uxy_obs,H_grnd_obs, &
                                         cf_min,cf_max,dx,sigma_err,sigma_vel,tau_c,H0,dt,fill_method,fill_dist)
         ! Update method following Lipscomb et al. (2021, tc)
 
@@ -294,7 +294,7 @@ contains
         real(wp), intent(IN)    :: uy(:,:) 
         real(wp), intent(IN)    :: H_obs(:,:) 
         real(wp), intent(IN)    :: uxy_obs(:,:) 
-        logical,  intent(IN)    :: is_float_obs(:,:) 
+        real(wp), intent(IN)    :: H_grnd_obs(:,:) 
         real(wp), intent(IN)    :: cf_min(:,:) 
         real(wp), intent(IN)    :: cf_max(:,:) 
         real(wp), intent(IN)    :: dx 
@@ -385,7 +385,7 @@ end if
             uxy_aa = sqrt(ux_aa**2+uy_aa**2)
 
             if ( uxy(i,j) .ne. 0.0 .and. uxy_err(i,j) .ne. MV &
-                            .and. (.not. is_float_obs(i,j)) ) then 
+                            .and. (H_grnd_obs(i,j) .gt. 0.0) ) then 
                 ! Update coefficient where velocity exists and 
                 ! observations are not floating.
 
@@ -468,7 +468,7 @@ end if
             case("cf_min")
 
                 ! Ensure where obs are floating, set cb_ref = cf_min 
-                where(is_float_obs) cb_ref = cf_min 
+                where(H_grnd_obs .le. 0.0) cb_ref = cf_min 
 
                 ! Also where no ice exists, set cb_ref = cf_min 
                 where(H_obs .eq. 0.0) cb_ref = cf_min 

@@ -1,6 +1,6 @@
 module mass_conservation
 
-    use yelmo_defs, only : sp, dp, wp, TOL_UNDERFLOW, g, rho_ice, rho_sw  
+    use yelmo_defs, only : sp, dp, wp, TOL_UNDERFLOW, MISSING_VALUE, g, rho_ice, rho_sw  
     use yelmo_tools, only : fill_borders_2D, set_boundaries_2D_aa
 
     use solver_advection, only : calc_advec2D  
@@ -71,6 +71,73 @@ contains
         return 
 
     end subroutine calc_G_advec_simple
+
+    subroutine calc_G_advec_interp(G_advec,H_ice,f_ice,ux,uy, &
+                                        solver,boundaries,dx,dt,mps_to_lo,mps_to_hi)
+        ! Interface subroutine to update ice thickness through application
+        ! of advection, vertical mass balance terms and calving 
+
+        ! Perform advection at lower resolution. 
+
+        use coordinates_mapping_scrip, only : map_scrip_class, map_scrip_init, map_scrip_field, &
+                                            gen_map_filename
+
+        implicit none 
+
+        real(wp),         intent(OUT)   :: G_advec(:,:)         ! [m/yr] Tendency due to advection
+        real(wp),         intent(IN)    :: H_ice(:,:)           ! [m]   Ice thickness 
+        real(wp),         intent(IN)    :: f_ice(:,:)           ! [--]  Ice area fraction 
+        real(wp),         intent(IN)    :: ux(:,:)              ! [m/a] Depth-averaged velocity, x-direction (ac-nodes)
+        real(wp),         intent(IN)    :: uy(:,:)              ! [m/a] Depth-averaged velocity, y-direction (ac-nodes)
+        character(len=*), intent(IN)    :: solver               ! Solver to use for the ice thickness advection equation
+        character(len=*), intent(IN)    :: boundaries
+        real(wp),         intent(IN)    :: dx                   ! [m]   Horizontal resolution
+        real(wp),         intent(IN)    :: dt                   ! [a]   Timestep 
+        type(map_scrip_class), intent(IN) :: mps_to_lo          ! Grid mapping to low resolution
+        type(map_scrip_class), intent(IN) :: mps_to_hi          ! Grid mapping to high resolution
+
+
+        ! Local variables 
+        integer :: i, j, nx, ny
+        integer :: nx_lo, ny_lo 
+
+        real(wp), allocatable :: F_now(:,:) 
+        real(wp), allocatable :: ux_tmp(:,:) 
+        real(wp), allocatable :: uy_tmp(:,:) 
+
+        ! Low resolution fields 
+        real(wp), allocatable :: H_ice_lo(:,:) 
+
+        nx = size(H_ice,1)
+        ny = size(H_ice,2)
+
+        allocate(F_now(nx,ny))
+        allocate(ux_tmp(nx,ny))
+        allocate(uy_tmp(nx,ny))
+
+
+        ! First, interpolate input fields to lower resolution using input mapping
+        ! Perform conservative interpolation 
+
+        H_ice_lo = MISSING_VALUE 
+        call map_scrip_field(mps_to_lo,"H_ice",H_ice,H_ice_lo,method="mean", &
+                                    missing_value=MISSING_VALUE,fill_method="nn")
+
+        ! Set local velocity fields with no margin treatment intially
+        ux_tmp = ux
+        uy_tmp = uy
+        
+        F_now = 0.0_wp
+
+        ! Ensure that no velocity is defined for outer boundaries of partially-filled margin points
+        call set_inactive_margins(ux_tmp,uy_tmp,f_ice)
+
+        ! Determine current advective rate of change (time=n)
+        call calc_advec2D(G_advec,H_ice,f_ice,ux_tmp,uy_tmp,F_now,dx,dx,dt,solver,boundaries)
+
+        return 
+
+    end subroutine calc_G_advec_interp
 
     subroutine calc_G_advec(G_adv,dHdt_n,H_ice_n,H_ice_pred,H_ice,f_ice,ux,uy, &
                         mask_pred_new,mask_corr_new,solver,boundaries, &

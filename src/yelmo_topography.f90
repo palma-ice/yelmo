@@ -311,7 +311,7 @@ if (.TRUE.) then
                                 dyn%now%uy_bar,tpo%par%solver,tpo%par%boundaries,tpo%par%dx,dt)
 
 else
-
+                    
                     call rk4_2D_step(tpo%rk4,tpo%now%H_ice,tpo%now%f_ice,dHdt_now,dyn%now%ux_bar,dyn%now%uy_bar, &
                                                         tpo%par%dx,dt,tpo%par%solver,tpo%par%boundaries)
 

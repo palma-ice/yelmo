@@ -76,7 +76,7 @@ $(objdir)/ice_enthalpy.o : $(srcdir)/physics/ice_enthalpy.f90 $(objdir)/yelmo_de
 $(objdir)/mass_conservation.o : $(srcdir)/physics/mass_conservation.f90 $(objdir)/yelmo_defs.o \
 								$(objdir)/solver_advection.o $(objdir)/solver_advection_sico.o \
 								$(objdir)/solver_advection_new.o $(objdir)/velocity_general.o \
-								$(objdir)/topography.o 
+								$(objdir)/topography.o $(objdir)/mapping_scrip.o
 	$(FC) $(DFLAGS) $(FFLAGS) -c -o $@ $<
 
 $(objdir)/runge_kutta.o: $(srcdir)/physics/runge_kutta.f90 $(objdir)/yelmo_defs.o $(objdir)/mass_conservation.o

@@ -3,6 +3,8 @@ module coordinates_mapping_scrip
     ! SCRIP file format for storing mapping
     ! weights and neighbors.
 
+    use, intrinsic :: iso_fortran_env, only : input_unit, output_unit, error_unit
+
     use ncio 
     use index 
     use interp2D
@@ -26,7 +28,7 @@ module coordinates_mapping_scrip
 
     ! Missing value and aliases
     real(dp), parameter :: MISSING_VALUE_DEFAULT = -9999.0_dp 
-    real(dp), parameter :: mv = MISSING_VALUE_DEFAULT
+    real(dp), parameter :: MV = MISSING_VALUE_DEFAULT
     
     ! Error distance (very large) and error index 
     real(dp), parameter :: ERR_DIST = 1E8_dp 
@@ -85,6 +87,16 @@ module coordinates_mapping_scrip
         module procedure map_scrip_field_logical
     end interface 
 
+    interface nc_read_interp
+        module procedure    nc_read_interp_dp_2D
+        module procedure    nc_read_interp_dp_3D
+        module procedure    nc_read_interp_sp_2D
+        module procedure    nc_read_interp_sp_3D
+        module procedure    nc_read_interp_int_2D
+        module procedure    nc_read_interp_int_3D
+        module procedure    nc_read_interp_logical_2D
+    end interface
+
     private 
     public :: map_scrip_class 
     public :: map_scrip_field
@@ -92,6 +104,8 @@ module coordinates_mapping_scrip
     public :: map_scrip_init_from_griddesc
     public :: map_scrip_load 
     public :: map_scrip_end
+
+    public :: nc_read_interp 
 
     public :: gen_map_filename
 
@@ -973,5 +987,503 @@ contains
         return
 
     end function gen_map_filename
-    
+
+
+! === NCIO Extension functions ===
+
+    subroutine nc_read_interp_dp_2D(filename,vnm,var2D,var2D_in,ncid,start,count,mps,method)
+        ! Read in a 2D field and interpolate it using scrip map
+        ! as needed. 
+
+        implicit none
+
+        character(len=*),   intent(IN)  :: filename 
+        character(len=*),   intent(IN)  :: vnm 
+        real(dp),           intent(OUT) :: var2D(:,:) 
+        real(dp),optional,  intent(IN)  :: var2D_in(:,:) 
+        integer, optional,  intent(IN)  :: ncid 
+        integer, optional,  intent(IN)  :: start(:) 
+        integer, optional,  intent(IN)  :: count(:) 
+        type(map_scrip_class), optional, intent(IN) :: mps
+        character(len=*),      optional, intent(IN) :: method 
+
+        ! Local variables 
+        integer :: nx, ny 
+        integer,  allocatable :: dims(:) 
+        real(dp), allocatable :: var2D_src(:,:) 
+        character(len=56) :: mapping_method 
+
+        if (present(var2D_in)) then 
+            ! Get source array from argument (useful for handling 3D arrays with this routine)
+
+            nx = size(var2D_in,1)
+            ny = size(var2D_in,2) 
+
+            allocate(var2D_src(nx,ny))
+
+            var2D_src = var2D_in 
+
+        else 
+            ! Load 2D array from file 
+
+            ! Determine dimensions of current variable in the source file
+            call nc_dims(filename,vnm,dims=dims)
+
+            nx = dims(1)
+            ny = dims(2) 
+
+            allocate(var2D_src(nx,ny))
+
+            ! Load the variable from the file to the local 2D array
+            call nc_read(filename,vnm,var2D_src,ncid=ncid,start=start,count=[nx,ny,1],missing_value=real(MV,dp))
+        
+        end if 
+
+
+        if (nx .eq. size(var2D,1) .and. ny .eq. size(var2D,2)) then 
+            ! Assume no interpolation needed, copy variable for output directly
+
+            var2D = var2D_src 
+
+        else 
+            ! Map local source array it to our target array 
+
+            ! Determine mapping method for this variable 
+            mapping_method = "mean"
+            if (present(method)) mapping_method = trim(method) 
+
+            ! Safety check 
+            if (.not. present(mps)) then 
+                write(error_unit,*) ""
+                write(error_unit,*) "nc_read_interp:: Error: map_scrip_class object must &
+                        &be provided as an argument since array read from file does not &
+                        &match the Yelmo array size."
+                write(error_unit,*) "filename: ", trim(filename)
+                write(error_unit,*) "variable: ", trim(vnm)
+                write(error_unit,*) "dims in file:         ", nx, ny 
+                write(error_unit,*) "dims in yelmo object: ", size(var2D,1), size(var2D,2)
+                stop 
+            end if 
+
+            ! Perform conservative interpolation 
+            var2D = real(MV,dp) 
+            call map_scrip_field(mps,vnm,var2D_src,var2D,method=mapping_method, &
+                                        missing_value=real(MV,dp),fill_method="nn")
+
+        end if 
+
+        return
+
+    end subroutine nc_read_interp_dp_2D
+
+    subroutine nc_read_interp_dp_3D(filename,vnm,var3D,ncid,start,count,mps,method)
+        ! Read in a 3D field and interpolate it using scrip map
+        ! as needed. 
+
+        implicit none
+
+        character(len=*),   intent(IN)  :: filename 
+        character(len=*),   intent(IN)  :: vnm 
+        real(dp),           intent(OUT) :: var3D(:,:,:) 
+        integer, optional,  intent(IN)  :: ncid 
+        integer, optional,  intent(IN)  :: start(:) 
+        integer, optional,  intent(IN)  :: count(:) 
+        type(map_scrip_class), optional, intent(IN) :: mps
+        character(len=*),      optional, intent(IN) :: method 
+
+        ! Local variables 
+        integer :: nx, ny, nz, k  
+        integer,  allocatable :: dims(:) 
+        real(dp), allocatable :: var3D_src(:,:,:) 
+
+        ! Determine dimensions of current variable in the source file
+        call nc_dims(filename,vnm,dims=dims)
+
+        nx = dims(1)
+        ny = dims(2) 
+        nz = dims(3) 
+
+        allocate(var3D_src(nx,ny,nz))
+
+        ! Safety check 
+        if (nz .ne. size(var3D,3)) then 
+
+            write(error_unit,*) ""
+            write(error_unit,*) "nc_read_interp_dp_3D:: Error: vertical dimension of variable in &
+                    &input file does not match vertical dimension of yelmo object. Vertical &
+                    & interpolation is not yet supported."
+            write(error_unit,*) "filename  = ", trim(filename)
+            write(error_unit,*) "variable  = ", trim(vnm)
+            write(error_unit,*) "nz[file]  = ", nz
+            write(error_unit,*) "nz[yelmo] = ", size(var3D,3) 
+            stop 
+        end if 
+            
+        ! Read in full 3D variable of interest 
+        call nc_read(filename,vnm,var3D_src,ncid=ncid,start=start,count=[nx,ny,nz,1],missing_value=real(MV,dp))
+        
+        ! Loop over vertical dimension and apply interpolation 
+        do k = 1, nz 
+            
+            call nc_read_interp_dp_2D(filename,vnm,var3D(:,:,k),var3D_src(:,:,k),ncid, &
+                                                                start,count,mps,method)
+
+        end do 
+
+        return
+
+    end subroutine nc_read_interp_dp_3D
+
+    subroutine nc_read_interp_sp_2D(filename,vnm,var2D,var2D_in,ncid,start,count,mps,method)
+        ! Read in a 2D field and interpolate it using scrip map
+        ! as needed. 
+
+        implicit none
+
+        character(len=*),   intent(IN)  :: filename 
+        character(len=*),   intent(IN)  :: vnm 
+        real(sp),           intent(OUT) :: var2D(:,:) 
+        real(sp),optional,  intent(IN)  :: var2D_in(:,:) 
+        integer, optional,  intent(IN)  :: ncid 
+        integer, optional,  intent(IN)  :: start(:) 
+        integer, optional,  intent(IN)  :: count(:) 
+        type(map_scrip_class), optional, intent(IN) :: mps
+        character(len=*),      optional, intent(IN) :: method 
+
+        ! Local variables 
+        integer :: nx, ny 
+        integer,  allocatable :: dims(:) 
+        real(sp), allocatable :: var2D_src(:,:) 
+        character(len=56) :: mapping_method 
+
+        if (present(var2D_in)) then 
+            ! Get source array from argument (useful for handling 3D arrays with this routine)
+
+            nx = size(var2D_in,1)
+            ny = size(var2D_in,2) 
+
+            allocate(var2D_src(nx,ny))
+
+            var2D_src = var2D_in 
+
+        else 
+            ! Load 2D array from file 
+
+            ! Determine dimensions of current variable in the source file
+            call nc_dims(filename,vnm,dims=dims)
+
+            nx = dims(1)
+            ny = dims(2) 
+
+            allocate(var2D_src(nx,ny))
+
+            ! Load the variable from the file to the local 2D array
+            call nc_read(filename,vnm,var2D_src,ncid=ncid,start=start,count=[nx,ny,1],missing_value=real(MV,wp))
+        
+        end if 
+
+
+        if (nx .eq. size(var2D,1) .and. ny .eq. size(var2D,2)) then 
+            ! Assume no interpolation needed, copy variable for output directly
+
+            var2D = var2D_src 
+
+        else 
+            ! Map local source array it to our target array 
+
+            ! Determine mapping method for this variable 
+            mapping_method = "mean"
+            if (present(method)) mapping_method = trim(method) 
+
+            ! Safety check 
+            if (.not. present(mps)) then 
+                write(error_unit,*) ""
+                write(error_unit,*) "nc_read_interp:: Error: map_scrip_class object must &
+                        &be provided as an argument since array read from file does not &
+                        &match the Yelmo array size."
+                write(error_unit,*) "filename: ", trim(filename)
+                write(error_unit,*) "variable: ", trim(vnm)
+                write(error_unit,*) "dims in file:         ", nx, ny 
+                write(error_unit,*) "dims in yelmo object: ", size(var2D,1), size(var2D,2)
+                stop 
+            end if 
+
+            ! Perform conservative interpolation 
+            var2D = real(MV,sp) 
+            call map_scrip_field(mps,vnm,var2D_src,var2D,method=mapping_method, &
+                                        missing_value=real(MV,sp),fill_method="nn")
+
+        end if 
+
+        return
+
+    end subroutine nc_read_interp_sp_2D
+
+    subroutine nc_read_interp_sp_3D(filename,vnm,var3D,ncid,start,count,mps,method)
+        ! Read in a 2D field and interpolate it using scrip map
+        ! as needed. 
+
+        implicit none
+
+        character(len=*),   intent(IN)  :: filename 
+        character(len=*),   intent(IN)  :: vnm 
+        real(sp),           intent(OUT) :: var3D(:,:,:) 
+        integer, optional,  intent(IN)  :: ncid 
+        integer, optional,  intent(IN)  :: start(:) 
+        integer, optional,  intent(IN)  :: count(:) 
+        type(map_scrip_class), optional, intent(IN) :: mps
+        character(len=*),      optional, intent(IN) :: method 
+
+        ! Local variables 
+        integer :: nx, ny, nz, k  
+        integer,  allocatable :: dims(:) 
+        real(sp), allocatable :: var3D_src(:,:,:) 
+
+        ! Determine dimensions of current variable in the source file
+        call nc_dims(filename,vnm,dims=dims)
+
+        nx = dims(1)
+        ny = dims(2) 
+        nz = dims(3) 
+
+        allocate(var3D_src(nx,ny,nz))
+
+        ! Safety check 
+        if (nz .ne. size(var3D,3)) then 
+
+            write(error_unit,*) ""
+            write(error_unit,*) "nc_read_interp_sp_3D:: Error: vertical dimension of variable in &
+                    &input file does not match vertical dimension of yelmo object. Vertical &
+                    & interpolation is not yet supported."
+            write(error_unit,*) "filename  = ", trim(filename)
+            write(error_unit,*) "variable  = ", trim(vnm)
+            write(error_unit,*) "nz[file]  = ", nz
+            write(error_unit,*) "nz[yelmo] = ", size(var3D,3) 
+            stop 
+        end if 
+            
+        ! Read in full 3D variable of interest 
+        call nc_read(filename,vnm,var3D_src,ncid=ncid,start=start,count=[nx,ny,nz,1],missing_value=real(MV,sp))
+        
+        ! Loop over vertical dimension and apply interpolation 
+        do k = 1, nz 
+            
+            call nc_read_interp_sp_2D(filename,vnm,var3D(:,:,k),var3D_src(:,:,k),ncid, &
+                                                                start,count,mps,method)
+
+        end do 
+
+        return
+
+    end subroutine nc_read_interp_sp_3D
+
+    subroutine nc_read_interp_int_2D(filename,vnm,var2D,var2D_in,ncid,start,count,mps,method)
+        ! Read in a 2D field and interpolate it using scrip map
+        ! as needed. 
+
+        implicit none
+
+        character(len=*),   intent(IN)  :: filename 
+        character(len=*),   intent(IN)  :: vnm 
+        integer,            intent(OUT) :: var2D(:,:) 
+        integer, optional,  intent(IN)  :: var2D_in(:,:) 
+        integer, optional,  intent(IN)  :: ncid 
+        integer, optional,  intent(IN)  :: start(:) 
+        integer, optional,  intent(IN)  :: count(:) 
+        type(map_scrip_class), optional, intent(IN) :: mps
+        character(len=*),      optional, intent(IN) :: method 
+
+        ! Local variables 
+        integer :: nx, ny 
+        integer,  allocatable :: dims(:) 
+        integer,  allocatable :: var2D_src(:,:) 
+        character(len=56) :: mapping_method 
+
+        if (present(var2D_in)) then 
+            ! Get source array from argument (useful for handling 3D arrays with this routine)
+
+            nx = size(var2D_in,1)
+            ny = size(var2D_in,2) 
+
+            allocate(var2D_src(nx,ny))
+
+            var2D_src = var2D_in 
+
+        else 
+            ! Load 2D array from file 
+
+            ! Determine dimensions of current variable in the source file
+            call nc_dims(filename,vnm,dims=dims)
+
+            nx = dims(1)
+            ny = dims(2) 
+
+            allocate(var2D_src(nx,ny))
+
+            ! Load the variable from the file to the local 2D array
+            call nc_read(filename,vnm,var2D_src,ncid=ncid,start=start,count=[nx,ny,1],missing_value=int(MV))
+        
+        end if 
+
+
+        if (nx .eq. size(var2D,1) .and. ny .eq. size(var2D,2)) then 
+            ! Assume no interpolation needed, copy variable for output directly
+
+            var2D = var2D_src 
+
+        else 
+            ! Map local source array it to our target array 
+
+            ! Determine mapping method for this variable 
+            mapping_method = "mean"
+            if (present(method)) mapping_method = trim(method) 
+
+            ! Perform conservative interpolation 
+            var2D = int(MV)
+            call map_scrip_field(mps,vnm,var2D_src,var2D,method=mapping_method, &
+                                        missing_value=int(MV),fill_method="nn")
+
+        end if 
+
+        return
+
+    end subroutine nc_read_interp_int_2D
+
+    subroutine nc_read_interp_int_3D(filename,vnm,var3D,ncid,start,count,mps,method)
+        ! Read in a 2D field and interpolate it using scrip map
+        ! as needed. 
+
+        implicit none
+
+        character(len=*),   intent(IN)  :: filename 
+        character(len=*),   intent(IN)  :: vnm 
+        integer,            intent(OUT) :: var3D(:,:,:) 
+        integer, optional,  intent(IN)  :: ncid 
+        integer, optional,  intent(IN)  :: start(:) 
+        integer, optional,  intent(IN)  :: count(:) 
+        type(map_scrip_class), optional, intent(IN) :: mps
+        character(len=*),      optional, intent(IN) :: method 
+
+        ! Local variables 
+        integer :: nx, ny, nz, k  
+        integer,  allocatable :: dims(:) 
+        integer,  allocatable :: var3D_src(:,:,:) 
+
+        ! Determine dimensions of current variable in the source file
+        call nc_dims(filename,vnm,dims=dims)
+
+        nx = dims(1)
+        ny = dims(2) 
+        nz = dims(3) 
+
+        allocate(var3D_src(nx,ny,nz))
+
+        ! Safety check 
+        if (nz .ne. size(var3D,3)) then 
+
+            write(error_unit,*) ""
+            write(error_unit,*) "nc_read_interp_int_3D:: Error: vertical dimension of variable in &
+                    &input file does not match vertical dimension of yelmo object. Vertical &
+                    & interpolation is not yet supported."
+            write(error_unit,*) "filename  = ", trim(filename)
+            write(error_unit,*) "variable  = ", trim(vnm)
+            write(error_unit,*) "nz[file]  = ", nz
+            write(error_unit,*) "nz[yelmo] = ", size(var3D,3) 
+            stop 
+        end if 
+            
+        ! Read in full 3D variable of interest 
+        call nc_read(filename,vnm,var3D_src,ncid=ncid,start=start,count=[nx,ny,nz,1],missing_value=int(MV))
+        
+        ! Loop over vertical dimension and apply interpolation 
+        do k = 1, nz 
+            
+            call nc_read_interp_int_2D(filename,vnm,var3D(:,:,k),var3D_src(:,:,k),ncid, &
+                                                                    start,count,mps,method)
+
+        end do 
+
+        return
+
+    end subroutine nc_read_interp_int_3D
+
+    subroutine nc_read_interp_logical_2D(filename,vnm,var2D,var2D_in,ncid,start,count,mps,method)
+        ! Read in a 2D field and interpolate it using scrip map
+        ! as needed. 
+
+        implicit none
+
+        character(len=*),   intent(IN)  :: filename 
+        character(len=*),   intent(IN)  :: vnm 
+        logical,            intent(OUT) :: var2D(:,:) 
+        logical, optional,  intent(IN)  :: var2D_in(:,:) 
+        integer, optional,  intent(IN)  :: ncid 
+        integer, optional,  intent(IN)  :: start(:) 
+        integer, optional,  intent(IN)  :: count(:) 
+        type(map_scrip_class), optional, intent(IN) :: mps
+        character(len=*),      optional, intent(IN) :: method 
+
+        ! Local variables 
+        integer :: nx, ny 
+        integer,  allocatable :: dims(:) 
+        integer,  allocatable :: var2D_src(:,:) 
+        integer,  allocatable :: var2D_int(:,:) 
+        character(len=56) :: mapping_method 
+
+        if (present(var2D_in)) then 
+            ! Get source array from argument (useful for handling 3D arrays with this routine)
+
+            nx = size(var2D_in,1)
+            ny = size(var2D_in,2) 
+
+            allocate(var2D_src(nx,ny))
+
+            var2D_src = 0 
+            where (var2D_in) var2D_src = 1 
+
+        else 
+            ! Load 2D array from file 
+
+            ! Determine dimensions of current variable in the source file
+            call nc_dims(filename,vnm,dims=dims)
+
+            nx = dims(1)
+            ny = dims(2) 
+
+            allocate(var2D_src(nx,ny))
+
+            ! Load the variable from the file to the local 2D array
+            call nc_read(filename,vnm,var2D_src,ncid=ncid,start=start,count=[nx,ny,1],missing_value=int(MV))
+        
+        end if 
+
+
+        if (nx .eq. size(var2D,1) .and. ny .eq. size(var2D,2)) then 
+            ! Assume no interpolation needed, copy variable for output directly
+
+            var2D = .FALSE. 
+            where(var2D_src .eq. 1) var2D = .TRUE.  
+
+        else 
+            ! Map local source array it to our target array 
+
+            ! Determine mapping method for this variable 
+            mapping_method = "count"
+            if (present(method)) mapping_method = trim(method) 
+
+            ! Perform conservative interpolation 
+            allocate(var2D_int(size(var2D,1),size(var2D,2)))
+            var2D_int = int(MV)
+            call map_scrip_field(mps,vnm,var2D_src,var2D_int,method=mapping_method, &
+                                        missing_value=int(MV),fill_method="nn")
+
+            var2D = .FALSE. 
+            where(var2D_int .eq. 1) var2D = .TRUE.  
+
+        end if 
+
+        return
+
+    end subroutine nc_read_interp_logical_2D
+
 end module coordinates_mapping_scrip

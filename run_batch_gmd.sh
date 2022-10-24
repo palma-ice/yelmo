@@ -40,8 +40,8 @@ jobrun ./runylmo -s -e initmip -n par-gmd/yelmo_Antarctica.nml -- -a -o ${fldr}/
 
 
 # Greenland present-day simulation (not part of GMD suite of tests)
-./runylmo -s -e initmip -o ${fldr}/grl -n par/yelmo_Greenland_initmip.nml
-
+#./runylmo -s -q short -e initmip -o ${fldr}/grl -n par/yelmo_Greenland_initmip.nml
+./runylmo -s -q short -e initmip -o ${fldr}/grl -n par/yelmo_initmip.nml
 
 ### MISMIP TESTS ###
 

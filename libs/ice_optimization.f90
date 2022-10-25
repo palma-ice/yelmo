@@ -9,6 +9,7 @@ module ice_optimization
     private 
 
     public :: update_tf_corr_l21
+    public :: update_tf_corr_l21_basin
     public :: update_cb_ref_errscaling_l21
     public :: update_cb_ref_errscaling
     public :: update_cb_ref_thickness_ratio
@@ -21,123 +22,86 @@ module ice_optimization
 
 contains 
     
-    ! subroutine update_calving_kt(kt,H_ice,H_grnd,dHicedt,H_obs,H_grnd_obs,basins, &
-    !                                 tau,m,kt_min,kt_max,dt)
+    subroutine update_tf_corr_l21(tf_corr,H_ice,H_grnd,dHicedt,H_obs,H_grnd_lim, &
+                                    tau_m,m_temp,tf_min,tf_max,dx,sigma,dt)
 
-    !     implicit none 
+        implicit none 
 
-    !     real(wp), intent(INOUT) :: kt(:,:) 
-    !     real(wp), intent(IN)    :: H_ice(:,:)
-    !     real(wp), intent(IN)    :: f_grnd(:,:)
-    !     real(wp), intent(IN)    :: dHicedt(:,:)
-    !     real(wp), intent(IN)    :: H_obs(:,:)
-    !     real(wp), intent(IN)    :: H_grnd_obs(:,:)
-    !     real(wp), intent(IN)    :: basins(:,:) 
-    !     real(wp), intent(IN)    :: H_grnd_lim 
-    !     real(wp), intent(IN)    :: tau
-    !     real(wp), intent(IN)    :: m
-    !     real(wp), intent(IN)    :: kt_min 
-    !     real(wp), intent(IN)    :: kt_max 
-    !     real(wp), intent(IN)    :: dt 
+        real(wp), intent(INOUT) :: tf_corr(:,:) 
+        real(wp), intent(IN)    :: H_ice(:,:)
+        real(wp), intent(IN)    :: H_grnd(:,:)
+        real(wp), intent(IN)    :: dHicedt(:,:)
+        real(wp), intent(IN)    :: H_obs(:,:)
+        real(wp), intent(IN)    :: H_grnd_lim 
+        real(wp), intent(IN)    :: tau_m 
+        real(wp), intent(IN)    :: m_temp
+        real(wp), intent(IN)    :: tf_min 
+        real(wp), intent(IN)    :: tf_max 
+        real(wp), intent(IN)    :: dx 
+        real(wp), intent(IN)    :: sigma
+        real(wp), intent(IN)    :: dt 
 
-    !     ! Local variables
-    !     integer  :: i, j, nx, ny, n  
-    !     integer  :: b, nb  
-    !     real(wp) :: f_damp 
-    !     real(wp) :: H_obs_bar 
-    !     real(wp) :: H_bar 
-    !     real(wp) :: H_bar_err
-    !     real(wp) :: A_obs 
-    !     real(wp) :: A_mod
-    !     real(wp) :: A_err
-    !     real(wp) :: dHdt_bar
-    !     real(wp) :: tf_corr_dot
+        ! Local variables
+        integer  :: i, j, nx, ny 
+        real(wp) :: f_damp 
+        real(wp) :: tau_tgt
+        real(wp) :: tf_corr_dot
+        real(wp) :: tf_corr_tgt 
 
-    !     logical,  allocatable :: mask(:,:) 
-    !     real(wp), allocatable :: basin_list(:) 
+        real(wp), allocatable :: H_err(:,:)
         
-    !     real(wp), parameter :: tol = 1e-5_wp
+        real(wp), parameter :: tol = 1e-5_wp
 
-    !     ! Internal parameters 
-    !     f_damp = 2.0 
+        ! Internal parameters 
+        f_damp = 2.0 
 
-    !     nx = size(kt,1)
-    !     ny = size(kt,2) 
+        tau_tgt     = 500.0     ! [yr] Target relaxation timescale 
+        tf_corr_tgt = 0.0       ! [degC] Target is no thermal forcing correction 
 
-    !     allocate(mask(nx,ny)) 
+        nx = size(tf_corr,1)
+        ny = size(tf_corr,2) 
 
-    !     ! Determine unique basin numbers 
-    !     call unique(basin_list,reshape(basins,[nx*ny]))
-    !     nb = size(basin_list,1) 
+        allocate(H_err(nx,ny))
 
-    !     ! Loop over each basin
-    !     do b = 1, nb 
-            
-    !         ! Calculate the floating ice area for this basin
+        ! Calculate ice thickness error for mainly floating points
+        where (H_grnd .le. H_grnd_lim)
+            H_err = H_ice - H_obs 
+        elsewhere
+            H_err = 0.0 
+        end where 
 
-    !         mask =  abs(basins-basin_list(b)) .lt. tol .and. &
-    !                 f_grnd .eq. 0.0
+        ! Additionally, apply a Gaussian filter to H_err to ensure smooth transitions
+        ! Apply a weighted average between smoothed and original H_err, where 
+        ! slow regions get more smoothed, and fast regions use more local error 
+        if (sigma .gt. 0.0) then  
+            call filter_gaussian(H_err,sigma,dx)
+        end if
 
-    !         if (count(mask) .gt. 0) then 
+        do j = 1, ny 
+        do i = 1, nx 
 
-    !         ! How many points available 
-    !         n = count(mask)
+            ! Get adjustment rate given error in ice thickness  =========
 
-                
-    !         if (n .gt. 0) then 
-    !             ! Points are available for averaging 
+            tf_corr_dot = 1.0_wp/(tau_m*m_temp) *( (H_err(i,j) / tau_m) + f_damp*dHicedt(i,j) ) &
+                    + (1.0_wp/tau_tgt)*(tf_corr_tgt-tf_corr(i,j))
 
-    !             ! Calculate average observed thickness for masked region
-    !             H_obs_bar = sum(H_obs,mask=mask)   / real(n,wp)
+            ! Apply correction to all points =========
 
-    !             ! Calculate average thickness and rate of change for masked region
-    !             H_bar     = sum(H_ice,mask=mask)   / real(n,wp)
-    !             dHdt_bar  = sum(dHicedt,mask=mask) / real(n,wp)
+            tf_corr(i,j) = tf_corr(i,j) + tf_corr_dot*dt 
 
-    !         else 
-    !             ! Quantities are not defined
+            ! Ensure tf_corr is not below lower or upper limit 
+            if (tf_corr(i,j) .lt. tf_min) tf_corr(i,j) = tf_min 
+            if (tf_corr(i,j) .gt. tf_max) tf_corr(i,j) = tf_max 
 
-    !             H_obs_bar = missing_value 
+        end do 
+        end do
 
-    !             H_bar     = 0.0_wp
-    !             dHdt_bar  = 0.0_wp 
-            
-    !         end if 
+        
+        return 
 
-            
-    !         if (H_obs_bar .ne. missing_value) then 
-    !             ! Observed ice exists in basin, proceed with calculations
-                                
-    !             ! Get mean error for this basin
-    !             H_bar_err = H_bar - H_obs_bar 
+    end subroutine update_tf_corr_l21
 
-
-    !             ! Get adjustment rate given error in floating ice area  =========
-                
-    !             kt_dot = -(cf_prev(i,j)/H0)*((H_err_now / tau_c) + f_damp*dHdt_now)
-
-    !             ! Apply correction to all points in basin =========
-
-    !             where(basins .eq. basin_list(b))
-
-    !                 kt = kt + kt_dot*dt 
-
-    !             end where 
-
-    !         end if 
-
-    !     end do 
-
-
-    !     ! Ensure tf_corr is not below lower or upper limit 
-    !     where (tf_corr .lt. tf_min) tf_corr = tf_min 
-    !     where (tf_corr .gt. tf_max) tf_corr = tf_max 
-
-    !     return 
-
-    ! end subroutine update_calving_kt
-
-    subroutine update_tf_corr_l21(tf_corr,H_ice,H_grnd,dHicedt,H_obs,basins,H_grnd_lim, &
+    subroutine update_tf_corr_l21_basin(tf_corr,H_ice,H_grnd,dHicedt,H_obs,basins,H_grnd_lim, &
                                     tau_m,m_temp,tf_min,tf_max,tf_basins,dt)
 
         implicit none 
@@ -277,7 +241,7 @@ contains
 
         return 
 
-    end subroutine update_tf_corr_l21
+    end subroutine update_tf_corr_l21_basin
 
     subroutine update_cb_ref_errscaling_l21(cb_ref,H_ice,dHdt,z_bed,z_sl,ux,uy,H_obs,uxy_obs,H_grnd_obs, &
                                         cf_min,cf_max,dx,sigma_err,sigma_vel,tau_c,H0,dt,fill_method,fill_dist, &

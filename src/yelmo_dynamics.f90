@@ -34,7 +34,7 @@ module yelmo_dynamics
 
     public :: ydyn_par_load, ydyn_alloc, ydyn_dealloc
     public :: calc_ydyn
-    public :: calc_ydyn_neff, calc_ydyn_cbref
+    public :: calc_ydyn_neff
     
 contains
 
@@ -113,11 +113,16 @@ contains
         ! Calculate effective pressure 
         call calc_ydyn_neff(dyn,tpo,thrm,bnd)
 
-        ! Update bed roughness coefficients cb_ref and c_bed (which are independent of velocity)
-        !call calc_ydyn_cbref(dyn,tpo,thrm,bnd)
-        call calc_cb_ref(dyn%now%cb_ref,bnd%z_bed,bnd%z_sl,dyn%par%till_cf_ref,dyn%par%till_cf_min, &
-                                dyn%par%till_z0,dyn%par%till_z1,dyn%par%till_method,dyn%par%till_scale)
+        ! Calculate cb_tgt (cb_ref target value) - same as cb_ref, but always calculated,
+        ! even if till_method=-1
+        call calc_cb_ref(dyn%now%cb_tgt,bnd%z_bed,bnd%z_sl,dyn%par%till_cf_ref,dyn%par%till_cf_min, &
+                                dyn%par%till_z0,dyn%par%till_z1,dyn%par%till_scale,till_method=1)
 
+        ! Update bed roughness coefficients cb_ref and c_bed (which are independent of velocity)
+        call calc_cb_ref(dyn%now%cb_ref,bnd%z_bed,bnd%z_sl,dyn%par%till_cf_ref,dyn%par%till_cf_min, &
+                                dyn%par%till_z0,dyn%par%till_z1,dyn%par%till_scale,dyn%par%till_method)
+
+        ! Finally calculate c_bed, which is simply c_bed = f(N_eff,cb_ref)
         call calc_c_bed(dyn%now%c_bed,dyn%now%cb_ref,dyn%now%N_eff,dyn%par%till_is_angle)
 
         ! ===== Calculate the 3D velocity field and helper variables =======================
@@ -807,74 +812,7 @@ contains
 !         return 
 
 !     end subroutine calc_ydyn_ssa
-
-    subroutine calc_ydyn_cbref(dyn,tpo,thrm,bnd)
-        ! Update cb_ref [--] based on parameter choices
-
-        implicit none
-        
-        type(ydyn_class),   intent(INOUT) :: dyn
-        type(ytopo_class),  intent(IN)    :: tpo 
-        type(ytherm_class), intent(IN)    :: thrm
-        type(ybound_class), intent(IN)    :: bnd  
-
-        integer :: i, j, nx, ny 
-        integer :: im1, ip1, jm1, jp1
-        real(prec) :: f_scale 
-        real(prec), allocatable :: cb_ref(:,:) 
-        real(prec), allocatable :: lambda_bed(:,:)  
-
-        nx = size(dyn%now%cb_ref,1)
-        ny = size(dyn%now%cb_ref,2)
-        
-        allocate(cb_ref(nx,ny))
-        allocate(lambda_bed(nx,ny))
-        
-        if (dyn%par%till_method .eq. -1) then 
-            ! Do nothing - cb_ref defined externally
-
-        else 
-            ! Calculate cb_ref following parameter choices 
-            ! lambda_bed: scaling as a function of bedrock elevation
-
-            select case(trim(dyn%par%till_scale))
-
-                case("none")
-                    ! No scaling with elevation, set reference value 
-
-                    dyn%now%cb_ref = dyn%par%till_cf_ref
-                    
-                case("lin")
-                    ! Linear scaling function with bedrock elevation
-
-                    lambda_bed = calc_lambda_bed_lin(bnd%z_bed,bnd%z_sl,dyn%par%till_z0,dyn%par%till_z1)
-
-                    ! Calculate cb_ref 
-                    dyn%now%cb_ref = dyn%par%till_cf_min + (dyn%par%till_cf_ref-dyn%par%till_cf_min)*lambda_bed
-
-                case("exp") 
-
-                    lambda_bed = calc_lambda_bed_exp(bnd%z_bed,bnd%z_sl,dyn%par%till_z0,dyn%par%till_z1)
-
-                    dyn%now%cb_ref = dyn%par%till_cf_ref * lambda_bed 
-                    where(dyn%now%cb_ref .lt. dyn%par%till_cf_min) dyn%now%cb_ref = dyn%par%till_cf_min 
-
-                case DEFAULT
-                    ! Scaling not recognized.
-
-                    write(io_unit_err,*) "calc_ydyn_cbref:: Error: scaling of cb_ref with &
-                    &elevation not recognized."
-                    write(io_unit_err,*) "ydyn.till_scale = ", dyn%par%till_scale 
-                    stop 
-
-            end select 
-            
-        end if 
-
-        return 
-
-    end subroutine calc_ydyn_cbref
-
+    
     subroutine calc_ydyn_neff(dyn,tpo,thrm,bnd)
         ! Update N_eff based on parameter choices
 
@@ -1113,6 +1051,7 @@ contains
         allocate(now%visc_eff(nx,ny,nz_aa))  
         allocate(now%visc_eff_int(nx,ny))
 
+        allocate(now%cb_tgt(nx,ny))
         allocate(now%cb_ref(nx,ny))
         allocate(now%c_bed(nx,ny)) 
         
@@ -1188,7 +1127,8 @@ contains
         now%de_eff            = 0.0 
         now%visc_eff          = 1e3  
         now%visc_eff_int      = 1e3  
-        
+            
+        now%cb_tgt            = 0.0
         now%cb_ref            = 0.0
         now%c_bed             = 0.0 
         
@@ -1275,6 +1215,7 @@ contains
         if (allocated(now%visc_eff))        deallocate(now%visc_eff) 
         if (allocated(now%visc_eff_int))    deallocate(now%visc_eff_int) 
         
+        if (allocated(now%cb_tgt))          deallocate(now%cb_tgt) 
         if (allocated(now%cb_ref))          deallocate(now%cb_ref) 
         if (allocated(now%c_bed))           deallocate(now%c_bed) 
         

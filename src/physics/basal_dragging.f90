@@ -59,7 +59,7 @@ module basal_dragging
 
 contains 
     
-    subroutine calc_cb_ref(cb_ref,z_bed,z_sl,cf_ref,cf_min,z0,z1,till_method,till_scale)
+    subroutine calc_cb_ref(cb_ref,z_bed,z_sl,cf_ref,cf_min,z0,z1,till_scale,till_method)
         ! Update cb_ref [--] based on parameter choices
 
         implicit none
@@ -72,9 +72,9 @@ contains
         real(wp), intent(IN)  :: cf_min
         real(wp), intent(IN)  :: z0 
         real(wp), intent(IN)  :: z1
-        integer,  intent(IN) :: till_method
         character(len=*), intent(IN) :: till_scale
-
+        integer,  intent(IN) :: till_method
+        
         real(prec), allocatable :: lambda_bed(:,:)  
 
         nx = size(cb_ref,1)

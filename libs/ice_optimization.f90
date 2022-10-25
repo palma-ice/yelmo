@@ -281,7 +281,7 @@ contains
 
     subroutine update_cb_ref_errscaling_l21(cb_ref,H_ice,dHdt,z_bed,z_sl,ux,uy,H_obs,uxy_obs,H_grnd_obs, &
                                         cf_min,cf_max,dx,sigma_err,sigma_vel,tau_c,H0,dt,fill_method,fill_dist, &
-                                        tf_corr)
+                                        cb_trgt)
         ! Update method following Lipscomb et al. (2021, tc)
 
         implicit none 
@@ -306,7 +306,7 @@ contains
         real(wp), intent(IN)    :: dt 
         character(len=*), intent(IN) :: fill_method         ! How should missing values outside obs be filled?
         real(wp), intent(IN)    :: fill_dist                ! [km] Distance over which to smooth between nearest neighbor and minimum value
-        real(wp), intent(IN), optional :: tf_corr(:,:) 
+        real(wp), intent(IN), optional :: cb_trgt(:,:) 
 
         ! Local variables 
         integer  :: i, j, nx, ny, i1, j1 
@@ -317,16 +317,19 @@ contains
         real(wp) :: xwt, ywt, xywt   
         real(wp) :: cf_val 
 
-        real(wp) :: f_tf 
+        real(wp) :: f_trgt
+        real(wp) :: tau_trgt 
 
         real(wp), allocatable   :: H_err_sm(:,:)
         real(wp), allocatable   :: H_err(:,:)
         real(wp), allocatable   :: uxy(:,:)
         real(wp), allocatable   :: uxy_err(:,:)
-        real(wp), allocatable   :: cf_prev(:,:) 
+        real(wp), allocatable   :: cb_prev(:,:) 
         real(wp), allocatable   :: cb_ref_dot(:,:)
-        real(wp), allocatable   :: tf_corr_now(:,:)
+        real(wp), allocatable   :: cb_trgt_fac(:,:)
         
+        logical :: use_cb_trgt 
+
         nx = size(cb_ref,1)
         ny = size(cb_ref,2) 
 
@@ -336,18 +339,19 @@ contains
         allocate(H_err(nx,ny))
         allocate(uxy(nx,ny))
         allocate(uxy_err(nx,ny))
-        allocate(cf_prev(nx,ny))
+        allocate(cb_prev(nx,ny))
         allocate(cb_ref_dot(nx,ny)) 
         
-        allocate(tf_corr_now(nx,ny))
+        allocate(cb_trgt_fac(nx,ny))
 
         ! Internal parameters 
         f_damp = 2.0 
 
-        f_tf   = 10.0       ! 10 [m/yr] / degC 
+        f_trgt   = 0.05 * H0    ! [--] * [m] = [m]
+        tau_trgt = tau_c        ! 500 [yr] 
 
         ! Store initial cb_ref solution 
-        cf_prev = cb_ref 
+        cb_prev = cb_ref 
 
         ! Calculate ice thickness error 
         H_err = H_ice - H_obs 
@@ -357,13 +361,7 @@ contains
          
         uxy_err = MV 
         where(uxy_obs .ne. MV .and. uxy_obs .ne. 0.0) uxy_err = (uxy - uxy_obs)
-
-        ! Check if tf_corr was passed and update local variable
-        ! (only keep positive anomalies)
-        tf_corr_now = 0.0 
-        if (present(tf_corr)) tf_corr_now = tf_corr 
-        where (tf_corr_now .lt. 0.0) tf_corr_now = 0.0
-
+                
 if (.TRUE.) then 
         ! Additionally, apply a Gaussian filter to H_err to ensure smooth transitions
         ! Apply a weighted average between smoothed and original H_err, where 
@@ -384,6 +382,17 @@ end if
 
         ! Initially set cf to missing value for now where no correction possible
         cb_ref = MV 
+
+        ! Determine cb_trgt correction term if needed 
+        if (present(cb_trgt)) then
+
+            cb_trgt_fac = log(cb_prev / cb_trgt)
+
+        else 
+
+            cb_trgt_fac = 0.0 
+
+        end if 
 
         do j = 1, ny 
         do i = 1, nx 
@@ -436,12 +445,12 @@ end if
 
                 ! Get adjustment rate given error in ice thickness  =========
 
-                cb_ref_dot(i,j) = -(cf_prev(i,j)/H0) * &
-                        ((H_err_now / tau_c) + f_damp*dHdt_now + f_tf*tf_corr_now(i,j))
+                cb_ref_dot(i,j) = -(cb_prev(i,j)/H0) * &
+                        ((H_err_now / tau_c) + f_damp*dHdt_now - (f_trgt/tau_trgt)*cb_trgt_fac(i,j))
 
                 ! Apply correction to current node =========
 
-                cb_ref(i,j) = cf_prev(i,j) + cb_ref_dot(i,j)*dt 
+                cb_ref(i,j) = cb_prev(i,j) + cb_ref_dot(i,j)*dt 
 
             end if 
 

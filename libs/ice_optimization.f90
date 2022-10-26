@@ -22,13 +22,14 @@ module ice_optimization
 
 contains 
     
-    subroutine update_tf_corr_l21(tf_corr,H_ice,dHicedt,H_obs,H_grnd_obs,H_grnd_lim, &
+    subroutine update_tf_corr_l21(tf_corr,H_ice,H_grnd,dHicedt,H_obs,H_grnd_obs,H_grnd_lim, &
                                     tau_m,m_temp,tf_min,tf_max,dx,sigma,dt)
 
         implicit none 
 
         real(wp), intent(INOUT) :: tf_corr(:,:) 
         real(wp), intent(IN)    :: H_ice(:,:)
+        real(wp), intent(IN)    :: H_grnd(:,:)
         real(wp), intent(IN)    :: dHicedt(:,:)
         real(wp), intent(IN)    :: H_obs(:,:)
         real(wp), intent(IN)    :: H_grnd_obs(:,:)
@@ -74,7 +75,7 @@ contains
         end if
 
         ! Limit H_err to desired region, mainly for mainly floating points
-        where (H_grnd_obs .gt. H_grnd_lim)
+        where (H_grnd .gt. H_grnd_lim)
             H_err = 0.0 
         end where 
 
@@ -99,7 +100,7 @@ contains
 
         ! Finally reset tf_corr to zero where no floating ice is observed
         ! (ie outside the observed floating ice margin)
-        where (H_grnd_obs .lt. 0.0 .and. H_obs .eq. 0.0)
+        where (H_grnd .lt. 0.0 .and. H_obs .eq. 0.0)
             tf_corr = 0.0
         end where 
 

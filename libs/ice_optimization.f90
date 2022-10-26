@@ -104,6 +104,11 @@ contains
             tf_corr = 0.0
         end where 
 
+        ! Also reset to zero for fully grounded ice 
+        where (H_grnd .gt. 0.0)
+            tf_corr = 0.0 
+        end where 
+        
         return 
 
     end subroutine update_tf_corr_l21

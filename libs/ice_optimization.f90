@@ -22,16 +22,16 @@ module ice_optimization
 
 contains 
     
-    subroutine update_tf_corr_l21(tf_corr,H_ice,H_grnd,dHicedt,H_obs,H_grnd_lim, &
+    subroutine update_tf_corr_l21(tf_corr,H_ice,dHicedt,H_obs,H_grnd_obs,H_grnd_lim, &
                                     tau_m,m_temp,tf_min,tf_max,dx,sigma,dt)
 
         implicit none 
 
         real(wp), intent(INOUT) :: tf_corr(:,:) 
         real(wp), intent(IN)    :: H_ice(:,:)
-        real(wp), intent(IN)    :: H_grnd(:,:)
         real(wp), intent(IN)    :: dHicedt(:,:)
         real(wp), intent(IN)    :: H_obs(:,:)
+        real(wp), intent(IN)    :: H_grnd_obs(:,:)
         real(wp), intent(IN)    :: H_grnd_lim 
         real(wp), intent(IN)    :: tau_m 
         real(wp), intent(IN)    :: m_temp
@@ -63,12 +63,8 @@ contains
 
         allocate(H_err(nx,ny))
 
-        ! Calculate ice thickness error for mainly floating points
-        where (H_grnd .le. H_grnd_lim)
-            H_err = H_ice - H_obs 
-        elsewhere
-            H_err = 0.0 
-        end where 
+        ! Calculate ice thickness error everywhere
+        H_err = H_ice - H_obs
 
         ! Additionally, apply a Gaussian filter to H_err to ensure smooth transitions
         ! Apply a weighted average between smoothed and original H_err, where 
@@ -76,6 +72,11 @@ contains
         if (sigma .gt. 0.0) then  
             call filter_gaussian(H_err,sigma,dx)
         end if
+
+        ! Limit H_err to desired region, mainly for mainly floating points
+        where (H_grnd_obs .gt. H_grnd_lim)
+            H_err = 0.0 
+        end where 
 
         do j = 1, ny 
         do i = 1, nx 
@@ -96,7 +97,12 @@ contains
         end do 
         end do
 
-        
+        ! Finally reset tf_corr to zero where no floating ice is observed
+        ! (ie outside the observed floating ice margin)
+        where (H_grnd_obs .lt. 0.0 .and. H_obs .eq. 0.0)
+            tf_corr = 0.0
+        end where 
+
         return 
 
     end subroutine update_tf_corr_l21
@@ -275,7 +281,7 @@ contains
         ! Local variables 
         integer  :: i, j, nx, ny, i1, j1 
         integer  :: im1, ip1, jm1, jp1  
-        real(wp) :: dx_km, f_damp   
+        real(wp) :: f_damp   
         real(wp) :: ux_aa, uy_aa, uxy_aa
         real(wp) :: H_err_now, dHdt_now, f_vel   
         real(wp) :: xwt, ywt, xywt   
@@ -295,9 +301,7 @@ contains
         logical :: use_cb_tgt 
 
         nx = size(cb_ref,1)
-        ny = size(cb_ref,2) 
-
-        dx_km = dx*1e-3  
+        ny = size(cb_ref,2)  
         
         allocate(H_err_sm(nx,ny))
         allocate(H_err(nx,ny))
@@ -317,22 +321,22 @@ contains
         ! Store initial cb_ref solution 
         cb_prev = cb_ref 
 
-        ! Calculate ice thickness error 
-        H_err = H_ice - H_obs 
-
         ! Calculate velocity magnitude and velocity error 
         uxy = calc_magnitude_from_staggered_ice(ux,uy,H_ice)
          
         uxy_err = MV 
         where(uxy_obs .ne. MV .and. uxy_obs .ne. 0.0) uxy_err = (uxy - uxy_obs)
-                
-if (.TRUE.) then 
+        
+        ! Calculate ice thickness error 
+        H_err = H_ice - H_obs 
+
         ! Additionally, apply a Gaussian filter to H_err to ensure smooth transitions
         ! Apply a weighted average between smoothed and original H_err, where 
         ! slow regions get more smoothed, and fast regions use more local error 
         if (sigma_err .gt. 0.0) then
+
             H_err_sm = H_err  
-            call filter_gaussian(var=H_err_sm,sigma=dx_km*sigma_err,dx=dx_km)
+            call filter_gaussian(H_err_sm,sigma_err,dx)
 
             do j = 1, ny 
             do i = 1, nx 
@@ -341,8 +345,7 @@ if (.TRUE.) then
             end do 
             end do  
 
-        end if 
-end if 
+        end if
 
         ! Initially set cf to missing value for now where no correction possible
         cb_ref = MV 
@@ -453,6 +456,15 @@ end if
                 
                 ! Fill in remaining missing values with nearest neighbor or cf_min when none available
                 !call fill_nearest(cb_ref,missing_value=MV,fill_value=cf_min,fill_dist=fill_dist,n=5,dx=dx)
+
+            case("target")
+                ! Fill in field with cg_tgt values 
+
+                ! Ensure where obs are floating, set cb_ref = cb_tgt 
+                where(H_grnd_obs .le. 0.0) cb_ref = cb_tgt 
+
+                ! Also where no ice exists, set cb_ref = cb_tgt 
+                where(H_obs .eq. 0.0) cb_ref = cb_tgt 
 
             case("cf_min")
 
@@ -1022,7 +1034,6 @@ end if
         ! Local variables 
         integer :: i, j, nx, ny, i1, j1, q, n_now, ij(2) 
         integer :: ntot 
-        real(wp) :: dx_km 
         real(wp) :: dist_now, f_d 
 
         real(wp), allocatable :: var0(:,:) 
@@ -1033,9 +1044,6 @@ end if
 
         allocate(var0(nx,ny)) 
         allocate(dist(nx,ny)) 
-
-        ! Define resolution in km 
-        dx_km = dx*1e-3 
 
         ! Store initial field 
         var0 = var 
@@ -1054,7 +1062,7 @@ end if
                 do j1 = 1, ny 
                 do i1 = 1, nx 
                     if (var0(i1,j1) .ne. MV) then 
-                        dist(i1,j1) = sqrt( real( (i1-i)**2 + (j1-j)**2 ) ) * dx_km 
+                        dist(i1,j1) = sqrt( real( (i1-i)**2 + (j1-j)**2 ) ) * dx
                     end if 
                 end do 
                 end do 

@@ -98,16 +98,16 @@ contains
         end do 
         end do
 
-        ! Finally reset tf_corr to zero where no floating ice is observed
-        ! (ie outside the observed floating ice margin)
-        where (H_grnd .lt. 0.0 .and. H_obs .eq. 0.0)
-            tf_corr = 0.0
-        end where 
+        ! ! Finally reset tf_corr to zero where no floating ice is observed
+        ! ! (ie outside the observed floating ice margin)
+        ! where (H_grnd .lt. 0.0 .and. H_obs .eq. 0.0)
+        !     tf_corr = 0.0
+        ! end where 
 
-        ! Also reset to zero for fully grounded ice 
-        where (H_grnd .gt. 0.0)
-            tf_corr = 0.0 
-        end where 
+        ! ! Also reset to zero for fully grounded ice 
+        ! where (H_grnd .gt. 0.0)
+        !     tf_corr = 0.0 
+        ! end where 
         
         return 
 

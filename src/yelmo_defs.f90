@@ -272,6 +272,7 @@ module yelmo_defs
         integer    :: till_method 
         character(len=56) :: till_scale
         logical    :: till_is_angle
+        integer    :: till_n_sd 
         real(wp)   :: till_z0 
         real(wp)   :: till_z1 
         real(wp)   :: till_cf_min

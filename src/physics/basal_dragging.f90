@@ -59,35 +59,67 @@ module basal_dragging
 
 contains 
     
-    subroutine calc_cb_ref(cb_ref,z_bed,z_sl,cf_ref,cf_min,z0,z1,till_scale,till_method)
+    subroutine calc_cb_ref(cb_ref,z_bed,z_bed_sd,z_sl,cf_ref,cf_min,z0,z1,n_sd,till_scale,till_method)
         ! Update cb_ref [--] based on parameter choices
 
         implicit none
         
-        integer :: nx, ny 
         real(wp), intent(OUT) :: cb_ref(:,:) 
         real(wp), intent(IN)  :: z_bed(:,:) 
+        real(wp), intent(IN)  :: z_bed_sd(:,:)
         real(wp), intent(IN)  :: z_sl(:,:) 
         real(wp), intent(IN)  :: cf_ref 
         real(wp), intent(IN)  :: cf_min
         real(wp), intent(IN)  :: z0 
         real(wp), intent(IN)  :: z1
+        integer,  intent(IN) :: n_sd 
         character(len=*), intent(IN) :: till_scale
         integer,  intent(IN) :: till_method
         
-        real(prec), allocatable :: lambda_bed(:,:)  
+        ! Local variables
+        integer :: q, nx, ny 
+        real(wp), allocatable :: lambda_bed(:,:)  
+        real(wp), allocatable :: cb_ref_samples(:,:,:) 
+
+        real(wp) :: f_sd_min, f_sd_max 
+        real(wp), allocatable :: f_sd(:) 
 
         nx = size(cb_ref,1)
         ny = size(cb_ref,2)
         
+        if (n_sd .le. 0) then 
+            write(io_unit_err,*) "calc_cb_ref:: Error: ytill.n_sd must be > 0."
+            write(io_unit_err,*) "ytill.n_sd = ", n_sd 
+            stop 
+        end if 
+
         allocate(lambda_bed(nx,ny))
-        
+        allocate(cb_ref_samples(nx,ny,n_sd))
+        allocate(f_sd(n_sd))
+
+        ! Sample over range, e.g., +/- 1-sigma 
+        f_sd_min = -1.0 
+        f_sd_max =  1.0 
+
+        do q = 1, n_sd 
+            f_sd(q) = f_sd_min + (f_sd_max-f_sd_min)*real(q-1,wp)/real(n_sd-1,wp)
+        end do 
+
+        if (n_sd .eq. 1) then 
+            ! No sampling performed
+            f_sd = 0.0 
+        end if 
+
         if (till_method .eq. -1) then 
             ! Do nothing - cb_ref defined externally
 
         else 
             ! Calculate cb_ref following parameter choices 
             ! lambda_bed: scaling as a function of bedrock elevation
+
+            ! Adjust bedrock field to account for pinning points
+            ! at low elevation (more friction) and fjords at
+            ! high elevation (less friction) 
 
             select case(trim(till_scale))
 
@@ -99,19 +131,33 @@ contains
                 case("lin")
                     ! Linear scaling function with bedrock elevation
 
-                    lambda_bed = calc_lambda_bed_lin(z_bed,z_sl,z0,z1)
+                    do q = 1, n_sd
 
-                    ! Calculate cb_ref 
-                    cb_ref = cf_ref * lambda_bed 
-                    where(cb_ref .lt. cf_min) cb_ref = cf_min 
-                    
+                        lambda_bed = calc_lambda_bed_lin(z_bed+f_sd(q)*z_bed_sd,z_sl,z0,z1)
+
+                        ! Calculate cb_ref 
+                        cb_ref_samples(:,:,q) = cf_ref * lambda_bed 
+                        where(cb_ref_samples(:,:,q) .lt. cf_min) cb_ref_samples(:,:,q) = cf_min 
+
+                    end do 
+
+                    ! Average samples 
+                    cb_ref = sum(cb_ref_samples,dim=3) / real(n_sd,wp)
+
                 case("exp") 
 
-                    lambda_bed = calc_lambda_bed_exp(z_bed,z_sl,z0,z1)
+                    do q = 1, n_sd
 
-                    ! Calculate cb_ref 
-                    cb_ref = cf_ref * lambda_bed 
-                    where(cb_ref .lt. cf_min) cb_ref = cf_min 
+                        lambda_bed = calc_lambda_bed_exp(z_bed+f_sd(q)*z_bed_sd,z_sl,z0,z1)
+
+                        ! Calculate cb_ref 
+                        cb_ref_samples(:,:,q) = cf_ref * lambda_bed 
+                        where(cb_ref_samples(:,:,q) .lt. cf_min) cb_ref_samples(:,:,q) = cf_min 
+
+                    end do 
+
+                    ! Average samples 
+                    cb_ref = sum(cb_ref_samples,dim=3) / real(n_sd,wp)
                     
                 case DEFAULT
                     ! Scaling not recognized.

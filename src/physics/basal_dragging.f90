@@ -77,12 +77,12 @@ contains
         integer,  intent(IN) :: till_method
         
         ! Local variables
-        integer :: q, nx, ny 
-        real(wp), allocatable :: lambda_bed(:,:)  
-        real(wp), allocatable :: cb_ref_samples(:,:,:) 
-
-        real(wp) :: f_sd_min, f_sd_max 
+        integer :: q, i, j, nx, ny 
+        real(wp) :: f_sd_min, f_sd_max
+        real(wp) :: lambda_bed  
+        real(wp), allocatable :: cb_ref_samples(:) 
         real(wp), allocatable :: f_sd(:) 
+        real(wp), allocatable :: w_sd(:) 
 
         nx = size(cb_ref,1)
         ny = size(cb_ref,2)
@@ -93,21 +93,29 @@ contains
             stop 
         end if 
 
-        allocate(lambda_bed(nx,ny))
-        allocate(cb_ref_samples(nx,ny,n_sd))
+        allocate(cb_ref_samples(n_sd))
         allocate(f_sd(n_sd))
-
-        ! Sample over range, e.g., +/- 1-sigma 
-        f_sd_min = -1.0 
-        f_sd_max =  1.0 
-
-        do q = 1, n_sd 
-            f_sd(q) = f_sd_min + (f_sd_max-f_sd_min)*real(q-1,wp)/real(n_sd-1,wp)
-        end do 
-
+        allocate(w_sd(n_sd))
+     
         if (n_sd .eq. 1) then 
             ! No sampling performed
             f_sd = 0.0 
+            w_sd = 0.0
+
+        else 
+
+            ! Sample over range, e.g., +/- 1-sigma 
+            f_sd_min = -1.0 
+            f_sd_max =  1.0 
+
+            do q = 1, n_sd 
+                f_sd(q) = f_sd_min + (f_sd_max-f_sd_min)*real(q-1,wp)/real(n_sd-1,wp)
+                w_sd(q) = (1.0_wp/sqrt(2.0_wp*pi)) * exp(-f_sd(q)**2/2.0_wp)
+            end do 
+
+            ! Normalize weighting 
+            w_sd = w_sd/sum(w_sd)
+
         end if 
 
         if (till_method .eq. -1) then 
@@ -131,34 +139,48 @@ contains
                 case("lin")
                     ! Linear scaling function with bedrock elevation
 
-                    do q = 1, n_sd
+                    do j = 1, ny 
+                    do i = 1, nx 
 
-                        lambda_bed = calc_lambda_bed_lin(z_bed+f_sd(q)*z_bed_sd,z_sl,z0,z1)
+                        do q = 1, n_sd
 
-                        ! Calculate cb_ref 
-                        cb_ref_samples(:,:,q) = cf_ref * lambda_bed 
-                        where(cb_ref_samples(:,:,q) .lt. cf_min) cb_ref_samples(:,:,q) = cf_min 
+                            lambda_bed = calc_lambda_bed_lin(z_bed(i,j)+f_sd(q)*z_bed_sd(i,j), &
+                                                                                    z_sl(i,j),z0,z1)
+
+                            ! Calculate cb_ref 
+                            cb_ref_samples(q) = cf_ref * lambda_bed 
+                            if(cb_ref_samples(q) .lt. cf_min) cb_ref_samples(q) = cf_min 
+
+                        end do 
+
+                        ! Average samples 
+                        cb_ref(i,j) = sum(cb_ref_samples*w_sd)
 
                     end do 
-
-                    ! Average samples 
-                    cb_ref = sum(cb_ref_samples,dim=3) / real(n_sd,wp)
+                    end do 
 
                 case("exp") 
 
-                    do q = 1, n_sd
+                    do j = 1, ny 
+                    do i = 1, nx 
 
-                        lambda_bed = calc_lambda_bed_exp(z_bed+f_sd(q)*z_bed_sd,z_sl,z0,z1)
+                        do q = 1, n_sd
 
-                        ! Calculate cb_ref 
-                        cb_ref_samples(:,:,q) = cf_ref * lambda_bed 
-                        where(cb_ref_samples(:,:,q) .lt. cf_min) cb_ref_samples(:,:,q) = cf_min 
+                            lambda_bed = calc_lambda_bed_exp(z_bed(i,j)+f_sd(q)*z_bed_sd(i,j), &
+                                                                                    z_sl(i,j),z0,z1)
+
+                            ! Calculate cb_ref 
+                            cb_ref_samples(q) = cf_ref * lambda_bed 
+                            if(cb_ref_samples(q) .lt. cf_min) cb_ref_samples(q) = cf_min 
+
+                        end do 
+
+                        ! Average samples 
+                        cb_ref(i,j) = sum(cb_ref_samples*w_sd)
 
                     end do 
+                    end do 
 
-                    ! Average samples 
-                    cb_ref = sum(cb_ref_samples,dim=3) / real(n_sd,wp)
-                    
                 case DEFAULT
                     ! Scaling not recognized.
 

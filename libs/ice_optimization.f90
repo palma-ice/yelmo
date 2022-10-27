@@ -290,21 +290,19 @@ contains
         real(wp) :: f_damp   
         real(wp) :: ux_aa, uy_aa, uxy_aa
         real(wp) :: H_err_now, dHdt_now, f_vel   
-        real(wp) :: xwt, ywt, xywt   
-        real(wp) :: cf_val 
+        real(wp) :: xwt, ywt, xywt
 
         real(wp) :: f_tgt
+        real(wp) :: cb_tgt_fac
         real(wp) :: tau_tgt 
+
+        real(wp) :: cb_ref_dot 
 
         real(wp), allocatable   :: H_err_sm(:,:)
         real(wp), allocatable   :: H_err(:,:)
         real(wp), allocatable   :: uxy(:,:)
         real(wp), allocatable   :: uxy_err(:,:)
         real(wp), allocatable   :: cb_prev(:,:) 
-        real(wp), allocatable   :: cb_ref_dot(:,:)
-        real(wp), allocatable   :: cb_tgt_fac(:,:)
-        
-        logical :: use_cb_tgt 
 
         nx = size(cb_ref,1)
         ny = size(cb_ref,2)  
@@ -314,10 +312,7 @@ contains
         allocate(uxy(nx,ny))
         allocate(uxy_err(nx,ny))
         allocate(cb_prev(nx,ny))
-        allocate(cb_ref_dot(nx,ny)) 
         
-        allocate(cb_tgt_fac(nx,ny))
-
         ! Internal parameters 
         f_damp = 2.0 
 
@@ -355,17 +350,6 @@ contains
 
         ! Initially set cf to missing value for now where no correction possible
         cb_ref = MV 
-
-        ! Determine cb_tgt correction term if needed 
-        if (present(cb_tgt)) then
-
-            cb_tgt_fac = log(cb_prev / cb_tgt)
-
-        else 
-
-            cb_tgt_fac = 0.0 
-
-        end if 
 
         do j = 1, ny 
         do i = 1, nx 
@@ -416,14 +400,21 @@ contains
                 H_err_now = xwt*H_err(i1,j) + ywt*H_err(i,j1) 
                 dHdt_now  = xwt*dHdt(i1,j)  + ywt*dHdt(i,j1) 
 
+                ! Determine scaling correction with respect to target cb_ref value
+                if (present(cb_tgt)) then
+                    cb_tgt_fac = log(cb_prev(i,j) / cb_tgt(i,j))
+                else 
+                    cb_tgt_fac = 0.0 
+                end if 
+
                 ! Get adjustment rate given error in ice thickness  =========
 
-                cb_ref_dot(i,j) = -(cb_prev(i,j)/H0) * &
-                        ((H_err_now / tau_c) + f_damp*dHdt_now - (f_tgt/tau_tgt)*cb_tgt_fac(i,j))
+                cb_ref_dot = -(cb_prev(i,j)/H0) * &
+                        ((H_err_now / tau_c) + f_damp*dHdt_now + (f_tgt/tau_tgt)*cb_tgt_fac)
 
                 ! Apply correction to current node =========
 
-                cb_ref(i,j) = cb_prev(i,j) + cb_ref_dot(i,j)*dt 
+                cb_ref(i,j) = cb_prev(i,j) + cb_ref_dot*dt 
 
             end if 
 

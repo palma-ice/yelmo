@@ -85,7 +85,7 @@ contains
             ! Get adjustment rate given error in ice thickness  =========
 
             tf_corr_dot = 1.0_wp/(tau_m*m_temp) *( (H_err(i,j) / tau_m) + f_damp*dHicedt(i,j) ) &
-                    + (1.0_wp/tau_tgt)*(tf_corr_tgt-tf_corr(i,j))
+                    - (1.0_wp/tau_tgt)*(tf_corr(i,j)-tf_corr_tgt)
 
             ! Apply correction to all points =========
 

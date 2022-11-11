@@ -117,20 +117,20 @@ program yelmo_test
     if (ctl%optimize) then 
         ! Load optimization parameters 
 
-        call nml_read(path_par,"opt_L21","cf_init",     opt%cf_init)
-        call nml_read(path_par,"opt_L21","cf_min",      opt%cf_min_par)
-        call nml_read(path_par,"opt_L21","cf_max",      opt%cf_max_par)
-        call nml_read(path_par,"opt_L21","tau_c",       opt%tau_c)
-        call nml_read(path_par,"opt_L21","H0",          opt%H0)
-        call nml_read(path_par,"opt_L21","sigma_err",   opt%sigma_err)   
-        call nml_read(path_par,"opt_L21","sigma_vel",   opt%sigma_vel)   
-        call nml_read(path_par,"opt_L21","fill_method", opt%fill_method)   
+        call nml_read(path_par,"opt","cf_init",     opt%cf_init)
+        call nml_read(path_par,"opt","cf_min",      opt%cf_min_par)
+        call nml_read(path_par,"opt","cf_max",      opt%cf_max_par)
+        call nml_read(path_par,"opt","tau_c",       opt%tau_c)
+        call nml_read(path_par,"opt","H0",          opt%H0)
+        call nml_read(path_par,"opt","sigma_err",   opt%sigma_err)   
+        call nml_read(path_par,"opt","sigma_vel",   opt%sigma_vel)   
+        call nml_read(path_par,"opt","fill_method", opt%fill_method)   
         
-        call nml_read(path_par,"opt_L21","rel_tau1",    opt%rel_tau1)   
-        call nml_read(path_par,"opt_L21","rel_tau2",    opt%rel_tau2)  
-        call nml_read(path_par,"opt_L21","rel_time1",   opt%rel_time1)    
-        call nml_read(path_par,"opt_L21","rel_time2",   opt%rel_time2) 
-        call nml_read(path_par,"opt_L21","rel_m",       opt%rel_m)
+        call nml_read(path_par,"opt","rel_tau1",    opt%rel_tau1)   
+        call nml_read(path_par,"opt","rel_tau2",    opt%rel_tau2)  
+        call nml_read(path_par,"opt","rel_time1",   opt%rel_time1)    
+        call nml_read(path_par,"opt","rel_time2",   opt%rel_time2) 
+        call nml_read(path_par,"opt","rel_m",       opt%rel_m)
     end if 
 
     ! Assume program is running from the output folder
@@ -407,7 +407,7 @@ program yelmo_test
                 ! === Optimization update step =========
 
                 ! Update cb_ref based on error metric(s) 
-                call update_cb_ref_errscaling_l21(yelmo1%dyn%now%cb_ref,yelmo1%tpo%now%H_ice, &
+                call optimize_cb_ref(yelmo1%dyn%now%cb_ref,yelmo1%tpo%now%H_ice, &
                                     yelmo1%tpo%now%dHicedt,yelmo1%bnd%z_bed,yelmo1%bnd%z_sl,yelmo1%dyn%now%ux_s,yelmo1%dyn%now%uy_s, &
                                     yelmo1%dta%pd%H_ice,yelmo1%dta%pd%uxy_s,yelmo1%dta%pd%H_grnd, &
                                     opt%cf_min,opt%cf_max,yelmo1%tpo%par%dx,opt%sigma_err,opt%sigma_vel,opt%tau_c,opt%H0, &

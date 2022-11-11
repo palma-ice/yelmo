@@ -1,28 +1,137 @@
 module ice_optimization
 
     use yelmo_defs, only : sp, dp, wp, prec, io_unit_err, pi, missing_value, mv, tol_underflow, rho_ice, rho_sw, g 
+    use nml 
 
     use gaussian_filter 
     
     implicit none 
 
+    type ice_opt_params
+        real(wp) :: cf_time
+        real(wp) :: cf_init
+        real(wp) :: cf_min_par
+        real(wp) :: tau_c 
+        real(wp) :: H0
+        real(wp) :: sigma_err 
+        real(wp) :: sigma_vel 
+        character(len=56) :: fill_method 
+
+        real(wp) :: rel_tau 
+        real(wp) :: rel_tau1 
+        real(wp) :: rel_tau2
+        real(wp) :: rel_time1
+        real(wp) :: rel_time2
+        real(wp) :: rel_m
+
+        logical  :: opt_tf 
+        real(wp) :: tf_time
+        real(wp) :: H_grnd_lim
+        real(wp) :: tf_sigma 
+        real(wp) :: tau_m 
+        real(wp) :: m_temp
+        real(wp) :: tf_min 
+        real(wp) :: tf_max
+        integer  :: tf_basins(100) 
+
+        real(wp) :: cf_ref_wais 
+
+        real(wp), allocatable :: cf_min(:,:) 
+        real(wp), allocatable :: cf_max(:,:) 
+        
+    end type 
+
     private 
 
-    public :: update_tf_corr_l21
-    public :: update_tf_corr_l21_basin
-    public :: update_cb_ref_errscaling_l21
-    public :: update_cb_ref_errscaling
-    public :: update_cb_ref_thickness_ratio
+    public :: ice_opt_params
+    public :: optimize_par_load 
+    public :: optimize_set_transient_param
+
+    public :: optimize_tf_corr
+    public :: optimize_tf_corr_basin
+    public :: optimize_cb_ref
+    
     public :: update_mb_corr
     public :: guess_cb_ref
     public :: fill_nearest
     public :: fill_cb_ref
     public :: wtd_mean
-    public :: get_opt_param
+
+    ! Obsolete:
+    !public :: update_cb_ref_errscaling
+    !public :: update_cb_ref_thickness_ratio
 
 contains 
     
-    subroutine update_tf_corr_l21(tf_corr,H_ice,H_grnd,dHicedt,H_obs,H_grnd_obs,H_grnd_lim, &
+    subroutine optimize_par_load(opt,path_par,group)
+
+        implicit none
+
+        type(ice_opt_params), intent(INOUT) :: opt 
+        character(len=*),     intent(IN)    :: path_par 
+        character(len=*),     intent(IN)    :: group 
+
+        ! Load optimization parameters 
+
+        call nml_read(path_par,group,"cf_time",     opt%cf_time)
+        call nml_read(path_par,group,"cf_init",     opt%cf_init)
+        call nml_read(path_par,group,"cf_min",      opt%cf_min_par)
+        call nml_read(path_par,group,"tau_c",       opt%tau_c)
+        call nml_read(path_par,group,"H0",          opt%H0)
+        call nml_read(path_par,group,"sigma_err",   opt%sigma_err)   
+        call nml_read(path_par,group,"sigma_vel",   opt%sigma_vel)   
+        call nml_read(path_par,group,"fill_method", opt%fill_method)   
+        
+        call nml_read(path_par,group,"rel_tau1",    opt%rel_tau1)   
+        call nml_read(path_par,group,"rel_tau2",    opt%rel_tau2)  
+        call nml_read(path_par,group,"rel_time1",   opt%rel_time1)    
+        call nml_read(path_par,group,"rel_time2",   opt%rel_time2) 
+        call nml_read(path_par,group,"rel_m",       opt%rel_m)
+
+        call nml_read(path_par,group,"opt_tf",      opt%opt_tf)
+        call nml_read(path_par,group,"tf_time",     opt%tf_time)
+        call nml_read(path_par,group,"H_grnd_lim",  opt%H_grnd_lim)
+        call nml_read(path_par,group,"tf_sigma",    opt%tf_sigma)
+        call nml_read(path_par,group,"tau_m",       opt%tau_m)
+        call nml_read(path_par,group,"m_temp",      opt%m_temp)
+        call nml_read(path_par,group,"tf_min",      opt%tf_min)
+        call nml_read(path_par,group,"tf_max",      opt%tf_max)
+        call nml_read(path_par,group,"tf_basins",   opt%tf_basins)
+
+        call nml_read(path_par,group,"cf_ref_wais", opt%cf_ref_wais)
+        
+        return
+
+    end subroutine optimize_par_load
+
+    subroutine optimize_set_transient_param(p,time,time1,time2,p1,p2,m)
+        ! Determine value of parameter as a function of time 
+
+        implicit none 
+
+        real(wp), intent(OUT) :: p 
+        real(wp), intent(IN)  :: time 
+        real(wp), intent(IN)  :: time1 
+        real(wp), intent(IN)  :: time2
+        real(wp), intent(IN)  :: p1
+        real(wp), intent(IN)  :: p2
+        real(wp), intent(IN)  :: m         ! Non-linear exponent (m=1.0 or higher)
+        
+
+        if (time .le. time1) then 
+            p = p1 
+        else if (time .ge. time2) then 
+            p = p2 
+        else 
+            ! Linear interpolation with non-linear factor m if desired
+            p = p1 + (p2-p1)* ((time-time1)/(time2-time1))**m 
+        end if  
+
+        return 
+
+    end subroutine optimize_set_transient_param
+
+    subroutine optimize_tf_corr(tf_corr,H_ice,H_grnd,dHicedt,H_obs,H_grnd_obs,H_grnd_lim, &
                                     tau_m,m_temp,tf_min,tf_max,dx,sigma,dt)
 
         implicit none 
@@ -111,9 +220,9 @@ contains
         
         return 
 
-    end subroutine update_tf_corr_l21
+    end subroutine optimize_tf_corr
 
-    subroutine update_tf_corr_l21_basin(tf_corr,H_ice,H_grnd,dHicedt,H_obs,basins,H_grnd_lim, &
+    subroutine optimize_tf_corr_basin(tf_corr,H_ice,H_grnd,dHicedt,H_obs,basins,H_grnd_lim, &
                                     tau_m,m_temp,tf_min,tf_max,tf_basins,dt)
 
         implicit none 
@@ -253,9 +362,9 @@ contains
 
         return 
 
-    end subroutine update_tf_corr_l21_basin
+    end subroutine optimize_tf_corr_basin
 
-    subroutine update_cb_ref_errscaling_l21(cb_ref,H_ice,dHdt,z_bed,z_sl,ux,uy,H_obs,uxy_obs,H_grnd_obs, &
+    subroutine optimize_cb_ref(cb_ref,H_ice,dHdt,z_bed,z_sl,ux,uy,H_obs,uxy_obs,H_grnd_obs, &
                                         cf_min,cf_max,dx,sigma_err,sigma_vel,tau_c,H0,dt,fill_method,fill_dist, &
                                         cb_tgt)
         ! Update method following Lipscomb et al. (2021, tc)
@@ -426,7 +535,7 @@ contains
             case("analog")
                 
                 write(io_unit_err,*)
-                write(io_unit_err,*) "update_cb_ref_errscaling_l21:: Error: &
+                write(io_unit_err,*) "optimize_cb_ref:: Error: &
                 &fill_method='analog' is not working right now!"
                 write(io_unit_err,*)
                 stop 
@@ -443,7 +552,7 @@ contains
             case("nearest")
 
                 write(io_unit_err,*)
-                write(io_unit_err,*) "update_cb_ref_errscaling_l21:: Error: &
+                write(io_unit_err,*) "optimize_cb_ref:: Error: &
                 &fill_method='nearest' is not working right now!"
                 write(io_unit_err,*)
                 stop 
@@ -474,7 +583,7 @@ contains
             case DEFAULT 
 
                 write(io_unit_err,*)
-                write(io_unit_err,*) "update_cb_ref_errscaling_l21:: Error: fill_method not recognized."
+                write(io_unit_err,*) "optimize_cb_ref:: Error: fill_method not recognized."
                 write(io_unit_err,*) "fill_method = ", trim(fill_method)
                 stop 
 
@@ -486,7 +595,7 @@ contains
 
         return 
 
-    end subroutine update_cb_ref_errscaling_l21
+    end subroutine optimize_cb_ref
 
     subroutine fill_cb_ref(cb_ref,H_ice,z_bed,z_sl,is_float_obs,cf_min,cf_max)
         ! Fill points that cannot be optimized with 
@@ -647,6 +756,367 @@ contains
 
     end function interp_linear
     
+    subroutine update_mb_corr(mb_corr,H_ice,H_obs,tau)
+
+        implicit none 
+
+        real(wp), intent(OUT) :: mb_corr(:,:)     ! [m/a] Mass balance correction term 
+        real(wp), intent(IN)  :: H_ice(:,:)       ! [m] Simulated ice thickness
+        real(wp), intent(IN)  :: H_obs(:,:)       ! [m] Target observed ice thickness
+        real(wp), intent(IN)  :: tau              ! [a] Relaxation time constant 
+
+        mb_corr = -(H_ice - H_obs) / tau 
+
+        return 
+
+    end subroutine update_mb_corr
+
+    subroutine guess_cb_ref(cb_ref,tau_d,uxy_obs,H_obs,H_grnd,u0,cf_min,cf_max)
+        ! Use suggestion by Morlighem et al. (2013) to guess friction
+        ! assuming tau_b ~ tau_d, and u_b = u_obs:
+        !
+        ! For a linear law, tau_b = beta * u_b, so 
+        ! beta = tau_b / u_b = tau_d / (u_obs+ebs), ebs=0.1 to avoid divide by zero 
+        ! beta = cb_ref/u0 * N_eff, so:
+        ! cb_ref = (tau_d/(u_obs+ebs)) * (u0/N_eff)
+
+        implicit none 
+
+        real(wp), intent(OUT) :: cb_ref(:,:) 
+        real(wp), intent(IN)  :: tau_d(:,:) 
+        real(wp), intent(IN)  :: uxy_obs(:,:) 
+        real(wp), intent(IN)  :: H_obs(:,:)
+        real(wp), intent(IN)  :: H_grnd(:,:)
+        real(wp), intent(IN)  :: u0 
+        real(wp), intent(IN)  :: cf_min 
+        real(wp), intent(IN)  :: cf_max  
+
+        ! Local variables 
+        real(wp), parameter :: ebs = 0.1          ! [m/yr] To avoid divide by zero 
+
+        where (H_obs .eq. 0.0_prec .or. H_grnd .eq. 0.0_prec) 
+            ! Set floating or ice-free points to minimum 
+            cb_ref = cf_min 
+
+        elsewhere 
+            ! Apply equation 
+
+            ! Linear law: 
+            cb_ref = (tau_d / (uxy_obs + ebs)) * (u0 / (rho_ice*g*H_obs + 1.0_prec))
+
+        end where 
+
+        where (cb_ref .gt. cf_max) cb_ref = cf_max 
+
+        return 
+
+    end subroutine guess_cb_ref
+
+    
+
+    subroutine fill_nearest(var,missing_value,fill_value,fill_dist,n,dx)
+
+        implicit none 
+
+        real(wp), intent(INOUT) :: var(:,:)
+        real(wp), intent(IN)    :: missing_value
+        real(wp), intent(IN)    :: fill_value 
+        real(wp), intent(IN)    :: fill_dist          ! [km]
+        integer,    intent(IN)    :: n                  ! Average of n neighbors 
+        real(wp), intent(IN)    :: dx                 ! [m] 
+
+        ! Local variables 
+        integer :: i, j, nx, ny, i1, j1, q, n_now, ij(2) 
+        integer :: ntot 
+        real(wp) :: dist_now, f_d 
+
+        real(wp), allocatable :: var0(:,:) 
+        real(wp), allocatable :: dist(:,:) 
+
+        nx = size(var,1)
+        ny = size(var,2) 
+
+        allocate(var0(nx,ny)) 
+        allocate(dist(nx,ny)) 
+
+        ! Store initial field 
+        var0 = var 
+
+        ntot = 0 
+
+        ! Loop over missing values, look for nearest non-missing neighbor
+        do j = 1, ny 
+        do i = 1, nx 
+
+            if (var(i,j) .eq. missing_value) then 
+                ! Find a neighbor value in var0 
+
+                ! Populate distance matrix where necessary 
+                dist = MV 
+                do j1 = 1, ny 
+                do i1 = 1, nx 
+                    if (var0(i1,j1) .ne. MV) then 
+                        dist(i1,j1) = sqrt( real( (i1-i)**2 + (j1-j)**2 ) ) * dx
+                    end if 
+                end do 
+                end do 
+
+                n_now    = 0 
+                var(i,j) = 0.0
+                dist_now = 0.0 
+
+                do q = 1, n 
+                    ! Loop over nearest neighbors to get average 
+
+                    ! Find minimum populated neighbor 
+                    ij = minloc(dist,mask=dist.ne.MV .and. var0.ne.MV)
+
+                    ! Check if no neighbors found 
+                    if (ij(1) .eq. 0) exit 
+
+                    ! Populate with neighbor value 
+                    var(i,j) = var(i,j) + var0(ij(1),ij(2))
+                    dist_now = dist_now + dist(ij(1),ij(2))
+                    n_now = n_now + 1 
+
+                    ! Reset distance of neighbor to zero so it cannot be used again
+                    dist(ij(1),ij(2)) = MV 
+                end do 
+
+                ! If no neighbors found, use fill value 
+                if (n_now .eq. 0) var(i,j) = fill_value 
+
+                ! Take average if multiple points used 
+                if (n_now .gt. 1) then 
+                    
+                    ! Determine mean distance to neighbors and weighting function versus distance
+                    dist_now = dist_now / real(n_now,prec) 
+                    f_d      = 1.0 - min( dist_now/fill_dist, 1.0 )
+
+                    ! Apply weighted average of mean neighbor value and fill value 
+                    var(i,j) = f_d * (var(i,j) / real(n_now,prec)) + (1.0-f_d)*fill_value
+                    
+                end if 
+
+                ! Add this missing point to total for diagnostics 
+                ntot = ntot + 1 
+            end if 
+
+        end do
+        end do 
+
+        return 
+
+    end subroutine fill_nearest
+
+    
+    subroutine wtd_mean(var_ave,var,wts)
+        ! wts == gauss_values(dx,dy,sigma,n)
+
+        implicit none
+
+        real(wp), intent(OUT) :: var_ave 
+        real(wp), intent(IN)  :: var(:,:) 
+        real(wp), intent(IN)  :: wts(:,:) 
+
+        ! Local variables 
+        real(wp) :: wts_tot 
+        real(wp) :: wts_norm(size(wts,1),size(wts,2))
+
+        wts_tot = sum(wts) 
+        if (wts_tot .gt. 0.0) then 
+            wts_norm = wts / wts_tot 
+        else 
+            wts_norm = 0.0 
+        end if 
+
+        var_ave = sum(var*wts_norm) 
+
+        return 
+
+    end subroutine wtd_mean
+
+    ! Yelmo functions duplicated here to avoid dependency
+
+    ! From yelmo_tools.f90:
+    function calc_magnitude_from_staggered_ice(u,v,H,boundaries) result(umag)
+        ! Calculate the centered (aa-nodes) magnitude of a vector 
+        ! from the staggered (ac-nodes) components
+
+        implicit none 
+        
+        real(wp), intent(IN)  :: u(:,:), v(:,:), H(:,:) 
+        real(wp) :: umag(size(u,1),size(u,2)) 
+        character(len=*), intent(IN), optional :: boundaries 
+
+        ! Local variables 
+        integer :: i, j, nx, ny 
+        integer :: ip1, jp1, im1, jm1
+        real(wp) :: unow, vnow 
+        real(wp) :: f1, f2, H1, H2 
+        
+        nx = size(u,1)
+        ny = size(u,2) 
+
+        umag = 0.0_prec 
+
+        do j = 1, ny 
+        do i = 1, nx 
+
+            im1 = max(i-1,1)
+            jm1 = max(j-1,1)
+            ip1 = min(i+1,nx)
+            jp1 = min(j+1,ny)
+
+            ! x-direction =====
+
+            H1 = 0.5_prec*(H(im1,j)+H(i,j))
+            H2 = 0.5_prec*(H(i,j)+H(ip1,j))
+
+            f1 = 0.5_prec 
+            f2 = 0.5_prec 
+            if (H1 .eq. 0.0) f1 = 0.0_prec  
+            if (H2 .eq. 0.0) f2 = 0.0_prec   
+
+            if (f1+f2 .gt. 0.0) then 
+                unow = (f1*u(im1,j) + f2*u(i,j)) / (f1+f2)
+                if (abs(unow) .lt. tol_underflow) unow = 0.0_prec 
+            else 
+                unow = 0.0 
+            end if 
+
+            ! y-direction =====
+
+            H1 = 0.5_prec*(H(i,jm1)+H(i,j))
+            H2 = 0.5_prec*(H(i,j)+H(i,jp1))
+
+            f1 = 0.5_prec 
+            f2 = 0.5_prec 
+            if (H1 .eq. 0.0) f1 = 0.0_prec  
+            if (H2 .eq. 0.0) f2 = 0.0_prec   
+
+            if (f1+f2 .gt. 0.0) then 
+                vnow = (f1*v(i,jm1) + f2*v(i,j)) / (f1+f2)
+                if (abs(vnow) .lt. tol_underflow) vnow = 0.0_prec 
+            else 
+                vnow = 0.0 
+            end if 
+
+            umag(i,j) = sqrt(unow*unow+vnow*vnow)
+        end do 
+        end do 
+
+        if (present(boundaries)) then 
+            ! Apply conditions at boundaries of domain 
+
+            if (trim(boundaries) .eq. "periodic") then 
+
+                umag(1,:)  = umag(nx-1,:) 
+                umag(nx,:) = umag(2,:) 
+                 
+                umag(:,1)  = umag(:,ny-1)
+                umag(:,ny) = umag(:,2) 
+                
+            end if 
+
+        end if 
+
+        return
+
+    end function calc_magnitude_from_staggered_ice
+    
+    ! From yelmo_tools.f90:
+    function gauss_values(dx,dy,sigma,n) result(filt)
+        ! Calculate 2D Gaussian smoothing kernel
+        ! https://en.wikipedia.org/wiki/Gaussian_blur
+
+        implicit none 
+
+        real(wp), intent(IN) :: dx 
+        real(wp), intent(IN) :: dy 
+        real(wp), intent(IN) :: sigma 
+        integer,    intent(IN) :: n 
+        real(wp) :: filt(n,n) 
+
+        ! Local variables 
+        real(wp) :: x, y  
+        integer    :: n2, i, j, i1, j1  
+
+        if (mod(n,2) .ne. 1) then 
+            write(*,*) "gauss_values:: error: n can only be odd."
+            write(*,*) "n = ", n 
+        end if 
+
+        n2 = (n-1)/2 
+
+        do j = -n2, n2 
+        do i = -n2, n2 
+            x = i*dx 
+            y = j*dy 
+
+            i1 = i+1+n2 
+            j1 = j+1+n2 
+            filt(i1,j1) = 1.0/(2.0*pi*sigma**2)*exp(-(x**2+y**2)/(2*sigma**2))
+
+        end do 
+        end do 
+        
+        ! Normalize to ensure sum to 1
+        filt = filt / sum(filt)
+
+        return 
+
+    end function gauss_values
+
+    subroutine unique(xu,x)
+        ! Return only the unique values of a vector
+        ! http://rosettacode.org/wiki/Remove_duplicate_elements#Fortran
+
+        implicit none 
+
+        real(wp), allocatable :: xu(:)      ! The output 
+        real(wp) :: x(:)                    ! The input
+        
+        ! Local variables 
+        integer :: i, j, n
+        real(wp) :: res(size(x))            ! The unique values
+        logical :: found 
+
+        real(wp), parameter :: tol = 1e-5_wp
+        
+        n = 1
+        res(1) = x(1)
+        do i=2,size(x)
+            found = .FALSE.
+            do j=1,n
+                if (abs(res(j)-x(i)) .le. tol) then 
+                   ! Found a match so start looking again
+                   found = .TRUE. 
+                   cycle 
+                end if
+            end do
+            ! No match found so add it to the output
+            if (.not. found) then 
+                n = n + 1
+                res(n) = x(i)
+            end if 
+        end do
+
+        ! Store output in properly sized output vector
+        if(allocated(xu)) deallocate(xu)
+        allocate(xu(n))
+        xu = res(1:n)
+
+        return 
+
+    end subroutine unique
+
+! ============
+!
+! OBSOLETE OPTIMIZATION ROUTINES
+!
+! ============
+
     subroutine update_cb_ref_errscaling(cb_ref,H_ice,z_bed,ux,uy,H_obs,uxy_obs,is_float_obs, &
                                         dx,cf_min,cf_max,sigma_err,sigma_vel,err_scale,fill_dist,optvar)
 
@@ -958,386 +1428,5 @@ end if
         return 
 
     end subroutine update_cb_ref_thickness_ratio
-
-    subroutine update_mb_corr(mb_corr,H_ice,H_obs,tau)
-
-        implicit none 
-
-        real(wp), intent(OUT) :: mb_corr(:,:)     ! [m/a] Mass balance correction term 
-        real(wp), intent(IN)  :: H_ice(:,:)       ! [m] Simulated ice thickness
-        real(wp), intent(IN)  :: H_obs(:,:)       ! [m] Target observed ice thickness
-        real(wp), intent(IN)  :: tau              ! [a] Relaxation time constant 
-
-        mb_corr = -(H_ice - H_obs) / tau 
-
-        return 
-
-    end subroutine update_mb_corr
-
-    subroutine guess_cb_ref(cb_ref,tau_d,uxy_obs,H_obs,H_grnd,u0,cf_min,cf_max)
-        ! Use suggestion by Morlighem et al. (2013) to guess friction
-        ! assuming tau_b ~ tau_d, and u_b = u_obs:
-        !
-        ! For a linear law, tau_b = beta * u_b, so 
-        ! beta = tau_b / u_b = tau_d / (u_obs+ebs), ebs=0.1 to avoid divide by zero 
-        ! beta = cb_ref/u0 * N_eff, so:
-        ! cb_ref = (tau_d/(u_obs+ebs)) * (u0/N_eff)
-
-        implicit none 
-
-        real(wp), intent(OUT) :: cb_ref(:,:) 
-        real(wp), intent(IN)  :: tau_d(:,:) 
-        real(wp), intent(IN)  :: uxy_obs(:,:) 
-        real(wp), intent(IN)  :: H_obs(:,:)
-        real(wp), intent(IN)  :: H_grnd(:,:)
-        real(wp), intent(IN)  :: u0 
-        real(wp), intent(IN)  :: cf_min 
-        real(wp), intent(IN)  :: cf_max  
-
-        ! Local variables 
-        real(wp), parameter :: ebs = 0.1          ! [m/yr] To avoid divide by zero 
-
-        where (H_obs .eq. 0.0_prec .or. H_grnd .eq. 0.0_prec) 
-            ! Set floating or ice-free points to minimum 
-            cb_ref = cf_min 
-
-        elsewhere 
-            ! Apply equation 
-
-            ! Linear law: 
-            cb_ref = (tau_d / (uxy_obs + ebs)) * (u0 / (rho_ice*g*H_obs + 1.0_prec))
-
-        end where 
-
-        where (cb_ref .gt. cf_max) cb_ref = cf_max 
-
-        return 
-
-    end subroutine guess_cb_ref
-
-    
-
-    subroutine fill_nearest(var,missing_value,fill_value,fill_dist,n,dx)
-
-        implicit none 
-
-        real(wp), intent(INOUT) :: var(:,:)
-        real(wp), intent(IN)    :: missing_value
-        real(wp), intent(IN)    :: fill_value 
-        real(wp), intent(IN)    :: fill_dist          ! [km]
-        integer,    intent(IN)    :: n                  ! Average of n neighbors 
-        real(wp), intent(IN)    :: dx                 ! [m] 
-
-        ! Local variables 
-        integer :: i, j, nx, ny, i1, j1, q, n_now, ij(2) 
-        integer :: ntot 
-        real(wp) :: dist_now, f_d 
-
-        real(wp), allocatable :: var0(:,:) 
-        real(wp), allocatable :: dist(:,:) 
-
-        nx = size(var,1)
-        ny = size(var,2) 
-
-        allocate(var0(nx,ny)) 
-        allocate(dist(nx,ny)) 
-
-        ! Store initial field 
-        var0 = var 
-
-        ntot = 0 
-
-        ! Loop over missing values, look for nearest non-missing neighbor
-        do j = 1, ny 
-        do i = 1, nx 
-
-            if (var(i,j) .eq. missing_value) then 
-                ! Find a neighbor value in var0 
-
-                ! Populate distance matrix where necessary 
-                dist = MV 
-                do j1 = 1, ny 
-                do i1 = 1, nx 
-                    if (var0(i1,j1) .ne. MV) then 
-                        dist(i1,j1) = sqrt( real( (i1-i)**2 + (j1-j)**2 ) ) * dx
-                    end if 
-                end do 
-                end do 
-
-                n_now    = 0 
-                var(i,j) = 0.0
-                dist_now = 0.0 
-
-                do q = 1, n 
-                    ! Loop over nearest neighbors to get average 
-
-                    ! Find minimum populated neighbor 
-                    ij = minloc(dist,mask=dist.ne.MV .and. var0.ne.MV)
-
-                    ! Check if no neighbors found 
-                    if (ij(1) .eq. 0) exit 
-
-                    ! Populate with neighbor value 
-                    var(i,j) = var(i,j) + var0(ij(1),ij(2))
-                    dist_now = dist_now + dist(ij(1),ij(2))
-                    n_now = n_now + 1 
-
-                    ! Reset distance of neighbor to zero so it cannot be used again
-                    dist(ij(1),ij(2)) = MV 
-                end do 
-
-                ! If no neighbors found, use fill value 
-                if (n_now .eq. 0) var(i,j) = fill_value 
-
-                ! Take average if multiple points used 
-                if (n_now .gt. 1) then 
-                    
-                    ! Determine mean distance to neighbors and weighting function versus distance
-                    dist_now = dist_now / real(n_now,prec) 
-                    f_d      = 1.0 - min( dist_now/fill_dist, 1.0 )
-
-                    ! Apply weighted average of mean neighbor value and fill value 
-                    var(i,j) = f_d * (var(i,j) / real(n_now,prec)) + (1.0-f_d)*fill_value
-                    
-                end if 
-
-                ! Add this missing point to total for diagnostics 
-                ntot = ntot + 1 
-            end if 
-
-        end do
-        end do 
-
-        return 
-
-    end subroutine fill_nearest
-
-    
-    subroutine wtd_mean(var_ave,var,wts)
-        ! wts == gauss_values(dx,dy,sigma,n)
-
-        implicit none
-
-        real(wp), intent(OUT) :: var_ave 
-        real(wp), intent(IN)  :: var(:,:) 
-        real(wp), intent(IN)  :: wts(:,:) 
-
-        ! Local variables 
-        real(wp) :: wts_tot 
-        real(wp) :: wts_norm(size(wts,1),size(wts,2))
-
-        wts_tot = sum(wts) 
-        if (wts_tot .gt. 0.0) then 
-            wts_norm = wts / wts_tot 
-        else 
-            wts_norm = 0.0 
-        end if 
-
-        var_ave = sum(var*wts_norm) 
-
-        return 
-
-    end subroutine wtd_mean
-
-    function get_opt_param(time,time1,time2,p1,p2,m) result(p) 
-        ! Determine value of parameter as a function of time 
-
-        implicit none 
-
-        real(wp), intent(IN) :: time 
-        real(wp), intent(IN) :: time1 
-        real(wp), intent(IN) :: time2
-        real(wp), intent(IN) :: p1
-        real(wp), intent(IN) :: p2
-        real(wp), intent(IN) :: m         ! Non-linear exponent (m=1.0 or higher)
-        real(wp) :: p 
-
-        if (time .le. time1) then 
-            p = p1 
-        else if (time .ge. time2) then 
-            p = p2 
-        else 
-            ! Linear interpolation with non-linear factor m if desired
-            p = p1 + (p2-p1)* ((time-time1)/(time2-time1))**m 
-        end if  
-
-        return 
-
-    end function get_opt_param
-
-    ! Yelmo functions duplicated here to avoid dependency
-
-    ! From yelmo_tools.f90:
-    function calc_magnitude_from_staggered_ice(u,v,H,boundaries) result(umag)
-        ! Calculate the centered (aa-nodes) magnitude of a vector 
-        ! from the staggered (ac-nodes) components
-
-        implicit none 
-        
-        real(wp), intent(IN)  :: u(:,:), v(:,:), H(:,:) 
-        real(wp) :: umag(size(u,1),size(u,2)) 
-        character(len=*), intent(IN), optional :: boundaries 
-
-        ! Local variables 
-        integer :: i, j, nx, ny 
-        integer :: ip1, jp1, im1, jm1
-        real(wp) :: unow, vnow 
-        real(wp) :: f1, f2, H1, H2 
-        
-        nx = size(u,1)
-        ny = size(u,2) 
-
-        umag = 0.0_prec 
-
-        do j = 1, ny 
-        do i = 1, nx 
-
-            im1 = max(i-1,1)
-            jm1 = max(j-1,1)
-            ip1 = min(i+1,nx)
-            jp1 = min(j+1,ny)
-
-            ! x-direction =====
-
-            H1 = 0.5_prec*(H(im1,j)+H(i,j))
-            H2 = 0.5_prec*(H(i,j)+H(ip1,j))
-
-            f1 = 0.5_prec 
-            f2 = 0.5_prec 
-            if (H1 .eq. 0.0) f1 = 0.0_prec  
-            if (H2 .eq. 0.0) f2 = 0.0_prec   
-
-            if (f1+f2 .gt. 0.0) then 
-                unow = (f1*u(im1,j) + f2*u(i,j)) / (f1+f2)
-                if (abs(unow) .lt. tol_underflow) unow = 0.0_prec 
-            else 
-                unow = 0.0 
-            end if 
-
-            ! y-direction =====
-
-            H1 = 0.5_prec*(H(i,jm1)+H(i,j))
-            H2 = 0.5_prec*(H(i,j)+H(i,jp1))
-
-            f1 = 0.5_prec 
-            f2 = 0.5_prec 
-            if (H1 .eq. 0.0) f1 = 0.0_prec  
-            if (H2 .eq. 0.0) f2 = 0.0_prec   
-
-            if (f1+f2 .gt. 0.0) then 
-                vnow = (f1*v(i,jm1) + f2*v(i,j)) / (f1+f2)
-                if (abs(vnow) .lt. tol_underflow) vnow = 0.0_prec 
-            else 
-                vnow = 0.0 
-            end if 
-
-            umag(i,j) = sqrt(unow*unow+vnow*vnow)
-        end do 
-        end do 
-
-        if (present(boundaries)) then 
-            ! Apply conditions at boundaries of domain 
-
-            if (trim(boundaries) .eq. "periodic") then 
-
-                umag(1,:)  = umag(nx-1,:) 
-                umag(nx,:) = umag(2,:) 
-                 
-                umag(:,1)  = umag(:,ny-1)
-                umag(:,ny) = umag(:,2) 
-                
-            end if 
-
-        end if 
-
-        return
-
-    end function calc_magnitude_from_staggered_ice
-    
-    ! From yelmo_tools.f90:
-    function gauss_values(dx,dy,sigma,n) result(filt)
-        ! Calculate 2D Gaussian smoothing kernel
-        ! https://en.wikipedia.org/wiki/Gaussian_blur
-
-        implicit none 
-
-        real(wp), intent(IN) :: dx 
-        real(wp), intent(IN) :: dy 
-        real(wp), intent(IN) :: sigma 
-        integer,    intent(IN) :: n 
-        real(wp) :: filt(n,n) 
-
-        ! Local variables 
-        real(wp) :: x, y  
-        integer    :: n2, i, j, i1, j1  
-
-        if (mod(n,2) .ne. 1) then 
-            write(*,*) "gauss_values:: error: n can only be odd."
-            write(*,*) "n = ", n 
-        end if 
-
-        n2 = (n-1)/2 
-
-        do j = -n2, n2 
-        do i = -n2, n2 
-            x = i*dx 
-            y = j*dy 
-
-            i1 = i+1+n2 
-            j1 = j+1+n2 
-            filt(i1,j1) = 1.0/(2.0*pi*sigma**2)*exp(-(x**2+y**2)/(2*sigma**2))
-
-        end do 
-        end do 
-        
-        ! Normalize to ensure sum to 1
-        filt = filt / sum(filt)
-
-        return 
-
-    end function gauss_values
-
-    subroutine unique(xu,x)
-        ! Return only the unique values of a vector
-        ! http://rosettacode.org/wiki/Remove_duplicate_elements#Fortran
-
-        implicit none 
-
-        real(wp), allocatable :: xu(:)      ! The output 
-        real(wp) :: x(:)                    ! The input
-        
-        ! Local variables 
-        integer :: i, j, n
-        real(wp) :: res(size(x))            ! The unique values
-        logical :: found 
-
-        real(wp), parameter :: tol = 1e-5_wp
-        
-        n = 1
-        res(1) = x(1)
-        do i=2,size(x)
-            found = .FALSE.
-            do j=1,n
-                if (abs(res(j)-x(i)) .le. tol) then 
-                   ! Found a match so start looking again
-                   found = .TRUE. 
-                   cycle 
-                end if
-            end do
-            ! No match found so add it to the output
-            if (.not. found) then 
-                n = n + 1
-                res(n) = x(i)
-            end if 
-        end do
-
-        ! Store output in properly sized output vector
-        if(allocated(xu)) deallocate(xu)
-        allocate(xu(n))
-        xu = res(1:n)
-
-        return 
-
-    end subroutine unique
 
 end module ice_optimization

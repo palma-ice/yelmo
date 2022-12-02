@@ -2,14 +2,18 @@
 
 # Define user options
 
-domain=Laurentide
-grid_name_src=LIS-32KM
-grid_name_tgt=LIS-16KM
+domain=Greenland
+grid_name_src=GRL-64KM
+grid_name_tgt=GRL-16KM
 
 # Determine input grid file using options
 
 nc_src=../ice_data/${domain}/${grid_name_src}/${grid_name_src}_REGIONS.nc 
 
+if [ $grid_name_src = ERA5 ]
+then
+  nc_src=../ice_data/ERA5/era5_orography.nc 
+fi
 
 # Call cdo command to generate map weights between source grid and target grid:
 

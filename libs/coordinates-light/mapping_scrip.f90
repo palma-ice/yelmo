@@ -446,7 +446,8 @@ contains
                         case("mean")
                             ! Calculate the area-weighted mean 
 
-                            var2_vec(k) = sum((wts1_now(1:num_links_now)/wts1_tot)*var1_now(1:num_links_now),mask=var1_now(1:num_links_now) .ne. missing_val)
+                            var2_vec(k) = sum((wts1_now(1:num_links_now)/wts1_tot)*var1_now(1:num_links_now), &
+                                                                    mask=var1_now(1:num_links_now) .ne. missing_val)
 
                         case("count")
                             ! Choose the most frequently occurring value, weighted by area
@@ -462,7 +463,8 @@ contains
                             if (npt_now .gt. 2) then
                                 ! Only calculate stdev for 2 or more input points
 
-                                pt_ave      = sum((wts1_now(1:num_links_now)/wts1_tot)*var1_now(1:num_links_now),mask=var1_now(1:num_links_now) .ne. missing_val)
+                                pt_ave      = sum((wts1_now(1:num_links_now)/wts1_tot)*var1_now(1:num_links_now), &
+                                                                    mask=var1_now(1:num_links_now) .ne. missing_val)
                                 var2_vec(k) = (npt_now/(npt_now - 1.0)) &
                                                * sum((wts1_now(1:num_links_now)/wts1_tot)*(var1_now(1:num_links_now)-pt_ave)**2, & 
                                                                             mask=var1_now(1:num_links_now) .ne. missing_val)
@@ -991,7 +993,8 @@ contains
 
 ! === NCIO Extension functions ===
 
-    subroutine nc_read_interp_dp_2D(filename,vnm,var2D,var2D_in,ncid,start,count,mps,method)
+    subroutine nc_read_interp_dp_2D(filename,vnm,var2D,var2D_in,ncid,start,count,mps,method, &
+                                        fill_method,filt_method,filt_par)
         ! Read in a 2D field and interpolate it using scrip map
         ! as needed. 
 
@@ -1004,9 +1007,12 @@ contains
         integer, optional,  intent(IN)  :: ncid 
         integer, optional,  intent(IN)  :: start(:) 
         integer, optional,  intent(IN)  :: count(:) 
-        type(map_scrip_class), optional, intent(IN) :: mps
-        character(len=*),      optional, intent(IN) :: method 
-
+        type(map_scrip_class), intent(IN),  optional :: mps
+        character(len=*),      intent(IN),  optional :: method 
+        character(len=*),      intent(IN),  optional :: fill_method     ! Method to fill in remaining missing values
+        character(len=*),      intent(IN),  optional :: filt_method     ! Method to use for filtering
+        real(dp),              intent(IN),  optional :: filt_par(:)     ! gaussian=[sigma,dx]; poisson=[tol]
+        
         ! Local variables 
         integer :: nx, ny 
         integer,  allocatable :: dims(:) 
@@ -1067,8 +1073,8 @@ contains
 
             ! Perform conservative interpolation 
             var2D = real(MV,dp) 
-            call map_scrip_field(mps,vnm,var2D_src,var2D,method=mapping_method, &
-                                        missing_value=real(MV,dp),fill_method="nn")
+            call map_scrip_field(mps,vnm,var2D_src,var2D,method=mapping_method,missing_value=real(MV,dp), &
+                        fill_method=fill_method,filt_method=filt_method,filt_par=filt_par)
 
         end if 
 
@@ -1076,7 +1082,8 @@ contains
 
     end subroutine nc_read_interp_dp_2D
 
-    subroutine nc_read_interp_dp_3D(filename,vnm,var3D,ncid,start,count,mps,method)
+    subroutine nc_read_interp_dp_3D(filename,vnm,var3D,ncid,start,count,mps,method, &
+                                        fill_method,filt_method,filt_par)
         ! Read in a 3D field and interpolate it using scrip map
         ! as needed. 
 
@@ -1088,9 +1095,12 @@ contains
         integer, optional,  intent(IN)  :: ncid 
         integer, optional,  intent(IN)  :: start(:) 
         integer, optional,  intent(IN)  :: count(:) 
-        type(map_scrip_class), optional, intent(IN) :: mps
-        character(len=*),      optional, intent(IN) :: method 
-
+        type(map_scrip_class), intent(IN),  optional :: mps
+        character(len=*),      intent(IN),  optional :: method 
+        character(len=*),      intent(IN),  optional :: fill_method     ! Method to fill in remaining missing values
+        character(len=*),      intent(IN),  optional :: filt_method     ! Method to use for filtering
+        real(dp),              intent(IN),  optional :: filt_par(:)     ! gaussian=[sigma,dx]; poisson=[tol]
+        
         ! Local variables 
         integer :: nx, ny, nz, k  
         integer,  allocatable :: dims(:) 
@@ -1109,24 +1119,24 @@ contains
         if (nz .ne. size(var3D,3)) then 
 
             write(error_unit,*) ""
-            write(error_unit,*) "nc_read_interp_dp_3D:: Error: vertical dimension of variable in &
-                    &input file does not match vertical dimension of yelmo object. Vertical &
-                    & interpolation is not yet supported."
+            write(error_unit,*) "nc_read_interp_dp_3D:: Error: third dimension of variable in &
+                    &input file does not match third dimension of array provided as an argument. &
+                    &Interpolation of the third dimension is not yet supported."
             write(error_unit,*) "filename  = ", trim(filename)
             write(error_unit,*) "variable  = ", trim(vnm)
             write(error_unit,*) "nz[file]  = ", nz
-            write(error_unit,*) "nz[yelmo] = ", size(var3D,3) 
+            write(error_unit,*) "nz[array] = ", size(var3D,3) 
             stop 
         end if 
             
         ! Read in full 3D variable of interest 
         call nc_read(filename,vnm,var3D_src,ncid=ncid,start=start,count=[nx,ny,nz,1],missing_value=real(MV,dp))
         
-        ! Loop over vertical dimension and apply interpolation 
+        ! Loop over third dimension and apply interpolation 
         do k = 1, nz 
             
-            call nc_read_interp_dp_2D(filename,vnm,var3D(:,:,k),var3D_src(:,:,k),ncid, &
-                                                                start,count,mps,method)
+            call nc_read_interp_dp_2D(filename,vnm,var3D(:,:,k),var3D_src(:,:,k),ncid,start,count, &
+                                mps,method,fill_method=fill_method,filt_method=filt_method,filt_par=filt_par)
 
         end do 
 
@@ -1134,7 +1144,8 @@ contains
 
     end subroutine nc_read_interp_dp_3D
 
-    subroutine nc_read_interp_sp_2D(filename,vnm,var2D,var2D_in,ncid,start,count,mps,method)
+    subroutine nc_read_interp_sp_2D(filename,vnm,var2D,var2D_in,ncid,start,count,mps,method, &
+                                        fill_method,filt_method,filt_par)
         ! Read in a 2D field and interpolate it using scrip map
         ! as needed. 
 
@@ -1147,9 +1158,12 @@ contains
         integer, optional,  intent(IN)  :: ncid 
         integer, optional,  intent(IN)  :: start(:) 
         integer, optional,  intent(IN)  :: count(:) 
-        type(map_scrip_class), optional, intent(IN) :: mps
-        character(len=*),      optional, intent(IN) :: method 
-
+        type(map_scrip_class), intent(IN),  optional :: mps
+        character(len=*),      intent(IN),  optional :: method 
+        character(len=*),      intent(IN),  optional :: fill_method     ! Method to fill in remaining missing values
+        character(len=*),      intent(IN),  optional :: filt_method     ! Method to use for filtering
+        real(sp),              intent(IN),  optional :: filt_par(:)     ! gaussian=[sigma,dx]; poisson=[tol]
+        
         ! Local variables 
         integer :: nx, ny 
         integer,  allocatable :: dims(:) 
@@ -1210,8 +1224,8 @@ contains
 
             ! Perform conservative interpolation 
             var2D = real(MV,sp) 
-            call map_scrip_field(mps,vnm,var2D_src,var2D,method=mapping_method, &
-                                        missing_value=real(MV,sp),fill_method="nn")
+            call map_scrip_field(mps,vnm,var2D_src,var2D,method=mapping_method,missing_value=real(MV,sp), &
+                            fill_method=fill_method,filt_method=filt_method,filt_par=filt_par)
 
         end if 
 
@@ -1219,7 +1233,8 @@ contains
 
     end subroutine nc_read_interp_sp_2D
 
-    subroutine nc_read_interp_sp_3D(filename,vnm,var3D,ncid,start,count,mps,method)
+    subroutine nc_read_interp_sp_3D(filename,vnm,var3D,ncid,start,count,mps,method, &
+                                        fill_method,filt_method,filt_par)
         ! Read in a 2D field and interpolate it using scrip map
         ! as needed. 
 
@@ -1231,9 +1246,12 @@ contains
         integer, optional,  intent(IN)  :: ncid 
         integer, optional,  intent(IN)  :: start(:) 
         integer, optional,  intent(IN)  :: count(:) 
-        type(map_scrip_class), optional, intent(IN) :: mps
-        character(len=*),      optional, intent(IN) :: method 
-
+        type(map_scrip_class), intent(IN),  optional :: mps
+        character(len=*),      intent(IN),  optional :: method 
+        character(len=*),      intent(IN),  optional :: fill_method     ! Method to fill in remaining missing values
+        character(len=*),      intent(IN),  optional :: filt_method     ! Method to use for filtering
+        real(sp),              intent(IN),  optional :: filt_par(:)     ! gaussian=[sigma,dx]; poisson=[tol]
+        
         ! Local variables 
         integer :: nx, ny, nz, k  
         integer,  allocatable :: dims(:) 
@@ -1268,8 +1286,8 @@ contains
         ! Loop over vertical dimension and apply interpolation 
         do k = 1, nz 
             
-            call nc_read_interp_sp_2D(filename,vnm,var3D(:,:,k),var3D_src(:,:,k),ncid, &
-                                                                start,count,mps,method)
+            call nc_read_interp_sp_2D(filename,vnm,var3D(:,:,k),var3D_src(:,:,k),ncid,start,count,mps,method, &
+                                fill_method=fill_method,filt_method=filt_method,filt_par=filt_par)
 
         end do 
 
@@ -1277,7 +1295,8 @@ contains
 
     end subroutine nc_read_interp_sp_3D
 
-    subroutine nc_read_interp_int_2D(filename,vnm,var2D,var2D_in,ncid,start,count,mps,method)
+    subroutine nc_read_interp_int_2D(filename,vnm,var2D,var2D_in,ncid,start,count,mps,method, &
+                                        fill_method)
         ! Read in a 2D field and interpolate it using scrip map
         ! as needed. 
 
@@ -1290,8 +1309,9 @@ contains
         integer, optional,  intent(IN)  :: ncid 
         integer, optional,  intent(IN)  :: start(:) 
         integer, optional,  intent(IN)  :: count(:) 
-        type(map_scrip_class), optional, intent(IN) :: mps
-        character(len=*),      optional, intent(IN) :: method 
+        type(map_scrip_class), intent(IN),  optional :: mps
+        character(len=*),      intent(IN),  optional :: method 
+        character(len=*),      intent(IN),  optional :: fill_method     ! Method to fill in remaining missing values
 
         ! Local variables 
         integer :: nx, ny 
@@ -1341,7 +1361,7 @@ contains
             ! Perform conservative interpolation 
             var2D = int(MV)
             call map_scrip_field(mps,vnm,var2D_src,var2D,method=mapping_method, &
-                                        missing_value=int(MV),fill_method="nn")
+                                    missing_value=int(MV),fill_method=fill_method)
 
         end if 
 
@@ -1349,7 +1369,7 @@ contains
 
     end subroutine nc_read_interp_int_2D
 
-    subroutine nc_read_interp_int_3D(filename,vnm,var3D,ncid,start,count,mps,method)
+    subroutine nc_read_interp_int_3D(filename,vnm,var3D,ncid,start,count,mps,method,fill_method)
         ! Read in a 2D field and interpolate it using scrip map
         ! as needed. 
 
@@ -1361,8 +1381,9 @@ contains
         integer, optional,  intent(IN)  :: ncid 
         integer, optional,  intent(IN)  :: start(:) 
         integer, optional,  intent(IN)  :: count(:) 
-        type(map_scrip_class), optional, intent(IN) :: mps
-        character(len=*),      optional, intent(IN) :: method 
+        type(map_scrip_class), intent(IN),  optional :: mps
+        character(len=*),      intent(IN),  optional :: method 
+        character(len=*),      intent(IN),  optional :: fill_method     ! Method to fill in remaining missing values
 
         ! Local variables 
         integer :: nx, ny, nz, k  
@@ -1398,8 +1419,8 @@ contains
         ! Loop over vertical dimension and apply interpolation 
         do k = 1, nz 
             
-            call nc_read_interp_int_2D(filename,vnm,var3D(:,:,k),var3D_src(:,:,k),ncid, &
-                                                                    start,count,mps,method)
+            call nc_read_interp_int_2D(filename,vnm,var3D(:,:,k),var3D_src(:,:,k),ncid,start,count,mps,method, &
+                                fill_method=fill_method)
 
         end do 
 
@@ -1420,8 +1441,8 @@ contains
         integer, optional,  intent(IN)  :: ncid 
         integer, optional,  intent(IN)  :: start(:) 
         integer, optional,  intent(IN)  :: count(:) 
-        type(map_scrip_class), optional, intent(IN) :: mps
-        character(len=*),      optional, intent(IN) :: method 
+        type(map_scrip_class), intent(IN),  optional :: mps
+        character(len=*),      intent(IN),  optional :: method 
 
         ! Local variables 
         integer :: nx, ny 
@@ -1475,7 +1496,7 @@ contains
             allocate(var2D_int(size(var2D,1),size(var2D,2)))
             var2D_int = int(MV)
             call map_scrip_field(mps,vnm,var2D_src,var2D_int,method=mapping_method, &
-                                        missing_value=int(MV),fill_method="nn")
+                                                missing_value=int(MV),fill_method="nn")
 
             var2D = .FALSE. 
             where(var2D_int .eq. 1) var2D = .TRUE.  

@@ -684,10 +684,8 @@ contains
 
                 nc = 2*lgs%ij2n(i,j)-1          ! column counter for ux(i,j)
                 k = k+1
-                lgs%a_value(k) = -4.0_wp*inv_dxdx*N_aa(i+1,j) &
-                                 -4.0_wp*inv_dxdx*N_aa(i,j) &
-                                 -1.0_wp*inv_dydy*N_ab(i,j) &
-                                 -1.0_wp*inv_dydy*N_ab(i,j-1) &
+                lgs%a_value(k) = -4.0_wp*inv_dxdx*(N_aa(i+1,j)+N_aa(i,j)) &
+                                 -1.0_wp*inv_dydy*(N_ab(i,j)+N_ab(i,j-1)) &
                                  -beta_acx(i,j)
                 lgs%a_index(k) = nc
 
@@ -1115,10 +1113,8 @@ contains
 
                 nc = 2*lgs%ij2n(i,j)        ! column counter for uy(i,j)
                 k = k+1
-                lgs%a_value(k) = -4.0_wp*inv_dydy*N_aa(i,j+1)   &
-                                 -4.0_wp*inv_dydy*N_aa(i,j)     &
-                                 -1.0_wp*inv_dxdx*N_ab(i,j)   &
-                                 -1.0_wp*inv_dxdx*N_ab(i-1,j) &
+                lgs%a_value(k) = -4.0_wp*inv_dydy*(N_aa(i,j+1)+N_aa(i,j))   &
+                                 -1.0_wp*inv_dxdx*(N_ab(i,j)+N_ab(i-1,j))   &
                                  -beta_acy(i,j)
                 lgs%a_index(k) = nc
 

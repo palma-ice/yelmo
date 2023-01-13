@@ -304,6 +304,16 @@ contains
             i = lgs%n2i((n+1)/2)
             j = lgs%n2j((n+1)/2)
 
+            ! BC: Periodic boundary conditions by default
+            im1 = i-1
+            if (im1 == 0) im1 = nx
+            ip1 = i+1
+            if (ip1 == nx+1) ip1 = 1
+            jm1 = j-1
+            if (jm1 == 0) jm1 = ny
+            jp1 = j+1
+            if (jp1 == ny+1) jp1 = 1
+
             ! ------ Equations for ux ---------------------------
 
             nr = n   ! row counter
@@ -551,7 +561,7 @@ contains
 
             else if (j .eq. ny) then 
                 ! Upper boundary 
-
+                
                 select case(trim(boundaries_ux(2)))
 
                     case("zeros")
@@ -609,19 +619,19 @@ contains
             else if (ssa_mask_acx(i,j) .eq. 3) then 
                 ! Lateral boundary condition should be applied here 
 
-                if (f_ice(i,j) .eq. 1.0 .and. f_ice(i+1,j) .lt. 1.0) then 
+                if (f_ice(i,j) .eq. 1.0 .and. f_ice(ip1,j) .lt. 1.0) then 
                     ! === Case 1: ice-free to the right ===
 
                     N_aa_now = N_aa(i,j)
                     
-                    nc = 2*lgs%ij2n(i-1,j)-1
-                        ! smallest nc (column counter), for ux(i-1,j)
+                    nc = 2*lgs%ij2n(im1,j)-1
+                        ! smallest nc (column counter), for ux(im1,j)
                     k = k+1
                     lgs%a_value(k) = -4.0_prec*inv_dx*N_aa_now
                     lgs%a_index(k) = nc 
 
-                    nc = 2*lgs%ij2n(i,j-1)
-                        ! next nc (column counter), for uy(i,j-1)
+                    nc = 2*lgs%ij2n(i,jm1)
+                        ! next nc (column counter), for uy(i,jm1)
                     k = k+1
                     lgs%a_value(k) = -2.0_prec*inv_dy*N_aa_now
                     lgs%a_index(k) = nc
@@ -645,7 +655,7 @@ contains
                 else 
                     ! Case 2: ice-free to the left
                     
-                    N_aa_now = N_aa(i+1,j)
+                    N_aa_now = N_aa(ip1,j)
                     
                     nc = 2*lgs%ij2n(i,j)-1
                         ! next nc (column counter), for ux(i,j)
@@ -653,20 +663,20 @@ contains
                     lgs%a_value(k) = -4.0_prec*inv_dx*N_aa_now
                     lgs%a_index(k) = nc
 
-                    nc = 2*lgs%ij2n(i+1,j-1)
-                        ! next nc (column counter), for uy(i+1,j-1)
+                    nc = 2*lgs%ij2n(ip1,jm1)
+                        ! next nc (column counter), for uy(ip1,jm1)
                     k  = k+1
                     lgs%a_value(k) = -2.0_prec*inv_dy*N_aa_now
                     lgs%a_index(k) = nc
 
-                    nc = 2*lgs%ij2n(i+1,j)-1
-                        ! next nc (column counter), for ux(i+1,j)
+                    nc = 2*lgs%ij2n(ip1,j)-1
+                        ! next nc (column counter), for ux(ip1,j)
                     k = k+1
                     lgs%a_value(k) = 4.0_prec*inv_dx*N_aa_now
                     lgs%a_index(k) = nc
 
-                    nc = 2*lgs%ij2n(i+1,j)
-                        ! largest nc (column counter), for uy(i+1,j)
+                    nc = 2*lgs%ij2n(ip1,j)
+                        ! largest nc (column counter), for uy(ip1,j)
                     k  = k+1
                     lgs%a_value(k) = 2.0_prec*inv_dy*N_aa_now
                     lgs%a_index(k) = nc
@@ -684,29 +694,29 @@ contains
 
                 nc = 2*lgs%ij2n(i,j)-1          ! column counter for ux(i,j)
                 k = k+1
-                lgs%a_value(k) = -4.0_wp*inv_dxdx*(N_aa(i+1,j)+N_aa(i,j)) &
-                                 -1.0_wp*inv_dydy*(N_ab(i,j)+N_ab(i,j-1)) &
+                lgs%a_value(k) = -4.0_wp*inv_dxdx*(N_aa(ip1,j)+N_aa(i,j)) &
+                                 -1.0_wp*inv_dydy*(N_ab(i,j)+N_ab(i,jm1)) &
                                  -beta_acx(i,j)
                 lgs%a_index(k) = nc
 
-                nc = 2*lgs%ij2n(i+1,j)-1        ! column counter for ux(i+1,j)
+                nc = 2*lgs%ij2n(ip1,j)-1        ! column counter for ux(ip1,j)
                 k = k+1
-                lgs%a_value(k) =  4.0_wp*inv_dxdx*N_aa(i+1,j)
+                lgs%a_value(k) =  4.0_wp*inv_dxdx*N_aa(ip1,j)
                 lgs%a_index(k) = nc
 
-                nc = 2*lgs%ij2n(i-1,j)-1        ! column counter for ux(i-1,j)
+                nc = 2*lgs%ij2n(im1,j)-1        ! column counter for ux(im1,j)
                 k = k+1
                 lgs%a_value(k) =  4.0_wp*inv_dxdx*N_aa(i,j)
                 lgs%a_index(k) = nc
 
-                nc = 2*lgs%ij2n(i,j+1)-1        ! column counter for ux(i,j+1)
+                nc = 2*lgs%ij2n(i,jp1)-1        ! column counter for ux(i,jp1)
                 k = k+1
                 lgs%a_value(k) =  1.0_wp*inv_dydy*N_ab(i,j)
                 lgs%a_index(k) = nc
 
-                nc = 2*lgs%ij2n(i,j-1)-1        ! column counter for ux(i,j-1)
+                nc = 2*lgs%ij2n(i,jm1)-1        ! column counter for ux(i,jm1)
                 k = k+1
-                lgs%a_value(k) =  1.0_wp*inv_dydy*N_ab(i,j-1)
+                lgs%a_value(k) =  1.0_wp*inv_dydy*N_ab(i,jm1)
                 lgs%a_index(k) = nc
 
                 ! -- vy terms -- 
@@ -717,22 +727,22 @@ contains
                                  -1.0_wp*inv_dxdy*N_ab(i,j)
                 lgs%a_index(k) = nc
 
-                nc = 2*lgs%ij2n(i+1,j)          ! column counter for uy(i+1,j)
+                nc = 2*lgs%ij2n(ip1,j)          ! column counter for uy(ip1,j)
                 k = k+1
-                lgs%a_value(k) =  2.0_wp*inv_dxdy*N_aa(i+1,j)   &
+                lgs%a_value(k) =  2.0_wp*inv_dxdy*N_aa(ip1,j)   &
                                  +1.0_wp*inv_dxdy*N_ab(i,j)
                 lgs%a_index(k) = nc
                 
-                nc = 2*lgs%ij2n(i+1,j-1)        ! column counter for uy(i+1,j-1)
+                nc = 2*lgs%ij2n(ip1,jm1)        ! column counter for uy(ip1,jm1)
                 k = k+1
-                lgs%a_value(k) = -2.0_wp*inv_dxdy*N_aa(i+1,j)   &
-                                 -1.0_wp*inv_dxdy*N_ab(i,j-1)
+                lgs%a_value(k) = -2.0_wp*inv_dxdy*N_aa(ip1,j)   &
+                                 -1.0_wp*inv_dxdy*N_ab(i,jm1)
                 lgs%a_index(k) = nc
                 
-                nc = 2*lgs%ij2n(i,j-1)          ! column counter for uy(i,j-1)
+                nc = 2*lgs%ij2n(i,jm1)          ! column counter for uy(i,jm1)
                 k = k+1
                 lgs%a_value(k) =  2.0_wp*inv_dxdy*N_aa(i,j)   &
-                                 +1.0_wp*inv_dxdy*N_ab(i,j-1)
+                                 +1.0_wp*inv_dxdy*N_ab(i,jm1)
                 lgs%a_index(k) = nc
                 
 
@@ -779,11 +789,11 @@ contains
                         ! Assume border vy velocity is zero 
 
                         k = k+1
-                        lgs%a_value(k)  = 1.0_prec   ! diagonal element only
+                        lgs%a_value(k)  = 1.0_wp        ! diagonal element only
                         lgs%a_index(k)  = nr
 
-                        lgs%b_value(nr) = 0.0_prec
-                        lgs%x_value(nr) = 0.0_prec
+                        lgs%b_value(nr) = 0.0_wp
+                        lgs%x_value(nr) = 0.0_wp
 
                     case("infinite")
                         ! Infinite boundary, take velocity from one point inward
@@ -835,11 +845,11 @@ contains
                         ! Assume border velocity is zero 
 
                         k = k+1
-                        lgs%a_value(k)  = 1.0_prec   ! diagonal element only
+                        lgs%a_value(k)  = 1.0_wp        ! diagonal element only
                         lgs%a_index(k)  = nr
 
-                        lgs%b_value(nr) = 0.0_prec
-                        lgs%x_value(nr) = 0.0_prec
+                        lgs%b_value(nr) = 0.0_wp
+                        lgs%x_value(nr) = 0.0_wp
 
                     case("infinite")
                         ! Infinite boundary, take velocity from two points inward
@@ -1043,14 +1053,14 @@ contains
 
                     N_aa_now = N_aa(i,j)
 
-                    nc = 2*lgs%ij2n(i-1,j)-1
-                        ! smallest nc (column counter), for ux(i-1,j)
+                    nc = 2*lgs%ij2n(im1,j)-1
+                        ! smallest nc (column counter), for ux(im1,j)
                     k = k+1
                     lgs%a_value(k) = -2.0_prec*inv_dx*N_aa_now
                     lgs%a_index(k) = nc
 
-                    nc = 2*lgs%ij2n(i,j-1)
-                        ! next nc (column counter), for uy(i,j-1)
+                    nc = 2*lgs%ij2n(i,jm1)
+                        ! next nc (column counter), for uy(i,jm1)
                     k = k+1
                     lgs%a_value(k) = -4.0_prec*inv_dy*N_aa_now
                     lgs%a_index(k) = nc
@@ -1074,10 +1084,10 @@ contains
                 else
                     ! === Case 2: ice-free to the bottom ===
                     
-                    N_aa_now = N_aa(i,j+1)
+                    N_aa_now = N_aa(i,jp1)
 
-                    nc = 2*lgs%ij2n(i-1,j+1)-1
-                        ! next nc (column counter), for ux(i-1,j+1)
+                    nc = 2*lgs%ij2n(im1,jp1)-1
+                        ! next nc (column counter), for ux(im1,jp1)
                     k = k+1
                     lgs%a_value(k) = -2.0_prec*inv_dx*N_aa_now
                     lgs%a_index(k) = nc
@@ -1088,14 +1098,14 @@ contains
                     lgs%a_value(k) = -4.0_prec*inv_dy*N_aa_now
                     lgs%a_index(k) = nc
 
-                    nc = 2*lgs%ij2n(i,j+1)-1
-                        ! next nc (column counter), for ux(i,j+1)
+                    nc = 2*lgs%ij2n(i,jp1)-1
+                        ! next nc (column counter), for ux(i,jp1)
                     k = k+1
                     lgs%a_value(k) = 2.0_prec*inv_dx*N_aa_now
                     lgs%a_index(k) = nc
 
-                    nc = 2*lgs%ij2n(i,j+1)
-                        ! next nc (column counter), for uy(i,j+1)
+                    nc = 2*lgs%ij2n(i,jp1)
+                        ! next nc (column counter), for uy(i,jp1)
                     k = k+1
                     lgs%a_value(k) = 4.0_prec*inv_dy*N_aa_now
                     lgs%a_index(k) = nc
@@ -1113,29 +1123,29 @@ contains
 
                 nc = 2*lgs%ij2n(i,j)        ! column counter for uy(i,j)
                 k = k+1
-                lgs%a_value(k) = -4.0_wp*inv_dydy*(N_aa(i,j+1)+N_aa(i,j))   &
-                                 -1.0_wp*inv_dxdx*(N_ab(i,j)+N_ab(i-1,j))   &
+                lgs%a_value(k) = -4.0_wp*inv_dydy*(N_aa(i,jp1)+N_aa(i,j))   &
+                                 -1.0_wp*inv_dxdx*(N_ab(i,j)+N_ab(im1,j))   &
                                  -beta_acy(i,j)
                 lgs%a_index(k) = nc
 
-                nc = 2*lgs%ij2n(i,j+1)      ! column counter for uy(i,j+1)
+                nc = 2*lgs%ij2n(i,jp1)      ! column counter for uy(i,jp1)
                 k = k+1
-                lgs%a_value(k) =  4.0_wp*inv_dydy*N_aa(i,j+1)
+                lgs%a_value(k) =  4.0_wp*inv_dydy*N_aa(i,jp1)
                 lgs%a_index(k) = nc
 
-                nc = 2*lgs%ij2n(i,j-1)      ! column counter for uy(i,j-1)
+                nc = 2*lgs%ij2n(i,jm1)      ! column counter for uy(i,jm1)
                 k = k+1
                 lgs%a_value(k) =  4.0_wp*inv_dydy*N_aa(i,j)
                 lgs%a_index(k) = nc
                 
-                nc = 2*lgs%ij2n(i+1,j)      ! column counter for uy(i+1,j)
+                nc = 2*lgs%ij2n(ip1,j)      ! column counter for uy(ip1,j)
                 k = k+1
                 lgs%a_value(k) =  1.0_wp*inv_dxdx*N_ab(i,j)
                 lgs%a_index(k) = nc
                 
-                nc = 2*lgs%ij2n(i-1,j)      ! column counter for uy(i-1,j)
+                nc = 2*lgs%ij2n(im1,j)      ! column counter for uy(im1,j)
                 k = k+1
-                lgs%a_value(k) =  1.0_wp*inv_dxdx*N_ab(i-1,j)
+                lgs%a_value(k) =  1.0_wp*inv_dxdx*N_ab(im1,j)
                 lgs%a_index(k) = nc
                 
                 ! -- vx terms -- 
@@ -1146,22 +1156,22 @@ contains
                                  -1.0_wp*inv_dxdy*N_ab(i,j)
                 lgs%a_index(k) = nc
 
-                nc = 2*lgs%ij2n(i,j+1)-1    ! column counter for ux(i,j+1)
+                nc = 2*lgs%ij2n(i,jp1)-1    ! column counter for ux(i,jp1)
                 k = k+1
-                lgs%a_value(k) =  2.0_wp*inv_dxdy*N_aa(i,j+1)     &
+                lgs%a_value(k) =  2.0_wp*inv_dxdy*N_aa(i,jp1)     &
                                  +1.0_wp*inv_dxdy*N_ab(i,j)
                 lgs%a_index(k) = nc
 
-                nc = 2*lgs%ij2n(i-1,j+1)-1  ! column counter for ux(i-1,j+1)
+                nc = 2*lgs%ij2n(im1,jp1)-1  ! column counter for ux(im1,jp1)
                 k = k+1
-                lgs%a_value(k) = -2.0_wp*inv_dxdy*N_aa(i,j+1)     &
-                                 -1.0_wp*inv_dxdy*N_ab(i-1,j)
+                lgs%a_value(k) = -2.0_wp*inv_dxdy*N_aa(i,jp1)     &
+                                 -1.0_wp*inv_dxdy*N_ab(im1,j)
                 lgs%a_index(k) = nc
 
-                nc = 2*lgs%ij2n(i-1,j)-1  ! column counter for ux(i-1,j)
+                nc = 2*lgs%ij2n(im1,j)-1  ! column counter for ux(im1,j)
                 k = k+1
                 lgs%a_value(k) =  2.0_wp*inv_dxdy*N_aa(i,j)     &
-                                 +1.0_wp*inv_dxdy*N_ab(i-1,j)
+                                 +1.0_wp*inv_dxdy*N_ab(im1,j)
                 lgs%a_index(k) = nc
 
                 lgs%b_value(nr) = taud_acy(i,j)

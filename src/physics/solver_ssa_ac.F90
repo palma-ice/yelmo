@@ -6,7 +6,7 @@ module solver_ssa_ac
 
 
 
-    use yelmo_defs, only : sp, dp, wp, prec, io_unit_err, TOL_UNDERFLOW, rho_ice, rho_sw, g 
+    use yelmo_defs, only : sp, dp, wp, io_unit_err, TOL_UNDERFLOW, rho_ice, rho_sw, g 
 
     use grid_calcs  ! For staggering routines 
     use ncio        ! For diagnostic outputting only 
@@ -324,11 +324,11 @@ contains
                 ! SSA set to zero velocity for this point
 
                 k = k+1
-                lgs%a_value(k) = 1.0_prec   ! diagonal element only
+                lgs%a_value(k) = 1.0_wp   ! diagonal element only
                 lgs%a_index(k) = nr
 
-                lgs%b_value(nr) = 0.0_prec
-                lgs%x_value(nr) = 0.0_prec
+                lgs%b_value(nr) = 0.0_wp
+                lgs%x_value(nr) = 0.0_wp
             
             else if (ssa_mask_acx(i,j) .eq. -1) then 
                 ! Assign prescribed boundary velocity to this point
@@ -561,7 +561,7 @@ contains
 
             else if (j .eq. ny) then 
                 ! Upper boundary 
-                
+
                 select case(trim(boundaries_ux(2)))
 
                     case("zeros")
@@ -627,25 +627,25 @@ contains
                     nc = 2*lgs%ij2n(im1,j)-1
                         ! smallest nc (column counter), for ux(im1,j)
                     k = k+1
-                    lgs%a_value(k) = -4.0_prec*inv_dx*N_aa_now
+                    lgs%a_value(k) = -4.0_wp*inv_dx*N_aa_now
                     lgs%a_index(k) = nc 
 
                     nc = 2*lgs%ij2n(i,jm1)
                         ! next nc (column counter), for uy(i,jm1)
                     k = k+1
-                    lgs%a_value(k) = -2.0_prec*inv_dy*N_aa_now
+                    lgs%a_value(k) = -2.0_wp*inv_dy*N_aa_now
                     lgs%a_index(k) = nc
 
                     nc = 2*lgs%ij2n(i,j)-1
                         ! next nc (column counter), for ux(i,j)
                     k = k+1
-                    lgs%a_value(k) = 4.0_prec*inv_dx*N_aa_now
+                    lgs%a_value(k) = 4.0_wp*inv_dx*N_aa_now
                     lgs%a_index(k) = nc
 
                     nc = 2*lgs%ij2n(i,j)
                         ! next nc (column counter), for uy(i,j)
                     k = k+1
-                    lgs%a_value(k) = 2.0_prec*inv_dy*N_aa_now
+                    lgs%a_value(k) = 2.0_wp*inv_dy*N_aa_now
                     lgs%a_index(k) = nc
 
                     ! Assign matrix values
@@ -660,25 +660,25 @@ contains
                     nc = 2*lgs%ij2n(i,j)-1
                         ! next nc (column counter), for ux(i,j)
                     k = k+1
-                    lgs%a_value(k) = -4.0_prec*inv_dx*N_aa_now
+                    lgs%a_value(k) = -4.0_wp*inv_dx*N_aa_now
                     lgs%a_index(k) = nc
 
                     nc = 2*lgs%ij2n(ip1,jm1)
                         ! next nc (column counter), for uy(ip1,jm1)
                     k  = k+1
-                    lgs%a_value(k) = -2.0_prec*inv_dy*N_aa_now
+                    lgs%a_value(k) = -2.0_wp*inv_dy*N_aa_now
                     lgs%a_index(k) = nc
 
                     nc = 2*lgs%ij2n(ip1,j)-1
                         ! next nc (column counter), for ux(ip1,j)
                     k = k+1
-                    lgs%a_value(k) = 4.0_prec*inv_dx*N_aa_now
+                    lgs%a_value(k) = 4.0_wp*inv_dx*N_aa_now
                     lgs%a_index(k) = nc
 
                     nc = 2*lgs%ij2n(ip1,j)
                         ! largest nc (column counter), for uy(ip1,j)
                     k  = k+1
-                    lgs%a_value(k) = 2.0_prec*inv_dy*N_aa_now
+                    lgs%a_value(k) = 2.0_wp*inv_dy*N_aa_now
                     lgs%a_index(k) = nc
 
                     ! Assign matrix values
@@ -763,11 +763,11 @@ contains
                 ! SSA not active here, velocity set to zero
 
                 k = k+1
-                lgs%a_value(k)  = 1.0_prec   ! diagonal element only
+                lgs%a_value(k)  = 1.0_wp   ! diagonal element only
                 lgs%a_index(k)  = nr
 
-                lgs%b_value(nr) = 0.0_prec
-                lgs%x_value(nr) = 0.0_prec
+                lgs%b_value(nr) = 0.0_wp
+                lgs%x_value(nr) = 0.0_wp
 
             else if (ssa_mask_acy(i,j) .eq. -1) then 
                 ! Assign prescribed boundary velocity to this point
@@ -942,11 +942,11 @@ contains
                         ! Assume border velocity is zero 
 
                         k = k+1
-                        lgs%a_value(k)  = 1.0_prec   ! diagonal element only
+                        lgs%a_value(k)  = 1.0_wp   ! diagonal element only
                         lgs%a_index(k)  = nr
 
-                        lgs%b_value(nr) = 0.0_prec
-                        lgs%x_value(nr) = 0.0_prec
+                        lgs%b_value(nr) = 0.0_wp
+                        lgs%x_value(nr) = 0.0_wp
 
                     case("infinite")
                         ! Infinite boundary, take velocity from one point inward
@@ -998,11 +998,11 @@ contains
                         ! Assume border velocity is zero 
 
                         k = k+1
-                        lgs%a_value(k)  = 1.0_prec   ! diagonal element only
+                        lgs%a_value(k)  = 1.0_wp   ! diagonal element only
                         lgs%a_index(k)  = nr
 
-                        lgs%b_value(nr) = 0.0_prec
-                        lgs%x_value(nr) = 0.0_prec
+                        lgs%b_value(nr) = 0.0_wp
+                        lgs%x_value(nr) = 0.0_wp
 
                     case("infinite")
                         ! Infinite boundary, take velocity from one point inward
@@ -1056,25 +1056,25 @@ contains
                     nc = 2*lgs%ij2n(im1,j)-1
                         ! smallest nc (column counter), for ux(im1,j)
                     k = k+1
-                    lgs%a_value(k) = -2.0_prec*inv_dx*N_aa_now
+                    lgs%a_value(k) = -2.0_wp*inv_dx*N_aa_now
                     lgs%a_index(k) = nc
 
                     nc = 2*lgs%ij2n(i,jm1)
                         ! next nc (column counter), for uy(i,jm1)
                     k = k+1
-                    lgs%a_value(k) = -4.0_prec*inv_dy*N_aa_now
+                    lgs%a_value(k) = -4.0_wp*inv_dy*N_aa_now
                     lgs%a_index(k) = nc
 
                     nc = 2*lgs%ij2n(i,j)-1
                         ! next nc (column counter), for ux(i,j)
                     k = k+1
-                    lgs%a_value(k) = 2.0_prec*inv_dx*N_aa_now
+                    lgs%a_value(k) = 2.0_wp*inv_dx*N_aa_now
                     lgs%a_index(k) = nc
 
                     nc = 2*lgs%ij2n(i,j)
                         ! next nc (column counter), for uy(i,j)
                     k = k+1
-                    lgs%a_value(k) = 4.0_prec*inv_dy*N_aa_now
+                    lgs%a_value(k) = 4.0_wp*inv_dy*N_aa_now
                     lgs%a_index(k) = nc
 
                     ! Assign matrix values
@@ -1089,25 +1089,25 @@ contains
                     nc = 2*lgs%ij2n(im1,jp1)-1
                         ! next nc (column counter), for ux(im1,jp1)
                     k = k+1
-                    lgs%a_value(k) = -2.0_prec*inv_dx*N_aa_now
+                    lgs%a_value(k) = -2.0_wp*inv_dx*N_aa_now
                     lgs%a_index(k) = nc
 
                     nc = 2*lgs%ij2n(i,j)
                         ! next nc (column counter), for uy(i,j)
                     k = k+1
-                    lgs%a_value(k) = -4.0_prec*inv_dy*N_aa_now
+                    lgs%a_value(k) = -4.0_wp*inv_dy*N_aa_now
                     lgs%a_index(k) = nc
 
                     nc = 2*lgs%ij2n(i,jp1)-1
                         ! next nc (column counter), for ux(i,jp1)
                     k = k+1
-                    lgs%a_value(k) = 2.0_prec*inv_dx*N_aa_now
+                    lgs%a_value(k) = 2.0_wp*inv_dx*N_aa_now
                     lgs%a_index(k) = nc
 
                     nc = 2*lgs%ij2n(i,jp1)
                         ! next nc (column counter), for uy(i,jp1)
                     k = k+1
-                    lgs%a_value(k) = 4.0_prec*inv_dy*N_aa_now
+                    lgs%a_value(k) = 4.0_wp*inv_dy*N_aa_now
                     lgs%a_index(k) = nc
 
                     ! Assign matrix values
@@ -1499,7 +1499,7 @@ contains
         ny = size(visc,2)
 
         ! Initialisation
-        visc_ab = 0.0_prec 
+        visc_ab = 0.0_wp 
 
         ! Stagger viscosity only using contributions from neighbors that have ice  
         do i = 1, nx 
@@ -1552,7 +1552,7 @@ contains
                 visc_ab(i,j) = visc_ab(i,j) + visc(ip1,jp1)
             end if
 
-            if (k .gt. 0) visc_ab(i,j) = visc_ab(i,j)/real(k,prec)
+            if (k .gt. 0) visc_ab(i,j) = visc_ab(i,j)/real(k,wp)
 
         end do
         end do
@@ -1594,9 +1594,9 @@ contains
 
         ! Initialize netcdf file and dimensions
         call nc_create(filename)
-        call nc_write_dim(filename,"xc",     x=0.0_prec,dx=1.0_prec,nx=nx,units="gridpoints")
-        call nc_write_dim(filename,"yc",     x=0.0_prec,dx=1.0_prec,nx=ny,units="gridpoints")
-        call nc_write_dim(filename,"time",   x=time_init,dx=1.0_prec,nx=1,units="iter",unlimited=.TRUE.)
+        call nc_write_dim(filename,"xc",     x=0.0_wp,dx=1.0_wp,nx=nx,units="gridpoints")
+        call nc_write_dim(filename,"yc",     x=0.0_wp,dx=1.0_wp,nx=ny,units="gridpoints")
+        call nc_write_dim(filename,"time",   x=time_init,dx=1.0_wp,nx=1,units="iter",unlimited=.TRUE.)
 
         return
 
@@ -1853,7 +1853,7 @@ contains
 
         ! Gather x values in local array of lis-type
         allocate(lgs_x_value_out(nmax))
-        lgs_x_value_out = 0.0_prec
+        lgs_x_value_out = 0.0_wp
         call lis_vector_gather(lgs_x, lgs_x_value_out, ierr)
         call CHKERR(ierr)
         

@@ -233,9 +233,9 @@ contains
             case("MISMIP3D")
 
                 boundaries_ux(1) = "zeros"
-                boundaries_ux(2) = "infinite"
+                boundaries_ux(2) = "free-slip"
                 boundaries_ux(3) = "zeros"
-                boundaries_ux(4) = "infinite"
+                boundaries_ux(4) = "free-slip"
 
                 boundaries_uy(1:4) = "zeros" 
 
@@ -248,20 +248,20 @@ contains
             case("periodic-x")
 
                 boundaries_ux(1) = "periodic"
-                boundaries_ux(2) = "infinite"
+                boundaries_ux(2) = "free-slip"
                 boundaries_ux(3) = "periodic"
-                boundaries_ux(4) = "infinite"
+                boundaries_ux(4) = "free-slip"
 
                 boundaries_uy(1) = "periodic"
-                boundaries_uy(2) = "infinite"
+                boundaries_uy(2) = "free-slip"
                 boundaries_uy(3) = "periodic"
-                boundaries_uy(4) = "infinite"
+                boundaries_uy(4) = "free-slip"
 
             case("infinite")
 
-                boundaries_ux(1:4) = "infinite" 
+                boundaries_ux(1:4) = "free-slip" 
 
-                boundaries_uy(1:4) = "infinite" 
+                boundaries_uy(1:4) = "free-slip" 
                 
             case DEFAULT 
 
@@ -285,7 +285,7 @@ contains
         inv_dxdy    = 1.0_wp / (dx*dy)
         inv_2dxdy   = 1.0_wp / (2.0_wp*dx*dy)
         inv_4dxdy   = 1.0_wp / (4.0_wp*dx*dy)
-
+        
 
         ! Calculate the staggered depth-integrated viscosity 
         ! at the grid-cell corners (ab-nodes). 
@@ -342,7 +342,7 @@ contains
                 lgs%b_value(nr) = ux(i,j)
                 lgs%x_value(nr) = ux(i,j)
             
-            else if (i .eq. 1) then 
+            else if (i .eq. 1 .and. trim(boundaries_ux(3)) .ne. "periodic") then 
                 ! Left boundary 
 
                 select case(trim(boundaries_ux(3)))
@@ -357,49 +357,25 @@ contains
                         lgs%b_value(nr) = 0.0
                         lgs%x_value(nr) = 0.0
 
-                    case("infinite")
-                        ! Infinite boundary condition, take 
-                        ! value from one point inward
+                    case("free-slip")
+                        ! Free-slip boundary condition
 
                         nc = 2*lgs%ij2n(i,j)-1          ! column counter for ux(i,j)
                         k = k+1
                         lgs%a_value(k) =  1.0_wp
                         lgs%a_index(k) = nc
 
-                        nc = 2*lgs%ij2n(i+1,j)-1        ! column counter for ux(i+1,j)
+                        nc = 2*lgs%ij2n(ip1,j)-1        ! column counter for ux(ip1,j)
                         k = k+1
                         lgs%a_value(k) = -1.0_wp
                         lgs%a_index(k) = nc
 
                         lgs%b_value(nr) = 0.0_wp
                         lgs%x_value(nr) = ux(i,j)
-
-                    case("periodic")
-                        ! Periodic boundary, take velocity from the right boundary
-                        
-                        nc = 2*lgs%ij2n(i,j)-1          ! column counter for ux(i,j)
-                        k = k+1
-                        lgs%a_value(k) =  1.0_wp
-                        lgs%a_index(k) = nc
-
-                        nc = 2*lgs%ij2n(nx-2,j)-1        ! column counter for ux(nx-2,j)
-                        k = k+1
-                        lgs%a_value(k) = -1.0_wp
-                        lgs%a_index(k) = nc
-
-                        lgs%b_value(nr) = 0.0_wp
-                        lgs%x_value(nr) = ux(i,j)
-
-                    case DEFAULT 
-
-                        write(*,*) "linear_solver_matrix_ssa_ac_csr_2D:: Error: left-border condition not &
-                        &recognized: "//trim(boundaries_ux(3))
-                        write(*,*) "boundaries parameter set to: "//trim(boundaries)
-                        stop
 
                 end select 
                 
-            else if (i .eq. nx) then 
+            else if (i .eq. nx .and. trim(boundaries_ux(1)) .ne. "periodic") then 
                 ! Right boundary 
                 
                 select case(trim(boundaries_ux(1)))
@@ -414,95 +390,25 @@ contains
                         lgs%b_value(nr) = 0.0
                         lgs%x_value(nr) = 0.0
 
-                    case("infinite")
-                        ! Infinite boundary condition, take 
-                        ! value from two points inward (one point inward will also be prescribed)
+                    case("free-slip")
+                        ! Free-slip boundary condition
 
                         nc = 2*lgs%ij2n(i,j)-1          ! column counter for ux(i,j)
                         k = k+1
                         lgs%a_value(k) =  1.0_wp
                         lgs%a_index(k) = nc
 
-                        nc = 2*lgs%ij2n(nx-2,j)-1       ! column counter for ux(nx-2,j)
+                        nc = 2*lgs%ij2n(nx-1,j)-1       ! column counter for ux(nx-1,j)
                         k = k+1
                         lgs%a_value(k) = -1.0_wp
                         lgs%a_index(k) = nc
 
                         lgs%b_value(nr) = 0.0_wp
                         lgs%x_value(nr) = ux(i,j)
-
-                    case("periodic")
-                        ! Periodic boundary condition, take velocity from one point
-                        ! interior to the left-border, as nx-1 will be set to value
-                        ! at the left-border 
-
-                        nc = 2*lgs%ij2n(i,j)-1          ! column counter for ux(i,j)
-                        k = k+1
-                        lgs%a_value(k) =  1.0_wp
-                        lgs%a_index(k) = nc
-
-                        nc = 2*lgs%ij2n(3,j)-1          ! column counter for ux(3,j)
-                        k = k+1
-                        lgs%a_value(k) = -1.0_wp
-                        lgs%a_index(k) = nc
-
-                        lgs%b_value(nr) = 0.0_wp
-                        lgs%x_value(nr) = ux(i,j)
-
-                    case DEFAULT 
-
-                        write(*,*) "linear_solver_matrix_ssa_ac_csr_2D:: Error: right-border condition not &
-                        &recognized: "//trim(boundaries_ux(1))
-                        write(*,*) "boundaries parameter set to: "//trim(boundaries)
-                        stop
 
                 end select 
 
-            else if (i .eq. nx-1 .and. trim(boundaries_ux(1)) .eq. "infinite") then 
-                ! Right boundary, staggered one point further inward 
-                ! (only needed for periodic conditions, otherwise
-                ! this point should be treated as normal)
-                
-                ! Periodic boundary condition, take velocity from one point
-                ! interior to the left-border, as nx-1 will be set to value
-                ! at the left-border 
-
-                nc = 2*lgs%ij2n(i,j)-1          ! column counter for ux(i,j)
-                k = k+1
-                lgs%a_value(k) =  1.0_wp
-                lgs%a_index(k) = nc
-
-                nc = 2*lgs%ij2n(nx-2,j)-1       ! column counter for ux(nx-2,j)
-                k = k+1
-                lgs%a_value(k) = -1.0_wp
-                lgs%a_index(k) = nc
-
-                lgs%b_value(nr) = 0.0_wp
-                lgs%x_value(nr) = ux(i,j)
-
-            else if (i .eq. nx-1 .and. trim(boundaries_ux(1)) .eq. "periodic") then 
-                ! Right boundary, staggered one point further inward 
-                ! (only needed for periodic conditions, otherwise
-                ! this point should be treated as normal)
-                
-                ! Periodic boundary condition, take velocity from one point
-                ! interior to the left-border, as nx-1 will be set to value
-                ! at the left-border 
-
-                nc = 2*lgs%ij2n(i,j)-1          ! column counter for ux(i,j)
-                k = k+1
-                lgs%a_value(k) =  1.0_wp
-                lgs%a_index(k) = nc
-
-                nc = 2*lgs%ij2n(2,j)-1          ! column counter for ux(2,j)
-                k = k+1
-                lgs%a_value(k) = -1.0_wp
-                lgs%a_index(k) = nc
-
-                lgs%b_value(nr) = 0.0_wp
-                lgs%x_value(nr) = ux(i,j)
-
-            else if (j .eq. 1) then 
+            else if (j .eq. 1 .and. trim(boundaries_ux(4)) .ne. "periodic") then 
                 ! Lower boundary 
 
                 select case(trim(boundaries_ux(4)))
@@ -511,55 +417,26 @@ contains
                         ! Assume border velocity is zero 
 
                         k = k+1
-                        lgs%a_value(k)  = 1.0   ! diagonal element only
+                        lgs%a_value(k)  = 1.0_wp   ! diagonal element only
                         lgs%a_index(k)  = nr
 
-                        lgs%b_value(nr) = 0.0
-                        lgs%x_value(nr) = 0.0
-
-                    case("infinite")
-                        ! Infinite boundary condition, take 
-                        ! value from one point inward
-
-                        nc = 2*lgs%ij2n(i,j)-1          ! column counter for ux(i,j)
-                        k = k+1
-                        lgs%a_value(k) =  1.0_wp
-                        lgs%a_index(k) = nc
-
-                        nc = 2*lgs%ij2n(i,j+1)-1        ! column counter for ux(i,j+1)
-                        k = k+1
-                        lgs%a_value(k) = -1.0_wp
-                        lgs%a_index(k) = nc
-
                         lgs%b_value(nr) = 0.0_wp
-                        lgs%x_value(nr) = ux(i,j)
+                        lgs%x_value(nr) = 0.0_wp
 
-                    case("periodic")
-                        ! Periodic boundary, take velocity from the upper boundary
+                    case("free-slip")
+                        ! Free-slip boundary condition
+                        ! (zero-velocity perpindicular to boundary)
                         
-                        nc = 2*lgs%ij2n(i,j)-1          ! column counter for ux(i,j)
                         k = k+1
-                        lgs%a_value(k) =  1.0_wp
-                        lgs%a_index(k) = nc
-
-                        nc = 2*lgs%ij2n(i,ny-1)-1        ! column counter for ux(i,ny-1)
-                        k = k+1
-                        lgs%a_value(k) = -1.0_wp
-                        lgs%a_index(k) = nc
+                        lgs%a_value(k)  = 1.0_wp   ! diagonal element only
+                        lgs%a_index(k)  = nr
 
                         lgs%b_value(nr) = 0.0_wp
-                        lgs%x_value(nr) = ux(i,j)
-
-                    case DEFAULT 
-
-                        write(*,*) "linear_solver_matrix_ssa_ac_csr_2D:: Error: upper-border condition not &
-                        &recognized: "//trim(boundaries_ux(4))
-                        write(*,*) "boundaries parameter set to: "//trim(boundaries)
-                        stop
+                        lgs%x_value(nr) = 0.0_wp
 
                 end select 
 
-            else if (j .eq. ny) then 
+            else if (j .eq. ny .and. trim(boundaries_ux(2)) .ne. "periodic") then 
                 ! Upper boundary 
 
                 select case(trim(boundaries_ux(2)))
@@ -568,51 +445,22 @@ contains
                         ! Assume border velocity is zero 
 
                         k = k+1
-                        lgs%a_value(k)  = 1.0   ! diagonal element only
+                        lgs%a_value(k)  = 1.0_wp   ! diagonal element only
                         lgs%a_index(k)  = nr
 
-                        lgs%b_value(nr) = 0.0
-                        lgs%x_value(nr) = 0.0
-
-                    case("infinite")
-                        ! Infinite boundary condition, take 
-                        ! value from one point inward
-
-                        nc = 2*lgs%ij2n(i,j)-1          ! column counter for ux(i,j)
-                        k = k+1
-                        lgs%a_value(k) =  1.0_wp
-                        lgs%a_index(k) = nc
-
-                        nc = 2*lgs%ij2n(i,j-1)-1        ! column counter for ux(i,j-1)
-                        k = k+1
-                        lgs%a_value(k) = -1.0_wp
-                        lgs%a_index(k) = nc
-
                         lgs%b_value(nr) = 0.0_wp
-                        lgs%x_value(nr) = ux(i,j)
-
-                    case("periodic")
-                        ! Periodic boundary, take velocity from the lower boundary
+                        lgs%x_value(nr) = 0.0_wp
                         
-                        nc = 2*lgs%ij2n(i,j)-1          ! column counter for ux(i,j)
+                    case("free-slip")
+                        ! Free-slip boundary condition
+                        ! (zero-velocity perpindicular to boundary)
+                        
                         k = k+1
-                        lgs%a_value(k) =  1.0_wp
-                        lgs%a_index(k) = nc
-
-                        nc = 2*lgs%ij2n(i,2)-1          ! column counter for ux(i,2)
-                        k = k+1
-                        lgs%a_value(k) = -1.0_wp
-                        lgs%a_index(k) = nc
+                        lgs%a_value(k)  = 1.0_wp   ! diagonal element only
+                        lgs%a_index(k)  = nr
 
                         lgs%b_value(nr) = 0.0_wp
-                        lgs%x_value(nr) = ux(i,j)
-
-                    case DEFAULT 
-
-                        write(*,*) "linear_solver_matrix_ssa_ac_csr_2D:: Error: upper-border condition not &
-                        &recognized: "//trim(boundaries_ux(2))
-                        write(*,*) "boundaries parameter set to: "//trim(boundaries)
-                        stop
+                        lgs%x_value(nr) = 0.0_wp
 
                 end select 
 
@@ -780,7 +628,7 @@ contains
                 lgs%b_value(nr) = uy(i,j)
                 lgs%x_value(nr) = uy(i,j)
             
-            else if (j .eq. 1) then 
+            else if (j .eq. 1 .and. trim(boundaries_uy(4)) .ne. "periodic") then 
                 ! lower boundary 
 
                 select case(trim(boundaries_uy(4)))
@@ -795,9 +643,9 @@ contains
                         lgs%b_value(nr) = 0.0_wp
                         lgs%x_value(nr) = 0.0_wp
 
-                    case("infinite")
-                        ! Infinite boundary, take velocity from one point inward
-                        
+                    case("free-slip")
+                        ! Free-slip boundary condition
+
                         nc = 2*lgs%ij2n(i,j)            ! column counter for uy(i,j)
                         k = k+1
                         lgs%a_value(k) =  1.0_wp
@@ -811,32 +659,9 @@ contains
                         lgs%b_value(nr) = 0.0_wp
                         lgs%x_value(nr) = uy(i,j)
 
-                    case("periodic")
-                        ! Periodic boundary, take velocity from the opposite boundary
-                        
-                        nc = 2*lgs%ij2n(i,j)            ! column counter for uy(i,j)
-                        k = k+1
-                        lgs%a_value(k) =  1.0_wp
-                        lgs%a_index(k) = nc
-
-                        nc = 2*lgs%ij2n(i,ny-2)         ! column counter for uy(i,ny-2)
-                        k = k+1
-                        lgs%a_value(k) = -1.0_wp
-                        lgs%a_index(k) = nc
-
-                        lgs%b_value(nr) = 0.0_wp
-                        lgs%x_value(nr) = uy(i,j)
-
-                    case DEFAULT 
-
-                        write(*,*) "linear_solver_matrix_ssa_ac_csr_2D:: Error: lower-border condition not &
-                        &recognized: "//trim(boundaries_uy(4))
-                        write(*,*) "boundaries parameter set to: "//trim(boundaries)
-                        stop
-
                 end select 
 
-            else if (j .eq. ny) then 
+            else if (j .eq. ny .and. trim(boundaries_uy(2)) .ne. "periodic") then 
                 ! Upper boundary 
 
                 select case(trim(boundaries_uy(2)))
@@ -851,89 +676,25 @@ contains
                         lgs%b_value(nr) = 0.0_wp
                         lgs%x_value(nr) = 0.0_wp
 
-                    case("infinite")
-                        ! Infinite boundary, take velocity from two points inward
-                        ! (to account for staggering)
+                    case("free-slip")
+                        ! Free-slip boundary condition
 
                         nc = 2*lgs%ij2n(i,j)            ! column counter for uy(i,j)
                         k = k+1
                         lgs%a_value(k) =  1.0_wp
                         lgs%a_index(k) = nc
 
-                        nc = 2*lgs%ij2n(i,ny-2)          ! column counter for uy(i,ny-2)
+                        nc = 2*lgs%ij2n(i,ny-1)         ! column counter for uy(i,ny-1)
                         k = k+1
                         lgs%a_value(k) = -1.0_wp
                         lgs%a_index(k) = nc
 
                         lgs%b_value(nr) = 0.0_wp
                         lgs%x_value(nr) = uy(i,j)
-
-                    case("periodic")
-                        ! Periodic boundary, take velocity from the right boundary
-                        
-                        nc = 2*lgs%ij2n(i,j)            ! column counter for uy(i,j)
-                        k = k+1
-                        lgs%a_value(k) =  1.0_wp
-                        lgs%a_index(k) = nc
-
-                        nc = 2*lgs%ij2n(i,3)            ! column counter for uy(i,3)
-                        k = k+1
-                        lgs%a_value(k) = -1.0_wp
-                        lgs%a_index(k) = nc
-
-                        lgs%b_value(nr) = 0.0_wp
-                        lgs%x_value(nr) = uy(i,j)
-
-                    case DEFAULT 
-
-                        write(*,*) "linear_solver_matrix_ssa_ac_csr_2D:: Error: upper-border condition not &
-                        &recognized: "//trim(boundaries_uy(2))
-                        write(*,*) "boundaries parameter set to: "//trim(boundaries)
-                        stop
 
                 end select 
-            
-            else if (j .eq. ny-1 .and. trim(boundaries_uy(2)) .eq. "infinite") then
-                ! Upper boundary, inward by one point
-                ! (only needed for periodic conditions, otherwise
-                ! this point should be treated as normal)
-                
-                ! Periodic boundary, take velocity from the lower boundary
 
-                nc = 2*lgs%ij2n(i,j)            ! column counter for uy(i,j)
-                k = k+1
-                lgs%a_value(k) =  1.0_wp
-                lgs%a_index(k) = nc
-
-                nc = 2*lgs%ij2n(i,ny-2)         ! column counter for uy(i,ny-2)
-                k = k+1
-                lgs%a_value(k) = -1.0_wp
-                lgs%a_index(k) = nc
-
-                lgs%b_value(nr) = 0.0_wp
-                lgs%x_value(nr) = uy(i,j)
-
-            else if (j .eq. ny-1 .and. trim(boundaries_uy(2)) .eq. "periodic") then
-                ! Upper boundary, inward by one point
-                ! (only needed for periodic conditions, otherwise
-                ! this point should be treated as normal)
-                
-                ! Periodic boundary, take velocity from the lower boundary
-                
-                nc = 2*lgs%ij2n(i,j)            ! column counter for uy(i,j)
-                k = k+1
-                lgs%a_value(k) =  1.0_wp
-                lgs%a_index(k) = nc
-
-                nc = 2*lgs%ij2n(i,2)            ! column counter for uy(i,2)
-                k = k+1
-                lgs%a_value(k) = -1.0_wp
-                lgs%a_index(k) = nc
-
-                lgs%b_value(nr) = 0.0_wp
-                lgs%x_value(nr) = uy(i,j)
-  
-            else if (i .eq. 1) then 
+            else if (i .eq. 1 .and. trim(boundaries_uy(3)) .ne. "periodic") then 
                 ! Left boundary 
 
                 select case(trim(boundaries_uy(3)))
@@ -948,48 +709,20 @@ contains
                         lgs%b_value(nr) = 0.0_wp
                         lgs%x_value(nr) = 0.0_wp
 
-                    case("infinite")
-                        ! Infinite boundary, take velocity from one point inward
+                    case("free-slip")
+                        ! Free-slip boundary condition
+                        ! (zero-velocity perpindicular to boundary)
 
-                        nc = 2*lgs%ij2n(i,j)            ! column counter for uy(i,j)
                         k = k+1
-                        lgs%a_value(k) =  1.0_wp
-                        lgs%a_index(k) = nc
-
-                        nc = 2*lgs%ij2n(2,j)            ! column counter for uy(2,j)
-                        k = k+1
-                        lgs%a_value(k) = -1.0_wp
-                        lgs%a_index(k) = nc
+                        lgs%a_value(k)  = 1.0_wp   ! diagonal element only
+                        lgs%a_index(k)  = nr
 
                         lgs%b_value(nr) = 0.0_wp
-                        lgs%x_value(nr) = uy(i,j)
-
-                    case("periodic")
-                        ! Periodic boundary, take velocity from the right boundary
-                        
-                        nc = 2*lgs%ij2n(i,j)            ! column counter for uy(i,j)
-                        k = k+1
-                        lgs%a_value(k) =  1.0_wp
-                        lgs%a_index(k) = nc
-
-                        nc = 2*lgs%ij2n(nx-1,j)         ! column counter for uy(nx-1,j)
-                        k = k+1
-                        lgs%a_value(k) = -1.0_wp
-                        lgs%a_index(k) = nc
-
-                        lgs%b_value(nr) = 0.0_wp
-                        lgs%x_value(nr) = uy(i,j)
-
-                    case DEFAULT 
-
-                        write(*,*) "linear_solver_matrix_ssa_ac_csr_2D:: Error: left-border condition not &
-                        &recognized: "//trim(boundaries_uy(3))
-                        write(*,*) "boundaries parameter set to: "//trim(boundaries)
-                        stop
+                        lgs%x_value(nr) = 0.0_wp
 
                 end select 
                 
-            else if (i .eq. nx) then 
+            else if (i .eq. nx .and. trim(boundaries_uy(1)) .ne. "periodic") then 
                 ! Right boundary 
 
                 select case(trim(boundaries_uy(1)))
@@ -1004,51 +737,23 @@ contains
                         lgs%b_value(nr) = 0.0_wp
                         lgs%x_value(nr) = 0.0_wp
 
-                    case("infinite")
-                        ! Infinite boundary, take velocity from one point inward
-
-                        nc = 2*lgs%ij2n(i,j)            ! column counter for uy(i,j)
-                        k = k+1
-                        lgs%a_value(k) =  1.0_wp
-                        lgs%a_index(k) = nc
-
-                        nc = 2*lgs%ij2n(nx-1,j)         ! column counter for uy(nx-1,j)
-                        k = k+1
-                        lgs%a_value(k) = -1.0_wp
-                        lgs%a_index(k) = nc
-
-                        lgs%b_value(nr) = 0.0_wp
-                        lgs%x_value(nr) = uy(i,j)
-
-                    case("periodic")
-                        ! Periodic boundary, take velocity from the right boundary
+                    case("free-slip")
+                        ! Free-slip boundary condition
+                        ! (zero-velocity perpindicular to boundary)
                         
-                        nc = 2*lgs%ij2n(i,j)            ! column counter for uy(i,j)
                         k = k+1
-                        lgs%a_value(k) =  1.0_wp
-                        lgs%a_index(k) = nc
-
-                        nc = 2*lgs%ij2n(2,j)            ! column counter for uy(2,j)
-                        k = k+1
-                        lgs%a_value(k) = -1.0_wp
-                        lgs%a_index(k) = nc
+                        lgs%a_value(k)  = 1.0_wp   ! diagonal element only
+                        lgs%a_index(k)  = nr
 
                         lgs%b_value(nr) = 0.0_wp
-                        lgs%x_value(nr) = uy(i,j)
-
-                    case DEFAULT 
-
-                        write(*,*) "linear_solver_matrix_ssa_ac_csr_2D:: Error: right-border condition not &
-                        &recognized: "//trim(boundaries_uy(1))
-                        write(*,*) "boundaries parameter set to: "//trim(boundaries)
-                        stop
+                        lgs%x_value(nr) = 0.0_wp
 
                 end select 
 
             else if (ssa_mask_acy(i,j) .eq. 3) then 
                 ! Lateral boundary condition should be applied here 
 
-                if (f_ice(i,j) .eq. 1.0 .and. f_ice(i,j+1) .lt. 1.0) then 
+                if (f_ice(i,j) .eq. 1.0 .and. f_ice(i,jp1) .lt. 1.0) then 
                     ! === Case 1: ice-free to the top ===
 
                     N_aa_now = N_aa(i,j)
@@ -1480,7 +1185,7 @@ contains
 
 ! === INTERNAL ROUTINES ==== 
 
-    subroutine stagger_visc_aa_ab(visc_ab,visc,H_ice,f_ice,boundaries)
+    subroutine stagger_visc_aa_ab(visc_ab,visc,H_ice,f_ice)
 
         implicit none 
 
@@ -1488,7 +1193,6 @@ contains
         real(wp), intent(IN)  :: visc(:,:) 
         real(wp), intent(IN)  :: H_ice(:,:) 
         real(wp), intent(IN)  :: f_ice(:,:) 
-        character(len=*), intent(IN) :: boundaries
         
         ! Local variables 
         integer :: i, j, k
@@ -1505,29 +1209,16 @@ contains
         do i = 1, nx 
         do j = 1, ny 
 
-            ! Get neighbor indices
-            im1 = max(i-1,1) 
-            ip1 = min(i+1,nx) 
-            jm1 = max(j-1,1) 
-            jp1 = min(j+1,ny) 
-            
-            ! Adjust border indices for specific periodic cases
-            ! (other cases should be ok with choice above?)
-            select case(trim(boundaries)) 
+            ! BC: Periodic boundary conditions by default
+            im1 = i-1
+            if (im1 == 0) im1 = nx
+            ip1 = i+1
+            if (ip1 == nx+1) ip1 = 1
+            jm1 = j-1
+            if (jm1 == 0) jm1 = ny
+            jp1 = j+1
+            if (jp1 == ny+1) jp1 = 1
 
-                case("periodic")
-
-                    if (i .eq. 1)  im1 = nx 
-                    if (i .eq. nx) ip1 = 1 
-                    if (j .eq. 1)  jm1 = ny 
-                    if (j .eq. ny) jp1 = 1 
-
-                case("periodic-x")
-
-                    if (i .eq. 1)  im1 = nx 
-                    if (i .eq. nx) ip1 = 1 
-                    
-            end select 
 
             visc_ab(i,j) = 0.0_wp
             k=0

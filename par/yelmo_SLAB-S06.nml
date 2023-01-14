@@ -11,8 +11,8 @@
 
     ! Domain parameters 
     dx           = 2.0                  ! [km] Grid resolution
-    lx           = 140.0                ! [km] Grid length, x-direction 
-    ly           = 100.0                ! [km] Grid width,  y-direction 
+    lx           = 100.0                ! [km] Grid length, x-direction 
+    ly           =  80.0                ! [km] Grid width,  y-direction 
     fc           = 16.0                 ! [km] Characteristic width of channel side walls
     dc           = 500.0                ! [m] Depth of bed trough compared with side walls
     wc           = 24.0                 ! [km] Half-width of bed trough
@@ -36,7 +36,7 @@
     domain          = "SLAB"
     grid_name       = "SLAB"
     grid_path       = "none"
-    experiment      = "infinite"
+    experiment      = "periodic"
     restart         = "no"
     restart_z_bed   = False             ! Take z_bed (and z_bed_sd) from restart file
     restart_H_ice   = False             ! Take H_ice from restart file

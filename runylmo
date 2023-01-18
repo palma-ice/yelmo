@@ -326,7 +326,18 @@ def main():
     # 2. Run the job
     ##########################################
 
-    # Generate the appropriate executable command to run job
+    # Determine where job will be running from
+    if copy_exec: 
+        # Assume executable is running from rundir
+        exe_rundir = "."
+
+    else:
+        # Assume executable will run from current working directory 
+        exe_rundir = os.getcwd()
+
+    # Generate the appropriate executable command to run program
+    executable = "{}{}/{} {}".format(profiler_prefix,exe_rundir,exe_path,exe_args)
+
     if copy_exec:
         # Assume executable is running from rundir
         #executable = "{}./{} {}".format(profiler_prefix,exe_fname,exe_args)
@@ -347,7 +358,8 @@ def main():
 
         else:
             # Run job in background 
-            pid = runjob(rundir,executable,omp)
+            command = "mpirun -n 1 {}".format(executable)
+            pid = runjob(rundir,command,omp)
 
     return 
 

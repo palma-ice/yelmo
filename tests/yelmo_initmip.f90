@@ -396,8 +396,8 @@ program yelmo_test
                 ! === Optimization parameters =========
                 
                 ! Update model relaxation time scale and error scaling (in [m])
-                opt%rel_tau = get_opt_param(time,time1=opt%rel_time1,time2=opt%rel_time2, &
-                                                p1=opt%rel_tau1,p2=opt%rel_tau2,m=opt%rel_m)
+                call optimize_set_transient_param(opt%rel_tau,time,time1=opt%rel_time1, &
+                                        time2=opt%rel_time2,p1=opt%rel_tau1,p2=opt%rel_tau2,m=opt%rel_m)
                 
                 ! Set model tau, and set yelmo relaxation switch (2: gl-line and shelves relaxing; 0: no relaxation)
                 yelmo1%tpo%par%topo_rel_tau = opt%rel_tau 

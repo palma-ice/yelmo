@@ -289,7 +289,7 @@ contains
 
         ! Calculate the staggered depth-integrated viscosity 
         ! at the grid-cell corners (ab-nodes). 
-        call stagger_visc_aa_ab(N_ab,N_aa,H_ice,f_ice,boundaries)
+        call stagger_visc_aa_ab(N_ab,N_aa,H_ice,f_ice)
         
 
         !-------- Assembly of the system of linear equations

@@ -336,8 +336,8 @@ def main():
         exe_rundir = os.getcwd()
 
     # Generate the appropriate executable command to run program
-    executable = "{}{}/{} {}".format(profiler_prefix,exe_rundir,exe_path,exe_args)
-    
+    executable = "{}{}/{} {}".format(profiler_prefix,exe_rundir,exe_fname,exe_args)
+
     # Run the job if desired 
     if run:
 

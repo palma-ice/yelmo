@@ -421,7 +421,8 @@ end if
         character(len=*), intent(IN) :: boundaries 
 
         ! Local variables
-        integer :: i, j, k, ip1, jp1, nx, ny, nz_aa  
+        integer :: i, j, k, nx, ny, nz_aa
+        integer :: im1, ip1, jm1, jp1
         real(wp), allocatable :: F1(:,:,:) 
         real(wp) :: F1_ac
 
@@ -452,8 +453,8 @@ end if
         do j = 1, ny 
         do i = 1, nx 
 
-            ip1 = min(i+1,nx)
-            jp1 = min(j+1,ny) 
+            ! Get neighbor indices
+            call get_neighbor_indices(im1,ip1,jm1,jp1,i,j,nx,ny,boundaries)
 
             ! === x direction ===============================================
 
@@ -486,10 +487,6 @@ end if
         end do 
         end do  
         end do
-
-        ! Apply boundary conditions as needed 
-        call set_boundaries_3D_acx(ux,boundaries)
-        call set_boundaries_3D_acy(uy,boundaries)
         
         return 
 
@@ -512,7 +509,7 @@ end if
 
         ! Local variables 
         integer  :: i, j, k, nx, ny, nz_aa 
-        integer  :: ip1, jp1 
+        integer  :: im1, ip1, jm1, jp1 
         real(wp) :: visc_eff_ac
 
         ! real(wp), parameter :: visc_min = 1e5_wp 
@@ -526,10 +523,9 @@ end if
         do j = 1, ny
         do i = 1, nx 
 
-            ! Get staggering indices limited to grid size
-            ip1 = min(i+1,nx)
-            jp1 = min(j+1,ny) 
-            
+            ! Get neighbor indices
+            call get_neighbor_indices(im1,ip1,jm1,jp1,i,j,nx,ny,boundaries)
+
             ! Calculate shear strain, acx-nodes
             visc_eff_ac  = calc_staggered_margin(visc_eff(i,j,k),visc_eff(ip1,j,k),f_ice(i,j),f_ice(ip1,j))
             if (visc_eff_ac .ne. 0.0_wp) then 
@@ -551,10 +547,6 @@ end if
         end do 
         !$omp end parallel do
 
-        ! Apply boundary conditions as needed 
-        call set_boundaries_3D_acx(duxdz,boundaries)
-        call set_boundaries_3D_acy(duydz,boundaries)
-        
         return 
 
     end subroutine calc_vertical_shear_3D
@@ -580,7 +572,7 @@ end if
 
         ! Local variables 
         integer  :: i, j, k
-        integer  :: ip1, jp1, im1, jm1 
+        integer  :: im1, ip1, jm1, jp1
         integer  :: nx, ny, nz   
         real(wp) :: p1, p2, eps_0_sq  
         real(wp) :: eps_sq                              ! [1/yr^2]

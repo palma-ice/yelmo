@@ -8,7 +8,7 @@ module thermodynamics
                            rho_sw, rho_w, rho_rock, L_ice, T_pmp_beta, &
                            TOL_UNDERFLOW 
 
-    use yelmo_tools, only : stagger_nodes_acx_ab_ice, stagger_nodes_acy_ab_ice, &
+    use yelmo_tools, only : get_neighbor_indices, acx_to_nodes, acy_to_nodes, stagger_nodes_acx_ab_ice, stagger_nodes_acy_ab_ice, &
                             set_boundaries_3D_aa
     
     use grid_calcs 
@@ -43,6 +43,7 @@ module thermodynamics
 
     public :: calc_basal_heating_fromaa 
     public :: calc_basal_heating_fromab 
+    public :: calc_basal_heating_nodes
     public :: calc_basal_heating_fromac 
     public :: calc_basal_heating_interp
 
@@ -253,7 +254,7 @@ contains
 
     end subroutine calc_advec_horizontal_column_quick
     
-    subroutine calc_advec_horizontal_column(advecxy,var_ice,H_ice,z_srf,ux,uy,dx,i,j)
+    subroutine calc_advec_horizontal_column(advecxy,var_ice,H_ice,z_srf,ux,uy,dx,i,j,boundaries)
         ! Newly implemented advection algorithms (ajr)
         ! Output: [K a-1]
 
@@ -269,9 +270,11 @@ contains
         real(prec), intent(IN)  :: uy(:,:,:)        ! nx,ny,nz_aa 
         real(prec), intent(IN)  :: dx  
         integer,    intent(IN)  :: i, j 
+        character(len=*), intent(IN) :: boundaries 
 
         ! Local variables 
         integer :: k, nx, ny, nz_aa 
+        integer :: im1, ip1, jm1, jp1
         real(prec) :: ux_aa, uy_aa 
         real(prec) :: dx_inv, dx_inv2
         real(prec) :: advecx, advecy, advec_rev 
@@ -288,15 +291,18 @@ contains
         advecy  = 0.0 
         advecxy = 0.0 
 
+        ! Get neighbor indices
+        call get_neighbor_indices(im1,ip1,jm1,jp1,i,j,nx,ny,boundaries)
+
         ! Loop over each point in the column
         do k = 1, nz_aa 
 
             ! Estimate direction of current flow into cell (x and y), centered in vertical layer and grid point
-            ux_aa = 0.5_prec*(ux(i,j,k)+ux(i-1,j,k))
-            uy_aa = 0.5_prec*(uy(i,j,k)+uy(i,j-1,k))
+            ux_aa = 0.5_prec*(ux(i,j,k)+ux(im1,j,k))
+            uy_aa = 0.5_prec*(uy(i,j,k)+uy(i,jm1,k))
             
             ! Explicit form (to test different order approximations)
-            if (ux(i-1,j,k) .gt. 0.0_prec .and. ux(i,j,k) .lt. 0.0_prec .and. i .ge. 3 .and. i .le. nx-2) then 
+            if (ux(im1,j,k) .gt. 0.0_prec .and. ux(i,j,k) .lt. 0.0_prec .and. i .ge. 3 .and. i .le. nx-2) then 
                 ! Convergent flow - take the mean 
 
                 ! 2nd order
@@ -304,8 +310,8 @@ contains
                 !advec_rev = dx_inv2 * ux(i,j,k)*((4.0*var_ice(i+1,j,k)-var_ice(i+2,j,k)-3.0*var_ice(i,j,k)))
 
                 ! 1st order
-                advecx    = dx_inv * ux(i-1,j,k)*(-(var_ice(i-1,j,k)-var_ice(i,j,k)))
-                advec_rev = dx_inv * ux(i,j,k)*((var_ice(i+1,j,k)-var_ice(i,j,k)))
+                advecx    = dx_inv * ux(im1,j,k)*(-(var_ice(im1,j,k)-var_ice(i,j,k)))
+                advec_rev = dx_inv * ux(i,j,k)*((var_ice(ip1,j,k)-var_ice(i,j,k)))
                 
                 advecx    = 0.5_prec * (advecx + advec_rev) 
 
@@ -316,13 +322,13 @@ contains
                 !advecx = dx_inv2 * ux(i-1,j,k)*(-(4.0*var_ice(i-1,j,k)-var_ice(i-2,j,k)-3.0*var_ice(i,j,k)))
 
                 ! 1st order
-                advecx = dx_inv * ux(i-1,j,k)*(-(var_ice(i-1,j,k)-var_ice(i,j,k)))
+                advecx = dx_inv * ux(im1,j,k)*(-(var_ice(im1,j,k)-var_ice(i,j,k)))
                 
             else if (ux_aa .gt. 0.0 .and. i .eq. 2) then  
                 ! Flow to the right - border points
 
                 ! 1st order
-                advecx = dx_inv * ux(i-1,j,k)*(-(var_ice(i-1,j,k)-var_ice(i,j,k)))
+                advecx = dx_inv * ux(im1,j,k)*(-(var_ice(im1,j,k)-var_ice(i,j,k)))
                 
             else if (ux_aa .lt. 0.0 .and. i .le. nx-2) then 
                 ! Flow to the left
@@ -331,13 +337,13 @@ contains
                 !advecx = dx_inv2 * ux(i,j,k)*((4.0*var_ice(i+1,j,k)-var_ice(i+2,j,k)-3.0*var_ice(i,j,k)))
 
                 ! 1st order 
-                advecx = dx_inv * ux(i,j,k)*((var_ice(i+1,j,k)-var_ice(i,j,k)))
+                advecx = dx_inv * ux(i,j,k)*((var_ice(ip1,j,k)-var_ice(i,j,k)))
                 
             else if (ux_aa .lt. 0.0 .and. i .eq. nx-1) then 
                 ! Flow to the left
 
                 ! 1st order 
-                advecx = dx_inv * ux(i,j,k)*((var_ice(i+1,j,k)-var_ice(i,j,k)))
+                advecx = dx_inv * ux(i,j,k)*((var_ice(ip1,j,k)-var_ice(i,j,k)))
                 
             else 
                 ! No flow or divergent 
@@ -354,8 +360,8 @@ contains
                 !advec_rev = dx_inv2 * uy(i,j,k)*((4.0*var_ice(i,j+1,k)-var_ice(i,j+2,k)-3.0*var_ice(i,j,k)))
                 
                 ! 1st order
-                advecy    = dx_inv * uy(i,j-1,k)*(-(var_ice(i,j-1,k)-var_ice(i,j,k)))
-                advec_rev = dx_inv * uy(i,j,k)*((var_ice(i,j+1,k)-var_ice(i,j,k)))
+                advecy    = dx_inv * uy(i,jm1,k)*(-(var_ice(i,jm1,k)-var_ice(i,j,k)))
+                advec_rev = dx_inv * uy(i,j,k)*((var_ice(i,jp1,k)-var_ice(i,j,k)))
                 
                 advecy    = 0.5_prec * (advecy + advec_rev) 
 
@@ -366,13 +372,13 @@ contains
                 !advecy = dx_inv2 * uy(i,j-1,k)*(-(4.0*var_ice(i,j-1,k)-var_ice(i,j-2,k)-3.0*var_ice(i,j,k)))
 
                 ! 1st order
-                advecy = dx_inv * uy(i,j-1,k)*(-(var_ice(i,j-1,k)-var_ice(i,j,k)))
+                advecy = dx_inv * uy(i,jm1,k)*(-(var_ice(i,jm1,k)-var_ice(i,j,k)))
                 
             else if (uy_aa .gt. 0.0 .and. j .eq. 2) then   
                 ! Flow to the right - border points
 
                 ! 1st order
-                advecy = dx_inv * uy(i,j-1,k)*(-(var_ice(i,j-1,k)-var_ice(i,j,k)))
+                advecy = dx_inv * uy(i,jm1,k)*(-(var_ice(i,jm1,k)-var_ice(i,j,k)))
                 
             else if (uy_aa .lt. 0.0 .and. j .le. ny-2) then 
                 ! Flow to the left
@@ -381,13 +387,13 @@ contains
                 !advecy = dx_inv2 * uy(i,j,k)*((4.0*var_ice(i,j+1,k)-var_ice(i,j+2,k)-3.0*var_ice(i,j,k)))
                 
                 ! 1st order
-                advecy = dx_inv * uy(i,j,k)*((var_ice(i,j+1,k)-var_ice(i,j,k)))
+                advecy = dx_inv * uy(i,j,k)*((var_ice(i,jp1,k)-var_ice(i,j,k)))
                 
             else if (uy_aa .lt. 0.0 .and. j .eq. ny-1) then 
                 ! Flow to the left
 
                 ! 1st order
-                advecy = dx_inv * uy(i,j,k)*((var_ice(i,j+1,k)-var_ice(i,j,k)))
+                advecy = dx_inv * uy(i,j,k)*((var_ice(i,jp1,k)-var_ice(i,j,k)))
                   
             else
                 ! No flow 
@@ -440,7 +446,7 @@ contains
          
         do j = 2, ny-1
         do i = 2, nx-1 
-            call calc_advec_horizontal_column(advecxy(i,j,:),var,H_ice,z_srf,ux,uy,dx,i,j)
+            call calc_advec_horizontal_column(advecxy(i,j,:),var,H_ice,z_srf,ux,uy,dx,i,j,boundaries)
         end do 
         end do 
 
@@ -649,6 +655,80 @@ contains
  
     end subroutine calc_basal_heating_fromaa
 
+    subroutine calc_basal_heating_nodes(Q_b,ux_b,uy_b,taub_acx,taub_acy,f_ice,beta1,beta2,boundaries)
+         ! Qb [J a-1 m-2] == [m a-1] * [J m-3]
+         ! Note: grounded ice fraction f_grnd_acx/y not used here, because taub_acx/y already accounts
+         ! for the grounded fraction via beta_acx/y: Q_b = tau_b*u = -beta*u*u.
+
+        real(prec), intent(INOUT) :: Q_b(:,:)           ! [mW m-2] Basal heat production (friction), aa-nodes
+        real(prec), intent(IN)    :: ux_b(:,:)          ! Basal velocity, x-component (acx)
+        real(prec), intent(IN)    :: uy_b(:,:)          ! Basal velocity, y-compenent (acy)
+        real(prec), intent(IN)    :: taub_acx(:,:)      ! Basal friction (acx)
+        real(prec), intent(IN)    :: taub_acy(:,:)      ! Basal friction (acy) 
+        real(prec), intent(IN)    :: f_ice(:,:)         ! [--] Ice area fraction
+        real(prec), intent(IN)    :: beta1              ! Timestepping weighting parameter
+        real(prec), intent(IN)    :: beta2              ! Timestepping weighting parameter
+        character(len=*), intent(IN) :: boundaries 
+
+        ! Local variables
+        integer  :: i, j, nx, ny, n 
+        integer  :: im1, ip1, jm1, jp1  
+
+        real(wp) :: wt0, wt1
+        real(wp) :: xn(4) 
+        real(wp) :: yn(4) 
+        real(wp) :: wtn(4)
+        real(wp) :: uxbn(4)
+        real(wp) :: uybn(4)
+        real(wp) :: taubxn(4)
+        real(wp) :: taubyn(4)
+        real(wp) :: Qbn(4)
+        real(wp) :: Qb_aa 
+
+        nx = size(Q_b,1)
+        ny = size(Q_b,2)
+
+        wt0 = 1.0/sqrt(3.0)
+        xn  = [wt0,-wt0,-wt0, wt0]
+        yn  = [wt0, wt0,-wt0,-wt0]
+        wtn = [1.0,1.0,1.0,1.0]
+        wt1 = sum(wtn)
+
+        do j = 1, ny 
+        do i = 1, nx
+         
+            ! Get neighbor indices
+            call get_neighbor_indices(im1,ip1,jm1,jp1,i,j,nx,ny,boundaries)
+
+            ! Get velocity components on nodes
+            call acx_to_nodes(uxbn,ux_b,i,j,xn,yn,im1,ip1,jm1,jp1)
+            call acy_to_nodes(uybn,uy_b,i,j,xn,yn,im1,ip1,jm1,jp1)
+
+            ! Get basal stress components on nodes
+            call acx_to_nodes(taubxn,taub_acx,i,j,xn,yn,im1,ip1,jm1,jp1)
+            call acy_to_nodes(taubyn,taub_acy,i,j,xn,yn,im1,ip1,jm1,jp1)
+
+            ! Calculate Qb at quadrature points [Pa m a-1] == [J a-1 m-2]
+            !Qbn   = abs( sqrt(uxbn**2+uybn**2) * sqrt(taubxn**2+taubyn**2) ) ! <= WRONG, ajr, 2023-01-21
+            Qbn   = sqrt( (uxbn*taubxn)**2 + (uybn*taubyn)**2 )
+            Qb_aa = sum(Qbn*wtn)/wt1
+
+            ! Ensure Q_b is strictly positive 
+            if (Qb_aa .lt. 0.0_wp) Qb_aa = 0.0_wp 
+
+            ! Convert to [mW m-2]
+            Qb_aa = Qb_aa * 1e3 / sec_year          ! [J a-1 m-2] => [mW m-2]
+
+            ! Get weighted average of Q_b with timestepping factors
+            Q_b(i,j) = beta1*Qb_aa + beta2*Q_b(i,j)
+
+        end do
+        end do 
+
+        return 
+ 
+    end subroutine calc_basal_heating_nodes
+    
     subroutine calc_basal_heating_fromab_new(Q_b,ux_b,uy_b,taub_acx,taub_acy,f_ice,beta1,beta2)
          ! Qb [J a-1 m-2] == [m a-1] * [J m-3]
          ! Note: grounded ice fraction f_grnd_acx/y not used here, because taub_acx/y already accounts

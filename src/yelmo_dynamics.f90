@@ -108,7 +108,7 @@ contains
 
         ! Calculate lateral boundary stress 
         call calc_lateral_bc_stress_2D(dyn%now%taul_int_acx,dyn%now%taul_int_acy,tpo%now%mask_frnt, &
-                        tpo%now%H_ice,tpo%now%f_ice,tpo%now%z_srf,bnd%z_sl,rho_ice,rho_sw)
+                        tpo%now%H_ice,tpo%now%f_ice,tpo%now%z_srf,bnd%z_sl,rho_ice,rho_sw,dyn%par%boundaries)
 
         ! Calculate effective pressure 
         call calc_ydyn_neff(dyn,tpo,thrm,bnd)
@@ -397,7 +397,8 @@ contains
         end if 
 
         call calc_uz_3D(dyn%now%uz,dyn%now%ux,dyn%now%uy,tpo%now%H_ice_dyn,tpo%now%f_ice_dyn,tpo%now%f_grnd,tpo%now%z_srf, &
-                        bnd%smb,bmb,tpo%now%dHicedt,tpo%now%dzsrfdt,dyn%par%zeta_aa,dyn%par%zeta_ac,dyn%par%dx,dyn%par%dy)
+                        bnd%smb,bmb,tpo%now%dHicedt,tpo%now%dzsrfdt,dyn%par%zeta_aa,dyn%par%zeta_ac, &
+                        dyn%par%dx,dyn%par%dy,dyn%par%boundaries)
         
         
         return
@@ -513,7 +514,8 @@ contains
         end if 
 
         call calc_uz_3D(dyn%now%uz,dyn%now%ux,dyn%now%uy,tpo%now%H_ice_dyn,tpo%now%f_ice_dyn,tpo%now%f_grnd,tpo%now%z_srf, &
-                        bnd%smb,bmb,tpo%now%dHicedt,tpo%now%dzsrfdt,dyn%par%zeta_aa,dyn%par%zeta_ac,dyn%par%dx,dyn%par%dy)
+                        bnd%smb,bmb,tpo%now%dHicedt,tpo%now%dzsrfdt,dyn%par%zeta_aa,dyn%par%zeta_ac, &
+                        dyn%par%dx,dyn%par%dy,dyn%par%boundaries)
         
         
         return
@@ -610,7 +612,8 @@ contains
         end if 
 
         call calc_uz_3D(dyn%now%uz,dyn%now%ux,dyn%now%uy,tpo%now%H_ice_dyn,tpo%now%f_ice_dyn,tpo%now%f_grnd,tpo%now%z_srf, &
-                        bnd%smb,bmb,tpo%now%dHicedt,tpo%now%dzsrfdt,dyn%par%zeta_aa,dyn%par%zeta_ac,dyn%par%dx,dyn%par%dy)
+                        bnd%smb,bmb,tpo%now%dHicedt,tpo%now%dzsrfdt,dyn%par%zeta_aa,dyn%par%zeta_ac, &
+                        dyn%par%dx,dyn%par%dy,dyn%par%boundaries)
         
         
         return

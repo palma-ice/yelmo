@@ -2,8 +2,8 @@
 
 fldr='tmp/20099e3'
 
-#runopt='-r'
-runopt='-s'
+runopt='-r'
+#runopt='-s'
 
 ### BENCHMARK TESTS ###
 
@@ -86,6 +86,19 @@ jobrun ./runylmo -r -e trough -n par/yelmo_SLAB-S06.nml -- -o ${fldr}/slab06-2 -
 
 # Standard ensemble, but different flow law exponent 
 jobrun ./runylmo -r -e trough -n par/yelmo_SLAB-S06.nml -- -o ${fldr}/slab06-3 -p ctrl.dx=0.5,1,2,4,8 ydyn.beta_q=0.5
+
+### SLAB Robinson 2022 ###
+
+make slab 
+
+# One simulation with solver of choice for each case
+# No ice thickness evolution
+jobrun ./runylmo ${runopt} -e slab -n par/yelmo_slab.nml -- -o ${fldr}/slab/weak   -p yelmo.pc_method="FE-SBE" ytopo.topo_fixed=True ctrl.dtt=0.1 ctrl.H0=1000 ctrl.H_stdev=0.0 ydyn.visc_const=1e5 ydyn.beta_const=1e3 ydyn.solver="ssa" ydyn.visc_method=3 ymat.rf_method=0
+jobrun ./runylmo ${runopt} -e slab -n par/yelmo_slab.nml -- -o ${fldr}/slab/strong -p yelmo.pc_method="FE-SBE" ytopo.topo_fixed=True ctrl.dtt=0.1 ctrl.H0=500  ctrl.H_stdev=0.0 ydyn.visc_const=4e5 ydyn.beta_const=30  ydyn.solver="ssa" ydyn.visc_method=3 ymat.rf_method=0
+
+# Full ensemble:
+jobrun ./runylmo ${runopt} -e slab -n par/yelmo_slab.nml -- -o ${fldr}/slab-sd0.1/weak   -p yelmo.pc_method="FE-SBE" yelmo.pc_use_H_pred=True ctrl.dtt=0.0 ctrl.H0=1000 ctrl.H_stdev=0.1 ydyn.visc_const=1e5 ydyn.beta_const=1e3 ydyn.solver="diva","hybrid","l1l2","ssa","sia"
+jobrun ./runylmo ${runopt} -e slab -n par/yelmo_slab.nml -- -o ${fldr}/slab-sd0.1/strong -p yelmo.pc_method="FE-SBE" yelmo.pc_use_H_pred=True ctrl.dtt=0.0 ctrl.H0=500  ctrl.H_stdev=0.1 ydyn.visc_const=4e5 ydyn.beta_const=30  ydyn.solver="diva","hybrid","l1l2","ssa","sia"
 
 
 ### AGE TESTS ###

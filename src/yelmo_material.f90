@@ -90,7 +90,7 @@ if (.FALSE.) then
 
         call calc_strain_rate_tensor(mat%now%strn,mat%now%strn2D,dyn%now%ux,dyn%now%uy,dyn%now%uz, &
                                  tpo%now%H_ice,tpo%now%f_ice,tpo%now%f_grnd,mat%par%zeta_aa, &
-                                 mat%par%zeta_ac,mat%par%dx,mat%par%de_max,mat%par%n_glen)
+                                 mat%par%zeta_ac,mat%par%dx,mat%par%dx,mat%par%de_max,mat%par%n_glen,tpo%par%boundaries)
 
 else 
         ! Calculate strain rate tensor on aa-nodes directly

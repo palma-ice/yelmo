@@ -1,7 +1,8 @@
 module calving
     ! Definitions for various calving laws 
 
-    use yelmo_defs, only : sp, dp, wp, prec, TOL_UNDERFLOW, rho_ice, rho_sw, g  
+    use yelmo_defs, only : sp, dp, wp, prec, TOL_UNDERFLOW, rho_ice, rho_sw, g
+    use yelmo_tools, only : get_neighbor_indices
     use topography, only : calc_H_eff 
 
     implicit none 
@@ -32,7 +33,7 @@ module calving
 
 contains 
     
-    subroutine apply_thin_calving_rate(calv_flt,H_ice,f_ice,f_grnd,calv_thin)
+    subroutine apply_thin_calving_rate(calv_flt,H_ice,f_ice,f_grnd,calv_thin,boundaries)
         ! Adjust calving rate based on ice thickness 
         ! to ensure that thin ice (calv_thin*1yr=Xm) is removed
         ! following Pattyn (2017), Eq. 24. Typical parameters 
@@ -46,7 +47,8 @@ contains
         real(wp), intent(IN)    :: f_ice(:,:) 
         real(wp), intent(IN)    :: f_grnd(:,:) 
         real(wp), intent(IN)    :: calv_thin
-        
+        character(len=*), intent(IN) :: boundaries 
+
         ! Local variables
         integer  :: i, j, nx, ny, n_mrgn, n_grnd 
         integer  :: im1, ip1, jm1, jp1
@@ -61,12 +63,9 @@ contains
         do j = 1, ny 
         do i = 1, nx 
 
-            ! Define neighbor indices
-            im1 = max(i-1,1)
-            ip1 = min(i+1,nx)
-            jm1 = max(j-1,1)
-            jp1 = min(j+1,ny)
-            
+            ! Get neighbor indices
+            call get_neighbor_indices(im1,ip1,jm1,jp1,i,j,nx,ny,boundaries)
+
             ! Count number of grounded ice-covered neighbors
             n_grnd = count([f_ice(im1,j),f_ice(ip1,j),f_ice(i,jm1),f_ice(i,jp1)].gt.0.0 .and. &
                            [f_grnd(im1,j),f_grnd(ip1,j),f_grnd(i,jm1),f_grnd(i,jp1)].gt.0.0)
@@ -105,7 +104,7 @@ contains
 
     end subroutine apply_thin_calving_rate
 
-    subroutine calc_calving_tongues(calv_flt,H_ice,f_ice,f_grnd,tau)
+    subroutine calc_calving_tongues(calv_flt,H_ice,f_ice,f_grnd,tau,boundaries)
         ! Increase calving for floating margin points with 3+ calving
         ! fronts to avoid protruding ice tongues. 
 
@@ -116,6 +115,7 @@ contains
         real(wp), intent(IN)    :: f_ice(:,:) 
         real(wp), intent(IN)    :: f_grnd(:,:)  
         real(wp), intent(IN)    :: tau 
+        character(len=*), intent(IN) :: boundaries 
 
         ! Local variables 
         integer  :: i, j, nx, ny
@@ -130,12 +130,9 @@ contains
         do j = 1, ny 
         do i = 1, nx
 
-            ! Define neighbor indices
-            im1 = max(i-1,1)
-            ip1 = min(i+1,nx)
-            jm1 = max(j-1,1)
-            jp1 = min(j+1,ny)
-            
+            ! Get neighbor indices
+            call get_neighbor_indices(im1,ip1,jm1,jp1,i,j,nx,ny,boundaries)
+
             ! Count number of grounded ice-covered neighbors
             n_grnd = count([f_ice(im1,j),f_ice(ip1,j),f_ice(i,jm1),f_ice(i,jp1)].gt.0.0 .and. &
                            [f_grnd(im1,j),f_grnd(ip1,j),f_grnd(i,jm1),f_grnd(i,jp1)].gt.0.0)
@@ -231,7 +228,7 @@ contains
         
     end subroutine calc_calving_tongues
 
-    subroutine calc_calving_residual(calv,H_ice,f_ice,dt,resid_lim)
+    subroutine calc_calving_residual(calv,H_ice,f_ice,dt,boundaries,resid_lim)
 
         implicit none 
 
@@ -239,6 +236,7 @@ contains
         real(wp), intent(IN)    :: H_ice(:,:) 
         real(wp), intent(IN)    :: f_ice(:,:)
         real(wp), intent(IN)    :: dt 
+        character(len=*), intent(IN) :: boundaries
         real(wp), intent(IN), optional :: resid_lim 
 
         ! Local variables 
@@ -290,11 +288,8 @@ contains
         do j = 1, ny 
         do i = 1, nx 
 
-            ! Define neighbor indices
-            im1 = max(i-1,1)
-            ip1 = min(i+1,nx)
-            jm1 = max(j-1,1)
-            jp1 = min(j+1,ny)
+            ! Get neighbor indices
+            call get_neighbor_indices(im1,ip1,jm1,jp1,i,j,nx,ny,boundaries)
             
             ! Calculate effective ice thickness for current cell
             if (f_ice(i,j) .gt. 0.0_prec) then 
@@ -399,7 +394,7 @@ end if
 !
 ! ===================================================================
 
-    subroutine calc_calving_rate_simple(calv,H_ice,f_ice,f_grnd,H_calv,tau)
+    subroutine calc_calving_rate_simple(calv,H_ice,f_ice,f_grnd,H_calv,tau,boundaries)
         ! Calculate the calving rate [m/a] based on a simple threshold rule
         ! H_ice < H_calv
 
@@ -411,6 +406,7 @@ end if
         real(wp), intent(IN)  :: f_grnd(:,:)                ! [--] Grounded fraction
         real(wp), intent(IN)  :: H_calv                     ! [m] Calving thickness threshold
         real(wp), intent(IN)  :: tau                        ! [a] Calving timescale, ~ 1yr
+        character(len=*), intent(IN) :: boundaries
 
         ! Local variables 
         integer  :: i, j, nx, ny
@@ -428,12 +424,9 @@ end if
         do j=1,ny
         do i=1,nx
 
-            ! Get neighbor indices 
-            im1 = max(i-1,1)
-            ip1 = min(i+1,nx)
-            jm1 = max(j-1,1)
-            jp1 = min(j+1,ny)
-
+            ! Get neighbor indices
+            call get_neighbor_indices(im1,ip1,jm1,jp1,i,j,nx,ny,boundaries)
+            
             if ( (f_grnd(i,j) .eq. 0.0 .and. f_ice(i,j) .gt. 0.0) ) then 
                 ! Floating ice point
 
@@ -469,7 +462,7 @@ end if
 
     end subroutine calc_calving_rate_simple
     
-    subroutine calc_calving_rate_flux(calv,H_ice,f_ice,f_grnd,mbal,ux,uy,dx,H_calv,tau)
+    subroutine calc_calving_rate_flux(calv,H_ice,f_ice,f_grnd,mbal,ux,uy,dx,H_calv,tau,boundaries)
         ! Calculate the calving rate [m/a] based on a simple threshold rule
         ! H_ice < H_calv
 
@@ -485,6 +478,7 @@ end if
         real(wp), intent(IN)  :: dx                         ! [m] Grid resolution
         real(wp), intent(IN)  :: H_calv                     ! [m] Threshold for calving
         real(wp), intent(IN)  :: tau                        ! [yr] Calving timescale, ~ 1yr
+        character(len=*), intent(IN) :: boundaries 
 
         ! Local variables 
         integer  :: i, j, nx, ny
@@ -515,11 +509,8 @@ end if
         do i = 1, nx
             
             ! Get neighbor indices
-            im1 = max(i-1,1)
-            ip1 = min(i+1,nx)
-            jm1 = max(j-1,1)
-            jp1 = min(j+1,ny)
-
+            call get_neighbor_indices(im1,ip1,jm1,jp1,i,j,nx,ny,boundaries)
+            
             ! Get effective ice thickness
             call calc_H_eff(H_eff,H_ice(i,j),f_ice(i,j))
 
@@ -574,11 +565,8 @@ end if
         do j = 1, ny
         do i = 1, nx
 
-            ! Get neighbor indices 
-            im1 = max(i-1,1)
-            ip1 = min(i+1,nx)
-            jm1 = max(j-1,1)
-            jp1 = min(j+1,ny)
+            ! Get neighbor indices
+            call get_neighbor_indices(im1,ip1,jm1,jp1,i,j,nx,ny,boundaries)
             
             ! Check if mass balance of current point is positive, 
             ! and there is at least one grounded neighbor. In this
@@ -652,7 +640,7 @@ end if
 
     end subroutine calc_calving_rate_flux
     
-    subroutine calc_calving_rate_flux_grisli(calv,H_ice,f_ice,f_grnd,mbal,ux,uy,dx,H_calv,tau)
+    subroutine calc_calving_rate_flux_grisli(calv,H_ice,f_ice,f_grnd,mbal,ux,uy,dx,H_calv,tau,boundaries)
         ! Calculate the calving rate [m/a] based on a simple threshold rule
         ! H_ice < H_calv
 
@@ -668,6 +656,7 @@ end if
         real(wp), intent(IN)  :: dx                         ! [m] Grid resolution
         real(wp), intent(IN)  :: H_calv                     ! [m] Threshold for calving
         real(wp), intent(IN)  :: tau                        ! [yr] Calving timescale, ~ 1yr
+        character(len=*), intent(IN) :: boundaries 
 
         ! Local variables 
         integer :: i, j, nx, ny
@@ -693,8 +682,7 @@ end if
         do i = 1, nx
             
             ! Get neighbor indices
-            im1 = max(i-1,1)
-            jm1 = max(j-1,1)
+            call get_neighbor_indices(im1,ip1,jm1,jp1,i,j,nx,ny,boundaries)
             
             if (f_ice(i,j) .eq. 1.0) then 
 
@@ -724,11 +712,8 @@ end if
         do i = 1, nx
             
             ! Get neighbor indices
-            im1 = max(i-1,1)
-            ip1 = min(i+1,nx)
-            jm1 = max(j-1,1)
-            jp1 = min(j+1,ny)
-
+            call get_neighbor_indices(im1,ip1,jm1,jp1,i,j,nx,ny,boundaries)
+            
             if ( f_ice(i,j) .lt. 1.0 .and. &
                 count([f_ice(im1,j),f_ice(ip1,j),f_ice(i,jm1),f_ice(i,jp1)] .eq. 1.0_wp) .gt. 0 ) then 
                 ! Ice-free (or partially ice-free) with ice-covered neighbors
@@ -777,11 +762,8 @@ end if
         do j = 1, ny
         do i = 1, nx
 
-            ! Get neighbor indices 
-            im1 = max(i-1,1)
-            ip1 = min(i+1,nx)
-            jm1 = max(j-1,1)
-            jp1 = min(j+1,ny)
+            ! Get neighbor indices
+            call get_neighbor_indices(im1,ip1,jm1,jp1,i,j,nx,ny,boundaries)
             
             if ( (f_grnd(i,j) .eq. 0.0 .and. f_ice(i,j) .gt. 0.0 .and. H_diff(i,j).lt.0.0) .and. &
                    ( (f_grnd(im1,j) .eq. 0.0 .and. f_ice(im1,j).eq.0.0) .or. &
@@ -838,7 +820,7 @@ end if
 
     end subroutine calc_calving_rate_flux_grisli
     
-    subroutine calc_calving_rate_vonmises_l19(calv,H_ice,f_ice,f_grnd,tau_eff,dx,kt)
+    subroutine calc_calving_rate_vonmises_l19(calv,H_ice,f_ice,f_grnd,tau_eff,dx,kt,boundaries)
         ! Calculate the 'horizontal' calving rate [m/yr] based on the 
         ! von Mises stress approach, as outlined by Lipscomb et al. (2019)
         ! Eqs. 73-75.
@@ -853,6 +835,7 @@ end if
         real(wp), intent(IN)  :: tau_eff(:,:)
         real(wp), intent(IN)  :: dx
         real(wp), intent(IN)  :: kt
+        character(len=*), intent(IN) :: boundaries 
 
         ! Local variables 
         integer  :: i, j
@@ -877,10 +860,7 @@ end if
         do i = 1, nx  
             
             ! Get neighbor indices
-            im1 = max(i-1,1) 
-            ip1 = min(i+1,nx) 
-            jm1 = max(j-1,1) 
-            jp1 = min(j+1,ny) 
+            call get_neighbor_indices(im1,ip1,jm1,jp1,i,j,nx,ny,boundaries)
             
             if ( (f_grnd(i,j) .eq. 0.0 .and. f_ice(i,j) .gt. 0.0) ) then 
                 ! Floating ice point, calculate calving rate at the margin 
@@ -922,7 +902,7 @@ end if
 
     end subroutine calc_calving_rate_vonmises_l19
        
-    subroutine calc_calving_rate_eigen(calv,H_ice,f_ice,f_grnd,eps_eff,dx,k2)
+    subroutine calc_calving_rate_eigen(calv,H_ice,f_ice,f_grnd,eps_eff,dx,k2,boundaries)
         ! Calculate the 'horizontal' calving rate [m/yr] based on the 
         ! von Mises stress approach, as outlined by Lipscomb et al. (2019)
         ! Eqs. 73-75.
@@ -937,6 +917,7 @@ end if
         real(wp), intent(IN)  :: eps_eff(:,:)
         real(wp), intent(IN)  :: dx
         real(wp), intent(IN)  :: k2
+        character(len=*), intent(IN) :: boundaries 
 
         ! Local variables 
         integer  :: i, j
@@ -967,10 +948,7 @@ end if
         do i = 1, nx  
             
             ! Get neighbor indices
-            im1 = max(i-1,1) 
-            ip1 = min(i+1,nx) 
-            jm1 = max(j-1,1) 
-            jp1 = min(j+1,ny) 
+            call get_neighbor_indices(im1,ip1,jm1,jp1,i,j,nx,ny,boundaries)
             
             if ( (f_grnd(i,j) .eq. 0.0 .and. f_ice(i,j) .gt. 0.0) ) then 
                 ! Floating ice point, calculate calving rate at the margin 
@@ -1012,7 +990,7 @@ end if
 
     end subroutine calc_calving_rate_eigen
 
-    subroutine calc_eps_eff(eps_eff,eps_eig_1,eps_eig_2,f_ice)
+    subroutine calc_eps_eff(eps_eff,eps_eig_1,eps_eig_2,f_ice,boundaries)
 
         implicit none 
 
@@ -1020,6 +998,7 @@ end if
         real(wp), intent(IN)  :: eps_eig_1(:,:)
         real(wp), intent(IN)  :: eps_eig_2(:,:) 
         real(wp), intent(IN)  :: f_ice(:,:) 
+        character(len=*), intent(IN) :: boundaries 
 
         ! Local variables 
         integer  :: i, j, nx, ny, n  
@@ -1033,10 +1012,7 @@ end if
         do i = 1, nx 
 
             ! Get neighbor indices
-            im1 = max(i-1,1) 
-            ip1 = min(i+1,nx) 
-            jm1 = max(j-1,1) 
-            jp1 = min(j+1,ny) 
+            call get_neighbor_indices(im1,ip1,jm1,jp1,i,j,nx,ny,boundaries)
             
             if (f_ice(i,j) .eq. 0.0_wp) then 
                 ! Ice-free point, no strain
@@ -1077,7 +1053,7 @@ end if
 
     end subroutine calc_eps_eff
     
-    subroutine calc_tau_eff(tau_eff,tau_eig_1,tau_eig_2,f_ice,w2)
+    subroutine calc_tau_eff(tau_eff,tau_eig_1,tau_eig_2,f_ice,w2,boundaries)
 
         implicit none 
 
@@ -1086,6 +1062,7 @@ end if
         real(wp), intent(IN)  :: tau_eig_2(:,:) 
         real(wp), intent(IN)  :: f_ice(:,:) 
         real(wp), intent(IN)  :: w2 
+        character(len=*), intent(IN) :: boundaries 
 
         ! Local variables 
         integer  :: i, j, nx, ny, n  
@@ -1099,10 +1076,7 @@ end if
         do i = 1, nx 
 
             ! Get neighbor indices
-            im1 = max(i-1,1) 
-            ip1 = min(i+1,nx) 
-            jm1 = max(j-1,1) 
-            jp1 = min(j+1,ny) 
+            call get_neighbor_indices(im1,ip1,jm1,jp1,i,j,nx,ny,boundaries)
             
             if (f_ice(i,j) .eq. 0.0_wp) then 
                 ! Ice-free point, no stress
@@ -1169,7 +1143,7 @@ end if
 !
 ! ===================================================================
 
-    subroutine calc_calving_ground_rate_stress_b12(calv,H_ice,f_ice,f_grnd,z_bed,H_ocn,tau)
+    subroutine calc_calving_ground_rate_stress_b12(calv,H_ice,f_ice,f_grnd,z_bed,H_ocn,tau,boundaries)
         ! Remove marginal ice that exceeds a stress threshold following
         ! Bassis and Walker (2012), Eq. 2.12 
 
@@ -1182,6 +1156,7 @@ end if
         real(wp), intent(IN)  :: z_bed(:,:)             ! [m] Bedrock elevation 
         real(wp), intent(IN)  :: H_ocn(:,:)             ! [m] Ocean thickness (depth)
         real(wp), intent(IN)  :: tau                    ! [yr] Calving timescale 
+        character(len=*), intent(IN) :: boundaries 
 
         ! Local variables 
         integer  :: i, j, nx, ny
@@ -1210,11 +1185,8 @@ end if
         do i = 1, nx 
 
             ! Get neighbor indices
-            im1 = max(i-1,1) 
-            ip1 = min(i+1,nx) 
-            jm1 = max(j-1,1) 
-            jp1 = min(j+1,ny) 
-
+            call get_neighbor_indices(im1,ip1,jm1,jp1,i,j,nx,ny,boundaries)
+            
             ! Check if neighbors are ice free and not at higher bedrock elevation
             mask_neighb = ([f_ice(im1,j),f_ice(ip1,j),f_ice(i,jm1),f_ice(i,jp1)] .eq. 0.0) .and. &
                           ([z_bed(im1,j),z_bed(ip1,j),z_bed(i,jm1),z_bed(i,jp1)] .le. z_bed(i,j))
@@ -1262,7 +1234,7 @@ end if
 
     end subroutine calc_calving_ground_rate_stress_b12
     
-    subroutine calc_calving_ground_rate_stdev(calv,H_ice,f_ice,f_grnd,z_bed_sd,sd_min,sd_max,calv_max,tau)
+    subroutine calc_calving_ground_rate_stdev(calv,H_ice,f_ice,f_grnd,z_bed_sd,sd_min,sd_max,calv_max,tau,boundaries)
         ! Parameterize grounded ice-margin calving as a function of 
         ! standard deviation of bedrock at each grid point.
         ! Assumes that higher variability in subgrid implies cliffs
@@ -1279,6 +1251,7 @@ end if
         real(wp), intent(IN)  :: sd_max                   ! [m] stdev(z_bed) at/above which calv=calv_max 
         real(wp), intent(IN)  :: calv_max                 ! [m/yr] Maximum allowed calving rate
         real(wp), intent(IN)  :: tau                      ! [yr] Calving timescale       
+        character(len=*), intent(IN) :: boundaries 
 
         ! Local variables
         integer  :: i, j, nx, ny  
@@ -1300,11 +1273,8 @@ end if
             do i = 1, nx 
 
                 ! Get neighbor indices
-                im1 = max(i-1,1) 
-                ip1 = min(i+1,nx) 
-                jm1 = max(j-1,1) 
-                jp1 = min(j+1,ny) 
-
+                call get_neighbor_indices(im1,ip1,jm1,jp1,i,j,nx,ny,boundaries)
+            
                 ! Determine if grounded, ice-covered point has an ice-free neighbor (ie, at the grounded ice margin)
                 is_grnd_margin = (f_ice(i,j) .gt. 0.0 .and. f_grnd(i,j) .gt. 0.0 &
                     .and. count([f_ice(im1,j),f_ice(ip1,j),f_ice(i,jm1),f_ice(i,jp1)] .eq. 0.0) .gt. 0)

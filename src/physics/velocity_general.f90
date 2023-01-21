@@ -2,7 +2,7 @@ module velocity_general
     ! This module contains general routines that are used by several solvers. 
     
     use yelmo_defs ,only  : sp, dp, wp, prec, tol_underflow, io_unit_err, rho_ice, rho_sw, rho_w, g
-    use yelmo_tools, only : stagger_aa_ab, stagger_aa_ab_ice, &
+    use yelmo_tools, only : get_neighbor_indices, stagger_aa_ab, stagger_aa_ab_ice, &
                     stagger_nodes_aa_ab_ice, stagger_nodes_acx_ab_ice, stagger_nodes_acy_ab_ice, &
                     staggerdiff_nodes_acx_ab_ice, staggerdiff_nodes_acy_ab_ice, &
                     staggerdiffx_nodes_aa_ab_ice, staggerdiffy_nodes_aa_ab_ice, &
@@ -36,7 +36,7 @@ module velocity_general
     
 contains 
     
-    subroutine calc_uz_3D(uz,ux,uy,H_ice,f_ice,f_grnd,z_srf,smb,bmb,dHdt,dzsdt,zeta_aa,zeta_ac,dx,dy)
+    subroutine calc_uz_3D(uz,ux,uy,H_ice,f_ice,f_grnd,z_srf,smb,bmb,dHdt,dzsdt,zeta_aa,zeta_ac,dx,dy,boundaries)
         ! Following algorithm outlined by the Glimmer ice sheet model:
         ! https://www.geos.ed.ac.uk/~mhagdorn/glide/glide-doc/glimmer_htmlse9.html#x17-660003.1.5
 
@@ -61,6 +61,7 @@ contains
         real(prec), intent(IN)  :: zeta_ac(:)    ! z-coordinate, ac-nodes  
         real(prec), intent(IN)  :: dx 
         real(prec), intent(IN)  :: dy
+        character(len=*), intent(IN) :: boundaries 
 
         ! Local variables 
         integer :: i, j, k, nx, ny, nz_aa, nz_ac
@@ -140,18 +141,15 @@ contains
         do j = 1, ny
         do i = 1, nx
 
-            ! Define neighbor indices
-            im1 = max(i-1,1)
-            ip1 = min(i+1,nx)
-            jm1 = max(j-1,1)
-            jp1 = min(j+1,ny)
-            
+            ! Get neighbor indices
+            call get_neighbor_indices(im1,ip1,jm1,jp1,i,j,nx,ny,boundaries)
+
             ! Get a locally smoothed value of dzsdt and dhdt to avoid spurious oscillations
             ! (eg in EISMINT-EXPA dhdt field)
-            call staggerdiffy_nodes_aa_ab_ice(dzsdt_ab,dzsdt,f_ice,i,j,dx)
+            call stagger_nodes_aa_ab_ice(dzsdt_ab,dzsdt,f_ice,i,j)
             dzsdt_now = sum(dzsdt_ab*wt_ab)
             
-            call staggerdiffy_nodes_aa_ab_ice(dhdt_ab,dhdt,f_ice,i,j,dx)
+            call stagger_nodes_aa_ab_ice(dhdt_ab,dhdt,f_ice,i,j)
             dhdt_now = sum(dhdt_ab*wt_ab)
             
             ! Diagnose rate of basal elevation change (needed for all points)
@@ -329,7 +327,7 @@ contains
 
     end subroutine calc_uz_3D
 
-    subroutine calc_uz_advec_corr_3D(uz_star,uz,ux,uy,H_ice,f_ice,f_grnd,z_srf,dzsdt,dhdt,zeta_aa,zeta_ac,dx,dy)
+    subroutine calc_uz_advec_corr_3D(uz_star,uz,ux,uy,H_ice,f_ice,f_grnd,z_srf,dzsdt,dhdt,zeta_aa,zeta_ac,dx,dy,boundaries)
         ! Following algorithm outlined by the Glimmer ice sheet model:
         ! https://www.geos.ed.ac.uk/~mhagdorn/glide/glide-doc/glimmer_htmlse9.html#x17-660003.1.5
 
@@ -353,6 +351,7 @@ contains
         real(prec), intent(IN)  :: zeta_ac(:)    ! z-coordinate, ac-nodes  
         real(prec), intent(IN)  :: dx 
         real(prec), intent(IN)  :: dy
+        character(len=*), intent(IN) :: boundaries 
 
         ! Local variables 
         integer :: i, j, k, nx, ny, nz_aa, nz_ac
@@ -417,12 +416,9 @@ contains
         do j = 1, ny
         do i = 1, nx
 
-            ! Define neighbor indices
-            im1 = max(i-1,1)
-            ip1 = min(i+1,nx)
-            jm1 = max(j-1,1)
-            jp1 = min(j+1,ny)
-            
+            ! Get neighbor indices
+            call get_neighbor_indices(im1,ip1,jm1,jp1,i,j,nx,ny,boundaries)
+
             if (f_ice(i,j) .eq. 1.0) then
 
                 ! Get the centered ice-base gradient
@@ -542,7 +538,7 @@ contains
 
 
 
-    subroutine calc_uz_3D_aa(uz,ux,uy,H_ice,f_ice,f_grnd,z_bed,z_srf,smb,bmb,dHdt,dzsdt,zeta_aa,zeta_ac,dx,dy)
+    subroutine calc_uz_3D_aa(uz,ux,uy,H_ice,f_ice,f_grnd,z_bed,z_srf,smb,bmb,dHdt,dzsdt,zeta_aa,zeta_ac,dx,dy,boundaries)
         ! Following algorithm outlined by the Glimmer ice sheet model:
         ! https://www.geos.ed.ac.uk/~mhagdorn/glide/glide-doc/glimmer_htmlse9.html#x17-660003.1.5
 
@@ -567,6 +563,7 @@ contains
         real(prec), intent(IN)  :: zeta_ac(:)    ! z-coordinate, ac-nodes  
         real(prec), intent(IN)  :: dx 
         real(prec), intent(IN)  :: dy
+        character(len=*), intent(IN) :: boundaries 
 
         ! Local variables 
         integer :: i, j, k, nx, ny, nz_aa, nz_ac
@@ -608,12 +605,9 @@ contains
         do j = 1, ny
         do i = 1, nx
 
-            ! Define neighbor indices
-            im1 = max(i-1,1)
-            ip1 = min(i+1,nx)
-            jm1 = max(j-1,1)
-            jp1 = min(j+1,ny)
-            
+            ! Get neighbor indices
+            call get_neighbor_indices(im1,ip1,jm1,jp1,i,j,nx,ny,boundaries)
+
             if (f_ice(i,j) .eq. 1.0) then
 
                 ! Get weighted ice thickness for stability
@@ -737,7 +731,7 @@ contains
 
     end subroutine calc_uz_3D_aa
 
-    subroutine calc_uz_advec_corr_3D_aa(uz_star,uz,ux,uy,f_ice,z_bed,z_srf,dzsdt,zeta_aa,zeta_ac,dx,dy)
+    subroutine calc_uz_advec_corr_3D_aa(uz_star,uz,ux,uy,f_ice,z_bed,z_srf,dzsdt,zeta_aa,zeta_ac,dx,dy,boundaries)
         ! Following algorithm outlined by the Glimmer ice sheet model:
         ! https://www.geos.ed.ac.uk/~mhagdorn/glide/glide-doc/glimmer_htmlse9.html#x17-660003.1.5
 
@@ -758,6 +752,7 @@ contains
         real(prec), intent(IN)  :: zeta_ac(:)    ! z-coordinate, ac-nodes  
         real(prec), intent(IN)  :: dx 
         real(prec), intent(IN)  :: dy
+        character(len=*), intent(IN) :: boundaries 
 
         ! Local variables 
         integer :: i, j, k, nx, ny, nz_aa, nz_ac
@@ -789,12 +784,9 @@ contains
         do j = 1, ny
         do i = 1, nx
 
-            ! Define neighbor indices
-            im1 = max(i-1,1)
-            ip1 = min(i+1,nx)
-            jm1 = max(j-1,1)
-            jp1 = min(j+1,ny)
-            
+            ! Get neighbor indices
+            call get_neighbor_indices(im1,ip1,jm1,jp1,i,j,nx,ny,boundaries)
+
             if (f_ice(i,j) .eq. 1.0) then
 
                 ! Get the centered bedrock gradient 
@@ -915,11 +907,8 @@ contains
         do j = 1, ny 
         do i = 1, nx 
 
-            im1 = max(1, i-1)
-            ip1 = min(nx,i+1)
-            
-            jm1 = max(1, j-1)
-            jp1 = min(ny,j+1)
+            ! Get neighbor indices
+            call get_neighbor_indices(im1,ip1,jm1,jp1,i,j,nx,ny,boundaries)
 
             ! x-direction
             if (f_ice(i,j) .eq. 1.0_wp .and. f_ice(ip1,j) .lt. 1.0_wp) then 
@@ -952,9 +941,9 @@ contains
         end do
         end do 
 
-        ! Apply boundary conditions 
-        call set_boundaries_2D_acx(taud_acx,boundaries)
-        call set_boundaries_2D_acy(taud_acy,boundaries)
+        ! ! Apply boundary conditions 
+        ! call set_boundaries_2D_acx(taud_acx,boundaries)
+        ! call set_boundaries_2D_acy(taud_acy,boundaries)
 
         return 
 
@@ -1277,7 +1266,7 @@ end if
 
     end subroutine calc_driving_stress_gl
 
-    subroutine calc_lateral_bc_stress_2D(tau_bc_int_acx,tau_bc_int_acy,mask_frnt,H_ice,f_ice,z_srf,z_sl,rho_ice,rho_sw)
+    subroutine calc_lateral_bc_stress_2D(tau_bc_int_acx,tau_bc_int_acy,mask_frnt,H_ice,f_ice,z_srf,z_sl,rho_ice,rho_sw,boundaries)
             ! Calculate the vertically integrated lateral stress [Pa m] boundary condition
             ! at the ice front. 
 
@@ -1292,6 +1281,7 @@ end if
         real(wp), intent(IN)  :: z_sl(:,:) 
         real(wp), intent(IN)  :: rho_ice 
         real(wp), intent(IN)  :: rho_sw 
+        character(len=*), intent(IN) :: boundaries 
 
         ! Local variables 
         integer  :: i, j, nx, ny
@@ -1311,12 +1301,9 @@ end if
         do j = 1, ny
         do i = 1, nx 
 
-            ! Define neighbor indices
-            im1 = max(i-1,1)
-            ip1 = min(i+1,nx)
-            jm1 = max(j-1,1)
-            jp1 = min(j+1,ny)
-            
+            ! Get neighbor indices
+            call get_neighbor_indices(im1,ip1,jm1,jp1,i,j,nx,ny,boundaries)
+
             ! == acx nodes == 
 
             ! if ( (f_ice(i,j) .eq. 1.0 .and. f_ice(ip1,j) .lt. 1.0) .or. &
@@ -1419,7 +1406,7 @@ end if
 
     end subroutine calc_lateral_bc_stress
     
-    subroutine adjust_visc_eff_margin(visc_int,ux,uy,f_ice,f_grnd)
+    subroutine adjust_visc_eff_margin(visc_int,ux,uy,f_ice,f_grnd,boundaries)
         ! This does not help, yet...
 
         implicit none 
@@ -1429,7 +1416,8 @@ end if
         real(wp), intent(IN)    :: uy(:,:)
         real(wp), intent(IN)    :: f_ice(:,:)
         real(wp), intent(IN)    :: f_grnd(:,:)
-        
+        character(len=*), intent(IN) :: boundaries 
+
         ! Local variables 
         integer  :: i, j, nx, ny, n  
         integer  :: im1, ip1, jm1, jp1 
@@ -1447,12 +1435,9 @@ end if
         do j = 1, ny 
         do i = 1, nx 
 
-            ! Define neighbor indices
-            im1 = max(i-1,1)
-            ip1 = min(i+1,nx)
-            jm1 = max(j-1,1)
-            jp1 = min(j+1,ny)
-            
+            ! Get neighbor indices
+            call get_neighbor_indices(im1,ip1,jm1,jp1,i,j,nx,ny,boundaries)
+
             if (f_ice(i,j) .gt. 0.0_wp) then 
                 ! Ice-covered point 
 
@@ -1503,7 +1488,7 @@ end if
 
     end subroutine adjust_visc_eff_margin
 
-    subroutine adjust_visc_eff_margin_2(visc_eff,ux,uy,f_ice,f_grnd)
+    subroutine adjust_visc_eff_margin_2(visc_eff,ux,uy,f_ice,f_grnd,boundaries)
         ! This doesn't seem to work...
 
         implicit none 
@@ -1513,7 +1498,8 @@ end if
         real(wp), intent(IN)    :: uy(:,:)
         real(wp), intent(IN)    :: f_ice(:,:)
         real(wp), intent(IN)    :: f_grnd(:,:)
-        
+        character(len=*), intent(IN) :: boundaries 
+
         ! Local variables 
         integer :: i, j, nx, ny 
         integer :: im1, ip1, jm1, jp1 
@@ -1531,12 +1517,9 @@ end if
         do j = 1, ny 
         do i = 1, nx 
 
-            ! Define neighbor indices
-            im1 = max(i-1,1)
-            ip1 = min(i+1,nx)
-            jm1 = max(j-1,1)
-            jp1 = min(j+1,ny)
-            
+            ! Get neighbor indices
+            call get_neighbor_indices(im1,ip1,jm1,jp1,i,j,nx,ny,boundaries)
+
             ! Assume viscosity should remain the same at first 
             f_visc = 1.0_wp 
 
@@ -1699,17 +1682,18 @@ end if
 
     end subroutine integrate_gl_driving_stress_linear
     
-    subroutine set_inactive_margins(ux,uy,f_ice)
+    subroutine set_inactive_margins(ux,uy,f_ice,boundaries)
 
         implicit none
 
         real(wp), intent(INOUT) :: ux(:,:) 
         real(wp), intent(INOUT) :: uy(:,:) 
         real(wp), intent(IN)    :: f_ice(:,:) 
+        character(len=*), intent(IN) :: boundaries 
 
         ! Local variables 
         integer :: i, j, nx, ny 
-        integer :: ip1, jp1 
+        integer :: im1, ip1, jm1, jp1
 
         nx = size(f_ice,1) 
         ny = size(f_ice,2) 
@@ -1720,8 +1704,8 @@ end if
         do j = 1, ny 
         do i = 1, nx 
 
-            ip1 = min(i+1,nx)
-            jp1 = min(j+1,ny)
+            ! Get neighbor indices
+            call get_neighbor_indices(im1,ip1,jm1,jp1,i,j,nx,ny,boundaries)
 
             if (f_ice(i,j) .lt. 1.0_wp .and. f_ice(ip1,j) .eq. 0.0_wp) then 
                 ux(i,j) = 0.0_wp 

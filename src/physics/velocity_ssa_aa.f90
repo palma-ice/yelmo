@@ -161,7 +161,7 @@ contains
         
         ! Ensure dynamically inactive cells have no velocity at 
         ! outer margins before starting iterations
-        ! call set_inactive_margins(ux_b,uy_b,f_ice)
+        ! call set_inactive_margins(ux_b,uy_b,f_ice,par%boundaries)
 
         if (write_ssa_diagnostics) then 
             call ssa_diagnostics_write_init("yelmo_ssa.nc",nx,ny,time_init=1.0_wp)

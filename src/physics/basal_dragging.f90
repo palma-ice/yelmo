@@ -13,7 +13,8 @@ module basal_dragging
     use yelmo_defs, only : sp, dp, wp, prec, pi, g, rho_sw, rho_ice, rho_w, &
                            TOL_UNDERFLOW, io_unit_err, degrees_to_radians
 
-    use yelmo_tools, only : stagger_aa_acx, stagger_aa_acy, &
+    use yelmo_tools, only : get_neighbor_indices, stagger_aa_acx, stagger_aa_acy, &
+                    acx_to_nodes, acy_to_nodes, &
                     stagger_nodes_aa_ab_ice, stagger_nodes_acx_ab_ice, stagger_nodes_acy_ab_ice, &
                     staggerdiff_nodes_acx_ab_ice, staggerdiff_nodes_acy_ab_ice, &
                     staggerdiffcross_nodes_acx_ab_ice, staggerdiffcross_nodes_acy_ab_ice
@@ -273,23 +274,23 @@ contains
                 ! Calculate beta from a linear law (simply set beta=c_bed/u0)
                 ! (use power-plastic function to ensure proper staggering)
 
-                call calc_beta_aa_power_plastic(beta,ux_b,uy_b,c_bed,f_ice,1.0_wp,beta_u0,simple_stagger=.FALSE.)
+                call calc_beta_aa_power_plastic(beta,ux_b,uy_b,c_bed,f_ice,1.0_wp,beta_u0,boundaries,simple_stagger=.FALSE.)
                 
             case(2)
                 ! Calculate beta from the quasi-plastic power-law as defined by Bueler and van Pelt (2015)
 
-                call calc_beta_aa_power_plastic(beta,ux_b,uy_b,c_bed,f_ice,beta_q,beta_u0,simple_stagger=.FALSE.)
+                call calc_beta_aa_power_plastic(beta,ux_b,uy_b,c_bed,f_ice,beta_q,beta_u0,boundaries,simple_stagger=.FALSE.)
                 
             case(3)
                 ! Calculate beta from regularized Coulomb law (Joughin et al., GRL, 2019)
 
-                call calc_beta_aa_reg_coulomb(beta,ux_b,uy_b,c_bed,f_ice,beta_q,beta_u0)
+                call calc_beta_aa_reg_coulomb(beta,ux_b,uy_b,c_bed,f_ice,beta_q,beta_u0,boundaries)
             
             case(4) 
                 ! Calculate beta from the quasi-plastic power-law as defined by Bueler and van Pelt (2015)
                 ! Use simple-staggering to aa-nodes - useful for Schoof (2006) slab test.
 
-                call calc_beta_aa_power_plastic(beta,ux_b,uy_b,c_bed,f_ice,beta_q,beta_u0,simple_stagger=.TRUE.)
+                call calc_beta_aa_power_plastic(beta,ux_b,uy_b,c_bed,f_ice,beta_q,beta_u0,boundaries,simple_stagger=.TRUE.)
                 
             case DEFAULT 
                 ! Not recognized 
@@ -784,7 +785,7 @@ contains
     !
     ! ================================================================================
 
-    subroutine calc_beta_aa_power_plastic(beta,ux_b,uy_b,c_bed,f_ice,q,u_0,simple_stagger)
+    subroutine calc_beta_aa_power_plastic(beta,ux_b,uy_b,c_bed,f_ice,q,u_0,boundaries,simple_stagger)
         ! Calculate basal friction coefficient (beta) that
         ! enters the SSA solver as a function of basal velocity
         ! using a power-law form following Bueler and van Pelt (2015)
@@ -798,20 +799,22 @@ contains
         real(wp), intent(IN)  :: f_ice(:,:)       ! aa-nodes
         real(wp), intent(IN)  :: q
         real(wp), intent(IN)  :: u_0              ! [m/a] 
+        character(len=*), intent(IN) :: boundaries 
         logical,  intent(IN)  :: simple_stagger 
-
+        
         ! Local variables
-        integer    :: i, j, nx, ny
-        integer    :: im1, ip1, jm1, jp1 
-        real(wp) :: uxy_b  
-        real(wp) :: ux_ab(4) 
-        real(wp) :: uy_ab(4) 
-        real(wp) :: uxy_ab(4) 
-        real(wp) :: cb_ab(4)
-        real(wp) :: beta_ab(4)
-        real(wp) :: wt_ab(4) 
-        real(wp) :: wt 
-        real(wp) :: beta_now 
+        integer  :: i, j, nx, ny
+        integer  :: im1, ip1, jm1, jp1 
+        real(wp) :: uxy_b
+        real(wp) :: wt0
+        real(wp) :: uxn(4) 
+        real(wp) :: uyn(4) 
+        real(wp) :: uxyn(4) 
+        real(wp) :: cbn(4)
+        real(wp) :: betan(4)
+        real(wp) :: xn(4) 
+        real(wp) :: yn(4) 
+        real(wp) :: wtn(4)
 
         real(wp), parameter :: ub_min    = 1e-3_wp          ! [m/yr] Minimum velocity is positive small value to avoid divide by zero
         real(wp), parameter :: ub_sq_min = ub_min**2
@@ -822,97 +825,62 @@ contains
         ! Initially set friction to zero everywhere
         beta = 0.0_wp 
         
-        ! Set equal weighting to all ab-nodes
-        wt_ab = 0.25_wp 
+        ! Get nodes and weighting 
+        wt0 = 1.0/sqrt(3.0)
+        xn  = [wt0,-wt0,-wt0, wt0]
+        yn  = [wt0, wt0,-wt0,-wt0]
+        wtn = [1.0,1.0,1.0,1.0]
 
         do j = 1, ny
         do i = 1, nx
 
-            ! Get neighbor indices 
-            im1 = max(i-1,1)
-            ip1 = min(i+1,nx)
-            jm1 = max(j-1,1) 
-            jp1 = min(j+1,ny)
-            
+            ! Get neighbor indices
+            call get_neighbor_indices(im1,ip1,jm1,jp1,i,j,nx,ny,boundaries)
+
             if (f_ice(i,j) .eq. 1.0_wp) then 
                 ! Fully ice-covered point with some fully ice-covered neighbors 
 
                 if (simple_stagger) then 
                     ! Use central value of c_bed
                     
-                    cb_ab(1:4) = c_bed(i,j) 
+                    cbn(1:4) = c_bed(i,j) 
 
                 else 
                     ! Get c_bed on ab-nodes
                     
-                    call stagger_nodes_aa_ab_ice(cb_ab,c_bed,f_ice,i,j)
+                    !call stagger_nodes_aa_ab_ice(cb_ab,c_bed,f_ice,i,j)
+                    cbn(1:4) = c_bed(i,j) 
 
                 end if 
                 
-                if (q .eq. 1.0_wp) then 
-                    ! Linear law, no f(ub) term
+                if (simple_stagger) then 
+                    ! Unstagger velocity components to aa-nodes 
 
-                    beta_ab = cb_ab / u_0
-
+                    uxn = 0.5*(ux_b(i,j)+ux_b(im1,j))
+                    uyn = 0.5*(uy_b(i,j)+uy_b(i,jm1))
+                
                 else
-                    ! Non-linear law with f(ub) term 
-
-                    if (simple_stagger) then 
-                        ! Unstagger velocity components to aa-nodes 
-
-                        ux_ab = 0.5*(ux_b(i,j)+ux_b(im1,j))
-                        uy_ab = 0.5*(uy_b(i,j)+uy_b(i,jm1))
+                    ! Calculate magnitude of basal velocity on aa-node 
+                    ! from ab-nodes (quadrature points)
                     
-                    else
-                        ! Calculate magnitude of basal velocity on aa-node 
-                        ! from ab-nodes (quadrature points)
-                        
-                        call stagger_nodes_acx_ab_ice(ux_ab,ux_b,f_ice,i,j)
-                        call stagger_nodes_acy_ab_ice(uy_ab,uy_b,f_ice,i,j)
-                    
-                    end if 
+                    ! call stagger_nodes_acx_ab_ice(uxn,ux_b,f_ice,i,j)
+                    ! call stagger_nodes_acy_ab_ice(uyn,uy_b,f_ice,i,j)
 
-                    uxy_ab = sqrt(ux_ab**2 + uy_ab**2 + ub_sq_min)
-                    
-                    if (q .eq. 0.0_wp) then 
-                        ! Plastic law
-
-                        beta_ab = cb_ab * (1.0_wp / uxy_ab)
-                        
-                    else
-
-                        beta_ab = cb_ab * (uxy_ab / u_0)**q * (1.0_wp / uxy_ab)
-                    
-                    end if 
-                    
+                    ! Calculate onto quadrature nodes
+                    call acx_to_nodes(uxn,ux_b,i,j,xn,yn,im1,ip1,jm1,jp1)
+                    call acy_to_nodes(uyn,uy_b,i,j,xn,yn,im1,ip1,jm1,jp1)
+                
                 end if 
 
-                beta(i,j) = sum(wt_ab*beta_ab)
+                uxyn      = sqrt(uxn**2 + uyn**2 + ub_sq_min)
+                betan     = c_bed(i,j) * (uxyn / u_0)**q * (1.0_wp / uxyn)
+                beta(i,j) = sum(wtn*betan)/sum(wtn)
 
             else
                 ! Assign minimum velocity value, no staggering for simplicity
 
-                if (q .eq. 1.0_wp) then 
-                    ! Linear law, no f(ub) term
-
-                    beta(i,j) = c_bed(i,j) / u_0
-
-                else
-                    
-                    uxy_b  = ub_min
-
-                    if (q .eq. 0.0_wp) then 
-                        ! Plastic law
- 
-                        beta(i,j) = c_bed(i,j) * (1.0_wp / uxy_b)
-
-                    else
-
-                        beta(i,j) = c_bed(i,j) * (uxy_b / u_0)**q * (1.0_wp / uxy_b)
-
-                    end if 
-
-                end if 
+                uxy_b     = ub_min
+                beta(i,j) = c_bed(i,j) * (uxy_b / u_0)**q * (1.0_wp / uxy_b)
 
             end if 
 
@@ -923,7 +891,7 @@ contains
         
     end subroutine calc_beta_aa_power_plastic
 
-    subroutine calc_beta_aa_reg_coulomb(beta,ux_b,uy_b,c_bed,f_ice,q,u_0)
+    subroutine calc_beta_aa_reg_coulomb(beta,ux_b,uy_b,c_bed,f_ice,q,u_0,boundaries)
         ! Calculate basal friction coefficient (beta) that
         ! enters the SSA solver as a function of basal velocity
         ! using a regularized Coulomb friction law following
@@ -941,18 +909,21 @@ contains
         real(wp), intent(IN)  :: f_ice(:,:)       ! aa-nodes
         real(wp), intent(IN)  :: q
         real(wp), intent(IN)  :: u_0              ! [m/a] 
-
+        character(len=*), intent(IN) :: boundaries 
+        
         ! Local variables
         integer  :: i, j, nx, ny
         integer  :: im1, ip1, jm1, jp1
-        real(wp) :: uxy_b  
-        real(wp) :: ux_ab(4) 
-        real(wp) :: uy_ab(4) 
-        real(wp) :: uxy_ab(4) 
-        real(wp) :: cb_ab(4)
-        real(wp) :: beta_ab(4)
-        real(wp) :: wt_ab(4) 
-        real(wp) :: beta_now
+        real(wp) :: uxy_b
+        real(wp) :: wt0
+        real(wp) :: uxn(4) 
+        real(wp) :: uyn(4) 
+        real(wp) :: uxyn(4) 
+        real(wp) :: cbn(4)
+        real(wp) :: betan(4)
+        real(wp) :: xn(4) 
+        real(wp) :: yn(4) 
+        real(wp) :: wtn(4)
 
         real(wp), parameter :: ub_min    = 1e-3_wp          ! [m/yr] Minimum velocity is positive small value to avoid divide by zero
         real(wp), parameter :: ub_sq_min = ub_min**2
@@ -963,37 +934,39 @@ contains
         ! Initially set friction to zero everywhere
         beta = 0.0_wp 
 
-        ! Set equal weighting to all ab-nodes
-        wt_ab = 0.25_wp
-            
+        ! Get nodes and weighting 
+        wt0 = 1.0/sqrt(3.0)
+        xn  = [wt0,-wt0,-wt0, wt0]
+        yn  = [wt0, wt0,-wt0,-wt0]
+        wtn = [1.0,1.0,1.0,1.0]
+
         do j = 1, ny
         do i = 1, nx
 
-            ! Get neighbor indices 
-            im1 = max(i-1,1)
-            ip1 = min(i+1,nx)
-            jm1 = max(j-1,1) 
-            jp1 = min(j+1,ny)
-            
+            ! Get neighbor indices
+            call get_neighbor_indices(im1,ip1,jm1,jp1,i,j,nx,ny,boundaries)
+
             if (f_ice(i,j) .eq. 1.0_wp) then 
                 ! Fully ice-covered point with some fully ice-covered neighbors 
 
                 ! Get c_bed on ab-nodes
-                call stagger_nodes_aa_ab_ice(cb_ab,c_bed,f_ice,i,j)
-
-                ! Use central value of c_bed
-                ! cb_ab(1:4) = c_bed(i,j) 
+                !call stagger_nodes_aa_ab_ice(cbn,c_bed,f_ice,i,j)
 
                 ! Calculate magnitude of basal velocity on aa-node 
                 ! from ab-nodes (quadrature points)
-                call stagger_nodes_acx_ab_ice(ux_ab,ux_b,f_ice,i,j)
-                call stagger_nodes_acy_ab_ice(uy_ab,uy_b,f_ice,i,j)
+                ! call stagger_nodes_acx_ab_ice(uxn,ux_b,f_ice,i,j)
+                ! call stagger_nodes_acy_ab_ice(uyn,uy_b,f_ice,i,j)
 
-                uxy_ab    = sqrt(ux_ab**2 + uy_ab**2 + ub_sq_min)
+                ! Use central value of c_bed
+                cbn(1:4) = c_bed(i,j) 
 
-                beta_ab   = cb_ab * (uxy_ab / (uxy_ab+u_0))**q * (1.0_wp / uxy_ab)
+                ! Calculate onto quadrature nodes
+                call acx_to_nodes(uxn,ux_b,i,j,xn,yn,im1,ip1,jm1,jp1)
+                call acy_to_nodes(uyn,uy_b,i,j,xn,yn,im1,ip1,jm1,jp1)
 
-                beta(i,j) = sum(wt_ab*beta_ab)
+                uxyn      = sqrt(uxn**2 + uyn**2 + ub_sq_min)
+                betan     = cbn * (uxyn / (uxyn+u_0))**q * (1.0_wp / uxyn)
+                beta(i,j) = sum(wtn*betan)/sum(wtn)
 
             else
                 ! Assign minimum velocity value, ignore staggering for simplicity 

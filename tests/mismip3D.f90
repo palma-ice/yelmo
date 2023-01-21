@@ -76,16 +76,22 @@ contains
 
     end subroutine mismip3D_topo_init
 
-    subroutine mismip3D_boundaries(T_srf,smb,ghf,experiment)
+    subroutine mismip3D_boundaries(T_srf,smb,ghf,calv_mask,experiment)
 
         implicit none 
 
         real(prec), intent(OUT) :: T_srf(:,:) 
         real(prec), intent(OUT) :: smb(:,:) 
         real(prec), intent(OUT) :: ghf(:,:) 
-        
+        logical,    intent(OUT) :: calv_mask(:,:)
         character(len=*), intent(IN) :: experiment 
 
+        ! Local variables 
+        integer :: nx, ny 
+
+        nx = size(T_srf,1) 
+        ny = size(T_srf,2) 
+        
         select case(trim(experiment))
 
             case("Stnd","Stnd-0.3","P75S")
@@ -118,6 +124,10 @@ contains
                 stop 
 
         end select 
+
+        ! Make sure that calving takes place for the last grid point in x-direction
+        calv_mask = .FALSE. 
+        calv_mask(nx,:) = .TRUE. 
 
         return 
 

@@ -172,7 +172,7 @@ end select
                     ! for sigma-coordinate grid stretching (horizontal derivatives
                     ! lead to vertical advection adjusment)
                     call calc_uz_advec_corr_3D(thrm%now%uz_star,dyn%now%uz,dyn%now%ux,dyn%now%uy,tpo%now%H_ice,tpo%now%f_ice,tpo%now%f_grnd,tpo%now%z_srf, &
-                                                tpo%now%dzsrfdt,tpo%now%dHicedt,thrm%par%z%zeta_aa,thrm%par%z%zeta_ac,thrm%par%dx,thrm%par%dx)
+                                                tpo%now%dzsrfdt,tpo%now%dHicedt,thrm%par%z%zeta_aa,thrm%par%z%zeta_ac,thrm%par%dx,thrm%par%dx,thrm%par%boundaries)
                     
                     ! Now calculate the thermodynamics:
 

@@ -2,12 +2,13 @@ module yelmo_tools
     ! Generic functions and subroutines that could be used in many contexts:
     ! math, vectors, sorting, etc. 
 
-    use yelmo_defs, only : sp, dp, wp, prec, missing_value, TOL_UNDERFLOW, pi, &
+    use yelmo_defs, only : sp, dp, wp, missing_value, TOL_UNDERFLOW, pi, &
                             io_unit_err
     
     implicit none 
 
     private 
+    public :: get_neighbor_indices
     public :: calc_magnitude 
     public :: calc_magnitude_from_staggered
     public :: calc_magnitude_from_staggered_ice
@@ -23,6 +24,8 @@ module yelmo_tools
     public :: stagger_ab_acx
     public :: stagger_ab_acy 
 
+    public :: acx_to_nodes
+    public :: acy_to_nodes
     public :: stagger_node_aa_ab_ice 
     public :: stagger_node_acx_ab_ice
     public :: stagger_node_acy_ab_ice
@@ -80,13 +83,55 @@ module yelmo_tools
     
 contains 
 
+    subroutine get_neighbor_indices(im1,ip1,jm1,jp1,i,j,nx,ny,boundaries)
+
+        implicit none
+
+        integer, intent(OUT) :: im1 
+        integer, intent(OUT) :: ip1 
+        integer, intent(OUT) :: jm1 
+        integer, intent(OUT) :: jp1 
+        integer, intent(IN)  :: i 
+        integer, intent(IN)  :: j
+        integer, intent(IN)  :: nx 
+        integer, intent(IN)  :: ny
+        
+        character(len=*), intent(IN) :: boundaries
+
+        select case(trim(boundaries))
+
+            case("infinite")
+                im1 = max(i-1,1)
+                ip1 = min(i+1,nx) 
+                jm1 = max(j-1,1)
+                jp1 = min(j+1,ny) 
+
+            case DEFAULT 
+                ! Periodic
+
+                im1 = i-1
+                if (im1 .eq. 0)    im1 = nx 
+                ip1 = i+1
+                if (ip1 .eq. nx+1) ip1 = 1 
+
+                jm1 = j-1
+                if (jm1 .eq. 0)    jm1 = ny
+                jp1 = j+1
+                if (jp1 .eq. ny+1) jp1 = 1 
+
+        end select 
+
+        return
+
+    end subroutine get_neighbor_indices
+
     elemental function calc_magnitude(u,v) result(umag)
         ! Get the vector magnitude from two components at the same grid location
 
         implicit none 
 
-        real(prec), intent(IN)  :: u, v 
-        real(prec) :: umag 
+        real(wp), intent(IN)  :: u, v 
+        real(wp) :: umag 
 
         umag = sqrt(u*u+v*v)
 
@@ -100,28 +145,35 @@ contains
 
         implicit none 
         
-        real(prec), intent(IN)  :: u(:,:), v(:,:)  
-        real(prec) :: umag(size(u,1),size(u,2)) 
+        real(wp), intent(IN)  :: u(:,:), v(:,:)  
+        real(wp) :: umag(size(u,1),size(u,2)) 
         character(len=*), intent(IN), optional :: boundaries 
 
         ! Local variables 
         integer :: i, j, nx, ny 
         integer :: ip1, jp1, im1, jm1 
-        real(prec) :: unow, vnow 
+        real(wp) :: unow, vnow 
 
         nx = size(u,1)
         ny = size(u,2) 
 
-        umag = 0.0_prec 
+        umag = 0.0_wp
 
         do j = 1, ny 
         do i = 1, nx
 
-            im1 = max(i-1,1)
-            jm1 = max(j-1,1)
+            ! BC: Periodic boundary conditions
+            im1 = i-1
+            if (im1 == 0) then
+                im1 = nx
+            end if
+            jm1 = j-1
+            if (jm1 == 0) then
+                jm1 = ny
+            end if
 
-            unow = 0.5_prec*(u(i,j)+u(im1,j))
-            vnow = 0.5_prec*(v(i,j)+v(i,jm1))
+            unow = 0.5_wp*(u(i,j)+u(im1,j))
+            vnow = 0.5_wp*(v(i,j)+v(i,jm1))
             umag(i,j) = sqrt(unow*unow+vnow*vnow)
             
         end do 
@@ -130,14 +182,7 @@ contains
         if (present(boundaries)) then 
             ! Apply conditions at boundaries of domain 
 
-            if (trim(boundaries) .eq. "periodic") then 
-
-                umag(1,:)  = umag(nx-1,:) 
-                umag(nx,:) = umag(2,:)  
-                umag(:,1)  = umag(:,ny-1)
-                umag(:,ny) = umag(:,2) 
-                
-            end if 
+            ! To do 
 
         end if 
 
@@ -151,29 +196,43 @@ contains
 
         implicit none 
         
-        real(prec), intent(IN)  :: u(:,:), v(:,:)
-        real(prec), intent(IN)  :: f_ice(:,:) 
-        real(prec) :: umag(size(u,1),size(u,2)) 
+        real(wp), intent(IN)  :: u(:,:), v(:,:)
+        real(wp), intent(IN)  :: f_ice(:,:) 
+        real(wp) :: umag(size(u,1),size(u,2)) 
         character(len=*), intent(IN), optional :: boundaries 
 
         ! Local variables 
         integer :: i, j, nx, ny 
         integer :: ip1, jp1, im1, jm1
-        real(prec) :: unow, vnow 
-        real(prec) :: f1, f2, H1, H2 
+        real(wp) :: unow, vnow 
+        real(wp) :: f1, f2, H1, H2 
         
         nx = size(u,1)
         ny = size(u,2) 
 
-        umag = 0.0_prec 
+        umag = 0.0_wp 
 
         do j = 1, ny 
         do i = 1, nx 
 
-            im1 = max(i-1,1)
-            jm1 = max(j-1,1)
-            ip1 = min(i+1,nx)
-            jp1 = min(j+1,ny)
+            ! BC: Periodic boundary conditions
+            im1 = i-1
+            if (im1 == 0) then
+                im1 = nx
+            end if
+            ip1 = i+1
+            if (ip1 == nx+1) then
+                ip1 = 1
+            end if
+
+            jm1 = j-1
+            if (jm1 == 0) then
+                jm1 = ny
+            end if
+            jp1 = j+1
+            if (jp1 == ny+1) then
+                jp1 = 1
+            end if
 
             if (f_ice(i,j) .eq. 1.0) then 
                 unow = 0.5*(u(im1,j)+u(i,j))
@@ -188,7 +247,7 @@ contains
 
             umag(i,j) = sqrt(unow*unow+vnow*vnow)
 
-            if (abs(umag(i,j)) .lt. TOL_UNDERFLOW) umag(i,j) = 0.0_prec
+            if (abs(umag(i,j)) .lt. TOL_UNDERFLOW) umag(i,j) = 0.0_wp
 
         end do 
         end do 
@@ -196,15 +255,7 @@ contains
         if (present(boundaries)) then 
             ! Apply conditions at boundaries of domain 
 
-            if (trim(boundaries) .eq. "periodic") then 
-
-                umag(1,:)  = umag(nx-1,:) 
-                umag(nx,:) = umag(2,:) 
-                 
-                umag(:,1)  = umag(:,ny-1)
-                umag(:,ny) = umag(:,2) 
-                
-            end if 
+            ! to do 
 
         end if 
 
@@ -218,20 +269,40 @@ contains
 
         implicit none 
         
-        real(prec), intent(IN)  :: u(:,:), v(:,:)    ! acx-, acy-nodes 
-        real(prec) :: umag(size(u,1),size(u,2))      ! aa-nodes 
+        real(wp), intent(IN)  :: u(:,:), v(:,:)    ! acx-, acy-nodes 
+        real(wp) :: umag(size(u,1),size(u,2))      ! aa-nodes 
 
         ! Local variables 
         integer :: i, j, nx, ny 
+        integer :: im1, ip1, jm1, jp1 
 
         nx = size(u,1)
         ny = size(u,2) 
 
-        umag = 0.0_prec 
+        umag = 0.0_wp 
 
-        do j = 2, ny-1 
-        do i = 2, nx-1 
-            umag(i,j) = 0.25_prec*(u(i,j)+u(i-1,j)+v(i,j)+v(i,j-1))
+        do j = 1, ny
+        do i = 1, nx 
+            ! BC: Periodic boundary conditions
+            im1 = i-1
+            if (im1 == 0) then
+                im1 = nx
+            end if
+            ip1 = i+1
+            if (ip1 == nx+1) then
+                ip1 = 1
+            end if
+
+            jm1 = j-1
+            if (jm1 == 0) then
+                jm1 = ny
+            end if
+            jp1 = j+1
+            if (jp1 == ny+1) then
+                jp1 = 1
+            end if
+
+            umag(i,j) = 0.25_wp*(u(i,j)+u(im1,j)+v(i,j)+v(i,jm1))
         end do 
         end do 
 
@@ -245,8 +316,8 @@ contains
 
         implicit none 
 
-        real(prec), intent(IN)  :: u(:,:) 
-        real(prec) :: ustag(size(u,1),size(u,2)) 
+        real(wp), intent(IN)  :: u(:,:) 
+        real(wp) :: ustag(size(u,1),size(u,2)) 
 
         ! Local variables 
         integer :: i, j, nx, ny  
@@ -255,13 +326,21 @@ contains
         nx = size(u,1)
         ny = size(u,2) 
 
-        ustag = 0.0_prec 
+        ustag = 0.0_wp 
 
         do j = 1, ny 
         do i = 1, nx
-            ip1 = min(i+1,nx)
-            jp1 = min(j+1,ny)
-            ustag(i,j) = 0.25_prec*(u(ip1,jp1)+u(ip1,j)+u(i,jp1)+u(i,j))
+            ! BC: Periodic boundary conditions
+            ip1 = i+1
+            if (ip1 == nx+1) then
+                ip1 = 1
+            end if
+            jp1 = j+1
+            if (jp1 == ny+1) then
+                jp1 = 1
+            end if
+
+            ustag(i,j) = 0.25_wp*(u(ip1,jp1)+u(ip1,j)+u(i,jp1)+u(i,j))
         end do 
         end do 
 
@@ -275,10 +354,10 @@ contains
 
         implicit none 
 
-        real(prec), intent(IN)  :: u(:,:) 
-        real(prec), intent(IN)  :: H_ice(:,:) 
-        real(prec), intent(IN)  :: f_ice(:,:) 
-        real(prec) :: ustag(size(u,1),size(u,2)) 
+        real(wp), intent(IN)  :: u(:,:) 
+        real(wp), intent(IN)  :: H_ice(:,:) 
+        real(wp), intent(IN)  :: f_ice(:,:) 
+        real(wp) :: ustag(size(u,1),size(u,2)) 
 
         ! Local variables 
         integer :: i, j, nx, ny, k   
@@ -287,13 +366,20 @@ contains
         nx = size(u,1)
         ny = size(u,2) 
 
-        ustag = 0.0_prec 
+        ustag = 0.0_wp 
 
         do j = 1, ny 
         do i = 1, nx
 
-            ip1 = min(i+1,nx)
-            jp1 = min(j+1,ny)
+            ! BC: Periodic boundary conditions
+            ip1 = i+1
+            if (ip1 == nx+1) then
+                ip1 = 1
+            end if
+            jp1 = j+1
+            if (jp1 == ny+1) then
+                jp1 = 1
+            end if
 
             k = 0 
             ustag(i,j) = 0.0 
@@ -318,9 +404,9 @@ contains
             end if 
             
             if (k .gt. 0) then 
-                ustag(i,j) = ustag(i,j) / real(k,prec)
+                ustag(i,j) = ustag(i,j) / real(k,wp)
             else 
-                ustag(i,j) = 0.25_prec*(u(ip1,jp1)+u(ip1,j)+u(i,jp1)+u(i,j))
+                ustag(i,j) = 0.25_wp*(u(ip1,jp1)+u(ip1,j)+u(i,jp1)+u(i,j))
             end if 
 
         end do 
@@ -336,8 +422,8 @@ contains
 
         implicit none 
 
-        real(prec), intent(IN)  :: u(:,:) 
-        real(prec) :: ustag(size(u,1),size(u,2)) 
+        real(wp), intent(IN)  :: u(:,:) 
+        real(wp) :: ustag(size(u,1),size(u,2)) 
 
         ! Local variables 
         integer :: i, j, nx, ny  
@@ -346,13 +432,21 @@ contains
         nx = size(u,1)
         ny = size(u,2) 
 
-        ustag = 0.0_prec 
+        ustag = 0.0_wp 
 
         do j = 1, ny 
         do i = 1, nx
-            im1 = max(i-1,1)
-            jm1 = max(j-1,1)
-            ustag(i,j) = 0.25_prec*(u(i,j)+u(im1,j)+u(i,jm1)+u(im1,jm1))
+            ! BC: Periodic boundary conditions
+            im1 = i-1
+            if (im1 == 0) then
+                im1 = nx
+            end if
+            jm1 = j-1
+            if (jm1 == 0) then
+                jm1 = ny
+            end if
+
+            ustag(i,j) = 0.25_wp*(u(i,j)+u(im1,j)+u(i,jm1)+u(im1,jm1))
         end do 
         end do 
 
@@ -366,15 +460,15 @@ contains
 
         implicit none 
 
-        real(prec), intent(IN)  :: u(:,:) 
-        real(prec), intent(IN)  :: H_ice(:,:) 
-        real(prec), intent(IN)  :: f_ice(:,:) 
-        real(prec) :: ustag(size(u,1),size(u,2)) 
+        real(wp), intent(IN)  :: u(:,:) 
+        real(wp), intent(IN)  :: H_ice(:,:) 
+        real(wp), intent(IN)  :: f_ice(:,:) 
+        real(wp) :: ustag(size(u,1),size(u,2)) 
 
         ! Local variables 
         integer :: i, j, nx, ny, k   
         integer :: im1, jm1, ip1, jp1 
-        real(prec), allocatable ::H_ice_ab(:,:) 
+        real(wp), allocatable ::H_ice_ab(:,:) 
 
         nx = size(u,1)
         ny = size(u,2) 
@@ -383,13 +477,21 @@ contains
 
         H_ice_ab = stagger_aa_ab_ice(H_ice,H_ice,f_ice) 
 
-        ustag = 0.0_prec 
+        ustag = 0.0_wp 
 
         do j = 1, ny 
         do i = 1, nx
 
-            im1 = max(i-1,1)
-            jm1 = max(j-1,1)
+            ! BC: Periodic boundary conditions
+            im1 = i-1
+            if (im1 == 0) then
+                im1 = nx
+            end if
+
+            jm1 = j-1
+            if (jm1 == 0) then
+                jm1 = ny
+            end if
 
             k = 0 
             ustag(i,j) = 0.0 
@@ -414,9 +516,9 @@ contains
             end if 
             
             if (k .gt. 0) then 
-                ustag(i,j) = ustag(i,j) / real(k,prec)
+                ustag(i,j) = ustag(i,j) / real(k,wp)
             else 
-                ustag(i,j) = 0.25_prec*(u(im1,jm1)+u(im1,j)+u(i,jm1)+u(i,j))
+                ustag(i,j) = 0.25_wp*(u(im1,jm1)+u(im1,j)+u(i,jm1)+u(i,j))
             end if 
 
         end do 
@@ -427,6 +529,106 @@ contains
     end function stagger_ab_aa_ice
 
 ! ===== NEW =======================
+
+    subroutine acx_to_nodes(varn,varx,i,j,xn,yn,im1,ip1,jm1,jp1)
+
+        real(wp), intent(OUT) :: varn(:) 
+        real(wp), intent(IN)  :: varx(:,:) 
+        integer,  intent(IN)  :: i 
+        integer,  intent(IN)  :: j
+        real(wp), intent(IN)  :: xn(:)
+        real(wp), intent(IN)  :: yn(:) 
+        integer,  intent(IN)  :: im1, ip1, jm1, jp1 
+
+        ! Local variables 
+        integer  :: k, nx, ny, n 
+        !integer  :: im1, ip1, jm1, jp1
+        integer  :: i0, i1, j0, j1 
+        real(wp) :: v0, v1, wt 
+
+        n = size(xn,1)
+        
+        nx = size(varx,1)
+        ny = size(varx,2)
+
+        ! Initialize interpolated variable at nodes of interest
+        varn = 0.0
+
+        do k = 1, n
+
+            if (yn(k) > 0) then
+                j0 = j
+                j1 = jp1
+                wt = yn(k) / 2.0 
+            else
+                j0 = jm1
+                j1 = j
+                wt = 1.0 - abs(yn(k)) / 2.0
+            end if
+
+            ! Get left and right-side 
+            v0 = (1.0-wt)*varx(im1,j0) + wt*varx(im1,j1)
+            v1 = (1.0-wt)*varx(i,j0)   + wt*varx(i,j1)
+            
+            ! Interpolate horizontally to the node location 
+            wt = (1.0 + xn(k)) / 2.0
+            varn(k) = (1.0-wt)*v0 + wt*v1
+
+        end do
+        
+        return
+
+    end subroutine acx_to_nodes
+
+    subroutine acy_to_nodes(varn,vary,i,j,xn,yn,im1,ip1,jm1,jp1)
+
+        real(wp), intent(OUT) :: varn(:) 
+        real(wp), intent(IN)  :: vary(:,:) 
+        integer,  intent(IN)  :: i 
+        integer,  intent(IN)  :: j
+        real(wp), intent(IN)  :: xn(:)
+        real(wp), intent(IN)  :: yn(:) 
+        integer,  intent(IN)  :: im1, ip1, jm1, jp1
+
+        ! Local variables 
+        integer  :: k, nx, ny, n 
+        !integer  :: im1, ip1, jm1, jp1
+        integer  :: i0, i1, j0, j1  
+        real(wp) :: v0, v1, wt 
+
+        n = size(xn,1)
+        
+        nx = size(vary,1)
+        ny = size(vary,2)
+        
+        ! Initialize interpolated variable at nodes of interest
+        varn = 0.0
+
+        do k = 1, n
+
+            if (xn(k) > 0) then
+                i0 = i
+                i1 = ip1
+                wt = xn(k) / 2.0 
+            else
+                i0 = im1
+                i1 = i
+                wt = 1.0 - abs(xn(k)) / 2.0
+            end if
+
+            ! Get left and right-side 
+            v0 = (1.0-wt)*vary(i0,jm1) + wt*vary(i1,jm1);
+            v1 = (1.0-wt)*vary(i0,j)   + wt*vary(i1,j);
+            
+            ! Interpolate vertically to the node location 
+            wt = (1.0 + yn(k)) / 2.0;
+            varn(k) = (1.0-wt)*v0 + wt*v1;
+
+        end do
+        
+        return
+
+    end subroutine acy_to_nodes
     
     subroutine stagger_node_aa_ab_ice(u_ab,u_aa,f_ice,i,j,check_underflow)
         ! Stagger from aa nodes to ab node for index [i,j]
@@ -2397,8 +2599,8 @@ contains
 
         implicit none
 
-        real(prec), intent(IN)  :: u(:,:) 
-        real(prec) :: ustag(size(u,1),size(u,2)) 
+        real(wp), intent(IN)  :: u(:,:) 
+        real(wp) :: ustag(size(u,1),size(u,2)) 
 
         ! Local variables 
         integer :: i, j, nx, ny  
@@ -2406,11 +2608,11 @@ contains
         nx = size(u,1)
         ny = size(u,2) 
 
-        ustag = 0.0_prec 
+        ustag = 0.0_wp 
 
         do j = 1, ny 
         do i = 1, nx-1
-            ustag(i,j) = 0.5_prec*(u(i,j)+u(i+1,j))
+            ustag(i,j) = 0.5_wp*(u(i,j)+u(i+1,j))
         end do 
         end do 
 
@@ -2423,8 +2625,8 @@ contains
 
         implicit none 
 
-        real(prec), intent(IN)  :: u(:,:) 
-        real(prec) :: ustag(size(u,1),size(u,2)) 
+        real(wp), intent(IN)  :: u(:,:) 
+        real(wp) :: ustag(size(u,1),size(u,2)) 
 
         ! Local variables 
         integer :: i, j, nx, ny  
@@ -2432,11 +2634,11 @@ contains
         nx = size(u,1)
         ny = size(u,2) 
 
-        ustag = 0.0_prec 
+        ustag = 0.0_wp 
 
         do j = 1, ny-1 
         do i = 1, nx
-            ustag(i,j) = 0.5_prec*(u(i,j)+u(i,j+1))
+            ustag(i,j) = 0.5_wp*(u(i,j)+u(i,j+1))
         end do 
         end do 
 
@@ -2449,8 +2651,8 @@ contains
 
         implicit none
 
-        real(prec), intent(IN)  :: u(:,:) 
-        real(prec) :: ustag(size(u,1),size(u,2)) 
+        real(wp), intent(IN)  :: u(:,:) 
+        real(wp) :: ustag(size(u,1),size(u,2)) 
 
         ! Local variables 
         integer :: i, j, nx, ny  
@@ -2458,11 +2660,11 @@ contains
         nx = size(u,1)
         ny = size(u,2) 
 
-        ustag = 0.0_prec 
+        ustag = 0.0_wp 
 
         do j = 1, ny 
         do i = 2, nx
-            ustag(i,j) = 0.5_prec*(u(i-1,j)+u(i,j))
+            ustag(i,j) = 0.5_wp*(u(i-1,j)+u(i,j))
         end do 
         end do 
 
@@ -2475,8 +2677,8 @@ contains
 
         implicit none 
 
-        real(prec), intent(IN)  :: u(:,:) 
-        real(prec) :: ustag(size(u,1),size(u,2)) 
+        real(wp), intent(IN)  :: u(:,:) 
+        real(wp) :: ustag(size(u,1),size(u,2)) 
 
         ! Local variables 
         integer :: i, j, nx, ny  
@@ -2484,11 +2686,11 @@ contains
         nx = size(u,1)
         ny = size(u,2) 
 
-        ustag = 0.0_prec 
+        ustag = 0.0_wp 
 
         do j = 2, ny
         do i = 1, nx
-            ustag(i,j) = 0.5_prec*(u(i,j-1)+u(i,j))
+            ustag(i,j) = 0.5_wp*(u(i,j-1)+u(i,j))
         end do 
         end do 
 
@@ -2501,8 +2703,8 @@ contains
 
         implicit none
 
-        real(prec), intent(IN)  :: u(:,:) 
-        real(prec) :: ustag(size(u,1),size(u,2)) 
+        real(wp), intent(IN)  :: u(:,:) 
+        real(wp) :: ustag(size(u,1),size(u,2)) 
 
         ! Local variables 
         integer :: i, j, nx, ny  
@@ -2510,11 +2712,11 @@ contains
         nx = size(u,1)
         ny = size(u,2) 
 
-        ustag = 0.0_prec 
+        ustag = 0.0_wp 
 
         do j = 2, ny 
         do i = 1, nx
-            ustag(i,j) = 0.5_prec*(u(i,j)+u(i,j-1))
+            ustag(i,j) = 0.5_wp*(u(i,j)+u(i,j-1))
         end do 
         end do 
 
@@ -2527,8 +2729,8 @@ contains
 
         implicit none 
 
-        real(prec), intent(IN)  :: u(:,:) 
-        real(prec) :: ustag(size(u,1),size(u,2)) 
+        real(wp), intent(IN)  :: u(:,:) 
+        real(wp) :: ustag(size(u,1),size(u,2)) 
 
         ! Local variables 
         integer :: i, j, nx, ny  
@@ -2536,11 +2738,11 @@ contains
         nx = size(u,1)
         ny = size(u,2) 
 
-        ustag = 0.0_prec 
+        ustag = 0.0_wp 
 
         do j = 1, ny 
         do i = 2, nx
-            ustag(i,j) = 0.5_prec*(u(i,j)+u(i-1,j))
+            ustag(i,j) = 0.5_wp*(u(i,j)+u(i-1,j))
         end do 
         end do 
 
@@ -2553,15 +2755,15 @@ contains
 
         implicit none 
 
-        real(prec), intent(OUT) :: dvardx(:,:) 
-        real(prec), intent(OUT) :: dvardy(:,:) 
-        real(prec), intent(IN)  :: var(:,:) 
-        real(prec), intent(IN)  :: dx 
+        real(wp), intent(OUT) :: dvardx(:,:) 
+        real(wp), intent(OUT) :: dvardy(:,:) 
+        real(wp), intent(IN)  :: var(:,:) 
+        real(wp), intent(IN)  :: dx 
 
         ! Local variables 
         integer    :: i, j, nx, ny
         integer    :: im1, ip1, jm1, jp1  
-        real(prec) :: dy 
+        real(wp) :: dy 
 
         nx = size(var,1)
         ny = size(var,2)
@@ -2595,21 +2797,21 @@ contains
 
         implicit none 
 
-        real(prec), intent(OUT) :: dvardx(:,:) 
-        real(prec), intent(OUT) :: dvardy(:,:) 
-        real(prec), intent(IN)  :: var(:,:) 
-        real(prec), intent(IN)  :: f_ice(:,:)
-        real(prec), intent(IN)  :: dx 
+        real(wp), intent(OUT) :: dvardx(:,:) 
+        real(wp), intent(OUT) :: dvardy(:,:) 
+        real(wp), intent(IN)  :: var(:,:) 
+        real(wp), intent(IN)  :: f_ice(:,:)
+        real(wp), intent(IN)  :: dx 
         logical,    intent(IN)  :: margin2nd 
-        real(prec), intent(IN)  :: grad_lim 
+        real(wp), intent(IN)  :: grad_lim 
         character(len=*), intent(IN) :: boundaries  ! Boundary conditions to apply 
         logical,    intent(IN), optional :: zero_outside 
 
         ! Local variables 
         integer    :: i, j, nx, ny 
         integer    :: im1, ip1, jm1, jp1 
-        real(prec) :: dy 
-        real(prec) :: H0, H1, H2 
+        real(wp) :: dy 
+        real(wp) :: H0, H1, H2 
         logical    :: use_zeros_outside 
 
 
@@ -2762,20 +2964,20 @@ contains
 
         implicit none 
 
-        real(prec), intent(OUT) :: dvardx(:,:)
-        real(prec), intent(OUT) :: dvardy(:,:) 
-        real(prec), intent(IN)  :: var(:,:) 
-        real(prec), intent(IN)  :: H_ice(:,:)
-        real(prec), intent(IN)  :: f_grnd_acx(:,:)
-        real(prec), intent(IN)  :: f_grnd_acy(:,:)
-        real(prec), intent(IN)  :: dx 
+        real(wp), intent(OUT) :: dvardx(:,:)
+        real(wp), intent(OUT) :: dvardy(:,:) 
+        real(wp), intent(IN)  :: var(:,:) 
+        real(wp), intent(IN)  :: H_ice(:,:)
+        real(wp), intent(IN)  :: f_grnd_acx(:,:)
+        real(wp), intent(IN)  :: f_grnd_acy(:,:)
+        real(wp), intent(IN)  :: dx 
         integer,    intent(IN)  :: method           ! Which gl gradient calculation to use
-        real(prec), intent(IN)  :: grad_lim         ! Very high limit == 0.05, low limit < 0.01 
+        real(wp), intent(IN)  :: grad_lim         ! Very high limit == 0.05, low limit < 0.01 
 
         ! Local variables 
         integer :: i, j, nx, ny 
-        real(prec) :: dy
-        real(prec) :: dvardx_1, dvardx_2 
+        real(wp) :: dy
+        real(wp) :: dvardx_1, dvardx_2 
 
         nx = size(H_ice,1)
         ny = size(H_ice,2) 
@@ -2953,15 +3155,15 @@ contains
 
         implicit none 
 
-        real(prec), intent(IN) :: var(:,:) 
+        real(wp), intent(IN) :: var(:,:) 
         logical,    intent(IN) :: mask(:,:) 
-        real(prec) :: ave 
+        real(wp) :: ave 
         integer :: n 
 
         n = count(mask)
         
         if (n .gt. 0) then 
-            ave = sum(var,mask=mask) / real(n,prec)
+            ave = sum(var,mask=mask) / real(n,wp)
         else 
             ave = 0.0 
         end if 
@@ -2974,8 +3176,8 @@ contains
 
         implicit none 
 
-        real(prec), intent(INOUT) :: var 
-        real(prec), intent(IN)    :: var_lim 
+        real(wp), intent(INOUT) :: var 
+        real(wp), intent(IN)    :: var_lim 
 
         if (var .lt. -var_lim) then 
             var = -var_lim 
@@ -3311,9 +3513,9 @@ contains
 
         implicit none 
 
-        real(prec), intent(INOUT) :: var(:,:) 
+        real(wp), intent(INOUT) :: var(:,:) 
         integer,    intent(IN)    :: nfill        ! How many neighbors to fill in 
-        real(prec), intent(IN), optional :: fill(:,:) ! Values to impose 
+        real(wp), intent(IN), optional :: fill(:,:) ! Values to impose 
 
         ! Local variables 
         integer :: i, j, nx, ny, q 
@@ -3354,7 +3556,7 @@ contains
 
         implicit none 
 
-        real(prec), intent(INOUT) :: var(:,:,:) 
+        real(wp), intent(INOUT) :: var(:,:,:) 
         integer,    intent(IN)    :: nfill        ! How many neighbors to fill in 
 
         ! Local variables 
@@ -3510,14 +3712,14 @@ contains
 
         implicit none 
 
-        real(prec), intent(IN) :: dx 
-        real(prec), intent(IN) :: dy 
-        real(prec), intent(IN) :: sigma 
+        real(wp), intent(IN) :: dx 
+        real(wp), intent(IN) :: dy 
+        real(wp), intent(IN) :: sigma 
         integer,    intent(IN) :: n 
-        real(prec) :: filt(n,n) 
+        real(wp) :: filt(n,n) 
 
         ! Local variables 
-        real(prec) :: x, y  
+        real(wp) :: x, y  
         integer    :: n2, i, j, i1, j1  
 
         if (mod(n,2) .ne. 1) then 
@@ -3558,14 +3760,14 @@ contains
 
         implicit none 
 
-        real(prec), intent(INOUT) :: var(:,:)       ! aa-nodes
-        real(prec), intent(IN)    :: H_ice(:,:)     ! aa-nodes
-        real(prec), intent(IN)    :: dx 
+        real(wp), intent(INOUT) :: var(:,:)       ! aa-nodes
+        real(wp), intent(IN)    :: H_ice(:,:)     ! aa-nodes
+        real(wp), intent(IN)    :: dx 
 
         ! Local variables
         integer    :: i, j, nx, ny  
         integer    :: im1, ip1, jm1, jp1 
-        real(prec) :: varx(2), vary(2)
+        real(wp) :: varx(2), vary(2)
         logical    :: check_x, check_y 
         
         logical, allocatable :: bad_pts(:,:) 
@@ -3591,10 +3793,10 @@ contains
                 jp1 = min(ny,j+1)
 
                 varx = [var(im1,j),var(ip1,j)]
-                where([H_ice(im1,j),H_ice(ip1,j)] .eq. 0.0_prec) varx = missing_value 
+                where([H_ice(im1,j),H_ice(ip1,j)] .eq. 0.0_wp) varx = missing_value 
 
                 vary = [var(i,jm1),var(i,jp1)]
-                where([H_ice(i,jm1),H_ice(i,jp1)] .eq. 0.0_prec) vary = missing_value 
+                where([H_ice(i,jm1),H_ice(i,jp1)] .eq. 0.0_wp) vary = missing_value 
                 
                 ! Check if checkerboard exists in each direction 
                 check_x = (count(varx .gt. var(i,j) .and. varx.ne.missing_value) .eq. 2 .or. &
@@ -3624,15 +3826,15 @@ contains
 
         implicit none 
 
-        real(prec), intent(INOUT) :: var(:,:)       ! aa-nodes
-        real(prec), intent(IN)    :: H_ice(:,:)     ! aa-nodes
-        real(prec), intent(IN)    :: dx 
+        real(wp), intent(INOUT) :: var(:,:)       ! aa-nodes
+        real(wp), intent(IN)    :: H_ice(:,:)     ! aa-nodes
+        real(wp), intent(IN)    :: dx 
 
         ! Local variables
         integer    :: i, j, nx, ny, n   
         integer    :: im1, ip1, jm1, jp1 
-        real(prec), allocatable :: var0(:,:) 
-        real(prec) :: varx(2), vary(2), var9(3,3)
+        real(wp), allocatable :: var0(:,:) 
+        real(wp) :: varx(2), vary(2), var9(3,3)
         logical    :: check_x, check_y 
         
         integer    :: q, qmax, npts
@@ -3662,10 +3864,10 @@ contains
                 jp1 = min(ny,j+1)
 
                 varx = [var0(im1,j),var0(ip1,j)]
-                where([H_ice(im1,j),H_ice(ip1,j)] .eq. 0.0_prec) varx = missing_value 
+                where([H_ice(im1,j),H_ice(ip1,j)] .eq. 0.0_wp) varx = missing_value 
 
                 vary = [var0(i,jm1),var0(i,jp1)]
-                where([H_ice(i,jm1),H_ice(i,jp1)] .eq. 0.0_prec) vary = missing_value 
+                where([H_ice(i,jm1),H_ice(i,jp1)] .eq. 0.0_wp) vary = missing_value 
                 
                 ! Check if checkerboard exists in each direction 
                 check_x = (count(varx .gt. var0(i,j) .and. varx.ne.missing_value) .eq. 2 .or. &
@@ -3678,11 +3880,11 @@ contains
                     ! Checkerboard exists, apply 9-point neighborhood average
 
                     var9 = var0(i-1:i+1,j-1:j+1)
-                    where(H_ice(i-1:i+1,j-1:j+1) .eq. 0.0_prec) var9 = missing_value 
+                    where(H_ice(i-1:i+1,j-1:j+1) .eq. 0.0_wp) var9 = missing_value 
 
                     n = count(var9 .ne. missing_value) 
 
-                    var(i,j) = sum(var9,mask=var9.ne.missing_value) / real(n,prec)
+                    var(i,j) = sum(var9,mask=var9.ne.missing_value) / real(n,wp)
                     npts     = npts + 1
                 end if 
 
@@ -3707,9 +3909,9 @@ contains
 
         implicit none
 
-        real(prec), intent(IN) :: var(:,:,:)
-        real(prec), intent(IN) :: zeta(:)
-        real(prec) :: var_int(size(var,1),size(var,2),size(var,3))
+        real(wp), intent(IN) :: var(:,:,:)
+        real(wp), intent(IN) :: zeta(:)
+        real(wp) :: var_int(size(var,1),size(var,2),size(var,3))
 
         ! Local variables 
         integer :: i, j, nx, ny
@@ -3735,9 +3937,9 @@ contains
         
         implicit none
 
-        real(prec), intent(IN) :: var(:,:,:)
-        real(prec), intent(IN) :: zeta(:)
-        real(prec) :: var_int(size(var,1),size(var,2))
+        real(wp), intent(IN) :: var(:,:,:)
+        real(wp), intent(IN) :: zeta(:)
+        real(wp) :: var_int(size(var,1),size(var,2))
 
         ! Local variables 
         integer :: i, j, nx, ny
@@ -3765,24 +3967,24 @@ contains
 
         implicit none
 
-        real(prec), intent(IN) :: var(:)
-        real(prec), intent(IN) :: zeta(:)
-        real(prec) :: var_int
+        real(wp), intent(IN) :: var(:)
+        real(wp), intent(IN) :: zeta(:)
+        real(wp) :: var_int
 
         ! Local variables 
         integer :: k, nk
-        real(prec) :: var_mid 
+        real(wp) :: var_mid 
         
         nk = size(var,1)
 
         ! Initial value is zero
-        var_int = 0.0_prec 
+        var_int = 0.0_wp 
 
         ! Intermediate values include sum of all previous values 
         ! Take current value as average between points
         do k = 2, nk
-            var_mid = 0.5_prec*(var(k)+var(k-1))
-            if (abs(var_mid) .lt. TOL_UNDERFLOW) var_mid = 0.0_prec 
+            var_mid = 0.5_wp*(var(k)+var(k-1))
+            if (abs(var_mid) .lt. TOL_UNDERFLOW) var_mid = 0.0_wp 
             var_int = var_int + var_mid*(zeta(k) - zeta(k-1))
         end do
 
@@ -3799,25 +4001,25 @@ contains
 
         implicit none
 
-        real(prec), intent(IN) :: var(:)
-        real(prec), intent(IN) :: zeta(:)
-        real(prec) :: var_int(size(var,1))
+        real(wp), intent(IN) :: var(:)
+        real(wp), intent(IN) :: zeta(:)
+        real(wp) :: var_int(size(var,1))
 
         ! Local variables 
         integer    :: k, nk
-        real(prec) :: var_mid 
+        real(wp) :: var_mid 
 
         nk = size(var,1)
 
         ! Initial value is zero
-        var_int(1:nk) = 0.0_prec 
+        var_int(1:nk) = 0.0_wp 
 
         ! Intermediate values include sum of all previous values 
         ! Take current value as average between points
         do k = 2, nk
-            var_mid = 0.5_prec*(var(k)+var(k-1))
-            if (abs(var_mid) .lt. TOL_UNDERFLOW) var_mid = 0.0_prec 
-            var_int(k:nk) = var_int(k:nk) + 0.5_prec*(var(k)+var(k-1))*(zeta(k) - zeta(k-1))
+            var_mid = 0.5_wp*(var(k)+var(k-1))
+            if (abs(var_mid) .lt. TOL_UNDERFLOW) var_mid = 0.0_wp 
+            var_int(k:nk) = var_int(k:nk) + 0.5_wp*(var(k)+var(k-1))*(zeta(k) - zeta(k-1))
         end do
         
         return
@@ -3862,25 +4064,25 @@ contains
         
         implicit none
 
-        real(prec) :: x(:)
-        real(prec) :: y(:)
-        real(prec) :: result
+        real(wp) :: x(:)
+        real(wp) :: y(:)
+        real(wp) :: result
 
         integer :: ntab
 
-        real(prec) :: del(3)
-        real(prec) :: e
-        real(prec) :: f
-        real(prec) :: feints
-        real(prec) :: g(3)
+        real(wp) :: del(3)
+        real(wp) :: e
+        real(wp) :: f
+        real(wp) :: feints
+        real(wp) :: g(3)
         integer    :: i
         integer    :: n
-        real(prec) :: pi(3)
-        real(prec) :: sum1
+        real(wp) :: pi(3)
+        real(wp) :: sum1
 
-        real(prec) :: x1
-        real(prec) :: x2
-        real(prec) :: x3
+        real(wp) :: x1
+        real(wp) :: x2
+        real(wp) :: x3
 
         ntab = size(x,1) 
 
@@ -3974,13 +4176,13 @@ contains
         ! Local variables
         integer :: i, j, n, k, t 
         integer :: nn(11) 
-        real(prec), allocatable :: zeta0(:) 
-        real(prec), allocatable :: zeta(:)
-        real(prec), allocatable :: var0(:) 
-        real(prec), allocatable :: var(:) 
-        real(prec), allocatable :: var_ints(:)
-        real(prec) :: var_int 
-        real(prec) :: var_int_00
+        real(wp), allocatable :: zeta0(:) 
+        real(wp), allocatable :: zeta(:)
+        real(wp), allocatable :: var0(:) 
+        real(wp), allocatable :: var(:) 
+        real(wp), allocatable :: var_ints(:)
+        real(wp) :: var_int 
+        real(wp) :: var_int_00
 
         write(*,*) "=== test_integration ======"
         

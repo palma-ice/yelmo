@@ -7,6 +7,7 @@ module solver_ssa_ac
 
 
     use yelmo_defs, only : sp, dp, wp, io_unit_err, TOL_UNDERFLOW, rho_ice, rho_sw, g 
+    use yelmo_tools, only : get_neighbor_indices
 
     use grid_calcs  ! For staggering routines 
     use ncio        ! For diagnostic outputting only 
@@ -187,13 +188,12 @@ contains
         
         real(wp), allocatable :: N_ab(:,:)
 
-        ! Boundary conditions counterclockwise unit circle 
+        ! Boundary conditions (bcs) counterclockwise unit circle 
         ! 1: x, right-border
         ! 2: y, upper-border 
         ! 3: x, left--border 
         ! 4: y, lower-border 
-        character(len=56) :: boundaries_ux(4)
-        character(len=56) :: boundaries_uy(4)
+        character(len=56) :: bcs(4)
 
         integer :: im1, ip1, jm1, jp1 
         real(wp) :: N_aa_now
@@ -227,47 +227,45 @@ contains
             
         end if 
 
-        ! Define border conditions (zeros, infinite, periodic)
+        ! Define border conditions (no-slip, free-slip, periodic)
         select case(trim(boundaries)) 
 
             case("MISMIP3D")
 
-                boundaries_ux(1) = "zeros"
-                boundaries_ux(2) = "free-slip"
-                boundaries_ux(3) = "zeros"
-                boundaries_ux(4) = "free-slip"
-
-                boundaries_uy(1:4) = "zeros" 
+                bcs(1) = "free-slip"
+                bcs(2) = "free-slip"
+                bcs(3) = "no-slip"
+                bcs(4) = "free-slip" 
+                ! bcs(1) = "free-slip"
+                ! bcs(2) = "periodic"
+                ! bcs(3) = "no-slip"
+                ! bcs(4) = "periodic" 
 
             case("periodic")
 
-                boundaries_ux(1:4) = "periodic" 
-
-                boundaries_uy(1:4) = "periodic" 
+                bcs(1:4) = "periodic" 
 
             case("periodic-x")
 
-                boundaries_ux(1) = "periodic"
-                boundaries_ux(2) = "free-slip"
-                boundaries_ux(3) = "periodic"
-                boundaries_ux(4) = "free-slip"
+                bcs(1) = "periodic"
+                bcs(2) = "free-slip"
+                bcs(3) = "periodic"
+                bcs(4) = "free-slip"
 
-                boundaries_uy(1) = "periodic"
-                boundaries_uy(2) = "free-slip"
-                boundaries_uy(3) = "periodic"
-                boundaries_uy(4) = "free-slip"
+            case("periodic-y")
 
+                bcs(1) = "free-slip"
+                bcs(2) = "periodic"
+                bcs(3) = "free-slip"
+                bcs(4) = "periodic"
+            
             case("infinite")
 
-                boundaries_ux(1:4) = "free-slip" 
-
-                boundaries_uy(1:4) = "free-slip" 
+                bcs(1:4) = "free-slip" 
                 
             case DEFAULT 
 
-                boundaries_ux(1:4) = "zeros" 
-
-                boundaries_uy(1:4) = "zeros" 
+                bcs(1:4) = "periodic"
                 
         end select 
 
@@ -289,7 +287,7 @@ contains
 
         ! Calculate the staggered depth-integrated viscosity 
         ! at the grid-cell corners (ab-nodes). 
-        call stagger_visc_aa_ab(N_ab,N_aa,H_ice,f_ice)
+        call stagger_visc_aa_ab(N_ab,N_aa,H_ice,f_ice,boundaries)
         
 
         !-------- Assembly of the system of linear equations
@@ -304,15 +302,8 @@ contains
             i = lgs%n2i((n+1)/2)
             j = lgs%n2j((n+1)/2)
 
-            ! BC: Periodic boundary conditions by default
-            im1 = i-1
-            if (im1 == 0) im1 = nx
-            ip1 = i+1
-            if (ip1 == nx+1) ip1 = 1
-            jm1 = j-1
-            if (jm1 == 0) jm1 = ny
-            jp1 = j+1
-            if (jp1 == ny+1) jp1 = 1
+            ! Get neighbor indices
+            call get_neighbor_indices(im1,ip1,jm1,jp1,i,j,nx,ny,boundaries)
 
             ! ------ Equations for ux ---------------------------
 
@@ -342,13 +333,12 @@ contains
                 lgs%b_value(nr) = ux(i,j)
                 lgs%x_value(nr) = ux(i,j)
             
-            else if (i .eq. 1 .and. trim(boundaries_ux(3)) .ne. "periodic") then 
+            else if (i .eq. 1 .and. trim(bcs(3)) .ne. "periodic") then 
                 ! Left boundary 
 
-                select case(trim(boundaries_ux(3)))
+                select case(trim(bcs(3)))
 
-                    case("zeros")
-                        ! Assume border velocity is zero 
+                    case("no-slip")
 
                         k = k+1
                         lgs%a_value(k)  = 1.0   ! diagonal element only
@@ -358,7 +348,6 @@ contains
                         lgs%x_value(nr) = 0.0
 
                     case("free-slip")
-                        ! Free-slip boundary condition
 
                         nc = 2*lgs%ij2n(i,j)-1          ! column counter for ux(i,j)
                         k = k+1
@@ -375,13 +364,12 @@ contains
 
                 end select 
                 
-            else if (i .eq. nx .and. trim(boundaries_ux(1)) .ne. "periodic") then 
+            else if (i .eq. nx .and. trim(bcs(1)) .ne. "periodic") then 
                 ! Right boundary 
                 
-                select case(trim(boundaries_ux(1)))
+                select case(trim(bcs(1)))
 
-                    case("zeros")
-                        ! Assume border velocity is zero 
+                    case("no-slip")
 
                         k = k+1
                         lgs%a_value(k)  = 1.0   ! diagonal element only
@@ -391,7 +379,6 @@ contains
                         lgs%x_value(nr) = 0.0
 
                     case("free-slip")
-                        ! Free-slip boundary condition
 
                         nc = 2*lgs%ij2n(i,j)-1          ! column counter for ux(i,j)
                         k = k+1
@@ -408,13 +395,12 @@ contains
 
                 end select 
 
-            else if (j .eq. 1 .and. trim(boundaries_ux(4)) .ne. "periodic") then 
+            else if (j .eq. 1 .and. trim(bcs(4)) .ne. "periodic") then 
                 ! Lower boundary 
 
-                select case(trim(boundaries_ux(4)))
+                select case(trim(bcs(4)))
 
-                    case("zeros")
-                        ! Assume border velocity is zero 
+                    case("no-slip")
 
                         k = k+1
                         lgs%a_value(k)  = 1.0_wp   ! diagonal element only
@@ -424,25 +410,28 @@ contains
                         lgs%x_value(nr) = 0.0_wp
 
                     case("free-slip")
-                        ! Free-slip boundary condition
-                        ! (zero-velocity perpindicular to boundary)
-                        
+
+                        nc = 2*lgs%ij2n(i,j)-1          ! column counter for ux(i,j)
                         k = k+1
-                        lgs%a_value(k)  = 1.0_wp   ! diagonal element only
-                        lgs%a_index(k)  = nr
+                        lgs%a_value(k) =  1.0_wp
+                        lgs%a_index(k) = nc
+
+                        nc = 2*lgs%ij2n(i,jp1)-1       ! column counter for ux(i,jp1)
+                        k = k+1
+                        lgs%a_value(k) = -1.0_wp
+                        lgs%a_index(k) = nc
 
                         lgs%b_value(nr) = 0.0_wp
-                        lgs%x_value(nr) = 0.0_wp
+                        lgs%x_value(nr) = ux(i,j)
 
                 end select 
 
-            else if (j .eq. ny .and. trim(boundaries_ux(2)) .ne. "periodic") then 
+            else if (j .eq. ny .and. trim(bcs(2)) .ne. "periodic") then 
                 ! Upper boundary 
 
-                select case(trim(boundaries_ux(2)))
+                select case(trim(bcs(2)))
 
-                    case("zeros")
-                        ! Assume border velocity is zero 
+                    case("no-slip")
 
                         k = k+1
                         lgs%a_value(k)  = 1.0_wp   ! diagonal element only
@@ -452,15 +441,19 @@ contains
                         lgs%x_value(nr) = 0.0_wp
                         
                     case("free-slip")
-                        ! Free-slip boundary condition
-                        ! (zero-velocity perpindicular to boundary)
-                        
+
+                        nc = 2*lgs%ij2n(i,j)-1          ! column counter for ux(i,j)
                         k = k+1
-                        lgs%a_value(k)  = 1.0_wp   ! diagonal element only
-                        lgs%a_index(k)  = nr
+                        lgs%a_value(k) =  1.0_wp
+                        lgs%a_index(k) = nc
+
+                        nc = 2*lgs%ij2n(i,ny-1)-1       ! column counter for ux(i,ny-1)
+                        k = k+1
+                        lgs%a_value(k) = -1.0_wp
+                        lgs%a_index(k) = nc
 
                         lgs%b_value(nr) = 0.0_wp
-                        lgs%x_value(nr) = 0.0_wp
+                        lgs%x_value(nr) = ux(i,j)
 
                 end select 
 
@@ -628,13 +621,12 @@ contains
                 lgs%b_value(nr) = uy(i,j)
                 lgs%x_value(nr) = uy(i,j)
             
-            else if (j .eq. 1 .and. trim(boundaries_uy(4)) .ne. "periodic") then 
+            else if (j .eq. 1 .and. trim(bcs(4)) .ne. "periodic") then 
                 ! lower boundary 
 
-                select case(trim(boundaries_uy(4)))
+                select case(trim(bcs(4)))
 
-                    case("zeros")
-                        ! Assume border vy velocity is zero 
+                    case("no-slip")
 
                         k = k+1
                         lgs%a_value(k)  = 1.0_wp        ! diagonal element only
@@ -644,14 +636,13 @@ contains
                         lgs%x_value(nr) = 0.0_wp
 
                     case("free-slip")
-                        ! Free-slip boundary condition
 
                         nc = 2*lgs%ij2n(i,j)            ! column counter for uy(i,j)
                         k = k+1
                         lgs%a_value(k) =  1.0_wp
                         lgs%a_index(k) = nc
 
-                        nc = 2*lgs%ij2n(i,2)            ! column counter for uy(i,2)
+                        nc = 2*lgs%ij2n(i,jp1)            ! column counter for uy(i,jp1)
                         k = k+1
                         lgs%a_value(k) = -1.0_wp
                         lgs%a_index(k) = nc
@@ -661,13 +652,12 @@ contains
 
                 end select 
 
-            else if (j .eq. ny .and. trim(boundaries_uy(2)) .ne. "periodic") then 
+            else if (j .eq. ny .and. trim(bcs(2)) .ne. "periodic") then 
                 ! Upper boundary 
 
-                select case(trim(boundaries_uy(2)))
+                select case(trim(bcs(2)))
 
-                    case("zeros")
-                        ! Assume border velocity is zero 
+                    case("no-slip")
 
                         k = k+1
                         lgs%a_value(k)  = 1.0_wp        ! diagonal element only
@@ -677,7 +667,6 @@ contains
                         lgs%x_value(nr) = 0.0_wp
 
                     case("free-slip")
-                        ! Free-slip boundary condition
 
                         nc = 2*lgs%ij2n(i,j)            ! column counter for uy(i,j)
                         k = k+1
@@ -694,13 +683,12 @@ contains
 
                 end select 
 
-            else if (i .eq. 1 .and. trim(boundaries_uy(3)) .ne. "periodic") then 
+            else if (i .eq. 1 .and. trim(bcs(3)) .ne. "periodic") then 
                 ! Left boundary 
 
-                select case(trim(boundaries_uy(3)))
+                select case(trim(bcs(3)))
 
-                    case("zeros")
-                        ! Assume border velocity is zero 
+                    case("no-slip")
 
                         k = k+1
                         lgs%a_value(k)  = 1.0_wp   ! diagonal element only
@@ -710,25 +698,28 @@ contains
                         lgs%x_value(nr) = 0.0_wp
 
                     case("free-slip")
-                        ! Free-slip boundary condition
-                        ! (zero-velocity perpindicular to boundary)
 
+                        nc = 2*lgs%ij2n(i,j)            ! column counter for uy(i,j)
                         k = k+1
-                        lgs%a_value(k)  = 1.0_wp   ! diagonal element only
-                        lgs%a_index(k)  = nr
+                        lgs%a_value(k) =  1.0_wp
+                        lgs%a_index(k) = nc
+
+                        nc = 2*lgs%ij2n(ip1,j)          ! column counter for uy(ip1,j)
+                        k = k+1
+                        lgs%a_value(k) = -1.0_wp
+                        lgs%a_index(k) = nc
 
                         lgs%b_value(nr) = 0.0_wp
-                        lgs%x_value(nr) = 0.0_wp
+                        lgs%x_value(nr) = uy(i,j)
 
                 end select 
                 
-            else if (i .eq. nx .and. trim(boundaries_uy(1)) .ne. "periodic") then 
+            else if (i .eq. nx .and. trim(bcs(1)) .ne. "periodic") then 
                 ! Right boundary 
 
-                select case(trim(boundaries_uy(1)))
+                select case(trim(bcs(1)))
 
-                    case("zeros")
-                        ! Assume border velocity is zero 
+                    case("no-slip")
 
                         k = k+1
                         lgs%a_value(k)  = 1.0_wp   ! diagonal element only
@@ -738,15 +729,19 @@ contains
                         lgs%x_value(nr) = 0.0_wp
 
                     case("free-slip")
-                        ! Free-slip boundary condition
-                        ! (zero-velocity perpindicular to boundary)
-                        
+
+                        nc = 2*lgs%ij2n(i,j)            ! column counter for uy(i,j)
                         k = k+1
-                        lgs%a_value(k)  = 1.0_wp   ! diagonal element only
-                        lgs%a_index(k)  = nr
+                        lgs%a_value(k) =  1.0_wp
+                        lgs%a_index(k) = nc
+
+                        nc = 2*lgs%ij2n(nx-1,j)         ! column counter for uy(nx-1,j)
+                        k = k+1
+                        lgs%a_value(k) = -1.0_wp
+                        lgs%a_index(k) = nc
 
                         lgs%b_value(nr) = 0.0_wp
-                        lgs%x_value(nr) = 0.0_wp
+                        lgs%x_value(nr) = uy(i,j)
 
                 end select 
 
@@ -1185,7 +1180,7 @@ contains
 
 ! === INTERNAL ROUTINES ==== 
 
-    subroutine stagger_visc_aa_ab(visc_ab,visc,H_ice,f_ice)
+    subroutine stagger_visc_aa_ab(visc_ab,visc,H_ice,f_ice,boundaries)
 
         implicit none 
 
@@ -1193,7 +1188,8 @@ contains
         real(wp), intent(IN)  :: visc(:,:) 
         real(wp), intent(IN)  :: H_ice(:,:) 
         real(wp), intent(IN)  :: f_ice(:,:) 
-        
+        character(len=*), intent(IN) :: boundaries 
+
         ! Local variables 
         integer :: i, j, k
         integer :: im1, ip1, jm1, jp1 
@@ -1209,16 +1205,8 @@ contains
         do i = 1, nx 
         do j = 1, ny 
 
-            ! BC: Periodic boundary conditions by default
-            im1 = i-1
-            if (im1 == 0) im1 = nx
-            ip1 = i+1
-            if (ip1 == nx+1) ip1 = 1
-            jm1 = j-1
-            if (jm1 == 0) jm1 = ny
-            jp1 = j+1
-            if (jp1 == ny+1) jp1 = 1
-
+            ! Get neighbor indices
+            call get_neighbor_indices(im1,ip1,jm1,jp1,i,j,nx,ny,boundaries)
 
             visc_ab(i,j) = 0.0_wp
             k=0

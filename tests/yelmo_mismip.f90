@@ -152,7 +152,7 @@ program yelmo_mismip
     yelmo1%bnd%T_shlf   = T0  
     yelmo1%bnd%H_sed    = 0.0 
 
-    call mismip3D_boundaries(yelmo1%bnd%T_srf,yelmo1%bnd%smb,yelmo1%bnd%Q_geo,experiment=experiment)
+    call mismip3D_boundaries(yelmo1%bnd%T_srf,yelmo1%bnd%smb,yelmo1%bnd%Q_geo,yelmo1%bnd%calv_mask,experiment=experiment)
 
     ! Check boundary values 
     call yelmo_print_bound(yelmo1%bnd)
@@ -261,7 +261,7 @@ program yelmo_mismip
         
         ! == Update boundaries 
         
-        call mismip3D_boundaries(yelmo1%bnd%T_srf,yelmo1%bnd%smb,yelmo1%bnd%Q_geo,experiment=experiment)
+        call mismip3D_boundaries(yelmo1%bnd%T_srf,yelmo1%bnd%smb,yelmo1%bnd%Q_geo,yelmo1%bnd%calv_mask,experiment=experiment)
 
         ! == MODEL OUTPUT =======================================================
         if (mod(nint(time*100),nint(dt2D_out*100))==0) then  

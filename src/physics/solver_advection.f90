@@ -1,7 +1,7 @@
 module solver_advection
     
-    use yelmo_defs, only : sp, dp, wp, prec, tol_underflow
-    use yelmo_tools, only : stagger_aa_ab, stagger_nodes_aa_ab_ice
+    use yelmo_defs, only : sp, dp, wp, tol_underflow
+    use yelmo_tools, only : get_neighbor_indices, stagger_aa_ab, stagger_nodes_aa_ab_ice
     use solver_advection_sico, only : calc_adv2D_expl_sico, calc_adv2D_impl_sico
 
     implicit none 
@@ -19,20 +19,20 @@ contains
         ! General routine to apply 2D advection equation to variable `var` 
         ! with source term `var_dot`. Various solvers are possible
 
-        real(prec),       intent(OUT)   :: dvdt(:,:)            ! [dvdt] Variable rate of change
-        real(prec),       intent(IN)    :: var(:,:)             ! [var]  Variable to be advected
-        real(prec),       intent(IN)    :: f_ice(:,:)             ! [var]  Variable to be advected
-        real(prec),       intent(IN)    :: ux(:,:)              ! [m/a] 2D velocity, x-direction (ac-nodes)
-        real(prec),       intent(IN)    :: uy(:,:)              ! [m/a] 2D velocity, y-direction (ac-nodes)
-        real(prec),       intent(IN)    :: var_dot(:,:)         ! [dvar/dt] Source term for variable
-        real(prec),       intent(IN)    :: dx                   ! [m]   Horizontal resolution, x-direction
-        real(prec),       intent(IN)    :: dy                   ! [m]   Horizontal resolution, y-direction
-        real(prec),       intent(IN)    :: dt                   ! [a]   Timestep 
+        real(wp),       intent(OUT)   :: dvdt(:,:)            ! [dvdt] Variable rate of change
+        real(wp),       intent(IN)    :: var(:,:)             ! [var]  Variable to be advected
+        real(wp),       intent(IN)    :: f_ice(:,:)             ! [var]  Variable to be advected
+        real(wp),       intent(IN)    :: ux(:,:)              ! [m/a] 2D velocity, x-direction (ac-nodes)
+        real(wp),       intent(IN)    :: uy(:,:)              ! [m/a] 2D velocity, y-direction (ac-nodes)
+        real(wp),       intent(IN)    :: var_dot(:,:)         ! [dvar/dt] Source term for variable
+        real(wp),       intent(IN)    :: dx                   ! [m]   Horizontal resolution, x-direction
+        real(wp),       intent(IN)    :: dy                   ! [m]   Horizontal resolution, y-direction
+        real(wp),       intent(IN)    :: dt                   ! [a]   Timestep 
         character(len=*), intent(IN)    :: solver               ! Solver to use for the ice thickness advection equation
         character(len=*), intent(IN)    :: boundaries           ! Boundary conditions to impose
 
         ! Local variables 
-        real(prec), allocatable :: var_now(:,:) 
+        real(wp), allocatable :: var_now(:,:) 
 
         allocate(var_now(size(var,1),size(var,2)))
 
@@ -48,20 +48,19 @@ contains
 
             case("expl")
 
-                call calc_adv2D_expl(var_now,f_ice,ux,uy,var_dot,dx,dy,dt)
+                call calc_adv2D_expl(var_now,f_ice,ux,uy,var_dot,dx,dy,dt,boundaries)
 
             case("expl-new")
 
-                call calc_adv2D_expl_new(var_now,f_ice,ux,uy,var_dot,dx,dy,dt)
+                call calc_adv2D_expl_new(var_now,f_ice,ux,uy,var_dot,dx,dy,dt,boundaries)
 
             case("expl-upwind")
 
-                call calc_adv2D_expl_upwind(var_now,ux,uy,var_dot,dx,dy,dt)
+                call calc_adv2D_expl_upwind(var_now,ux,uy,var_dot,dx,dy,dt,boundaries)
 
             case("impl-upwind") 
 
-                call calc_adv2D_impl_upwind(var_now,ux,uy,var_dot,dx,dy,dt, &
-                                                f_upwind=1.0_prec,boundaries=boundaries)
+                call calc_adv2D_impl_upwind(var_now,ux,uy,var_dot,dx,dy,dt,boundaries,f_upwind=1.0_wp)
             
             ! Other solvers below...
             case("expl-sico")
@@ -91,20 +90,21 @@ contains
 
     end subroutine calc_advec2D
 
-    subroutine calc_adv2D_expl_new(H_ice, f_ice, ux, uy, mdot, dx, dy, dt)
+    subroutine calc_adv2D_expl_new(H_ice, f_ice, ux, uy, mdot, dx, dy, dt, boundaries)
         ! Solve 2D advection equation for ice sheet thickness via explicit flux divergence:
         ! d[H]/dt = -grad[H*(ux,uy)] + mdot 
         
         implicit none 
 
-        real(prec), intent(INOUT) :: H_ice(:,:)             ! [m] aa-nodes, Ice thickness 
-        real(prec), intent(IN)    :: f_ice(:,:)
-        real(prec), intent(IN)    :: ux(:,:)                ! [m a^-1] ac-nodes, Horizontal velocity, x-direction
-        real(prec), intent(IN)    :: uy(:,:)                ! [m a^-1] ac-nodes, Horizontal velocity, y-direction
-        real(prec), intent(IN)    :: mdot(:,:)              ! [m a^-1] aa-nodes, Source term, net rate of change at top and bottom of cell (no vertical advection) 
-        real(prec), intent(IN)    :: dx                     ! [m] Horizontal grid spacing, x-direction
-        real(prec), intent(IN)    :: dy                     ! [m] Horizontal grid spacing, y-direction
-        real(prec), intent(IN)    :: dt                     ! [a] Timestep 
+        real(wp), intent(INOUT) :: H_ice(:,:)             ! [m] aa-nodes, Ice thickness 
+        real(wp), intent(IN)    :: f_ice(:,:)
+        real(wp), intent(IN)    :: ux(:,:)                ! [m a^-1] ac-nodes, Horizontal velocity, x-direction
+        real(wp), intent(IN)    :: uy(:,:)                ! [m a^-1] ac-nodes, Horizontal velocity, y-direction
+        real(wp), intent(IN)    :: mdot(:,:)              ! [m a^-1] aa-nodes, Source term, net rate of change at top and bottom of cell (no vertical advection) 
+        real(wp), intent(IN)    :: dx                     ! [m] Horizontal grid spacing, x-direction
+        real(wp), intent(IN)    :: dy                     ! [m] Horizontal grid spacing, y-direction
+        real(wp), intent(IN)    :: dt                     ! [a] Timestep 
+        character(len=*), intent(IN) :: boundaries 
 
         ! Local variables:
         integer    :: i, j, nx, ny 
@@ -131,7 +131,7 @@ contains
 
         ! Initialize dHdt 
         allocate(dHdt(nx,ny))
-        dHdt = 0.0_prec 
+        dHdt = 0.0_wp 
 
         allocate(fx(nx,ny))
         allocate(fy(nx,ny))
@@ -143,12 +143,9 @@ contains
         do i = 1, nx
         do j = 1, ny
 
-            ! Define neighbor indices
-            im1 = max(i-1,1)
-            ip1 = min(i+1,nx)
-            jm1 = max(j-1,1)
-            jp1 = min(j+1,ny)
-            
+            ! Get neighbor indices
+            call get_neighbor_indices(im1,ip1,jm1,jp1,i,j,nx,ny,boundaries)
+
             ! Get ab-node weighting based on whether ice is present 
             wt_ab = 0.0_wp 
             if (count([f_ice(i,j),f_ice(ip1,j),f_ice(i,jp1),f_ice(ip1,jp1)].lt.1.0_wp) .eq. 0) then 
@@ -223,16 +220,13 @@ if (.FALSE.) then
         do i = 1, nx
         do j = 1, ny
 
-            ! Define neighbor indices
-            im1 = max(i-1,1)
-            ip1 = min(i+1,nx)
-            jm1 = max(j-1,1)
-            jp1 = min(j+1,ny)
-            
-            im2 = max(i-2,1)
-            ip2 = min(i+2,nx)
-            jm2 = max(j-2,1)
-            jp2 = min(j+2,ny)
+            ! Get neighbor indices
+            call get_neighbor_indices(im1,ip1,jm1,jp1,i,j,nx,ny,boundaries)
+
+            !im2 = max(i-2,1)
+            !ip2 = min(i+2,nx)
+            !jm2 = max(j-2,1)
+            !jp2 = min(j+2,ny)
             
             ! ajr: works for simple (EISMINT tests), but not for non-linear
             ! realistic ice sheets
@@ -267,7 +261,7 @@ end if
 
     end subroutine calc_adv2D_expl_new
 
-    subroutine calc_adv2D_expl(H_ice, f_ice, ux, uy, mdot, dx, dy, dt)
+    subroutine calc_adv2D_expl(H_ice, f_ice, ux, uy, mdot, dx, dy, dt, boundaries)
         ! Solve 2D advection equation for ice sheet thickness via explicit flux divergence:
         ! d[H]/dt = -grad[H*(ux,uy)] + mdot 
         !
@@ -285,7 +279,8 @@ end if
         real(wp), intent(IN)    :: dx                       ! [m] Horizontal grid spacing, x-direction
         real(wp), intent(IN)    :: dy                       ! [m] Horizontal grid spacing, y-direction
         real(wp), intent(IN)    :: dt                       ! [a] Timestep 
-
+        character(len=*), intent(IN) :: boundaries 
+        
         ! Local variables:
         integer  :: i, j, nx, ny 
         integer  :: im1, ip1, jm1, jp1
@@ -303,7 +298,7 @@ end if
 
         ! Initialize dHdt 
         allocate(dHdt(nx,ny))
-        dHdt = 0.0_prec 
+        dHdt = 0.0_wp 
 
         allocate(f_ice_now(nx,ny))
         f_ice_now = 1.0 
@@ -311,12 +306,9 @@ end if
         do j = 1, ny
         do i = 1, nx
         
-            ! Define neighbor indices
-            im1 = max(i-1,1)
-            ip1 = min(i+1,nx)
-            jm1 = max(j-1,1)
-            jp1 = min(j+1,ny)
-            
+            ! Get neighbor indices
+            call get_neighbor_indices(im1,ip1,jm1,jp1,i,j,nx,ny,boundaries)
+
             ! Get the ice thickness on ab-nodes
             call stagger_nodes_aa_ab_ice(H_ab,H_ice,f_ice_now,i,j)
 
@@ -343,7 +335,7 @@ end if
 
     end subroutine calc_adv2D_expl
 
-    subroutine calc_adv2D_expl_upwind(H_ice, ux, uy, mdot, dx, dy, dt)
+    subroutine calc_adv2D_expl_upwind(H_ice, ux, uy, mdot, dx, dy, dt, boundaries)
         ! Solve 2D advection equation for ice sheet thickness via explicit flux divergence:
         ! d[H]/dt = -grad[H*(ux,uy)] + mdot 
 
@@ -351,42 +343,40 @@ end if
 
         implicit none 
 
-        real(prec), intent(INOUT) :: H_ice(:,:)             ! [m] aa-nodes, Ice thickness 
-        real(prec), intent(IN)    :: ux(:,:)                ! [m a^-1] ac-nodes, Horizontal velocity, x-direction
-        real(prec), intent(IN)    :: uy(:,:)                ! [m a^-1] ac-nodes, Horizontal velocity, y-direction
-        real(prec), intent(IN)    :: mdot(:,:)              ! [m a^-1] aa-nodes, Source term, net rate of change at top and bottom of cell (no vertical advection) 
-        real(prec), intent(IN)    :: dx                     ! [m] Horizontal grid spacing, x-direction
-        real(prec), intent(IN)    :: dy                     ! [m] Horizontal grid spacing, y-direction
-        real(prec), intent(IN)    :: dt                     ! [a] Timestep 
-
+        real(wp), intent(INOUT) :: H_ice(:,:)             ! [m] aa-nodes, Ice thickness 
+        real(wp), intent(IN)    :: ux(:,:)                ! [m a^-1] ac-nodes, Horizontal velocity, x-direction
+        real(wp), intent(IN)    :: uy(:,:)                ! [m a^-1] ac-nodes, Horizontal velocity, y-direction
+        real(wp), intent(IN)    :: mdot(:,:)              ! [m a^-1] aa-nodes, Source term, net rate of change at top and bottom of cell (no vertical advection) 
+        real(wp), intent(IN)    :: dx                     ! [m] Horizontal grid spacing, x-direction
+        real(wp), intent(IN)    :: dy                     ! [m] Horizontal grid spacing, y-direction
+        real(wp), intent(IN)    :: dt                     ! [a] Timestep 
+        character(len=*), intent(IN) :: boundaries 
+        
         ! Local variables:
         integer    :: i, j, nx, ny
         integer    :: im1, ip1, jm1, jp1 
-        real(prec) :: H_now 
-        real(prec) :: flux_xr                               ! [m^2 a^-1] ac-nodes, Flux in the x-direction to the right
-        real(prec) :: flux_xl                               ! [m^2 a^-1] ac-nodes, Flux in the x-direction to the left
-        real(prec) :: flux_yu                               ! [m^2 a^-1] ac-nodes, Flux in the y-direction upwards
-        real(prec) :: flux_yd                               ! [m^2 a^-1] ac-nodes, Flux in the y-direction downwards
-        real(prec), allocatable :: dHdt(:,:)                ! [m] aa-nodes, Total change this timestep due to fluxes divergence and mdot 
+        real(wp) :: H_now 
+        real(wp) :: flux_xr                               ! [m^2 a^-1] ac-nodes, Flux in the x-direction to the right
+        real(wp) :: flux_xl                               ! [m^2 a^-1] ac-nodes, Flux in the x-direction to the left
+        real(wp) :: flux_yu                               ! [m^2 a^-1] ac-nodes, Flux in the y-direction upwards
+        real(wp) :: flux_yd                               ! [m^2 a^-1] ac-nodes, Flux in the y-direction downwards
+        real(wp), allocatable :: dHdt(:,:)                ! [m] aa-nodes, Total change this timestep due to fluxes divergence and mdot 
 
-        real(prec), parameter :: dHdt_lim = 1e3             ! [m a-1] Maximum rate of change allowed (high value for extreme changes)
+        real(wp), parameter :: dHdt_lim = 1e3             ! [m a-1] Maximum rate of change allowed (high value for extreme changes)
 
         nx = size(H_ice,1)
         ny = size(H_ice,2)
 
         ! Initialize dHdt 
         allocate(dHdt(nx,ny))
-        dHdt = 0.0_prec 
+        dHdt = 0.0_wp 
 
         do j = 1, ny
         do i = 1, nx
         
-            ! Define neighbor indices
-            im1 = max(i-1,1)
-            ip1 = min(i+1,nx)
-            jm1 = max(j-1,1)
-            jp1 = min(j+1,ny)
-            
+            ! Get neighbor indices
+            call get_neighbor_indices(im1,ip1,jm1,jp1,i,j,nx,ny,boundaries)
+
             ! Calculate the flux across each boundary [m^2 a^-1]
             if (ux(i,j) .gt. 0.0) then 
                 flux_xr = ux(i,j)*H_ice(i,j)
@@ -429,7 +419,7 @@ end if
 
     end subroutine calc_adv2D_expl_upwind
 
-    subroutine  calc_adv2D_impl_upwind(H,ux,uy,mdot,dx,dy,dt,f_upwind,boundaries)
+    subroutine  calc_adv2D_impl_upwind(H,ux,uy,mdot,dx,dy,dt,boundaries,f_upwind)
         ! To solve the 2D adevection equation:
         ! dH/dt =
         ! M H = Frelax
@@ -437,34 +427,34 @@ end if
 
         implicit none
 
-        real(prec), intent(INOUT) :: H(:,:)         ! Ice thickness (aa-node)
-        real(prec), intent(IN)    :: ux(:,:)        ! Depth-averaged velocity - x direction (ac-node)
-        real(prec), intent(IN)    :: uy(:,:)        ! Depth-averaged velocity - y direction (ac-node)
-        real(prec), intent(IN)    :: mdot(:,:)      ! Total column mass balance (aa-node)
-        real(prec), intent(IN)    :: dx             ! [m] x-resolution
-        real(prec), intent(IN)    :: dy             ! [m] y-resolution
-        real(prec), intent(IN)    :: dt             ! [a] Timestep (assumes dx=dy)
-        real(prec), intent(IN)    :: f_upwind       ! [-] Fraction of "upwind-ness" to apply (ajr: experimental!) - between 0.5 and 1.0, default f_upwind=1.0
+        real(wp), intent(INOUT) :: H(:,:)         ! Ice thickness (aa-node)
+        real(wp), intent(IN)    :: ux(:,:)        ! Depth-averaged velocity - x direction (ac-node)
+        real(wp), intent(IN)    :: uy(:,:)        ! Depth-averaged velocity - y direction (ac-node)
+        real(wp), intent(IN)    :: mdot(:,:)      ! Total column mass balance (aa-node)
+        real(wp), intent(IN)    :: dx             ! [m] x-resolution
+        real(wp), intent(IN)    :: dy             ! [m] y-resolution
+        real(wp), intent(IN)    :: dt             ! [a] Timestep (assumes dx=dy)
         character(len=*), intent(IN) :: boundaries 
-
+        real(wp), intent(IN)    :: f_upwind       ! [-] Fraction of "upwind-ness" to apply (ajr: experimental!) - between 0.5 and 1.0, default f_upwind=1.0
+        
         ! Local variables
         integer    :: i, j, nx, ny
         integer    :: im1, ip1, jm1, jp1 
         integer    :: iter, ierr 
-        real(prec) :: dtdx, dtdx2
-        real(prec) :: reste, delh, tmp 
-        real(prec) :: ux_i, ux_im1, uy_j, uy_jm1
-        real(prec), allocatable :: crelax(:,:)      ! diagnonale de M
-        real(prec), allocatable :: arelax(:,:)      ! sous diagonale selon x
-        real(prec), allocatable :: brelax(:,:)      ! sur  diagonale selon x
-        real(prec), allocatable :: drelax(:,:)      ! sous diagonale selon y
-        real(prec), allocatable :: erelax(:,:)      ! sur  diagonale selon y
-        real(prec), allocatable :: frelax(:,:)      ! vecteur
-        real(prec), allocatable :: c_west(:,:)      ! sur demi mailles Ux
-        real(prec), allocatable :: c_east(:,:)      ! sur demi mailles Ux
-        real(prec), allocatable :: c_north(:,:)     ! sur demi mailles Uy
-        real(prec), allocatable :: c_south(:,:)     ! sur demi mailles Uy
-        real(prec), allocatable :: deltaH(:,:)      ! Change in H
+        real(wp) :: dtdx, dtdx2
+        real(wp) :: reste, delh, tmp 
+        real(wp) :: ux_i, ux_im1, uy_j, uy_jm1
+        real(wp), allocatable :: crelax(:,:)      ! diagnonale de M
+        real(wp), allocatable :: arelax(:,:)      ! sous diagonale selon x
+        real(wp), allocatable :: brelax(:,:)      ! sur  diagonale selon x
+        real(wp), allocatable :: drelax(:,:)      ! sous diagonale selon y
+        real(wp), allocatable :: erelax(:,:)      ! sur  diagonale selon y
+        real(wp), allocatable :: frelax(:,:)      ! vecteur
+        real(wp), allocatable :: c_west(:,:)      ! sur demi mailles Ux
+        real(wp), allocatable :: c_east(:,:)      ! sur demi mailles Ux
+        real(wp), allocatable :: c_north(:,:)     ! sur demi mailles Uy
+        real(wp), allocatable :: c_south(:,:)     ! sur demi mailles Uy
+        real(wp), allocatable :: deltaH(:,:)      ! Change in H
 
         logical,    parameter :: use_upwind = .TRUE.  ! Apply upwind advection scheme or central scheme?   
                                                       ! (now this is redundant with f_upwind parameter) 
@@ -566,8 +556,8 @@ end if
         do j = 1, ny
         do i = 1, nx
 
-            call get_neighbor_i(im1,ip1,i,nx,boundaries) 
-            call get_neighbor_i(jm1,jp1,j,ny,boundaries) 
+            ! Get neighbor indices
+            call get_neighbor_indices(im1,ip1,jm1,jp1,i,j,nx,ny,boundaries)
 
             !  sous diagonale en x
             ux_im1 = ux(im1,j)
@@ -602,10 +592,10 @@ end if
         end do
 
         ! Avoid underflows 
-        where (abs(arelax) .lt. tol_underflow) arelax = 0.0_prec 
-        where (abs(brelax) .lt. tol_underflow) brelax = 0.0_prec 
-        where (abs(drelax) .lt. tol_underflow) drelax = 0.0_prec 
-        where (abs(erelax) .lt. tol_underflow) erelax = 0.0_prec 
+        where (abs(arelax) .lt. tol_underflow) arelax = 0.0_wp 
+        where (abs(brelax) .lt. tol_underflow) brelax = 0.0_wp 
+        where (abs(drelax) .lt. tol_underflow) drelax = 0.0_wp 
+        where (abs(erelax) .lt. tol_underflow) erelax = 0.0_wp 
         
         ! Initialize new H solution to zero (to get zeros at boundaries)
         H  = 0.0
@@ -620,8 +610,8 @@ end if
             do j = 1, ny
             do i = 1, nx
 
-                call get_neighbor_i(im1,ip1,i,nx,boundaries) 
-                call get_neighbor_i(jm1,jp1,j,ny,boundaries) 
+                ! Get neighbor indices
+                call get_neighbor_indices(im1,ip1,jm1,jp1,i,j,nx,ny,boundaries)
 
                 reste = (((arelax(i,j)*H(im1,j) + drelax(i,j)*H(i,jm1)) &
                         + (brelax(i,j)*H(ip1,j) + erelax(i,j)*H(i,jp1))) &
@@ -633,13 +623,13 @@ end if
             end do
 
             ! Avoid underflows
-            where(abs(deltaH) .lt. tol_underflow) deltaH = 0.0_prec
+            where(abs(deltaH) .lt. tol_underflow) deltaH = 0.0_wp
             
             ! Adjust H to new value
             H = H - deltaH
 
             ! Avoid underflows
-            where(abs(H) .lt. tol_underflow) H = 0.0_prec
+            where(abs(H) .lt. tol_underflow) H = 0.0_wp
             
             ! Check stopping criterion (something like rmse of remaining change in H)
             delh = sqrt(sum(deltaH**2)) / ((nx-2)*(ny-2))
@@ -663,54 +653,4 @@ end if
 
     end subroutine calc_adv2D_impl_upwind
 
-    subroutine get_neighbor_i(im1,ip1,i,nx,boundaries)
-
-        implicit none
-
-        integer, intent(OUT) :: im1 
-        integer, intent(OUT) :: ip1 
-        integer, intent(IN)  :: i 
-        integer, intent(IN)  :: nx 
-
-        character(len=*), intent(IN) :: boundaries
-
-        im1 = max(i-1,1)
-        ip1 = min(i+1,nx) 
-
-        select case(trim(boundaries))
-
-            case("periodic","periodic-x")
-                if (i .eq. 1)  im1 = nx 
-                if (i .eq. nx) ip1 = 1 
-        end select 
-
-        return
-
-    end subroutine get_neighbor_i
-
-    subroutine get_neighbor_j(jm1,jp1,j,ny,boundaries)
-
-        implicit none
-
-        integer, intent(OUT) :: jm1 
-        integer, intent(OUT) :: jp1 
-        integer, intent(IN)  :: j 
-        integer, intent(IN)  :: ny 
-
-        character(len=*), intent(IN) :: boundaries
-
-        jm1 = max(j-1,1)
-        jp1 = min(j+1,ny) 
-
-        select case(trim(boundaries))
-
-            case("periodic")
-                if (j .eq. 1)  jm1 = ny 
-                if (j .eq. ny) jp1 = 1 
-        end select 
-
-        return
-
-    end subroutine get_neighbor_j
-    
 end module solver_advection

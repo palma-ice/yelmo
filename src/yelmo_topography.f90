@@ -162,16 +162,16 @@ contains
                     case("H_ref")
                         ! Relax towards reference ice thickness field H_ref
 
-                        call relax_ice_thickness(tpo%now%H_ice,tpo%now%f_grnd,tpo%now%mask_grz, &
-                                            bnd%H_ice_ref,tpo%par%topo_rel,tpo%par%topo_rel_tau,dt)
+                        call relax_ice_thickness(tpo%now%H_ice,tpo%now%f_grnd,tpo%now%mask_grz,bnd%H_ice_ref, &
+                                                    tpo%par%topo_rel,tpo%par%topo_rel_tau,dt,tpo%par%boundaries)
                     
                     case("H_ice_n")
                         ! Relax towards previous iteration ice thickness 
                         ! (ie slow down changes)
                         ! ajr: needs testing, not sure if this works well or helps anything.
 
-                        call relax_ice_thickness(tpo%now%H_ice,tpo%now%f_grnd,tpo%now%mask_grz, &
-                                            tpo%now%H_ice_n,tpo%par%topo_rel,tpo%par%topo_rel_tau,dt)
+                        call relax_ice_thickness(tpo%now%H_ice,tpo%now%f_grnd,tpo%now%mask_grz,tpo%now%H_ice_n, &
+                                                    tpo%par%topo_rel,tpo%par%topo_rel_tau,dt,tpo%par%boundaries)
                     
                     case DEFAULT 
 
@@ -387,16 +387,16 @@ end if
                     case("H_ref")
                         ! Relax towards reference ice thickness field H_ref
 
-                        call relax_ice_thickness(tpo%now%H_ice,tpo%now%f_grnd,tpo%now%mask_grz, &
-                                            bnd%H_ice_ref,tpo%par%topo_rel,tpo%par%topo_rel_tau,dt)
+                        call relax_ice_thickness(tpo%now%H_ice,tpo%now%f_grnd,tpo%now%mask_grz,bnd%H_ice_ref, &
+                                                        tpo%par%topo_rel,tpo%par%topo_rel_tau,dt,tpo%par%boundaries)
                     
                     case("H_ice_n")
                         ! Relax towards previous iteration ice thickness 
                         ! (ie slow down changes)
                         ! ajr: needs testing, not sure if this works well or helps anything.
 
-                        call relax_ice_thickness(tpo%now%H_ice,tpo%now%f_grnd,tpo%now%mask_grz, &
-                                            tpo%now%H_ice_n,tpo%par%topo_rel,tpo%par%topo_rel_tau,dt)
+                        call relax_ice_thickness(tpo%now%H_ice,tpo%now%f_grnd,tpo%now%mask_grz,tpo%now%H_ice_n, &
+                                                        tpo%par%topo_rel,tpo%par%topo_rel_tau,dt,tpo%par%boundaries)
                     
                     case DEFAULT 
 
@@ -539,10 +539,10 @@ end if
         ! Diagnose strains and stresses relevant to calving 
 
         ! eps_eff = effective strain = eigencalving e+*e- following Levermann et al. (2012)
-        call calc_eps_eff(tpo%now%eps_eff,mat%now%strn2D%eps_eig_1,mat%now%strn2D%eps_eig_2,tpo%now%f_ice)
+        call calc_eps_eff(tpo%now%eps_eff,mat%now%strn2D%eps_eig_1,mat%now%strn2D%eps_eig_2,tpo%now%f_ice,tpo%par%boundaries)
 
         ! tau_eff = effective stress ~ von Mises stress following Lipscomb et al. (2019)
-        call calc_tau_eff(tpo%now%tau_eff,mat%now%strs2D%tau_eig_1,mat%now%strs2D%tau_eig_2,tpo%now%f_ice,tpo%par%w2)
+        call calc_tau_eff(tpo%now%tau_eff,mat%now%strs2D%tau_eig_1,mat%now%strs2D%tau_eig_2,tpo%now%f_ice,tpo%par%w2,tpo%par%boundaries)
 
         select case(trim(tpo%par%calv_flt_method))
 
@@ -554,40 +554,40 @@ end if
                 ! Use simple threshold method
 
                 call calc_calving_rate_simple(tpo%now%calv_flt,tpo%now%H_ice,tpo%now%f_ice,tpo%now%f_grnd, &
-                                                tpo%par%calv_H_lim,tpo%par%calv_tau)
+                                                tpo%par%calv_H_lim,tpo%par%calv_tau,tpo%par%boundaries)
                 
             case("flux") 
                 ! Use threshold+flux method from Peyaud et al. (2007), ie, GRISLI,
                 ! but reformulated. 
 
                 call calc_calving_rate_flux(tpo%now%calv_flt,tpo%now%H_ice,tpo%now%f_ice,tpo%now%f_grnd,mbal, &
-                                            dyn%now%ux_bar,dyn%now%uy_bar,tpo%par%dx,tpo%par%calv_H_lim,tpo%par%calv_tau)
+                                dyn%now%ux_bar,dyn%now%uy_bar,tpo%par%dx,tpo%par%calv_H_lim,tpo%par%calv_tau,tpo%par%boundaries)
                 
             case("flux-grisli")
                 ! Use threshold+flux method from Peyaud et al. (2007), ie, GRISLI
 
                 call calc_calving_rate_flux_grisli(tpo%now%calv_flt,tpo%now%H_ice,tpo%now%f_ice,tpo%now%f_grnd,mbal, &
-                                            dyn%now%ux_bar,dyn%now%uy_bar,tpo%par%dx,tpo%par%calv_H_lim,tpo%par%calv_tau)
+                                dyn%now%ux_bar,dyn%now%uy_bar,tpo%par%dx,tpo%par%calv_H_lim,tpo%par%calv_tau,tpo%par%boundaries)
                 
             case("vm-l19")
                 ! Use von Mises calving as defined by Lipscomb et al. (2019)
 
                 ! Next, diagnose calving
                 call calc_calving_rate_vonmises_l19(tpo%now%calv_flt,tpo%now%H_ice,tpo%now%f_ice,tpo%now%f_grnd, &
-                                                                            tpo%now%tau_eff,tpo%par%dx,tpo%par%kt)
+                                                                        tpo%now%tau_eff,tpo%par%dx,tpo%par%kt,tpo%par%boundaries)
             case("eigen")
                 ! Use Eigen calving as defined by Levermann et al. (2012)
 
                 ! Next, diagnose calving
                 call calc_calving_rate_eigen(tpo%now%calv_flt,tpo%now%H_ice,tpo%now%f_ice,tpo%now%f_grnd, &
-                                                                            tpo%now%eps_eff,tpo%par%dx,tpo%par%k2)
+                                                                        tpo%now%eps_eff,tpo%par%dx,tpo%par%k2,tpo%par%boundaries)
 
             case("kill") 
                 ! Delete all floating ice (using characteristic time parameter)
                 ! Make sure dt is a postive number
 
                 call calc_calving_rate_kill(tpo%now%calv_flt,tpo%now%H_ice,tpo%now%f_grnd.eq.0.0_wp, &
-                                                                    tpo%par%calv_tau,dt)
+                                                                                    tpo%par%calv_tau,dt)
 
             case("kill-pos")
                 ! Delete all floating ice beyond a given location (using characteristic time parameter)
@@ -611,7 +611,7 @@ end if
                 
                 ! Scale calving with 'thin' calving rate to ensure 
                 ! small ice thicknesses are removed.
-                call apply_thin_calving_rate(tpo%now%calv_flt,tpo%now%H_ice,tpo%now%f_ice,tpo%now%f_grnd,tpo%par%calv_thin)
+                call apply_thin_calving_rate(tpo%now%calv_flt,tpo%now%H_ice,tpo%now%f_ice,tpo%now%f_grnd,tpo%par%calv_thin,tpo%par%boundaries)
 
                 ! Adjust calving so that any excess is distributed to upstream neighbors
                 !call calc_calving_residual(tpo%now%calv_flt,tpo%now%H_ice,tpo%now%f_ice,dt)
@@ -620,7 +620,7 @@ end if
 
         ! Additionally ensure higher calving rate for floating tongues of
         ! one grid-point width.
-        call calc_calving_tongues(tpo%now%calv_flt,tpo%now%H_ice,tpo%now%f_ice,tpo%now%f_grnd,tpo%par%calv_tau)
+        call calc_calving_tongues(tpo%now%calv_flt,tpo%now%H_ice,tpo%now%f_ice,tpo%now%f_grnd,tpo%par%calv_tau,tpo%par%boundaries)
         
         ! Diagnose potential grounded-ice calving rate [m/yr]
 
@@ -634,7 +634,7 @@ end if
                 ! Use simple threshold method
 
                 call calc_calving_ground_rate_stress_b12(tpo%now%calv_grnd,tpo%now%H_ice,tpo%now%f_ice, &
-                                                tpo%now%f_grnd,bnd%z_bed,bnd%z_sl-bnd%z_bed,tpo%par%calv_tau)
+                                                tpo%now%f_grnd,bnd%z_bed,bnd%z_sl-bnd%z_bed,tpo%par%calv_tau,tpo%par%boundaries)
 
             case DEFAULT 
 
@@ -647,13 +647,13 @@ end if
         ! Additionally include parameterized grounded calving 
         ! to account for grid resolution 
         call calc_calving_ground_rate_stdev(calv_sd,tpo%now%H_ice,tpo%now%f_ice,tpo%now%f_grnd, &
-                                        bnd%z_bed_sd,tpo%par%sd_min,tpo%par%sd_max,tpo%par%calv_max,tpo%par%calv_tau)
+                                bnd%z_bed_sd,tpo%par%sd_min,tpo%par%sd_max,tpo%par%calv_max,tpo%par%calv_tau,tpo%par%boundaries)
         tpo%now%calv_grnd = tpo%now%calv_grnd + calv_sd 
 
 
         ! Diagnose actual calving (forcing) tendency
         call calc_G_calv(tpo%now%calv,tpo%now%H_ice,tpo%now%calv_flt,tpo%now%calv_grnd,dt, &
-                                                                trim(tpo%par%calv_flt_method))
+                                                                trim(tpo%par%calv_flt_method),tpo%par%boundaries)
 
         ! Now update ice thickness with all tendencies for this timestep 
         tpo%now%H_ice = tpo%now%H_ice - dt*tpo%now%calv  

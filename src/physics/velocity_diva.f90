@@ -1,7 +1,8 @@
 module velocity_diva
 
     use yelmo_defs, only  : sp, dp, prec, wp, pi, rho_ice, rho_sw, rho_w, g, TOL_UNDERFLOW
-    use yelmo_tools, only : stagger_aa_ab, stagger_aa_ab_ice, stagger_ab_aa_ice, & 
+    use yelmo_tools, only : get_neighbor_indices, stagger_aa_ab, stagger_aa_ab_ice, stagger_ab_aa_ice, & 
+                    acx_to_nodes, acy_to_nodes, &
                     stagger_nodes_aa_ab_ice, stagger_nodes_acx_ab_ice, stagger_nodes_acy_ab_ice, &
                     staggerdiff_nodes_acx_ab_ice, staggerdiff_nodes_acy_ab_ice, &
                     staggerdiffcross_nodes_acx_ab_ice, staggerdiffcross_nodes_acy_ab_ice, &
@@ -9,6 +10,7 @@ module velocity_diva
                     set_boundaries_2D_aa, set_boundaries_3D_aa, set_boundaries_3D_acx, &
                     set_boundaries_3D_acy
 
+    use deformation, only : calc_strain_rate_horizontal
     use basal_dragging 
     use solver_ssa_ac
     use velocity_general, only : set_inactive_margins, adjust_visc_eff_margin, &
@@ -187,7 +189,7 @@ contains
 
         ! Ensure dynamically inactive cells have no velocity at 
         ! outer margins before starting iterations
-        call set_inactive_margins(ux_bar,uy_bar,f_ice)
+        call set_inactive_margins(ux_bar,uy_bar,f_ice,par%boundaries)
 
         if (write_ssa_diagnostics) then 
             call ssa_diagnostics_write_init("yelmo_ssa.nc",nx,ny,time_init=1.0_wp)
@@ -219,9 +221,9 @@ contains
 
                 case(1) 
                     ! Calculate effective viscosity, using velocity solution from previous iteration
-                    ! Use default staggering stencil (to ab-node quadrature points, then average to aa-nodes)
+                    ! Use default staggering stencil (to quadrature points, then average to aa-nodes)
 
-                    call calc_visc_eff_3D(visc_eff,ux_bar,uy_bar,duxdz,duydz,ATT,H_ice,f_ice,zeta_aa, &
+                    call calc_visc_eff_3D_nodes(visc_eff,ux_bar,uy_bar,duxdz,duydz,ATT,H_ice,f_ice,zeta_aa, &
                                                             dx,dy,n_glen,par%eps_0,par%boundaries)
 
                 case(2) 
@@ -367,7 +369,7 @@ end if
             call calc_basal_stress(taub_acx,taub_acy,beta_eff_acx,beta_eff_acy,ux_bar,uy_bar)
 
             ! Calculate basal velocity from depth-averaged solution and basal stress
-            call calc_vel_basal(ux_b,uy_b,ux_bar,uy_bar,F2,taub_acx,taub_acy,H_ice,f_ice,par%no_slip)
+            call calc_vel_basal(ux_b,uy_b,ux_bar,uy_bar,F2,taub_acx,taub_acy,H_ice,f_ice,par%no_slip,par%boundaries)
 
             ! Exit iterations if ssa solution has converged
             if (is_converged) exit 
@@ -392,7 +394,7 @@ end if
 
         if (par%visc_method .eq. 0) then 
             ! Diagnose viscosity for visc_method=0 (not used prognostically)
-            call calc_visc_eff_3D(visc_eff,ux_bar,uy_bar,duxdz,duydz,ATT,H_ice,f_ice,zeta_aa, &
+            call calc_visc_eff_3D_nodes(visc_eff,ux_bar,uy_bar,duxdz,duydz,ATT,H_ice,f_ice,zeta_aa, &
                                                             dx,dy,n_glen,par%eps_0,par%boundaries)
         end if 
 
@@ -557,16 +559,11 @@ end if
 
     end subroutine calc_vertical_shear_3D
 
-    subroutine calc_visc_eff_3D(visc_eff,ux,uy,duxdz,duydz,ATT,H_ice,f_ice,zeta_aa,dx,dy,n_glen,eps_0,boundaries)
-        ! Calculate 3D effective viscosity following L19, Eq. 2
-        ! Use of eps_0 ensures non-zero positive viscosity value everywhere 
-        ! Note: viscosity is first calculated on ab-nodes, then 
-        ! unstaggered back to aa-nodes. This ensures more stability for 
-        ! visc_eff (less likely to blow up for low strain rates). 
+    subroutine calc_visc_eff_3D_nodes(visc,ux,uy,duxdz,duydz,ATT,H_ice,f_ice,zeta_aa,dx,dy,n_glen,eps_0,boundaries)
 
         implicit none 
         
-        real(wp), intent(OUT) :: visc_eff(:,:,:)        ! aa-nodes
+        real(wp), intent(OUT) :: visc(:,:,:)            ! aa-nodes
         real(wp), intent(IN)  :: ux(:,:)                ! [m/yr] Vertically averaged horizontal velocity, x-component
         real(wp), intent(IN)  :: uy(:,:)                ! [m/yr] Vertically averaged horizontal velocity, y-component
         real(wp), intent(IN)  :: duxdz(:,:,:)           ! [1/yr] Vertical shearing, x-component
@@ -584,129 +581,101 @@ end if
         ! Local variables 
         integer  :: i, j, k
         integer  :: ip1, jp1, im1, jm1 
-        integer  :: ip2, jp2, im2, jm2
-        integer  :: nx, ny, nz  
-        real(wp) :: inv_4dx, inv_4dy 
+        integer  :: nx, ny, nz   
         real(wp) :: p1, p2, eps_0_sq  
         real(wp) :: eps_sq                              ! [1/yr^2]
-        real(wp) :: dudx_ab(4)
-        real(wp) :: dvdy_ab(4)
-        real(wp) :: dudy_ab(4)
-        real(wp) :: dvdx_ab(4) 
-        real(wp) :: duxdz_ab(4)
-        real(wp) :: duydz_ab(4)
-        real(wp) :: eps_sq_ab(4)
-        real(wp) :: visc_eff_ab(4)
-        real(wp) :: ATT_ab(4)
-        real(wp) :: wt_ab(4)
-        real(wp) :: wt
 
+        real(wp) :: wt0
+        real(wp) :: xn(4) 
+        real(wp) :: yn(4) 
+        real(wp) :: wtn(4)
+        real(wp) :: dudxn(4)
+        real(wp) :: dudyn(4)
+        real(wp) :: dvdxn(4)
+        real(wp) :: dvdyn(4)
+        real(wp) :: duxdzn(4)
+        real(wp) :: duydzn(4)
+        real(wp) :: eps_sq_n(4)
+        real(wp) :: ATTn(4)
+        real(wp) :: viscn(4)
+
+        real(wp), allocatable :: dudx(:,:) 
+        real(wp), allocatable :: dudy(:,:) 
+        real(wp), allocatable :: dvdx(:,:) 
+        real(wp), allocatable :: dvdy(:,:) 
+        
         real(wp), parameter :: visc_min = 1e5_wp        ! Just for safety 
 
-        nx = size(visc_eff,1)
-        ny = size(visc_eff,2)
-        nz = size(visc_eff,3)
+        nx = size(visc,1)
+        ny = size(visc,2)
+        nz = size(visc,3)
         
-        ! Calculate scaling factors
-        inv_4dx = 1.0_wp / (4.0_wp*dx) 
-        inv_4dy = 1.0_wp / (4.0_wp*dy) 
+        allocate(dudx(nx,ny))
+        allocate(dudy(nx,ny))
+        allocate(dvdx(nx,ny))
+        allocate(dvdy(nx,ny))
 
         ! Calculate exponents 
-        p1 = (1.0_wp - n_glen)/(2.0_wp*n_glen)
-        p2 = -1.0_wp/n_glen
+        p1 = (1.0 - n_glen)/(2.0*n_glen)
+        p2 = -1.0/n_glen
 
         ! Calculate squared minimum strain rate 
-        eps_0_sq = eps_0*eps_0 
+        eps_0_sq = eps_0*eps_0
 
-        ! Set equal weighting for all four ab-nodes
-        wt_ab = 0.25_wp 
+        ! Populate strain rates over the whole domain on acx- and acy-nodes
 
-        ! Calculate visc_eff on quadrature points (ab-nodes),
-        ! and then average to get grid-centered value (aa-node)
-        do j = 1, ny 
-        do i = 1, nx 
+        call calc_strain_rate_horizontal(dudx,dudy,dvdx,dvdy,ux,uy,f_ice,dx,dy,boundaries)
 
-            if (f_ice(i,j) .eq. 1.0_wp) then 
+        ! Calculate visc_eff on aa-nodes
 
-                im1 = max(i-1,1)    
-                ip1 = min(i+1,nx) 
-                jm1 = max(j-1,1) 
-                jp1 = min(j+1,ny) 
+        visc   = visc_min
 
-                ! Get strain rate terms
-                call staggerdiff_nodes_acx_ab_ice(dudx_ab,ux,f_ice,i,j,dx) 
-                call staggerdiff_nodes_acy_ab_ice(dvdy_ab,uy,f_ice,i,j,dy) 
-                call staggerdiffcross_nodes_acx_ab_ice(dudy_ab,ux,f_ice,i,j,dy)
-                call staggerdiffcross_nodes_acy_ab_ice(dvdx_ab,uy,f_ice,i,j,dx)
-                
-                ! Loop over column
-                do k = 1, nz 
+        wt0 = 1.0/sqrt(3.0)
+        xn  = [wt0,-wt0,-wt0, wt0]
+        yn  = [wt0, wt0,-wt0,-wt0]
+        wtn = [1.0,1.0,1.0,1.0]
 
-                    ! Get vertical shear strain rate terms
-                    call stagger_nodes_acx_ab_ice(duxdz_ab,duxdz(:,:,k),f_ice,i,j)
-                    call stagger_nodes_acy_ab_ice(duydz_ab,duydz(:,:,k),f_ice,i,j)
+        do i = 1, nx
+            do j = 1, ny  
 
-                    ! Calculate the total effective strain rate from L19, Eq. 21 
-                    eps_sq_ab = dudx_ab**2 + dvdy_ab**2 + dudx_ab*dvdy_ab + 0.25_wp*(dudy_ab+dvdx_ab)**2 &
-                                + 0.25_wp*duxdz_ab**2 + 0.25_wp*duydz_ab**2 + eps_0_sq
+                if (f_ice(i,j) == 1.0) then
 
-! ajr: Although logically I would choose to use the ab-node values 
-! of ATT, calculate viscosity at each ab node and then average, this 
-! seems to reduce stability of the model. Rather it seems to work 
-! better by only calculating the effective strain rate at each ab-node,
-! and center it, then multiply with the centered ATT value to get visc. 
-! So that is why the central ATT value is used below. This should be 
-! investigated further in the future perhaps.
-if (.TRUE.) then  
-                    ! Get the rate factor on ab-nodes too
-                    call stagger_nodes_aa_ab_ice(ATT_ab,ATT(:,:,k),f_ice,i,j)
-else
-                    ! Just use the aa-node central value of ATT 
-                    ATT_ab = ATT(i,j,k)
+                    ! Get neighbor indices
+                    call get_neighbor_indices(im1,ip1,jm1,jp1,i,j,nx,ny,boundaries)
 
-end if
+                    ! Get strain rate terms on node locations
+                    call acx_to_nodes(dudxn,dudx,i,j,xn,yn,im1,ip1,jm1,jp1)
+                    call acx_to_nodes(dudyn,dudy,i,j,xn,yn,im1,ip1,jm1,jp1)
+                    
+                    call acy_to_nodes(dvdxn,dvdx,i,j,xn,yn,im1,ip1,jm1,jp1)
+                    call acy_to_nodes(dvdyn,dvdy,i,j,xn,yn,im1,ip1,jm1,jp1)
+                    
+                    do k = 1, nz
+                        
+                        ! Get vertical shear strain rate terms
+                        call acx_to_nodes(duxdzn,duxdz(:,:,k),i,j,xn,yn,im1,ip1,jm1,jp1)
+                        call acy_to_nodes(duydzn,duydz(:,:,k),i,j,xn,yn,im1,ip1,jm1,jp1)
+                        
+                        ! Calculate the total effective strain rate from L19, Eq. 21 
+                        eps_sq_n = dudxn**2 + dvdyn**2 + dudxn*dvdyn + 0.25_wp*(dudyn+dvdxn)**2 &
+                                                    + 0.25_wp*duxdzn**2 + 0.25_wp*duydzn**2 + eps_0_sq
 
-                    ! Calculate effective viscosity on ab-nodes
-                    visc_eff_ab = 0.5_wp*(eps_sq_ab)**(p1) * ATT_ab**(p2)
+                        ! Get rate factor on central node
+                        ATTn = ATT(i,j,k)
 
-                    ! Calcualte effective viscosity on aa-nodes
-                    visc_eff(i,j,k) = sum(wt_ab*visc_eff_ab)
-                     
-                end do 
+                        ! Calculate effective viscosity on ab-nodes
+                        viscn = 0.5 * (eps_sq_n)**(p1) * ATTn**(p2);
 
-            else 
+                        visc(i,j,k) = sum(viscn*wtn)/sum(wtn)
+                    end do
+                end if
 
-                do k = 1, nz 
-                    visc_eff(i,j,k) = 0.0_wp 
-                end do 
-
-            end if 
-
-        end do  
-        end do 
-
-        ! Set boundaries 
-        call set_boundaries_3D_aa(visc_eff,boundaries)
-
-        ! Final safety check (mainly for grid boundaries)
-        ! Ensure non-zero visc value everywhere there is ice. 
-        do j = 1, ny 
-        do i = 1, nx 
-
-            if (f_ice(i,j) .eq. 1.0_wp) then
-
-                do k = 1, nz 
-                    if (visc_eff(i,j,k) .lt. visc_min) visc_eff(i,j,k) = visc_min
-                end do 
-
-            end if 
-
-        end do
+            end do
         end do
 
-        return 
+        return
 
-    end subroutine calc_visc_eff_3D
+    end subroutine calc_visc_eff_3D_nodes
 
     subroutine calc_visc_eff_3D_aa(visc_eff,ux,uy,duxdz,duydz,ATT,H_ice,f_ice,zeta_aa,dx,dy,n_glen,eps_0,boundaries)
         ! Calculate 3D effective viscosity following L19, Eq. 2
@@ -764,16 +733,17 @@ end if
         ! Calculate squared minimum strain rate 
         eps_0_sq = eps_0*eps_0 
 
+        ! Initially set to visc_min everywhere 
+        visc_eff = visc_min 
+
         ! Calculate visc_eff on aa-nodes
         do j = 1, ny 
         do i = 1, nx 
 
             if (f_ice(i,j) .eq. 1.0_wp) then 
 
-                im1 = max(i-1,1)    
-                ip1 = min(i+1,nx) 
-                jm1 = max(j-1,1) 
-                jp1 = min(j+1,ny) 
+                ! Get neighbor indices
+                call get_neighbor_indices(im1,ip1,jm1,jp1,i,j,nx,ny,boundaries)
 
                 ! Get strain rate terms
                 dudx_aa = (ux(i,j)-ux(im1,j))/dx 
@@ -806,35 +776,10 @@ end if
 
                 end do 
 
-            else 
-
-                do k = 1, nz 
-                    visc_eff(i,j,k) = 0.0_wp 
-                end do 
-
             end if 
 
         end do  
         end do 
-
-        ! Set boundaries 
-        call set_boundaries_3D_aa(visc_eff,boundaries)
-
-        ! Final safety check (mainly for grid boundaries)
-        ! Ensure non-zero visc value everywhere there is ice. 
-        do j = 1, ny 
-        do i = 1, nx 
-
-            if (f_ice(i,j) .eq. 1.0_wp) then
-
-                do k = 1, nz 
-                    if (visc_eff(i,j,k) .lt. visc_min) visc_eff(i,j,k) = visc_min
-                end do 
-
-            end if 
-
-        end do
-        end do
 
         return 
 
@@ -997,7 +942,7 @@ end if
 
     end subroutine calc_beta_eff
 
-    subroutine calc_vel_basal(ux_b,uy_b,ux_bar,uy_bar,F2,taub_acx,taub_acy,H_ice,f_ice,no_slip)
+    subroutine calc_vel_basal(ux_b,uy_b,ux_bar,uy_bar,F2,taub_acx,taub_acy,H_ice,f_ice,no_slip,boundaries)
         ! Calculate basal sliding following Goldberg (2011), Eq. 34
         ! (or it can also be obtained from L19, Eq. 32 given ub*beta=taub)
 
@@ -1012,11 +957,12 @@ end if
         real(wp), intent(IN)  :: taub_acy(:,:)
         real(wp), intent(IN)  :: H_ice(:,:)
         real(wp), intent(IN)  :: f_ice(:,:)
-        logical,    intent(IN)  :: no_slip
+        logical,  intent(IN)  :: no_slip
+        character(len=*), intent(IN) :: boundaries 
 
         ! Local variables 
         integer    :: i, j, nx, ny 
-        integer    :: ip1, jp1 
+        integer    :: im1, ip1, jm1, jp1 
         real(wp) :: F2_ac 
 
         nx = size(ux_b,1)
@@ -1036,8 +982,8 @@ end if
             do j = 1, ny 
             do i = 1, nx 
 
-                ip1 = min(i+1,nx)
-                jp1 = min(j+1,ny)
+                ! Get neighbor indices
+                call get_neighbor_indices(im1,ip1,jm1,jp1,i,j,nx,ny,boundaries)
 
                 ! ==== x-direction =====
 

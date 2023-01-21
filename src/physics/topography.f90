@@ -78,12 +78,25 @@ contains
             do j = 1, ny 
             do i = 1, nx 
 
-                ! Get neighbor indices
-                im1 = max(i-1,1) 
-                ip1 = min(i+1,nx) 
-                jm1 = max(j-1,1) 
-                jp1 = min(j+1,ny) 
-                
+                ! BC: Periodic boundary conditions
+                im1 = i-1
+                if (im1 == 0) then
+                    im1 = nx
+                end if
+                ip1 = i+1
+                if (ip1 == nx+1) then
+                    ip1 = 1
+                end if
+
+                jm1 = j-1
+                if (jm1 == 0) then
+                    jm1 = ny
+                end if
+                jp1 = j+1
+                if (jp1 == ny+1) then
+                    jp1 = 1
+                end if
+
                 if ( f_grnd(i,j) .eq. 0.0 .and. H_ice(i,j) .eq. 0.0 ) then 
                     ! Floating ice-free ocean point
                     
@@ -146,12 +159,25 @@ contains
         do j = 1, ny 
         do i = 1, nx 
 
-            ! Get neighbor indices
-            im1 = max(i-1,1) 
-            ip1 = min(i+1,nx) 
-            jm1 = max(j-1,1) 
-            jp1 = min(j+1,ny) 
-            
+            ! BC: Periodic boundary conditions
+            im1 = i-1
+            if (im1 == 0) then
+                im1 = nx
+            end if
+            ip1 = i+1
+            if (ip1 == nx+1) then
+                ip1 = 1
+            end if
+
+            jm1 = j-1
+            if (jm1 == 0) then
+                jm1 = ny
+            end if
+            jp1 = j+1
+            if (jp1 == ny+1) then
+                jp1 = 1
+            end if
+
             if (f_ice(i,j) .gt. 0.0 .and. f_ice(i,j) .lt. 1.0) then 
                 ! Fractional ice-covered point 
 
@@ -230,12 +256,25 @@ contains
             do j = 1, ny 
             do i = 1, nx 
 
-                ! Get neighbor indices 
-                im1 = max(i-1,1)
-                ip1 = min(i+1,nx)
-                jm1 = max(j-1,1)
-                jp1 = min(j+1,ny)
-                
+                ! BC: Periodic boundary conditions
+                im1 = i-1
+                if (im1 == 0) then
+                    im1 = nx
+                end if
+                ip1 = i+1
+                if (ip1 == nx+1) then
+                    ip1 = 1
+                end if
+
+                jm1 = j-1
+                if (jm1 == 0) then
+                    jm1 = ny
+                end if
+                jp1 = j+1
+                if (jp1 == ny+1) then
+                    jp1 = 1
+                end if
+
                 if (mask_now(i,j)) then 
                     ! This is a point of interest
                     ! Define any neighbor points of interest as connected
@@ -338,12 +377,25 @@ contains
             do j = 1, ny
             do i = 1, nx 
 
-            ! Get neighbor indices
-            im1 = max(i-1,1) 
-            ip1 = min(i+1,nx) 
-            jm1 = max(j-1,1) 
-            jp1 = min(j+1,ny) 
-            
+                ! BC: Periodic boundary conditions
+                im1 = i-1
+                if (im1 == 0) then
+                    im1 = nx
+                end if
+                ip1 = i+1
+                if (ip1 == nx+1) then
+                    ip1 = 1
+                end if
+
+                jm1 = j-1
+                if (jm1 == 0) then
+                    jm1 = ny
+                end if
+                jp1 = j+1
+                if (jp1 == ny+1) then
+                    jp1 = 1
+                end if
+    
                 ! Determine calving front mask 
                 if (H_ice(i,j) .gt. 0.0 .and. H_grnd(i,j) .lt. 0.0) then 
                     ! Current point is floating 
@@ -367,12 +419,25 @@ contains
             do j = 1, ny
             do i = 1, nx 
 
-                ! Get neighbor indices
-                im1 = max(i-1,1) 
-                ip1 = min(i+1,nx) 
-                jm1 = max(j-1,1) 
-                jp1 = min(j+1,ny) 
-                
+                ! BC: Periodic boundary conditions
+                im1 = i-1
+                if (im1 == 0) then
+                    im1 = nx
+                end if
+                ip1 = i+1
+                if (ip1 == nx+1) then
+                    ip1 = 1
+                end if
+
+                jm1 = j-1
+                if (jm1 == 0) then
+                    jm1 = ny
+                end if
+                jp1 = j+1
+                if (jp1 == ny+1) then
+                    jp1 = 1
+                end if
+
                 if (mask_cf(i,j)) then 
                     ! This is a calving front point 
 
@@ -483,12 +548,25 @@ contains
             do j = 1, ny
             do i = 1, nx 
 
-                ! Get neighbor indices
-                im1 = max(i-1,1) 
-                ip1 = min(i+1,nx) 
-                jm1 = max(j-1,1) 
-                jp1 = min(j+1,ny) 
-                
+                ! BC: Periodic boundary conditions
+                im1 = i-1
+                if (im1 == 0) then
+                    im1 = nx
+                end if
+                ip1 = i+1
+                if (ip1 == nx+1) then
+                    ip1 = 1
+                end if
+
+                jm1 = j-1
+                if (jm1 == 0) then
+                    jm1 = ny
+                end if
+                jp1 = j+1
+                if (jp1 == ny+1) then
+                    jp1 = 1
+                end if
+
                 ! Count how many neighbors are ice covered  
                 H_neighb   = [H_ice(im1,j),H_ice(ip1,j),H_ice(i,jm1),H_ice(i,jp1)]
                 mask       = H_neighb .gt. 0.0_wp 
@@ -510,12 +588,25 @@ contains
             do j = 1, ny
             do i = 1, nx 
 
-                ! Get neighbor indices
-                im1 = max(i-1,1) 
-                ip1 = min(i+1,nx) 
-                jm1 = max(j-1,1) 
-                jp1 = min(j+1,ny) 
-                
+                ! BC: Periodic boundary conditions
+                im1 = i-1
+                if (im1 == 0) then
+                    im1 = nx
+                end if
+                ip1 = i+1
+                if (ip1 == nx+1) then
+                    ip1 = 1
+                end if
+
+                jm1 = j-1
+                if (jm1 == 0) then
+                    jm1 = ny
+                end if
+                jp1 = j+1
+                if (jp1 == ny+1) then
+                    jp1 = 1
+                end if
+
                 if (H_ice(i,j) .gt. 0.0_wp .and. n_ice(i,j) .eq. 0) then 
                     ! First, treat a special case:
                     ! Island point, assume the cell is fully covered
@@ -615,12 +706,25 @@ contains
         do j = 1, ny
         do i = 1, nx 
 
-            ! Get neighbor indices
-            im1 = max(i-1,1) 
-            ip1 = min(i+1,nx) 
-            jm1 = max(j-1,1) 
-            jp1 = min(j+1,ny) 
-            
+            ! BC: Periodic boundary conditions
+            im1 = i-1
+            if (im1 == 0) then
+                im1 = nx
+            end if
+            ip1 = i+1
+            if (ip1 == nx+1) then
+                ip1 = 1
+            end if
+
+            jm1 = j-1
+            if (jm1 == 0) then
+                jm1 = ny
+            end if
+            jp1 = j+1
+            if (jp1 == ny+1) then
+                jp1 = 1
+            end if
+
             f_neighb = [f_ice(im1,j),f_ice(ip1,j),f_ice(i,jm1),f_ice(i,jp1)]
             n = count(f_neighb .lt. 1.0)
 
@@ -776,12 +880,25 @@ contains
         do j = 1, ny 
         do i = 1, nx
 
-            ! Get neighbor indices
-            im1 = max(i-1,1) 
-            ip1 = min(i+1,nx) 
-            jm1 = max(j-1,1) 
-            jp1 = min(j+1,ny) 
-            
+            ! BC: Periodic boundary conditions
+            im1 = i-1
+            if (im1 == 0) then
+                im1 = nx
+            end if
+            ip1 = i+1
+            if (ip1 == nx+1) then
+                ip1 = 1
+            end if
+
+            jm1 = j-1
+            if (jm1 == 0) then
+                jm1 = ny
+            end if
+            jp1 = j+1
+            if (jp1 == ny+1) then
+                jp1 = 1
+            end if
+
             f_grnd_neighb = [f_grnd(im1,j),f_grnd(ip1,j),f_grnd(i,jm1),f_grnd(i,jp1)]
 
             if (f_grnd(i,j) .eq. 0.0 .and. count(f_grnd_neighb .gt. 0.0).gt.0) then
@@ -982,12 +1099,25 @@ contains
         do j = 1, ny 
         do i = 1, nx
 
-            ! Get neighbor indices
-            im1 = max(i-1,1) 
-            ip1 = min(i+1,nx) 
-            jm1 = max(j-1,1) 
-            jp1 = min(j+1,ny) 
-                
+            ! BC: Periodic boundary conditions
+            im1 = i-1
+            if (im1 == 0) then
+                im1 = nx
+            end if
+            ip1 = i+1
+            if (ip1 == nx+1) then
+                ip1 = 1
+            end if
+
+            jm1 = j-1
+            if (jm1 == 0) then
+                jm1 = ny
+            end if
+            jp1 = j+1
+            if (jp1 == ny+1) then
+                jp1 = 1
+            end if
+  
             ! Calculate Hg at corners (ab-nodes)
             Hg_1 = 0.25_prec*(H_grnd(i,j) + H_grnd(ip1,j) + H_grnd(ip1,jp1) + H_grnd(i,jp1))
             Hg_2 = 0.25_prec*(H_grnd(i,j) + H_grnd(im1,j) + H_grnd(im1,jp1) + H_grnd(i,jp1))
@@ -1039,12 +1169,25 @@ contains
         do j = 1, ny 
         do i = 1, nx
 
-            ! Get neighbor indices
-            im1 = max(i-1,1) 
-            ip1 = min(i+1,nx) 
-            jm1 = max(j-1,1) 
-            jp1 = min(j+1,ny) 
-            
+            ! BC: Periodic boundary conditions
+            im1 = i-1
+            if (im1 == 0) then
+                im1 = nx
+            end if
+            ip1 = i+1
+            if (ip1 == nx+1) then
+                ip1 = 1
+            end if
+
+            jm1 = j-1
+            if (jm1 == 0) then
+                jm1 = ny
+            end if
+            jp1 = j+1
+            if (jp1 == ny+1) then
+                jp1 = 1
+            end if
+
             ! === f_grnd at aa-nodes ===
 
             ! Calculate Hg at corners (ab-nodes)
@@ -1446,11 +1589,24 @@ end if
         do j = 1, ny 
         do i = 1, nx
 
-            ! Get neighbor indices
-            im1 = max(1,i-1)
-            ip1 = min(nx,i+1)
-            jm1 = max(1,j-1)
-            jp1 = min(ny,j+1)
+            ! BC: Periodic boundary conditions
+            im1 = i-1
+            if (im1 == 0) then
+                im1 = nx
+            end if
+            ip1 = i+1
+            if (ip1 == nx+1) then
+                ip1 = 1
+            end if
+
+            jm1 = j-1
+            if (jm1 == 0) then
+                jm1 = ny
+            end if
+            jp1 = j+1
+            if (jp1 == ny+1) then
+                jp1 = 1
+            end if
 
             ! Grounded point or partially floating point with floating neighbors
             if (f_grnd(i,j) .gt. 0.0 .and. &
@@ -1477,11 +1633,24 @@ end if
                 if (dist_gl(i,j) .eq. dist_max) then 
                     ! Distance needs to be determined for this point 
 
-                    ! Get neighbor indices
-                    im1 = max(1, i-1)
-                    ip1 = min(nx,i+1)
-                    jm1 = max(1, j-1)
-                    jp1 = min(ny,j+1)
+                    ! BC: Periodic boundary conditions
+                    im1 = i-1
+                    if (im1 == 0) then
+                        im1 = nx
+                    end if
+                    ip1 = i+1
+                    if (ip1 == nx+1) then
+                        ip1 = 1
+                    end if
+
+                    jm1 = j-1
+                    if (jm1 == 0) then
+                        jm1 = ny
+                    end if
+                    jp1 = j+1
+                    if (jp1 == ny+1) then
+                        jp1 = 1
+                    end if
 
                     ! Get distances to direct and corner neighbors
                     dists = [dist_gl_ref(im1,j),dist_gl_ref(ip1,j), &       ! Direct neighbors
@@ -1748,12 +1917,25 @@ end if
                 do j = 1, ny 
                 do i = 1, nx 
 
-                    ! Get neighbor indices
-                    im1 = max(i-1,1) 
-                    ip1 = min(i+1,nx) 
-                    jm1 = max(j-1,1) 
-                    jp1 = min(j+1,ny) 
-                    
+                    ! BC: Periodic boundary conditions
+                    im1 = i-1
+                    if (im1 == 0) then
+                        im1 = nx
+                    end if
+                    ip1 = i+1
+                    if (ip1 == nx+1) then
+                        ip1 = 1
+                    end if
+
+                    jm1 = j-1
+                    if (jm1 == 0) then
+                        jm1 = ny
+                    end if
+                    jp1 = j+1
+                    if (jp1 == ny+1) then
+                        jp1 = 1
+                    end if
+
                     ! Get mask of neighbors that are ice free 
                     mask = ( [H_ice(im1,j),H_ice(ip1,j),H_ice(i,jm1),H_ice(i,jp1)].eq.0.0 )
 
@@ -2102,11 +2284,24 @@ end if
     do j = 1, ny
     do i = 1, nx 
         
-      ! Get neighbor indices
-      im1 = max(i-1,1) 
-      ip1 = min(i+1,nx) 
-      jm1 = max(j-1,1) 
-      jp1 = min(j+1,ny) 
+        ! BC: Periodic boundary conditions
+        im1 = i-1
+        if (im1 == 0) then
+            im1 = nx
+        end if
+        ip1 = i+1
+        if (ip1 == nx+1) then
+            ip1 = 1
+        end if
+
+        jm1 = j-1
+        if (jm1 == 0) then
+            jm1 = ny
+        end if
+        jp1 = j+1
+        if (jp1 == ny+1) then
+            jp1 = 1
+        end if
 
       ! aa-nodes
       f_grnd(i,j)     = 0.25_wp * (f_grnd_NW(i,j) + f_grnd_NE(i,j) + f_grnd_SW(i,j) + f_grnd_SE(i,j))
@@ -2159,11 +2354,24 @@ end if
     do j = 1, ny
     do i = 1, nx
         
-      ! Get neighbor indices
-      im1 = max(i-1,1) 
-      ip1 = min(i+1,nx) 
-      jm1 = max(j-1,1) 
-      jp1 = min(j+1,ny) 
+        ! BC: Periodic boundary conditions
+        im1 = i-1
+        if (im1 == 0) then
+            im1 = nx
+        end if
+        ip1 = i+1
+        if (ip1 == nx+1) then
+            ip1 = 1
+        end if
+
+        jm1 = j-1
+        if (jm1 == 0) then
+            jm1 = ny
+        end if
+        jp1 = j+1
+        if (jp1 == ny+1) then
+            jp1 = 1
+        end if
 
       f_NW = 0.25_wp * (f_flt(im1,jp1) + f_flt(i,jp1)   + f_flt(im1,j)   + f_flt(i,j))
       f_N  = 0.50_wp * (f_flt(i,jp1)   + f_flt(i,j))

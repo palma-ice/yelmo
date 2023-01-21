@@ -1,7 +1,7 @@
 module mass_conservation
 
     use yelmo_defs, only : sp, dp, wp, TOL_UNDERFLOW, MISSING_VALUE, g, rho_ice, rho_sw  
-    use yelmo_tools, only : fill_borders_2D, set_boundaries_2D_aa
+    use yelmo_tools, only : get_neighbor_indices, fill_borders_2D, set_boundaries_2D_aa
 
     use solver_advection, only : calc_advec2D  
     use velocity_general, only : set_inactive_margins 
@@ -63,7 +63,7 @@ contains
         if (present(F)) F_now = F 
 
         ! Ensure that no velocity is defined for outer boundaries of partially-filled margin points
-        call set_inactive_margins(ux_tmp,uy_tmp,f_ice)
+        call set_inactive_margins(ux_tmp,uy_tmp,f_ice,boundaries)
 
         ! Determine current advective rate of change (time=n)
         call calc_advec2D(G_advec,H_ice,f_ice,ux_tmp,uy_tmp,F_now,dx,dx,dt,solver,boundaries)
@@ -130,7 +130,7 @@ contains
         F_now = 0.0_wp
 
         ! Ensure that no velocity is defined for outer boundaries of partially-filled margin points
-        call set_inactive_margins(ux_tmp,uy_tmp,f_ice)
+        call set_inactive_margins(ux_tmp,uy_tmp,f_ice,boundaries)
 
         ! Determine current advective rate of change (time=n)
         call calc_advec2D(G_advec,H_ice,f_ice,ux_tmp,uy_tmp,F_now,dx,dx,dt,solver,boundaries)
@@ -200,10 +200,10 @@ contains
             case("predictor") 
                 
                 ! Fill velocity field for new cells 
-                call fill_vel_new_cells(ux_tmp,uy_tmp,mask_corr_new)
+                call fill_vel_new_cells(ux_tmp,uy_tmp,mask_corr_new,boundaries)
 
                 ! Ensure that no velocity is defined for outer boundaries of partially-filled margin points
-                call set_inactive_margins(ux_tmp,uy_tmp,f_ice)
+                call set_inactive_margins(ux_tmp,uy_tmp,f_ice,boundaries)
 
                 ! Store ice thickness from time=n
                 H_ice_n   = H_ice 
@@ -223,10 +223,10 @@ contains
             case("corrector") ! corrector 
 
                 ! Fill velocity field for new cells 
-                call fill_vel_new_cells(ux_tmp,uy_tmp,mask_pred_new)
+                call fill_vel_new_cells(ux_tmp,uy_tmp,mask_pred_new,boundaries)
 
                 ! Ensure that no velocity is defined for outer boundaries of partially-filled margin points
-                call set_inactive_margins(ux_tmp,uy_tmp,f_ice)
+                call set_inactive_margins(ux_tmp,uy_tmp,f_ice,boundaries)
 
                 ! Determine advective rate of change based on predicted H,ux/y fields (time=n+1,pred)
                 call calc_advec2D(dHdt_advec,H_ice_pred,f_ice,ux_tmp,uy_tmp,F_now,dx,dx,dt,solver,boundaries)
@@ -249,13 +249,14 @@ contains
 
     end subroutine calc_G_advec
 
-    subroutine fill_vel_new_cells(ux,uy,mask)
+    subroutine fill_vel_new_cells(ux,uy,mask,boundaries)
 
         implicit none
 
         real(wp), intent(INOUT) :: ux(:,:) 
         real(wp), intent(INOUT) :: uy(:,:) 
         integer,  intent(IN)    :: mask(:,:) 
+        character(len=*), intent(IN) :: boundaries 
 
         ! Local variables 
         integer :: i, j, nx, ny 
@@ -267,12 +268,9 @@ contains
         do j = 1, ny
         do i = 1, nx 
 
-            ! Get neighbor indices 
-            im1 = max(i-1,1)
-            ip1 = min(i+1,nx)
-            jm1 = max(j-1,1)
-            jp1 = min(j+1,ny)
-
+            ! Get neighbor indices
+            call get_neighbor_indices(im1,ip1,jm1,jp1,i,j,nx,ny,boundaries)
+            
             if (mask(i,j) .eq. 2) then 
                 ! This site just filled with ice, so 
                 ! velocity may not be defined on borders
@@ -339,7 +337,7 @@ contains
 
     end subroutine calc_G_mbal
 
-    subroutine calc_G_calv(G_calv,H_ice,calv_flt,calv_grnd,dt,calv_flt_method)
+    subroutine calc_G_calv(G_calv,H_ice,calv_flt,calv_grnd,dt,calv_flt_method,boundaries)
         ! Interface subroutine to update ice thickness through application
         ! of advection, vertical mass balance terms and calving 
 
@@ -351,6 +349,7 @@ contains
         real(wp), intent(IN)    :: calv_grnd(:,:)       ! [m/a] Potential calving rate (grounded)
         real(wp), intent(IN)    :: dt                   ! [a]   Timestep   
         character(len=*), intent(IN) :: calv_flt_method
+        character(len=*), intent(IN) :: boundaries 
 
         ! Local variables 
         integer :: i, j, nx, ny 
@@ -390,12 +389,9 @@ contains
         do j = 1, ny 
         do i = 1, nx 
 
-            ! Get neighbor indices 
-            im1 = max(i-1,1)
-            ip1 = min(i+1,nx)
-            jm1 = max(j-1,1)
-            jp1 = min(j+1,ny)
-
+            ! Get neighbor indices
+            call get_neighbor_indices(im1,ip1,jm1,jp1,i,j,nx,ny,boundaries)
+            
             is_margin = H_ice(i,j) .gt. 0.0 .and. &
                 count([H_ice(im1,j),H_ice(ip1,j),H_ice(i,jm1),H_ice(i,jp1)].eq.0.0) .gt. 0
 
@@ -472,7 +468,7 @@ contains
         uy_tmp = uy
         
         ! Ensure that no velocity is defined for outer boundaries of partially-filled margin points
-        call set_inactive_margins(ux_tmp,uy_tmp,f_ice)
+        call set_inactive_margins(ux_tmp,uy_tmp,f_ice,boundaries)
 
         ! ===================================================================================
         ! Resolve the dynamic part (ice advection) using multistep method
@@ -682,12 +678,9 @@ contains
         do j = 1, ny 
         do i = 1, nx 
 
-            ! Get neighbor indices 
-            im1 = max(i-1,1)
-            ip1 = min(i+1,nx)
-            jm1 = max(j-1,1)
-            jp1 = min(j+1,ny)
-
+            ! Get neighbor indices
+            call get_neighbor_indices(im1,ip1,jm1,jp1,i,j,nx,ny,boundaries)
+            
             is_margin = H_tmp(i,j) .gt. 0.0 .and. &
                 count([H_tmp(im1,j),H_tmp(ip1,j),H_tmp(i,jm1),H_tmp(i,jp1)].eq.0.0) .gt. 0
 
@@ -713,12 +706,9 @@ contains
         do j = 1, ny 
         do i = 1, nx 
 
-            ! Get neighbor indices 
-            im1 = max(i-1,1)
-            ip1 = min(i+1,nx)
-            jm1 = max(j-1,1)
-            jp1 = min(j+1,ny)
-
+            ! Get neighbor indices
+            call get_neighbor_indices(im1,ip1,jm1,jp1,i,j,nx,ny,boundaries)
+            
             ! Check for ice islands
             is_island = H_tmp(i,j) .gt. 0.0 .and. &
                 count([H_tmp(im1,j),H_tmp(ip1,j),H_tmp(i,jm1),H_tmp(i,jp1)].gt.0.0) .eq. 0
@@ -756,12 +746,9 @@ contains
         do j = 1, ny 
         do i = 1, nx 
 
-            ! Get neighbor indices 
-            im1 = max(i-1,1)
-            ip1 = min(i+1,nx)
-            jm1 = max(j-1,1)
-            jp1 = min(j+1,ny)
-
+            ! Get neighbor indices
+            call get_neighbor_indices(im1,ip1,jm1,jp1,i,j,nx,ny,boundaries)
+            
             is_margin = H_tmp(i,j) .gt. 0.0 .and. &
                 count([H_tmp(im1,j),H_tmp(ip1,j),H_tmp(i,jm1),H_tmp(i,jp1)].eq.0.0) .gt. 0
 
@@ -784,7 +771,7 @@ contains
         end do 
         end do
                 
-        call set_boundaries_2D_aa(H_ice_new,boundaries,H_ice_ref)
+        !call set_boundaries_2D_aa(H_ice_new,boundaries,H_ice_ref)
 
         ! select case(trim(boundaries))
 
@@ -856,7 +843,7 @@ contains
 
     end subroutine apply_ice_thickness_boundaries
 
-    subroutine relax_ice_thickness(H_ice,f_grnd,mask_grz,H_ref,topo_rel,tau,dt)
+    subroutine relax_ice_thickness(H_ice,f_grnd,mask_grz,H_ref,topo_rel,tau,dt,boundaries)
         ! This routines allows ice within a given mask to be
         ! relaxed to a reference state with certain timescale tau 
         ! (if tau=0), then H_ice = H_ice_ref directly 
@@ -870,78 +857,83 @@ contains
         integer,  intent(IN)    :: topo_rel 
         real(wp), intent(IN)    :: tau
         real(wp), intent(IN)    :: dt 
+        character(len=*), intent(IN) :: boundaries 
 
         ! Local variables 
         integer  :: i, j, nx, ny 
+        integer  :: im1, ip1, jm1, jp1
         logical  :: apply_relax 
         real(wp) :: dHdt 
 
         nx = size(H_ice,1)
         ny = size(H_ice,2) 
 
-        do j = 2, ny-1 
-            do i = 2, nx-1 
+        do j = 1, ny
+        do i = 1, nx 
 
-                ! No relaxation to start
-                apply_relax = .FALSE.
+            ! Get neighbor indices
+            call get_neighbor_indices(im1,ip1,jm1,jp1,i,j,nx,ny,boundaries)
+            
+            ! No relaxation to start
+            apply_relax = .FALSE.
 
-                select case(topo_rel)
+            select case(topo_rel)
 
-                    case(1) 
-                        ! Relax the shelf (floating) ice and ice-free points
+                case(1) 
+                    ! Relax the shelf (floating) ice and ice-free points
+                
+                    if (f_grnd(i,j) .eq. 0.0 .or. H_ref(i,j) .eq. 0.0) apply_relax = .TRUE. 
+            
+                case(2) 
+                    ! Relax the shelf (floating) ice and ice-free points
+                    ! and the grounding-line ice too
                     
-                        if (f_grnd(i,j) .eq. 0.0 .or. H_ref(i,j) .eq. 0.0) apply_relax = .TRUE. 
+                    if (f_grnd(i,j) .eq. 0.0 .or. H_ref(i,j) .eq. 0.0) apply_relax = .TRUE. 
+                    
+                    if (f_grnd(i,j) .gt. 0.0 .and. &
+                        (f_grnd(im1,j) .eq. 0.0 .or. f_grnd(ip1,j) .eq. 0.0 &
+                        .or. f_grnd(i,jm1) .eq. 0.0 .or. f_grnd(i,jp1) .eq. 0.0)) apply_relax = .TRUE. 
+            
+                case(3)
+                    ! Relax all points
+                    
+                    apply_relax = .TRUE. 
                 
-                    case(2) 
-                        ! Relax the shelf (floating) ice and ice-free points
-                        ! and the grounding-line ice too
-                        
-                        if (f_grnd(i,j) .eq. 0.0 .or. H_ref(i,j) .eq. 0.0) apply_relax = .TRUE. 
-                        
-                        if (f_grnd(i,j) .gt. 0.0 .and. &
-                         (f_grnd(i-1,j) .eq. 0.0 .or. f_grnd(i+1,j) .eq. 0.0 &
-                            .or. f_grnd(i,j-1) .eq. 0.0 .or. f_grnd(i,j+1) .eq. 0.0)) apply_relax = .TRUE. 
-                
-                    case(3)
-                        ! Relax all points
-                        
+                case(4) 
+                    ! Relax all grounded grounding-zone points 
+
+                    if (mask_grz(i,j) .eq. 0 .or. mask_grz(i,j) .eq. 1) then 
+
                         apply_relax = .TRUE. 
-                    
-                    case(4) 
-                        ! Relax all grounded grounding-zone points 
-
-                        if (mask_grz(i,j) .eq. 0 .or. mask_grz(i,j) .eq. 1) then 
-
-                            apply_relax = .TRUE. 
-
-                        end if 
-
-                    case DEFAULT
-                        ! No relaxation
-
-                        apply_relax = .FALSE.
-
-                end select
-                
-
-                if (apply_relax) then 
-
-                    if (tau .eq. 0.0) then
-                        ! Impose ice thickness 
-
-                        H_ice(i,j) = H_ref(i,j) 
-
-                    else
-                        ! Apply relaxation to reference state 
-
-                        dHdt = (H_ref(i,j) - H_ice(i,j)) / tau 
-
-                        H_ice(i,j) = H_ice(i,j) + dHdt*dt 
 
                     end if 
-                end if 
 
-            end do 
+                case DEFAULT
+                    ! No relaxation
+
+                    apply_relax = .FALSE.
+
+            end select
+            
+
+            if (apply_relax) then 
+
+                if (tau .eq. 0.0) then
+                    ! Impose ice thickness 
+
+                    H_ice(i,j) = H_ref(i,j) 
+
+                else
+                    ! Apply relaxation to reference state 
+
+                    dHdt = (H_ref(i,j) - H_ice(i,j)) / tau 
+
+                    H_ice(i,j) = H_ice(i,j) + dHdt*dt 
+
+                end if 
+            end if 
+
+        end do 
         end do 
 
 

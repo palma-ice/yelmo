@@ -14,6 +14,9 @@ make benchmarks
 ./runylmo ${runopt} -q priority -w 5 -e benchmarks -o ${fldr}/expa   -n par-gmd/yelmo_EISMINT_expa.nml
 ./runylmo ${runopt} -q priority -w 5 -e benchmarks -o ${fldr}/expf   -n par-gmd/yelmo_EISMINT_expf.nml
 
+# EISMINT1-moving margin with DIVA-noslip solver
+./runylmo ${runopt} -q priority -w 1 -e benchmarks -o ${fldr}/moving-diva-noslip -n par-gmd/yelmo_EISMINT_moving.nml -p ydyn.solver="diva-noslip"
+
 # EISMINT1 EXPA with SSA velocity turned on for testing symmetry (not part of GMD suite of tests)
 ./runylmo ${runopt} -e benchmarks -o ${fldr}/expssa -n par/yelmo_EISMINT_ssa.nml
 
@@ -27,8 +30,7 @@ jobrun ./runylmo ${runopt} -e benchmarks -n par-gmd/yelmo_HALFAR.nml -- -o ${fld
 jobrun ./runylmo ${runopt} -e benchmarks -n par-gmd/yelmo_EISMINT_moving.nml -p eismint.time_end=25e3 yelmo.log_timestep=True ytherm.method='fixed' -- -o ${fldr}/moving_dts -p eismint.dx=5.0,10.0,25.0,50.0,60.0 yelmo.pc_eps=1e-2,1e-1,1e0
 
 
-# Testing EISMINT1-moving simulations with DIVA-noslip solver
-./runylmo ${runopt} -q priority -w 1 -e benchmarks -o ${fldr}/moving-diva-noslip -n par-gmd/yelmo_EISMINT_moving.nml
+
 
 ### INITMIP TESTS ### 
 

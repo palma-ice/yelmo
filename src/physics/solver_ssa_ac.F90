@@ -209,24 +209,29 @@ contains
 
         end if 
 
-        ! Consistency check: ensure beta is defined well 
-        if ( ( count(ssa_mask_acx .eq. 1 .and. beta_acx .gt. 0.0) .eq. 0 ) .or. & 
-             ( count(ssa_mask_acy .eq. 1 .and. beta_acy .gt. 0.0) .eq. 0 ) ) then  
-            ! No points found with a non-zero beta for grounded ice,
-            ! something was not well-defined/well-initialized
+        if (count(ssa_mask_acx .eq. 1) + count(ssa_mask_acy .eq. 1) .gt. 0) then 
+            ! Points exist for ssa solver to treat
 
-            write(*,*) 
-            write(*,"(a)") "linear_solver_matrix_ssa_ac_csr_2D:: Error: beta appears to be zero everywhere for grounded ice."
-            write(*,*) "range(beta_acx): ", minval(beta_acx), maxval(beta_acx)
-            write(*,*) "range(beta_acy): ", minval(beta_acy), maxval(beta_acy)
-            write(*,*) "range(ssa_mask_acx): ", minval(ssa_mask_acx), maxval(ssa_mask_acx)
-            write(*,*) "range(ssa_mask_acy): ", minval(ssa_mask_acy), maxval(ssa_mask_acy)
-            write(*,*) "Stopping."
-            write(*,*) 
-            stop 
-            
+            ! Consistency check: ensure beta is defined well 
+            if ( ( count(ssa_mask_acx .eq. 1 .and. beta_acx .gt. 0.0) .eq. 0 ) .or. & 
+                ( count(ssa_mask_acy .eq. 1 .and. beta_acy .gt. 0.0) .eq. 0 ) ) then  
+                ! No points found with a non-zero beta for grounded ice,
+                ! something was not well-defined/well-initialized
+
+                write(*,*) 
+                write(*,"(a)") "linear_solver_matrix_ssa_ac_csr_2D:: Error: beta appears to be zero everywhere for grounded ice."
+                write(*,*) "range(beta_acx): ", minval(beta_acx), maxval(beta_acx)
+                write(*,*) "range(beta_acy): ", minval(beta_acy), maxval(beta_acy)
+                write(*,*) "range(ssa_mask_acx): ", minval(ssa_mask_acx), maxval(ssa_mask_acx)
+                write(*,*) "range(ssa_mask_acy): ", minval(ssa_mask_acy), maxval(ssa_mask_acy)
+                write(*,*) "Stopping."
+                write(*,*) 
+                stop 
+                
+            end if 
+
         end if 
-
+        
         ! Define border conditions (no-slip, free-slip, periodic)
         select case(trim(boundaries)) 
 

@@ -656,9 +656,11 @@ contains
     end subroutine calc_basal_heating_fromaa
 
     subroutine calc_basal_heating_nodes(Q_b,ux_b,uy_b,taub_acx,taub_acy,f_ice,beta1,beta2,boundaries)
-         ! Qb [J a-1 m-2] == [m a-1] * [J m-3]
-         ! Note: grounded ice fraction f_grnd_acx/y not used here, because taub_acx/y already accounts
-         ! for the grounded fraction via beta_acx/y: Q_b = tau_b*u = -beta*u*u.
+        ! Qb [J a-1 m-2] == [m a-1] * [J m-3]
+        ! Note: grounded ice fraction f_grnd_acx/y not used here, because taub_acx/y already accounts
+        ! for the grounded fraction via beta_acx/y: Q_b = tau_b*u = -beta*u*u,
+        ! i.e., the magnitude of basal stress multiplied with the magnitude of basal velocity.
+        ! See Cuffey and Paterson, p. 418, Eq. 9.35. 
 
         real(prec), intent(INOUT) :: Q_b(:,:)           ! [mW m-2] Basal heat production (friction), aa-nodes
         real(prec), intent(IN)    :: ux_b(:,:)          ! Basal velocity, x-component (acx)
@@ -709,8 +711,7 @@ contains
             call acy_to_nodes(taubyn,taub_acy,i,j,xn,yn,im1,ip1,jm1,jp1)
 
             ! Calculate Qb at quadrature points [Pa m a-1] == [J a-1 m-2]
-            !Qbn   = abs( sqrt(uxbn**2+uybn**2) * sqrt(taubxn**2+taubyn**2) ) ! <= WRONG, ajr, 2023-01-21
-            Qbn   = sqrt( (uxbn*taubxn)**2 + (uybn*taubyn)**2 )
+            Qbn   = abs( sqrt(uxbn**2+uybn**2) * sqrt(taubxn**2+taubyn**2) )
             Qb_aa = sum(Qbn*wtn)/wt1
 
             ! Ensure Q_b is strictly positive 

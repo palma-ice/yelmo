@@ -1,6 +1,6 @@
 #!/bin/bash
 
-fldr='tmp/20099e3'
+fldr='tmp/87adeb6'
 
 runopt='-r'
 #runopt='-s'
@@ -26,6 +26,9 @@ jobrun ./runylmo ${runopt} -e benchmarks -n par-gmd/yelmo_HALFAR.nml -- -o ${fld
 # Note: make sure to specify: eismint.time_end=25e3 yelmo.log_timestep=True ytherm.method='fixed'
 jobrun ./runylmo ${runopt} -e benchmarks -n par-gmd/yelmo_EISMINT_moving.nml -p eismint.time_end=25e3 yelmo.log_timestep=True ytherm.method='fixed' -- -o ${fldr}/moving_dts -p eismint.dx=5.0,10.0,25.0,50.0,60.0 yelmo.pc_eps=1e-2,1e-1,1e0
 
+
+# Testing EISMINT1-moving simulations with DIVA-noslip solver
+./runylmo ${runopt} -q priority -w 1 -e benchmarks -o ${fldr}/moving-diva-noslip -n par-gmd/yelmo_EISMINT_moving.nml
 
 ### INITMIP TESTS ### 
 

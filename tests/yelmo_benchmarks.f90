@@ -278,7 +278,9 @@ program yelmo_benchmarks
             yelmo1%tpo%now%z_srf  = yelmo1%bnd%z_bed + yelmo1%tpo%now%H_ice
         
         case("mismip")
-
+            
+            ! To do: define calv_mask!!
+            
             ! Set conditions similar to EISMINT2-EXPA with smaller radius 
             call dome_boundaries(yelmo1%bnd%T_srf,yelmo1%bnd%smb,yelmo1%bnd%Q_geo, &
                             yelmo1%grd%x,yelmo1%grd%y,yelmo1%tpo%now%H_ice, &
@@ -286,8 +288,10 @@ program yelmo_benchmarks
                 
         case("mismip-stnd") 
 
+            ! To do: define calv_mask!!
+
             ! Initialize mismip boundary values 
-            call mismip3D_boundaries(yelmo1%bnd%T_srf,yelmo1%bnd%smb,yelmo1%bnd%Q_geo,experiment="Stnd") 
+            call mismip3D_boundaries(yelmo1%bnd%T_srf,yelmo1%bnd%smb,yelmo1%bnd%Q_geo,yelmo1%bnd%calv_mask,experiment="Stnd") 
 
 
         case("dome") 
@@ -427,7 +431,7 @@ program yelmo_benchmarks
             case("mismip-stnd") 
 
                 ! Initialize mismip boundary values 
-                call mismip3D_boundaries(yelmo1%bnd%T_srf,yelmo1%bnd%smb,yelmo1%bnd%Q_geo,experiment="Stnd") 
+                call mismip3D_boundaries(yelmo1%bnd%T_srf,yelmo1%bnd%smb,yelmo1%bnd%Q_geo,yelmo1%bnd%calv_mask,experiment="Stnd") 
 
             case("dome") 
             ! Boundary conditions are free to be chosen here 

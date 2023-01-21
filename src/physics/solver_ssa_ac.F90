@@ -231,7 +231,7 @@ contains
             end if 
 
         end if 
-        
+
         ! Define border conditions (no-slip, free-slip, periodic)
         select case(trim(boundaries)) 
 
@@ -245,6 +245,13 @@ contains
                 ! bcs(2) = "periodic"
                 ! bcs(3) = "no-slip"
                 ! bcs(4) = "periodic" 
+
+            case("TROUGH")
+
+                bcs(1) = "free-slip"
+                bcs(2) = "periodic"
+                bcs(3) = "no-slip"
+                bcs(4) = "periodic" 
 
             case("periodic")
 

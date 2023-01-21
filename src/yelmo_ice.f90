@@ -688,7 +688,7 @@ end if
                 dom%dyn%par%boundaries  = "infinite"
                 dom%thrm%par%boundaries = "infinite"
 
-            case("MISMIP3D","TROUGH-F17","MISMIP+") 
+            case("MISMIP3D","MISMIP+") 
 
                 dom%tpo%par%boundaries  = "MISMIP3D"
                 dom%dyn%par%boundaries  = "MISMIP3D"
@@ -703,6 +703,12 @@ end if
                     stop 
                 end if 
             
+            case("TROUGH-F17")
+
+                dom%tpo%par%boundaries  = "MISMIP3D"
+                dom%dyn%par%boundaries  = "TROUGH"
+                dom%thrm%par%boundaries = "MISMIP3D"
+
             case("ISMIPHOM","slab","periodic","periodic-xy") 
                 ! Periodic boundary conditions in x and y, eg: X_1 = X_n-1; X_n = X_2
 

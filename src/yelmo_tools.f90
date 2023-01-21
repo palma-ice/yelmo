@@ -600,7 +600,7 @@ contains
         
         nx = size(vary,1)
         ny = size(vary,2)
-        
+
         ! Initialize interpolated variable at nodes of interest
         varn = 0.0
 
@@ -3241,6 +3241,12 @@ contains
 !                var(:,1)    = var(:,2)          ! y=-50km, Free-slip condition
 !                var(:,ny)   = var(:,ny-1)       ! y= 50km, Free-slip condition
 
+            case("TROUGH")
+
+                ! === MISMIP3D =====
+                var(1,:)    = var(2,:)          ! x=0, Symmetry 
+                var(nx,:)   = 0.0               ! x=800km, no ice
+                
             case("infinite")
                 ! Set border points equal to inner neighbors 
 
@@ -3336,7 +3342,7 @@ contains
                 var_acx(:,1)    = var_acx(:,2)
                 var_acx(:,ny)   = var_acx(:,ny-1) 
 
-            case("MISMIP3D") 
+            case("MISMIP3D","TROUGH") 
                 
                 !var_acx(1,:)    = var_acx(2,:) 
                 var_acx(nx-1,:) = var_acx(nx-2,:) 
@@ -3389,7 +3395,7 @@ contains
                 var_acx(:,1,:)    = var_acx(:,2,:)
                 var_acx(:,ny,:)   = var_acx(:,ny-1,:) 
 
-            case("MISMIP3D") 
+            case("MISMIP3D","TROUGH") 
                 
                 var_acx(1,:,:)    = var_acx(2,:,:) 
                 var_acx(nx-1,:,:) = var_acx(nx-2,:,:) 
@@ -3442,7 +3448,7 @@ contains
                 var_acy(:,ny-1) = var_acy(:,ny-2) 
                 var_acy(:,ny)   = var_acy(:,ny-1)
 
-            case("MISMIP3D") 
+            case("MISMIP3D","TROUGH") 
                 
                 var_acy(1,:)    = var_acy(2,:) 
                 var_acy(nx,:)   = var_acy(nx-1,:) 
@@ -3495,7 +3501,7 @@ contains
                 var_acy(:,ny-1,:) = var_acy(:,ny-2,:) 
                 var_acy(:,ny,:)   = var_acy(:,ny-1,:)
 
-            case("MISMIP3D") 
+            case("MISMIP3D","TROUGH") 
                 
                 var_acy(1,:,:)    = var_acy(2,:,:) 
                 var_acy(nx,:,:)   = var_acy(nx-1,:,:) 

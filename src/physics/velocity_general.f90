@@ -1,7 +1,7 @@
 module velocity_general 
     ! This module contains general routines that are used by several solvers. 
     
-    use yelmo_defs ,only  : sp, dp, wp, prec, tol_underflow, io_unit_err, rho_ice, rho_sw, rho_w, g
+    use yelmo_defs ,only  : sp, dp, wp, tol_underflow, io_unit_err, rho_ice, rho_sw, rho_w, g
     use yelmo_tools, only : get_neighbor_indices, stagger_aa_ab, stagger_aa_ab_ice, &
                     stagger_nodes_aa_ab_ice, stagger_nodes_acx_ab_ice, stagger_nodes_acy_ab_ice, &
                     staggerdiff_nodes_acx_ab_ice, staggerdiff_nodes_acy_ab_ice, &
@@ -22,7 +22,6 @@ module velocity_general
     public :: calc_driving_stress
     public :: calc_driving_stress_gl
     public :: calc_lateral_bc_stress_2D
-    public :: adjust_visc_eff_margin
     public :: set_inactive_margins
     public :: calc_ice_flux
     public :: calc_vel_ratio
@@ -46,47 +45,47 @@ contains
 
         implicit none 
 
-        real(prec), intent(OUT) :: uz(:,:,:)        ! nx,ny,nz_ac
-        real(prec), intent(IN)  :: ux(:,:,:)        ! nx,ny,nz_aa
-        real(prec), intent(IN)  :: uy(:,:,:)        ! nx,ny,nz_aa
-        real(prec), intent(IN)  :: H_ice(:,:)
-        real(prec), intent(IN)  :: f_ice(:,:)
-        real(prec), intent(IN)  :: f_grnd(:,:)
-        real(prec), intent(IN)  :: z_srf(:,:) 
-        real(prec), intent(IN)  :: smb(:,:) 
-        real(prec), intent(IN)  :: bmb(:,:) 
-        real(prec), intent(IN)  :: dHdt(:,:) 
-        real(prec), intent(IN)  :: dzsdt(:,:) 
-        real(prec), intent(IN)  :: zeta_aa(:)    ! z-coordinate, aa-nodes 
-        real(prec), intent(IN)  :: zeta_ac(:)    ! z-coordinate, ac-nodes  
-        real(prec), intent(IN)  :: dx 
-        real(prec), intent(IN)  :: dy
+        real(wp), intent(OUT) :: uz(:,:,:)        ! nx,ny,nz_ac
+        real(wp), intent(IN)  :: ux(:,:,:)        ! nx,ny,nz_aa
+        real(wp), intent(IN)  :: uy(:,:,:)        ! nx,ny,nz_aa
+        real(wp), intent(IN)  :: H_ice(:,:)
+        real(wp), intent(IN)  :: f_ice(:,:)
+        real(wp), intent(IN)  :: f_grnd(:,:)
+        real(wp), intent(IN)  :: z_srf(:,:) 
+        real(wp), intent(IN)  :: smb(:,:) 
+        real(wp), intent(IN)  :: bmb(:,:) 
+        real(wp), intent(IN)  :: dHdt(:,:) 
+        real(wp), intent(IN)  :: dzsdt(:,:) 
+        real(wp), intent(IN)  :: zeta_aa(:)    ! z-coordinate, aa-nodes 
+        real(wp), intent(IN)  :: zeta_ac(:)    ! z-coordinate, ac-nodes  
+        real(wp), intent(IN)  :: dx 
+        real(wp), intent(IN)  :: dy
         character(len=*), intent(IN) :: boundaries 
 
         ! Local variables 
         integer :: i, j, k, nx, ny, nz_aa, nz_ac
         integer :: im1, ip1, jm1, jp1   
-        real(prec) :: H_now
-        real(prec) :: H_inv
-        real(prec) :: dzbdx_aa
-        real(prec) :: dzbdy_aa
-        real(prec) :: dzsdx_aa
-        real(prec) :: dzsdy_aa
-        real(prec) :: dHdx_aa 
-        real(prec) :: dHdy_aa 
-        real(prec) :: duxdx_aa
-        real(prec) :: duydy_aa
-        real(prec) :: duxdz_aa 
-        real(prec) :: duydz_aa
-        real(prec) :: duxdx_now 
-        real(prec) :: duydy_now 
-        real(prec) :: ux_aa 
-        real(prec) :: uy_aa 
-        real(prec) :: uz_grid 
-        real(prec) :: uz_srf 
-        real(prec) :: corr 
-        real(prec) :: c_x 
-        real(prec) :: c_y 
+        real(wp) :: H_now
+        real(wp) :: H_inv
+        real(wp) :: dzbdx_aa
+        real(wp) :: dzbdy_aa
+        real(wp) :: dzsdx_aa
+        real(wp) :: dzsdy_aa
+        real(wp) :: dHdx_aa 
+        real(wp) :: dHdy_aa 
+        real(wp) :: duxdx_aa
+        real(wp) :: duydy_aa
+        real(wp) :: duxdz_aa 
+        real(wp) :: duydz_aa
+        real(wp) :: duxdx_now 
+        real(wp) :: duydy_now 
+        real(wp) :: ux_aa 
+        real(wp) :: uy_aa 
+        real(wp) :: uz_grid 
+        real(wp) :: uz_srf 
+        real(wp) :: corr 
+        real(wp) :: c_x 
+        real(wp) :: c_y 
 
         real(wp) :: wt_ab(4) 
         real(wp) :: dzsdt_ab(4)
@@ -114,7 +113,7 @@ contains
 
         real(wp), allocatable :: z_base(:,:) 
 
-        real(prec), parameter :: uz_min = -10.0     ! [m/yr] Minimum allowed vertical velocity downwards for stability
+        real(wp), parameter :: uz_min = -10.0     ! [m/yr] Minimum allowed vertical velocity downwards for stability
         
         nx    = size(ux,1)
         ny    = size(ux,2)
@@ -197,8 +196,8 @@ contains
                 ! Glimmer, Eq. 3.35 
                 ! ajr, 2020-01-27, untested:::
 !                 uz_grid = dzsdt(i,j) + (ux_aa*dzsdx_aa + uy_aa*dzsdy_aa) &
-!                             - ( (1.0_prec-zeta_ac(1))*dHdt(i,j) + ux_aa*dHdx_aa + uy_aa*dHdy_aa )
-                uz_grid = 0.0_prec 
+!                             - ( (1.0_wp-zeta_ac(1))*dHdt(i,j) + ux_aa*dHdx_aa + uy_aa*dHdy_aa )
+                uz_grid = 0.0_wp 
 
                 ! ===================================================================
                 ! Greve and Blatter (2009) style:
@@ -206,7 +205,7 @@ contains
                 ! Determine basal vertical velocity for this grid point 
                 ! Following Eq. 5.31 of Greve and Blatter (2009)
                 uz(i,j,1) = dzbdt_now + uz_grid + bmb(i,j) + ux_aa*dzbdx_aa + uy_aa*dzbdy_aa
-                if (abs(uz(i,j,1)) .lt. TOL_UNDERFLOW) uz(i,j,1) = 0.0_prec 
+                if (abs(uz(i,j,1)) .lt. TOL_UNDERFLOW) uz(i,j,1) = 0.0_wp 
                 
                 ! Set stability limit on basal uz value.
                 ! This only gets applied in rare cases when something
@@ -337,36 +336,36 @@ contains
 
         implicit none 
 
-        real(prec), intent(OUT) :: uz_star(:,:,:)   ! nx,ny,nz_ac
-        real(prec), intent(IN)  :: uz(:,:,:)        ! nx,ny,nz_ac
-        real(prec), intent(IN)  :: ux(:,:,:)        ! nx,ny,nz_aa
-        real(prec), intent(IN)  :: uy(:,:,:)        ! nx,ny,nz_aa
-        real(prec), intent(IN)  :: H_ice(:,:)
-        real(prec), intent(IN)  :: f_ice(:,:)
-        real(prec), intent(IN)  :: f_grnd(:,:)
-        real(prec), intent(IN)  :: z_srf(:,:) 
-        real(prec), intent(IN)  :: dzsdt(:,:) 
-        real(prec), intent(IN)  :: dhdt(:,:) 
-        real(prec), intent(IN)  :: zeta_aa(:)    ! z-coordinate, aa-nodes 
-        real(prec), intent(IN)  :: zeta_ac(:)    ! z-coordinate, ac-nodes  
-        real(prec), intent(IN)  :: dx 
-        real(prec), intent(IN)  :: dy
+        real(wp), intent(OUT) :: uz_star(:,:,:)   ! nx,ny,nz_ac
+        real(wp), intent(IN)  :: uz(:,:,:)        ! nx,ny,nz_ac
+        real(wp), intent(IN)  :: ux(:,:,:)        ! nx,ny,nz_aa
+        real(wp), intent(IN)  :: uy(:,:,:)        ! nx,ny,nz_aa
+        real(wp), intent(IN)  :: H_ice(:,:)
+        real(wp), intent(IN)  :: f_ice(:,:)
+        real(wp), intent(IN)  :: f_grnd(:,:)
+        real(wp), intent(IN)  :: z_srf(:,:) 
+        real(wp), intent(IN)  :: dzsdt(:,:) 
+        real(wp), intent(IN)  :: dhdt(:,:) 
+        real(wp), intent(IN)  :: zeta_aa(:)    ! z-coordinate, aa-nodes 
+        real(wp), intent(IN)  :: zeta_ac(:)    ! z-coordinate, ac-nodes  
+        real(wp), intent(IN)  :: dx 
+        real(wp), intent(IN)  :: dy
         character(len=*), intent(IN) :: boundaries 
 
         ! Local variables 
         integer :: i, j, k, nx, ny, nz_aa, nz_ac
         integer :: im1, ip1, jm1, jp1
-        real(prec) :: dzbdx_aa
-        real(prec) :: dzbdy_aa
-        real(prec) :: dzsdx_aa
-        real(prec) :: dzsdy_aa
-        real(prec) :: dhdx_aa
-        real(prec) :: dhdy_aa
-        real(prec) :: ux_aa 
-        real(prec) :: uy_aa 
-        real(prec) :: c_x 
-        real(prec) :: c_y 
-        real(prec) :: c_t 
+        real(wp) :: dzbdx_aa
+        real(wp) :: dzbdy_aa
+        real(wp) :: dzsdx_aa
+        real(wp) :: dzsdy_aa
+        real(wp) :: dhdx_aa
+        real(wp) :: dhdy_aa
+        real(wp) :: ux_aa 
+        real(wp) :: uy_aa 
+        real(wp) :: c_x 
+        real(wp) :: c_y 
+        real(wp) :: c_t 
         real(wp)   :: dzsdt_now 
         real(wp)   :: dhdt_now 
         real(wp)   :: dzbdt_now 
@@ -547,49 +546,49 @@ contains
 
         implicit none 
 
-        real(prec), intent(OUT) :: uz(:,:,:)        ! nx,ny,nz_ac
-        real(prec), intent(IN)  :: ux(:,:,:)        ! nx,ny,nz_aa
-        real(prec), intent(IN)  :: uy(:,:,:)        ! nx,ny,nz_aa
-        real(prec), intent(IN)  :: H_ice(:,:)
-        real(prec), intent(IN)  :: f_ice(:,:)
-        real(prec), intent(IN)  :: f_grnd(:,:)
-        real(prec), intent(IN)  :: z_bed(:,:) 
-        real(prec), intent(IN)  :: z_srf(:,:) 
-        real(prec), intent(IN)  :: smb(:,:) 
-        real(prec), intent(IN)  :: bmb(:,:) 
-        real(prec), intent(IN)  :: dHdt(:,:) 
-        real(prec), intent(IN)  :: dzsdt(:,:) 
-        real(prec), intent(IN)  :: zeta_aa(:)    ! z-coordinate, aa-nodes 
-        real(prec), intent(IN)  :: zeta_ac(:)    ! z-coordinate, ac-nodes  
-        real(prec), intent(IN)  :: dx 
-        real(prec), intent(IN)  :: dy
+        real(wp), intent(OUT) :: uz(:,:,:)        ! nx,ny,nz_ac
+        real(wp), intent(IN)  :: ux(:,:,:)        ! nx,ny,nz_aa
+        real(wp), intent(IN)  :: uy(:,:,:)        ! nx,ny,nz_aa
+        real(wp), intent(IN)  :: H_ice(:,:)
+        real(wp), intent(IN)  :: f_ice(:,:)
+        real(wp), intent(IN)  :: f_grnd(:,:)
+        real(wp), intent(IN)  :: z_bed(:,:) 
+        real(wp), intent(IN)  :: z_srf(:,:) 
+        real(wp), intent(IN)  :: smb(:,:) 
+        real(wp), intent(IN)  :: bmb(:,:) 
+        real(wp), intent(IN)  :: dHdt(:,:) 
+        real(wp), intent(IN)  :: dzsdt(:,:) 
+        real(wp), intent(IN)  :: zeta_aa(:)    ! z-coordinate, aa-nodes 
+        real(wp), intent(IN)  :: zeta_ac(:)    ! z-coordinate, ac-nodes  
+        real(wp), intent(IN)  :: dx 
+        real(wp), intent(IN)  :: dy
         character(len=*), intent(IN) :: boundaries 
 
         ! Local variables 
         integer :: i, j, k, nx, ny, nz_aa, nz_ac
         integer :: im1, ip1, jm1, jp1    
-        real(prec) :: H_now
-        real(prec) :: H_inv
-        real(prec) :: dzbdx_aa
-        real(prec) :: dzbdy_aa
-        real(prec) :: dzsdx_aa
-        real(prec) :: dzsdy_aa
-        real(prec) :: duxdx_aa
-        real(prec) :: duydy_aa
-        real(prec) :: duxdz_aa 
-        real(prec) :: duydz_aa
-        real(prec) :: duxdx_now 
-        real(prec) :: duydy_now 
-        real(prec) :: ux_aa 
-        real(prec) :: uy_aa 
-        real(prec) :: uz_grid 
-        real(prec) :: uz_srf 
-        real(prec) :: corr 
-        real(prec) :: c_x 
-        real(prec) :: c_y 
+        real(wp) :: H_now
+        real(wp) :: H_inv
+        real(wp) :: dzbdx_aa
+        real(wp) :: dzbdy_aa
+        real(wp) :: dzsdx_aa
+        real(wp) :: dzsdy_aa
+        real(wp) :: duxdx_aa
+        real(wp) :: duydy_aa
+        real(wp) :: duxdz_aa 
+        real(wp) :: duydz_aa
+        real(wp) :: duxdx_now 
+        real(wp) :: duydy_now 
+        real(wp) :: ux_aa 
+        real(wp) :: uy_aa 
+        real(wp) :: uz_grid 
+        real(wp) :: uz_srf 
+        real(wp) :: corr 
+        real(wp) :: c_x 
+        real(wp) :: c_y 
 
-        real(prec), parameter :: dzbdt        = 0.0     ! For posterity, keep dzbdt variable, but set to zero 
-        real(prec), parameter :: uz_min       = -10.0   ! [m/yr] Minimum allowed vertical velocity downwards for stability
+        real(wp), parameter :: dzbdt        = 0.0     ! For posterity, keep dzbdt variable, but set to zero 
+        real(wp), parameter :: uz_min       = -10.0   ! [m/yr] Minimum allowed vertical velocity downwards for stability
         
         nx    = size(ux,1)
         ny    = size(ux,2)
@@ -618,28 +617,28 @@ contains
                 H_inv = 1.0/H_now 
 
                 ! Get the centered bedrock gradient 
-                dzbdx_aa = (z_bed(ip1,j)-z_bed(im1,j))/(2.0_prec*dx)
-                dzbdy_aa = (z_bed(i,jp1)-z_bed(i,jm1))/(2.0_prec*dy)
+                dzbdx_aa = (z_bed(ip1,j)-z_bed(im1,j))/(2.0_wp*dx)
+                dzbdy_aa = (z_bed(i,jp1)-z_bed(i,jm1))/(2.0_wp*dy)
                 
                 ! Get the centered surface gradient 
-                dzsdx_aa = (z_srf(ip1,j)-z_srf(im1,j))/(2.0_prec*dx)
-                dzsdy_aa = (z_srf(i,jp1)-z_srf(i,jm1))/(2.0_prec*dy)
+                dzsdx_aa = (z_srf(ip1,j)-z_srf(im1,j))/(2.0_wp*dx)
+                dzsdy_aa = (z_srf(i,jp1)-z_srf(i,jm1))/(2.0_wp*dy)
                 
                 ! Get the centered horizontal velocity at the base
-                ux_aa = 0.5_prec* (ux(im1,j,1) + ux(i,j,1))
-                uy_aa = 0.5_prec* (uy(i,jm1,1) + uy(i,j,1))
+                ux_aa = 0.5_wp* (ux(im1,j,1) + ux(i,j,1))
+                uy_aa = 0.5_wp* (uy(i,jm1,1) + uy(i,j,1))
                 
                 
 !                 ! Get the centered ice thickness gradient 
-!                 dHdx_aa = (H_ice(ip1,j)-H_ice(im1,j))/(2.0_prec*dx)
-!                 dHdy_aa = (H_ice(i,jp1)-H_ice(i,jm1))/(2.0_prec*dy)
+!                 dHdx_aa = (H_ice(ip1,j)-H_ice(im1,j))/(2.0_wp*dx)
+!                 dHdy_aa = (H_ice(i,jp1)-H_ice(i,jm1))/(2.0_wp*dy)
                 
                 ! Determine grid vertical velocity at the base due to sigma-coordinates 
                 ! Glimmer, Eq. 3.35 
                 ! ajr, 2020-01-27, untested:::
 !                 uz_grid = dzsdt(i,j) + (ux_aa*dzsdx_aa + uy_aa*dzsdy_aa) &
-!                             - ( (1.0_prec-zeta_ac(1))*dHdt(i,j) + ux_aa*dHdx_aa + uy_aa*dHdy_aa )
-                uz_grid = 0.0_prec 
+!                             - ( (1.0_wp-zeta_ac(1))*dHdt(i,j) + ux_aa*dHdx_aa + uy_aa*dHdy_aa )
+                uz_grid = 0.0_wp 
 
                 ! ===================================================================
                 ! Greve and Blatter (2009) style:
@@ -647,7 +646,7 @@ contains
                 ! Determine basal vertical velocity for this grid point 
                 ! Following Eq. 5.31 of Greve and Blatter (2009)
                 uz(i,j,1) = dzbdt + uz_grid + bmb(i,j) + ux_aa*dzbdx_aa + uy_aa*dzbdy_aa
-                if (abs(uz(i,j,1)) .lt. TOL_UNDERFLOW) uz(i,j,1) = 0.0_prec 
+                if (abs(uz(i,j,1)) .lt. TOL_UNDERFLOW) uz(i,j,1) = 0.0_wp 
                 
                 ! Set stability limit on basal uz value for grounded ice.
                 ! This only gets applied in rare cases when something
@@ -709,7 +708,7 @@ contains
                     ! Apply correction to match kinematic boundary condition at surface 
                     !uz(i,j,k) = uz(i,j,k) - zeta_ac(k)*(uz(i,j,k)-uz_srf)
 
-                    if (abs(uz(i,j,k)) .lt. TOL_UNDERFLOW) uz(i,j,k) = 0.0_prec 
+                    if (abs(uz(i,j,k)) .lt. TOL_UNDERFLOW) uz(i,j,k) = 0.0_wp 
                     
                 end do 
                 
@@ -718,7 +717,7 @@ contains
 
                 do k = 1, nz_ac 
                     uz(i,j,k) = dzbdt - max(smb(i,j),0.0)
-                    if (abs(uz(i,j,k)) .lt. TOL_UNDERFLOW) uz(i,j,k) = 0.0_prec 
+                    if (abs(uz(i,j,k)) .lt. TOL_UNDERFLOW) uz(i,j,k) = 0.0_wp 
                end do 
 
             end if 
@@ -740,35 +739,35 @@ contains
 
         implicit none 
 
-        real(prec), intent(OUT) :: uz_star(:,:,:)   ! nx,ny,nz_ac
-        real(prec), intent(IN)  :: uz(:,:,:)        ! nx,ny,nz_ac
-        real(prec), intent(IN)  :: ux(:,:,:)        ! nx,ny,nz_aa
-        real(prec), intent(IN)  :: uy(:,:,:)        ! nx,ny,nz_aa
-        real(prec), intent(IN)  :: f_ice(:,:)
-        real(prec), intent(IN)  :: z_bed(:,:) 
-        real(prec), intent(IN)  :: z_srf(:,:) 
-        real(prec), intent(IN)  :: dzsdt(:,:) 
-        real(prec), intent(IN)  :: zeta_aa(:)    ! z-coordinate, aa-nodes 
-        real(prec), intent(IN)  :: zeta_ac(:)    ! z-coordinate, ac-nodes  
-        real(prec), intent(IN)  :: dx 
-        real(prec), intent(IN)  :: dy
+        real(wp), intent(OUT) :: uz_star(:,:,:)   ! nx,ny,nz_ac
+        real(wp), intent(IN)  :: uz(:,:,:)        ! nx,ny,nz_ac
+        real(wp), intent(IN)  :: ux(:,:,:)        ! nx,ny,nz_aa
+        real(wp), intent(IN)  :: uy(:,:,:)        ! nx,ny,nz_aa
+        real(wp), intent(IN)  :: f_ice(:,:)
+        real(wp), intent(IN)  :: z_bed(:,:) 
+        real(wp), intent(IN)  :: z_srf(:,:) 
+        real(wp), intent(IN)  :: dzsdt(:,:) 
+        real(wp), intent(IN)  :: zeta_aa(:)    ! z-coordinate, aa-nodes 
+        real(wp), intent(IN)  :: zeta_ac(:)    ! z-coordinate, ac-nodes  
+        real(wp), intent(IN)  :: dx 
+        real(wp), intent(IN)  :: dy
         character(len=*), intent(IN) :: boundaries 
 
         ! Local variables 
         integer :: i, j, k, nx, ny, nz_aa, nz_ac
         integer :: im1, ip1, jm1, jp1
-        real(prec) :: dzbdx_aa
-        real(prec) :: dzbdy_aa
-        real(prec) :: dzsdx_aa
-        real(prec) :: dzsdy_aa
-        real(prec) :: ux_aa 
-        real(prec) :: uy_aa 
-        real(prec) :: c_x 
-        real(prec) :: c_y 
-        real(prec) :: c_t 
+        real(wp) :: dzbdx_aa
+        real(wp) :: dzbdy_aa
+        real(wp) :: dzsdx_aa
+        real(wp) :: dzsdy_aa
+        real(wp) :: ux_aa 
+        real(wp) :: uy_aa 
+        real(wp) :: c_x 
+        real(wp) :: c_y 
+        real(wp) :: c_t 
         real(wp)   :: dzsdt_now 
 
-        real(prec), parameter :: dzbdt = 0.0   ! For posterity, keep dzbdt variable, but set to zero 
+        real(wp), parameter :: dzbdt = 0.0   ! For posterity, keep dzbdt variable, but set to zero 
 
         nx    = size(ux,1)
         ny    = size(ux,2)
@@ -839,7 +838,7 @@ contains
                     ! (e.g., Greve and Blatter, 2009, Eq. 5.148)
                     uz_star(i,j,k) = uz(i,j,k) + c_x + c_y + c_t 
 
-                    if (abs(uz_star(i,j,k)) .lt. TOL_UNDERFLOW) uz_star(i,j,k) = 0.0_prec 
+                    if (abs(uz_star(i,j,k)) .lt. TOL_UNDERFLOW) uz_star(i,j,k) = 0.0_wp 
                     
                 end do 
                 
@@ -874,23 +873,23 @@ contains
 
         implicit none 
 
-        real(prec), intent(OUT) :: taud_acx(:,:)    ! [Pa]
-        real(prec), intent(OUT) :: taud_acy(:,:)    ! [Pa]
-        real(prec), intent(IN)  :: H_ice(:,:)       ! [m]
-        real(prec), intent(IN)  :: f_ice(:,:)       ! [--]
-        real(prec), intent(IN)  :: dzsdx(:,:)       ! [--]
-        real(prec), intent(IN)  :: dzsdy(:,:)       ! [--]
-        real(prec), intent(IN)  :: dx               ! [m] 
-        real(prec), intent(IN)  :: taud_lim         ! [Pa]
+        real(wp), intent(OUT) :: taud_acx(:,:)    ! [Pa]
+        real(wp), intent(OUT) :: taud_acy(:,:)    ! [Pa]
+        real(wp), intent(IN)  :: H_ice(:,:)       ! [m]
+        real(wp), intent(IN)  :: f_ice(:,:)       ! [--]
+        real(wp), intent(IN)  :: dzsdx(:,:)       ! [--]
+        real(wp), intent(IN)  :: dzsdy(:,:)       ! [--]
+        real(wp), intent(IN)  :: dx               ! [m] 
+        real(wp), intent(IN)  :: taud_lim         ! [Pa]
         character(len=*), intent(IN) :: boundaries  ! Boundary conditions to apply 
 
         ! Local variables 
         integer :: i, j, nx, ny 
         integer    :: im1, ip1, jm1, jp1 
-        real(prec) :: dy, rhog 
-        real(prec) :: H_mid
+        real(wp) :: dy, rhog 
+        real(wp) :: H_mid
 
-        ! real(prec), allocatable :: H_ab(:,:)
+        ! real(wp), allocatable :: H_ab(:,:)
 
         nx = size(H_ice,1)
         ny = size(H_ice,2) 
@@ -960,32 +959,32 @@ contains
 
         implicit none 
 
-        real(prec), intent(OUT) :: taud_acx(:,:)
-        real(prec), intent(OUT) :: taud_acy(:,:) 
-        real(prec), intent(IN)  :: H_ice(:,:)
-        real(prec), intent(IN)  :: z_srf(:,:)
-        real(prec), intent(IN)  :: z_bed(:,:)
-        real(prec), intent(IN)  :: z_sl(:,:)
-        real(prec), intent(IN)  :: H_grnd(:,:)
-        real(prec), intent(IN)  :: f_grnd(:,:)
-        real(prec), intent(IN)  :: f_grnd_acx(:,:)
-        real(prec), intent(IN)  :: f_grnd_acy(:,:)
-        real(prec), intent(IN)  :: dx 
+        real(wp), intent(OUT) :: taud_acx(:,:)
+        real(wp), intent(OUT) :: taud_acy(:,:) 
+        real(wp), intent(IN)  :: H_ice(:,:)
+        real(wp), intent(IN)  :: z_srf(:,:)
+        real(wp), intent(IN)  :: z_bed(:,:)
+        real(wp), intent(IN)  :: z_sl(:,:)
+        real(wp), intent(IN)  :: H_grnd(:,:)
+        real(wp), intent(IN)  :: f_grnd(:,:)
+        real(wp), intent(IN)  :: f_grnd_acx(:,:)
+        real(wp), intent(IN)  :: f_grnd_acy(:,:)
+        real(wp), intent(IN)  :: dx 
         integer,    intent(IN)  :: method        ! Which driving stress calculation to use
         integer,    intent(IN)  :: beta_gl_stag  ! Method of grounding line staggering of beta 
 
         ! Local variables 
         integer :: i, j, nx, ny
         integer :: im1, ip1, jm1, jp1  
-        real(prec) :: dy, rhog 
-        real(prec) :: taud_grnd, taud_flt, taud_now 
-        real(prec) :: H_mid, H_gl, z_gl, H_grnd_mid 
-        real(prec) :: dzsdx, dzsdy
-        real(prec) :: dzsdx_1, dzsdx_2
-        real(prec) :: H_1, H_2  
-        real(prec) :: taud_old, fac_gl   
+        real(wp) :: dy, rhog 
+        real(wp) :: taud_grnd, taud_flt, taud_now 
+        real(wp) :: H_mid, H_gl, z_gl, H_grnd_mid 
+        real(wp) :: dzsdx, dzsdy
+        real(wp) :: dzsdx_1, dzsdx_2
+        real(wp) :: H_1, H_2  
+        real(wp) :: taud_old, fac_gl   
 
-        real(prec), parameter :: slope_max = 0.05   ! Very high limit == 0.05, low limit < 0.01 
+        real(wp), parameter :: slope_max = 0.05   ! Very high limit == 0.05, low limit < 0.01 
 
         nx = size(H_ice,1)
         ny = size(H_ice,2) 
@@ -1088,7 +1087,7 @@ end if
                         ! Grounding line point (ac-node)
 
                         ! Get the ice thickness at the ac-node as the average of two neighbors
-                        H_gl    = 0.5_prec*(H_ice(i,j)+H_ice(i+1,j))
+                        H_gl    = 0.5_wp*(H_ice(i,j)+H_ice(i+1,j))
 
                         ! Get slope of grounded point and virtual floating point (using H_ice),
                         ! then assume slope is the weighted average of the two 
@@ -1120,7 +1119,7 @@ end if
                         ! Grounding line point (ac-node)
 
                         ! Get the ice thickness at the ac-node as the average of two neighbors
-                        H_gl    = 0.5_prec*(H_ice(i,j)+H_ice(i,j+1))
+                        H_gl    = 0.5_wp*(H_ice(i,j)+H_ice(i,j+1))
 
                         ! Get slope of grounded point and virtual floating point (using H_ice),
                         ! then assume slope is the weighted average of the two 
@@ -1149,7 +1148,7 @@ end if
                     if ( f_grnd_acx(i,j) .gt. 0.0 .and. f_grnd_acx(i,j) .lt. 1.0) then 
                         ! Grounding line point (ac-node)
 
-                        H_grnd_mid = 0.5_prec*(H_grnd(i,j) + H_grnd(i+1,j))
+                        H_grnd_mid = 0.5_wp*(H_grnd(i,j) + H_grnd(i+1,j))
 
                         if (H_grnd_mid .gt. 0.0) then 
                             ! Consider grounded 
@@ -1161,7 +1160,7 @@ end if
                         call minmax(dzsdx,slope_max)  
 
                         ! Get the ice thickness at the ac-node
-                        H_gl    = 0.5_prec*(H_ice(i,j)+H_ice(i+1,j))
+                        H_gl    = 0.5_wp*(H_ice(i,j)+H_ice(i+1,j))
 
                         ! Get the driving stress
                         taud_old = taud_acx(i,j) 
@@ -1183,7 +1182,7 @@ end if
                     if ( f_grnd_acy(i,j) .gt. 0.0 .and. f_grnd_acy(i,j) .lt. 1.0) then 
                         ! Grounding line point (ac-node)
 
-                        H_grnd_mid = 0.5_prec*(H_grnd(i,j) + H_grnd(i,j+1))
+                        H_grnd_mid = 0.5_wp*(H_grnd(i,j) + H_grnd(i,j+1))
 
                         if (H_grnd_mid .gt. 0.0) then 
                             ! Consider grounded 
@@ -1195,7 +1194,7 @@ end if
                         call minmax(dzsdx,slope_max)  
 
                         ! Get the ice thickness at the ac-node
-                        H_gl    = 0.5_prec*(H_ice(i,j)+H_ice(i,j+1))
+                        H_gl    = 0.5_wp*(H_ice(i,j)+H_ice(i,j+1))
 
                         ! Get the driving stress
                         taud_acy(i,j) = rhog * H_gl * dzsdx
@@ -1405,210 +1404,6 @@ end if
         return
 
     end subroutine calc_lateral_bc_stress
-    
-    subroutine adjust_visc_eff_margin(visc_int,ux,uy,f_ice,f_grnd,boundaries)
-        ! This does not help, yet...
-
-        implicit none 
-
-        real(wp), intent(INOUT) :: visc_int(:,:) 
-        real(wp), intent(IN)    :: ux(:,:)
-        real(wp), intent(IN)    :: uy(:,:)
-        real(wp), intent(IN)    :: f_ice(:,:)
-        real(wp), intent(IN)    :: f_grnd(:,:)
-        character(len=*), intent(IN) :: boundaries 
-
-        ! Local variables 
-        integer  :: i, j, nx, ny, n  
-        integer  :: im1, ip1, jm1, jp1 
-        real(wp) :: visc_aa5(5) 
-        real(wp) :: wt_aa5(5) 
-
-        real(wp), allocatable :: visc_int_in(:,:) 
-
-        nx = size(visc_int,1) 
-        ny = size(visc_int,2) 
-
-        allocate(visc_int_in(nx,ny))
-        visc_int_in = visc_int
-
-        do j = 1, ny 
-        do i = 1, nx 
-
-            ! Get neighbor indices
-            call get_neighbor_indices(im1,ip1,jm1,jp1,i,j,nx,ny,boundaries)
-
-            if (f_ice(i,j) .gt. 0.0_wp) then 
-                ! Ice-covered point 
-
-                visc_aa5 = visc_int_in(i,j) 
-                wt_aa5   = 0.0_wp
-
-                if (f_ice(ip1,j) .eq. 1.0_wp ) then 
-                    visc_aa5(1) = visc_int_in(ip1,j) 
-                    wt_aa5(1)   = 1.0_wp 
-                end if 
-
-                if (f_ice(im1,j) .eq. 1.0_wp ) then 
-                    visc_aa5(2) = visc_int_in(im1,j) 
-                    wt_aa5(2)   = 1.0_wp 
-                end if 
-
-                if (f_ice(i,jp1) .eq. 1.0_wp ) then 
-                    visc_aa5(3) = visc_int_in(i,jp1) 
-                    wt_aa5(3)   = 1.0_wp 
-                end if 
-
-                if (f_ice(i,jm1) .eq. 1.0_wp ) then 
-                    visc_aa5(4) = visc_int_in(i,jm1) 
-                    wt_aa5(4)   = 1.0_wp 
-                end if 
-
-                ! Fill in last value with central point 
-                visc_aa5(5) = visc_int_in(i,j) 
-                wt_aa5(5)   = 1.0_wp 
-
-                ! How many fully ice-covered neighbors
-                n = sum(wt_aa5) 
-
-                if (n .gt. 1 .and. n .lt. 5) then 
-                    ! Margin point with some ice-covered neighbors,
-                    ! smooth viscosity. 
-
-                    visc_int(i,j) = sum(visc_aa5*wt_aa5)/sum(wt_aa5)
-
-                end if 
-
-            end if 
-
-        end do 
-        end do  
-
-        return 
-
-    end subroutine adjust_visc_eff_margin
-
-    subroutine adjust_visc_eff_margin_2(visc_eff,ux,uy,f_ice,f_grnd,boundaries)
-        ! This doesn't seem to work...
-
-        implicit none 
-
-        real(wp), intent(INOUT) :: visc_eff(:,:,:) 
-        real(wp), intent(IN)    :: ux(:,:)
-        real(wp), intent(IN)    :: uy(:,:)
-        real(wp), intent(IN)    :: f_ice(:,:)
-        real(wp), intent(IN)    :: f_grnd(:,:)
-        character(len=*), intent(IN) :: boundaries 
-
-        ! Local variables 
-        integer :: i, j, nx, ny 
-        integer :: im1, ip1, jm1, jp1 
-        real(wp) :: vel_now, vel_up_now 
-        real(wp) :: f_visc(4) 
-        real(wp) :: f_visc_now 
-
-        real(wp), parameter :: vel_lim_0    = 1000.0_wp 
-        real(wp), parameter :: vel_lim_1    = 5000.0_wp 
-        real(wp), parameter :: vel_lim_diff = 100.0_wp
-
-        nx = size(visc_eff,1) 
-        ny = size(visc_eff,2) 
-
-        do j = 1, ny 
-        do i = 1, nx 
-
-            ! Get neighbor indices
-            call get_neighbor_indices(im1,ip1,jm1,jp1,i,j,nx,ny,boundaries)
-
-            ! Assume viscosity should remain the same at first 
-            f_visc = 1.0_wp 
-
-            ! Find points at the ice front (four cases to check)
-            ! For stability increase viscosity in border point if 
-            ! ice-front velocity magnitude is too high. 
-
-            ! Ice-free to the right
-            if (f_ice(i,j) .eq. 1.0_wp .and. f_ice(ip1,j) .lt. 1.0_wp ) then 
-
-                vel_now    = abs(ux(i,j))
-                vel_up_now = abs(ux(im1,j))
-
-                if (abs(vel_now) .gt. vel_lim_0 .and. abs(vel_now-vel_up_now) .gt. vel_lim_diff) then 
-
-                    f_visc(1) = 1.0_wp + 1.0_wp*min((vel_now-vel_lim_0)/(vel_lim_1-vel_lim_0),1.0_wp)
-
-                end if
-
-                write(*,*) "visc: 1 :", vel_now, vel_up_now, f_visc(1) 
-
-            end if 
-
-            ! Ice-free to the left
-            if (f_ice(i,j) .eq. 1.0_wp .and. f_ice(im1,j) .eq. 1.0_wp ) then 
-
-                vel_now    = abs(ux(im1,j))
-                vel_up_now = abs(ux(i,j))
-
-                if (abs(vel_now) .gt. vel_lim_0 .and. abs(vel_now-vel_up_now) .gt. vel_lim_diff) then 
-
-                    f_visc(2) = 1.0_wp + 1.0_wp*min((vel_now-vel_lim_0)/(vel_lim_1-vel_lim_0),1.0_wp)
-                    
-                end if
-
-                write(*,*) "visc: 2 :", vel_now, vel_up_now, f_visc(2) 
-                
-            end if 
-
-            ! Ice-free to the top
-            if (f_ice(i,j) .eq. 1.0_wp .and. f_ice(i,jp1) .lt. 1.0_wp ) then 
-
-                vel_now    = abs(uy(i,j))
-                vel_up_now = abs(uy(i,jm1))
-
-                if (abs(vel_now) .gt. vel_lim_0 .and. abs(vel_now-vel_up_now) .gt. vel_lim_diff) then 
-
-                    f_visc(3) = 1.0_wp + 1.0_wp*min((vel_now-vel_lim_0)/(vel_lim_1-vel_lim_0),1.0_wp)
-                    
-                end if
-
-                write(*,*) "visc: 3 :", vel_now, vel_up_now, f_visc(3) 
-                
-            end if 
-
-            ! Ice-free to the bottom
-            if (f_ice(i,j) .eq. 1.0_wp .and. f_ice(i,jm1) .lt. 1.0_wp ) then 
-
-                vel_now    = abs(uy(i,jm1))
-                vel_up_now = abs(uy(i,j))
-
-                if (abs(vel_now) .gt. vel_lim_0 .and. abs(vel_now-vel_up_now) .gt. vel_lim_diff) then 
-
-                    f_visc(4) = 1.0_wp + 1.0_wp*min((vel_now-vel_lim_0)/(vel_lim_1-vel_lim_0),1.0_wp)
-                    
-                end if
-
-                write(*,*) "visc: 4 :", vel_now, vel_up_now, f_visc(4) 
-                
-            end if 
-
-            ! Get maximum value of viscosity scalar 
-            f_visc_now = maxval(f_visc) 
-
-            !write(*,*) "visc: ", f_visc
-            
-            ! Adjust viscosity for this column as needed 
-            if (f_visc_now .gt. 1.0_wp) then 
-
-                !write(*,*) "visc: ", f_visc_now
-                visc_eff(i,j,:) = visc_eff(i,j,:)*f_visc_now
-            end if 
-
-        end do 
-        end do  
-
-        return 
-
-    end subroutine adjust_visc_eff_margin_2
 
     subroutine integrate_gl_driving_stress_linear(taud,H_a,H_b,zb_a,zb_b,z_sl_a,z_sl_b,dx)
         ! Compute the driving stress for the grounding line more precisely (subgrid)
@@ -1737,17 +1532,17 @@ end if
 
         implicit none 
 
-        real(prec), intent(OUT) :: qq_acx(:,:)     ! [m3 a-1] Ice flux (acx nodes)
-        real(prec), intent(OUT) :: qq_acy(:,:)     ! [m3 a-1] Ice flux (acy nodes)
-        real(prec), intent(IN)  :: ux_bar(:,:)     ! [m a-1]  Vertically averaged velocity (acx nodes)
-        real(prec), intent(IN)  :: uy_bar(:,:)     ! [m a-1]  Vertically averaged velocity (acy nodes)
-        real(prec), intent(IN)  :: H_ice(:,:)      ! [m]      Ice thickness, aa-nodes
-        real(prec), intent(IN)  :: dx              ! [m]      Horizontal resolution, x-dir
-        real(prec), intent(IN)  :: dy              ! [m]      Horizontal resolution, y-dir 
+        real(wp), intent(OUT) :: qq_acx(:,:)     ! [m3 a-1] Ice flux (acx nodes)
+        real(wp), intent(OUT) :: qq_acy(:,:)     ! [m3 a-1] Ice flux (acy nodes)
+        real(wp), intent(IN)  :: ux_bar(:,:)     ! [m a-1]  Vertically averaged velocity (acx nodes)
+        real(wp), intent(IN)  :: uy_bar(:,:)     ! [m a-1]  Vertically averaged velocity (acy nodes)
+        real(wp), intent(IN)  :: H_ice(:,:)      ! [m]      Ice thickness, aa-nodes
+        real(wp), intent(IN)  :: dx              ! [m]      Horizontal resolution, x-dir
+        real(wp), intent(IN)  :: dy              ! [m]      Horizontal resolution, y-dir 
 
         ! Local variables 
         integer :: i, j, nx, ny 
-        real(prec) :: area_ac 
+        real(wp) :: area_ac 
 
         nx = size(H_ice,1)
         ny = size(H_ice,2)
@@ -1759,7 +1554,7 @@ end if
         ! acx-nodes 
         do j = 1, ny 
         do i = 1, nx-1 
-            area_ac     = (0.5_prec*(H_ice(i,j)+H_ice(i+1,j))) * dx 
+            area_ac     = (0.5_wp*(H_ice(i,j)+H_ice(i+1,j))) * dx 
             qq_acx(i,j) = area_ac*ux_bar(i,j)
         end do 
         end do 
@@ -1767,7 +1562,7 @@ end if
         ! acy-nodes 
         do j = 1, ny-1 
         do i = 1, nx 
-            area_ac     = (0.5_prec*(H_ice(i,j)+H_ice(i,j+1))) * dy 
+            area_ac     = (0.5_wp*(H_ice(i,j)+H_ice(i,j+1))) * dy 
             qq_acy(i,j) = area_ac*uy_bar(i,j)
         end do 
         end do 
@@ -1780,8 +1575,8 @@ end if
 
         implicit none 
 
-        real(prec), intent(IN) :: uxy_base, uxy_srf  
-        real(prec) :: f_vbvs 
+        real(wp), intent(IN) :: uxy_base, uxy_srf  
+        real(wp) :: f_vbvs 
 
         ! Calculate the basal to surface velocity ratio, f_vbvs
         if ( uxy_srf .gt. 0.0) then
@@ -1800,10 +1595,10 @@ end if
 
         implicit none 
 
-        real(prec), intent(INOUT) :: u 
-        real(prec), intent(IN)    :: u_lim
+        real(wp), intent(INOUT) :: u 
+        real(wp), intent(IN)    :: u_lim
 
-        real(prec), parameter :: tol = 1e-10
+        real(wp), parameter :: tol = 1e-10
         
         u = min(u, u_lim)
         u = max(u,-u_lim)
@@ -1888,30 +1683,30 @@ end if
 
         implicit none 
 
-        real(prec), intent(OUT) :: err_x(:,:)
-        real(prec), intent(OUT) :: err_y(:,:)
-        real(prec), intent(IN)  :: ux(:,:) 
-        real(prec), intent(IN)  :: uy(:,:) 
-        real(prec), intent(IN)  :: ux_prev(:,:) 
-        real(prec), intent(IN)  :: uy_prev(:,:)  
+        real(wp), intent(OUT) :: err_x(:,:)
+        real(wp), intent(OUT) :: err_y(:,:)
+        real(wp), intent(IN)  :: ux(:,:) 
+        real(wp), intent(IN)  :: uy(:,:) 
+        real(wp), intent(IN)  :: ux_prev(:,:) 
+        real(wp), intent(IN)  :: uy_prev(:,:)  
 
         ! Local variables
 
-        real(prec), parameter :: ssa_vel_tolerance = 1e-2   ! [m/a] only consider points with velocity above this tolerance limit
-        real(prec), parameter :: tol = 1e-5 
+        real(wp), parameter :: ssa_vel_tolerance = 1e-2   ! [m/a] only consider points with velocity above this tolerance limit
+        real(wp), parameter :: tol = 1e-5 
 
         ! Error in x-direction
         where (abs(ux) .gt. ssa_vel_tolerance) 
-            err_x = 2.0_prec * abs(ux - ux_prev) / abs(ux + ux_prev + tol)
+            err_x = 2.0_wp * abs(ux - ux_prev) / abs(ux + ux_prev + tol)
         elsewhere 
-            err_x = 0.0_prec
+            err_x = 0.0_wp
         end where 
 
         ! Error in y-direction 
         where (abs(uy) .gt. ssa_vel_tolerance) 
-            err_y = 2.0_prec * abs(uy - uy_prev) / abs(uy + uy_prev + tol)
+            err_y = 2.0_wp * abs(uy - uy_prev) / abs(uy + uy_prev + tol)
         elsewhere 
-            err_y = 0.0_prec
+            err_y = 0.0_wp
         end where 
 
         return 
@@ -1987,7 +1782,7 @@ end if
                     res2 = sqrt( sum((ux+ux_prev)*(ux+ux_prev),mask=abs(ux).gt.vel_tol .and. mask_acx) &
                                + sum((uy+uy_prev)*(uy+uy_prev),mask=abs(uy).gt.vel_tol .and. mask_acy) )
 
-                    resid = 2.0_prec*res1/(res2+du_reg)
+                    resid = 2.0_wp*res1/(res2+du_reg)
 
             end select 
 
@@ -1996,7 +1791,7 @@ end if
         else 
             ! No points available for comparison, set residual equal to zero 
 
-            resid = 0.0_prec 
+            resid = 0.0_wp 
 
         end if
 
@@ -2068,11 +1863,11 @@ end if
 
         implicit none 
 
-        real(prec), intent(INOUT) :: ux
-        real(prec), intent(INOUT) :: uy
-        real(prec), intent(IN)    :: ux_prev
-        real(prec), intent(IN)    :: uy_prev
-        real(prec), intent(IN)    :: rel
+        real(wp), intent(INOUT) :: ux
+        real(wp), intent(INOUT) :: uy
+        real(wp), intent(IN)    :: ux_prev
+        real(wp), intent(IN)    :: uy_prev
+        real(wp), intent(IN)    :: rel
 
         ! Apply relaxation 
         ux = ux_prev + rel*(ux-ux_prev)

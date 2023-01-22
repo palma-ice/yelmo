@@ -11,7 +11,6 @@ module yelmo_tools
     public :: get_neighbor_indices
     public :: calc_magnitude 
     public :: calc_magnitude_from_staggered
-    public :: calc_magnitude_from_staggered_ice
     public :: stagger_ac_aa
     public :: stagger_aa_ab
     public :: stagger_aa_ab_ice 
@@ -139,58 +138,7 @@ contains
 
     end function calc_magnitude
     
-    function calc_magnitude_from_staggered(u,v,boundaries) result(umag)
-        ! Calculate the centered (aa-nodes) magnitude of a vector 
-        ! from the staggered (ac-nodes) components
-
-        implicit none 
-        
-        real(wp), intent(IN)  :: u(:,:), v(:,:)  
-        real(wp) :: umag(size(u,1),size(u,2)) 
-        character(len=*), intent(IN), optional :: boundaries 
-
-        ! Local variables 
-        integer :: i, j, nx, ny 
-        integer :: ip1, jp1, im1, jm1 
-        real(wp) :: unow, vnow 
-
-        nx = size(u,1)
-        ny = size(u,2) 
-
-        umag = 0.0_wp
-
-        do j = 1, ny 
-        do i = 1, nx
-
-            ! BC: Periodic boundary conditions
-            im1 = i-1
-            if (im1 == 0) then
-                im1 = nx
-            end if
-            jm1 = j-1
-            if (jm1 == 0) then
-                jm1 = ny
-            end if
-
-            unow = 0.5_wp*(u(i,j)+u(im1,j))
-            vnow = 0.5_wp*(v(i,j)+v(i,jm1))
-            umag(i,j) = sqrt(unow*unow+vnow*vnow)
-            
-        end do 
-        end do 
-
-        if (present(boundaries)) then 
-            ! Apply conditions at boundaries of domain 
-
-            ! To do 
-
-        end if 
-
-        return
-
-    end function calc_magnitude_from_staggered
-    
-    function calc_magnitude_from_staggered_ice(u,v,f_ice,boundaries) result(umag)
+    function calc_magnitude_from_staggered(u,v,f_ice,boundaries) result(umag)
         ! Calculate the centered (aa-nodes) magnitude of a vector 
         ! from the staggered (ac-nodes) components
 
@@ -199,11 +147,11 @@ contains
         real(wp), intent(IN)  :: u(:,:), v(:,:)
         real(wp), intent(IN)  :: f_ice(:,:) 
         real(wp) :: umag(size(u,1),size(u,2)) 
-        character(len=*), intent(IN), optional :: boundaries 
+        character(len=*), intent(IN) :: boundaries 
 
         ! Local variables 
         integer :: i, j, nx, ny 
-        integer :: ip1, jp1, im1, jm1
+        integer :: im1, ip1, jm1, jp1
         real(wp) :: unow, vnow 
         real(wp) :: f1, f2, H1, H2 
         
@@ -215,25 +163,9 @@ contains
         do j = 1, ny 
         do i = 1, nx 
 
-            ! BC: Periodic boundary conditions
-            im1 = i-1
-            if (im1 == 0) then
-                im1 = nx
-            end if
-            ip1 = i+1
-            if (ip1 == nx+1) then
-                ip1 = 1
-            end if
-
-            jm1 = j-1
-            if (jm1 == 0) then
-                jm1 = ny
-            end if
-            jp1 = j+1
-            if (jp1 == ny+1) then
-                jp1 = 1
-            end if
-
+            ! Get neighbor indices
+            call get_neighbor_indices(im1,ip1,jm1,jp1,i,j,nx,ny,boundaries)
+            
             if (f_ice(i,j) .eq. 1.0) then 
                 unow = 0.5*(u(im1,j)+u(i,j))
                 vnow = 0.5*(v(i,jm1)+v(i,j))
@@ -252,16 +184,9 @@ contains
         end do 
         end do 
 
-        if (present(boundaries)) then 
-            ! Apply conditions at boundaries of domain 
-
-            ! to do 
-
-        end if 
-
         return
 
-    end function calc_magnitude_from_staggered_ice
+    end function calc_magnitude_from_staggered
 
     function stagger_ac_aa(u,v) result(umag)
         ! Calculate the centered (aa-node) magnitude of a scalar 

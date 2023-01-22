@@ -13,7 +13,7 @@ module velocity_diva
     use deformation, only : calc_strain_rate_horizontal
     use basal_dragging 
     use solver_ssa_ac
-    use velocity_general, only : set_inactive_margins, adjust_visc_eff_margin, &
+    use velocity_general, only : set_inactive_margins, &
                         picard_calc_error, picard_calc_error_angle, picard_relax, &
                         picard_calc_convergence_l1rel_matrix, picard_calc_convergence_l2 
 
@@ -241,16 +241,10 @@ contains
 
             end select
             
-            ! Apply adjustment to margin viscosity values to improve stability 
-            ! call adjust_visc_eff_margin_2(visc_eff,ux_bar,uy_bar,f_ice,f_grnd)
-
             ! Calculate depth-integrated effective viscosity
             ! Note L19 uses eta_bar*H in the ssa equation. Yelmo uses eta_int=eta_bar*H directly.
             call calc_visc_eff_int(visc_eff_int,visc_eff,H_ice,f_ice,zeta_aa,par%boundaries)
             
-            ! Apply adjustment to margin viscosity values to improve stability 
-            ! call adjust_visc_eff_margin(visc_eff_int,ux_bar,uy_bar,f_ice,f_grnd)
-
             ! Calculate beta (at the ice base)
             call calc_beta(beta,c_bed,ux_b,uy_b,H_ice,f_ice,H_grnd,f_grnd,z_bed,z_sl,par%beta_method, &
                                 par%beta_const,par%beta_q,par%beta_u0,par%beta_gl_scale,par%beta_gl_f, &

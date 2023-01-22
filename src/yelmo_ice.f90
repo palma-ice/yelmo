@@ -718,7 +718,6 @@ end if
 
             case("infinite") 
                 ! Set border points equal to interior neighbors 
-                ! (ajr: not fully implemented yet)
 
                 dom%tpo%par%boundaries  = "infinite"
                 dom%dyn%par%boundaries  = "infinite"
@@ -730,6 +729,13 @@ end if
                 dom%tpo%par%boundaries  = "periodic-x"
                 dom%dyn%par%boundaries  = "periodic-x"
                 dom%thrm%par%boundaries = "periodic-x"
+        
+            case DEFAULT
+                ! Infinite by default (most natural for real domains)
+
+                dom%tpo%par%boundaries  = "infinite"
+                dom%dyn%par%boundaries  = "infinite"
+                dom%thrm%par%boundaries = "infinite"
 
         end select 
 

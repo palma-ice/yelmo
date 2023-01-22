@@ -915,7 +915,7 @@ contains
         integer  :: i, j, nx, ny
         integer  :: im1, ip1, jm1, jp1
         real(wp) :: uxy_b
-        real(wp) :: wt0
+        real(wp) :: wt0, wt1
         real(wp) :: uxn(4) 
         real(wp) :: uyn(4) 
         real(wp) :: uxyn(4) 
@@ -939,6 +939,7 @@ contains
         xn  = [wt0,-wt0,-wt0, wt0]
         yn  = [wt0, wt0,-wt0,-wt0]
         wtn = [1.0,1.0,1.0,1.0]
+        wt1 = sum(wtn)
 
         do j = 1, ny
         do i = 1, nx
@@ -966,8 +967,14 @@ contains
 
                 uxyn      = sqrt(uxn**2 + uyn**2 + ub_sq_min)
                 betan     = cbn * (uxyn / (uxyn+u_0))**q * (1.0_wp / uxyn)
-                beta(i,j) = sum(wtn*betan)/sum(wtn)
+                beta(i,j) = sum(wtn*betan)/wt1
 
+                if (c_bed(i,j) .gt. 1e4 .and. ux_b(i,j) .gt. 10.0) then 
+                    write(*,*) i, j, c_bed(i,j), ux_b(i,j), uy_b(i,j)
+                    write(*,*) uxyn(:)
+                    write(*,*) betan, beta(i,j)
+                    stop  
+                end if
             else
                 ! Assign minimum velocity value, ignore staggering for simplicity 
 

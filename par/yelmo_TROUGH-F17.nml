@@ -10,7 +10,7 @@
     dt2D_out     = 200.0                ! [yr] Frequency of writing 2D output files 
 
     ! Domain parameters 
-    dx           = 5.0                  ! [km] Grid resolution
+    dx           = 4.0                  ! [km] Grid resolution
     lx           = 700.0                ! [km] Grid length, x-direction 
     ly           = 160.0                ! [km] Grid width,  y-direction 
     fc           = 16.0                 ! [km] Characteristic width of channel side walls

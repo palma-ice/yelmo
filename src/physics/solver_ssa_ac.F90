@@ -250,7 +250,7 @@ contains
 
                 bcs(1) = "free-slip"
                 bcs(2) = "periodic"
-                bcs(3) = "no-slip"
+                bcs(3) = "free-slip"
                 bcs(4) = "periodic" 
 
             case("periodic")
@@ -314,9 +314,18 @@ contains
             i = lgs%n2i((n+1)/2)
             j = lgs%n2j((n+1)/2)
 
-            ! Get neighbor indices
-            call get_neighbor_indices(im1,ip1,jm1,jp1,i,j,nx,ny,boundaries)
+            ! Get neighbor indices assuming periodic domain
+            ! (all other boundary conditions are treated with special cases below)
+            im1 = i-1
+            if (im1 .eq. 0)    im1 = nx 
+            ip1 = i+1
+            if (ip1 .eq. nx+1) ip1 = 1 
 
+            jm1 = j-1
+            if (jm1 .eq. 0)    jm1 = ny
+            jp1 = j+1
+            if (jp1 .eq. ny+1) jp1 = 1 
+                
             ! ------ Equations for ux ---------------------------
 
             nr = n   ! row counter

@@ -705,9 +705,9 @@ end if
             
             case("TROUGH-F17")
 
-                dom%tpo%par%boundaries  = "MISMIP3D"
+                dom%tpo%par%boundaries  = "TROUGH"
                 dom%dyn%par%boundaries  = "TROUGH"
-                dom%thrm%par%boundaries = "MISMIP3D"
+                dom%thrm%par%boundaries = "TROUGH"
 
             case("ISMIPHOM","slab","periodic","periodic-xy") 
                 ! Periodic boundary conditions in x and y, eg: X_1 = X_n-1; X_n = X_2

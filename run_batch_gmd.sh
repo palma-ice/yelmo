@@ -1,6 +1,6 @@
 #!/bin/bash
 
-fldr='tmp/fa965c08'
+fldr='tmp/1073a08'
 
 runopt='-r'
 #runopt='-s'
@@ -78,7 +78,7 @@ jobrun ./runylmo -s -q priority -w 5 -e trough -n par/yelmo_MISMIP+.nml -- -o ${
 ./runylmo -s -e trough -n par/yelmo_TROUGH-F17.nml -o ${fldr}/trough-1
 ./runylmo -s -e trough -n par/yelmo_TROUGH-F17.nml -o ${fldr}/trough-1-ssa -p ydyn.solver="ssa"
 ./runylmo -s -w 24 -e trough -n par/yelmo_TROUGH-F17.nml -o ${fldr}/trough-1-dx2 -p ctrl.dx=2.0
-./runylmo -s -w 24 -e trough -n par/yelmo_TROUGH-F17.nml -o ${fldr}/trough-1-u0.100 -p ydyn.beta_u0=100 ytill.cf_ref=8.0
+./runylmo -s -w 24 -e trough -n par/yelmo_TROUGH-F17.nml -o ${fldr}/trough-1-u0.100-cf5.0 -p ydyn.beta_u0=100 ytill.cf_ref=5.0
 
 
 ### SLAB-S06 ###

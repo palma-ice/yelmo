@@ -770,7 +770,16 @@ contains
             
         end do 
         end do
-                
+
+        select case(trim(boundaries))
+
+            case("MISMIP3D","TROUGH")
+
+                H_ice_new(1,:)    = H_ice_new(2,:)          ! x=0, Symmetry 
+                H_ice_new(nx,:)   = 0.0                     ! x=max, no ice
+
+        end select
+
         !call set_boundaries_2D_aa(H_ice_new,boundaries,H_ice_ref)
 
         ! select case(trim(boundaries))

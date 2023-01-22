@@ -232,7 +232,7 @@ contains
 
         end if 
 
-        ! Define border conditions (no-slip, free-slip, periodic)
+        ! Define border conditions (only choices are: no-slip, free-slip, periodic)
         select case(trim(boundaries)) 
 
             case("MISMIP3D")
@@ -357,126 +357,119 @@ contains
             else if (i .eq. 1 .and. trim(bcs(3)) .ne. "periodic") then 
                 ! Left boundary 
 
-                select case(trim(bcs(3)))
-
-                    case("no-slip")
-
-                        k = k+1
-                        lgs%a_value(k)  = 1.0   ! diagonal element only
-                        lgs%a_index(k)  = nr
-
-                        lgs%b_value(nr) = 0.0
-                        lgs%x_value(nr) = 0.0
-
-                    case("free-slip")
-
-                        nc = 2*lgs%ij2n(i,j)-1          ! column counter for ux(i,j)
-                        k = k+1
-                        lgs%a_value(k) =  1.0_wp
-                        lgs%a_index(k) = nc
-
-                        nc = 2*lgs%ij2n(ip1,j)-1        ! column counter for ux(ip1,j)
-                        k = k+1
-                        lgs%a_value(k) = -1.0_wp
-                        lgs%a_index(k) = nc
-
-                        lgs%b_value(nr) = 0.0_wp
-                        lgs%x_value(nr) = ux(i,j)
-
-                end select 
+                if (trim(bcs(3)) .eq. "free-slip") then 
                 
+                    nc = 2*lgs%ij2n(i,j)-1          ! column counter for ux(i,j)
+                    k = k+1
+                    lgs%a_value(k) =  1.0_wp
+                    lgs%a_index(k) = nc
+
+                    nc = 2*lgs%ij2n(ip1,j)-1        ! column counter for ux(ip1,j)
+                    k = k+1
+                    lgs%a_value(k) = -1.0_wp
+                    lgs%a_index(k) = nc
+
+                    lgs%b_value(nr) = 0.0_wp
+                    lgs%x_value(nr) = ux(i,j)
+
+                else ! bcs(3) == "no-slip"
+
+                    k = k+1
+                    lgs%a_value(k)  = 1.0   ! diagonal element only
+                    lgs%a_index(k)  = nr
+
+                    lgs%b_value(nr) = 0.0
+                    lgs%x_value(nr) = 0.0
+
+                end if 
+
             else if (i .eq. nx .and. trim(bcs(1)) .ne. "periodic") then 
                 ! Right boundary 
                 
-                select case(trim(bcs(1)))
+                if (trim(bcs(1)) .eq. "free-slip") then 
+                
+                    nc = 2*lgs%ij2n(i,j)-1          ! column counter for ux(i,j)
+                    k = k+1
+                    lgs%a_value(k) =  1.0_wp
+                    lgs%a_index(k) = nc
 
-                    case("no-slip")
+                    nc = 2*lgs%ij2n(nx-1,j)-1       ! column counter for ux(nx-1,j)
+                    k = k+1
+                    lgs%a_value(k) = -1.0_wp
+                    lgs%a_index(k) = nc
 
-                        k = k+1
-                        lgs%a_value(k)  = 1.0   ! diagonal element only
-                        lgs%a_index(k)  = nr
+                    lgs%b_value(nr) = 0.0_wp
+                    lgs%x_value(nr) = ux(i,j)
 
-                        lgs%b_value(nr) = 0.0
-                        lgs%x_value(nr) = 0.0
+                else ! bcs(3) == "no-slip"
 
-                    case("free-slip")
+                    k = k+1
+                    lgs%a_value(k)  = 1.0   ! diagonal element only
+                    lgs%a_index(k)  = nr
 
-                        nc = 2*lgs%ij2n(i,j)-1          ! column counter for ux(i,j)
-                        k = k+1
-                        lgs%a_value(k) =  1.0_wp
-                        lgs%a_index(k) = nc
+                    lgs%b_value(nr) = 0.0
+                    lgs%x_value(nr) = 0.0
 
-                        nc = 2*lgs%ij2n(nx-1,j)-1       ! column counter for ux(nx-1,j)
-                        k = k+1
-                        lgs%a_value(k) = -1.0_wp
-                        lgs%a_index(k) = nc
-
-                        lgs%b_value(nr) = 0.0_wp
-                        lgs%x_value(nr) = ux(i,j)
-
-                end select 
+                end if 
 
             else if (j .eq. 1 .and. trim(bcs(4)) .ne. "periodic") then 
                 ! Lower boundary 
 
-                select case(trim(bcs(4)))
+                if (trim(bcs(4)) .eq. "free-slip") then 
 
-                    case("no-slip")
+                    nc = 2*lgs%ij2n(i,j)-1          ! column counter for ux(i,j)
+                    k = k+1
+                    lgs%a_value(k) =  1.0_wp
+                    lgs%a_index(k) = nc
 
-                        k = k+1
-                        lgs%a_value(k)  = 1.0_wp   ! diagonal element only
-                        lgs%a_index(k)  = nr
+                    nc = 2*lgs%ij2n(i,jp1)-1       ! column counter for ux(i,jp1)
+                    k = k+1
+                    lgs%a_value(k) = -1.0_wp
+                    lgs%a_index(k) = nc
 
-                        lgs%b_value(nr) = 0.0_wp
-                        lgs%x_value(nr) = 0.0_wp
+                    lgs%b_value(nr) = 0.0_wp
+                    lgs%x_value(nr) = ux(i,j)
 
-                    case("free-slip")
 
-                        nc = 2*lgs%ij2n(i,j)-1          ! column counter for ux(i,j)
-                        k = k+1
-                        lgs%a_value(k) =  1.0_wp
-                        lgs%a_index(k) = nc
+                else ! bcs(4) == "no-slip"
 
-                        nc = 2*lgs%ij2n(i,jp1)-1       ! column counter for ux(i,jp1)
-                        k = k+1
-                        lgs%a_value(k) = -1.0_wp
-                        lgs%a_index(k) = nc
+                    k = k+1
+                    lgs%a_value(k)  = 1.0_wp   ! diagonal element only
+                    lgs%a_index(k)  = nr
 
-                        lgs%b_value(nr) = 0.0_wp
-                        lgs%x_value(nr) = ux(i,j)
+                    lgs%b_value(nr) = 0.0_wp
+                    lgs%x_value(nr) = 0.0_wp
 
-                end select 
+                end if 
 
             else if (j .eq. ny .and. trim(bcs(2)) .ne. "periodic") then 
                 ! Upper boundary 
 
-                select case(trim(bcs(2)))
+                if (trim(bcs(2)) .eq. "free-slip") then 
+                    
+                    nc = 2*lgs%ij2n(i,j)-1          ! column counter for ux(i,j)
+                    k = k+1
+                    lgs%a_value(k) =  1.0_wp
+                    lgs%a_index(k) = nc
 
-                    case("no-slip")
+                    nc = 2*lgs%ij2n(i,ny-1)-1       ! column counter for ux(i,ny-1)
+                    k = k+1
+                    lgs%a_value(k) = -1.0_wp
+                    lgs%a_index(k) = nc
 
-                        k = k+1
-                        lgs%a_value(k)  = 1.0_wp   ! diagonal element only
-                        lgs%a_index(k)  = nr
+                    lgs%b_value(nr) = 0.0_wp
+                    lgs%x_value(nr) = ux(i,j)
 
-                        lgs%b_value(nr) = 0.0_wp
-                        lgs%x_value(nr) = 0.0_wp
-                        
-                    case("free-slip")
+                else ! bcs(2) == "no-slip"
 
-                        nc = 2*lgs%ij2n(i,j)-1          ! column counter for ux(i,j)
-                        k = k+1
-                        lgs%a_value(k) =  1.0_wp
-                        lgs%a_index(k) = nc
+                    k = k+1
+                    lgs%a_value(k)  = 1.0_wp   ! diagonal element only
+                    lgs%a_index(k)  = nr
 
-                        nc = 2*lgs%ij2n(i,ny-1)-1       ! column counter for ux(i,ny-1)
-                        k = k+1
-                        lgs%a_value(k) = -1.0_wp
-                        lgs%a_index(k) = nc
+                    lgs%b_value(nr) = 0.0_wp
+                    lgs%x_value(nr) = 0.0_wp
 
-                        lgs%b_value(nr) = 0.0_wp
-                        lgs%x_value(nr) = ux(i,j)
-
-                end select 
+                end if 
 
             else if (ssa_mask_acx(i,j) .eq. 3) then 
                 ! Lateral boundary condition should be applied here 
@@ -645,126 +638,118 @@ contains
             else if (j .eq. 1 .and. trim(bcs(4)) .ne. "periodic") then 
                 ! lower boundary 
 
-                select case(trim(bcs(4)))
+                if (trim(bcs(4)) .eq. "free-slip") then 
 
-                    case("no-slip")
+                    nc = 2*lgs%ij2n(i,j)            ! column counter for uy(i,j)
+                    k = k+1
+                    lgs%a_value(k) =  1.0_wp
+                    lgs%a_index(k) = nc
 
-                        k = k+1
-                        lgs%a_value(k)  = 1.0_wp        ! diagonal element only
-                        lgs%a_index(k)  = nr
+                    nc = 2*lgs%ij2n(i,jp1)            ! column counter for uy(i,jp1)
+                    k = k+1
+                    lgs%a_value(k) = -1.0_wp
+                    lgs%a_index(k) = nc
 
-                        lgs%b_value(nr) = 0.0_wp
-                        lgs%x_value(nr) = 0.0_wp
+                    lgs%b_value(nr) = 0.0_wp
+                    lgs%x_value(nr) = uy(i,j)
 
-                    case("free-slip")
+                else ! bcs(4) == "no-slip"
 
-                        nc = 2*lgs%ij2n(i,j)            ! column counter for uy(i,j)
-                        k = k+1
-                        lgs%a_value(k) =  1.0_wp
-                        lgs%a_index(k) = nc
+                    k = k+1
+                    lgs%a_value(k)  = 1.0_wp        ! diagonal element only
+                    lgs%a_index(k)  = nr
 
-                        nc = 2*lgs%ij2n(i,jp1)            ! column counter for uy(i,jp1)
-                        k = k+1
-                        lgs%a_value(k) = -1.0_wp
-                        lgs%a_index(k) = nc
+                    lgs%b_value(nr) = 0.0_wp
+                    lgs%x_value(nr) = 0.0_wp
 
-                        lgs%b_value(nr) = 0.0_wp
-                        lgs%x_value(nr) = uy(i,j)
-
-                end select 
+                end if 
 
             else if (j .eq. ny .and. trim(bcs(2)) .ne. "periodic") then 
                 ! Upper boundary 
 
-                select case(trim(bcs(2)))
+                if (trim(bcs(2)) .eq. "free-slip") then 
 
-                    case("no-slip")
+                    nc = 2*lgs%ij2n(i,j)            ! column counter for uy(i,j)
+                    k = k+1
+                    lgs%a_value(k) =  1.0_wp
+                    lgs%a_index(k) = nc
 
-                        k = k+1
-                        lgs%a_value(k)  = 1.0_wp        ! diagonal element only
-                        lgs%a_index(k)  = nr
+                    nc = 2*lgs%ij2n(i,ny-1)         ! column counter for uy(i,ny-1)
+                    k = k+1
+                    lgs%a_value(k) = -1.0_wp
+                    lgs%a_index(k) = nc
 
-                        lgs%b_value(nr) = 0.0_wp
-                        lgs%x_value(nr) = 0.0_wp
+                    lgs%b_value(nr) = 0.0_wp
+                    lgs%x_value(nr) = uy(i,j)
 
-                    case("free-slip")
+                else ! bcs(2) == "no-slip"
 
-                        nc = 2*lgs%ij2n(i,j)            ! column counter for uy(i,j)
-                        k = k+1
-                        lgs%a_value(k) =  1.0_wp
-                        lgs%a_index(k) = nc
+                    k = k+1
+                    lgs%a_value(k)  = 1.0_wp        ! diagonal element only
+                    lgs%a_index(k)  = nr
 
-                        nc = 2*lgs%ij2n(i,ny-1)         ! column counter for uy(i,ny-1)
-                        k = k+1
-                        lgs%a_value(k) = -1.0_wp
-                        lgs%a_index(k) = nc
+                    lgs%b_value(nr) = 0.0_wp
+                    lgs%x_value(nr) = 0.0_wp
 
-                        lgs%b_value(nr) = 0.0_wp
-                        lgs%x_value(nr) = uy(i,j)
-
-                end select 
+                end if 
 
             else if (i .eq. 1 .and. trim(bcs(3)) .ne. "periodic") then 
                 ! Left boundary 
 
-                select case(trim(bcs(3)))
+                if (trim(bcs(3)) .eq. "free-slip") then 
 
-                    case("no-slip")
+                    nc = 2*lgs%ij2n(i,j)            ! column counter for uy(i,j)
+                    k = k+1
+                    lgs%a_value(k) =  1.0_wp
+                    lgs%a_index(k) = nc
 
-                        k = k+1
-                        lgs%a_value(k)  = 1.0_wp   ! diagonal element only
-                        lgs%a_index(k)  = nr
+                    nc = 2*lgs%ij2n(ip1,j)          ! column counter for uy(ip1,j)
+                    k = k+1
+                    lgs%a_value(k) = -1.0_wp
+                    lgs%a_index(k) = nc
 
-                        lgs%b_value(nr) = 0.0_wp
-                        lgs%x_value(nr) = 0.0_wp
+                    lgs%b_value(nr) = 0.0_wp
+                    lgs%x_value(nr) = uy(i,j)
 
-                    case("free-slip")
+                else ! bcs(2) == "no-slip"
 
-                        nc = 2*lgs%ij2n(i,j)            ! column counter for uy(i,j)
-                        k = k+1
-                        lgs%a_value(k) =  1.0_wp
-                        lgs%a_index(k) = nc
+                    k = k+1
+                    lgs%a_value(k)  = 1.0_wp        ! diagonal element only
+                    lgs%a_index(k)  = nr
 
-                        nc = 2*lgs%ij2n(ip1,j)          ! column counter for uy(ip1,j)
-                        k = k+1
-                        lgs%a_value(k) = -1.0_wp
-                        lgs%a_index(k) = nc
+                    lgs%b_value(nr) = 0.0_wp
+                    lgs%x_value(nr) = 0.0_wp
 
-                        lgs%b_value(nr) = 0.0_wp
-                        lgs%x_value(nr) = uy(i,j)
+                end if 
 
-                end select 
-                
             else if (i .eq. nx .and. trim(bcs(1)) .ne. "periodic") then 
                 ! Right boundary 
 
-                select case(trim(bcs(1)))
+                if (trim(bcs(1)) .eq. "free-slip") then 
 
-                    case("no-slip")
+                    nc = 2*lgs%ij2n(i,j)            ! column counter for uy(i,j)
+                    k = k+1
+                    lgs%a_value(k) =  1.0_wp
+                    lgs%a_index(k) = nc
 
-                        k = k+1
-                        lgs%a_value(k)  = 1.0_wp   ! diagonal element only
-                        lgs%a_index(k)  = nr
+                    nc = 2*lgs%ij2n(nx-1,j)         ! column counter for uy(nx-1,j)
+                    k = k+1
+                    lgs%a_value(k) = -1.0_wp
+                    lgs%a_index(k) = nc
 
-                        lgs%b_value(nr) = 0.0_wp
-                        lgs%x_value(nr) = 0.0_wp
+                    lgs%b_value(nr) = 0.0_wp
+                    lgs%x_value(nr) = uy(i,j)
 
-                    case("free-slip")
+                else ! bcs(2) == "no-slip"
 
-                        nc = 2*lgs%ij2n(i,j)            ! column counter for uy(i,j)
-                        k = k+1
-                        lgs%a_value(k) =  1.0_wp
-                        lgs%a_index(k) = nc
+                    k = k+1
+                    lgs%a_value(k)  = 1.0_wp        ! diagonal element only
+                    lgs%a_index(k)  = nr
 
-                        nc = 2*lgs%ij2n(nx-1,j)         ! column counter for uy(nx-1,j)
-                        k = k+1
-                        lgs%a_value(k) = -1.0_wp
-                        lgs%a_index(k) = nc
+                    lgs%b_value(nr) = 0.0_wp
+                    lgs%x_value(nr) = 0.0_wp
 
-                        lgs%b_value(nr) = 0.0_wp
-                        lgs%x_value(nr) = uy(i,j)
-
-                end select 
+                end if 
 
             else if (ssa_mask_acy(i,j) .eq. 3) then 
                 ! Lateral boundary condition should be applied here 
@@ -852,7 +837,7 @@ contains
                 nc = 2*lgs%ij2n(i,jp1)      ! column counter for uy(i,jp1)
                 k = k+1
                 lgs%a_value(k) =  4.0_wp*inv_dydy*N_aa(i,jp1)
-                lgs%a_index(k) = nc
+                lgs%a_index(k) = nc 
 
                 nc = 2*lgs%ij2n(i,jm1)      ! column counter for uy(i,jm1)
                 k = k+1

@@ -60,7 +60,8 @@ module basal_dragging
 
 contains 
     
-    subroutine calc_cb_ref(cb_ref,z_bed,z_bed_sd,z_sl,cf_ref,cf_min,z0,z1,n_sd,till_scale,till_method)
+    subroutine calc_cb_ref(cb_ref,z_bed,z_bed_sd,z_sl,H_sed,f_sed,H_sed_min,H_sed_max, &
+                                            cf_ref,cf_min,z0,z1,n_sd,till_scale,till_method)
         ! Update cb_ref [--] based on parameter choices
 
         implicit none
@@ -69,6 +70,10 @@ contains
         real(wp), intent(IN)  :: z_bed(:,:) 
         real(wp), intent(IN)  :: z_bed_sd(:,:)
         real(wp), intent(IN)  :: z_sl(:,:) 
+        real(wp), intent(IN)  :: H_sed(:,:) 
+        real(wp), intent(IN)  :: f_sed 
+        real(wp), intent(IN)  :: H_sed_min
+        real(wp), intent(IN)  :: H_sed_max  
         real(wp), intent(IN)  :: cf_ref 
         real(wp), intent(IN)  :: cf_min
         real(wp), intent(IN)  :: z0 
@@ -126,9 +131,10 @@ contains
             ! Calculate cb_ref following parameter choices 
             ! lambda_bed: scaling as a function of bedrock elevation
 
-            ! Adjust bedrock field to account for pinning points
-            ! at low elevation (more friction) and fjords at
-            ! high elevation (less friction) 
+            ! Sample bedrock according to its standard deviation to account for uncertainty
+            ! and possible pinning points, etc. 
+
+            ! Finally, scale according to sediment parameterization too.
 
             select case(trim(till_scale))
 
@@ -192,6 +198,28 @@ contains
                     
             end select 
             
+            ! Sediment scaling if desired
+            if (f_sed .lt. 1.0) then 
+
+                do j = 1, ny 
+                do i = 1, nx 
+
+                    ! Get linear scaling as a function of sediment thickness
+                    lambda_bed = (H_sed(i,j) - H_sed_min) / (H_sed_max - H_sed_min)
+                    if (lambda_bed .lt. 0.0) lambda_bed = 0.0
+                    if (lambda_bed .gt. 1.0) lambda_bed = 1.0 
+
+                    ! Get scaling factor ranging from f_sed(H_sed=H_sed_min) to 1.0(H_sed=H_sed_max)
+                    lambda_bed = 1.0 - (1.0-f_sed)*lambda_bed
+
+                    ! Apply scaling to cb_ref 
+                    cb_ref(i,j) = cb_ref(i,j) * lambda_bed 
+
+                end do
+                end do
+
+            end if 
+
         end if 
 
         return 
@@ -968,7 +996,7 @@ contains
                 uxyn      = sqrt(uxn**2 + uyn**2 + ub_sq_min)
                 betan     = cbn * (uxyn / (uxyn+u_0))**q * (1.0_wp / uxyn)
                 beta(i,j) = sum(wtn*betan)/wt1
-                
+
             else
                 ! Assign minimum velocity value, ignore staggering for simplicity 
 

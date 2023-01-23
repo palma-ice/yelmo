@@ -1930,54 +1930,65 @@ contains
         dudy = 0.0
         dvdx = 0.0
         
+        do j = 1, ny  
         do i = 1, nx
-            do j = 1, ny  
+            
+            ! Get neighbor indices
+            call get_neighbor_indices(im1,ip1,jm1,jp1,i,j,nx,ny,boundaries)
 
-                ! Get neighbor indices
-                call get_neighbor_indices(im1,ip1,jm1,jp1,i,j,nx,ny,boundaries)
+            dudx(i,j) = (ux(ip1,j)-ux(im1,j))/(2.0*dx)
+            dudy(i,j) = (ux(i,jp1)-ux(i,jm1))/(2.0*dy)
+            dvdx(i,j) = (uy(ip1,j)-uy(im1,j))/(2.0*dx)
+            dvdy(i,j) = (uy(i,jp1)-uy(i,jm1))/(2.0*dy)
 
-                dudx(i,j) = (ux(ip1,j)-ux(im1,j))/(2.0*dx)
-                dudy(i,j) = (ux(i,jp1)-ux(i,jm1))/(2.0*dy)
-                dvdx(i,j) = (uy(ip1,j)-uy(im1,j))/(2.0*dx)
-                dvdy(i,j) = (uy(i,jp1)-uy(i,jm1))/(2.0*dy)
+            ! Treat special cases of ice-margin points (take upstream/downstream derivatives instead)
 
-                ! Treat special cases of ice-margin points (take upstream/downstream derivatives instead)
+            ! dudx
+            if (f_ice(i,j) .eq. 1.0 .and. f_ice(ip1,j) .lt. 1.0) then 
+                dudx(i,j) = (ux(i,j)-ux(im1,j))/dx
+            else if (f_ice(i,j) .lt. 1.0 .and. f_ice(ip1,j) .eq. 1.0) then 
+                dudx(i,j) = (ux(ip1,j)-ux(i,j))/dx
+            end if 
 
-                ! dudx
-                if (f_ice(i,j) .eq. 1.0 .and. f_ice(ip1,j) .lt. 1.0) then 
-                    dudx(i,j) = (ux(i,j)-ux(im1,j))/dx
-                else if (f_ice(i,j) .lt. 1.0 .and. f_ice(ip1,j) .eq. 1.0) then 
-                    dudx(i,j) = (ux(ip1,j)-ux(i,j))/dx
-                end if 
+            ! dudy
+            if (f_ice(i,j) .eq. 1.0 .and. f_ice(i,jp1) .lt. 1.0 .and. f_ice(i,jm1) .lt. 1.0) then 
+                dudy(i,j) = 0.0
+            else if (f_ice(i,j) .eq. 1.0 .and. f_ice(i,jp1) .lt. 1.0 .and. f_ice(i,jm1) .eq. 1.0) then 
+                dudy(i,j) = (ux(i,j)-ux(i,jm1))/dy
+            else if (f_ice(i,j) .eq. 1.0 .and. f_ice(i,jp1) .eq. 1.0 .and. f_ice(i,jm1) .lt. 1.0) then 
+                dudy(i,j) = (ux(i,jp1)-ux(i,j))/dy
+            end if 
 
-                ! dudy
-                if (f_ice(i,j) .eq. 1.0 .and. f_ice(i,jp1) .lt. 1.0 .and. f_ice(i,jm1) .lt. 1.0) then 
-                    dudy(i,j) = 0.0
-                else if (f_ice(i,j) .eq. 1.0 .and. f_ice(i,jp1) .lt. 1.0 .and. f_ice(i,jm1) .eq. 1.0) then 
-                    dudy(i,j) = (ux(i,j)-ux(i,jm1))/dy
-                else if (f_ice(i,j) .eq. 1.0 .and. f_ice(i,jp1) .eq. 1.0 .and. f_ice(i,jm1) .lt. 1.0) then 
-                    dudy(i,j) = (ux(i,jp1)-ux(i,j))/dy
-                end if 
+            ! dvdy
+            if (f_ice(i,j) .eq. 1.0 .and. f_ice(i,jp1) .lt. 1.0) then 
+                dvdy(i,j) = (uy(i,j)-uy(i,jm1))/dy
+            else if (f_ice(i,j) .lt. 1.0 .and. f_ice(i,jp1) .eq. 1.0) then 
+                dvdy(i,j) = (uy(i,jp1)-uy(i,j))/dy
+            end if 
 
-                ! dvdy
-                if (f_ice(i,j) .eq. 1.0 .and. f_ice(i,jp1) .lt. 1.0) then 
-                    dvdy(i,j) = (uy(i,j)-uy(i,jm1))/dy
-                else if (f_ice(i,j) .lt. 1.0 .and. f_ice(i,jp1) .eq. 1.0) then 
-                    dvdy(i,j) = (uy(i,jp1)-uy(i,j))/dy
-                end if 
+            ! dvdx
+            if (f_ice(i,j) .eq. 1.0 .and. f_ice(ip1,j) .lt. 1.0 .and. f_ice(im1,j) .lt. 1.0) then 
+                dvdx(i,j) = 0.0
+            else if (f_ice(i,j) .eq. 1.0 .and. f_ice(ip1,j) .lt. 1.0 .and. f_ice(im1,j) .eq. 1.0) then 
+                dvdx(i,j) = (uy(i,j)-uy(im1,j))/dx
+            else if (f_ice(i,j) .eq. 1.0 .and. f_ice(ip1,j) .eq. 1.0 .and. f_ice(im1,j) .lt. 1.0) then 
+                dvdx(i,j) = (uy(ip1,j)-uy(i,j))/dx
+            end if 
 
-                ! dvdx
-                if (f_ice(i,j) .eq. 1.0 .and. f_ice(ip1,j) .lt. 1.0 .and. f_ice(im1,j) .lt. 1.0) then 
-                    dvdx(i,j) = 0.0
-                else if (f_ice(i,j) .eq. 1.0 .and. f_ice(ip1,j) .lt. 1.0 .and. f_ice(im1,j) .eq. 1.0) then 
-                    dvdx(i,j) = (uy(i,j)-uy(im1,j))/dx
-                else if (f_ice(i,j) .eq. 1.0 .and. f_ice(ip1,j) .eq. 1.0 .and. f_ice(im1,j) .lt. 1.0) then 
-                    dvdx(i,j) = (uy(ip1,j)-uy(i,j))/dx
-                end if 
-
-            end do
+        end do
         end do
 
+        ! To do... ? 
+        
+        ! Further special cases when using 'infinite' boundary conditions 
+        ! if (trim(boundaries) .eq. "infinite") then 
+
+        !     dudx(1,:)  = dudx(2,:) 
+        !     dudx(nx,:) = dudx(nx-1,:) 
+        !     dudx(:,1)  = dudx(:,2) 
+        !     dudx(:,ny) = dudx(:,ny-1)
+            
+        ! end if
                 
         return
 

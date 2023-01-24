@@ -30,7 +30,7 @@ module yelmo_topography
     private
     public :: calc_ytopo_rk4
     public :: calc_ytopo_pc 
-    public :: calc_ytopo_masks 
+    public :: calc_ytopo_diagnostic 
     public :: ytopo_par_load
     public :: ytopo_alloc
     public :: ytopo_dealloc
@@ -197,12 +197,9 @@ contains
             
         end if 
 
-        ! Update masks
-        call calc_ytopo_masks(tpo,dyn,mat,thrm,bnd)
+        ! Update fields and masks
+        call calc_ytopo_diagnostic(tpo,dyn,mat,thrm,bnd)
 
-        ! Calculate the surface elevation to be consistent with current H_ice field
-        call calc_z_srf_max(tpo%now%z_srf,tpo%now%H_ice,tpo%now%f_ice,bnd%z_bed,bnd%z_sl)
-        
         ! Determine rates of change
         if ( .not. topo_fixed .and. dt .gt. 0.0 ) then 
 
@@ -483,12 +480,9 @@ end if
 
         end if 
 
-        ! Update masks
-        call calc_ytopo_masks(tpo,dyn,mat,thrm,bnd)
+        ! Update fields and masks
+        call calc_ytopo_diagnostic(tpo,dyn,mat,thrm,bnd)
 
-        ! Calculate the surface elevation to be consistent with current H_ice field
-        call calc_z_srf_max(tpo%now%z_srf,tpo%now%H_ice,tpo%now%f_ice,bnd%z_bed,bnd%z_sl)
-        
         ! Determine rates of change
         if ( .not. topo_fixed .and. dt .gt. 0.0 ) then 
 
@@ -672,7 +666,7 @@ end if
 
     end subroutine calc_ytopo_calving
 
-    subroutine calc_ytopo_masks(tpo,dyn,mat,thrm,bnd)
+    subroutine calc_ytopo_diagnostic(tpo,dyn,mat,thrm,bnd)
         ! Calculate adjustments to surface elevation, bedrock elevation
         ! and ice thickness 
 
@@ -689,6 +683,16 @@ end if
         
         ! Calculate grounding overburden ice thickness 
         call calc_H_grnd(tpo%now%H_grnd,tpo%now%H_ice,tpo%now%f_ice,bnd%z_bed,bnd%z_sl)
+
+        ! Calculate the surface elevation to be consistent with current H_ice field
+        call calc_z_srf_max(tpo%now%z_srf,tpo%now%H_ice,tpo%now%f_ice,bnd%z_bed,bnd%z_sl)
+        
+        ! Calculate the ice base elevation too
+        ! Define z_base as the elevation at the base of the ice sheet 
+        ! This is used for the basal derivative instead of bedrock so
+        ! that it is valid for both grounded and floating ice. Note, 
+        ! for grounded ice, z_base==z_bed.  
+        tpo%now%z_base = tpo%now%z_srf - tpo%now%H_ice 
 
         ! 2. Calculate additional topographic properties ------------------
 
@@ -709,8 +713,8 @@ end if
         call ddx_a_to_cx_2D(tpo%now%dHidx,tpo%now%H_ice,tpo%par%dx)
         call ddy_a_to_cy_2D(tpo%now%dHidy,tpo%now%H_ice,tpo%par%dy)
         
-        call ddx_a_to_cx_2D(tpo%now%dzbdx,bnd%z_bed,tpo%par%dx)
-        call ddy_a_to_cy_2D(tpo%now%dzbdy,bnd%z_bed,tpo%par%dy)
+        call ddx_a_to_cx_2D(tpo%now%dzbdx,tpo%now%z_base,tpo%par%dx)
+        call ddy_a_to_cy_2D(tpo%now%dzbdy,tpo%now%z_base,tpo%par%dy)
         
         call map_a_to_b_2D(tpo%now%H_ice_ab,tpo%now%H_ice)
 
@@ -804,7 +808,7 @@ end if
 
         return 
 
-    end subroutine calc_ytopo_masks
+    end subroutine calc_ytopo_diagnostic
 
     elemental subroutine gen_mask_bed(mask,f_ice,f_pmp,f_grnd,mask_grz)
         ! Generate an output mask for model conditions at bed
@@ -963,6 +967,7 @@ end if
 
         allocate(now%H_ice(nx,ny))
         allocate(now%z_srf(nx,ny))
+        allocate(now%z_base(nx,ny))
         allocate(now%dzsdt(nx,ny))
         allocate(now%dHidt(nx,ny))
         allocate(now%bmb(nx,ny))
@@ -1026,9 +1031,10 @@ end if
         allocate(now%f_ice_dyn(nx,ny))
 
         now%H_ice       = 0.0 
-        now%z_srf       = 0.0  
-        now%dzsdt     = 0.0 
-        now%dHidt     = 0.0
+        now%z_srf       = 0.0
+        now%z_base      = 0.0  
+        now%dzsdt       = 0.0 
+        now%dHidt       = 0.0
         now%bmb         = 0.0  
         now%fmb         = 0.0
         now%mb_applied  = 0.0 
@@ -1093,7 +1099,8 @@ end if
 
         if (allocated(now%H_ice))       deallocate(now%H_ice)
         if (allocated(now%z_srf))       deallocate(now%z_srf)
-        
+        if (allocated(now%z_base))      deallocate(now%z_base)
+
         if (allocated(now%dzsdt))       deallocate(now%dzsdt)
         if (allocated(now%dHidt))       deallocate(now%dHidt)
         if (allocated(now%bmb))         deallocate(now%bmb)

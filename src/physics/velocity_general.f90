@@ -35,7 +35,8 @@ module velocity_general
     
 contains 
     
-    subroutine calc_uz_3D(uz,ux,uy,H_ice,f_ice,f_grnd,z_srf,smb,bmb,dHdt,dzsdt,zeta_aa,zeta_ac,dx,dy,boundaries)
+    subroutine calc_uz_3D(uz,ux,uy,H_ice,f_ice,f_grnd,smb,bmb,dHdt,dzsdt,dHdx,dHdy, &
+                                    dzsdx,dzsdy,dzbdx,dzbdy,zeta_aa,zeta_ac,dx,dy,boundaries)
         ! Following algorithm outlined by the Glimmer ice sheet model:
         ! https://www.geos.ed.ac.uk/~mhagdorn/glide/glide-doc/glimmer_htmlse9.html#x17-660003.1.5
 
@@ -51,11 +52,16 @@ contains
         real(wp), intent(IN)  :: H_ice(:,:)
         real(wp), intent(IN)  :: f_ice(:,:)
         real(wp), intent(IN)  :: f_grnd(:,:)
-        real(wp), intent(IN)  :: z_srf(:,:) 
         real(wp), intent(IN)  :: smb(:,:) 
         real(wp), intent(IN)  :: bmb(:,:) 
         real(wp), intent(IN)  :: dHdt(:,:) 
         real(wp), intent(IN)  :: dzsdt(:,:) 
+        real(wp), intent(IN)  :: dHdx(:,:) 
+        real(wp), intent(IN)  :: dHdy(:,:)
+        real(wp), intent(IN)  :: dzsdx(:,:) 
+        real(wp), intent(IN)  :: dzsdy(:,:) 
+        real(wp), intent(IN)  :: dzbdx(:,:) 
+        real(wp), intent(IN)  :: dzbdy(:,:) 
         real(wp), intent(IN)  :: zeta_aa(:)    ! z-coordinate, aa-nodes 
         real(wp), intent(IN)  :: zeta_ac(:)    ! z-coordinate, ac-nodes  
         real(wp), intent(IN)  :: dx 
@@ -111,23 +117,13 @@ contains
         real(wp) :: dhdt_now
         real(wp) :: dzbdt_now 
 
-        real(wp), allocatable :: z_base(:,:) 
-
         real(wp), parameter :: uz_min = -10.0     ! [m/yr] Minimum allowed vertical velocity downwards for stability
         
         nx    = size(ux,1)
         ny    = size(ux,2)
         nz_aa = size(zeta_aa,1)
         nz_ac = size(zeta_ac,1) 
-
-        allocate(z_base(nx,ny)) 
-
-        ! Define z_base as the elevation at the base of the ice sheet 
-        ! This is used for the basal derivative instead of bedrock so
-        ! that it is valid for both grounded and floating ice. Note, 
-        ! for grounded ice, z_base==z_bed. 
-        z_base = z_srf - H_ice
-
+        
         ! Initialize vertical velocity to zero 
         uz = 0.0 
 
@@ -151,7 +147,7 @@ contains
             call stagger_nodes_aa_ab_ice(dhdt_ab,dhdt,f_ice,i,j)
             dhdt_now = sum(dhdt_ab*wt_ab)
             
-            ! Diagnose rate of basal elevation change (needed for all points)
+            ! Diagnose rate of ice-base elevation change (needed for all points)
             dzbdt_now = dzsdt_now - dhdt_now
 
 
@@ -165,25 +161,26 @@ contains
                 H_inv = 1.0/H_now 
 
                 ! Get the centered ice-base gradient
-                call staggerdiffx_nodes_aa_ab_ice(dzbdx_ab,z_base,f_ice,i,j,dx)
+                call stagger_nodes_acx_ab_ice(dzbdx_ab,dzbdx,f_ice,i,j)
                 dzbdx_aa = sum(dzbdx_ab*wt_ab)
                 
-                call staggerdiffy_nodes_aa_ab_ice(dzbdy_ab,z_base,f_ice,i,j,dy)
+                call stagger_nodes_acy_ab_ice(dzbdy_ab,dzbdy,f_ice,i,j)
                 dzbdy_aa = sum(dzbdy_ab*wt_ab)
                 
-                ! Get the centered surface gradient 
-                call staggerdiffx_nodes_aa_ab_ice(dzsdx_ab,z_srf,f_ice,i,j,dx)
+                ! Get the centered surface gradient
+                call stagger_nodes_acx_ab_ice(dzsdx_ab,dzsdx,f_ice,i,j)
                 dzsdx_aa = sum(dzsdx_ab*wt_ab)
                 
-                call staggerdiffy_nodes_aa_ab_ice(dzsdy_ab,z_srf,f_ice,i,j,dy)
+                call stagger_nodes_acy_ab_ice(dzsdy_ab,dzsdy,f_ice,i,j)
                 dzsdy_aa = sum(dzsdy_ab*wt_ab)
                 
                 ! Get the centered ice thickness gradient 
-                call staggerdiffx_nodes_aa_ab_ice(dHdx_ab,H_ice,f_ice,i,j,dx)
+                call stagger_nodes_acx_ab_ice(dHdx_ab,dHdx,f_ice,i,j)
                 dHdx_aa = sum(dHdx_ab*wt_ab)
                 
-                call staggerdiffy_nodes_aa_ab_ice(dHdy_ab,H_ice,f_ice,i,j,dy)
+                call stagger_nodes_acy_ab_ice(dHdy_ab,dHdy,f_ice,i,j)
                 dHdy_aa = sum(dHdy_ab*wt_ab)
+                
                 
                 ! Get the centered horizontal velocity at the base
                 call stagger_nodes_acx_ab_ice(ux_ab,ux(:,:,1),f_ice,i,j)

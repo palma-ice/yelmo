@@ -162,6 +162,7 @@ module yelmo_defs
 
         real(wp), allocatable   :: H_ice(:,:)       ! Ice thickness [m] 
         real(wp), allocatable   :: z_srf(:,:)       ! Surface elevation [m]
+        real(wp), allocatable   :: z_base(:,:)      ! Ice-base elevation [m]
         real(wp), allocatable   :: dzsdt(:,:)       ! Surface elevation rate of change [m/a] 
         real(wp), allocatable   :: dHidt(:,:)       ! Ice thickness rate of change [m/a] 
         real(wp), allocatable   :: bmb(:,:)         ! Combined field of bmb_grnd and bmb_shlf 

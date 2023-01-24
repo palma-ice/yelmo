@@ -398,10 +398,9 @@ contains
             bmb = 0.0 
         end if 
 
-        call calc_uz_3D(dyn%now%uz,dyn%now%ux,dyn%now%uy,tpo%now%H_ice_dyn,tpo%now%f_ice_dyn,tpo%now%f_grnd,tpo%now%z_srf, &
-                        bnd%smb,bmb,tpo%now%dHidt,tpo%now%dzsdt,dyn%par%zeta_aa,dyn%par%zeta_ac, &
-                        dyn%par%dx,dyn%par%dy,dyn%par%boundaries)
-        
+        call calc_uz_3D(dyn%now%uz,dyn%now%ux,dyn%now%uy,tpo%now%H_ice_dyn,tpo%now%f_ice_dyn,tpo%now%f_grnd, &
+                        bnd%smb,bmb,tpo%now%dHidt,tpo%now%dzsdt,tpo%now%dHidx,tpo%now%dHidy,tpo%now%dzsdx,tpo%now%dzsdy, &
+                        tpo%now%dzbdx,tpo%now%dzbdy,dyn%par%zeta_aa,dyn%par%zeta_ac,dyn%par%dx,dyn%par%dy,dyn%par%boundaries)
         
         return
 
@@ -515,10 +514,9 @@ contains
             bmb = 0.0 
         end if 
 
-        call calc_uz_3D(dyn%now%uz,dyn%now%ux,dyn%now%uy,tpo%now%H_ice_dyn,tpo%now%f_ice_dyn,tpo%now%f_grnd,tpo%now%z_srf, &
-                        bnd%smb,bmb,tpo%now%dHidt,tpo%now%dzsdt,dyn%par%zeta_aa,dyn%par%zeta_ac, &
-                        dyn%par%dx,dyn%par%dy,dyn%par%boundaries)
-        
+        call calc_uz_3D(dyn%now%uz,dyn%now%ux,dyn%now%uy,tpo%now%H_ice_dyn,tpo%now%f_ice_dyn,tpo%now%f_grnd, &
+                        bnd%smb,bmb,tpo%now%dHidt,tpo%now%dzsdt,tpo%now%dHidx,tpo%now%dHidy,tpo%now%dzsdx,tpo%now%dzsdy, &
+                        tpo%now%dzbdx,tpo%now%dzbdy,dyn%par%zeta_aa,dyn%par%zeta_ac,dyn%par%dx,dyn%par%dy,dyn%par%boundaries)
         
         return
 
@@ -613,10 +611,9 @@ contains
             bmb = 0.0 
         end if 
 
-        call calc_uz_3D(dyn%now%uz,dyn%now%ux,dyn%now%uy,tpo%now%H_ice_dyn,tpo%now%f_ice_dyn,tpo%now%f_grnd,tpo%now%z_srf, &
-                        bnd%smb,bmb,tpo%now%dHidt,tpo%now%dzsdt,dyn%par%zeta_aa,dyn%par%zeta_ac, &
-                        dyn%par%dx,dyn%par%dy,dyn%par%boundaries)
-        
+        call calc_uz_3D(dyn%now%uz,dyn%now%ux,dyn%now%uy,tpo%now%H_ice_dyn,tpo%now%f_ice_dyn,tpo%now%f_grnd, &
+                        bnd%smb,bmb,tpo%now%dHidt,tpo%now%dzsdt,tpo%now%dHidx,tpo%now%dHidy,tpo%now%dzsdx,tpo%now%dzsdy, &
+                        tpo%now%dzbdx,tpo%now%dzbdy,dyn%par%zeta_aa,dyn%par%zeta_ac,dyn%par%dx,dyn%par%dy,dyn%par%boundaries)
         
         return
 

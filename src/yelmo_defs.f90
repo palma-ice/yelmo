@@ -321,7 +321,8 @@ module yelmo_defs
         real(wp), allocatable :: uy(:,:,:) 
         real(wp), allocatable :: uxy(:,:,:)
         real(wp), allocatable :: uz(:,:,:)  
-
+        real(wp), allocatable :: uz_star(:,:,:)
+        
         real(wp), allocatable :: ux_bar(:,:) 
         real(wp), allocatable :: uy_bar(:,:)
         real(wp), allocatable :: uxy_bar(:,:)

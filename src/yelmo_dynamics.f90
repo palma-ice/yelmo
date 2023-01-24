@@ -398,7 +398,7 @@ contains
             bmb = 0.0 
         end if 
 
-        call calc_uz_3D(dyn%now%uz,dyn%now%ux,dyn%now%uy,tpo%now%H_ice_dyn,tpo%now%f_ice_dyn,tpo%now%f_grnd, &
+        call calc_uz_3D(dyn%now%uz,dyn%now%uz_star,dyn%now%ux,dyn%now%uy,tpo%now%H_ice_dyn,tpo%now%f_ice_dyn,tpo%now%f_grnd, &
                         bnd%smb,bmb,tpo%now%dHidt,tpo%now%dzsdt,tpo%now%dHidx,tpo%now%dHidy,tpo%now%dzsdx,tpo%now%dzsdy, &
                         tpo%now%dzbdx,tpo%now%dzbdy,dyn%par%zeta_aa,dyn%par%zeta_ac,dyn%par%dx,dyn%par%dy,dyn%par%boundaries)
         
@@ -514,7 +514,7 @@ contains
             bmb = 0.0 
         end if 
 
-        call calc_uz_3D(dyn%now%uz,dyn%now%ux,dyn%now%uy,tpo%now%H_ice_dyn,tpo%now%f_ice_dyn,tpo%now%f_grnd, &
+        call calc_uz_3D(dyn%now%uz,dyn%now%uz_star,dyn%now%ux,dyn%now%uy,tpo%now%H_ice_dyn,tpo%now%f_ice_dyn,tpo%now%f_grnd, &
                         bnd%smb,bmb,tpo%now%dHidt,tpo%now%dzsdt,tpo%now%dHidx,tpo%now%dHidy,tpo%now%dzsdx,tpo%now%dzsdy, &
                         tpo%now%dzbdx,tpo%now%dzbdy,dyn%par%zeta_aa,dyn%par%zeta_ac,dyn%par%dx,dyn%par%dy,dyn%par%boundaries)
         
@@ -611,7 +611,7 @@ contains
             bmb = 0.0 
         end if 
 
-        call calc_uz_3D(dyn%now%uz,dyn%now%ux,dyn%now%uy,tpo%now%H_ice_dyn,tpo%now%f_ice_dyn,tpo%now%f_grnd, &
+        call calc_uz_3D(dyn%now%uz,dyn%now%uz_star,dyn%now%ux,dyn%now%uy,tpo%now%H_ice_dyn,tpo%now%f_ice_dyn,tpo%now%f_grnd, &
                         bnd%smb,bmb,tpo%now%dHidt,tpo%now%dzsdt,tpo%now%dHidx,tpo%now%dHidy,tpo%now%dzsdx,tpo%now%dzsdy, &
                         tpo%now%dzbdx,tpo%now%dzbdy,dyn%par%zeta_aa,dyn%par%zeta_ac,dyn%par%dx,dyn%par%dy,dyn%par%boundaries)
         
@@ -1006,6 +1006,7 @@ contains
         allocate(now%uy(nx,ny,nz_aa)) 
         allocate(now%uxy(nx,ny,nz_aa)) 
         allocate(now%uz(nx,ny,nz_ac)) 
+        allocate(now%uz_star(nx,ny,nz_ac)) 
 
         allocate(now%ux_bar(nx,ny)) 
         allocate(now%uy_bar(nx,ny))
@@ -1083,6 +1084,7 @@ contains
         now%uy                = 0.0 
         now%uxy               = 0.0 
         now%uz                = 0.0 
+        now%uz_star           = 0.0
 
         now%ux_bar            = 0.0 
         now%uy_bar            = 0.0
@@ -1169,6 +1171,7 @@ contains
         if (allocated(now%uy))              deallocate(now%uy) 
         if (allocated(now%uxy))             deallocate(now%uxy) 
         if (allocated(now%uz))              deallocate(now%uz) 
+        if (allocated(now%uz_star))         deallocate(now%uz_star) 
 
         if (allocated(now%ux_bar))          deallocate(now%ux_bar) 
         if (allocated(now%uy_bar))          deallocate(now%uy_bar)

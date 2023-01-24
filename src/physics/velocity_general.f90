@@ -38,7 +38,7 @@ module velocity_general
     
 contains 
     
-    subroutine calc_uz_3D(uz,ux,uy,H_ice,f_ice,f_grnd,smb,bmb,dHdt,dzsdt,dHdx,dHdy, &
+    subroutine calc_uz_3D(uz,uz_star,ux,uy,H_ice,f_ice,f_grnd,smb,bmb,dHdt,dzsdt,dHdx,dHdy, &
                                     dzsdx,dzsdy,dzbdx,dzbdy,zeta_aa,zeta_ac,dx,dy,boundaries)
         ! Following algorithm outlined by the Glimmer ice sheet model:
         ! https://www.geos.ed.ac.uk/~mhagdorn/glide/glide-doc/glimmer_htmlse9.html#x17-660003.1.5
@@ -49,9 +49,10 @@ contains
 
         implicit none 
 
-        real(wp), intent(OUT) :: uz(:,:,:)        ! nx,ny,nz_ac
-        real(wp), intent(IN)  :: ux(:,:,:)        ! nx,ny,nz_aa
-        real(wp), intent(IN)  :: uy(:,:,:)        ! nx,ny,nz_aa
+        real(wp), intent(OUT) :: uz(:,:,:)          ! nx,ny,nz_ac
+        real(wp), intent(OUT) :: uz_star(:,:,:)     ! nx,ny,nz_ac
+        real(wp), intent(IN)  :: ux(:,:,:)          ! nx,ny,nz_aa
+        real(wp), intent(IN)  :: uy(:,:,:)          ! nx,ny,nz_aa
         real(wp), intent(IN)  :: H_ice(:,:)
         real(wp), intent(IN)  :: f_ice(:,:)
         real(wp), intent(IN)  :: f_grnd(:,:)
@@ -93,8 +94,10 @@ contains
         real(wp) :: uy_aa 
         real(wp) :: uz_grid 
         real(wp) :: uz_srf 
+        real(wp) :: zeta_now 
         real(wp) :: c_x 
         real(wp) :: c_y 
+        real(wp) :: c_t 
 
         real(wp) :: dzsdtn(4)
         real(wp) :: dhdtn(4)
@@ -247,14 +250,10 @@ contains
 
                     ! Greve and Blatter (2009), Eq. 5.72
                     ! Bueler and Brown  (2009), Eq. 4
-
-                    ! Note these routines stagger to ab-nodes. This should be replaced
-                    ! with routines that solve for dudx and dvdy on ac-nodes, then uses acx_to_nodes...
-                    !call staggerdiff_nodes_acx_ab_ice(dudxn,ux(:,:,k-1),f_ice,i,j,dx)
+                    
                     call acx_to_nodes(dudxn,dudx(:,:,k-1),i,j,xn,yn,im1,ip1,jm1,jp1)
                     dudx_aa = sum(dudxn*wtn)/wt1
 
-                    !call staggerdiff_nodes_acy_ab_ice(dvdyn,uy(:,:,k-1),f_ice,i,j,dy)
                     call acy_to_nodes(dvdyn,dvdy(:,:,k-1),i,j,xn,yn,im1,ip1,jm1,jp1)
                     dvdy_aa = sum(dvdyn*wtn)/wt1
 
@@ -262,21 +261,15 @@ contains
                     ! to vertically integrate each cell up to ac-node border.
                     ! Note: nz_ac = nz_aa + 1
                     if (k .eq. 2) then
-
                         kup = k 
                         kdn = k-1 
-
                     else if (k .eq. nz_ac) then 
-
                         kup = k-1 
                         kdn = k-2 
-
                     else 
                         ! Centered on k-1 
-
                         kup = k 
-                        kdn = k-2  
-                        
+                        kdn = k-2
                     end if
 
                     call acx_to_nodes(uxn_up,ux(:,:,kup),i,j,xn,yn,im1,ip1,jm1,jp1)
@@ -293,17 +286,21 @@ contains
                     ! (Greve and Blatter, 2009, Eqs. 5.131 and 5.132, 
                     !  also shown in 1D with Eq. 5.145)
 
+                    ! Take zeta at the center of the cell below the current vertical ac boundary
+                    ! (this is also where dudz_aa and dvz_aa are calculated above)
+                    zeta_now = zeta_aa(k-1)
+
                     ! Note 1: Below are three different ways to calculate correction
                     ! factors. All give the same result for EISMINT1-moving, as they should. 
 
-                    c_x = -H_inv * ( (1.0-zeta_aa(k-1))*dzbdx_aa + zeta_aa(k-1)*dzsdx_aa )
-                    c_y = -H_inv * ( (1.0-zeta_aa(k-1))*dzbdy_aa + zeta_aa(k-1)*dzsdy_aa )
+                    c_x = -H_inv * ( (1.0-zeta_now)*dzbdx_aa + zeta_now*dzsdx_aa )
+                    c_y = -H_inv * ( (1.0-zeta_now)*dzbdy_aa + zeta_now*dzsdy_aa )
 
-                    ! c_x =  -H_inv * (dzbdx_aa + zeta_aa(k-1)*dHdx_aa)
-                    ! c_y =  -H_inv * (dzbdy_aa + zeta_aa(k-1)*dHdy_aa)
+                    ! c_x =  -H_inv * (dzbdx_aa + zeta_now*dHdx_aa)
+                    ! c_y =  -H_inv * (dzbdy_aa + zeta_now*dHdy_aa)
 
-                    ! c_x =  -H_inv * (dzsdx_aa - (1.0-zeta_aa(k-1))*dHdx_aa)
-                    ! c_y =  -H_inv * (dzsdy_aa - (1.0-zeta_aa(k-1))*dHdy_aa)
+                    ! c_x =  -H_inv * (dzsdx_aa - (1.0-zeta_now)*dHdx_aa)
+                    ! c_y =  -H_inv * (dzsdy_aa - (1.0-zeta_now)*dHdy_aa)
 
                     ! Calculate sigma-corrected derivatives
                     dudx_now = dudx_aa + c_x*dudz_aa 
@@ -321,13 +318,66 @@ contains
                     if (abs(uz(i,j,k)) .lt. TOL_UNDERFLOW) uz(i,j,k) = 0.0_wp 
                     
                 end do 
+
+
+                ! === Also calculate adjusted vertical velocity to be used for temperature advection
+                
+                do k = 1, nz_ac 
+
+                    ! Get the centered horizontal velocity of box on vertical ac-nodes at the level k 
+                    ! ajr: Given that the correction is applied to uz, which is defined on 
+                    ! ac-nodes, it seems the correction should also be calculated on ac-nodes.
+                    ! Note: nz_ac = nz_aa + 1
+    
+                    if (k .eq. 1) then 
+                        kup = k 
+                        kdn = k 
+                    else if (k .eq. nz_ac) then 
+                        kup = k-1 
+                        kdn = k-1 
+                    else
+                        kup = k 
+                        kdn = k-1 
+                    end if
+                    
+                    call acx_to_nodes(uxn_up,ux(:,:,kup),i,j,xn,yn,im1,ip1,jm1,jp1)
+                    call acx_to_nodes(uxn_dn,ux(:,:,kdn),i,j,xn,yn,im1,ip1,jm1,jp1)
+                    uxn = 0.5_wp*(uxn_up+uxn_dn)
+                    ux_aa = sum(uxn*wtn)/wt1
+                    
+                    call acy_to_nodes(uyn_up,uy(:,:,kup),i,j,xn,yn,im1,ip1,jm1,jp1)
+                    call acy_to_nodes(uyn_dn,uy(:,:,kdn),i,j,xn,yn,im1,ip1,jm1,jp1)
+                    uyn = 0.5_wp*(uyn_up+uyn_dn)
+                    uy_aa = sum(uyn*wtn)/wt1
+                    
+                    ! Take zeta directly at vertical cell edge where uz is calculated
+                    ! (this is also where ux_aa and uy_aa are calculated above)
+                    zeta_now = zeta_ac(k)
+
+                    ! Note: not dividing by H here, since this is done in the thermodynamics advection step
+                    c_x = -( (1.0-zeta_now)*dzbdx_aa  + zeta_now*dzsdx_aa )
+                    c_y = -( (1.0-zeta_now)*dzbdy_aa  + zeta_now*dzsdy_aa )
+                    c_t = -( (1.0-zeta_now)*dzbdt_now + zeta_now*dzsdt_now )
+                    
+                    ! Calculate adjusted vertical velocity for advection 
+                    ! of this layer
+                    ! (e.g., Greve and Blatter, 2009, Eq. 5.148)
+                    uz_star(i,j,k) = uz(i,j,k) + ux_aa*c_x + uy_aa*c_y + c_t 
+
+                    if (abs(uz_star(i,j,k)) .lt. TOL_UNDERFLOW) uz_star(i,j,k) = 0.0_wp
+                    
+                end do 
                 
             else 
                 ! No ice here, set vertical velocity equal to negative accum and bedrock change 
 
-                do k = 1, nz_ac 
+                do k = 1, nz_ac
+
                     uz(i,j,k) = dzbdt_now - max(smb(i,j),0.0)
                     if (abs(uz(i,j,k)) .lt. TOL_UNDERFLOW) uz(i,j,k) = 0.0_wp 
+
+                    uz_star(i,j,k) = uz(i,j,k)
+
                end do 
 
             end if 
@@ -340,7 +390,8 @@ contains
 
     end subroutine calc_uz_3D
 
-    subroutine calc_uz_advec_corr_3D(uz_star,uz,ux,uy,H_ice,f_ice,f_grnd,z_srf,dzsdt,dhdt,zeta_aa,zeta_ac,dx,dy,boundaries)
+    subroutine calc_uz_advec_corr_3D(uz_star,uz,ux,uy,H_ice,f_ice,f_grnd,z_srf,dzsdt,dHdt, &
+                                        dzsdx,dzsdy,dzbdx,dzbdy,zeta_aa,zeta_ac,dx,dy,boundaries)
         ! Following algorithm outlined by the Glimmer ice sheet model:
         ! https://www.geos.ed.ac.uk/~mhagdorn/glide/glide-doc/glimmer_htmlse9.html#x17-660003.1.5
 
@@ -359,7 +410,12 @@ contains
         real(wp), intent(IN)  :: f_grnd(:,:)
         real(wp), intent(IN)  :: z_srf(:,:) 
         real(wp), intent(IN)  :: dzsdt(:,:) 
-        real(wp), intent(IN)  :: dhdt(:,:) 
+        real(wp), intent(IN)  :: dHdt(:,:) 
+        real(wp), intent(IN)  :: dzsdx(:,:) 
+        real(wp), intent(IN)  :: dzsdy(:,:) 
+        real(wp), intent(IN)  :: dzbdx(:,:) 
+        real(wp), intent(IN)  :: dzbdy(:,:) 
+        
         real(wp), intent(IN)  :: zeta_aa(:)    ! z-coordinate, aa-nodes 
         real(wp), intent(IN)  :: zeta_ac(:)    ! z-coordinate, ac-nodes  
         real(wp), intent(IN)  :: dx 
@@ -367,8 +423,9 @@ contains
         character(len=*), intent(IN) :: boundaries 
 
         ! Local variables 
-        integer :: i, j, k, nx, ny, nz_aa, nz_ac
-        integer :: im1, ip1, jm1, jp1
+        integer  :: i, j, k, nx, ny, nz_aa, nz_ac
+        integer  :: im1, ip1, jm1, jp1
+        integer  :: kup, kdn
         real(wp) :: dzbdx_aa
         real(wp) :: dzbdy_aa
         real(wp) :: dzsdx_aa
@@ -384,22 +441,25 @@ contains
         real(wp)   :: dhdt_now 
         real(wp)   :: dzbdt_now 
 
-        real(wp) :: wt_ab(4) 
-        real(wp) :: dzsdt_ab(4)
-        real(wp) :: dhdt_ab(4)
-        real(wp) :: dzbdx_ab(4)
-        real(wp) :: dzbdy_ab(4)
-        real(wp) :: dzsdx_ab(4)
-        real(wp) :: dzsdy_ab(4)
-        real(wp) :: dHdx_ab(4)
-        real(wp) :: dHdy_ab(4)
-        real(wp) :: ux_ab_up(4) 
-        real(wp) :: ux_ab_dn(4) 
-        real(wp) :: ux_ab(4)
-        real(wp) :: uy_ab_up(4) 
-        real(wp) :: uy_ab_dn(4) 
-        real(wp) :: uy_ab(4)
-
+        real(wp) :: dzsdtn(4)
+        real(wp) :: dhdtn(4)
+        real(wp) :: dzbdxn(4)
+        real(wp) :: dzbdyn(4)
+        real(wp) :: dzsdxn(4)
+        real(wp) :: dzsdyn(4)
+        real(wp) :: dHdxn(4)
+        real(wp) :: dHdyn(4)
+        real(wp) :: dudxn(4) 
+        real(wp) :: dvdyn(4) 
+        real(wp) :: uxn_up(4) 
+        real(wp) :: uxn_dn(4) 
+        real(wp) :: uxn(4) 
+        real(wp) :: uyn_up(4) 
+        real(wp) :: uyn_dn(4)
+        real(wp) :: uyn(4)  
+        real(wp) :: dudzn(4) 
+        real(wp) :: dvdzn(4) 
+        
         real(wp) :: wt0
         real(wp) :: xn(4) 
         real(wp) :: yn(4) 
@@ -408,28 +468,22 @@ contains
 
         real(wp) :: zeta_now 
 
-        real(wp), allocatable :: z_base(:,:) 
-
         nx    = size(ux,1)
         ny    = size(ux,2)
         nz_aa = size(zeta_aa,1)
         nz_ac = size(zeta_ac,1)
 
-        allocate(z_base(nx,ny)) 
-
-        ! Define z_base as the elevation at the base of the ice sheet 
-        ! This is used for the basal derivative instead of bedrock so
-        ! that it is valid for both grounded and floating ice. Note, 
-        ! for grounded ice, z_base==z_bed. 
-        z_base = z_srf - H_ice
-
         ! Initialize adjusted vertical velocity to zero 
         uz_star = 0.0 
 
-        ! Get equal weighting for all ab-nodes 
-        wt_ab = 0.25_wp 
+        ! Get nodes and weighting 
+        wt0 = 1.0/sqrt(3.0)
+        xn  = [wt0,-wt0,-wt0, wt0]
+        yn  = [wt0, wt0,-wt0,-wt0]
+        wtn = [1.0,1.0,1.0,1.0]
+        wt1 = sum(wtn)
 
-        ! Next, calculate velocity 
+        ! Calculate *corrected* vertical velocity at each point through the column
 
         !$omp parallel do 
         do j = 1, ny
@@ -440,81 +494,63 @@ contains
 
             if (f_ice(i,j) .eq. 1.0) then
 
-                ! Get the centered ice-base gradient
-                call staggerdiffx_nodes_aa_ab_ice(dzbdx_ab,z_base,f_ice,i,j,dx)
-                dzbdx_aa = sum(dzbdx_ab*wt_ab)
-                
-                call staggerdiffy_nodes_aa_ab_ice(dzbdy_ab,z_base,f_ice,i,j,dy)
-                dzbdy_aa = sum(dzbdy_ab*wt_ab)
-                
-                ! Get the centered surface gradient 
-                call staggerdiffx_nodes_aa_ab_ice(dzsdx_ab,z_srf,f_ice,i,j,dx)
-                dzsdx_aa = sum(dzsdx_ab*wt_ab)
-                
-                call staggerdiffy_nodes_aa_ab_ice(dzsdy_ab,z_srf,f_ice,i,j,dy)
-                dzsdy_aa = sum(dzsdy_ab*wt_ab)
-                
-                ! Get the centered ice thickness gradient 
-                call staggerdiffx_nodes_aa_ab_ice(dHdx_ab,H_ice,f_ice,i,j,dx)
-                dHdx_aa = sum(dHdx_ab*wt_ab)
-                
-                call staggerdiffy_nodes_aa_ab_ice(dHdy_ab,H_ice,f_ice,i,j,dy)
-                dHdy_aa = sum(dHdy_ab*wt_ab)
-                
                 ! Get a locally smoothed value of dzsdt and dhdt to avoid spurious oscillations
                 ! (eg in EISMINT-EXPA dhdt field)
-                call staggerdiffy_nodes_aa_ab_ice(dzsdt_ab,dzsdt,f_ice,i,j,dy)
-                dzsdt_now = sum(dzsdt_ab*wt_ab)
+                ! These routines stagger to ab-nodes, consider replacing with staggering to 
+                ! quadrature nodes. 
+                call stagger_nodes_aa_ab_ice(dzsdtn,dzsdt,f_ice,i,j)
+                dzsdt_now = sum(dzsdtn*wtn)/wt1
                 
-                call staggerdiffy_nodes_aa_ab_ice(dhdt_ab,dhdt,f_ice,i,j,dy)
-                dhdt_now = sum(dhdt_ab*wt_ab)
+                call stagger_nodes_aa_ab_ice(dhdtn,dhdt,f_ice,i,j)
+                dhdt_now = sum(dhdtn*wtn)/wt1
                 
-
-                ! Diagnose rate of basal elevation change 
+                ! Diagnose rate of ice-base elevation change (needed for all points)
                 dzbdt_now = dzsdt_now - dhdt_now
 
 
+                ! Get the centered ice-base gradient
+                call acx_to_nodes(dzbdxn,dzbdx,i,j,xn,yn,im1,ip1,jm1,jp1)
+                dzbdx_aa = sum(dzbdxn*wtn)/wt1
+                
+                call acy_to_nodes(dzbdyn,dzbdy,i,j,xn,yn,im1,ip1,jm1,jp1)
+                dzbdy_aa = sum(dzbdyn*wtn)/wt1
+                
+                ! Get the centered surface gradient
+                call acx_to_nodes(dzsdxn,dzsdx,i,j,xn,yn,im1,ip1,jm1,jp1)
+                dzsdx_aa = sum(dzsdxn*wtn)/wt1
+                
+                call acy_to_nodes(dzsdyn,dzsdy,i,j,xn,yn,im1,ip1,jm1,jp1)
+                dzsdy_aa = sum(dzsdyn*wtn)/wt1
+                
                 ! Calculate adjusted vertical velocity for each layer
                 do k = 1, nz_ac 
 
-                ! Get the centered horizontal velocity of box
-                ! on vertical ac-nodes at the level k 
-                ! ajr: Given that the correction is 
-                ! applied to uz, which is defined on 
-                ! ac-nodes, it seems the correction
-                ! should also be calculated on ac-nodes.
-                ! Note: nz_ac = nz_aa + 1
+                    ! Get the centered horizontal velocity of box on vertical ac-nodes at the level k 
+                    ! ajr: Given that the correction is applied to uz, which is defined on 
+                    ! ac-nodes, it seems the correction should also be calculated on ac-nodes.
+                    ! Note: nz_ac = nz_aa + 1
     
                     if (k .eq. 1) then 
-
-                        call stagger_nodes_acx_ab_ice(ux_ab,ux(:,:,k),f_ice,i,j)
-                        ux_aa = sum(ux_ab*wt_ab)
-                        
-                        call stagger_nodes_acy_ab_ice(uy_ab,uy(:,:,k),f_ice,i,j)
-                        uy_aa = sum(uy_ab*wt_ab)
-                        
+                        kup = k 
+                        kdn = k 
                     else if (k .eq. nz_ac) then 
-                        
-                        call stagger_nodes_acx_ab_ice(ux_ab,ux(:,:,k-1),f_ice,i,j)
-                        ux_aa = sum(ux_ab*wt_ab)
-                        
-                        call stagger_nodes_acy_ab_ice(uy_ab,uy(:,:,k-1),f_ice,i,j)
-                        uy_aa = sum(uy_ab*wt_ab)
-                        
+                        kup = k-1 
+                        kdn = k-1 
                     else
-                        
-                        call stagger_nodes_acx_ab_ice(ux_ab_up,ux(:,:,k),  f_ice,i,j)
-                        call stagger_nodes_acx_ab_ice(ux_ab_dn,ux(:,:,k-1),f_ice,i,j)
-                        ux_ab = 0.5_wp*(ux_ab_up+ux_ab_dn)
-                        ux_aa = sum(ux_ab*wt_ab)
-                        
-                        call stagger_nodes_acy_ab_ice(uy_ab_up,uy(:,:,k),  f_ice,i,j)
-                        call stagger_nodes_acy_ab_ice(uy_ab_dn,uy(:,:,k-1),f_ice,i,j)
-                        uy_ab = 0.5_wp*(uy_ab_up+uy_ab_dn)
-                        uy_aa = sum(uy_ab*wt_ab)
-                        
-                    end if 
-
+                        kup = k 
+                        kdn = k-1 
+                    end if
+                    
+                    call acx_to_nodes(uxn_up,ux(:,:,kup),i,j,xn,yn,im1,ip1,jm1,jp1)
+                    call acx_to_nodes(uxn_dn,ux(:,:,kdn),i,j,xn,yn,im1,ip1,jm1,jp1)
+                    uxn = 0.5_wp*(uxn_up+uxn_dn)
+                    ux_aa = sum(uxn*wtn)/wt1
+                    
+                    call acy_to_nodes(uyn_up,uy(:,:,kup),i,j,xn,yn,im1,ip1,jm1,jp1)
+                    call acy_to_nodes(uyn_dn,uy(:,:,kdn),i,j,xn,yn,im1,ip1,jm1,jp1)
+                    uyn = 0.5_wp*(uyn_up+uyn_dn)
+                    uy_aa = sum(uyn*wtn)/wt1
+                    
                     ! Calculate sigma-coordinate derivative correction factors
                     ! (Greve and Blatter, 2009, Eqs. 5.131 and 5.132, 
                     !  also shown in 1D with Eq. 5.145)

@@ -1,6 +1,6 @@
 #!/bin/bash
 
-fldr='tmp/ebca65'
+fldr='tmp/9015f4e'
 
 runopt='-r'
 #runopt='-s'
@@ -74,9 +74,11 @@ jobrun ./runylmo -s -q priority -w 5 -e trough -n par/yelmo_MISMIP+.nml -- -o ${
 # F17
 ./runylmo -s -e trough -n par/yelmo_TROUGH-F17.nml -o ${fldr}/trough
 
-# ssa, dx=2km, [u0=100, cf_ref=10.0, cf_ref=20.0]:
+# ssa, dx=2km, [u0=100, cf_ref=5,10,20]:
 ./runylmo -s -e trough -n par/yelmo_TROUGH-F17.nml -o ${fldr}/trough-ssa -p ydyn.solver="ssa"
-./runylmo -s -w 24 -e trough -n par/yelmo_TROUGH-F17.nml -o ${fldr}/trough-dx2 -p ctrl.dx=2.0
+./runylmo -s -q medium -w 48 -e trough -n par/yelmo_TROUGH-F17.nml -o ${fldr}/trough-dx1 -p ctrl.dx=1.0
+./runylmo -s -q short  -w 24 -e trough -n par/yelmo_TROUGH-F17.nml -o ${fldr}/trough-dx2 -p ctrl.dx=2.0
+./runylmo -s -e trough -n par/yelmo_TROUGH-F17.nml -o ${fldr}/trough-u0.100-cf5.0  -p ydyn.beta_u0=100 ytill.cf_ref=5.0
 ./runylmo -s -e trough -n par/yelmo_TROUGH-F17.nml -o ${fldr}/trough-u0.100-cf10.0 -p ydyn.beta_u0=100 ytill.cf_ref=10.0
 ./runylmo -s -e trough -n par/yelmo_TROUGH-F17.nml -o ${fldr}/trough-u0.100-cf20.0 -p ydyn.beta_u0=100 ytill.cf_ref=20.0
 

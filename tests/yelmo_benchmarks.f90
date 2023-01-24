@@ -564,14 +564,14 @@ contains
         call nc_write(filename,"mb_resid",ylmo%tpo%now%mb_resid,units="m/a",long_name="Residual mass balance", &
                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
         
-        call nc_write(filename,"dzsrfdt",ylmo%tpo%now%dzsrfdt,units="m/a",long_name="Surface elevation change", &
+        call nc_write(filename,"dzsdt",ylmo%tpo%now%dzsdt,units="m/a",long_name="Surface elevation change", &
                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-        call nc_write(filename,"dHicedt",ylmo%tpo%now%dHicedt,units="m/a",long_name="Ice thickness change", &
+        call nc_write(filename,"dHidt",ylmo%tpo%now%dHidt,units="m/a",long_name="Ice thickness change", &
                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
         
-        call nc_write(filename,"dHicedx",ylmo%tpo%now%dHicedx,units="m/m",long_name="Ice thickness gradient (acx)", &
+        call nc_write(filename,"dHidx",ylmo%tpo%now%dHidx,units="m/m",long_name="Ice thickness gradient (acx)", &
                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-        call nc_write(filename,"dHicedy",ylmo%tpo%now%dHicedy,units="m/m",long_name="Ice thickness gradient (acy)", &
+        call nc_write(filename,"dHidy",ylmo%tpo%now%dHidy,units="m/m",long_name="Ice thickness gradient (acy)", &
                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
         
         call nc_write(filename,"f_grnd",ylmo%tpo%now%f_grnd,units="1",long_name="Grounded fraction", &

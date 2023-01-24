@@ -177,14 +177,14 @@ end select
                     ! for sigma-coordinate grid stretching (horizontal derivatives
                     ! lead to vertical advection adjusment)
                     call calc_uz_advec_corr_3D(thrm%now%uz_star,dyn%now%uz,dyn%now%ux,dyn%now%uy,tpo%now%H_ice,tpo%now%f_ice,tpo%now%f_grnd,tpo%now%z_srf, &
-                                                tpo%now%dzsrfdt,tpo%now%dHicedt,thrm%par%z%zeta_aa,thrm%par%z%zeta_ac,thrm%par%dx,thrm%par%dx,thrm%par%boundaries)
+                                                tpo%now%dzsdt,tpo%now%dHidt,thrm%par%z%zeta_aa,thrm%par%z%zeta_ac,thrm%par%dx,thrm%par%dx,thrm%par%boundaries)
                     
                     ! Now calculate the thermodynamics:
 
                     call calc_ytherm_enthalpy_3D(thrm%now%enth,thrm%now%T_ice,thrm%now%omega,thrm%now%bmb_grnd,thrm%now%Q_ice_b, &
                                 thrm%now%H_cts,thrm%now%T_pmp,thrm%now%cp,thrm%now%kt,thrm%now%advecxy,dyn%now%ux,dyn%now%uy,thrm%now%uz_star,thrm%now%Q_strn, &
                                 thrm%now%Q_b,thrm%now%Q_rock,bnd%T_srf,tpo%now%H_ice,tpo%now%f_ice,tpo%now%z_srf,thrm%now%H_w,thrm%now%dHwdt,tpo%now%H_grnd, &
-                                tpo%now%f_grnd,tpo%now%dHicedt,tpo%now%dzsrfdt,thrm%par%z%zeta_aa,thrm%par%z%zeta_ac,thrm%par%z%dzeta_a,thrm%par%z%dzeta_b, &
+                                tpo%now%f_grnd,thrm%par%z%zeta_aa,thrm%par%z%zeta_ac,thrm%par%z%dzeta_a,thrm%par%z%dzeta_b, &
                                 thrm%par%enth_cr,thrm%par%omega_max,dt,thrm%par%dx,thrm%par%method,thrm%par%solver_advec)
                 
                 case("robin")
@@ -283,7 +283,7 @@ end select
     end subroutine calc_ytherm
 
     subroutine calc_ytherm_enthalpy_3D(enth,T_ice,omega,bmb_grnd,Q_ice_b,H_cts,T_pmp,cp,kt,advecxy,ux,uy,uz,Q_strn,Q_b,Q_rock, &
-                                        T_srf,H_ice,f_ice,z_srf,H_w,dHwdt,H_grnd,f_grnd,dHdt,dzsdt,zeta_aa,zeta_ac,dzeta_a,dzeta_b, &
+                                        T_srf,H_ice,f_ice,z_srf,H_w,dHwdt,H_grnd,f_grnd,zeta_aa,zeta_ac,dzeta_a,dzeta_b, &
                                         cr,omega_max,dt,dx,solver,solver_advec)
         ! This wrapper subroutine breaks the thermodynamics problem into individual columns,
         ! which are solved independently by calling calc_enth_column
@@ -318,8 +318,6 @@ end select
         real(prec), intent(IN)    :: dHwdt(:,:)     ! [m/a] Basal water layer thickness change
         real(prec), intent(IN)    :: H_grnd(:,:)    ! [--] Ice thickness above flotation 
         real(prec), intent(IN)    :: f_grnd(:,:)    ! [--] Grounded fraction
-        real(prec), intent(IN)    :: dHdt(:,:)      ! [m/a] Ice thickness change
-        real(prec), intent(IN)    :: dzsdt(:,:)     ! [m/a] Ice surface change
         real(prec), intent(IN)    :: zeta_aa(:)     ! [--] Vertical sigma coordinates (zeta==height), aa-nodes
         real(prec), intent(IN)    :: zeta_ac(:)     ! [--] Vertical sigma coordinates (zeta==height), ac-nodes
         real(prec), intent(IN)    :: dzeta_a(:)     ! nz_aa [--] Solver discretization helper variable ak

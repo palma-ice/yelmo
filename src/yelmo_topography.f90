@@ -206,8 +206,8 @@ contains
         ! Determine rates of change
         if ( .not. topo_fixed .and. dt .gt. 0.0 ) then 
 
-            tpo%now%dHicedt = (tpo%now%H_ice - tpo%now%H_ice_n) / dt 
-            tpo%now%dzsrfdt = (tpo%now%z_srf - tpo%now%z_srf_n) / dt 
+            tpo%now%dHidt = (tpo%now%H_ice - tpo%now%H_ice_n) / dt 
+            tpo%now%dzsdt = (tpo%now%z_srf - tpo%now%z_srf_n) / dt 
         
         end if 
 
@@ -492,8 +492,8 @@ end if
         ! Determine rates of change
         if ( .not. topo_fixed .and. dt .gt. 0.0 ) then 
 
-            tpo%now%dHicedt = (tpo%now%H_ice - tpo%now%H_ice_n) / dt 
-            tpo%now%dzsrfdt = (tpo%now%z_srf - tpo%now%z_srf_n) / dt 
+            tpo%now%dHidt = (tpo%now%H_ice - tpo%now%H_ice_n) / dt 
+            tpo%now%dzsdt = (tpo%now%z_srf - tpo%now%z_srf_n) / dt 
         
         end if 
 
@@ -693,8 +693,8 @@ end if
         ! 2. Calculate additional topographic properties ------------------
 
         ! Calculate the ice thickness gradient (on staggered acx/y nodes)
-        !call calc_gradient_ac(tpo%now%dHicedx,tpo%now%dHicedy,tpo%now%H_ice,tpo%par%dx)
-        ! call calc_gradient_ac_ice(tpo%now%dHicedx,tpo%now%dHicedy,tpo%now%H_ice,tpo%now%f_ice,tpo%par%dx, &
+        !call calc_gradient_ac(tpo%now%dHidx,tpo%now%dHidy,tpo%now%H_ice,tpo%par%dx)
+        ! call calc_gradient_ac_ice(tpo%now%dHidx,tpo%now%dHidy,tpo%now%H_ice,tpo%now%f_ice,tpo%par%dx, &
         !                                         tpo%par%margin2nd,tpo%par%grad_lim,tpo%par%boundaries,zero_outside=.TRUE.)
         
         ! Calculate the surface slope
@@ -702,14 +702,18 @@ end if
 
 
         ! New routines 
-        call map_a_to_b_2D(tpo%now%H_ice_ab,tpo%now%H_ice)
-
-        call ddx_a_to_cx_2D(tpo%now%dHicedx,tpo%now%H_ice,tpo%par%dx)
-        call ddy_a_to_cy_2D(tpo%now%dHicedy,tpo%now%H_ice,tpo%par%dx)
         
         call ddx_a_to_cx_2D(tpo%now%dzsdx,tpo%now%z_srf,tpo%par%dx)
-        call ddy_a_to_cy_2D(tpo%now%dzsdy,tpo%now%z_srf,tpo%par%dx)
+        call ddy_a_to_cy_2D(tpo%now%dzsdy,tpo%now%z_srf,tpo%par%dy)
         
+        call ddx_a_to_cx_2D(tpo%now%dHidx,tpo%now%H_ice,tpo%par%dx)
+        call ddy_a_to_cy_2D(tpo%now%dHidy,tpo%now%H_ice,tpo%par%dy)
+        
+        call ddx_a_to_cx_2D(tpo%now%dzbdx,bnd%z_bed,tpo%par%dx)
+        call ddy_a_to_cy_2D(tpo%now%dzbdy,bnd%z_bed,tpo%par%dy)
+        
+        call map_a_to_b_2D(tpo%now%H_ice_ab,tpo%now%H_ice)
+
         ! ajr: experimental, doesn't seem to work properly yet! ===>
         ! Modify surface slope gradient at the grounding line if desired 
 !         call calc_gradient_ac_gl(tpo%now%dzsdx,tpo%now%dzsdy,tpo%now%z_srf,tpo%now%H_ice, &
@@ -959,8 +963,8 @@ end if
 
         allocate(now%H_ice(nx,ny))
         allocate(now%z_srf(nx,ny))
-        allocate(now%dzsrfdt(nx,ny))
-        allocate(now%dHicedt(nx,ny))
+        allocate(now%dzsdt(nx,ny))
+        allocate(now%dHidt(nx,ny))
         allocate(now%bmb(nx,ny))
         allocate(now%fmb(nx,ny))
         allocate(now%mb_applied(nx,ny))
@@ -980,10 +984,11 @@ end if
         
         allocate(now%dzsdx(nx,ny))
         allocate(now%dzsdy(nx,ny))
+        allocate(now%dHidx(nx,ny))
+        allocate(now%dHidy(nx,ny))
+        allocate(now%dzbdx(nx,ny))
+        allocate(now%dzbdy(nx,ny))
 
-        allocate(now%dHicedx(nx,ny))
-        allocate(now%dHicedy(nx,ny))
-        
         allocate(now%H_eff(nx,ny))
         allocate(now%H_grnd(nx,ny))
 
@@ -1022,8 +1027,8 @@ end if
 
         now%H_ice       = 0.0 
         now%z_srf       = 0.0  
-        now%dzsrfdt     = 0.0 
-        now%dHicedt     = 0.0
+        now%dzsdt     = 0.0 
+        now%dHidt     = 0.0
         now%bmb         = 0.0  
         now%fmb         = 0.0
         now%mb_applied  = 0.0 
@@ -1042,8 +1047,10 @@ end if
         now%calv_grnd   = 0.0
         now%dzsdx       = 0.0 
         now%dzsdy       = 0.0 
-        now%dHicedx     = 0.0 
-        now%dHicedy     = 0.0
+        now%dHidx       = 0.0 
+        now%dHidy       = 0.0
+        now%dzbdx       = 0.0 
+        now%dzbdy       = 0.0 
         now%H_eff       = 0.0 
         now%H_grnd      = 0.0  
 
@@ -1087,8 +1094,8 @@ end if
         if (allocated(now%H_ice))       deallocate(now%H_ice)
         if (allocated(now%z_srf))       deallocate(now%z_srf)
         
-        if (allocated(now%dzsrfdt))     deallocate(now%dzsrfdt)
-        if (allocated(now%dHicedt))     deallocate(now%dHicedt)
+        if (allocated(now%dzsdt))       deallocate(now%dzsdt)
+        if (allocated(now%dHidt))       deallocate(now%dHidt)
         if (allocated(now%bmb))         deallocate(now%bmb)
         if (allocated(now%fmb))         deallocate(now%fmb)
         if (allocated(now%mb_applied))  deallocate(now%mb_applied)
@@ -1108,13 +1115,15 @@ end if
             
         if (allocated(now%dzsdx))       deallocate(now%dzsdx)
         if (allocated(now%dzsdy))       deallocate(now%dzsdy)
-        if (allocated(now%dHicedx))     deallocate(now%dHicedx)
-        if (allocated(now%dHicedy))     deallocate(now%dHicedy)
+        if (allocated(now%dHidx))       deallocate(now%dHidx)
+        if (allocated(now%dHidy))       deallocate(now%dHidy)
+        if (allocated(now%dzbdx))       deallocate(now%dzbdx)
+        if (allocated(now%dzbdy))       deallocate(now%dzbdy)
         
         if (allocated(now%H_eff))       deallocate(now%H_eff)
         if (allocated(now%H_grnd))      deallocate(now%H_grnd)
 
-        if (allocated(now%H_ice_ab))     deallocate(now%H_ice_ab)
+        if (allocated(now%H_ice_ab))    deallocate(now%H_ice_ab)
         
         if (allocated(now%f_grnd))      deallocate(now%f_grnd)
         if (allocated(now%f_grnd_acx))  deallocate(now%f_grnd_acx)
@@ -1130,7 +1139,7 @@ end if
         
         if (allocated(now%mask_bed))    deallocate(now%mask_bed)
         if (allocated(now%mask_grz))    deallocate(now%mask_grz)
-        if (allocated(now%mask_frnt))       deallocate(now%mask_frnt)
+        if (allocated(now%mask_frnt))   deallocate(now%mask_frnt)
         
         if (allocated(now%dHdt_n))      deallocate(now%dHdt_n)
         if (allocated(now%dHdt_pred))   deallocate(now%dHdt_pred)

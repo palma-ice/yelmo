@@ -94,23 +94,23 @@ contains
             ! ytopo variables 
             reg%H_ice      = sum(tpo%now%H_ice,mask=mask_tot)/npts_tot        ! [m]
             reg%z_srf      = sum(tpo%now%z_srf,mask=mask_tot)/npts_tot        ! [m]
-            reg%dHicedt    = sum(tpo%now%dHicedt,mask=mask_tot)/npts_tot      ! [m/a]
+            reg%dHidt      = sum(tpo%now%dHidt,mask=mask_tot)/npts_tot        ! [m/yr]
             reg%H_ice_max  = maxval(tpo%now%H_ice,mask=mask_tot)              ! [m]
-            reg%dzsrfdt    = sum(tpo%now%dzsrfdt,mask=mask_tot)/npts_tot      ! [m/a]
+            reg%dzsdt      = sum(tpo%now%dzsdt,mask=mask_tot)/npts_tot        ! [m/yr]
             
             reg%V_ice      = sum(tpo%now%H_ice,mask=mask_tot)*tpo%par%dx*tpo%par%dy*m3_km3              ! [km^3]
             reg%A_ice      = count(tpo%now%H_ice .gt. 0.0 .and. mask_tot)*tpo%par%dx*tpo%par%dy*m2_km2  ! [km^2]
-            reg%dVicedt    = sum(tpo%now%dHicedt,mask=mask_tot)*tpo%par%dx*tpo%par%dy*m3_km3            ! [km^3/a]
-            reg%fwf        = -reg%dVicedt*conv_km3a_Sv                        ! [Sv]
+            reg%dVidt      = sum(tpo%now%dHidt,mask=mask_tot)*tpo%par%dx*tpo%par%dy*m3_km3              ! [km^3/yr]
+            reg%fwf        = -reg%dVidt*conv_km3a_Sv                        ! [Sv]
 
             ! Volume above sea level
             reg%V_sl       = sum(H_af,mask=mask_tot)*tpo%par%dx*tpo%par%dy*m3_km3   ! [km^3]
             reg%V_sle      = reg%V_sl * conv_km3_sle                          ! [km^3] => [m sle]
             
             ! ydyn variables 
-            reg%uxy_bar    = sum(dyn%now%uxy_bar,mask=mask_tot)/npts_tot      ! [m/a]
-            reg%uxy_s      = sum(dyn%now%uxy_s,mask=mask_tot)/npts_tot        ! [m/a]
-            reg%uxy_b      = sum(dyn%now%uxy_b,mask=mask_tot)/npts_tot        ! [m/a]
+            reg%uxy_bar    = sum(dyn%now%uxy_bar,mask=mask_tot)/npts_tot      ! [m/yr]
+            reg%uxy_s      = sum(dyn%now%uxy_s,mask=mask_tot)/npts_tot        ! [m/yr]
+            reg%uxy_b      = sum(dyn%now%uxy_b,mask=mask_tot)/npts_tot        ! [m/yr]
             
             ! Boundary variables
             reg%z_bed      = sum(bnd%z_bed,mask=mask_tot)/npts_tot
@@ -123,13 +123,13 @@ contains
             ! ytopo variables 
             reg%H_ice      = 0.0_wp 
             reg%z_srf      = 0.0_wp 
-            reg%dHicedt    = 0.0_wp 
+            reg%dHidt    = 0.0_wp 
             reg%H_ice_max  = 0.0_wp 
-            reg%dzsrfdt    = 0.0_wp 
+            reg%dzsdt    = 0.0_wp 
             
             reg%V_ice      = 0.0_wp 
             reg%A_ice      = 0.0_wp 
-            reg%dVicedt    = 0.0_wp 
+            reg%dVidt    = 0.0_wp 
             reg%fwf        = 0.0_wp 
             reg%V_sl       = 0.0_wp 
             reg%V_sle      = 0.0_wp 
@@ -318,18 +318,18 @@ contains
                       dim1="time",start=[n],ncid=ncid)
         call nc_write(filename,"z_srf",reg%z_srf,units="m",long_name="Mean surface elevation", &
                       dim1="time",start=[n],ncid=ncid)
-        call nc_write(filename,"dHicedt",reg%dHicedt,units="m/a",long_name="Mean rate ice thickness change", &
+        call nc_write(filename,"dHidt",reg%dHidt,units="m/a",long_name="Mean rate ice thickness change", &
                       dim1="time",start=[n],ncid=ncid)
         call nc_write(filename,"H_ice_max",reg%H_ice_max,units="m/a",long_name="Max ice thickness", &
                       dim1="time",start=[n],ncid=ncid)
-        call nc_write(filename,"dzsrfdt",reg%dzsrfdt,units="m/a",long_name="Mean rate surface elevation change", &
+        call nc_write(filename,"dzsdt",reg%dzsdt,units="m/a",long_name="Mean rate surface elevation change", &
                       dim1="time",start=[n],ncid=ncid)
         
         call nc_write(filename,"V_ice",reg%V_ice*1e-6,units="1e6 km^3",long_name="Ice volume", &
                       dim1="time",start=[n],ncid=ncid)
         call nc_write(filename,"A_ice",reg%A_ice*1e-6,units="1e6 km^2",long_name="Ice area", &
                       dim1="time",start=[n],ncid=ncid)
-        call nc_write(filename,"dVicedt",reg%dVicedt,units="km^3/a",long_name="Rate volume change", &
+        call nc_write(filename,"dVidt",reg%dVidt,units="km^3/a",long_name="Rate volume change", &
                       dim1="time",start=[n],ncid=ncid)
         call nc_write(filename,"fwf",reg%fwf,units="Sv",long_name="Rate volume change", &
                       dim1="time",start=[n],ncid=ncid)

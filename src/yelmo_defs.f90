@@ -162,8 +162,8 @@ module yelmo_defs
 
         real(wp), allocatable   :: H_ice(:,:)       ! Ice thickness [m] 
         real(wp), allocatable   :: z_srf(:,:)       ! Surface elevation [m]
-        real(wp), allocatable   :: dzsrfdt(:,:)     ! Surface elevation rate of change [m/a] 
-        real(wp), allocatable   :: dHicedt(:,:)     ! Ice thickness rate of change [m/a] 
+        real(wp), allocatable   :: dzsdt(:,:)       ! Surface elevation rate of change [m/a] 
+        real(wp), allocatable   :: dHidt(:,:)       ! Ice thickness rate of change [m/a] 
         real(wp), allocatable   :: bmb(:,:)         ! Combined field of bmb_grnd and bmb_shlf 
         real(wp), allocatable   :: fmb(:,:)         ! Combined field of fmb_grnd and fmb_shlf 
         real(wp), allocatable   :: mb_applied(:,:)  ! Actual mass balance applied [m/a], for mass balance accounting
@@ -181,10 +181,12 @@ module yelmo_defs
         real(wp), allocatable   :: calv_flt(:,:)    ! Reference floating calving rate [m/a]
         real(wp), allocatable   :: calv_grnd(:,:)   ! Reference grounded calving rate [m/a]
         
-        real(wp), allocatable   :: dzsdx(:,:)       ! Surface elevation slope [m m-1], Ac x nodes
-        real(wp), allocatable   :: dzsdy(:,:)       ! Surface elevation slope [m m-1], Ac y nodes
-        real(wp), allocatable   :: dHicedx(:,:)     ! Ice thickness gradient slope [m m-1], Ac x nodes
-        real(wp), allocatable   :: dHicedy(:,:)     ! Ice thickness gradient slope [m m-1], Ac y nodes
+        real(wp), allocatable   :: dzsdx(:,:)       ! Surface elevation slope [m m-1], acx nodes
+        real(wp), allocatable   :: dzsdy(:,:)       ! Surface elevation slope [m m-1], acy nodes
+        real(wp), allocatable   :: dHidx(:,:)       ! Ice thickness gradient slope [m m-1], acx nodes
+        real(wp), allocatable   :: dHidy(:,:)       ! Ice thickness gradient slope [m m-1], acy nodes
+        real(wp), allocatable   :: dzbdx(:,:)       ! Bedrock elevation slope [m m-1], acx nodes
+        real(wp), allocatable   :: dzbdy(:,:)       ! Bedrock elevation slope [m m-1], acy nodes
         
         real(wp), allocatable   :: H_eff(:,:)       ! Effective ice thickness (margin-corrected) [m]
         real(wp), allocatable   :: H_grnd(:,:)      ! Ice thickness overburden [m]
@@ -722,8 +724,8 @@ module yelmo_defs
         ! Individual values of interest to output from a Yelmo domain 
 
         ! ===== Total ice variables =====
-        real(wp)   :: H_ice, z_srf, dHicedt, H_ice_max, dzsrfdt
-        real(wp)   :: V_ice, A_ice, dVicedt, fwf, V_sl, V_sle
+        real(wp)   :: H_ice, z_srf,dHidt, H_ice_max, dzsdt
+        real(wp)   :: V_ice, A_ice, dVidt, fwf, V_sl, V_sle
         real(wp)   :: uxy_bar, uxy_s, uxy_b, z_bed, smb, T_srf, bmb
 
         ! ===== Grounded ice variables =====

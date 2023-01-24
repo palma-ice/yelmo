@@ -399,7 +399,7 @@ contains
         end if 
 
         call calc_uz_3D(dyn%now%uz,dyn%now%ux,dyn%now%uy,tpo%now%H_ice_dyn,tpo%now%f_ice_dyn,tpo%now%f_grnd,tpo%now%z_srf, &
-                        bnd%smb,bmb,tpo%now%dHicedt,tpo%now%dzsrfdt,dyn%par%zeta_aa,dyn%par%zeta_ac, &
+                        bnd%smb,bmb,tpo%now%dHidt,tpo%now%dzsdt,dyn%par%zeta_aa,dyn%par%zeta_ac, &
                         dyn%par%dx,dyn%par%dy,dyn%par%boundaries)
         
         
@@ -516,7 +516,7 @@ contains
         end if 
 
         call calc_uz_3D(dyn%now%uz,dyn%now%ux,dyn%now%uy,tpo%now%H_ice_dyn,tpo%now%f_ice_dyn,tpo%now%f_grnd,tpo%now%z_srf, &
-                        bnd%smb,bmb,tpo%now%dHicedt,tpo%now%dzsrfdt,dyn%par%zeta_aa,dyn%par%zeta_ac, &
+                        bnd%smb,bmb,tpo%now%dHidt,tpo%now%dzsdt,dyn%par%zeta_aa,dyn%par%zeta_ac, &
                         dyn%par%dx,dyn%par%dy,dyn%par%boundaries)
         
         
@@ -614,7 +614,7 @@ contains
         end if 
 
         call calc_uz_3D(dyn%now%uz,dyn%now%ux,dyn%now%uy,tpo%now%H_ice_dyn,tpo%now%f_ice_dyn,tpo%now%f_grnd,tpo%now%z_srf, &
-                        bnd%smb,bmb,tpo%now%dHicedt,tpo%now%dzsrfdt,dyn%par%zeta_aa,dyn%par%zeta_ac, &
+                        bnd%smb,bmb,tpo%now%dHidt,tpo%now%dzsdt,dyn%par%zeta_aa,dyn%par%zeta_ac, &
                         dyn%par%dx,dyn%par%dy,dyn%par%boundaries)
         
         
@@ -1375,9 +1375,9 @@ contains
         call nc_write(filename,"mask_bed",tpo%now%mask_bed,units="",long_name="Bed mask", &
                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
         
-        call nc_write(filename,"dzsrfdt",tpo%now%dzsrfdt,units="m/a",long_name="Surface elevation change", &
+        call nc_write(filename,"dzsdt",tpo%now%dzsdt,units="m/a",long_name="Surface elevation change", &
                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-        call nc_write(filename,"dHicedt",tpo%now%dHicedt,units="m/a",long_name="Ice thickness change", &
+        call nc_write(filename,"dHidt",tpo%now%dHidt,units="m/a",long_name="Ice thickness change", &
                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
         
         call nc_write(filename,"H_grnd",tpo%now%H_grnd,units="m",long_name="Ice thickness overburden", &

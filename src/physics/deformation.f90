@@ -1936,6 +1936,7 @@ contains
             ! Get neighbor indices
             call get_neighbor_indices(im1,ip1,jm1,jp1,i,j,nx,ny,boundaries)
 
+            ! Calculate derivatives (second-order, centered)
             dudx(i,j) = (ux(ip1,j)-ux(im1,j))/(2.0*dx)
             dudy(i,j) = (ux(i,jp1)-ux(i,jm1))/(2.0*dy)
             dvdx(i,j) = (uy(ip1,j)-uy(im1,j))/(2.0*dx)
@@ -1994,9 +1995,142 @@ contains
 
     end subroutine calc_strain_rate_horizontal
 
+    subroutine calc_strain_rate_uz(dwdx,dwdy,dwdz,uz,H_ice,f_ice,dzbdx,dzbdy, &
+                                            dzsdx,dzsdy,zeta_ac,dx,dy,boundaries)
+
+        implicit none
+        
+        real(wp), intent(OUT) :: dwdx(:,:,:) 
+        real(wp), intent(OUT) :: dwdy(:,:,:) 
+        real(wp), intent(OUT) :: dwdz(:,:,:) 
+        real(wp), intent(IN)  :: uz(:,:,:) 
+        real(wp), intent(IN)  :: H_ice(:,:)
+        real(wp), intent(IN)  :: f_ice(:,:) 
+        real(wp), intent(IN)  :: dzbdx(:,:) 
+        real(wp), intent(IN)  :: dzbdy(:,:)
+        real(wp), intent(IN)  :: dzsdx(:,:) 
+        real(wp), intent(IN)  :: dzsdy(:,:) 
+        real(wp), intent(IN)  :: zeta_ac(:)
+        real(wp), intent(IN)  :: dx 
+        real(wp), intent(IN)  :: dy
+        character(len=*), intent(IN) :: boundaries         
+        
+        ! Local variables 
+        integer  :: i, j, k, nx, ny, nz 
+        integer  :: im1, ip1, jm1, jp1 
+        real(wp) :: H_inv
+        real(wp) :: dzbdx_aa, dzbdy_aa 
+        real(wp) :: dzsdx_aa, dzsdy_aa
+        real(wp) :: c_x, c_y 
+
+        nx = size(dwdx,1)
+        ny = size(dwdx,2) 
+        nz = size(dwdx,3)
+
+        ! First calculate dwdz - it is also used as a correction term 
+        ! for horizontal derivatives, due to vertical sigma coordinate
+
+        dwdz = 0.0 
+
+        do j = 1, ny  
+        do i = 1, nx
+            
+            ! Get neighbor indices
+            call get_neighbor_indices(im1,ip1,jm1,jp1,i,j,nx,ny,boundaries)
+
+
+            do k = 1, nz 
+                ! To do
+            end do
+
+
+        end do 
+        end do
 
 
 
+        dwdx = 0.0
+        dwdy = 0.0
+        
+        do j = 1, ny  
+        do i = 1, nx
+            
+            if (f_ice(i,j) .eq. 1.0) then 
+                ! Ice is present
+
+                ! Get neighbor indices
+                call get_neighbor_indices(im1,ip1,jm1,jp1,i,j,nx,ny,boundaries)
+
+                
+                ! Calculate standard derivatives (second-order, centered)
+                do k = 1, nz
+                    dwdx(i,j,k) = (uz(ip1,j,k)-uz(im1,j,k))/(2.0*dx)
+                    dwdy(i,j,k) = (uz(i,jp1,k)-uz(i,jm1,k))/(2.0*dy)
+                end do          
+                 
+                ! Treat special cases of ice-margin points (take upstream/downstream derivatives instead)
+
+                ! dwdx
+
+                if (f_ice(ip1,j) .lt. 1.0 .and. f_ice(im1,j) .lt. 1.0) then 
+                    do k = 1, nz
+                        dwdx(i,j,k) = 0.0
+                    end do
+                else if (f_ice(ip1,j) .lt. 1.0 .and. f_ice(im1,j) .eq. 1.0) then 
+                    do k = 1, nz
+                        dwdx(i,j,k) = (uz(i,j,k)-uz(im1,j,k))/dx
+                    end do
+                else if (f_ice(ip1,j) .eq. 1.0 .and. f_ice(im1,j) .lt. 1.0) then 
+                    do k = 1, nz
+                        dwdx(i,j,k) = (uz(ip1,j,k)-uz(i,j,k))/dx
+                    end do
+                end if 
+
+                ! dwdy
+
+                if (f_ice(i,jp1) .lt. 1.0 .and. f_ice(i,jm1) .lt. 1.0) then 
+                    do k = 1, nz
+                        dwdy(i,j,k) = 0.0
+                    end do
+                else if (f_ice(i,jp1) .lt. 1.0 .and. f_ice(i,jm1) .eq. 1.0) then 
+                    do k = 1, nz
+                        dwdy(i,j,k) = (uz(i,j,k)-uz(i,jm1,k))/dy
+                    end do
+                else if (f_ice(i,jp1) .eq. 1.0 .and. f_ice(i,jm1) .lt. 1.0) then 
+                    do k = 1, nz
+                        dwdy(i,j,k) = (uz(i,jp1,k)-uz(i,j,k))/dy
+                    end do
+                end if 
+
+                ! Apply sigma correction factors
+
+                H_inv = 1.0/H_ice(i,j)
+
+                ! Get horizontal grid-centered gradients 
+                dzbdx_aa = 1
+                dzbdy_aa = 1 
+                dzsdx_aa = 1 
+                dzsdy_aa = 1 
+
+                do k = 1, nz
+
+                    ! Get correction factors for this grid point on aa-nodes horizontally, ac-nodes vertically
+                    c_x = -H_inv * ( (1.0-zeta_ac(k))*dzbdx_aa + zeta_ac(k)*dzsdx_aa )
+                    c_y = -H_inv * ( (1.0-zeta_ac(k))*dzbdy_aa + zeta_ac(k)*dzsdy_aa )
+                    
+                    dwdx(i,j,k) = dwdx(i,j,k) + c_x*dwdz(i,j,k)
+                    dwdy(i,j,k) = dwdy(i,j,k) + c_y*dwdz(i,j,k)
+
+                end do
+
+            end if 
+
+        end do 
+        end do
+
+        return
+
+    end subroutine calc_strain_rate_uz
 
 
     subroutine calc_stress_tensor(strs,strs2D,visc,strn,zeta_aa)

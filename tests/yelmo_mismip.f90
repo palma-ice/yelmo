@@ -198,7 +198,7 @@ program yelmo_mismip
                 ! Apply convergence criteria to step rate factor 
 
                 is_converged = .FALSE. 
-                err = sqrt(sum(yelmo1%tpo%now%dHicedt**2)/yelmo1%grd%npts)
+                err = sqrt(sum(yelmo1%tpo%now%dHidt**2)/yelmo1%grd%npts)
                 if (err .lt. 1e-2) is_converged =.TRUE. 
 
                 if (time .gt. ATT_time+ATT_dt) then 
@@ -338,9 +338,9 @@ contains
         call nc_write(filename,"N_eff",ylmo%dyn%now%N_eff,units="Pa",long_name="Effective pressure", &
                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
         
-!         call nc_write(filename,"dzsrfdt",ylmo%tpo%now%dzsrfdt,units="m/a",long_name="Surface elevation change", &
+!         call nc_write(filename,"dzsdt",ylmo%tpo%now%dzsdt,units="m/a",long_name="Surface elevation change", &
 !                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-        call nc_write(filename,"dHicedt",ylmo%tpo%now%dHicedt,units="m/a",long_name="Ice thickness change", &
+        call nc_write(filename,"dHidt",ylmo%tpo%now%dHidt,units="m/a",long_name="Ice thickness change", &
                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
         
         call nc_write(filename,"H_grnd",ylmo%tpo%now%H_grnd,units="m",long_name="Ice thickness overburden", &

@@ -551,6 +551,8 @@ contains
 
         call nc_write(filename,"calv",ylmo%tpo%now%calv,units="m/a",long_name="Calving rate", &
                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
+        call nc_write(filename,"calv_flt",ylmo%tpo%now%calv_flt,units="m/a",long_name="Calving rate (floating)", &
+                      dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
 
         ! == yelmo_thermodynamics ==
         call nc_write(filename,"T_ice",ylmo%thrm%now%T_ice,units="K",long_name="Ice temperature", &

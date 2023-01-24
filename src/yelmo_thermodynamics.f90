@@ -9,8 +9,7 @@ module yelmo_thermodynamics
     
     use thermodynamics 
     use ice_enthalpy
-    use solver_advection, only : calc_advec2D  
-    use velocity_general, only : calc_uz_advec_corr_3D, calc_uz_advec_corr_3D_aa
+    use solver_advection, only : calc_advec2D
 
     implicit none
     
@@ -173,17 +172,10 @@ end select
                     
                     end if 
 
-                    ! First calculate corrected vertical velocity to account 
-                    ! for sigma-coordinate grid stretching (horizontal derivatives
-                    ! lead to vertical advection adjusment)
-                    ! call calc_uz_advec_corr_3D(thrm%now%uz_star,dyn%now%uz,dyn%now%ux,dyn%now%uy,tpo%now%H_ice,tpo%now%f_ice,tpo%now%f_grnd,tpo%now%z_srf, &
-                    !                             tpo%now%dzsdt,tpo%now%dHidt,thrm%par%z%zeta_aa,thrm%par%z%zeta_ac,thrm%par%dx,thrm%par%dx,thrm%par%boundaries)
-                    thrm%now%uz_star = dyn%now%uz_star 
-
                     ! Now calculate the thermodynamics:
 
                     call calc_ytherm_enthalpy_3D(thrm%now%enth,thrm%now%T_ice,thrm%now%omega,thrm%now%bmb_grnd,thrm%now%Q_ice_b, &
-                                thrm%now%H_cts,thrm%now%T_pmp,thrm%now%cp,thrm%now%kt,thrm%now%advecxy,dyn%now%ux,dyn%now%uy,thrm%now%uz_star,thrm%now%Q_strn, &
+                                thrm%now%H_cts,thrm%now%T_pmp,thrm%now%cp,thrm%now%kt,thrm%now%advecxy,dyn%now%ux,dyn%now%uy,dyn%now%uz_star,thrm%now%Q_strn, &
                                 thrm%now%Q_b,thrm%now%Q_rock,bnd%T_srf,tpo%now%H_ice,tpo%now%f_ice,tpo%now%z_srf,thrm%now%H_w,thrm%now%dHwdt,tpo%now%H_grnd, &
                                 tpo%now%f_grnd,thrm%par%z%zeta_aa,thrm%par%z%zeta_ac,thrm%par%z%dzeta_a,thrm%par%z%dzeta_b, &
                                 thrm%par%enth_cr,thrm%par%omega_max,dt,thrm%par%dx,thrm%par%method,thrm%par%solver_advec)
@@ -665,7 +657,6 @@ end select
         allocate(now%dHwdt(nx,ny))
         
         allocate(now%advecxy(nx,ny,nz_aa))
-        allocate(now%uz_star(nx,ny,nz_ac))
 
         allocate(now%Q_rock(nx,ny))
         allocate(now%enth_rock(nx,ny,nzr_aa))
@@ -688,8 +679,7 @@ end select
         now%dHwdt       = 0.0 
         
         now%advecxy     = 0.0 
-        now%uz_star     = 0.0 
-        
+
         now%Q_rock      = 0.0 
         now%enth_rock   = 0.0 
         now%T_rock      = 0.0 
@@ -721,8 +711,7 @@ end select
         if (allocated(now%dHwdt))       deallocate(now%dHwdt)
         
         if (allocated(now%advecxy))     deallocate(now%advecxy)
-        if (allocated(now%uz_star))     deallocate(now%uz_star)
-        
+
         if (allocated(now%Q_rock))      deallocate(now%Q_rock)
         if (allocated(now%enth_rock))   deallocate(now%enth_rock)
         if (allocated(now%T_rock))      deallocate(now%T_rock)

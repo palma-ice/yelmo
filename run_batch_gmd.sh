@@ -1,6 +1,6 @@
 #!/bin/bash
 
-fldr='tmp/086d7b02'
+fldr='tmp/fe44e13f'
 
 runopt='-r'
 #runopt='-s'

@@ -574,33 +574,33 @@ contains
         integer,  intent(IN)  :: im1, ip1, jm1, jp1
 
         ! Local variables 
-        integer  :: k, nx, ny, n 
+        integer  :: q, nx, ny, n 
         integer  :: i0, i1, j0, j1  
         real(wp) :: v0, v1, wt 
 
         n = size(xn,1)
         
-        nx = size(vary,1)
-        ny = size(vary,2)
+        nx = size(varz,1)
+        ny = size(varz,2)
 
         ! Initialize interpolated variable at nodes of interest
         varn = 0.0
 
-        do k = 1, n
+        do q = 1, n
 
-            if (xn(k) > 0) then
+            if (xn(q) > 0) then
                 i0 = i
                 i1 = ip1
-                wt = xn(k) / 2.0 
+                wt = xn(q) / 2.0 
             else
                 i0 = im1
                 i1 = i
-                wt = 1.0 - abs(xn(k)) / 2.0
+                wt = 1.0 - abs(xn(q)) / 2.0
             end if
 
             ! Get left and right-side 
-            v0 = (1.0-wt)*vary(i0,jm1) + wt*vary(i1,jm1);
-            v1 = (1.0-wt)*vary(i0,j)   + wt*vary(i1,j);
+            v0 = (1.0-wt)*varz(i0,jm1,k) + wt*varz(i1,jm1,k);
+            v1 = (1.0-wt)*varz(i0,j,k)   + wt*varz(i1,j,k);
             
             ! Interpolate vertically to the node location 
             wt = (1.0 + yn(k)) / 2.0;

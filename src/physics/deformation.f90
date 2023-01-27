@@ -36,7 +36,7 @@ module deformation
     public :: calc_rate_factor_integrated
     public :: calc_strain_rate_tensor
     public :: calc_strain_rate_tensor_2D
-    public :: calc_strain_rate_horizontal
+    public :: calc_strain_rate_horizontal_2D
     public :: calc_stress_tensor 
     public :: calc_stress_tensor_2D
     public :: calc_2D_eigen_values
@@ -983,7 +983,7 @@ contains
         ! === First calculate the horizontal strain rate ===
 
 
-        call calc_strain_rate_horizontal(dudx,dudy,dvdx,dvdy,ux,uy,f_ice,dx,dy,boundaries)
+        call calc_strain_rate_horizontal_2D(dudx,dudy,dvdx,dvdy,ux,uy,f_ice,dx,dy,boundaries)
 
 
         ! === Next perform interpolations to get strain rate tensor components on aa-nodes ===
@@ -1055,7 +1055,7 @@ contains
         
     end subroutine calc_strain_rate_tensor_2D
     
-    subroutine calc_strain_rate_horizontal(dudx,dudy,dvdx,dvdy,ux,uy,f_ice,dx,dy,boundaries)
+    subroutine calc_strain_rate_horizontal_2D(dudx,dudy,dvdx,dvdy,ux,uy,f_ice,dx,dy,boundaries)
 
         implicit none
 
@@ -1148,7 +1148,7 @@ contains
                 
         return
 
-    end subroutine calc_strain_rate_horizontal
+    end subroutine calc_strain_rate_horizontal_2D
 
     subroutine calc_strain_rate_uz(dwdx,dwdy,dwdz,uz,H_ice,f_ice,dzbdx,dzbdy, &
                                             dzsdx,dzsdy,zeta_ac,dx,dy,boundaries)

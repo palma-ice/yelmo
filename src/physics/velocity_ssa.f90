@@ -11,7 +11,7 @@ module velocity_ssa
                     integrate_trapezoid1D_1D, integrate_trapezoid1D_pt, minmax, &
                     set_boundaries_2D_aa, set_boundaries_3D_aa
 
-    use deformation, only : calc_strain_rate_horizontal
+    use deformation, only : calc_strain_rate_horizontal_2D
     use basal_dragging 
     use solver_ssa_ac
     use velocity_general, only : set_inactive_margins, &
@@ -397,7 +397,7 @@ end if
 
         ! Populate strain rates over the whole domain on acx- and acy-nodes
 
-        call calc_strain_rate_horizontal(dudx,dudy,dvdx,dvdy,ux,uy,f_ice,dx,dy,boundaries)
+        call calc_strain_rate_horizontal_2D(dudx,dudy,dvdx,dvdy,ux,uy,f_ice,dx,dy,boundaries)
 
         ! Calculate visc_eff on aa-nodes
 

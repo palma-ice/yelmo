@@ -399,7 +399,7 @@ contains
         end if 
 
         call calc_uz_3D(dyn%now%uz,dyn%now%uz_star,dyn%now%ux,dyn%now%uy,tpo%now%H_ice_dyn,tpo%now%f_ice_dyn,tpo%now%f_grnd, &
-                        bnd%smb,bmb,tpo%now%dHidt,tpo%now%dzsdt,tpo%now%dHidx,tpo%now%dHidy,tpo%now%dzsdx,tpo%now%dzsdy, &
+                        bnd%smb,bmb,tpo%now%dHidt,tpo%now%dzsdt,tpo%now%dzsdx,tpo%now%dzsdy, &
                         tpo%now%dzbdx,tpo%now%dzbdy,dyn%par%zeta_aa,dyn%par%zeta_ac,dyn%par%dx,dyn%par%dy,dyn%par%boundaries)
         
         return
@@ -515,7 +515,7 @@ contains
         end if 
 
         call calc_uz_3D(dyn%now%uz,dyn%now%uz_star,dyn%now%ux,dyn%now%uy,tpo%now%H_ice_dyn,tpo%now%f_ice_dyn,tpo%now%f_grnd, &
-                        bnd%smb,bmb,tpo%now%dHidt,tpo%now%dzsdt,tpo%now%dHidx,tpo%now%dHidy,tpo%now%dzsdx,tpo%now%dzsdy, &
+                        bnd%smb,bmb,tpo%now%dHidt,tpo%now%dzsdt,tpo%now%dzsdx,tpo%now%dzsdy, &
                         tpo%now%dzbdx,tpo%now%dzbdy,dyn%par%zeta_aa,dyn%par%zeta_ac,dyn%par%dx,dyn%par%dy,dyn%par%boundaries)
         
         return
@@ -612,7 +612,7 @@ contains
         end if 
 
         call calc_uz_3D(dyn%now%uz,dyn%now%uz_star,dyn%now%ux,dyn%now%uy,tpo%now%H_ice_dyn,tpo%now%f_ice_dyn,tpo%now%f_grnd, &
-                        bnd%smb,bmb,tpo%now%dHidt,tpo%now%dzsdt,tpo%now%dHidx,tpo%now%dHidy,tpo%now%dzsdx,tpo%now%dzsdy, &
+                        bnd%smb,bmb,tpo%now%dHidt,tpo%now%dzsdt,tpo%now%dzsdx,tpo%now%dzsdy, &
                         tpo%now%dzbdx,tpo%now%dzbdy,dyn%par%zeta_aa,dyn%par%zeta_ac,dyn%par%dx,dyn%par%dy,dyn%par%boundaries)
         
         return

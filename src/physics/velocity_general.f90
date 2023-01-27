@@ -11,7 +11,7 @@ module velocity_general
                     set_boundaries_2D_aa, set_boundaries_3D_aa, &
                     set_boundaries_2D_acx, set_boundaries_2D_acy
 
-    use deformation, only : calc_strain_rate_horizontal
+    use deformation, only : calc_strain_rate_horizontal_2D
 
     use solver_ssa_ac, only : ssa_diagnostics_write_init, ssa_diagnostics_write_step
 
@@ -37,7 +37,7 @@ module velocity_general
     
 contains 
     
-    subroutine calc_uz_3D(uz,uz_star,ux,uy,H_ice,f_ice,f_grnd,smb,bmb,dHdt,dzsdt,dHdx,dHdy, &
+    subroutine calc_uz_3D(uz,uz_star,ux,uy,H_ice,f_ice,f_grnd,smb,bmb,dHdt,dzsdt, &
                                     dzsdx,dzsdy,dzbdx,dzbdy,zeta_aa,zeta_ac,dx,dy,boundaries)
         ! Following algorithm outlined by the Glimmer ice sheet model:
         ! https://www.geos.ed.ac.uk/~mhagdorn/glide/glide-doc/glimmer_htmlse9.html#x17-660003.1.5
@@ -59,8 +59,6 @@ contains
         real(wp), intent(IN)  :: bmb(:,:) 
         real(wp), intent(IN)  :: dHdt(:,:) 
         real(wp), intent(IN)  :: dzsdt(:,:) 
-        real(wp), intent(IN)  :: dHdx(:,:) 
-        real(wp), intent(IN)  :: dHdy(:,:)
         real(wp), intent(IN)  :: dzsdx(:,:) 
         real(wp), intent(IN)  :: dzsdy(:,:) 
         real(wp), intent(IN)  :: dzbdx(:,:) 
@@ -80,9 +78,7 @@ contains
         real(wp) :: dzbdx_aa
         real(wp) :: dzbdy_aa
         real(wp) :: dzsdx_aa
-        real(wp) :: dzsdy_aa
-        real(wp) :: dHdx_aa 
-        real(wp) :: dHdy_aa 
+        real(wp) :: dzsdy_aa 
         real(wp) :: dudx_aa
         real(wp) :: dvdy_aa
         real(wp) :: dudz_aa 
@@ -104,8 +100,6 @@ contains
         real(wp) :: dzbdyn(4)
         real(wp) :: dzsdxn(4)
         real(wp) :: dzsdyn(4)
-        real(wp) :: dHdxn(4)
-        real(wp) :: dHdyn(4)
         real(wp) :: dudxn(4) 
         real(wp) :: dvdyn(4) 
         real(wp) :: uxn_up(4) 
@@ -160,7 +154,7 @@ contains
 
         !$omp parallel do 
         do k = 1, nz_aa
-            call calc_strain_rate_horizontal(dudx(:,:,k),dudy,dvdx,dvdy(:,:,k),ux(:,:,k),uy(:,:,k),f_ice,dx,dy,boundaries)
+            call calc_strain_rate_horizontal_2D(dudx(:,:,k),dudy,dvdx,dvdy(:,:,k),ux(:,:,k),uy(:,:,k),f_ice,dx,dy,boundaries)
         end do
 
         ! Next, calculate vertical velocity at each point through the column
@@ -205,14 +199,7 @@ contains
                 call acy_to_nodes(dzsdyn,dzsdy,i,j,xn,yn,im1,ip1,jm1,jp1)
                 dzsdy_aa = sum(dzsdyn*wtn)/wt1
                 
-                ! Get the centered ice thickness gradient 
-                call acx_to_nodes(dHdxn,dHdx,i,j,xn,yn,im1,ip1,jm1,jp1)
-                dHdx_aa = sum(dHdxn*wtn)/wt1
-                
-                call acy_to_nodes(dHdyn,dHdy,i,j,xn,yn,im1,ip1,jm1,jp1)
-                dHdy_aa = sum(dHdyn*wtn)/wt1
-                
-                ! Get the centered horizontal velocity at the base
+                ! Get the aa-node centered horizontal velocity at the base
                 call acx_to_nodes(uxn,ux(:,:,1),i,j,xn,yn,im1,ip1,jm1,jp1)
                 ux_aa = sum(uxn*wtn)/wt1
                 
@@ -247,14 +234,28 @@ contains
                 ! Integrate on vertical ac-nodes (ie, vertical cell borders between aa-node centers)
                 do k = 2, nz_ac 
 
+                    ! Calculate sigma-coordinate derivative correction factors for this layer
+                    ! (Greve and Blatter, 2009, Eqs. 5.131 and 5.132, 
+                    !  also shown in 1D with Eq. 5.145)
+
+                    ! Take zeta at the center of the cell below the current vertical ac boundary
+                    ! (this is also where dudz_aa and dvz_aa are calculated above)
+                    zeta_now = zeta_aa(k-1)
+
+                    ! Note 1: Below are three different ways to calculate correction
+                    ! factors. All give the same result for EISMINT1-moving, as they should. 
+
+                    c_x = -H_inv * ( (1.0-zeta_now)*dzbdx_aa + zeta_now*dzsdx_aa )
+                    c_y = -H_inv * ( (1.0-zeta_now)*dzbdy_aa + zeta_now*dzsdy_aa )
+
+                    ! c_x =  -H_inv * (dzbdx_aa + zeta_now*dHdx_aa)
+                    ! c_y =  -H_inv * (dzbdy_aa + zeta_now*dHdy_aa)
+
+                    ! c_x =  -H_inv * (dzsdx_aa - (1.0-zeta_now)*dHdx_aa)
+                    ! c_y =  -H_inv * (dzsdy_aa - (1.0-zeta_now)*dHdy_aa)
+
                     ! Greve and Blatter (2009), Eq. 5.72
                     ! Bueler and Brown  (2009), Eq. 4
-
-                    call acx_to_nodes(dudxn,dudx(:,:,k-1),i,j,xn,yn,im1,ip1,jm1,jp1)
-                    dudx_aa = sum(dudxn*wtn)/wt1
-
-                    call acy_to_nodes(dvdyn,dvdy(:,:,k-1),i,j,xn,yn,im1,ip1,jm1,jp1)
-                    dvdy_aa = sum(dvdyn*wtn)/wt1
 
                     ! Get dudz/dvdz values at vertical aa-nodes, in order
                     ! to vertically integrate each cell up to ac-node border.
@@ -281,29 +282,13 @@ contains
                     dvdzn = (uyn_up - uyn_dn) / (zeta_aa(kup)-zeta_aa(kdn))
                     dvdz_aa = sum(dvdzn*wtn)
 
-                    ! Calculate sigma-coordinate derivative correction factors
-                    ! (Greve and Blatter, 2009, Eqs. 5.131 and 5.132, 
-                    !  also shown in 1D with Eq. 5.145)
-
-                    ! Take zeta at the center of the cell below the current vertical ac boundary
-                    ! (this is also where dudz_aa and dvz_aa are calculated above)
-                    zeta_now = zeta_aa(k-1)
-
-                    ! Note 1: Below are three different ways to calculate correction
-                    ! factors. All give the same result for EISMINT1-moving, as they should. 
-
-                    c_x = -H_inv * ( (1.0-zeta_now)*dzbdx_aa + zeta_now*dzsdx_aa )
-                    c_y = -H_inv * ( (1.0-zeta_now)*dzbdy_aa + zeta_now*dzsdy_aa )
-
-                    ! c_x =  -H_inv * (dzbdx_aa + zeta_now*dHdx_aa)
-                    ! c_y =  -H_inv * (dzbdy_aa + zeta_now*dHdy_aa)
-
-                    ! c_x =  -H_inv * (dzsdx_aa - (1.0-zeta_now)*dHdx_aa)
-                    ! c_y =  -H_inv * (dzsdy_aa - (1.0-zeta_now)*dHdy_aa)
-
                     ! Calculate sigma-corrected derivatives
-                    dudx_now = dudx_aa + c_x*dudz_aa 
-                    dvdy_now = dvdy_aa + c_y*dvdz_aa 
+                    call acx_to_nodes(dudxn,dudx(:,:,k-1),i,j,xn,yn,im1,ip1,jm1,jp1)
+                    dudx_aa = sum(dudxn*wtn)/wt1  +  c_x*dudz_aa 
+
+                    call acy_to_nodes(dvdyn,dvdy(:,:,k-1),i,j,xn,yn,im1,ip1,jm1,jp1)
+                    dvdy_aa = sum(dvdyn*wtn)/wt1  +  c_y*dvdz_aa 
+
                     
                     ! Calculate vertical velocity of this layer
                     ! (Greve and Blatter, 2009, Eq. 5.95)

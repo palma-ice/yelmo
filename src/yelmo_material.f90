@@ -361,6 +361,16 @@ contains
         call ymat_dealloc(now)
 
         ! Allocate fields to desired dimensions 
+        
+        allocate(now%strn%dxx(nx,ny,nz_aa))
+        allocate(now%strn%dyy(nx,ny,nz_aa))
+        allocate(now%strn%dxy(nx,ny,nz_aa))
+        allocate(now%strn%dxz(nx,ny,nz_aa))
+        allocate(now%strn%dyz(nx,ny,nz_aa))
+        allocate(now%strn%div(nx,ny,nz_aa))
+        allocate(now%strn%de(nx,ny,nz_aa))
+        allocate(now%strn%f_shear(nx,ny,nz_aa))
+        
         allocate(now%strn2D%dxx(nx,ny))
         allocate(now%strn2D%dyy(nx,ny))
         allocate(now%strn2D%dxy(nx,ny))
@@ -372,14 +382,12 @@ contains
         allocate(now%strn2D%eps_eig_1(nx,ny))
         allocate(now%strn2D%eps_eig_2(nx,ny))
         
-        allocate(now%strn%dxx(nx,ny,nz_aa))
-        allocate(now%strn%dyy(nx,ny,nz_aa))
-        allocate(now%strn%dxy(nx,ny,nz_aa))
-        allocate(now%strn%dxz(nx,ny,nz_aa))
-        allocate(now%strn%dyz(nx,ny,nz_aa))
-        allocate(now%strn%div(nx,ny,nz_aa))
-        allocate(now%strn%de(nx,ny,nz_aa))
-        allocate(now%strn%f_shear(nx,ny,nz_aa))
+        allocate(now%strs%txx(nx,ny,nz_aa))
+        allocate(now%strs%tyy(nx,ny,nz_aa))
+        allocate(now%strs%txy(nx,ny,nz_aa))
+        allocate(now%strs%txz(nx,ny,nz_aa))
+        allocate(now%strs%tyz(nx,ny,nz_aa))
+        allocate(now%strs%te(nx,ny,nz_aa))
         
         allocate(now%strs2D%txx(nx,ny))
         allocate(now%strs2D%tyy(nx,ny))
@@ -389,13 +397,6 @@ contains
         allocate(now%strs2D%te(nx,ny))
         allocate(now%strs2D%tau_eig_1(nx,ny))
         allocate(now%strs2D%tau_eig_2(nx,ny))
-        
-        allocate(now%strs%txx(nx,ny,nz_aa))
-        allocate(now%strs%tyy(nx,ny,nz_aa))
-        allocate(now%strs%txy(nx,ny,nz_aa))
-        allocate(now%strs%txz(nx,ny,nz_aa))
-        allocate(now%strs%tyz(nx,ny,nz_aa))
-        allocate(now%strs%te(nx,ny,nz_aa))
         
         allocate(now%enh(nx,ny,nz_aa))
         allocate(now%enh_bnd(nx,ny,nz_aa))
@@ -412,6 +413,15 @@ contains
         allocate(now%dep_time(nx,ny,nz_aa)) 
         allocate(now%depth_iso(nx,ny,n_iso)) 
 
+        now%strn%dxx     = 0.0 
+        now%strn%dyy     = 0.0 
+        now%strn%dxy     = 0.0 
+        now%strn%dxz     = 0.0
+        now%strn%dyz     = 0.0
+        now%strn%div     = 0.0
+        now%strn%de      = 0.0
+        now%strn%f_shear = 0.0 
+        
         now%strn2D%dxx   = 0.0 
         now%strn2D%dyy   = 0.0 
         now%strn2D%dxy   = 0.0
@@ -422,14 +432,12 @@ contains
         now%strn2D%eps_eig_1 = 0.0 
         now%strn2D%eps_eig_2 = 0.0 
         
-        now%strn%dxx     = 0.0 
-        now%strn%dyy     = 0.0 
-        now%strn%dxy     = 0.0 
-        now%strn%dxz     = 0.0
-        now%strn%dyz     = 0.0
-        now%strn%div     = 0.0
-        now%strn%de      = 0.0
-        now%strn%f_shear = 0.0 
+        now%strs%txx     = 0.0 
+        now%strs%tyy     = 0.0 
+        now%strs%txy     = 0.0 
+        now%strs%txz     = 0.0
+        now%strs%tyz     = 0.0
+        now%strs%te      = 0.0
         
         now%strs2D%txx   = 0.0 
         now%strs2D%tyy   = 0.0 
@@ -439,13 +447,6 @@ contains
         now%strs2D%te    = 0.0 
         now%strs2D%tau_eig_1 = 0.0 
         now%strs2D%tau_eig_2 = 0.0 
-        
-        now%strs%txx     = 0.0 
-        now%strs%tyy     = 0.0 
-        now%strs%txy     = 0.0 
-        now%strs%txz     = 0.0
-        now%strs%tyz     = 0.0
-        now%strs%te      = 0.0
         
         now%enh          = 1.0 
         now%enh_bnd      = 1.0 
@@ -471,6 +472,15 @@ contains
 
         type(ymat_state_class), intent(INOUT) :: now 
 
+        if (allocated(now%strn%dxx))        deallocate(now%strn%dxx)
+        if (allocated(now%strn%dyy))        deallocate(now%strn%dyy)
+        if (allocated(now%strn%dxy))        deallocate(now%strn%dxy)
+        if (allocated(now%strn%dxz))        deallocate(now%strn%dxz)
+        if (allocated(now%strn%dyz))        deallocate(now%strn%dyz)
+        if (allocated(now%strn%div))        deallocate(now%strn%div)
+        if (allocated(now%strn%de))         deallocate(now%strn%de)
+        if (allocated(now%strn%f_shear))    deallocate(now%strn%f_shear)
+        
         if (allocated(now%strn2D%dxx))      deallocate(now%strn2D%dxx)
         if (allocated(now%strn2D%dyy))      deallocate(now%strn2D%dyy)
         if (allocated(now%strn2D%dxy))      deallocate(now%strn2D%dxy)
@@ -481,14 +491,12 @@ contains
         if (allocated(now%strn2D%eps_eig_1)) deallocate(now%strn2D%eps_eig_1)
         if (allocated(now%strn2D%eps_eig_2)) deallocate(now%strn2D%eps_eig_2)
         
-        if (allocated(now%strn%dxx))        deallocate(now%strn%dxx)
-        if (allocated(now%strn%dyy))        deallocate(now%strn%dyy)
-        if (allocated(now%strn%dxy))        deallocate(now%strn%dxy)
-        if (allocated(now%strn%dxz))        deallocate(now%strn%dxz)
-        if (allocated(now%strn%dyz))        deallocate(now%strn%dyz)
-        if (allocated(now%strn%div))        deallocate(now%strn%div)
-        if (allocated(now%strn%de))         deallocate(now%strn%de)
-        if (allocated(now%strn%f_shear))    deallocate(now%strn%f_shear)
+        if (allocated(now%strs%txx))        deallocate(now%strs%txx)
+        if (allocated(now%strs%tyy))        deallocate(now%strs%tyy)
+        if (allocated(now%strs%txy))        deallocate(now%strs%txy)
+        if (allocated(now%strs%txz))        deallocate(now%strs%txz)
+        if (allocated(now%strs%tyz))        deallocate(now%strs%tyz)
+        if (allocated(now%strs%te))         deallocate(now%strs%te)
         
         if (allocated(now%strs2D%txx))      deallocate(now%strs2D%txx)
         if (allocated(now%strs2D%tyy))      deallocate(now%strs2D%tyy)
@@ -498,13 +506,6 @@ contains
         if (allocated(now%strs2D%te))       deallocate(now%strs2D%te)
         if (allocated(now%strs2D%tau_eig_1)) deallocate(now%strs2D%tau_eig_1)
         if (allocated(now%strs2D%tau_eig_2)) deallocate(now%strs2D%tau_eig_2)
-        
-        if (allocated(now%strs%txx))        deallocate(now%strs%txx)
-        if (allocated(now%strs%tyy))        deallocate(now%strs%tyy)
-        if (allocated(now%strs%txy))        deallocate(now%strs%txy)
-        if (allocated(now%strs%txz))        deallocate(now%strs%txz)
-        if (allocated(now%strs%tyz))        deallocate(now%strs%tyz)
-        if (allocated(now%strs%te))         deallocate(now%strs%te)
         
         if (allocated(now%enh))             deallocate(now%enh)
         if (allocated(now%enh_bnd))         deallocate(now%enh_bnd)

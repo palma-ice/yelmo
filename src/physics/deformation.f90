@@ -36,6 +36,8 @@ module deformation
     public :: calc_rate_factor_integrated
 
     public :: calc_jacobian_vel_3D
+    public :: calc_strain_rate_tensor_jac
+
     public :: calc_strain_rate_tensor
     public :: calc_strain_rate_tensor_2D
     public :: calc_strain_rate_horizontal_2D
@@ -657,7 +659,7 @@ contains
         integer  :: i, j, k
         integer  :: im1, ip1, jm1, jp1 
         integer  :: nx, ny, nz_aa, nz_ac
-        real(wp) :: H_inv, H_inv_acx, H_inv_acy 
+        real(wp) :: H_now, H_now_acx, H_now_acy 
         real(wp) :: dzbdx_acy, dzbdy_acx, dzsdx_acy, dzsdy_acx
         real(wp) :: dzbdx_aa, dzbdy_aa, dzsdx_aa, dzsdy_aa
         real(wp) :: c_x, c_y, c_x_acy, c_y_acx
@@ -701,18 +703,32 @@ contains
                 ! for ac-nodes. For fractional points, ac-node may border a fully
                 ! ice-covered grid point. 
 
-                H_inv     = 1.0 / H_ice(i,j)
-                H_inv_acx = 1.0 / 0.5*(H_ice(i,j)+H_ice(ip1,j))
-                H_inv_acy = 1.0 / 0.5*(H_ice(i,j)+H_ice(i,jp1))
-                ! ajr: treat margins for staggered thickness specifically too? 
+                H_now     = H_ice(i,j)
+
+                ! Get staggered ice thickness too 
+                if (f_ice(i,j) .eq. 1.0 .and. f_ice(ip1,j) .lt. 1.0) then 
+                    H_now_acx = H_ice(i,j)
+                else if (f_ice(i,j) .lt. 1.0 .and. f_ice(ip1,j) .eq. 1.0) then 
+                    H_now_acx = H_ice(ip1,j)
+                else
+                    H_now_acx = 0.5*(H_ice(i,j)+H_ice(ip1,j))
+                end if
+
+                if (f_ice(i,j) .eq. 1.0 .and. f_ice(i,jp1) .lt. 1.0) then 
+                    H_now_acy = H_ice(i,j)
+                else if (f_ice(i,j) .lt. 1.0 .and. f_ice(i,jp1) .eq. 1.0) then 
+                    H_now_acy = H_ice(i,jp1)
+                else
+                    H_now_acy = 0.5*(H_ice(i,j)+H_ice(i,jp1))
+                end if
 
 
                 ! Calculate dxz, dyz on aa-nodes vertically, ac-nodes horizontally
 
                 ! Bottom layer - upwind derivative
                 k = 1
-                jvel%dxz(i,j,k) = (ux(i,j,k+1)-ux(i,j,k)) / (H_inv_acx*(zeta_aa(k+1)-zeta_aa(k)))
-                jvel%dyz(i,j,k) = (uy(i,j,k+1)-uy(i,j,k)) / (H_inv_acy*(zeta_aa(k+1)-zeta_aa(k)))
+                jvel%dxz(i,j,k) = (ux(i,j,k+1)-ux(i,j,k)) / (H_now_acx*(zeta_aa(k+1)-zeta_aa(k)))
+                jvel%dyz(i,j,k) = (uy(i,j,k+1)-uy(i,j,k)) / (H_now_acy*(zeta_aa(k+1)-zeta_aa(k)))
 
                 ! Intermediate layers
                 do k = 2, nz_aa-1 
@@ -722,24 +738,24 @@ contains
                     ! by Singh and Bhadauria
                     ! http://www.m-hikari.com/ijma/ijma-password-2009/ijma-password17-20-2009/bhadauriaIJMA17-20-2009.pdf
 
-                    h1 = H_inv_acx*(zeta_aa(k)-zeta_aa(k-1))
-                    h2 = H_inv_acx*(zeta_aa(k+1)-zeta_aa(k))
-                    jvel%dxz(i,j,k) = -h2/(h1*(h1+h2))*ux(i,j,k-1) - (h1-h2)/(h1*h2)*ux(i,j,k) + h1/(h2*h1+h2)*ux(i,j,k+1)
+                    !h1 = H_now_acx*(zeta_aa(k)-zeta_aa(k-1))
+                    !h2 = H_now_acx*(zeta_aa(k+1)-zeta_aa(k))
+                    !jvel%dxz(i,j,k) = -h2/(h1*(h1+h2))*ux(i,j,k-1) - (h1-h2)/(h1*h2)*ux(i,j,k) + h1/(h2*h1+h2)*ux(i,j,k+1)
 
-                    h1 = H_inv_acy*(zeta_aa(k)-zeta_aa(k-1))
-                    h2 = H_inv_acy*(zeta_aa(k+1)-zeta_aa(k))
-                    jvel%dyz(i,j,k) = -h2/(h1*(h1+h2))*uy(i,j,k-1) - (h1-h2)/(h1*h2)*uy(i,j,k) + h1/(h2*h1+h2)*uy(i,j,k+1)
+                    !h1 = H_now_acy*(zeta_aa(k)-zeta_aa(k-1))
+                    !h2 = H_now_acy*(zeta_aa(k+1)-zeta_aa(k))
+                    !jvel%dyz(i,j,k) = -h2/(h1*(h1+h2))*uy(i,j,k-1) - (h1-h2)/(h1*h2)*uy(i,j,k) + h1/(h2*h1+h2)*uy(i,j,k+1)
                     
                     ! Simple upwind derivatives
-                    !jvel%dxz(i,j,k) = (ux(i,j,k+1)-ux(i,j,k)) / (H_inv_acx*(zeta_aa(k+1)-zeta_aa(k)))
-                    !jvel%dyz(i,j,k) = (uy(i,j,k+1)-uy(i,j,k)) / (H_inv_acy*(zeta_aa(k+1)-zeta_aa(k)))
+                    jvel%dxz(i,j,k) = (ux(i,j,k+1)-ux(i,j,k)) / (H_now_acx*(zeta_aa(k+1)-zeta_aa(k)))
+                    jvel%dyz(i,j,k) = (uy(i,j,k+1)-uy(i,j,k)) / (H_now_acy*(zeta_aa(k+1)-zeta_aa(k)))
 
                 end do 
 
                 ! Top layer - downwind derivative
                 k = nz_aa 
-                jvel%dxz(i,j,k) = (ux(i,j,k)-ux(i,j,k-1)) / (H_inv_acx*(zeta_aa(k)-zeta_aa(k-1)))
-                jvel%dyz(i,j,k) = (uy(i,j,k)-uy(i,j,k-1)) / (H_inv_acy*(zeta_aa(k)-zeta_aa(k-1)))
+                jvel%dxz(i,j,k) = (ux(i,j,k)-ux(i,j,k-1)) / (H_now_acx*(zeta_aa(k)-zeta_aa(k-1)))
+                jvel%dyz(i,j,k) = (uy(i,j,k)-uy(i,j,k-1)) / (H_now_acy*(zeta_aa(k)-zeta_aa(k-1)))
 
             end if
 
@@ -752,7 +768,7 @@ contains
 
                 ! Bottom layer - upwind derivative
                 k = 1
-                jvel%dzz(i,j,k) = (uz(i,j,k+1)-uz(i,j,k)) / (H_inv*(zeta_ac(k+1)-zeta_ac(k)))
+                jvel%dzz(i,j,k) = (uz(i,j,k+1)-uz(i,j,k)) / (H_now*(zeta_ac(k+1)-zeta_ac(k)))
 
                 ! Intermediate layers
                 do k = 2, nz_ac-1 
@@ -762,18 +778,18 @@ contains
                     ! by Singh and Bhadauria
                     ! http://www.m-hikari.com/ijma/ijma-password-2009/ijma-password17-20-2009/bhadauriaIJMA17-20-2009.pdf
 
-                    h1 = H_inv*(zeta_ac(k)-zeta_ac(k-1))
-                    h2 = H_inv*(zeta_ac(k+1)-zeta_ac(k))
-                    jvel%dzz(i,j,k) = -h2/(h1*(h1+h2))*uz(i,j,k-1) - (h1-h2)/(h1*h2)*uz(i,j,k) + h1/(h2*h1+h2)*uz(i,j,k+1)
+                    !h1 = H_now*(zeta_ac(k)-zeta_ac(k-1))
+                    !h2 = H_now*(zeta_ac(k+1)-zeta_ac(k))
+                    !jvel%dzz(i,j,k) = -h2/(h1*(h1+h2))*uz(i,j,k-1) - (h1-h2)/(h1*h2)*uz(i,j,k) + h1/(h2*h1+h2)*uz(i,j,k+1)
 
                     ! Simple upwind derivative
-                    !jvel%dzz(i,j,k) = (uz(i,j,k+1)-uz(i,j,k)) / (H_inv*(zeta_ac(k+1)-zeta_ac(k)))
+                    jvel%dzz(i,j,k) = (uz(i,j,k+1)-uz(i,j,k)) / (H_now*(zeta_ac(k+1)-zeta_ac(k)))
 
                 end do 
 
                 ! Top layer - downwind derivative
                 k = nz_ac
-                jvel%dzz(i,j,k) = (uz(i,j,k)-uz(i,j,k-1)) / (H_inv*(zeta_ac(k)-zeta_ac(k-1)))
+                jvel%dzz(i,j,k) = (uz(i,j,k)-uz(i,j,k-1)) / (H_now*(zeta_ac(k)-zeta_ac(k-1)))
 
             end if
 
@@ -997,6 +1013,8 @@ contains
         real(wp) :: wt1 
         
         real(wp) :: ddn(4) 
+        real(wp) :: ddan(4) 
+        real(wp) :: ddbn(4) 
 
         ! Get nodes and weighting 
         wt0 = 1.0/sqrt(3.0)
@@ -1013,11 +1031,12 @@ contains
         nz_ac = size(zeta_ac,1)
         
         ! Calculate all strain rate tensor components on aa-nodes (horizontally and vertically)
-        ! dxx
-        ! 0.5*(dxy+dyx)
-        ! dyy 
-        ! 0.5*(dxz+dzx)
-        ! 0.5*(dyz+dzy)
+        ! dxx = dxx
+        ! dxy = 0.5*(dxy+dyx)
+        ! dyy = dyy 
+        ! dxz = 0.5*(dxz+dzx)
+        ! dyz = 0.5*(dyz+dzy)
+        ! dzz = dzz  <= Not calculated, as it is not needed 
 
         do j = 1, ny 
         do i = 1, nx 
@@ -1025,19 +1044,102 @@ contains
             ! Get neighbor indices
             call get_neighbor_indices(im1,ip1,jm1,jp1,i,j,nx,ny,boundaries)
 
-            ! Loop over all aa-nodes
+            if (f_ice(i,j) .eq. 1.0) then 
+                ! Ice is present here, calculate the strain-rate tensor
 
-            do k = 1, nz_aa 
-                
-                ! Get dxx on aa-nodes 
-                call acx_to_nodes(ddn,jvel%dxx(:,:,k),i,j,xn,yn,im1,ip1,jm1,jp1)
-                strn%dxx(i,j,k) = sum(ddn*wtn)/wt1
+                ! Loop over all aa-nodes vertically
+                do k = 1, nz_aa 
 
-            end do 
+                    ! Get dxx on aa-nodes 
+                    call acx_to_nodes(ddn,jvel%dxx(:,:,k),i,j,xn,yn,im1,ip1,jm1,jp1)
+                    strn%dxx(i,j,k) = sum(ddn*wtn)/wt1
 
+                    ! Get dxy and dyx on aa-nodes 
+                    call acx_to_nodes(ddan,jvel%dxy(:,:,k),i,j,xn,yn,im1,ip1,jm1,jp1)
+                    call acy_to_nodes(ddbn,jvel%dyx(:,:,k),i,j,xn,yn,im1,ip1,jm1,jp1)
+                    ddn = 0.5*(ddan+ddbn)
+                    strn%dxy(i,j,k) = sum(ddn*wtn)/wt1
+
+                    ! Get dxz and dzx on aa-nodes 
+                    ! (but also get dzx on aa-nodes vertically)
+                    call acx_to_nodes(ddan,jvel%dxz(:,:,k),i,j,xn,yn,im1,ip1,jm1,jp1)
+                    ddbn = 0.5*(jvel%dzx(i,j,k)+jvel%dzx(i,j,k+1))  ! nz_ac has one more index than nz_aa, so this is ok!
+                    ddn  = 0.5*(ddan+ddbn)
+                    strn%dxz(i,j,k) = sum(ddn*wtn)/wt1
+                    !strn%dxz(i,j,k) =  0.0 
+
+                    ! Get dyz and dzy on aa-nodes 
+                    ! (but also get dzy on aa-nodes vertically)
+                    call acy_to_nodes(ddan,jvel%dyz(:,:,k),i,j,xn,yn,im1,ip1,jm1,jp1)
+                    ddbn = 0.5*(jvel%dzy(i,j,k)+jvel%dzy(i,j,k+1))  ! nz_ac has one more index than nz_aa, so this is ok!
+                    ddn  = 0.5*(ddan+ddbn)
+                    strn%dyz(i,j,k) = sum(ddn*wtn)/wt1
+                    !strn%dyz(i,j,k) = 0.0 
+
+                    ! Get dyy on aa-nodes 
+                    call acy_to_nodes(ddn,jvel%dyy(:,:,k),i,j,xn,yn,im1,ip1,jm1,jp1)
+                    strn%dyy(i,j,k) = sum(ddn*wtn)/wt1
+
+
+                    ! ====== Finished calculating individual strain rate terms ====== 
+                        
+                    strn%de(i,j,k) =  sqrt(   strn%dxx(i,j,k)*strn%dxx(i,j,k) &
+                                            + strn%dyy(i,j,k)*strn%dyy(i,j,k) &
+                                            + strn%dxx(i,j,k)*strn%dyy(i,j,k) &
+                                            + strn%dxy(i,j,k)*strn%dxy(i,j,k) &
+                                            + strn%dxz(i,j,k)*strn%dxz(i,j,k) &
+                                            + strn%dyz(i,j,k)*strn%dyz(i,j,k) )
+                    
+                    if (strn%de(i,j,k) .gt. de_max) strn%de(i,j,k) = de_max 
+
+                    ! Calculate the horizontal divergence too 
+                    strn%div(i,j,k) = strn%dxx(i,j,k) + strn%dyy(i,j,k) 
+
+                    ! Note: Using only the below should be equivalent to applying
+                    ! the SIA approximation to calculate `de`
+                    !strn%de(i,j,k)    =  sqrt( shear_squared(k) )
+
+                    if (strn%de(i,j,k) .gt. 0.0) then 
+                        ! Calculate the shear-based strain, stretching and the shear-fraction
+                        shear_squared =   strn%dxz(i,j,k)*strn%dxz(i,j,k) &
+                                        + strn%dyz(i,j,k)*strn%dyz(i,j,k)
+                        strn%f_shear(i,j,k) = sqrt(shear_squared)/strn%de(i,j,k)
+                    else 
+                        strn%f_shear(i,j,k) = 1.0   ! Shearing by default for low strain rates
+                    end if 
+
+                    !  ------ Modification of the shear fraction for floating ice (ice shelves)
+
+                    if (f_grnd(i,j) .eq. 0.0) then 
+                        strn%f_shear(i,j,k) = 0.0    ! Assume ice shelf is only stretching, no shear 
+                    end if 
+
+                    !  ------ Constrain the shear fraction to reasonable [0,1] interval
+
+                    strn%f_shear(i,j,k) = min(max(strn%f_shear(i,j,k), 0.0), 1.0)
+
+                end do 
+
+            end if 
+            
         end do 
         end do 
 
+        ! === Also calculate vertically averaged strain rate tensor ===
+        
+        ! Get the 2D average of strain rate in case it is needed 
+        strn2D%dxx     = calc_vertical_integrated_2D(strn%dxx, zeta_aa)
+        strn2D%dyy     = calc_vertical_integrated_2D(strn%dyy, zeta_aa)
+        strn2D%dxy     = calc_vertical_integrated_2D(strn%dxy, zeta_aa)
+        strn2D%dxz     = calc_vertical_integrated_2D(strn%dxz, zeta_aa)
+        strn2D%dyz     = calc_vertical_integrated_2D(strn%dyz, zeta_aa)
+        strn2D%div     = calc_vertical_integrated_2D(strn%div, zeta_aa)
+        strn2D%de      = calc_vertical_integrated_2D(strn%de,  zeta_aa)
+        strn2D%f_shear = calc_vertical_integrated_2D(strn%f_shear,zeta_aa) 
+        
+        ! Finally, calculate the first two eigenvectors for 2D strain rate tensor 
+        call calc_2D_eigen_values(strn2D%eps_eig_1,strn2D%eps_eig_2, &
+                                    strn2D%dxx,strn2D%dyy,strn2D%dxy)
 
         return 
 

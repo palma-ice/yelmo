@@ -1076,6 +1076,36 @@ contains
         allocate(now%ssa_err_acx(nx,ny)) 
         allocate(now%ssa_err_acy(nx,ny)) 
         
+        allocate(now%jvel%dxx(nx,ny,nz_aa))
+        allocate(now%jvel%dxy(nx,ny,nz_aa))
+        allocate(now%jvel%dxz(nx,ny,nz_aa))
+        allocate(now%jvel%dyx(nx,ny,nz_aa))
+        allocate(now%jvel%dyy(nx,ny,nz_aa))
+        allocate(now%jvel%dyz(nx,ny,nz_aa))
+        allocate(now%jvel%dzx(nx,ny,nz_ac))
+        allocate(now%jvel%dzy(nx,ny,nz_ac))
+        allocate(now%jvel%dzz(nx,ny,nz_ac))
+
+        allocate(now%strn%dxx(nx,ny,nz_aa))
+        allocate(now%strn%dyy(nx,ny,nz_aa))
+        allocate(now%strn%dxy(nx,ny,nz_aa))
+        allocate(now%strn%dxz(nx,ny,nz_aa))
+        allocate(now%strn%dyz(nx,ny,nz_aa))
+        allocate(now%strn%div(nx,ny,nz_aa))
+        allocate(now%strn%de(nx,ny,nz_aa))
+        allocate(now%strn%f_shear(nx,ny,nz_aa))
+        
+        allocate(now%strn2D%dxx(nx,ny))
+        allocate(now%strn2D%dyy(nx,ny))
+        allocate(now%strn2D%dxy(nx,ny))
+        allocate(now%strn2D%dxz(nx,ny))
+        allocate(now%strn2D%dyz(nx,ny))
+        allocate(now%strn2D%div(nx,ny))
+        allocate(now%strn2D%de(nx,ny))
+        allocate(now%strn2D%f_shear(nx,ny))
+        allocate(now%strn2D%eps_eig_1(nx,ny))
+        allocate(now%strn2D%eps_eig_2(nx,ny))
+        
         ! Set all variables to zero intially
         now%ux_bar_ab         = 0.0 
         now%uy_bar_ab         = 0.0
@@ -1153,6 +1183,35 @@ contains
         now%ssa_mask_acy      = 0.0 
         now%ssa_err_acx       = 0.0 
         now%ssa_err_acy       = 0.0 
+        
+        now%jvel%dxx            = 0.0
+        now%jvel%dxy            = 0.0
+        now%jvel%dxz            = 0.0
+        now%jvel%dyx            = 0.0
+        now%jvel%dyy            = 0.0
+        now%jvel%dyz            = 0.0
+        now%jvel%dzx            = 0.0
+        now%jvel%dzy            = 0.0
+        now%jvel%dzz            = 0.0
+        
+        now%strn%dxx     = 0.0 
+        now%strn%dyy     = 0.0 
+        now%strn%dxy     = 0.0 
+        now%strn%dxz     = 0.0
+        now%strn%dyz     = 0.0
+        now%strn%div     = 0.0
+        now%strn%de      = 0.0
+        now%strn%f_shear = 0.0 
+        
+        now%strn2D%dxx   = 0.0 
+        now%strn2D%dyy   = 0.0 
+        now%strn2D%dxy   = 0.0
+        now%strn2D%dxz   = 0.0
+        now%strn2D%dyz   = 0.0
+        now%strn2D%div   = 0.0
+        now%strn2D%de    = 0.0 
+        now%strn2D%eps_eig_1 = 0.0 
+        now%strn2D%eps_eig_2 = 0.0 
         
         return 
 
@@ -1242,6 +1301,35 @@ contains
         if (allocated(now%ssa_err_acx))     deallocate(now%ssa_err_acx) 
         if (allocated(now%ssa_err_acy))     deallocate(now%ssa_err_acy) 
 
+        if (allocated(now%jvel%dxx))         deallocate(now%jvel%dxx)
+        if (allocated(now%jvel%dxy))         deallocate(now%jvel%dxy)
+        if (allocated(now%jvel%dxz))         deallocate(now%jvel%dxz)
+        if (allocated(now%jvel%dyx))         deallocate(now%jvel%dyx)
+        if (allocated(now%jvel%dyy))         deallocate(now%jvel%dyy)
+        if (allocated(now%jvel%dyz))         deallocate(now%jvel%dyz)
+        if (allocated(now%jvel%dzx))         deallocate(now%jvel%dzx)
+        if (allocated(now%jvel%dzy))         deallocate(now%jvel%dzy)
+        if (allocated(now%jvel%dzz))         deallocate(now%jvel%dzz)
+
+        if (allocated(now%strn%dxx))        deallocate(now%strn%dxx)
+        if (allocated(now%strn%dyy))        deallocate(now%strn%dyy)
+        if (allocated(now%strn%dxy))        deallocate(now%strn%dxy)
+        if (allocated(now%strn%dxz))        deallocate(now%strn%dxz)
+        if (allocated(now%strn%dyz))        deallocate(now%strn%dyz)
+        if (allocated(now%strn%div))        deallocate(now%strn%div)
+        if (allocated(now%strn%de))         deallocate(now%strn%de)
+        if (allocated(now%strn%f_shear))    deallocate(now%strn%f_shear)
+        
+        if (allocated(now%strn2D%dxx))      deallocate(now%strn2D%dxx)
+        if (allocated(now%strn2D%dyy))      deallocate(now%strn2D%dyy)
+        if (allocated(now%strn2D%dxy))      deallocate(now%strn2D%dxy)
+        if (allocated(now%strn2D%dxz))      deallocate(now%strn2D%dxz)
+        if (allocated(now%strn2D%dyz))      deallocate(now%strn2D%dyz)
+        if (allocated(now%strn2D%div))      deallocate(now%strn2D%div)
+        if (allocated(now%strn2D%de))       deallocate(now%strn2D%de)
+        if (allocated(now%strn2D%eps_eig_1)) deallocate(now%strn2D%eps_eig_1)
+        if (allocated(now%strn2D%eps_eig_2)) deallocate(now%strn2D%eps_eig_2)
+        
         return 
 
     end subroutine ydyn_dealloc

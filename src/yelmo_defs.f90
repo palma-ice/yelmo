@@ -242,6 +242,44 @@ module yelmo_defs
     !
     ! =========================================================================
     
+    type jacobian_3D_class
+        real(wp), allocatable :: dxx(:,:,:)
+        real(wp), allocatable :: dxy(:,:,:)
+        real(wp), allocatable :: dxz(:,:,:) 
+        real(wp), allocatable :: dyx(:,:,:)
+        real(wp), allocatable :: dyy(:,:,:)
+        real(wp), allocatable :: dyz(:,:,:) 
+        real(wp), allocatable :: dzx(:,:,:)
+        real(wp), allocatable :: dzy(:,:,:)
+        real(wp), allocatable :: dzz(:,:,:) 
+    end type
+
+    type strain_2D_class 
+        real(wp), allocatable :: dxx(:,:) 
+        real(wp), allocatable :: dyy(:,:) 
+        real(wp), allocatable :: dxy(:,:) 
+        real(wp), allocatable :: dxz(:,:) 
+        real(wp), allocatable :: dyz(:,:)
+        real(wp), allocatable :: de(:,:)
+        real(wp), allocatable :: div(:,:) 
+        real(wp), allocatable :: f_shear(:,:) 
+
+        real(wp), allocatable :: eps_eig_1(:,:) 
+        real(wp), allocatable :: eps_eig_2(:,:) 
+
+    end type 
+
+    type strain_3D_class 
+        real(wp), allocatable :: dxx(:,:,:) 
+        real(wp), allocatable :: dyy(:,:,:) 
+        real(wp), allocatable :: dxy(:,:,:) 
+        real(wp), allocatable :: dxz(:,:,:) 
+        real(wp), allocatable :: dyz(:,:,:) 
+        real(wp), allocatable :: de(:,:,:) 
+        real(wp), allocatable :: div(:,:,:) 
+        real(wp), allocatable :: f_shear(:,:,:) 
+    end type 
+    
     ! ydyn parameters
     type ydyn_param_class
 
@@ -391,6 +429,10 @@ module yelmo_defs
         real(wp), allocatable :: ssa_err_acx(:,:) 
         real(wp), allocatable :: ssa_err_acy(:,:) 
         
+        type(jacobian_3D_class) :: jvel
+        type(strain_3D_class)   :: strn 
+        type(strain_2D_class)   :: strn2D
+        
     end type
 
     ! ydyn class
@@ -406,32 +448,6 @@ module yelmo_defs
     ! YELMO objects: ymat 
     !
     ! =========================================================================
-    
-    type strain_2D_class 
-        real(wp), allocatable :: dxx(:,:) 
-        real(wp), allocatable :: dyy(:,:) 
-        real(wp), allocatable :: dxy(:,:) 
-        real(wp), allocatable :: dxz(:,:) 
-        real(wp), allocatable :: dyz(:,:)
-        real(wp), allocatable :: de(:,:)
-        real(wp), allocatable :: div(:,:) 
-        real(wp), allocatable :: f_shear(:,:) 
-
-        real(wp), allocatable :: eps_eig_1(:,:) 
-        real(wp), allocatable :: eps_eig_2(:,:) 
-
-    end type 
-
-    type strain_3D_class 
-        real(wp), allocatable :: dxx(:,:,:) 
-        real(wp), allocatable :: dyy(:,:,:) 
-        real(wp), allocatable :: dxy(:,:,:) 
-        real(wp), allocatable :: dxz(:,:,:) 
-        real(wp), allocatable :: dyz(:,:,:) 
-        real(wp), allocatable :: de(:,:,:) 
-        real(wp), allocatable :: div(:,:,:) 
-        real(wp), allocatable :: f_shear(:,:,:) 
-    end type 
     
     type stress_2D_class 
         real(wp), allocatable :: txx(:,:) 
@@ -491,10 +507,10 @@ module yelmo_defs
 
     type ymat_state_class 
 
-        type(strain_2D_class)   :: strn2D
         type(strain_3D_class)   :: strn 
-        type(stress_2D_class)   :: strs2D
+        type(strain_2D_class)   :: strn2D
         type(stress_3D_class)   :: strs 
+        type(stress_2D_class)   :: strs2D
         
         real(wp), allocatable :: enh(:,:,:)
         real(wp), allocatable :: enh_bnd(:,:,:)

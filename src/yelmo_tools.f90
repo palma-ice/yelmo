@@ -456,6 +456,9 @@ contains
 ! ===== NEW =======================
 
     subroutine acx_to_nodes(varn,varx,i,j,xn,yn,im1,ip1,jm1,jp1)
+        ! 2D !!
+        ! Variable defined on acx-nodes horizontally 
+        ! Assumed no vertical dimension. 
 
         real(wp), intent(OUT) :: varn(:) 
         real(wp), intent(IN)  :: varx(:,:) 
@@ -467,7 +470,6 @@ contains
 
         ! Local variables 
         integer  :: k, nx, ny, n 
-        !integer  :: im1, ip1, jm1, jp1
         integer  :: i0, i1, j0, j1 
         real(wp) :: v0, v1, wt 
 
@@ -506,7 +508,10 @@ contains
     end subroutine acx_to_nodes
 
     subroutine acy_to_nodes(varn,vary,i,j,xn,yn,im1,ip1,jm1,jp1)
-
+        ! 2D !!
+        ! Variable defined on acy-nodes horizontally 
+        ! Assumed no vertical dimension. 
+        
         real(wp), intent(OUT) :: varn(:) 
         real(wp), intent(IN)  :: vary(:,:) 
         integer,  intent(IN)  :: i 
@@ -517,7 +522,6 @@ contains
 
         ! Local variables 
         integer  :: k, nx, ny, n 
-        !integer  :: im1, ip1, jm1, jp1
         integer  :: i0, i1, j0, j1  
         real(wp) :: v0, v1, wt 
 
@@ -554,6 +558,59 @@ contains
         return
 
     end subroutine acy_to_nodes
+    
+    subroutine acz_to_nodes(varn,varz,i,j,k,xn,yn,zn,im1,ip1,jm1,jp1)
+        ! Variable on aa-nodes horizontally, acz nodes vertically.
+        ! Bring to 8 nodes internal to 3D cell. 
+
+        real(wp), intent(OUT) :: varn(:) 
+        real(wp), intent(IN)  :: varz(:,:,:) 
+        integer,  intent(IN)  :: i 
+        integer,  intent(IN)  :: j
+        integer,  intent(IN)  :: k
+        real(wp), intent(IN)  :: xn(:)
+        real(wp), intent(IN)  :: yn(:) 
+        real(wp), intent(IN)  :: zn(:) 
+        integer,  intent(IN)  :: im1, ip1, jm1, jp1
+
+        ! Local variables 
+        integer  :: k, nx, ny, n 
+        integer  :: i0, i1, j0, j1  
+        real(wp) :: v0, v1, wt 
+
+        n = size(xn,1)
+        
+        nx = size(vary,1)
+        ny = size(vary,2)
+
+        ! Initialize interpolated variable at nodes of interest
+        varn = 0.0
+
+        do k = 1, n
+
+            if (xn(k) > 0) then
+                i0 = i
+                i1 = ip1
+                wt = xn(k) / 2.0 
+            else
+                i0 = im1
+                i1 = i
+                wt = 1.0 - abs(xn(k)) / 2.0
+            end if
+
+            ! Get left and right-side 
+            v0 = (1.0-wt)*vary(i0,jm1) + wt*vary(i1,jm1);
+            v1 = (1.0-wt)*vary(i0,j)   + wt*vary(i1,j);
+            
+            ! Interpolate vertically to the node location 
+            wt = (1.0 + yn(k)) / 2.0;
+            varn(k) = (1.0-wt)*v0 + wt*v1;
+
+        end do
+        
+        return
+
+    end subroutine acz_to_nodes
     
     subroutine stagger_node_aa_ab_ice(u_ab,u_aa,f_ice,i,j,check_underflow)
         ! Stagger from aa nodes to ab node for index [i,j]

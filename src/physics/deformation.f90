@@ -969,18 +969,17 @@ contains
         ! -------------------------------------------------------------------------------
         !  Computation of all components of the strain-rate tensor, the full
         !  effective strain rate and the shear fraction.
-        !  Alexander Robinson: Adapted from sicopolis5-dev::calc_dxyz 
         ! ------------------------------------------------------------------------------
 
         ! Note: vx, vy are staggered on ac-nodes in the horizontal, but are on the zeta_aa nodes (ie layer-centered)
         ! in the vertical. vz is centered on aa-nodes in the horizontal, but staggered on zeta_ac nodes
         ! in the vertical. 
 
-        ! Note: first calculate each tensor component on ab-nodes, then interpolate to aa-nodes)
+        ! Note: first calculate each tensor component on quadrature nodes, then interpolate to aa-nodes)
         ! This is a quadrature approach and is generally more stable. 
-        ! The temperorary variable dd_ab(1:4) is used to hold the values 
-        ! calculated at each corner (ab-node), starting from dd_ab(1)==upper-right, and
-        ! moving counter-clockwise. The average of dd_ab(1:4) gives the cell-centered
+        ! The temperorary variable ddn(1:4) is used to hold the values 
+        ! calculated at each quadrature point, starting from ddn(1)==upper-right, and
+        ! moving counter-clockwise. The average of ddn(1:4) gives the cell-centered
         ! (aa-node) value.
 
         implicit none
@@ -1050,6 +1049,8 @@ contains
                 ! Loop over all aa-nodes vertically
                 do k = 1, nz_aa 
 
+if (.FALSE.) then 
+    ! Use quadrature points
                     ! Get dxx on aa-nodes 
                     call acx_to_nodes(ddn,jvel%dxx(:,:,k),i,j,xn,yn,im1,ip1,jm1,jp1)
                     strn%dxx(i,j,k) = sum(ddn*wtn)/wt1
@@ -1066,7 +1067,6 @@ contains
                     ddbn = 0.5*(jvel%dzx(i,j,k)+jvel%dzx(i,j,k+1))  ! nz_ac has one more index than nz_aa, so this is ok!
                     ddn  = 0.5*(ddan+ddbn)
                     strn%dxz(i,j,k) = sum(ddn*wtn)/wt1
-                    !strn%dxz(i,j,k) =  0.0 
 
                     ! Get dyz and dzy on aa-nodes 
                     ! (but also get dzy on aa-nodes vertically)
@@ -1074,12 +1074,44 @@ contains
                     ddbn = 0.5*(jvel%dzy(i,j,k)+jvel%dzy(i,j,k+1))  ! nz_ac has one more index than nz_aa, so this is ok!
                     ddn  = 0.5*(ddan+ddbn)
                     strn%dyz(i,j,k) = sum(ddn*wtn)/wt1
-                    !strn%dyz(i,j,k) = 0.0 
 
                     ! Get dyy on aa-nodes 
                     call acy_to_nodes(ddn,jvel%dyy(:,:,k),i,j,xn,yn,im1,ip1,jm1,jp1)
                     strn%dyy(i,j,k) = sum(ddn*wtn)/wt1
+else
+    ! Unstagger directly to aa-nodes
 
+                    ! Get dxx on aa-nodes 
+                    strn%dxx(i,j,k) = 0.5*(jvel%dxx(i,j,k)+jvel%dxx(im1,j,k))
+
+                    ! Get dxy and dyx on aa-nodes 
+                    ddan = 0.5*(jvel%dxy(i,j,k)+jvel%dxy(im1,j,k))
+                    ddbn = 0.5*(jvel%dyx(i,j,k)+jvel%dyx(i,jm1,k))
+                    ddn = 0.5*(ddan+ddbn)
+                    strn%dxy(i,j,k) = sum(ddn*wtn)/wt1
+
+                    ! Get dxz and dzx on aa-nodes 
+                    ! (but also get dzx on aa-nodes vertically)
+                    ddan = 0.5*(jvel%dxz(i,j,k)+jvel%dxz(im1,j,k))
+                    ddbn = 0.5*(jvel%dzx(i,j,k)+jvel%dzx(i,j,k+1))  ! nz_ac has one more index than nz_aa, so this is ok!
+                    ddn  = 0.5*(ddan+ddbn)
+                    strn%dxz(i,j,k) = sum(ddn*wtn)/wt1
+
+                    ! Get dyz and dzy on aa-nodes 
+                    ! (but also get dzy on aa-nodes vertically)
+                    ddan = 0.5*(jvel%dyz(i,j,k)+jvel%dyz(i,jm1,k))
+                    ddbn = 0.5*(jvel%dzy(i,j,k)+jvel%dzy(i,j,k+1))  ! nz_ac has one more index than nz_aa, so this is ok!
+                    ddn  = 0.5*(ddan+ddbn)
+                    strn%dyz(i,j,k) = sum(ddn*wtn)/wt1
+
+                    ! Get dyy on aa-nodes 
+                    strn%dyy(i,j,k) = 0.5*(jvel%dyy(i,j,k)+jvel%dyy(i,jm1,k))
+
+end if
+
+                    ! TEST - set shear strain terms to zero
+                    !strn%dxz(i,j,k) =  0.0 
+                    !strn%dyz(i,j,k) = 0.0 
 
                     ! ====== Finished calculating individual strain rate terms ====== 
                         
@@ -1121,7 +1153,7 @@ contains
                 end do 
 
             end if 
-            
+
         end do 
         end do 
 
@@ -1150,18 +1182,17 @@ contains
         ! -------------------------------------------------------------------------------
         !  Computation of all components of the strain-rate tensor, the full
         !  effective strain rate and the shear fraction.
-        !  Alexander Robinson: Adapted from sicopolis5-dev::calc_dxyz 
         ! ------------------------------------------------------------------------------
 
         ! Note: vx, vy are staggered on ac-nodes in the horizontal, but are on the zeta_aa nodes (ie layer-centered)
         ! in the vertical. vz is centered on aa-nodes in the horizontal, but staggered on zeta_ac nodes
         ! in the vertical. 
 
-        ! Note: first calculate each tensor component on ab-nodes, then interpolate to aa-nodes)
+        ! Note: first calculate each tensor component on quadrature nodes, then interpolate to aa-nodes)
         ! This is a quadrature approach and is generally more stable. 
-        ! The temperorary variable dd_ab(1:4) is used to hold the values 
-        ! calculated at each corner (ab-node), starting from dd_ab(1)==upper-right, and
-        ! moving counter-clockwise. The average of dd_ab(1:4) gives the cell-centered
+        ! The temperorary variable ddn(1:4) is used to hold the values 
+        ! calculated at each quadrature point, starting from ddn(1)==upper-right, and
+        ! moving counter-clockwise. The average of ddn(1:4) gives the cell-centered
         ! (aa-node) value.
 
         implicit none

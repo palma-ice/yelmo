@@ -10,7 +10,7 @@ module deformation
     ! Note: 3D arrays defined such that first index (k=1) == base, and max index (k=nk) == surface 
 
     use yelmo_defs,  only : sp, dp, wp, prec, TOL_UNDERFLOW, T0, rho_ice, g, &
-                        strain_2D_class, strain_3D_class, stress_2D_class, stress_3D_class
+                        jacobian_3D_class, strain_2D_class, strain_3D_class, stress_2D_class, stress_3D_class
     use yelmo_tools, only : get_neighbor_indices, &
                     calc_vertical_integrated_2D, integrate_trapezoid1D_1D, integrate_trapezoid1D_pt, &
                     acx_to_nodes, acy_to_nodes, &
@@ -34,6 +34,8 @@ module deformation
     public :: calc_rate_factor_eismint
     public :: scale_rate_factor_water
     public :: calc_rate_factor_integrated
+
+    public :: calc_jacobian_vel_3D
     public :: calc_strain_rate_tensor
     public :: calc_strain_rate_tensor_2D
     public :: calc_strain_rate_horizontal_2D
@@ -615,6 +617,336 @@ contains
     
 
 
+
+
+        subroutine calc_jacobian_vel_3D(jvel, ux, uy, uz, H_ice, f_ice, f_grnd, dzsdx, dzsdy,  &
+                                                dzbdx, dzbdy, zeta_aa, zeta_ac, dx, dy, boundaries)
+
+        ! -------------------------------------------------------------------------------
+        !  Computation of all components of the Jacobian of the velocity vector:
+        !  (ux,uy,uz) == (u,v,w)
+        !
+        ! ------------------------------------------------------------------------------
+
+        ! Note: vx, vy are staggered on ac-nodes in the horizontal, but are on the zeta_aa nodes (ie layer-centered)
+        ! in the vertical. vz is centered on aa-nodes in the horizontal, but staggered on zeta_ac nodes
+        ! in the vertical. 
+
+        ! All tensor components are calculated in the same location as the velocity components. 
+        
+        implicit none
+        
+        type(jacobian_3D_class), intent(INOUT) :: jvel          ! [yr^-1] on ac-nodes (3D)
+        real(wp), intent(IN) :: ux(:,:,:)                       ! nx,ny,nz_aa
+        real(wp), intent(IN) :: uy(:,:,:)                       ! nx,ny,nz_aa
+        real(wp), intent(IN) :: uz(:,:,:)                       ! nx,ny,nz_ac
+        real(wp), intent(IN) :: H_ice(:,:)
+        real(wp), intent(IN) :: f_ice(:,:)
+        real(wp), intent(IN) :: f_grnd(:,:)
+        real(wp), intent(IN) :: dzsdx(:,:) 
+        real(wp), intent(IN) :: dzsdy(:,:) 
+        real(wp), intent(IN) :: dzbdx(:,:) 
+        real(wp), intent(IN) :: dzbdy(:,:) 
+        real(wp), intent(IN) :: zeta_aa(:) 
+        real(wp), intent(IN) :: zeta_ac(:) 
+        real(wp), intent(IN) :: dx
+        real(wp), intent(IN) :: dy
+        character(len=*), intent(IN) :: boundaries 
+
+        ! Local variables 
+        integer  :: i, j, k
+        integer  :: im1, ip1, jm1, jp1 
+        integer  :: nx, ny, nz_aa, nz_ac
+        real(wp) :: H_inv, H_inv_acx, H_inv_acy 
+        real(wp) :: dzbdx_acy, dzbdy_acx, dzsdx_acy, dzsdy_acx
+        real(wp) :: dzbdx_aa, dzbdy_aa, dzsdx_aa, dzsdy_aa
+        real(wp) :: c_x, c_y, c_x_acy, c_y_acx
+        real(wp) :: h1, h2 
+
+
+        ! Determine sizes and allocate local variables 
+        nx    = size(ux,1)
+        ny    = size(ux,2)
+        nz_aa = size(zeta_aa,1)
+        nz_ac = size(zeta_ac,1)
+        
+        !-------- Initialisation --------
+
+        jvel%dxx          = 0.0_wp
+        jvel%dxy          = 0.0_wp
+        jvel%dxz          = 0.0_wp
+        jvel%dyx          = 0.0_wp
+        jvel%dyy          = 0.0_wp
+        jvel%dyz          = 0.0_wp
+        jvel%dzx          = 0.0_wp
+        jvel%dzy          = 0.0_wp
+        jvel%dzz          = 0.0_wp
+
+        !-------- Computation --------
+
+        ! Step 1: Calculate all vertical derivatives, some of which are used 
+        ! as correction terms for the horizontal derivatives w.r.t. sigma-coordinate transformation. 
+
+        !$omp parallel do
+        do j = 1, ny 
+        do i = 1, nx 
+
+            ! Get neighbor indices
+            call get_neighbor_indices(im1,ip1,jm1,jp1,i,j,nx,ny,boundaries)
+
+
+            if (f_ice(i,j) .gt. 0.0) then 
+                ! Ice is present at this grid point
+                ! Include fractional points, since these derivatives are calculated
+                ! for ac-nodes. For fractional points, ac-node may border a fully
+                ! ice-covered grid point. 
+
+                H_inv     = 1.0 / H_ice(i,j)
+                H_inv_acx = 1.0 / 0.5*(H_ice(i,j)+H_ice(ip1,j))
+                H_inv_acy = 1.0 / 0.5*(H_ice(i,j)+H_ice(i,jp1))
+                ! ajr: treat margins for staggered thickness specifically too? 
+
+
+                ! Calculate dxz, dyz on aa-nodes vertically, ac-nodes horizontally
+
+                ! Bottom layer - upwind derivative
+                k = 1
+                jvel%dxz(i,j,k) = (ux(i,j,k+1)-ux(i,j,k)) / (H_inv_acx*(zeta_aa(k+1)-zeta_aa(k)))
+                jvel%dyz(i,j,k) = (uy(i,j,k+1)-uy(i,j,k)) / (H_inv_acy*(zeta_aa(k+1)-zeta_aa(k)))
+
+                ! Intermediate layers
+                do k = 2, nz_aa-1 
+
+                    ! Use centered, 1st order derivative for uneven layers 
+                    ! see "Finite Difference Formulae for Unequal Sub-Intervals Using Lagrange’s Interpolation Formula"
+                    ! by Singh and Bhadauria
+                    ! http://www.m-hikari.com/ijma/ijma-password-2009/ijma-password17-20-2009/bhadauriaIJMA17-20-2009.pdf
+
+                    h1 = H_inv_acx*(zeta_aa(k)-zeta_aa(k-1))
+                    h2 = H_inv_acx*(zeta_aa(k+1)-zeta_aa(k))
+                    jvel%dxz(i,j,k) = -h2/(h1*(h1+h2))*ux(i,j,k-1) - (h1-h2)/(h1*h2)*ux(i,j,k) + h1/(h2*h1+h2)*ux(i,j,k+1)
+
+                    h1 = H_inv_acy*(zeta_aa(k)-zeta_aa(k-1))
+                    h2 = H_inv_acy*(zeta_aa(k+1)-zeta_aa(k))
+                    jvel%dyz(i,j,k) = -h2/(h1*(h1+h2))*uy(i,j,k-1) - (h1-h2)/(h1*h2)*uy(i,j,k) + h1/(h2*h1+h2)*uy(i,j,k+1)
+                    
+                    ! Simple upwind derivatives
+                    !jvel%dxz(i,j,k) = (ux(i,j,k+1)-ux(i,j,k)) / (H_inv_acx*(zeta_aa(k+1)-zeta_aa(k)))
+                    !jvel%dyz(i,j,k) = (uy(i,j,k+1)-uy(i,j,k)) / (H_inv_acy*(zeta_aa(k+1)-zeta_aa(k)))
+
+                end do 
+
+                ! Top layer - downwind derivative
+                k = nz_aa 
+                jvel%dxz(i,j,k) = (ux(i,j,k)-ux(i,j,k-1)) / (H_inv_acx*(zeta_aa(k)-zeta_aa(k-1)))
+                jvel%dyz(i,j,k) = (uy(i,j,k)-uy(i,j,k-1)) / (H_inv_acy*(zeta_aa(k)-zeta_aa(k-1)))
+
+            end if
+
+            if (f_ice(i,j) .eq. 1.0) then
+                ! Ice present at this point
+                ! Derivatives are calculated horizontally for aa-nodes, thus, we
+                ! are only concerned with fully ice-covered points now. 
+
+                ! Calculate dzz on ac-nodes vertically, aa-nodes horizontally
+
+                ! Bottom layer - upwind derivative
+                k = 1
+                jvel%dzz(i,j,k) = (uz(i,j,k+1)-uz(i,j,k)) / (H_inv*(zeta_ac(k+1)-zeta_ac(k)))
+
+                ! Intermediate layers
+                do k = 2, nz_ac-1 
+
+                    ! Use centered, 1st order derivative for uneven layers 
+                    ! see "Finite Difference Formulae for Unequal Sub-Intervals Using Lagrange’s Interpolation Formula"
+                    ! by Singh and Bhadauria
+                    ! http://www.m-hikari.com/ijma/ijma-password-2009/ijma-password17-20-2009/bhadauriaIJMA17-20-2009.pdf
+
+                    h1 = H_inv*(zeta_ac(k)-zeta_ac(k-1))
+                    h2 = H_inv*(zeta_ac(k+1)-zeta_ac(k))
+                    jvel%dzz(i,j,k) = -h2/(h1*(h1+h2))*uz(i,j,k-1) - (h1-h2)/(h1*h2)*uz(i,j,k) + h1/(h2*h1+h2)*uz(i,j,k+1)
+
+                    ! Simple upwind derivative
+                    !jvel%dzz(i,j,k) = (uz(i,j,k+1)-uz(i,j,k)) / (H_inv*(zeta_ac(k+1)-zeta_ac(k)))
+
+                end do 
+
+                ! Top layer - downwind derivative
+                k = nz_ac
+                jvel%dzz(i,j,k) = (uz(i,j,k)-uz(i,j,k-1)) / (H_inv*(zeta_ac(k)-zeta_ac(k-1)))
+
+            end if
+
+        end do
+        end do 
+        !$omp end parallel do
+
+        ! Set 2: Calculate all horizontal derivatives accounting for correction terms
+
+        !$omp parallel do
+        do j = 1, ny 
+        do i = 1, nx 
+            
+            ! Get neighbor indices
+            call get_neighbor_indices(im1,ip1,jm1,jp1,i,j,nx,ny,boundaries)
+
+
+            if (f_ice(i,j) .gt. 0.0) then 
+                ! Ice is present at this grid point*
+                ! Include fractional points, since these derivatives are calculated
+                ! for ac-nodes. For fractional points, ac-node may border a fully
+                ! ice-covered grid point. 
+
+                do k = 1, nz_aa 
+
+                    ! === Calculate derivatives , no sigma-correction terms yet ===
+
+                    ! Second-order, centered derivatives
+                    jvel%dxx(i,j,k) = (ux(ip1,j,k)-ux(im1,j,k))/(2.0*dx)
+                    jvel%dxy(i,j,k) = (ux(i,jp1,k)-ux(i,jm1,k))/(2.0*dy)
+                    
+                    jvel%dyx(i,j,k) = (uy(ip1,j,k)-uy(im1,j,k))/(2.0*dx)
+                    jvel%dyy(i,j,k) = (uy(i,jp1,k)-uy(i,jm1,k))/(2.0*dy)
+
+                    ! Treat special cases of ice-margin points (take upstream/downstream derivatives instead)
+
+                    ! jvel%dxx
+                    if (f_ice(i,j) .eq. 1.0 .and. f_ice(ip1,j) .lt. 1.0) then 
+                        jvel%dxx(i,j,k) = (ux(i,j,k)-ux(im1,j,k))/dx
+                    else if (f_ice(i,j) .lt. 1.0 .and. f_ice(ip1,j) .eq. 1.0) then 
+                        jvel%dxx(i,j,k) = (ux(ip1,j,k)-ux(i,j,k))/dx
+                    end if 
+
+                    ! jvel%dxy
+                    if (f_ice(i,j) .eq. 1.0 .and. f_ice(i,jp1) .lt. 1.0 .and. f_ice(i,jm1) .lt. 1.0) then 
+                        jvel%dxy(i,j,k) = 0.0
+                    else if (f_ice(i,j) .eq. 1.0 .and. f_ice(i,jp1) .lt. 1.0 .and. f_ice(i,jm1) .eq. 1.0) then 
+                        jvel%dxy(i,j,k) = (ux(i,j,k)-ux(i,jm1,k))/dy
+                    else if (f_ice(i,j) .eq. 1.0 .and. f_ice(i,jp1) .eq. 1.0 .and. f_ice(i,jm1) .lt. 1.0) then 
+                        jvel%dxy(i,j,k) = (ux(i,jp1,k)-ux(i,j,k))/dy
+                    end if 
+
+                    ! jvel%dyx
+                    if (f_ice(i,j) .eq. 1.0 .and. f_ice(ip1,j) .lt. 1.0 .and. f_ice(im1,j) .lt. 1.0) then 
+                        jvel%dyx(i,j,k) = 0.0
+                    else if (f_ice(i,j) .eq. 1.0 .and. f_ice(ip1,j) .lt. 1.0 .and. f_ice(im1,j) .eq. 1.0) then 
+                        jvel%dyx(i,j,k) = (uy(i,j,k)-uy(im1,j,k))/dx
+                    else if (f_ice(i,j) .eq. 1.0 .and. f_ice(ip1,j) .eq. 1.0 .and. f_ice(im1,j) .lt. 1.0) then 
+                        jvel%dyx(i,j,k) = (uy(ip1,j,k)-uy(i,j,k))/dx
+                    end if 
+
+                    ! jvel%dyy
+                    if (f_ice(i,j) .eq. 1.0 .and. f_ice(i,jp1) .lt. 1.0) then 
+                        jvel%dyy(i,j,k) = (uy(i,j,k)-uy(i,jm1,k))/dy
+                    else if (f_ice(i,j) .lt. 1.0 .and. f_ice(i,jp1) .eq. 1.0) then 
+                        jvel%dyy(i,j,k) = (uy(i,jp1,k)-uy(i,j,k))/dy
+                    end if 
+
+                    ! === Calculate and apply the sigma-transformation correction terms ===
+
+                    ! First, calculate sigma-coordinate derivative correction factors for this layer
+                    ! (Greve and Blatter, 2009, Eqs. 5.131 and 5.132, also shown in 1D with Eq. 5.145)
+                    ! Note: these factors can be calculated with different combinations of terms using
+                    ! the gradients (dzbdx,dzsdx), (dzbdx,dHidx) or (dHidx,dzsdx), with the same result. 
+                    ! (dzbdx,dzsdx) is used for convenience, since dzsdx and dzbdx are needed elsewhere.
+
+                    ! Note that this factor should normally include H_ice in the denominator. It
+                    ! is not included here, because the vertical derivative is in z-coordinates
+                    ! not sigma-coordinates (zeta), so the H has already been accounted for, 
+                    ! e.g.: d/dz = d/(dzeta*H)
+
+                    c_x = - ( (1.0-zeta_aa(k))*dzbdx(i,j) + zeta_aa(k)*dzsdx(i,j))
+                    c_y = - ( (1.0-zeta_aa(k))*dzbdy(i,j) + zeta_aa(k)*dzsdy(i,j))
+
+                    ! Get cross correction terms too 
+                    dzbdx_acy = 0.25*(dzbdx(i,j)+dzbdx(i,jp1)+dzbdx(im1,j)+dzbdx(im1,jp1))
+                    dzsdx_acy = 0.25*(dzsdx(i,j)+dzsdx(i,jp1)+dzsdx(im1,j)+dzsdx(im1,jp1))
+                    c_x_acy = - ( (1.0-zeta_aa(k))*dzbdx_acy + zeta_aa(k)*dzsdx_acy)
+
+                    dzbdy_acx = 0.25*(dzbdy(i,j)+dzbdy(ip1,j)+dzbdy(i,jm1)+dzbdy(ip1,jm1))
+                    dzsdy_acx = 0.25*(dzsdy(i,j)+dzsdy(ip1,j)+dzsdy(i,jm1)+dzsdy(ip1,jm1))
+                    c_y_acx = - ( (1.0-zeta_aa(k))*dzbdy_acx + zeta_aa(k)*dzsdy_acx)
+
+                    ! Apply the correction 
+
+                    jvel%dxx(i,j,k) = jvel%dxx(i,j,k) + c_x*jvel%dxz(i,j,k)
+                    jvel%dxy(i,j,k) = jvel%dxy(i,j,k) + c_y_acx*jvel%dxz(i,j,k)
+                    
+                    jvel%dyx(i,j,k) = jvel%dyx(i,j,k) + c_x_acy*jvel%dyz(i,j,k)
+                    jvel%dyy(i,j,k) = jvel%dyy(i,j,k) + c_y*jvel%dyz(i,j,k)
+                    
+                end do
+
+            end if 
+
+            if (f_ice(i,j) .eq. 1.0) then 
+                ! Ice present at this point
+                ! Derivatives are calculated horizontally for aa-nodes, thus, we
+                ! are only concerned with fully ice-covered points now. 
+
+                ! === Now get horizontal derivatives of uz (ac-nodes vertically, aa-nodes horizontally) ===
+
+                do k = 1, nz_ac
+
+                    ! === Calculate derivatives , no sigma-correction terms yet ===
+
+                    ! Second-order, centered derivatives
+                    jvel%dzx(i,j,k) = (uz(ip1,j,k)-uz(im1,j,k))/(2.0*dx)
+                    jvel%dzy(i,j,k) = (uz(i,jp1,k)-uz(i,jm1,k))/(2.0*dy)
+                    
+                    ! Treat special cases of ice-margin points (take upstream/downstream derivatives instead)
+
+                    ! jvel%dzx
+                    if (f_ice(ip1,j) .lt. 1.0 .and. f_ice(im1,j) .lt. 1.0) then 
+                        jvel%dzx(i,j,k) = 0.0
+                    else if (f_ice(ip1,j) .lt. 1.0 .and. f_ice(im1,j) .eq. 1.0) then 
+                        jvel%dzx(i,j,k) = (uz(i,j,k)-uz(im1,j,k))/dx
+                    else if (f_ice(ip1,j) .eq. 1.0 .and. f_ice(im1,j) .lt. 1.0) then 
+                        jvel%dzx(i,j,k) = (uz(ip1,j,k)-uz(i,j,k))/dx
+                    end if 
+
+                    ! jvel%dzy
+                    if (f_ice(i,jp1) .lt. 1.0 .and. f_ice(i,jm1) .lt. 1.0) then 
+                        jvel%dzy(i,j,k) = 0.0
+                    else if (f_ice(i,jp1) .lt. 1.0 .and. f_ice(i,jm1) .eq. 1.0) then 
+                        jvel%dzy(i,j,k) = (uz(i,j,k)-uz(i,jm1,k))/dy
+                    else if (f_ice(i,jp1) .eq. 1.0 .and. f_ice(i,jm1) .lt. 1.0) then 
+                        jvel%dzy(i,j,k) = (uz(i,jp1,k)-uz(i,j,k))/dy
+                    end if 
+                    
+                    ! === Calculate and apply the sigma-transformation correction terms ===
+
+                    ! Recalculate correction factors on aa-nodes horizontally, ac-nodes vertically
+
+                    dzbdx_aa = 0.5*(dzbdx(i,j)+dzbdx(im1,j))
+                    dzbdy_aa = 0.5*(dzbdy(i,j)+dzbdy(i,jm1))
+                    dzsdx_aa = 0.5*(dzsdx(i,j)+dzsdx(im1,j))
+                    dzsdy_aa = 0.5*(dzsdy(i,j)+dzsdy(i,jm1))
+                    
+                    c_x = - ( (1.0-zeta_ac(k))*dzbdx_aa + zeta_ac(k)*dzsdx_aa)
+                    c_y = - ( (1.0-zeta_ac(k))*dzbdy_aa + zeta_ac(k)*dzsdy_aa)
+                    
+                    ! Apply the correction 
+
+                    jvel%dzx(i,j,k) = jvel%dzx(i,j,k) + c_x*jvel%dzz(i,j,k)
+                    jvel%dzy(i,j,k) = jvel%dzy(i,j,k) + c_y*jvel%dzz(i,j,k)
+                    
+                end do 
+
+            end if ! ice present 
+
+        end do 
+        end do 
+        !$omp end parallel do
+
+
+        ! Step X: fill in partially filled margin points with neighbor strain-rate values
+        
+        ! To do....
+        
+        return 
+
+    end subroutine calc_jacobian_vel_3D
 
 
     subroutine calc_strain_rate_tensor(strn, strn2D, ux, uy, uz, H_ice, f_ice, f_grnd,  &

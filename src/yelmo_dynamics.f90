@@ -8,6 +8,8 @@ module yelmo_dynamics
     use yelmo_tools, only : stagger_aa_acx, stagger_aa_acy, stagger_ac_aa, &
         calc_magnitude_from_staggered, calc_vertical_integrated_2D
 
+    use deformation, only : calc_jacobian_vel_3D
+
     use velocity_general
 
     use velocity_sia 
@@ -200,6 +202,13 @@ contains
         where (abs(dyn%now%ux_bar) .lt. TOL_UNDERFLOW) dyn%now%ux_bar = 0.0_wp 
         where (abs(dyn%now%uy_bar) .lt. TOL_UNDERFLOW) dyn%now%uy_bar = 0.0_wp 
         
+        ! ===== Velocity Jacobian and strain rate tensor ===========================
+
+        call calc_jacobian_vel_3D(dyn%now%jvel, dyn%now%ux, dyn%now%uy, dyn%now%uz, tpo%now%H_ice, tpo%now%f_ice, &
+                                    tpo%now%f_grnd, tpo%now%dzsdx, tpo%now%dzsdy,tpo%now%dzbdx, tpo%now%dzbdy,   &
+                                    dyn%par%zeta_aa, dyn%par%zeta_ac, dyn%par%dx, dyn%par%dy, dyn%par%boundaries)
+
+
         ! ===== Additional diagnostic variables ====================================
         
         ! Diagnose ice flux 

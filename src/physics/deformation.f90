@@ -1049,7 +1049,7 @@ contains
                 ! Loop over all aa-nodes vertically
                 do k = 1, nz_aa 
 
-if (.FALSE.) then 
+if (.TRUE.) then 
     ! Use quadrature points
                     ! Get dxx on aa-nodes 
                     call acx_to_nodes(ddn,jvel%dxx(:,:,k),i,j,xn,yn,im1,ip1,jm1,jp1)

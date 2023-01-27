@@ -650,7 +650,7 @@ end if
                         ATTn = ATT(i,j,k)
 
                         ! Calculate effective viscosity on ab-nodes
-                        viscn = 0.5 * (eps_sq_n)**(p1) * ATTn**(p2);
+                        viscn = 0.5 * (eps_sq_n)**(p1) * ATTn**(p2)
 
                         visc(i,j,k) = sum(viscn*wtn)/sum(wtn)
                     end do

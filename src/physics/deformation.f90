@@ -948,9 +948,103 @@ contains
 
     end subroutine calc_jacobian_vel_3D
 
+    subroutine calc_strain_rate_tensor_jac(strn, strn2D, jvel, H_ice, f_ice, f_grnd,  &
+                                                    zeta_aa, zeta_ac, dx, dy, de_max, boundaries)
+        ! -------------------------------------------------------------------------------
+        !  Computation of all components of the strain-rate tensor, the full
+        !  effective strain rate and the shear fraction.
+        !  Alexander Robinson: Adapted from sicopolis5-dev::calc_dxyz 
+        ! ------------------------------------------------------------------------------
+
+        ! Note: vx, vy are staggered on ac-nodes in the horizontal, but are on the zeta_aa nodes (ie layer-centered)
+        ! in the vertical. vz is centered on aa-nodes in the horizontal, but staggered on zeta_ac nodes
+        ! in the vertical. 
+
+        ! Note: first calculate each tensor component on ab-nodes, then interpolate to aa-nodes)
+        ! This is a quadrature approach and is generally more stable. 
+        ! The temperorary variable dd_ab(1:4) is used to hold the values 
+        ! calculated at each corner (ab-node), starting from dd_ab(1)==upper-right, and
+        ! moving counter-clockwise. The average of dd_ab(1:4) gives the cell-centered
+        ! (aa-node) value.
+
+        implicit none
+        
+        type(strain_3D_class), intent(INOUT) :: strn            ! [yr^-1] on aa-nodes (3D)
+        type(strain_2D_class), intent(INOUT) :: strn2D          ! [yr^-1] on aa-nodes (2D)
+        type(jacobian_3D_class), intent(IN)  :: jvel            ! 3D velocity Jacobian: Grad([ux,uy,uz])
+        real(wp), intent(IN) :: H_ice(:,:)
+        real(wp), intent(IN) :: f_ice(:,:)
+        real(wp), intent(IN) :: f_grnd(:,:)
+        real(wp), intent(IN) :: zeta_aa(:) 
+        real(wp), intent(IN) :: zeta_ac(:) 
+        real(wp), intent(IN) :: dx
+        real(wp), intent(IN) :: dy
+        real(wp), intent(IN) :: de_max                          ! [yr^-1] Maximum allowed effective strain rate
+        character(len=*), intent(IN) :: boundaries 
+
+        ! Local variables 
+        integer  :: i, j, k
+        integer  :: im1, ip1, jm1, jp1 
+        integer  :: nx, ny, nz_aa, nz_ac   
+        real(wp) :: lxz, lzx, lyz, lzy
+        real(wp) :: shear_squared  
+        real(wp), allocatable :: fact_z(:)
+        
+        real(wp) :: wt0
+        real(wp) :: xn(4) 
+        real(wp) :: yn(4) 
+        real(wp) :: wtn(4)
+        real(wp) :: wt1 
+        
+        real(wp) :: ddn(4) 
+
+        ! Get nodes and weighting 
+        wt0 = 1.0/sqrt(3.0)
+        xn  = [wt0,-wt0,-wt0, wt0]
+        yn  = [wt0, wt0,-wt0,-wt0]
+        wtn = [1.0,1.0,1.0,1.0]
+        wt1 = sum(wtn)
+
+
+        ! Determine sizes and allocate local variables 
+        nx    = size(H_ice,1)
+        ny    = size(H_ice,2)
+        nz_aa = size(zeta_aa,1)
+        nz_ac = size(zeta_ac,1)
+        
+        ! Calculate all strain rate tensor components on aa-nodes (horizontally and vertically)
+        ! dxx
+        ! 0.5*(dxy+dyx)
+        ! dyy 
+        ! 0.5*(dxz+dzx)
+        ! 0.5*(dyz+dzy)
+
+        do j = 1, ny 
+        do i = 1, nx 
+
+            ! Get neighbor indices
+            call get_neighbor_indices(im1,ip1,jm1,jp1,i,j,nx,ny,boundaries)
+
+            ! Loop over all aa-nodes
+
+            do k = 1, nz_aa 
+                
+                ! Get dxx on aa-nodes 
+                call acx_to_nodes(ddn,jvel%dxx(:,:,k),i,j,xn,yn,im1,ip1,jm1,jp1)
+                strn%dxx(i,j,k) = sum(ddn*wtn)/wt1
+
+            end do 
+
+        end do 
+        end do 
+
+
+        return 
+
+    end subroutine calc_strain_rate_tensor_jac 
 
     subroutine calc_strain_rate_tensor(strn, strn2D, ux, uy, uz, H_ice, f_ice, f_grnd,  &
-                                                    zeta_aa, zeta_ac, dx, dy, de_max, n_glen, boundaries)
+                                                    zeta_aa, zeta_ac, dx, dy, de_max, boundaries)
         ! -------------------------------------------------------------------------------
         !  Computation of all components of the strain-rate tensor, the full
         !  effective strain rate and the shear fraction.
@@ -983,7 +1077,6 @@ contains
         real(wp), intent(IN) :: dx
         real(wp), intent(IN) :: dy
         real(wp), intent(IN) :: de_max                          ! [yr^-1] Maximum allowed effective strain rate
-        real(wp), intent(IN) :: n_glen
         character(len=*), intent(IN) :: boundaries 
 
         ! Local variables 
@@ -1034,7 +1127,7 @@ contains
         ! that manages staggering and averaging. 
 
         do k = 1, nz_aa 
-            call calc_strain_rate_tensor_2D(strn2D,ux(:,:,k),uy(:,:,k),H_ice,f_ice,f_grnd,dx,dy,de_max,n_glen,boundaries)
+            call calc_strain_rate_tensor_2D(strn2D,ux(:,:,k),uy(:,:,k),H_ice,f_ice,f_grnd,dx,dy,de_max,boundaries)
             strn%dxx(:,:,k) = strn2D%dxx
             strn%dyy(:,:,k) = strn2D%dyy
             strn%dxy(:,:,k) = strn2D%dxy
@@ -1263,7 +1356,7 @@ contains
     end subroutine calc_strain_rate_tensor
 
 
-    subroutine calc_strain_rate_tensor_2D(strn2D,ux,uy,H_ice,f_ice,f_grnd,dx,dy,de_max,n_glen,boundaries)
+    subroutine calc_strain_rate_tensor_2D(strn2D,ux,uy,H_ice,f_ice,f_grnd,dx,dy,de_max,boundaries)
         ! Calculate the 2D (vertically averaged) strain rate tensor,
         ! assuming a constant vertical velocity profile. 
 
@@ -1281,8 +1374,7 @@ contains
         real(wp), intent(IN) :: f_grnd(:,:)
         real(wp), intent(IN) :: dx                              ! [m] Resolution
         real(wp), intent(IN) :: dy                              ! [m] Resolution
-        real(wp), intent(IN) :: de_max                          ! [yr^-1] Maximum allowed effective strain rate
-        real(wp), intent(IN) :: n_glen 
+        real(wp), intent(IN) :: de_max                          ! [yr^-1] Maximum allowed effective strain rate 
         character(len=*), intent(IN) :: boundaries 
 
         ! Local variables

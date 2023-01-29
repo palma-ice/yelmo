@@ -725,28 +725,16 @@ contains
 
                 ! Calculate dxz, dyz on aa-nodes vertically, ac-nodes horizontally
 
+if (.FALSE.) then 
+
                 ! Bottom layer - upwind derivative
                 k = 1
                 jvel%dxz(i,j,k) = (ux(i,j,k+1)-ux(i,j,k)) / (H_now_acx*(zeta_aa(k+1)-zeta_aa(k)))
                 jvel%dyz(i,j,k) = (uy(i,j,k+1)-uy(i,j,k)) / (H_now_acy*(zeta_aa(k+1)-zeta_aa(k)))
 
-                ! Intermediate layers
+                ! Intermediate layers - upwind derivatives to avoid complications with unequal spacing
                 do k = 2, nz_aa-1 
 
-                    ! Use centered, 1st order derivative for uneven layers 
-                    ! see "Finite Difference Formulae for Unequal Sub-Intervals Using Lagrange’s Interpolation Formula"
-                    ! by Singh and Bhadauria
-                    ! http://www.m-hikari.com/ijma/ijma-password-2009/ijma-password17-20-2009/bhadauriaIJMA17-20-2009.pdf
-
-                    !h1 = H_now_acx*(zeta_aa(k)-zeta_aa(k-1))
-                    !h2 = H_now_acx*(zeta_aa(k+1)-zeta_aa(k))
-                    !jvel%dxz(i,j,k) = -h2/(h1*(h1+h2))*ux(i,j,k-1) - (h1-h2)/(h1*h2)*ux(i,j,k) + h1/(h2*h1+h2)*ux(i,j,k+1)
-
-                    !h1 = H_now_acy*(zeta_aa(k)-zeta_aa(k-1))
-                    !h2 = H_now_acy*(zeta_aa(k+1)-zeta_aa(k))
-                    !jvel%dyz(i,j,k) = -h2/(h1*(h1+h2))*uy(i,j,k-1) - (h1-h2)/(h1*h2)*uy(i,j,k) + h1/(h2*h1+h2)*uy(i,j,k+1)
-                    
-                    ! Simple upwind derivatives
                     jvel%dxz(i,j,k) = (ux(i,j,k+1)-ux(i,j,k)) / (H_now_acx*(zeta_aa(k+1)-zeta_aa(k)))
                     jvel%dyz(i,j,k) = (uy(i,j,k+1)-uy(i,j,k)) / (H_now_acy*(zeta_aa(k+1)-zeta_aa(k)))
 
@@ -757,6 +745,57 @@ contains
                 jvel%dxz(i,j,k) = (ux(i,j,k)-ux(i,j,k-1)) / (H_now_acx*(zeta_aa(k)-zeta_aa(k-1)))
                 jvel%dyz(i,j,k) = (uy(i,j,k)-uy(i,j,k-1)) / (H_now_acy*(zeta_aa(k)-zeta_aa(k-1)))
 
+else
+
+                ! Use centered, 1st order derivative for uneven layers 
+                ! see "Finite Difference Formulae for Unequal Sub-Intervals Using Lagrange’s Interpolation Formula"
+                ! by Singh and Bhadauria
+                ! http://www.m-hikari.com/ijma/ijma-password-2009/ijma-password17-20-2009/bhadauriaIJMA17-20-2009.pdf
+
+                ! Bottom layer - upwind derivative
+                k = 1
+                
+                h1 = H_now_acx*(zeta_aa(k+1)-zeta_aa(k))
+                h2 = H_now_acx*(zeta_aa(k+2)-zeta_aa(k+1))
+                jvel%dxz(i,j,k) = -(2.0*h1+h2)/(h1*(h1+h2))*ux(i,j,k) + (h1+h2)/(h1*h2)*ux(i,j,k+1) - h1/(h2*(h1+h2))*ux(i,j,k+2)
+                
+                h1 = H_now_acy*(zeta_aa(k+1)-zeta_aa(k))
+                h2 = H_now_acy*(zeta_aa(k+2)-zeta_aa(k+1))
+                jvel%dyz(i,j,k) = -(2.0*h1+h2)/(h1*(h1+h2))*uy(i,j,k) + (h1+h2)/(h1*h2)*uy(i,j,k+1) - h1/(h2*(h1+h2))*uy(i,j,k+2)
+
+                ! Intermediate layers - centered derivative
+                do k = 2, nz_aa-1 
+
+                    h1 = H_now_acx*(zeta_aa(k)-zeta_aa(k-1))
+                    h2 = H_now_acx*(zeta_aa(k+1)-zeta_aa(k))
+                    jvel%dxz(i,j,k) = -h2/(h1*(h1+h2))*ux(i,j,k-1) - (h1-h2)/(h1*h2)*ux(i,j,k) + h1/(h2*(h1+h2))*ux(i,j,k+1)
+
+                    h1 = H_now_acy*(zeta_aa(k)-zeta_aa(k-1))
+                    h2 = H_now_acy*(zeta_aa(k+1)-zeta_aa(k))
+                    jvel%dyz(i,j,k) = -h2/(h1*(h1+h2))*uy(i,j,k-1) - (h1-h2)/(h1*h2)*uy(i,j,k) + h1/(h2*(h1+h2))*uy(i,j,k+1)
+                    
+                end do 
+
+                ! Top layer - downwind derivative
+                ! k = nz_aa
+                 
+                ! h1 = H_now_acx*(zeta_aa(k-2)-zeta_aa(k-1))
+                ! h2 = H_now_acx*(zeta_aa(k)-zeta_aa(k-1))
+                ! jvel%dxz(i,j,k) = h2/(h1*(h1+h2))*ux(i,j,k-2) - (h1+h2)/(h1*h2)*ux(i,j,k-1) + (h1+2.0*h2)/(h2*(h1+h2))*ux(i,j,k)
+                
+                ! h1 = H_now_acy*(zeta_aa(k-2)-zeta_aa(k-1))
+                ! h2 = H_now_acy*(zeta_aa(k)-zeta_aa(k-1))
+                ! jvel%dyz(i,j,k) = h2/(h1*(h1+h2))*uy(i,j,k-2) - (h1+h2)/(h1*h2)*uy(i,j,k-1) + (h1+2.0*h2)/(h2*(h1+h2))*uy(i,j,k)
+                
+                ! ajr: derivative for top layer seems broken for now - check!
+                ! Use simple downwind derivative instead:
+                k = nz_aa 
+                jvel%dxz(i,j,k) = (ux(i,j,k)-ux(i,j,k-1)) / (H_now_acx*(zeta_aa(k)-zeta_aa(k-1)))
+                jvel%dyz(i,j,k) = (uy(i,j,k)-uy(i,j,k-1)) / (H_now_acy*(zeta_aa(k)-zeta_aa(k-1)))
+
+end if 
+
+
             end if
 
             if (f_ice(i,j) .eq. 1.0) then
@@ -766,21 +805,13 @@ contains
 
                 ! Calculate dzz on ac-nodes vertically, aa-nodes horizontally
 
+if (.FALSE.) then
                 ! Bottom layer - upwind derivative
                 k = 1
                 jvel%dzz(i,j,k) = (uz(i,j,k+1)-uz(i,j,k)) / (H_now*(zeta_ac(k+1)-zeta_ac(k)))
 
-                ! Intermediate layers
+                ! Intermediate layers - upwind derivatives to avoid complications with unequal spacing
                 do k = 2, nz_ac-1 
-
-                    ! Use centered, 1st order derivative for uneven layers 
-                    ! see "Finite Difference Formulae for Unequal Sub-Intervals Using Lagrange’s Interpolation Formula"
-                    ! by Singh and Bhadauria
-                    ! http://www.m-hikari.com/ijma/ijma-password-2009/ijma-password17-20-2009/bhadauriaIJMA17-20-2009.pdf
-
-                    !h1 = H_now*(zeta_ac(k)-zeta_ac(k-1))
-                    !h2 = H_now*(zeta_ac(k+1)-zeta_ac(k))
-                    !jvel%dzz(i,j,k) = -h2/(h1*(h1+h2))*uz(i,j,k-1) - (h1-h2)/(h1*h2)*uz(i,j,k) + h1/(h2*h1+h2)*uz(i,j,k+1)
 
                     ! Simple upwind derivative
                     jvel%dzz(i,j,k) = (uz(i,j,k+1)-uz(i,j,k)) / (H_now*(zeta_ac(k+1)-zeta_ac(k)))
@@ -790,6 +821,42 @@ contains
                 ! Top layer - downwind derivative
                 k = nz_ac
                 jvel%dzz(i,j,k) = (uz(i,j,k)-uz(i,j,k-1)) / (H_now*(zeta_ac(k)-zeta_ac(k-1)))
+
+else 
+
+                ! Use 1st order derivatives for uneven layers 
+                ! see "Finite Difference Formulae for Unequal Sub-Intervals Using Lagrange’s Interpolation Formula"
+                ! by Singh and Bhadauria
+                ! http://www.m-hikari.com/ijma/ijma-password-2009/ijma-password17-20-2009/bhadauriaIJMA17-20-2009.pdf
+
+                ! Bottom layer - upwind derivative
+                k = 1
+                h1 = H_now*(zeta_ac(k+1)-zeta_ac(k))
+                h2 = H_now*(zeta_ac(k+2)-zeta_ac(k+1))
+                jvel%dzz(i,j,k) = -(2.0*h1+h2)/(h1*(h1+h2))*uz(i,j,k) + (h1+h2)/(h1*h2)*uz(i,j,k+1) - h1/(h2*(h1+h2))*uz(i,j,k+2)
+
+                ! Intermediate layers - centered derivative
+                do k = 2, nz_ac-1 
+
+                    h1 = H_now*(zeta_ac(k)-zeta_ac(k-1))
+                    h2 = H_now*(zeta_ac(k+1)-zeta_ac(k))
+                    jvel%dzz(i,j,k) = -h2/(h1*(h1+h2))*uz(i,j,k-1) - (h1-h2)/(h1*h2)*uz(i,j,k) + h1/(h2*(h1+h2))*uz(i,j,k+1)
+
+                end do 
+
+                ! Top layer - downwind derivative
+                ! k = nz_ac
+                ! h1 = H_now*(zeta_ac(k-2)-zeta_ac(k-1))
+                ! h2 = H_now*(zeta_ac(k)-zeta_ac(k-1))
+                ! jvel%dzz(i,j,k) = h2/(h1*(h1+h2))*uz(i,j,k-2) - (h1+h2)/(h1*h2)*uz(i,j,k-1) + (h1+2.0*h2)/(h2*(h1+h2))*uz(i,j,k)
+                
+                ! ajr: derivative for top layer seems broken for now - check!
+                ! Use simple downwind derivative instead:
+                k = nz_ac
+                jvel%dzz(i,j,k) = (uz(i,j,k)-uz(i,j,k-1)) / (H_now*(zeta_ac(k)-zeta_ac(k-1)))
+
+end if 
+
 
             end if
 

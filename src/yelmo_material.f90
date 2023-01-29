@@ -102,6 +102,7 @@ else
 end if 
 
         ! Calculate the deviatoric stress tensor and 2D average
+        ! Use the strain rate tensor that is calculated in the dynamics module
         ! ajr: for now, only calculate the 2D stress tensor directly. This is 
         ! currently only used for calving, and so only horizontal stresses are
         ! needed (ie, assume constant vertical profile for horizontal velocity)

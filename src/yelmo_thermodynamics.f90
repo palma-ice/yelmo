@@ -110,7 +110,10 @@ end select
                                     tpo%now%H_ice.gt.0.0,tpo%now%H_ice.gt.0.0)
         end if 
 
-        ! Calculate internal strain heating
+        ! Calculate internal strain heating and its rate of change
+
+        thrm%now%dQsdt = thrm%now%Q_strn 
+
         if (thrm%par%use_strain_sia) then 
             ! Calculate strain heating from SIA approximation
 
@@ -131,6 +134,13 @@ end select
             call smooth_gauss_3D(thrm%now%Q_strn,thrm%par%dx,real(thrm%par%n_sm_qstrn,wp), &
                                         tpo%now%H_ice.gt.0.0,tpo%now%H_ice.gt.0.0)
         end if 
+        
+        ! Get rate of change of strain heating too
+        if (dt .gt. 0.0) then 
+            thrm%now%dQsdt = (thrm%now%Q_strn - thrm%now%dQsdt) / dt 
+        else 
+            thrm%now%dQsdt = 0.0 
+        end if
 
         ! Ensure that Q_rock is defined. At initialization, 
         ! it may have a value of zero. In this case, set equal 
@@ -647,6 +657,7 @@ end select
         allocate(now%bmb_grnd(nx,ny))
         allocate(now%f_pmp(nx,ny))
         allocate(now%Q_strn(nx,ny,nz_aa))
+        allocate(now%dQsdt(nx,ny,nz_aa))
         allocate(now%Q_b(nx,ny))
         allocate(now%Q_ice_b(nx,ny))
         allocate(now%cp(nx,ny,nz_aa))
@@ -669,6 +680,7 @@ end select
         now%bmb_grnd    = 0.0 
         now%f_pmp       = 0.0 
         now%Q_strn      = 0.0 
+        now%dQsdt       = 0.0 
         now%Q_b         = 0.0 
         now%Q_ice_b     = 0.0 
         now%cp          = 0.0 
@@ -701,6 +713,7 @@ end select
         if (allocated(now%bmb_grnd))    deallocate(now%bmb_grnd)
         if (allocated(now%f_pmp))       deallocate(now%f_pmp)
         if (allocated(now%Q_strn))      deallocate(now%Q_strn)
+        if (allocated(now%dQsdt))       deallocate(now%dQsdt)
         if (allocated(now%Q_b))         deallocate(now%Q_b)
         if (allocated(now%Q_ice_b))     deallocate(now%Q_ice_b)
         if (allocated(now%cp))          deallocate(now%cp)

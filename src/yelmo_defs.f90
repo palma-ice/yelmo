@@ -601,6 +601,7 @@ module yelmo_defs
         real(wp), allocatable :: f_pmp(:,:)       ! fraction of cell at pressure melting point
         real(wp), allocatable :: bmb_grnd(:,:)    ! Grounded basal mass balance 
         real(wp), allocatable :: Q_strn(:,:,:)    ! Internal heat production 
+        real(wp), allocatable :: dQsdt(:,:,:)     ! Internal heat production rate of change
         real(wp), allocatable :: Q_b(:,:)         ! Basal friction heat production
         real(wp), allocatable :: Q_ice_b(:,:)     ! Basal ice heat flux 
         real(wp), allocatable :: T_prime_b(:,:)   ! Homologous temperature at the base 

@@ -23,6 +23,8 @@ module yelmo_tools
     public :: stagger_ab_acx
     public :: stagger_ab_acy 
 
+    public :: acx_to_nodes_3D
+    public :: acy_to_nodes_3D
     public :: acx_to_nodes
     public :: acy_to_nodes
     public :: stagger_node_aa_ab_ice 
@@ -455,6 +457,104 @@ contains
 
 ! ===== NEW =======================
 
+    subroutine acx_to_nodes_3D(varn,varx,i,j,k,xn,yn,zn,im1,ip1,jm1,jp1)
+        ! 3D !!
+        ! Variable defined on acx-nodes horizontally, aa-nodes vertically. 
+
+        real(wp), intent(OUT) :: varn(:) 
+        real(wp), intent(IN)  :: varx(:,:,:) 
+        integer,  intent(IN)  :: i 
+        integer,  intent(IN)  :: j
+        integer,  intent(IN)  :: k 
+        real(wp), intent(IN)  :: xn(:)      ! Four points in horizontal plane
+        real(wp), intent(IN)  :: yn(:)      ! Four points in horizontal plane
+        real(wp), intent(IN)  :: zn         ! Distance to horizontal planes in vertical direction
+        integer,  intent(IN)  :: im1, ip1, jm1, jp1 
+
+        ! Local variables 
+        integer  :: nx, ny, nz_aa
+        real(wp) :: wt
+        real(wp) :: vx_up(4)
+        real(wp) :: vx_md(4)
+        real(wp) :: vx_dn(4) 
+
+        nx = size(varx,1)
+        ny = size(varx,2)
+
+        ! Get four nodes in horizontal aa-node (middle) plane 
+        call acx_to_nodes(vx_md,varx(:,:,k),i,j,xn,yn,im1,ip1,jm1,jp1)
+
+        ! Get four nodes in plane below
+        if (k .gt. 1) then 
+            call acx_to_nodes(vx_dn,varx(:,:,k-1),i,j,xn,yn,im1,ip1,jm1,jp1)
+            wt = zn/2.0
+            varn(1:4) = wt*vx_dn + (1.0-wt)*vx_md
+        else 
+            varn(1:4) = vx_md 
+        end if 
+
+        ! Get four nodes in plane above
+        if (k .lt. nz_aa) then 
+            call acx_to_nodes(vx_up,varx(:,:,k+1),i,j,xn,yn,im1,ip1,jm1,jp1)
+            wt = zn/2.0
+            varn(5:8) = wt*vx_up + (1.0-wt)*vx_md
+        else 
+            varn(5:8) = vx_md 
+        end if 
+
+        return
+
+    end subroutine acx_to_nodes_3D
+
+    subroutine acy_to_nodes_3D(varn,vary,i,j,k,xn,yn,zn,im1,ip1,jm1,jp1)
+        ! 3D !!
+        ! Variable defined on acx-nodes horizontally, aa-nodes vertically. 
+
+        real(wp), intent(OUT) :: varn(:) 
+        real(wp), intent(IN)  :: vary(:,:,:) 
+        integer,  intent(IN)  :: i 
+        integer,  intent(IN)  :: j
+        integer,  intent(IN)  :: k 
+        real(wp), intent(IN)  :: xn(:)      ! Four points in horizontal plane
+        real(wp), intent(IN)  :: yn(:)      ! Four points in horizontal plane
+        real(wp), intent(IN)  :: zn         ! Distance to horizontal planes in vertical direction
+        integer,  intent(IN)  :: im1, ip1, jm1, jp1 
+
+        ! Local variables 
+        integer  :: nx, ny, nz_aa
+        real(wp) :: wt
+        real(wp) :: vy_up(4)
+        real(wp) :: vy_md(4)
+        real(wp) :: vy_dn(4) 
+
+        nx = size(vary,1)
+        ny = size(vary,2)
+
+        ! Get four nodes in horizontal aa-node (middle) plane 
+        call acy_to_nodes(vy_md,vary(:,:,k),i,j,xn,yn,im1,ip1,jm1,jp1)
+
+        ! Get four nodes in plane below
+        if (k .gt. 1) then 
+            call acy_to_nodes(vy_dn,vary(:,:,k-1),i,j,xn,yn,im1,ip1,jm1,jp1)
+            wt = zn/2.0
+            varn(1:4) = wt*vy_dn + (1.0-wt)*vy_md
+        else 
+            varn(1:4) = vy_md 
+        end if 
+
+        ! Get four nodes in plane above
+        if (k .lt. nz_aa) then 
+            call acy_to_nodes(vy_up,vary(:,:,k+1),i,j,xn,yn,im1,ip1,jm1,jp1)
+            wt = zn/2.0
+            varn(5:8) = wt*vy_up + (1.0-wt)*vy_md
+        else 
+            varn(5:8) = vy_md 
+        end if 
+
+        return
+
+    end subroutine acy_to_nodes_3D
+    
     subroutine acx_to_nodes(varn,varx,i,j,xn,yn,im1,ip1,jm1,jp1)
         ! 2D !!
         ! Variable defined on acx-nodes horizontally 

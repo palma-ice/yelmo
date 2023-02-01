@@ -5,10 +5,9 @@ module yelmo_dynamics
     use ncio 
 
     use yelmo_defs
-    use yelmo_tools, only : stagger_aa_acx, stagger_aa_acy, stagger_ac_aa, &
-        calc_magnitude_from_staggered, calc_vertical_integrated_2D
+    use yelmo_tools, only : calc_magnitude_from_staggered, calc_vertical_integrated_2D
 
-    use deformation, only : calc_jacobian_vel_3D, calc_strain_rate_tensor_jac
+    use deformation, only : calc_jacobian_vel_3D, calc_strain_rate_tensor_jac, calc_strain_rate_tensor_jac_quad3D
 
     use velocity_general
 
@@ -208,9 +207,12 @@ contains
                                     tpo%now%f_grnd, tpo%now%dzsdx, tpo%now%dzsdy,tpo%now%dzbdx, tpo%now%dzbdy,   &
                                     dyn%par%zeta_aa, dyn%par%zeta_ac, dyn%par%dx, dyn%par%dy, dyn%par%boundaries)
 
-        call calc_strain_rate_tensor_jac(dyn%now%strn, dyn%now%strn2D, dyn%now%jvel, tpo%now%H_ice, tpo%now%f_ice, tpo%now%f_grnd,  &
-                                           dyn%par%zeta_aa, dyn%par%zeta_ac, dyn%par%dx, dyn%par%dy, mat%par%de_max, dyn%par%boundaries)
-        
+        ! call calc_strain_rate_tensor_jac(dyn%now%strn, dyn%now%strn2D, dyn%now%jvel, tpo%now%H_ice, tpo%now%f_ice, tpo%now%f_grnd,  &
+        !                                    dyn%par%zeta_aa, dyn%par%zeta_ac, dyn%par%dx, dyn%par%dy, mat%par%de_max, dyn%par%boundaries)
+        call calc_strain_rate_tensor_jac_quad3D(dyn%now%strn, dyn%now%strn2D, dyn%now%jvel, tpo%now%H_ice, tpo%now%f_ice, tpo%now%f_grnd,  &
+                                                    dyn%par%zeta_aa, dyn%par%zeta_ac, dyn%par%dx, dyn%par%dy, mat%par%de_max, dyn%par%boundaries)
+
+
         ! ===== Additional diagnostic variables ====================================
         
         ! Diagnose ice flux 

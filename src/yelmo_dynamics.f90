@@ -207,11 +207,11 @@ contains
         call calc_jacobian_vel_3D(dyn%now%jvel, dyn%now%ux, dyn%now%uy, dyn%now%uz, tpo%now%H_ice, tpo%now%f_ice, &
                                     tpo%now%f_grnd, tpo%now%dzsdx, tpo%now%dzsdy,tpo%now%dzbdx, tpo%now%dzbdy,   &
                                     dyn%par%zeta_aa, dyn%par%zeta_ac, dyn%par%dx, dyn%par%dy, dyn%par%boundaries)
-
-        ! call calc_strain_rate_tensor_jac(dyn%now%strn, dyn%now%strn2D, dyn%now%jvel, tpo%now%H_ice, tpo%now%f_ice, tpo%now%f_grnd,  &
-        !                                    dyn%par%zeta_aa, dyn%par%zeta_ac, dyn%par%dx, dyn%par%dy, mat%par%de_max, dyn%par%boundaries)
-        call calc_strain_rate_tensor_jac_quad3D(dyn%now%strn, dyn%now%strn2D, dyn%now%jvel, tpo%now%H_ice, tpo%now%f_ice, tpo%now%f_grnd,  &
+        
+        call calc_strain_rate_tensor_jac(dyn%now%strn, dyn%now%strn2D, dyn%now%jvel, tpo%now%H_ice, tpo%now%f_ice, tpo%now%f_grnd,  &
                                            dyn%par%zeta_aa, dyn%par%zeta_ac, dyn%par%dx, dyn%par%dy, mat%par%de_max, dyn%par%boundaries)
+        ! call calc_strain_rate_tensor_jac_quad3D(dyn%now%strn, dyn%now%strn2D, dyn%now%jvel, tpo%now%H_ice, tpo%now%f_ice, tpo%now%f_grnd,  &
+        !                                    dyn%par%zeta_aa, dyn%par%zeta_ac, dyn%par%dx, dyn%par%dy, mat%par%de_max, dyn%par%boundaries)
         
         ! ===== Additional diagnostic variables ====================================
         

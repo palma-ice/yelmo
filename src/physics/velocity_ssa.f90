@@ -275,13 +275,9 @@ else
 end if
 
             ! Apply relaxation to keep things stable
-            !call relax_ssa(ux_b,uy_b,ux_b_nm1,uy_b_nm1,rel=par%ssa_iter_rel)
             call picard_relax(ux_b,uy_b,ux_b_nm1,uy_b_nm1,rel=corr_rel)
             
             ! Check for convergence
-            ! is_converged = check_vel_convergence_l2rel(ux_b,uy_b,ux_b_nm1,uy_b_nm1,ssa_mask_acx.gt.0,     &
-            !                                            ssa_mask_acy.gt.0,par%ssa_iter_conv,iter,par%ssa_iter_max, &
-            !                                            par%ssa_write_log,use_L2_norm=.FALSE.,L2_norm=L2_norm)
             call picard_calc_convergence_l2(is_converged,ssa_resid,ux_b,uy_b,ux_b_nm1,uy_b_nm1, &
                                                 ssa_mask_acx.gt.0,ssa_mask_acy.gt.0,par%ssa_iter_conv,  &
                                                 iter,par%ssa_iter_max,par%ssa_write_log)
@@ -318,23 +314,15 @@ end if
         ! Diagnose basal stress 
         call calc_basal_stress(taub_acx,taub_acy,beta_acx,beta_acy,ux_b,uy_b)
         
+        if (par%visc_method .eq. 0) then 
+            ! Diagnose viscosity for visc_method=0 (not used prognostically)
+            call calc_visc_eff_3D_nodes(visc_eff,ux_b,uy_b,ATT,H_ice,f_ice,zeta_aa, &
+                                                    dx,dy,n_glen,par%eps_0,par%boundaries)
+        end if 
+        
         return 
 
     end subroutine calc_velocity_ssa
-
-    subroutine scale_visc_eff_int(visc_eff_int,v0,fac)
-
-        implicit none 
-
-        real(wp), intent(INOUT) :: visc_eff_int(:,:) 
-        real(wp), intent(IN) :: v0
-        real(wp), intent(IN) :: fac
-        
-        where(visc_eff_int .lt. v0) visc_eff_int = visc_eff_int*fac 
-
-        return 
-
-    end subroutine scale_visc_eff_int
 
     subroutine calc_visc_eff_3D_nodes(visc,ux,uy,ATT,H_ice,f_ice,zeta_aa,dx,dy,n_glen,eps_0,boundaries)
 
@@ -364,6 +352,8 @@ end if
         real(wp) :: xn(4) 
         real(wp) :: yn(4) 
         real(wp) :: wtn(4)
+        real(wp) :: wt1
+
         real(wp) :: dudxn(4)
         real(wp) :: dudyn(4)
         real(wp) :: dvdxn(4)
@@ -401,12 +391,13 @@ end if
 
         ! Calculate visc_eff on aa-nodes
 
-        visc   = visc_min
+        visc = visc_min
 
         wt0 = 1.0/sqrt(3.0)
         xn  = [wt0,-wt0,-wt0, wt0]
         yn  = [wt0, wt0,-wt0,-wt0]
         wtn = [1.0,1.0,1.0,1.0]
+        wt1 = sum(wtn)
 
         do i = 1, nx
             do j = 1, ny  
@@ -433,7 +424,7 @@ end if
                         ! Calculate effective viscosity on ab-nodes
                         viscn = 0.5 * (eps_sq_n)**(p1) * ATTn**(p2);
 
-                        visc(i,j,k) = sum(viscn*wtn)/sum(wtn)
+                        visc(i,j,k) = sum(viscn*wtn)/wt1
                     end do
                 end if
 
@@ -493,6 +484,9 @@ end if
         eps_0_sq = eps_0*eps_0 
 
         ! Calculate visc_eff on aa-nodes
+
+        visc_eff = visc_min
+
         do j = 1, ny 
         do i = 1, nx 
 
@@ -542,26 +536,7 @@ end if
 
         end do  
         end do 
-
-        ! Set boundaries 
-        !call set_boundaries_3D_aa(visc_eff,boundaries)
-
-        ! Final safety check (mainly for grid boundaries)
-        ! Ensure non-zero visc value everywhere there is ice. 
-        do j = 1, ny 
-        do i = 1, nx 
-
-            if (f_ice(i,j) .eq. 1.0_wp) then
-
-                do k = 1, nz 
-                    if (visc_eff(i,j,k) .lt. visc_min) visc_eff(i,j,k) = visc_min
-                end do 
-
-            end if 
-
-        end do
-        end do
-
+        
         return 
 
     end subroutine calc_visc_eff_3D_aa

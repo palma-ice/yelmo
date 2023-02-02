@@ -590,7 +590,8 @@ contains
             else
                 j0 = jm1
                 j1 = j
-                wt = 1.0 - abs(yn(k)) / 2.0
+                !wt = 1.0 - abs(yn(k)) / 2.0
+                wt = (1.0 + (1.0+yn(k)) ) / 2.0 
             end if
 
             ! Get left and right-side 
@@ -642,7 +643,8 @@ contains
             else
                 i0 = im1
                 i1 = i
-                wt = 1.0 - abs(xn(k)) / 2.0
+                !wt = 1.0 - abs(xn(k)) / 2.0
+                wt = (1.0 + (1.0+xn(k)) ) / 2.0 
             end if
 
             ! Get left and right-side 

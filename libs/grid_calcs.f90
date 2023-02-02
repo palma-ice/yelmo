@@ -502,7 +502,7 @@ contains
 
     end subroutine ddx_a_to_cx_2D
 
-    subroutine ddy_a_to_cy_2D( dy_cy, d_a, dx )
+    subroutine ddy_a_to_cy_2D( dy_cy, d_a, dy )
         ! Input:  scalar on the Aa grid
         ! Output: its y-derivative on the Acy grid
 
@@ -512,7 +512,7 @@ contains
 
         real(wp), intent(OUT)   :: dy_cy(:,:)
         real(wp), intent(IN)    :: d_a(:,:)
-        real(wp), intent(IN)    :: dx 
+        real(wp), intent(IN)    :: dy
 
         ! Local variables:
         integer :: i, j, nx, ny
@@ -524,7 +524,7 @@ contains
 
         do j = 1, ny-1
         do i = 1, nx
-          dy_cy(i,j) = (d_a(i,j+1) - d_a(i,j)) / dx
+          dy_cy(i,j) = (d_a(i,j+1) - d_a(i,j)) / dy
         end do
         end do
 

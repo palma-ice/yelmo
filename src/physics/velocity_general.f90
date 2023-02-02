@@ -84,9 +84,7 @@ contains
         real(wp) :: dudx_aa
         real(wp) :: dvdy_aa
         real(wp) :: dudz_aa 
-        real(wp) :: dvdz_aa
-        real(wp) :: dudx_now 
-        real(wp) :: dvdy_now 
+        real(wp) :: dvdz_aa 
         real(wp) :: ux_aa 
         real(wp) :: uy_aa 
         real(wp) :: uz_grid 
@@ -258,7 +256,7 @@ contains
                     ! Calculate vertical velocity of this layer
                     ! (Greve and Blatter, 2009, Eq. 5.95)
                     uz(i,j,k) = uz(i,j,k-1) & 
-                        - H_now*(zeta_ac(k)-zeta_ac(k-1))*(dudx_now+dvdy_now)
+                        - H_now*(zeta_ac(k)-zeta_ac(k-1))*(dudx_aa+dvdy_aa)
 
 
                     ! Apply correction to match kinematic boundary condition at surface 
@@ -302,10 +300,6 @@ contains
                     ! Take zeta directly at vertical cell edge where uz is calculated
                     ! (this is also where ux_aa and uy_aa are calculated above)
                     zeta_now = zeta_ac(k)
-
-                    ! Calculate sigma-coordinate derivative correction factors
-                    ! (Greve and Blatter, 2009, Eqs. 5.131 and 5.132, 
-                    !  also shown in 1D with Eq. 5.145)
 
                     ! Note: not dividing by H here, since this is done in the thermodynamics advection step
                     c_x = -( (1.0-zeta_now)*dzbdx_aa  + zeta_now*dzsdx_aa )
@@ -388,9 +382,7 @@ contains
         real(wp) :: dudx_aa
         real(wp) :: dvdy_aa
         real(wp) :: dudz_aa 
-        real(wp) :: dvdz_aa
-        real(wp) :: dudx_now 
-        real(wp) :: dvdy_now 
+        real(wp) :: dvdz_aa 
         real(wp) :: ux_aa 
         real(wp) :: uy_aa 
         real(wp) :: uz_grid 
@@ -455,7 +447,8 @@ contains
         wtn = [1.0,1.0,1.0,1.0]
         wt1 = sum(wtn)
 
-        ! First calculate horizontal strain rates at each layer for later use
+        ! First calculate horizontal strain rates at each layer for later use,
+        ! with no correction factor for sigma-transformation.
         ! Note: we only need dudx and dvdy, but routine also calculate cross terms, which will not be used.
 
         !$omp parallel do 
@@ -476,12 +469,15 @@ contains
             ! (eg in EISMINT-EXPA dhdt field)
             ! These routines stagger to ab-nodes, consider replacing with staggering to 
             ! quadrature nodes. 
-            call stagger_nodes_aa_ab_ice(dzsdtn,dzsdt,f_ice,i,j)
-            dzsdt_now = sum(dzsdtn*wtn)/wt1
+            !call stagger_nodes_aa_ab_ice(dzsdtn,dzsdt,f_ice,i,j)
+            !dzsdt_now = sum(dzsdtn*wtn)/wt1
             
-            call stagger_nodes_aa_ab_ice(dhdtn,dhdt,f_ice,i,j)
-            dhdt_now = sum(dhdtn*wtn)/wt1
+            !call stagger_nodes_aa_ab_ice(dhdtn,dhdt,f_ice,i,j)
+            !dhdt_now = sum(dhdtn*wtn)/wt1
             
+            dzsdt_now = dzsdt(i,j) 
+            dhdt_now  = dhdt(i,j) 
+
             ! Diagnose rate of ice-base elevation change (needed for all points)
             dzbdt_now = dzsdt_now - dhdt_now
 
@@ -543,25 +539,14 @@ contains
                     ! Calculate sigma-coordinate derivative correction factors for this layer
                     ! (Greve and Blatter, 2009, Eqs. 5.131 and 5.132, 
                     !  also shown in 1D with Eq. 5.145)
+                    ! See src/physics/deformation.f90::calc_jacobian_vel_3D()
 
                     ! Take zeta at the center of the cell below the current vertical ac boundary
                     ! (this is also where dudz_aa and dvz_aa are calculated above)
                     zeta_now = zeta_aa(k-1)
 
-                    ! Note 1: Below are three different ways to calculate correction
-                    ! factors. All give the same result for EISMINT1-moving, as they should. 
-
                     c_x = -H_inv * ( (1.0-zeta_now)*dzbdx_aa + zeta_now*dzsdx_aa )
                     c_y = -H_inv * ( (1.0-zeta_now)*dzbdy_aa + zeta_now*dzsdy_aa )
-
-                    ! c_x =  -H_inv * (dzbdx_aa + zeta_now*dHdx_aa)
-                    ! c_y =  -H_inv * (dzbdy_aa + zeta_now*dHdy_aa)
-
-                    ! c_x =  -H_inv * (dzsdx_aa - (1.0-zeta_now)*dHdx_aa)
-                    ! c_y =  -H_inv * (dzsdy_aa - (1.0-zeta_now)*dHdy_aa)
-
-                    ! Greve and Blatter (2009), Eq. 5.72
-                    ! Bueler and Brown  (2009), Eq. 4
 
                     ! Get dudz/dvdz values at vertical aa-nodes, in order
                     ! to vertically integrate each cell up to ac-node border.
@@ -586,7 +571,7 @@ contains
                     call acy_to_nodes(uyn_up,uy(:,:,kup),i,j,xn,yn,im1,ip1,jm1,jp1)
                     call acy_to_nodes(uyn_dn,uy(:,:,kdn),i,j,xn,yn,im1,ip1,jm1,jp1)
                     dvdzn = (uyn_up - uyn_dn) / (zeta_aa(kup)-zeta_aa(kdn))
-                    dvdz_aa = sum(dvdzn*wtn)
+                    dvdz_aa = sum(dvdzn*wtn)/wt1
 
                     ! Calculate sigma-corrected derivatives
                     call acx_to_nodes(dudxn,dudx(:,:,k-1),i,j,xn,yn,im1,ip1,jm1,jp1)
@@ -595,13 +580,10 @@ contains
                     call acy_to_nodes(dvdyn,dvdy(:,:,k-1),i,j,xn,yn,im1,ip1,jm1,jp1)
                     dvdy_aa = sum(dvdyn*wtn)/wt1  +  c_y*dvdz_aa 
 
-                    
                     ! Calculate vertical velocity of this layer
                     ! (Greve and Blatter, 2009, Eq. 5.95)
-                    uz(i,j,k) = uz(i,j,k-1) & 
-                        - H_now*(zeta_ac(k)-zeta_ac(k-1))*(dudx_now+dvdy_now)
-
-
+                    uz(i,j,k) = uz(i,j,k-1) - H_now*(zeta_ac(k)-zeta_ac(k-1))*(dudx_aa+dvdy_aa)
+                    
                     ! Apply correction to match kinematic boundary condition at surface 
                     !uz(i,j,k) = uz(i,j,k) - zeta_ac(k)*(uz(i,j,k)-uz_srf)
 

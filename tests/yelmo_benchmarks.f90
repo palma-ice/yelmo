@@ -569,6 +569,11 @@ contains
         call nc_write(filename,"dHidt",ylmo%tpo%now%dHidt,units="m/a",long_name="Ice thickness change", &
                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
         
+        call nc_write(filename,"dzsdx",ylmo%tpo%now%dzsdx,units="m/m",long_name="Surface gradient (acx)", &
+                      dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
+        call nc_write(filename,"dzsdy",ylmo%tpo%now%dzsdy,units="m/m",long_name="Surface gradient (acy)", &
+                      dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
+        
         call nc_write(filename,"dHidx",ylmo%tpo%now%dHidx,units="m/m",long_name="Ice thickness gradient (acx)", &
                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
         call nc_write(filename,"dHidy",ylmo%tpo%now%dHidy,units="m/m",long_name="Ice thickness gradient (acy)", &
@@ -600,7 +605,7 @@ contains
 !         call nc_write(filename,"T_pmp",ylmo%thrm%now%T_pmp,units="K",long_name="Ice pressure melting point (pmp)", &
 !                       dim1="xc",dim2="yc",dim3="zeta",dim4="time",start=[1,1,1,n],ncid=ncid)
         
-        call nc_write(filename,"uz_star",ylmo%thrm%now%uz_star,units="m yr-1",long_name="Advection-adjusted vertical velocity", &
+        call nc_write(filename,"uz_star",ylmo%dyn%now%uz_star,units="m yr-1",long_name="Advection-adjusted vertical velocity", &
                       dim1="xc",dim2="yc",dim3="zeta_ac",dim4="time",start=[1,1,1,n],ncid=ncid)
         
         call nc_write(filename,"T_rock",ylmo%thrm%now%T_rock,units="K",long_name="Bedrock temperature", &
@@ -717,6 +722,17 @@ contains
                        dim1="xc",dim2="yc",dim3="zeta",dim4="time",start=[1,1,1,n],ncid=ncid)
         call nc_write(filename,"duydz",ylmo%dyn%now%duydz,units="1/a",long_name="Vertical shear (y)", &
                        dim1="xc",dim2="yc",dim3="zeta",dim4="time",start=[1,1,1,n],ncid=ncid)
+        
+        ! call nc_write(filename,"dxx",ylmo%dyn%now%strn%dxx,units="1/a",long_name="Strain dxx", &
+        !                dim1="xc",dim2="yc",dim3="zeta",dim4="time",start=[1,1,1,n],ncid=ncid)
+        ! call nc_write(filename,"dxy",ylmo%dyn%now%strn%dxy,units="1/a",long_name="Strain dxy", &
+        !                dim1="xc",dim2="yc",dim3="zeta",dim4="time",start=[1,1,1,n],ncid=ncid)
+        ! call nc_write(filename,"dyy",ylmo%dyn%now%strn%dyy,units="1/a",long_name="Strain dyy", &
+        !                dim1="xc",dim2="yc",dim3="zeta",dim4="time",start=[1,1,1,n],ncid=ncid)
+        ! call nc_write(filename,"dxz",ylmo%dyn%now%strn%dxz,units="1/a",long_name="Strain dxz", &
+        !                dim1="xc",dim2="yc",dim3="zeta",dim4="time",start=[1,1,1,n],ncid=ncid)
+        ! call nc_write(filename,"dyz",ylmo%dyn%now%strn%dyz,units="1/a",long_name="Strain dyz", &
+        !                dim1="xc",dim2="yc",dim3="zeta",dim4="time",start=[1,1,1,n],ncid=ncid)
         
 !         call nc_write(filename,"ux_i_bar",ylmo%dyn%now%ux_i_bar,units="m/a",long_name="Internal shear velocity (x)", &
 !                        dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)

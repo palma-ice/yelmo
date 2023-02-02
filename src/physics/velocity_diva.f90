@@ -1,14 +1,8 @@
 module velocity_diva
 
     use yelmo_defs, only  : sp, dp, prec, wp, pi, rho_ice, rho_sw, rho_w, g, TOL_UNDERFLOW
-    use yelmo_tools, only : get_neighbor_indices, stagger_aa_ab, stagger_aa_ab_ice, stagger_ab_aa_ice, & 
-                    acx_to_nodes, acy_to_nodes, acx_to_nodes_3D, acy_to_nodes_3D, &
-                    stagger_nodes_aa_ab_ice, stagger_nodes_acx_ab_ice, stagger_nodes_acy_ab_ice, &
-                    staggerdiff_nodes_acx_ab_ice, staggerdiff_nodes_acy_ab_ice, &
-                    staggerdiffcross_nodes_acx_ab_ice, staggerdiffcross_nodes_acy_ab_ice, &
-                    integrate_trapezoid1D_1D, integrate_trapezoid1D_pt, minmax, &
-                    set_boundaries_2D_aa, set_boundaries_3D_aa, set_boundaries_3D_acx, &
-                    set_boundaries_3D_acy
+    use yelmo_tools, only : get_neighbor_indices, acx_to_nodes, acy_to_nodes, &
+                    integrate_trapezoid1D_1D, integrate_trapezoid1D_pt, minmax
 
     use deformation, only : calc_strain_rate_horizontal_2D
     use basal_dragging 
@@ -225,8 +219,6 @@ contains
 
                     call calc_visc_eff_3D_nodes(visc_eff,ux_bar,uy_bar,duxdz,duydz,ATT,H_ice,f_ice,zeta_aa, &
                                                             dx,dy,n_glen,par%eps_0,par%boundaries)
-                    ! call calc_visc_eff_3D_nodes_quad3D(visc_eff,ux_bar,uy_bar,duxdz,duydz,ATT,H_ice,f_ice,zeta_aa, &
-                    !                                         dx,dy,n_glen,par%eps_0,par%boundaries)
 
                 case(2) 
                     ! Calculate effective viscosity, using velocity solution from previous iteration
@@ -387,7 +379,6 @@ end if
             uy_i(:,:,k) = uy(:,:,k) - uy_b 
         end do
         
-
         if (par%visc_method .eq. 0) then 
             ! Diagnose viscosity for visc_method=0 (not used prognostically)
             call calc_visc_eff_3D_nodes(visc_eff,ux_bar,uy_bar,duxdz,duydz,ATT,H_ice,f_ice,zeta_aa, &
@@ -599,7 +590,7 @@ end if
 
         ! Calculate visc_eff on aa-nodes
 
-        visc   = visc_min
+        visc = visc_min
 
         wt0 = 1.0/sqrt(3.0)
         xn  = [wt0,-wt0,-wt0, wt0]
@@ -649,143 +640,6 @@ end if
         return
 
     end subroutine calc_visc_eff_3D_nodes
-
-    subroutine calc_visc_eff_3D_nodes_quad3D(visc,ux,uy,duxdz,duydz,ATT,H_ice,f_ice,zeta_aa,dx,dy,n_glen,eps_0,boundaries)
-
-        implicit none 
-        
-        real(wp), intent(OUT) :: visc(:,:,:)            ! aa-nodes
-        real(wp), intent(IN)  :: ux(:,:)                ! [m/yr] Vertically averaged horizontal velocity, x-component
-        real(wp), intent(IN)  :: uy(:,:)                ! [m/yr] Vertically averaged horizontal velocity, y-component
-        real(wp), intent(IN)  :: duxdz(:,:,:)           ! [1/yr] Vertical shearing, x-component
-        real(wp), intent(IN)  :: duydz(:,:,:)           ! [1/yr] Vertical shearing, x-component
-        real(wp), intent(IN)  :: ATT(:,:,:)             ! aa-nodes
-        real(wp), intent(IN)  :: H_ice(:,:) 
-        real(wp), intent(IN)  :: f_ice(:,:)
-        real(wp), intent(IN)  :: zeta_aa(:)             ! Vertical axis (sigma-coordinates from 0 to 1)
-        real(wp), intent(IN)  :: dx
-        real(wp), intent(IN)  :: dy
-        real(wp), intent(IN)  :: n_glen   
-        real(wp), intent(IN)  :: eps_0                  ! [1/yr] Regularization constant (minimum strain rate, ~1e-6)
-        character(len=*), intent(IN) :: boundaries 
-
-        ! Local variables 
-        integer  :: i, j, k
-        integer  :: im1, ip1, jm1, jp1
-        integer  :: nx, ny, nz   
-        real(wp) :: p1, p2, eps_0_sq  
-        real(wp) :: eps_sq                              ! [1/yr^2]
-
-        real(wp) :: wt0
-        real(wp) :: xn(4) 
-        real(wp) :: yn(4) 
-        real(wp) :: zn
-        real(wp) :: wtn(8)
-        real(wp) :: wt1 
-
-        real(wp) :: dudxn_4(4)
-        real(wp) :: dudyn_4(4)
-        real(wp) :: dvdxn_4(4)
-        real(wp) :: dvdyn_4(4)
-
-        real(wp) :: dudxn(8)
-        real(wp) :: dudyn(8)
-        real(wp) :: dvdxn(8)
-        real(wp) :: dvdyn(8)
-        real(wp) :: duxdzn(8)
-        real(wp) :: duydzn(8)
-        real(wp) :: eps_sq_n(8)
-        real(wp) :: ATTn(8)
-        real(wp) :: viscn(8)
-
-        real(wp), allocatable :: dudx(:,:) 
-        real(wp), allocatable :: dudy(:,:) 
-        real(wp), allocatable :: dvdx(:,:) 
-        real(wp), allocatable :: dvdy(:,:) 
-        
-        real(wp), parameter :: visc_min = 1e5_wp        ! Just for safety 
-
-        nx = size(visc,1)
-        ny = size(visc,2)
-        nz = size(visc,3)
-        
-        allocate(dudx(nx,ny))
-        allocate(dudy(nx,ny))
-        allocate(dvdx(nx,ny))
-        allocate(dvdy(nx,ny))
-
-        ! Calculate exponents 
-        p1 = (1.0 - n_glen)/(2.0*n_glen)
-        p2 = -1.0/n_glen
-
-        ! Calculate squared minimum strain rate 
-        eps_0_sq = eps_0*eps_0
-
-        ! Populate strain rates over the whole domain on acx- and acy-nodes
-
-        call calc_strain_rate_horizontal_2D(dudx,dudy,dvdx,dvdy,ux,uy,f_ice,dx,dy,boundaries)
-
-        ! Calculate visc_eff on aa-nodes
-
-        visc   = visc_min
-
-        wt0 = 1.0/sqrt(3.0)
-        xn  = [wt0,-wt0,-wt0, wt0]
-        yn  = [wt0, wt0,-wt0,-wt0]
-        zn  = wt0 
-
-        wtn = [1.0,1.0,1.0,1.0,1.0,1.0,1.0,1.0]
-        wt1 = sum(wtn)
-
-        do i = 1, nx
-            do j = 1, ny  
-
-                if (f_ice(i,j) == 1.0) then
-
-                    ! Get neighbor indices
-                    call get_neighbor_indices(im1,ip1,jm1,jp1,i,j,nx,ny,boundaries)
-
-                    ! Get strain rate terms on node locations
-                    call acx_to_nodes(dudxn_4,dudx,i,j,xn,yn,im1,ip1,jm1,jp1)
-                    call acx_to_nodes(dudyn_4,dudy,i,j,xn,yn,im1,ip1,jm1,jp1)
-                    
-                    call acy_to_nodes(dvdxn_4,dvdx,i,j,xn,yn,im1,ip1,jm1,jp1)
-                    call acy_to_nodes(dvdyn_4,dvdy,i,j,xn,yn,im1,ip1,jm1,jp1)
-
-                    ! Populate all 8 nodes for horizontal terms
-                    dudxn = [dudxn_4,dudxn_4]
-                    dvdxn = [dvdxn_4,dvdxn_4]
-                    dvdyn = [dvdyn_4,dvdyn_4]
-                    
-                    do k = 1, nz
-                        
-                        ! Get vertical shear terms on 8 nodes for 3D element
-
-                        ! Get vertical shear strain rate terms
-                        call acx_to_nodes_3D(duxdzn,duxdz,i,j,k,xn,yn,zn,im1,ip1,jm1,jp1)
-                        call acy_to_nodes_3D(duydzn,duydz,i,j,k,xn,yn,zn,im1,ip1,jm1,jp1)
-                        
-                        ! Calculate the total effective strain rate from L19, Eq. 21 
-                        eps_sq_n = dudxn**2 + dvdyn**2 + dudxn*dvdyn + 0.25_wp*(dudyn+dvdxn)**2 &
-                                                    + 0.25_wp*duxdzn**2 + 0.25_wp*duydzn**2 + eps_0_sq
-
-                        ! Get rate factor on central node
-                        ATTn = ATT(i,j,k)
-
-                        ! Calculate effective viscosity on nodes and averaged to center aa-node
-                        viscn = 0.5 * (eps_sq_n)**(p1) * ATTn**(p2)
-                        visc(i,j,k) = sum(viscn*wtn)/wt1
-
-                    end do
-
-                end if
-
-            end do
-        end do
-
-        return
-
-    end subroutine calc_visc_eff_3D_nodes_quad3D
 
     subroutine calc_visc_eff_3D_aa(visc_eff,ux,uy,duxdz,duydz,ATT,H_ice,f_ice,zeta_aa,dx,dy,n_glen,eps_0,boundaries)
         ! Calculate 3D effective viscosity following L19, Eq. 2
@@ -843,10 +697,10 @@ end if
         ! Calculate squared minimum strain rate 
         eps_0_sq = eps_0*eps_0 
 
-        ! Initially set to visc_min everywhere 
-        visc_eff = visc_min 
-
         ! Calculate visc_eff on aa-nodes
+
+        visc_eff = visc_min
+
         do j = 1, ny 
         do i = 1, nx 
 
@@ -930,10 +784,6 @@ end if
 
         end do 
         end do 
-
-        ! ajr: to delete, since there are no neighbors used in this routine.
-        ! Apply boundary conditions as needed
-        !call set_boundaries_2D_aa(visc_eff_int,boundaries) 
 
         return
 

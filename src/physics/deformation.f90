@@ -33,7 +33,7 @@ module deformation
 
     public :: calc_jacobian_vel_3D
     public :: calc_strain_rate_tensor_jac
-    !public :: calc_strain_rate_tensor_jac_quad3D
+    public :: calc_strain_rate_tensor_jac_quad3D
 
     public :: calc_strain_rate_tensor_2D
     public :: calc_strain_rate_horizontal_2D

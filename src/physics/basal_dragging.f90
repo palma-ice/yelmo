@@ -881,8 +881,8 @@ contains
                 else 
                     ! Get c_bed on nodes
                     
-                    !call aa_to_nodes(cbn,c_bed,i,j,xn,yn,im1,ip1,jm1,jp1)
-                    cbn(1:4) = c_bed(i,j) 
+                    call aa_to_nodes(cbn,c_bed,i,j,xn,yn,im1,ip1,jm1,jp1)
+                    !cbn(1:4) = c_bed(i,j) 
 
                 end if 
                 
@@ -987,8 +987,8 @@ contains
                 else 
                     ! Get c_bed on nodes
                     
-                    !call aa_to_nodes(cbn,c_bed,i,j,xn,yn,im1,ip1,jm1,jp1)
-                    cbn(1:4) = c_bed(i,j) 
+                    call aa_to_nodes(cbn,c_bed,i,j,xn,yn,im1,ip1,jm1,jp1)
+                    !cbn(1:4) = c_bed(i,j) 
 
                 end if 
                 

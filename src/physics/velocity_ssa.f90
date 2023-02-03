@@ -4,7 +4,7 @@ module velocity_ssa
 
     use yelmo_defs ,only  : sp, dp, wp, tol_underflow, pi, rho_ice, rho_sw, rho_w, g
     use yelmo_tools, only : get_neighbor_indices, stagger_aa_ab, stagger_aa_ab_ice, stagger_ab_aa_ice, & 
-                    acx_to_nodes, acy_to_nodes, &
+                    acx_to_nodes, acy_to_nodes, aa_to_nodes, &
                     stagger_nodes_aa_ab_ice, stagger_nodes_acx_ab_ice, stagger_nodes_acy_ab_ice, &
                     staggerdiff_nodes_acx_ab_ice, staggerdiff_nodes_acy_ab_ice, &
                     staggerdiffcross_nodes_acx_ab_ice, staggerdiffcross_nodes_acy_ab_ice, &
@@ -418,9 +418,11 @@ end if
                     eps_sq_n = dudxn**2 + dvdyn**2 + dudxn*dvdyn + 0.25*(dudyn+dvdxn)**2 + eps_0_sq
 
                     do k = 1, nz
-                        ! Get rate factor on central node
-                        ATTn = ATT(i,j,k)
-
+                    
+                        ! Get rate factor
+                        call aa_to_nodes(ATTn,ATT(:,:,k),i,j,xn,yn,im1,ip1,jm1,jp1)
+                        !ATTn = ATT(i,j,k)
+                        
                         ! Calculate effective viscosity on ab-nodes
                         viscn = 0.5 * (eps_sq_n)**(p1) * ATTn**(p2);
 

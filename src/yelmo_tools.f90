@@ -27,6 +27,7 @@ module yelmo_tools
     public :: acy_to_nodes_3D
     public :: acx_to_nodes
     public :: acy_to_nodes
+    public :: aa_to_nodes
     public :: stagger_node_aa_ab_ice 
     public :: stagger_node_acx_ab_ice
     public :: stagger_node_acy_ab_ice
@@ -590,7 +591,6 @@ contains
             else
                 j0 = jm1
                 j1 = j
-                !wt = 1.0 - abs(yn(k)) / 2.0
                 wt = (1.0 + (1.0+yn(k)) ) / 2.0 
             end if
 
@@ -643,7 +643,6 @@ contains
             else
                 i0 = im1
                 i1 = i
-                !wt = 1.0 - abs(xn(k)) / 2.0
                 wt = (1.0 + (1.0+xn(k)) ) / 2.0 
             end if
 
@@ -661,59 +660,66 @@ contains
 
     end subroutine acy_to_nodes
     
-    subroutine acz_to_nodes(varn,varz,i,j,k,xn,yn,zn,im1,ip1,jm1,jp1)
-        ! Variable on aa-nodes horizontally, acz nodes vertically.
-        ! Bring to 8 nodes internal to 3D cell. 
+    subroutine aa_to_nodes(varn,var,i,j,xn,yn,im1,ip1,jm1,jp1)
+        ! 2D !!
+        ! Variable defined on aa-nodes horizontally 
+        ! Assumed no vertical dimension. 
 
         real(wp), intent(OUT) :: varn(:) 
-        real(wp), intent(IN)  :: varz(:,:,:) 
+        real(wp), intent(IN)  :: var(:,:) 
         integer,  intent(IN)  :: i 
         integer,  intent(IN)  :: j
-        integer,  intent(IN)  :: k
         real(wp), intent(IN)  :: xn(:)
         real(wp), intent(IN)  :: yn(:) 
-        real(wp), intent(IN)  :: zn(:) 
-        integer,  intent(IN)  :: im1, ip1, jm1, jp1
+        integer,  intent(IN)  :: im1, ip1, jm1, jp1 
 
         ! Local variables 
-        integer  :: q, nx, ny, n 
-        integer  :: i0, i1, j0, j1  
+        integer  :: k, nx, ny, n 
+        integer  :: i0, i1, j0, j1 
         real(wp) :: v0, v1, wt 
 
         n = size(xn,1)
         
-        nx = size(varz,1)
-        ny = size(varz,2)
+        nx = size(var,1)
+        ny = size(var,2)
 
         ! Initialize interpolated variable at nodes of interest
         varn = 0.0
 
-        do q = 1, n
+        do k = 1, n
 
-            if (xn(q) > 0) then
+            if (yn(k) > 0) then
+                j0 = j
+                j1 = jp1
+                wt = yn(k) / 2.0 
+            else
+                j0 = jm1
+                j1 = j
+                wt = (1.0 + (1.0+yn(k)) ) / 2.0 
+            end if
+
+            if (xn(k) > 0) then
                 i0 = i
-                i1 = ip1
-                wt = xn(q) / 2.0 
+                i1 = ip1 
             else
                 i0 = im1
                 i1 = i
-                wt = 1.0 - abs(xn(q)) / 2.0
             end if
 
             ! Get left and right-side 
-            v0 = (1.0-wt)*varz(i0,jm1,k) + wt*varz(i1,jm1,k);
-            v1 = (1.0-wt)*varz(i0,j,k)   + wt*varz(i1,j,k);
+            v0 = (1.0-wt)*var(i0,j0) + wt*var(i0,j1)
+            v1 = (1.0-wt)*var(i1,j0) + wt*var(i1,j1)
             
-            ! Interpolate vertically to the node location 
-            wt = (1.0 + yn(k)) / 2.0;
-            varn(k) = (1.0-wt)*v0 + wt*v1;
+            ! Interpolate horizontally to the node location 
+            wt = abs(xn(k)) / 2.0
+            varn(k) = (1.0-wt)*v0 + wt*v1
 
         end do
         
         return
 
-    end subroutine acz_to_nodes
-    
+    end subroutine aa_to_nodes
+
     subroutine stagger_node_aa_ab_ice(u_ab,u_aa,f_ice,i,j,check_underflow)
         ! Stagger from aa nodes to ab node for index [i,j]
 

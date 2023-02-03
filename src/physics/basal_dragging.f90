@@ -14,7 +14,7 @@ module basal_dragging
                            TOL_UNDERFLOW, io_unit_err, degrees_to_radians
 
     use yelmo_tools, only : get_neighbor_indices, stagger_aa_acx, stagger_aa_acy, &
-                    acx_to_nodes, acy_to_nodes, &
+                    acx_to_nodes, acy_to_nodes, aa_to_nodes, &
                     stagger_nodes_aa_ab_ice, stagger_nodes_acx_ab_ice, stagger_nodes_acy_ab_ice, &
                     staggerdiff_nodes_acx_ab_ice, staggerdiff_nodes_acy_ab_ice, &
                     staggerdiffcross_nodes_acx_ab_ice, staggerdiffcross_nodes_acy_ab_ice
@@ -312,14 +312,19 @@ contains
             case(3)
                 ! Calculate beta from regularized Coulomb law (Joughin et al., GRL, 2019)
 
-                call calc_beta_aa_reg_coulomb(beta,ux_b,uy_b,c_bed,f_ice,beta_q,beta_u0,boundaries)
+                call calc_beta_aa_reg_coulomb(beta,ux_b,uy_b,c_bed,f_ice,beta_q,beta_u0,boundaries,simple_stagger=.FALSE.)
             
             case(4) 
                 ! Calculate beta from the quasi-plastic power-law as defined by Bueler and van Pelt (2015)
                 ! Use simple-staggering to aa-nodes - useful for Schoof (2006) slab test.
 
                 call calc_beta_aa_power_plastic(beta,ux_b,uy_b,c_bed,f_ice,beta_q,beta_u0,boundaries,simple_stagger=.TRUE.)
-                
+            
+            case(5)
+                ! Calculate beta from regularized Coulomb law (Joughin et al., GRL, 2019)
+
+                call calc_beta_aa_reg_coulomb(beta,ux_b,uy_b,c_bed,f_ice,beta_q,beta_u0,boundaries,simple_stagger=.TRUE.)
+            
             case DEFAULT 
                 ! Not recognized 
 
@@ -874,9 +879,9 @@ contains
                     cbn(1:4) = c_bed(i,j) 
 
                 else 
-                    ! Get c_bed on ab-nodes
+                    ! Get c_bed on nodes
                     
-                    !call stagger_nodes_aa_ab_ice(cb_ab,c_bed,f_ice,i,j)
+                    !call aa_to_nodes(cbn,c_bed,i,j,xn,yn,im1,ip1,jm1,jp1)
                     cbn(1:4) = c_bed(i,j) 
 
                 end if 
@@ -888,13 +893,8 @@ contains
                     uyn = 0.5*(uy_b(i,j)+uy_b(i,jm1))
                 
                 else
-                    ! Calculate magnitude of basal velocity on aa-node 
-                    ! from ab-nodes (quadrature points)
+                    ! Calculate magnitude of basal velocity on nodes
                     
-                    ! call stagger_nodes_acx_ab_ice(uxn,ux_b,f_ice,i,j)
-                    ! call stagger_nodes_acy_ab_ice(uyn,uy_b,f_ice,i,j)
-
-                    ! Calculate onto quadrature nodes
                     call acx_to_nodes(uxn,ux_b,i,j,xn,yn,im1,ip1,jm1,jp1)
                     call acy_to_nodes(uyn,uy_b,i,j,xn,yn,im1,ip1,jm1,jp1)
                 
@@ -919,7 +919,7 @@ contains
         
     end subroutine calc_beta_aa_power_plastic
 
-    subroutine calc_beta_aa_reg_coulomb(beta,ux_b,uy_b,c_bed,f_ice,q,u_0,boundaries)
+    subroutine calc_beta_aa_reg_coulomb(beta,ux_b,uy_b,c_bed,f_ice,q,u_0,boundaries,simple_stagger)
         ! Calculate basal friction coefficient (beta) that
         ! enters the SSA solver as a function of basal velocity
         ! using a regularized Coulomb friction law following
@@ -938,7 +938,8 @@ contains
         real(wp), intent(IN)  :: q
         real(wp), intent(IN)  :: u_0              ! [m/a] 
         character(len=*), intent(IN) :: boundaries 
-        
+        logical,  intent(IN)  :: simple_stagger 
+
         ! Local variables
         integer  :: i, j, nx, ny
         integer  :: im1, ip1, jm1, jp1
@@ -978,21 +979,33 @@ contains
             if (f_ice(i,j) .eq. 1.0_wp) then 
                 ! Fully ice-covered point with some fully ice-covered neighbors 
 
-                ! Get c_bed on ab-nodes
-                !call stagger_nodes_aa_ab_ice(cbn,c_bed,f_ice,i,j)
+                if (simple_stagger) then 
+                    ! Use central value of c_bed
+                    
+                    cbn(1:4) = c_bed(i,j) 
 
-                ! Calculate magnitude of basal velocity on aa-node 
-                ! from ab-nodes (quadrature points)
-                ! call stagger_nodes_acx_ab_ice(uxn,ux_b,f_ice,i,j)
-                ! call stagger_nodes_acy_ab_ice(uyn,uy_b,f_ice,i,j)
+                else 
+                    ! Get c_bed on nodes
+                    
+                    !call aa_to_nodes(cbn,c_bed,i,j,xn,yn,im1,ip1,jm1,jp1)
+                    cbn(1:4) = c_bed(i,j) 
 
-                ! Use central value of c_bed
-                cbn(1:4) = c_bed(i,j) 
+                end if 
+                
+                if (simple_stagger) then 
+                    ! Unstagger velocity components to aa-nodes 
 
-                ! Calculate onto quadrature nodes
-                call acx_to_nodes(uxn,ux_b,i,j,xn,yn,im1,ip1,jm1,jp1)
-                call acy_to_nodes(uyn,uy_b,i,j,xn,yn,im1,ip1,jm1,jp1)
-
+                    uxn = 0.5*(ux_b(i,j)+ux_b(im1,j))
+                    uyn = 0.5*(uy_b(i,j)+uy_b(i,jm1))
+                
+                else
+                    ! Calculate magnitude of basal velocity on nodes
+                    
+                    call acx_to_nodes(uxn,ux_b,i,j,xn,yn,im1,ip1,jm1,jp1)
+                    call acy_to_nodes(uyn,uy_b,i,j,xn,yn,im1,ip1,jm1,jp1)
+                
+                end if 
+                
                 uxyn      = sqrt(uxn**2 + uyn**2 + ub_sq_min)
                 betan     = cbn * (uxyn / (uxyn+u_0))**q * (1.0_wp / uxyn)
                 beta(i,j) = sum(wtn*betan)/wt1

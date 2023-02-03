@@ -1,7 +1,7 @@
 module velocity_diva
 
     use yelmo_defs, only  : sp, dp, prec, wp, pi, rho_ice, rho_sw, rho_w, g, TOL_UNDERFLOW
-    use yelmo_tools, only : get_neighbor_indices, acx_to_nodes, acy_to_nodes, &
+    use yelmo_tools, only : get_neighbor_indices, acx_to_nodes, acy_to_nodes, aa_to_nodes, &
                     integrate_trapezoid1D_1D, integrate_trapezoid1D_pt, minmax
 
     use deformation, only : calc_strain_rate_horizontal_2D
@@ -623,8 +623,9 @@ end if
                         eps_sq_n = dudxn**2 + dvdyn**2 + dudxn*dvdyn + 0.25_wp*(dudyn+dvdxn)**2 &
                                                     + 0.25_wp*duxdzn**2 + 0.25_wp*duydzn**2 + eps_0_sq
 
-                        ! Get rate factor on central node
-                        ATTn = ATT(i,j,k)
+                        ! Get rate factor
+                        call aa_to_nodes(ATTn,ATT(:,:,k),i,j,xn,yn,im1,ip1,jm1,jp1)
+                        !ATTn = ATT(i,j,k)
 
                         ! Calculate effective viscosity on nodes and averaged to center aa-node
                         viscn = 0.5 * (eps_sq_n)**(p1) * ATTn**(p2)

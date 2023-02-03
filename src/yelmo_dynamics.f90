@@ -207,7 +207,7 @@ contains
         call calc_jacobian_vel_3D(dyn%now%jvel, dyn%now%ux, dyn%now%uy, dyn%now%uz, tpo%now%H_ice, tpo%now%f_ice, &
                                     tpo%now%f_grnd, tpo%now%dzsdx, tpo%now%dzsdy,tpo%now%dzbdx, tpo%now%dzbdy,   &
                                     dyn%par%zeta_aa, dyn%par%zeta_ac, dyn%par%dx, dyn%par%dy, dyn%par%boundaries)
-        
+
         call calc_strain_rate_tensor_jac(dyn%now%strn, dyn%now%strn2D, dyn%now%jvel, tpo%now%H_ice, tpo%now%f_ice, tpo%now%f_grnd,  &
                                            dyn%par%zeta_aa, dyn%par%zeta_ac, dyn%par%dx, dyn%par%dy, mat%par%de_max, dyn%par%boundaries)
         ! call calc_strain_rate_tensor_jac_quad3D(dyn%now%strn, dyn%now%strn2D, dyn%now%jvel, tpo%now%H_ice, tpo%now%f_ice, tpo%now%f_grnd,  &
@@ -319,10 +319,8 @@ contains
         ! 2. Calculate SSA solution =====
 
         ! Define grid points with ssa active (uses beta from previous timestep)
-        ! call set_ssa_masks(dyn%now%ssa_mask_acx,dyn%now%ssa_mask_acy,dyn%now%beta_acx,dyn%now%beta_acy, &
-        !                    tpo%now%H_ice_dyn,tpo%now%f_ice_dyn,tpo%now%f_grnd_acx,tpo%now%f_grnd_acy,dyn%par%ssa_beta_max,use_ssa=.TRUE.)
-        call set_ssa_masks(dyn%now%ssa_mask_acx,dyn%now%ssa_mask_acy,tpo%now%mask_frnt,tpo%now%H_ice, &
-                                tpo%now%f_ice,tpo%now%f_grnd,use_ssa=.TRUE.,lateral_bc=dyn%par%ssa_lat_bc)
+        call set_ssa_masks(dyn%now%ssa_mask_acx,dyn%now%ssa_mask_acy,tpo%now%mask_frnt,tpo%now%H_ice,tpo%now%f_ice, &
+                                    tpo%now%f_grnd,bnd%z_bed,dyn%par%dx,use_ssa=.TRUE.,lateral_bc=dyn%par%ssa_lat_bc)
 
         if (use_ssa .and. dyn%par%use_ssa .and. &
                 maxval(dyn%now%ssa_mask_acx+dyn%now%ssa_mask_acy) .gt. 0) then 
@@ -457,11 +455,9 @@ contains
         ! ===== Calculate 3D horizontal velocity solution via DIVA algorithm ===================
 
         ! Define grid points with ssa active (uses beta from previous timestep)
-        ! call set_ssa_masks(dyn%now%ssa_mask_acx,dyn%now%ssa_mask_acy,dyn%now%beta_acx,dyn%now%beta_acy, &
-        !                    tpo%now%H_ice_dyn,tpo%now%f_ice_dyn,tpo%now%f_grnd_acx,tpo%now%f_grnd_acy,dyn%par%ssa_beta_max,use_ssa=.TRUE.)
-        call set_ssa_masks(dyn%now%ssa_mask_acx,dyn%now%ssa_mask_acy,tpo%now%mask_frnt,tpo%now%H_ice, &
-                                tpo%now%f_ice,tpo%now%f_grnd,use_ssa=.TRUE.,lateral_bc=dyn%par%ssa_lat_bc)
-        
+        call set_ssa_masks(dyn%now%ssa_mask_acx,dyn%now%ssa_mask_acy,tpo%now%mask_frnt,tpo%now%H_ice,tpo%now%f_ice, &
+                                    tpo%now%f_grnd,bnd%z_bed,dyn%par%dx,use_ssa=.TRUE.,lateral_bc=dyn%par%ssa_lat_bc)
+
         ! ajr: add these two statements for testing 2D flow (no flow in y-direction)
         ! Should consider whether this should be made into a parameter option of some kind,
         ! but it needs to be generalized, here it is hard-coded for diva only...
@@ -573,11 +569,9 @@ contains
         ! ===== Calculate 3D horizontal velocity solution via DIVA algorithm ===================
 
         ! Define grid points with ssa active (uses beta from previous timestep)
-        ! call set_ssa_masks(dyn%now%ssa_mask_acx,dyn%now%ssa_mask_acy,dyn%now%beta_acx,dyn%now%beta_acy, &
-        !                    tpo%now%H_ice_dyn,tpo%now%f_ice_dyn,tpo%now%f_grnd_acx,tpo%now%f_grnd_acy,dyn%par%ssa_beta_max,use_ssa=.TRUE.)
-        call set_ssa_masks(dyn%now%ssa_mask_acx,dyn%now%ssa_mask_acy,tpo%now%mask_frnt,tpo%now%H_ice, &
-                                tpo%now%f_ice,tpo%now%f_grnd,use_ssa=.TRUE.,lateral_bc=dyn%par%ssa_lat_bc)
-        
+        call set_ssa_masks(dyn%now%ssa_mask_acx,dyn%now%ssa_mask_acy,tpo%now%mask_frnt,tpo%now%H_ice,tpo%now%f_ice, &
+                                    tpo%now%f_grnd,bnd%z_bed,dyn%par%dx,use_ssa=.TRUE.,lateral_bc=dyn%par%ssa_lat_bc)
+
         ! Set diva parameters from Yelmo settings 
         l1l2_par%ssa_lis_opt    = dyn%par%ssa_lis_opt 
         l1l2_par%ssa_lateral_bc = dyn%par%ssa_lat_bc 

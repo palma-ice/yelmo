@@ -583,7 +583,7 @@ contains
                     ! Calculate vertical velocity of this layer
                     ! (Greve and Blatter, 2009, Eq. 5.95)
                     uz(i,j,k) = uz(i,j,k-1) - H_now*(zeta_ac(k)-zeta_ac(k-1))*(dudx_aa+dvdy_aa)
-                    
+
                     ! Apply correction to match kinematic boundary condition at surface 
                     !uz(i,j,k) = uz(i,j,k) - zeta_ac(k)*(uz(i,j,k)-uz_srf)
 
@@ -1017,14 +1017,11 @@ contains
         integer    :: im1, ip1, jm1, jp1 
         real(wp) :: dy, rhog 
         real(wp) :: H_mid
-
-        ! real(wp), allocatable :: H_ab(:,:)
+        real(wp) :: taud_mean 
+        real(wp) :: taud_eps 
 
         nx = size(H_ice,1)
         ny = size(H_ice,2) 
-
-        ! allocate(H_ab(nx,ny))
-
 
         ! Define shortcut parameter 
         rhog = rho_ice * g 
@@ -1065,6 +1062,92 @@ contains
             ! Apply limit
             if (taud_acy(i,j) .gt.  taud_lim) taud_acy(i,j) =  taud_lim 
             if (taud_acy(i,j) .lt. -taud_lim) taud_acy(i,j) = -taud_lim 
+            
+        end do
+        end do 
+
+        ! SPECIAL CASES: edge cases for stability...
+
+        do j = 1, ny 
+        do i = 1, nx 
+
+            ! Get neighbor indices
+            call get_neighbor_indices(im1,ip1,jm1,jp1,i,j,nx,ny,boundaries)
+
+            ! === x-direction ===
+
+            if (f_ice(i,j) .eq. 1.0_wp .and. f_ice(ip1,j) .eq. 1.0_wp) then 
+
+                taud_mean = 0.5*(taud_acx(im1,j)+taud_acx(ip1,j))
+                taud_eps  = (taud_acx(i,j) - taud_mean) / taud_lim
+
+                if (abs(taud_acx(i,j)) .eq. taud_lim .and. abs(taud_eps) .gt. 0.4) then 
+                    ! Set driving stress equal to weighted average of neighbors
+                    taud_acx(i,j) = 0.3*taud_acx(i,j) + 0.35*taud_acx(im1,j)+ 0.35*taud_acx(ip1,j)
+                end if 
+
+
+            end if
+
+            ! === y-direction ===
+
+            if (f_ice(i,j) .eq. 1.0_wp .and. f_ice(i,jp1) .eq. 1.0_wp) then 
+
+                taud_mean = 0.5*(taud_acy(i,jm1)+taud_acy(i,jp1))
+                taud_eps  = (taud_acy(i,j) - taud_mean) / taud_lim
+
+                if (abs(taud_acy(i,j)) .eq. taud_lim .and. abs(taud_eps) .gt. 0.4) then 
+                    ! Set driving stress equal to weighted average of neighbors
+                    taud_acy(i,j) = 0.30*taud_acy(i,j) + 0.35*taud_acy(i,jm1)+ 0.35*taud_acy(i,jp1)
+                end if 
+
+
+            end if
+            
+
+            ! if ( abs(taud_acx(i,j)) .eq. taud_lim ) then 
+
+            !     if ( sign(1.0_wp,taud_acx(i,j)*taud_acx(im1,j)) .lt. 0.0 .or. & 
+            !          sign(1.0_wp,taud_acx(i,j)*taud_acx(ip1,j)) .lt. 0.0 ) then 
+            !         ! Case 1: High driving stress in one direction with one or both neighbors'
+            !         ! driving stress in opposing directions. 
+
+            !         ! Set driving stress equal to average of neighbors
+            !         taud_acx(i,j) = 0.5*(taud_acx(im1,j)+taud_acx(ip1,j))
+
+            !     else if ( abs(taud_acx(i,j)) .gt. (0.5*(taud_acx(im1,j)+taud_acx(ip1,j))) .or. &
+            !               abs(taud_acx(i,j)) .gt. 2.0*abs(taud_acx(ip1,j)) ) then 
+            !         ! Case 2: High driving stress with low driving stress in both neighbors
+
+            !         ! Set driving stress equal to weighted average of neighbors
+            !         taud_acx(i,j) = 0.5*taud_acx(i,j) + 0.25*taud_acx(im1,j)+ 0.25*taud_acx(ip1,j)
+
+            !     end if
+
+            ! end if 
+
+            ! ! === y-direction ===
+            
+            ! if ( abs(taud_acy(i,j)) .eq. taud_lim ) then
+
+            !     if ( sign(1.0_wp,taud_acy(i,j)*taud_acy(i,jm1)) .lt. 0.0 .or. & 
+            !          sign(1.0_wp,taud_acy(i,j)*taud_acy(i,jm1)) .lt. 0.0 ) ) then 
+
+            !         ! Set driving stress equal to average of neighbors
+            !         taud_acy(i,j) = 0.5*(taud_acy(i,jm1)+taud_acy(i,jp1))
+
+            !     end if
+
+            ! end if 
+
+            ! if ( abs(taud_acy(i,j)) .eq. taud_lim .and. &
+            !       ( abs(taud_acy(i,j)) .gt. 2.0*abs(taud_acy(im1,j)) .or. &
+            !         abs(taud_acy(i,j)) .gt. 2.0*abs(taud_acy(ip1,j)) ) ) then 
+
+            !     ! Set driving stress equal to weighted average of neighbors
+            !     taud_acy(i,j) = 0.5*taud_acy(i,j) + 0.25*taud_acy(i,jm1)+ 0.25*taud_acy(i,jp1)
+
+            ! end if
             
         end do
         end do 

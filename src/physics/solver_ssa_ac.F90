@@ -896,7 +896,27 @@ contains
 
     end subroutine linear_solver_matrix_ssa_ac_csr_2D
 
-    subroutine set_ssa_masks(ssa_mask_acx,ssa_mask_acy,mask_frnt,H_ice,f_ice,f_grnd,use_ssa,lateral_bc)
+    subroutine check_bed_slope(is_steep,zb0,zb1,dx,lim)
+
+        logical,  intent(OUT) :: is_steep
+        real(wp), intent(IN) :: zb0         ! [m]
+        real(wp), intent(IN) :: zb1         ! [m]
+        real(wp), intent(IN) :: dx          ! [m]
+        real(wp), intent(IN) :: lim         ! [dx/dx] = [unitless]
+
+        if ( abs(zb1-zb0) / dx .gt. lim ) then 
+            is_steep = .TRUE. 
+        else 
+            is_steep = .FALSE. 
+        end if 
+
+        return
+
+    end subroutine check_bed_slope
+
+
+    subroutine set_ssa_masks(ssa_mask_acx,ssa_mask_acy,mask_frnt,H_ice,f_ice, &
+                                                f_grnd,z_bed,dx,use_ssa,lateral_bc)
         ! Define where ssa calculations should be performed
         ! Note: could be binary, but perhaps also distinguish 
         ! grounding line/zone to use this mask for later gl flux corrections
@@ -915,13 +935,17 @@ contains
         real(wp), intent(IN)  :: H_ice(:,:)
         real(wp), intent(IN)  :: f_ice(:,:)
         real(wp), intent(IN)  :: f_grnd(:,:)
+        real(wp), intent(IN)  :: z_bed(:,:)
+        real(wp), intent(IN)  :: dx 
         logical,  intent(IN)  :: use_ssa       ! SSA is actually active now? 
         character(len=*), intent(IN) :: lateral_bc 
 
         ! Local variables
-        integer    :: i, j, nx, ny
-        integer    :: im1, ip1, jm1, jp1
+        integer  :: i, j, nx, ny
+        integer  :: im1, ip1, jm1, jp1
         real(wp) :: H_acx, H_acy
+        logical  :: is_steep 
+        logical  :: is_convergent 
         
         real(wp), allocatable :: mask_frnt_dyn(:,:)
 
@@ -930,6 +954,8 @@ contains
         integer, parameter :: val_marine    = 2
         integer, parameter :: val_grnd      = 3
         integer, parameter :: val_disabled  = 5 
+
+        real(wp), parameter :: grad_lim_bed = 0.04 
 
         nx = size(H_ice,1)
         ny = size(H_ice,2)
@@ -1033,7 +1059,7 @@ contains
                         ssa_mask_acx(i,j) = 2
                     end if 
 
-                    ! Check for special case of floating ice next to ice-free land,
+                    ! SPECIAL CASE: floating ice next to ice-free land,
                     ! then set ssa mask to zero (ie, set velocity to zero)
                     if (ssa_mask_acx(i,j) .eq. 2) then 
 
@@ -1051,8 +1077,23 @@ contains
 
                     end if 
 
-                end if
+                    ! SPECIAL CASE: GROUNDED ICE
+                    if (ssa_mask_acx(i,j) .eq. 1 .and. &
+                            (f_ice(i,j) .eq. 1.0 .and. f_ice(ip1,j) .eq. 1.0) ) then 
 
+                        ! Case 1: extremely steep bedrock slopes for grounded ice,
+                        ! then set ssa mask to zero (ie, set velocity to zero)
+                        
+                        call check_bed_slope(is_steep,z_bed(i,j),z_bed(ip1,j),dx,lim=grad_lim_bed)
+
+                        if (is_steep) then 
+                            ssa_mask_acx(i,j) = 0
+                        end if
+
+                    end if 
+
+                end if
+                
                 ! Overwrite above if this point should be treated via lateral boundary conditions
                 if ( (mask_frnt_dyn(i,j) .gt. 0 .and. mask_frnt_dyn(ip1,j) .lt. 0) .or. &
                      (mask_frnt_dyn(i,j) .lt. 0 .and. mask_frnt_dyn(ip1,j) .gt. 0) ) then 
@@ -1085,7 +1126,7 @@ contains
                         ssa_mask_acy(i,j) = 2
                     end if 
 
-                    ! Check for special case of floating ice next to ice-free land,
+                    ! SPECIAL CASE: floating ice next to ice-free land,
                     ! then set ssa mask to zero (ie, set velocity to zero)
                     if (ssa_mask_acy(i,j) .eq. 2) then 
 
@@ -1103,6 +1144,21 @@ contains
 
                     end if 
                     
+                    ! SPECIAL CASE: GROUNDED ICE
+                    if (ssa_mask_acy(i,j) .eq. 1 .and. &
+                            (f_ice(i,j) .eq. 1.0 .and. f_ice(i,jp1) .eq. 1.0) ) then 
+
+                        ! Case 1: extremely steep bedrock slopes for grounded ice,
+                        ! then set ssa mask to zero (ie, set velocity to zero)
+                        
+                        call check_bed_slope(is_steep,z_bed(i,j),z_bed(i,jp1),dx,lim=grad_lim_bed)
+
+                        if (is_steep) then 
+                            ssa_mask_acy(i,j) = 0
+                        end if
+
+                    end if 
+
                 end if
 
                 ! Overwrite above if this point should be treated via lateral boundary conditions

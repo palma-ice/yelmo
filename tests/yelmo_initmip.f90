@@ -661,6 +661,11 @@ contains
         call nc_write(filename,"f_ice_dyn",ylmo%tpo%now%f_ice_dyn,units="1",long_name="Ice fraction (dynamics)", &
                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
         
+        call nc_write(filename,"dzbdx",ylmo%tpo%now%dzbdx,units="1",long_name="Bed slope", &
+                      dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
+        call nc_write(filename,"dzbdy",ylmo%tpo%now%dzbdy,units="1",long_name="Bed slope", &
+                      dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
+                      
         ! Strain-rate and stress tensors 
         if (.TRUE.) then
 

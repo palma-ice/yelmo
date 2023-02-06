@@ -465,22 +465,10 @@ contains
             ! Get neighbor indices
             call get_neighbor_indices(im1,ip1,jm1,jp1,i,j,nx,ny,boundaries)
 
-            ! Get a locally smoothed value of dzsdt and dhdt to avoid spurious oscillations
-            ! (eg in EISMINT-EXPA dhdt field)
-            ! These routines stagger to ab-nodes, consider replacing with staggering to 
-            ! quadrature nodes. 
-            !call stagger_nodes_aa_ab_ice(dzsdtn,dzsdt,f_ice,i,j)
-            !dzsdt_now = sum(dzsdtn*wtn)/wt1
-            
-            !call stagger_nodes_aa_ab_ice(dhdtn,dhdt,f_ice,i,j)
-            !dhdt_now = sum(dhdtn*wtn)/wt1
-            
+            ! Diagnose rate of ice-base elevation change (needed for all points)
             dzsdt_now = dzsdt(i,j) 
             dhdt_now  = dhdt(i,j) 
-
-            ! Diagnose rate of ice-base elevation change (needed for all points)
             dzbdt_now = dzsdt_now - dhdt_now
-
 
             if (f_ice(i,j) .eq. 1.0) then
 
@@ -666,7 +654,8 @@ contains
 
     end subroutine calc_uz_3D
 
-    subroutine calc_uz_3D_aa(uz,ux,uy,H_ice,f_ice,f_grnd,z_bed,z_srf,smb,bmb,dHdt,dzsdt,zeta_aa,zeta_ac,dx,dy,boundaries)
+    subroutine calc_uz_3D_aa(uz,uz_star,ux,uy,H_ice,f_ice,f_grnd,z_bed,z_srf,smb,bmb,dHdt,dzsdt, &
+                                            dzsdx,dzsdy,dzbdx,dzbdy,zeta_aa,zeta_ac,dx,dy,boundaries)
         ! Following algorithm outlined by the Glimmer ice sheet model:
         ! https://www.geos.ed.ac.uk/~mhagdorn/glide/glide-doc/glimmer_htmlse9.html#x17-660003.1.5
 
@@ -675,9 +664,10 @@ contains
 
         implicit none 
 
-        real(wp), intent(OUT) :: uz(:,:,:)        ! nx,ny,nz_ac
-        real(wp), intent(IN)  :: ux(:,:,:)        ! nx,ny,nz_aa
-        real(wp), intent(IN)  :: uy(:,:,:)        ! nx,ny,nz_aa
+        real(wp), intent(OUT) :: uz(:,:,:)          ! nx,ny,nz_ac
+        real(wp), intent(OUT) :: uz_star(:,:,:)     ! nx,ny,nz_ac
+        real(wp), intent(IN)  :: ux(:,:,:)          ! nx,ny,nz_aa
+        real(wp), intent(IN)  :: uy(:,:,:)          ! nx,ny,nz_aa
         real(wp), intent(IN)  :: H_ice(:,:)
         real(wp), intent(IN)  :: f_ice(:,:)
         real(wp), intent(IN)  :: f_grnd(:,:)
@@ -686,7 +676,11 @@ contains
         real(wp), intent(IN)  :: smb(:,:) 
         real(wp), intent(IN)  :: bmb(:,:) 
         real(wp), intent(IN)  :: dHdt(:,:) 
-        real(wp), intent(IN)  :: dzsdt(:,:) 
+        real(wp), intent(IN)  :: dzsdt(:,:)
+        real(wp), intent(IN)  :: dzsdx(:,:) 
+        real(wp), intent(IN)  :: dzsdy(:,:) 
+        real(wp), intent(IN)  :: dzbdx(:,:) 
+        real(wp), intent(IN)  :: dzbdy(:,:) 
         real(wp), intent(IN)  :: zeta_aa(:)    ! z-coordinate, aa-nodes 
         real(wp), intent(IN)  :: zeta_ac(:)    ! z-coordinate, ac-nodes  
         real(wp), intent(IN)  :: dx 
@@ -712,9 +706,14 @@ contains
         real(wp) :: uy_aa 
         real(wp) :: uz_grid 
         real(wp) :: uz_srf 
-        real(wp) :: corr 
+        real(wp) :: zeta_now 
         real(wp) :: c_x 
         real(wp) :: c_y 
+        real(wp) :: c_t 
+
+        real(wp) :: dzsdt_now
+        real(wp) :: dhdt_now
+        real(wp) :: dzbdt_now 
 
         real(wp), parameter :: dzbdt        = 0.0     ! For posterity, keep dzbdt variable, but set to zero 
         real(wp), parameter :: uz_min       = -10.0   ! [m/yr] Minimum allowed vertical velocity downwards for stability
@@ -736,6 +735,11 @@ contains
             ! Get neighbor indices
             call get_neighbor_indices(im1,ip1,jm1,jp1,i,j,nx,ny,boundaries)
 
+            ! Diagnose rate of ice-base elevation change (needed for all points)
+            dzsdt_now = dzsdt(i,j) 
+            dhdt_now  = dhdt(i,j) 
+            dzbdt_now = dzsdt_now - dhdt_now
+
             if (f_ice(i,j) .eq. 1.0) then
 
                 ! Get weighted ice thickness for stability
@@ -746,17 +750,16 @@ contains
                 H_inv = 1.0/H_now 
 
                 ! Get the centered bedrock gradient 
-                dzbdx_aa = (z_bed(ip1,j)-z_bed(im1,j))/(2.0_wp*dx)
-                dzbdy_aa = (z_bed(i,jp1)-z_bed(i,jm1))/(2.0_wp*dy)
-                
+                dzbdx_aa = 0.5*(dzbdx(i,j)+dzbdx(im1,j))
+                dzbdy_aa = 0.5*(dzbdy(i,j)+dzbdy(i,jm1))
+
                 ! Get the centered surface gradient 
-                dzsdx_aa = (z_srf(ip1,j)-z_srf(im1,j))/(2.0_wp*dx)
-                dzsdy_aa = (z_srf(i,jp1)-z_srf(i,jm1))/(2.0_wp*dy)
-                
+                dzsdx_aa = 0.5*(dzsdx(i,j)+dzsdx(im1,j))
+                dzsdy_aa = 0.5*(dzsdy(i,j)+dzsdy(i,jm1))
+
                 ! Get the centered horizontal velocity at the base
                 ux_aa = 0.5_wp* (ux(im1,j,1) + ux(i,j,1))
                 uy_aa = 0.5_wp* (uy(i,jm1,1) + uy(i,j,1))
-                
                 
 !                 ! Get the centered ice thickness gradient 
 !                 dHdx_aa = (H_ice(ip1,j)-H_ice(im1,j))/(2.0_wp*dx)
@@ -791,13 +794,7 @@ contains
 
                     ! Greve and Blatter (2009), Eq. 5.72
                     ! Bueler and Brown  (2009), Eq. 4
-                    ! if (k .eq. nz_ac) then 
-                    !     duxdx_aa  = (ux(i,j,k-1)   - ux(im1,j,k-1)  )/dx
-                    !     duydy_aa  = (uy(i,j,k-1)   - uy(i,jm1,k-1)  )/dy
-                    ! else
-                    !     duxdx_aa  = (ux(i,j,k)   - ux(im1,j,k)  )/dx
-                    !     duydy_aa  = (uy(i,j,k)   - uy(i,jm1,k)  )/dy
-                    ! end if 
+                    
                     duxdx_aa  = (ux(i,j,k-1)   - ux(im1,j,k-1)  )/dx
                     duydy_aa  = (uy(i,j,k-1)   - uy(i,jm1,k-1)  )/dy
 
@@ -841,101 +838,17 @@ contains
                     
                 end do 
                 
-            else 
-                ! No ice here, set vertical velocity equal to negative accum and bedrock change 
-
-                do k = 1, nz_ac 
-                    uz(i,j,k) = dzbdt - max(smb(i,j),0.0)
-                    if (abs(uz(i,j,k)) .lt. TOL_UNDERFLOW) uz(i,j,k) = 0.0_wp 
-               end do 
-
-            end if 
-
-        end do 
-        end do 
-        !$omp end parallel do 
-
-        return 
-
-    end subroutine calc_uz_3D_aa
-
-    subroutine calc_uz_advec_corr_3D_aa(uz_star,uz,ux,uy,f_ice,z_bed,z_srf,dzsdt,zeta_aa,zeta_ac,dx,dy,boundaries)
-        ! Following algorithm outlined by the Glimmer ice sheet model:
-        ! https://www.geos.ed.ac.uk/~mhagdorn/glide/glide-doc/glimmer_htmlse9.html#x17-660003.1.5
-
-        ! Note: rate of bedrock uplift (dzbdt) no longer considered, since the rate is 
-        ! very small and now z_bed is updated externally (ie, now assume dzbdt = 0.0 here)
-
-        implicit none 
-
-        real(wp), intent(OUT) :: uz_star(:,:,:)   ! nx,ny,nz_ac
-        real(wp), intent(IN)  :: uz(:,:,:)        ! nx,ny,nz_ac
-        real(wp), intent(IN)  :: ux(:,:,:)        ! nx,ny,nz_aa
-        real(wp), intent(IN)  :: uy(:,:,:)        ! nx,ny,nz_aa
-        real(wp), intent(IN)  :: f_ice(:,:)
-        real(wp), intent(IN)  :: z_bed(:,:) 
-        real(wp), intent(IN)  :: z_srf(:,:) 
-        real(wp), intent(IN)  :: dzsdt(:,:) 
-        real(wp), intent(IN)  :: zeta_aa(:)    ! z-coordinate, aa-nodes 
-        real(wp), intent(IN)  :: zeta_ac(:)    ! z-coordinate, ac-nodes  
-        real(wp), intent(IN)  :: dx 
-        real(wp), intent(IN)  :: dy
-        character(len=*), intent(IN) :: boundaries 
-
-        ! Local variables 
-        integer :: i, j, k, nx, ny, nz_aa, nz_ac
-        integer :: im1, ip1, jm1, jp1
-        real(wp) :: dzbdx_aa
-        real(wp) :: dzbdy_aa
-        real(wp) :: dzsdx_aa
-        real(wp) :: dzsdy_aa
-        real(wp) :: ux_aa 
-        real(wp) :: uy_aa 
-        real(wp) :: c_x 
-        real(wp) :: c_y 
-        real(wp) :: c_t 
-        real(wp)   :: dzsdt_now 
-
-        real(wp), parameter :: dzbdt = 0.0   ! For posterity, keep dzbdt variable, but set to zero 
-
-        nx    = size(ux,1)
-        ny    = size(ux,2)
-        nz_aa = size(zeta_aa,1)
-        nz_ac = size(zeta_ac,1) 
-
-        ! Initialize adjusted vertical velocity to zero 
-        uz_star = 0.0 
-
-        ! Next, calculate velocity 
-
-        !$omp parallel do 
-        do j = 1, ny
-        do i = 1, nx
-
-            ! Get neighbor indices
-            call get_neighbor_indices(im1,ip1,jm1,jp1,i,j,nx,ny,boundaries)
-
-            if (f_ice(i,j) .eq. 1.0) then
-
-                ! Get the centered bedrock gradient 
-                dzbdx_aa = (z_bed(ip1,j)-z_bed(im1,j))/(2.0_wp*dx)
-                dzbdy_aa = (z_bed(i,jp1)-z_bed(i,jm1))/(2.0_wp*dy)
+                ! === Also calculate adjusted vertical velocity to be used for temperature advection
                 
-                ! Get the centered surface gradient 
-                dzsdx_aa = (z_srf(ip1,j)-z_srf(im1,j))/(2.0_wp*dx)
-                dzsdy_aa = (z_srf(i,jp1)-z_srf(i,jm1))/(2.0_wp*dy)
-                
-
-                ! Calculate adjusted vertical velocity for each layer
                 do k = 1, nz_ac 
 
-                ! Get the centered horizontal velocity of box
-                ! on vertical ac-nodes at the level k 
-                ! ajr: Given that the correction is 
-                ! applied to uz, which is defined on 
-                ! ac-nodes, it seems the correction
-                ! should also be calculated on ac-nodes.
-                ! Note: nz_ac = nz_aa + 1
+                    ! Get the centered horizontal velocity of box
+                    ! on vertical ac-nodes at the level k 
+                    ! ajr: Given that the correction is 
+                    ! applied to uz, which is defined on 
+                    ! ac-nodes, it seems the correction
+                    ! should also be calculated on ac-nodes.
+                    ! Note: nz_ac = nz_aa + 1
     
                     if (k .eq. 1) then 
                         ux_aa = 0.5_wp* (ux(im1,j,k) + ux(i,j,k))
@@ -948,19 +861,18 @@ contains
                         uy_aa = 0.25_wp* (uy(i,jm1,k) + uy(i,j,k) + uy(i,jm1,k-1) + uy(i,j,k-1))
                     end if 
 
-                    ! Calculate sigma-coordinate derivative correction factors
-                    ! (Greve and Blatter, 2009, Eqs. 5.131 and 5.132)
-                    ! Not dividing by H here, since this is done in the thermodynamics advection step
-                    c_x = -ux_aa * ( (1.0_wp-zeta_ac(k))*dzbdx_aa + zeta_ac(k)*dzsdx_aa )
-                    c_y = -uy_aa * ( (1.0_wp-zeta_ac(k))*dzbdy_aa + zeta_ac(k)*dzsdy_aa )
+                    ! Take zeta directly at vertical cell edge where uz is calculated
+                    ! (this is also where ux_aa and uy_aa are calculated above)
+                    zeta_now = zeta_ac(k)
 
-                    ! Get a locally smoothed value of dzsdt to avoid spurious oscillations
-                    ! (eg in EISMINT-EXPA dhdt field)
-                    dzsdt_now = 0.5_wp*dzsdt(i,j) &
-                              + 0.125_wp*( dzsdt(im1,j)+dzsdt(ip1,j)+dzsdt(i,jm1)+dzsdt(i,jp1) )
-                    
-                    c_t = -( (1.0_wp-zeta_ac(k))*dzbdt + zeta_ac(k)*dzsdt_now )
-                    
+                    ! Calculate sigma-coordinate derivative correction factors
+                    ! (Greve and Blatter, 2009, Eqs. 5.131 and 5.132, 
+                    !  also shown in 1D with Eq. 5.145)
+
+                    ! Note: not dividing by H here, since this is done in the thermodynamics advection step
+                    c_x = -ux_aa * ( (1.0_wp-zeta_now)*dzbdx_aa  + zeta_now*dzsdx_aa )
+                    c_y = -uy_aa * ( (1.0_wp-zeta_now)*dzbdy_aa  + zeta_now*dzsdy_aa )
+                    c_t =         -( (1.0_wp-zeta_now)*dzbdt_now + zeta_now*dzsdt_now )
 
                     ! Calculate adjusted vertical velocity for advection 
                     ! of this layer
@@ -972,10 +884,15 @@ contains
                 end do 
                 
             else 
-                ! No ice here, no adjustment needed. 
+                ! No ice here, set vertical velocity equal to negative accum and bedrock change 
 
                 do k = 1, nz_ac 
+
+                    uz(i,j,k) = dzbdt - max(smb(i,j),0.0)
+                    if (abs(uz(i,j,k)) .lt. TOL_UNDERFLOW) uz(i,j,k) = 0.0_wp 
+
                     uz_star(i,j,k) = uz(i,j,k)
+
                end do 
 
             end if 
@@ -986,7 +903,7 @@ contains
 
         return 
 
-    end subroutine calc_uz_advec_corr_3D_aa
+    end subroutine calc_uz_3D_aa
 
     subroutine calc_driving_stress(taud_acx,taud_acy,H_ice,f_ice,dzsdx,dzsdy,dx,taud_lim,boundaries)
         ! Calculate driving stress on staggered grid points

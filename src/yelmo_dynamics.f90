@@ -129,11 +129,10 @@ contains
         ! Finally calculate c_bed, which is simply c_bed = f(N_eff,cb_ref)
         call calc_c_bed(dyn%now%c_bed,dyn%now%cb_ref,dyn%now%N_eff,dyn%par%till_is_angle)
 
-        ! ===== Calculate the 3D velocity field and helper variables =======================
+        ! ===== Calculate the 3D horizontal velocity field and helper variables =======================
         ! The variables to be obtained from these routines are:
         !     ux(:,:,:)           ! [m/a]
         !     uy(:,:,:)           ! [m/a]
-        !     uz(:,:,:)           ! [m/a]
         !     ux_bar(:,:)         ! [m/a]
         !     uy_bar(:,:)         ! [m/a]
         !     ux_b(:,:)           ! [m/a]
@@ -154,7 +153,7 @@ contains
         !     ssa_err_acy(:,:)
         ! If a given solver does not use/calculate the variable, it is set to zero. 
         ! For the rest of Yelmo, at least these variables should be populated:
-        ! ux, uy, uz, ux_bar, uy_bar, ux_b, uy_b, taub_acx, taub_acy, beta 
+        ! ux, uy, ux_bar, uy_bar, ux_b, uy_b, taub_acx, taub_acy, beta 
 
         select case(dyn%par%solver)
 
@@ -202,11 +201,21 @@ contains
         where (abs(dyn%now%ux_bar) .lt. TOL_UNDERFLOW) dyn%now%ux_bar = 0.0_wp 
         where (abs(dyn%now%uy_bar) .lt. TOL_UNDERFLOW) dyn%now%uy_bar = 0.0_wp 
         
-        ! ===== Velocity Jacobian and strain rate tensor ===========================
+        ! ===== Calculate the velocity Jacobian ===============================================
 
         call calc_jacobian_vel_3D(dyn%now%jvel, dyn%now%ux, dyn%now%uy, dyn%now%uz, tpo%now%H_ice, tpo%now%f_ice, &
                                     tpo%now%f_grnd, tpo%now%dzsdx, tpo%now%dzsdy,tpo%now%dzbdx, tpo%now%dzbdy,   &
                                     dyn%par%zeta_aa, dyn%par%zeta_ac, dyn%par%dx, dyn%par%dy, dyn%par%boundaries)
+
+        ! ===== Calculate the vertical velocity through continuity ============================
+        ! (using the Jacobian) 
+
+        call calc_uz_3D_jac(dyn%now%uz,dyn%now%uz_star,dyn%now%ux,dyn%now%uy,dyn%now%jvel,tpo%now%H_ice_dyn,tpo%now%f_ice_dyn, &
+                            tpo%now%f_grnd,bnd%smb,tpo%now%bmb,tpo%now%dHidt,tpo%now%dzsdt,tpo%now%dzsdx,tpo%now%dzsdy,tpo%now%dzbdx, &
+                            tpo%now%dzbdy,dyn%par%zeta_aa,dyn%par%zeta_ac,dyn%par%dx,dyn%par%dy,dyn%par%use_bmb,dyn%par%boundaries)
+        
+        ! ===== Strain rate tensor ===========================
+        ! (using the Jacobian)
 
         call calc_strain_rate_tensor_jac(dyn%now%strn, dyn%now%strn2D, dyn%now%jvel, tpo%now%H_ice, tpo%now%f_ice, tpo%now%f_grnd,  &
                                            dyn%par%zeta_aa, dyn%par%zeta_ac, dyn%par%dx, dyn%par%dy, mat%par%de_max, dyn%par%boundaries)
@@ -285,15 +294,10 @@ contains
         
         type(ssa_param_class) :: ssa_par 
 
-        ! For vertical velocity calculation 
-        real(wp), allocatable :: bmb(:,:)
-
         nx    = dyn%par%nx 
         ny    = dyn%par%ny 
         nz_aa = dyn%par%nz_aa 
         nz_ac = dyn%par%nz_ac 
-        
-        allocate(bmb(nx,ny))
         
         ! ===== Calculate 3D horizontal velocity solution via SIA + SSA algorithm ===================
 
@@ -401,18 +405,6 @@ contains
         dyn%now%duydz     = 0.0_wp 
         dyn%now%beta_eff  = 0.0_wp 
 
-        ! ===== Calculate the vertical velocity through continuity ============================
-
-        if (dyn%par%use_bmb) then 
-            bmb = tpo%now%bmb 
-        else 
-            bmb = 0.0 
-        end if 
-
-        call calc_uz_3D(dyn%now%uz,dyn%now%uz_star,dyn%now%ux,dyn%now%uy,tpo%now%H_ice_dyn,tpo%now%f_ice_dyn,tpo%now%f_grnd, &
-                        bnd%smb,bmb,tpo%now%dHidt,tpo%now%dzsdt,tpo%now%dzsdx,tpo%now%dzsdy, &
-                        tpo%now%dzbdx,tpo%now%dzbdy,dyn%par%zeta_aa,dyn%par%zeta_ac,dyn%par%dx,dyn%par%dy,dyn%par%boundaries)
-        
         return
 
     end subroutine calc_ydyn_hybrid
@@ -514,18 +506,6 @@ contains
         ! Integrate from 3D shear velocity field to get depth-averaged field
         dyn%now%ux_i_bar = calc_vertical_integrated_2D(dyn%now%ux_i,dyn%par%zeta_aa)
         dyn%now%uy_i_bar = calc_vertical_integrated_2D(dyn%now%uy_i,dyn%par%zeta_aa)
-          
-        ! ===== Calculate the vertical velocity through continuity ============================
-
-        if (dyn%par%use_bmb) then 
-            bmb = tpo%now%bmb 
-        else 
-            bmb = 0.0 
-        end if 
-
-        call calc_uz_3D(dyn%now%uz,dyn%now%uz_star,dyn%now%ux,dyn%now%uy,tpo%now%H_ice_dyn,tpo%now%f_ice_dyn,tpo%now%f_grnd, &
-                        bnd%smb,bmb,tpo%now%dHidt,tpo%now%dzsdt,tpo%now%dzsdx,tpo%now%dzsdy, &
-                        tpo%now%dzbdx,tpo%now%dzbdy,dyn%par%zeta_aa,dyn%par%zeta_ac,dyn%par%dx,dyn%par%dy,dyn%par%boundaries)
         
         return
 
@@ -609,18 +589,6 @@ contains
         ! Integrate from 3D shear velocity field to get depth-averaged field
         dyn%now%ux_i_bar = calc_vertical_integrated_2D(dyn%now%ux_i,dyn%par%zeta_aa)
         dyn%now%uy_i_bar = calc_vertical_integrated_2D(dyn%now%uy_i,dyn%par%zeta_aa)
-          
-        ! ===== Calculate the vertical velocity through continuity ============================
-
-        if (dyn%par%use_bmb) then 
-            bmb = tpo%now%bmb 
-        else 
-            bmb = 0.0 
-        end if 
-
-        call calc_uz_3D(dyn%now%uz,dyn%now%uz_star,dyn%now%ux,dyn%now%uy,tpo%now%H_ice_dyn,tpo%now%f_ice_dyn,tpo%now%f_grnd, &
-                        bnd%smb,bmb,tpo%now%dHidt,tpo%now%dzsdt,tpo%now%dzsdx,tpo%now%dzsdy, &
-                        tpo%now%dzbdx,tpo%now%dzbdy,dyn%par%zeta_aa,dyn%par%zeta_ac,dyn%par%dx,dyn%par%dy,dyn%par%boundaries)
         
         return
 

@@ -4,13 +4,8 @@ module velocity_general
     use yelmo_defs ,only  : sp, dp, wp, tol_underflow, io_unit_err, rho_ice, rho_sw, rho_w, g, &
                             jacobian_3D_class
     use yelmo_tools, only : get_neighbor_indices, stagger_aa_ab, stagger_aa_ab_ice, &
-                    acx_to_nodes, acy_to_nodes, &
-                    stagger_nodes_aa_ab_ice, stagger_nodes_acx_ab_ice, stagger_nodes_acy_ab_ice, &
-                    staggerdiff_nodes_acx_ab_ice, staggerdiff_nodes_acy_ab_ice, &
-                    staggerdiffx_nodes_aa_ab_ice, staggerdiffy_nodes_aa_ab_ice, &
-                    integrate_trapezoid1D_1D, integrate_trapezoid1D_pt, minmax, &
-                    set_boundaries_2D_aa, set_boundaries_3D_aa, &
-                    set_boundaries_2D_acx, set_boundaries_2D_acy
+                    acx_to_nodes, acy_to_nodes, acx_to_nodes_3D, acy_to_nodes_3D, &
+                    integrate_trapezoid1D_1D, integrate_trapezoid1D_pt, minmax
 
     use deformation, only : calc_strain_rate_horizontal_2D
 
@@ -19,9 +14,9 @@ module velocity_general
     implicit none 
 
     private 
+    public :: calc_uz_3D_jac
     public :: calc_uz_3D
     !public :: calc_uz_3D_aa
-    !public :: calc_uz_advec_corr_3D_aa
     public :: calc_driving_stress
     public :: calc_driving_stress_gl
     public :: calc_lateral_bc_stress_2D
@@ -39,7 +34,7 @@ module velocity_general
 contains 
     
     subroutine calc_uz_3D_jac(uz,uz_star,ux,uy,jvel,H_ice,f_ice,f_grnd,smb,bmb,dHdt,dzsdt, &
-                                    dzsdx,dzsdy,dzbdx,dzbdy,zeta_aa,zeta_ac,dx,dy,boundaries)
+                                    dzsdx,dzsdy,dzbdx,dzbdy,zeta_aa,zeta_ac,dx,dy,use_bmb,boundaries)
         ! Following algorithm outlined by the Glimmer ice sheet model:
         ! https://www.geos.ed.ac.uk/~mhagdorn/glide/glide-doc/glimmer_htmlse9.html#x17-660003.1.5
 
@@ -69,12 +64,14 @@ contains
         real(wp), intent(IN)  :: zeta_ac(:)    ! z-coordinate, ac-nodes  
         real(wp), intent(IN)  :: dx 
         real(wp), intent(IN)  :: dy
+        logical,  intent(IN)  :: use_bmb
         character(len=*), intent(IN) :: boundaries 
 
         ! Local variables 
         integer :: i, j, k, nx, ny, nz_aa, nz_ac
         integer :: im1, ip1, jm1, jp1   
-        integer :: kup, kdn
+        integer :: kup, kdn, kmid
+        real(wp) :: f_bmb
         real(wp) :: H_now
         real(wp) :: H_inv
         real(wp) :: dzbdx_aa
@@ -117,6 +114,12 @@ contains
         real(wp) :: wtn(4)
         real(wp) :: wt1 
 
+        real(wp) :: dudzn8(8) 
+        real(wp) :: dvdzn8(8) 
+        real(wp) :: zn 
+        real(wp) :: wtn8(8)
+        real(wp) :: wt18 
+
         real(wp) :: dzsdt_now
         real(wp) :: dhdt_now
         real(wp) :: dzbdt_now 
@@ -128,9 +131,6 @@ contains
         nz_aa = size(zeta_aa,1)
         nz_ac = size(zeta_ac,1) 
         
-        ! Initialize vertical velocity to zero 
-        uz = 0.0 
-
         ! Get nodes and weighting 
         wt0 = 1.0/sqrt(3.0)
         xn  = [wt0,-wt0,-wt0, wt0]
@@ -138,7 +138,22 @@ contains
         wtn = [1.0,1.0,1.0,1.0]
         wt1 = sum(wtn)
 
-        ! Calculate vertical velocity at each point through the column
+        ! Get nodes and weighting 
+        zn   = wt0
+        wtn8 = [1.0,1.0,1.0,1.0,1.0,1.0,1.0,1.0]
+        wt18 = sum(wtn)
+
+        ! Initialize vertical velocity to zero 
+        uz = 0.0 
+
+        ! Define switch for bmb
+        if (use_bmb) then 
+            f_bmb = 1.0 
+        else 
+            f_bmb = 0.0 
+        end if 
+
+        ! Next, calculate vertical velocity at each point through the column
 
         !$omp parallel do 
         do j = 1, ny
@@ -147,19 +162,10 @@ contains
             ! Get neighbor indices
             call get_neighbor_indices(im1,ip1,jm1,jp1,i,j,nx,ny,boundaries)
 
-            ! Get a locally smoothed value of dzsdt and dhdt to avoid spurious oscillations
-            ! (eg in EISMINT-EXPA dhdt field)
-            ! These routines stagger to ab-nodes, consider replacing with staggering to 
-            ! quadrature nodes. 
-            call stagger_nodes_aa_ab_ice(dzsdtn,dzsdt,f_ice,i,j)
-            dzsdt_now = sum(dzsdtn*wtn)/wt1
-            
-            call stagger_nodes_aa_ab_ice(dhdtn,dhdt,f_ice,i,j)
-            dhdt_now = sum(dhdtn*wtn)/wt1
-            
             ! Diagnose rate of ice-base elevation change (needed for all points)
+            dzsdt_now = dzsdt(i,j) 
+            dhdt_now  = dhdt(i,j) 
             dzbdt_now = dzsdt_now - dhdt_now
-
 
             if (f_ice(i,j) .eq. 1.0) then
 
@@ -199,7 +205,7 @@ contains
 
                 ! Determine basal vertical velocity for this grid point 
                 ! Following Eq. 5.31 of Greve and Blatter (2009)
-                uz(i,j,1) = dzbdt_now + uz_grid + bmb(i,j) + ux_aa*dzbdx_aa + uy_aa*dzbdy_aa
+                uz(i,j,1) = dzbdt_now + uz_grid + f_bmb*bmb(i,j) + ux_aa*dzbdx_aa + uy_aa*dzbdy_aa
                 if (abs(uz(i,j,1)) .lt. TOL_UNDERFLOW) uz(i,j,1) = 0.0_wp 
                 
                 ! Set stability limit on basal uz value.
@@ -215,49 +221,32 @@ contains
                 ! Integrate on vertical ac-nodes (ie, vertical cell borders between aa-node centers)
                 do k = 2, nz_ac 
 
-                    ! Greve and Blatter (2009), Eq. 5.72
-                    ! Bueler and Brown  (2009), Eq. 4
+                    ! Note: center of cell below this one is zeta_aa(k-1)
+                    kmid = k-1
 
                     ! Get dudz/dvdz values at vertical aa-nodes, in order
                     ! to vertically integrate each cell up to ac-node border.
-                    ! Note: nz_ac = nz_aa + 1
-                    if (k .eq. 2) then
-                        kup = k 
-                        kdn = k-1 
-                    else if (k .eq. nz_ac) then 
-                        kup = k-1 
-                        kdn = k-2 
-                    else 
-                        ! Centered on k-1 
-                        kup = k 
-                        kdn = k-2
-                    end if
 
+if (.TRUE.) then
+    ! 2D QUADRATURE
+                    call acx_to_nodes(dudzn,jvel%dxz(:,:,kmid),i,j,xn,yn,im1,ip1,jm1,jp1)
+                    dudz_aa = sum(dudzn*wtn)/wt1
 
-           !!! TO DO !!!
-                    ! call acx_to_nodes(uxn_up,ux(:,:,kup),i,j,xn,yn,im1,ip1,jm1,jp1)
-                    ! call acx_to_nodes(uxn_dn,ux(:,:,kdn),i,j,xn,yn,im1,ip1,jm1,jp1)
-                    ! dudzn = (uxn_up - uxn_dn) / (zeta_aa(kup)-zeta_aa(kdn))
-                    ! dudz_aa = sum(dudzn*wtn)/wt1
+                    call acx_to_nodes(dvdzn,jvel%dyz(:,:,kmid),i,j,xn,yn,im1,ip1,jm1,jp1)
+                    dvdz_aa = sum(dvdzn*wtn)/wt1
 
-                    ! call acy_to_nodes(uyn_up,uy(:,:,kup),i,j,xn,yn,im1,ip1,jm1,jp1)
-                    ! call acy_to_nodes(uyn_dn,uy(:,:,kdn),i,j,xn,yn,im1,ip1,jm1,jp1)
-                    ! dvdzn = (uyn_up - uyn_dn) / (zeta_aa(kup)-zeta_aa(kdn))
-                    ! dvdz_aa = sum(dvdzn*wtn)
+else 
+    ! 3D QUADRATURE
+                    call acx_to_nodes_3D(dudzn8,jvel%dxz,i,j,kmid,xn,yn,zn,im1,ip1,jm1,jp1)
+                    dudz_aa = sum(dudzn8*wtn8)/wt18
 
-                    ! ! Calculate sigma-corrected derivatives
-                    ! call acx_to_nodes(dudxn,dudx(:,:,k-1),i,j,xn,yn,im1,ip1,jm1,jp1)
-                    ! dudx_aa = sum(dudxn*wtn)/wt1  +  c_x*dudz_aa 
+                    call acx_to_nodes_3D(dvdzn8,jvel%dyz,i,j,kmid,xn,yn,zn,im1,ip1,jm1,jp1)
+                    dvdz_aa = sum(dvdzn8*wtn8)/wt18
+end if 
 
-                    ! call acy_to_nodes(dvdyn,dvdy(:,:,k-1),i,j,xn,yn,im1,ip1,jm1,jp1)
-                    ! dvdy_aa = sum(dvdyn*wtn)/wt1  +  c_y*dvdz_aa 
-
-                    
                     ! Calculate vertical velocity of this layer
                     ! (Greve and Blatter, 2009, Eq. 5.95)
-                    uz(i,j,k) = uz(i,j,k-1) & 
-                        - H_now*(zeta_ac(k)-zeta_ac(k-1))*(dudx_aa+dvdy_aa)
-
+                    uz(i,j,k) = uz(i,j,k-1) - H_now*(zeta_ac(k)-zeta_ac(k-1))*(dudx_aa+dvdy_aa)
 
                     ! Apply correction to match kinematic boundary condition at surface 
                     !uz(i,j,k) = uz(i,j,k) - zeta_ac(k)*(uz(i,j,k)-uz_srf)
@@ -301,6 +290,10 @@ contains
                     ! (this is also where ux_aa and uy_aa are calculated above)
                     zeta_now = zeta_ac(k)
 
+                    ! Calculate sigma-coordinate derivative correction factors
+                    ! (Greve and Blatter, 2009, Eqs. 5.131 and 5.132, 
+                    !  also shown in 1D with Eq. 5.145)
+
                     ! Note: not dividing by H here, since this is done in the thermodynamics advection step
                     c_x = -( (1.0-zeta_now)*dzbdx_aa  + zeta_now*dzsdx_aa )
                     c_y = -( (1.0-zeta_now)*dzbdy_aa  + zeta_now*dzsdy_aa )
@@ -338,7 +331,7 @@ contains
     end subroutine calc_uz_3D_jac
 
     subroutine calc_uz_3D(uz,uz_star,ux,uy,H_ice,f_ice,f_grnd,smb,bmb,dHdt,dzsdt, &
-                                    dzsdx,dzsdy,dzbdx,dzbdy,zeta_aa,zeta_ac,dx,dy,boundaries)
+                                    dzsdx,dzsdy,dzbdx,dzbdy,zeta_aa,zeta_ac,dx,dy,use_bmb,boundaries)
         ! Following algorithm outlined by the Glimmer ice sheet model:
         ! https://www.geos.ed.ac.uk/~mhagdorn/glide/glide-doc/glimmer_htmlse9.html#x17-660003.1.5
 
@@ -367,12 +360,14 @@ contains
         real(wp), intent(IN)  :: zeta_ac(:)    ! z-coordinate, ac-nodes  
         real(wp), intent(IN)  :: dx 
         real(wp), intent(IN)  :: dy
+        logical,  intent(IN)  :: use_bmb
         character(len=*), intent(IN) :: boundaries 
 
         ! Local variables 
         integer :: i, j, k, nx, ny, nz_aa, nz_ac
         integer :: im1, ip1, jm1, jp1   
         integer :: kup, kdn
+        real(wp) :: f_bmb
         real(wp) :: H_now
         real(wp) :: H_inv
         real(wp) :: dzbdx_aa
@@ -437,15 +432,22 @@ contains
         allocate(dudy(nx,ny))
         allocate(dvdx(nx,ny))
         
-        ! Initialize vertical velocity to zero 
-        uz = 0.0 
-
         ! Get nodes and weighting 
         wt0 = 1.0/sqrt(3.0)
         xn  = [wt0,-wt0,-wt0, wt0]
         yn  = [wt0, wt0,-wt0,-wt0]
         wtn = [1.0,1.0,1.0,1.0]
         wt1 = sum(wtn)
+
+        ! Initialize vertical velocity to zero 
+        uz = 0.0 
+
+        ! Define switch for bmb
+        if (use_bmb) then 
+            f_bmb = 1.0 
+        else 
+            f_bmb = 0.0 
+        end if 
 
         ! First calculate horizontal strain rates at each layer for later use,
         ! with no correction factor for sigma-transformation.
@@ -508,7 +510,7 @@ contains
 
                 ! Determine basal vertical velocity for this grid point 
                 ! Following Eq. 5.31 of Greve and Blatter (2009)
-                uz(i,j,1) = dzbdt_now + uz_grid + bmb(i,j) + ux_aa*dzbdx_aa + uy_aa*dzbdy_aa
+                uz(i,j,1) = dzbdt_now + uz_grid + f_bmb*bmb(i,j) + ux_aa*dzbdx_aa + uy_aa*dzbdy_aa
                 if (abs(uz(i,j,1)) .lt. TOL_UNDERFLOW) uz(i,j,1) = 0.0_wp 
                 
                 ! Set stability limit on basal uz value.
@@ -655,7 +657,7 @@ contains
     end subroutine calc_uz_3D
 
     subroutine calc_uz_3D_aa(uz,uz_star,ux,uy,H_ice,f_ice,f_grnd,z_bed,z_srf,smb,bmb,dHdt,dzsdt, &
-                                            dzsdx,dzsdy,dzbdx,dzbdy,zeta_aa,zeta_ac,dx,dy,boundaries)
+                                            dzsdx,dzsdy,dzbdx,dzbdy,zeta_aa,zeta_ac,dx,dy,use_bmb,boundaries)
         ! Following algorithm outlined by the Glimmer ice sheet model:
         ! https://www.geos.ed.ac.uk/~mhagdorn/glide/glide-doc/glimmer_htmlse9.html#x17-660003.1.5
 
@@ -685,11 +687,13 @@ contains
         real(wp), intent(IN)  :: zeta_ac(:)    ! z-coordinate, ac-nodes  
         real(wp), intent(IN)  :: dx 
         real(wp), intent(IN)  :: dy
+        logical,  intent(IN)  :: use_bmb
         character(len=*), intent(IN) :: boundaries 
 
         ! Local variables 
-        integer :: i, j, k, nx, ny, nz_aa, nz_ac
-        integer :: im1, ip1, jm1, jp1    
+        integer  :: i, j, k, nx, ny, nz_aa, nz_ac
+        integer  :: im1, ip1, jm1, jp1   
+        real(wp) :: f_bmb 
         real(wp) :: H_now
         real(wp) :: H_inv
         real(wp) :: dzbdx_aa
@@ -726,6 +730,13 @@ contains
         ! Initialize vertical velocity to zero 
         uz = 0.0 
 
+        ! Define switch for bmb
+        if (use_bmb) then 
+            f_bmb = 1.0 
+        else 
+            f_bmb = 0.0 
+        end if 
+        
         ! Next, calculate velocity 
 
         !$omp parallel do 
@@ -777,7 +788,7 @@ contains
 
                 ! Determine basal vertical velocity for this grid point 
                 ! Following Eq. 5.31 of Greve and Blatter (2009)
-                uz(i,j,1) = dzbdt + uz_grid + bmb(i,j) + ux_aa*dzbdx_aa + uy_aa*dzbdy_aa
+                uz(i,j,1) = dzbdt + uz_grid + f_bmb*bmb(i,j) + ux_aa*dzbdx_aa + uy_aa*dzbdy_aa
                 if (abs(uz(i,j,1)) .lt. TOL_UNDERFLOW) uz(i,j,1) = 0.0_wp 
                 
                 ! Set stability limit on basal uz value for grounded ice.
@@ -1068,10 +1079,6 @@ contains
             
         end do
         end do 
-
-        ! ! Apply boundary conditions 
-        ! call set_boundaries_2D_acx(taud_acx,boundaries)
-        ! call set_boundaries_2D_acy(taud_acy,boundaries)
 
         return 
 

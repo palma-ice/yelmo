@@ -613,6 +613,7 @@ end if
         wtn = [1.0,1.0,1.0,1.0]
         wt1 = sum(wtn)
 
+        zn   = wt0 
         wtn8 = [1.0,1.0,1.0,1.0,1.0,1.0,1.0,1.0]
         wt18 = sum(wtn8)
 
@@ -807,8 +808,8 @@ end if
         character(len=*), intent(IN) :: boundaries 
 
         ! Local variables 
-        integer :: i, j, nx, ny
-        integer :: im1, ip1, jm1, jp1  
+        integer  :: i, j, nx, ny
+        integer  :: im1, ip1, jm1, jp1  
         real(wp) :: H_now
         real(wp) :: visc_eff_mean 
         real(wp) :: wt 
@@ -850,7 +851,7 @@ end if
         real(wp), intent(IN)  :: n  
 
         ! Local variables 
-        integer :: i, j, nx, ny, nz_aa, np
+        integer  :: i, j, nx, ny, nz_aa, np
         real(wp) :: H_eff  
 
         nx    = size(visc,1)
@@ -891,10 +892,10 @@ end if
         real(wp), intent(IN)  :: beta(:,:)        ! aa-nodes
         real(wp), intent(IN)  :: F2(:,:)          ! aa-nodes
         real(wp), intent(IN)  :: zeta_aa(:)       ! aa-nodes
-        logical,    intent(IN)  :: no_slip 
+        logical,  intent(IN)  :: no_slip 
 
         ! Local variables 
-        integer    :: i, j, nx, ny
+        integer :: i, j, nx, ny
 
         nx = size(beta_eff,1)
         ny = size(beta_eff,2)
@@ -936,8 +937,8 @@ end if
         character(len=*), intent(IN) :: boundaries 
 
         ! Local variables 
-        integer    :: i, j, nx, ny 
-        integer    :: im1, ip1, jm1, jp1 
+        integer  :: i, j, nx, ny 
+        integer  :: im1, ip1, jm1, jp1 
         real(wp) :: F2_ac 
 
         nx = size(ux_b,1)

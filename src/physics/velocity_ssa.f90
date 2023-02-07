@@ -4,12 +4,8 @@ module velocity_ssa
 
     use yelmo_defs ,only  : sp, dp, wp, tol_underflow, pi, rho_ice, rho_sw, rho_w, g
     use yelmo_tools, only : get_neighbor_indices, stagger_aa_ab, stagger_aa_ab_ice, stagger_ab_aa_ice, & 
-                    acx_to_nodes, acy_to_nodes, aa_to_nodes, &
-                    stagger_nodes_aa_ab_ice, stagger_nodes_acx_ab_ice, stagger_nodes_acy_ab_ice, &
-                    staggerdiff_nodes_acx_ab_ice, staggerdiff_nodes_acy_ab_ice, &
-                    staggerdiffcross_nodes_acx_ab_ice, staggerdiffcross_nodes_acy_ab_ice, &
-                    integrate_trapezoid1D_1D, integrate_trapezoid1D_pt, minmax, &
-                    set_boundaries_2D_aa, set_boundaries_3D_aa
+                    acx_to_nodes, acy_to_nodes, aa_to_nodes, aa_to_nodes_3D, &
+                    integrate_trapezoid1D_1D, integrate_trapezoid1D_pt, minmax
 
     use deformation, only : calc_strain_rate_horizontal_2D
     use basal_dragging 
@@ -65,26 +61,26 @@ contains
         real(wp), intent(INOUT) :: taub_acy(:,:)      ! [Pa]
         real(wp), intent(OUT)   :: visc_eff(:,:,:)    ! [Pa yr]
         real(wp), intent(OUT)   :: visc_eff_int(:,:)  ! [Pa yr m]
-        integer,    intent(OUT)   :: ssa_mask_acx(:,:)  ! [-]
-        integer,    intent(OUT)   :: ssa_mask_acy(:,:)  ! [-]
+        integer,  intent(OUT)   :: ssa_mask_acx(:,:)  ! [-]
+        integer,  intent(OUT)   :: ssa_mask_acy(:,:)  ! [-]
         real(wp), intent(OUT)   :: ssa_err_acx(:,:)
         real(wp), intent(OUT)   :: ssa_err_acy(:,:)
-        integer,    intent(OUT)   :: ssa_iter_now 
+        integer,  intent(OUT)   :: ssa_iter_now 
         real(wp), intent(INOUT) :: beta(:,:)          ! [Pa yr/m]
         real(wp), intent(INOUT) :: beta_acx(:,:)      ! [Pa yr/m]
         real(wp), intent(INOUT) :: beta_acy(:,:)      ! [Pa yr/m]
         real(wp), intent(IN)    :: c_bed(:,:)         ! [Pa]
         real(wp), intent(IN)    :: taud_acx(:,:)      ! [Pa]
         real(wp), intent(IN)    :: taud_acy(:,:)      ! [Pa]
-        real(wp),   intent(IN)    :: taul_int_acx(:,:)  ! [Pa m]
-        real(wp),   intent(IN)    :: taul_int_acy(:,:)  ! [Pa m]
+        real(wp), intent(IN)    :: taul_int_acx(:,:)  ! [Pa m]
+        real(wp), intent(IN)    :: taul_int_acy(:,:)  ! [Pa m]
         real(wp), intent(IN)    :: H_ice(:,:)         ! [m]
         real(wp), intent(IN)    :: f_ice(:,:)         ! [--]
         real(wp), intent(IN)    :: H_grnd(:,:)        ! [m]
         real(wp), intent(IN)    :: f_grnd(:,:)        ! [-]
         real(wp), intent(IN)    :: f_grnd_acx(:,:)    ! [-]
         real(wp), intent(IN)    :: f_grnd_acy(:,:)    ! [-]
-        integer,    intent(IN)    :: mask_frnt(:,:)     ! [-]
+        integer,  intent(IN)    :: mask_frnt(:,:)     ! [-]
         real(wp), intent(IN)    :: ATT(:,:,:)         ! [yr^-1 Pa^-n_glen]
         real(wp), intent(IN)    :: zeta_aa(:)         ! [-]
         real(wp), intent(IN)    :: z_sl(:,:)          ! [m]
@@ -103,8 +99,8 @@ contains
         real(wp), allocatable :: uy_b_nm1(:,:)    
         real(wp), allocatable :: visc_eff_nm1(:,:,:)
 
-        integer,    allocatable :: ssa_mask_acx_ref(:,:)
-        integer,    allocatable :: ssa_mask_acy_ref(:,:)
+        integer,  allocatable :: ssa_mask_acx_ref(:,:)
+        integer,  allocatable :: ssa_mask_acy_ref(:,:)
 
         real(wp), allocatable :: corr_nm1(:) 
         real(wp), allocatable :: corr_nm2(:) 
@@ -354,6 +350,10 @@ end if
         real(wp) :: wtn(4)
         real(wp) :: wt1
 
+        real(wp) :: zn 
+        real(wp) :: wtn8(8)
+        real(wp) :: wt18
+
         real(wp) :: dudxn(4)
         real(wp) :: dudyn(4)
         real(wp) :: dvdxn(4)
@@ -361,6 +361,10 @@ end if
         real(wp) :: eps_sq_n(4)
         real(wp) :: ATTn(4)
         real(wp) :: viscn(4)
+
+        real(wp) :: eps_sq_n8(8)
+        real(wp) :: ATTn8(8)
+        real(wp) :: viscn8(8)
 
         real(wp), allocatable :: dudx(:,:) 
         real(wp), allocatable :: dudy(:,:) 
@@ -399,6 +403,10 @@ end if
         wtn = [1.0,1.0,1.0,1.0]
         wt1 = sum(wtn)
 
+        zn   = wt0 
+        wtn8 = [1.0,1.0,1.0,1.0,1.0,1.0,1.0,1.0]
+        wt18 = sum(wtn8)
+
         do i = 1, nx
             do j = 1, ny  
 
@@ -417,8 +425,11 @@ end if
                     ! Calculate the total effective strain rate from L19, Eq. 21 
                     eps_sq_n = dudxn**2 + dvdyn**2 + dudxn*dvdyn + 0.25*(dudyn+dvdxn)**2 + eps_0_sq
 
+if (.FALSE.) then 
+    ! 2D QUADRATURE
+
                     do k = 1, nz
-                    
+
                         ! Get rate factor
                         call aa_to_nodes(ATTn,ATT(:,:,k),i,j,xn,yn,im1,ip1,jm1,jp1)
                         !ATTn = ATT(i,j,k)
@@ -427,7 +438,27 @@ end if
                         viscn = 0.5 * (eps_sq_n)**(p1) * ATTn**(p2);
 
                         visc(i,j,k) = sum(viscn*wtn)/wt1
+
                     end do
+
+else 
+    ! 3D QUADRATURE 
+
+                    eps_sq_n8 = [eps_sq_n,eps_sq_n]
+
+                    do k = 1, nz
+                        
+                        ! Get rate factor
+                        call aa_to_nodes_3D(ATTn8,ATT,i,j,k,xn,yn,zn,im1,ip1,jm1,jp1)
+                        !ATTn = ATT(i,j,k)
+
+                        ! Calculate effective viscosity on nodes and averaged to center aa-node
+                        viscn8 = 0.5 * (eps_sq_n8)**(p1) * ATTn8**(p2)
+                        visc(i,j,k) = sum(viscn8*wtn8)/wt18
+
+                    end do
+end if
+
                 end if
 
             end do
@@ -460,8 +491,7 @@ end if
 
         ! Local variables 
         integer  :: i, j, k
-        integer  :: ip1, jp1, im1, jm1 
-        integer  :: ip2, jp2, im2, jm2
+        integer  :: ip1, jp1, im1, jm1
         integer  :: nx, ny, nz   
         real(wp) :: p1, p2, eps_0_sq  
         real(wp) :: eps_sq                              ! [1/yr^2]
@@ -469,7 +499,6 @@ end if
         real(wp) :: dudx_aa, dvdy_aa 
         real(wp) :: dudy_aa_1, dudy_aa_2, dudy_aa 
         real(wp) :: dvdx_aa_1, dvdx_aa_2, dvdx_aa 
-        real(wp) :: duxdz_aa, duydz_aa
         real(wp) :: eps_sq_aa, ATT_aa
         
         real(wp), parameter :: visc_min = 1e5_wp        ! Just for safety 
@@ -509,16 +538,11 @@ end if
                 dvdx_aa_2 = (uy(ip1,jm1)-uy(im1,jm1))/(2.0_wp*dx)
                 dvdx_aa   = 0.5_wp*(dvdx_aa_1+dvdx_aa_2)
 
+                ! Calculate the total effective strain rate from L19, Eq. 21 
+                eps_sq_aa = dudx_aa**2 + dvdy_aa**2 + dudx_aa*dvdy_aa + 0.25_wp*(dudy_aa+dvdx_aa)**2 + eps_0_sq
+
                 ! Loop over column
                 do k = 1, nz 
-
-                    ! Vertical shear strain rate terms are zero
-                    duxdz_aa = 0.0_wp
-                    duydz_aa = 0.0_wp
-
-                    ! Calculate the total effective strain rate from L19, Eq. 21 
-                    eps_sq_aa = dudx_aa**2 + dvdy_aa**2 + dudx_aa*dvdy_aa + 0.25_wp*(dudy_aa+dvdx_aa)**2 &
-                                + 0.25_wp*duxdz_aa**2 + 0.25_wp*duydz_aa**2 + eps_0_sq
 
                     ! Get rate factor on central node
                     ATT_aa = ATT(i,j,k)
@@ -554,8 +578,8 @@ end if
         real(wp), intent(IN)  :: zeta_aa(:)
 
         ! Local variables 
-        integer :: i, j, nx, ny
-        integer :: im1, ip1, jm1, jp1  
+        integer  :: i, j, nx, ny
+        integer  :: im1, ip1, jm1, jp1  
         real(wp) :: H_now
         real(wp) :: visc_eff_mean 
         real(wp) :: wt 

@@ -393,6 +393,7 @@ contains
         ! Local variables 
         integer    :: k, nz_aa
         real(prec) :: fac, fac_a, fac_b, uz_aa, dz
+        real(prec) :: h1, h2, afac_a, afac_b, afac_mid
         real(prec) :: kappa_a, kappa_b, dz1, dz2 
         real(prec), allocatable :: subd(:)      ! nz_aa 
         real(prec), allocatable :: diag(:)      ! nz_aa  
@@ -438,9 +439,6 @@ contains
 
         do k = 2, nz_aa-1
 
-            ! Get implicit vertical advection term, ac => aa nodes
-            uz_aa   = 0.5*(uz(k)+uz(k+1))
-
             ! Get kappa for the lower and upper ac-nodes using harmonic mean from aa-nodes
             
             dz1 = zeta_ac(k)-zeta_aa(k-1)
@@ -451,17 +449,44 @@ contains
             dz2 = zeta_aa(k+1)-zeta_ac(k+1)
             call calc_wtd_harmonic_mean(kappa_b,kappa(k),kappa(k+1),dz1,dz2)
 
-            ! Vertical distance for centered difference advection scheme
-            dz      =  thickness*(zeta_aa(k+1)-zeta_aa(k-1))
-            
+            ! Get diffusion factors
             fac_a   = -kappa_a*dzeta_a(k)*dt/thickness**2
             fac_b   = -kappa_b*dzeta_b(k)*dt/thickness**2
 
+            ! Get implicit vertical advection term, ac => aa nodes
+            uz_aa   = 0.5*(uz(k)+uz(k+1))
+
+if (.FALSE.) then
+    ! Use simple centered-difference scheme for vertical advection
+
+            ! Vertical distance for centered difference advection scheme
+            dz      =  thickness*(zeta_aa(k+1)-zeta_aa(k-1))
+            
             subd(k) = fac_a - uz_aa * dt/dz
             supd(k) = fac_b + uz_aa * dt/dz
             diag(k) = 1.0_prec - fac_a - fac_b
             rhs(k)  = (temp(k)-T_ref) - dt*advecxy(k) + dt*Q_strn(k)
-            
+
+else
+    ! Use centered-difference advection scheme accounting for variable layer thickness
+
+            ! Get grid spacing between neighboring points
+            h1 = thickness*(zeta_aa(k)-zeta_aa(k-1))
+            h2 = thickness*(zeta_aa(k+1)-zeta_aa(k))
+
+            ! Get advective factor terms for centered difference with 
+            ! uneven layers 
+            afac_a   = -h2/(h1*(h1+h2))
+            afac_mid = -(h1-h2)/(h1*h2)
+            afac_b   = +h1/(h2*(h1+h2))
+
+            subd(k) = fac_a + uz_aa * dt*afac_a
+            supd(k) = fac_b + uz_aa * dt*afac_b
+            diag(k) = 1.0_prec - fac_a - fac_b + uz_aa * dt*afac_mid
+            rhs(k)  = (temp(k)-T_ref) - dt*advecxy(k) + dt*Q_strn(k)
+
+end if 
+
         end do 
 
         ! == Column surface ==
@@ -692,7 +717,7 @@ contains
 
     end subroutine calc_enth_column
 
-    subroutine calc_enth_column_internal(enth,kappa,uz,advecxy,Q_strn,val_base,val_srf,H_ice, &
+    subroutine calc_enth_column_internal(enth,kappa,uz,advecxy,Q_strn,val_base,val_srf,thickness, &
                                             zeta_aa,zeta_ac,dzeta_a,dzeta_b,enth_ref,dt,k_cts,is_basal_flux)
         ! Thermodynamics solver for a given column of ice 
         ! Note zeta=height, k=1 base, k=nz surface 
@@ -711,7 +736,7 @@ contains
         real(prec), intent(IN)    :: Q_strn(:)      ! nz_aa [J kg a-1] Internal strain heat production in ice
         real(prec), intent(IN)    :: val_base       ! [J kg or flux] Basal boundary condition
         real(prec), intent(IN)    :: val_srf        ! [J kg] Surface temperature 
-        real(prec), intent(IN)    :: H_ice          ! [m] Ice thickness 
+        real(prec), intent(IN)    :: thickness      ! [m] Ice thickness 
         real(prec), intent(IN)    :: zeta_aa(:)     ! nz_aa [--] Vertical sigma coordinates (zeta==height), layer centered aa-nodes
         real(prec), intent(IN)    :: zeta_ac(:)     ! nz_ac [--] Vertical height axis temperature (0:1), layer edges ac-nodes
         real(prec), intent(IN)    :: dzeta_a(:)     ! nz_aa [--] Solver discretization helper variable ak
@@ -723,6 +748,7 @@ contains
         ! Local variables 
         integer    :: k, nz_aa
         real(prec) :: fac, fac_a, fac_b, uz_aa, dz
+        real(prec) :: h1, h2, afac_a, afac_b, afac_mid
         real(prec) :: kappa_a, kappa_b, dz1, dz2 
         real(prec), allocatable :: subd(:)      ! nz_aa 
         real(prec), allocatable :: diag(:)      ! nz_aa  
@@ -746,7 +772,7 @@ contains
             ! Calculate dz for the bottom layer between the basal boundary
             ! (ac-node) and the centered (aa-node) temperature point above
             ! Note: zeta_aa(1) == zeta_ac(1) == bottom boundary 
-            dz = H_ice * (zeta_aa(2) - zeta_aa(1))
+            dz = thickness * (zeta_aa(2) - zeta_aa(1))
 
             ! backward Euler flux basal boundary condition
             subd(1) =  0.0_prec
@@ -777,9 +803,6 @@ contains
 
         do k = 2, nz_aa-1
 
-            ! Get implicit vertical advection term, ac => aa nodes
-            uz_aa   = 0.5*(uz(k-1)+uz(k))
-
             ! Get kappa for the lower and upper ac-nodes using harmonic mean from aa-nodes
             
             dz1 = zeta_ac(k-1)-zeta_aa(k-1)
@@ -794,17 +817,45 @@ contains
             if (k .eq. k_cts+1) kappa_a = kappa(k-1)
             !if (k .eq. k_cts)   kappa_b = kappa(k+1) 
             
-            ! Vertical distance for centered difference advection scheme
-            dz      =  H_ice*(zeta_aa(k+1)-zeta_aa(k-1))
-            
-            fac_a   = -kappa_a*dzeta_a(k)*dt/H_ice**2
-            fac_b   = -kappa_b*dzeta_b(k)*dt/H_ice**2
+            ! Get diffusion factors
+            fac_a   = -kappa_a*dzeta_a(k)*dt/thickness**2
+            fac_b   = -kappa_b*dzeta_b(k)*dt/thickness**2
 
+
+            ! Get implicit vertical advection term, ac => aa nodes
+            uz_aa   = 0.5*(uz(k)+uz(k+1))
+
+if (.FALSE.) then
+    ! Use simple centered-difference scheme for vertical advection
+
+            ! Vertical distance for centered difference advection scheme
+            dz      =  thickness*(zeta_aa(k+1)-zeta_aa(k-1))
+            
             subd(k) = fac_a - uz_aa * dt/dz
             supd(k) = fac_b + uz_aa * dt/dz
             diag(k) = 1.0_prec - fac_a - fac_b
             rhs(k)  = (enth(k)-enth_ref) - dt*advecxy(k) + dt*Q_strn(k)
             
+else
+    ! Use centered-difference advection scheme accounting for variable layer thickness
+
+            ! Get grid spacing between neighboring points
+            h1 = thickness*(zeta_aa(k)-zeta_aa(k-1))
+            h2 = thickness*(zeta_aa(k+1)-zeta_aa(k))
+
+            ! Get advective factor terms for centered difference with 
+            ! uneven layers 
+            afac_a   = -h2/(h1*(h1+h2))
+            afac_mid = -(h1-h2)/(h1*h2)
+            afac_b   = +h1/(h2*(h1+h2))
+
+            subd(k) = fac_a + uz_aa * dt*afac_a
+            supd(k) = fac_b + uz_aa * dt*afac_b
+            diag(k) = 1.0_prec - fac_a - fac_b + uz_aa * dt*afac_mid
+            rhs(k)  = (enth(k)-enth_ref) - dt*advecxy(k) + dt*Q_strn(k)
+            
+end if 
+
         end do 
 
         ! == Ice surface ==

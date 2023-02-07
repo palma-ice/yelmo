@@ -25,6 +25,8 @@ module yelmo_tools
 
     public :: acx_to_nodes_3D
     public :: acy_to_nodes_3D
+    public :: aa_to_nodes_3D
+    public :: acz_to_nodes_3D
     public :: acx_to_nodes
     public :: acy_to_nodes
     public :: aa_to_nodes
@@ -479,8 +481,9 @@ contains
         real(wp) :: vx_md(4)
         real(wp) :: vx_dn(4) 
 
-        nx = size(varx,1)
-        ny = size(varx,2)
+        nx    = size(varx,1)
+        ny    = size(varx,2)
+        nz_aa = size(varx,3) 
 
         ! Get four nodes in horizontal aa-node (middle) plane 
         call acx_to_nodes(vx_md,varx(:,:,k),i,j,xn,yn,im1,ip1,jm1,jp1)
@@ -528,8 +531,9 @@ contains
         real(wp) :: vy_md(4)
         real(wp) :: vy_dn(4) 
 
-        nx = size(vary,1)
-        ny = size(vary,2)
+        nx    = size(vary,1)
+        ny    = size(vary,2)
+        nz_aa = size(vary,3)
 
         ! Get four nodes in horizontal aa-node (middle) plane 
         call acy_to_nodes(vy_md,vary(:,:,k),i,j,xn,yn,im1,ip1,jm1,jp1)
@@ -555,6 +559,100 @@ contains
         return
 
     end subroutine acy_to_nodes_3D
+    
+    subroutine aa_to_nodes_3D(varn,var,i,j,k,xn,yn,zn,im1,ip1,jm1,jp1)
+        ! 3D !!
+        ! Variable defined on aa-nodes horizontally, aa-nodes vertically. 
+
+        real(wp), intent(OUT) :: varn(:) 
+        real(wp), intent(IN)  :: var(:,:,:) 
+        integer,  intent(IN)  :: i 
+        integer,  intent(IN)  :: j
+        integer,  intent(IN)  :: k 
+        real(wp), intent(IN)  :: xn(:)      ! Four points in horizontal plane
+        real(wp), intent(IN)  :: yn(:)      ! Four points in horizontal plane
+        real(wp), intent(IN)  :: zn         ! Distance to horizontal planes in vertical direction
+        integer,  intent(IN)  :: im1, ip1, jm1, jp1 
+
+        ! Local variables 
+        integer  :: nx, ny, nz_aa
+        real(wp) :: wt
+        real(wp) :: vv_up(4)
+        real(wp) :: vv_md(4)
+        real(wp) :: vv_dn(4) 
+
+        nx    = size(var,1)
+        ny    = size(var,2)
+        nz_aa = size(var,3) 
+
+        ! Get four nodes in horizontal aa-node (middle) plane 
+        call aa_to_nodes(vv_md,var(:,:,k),i,j,xn,yn,im1,ip1,jm1,jp1)
+
+        ! Get four nodes in plane below
+        if (k .gt. 1) then 
+            call aa_to_nodes(vv_dn,var(:,:,k-1),i,j,xn,yn,im1,ip1,jm1,jp1)
+            wt = zn/2.0
+            varn(1:4) = wt*vv_dn + (1.0-wt)*vv_md
+        else 
+            varn(1:4) = vv_md 
+        end if 
+
+        ! Get four nodes in plane above
+        if (k .lt. nz_aa) then 
+            call aa_to_nodes(vv_up,var(:,:,k+1),i,j,xn,yn,im1,ip1,jm1,jp1)
+            wt = zn/2.0
+            varn(5:8) = wt*vv_up + (1.0-wt)*vv_md
+        else 
+            varn(5:8) = vv_md 
+        end if 
+
+        return
+
+    end subroutine aa_to_nodes_3D
+    
+    subroutine acz_to_nodes_3D(varn,var,i,j,k,xn,yn,zn,im1,ip1,jm1,jp1)
+        ! 3D !!
+        ! Variable defined on aa-nodes horizontally, acz-nodes vertically. 
+
+        real(wp), intent(OUT) :: varn(:) 
+        real(wp), intent(IN)  :: var(:,:,:) 
+        integer,  intent(IN)  :: i 
+        integer,  intent(IN)  :: j
+        integer,  intent(IN)  :: k 
+        real(wp), intent(IN)  :: xn(:)      ! Four points in horizontal plane
+        real(wp), intent(IN)  :: yn(:)      ! Four points in horizontal plane
+        real(wp), intent(IN)  :: zn         ! Distance to horizontal planes in vertical direction
+        integer,  intent(IN)  :: im1, ip1, jm1, jp1 
+
+        ! Local variables 
+        integer  :: nx, ny, nz_ac
+        real(wp) :: wt
+        real(wp) :: vv_up(4)
+        real(wp) :: vv_md(4)
+        real(wp) :: vv_dn(4) 
+
+        nx    = size(var,1)
+        ny    = size(var,2)
+        nz_ac = size(var,3)
+
+        ! Get four nodes in horizontal plane of top cell face
+        call aa_to_nodes(vv_up,var(:,:,k),i,j,xn,yn,im1,ip1,jm1,jp1)
+        
+        ! Get four nodes in horizontal plane of bottom cell face
+        if (k .gt. 1) then 
+            call aa_to_nodes(vv_dn,var(:,:,k-1),i,j,xn,yn,im1,ip1,jm1,jp1)
+        else 
+            vv_dn = vv_up 
+        end if 
+
+        ! Interpolate to upper and lower nodes
+        wt = (1.0-zn) / 2.0
+        varn(1:4) = wt*vv_dn + (1.0-wt)*vv_up 
+        varn(5:8) = (1.0-wt)*vv_dn + wt*vv_up 
+
+        return
+
+    end subroutine acz_to_nodes_3D
     
     subroutine acx_to_nodes(varn,varx,i,j,xn,yn,im1,ip1,jm1,jp1)
         ! 2D !!

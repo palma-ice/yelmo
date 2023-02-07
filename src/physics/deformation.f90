@@ -13,7 +13,7 @@ module deformation
                         jacobian_3D_class, strain_2D_class, strain_3D_class, stress_2D_class, stress_3D_class
     use yelmo_tools, only : get_neighbor_indices, &
                     calc_vertical_integrated_2D, integrate_trapezoid1D_1D, integrate_trapezoid1D_pt, &
-                    acx_to_nodes, acy_to_nodes, acx_to_nodes_3D, acy_to_nodes_3D
+                    acx_to_nodes, acy_to_nodes, acx_to_nodes_3D, acy_to_nodes_3D, acz_to_nodes_3D
                     
     use grid_calcs 
 
@@ -1230,14 +1230,16 @@ end if
                     ! Get dxz and dzx on aa-nodes 
                     ! (but also get dzx on aa-nodes vertically)
                     call acx_to_nodes_3D(ddan,jvel%dxz,i,j,k,xn,yn,zn,im1,ip1,jm1,jp1)
-                    ddbn = 0.5*(jvel%dzx(i,j,k)+jvel%dzx(i,j,k+1))  ! nz_ac has one more index than nz_aa, so this is ok!
+                    call acz_to_nodes_3D(ddbn,jvel%dzx,i,j,k,xn,yn,zn,im1,ip1,jm1,jp1)
+                    !ddbn = 0.5*(jvel%dzx(i,j,k)+jvel%dzx(i,j,k+1))  ! nz_ac has one more index than nz_aa, so this is ok!
                     ddn  = 0.5*(ddan+ddbn)
                     strn%dxz(i,j,k) = sum(ddn*wtn)/wt1
 
                     ! Get dyz and dzy on aa-nodes 
                     ! (but also get dzy on aa-nodes vertically)
                     call acy_to_nodes_3D(ddan,jvel%dyz,i,j,k,xn,yn,zn,im1,ip1,jm1,jp1)
-                    ddbn = 0.5*(jvel%dzy(i,j,k)+jvel%dzy(i,j,k+1))  ! nz_ac has one more index than nz_aa, so this is ok!
+                    call acz_to_nodes_3D(ddbn,jvel%dzy,i,j,k,xn,yn,zn,im1,ip1,jm1,jp1)
+                    !ddbn = 0.5*(jvel%dzy(i,j,k)+jvel%dzy(i,j,k+1))  ! nz_ac has one more index than nz_aa, so this is ok!
                     ddn  = 0.5*(ddan+ddbn)
                     strn%dyz(i,j,k) = sum(ddn*wtn)/wt1
 

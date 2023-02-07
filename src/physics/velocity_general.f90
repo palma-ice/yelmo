@@ -114,8 +114,8 @@ contains
         real(wp) :: wtn(4)
         real(wp) :: wt1 
 
-        real(wp) :: dudzn8(8) 
-        real(wp) :: dvdzn8(8) 
+        real(wp) :: dudxn8(8) 
+        real(wp) :: dvdyn8(8) 
         real(wp) :: zn 
         real(wp) :: wtn8(8)
         real(wp) :: wt18 
@@ -141,7 +141,7 @@ contains
         ! Get nodes and weighting 
         zn   = wt0
         wtn8 = [1.0,1.0,1.0,1.0,1.0,1.0,1.0,1.0]
-        wt18 = sum(wtn)
+        wt18 = sum(wtn8)
 
         ! Initialize vertical velocity to zero 
         uz = 0.0 
@@ -227,21 +227,22 @@ contains
                     ! Get dudz/dvdz values at vertical aa-nodes, in order
                     ! to vertically integrate each cell up to ac-node border.
 
-if (.TRUE.) then
+if (.FALSE.) then
     ! 2D QUADRATURE
-                    call acx_to_nodes(dudzn,jvel%dxz(:,:,kmid),i,j,xn,yn,im1,ip1,jm1,jp1)
-                    dudz_aa = sum(dudzn*wtn)/wt1
+                    call acx_to_nodes(dudxn,jvel%dxx(:,:,kmid),i,j,xn,yn,im1,ip1,jm1,jp1)
+                    dudx_aa = sum(dudxn*wtn)/wt1
 
-                    call acx_to_nodes(dvdzn,jvel%dyz(:,:,kmid),i,j,xn,yn,im1,ip1,jm1,jp1)
-                    dvdz_aa = sum(dvdzn*wtn)/wt1
+                    call acy_to_nodes(dvdyn,jvel%dyy(:,:,kmid),i,j,xn,yn,im1,ip1,jm1,jp1)
+                    dvdy_aa = sum(dvdyn*wtn)/wt1
 
 else 
     ! 3D QUADRATURE
-                    call acx_to_nodes_3D(dudzn8,jvel%dxz,i,j,kmid,xn,yn,zn,im1,ip1,jm1,jp1)
-                    dudz_aa = sum(dudzn8*wtn8)/wt18
+                    call acx_to_nodes_3D(dudxn8,jvel%dxx,i,j,kmid,xn,yn,zn,im1,ip1,jm1,jp1)
+                    dudx_aa = sum(dudxn8*wtn8)/wt18
 
-                    call acx_to_nodes_3D(dvdzn8,jvel%dyz,i,j,kmid,xn,yn,zn,im1,ip1,jm1,jp1)
-                    dvdz_aa = sum(dvdzn8*wtn8)/wt18
+                    call acy_to_nodes_3D(dvdyn8,jvel%dyy,i,j,kmid,xn,yn,zn,im1,ip1,jm1,jp1)
+                    dvdy_aa = sum(dvdyn8*wtn8)/wt18
+
 end if 
 
                     ! Calculate vertical velocity of this layer

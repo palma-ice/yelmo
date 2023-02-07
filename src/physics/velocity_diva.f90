@@ -2,6 +2,7 @@ module velocity_diva
 
     use yelmo_defs, only  : sp, dp, prec, wp, pi, rho_ice, rho_sw, rho_w, g, TOL_UNDERFLOW
     use yelmo_tools, only : get_neighbor_indices, acx_to_nodes, acy_to_nodes, aa_to_nodes, &
+                    acx_to_nodes_3D, acy_to_nodes_3D, aa_to_nodes_3D, &
                     integrate_trapezoid1D_1D, integrate_trapezoid1D_pt, minmax
 
     use deformation, only : calc_strain_rate_horizontal_2D
@@ -519,15 +520,15 @@ end if
 
     end subroutine calc_vertical_shear_3D
 
-    subroutine calc_visc_eff_3D_nodes(visc,ux,uy,duxdz,duydz,ATT,H_ice,f_ice,zeta_aa,dx,dy,n_glen,eps_0,boundaries)
+    subroutine calc_visc_eff_3D_nodes(visc,ux,uy,dudz,dvdz,ATT,H_ice,f_ice,zeta_aa,dx,dy,n_glen,eps_0,boundaries)
 
         implicit none 
         
         real(wp), intent(OUT) :: visc(:,:,:)            ! aa-nodes
         real(wp), intent(IN)  :: ux(:,:)                ! [m/yr] Vertically averaged horizontal velocity, x-component
         real(wp), intent(IN)  :: uy(:,:)                ! [m/yr] Vertically averaged horizontal velocity, y-component
-        real(wp), intent(IN)  :: duxdz(:,:,:)           ! [1/yr] Vertical shearing, x-component
-        real(wp), intent(IN)  :: duydz(:,:,:)           ! [1/yr] Vertical shearing, x-component
+        real(wp), intent(IN)  :: dudz(:,:,:)            ! [1/yr] Vertical shearing, x-component
+        real(wp), intent(IN)  :: dvdz(:,:,:)            ! [1/yr] Vertical shearing, x-component
         real(wp), intent(IN)  :: ATT(:,:,:)             ! aa-nodes
         real(wp), intent(IN)  :: H_ice(:,:) 
         real(wp), intent(IN)  :: f_ice(:,:)
@@ -551,15 +552,29 @@ end if
         real(wp) :: wtn(4)
         real(wp) :: wt1 
 
+        real(wp) :: zn 
+        real(wp) :: wtn8(8)
+        real(wp) :: wt18
+
         real(wp) :: dudxn(4)
         real(wp) :: dudyn(4)
         real(wp) :: dvdxn(4)
         real(wp) :: dvdyn(4)
-        real(wp) :: duxdzn(4)
-        real(wp) :: duydzn(4)
+        real(wp) :: dudzn(4)
+        real(wp) :: dvdzn(4)
         real(wp) :: eps_sq_n(4)
         real(wp) :: ATTn(4)
         real(wp) :: viscn(4)
+
+        real(wp) :: dudxn8(8)
+        real(wp) :: dudyn8(8)
+        real(wp) :: dvdxn8(8)
+        real(wp) :: dvdyn8(8)
+        real(wp) :: dudzn8(8)
+        real(wp) :: dvdzn8(8)
+        real(wp) :: eps_sq_n8(8)
+        real(wp) :: ATTn8(8)
+        real(wp) :: viscn8(8)
 
         real(wp), allocatable :: dudx(:,:) 
         real(wp), allocatable :: dudy(:,:) 
@@ -598,6 +613,9 @@ end if
         wtn = [1.0,1.0,1.0,1.0]
         wt1 = sum(wtn)
 
+        wtn8 = [1.0,1.0,1.0,1.0,1.0,1.0,1.0,1.0]
+        wt18 = sum(wtn8)
+
         do i = 1, nx
             do j = 1, ny  
 
@@ -613,15 +631,18 @@ end if
                     call acy_to_nodes(dvdxn,dvdx,i,j,xn,yn,im1,ip1,jm1,jp1)
                     call acy_to_nodes(dvdyn,dvdy,i,j,xn,yn,im1,ip1,jm1,jp1)
 
+if (.FALSE.) then 
+    ! 2D QUADRATURE
+
                     do k = 1, nz
                         
                         ! Get vertical shear strain rate terms
-                        call acx_to_nodes(duxdzn,duxdz(:,:,k),i,j,xn,yn,im1,ip1,jm1,jp1)
-                        call acy_to_nodes(duydzn,duydz(:,:,k),i,j,xn,yn,im1,ip1,jm1,jp1)
+                        call acx_to_nodes(dudzn,dudz(:,:,k),i,j,xn,yn,im1,ip1,jm1,jp1)
+                        call acy_to_nodes(dvdzn,dvdz(:,:,k),i,j,xn,yn,im1,ip1,jm1,jp1)
                         
                         ! Calculate the total effective strain rate from L19, Eq. 21 
                         eps_sq_n = dudxn**2 + dvdyn**2 + dudxn*dvdyn + 0.25_wp*(dudyn+dvdxn)**2 &
-                                                    + 0.25_wp*duxdzn**2 + 0.25_wp*duydzn**2 + eps_0_sq
+                                                    + 0.25_wp*dudzn**2 + 0.25_wp*dvdzn**2 + eps_0_sq
 
                         ! Get rate factor
                         call aa_to_nodes(ATTn,ATT(:,:,k),i,j,xn,yn,im1,ip1,jm1,jp1)
@@ -632,6 +653,36 @@ end if
                         visc(i,j,k) = sum(viscn*wtn)/wt1
 
                     end do
+
+else
+    ! 3D QUADRATURE 
+
+                    dudxn8 = [dudxn,dudxn]
+                    dudyn8 = [dudyn,dudyn]
+                    dvdxn8 = [dvdxn,dvdxn]
+                    dvdyn8 = [dvdyn,dvdyn]
+
+                    do k = 1, nz
+                        
+                        ! Get vertical shear strain rate terms
+                        call acx_to_nodes_3D(dudzn8,dudz,i,j,k,xn,yn,zn,im1,ip1,jm1,jp1)
+                        call acy_to_nodes_3D(dvdzn8,dvdz,i,j,k,xn,yn,zn,im1,ip1,jm1,jp1)
+                        
+                        ! Calculate the total effective strain rate from L19, Eq. 21 
+                        eps_sq_n8 = dudxn8**2 + dvdyn8**2 + dudxn8*dvdyn8 + 0.25_wp*(dudyn8+dvdxn8)**2 &
+                                                    + 0.25_wp*dudzn8**2 + 0.25_wp*dvdzn8**2 + eps_0_sq
+
+                        ! Get rate factor
+                        call aa_to_nodes_3D(ATTn8,ATT,i,j,k,xn,yn,zn,im1,ip1,jm1,jp1)
+                        !ATTn = ATT(i,j,k)
+
+                        ! Calculate effective viscosity on nodes and averaged to center aa-node
+                        viscn8 = 0.5 * (eps_sq_n8)**(p1) * ATTn8**(p2)
+                        visc(i,j,k) = sum(viscn8*wtn8)/wt18
+
+                    end do
+
+end if
 
                 end if
 
@@ -669,9 +720,7 @@ end if
         ! Local variables 
         integer  :: i, j, k
         integer  :: ip1, jp1, im1, jm1 
-        integer  :: ip2, jp2, im2, jm2
         integer  :: nx, ny, nz  
-        real(wp) :: inv_4dx, inv_4dy 
         real(wp) :: p1, p2, eps_0_sq  
         real(wp) :: eps_sq                              ! [1/yr^2]
 
@@ -687,10 +736,6 @@ end if
         ny = size(visc_eff,2)
         nz = size(visc_eff,3)
         
-        ! Calculate scaling factors
-        inv_4dx = 1.0_wp / (4.0_wp*dx) 
-        inv_4dy = 1.0_wp / (4.0_wp*dy) 
-
         ! Calculate exponents 
         p1 = (1.0_wp - n_glen)/(2.0_wp*n_glen)
         p2 = -1.0_wp/n_glen

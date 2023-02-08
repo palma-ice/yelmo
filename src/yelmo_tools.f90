@@ -23,6 +23,9 @@ module yelmo_tools
     public :: stagger_ab_acx
     public :: stagger_ab_acy 
 
+    public :: calc_gradient_acx
+    public :: calc_gradient_acy
+
     public :: acx_to_nodes_3D
     public :: acy_to_nodes_3D
     public :: aa_to_nodes_3D
@@ -2979,6 +2982,186 @@ contains
         return 
 
     end subroutine calc_gradient_ac
+    
+    subroutine calc_gradient_acx(dvardx,var,f_ice,dx,grad_lim,margin2nd,zero_outside,boundaries)
+        ! Calculate gradient on ac-nodes, accounting for ice margin if needed
+
+        implicit none 
+
+        real(wp), intent(OUT) :: dvardx(:,:) 
+        real(wp), intent(IN)  :: var(:,:) 
+        real(wp), intent(IN)  :: f_ice(:,:)
+        real(wp), intent(IN)  :: dx 
+        real(wp), intent(IN)  :: grad_lim 
+        logical,  intent(IN)  :: margin2nd 
+        logical,  intent(IN)  :: zero_outside 
+        character(len=*), intent(IN) :: boundaries  ! Boundary conditions to apply 
+        
+        ! Local variables 
+        integer  :: i, j, nx, ny 
+        integer  :: im1, ip1, jm1, jp1
+        integer  :: im2, ip2, jm2, jp2
+        real(wp) :: V0, V1, V2 
+
+        nx = size(var,1)
+        ny = size(var,2)
+
+        do j = 1, ny 
+        do i = 1, nx 
+
+            ! Get neighbor indices
+            call get_neighbor_indices(im1,ip1,jm1,jp1,i,j,nx,ny,boundaries)
+            
+            V0 = var(i,j) 
+            V1 = var(ip1,j) 
+
+            if (zero_outside) then 
+
+                if (f_ice(i,j)   .lt. 1.0) V0 = 0.0 
+                if (f_ice(ip1,j) .lt. 1.0) V1 = 0.0 
+                
+            end if 
+
+            dvardx(i,j) = (V1-V0)/dx 
+
+if (margin2nd) then 
+            ! === Modify margin gradients =========================
+            ! Following Saito et al (2007) by applying a second-order, upwind gradient
+
+            if (f_ice(i,j) .eq. 1.0 .and. f_ice(ip1,j) .lt. 1.0) then 
+                ! Ice-free to the right
+
+                if (f_ice(im1,j) .eq. 1.0) then 
+                    V0 = var(ip1,j)
+                    if (zero_outside) V0 = 0.0 
+                    V1 = var(i,j)
+                    V2 = var(im1,j)
+                    dvardx(i,j) = (1.0*V2-4.0*V1+3.0*V0)/dx
+                else 
+                    dvardx(i,j) = 0.0
+                end if 
+
+            else if (f_ice(i,j) .lt. 1.0 .and. f_ice(ip1,j) .eq. 1.0) then
+                ! Ice-free to the left
+
+                if (ip1 .lt. nx) then 
+                    ip2 = ip1+1 
+                    if (f_ice(ip2,j) .eq. 1.0) then
+                        V0 = var(i,j)
+                        if (zero_outside) V0 = 0.0 
+                        V1 = var(ip1,j)
+                        V2 = var(ip2,j)
+                        dvardx(i,j) = -(1.0*V2-4.0*V1+3.0*V0)/dx
+                    else 
+                        dvardx(i,j) = 0.0
+                    end if
+                else
+                    dvardx(i,j) = 0.0
+                end if
+
+            end if 
+
+end if
+
+        end do 
+        end do 
+
+        ! Finally, ensure that gradient is beneath desired limit 
+        call minmax(dvardx,grad_lim)
+
+        return 
+
+    end subroutine calc_gradient_acx
+    
+subroutine calc_gradient_acy(dvardy,var,f_ice,dy,grad_lim,margin2nd,zero_outside,boundaries)
+        ! Calculate gradient on ac-nodes, accounting for ice margin if needed
+
+        implicit none 
+
+        real(wp), intent(OUT) :: dvardy(:,:) 
+        real(wp), intent(IN)  :: var(:,:) 
+        real(wp), intent(IN)  :: f_ice(:,:)
+        real(wp), intent(IN)  :: dy 
+        real(wp), intent(IN)  :: grad_lim 
+        logical,  intent(IN)  :: margin2nd 
+        logical,  intent(IN)  :: zero_outside 
+        character(len=*), intent(IN) :: boundaries  ! Boundary conditions to apply 
+        
+        ! Local variables 
+        integer  :: i, j, nx, ny 
+        integer  :: im1, ip1, jm1, jp1
+        integer  :: im2, ip2, jm2, jp2
+        real(wp) :: V0, V1, V2 
+
+        nx = size(var,1)
+        ny = size(var,2)
+
+        do j = 1, ny 
+        do i = 1, nx 
+
+            ! Get neighbor indices
+            call get_neighbor_indices(im1,ip1,jm1,jp1,i,j,nx,ny,boundaries)
+             
+            V0 = var(i,j) 
+            V1 = var(i,jp1) 
+
+            if (zero_outside) then 
+
+                if (f_ice(i,j)   .lt. 1.0) V0 = 0.0 
+                if (f_ice(i,jp1) .lt. 1.0) V1 = 0.0 
+                
+            end if 
+
+            dvardy(i,j) = (V1-V0)/dy
+
+if (margin2nd) then 
+            ! === Modify margin gradients =========================
+            ! Following Saito et al (2007) by applying a second-order, upwind gradient
+
+            if (f_ice(i,j) .eq. 1.0 .and. f_ice(i,jp1) .lt. 1.0) then 
+                ! Ice-free to the top
+
+                if (f_ice(i,jm1) .eq. 1.0) then 
+                    V0 = var(i,jp1)
+                    if (zero_outside) V0 = 0.0 
+                    V1 = var(i,j)
+                    V2 = var(i,jm1)
+                    dvardy(i,j) = (1.0*V2-4.0*V1+3.0*V0)/dy
+                else 
+                    dvardy(i,j) = 0.0
+                end if 
+
+            else if (f_ice(i,j) .lt. 1.0 .and. f_ice(i,jp1) .eq. 1.0) then
+                ! Ice-free to the bottom
+
+                if (jp1 .lt. ny) then 
+                    jp2 = jp1+1 
+                    if (f_ice(i,jp2) .eq. 1.0) then
+                        V0 = var(i,j)
+                        if (zero_outside) V0 = 0.0 
+                        V1 = var(i,jp1)
+                        V2 = var(i,jp2)
+                        dvardy(i,j) = -(1.0*V2-4.0*V1+3.0*V0)/dy
+                    else 
+                        dvardy(i,j) = 0.0
+                    end if
+                else
+                    dvardy(i,j) = 0.0
+                end if
+
+            end if 
+
+end if
+
+        end do 
+        end do 
+
+        ! Finally, ensure that gradient is beneath desired limit 
+        call minmax(dvardy,grad_lim)
+
+        return 
+
+    end subroutine calc_gradient_acy
     
     subroutine calc_gradient_ac_ice(dvardx,dvardy,var,f_ice,dx,margin2nd,grad_lim,boundaries,zero_outside)
         ! Calculate gradient on ac nodes, accounting for ice margin if needed

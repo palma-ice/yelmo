@@ -40,12 +40,9 @@ module thermodynamics
     public :: calc_Q_bedrock_column
 
     public :: calc_basal_water_local
-
-    public :: calc_basal_heating_fromaa 
-    public :: calc_basal_heating_fromab 
+    
     public :: calc_basal_heating_nodes
-    public :: calc_basal_heating_fromac 
-    public :: calc_basal_heating_interp
+    public :: calc_basal_heating_simplestagger
 
     public :: convert_to_enthalpy
     public :: convert_from_enthalpy_column
@@ -598,7 +595,105 @@ contains
 
     end subroutine calc_strain_heating_sia
 
-    subroutine calc_basal_heating_fromaa(Q_b,ux_b,uy_b,taub_acx,taub_acy,beta1,beta2)
+    subroutine calc_basal_heating_nodes(Q_b,ux_b,uy_b,taub_acx,taub_acy,f_ice,beta1,beta2,boundaries)
+        ! Qb [J a-1 m-2] == [m a-1] * [J m-3]
+        ! Note: grounded ice fraction f_grnd_acx/y not used here, because taub_acx/y already accounts
+        ! for the grounded fraction via beta_acx/y: Q_b = tau_b*u = -beta*u*u,
+        ! i.e., the magnitude of basal stress multiplied with the magnitude of basal velocity.
+        ! See Cuffey and Paterson, p. 418, Eq. 9.35. 
+
+        real(prec), intent(INOUT) :: Q_b(:,:)           ! [mW m-2] Basal heat production (friction), aa-nodes
+        real(prec), intent(IN)    :: ux_b(:,:)          ! Basal velocity, x-component (acx)
+        real(prec), intent(IN)    :: uy_b(:,:)          ! Basal velocity, y-compenent (acy)
+        real(prec), intent(IN)    :: taub_acx(:,:)      ! Basal friction (acx)
+        real(prec), intent(IN)    :: taub_acy(:,:)      ! Basal friction (acy) 
+        real(prec), intent(IN)    :: f_ice(:,:)         ! [--] Ice area fraction
+        real(prec), intent(IN)    :: beta1              ! Timestepping weighting parameter
+        real(prec), intent(IN)    :: beta2              ! Timestepping weighting parameter
+        character(len=*), intent(IN) :: boundaries 
+
+        ! Local variables
+        integer  :: i, j, nx, ny, n 
+        integer  :: im1, ip1, jm1, jp1  
+        integer  :: im1m, ip1m, jm1m, jp1m 
+
+        real(wp) :: wt0
+        real(wp) :: xn(4) 
+        real(wp) :: yn(4) 
+        real(wp) :: wtn(4)
+        real(wp) :: wt2D
+
+        real(wp) :: uxbn(4)
+        real(wp) :: uybn(4)
+        real(wp) :: taubxn(4)
+        real(wp) :: taubyn(4)
+        real(wp) :: Qbn(4)
+        real(wp) :: Qb_aa 
+
+        nx = size(Q_b,1)
+        ny = size(Q_b,2)
+
+        wt0  = 1.0/sqrt(3.0)
+        xn   = [wt0,-wt0,-wt0, wt0]
+        yn   = [wt0, wt0,-wt0,-wt0]
+        wtn  = [1.0,1.0,1.0,1.0]
+        wt2D = 4.0   ! Surface area of square [-1:1,-1:1]=> 2x2 => 4 
+
+        do j = 1, ny 
+        do i = 1, nx
+
+            if (f_ice(i,j) .eq. 1.0) then 
+                ! Fully ice-covered point 
+
+                ! Get neighbor indices
+                call get_neighbor_indices(im1,ip1,jm1,jp1,i,j,nx,ny,boundaries)
+
+                ! Get neighbor indices limited to ice-covered points
+                im1m = im1
+                if (f_ice(im1,j) .lt. 1.0) im1m = i  
+                ip1m = ip1
+                if (f_ice(ip1,j) .lt. 1.0) ip1m = i  
+                jm1m = jm1 
+                if (f_ice(i,jm1) .lt. 1.0) jm1m = j 
+                jp1m = jp1 
+                if (f_ice(i,jp1) .lt. 1.0) jp1m = j
+
+                ! Get velocity components on nodes
+                call acx_to_nodes(uxbn,ux_b,i,j,xn,yn,im1m,ip1m,jm1m,jp1m)
+                call acy_to_nodes(uybn,uy_b,i,j,xn,yn,im1m,ip1m,jm1m,jp1m)
+
+                ! Get basal stress components on nodes
+                call acx_to_nodes(taubxn,taub_acx,i,j,xn,yn,im1m,ip1m,jm1m,jp1m)
+                call acy_to_nodes(taubyn,taub_acy,i,j,xn,yn,im1m,ip1m,jm1m,jp1m)
+
+                ! Calculate Qb at quadrature points [Pa m a-1] == [J a-1 m-2]
+                Qbn   = abs( sqrt(uxbn**2+uybn**2) * sqrt(taubxn**2+taubyn**2) )
+                Qb_aa = sum(Qbn*wtn)/wt2D
+
+                ! Ensure Q_b is strictly positive 
+                if (Qb_aa .lt. 0.0_wp) Qb_aa = 0.0_wp 
+
+                ! Convert to [mW m-2]
+                Qb_aa = Qb_aa * 1e3 / sec_year          ! [J a-1 m-2] => [mW m-2]
+
+                ! Get weighted average of Q_b with timestepping factors
+                Q_b(i,j) = beta1*Qb_aa + beta2*Q_b(i,j)
+
+            else 
+                ! Ice-free point
+
+                Q_b(i,j) = 0.0 
+
+            end if
+
+        end do
+        end do 
+
+        return 
+ 
+    end subroutine calc_basal_heating_nodes
+    
+    subroutine calc_basal_heating_simplestagger(Q_b,ux_b,uy_b,taub_acx,taub_acy,beta1,beta2)
          ! Qb [J a-1 m-2] == [m a-1] * [J m-3]
          ! Note: grounded ice fraction f_grnd_acx/y not used here, because taub_acx/y already accounts
          ! for the grounded fraction via beta_acx/y: Q_b = tau_b*u = -beta*u*u.
@@ -653,407 +748,7 @@ contains
         
         return 
  
-    end subroutine calc_basal_heating_fromaa
-
-    subroutine calc_basal_heating_nodes(Q_b,ux_b,uy_b,taub_acx,taub_acy,f_ice,beta1,beta2,boundaries)
-        ! Qb [J a-1 m-2] == [m a-1] * [J m-3]
-        ! Note: grounded ice fraction f_grnd_acx/y not used here, because taub_acx/y already accounts
-        ! for the grounded fraction via beta_acx/y: Q_b = tau_b*u = -beta*u*u,
-        ! i.e., the magnitude of basal stress multiplied with the magnitude of basal velocity.
-        ! See Cuffey and Paterson, p. 418, Eq. 9.35. 
-
-        real(prec), intent(INOUT) :: Q_b(:,:)           ! [mW m-2] Basal heat production (friction), aa-nodes
-        real(prec), intent(IN)    :: ux_b(:,:)          ! Basal velocity, x-component (acx)
-        real(prec), intent(IN)    :: uy_b(:,:)          ! Basal velocity, y-compenent (acy)
-        real(prec), intent(IN)    :: taub_acx(:,:)      ! Basal friction (acx)
-        real(prec), intent(IN)    :: taub_acy(:,:)      ! Basal friction (acy) 
-        real(prec), intent(IN)    :: f_ice(:,:)         ! [--] Ice area fraction
-        real(prec), intent(IN)    :: beta1              ! Timestepping weighting parameter
-        real(prec), intent(IN)    :: beta2              ! Timestepping weighting parameter
-        character(len=*), intent(IN) :: boundaries 
-
-        ! Local variables
-        integer  :: i, j, nx, ny, n 
-        integer  :: im1, ip1, jm1, jp1  
-
-        real(wp) :: wt0, wt1
-        real(wp) :: xn(4) 
-        real(wp) :: yn(4) 
-        real(wp) :: wtn(4)
-        real(wp) :: uxbn(4)
-        real(wp) :: uybn(4)
-        real(wp) :: taubxn(4)
-        real(wp) :: taubyn(4)
-        real(wp) :: Qbn(4)
-        real(wp) :: Qb_aa 
-
-        nx = size(Q_b,1)
-        ny = size(Q_b,2)
-
-        wt0 = 1.0/sqrt(3.0)
-        xn  = [wt0,-wt0,-wt0, wt0]
-        yn  = [wt0, wt0,-wt0,-wt0]
-        wtn = [1.0,1.0,1.0,1.0]
-        wt1 = sum(wtn)
-
-        do j = 1, ny 
-        do i = 1, nx
-         
-            ! Get neighbor indices
-            call get_neighbor_indices(im1,ip1,jm1,jp1,i,j,nx,ny,boundaries)
-
-            ! Get velocity components on nodes
-            call acx_to_nodes(uxbn,ux_b,i,j,xn,yn,im1,ip1,jm1,jp1)
-            call acy_to_nodes(uybn,uy_b,i,j,xn,yn,im1,ip1,jm1,jp1)
-
-            ! Get basal stress components on nodes
-            call acx_to_nodes(taubxn,taub_acx,i,j,xn,yn,im1,ip1,jm1,jp1)
-            call acy_to_nodes(taubyn,taub_acy,i,j,xn,yn,im1,ip1,jm1,jp1)
-
-            ! Calculate Qb at quadrature points [Pa m a-1] == [J a-1 m-2]
-            Qbn   = abs( sqrt(uxbn**2+uybn**2) * sqrt(taubxn**2+taubyn**2) )
-            Qb_aa = sum(Qbn*wtn)/wt1
-
-            ! Ensure Q_b is strictly positive 
-            if (Qb_aa .lt. 0.0_wp) Qb_aa = 0.0_wp 
-
-            ! Convert to [mW m-2]
-            Qb_aa = Qb_aa * 1e3 / sec_year          ! [J a-1 m-2] => [mW m-2]
-
-            ! Get weighted average of Q_b with timestepping factors
-            Q_b(i,j) = beta1*Qb_aa + beta2*Q_b(i,j)
-
-        end do
-        end do 
-
-        return 
- 
-    end subroutine calc_basal_heating_nodes
-    
-    subroutine calc_basal_heating_fromab_new(Q_b,ux_b,uy_b,taub_acx,taub_acy,f_ice,beta1,beta2)
-         ! Qb [J a-1 m-2] == [m a-1] * [J m-3]
-         ! Note: grounded ice fraction f_grnd_acx/y not used here, because taub_acx/y already accounts
-         ! for the grounded fraction via beta_acx/y: Q_b = tau_b*u = -beta*u*u.
-
-        real(prec), intent(INOUT) :: Q_b(:,:)           ! [mW m-2] Basal heat production (friction), aa-nodes
-        real(prec), intent(IN)    :: ux_b(:,:)          ! Basal velocity, x-component (acx)
-        real(prec), intent(IN)    :: uy_b(:,:)          ! Basal velocity, y-compenent (acy)
-        real(prec), intent(IN)    :: taub_acx(:,:)      ! Basal friction (acx)
-        real(prec), intent(IN)    :: taub_acy(:,:)      ! Basal friction (acy) 
-        real(prec), intent(IN)    :: f_ice(:,:)         ! [--] Ice area fraction
-        real(prec), intent(IN)    :: beta1              ! Timestepping weighting parameter
-        real(prec), intent(IN)    :: beta2              ! Timestepping weighting parameter
-        
-        ! Local variables
-        integer  :: i, j, nx, ny, n 
-        integer  :: im1, ip1, jm1, jp1  
-
-        real(wp), allocatable :: uxb_ab(:,:) 
-        real(wp), allocatable :: uyb_ab(:,:) 
-        real(wp), allocatable :: taubx_ab(:,:) 
-        real(wp), allocatable :: tauby_ab(:,:) 
-        real(wp), allocatable :: Qb_ab(:,:) 
-        real(wp), allocatable :: Qb_aa(:,:)
-
-        nx = size(Q_b,1)
-        ny = size(Q_b,2)
-
-        allocate(uxb_ab(nx,ny))
-        allocate(uyb_ab(nx,ny))
-        allocate(taubx_ab(nx,ny))
-        allocate(tauby_ab(nx,ny))
-        allocate(Qb_ab(nx,ny))
-        allocate(Qb_aa(nx,ny))
-        
-        call map_cx_to_b_2D(uxb_ab,ux_b)
-        call map_cx_to_b_2D(uyb_ab,uy_b)
-        call map_cx_to_b_2D(taubx_ab,taub_acx)
-        call map_cx_to_b_2D(tauby_ab,taub_acy)
-        
-        ! Calculate Qb at quadrature points [Pa m a-1] == [J a-1 m-2]
-        Qb_ab = abs( sqrt(uxb_ab**2+uyb_ab**2) &
-                        * sqrt(taubx_ab**2+tauby_ab**2) )
-
-        ! Map to aa-nodes 
-        call map_b_to_a_2D(Qb_aa,Qb_ab)
-
-        ! Ensure Q_b is strictly positive 
-        where (Qb_aa .lt. 0.0_wp) Qb_aa = 0.0_wp 
-
-        ! Convert to [mW m-2]
-        Qb_aa = Qb_aa * 1e3 / sec_year          ! [J a-1 m-2] => [mW m-2]
-            
-        ! Get weighted average of Q_b with timestepping factors
-        Q_b = beta1*Qb_aa + beta2*Q_b
-
-        return 
- 
-    end subroutine calc_basal_heating_fromab_new
-
-    subroutine calc_basal_heating_fromab(Q_b,ux_b,uy_b,taub_acx,taub_acy,f_ice,beta1,beta2)
-         ! Qb [J a-1 m-2] == [m a-1] * [J m-3]
-         ! Note: grounded ice fraction f_grnd_acx/y not used here, because taub_acx/y already accounts
-         ! for the grounded fraction via beta_acx/y: Q_b = tau_b*u = -beta*u*u.
-
-        real(prec), intent(INOUT) :: Q_b(:,:)           ! [mW m-2] Basal heat production (friction), aa-nodes
-        real(prec), intent(IN)    :: ux_b(:,:)          ! Basal velocity, x-component (acx)
-        real(prec), intent(IN)    :: uy_b(:,:)          ! Basal velocity, y-compenent (acy)
-        real(prec), intent(IN)    :: taub_acx(:,:)      ! Basal friction (acx)
-        real(prec), intent(IN)    :: taub_acy(:,:)      ! Basal friction (acy) 
-        real(prec), intent(IN)    :: f_ice(:,:)         ! [--] Ice area fraction
-        real(prec), intent(IN)    :: beta1              ! Timestepping weighting parameter
-        real(prec), intent(IN)    :: beta2              ! Timestepping weighting parameter
-        
-        ! Local variables
-        integer  :: i, j, nx, ny, n 
-        integer  :: im1, ip1, jm1, jp1 
-        real(wp) :: uxb_ab(4) 
-        real(wp) :: uyb_ab(4) 
-        real(wp) :: taubx_ab(4) 
-        real(wp) :: tauby_ab(4)
-        real(wp) :: Qb_ab(4) 
-        real(wp) :: wt_ab(4) 
-        real(wp) :: Q_b_now
-        real(wp) :: wt
-
-        nx = size(Q_b,1)
-        ny = size(Q_b,2)
-
-        wt_ab = 1.0_wp / 4.0_wp 
-
-        ! Calculate current basal frictional heating at ab-nodes
-        ! following quadrature method, and then average to get 
-        ! the grid center (using contributions from ice-covered nodes)
-        do j = 1, ny
-        do i = 1, nx
-            
-            ! Define neighbor indices
-            im1 = max(i-1,1)
-            ip1 = min(i+1,nx)
-            jm1 = max(j-1,1)
-            jp1 = min(j+1,ny)
-            
-            call stagger_nodes_acx_ab_ice(uxb_ab,ux_b,f_ice,i,j)
-            call stagger_nodes_acy_ab_ice(uyb_ab,uy_b,f_ice,i,j)
-
-            call stagger_nodes_acx_ab_ice(taubx_ab,taub_acx,f_ice,i,j)
-            call stagger_nodes_acy_ab_ice(tauby_ab,taub_acy,f_ice,i,j)
-            
-            ! Calculate Qb at quadrature points [Pa m a-1] == [J a-1 m-2]
-            Qb_ab = abs( sqrt(uxb_ab**2+uyb_ab**2) &
-                          * sqrt(taubx_ab**2+tauby_ab**2) )
-
-            ! Get weighted average using only ice-covered nodes
-            ! and convert to [mW m-2]
-            Q_b_now = sum(wt_ab*Qb_ab) * 1e3 / sec_year      ! [J a-1 m-2] => [mW m-2]
-
-            ! Get weighted average of Q_b with timestepping factors
-            Q_b(i,j) = beta1*Q_b_now + beta2*Q_b(i,j) 
-
-            ! Ensure Q_b is strictly positive 
-            if (Q_b(i,j) .lt. 0.0_wp) Q_b(i,j) = 0.0_wp 
-            
-        end do 
-        end do 
-
-        return 
- 
-    end subroutine calc_basal_heating_fromab
-
-    subroutine calc_basal_heating_fromac(Q_b,ux_b,uy_b,taub_acx,taub_acy,H_ice,f_pmp,beta1,beta2)
-         ! Qb [J a-1 m-2] == [m a-1] * [J m-3]
-         ! Note: grounded ice fraction f_grnd_acx/y not used here, because taub_acx/y already accounts
-         ! for the grounded fraction via beta_acx/y: Q_b = tau_b*u = -beta*u*u.
-
-        real(prec), intent(INOUT) :: Q_b(:,:)           ! [mW m-2] Basal heat production (friction), aa-nodes
-        real(prec), intent(IN)    :: ux_b(:,:)          ! Basal velocity, x-component (acx)
-        real(prec), intent(IN)    :: uy_b(:,:)          ! Basal velocity, y-compenent (acy)
-        real(prec), intent(IN)    :: taub_acx(:,:)      ! Basal friction (acx)
-        real(prec), intent(IN)    :: taub_acy(:,:)      ! Basal friction (acy) 
-        real(prec), intent(IN)    :: f_pmp(:,:)         ! [--] Grid-fraction at pmp (aa-nodes)
-        real(prec), intent(IN)    :: H_ice(:,:)         ! [m] Ice thickness 
-        real(prec), intent(IN)    :: beta1              ! Timestepping weighting parameter
-        real(prec), intent(IN)    :: beta2              ! Timestepping weighting parameter
-        
-        ! Local variables
-        integer    :: i, j, nx, ny, n 
-        integer    :: im1, jm1, ip1, jp1 
-        real(prec), allocatable :: Qb_acx(:,:)
-        real(prec), allocatable :: Qb_acy(:,:)
-        real(prec) :: Q_b_now
-
-        nx = size(Q_b,1)
-        ny = size(Q_b,2)
-
-        allocate(Qb_acx(nx,ny))
-        allocate(Qb_acy(nx,ny))
-
-        ! Determine basal frictional heating values (staggered acx/acy nodes)
-        Qb_acx = abs(ux_b*taub_acx)   ! [Pa m a-1] == [J a-1 m-2]
-        Qb_acy = abs(uy_b*taub_acy)   ! [Pa m a-1] == [J a-1 m-2]
-
-
-        ! Get basal frictional heating on centered nodes (aa-nodes)          
-        do j = 1, ny
-        do i = 1, nx
-
-            ! Define neighbor indices
-            im1 = max(i-1,1)
-            ip1 = min(i+1,nx)
-            jm1 = max(j-1,1)
-            jp1 = min(j+1,ny)
-            
-            ! Average from ac-nodes to aa-node
-            Q_b_now = 0.25*(Qb_acx(i,j)+Qb_acx(im1,j)+Qb_acy(i,j)+Qb_acy(i,jm1))
-
-            ! Convert to [mW m-2]
-            Q_b_now = Q_b_now * 1e3 / sec_year      ! [J a-1 m-2] => [mW m-2]
-            
-if (.FALSE.) then 
-            ! Reduction of Q_b with f_pmp (ajr: this is an open question)
-            Q_b_now = Q_b_now*f_pmp(i,j)  
-end if 
-            
-            ! Get weighted average of Q_b with timestepping factors
-            Q_b(i,j) = beta1*Q_b_now + beta2*Q_b(i,j) 
-
-            ! Ensure Q_b is strictly positive 
-            if (Q_b(i,j) .lt. 0.0_prec) Q_b(i,j) = 0.0_prec 
-            
-        end do 
-        end do 
-        
-        return 
- 
-    end subroutine calc_basal_heating_fromac
-
-    subroutine calc_basal_heating_interp(Q_b,ux_b,uy_b,taub_acx,taub_acy,H_ice,beta1,beta2)
-         ! Qb [J a-1 m-2] == [m a-1] * [J m-3]
-         ! Note: grounded ice fraction f_grnd_acx/y not used here, because beta_acx/y already accounts
-         ! for the grounded fraction via beta_acx/y: Q_b = tau_b*u = -beta*u*u.
-
-        real(prec), intent(INOUT) :: Q_b(:,:)           ! [mW m-2] Basal heat production (friction), aa-nodes
-        real(prec), intent(IN)    :: ux_b(:,:)          ! Basal velocity, x-component (acx)
-        real(prec), intent(IN)    :: uy_b(:,:)          ! Basal velocity, y-compenent (acy)
-        real(prec), intent(IN)    :: taub_acx(:,:)      ! Basal stress (acx)
-        real(prec), intent(IN)    :: taub_acy(:,:)      ! Basal stress (acy) 
-        real(prec), intent(IN)    :: H_ice(:,:)         ! [m] Ice thickness
-        real(prec), intent(IN)    :: beta1              ! Timestepping weighting parameter
-        real(prec), intent(IN)    :: beta2              ! Timestepping weighting parameter
-        
-        ! Local variables
-        integer    :: i, j, nx, ny, n 
-        integer    :: im1, ip1, jm1, jp1 
-        real(prec) :: ux_1, ux_2, ux_3, ux_4 
-        real(prec) :: uy_1, uy_2, uy_3, uy_4 
-        real(prec) :: taubx_1, taubx_2, taubx_3, taubx_4 
-        real(prec) :: tauby_1, tauby_2, tauby_3, tauby_4
-        
-        real(prec) :: uxy_ab, taub_ab 
-        real(prec), allocatable :: Qb_ab(:,:)
-        real(prec) :: Q_b_now, wt
-
-        integer, parameter :: nhi = 10 
-        real(prec), allocatable :: uxhi(:,:)
-        real(prec), allocatable :: uyhi(:,:)
-        real(prec), allocatable :: taubxhi(:,:)
-        real(prec), allocatable :: taubyhi(:,:)
-        real(prec), allocatable :: Qbhi(:,:)
-        real(prec) :: Qbhi_tot 
-
-        integer, parameter :: ix = 36
-        integer, parameter :: jx =  9
-        
-        nx = size(Q_b,1)
-        ny = size(Q_b,2)
-
-        allocate(Qb_ab(nx,ny))
-
-        allocate(uxhi(nhi,nhi))
-        allocate(uyhi(nhi,nhi))
-        allocate(taubxhi(nhi,nhi))
-        allocate(taubyhi(nhi,nhi))
-        allocate(Qbhi(nhi,nhi))
-        
-        ! First calculate basal frictional heating on ab-nodes 
-        do j = 1, ny
-        do i = 1, nx
-            
-            if (H_ice(i,j) .gt. 0.0_prec) then 
-                ! only treat ice-covered points 
-
-                ! Define neighbor indices
-                im1 = max(i-1,1)
-                ip1 = min(i+1,nx)
-                jm1 = max(j-1,1)
-                jp1 = min(j+1,ny)
-            
-                ! Get variables on ab-nodes (corners of cell)
-                ! and calculate hi resolution subgrid values
-                ux_1 = 0.5_prec*(ux_b(i,j)  +ux_b(i,jp1))
-                ux_2 = 0.5_prec*(ux_b(im1,j)+ux_b(im1,jp1))
-                ux_3 = 0.5_prec*(ux_b(im1,j)+ux_b(im1,jm1))
-                ux_4 = 0.5_prec*(ux_b(i,j)  +ux_b(i,jm1))
-
-                call calc_hires_cell(uxhi,ux_1,ux_2,ux_3,ux_4)
-
-                uy_1 = 0.5_prec*(uy_b(i,j)  +uy_b(ip1,j))
-                uy_2 = 0.5_prec*(uy_b(i,j)  +uy_b(im1,j))
-                uy_3 = 0.5_prec*(uy_b(i,jm1)+uy_b(im1,jm1))
-                uy_4 = 0.5_prec*(uy_b(i,jm1)+uy_b(ip1,jm1))
-
-                call calc_hires_cell(uyhi,uy_1,uy_2,uy_3,uy_4)
-
-                taubx_1 = 0.5_prec*(taub_acx(i,j)  +taub_acx(i,jp1))
-                taubx_2 = 0.5_prec*(taub_acx(im1,j)+taub_acx(im1,jp1))
-                taubx_3 = 0.5_prec*(taub_acx(im1,j)+taub_acx(im1,jm1))
-                taubx_4 = 0.5_prec*(taub_acx(i,j)  +taub_acx(i,jm1))
-
-                call calc_hires_cell(taubxhi,taubx_1,taubx_2,taubx_3,taubx_4)
-
-                tauby_1 = 0.5_prec*(taub_acy(i,j)  +taub_acy(ip1,j))
-                tauby_2 = 0.5_prec*(taub_acy(i,j)  +taub_acy(im1,j))
-                tauby_3 = 0.5_prec*(taub_acy(i,jm1)+taub_acy(im1,jm1))
-                tauby_4 = 0.5_prec*(taub_acy(i,jm1)+taub_acy(ip1,jm1))
-
-                call calc_hires_cell(taubyhi,tauby_1,tauby_2,tauby_3,tauby_4) 
-
-                Qbhi = abs( sqrt(uxhi**2 + uyhi**2) * sqrt(taubxhi**2 + taubyhi**2) )  ! [Pa m a-1] == [J a-1 m-2]
-
-                Qbhi_tot = sum(Qbhi)
-
-                if (Qbhi_tot .gt. 0.0_prec) then 
-                    
-                    Q_b_now = sum(Qbhi,mask=Qbhi .gt. 0.0_prec) &
-                                            / count(Qbhi .gt. 0.0_prec)
-
-                else 
-
-                    Q_b_now = 0.0_prec 
-
-                end if 
-
-            else 
-
-                Q_b_now = 0.0_prec 
-
-            end if 
-
-            ! Convert to [mW m-2]
-            Q_b_now = Q_b_now * 1e3 / sec_year      ! [J a-1 m-2] => [mW m-2]
-            
-            ! Get weighted average of Q_b with timestepping factors
-            Q_b(i,j) = beta1*Q_b_now + beta2*Q_b(i,j) 
-
-            ! Ensure Q_b is strictly positive 
-            if (Q_b(i,j) .lt. 0.0_prec) Q_b(i,j) = 0.0_prec 
-            
-        end do 
-        end do 
-
-        return 
- 
-    end subroutine calc_basal_heating_interp
+    end subroutine calc_basal_heating_simplestagger
 
     subroutine calc_hires_cell(var_hi,var_1,var_2,var_3,var_4)
         ! Given the four corners of a cell in quadrants 1,2,3,4,

@@ -828,7 +828,7 @@ contains
         ! Local variables
         integer  :: i, j, nx, ny
         integer  :: im1, ip1, jm1, jp1 
-        integer  :: vim1, vip1, vjm1, vjp1
+        integer  :: im1m, ip1m, jm1m, jp1m 
         real(wp) :: uxy_b
         real(wp) :: uxn(4) 
         real(wp) :: uyn(4) 
@@ -839,7 +839,7 @@ contains
         real(wp) :: xn(4) 
         real(wp) :: yn(4) 
         real(wp) :: wtn(4)
-        real(wp) :: wt1 
+        real(wp) :: wt2D
 
         real(wp), parameter :: ub_min    = 1e-3_wp          ! [m/yr] Minimum velocity is positive small value to avoid divide by zero
         real(wp), parameter :: ub_sq_min = ub_min**2
@@ -851,11 +851,11 @@ contains
         beta = 0.0_wp 
         
         ! Get nodes and weighting 
-        wt0 = 1.0/sqrt(3.0)
-        xn  = [wt0,-wt0,-wt0, wt0]
-        yn  = [wt0, wt0,-wt0,-wt0]
-        wtn = [1.0,1.0,1.0,1.0]
-        wt1 = 4.0   ! Surface area of square [-1:1,-1:1]=> 2x2 => 4 
+        wt0  = 1.0/sqrt(3.0)
+        xn   = [wt0,-wt0,-wt0, wt0]
+        yn   = [wt0, wt0,-wt0,-wt0]
+        wtn  = [1.0,1.0,1.0,1.0]
+        wt2D = 4.0   ! Surface area of square [-1:1,-1:1]=> 2x2 => 4 
 
         do j = 1, ny
         do i = 1, nx
@@ -863,8 +863,18 @@ contains
             ! Get neighbor indices
             call get_neighbor_indices(im1,ip1,jm1,jp1,i,j,nx,ny,boundaries)
 
+            ! Get neighbor indices limited to ice-covered points
+            im1m = im1
+            if (f_ice(im1,j) .lt. 1.0) im1m = i  
+            ip1m = ip1
+            if (f_ice(ip1,j) .lt. 1.0) ip1m = i  
+            jm1m = jm1 
+            if (f_ice(i,jm1) .lt. 1.0) jm1m = j 
+            jp1m = jp1 
+            if (f_ice(i,jp1) .lt. 1.0) jp1m = j
+
             if (f_ice(i,j) .eq. 1.0_wp) then 
-                ! Fully ice-covered point with some fully ice-covered neighbors 
+                ! Fully ice-covered point
 
                 if (simple_stagger) then 
                     ! Unstagger velocity components to aa-nodes 
@@ -880,21 +890,11 @@ contains
                     
                     ! Get c_bed on nodes
                     
-                    call aa_to_nodes(cbn,c_bed,i,j,xn,yn,im1,ip1,jm1,jp1)
+                    call aa_to_nodes(cbn,c_bed,i,j,xn,yn,im1m,ip1m,jm1m,jp1m)
                     !cbn(1:4) = c_bed(i,j) 
 
-                    ! Limit velocity contributions to points with ice 
-                    vim1 = im1
-                    if (f_ice(im1,j) .lt. 1.0) vim1 = i  
-                    vip1 = ip1
-                    if (f_ice(ip1,j) .lt. 1.0) vip1 = i  
-                    vjm1 = jm1 
-                    if (f_ice(i,jm1) .lt. 1.0) vjm1 = j 
-                    vjp1 = jp1 
-                    if (f_ice(i,jp1) .lt. 1.0) vjp1 = j
-
-                    call acx_to_nodes(uxn,ux_b,i,j,xn,yn,vim1,vip1,vjm1,vjp1)
-                    call acy_to_nodes(uyn,uy_b,i,j,xn,yn,vim1,vip1,vjm1,vjp1)
+                    call acx_to_nodes(uxn,ux_b,i,j,xn,yn,im1m,ip1m,jm1m,jp1m)
+                    call acy_to_nodes(uyn,uy_b,i,j,xn,yn,im1m,ip1m,jm1m,jp1m)
                 
                 end if 
                 
@@ -903,7 +903,7 @@ contains
 
                 ! Calculate basal friction
                 betan     = c_bed(i,j) * (uxyn / u_0)**q * (1.0_wp / uxyn)
-                beta(i,j) = sum(wtn*betan)/wt1
+                beta(i,j) = sum(wtn*betan)/wt2D
 
             else
                 ! Assign minimum velocity value, no staggering for simplicity
@@ -944,7 +944,7 @@ contains
         ! Local variables
         integer  :: i, j, nx, ny
         integer  :: im1, ip1, jm1, jp1
-        integer  :: vim1, vip1, vjm1, vjp1
+        integer  :: im1m, ip1m, jm1m, jp1m 
         real(wp) :: uxy_b
         real(wp) :: uxn(4) 
         real(wp) :: uyn(4) 
@@ -955,7 +955,7 @@ contains
         real(wp) :: xn(4) 
         real(wp) :: yn(4) 
         real(wp) :: wtn(4)
-        real(wp) :: wt1 
+        real(wp) :: wt2D
 
         real(wp), parameter :: ub_min    = 1e-3_wp          ! [m/yr] Minimum velocity is positive small value to avoid divide by zero
         real(wp), parameter :: ub_sq_min = ub_min**2
@@ -967,11 +967,11 @@ contains
         beta = 0.0_wp 
 
         ! Get nodes and weighting 
-        wt0 = 1.0/sqrt(3.0)
-        xn  = [wt0,-wt0,-wt0, wt0]
-        yn  = [wt0, wt0,-wt0,-wt0]
-        wtn = [1.0,1.0,1.0,1.0]
-        wt1 = 4.0   ! Surface area of square [-1:1,-1:1]=> 2x2 => 4 
+        wt0  = 1.0/sqrt(3.0)
+        xn   = [wt0,-wt0,-wt0, wt0]
+        yn   = [wt0, wt0,-wt0,-wt0]
+        wtn  = [1.0,1.0,1.0,1.0]
+        wt2D = 4.0   ! Surface area of square [-1:1,-1:1]=> 2x2 => 4 
 
         do j = 1, ny
         do i = 1, nx
@@ -979,8 +979,18 @@ contains
             ! Get neighbor indices
             call get_neighbor_indices(im1,ip1,jm1,jp1,i,j,nx,ny,boundaries)
 
+            ! Get neighbor indices limited to ice-covered points
+            im1m = im1
+            if (f_ice(im1,j) .lt. 1.0) im1m = i  
+            ip1m = ip1
+            if (f_ice(ip1,j) .lt. 1.0) ip1m = i  
+            jm1m = jm1 
+            if (f_ice(i,jm1) .lt. 1.0) jm1m = j 
+            jp1m = jp1 
+            if (f_ice(i,jp1) .lt. 1.0) jp1m = j
+
             if (f_ice(i,j) .eq. 1.0_wp) then 
-                ! Fully ice-covered point with some fully ice-covered neighbors 
+                ! Fully ice-covered point
 
                 if (simple_stagger) then 
                     ! Unstagger velocity components to aa-nodes 
@@ -993,24 +1003,13 @@ contains
                     uyn = 0.5*(uy_b(i,j)+uy_b(i,jm1))
                 
                 else
-                    
                     ! Get c_bed on nodes
                     
-                    call aa_to_nodes(cbn,c_bed,i,j,xn,yn,im1,ip1,jm1,jp1)
+                    call aa_to_nodes(cbn,c_bed,i,j,xn,yn,im1m,ip1m,jm1m,jp1m)
                     !cbn(1:4) = c_bed(i,j) 
 
-                    ! Limit velocity contributions to points with ice 
-                    vim1 = im1
-                    if (f_ice(im1,j) .lt. 1.0) vim1 = i  
-                    vip1 = ip1
-                    if (f_ice(ip1,j) .lt. 1.0) vip1 = i  
-                    vjm1 = jm1 
-                    if (f_ice(i,jm1) .lt. 1.0) vjm1 = j 
-                    vjp1 = jp1 
-                    if (f_ice(i,jp1) .lt. 1.0) vjp1 = j
-
-                    call acx_to_nodes(uxn,ux_b,i,j,xn,yn,vim1,vip1,vjm1,vjp1)
-                    call acy_to_nodes(uyn,uy_b,i,j,xn,yn,vim1,vip1,vjm1,vjp1)
+                    call acx_to_nodes(uxn,ux_b,i,j,xn,yn,im1m,ip1m,jm1m,jp1m)
+                    call acy_to_nodes(uyn,uy_b,i,j,xn,yn,im1m,ip1m,jm1m,jp1m)
                 
                 end if 
                 
@@ -1019,7 +1018,7 @@ contains
 
                 ! Calculate basal friction
                 betan     = cbn * (uxyn / (uxyn+u_0))**q * (1.0_wp / uxyn)
-                beta(i,j) = sum(wtn*betan)/wt1
+                beta(i,j) = sum(wtn*betan)/wt2D
 
             else
                 ! Assign minimum velocity value, ignore staggering for simplicity 

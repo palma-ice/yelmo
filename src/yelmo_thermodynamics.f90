@@ -77,30 +77,15 @@ contains
 
 select case("nodes")
 
-    case("aa")
-        ! Calculate the basal frictional heating (from aa-nodes)
-        call calc_basal_heating_fromaa(thrm%now%Q_b,dyn%now%ux_b,dyn%now%uy_b,dyn%now%taub_acx,dyn%now%taub_acy, &
-                                            beta1=thrm%par%dt_beta(1),beta2=thrm%par%dt_beta(2))
-
-    case("ab")
-        ! Calculate the basal frictional heating (from ab-nodes)
-        call calc_basal_heating_fromab(thrm%now%Q_b,dyn%now%ux_b,dyn%now%uy_b,dyn%now%taub_acx,dyn%now%taub_acy, &
-                                            tpo%now%f_ice,beta1=thrm%par%dt_beta(1),beta2=thrm%par%dt_beta(2))
-
     case("nodes")
         ! Calculate the basal frictional heating (from quadrature-nodes)
         call calc_basal_heating_nodes(thrm%now%Q_b,dyn%now%ux_b,dyn%now%uy_b,dyn%now%taub_acx,dyn%now%taub_acy, &
                         tpo%now%f_ice,beta1=thrm%par%dt_beta(1),beta2=thrm%par%dt_beta(2),boundaries=thrm%par%boundaries)
 
-    case("ac")
-        ! ajr: old interface with scaling optional via f_pmp
-        call calc_basal_heating_fromac(thrm%now%Q_b,dyn%now%ux_b,dyn%now%uy_b,dyn%now%taub_acx,dyn%now%taub_acy, &
-                        tpo%now%H_ice,thrm%now%f_pmp,beta1=thrm%par%dt_beta(1),beta2=thrm%par%dt_beta(2))
-
-    case("interp")
-
-        call calc_basal_heating_interp(thrm%now%Q_b,dyn%now%ux_b,dyn%now%uy_b,dyn%now%taub_acx,dyn%now%taub_acy, &
-                                            tpo%now%H_ice,beta1=thrm%par%dt_beta(1),beta2=thrm%par%dt_beta(2))
+    case("aa")
+        ! Calculate the basal frictional heating (from aa-nodes)
+        call calc_basal_heating_simplestagger(thrm%now%Q_b,dyn%now%ux_b,dyn%now%uy_b,dyn%now%taub_acx,dyn%now%taub_acy, &
+                                            beta1=thrm%par%dt_beta(1),beta2=thrm%par%dt_beta(2))
 
 end select
         

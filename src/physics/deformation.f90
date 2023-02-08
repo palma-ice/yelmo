@@ -34,7 +34,6 @@ module deformation
     public :: calc_jacobian_vel_3D
     public :: calc_strain_rate_tensor_jac
     public :: calc_strain_rate_tensor_jac_quad3D
-
     public :: calc_strain_rate_tensor_2D
     public :: calc_strain_rate_horizontal_2D
     public :: calc_stress_tensor 
@@ -534,6 +533,7 @@ contains
         ! Local variables 
         integer  :: i, j, k
         integer  :: im1, ip1, jm1, jp1 
+        integer  :: im2, ip2, jm2, jp2
         integer  :: nx, ny, nz_aa, nz_ac
         real(wp) :: H_now, H_now_acx, H_now_acy 
         real(wp) :: dzbdx_acy, dzbdy_acx, dzsdx_acy, dzsdy_acx
@@ -774,7 +774,107 @@ end if
                     jvel%dyx(i,j,k) = (uy(ip1,j,k)-uy(im1,j,k))/(2.0*dx)
                     jvel%dyy(i,j,k) = (uy(i,jp1,k)-uy(i,jm1,k))/(2.0*dy)
 
+if (.TRUE.) then
                     ! Treat special cases of ice-margin points (take upstream/downstream derivatives instead)
+                    ! Second-order, one-sided derivatives
+
+                    ! jvel%dxx
+                    if (f_ice(i,j) .eq. 1.0 .and. f_ice(ip1,j) .lt. 1.0) then
+                        if (f_ice(im1,j) .eq. 1.0 .and. im1-1 .gt. 0) then
+                            im2 = im1-1  
+                            jvel%dxx(i,j,k) = (1.0*ux(im2,j,k)-4.0*ux(im1,j,k)+3.0*ux(i,j,k))/(2.0*dx)
+                        else 
+                            jvel%dxx(i,j,k) = (ux(i,j,k)-ux(im1,j,k))/dx
+                        end if
+                    else if (f_ice(i,j) .lt. 1.0 .and. f_ice(ip1,j) .eq. 1.0) then 
+                        if (ip1 .lt. nx) then
+                            ip2 = ip1+1
+                            if (f_ice(ip2,j) .eq. 1.0) then
+                                jvel%dxx(i,j,k) = -(1.0*ux(ip2,j,k)-4.0*ux(ip1,j,k)+3.0*ux(i,j,k))/(2.0*dx)
+                            else
+                                jvel%dxx(i,j,k) = (ux(ip1,j,k)-ux(i,j,k))/dx
+                            end if
+                        else
+                            jvel%dxx(i,j,k) = (ux(ip1,j,k)-ux(i,j,k))/dx
+                        end if
+                    end if 
+
+                    ! jvel%dxy
+                    if (f_ice(i,j) .eq. 1.0 .and. f_ice(i,jp1) .lt. 1.0 .and. f_ice(i,jm1) .lt. 1.0) then 
+                        jvel%dxy(i,j,k) = 0.0
+                    else if (f_ice(i,j) .eq. 1.0 .and. f_ice(i,jp1) .lt. 1.0 .and. f_ice(i,jm1) .eq. 1.0) then
+                        if (jm1 .gt. 1) then 
+                            jm2 = jm1-1
+                            if (f_ice(i,jm2) .eq. 1.0) then 
+                                jvel%dxy(i,j,k) = (1.0*ux(i,jm2,k)-4.0*ux(i,jm1,k)+3.0*ux(i,j,k))/(2.0*dy)
+                            else 
+                                jvel%dxy(i,j,k) = (ux(i,j,k)-ux(i,jm1,k))/dy
+                            end if
+                        else 
+                            jvel%dxy(i,j,k) = (ux(i,j,k)-ux(i,jm1,k))/dy
+                        end if
+                    else if (f_ice(i,j) .eq. 1.0 .and. f_ice(i,jp1) .eq. 1.0 .and. f_ice(i,jm1) .lt. 1.0) then 
+                        if (jp1 .lt. ny) then 
+                            jp2 = jp1+1
+                            if (f_ice(i,jp2) .eq. 1.0) then 
+                                jvel%dxy(i,j,k) = -(1.0*ux(i,jp2,k)-4.0*ux(i,jp1,k)+3.0*ux(i,j,k))/(2.0*dy)
+                            else
+                                jvel%dxy(i,j,k) = (ux(i,jp1,k)-ux(i,j,k))/dy
+                            end if
+                        else
+                            jvel%dxy(i,j,k) = (ux(i,jp1,k)-ux(i,j,k))/dy
+                        end if
+                    end if 
+
+                    ! jvel%dyy
+                    if (f_ice(i,j) .eq. 1.0 .and. f_ice(i,jp1) .lt. 1.0) then
+                        if (f_ice(i,jm1) .eq. 1.0 .and. jm1-1 .gt. 0) then 
+                            jm2 = jm1-1  
+                            jvel%dyy(i,j,k) = (1.0*uy(i,jm2,k)-4.0*uy(i,jm1,k)+3.0*uy(i,j,k))/(2.0*dy)
+                        else
+                            jvel%dyy(i,j,k) = (uy(i,j,k)-uy(i,jm1,k))/dy
+                        end if
+                    else if (f_ice(i,j) .lt. 1.0 .and. f_ice(i,jp1) .eq. 1.0) then
+                        if (jp1 .lt. ny) then
+                            jp2 = jp1+1
+                            if (f_ice(i,jp2) .eq. 1.0) then
+                                jvel%dyy(i,j,k) = -(1.0*uy(i,jp2,k)-4.0*uy(i,jp1,k)+3.0*uy(i,j,k))/(2.0*dy)
+                            else
+                                jvel%dyy(i,j,k) = (uy(i,jp1,k)-uy(i,j,k))/dy
+                            end if 
+                        end if
+                    end if 
+
+                    ! jvel%dyx
+                    if (f_ice(i,j) .eq. 1.0 .and. f_ice(ip1,j) .lt. 1.0 .and. f_ice(im1,j) .lt. 1.0) then 
+                        jvel%dyx(i,j,k) = 0.0
+                    else if (f_ice(i,j) .eq. 1.0 .and. f_ice(ip1,j) .lt. 1.0 .and. f_ice(im1,j) .eq. 1.0) then 
+                        if (im1 .gt. 1) then 
+                            im2 = im1-1
+                            if (f_ice(im2,j) .eq. 1.0) then 
+                                jvel%dyx(i,j,k) = (1.0*uy(im2,j,k)-4.0*uy(im1,j,k)+3.0*uy(i,j,k))/(2.0*dx)
+                            else 
+                                jvel%dyx(i,j,k) = (uy(i,j,k)-uy(im1,j,k))/dx
+                            end if
+                        else 
+                            jvel%dyx(i,j,k) = (uy(i,j,k)-uy(im1,j,k))/dx
+                        end if
+                    else if (f_ice(i,j) .eq. 1.0 .and. f_ice(ip1,j) .eq. 1.0 .and. f_ice(im1,j) .lt. 1.0) then
+                        if (ip1 .lt. nx) then 
+                            ip2 = ip1+1
+                            if (f_ice(ip2,j) .eq. 1.0) then 
+                                jvel%dyx(i,j,k) = -(1.0*uy(ip2,j,k)-4.0*uy(ip1,j,k)+3.0*uy(i,j,k))/(2.0*dx)
+                            else
+                                jvel%dyx(i,j,k) = (uy(ip1,j,k)-uy(i,j,k))/dx
+                            end if
+                        else
+                            jvel%dyx(i,j,k) = (uy(ip1,j,k)-uy(i,j,k))/dx
+                        end if 
+                    end if 
+
+else  
+                    ! Treat special cases of ice-margin points (take upstream/downstream derivatives instead)
+                    ! First-order, one-sided derivatives 
 
                     ! jvel%dxx
                     if (f_ice(i,j) .eq. 1.0 .and. f_ice(ip1,j) .lt. 1.0) then 
@@ -792,6 +892,13 @@ end if
                         jvel%dxy(i,j,k) = (ux(i,jp1,k)-ux(i,j,k))/dy
                     end if 
 
+                    ! jvel%dyy
+                    if (f_ice(i,j) .eq. 1.0 .and. f_ice(i,jp1) .lt. 1.0) then 
+                        jvel%dyy(i,j,k) = (uy(i,j,k)-uy(i,jm1,k))/dy
+                    else if (f_ice(i,j) .lt. 1.0 .and. f_ice(i,jp1) .eq. 1.0) then 
+                        jvel%dyy(i,j,k) = (uy(i,jp1,k)-uy(i,j,k))/dy
+                    end if 
+
                     ! jvel%dyx
                     if (f_ice(i,j) .eq. 1.0 .and. f_ice(ip1,j) .lt. 1.0 .and. f_ice(im1,j) .lt. 1.0) then 
                         jvel%dyx(i,j,k) = 0.0
@@ -799,14 +906,9 @@ end if
                         jvel%dyx(i,j,k) = (uy(i,j,k)-uy(im1,j,k))/dx
                     else if (f_ice(i,j) .eq. 1.0 .and. f_ice(ip1,j) .eq. 1.0 .and. f_ice(im1,j) .lt. 1.0) then 
                         jvel%dyx(i,j,k) = (uy(ip1,j,k)-uy(i,j,k))/dx
-                    end if 
-
-                    ! jvel%dyy
-                    if (f_ice(i,j) .eq. 1.0 .and. f_ice(i,jp1) .lt. 1.0) then 
-                        jvel%dyy(i,j,k) = (uy(i,j,k)-uy(i,jm1,k))/dy
-                    else if (f_ice(i,j) .lt. 1.0 .and. f_ice(i,jp1) .eq. 1.0) then 
-                        jvel%dyy(i,j,k) = (uy(i,jp1,k)-uy(i,j,k))/dy
-                    end if 
+                    end if
+                    
+end if 
 
                     ! === Calculate and apply the sigma-transformation correction terms ===
 
@@ -857,8 +959,68 @@ end if
                     ! Second-order, centered derivatives
                     jvel%dzx(i,j,k) = (uz(ip1,j,k)-uz(im1,j,k))/(2.0*dx)
                     jvel%dzy(i,j,k) = (uz(i,jp1,k)-uz(i,jm1,k))/(2.0*dy)
-                    
+
+if (.TRUE.) then
                     ! Treat special cases of ice-margin points (take upstream/downstream derivatives instead)
+                    ! Second-order, one-sided derivatives
+
+                    ! jvel%dzx
+                    if (f_ice(ip1,j) .lt. 1.0 .and. f_ice(im1,j) .lt. 1.0) then 
+                        jvel%dzx(i,j,k) = 0.0
+                    else if (f_ice(ip1,j) .lt. 1.0 .and. f_ice(im1,j) .eq. 1.0) then 
+                        if (im1 .gt. 1) then 
+                            im2 = im1-1
+                            if (f_ice(im2,j) .eq. 1.0) then 
+                                jvel%dzx(i,j,k) = (1.0*uz(im2,j,k)-4.0*uz(im1,j,k)+3.0*uz(i,j,k))/(2.0*dx)
+                            else 
+                                jvel%dzx(i,j,k) = (uz(i,j,k)-uz(im1,j,k))/dx
+                            end if
+                        else 
+                            jvel%dzx(i,j,k) = (uz(i,j,k)-uz(im1,j,k))/dx
+                        end if
+                    else if (f_ice(ip1,j) .eq. 1.0 .and. f_ice(im1,j) .lt. 1.0) then
+                        if (ip1 .lt. nx) then 
+                            ip2 = ip1+1
+                            if (f_ice(ip2,j) .eq. 1.0) then 
+                                jvel%dzx(i,j,k) = -(1.0*uz(ip2,j,k)-4.0*uz(ip1,j,k)+3.0*uz(i,j,k))/(2.0*dx)
+                            else
+                                jvel%dzx(i,j,k) = (uz(ip1,j,k)-uz(i,j,k))/dx
+                            end if
+                        else
+                            jvel%dzx(i,j,k) = (uz(ip1,j,k)-uz(i,j,k))/dx
+                        end if 
+                    end if 
+
+                    ! jvel%dzy
+                    if (f_ice(i,jp1) .lt. 1.0 .and. f_ice(i,jm1) .lt. 1.0) then 
+                        jvel%dzy(i,j,k) = 0.0
+                    else if (f_ice(i,jp1) .lt. 1.0 .and. f_ice(i,jm1) .eq. 1.0) then
+                        if (jm1 .gt. 1) then 
+                            jm2 = jm1-1
+                            if (f_ice(i,jm2) .eq. 1.0) then 
+                                jvel%dzy(i,j,k) = (1.0*uz(i,jm2,k)-4.0*uz(i,jm1,k)+3.0*uz(i,j,k))/(2.0*dy)
+                            else 
+                                jvel%dzy(i,j,k) = (uz(i,j,k)-uz(i,jm1,k))/dy
+                            end if
+                        else 
+                            jvel%dzy(i,j,k) = (uz(i,j,k)-uz(i,jm1,k))/dy
+                        end if
+                    else if (f_ice(i,jp1) .eq. 1.0 .and. f_ice(i,jm1) .lt. 1.0) then 
+                        if (jp1 .lt. ny) then 
+                            jp2 = jp1+1
+                            if (f_ice(i,jp2) .eq. 1.0) then 
+                                jvel%dzy(i,j,k) = -(1.0*uz(i,jp2,k)-4.0*uz(i,jp1,k)+3.0*uz(i,j,k))/(2.0*dy)
+                            else
+                                jvel%dzy(i,j,k) = (uz(i,jp1,k)-uz(i,j,k))/dy
+                            end if
+                        else
+                            jvel%dzy(i,j,k) = (uz(i,jp1,k)-uz(i,j,k))/dy
+                        end if
+                    end if 
+
+else
+                    ! Treat special cases of ice-margin points (take upstream/downstream derivatives instead)
+                    ! First-order, one-sided derivatives 
 
                     ! jvel%dzx
                     if (f_ice(ip1,j) .lt. 1.0 .and. f_ice(im1,j) .lt. 1.0) then 
@@ -877,7 +1039,8 @@ end if
                     else if (f_ice(i,jp1) .eq. 1.0 .and. f_ice(i,jm1) .lt. 1.0) then 
                         jvel%dzy(i,j,k) = (uz(i,jp1,k)-uz(i,j,k))/dy
                     end if 
-                    
+end if
+
                     ! === Calculate and apply the sigma-transformation correction terms ===
 
                     ! Recalculate correction factors on aa-nodes horizontally, ac-nodes vertically
@@ -906,7 +1069,7 @@ end if
 
         ! Step X: fill in partially filled margin points with neighbor strain-rate values
         
-        ! To do....
+        ! To do....?
         
         return 
 
@@ -957,19 +1120,18 @@ end if
         real(wp) :: xn(4) 
         real(wp) :: yn(4) 
         real(wp) :: wtn(4)
-        real(wp) :: wt1 
+        real(wp) :: wt2D
         
         real(wp) :: ddn(4) 
         real(wp) :: ddan(4) 
         real(wp) :: ddbn(4) 
 
         ! Get nodes and weighting 
-        wt0 = 1.0/sqrt(3.0)
-        xn  = [wt0,-wt0,-wt0, wt0]
-        yn  = [wt0, wt0,-wt0,-wt0]
-        wtn = [1.0,1.0,1.0,1.0]
-        wt1 = sum(wtn)
-
+        wt0  = 1.0/sqrt(3.0)
+        xn   = [wt0,-wt0,-wt0, wt0]
+        yn   = [wt0, wt0,-wt0,-wt0]
+        wtn  = [1.0,1.0,1.0,1.0]
+        wt2D = 4.0   ! Surface area of square [-1:1,-1:1]=> 2x2 => 4 
 
         ! Determine sizes and allocate local variables 
         nx    = size(H_ice,1)
@@ -1001,31 +1163,31 @@ if (.TRUE.) then
     ! Use quadrature points
                     ! Get dxx on aa-nodes 
                     call acx_to_nodes(ddn,jvel%dxx(:,:,k),i,j,xn,yn,im1,ip1,jm1,jp1)
-                    strn%dxx(i,j,k) = sum(ddn*wtn)/wt1
+                    strn%dxx(i,j,k) = sum(ddn*wtn)/wt2D
 
                     ! Get dxy and dyx on aa-nodes 
                     call acx_to_nodes(ddan,jvel%dxy(:,:,k),i,j,xn,yn,im1,ip1,jm1,jp1)
                     call acy_to_nodes(ddbn,jvel%dyx(:,:,k),i,j,xn,yn,im1,ip1,jm1,jp1)
                     ddn = 0.5*(ddan+ddbn)
-                    strn%dxy(i,j,k) = sum(ddn*wtn)/wt1
+                    strn%dxy(i,j,k) = sum(ddn*wtn)/wt2D
 
                     ! Get dxz and dzx on aa-nodes 
                     ! (but also get dzx on aa-nodes vertically)
                     call acx_to_nodes(ddan,jvel%dxz(:,:,k),i,j,xn,yn,im1,ip1,jm1,jp1)
                     ddbn = 0.5*(jvel%dzx(i,j,k)+jvel%dzx(i,j,k+1))  ! nz_ac has one more index than nz_aa, so this is ok!
                     ddn  = 0.5*(ddan+ddbn)
-                    strn%dxz(i,j,k) = sum(ddn*wtn)/wt1
+                    strn%dxz(i,j,k) = sum(ddn*wtn)/wt2D
 
                     ! Get dyz and dzy on aa-nodes 
                     ! (but also get dzy on aa-nodes vertically)
                     call acy_to_nodes(ddan,jvel%dyz(:,:,k),i,j,xn,yn,im1,ip1,jm1,jp1)
                     ddbn = 0.5*(jvel%dzy(i,j,k)+jvel%dzy(i,j,k+1))  ! nz_ac has one more index than nz_aa, so this is ok!
                     ddn  = 0.5*(ddan+ddbn)
-                    strn%dyz(i,j,k) = sum(ddn*wtn)/wt1
+                    strn%dyz(i,j,k) = sum(ddn*wtn)/wt2D
 
                     ! Get dyy on aa-nodes 
                     call acy_to_nodes(ddn,jvel%dyy(:,:,k),i,j,xn,yn,im1,ip1,jm1,jp1)
-                    strn%dyy(i,j,k) = sum(ddn*wtn)/wt1
+                    strn%dyy(i,j,k) = sum(ddn*wtn)/wt2D
 else
     ! Unstagger directly to aa-nodes
 
@@ -1036,21 +1198,21 @@ else
                     ddan = 0.5*(jvel%dxy(im1,j,k)+jvel%dxy(i,j,k))
                     ddbn = 0.5*(jvel%dyx(i,jm1,k)+jvel%dyx(i,j,k))
                     ddn = 0.5*(ddan+ddbn)
-                    strn%dxy(i,j,k) = sum(ddn*wtn)/wt1
+                    strn%dxy(i,j,k) = sum(ddn*wtn)/sum(wtn)
 
                     ! Get dxz and dzx on aa-nodes 
                     ! (but also get dzx on aa-nodes vertically)
                     ddan = 0.5*(jvel%dxz(im1,j,k)+jvel%dxz(i,j,k))
                     ddbn = 0.5*(jvel%dzx(i,j,k)+jvel%dzx(i,j,k+1))  ! nz_ac has one more index than nz_aa, so this is ok!
                     ddn  = 0.5*(ddan+ddbn)
-                    strn%dxz(i,j,k) = sum(ddn*wtn)/wt1
+                    strn%dxz(i,j,k) = sum(ddn*wtn)/sum(wtn)
 
                     ! Get dyz and dzy on aa-nodes 
                     ! (but also get dzy on aa-nodes vertically)
                     ddan = 0.5*(jvel%dyz(i,jm1,k)+jvel%dyz(i,j,k))
                     ddbn = 0.5*(jvel%dzy(i,j,k)+jvel%dzy(i,j,k+1))  ! nz_ac has one more index than nz_aa, so this is ok!
                     ddn  = 0.5*(ddan+ddbn)
-                    strn%dyz(i,j,k) = sum(ddn*wtn)/wt1
+                    strn%dyz(i,j,k) = sum(ddn*wtn)/sum(wtn)
 
                     ! Get dyy on aa-nodes 
                     strn%dyy(i,j,k) = 0.5*(jvel%dyy(i,jm1,k)+jvel%dyy(i,j,k))
@@ -1173,21 +1335,20 @@ end if
         real(wp) :: yn(4) 
         real(wp) :: zn
         real(wp) :: wtn(8)
-        real(wp) :: wt1 
+        real(wp) :: wt3D
         
         real(wp) :: ddn(8) 
         real(wp) :: ddan(8) 
         real(wp) :: ddbn(8) 
 
         ! Get nodes and weighting 
-        wt0 = 1.0/sqrt(3.0)
-        xn  = [wt0,-wt0,-wt0, wt0]
-        yn  = [wt0, wt0,-wt0,-wt0]
-        zn  = wt0
-        wtn = [1.0,1.0,1.0,1.0,1.0,1.0,1.0,1.0]
-        wt1 = sum(wtn)
-
-
+        wt0  = 1.0/sqrt(3.0)
+        xn   = [wt0,-wt0,-wt0, wt0]
+        yn   = [wt0, wt0,-wt0,-wt0]
+        zn   = wt0
+        wtn  = [1.0,1.0,1.0,1.0,1.0,1.0,1.0,1.0]
+        wt3D = 8.0   ! Volume of square [-1:1,-1:1, -1:1]=> 2x2x2 => 8
+        
         ! Determine sizes and allocate local variables 
         nx    = size(H_ice,1)
         ny    = size(H_ice,2)
@@ -1218,13 +1379,13 @@ end if
 
                     ! Get dxx on aa-nodes 
                     call acx_to_nodes_3D(ddn,jvel%dxx,i,j,k,xn,yn,zn,im1,ip1,jm1,jp1)
-                    strn%dxx(i,j,k) = sum(ddn*wtn)/wt1
+                    strn%dxx(i,j,k) = sum(ddn*wtn)/wt3D
 
                     ! Get dxy and dyx on aa-nodes 
                     call acx_to_nodes_3D(ddan,jvel%dxy,i,j,k,xn,yn,zn,im1,ip1,jm1,jp1)
                     call acy_to_nodes_3D(ddbn,jvel%dyx,i,j,k,xn,yn,zn,im1,ip1,jm1,jp1)
                     ddn = 0.5*(ddan+ddbn)
-                    strn%dxy(i,j,k) = sum(ddn*wtn)/wt1
+                    strn%dxy(i,j,k) = sum(ddn*wtn)/wt3D
 
                     ! Get dxz and dzx on aa-nodes 
                     ! (but also get dzx on aa-nodes vertically)
@@ -1232,7 +1393,7 @@ end if
                     call acz_to_nodes_3D(ddbn,jvel%dzx,i,j,k,xn,yn,zn,im1,ip1,jm1,jp1)
                     !ddbn = 0.5*(jvel%dzx(i,j,k)+jvel%dzx(i,j,k+1))  ! nz_ac has one more index than nz_aa, so this is ok!
                     ddn  = 0.5*(ddan+ddbn)
-                    strn%dxz(i,j,k) = sum(ddn*wtn)/wt1
+                    strn%dxz(i,j,k) = sum(ddn*wtn)/wt3D
 
                     ! Get dyz and dzy on aa-nodes 
                     ! (but also get dzy on aa-nodes vertically)
@@ -1240,11 +1401,11 @@ end if
                     call acz_to_nodes_3D(ddbn,jvel%dzy,i,j,k,xn,yn,zn,im1,ip1,jm1,jp1)
                     !ddbn = 0.5*(jvel%dzy(i,j,k)+jvel%dzy(i,j,k+1))  ! nz_ac has one more index than nz_aa, so this is ok!
                     ddn  = 0.5*(ddan+ddbn)
-                    strn%dyz(i,j,k) = sum(ddn*wtn)/wt1
+                    strn%dyz(i,j,k) = sum(ddn*wtn)/wt3D
 
                     ! Get dyy on aa-nodes 
                     call acy_to_nodes_3D(ddn,jvel%dyy,i,j,k,xn,yn,zn,im1,ip1,jm1,jp1)
-                    strn%dyy(i,j,k) = sum(ddn*wtn)/wt1
+                    strn%dyy(i,j,k) = sum(ddn*wtn)/wt3D
 
                     ! TEST - set shear strain terms to zero
                     !strn%dxz(i,j,k) =  0.0 
@@ -1455,7 +1616,7 @@ end if
         ! Local variables 
         integer :: i, j, nx, ny 
         integer :: im1, ip1, jm1, jp1 
-
+        integer :: im2, ip2, jm2, jp2 
 
         nx = size(dudx,1)
         ny = size(dudx,2) 
@@ -1479,7 +1640,107 @@ end if
             dvdx(i,j) = (uy(ip1,j)-uy(im1,j))/(2.0*dx)
             dvdy(i,j) = (uy(i,jp1)-uy(i,jm1))/(2.0*dy)
 
+if (.TRUE.) then
             ! Treat special cases of ice-margin points (take upstream/downstream derivatives instead)
+            ! Second-order, one-sided derivatives
+
+            ! dudx
+            if (f_ice(i,j) .eq. 1.0 .and. f_ice(ip1,j) .lt. 1.0) then
+                if (f_ice(im1,j) .eq. 1.0 .and. im1 .gt. 1) then
+                    im2 = im1-1  
+                    dudx(i,j) = (1.0*ux(im2,j)-4.0*ux(im1,j)+3.0*ux(i,j))/(2.0*dx)
+                else 
+                    dudx(i,j) = (ux(i,j)-ux(im1,j))/dx
+                end if
+            else if (f_ice(i,j) .lt. 1.0 .and. f_ice(ip1,j) .eq. 1.0) then 
+                if (ip1 .lt. nx) then
+                    ip2 = ip1+1
+                    if (f_ice(ip2,j) .eq. 1.0) then
+                        dudx(i,j) = -(1.0*ux(ip2,j)-4.0*ux(ip1,j)+3.0*ux(i,j))/(2.0*dx)
+                    else
+                        dudx(i,j) = (ux(ip1,j)-ux(i,j))/dx
+                    end if
+                else
+                    dudx(i,j) = (ux(ip1,j)-ux(i,j))/dx
+                end if
+            end if 
+
+            ! dudy
+            if (f_ice(i,j) .eq. 1.0 .and. f_ice(i,jp1) .lt. 1.0 .and. f_ice(i,jm1) .lt. 1.0) then 
+                dudy(i,j) = 0.0
+            else if (f_ice(i,j) .eq. 1.0 .and. f_ice(i,jp1) .lt. 1.0 .and. f_ice(i,jm1) .eq. 1.0) then
+                if (jm1 .gt. 1) then 
+                    jm2 = jm1-1
+                    if (f_ice(i,jm2) .eq. 1.0) then 
+                        dudy(i,j) = (1.0*ux(i,jm2)-4.0*ux(i,jm1)+3.0*ux(i,j))/(2.0*dy)
+                    else 
+                        dudy(i,j) = (ux(i,j)-ux(i,jm1))/dy
+                    end if
+                else 
+                    dudy(i,j) = (ux(i,j)-ux(i,jm1))/dy
+                end if
+            else if (f_ice(i,j) .eq. 1.0 .and. f_ice(i,jp1) .eq. 1.0 .and. f_ice(i,jm1) .lt. 1.0) then 
+                if (jp1 .lt. ny) then 
+                    jp2 = jp1+1
+                    if (f_ice(i,jp2) .eq. 1.0) then 
+                        dudy(i,j) = -(1.0*ux(i,jp2)-4.0*ux(i,jp1)+3.0*ux(i,j))/(2.0*dy)
+                    else
+                        dudy(i,j) = (ux(i,jp1)-ux(i,j))/dy
+                    end if
+                else
+                    dudy(i,j) = (ux(i,jp1)-ux(i,j))/dy
+                end if
+            end if 
+
+            ! dvdy
+            if (f_ice(i,j) .eq. 1.0 .and. f_ice(i,jp1) .lt. 1.0) then
+                if (f_ice(i,jm1) .eq. 1.0 .and. jm1 .gt. 1) then 
+                    jm2 = jm1-1  
+                    dvdy(i,j) = (1.0*uy(i,jm2)-4.0*uy(i,jm1)+3.0*uy(i,j))/(2.0*dy)
+                else
+                    dvdy(i,j) = (uy(i,j)-uy(i,jm1))/dy
+                end if
+            else if (f_ice(i,j) .lt. 1.0 .and. f_ice(i,jp1) .eq. 1.0) then
+                if (jp1 .lt. ny) then
+                    jp2 = jp1+1
+                    if (f_ice(i,jp2) .eq. 1.0) then
+                        dvdy(i,j) = -(1.0*uy(i,jp2)-4.0*uy(i,jp1)+3.0*uy(i,j))/(2.0*dy)
+                    else
+                        dvdy(i,j) = (uy(i,jp1)-uy(i,j))/dy
+                    end if 
+                end if
+            end if 
+
+            ! dvdx
+            if (f_ice(i,j) .eq. 1.0 .and. f_ice(ip1,j) .lt. 1.0 .and. f_ice(im1,j) .lt. 1.0) then 
+                dvdx(i,j) = 0.0
+            else if (f_ice(i,j) .eq. 1.0 .and. f_ice(ip1,j) .lt. 1.0 .and. f_ice(im1,j) .eq. 1.0) then 
+                if (im1 .gt. 1) then 
+                    im2 = im1-1
+                    if (f_ice(im2,j) .eq. 1.0) then 
+                        dvdx(i,j) = (1.0*uy(im2,j)-4.0*uy(im1,j)+3.0*uy(i,j))/(2.0*dx)
+                    else 
+                        dvdx(i,j) = (uy(i,j)-uy(im1,j))/dx
+                    end if
+                else 
+                    dvdx(i,j) = (uy(i,j)-uy(im1,j))/dx
+                end if
+            else if (f_ice(i,j) .eq. 1.0 .and. f_ice(ip1,j) .eq. 1.0 .and. f_ice(im1,j) .lt. 1.0) then
+                if (ip1 .lt. nx) then 
+                    ip2 = ip1+1
+                    if (f_ice(ip2,j) .eq. 1.0) then 
+                        dvdx(i,j) = -(1.0*uy(ip2,j)-4.0*uy(ip1,j)+3.0*uy(i,j))/(2.0*dx)
+                    else
+                        dvdx(i,j) = (uy(ip1,j)-uy(i,j))/dx
+                    end if
+                else
+                    dvdx(i,j) = (uy(ip1,j)-uy(i,j))/dx
+                end if 
+            end if 
+
+else
+            ! Treat special cases of ice-margin points (take upstream/downstream derivatives instead)
+            ! First-order, one-sided derivatives 
 
             ! dudx
             if (f_ice(i,j) .eq. 1.0 .and. f_ice(ip1,j) .lt. 1.0) then 
@@ -1512,6 +1773,7 @@ end if
             else if (f_ice(i,j) .eq. 1.0 .and. f_ice(ip1,j) .eq. 1.0 .and. f_ice(im1,j) .lt. 1.0) then 
                 dvdx(i,j) = (uy(ip1,j)-uy(i,j))/dx
             end if 
+end if 
 
         end do
         end do

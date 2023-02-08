@@ -706,18 +706,15 @@ end if
 
 
         ! New routines 
+        call calc_gradient_acx(tpo%now%dzsdx,tpo%now%z_srf,tpo%now%f_ice,tpo%par%dx,tpo%par%grad_lim,tpo%par%margin2nd,zero_outside=.FALSE.,boundaries=tpo%par%boundaries)
+        call calc_gradient_acy(tpo%now%dzsdy,tpo%now%z_srf,tpo%now%f_ice,tpo%par%dy,tpo%par%grad_lim,tpo%par%margin2nd,zero_outside=.FALSE.,boundaries=tpo%par%boundaries)
         
-        call ddx_a_to_cx_2D(tpo%now%dzsdx,tpo%now%z_srf,tpo%par%dx)
-        call ddy_a_to_cy_2D(tpo%now%dzsdy,tpo%now%z_srf,tpo%par%dy)
+        call calc_gradient_acx(tpo%now%dHidx,tpo%now%H_ice,tpo%now%f_ice,tpo%par%dx,tpo%par%grad_lim,tpo%par%margin2nd,zero_outside=.TRUE.,boundaries=tpo%par%boundaries)
+        call calc_gradient_acy(tpo%now%dHidy,tpo%now%H_ice,tpo%now%f_ice,tpo%par%dy,tpo%par%grad_lim,tpo%par%margin2nd,zero_outside=.TRUE.,boundaries=tpo%par%boundaries)
         
-        call ddx_a_to_cx_2D(tpo%now%dHidx,tpo%now%H_ice,tpo%par%dx)
-        call ddy_a_to_cy_2D(tpo%now%dHidy,tpo%now%H_ice,tpo%par%dy)
+        call calc_gradient_acx(tpo%now%dzbdx,tpo%now%z_base,tpo%now%f_ice,tpo%par%dx,tpo%par%grad_lim,tpo%par%margin2nd,zero_outside=.FALSE.,boundaries=tpo%par%boundaries)
+        call calc_gradient_acy(tpo%now%dzbdy,tpo%now%z_base,tpo%now%f_ice,tpo%par%dy,tpo%par%grad_lim,tpo%par%margin2nd,zero_outside=.FALSE.,boundaries=tpo%par%boundaries)
         
-        call ddx_a_to_cx_2D(tpo%now%dzbdx,tpo%now%z_base,tpo%par%dx)
-        call ddy_a_to_cy_2D(tpo%now%dzbdy,tpo%now%z_base,tpo%par%dy)
-        
-        call map_a_to_b_2D(tpo%now%H_ice_ab,tpo%now%H_ice)
-
         ! ajr: experimental, doesn't seem to work properly yet! ===>
         ! Modify surface slope gradient at the grounding line if desired 
 !         call calc_gradient_ac_gl(tpo%now%dzsdx,tpo%now%dzsdy,tpo%now%z_srf,tpo%now%H_ice, &
@@ -997,10 +994,6 @@ end if
         allocate(now%H_eff(nx,ny))
         allocate(now%H_grnd(nx,ny))
 
-
-        allocate(now%H_ice_ab(nx,ny))
-
-
         ! Masks 
         allocate(now%f_grnd(nx,ny))
         allocate(now%f_grnd_acx(nx,ny))
@@ -1059,8 +1052,6 @@ end if
         now%dzbdy       = 0.0 
         now%H_eff       = 0.0 
         now%H_grnd      = 0.0  
-
-        now%H_ice_ab    = 0.0 
 
         now%f_grnd      = 0.0  
         now%f_grnd_acx  = 0.0  
@@ -1130,8 +1121,6 @@ end if
         if (allocated(now%H_eff))       deallocate(now%H_eff)
         if (allocated(now%H_grnd))      deallocate(now%H_grnd)
 
-        if (allocated(now%H_ice_ab))    deallocate(now%H_ice_ab)
-        
         if (allocated(now%f_grnd))      deallocate(now%f_grnd)
         if (allocated(now%f_grnd_acx))  deallocate(now%f_grnd_acx)
         if (allocated(now%f_grnd_acy))  deallocate(now%f_grnd_acy)

@@ -69,7 +69,8 @@ contains
 
         ! Local variables 
         integer :: i, j, k, nx, ny, nz_aa, nz_ac
-        integer :: im1, ip1, jm1, jp1   
+        integer :: im1, ip1, jm1, jp1  
+        integer  :: im1m, ip1m, jm1m, jp1m 
         integer :: kup, kdn, kmid
         real(wp) :: f_bmb
         real(wp) :: H_now
@@ -112,13 +113,13 @@ contains
         real(wp) :: xn(4) 
         real(wp) :: yn(4) 
         real(wp) :: wtn(4)
-        real(wp) :: wt1 
+        real(wp) :: wt2D 
 
         real(wp) :: dudxn8(8) 
         real(wp) :: dvdyn8(8) 
         real(wp) :: zn 
         real(wp) :: wtn8(8)
-        real(wp) :: wt18 
+        real(wp) :: wt3D 
 
         real(wp) :: dzsdt_now
         real(wp) :: dhdt_now
@@ -132,16 +133,16 @@ contains
         nz_ac = size(zeta_ac,1) 
         
         ! Get nodes and weighting 
-        wt0 = 1.0/sqrt(3.0)
-        xn  = [wt0,-wt0,-wt0, wt0]
-        yn  = [wt0, wt0,-wt0,-wt0]
-        wtn = [1.0,1.0,1.0,1.0]
-        wt1 = sum(wtn)
+        wt0  = 1.0/sqrt(3.0)
+        xn   = [wt0,-wt0,-wt0, wt0]
+        yn   = [wt0, wt0,-wt0,-wt0]
+        wtn  = [1.0,1.0,1.0,1.0]
+        wt2D = 4.0   ! Surface area of square [-1:1,-1:1]=> 2x2 => 4 
 
         ! Get nodes and weighting 
         zn   = wt0
         wtn8 = [1.0,1.0,1.0,1.0,1.0,1.0,1.0,1.0]
-        wt18 = sum(wtn8)
+        wt3D = 8.0   ! Volume of square [-1:1,-1:1, -1:1]=> 2x2x2 => 8
 
         ! Initialize vertical velocity to zero 
         uz = 0.0 
@@ -162,6 +163,16 @@ contains
             ! Get neighbor indices
             call get_neighbor_indices(im1,ip1,jm1,jp1,i,j,nx,ny,boundaries)
 
+            ! Get neighbor indices limited to ice-covered points
+            im1m = im1
+            if (f_ice(im1,j) .lt. 1.0) im1m = i  
+            ip1m = ip1
+            if (f_ice(ip1,j) .lt. 1.0) ip1m = i  
+            jm1m = jm1 
+            if (f_ice(i,jm1) .lt. 1.0) jm1m = j 
+            jp1m = jp1 
+            if (f_ice(i,jp1) .lt. 1.0) jp1m = j
+
             ! Diagnose rate of ice-base elevation change (needed for all points)
             dzsdt_now = dzsdt(i,j) 
             dhdt_now  = dhdt(i,j) 
@@ -173,25 +184,25 @@ contains
                 H_inv = 1.0/H_now 
 
                 ! Get the centered ice-base gradient
-                call acx_to_nodes(dzbdxn,dzbdx,i,j,xn,yn,im1,ip1,jm1,jp1)
-                dzbdx_aa = sum(dzbdxn*wtn)/wt1
+                call acx_to_nodes(dzbdxn,dzbdx,i,j,xn,yn,im1m,ip1m,jm1m,jp1m)
+                dzbdx_aa = sum(dzbdxn*wtn)/wt2D
                 
-                call acy_to_nodes(dzbdyn,dzbdy,i,j,xn,yn,im1,ip1,jm1,jp1)
-                dzbdy_aa = sum(dzbdyn*wtn)/wt1
+                call acy_to_nodes(dzbdyn,dzbdy,i,j,xn,yn,im1m,ip1m,jm1m,jp1m)
+                dzbdy_aa = sum(dzbdyn*wtn)/wt2D
                 
                 ! Get the centered surface gradient
-                call acx_to_nodes(dzsdxn,dzsdx,i,j,xn,yn,im1,ip1,jm1,jp1)
-                dzsdx_aa = sum(dzsdxn*wtn)/wt1
+                call acx_to_nodes(dzsdxn,dzsdx,i,j,xn,yn,im1m,ip1m,jm1m,jp1m)
+                dzsdx_aa = sum(dzsdxn*wtn)/wt2D
                 
-                call acy_to_nodes(dzsdyn,dzsdy,i,j,xn,yn,im1,ip1,jm1,jp1)
-                dzsdy_aa = sum(dzsdyn*wtn)/wt1
+                call acy_to_nodes(dzsdyn,dzsdy,i,j,xn,yn,im1m,ip1m,jm1m,jp1m)
+                dzsdy_aa = sum(dzsdyn*wtn)/wt2D
                 
                 ! Get the aa-node centered horizontal velocity at the base
-                call acx_to_nodes(uxn,ux(:,:,1),i,j,xn,yn,im1,ip1,jm1,jp1)
-                ux_aa = sum(uxn*wtn)/wt1
+                call acx_to_nodes(uxn,ux(:,:,1),i,j,xn,yn,im1m,ip1m,jm1m,jp1m)
+                ux_aa = sum(uxn*wtn)/wt2D
                 
-                call acy_to_nodes(uyn,uy(:,:,1),i,j,xn,yn,im1,ip1,jm1,jp1)
-                uy_aa = sum(uyn*wtn)/wt1
+                call acy_to_nodes(uyn,uy(:,:,1),i,j,xn,yn,im1m,ip1m,jm1m,jp1m)
+                uy_aa = sum(uyn*wtn)/wt2D
                 
                 ! Determine grid vertical velocity at the base due to sigma-coordinates 
                 ! Glimmer, Eq. 3.35 
@@ -229,19 +240,19 @@ contains
 
 if (.FALSE.) then
     ! 2D QUADRATURE
-                    call acx_to_nodes(dudxn,jvel%dxx(:,:,kmid),i,j,xn,yn,im1,ip1,jm1,jp1)
-                    dudx_aa = sum(dudxn*wtn)/wt1
+                    call acx_to_nodes(dudxn,jvel%dxx(:,:,kmid),i,j,xn,yn,im1m,ip1m,jm1m,jp1m)
+                    dudx_aa = sum(dudxn*wtn)/wt2D
 
-                    call acy_to_nodes(dvdyn,jvel%dyy(:,:,kmid),i,j,xn,yn,im1,ip1,jm1,jp1)
-                    dvdy_aa = sum(dvdyn*wtn)/wt1
+                    call acy_to_nodes(dvdyn,jvel%dyy(:,:,kmid),i,j,xn,yn,im1m,ip1m,jm1m,jp1m)
+                    dvdy_aa = sum(dvdyn*wtn)/wt2D
 
 else 
     ! 3D QUADRATURE
-                    call acx_to_nodes_3D(dudxn8,jvel%dxx,i,j,kmid,xn,yn,zn,im1,ip1,jm1,jp1)
-                    dudx_aa = sum(dudxn8*wtn8)/wt18
+                    call acx_to_nodes_3D(dudxn8,jvel%dxx,i,j,kmid,xn,yn,zn,im1m,ip1m,jm1m,jp1m)
+                    dudx_aa = sum(dudxn8*wtn8)/wt3D
 
-                    call acy_to_nodes_3D(dvdyn8,jvel%dyy,i,j,kmid,xn,yn,zn,im1,ip1,jm1,jp1)
-                    dvdy_aa = sum(dvdyn8*wtn8)/wt18
+                    call acy_to_nodes_3D(dvdyn8,jvel%dyy,i,j,kmid,xn,yn,zn,im1m,ip1m,jm1m,jp1m)
+                    dvdy_aa = sum(dvdyn8*wtn8)/wt3D
 
 end if 
 
@@ -277,15 +288,15 @@ end if
                         kdn = k-1 
                     end if
                     
-                    call acx_to_nodes(uxn_up,ux(:,:,kup),i,j,xn,yn,im1,ip1,jm1,jp1)
-                    call acx_to_nodes(uxn_dn,ux(:,:,kdn),i,j,xn,yn,im1,ip1,jm1,jp1)
+                    call acx_to_nodes(uxn_up,ux(:,:,kup),i,j,xn,yn,im1m,ip1m,jm1m,jp1m)
+                    call acx_to_nodes(uxn_dn,ux(:,:,kdn),i,j,xn,yn,im1m,ip1m,jm1m,jp1m)
                     uxn = 0.5_wp*(uxn_up+uxn_dn)
-                    ux_aa = sum(uxn*wtn)/wt1
+                    ux_aa = sum(uxn*wtn)/wt2D
                     
-                    call acy_to_nodes(uyn_up,uy(:,:,kup),i,j,xn,yn,im1,ip1,jm1,jp1)
-                    call acy_to_nodes(uyn_dn,uy(:,:,kdn),i,j,xn,yn,im1,ip1,jm1,jp1)
+                    call acy_to_nodes(uyn_up,uy(:,:,kup),i,j,xn,yn,im1m,ip1m,jm1m,jp1m)
+                    call acy_to_nodes(uyn_dn,uy(:,:,kdn),i,j,xn,yn,im1m,ip1m,jm1m,jp1m)
                     uyn = 0.5_wp*(uyn_up+uyn_dn)
-                    uy_aa = sum(uyn*wtn)/wt1
+                    uy_aa = sum(uyn*wtn)/wt2D
                     
                     ! Take zeta directly at vertical cell edge where uz is calculated
                     ! (this is also where ux_aa and uy_aa are calculated above)
@@ -409,7 +420,7 @@ end if
         real(wp) :: xn(4) 
         real(wp) :: yn(4) 
         real(wp) :: wtn(4)
-        real(wp) :: wt1 
+        real(wp) :: wt2D 
 
         real(wp) :: dzsdt_now
         real(wp) :: dhdt_now
@@ -434,11 +445,11 @@ end if
         allocate(dvdx(nx,ny))
         
         ! Get nodes and weighting 
-        wt0 = 1.0/sqrt(3.0)
-        xn  = [wt0,-wt0,-wt0, wt0]
-        yn  = [wt0, wt0,-wt0,-wt0]
-        wtn = [1.0,1.0,1.0,1.0]
-        wt1 = sum(wtn)
+        wt0  = 1.0/sqrt(3.0)
+        xn   = [wt0,-wt0,-wt0, wt0]
+        yn   = [wt0, wt0,-wt0,-wt0]
+        wtn  = [1.0,1.0,1.0,1.0]
+        wt2D = 4.0   ! Surface area of square [-1:1,-1:1]=> 2x2 => 4 
 
         ! Initialize vertical velocity to zero 
         uz = 0.0 
@@ -480,24 +491,24 @@ end if
 
                 ! Get the centered ice-base gradient
                 call acx_to_nodes(dzbdxn,dzbdx,i,j,xn,yn,im1,ip1,jm1,jp1)
-                dzbdx_aa = sum(dzbdxn*wtn)/wt1
+                dzbdx_aa = sum(dzbdxn*wtn)/wt2D
                 
                 call acy_to_nodes(dzbdyn,dzbdy,i,j,xn,yn,im1,ip1,jm1,jp1)
-                dzbdy_aa = sum(dzbdyn*wtn)/wt1
+                dzbdy_aa = sum(dzbdyn*wtn)/wt2D
                 
                 ! Get the centered surface gradient
                 call acx_to_nodes(dzsdxn,dzsdx,i,j,xn,yn,im1,ip1,jm1,jp1)
-                dzsdx_aa = sum(dzsdxn*wtn)/wt1
+                dzsdx_aa = sum(dzsdxn*wtn)/wt2D
                 
                 call acy_to_nodes(dzsdyn,dzsdy,i,j,xn,yn,im1,ip1,jm1,jp1)
-                dzsdy_aa = sum(dzsdyn*wtn)/wt1
+                dzsdy_aa = sum(dzsdyn*wtn)/wt2D
                 
                 ! Get the aa-node centered horizontal velocity at the base
                 call acx_to_nodes(uxn,ux(:,:,1),i,j,xn,yn,im1,ip1,jm1,jp1)
-                ux_aa = sum(uxn*wtn)/wt1
+                ux_aa = sum(uxn*wtn)/wt2D
                 
                 call acy_to_nodes(uyn,uy(:,:,1),i,j,xn,yn,im1,ip1,jm1,jp1)
-                uy_aa = sum(uyn*wtn)/wt1
+                uy_aa = sum(uyn*wtn)/wt2D
                 
                 ! Determine grid vertical velocity at the base due to sigma-coordinates 
                 ! Glimmer, Eq. 3.35 
@@ -557,19 +568,19 @@ end if
                     call acx_to_nodes(uxn_up,ux(:,:,kup),i,j,xn,yn,im1,ip1,jm1,jp1)
                     call acx_to_nodes(uxn_dn,ux(:,:,kdn),i,j,xn,yn,im1,ip1,jm1,jp1)
                     dudzn = (uxn_up - uxn_dn) / (zeta_aa(kup)-zeta_aa(kdn))
-                    dudz_aa = sum(dudzn*wtn)/wt1
+                    dudz_aa = sum(dudzn*wtn)/wt2D
 
                     call acy_to_nodes(uyn_up,uy(:,:,kup),i,j,xn,yn,im1,ip1,jm1,jp1)
                     call acy_to_nodes(uyn_dn,uy(:,:,kdn),i,j,xn,yn,im1,ip1,jm1,jp1)
                     dvdzn = (uyn_up - uyn_dn) / (zeta_aa(kup)-zeta_aa(kdn))
-                    dvdz_aa = sum(dvdzn*wtn)/wt1
+                    dvdz_aa = sum(dvdzn*wtn)/wt2D
 
                     ! Calculate sigma-corrected derivatives
                     call acx_to_nodes(dudxn,dudx(:,:,k-1),i,j,xn,yn,im1,ip1,jm1,jp1)
-                    dudx_aa = sum(dudxn*wtn)/wt1  +  c_x*dudz_aa 
+                    dudx_aa = sum(dudxn*wtn)/wt2D  +  c_x*dudz_aa 
 
                     call acy_to_nodes(dvdyn,dvdy(:,:,k-1),i,j,xn,yn,im1,ip1,jm1,jp1)
-                    dvdy_aa = sum(dvdyn*wtn)/wt1  +  c_y*dvdz_aa 
+                    dvdy_aa = sum(dvdyn*wtn)/wt2D  +  c_y*dvdz_aa 
 
                     ! Calculate vertical velocity of this layer
                     ! (Greve and Blatter, 2009, Eq. 5.95)
@@ -606,12 +617,12 @@ end if
                     call acx_to_nodes(uxn_up,ux(:,:,kup),i,j,xn,yn,im1,ip1,jm1,jp1)
                     call acx_to_nodes(uxn_dn,ux(:,:,kdn),i,j,xn,yn,im1,ip1,jm1,jp1)
                     uxn = 0.5_wp*(uxn_up+uxn_dn)
-                    ux_aa = sum(uxn*wtn)/wt1
+                    ux_aa = sum(uxn*wtn)/wt2D
                     
                     call acy_to_nodes(uyn_up,uy(:,:,kup),i,j,xn,yn,im1,ip1,jm1,jp1)
                     call acy_to_nodes(uyn_dn,uy(:,:,kdn),i,j,xn,yn,im1,ip1,jm1,jp1)
                     uyn = 0.5_wp*(uyn_up+uyn_dn)
-                    uy_aa = sum(uyn*wtn)/wt1
+                    uy_aa = sum(uyn*wtn)/wt2D
                     
                     ! Take zeta directly at vertical cell edge where uz is calculated
                     ! (this is also where ux_aa and uy_aa are calculated above)
@@ -772,10 +783,6 @@ end if
                 ! Get the centered horizontal velocity at the base
                 ux_aa = 0.5_wp* (ux(im1,j,1) + ux(i,j,1))
                 uy_aa = 0.5_wp* (uy(i,jm1,1) + uy(i,j,1))
-                
-!                 ! Get the centered ice thickness gradient 
-!                 dHdx_aa = (H_ice(ip1,j)-H_ice(im1,j))/(2.0_wp*dx)
-!                 dHdy_aa = (H_ice(i,jp1)-H_ice(i,jm1))/(2.0_wp*dy)
                 
                 ! Determine grid vertical velocity at the base due to sigma-coordinates 
                 ! Glimmer, Eq. 3.35 
@@ -1032,51 +1039,6 @@ end if
 
 
             end if
-            
-
-            ! if ( abs(taud_acx(i,j)) .eq. taud_lim ) then 
-
-            !     if ( sign(1.0_wp,taud_acx(i,j)*taud_acx(im1,j)) .lt. 0.0 .or. & 
-            !          sign(1.0_wp,taud_acx(i,j)*taud_acx(ip1,j)) .lt. 0.0 ) then 
-            !         ! Case 1: High driving stress in one direction with one or both neighbors'
-            !         ! driving stress in opposing directions. 
-
-            !         ! Set driving stress equal to average of neighbors
-            !         taud_acx(i,j) = 0.5*(taud_acx(im1,j)+taud_acx(ip1,j))
-
-            !     else if ( abs(taud_acx(i,j)) .gt. (0.5*(taud_acx(im1,j)+taud_acx(ip1,j))) .or. &
-            !               abs(taud_acx(i,j)) .gt. 2.0*abs(taud_acx(ip1,j)) ) then 
-            !         ! Case 2: High driving stress with low driving stress in both neighbors
-
-            !         ! Set driving stress equal to weighted average of neighbors
-            !         taud_acx(i,j) = 0.5*taud_acx(i,j) + 0.25*taud_acx(im1,j)+ 0.25*taud_acx(ip1,j)
-
-            !     end if
-
-            ! end if 
-
-            ! ! === y-direction ===
-            
-            ! if ( abs(taud_acy(i,j)) .eq. taud_lim ) then
-
-            !     if ( sign(1.0_wp,taud_acy(i,j)*taud_acy(i,jm1)) .lt. 0.0 .or. & 
-            !          sign(1.0_wp,taud_acy(i,j)*taud_acy(i,jm1)) .lt. 0.0 ) ) then 
-
-            !         ! Set driving stress equal to average of neighbors
-            !         taud_acy(i,j) = 0.5*(taud_acy(i,jm1)+taud_acy(i,jp1))
-
-            !     end if
-
-            ! end if 
-
-            ! if ( abs(taud_acy(i,j)) .eq. taud_lim .and. &
-            !       ( abs(taud_acy(i,j)) .gt. 2.0*abs(taud_acy(im1,j)) .or. &
-            !         abs(taud_acy(i,j)) .gt. 2.0*abs(taud_acy(ip1,j)) ) ) then 
-
-            !     ! Set driving stress equal to weighted average of neighbors
-            !     taud_acy(i,j) = 0.5*taud_acy(i,j) + 0.25*taud_acy(i,jm1)+ 0.25*taud_acy(i,jp1)
-
-            ! end if
             
         end do
         end do 

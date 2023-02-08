@@ -456,7 +456,7 @@ contains
             ! Get implicit vertical advection term, ac => aa nodes
             uz_aa   = 0.5*(uz(k)+uz(k+1))
 
-if (.FALSE.) then
+if (.TRUE.) then
     ! Use simple centered-difference scheme for vertical advection
 
             ! Vertical distance for centered difference advection scheme
@@ -825,7 +825,7 @@ end if
             ! Get implicit vertical advection term, ac => aa nodes
             uz_aa   = 0.5*(uz(k)+uz(k+1))
 
-if (.FALSE.) then
+if (.TRUE.) then
     ! Use simple centered-difference scheme for vertical advection
 
             ! Vertical distance for centered difference advection scheme

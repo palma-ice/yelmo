@@ -1227,7 +1227,7 @@ end if
 
         ! Local variables 
         integer :: i, j, k 
-        logical :: kill_it, kill_it_H, kill_it_vel, kill_it_nan, kill_it_eta   
+        logical :: kill_it, kill_it_H, kill_it_vel, kill_it_temp, kill_it_nan, kill_it_eta   
         character(len=512) :: kill_msg 
         real(prec) :: pc_eta_avg 
         character(len=3) :: pc_iter_str(10) 
@@ -1235,10 +1235,11 @@ end if
         real(prec), parameter :: H_lim = 1e4   ! [m] 
         real(prec), parameter :: u_lim = 1e4   ! [m/a]
 
-        kill_it_H   = .FALSE. 
-        kill_it_vel = .FALSE. 
-        kill_it_nan = .FALSE. 
-        kill_it_eta = .FALSE. 
+        kill_it_H    = .FALSE.
+        kill_it_vel  = .FALSE.
+        kill_it_temp = .FALSE. 
+        kill_it_nan  = .FALSE. 
+        kill_it_eta  = .FALSE. 
 
         pc_iter_str = "" 
         pc_iter_str(1)  = "n"
@@ -1268,14 +1269,39 @@ end if
 
         end if 
 
+        if (maxval(abs(dom%thrm%now%T_ice-dom%thrm%now%T_ice)) .ne. 0.0 ) then 
+
+            kill_it_temp = .TRUE. 
+            kill_msg     = "Temperature field invalid."
+
+        end if
+
         ! Additionally check for NANs using intrinsic ieee_arithmetic module 
         do j = 1, dom%grd%ny 
         do i = 1, dom%grd%nx 
-            if (ieee_is_nan(dom%dyn%now%uxy_bar(i,j)) .or. ieee_is_nan(dom%tpo%now%H_ice(i,j))) then 
+            
+            if (ieee_is_nan(dom%dyn%now%uxy_bar(i,j))) then 
                 kill_it_nan = .TRUE. 
-                write(kill_msg,*) "** NANs detected ** ... i, j: ", i, j 
+                write(kill_msg,*) "** NANs detected - uxy_bar ** ... i, j: ", i, j 
                 exit 
             end if 
+
+            if (ieee_is_nan(dom%tpo%now%H_ice(i,j))) then 
+                kill_it_nan = .TRUE. 
+                write(kill_msg,*) "** NANs detected - H_ice ** ... i, j: ", i, j 
+                exit 
+            end if 
+
+            do k = 1, dom%thrm%par%nz_aa
+
+                if (ieee_is_nan(dom%thrm%now%T_ice(i,j,k))) then 
+                    kill_it_nan = .TRUE. 
+                    write(kill_msg,*) "** NANs detected - T_ice ** ... i, j, k: ", i, j, k
+                    exit 
+                end if 
+
+            end do
+
         end do 
         end do 
 
@@ -1288,7 +1314,7 @@ end if
         end if 
 
         ! Determine if model should be killed 
-        kill_it = kill_it_H .or. kill_it_vel .or. kill_it_nan .or. kill_it_eta 
+        kill_it = kill_it_H .or. kill_it_vel .or. kill_it_temp .or. kill_it_nan .or. kill_it_eta 
 
         ! Definitely kill the model if it was requested externally
         if (present(kill_request)) then 
@@ -1315,8 +1341,9 @@ end if
             end do 
 
             write(io_unit_err,*) 
-            write(io_unit_err,"(a16,2g14.4)") "range(H_ice):   ", minval(dom%tpo%now%H_ice), maxval(dom%tpo%now%H_ice)
+            write(io_unit_err,"(a16,2g14.4)") "range(H_ice):   ", minval(dom%tpo%now%H_ice),   maxval(dom%tpo%now%H_ice)
             write(io_unit_err,"(a16,2g14.4)") "range(uxy_bar): ", minval(dom%dyn%now%uxy_bar), maxval(dom%dyn%now%uxy_bar)
+            write(io_unit_err,"(a16,2g14.4)") "range(T_ice):   ", minval(dom%thrm%now%T_ice),  maxval(dom%thrm%now%T_ice)
             write(io_unit_err,*) 
 
             call yelmo_restart_write(dom,"yelmo_killed.nc",time=time) 

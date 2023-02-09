@@ -759,6 +759,9 @@ end if
         ! Update the ice_allowed mask based on domain definition 
         call ybound_define_ice_allowed(dom%bnd,dom%par%domain)
         
+        ! Define the advection mask (by default, for now allow advection everywhere)
+        dom%tpo%now%mask_adv = 1
+
         write(*,*) "yelmo_init:: boundary initialized (loaded masks, set ref. topography)."
         
         ! == data == 

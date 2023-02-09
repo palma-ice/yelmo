@@ -172,6 +172,7 @@ module yelmo_defs
         
         real(wp), allocatable   :: G_advec(:,:)     ! [m/yr] Ice thickness tendency due to advection
 
+        integer,  allocatable   :: mask_adv(:,:)    ! Advection mask 
         integer,  allocatable   :: mask_new(:,:) 
         integer,  allocatable   :: mask_pred_new(:,:) 
         integer,  allocatable   :: mask_corr_new(:,:) 

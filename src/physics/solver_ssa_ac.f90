@@ -15,9 +15,9 @@ module solver_ssa_ac
     public :: ssa_diagnostics_write_step
 
     ! Routines that make use of the linear_solver_class object defined in the module solver_linear.F90:
-    public :: linear_solver_matrix_ssa_ac_csr_2D
     public :: linear_solver_save_velocity
-
+    public :: linear_solver_matrix_ssa_ac_csr_2D
+    
 contains 
     
     subroutine linear_solver_save_velocity(ux,uy,lgs,ulim)
@@ -512,7 +512,7 @@ contains
             end if
 
             lgs%a_ptr(nr+1) = k+1   ! row is completed, store index to next row
-
+            
             ! ------ Equations for uy ---------------------------
 
             nr = n+1   ! row counter

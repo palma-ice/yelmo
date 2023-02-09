@@ -129,7 +129,7 @@ contains
             ! call rk23_2D_step(tpo%rk4,tpo%now%H_ice,tpo%now%f_ice,dHdt_now,dyn%now%ux_bar,dyn%now%uy_bar, &
             !                                     tpo%par%dx,dt,tpo%par%solver,tpo%par%boundaries)
             call rk4_2D_step(tpo%rk4,tpo%now%H_ice,tpo%now%f_ice,dHdt_now,dyn%now%ux_bar,dyn%now%uy_bar, &
-                                                tpo%par%dx,dt,tpo%par%solver,tpo%par%boundaries)
+                                                tpo%now%mask_adv,tpo%par%dx,dt,tpo%par%solver,tpo%par%boundaries)
 
             ! Calculate rate of change using weighted advective rates of change 
             ! depending on timestepping method chosen 
@@ -304,13 +304,13 @@ contains
                     call calc_ice_fraction(tpo%now%f_ice,tpo%now%H_ice,bnd%z_bed,bnd%z_sl,tpo%par%margin_flt_subgrid)
     
 if (.TRUE.) then
-                    call calc_G_advec_simple(dHdt_now,tpo%now%H_ice,tpo%now%f_ice,dyn%now%ux_bar, &
-                                dyn%now%uy_bar,tpo%par%solver,tpo%par%boundaries,tpo%par%dx,dt)
+                    call calc_G_advec_simple(dHdt_now,tpo%now%H_ice,tpo%now%f_ice,dyn%now%ux_bar,dyn%now%uy_bar, &
+                                                 tpo%now%mask_adv,tpo%par%solver,tpo%par%boundaries,tpo%par%dx,dt)
 
 else
                     
                     call rk4_2D_step(tpo%rk4,tpo%now%H_ice,tpo%now%f_ice,dHdt_now,dyn%now%ux_bar,dyn%now%uy_bar, &
-                                                        tpo%par%dx,dt,tpo%par%solver,tpo%par%boundaries)
+                                                tpo%now%mask_adv,tpo%par%dx,dt,tpo%par%solver,tpo%par%boundaries)
 
 end if 
                     
@@ -330,13 +330,13 @@ end if
                     call calc_ice_fraction(tpo%now%f_ice,tpo%now%H_ice,bnd%z_bed,bnd%z_sl,tpo%par%margin_flt_subgrid)
 
 if (.TRUE.) then
-                    call calc_G_advec_simple(dHdt_now,tpo%now%H_ice,tpo%now%f_ice, &
-                            dyn%now%ux_bar,dyn%now%uy_bar,tpo%par%solver,tpo%par%boundaries,tpo%par%dx,dt)
+                    call calc_G_advec_simple(dHdt_now,tpo%now%H_ice,tpo%now%f_ice,dyn%now%ux_bar,dyn%now%uy_bar, &
+                                                tpo%now%mask_adv,tpo%par%solver,tpo%par%boundaries,tpo%par%dx,dt)
 
 else
 
                     call rk4_2D_step(tpo%rk4,tpo%now%H_ice,tpo%now%f_ice,dHdt_now,dyn%now%ux_bar,dyn%now%uy_bar, &
-                                                        tpo%par%dx,dt,tpo%par%solver,tpo%par%boundaries)
+                                                tpo%now%mask_adv,tpo%par%dx,dt,tpo%par%solver,tpo%par%boundaries)
 
 end if
 
@@ -973,6 +973,7 @@ end if
         allocate(now%mb_resid(nx,ny))
         
         allocate(now%G_advec(nx,ny))
+        allocate(now%mask_adv(nx,ny))
         
         allocate(now%mask_new(nx,ny))
         allocate(now%mask_pred_new(nx,ny))
@@ -1034,6 +1035,7 @@ end if
         now%mb_resid    = 0.0
 
         now%G_advec     = 0.0
+        now%mask_adv    = 0
 
         now%mask_new      = 0 
         now%mask_pred_new = 0 
@@ -1100,6 +1102,7 @@ end if
         if (allocated(now%mb_resid))    deallocate(now%mb_resid)
         
         if (allocated(now%G_advec))     deallocate(now%G_advec)
+        if (allocated(now%mask_adv))    deallocate(now%mask_adv)
         
         if (allocated(now%mask_new))      deallocate(now%mask_new)
         if (allocated(now%mask_pred_new)) deallocate(now%mask_pred_new)

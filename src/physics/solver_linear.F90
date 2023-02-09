@@ -90,14 +90,14 @@ contains
         ! Define indices for reshaping of a 2-d array (with indices i, j)
         ! to a vector (with index n)
 
-        n = 1
+        n = 0
 
         do i = 1, nx
         do j = 1, ny
+            n = n+1
             lgs%n2i(n)    = i
             lgs%n2j(n)    = j
             lgs%ij2n(i,j) = n
-            n = n+1
         end do
         end do
 

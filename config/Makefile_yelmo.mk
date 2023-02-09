@@ -94,7 +94,8 @@ $(objdir)/solver_tridiagonal.o: $(srcdir)/physics/solver_tridiagonal.f90 $(objdi
 	$(FC) $(DFLAGS) $(FFLAGS) -c -o $@ $<
 
 $(objdir)/solver_advection.o: $(srcdir)/physics/solver_advection.f90 $(objdir)/yelmo_defs.o \
-								$(objdir)/yelmo_tools.o $(objdir)/solver_advection_sico.o
+								$(objdir)/yelmo_tools.o $(objdir)/solver_advection_sico.o \
+								$(objdir)/solver_linear.o
 	$(FC) $(DFLAGS) $(FFLAGS) -c -o $@ $<
 
 $(objdir)/solver_advection_sico.o : $(srcdir)/physics/solver_advection_sico.F90 $(objdir)/yelmo_defs.o \

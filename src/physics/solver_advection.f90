@@ -2,7 +2,10 @@ module solver_advection
     
     use yelmo_defs, only : sp, dp, wp, tol_underflow
     use yelmo_tools, only : get_neighbor_indices, stagger_aa_ab, stagger_nodes_aa_ab_ice
-    use solver_advection_sico, only : calc_adv2D_expl_sico, calc_adv2D_impl_sico
+    
+    use solver_linear
+    use solver_advection_sico, only : linear_solver_save_advection, linear_solver_matrix_advection_csr_2D, &
+                    calc_adv2D_expl_sico, calc_adv2D_impl_sico
 
     implicit none 
 
@@ -15,26 +18,34 @@ module solver_advection
 
 contains 
 
-    subroutine calc_advec2D(dvdt,var,f_ice,ux,uy,var_dot,dx,dy,dt,solver,boundaries)
+    subroutine calc_advec2D(dvdt,var,f_ice,ux,uy,var_dot,mask_adv,dx,dy,dt,solver,boundaries)
         ! General routine to apply 2D advection equation to variable `var` 
         ! with source term `var_dot`. Various solvers are possible
 
-        real(wp),       intent(OUT)   :: dvdt(:,:)            ! [dvdt] Variable rate of change
-        real(wp),       intent(IN)    :: var(:,:)             ! [var]  Variable to be advected
+        real(wp),       intent(OUT)   :: dvdt(:,:)              ! [dvdt] Variable rate of change
+        real(wp),       intent(IN)    :: var(:,:)               ! [var]  Variable to be advected
         real(wp),       intent(IN)    :: f_ice(:,:)             ! [var]  Variable to be advected
-        real(wp),       intent(IN)    :: ux(:,:)              ! [m/a] 2D velocity, x-direction (ac-nodes)
-        real(wp),       intent(IN)    :: uy(:,:)              ! [m/a] 2D velocity, y-direction (ac-nodes)
-        real(wp),       intent(IN)    :: var_dot(:,:)         ! [dvar/dt] Source term for variable
-        real(wp),       intent(IN)    :: dx                   ! [m]   Horizontal resolution, x-direction
-        real(wp),       intent(IN)    :: dy                   ! [m]   Horizontal resolution, y-direction
-        real(wp),       intent(IN)    :: dt                   ! [a]   Timestep 
+        real(wp),       intent(IN)    :: ux(:,:)                ! [m/a] 2D velocity, x-direction (ac-nodes)
+        real(wp),       intent(IN)    :: uy(:,:)                ! [m/a] 2D velocity, y-direction (ac-nodes)
+        real(wp),       intent(IN)    :: var_dot(:,:)           ! [dvar/dt] Source term for variable
+        integer,        intent(IN)    :: mask_adv(:,:)          ! Advection mask
+        real(wp),       intent(IN)    :: dx                     ! [m]   Horizontal resolution, x-direction
+        real(wp),       intent(IN)    :: dy                     ! [m]   Horizontal resolution, y-direction
+        real(wp),       intent(IN)    :: dt                     ! [a]   Timestep 
         character(len=*), intent(IN)    :: solver               ! Solver to use for the ice thickness advection equation
         character(len=*), intent(IN)    :: boundaries           ! Boundary conditions to impose
 
-        ! Local variables 
+        ! Local variables
+        integer :: nx, ny  
+        type(linear_solver_class) :: lgs
+        character(len=512)        :: adv_lis_opt 
+
         real(wp), allocatable :: var_now(:,:) 
 
-        allocate(var_now(size(var,1),size(var,2)))
+        nx = size(var,1)
+        ny = size(var,2)
+
+        allocate(var_now(nx,ny))
 
         ! Assign local variable to be modified 
         var_now = var 
@@ -74,6 +85,24 @@ contains
             case("impl-sico-lis")
 
                 call calc_adv2D_impl_sico(var_now,ux,uy,var_dot,dx,dy,dt,use_lis=.TRUE.)
+
+            case("impl-lis")
+
+                ! Initialize linear solver variables
+                call linear_solver_init(lgs,nx,ny,nvar=1,n_terms=5)
+
+                ! Populate advection matrices Ax=b
+                call linear_solver_matrix_advection_csr_2D(lgs,var_now,ux,uy,var_dot,mask_adv,dx,dy,dt,boundaries)
+                
+                ! Solve linear equation
+                adv_lis_opt = "-i bicg -p ilu -maxiter 1000 -tol 1.0e-12 -initx_zeros false"
+                call linear_solver_matrix_solve(lgs,adv_lis_opt)
+            
+                ! Save L2_norm locally
+                !L2_norm = lgs%L2_rel_norm 
+
+                ! Store advection solution
+                call linear_solver_save_advection(var_now,lgs)
 
             case DEFAULT 
 

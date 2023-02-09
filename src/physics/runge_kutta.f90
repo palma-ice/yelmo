@@ -30,7 +30,7 @@ module runge_kutta
 
 contains
     
-    subroutine rk23_2D_step(rk4,var,fvar,dvdt,ux,uy,dx,dt,solver,boundaries,F)
+    subroutine rk23_2D_step(rk4,var,fvar,dvdt,ux,uy,mask_adv,dx,dt,solver,boundaries,F)
         ! Adapted from https://fncbook.github.io/fnc/ivp/adaptive.html#function-rk23 
         ! Implementation of the Bogacki–Shampine method, described in detail here:
         ! https://en.wikipedia.org/wiki/Bogacki%E2%80%93Shampine_method
@@ -45,6 +45,7 @@ contains
         real(wp), intent(IN)    :: uy(:,:) 
         real(wp), intent(IN)    :: dx
         real(wp), intent(IN)    :: dt
+        integer,  intent(IN)    :: mask_adv(:,:)
         character(len=*), intent(IN)    :: solver               ! Solver to use for the ice thickness advection equation
         character(len=*), intent(IN)    :: boundaries           ! Boundary conditions to impose
         real(wp), intent(IN), optional :: F(:,:) 
@@ -86,21 +87,21 @@ contains
         dt_now = dt 
         y_now  = var
         
-        call calc_G_advec_simple(k1,y_now,fvar,ux,uy,solver,boundaries,dx,dt_now)
+        call calc_G_advec_simple(k1,y_now,fvar,ux,uy,mask_adv,solver,boundaries,dx,dt_now)
 
         ! ===== k2 =====
 
         dt_now = dt / 2.0_wp 
         y_now  = var + k1*dt_now
         
-        call calc_G_advec_simple(k2,y_now,fvar,ux,uy,solver,boundaries,dx,dt_now)
+        call calc_G_advec_simple(k2,y_now,fvar,ux,uy,mask_adv,solver,boundaries,dx,dt_now)
 
         ! ===== k3 =====
 
         dt_now = dt * (3.0_wp / 4.0_wp)
         y_now  = var + k2*dt_now
         
-        call calc_G_advec_simple(k3,y_now,fvar,ux,uy,solver,boundaries,dx,dt_now)
+        call calc_G_advec_simple(k3,y_now,fvar,ux,uy,mask_adv,solver,boundaries,dx,dt_now)
 
         ! 2nd order solution
         y_new_2 = var + dt*(2.0_wp*k1 + 3.0_wp*k2 + 4.0_wp*k3)/9.0_wp
@@ -110,7 +111,7 @@ contains
         dt_now = dt
         y_now  = y_new_2
         
-        call calc_G_advec_simple(k4,y_now,fvar,ux,uy,solver,boundaries,dx,dt_now)
+        call calc_G_advec_simple(k4,y_now,fvar,ux,uy,mask_adv,solver,boundaries,dx,dt_now)
 
         ! 3rd order solution
         y_new_3 = var + dt*( (7.0_wp/24.0_wp)*k1 + (1.0_wp/4.0_wp)*k2 + (1.0_wp/3.0_wp)*k3 + (1.0_wp/8.0_wp)*k4 )
@@ -143,7 +144,7 @@ contains
 
     end subroutine rk23_2D_step
 
-    subroutine rk4_2D_step(rk4,var,fvar,dvdt,ux,uy,dx,dt,solver,boundaries)
+    subroutine rk4_2D_step(rk4,var,fvar,dvdt,ux,uy,mask_adv,dx,dt,solver,boundaries)
 
         implicit none
 
@@ -153,6 +154,7 @@ contains
         real(wp), intent(INOUT) :: dvdt(:,:) 
         real(wp), intent(IN)    :: ux(:,:) 
         real(wp), intent(IN)    :: uy(:,:) 
+        integer,  intent(IN)    :: mask_adv(:,:)
         real(wp), intent(IN)    :: dx
         real(wp), intent(IN)    :: dt
         character(len=*), intent(IN)    :: solver               ! Solver to use for the ice thickness advection equation
@@ -188,28 +190,28 @@ contains
         dt_now = dt 
         y_now  = var
         
-        call calc_G_advec_simple(k1,y_now,fvar,ux,uy,solver,boundaries,dx,dt_now)
+        call calc_G_advec_simple(k1,y_now,fvar,ux,uy,mask_adv,solver,boundaries,dx,dt_now)
 
         ! ===== k2 =====
 
         dt_now = dt / 2.0_wp 
         y_now  = var + k1*dt_now
         
-        call calc_G_advec_simple(k2,y_now,fvar,ux,uy,solver,boundaries,dx,dt_now)
+        call calc_G_advec_simple(k2,y_now,fvar,ux,uy,mask_adv,solver,boundaries,dx,dt_now)
 
         ! ===== k3 =====
 
         dt_now = dt / 2.0_wp 
         y_now  = var + k2*dt_now
         
-        call calc_G_advec_simple(k3,y_now,fvar,ux,uy,solver,boundaries,dx,dt_now)
+        call calc_G_advec_simple(k3,y_now,fvar,ux,uy,mask_adv,solver,boundaries,dx,dt_now)
 
         ! ===== k4 =====
 
         dt_now = dt
         y_now  = var + k3*dt_now
         
-        call calc_G_advec_simple(k4,y_now,fvar,ux,uy,solver,boundaries,dx,dt_now)
+        call calc_G_advec_simple(k4,y_now,fvar,ux,uy,mask_adv,solver,boundaries,dx,dt_now)
 
 
         ! ===== advance to t+dt =====

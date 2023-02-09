@@ -171,7 +171,7 @@ contains
         end if 
 
         ! Initialize linear solver variables for current and previous iteration
-        call linear_solver_init(lgs_now,nx,ny)
+        call linear_solver_init(lgs_now,nx,ny,nvar=2,n_terms=9)
         lgs_prev = lgs_now 
 
         do iter = 1, par%ssa_iter_max 

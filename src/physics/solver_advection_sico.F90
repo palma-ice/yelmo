@@ -2,6 +2,8 @@ module solver_advection_sico
 
     use yelmo_defs, only : sp, dp, wp 
 
+    use solver_linear
+
     implicit none 
     
     private
@@ -10,6 +12,31 @@ module solver_advection_sico
     public :: calc_advec_horizontal_point_expl
 
 contains 
+
+    subroutine linear_solver_save_thickness(uu,lgs)
+        ! Extract ice thickness solution from lgs object. 
+
+        implicit none 
+
+        real(wp), intent(OUT) :: uu(:,:)                ! [m]
+        type(linear_solver_class), intent(IN) :: lgs 
+
+        ! Local variables 
+        integer :: i, j, n, nr 
+
+        do n = 1, lgs%nmax-1, 2
+
+            i = lgs%n2i((n+1)/2)
+            j = lgs%n2j((n+1)/2)
+
+            nr = n
+            uu(i,j) = lgs%x_value(nr)
+
+        end do
+
+        return
+
+    end subroutine linear_solver_save_thickness
 
     ! ==== SICOPOLIS5-dev explicit solver =====
 

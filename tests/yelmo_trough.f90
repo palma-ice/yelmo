@@ -252,7 +252,8 @@ program yelmo_trough
         time = time_init + n*dtt
 
 if (.FALSE.) then
-        if (trim(domain) .eq. "SLAB-SHELF" .and. time .ge. 3e3) then 
+        !if (trim(domain) .eq. "SLAB-SHELF" .and. time .ge. 3e3) then 
+        if (trim(domain) .eq. "TROUGH-F17" .and. time .ge. 3e3) then 
 
             ! ! Define calving front 
             ! x_cf = 540.0_wp 

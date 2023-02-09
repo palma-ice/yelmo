@@ -97,7 +97,8 @@ $(objdir)/solver_advection.o: $(srcdir)/physics/solver_advection.f90 $(objdir)/y
 								$(objdir)/yelmo_tools.o $(objdir)/solver_advection_sico.o
 	$(FC) $(DFLAGS) $(FFLAGS) -c -o $@ $<
 
-$(objdir)/solver_advection_sico.o : $(srcdir)/physics/solver_advection_sico.F90 $(objdir)/yelmo_defs.o
+$(objdir)/solver_advection_sico.o : $(srcdir)/physics/solver_advection_sico.F90 $(objdir)/yelmo_defs.o \
+										$(objdir)/solver_linear.o
 	$(FC) $(DFLAGS) $(FFLAGS) $(INC_LINEAR) -c -o $@ $<
 
 $(objdir)/solver_advection_new.o: $(srcdir)/physics/solver_advection_new.f90 $(objdir)/yelmo_defs.o \

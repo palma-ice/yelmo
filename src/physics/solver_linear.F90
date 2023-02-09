@@ -36,7 +36,7 @@ module solver_linear
 
 contains 
     
-    subroutine linear_solver_init(lgs,nx,ny)
+    subroutine linear_solver_init(lgs,nx,ny,nvar,n_terms)
         ! Initialize the lgs object that will hold
         ! arrays A, x and b needed to solve linear
         ! equation Ax=b. Arrays are populated in 
@@ -46,15 +46,18 @@ contains
         implicit none
 
         type(linear_solver_class), intent(INOUT) :: lgs
-        integer, intent(IN) :: nx, ny 
+        integer, intent(IN) :: nx
+        integer, intent(IN) :: ny 
+        integer, intent(IN) :: nvar 
+        integer, intent(IN) :: n_terms 
 
         ! Local variables
         integer :: i, j, n 
 
         ! Define array sizes
-        lgs%nmax    = 2*nx*ny 
-        lgs%n_terms = 9
-        lgs%n_sprs  = 2*lgs%n_terms*nx*ny 
+        lgs%nmax    = nvar*nx*ny 
+        lgs%n_terms = n_terms
+        lgs%n_sprs  = nvar*n_terms*nx*ny 
 
         ! Ensure all object arrays are deallocated first
         if (allocated(lgs%n2i))     deallocate(lgs%n2i)

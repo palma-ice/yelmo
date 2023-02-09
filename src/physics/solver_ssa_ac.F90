@@ -8,7 +8,6 @@ module solver_ssa_ac
 
     implicit none 
 
-
     private 
     public :: set_ssa_masks
     public :: update_ssa_mask_convergence
@@ -111,7 +110,7 @@ contains
         if (.not. allocated(lgs%x_value)) then 
             ! Object 'lgs' has not been initialized yet, do so now.
 
-            call linear_solver_init(lgs,nx,ny)
+            call linear_solver_init(lgs,nx,ny,nvar=2,n_terms=9)
 
         end if 
 

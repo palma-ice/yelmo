@@ -82,7 +82,7 @@ $(objdir)/mass_conservation.o : $(srcdir)/physics/mass_conservation.f90 $(objdir
 $(objdir)/runge_kutta.o: $(srcdir)/physics/runge_kutta.f90 $(objdir)/yelmo_defs.o $(objdir)/mass_conservation.o
 	$(FC) $(DFLAGS) $(FFLAGS) -c -o $@ $<
 
-$(objdir)/solver_ssa_ac.o: $(srcdir)/physics/solver_ssa_ac.F90 $(objdir)/yelmo_defs.o \
+$(objdir)/solver_ssa_ac.o: $(srcdir)/physics/solver_ssa_ac.f90 $(objdir)/yelmo_defs.o \
 							$(objdir)/yelmo_tools.o $(objdir)/ncio.o $(objdir)/solver_linear.o
 	$(FC) $(DFLAGS) $(FFLAGS) $(INC_LINEAR) -c -o $@ $<
 

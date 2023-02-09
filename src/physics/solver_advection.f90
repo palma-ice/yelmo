@@ -632,7 +632,7 @@ end if
             where(abs(H) .lt. tol_underflow) H = 0.0_wp
             
             ! Check stopping criterion (something like rmse of remaining change in H)
-            delh = sqrt(sum(deltaH**2)) / ((nx-2)*(ny-2))
+            delh = sqrt(sum(deltaH**2)) / (nx*ny)
             
             ! Use simple stopping criterion: maximum remaining change in H
             ! Note: this is less likely to converge given the same stopping

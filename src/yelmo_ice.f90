@@ -67,7 +67,8 @@ contains
         real(wp) :: max_dt_used 
         real(wp) :: min_dt_used 
 
-        logical, parameter :: update_others_pc = .FALSE. 
+        logical, parameter :: update_others_pc  = .FALSE. 
+        logical, parameter :: very_verbose      = .TRUE. 
 
         ! Safety: check status of model object, 
         ! Has it been initialized?
@@ -380,6 +381,14 @@ end if
                 
             ! === Done, Yelmo fields are fully consistent with time=time_now 
 
+            ! Output some diagnostic info if desired
+            if (very_verbose) then 
+
+                write(*,"(a,f13.2,f10.2,G10.3,i5)") &
+                    "yelmo:: times: ", &
+                    time_now, dt_now, eta_now, dom%dyn%par%ssa_iter_now
+
+            end if
 
             ! Output diagnostic file if desired 
             if (present(file_diagnostics)) then 
@@ -966,8 +975,8 @@ end if
         ! Step 3: update remaining topogaphic info to be consistent with initial fields 
 
         ! Run topo and masks to make sure all fields are synchronized (masks, etc)
-        call calc_ytopo_rk4(dom%tpo,dom%dyn,dom%mat,dom%thrm,dom%bnd,time,topo_fixed=.TRUE.)
-        !call calc_ytopo_pc(dom%tpo,dom%dyn,dom%mat,dom%thrm,dom%bnd,time,topo_fixed=.TRUE.,pc_step="none",use_H_pred=dom%par%pc_use_H_pred)
+        !call calc_ytopo_rk4(dom%tpo,dom%dyn,dom%mat,dom%thrm,dom%bnd,time,topo_fixed=.TRUE.)
+        call calc_ytopo_pc(dom%tpo,dom%dyn,dom%mat,dom%thrm,dom%bnd,time,topo_fixed=.TRUE.,pc_step="none",use_H_pred=dom%par%pc_use_H_pred)
         call calc_ytopo_diagnostic(dom%tpo,dom%dyn,dom%mat,dom%thrm,dom%bnd)
 
         ! Update regional calculations (for entire domain)

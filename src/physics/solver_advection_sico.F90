@@ -155,9 +155,9 @@ contains
         real(wp), allocatable  :: up_y_1(:,:), up_y_2(:,:)
         integer,  allocatable  :: ii(:), jj(:), nn(:,:) 
         real(wp) :: dt_darea
-        real(wp), parameter    :: EPS_SOR    = 1e-3 ! [m] Error tolerance
-        real(wp), parameter    :: OVI_WEIGHT = 1.5  ! Weighing parameter for the over-implicit scheme 
+        real(wp), parameter    :: OVI_WEIGHT = 1.0  ! Weighing parameter for the over-implicit scheme 
         real(wp), parameter    :: OMEGA_SOR  = 1.0  ! Relaxation parameter for the iterative SOR solver (0 < OMEGA_SOR < 2)
+        real(wp), parameter    :: EPS_SOR    = 1e-3 ! [m] Error tolerance
         
 ! Include header for lis solver fortran interface
 #include "lisf.h"
@@ -398,7 +398,7 @@ contains
             call CHKERR(ierr)
 
             call lis_solver_get_iter(solver, iter, ierr)
-            write(6,'(10x,a,i0,5x,i2)') 'calc_adv2D_impl_sico [lis]: iter = ', iter, ierr
+            !write(6,'(10x,a,i0,5x,i2)') 'calc_adv2D_impl_sico [lis]: iter = ', iter, ierr
 
             lgs_x_value = 0.0
             call lis_vector_gather(lgs_x, lgs_x_value, ierr)
@@ -416,7 +416,7 @@ contains
                           lgs_a_diag_index,lgs_a_ptr,lgs_b_value, &
                           OMEGA_SOR, EPS_SOR, lgs_x_value, iter, ierr)
 
-            write(6,'(10x,a,i0,5x,i2)') 'calc_adv2D_impl_sico [sor]: iter = ', iter, ierr
+            !write(6,'(10x,a,i0,5x,i2)') 'calc_adv2D_impl_sico [sor]: iter = ', iter, ierr
             
         end if 
 

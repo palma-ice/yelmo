@@ -12,6 +12,7 @@ module velocity_l1l2
 
     use basal_dragging 
     use solver_ssa_ac
+    use solver_linear 
     use velocity_general, only : set_inactive_margins, &
                         picard_calc_error, picard_calc_error_angle, picard_relax, &
                         picard_calc_convergence_l1rel_matrix, picard_calc_convergence_l2 

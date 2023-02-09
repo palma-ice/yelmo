@@ -83,15 +83,11 @@ $(objdir)/runge_kutta.o: $(srcdir)/physics/runge_kutta.f90 $(objdir)/yelmo_defs.
 	$(FC) $(DFLAGS) $(FFLAGS) -c -o $@ $<
 
 $(objdir)/solver_ssa_ac.o: $(srcdir)/physics/solver_ssa_ac.F90 $(objdir)/yelmo_defs.o \
+							$(objdir)/yelmo_tools.o $(objdir)/ncio.o $(objdir)/solver_linear.o
+	$(FC) $(DFLAGS) $(FFLAGS) $(INC_LINEAR) -c -o $@ $<
+
+$(objdir)/solver_linear.o: $(srcdir)/physics/solver_linear.F90 $(objdir)/yelmo_defs.o \
 							$(objdir)/yelmo_tools.o $(objdir)/ncio.o
-	$(FC) $(DFLAGS) $(FFLAGS) $(INC_LINEAR) -c -o $@ $<
-
-$(objdir)/solver_ssa_aa.o: $(srcdir)/physics/solver_ssa_aa.F90 $(objdir)/yelmo_defs.o \
-							$(objdir)/yelmo_tools.o $(objdir)/ncio.o $(objdir)/grid_calcs.o
-	$(FC) $(DFLAGS) $(FFLAGS) $(INC_LINEAR) -c -o $@ $<
-
-$(objdir)/solver_ssa_ab.o: $(srcdir)/physics/solver_ssa_ab.F90 $(objdir)/yelmo_defs.o \
-							$(objdir)/yelmo_tools.o $(objdir)/ncio.o $(objdir)/grid_calcs.o
 	$(FC) $(DFLAGS) $(FFLAGS) $(INC_LINEAR) -c -o $@ $<
 
 $(objdir)/solver_tridiagonal.o: $(srcdir)/physics/solver_tridiagonal.f90 $(objdir)/yelmo_defs.o
@@ -124,20 +120,9 @@ $(objdir)/velocity_ssa.o: $(srcdir)/physics/velocity_ssa.f90 \
 						  	$(objdir)/solver_ssa_ac.o $(objdir)/velocity_general.o
 	$(FC) $(DFLAGS) $(FFLAGS) -c -o $@ $<
 
-$(objdir)/velocity_ssa_aa.o: $(srcdir)/physics/velocity_ssa_aa.f90 \
-						  	$(objdir)/yelmo_defs.o $(objdir)/yelmo_tools.o $(objdir)/basal_dragging.o \
-						  	$(objdir)/solver_ssa_aa.o $(objdir)/velocity_general.o
-	$(FC) $(DFLAGS) $(FFLAGS) -c -o $@ $<
-
 $(objdir)/velocity_diva.o: $(srcdir)/physics/velocity_diva.f90 \
 						  	$(objdir)/yelmo_defs.o $(objdir)/yelmo_tools.o $(objdir)/basal_dragging.o \
 						  	$(objdir)/solver_ssa_ac.o $(objdir)/velocity_general.o \
-						  	$(objdir)/grid_calcs.o
-	$(FC) $(DFLAGS) $(FFLAGS) -c -o $@ $<
-
-$(objdir)/velocity_diva_ab.o: $(srcdir)/physics/velocity_diva_ab.f90 \
-						  	$(objdir)/yelmo_defs.o $(objdir)/yelmo_tools.o $(objdir)/basal_dragging.o \
-						  	$(objdir)/solver_ssa_ab.o $(objdir)/velocity_general.o \
 						  	$(objdir)/grid_calcs.o
 	$(FC) $(DFLAGS) $(FFLAGS) -c -o $@ $<
 
@@ -175,9 +160,7 @@ $(objdir)/yelmo_dynamics.o: $(srcdir)/yelmo_dynamics.f90 $(objdir)/yelmo_defs.o 
 							$(objdir)/velocity_general.o \
 							$(objdir)/velocity_sia.o \
 							$(objdir)/velocity_ssa.o \
-							$(objdir)/velocity_ssa_aa.o \
 							$(objdir)/velocity_diva.o \
-							$(objdir)/velocity_diva_ab.o \
 							$(objdir)/velocity_l1l2.o \
 							$(objdir)/basal_dragging.o
 	$(FC) $(DFLAGS) $(FFLAGS) -c -o $@ $<
@@ -262,8 +245,7 @@ yelmo_physics =  	   $(objdir)/basal_dragging.o \
 					   $(objdir)/mass_conservation.o \
 					   $(objdir)/runge_kutta.o \
 					   $(objdir)/solver_ssa_ac.o \
-					   $(objdir)/solver_ssa_aa.o \
-					   $(objdir)/solver_ssa_ab.o \
+					   $(objdir)/solver_linear.o \
 					   $(objdir)/solver_tridiagonal.o \
 					   $(objdir)/solver_advection.o \
 					   $(objdir)/solver_advection_sico.o \
@@ -272,9 +254,7 @@ yelmo_physics =  	   $(objdir)/basal_dragging.o \
 					   $(objdir)/velocity_general.o \
 					   $(objdir)/velocity_sia.o \
 					   $(objdir)/velocity_ssa.o \
-					   $(objdir)/velocity_ssa_aa.o \
 					   $(objdir)/velocity_diva.o \
-					   $(objdir)/velocity_diva_ab.o \
 					   $(objdir)/velocity_l1l2.o
 					   
 					   

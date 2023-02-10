@@ -38,7 +38,7 @@ contains
         ! Local variables
         integer :: nx, ny  
         type(linear_solver_class) :: lgs
-        character(len=512)        :: adv_lis_opt 
+        character(len=256)        :: adv_lis_opt 
 
         real(wp), allocatable :: var_now(:,:) 
 

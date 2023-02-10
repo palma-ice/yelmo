@@ -26,14 +26,13 @@ contains
         type(linear_solver_class), intent(IN) :: lgs 
 
         ! Local variables 
-        integer :: i, j, n, nr 
+        integer :: i, j, nr 
 
-        do n = 1, lgs%nmax
+        do nr = 1, lgs%nmax
 
-            i = lgs%n2i((n+1)/2)
-            j = lgs%n2j((n+1)/2)
+            i = lgs%n2i(nr)
+            j = lgs%n2j(nr)
 
-            nr = n
             H(i,j) = lgs%x_value(nr)
 
         end do
@@ -75,6 +74,9 @@ contains
         real(wp), allocatable  :: Hy_1(:,:), Hy_2(:,:)
 
         real(wp), parameter :: WOVI = 1.0     ! Weighing parameter for the over-implicit scheme 
+
+        integer :: IMAX, JMAX 
+        integer :: m 
 
         nx = size(H,1)
         ny = size(H,2) 
@@ -281,12 +283,10 @@ contains
 
                 ! Initial guess == previous H
 
-                ! lgs%x_value(nr) = H(i,j)                            
+                lgs%x_value(nr) = H(i,j)                            
                 
             end if
 
-            lgs%x_value(nr) = H(i,j)                            
-                
             lgs%a_ptr(nr+1) = k+1   ! row is completed, store index to next row
             
         end do
@@ -434,44 +434,20 @@ contains
 
         ! Local variables  
         integer :: i, j, nx, ny 
-        integer :: IMAX, JMAX
-        integer :: n, m, k, nnz
+        integer :: n, nr, k
         real(wp), allocatable  :: ux_1(:,:), ux_2(:,:)
         real(wp), allocatable  :: uy_1(:,:), uy_2(:,:)
         real(wp), allocatable  :: up_x_1(:,:), up_x_2(:,:)
         real(wp), allocatable  :: up_y_1(:,:), up_y_2(:,:)
-        integer,  allocatable  :: ii(:), jj(:), nn(:,:) 
         real(wp) :: dt_darea
         real(wp), parameter    :: OVI_WEIGHT = 1.0  ! Weighing parameter for the over-implicit scheme 
-        real(wp), parameter    :: OMEGA_SOR  = 1.0  ! Relaxation parameter for the iterative SOR solver (0 < OMEGA_SOR < 2)
-        real(wp), parameter    :: EPS_SOR    = 1e-3 ! [m] Error tolerance
-        
-        type(linear_solver_class) :: lgs 
 
-! Include header for lis solver fortran interface
-#include "lisf.h"
-        
-        LIS_INTEGER              :: ierr
-        LIS_INTEGER              :: iter
-        LIS_INTEGER              :: nc, nr
-        LIS_INTEGER              :: nmax, n_sprs
-        LIS_INTEGER, allocatable :: lgs_a_ptr(:), lgs_a_index(:)
-        LIS_INTEGER, allocatable :: lgs_a_diag_index(:)
-        LIS_MATRIX               :: lgs_a
-        LIS_VECTOR               :: lgs_b, lgs_x
-        LIS_SCALAR,  allocatable :: lgs_a_value(:), lgs_b_value(:), lgs_x_value(:)
-        LIS_SOLVER               :: solver
-        character(len=256)       :: ch_solver_set_option
+        type(linear_solver_class) :: lgs 
+        character(len=256) :: adv_lis_opt
 
         nx = size(uu,1)
         ny = size(uu,2)
         
-        nmax   =   nx*ny 
-        n_sprs = 5*nx*ny 
-
-        allocate(ii(nx*ny),jj(nx*ny))
-        allocate(nn(nx,ny))
-
         allocate(ux_1(nx,ny))
         allocate(ux_2(nx,ny))
         allocate(uy_1(nx,ny))
@@ -481,37 +457,6 @@ contains
         allocate(up_x_2(nx,ny))
         allocate(up_y_1(nx,ny))
         allocate(up_y_2(nx,ny))
-
-        ! ajr:        
-        call linear_solver_init(lgs,nx,ny,nvar=1,n_terms=5)
-
-        ! =======================================================================
-        !-------- Construction of a vector (with index n) from a 2-d array
-        !         (with indices i, j) by diagonal numbering --------
-        ! ajr: note ii, jj, and nn are built with 0-indexing in mind, 
-        ! later when i,j values are extracted, make sure to add a 1.
-        ! ajr: note, this can be done once outside this routine, but for now
-        ! do it here.
-
-        ! For keeping consistency with sico (0:nx-1,0:ny-1) indexing        
-        IMAX = nx-1
-        JMAX = ny-1 
-
-        n=1
-
-        do m=0, IMAX+JMAX
-           do i=m, 0, -1
-              j = m-i
-              if ((i <= IMAX).and.(j <= JMAX)) then
-                 ii(n)   = i+1
-                 jj(n)   = j+1
-                 nn(i+1,j+1) = n
-                 n=n+1
-              end if
-           end do
-        end do
-        ! =======================================================================
-
 
         !-------- Abbreviations --------
 
@@ -562,62 +507,57 @@ contains
         end do
         end do
 
+        ! Initialize the linear solver object       
+        call linear_solver_init(lgs,nx,ny,nvar=1,n_terms=5)
+        
         !-------- Assembly of the system of linear equations
         !                     (matrix storage: compressed sparse row CSR) --------
 
-        allocate(lgs_a_value(n_sprs), lgs_a_index(n_sprs), lgs_a_ptr(nmax+1))
-        allocate(lgs_a_diag_index(nmax), lgs_b_value(nmax), lgs_x_value(nmax))
-
-        lgs_a_value = 0.0
-        lgs_a_index = 0
-        lgs_a_ptr   = 0
-        lgs_b_value = 0.0
-        lgs_x_value = 0.0
-
-        lgs_a_ptr(1) = 1
+        lgs%a_ptr(1) = 1
 
         k = 0
 
-        do nr=1, nmax   ! loop over rows
-
-            i = ii(nr)
-            j = jj(nr)
-
+        do nr = 1, lgs%nmax   ! loop over rows
+            
+            i = lgs%n2i(nr)
+            j = lgs%n2j(nr)
+            
             if (i .gt. 1 .and. i .lt. nx .and. j .gt. 1 .and. j .lt. ny) then
                 ! Inner point 
 
-                k=k+1 ; nc=nn(i,j-1) ; lgs_a_index(k)=nc   ! for uu(i,j-1)
+                k=k+1 ; lgs%a_index(k)=lgs%ij2n(i,j-1)   ! for uu(i,j-1)
                 if (uy_1(i,j) > 0.0) &
-                 lgs_a_value(k) = -dt_darea*uy_1(i,j)*dx*OVI_WEIGHT
+                 lgs%a_value(k) = -dt_darea*uy_1(i,j)*dx*OVI_WEIGHT
 
-                k=k+1 ; nc=nn(i-1,j) ; lgs_a_index(k)=nc   ! for uu(i-1,j)
+                k=k+1 ; lgs%a_index(k)=lgs%ij2n(i-1,j)   ! for uu(i-1,j)
                 if (ux_1(i,j) > 0.0) &
-                 lgs_a_value(k) = -dt_darea*ux_1(i,j)*dy*OVI_WEIGHT
+                 lgs%a_value(k) = -dt_darea*ux_1(i,j)*dy*OVI_WEIGHT
 
-                k=k+1 ; lgs_a_index(k)=nr ; lgs_a_diag_index(nr)=k  ! for uu(i,j)
-                lgs_a_value(k) = 1.0                             ! (diagonal element)
+                k=k+1 ; lgs%a_index(k)=nr                       ! for uu(i,j)
+                lgs%a_value(k) = 1.0                             ! (diagonal element)
                 if (uy_1(i,j) < 0.0) &
-                 lgs_a_value(k) = lgs_a_value(k) &
+                 lgs%a_value(k) = lgs%a_value(k) &
                                   - dt_darea*uy_1(i,j)*dx*OVI_WEIGHT
                 if (ux_1(i,j) < 0.0) &
-                 lgs_a_value(k) = lgs_a_value(k) &
+                 lgs%a_value(k) = lgs%a_value(k) &
                                   - dt_darea*ux_1(i,j)*dy*OVI_WEIGHT
                 if (ux_2(i,j) > 0.0) &
-                 lgs_a_value(k) = lgs_a_value(k) &
+                 lgs%a_value(k) = lgs%a_value(k) &
                                   + dt_darea*ux_2(i,j)*dy*OVI_WEIGHT
                 if (uy_2(i,j) > 0.0) &
-                 lgs_a_value(k) = lgs_a_value(k) &
+                 lgs%a_value(k) = lgs%a_value(k) &
                                   + dt_darea*uy_2(i,j)*dx*OVI_WEIGHT
 
-                k=k+1 ; nc=nn(i+1,j) ; lgs_a_index(k)=nc   ! for uu(i+1,j)
+
+                k=k+1 ; lgs%a_index(k)=lgs%ij2n(i+1,j)   ! for uu(i+1,j)
                 if (ux_2(i,j) < 0.0) &
-                 lgs_a_value(k) = dt_darea*ux_2(i,j)*dy*OVI_WEIGHT
+                 lgs%a_value(k) = dt_darea*ux_2(i,j)*dy*OVI_WEIGHT
 
-                k=k+1 ; nc=nn(i,j+1) ; lgs_a_index(k)=nc   ! for uu(i,j+1)
+                k=k+1 ; lgs%a_index(k)=lgs%ij2n(i,j+1)   ! for uu(i,j+1)
                 if (uy_2(i,j) < 0.0) &
-                 lgs_a_value(k) = dt_darea*uy_2(i,j)*dx*OVI_WEIGHT
+                 lgs%a_value(k) = dt_darea*uy_2(i,j)*dx*OVI_WEIGHT
 
-                lgs_b_value(nr) = uu(i,j) &
+                lgs%b_value(nr) = uu(i,j) &
                                 +dt*F(i,j) &
                                 -(1.0-OVI_WEIGHT) &
                                    * dt_darea &
@@ -630,97 +570,31 @@ contains
             else   ! zero-thickness boundary condition
 
                 k = k+1
-                lgs_a_value(k)       = 1.0   ! diagonal element only
-                lgs_a_diag_index(nr) = k
-                lgs_a_index(k)       = nr
-                lgs_b_value(nr)      = 0.0
+                lgs%a_value(k)       = 1.0   ! diagonal element only
+                lgs%a_index(k)       = nr
+                lgs%b_value(nr)      = 0.0
 
             end if
 
-            lgs_x_value(nr) = uu(i,j)   ! old variable value,
+            lgs%x_value(nr) = uu(i,j)   ! old variable value,
             ! initial guess for solution vector
 
-            lgs_a_ptr(nr+1) = k+1   ! row is completed, store index to next row
+            lgs%a_ptr(nr+1) = k+1   ! row is completed, store index to next row
 
         end do
 
-        nnz = k   ! number of non-zero elements of the matrix
-
-        !-------- Solution of the system of linear equations --------
-
-        if (use_lis) then 
-
-            !  ------ Settings for Lis
-                    
-            call lis_initialize(ierr)           ! Important for parallel computing environments
-
-            call lis_matrix_create(LIS_COMM_WORLD, lgs_a, ierr)
-            call lis_vector_create(LIS_COMM_WORLD, lgs_b, ierr)
-            call lis_vector_create(LIS_COMM_WORLD, lgs_x, ierr)
-
-            call lis_matrix_set_size(lgs_a, 0, nmax, ierr)
-            call lis_vector_set_size(lgs_b, 0, nmax, ierr)
-            call lis_vector_set_size(lgs_x, 0, nmax, ierr)
-
-            do nr=1, nmax
-
-                do nc=lgs_a_ptr(nr), lgs_a_ptr(nr+1)-1
-                    call lis_matrix_set_value(LIS_INS_VALUE, nr, lgs_a_index(nc), &
-                                                        lgs_a_value(nc), lgs_a, ierr)
-                end do
-
-                call lis_vector_set_value(LIS_INS_VALUE, nr, lgs_b_value(nr), lgs_b, ierr)
-                call lis_vector_set_value(LIS_INS_VALUE, nr, lgs_x_value(nr), lgs_x, ierr)
-
-            end do
-
-            call lis_matrix_set_type(lgs_a, LIS_MATRIX_CSR, ierr)
-            call lis_matrix_assemble(lgs_a, ierr)
-
-            !  ------ Solution with Lis
-
-            call lis_solver_create(solver, ierr)
-
-            ch_solver_set_option = '-i bicg -p ilu -maxiter 1000 -tol 1.0e-12 -initx_zeros false'
-
-            call lis_solver_set_option(trim(ch_solver_set_option), solver, ierr)
-            call CHKERR(ierr)
-
-            call lis_solve(lgs_a, lgs_b, lgs_x, solver, ierr)
-            call CHKERR(ierr)
-
-            call lis_solver_get_iter(solver, iter, ierr)
-            !write(6,'(10x,a,i0,5x,i2)') 'calc_adv2D_impl_sico [lis]: iter = ', iter, ierr
-
-            lgs_x_value = 0.0
-            call lis_vector_gather(lgs_x, lgs_x_value, ierr)
-            call lis_matrix_destroy(lgs_a, ierr)
-            call lis_vector_destroy(lgs_b, ierr)
-            call lis_vector_destroy(lgs_x, ierr)
-            call lis_solver_destroy(solver, ierr)
-                   
-            call lis_finalize(ierr)     ! Important for parallel computing environments 
-
-        else 
-            ! Use internal SOR solver 
-
-            call sor_sprs(lgs_a_value(1:nnz),lgs_a_index(1:nnz),  &
-                          lgs_a_diag_index,lgs_a_ptr,lgs_b_value, &
-                          OMEGA_SOR, EPS_SOR, lgs_x_value, iter, ierr)
-
-            !write(6,'(10x,a,i0,5x,i2)') 'calc_adv2D_impl_sico [sor]: iter = ', iter, ierr
-            
-        end if 
-
-        do nr = 1, nmax
-            i       = ii(nr)
-            j       = jj(nr)
-            uu(i,j) = lgs_x_value(nr)
-        end do
-
-        deallocate(lgs_a_value, lgs_a_index, lgs_a_ptr)
-        deallocate(lgs_a_diag_index, lgs_b_value, lgs_x_value)
+        adv_lis_opt = "-i bicg -p ilu -maxiter 1000 -tol 1.0e-12 -initx_zeros false"
+        !call mysolver(lgs,adv_lis_opt)
+        call linear_solver_matrix_solve(lgs,adv_lis_opt)
         
+        ! Save L2_norm locally
+        !L2_norm = lgs%L2_rel_norm 
+
+        ! Store advection solution
+        call linear_solver_save_advection(uu,lgs)
+
+        if (maxval(uu) .gt. 1e3) stop
+
         return 
 
     end subroutine calc_adv2D_impl_sico

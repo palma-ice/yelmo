@@ -672,7 +672,7 @@ contains
 
     end subroutine calc_ice_fraction
     
-    subroutine calc_ice_front(mask_frnt,f_ice,f_grnd,z_bed,z_sl)
+    subroutine calc_ice_front(mask_frnt,f_ice,f_grnd,z_bed,z_sl,boundaries)
         ! Calculate a mask of ice front points that 
         ! demarcates both the ice front (last ice-covered point)
         ! and the ice-free front (first ice-free point), 
@@ -685,7 +685,8 @@ contains
         real(wp), intent(IN)  :: f_grnd(:,:) 
         real(wp), intent(IN)  :: z_bed(:,:)
         real(wp), intent(IN)  :: z_sl(:,:)
-
+        character(len=*), intent(IN) :: boundaries 
+        
         ! Local variables 
         integer  :: i, j, nx, ny
         integer  :: im1, ip1, jm1, jp1 

@@ -764,7 +764,7 @@ end if
 
 
         ! Calculate the ice-front mask (mainly for use in dynamics)
-        call calc_ice_front(tpo%now%mask_frnt,tpo%now%f_ice,tpo%now%f_grnd,bnd%z_bed,bnd%z_sl)
+        call calc_ice_front(tpo%now%mask_frnt,tpo%now%f_ice,tpo%now%f_grnd,bnd%z_bed,bnd%z_sl,tpo%par%boundaries)
 
 
         ! Determine ice thickness for use exclusively with the dynamics solver

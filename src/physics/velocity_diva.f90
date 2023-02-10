@@ -298,8 +298,7 @@ end if
 
             ! Solve linear equation
             call linear_solver_matrix_solve(lgs_now,par%ssa_lis_opt)
-            !call mysolver(lgs_now,par%ssa_lis_opt)
-
+            
             ! Save L2_norm locally
             L2_norm = lgs_now%L2_rel_norm 
 

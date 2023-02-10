@@ -47,7 +47,7 @@
 /
 
 &ytopo
-    solver              = "expl"            ! "expl", "impl-upwind"
+    solver              = "expl"            ! "expl", "impl-upwind", "impl-lis"
     calv_flt_method     = "zero"            ! "zero", "simple", "flux", "vm-l19", "kill"
     calv_grnd_method    = "zero"            ! "zero", "stress-b12"
     bmb_gl_method       = "pmp"             ! "fcmp": flotation; "fmp": full melt; "pmp": partial melt; "nmp": no melt

@@ -34,7 +34,6 @@ module solver_linear
     public :: linear_solver_class
     public :: linear_solver_init
     public :: linear_solver_matrix_solve
-    public :: mysolver 
 
 contains 
     
@@ -271,118 +270,6 @@ contains
         return
 
     end subroutine linear_solver_matrix_solve_lis
-
-    subroutine mysolver(lgs,lis_settings)
-
-        implicit none
-
-        type(linear_solver_class), intent(INOUT) :: lgs
-        character(len=*), intent(IN) :: lis_settings        ! LIS solver settings
-
-! Include header for lis solver fortran interface
-#include "lisf.h"
-        
-        LIS_INTEGER :: ierr
-        LIS_INTEGER :: iter
-        LIS_INTEGER :: nr
-        LIS_INTEGER :: nc
-        LIS_INTEGER :: nmax
-        LIS_INTEGER :: lin_iter
-        LIS_REAL    :: residual 
-        LIS_MATRIX  :: lgs_a
-        LIS_VECTOR  :: lgs_b, lgs_x
-        LIS_SOLVER  :: solver
-        
-        LIS_INTEGER :: n_sprs
-        LIS_INTEGER, allocatable :: lgs_a_index(:)
-        LIS_SCALAR,  allocatable :: lgs_a_value(:)
-        LIS_SCALAR,  allocatable :: lgs_b_value(:)
-        LIS_SCALAR,  allocatable :: lgs_x_value(:)
-        
-        nmax   = lgs%nmax
-        n_sprs = lgs%n_sprs
-
-        !-------- Solution of the system of linear equations --------
-
-        !-------- Settings for Lis --------
-               
-        call lis_initialize(ierr)           ! Important for parallel computing environments   
-        call CHKERR(ierr)
-
-        call lis_matrix_create(LIS_COMM_WORLD, lgs_a, ierr)
-        call CHKERR(ierr)
-        call lis_vector_create(LIS_COMM_WORLD, lgs_b, ierr)
-        call lis_vector_create(LIS_COMM_WORLD, lgs_x, ierr)
-
-        call lis_matrix_set_size(lgs_a, 0, nmax, ierr)
-        call CHKERR(ierr)
-        call lis_vector_set_size(lgs_b, 0, nmax, ierr)
-        call lis_vector_set_size(lgs_x, 0, nmax, ierr)
-
-        allocate(lgs_a_index(n_sprs))
-        allocate(lgs_a_value(n_sprs))
-        allocate(lgs_b_value(nmax))
-        allocate(lgs_x_value(nmax))
-
-        lgs_a_index = lgs%a_index 
-        lgs_a_value = lgs%a_value 
-        lgs_b_value = lgs%b_value 
-        lgs_x_value = lgs%x_value 
-
-        do nr = 1, nmax
-
-            do nc=lgs%a_ptr(nr), lgs%a_ptr(nr+1)-1
-                call lis_matrix_set_value(LIS_INS_VALUE, nr, lgs_a_index(nc), lgs_a_value(nc), lgs_a, ierr)
-            end do
-
-            call lis_vector_set_value(LIS_INS_VALUE, nr, lgs_b_value(nr), lgs_b, ierr)
-            call lis_vector_set_value(LIS_INS_VALUE, nr, lgs_x_value(nr), lgs_x, ierr)
-
-        end do
-
-        call lis_matrix_set_type(lgs_a, LIS_MATRIX_CSR, ierr)
-        call lis_matrix_assemble(lgs_a, ierr)
-
-        !  ------ Solution with Lis
-
-        call lis_solver_create(solver, ierr)
-
-        ! e.g., advection:
-        !lis_settings = '-i bicg -p ilu -maxiter 1000 -tol 1.0e-12 -initx_zeros false'
-
-        ! e.g., ssa:
-        !lis_settings = '-i bicgsafe -p jacobi -maxiter 100 -tol 1.0e-4 -initx_zeros false'
-
-        call lis_solver_set_option(trim(lis_settings), solver, ierr)
-        call CHKERR(ierr)
-
-        call lis_solve(lgs_a, lgs_b, lgs_x, solver, ierr)
-        call CHKERR(ierr)
-
-        call lis_solver_get_iter(solver, iter, ierr)
-
-        lgs_x_value = 0.0
-        call lis_vector_gather(lgs_x, lgs_x_value, ierr)
-        call CHKERR(ierr)
-
-        call lis_matrix_destroy(lgs_a, ierr)
-        call lis_vector_destroy(lgs_b, ierr)
-        call lis_vector_destroy(lgs_x, ierr)
-        call lis_solver_destroy(solver, ierr)
-                
-        call lis_finalize(ierr)     ! Important for parallel computing environments 
-
-        lgs%x_value = lgs_x_value 
-
-        ! Deallocate local arrays
-        deallocate(lgs_a_index)
-        deallocate(lgs_a_value)
-        deallocate(lgs_b_value)
-        deallocate(lgs_x_value)
-
-        return
-
-    end subroutine mysolver
 
 ! ==== PETSC SPECIFIC CODE =====
 #ifdef USEPETSC

@@ -1,6 +1,6 @@
 module solver_advection_sico
 
-    use yelmo_defs, only : sp, dp, wp 
+    use yelmo_defs, only : sp, dp, wp, io_unit_err 
     use yelmo_tools, only : get_neighbor_indices
     use solver_linear
 
@@ -66,7 +66,7 @@ contains
         integer  :: im1, ip1, jm1, jp1 
         integer  :: n, nr, nc
         real(wp) :: dt_darea
-        logical  :: is_periodic
+        character(len=56) :: bcs(4)
 
         real(wp), allocatable  :: ux_1(:,:), ux_2(:,:)
         real(wp), allocatable  :: uy_1(:,:), uy_2(:,:)
@@ -75,20 +75,41 @@ contains
 
         real(wp), parameter :: WOVI = 1.0     ! Weighing parameter for the over-implicit scheme 
 
-        integer :: IMAX, JMAX 
-        integer :: m 
-
         nx = size(H,1)
         ny = size(H,2) 
 
         dt_darea = dt/(dx*dy)
 
-        ! Check if domain is periodic
-        if (trim(boundaries) .eq. "periodic") then 
-            is_periodic = .TRUE. 
-        else 
-            is_periodic = .FALSE. 
-        end if 
+        ! Boundary conditions (bcs) counterclockwise unit circle 
+        ! 1: x, right-border
+        ! 2: y, upper-border 
+        ! 3: x, left--border 
+        ! 4: y, lower-border 
+        
+        ! Define border conditions (only choices are: no-slip, free-slip, periodic)
+        select case(trim(boundaries)) 
+
+            case("MISMIP3D","TROUGH")
+
+                bcs(1) = "zero"
+                bcs(2) = "periodic"
+                bcs(3) = "infinite"
+                bcs(4) = "periodic" 
+
+            case("infinite")
+
+                bcs(1:4) = "infinite" 
+            
+            case("periodic")
+
+                bcs(1:4) = "periodic" 
+
+            case DEFAULT 
+
+                bcs(1:4) = "periodic"
+                
+        end select 
+
 
         ! Safety check for initialization
         if (.not. allocated(lgs%x_value)) then 
@@ -218,19 +239,117 @@ contains
                 lgs%b_value(nr) = 0.0_wp
                 lgs%x_value(nr) = H(i,j)
             
-            else if ( (.not. is_periodic) .and. &
-                (i .eq. 1 .or. i .eq. nx .or. j .eq. 1 .or. j .eq. ny) ) then
-                ! At outer boundary, and not periodic,
-                ! for now set to zero boundary condition
-                ! but should be handled in the future via 'boundaries' argument
-                ! and/or mask
+            else if ( (.not. trim(bcs(1)) .eq. "periodic") .and. i .eq. nx) then
+                ! Right border
 
-                k = k+1
-                lgs%a_index(k) = nr
-                lgs%a_value(k) = 1.0_wp   ! diagonal element only
-                
-                lgs%b_value(nr) = 0.0_wp
-                lgs%x_value(nr) = 0.0_wp
+                if (bcs(1) .eq. "infinite") then
+
+                    k = k+1
+                    lgs%a_index(k) = lgs%ij2n(i,j)                  ! column counter for H(i,j)
+                    lgs%a_value(k) =  1.0_wp
+                    
+                    k = k+1
+                    lgs%a_index(k) = lgs%ij2n(im1,j)                ! column counter for H(im1,j)
+                    lgs%a_value(k) = -1.0_wp
+
+                    lgs%b_value(nr) = 0.0_wp
+                    lgs%x_value(nr) = H(i,j)
+
+                else
+                    ! Assume zero for now
+
+                    k = k+1
+                    lgs%a_index(k) = nr
+                    lgs%a_value(k) = 1.0_wp   ! diagonal element only
+                    
+                    lgs%b_value(nr) = 0.0_wp
+                    lgs%x_value(nr) = 0.0_wp
+
+                end if
+
+            else if ( (.not. trim(bcs(2)) .eq. "periodic") .and. j .eq. ny) then
+                ! Top border
+
+                if (bcs(2) .eq. "infinite") then
+
+                    k = k+1
+                    lgs%a_index(k) = lgs%ij2n(i,j)                  ! column counter for H(i,j)
+                    lgs%a_value(k) =  1.0_wp
+                    
+                    k = k+1
+                    lgs%a_index(k) = lgs%ij2n(i,jm1)                ! column counter for H(i,jm1)
+                    lgs%a_value(k) = -1.0_wp
+
+                    lgs%b_value(nr) = 0.0_wp
+                    lgs%x_value(nr) = H(i,j)
+
+                else
+                    ! Assume zero for now
+
+                    k = k+1
+                    lgs%a_index(k) = nr
+                    lgs%a_value(k) = 1.0_wp   ! diagonal element only
+                    
+                    lgs%b_value(nr) = 0.0_wp
+                    lgs%x_value(nr) = 0.0_wp
+
+                end if
+
+            else if ( (.not. trim(bcs(3)) .eq. "periodic") .and. i .eq. 1) then
+                ! Left border
+
+                if (bcs(3) .eq. "infinite") then
+
+                    k = k+1
+                    lgs%a_index(k) = lgs%ij2n(i,j)                  ! column counter for H(i,j)
+                    lgs%a_value(k) =  1.0_wp
+                    
+                    k = k+1
+                    lgs%a_index(k) = lgs%ij2n(ip1,j)                ! column counter for H(ip1,j)
+                    lgs%a_value(k) = -1.0_wp
+
+                    lgs%b_value(nr) = 0.0_wp
+                    lgs%x_value(nr) = H(i,j)
+
+                else
+                    ! Assume zero for now
+
+                    k = k+1
+                    lgs%a_index(k) = nr
+                    lgs%a_value(k) = 1.0_wp   ! diagonal element only
+                    
+                    lgs%b_value(nr) = 0.0_wp
+                    lgs%x_value(nr) = 0.0_wp
+
+                end if
+
+            else if ( (.not. trim(bcs(4)) .eq. "periodic") .and. j .eq. 1) then
+                ! Bottom border
+
+                if (bcs(4) .eq. "infinite") then
+
+                    k = k+1
+                    lgs%a_index(k) = lgs%ij2n(i,j)                  ! column counter for H(i,j)
+                    lgs%a_value(k) =  1.0_wp
+                    
+                    k = k+1
+                    lgs%a_index(k) = lgs%ij2n(i,jp1)                ! column counter for H(i,jp1)
+                    lgs%a_value(k) = -1.0_wp
+
+                    lgs%b_value(nr) = 0.0_wp
+                    lgs%x_value(nr) = H(i,j)
+
+                else
+                    ! Assume zero for now
+
+                    k = k+1
+                    lgs%a_index(k) = nr
+                    lgs%a_value(k) = 1.0_wp   ! diagonal element only
+                    
+                    lgs%b_value(nr) = 0.0_wp
+                    lgs%x_value(nr) = 0.0_wp
+
+                end if
 
             else
                 ! Inner point
@@ -417,189 +536,6 @@ contains
     ! ==== SICOPOLIS5-dev over-implicit solver =====
     
     subroutine calc_adv2D_impl_sico(uu,ux,uy,F,dx,dy,dt,use_lis)
-        !------------------------------------------------------------------------------
-        ! Over-implicit solver for the general ice thickness equation.
-        !------------------------------------------------------------------------------
-
-        implicit none
-
-        real(wp), intent(INOUT)   :: uu(:,:)  ! [X] Variable of interest (aa nodes)
-        real(wp), intent(IN)      :: ux(:,:)  ! [m a-1] Horizontal velocity x-direction (ac nodes)
-        real(wp), intent(IN)      :: uy(:,:)  ! [m a-1] Horizontal velocity y-direction (ac nodes)
-        real(wp), intent(IN)      :: F(:,:)   ! [m a-1] Net source/sink terms (aa nodes)
-        real(wp), intent(IN)      :: dx       ! [m] Horizontal step x-direction
-        real(wp), intent(IN)      :: dy       ! [m] Horizontal step y-direction 
-        real(wp), intent(IN)      :: dt       ! [a] Time step 
-        logical,  intent(IN)      :: use_lis  ! use_lis or sor? 
-
-        ! Local variables  
-        integer :: i, j, nx, ny 
-        integer :: n, nr, k
-        real(wp), allocatable  :: ux_1(:,:), ux_2(:,:)
-        real(wp), allocatable  :: uy_1(:,:), uy_2(:,:)
-        real(wp), allocatable  :: up_x_1(:,:), up_x_2(:,:)
-        real(wp), allocatable  :: up_y_1(:,:), up_y_2(:,:)
-        real(wp) :: dt_darea
-        real(wp), parameter    :: OVI_WEIGHT = 1.0  ! Weighing parameter for the over-implicit scheme 
-
-        type(linear_solver_class) :: lgs 
-        character(len=256) :: adv_lis_opt
-
-        nx = size(uu,1)
-        ny = size(uu,2)
-        
-        allocate(ux_1(nx,ny))
-        allocate(ux_2(nx,ny))
-        allocate(uy_1(nx,ny))
-        allocate(uy_2(nx,ny))
-        
-        allocate(up_x_1(nx,ny))
-        allocate(up_x_2(nx,ny))
-        allocate(up_y_1(nx,ny))
-        allocate(up_y_2(nx,ny))
-
-        !-------- Abbreviations --------
-
-        dt_darea = dt/(dx*dy)
-
-        ux_1 = 0.0
-        ux_2 = 0.0
-        uy_1 = 0.0
-        uy_2 = 0.0
-        
-        up_x_1 = 0.0
-        up_x_2 = 0.0
-        up_y_1 = 0.0
-        up_y_2 = 0.0
-
-        do i = 2, nx-1 
-        do j = 2, ny-1
-
-            ux_1(i,j) = ux(i-1,j)
-            ux_2(i,j) = ux(i,j)
-            uy_1(i,j) = uy(i,j-1)
-            uy_2(i,j) = uy(i,j)
-
-            if (ux_1(i,j) >= 0.0) then
-                up_x_1(i,j) = uu(i-1,j)
-            else
-                up_x_1(i,j) = uu(i,j)
-            end if
-
-            if (ux_2(i,j) >= 0.0) then
-                up_x_2(i,j) = uu(i,j)
-            else
-                up_x_2(i,j) = uu(i+1,j)
-            end if
-
-            if (uy_1(i,j) >= 0.0) then
-                up_y_1(i,j) = uu(i,j-1)
-            else
-                up_y_1(i,j) = uu(i,j)
-            end if
-
-            if (uy_2(i,j) >= 0.0) then
-                up_y_2(i,j) = uu(i,j)
-            else
-                up_y_2(i,j) = uu(i,j+1)
-            end if
-
-        end do
-        end do
-
-        ! Initialize the linear solver object       
-        call linear_solver_init(lgs,nx,ny,nvar=1,n_terms=5)
-        
-        !-------- Assembly of the system of linear equations
-        !                     (matrix storage: compressed sparse row CSR) --------
-
-        lgs%a_ptr(1) = 1
-
-        k = 0
-
-        do nr = 1, lgs%nmax   ! loop over rows
-            
-            i = lgs%n2i(nr)
-            j = lgs%n2j(nr)
-            
-            if (i .gt. 1 .and. i .lt. nx .and. j .gt. 1 .and. j .lt. ny) then
-                ! Inner point 
-
-                k=k+1 ; lgs%a_index(k)=lgs%ij2n(i,j-1)   ! for uu(i,j-1)
-                if (uy_1(i,j) > 0.0) &
-                 lgs%a_value(k) = -dt_darea*uy_1(i,j)*dx*OVI_WEIGHT
-
-                k=k+1 ; lgs%a_index(k)=lgs%ij2n(i-1,j)   ! for uu(i-1,j)
-                if (ux_1(i,j) > 0.0) &
-                 lgs%a_value(k) = -dt_darea*ux_1(i,j)*dy*OVI_WEIGHT
-
-                k=k+1 ; lgs%a_index(k)=nr                       ! for uu(i,j)
-                lgs%a_value(k) = 1.0                             ! (diagonal element)
-                if (uy_1(i,j) < 0.0) &
-                 lgs%a_value(k) = lgs%a_value(k) &
-                                  - dt_darea*uy_1(i,j)*dx*OVI_WEIGHT
-                if (ux_1(i,j) < 0.0) &
-                 lgs%a_value(k) = lgs%a_value(k) &
-                                  - dt_darea*ux_1(i,j)*dy*OVI_WEIGHT
-                if (ux_2(i,j) > 0.0) &
-                 lgs%a_value(k) = lgs%a_value(k) &
-                                  + dt_darea*ux_2(i,j)*dy*OVI_WEIGHT
-                if (uy_2(i,j) > 0.0) &
-                 lgs%a_value(k) = lgs%a_value(k) &
-                                  + dt_darea*uy_2(i,j)*dx*OVI_WEIGHT
-
-
-                k=k+1 ; lgs%a_index(k)=lgs%ij2n(i+1,j)   ! for uu(i+1,j)
-                if (ux_2(i,j) < 0.0) &
-                 lgs%a_value(k) = dt_darea*ux_2(i,j)*dy*OVI_WEIGHT
-
-                k=k+1 ; lgs%a_index(k)=lgs%ij2n(i,j+1)   ! for uu(i,j+1)
-                if (uy_2(i,j) < 0.0) &
-                 lgs%a_value(k) = dt_darea*uy_2(i,j)*dx*OVI_WEIGHT
-
-                lgs%b_value(nr) = uu(i,j) &
-                                +dt*F(i,j) &
-                                -(1.0-OVI_WEIGHT) &
-                                   * dt_darea &
-                                     * (  ( ux_2(i,j)*up_x_2(i,j)*dy   &
-                                           -ux_1(i,j)*up_x_1(i,j)*dy ) &
-                                        + ( uy_2(i,j)*up_y_2(i,j)*dx    &
-                                           -uy_1(i,j)*up_y_1(i,j)*dx  ) )
-                ! right-hand side
-
-            else   ! zero-thickness boundary condition
-
-                k = k+1
-                lgs%a_value(k)       = 1.0   ! diagonal element only
-                lgs%a_index(k)       = nr
-                lgs%b_value(nr)      = 0.0
-
-            end if
-
-            lgs%x_value(nr) = uu(i,j)   ! old variable value,
-            ! initial guess for solution vector
-
-            lgs%a_ptr(nr+1) = k+1   ! row is completed, store index to next row
-
-        end do
-
-        adv_lis_opt = "-i bicg -p ilu -maxiter 1000 -tol 1.0e-12 -initx_zeros false"
-        !call mysolver(lgs,adv_lis_opt)
-        call linear_solver_matrix_solve(lgs,adv_lis_opt)
-        
-        ! Save L2_norm locally
-        !L2_norm = lgs%L2_rel_norm 
-
-        ! Store advection solution
-        call linear_solver_save_advection(uu,lgs)
-
-        if (maxval(uu) .gt. 1e3) stop
-
-        return 
-
-    end subroutine calc_adv2D_impl_sico
-    
-    subroutine calc_adv2D_impl_sico_0(uu,ux,uy,F,dx,dy,dt,use_lis)
         !------------------------------------------------------------------------------
         ! Over-implicit solver for the general ice thickness equation.
         !------------------------------------------------------------------------------
@@ -868,7 +804,7 @@ contains
             call CHKERR(ierr)
 
             call lis_solver_get_iter(solver, iter, ierr)
-            !write(6,'(10x,a,i0,5x,i2)') 'calc_adv2D_impl_sico_0 [lis]: iter = ', iter, ierr
+            !write(6,'(10x,a,i0,5x,i2)') 'calc_adv2D_impl_sico [lis]: iter = ', iter, ierr
 
             lgs_x_value = 0.0
             call lis_vector_gather(lgs_x, lgs_x_value, ierr)
@@ -901,7 +837,7 @@ contains
         
         return 
 
-    end subroutine calc_adv2D_impl_sico_0
+    end subroutine calc_adv2D_impl_sico
     
     subroutine sor_sprs(lgs_a_value, lgs_a_index, lgs_a_diag_index, lgs_a_ptr, &
                         lgs_b_value, omega, eps_sor, lgs_x_value, iter, ierr)

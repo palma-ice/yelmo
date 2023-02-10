@@ -97,10 +97,7 @@ contains
                 ! Solve linear equation
                 adv_lis_opt = "-i bicg -p ilu -maxiter 1000 -tol 1.0e-12 -initx_zeros false"
                 call linear_solver_matrix_solve(lgs,adv_lis_opt)
-            
-                ! Save L2_norm locally
-                !L2_norm = lgs%L2_rel_norm 
-
+                
                 ! Store advection solution
                 call linear_solver_save_advection(var_now,lgs)
 

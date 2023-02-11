@@ -100,13 +100,17 @@ contains
 
                 bcs(1:4) = "infinite" 
             
+            case("zeros")
+
+                bcs(1:4) = "zero" 
+
             case("periodic")
 
                 bcs(1:4) = "periodic" 
 
             case DEFAULT 
 
-                bcs(1:4) = "periodic"
+                bcs(1:4) = "zero"
                 
         end select 
 

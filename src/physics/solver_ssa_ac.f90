@@ -119,7 +119,7 @@ contains
 
             ! Consistency check: ensure beta is defined well 
             if ( ( count(ssa_mask_acx .eq. 1 .and. beta_acx .gt. 0.0) .eq. 0 ) .or. & 
-                ( count(ssa_mask_acy .eq. 1 .and. beta_acy .gt. 0.0) .eq. 0 ) ) then  
+                 ( count(ssa_mask_acy .eq. 1 .and. beta_acy .gt. 0.0) .eq. 0 ) ) then  
                 ! No points found with a non-zero beta for grounded ice,
                 ! something was not well-defined/well-initialized
 
@@ -179,10 +179,14 @@ contains
             case("infinite")
 
                 bcs(1:4) = "free-slip" 
+            
+            case("zeros")
+
+                bcs(1:4) = "no-slip" 
                 
             case DEFAULT 
 
-                bcs(1:4) = "periodic"
+                bcs(1:4) = "no-slip" 
                 
         end select 
 

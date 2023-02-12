@@ -22,6 +22,7 @@ module yelmo_ice
     use yelmo_regions 
 
     use topography, only : remove_englacial_lakes
+    use mass_conservation, only : apply_ice_thickness_boundaries
 
     implicit none 
 
@@ -724,6 +725,13 @@ end if
                 dom%tpo%par%boundaries  = "periodic"
                 dom%dyn%par%boundaries  = "periodic"
                 dom%thrm%par%boundaries = "periodic"
+            
+            case("periodic-x") 
+                ! Periodic boundary conditions in x-direction,
+                ! infinite in y-direction
+                dom%tpo%par%boundaries  = "periodic-x"
+                dom%dyn%par%boundaries  = "periodic-x"
+                dom%thrm%par%boundaries = "periodic-x"
 
             case("infinite") 
                 ! Set border points equal to interior neighbors 
@@ -732,19 +740,12 @@ end if
                 dom%dyn%par%boundaries  = "infinite"
                 dom%thrm%par%boundaries = "infinite"
 
-            case("periodic-x") 
-                ! Periodic boundary conditions in x-direction,
-                ! infinite in y-direction
-                dom%tpo%par%boundaries  = "periodic-x"
-                dom%dyn%par%boundaries  = "periodic-x"
-                dom%thrm%par%boundaries = "periodic-x"
-        
             case DEFAULT
-                ! Infinite by default (most natural for real domains)
+                ! zeros by default - safest option
 
-                dom%tpo%par%boundaries  = "infinite"
-                dom%dyn%par%boundaries  = "infinite"
-                dom%thrm%par%boundaries = "infinite"
+                dom%tpo%par%boundaries  = "zeros"
+                dom%dyn%par%boundaries  = "zeros"
+                dom%thrm%par%boundaries = "zeros"
 
         end select 
 
@@ -895,14 +896,19 @@ end if
 
             end if
 
-            ! Clean up ice thickness field 
-            where (.not. dom%bnd%ice_allowed)  H_ice = 0.0_wp
-            where (H_ice  .lt. 1.0)            H_ice = 0.0_wp
-
             ! Smooth ice thickness field, if desired 
             if (smooth_H_ice .ge. 1.0_wp) then 
                 call smooth_gauss_2D(H_ice,dx=dom%grd%dx,f_sigma=smooth_H_ice)
             end if 
+
+            ! Clean up ice thickness field 
+            ! Apply all additional (generally artificial) ice thickness adjustments 
+            ! and store changes in residual mass balance field. 
+            ! Set minimum ice thickness to 1m for safety to start.
+            call apply_ice_thickness_boundaries(dom%tpo%now%mb_resid,dom%tpo%now%H_ice,dom%tpo%now%f_ice,dom%tpo%now%f_grnd, &
+                                                dom%dyn%now%uxy_b,dom%bnd%ice_allowed,dom%tpo%par%boundaries,dom%bnd%H_ice_ref, &
+                                                H_min_flt=1.0_wp,H_min_grnd=1.0_wp,dt=0.0,reset=.TRUE.)
+
 
             ! Smooth z_bed field, if desired 
             if (smooth_z_bed .ge. 1.0_wp) then 

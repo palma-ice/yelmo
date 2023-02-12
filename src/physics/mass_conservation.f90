@@ -779,75 +779,71 @@ contains
 
             case("MISMIP3D","TROUGH")
 
-                H_ice_new(1,:)    = H_ice_new(2,:)          ! x=0, Symmetry 
-                H_ice_new(nx,:)   = 0.0                     ! x=max, no ice
+                ! Do nothing - this should be handled by the ice advection routine
+                ! if the default choice ytopo.solver="impl-lis" is used.
+                
+                !H_ice_new(1,:)    = H_ice_new(2,:)          ! x=0, Symmetry 
+                !H_ice_new(nx,:)   = 0.0                     ! x=max, no ice
 
+                !H_ice_new(:,1)    = H_ice_new(:,2)          ! y=-50km, Free-slip condition
+                !H_ice_new(:,ny)   = H_ice_new(:,ny-1)       ! y= 50km, Free-slip condition
+
+            case("periodic","periodic-xy")
+
+                ! Do nothing - this should be handled by the ice advection routine
+                ! if the default choice ytopo.solver="impl-lis" is used.
+
+            ! case("periodic-x") 
+
+            !     ! Periodic x 
+            !     H_ice_new(1:2,:)     = H_ice_new(nx-3:nx-2,:) 
+            !     H_ice_new(nx-1:nx,:) = H_ice_new(2:3,:) 
+                
+            !     ! Infinite (free-slip too)
+            !     H_ice_new(:,1)  = H_ice_new(:,2)
+            !     H_ice_new(:,ny) = H_ice_new(:,ny-1)
+
+            case("infinite")
+                ! Set border points equal to inner neighbors 
+
+                ! Do nothing - this should be handled by the ice advection routine
+                ! if the default choice ytopo.solver="impl-lis" is used.
+
+                !call fill_borders_2D(H_ice_new,nfill=1)
+
+            case("fixed") 
+                ! Set border points equal to prescribed values from array
+
+                ! Do nothing - this should be handled by the ice advection routine
+                ! if the default choice ytopo.solver="impl-lis" is used.
+
+                !call fill_borders_2D(H_ice_new,nfill=1,fill=H_ice_ref)
+
+            case DEFAULT    ! e.g., None/none, zeros, EISMINT
+                ! By default, impose zero ice thickness on grid borders
+
+                ! Set border values to zero
+                H_ice_new(1,:)  = 0.0
+                H_ice_new(nx,:) = 0.0
+
+                H_ice_new(:,1)  = 0.0
+                H_ice_new(:,ny) = 0.0
+     
         end select
 
-        !call set_boundaries_2D_aa(H_ice_new,boundaries,H_ice_ref)
-
-        ! select case(trim(boundaries))
-
-        !     case("zeros","EISMINT")
-
-        !         ! Set border values to zero
-        !         H_ice_new(1,:)  = 0.0
-        !         H_ice_new(nx,:) = 0.0
-
-        !         H_ice_new(:,1)  = 0.0
-        !         H_ice_new(:,ny) = 0.0
-
-        !     case("periodic","periodic-xy") 
-
-        !         H_ice_new(1:2,:)     = H_ice_new(nx-3:nx-2,:) 
-        !         H_ice_new(nx-1:nx,:) = H_ice_new(2:3,:) 
-
-        !         H_ice_new(:,1:2)     = H_ice_new(:,ny-3:ny-2) 
-        !         H_ice_new(:,ny-1:ny) = H_ice_new(:,2:3) 
-            
-        !     case("periodic-x") 
-
-        !         ! Periodic x 
-        !         H_ice_new(1:2,:)     = H_ice_new(nx-3:nx-2,:) 
-        !         H_ice_new(nx-1:nx,:) = H_ice_new(2:3,:) 
-                
-        !         ! Infinite (free-slip too)
-        !         H_ice_new(:,1)  = H_ice_new(:,2)
-        !         H_ice_new(:,ny) = H_ice_new(:,ny-1)
-
-        !     case("MISMIP3D")
-
-        !         ! === MISMIP3D =====
-        !         H_ice_new(1,:)    = H_ice_new(2,:)          ! x=0, Symmetry 
-        !         H_ice_new(nx,:)   = 0.0                     ! x=800km, no ice
-                
-        !         H_ice_new(:,1)    = H_ice_new(:,2)          ! y=-50km, Free-slip condition
-        !         H_ice_new(:,ny)   = H_ice_new(:,ny-1)       ! y= 50km, Free-slip condition
-
-        !     case("infinite")
-        !         ! Set border points equal to inner neighbors 
-
-        !         call fill_borders_2D(H_ice_new,nfill=1)
-
-        !     case("fixed") 
-        !         ! Set border points equal to prescribed values from array
-
-        !         call fill_borders_2D(H_ice_new,nfill=1,fill=H_ice_ref)
-
-        !     case DEFAULT 
-
-        !         write(*,*) "apply_ice_thickness_boundaries:: error: boundary method not recognized: "//trim(boundaries)
-        !         stop 
-
-        ! end select 
-
+        write(*,*) "masscon: ", trim(boundaries), maxval(H_ice(:,ny))
+        
         ! Determine mass balance related to changes applied here
 
         if (reset) then  
             mb_resid = 0.0_wp 
         end if 
 
-        mb_resid = mb_resid + (H_ice_new - H_ice) / dt 
+        if (dt .ne. 0.0) then 
+            mb_resid = mb_resid + (H_ice_new - H_ice) / dt 
+        else 
+            mb_resid = 0.0
+        end if
 
         ! Reset actual ice thickness to new values 
         H_ice = H_ice_new 

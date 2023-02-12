@@ -104,14 +104,14 @@ contains
 
                 bcs(1:4) = "zero" 
 
-            case("periodic")
+            case("periodic","periodic-xy")
 
                 bcs(1:4) = "periodic" 
 
             case DEFAULT 
 
                 bcs(1:4) = "zero"
-                
+
         end select 
 
 

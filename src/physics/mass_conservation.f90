@@ -830,8 +830,6 @@ contains
                 H_ice_new(:,ny) = 0.0
      
         end select
-
-        write(*,*) "masscon: ", trim(boundaries), maxval(H_ice(:,ny))
         
         ! Determine mass balance related to changes applied here
 

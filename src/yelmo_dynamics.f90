@@ -240,6 +240,9 @@ contains
             dyn%now%uxy(:,:,k) = calc_magnitude_from_staggered(dyn%now%ux(:,:,k),dyn%now%uy(:,:,k),tpo%now%f_ice,dyn%par%boundaries)
         end do 
 
+        ! Store basal velocity for easy access (horizontal components already defined)
+        dyn%now%uz_b  = dyn%now%uz(:,:,1)
+
         ! Store surface velocities for easy access too 
         dyn%now%ux_s  = dyn%now%ux(:,:,nz_aa)
         dyn%now%uy_s  = dyn%now%uy(:,:,nz_aa)
@@ -993,6 +996,7 @@ contains
 
         allocate(now%ux_b(nx,ny)) 
         allocate(now%uy_b(nx,ny))
+        allocate(now%uz_b(nx,ny))
         allocate(now%uxy_b(nx,ny))
 
         allocate(now%ux_s(nx,ny)) 
@@ -1103,6 +1107,7 @@ contains
         
         now%ux_b              = 0.0 
         now%uy_b              = 0.0
+        now%uz_b              = 0.0
         now%uxy_b             = 0.0
 
         now%ux_s              = 0.0 
@@ -1220,6 +1225,7 @@ contains
         
         if (allocated(now%ux_b))            deallocate(now%ux_b) 
         if (allocated(now%uy_b))            deallocate(now%uy_b)
+        if (allocated(now%uz_b))            deallocate(now%uz_b)
         if (allocated(now%uxy_b))           deallocate(now%uxy_b)
         
         if (allocated(now%ux_s))            deallocate(now%ux_s) 

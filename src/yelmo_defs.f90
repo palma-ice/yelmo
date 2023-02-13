@@ -369,6 +369,7 @@ module yelmo_defs
 
         real(wp), allocatable :: ux_b(:,:) 
         real(wp), allocatable :: uy_b(:,:)
+        real(wp), allocatable :: uz_b(:,:)
         real(wp), allocatable :: uxy_b(:,:)
 
         ! Surface velocity: eventually these could be pointers since it is simply

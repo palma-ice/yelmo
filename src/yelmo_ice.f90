@@ -705,11 +705,11 @@ end if
                 dom%thrm%par%boundaries = "MISMIP3D"
 
                 ! Consistency check 
-                if (trim(dom%tpo%par%solver) .ne. "impl-upwind") then 
+                if (trim(dom%tpo%par%solver) .ne. "impl-lis") then 
                     write(io_unit_err,*) "yelmo_init:: Error: the mass conservation solver for MISMIP3D experiments &
-                    &must be 'impl-upwind' for stability. The 'expl' solver has not yet been designed to &
+                    &must be 'impl-lis' for stability. The 'expl' solver has not yet been designed to &
                     &handle ice advected at the border point nx-1, and thus oscillations can be produced. &
-                    &Please set 'solver=impl-upwind'."
+                    &Please set 'solver=impl-lis'."
                     stop 
                 end if 
             

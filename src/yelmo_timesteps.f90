@@ -42,6 +42,13 @@ contains
         real(wp),         intent(IN)  :: zeta           ! Ratio of current to previous timestep
         character(len=*), intent(IN)  :: pc_method 
 
+        ! Local variables
+
+        ! Using a small value of eps, like eps=0.1, may help improve stability further
+        ! of the AB method. See this page for more details:
+        ! https://mitgcm.readthedocs.io/en/latest/algorithm/algorithm.html#explicit-time-stepping-adams-bashforth
+        real(wp), parameter :: eps = 0.0
+
         ! Determine which predictor-corrector (pc) method we are using for timestepping,
         ! assign scheme order and weights 
 
@@ -66,8 +73,8 @@ contains
                     ! Order of the method 
                     pc_k = 2 
 
-                    beta(1) = 1.0_wp + zeta/2.0_wp 
-                    beta(2) = -zeta/2.0_wp 
+                    beta(1) = 1.0_wp + zeta/2.0_wp + eps
+                    beta(2) = -zeta/2.0_wp - eps
 
                     beta(3) = 0.5_wp 
                     beta(4) = 0.5_wp 

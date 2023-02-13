@@ -393,18 +393,16 @@ contains
                     ! Calc icebergs: jablasco
                     call calc_iceberg_island(tpo%now%iceberg_mask,tpo%now%f_grnd,tpo%now%H_ice)
                     ! Remove icebergs
-                    where (tpo%now%iceberg_mask.eq.1.0)
-                        tpo%now%H_ice  = 0.0
-                        tpo%now%f_grnd = 0.0
-                        tpo%now%f_ice  = 0.0
-                    end where
-                    !call calc_calving_rate_kill(tpo%now%calv,tpo%now%H_ice,tpo%now%iceberg_mask.eq.1.0,tpo%par%calv_tau,dt)
+                    if (.True.) then
+                        where (tpo%now%iceberg_mask.eq.1.0)
+                            tpo%now%H_ice  = 0.0
+                            tpo%now%f_grnd = 0.0
+                            tpo%now%f_ice  = 0.0
+                        end where
+                    end if
                     ! Calc ice fraction
                     call calc_ice_fraction(tpo%now%f_ice,tpo%now%H_ice,bnd%z_bed,bnd%z_sl,tpo%par%margin_flt_subgrid)
                    
-                    ! jablasco: define icebergs
-                    !call calc_iceberg_island(tpo%now%iceberg_mask,tpo%now%f_grnd,tpo%now%H_ice)
- 
                     ! If desired, finally relax solution to reference state
                     if (tpo%par%topo_rel .ne. 0) then 
 
@@ -875,13 +873,14 @@ end if
             call remove_fractional_ice(tpo%now%H_ice,tpo%now%f_ice)
             ! Define and remove icebergs
             call calc_iceberg_island(tpo%now%iceberg_mask,tpo%now%f_grnd,tpo%now%H_ice)
-            !call calc_calving_rate_kill(tpo%now%calv,tpo%now%H_ice,tpo%now%iceberg_mask.eq.1.0,tpo%par%calv_tau,dt)
-            ! Remove icebergs
-            where (tpo%now%iceberg_mask.eq.1.0)
-                   tpo%now%H_ice  = 0.0
-                   tpo%now%f_grnd = 0.0
-                   tpo%now%f_ice  = 0.0
-            end where
+            !! Remove icebergs
+            if (.True.) then
+                where (tpo%now%iceberg_mask.eq.1.0)
+                    tpo%now%H_ice  = 0.0
+                    tpo%now%f_grnd = 0.0
+                    tpo%now%f_ice  = 0.0
+                end where
+            end if
             call calc_ice_fraction(tpo%now%f_ice,tpo%now%H_ice,bnd%z_bed,bnd%z_sl,tpo%par%margin_flt_subgrid)
             
 

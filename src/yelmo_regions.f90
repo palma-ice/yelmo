@@ -257,7 +257,8 @@ contains
         if (npts_grl .gt. 0) then
 
             reg%A_ice_grl = count(tpo%now%H_ice .gt. 0.0 .and. mask_grl)*tpo%par%dx*tpo%par%dy*m2_km2 ! [km^2]
-            reg%flux_grl  = sum(tpo%now%H_ice,mask=mask_grl)*(tpo%par%dx*tpo%par%dy)                      ! m^3/yr: flux
+            !reg%flux_grl  = sum(tpo%now%H_ice,mask=mask_grl)*(tpo%par%dx*tpo%par%dy)                 ! m^3/yr: flux
+            reg%flux_grl  = sum(dyn%now%uxy_bar*tpo%now%H_ice,mask=mask_grl)*tpo%par%dx               ! m^3/yr: flux
 
         else
 
@@ -272,8 +273,8 @@ contains
         if (npts_frnt .gt. 0) then
 
             reg%A_ice_frnt = count(tpo%now%H_ice .gt. 0.0 .and. mask_frnt)*tpo%par%dx*tpo%par%dy*m2_km2 ! [km^2]
-            reg%calv_flt   = sum(tpo%now%calv_flt,mask=mask_frnt)*(tpo%par%dx*tpo%par%dy)
-            reg%flux_frnt  = reg%calv_flt+sum(tpo%now%fmb,mask=mask_frnt)*(tpo%par%dx*tpo%par%dy)         ! m^3/yr: flux [m-1 yr-1]
+            reg%calv_flt   = sum(tpo%now%calv_flt*tpo%now%H_ice,mask=mask_frnt)*tpo%par%dx              ! m^3/yr: flux [m-1 yr-1]
+            reg%flux_frnt  = reg%calv_flt+sum(tpo%now%fmb*tpo%now%H_ice,mask=mask_frnt)*tpo%par%dx      ! m^3/yr: flux [m-1 yr-1]
 
         else
 

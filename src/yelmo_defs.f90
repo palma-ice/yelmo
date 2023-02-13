@@ -967,8 +967,6 @@ contains
         logical :: init_pars
         integer :: n_threads 
         character(len=10) :: n_threads_str 
-
-        init_pars = .TRUE. 
         
         ! Check openmp status - set global variable to use as a switch 
         yelmo_use_omp = .FALSE. 
@@ -994,6 +992,8 @@ contains
 
         ! Load parameter values 
 
+        init_pars = .TRUE. 
+        
         call nml_read(filename,"yelmo_config","yelmo_log",yelmo_log,init=init_pars)
 
         call nml_read(filename,"yelmo_constants","sec_year",    sec_year,   init=init_pars)

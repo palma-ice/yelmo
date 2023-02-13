@@ -243,6 +243,7 @@ contains
         ! Store surface velocities for easy access too 
         dyn%now%ux_s  = dyn%now%ux(:,:,nz_aa)
         dyn%now%uy_s  = dyn%now%uy(:,:,nz_aa)
+        dyn%now%uz_s  = dyn%now%uz(:,:,nz_ac)
         dyn%now%uxy_s = dyn%now%uxy(:,:,nz_aa)
 
         ! Determine ratio of basal to surface velocity
@@ -996,7 +997,9 @@ contains
 
         allocate(now%ux_s(nx,ny)) 
         allocate(now%uy_s(nx,ny))
+        allocate(now%uz_s(nx,ny)) 
         allocate(now%uxy_s(nx,ny))
+        
         
         allocate(now%ux_i(nx,ny,nz_aa)) 
         allocate(now%uy_i(nx,ny,nz_aa))
@@ -1104,6 +1107,7 @@ contains
 
         now%ux_s              = 0.0 
         now%uy_s              = 0.0
+        now%uz_s              = 0.0
         now%uxy_s             = 0.0
         
         now%ux_i              = 0.0 
@@ -1127,8 +1131,8 @@ contains
         now%taub_acy          = 0.0 
         now%taub              = 0.0 
         
-        now%taul_int_acx    = 0.0 
-        now%taul_int_acy    = 0.0 
+        now%taul_int_acx      = 0.0 
+        now%taul_int_acy      = 0.0 
 
         now%qq_gl_acx         = 0.0 
         now%qq_gl_acy         = 0.0 
@@ -1159,34 +1163,34 @@ contains
         now%ssa_err_acx       = 0.0 
         now%ssa_err_acy       = 0.0 
         
-        now%jvel%dxx            = 0.0
-        now%jvel%dxy            = 0.0
-        now%jvel%dxz            = 0.0
-        now%jvel%dyx            = 0.0
-        now%jvel%dyy            = 0.0
-        now%jvel%dyz            = 0.0
-        now%jvel%dzx            = 0.0
-        now%jvel%dzy            = 0.0
-        now%jvel%dzz            = 0.0
+        now%jvel%dxx          = 0.0
+        now%jvel%dxy          = 0.0
+        now%jvel%dxz          = 0.0
+        now%jvel%dyx          = 0.0
+        now%jvel%dyy          = 0.0
+        now%jvel%dyz          = 0.0
+        now%jvel%dzx          = 0.0
+        now%jvel%dzy          = 0.0
+        now%jvel%dzz          = 0.0
         
-        now%strn%dxx     = 0.0 
-        now%strn%dyy     = 0.0 
-        now%strn%dxy     = 0.0 
-        now%strn%dxz     = 0.0
-        now%strn%dyz     = 0.0
-        now%strn%div     = 0.0
-        now%strn%de      = 0.0
-        now%strn%f_shear = 0.0 
+        now%strn%dxx          = 0.0 
+        now%strn%dyy          = 0.0 
+        now%strn%dxy          = 0.0 
+        now%strn%dxz          = 0.0
+        now%strn%dyz          = 0.0
+        now%strn%div          = 0.0
+        now%strn%de           = 0.0
+        now%strn%f_shear      = 0.0 
         
-        now%strn2D%dxx   = 0.0 
-        now%strn2D%dyy   = 0.0 
-        now%strn2D%dxy   = 0.0
-        now%strn2D%dxz   = 0.0
-        now%strn2D%dyz   = 0.0
-        now%strn2D%div   = 0.0
-        now%strn2D%de    = 0.0 
-        now%strn2D%eps_eig_1 = 0.0 
-        now%strn2D%eps_eig_2 = 0.0 
+        now%strn2D%dxx        = 0.0 
+        now%strn2D%dyy        = 0.0 
+        now%strn2D%dxy        = 0.0
+        now%strn2D%dxz        = 0.0
+        now%strn2D%dyz        = 0.0
+        now%strn2D%div        = 0.0
+        now%strn2D%de         = 0.0 
+        now%strn2D%eps_eig_1  = 0.0 
+        now%strn2D%eps_eig_2  = 0.0 
         
         return 
 
@@ -1220,6 +1224,7 @@ contains
         
         if (allocated(now%ux_s))            deallocate(now%ux_s) 
         if (allocated(now%uy_s))            deallocate(now%uy_s)
+        if (allocated(now%uz_s))            deallocate(now%uz_s)
         if (allocated(now%uxy_s))           deallocate(now%uxy_s)
         
         if (allocated(now%ux_i))            deallocate(now%ux_i) 

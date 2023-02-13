@@ -375,6 +375,7 @@ module yelmo_defs
         ! the top layer in ux(:,:,:), etc. and only used, not calculated.
         real(wp), allocatable :: ux_s(:,:) 
         real(wp), allocatable :: uy_s(:,:)
+        real(wp), allocatable :: uz_s(:,:)
         real(wp), allocatable :: uxy_s(:,:)
         
         real(wp), allocatable :: ux_i(:,:,:) 

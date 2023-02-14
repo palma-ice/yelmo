@@ -674,7 +674,9 @@ contains
         ! according to boundary mask (ie, EISMINT, BUELER-A, open ocean)
         where (.not. ice_allowed) H_ice_new = 0.0 
         
-
+        ! Also remove ice that is very small to avoid issues
+        where (H_ice_new .lt. 1e-4) H_ice_new = 0.0
+        
         ! Remove margin points that are too thin ====
 
         H_tmp = H_ice_new 

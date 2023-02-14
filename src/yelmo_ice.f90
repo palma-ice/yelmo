@@ -902,13 +902,7 @@ end if
             end if 
 
             ! Clean up ice thickness field 
-            ! Apply all additional (generally artificial) ice thickness adjustments 
-            ! and store changes in residual mass balance field. 
-            ! Set minimum ice thickness to 1m for safety to start.
-            call apply_ice_thickness_boundaries(dom%tpo%now%mb_resid,dom%tpo%now%H_ice,dom%tpo%now%f_ice,dom%tpo%now%f_grnd, &
-                                                dom%dyn%now%uxy_b,dom%bnd%ice_allowed,dom%tpo%par%boundaries,dom%bnd%H_ice_ref, &
-                                                H_min_flt=1.0_wp,H_min_grnd=1.0_wp,dt=0.0,reset=.TRUE.)
-
+            where (H_ice .lt. 1.0_wp) H_ice = 0.0_wp 
 
             ! Smooth z_bed field, if desired 
             if (smooth_z_bed .ge. 1.0_wp) then 
@@ -945,6 +939,13 @@ end if
             dom%tpo%now%H_ice = H_ice 
             dom%bnd%z_bed     = z_bed 
             dom%bnd%z_bed_sd  = z_bed_sd 
+
+            ! Finally, apply all additional (generally artificial) ice thickness adjustments 
+            ! and store changes in residual mass balance field. 
+            ! Set minimum ice thickness to 1m for safety to start.
+            call apply_ice_thickness_boundaries(dom%tpo%now%mb_resid,dom%tpo%now%H_ice,dom%tpo%now%f_ice,dom%tpo%now%f_grnd, &
+                                                dom%dyn%now%uxy_b,dom%bnd%ice_allowed,dom%tpo%par%boundaries,dom%bnd%H_ice_ref, &
+                                                H_min_flt=1.0_wp,H_min_grnd=1.0_wp,dt=0.0,reset=.TRUE.)
 
         end if 
 

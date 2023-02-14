@@ -805,20 +805,22 @@ contains
         type(ybound_class), intent(IN)    :: bnd  
 
         ! Local variables 
-        real(prec), allocatable :: H_w(:,:) 
+        real(wp) :: H_w_max
 
-        ! Allocate local H_w variable to represent water layer thickness if not available
-        allocate(H_w(dyn%par%nx,dyn%par%ny)) 
+        if (dyn%par%neff_H_w_max .lt. 0.0) then 
+            ! Set the water saturation value to the parameter value
+            ! obtained from the thermodynamics module. Ie, let the
+            ! saturation value coincide with the maximum allowed water thickness. 
 
-        ! Determine whether to use actual water layer thickness or parameterized layer thickness
-        if (dyn%par%neff_set_water) then
-            ! Set water to maximum thickness for temperate ice
-            H_w = thrm%par%H_w_max * thrm%now%f_pmp  
-        else 
-            ! Use boundary water thickness field
-            H_w = thrm%now%H_w 
-        end if 
-        
+            H_w_max = thrm%par%H_w_max
+
+        else
+            ! Impose the water saturation value desired
+
+            H_w_max = dyn%par%neff_H_w_max 
+
+        end if
+
         ! Calculate effective pressure N_eff [Pa]
         select case(dyn%par%neff_method)
 
@@ -840,14 +842,14 @@ contains
                 ! following Leguy et al. (2014) 
 
                 dyn%now%N_eff = calc_effective_pressure_marine(tpo%now%H_ice_dyn,tpo%now%f_ice_dyn,bnd%z_bed,bnd%z_sl, &
-                                                                                            H_w,p=dyn%par%neff_p)
+                                                                                            thrm%now%H_w,p=dyn%par%neff_p)
 
             case(3)
                 ! Effective pressure as basal till pressure
                 ! following van Pelt and Bueler (2015)
 
-                call calc_effective_pressure_till(dyn%now%N_eff,H_w,tpo%now%H_ice_dyn,tpo%now%f_ice_dyn,tpo%now%f_grnd, &
-                                  thrm%par%H_w_max,dyn%par%neff_N0,dyn%par%neff_delta,dyn%par%neff_e0,dyn%par%neff_Cc) 
+                call calc_effective_pressure_till(dyn%now%N_eff,thrm%now%H_w,tpo%now%H_ice_dyn,tpo%now%f_ice_dyn,tpo%now%f_grnd, &
+                                                        H_w_max,dyn%par%neff_N0,dyn%par%neff_delta,dyn%par%neff_e0,dyn%par%neff_Cc) 
 
             case(4) 
                 ! Calculate two-valued effective pressure using till parameter neff_delta 
@@ -924,7 +926,7 @@ contains
         call nml_read(filename,"yneff","method",            par%neff_method,        init=init_pars)
         call nml_read(filename,"yneff","const",             par%neff_const,         init=init_pars)
         call nml_read(filename,"yneff","p",                 par%neff_p,             init=init_pars)
-        call nml_read(filename,"yneff","set_water",         par%neff_set_water,     init=init_pars)
+        call nml_read(filename,"yneff","H_w_max",           par%neff_H_w_max,       init=init_pars)
         call nml_read(filename,"yneff","N0",                par%neff_N0,            init=init_pars)
         call nml_read(filename,"yneff","delta",             par%neff_delta,         init=init_pars)
         call nml_read(filename,"yneff","e0",                par%neff_e0,            init=init_pars)

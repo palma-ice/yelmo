@@ -325,8 +325,7 @@ module yelmo_defs
         integer    :: neff_method
         real(wp)   :: neff_const
         real(wp)   :: neff_p 
-        logical    :: neff_set_water 
-        real(wp)   :: neff_w_max
+        real(wp)   :: neff_H_w_max
         real(wp)   :: neff_N0
         real(wp)   :: neff_delta 
         real(wp)   :: neff_e0 

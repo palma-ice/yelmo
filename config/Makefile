@@ -43,10 +43,14 @@ include config/Makefile_yelmo.mk
 ##
 ###############################################
 
+check-hash:
+	./check_githash > git_yelmo.txt
+
 # Static library compilation
 yelmo-static: $(yelmo_libs) $(yelmo_physics) $(yelmo_base) $(yelmo_tests)
 	ar rc $(objdir)/libyelmo.a $(yelmo_libs) $(yelmo_physics) $(yelmo_base) $(yelmo_tests)
 	ranlib $(objdir)/libyelmo.a
+	./check_githash > git_yelmo.txt
 	@echo " "
 	@echo "    $(objdir)/libyelmo.a is ready."
 	@echo " "
@@ -160,3 +164,4 @@ clean:
 	rm -f $(bindir)/*.x
 	rm -f  *.x gmon.out $(objdir)/*.o $(objdir)/*.mod $(objdir)/*.a $(objdir)/*.so
 	rm -rf *.x.dSYM
+	rm -f ./git_yelmo.txt

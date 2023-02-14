@@ -1,0 +1,29 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+
+import subprocess as subp 
+
+
+def get_git_revision_hash():
+
+    #gitcmd = ['git', 'describe', '--always', '--long', 'HEAD']
+    gitcmd = ['git', 'rev-parse', 'HEAD']
+
+    try:
+        githash = subp.check_output(gitcmd,encoding="ascii").strip()
+    except:
+        githash = "nohash"
+    
+    return githash
+
+
+def main():
+
+    hash = get_git_revision_hash()
+
+    print("hash = ",hash)
+
+
+
+if __name__ == "__main__":
+    main()

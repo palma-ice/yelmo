@@ -805,7 +805,7 @@ contains
 
     end subroutine linear_solver_matrix_ssa_ac_csr_2D
 
-    subroutine check_bed_slope(is_steep,zb0,zb1,dx,lim)
+    subroutine check_base_slope(is_steep,zb0,zb1,dx,lim)
 
         logical,  intent(OUT) :: is_steep
         real(wp), intent(IN) :: zb0         ! [m]
@@ -821,11 +821,11 @@ contains
 
         return
 
-    end subroutine check_bed_slope
+    end subroutine check_base_slope
 
 
     subroutine set_ssa_masks(ssa_mask_acx,ssa_mask_acy,mask_frnt,H_ice,f_ice, &
-                                                f_grnd,z_bed,z_sl,dx,use_ssa,lateral_bc)
+                                                f_grnd,z_base,z_sl,dx,use_ssa,lateral_bc)
         ! Define where ssa calculations should be performed
         ! Note: could be binary, but perhaps also distinguish 
         ! grounding line/zone to use this mask for later gl flux corrections
@@ -844,7 +844,7 @@ contains
         real(wp), intent(IN)  :: H_ice(:,:)
         real(wp), intent(IN)  :: f_ice(:,:)
         real(wp), intent(IN)  :: f_grnd(:,:)
-        real(wp), intent(IN)  :: z_bed(:,:)
+        real(wp), intent(IN)  :: z_base(:,:)
         real(wp), intent(IN)  :: z_sl(:,:)
         real(wp), intent(IN)  :: dx 
         logical,  intent(IN)  :: use_ssa       ! SSA is actually active now? 
@@ -865,7 +865,7 @@ contains
         integer, parameter :: val_grnd      = 3
         integer, parameter :: val_disabled  = 5 
 
-        real(wp), parameter :: grad_lim_bed = 0.04 
+        real(wp), parameter :: grad_lim_base = 0.1 
 
         nx = size(H_ice,1)
         ny = size(H_ice,2)
@@ -994,7 +994,7 @@ contains
                         ! Case 1: extremely steep bedrock slopes for grounded ice,
                         ! then set ssa mask to zero (ie, set velocity to zero)
                         
-                        call check_bed_slope(is_steep,z_bed(i,j),z_bed(ip1,j),dx,lim=grad_lim_bed)
+                        call check_base_slope(is_steep,z_base(i,j),z_base(ip1,j),dx,lim=grad_lim_base)
 
                         if (is_steep) then 
                             ssa_mask_acx(i,j) = 0
@@ -1061,7 +1061,7 @@ contains
                         ! Case 1: extremely steep bedrock slopes for grounded ice,
                         ! then set ssa mask to zero (ie, set velocity to zero)
                         
-                        call check_bed_slope(is_steep,z_bed(i,j),z_bed(i,jp1),dx,lim=grad_lim_bed)
+                        call check_base_slope(is_steep,z_base(i,j),z_base(i,jp1),dx,lim=grad_lim_base)
 
                         if (is_steep) then 
                             ssa_mask_acy(i,j) = 0

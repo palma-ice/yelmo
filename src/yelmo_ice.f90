@@ -38,28 +38,28 @@ contains
         ! using the predictor-corrector method (Cheng et al., 2017) 
 
         type(yelmo_class), intent(INOUT) :: dom
-        real(prec),        intent(IN)    :: time
+        real(wp),          intent(IN)    :: time
         character(len=*),  intent(IN), optional :: file_diagnostics
 
         ! Local variables 
         type(yelmo_class)  :: dom_ref 
 
-        real(prec) :: dt_now, dt_max  
-        real(prec) :: time_now 
-        integer    :: n, nstep, n_now, n_dtmin 
-        integer    :: n_lim 
-        real(prec), parameter :: time_tol = 1e-5
+        real(wp) :: dt_now, dt_max  
+        real(wp) :: time_now 
+        integer  :: n, nstep, n_now, n_dtmin 
+        integer  :: n_lim 
+        real(wp), parameter :: time_tol = 1e-5
 
-        real(8)    :: cpu_time0, cpu_time1 
-        real(prec) :: model_time0, model_time1 
-        real(prec) :: speed  
+        real(8)  :: cpu_time0, cpu_time1 
+        real(wp) :: model_time0, model_time1 
+        real(wp) :: speed  
 
-        real(prec) :: H_mean, T_mean 
-        real(prec), allocatable :: dt_save(:) 
-        real(prec) :: dt_adv_min, dt_pi
-        real(prec) :: eta_now, rho_now 
-        integer    :: iter_redo, iter_redo_tot 
-        real(prec) :: ab_zeta 
+        real(wp) :: H_mean, T_mean 
+        real(wp), allocatable :: dt_save(:) 
+        real(wp) :: dt_adv_min, dt_pi
+        real(wp) :: eta_now, rho_now 
+        integer  :: iter_redo, iter_redo_tot 
+        real(wp) :: ab_zeta 
         logical, allocatable :: pc_mask(:,:) 
 
         character(len=1012) :: kill_txt
@@ -124,7 +124,7 @@ contains
             dom_ref = dom 
 
             ! Update dt_max as a function of the total timestep 
-            dt_max = max(time-time_now,0.0_prec)
+            dt_max = max(time-time_now,0.0_wp)
 
             ! === Diagnose different adaptive timestep limits ===
 
@@ -250,8 +250,8 @@ contains
                 if (dom%par%pc_filter_vel) then 
                     
                     ! Modify ux/y_bar to use the average between the current and previous velocity solutions
-                    dom%dyn%now%ux_bar = 0.5_prec*dom%dyn%now%ux_bar + 0.5_prec*dom%dyn%now%ux_bar_prev
-                    dom%dyn%now%uy_bar = 0.5_prec*dom%dyn%now%uy_bar + 0.5_prec*dom%dyn%now%uy_bar_prev
+                    dom%dyn%now%ux_bar = 0.5_wp*dom%dyn%now%ux_bar + 0.5_wp*dom%dyn%now%ux_bar_prev
+                    dom%dyn%now%uy_bar = 0.5_wp*dom%dyn%now%uy_bar + 0.5_wp*dom%dyn%now%uy_bar_prev
                     
                 end if 
                 
@@ -315,7 +315,7 @@ end if
 
                 ! Save masked pc_tau for output too 
                 dom%time%pc_tau_masked = dom%time%pc_tau 
-                where( .not. pc_mask) dom%time%pc_tau_masked = 0.0_prec 
+                where( .not. pc_mask) dom%time%pc_tau_masked = 0.0_wp 
 
                 ij = maxloc(abs(dom%time%pc_tau_masked))
 
@@ -332,9 +332,9 @@ end if
                      .and. eta_now .gt. dom%par%pc_tol ) then
 
                     ! Calculate timestep reduction to apply
-                    !rho_now = 0.7_prec
+                    !rho_now = 0.7_wp
                     !rho_now = (dom%par%pc_tol / eta_now)
-                    rho_now = 0.7_prec*(1.0_prec+(eta_now-dom%par%pc_tol)/10.0_prec)**(-1.0_prec) 
+                    rho_now = 0.7_wp*(1.0_wp+(eta_now-dom%par%pc_tol)/10.0_wp)**(-1.0_wp) 
 
                     ! Reset yelmo and time variables to beginning of timestep
                     dom      = dom_ref 
@@ -484,8 +484,8 @@ end if
                 H_mean = sum(dom%tpo%now%H_ice,mask=dom%tpo%now%H_ice.gt.0.0)/real(n)
                 T_mean = sum(dom%thrm%now%T_ice(:,:,dom%thrm%par%nz_aa),mask=dom%tpo%now%H_ice.gt.0.0)/real(n)
             else 
-                H_mean = 0.0_prec 
-                T_mean = 0.0_prec
+                H_mean = 0.0_wp 
+                T_mean = 0.0_wp
             end if 
 
             n       = count(dt_save .ne. missing_value)
@@ -522,17 +522,17 @@ end if
         ! Iterate yelmo solutions to equilibrate without updating boundary conditions
 
         type(yelmo_class), intent(INOUT) :: dom
-        real(prec),        intent(IN)    :: time              ! [yr] Current time
-        real(prec),        intent(IN)    :: time_tot          ! [yr] Equilibration time 
-        real(prec),        intent(IN)    :: dt                ! Local dt to be used for all modules
+        real(wp),          intent(IN)    :: time              ! [yr] Current time
+        real(wp),          intent(IN)    :: time_tot          ! [yr] Equilibration time 
+        real(wp),          intent(IN)    :: dt                ! Local dt to be used for all modules
         logical,           intent(IN)    :: topo_fixed        ! Should topography be fixed? 
         character(len=*),  intent(IN), optional :: tpo_solver
         character(len=*),  intent(IN), optional :: dyn_solver
         
         ! Local variables 
         type(yelmo_class) :: dom_ref 
-        real(prec) :: time_now  
-        integer    :: n, nstep 
+        real(wp) :: time_now  
+        integer  :: n, nstep 
         
         ! Only run equilibration if time_tot > 0 
 
@@ -601,7 +601,7 @@ end if
         type(yelmo_class) :: dom 
         character(len=*),  intent(IN) :: filename 
         character(len=*),  intent(IN) :: grid_def 
-        real(prec),        intent(IN) :: time 
+        real(wp),          intent(IN) :: time 
         logical, optional, intent(IN) :: load_topo 
         character(len=*),  intent(IN), optional :: domain
         character(len=*),  intent(IN), optional :: grid_name 
@@ -793,8 +793,8 @@ end if
         if (dom%par%log_timestep) then 
             ! Timestep file 
             call yelmo_timestep_write_init(dom%time%log_timestep_file,time,dom%grd%xc,dom%grd%yc,dom%par%pc_eps)
-            call yelmo_timestep_write(dom%time%log_timestep_file,time,0.0_prec,0.0_prec,dom%time%pc_dt(1), &
-                            dom%time%pc_eta(1),dom%time%pc_tau_masked,0.0_prec,0.0_prec,0.0_prec,dom%dyn%par%ssa_iter_now,0)
+            call yelmo_timestep_write(dom%time%log_timestep_file,time,0.0_wp,0.0_wp,dom%time%pc_dt(1), &
+                            dom%time%pc_eta(1),dom%time%pc_tau_masked,0.0_wp,0.0_wp,0.0_wp,dom%dyn%par%ssa_iter_now,0)
         end if 
 
         return
@@ -876,7 +876,7 @@ end if
                 z_bed = z_bed + z_bed_f_sd*z_bed_sd 
 
             else
-                z_bed_sd = 0.0_prec 
+                z_bed_sd = 0.0_wp 
             end if 
 
             ! If desired and available, read surface elevation field
@@ -902,7 +902,8 @@ end if
             end if 
 
             ! Clean up ice thickness field 
-            where (H_ice .lt. 1.0_wp) H_ice = 0.0_wp 
+            where (H_ice .lt. 0.1_wp) H_ice = 0.0_wp 
+            where (H_ice .ge. 0.1_wp .and. H_ice .lt. 10.0_wp) H_ice = 10.0_wp 
 
             ! Smooth z_bed field, if desired 
             if (smooth_z_bed .ge. 1.0_wp) then 
@@ -919,13 +920,13 @@ end if
                 case(1) 
                     ! Remove ice, but do not adjust bedrock 
 
-                    H_ice = 0.0_prec 
+                    H_ice = 0.0_wp 
 
                 case(2)
                     ! Remove ice, set bedrock to isostatically rebounded state 
 
                     z_bed = z_bed + (rho_ice/rho_a)*H_ice
-                    H_ice = 0.0_prec
+                    H_ice = 0.0_wp
 
                 case DEFAULT 
 
@@ -1016,7 +1017,7 @@ end if
         implicit none 
 
         type(yelmo_class), intent(INOUT) :: dom
-        real(prec),        intent(IN)    :: time  
+        real(wp),          intent(IN)    :: time  
         character(len=*),  intent(IN)    :: thrm_method 
 
         ! Local variables 
@@ -1072,8 +1073,8 @@ end if
 
             ! Impose [high] beta value in case it hasn't been initialized (eg, in the case of cb_method=-1/beta_method=-1)
             ! This will be overwritten when cb_ref/beta are calculated internally
-            if (maxval(dom%dyn%now%beta) .eq. 0.0_prec) then 
-                if (maxval(dom%dyn%now%cb_ref) .eq. 0.0_prec) then 
+            if (maxval(dom%dyn%now%beta) .eq. 0.0_wp) then 
+                if (maxval(dom%dyn%now%cb_ref) .eq. 0.0_wp) then 
                     dom%dyn%now%cb_ref = 1.0
                 end if 
                 dom%dyn%now%c_bed  = dom%dyn%now%cb_ref*1e5
@@ -1179,7 +1180,7 @@ end if
         implicit none 
 
         type(yelmo_class), intent(INOUT) :: dom 
-        real(prec), intent(IN) :: time 
+        real(wp), intent(IN) :: time 
 
         call ytopo_dealloc(dom%tpo%now)
         call ydyn_dealloc(dom%dyn%now)
@@ -1223,7 +1224,7 @@ end if
         implicit none 
 
         type(yelmo_class), intent(INOUT) :: dom
-        real(prec), intent(IN) :: time
+        real(wp), intent(IN) :: time
         
         dom%tpo%par%time      = time 
         dom%dyn%par%time      = time 
@@ -1241,18 +1242,18 @@ end if
         implicit none 
 
         type(yelmo_class), intent(IN) :: dom
-        real(prec),        intent(IN) :: time
+        real(wp),          intent(IN) :: time
         character(len=*), optional, intent(IN) :: kill_request 
 
         ! Local variables 
         integer :: i, j, k 
         logical :: kill_it, kill_it_H, kill_it_vel, kill_it_temp, kill_it_nan, kill_it_eta   
         character(len=512) :: kill_msg 
-        real(prec) :: pc_eta_avg 
+        real(wp) :: pc_eta_avg 
         character(len=3) :: pc_iter_str(10) 
 
-        real(prec), parameter :: H_lim = 1e4   ! [m] 
-        real(prec), parameter :: u_lim = 1e4   ! [m/a]
+        real(wp), parameter :: H_lim = 1e4   ! [m] 
+        real(wp), parameter :: u_lim = 1e4   ! [m/a]
 
         kill_it_H    = .FALSE.
         kill_it_vel  = .FALSE.

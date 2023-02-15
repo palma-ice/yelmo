@@ -938,14 +938,14 @@ end if
 
         implicit none 
 
-        real(wp), intent(OUT) :: taud_acx(:,:)    ! [Pa]
-        real(wp), intent(OUT) :: taud_acy(:,:)    ! [Pa]
-        real(wp), intent(IN)  :: H_ice(:,:)       ! [m]
-        real(wp), intent(IN)  :: f_ice(:,:)       ! [--]
-        real(wp), intent(IN)  :: dzsdx(:,:)       ! [--]
-        real(wp), intent(IN)  :: dzsdy(:,:)       ! [--]
-        real(wp), intent(IN)  :: dx               ! [m] 
-        real(wp), intent(IN)  :: taud_lim         ! [Pa]
+        real(wp), intent(OUT) :: taud_acx(:,:)      ! [Pa]
+        real(wp), intent(OUT) :: taud_acy(:,:)      ! [Pa]
+        real(wp), intent(IN)  :: H_ice(:,:)         ! [m]
+        real(wp), intent(IN)  :: f_ice(:,:)         ! [--]
+        real(wp), intent(IN)  :: dzsdx(:,:)         ! [--]
+        real(wp), intent(IN)  :: dzsdy(:,:)         ! [--]
+        real(wp), intent(IN)  :: dx                 ! [m] 
+        real(wp), intent(IN)  :: taud_lim           ! [Pa]
         character(len=*), intent(IN) :: boundaries  ! Boundary conditions to apply 
 
         ! Local variables 
@@ -956,7 +956,7 @@ end if
         real(wp) :: taud_mean 
         real(wp) :: taud_eps
 
-        real(wp) :: taud_eps_lim = 0.3
+        real(wp) :: taud_eps_lim = 0.4
 
         real(wp), allocatable :: taud_acx_0(:,:)
         real(wp), allocatable :: taud_acy_0(:,:)

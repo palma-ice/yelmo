@@ -940,6 +940,7 @@ end if
                     dzsdy_acx = 0.25*(dzsdy(i,j)+dzsdy(ip1,j)+dzsdy(i,jm1)+dzsdy(ip1,jm1))
                     c_y_acx = - ( (1.0-zeta_aa(k))*dzbdy_acx + zeta_aa(k)*dzsdy_acx)
 
+if (.FALSE.) then
                     ! Limit the corrective factor to avoid extremes
                     ! (e.g., in the case of very steep ice base gradient)
                     if (c_x .gt. corr_grad_lim) c_x =  corr_grad_lim
@@ -950,7 +951,8 @@ end if
                     if (c_x_acy .lt. corr_grad_lim) c_x_acy = -corr_grad_lim
                     if (c_y_acx .gt. corr_grad_lim) c_y_acx =  corr_grad_lim
                     if (c_y_acx .lt. corr_grad_lim) c_y_acx = -corr_grad_lim
-                    
+end if 
+  
                     ! Apply the correction 
 
                     jvel%dxx(i,j,k) = jvel%dxx(i,j,k) + c_x*jvel%dxz(i,j,k)

@@ -114,7 +114,7 @@ contains
             end select 
             
         else 
-            ! ======== ONE-STEP METHODS with 4 beta values ========
+            ! ======== ONE-STEP METHODS with 2 beta values ========
             ! Note: also set pc_k here for consistency, but order 
             ! of method is not critical here since PC adaptive timestepping
             ! is not used with one-step methods. 
@@ -268,6 +268,9 @@ end if
 
         real(prec), parameter :: eta_tol = 1e-8 
 
+        integer :: npts
+
+if (.TRUE.) then
         ! Calculate eta 
         eta = maxval(abs(tau),mask=mask)
 
@@ -275,6 +278,18 @@ end if
         ! Note: Limiting minimum to above eg 1e-8 is very 
         ! important for reducing fluctuations in dt 
         eta = max(eta,eta_tol)
+
+else
+    ! ajr: testing rmse(tau) instead of max(tau)
+    ! So far, this works, but leads to large areas of Antarctica on the coast with large tau values.
+        npts = count(mask)
+        if (npts .eq. 0) then 
+            eta = eta_tol 
+        else 
+            eta = sqrt(sum(tau**2,mask=mask)/real(npts,wp))
+            eta = max(eta,eta_tol)
+        end if
+end if 
 
         return 
 

@@ -694,9 +694,9 @@ end if
 
             case("EISMINT")
 
-                dom%tpo%par%boundaries  = "infinite"
-                dom%dyn%par%boundaries  = "infinite"
-                dom%thrm%par%boundaries = "infinite"
+                dom%tpo%par%boundaries  = "zeros"
+                dom%dyn%par%boundaries  = "zeros"
+                dom%thrm%par%boundaries = "zeros"
 
             case("MISMIP3D","MISMIP+") 
 

@@ -954,11 +954,19 @@ end if
         real(wp) :: dy, rhog 
         real(wp) :: H_mid
         real(wp) :: taud_mean 
-        real(wp) :: taud_eps 
+        real(wp) :: taud_eps
+
+        real(wp) :: taud_eps_lim = 0.3
+
+        real(wp), allocatable :: taud_acx_0(:,:)
+        real(wp), allocatable :: taud_acy_0(:,:)
 
         nx = size(H_ice,1)
         ny = size(H_ice,2) 
 
+        allocate(taud_acx_0(nx,ny))
+        allocate(taud_acy_0(nx,ny))
+        
         ! Define shortcut parameter 
         rhog = rho_ice * g 
 
@@ -1004,6 +1012,9 @@ end if
 
         ! SPECIAL CASES: edge cases for stability...
 
+        taud_acx_0 = taud_acx 
+        taud_acy_0 = taud_acy 
+
         do j = 1, ny 
         do i = 1, nx 
 
@@ -1014,14 +1025,13 @@ end if
 
             if (f_ice(i,j) .eq. 1.0_wp .and. f_ice(ip1,j) .eq. 1.0_wp) then 
 
-                taud_mean = 0.5*(taud_acx(im1,j)+taud_acx(ip1,j))
-                taud_eps  = (taud_acx(i,j) - taud_mean) / taud_lim
+                taud_mean = 0.5*(taud_acx_0(im1,j)+taud_acx_0(ip1,j))
+                taud_eps  = (taud_acx_0(i,j) - taud_mean) / taud_lim
 
-                if (abs(taud_acx(i,j)) .eq. taud_lim .and. abs(taud_eps) .gt. 0.4) then 
+                if (abs(taud_acx_0(i,j)) .eq. taud_lim .and. abs(taud_eps) .gt. taud_eps_lim) then 
                     ! Set driving stress equal to weighted average of neighbors
-                    taud_acx(i,j) = 0.3*taud_acx(i,j) + 0.35*taud_acx(im1,j)+ 0.35*taud_acx(ip1,j)
+                    taud_acx(i,j) = 0.20*taud_acx_0(i,j) + 0.40*taud_acx_0(im1,j)+ 0.40*taud_acx_0(ip1,j)
                 end if 
-
 
             end if
 
@@ -1029,14 +1039,13 @@ end if
 
             if (f_ice(i,j) .eq. 1.0_wp .and. f_ice(i,jp1) .eq. 1.0_wp) then 
 
-                taud_mean = 0.5*(taud_acy(i,jm1)+taud_acy(i,jp1))
-                taud_eps  = (taud_acy(i,j) - taud_mean) / taud_lim
+                taud_mean = 0.5*(taud_acy_0(i,jm1)+taud_acy_0(i,jp1))
+                taud_eps  = (taud_acy_0(i,j) - taud_mean) / taud_lim
 
-                if (abs(taud_acy(i,j)) .eq. taud_lim .and. abs(taud_eps) .gt. 0.4) then 
+                if (abs(taud_acy_0(i,j)) .eq. taud_lim .and. abs(taud_eps) .gt. taud_eps_lim) then 
                     ! Set driving stress equal to weighted average of neighbors
-                    taud_acy(i,j) = 0.30*taud_acy(i,j) + 0.35*taud_acy(i,jm1)+ 0.35*taud_acy(i,jp1)
+                    taud_acy(i,j) = 0.20*taud_acy_0(i,j) + 0.40*taud_acy_0(i,jm1)+ 0.40*taud_acy_0(i,jp1)
                 end if 
-
 
             end if
             

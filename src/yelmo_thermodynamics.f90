@@ -231,10 +231,9 @@ end select
                     ! Solve thermodynamic equation for the bedrock 
 
                     call calc_ytherm_enthalpy_bedrock_3D(thrm%now%enth_rock,thrm%now%T_rock,thrm%now%Q_rock, &
-                                        thrm%now%T_ice(:,:,1),thrm%now%T_pmp(:,:,1),thrm%par%cp_rock,thrm%par%kt_rock, &
-                                        thrm%par%H_rock,tpo%now%H_ice,tpo%now%H_grnd,thrm%now%Q_ice_b,bnd%Q_geo, &
-                                        thrm%par%zr%zeta_aa,thrm%par%zr%zeta_ac, &
-                                        thrm%par%zr%dzeta_a,thrm%par%zr%dzeta_b,dt)
+                                    thrm%now%T_ice(:,:,1),thrm%now%T_pmp(:,:,1),thrm%par%cp_rock,thrm%par%kt_rock, &
+                                    thrm%par%H_rock,tpo%now%H_ice,tpo%now%H_grnd,thrm%now%Q_ice_b,bnd%Q_geo, &
+                                    thrm%par%zr%zeta_aa,thrm%par%zr%zeta_ac,thrm%par%zr%dzeta_a,thrm%par%zr%dzeta_b,dt)
 
                 case("fixed") 
                     ! Pass - do nothing, use the enth/temp/omega fields as they are defined

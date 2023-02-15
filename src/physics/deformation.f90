@@ -540,7 +540,12 @@ contains
         real(wp) :: dzbdx_aa, dzbdy_aa, dzsdx_aa, dzsdy_aa
         real(wp) :: c_x, c_y, c_x_acy, c_y_acx
         real(wp) :: h1, h2 
-
+        
+        ! Parameter to limit sigma-coordinate corrective factor
+        ! to reasonable slope values. This seems to help avoid
+        ! getting strange results in thermodynamics, including
+        ! highly negative bmb_grnd values (high basal melt for grounded ice)
+        real(wp), parameter :: corr_grad_lim = 0.05
 
         ! Determine sizes and allocate local variables 
         nx    = size(ux,1)
@@ -935,6 +940,17 @@ end if
                     dzsdy_acx = 0.25*(dzsdy(i,j)+dzsdy(ip1,j)+dzsdy(i,jm1)+dzsdy(ip1,jm1))
                     c_y_acx = - ( (1.0-zeta_aa(k))*dzbdy_acx + zeta_aa(k)*dzsdy_acx)
 
+                    ! Limit the corrective factor to avoid extremes
+                    ! (e.g., in the case of very steep ice base gradient)
+                    if (c_x .gt. corr_grad_lim) c_x =  corr_grad_lim
+                    if (c_x .lt. corr_grad_lim) c_x = -corr_grad_lim
+                    if (c_y .gt. corr_grad_lim) c_y =  corr_grad_lim
+                    if (c_y .lt. corr_grad_lim) c_y = -corr_grad_lim
+                    if (c_x_acy .gt. corr_grad_lim) c_x_acy =  corr_grad_lim
+                    if (c_x_acy .lt. corr_grad_lim) c_x_acy = -corr_grad_lim
+                    if (c_y_acx .gt. corr_grad_lim) c_y_acx =  corr_grad_lim
+                    if (c_y_acx .lt. corr_grad_lim) c_y_acx = -corr_grad_lim
+                    
                     ! Apply the correction 
 
                     jvel%dxx(i,j,k) = jvel%dxx(i,j,k) + c_x*jvel%dxz(i,j,k)
@@ -1599,6 +1615,8 @@ end if
     end subroutine calc_strain_rate_tensor_2D
     
     subroutine calc_strain_rate_horizontal_2D(dudx,dudy,dvdx,dvdy,ux,uy,f_ice,dx,dy,boundaries)
+        ! Get simple horizontal derivatives with sigma corrections
+        ! (valid for depth-averaged fields like for SSA/DIVA effective viscosity)
 
         implicit none
 

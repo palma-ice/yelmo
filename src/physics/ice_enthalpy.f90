@@ -469,7 +469,8 @@ if (.TRUE.) then
 
 else
     ! Use centered-difference advection scheme accounting for variable layer thickness
-
+    ! Note: this can get unstable in some rare cases, for now using centered differences as above. 
+    
             ! Get grid spacing between neighboring points
             h1 = thickness*(zeta_aa(k)-zeta_aa(k-1))
             h2 = thickness*(zeta_aa(k+1)-zeta_aa(k))

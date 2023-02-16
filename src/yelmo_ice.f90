@@ -69,7 +69,7 @@ contains
         real(wp) :: min_dt_used 
 
         logical, parameter :: update_others_pc  = .FALSE. 
-        logical, parameter :: very_verbose      = .TRUE. 
+        logical, parameter :: very_verbose      = .FALSE. 
 
         ! Safety: check status of model object, 
         ! Has it been initialized?

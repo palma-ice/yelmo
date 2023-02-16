@@ -865,6 +865,12 @@ contains
         integer, parameter :: val_grnd      = 3
         integer, parameter :: val_disabled  = 5 
 
+        ! Check slope of ice base. If at a given point,
+        ! it is greater than this limit, 
+        ! disable ssa solver in this direction.
+        ! 0.1 is a high value, but reached for some points
+        ! next to deep troughs in Antarctica, and next
+        ! to some fjords in Greenland.
         real(wp), parameter :: grad_lim_base = 0.1 
 
         nx = size(H_ice,1)

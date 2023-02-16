@@ -541,11 +541,16 @@ contains
         real(wp) :: c_x, c_y, c_x_acy, c_y_acx
         real(wp) :: h1, h2 
         
+        real(wp), allocatable :: c_x_tmp(:,:,:)
+        real(wp), allocatable :: c_y_tmp(:,:,:)
+        
         ! Parameter to limit sigma-coordinate corrective factor
-        ! to reasonable slope values. This seems to help avoid
+        ! to reasonable slope values. Maybe could help avoid
         ! getting strange results in thermodynamics, including
         ! highly negative bmb_grnd values (high basal melt for grounded ice)
-        real(wp), parameter :: corr_grad_lim = 0.05
+        ! ajr: 0.05 is too restrictive! See comments below. For now,
+        ! set to very high value and disabled.
+        real(wp), parameter :: corr_grad_lim = 0.2
 
         ! Determine sizes and allocate local variables 
         nx    = size(ux,1)
@@ -553,6 +558,9 @@ contains
         nz_aa = size(zeta_aa,1)
         nz_ac = size(zeta_ac,1)
         
+        allocate(c_x_tmp(nx,ny,nz_aa))
+        allocate(c_y_tmp(nx,ny,nz_aa))
+
         !-------- Initialisation --------
 
         jvel%dxx          = 0.0_wp
@@ -779,7 +787,7 @@ end if
                     jvel%dyx(i,j,k) = (uy(ip1,j,k)-uy(im1,j,k))/(2.0*dx)
                     jvel%dyy(i,j,k) = (uy(i,jp1,k)-uy(i,jm1,k))/(2.0*dy)
 
-if (.TRUE.) then
+
                     ! Treat special cases of ice-margin points (take upstream/downstream derivatives instead)
                     ! Second-order, one-sided derivatives
 
@@ -875,45 +883,7 @@ if (.TRUE.) then
                         else
                             jvel%dyx(i,j,k) = (uy(ip1,j,k)-uy(i,j,k))/dx
                         end if 
-                    end if 
-
-else  
-                    ! Treat special cases of ice-margin points (take upstream/downstream derivatives instead)
-                    ! First-order, one-sided derivatives 
-
-                    ! jvel%dxx
-                    if (f_ice(i,j) .eq. 1.0 .and. f_ice(ip1,j) .lt. 1.0) then 
-                        jvel%dxx(i,j,k) = (ux(i,j,k)-ux(im1,j,k))/dx
-                    else if (f_ice(i,j) .lt. 1.0 .and. f_ice(ip1,j) .eq. 1.0) then 
-                        jvel%dxx(i,j,k) = (ux(ip1,j,k)-ux(i,j,k))/dx
-                    end if 
-
-                    ! jvel%dxy
-                    if (f_ice(i,j) .eq. 1.0 .and. f_ice(i,jp1) .lt. 1.0 .and. f_ice(i,jm1) .lt. 1.0) then 
-                        jvel%dxy(i,j,k) = 0.0
-                    else if (f_ice(i,j) .eq. 1.0 .and. f_ice(i,jp1) .lt. 1.0 .and. f_ice(i,jm1) .eq. 1.0) then 
-                        jvel%dxy(i,j,k) = (ux(i,j,k)-ux(i,jm1,k))/dy
-                    else if (f_ice(i,j) .eq. 1.0 .and. f_ice(i,jp1) .eq. 1.0 .and. f_ice(i,jm1) .lt. 1.0) then 
-                        jvel%dxy(i,j,k) = (ux(i,jp1,k)-ux(i,j,k))/dy
-                    end if 
-
-                    ! jvel%dyy
-                    if (f_ice(i,j) .eq. 1.0 .and. f_ice(i,jp1) .lt. 1.0) then 
-                        jvel%dyy(i,j,k) = (uy(i,j,k)-uy(i,jm1,k))/dy
-                    else if (f_ice(i,j) .lt. 1.0 .and. f_ice(i,jp1) .eq. 1.0) then 
-                        jvel%dyy(i,j,k) = (uy(i,jp1,k)-uy(i,j,k))/dy
-                    end if 
-
-                    ! jvel%dyx
-                    if (f_ice(i,j) .eq. 1.0 .and. f_ice(ip1,j) .lt. 1.0 .and. f_ice(im1,j) .lt. 1.0) then 
-                        jvel%dyx(i,j,k) = 0.0
-                    else if (f_ice(i,j) .eq. 1.0 .and. f_ice(ip1,j) .lt. 1.0 .and. f_ice(im1,j) .eq. 1.0) then 
-                        jvel%dyx(i,j,k) = (uy(i,j,k)-uy(im1,j,k))/dx
-                    else if (f_ice(i,j) .eq. 1.0 .and. f_ice(ip1,j) .eq. 1.0 .and. f_ice(im1,j) .lt. 1.0) then 
-                        jvel%dyx(i,j,k) = (uy(ip1,j,k)-uy(i,j,k))/dx
                     end if
-                    
-end if 
 
                     ! === Calculate and apply the sigma-transformation correction terms ===
 
@@ -941,6 +911,10 @@ end if
                     c_y_acx = - ( (1.0-zeta_aa(k))*dzbdy_acx + zeta_aa(k)*dzsdy_acx)
 
 if (.FALSE.) then
+    ! ajr: so far, this wasn't helpful. But I only tested a value of corr_grad_lim=0.05,
+    ! which could be quite restrictive. In ANT-32KM, c_x and c_y show values up to 0.12.
+    ! Consider for future testing: 
+
                     ! Limit the corrective factor to avoid extremes
                     ! (e.g., in the case of very steep ice base gradient)
                     if (c_x .gt. corr_grad_lim) c_x =  corr_grad_lim
@@ -952,7 +926,7 @@ if (.FALSE.) then
                     if (c_y_acx .gt. corr_grad_lim) c_y_acx =  corr_grad_lim
                     if (c_y_acx .lt. corr_grad_lim) c_y_acx = -corr_grad_lim
 end if 
-  
+
                     ! Apply the correction 
 
                     jvel%dxx(i,j,k) = jvel%dxx(i,j,k) + c_x*jvel%dxz(i,j,k)
@@ -978,7 +952,6 @@ end if
                     jvel%dzx(i,j,k) = (uz(ip1,j,k)-uz(im1,j,k))/(2.0*dx)
                     jvel%dzy(i,j,k) = (uz(i,jp1,k)-uz(i,jm1,k))/(2.0*dy)
 
-if (.TRUE.) then
                     ! Treat special cases of ice-margin points (take upstream/downstream derivatives instead)
                     ! Second-order, one-sided derivatives
 
@@ -1036,29 +1009,6 @@ if (.TRUE.) then
                         end if
                     end if 
 
-else
-                    ! Treat special cases of ice-margin points (take upstream/downstream derivatives instead)
-                    ! First-order, one-sided derivatives 
-
-                    ! jvel%dzx
-                    if (f_ice(ip1,j) .lt. 1.0 .and. f_ice(im1,j) .lt. 1.0) then 
-                        jvel%dzx(i,j,k) = 0.0
-                    else if (f_ice(ip1,j) .lt. 1.0 .and. f_ice(im1,j) .eq. 1.0) then 
-                        jvel%dzx(i,j,k) = (uz(i,j,k)-uz(im1,j,k))/dx
-                    else if (f_ice(ip1,j) .eq. 1.0 .and. f_ice(im1,j) .lt. 1.0) then 
-                        jvel%dzx(i,j,k) = (uz(ip1,j,k)-uz(i,j,k))/dx
-                    end if 
-
-                    ! jvel%dzy
-                    if (f_ice(i,jp1) .lt. 1.0 .and. f_ice(i,jm1) .lt. 1.0) then 
-                        jvel%dzy(i,j,k) = 0.0
-                    else if (f_ice(i,jp1) .lt. 1.0 .and. f_ice(i,jm1) .eq. 1.0) then 
-                        jvel%dzy(i,j,k) = (uz(i,j,k)-uz(i,jm1,k))/dy
-                    else if (f_ice(i,jp1) .eq. 1.0 .and. f_ice(i,jm1) .lt. 1.0) then 
-                        jvel%dzy(i,j,k) = (uz(i,jp1,k)-uz(i,j,k))/dy
-                    end if 
-end if
-
                     ! === Calculate and apply the sigma-transformation correction terms ===
 
                     ! Recalculate correction factors on aa-nodes horizontally, ac-nodes vertically
@@ -1083,8 +1033,7 @@ end if
         end do 
         end do 
         !$omp end parallel do
-
-
+        
         ! Step X: fill in partially filled margin points with neighbor strain-rate values
         
         ! To do....?

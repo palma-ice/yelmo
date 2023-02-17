@@ -825,7 +825,7 @@ contains
 
 
     subroutine set_ssa_masks(ssa_mask_acx,ssa_mask_acy,mask_frnt,H_ice,f_ice, &
-                                                f_grnd,z_base,z_sl,dx,use_ssa,lateral_bc)
+                                        f_grnd,z_base,z_sl,dx,use_ssa,gradbase_max,lateral_bc)
         ! Define where ssa calculations should be performed
         ! Note: could be binary, but perhaps also distinguish 
         ! grounding line/zone to use this mask for later gl flux corrections
@@ -836,6 +836,13 @@ contains
         ! mask = 3: ssa lateral boundary condition applied
         ! mask = 4: ssa lateral boundary, but treated as inner ssa
 
+        ! Note: the parameter gradbase_max is used to check slope of ice base. 
+        ! If at a given point, it is greater than this limit, the ssa solver
+        ! will be disabled in this direction. gradbase_max=0.1 is a relatively
+        ! high value, but is reached for points next to deep troughs in Antarctica,
+        ! and next to some fjords in Greenland. Steeper slopes are present
+        ! in higher-resolution topographies typically.
+        
         implicit none 
         
         integer,  intent(OUT) :: ssa_mask_acx(:,:) 
@@ -848,6 +855,7 @@ contains
         real(wp), intent(IN)  :: z_sl(:,:)
         real(wp), intent(IN)  :: dx 
         logical,  intent(IN)  :: use_ssa       ! SSA is actually active now? 
+        real(wp), intent(IN)  :: gradbase_max
         character(len=*), intent(IN) :: lateral_bc 
 
         ! Local variables
@@ -859,19 +867,14 @@ contains
         
         real(wp), allocatable :: mask_frnt_dyn(:,:)
 
+        ! Integer values for the mask_frnt should be consistent
+        ! with those defined in topography.f90:calc_ice_front().
+        ! val_disabled is an internal value only used in this routine.
         integer, parameter :: val_ice_free  = -1 
         integer, parameter :: val_flt       = 1
         integer, parameter :: val_marine    = 2
         integer, parameter :: val_grnd      = 3
         integer, parameter :: val_disabled  = 5 
-
-        ! Check slope of ice base. If at a given point,
-        ! it is greater than this limit, 
-        ! disable ssa solver in this direction.
-        ! 0.1 is a high value, but reached for some points
-        ! next to deep troughs in Antarctica, and next
-        ! to some fjords in Greenland.
-        real(wp), parameter :: grad_lim_base = 0.1 
 
         nx = size(H_ice,1)
         ny = size(H_ice,2)
@@ -1000,7 +1003,7 @@ contains
                         ! Case 1: extremely steep bedrock slopes for grounded ice,
                         ! then set ssa mask to zero (ie, set velocity to zero)
                         
-                        call check_base_slope(is_steep,z_base(i,j),z_base(ip1,j),dx,lim=grad_lim_base)
+                        call check_base_slope(is_steep,z_base(i,j),z_base(ip1,j),dx,lim=gradbase_max)
 
                         if (is_steep) then 
                             ssa_mask_acx(i,j) = 0
@@ -1067,7 +1070,7 @@ contains
                         ! Case 1: extremely steep bedrock slopes for grounded ice,
                         ! then set ssa mask to zero (ie, set velocity to zero)
                         
-                        call check_base_slope(is_steep,z_base(i,j),z_base(i,jp1),dx,lim=grad_lim_base)
+                        call check_base_slope(is_steep,z_base(i,j),z_base(i,jp1),dx,lim=gradbase_max)
 
                         if (is_steep) then 
                             ssa_mask_acy(i,j) = 0

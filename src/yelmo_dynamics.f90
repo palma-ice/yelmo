@@ -328,7 +328,8 @@ contains
 
         ! Define grid points with ssa active (uses beta from previous timestep)
         call set_ssa_masks(dyn%now%ssa_mask_acx,dyn%now%ssa_mask_acy,tpo%now%mask_frnt,tpo%now%H_ice,tpo%now%f_ice, &
-                                tpo%now%f_grnd,tpo%now%z_base,bnd%z_sl,dyn%par%dx,use_ssa=.TRUE.,lateral_bc=dyn%par%ssa_lat_bc)
+                                tpo%now%f_grnd,tpo%now%z_base,bnd%z_sl,dyn%par%dx,use_ssa=.TRUE., &
+                                gradbase_max=dyn%par%ssa_gradbase_max,lateral_bc=dyn%par%ssa_lat_bc)
 
         if (use_ssa .and. dyn%par%use_ssa .and. &
                 maxval(dyn%now%ssa_mask_acx+dyn%now%ssa_mask_acy) .gt. 0) then 
@@ -452,7 +453,8 @@ contains
 
         ! Define grid points with ssa active (uses beta from previous timestep)
         call set_ssa_masks(dyn%now%ssa_mask_acx,dyn%now%ssa_mask_acy,tpo%now%mask_frnt,tpo%now%H_ice,tpo%now%f_ice, &
-                                tpo%now%f_grnd,tpo%now%z_base,bnd%z_sl,dyn%par%dx,use_ssa=.TRUE.,lateral_bc=dyn%par%ssa_lat_bc)
+                                tpo%now%f_grnd,tpo%now%z_base,bnd%z_sl,dyn%par%dx,use_ssa=.TRUE., &
+                                gradbase_max=dyn%par%ssa_gradbase_max,lateral_bc=dyn%par%ssa_lat_bc)
 
         ! ajr: add these two statements for testing 2D flow (no flow in y-direction)
         ! Should consider whether this should be made into a parameter option of some kind,
@@ -554,7 +556,8 @@ contains
 
         ! Define grid points with ssa active (uses beta from previous timestep)
         call set_ssa_masks(dyn%now%ssa_mask_acx,dyn%now%ssa_mask_acy,tpo%now%mask_frnt,tpo%now%H_ice,tpo%now%f_ice, &
-                                tpo%now%f_grnd,tpo%now%z_base,bnd%z_sl,dyn%par%dx,use_ssa=.TRUE.,lateral_bc=dyn%par%ssa_lat_bc)
+                                tpo%now%f_grnd,tpo%now%z_base,bnd%z_sl,dyn%par%dx,use_ssa=.TRUE., &
+                                gradbase_max=dyn%par%ssa_gradbase_max,lateral_bc=dyn%par%ssa_lat_bc)
 
         ! Set diva parameters from Yelmo settings 
         l1l2_par%ssa_lis_opt    = dyn%par%ssa_lis_opt 
@@ -903,11 +906,13 @@ contains
         call nml_read(filename,"ydyn","eps_0",              par%eps_0,              init=init_pars)
         call nml_read(filename,"ydyn","ssa_lis_opt",        par%ssa_lis_opt,        init=init_pars)
         call nml_read(filename,"ydyn","ssa_lat_bc",         par%ssa_lat_bc,         init=init_pars)
+        call nml_read(filename,"ydyn","ssa_gradbase_max",   par%ssa_gradbase_max,   init=init_pars)
         call nml_read(filename,"ydyn","ssa_beta_max",       par%ssa_beta_max,       init=init_pars)
         call nml_read(filename,"ydyn","ssa_vel_max",        par%ssa_vel_max,        init=init_pars)
         call nml_read(filename,"ydyn","ssa_iter_max",       par%ssa_iter_max,       init=init_pars)
         call nml_read(filename,"ydyn","ssa_iter_rel",       par%ssa_iter_rel,       init=init_pars)
         call nml_read(filename,"ydyn","ssa_iter_conv",      par%ssa_iter_conv,      init=init_pars)
+
         call nml_read(filename,"ydyn","taud_lim",           par%taud_lim,           init=init_pars)
         call nml_read(filename,"ydyn","cb_sia",             par%cb_sia,             init=init_pars)
         

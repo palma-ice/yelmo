@@ -91,6 +91,7 @@ contains
         real(wp) :: c_x 
         real(wp) :: c_y 
         real(wp) :: c_t 
+        real(wp) :: c_z 
 
         real(wp) :: dzsdtn(4)
         real(wp) :: dhdtn(4)
@@ -306,15 +307,21 @@ end if
                     ! (Greve and Blatter, 2009, Eqs. 5.131 and 5.132, 
                     !  also shown in 1D with Eq. 5.145)
 
-                    ! Note: not dividing by H here, since this is done in the thermodynamics advection step
+                    ! Note: not dividing by H here, since the thermodynamics advection step
+                    ! is in terms of d/dz, not d/dzeta. Units of uz_star should still be m/m
+                    ! c_x = - H_inv * ( (1.0-zeta_now)*dzbdx_aa  + zeta_now*dzsdx_aa )
+                    ! c_y = - H_inv * ( (1.0-zeta_now)*dzbdy_aa  + zeta_now*dzsdy_aa )
+                    ! c_t = - H_inv * ( (1.0-zeta_now)*dzbdt_now + zeta_now*dzsdt_now )
+                    ! c_z = H_inv 
                     c_x = -( (1.0-zeta_now)*dzbdx_aa  + zeta_now*dzsdx_aa )
                     c_y = -( (1.0-zeta_now)*dzbdy_aa  + zeta_now*dzsdy_aa )
                     c_t = -( (1.0-zeta_now)*dzbdt_now + zeta_now*dzsdt_now )
-                    
+                    c_z = 1.0 
+
                     ! Calculate adjusted vertical velocity for advection 
-                    ! of this layer
+                    ! of this layer - units of m/m
                     ! (e.g., Greve and Blatter, 2009, Eq. 5.148)
-                    uz_star(i,j,k) = uz(i,j,k) + ux_aa*c_x + uy_aa*c_y + c_t 
+                    uz_star(i,j,k) = uz(i,j,k)*c_z + ux_aa*c_x + uy_aa*c_y + c_t
 
                     if (abs(uz_star(i,j,k)) .lt. TOL_UNDERFLOW) uz_star(i,j,k) = 0.0_wp
                     

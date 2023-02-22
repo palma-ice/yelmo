@@ -1066,7 +1066,7 @@ end if
                     end if 
 
 if (.FALSE.) then
-                    ! SPECIAL CASE: GROUNDED ICE
+                    ! SPECIAL CASE: GROUNDED ICE 
                     if (ssa_mask_acy(i,j) .eq. 1 .and. &
                             (f_ice(i,j) .eq. 1.0 .and. f_ice(i,jp1) .eq. 1.0) ) then 
 

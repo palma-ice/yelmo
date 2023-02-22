@@ -300,7 +300,6 @@ module yelmo_defs
         real(wp)   :: eps_0                 ! Minimum assumed strain rate for effective viscosity regularization
         character(len=256) :: ssa_lis_opt 
         character(len=56)  :: ssa_lat_bc
-        real(wp)   :: ssa_gradbase_max 
         real(wp)   :: ssa_beta_max          ! Maximum value of beta for which ssa should be calculated
         real(wp)   :: ssa_vel_max
         integer    :: ssa_iter_max 

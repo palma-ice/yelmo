@@ -1,6 +1,6 @@
 module yelmo_timesteps
 
-    use yelmo_defs, only : sp, dp, wp, prec, io_unit_err, ytime_class, MV, TOL_UNDERFLOW   
+    use yelmo_defs, only : sp, dp, wp, io_unit_err, ytime_class, MV, TOL_UNDERFLOW   
     use ncio 
 
     use topography, only : calc_ice_fraction, calc_H_grnd
@@ -98,11 +98,11 @@ contains
                     ! Order of the method 
                     pc_k = 2 
 
-                    beta(1) = 2.0_prec / 3.0_prec
-                    beta(2) = 0.0_prec 
+                    beta(1) = 2.0_wp / 3.0_wp
+                    beta(2) = 0.0_wp 
                     
-                    beta(3) = 0.25_prec 
-                    beta(4) = 0.75_prec 
+                    beta(3) = 0.25_wp 
+                    beta(4) = 0.75_wp 
                 
                 case DEFAULT 
 
@@ -126,16 +126,16 @@ contains
 
                     pc_k = 1
 
-                    beta(1) = 1.0_prec  
-                    beta(2) = 0.0_prec  
+                    beta(1) = 1.0_wp  
+                    beta(2) = 0.0_wp  
 
                 case("AB") 
                     ! Adams-Bashforth
 
                     pc_k = 2
                     
-                    beta(1) = 1.0_prec + zeta/2.0_prec 
-                    beta(2) = -zeta/2.0_prec 
+                    beta(1) = 1.0_wp + zeta/2.0_wp 
+                    beta(2) = -zeta/2.0_wp 
 
                 case("SAM") 
                     ! Semi-implicit Adams–Moulton
@@ -166,23 +166,23 @@ contains
         implicit none 
 
         logical, intent(OUT) :: mask(:,:) 
-        real(prec), intent(IN) :: pc_tau(:,:) 
-        real(prec), intent(IN) :: H_ice_pred(:,:) 
-        real(prec), intent(IN) :: H_ice_corr(:,:) 
-        real(prec), intent(IN) :: z_bed(:,:) 
-        real(prec), intent(IN) :: z_sl(:,:) 
+        real(wp), intent(IN) :: pc_tau(:,:) 
+        real(wp), intent(IN) :: H_ice_pred(:,:) 
+        real(wp), intent(IN) :: H_ice_corr(:,:) 
+        real(wp), intent(IN) :: z_bed(:,:) 
+        real(wp), intent(IN) :: z_sl(:,:) 
         logical,    intent(IN) :: margin_flt_subgrid 
 
         ! Local variables 
         integer :: i, j, nx, ny 
         integer :: im1, jm1, ip1, jp1 
 
-        real(prec), allocatable :: f_ice_pred(:,:) 
-        real(prec), allocatable :: f_ice_corr(:,:) 
-        real(prec), allocatable :: H_grnd_pred(:,:) 
-        real(prec), allocatable :: H_grnd_corr(:,:) 
+        real(wp), allocatable :: f_ice_pred(:,:) 
+        real(wp), allocatable :: f_ice_corr(:,:) 
+        real(wp), allocatable :: H_grnd_pred(:,:) 
+        real(wp), allocatable :: H_grnd_corr(:,:) 
 
-        real(prec), parameter :: H_lim = 10.0      ! [m] 
+        real(wp), parameter :: H_lim = 10.0      ! [m] 
         
         nx = size(mask,1)
         ny = size(mask,2) 
@@ -220,7 +220,7 @@ if (.TRUE.) then
                 mask(i,j) = .FALSE. 
 
             ! ajr: excluding thin points doesn't help...
-            !else if (H_ice(i,j) .lt. 50.0_prec) then 
+            !else if (H_ice(i,j) .lt. 50.0_wp) then 
             !    ! Thin ice-covered point 
             !
             !    mask(i,j) = .FALSE. 
@@ -234,13 +234,13 @@ if (.TRUE.) then
 
                     mask(i,j) = .FALSE. 
 
-                else if (H_grnd_pred(i,j) .le. 0.0_prec .or. H_grnd_corr(i,j) .le. 0.0_prec) then 
+                else if (H_grnd_pred(i,j) .le. 0.0_wp .or. H_grnd_corr(i,j) .le. 0.0_wp) then 
                     ! Grounding-line or floating ice point 
 
                     mask(i,j) = .FALSE. 
 
-!                 else if (H_grnd(i,j) .gt. 0.0_prec .and. &
-!                             count(H_grnd(im1:ip1,jm1:jp1).lt.1.0_prec) .le. 0) then 
+!                 else if (H_grnd(i,j) .gt. 0.0_wp .and. &
+!                             count(H_grnd(im1:ip1,jm1:jp1).lt.1.0_wp) .le. 0) then 
 !                     ! Neighbor at the grounding line
 
 !                     mask(i,j) = .FALSE. 
@@ -262,11 +262,11 @@ end if
 
         implicit none 
 
-        real(prec), intent(IN) :: tau(:,:) 
+        real(wp), intent(IN) :: tau(:,:) 
         logical,    intent(IN) :: mask(:,:) 
-        real(prec) :: eta 
+        real(wp) :: eta 
 
-        real(prec), parameter :: eta_tol = 1e-8 
+        real(wp), parameter :: eta_tol = 1e-8 
 
         integer :: npts
 
@@ -304,15 +304,15 @@ end if
 
         implicit none 
 
-        real(prec), intent(OUT) :: tau
-        real(prec), intent(IN)  :: var_corr
-        real(prec), intent(IN)  :: var_pred
-        real(prec), intent(IN)  :: dt_n 
+        real(wp), intent(OUT) :: tau
+        real(wp), intent(IN)  :: var_corr
+        real(wp), intent(IN)  :: var_pred
+        real(wp), intent(IN)  :: dt_n 
         
-        if (dt_n .eq. 0.0_prec) then 
-            tau = 0.0_prec 
+        if (dt_n .eq. 0.0_wp) then 
+            tau = 0.0_wp 
         else 
-            tau = (1.0_prec / (2.0_prec*dt_n)) * (var_corr - var_pred)
+            tau = (1.0_wp / (2.0_wp*dt_n)) * (var_corr - var_pred)
         end if 
 
         ! Keep tau positive to make crash analysis simpler
@@ -331,16 +331,16 @@ end if
 
         implicit none 
 
-        real(prec), intent(OUT) :: tau
-        real(prec), intent(IN)  :: var_corr
-        real(prec), intent(IN)  :: var_pred
-        real(prec), intent(IN)  :: dt_n 
-        real(prec), intent(IN)  :: zeta 
+        real(wp), intent(OUT) :: tau
+        real(wp), intent(IN)  :: var_corr
+        real(wp), intent(IN)  :: var_pred
+        real(wp), intent(IN)  :: dt_n 
+        real(wp), intent(IN)  :: zeta 
 
-        if (dt_n .eq. 0.0_prec) then 
-            tau = 0.0_prec 
+        if (dt_n .eq. 0.0_wp) then 
+            tau = 0.0_wp 
         else 
-            tau = zeta * (var_corr - var_pred) / ((3.0_prec*zeta + 3.0_prec)*dt_n)
+            tau = zeta * (var_corr - var_pred) / ((3.0_wp*zeta + 3.0_wp)*dt_n)
         end if 
 
         ! Keep tau positive to make crash analysis simpler
@@ -356,15 +356,15 @@ end if
 
         implicit none 
 
-        real(prec), intent(OUT) :: tau
-        real(prec), intent(IN)  :: var_corr
-        real(prec), intent(IN)  :: var_pred
-        real(prec), intent(IN)  :: dt_n 
+        real(wp), intent(OUT) :: tau
+        real(wp), intent(IN)  :: var_corr
+        real(wp), intent(IN)  :: var_pred
+        real(wp), intent(IN)  :: dt_n 
         
-        if (dt_n .eq. 0.0_prec) then 
-            tau = 0.0_prec 
+        if (dt_n .eq. 0.0_wp) then 
+            tau = 0.0_wp 
         else 
-            tau = (1.0_prec / (6.0_prec*dt_n)) * (var_corr - var_pred)
+            tau = (1.0_wp / (6.0_wp*dt_n)) * (var_corr - var_pred)
         end if 
 
         ! Keep tau positive to make crash analysis simpler
@@ -381,31 +381,31 @@ end if
 
         implicit none 
 
-        real(prec), intent(OUT) :: dt_new               ! [yr]   Timestep (n+1)
-        real(prec), intent(IN)  :: dt(:)                ! [yr]   Timesteps (n:n-2)
-        real(prec), intent(IN)  :: eta(:)               ! [X/yr] Maximum truncation error (n:n-2)
-        real(prec), intent(IN)  :: eps                  ! [--]   Tolerance value (eg, eps=1e-4)
-        real(prec), intent(IN)  :: dtmin                ! [yr]   Minimum allowed timestep
-        real(prec), intent(IN)  :: dtmax                ! [yr]   Maximum allowed timestep
-        real(prec), intent(IN)  :: ux_bar(:,:)          ! [m/yr]
-        real(prec), intent(IN)  :: uy_bar(:,:)          ! [m/yr]
-        real(prec), intent(IN)  :: dx                   ! [m]
+        real(wp), intent(OUT) :: dt_new               ! [yr]   Timestep (n+1)
+        real(wp), intent(IN)  :: dt(:)                ! [yr]   Timesteps (n:n-2)
+        real(wp), intent(IN)  :: eta(:)               ! [X/yr] Maximum truncation error (n:n-2)
+        real(wp), intent(IN)  :: eps                  ! [--]   Tolerance value (eg, eps=1e-4)
+        real(wp), intent(IN)  :: dtmin                ! [yr]   Minimum allowed timestep
+        real(wp), intent(IN)  :: dtmax                ! [yr]   Maximum allowed timestep
+        real(wp), intent(IN)  :: ux_bar(:,:)          ! [m/yr]
+        real(wp), intent(IN)  :: uy_bar(:,:)          ! [m/yr]
+        real(wp), intent(IN)  :: dx                   ! [m]
         integer,    intent(IN)  :: pc_k                 ! pc_k gives the order of the timestepping scheme (pc_k=2 for FE-SBE, pc_k=3 for AB-SAM)
         character(len=*), intent(IN) :: controller      ! Adaptive controller to use [PI42, H312b, H312PID]
 
         ! Local variables
-        real(prec) :: dt_n, dt_nm1, dt_nm2          ! [yr]   Timesteps (n:n-2)
-        real(prec) :: eta_n, eta_nm1, eta_nm2       ! [X/yr] Maximum truncation error (n:n-2)
-        real(prec) :: rho_n, rho_nm1, rho_nm2
-        real(prec) :: rhohat_n 
-        real(prec) :: dt_adv 
-        real(prec) :: dtmax_now
-        real(prec) :: k_i 
-        real(prec) :: k_p, k_d 
+        real(wp) :: dt_n, dt_nm1, dt_nm2          ! [yr]   Timesteps (n:n-2)
+        real(wp) :: eta_n, eta_nm1, eta_nm2       ! [X/yr] Maximum truncation error (n:n-2)
+        real(wp) :: rho_n, rho_nm1, rho_nm2
+        real(wp) :: rhohat_n 
+        real(wp) :: dt_adv 
+        real(wp) :: dtmax_now
+        real(wp) :: k_i 
+        real(wp) :: k_p, k_d 
 
         ! Smoothing parameter; Söderlind and Wang (2006) method, Eq. 10
         ! Values on the order of [0.7,2.0] are reasonable. Higher kappa slows variation in dt
-        real(prec), parameter :: kappa = 2.0_prec 
+        real(wp), parameter :: kappa = 2.0_wp 
         
         ! Step 1: Save information needed for adapative controller algorithms 
 
@@ -437,38 +437,38 @@ end if
                 ! are outside of these bounds. 
 
                 ! Default parameter values 
-                k_i = 2.0_prec / (pc_k*5.0_prec)
-                k_p = 1.0_prec / (pc_k*5.0_prec)
+                k_i = 2.0_wp / (pc_k*5.0_wp)
+                k_p = 1.0_wp / (pc_k*5.0_wp)
                 
                 ! Improved parameter values (reduced oscillations)
-!                 k_i = 4.0_prec / (pc_k*10.0_prec)
-!                 k_p = 3.0_prec / (pc_k*10.0_prec)
+!                 k_i = 4.0_wp / (pc_k*10.0_wp)
+!                 k_p = 3.0_wp / (pc_k*10.0_wp)
 
                 ! Experimental parameter values (minimal oscillations, does not access largest timesteps)
-                ! k_i = 0.5_prec / (pc_k*10.0_prec)
-                ! k_p = 6.5_prec / (pc_k*10.0_prec)
+                ! k_i = 0.5_wp / (pc_k*10.0_wp)
+                ! k_p = 6.5_wp / (pc_k*10.0_wp)
 
                 ! Default parameter values
-                rho_n = calc_pi_rho_pi42(eta_n,eta_nm1,rho_nm1,eps,k_i,k_p,alpha_2=0.0_prec)
+                rho_n = calc_pi_rho_pi42(eta_n,eta_nm1,rho_nm1,eps,k_i,k_p,alpha_2=0.0_wp)
 
             case("H312b") 
                 ! Söderlind (2003) H312b, Eq. 31+ (unlabeled) 
                 
-                rho_n = calc_pi_rho_H312b(eta_n,eta_nm1,eta_nm2,rho_nm1,rho_nm2,eps,k=real(pc_k,prec),b=8.0_prec)
+                rho_n = calc_pi_rho_H312b(eta_n,eta_nm1,eta_nm2,rho_nm1,rho_nm2,eps,k=real(pc_k,wp),b=8.0_wp)
 
             case("H312PID") 
                 ! Söderlind (2003) H312PD, Eq. 38
                 ! Note: Suggested k_i =(2/9)*1/pc_k, but lower value gives more stable solution
 
-                !k_i = (2.0_prec/9.0_prec)*1.0_prec/real(pc_k,prec)
-                k_i = 0.08_prec/real(pc_k,prec)
+                !k_i = (2.0_wp/9.0_wp)*1.0_wp/real(pc_k,wp)
+                k_i = 0.08_wp/real(pc_k,wp)
 
                 rho_n = calc_pi_rho_H312PID(eta_n,eta_nm1,eta_nm2,eps,k_i)
 
             case("H321PID")
 
-                k_i = 0.1  / real(pc_k,prec)
-                k_p = 0.45 / real(pc_k,prec) 
+                k_i = 0.1  / real(pc_k,wp)
+                k_p = 0.45 / real(pc_k,wp) 
 
                 rho_n = calc_pi_rho_H321PID(eta_n,eta_nm1,eta_nm2,dt_n,dt_nm1,eps,k_i,k_p)
                 
@@ -491,7 +491,7 @@ end if
         ! Scale rho_n for smoothness 
         rhohat_n = rho_n
         !rhohat_n = min(rho_n,1.1)
-        !rhohat_n = 1.0_prec + kappa * atan((rho_n-1.0_prec)/kappa) ! Söderlind and Wang, 2006, Eq. 10
+        !rhohat_n = 1.0_wp + kappa * atan((rho_n-1.0_wp)/kappa) ! Söderlind and Wang, 2006, Eq. 10
         
         ! Step 3: calculate the next time timestep (dt,n+1)
         dt_new = rhohat_n * dt_n
@@ -499,7 +499,7 @@ end if
         ! Step 4: Modify timestep to fit within prescribed limits 
 
         ! Calculate CFL advection limit too, and limit maximum allowed timestep
-        dt_adv    = minval( calc_adv2D_timestep1(ux_bar,uy_bar,dx,dx,cfl_max=1.0_prec) ) 
+        dt_adv    = minval( calc_adv2D_timestep1(ux_bar,uy_bar,dx,dx,cfl_max=1.0_wp) ) 
         dtmax_now = min(dtmax,dt_adv) 
 
         ! Finally, ensure timestep is within prescribed limits
@@ -513,14 +513,14 @@ end if
 
         implicit none 
 
-        real(prec), intent(IN) :: eta_n 
-        real(prec), intent(IN) :: eta_nm1 
-        real(prec), intent(IN) :: rho_nm1 
-        real(prec), intent(IN) :: eps 
-        real(prec), intent(IN) :: k_i 
-        real(prec), intent(IN) :: k_p
-        real(prec), intent(IN) :: alpha_2 
-        real(prec) :: rho_n 
+        real(wp), intent(IN) :: eta_n 
+        real(wp), intent(IN) :: eta_nm1 
+        real(wp), intent(IN) :: rho_nm1 
+        real(wp), intent(IN) :: eps 
+        real(wp), intent(IN) :: k_i 
+        real(wp), intent(IN) :: k_p
+        real(wp), intent(IN) :: alpha_2 
+        real(wp) :: rho_n 
 
         ! Söderlind and Wang, 2006; Cheng et al., 2017
         ! Original formulation: Söderlind, 2002, Eq. 3.12:
@@ -534,25 +534,25 @@ end if
 
         implicit none 
 
-        real(prec), intent(IN) :: eta_n 
-        real(prec), intent(IN) :: eta_nm1 
-        real(prec), intent(IN) :: eta_nm2 
-        real(prec), intent(IN) :: rho_nm1
-        real(prec), intent(IN) :: rho_nm2
-        real(prec), intent(IN) :: eps 
-        real(prec), intent(IN) :: k 
-        real(prec), intent(IN) :: b 
-        real(prec) :: rho_n 
+        real(wp), intent(IN) :: eta_n 
+        real(wp), intent(IN) :: eta_nm1 
+        real(wp), intent(IN) :: eta_nm2 
+        real(wp), intent(IN) :: rho_nm1
+        real(wp), intent(IN) :: rho_nm2
+        real(wp), intent(IN) :: eps 
+        real(wp), intent(IN) :: k 
+        real(wp), intent(IN) :: b 
+        real(wp) :: rho_n 
 
         ! Local variables 
-        real(prec) :: beta_1, beta_2, beta_3 
-        real(prec) :: alpha_2, alpha_3 
+        real(wp) :: beta_1, beta_2, beta_3 
+        real(wp) :: alpha_2, alpha_3 
 
-        beta_1  =  1.0_prec / (k*b)
-        beta_2  =  2.0_prec / (k*b)
-        beta_3  =  1.0_prec / (k*b)
-        alpha_2 = -3.0_prec / b 
-        alpha_3 = -1.0_prec / b 
+        beta_1  =  1.0_wp / (k*b)
+        beta_2  =  2.0_wp / (k*b)
+        beta_3  =  1.0_wp / (k*b)
+        alpha_2 = -3.0_wp / b 
+        alpha_3 = -1.0_wp / b 
 
         ! Söderlind (2003) H312b, Eq. 31+ (unlabeled) 
         rho_n   = (eps/eta_n)**beta_1 * (eps/eta_nm1)**beta_2 * (eps/eta_nm2)**beta_3 &
@@ -566,19 +566,19 @@ end if
 
         implicit none 
 
-        real(prec), intent(IN) :: eta_n 
-        real(prec), intent(IN) :: eta_nm1 
-        real(prec), intent(IN) :: eta_nm2 
-        real(prec), intent(IN) :: eps 
-        real(prec), intent(IN) :: k_i  
-        real(prec) :: rho_n 
+        real(wp), intent(IN) :: eta_n 
+        real(wp), intent(IN) :: eta_nm1 
+        real(wp), intent(IN) :: eta_nm2 
+        real(wp), intent(IN) :: eps 
+        real(wp), intent(IN) :: k_i  
+        real(wp) :: rho_n 
 
         ! Local variables 
-        real(prec) :: k_i_1, k_i_2, k_i_3
+        real(wp) :: k_i_1, k_i_2, k_i_3
 
-        k_i_1   = k_i / 4.0_prec 
-        k_i_2   = k_i / 2.0_prec 
-        k_i_3   = k_i / 4.0_prec 
+        k_i_1   = k_i / 4.0_wp 
+        k_i_2   = k_i / 2.0_wp 
+        k_i_3   = k_i / 4.0_wp 
 
         ! Söderlind (2003) H312PID, Eq. 38
         rho_n   = (eps/eta_n)**k_i_1 * (eps/eta_nm1)**k_i_2 * (eps/eta_nm2)**k_i_3
@@ -591,22 +591,22 @@ end if
 
         implicit none 
 
-        real(prec), intent(IN) :: eta_n 
-        real(prec), intent(IN) :: eta_nm1 
-        real(prec), intent(IN) :: eta_nm2 
-        real(prec), intent(IN) :: dt_n 
-        real(prec), intent(IN) :: dt_nm1 
-        real(prec), intent(IN) :: eps 
-        real(prec), intent(IN) :: k_i  
-        real(prec), intent(IN) :: k_p
-        real(prec) :: rho_n 
+        real(wp), intent(IN) :: eta_n 
+        real(wp), intent(IN) :: eta_nm1 
+        real(wp), intent(IN) :: eta_nm2 
+        real(wp), intent(IN) :: dt_n 
+        real(wp), intent(IN) :: dt_nm1 
+        real(wp), intent(IN) :: eps 
+        real(wp), intent(IN) :: k_i  
+        real(wp), intent(IN) :: k_p
+        real(wp) :: rho_n 
 
         ! Local variables 
-        real(prec) :: k_i_1, k_i_2, k_i_3
+        real(wp) :: k_i_1, k_i_2, k_i_3
 
-        k_i_1   =   0.75_prec*k_i + 0.50_prec*k_p 
-        k_i_2   =   0.50_prec*k_i 
-        k_i_3   = -(0.25_prec*k_i + 0.50_prec*k_p)
+        k_i_1   =   0.75_wp*k_i + 0.50_wp*k_p 
+        k_i_2   =   0.50_wp*k_i 
+        k_i_3   = -(0.25_wp*k_i + 0.50_wp*k_p)
 
         ! Söderlind (2003) H321PID, Eq. 42
         rho_n   = (eps/eta_n)**k_i_1 * (eps/eta_nm1)**k_i_2 * (eps/eta_nm2)**k_i_3 * (dt_n / dt_nm1)
@@ -619,14 +619,14 @@ end if
 
         implicit none 
 
-        real(prec), intent(IN) :: eta_n 
-        real(prec), intent(IN) :: eta_nm1 
-        real(prec), intent(IN) :: eta_nm2 
-        real(prec), intent(IN) :: eps 
-        real(prec), intent(IN) :: k_i  
-        real(prec), intent(IN) :: k_p
-        real(prec), intent(IN) :: k_d
-        real(prec) :: rho_n 
+        real(wp), intent(IN) :: eta_n 
+        real(wp), intent(IN) :: eta_nm1 
+        real(wp), intent(IN) :: eta_nm2 
+        real(wp), intent(IN) :: eps 
+        real(wp), intent(IN) :: k_i  
+        real(wp), intent(IN) :: k_p
+        real(wp), intent(IN) :: k_d
+        real(wp) :: rho_n 
 
         ! https://www.mathematik.uni-dortmund.de/~kuzmin/cfdintro/lecture8.pdf
         ! Page 20 (theoretical basis unclear/unknown)
@@ -645,30 +645,30 @@ end if
 
         implicit none 
 
-        real(prec), intent(OUT) :: dt             ! [a] Current timestep 
-        real(prec), intent(OUT) :: dt_adv(:,:)     ! [a] Diagnosed maximum advective timestep (vertical ave)
-        real(prec), intent(OUT) :: dt_diff(:,:)    ! [a] Diagnosed maximum diffusive timestep (vertical ave) 
-        real(prec), intent(OUT) :: dt_adv3D(:,:,:) ! [a] Diagnosed maximum advective timestep (3D) 
-        real(prec), intent(IN)  :: ux(:,:,:)       ! [m a-1]
-        real(prec), intent(IN)  :: uy(:,:,:)       ! [m a-1]
-        real(prec), intent(IN)  :: uz(:,:,:)       ! [m a-1]
-        real(prec), intent(IN)  :: ux_bar(:,:)     ! [m a-1]
-        real(prec), intent(IN)  :: uy_bar(:,:)     ! [m a-1]
-        real(prec), intent(IN)  :: H_ice(:,:)      ! [m]
-        real(prec), intent(IN)  :: dHicedt(:,:)    ! [m a-1]
-        real(prec), intent(IN)  :: zeta_ac(:)      ! [--] 
-        real(prec), intent(IN)  :: dx, dtmin, dtmax ! [a]
-        real(prec), intent(IN)  :: cfl_max
-        real(prec), intent(IN)  :: cfl_diff_max
+        real(wp), intent(OUT) :: dt             ! [a] Current timestep 
+        real(wp), intent(OUT) :: dt_adv(:,:)     ! [a] Diagnosed maximum advective timestep (vertical ave)
+        real(wp), intent(OUT) :: dt_diff(:,:)    ! [a] Diagnosed maximum diffusive timestep (vertical ave) 
+        real(wp), intent(OUT) :: dt_adv3D(:,:,:) ! [a] Diagnosed maximum advective timestep (3D) 
+        real(wp), intent(IN)  :: ux(:,:,:)       ! [m a-1]
+        real(wp), intent(IN)  :: uy(:,:,:)       ! [m a-1]
+        real(wp), intent(IN)  :: uz(:,:,:)       ! [m a-1]
+        real(wp), intent(IN)  :: ux_bar(:,:)     ! [m a-1]
+        real(wp), intent(IN)  :: uy_bar(:,:)     ! [m a-1]
+        real(wp), intent(IN)  :: H_ice(:,:)      ! [m]
+        real(wp), intent(IN)  :: dHicedt(:,:)    ! [m a-1]
+        real(wp), intent(IN)  :: zeta_ac(:)      ! [--] 
+        real(wp), intent(IN)  :: dx, dtmin, dtmax ! [a]
+        real(wp), intent(IN)  :: cfl_max
+        real(wp), intent(IN)  :: cfl_diff_max
         
         ! Local variables 
-        real(prec) :: dt_adv_min, dt_diff_min 
-        real(prec) :: x 
+        real(wp) :: dt_adv_min, dt_diff_min 
+        real(wp) :: x 
         logical    :: is_unstable
-        real(prec), parameter :: dtmax_cfl   = 20.0_prec 
-        real(prec), parameter :: exp_cfl     =  2.0_prec 
-        real(prec), parameter :: rate_lim    = 1.0_prec   ! Reduction in timestep for instability 
-        real(prec), parameter :: rate_scalar = 0.05_prec  ! Reduction in timestep for instability 
+        real(wp), parameter :: dtmax_cfl   = 20.0_wp 
+        real(wp), parameter :: exp_cfl     =  2.0_wp 
+        real(wp), parameter :: rate_lim    = 1.0_wp   ! Reduction in timestep for instability 
+        real(wp), parameter :: rate_scalar = 0.05_wp  ! Reduction in timestep for instability 
 
         ! Timestep limits determined from CFL conditions for general advective
         ! velocity, as well as diagnosed diffusive magnitude
@@ -724,13 +724,13 @@ end if
 
         implicit none
 
-        real(prec), intent(INOUT) :: dt               ! [a] Current timestep 
-        real(prec), intent(IN)    :: dtmin            ! [a] Minimum allowed timestep
-        real(prec), intent(IN)    :: dtmax            ! [a] Maximum allowed timestep 
+        real(wp), intent(INOUT) :: dt               ! [a] Current timestep 
+        real(wp), intent(IN)    :: dtmin            ! [a] Minimum allowed timestep
+        real(wp), intent(IN)    :: dtmax            ! [a] Maximum allowed timestep 
 
         ! Local variables  
-        real(prec), parameter :: n_decimal   = 6          ! Maximum decimals to treat for timestep
-        real(prec), parameter :: dt_half_lim = 0.5_prec   ! Should be 0.5 or greater to make sense
+        real(wp), parameter :: n_decimal   = 6          ! Maximum decimals to treat for timestep
+        real(wp), parameter :: dt_half_lim = 0.5_wp   ! Should be 0.5 or greater to make sense
 
         ! Check to avoid lopsided timesteps (1 big, 1 tiny) to arrive at time_max  
         if (dtmax .gt. 0.0) then 
@@ -750,7 +750,7 @@ end if
             else if (dt/dtmax .lt. dt_half_lim) then 
                 ! Round-off extra digits for neatness
 
-                dt = real(floor(dt*10.0_prec**n_decimal)*10.0_prec**(-n_decimal), prec)
+                dt = real(floor(dt*10.0_wp**n_decimal)*10.0_wp**(-n_decimal), wp)
                 
             end if 
 
@@ -803,9 +803,9 @@ end if
 
         implicit none 
         
-        real(prec), intent(IN) :: D, dx, dy
-        real(prec), intent(IN) :: cfl_diff_max       ! Maximum Courant number, default cfl_diff_max=0.12
-        real(prec) :: dt 
+        real(wp), intent(IN) :: D, dx, dy
+        real(wp), intent(IN) :: cfl_diff_max       ! Maximum Courant number, default cfl_diff_max=0.12
+        real(wp) :: dt 
 
         dt = (2.0*cfl_diff_max) / ((1.0/(dx**2)+1.0/(dy**2))*max(abs(D),1e-5))
         
@@ -826,17 +826,17 @@ end if
 
         implicit none 
         
-        real(prec), intent(IN) :: ux(:,:)           ! acx-nodes
-        real(prec), intent(IN) :: uy(:,:)           ! acy-nodes 
-        real(prec), intent(IN) :: dx, dy
-        real(prec), intent(IN) :: cfl_max           ! Maximum Courant number, default cfl_max=1.0
-        real(prec) :: dt(size(ux,1),size(ux,2))     ! aa-nodes 
+        real(wp), intent(IN) :: ux(:,:)           ! acx-nodes
+        real(wp), intent(IN) :: uy(:,:)           ! acy-nodes 
+        real(wp), intent(IN) :: dx, dy
+        real(wp), intent(IN) :: cfl_max           ! Maximum Courant number, default cfl_max=1.0
+        real(wp) :: dt(size(ux,1),size(ux,2))     ! aa-nodes 
 
         ! Local variables  
         integer :: i, j, nx, ny 
-        real(prec) :: ux_now, uy_now 
+        real(wp) :: ux_now, uy_now 
 
-        real(prec), parameter :: eps = 1e-1         ! [m/a] Small factor to avoid divide by zero 
+        real(wp), parameter :: eps = 1e-1         ! [m/a] Small factor to avoid divide by zero 
 
         nx = size(ux,1)
         ny = size(ux,2)
@@ -883,19 +883,19 @@ end if
 
         implicit none 
         
-        real(prec), intent(IN) :: ux(:,:,:)        ! acx-nodes
-        real(prec), intent(IN) :: uy(:,:,:)        ! acy-nodes
-        real(prec), intent(IN) :: uz(:,:,:)        ! acz-nodes  
-        real(prec), intent(IN) :: dx, dy
-        real(prec), intent(IN) :: H_ice(:,:)       ! aa-nodes 
-        real(prec), intent(IN) :: zeta_ac(:)       ! ac-nodes 
-        real(prec), intent(IN) :: cfl_max          ! Maximum Courant number, default cfl_max=1.0
-        real(prec) :: dt(size(ux,1),size(ux,2),size(ux,3))    ! aa-nodes 
+        real(wp), intent(IN) :: ux(:,:,:)        ! acx-nodes
+        real(wp), intent(IN) :: uy(:,:,:)        ! acy-nodes
+        real(wp), intent(IN) :: uz(:,:,:)        ! acz-nodes  
+        real(wp), intent(IN) :: dx, dy
+        real(wp), intent(IN) :: H_ice(:,:)       ! aa-nodes 
+        real(wp), intent(IN) :: zeta_ac(:)       ! ac-nodes 
+        real(wp), intent(IN) :: cfl_max          ! Maximum Courant number, default cfl_max=1.0
+        real(wp) :: dt(size(ux,1),size(ux,2),size(ux,3))    ! aa-nodes 
 
         ! Local variables  
         integer :: i, j, k, nx, ny, nz_aa  
-        real(prec) :: ux_now, uy_now 
-        real(prec) :: dz 
+        real(wp) :: ux_now, uy_now 
+        real(wp) :: dz 
 
         nx    = size(ux,1)
         ny    = size(ux,2)
@@ -954,11 +954,11 @@ end if
 
         implicit none 
         
-        real(prec), intent(IN) :: ux
-        real(prec), intent(IN) :: uy
-        real(prec), intent(IN) :: dx, dy
-        real(prec), intent(IN) :: cfl_max             ! Maximum Courant number, default cfl_max=1.0
-        real(prec) :: dt 
+        real(wp), intent(IN) :: ux
+        real(wp), intent(IN) :: uy
+        real(wp), intent(IN) :: dx, dy
+        real(wp), intent(IN) :: cfl_max             ! Maximum Courant number, default cfl_max=1.0
+        real(wp) :: dt 
 
         dt = cfl_max * 1.0 / max(abs(ux)/dx + abs(uy)/dy,1e-5)
 
@@ -980,17 +980,17 @@ end if
 
         implicit none 
         
-        real(prec), intent(INOUT) :: ux(:,:)
-        real(prec), intent(INOUT) :: uy(:,:)
-        real(prec), intent(IN)    :: dx, dy
-        real(prec), intent(IN)    :: dt 
-        real(prec), intent(IN)    :: cfl_max       ! Maximum Courant number, default cfl_max=1.0
+        real(wp), intent(INOUT) :: ux(:,:)
+        real(wp), intent(INOUT) :: uy(:,:)
+        real(wp), intent(IN)    :: dx, dy
+        real(wp), intent(IN)    :: dt 
+        real(wp), intent(IN)    :: cfl_max       ! Maximum Courant number, default cfl_max=1.0
         
         ! Local variables 
         integer    :: i, j, q, nx, ny 
-        real(prec) :: uxy, dt_now 
-        real(prec) :: X, X_max 
-        real(prec) :: f_scale 
+        real(wp) :: uxy, dt_now 
+        real(wp) :: X, X_max 
+        real(wp) :: f_scale 
 
         nx = size(ux,1)
         ny = size(ux,2)
@@ -1039,19 +1039,19 @@ end if
 
         implicit none 
         
-        real(prec), intent(IN) :: ux(:,:,:), uy(:,:,:), uz(:,:,:)
-        real(prec), intent(IN) :: H_ice(:,:) 
-        real(prec), intent(IN) :: zeta_ac(:) 
-        real(prec), intent(IN) :: dx, dy
-        real(prec), intent(IN) :: cfl_max             ! Maximum Courant number, default cfl_max=1.0
-        real(prec) :: dt 
+        real(wp), intent(IN) :: ux(:,:,:), uy(:,:,:), uz(:,:,:)
+        real(wp), intent(IN) :: H_ice(:,:) 
+        real(wp), intent(IN) :: zeta_ac(:) 
+        real(wp), intent(IN) :: dx, dy
+        real(wp), intent(IN) :: cfl_max             ! Maximum Courant number, default cfl_max=1.0
+        real(wp) :: dt 
 
         ! Local variables 
         integer    :: i, j, k, nx, ny, nz_aa 
-        real(prec) :: dt_check, dt_max 
-        real(prec) :: dz, ux_aa, uy_aa, uz_aa  
+        real(wp) :: dt_check, dt_max 
+        real(wp) :: dz, ux_aa, uy_aa, uz_aa  
 
-        real(prec), parameter :: tol = 1e-5 
+        real(wp), parameter :: tol = 1e-5 
 
         nx    = size(ux,1)
         ny    = size(ux,2)
@@ -1116,8 +1116,8 @@ end if
 
         implicit none 
 
-        real(prec), intent(OUT) :: var_check(:,:) 
-        real(prec), intent(IN)  :: var(:,:) 
+        real(wp), intent(OUT) :: var_check(:,:) 
+        real(wp), intent(IN)  :: var(:,:) 
         logical,    intent(IN)  :: mask(:,:)  
 
         ! Local variables 
@@ -1127,7 +1127,7 @@ end if
         ny = size(var,2) 
 
         ! First assume everything is stable 
-        var_check = 0.0_prec 
+        var_check = 0.0_wp 
 
         do j = 2, ny-1
         do i = 2, nx-1 
@@ -1159,8 +1159,8 @@ end if
         implicit none 
 
         logical,    intent(OUT) :: is_unstable
-        real(prec), intent(IN)  :: var(:,:) 
-        real(prec), intent(IN)  :: lim 
+        real(wp), intent(IN)  :: var(:,:) 
+        real(wp), intent(IN)  :: lim 
 
         ! Local variables 
         integer :: i, j, nx, ny 
@@ -1202,10 +1202,10 @@ end if
         implicit none 
 
         character(len=*),  intent(IN) :: filename
-        real(prec), intent(IN) :: time
-        real(prec), intent(IN) :: xc(:) 
-        real(prec), intent(IN) :: yc(:)  
-        real(prec), intent(IN) :: pc_eps
+        real(wp), intent(IN) :: time
+        real(wp), intent(IN) :: xc(:) 
+        real(wp), intent(IN) :: yc(:)  
+        real(wp), intent(IN) :: pc_eps
 
         ! Local variables 
         character(len=16) :: xnm 
@@ -1225,7 +1225,7 @@ end if
         call nc_write_dim(filename,ynm,x=yc*1e-3,units="kilometers")
         call nc_write_attr(filename,ynm,"_CoordinateAxisType","GeoY")
         
-        call nc_write_dim(filename,"time",x=time,dx=1.0_prec,nx=1,units="years",unlimited=.TRUE.)
+        call nc_write_dim(filename,"time",x=time,dx=1.0_wp,nx=1,units="years",unlimited=.TRUE.)
 
         call nc_write(filename, "pc_eps", pc_eps,dim1="pt")
         
@@ -1239,21 +1239,21 @@ end if
         implicit none 
 
         character(len=*),  intent(IN) :: filename
-        real(prec), intent(IN) :: time 
-        real(prec), intent(IN) :: dt_now 
-        real(prec), intent(IN) :: dt_adv
-        real(prec), intent(IN) :: dt_pi 
-        real(prec), intent(IN) :: pc_eta 
-        real(prec), intent(IN) :: pc_tau(:,:) 
-        real(prec), intent(IN) :: speed 
-        real(prec), intent(IN) :: speed_tpo
-        real(prec), intent(IN) :: speed_dyn 
+        real(wp), intent(IN) :: time 
+        real(wp), intent(IN) :: dt_now 
+        real(wp), intent(IN) :: dt_adv
+        real(wp), intent(IN) :: dt_pi 
+        real(wp), intent(IN) :: pc_eta 
+        real(wp), intent(IN) :: pc_tau(:,:) 
+        real(wp), intent(IN) :: speed 
+        real(wp), intent(IN) :: speed_tpo
+        real(wp), intent(IN) :: speed_dyn 
         integer,    intent(IN) :: ssa_iter 
         integer,    intent(IN) :: iter_redo 
 
         ! Local variables
         integer    :: ncid, n, nx, ny 
-        real(prec) :: time_prev 
+        real(wp) :: time_prev 
 
         logical, parameter :: write_pc_tau_field = .FALSE.  ! Signficantly increases filesize, careful!
 
@@ -1300,7 +1300,7 @@ end if
 
         type(ytime_class), intent(INOUT) :: ytime
         integer,    intent(IN) :: nx, ny, nz 
-        real(prec), intent(IN) :: dt_min, pc_eps 
+        real(wp), intent(IN) :: dt_min, pc_eps 
 
         ! Allocate ytime object
         call ytime_alloc(ytime,nx,ny,nz)
@@ -1317,11 +1317,11 @@ end if
         ytime%dt_diff       = 0.0 
         ytime%dt_adv3D      = 0.0 
 
-        ytime%pc_tau        = 0.0_prec 
-        ytime%pc_tau_masked = 0.0_prec 
+        ytime%pc_tau        = 0.0_wp 
+        ytime%pc_tau_masked = 0.0_wp 
         
-        ytime%pc_taus       = 0.0_prec 
-        ytime%pc_tau_max    = 0.0_prec
+        ytime%pc_taus       = 0.0_wp 
+        ytime%pc_tau_max    = 0.0_wp
         
         ! Initialize averages to zero too
         ytime%model_speeds  = MV

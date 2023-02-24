@@ -1003,6 +1003,18 @@ end if
                             &corrected to reflect isostatic offset from z_bed_ref in restart file."
                 write(*,*) "yelmo.restart: ", trim(dom%par%restart)
                 write(*,*) "yelmo_init_topo.init_topo_path: ", trim(init_topo_path)
+
+                ! Next if using H_ice from the restart file, and the restart
+                ! file fields were interpolated, then determine H_ice from z_srf-z_bed
+                ! rather than just H_ice, to avoid strange patterns near troughs etc. 
+                if (dom%par%restart_H_ice .and. dom%par%restart_interpolated) then
+
+                    where(tpo_restart%now%f_grnd .gt. 0.0)
+                        tpo_restart%now%H_ice = tpo_restart%now%z_srf - bnd_restart%z_bed
+                    end where
+
+                end if 
+
             end if
 
             ! Replace several boundary fields like masks from the main dom object that 

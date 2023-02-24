@@ -374,6 +374,74 @@ end if
 
     end subroutine calc_pc_tau_heun
 
+    subroutine pc1_set_adaptive_timestep_pc(dt,tau,eps,dtmin,dtmax,mask,ux_bar,uy_bar,dx,pc_k,controller)
+        ! Calculate the timestep following algorithm for 
+        ! a general predictor-corrector (pc) method.
+        ! Implemented followig Cheng et al (2017, GMD)
+
+        implicit none 
+
+        real(wp), intent(INOUT) :: dt(:,:,:)            ! [yr]   Timesteps (nx,ny,n+1:n-2)
+        real(wp), intent(IN)  :: tau(:,:,:)             ! [X/yr] Truncation error (nx,ny,n:n-2)
+        real(wp), intent(IN)  :: eps(:,:,:)             ! [--]   Tolerance value (eg, eps=1e-4)
+        real(wp), intent(IN)  :: dtmin                  ! [yr]   Minimum allowed timestep
+        real(wp), intent(IN)  :: dtmax                  ! [yr]   Maximum allowed timestep
+        logical,  intent(IN)  :: mask(:,:)              ! [--]   Mask to limit to region of interest
+        real(wp), intent(IN)  :: ux_bar(:,:)            ! [m/yr]
+        real(wp), intent(IN)  :: uy_bar(:,:)            ! [m/yr]
+        real(wp), intent(IN)  :: dx                     ! [m]
+        integer,  intent(IN)  :: pc_k                   ! pc_k gives the order of the timestepping scheme (pc_k=2 for FE-SBE, pc_k=3 for AB-SAM)
+        character(len=*), intent(IN) :: controller      ! Adaptive controller to use [PI42, H312b, H312PID]
+
+        ! Local variables
+        integer  :: i, j, nx, ny 
+        real(wp) :: k_i 
+        real(wp) :: k_p, k_d 
+        real(wp) :: dt_n 
+        real(wp) :: dt_nm1 
+        real(wp) :: rho_nm1 
+        real(wp) :: rho_n 
+
+        nx = size(dt,1)
+        ny = size(dt,2) 
+
+
+
+        ! Shift array to eliminate oldest entry, then add current entry in the first position
+        dt  = cshift(dt,-1,dim=3)
+        !dt(:,:,1) = dt_now  
+        
+
+        ! Default controller parameter values 
+        k_i = 2.0_wp / (pc_k*5.0_wp)
+        k_p = 1.0_wp / (pc_k*5.0_wp)
+        
+
+        do j = 1, ny 
+        do i = 1, nx 
+            ! ! To do:
+            ! call set_adaptive_timestep_pc(dt(i,j,1),dt(i,j,2:4),tau(i,j,1:3),eps(),dtmin,dtmax,ux_bar,uy_bar,dx,pc_k,controller)
+
+            dt_n    = max(dt(i,j,2),dtmin) 
+            dt_nm1  = max(dt(i,j,3),dtmin) 
+            rho_nm1 = (dt_n / dt_nm1) 
+
+            ! Calculate controller update
+            rho_n = pc1_calc_pi_rho_pi42(tau(i,j,1:2),eps(i,j,1:2),rho_nm1,k_i,k_p,alpha_2=0.0_wp)
+
+            ! Calculate the next time timestep (dt,n+1)
+            dt(i,j,1) = rho_n * dt_n
+            
+            ! Finally, ensure timestep is within prescribed limits
+            call limit_adaptive_timestep(dt(i,j,1),dtmin,dtmax)
+        
+        end do 
+        end do 
+
+        return
+
+    end subroutine pc1_set_adaptive_timestep_pc
+
     subroutine set_adaptive_timestep_pc(dt_new,dt,eta,eps,dtmin,dtmax,ux_bar,uy_bar,dx,pc_k,controller)
         ! Calculate the timestep following algorithm for 
         ! a general predictor-corrector (pc) method.
@@ -508,6 +576,27 @@ end if
         return 
 
     end subroutine set_adaptive_timestep_pc
+
+    function pc1_calc_pi_rho_pi42(eta,eps,rho_nm1,k_i,k_p,alpha_2) result(rho_n)
+
+        implicit none 
+
+        real(wp), intent(IN) :: eta(:)      ! (n,nm1)
+        real(wp), intent(IN) :: eps(:)      ! (n,nm1)
+        real(wp), intent(IN) :: rho_nm1 
+        real(wp), intent(IN) :: k_i 
+        real(wp), intent(IN) :: k_p
+        real(wp), intent(IN) :: alpha_2 
+        real(wp) :: rho_n 
+
+        ! Söderlind and Wang, 2006; Cheng et al., 2017
+        ! Original formulation: Söderlind, 2002, Eq. 3.12:
+        rho_n   = (eps(1)/eta(1))**(k_i+k_p) * (eps(2)/eta(2))**(-k_p) * rho_nm1**(-alpha_2)
+
+        return 
+
+    end function pc1_calc_pi_rho_pi42
+
 
     function calc_pi_rho_pi42(eta_n,eta_nm1,rho_nm1,eps,k_i,k_p,alpha_2) result(rho_n)
 
@@ -1317,13 +1406,18 @@ end if
         ytime%dt_diff       = 0.0 
         ytime%dt_adv3D      = 0.0 
 
-        ytime%pc_tau        = 0.0_wp 
-        ytime%pc_tau_masked = 0.0_wp 
+        ytime%pc_tau        = 0.0 
+        ytime%pc_tau_masked = 0.0 
         
-        ytime%pc_taus       = 0.0_wp 
-        ytime%pc_tau_max    = 0.0_wp
+        ytime%pc_taus       = 0.0 
+        ytime%pc_tau_max    = 0.0
         
-        ! Initialize averages to zero too
+        ytime%pc1_dt_masked = dt_min 
+        ytime%pc1_eps       = pc_eps 
+        ytime%pc1_dt        = dt_min
+        ytime%pc1_tau       = 0.0
+        
+        ! Initialize averages to missing values
         ytime%model_speeds  = MV
         ytime%etas          = MV 
         ytime%ssa_iters     = MV 
@@ -1365,6 +1459,12 @@ end if
         allocate(ytime%pc_taus(nx,ny,50))
         allocate(ytime%pc_tau_max(nx,ny))
 
+        ! Allocate new arrays for testing
+        allocate(ytime%pc1_dt_masked(nx,ny))
+        allocate(ytime%pc1_eps(nx,ny,3))
+        allocate(ytime%pc1_dt(nx,ny,3))
+        allocate(ytime%pc1_tau(nx,ny,3))
+        
         return 
 
     end subroutine ytime_alloc
@@ -1384,6 +1484,11 @@ end if
         
         if (allocated(ytime%pc_taus))       deallocate(ytime%pc_taus)
         if (allocated(ytime%pc_tau_max))    deallocate(ytime%pc_tau_max)
+        
+        if (allocated(ytime%pc1_dt_masked)) deallocate(ytime%pc1_dt_masked)
+        if (allocated(ytime%pc1_eps))       deallocate(ytime%pc1_eps)
+        if (allocated(ytime%pc1_dt))        deallocate(ytime%pc1_dt)
+        if (allocated(ytime%pc1_tau))       deallocate(ytime%pc1_tau)
         
         return 
 

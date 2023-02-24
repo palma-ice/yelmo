@@ -169,7 +169,7 @@ contains
         real(wp), allocatable  :: Hx_1(:,:), Hx_2(:,:)
         real(wp), allocatable  :: Hy_1(:,:), Hy_2(:,:)
 
-        real(wp), parameter :: WOVI = 1.0     ! Weighing parameter for the over-implicit scheme 
+        real(wp), parameter :: WOVI = 1.0     ! Weighting parameter for the over-implicit scheme 
 
         nx = size(H,1)
         ny = size(H,2) 

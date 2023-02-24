@@ -948,6 +948,9 @@ end if
                                                 dom%dyn%now%uxy_b,dom%bnd%ice_allowed,dom%tpo%par%boundaries,dom%bnd%H_ice_ref, &
                                                 H_min_flt=1.0_wp,H_min_grnd=1.0_wp,dt=0.0,reset=.TRUE.)
 
+            ! Update H_ice again to be consistent with that saved in Yelmo
+            H_ice = dom%tpo%now%H_ice
+
         end if 
 
         ! Step 2: load topo and bnd variables from a restart file if desired 
@@ -956,7 +959,8 @@ end if
             ! Load variables from a restart file. Note: this will
             ! overwrite all information stored in yelmo object from above.
 
-            call yelmo_restart_read_topo_bnd(dom,dom%par%restart,time)
+            call yelmo_restart_read_topo_bnd(dom%tpo,dom%bnd,dom%par%restart_interpolated, &
+                                            dom%par%domain,dom%par%grid_name,dom%par%restart,time)
 
             ! Now determine which values should be used from restart.
             

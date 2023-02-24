@@ -986,7 +986,7 @@ end if
                 write(*,*) "yelmo_init_topo.init_topo_path: ", trim(init_topo_path)
             end if 
 
-            if (.not. dom%par%restart_z_bed) then 
+            if ( (.not. dom%par%restart_z_bed) .or. dom%par%restart_interpolated) then 
                 ! Use fields from default initialization, but make sure the current
                 ! state of isostatic rebound is well represented. 
 
@@ -994,6 +994,8 @@ end if
                 dzb         = dom%bnd%z_bed - dom%bnd%z_bed_ref 
                 dzb_restart = bnd_restart%z_bed - bnd_restart%z_bed_ref 
                 
+                ! Set the restart field equal to that loaded via parameters but offset
+                ! with the correct offset from the restart file.
                 bnd_restart%z_bed    = dom%bnd%z_bed - dzb + dzb_restart
                 bnd_restart%z_bed_sd = dom%bnd%z_bed_sd
 
@@ -1011,7 +1013,7 @@ end if
             bnd_restart%calv_mask   = dom%bnd%calv_mask 
             bnd_restart%H_ice_ref   = dom%bnd%H_ice_ref 
             bnd_restart%z_bed_ref   = dom%bnd%z_bed_ref 
-            
+
             bnd_restart%basins      = dom%bnd%basins 
             bnd_restart%basin_mask  = dom%bnd%basin_mask 
             bnd_restart%regions     = dom%bnd%regions 

@@ -688,6 +688,7 @@ contains
             ! Load the scrip map from file (should already have been generated via cdo externally)
             call map_scrip_init(mps,restart_grid_name,grid_name,method="con",fldr="maps",load=.TRUE.)
 
+            ! Load the data with interpolation
             call yelmo_restart_read_topo_bnd_internal(tpo,bnd,filename,time,mps) 
 
             ! Set yelmo flag too

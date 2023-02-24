@@ -830,12 +830,21 @@ end if
         real(wp), allocatable :: z_bed_sd(:,:) 
         real(wp), allocatable :: z_srf(:,:) 
 
+        real(wp), allocatable :: dzb(:,:)
+        real(wp), allocatable :: dzb_restart(:,:)
+        
+        ! Local copies of tpo and bnd
+        type(ytopo_class)  :: tpo_restart 
+        type(ybound_class) :: bnd_restart 
+
         ! Allocate local arrays
         allocate(H_ice(dom%grd%nx,dom%grd%ny))
         allocate(z_bed(dom%grd%nx,dom%grd%ny))
         allocate(z_bed_sd(dom%grd%nx,dom%grd%ny))
         allocate(z_srf(dom%grd%nx,dom%grd%ny))
-
+        allocate(dzb(dom%grd%nx,dom%grd%ny))
+        allocate(dzb_restart(dom%grd%nx,dom%grd%ny))
+        
         ! Set to zero to start 
         H_ice    = 0.0_wp 
         z_bed    = 0.0_wp 
@@ -843,7 +852,7 @@ end if
         z_srf    = 0.0_wp 
 
         ! Step 1: load topography variables from a file, if desired.
-        ! Store in the temporary local arrays for now. 
+        ! Manipulate in local arrays, then store in the main dom object. 
 
         ! Load parameters related to topography initiaization 
         call nml_read(filename,"yelmo_init_topo","init_topo_load",  init_topo_load)
@@ -948,46 +957,74 @@ end if
                                                 dom%dyn%now%uxy_b,dom%bnd%ice_allowed,dom%tpo%par%boundaries,dom%bnd%H_ice_ref, &
                                                 H_min_flt=1.0_wp,H_min_grnd=1.0_wp,dt=0.0,reset=.TRUE.)
 
-            ! Update H_ice again to be consistent with that saved in Yelmo
-            H_ice = dom%tpo%now%H_ice
-
         end if 
 
         ! Step 2: load topo and bnd variables from a restart file if desired 
+        ! Store fields in temporary objects and determine which fields to pass
+        ! to the main dom object.
 
         if (dom%par%use_restart) then 
             ! Load variables from a restart file. Note: this will
             ! overwrite all information stored in yelmo object from above.
 
-            call yelmo_restart_read_topo_bnd(dom%tpo,dom%bnd,dom%par%restart_interpolated, &
-                                            dom%par%domain,dom%par%grid_name,dom%par%restart,time)
+            ! Intialize tpo and bnd objects locally 
+            tpo_restart = dom%tpo 
+            bnd_restart = dom%bnd 
+
+            call yelmo_restart_read_topo_bnd(tpo_restart,bnd_restart,dom%par%restart_interpolated, &
+                                                dom%par%domain,dom%par%grid_name,dom%par%restart,time)
 
             ! Now determine which values should be used from restart.
-            
+            ! Replace fields in restart objects that should not be used. 
+
             if (.not. dom%par%restart_H_ice) then 
-                ! Use externally loaded field
-                dom%tpo%now%H_ice = H_ice 
-            end if 
+                ! Use field from default initialization
+                tpo_restart%now%H_ice = dom%tpo%now%H_ice
 
-            if (.not. dom%par%restart_z_bed) then 
-                ! Use externally loaded fields
-                dom%bnd%z_bed     = z_bed 
-                dom%bnd%z_bed_sd  = z_bed_sd 
-
-                write(*,*) "yelmo_init_topo: z_bed taken from input file, remaining &
-                            &topo data from restart file."
+                write(*,*) "yelmo_init_topo: H_ice taken from input file, not restart file."
                 write(*,*) "yelmo.restart: ", trim(dom%par%restart)
                 write(*,*) "yelmo_init_topo.init_topo_path: ", trim(init_topo_path)
             end if 
 
+            if (.not. dom%par%restart_z_bed) then 
+                ! Use fields from default initialization, but make sure the current
+                ! state of isostatic rebound is well represented. 
+
+                ! Determine isostatic offset in each case 
+                dzb         = dom%bnd%z_bed - dom%bnd%z_bed_ref 
+                dzb_restart = bnd_restart%z_bed - bnd_restart%z_bed_ref 
+                
+                bnd_restart%z_bed    = dom%bnd%z_bed - dzb + dzb_restart
+                bnd_restart%z_bed_sd = dom%bnd%z_bed_sd
+
+                write(*,*) "yelmo_init_topo: z_bed taken from input file, not restart file. But it has been &
+                            &corrected to reflect isostatic offset from z_bed_ref in restart file."
+                write(*,*) "yelmo.restart: ", trim(dom%par%restart)
+                write(*,*) "yelmo_init_topo.init_topo_path: ", trim(init_topo_path)
+            end if
+
+            ! Replace several boundary fields like masks from the main dom object that 
+            ! were loaded via parameter file choices. These should not be loaded 
+            ! from the restart file, especially if the restart file was at, e.g., 
+            ! a lower resolution 
+            bnd_restart%ice_allowed = dom%bnd%ice_allowed 
+            bnd_restart%calv_mask   = dom%bnd%calv_mask 
+            bnd_restart%H_ice_ref   = dom%bnd%H_ice_ref 
+            bnd_restart%z_bed_ref   = dom%bnd%z_bed_ref 
+            
+            bnd_restart%basins      = dom%bnd%basins 
+            bnd_restart%basin_mask  = dom%bnd%basin_mask 
+            bnd_restart%regions     = dom%bnd%regions 
+            bnd_restart%region_mask = dom%bnd%region_mask 
+            
+            ! Finally populate the main dom object with the desired restart fields
+            dom%tpo = tpo_restart 
+            dom%bnd = bnd_restart 
+
         end if 
 
-        ! ajr: WARNING: the above will not work properly if z_bed from the restart file has
-        ! been affected by isostatic rebound. In that case, the new z_bed should be adjusted
-        ! so that it reflects the same amount of isostatic rebound. 
-        
-
         ! Step 3: update remaining topogaphic info to be consistent with initial fields 
+        ! Here several fields in ytopo will be overwritten and topo will be fully consistent with itself.
 
         ! Run topo and masks to make sure all fields are synchronized (masks, etc)
         !call calc_ytopo_rk4(dom%tpo,dom%dyn,dom%mat,dom%thrm,dom%bnd,time,topo_fixed=.TRUE.)

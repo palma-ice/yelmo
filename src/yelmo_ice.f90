@@ -29,6 +29,7 @@ module yelmo_ice
     private
     public :: yelmo_init, yelmo_init_topo, yelmo_init_state
     public :: yelmo_update, yelmo_update_equil, yelmo_end 
+    public :: yelmo_update_z_bed_restart
     public :: yelmo_print_bound, yelmo_set_time
 
 contains
@@ -1099,6 +1100,7 @@ end if
         real(wp), intent(IN)    :: time 
 
         ! Local variables 
+        integer  :: q, n_iter 
         real(wp) :: fac
         real(wp), allocatable :: dzb_now(:,:) 
 
@@ -1111,35 +1113,50 @@ end if
 
         if (dom%par%restart_interpolated .eq. 1) then 
             ! Low-to-high restart:  adjust z_bed as needed 
-
-            allocate(dzb_now(dom%grd%nx,dom%grd%ny))
-
-            dzb_now = dom%bnd%z_bed_corr * fac 
-            dom%bnd%z_bed = dom%bnd%z_bed + dzb_now 
-
-            ! Remove applied correction from field
-            dom%bnd%z_bed_corr = dom%bnd%z_bed_corr - dzb_now
-
-            write(*,*) "Running restart topo smoothing step..."
-
+            
             ! Run model with no advection
+            write(*,*) "Restart smoothing 1: no advection + ssa, 10 years."
             call yelmo_update_equil(dom,time,time_tot=10.0_prec,dt=1.0_wp, &
                                 tpo_solver="none",topo_fixed=.FALSE.,dyn_solver="ssa")
 
             ! Run thermodynamics with SSA solver very briefly to smooth it out
+            write(*,*) "Restart smoothing 2: no advection + ssa, 10 years."
             call yelmo_update_equil(dom,time,time_tot=10.0_prec,dt=1.0_wp, &
                                                     topo_fixed=.TRUE.,dyn_solver="ssa")
 
             ! Run full model (tpo,dyn,thrm) with SSA solver very briefly to smooth it out
-            call yelmo_update_equil(dom,time,time_tot=1.0_prec,dt=0.2_wp, &
+            write(*,*) "Restart smoothing 3: advection + ssa, 10 years."
+            call yelmo_update_equil(dom,time,time_tot=10.0_prec,dt=0.2_wp, &
                                                     topo_fixed=.FALSE.,dyn_solver="ssa")
 
-            if (dom%grd%dx .le. 8e3_wp) then 
-                ! Perform additional ssa smoothing step for higher resolution simulations
+            ! Run full model (tpo,dyn,thrm) with SSA solver very briefly to smooth it out
+            write(*,*) "Restart smoothing 4: full model, 50 years."
+            call yelmo_update_equil(dom,time,time_tot=50.0_prec,dt=1.0_wp,topo_fixed=.FALSE.)
 
-                call yelmo_update_equil(dom,time,time_tot=100.0_prec,dt=1.0_wp, &
-                                                    topo_fixed=.FALSE.,dyn_solver="ssa")
+            ! Slowly introduce high-resolution features to basal topography
 
+            allocate(dzb_now(dom%grd%nx,dom%grd%ny))
+
+            n_iter  = 5
+            fac     = 1.0/real(n_iter,wp)
+            dzb_now = dom%bnd%z_bed_corr * fac
+            
+            do q = 1, n_iter
+                
+                dom%bnd%z_bed      = dom%bnd%z_bed      + dzb_now 
+                dom%bnd%z_bed_corr = dom%bnd%z_bed_corr - dzb_now
+                
+                write(*,*) "Restart smoothing iter: full model, 50 years. iter = ", q
+                call yelmo_update_equil(dom,time,time_tot=50.0_prec,dt=1.0_wp,topo_fixed=.FALSE.)
+
+            end do 
+
+
+            if (maxval(abs(dom%bnd%z_bed_corr)) .gt. 1e-1) then
+                write(*,*) "yelmo_update_z_bed_restart:: Error: z_bed_corr should &
+                &be equal to zero by the end of all iterations."
+                write(*,*) "range(z_bed_corr): ", minval(dom%bnd%z_bed_corr), maxval(dom%bnd%z_bed_corr)
+                stop
             end if 
 
         end if

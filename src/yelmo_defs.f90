@@ -672,6 +672,9 @@ module yelmo_defs
         ! Other external variables that can be useful, ie maybe with tracers
         ! to do 
 
+        ! Internal variables
+        real(wp), allocatable :: z_bed_corr(:,:) 
+        real(wp) :: z_bed_corr_time_init
     end type
 
     ! =========================================================================
@@ -847,9 +850,10 @@ module yelmo_defs
         real(wp), allocatable :: zeta_ac(:)   ! Layer borders (ac-nodes), plus base and surface: nz_ac == nz_aa-1 points
         
         ! Other internal parameters
-        logical :: use_restart 
-        logical :: restart_interpolated
-        
+        logical  :: use_restart 
+        integer  :: restart_interpolated
+        real(wp) :: time_bed_shift
+
     end type
 
     type ytime_class 

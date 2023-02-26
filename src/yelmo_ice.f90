@@ -541,7 +541,7 @@ end if
             ! Save original model configuration 
             dom_ref = dom 
 
-            ! Set new, temporary parameter values from arguments 
+            ! Set new, temporary parameter values from arguments
             dom%tpo%par%topo_fixed = topo_fixed 
 
             if (present(tpo_solver)) dom%tpo%par%solver = tpo_solver 
@@ -972,7 +972,7 @@ end if
             bnd_restart = dom%bnd 
 
             call yelmo_restart_read_topo_bnd(tpo_restart,bnd_restart,dom%par%restart_interpolated, &
-                                                dom%par%domain,dom%par%grid_name,dom%par%restart,time)
+                                             dom%grd,dom%par%domain,dom%par%grid_name,dom%par%restart,time)
 
             ! Now determine which values should be used from restart.
             ! Replace fields in restart objects that should not be used. 
@@ -986,7 +986,7 @@ end if
                 write(*,*) "yelmo_init_topo.init_topo_path: ", trim(init_topo_path)
             end if 
 
-            if ( (.not. dom%par%restart_z_bed) .or. dom%par%restart_interpolated) then 
+            if ( (.not. dom%par%restart_z_bed) .or. dom%par%restart_interpolated .eq. 1) then 
                 ! Use fields from default initialization, but make sure the current
                 ! state of isostatic rebound is well represented. 
 
@@ -996,18 +996,33 @@ end if
                 
                 ! Set the restart field equal to that loaded via parameters but offset
                 ! with the correct offset from the restart file.
-                bnd_restart%z_bed    = dom%bnd%z_bed - dzb + dzb_restart
-                bnd_restart%z_bed_sd = dom%bnd%z_bed_sd
 
-                write(*,*) "yelmo_init_topo: z_bed taken from input file, not restart file. But it has been &
-                            &corrected to reflect isostatic offset from z_bed_ref in restart file."
-                write(*,*) "yelmo.restart: ", trim(dom%par%restart)
-                write(*,*) "yelmo_init_topo.init_topo_path: ", trim(init_topo_path)
+                ! Modify main z_bed object to account for isostatic uplift of restart field
+                dom%bnd%z_bed = dom%bnd%z_bed - dzb + dzb_restart
+                
+                ! Determine remaining differences between (z_bed from parameters)
+                ! and (z_bed from restart file) - these differences should be equivalent
+                ! to the high resolution information not contained in the low-to-high
+                ! resolution field from the restart file. 
+                bnd_restart%z_bed_corr = dom%bnd%z_bed - bnd_restart%z_bed
+                bnd_restart%z_bed_corr_time_init = time
+                
+if (.TRUE.) then 
+                ! Do nothing: do not modify bnd_restart%z_bed.
+                ! So, to start with, the bedrock topography will still be fully
+                ! consistent with the simulation being loaded from the restart file. 
+                ! Use the routine yelmo_udpate_zbed_restart to slow incorporate
+                ! high-resolution information after initializing all other fields. 
+
+else        
+                ! Initialize to the isostatically-adjusted high resolution bedrock field
+                bnd_restart%z_bed = dom%bnd%z_bed
 
                 ! Next if using H_ice from the restart file, and the restart
-                ! file fields were interpolated, then determine H_ice from z_srf-z_bed
+                ! file fields were interpolated from low to high resolution, 
+                ! then determine H_ice from z_srf-z_bed
                 ! rather than just H_ice, to avoid strange patterns near troughs etc. 
-                if (dom%par%restart_H_ice .and. dom%par%restart_interpolated) then
+                if (dom%par%restart_H_ice .and. dom%par%restart_interpolated .eq. 1) then
 
                     where(tpo_restart%now%f_grnd .gt. 0.0)
                         tpo_restart%now%H_ice = tpo_restart%now%z_srf - bnd_restart%z_bed
@@ -1015,6 +1030,17 @@ end if
 
                 end if 
 
+end if 
+
+                ! Finally, store the variability field loaded from parameter choices too
+                bnd_restart%z_bed_sd = dom%bnd%z_bed_sd
+
+                write(*,*) "yelmo_init_topo: z_bed taken from input file, not restart file. But it has been &
+                            &corrected to reflect isostatic offset from z_bed_ref in restart file."
+                write(*,*) "yelmo.restart: ", trim(dom%par%restart)
+                write(*,*) "yelmo_init_topo.init_topo_path: ", trim(init_topo_path)
+
+                
             end if
 
             ! Replace several boundary fields like masks from the main dom object that 
@@ -1059,6 +1085,68 @@ end if
         return 
 
     end subroutine yelmo_init_topo
+
+    subroutine yelmo_update_z_bed_restart(dom,time)
+        ! Use this routine to update z_bed in Yelmo
+        ! to account for new high-resolution information in the bedrock
+        ! not contained in the bedrock field loaded from the restart file. 
+        ! This routine will slowly add this information into the field
+        ! z_bed until it is accurate. 
+
+        implicit none
+
+        type(yelmo_class), intent(INOUT) :: dom 
+        real(wp), intent(IN)    :: time 
+
+        ! Local variables 
+        real(wp) :: fac
+        real(wp), allocatable :: dzb_now(:,:) 
+
+        ! Define transition time
+        ! ajr: later this could be a user parameter if it works...
+        dom%par%time_bed_shift = 500.0 
+
+        ! This routine is only needed if we are running
+        ! a high resolution run loaded from a low resolution restart file
+
+        if (dom%par%restart_interpolated .eq. 1) then 
+            ! Low-to-high restart:  adjust z_bed as needed 
+
+            allocate(dzb_now(dom%grd%nx,dom%grd%ny))
+
+            dzb_now = dom%bnd%z_bed_corr * fac 
+            dom%bnd%z_bed = dom%bnd%z_bed + dzb_now 
+
+            ! Remove applied correction from field
+            dom%bnd%z_bed_corr = dom%bnd%z_bed_corr - dzb_now
+
+            write(*,*) "Running restart topo smoothing step..."
+
+            ! Run model with no advection
+            call yelmo_update_equil(dom,time,time_tot=10.0_prec,dt=1.0_wp, &
+                                tpo_solver="none",topo_fixed=.FALSE.,dyn_solver="ssa")
+
+            ! Run thermodynamics with SSA solver very briefly to smooth it out
+            call yelmo_update_equil(dom,time,time_tot=10.0_prec,dt=1.0_wp, &
+                                                    topo_fixed=.TRUE.,dyn_solver="ssa")
+
+            ! Run full model (tpo,dyn,thrm) with SSA solver very briefly to smooth it out
+            call yelmo_update_equil(dom,time,time_tot=1.0_prec,dt=0.2_wp, &
+                                                    topo_fixed=.FALSE.,dyn_solver="ssa")
+
+            if (dom%grd%dx .le. 8e3_wp) then 
+                ! Perform additional ssa smoothing step for higher resolution simulations
+
+                call yelmo_update_equil(dom,time,time_tot=100.0_prec,dt=1.0_wp, &
+                                                    topo_fixed=.FALSE.,dyn_solver="ssa")
+
+            end if 
+
+        end if
+
+        return
+
+    end subroutine yelmo_update_z_bed_restart
 
     subroutine yelmo_init_state(dom,time,thrm_method)
         ! This subroutine is the second step to intializing 

@@ -640,7 +640,7 @@ contains
 
     end subroutine yelmo_read_interp_2D
 
-    subroutine yelmo_restart_read_topo_bnd(tpo,bnd,restart_interpolated,domain,grid_name,filename,time)  
+    subroutine yelmo_restart_read_topo_bnd(tpo,bnd,restart_interpolated,grd,domain,grid_name,filename,time)  
         ! Load yelmo variables from restart file: [tpo] 
         ! [dyn,therm,mat] variables loaded using yelmo_restart_read
         
@@ -648,17 +648,21 @@ contains
 
         type(ytopo_class),  intent(INOUT) :: tpo 
         type(ybound_class), intent(INOUT) :: bnd 
-        logical,            intent(OUT)   :: restart_interpolated
+        integer,            intent(OUT)   :: restart_interpolated
+        type(ygrid_class),  intent(IN)    :: grd
         character(len=*),   intent(IN)    :: domain
         character(len=*),   intent(IN)    :: grid_name
         character(len=*),   intent(IN)    :: filename 
-        real(wp),           intent(IN)    :: time 
-        
+        real(wp),           intent(IN)    :: time  
+
         ! Local variables
         character(len=56) :: restart_domain 
         character(len=56) :: restart_grid_name 
         type(map_scrip_class) :: mps 
-
+        integer  :: nx_restart
+        real(wp) :: dx_restart 
+        real(wp), allocatable :: xc_restart(:)
+        
         ! Load restart file grid attributes 
         if (nc_exists_attr(filename,"domain")) then 
             call nc_read_attr(filename,"domain",    restart_domain)
@@ -680,7 +684,7 @@ contains
             call yelmo_restart_read_topo_bnd_internal(tpo,bnd,filename,time)
 
             ! Set yelmo flag too
-            restart_interpolated = .FALSE. 
+            restart_interpolated = 0
 
         else 
             ! Restart grid is different than Yelmo grid 
@@ -691,9 +695,24 @@ contains
             ! Load the data with interpolation
             call yelmo_restart_read_topo_bnd_internal(tpo,bnd,filename,time,mps) 
 
-            ! Set yelmo flag too
-            restart_interpolated = .TRUE. 
-            
+            ! Determine whether interpolation is from low to high resolution (1)
+            ! or from high to low resolution (-1)
+
+            ! Load the x-axis from the restart file 
+            ! and determine grid resolution from first points
+            nx_restart = nc_size(filename,"xc")
+            allocate(xc_restart(nx_restart))
+            call nc_read(filename,"xc",xc_restart)
+            dx_restart = xc_restart(2) - xc_restart(1) 
+
+            if (dx_restart .lt. grd%dx) then 
+                ! Low to high resolution
+                restart_interpolated = 1
+            else 
+                ! High to low resolution
+                restart_interpolated = -1 
+            end if 
+
         end if 
 
         return 

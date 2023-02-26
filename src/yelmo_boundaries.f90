@@ -218,6 +218,8 @@ contains
         allocate(now%H_ice_ref(nx,ny))
         allocate(now%z_bed_ref(nx,ny))
         
+        allocate(now%z_bed_corr(nx,ny))
+
         now%z_bed       = 0.0_prec 
         now%z_bed_sd    = 0.0_prec
         now%z_sl        = 0.0_prec 
@@ -241,6 +243,8 @@ contains
 
         now%H_ice_ref   = 0.0_prec 
         now%z_bed_ref   = 0.0_prec
+
+        now%z_bed_corr  = 0.0_prec
 
         return 
 
@@ -275,6 +279,8 @@ contains
         
         if (allocated(now%H_ice_ref))   deallocate(now%H_ice_ref) 
         if (allocated(now%z_bed_ref))   deallocate(now%z_bed_ref)
+
+        if (allocated(now%z_bed_corr))  deallocate(now%z_bed_corr)
 
         return 
 

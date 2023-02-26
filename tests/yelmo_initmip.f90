@@ -282,7 +282,7 @@ program yelmo_test
     end if 
 
 
-    if (yelmo1%par%use_restart .and. yelmo1%par%restart_interpolated) then 
+    if (yelmo1%par%use_restart .and. yelmo1%par%restart_interpolated .eq. 1) then 
 
         write(*,*) "Running restart topo smoothing step..."
 

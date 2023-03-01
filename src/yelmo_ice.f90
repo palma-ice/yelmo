@@ -9,7 +9,8 @@ module yelmo_ice
     use yelmo_grid, only : yelmo_init_grid, calc_zeta
     use yelmo_timesteps, only : ytime_init, set_pc_beta_coefficients, set_adaptive_timestep, set_adaptive_timestep_pc,   &
                                 set_pc_mask, calc_pc_eta, calc_pc_tau_fe_sbe,calc_pc_tau_ab_sam, calc_pc_tau_heun,  &
-                                limit_adaptive_timestep, yelmo_timestep_write_init, yelmo_timestep_write, calc_adv3D_timestep1
+                                limit_adaptive_timestep, yelmo_timestep_write_init, yelmo_timestep_write, calc_adv3D_timestep1, &
+                                pc1_set_adaptive_timestep_pc
     use yelmo_tools, only : smooth_gauss_2D
     use yelmo_io 
 
@@ -139,6 +140,25 @@ contains
             call set_adaptive_timestep_pc(dt_pi,dom%time%pc_dt,dom%time%pc_eta,dom%par%pc_eps,dom%par%dt_min,dt_max, &
                                     dom%dyn%now%ux_bar,dom%dyn%now%uy_bar,dom%tpo%par%dx,dom%tpo%par%pc_k,dom%par%pc_controller)
 
+            ! === pc1 ======================================================
+
+            call set_pc_mask(pc_mask,dom%time%pc_tau,dom%tpo%now%H_ice_pred,dom%tpo%now%H_ice_corr, &
+                                                    dom%bnd%z_bed,dom%bnd%z_sl,dom%tpo%par%margin_flt_subgrid)
+
+            ! Determine the distribution of pc1_eps to use for timestep calculations
+            ! For now set to a constant value, except for ice-free and ice-shelves
+            dom%time%pc1_eps = cshift(dom%time%pc1_eps,-1,dim=3)
+            dom%time%pc1_eps(:,:,1) = dom%par%pc_eps
+            where(dom%tpo%now%H_ice .eq. 0.0)  dom%time%pc1_eps(:,:,1) = dom%par%pc_tol 
+            where(dom%tpo%now%f_grnd .lt. 1.0) dom%time%pc1_eps(:,:,1) = dom%par%pc_tol 
+            
+            ! Calculate adaptive timestep at each location using proportional-integral (PI) methods
+            call pc1_set_adaptive_timestep_pc(dom%time%pc1_dt,dom%time%pc1_tau,dom%time%pc1_eps, &
+                                    pc_mask, &
+                                    dom%par%dt_min,dt_max,dom%tpo%par%pc_k,dom%par%pc_controller)
+
+            ! ==============================================================
+
             ! Determine current time step to be used based on method of choice 
             select case(dom%par%dt_method) 
 
@@ -156,6 +176,11 @@ contains
                     ! Use minimum of PI adaptive timestep
 
                     dt_now = dt_pi
+
+                case(3)
+                    ! Use minimum of spatially variable PI adaptive timestep 
+
+                    dt_now = minval(dom%time%pc1_dt(:,:,1))
 
                 case DEFAULT 
 
@@ -319,6 +344,12 @@ end if
                 where( .not. pc_mask) dom%time%pc_tau_masked = 0.0_wp 
 
                 ij = maxloc(abs(dom%time%pc_tau_masked))
+
+                ! === pc1 =====
+                ! Store pc1_tau field for this timestep
+                dom%time%pc1_tau = cshift(dom%time%pc1_tau,-1,dim=3)
+                dom%time%pc1_tau(:,:,1) = dom%time%pc_tau
+                ! =============
 
                 !write(*,"(a,f12.5,f12.5,f12.5,2i4,2f10.2)") &
                 !    "test: ", time_now, dt_now, eta_now, ij(1), ij(2), &
@@ -1087,7 +1118,7 @@ end if
 
     end subroutine yelmo_init_topo
 
-    subroutine yelmo_update_z_bed_restart(dom,time)
+    subroutine yelmo_update_z_bed_restart(dom,time,write_nc_file)
         ! Use this routine to update z_bed in Yelmo
         ! to account for new high-resolution information in the bedrock
         ! not contained in the bedrock field loaded from the restart file. 
@@ -1098,6 +1129,7 @@ end if
 
         type(yelmo_class), intent(INOUT) :: dom 
         real(wp), intent(IN)    :: time 
+        logical,  intent(IN)    :: write_nc_file 
 
         ! Local variables 
         integer  :: q, n_iter 
@@ -1137,7 +1169,7 @@ end if
 
             allocate(dzb_now(dom%grd%nx,dom%grd%ny))
 
-            n_iter  = 5
+            n_iter  = 10
             fac     = 1.0/real(n_iter,wp)
             dzb_now = dom%bnd%z_bed_corr * fac
             
@@ -1146,8 +1178,8 @@ end if
                 dom%bnd%z_bed      = dom%bnd%z_bed      + dzb_now 
                 dom%bnd%z_bed_corr = dom%bnd%z_bed_corr - dzb_now
                 
-                write(*,*) "Restart smoothing iter: full model, 50 years. iter = ", q
-                call yelmo_update_equil(dom,time,time_tot=50.0_prec,dt=1.0_wp,topo_fixed=.FALSE.)
+                write(*,*) "Restart smoothing iter: full model, 100 years. iter = ", q
+                call yelmo_update_equil(dom,time,time_tot=100.0_prec,dt=1.0_wp,topo_fixed=.FALSE.)
 
             end do 
 

@@ -864,7 +864,6 @@ module yelmo_defs
         real(wp), allocatable :: pc_tau(:,:)
         real(wp), allocatable :: pc_tau_masked(:,:)
         
-        real(wp), allocatable :: pc1_dt_masked(:,:)
         real(wp), allocatable :: pc1_eps(:,:,:)
         real(wp), allocatable :: pc1_dt(:,:,:)
         real(wp), allocatable :: pc1_tau(:,:,:)

@@ -43,6 +43,7 @@ contains
         call nc_write_dim(filename,"zeta_rock", x=ylmo%thrm%par%zr%zeta_aa,units="1")
         call nc_write_dim(filename,"age_iso",   x=ylmo%mat%par%age_iso, units="kyr")
         call nc_write_dim(filename,"pd_age_iso",x=ylmo%dta%pd%age_iso,  units="kyr")
+        call nc_write_dim(filename,"pc_steps",  x=1,dx=1,nx=3,          units="1")
         
         call nc_write_dim(filename,"time",      x=time_init,dx=1.0_prec,nx=1,units=trim(units),unlimited=.TRUE.)
 
@@ -343,6 +344,17 @@ contains
         call nc_write(filename,"pc_tau_masked",dom%time%pc_tau_masked, units="m/yr",dim1="xc",dim2="yc",dim3="time",ncid=ncid,start=[1,1,n],count=[nx,ny,1])
         call nc_write(filename,"pc_tau_max",   dom%time%pc_tau_max,    units="m/yr",dim1="xc",dim2="yc",dim3="time",ncid=ncid,start=[1,1,n],count=[nx,ny,1])
         
+        ! === pc1 ======
+
+        call nc_write(filename,"pc1_dt",dom%time%pc1_dt,units="yr",long_name="Diagnosed adaptive timesteps (n,n-1,n-2)", &
+                      dim1="xc",dim2="yc",dim3="pc_steps",dim4="time",start=[1,1,1,n],ncid=ncid)
+        call nc_write(filename,"pc1_tau",dom%time%pc1_tau,units="m/yr",long_name="Truncation error (n,n-1,n-2)", &
+                      dim1="xc",dim2="yc",dim3="pc_steps",dim4="time",start=[1,1,1,n],ncid=ncid)
+        call nc_write(filename,"pc1_eps",dom%time%pc1_eps,units="m/yr",long_name="Target tolerance (n,n-1,n-2)", &
+                      dim1="xc",dim2="yc",dim3="pc_steps",dim4="time",start=[1,1,1,n],ncid=ncid)
+        
+        ! ==============
+
         ! == time variables ===
 
         ! Note: these variables are not defined on the 2D grid, so they 

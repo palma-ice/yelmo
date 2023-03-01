@@ -1135,6 +1135,9 @@ end if
         integer  :: q, n_iter 
         real(wp) :: fac
         real(wp), allocatable :: dzb_now(:,:) 
+        character(len=512)    :: filename 
+
+        filename = "./yelmo_z_bed_restart.nc"
 
         ! Define transition time
         ! ajr: later this could be a user parameter if it works...
@@ -1146,24 +1149,39 @@ end if
         if (dom%par%restart_interpolated .eq. 1) then 
             ! Low-to-high restart:  adjust z_bed as needed 
             
+            if (write_nc_file) & 
+                call yelmo_restart_write(dom,filename,time=0.0_wp,init=.TRUE.)
+
             ! Run model with no advection
             write(*,*) "Restart smoothing 1: no advection + ssa, 10 years."
             call yelmo_update_equil(dom,time,time_tot=10.0_prec,dt=1.0_wp, &
                                 tpo_solver="none",topo_fixed=.FALSE.,dyn_solver="ssa")
+
+            if (write_nc_file) & 
+                call yelmo_restart_write(dom,filename,time=1.0_wp,init=.FALSE.)
 
             ! Run thermodynamics with SSA solver very briefly to smooth it out
             write(*,*) "Restart smoothing 2: no advection + ssa, 10 years."
             call yelmo_update_equil(dom,time,time_tot=10.0_prec,dt=1.0_wp, &
                                                     topo_fixed=.TRUE.,dyn_solver="ssa")
 
+            if (write_nc_file) & 
+                call yelmo_restart_write(dom,filename,time=2.0_wp,init=.FALSE.)
+
             ! Run full model (tpo,dyn,thrm) with SSA solver very briefly to smooth it out
             write(*,*) "Restart smoothing 3: advection + ssa, 10 years."
             call yelmo_update_equil(dom,time,time_tot=10.0_prec,dt=0.2_wp, &
                                                     topo_fixed=.FALSE.,dyn_solver="ssa")
 
+            if (write_nc_file) & 
+                call yelmo_restart_write(dom,filename,time=3.0_wp,init=.FALSE.)
+
             ! Run full model (tpo,dyn,thrm) with SSA solver very briefly to smooth it out
             write(*,*) "Restart smoothing 4: full model, 50 years."
             call yelmo_update_equil(dom,time,time_tot=50.0_prec,dt=1.0_wp,topo_fixed=.FALSE.)
+
+            if (write_nc_file) & 
+                call yelmo_restart_write(dom,filename,time=4.0_wp,init=.FALSE.)
 
             ! Slowly introduce high-resolution features to basal topography
 
@@ -1180,6 +1198,9 @@ end if
                 
                 write(*,*) "Restart smoothing iter: full model, 100 years. iter = ", q
                 call yelmo_update_equil(dom,time,time_tot=100.0_prec,dt=1.0_wp,topo_fixed=.FALSE.)
+
+                if (write_nc_file) & 
+                    call yelmo_restart_write(dom,filename,time=4.0_wp+real(q,wp),init=.FALSE.)
 
             end do 
 

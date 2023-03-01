@@ -778,7 +778,7 @@ contains
         end if 
         
         ! ajr: testing
-        call yelmo_restart_write(dom,"yelmo_restart_init.nc",time)
+        call yelmo_restart_write(dom,"./yelmo_restart_init.nc",time)
         
         return 
 

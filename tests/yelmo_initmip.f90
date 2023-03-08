@@ -529,17 +529,6 @@ contains
         ! Write present-day data metrics (rmse[H],etc)
         call yelmo_write_step_pd_metrics(filename,ylmo,n,ncid)
         
-        ! === pc1 ======
-
-        call nc_write(filename,"pc1_dt",ylmo%time%pc1_dt,units="yr",long_name="Diagnosed adaptive timesteps (n,n-1,n-2)", &
-                      dim1="xc",dim2="yc",dim3="pc_steps",dim4="time",start=[1,1,1,n],ncid=ncid)
-        call nc_write(filename,"pc1_tau",ylmo%time%pc1_tau,units="m/yr",long_name="Truncation error (n,n-1,n-2)", &
-                      dim1="xc",dim2="yc",dim3="pc_steps",dim4="time",start=[1,1,1,n],ncid=ncid)
-        call nc_write(filename,"pc1_eps",ylmo%time%pc1_eps,units="m/yr",long_name="Target tolerance (n,n-1,n-2)", &
-                      dim1="xc",dim2="yc",dim3="pc_steps",dim4="time",start=[1,1,1,n],ncid=ncid)
-
-        ! ==============
-
         ! == ISMIP6 specific variables 
         ! http://www.climate-cryosphere.org/wiki/index.php?title=InitMIP-Greenland#Appendix_2_.E2.80.93_Naming_conventions.2C_upload_and_model_output_data.
         

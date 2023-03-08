@@ -9,8 +9,7 @@ module yelmo_ice
     use yelmo_grid, only : yelmo_init_grid, calc_zeta
     use yelmo_timesteps, only : ytime_init, set_pc_beta_coefficients, set_adaptive_timestep, set_adaptive_timestep_pc,   &
                                 set_pc_mask, calc_pc_eta, calc_pc_tau_fe_sbe,calc_pc_tau_ab_sam, calc_pc_tau_heun,  &
-                                limit_adaptive_timestep, yelmo_timestep_write_init, yelmo_timestep_write, calc_adv3D_timestep1, &
-                                pc1_set_adaptive_timestep_pc
+                                limit_adaptive_timestep, yelmo_timestep_write_init, yelmo_timestep_write, calc_adv3D_timestep1
     use yelmo_tools, only : smooth_gauss_2D
     use yelmo_io 
 
@@ -140,24 +139,6 @@ contains
             call set_adaptive_timestep_pc(dt_pi,dom%time%pc_dt,dom%time%pc_eta,dom%par%pc_eps,dom%par%dt_min,dt_max, &
                                     dom%dyn%now%ux_bar,dom%dyn%now%uy_bar,dom%tpo%par%dx,dom%tpo%par%pc_k,dom%par%pc_controller)
 
-            ! === pc1 ======================================================
-
-            call set_pc_mask(pc_mask,dom%time%pc_tau,dom%tpo%now%H_ice_pred,dom%tpo%now%H_ice_corr, &
-                                                    dom%bnd%z_bed,dom%bnd%z_sl,dom%tpo%par%margin_flt_subgrid)
-
-            ! Determine the distribution of pc1_eps to use for timestep calculations
-            ! For now set to a constant value, except for ice-free and ice-shelves
-            dom%time%pc1_eps = cshift(dom%time%pc1_eps,-1,dim=3)
-            dom%time%pc1_eps(:,:,1) = dom%par%pc_eps
-            where(dom%tpo%now%H_ice .eq. 0.0)  dom%time%pc1_eps(:,:,1) = dom%par%pc_tol 
-            where(dom%tpo%now%f_grnd .lt. 1.0) dom%time%pc1_eps(:,:,1) = dom%par%pc_tol 
-            
-            ! Calculate adaptive timestep at each location using proportional-integral (PI) methods
-            call pc1_set_adaptive_timestep_pc(dom%time%pc1_dt,dom%time%pc1_tau,dom%time%pc1_eps, &
-                                    pc_mask, &
-                                    dom%par%dt_min,dt_max,dom%tpo%par%pc_k,dom%par%pc_controller)
-
-            ! ==============================================================
 
             ! Determine current time step to be used based on method of choice 
             select case(dom%par%dt_method) 
@@ -177,11 +158,6 @@ contains
 
                     dt_now = dt_pi
 
-                case(3)
-                    ! Use minimum of spatially variable PI adaptive timestep 
-
-                    dt_now = minval(dom%time%pc1_dt(:,:,1))
-
                 case DEFAULT 
 
                     write(io_unit_err,*) "yelmo_update:: Error: dt_method not recognized."
@@ -194,10 +170,9 @@ contains
                 ! Override timestep choice and simply use a very small value for 
                 ! first timestep. 
 
-                dt_now = dom%par%dt_min 
+                dt_now = dom%par%dt_min
 
             end if 
-
 
             ! Finally, override all cases if time is already up-to-date.
             ! This is done here, to let all PC timestepping algorithms etc.
@@ -345,12 +320,6 @@ end if
 
                 ij = maxloc(abs(dom%time%pc_tau_masked))
 
-                ! === pc1 =====
-                ! Store pc1_tau field for this timestep
-                dom%time%pc1_tau = cshift(dom%time%pc1_tau,-1,dim=3)
-                dom%time%pc1_tau(:,:,1) = dom%time%pc_tau
-                ! =============
-
                 !write(*,"(a,f12.5,f12.5,f12.5,2i4,2f10.2)") &
                 !    "test: ", time_now, dt_now, eta_now, ij(1), ij(2), &
                 !    dom%tpo%now%H_ice_pred(ij(1),ij(2)), &
@@ -459,7 +428,7 @@ end if
             
             ! Extra diagnostic field, not necessary for normal runs
             call yelmo_calc_running_stats_2D(dom%time%pc_tau_max,dom%time%pc_taus,dom%time%pc_tau_masked,stat="max")
-
+            
             if (dom%par%log_timestep) then 
                 ! Write timestep file if desired
 

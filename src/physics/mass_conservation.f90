@@ -1,6 +1,6 @@
 module mass_conservation
 
-    use yelmo_defs, only : sp, dp, wp, TOL_UNDERFLOW, MISSING_VALUE, g, rho_ice, rho_sw  
+    use yelmo_defs, only : sp, dp, wp, TOL_UNDERFLOW, MISSING_VALUE
     use yelmo_tools, only : get_neighbor_indices, fill_borders_2D, set_boundaries_2D_aa
 
     use solver_advection, only : calc_advec2D  

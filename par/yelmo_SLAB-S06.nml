@@ -36,6 +36,7 @@
     domain          = "SLAB"
     grid_name       = "SLAB"
     grid_path       = "none"
+    phys_const      = "TROUGH"
     experiment      = "periodic"
     restart         = "no"
     restart_z_bed   = False             ! Take z_bed (and z_bed_sd) from restart file

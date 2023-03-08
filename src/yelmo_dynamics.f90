@@ -95,7 +95,7 @@ contains
 
         ! Calculate driving stress 
         call calc_driving_stress(dyn%now%taud_acx,dyn%now%taud_acy,tpo%now%H_ice_dyn,tpo%now%f_ice_dyn,tpo%now%dzsdx, &
-                                        tpo%now%dzsdy,dyn%par%dx,dyn%par%taud_lim,dyn%par%boundaries)
+                                        tpo%now%dzsdy,dyn%par%dx,dyn%par%taud_lim,bnd%c%rho_ice,bnd%c%g,dyn%par%boundaries)
 
         if (dyn%par%taud_gl_method .ne. 0) then 
             ! Calculate driving stress specifically at the grounding line 
@@ -103,14 +103,14 @@ contains
 
             call calc_driving_stress_gl(dyn%now%taud_acx,dyn%now%taud_acy, &
                         tpo%now%H_ice_dyn,tpo%now%z_srf,bnd%z_bed,bnd%z_sl,tpo%now%H_grnd, &
-                                      tpo%now%f_grnd,tpo%now%f_grnd_acx,tpo%now%f_grnd_acy, &
-                                      dyn%par%dx,dyn%par%taud_gl_method,beta_gl_stag=1)
+                        tpo%now%f_grnd,tpo%now%f_grnd_acx,tpo%now%f_grnd_acy,dyn%par%dx, &
+                        bnd%c%rho_ice,bnd%c%rho_sw,bnd%c%g,dyn%par%taud_gl_method,beta_gl_stag=1)
 
         end if 
 
         ! Calculate lateral boundary stress 
-        call calc_lateral_bc_stress_2D(dyn%now%taul_int_acx,dyn%now%taul_int_acy,tpo%now%mask_frnt, &
-                        tpo%now%H_ice,tpo%now%f_ice,tpo%now%z_srf,bnd%z_sl,rho_ice,rho_sw,dyn%par%boundaries)
+        call calc_lateral_bc_stress_2D(dyn%now%taul_int_acx,dyn%now%taul_int_acy,tpo%now%mask_frnt,tpo%now%H_ice, &
+                        tpo%now%f_ice,tpo%now%z_srf,bnd%z_sl,bnd%c%rho_ice,bnd%c%rho_sw,bnd%c%g,dyn%par%boundaries)
 
         ! Calculate effective pressure 
         call calc_ydyn_neff(dyn,tpo,thrm,bnd)
@@ -312,7 +312,7 @@ contains
 
             call calc_velocity_sia(dyn%now%ux_i,dyn%now%uy_i,dyn%now%ux_i_bar,dyn%now%uy_i_bar,tpo%now%H_ice, &
                                     tpo%now%f_ice,dyn%now%taud_acx,dyn%now%taud_acy,mat%now%ATT,dyn%par%zeta_aa, &
-                                    dyn%par%dx,mat%par%n_glen,rho_ice,g,dyn%par%boundaries)
+                                    dyn%par%dx,mat%par%n_glen,bnd%c%rho_ice,bnd%c%g,dyn%par%boundaries)
 
         else 
             ! Set all SIA terms to zero 
@@ -356,6 +356,10 @@ contains
             ssa_par%ssa_iter_conv  = dyn%par%ssa_iter_conv 
             ssa_par%ssa_write_log  = yelmo_log
 
+            ssa_par%rho_ice        = bnd%c%rho_ice 
+            ssa_par%rho_sw         = bnd%c%rho_sw 
+            ssa_par%g              = bnd%c%g 
+            
             call calc_velocity_ssa(dyn%now%ux_b,dyn%now%uy_b,dyn%now%taub_acx,dyn%now%taub_acy, &
                                       dyn%now%visc_eff,dyn%now%visc_eff_int,dyn%now%ssa_mask_acx,dyn%now%ssa_mask_acy, &
                                       dyn%now%ssa_err_acx,dyn%now%ssa_err_acy,dyn%par%ssa_iter_now,dyn%now%beta, &
@@ -387,7 +391,7 @@ contains
                     
             ! call calc_velocity_basal_sia_00(dyn%now%ux_b,dyn%now%uy_b,dyn%now%taub_acx,dyn%now%taub_acy, &
             !                                 tpo%now%H_ice,tpo%now%dzsdx,tpo%now%dzsdy,thrm%now%f_pmp, &
-            !                                 dyn%par%zeta_aa,dyn%par%dx,dyn%par%cb_sia,rho_ice,g)
+            !                                 dyn%par%zeta_aa,dyn%par%dx,dyn%par%cb_sia,bnd%c%rho_ice,bnd%c%g)
             
         end if 
 
@@ -483,6 +487,10 @@ contains
         diva_par%ssa_iter_conv  = dyn%par%ssa_iter_conv 
         diva_par%ssa_write_log  = yelmo_log
 
+        diva_par%rho_ice        = bnd%c%rho_ice 
+        diva_par%rho_sw         = bnd%c%rho_sw 
+        diva_par%g              = bnd%c%g 
+            
         call calc_velocity_diva(dyn%now%ux,dyn%now%uy,dyn%now%ux_bar,dyn%now%uy_bar, &
                                 dyn%now%ux_b,dyn%now%uy_b,dyn%now%ux_i,dyn%now%uy_i, &
                                 dyn%now%taub_acx,dyn%now%taub_acy,dyn%now%beta,dyn%now%beta_acx, &
@@ -579,6 +587,10 @@ contains
         l1l2_par%ssa_iter_conv  = dyn%par%ssa_iter_conv 
         l1l2_par%ssa_write_log  = yelmo_log
 
+        l1l2_par%rho_ice        = bnd%c%rho_ice 
+        l1l2_par%rho_sw         = bnd%c%rho_sw 
+        l1l2_par%g              = bnd%c%g 
+            
         call calc_velocity_l1l2(dyn%now%ux,dyn%now%uy,dyn%now%ux_bar,dyn%now%uy_bar, &
                                 dyn%now%ux_b,dyn%now%uy_b,dyn%now%ux_i,dyn%now%uy_i, &
                                 dyn%now%taub_acx,dyn%now%taub_acy,dyn%now%beta,dyn%now%beta_acx, &
@@ -835,27 +847,29 @@ contains
             case(1)
                 ! Effective pressure == overburden pressure 
 
-                dyn%now%N_eff = calc_effective_pressure_overburden(tpo%now%H_ice_dyn,tpo%now%f_ice_dyn,tpo%now%f_grnd)
+                dyn%now%N_eff = calc_effective_pressure_overburden(tpo%now%H_ice_dyn,tpo%now%f_ice_dyn,tpo%now%f_grnd, &
+                                                                                                        bnd%c%rho_ice,bnd%c%g)
 
             case(2) 
                 ! Effective pressure diminishes with marine character
                 ! following Leguy et al. (2014) 
 
                 dyn%now%N_eff = calc_effective_pressure_marine(tpo%now%H_ice_dyn,tpo%now%f_ice_dyn,bnd%z_bed,bnd%z_sl, &
-                                                                                            thrm%now%H_w,p=dyn%par%neff_p)
+                                                                thrm%now%H_w,dyn%par%neff_p,bnd%c%rho_ice,bnd%c%rho_sw,bnd%c%g)
 
             case(3)
                 ! Effective pressure as basal till pressure
                 ! following van Pelt and Bueler (2015)
 
                 call calc_effective_pressure_till(dyn%now%N_eff,thrm%now%H_w,tpo%now%H_ice_dyn,tpo%now%f_ice_dyn,tpo%now%f_grnd, &
-                                                        H_w_max,dyn%par%neff_N0,dyn%par%neff_delta,dyn%par%neff_e0,dyn%par%neff_Cc) 
+                                                        H_w_max,dyn%par%neff_N0,dyn%par%neff_delta,dyn%par%neff_e0,dyn%par%neff_Cc, &
+                                                        bnd%c%rho_ice,bnd%c%g) 
 
             case(4) 
                 ! Calculate two-valued effective pressure using till parameter neff_delta 
 
                 call calc_effective_pressure_two_value(dyn%now%N_eff,thrm%now%f_pmp,tpo%now%H_ice_dyn,tpo%now%f_ice_dyn, &
-                                                                                        tpo%now%f_grnd,dyn%par%neff_delta)
+                                                                    tpo%now%f_grnd,dyn%par%neff_delta,bnd%c%rho_ice,bnd%c%g)
                 
             case DEFAULT 
 

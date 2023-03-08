@@ -1,6 +1,6 @@
 module ice_optimization
 
-    use yelmo_defs, only : sp, dp, wp, prec, io_unit_err, pi, missing_value, mv, tol_underflow, rho_ice, rho_sw, g 
+    use yelmo_defs, only : sp, dp, wp, prec, io_unit_err, pi, missing_value, mv, tol_underflow
     use nml 
 
     use gaussian_filter 
@@ -597,7 +597,7 @@ contains
 
     end subroutine optimize_cb_ref
 
-    subroutine fill_cb_ref(cb_ref,H_ice,z_bed,z_sl,is_float_obs,cf_min,cf_max)
+    subroutine fill_cb_ref(cb_ref,H_ice,z_bed,z_sl,is_float_obs,cf_min,cf_max,rho_ice,rho_sw)
         ! Fill points that cannot be optimized with 
         ! analagous values from similar bed elevations 
 
@@ -610,6 +610,8 @@ contains
         logical,  intent(IN)    :: is_float_obs(:,:) 
         real(wp), intent(IN)    :: cf_min 
         real(wp), intent(IN)    :: cf_max
+        real(wp), intent(IN)    :: rho_ice 
+        real(wp), intent(IN)    :: rho_sw
 
         ! Local variables 
         integer :: i, j, nx, ny 
@@ -771,7 +773,7 @@ contains
 
     end subroutine update_mb_corr
 
-    subroutine guess_cb_ref(cb_ref,tau_d,uxy_obs,H_obs,H_grnd,u0,cf_min,cf_max)
+    subroutine guess_cb_ref(cb_ref,tau_d,uxy_obs,H_obs,H_grnd,u0,cf_min,cf_max,rho_ice,g)
         ! Use suggestion by Morlighem et al. (2013) to guess friction
         ! assuming tau_b ~ tau_d, and u_b = u_obs:
         !
@@ -790,7 +792,9 @@ contains
         real(wp), intent(IN)  :: u0 
         real(wp), intent(IN)  :: cf_min 
         real(wp), intent(IN)  :: cf_max  
-
+        real(wp), intent(IN)  :: rho_ice 
+        real(wp), intent(IN)  :: g 
+        
         ! Local variables 
         real(wp), parameter :: ebs = 0.1          ! [m/yr] To avoid divide by zero 
 

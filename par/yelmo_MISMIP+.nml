@@ -29,6 +29,7 @@
     domain          = "MISMIP+"
     grid_name       = "MISMIP+"
     grid_path       = "none"
+    phys_const      = "MISMIP3D"
     experiment      = "MISMIP+"
     restart         = "no"
     restart_z_bed   = False             ! Take z_bed (and z_bed_sd) from restart file

@@ -227,10 +227,10 @@ end if
 
                 if (mat%par%rf_use_eismint2) then 
                     ! Use EISMINT2 (Payne et al, 2000) constants
-                    mat%now%ATT = calc_rate_factor_eismint(thrm%now%T_ice,thrm%now%T_pmp,mat%now%enh)
+                    mat%now%ATT = calc_rate_factor_eismint(thrm%now%T_ice,thrm%now%T_pmp,mat%now%enh,bnd%c%T0)
                 else 
                     ! Use Greve and Blatter (2009) constants 
-                    mat%now%ATT = calc_rate_factor(thrm%now%T_ice,thrm%now%T_pmp,mat%now%enh)
+                    mat%now%ATT = calc_rate_factor(thrm%now%T_ice,thrm%now%T_pmp,mat%now%enh,bnd%c%T0)
                 end if 
 
                 ! Scale rate factor by water content if desired 

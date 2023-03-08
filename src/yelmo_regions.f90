@@ -62,7 +62,7 @@ contains
         real(wp), allocatable :: H_af(:,:) 
 
         ! Conversion parameter 
-        conv_km3a_Sv = 1e-6*(1e9*rho_w/rho_ice)/sec_year
+        conv_km3a_Sv = 1e-6*(1e9*bnd%c%rho_w/bnd%c%rho_ice)/bnd%c%sec_year
 
         ! Grid size 
         nx = size(mask,1)
@@ -81,7 +81,7 @@ contains
         mask_flt  = (mask .and. tpo%now%H_ice .gt. 0.0 .and. tpo%now%f_grnd .eq. 0.0)
          
         ! Calculate ice thickness above flotation 
-        call calc_H_af(H_af,tpo%now%H_ice,tpo%now%f_ice,bnd%z_bed,bnd%z_sl,use_f_ice=.FALSE.)
+        call calc_H_af(H_af,tpo%now%H_ice,tpo%now%f_ice,bnd%z_bed,bnd%z_sl,bnd%c%rho_ice,bnd%c%rho_sw,use_f_ice=.FALSE.)
 
         npts_tot  = real(count(mask_tot),prec)
         npts_grnd = real(count(mask_grnd),prec)
@@ -105,7 +105,7 @@ contains
 
             ! Volume above sea level
             reg%V_sl       = sum(H_af,mask=mask_tot)*tpo%par%dx*tpo%par%dy*m3_km3   ! [km^3]
-            reg%V_sle      = reg%V_sl * conv_km3_sle                          ! [km^3] => [m sle]
+            reg%V_sle      = reg%V_sl * bnd%c%conv_km3_sle                          ! [km^3] => [m sle]
             
             ! ydyn variables 
             reg%uxy_bar    = sum(dyn%now%uxy_bar,mask=mask_tot)/npts_tot      ! [m/yr]

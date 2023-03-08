@@ -18,6 +18,7 @@
     domain          = "ISMIPHOM"
     grid_name       = "ISMIPHOM"
     grid_path       = "none"
+    phys_const      = "TROUGH"
     experiment      = "periodic"        ! "None", "EISMINT", "MISMIP3D", "BUELER",  to apply special boundary conditions   
     restart         = "no"
     restart_z_bed   = False             ! Take z_bed (and z_bed_sd) from restart file

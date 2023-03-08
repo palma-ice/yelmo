@@ -39,6 +39,7 @@
     domain          = "Greenland"
     grid_name       = "GRL-32KM"
     grid_path       = "ice_data/{domain}/{grid_name}/{grid_name}_REGIONS.nc"
+    phys_const      = "Earth"
     experiment      = "None"       
     restart         = "None" !"input/{domain}/{grid_name}/{grid_name}_yelmo_opt_restart_init.nc"
     restart_z_bed   = False             ! Take z_bed (and z_bed_sd) from restart file

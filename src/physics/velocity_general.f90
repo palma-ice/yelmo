@@ -1,8 +1,7 @@
 module velocity_general 
     ! This module contains general routines that are used by several solvers. 
     
-    use yelmo_defs ,only  : sp, dp, wp, tol_underflow, io_unit_err, rho_ice, rho_sw, rho_w, g, &
-                            jacobian_3D_class
+    use yelmo_defs ,only  : sp, dp, wp, tol_underflow, io_unit_err, jacobian_3D_class
     use yelmo_tools, only : get_neighbor_indices, stagger_aa_ab, stagger_aa_ab_ice, &
                     acx_to_nodes, acy_to_nodes, acx_to_nodes_3D, acy_to_nodes_3D, &
                     integrate_trapezoid1D_1D, integrate_trapezoid1D_pt, minmax
@@ -931,7 +930,7 @@ end if
 
     end subroutine calc_uz_3D_aa
 
-    subroutine calc_driving_stress(taud_acx,taud_acy,H_ice,f_ice,dzsdx,dzsdy,dx,taud_lim,boundaries)
+    subroutine calc_driving_stress(taud_acx,taud_acy,H_ice,f_ice,dzsdx,dzsdy,dx,taud_lim,rho_ice,g,boundaries)
         ! Calculate driving stress on staggered grid points
         ! Units: taud [Pa] == [kg m-1 s-2]
         ! taud = rho_ice*g*H_ice*dzs/dx
@@ -953,6 +952,8 @@ end if
         real(wp), intent(IN)  :: dzsdy(:,:)         ! [--]
         real(wp), intent(IN)  :: dx                 ! [m] 
         real(wp), intent(IN)  :: taud_lim           ! [Pa]
+        real(wp), intent(IN)  :: rho_ice 
+        real(wp), intent(IN)  :: g 
         character(len=*), intent(IN) :: boundaries  ! Boundary conditions to apply 
 
         ! Local variables 
@@ -1064,7 +1065,7 @@ end if
     end subroutine calc_driving_stress
 
     subroutine calc_driving_stress_gl(taud_acx,taud_acy,H_ice,z_srf,z_bed,z_sl,H_grnd, &
-                                      f_grnd,f_grnd_acx,f_grnd_acy,dx,method,beta_gl_stag)
+                                      f_grnd,f_grnd_acx,f_grnd_acy,dx,rho_ice,rho_sw,g,method,beta_gl_stag)
         ! taud = rho_ice*g*H_ice
         ! Calculate driving stress on staggered grid points, with 
         ! special treatment of the grounding line 
@@ -1085,6 +1086,9 @@ end if
         real(wp), intent(IN)  :: f_grnd_acx(:,:)
         real(wp), intent(IN)  :: f_grnd_acy(:,:)
         real(wp), intent(IN)  :: dx 
+        real(wp), intent(IN)  :: rho_ice 
+        real(wp), intent(IN)  :: rho_sw 
+        real(wp), intent(IN)  :: g 
         integer,    intent(IN)  :: method        ! Which driving stress calculation to use
         integer,    intent(IN)  :: beta_gl_stag  ! Method of grounding line staggering of beta 
 
@@ -1338,13 +1342,13 @@ end if
 
                         ! (i,j) grounded; (ip1,j) floating
                         call integrate_gl_driving_stress_linear(taud_acx(i,j),H_ice(i,j),H_ice(ip1,j), &
-                                                    z_bed(i,j),z_bed(ip1,j),z_sl(i,j), z_sl(ip1,j),dx)
+                                            z_bed(i,j),z_bed(ip1,j),z_sl(i,j), z_sl(ip1,j),dx,rho_ice,rho_sw,g)
                     
                     else if (H_grnd(i,j) .le. 0.0 .and. H_grnd(ip1,j) .gt. 0.0) then 
                         ! (i,j) floating; (ip1,j) grounded 
 
                         call integrate_gl_driving_stress_linear(taud_acx(i,j),H_ice(ip1,j),H_ice(i,j), &
-                                                    z_bed(ip1,j),z_bed(i,j),z_sl(ip1,j),z_sl(i,j),dx)
+                                            z_bed(ip1,j),z_bed(i,j),z_sl(ip1,j),z_sl(i,j),dx,rho_ice,rho_sw,g)
                         
                         ! Set negative for direction 
                         taud_acx(i,j) = -taud_acx(i,j)
@@ -1357,13 +1361,13 @@ end if
  
                         ! (i,j) grounded; (i,jp1) floating 
                         call integrate_gl_driving_stress_linear(taud_acy(i,j),H_ice(i,j),H_ice(i,jp1), &
-                                                    z_bed(i,j),z_bed(i,jp1),z_sl(i,j),z_sl(i,jp1),dx)
+                                            z_bed(i,j),z_bed(i,jp1),z_sl(i,j),z_sl(i,jp1),dx,rho_ice,rho_sw,g)
 
                     else if (H_grnd(i,j) .le. 0.0 .and. H_grnd(i,jp1) .gt. 0.0) then
                         ! (i,j) floating; (i,jp1) grounded
 
                         call integrate_gl_driving_stress_linear(taud_acy(i,j),H_ice(i,jp1),H_ice(i,j), &
-                                                    z_bed(i,jp1),z_bed(i,j),z_sl(i,jp1),z_sl(i,j),dx)
+                                            z_bed(i,jp1),z_bed(i,j),z_sl(i,jp1),z_sl(i,j),dx,rho_ice,rho_sw,g)
                         
                         ! Set negative for direction 
                         taud_acy(i,j) = -taud_acy(i,j) 
@@ -1380,7 +1384,8 @@ end if
 
     end subroutine calc_driving_stress_gl
 
-    subroutine calc_lateral_bc_stress_2D(tau_bc_int_acx,tau_bc_int_acy,mask_frnt,H_ice,f_ice,z_srf,z_sl,rho_ice,rho_sw,boundaries)
+    subroutine calc_lateral_bc_stress_2D(tau_bc_int_acx,tau_bc_int_acy,mask_frnt,H_ice,f_ice,z_srf,z_sl, &
+                                                                                rho_ice,rho_sw,g,boundaries)
             ! Calculate the vertically integrated lateral stress [Pa m] boundary condition
             ! at the ice front. 
 
@@ -1395,6 +1400,7 @@ end if
         real(wp), intent(IN)  :: z_sl(:,:) 
         real(wp), intent(IN)  :: rho_ice 
         real(wp), intent(IN)  :: rho_sw 
+        real(wp), intent(IN)  :: g 
         character(len=*), intent(IN) :: boundaries 
 
         ! Local variables 
@@ -1444,7 +1450,7 @@ end if
 
                 ! Calculate the lateral stress bc for this point
                 call calc_lateral_bc_stress(tau_bc_int_acx(i,j),H_ice_now, &
-                                                z_srf_now,z_sl_now,rho_ice,rho_sw)
+                                                z_srf_now,z_sl_now,rho_ice,rho_sw,g)
 
             end if 
 
@@ -1475,7 +1481,7 @@ end if
 
                 ! Calculate the lateral stress bc for this point
                 call calc_lateral_bc_stress(tau_bc_int_acy(i,j),H_ice_now, &
-                                                z_srf_now,z_sl_now,rho_ice,rho_sw)
+                                                z_srf_now,z_sl_now,rho_ice,rho_sw,g)
 
             end if 
 
@@ -1486,7 +1492,7 @@ end if
 
     end subroutine calc_lateral_bc_stress_2D
     
-    subroutine calc_lateral_bc_stress(tau_bc_int,H_ice,z_srf,z_sl,rho_ice,rho_sw)
+    subroutine calc_lateral_bc_stress(tau_bc_int,H_ice,z_srf,z_sl,rho_ice,rho_sw,g)
             ! Calculate the vertically integrated lateral stress [Pa m] boundary condition
             ! at the ice front for given conditions.
 
@@ -1502,7 +1508,8 @@ end if
         real(wp), intent(IN)  :: z_srf
         real(wp), intent(IN)  :: z_sl
         real(wp), intent(IN)  :: rho_ice 
-        real(wp), intent(IN)  :: rho_sw 
+        real(wp), intent(IN)  :: rho_sw
+        real(wp), intent(IN)  :: g 
 
         ! Local variables 
         real(wp) :: f_submerged 
@@ -1520,7 +1527,7 @@ end if
 
     end subroutine calc_lateral_bc_stress
 
-    subroutine integrate_gl_driving_stress_linear(taud,H_a,H_b,zb_a,zb_b,z_sl_a,z_sl_b,dx)
+    subroutine integrate_gl_driving_stress_linear(taud,H_a,H_b,zb_a,zb_b,z_sl_a,z_sl_b,dx,rho_ice,rho_sw,g)
         ! Compute the driving stress for the grounding line more precisely (subgrid)
         ! following Gladstone et al. (2010, TC), Eq. 27 
         ! Note: here cell i is grounded and cell i+1 is floating 
@@ -1533,6 +1540,9 @@ end if
         real(wp), intent(IN) :: zb_a, zb_b        ! Bedrock elevation cell i and i+1, resp.
         real(wp), intent(IN) :: z_sl_a,  z_sl_b   ! Sea level cell i and i+1, resp.
         real(wp), intent(IN) :: dx  
+        real(wp), intent(IN)  :: rho_ice 
+        real(wp), intent(IN)  :: rho_sw
+        real(wp), intent(IN)  :: g 
 
         ! Local variables 
         real(wp) :: Ha, Hb, Sa, Sb, Ba, Bb, sla, slb 

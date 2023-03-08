@@ -8,12 +8,131 @@ module yelmo_boundaries
     implicit none
     
     private
+    public :: ybound_define_physical_constants
     public :: ybound_load_masks
     public :: ybound_define_ice_allowed
     public :: ybound_alloc, ybound_dealloc
     
 contains
 
+    subroutine ybound_define_physical_constants(c,phys_const,domain,grid_name)
+
+        implicit none
+
+        type(ybound_const_class), intent(OUT) :: c 
+        character(len=*), intent(IN) :: phys_const 
+        character(len=*), intent(IN) :: domain 
+        character(len=*), intent(IN) :: grid_name 
+        
+        ! Local variables 
+        logical :: init_pars 
+
+        select case(trim(phys_const))
+
+            case("Earth")
+                c%sec_year   = 31536000.0       ! [s/a]  365*24*3600
+                c%g          = 9.81             ! [m/s^2] Gravitational accel.
+                c%T0         = 273.15           ! [K] Reference freezing temperature 
+                c%rho_ice    =  910.0           ! [kg/m^3] Density ice            
+                c%rho_w      = 1000.0           ! [kg/m^3] Density water          
+                c%rho_sw     = 1028.0           ! [kg/m^3] Density seawater       
+                c%rho_a      = 3300.0           ! [kg m-3] Density asthenosphere
+                c%rho_rock   = 2000.0           ! [kg m-3] Density bedrock (mantle/lithosphere)
+                c%L_ice      = 333500.0         ! [J kg-1] Latent heat of fusion for ice/water
+                c%T_pmp_beta = 9.8e-8           ! [K Pa^-1] Greve and Blatter (2009)   
+
+            case("EISMINT","EISMINT1","EISMINT2")
+
+                c%sec_year   = 31556926.0       ! [s/a] EISMINT value
+                c%g          = 9.81             ! [m s-2] Gravitational accel.
+                c%T0         = 273.15           ! [K] Reference freezing temperature 
+                c%rho_ice    =  910.0           ! [kg m-3] Density ice            
+                c%rho_w      = 1000.0           ! [kg m-3] Density water          
+                c%rho_sw     = 1028.0           ! [kg m-3] Density seawater       
+                c%rho_a      = 3300.0           ! [kg m-3] Density asthenosphere
+                c%rho_rock   = 2000.0           ! [kg m-3] Density bedrock (mantle/lithosphere)
+                c%L_ice      = 333500.0         ! [J kg-1] Latent heat of fusion for ice/water
+                c%T_pmp_beta = 9.7e-8           ! [K Pa^-1] EISMINT2 value (beta1 = 8.66e-4 [K m^-1])
+            
+            case("MISMIP3D")
+
+                c%sec_year   = 31556926.0       ! [s/a] EISMINT value
+                c%g          = 9.81             ! [m s-2] Gravitational accel.
+                c%T0         = 273.15           ! [K] Reference freezing temperature 
+                c%rho_ice    =  900.0           ! [kg m-3] Density ice            
+                c%rho_w      = 1000.0           ! [kg m-3] Density water          
+                c%rho_sw     = 1028.0           ! [kg m-3] Density seawater       
+                c%rho_a      = 3300.0           ! [kg m-3] Density asthenosphere
+                c%rho_rock   = 2000.0           ! [kg m-3] Density bedrock (mantle/lithosphere)
+                c%L_ice      = 333500.0         ! [J kg-1] Latent heat of fusion for ice/water
+                c%T_pmp_beta = 9.7e-8           ! [K Pa^-1] EISMINT2 value (beta1 = 8.66e-4 [K m^-1])
+
+            case("TROUGH")
+
+                c%sec_year   = 31556926.0       ! [s/a] EISMINT value
+                c%g          = 9.81             ! [m s-2] Gravitational accel.
+                c%T0         = 273.15           ! [K] Reference freezing temperature 
+                c%rho_ice    =  918.0           ! [kg m-3] Density ice            
+                c%rho_w      = 1000.0           ! [kg m-3] Density water          
+                c%rho_sw     = 1028.0           ! [kg m-3] Density seawater       
+                c%rho_a      = 3300.0           ! [kg m-3] Density asthenosphere
+                c%rho_rock   = 2000.0           ! [kg m-3] Density bedrock (mantle/lithosphere)
+                c%L_ice      = 333500.0         ! [J kg-1] Latent heat of fusion for ice/water
+                c%T_pmp_beta = 9.7e-8           ! [K Pa^-1] EISMINT2 value (beta1 = 8.66e-4 [K m^-1])
+
+            case DEFAULT
+                ! Load parameter values from parameter file
+
+                init_pars = .TRUE. 
+                
+                call nml_read(phys_const,"yconst","sec_year",    c%sec_year,   init=init_pars)
+                call nml_read(phys_const,"yconst","g",           c%g,          init=init_pars)
+                call nml_read(phys_const,"yconst","T0",          c%T0,         init=init_pars)
+                call nml_read(phys_const,"yconst","rho_ice",     c%rho_ice,    init=init_pars)
+                call nml_read(phys_const,"yconst","rho_w",       c%rho_w,      init=init_pars)
+                call nml_read(phys_const,"yconst","rho_sw",      c%rho_sw,     init=init_pars)
+                call nml_read(phys_const,"yconst","rho_a",       c%rho_a,      init=init_pars)
+                call nml_read(phys_const,"yconst","rho_rock",    c%rho_rock,   init=init_pars)
+                call nml_read(phys_const,"yconst","L_ice",       c%L_ice,      init=init_pars)
+                call nml_read(phys_const,"yconst","T_pmp_beta",  c%T_pmp_beta, init=init_pars)
+
+        end select
+
+
+        ! Define conversion factors too
+
+        c%conv_we_ie          = c%rho_w/c%rho_ice
+        c%conv_mmdwe_maie     = 1e-3*365*c%conv_we_ie
+        c%conv_mmawe_maie     = 1e-3*c%conv_we_ie
+        
+        c%conv_m3_Gt          = c%rho_ice *1e-12                ! [kg/m3] * [Gigaton/1e12kg]
+        c%conv_km3_Gt         = (1e9) * c%conv_m3_Gt            ! [1e9m^3/km^3]
+        c%conv_millionkm3_Gt  = (1e6) * (1e9) *c%conv_m3_Gt     ! [1e6km3/1] * [1e9m^3/km^3] * conv
+        
+        c%area_seasurf        = 3.618e8                         ! [km^2]
+        c%conv_km3_sle        = (1e-3) / 394.7                  ! [m/mm] / [km^3 to raise ocean by 1mm] => m sle, see https://sealevel.info/conversion_factors.html
+
+        if (yelmo_log) then
+            write(*,*) "yelmo:: loaded physical constants: "
+            write(*,*) "domain:    ", trim(domain)
+            write(*,*) "grid_name: ", trim(grid_name)
+            write(*,*) "    sec_year   = ", c%sec_year 
+            write(*,*) "    g          = ", c%g 
+            write(*,*) "    T0         = ", c%T0 
+            write(*,*) "    rho_ice    = ", c%rho_ice 
+            write(*,*) "    rho_w      = ", c%rho_w 
+            write(*,*) "    rho_sw     = ", c%rho_sw 
+            write(*,*) "    rho_a      = ", c%rho_a 
+            write(*,*) "    rho_rock   = ", c%rho_rock 
+            write(*,*) "    L_ice      = ", c%L_ice 
+            write(*,*) "    T_pmp_beta = ", c%T_pmp_beta 
+            
+        end if 
+
+        return
+
+    end subroutine ybound_define_physical_constants
+    
     subroutine ybound_load_masks(bnd,nml_path,nml_group,domain,grid_name)
         ! Load masks for managing regions and basins, etc. 
 

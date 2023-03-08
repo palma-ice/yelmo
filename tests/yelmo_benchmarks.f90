@@ -200,7 +200,7 @@ program yelmo_benchmarks
 
     yelmo1%bnd%z_sl     = 0.0
     yelmo1%bnd%bmb_shlf = 0.0  
-    yelmo1%bnd%T_shlf   = T0  
+    yelmo1%bnd%T_shlf   = yelmo1%bnd%c%T0  
     yelmo1%bnd%H_sed    = 0.0 
 
     if (with_bumps .or. low_z_sl) then 
@@ -213,7 +213,8 @@ program yelmo_benchmarks
 
             ! Initialize BUELER-A 
             call bueler_test_AE(buel%H_ice,buel%mbal,buel%u_b,yelmo1%grd%x,yelmo1%grd%y, &
-                                L=750.0_prec,mbal0=0.3_prec,A=1e-16_prec,n=3.0_prec,rho_ice=rho_ice,g=g,mu_max=0.0_prec)
+                                L=750.0_prec,mbal0=0.3_prec,A=1e-16_prec,n=3.0_prec, &
+                                rho_ice=yelmo1%bnd%c%rho_ice,g=yelmo1%bnd%c%g,mu_max=0.0_prec)
 
             yelmo1%bnd%T_srf = 223.15 
             yelmo1%bnd%Q_geo = 42.0 
@@ -230,7 +231,8 @@ program yelmo_benchmarks
 
             ! Initialize BUELER-B 
             call bueler_test_BC(buel%H_ice,buel%mbal,buel%u_b,yelmo1%grd%x,yelmo1%grd%y, &
-                        time=0.0_prec,R0=750.0_prec,H0=3600.0_prec,lambda=0.0_prec,n=3.0_prec,A=1e-16_prec,rho_ice=rho_ice,g=g)
+                        time=0.0_prec,R0=750.0_prec,H0=3600.0_prec,lambda=0.0_prec,n=3.0_prec,A=1e-16_prec, &
+                        rho_ice=yelmo1%bnd%c%rho_ice,g=yelmo1%bnd%c%g)
 
             yelmo1%bnd%T_srf = 223.15 
             yelmo1%bnd%Q_geo = 42.0 
@@ -247,7 +249,8 @@ program yelmo_benchmarks
 
             ! Initialize BUELER-B (but with HALFAR conditions)
             call bueler_test_BC(buel%H_ice,buel%mbal,buel%u_b,yelmo1%grd%x,yelmo1%grd%y, &
-                        time=0.0_prec,R0=21.2132_prec,H0=707.1_prec,lambda=0.0_prec,n=3.0_prec,A=1e-16_prec,rho_ice=rho_ice,g=g)
+                        time=0.0_prec,R0=21.2132_prec,H0=707.1_prec,lambda=0.0_prec,n=3.0_prec,A=1e-16_prec, &
+                        rho_ice=yelmo1%bnd%c%rho_ice,g=yelmo1%bnd%c%g)
 
             yelmo1%bnd%T_srf = 223.15 
             yelmo1%bnd%Q_geo = 42.0 
@@ -264,7 +267,8 @@ program yelmo_benchmarks
 
             ! Initialize BUELER-B (but with conditions between Bueler-B and HALFAR - not too big, not too small)
             call bueler_test_BC(buel%H_ice,buel%mbal,buel%u_b,yelmo1%grd%x,yelmo1%grd%y, &
-                        time=0.0_prec,R0=100.0_prec,H0=800.0_prec,lambda=0.0_prec,n=3.0_prec,A=1e-16_prec,rho_ice=rho_ice,g=g)
+                        time=0.0_prec,R0=100.0_prec,H0=800.0_prec,lambda=0.0_prec,n=3.0_prec,A=1e-16_prec, &
+                        rho_ice=yelmo1%bnd%c%rho_ice,g=yelmo1%bnd%c%g)
 
             yelmo1%bnd%T_srf = 223.15 
             yelmo1%bnd%Q_geo = 42.0 
@@ -291,7 +295,7 @@ program yelmo_benchmarks
             ! To do: define calv_mask!!
 
             ! Initialize mismip boundary values 
-            call mismip3D_boundaries(yelmo1%bnd%T_srf,yelmo1%bnd%smb,yelmo1%bnd%Q_geo,yelmo1%bnd%calv_mask,experiment="Stnd") 
+            call mismip3D_boundaries(yelmo1%bnd%T_srf,yelmo1%bnd%smb,yelmo1%bnd%Q_geo,yelmo1%bnd%calv_mask,yelmo1%bnd%c%T0,experiment="Stnd") 
 
 
         case("dome") 
@@ -407,19 +411,22 @@ program yelmo_benchmarks
 
                 ! Update BUELER-B profile
                 call bueler_test_BC(buel%H_ice,buel%mbal,buel%u_b,yelmo1%grd%x,yelmo1%grd%y, &
-                      time=time,R0=750.0_prec,H0=3600.0_prec,lambda=0.0_prec,n=3.0_prec,A=1e-16_prec,rho_ice=rho_ice,g=g)
+                      time=time,R0=750.0_prec,H0=3600.0_prec,lambda=0.0_prec,n=3.0_prec,A=1e-16_prec, &
+                      rho_ice=yelmo1%bnd%c%rho_ice,g=yelmo1%bnd%c%g)
 
             case("HALFAR")
 
                 ! Update BUELER-B (but with HALFAR conditions)
                 call bueler_test_BC(buel%H_ice,buel%mbal,buel%u_b,yelmo1%grd%x,yelmo1%grd%y, &
-                      time=time,R0=21.2132_prec,H0=707.1_prec,lambda=0.0_prec,n=3.0_prec,A=1e-16_prec,rho_ice=rho_ice,g=g)
+                      time=time,R0=21.2132_prec,H0=707.1_prec,lambda=0.0_prec,n=3.0_prec,A=1e-16_prec, &
+                      rho_ice=yelmo1%bnd%c%rho_ice,g=yelmo1%bnd%c%g)
 
             case("HALFAR-MED")
 
                 ! Initialize BUELER-B (but with conditions between Bueler-B and HALFAR - not too big, not too small)
                 call bueler_test_BC(buel%H_ice,buel%mbal,buel%u_b,yelmo1%grd%x,yelmo1%grd%y, &
-                            time=time,R0=100.0_prec,H0=800.0_prec,lambda=0.0_prec,n=3.0_prec,A=1e-16_prec,rho_ice=rho_ice,g=g)
+                            time=time,R0=100.0_prec,H0=800.0_prec,lambda=0.0_prec,n=3.0_prec,A=1e-16_prec, &
+                            rho_ice=yelmo1%bnd%c%rho_ice,g=yelmo1%bnd%c%g)
             
             case("mismip")
 
@@ -431,7 +438,7 @@ program yelmo_benchmarks
             case("mismip-stnd") 
 
                 ! Initialize mismip boundary values 
-                call mismip3D_boundaries(yelmo1%bnd%T_srf,yelmo1%bnd%smb,yelmo1%bnd%Q_geo,yelmo1%bnd%calv_mask,experiment="Stnd") 
+                call mismip3D_boundaries(yelmo1%bnd%T_srf,yelmo1%bnd%smb,yelmo1%bnd%Q_geo,yelmo1%bnd%calv_mask,yelmo1%bnd%c%T0,experiment="Stnd") 
 
             case("dome") 
             ! Boundary conditions are free to be chosen here 
@@ -626,7 +633,7 @@ contains
         
         call nc_write(filename,"Q_ice_b",ylmo%thrm%now%Q_ice_b,units="mW m-2",long_name="Basal ice heat flux", &
                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-        call nc_write(filename,"Q_strn",ylmo%thrm%now%Q_strn/(rho_ice*ylmo%thrm%now%cp),units="K a-1",long_name="Strain heating", &
+        call nc_write(filename,"Q_strn",ylmo%thrm%now%Q_strn/(ylmo%bnd%c%rho_ice*ylmo%thrm%now%cp),units="K a-1",long_name="Strain heating", &
                       dim1="xc",dim2="yc",dim3="zeta",dim4="time",start=[1,1,1,n],ncid=ncid)
 
         call nc_write(filename,"Q_b",ylmo%thrm%now%Q_b,units="mW m-2",long_name="Basal frictional heating", &

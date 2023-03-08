@@ -4,9 +4,7 @@ module thermodynamics
     ! Note: once icetemp is working well, this module could be 
     ! remerged into icetemp as one module. 
 
-    use yelmo_defs, only : prec, wp, sec_year, pi, T0, g, rho_ice, &
-                           rho_sw, rho_w, rho_rock, L_ice, T_pmp_beta, &
-                           TOL_UNDERFLOW 
+    use yelmo_defs, only : prec, wp, pi, TOL_UNDERFLOW 
 
     use yelmo_tools, only : get_neighbor_indices, acx_to_nodes, acy_to_nodes, stagger_nodes_acx_ab_ice, stagger_nodes_acy_ab_ice, &
                             set_boundaries_3D_aa
@@ -49,7 +47,7 @@ module thermodynamics
 
 contains
 
-    subroutine calc_bmb_grounded(bmb_grnd,T_prime_b,Q_ice_b_now,Q_b_now,Q_rock_now,rho_ice)
+    subroutine calc_bmb_grounded(bmb_grnd,T_prime_b,Q_ice_b_now,Q_b_now,Q_rock_now,rho_ice,L_ice)
         ! Calculate basal mass balance of grounded ice points
 
         implicit none 
@@ -60,7 +58,8 @@ contains
         real(prec), intent(IN)  :: Q_b_now           ! [J a-1 m-2] Basal heat production from friction and strain heating
         real(prec), intent(IN)  :: Q_rock_now        ! [J a-1 m-2] Geothermal heat flux 
         real(prec), intent(IN)  :: rho_ice           ! [kg m-3] Ice density 
-        
+        real(prec), intent(IN)  :: L_ice
+
         ! Local variables
         real(prec) :: Q_net  
         real(prec), parameter :: tol = 1e-5  
@@ -509,7 +508,7 @@ contains
 
     end subroutine calc_strain_heating
     
-    subroutine calc_strain_heating_sia(Q_strn,ux,uy,dzsdx,dzsdy,cp,H_ice,rho_ice,zeta_aa,zeta_ac,beta1,beta2)
+    subroutine calc_strain_heating_sia(Q_strn,ux,uy,dzsdx,dzsdy,cp,H_ice,rho_ice,g,zeta_aa,zeta_ac,beta1,beta2)
 
         ! Calculate the general 3D internal strain heating
         ! as sum(D_ij*tau_ij)  (strain*stress)
@@ -530,6 +529,7 @@ contains
         real(prec), intent(IN)    :: cp(:,:,:)        ! nx,ny,nz_aa  [J/kg/K] Specific heat capacity
         real(prec), intent(IN)    :: H_ice(:,:)       ! nx,ny        [m] Ice thickness
         real(prec), intent(IN)    :: rho_ice          ! [kg m-3] Ice density 
+        real(prec), intent(IN)    :: g
         real(prec), intent(IN)    :: zeta_aa(:)       ! [-] Height axis, centered aa-nodes 
         real(prec), intent(IN)    :: zeta_ac(:)       ! [-] Height axis, boundaries ac-nodes
         real(prec), intent(IN)    :: beta1            ! Timestepping weighting parameter
@@ -595,7 +595,7 @@ contains
 
     end subroutine calc_strain_heating_sia
 
-    subroutine calc_basal_heating_nodes(Q_b,ux_b,uy_b,taub_acx,taub_acy,f_ice,beta1,beta2,boundaries)
+    subroutine calc_basal_heating_nodes(Q_b,ux_b,uy_b,taub_acx,taub_acy,f_ice,beta1,beta2,sec_year,boundaries)
         ! Qb [J a-1 m-2] == [m a-1] * [J m-3]
         ! Note: grounded ice fraction f_grnd_acx/y not used here, because taub_acx/y already accounts
         ! for the grounded fraction via beta_acx/y: Q_b = tau_b*u = -beta*u*u,
@@ -610,6 +610,7 @@ contains
         real(prec), intent(IN)    :: f_ice(:,:)         ! [--] Ice area fraction
         real(prec), intent(IN)    :: beta1              ! Timestepping weighting parameter
         real(prec), intent(IN)    :: beta2              ! Timestepping weighting parameter
+        real(prec), intent(IN)    :: sec_year 
         character(len=*), intent(IN) :: boundaries 
 
         ! Local variables
@@ -693,7 +694,7 @@ contains
  
     end subroutine calc_basal_heating_nodes
     
-    subroutine calc_basal_heating_simplestagger(Q_b,ux_b,uy_b,taub_acx,taub_acy,beta1,beta2)
+    subroutine calc_basal_heating_simplestagger(Q_b,ux_b,uy_b,taub_acx,taub_acy,beta1,beta2,sec_year)
          ! Qb [J a-1 m-2] == [m a-1] * [J m-3]
          ! Note: grounded ice fraction f_grnd_acx/y not used here, because taub_acx/y already accounts
          ! for the grounded fraction via beta_acx/y: Q_b = tau_b*u = -beta*u*u.
@@ -705,7 +706,8 @@ contains
         real(prec), intent(IN)    :: taub_acy(:,:)      ! Basal friction (acy) 
         real(prec), intent(IN)    :: beta1              ! Timestepping weighting parameter
         real(prec), intent(IN)    :: beta2              ! Timestepping weighting parameter
-        
+        real(prec), intent(IN)    :: sec_year
+
         ! Local variables
         integer    :: i, j, nx, ny, n 
         integer    :: im1, ip1, jm1, jp1 
@@ -842,11 +844,12 @@ contains
 
     end function calc_specific_heat_capacity
 
-    elemental function calc_thermal_conductivity(T_ice) result(ct)
+    elemental function calc_thermal_conductivity(T_ice,sec_year) result(ct)
 
         implicit none 
 
         real(prec), intent(IN) :: T_ice  
+        real(prec), intent(IN) :: sec_year 
         real(prec) :: ct 
 
         ! Heat conductivity (Greve and Blatter, 2009, Eq. 4.37; Ritz, 1987)
@@ -856,7 +859,7 @@ contains
 
     end function calc_thermal_conductivity
     
-    elemental function calc_T_pmp(H_ice,zeta,T0,beta) result(T_pmp)
+    elemental function calc_T_pmp(H_ice,zeta,T0,beta,rho_ice,g) result(T_pmp)
         ! Greve and Blatter (Chpt 4, pg 54), Eq. 4.13
         ! This gives the pressure-corrected melting point of ice
         ! where H_ice*(1-zeta) is the thickness of ice overlying the current point 
@@ -867,6 +870,8 @@ contains
         real(prec), intent(IN) :: zeta   ! [-] Fractional height of this point within the ice
         real(prec), intent(IN) :: T0     ! [K] Reference freezing point of water (e.g., 273.15 K or 0 C)
         real(prec), intent(IN) :: beta   ! [K Pa^-1] Melting point gradient with pressure
+        real(prec), intent(IN) :: rho_ice 
+        real(prec), intent(IN) :: g 
         real(prec) :: T_pmp              ! [K] Pressure corrected melting point
 
         ! Local variables
@@ -947,7 +952,7 @@ contains
 
     end subroutine calc_f_pmp
     
-    elemental function calc_T_base_shlf_approx(H_ice,T_pmp,H_grnd) result(T_base_shlf)
+    elemental function calc_T_base_shlf_approx(H_ice,T_pmp,H_grnd,T0,rho_ice,rho_sw) result(T_base_shlf)
         ! Calculate the basal shelf temperature for floating ice
         ! as the estimated freezing temperature of seawater
         ! following Jenkins (1991)
@@ -958,6 +963,9 @@ contains
         real(prec), intent(IN) :: H_ice 
         real(prec), intent(IN) :: T_pmp 
         real(prec), intent(IN) :: H_grnd 
+        real(prec), intent(IN) :: T0 
+        real(prec), intent(IN) :: rho_ice
+        real(prec), intent(IN) :: rho_sw 
         real(prec) :: T_base_shlf
 
         ! Local variables 
@@ -984,7 +992,7 @@ contains
 
     end function calc_T_base_shlf_approx
     
-    subroutine define_temp_linear_3D(enth,T_ice,omega,cp,H_ice,T_srf,zeta_aa)
+    subroutine define_temp_linear_3D(enth,T_ice,omega,cp,H_ice,T_srf,zeta_aa,T0,rho_ice,L_ice,T_pmp_beta,g)
         ! Define a linear vertical temperature profile
        
         implicit none
@@ -996,7 +1004,12 @@ contains
         real(prec), intent(IN)  :: H_ice(:,:)
         real(prec), intent(IN)  :: T_srf(:,:) 
         real(prec), intent(IN)  :: zeta_aa(:)
-           
+        real(prec), intent(IN)  :: T0 
+        real(prec), intent(IN)  :: rho_ice 
+        real(prec), intent(IN)  :: L_ice 
+        real(prec), intent(IN)  :: T_pmp_beta 
+        real(prec), intent(IN)  :: g
+
         ! Local variables
         integer :: i, j, k, nx, ny, nz_aa   
         real(prec) :: T_base, T_pmp  
@@ -1011,7 +1024,7 @@ contains
             if (H_ice(i,j) .gt. 0.0) then
                 ! Ice is present, define linear temperature profile with frozen bed (-10 degC)
                  
-                T_base       = calc_T_pmp(H_ice(i,j),zeta_aa(1),T0,T_pmp_beta) - 10.0 
+                T_base       = calc_T_pmp(H_ice(i,j),zeta_aa(1),T0,T_pmp_beta,rho_ice,g) - 10.0 
                 T_ice(i,j,:) = define_temp_linear_column(T_srf(i,j),T_base,T0,zeta_aa)
 
             else 
@@ -1059,7 +1072,8 @@ contains
 
     end function define_temp_linear_column
 
-    subroutine define_temp_robin_3D(enth,T_ice,omega,T_pmp,cp,ct,Q_rock,T_srf,H_ice,H_w,smb,bmb,f_grnd,zeta_aa,cold)
+    subroutine define_temp_robin_3D(enth,T_ice,omega,T_pmp,cp,ct,Q_rock,T_srf,H_ice,H_w,smb,bmb, &
+                                                                    f_grnd,zeta_aa,rho_ice,L_ice,sec_year,cold)
         ! Robin solution for thermodynamics for a given column of ice 
         ! Note zeta=height, k=1 base, k=nz surface 
 
@@ -1079,6 +1093,9 @@ contains
         real(prec), intent(IN)  :: bmb(:,:)         ! [m a-1] Basal mass balance (melting is negative)
         real(prec), intent(IN)  :: f_grnd(:,:)      ! [--] Floating point or grounded?
         real(prec), intent(IN)  :: zeta_aa(:)       ! [--] Vertical zeta coordinates (zeta==height), aa-nodes
+        real(prec), intent(IN)  :: rho_ice 
+        real(prec), intent(IN)  :: L_ice 
+        real(prec), intent(IN)  :: sec_year
         logical,    intent(IN)  :: cold             ! False: robin as normal, True: ensure cold base 
 
         ! Local variable
@@ -1099,7 +1116,7 @@ contains
             is_float = (f_grnd(i,j) .eq. 0.0)
 
             T_ice(i,j,:) = define_temp_robin_column(zeta_aa,T_pmp(i,j,:),ct(i,j,:),cp(i,j,:),rho_ice,H_ice(i,j), &
-                                                  T_srf(i,j),smb(i,j)+bmb(i,j),Q_rock(i,j),is_float)
+                                                  T_srf(i,j),smb(i,j)+bmb(i,j),Q_rock(i,j),is_float,sec_year)
 
             if (cold) then 
                 T1(nz_aa) = T_srf(i,j)
@@ -1127,7 +1144,8 @@ contains
 
     end subroutine define_temp_robin_3D
 
-    function define_temp_robin_column(zeta_aa,T_pmp,kt,cp,rho_ice,H_ice,T_srf,mb_net,Q_rock,is_float) result(T_ice)
+    function define_temp_robin_column(zeta_aa,T_pmp,kt,cp,rho_ice,H_ice,T_srf,mb_net, &
+                                                        Q_rock,is_float,sec_year) result(T_ice)
         ! This function will impose a temperature solution in a given ice column.
         ! For:
         !  Grounded ice with positive net mass balance: Robin solution where possible
@@ -1147,6 +1165,7 @@ contains
         real(prec), intent(IN) :: mb_net
         real(prec), intent(IN) :: Q_rock 
         logical,    intent(IN) :: is_float 
+        real(prec), intent(IN) :: sec_year 
 
         real(prec) :: T_ice(size(zeta_aa,1))
 
@@ -1217,7 +1236,8 @@ contains
 
     end function define_temp_robin_column
 
-    subroutine define_temp_bedrock_3D(enth_rock,T_rock,Q_rock,cp_rock,kt_rock,Q_geo,T_bed,H_rock,zeta_aa)
+    subroutine define_temp_bedrock_3D(enth_rock,T_rock,Q_rock,cp_rock,kt_rock,Q_geo, &
+                                                T_bed,H_rock,zeta_aa,rho_rock,sec_year)
         ! Define 3D bedrock enth/temp field 
 
         implicit none 
@@ -1231,6 +1251,8 @@ contains
         real(prec), intent(IN)  :: T_bed(:,:)           ! [K] Surface temperature 
         real(prec), intent(IN)  :: H_rock               ! [m] Column thickness 
         real(prec), intent(IN)  :: zeta_aa(:)           ! [--] Vertical zeta coordinates (zeta==height), aa-nodes
+        real(prec), intent(IN)  :: rho_rock 
+        real(prec), intent(IN)  :: sec_year 
 
         ! Local variable
         integer :: i, j, k, nx, ny, nz_aa  
@@ -1244,10 +1266,10 @@ contains
 
             ! Calculate temperature profile 
             call define_temp_bedrock_column(T_rock(i,j,:),kt_rock,rho_rock,H_rock, &
-                                                    T_bed(i,j),Q_geo(i,j),zeta_aa)
+                                                    T_bed(i,j),Q_geo(i,j),zeta_aa,sec_year)
 
             ! Calculate heat flux through bed surface from lithosphere [mW m-2]
-            call calc_Q_bedrock_column(Q_rock(i,j),T_rock(i,j,:),kt_rock,H_rock,zeta_aa)
+            call calc_Q_bedrock_column(Q_rock(i,j),T_rock(i,j,:),kt_rock,H_rock,zeta_aa,sec_year)
 
         end do 
         end do 
@@ -1259,7 +1281,7 @@ contains
 
     end subroutine define_temp_bedrock_3D
 
-    subroutine define_temp_bedrock_column(T_rock,kt_rock,rho_rock,H_rock,T_bed,Q_geo,zeta_aa)
+    subroutine define_temp_bedrock_column(T_rock,kt_rock,rho_rock,H_rock,T_bed,Q_geo,zeta_aa,sec_year)
         ! This function will impose a temperature profile in a column 
         ! of bedrock assuming equilibrium with the bed surface temperature (T_bed)
         ! and the geothermal heat flux deep in the bedrock (Q_geo) 
@@ -1273,7 +1295,8 @@ contains
         real(prec), intent(IN)  :: T_bed 
         real(prec), intent(IN)  :: Q_geo 
         real(prec), intent(IN)  :: zeta_aa(:) 
-        
+        real(prec), intent(IN)  :: sec_year 
+
         ! Local variables
         integer :: k, nz_aa
         real(prec) :: Q_geo_now 
@@ -1302,7 +1325,7 @@ contains
 
     end subroutine define_temp_bedrock_column
 
-    subroutine calc_Q_bedrock(Q_rock,T_rock,kt_rock,H_rock,zeta_aa)
+    subroutine calc_Q_bedrock(Q_rock,T_rock,kt_rock,H_rock,zeta_aa,sec_year)
 
         implicit none 
 
@@ -1311,6 +1334,7 @@ contains
         real(wp), intent(IN)  :: kt_rock
         real(wp), intent(IN)  :: H_rock 
         real(wp), intent(IN)  :: zeta_aa(:) 
+        real(wp), intent(IN)  :: sec_year 
 
         ! Local variables 
         integer  :: i, j, nx, ny  
@@ -1321,7 +1345,7 @@ contains
         do j = 1, ny 
         do i = 1, nx 
 
-            call calc_Q_bedrock_column(Q_rock(i,j),T_rock(i,j,:),kt_rock,H_rock,zeta_aa)
+            call calc_Q_bedrock_column(Q_rock(i,j),T_rock(i,j,:),kt_rock,H_rock,zeta_aa,sec_year)
 
         end do 
         end do  
@@ -1333,7 +1357,7 @@ contains
 
     end subroutine calc_Q_bedrock
 
-    subroutine calc_Q_bedrock_column(Q_rock,T_rock,kt_rock,H_rock,zeta_aa)
+    subroutine calc_Q_bedrock_column(Q_rock,T_rock,kt_rock,H_rock,zeta_aa,sec_year)
 
         implicit none 
 
@@ -1342,6 +1366,7 @@ contains
         real(wp), intent(IN)  :: kt_rock
         real(wp), intent(IN)  :: H_rock
         real(wp), intent(IN)  :: zeta_aa(:) 
+        real(wp), intent(IN)  :: sec_year 
 
         ! Local variables 
         integer  :: nz_aa 

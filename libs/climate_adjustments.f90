@@ -1,6 +1,6 @@
 module climate_adjustments
     
-    use yelmo_defs, only : sp, dp, prec, pi, missing_value, mv, tol_underflow, rho_ice, g 
+    use yelmo_defs, only : sp, dp, prec, pi, missing_value, mv, tol_underflow
     
     implicit none 
 

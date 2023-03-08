@@ -179,9 +179,9 @@ program yelmo_test
         yelmo1%bnd%bmb_shlf = ctl%bmb_shlf_const        ! [m.i.e./a]
     end if 
 
-    yelmo1%bnd%T_shlf   = T0                ! [K]   
+    yelmo1%bnd%T_shlf   = yelmo1%bnd%c%T0                ! [K]   
 
-    if (ctl%dT_ann .lt. 0.0) yelmo1%bnd%T_shlf   = T0 + ctl%dT_ann*0.25_wp      ! [K] Oceanic temp anomaly
+    if (ctl%dT_ann .lt. 0.0) yelmo1%bnd%T_shlf   = yelmo1%bnd%c%T0 + ctl%dT_ann*0.25_wp      ! [K] Oceanic temp anomaly
     
     call yelmo_print_bound(yelmo1%bnd)
 
@@ -710,7 +710,7 @@ contains
         
         call nc_write(filename,"Q_ice_b",ylmo%thrm%now%Q_ice_b,units="mW m-2",long_name="Basal ice heat flux", &
                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-        call nc_write(filename,"Q_strn",ylmo%thrm%now%Q_strn/(rho_ice*ylmo%thrm%now%cp),units="K a-1",long_name="Strain heating", &
+        call nc_write(filename,"Q_strn",ylmo%thrm%now%Q_strn/(ylmo%bnd%c%rho_ice*ylmo%thrm%now%cp),units="K a-1",long_name="Strain heating", &
                       dim1="xc",dim2="yc",dim3="zeta",dim4="time",start=[1,1,1,n],ncid=ncid)
 
         call nc_write(filename,"Q_b",ylmo%thrm%now%Q_b,units="mW m-2",long_name="Basal frictional heating", &

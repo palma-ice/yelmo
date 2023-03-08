@@ -2,7 +2,7 @@ module velocity_ssa
     ! This module solves for the ice sheet's horizontal velocity field (ux,uy)
     ! using the shallow-shelf approximation (SSA). 
 
-    use yelmo_defs ,only  : sp, dp, wp, tol_underflow, pi, rho_ice, rho_sw, rho_w, g
+    use yelmo_defs ,only  : sp, dp, wp, tol_underflow, pi
     use yelmo_tools, only : get_neighbor_indices, stagger_aa_ab, stagger_aa_ab_ice, stagger_ab_aa_ice, & 
                     acx_to_nodes, acy_to_nodes, aa_to_nodes, aa_to_nodes_3D, &
                     integrate_trapezoid1D_1D, integrate_trapezoid1D_pt, minmax
@@ -38,6 +38,10 @@ module velocity_ssa
         real(wp) :: ssa_iter_rel 
         real(wp) :: ssa_iter_conv 
         logical  :: ssa_write_log 
+
+        real(wp) :: rho_ice 
+        real(wp) :: rho_sw
+        real(wp) :: g 
 
     end type
 
@@ -206,7 +210,7 @@ contains
             ! Calculate beta (at the ice base)
             call calc_beta(beta,c_bed,ux_b,uy_b,H_ice,f_ice,H_grnd,f_grnd,z_bed,z_sl,par%beta_method, &
                                 par%beta_const,par%beta_q,par%beta_u0,par%beta_gl_scale,par%beta_gl_f, &
-                                par%H_grnd_lim,par%beta_min,par%boundaries)
+                                par%H_grnd_lim,par%beta_min,par%rho_ice,par%rho_sw,par%boundaries)
 
             ! Stagger beta
             call stagger_beta(beta_acx,beta_acy,beta,H_ice,f_ice,ux_b,uy_b, &

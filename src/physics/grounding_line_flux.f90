@@ -1,7 +1,7 @@
 module grounding_line_flux
     ! Routines to prescribe grounding-line fluxes (eg, Schoof or Tsai laws)
 
-    use yelmo_defs, only : sp, dp, prec, rho_ice, rho_sw, g  
+    use yelmo_defs, only : sp, dp, prec
 
     implicit none 
 
@@ -15,7 +15,8 @@ module grounding_line_flux
 contains 
 
     subroutine calc_grounding_line_flux(qq_gl_acx,qq_gl_acy,H_ice,ATT_bar,C_bed,ux_bar,uy_bar, &
-                                            f_grnd,f_grnd_acx,f_grnd_acy,n_glen,m_drag,Q0,f_drag,glf_method)
+                                            f_grnd,f_grnd_acx,f_grnd_acy,n_glen,m_drag,Q0,f_drag, &
+                                            rho_ice,rho_sw,g,glf_method)
 
         implicit none 
 
@@ -33,6 +34,9 @@ contains
         real(prec), intent(IN)  :: m_drag               ! [--] Power law exponent
         real(prec), intent(IN)  :: Q0                   ! [?] Scaling coefficient, in the range of 0.60-0.65
         real(prec), intent(IN)  :: f_drag               ! [--] Dragging coefficient, f_drag ~ 0.6 
+        real(prec), intent(IN)  :: rho_ice 
+        real(prec), intent(IN)  :: rho_sw 
+        real(prec), intent(IN)  :: g 
         character(len=*), intent(IN) :: glf_method      ! "power" or "coulomb" method 
 
         ! Local variables
@@ -88,12 +92,12 @@ contains
                     case("power")
                         ! Calculate magnitude of flux given a Coulomb friction relation, following Schoof (2007)
                         
-                        qq_gl = calc_gl_flux_power(H_gl,A_gl,C_bed_gl,n_glen,m_drag)
+                        qq_gl = calc_gl_flux_power(H_gl,A_gl,C_bed_gl,n_glen,m_drag,rho_ice,rho_sw,g)
 
                     case("coulomb")
                         ! Calculate magnitude of flux given a Coulomb friction relation, following Tsai et al. (2015)
                         
-                        qq_gl = calc_gl_flux_coulomb(H_gl,A_gl,n_glen,Q0,f_drag)
+                        qq_gl = calc_gl_flux_coulomb(H_gl,A_gl,n_glen,Q0,f_drag,rho_ice,rho_sw,g)
 
                     case DEFAULT 
 
@@ -180,7 +184,7 @@ contains
 
     end subroutine calc_grounding_line_flux
 
-    elemental function calc_gl_flux_power(H_gl,A_gl,C_bed,n_glen,m_drag) result(qq_gl)
+    elemental function calc_gl_flux_power(H_gl,A_gl,C_bed,n_glen,m_drag,rho_ice,rho_sw,g) result(qq_gl)
         ! Calculate the analytical grounding-line flux solution
         ! following Schoof (2007) 
         
@@ -191,6 +195,9 @@ contains
         real(prec), intent(IN)  :: C_bed                ! [Pa a/m] Basal friction coefficient
         real(prec), intent(IN)  :: n_glen               ! [--] Glen's flow law exponent 
         real(prec), intent(IN)  :: m_drag               ! [--] Power-law dragging exponent
+        real(prec), intent(IN)  :: rho_ice 
+        real(prec), intent(IN)  :: rho_sw 
+        real(prec), intent(IN)  :: g 
         real(prec) :: qq_gl                             ! [m2 / a] Grounding-line flux 
         
         ! Calculate grounding line flux following Schoof (2007), Eq. 20
@@ -202,7 +209,7 @@ contains
 
     end function calc_gl_flux_power
 
-    elemental function calc_gl_flux_coulomb(H_gl,A_gl,n_glen,Q0,f_drag) result(qq_gl)
+    elemental function calc_gl_flux_coulomb(H_gl,A_gl,n_glen,Q0,f_drag,rho_ice,rho_sw,g) result(qq_gl)
         ! Calculate the analytical grounding-line flux solution
         ! following Tsai et al. (2015)
 
@@ -213,6 +220,9 @@ contains
         real(prec), intent(IN)  :: n_glen               ! [--] Glen's flow law exponent 
         real(prec), intent(IN)  :: Q0                   ! [?] Scaling coefficient, in the range of 0.60-0.65
         real(prec), intent(IN)  :: f_drag               ! [--] Dragging coefficient, f_drag ~ 0.6 
+        real(prec), intent(IN)  :: rho_ice 
+        real(prec), intent(IN)  :: rho_sw 
+        real(prec), intent(IN)  :: g 
         real(prec) :: qq_gl                             ! [m2 / a] Grounding-line flux 
         
         ! Calculate grounding line flux following Tsai et al. (2015), Eq. 38

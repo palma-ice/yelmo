@@ -1,6 +1,6 @@
 module topography 
 
-    use yelmo_defs, only : wp, dp, prec, io_unit_err, sec_year, pi, T0, g, rho_ice, rho_sw, rho_w 
+    use yelmo_defs, only : wp, dp, prec, io_unit_err, pi
 
     implicit none 
 
@@ -315,7 +315,7 @@ contains
 
     end subroutine find_connected_mask
     
-    subroutine calc_ice_fraction_new(f_ice,H_ice,z_bed,z_sl,flt_subgrid)
+    subroutine calc_ice_fraction_new(f_ice,H_ice,z_bed,z_sl,rho_ice,rho_sw,flt_subgrid)
         ! Determine the area fraction of a grid cell
         ! that is ice-covered. Assume that marginal points
         ! have equal thickness to inland neighbors 
@@ -329,6 +329,8 @@ contains
         real(wp), intent(IN)  :: H_ice(:,:)             ! [m] Ice thickness on standard grid (aa-nodes)
         real(wp), intent(IN)  :: z_bed(:,:)             ! [m] Bedrock elevation
         real(wp), intent(IN)  :: z_sl(:,:)              ! [m] Sea-level elevation
+        real(wp), intent(IN)  :: rho_ice 
+        real(wp), intent(IN)  :: rho_sw 
         logical, optional     :: flt_subgrid            ! Option to allow fractions for floating ice margins             
         
         ! Local variables 
@@ -355,7 +357,7 @@ contains
 
         if (get_fractional_cover) then 
             ! Calculate H_grnd, without accounting for fractional ice cover
-            call calc_H_grnd(H_grnd,H_ice,f_ice,z_bed,z_sl,use_f_ice=.FALSE.)
+            call calc_H_grnd(H_grnd,H_ice,f_ice,z_bed,z_sl,rho_ice,rho_sw,use_f_ice=.FALSE.)
         end if 
 
         ! Initialize mask_cf to False 
@@ -488,7 +490,7 @@ contains
 
     end subroutine calc_ice_fraction_new
     
-    subroutine calc_ice_fraction(f_ice,H_ice,z_bed,z_sl,flt_subgrid)
+    subroutine calc_ice_fraction(f_ice,H_ice,z_bed,z_sl,rho_ice,rho_sw,flt_subgrid)
         ! Determine the area fraction of a grid cell
         ! that is ice-covered. Assume that marginal points
         ! have equal thickness to inland neighbors 
@@ -499,6 +501,8 @@ contains
         real(wp), intent(IN)  :: H_ice(:,:)             ! [m] Ice thickness on standard grid (aa-nodes)
         real(wp), intent(IN)  :: z_bed(:,:)             ! [m] Bedrock elevation
         real(wp), intent(IN)  :: z_sl(:,:)              ! [m] Sea-level elevation
+        real(wp), intent(IN)  :: rho_ice
+        real(wp), intent(IN)  :: rho_sw
         logical, optional     :: flt_subgrid            ! Option to allow fractions for floating ice margins             
         
         ! Local variables 
@@ -531,7 +535,7 @@ contains
 
         if (get_fractional_cover) then 
             ! Calculate H_grnd, without accounting for fractional ice cover
-            call calc_H_grnd(H_grnd,H_ice,f_ice,z_bed,z_sl,use_f_ice=.FALSE.)
+            call calc_H_grnd(H_grnd,H_ice,f_ice,z_bed,z_sl,rho_ice,rho_sw,use_f_ice=.FALSE.)
         end if 
 
         ! Initialize f_ice to binary values first 
@@ -764,7 +768,7 @@ contains
 
     end subroutine calc_ice_front
 
-    elemental subroutine calc_z_srf(z_srf,H_ice,f_ice,H_grnd,z_bed,z_sl)
+    elemental subroutine calc_z_srf(z_srf,H_ice,f_ice,H_grnd,z_bed,z_sl,rho_ice,rho_sw)
         ! Calculate surface elevation
 
         implicit none 
@@ -775,7 +779,9 @@ contains
         real(prec), intent(IN)    :: H_grnd
         real(prec), intent(IN)    :: z_bed
         real(prec), intent(IN)    :: z_sl
-
+        real(prec), intent(IN)    :: rho_ice 
+        real(prec), intent(IN)    :: rho_sw
+        
         ! Local variables 
         real(prec) :: rho_ice_sw
         real(wp)   :: H_eff 
@@ -802,7 +808,7 @@ contains
 
     end subroutine calc_z_srf
 
-    elemental subroutine calc_z_srf_max(z_srf,H_ice,f_ice,z_bed,z_sl)
+    elemental subroutine calc_z_srf_max(z_srf,H_ice,f_ice,z_bed,z_sl,rho_ice,rho_sw)
         ! Calculate surface elevation
         ! Adapted from Pattyn (2017), Eq. 1
         
@@ -813,7 +819,9 @@ contains
         real(prec), intent(IN)    :: f_ice
         real(prec), intent(IN)    :: z_bed
         real(prec), intent(IN)    :: z_sl
-
+        real(prec), intent(IN)    :: rho_ice 
+        real(prec), intent(IN)    :: rho_sw
+        
         ! Local variables
         integer :: i, j, nx, ny 
         real(prec) :: rho_ice_sw
@@ -831,7 +839,7 @@ contains
 
     end subroutine calc_z_srf_max
 
-    subroutine calc_z_srf_gl_subgrid_area(z_srf,f_grnd,H_ice,f_ice,z_bed,z_sl,gl_sep_nx)
+    subroutine calc_z_srf_gl_subgrid_area(z_srf,f_grnd,H_ice,f_ice,z_bed,z_sl,gl_sep_nx,rho_ice,rho_sw)
         ! Interpolate variables at grounding line to subgrid level to 
         ! calculate the average z_srf value for the aa-node cell
 
@@ -844,7 +852,9 @@ contains
         real(prec), intent(IN)  :: z_bed(:,:)
         real(prec), intent(IN)  :: z_sl(:,:)
         integer,    intent(IN)  :: gl_sep_nx        ! Number of interpolation points per side (nx*nx)
-
+        real(prec), intent(IN)  :: rho_ice 
+        real(prec), intent(IN)  :: rho_sw
+        
         ! Local variables
         integer  :: i, j, nx, ny
         real(wp) :: v1, v2, v3, v4 
@@ -938,7 +948,7 @@ contains
                 call calc_subgrid_array(z_sl_int,v1,v2,v3,v4,gl_sep_nx)
                 
                 ! Calculate subgrid surface elevations
-                call calc_z_srf_max(z_srf_int,H_ice_int,f_ice_int,z_bed_int,z_sl_int)
+                call calc_z_srf_max(z_srf_int,H_ice_int,f_ice_int,z_bed_int,z_sl_int,rho_ice,rho_sw)
 
                 ! Calculate full grid z_srf value as the mean of subgrid values 
                 z_srf(i,j) = sum(z_srf_int) / real(gl_sep_nx*gl_sep_nx,prec)
@@ -977,7 +987,7 @@ contains
 
     end subroutine calc_H_eff
 
-    elemental subroutine calc_H_grnd(H_grnd,H_ice,f_ice,z_bed,z_sl,use_f_ice)
+    elemental subroutine calc_H_grnd(H_grnd,H_ice,f_ice,z_bed,z_sl,rho_ice,rho_sw,use_f_ice)
         ! Calculate ice thickness overburden, H_grnd
         ! When H_grnd >= 0, grounded, when H_grnd < 0, floating 
         ! Also calculate rate of change for diagnostic related to grounding line 
@@ -992,6 +1002,8 @@ contains
         real(wp), intent(IN)    :: f_ice
         real(wp), intent(IN)    :: z_bed
         real(wp), intent(IN)    :: z_sl 
+        real(wp), intent(IN)    :: rho_ice 
+        real(wp), intent(IN)    :: rho_sw
         logical,  intent(IN), optional :: use_f_ice
 
         ! Local variables   
@@ -1032,7 +1044,7 @@ contains
 
     end subroutine calc_H_grnd
 
-    elemental subroutine calc_H_af(H_af,H_ice,f_ice,z_bed,z_sl,use_f_ice)
+    elemental subroutine calc_H_af(H_af,H_ice,f_ice,z_bed,z_sl,rho_ice,rho_sw,use_f_ice)
         ! Calculate ice thickness above flotation, H_af
 
         implicit none 
@@ -1041,7 +1053,10 @@ contains
         real(wp), intent(IN)    :: H_ice
         real(wp), intent(IN)    :: f_ice
         real(wp), intent(IN)    :: z_bed
-        real(wp), intent(IN)    :: z_sl 
+        real(wp), intent(IN)    :: z_sl
+        real(wp), intent(IN)    :: rho_ice 
+        real(wp), intent(IN)    :: rho_sw
+        
         logical,  intent(IN), optional :: use_f_ice
 
         ! Local variables   
@@ -1399,7 +1414,7 @@ end if
 
     end subroutine calc_f_grnd_subgrid_linear
     
-    subroutine calc_f_grnd_pinning_points(f_grnd,H_ice,f_ice,z_bed,z_bed_sd,z_sl)
+    subroutine calc_f_grnd_pinning_points(f_grnd,H_ice,f_ice,z_bed,z_bed_sd,z_sl,rho_ice,rho_sw)
         ! For floating points, determine how much of bed could be
         ! touching the base of the ice shelf due to subgrid pinning
         ! points following the distribution z = N(z_bed,z_bed_sd)
@@ -1412,6 +1427,8 @@ end if
         real(wp), intent(IN)  :: z_bed(:,:) 
         real(wp), intent(IN)  :: z_bed_sd(:,:) 
         real(wp), intent(IN)  :: z_sl(:,:) 
+        real(wp), intent(IN)  :: rho_ice 
+        real(wp), intent(IN)  :: rho_sw 
 
         ! Local variables 
         integer :: i, j, nx, ny 
@@ -1477,7 +1494,7 @@ end if
 
     end subroutine calc_f_grnd_pinning_points
 
-    subroutine remove_englacial_lakes(H_ice,z_bed,z_srf,z_sl)
+    subroutine remove_englacial_lakes(H_ice,z_bed,z_srf,z_sl,rho_ice,rho_sw)
         ! Diagnose where ice should be grounded, but a gap exists.
         ! In these locations, increase ice thickness in order
         ! to fill in the englacial lake. 
@@ -1491,7 +1508,9 @@ end if
         real(wp), intent(IN)    :: z_bed(:,:) 
         real(wp), intent(IN)    :: z_srf(:,:) 
         real(wp), intent(IN)    :: z_sl(:,:) 
-        
+        real(wp), intent(IN)    :: rho_ice 
+        real(wp), intent(IN)    :: rho_sw 
+
         ! Local variables 
         integer :: i, j, nx , ny 
         real(wp) :: H_grnd_now 
@@ -1868,7 +1887,7 @@ end if
 
     end subroutine calc_bmb_total
 
-    subroutine calc_fmb_total(fmb,fmb_shlf,bmb_shlf,H_ice,H_grnd,f_ice,fmb_method,fmb_scale,dx)
+    subroutine calc_fmb_total(fmb,fmb_shlf,bmb_shlf,H_ice,H_grnd,f_ice,fmb_method,fmb_scale,rho_ice,rho_sw,dx)
 
         implicit none 
 
@@ -1880,6 +1899,8 @@ end if
         real(wp), intent(IN)  :: f_ice(:,:)
         integer,  intent(IN)  :: fmb_method 
         real(wp), intent(IN)  :: fmb_scale
+        real(wp), intent(IN)  :: rho_ice
+        real(wp), intent(IN)  :: rho_sw
         real(wp), intent(IN)  :: dx
 
         ! Local variables

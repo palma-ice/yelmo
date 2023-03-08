@@ -55,26 +55,26 @@ module yelmo_defs
     ! being run in the same program. 
 
     ! Physical constants 
-    real(wp)   :: sec_year       ! [s] seconds per year 
-    real(wp)   :: g              ! [m s-2] Gravitational accel.  
-    real(wp)   :: T0             ! [K] Reference freezing temperature  
-    real(wp)   :: rho_ice        ! [kg m-3] Density ice           
-    real(wp)   :: rho_w          ! [kg m-3] Density water          
-    real(wp)   :: rho_sw         ! [kg m-3] Density seawater      
-    real(wp)   :: rho_a          ! [kg m-3] Density asthenosphere  
-    real(wp)   :: rho_rock       ! [kg m-3] Density bedrock (mantle/lithosphere) 
-    real(wp)   :: L_ice          ! [J kg-1] Latent heat           
-    real(wp)   :: T_pmp_beta     ! [K Pa-1] Melt point pressure slope
+    !real(wp)   :: sec_year       ! [s] seconds per year 
+    !real(wp)   :: g              ! [m s-2] Gravitational accel.  
+    !real(wp)   :: T0             ! [K] Reference freezing temperature  
+    !real(wp)   :: rho_ice        ! [kg m-3] Density ice           
+    !real(wp)   :: rho_w          ! [kg m-3] Density water          
+    !real(wp)   :: rho_sw         ! [kg m-3] Density seawater      
+    !real(wp)   :: rho_a          ! [kg m-3] Density asthenosphere  
+    !real(wp)   :: rho_rock       ! [kg m-3] Density bedrock (mantle/lithosphere) 
+    !real(wp)   :: L_ice          ! [J kg-1] Latent heat           
+    !real(wp)   :: T_pmp_beta     ! [K Pa-1] Melt point pressure slope
 
     ! Internal parameters 
-    real(wp)   :: conv_we_ie            ! Conversion water equiv. => m/a ice equiv. 
-    real(wp)   :: conv_mmdwe_maie       ! Conversion mm/d water equiv. => m/a ice equiv.
-    real(wp)   :: conv_mmawe_maie       ! Conversion mm/a water equiv. => m/a ice equiv. 
-    real(wp)   :: conv_m3_Gt            ! Conversion m^3 ice to Gt of ice 
-    real(wp)   :: conv_km3_Gt           ! Conversion km^3 ice to Gt of ice 
-    real(wp)   :: conv_millionkm3_Gt    ! Conversion million km^3 ice to Gt of ice 
-    real(wp)   :: area_seasurf          ! Global present-day sea-surface area
-    real(wp)   :: conv_km3_sle          ! Conversion km^3 ice to m sle
+    ! real(wp)   :: conv_we_ie            ! Conversion water equiv. => m/a ice equiv. 
+    ! real(wp)   :: conv_mmdwe_maie       ! Conversion mm/d water equiv. => m/a ice equiv.
+    ! real(wp)   :: conv_mmawe_maie       ! Conversion mm/a water equiv. => m/a ice equiv. 
+    ! real(wp)   :: conv_m3_Gt            ! Conversion m^3 ice to Gt of ice 
+    ! real(wp)   :: conv_km3_Gt           ! Conversion km^3 ice to Gt of ice 
+    ! real(wp)   :: conv_millionkm3_Gt    ! Conversion million km^3 ice to Gt of ice 
+    ! real(wp)   :: area_seasurf          ! Global present-day sea-surface area
+    ! real(wp)   :: conv_km3_sle          ! Conversion km^3 ice to m sle
 
     ! =========================================================================
     !
@@ -636,8 +636,34 @@ module yelmo_defs
     !
     ! =========================================================================
     
+    type ybound_const_class
+        ! Physical constants 
+        real(wp)   :: sec_year       ! [s] seconds per year 
+        real(wp)   :: g              ! [m s-2] Gravitational accel.  
+        real(wp)   :: T0             ! [K] Reference freezing temperature  
+        real(wp)   :: rho_ice        ! [kg m-3] Density ice           
+        real(wp)   :: rho_w          ! [kg m-3] Density water          
+        real(wp)   :: rho_sw         ! [kg m-3] Density seawater      
+        real(wp)   :: rho_a          ! [kg m-3] Density asthenosphere  
+        real(wp)   :: rho_rock       ! [kg m-3] Density bedrock (mantle/lithosphere) 
+        real(wp)   :: L_ice          ! [J kg-1] Latent heat           
+        real(wp)   :: T_pmp_beta     ! [K Pa-1] Melt point pressure slope
+
+        ! Internal parameters 
+        real(wp)   :: conv_we_ie            ! Conversion water equiv. => m/a ice equiv. 
+        real(wp)   :: conv_mmdwe_maie       ! Conversion mm/d water equiv. => m/a ice equiv.
+        real(wp)   :: conv_mmawe_maie       ! Conversion mm/a water equiv. => m/a ice equiv. 
+        real(wp)   :: conv_m3_Gt            ! Conversion m^3 ice to Gt of ice 
+        real(wp)   :: conv_km3_Gt           ! Conversion km^3 ice to Gt of ice 
+        real(wp)   :: conv_millionkm3_Gt    ! Conversion million km^3 ice to Gt of ice 
+        real(wp)   :: area_seasurf          ! Global present-day sea-surface area
+        real(wp)   :: conv_km3_sle          ! Conversion km^3 ice to m sle
+    end type 
+
     ! ybnd variables (intent IN)
     type ybound_class
+
+        type(ybound_const_class) :: c       ! Physical constants for the domain
 
         ! Region constants
         real(wp)   :: index_north = 1.0   ! Northern Hemisphere region number
@@ -813,6 +839,7 @@ module yelmo_defs
         character (len=256) :: domain
         character (len=256) :: grid_name
         character (len=512) :: grid_path
+        character (len=512) :: phys_const
         character (len=256) :: experiment
         character (len=512) :: restart
 
@@ -996,52 +1023,37 @@ contains
 
         end if 
 
+        write(*,*) "yelmo_global_init:: yelmo_log = ", yelmo_log
+
         ! Load parameter values 
 
         init_pars = .TRUE. 
         
-        call nml_read(filename,"yelmo_constants","sec_year",    sec_year,   init=init_pars)
-        call nml_read(filename,"yelmo_constants","g",           g,          init=init_pars)
-        call nml_read(filename,"yelmo_constants","T0",          T0,         init=init_pars)
+        !call nml_read(filename,"yelmo_constants","sec_year",    sec_year,   init=init_pars)
+        !call nml_read(filename,"yelmo_constants","g",           g,          init=init_pars)
+        !call nml_read(filename,"yelmo_constants","T0",          T0,         init=init_pars)
         
-        call nml_read(filename,"yelmo_constants","rho_ice",     rho_ice,    init=init_pars)
-        call nml_read(filename,"yelmo_constants","rho_w",       rho_w,      init=init_pars)
-        call nml_read(filename,"yelmo_constants","rho_sw",      rho_sw,     init=init_pars)
-        call nml_read(filename,"yelmo_constants","rho_a",       rho_a,      init=init_pars)
-        call nml_read(filename,"yelmo_constants","rho_rock",    rho_rock,   init=init_pars)
-        call nml_read(filename,"yelmo_constants","L_ice",       L_ice,      init=init_pars)
-        call nml_read(filename,"yelmo_constants","T_pmp_beta",  T_pmp_beta, init=init_pars)
+        !call nml_read(filename,"yelmo_constants","rho_ice",     rho_ice,    init=init_pars)
+        !call nml_read(filename,"yelmo_constants","rho_w",       rho_w,      init=init_pars)
+        !call nml_read(filename,"yelmo_constants","rho_sw",      rho_sw,     init=init_pars)
+        !call nml_read(filename,"yelmo_constants","rho_a",       rho_a,      init=init_pars)
+        !call nml_read(filename,"yelmo_constants","rho_rock",    rho_rock,   init=init_pars)
+        !call nml_read(filename,"yelmo_constants","L_ice",       L_ice,      init=init_pars)
+        !call nml_read(filename,"yelmo_constants","T_pmp_beta",  T_pmp_beta, init=init_pars)
         
-        if (yelmo_log) then 
-            write(*,*) "yelmo:: configuration:"
-            write(*,*) "    yelmo_log          = ", yelmo_log
-            
-            write(*,*) "yelmo:: loaded global constants:"
-            write(*,*) "    sec_year   = ", sec_year 
-            write(*,*) "    g          = ", g 
-            write(*,*) "    T0         = ", T0 
-            write(*,*) "    rho_ice    = ", rho_ice 
-            write(*,*) "    rho_w      = ", rho_w 
-            write(*,*) "    rho_sw     = ", rho_sw 
-            write(*,*) "    rho_a      = ", rho_a 
-            write(*,*) "    rho_rock   = ", rho_rock 
-            write(*,*) "    L_ice      = ", L_ice 
-            write(*,*) "    T_pmp_beta = ", T_pmp_beta 
-            
-        end if 
 
         ! Define conversion factors too
 
-        conv_we_ie          = rho_w/rho_ice
-        conv_mmdwe_maie     = 1e-3*365*conv_we_ie
-        conv_mmawe_maie     = 1e-3*conv_we_ie
+        ! conv_we_ie          = rho_w/rho_ice
+        ! conv_mmdwe_maie     = 1e-3*365*conv_we_ie
+        ! conv_mmawe_maie     = 1e-3*conv_we_ie
         
-        conv_m3_Gt          = rho_ice *1e-12            ! [kg/m3] * [Gigaton/1e12kg]
-        conv_km3_Gt         = (1e9) * conv_m3_Gt        ! [1e9m^3/km^3]
-        conv_millionkm3_Gt  = (1e6) * (1e9) *conv_m3_Gt ! [1e6km3/1] * [1e9m^3/km^3] * conv
+        ! conv_m3_Gt          = rho_ice *1e-12            ! [kg/m3] * [Gigaton/1e12kg]
+        ! conv_km3_Gt         = (1e9) * conv_m3_Gt        ! [1e9m^3/km^3]
+        ! conv_millionkm3_Gt  = (1e6) * (1e9) *conv_m3_Gt ! [1e6km3/1] * [1e9m^3/km^3] * conv
         
-        area_seasurf        = 3.618e8                   ! [km^2]
-        conv_km3_sle        = (1e-3) / 394.7            ! [m/mm] / [km^3 to raise ocean by 1mm] => m sle, see https://sealevel.info/conversion_factors.html
+        ! area_seasurf        = 3.618e8                   ! [km^2]
+        ! conv_km3_sle        = (1e-3) / 394.7            ! [m/mm] / [km^3 to raise ocean by 1mm] => m sle, see https://sealevel.info/conversion_factors.html
 
         return
 

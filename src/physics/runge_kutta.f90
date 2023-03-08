@@ -1,6 +1,6 @@
 module runge_kutta
 
-    use yelmo_defs 
+    use yelmo_defs, only : sp, dp, wp, TOL_UNDERFLOW, MISSING_VALUE, rk4_class
     use mass_conservation, only : calc_G_advec_simple
 
     implicit none

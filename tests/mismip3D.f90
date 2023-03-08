@@ -1,7 +1,7 @@
 module mismip3D
 
     use ncio 
-    use yelmo_defs, only : sp, dp, prec, sec_year, T0  
+    use yelmo_defs, only : sp, dp, prec
     
     implicit none 
 
@@ -76,7 +76,7 @@ contains
 
     end subroutine mismip3D_topo_init
 
-    subroutine mismip3D_boundaries(T_srf,smb,ghf,calv_mask,experiment)
+    subroutine mismip3D_boundaries(T_srf,smb,ghf,calv_mask,T0,experiment)
 
         implicit none 
 
@@ -84,6 +84,7 @@ contains
         real(prec), intent(OUT) :: smb(:,:) 
         real(prec), intent(OUT) :: ghf(:,:) 
         logical,    intent(OUT) :: calv_mask(:,:)
+        real(prec), intent(IN)  :: T0 
         character(len=*), intent(IN) :: experiment 
 
         ! Local variables 

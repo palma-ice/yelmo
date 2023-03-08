@@ -26,6 +26,7 @@
     domain          = "slab"
     grid_name       = "slab"
     grid_path       = "none"
+    phys_const      = "TROUGH"
     experiment      = "slab"         ! Infinite boundary conditions 
     restart         = "no"
     restart_z_bed   = False             ! Take z_bed (and z_bed_sd) from restart file

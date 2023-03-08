@@ -9,7 +9,7 @@ module deformation
 
     ! Note: 3D arrays defined such that first index (k=1) == base, and max index (k=nk) == surface 
 
-    use yelmo_defs,  only : sp, dp, wp, prec, TOL_UNDERFLOW, T0, rho_ice, g, &
+    use yelmo_defs,  only : sp, dp, wp, prec, TOL_UNDERFLOW, &
                         jacobian_3D_class, strain_2D_class, strain_3D_class, stress_2D_class, stress_3D_class
     use yelmo_tools, only : get_neighbor_indices, &
                     calc_vertical_integrated_2D, integrate_trapezoid1D_1D, integrate_trapezoid1D_pt, &
@@ -379,7 +379,7 @@ contains
 
     end subroutine calc_visc_int
 
-    elemental function calc_rate_factor(T_ice,T_pmp,enh) result(ATT)
+    elemental function calc_rate_factor(T_ice,T_pmp,enh,T0) result(ATT)
         ! Greve and Blatter (2009): Chapter 4, page 54 
         ! Note: only valid for a Glen's flow law exponent n=3
 
@@ -388,6 +388,7 @@ contains
         real(prec), intent(IN) :: T_ice     ! [K]  Ice temperature
         real(prec), intent(IN) :: T_pmp     ! [K]  Pressure-corrected melting point
         real(prec), intent(IN) :: enh       !  [--] Enhancement factor 
+        real(prec), intent(IN) :: T0 
         real(prec) :: ATT                   ! [a^-1 Pa^-3]
 
         ! Local variables
@@ -416,7 +417,7 @@ contains
 
     end function calc_rate_factor
     
-    elemental function calc_rate_factor_eismint(T_ice,T_pmp,enh) result(ATT)
+    elemental function calc_rate_factor_eismint(T_ice,T_pmp,enh,T0) result(ATT)
         ! Greve and Blatter (2009): Chapter 4, page 54 
         ! Note: only valid for a Glen's flow law exponent n=3
 
@@ -425,6 +426,7 @@ contains
         real(prec), intent(IN) :: T_ice     ! [K]  Ice temperature
         real(prec), intent(IN) :: T_pmp     ! [K]  Pressure-corrected melting point
         real(prec), intent(IN) :: enh       ! [--] Enhancement factor 
+        real(prec), intent(IN) :: T0 
         real(prec) :: ATT                   ! [a^-1 Pa^-3]
 
         ! Local variables

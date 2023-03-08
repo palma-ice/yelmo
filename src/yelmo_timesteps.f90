@@ -163,7 +163,7 @@ contains
     end subroutine set_pc_beta_coefficients
 
 
-    subroutine set_pc_mask(mask,pc_tau,H_ice_pred,H_ice_corr,z_bed,z_sl,margin_flt_subgrid)
+    subroutine set_pc_mask(mask,pc_tau,H_ice_pred,H_ice_corr,z_bed,z_sl,rho_ice,rho_sw,margin_flt_subgrid)
 
         implicit none 
 
@@ -173,7 +173,9 @@ contains
         real(wp), intent(IN) :: H_ice_corr(:,:) 
         real(wp), intent(IN) :: z_bed(:,:) 
         real(wp), intent(IN) :: z_sl(:,:) 
-        logical,    intent(IN) :: margin_flt_subgrid 
+        real(wp), intent(IN) :: rho_ice
+        real(wp), intent(IN) :: rho_sw
+        logical,  intent(IN) :: margin_flt_subgrid 
 
         ! Local variables 
         integer :: i, j, nx, ny 
@@ -195,12 +197,12 @@ contains
         allocate(H_grnd_corr(nx,ny))
         
         ! Get the ice area fraction mask for each ice thickness map 
-        call calc_ice_fraction(f_ice_pred,H_ice_pred,z_bed,z_sl,margin_flt_subgrid)
-        call calc_ice_fraction(f_ice_corr,H_ice_corr,z_bed,z_sl,margin_flt_subgrid)
+        call calc_ice_fraction(f_ice_pred,H_ice_pred,z_bed,z_sl,rho_ice,rho_sw,margin_flt_subgrid)
+        call calc_ice_fraction(f_ice_corr,H_ice_corr,z_bed,z_sl,rho_ice,rho_sw,margin_flt_subgrid)
 
         ! Get the grounded ice distance to flotation 
-        call calc_H_grnd(H_grnd_pred,H_ice_pred,f_ice_pred,z_bed,z_sl)
-        call calc_H_grnd(H_grnd_corr,H_ice_corr,f_ice_corr,z_bed,z_sl)
+        call calc_H_grnd(H_grnd_pred,H_ice_pred,f_ice_pred,z_bed,z_sl,rho_ice,rho_sw)
+        call calc_H_grnd(H_grnd_corr,H_ice_corr,f_ice_corr,z_bed,z_sl,rho_ice,rho_sw)
 
         ! Initially set all points to True 
         mask = .TRUE. 
@@ -510,7 +512,7 @@ end if
         return 
 
     end subroutine set_adaptive_timestep_pc
-    
+
     function calc_pi_rho_pi42(eta_n,eta_nm1,rho_nm1,eps,k_i,k_p,alpha_2) result(rho_n)
 
         implicit none 

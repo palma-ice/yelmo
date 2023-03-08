@@ -1,6 +1,6 @@
 module velocity_diva
 
-    use yelmo_defs, only  : sp, dp, prec, wp, pi, rho_ice, rho_sw, rho_w, g, TOL_UNDERFLOW
+    use yelmo_defs, only  : sp, dp, prec, wp, pi, TOL_UNDERFLOW
     use yelmo_tools, only : get_neighbor_indices, acx_to_nodes, acy_to_nodes, aa_to_nodes, &
                     acx_to_nodes_3D, acy_to_nodes_3D, aa_to_nodes_3D, &
                     integrate_trapezoid1D_1D, integrate_trapezoid1D_pt, minmax
@@ -41,6 +41,10 @@ module velocity_diva
         real(wp) :: ssa_iter_rel 
         real(wp) :: ssa_iter_conv 
         logical  :: ssa_write_log 
+
+        real(wp) :: rho_ice 
+        real(wp) :: rho_sw 
+        real(wp) :: g 
 
         real(wp) :: glf_Q0                  ! Q0=0.61_wp
         real(wp) :: glf_f_drag              ! f_drag=0.6_wp
@@ -244,7 +248,7 @@ contains
             ! Calculate beta (at the ice base)
             call calc_beta(beta,c_bed,ux_b,uy_b,H_ice,f_ice,H_grnd,f_grnd,z_bed,z_sl,par%beta_method, &
                                 par%beta_const,par%beta_q,par%beta_u0,par%beta_gl_scale,par%beta_gl_f, &
-                                par%H_grnd_lim,par%beta_min,par%boundaries)
+                                par%H_grnd_lim,par%beta_min,par%rho_ice,par%rho_sw,par%boundaries)
 
             ! Calculate F-integeral (F2) on aa-nodes 
             call calc_F_integral(F2,visc_eff,H_ice,f_ice,zeta_aa,n=2.0_wp)

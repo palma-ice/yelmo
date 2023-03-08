@@ -1,6 +1,6 @@
 module solver_ssa_ac
 
-    use yelmo_defs, only : sp, dp, wp, io_unit_err, TOL_UNDERFLOW, rho_ice, rho_sw, g 
+    use yelmo_defs, only : sp, dp, wp, io_unit_err, TOL_UNDERFLOW
     use yelmo_tools, only : get_neighbor_indices
 
     use solver_linear

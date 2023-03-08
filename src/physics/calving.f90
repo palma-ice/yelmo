@@ -1,7 +1,7 @@
 module calving
     ! Definitions for various calving laws 
 
-    use yelmo_defs, only : sp, dp, wp, prec, TOL_UNDERFLOW, rho_ice, rho_sw, g
+    use yelmo_defs, only : sp, dp, wp, prec, TOL_UNDERFLOW
     use yelmo_tools, only : get_neighbor_indices
     use topography, only : calc_H_eff 
 
@@ -1143,7 +1143,7 @@ end if
 !
 ! ===================================================================
 
-    subroutine calc_calving_ground_rate_stress_b12(calv,H_ice,f_ice,f_grnd,z_bed,H_ocn,tau,boundaries)
+    subroutine calc_calving_ground_rate_stress_b12(calv,H_ice,f_ice,f_grnd,z_bed,H_ocn,tau,rho_ice,rho_sw,g,boundaries)
         ! Remove marginal ice that exceeds a stress threshold following
         ! Bassis and Walker (2012), Eq. 2.12 
 
@@ -1156,6 +1156,9 @@ end if
         real(wp), intent(IN)  :: z_bed(:,:)             ! [m] Bedrock elevation 
         real(wp), intent(IN)  :: H_ocn(:,:)             ! [m] Ocean thickness (depth)
         real(wp), intent(IN)  :: tau                    ! [yr] Calving timescale 
+        real(wp), intent(IN)  :: rho_ice 
+        real(wp), intent(IN)  :: rho_sw
+        real(wp), intent(IN)  :: g
         character(len=*), intent(IN) :: boundaries 
 
         ! Local variables 

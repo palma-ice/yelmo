@@ -163,12 +163,12 @@ contains
 
     end subroutine ydata_compare
 
-    subroutine ydata_load(dta,ice_allowed,par_path)
+    subroutine ydata_load(dta,bnd,par_path)
 
         implicit none 
 
         type(ydata_class),  intent(INOUT) :: dta 
-        logical,            intent(IN)    :: ice_allowed(:,:)  
+        type(ybound_class), intent(IN)    :: bnd 
         character(len=*),   intent(IN)    :: par_path 
 
         ! Local variables 
@@ -230,7 +230,8 @@ contains
             ! Remove englacial lakes for better comparison with model
             ! Assume sea level is present day level of 0.
             call remove_englacial_lakes(dta%pd%H_ice,dta%pd%z_bed, &
-                                        dta%pd%z_srf,z_sl=dta%pd%z_srf*0.0_wp)
+                                        dta%pd%z_srf,dta%pd%z_srf*0.0_wp, &
+                                        bnd%c%rho_ice,bnd%c%rho_sw)
 
             write(*,*) "ydata_load:: removed englacial lakes from PD reference ice thickness."
 
@@ -238,14 +239,14 @@ contains
             where(dta%pd%H_ice  .lt. 1.0) dta%pd%H_ice = 0.0 
 
             ! Artificially delete ice from locations that are not allowed
-            where (.not. ice_allowed) 
+            where (.not. bnd%ice_allowed) 
                 dta%pd%H_ice = 0.0 
                 dta%pd%z_srf = max(dta%pd%z_bed,0.0)
             end where 
             
             ! Calculate H_grnd (ice thickness overburden)
             ! (extracted from `calc_H_grnd` in topography)
-            dta%pd%H_grnd = dta%pd%H_ice - (rho_sw/rho_ice)*max(z_sl_pd-dta%pd%z_bed,0.0_wp)
+            dta%pd%H_grnd = dta%pd%H_ice - (bnd%c%rho_sw/bnd%c%rho_ice)*max(z_sl_pd-dta%pd%z_bed,0.0_wp)
 
         end if 
 
@@ -287,13 +288,13 @@ contains
                 dta%pd%smb = sum(tmp,dim=3) / 12.0
 
                 ! Convert from mm we / day to m ie / a 
-                dta%pd%smb = dta%pd%smb * conv_mmdwe_maie
+                dta%pd%smb = dta%pd%smb * bnd%c%conv_mmdwe_maie
 
             else 
                 call nc_read(filename,nms(1), dta%pd%smb, missing_value=mv)
 
                 ! Convert from mm we / a to m ie / a 
-                dta%pd%smb = dta%pd%smb * conv_mmawe_maie
+                dta%pd%smb = dta%pd%smb * bnd%c%conv_mmawe_maie
 
             end if 
 

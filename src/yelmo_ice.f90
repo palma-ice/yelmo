@@ -310,8 +310,8 @@ else
 end if 
 
                 ! Calculate eta for this timestep 
-                call set_pc_mask(pc_mask,dom%time%pc_tau,dom%tpo%now%H_ice_pred,dom%tpo%now%H_ice_corr, &
-                                                    dom%bnd%z_bed,dom%bnd%z_sl,dom%tpo%par%margin_flt_subgrid)
+                call set_pc_mask(pc_mask,dom%time%pc_tau,dom%tpo%now%H_ice_pred,dom%tpo%now%H_ice_corr,dom%bnd%z_bed, &
+                                dom%bnd%z_sl,dom%bnd%c%rho_ice,dom%bnd%c%rho_sw,dom%tpo%par%margin_flt_subgrid)
                 eta_now = calc_pc_eta(dom%time%pc_tau,mask=pc_mask)
 
                 ! Save masked pc_tau for output too 
@@ -428,7 +428,7 @@ end if
             
             ! Extra diagnostic field, not necessary for normal runs
             call yelmo_calc_running_stats_2D(dom%time%pc_tau_max,dom%time%pc_taus,dom%time%pc_tau_masked,stat="max")
-            
+
             if (dom%par%log_timestep) then 
                 ! Write timestep file if desired
 
@@ -612,6 +612,9 @@ end if
         ! Load the default yelmo parameters, then the domain specific parameters
         call yelmo_par_load(dom%par,filename,domain,grid_name)
         
+        ! Define physical constants
+        call ybound_define_physical_constants(dom%bnd%c,dom%par%phys_const,domain,grid_name)
+
         ! Define the grid for the current domain 
         select case(grid_def)
 
@@ -772,7 +775,7 @@ end if
         call ydata_alloc(dom%dta%pd,dom%grd%nx,dom%grd%ny,dom%par%nz_aa,dom%dta%par%pd_age_n_iso)
 
         ! Load data objects   
-        call ydata_load(dom%dta,dom%bnd%ice_allowed,filename)
+        call ydata_load(dom%dta,dom%bnd,filename)
 
         ! Set H_ice_ref and z_bed_ref to present-day ice thickness by default 
         dom%bnd%H_ice_ref = dom%dta%pd%H_ice 
@@ -900,7 +903,7 @@ end if
                 ! Note: this routine uses z_sl, that is likely still set to zero
                 ! here. This routine is mainly for fixing present-day datasets,
                 ! so this is probably ok.
-                call remove_englacial_lakes(H_ice,z_bed,z_srf,dom%bnd%z_sl)
+                call remove_englacial_lakes(H_ice,z_bed,z_srf,dom%bnd%z_sl,dom%bnd%c%rho_ice,dom%bnd%c%rho_sw)
 
                 write(*,*) "yelmo_init_topo:: removed englacial lakes."
 
@@ -935,7 +938,7 @@ end if
                 case(2)
                     ! Remove ice, set bedrock to isostatically rebounded state 
 
-                    z_bed = z_bed + (rho_ice/rho_a)*H_ice
+                    z_bed = z_bed + (dom%bnd%c%rho_ice/dom%bnd%c%rho_a)*H_ice
                     H_ice = 0.0_wp
 
                 case DEFAULT 
@@ -1300,6 +1303,7 @@ end if
         call nml_read(filename,"yelmo","domain",        par%domain)
         call nml_read(filename,"yelmo","grid_name",     par%grid_name)
         call nml_read(filename,"yelmo","grid_path",     par%grid_path)
+        call nml_read(filename,"yelmo","phys_const",    par%phys_const)
         call nml_read(filename,"yelmo","experiment",    par%experiment)
         call nml_read(filename,"yelmo","restart",       par%restart)
         call nml_read(filename,"yelmo","restart_z_bed", par%restart_z_bed)

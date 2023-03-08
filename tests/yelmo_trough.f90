@@ -110,10 +110,10 @@ program yelmo_trough
 
     yelmo1%bnd%z_sl     = 0.0
     yelmo1%bnd%bmb_shlf = 0.0 
-    yelmo1%bnd%T_shlf   = T0  
+    yelmo1%bnd%T_shlf   = yelmo1%bnd%c%T0  
     yelmo1%bnd%H_sed    = 0.0 
 
-    yelmo1%bnd%T_srf    = T0 + Tsrf_const   ! [K] 
+    yelmo1%bnd%T_srf    = yelmo1%bnd%c%T0 + Tsrf_const   ! [K] 
     yelmo1%bnd%smb      = smb_const         ! [m/yr]
     yelmo1%bnd%Q_geo    = Qgeo_const        ! [mW/m2] 
 
@@ -174,7 +174,7 @@ program yelmo_trough
             
             call SSA_Schoof2006_analytical_solution_yelmo(ux_ref, tau_c_ref, yelmo1%grd%y, &
                                     s06_alpha,s06_H0,yelmo1%mat%par%rf_const,s06_W,s06_m, &
-                                    yelmo1%mat%par%n_glen,rho_ice, g)
+                                    yelmo1%mat%par%n_glen,yelmo1%bnd%c%rho_ice, yelmo1%bnd%c%g)
             
             ! Assign analytical values (tau_c as a boundary condition, ux as initial condition)
             yelmo1%dyn%now%cb_ref = tau_c_ref
@@ -195,8 +195,8 @@ program yelmo_trough
             write(*,*) "SLAB-S06: W           = ", s06_W 
             write(*,*) "SLAB-S06: L           = ", L 
             write(*,*) "SLAB-S06: m           = ", s06_m 
-            write(*,*) "SLAB-S06: rho g       = ", rho_ice, g
-            write(*,*) "SLAB-S06: f           = ", (rho_ice*g*s06_H0)*s06_alpha
+            write(*,*) "SLAB-S06: rho g       = ", yelmo1%bnd%c%rho_ice, yelmo1%bnd%c%g
+            write(*,*) "SLAB-S06: f           = ", (yelmo1%bnd%c%rho_ice*yelmo1%bnd%c%g*s06_H0)*s06_alpha
             write(*,*) "SLAB-S06: ATT         = ", yelmo1%mat%par%rf_const
             write(*,*) "SLAB-S06: cb_ref      = ", yelmo1%dyn%now%cb_ref(1,1)
             write(*,*) "SLAB-S06: tau_c_ref   = ", tau_c_ref(1,1)
@@ -581,9 +581,9 @@ contains
         
         call nc_write(filename,"Q_ice_b",ylmo%thrm%now%Q_ice_b,units="mW m-2",long_name="Basal ice heat flux", &
                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-        call nc_write(filename,"Q_strn",ylmo%thrm%now%Q_strn/(rho_ice*ylmo%thrm%now%cp),units="K a-1",long_name="Strain heating", &
+        call nc_write(filename,"Q_strn",ylmo%thrm%now%Q_strn/(ylmo%bnd%c%rho_ice*ylmo%thrm%now%cp),units="K a-1",long_name="Strain heating", &
                       dim1="xc",dim2="yc",dim3="zeta",dim4="time",start=[1,1,1,n],ncid=ncid)
-        call nc_write(filename,"dQsdt",ylmo%thrm%now%dQsdt/(rho_ice*ylmo%thrm%now%cp),units="K a-2",long_name="Strain heating", &
+        call nc_write(filename,"dQsdt",ylmo%thrm%now%dQsdt/(ylmo%bnd%c%rho_ice*ylmo%thrm%now%cp),units="K a-2",long_name="Strain heating", &
                       dim1="xc",dim2="yc",dim3="zeta",dim4="time",start=[1,1,1,n],ncid=ncid)
 
         call nc_write(filename,"Q_b",ylmo%thrm%now%Q_b,units="mW m-2",long_name="Basal frictional heating", &

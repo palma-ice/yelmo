@@ -10,8 +10,7 @@ module basal_dragging
     ! particularly at the grounding line, beta should be defined
     ! directly on the ac nodes (acx,acy). 
     
-    use yelmo_defs, only : sp, dp, wp, prec, pi, g, rho_sw, rho_ice, rho_w, &
-                           TOL_UNDERFLOW, io_unit_err, degrees_to_radians
+    use yelmo_defs, only : sp, dp, wp, prec, pi, TOL_UNDERFLOW, io_unit_err, degrees_to_radians
 
     use yelmo_tools, only : get_neighbor_indices, stagger_aa_acx, stagger_aa_acy, &
                     acx_to_nodes, acy_to_nodes, aa_to_nodes, &
@@ -255,7 +254,8 @@ contains
     end subroutine calc_c_bed
 
     subroutine calc_beta(beta,c_bed,ux_b,uy_b,H_ice,f_ice,H_grnd,f_grnd,z_bed,z_sl,beta_method, &
-                         beta_const,beta_q,beta_u0,beta_gl_scale,beta_gl_f,H_grnd_lim,beta_min,boundaries)
+                         beta_const,beta_q,beta_u0,beta_gl_scale,beta_gl_f,H_grnd_lim, &
+                         beta_min,rho_ice,rho_sw,boundaries)
 
         ! Update beta based on parameter choices
 
@@ -279,6 +279,8 @@ contains
         real(wp), intent(IN)    :: beta_gl_f
         real(wp), intent(IN)    :: H_grnd_lim
         real(wp), intent(IN)    :: beta_min 
+        real(wp), intent(IN)    :: rho_ice 
+        real(wp), intent(IN)    :: rho_sw 
         character(len=*), intent(IN) :: boundaries 
 
         ! Local variables 
@@ -356,7 +358,7 @@ contains
                 ! norm==.TRUE., so that zstar-scaling is bounded between 0 and 1, and thus won't affect 
                 ! choice of c_bed value that is independent of this scaling. 
                 
-                call scale_beta_gl_zstar(beta,H_ice,f_ice,z_bed,z_sl,norm=.TRUE.)
+                call scale_beta_gl_zstar(beta,H_ice,f_ice,z_bed,z_sl,rho_ice,rho_sw,norm=.TRUE.)
 
             case(3)
                 ! Apply f_grnd scaling on aa-nodes 
@@ -539,7 +541,7 @@ contains
 
     end subroutine stagger_beta
 
-    elemental function calc_effective_pressure_overburden(H_ice,f_ice,f_grnd) result(N_eff)
+    elemental function calc_effective_pressure_overburden(H_ice,f_ice,f_grnd,rho_ice,g) result(N_eff)
         ! Effective pressure as overburden pressure N_eff = rho*g*H_ice 
 
         implicit none 
@@ -547,6 +549,8 @@ contains
         real(wp), intent(IN) :: H_ice 
         real(wp), intent(IN) :: f_ice
         real(wp), intent(IN) :: f_grnd 
+        real(wp), intent(IN) :: rho_ice 
+        real(wp), intent(IN) :: g
         real(wp) :: N_eff                 ! [Pa]
 
         ! Local variables 
@@ -569,7 +573,7 @@ contains
 
     end function calc_effective_pressure_overburden
 
-    elemental function calc_effective_pressure_marine(H_ice,f_ice,z_bed,z_sl,H_w,p) result(N_eff)
+    elemental function calc_effective_pressure_marine(H_ice,f_ice,z_bed,z_sl,H_w,p,rho_ice,rho_sw,g) result(N_eff)
         ! Effective pressure as a function of connectivity to the ocean
         ! as defined by Leguy et al. (2014), Eq. 14, and modified
         ! by Robinson and Alvarez-Solas to account for basal water pressure (to do!)
@@ -585,6 +589,10 @@ contains
         real(wp), intent(IN) :: z_sl 
         real(wp), intent(IN) :: H_w 
         real(wp), intent(IN) :: p       ! [0:1], 0: no ocean connectivity, 1: full ocean connectivity
+        real(wp), intent(IN) :: rho_ice 
+        real(wp), intent(IN) :: rho_sw
+        real(wp), intent(IN) :: g
+        
         real(wp) :: N_eff               ! [Pa]
 
         ! Local variables 
@@ -631,7 +639,7 @@ contains
 
     end function calc_effective_pressure_marine
 
-    subroutine calc_effective_pressure_till(N_eff,H_w,H_ice,f_ice,f_grnd,H_w_max,N0,delta,e0,Cc)
+    subroutine calc_effective_pressure_till(N_eff,H_w,H_ice,f_ice,f_grnd,H_w_max,N0,delta,e0,Cc,rho_ice,g)
         ! Calculate the effective pressure of the till
         ! following van Pelt and Bueler (2015), Eq. 23.
         
@@ -647,6 +655,8 @@ contains
         real(wp), intent(IN)  :: delta              ! [--] Fraction of overburden pressure for saturated till
         real(wp), intent(IN)  :: e0                 ! [--] Reference void ratio at N0 
         real(wp), intent(IN)  :: Cc                 ! [--] Till compressibility 
+        real(wp), intent(IN) :: rho_ice 
+        real(wp), intent(IN) :: g
         
         ! Local variables
         integer :: i, j, nx, ny  
@@ -698,7 +708,7 @@ contains
 
     end subroutine calc_effective_pressure_till
     
-    subroutine calc_effective_pressure_two_value(N_eff,f_pmp,H_ice,f_ice,f_grnd,delta)
+    subroutine calc_effective_pressure_two_value(N_eff,f_pmp,H_ice,f_ice,f_grnd,delta,rho_ice,g)
 
         implicit none 
 
@@ -708,6 +718,8 @@ contains
         real(wp), intent(IN)  :: f_ice(:,:) 
         real(wp), intent(IN)  :: f_grnd(:,:) 
         real(wp), intent(IN)  :: delta
+        real(wp), intent(IN) :: rho_ice 
+        real(wp), intent(IN) :: g
         
         ! Local variables
         integer :: i, j, nx, ny  
@@ -1129,7 +1141,7 @@ contains
         
     end subroutine scale_beta_gl_Hgrnd
     
-    subroutine scale_beta_gl_zstar(beta,H_ice,f_ice,z_bed,z_sl,norm)
+    subroutine scale_beta_gl_zstar(beta,H_ice,f_ice,z_bed,z_sl,rho_ice,rho_sw,norm)
         ! Calculate scalar between 0 and 1 to modify basal friction coefficient
         ! as ice approaches and achieves floatation, and apply.
         ! Following "Zstar" approach of Gladstone et al. (2017) 
@@ -1141,8 +1153,10 @@ contains
         real(wp), intent(IN)    :: f_ice(:,:)       ! aa-nodes
         real(wp), intent(IN)    :: z_bed(:,:)       ! aa-nodes        
         real(wp), intent(IN)    :: z_sl(:,:)        ! aa-nodes        
+        real(wp), intent(IN)    :: rho_ice 
+        real(wp), intent(IN)    :: rho_sw
         logical,  intent(IN)    :: norm             ! Normalize by H_ice? 
-
+        
         ! Local variables
         integer    :: i, j, nx, ny
         real(wp) :: rho_sw_ice 

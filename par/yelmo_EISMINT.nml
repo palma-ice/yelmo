@@ -28,6 +28,7 @@
     domain          = "EISMINT"
     grid_name       = "EISMINT"
     grid_path       = "none"
+    phys_const      = "EISMINT"
     experiment      = "EISMINT"         ! "None", "EISMINT", "MISMIP3D", "BUELER"  to apply special boundary conditions   
     restart         = "no"
     restart_z_bed   = False             ! Take z_bed (and z_bed_sd) from restart file

@@ -33,21 +33,6 @@
     "links" : 
         ["input","ice_data","maps"],
 
-    "const_paths" : 
-        {   "EISMINT"  : "par/yelmo_const_EISMINT.nml",
-            "HALFAR"   : "par/yelmo_const_EISMINT.nml",
-            "dome"     : "par/yelmo_const_EISMINT.nml",
-            "MISMIP3D" : "par/yelmo_const_MISMIP3D.nml",
-            "TROUGH"   : "par/yelmo_const_TROUGH.nml",
-            "SLAB-S06" : "par/yelmo_const_TROUGH.nml",
-            "SLAB-SHELF" : "par/yelmo_const_TROUGH.nml",
-            "MISMIP+"  : "par/yelmo_const_TROUGH.nml",
-            "ISMIPHOM" : "par/yelmo_const_EISMINT.nml", 
-            "slab"     : "par/yelmo_const_EISMINT.nml" 
-        },
-
-    "const_path_default" : "par/yelmo_const_Earth.nml",
-    
     "job_queues" :
         {   "priority" :
             {   "wall" : 24  },

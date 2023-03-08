@@ -210,17 +210,8 @@ def main():
         profiler_prefix = ""
 
     ### Yelmo-specific ###
-    # Get path of constants parameter file based on parameter name
-    # First set const_path to default, then see if it should be overwritten 
-    const_path = info["const_path_default"]
-    for key, value in info["const_paths"].items():
-        if key in par_fname: 
-            const_path = value 
 
     # Make sure input files exist 
-    if not os.path.isfile(const_path):
-        print("Input file does not exist: {}".format(const_path))
-        sys.exit() 
 
     if not os.path.isfile(par_path):
         print("Input file does not exist: {}".format(par_path))
@@ -262,10 +253,7 @@ def main():
 
     # Copy exe file to rundir (even if running from cwd)
     shutil.copy(exe_path,rundir)
-
-    # Yelmo-specific: copy the constants parameter file
-    shutil.copy(const_path,rundir)
-
+    
     ### PARAMETER FILES ###
 
     # Get list of parameter files to manage

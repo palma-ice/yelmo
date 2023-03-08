@@ -1,7 +1,3 @@
-&yelmo_config 
-    yelmo_log  = True
-/
-
 &yelmo_constants 
     sec_year   = 31536000.0     ! [s/a]  365*24*3600
     g          = 9.81           ! [m/s^2] Gravitational accel.

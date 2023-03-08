@@ -43,15 +43,16 @@ module yelmo_defs
     
     integer, parameter :: io_unit_err = error_unit 
 
+    ! Yelmo configuration options 
+    logical, parameter :: yelmo_log = .TRUE.
+     
+    logical :: yelmo_use_omp                    ! Will be set when program is running
+
     ! The constants below should be loaded using the global subroutine
     ! defined below `yelmo_constants_load`.
     ! Note: The key limitation imposed by defining the parameters defined 
     ! globally is that these constants must be the same for all domains 
     ! being run in the same program. 
-
-    ! Yelmo configuration options 
-    logical :: yelmo_log
-    logical :: yelmo_use_omp 
 
     ! Physical constants 
     real(wp)   :: sec_year       ! [s] seconds per year 
@@ -999,8 +1000,6 @@ contains
 
         init_pars = .TRUE. 
         
-        call nml_read(filename,"yelmo_config","yelmo_log",yelmo_log,init=init_pars)
-
         call nml_read(filename,"yelmo_constants","sec_year",    sec_year,   init=init_pars)
         call nml_read(filename,"yelmo_constants","g",           g,          init=init_pars)
         call nml_read(filename,"yelmo_constants","T0",          T0,         init=init_pars)

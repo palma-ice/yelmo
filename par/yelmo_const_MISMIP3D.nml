@@ -1,7 +1,3 @@
-&yelmo_config 
-    yelmo_log  = True 
-/
-
 &yelmo_constants 
     sec_year   = 31556926.0     ! [s/a] EISMINT value
     g          = 9.81           ! [m s-2] Gravitational accel.

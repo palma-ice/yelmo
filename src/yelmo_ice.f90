@@ -10,7 +10,7 @@ module yelmo_ice
     use yelmo_timesteps, only : ytime_init, set_pc_beta_coefficients, set_adaptive_timestep, set_adaptive_timestep_pc,   &
                                 set_pc_mask, calc_pc_eta, calc_pc_tau_fe_sbe,calc_pc_tau_ab_sam, calc_pc_tau_heun,  &
                                 limit_adaptive_timestep, yelmo_timestep_write_init, yelmo_timestep_write, calc_adv3D_timestep1
-    use yelmo_tools, only : smooth_gauss_2D
+    use yelmo_tools, only : get_neighbor_indices, calc_gradient_acx, calc_gradient_acy, smooth_gauss_2D
     use yelmo_io 
 
     use yelmo_topography
@@ -837,6 +837,12 @@ end if
         real(wp), allocatable :: dzb(:,:)
         real(wp), allocatable :: dzb_restart(:,:)
         
+        integer :: i, j, q, n_iter_grad
+        integer :: im1, ip1, jm1, jp1 
+        real(wp) :: grad_lim 
+        logical, allocatable :: mask_apply(:,:) 
+        logical, allocatable :: mask_use(:,:) 
+
         ! Local copies of tpo and bnd
         type(ytopo_class)  :: tpo_restart 
         type(ybound_class) :: bnd_restart 
@@ -922,6 +928,62 @@ end if
             if (smooth_z_bed .ge. 1.0_wp) then 
                 call smooth_gauss_2D(z_bed,dx=dom%grd%dx,f_sigma=smooth_z_bed)
             end if 
+
+
+if (.TRUE.) then
+            ! Further smooth z_bed in specific locations if gradients are exceeded.
+
+            !grad_lim = 0.05
+            grad_lim = dom%tpo%par%grad_lim 
+            n_iter_grad = 50
+
+            allocate(mask_apply(dom%grd%nx,dom%grd%ny))
+            allocate(mask_use(dom%grd%nx,dom%grd%ny))
+            
+            mask_use = .TRUE. 
+
+            do q = 1, n_iter_grad
+
+                ! Calculate bedrock gradients (use available fields in tpo object for now; f_ice and grad_lim are not used)
+                dom%tpo%now%f_ice = 1.0 
+                call calc_gradient_acx(dom%tpo%now%dzbdx,z_bed,dom%tpo%now%f_ice,dom%tpo%par%dx,100.0_wp, &
+                                            margin2nd=.FALSE.,zero_outside=.FALSE.,boundaries=dom%tpo%par%boundaries)
+                call calc_gradient_acy(dom%tpo%now%dzbdy,z_bed,dom%tpo%now%f_ice,dom%tpo%par%dy,100.0_wp, &
+                                            margin2nd=.FALSE.,zero_outside=.FALSE.,boundaries=dom%tpo%par%boundaries)
+
+                ! Determine where gradients are too large
+                mask_apply = .FALSE.
+                do j = 3, dom%grd%ny-3
+                do i = 3, dom%grd%nx-3
+                    
+                    ! Get neighbor indices
+                    call get_neighbor_indices(im1,ip1,jm1,jp1,i,j,dom%grd%nx,dom%grd%ny,dom%tpo%par%boundaries)
+
+                    if (abs(dom%tpo%now%dzbdx(i,j)) .ge. grad_lim) then 
+                        mask_apply(i,j)   = .TRUE. 
+                        mask_apply(ip1,j) = .TRUE. 
+                    end if
+
+                    if (abs(dom%tpo%now%dzbdy(i,j)) .ge. grad_lim) then 
+                        mask_apply(i,j)   = .TRUE. 
+                        mask_apply(i,jp1) = .TRUE. 
+                    end if
+                end do 
+                end do 
+
+                write(*,*) "z_bed smoothing: ", q, count(mask_apply),  &
+                        maxval(abs(dom%tpo%now%dzbdx(3:dom%grd%nx-3,3:dom%grd%ny-3))), &
+                        maxval(abs(dom%tpo%now%dzbdy(3:dom%grd%nx-3,3:dom%grd%ny-3)))
+
+                if (count(mask_apply) .eq. 0) exit 
+
+                ! Smooth z_bed at desired locations, and H_ice so that H_ice avoids spurious patterns
+                call smooth_gauss_2D(z_bed,dx=dom%grd%dx,f_sigma=2.0,mask_apply=mask_apply,mask_use=mask_use)
+                call smooth_gauss_2D(H_ice,dx=dom%grd%dx,f_sigma=2.0,mask_apply=mask_apply,mask_use=mask_use)
+                
+            end do
+
+end if
 
             ! Additionally modify initial topographic state 
             select case(init_topo_state)
@@ -1086,6 +1148,11 @@ end if
         write(*,*) "yelmo_init_topo:: range(H_ice):     ", minval(dom%tpo%now%H_ice), maxval(dom%tpo%now%H_ice) 
         write(*,*) "yelmo_init_topo:: scaling fac z_bed_f_sd: ", z_bed_f_sd  
         
+        ! ajr: diagnostics!!
+        !call yelmo_restart_write(dom,"./yelmo_check_z_bed.nc",time=0.0_wp,init=.TRUE.)
+        !stop 
+
+
         return 
 
     end subroutine yelmo_init_topo

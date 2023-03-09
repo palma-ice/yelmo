@@ -4015,15 +4015,15 @@ end if
         ! Get smoothing radius as standard devation of Gaussian function
         sigma = dx*f_sigma 
 
-        ! Determine half-width of filter as 2-sigma
-        n2 = 2*ceiling(f_sigma)
+        ! Determine half-width of filter as 3-sigma
+        n2 = 3*ceiling(f_sigma)
 
         ! Get total number of points for filter window in each direction
         n = 2*n2+1
         
-        allocate(var_old(nx,ny))
-        allocate(mask_apply_local(nx,ny))
-        allocate(mask_use_local(nx,ny))
+        allocate(var_old(nx+2*n2,ny+2*n2))
+        allocate(mask_apply_local(nx+2*n2,ny+2*n2))
+        allocate(mask_use_local(nx+2*n2,ny+2*n2))
         allocate(filter0(n,n))
         allocate(filter(n,n))
 
@@ -4031,12 +4031,14 @@ end if
         if (present(mask_apply)) then 
             ! use mask_use to define neighborhood points
             
-            mask_apply_local = mask_apply 
+            mask_apply_local = .FALSE. 
+            mask_apply_local(n2+1:n2+nx,n2+1:n2+ny) = mask_apply 
 
         else
             ! Assume that everywhere should be smoothed
 
-            mask_apply_local = .TRUE.
+            mask_apply_local = .FALSE. 
+            mask_apply_local(n2+1:n2+nx,n2+1:n2+ny) = .TRUE.
         
         end if
 
@@ -4044,7 +4046,8 @@ end if
         if (present(mask_use)) then 
             ! use mask_use to define neighborhood points
             
-            mask_use_local = mask_use 
+            mask_use_local = .TRUE.
+            mask_use_local(n2+1:n2+nx,n2+1:n2+ny) = mask_use 
 
         else
             ! Assume that mask_apply also gives the points to use for smoothing 
@@ -4056,10 +4059,19 @@ end if
         ! Calculate default 2D Gaussian smoothing kernel
         filter0 = gauss_values(dx,dx,sigma=sigma,n=n)
 
-        var_old = var 
-
-        do j = n2+1, ny-n2
-        do i = n2+1, nx-n2
+        var_old = 0.0 
+        var_old(n2+1:n2+nx,n2+1:n2+ny) = var 
+        var_old(1:n2,:)       = var(n2:1,:)
+        var_old(nx+1:nx+n2,:) = var((nx-n2):nx,:)
+        var_old(:,1:n2)       = var(:,n2:1)
+        var_old(:,ny+1:ny+n2) = var(:,(ny-n2):ny)
+        var_old(1:n2,:)       = var(n2:1,:)
+        var_old(nx+1:nx+n2,:) = var((nx-n2):nx,:)
+        var_old(:,1:n2)       = var(:,n2:1)
+        var_old(:,ny+1:ny+n2) = var(:,(ny-n2):ny)
+        
+        do j = n2+1, n2+ny 
+        do i = n2+1, n2+nx 
 
             if (mask_apply_local(i,j)) then 
                 ! Apply smoothing to this point 
@@ -4071,7 +4083,7 @@ end if
                 ! If neighbors are available, normalize and perform smoothing  
                 if (sum(filter) .gt. 0.0) then 
                     filter = filter/sum(filter)
-                    var(i,j) = sum(var_old(i-n2:i+n2,j-n2:j+n2)*filter) 
+                    var(i-n2,j-n2) = sum(var_old(i-n2:i+n2,j-n2:j+n2)*filter) 
                 end if  
 
             end if 

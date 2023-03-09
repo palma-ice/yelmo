@@ -730,6 +730,7 @@ contains
         end do 
         end do 
 
+if (.FALSE.) then
         ! ajr: testing:
         ! This is needed for a bizzare case seen in 
         ! Antarctica, where a grid point with inflow from two neighbors
@@ -742,6 +743,8 @@ contains
         ! ajr: the above situation may be related to poor treatment of
         ! grounded ice-front boundary conditions (in ssa solver). It
         ! can also happen in Greenland at the grounded ice front.
+
+end if 
 
 
         ! Reduce ice thickness for margin points that are thicker 

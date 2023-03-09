@@ -1020,6 +1020,7 @@ end if
 
         ! SPECIAL CASES: edge cases for stability...
 
+if (.FALSE.) then
         taud_acx_0 = taud_acx 
         taud_acy_0 = taud_acy 
 
@@ -1059,6 +1060,9 @@ end if
             
         end do
         end do 
+
+end if 
+
 
         return 
 

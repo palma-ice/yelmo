@@ -163,7 +163,7 @@ contains
     end subroutine set_pc_beta_coefficients
 
 
-    subroutine set_pc_mask(mask,pc_tau,H_ice_pred,H_ice_corr,z_bed,z_sl,rho_ice,rho_sw,margin_flt_subgrid)
+    subroutine set_pc_mask(mask,pc_tau,H_ice_pred,H_ice_corr,z_bed,z_sl,rho_ice,rho_sw,pc_eps,margin_flt_subgrid)
 
         implicit none 
 
@@ -175,6 +175,7 @@ contains
         real(wp), intent(IN) :: z_sl(:,:) 
         real(wp), intent(IN) :: rho_ice
         real(wp), intent(IN) :: rho_sw
+        real(wp), intent(IN) :: pc_eps
         logical,  intent(IN) :: margin_flt_subgrid 
 
         ! Local variables 
@@ -253,6 +254,14 @@ if (.TRUE.) then
 
             end if 
 
+            ! Ignore isolated points with high tau 
+            if (abs(pc_tau(i,j)) .gt. 2.0*pc_eps .and. &
+                count([pc_tau(im1,j),pc_tau(ip1,j),pc_tau(i,jm1),pc_tau(i,jp1)] &
+                                                                 .gt. pc_eps) .eq. 0 ) then 
+
+                mask(i,j) = .FALSE. 
+                
+            end if
         end do 
         end do  
 

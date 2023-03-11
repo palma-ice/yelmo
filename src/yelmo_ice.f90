@@ -1072,32 +1072,13 @@ end if
                 ! resolution field from the restart file. 
                 bnd_restart%z_bed_corr = dom%bnd%z_bed - bnd_restart%z_bed
                 bnd_restart%z_bed_corr_time_init = time
-                
-if (.TRUE.) then 
-                ! Do nothing: do not modify bnd_restart%z_bed.
+                 
+                ! Note, now, do nothing: do not modify bnd_restart%z_bed.
                 ! So, to start with, the bedrock topography will still be fully
                 ! consistent with the simulation being loaded from the restart file. 
                 ! Use the routine yelmo_udpate_zbed_restart to slow incorporate
                 ! high-resolution information after initializing all other fields. 
-
-else        
-                ! Initialize to the isostatically-adjusted high resolution bedrock field
-                bnd_restart%z_bed = dom%bnd%z_bed
-
-                ! Next if using H_ice from the restart file, and the restart
-                ! file fields were interpolated from low to high resolution, 
-                ! then determine H_ice from z_srf-z_bed
-                ! rather than just H_ice, to avoid strange patterns near troughs etc. 
-                if (dom%par%restart_H_ice .and. dom%par%restart_interpolated .eq. 1) then
-
-                    where(tpo_restart%now%f_grnd .gt. 0.0)
-                        tpo_restart%now%H_ice = tpo_restart%now%z_srf - bnd_restart%z_bed
-                    end where
-
-                end if 
-
-end if 
-
+                
                 ! Finally, store the variability field loaded from parameter choices too
                 bnd_restart%z_bed_sd = dom%bnd%z_bed_sd
 

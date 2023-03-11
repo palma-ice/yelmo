@@ -309,7 +309,8 @@ contains
         allocate(now%z_bed_ref(nx,ny))
         
         allocate(now%z_bed_corr(nx,ny))
-
+        allocate(now%dzbdt_corr (nx,ny))
+        
         now%z_bed       = 0.0_prec 
         now%z_bed_sd    = 0.0_prec
         now%z_sl        = 0.0_prec 
@@ -335,7 +336,8 @@ contains
         now%z_bed_ref   = 0.0_prec
 
         now%z_bed_corr  = 0.0_prec
-
+        now%dzbdt_corr  = 0.0_prec
+        
         return 
 
     end subroutine ybound_alloc
@@ -371,6 +373,7 @@ contains
         if (allocated(now%z_bed_ref))   deallocate(now%z_bed_ref)
 
         if (allocated(now%z_bed_corr))  deallocate(now%z_bed_corr)
+        if (allocated(now%dzbdt_corr )) deallocate(now%dzbdt_corr )
 
         return 
 

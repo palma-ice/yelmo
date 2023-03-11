@@ -701,6 +701,7 @@ module yelmo_defs
 
         ! Internal variables
         real(wp), allocatable :: z_bed_corr(:,:) 
+        real(wp), allocatable :: dzbdt_corr(:,:) 
         real(wp) :: z_bed_corr_time_init
     end type
 
@@ -880,7 +881,7 @@ module yelmo_defs
         ! Other internal parameters
         logical  :: use_restart 
         integer  :: restart_interpolated
-        real(wp) :: time_bed_shift
+        real(wp) :: z_bed_corr_time_relax
 
     end type
 

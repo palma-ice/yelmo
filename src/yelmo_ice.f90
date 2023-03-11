@@ -510,6 +510,11 @@ end if
             !                                     dom%thrm%par%time, dom%mat%par%time, dom%dyn%par%time
         end if 
 
+
+        ! Finally, update z_bed relaxation rate to high resolution bedrock topography
+        ! This rate should be passed to the isostasy module as needed.
+        call yelmo_update_z_bed_restart_rate(dom,time)
+
         ! ! ajr: diagnostics 
         ! if (time .gt. 100.0 .and. dom%dyn%par%ssa_iter_now .ge. 5) then 
         !     stop 
@@ -837,12 +842,6 @@ end if
         real(wp), allocatable :: dzb(:,:)
         real(wp), allocatable :: dzb_restart(:,:)
         
-        integer :: i, j, q, n_iter_grad
-        integer :: im1, ip1, jm1, jp1 
-        real(wp) :: grad_lim 
-        logical, allocatable :: mask_apply(:,:) 
-        logical, allocatable :: mask_use(:,:) 
-
         ! Local copies of tpo and bnd
         type(ytopo_class)  :: tpo_restart 
         type(ybound_class) :: bnd_restart 
@@ -930,65 +929,9 @@ end if
             end if 
 
 
-if (.FALSE.) then
-            ! Further smooth z_bed in specific locations if gradients are exceeded.
-
-            !grad_lim = 0.05
-            grad_lim = dom%tpo%par%grad_lim 
-            n_iter_grad = 50
-
-            allocate(mask_apply(dom%grd%nx,dom%grd%ny))
-            allocate(mask_use(dom%grd%nx,dom%grd%ny))
-            
-            mask_use = .TRUE. 
-
-            do q = 1, n_iter_grad
-
-                ! Calculate bedrock gradients (use available fields in tpo object for now; f_ice and grad_lim are not used)
-                dom%tpo%now%f_ice = 1.0 
-                call calc_gradient_acx(dom%tpo%now%dzbdx,z_bed,dom%tpo%now%f_ice,dom%tpo%par%dx,100.0_wp, &
-                                            margin2nd=.FALSE.,zero_outside=.FALSE.,boundaries=dom%tpo%par%boundaries)
-                call calc_gradient_acy(dom%tpo%now%dzbdy,z_bed,dom%tpo%now%f_ice,dom%tpo%par%dy,100.0_wp, &
-                                            margin2nd=.FALSE.,zero_outside=.FALSE.,boundaries=dom%tpo%par%boundaries)
-
-                ! Determine where gradients are too large
-                mask_apply = .FALSE.
-                do j = 3, dom%grd%ny-3
-                do i = 3, dom%grd%nx-3
-                    
-                    ! Get neighbor indices
-                    call get_neighbor_indices(im1,ip1,jm1,jp1,i,j,dom%grd%nx,dom%grd%ny,dom%tpo%par%boundaries)
-
-                    if (abs(dom%tpo%now%dzbdx(i,j)) .ge. grad_lim) then 
-                        mask_apply(i,j)   = .TRUE. 
-                        mask_apply(ip1,j) = .TRUE. 
-                    end if
-
-                    if (abs(dom%tpo%now%dzbdy(i,j)) .ge. grad_lim) then 
-                        mask_apply(i,j)   = .TRUE. 
-                        mask_apply(i,jp1) = .TRUE. 
-                    end if
-                end do 
-                end do 
-
-                write(*,*) "z_bed smoothing: ", q, count(mask_apply),  &
-                        maxval(abs(dom%tpo%now%dzbdx(3:dom%grd%nx-3,3:dom%grd%ny-3))), &
-                        maxval(abs(dom%tpo%now%dzbdy(3:dom%grd%nx-3,3:dom%grd%ny-3)))
-
-                if (count(mask_apply) .eq. 0) exit 
-
-                ! Smooth z_bed at desired locations, and H_ice so that H_ice avoids spurious patterns
-                call smooth_gauss_2D(z_bed,dx=dom%grd%dx,f_sigma=2.0,mask_apply=mask_apply,mask_use=mask_use)
-                call smooth_gauss_2D(H_ice,dx=dom%grd%dx,f_sigma=2.0,mask_apply=mask_apply,mask_use=mask_use)
-                
-            end do
-
-else 
-
-            ! Adjust bedrock and ice thickness for smoothness
+            ! Adjust bedrock topography and ice thickness for smoothness
             call adjust_topography_gradients(z_bed,H_ice,dom%tpo%par%grad_lim,dom%grd%dx,dom%tpo%par%boundaries)
             
-end if
 
             ! Additionally modify initial topographic state 
             select case(init_topo_state)
@@ -1078,10 +1021,17 @@ end if
                 bnd_restart%z_bed_corr = dom%bnd%z_bed - bnd_restart%z_bed
                 bnd_restart%z_bed_corr_time_init = time
                  
+                ! Define transition time
+                ! ajr: later this could be a user parameter if it works...
+                dom%par%z_bed_corr_time_relax = 2e3 
+
+                ! Calculate the desired rate of change
+                bnd_restart%dzbdt_corr = bnd_restart%z_bed_corr / dom%par%z_bed_corr_time_relax
+
                 ! Note, now, do nothing: do not modify bnd_restart%z_bed.
                 ! So, to start with, the bedrock topography will still be fully
                 ! consistent with the simulation being loaded from the restart file. 
-                ! Use the routine yelmo_udpate_zbed_restart to slow incorporate
+                ! Pass dzbdt_corr to isostasy routine to slow incorporate
                 ! high-resolution information after initializing all other fields. 
 
                 ! Finally, store the variability field loaded from parameter choices too
@@ -1143,6 +1093,25 @@ end if
 
     end subroutine yelmo_init_topo
 
+    subroutine yelmo_update_z_bed_restart_rate(dom,time)
+        
+        implicit none 
+
+        type(yelmo_class), intent(INOUT) :: dom 
+        real(wp), intent(IN) :: time 
+
+        if (time - dom%bnd%z_bed_corr_time_init .ge. dom%par%z_bed_corr_time_relax) then 
+            dom%bnd%dzbdt_corr = 0.0 
+        end if 
+
+        if (maxval(abs(dom%bnd%dzbdt_corr)) .gt. 0.0) then 
+            write(*,*) "z_bed_corr rate: ", time, minval(dom%bnd%dzbdt_corr), maxval(dom%bnd%dzbdt_corr)
+        end if 
+        
+        return
+
+    end subroutine yelmo_update_z_bed_restart_rate
+
     subroutine yelmo_update_z_bed_restart(dom,time,write_nc_file)
         ! Use this routine to update z_bed in Yelmo
         ! to account for new high-resolution information in the bedrock
@@ -1164,10 +1133,7 @@ end if
 
         filename = "./yelmo_z_bed_restart.nc"
 
-        ! Define transition time
-        ! ajr: later this could be a user parameter if it works...
-        dom%par%time_bed_shift = 500.0 
-
+        
         ! This routine is only needed if we are running
         ! a high resolution run loaded from a low resolution restart file
 

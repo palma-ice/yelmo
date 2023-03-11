@@ -79,6 +79,8 @@ module yelmo_tools
     public :: smooth_gauss_3D
     public :: gauss_values
 
+    public :: adjust_topography_gradients 
+    
     public :: regularize2D 
 
     ! Integration functions
@@ -4142,6 +4144,91 @@ end if
     ! Regularizing/smoothing functions 
     !
     ! ================================================================================
+
+    subroutine adjust_topography_gradients(z_bed,H_ice,grad_lim,dx,boundaries)
+        ! Smooth the bedrock topography and corresponding ice thickness,
+        ! so that specified limit on gradients is not exceeded. Only
+        ! apply smoothing directly in places where gradient is too large.
+
+        implicit none 
+
+        real(wp), intent(INOUT) :: z_bed(:,:) 
+        real(wp), intent(INOUT) :: H_ice(:,:) 
+        real(wp), intent(IN)    :: grad_lim 
+        real(wp), intent(IN)    :: dx 
+        character(len=*), intent(IN) :: boundaries 
+
+        ! Local variables 
+        integer  :: i, j, q, nx, ny 
+        integer  :: im1, ip1, jm1, jp1 
+        real(wp) :: dy
+        real(wp), allocatable :: dzbdx(:,:)
+        real(wp), allocatable :: dzbdy(:,:)
+        real(wp), allocatable :: f_ice(:,:)
+        logical,  allocatable :: mask_apply(:,:) 
+        logical,  allocatable :: mask_use(:,:) 
+
+        integer, parameter :: iter_max = 50 
+
+        nx = size(z_bed,1)
+        ny = size(z_bed,2) 
+
+        dy = dx 
+
+        allocate(dzbdx(nx,ny))
+        allocate(dzbdy(nx,ny))
+        allocate(f_ice(nx,ny))
+        allocate(mask_apply(nx,ny))
+        allocate(mask_use(nx,ny))
+
+        ! Smooth z_bed in specific locations if gradients are exceeded.
+
+        mask_use = .TRUE. 
+        f_ice    = 1.0 
+
+        do q = 1, iter_max
+
+            ! Calculate bedrock gradients (f_ice and grad_lim are not used)
+            call calc_gradient_acx(dzbdx,z_bed,f_ice,dx,grad_lim=100.0_wp, &
+                                        margin2nd=.FALSE.,zero_outside=.FALSE.,boundaries=boundaries)
+            call calc_gradient_acy(dzbdy,z_bed,f_ice,dy,grad_lim=100.0_wp, &
+                                        margin2nd=.FALSE.,zero_outside=.FALSE.,boundaries=boundaries)
+
+            ! Determine where gradients are too large
+            mask_apply = .FALSE.
+            do j = 3, ny-3
+            do i = 3, nx-3
+                
+                ! Get neighbor indices
+                call get_neighbor_indices(im1,ip1,jm1,jp1,i,j,nx,ny,boundaries)
+
+                if (abs(dzbdx(i,j)) .ge. grad_lim) then 
+                    mask_apply(i,j)   = .TRUE. 
+                    mask_apply(ip1,j) = .TRUE. 
+                end if
+
+                if (abs(dzbdy(i,j)) .ge. grad_lim) then 
+                    mask_apply(i,j)   = .TRUE. 
+                    mask_apply(i,jp1) = .TRUE. 
+                end if
+            end do 
+            end do 
+
+            write(*,*) "z_bed smoothing: ", q, count(mask_apply),  &
+                                        maxval(abs(dzbdx(3:nx-3,3:ny-3))), &
+                                        maxval(abs(dzbdy(3:nx-3,3:ny-3)))
+
+            if (count(mask_apply) .eq. 0) exit 
+
+            ! Smooth z_bed at desired locations, and H_ice so that H_ice avoids spurious patterns
+            call smooth_gauss_2D(z_bed,dx=dx,f_sigma=2.0,mask_apply=mask_apply,mask_use=mask_use)
+            call smooth_gauss_2D(H_ice,dx=dx,f_sigma=2.0,mask_apply=mask_apply,mask_use=mask_use)
+            
+        end do
+
+        return
+
+    end subroutine adjust_topography_gradients
 
     subroutine regularize2D_gauss(var,H_ice,dx)
         ! Ensure smoothness in 2D fields (ie, no checkerboard patterns)

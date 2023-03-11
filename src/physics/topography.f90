@@ -1,11 +1,11 @@
 module topography 
 
     use yelmo_defs, only : wp, dp, prec, io_unit_err, pi
-
+    
     implicit none 
 
     private  
-
+    
     public :: extend_floating_slab
     public :: remove_fractional_ice
     public :: remove_icebergs 
@@ -37,7 +37,7 @@ module topography
     public :: determine_grounded_fractions
 
 contains 
-
+    
     subroutine extend_floating_slab(H_ice,f_grnd,H_slab,n_ext)
         ! Extend ice field so that there is always 
         ! floating ice next to grounded marine margins

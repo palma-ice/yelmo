@@ -10,7 +10,7 @@ module yelmo_ice
     use yelmo_timesteps, only : ytime_init, set_pc_beta_coefficients, set_adaptive_timestep, set_adaptive_timestep_pc,   &
                                 set_pc_mask, calc_pc_eta, calc_pc_tau_fe_sbe,calc_pc_tau_ab_sam, calc_pc_tau_heun,  &
                                 limit_adaptive_timestep, yelmo_timestep_write_init, yelmo_timestep_write, calc_adv3D_timestep1
-    use yelmo_tools, only : get_neighbor_indices, calc_gradient_acx, calc_gradient_acy, smooth_gauss_2D
+    use yelmo_tools, only : get_neighbor_indices, calc_gradient_acx, calc_gradient_acy, smooth_gauss_2D, adjust_topography_gradients
     use yelmo_io 
 
     use yelmo_topography
@@ -775,7 +775,7 @@ end if
         call ydata_alloc(dom%dta%pd,dom%grd%nx,dom%grd%ny,dom%par%nz_aa,dom%dta%par%pd_age_n_iso)
 
         ! Load data objects   
-        call ydata_load(dom%dta,dom%bnd,filename)
+        call ydata_load(dom%dta,dom%bnd,filename,dom%tpo%par%grad_lim,dom%grd%dx,dom%tpo%par%boundaries)
 
         ! Set H_ice_ref and z_bed_ref to present-day ice thickness by default 
         dom%bnd%H_ice_ref = dom%dta%pd%H_ice 
@@ -930,7 +930,7 @@ end if
             end if 
 
 
-if (.TRUE.) then
+if (.FALSE.) then
             ! Further smooth z_bed in specific locations if gradients are exceeded.
 
             !grad_lim = 0.05
@@ -983,6 +983,11 @@ if (.TRUE.) then
                 
             end do
 
+else 
+
+            ! Adjust bedrock and ice thickness for smoothness
+            call adjust_topography_gradients(z_bed,H_ice,dom%tpo%par%grad_lim,dom%grd%dx,dom%tpo%par%boundaries)
+            
 end if
 
             ! Additionally modify initial topographic state 

@@ -4,7 +4,7 @@ module yelmo_data
     use nml 
     use ncio 
     use yelmo_defs 
-
+    use yelmo_tools, only : adjust_topography_gradients
     use topography 
     
     implicit none
@@ -163,13 +163,16 @@ contains
 
     end subroutine ydata_compare
 
-    subroutine ydata_load(dta,bnd,par_path)
+    subroutine ydata_load(dta,bnd,par_path,grad_lim,dx,boundaries)
 
         implicit none 
 
         type(ydata_class),  intent(INOUT) :: dta 
         type(ybound_class), intent(IN)    :: bnd 
         character(len=*),   intent(IN)    :: par_path 
+        real(wp),           intent(IN)    :: grad_lim 
+        real(wp),           intent(IN)    :: dx 
+        character(len=*),   intent(IN)    :: boundaries 
 
         ! Local variables 
         character(len=1028) :: filename 
@@ -237,6 +240,9 @@ contains
 
             ! Clean up field 
             where(dta%pd%H_ice  .lt. 1.0) dta%pd%H_ice = 0.0 
+
+            ! Adjust bedrock and ice thickness for smoothness
+            call adjust_topography_gradients(dta%pd%z_bed,dta%pd%H_ice,grad_lim,dx,boundaries)
 
             ! Artificially delete ice from locations that are not allowed
             where (.not. bnd%ice_allowed) 

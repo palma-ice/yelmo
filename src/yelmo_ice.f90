@@ -28,8 +28,7 @@ module yelmo_ice
 
     private
     public :: yelmo_init, yelmo_init_topo, yelmo_init_state
-    public :: yelmo_update, yelmo_update_equil, yelmo_end 
-    public :: yelmo_update_z_bed_restart
+    public :: yelmo_update, yelmo_update_equil, yelmo_end
     public :: yelmo_print_bound, yelmo_set_time
 
 contains
@@ -1019,20 +1018,25 @@ end if
                 ! to the high resolution information not contained in the low-to-high
                 ! resolution field from the restart file. 
                 bnd_restart%z_bed_corr = dom%bnd%z_bed - bnd_restart%z_bed
-                bnd_restart%z_bed_corr_time_init = time
-                 
-                ! Define transition time
-                ! ajr: later this could be a user parameter if it works...
-                dom%par%z_bed_corr_time_relax = 2e3 
+                bnd_restart%restart_relax_init = time
+                
+                if (dom%par%restart_relax .eq. 0.0) then
+                    ! Impose high resolution changes to new topography directly
 
-                ! Calculate the desired rate of change
-                bnd_restart%dzbdt_corr = bnd_restart%z_bed_corr / dom%par%z_bed_corr_time_relax
+                    bnd_restart%z_bed       = dom%bnd%z_bed
+                    bnd_restart%dzbdt_corr  = 0.0 
+                else 
 
-                ! Note, now, do nothing: do not modify bnd_restart%z_bed.
-                ! So, to start with, the bedrock topography will still be fully
-                ! consistent with the simulation being loaded from the restart file. 
-                ! Pass dzbdt_corr to isostasy routine to slow incorporate
-                ! high-resolution information after initializing all other fields. 
+                    ! Calculate the desired rate of change based on relaxation time
+                    bnd_restart%dzbdt_corr  = bnd_restart%z_bed_corr / dom%par%restart_relax
+
+                    ! Note, now, do nothing: do not modify bnd_restart%z_bed.
+                    ! So, to start with, the bedrock topography will still be fully
+                    ! consistent with the simulation being loaded from the restart file. 
+                    ! Pass dzbdt_corr to isostasy routine to slow incorporate
+                    ! high-resolution information after initializing all other fields. 
+                
+                end if 
 
                 ! Finally, store the variability field loaded from parameter choices too
                 bnd_restart%z_bed_sd = dom%bnd%z_bed_sd
@@ -1100,114 +1104,23 @@ end if
         type(yelmo_class), intent(INOUT) :: dom 
         real(wp), intent(IN) :: time 
 
-        if (time - dom%bnd%z_bed_corr_time_init .ge. dom%par%z_bed_corr_time_relax) then 
+        ! Local variables
+        real(wp) :: time_elapsed 
+
+        time_elapsed = time - dom%bnd%restart_relax_init
+
+        if (time_elapsed .gt. dom%par%restart_relax) then 
             dom%bnd%dzbdt_corr = 0.0 
         end if 
 
         if (maxval(abs(dom%bnd%dzbdt_corr)) .gt. 0.0) then 
-            write(*,*) "z_bed_corr rate: ", time, minval(dom%bnd%dzbdt_corr), maxval(dom%bnd%dzbdt_corr)
+            write(*,*) "z_bed_corr rate: ", time, time_elapsed, &
+                                        minval(dom%bnd%dzbdt_corr), maxval(dom%bnd%dzbdt_corr)
         end if 
-        
+
         return
 
     end subroutine yelmo_update_z_bed_restart_rate
-
-    subroutine yelmo_update_z_bed_restart(dom,time,write_nc_file)
-        ! Use this routine to update z_bed in Yelmo
-        ! to account for new high-resolution information in the bedrock
-        ! not contained in the bedrock field loaded from the restart file. 
-        ! This routine will slowly add this information into the field
-        ! z_bed until it is accurate. 
-
-        implicit none
-
-        type(yelmo_class), intent(INOUT) :: dom 
-        real(wp), intent(IN)    :: time 
-        logical,  intent(IN)    :: write_nc_file 
-
-        ! Local variables 
-        integer  :: q, n_iter 
-        real(wp) :: fac
-        real(wp), allocatable :: dzb_now(:,:) 
-        character(len=512)    :: filename 
-
-        filename = "./yelmo_z_bed_restart.nc"
-
-        
-        ! This routine is only needed if we are running
-        ! a high resolution run loaded from a low resolution restart file
-
-        if (dom%par%restart_interpolated .eq. 1) then 
-            ! Low-to-high restart:  adjust z_bed as needed 
-            
-            if (write_nc_file) & 
-                call yelmo_restart_write(dom,filename,time=0.0_wp,init=.TRUE.)
-
-            ! Run model with no advection
-            write(*,*) "Restart smoothing 1: no advection + ssa, 10 years."
-            call yelmo_update_equil(dom,time,time_tot=10.0_prec,dt=1.0_wp, &
-                                tpo_solver="none",topo_fixed=.FALSE.,dyn_solver="ssa")
-
-            if (write_nc_file) & 
-                call yelmo_restart_write(dom,filename,time=1.0_wp,init=.FALSE.)
-
-            ! Run thermodynamics with SSA solver very briefly to smooth it out
-            write(*,*) "Restart smoothing 2: no advection + ssa, 10 years."
-            call yelmo_update_equil(dom,time,time_tot=10.0_prec,dt=1.0_wp, &
-                                                    topo_fixed=.TRUE.,dyn_solver="ssa")
-
-            if (write_nc_file) & 
-                call yelmo_restart_write(dom,filename,time=2.0_wp,init=.FALSE.)
-
-            ! Run full model (tpo,dyn,thrm) with SSA solver very briefly to smooth it out
-            write(*,*) "Restart smoothing 3: advection + ssa, 10 years."
-            call yelmo_update_equil(dom,time,time_tot=10.0_prec,dt=0.2_wp, &
-                                                    topo_fixed=.FALSE.,dyn_solver="ssa")
-
-            if (write_nc_file) & 
-                call yelmo_restart_write(dom,filename,time=3.0_wp,init=.FALSE.)
-
-            ! Run full model (tpo,dyn,thrm) with SSA solver very briefly to smooth it out
-            write(*,*) "Restart smoothing 4: full model, 50 years."
-            call yelmo_update_equil(dom,time,time_tot=50.0_prec,dt=1.0_wp,topo_fixed=.FALSE.)
-
-            if (write_nc_file) & 
-                call yelmo_restart_write(dom,filename,time=4.0_wp,init=.FALSE.)
-
-            ! Slowly introduce high-resolution features to basal topography
-
-            allocate(dzb_now(dom%grd%nx,dom%grd%ny))
-
-            n_iter  = 10
-            fac     = 1.0/real(n_iter,wp)
-            dzb_now = dom%bnd%z_bed_corr * fac
-            
-            do q = 1, n_iter
-                
-                dom%bnd%z_bed      = dom%bnd%z_bed      + dzb_now 
-                dom%bnd%z_bed_corr = dom%bnd%z_bed_corr - dzb_now
-                
-                write(*,*) "Restart smoothing iter: full model, 100 years. iter = ", q
-                call yelmo_update_equil(dom,time,time_tot=100.0_prec,dt=1.0_wp,topo_fixed=.FALSE.)
-
-                if (write_nc_file) & 
-                    call yelmo_restart_write(dom,filename,time=4.0_wp+real(q,wp),init=.FALSE.)
-
-            end do 
-
-
-            if (maxval(abs(dom%bnd%z_bed_corr)) .gt. 1e-1) then
-                write(*,*) "yelmo_update_z_bed_restart:: Error: z_bed_corr should &
-                &be equal to zero by the end of all iterations."
-                write(*,*) "range(z_bed_corr): ", minval(dom%bnd%z_bed_corr), maxval(dom%bnd%z_bed_corr)
-                stop
-            end if 
-
-        end if
-
-        return
-
-    end subroutine yelmo_update_z_bed_restart
 
     subroutine yelmo_init_state(dom,time,thrm_method)
         ! This subroutine is the second step to intializing 
@@ -1327,6 +1240,7 @@ end if
         call nml_read(filename,"yelmo","restart",       par%restart)
         call nml_read(filename,"yelmo","restart_z_bed", par%restart_z_bed)
         call nml_read(filename,"yelmo","restart_H_ice", par%restart_H_ice)
+        call nml_read(filename,"yelmo","restart_relax", par%restart_relax)
         call nml_read(filename,"yelmo","log_timestep",  par%log_timestep)
         call nml_read(filename,"yelmo","disable_kill",  par%disable_kill)
         call nml_read(filename,"yelmo","zeta_scale",    par%zeta_scale)

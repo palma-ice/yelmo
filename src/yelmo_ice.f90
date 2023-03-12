@@ -1114,7 +1114,7 @@ end if
         end if 
 
         if (maxval(abs(dom%bnd%dzbdt_corr)) .gt. 0.0) then 
-            write(*,*) "z_bed_corr rate: ", time, time_elapsed, &
+            write(*,*) "restart z_bed_corr rate: ", time, time_elapsed, &
                                         minval(dom%bnd%dzbdt_corr), maxval(dom%bnd%dzbdt_corr)
         end if 
 

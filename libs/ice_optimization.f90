@@ -8,7 +8,9 @@ module ice_optimization
     implicit none 
 
     type ice_opt_params
-        real(wp) :: cf_time
+        logical  :: opt_cf 
+        real(wp) :: cf_time_init
+        real(wp) :: cf_time_end
         real(wp) :: cf_init
         real(wp) :: cf_min_par
         real(wp) :: tau_c 
@@ -25,7 +27,8 @@ module ice_optimization
         real(wp) :: rel_m
 
         logical  :: opt_tf 
-        real(wp) :: tf_time
+        real(wp) :: tf_time_init
+        real(wp) :: tf_time_end
         real(wp) :: H_grnd_lim
         real(wp) :: tf_sigma 
         real(wp) :: tau_m 
@@ -73,7 +76,9 @@ contains
 
         ! Load optimization parameters 
 
-        call nml_read(path_par,group,"cf_time",     opt%cf_time)
+        call nml_read(path_par,group,"opt_cf",      opt%opt_cf)
+        call nml_read(path_par,group,"cf_time_init",opt%cf_time_init)
+        call nml_read(path_par,group,"cf_time_end", opt%cf_time_end)
         call nml_read(path_par,group,"cf_init",     opt%cf_init)
         call nml_read(path_par,group,"cf_min",      opt%cf_min_par)
         call nml_read(path_par,group,"tau_c",       opt%tau_c)
@@ -89,7 +94,8 @@ contains
         call nml_read(path_par,group,"rel_m",       opt%rel_m)
 
         call nml_read(path_par,group,"opt_tf",      opt%opt_tf)
-        call nml_read(path_par,group,"tf_time",     opt%tf_time)
+        call nml_read(path_par,group,"tf_time_init",opt%tf_time_init)
+        call nml_read(path_par,group,"tf_time_end", opt%tf_time_end)
         call nml_read(path_par,group,"H_grnd_lim",  opt%H_grnd_lim)
         call nml_read(path_par,group,"tf_sigma",    opt%tf_sigma)
         call nml_read(path_par,group,"tau_m",       opt%tau_m)

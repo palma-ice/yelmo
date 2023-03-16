@@ -1,5 +1,6 @@
 program yelmo_test_regridding 
-
+    
+    use nml 
     use ncio 
     use yelmo 
     

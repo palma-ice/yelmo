@@ -1,5 +1,6 @@
 program test_icetemp 
 
+    use nml 
     use ncio  
     
     use yelmo_defs

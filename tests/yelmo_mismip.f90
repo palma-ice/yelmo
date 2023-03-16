@@ -2,6 +2,7 @@
 
 program yelmo_mismip
 
+    use nml 
     use ncio 
     use yelmo 
     use yelmo_tools, only : stagger_aa_acx, stagger_aa_acy

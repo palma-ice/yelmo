@@ -4,6 +4,7 @@ program yelmo_trough
 
     use mpi 
 
+    use nml
     use ncio 
     use yelmo 
     use deformation 

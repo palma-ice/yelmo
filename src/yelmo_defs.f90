@@ -3,7 +3,7 @@ module yelmo_defs
     
     use, intrinsic :: iso_fortran_env, only : input_unit, output_unit, error_unit
 
-    use nml 
+    use nml, only : nml_replace
 
     implicit none 
 
@@ -998,7 +998,6 @@ contains
         character(len=*), intent(IN)  :: filename
         
         ! Local variables
-        logical :: init_pars
         integer :: n_threads 
         character(len=10) :: n_threads_str 
         
@@ -1025,36 +1024,6 @@ contains
         end if 
 
         write(*,*) "yelmo_global_init:: yelmo_log = ", yelmo_log
-
-        ! Load parameter values 
-
-        init_pars = .TRUE. 
-        
-        !call nml_read(filename,"yelmo_constants","sec_year",    sec_year,   init=init_pars)
-        !call nml_read(filename,"yelmo_constants","g",           g,          init=init_pars)
-        !call nml_read(filename,"yelmo_constants","T0",          T0,         init=init_pars)
-        
-        !call nml_read(filename,"yelmo_constants","rho_ice",     rho_ice,    init=init_pars)
-        !call nml_read(filename,"yelmo_constants","rho_w",       rho_w,      init=init_pars)
-        !call nml_read(filename,"yelmo_constants","rho_sw",      rho_sw,     init=init_pars)
-        !call nml_read(filename,"yelmo_constants","rho_a",       rho_a,      init=init_pars)
-        !call nml_read(filename,"yelmo_constants","rho_rock",    rho_rock,   init=init_pars)
-        !call nml_read(filename,"yelmo_constants","L_ice",       L_ice,      init=init_pars)
-        !call nml_read(filename,"yelmo_constants","T_pmp_beta",  T_pmp_beta, init=init_pars)
-        
-
-        ! Define conversion factors too
-
-        ! conv_we_ie          = rho_w/rho_ice
-        ! conv_mmdwe_maie     = 1e-3*365*conv_we_ie
-        ! conv_mmawe_maie     = 1e-3*conv_we_ie
-        
-        ! conv_m3_Gt          = rho_ice *1e-12            ! [kg/m3] * [Gigaton/1e12kg]
-        ! conv_km3_Gt         = (1e9) * conv_m3_Gt        ! [1e9m^3/km^3]
-        ! conv_millionkm3_Gt  = (1e6) * (1e9) *conv_m3_Gt ! [1e6km3/1] * [1e9m^3/km^3] * conv
-        
-        ! area_seasurf        = 3.618e8                   ! [km^2]
-        ! conv_km3_sle        = (1e-3) / 394.7            ! [m/mm] / [km^3 to raise ocean by 1mm] => m sle, see https://sealevel.info/conversion_factors.html
 
         return
 

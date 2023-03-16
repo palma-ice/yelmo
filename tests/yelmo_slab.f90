@@ -1,6 +1,7 @@
 program yelmo_slab
     ! For testing an idealized slab domain
 
+    use nml
     use ncio 
     use yelmo 
     use deformation 
@@ -280,13 +281,15 @@ contains
 
         ! Initialize velocity to u0 value too
         call calc_u0(u0,ctrl%H0,yelmo1%dyn%par%beta_const, &
-                        yelmo1%dyn%par%visc_const,ctrl%alpha)
+                        yelmo1%dyn%par%visc_const,ctrl%alpha, &
+                        yelmo1%bnd%c%rho_ice,yelmo1%bnd%c%g)
         
         yelmo1%dyn%now%ux_bar = u0
 
         if (trim(yelmo1%dyn%par%solver) .ne. "diva") then 
             call calc_ub0(ub0,ctrl%H0,yelmo1%dyn%par%beta_const, &
-                        yelmo1%dyn%par%visc_const,ctrl%alpha)
+                        yelmo1%dyn%par%visc_const,ctrl%alpha, &
+                        yelmo1%bnd%c%rho_ice,yelmo1%bnd%c%g)
             
             yelmo1%dyn%now%ux_b = ub0 
         else 
@@ -586,7 +589,7 @@ contains
 
     end subroutine calc_stdev
 
-    elemental subroutine calc_u0(u0,H0,beta,eta,alpha)
+    elemental subroutine calc_u0(u0,H0,beta,eta,alpha,rho_ice,g)
         ! Prescribe initial velocity as u0 
 
         real(wp), intent(OUT) :: u0 
@@ -594,7 +597,9 @@ contains
         real(wp), intent(IN)  :: beta 
         real(wp), intent(IN)  :: eta            ! Viscosity!
         real(wp), intent(IN)  :: alpha
-
+        real(wp), intent(IN)  :: rho_ice 
+        real(wp), intent(IN)  :: g 
+        
         ! Local variables 
         real(wp) :: F2 
  
@@ -605,7 +610,7 @@ contains
 
     end subroutine calc_u0
 
-    elemental subroutine calc_ub0(ub0,H0,beta,eta,alpha)
+    elemental subroutine calc_ub0(ub0,H0,beta,eta,alpha,rho_ice,g)
         ! Prescribe initial velocity as u0 
 
         real(wp), intent(OUT) :: ub0 
@@ -613,6 +618,8 @@ contains
         real(wp), intent(IN)  :: beta 
         real(wp), intent(IN)  :: eta            ! Viscosity!
         real(wp), intent(IN)  :: alpha
+        real(wp), intent(IN)  :: rho_ice 
+        real(wp), intent(IN)  :: g 
 
         ub0 = (rho_ice*g) * H0 * alpha / beta
 

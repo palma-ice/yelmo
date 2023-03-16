@@ -2,6 +2,7 @@
 
 program yelmo_test
 
+    use nml
     use ncio 
     use yelmo 
 

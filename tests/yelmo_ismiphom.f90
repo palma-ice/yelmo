@@ -183,7 +183,7 @@ program yelmo_ismiphom
 
     yelmo1%bnd%z_sl     = -10000.0       ! Set sea level to a very negative value to avoid allowing floating ice 
     yelmo1%bnd%bmb_shlf = 0.0  
-    yelmo1%bnd%T_shlf   = T0  
+    yelmo1%bnd%T_shlf   = yelmo1%bnd%c%T0  
     yelmo1%bnd%H_sed    = 0.0 
     yelmo1%bnd%T_srf    = 260.0         ! Random filler values, not used
     yelmo1%bnd%Q_geo    = 50.0          ! Random filler values, not used

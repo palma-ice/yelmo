@@ -1,8 +1,10 @@
 program test_levelset
 
-    use yelmo 
+    use nml
     use ncio 
 
+    use yelmo 
+    
     implicit none
 
     type(yelmo_class)  :: yelmo1

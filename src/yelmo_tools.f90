@@ -4063,14 +4063,14 @@ end if
 
         var_old = 0.0 
         var_old(n2+1:n2+nx,n2+1:n2+ny) = var 
-        var_old(1:n2,:)       = var(n2:1,:)
-        var_old(nx+1:nx+n2,:) = var((nx-n2):nx,:)
-        var_old(:,1:n2)       = var(:,n2:1)
-        var_old(:,ny+1:ny+n2) = var(:,(ny-n2):ny)
-        var_old(1:n2,:)       = var(n2:1,:)
-        var_old(nx+1:nx+n2,:) = var((nx-n2):nx,:)
-        var_old(:,1:n2)       = var(:,n2:1)
-        var_old(:,ny+1:ny+n2) = var(:,(ny-n2):ny)
+        var_old(1:n2,n2+1:n2+ny)       = var(n2:1:-1,:)
+        var_old(nx+1:nx+n2,n2+1:n2+ny) = var((nx-n2+1):nx,:)
+        var_old(n2+1:n2+nx,1:n2)       = var(:,n2:1:-1)
+        var_old(n2+1:n2+nx,ny+1:ny+n2) = var(:,(ny-n2+1):ny)
+        var_old(1:n2,n2+1:n2+ny)       = var(n2:1:-1,:)
+        var_old(nx+1:nx+n2,n2+1:n2+ny) = var((nx-n2+1):nx,:)
+        var_old(n2+1:n2+nx,1:n2)       = var(:,n2:1:-1)
+        var_old(n2+1:n2+nx,ny+1:ny+n2) = var(:,(ny-n2+1):ny)
         
         do j = n2+1, n2+ny 
         do i = n2+1, n2+nx 

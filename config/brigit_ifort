@@ -12,7 +12,7 @@ PETSCROOT = /opt/local/lib/petsc
 INC_PETSC = -I $(PETSC_DIR)/include
 LIB_PETSC = -L${PETSC_DIR}/lib -lpetsc
 
-FFLAGS  = -module $(objdir) -L$(objdir)
+FFLAGS  = -no-wrap-margin -module $(objdir) -L$(objdir)
 
 ifeq ($(parallel), 1)
     # Overwrite default choices with openmp relevant choices 
@@ -21,7 +21,7 @@ ifeq ($(parallel), 1)
     INC_LIS = -I${LISROOT}/include 
     LIB_LIS = -L${LISROOT}/lib/ -llis
 
-    FFLAGS  = -module $(objdir) -L$(objdir) -qopenmp 
+    FFLAGS  = -no-wrap-margin -module $(objdir) -L$(objdir) -qopenmp 
 
 endif 
 

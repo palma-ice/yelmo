@@ -7,7 +7,7 @@ LISROOT = /home/student/apps/lis/lis
 INC_LIS = -I${LISROOT}/include 
 LIB_LIS = -L${LISROOT}/lib/ -llis
 
-FFLAGS  = -module $(objdir) -L$(objdir) 
+FFLAGS  = -no-wrap-margin -module $(objdir) -L$(objdir) 
 LFLAGS  = $(LIB_NC) $(LIB_LIS) $(LIB_MKL) -Wl,-zmuldefs
 
 DFLAGS_NODEBUG = -O2 -fp-model precise

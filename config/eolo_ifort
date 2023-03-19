@@ -7,7 +7,7 @@ LISROOT = /home/fispalma25/apps/lis/lis
 INC_LIS = -I${LISROOT}/include 
 LIB_LIS = -L${LISROOT}/lib/ -llis
 
-FFLAGS  = -module $(objdir) -L$(objdir)
+FFLAGS  = -no-wrap-margin -module $(objdir) -L$(objdir)
 LFLAGS  = $(LIB_NC) $(LIB_LIS) -Wl,-zmuldefs
 
 DFLAGS_NODEBUG = -vec-report0 -O2 -fp-model precise

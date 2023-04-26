@@ -105,7 +105,8 @@ module yelmo_defs
         real(wp)           :: sd_min 
         real(wp)           :: sd_max 
         real(wp)           :: calv_max  
-        real(wp)           :: grad_lim 
+        real(wp)           :: grad_lim
+        real(wp)           :: grad_lim_zb
         real(wp)           :: dist_grz
         integer            :: gl_sep 
         integer            :: gl_sep_nx 

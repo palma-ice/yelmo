@@ -928,6 +928,7 @@ end if
         call nml_read(filename,"ytopo","sd_max",            par%sd_max,           init=init_pars)
         call nml_read(filename,"ytopo","calv_max",          par%calv_max,         init=init_pars)
         call nml_read(filename,"ytopo","grad_lim",          par%grad_lim,         init=init_pars)
+        call nml_read(filename,"ytopo","grad_lim_zb",       par%grad_lim_zb,      init=init_pars)
         call nml_read(filename,"ytopo","dist_grz",          par%dist_grz,         init=init_pars)
         call nml_read(filename,"ytopo","gl_sep",            par%gl_sep,           init=init_pars)
         call nml_read(filename,"ytopo","gl_sep_nx",         par%gl_sep_nx,        init=init_pars)

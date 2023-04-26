@@ -779,7 +779,7 @@ end if
         call ydata_alloc(dom%dta%pd,dom%grd%nx,dom%grd%ny,dom%par%nz_aa,dom%dta%par%pd_age_n_iso)
 
         ! Load data objects   
-        call ydata_load(dom%dta,dom%bnd,filename,dom%tpo%par%grad_lim,dom%grd%dx,dom%tpo%par%boundaries)
+        call ydata_load(dom%dta,dom%bnd,filename,dom%tpo%par%grad_lim_zb,dom%grd%dx,dom%tpo%par%boundaries)
 
         ! Set H_ice_ref and z_bed_ref to present-day ice thickness by default 
         dom%bnd%H_ice_ref = dom%dta%pd%H_ice 
@@ -929,7 +929,7 @@ end if
 
 
             ! Adjust bedrock topography and ice thickness for smoothness
-            call adjust_topography_gradients(z_bed,H_ice,dom%tpo%par%grad_lim,dom%grd%dx,dom%tpo%par%boundaries)
+            call adjust_topography_gradients(z_bed,H_ice,dom%tpo%par%grad_lim_zb,dom%grd%dx,dom%tpo%par%boundaries)
             
 
             ! Additionally modify initial topographic state 

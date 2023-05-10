@@ -14,7 +14,8 @@ module velocity_l1l2
     use solver_ssa_ac
     use solver_linear 
     use velocity_general, only : set_inactive_margins, &
-                        picard_calc_error, picard_calc_error_angle, picard_relax, &
+                        picard_calc_error, picard_calc_error_angle, &
+                        picard_relax_vel, picard_relax_visc, &
                         picard_calc_convergence_l1rel_matrix, picard_calc_convergence_l2 
     
     implicit none 
@@ -295,8 +296,7 @@ else
 end if
 
                 ! Apply relaxation to keep things stable
-                !call relax_ssa(ux_b,uy_b,ux_b_nm1,uy_b_nm1,rel=par%ssa_iter_rel)
-                call picard_relax(ux_b,uy_b,ux_b_nm1,uy_b_nm1,rel=corr_rel)
+                call picard_relax_vel(ux_b,uy_b,ux_b_nm1,uy_b_nm1,rel=corr_rel)
                 
             end if 
 

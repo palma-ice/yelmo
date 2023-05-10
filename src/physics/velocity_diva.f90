@@ -10,7 +10,8 @@ module velocity_diva
     use solver_ssa_ac
     use solver_linear 
     use velocity_general, only : set_inactive_margins, &
-                        picard_calc_error, picard_calc_error_angle, picard_relax, &
+                        picard_calc_error, picard_calc_error_angle,  &
+                        picard_relax_vel, picard_relax_visc, &
                         picard_calc_convergence_l1rel_matrix, picard_calc_convergence_l2 
 
     use grid_calcs 
@@ -126,6 +127,7 @@ contains
         integer :: i, j, k, nx, ny, nz_aa, nz_ac, iter 
         logical :: is_converged
 
+        real(wp), allocatable :: visc_eff_nm1(:,:,:) 
         real(wp), allocatable :: ux_bar_nm1(:,:) 
         real(wp), allocatable :: uy_bar_nm1(:,:)  
         real(wp), allocatable :: beta_eff_acx(:,:)
@@ -161,6 +163,7 @@ contains
         nz_aa = size(ux,3)
 
         ! Prepare local variables 
+        allocate(visc_eff_nm1(nx,ny,nz_aa))
         allocate(ux_bar_nm1(nx,ny))
         allocate(uy_bar_nm1(nx,ny))
         allocate(beta_eff_acx(nx,ny))
@@ -202,8 +205,9 @@ contains
         do iter = 1, par%ssa_iter_max 
 
             ! Store solution from previous iteration (nm1 == n minus 1) 
-            ux_bar_nm1 = ux_bar 
-            uy_bar_nm1 = uy_bar 
+            visc_eff_nm1 = visc_eff
+            ux_bar_nm1   = ux_bar 
+            uy_bar_nm1   = uy_bar 
             
             ! =========================================================================================
             ! Step 1: Calculate fields needed by ssa solver (visc_eff_int, beta_eff)
@@ -240,6 +244,9 @@ contains
                     stop 
 
             end select
+            
+            ! Apply Picard relaxation to viscosity solution in log-space (e.g. Sandip et al., gmd, 2023)
+            call picard_relax_visc(visc_eff,visc_eff_nm1,rel=par%ssa_iter_rel)
             
             ! Calculate depth-integrated effective viscosity
             ! Note L19 uses eta_bar*H in the ssa equation. Yelmo uses eta_int=eta_bar*H directly.
@@ -333,8 +340,7 @@ end if
             !write(*,*) "pic: ", iter, corr_theta, corr_rel
 
             ! Apply relaxation to keep things stable
-            !call relax_ssa(ux_bar,uy_bar,ux_bar_nm1,uy_bar_nm1,rel=par%ssa_iter_rel)
-            call picard_relax(ux_bar,uy_bar,ux_bar_nm1,uy_bar_nm1,rel=corr_rel)
+            call picard_relax_vel(ux_bar,uy_bar,ux_bar_nm1,uy_bar_nm1,rel=corr_rel)
             
             ! Check for convergence
             ! is_converged = check_vel_convergence_l2rel(ux_bar,uy_bar,ux_bar_nm1,uy_bar_nm1,ssa_mask_acx.gt.0,     &

@@ -3068,6 +3068,15 @@ end if
         end do 
         end do 
 
+        ! Special case for infinite boundary conditions - ensure that slope 
+        ! is the same, not the variable itself.
+        select case(trim(boundaries))
+
+            case("infinite","TROUGH") 
+                dvardx(1,:)  = dvardx(2,:)
+                dvardx(nx,:) = dvardx(nx-1,:)
+        end select
+
         ! Finally, ensure that gradient is beneath desired limit 
         call minmax(dvardx,grad_lim)
 
@@ -3157,6 +3166,16 @@ end if
 
         end do 
         end do 
+        
+        ! Special case for infinite boundary conditions - ensure that slope 
+        ! is the same, not the variable itself.
+        select case(trim(boundaries))
+
+            case("infinite") 
+                dvardy(:,1)  = dvardy(:,2)
+                dvardy(:,ny) = dvardy(:,ny-1)
+
+        end select
 
         ! Finally, ensure that gradient is beneath desired limit 
         call minmax(dvardy,grad_lim)

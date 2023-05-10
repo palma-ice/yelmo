@@ -727,6 +727,12 @@ end if
                 dom%dyn%par%boundaries  = "TROUGH"
                 dom%thrm%par%boundaries = "TROUGH"
 
+            case("SLAB")
+
+                dom%tpo%par%boundaries  = "infinite"
+                dom%dyn%par%boundaries  = "periodic"
+                dom%thrm%par%boundaries = "periodic"
+                
             case("ISMIPHOM","slab","periodic","periodic-xy") 
                 ! Periodic boundary conditions in x and y, eg: X_1 = X_n-1; X_n = X_2
 

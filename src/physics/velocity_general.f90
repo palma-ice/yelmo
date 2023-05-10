@@ -28,7 +28,8 @@ module velocity_general
     public :: picard_calc_error_angle 
     public :: picard_calc_convergence_l1rel_matrix
     public :: picard_calc_convergence_l2
-    public :: picard_relax 
+    public :: picard_relax_vel
+    public :: picard_relax_visc
     
 contains 
     
@@ -996,7 +997,7 @@ end if
                 H_mid = 0.5_wp*(H_ice(i,j)+H_ice(ip1,j)) 
             end if
             taud_acx(i,j) = rhog * H_mid * dzsdx(i,j) 
-
+            
             ! Apply limit
             if (taud_acx(i,j) .gt.  taud_lim) taud_acx(i,j) =  taud_lim 
             if (taud_acx(i,j) .lt. -taud_lim) taud_acx(i,j) = -taud_lim 
@@ -1987,7 +1988,7 @@ end if
 
     end subroutine picard_calc_convergence_l2
 
-    elemental subroutine picard_relax(ux,uy,ux_prev,uy_prev,rel)
+    elemental subroutine picard_relax_vel(ux,uy,ux_prev,uy_prev,rel)
         ! Relax velocity solution with previous iteration 
 
         implicit none 
@@ -2004,8 +2005,23 @@ end if
         
         return 
 
-    end subroutine picard_relax
+    end subroutine picard_relax_vel
 
+    elemental subroutine picard_relax_visc(visc,visc_prev,rel)
+        ! Relax velocity solution with previous iteration 
+
+        implicit none 
+
+        real(wp), intent(INOUT) :: visc
+        real(wp), intent(IN)    :: visc_prev
+        real(wp), intent(IN)    :: rel
+
+        ! Apply relaxation 
+        visc = exp( (1.0-rel)*log(visc_prev) + rel*log(visc) )
+        
+        return 
+
+    end subroutine picard_relax_visc
 
 
 

@@ -1,6 +1,6 @@
 #!/bin/bash
 
-fldr='tmp/new01'
+fldr='tmp/new02'
 
 runopt='-r'
 #runopt='-s'

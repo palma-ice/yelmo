@@ -83,9 +83,9 @@ contains
         ! Calculate ice thickness above flotation 
         call calc_H_af(H_af,tpo%now%H_ice,tpo%now%f_ice,bnd%z_bed,bnd%z_sl,bnd%c%rho_ice,bnd%c%rho_sw,use_f_ice=.FALSE.)
 
-        npts_tot  = real(count(mask_tot),prec)
-        npts_grnd = real(count(mask_grnd),prec)
-        npts_flt  = real(count(mask_flt),prec)
+        npts_tot  = real(count(mask_tot),wp)
+        npts_grnd = real(count(mask_grnd),wp)
+        npts_flt  = real(count(mask_flt),wp)
         
         ! ===== Total ice variables =====
 
@@ -103,6 +103,11 @@ contains
             reg%dVidt      = sum(tpo%now%dHidt,mask=mask_tot)*tpo%par%dx*tpo%par%dy*m3_km3              ! [km^3/yr]
             reg%fwf        = -reg%dVidt*conv_km3a_Sv                        ! [Sv]
 
+            ! Calving
+            reg%calv       = sum(tpo%now%calv,mask=mask_tot)*tpo%par%dx*tpo%par%dy              ! [m^3/yr]
+            reg%calv_flt   = sum(tpo%now%calv_flt,mask=mask_tot)*tpo%par%dx*tpo%par%dy          ! [m^3/yr]
+            reg%calv_grnd  = sum(tpo%now%calv_grnd,mask=mask_tot)*tpo%par%dx*tpo%par%dy         ! [m^3/yr]
+            
             ! Volume above sea level
             reg%V_sl       = sum(H_af,mask=mask_tot)*tpo%par%dx*tpo%par%dy*m3_km3   ! [km^3]
             reg%V_sle      = reg%V_sl * bnd%c%conv_km3_sle                          ! [km^3] => [m sle]
@@ -121,29 +126,32 @@ contains
         else 
 
             ! ytopo variables 
-            reg%H_ice      = 0.0_wp 
-            reg%z_srf      = 0.0_wp 
-            reg%dHidt    = 0.0_wp 
-            reg%H_ice_max  = 0.0_wp 
-            reg%dzsdt    = 0.0_wp 
+            reg%H_ice       = 0.0_wp 
+            reg%z_srf       = 0.0_wp 
+            reg%dHidt       = 0.0_wp 
+            reg%H_ice_max   = 0.0_wp 
+            reg%dzsdt       = 0.0_wp 
             
-            reg%V_ice      = 0.0_wp 
-            reg%A_ice      = 0.0_wp 
-            reg%dVidt    = 0.0_wp 
-            reg%fwf        = 0.0_wp 
-            reg%V_sl       = 0.0_wp 
-            reg%V_sle      = 0.0_wp 
+            reg%V_ice       = 0.0_wp 
+            reg%A_ice       = 0.0_wp 
+            reg%dVidt       = 0.0_wp 
+            reg%fwf         = 0.0_wp 
+            reg%calv        = 0.0_wp
+            reg%calv_flt    = 0.0_wp
+            reg%calv_grnd   = 0.0_wp
+            reg%V_sl        = 0.0_wp 
+            reg%V_sle       = 0.0_wp 
 
             ! ydyn variables 
-            reg%uxy_bar    = 0.0_wp 
-            reg%uxy_s      = 0.0_wp 
-            reg%uxy_b      = 0.0_wp 
+            reg%uxy_bar     = 0.0_wp 
+            reg%uxy_s       = 0.0_wp 
+            reg%uxy_b       = 0.0_wp 
             
             ! Boundary variables
-            reg%z_bed      = 0.0_wp 
-            reg%smb        = 0.0_wp 
-            reg%T_srf      = 0.0_wp 
-            reg%bmb        = 0.0_wp 
+            reg%z_bed       = 0.0_wp 
+            reg%smb         = 0.0_wp 
+            reg%T_srf       = 0.0_wp 
+            reg%bmb         = 0.0_wp 
             
         end if 
 
@@ -333,6 +341,14 @@ contains
                       dim1="time",start=[n],ncid=ncid)
         call nc_write(filename,"fwf",reg%fwf,units="Sv",long_name="Rate volume change", &
                       dim1="time",start=[n],ncid=ncid)
+
+        call nc_write(filename,"calv",reg%calv,units="m^3/yr",long_name="Calving rate", &
+                      dim1="time",start=[n],ncid=ncid)
+        call nc_write(filename,"calv_flt",reg%calv_flt,units="m^3/yr",long_name="Potential calving rate (floating)", &
+                      dim1="time",start=[n],ncid=ncid)
+        call nc_write(filename,"calv_grnd",reg%calv_grnd,units="m^3/yr",long_name="Potential calving rate (grounded)", &
+                      dim1="time",start=[n],ncid=ncid)
+
         call nc_write(filename,"V_sl",reg%V_sl*1e-6,units="1e6 km^3",long_name="Ice volume above flotation", &
                       dim1="time",start=[n],ncid=ncid)
         call nc_write(filename,"V_sle",reg%V_sle,units="m sle",long_name="Sea-level equivalent volume", &

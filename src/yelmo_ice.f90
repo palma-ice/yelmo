@@ -44,7 +44,7 @@ contains
         ! Local variables 
         type(yelmo_class)  :: dom_ref 
 
-        real(wp) :: dt_now, dt_max  
+        real(wp) :: dt_now, dt_max, dt_max_0
         real(wp) :: time_now 
         integer  :: n, nstep, n_now, n_dtmin 
         integer  :: n_lim 
@@ -104,12 +104,18 @@ contains
         nstep   = max(nstep,1)  
         n_now   = 0  ! Number of timesteps saved 
 
+        ! Get initial estimate of maximum timestep
+        dt_max_0 = max(time-time_now,0.0_wp)
+
         iter_redo_tot = 0   ! Number of times total this loop 
         allocate(dt_save(nstep))
         dt_save = missing_value 
 
         dom%time%eta_avg      = missing_value
         dom%time%ssa_iter_avg = missing_value
+
+        ! Initialize rate averages
+        call calc_ytopo_rates(dom%tpo,dt=0.0_wp,step="init")
 
         allocate(pc_mask(dom%grd%nx,dom%grd%ny))
         
@@ -372,6 +378,9 @@ end if
             call calc_ytopo_pc(dom%tpo,dom%dyn,dom%mat,dom%thrm,dom%bnd,time_now,dom%tpo%par%topo_fixed,"advance",use_H_pred=dom%par%pc_use_H_pred)
             call calc_ytopo_diagnostic(dom%tpo,dom%dyn,dom%mat,dom%thrm,dom%bnd)
 
+            ! Update time averaging of instantaneous rates
+            call calc_ytopo_rates(dom%tpo,dt_now,step="step")
+
             ! if (time_now .ge. 10.0) then 
             !     write(*,*) time_now
             !     write(*,*) maxval(dom%tpo%now%H_ice_pred)
@@ -469,6 +478,9 @@ end if
             if (abs(time_now - time) .lt. time_tol) exit 
 
         end do 
+
+        ! Finalize averaging of instantaneous rates
+        call calc_ytopo_rates(dom%tpo,dt_max_0,step="final",overwrite=.TRUE.)
 
         ! Update regional calculations (for now entire domain with ice)
         call calc_yregions(dom%reg,dom%tpo,dom%dyn,dom%thrm,dom%mat,dom%bnd,mask=dom%bnd%ice_allowed)

@@ -32,9 +32,10 @@ module yelmo_defs
     integer,  parameter :: MV_INT                = int(MISSING_VALUE)
     
     ! Error distance (very large), error index, and smallest number epsilon 
-    real(wp), parameter :: ERR_DIST = real(1E8,wp) 
-    integer,  parameter :: ERR_IND  = -1 
-    real(wp), parameter :: TOL_UNDERFLOW = real(1E-15,wp)
+    real(wp), parameter :: ERR_DIST      = real(1e8,wp) 
+    integer,  parameter :: ERR_IND       = -1 
+    real(wp), parameter :: TOL           = real(1e-5,wp)
+    real(wp), parameter :: TOL_UNDERFLOW = real(1e-15,wp)
 
     ! Mathematical constants
     real(wp), parameter :: pi  = real(2._dp*acos(0.0_dp),wp)
@@ -158,9 +159,25 @@ module yelmo_defs
         real(wp) :: dt_nm2
     end type
 
+    type ytopo_rates
+        real(wp), allocatable :: dzsdt(:,:)       ! Surface elevation rate of change [m/a] 
+        real(wp), allocatable :: dHidt(:,:)       ! Ice thickness rate of change [m/a] 
+        real(wp), allocatable :: bmb(:,:)         ! Combined field of bmb_grnd and bmb_shlf 
+        real(wp), allocatable :: fmb(:,:)         ! Combined field of fmb_grnd and fmb_shlf 
+        real(wp), allocatable :: mb_applied(:,:)  ! Actual mass balance applied [m/a], for mass balance accounting
+        real(wp), allocatable :: mb_resid(:,:)    ! Residual mass balance from boundary conditions, cleanup
+        real(wp), allocatable :: calv(:,:)        ! Calving rate (applied) [m/a]
+        real(wp), allocatable :: calv_flt(:,:)    ! Reference floating calving rate [m/a]
+        real(wp), allocatable :: calv_grnd(:,:)   ! Reference grounded calving rate [m/a]
+
+        real(wp) :: dt_tot
+    end type
+
     ! ytopo state variables
     type ytopo_state_class
         ! Model variables that the define the state of the domain 
+
+        type(ytopo_rates) :: rates
 
         real(wp), allocatable   :: H_ice(:,:)       ! Ice thickness [m] 
         real(wp), allocatable   :: z_srf(:,:)       ! Surface elevation [m]
@@ -169,11 +186,9 @@ module yelmo_defs
         real(wp), allocatable   :: dHidt(:,:)       ! Ice thickness rate of change [m/a] 
         real(wp), allocatable   :: bmb(:,:)         ! Combined field of bmb_grnd and bmb_shlf 
         real(wp), allocatable   :: fmb(:,:)         ! Combined field of fmb_grnd and fmb_shlf 
-        real(wp), allocatable   :: mb_applied(:,:)  ! Actual mass balance applied [m/a], for mass balance accounting
-        real(wp), allocatable   :: mb_resid(:,:)    ! Residual mass balance from boundary conditions, cleanup
+        real(wp), allocatable   :: mb_applied(:,:)      ! Actual mass balance applied [m/a], for mass balance accounting
+        real(wp), allocatable   :: mb_resid(:,:)        ! Residual mass balance from boundary conditions, cleanup
         
-        real(wp), allocatable   :: G_advec(:,:)     ! [m/yr] Ice thickness tendency due to advection
-
         integer,  allocatable   :: mask_adv(:,:)    ! Advection mask 
         integer,  allocatable   :: mask_new(:,:) 
         integer,  allocatable   :: mask_pred_new(:,:) 
@@ -775,7 +790,8 @@ module yelmo_defs
 
         ! ===== Total ice variables =====
         real(wp)   :: H_ice, z_srf,dHidt, H_ice_max, dzsdt
-        real(wp)   :: V_ice, A_ice, dVidt, fwf, V_sl, V_sle
+        real(wp)   :: V_ice, A_ice, dVidt, fwf, calv, calv_flt, calv_grnd
+        real(wp)   :: V_sl, V_sle
         real(wp)   :: uxy_bar, uxy_s, uxy_b, z_bed, smb, T_srf, bmb
 
         ! ===== Grounded ice variables =====

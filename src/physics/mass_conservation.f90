@@ -414,7 +414,7 @@ contains
             
             ! Limit calving rate to available ice
             if (H_ice(i,j)-dt*G_calv(i,j) .lt. 0.0) G_calv(i,j) = H_ice(i,j)/dt
-
+            
         end do 
         end do
 

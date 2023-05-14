@@ -31,6 +31,7 @@ module yelmo_topography
     public :: calc_ytopo_rk4
     public :: calc_ytopo_pc 
     public :: calc_ytopo_diagnostic 
+    public :: calc_ytopo_rates
     public :: ytopo_par_load
     public :: ytopo_alloc
     public :: ytopo_dealloc
@@ -525,7 +526,7 @@ end if
         real(wp),           intent(IN)    :: dt
 
         ! Local variables 
-        integer :: nx, ny 
+        integer :: i, j, nx, ny 
         real(wp), allocatable :: calv_sd(:,:) 
 
         nx = size(tpo%now%H_ice,1) 
@@ -823,6 +824,101 @@ end if
 
     end subroutine calc_ytopo_diagnostic
 
+    subroutine calc_ytopo_rates(tpo,dt,step,overwrite)
+        ! Calculate average rates over outer timestep
+
+        implicit none
+
+        type(ytopo_class), intent(INOUT) :: tpo 
+        real(wp),          intent(IN)    :: dt 
+        character(len=*),  intent(IN)    :: step 
+        logical, optional, intent(IN)    :: overwrite 
+
+        real(wp), parameter :: tol_dt = 1e-3
+
+        select case(trim(step))
+
+            case("init")
+                ! Initialization of averaging fields - set to zero
+
+                tpo%now%rates%dzsdt         = 0.0
+                tpo%now%rates%dHidt         = 0.0
+                tpo%now%rates%bmb           = 0.0
+                tpo%now%rates%fmb           = 0.0
+                tpo%now%rates%mb_applied    = 0.0
+                tpo%now%rates%mb_resid      = 0.0
+                tpo%now%rates%calv          = 0.0
+                tpo%now%rates%calv_flt      = 0.0
+                tpo%now%rates%calv_grnd     = 0.0
+
+                tpo%now%rates%dt_tot = 0.0 
+
+            case("step")
+                ! Add current step to total
+
+                tpo%now%rates%dzsdt         = tpo%now%dzsdt*dt
+                tpo%now%rates%dHidt         = tpo%now%dHidt*dt
+                tpo%now%rates%bmb           = tpo%now%bmb*dt
+                tpo%now%rates%fmb           = tpo%now%fmb*dt
+                tpo%now%rates%mb_applied    = tpo%now%mb_applied*dt
+                tpo%now%rates%mb_resid      = tpo%now%mb_resid*dt
+                tpo%now%rates%calv          = tpo%now%calv*dt
+                tpo%now%rates%calv_flt      = tpo%now%calv_flt*dt
+                tpo%now%rates%calv_grnd     = tpo%now%calv_grnd*dt
+
+                tpo%now%rates%dt_tot = tpo%now%rates%dt_tot + dt  
+                
+            case("final")
+                ! Divide by total time to get average rate
+
+                if (tpo%now%rates%dt_tot .gt. 0.0) then 
+
+                    tpo%now%rates%dzsdt         = tpo%now%dzsdt / tpo%now%rates%dt_tot
+                    tpo%now%rates%dHidt         = tpo%now%dHidt / tpo%now%rates%dt_tot
+                    tpo%now%rates%bmb           = tpo%now%bmb / tpo%now%rates%dt_tot
+                    tpo%now%rates%fmb           = tpo%now%fmb / tpo%now%rates%dt_tot
+                    tpo%now%rates%mb_applied    = tpo%now%mb_applied / tpo%now%rates%dt_tot
+                    tpo%now%rates%mb_resid      = tpo%now%mb_resid / tpo%now%rates%dt_tot
+                    tpo%now%rates%calv          = tpo%now%calv / tpo%now%rates%dt_tot
+                    tpo%now%rates%calv_flt      = tpo%now%calv_flt / tpo%now%rates%dt_tot
+                    tpo%now%rates%calv_grnd     = tpo%now%calv_grnd / tpo%now%rates%dt_tot
+
+                    ! Check that dt_tot matches outer dt value
+                    if ( abs(dt - tpo%now%rates%dt_tot) .gt. tol_dt) then
+                        write(*,*) "calc_ytopo_rates: dt, dt_tot : ", dt, tpo%now%rates%dt_tot
+                    end if 
+
+                end if
+
+                if (present(overwrite)) then
+                    if (overwrite) then
+                        ! Overwrite the instantaneous rates with averaged rates for output
+
+                        tpo%now%dzsdt        = tpo%now%rates%dzsdt
+                        tpo%now%dHidt        = tpo%now%rates%dHidt
+                        tpo%now%bmb          = tpo%now%rates%bmb
+                        tpo%now%fmb          = tpo%now%rates%fmb
+                        tpo%now%mb_applied   = tpo%now%rates%mb_applied
+                        tpo%now%mb_resid     = tpo%now%rates%mb_resid
+                        tpo%now%calv         = tpo%now%rates%calv
+                        tpo%now%calv_flt     = tpo%now%rates%calv_flt
+                        tpo%now%calv_grnd    = tpo%now%rates%calv_grnd
+
+                    end if
+                end if 
+
+            case DEFAULT 
+
+                write(io_unit_err,*) "calc_ytopo_rates:: Error: step name not recognized."
+                write(io_unit_err,*) "step = ", trim(step)
+                stop 
+
+        end select
+
+        return
+
+    end subroutine calc_ytopo_rates
+
     elemental subroutine gen_mask_bed(mask,f_ice,f_pmp,f_grnd,mask_grz)
         ! Generate an output mask for model conditions at bed
         ! based on input masks 
@@ -979,6 +1075,19 @@ end if
 
         call ytopo_dealloc(now)
 
+        ! Rates (for timestep averages)
+        allocate(now%rates%dzsdt(nx,ny))
+        allocate(now%rates%dHidt(nx,ny))
+        allocate(now%rates%bmb(nx,ny))
+        allocate(now%rates%fmb(nx,ny))
+        allocate(now%rates%mb_applied(nx,ny))
+        allocate(now%rates%mb_resid(nx,ny))
+        allocate(now%rates%calv(nx,ny))
+        allocate(now%rates%calv_flt(nx,ny))
+        allocate(now%rates%calv_grnd(nx,ny))
+        
+        ! Remaining ytopo fields...
+
         allocate(now%H_ice(nx,ny))
         allocate(now%z_srf(nx,ny))
         allocate(now%z_base(nx,ny))
@@ -989,7 +1098,6 @@ end if
         allocate(now%mb_applied(nx,ny))
         allocate(now%mb_resid(nx,ny))
         
-        allocate(now%G_advec(nx,ny))
         allocate(now%mask_adv(nx,ny))
         
         allocate(now%mask_new(nx,ny))
@@ -1041,6 +1149,16 @@ end if
         allocate(now%H_ice_dyn(nx,ny))
         allocate(now%f_ice_dyn(nx,ny))
 
+        now%rates%dzsdt         = 0.0
+        now%rates%dHidt         = 0.0
+        now%rates%bmb           = 0.0
+        now%rates%fmb           = 0.0
+        now%rates%mb_applied    = 0.0
+        now%rates%mb_resid      = 0.0
+        now%rates%calv          = 0.0
+        now%rates%calv_flt      = 0.0
+        now%rates%calv_grnd     = 0.0
+        
         now%H_ice       = 0.0 
         now%z_srf       = 0.0
         now%z_base      = 0.0  
@@ -1051,7 +1169,6 @@ end if
         now%mb_applied  = 0.0 
         now%mb_resid    = 0.0
 
-        now%G_advec     = 0.0
         now%mask_adv    = 0
 
         now%mask_new      = 0 
@@ -1107,6 +1224,16 @@ end if
 
         type(ytopo_state_class), intent(INOUT) :: now
 
+        if (allocated(now%rates%dzsdt))         deallocate(now%rates%dzsdt)
+        if (allocated(now%rates%dHidt))         deallocate(now%rates%dHidt)
+        if (allocated(now%rates%bmb))           deallocate(now%rates%bmb)
+        if (allocated(now%rates%fmb))           deallocate(now%rates%fmb)
+        if (allocated(now%rates%mb_applied))    deallocate(now%rates%mb_applied)
+        if (allocated(now%rates%mb_resid))      deallocate(now%rates%mb_resid)
+        if (allocated(now%rates%calv))          deallocate(now%rates%calv)
+        if (allocated(now%rates%calv_flt))      deallocate(now%rates%calv_flt)
+        if (allocated(now%rates%calv_grnd))     deallocate(now%rates%calv_grnd)
+        
         if (allocated(now%H_ice))       deallocate(now%H_ice)
         if (allocated(now%z_srf))       deallocate(now%z_srf)
         if (allocated(now%z_base))      deallocate(now%z_base)
@@ -1118,7 +1245,6 @@ end if
         if (allocated(now%mb_applied))  deallocate(now%mb_applied)
         if (allocated(now%mb_resid))    deallocate(now%mb_resid)
         
-        if (allocated(now%G_advec))     deallocate(now%G_advec)
         if (allocated(now%mask_adv))    deallocate(now%mask_adv)
         
         if (allocated(now%mask_new))      deallocate(now%mask_new)

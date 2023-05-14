@@ -881,8 +881,14 @@ end if
                     ! Get effective ice thickness
                     call calc_H_eff(H_eff,H_ice(i,j),f_ice(i,j))
 
-                    ! Convert to horizontal volume change, weighted
-                    ! by number of exposed faces.
+                    ! Convert to vertical height change spread over the whole cell
+                    ! Volume calved, V = H_eff*calv_ref*dx
+                    ! Area of grid cell, A = dx*dy
+                    ! Height change spread over cell, 
+                    !   calv = V/A = H_eff*calv_ref*dx / (dx*dy)
+                    !   calv = H_eff*calv_ref / (dy)
+                    ! Using sqrt(dx*dy) in the denominator accounts for the case
+                    ! where dx != dy. If dx=dy, then expresion below is equivalent to above.
                     calv(i,j) = (H_eff*calv_ref) / sqrt(dx*dy)
 
                     ! write(*,*) "calv", i, j, tau_eff(i,j), calv_ref,  &

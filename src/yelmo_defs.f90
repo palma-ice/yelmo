@@ -167,6 +167,7 @@ module yelmo_defs
         real(wp), allocatable :: fmb(:,:)         ! Combined field of fmb_grnd and fmb_shlf 
         real(wp), allocatable :: mb_relax(:,:)    ! Residual mass balance from boundary conditions, cleanup
         real(wp), allocatable :: mb_resid(:,:)    ! Residual mass balance from boundary conditions, cleanup
+        real(wp), allocatable :: mb_err(:,:)      ! Residual error in mass balance accounting 
         real(wp), allocatable :: calv(:,:)        ! Calving rate (applied) [m/a]
         real(wp), allocatable :: calv_flt(:,:)    ! Reference floating calving rate [m/a]
         real(wp), allocatable :: calv_grnd(:,:)   ! Reference grounded calving rate [m/a]
@@ -191,6 +192,7 @@ module yelmo_defs
         real(wp), allocatable   :: calv(:,:)        ! Calving rate (applied) [m/a]
         real(wp), allocatable   :: mb_relax(:,:)    ! Change in mass balance to due relaxation
         real(wp), allocatable   :: mb_resid(:,:)    ! Residual mass balance from boundary conditions, cleanup
+        real(wp), allocatable   :: mb_err(:,:)      ! Residual error in mass balance accounting 
 
         real(wp), allocatable   :: bmb(:,:)         ! Combined field of bmb_grnd and bmb_shlf 
         real(wp), allocatable   :: fmb(:,:)         ! Combined field of fmb_grnd and fmb_shlf    
@@ -231,7 +233,7 @@ module yelmo_defs
         integer,  allocatable   :: mask_bed(:,:)    ! Multi-valued bed mask
         integer,  allocatable   :: mask_grz(:,:)    ! Multi-valued mask for the grounding-line zone
         integer,  allocatable   :: mask_frnt(:,:)   ! Multi-valued mask of ice fronts
-        
+
         real(wp), allocatable   :: dHidt_dyn_n(:,:) ! [m/a] Ice thickness change due to advection only
         real(wp), allocatable   :: H_ice_n(:,:)     ! [m] Ice thickness from the previous timestep 
         real(wp), allocatable   :: z_srf_n(:,:)     ! [m] Surface elevation from the previous timestep 

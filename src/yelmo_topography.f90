@@ -271,7 +271,7 @@ end if
                     ! Get ice-fraction mask for ice thickness  
                     call calc_ice_fraction(tpo%now%f_ice,tpo%now%H_ice,bnd%z_bed,bnd%z_sl, &
                                             bnd%c%rho_ice,bnd%c%rho_sw,tpo%par%margin_flt_subgrid)
-            
+
             end select 
 
             select case(trim(pc_step))
@@ -345,19 +345,19 @@ end if
                     
             end select
 
+            ! Determine rates of change
+            tpo%now%dHidt = (tpo%now%H_ice - tpo%now%H_ice_n) / dt 
+            tpo%now%dzsdt = (tpo%now%z_srf - tpo%now%z_srf_n) / dt 
+
+            ! Determine mass balance error by comparing mass_in - mass_out to dHidt
+            tpo%now%mb_err = tpo%now%dHidt - (tpo%now%mb_applied + tpo%now%calv)
+
         end if 
 
         ! Update fields and masks
         call calc_ytopo_diagnostic(tpo,dyn,mat,thrm,bnd)
 
-        ! Determine rates of change
-        if ( .not. topo_fixed .and. dt .gt. 0.0 ) then 
-
-            tpo%now%dHidt = (tpo%now%H_ice - tpo%now%H_ice_n) / dt 
-            tpo%now%dzsdt = (tpo%now%z_srf - tpo%now%z_srf_n) / dt 
         
-        end if 
-
         if (trim(pc_step) .eq. "advance") then 
             ! Advance timestep here whether topo_fixed was true or not...
             
@@ -726,6 +726,7 @@ end if
                 tpo%now%rates%fmb           = 0.0
                 tpo%now%rates%mb_relax      = 0.0
                 tpo%now%rates%mb_resid      = 0.0
+                tpo%now%rates%mb_err        = 0.0
                 tpo%now%rates%calv          = 0.0
                 tpo%now%rates%calv_flt      = 0.0
                 tpo%now%rates%calv_grnd     = 0.0
@@ -743,6 +744,7 @@ end if
                 tpo%now%rates%fmb           = tpo%now%rates%fmb        + tpo%now%fmb*dt
                 tpo%now%rates%mb_relax      = tpo%now%rates%mb_relax   + tpo%now%mb_relax*dt
                 tpo%now%rates%mb_resid      = tpo%now%rates%mb_resid   + tpo%now%mb_resid*dt
+                tpo%now%rates%mb_err        = tpo%now%rates%mb_err     + tpo%now%mb_err*dt
                 tpo%now%rates%calv          = tpo%now%rates%calv       + tpo%now%calv*dt
                 tpo%now%rates%calv_flt      = tpo%now%rates%calv_flt   + tpo%now%calv_flt*dt
                 tpo%now%rates%calv_grnd     = tpo%now%rates%calv_grnd  + tpo%now%calv_grnd*dt
@@ -762,6 +764,7 @@ end if
                     tpo%now%rates%fmb           = tpo%now%rates%fmb / tpo%now%rates%dt_tot
                     tpo%now%rates%mb_relax      = tpo%now%rates%mb_relax / tpo%now%rates%dt_tot
                     tpo%now%rates%mb_resid      = tpo%now%rates%mb_resid / tpo%now%rates%dt_tot
+                    tpo%now%rates%mb_err        = tpo%now%rates%mb_err / tpo%now%rates%dt_tot
                     tpo%now%rates%calv          = tpo%now%rates%calv / tpo%now%rates%dt_tot
                     tpo%now%rates%calv_flt      = tpo%now%rates%calv_flt / tpo%now%rates%dt_tot
                     tpo%now%rates%calv_grnd     = tpo%now%rates%calv_grnd / tpo%now%rates%dt_tot
@@ -785,6 +788,7 @@ end if
                         tpo%now%fmb         = tpo%now%rates%fmb
                         tpo%now%mb_relax    = tpo%now%rates%mb_relax
                         tpo%now%mb_resid    = tpo%now%rates%mb_resid
+                        tpo%now%mb_err      = tpo%now%rates%mb_err
                         tpo%now%calv        = tpo%now%rates%calv
                         tpo%now%calv_flt    = tpo%now%rates%calv_flt
                         tpo%now%calv_grnd   = tpo%now%rates%calv_grnd
@@ -982,6 +986,7 @@ end if
         allocate(now%rates%fmb(nx,ny))
         allocate(now%rates%mb_relax(nx,ny))
         allocate(now%rates%mb_resid(nx,ny))
+        allocate(now%rates%mb_err(nx,ny))
         allocate(now%rates%calv(nx,ny))
         allocate(now%rates%calv_flt(nx,ny))
         allocate(now%rates%calv_grnd(nx,ny))
@@ -1000,7 +1005,8 @@ end if
         allocate(now%fmb(nx,ny))
         allocate(now%mb_relax(nx,ny))
         allocate(now%mb_resid(nx,ny))
-        
+        allocate(now%mb_err(nx,ny))
+
         allocate(now%mask_adv(nx,ny))
         
         allocate(now%eps_eff(nx,ny))
@@ -1051,6 +1057,7 @@ end if
         now%rates%fmb           = 0.0
         now%rates%mb_relax      = 0.0
         now%rates%mb_resid      = 0.0
+        now%rates%mb_err        = 0.0
         now%rates%calv          = 0.0
         now%rates%calv_flt      = 0.0
         now%rates%calv_grnd     = 0.0
@@ -1066,6 +1073,7 @@ end if
         now%fmb         = 0.0
         now%mb_relax    = 0.0
         now%mb_resid    = 0.0
+        now%mb_err      = 0.0
         now%calv        = 0.0
         now%calv_flt    = 0.0
         now%calv_grnd   = 0.0
@@ -1126,6 +1134,7 @@ end if
         if (allocated(now%rates%mb_applied))    deallocate(now%rates%mb_applied)
         if (allocated(now%rates%mb_relax))      deallocate(now%rates%mb_relax)
         if (allocated(now%rates%mb_resid))      deallocate(now%rates%mb_resid)
+        if (allocated(now%rates%mb_err))        deallocate(now%rates%mb_err)
         if (allocated(now%rates%calv))          deallocate(now%rates%calv)
         if (allocated(now%rates%calv_flt))      deallocate(now%rates%calv_flt)
         if (allocated(now%rates%calv_grnd))     deallocate(now%rates%calv_grnd)
@@ -1142,6 +1151,7 @@ end if
         if (allocated(now%mb_applied))  deallocate(now%mb_applied)
         if (allocated(now%mb_relax))    deallocate(now%mb_relax)
         if (allocated(now%mb_resid))    deallocate(now%mb_resid)
+        if (allocated(now%mb_err))      deallocate(now%mb_err)
         
         if (allocated(now%mask_adv))    deallocate(now%mask_adv)
         

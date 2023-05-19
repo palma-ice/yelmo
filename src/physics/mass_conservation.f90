@@ -591,6 +591,8 @@ contains
         logical  :: is_isthmus_x 
         logical  :: is_isthmus_y 
 
+        real(wp), parameter :: H_min_tol = 1e-6
+
         nx = size(H_ice,1)
         ny = size(H_ice,2) 
 
@@ -614,7 +616,7 @@ contains
         ! Also remove ice that is very small to avoid issues
         where (H_ice_new .lt. 1e-4) H_ice_new = 0.0
         
-        ! Remove margin points that are too thin ====
+        ! Remove margin points that are too thin, or points that are below tolerance ====
 
         H_tmp = H_ice_new 
 
@@ -638,6 +640,11 @@ contains
                 if (f_grnd(i,j) .gt. 0.0_wp .and. H_eff .lt. H_min_grnd) H_ice_new(i,j) = 0.0_wp 
  
             end if 
+
+            ! Also remove very thin ice points (eg 1e-6 m thick - thicker than machine tolerance, but thinner than relevant)
+            ! E.g., for a very small timestep of dt=1e-3 and an accumulation rate of 0.1 m/yr, 
+            ! after one timestep, H = 1e-3*0.1 = 1e-4 m. 
+            if (H_tmp(i,j) .lt. H_min_tol) H_ice_new(i,j) = 0.0_wp 
 
         end do 
         end do 
@@ -670,11 +677,6 @@ contains
         ! Reduce ice thickness for margin points that are thicker 
         ! than inland neighbors ====
 
-if (.FALSE.) then
-    ! ajr, disabled for mass balance checking. When this is active, mass balance
-    ! calculations are quite wrong...
-
-
         H_tmp = H_ice_new
 
         do j = 1, ny 
@@ -705,8 +707,6 @@ if (.FALSE.) then
         end do 
         end do
         
-end if
-
         select case(trim(boundaries))
 
             case("MISMIP3D","TROUGH")

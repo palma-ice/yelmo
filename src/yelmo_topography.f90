@@ -132,11 +132,12 @@ contains
                 case("predictor") 
                     ! Determine predicted ice thickness 
 
-                    ! Store ice thickness and dynamic rate of change from previous timestep 
-                    tpo%now%H_ice_n = tpo%now%H_ice 
+                    ! Store dynamic rate of change from previous timestep,
+                    ! along with ice thickness and surface elevation
+                    ! (the latter only for calculating rate of change later)
                     tpo%now%dHidt_dyn_n = tpo%now%dHidt_dyn
-                    ! Store previous surface elevation too (for calculating rate of change)
-                    tpo%now%z_srf_n = tpo%now%z_srf 
+                    tpo%now%H_ice_n     = tpo%now%H_ice 
+                    tpo%now%z_srf_n     = tpo%now%z_srf 
 
                     ! Get ice-fraction mask for current ice thickness  
                     call calc_ice_fraction(tpo%now%f_ice,tpo%now%H_ice,bnd%z_bed,bnd%z_sl, &

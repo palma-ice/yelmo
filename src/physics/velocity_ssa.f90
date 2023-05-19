@@ -604,6 +604,8 @@ end if
         real(wp) :: visc_eff_mean 
         real(wp) :: wt 
 
+        real(wp), parameter :: visc_min = 1e5_wp
+
         nx = size(visc_eff_int,1)
         ny = size(visc_eff_int,2)
 
@@ -619,6 +621,9 @@ end if
                 !visc_eff_int(i,j) = visc_eff_mean 
                 visc_eff_int(i,j) = 0.0_wp
             end if 
+
+            ! Avoid very low viscosity values, e.g. when ice thickness is < 1m
+            if (visc_eff_int(i,j) .lt. visc_min) visc_eff_int(i,j) = visc_min 
 
         end do 
         end do 

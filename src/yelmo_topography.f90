@@ -158,7 +158,7 @@ end if
 
                     ! Apply rate and update ice thickness (predicted)
                     tpo%now%H_ice = tpo%now%H_ice_n
-                    call apply_tendency(tpo%now%H_ice,tpo%now%dHidt_dyn,dt,"dyn_pred",adjust_mb=.TRUE.)
+                    call apply_tendency(tpo%now%H_ice,tpo%now%dHidt_dyn,dt,"dyn_pred",adjust_mb=.FALSE.)
 
                 case("corrector") 
 
@@ -184,7 +184,7 @@ end if
                     
                     ! Apply rate and update ice thickness (corrected)
                     tpo%now%H_ice = tpo%now%H_ice_n
-                    call apply_tendency(tpo%now%H_ice,tpo%now%dHidt_dyn,dt,"dyn_corr",adjust_mb=.TRUE.)
+                    call apply_tendency(tpo%now%H_ice,tpo%now%dHidt_dyn,dt,"dyn_corr",adjust_mb=.FALSE.)
                     
             end select
 

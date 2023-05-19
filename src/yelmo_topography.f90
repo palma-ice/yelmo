@@ -191,16 +191,17 @@ end if
             ! Note: at this point, mass has only been advected (moved around). In principle,
             ! this is fully conservative and the net Δmb=0. However, due to the predictor-corrector
             ! mixing of dHdt with previous timesteps/iterations, some small amounts of negative
-            ! ice thickness can arise. These are handled above and dHdt_pred/dHdt_corr are
-            ! adjusted to ensure they match the actual changes in each grid cell. The consequence
-            ! is that a very small amount of mass loss can occur after a step that should be
-            ! fully conservative. The quantities are much smaller than other mb quantities
-            ! and localized at the margin, so it should not be problematic.
+            ! ice thickness can arise. The quantities are much smaller than other mb quantities
+            ! and localized at the margin, so it should not be problematic. They should be captured
+            ! and corrected in the apply_tendency routine below, where adjust_mb=.TRUE. ensures
+            ! the ice thickness stays >= 0. Alternatively, adjust_mb=.TRUE. can be imposed above,
+            ! but this implies that the advective dHdt fields are less precise, potentially
+            ! impacting the pc-stability.
 
             select case(trim(pc_step))
 
                 case("predictor","corrector")
-                    ! For predictor or corrector step, also calculate all mass balance changes
+                    ! For either predictor or corrector step, also calculate all mass balance changes
 
                     ! Diagnose mass balance (forcing) tendency on ice thickness from previous iteration
                     call calc_G_mbal(tpo%now%mb_applied,tpo%now%H_ice_n,tpo%now%f_grnd,mbal,dt)
@@ -209,16 +210,13 @@ end if
                     call apply_tendency(tpo%now%H_ice,tpo%now%mb_applied,dt,"mbal",adjust_mb=.TRUE.)
                     
                     ! Calculate and apply calving
-                    call calc_ytopo_calving(tpo,dyn,mat,thrm,bnd,mbal,dt)
+                    call calc_ytopo_calving(tpo,dyn,mat,thrm,bnd,dt)
 
                     ! Get ice-fraction mask for ice thickness  
                     call calc_ice_fraction(tpo%now%f_ice,tpo%now%H_ice,bnd%z_bed,bnd%z_sl, &
                                             bnd%c%rho_ice,bnd%c%rho_sw,tpo%par%margin_flt_subgrid)
                     
                     ! If desired, finally relax solution to reference state
-                    ! Note, when relaxing, mass balance is not conserved!!
-                    ! Currently, mass changes due to relaxation are not tracked either. This
-                    ! could be implmented in the future if useful.
                     if (tpo%par%topo_rel .ne. 0) then 
 
                         select case(trim(tpo%par%topo_rel_field))
@@ -371,7 +369,7 @@ end if
 
     end subroutine calc_ytopo_pc
 
-    subroutine calc_ytopo_calving(tpo,dyn,mat,thrm,bnd,mbal,dt)
+    subroutine calc_ytopo_calving(tpo,dyn,mat,thrm,bnd,dt)
 
         implicit none 
 
@@ -380,7 +378,6 @@ end if
         type(ymat_class),   intent(IN)    :: mat
         type(ytherm_class), intent(IN)    :: thrm  
         type(ybound_class), intent(IN)    :: bnd 
-        real(wp),           intent(IN)    :: mbal(:,:) 
         real(wp),           intent(IN)    :: dt
 
         ! Local variables 

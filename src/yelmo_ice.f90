@@ -22,7 +22,7 @@ module yelmo_ice
     use yelmo_regions 
 
     use topography, only : remove_englacial_lakes
-    use mass_conservation, only : apply_ice_thickness_boundaries
+    use mass_conservation, only : calc_G_boundaries, check_mass_conservation, apply_tendency
 
     implicit none 
 
@@ -70,6 +70,7 @@ contains
 
         logical, parameter :: update_others_pc  = .FALSE. 
         logical, parameter :: very_verbose      = .FALSE. 
+        logical, parameter :: check_mb          = .TRUE. 
 
         ! Safety: check status of model object, 
         ! Has it been initialized?
@@ -115,7 +116,7 @@ contains
         dom%time%ssa_iter_avg = missing_value
 
         ! Initialize rate averages
-        call calc_ytopo_rates(dom%tpo,dt=0.0_wp,step="init")
+        call calc_ytopo_rates(dom%tpo,dom%bnd,time,dt=0.0_wp,step="init",check_mb=check_mb)
 
         allocate(pc_mask(dom%grd%nx,dom%grd%ny))
         
@@ -379,7 +380,7 @@ end if
             call calc_ytopo_diagnostic(dom%tpo,dom%dyn,dom%mat,dom%thrm,dom%bnd)
 
             ! Update time averaging of instantaneous rates
-            call calc_ytopo_rates(dom%tpo,dt_now,step="step")
+            call calc_ytopo_rates(dom%tpo,dom%bnd,time_now,dt_now,step="step",check_mb=check_mb)
 
             ! if (time_now .ge. 10.0) then 
             !     write(*,*) time_now
@@ -480,7 +481,7 @@ end if
         end do 
 
         ! Finalize averaging of instantaneous rates
-        call calc_ytopo_rates(dom%tpo,dt_max_0,step="final",overwrite=.TRUE.)
+        call calc_ytopo_rates(dom%tpo,dom%bnd,time,dt_max_0,step="final",overwrite=.TRUE.,check_mb=check_mb)
 
         ! Update regional calculations (for now entire domain with ice)
         call calc_yregions(dom%reg,dom%tpo,dom%dyn,dom%thrm,dom%mat,dom%bnd,mask=dom%bnd%ice_allowed)
@@ -519,6 +520,14 @@ end if
 
             ! write(*,*) "time2: ", time, time_now, dom%tpo%par%time, dom%tpo%par%time_calv, &
             !                                     dom%thrm%par%time, dom%mat%par%time, dom%dyn%par%time
+
+
+            ! Check mass conservation if desired (uncomment)
+            ! call check_mass_conservation(dom%tpo%now%H_ice,dom%tpo%now%f_ice,dom%tpo%now%f_grnd,dom%tpo%now%dHidt, &
+            !                 dom%tpo%now%mb_applied,dom%tpo%now%calv,dom%tpo%now%mb_dyn,dom%bnd%smb,dom%tpo%now%bmb, &
+            !                 dom%tpo%now%fmb,dom%tpo%now%mb_resid,dom%grd%dx,dom%bnd%c%sec_year,time_now,dt_max_0, &
+            !                 units="km^3/yr",label="final")
+
         end if 
 
 
@@ -981,12 +990,14 @@ end if
             dom%bnd%z_bed     = z_bed 
             dom%bnd%z_bed_sd  = z_bed_sd 
 
-            ! Finally, apply all additional (generally artificial) ice thickness adjustments 
-            ! and store changes in residual mass balance field. 
+            ! Finally, calculate and apply all additional (generally artificial) ice thickness adjustments
             ! Set minimum ice thickness to 1m for safety to start.
-            call apply_ice_thickness_boundaries(dom%tpo%now%mb_resid,dom%tpo%now%H_ice,dom%tpo%now%f_ice,dom%tpo%now%f_grnd, &
+            call calc_G_boundaries(dom%tpo%now%mb_resid,dom%tpo%now%H_ice,dom%tpo%now%f_ice,dom%tpo%now%f_grnd, &
                                                 dom%dyn%now%uxy_b,dom%bnd%ice_allowed,dom%tpo%par%boundaries,dom%bnd%H_ice_ref, &
-                                                H_min_flt=1.0_wp,H_min_grnd=1.0_wp,dt=0.0,reset=.TRUE.)
+                                                H_min_flt=1.0_wp,H_min_grnd=1.0_wp,dt=1.0_wp)
+
+            ! Apply rate and update ice thickness
+            call apply_tendency(dom%tpo%now%H_ice,dom%tpo%now%mb_resid,dt=1.0_wp,label="init")
 
         end if 
 

@@ -5,10 +5,6 @@ module topography
     implicit none 
 
     private  
-    
-    public :: extend_floating_slab
-    public :: remove_fractional_ice
-    public :: remove_icebergs 
 
     public :: calc_ice_fraction
     public :: calc_ice_front
@@ -37,180 +33,6 @@ module topography
     public :: determine_grounded_fractions
 
 contains 
-    
-    subroutine extend_floating_slab(H_ice,f_grnd,H_slab,n_ext)
-        ! Extend ice field so that there is always 
-        ! floating ice next to grounded marine margins
-        ! Extended ice should be very thin, will 
-        ! be assigned value H_slab. Slab will be extended
-        ! n_ext points away from marine margin
-
-        implicit none 
-
-        real(wp), intent(INOUT) :: H_ice(:,:) 
-        real(wp), intent(IN)    :: f_grnd(:,:) 
-        real(wp), intent(IN)    :: H_slab       ! Typically 1 or 0.1 m. 
-        integer,  intent(IN)    :: n_ext        ! Number of points to extend slab
-        
-        ! Local variables 
-        integer :: i, j, nx, ny, iter 
-        integer :: im1, ip1, jm1, jp1
-        logical :: is_marine 
-
-        logical  :: ms4(4)
-        real(wp) :: Hi4(4) 
-        real(wp) :: fg4(4)
-        
-        logical,  allocatable :: mask_slab(:,:)
-        real(wp), allocatable :: H_new(:,:) 
-
-        nx = size(H_ice,1) 
-        ny = size(H_ice,2) 
-
-        allocate(mask_slab(nx,ny)) 
-        allocate(H_new(nx,ny)) 
-
-        mask_slab = .FALSE. 
-        H_new     = H_ice 
-
-        do iter = 1, n_ext
-
-            do j = 1, ny 
-            do i = 1, nx 
-
-                ! BC: Periodic boundary conditions
-                im1 = i-1
-                if (im1 == 0) then
-                    im1 = nx
-                end if
-                ip1 = i+1
-                if (ip1 == nx+1) then
-                    ip1 = 1
-                end if
-
-                jm1 = j-1
-                if (jm1 == 0) then
-                    jm1 = ny
-                end if
-                jp1 = j+1
-                if (jp1 == ny+1) then
-                    jp1 = 1
-                end if
-
-                if ( f_grnd(i,j) .eq. 0.0 .and. H_ice(i,j) .eq. 0.0 ) then 
-                    ! Floating ice-free ocean point
-                    
-                    ! Get neighbor values in convenient arrays
-                    fg4 = [f_grnd(im1,j),f_grnd(ip1,j),f_grnd(i,jm1),f_grnd(i,jp1)]
-                    Hi4 = [H_ice(im1,j),H_ice(ip1,j),H_ice(i,jm1),H_ice(i,jp1)]
-                    ms4 = [mask_slab(im1,j),mask_slab(ip1,j),mask_slab(i,jm1),mask_slab(i,jp1)]
-
-                    if ( (count(fg4 .gt. 0.0 .and. Hi4 .gt. 0.0) .gt. 0) .or. &
-                         (count(ms4) .gt. 0) ) then 
-                        ! At least one neighbors is either a grounded point
-                        ! or an extended slab point - make this point extended slab.
-
-                        H_new(i,j)     = H_slab 
-                        
-                    end if
-
-                end if 
-
-            end do 
-            end do 
-
-            ! Update H_ice to current array 
-            H_ice = H_new 
-
-            ! Update mask_slab
-            where(H_ice .eq. H_slab) 
-                mask_slab = .TRUE. 
-            elsewhere
-                mask_slab = .FALSE.
-            end where
-
-        end do 
-
-        return
-
-    end subroutine extend_floating_slab
-
-    subroutine remove_fractional_ice(H_ice,f_ice)
-        ! Eliminate fractional ice covered points that only 
-        ! have fractional ice neighbors. 
-
-        implicit none 
-
-        real(wp), intent(INOUT) :: H_ice(:,:) 
-        real(wp), intent(INOUT) :: f_ice(:,:) 
-        
-        ! Local variables 
-        integer :: i, j, nx, ny 
-        integer :: im1, ip1, jm1, jp1 
-        real(wp), allocatable :: H_new(:,:) 
-
-        nx = size(H_ice,1) 
-        ny = size(H_ice,2) 
-
-        allocate(H_new(nx,ny)) 
-
-        H_new = H_ice 
-
-        do j = 1, ny 
-        do i = 1, nx 
-
-            ! BC: Periodic boundary conditions
-            im1 = i-1
-            if (im1 == 0) then
-                im1 = nx
-            end if
-            ip1 = i+1
-            if (ip1 == nx+1) then
-                ip1 = 1
-            end if
-
-            jm1 = j-1
-            if (jm1 == 0) then
-                jm1 = ny
-            end if
-            jp1 = j+1
-            if (jp1 == ny+1) then
-                jp1 = 1
-            end if
-
-            if (f_ice(i,j) .gt. 0.0 .and. f_ice(i,j) .lt. 1.0) then 
-                ! Fractional ice-covered point 
-
-                if ( count([f_ice(im1,j),f_ice(ip1,j), &
-                        f_ice(i,jm1),f_ice(i,jp1)] .eq. 1.0) .eq. 0) then 
-                    ! No fully ice-covered neighbors available.
-                    ! Point should be removed. 
-
-                    H_new(i,j) = 0.0_wp 
-
-                end if
-
-            end if
-
-        end do 
-        end do
-
-        ! Update ice thickness 
-        H_ice = H_new 
-
-        return
-
-    end subroutine remove_fractional_ice
-
-    subroutine remove_icebergs(H_ice)
-
-        implicit none 
-
-        real(wp), intent(INOUT) :: H_ice(:,:) 
-
-        return
-
-    end subroutine remove_icebergs
 
     subroutine find_connected_mask(mask,mask_ref,mask_now)
         ! Brute-force routine to find all points 
@@ -1037,7 +859,7 @@ contains
             H_grnd = H_eff + (z_bed-z_sl)
         end if 
 
-        ! ajr: to test somewhere eventually, more closely follows Gladstone et al (2010), Leguy etl (2021)
+        ! ajr: to test somewhere eventually, more closely follows Gladstone et al (2010), Leguy et al (2021)
         !H_grnd = -( (z_sl-z_bed) - rho_ice_sw*H_eff )
 
         return 

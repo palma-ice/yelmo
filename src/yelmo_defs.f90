@@ -132,12 +132,14 @@ module yelmo_defs
 
     end type
 
-    type ytopo_amc_class 
+    type ytopo_pc_class 
 
         integer    :: nx, ny 
         real(wp)   :: dt_zeta
 
         real(wp), allocatable   :: dHdt_n(:,:)      ! [m/a] Ice thickness change due to advection only
+        real(wp), allocatable   :: dHdt_pred(:,:)   ! [m/a] Ice thickness change due to advection only
+        real(wp), allocatable   :: dHdt_corr(:,:)   ! [m/a] Ice thickness change due to advection only
         real(wp), allocatable   :: H_ice_n(:,:)     ! [m] Ice thickness from the previous timestep 
         real(wp), allocatable   :: H_ice_pred(:,:)  ! [m] Ice thickness, predicted, for time=n+1
         real(wp), allocatable   :: H_ice_corr(:,:)  ! [m] Ice thickness, corrected, for time=n+1 
@@ -162,9 +164,10 @@ module yelmo_defs
     type ytopo_rates
         real(wp), allocatable :: dzsdt(:,:)       ! Surface elevation rate of change [m/a] 
         real(wp), allocatable :: dHidt(:,:)       ! Ice thickness rate of change [m/a] 
+        real(wp), allocatable :: mb_applied(:,:)  ! Actual mass balance applied [m/a], for mass balance accounting
         real(wp), allocatable :: bmb(:,:)         ! Combined field of bmb_grnd and bmb_shlf 
         real(wp), allocatable :: fmb(:,:)         ! Combined field of fmb_grnd and fmb_shlf 
-        real(wp), allocatable :: mb_applied(:,:)  ! Actual mass balance applied [m/a], for mass balance accounting
+        real(wp), allocatable :: mb_dyn(:,:)      ! Change in mass balance to due dynamics (ie, dHidt_dyn)
         real(wp), allocatable :: mb_resid(:,:)    ! Residual mass balance from boundary conditions, cleanup
         real(wp), allocatable :: calv(:,:)        ! Calving rate (applied) [m/a]
         real(wp), allocatable :: calv_flt(:,:)    ! Reference floating calving rate [m/a]
@@ -184,15 +187,13 @@ module yelmo_defs
         real(wp), allocatable   :: z_base(:,:)      ! Ice-base elevation [m]
         real(wp), allocatable   :: dzsdt(:,:)       ! Surface elevation rate of change [m/a] 
         real(wp), allocatable   :: dHidt(:,:)       ! Ice thickness rate of change [m/a] 
+        real(wp), allocatable   :: mb_applied(:,:)  ! Actual mass balance applied [m/a], for mass balance accounting
         real(wp), allocatable   :: bmb(:,:)         ! Combined field of bmb_grnd and bmb_shlf 
         real(wp), allocatable   :: fmb(:,:)         ! Combined field of fmb_grnd and fmb_shlf 
-        real(wp), allocatable   :: mb_applied(:,:)      ! Actual mass balance applied [m/a], for mass balance accounting
-        real(wp), allocatable   :: mb_resid(:,:)        ! Residual mass balance from boundary conditions, cleanup
+        real(wp), allocatable   :: mb_dyn(:,:)      ! Change in mass balance to due dynamics (ie, dHidt_dyn)
+        real(wp), allocatable   :: mb_resid(:,:)    ! Residual mass balance from boundary conditions, cleanup
         
         integer,  allocatable   :: mask_adv(:,:)    ! Advection mask 
-        integer,  allocatable   :: mask_new(:,:) 
-        integer,  allocatable   :: mask_pred_new(:,:) 
-        integer,  allocatable   :: mask_corr_new(:,:) 
         
         real(wp), allocatable   :: eps_eff(:,:)     ! Effective strain [1/yr]
         real(wp), allocatable   :: tau_eff(:,:)     ! Effective stress [Pa]
@@ -236,8 +237,6 @@ module yelmo_defs
         
         real(wp), allocatable   :: z_srf_n(:,:)     ! [m] Surface elevation from the previous timestep 
         
-        type(ytopo_amc_class)   :: amc
-        
         real(wp), allocatable   :: H_ice_dyn(:,:) 
         real(wp), allocatable   :: f_ice_dyn(:,:) 
         
@@ -248,6 +247,7 @@ module yelmo_defs
 
         type(ytopo_param_class) :: par          ! Parameters
         type(ytopo_state_class) :: now          ! Variables
+        type(ytopo_pc_class)    :: pc           ! pc-related variables
         type(rk4_class)         :: rk4 
         
     end type

@@ -573,7 +573,9 @@ contains
                        dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
         call nc_write(filename,"calv",ylmo%tpo%now%calv,units="m/yr ice equiv.",long_name="Calving rate", &
                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-        call nc_write(filename,"calv_grnd",ylmo%tpo%now%calv_grnd,units="m/yr ice equiv.",long_name="Grounded calving rate", &
+        call nc_write(filename,"calv_flt",ylmo%tpo%now%calv_flt,units="m/yr ice equiv.",long_name="Floating potential calving rate", &
+                      dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
+        call nc_write(filename,"calv_grnd",ylmo%tpo%now%calv_grnd,units="m/yr ice equiv.",long_name="Grounded potential calving rate", &
                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
         call nc_write(filename,"f_ice",ylmo%tpo%now%f_ice,units="1",long_name="Total ice fraction", &
                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
@@ -596,8 +598,6 @@ contains
         call nc_write(filename,"dHidt",ylmo%tpo%now%dHidt,units="m/yr",long_name="Ice thickness rate of change", &
                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
         call nc_write(filename,"dzsdt",ylmo%tpo%now%dzsdt,units="m/yr",long_name="Surface elevation rate of change", &
-                      dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-        call nc_write(filename,"mask_new",ylmo%tpo%now%mask_new,units="",long_name="New ice mask", &
                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
         
         call nc_write(filename,"dist_grline",ylmo%tpo%now%dist_grline,units="km",long_name="Distance to grounding line", &

@@ -1,6 +1,6 @@
 module mass_conservation
 
-    use yelmo_defs, only : sp, dp, wp, TOL_UNDERFLOW, MISSING_VALUE
+    use yelmo_defs, only : sp, dp, wp, TOL_UNDERFLOW, MISSING_VALUE, io_unit_err
     use yelmo_tools, only : get_neighbor_indices, fill_borders_2D, set_boundaries_2D_aa
 
     use solver_advection, only : calc_advec2D  
@@ -11,19 +11,162 @@ module mass_conservation
 
     private
 
+    public :: check_mass_conservation
+    public :: apply_tendency
     public :: calc_G_advec_simple
     public :: calc_G_advec
     public :: calc_G_mbal
     public :: calc_G_calv
+    public :: calc_G_boundaries
+
+    public :: extend_floating_slab
+    public :: calc_G_remove_fractional_ice
+    public :: remove_icebergs 
 
     public :: calc_ice_thickness_dyn
     public :: calc_ice_thickness_mbal
     public :: calc_ice_thickness_calving
-    public :: apply_ice_thickness_boundaries
     public :: relax_ice_thickness
 
 contains 
     
+    subroutine check_mass_conservation(H_ice,f_ice,f_grnd,dHidt,mb_applied,mb_calv,mb_dyn,smb,bmb,fmb, &
+                                                                mb_resid,dx,sec_year,time,dt,units,label)
+
+        implicit none
+
+        real(wp), intent(IN) :: H_ice(:,:)
+        real(wp), intent(IN) :: f_ice(:,:)
+        real(wp), intent(IN) :: f_grnd(:,:)
+        real(wp), intent(IN) :: dHidt(:,:)
+        real(wp), intent(IN) :: mb_applied(:,:)
+        real(wp), intent(IN) :: mb_calv(:,:)
+        real(wp), intent(IN) :: mb_dyn(:,:)
+        real(wp), intent(IN) :: smb(:,:)
+        real(wp), intent(IN) :: bmb(:,:)
+        real(wp), intent(IN) :: fmb(:,:)
+        real(wp), intent(IN) :: mb_resid(:,:)
+        real(wp), intent(IN) :: dx 
+        real(wp), intent(IN) :: sec_year
+        real(wp), intent(IN) :: time
+        real(wp), intent(IN) :: dt
+        character(len=*), intent(IN) :: units 
+        character(len=*), intent(IN) :: label 
+
+        ! Local variables
+        integer  :: npts
+        real(wp) :: tot_dHidt
+        real(wp) :: tot_components
+        real(wp) :: tot_mb_applied
+        real(wp) :: tot_mb_calv
+        real(wp) :: tot_mb_dyn
+        real(wp) :: conv
+
+        real(wp) :: percent_error
+
+        real(wp), parameter :: tol_mb = 1e-6
+
+        ! Determine conversion factor to units of interest from [m^3/yr]
+
+        select case(trim(units))
+
+            case("m^3/yr")
+
+                conv = 1.0 
+
+            case("km^3/yr")
+
+                conv = 1e-9
+
+            case("Sv")
+
+                conv = 1e-6 / sec_year
+
+            case DEFAULT
+
+                write(io_unit_err,*) "check_mass_conservation:: Error: units not recognized."
+                write(io_unit_err,*) "units = ", trim(units)
+                stop
+
+        end select
+
+        ! Calculate totals, initially [m^3/yr] => [units]
+ 
+        tot_dHidt       = sum(dHidt)*dx*dx      * conv
+        tot_mb_applied  = sum(mb_applied)*dx*dx * conv
+        tot_mb_calv     = sum(mb_calv)*dx*dx    * conv
+        tot_mb_dyn      = sum(mb_dyn)*dx*dx     * conv
+
+        ! Get total of components and percent error
+        tot_components = tot_mb_applied + tot_mb_calv
+        percent_error  = (tot_components - tot_dHidt) / (tot_dHidt+tol_mb) * 100.0 
+
+        write(*,"(a8,a,2f9.3,a3,2g14.4,g10.3,a3,2g13.4,a3,g13.4)") &
+                    trim(label), " mbcheck ["//trim(units)//"]: ", time, dt, " | ", &
+                    tot_dHidt, tot_components, percent_error, " | ", &
+                    tot_mb_applied, tot_mb_calv !, " | ", tot_mb_dyn
+
+        return
+
+    end subroutine check_mass_conservation
+
+    subroutine apply_tendency(H_ice,mb_dot,dt,label,adjust_mb)
+
+        implicit none
+
+        real(wp), intent(INOUT) :: H_ice(:,:)
+        real(wp), intent(INOUT) :: mb_dot(:,:)
+        real(wp), intent(IN)    :: dt 
+        character(len=*),  intent(IN) :: label 
+        logical, optional, intent(IN) :: adjust_mb
+
+        ! Local variables
+        integer :: i, j, nx, ny
+        real(wp) :: H_prev
+        real(wp) :: dHdt 
+        logical  :: allow_adjust_mb
+        
+        if (dt .gt. 0.0) then 
+            ! Only apply this routine if dt > 0!
+
+            allow_adjust_mb = .FALSE.
+            if (present(adjust_mb)) allow_adjust_mb = adjust_mb 
+
+            nx = size(H_ice,1)
+            ny = size(H_ice,2)
+
+            do j = 1, ny 
+            do i = 1, nx 
+
+                ! Store previous ice thickness
+                H_prev = H_ice(i,j) 
+
+                ! Now update ice thickness with tendency for this timestep 
+                H_ice(i,j) = H_prev + dt*mb_dot(i,j)
+
+                ! Limit ice thickness to zero 
+                if (H_ice(i,j) .lt. 0.0) H_ice(i,j) = 0.0 
+
+                ! Ensure tiny numeric ice thicknesses are removed
+                if (abs(H_ice(i,j)) .lt. TOL_UNDERFLOW) H_ice(i,j) = 0.0
+                
+                ! Calculate actual current rate of change
+                dHdt = (H_ice(i,j) - H_prev) / dt 
+
+                ! Update mb rate to match ice rate of change perfectly
+                if (allow_adjust_mb) then
+                    mb_dot(i,j) = dHdt
+                end if 
+
+            end do
+            end do
+
+        end if 
+
+        return
+
+    end subroutine apply_tendency
+
     subroutine calc_G_advec_simple(G_advec,H_ice,f_ice,ux,uy,mask_adv, &
                                         solver,boundaries,dx,dt,F)
         ! Interface subroutine to update ice thickness through application
@@ -410,10 +553,11 @@ contains
                 calv_grnd_now = 0.0_wp
             end if
 
-            G_calv(i,j) = calv_flt_now + calv_grnd_now
+            ! Calculate calving rate tendency (negative == mass loss)
+            G_calv(i,j) = -(calv_flt_now + calv_grnd_now)
             
             ! Limit calving rate to available ice
-            if (H_ice(i,j)-dt*G_calv(i,j) .lt. 0.0) G_calv(i,j) = H_ice(i,j)/dt
+            if (H_ice(i,j)+dt*G_calv(i,j) .lt. 0.0) G_calv(i,j) = -H_ice(i,j)/dt
             
         end do 
         end do
@@ -421,6 +565,404 @@ contains
         return 
 
     end subroutine calc_G_calv
+
+    subroutine calc_G_boundaries(mb_resid,H_ice,f_ice,f_grnd,uxy_b,ice_allowed,boundaries, &
+                                                            H_ice_ref,H_min_flt,H_min_grnd,dt)
+
+        implicit none
+
+        real(wp),           intent(INOUT)   :: mb_resid(:,:)            ! [m/yr] Residual mass balance
+        real(wp),           intent(IN)      :: H_ice(:,:)               ! [m] Ice thickness 
+        real(wp),           intent(IN)      :: f_ice(:,:)               ! [--] Fraction of ice cover
+        real(wp),           intent(IN)      :: f_grnd(:,:)              ! [--] Grounded ice fraction
+        real(wp),           intent(IN)      :: uxy_b(:,:)               ! [m/a] Basal sliding speed, aa-nodes
+        logical,            intent(IN)      :: ice_allowed(:,:)         ! Mask of where ice is allowed to be greater than zero 
+        character(len=*),   intent(IN)      :: boundaries               ! Boundary condition choice
+        real(wp),           intent(IN)      :: H_ice_ref(:,:)           ! [m]  Reference ice thickness to fill with for boundaries=="fixed"
+        real(wp),           intent(IN)      :: H_min_flt                ! [m] Minimum allowed floating ice thickness 
+        real(wp),           intent(IN)      :: H_min_grnd               ! [m] Minimum allowed grounded ice thickness 
+        real(wp),           intent(IN)      :: dt                       ! [yr] Timestep
+
+        ! Local variables 
+        integer :: i, j, nx, ny 
+        integer :: im1, ip1, jm1, jp1 
+        real(wp), allocatable :: H_ice_new(:,:)
+        real(wp), allocatable :: H_tmp(:,:)
+        real(wp) :: H_eff
+        real(wp) :: H_max 
+        logical  :: is_margin 
+        logical  :: is_island 
+        logical  :: is_isthmus_x 
+        logical  :: is_isthmus_y 
+
+        nx = size(H_ice,1)
+        ny = size(H_ice,2) 
+
+        allocate(H_tmp(nx,ny)) 
+        allocate(H_ice_new(nx,ny)) 
+        H_ice_new = H_ice 
+
+        ! Apply special case for symmetric EISMINT domain when basal sliding is active
+        ! (ensure summit thickness does not grow disproportionately)
+        if (trim(boundaries) .eq. "EISMINT" .and. maxval(uxy_b) .gt. 0.0) then 
+            i = (nx-1)/2 
+            j = (ny-1)/2
+            H_ice_new(i,j) = (H_ice(i-1,j)+H_ice(i+1,j) &
+                                    +H_ice(i,j-1)+H_ice(i,j+1)) / 4.0 
+        end if  
+        
+        ! Artificially delete ice from locations that are not allowed
+        ! according to boundary mask (ie, EISMINT, BUELER-A, open ocean)
+        where (.not. ice_allowed) H_ice_new = 0.0 
+        
+        ! Also remove ice that is very small to avoid issues
+        where (H_ice_new .lt. 1e-4) H_ice_new = 0.0
+        
+        ! Remove margin points that are too thin ====
+
+        H_tmp = H_ice_new 
+
+        do j = 1, ny 
+        do i = 1, nx 
+
+            ! Get neighbor indices
+            call get_neighbor_indices(im1,ip1,jm1,jp1,i,j,nx,ny,boundaries)
+            
+            is_margin = H_tmp(i,j) .gt. 0.0 .and. &
+                count([H_tmp(im1,j),H_tmp(ip1,j),H_tmp(i,jm1),H_tmp(i,jp1)].eq.0.0) .gt. 0
+
+            if (is_margin) then
+                ! Ice covered point at the margin
+
+                ! Calculate current ice thickness 
+                call calc_H_eff(H_eff,H_ice_new(i,j),f_ice(i,j)) 
+
+                ! Remove ice that is too thin 
+                if (f_grnd(i,j) .eq. 0.0_wp .and. H_eff .lt. H_min_flt)  H_ice_new(i,j) = 0.0_wp 
+                if (f_grnd(i,j) .gt. 0.0_wp .and. H_eff .lt. H_min_grnd) H_ice_new(i,j) = 0.0_wp 
+ 
+            end if 
+
+        end do 
+        end do 
+
+        ! Remove ice islands =====
+
+        H_tmp = H_ice_new 
+
+        do j = 1, ny 
+        do i = 1, nx 
+
+            ! Get neighbor indices
+            call get_neighbor_indices(im1,ip1,jm1,jp1,i,j,nx,ny,boundaries)
+            
+            ! Check for ice islands
+            is_island = H_tmp(i,j) .gt. 0.0 .and. &
+                count([H_tmp(im1,j),H_tmp(ip1,j),H_tmp(i,jm1),H_tmp(i,jp1)].gt.0.0) .eq. 0
+
+            if (is_island) then 
+                ! Ice-covered island
+                ! Remove ice completely. 
+
+                H_ice_new(i,j)   = 0.0_wp 
+
+            end if 
+
+        end do 
+        end do 
+
+        ! Reduce ice thickness for margin points that are thicker 
+        ! than inland neighbors ====
+
+if (.FALSE.) then
+    ! ajr, disabled for mass balance checking. When this is active, mass balance
+    ! calculations are quite wrong...
+
+
+        H_tmp = H_ice_new
+
+        do j = 1, ny 
+        do i = 1, nx 
+
+            ! Get neighbor indices
+            call get_neighbor_indices(im1,ip1,jm1,jp1,i,j,nx,ny,boundaries)
+            
+            is_margin = H_tmp(i,j) .gt. 0.0 .and. &
+                count([H_tmp(im1,j),H_tmp(ip1,j),H_tmp(i,jm1),H_tmp(i,jp1)].eq.0.0) .gt. 0
+
+            if (is_margin) then
+                ! Ice covered point at the margin
+                
+                ! Calculate current ice thickness 
+                call calc_H_eff(H_eff,H_ice_new(i,j),f_ice(i,j))
+
+                ! Calculate maximum thickness of neighbors 
+                H_max = maxval([H_tmp(im1,j),H_tmp(ip1,j), &
+                                H_tmp(i,jm1),H_tmp(i,jp1)])
+
+                if ( H_eff .gt. H_max) then 
+                    H_ice_new(i,j) = H_max 
+                end if
+                
+            end if
+            
+        end do 
+        end do
+        
+end if
+
+        select case(trim(boundaries))
+
+            case("MISMIP3D","TROUGH")
+
+                ! Do nothing - this should be handled by the ice advection routine
+                ! if the default choice ytopo.solver="impl-lis" is used.
+                
+                !H_ice_new(1,:)    = H_ice_new(2,:)          ! x=0, Symmetry 
+                !H_ice_new(nx,:)   = 0.0                     ! x=max, no ice
+
+                !H_ice_new(:,1)    = H_ice_new(:,2)          ! y=-50km, Free-slip condition
+                !H_ice_new(:,ny)   = H_ice_new(:,ny-1)       ! y= 50km, Free-slip condition
+
+            case("periodic","periodic-xy")
+
+                ! Do nothing - this should be handled by the ice advection routine
+                ! if the default choice ytopo.solver="impl-lis" is used.
+
+            ! case("periodic-x") 
+
+            !     ! Periodic x 
+            !     H_ice_new(1:2,:)     = H_ice_new(nx-3:nx-2,:) 
+            !     H_ice_new(nx-1:nx,:) = H_ice_new(2:3,:) 
+                
+            !     ! Infinite (free-slip too)
+            !     H_ice_new(:,1)  = H_ice_new(:,2)
+            !     H_ice_new(:,ny) = H_ice_new(:,ny-1)
+
+            case("infinite")
+                ! Set border points equal to inner neighbors 
+
+                ! Do nothing - this should be handled by the ice advection routine
+                ! if the default choice ytopo.solver="impl-lis" is used.
+
+                !call fill_borders_2D(H_ice_new,nfill=1)
+
+            case("fixed") 
+                ! Set border points equal to prescribed values from array
+
+                ! Do nothing - this should be handled by the ice advection routine
+                ! if the default choice ytopo.solver="impl-lis" is used.
+
+                !call fill_borders_2D(H_ice_new,nfill=1,fill=H_ice_ref)
+
+            case DEFAULT    ! e.g., None/none, zeros, EISMINT
+                ! By default, impose zero ice thickness on grid borders
+
+                ! Set border values to zero
+                H_ice_new(1,:)  = 0.0
+                H_ice_new(nx,:) = 0.0
+
+                H_ice_new(:,1)  = 0.0
+                H_ice_new(:,ny) = 0.0
+     
+        end select
+        
+        ! Determine rate of mass balance related to changes applied here
+
+        if (dt .ne. 0.0) then 
+            mb_resid = (H_ice_new - H_ice) / dt 
+        else 
+            mb_resid = 0.0
+        end if
+
+        return
+
+    end subroutine calc_G_boundaries
+
+
+    subroutine extend_floating_slab(H_ice,f_grnd,H_slab,n_ext)
+        ! Extend ice field so that there is always 
+        ! floating ice next to grounded marine margins
+        ! Extended ice should be very thin, will 
+        ! be assigned value H_slab. Slab will be extended
+        ! n_ext points away from marine margin
+
+        implicit none 
+
+        real(wp), intent(INOUT) :: H_ice(:,:) 
+        real(wp), intent(IN)    :: f_grnd(:,:) 
+        real(wp), intent(IN)    :: H_slab       ! Typically 1 or 0.1 m. 
+        integer,  intent(IN)    :: n_ext        ! Number of points to extend slab
+        
+        ! Local variables 
+        integer :: i, j, nx, ny, iter 
+        integer :: im1, ip1, jm1, jp1
+        logical :: is_marine 
+
+        logical  :: ms4(4)
+        real(wp) :: Hi4(4) 
+        real(wp) :: fg4(4)
+        
+        logical,  allocatable :: mask_slab(:,:)
+        real(wp), allocatable :: H_new(:,:) 
+
+        nx = size(H_ice,1) 
+        ny = size(H_ice,2) 
+
+        allocate(mask_slab(nx,ny)) 
+        allocate(H_new(nx,ny)) 
+
+        mask_slab = .FALSE. 
+        H_new     = H_ice 
+
+        do iter = 1, n_ext
+
+            do j = 1, ny 
+            do i = 1, nx 
+
+                ! BC: Periodic boundary conditions
+                im1 = i-1
+                if (im1 == 0) then
+                    im1 = nx
+                end if
+                ip1 = i+1
+                if (ip1 == nx+1) then
+                    ip1 = 1
+                end if
+
+                jm1 = j-1
+                if (jm1 == 0) then
+                    jm1 = ny
+                end if
+                jp1 = j+1
+                if (jp1 == ny+1) then
+                    jp1 = 1
+                end if
+
+                if ( f_grnd(i,j) .eq. 0.0 .and. H_ice(i,j) .eq. 0.0 ) then 
+                    ! Floating ice-free ocean point
+                    
+                    ! Get neighbor values in convenient arrays
+                    fg4 = [f_grnd(im1,j),f_grnd(ip1,j),f_grnd(i,jm1),f_grnd(i,jp1)]
+                    Hi4 = [H_ice(im1,j),H_ice(ip1,j),H_ice(i,jm1),H_ice(i,jp1)]
+                    ms4 = [mask_slab(im1,j),mask_slab(ip1,j),mask_slab(i,jm1),mask_slab(i,jp1)]
+
+                    if ( (count(fg4 .gt. 0.0 .and. Hi4 .gt. 0.0) .gt. 0) .or. &
+                         (count(ms4) .gt. 0) ) then 
+                        ! At least one neighbors is either a grounded point
+                        ! or an extended slab point - make this point extended slab.
+
+                        H_new(i,j)     = H_slab 
+                        
+                    end if
+
+                end if 
+
+            end do 
+            end do 
+
+            ! Update H_ice to current array 
+            H_ice = H_new 
+
+            ! Update mask_slab
+            where(H_ice .eq. H_slab) 
+                mask_slab = .TRUE. 
+            elsewhere
+                mask_slab = .FALSE.
+            end where
+
+        end do 
+
+        return
+
+    end subroutine extend_floating_slab
+
+    subroutine calc_G_remove_fractional_ice(mb_diff,H_ice,f_ice,dt)
+        ! Eliminate fractional ice covered points that only 
+        ! have fractional ice neighbors. 
+
+        implicit none 
+
+        real(wp), intent(OUT) :: mb_diff(:,:) 
+        real(wp), intent(IN)  :: H_ice(:,:) 
+        real(wp), intent(IN)  :: f_ice(:,:) 
+        real(wp), intent(IN)  :: dt 
+
+        ! Local variables 
+        integer :: i, j, nx, ny 
+        integer :: im1, ip1, jm1, jp1 
+        real(wp), allocatable :: H_new(:,:) 
+
+        nx = size(H_ice,1) 
+        ny = size(H_ice,2) 
+
+        allocate(H_new(nx,ny)) 
+
+        H_new = H_ice 
+
+        do j = 1, ny 
+        do i = 1, nx 
+
+            ! BC: Periodic boundary conditions
+            im1 = i-1
+            if (im1 == 0) then
+                im1 = nx
+            end if
+            ip1 = i+1
+            if (ip1 == nx+1) then
+                ip1 = 1
+            end if
+
+            jm1 = j-1
+            if (jm1 == 0) then
+                jm1 = ny
+            end if
+            jp1 = j+1
+            if (jp1 == ny+1) then
+                jp1 = 1
+            end if
+
+            if (f_ice(i,j) .gt. 0.0 .and. f_ice(i,j) .lt. 1.0) then 
+                ! Fractional ice-covered point 
+
+                if ( count([f_ice(im1,j),f_ice(ip1,j), &
+                        f_ice(i,jm1),f_ice(i,jp1)] .eq. 1.0) .eq. 0) then 
+                    ! No fully ice-covered neighbors available.
+                    ! Point should be removed. 
+
+                    H_new(i,j) = 0.0_wp 
+
+                end if
+
+            end if
+
+        end do 
+        end do
+
+        ! Determine rate of mass balance related to changes applied here
+
+        if (dt .ne. 0.0) then 
+            mb_diff = (H_new - H_ice) / dt 
+        else 
+            mb_diff = 0.0
+        end if
+
+        return
+
+    end subroutine calc_G_remove_fractional_ice
+
+    subroutine remove_icebergs(H_ice)
+
+        implicit none 
+
+        real(wp), intent(INOUT) :: H_ice(:,:) 
+
+        return
+
+    end subroutine remove_icebergs
+
+
+
 
 
     subroutine calc_ice_thickness_dyn(H_ice,dHdt_n,H_ice_n,H_ice_pred,f_ice,ux,uy,mask_adv, &
@@ -623,237 +1165,6 @@ contains
         return 
 
     end subroutine calc_ice_thickness_calving
-
-    subroutine apply_ice_thickness_boundaries(mb_resid,H_ice,f_ice,f_grnd,uxy_b,ice_allowed,boundaries,H_ice_ref, &
-                                                H_min_flt,H_min_grnd,dt,reset)
-
-        implicit none
-
-        real(wp),           intent(INOUT)   :: mb_resid(:,:)            ! [m/yr] Residual mass balance
-        real(wp),           intent(INOUT)   :: H_ice(:,:)               ! [m] Ice thickness 
-        real(wp),           intent(IN)      :: f_ice(:,:)               ! [--] Fraction of ice cover
-        real(wp),           intent(IN)      :: f_grnd(:,:)              ! [--] Grounded ice fraction
-        real(wp),           intent(IN)      :: uxy_b(:,:)               ! [m/a] Basal sliding speed, aa-nodes
-        logical,            intent(IN)      :: ice_allowed(:,:)         ! Mask of where ice is allowed to be greater than zero 
-        character(len=*),   intent(IN)      :: boundaries               ! Boundary condition choice
-        real(wp),           intent(IN)      :: H_ice_ref(:,:)           ! [m]  Reference ice thickness to fill with for boundaries=="fixed"
-        real(wp),           intent(IN)      :: H_min_flt                ! [m] Minimum allowed floating ice thickness 
-        real(wp),           intent(IN)      :: H_min_grnd               ! [m] Minimum allowed grounded ice thickness 
-        real(wp),           intent(IN)      :: dt                       ! [yr] Timestep
-        logical, optional,  intent(IN)      :: reset                    ! Reset mb_resid to zero? 
-
-        ! Local variables 
-        integer :: i, j, nx, ny 
-        integer :: im1, ip1, jm1, jp1 
-        real(wp), allocatable :: H_ice_new(:,:)
-        real(wp), allocatable :: H_tmp(:,:)
-        real(wp) :: H_eff
-        real(wp) :: H_max 
-        logical  :: is_margin 
-        logical  :: is_island 
-        logical  :: is_isthmus_x 
-        logical  :: is_isthmus_y 
-
-        nx = size(H_ice,1)
-        ny = size(H_ice,2) 
-
-        allocate(H_tmp(nx,ny)) 
-        allocate(H_ice_new(nx,ny)) 
-        H_ice_new = H_ice 
-
-        ! Apply special case for symmetric EISMINT domain when basal sliding is active
-        ! (ensure summit thickness does not grow disproportionately)
-        if (trim(boundaries) .eq. "EISMINT" .and. maxval(uxy_b) .gt. 0.0) then 
-            i = (nx-1)/2 
-            j = (ny-1)/2
-            H_ice_new(i,j) = (H_ice(i-1,j)+H_ice(i+1,j) &
-                                    +H_ice(i,j-1)+H_ice(i,j+1)) / 4.0 
-        end if  
-        
-        ! Artificially delete ice from locations that are not allowed
-        ! according to boundary mask (ie, EISMINT, BUELER-A, open ocean)
-        where (.not. ice_allowed) H_ice_new = 0.0 
-        
-        ! Also remove ice that is very small to avoid issues
-        where (H_ice_new .lt. 1e-4) H_ice_new = 0.0
-        
-        ! Remove margin points that are too thin ====
-
-        H_tmp = H_ice_new 
-
-        do j = 1, ny 
-        do i = 1, nx 
-
-            ! Get neighbor indices
-            call get_neighbor_indices(im1,ip1,jm1,jp1,i,j,nx,ny,boundaries)
-            
-            is_margin = H_tmp(i,j) .gt. 0.0 .and. &
-                count([H_tmp(im1,j),H_tmp(ip1,j),H_tmp(i,jm1),H_tmp(i,jp1)].eq.0.0) .gt. 0
-
-            if (is_margin) then
-                ! Ice covered point at the margin
-
-                ! Calculate current ice thickness 
-                call calc_H_eff(H_eff,H_ice_new(i,j),f_ice(i,j)) 
-
-                ! Remove ice that is too thin 
-                if (f_grnd(i,j) .eq. 0.0_wp .and. H_eff .lt. H_min_flt)  H_ice_new(i,j) = 0.0_wp 
-                if (f_grnd(i,j) .gt. 0.0_wp .and. H_eff .lt. H_min_grnd) H_ice_new(i,j) = 0.0_wp 
- 
-            end if 
-
-        end do 
-        end do 
-
-        ! Remove ice islands =====
-
-        H_tmp = H_ice_new 
-
-        do j = 1, ny 
-        do i = 1, nx 
-
-            ! Get neighbor indices
-            call get_neighbor_indices(im1,ip1,jm1,jp1,i,j,nx,ny,boundaries)
-            
-            ! Check for ice islands
-            is_island = H_tmp(i,j) .gt. 0.0 .and. &
-                count([H_tmp(im1,j),H_tmp(ip1,j),H_tmp(i,jm1),H_tmp(i,jp1)].gt.0.0) .eq. 0
-
-            if (is_island) then 
-                ! Ice-covered island
-                ! Remove ice completely. 
-
-                H_ice_new(i,j)   = 0.0_wp 
-
-            end if 
-
-        end do 
-        end do 
-
-if (.FALSE.) then
-        ! ajr: testing:
-        ! This is needed for a bizzare case seen in 
-        ! Antarctica, where a grid point with inflow from two neighbors
-        ! and positive mass balance, with two ice-free ocean neighbors
-        ! nextdoor, grows indefinitely, until the model is killed. A 
-        ! solution is needed, but limiting the ice thickness at least 
-        ! ensures the simulation continues. 
-        where (H_ice_new .gt. 6e3) H_ice_new = 6e3 
-
-        ! ajr: the above situation may be related to poor treatment of
-        ! grounded ice-front boundary conditions (in ssa solver). It
-        ! can also happen in Greenland at the grounded ice front.
-
-end if 
-
-
-        ! Reduce ice thickness for margin points that are thicker 
-        ! than inland neighbors ====
-
-        H_tmp = H_ice_new
-
-        do j = 1, ny 
-        do i = 1, nx 
-
-            ! Get neighbor indices
-            call get_neighbor_indices(im1,ip1,jm1,jp1,i,j,nx,ny,boundaries)
-            
-            is_margin = H_tmp(i,j) .gt. 0.0 .and. &
-                count([H_tmp(im1,j),H_tmp(ip1,j),H_tmp(i,jm1),H_tmp(i,jp1)].eq.0.0) .gt. 0
-
-            if (is_margin) then
-                ! Ice covered point at the margin
-                
-                ! Calculate current ice thickness 
-                call calc_H_eff(H_eff,H_ice_new(i,j),f_ice(i,j))
-
-                ! Calculate maximum thickness of neighbors 
-                H_max = maxval([H_tmp(im1,j),H_tmp(ip1,j), &
-                                H_tmp(i,jm1),H_tmp(i,jp1)])
-
-                if ( H_eff .gt. H_max) then 
-                    H_ice_new(i,j) = H_max 
-                end if
-                
-            end if
-            
-        end do 
-        end do
-
-        select case(trim(boundaries))
-
-            case("MISMIP3D","TROUGH")
-
-                ! Do nothing - this should be handled by the ice advection routine
-                ! if the default choice ytopo.solver="impl-lis" is used.
-                
-                !H_ice_new(1,:)    = H_ice_new(2,:)          ! x=0, Symmetry 
-                !H_ice_new(nx,:)   = 0.0                     ! x=max, no ice
-
-                !H_ice_new(:,1)    = H_ice_new(:,2)          ! y=-50km, Free-slip condition
-                !H_ice_new(:,ny)   = H_ice_new(:,ny-1)       ! y= 50km, Free-slip condition
-
-            case("periodic","periodic-xy")
-
-                ! Do nothing - this should be handled by the ice advection routine
-                ! if the default choice ytopo.solver="impl-lis" is used.
-
-            ! case("periodic-x") 
-
-            !     ! Periodic x 
-            !     H_ice_new(1:2,:)     = H_ice_new(nx-3:nx-2,:) 
-            !     H_ice_new(nx-1:nx,:) = H_ice_new(2:3,:) 
-                
-            !     ! Infinite (free-slip too)
-            !     H_ice_new(:,1)  = H_ice_new(:,2)
-            !     H_ice_new(:,ny) = H_ice_new(:,ny-1)
-
-            case("infinite")
-                ! Set border points equal to inner neighbors 
-
-                ! Do nothing - this should be handled by the ice advection routine
-                ! if the default choice ytopo.solver="impl-lis" is used.
-
-                !call fill_borders_2D(H_ice_new,nfill=1)
-
-            case("fixed") 
-                ! Set border points equal to prescribed values from array
-
-                ! Do nothing - this should be handled by the ice advection routine
-                ! if the default choice ytopo.solver="impl-lis" is used.
-
-                !call fill_borders_2D(H_ice_new,nfill=1,fill=H_ice_ref)
-
-            case DEFAULT    ! e.g., None/none, zeros, EISMINT
-                ! By default, impose zero ice thickness on grid borders
-
-                ! Set border values to zero
-                H_ice_new(1,:)  = 0.0
-                H_ice_new(nx,:) = 0.0
-
-                H_ice_new(:,1)  = 0.0
-                H_ice_new(:,ny) = 0.0
-     
-        end select
-        
-        ! Determine mass balance related to changes applied here
-
-        if (reset) then  
-            mb_resid = 0.0_wp 
-        end if 
-
-        if (dt .ne. 0.0) then 
-            mb_resid = mb_resid + (H_ice_new - H_ice) / dt 
-        else 
-            mb_resid = 0.0
-        end if
-
-        ! Reset actual ice thickness to new values 
-        H_ice = H_ice_new 
-
-        return
-
-    end subroutine apply_ice_thickness_boundaries
 
     subroutine relax_ice_thickness(H_ice,f_grnd,mask_grz,H_ref,topo_rel,tau,dt,boundaries)
         ! This routines allows ice within a given mask to be

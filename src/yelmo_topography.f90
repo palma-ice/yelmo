@@ -65,7 +65,7 @@ contains
         integer  :: i, j, nx, ny
         real(wp) :: dt  
         real(wp), allocatable :: mbal(:,:) 
-        real(wp), allocatable :: dHdt_now(:,:) 
+        real(wp), allocatable :: dHidt_now(:,:) 
         real(wp), allocatable :: H_prev(:,:)
 
         logical, parameter :: use_rk4 = .FALSE. 
@@ -74,7 +74,7 @@ contains
         ny = size(tpo%now%H_ice,2)
 
         allocate(mbal(nx,ny))
-        allocate(dHdt_now(nx,ny))
+        allocate(dHidt_now(nx,ny))
         allocate(H_prev(nx,ny))
 
         ! Initialize time if necessary 
@@ -132,9 +132,9 @@ contains
                 case("predictor") 
                     ! Determine predicted ice thickness 
 
-                    ! Store ice thickness from previous timestep 
+                    ! Store ice thickness and dynamic rate of change from previous timestep 
                     tpo%now%H_ice_n = tpo%now%H_ice 
-
+                    tpo%now%dHidt_dyn_n = tpo%now%dHidt_dyn
                     ! Store previous surface elevation too (for calculating rate of change)
                     tpo%now%z_srf_n = tpo%now%z_srf 
 
@@ -143,48 +143,48 @@ contains
                                             bnd%c%rho_ice,bnd%c%rho_sw,tpo%par%margin_flt_subgrid)
     
 if (use_rk4) then
-                    call rk4_2D_step(tpo%rk4,tpo%now%H_ice,tpo%now%f_ice,dHdt_now,dyn%now%ux_bar,dyn%now%uy_bar, &
+                    call rk4_2D_step(tpo%rk4,tpo%now%H_ice,tpo%now%f_ice,dHidt_now,dyn%now%ux_bar,dyn%now%uy_bar, &
                                                 tpo%now%mask_adv,tpo%par%dx,dt,tpo%par%solver,tpo%par%boundaries)
 
 else
-                    call calc_G_advec_simple(dHdt_now,tpo%now%H_ice,tpo%now%f_ice,dyn%now%ux_bar,dyn%now%uy_bar, &
+                    call calc_G_advec_simple(dHidt_now,tpo%now%H_ice,tpo%now%f_ice,dyn%now%ux_bar,dyn%now%uy_bar, &
                                                  tpo%now%mask_adv,tpo%par%solver,tpo%par%boundaries,tpo%par%dx,dt)
                  
 end if 
                     
                     ! Calculate rate of change using weighted advective rates of change 
                     ! depending on timestepping method chosen 
-                    tpo%now%dHdt_pred = tpo%par%dt_beta(1)*dHdt_now + tpo%par%dt_beta(2)*tpo%now%dHdt_n 
+                    tpo%now%dHidt_dyn = tpo%par%dt_beta(1)*dHidt_now + tpo%par%dt_beta(2)*tpo%now%dHidt_dyn_n 
 
                     ! Apply rate and update ice thickness (predicted)
                     tpo%now%H_ice = tpo%now%H_ice_n
-                    call apply_tendency(tpo%now%H_ice,tpo%now%dHdt_pred,dt,"dyn_pred",adjust_mb=.TRUE.)
+                    call apply_tendency(tpo%now%H_ice,tpo%now%dHidt_dyn,dt,"dyn_pred",adjust_mb=.TRUE.)
 
                 case("corrector") 
 
                     ! Set current thickness to predicted thickness
-                    tpo%now%H_ice = tpo%now%H_ice_pred 
+                    tpo%now%H_ice = tpo%now%pred%H_ice 
 
                     ! Get ice-fraction mask for predicted ice thickness  
                     call calc_ice_fraction(tpo%now%f_ice,tpo%now%H_ice,bnd%z_bed,bnd%z_sl, &
                                             bnd%c%rho_ice,bnd%c%rho_sw,tpo%par%margin_flt_subgrid)
 
 if (use_rk4) then
-                    call rk4_2D_step(tpo%rk4,tpo%now%H_ice,tpo%now%f_ice,dHdt_now,dyn%now%ux_bar,dyn%now%uy_bar, &
+                    call rk4_2D_step(tpo%rk4,tpo%now%H_ice,tpo%now%f_ice,dHidt_now,dyn%now%ux_bar,dyn%now%uy_bar, &
                                                 tpo%now%mask_adv,tpo%par%dx,dt,tpo%par%solver,tpo%par%boundaries)
 else
-                    call calc_G_advec_simple(dHdt_now,tpo%now%H_ice,tpo%now%f_ice,dyn%now%ux_bar,dyn%now%uy_bar, &
+                    call calc_G_advec_simple(dHidt_now,tpo%now%H_ice,tpo%now%f_ice,dyn%now%ux_bar,dyn%now%uy_bar, &
                                                 tpo%now%mask_adv,tpo%par%solver,tpo%par%boundaries,tpo%par%dx,dt)
                  
 end if
 
                     ! Calculate rate of change using weighted advective rates of change 
                     ! depending on timestepping method chosen 
-                    tpo%now%dHdt_corr = tpo%par%dt_beta(3)*dHdt_now + tpo%par%dt_beta(4)*tpo%now%dHdt_n 
+                    tpo%now%dHidt_dyn = tpo%par%dt_beta(3)*dHidt_now + tpo%par%dt_beta(4)*tpo%now%dHidt_dyn_n 
                     
-                    ! Apply rate and update ice thickness (predicted)
+                    ! Apply rate and update ice thickness (corrected)
                     tpo%now%H_ice = tpo%now%H_ice_n
-                    call apply_tendency(tpo%now%H_ice,tpo%now%dHdt_corr,dt,"dyn_corr",adjust_mb=.TRUE.)
+                    call apply_tendency(tpo%now%H_ice,tpo%now%dHidt_dyn,dt,"dyn_corr",adjust_mb=.TRUE.)
                     
             end select
 
@@ -216,6 +216,9 @@ end if
                                             bnd%c%rho_ice,bnd%c%rho_sw,tpo%par%margin_flt_subgrid)
                     
                     ! If desired, finally relax solution to reference state
+                    ! Note, when relaxing, mass balance is not conserved!!
+                    ! Currently, mass changes due to relaxation are not tracked either. This
+                    ! could be implmented in the future if useful.
                     if (tpo%par%topo_rel .ne. 0) then 
 
                         select case(trim(tpo%par%topo_rel_field))
@@ -223,16 +226,16 @@ end if
                             case("H_ref")
                                 ! Relax towards reference ice thickness field H_ref
 
-                                call relax_ice_thickness(tpo%now%H_ice,tpo%now%f_grnd,tpo%now%mask_grz,bnd%H_ice_ref, &
-                                                                tpo%par%topo_rel,tpo%par%topo_rel_tau,dt,tpo%par%boundaries)
+                                call calc_G_relaxation(tpo%now%mb_relax,tpo%now%H_ice,tpo%now%f_grnd,tpo%now%mask_grz, &
+                                                            bnd%H_ice_ref,tpo%par%topo_rel,tpo%par%topo_rel_tau,dt,tpo%par%boundaries)
                             
                             case("H_ice_n")
                                 ! Relax towards previous iteration ice thickness 
                                 ! (ie slow down changes)
                                 ! ajr: needs testing, not sure if this works well or helps anything.
 
-                                call relax_ice_thickness(tpo%now%H_ice,tpo%now%f_grnd,tpo%now%mask_grz,tpo%now%H_ice_n, &
-                                                                tpo%par%topo_rel,tpo%par%topo_rel_tau,dt,tpo%par%boundaries)
+                                call calc_G_relaxation(tpo%now%mb_relax,tpo%now%H_ice,tpo%now%f_grnd,tpo%now%mask_grz, &
+                                                            tpo%now%H_ice_n,tpo%par%topo_rel,tpo%par%topo_rel_tau,dt,tpo%par%boundaries)
                             
                             case DEFAULT 
 
@@ -241,6 +244,12 @@ end if
                                 stop 
 
                         end select
+
+                        ! Apply rate and update ice thickness
+                        call apply_tendency(tpo%now%H_ice,tpo%now%mb_relax,dt,"relax",adjust_mb=.TRUE.)
+
+                        ! Add relaxation tendency to mb_applied for proper accounting of mass change
+                        tpo%now%mb_applied = tpo%now%mb_applied + tpo%now%mb_relax
 
                         ! Get ice-fraction mask for ice thickness  
                         call calc_ice_fraction(tpo%now%f_ice,tpo%now%H_ice,bnd%z_bed,bnd%z_sl, &
@@ -254,11 +263,11 @@ end if
                                             dyn%now%uxy_b,bnd%ice_allowed,tpo%par%boundaries,bnd%H_ice_ref, &
                                             tpo%par%H_min_flt,tpo%par%H_min_grnd,dt)
 
-                    ! Add residual tendency to mb_applied for proper accounting of mass change
-                    tpo%now%mb_applied = tpo%now%mb_applied + tpo%now%mb_resid
-
                     ! Apply rate and update ice thickness
                     call apply_tendency(tpo%now%H_ice,tpo%now%mb_resid,dt,"resid",adjust_mb=.TRUE.)
+
+                    ! Add residual tendency to mb_applied for proper accounting of mass change
+                    tpo%now%mb_applied = tpo%now%mb_applied + tpo%now%mb_resid
 
                     ! Get ice-fraction mask for ice thickness  
                     call calc_ice_fraction(tpo%now%f_ice,tpo%now%H_ice,bnd%z_bed,bnd%z_sl, &
@@ -270,17 +279,30 @@ end if
 
                 case("predictor") 
 
-                    ! Save current ice thickness as predictor field, 
-                    ! proceed with predictor field in the main
-                    ! H_ice variable for calculating dynamics.
-                    tpo%now%H_ice_pred = tpo%now%H_ice 
-
+                    ! Save current predictor fields, 
+                    ! proceed with predictor fields for calculating dynamics.
+                    tpo%now%pred%H_ice      = tpo%now%H_ice 
+                    tpo%now%pred%dHidt_dyn  = tpo%now%dHidt_dyn
+                    tpo%now%pred%mb_applied = tpo%now%mb_applied 
+                    tpo%now%pred%calv_flt   = tpo%now%calv_flt 
+                    tpo%now%pred%calv_grnd  = tpo%now%calv_grnd 
+                    tpo%now%pred%calv       = tpo%now%calv 
+                    tpo%now%pred%mb_relax   = tpo%now%mb_relax 
+                    tpo%now%pred%mb_resid   = tpo%now%mb_resid 
+                    
                 case("corrector")
                     ! Determine corrected ice thickness 
 
-                    ! Save current ice thickness as corrector field
-                    tpo%now%H_ice_corr = tpo%now%H_ice
-
+                    ! Save current corrector fields
+                    tpo%now%corr%H_ice      = tpo%now%H_ice 
+                    tpo%now%corr%dHidt_dyn  = tpo%now%dHidt_dyn
+                    tpo%now%corr%mb_applied = tpo%now%mb_applied 
+                    tpo%now%corr%calv_flt   = tpo%now%calv_flt 
+                    tpo%now%corr%calv_grnd  = tpo%now%calv_grnd 
+                    tpo%now%corr%calv       = tpo%now%calv 
+                    tpo%now%corr%mb_relax   = tpo%now%mb_relax 
+                    tpo%now%corr%mb_resid   = tpo%now%mb_resid 
+                    
                     ! Restore main ice thickness field to original 
                     ! value at the beginning of the timestep for 
                     ! calculation of remaining quantities (thermo, material)
@@ -298,13 +320,28 @@ end if
 
                     ! Determine which ice thickness to use going forward
                     if (use_H_pred) then 
-                        tpo%now%H_ice  = tpo%now%H_ice_pred
-                        tpo%now%dHdt_n = tpo%now%dHdt_pred 
-                        tpo%now%mb_dyn = tpo%now%dHdt_pred
+
+                        ! Load predictor fields in current state variables
+                        tpo%now%H_ice      = tpo%now%pred%H_ice 
+                        tpo%now%dHidt_dyn  = tpo%now%pred%dHidt_dyn
+                        tpo%now%mb_applied = tpo%now%pred%mb_applied 
+                        tpo%now%calv_flt   = tpo%now%pred%calv_flt 
+                        tpo%now%calv_grnd  = tpo%now%pred%calv_grnd 
+                        tpo%now%calv       = tpo%now%pred%calv 
+                        tpo%now%mb_relax   = tpo%now%pred%mb_relax 
+                        tpo%now%mb_resid   = tpo%now%pred%mb_resid 
+                    
                     else
-                        tpo%now%H_ice  = tpo%now%H_ice_corr
-                        tpo%now%dHdt_n = tpo%now%dHdt_corr 
-                        tpo%now%mb_dyn = tpo%now%dHdt_corr
+                        ! Load corrector fields in current state variables
+                        tpo%now%H_ice      = tpo%now%corr%H_ice 
+                        tpo%now%dHidt_dyn  = tpo%now%corr%dHidt_dyn
+                        tpo%now%mb_applied = tpo%now%corr%mb_applied 
+                        tpo%now%calv_flt   = tpo%now%corr%calv_flt 
+                        tpo%now%calv_grnd  = tpo%now%corr%calv_grnd 
+                        tpo%now%calv       = tpo%now%corr%calv 
+                        tpo%now%mb_relax   = tpo%now%corr%mb_relax 
+                        tpo%now%mb_resid   = tpo%now%corr%mb_resid 
+
                     end if
                     
             end select
@@ -384,19 +421,6 @@ end if
                 call calc_calving_rate_simple(tpo%now%calv_flt,tpo%now%H_ice,tpo%now%f_ice,tpo%now%f_grnd, &
                                                 tpo%par%calv_H_lim,tpo%par%calv_tau,tpo%par%boundaries)
                 
-            case("flux") 
-                ! Use threshold+flux method from Peyaud et al. (2007), ie, GRISLI,
-                ! but reformulated. 
-
-                call calc_calving_rate_flux(tpo%now%calv_flt,tpo%now%H_ice,tpo%now%f_ice,tpo%now%f_grnd,mbal, &
-                                dyn%now%ux_bar,dyn%now%uy_bar,tpo%par%dx,tpo%par%calv_H_lim,tpo%par%calv_tau,tpo%par%boundaries)
-                
-            case("flux-grisli")
-                ! Use threshold+flux method from Peyaud et al. (2007), ie, GRISLI
-
-                call calc_calving_rate_flux_grisli(tpo%now%calv_flt,tpo%now%H_ice,tpo%now%f_ice,tpo%now%f_grnd,mbal, &
-                                dyn%now%ux_bar,dyn%now%uy_bar,tpo%par%dx,tpo%par%calv_H_lim,tpo%par%calv_tau,tpo%par%boundaries)
-                
             case("vm-l19")
                 ! Use von Mises calving as defined by Lipscomb et al. (2019)
 
@@ -406,11 +430,8 @@ end if
 
                 ! Scale calving with 'thin' calving rate to ensure 
                 ! small ice thicknesses are removed.
-                call apply_thin_calving_rate(tpo%now%calv_flt,tpo%now%H_ice,tpo%now%f_ice,tpo%now%f_grnd,tpo%par%calv_thin,tpo%par%boundaries)
+                call apply_calving_rate_thin(tpo%now%calv_flt,tpo%now%H_ice,tpo%now%f_ice,tpo%now%f_grnd,tpo%par%calv_thin,tpo%par%boundaries)
 
-                ! Adjust calving so that any excess is distributed to upstream neighbors
-                !call calc_calving_residual(tpo%now%calv_flt,tpo%now%H_ice,tpo%now%f_ice,dt)
-        
             case("eigen")
                 ! Use Eigen calving as defined by Levermann et al. (2012)
 
@@ -420,11 +441,8 @@ end if
 
                 ! Scale calving with 'thin' calving rate to ensure 
                 ! small ice thicknesses are removed.
-                call apply_thin_calving_rate(tpo%now%calv_flt,tpo%now%H_ice,tpo%now%f_ice,tpo%now%f_grnd,tpo%par%calv_thin,tpo%par%boundaries)
+                call apply_calving_rate_thin(tpo%now%calv_flt,tpo%now%H_ice,tpo%now%f_ice,tpo%now%f_grnd,tpo%par%calv_thin,tpo%par%boundaries)
 
-                ! Adjust calving so that any excess is distributed to upstream neighbors
-                !call calc_calving_residual(tpo%now%calv_flt,tpo%now%H_ice,tpo%now%f_ice,dt)
-        
             case("kill") 
                 ! Delete all floating ice (using characteristic time parameter)
                 ! Make sure dt is a postive number
@@ -449,7 +467,8 @@ end if
         end select
         
         ! Additionally ensure higher calving rate for floating tongues of
-        ! one grid-point width.
+        ! one grid-point width, or lower calving rate for embayed points.
+
         select case(trim(tpo%par%calv_flt_method))
 
             case("zero","none","kill","kill-pos")
@@ -458,12 +477,16 @@ end if
 
             case DEFAULT 
 
-                call calc_calving_tongues(tpo%now%calv_flt,tpo%now%H_ice,tpo%now%f_ice, &
-                                            tpo%now%f_grnd,tpo%par%calv_tau,tpo%par%boundaries)
+                call calc_calving_rate_tongues(tpo%now%calv_flt,tpo%now%H_ice,tpo%now%f_ice, &
+                                                tpo%now%f_grnd,tpo%par%calv_tau,tpo%par%boundaries)
         
         end select 
 
         
+        ! Apply rate and update ice thickness
+        call apply_tendency(tpo%now%H_ice,tpo%now%calv_flt,dt,"calv_flt",adjust_mb=.TRUE.)
+
+
         ! Diagnose potential grounded-ice calving rate [m/yr]
 
         select case(trim(tpo%par%calv_grnd_method))
@@ -503,16 +526,19 @@ end if
 
         end select
         
-        ! Diagnose actual calving (forcing) tendency limited to current ice thickness
-        call calc_G_calv(tpo%now%calv,tpo%now%H_ice,tpo%now%calv_flt,tpo%now%calv_grnd,dt, &
-                                                    trim(tpo%par%calv_flt_method),tpo%par%boundaries)
-
         ! Apply rate and update ice thickness
-        call apply_tendency(tpo%now%H_ice,tpo%now%calv,dt,"calv",adjust_mb=.TRUE.)
+        call apply_tendency(tpo%now%H_ice,tpo%now%calv_grnd,dt,"calv_grnd",adjust_mb=.TRUE.)
+
+
+
+        ! Finally, get the total combined calving mass balance
+        tpo%now%calv = tpo%now%calv_flt + tpo%now%calv_grnd 
+
 
         ! Update ice fraction mask 
         call calc_ice_fraction(tpo%now%f_ice,tpo%now%H_ice,bnd%z_bed,bnd%z_sl, &
                                 bnd%c%rho_ice,bnd%c%rho_sw,tpo%par%margin_flt_subgrid)
+
 
         ! Treat fractional points that are not connected to full ice-covered points
         call calc_G_remove_fractional_ice(mbal_now,tpo%now%H_ice,tpo%now%f_ice,dt)
@@ -680,7 +706,7 @@ end if
         implicit none
 
         type(ytopo_class),  intent(INOUT) :: tpo 
-        type(ybound_class), intent(IN)   :: bnd
+        type(ybound_class), intent(IN)    :: bnd
         real(wp),           intent(IN)    :: time
         real(wp),           intent(IN)    :: dt 
         character(len=*),   intent(IN)    :: step 
@@ -696,10 +722,11 @@ end if
 
                 tpo%now%rates%dzsdt         = 0.0
                 tpo%now%rates%dHidt         = 0.0
+                tpo%now%rates%dHidt_dyn     = 0.0
                 tpo%now%rates%mb_applied    = 0.0
                 tpo%now%rates%bmb           = 0.0
                 tpo%now%rates%fmb           = 0.0
-                tpo%now%rates%mb_dyn        = 0.0
+                tpo%now%rates%mb_relax      = 0.0
                 tpo%now%rates%mb_resid      = 0.0
                 tpo%now%rates%calv          = 0.0
                 tpo%now%rates%calv_flt      = 0.0
@@ -712,10 +739,11 @@ end if
 
                 tpo%now%rates%dzsdt         = tpo%now%rates%dzsdt      + tpo%now%dzsdt*dt
                 tpo%now%rates%dHidt         = tpo%now%rates%dHidt      + tpo%now%dHidt*dt
+                tpo%now%rates%dHidt_dyn     = tpo%now%rates%dHidt_dyn  + tpo%now%dHidt_dyn*dt
                 tpo%now%rates%mb_applied    = tpo%now%rates%mb_applied + tpo%now%mb_applied*dt
                 tpo%now%rates%bmb           = tpo%now%rates%bmb        + tpo%now%bmb*dt
                 tpo%now%rates%fmb           = tpo%now%rates%fmb        + tpo%now%fmb*dt
-                tpo%now%rates%mb_dyn        = tpo%now%rates%mb_dyn     + tpo%now%mb_dyn*dt
+                tpo%now%rates%mb_relax      = tpo%now%rates%mb_relax   + tpo%now%mb_relax*dt
                 tpo%now%rates%mb_resid      = tpo%now%rates%mb_resid   + tpo%now%mb_resid*dt
                 tpo%now%rates%calv          = tpo%now%rates%calv       + tpo%now%calv*dt
                 tpo%now%rates%calv_flt      = tpo%now%rates%calv_flt   + tpo%now%calv_flt*dt
@@ -730,10 +758,11 @@ end if
 
                     tpo%now%rates%dzsdt         = tpo%now%rates%dzsdt / tpo%now%rates%dt_tot
                     tpo%now%rates%dHidt         = tpo%now%rates%dHidt / tpo%now%rates%dt_tot
+                    tpo%now%rates%dHidt_dyn     = tpo%now%rates%dHidt_dyn / tpo%now%rates%dt_tot
                     tpo%now%rates%mb_applied    = tpo%now%rates%mb_applied / tpo%now%rates%dt_tot
                     tpo%now%rates%bmb           = tpo%now%rates%bmb / tpo%now%rates%dt_tot
                     tpo%now%rates%fmb           = tpo%now%rates%fmb / tpo%now%rates%dt_tot
-                    tpo%now%rates%mb_dyn        = tpo%now%rates%mb_dyn / tpo%now%rates%dt_tot
+                    tpo%now%rates%mb_relax      = tpo%now%rates%mb_relax / tpo%now%rates%dt_tot
                     tpo%now%rates%mb_resid      = tpo%now%rates%mb_resid / tpo%now%rates%dt_tot
                     tpo%now%rates%calv          = tpo%now%rates%calv / tpo%now%rates%dt_tot
                     tpo%now%rates%calv_flt      = tpo%now%rates%calv_flt / tpo%now%rates%dt_tot
@@ -752,10 +781,11 @@ end if
 
                         tpo%now%dzsdt       = tpo%now%rates%dzsdt
                         tpo%now%dHidt       = tpo%now%rates%dHidt
+                        tpo%now%dHidt_dyn   = tpo%now%rates%dHidt_dyn
                         tpo%now%mb_applied  = tpo%now%rates%mb_applied
                         tpo%now%bmb         = tpo%now%rates%bmb
                         tpo%now%fmb         = tpo%now%rates%fmb
-                        tpo%now%mb_dyn      = tpo%now%rates%mb_dyn
+                        tpo%now%mb_relax    = tpo%now%rates%mb_relax
                         tpo%now%mb_resid    = tpo%now%rates%mb_resid
                         tpo%now%calv        = tpo%now%rates%calv
                         tpo%now%calv_flt    = tpo%now%rates%calv_flt
@@ -776,7 +806,7 @@ end if
             ! Perform mass balance check to make sure that mass is conserved
 
             call check_mass_conservation(tpo%now%H_ice,tpo%now%f_ice,tpo%now%f_grnd,tpo%now%dHidt, &
-                        tpo%now%mb_applied,tpo%now%calv,tpo%now%mb_dyn,bnd%smb,tpo%now%bmb, &
+                        tpo%now%mb_applied,tpo%now%calv,tpo%now%dHidt_dyn,bnd%smb,tpo%now%bmb, &
                         tpo%now%fmb,tpo%now%mb_resid,tpo%par%dx,bnd%c%sec_year,time,dt, &
                         units="km^3/yr",label=step)
                         
@@ -942,13 +972,17 @@ end if
 
         call ytopo_dealloc(now)
 
+        call ytopo_pc_alloc(now%pred,nx,ny)
+        call ytopo_pc_alloc(now%corr,nx,ny)
+
         ! Rates (for timestep averages)
         allocate(now%rates%dzsdt(nx,ny))
         allocate(now%rates%dHidt(nx,ny))
+        allocate(now%rates%dHidt_dyn(nx,ny))
         allocate(now%rates%mb_applied(nx,ny))
         allocate(now%rates%bmb(nx,ny))
         allocate(now%rates%fmb(nx,ny))
-        allocate(now%rates%mb_dyn(nx,ny))
+        allocate(now%rates%mb_relax(nx,ny))
         allocate(now%rates%mb_resid(nx,ny))
         allocate(now%rates%calv(nx,ny))
         allocate(now%rates%calv_flt(nx,ny))
@@ -962,10 +996,11 @@ end if
 
         allocate(now%dzsdt(nx,ny))
         allocate(now%dHidt(nx,ny))
+        allocate(now%dHidt_dyn(nx,ny))
         allocate(now%mb_applied(nx,ny))
         allocate(now%bmb(nx,ny))
         allocate(now%fmb(nx,ny))
-        allocate(now%mb_dyn(nx,ny))
+        allocate(now%mb_relax(nx,ny))
         allocate(now%mb_resid(nx,ny))
         
         allocate(now%mask_adv(nx,ny))
@@ -1003,13 +1038,8 @@ end if
         allocate(now%mask_grz(nx,ny))
         allocate(now%mask_frnt(nx,ny))
         
-        allocate(now%dHdt_n(nx,ny))
-        allocate(now%dHdt_pred(nx,ny))
-        allocate(now%dHdt_corr(nx,ny))
+        allocate(now%dHidt_dyn_n(nx,ny))
         allocate(now%H_ice_n(nx,ny))
-        allocate(now%H_ice_pred(nx,ny))
-        allocate(now%H_ice_corr(nx,ny))
-        
         allocate(now%z_srf_n(nx,ny))
         
         allocate(now%H_ice_dyn(nx,ny))
@@ -1017,10 +1047,11 @@ end if
 
         now%rates%dzsdt         = 0.0
         now%rates%dHidt         = 0.0
+        now%rates%dHidt_dyn     = 0.0
         now%rates%mb_applied    = 0.0
         now%rates%bmb           = 0.0
         now%rates%fmb           = 0.0
-        now%rates%mb_dyn        = 0.0
+        now%rates%mb_relax      = 0.0
         now%rates%mb_resid      = 0.0
         now%rates%calv          = 0.0
         now%rates%calv_flt      = 0.0
@@ -1031,10 +1062,11 @@ end if
         now%z_base      = 0.0  
         now%dzsdt       = 0.0 
         now%dHidt       = 0.0
+        now%dHidt_dyn   = 0.0
         now%mb_applied  = 0.0 
         now%bmb         = 0.0  
         now%fmb         = 0.0
-        now%mb_dyn      = 0.0
+        now%mb_relax    = 0.0
         now%mb_resid    = 0.0
         now%calv        = 0.0
         now%calv_flt    = 0.0
@@ -1067,13 +1099,9 @@ end if
         now%mask_bed    = 0 
         now%mask_grz    = 0 
         now%mask_frnt   = 0
-        now%dHdt_n      = 0.0  
-        now%dHdt_pred   = 0.0
-        now%dHdt_corr   = 0.0
+
+        now%dHidt_dyn_n = 0.0  
         now%H_ice_n     = 0.0 
-        now%H_ice_pred  = 0.0 
-        now%H_ice_corr  = 0.0 
-        
         now%z_srf_n     = 0.0 
 
         now%H_ice_dyn   = 0.0 
@@ -1089,11 +1117,16 @@ end if
 
         type(ytopo_state_class), intent(INOUT) :: now
 
+        call ytopo_pc_dealloc(now%pred)
+        call ytopo_pc_dealloc(now%corr)
+
         if (allocated(now%rates%dzsdt))         deallocate(now%rates%dzsdt)
         if (allocated(now%rates%dHidt))         deallocate(now%rates%dHidt)
+        if (allocated(now%rates%dHidt_dyn))     deallocate(now%rates%dHidt_dyn)
         if (allocated(now%rates%bmb))           deallocate(now%rates%bmb)
         if (allocated(now%rates%fmb))           deallocate(now%rates%fmb)
         if (allocated(now%rates%mb_applied))    deallocate(now%rates%mb_applied)
+        if (allocated(now%rates%mb_relax))      deallocate(now%rates%mb_relax)
         if (allocated(now%rates%mb_resid))      deallocate(now%rates%mb_resid)
         if (allocated(now%rates%calv))          deallocate(now%rates%calv)
         if (allocated(now%rates%calv_flt))      deallocate(now%rates%calv_flt)
@@ -1105,9 +1138,11 @@ end if
 
         if (allocated(now%dzsdt))       deallocate(now%dzsdt)
         if (allocated(now%dHidt))       deallocate(now%dHidt)
+        if (allocated(now%dHidt_dyn))   deallocate(now%dHidt_dyn)
         if (allocated(now%bmb))         deallocate(now%bmb)
         if (allocated(now%fmb))         deallocate(now%fmb)
         if (allocated(now%mb_applied))  deallocate(now%mb_applied)
+        if (allocated(now%mb_relax))    deallocate(now%mb_relax)
         if (allocated(now%mb_resid))    deallocate(now%mb_resid)
         
         if (allocated(now%mask_adv))    deallocate(now%mask_adv)
@@ -1144,13 +1179,8 @@ end if
         if (allocated(now%mask_grz))    deallocate(now%mask_grz)
         if (allocated(now%mask_frnt))   deallocate(now%mask_frnt)
         
-        if (allocated(now%dHdt_n))      deallocate(now%dHdt_n)
-        if (allocated(now%dHdt_pred))   deallocate(now%dHdt_pred)
-        if (allocated(now%dHdt_corr))   deallocate(now%dHdt_corr)
+        if (allocated(now%dHidt_dyn_n)) deallocate(now%dHidt_dyn_n)
         if (allocated(now%H_ice_n))     deallocate(now%H_ice_n)
-        if (allocated(now%H_ice_pred))  deallocate(now%H_ice_pred)
-        if (allocated(now%H_ice_corr))  deallocate(now%H_ice_corr)
-        
         if (allocated(now%z_srf_n))     deallocate(now%z_srf_n)
         
         if (allocated(now%H_ice_dyn))   deallocate(now%H_ice_dyn)
@@ -1160,4 +1190,57 @@ end if
 
     end subroutine ytopo_dealloc
     
+    subroutine ytopo_pc_alloc(pc,nx,ny)
+
+        implicit none
+
+        type(ytopo_pc_class), intent(INOUT) :: pc 
+        integer, intent(IN) :: nx, ny  
+
+        ! First deallocate everything for safety
+        call ytopo_pc_dealloc(pc)
+
+        ! Allocate fields 
+        allocate(pc%H_ice(nx,ny))
+        allocate(pc%dHidt_dyn(nx,ny))
+        allocate(pc%mb_applied(nx,ny))
+        allocate(pc%calv_flt(nx,ny))
+        allocate(pc%calv_grnd(nx,ny))
+        allocate(pc%calv(nx,ny))      
+        allocate(pc%mb_relax(nx,ny))
+        allocate(pc%mb_resid(nx,ny))
+
+        ! Initialize to zero
+        pc%H_ice        = 0.0
+        pc%dHidt_dyn    = 0.0
+        pc%mb_applied   = 0.0
+        pc%calv_flt     = 0.0
+        pc%calv_grnd    = 0.0
+        pc%calv         = 0.0      
+        pc%mb_relax     = 0.0
+        pc%mb_resid     = 0.0
+
+        return
+
+    end subroutine ytopo_pc_alloc
+
+    subroutine ytopo_pc_dealloc(pc)
+
+        implicit none
+
+        type(ytopo_pc_class), intent(INOUT) :: pc 
+        
+        if (allocated(pc%H_ice))       deallocate(pc%H_ice)
+        if (allocated(pc%dHidt_dyn))   deallocate(pc%dHidt_dyn)
+        if (allocated(pc%mb_applied))  deallocate(pc%mb_applied)
+        if (allocated(pc%calv_flt))    deallocate(pc%calv_flt)
+        if (allocated(pc%calv_grnd))   deallocate(pc%calv_grnd)
+        if (allocated(pc%calv))        deallocate(pc%calv)
+        if (allocated(pc%mb_relax))    deallocate(pc%mb_relax)
+        if (allocated(pc%mb_resid))    deallocate(pc%mb_resid)
+
+        return
+
+    end subroutine ytopo_pc_dealloc
+
 end module yelmo_topography

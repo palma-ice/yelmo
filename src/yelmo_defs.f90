@@ -132,20 +132,6 @@ module yelmo_defs
 
     end type
 
-    type ytopo_pc_class 
-
-        integer    :: nx, ny 
-        real(wp)   :: dt_zeta
-
-        real(wp), allocatable   :: dHdt_n(:,:)      ! [m/a] Ice thickness change due to advection only
-        real(wp), allocatable   :: dHdt_pred(:,:)   ! [m/a] Ice thickness change due to advection only
-        real(wp), allocatable   :: dHdt_corr(:,:)   ! [m/a] Ice thickness change due to advection only
-        real(wp), allocatable   :: H_ice_n(:,:)     ! [m] Ice thickness from the previous timestep 
-        real(wp), allocatable   :: H_ice_pred(:,:)  ! [m] Ice thickness, predicted, for time=n+1
-        real(wp), allocatable   :: H_ice_corr(:,:)  ! [m] Ice thickness, corrected, for time=n+1 
-        
-    end type
-
     type rk4_class
         real(wp), allocatable  :: tau(:,:) 
         real(wp), allocatable  :: y_np1(:,:) 
@@ -161,13 +147,25 @@ module yelmo_defs
         real(wp) :: dt_nm2
     end type
 
-    type ytopo_rates
+    type ytopo_pc_class 
+        real(wp), allocatable :: H_ice(:,:)
+        real(wp), allocatable :: dHidt_dyn(:,:)
+        real(wp), allocatable :: mb_applied(:,:)
+        real(wp), allocatable :: calv_flt(:,:)
+        real(wp), allocatable :: calv_grnd(:,:)
+        real(wp), allocatable :: calv(:,:)
+        real(wp), allocatable :: mb_relax(:,:)
+        real(wp), allocatable :: mb_resid(:,:)
+    end type
+
+    type ytopo_rates_class
         real(wp), allocatable :: dzsdt(:,:)       ! Surface elevation rate of change [m/a] 
         real(wp), allocatable :: dHidt(:,:)       ! Ice thickness rate of change [m/a] 
+        real(wp), allocatable :: dHidt_dyn(:,:)   ! Change in thickness due to dynamics only [m/yr]
         real(wp), allocatable :: mb_applied(:,:)  ! Actual mass balance applied [m/a], for mass balance accounting
         real(wp), allocatable :: bmb(:,:)         ! Combined field of bmb_grnd and bmb_shlf 
         real(wp), allocatable :: fmb(:,:)         ! Combined field of fmb_grnd and fmb_shlf 
-        real(wp), allocatable :: mb_dyn(:,:)      ! Change in mass balance to due dynamics (ie, dHidt_dyn)
+        real(wp), allocatable :: mb_relax(:,:)    ! Residual mass balance from boundary conditions, cleanup
         real(wp), allocatable :: mb_resid(:,:)    ! Residual mass balance from boundary conditions, cleanup
         real(wp), allocatable :: calv(:,:)        ! Calving rate (applied) [m/a]
         real(wp), allocatable :: calv_flt(:,:)    ! Reference floating calving rate [m/a]
@@ -180,27 +178,32 @@ module yelmo_defs
     type ytopo_state_class
         ! Model variables that the define the state of the domain 
 
-        type(ytopo_rates) :: rates
+        type(ytopo_pc_class)    :: pred
+        type(ytopo_pc_class)    :: corr
+        type(ytopo_rates_class) :: rates
 
         real(wp), allocatable   :: H_ice(:,:)       ! Ice thickness [m] 
-        real(wp), allocatable   :: z_srf(:,:)       ! Surface elevation [m]
-        real(wp), allocatable   :: z_base(:,:)      ! Ice-base elevation [m]
-        real(wp), allocatable   :: dzsdt(:,:)       ! Surface elevation rate of change [m/a] 
         real(wp), allocatable   :: dHidt(:,:)       ! Ice thickness rate of change [m/a] 
+        real(wp), allocatable   :: dHidt_dyn(:,:)
         real(wp), allocatable   :: mb_applied(:,:)  ! Actual mass balance applied [m/a], for mass balance accounting
-        real(wp), allocatable   :: bmb(:,:)         ! Combined field of bmb_grnd and bmb_shlf 
-        real(wp), allocatable   :: fmb(:,:)         ! Combined field of fmb_grnd and fmb_shlf 
-        real(wp), allocatable   :: mb_dyn(:,:)      ! Change in mass balance to due dynamics (ie, dHidt_dyn)
+        real(wp), allocatable   :: calv_flt(:,:)    ! Reference floating calving rate [m/a]
+        real(wp), allocatable   :: calv_grnd(:,:)   ! Reference grounded calving rate [m/a]
+        real(wp), allocatable   :: calv(:,:)        ! Calving rate (applied) [m/a]
+        real(wp), allocatable   :: mb_relax(:,:)    ! Change in mass balance to due relaxation
         real(wp), allocatable   :: mb_resid(:,:)    ! Residual mass balance from boundary conditions, cleanup
+
+        real(wp), allocatable   :: bmb(:,:)         ! Combined field of bmb_grnd and bmb_shlf 
+        real(wp), allocatable   :: fmb(:,:)         ! Combined field of fmb_grnd and fmb_shlf    
+        
+        real(wp), allocatable   :: z_srf(:,:)       ! Surface elevation [m]
+        real(wp), allocatable   :: dzsdt(:,:)       ! Surface elevation rate of change [m/a] 
         
         integer,  allocatable   :: mask_adv(:,:)    ! Advection mask 
         
         real(wp), allocatable   :: eps_eff(:,:)     ! Effective strain [1/yr]
         real(wp), allocatable   :: tau_eff(:,:)     ! Effective stress [Pa]
-        real(wp), allocatable   :: calv(:,:)        ! Calving rate (applied) [m/a]
-        real(wp), allocatable   :: calv_flt(:,:)    ! Reference floating calving rate [m/a]
-        real(wp), allocatable   :: calv_grnd(:,:)   ! Reference grounded calving rate [m/a]
         
+        real(wp), allocatable   :: z_base(:,:)      ! Ice-base elevation [m]
         real(wp), allocatable   :: dzsdx(:,:)       ! Surface elevation slope [m m-1], acx nodes
         real(wp), allocatable   :: dzsdy(:,:)       ! Surface elevation slope [m m-1], acy nodes
         real(wp), allocatable   :: dHidx(:,:)       ! Ice thickness gradient slope [m m-1], acx nodes
@@ -228,13 +231,9 @@ module yelmo_defs
         integer,  allocatable   :: mask_bed(:,:)    ! Multi-valued bed mask
         integer,  allocatable   :: mask_grz(:,:)    ! Multi-valued mask for the grounding-line zone
         integer,  allocatable   :: mask_frnt(:,:)   ! Multi-valued mask of ice fronts
-        real(wp), allocatable   :: dHdt_n(:,:)      ! [m/a] Ice thickness change due to advection only
-        real(wp), allocatable   :: dHdt_pred(:,:)   ! [m/a] Ice thickness change due to advection only
-        real(wp), allocatable   :: dHdt_corr(:,:)   ! [m/a] Ice thickness change due to advection only
-        real(wp), allocatable   :: H_ice_n(:,:)     ! [m] Ice thickness from the previous timestep 
-        real(wp), allocatable   :: H_ice_pred(:,:)  ! [m] Ice thickness, predicted, for time=n+1
-        real(wp), allocatable   :: H_ice_corr(:,:)  ! [m] Ice thickness, corrected, for time=n+1 
         
+        real(wp), allocatable   :: dHidt_dyn_n(:,:) ! [m/a] Ice thickness change due to advection only
+        real(wp), allocatable   :: H_ice_n(:,:)     ! [m] Ice thickness from the previous timestep 
         real(wp), allocatable   :: z_srf_n(:,:)     ! [m] Surface elevation from the previous timestep 
         
         real(wp), allocatable   :: H_ice_dyn(:,:) 

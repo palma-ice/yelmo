@@ -18,19 +18,15 @@ module mass_conservation
     public :: calc_G_mbal
     public :: calc_G_calv
     public :: calc_G_boundaries
+    public :: calc_G_relaxation
 
     public :: extend_floating_slab
     public :: calc_G_remove_fractional_ice
-    public :: remove_icebergs 
-
-    public :: calc_ice_thickness_dyn
-    public :: calc_ice_thickness_mbal
-    public :: calc_ice_thickness_calving
-    public :: relax_ice_thickness
-
+    public :: remove_icebergs
+    
 contains 
     
-    subroutine check_mass_conservation(H_ice,f_ice,f_grnd,dHidt,mb_applied,mb_calv,mb_dyn,smb,bmb,fmb, &
+    subroutine check_mass_conservation(H_ice,f_ice,f_grnd,dHidt,mb_applied,mb_calv,dHidt_dyn,smb,bmb,fmb, &
                                                                 mb_resid,dx,sec_year,time,dt,units,label)
 
         implicit none
@@ -41,7 +37,7 @@ contains
         real(wp), intent(IN) :: dHidt(:,:)
         real(wp), intent(IN) :: mb_applied(:,:)
         real(wp), intent(IN) :: mb_calv(:,:)
-        real(wp), intent(IN) :: mb_dyn(:,:)
+        real(wp), intent(IN) :: dHidt_dyn(:,:)
         real(wp), intent(IN) :: smb(:,:)
         real(wp), intent(IN) :: bmb(:,:)
         real(wp), intent(IN) :: fmb(:,:)
@@ -59,7 +55,7 @@ contains
         real(wp) :: tot_components
         real(wp) :: tot_mb_applied
         real(wp) :: tot_mb_calv
-        real(wp) :: tot_mb_dyn
+        real(wp) :: tot_dHidt_dyn
         real(wp) :: conv
 
         real(wp) :: percent_error
@@ -95,7 +91,7 @@ contains
         tot_dHidt       = sum(dHidt)*dx*dx      * conv
         tot_mb_applied  = sum(mb_applied)*dx*dx * conv
         tot_mb_calv     = sum(mb_calv)*dx*dx    * conv
-        tot_mb_dyn      = sum(mb_dyn)*dx*dx     * conv
+        tot_dHidt_dyn   = sum(dHidt_dyn)*dx*dx  * conv
 
         ! Get total of components and percent error
         tot_components = tot_mb_applied + tot_mb_calv
@@ -104,7 +100,7 @@ contains
         write(*,"(a8,a,2f9.3,a3,2g14.4,g10.3,a3,2g13.4,a3,g13.4)") &
                     trim(label), " mbcheck ["//trim(units)//"]: ", time, dt, " | ", &
                     tot_dHidt, tot_components, percent_error, " | ", &
-                    tot_mb_applied, tot_mb_calv !, " | ", tot_mb_dyn
+                    tot_mb_applied, tot_mb_calv !, " | ", tot_dHidt_dyn
 
         return
 
@@ -779,6 +775,107 @@ end if
 
     end subroutine calc_G_boundaries
 
+    subroutine calc_G_relaxation(dHdt,H_ice,f_grnd,mask_grz,H_ref,topo_rel,tau,dt,boundaries)
+        ! This routines allows ice within a given mask to be
+        ! relaxed to a reference state with certain timescale tau 
+        ! (if tau=0), then H_ice = H_ice_ref directly 
+
+        implicit none 
+
+        real(wp), intent(OUT)   :: dHdt(:,:) 
+        real(wp), intent(IN)    :: H_ice(:,:) 
+        real(wp), intent(IN)    :: f_grnd(:,:)  
+        integer,  intent(IN)    :: mask_grz(:,:) 
+        real(wp), intent(IN)    :: H_ref(:,:) 
+        integer,  intent(IN)    :: topo_rel 
+        real(wp), intent(IN)    :: tau
+        real(wp), intent(IN)    :: dt 
+        character(len=*), intent(IN) :: boundaries 
+
+        ! Local variables 
+        integer  :: i, j, nx, ny 
+        integer  :: im1, ip1, jm1, jp1
+        logical  :: apply_relax 
+
+        nx = size(H_ice,1)
+        ny = size(H_ice,2) 
+
+        dHdt = 0.0 
+
+        do j = 1, ny
+        do i = 1, nx 
+
+            ! Get neighbor indices
+            call get_neighbor_indices(im1,ip1,jm1,jp1,i,j,nx,ny,boundaries)
+            
+            ! No relaxation to start
+            apply_relax = .FALSE.
+
+            select case(topo_rel)
+
+                case(1) 
+                    ! Relax the shelf (floating) ice and ice-free points
+                
+                    if (f_grnd(i,j) .eq. 0.0 .or. H_ref(i,j) .eq. 0.0) apply_relax = .TRUE. 
+            
+                case(2) 
+                    ! Relax the shelf (floating) ice and ice-free points
+                    ! and the grounding-line ice too
+                    
+                    if (f_grnd(i,j) .eq. 0.0 .or. H_ref(i,j) .eq. 0.0) apply_relax = .TRUE. 
+                    
+                    if (f_grnd(i,j) .gt. 0.0 .and. &
+                        (f_grnd(im1,j) .eq. 0.0 .or. f_grnd(ip1,j) .eq. 0.0 &
+                        .or. f_grnd(i,jm1) .eq. 0.0 .or. f_grnd(i,jp1) .eq. 0.0)) apply_relax = .TRUE. 
+            
+                case(3)
+                    ! Relax all points
+                    
+                    apply_relax = .TRUE. 
+                
+                case(4) 
+                    ! Relax all grounded grounding-zone points 
+
+                    if (mask_grz(i,j) .eq. 0 .or. mask_grz(i,j) .eq. 1) then 
+
+                        apply_relax = .TRUE. 
+
+                    end if 
+
+                case DEFAULT
+                    ! No relaxation
+
+                    apply_relax = .FALSE.
+
+            end select
+            
+
+            if (apply_relax) then 
+
+                if (tau .eq. 0.0) then
+                    ! Impose ice thickness 
+
+                    if (dt .gt. 0.0) then
+                        dHdt(i,j)  = (H_ref(i,j) - H_ice(i,j)) / dt
+                    else
+                        dHdt(i,j)  = (H_ref(i,j) - H_ice(i,j)) / 1.0
+                    end if
+
+                else
+                    ! Apply relaxation to reference state 
+
+                    dHdt = (H_ref(i,j) - H_ice(i,j)) / tau 
+
+                end if 
+            end if 
+
+        end do 
+        end do 
+
+
+        return 
+
+    end subroutine calc_G_relaxation
 
     subroutine extend_floating_slab(H_ice,f_grnd,H_slab,n_ext)
         ! Extend ice field so that there is always 
@@ -960,309 +1057,6 @@ end if
         return
 
     end subroutine remove_icebergs
-
-
-
-
-
-    subroutine calc_ice_thickness_dyn(H_ice,dHdt_n,H_ice_n,H_ice_pred,f_ice,ux,uy,mask_adv, &
-                                      solver,boundaries,dx,dt,beta,pc_step)
-        ! Interface subroutine to update ice thickness through application
-        ! of advection, vertical mass balance terms and calving 
-
-        implicit none 
-
-        real(wp),         intent(INOUT) :: H_ice(:,:)           ! [m]   Ice thickness 
-        real(wp),         intent(INOUT) :: dHdt_n(:,:)          ! [m/a] Advective rate of ice thickness change from previous=>current timestep 
-        real(wp),         intent(INOUT) :: H_ice_n(:,:)         ! [m]   Ice thickness from previous=>current timestep 
-        real(wp),         intent(INOUT) :: H_ice_pred(:,:)      ! [m]   Ice thickness from predicted timestep 
-        real(wp),         intent(IN)    :: f_ice(:,:)           ! [--]  Ice area fraction 
-        real(wp),         intent(IN)    :: ux(:,:)              ! [m/a] Depth-averaged velocity, x-direction (ac-nodes)
-        real(wp),         intent(IN)    :: uy(:,:)              ! [m/a] Depth-averaged velocity, y-direction (ac-nodes)
-        integer,          intent(IN)    :: mask_adv(:,:)        ! Advection mask
-        character(len=*), intent(IN)    :: solver               ! Solver to use for the ice thickness advection equation
-        character(len=*), intent(IN)    :: boundaries
-        real(wp),         intent(IN)    :: dx                   ! [m]   Horizontal resolution
-        real(wp),         intent(IN)    :: dt                   ! [a]   Timestep 
-        real(wp),         intent(IN)    :: beta(4)              ! Timestep weighting parameters
-        character(len=*), intent(IN)    :: pc_step              ! Current predictor-corrector step ('predictor' or 'corrector')
-
-        ! Local variables 
-        integer :: i, j, nx, ny
-        integer :: im1, ip1, jm1, jp1  
-        real(wp), allocatable :: mbal_zero(:,:) 
-        real(wp), allocatable :: dHdt_advec(:,:) 
-        real(wp), allocatable :: ux_tmp(:,:) 
-        real(wp), allocatable :: uy_tmp(:,:) 
-
-        real(wp), parameter :: dHdt_advec_lim = 10.0_wp     ! [m/a] Hard limit on advection rate
-
-        nx = size(H_ice,1)
-        ny = size(H_ice,2)
-
-        allocate(mbal_zero(nx,ny))
-        mbal_zero = 0.0_wp 
-
-        allocate(ux_tmp(nx,ny))
-        allocate(uy_tmp(nx,ny))
-        allocate(dHdt_advec(nx,ny))
-
-        dHdt_advec = 0.0_wp 
-
-        ! Set local velocity fields with no margin treatment intially
-        ux_tmp = ux
-        uy_tmp = uy
-        
-        ! Ensure that no velocity is defined for outer boundaries of partially-filled margin points
-        call set_inactive_margins(ux_tmp,uy_tmp,f_ice,boundaries)
-
-        ! ===================================================================================
-        ! Resolve the dynamic part (ice advection) using multistep method
-
-        select case(trim(pc_step))
-        
-            case("predictor") 
-                
-                ! Store ice thickness from time=n
-                H_ice_n   = H_ice 
-
-                ! Store advective rate of change from saved from previous timestep (now represents time=n-1)
-                dHdt_advec = dHdt_n 
-
-                ! Determine current advective rate of change (time=n)
-                call calc_advec2D(dHdt_n,H_ice,f_ice,ux_tmp,uy_tmp,mbal_zero,mask_adv,dx,dx,dt,solver,boundaries)
-
-                ! ajr: testing stability fix for spin-up, limit advection rate!
-                ! where(dHdt_n .gt.  dHdt_advec_lim) dHdt_n = dHdt_advec_lim
-                ! where(dHdt_n .lt. -dHdt_advec_lim) dHdt_n = -dHdt_advec_lim
-                
-                ! Calculate rate of change using weighted advective rates of change 
-                dHdt_advec = beta(1)*dHdt_n + beta(2)*dHdt_advec 
-                
-                ! Calculate predicted ice thickness (time=n+1,pred)
-                H_ice = H_ice_n + dt*dHdt_advec 
-
-            case("corrector") ! corrector 
-
-                ! Determine advective rate of change based on predicted H,ux/y fields (time=n+1,pred)
-                call calc_advec2D(dHdt_advec,H_ice_pred,f_ice,ux_tmp,uy_tmp,mbal_zero,mask_adv,dx,dx,dt,solver,boundaries)
-
-                ! ajr: testing stability fix for spin-up, limit advection rate!
-                ! where(dHdt_advec .gt.  dHdt_advec_lim) dHdt_advec = dHdt_advec_lim
-                ! where(dHdt_advec .lt. -dHdt_advec_lim) dHdt_advec = -dHdt_advec_lim
-                
-                ! Calculate rate of change using weighted advective rates of change 
-                dHdt_advec = beta(3)*dHdt_advec + beta(4)*dHdt_n 
-                
-                ! Calculate corrected ice thickness (time=n+1)
-                H_ice = H_ice_n + dt*dHdt_advec 
-
-                ! Finally, update dHdt_n with correct term to use as n-1 on next iteration
-                dHdt_n = dHdt_advec 
-
-        end select
-
-        ! Post processing of H_ice ================
-
-        ! Also ensure tiny numeric ice thicknesses are removed
-        where (H_ice .lt. TOL_UNDERFLOW) H_ice = 0.0 
-
-        return 
-
-    end subroutine calc_ice_thickness_dyn
-
-    subroutine calc_ice_thickness_mbal(H_ice,f_ice,mb_applied,f_grnd,H_ocn,mbal,dx,dt)
-        ! Interface subroutine to update ice thickness through application
-        ! of advection, vertical mass balance terms and calving 
-
-        implicit none 
-
-        real(wp), intent(INOUT) :: H_ice(:,:)           ! [m]   Ice thickness 
-        real(wp), intent(INOUT) :: f_ice(:,:)           ! [--]  Ice cover fraction 
-        real(wp), intent(OUT)   :: mb_applied(:,:)      ! [m/a] Actual mass balance applied to real ice points
-        real(wp), intent(IN)    :: f_grnd(:,:)          ! [--]  Grounded fraction 
-        real(wp), intent(IN)    :: H_ocn(:,:)           ! [m]   Ocean thickness (ie, depth)
-        real(wp), intent(IN)    :: mbal(:,:)            ! [m/a] Net mass balance; mbal = smb+bmb (calving separate) 
-        real(wp), intent(IN)    :: dx                   ! [m]   Horizontal resolution
-        real(wp), intent(IN)    :: dt                   ! [a]   Timestep  
-
-        ! Local variables 
-        integer :: i, j, nx, ny 
-        integer :: im1, ip1, jm1, jp1 
-
-        nx = size(H_ice,1)
-        ny = size(H_ice,2) 
-
-        ! ==== MASS BALANCE =====
-
-        ! ! Combine mass balance and calving into one field, mb_applied.
-        ! ! negative mbal is scaled by f_ice, to account for available surface area. 
-        ! where(mbal .lt. 0.0_wp)
-        !     mb_applied = f_ice*mbal
-        ! elsewhere 
-        !     mb_applied = mbal
-        ! end where
-
-        ! ajr: testing, ensure f_ice scaling is already applied externally 
-        mb_applied = mbal
-
-        ! Ensure melting is only counted where ice exists 
-        where(mb_applied .lt. 0.0 .and. H_ice .eq. 0.0) mb_applied = 0.0 
-
-        ! Additionally ensure ice cannot form in open ocean 
-        where(f_grnd .eq. 0.0 .and. H_ice .eq. 0.0)  mb_applied = 0.0  
-
-        ! Ensure melt is limited to amount of available ice to melt  
-        where((H_ice+dt*mb_applied) .lt. 0.0) mb_applied = -H_ice/dt
-
-        ! Apply modified mass balance to update the ice thickness 
-        H_ice = H_ice + dt*mb_applied
-
-        ! Ensure tiny numeric ice thicknesses are removed
-        where (H_ice .lt. TOL_UNDERFLOW) H_ice = 0.0 
-
-        return 
-
-    end subroutine calc_ice_thickness_mbal
-
-    subroutine calc_ice_thickness_calving(H_ice,f_ice,calv_applied, &
-                                       calv_flt,calv_grnd,dx,dt)
-        ! Interface subroutine to update ice thickness through application
-        ! of advection, vertical mass balance terms and calving 
-
-        implicit none 
-
-        real(wp), intent(INOUT) :: H_ice(:,:)           ! [m]   Ice thickness 
-        real(wp), intent(INOUT) :: f_ice(:,:)           ! [--]  Ice cover fraction 
-        real(wp), intent(OUT)   :: calv_applied(:,:)    ! [m/a] Actual calving applied to real ice points
-        real(wp), intent(IN)    :: calv_flt(:,:)        ! [m/a] Potential calving rate (floating)
-        real(wp), intent(IN)    :: calv_grnd(:,:)       ! [m/a] Potential calving rate (grounded)
-        real(wp), intent(IN)    :: dx                   ! [m]   Horizontal resolution
-        real(wp), intent(IN)    :: dt                   ! [a]   Timestep  
-
-        ! Local variables 
-        integer :: i, j, nx, ny 
-        integer :: im1, ip1, jm1, jp1 
-
-        nx = size(H_ice,1)
-        ny = size(H_ice,2) 
-
-        ! ===== CALVING ======
-
-        ! Combine grounded and floating calving into one field for output.
-        ! It has already been scaled by area of ice in cell (f_ice).
-        calv_applied = (calv_flt + calv_grnd)
-
-        ! Ensure applied calving is limited to amount of available ice to calve
-        where((H_ice-dt*calv_applied) .lt. 0.0) calv_applied = H_ice/dt
-
-        ! Apply modified mass balance to update the ice thickness 
-        H_ice = H_ice - dt*calv_applied
-
-        ! Ensure tiny numeric ice thicknesses are removed
-        where (H_ice .lt. TOL_UNDERFLOW) H_ice = 0.0 
-
-        return 
-
-    end subroutine calc_ice_thickness_calving
-
-    subroutine relax_ice_thickness(H_ice,f_grnd,mask_grz,H_ref,topo_rel,tau,dt,boundaries)
-        ! This routines allows ice within a given mask to be
-        ! relaxed to a reference state with certain timescale tau 
-        ! (if tau=0), then H_ice = H_ice_ref directly 
-
-        implicit none 
-
-        real(wp), intent(INOUT) :: H_ice(:,:) 
-        real(wp), intent(IN)    :: f_grnd(:,:)  
-        integer,  intent(IN)    :: mask_grz(:,:) 
-        real(wp), intent(IN)    :: H_ref(:,:) 
-        integer,  intent(IN)    :: topo_rel 
-        real(wp), intent(IN)    :: tau
-        real(wp), intent(IN)    :: dt 
-        character(len=*), intent(IN) :: boundaries 
-
-        ! Local variables 
-        integer  :: i, j, nx, ny 
-        integer  :: im1, ip1, jm1, jp1
-        logical  :: apply_relax 
-        real(wp) :: dHdt 
-
-        nx = size(H_ice,1)
-        ny = size(H_ice,2) 
-
-        do j = 1, ny
-        do i = 1, nx 
-
-            ! Get neighbor indices
-            call get_neighbor_indices(im1,ip1,jm1,jp1,i,j,nx,ny,boundaries)
-            
-            ! No relaxation to start
-            apply_relax = .FALSE.
-
-            select case(topo_rel)
-
-                case(1) 
-                    ! Relax the shelf (floating) ice and ice-free points
-                
-                    if (f_grnd(i,j) .eq. 0.0 .or. H_ref(i,j) .eq. 0.0) apply_relax = .TRUE. 
-            
-                case(2) 
-                    ! Relax the shelf (floating) ice and ice-free points
-                    ! and the grounding-line ice too
-                    
-                    if (f_grnd(i,j) .eq. 0.0 .or. H_ref(i,j) .eq. 0.0) apply_relax = .TRUE. 
-                    
-                    if (f_grnd(i,j) .gt. 0.0 .and. &
-                        (f_grnd(im1,j) .eq. 0.0 .or. f_grnd(ip1,j) .eq. 0.0 &
-                        .or. f_grnd(i,jm1) .eq. 0.0 .or. f_grnd(i,jp1) .eq. 0.0)) apply_relax = .TRUE. 
-            
-                case(3)
-                    ! Relax all points
-                    
-                    apply_relax = .TRUE. 
-                
-                case(4) 
-                    ! Relax all grounded grounding-zone points 
-
-                    if (mask_grz(i,j) .eq. 0 .or. mask_grz(i,j) .eq. 1) then 
-
-                        apply_relax = .TRUE. 
-
-                    end if 
-
-                case DEFAULT
-                    ! No relaxation
-
-                    apply_relax = .FALSE.
-
-            end select
-            
-
-            if (apply_relax) then 
-
-                if (tau .eq. 0.0) then
-                    ! Impose ice thickness 
-
-                    H_ice(i,j) = H_ref(i,j) 
-
-                else
-                    ! Apply relaxation to reference state 
-
-                    dHdt = (H_ref(i,j) - H_ice(i,j)) / tau 
-
-                    H_ice(i,j) = H_ice(i,j) + dHdt*dt 
-
-                end if 
-            end if 
-
-        end do 
-        end do 
-
-
-        return 
-
-    end subroutine relax_ice_thickness
 
 
 end module mass_conservation

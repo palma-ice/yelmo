@@ -70,7 +70,7 @@ contains
 
         logical, parameter :: update_others_pc  = .FALSE. 
         logical, parameter :: very_verbose      = .FALSE. 
-        logical, parameter :: check_mb          = .TRUE. 
+        logical, parameter :: check_mb          = .FALSE. 
 
         ! Safety: check status of model object, 
         ! Has it been initialized?
@@ -291,22 +291,22 @@ if (.TRUE.) then
                     case("FE-SBE")
                         
                         ! FE-SBE truncation error 
-                        call calc_pc_tau_fe_sbe(dom%time%pc_tau,dom%tpo%now%H_ice_corr,dom%tpo%now%H_ice_pred,dt_now)
+                        call calc_pc_tau_fe_sbe(dom%time%pc_tau,dom%tpo%now%corr%H_ice,dom%tpo%now%pred%H_ice,dt_now)
 
                     case("AB-SAM")
                         
                         ! AB-SAM truncation error 
-                        call calc_pc_tau_ab_sam(dom%time%pc_tau,dom%tpo%now%H_ice_corr,dom%tpo%now%H_ice_pred,dt_now, &
+                        call calc_pc_tau_ab_sam(dom%time%pc_tau,dom%tpo%now%corr%H_ice,dom%tpo%now%pred%H_ice,dt_now, &
                                                                                                 dom%tpo%par%dt_zeta)
 
                     case("HEUN")
 
                         ! HEUN truncation error (same as FE-SBE)
-                        call calc_pc_tau_heun(dom%time%pc_tau,dom%tpo%now%H_ice_corr,dom%tpo%now%H_ice_pred,dt_now)
+                        call calc_pc_tau_heun(dom%time%pc_tau,dom%tpo%now%corr%H_ice,dom%tpo%now%pred%H_ice,dt_now)
 
                     case("RALSTON")
 
-                        call calc_pc_tau_fe_sbe(dom%time%pc_tau,dom%tpo%now%H_ice_corr,dom%tpo%now%H_ice_pred,dt_now)
+                        call calc_pc_tau_fe_sbe(dom%time%pc_tau,dom%tpo%now%corr%H_ice,dom%tpo%now%pred%H_ice,dt_now)
 
                 end select 
 
@@ -316,7 +316,7 @@ else
 end if 
 
                 ! Calculate eta for this timestep 
-                call set_pc_mask(pc_mask,dom%time%pc_tau,dom%tpo%now%H_ice_pred,dom%tpo%now%H_ice_corr,dom%bnd%z_bed, &
+                call set_pc_mask(pc_mask,dom%time%pc_tau,dom%tpo%now%corr%H_ice,dom%tpo%now%pred%H_ice,dom%bnd%z_bed, &
                                 dom%bnd%z_sl,dom%bnd%c%rho_ice,dom%bnd%c%rho_sw,dom%par%pc_eps,dom%tpo%par%margin_flt_subgrid)
                 eta_now = calc_pc_eta(dom%time%pc_tau,mask=pc_mask)
 
@@ -328,8 +328,8 @@ end if
 
                 !write(*,"(a,f12.5,f12.5,f12.5,2i4,2f10.2)") &
                 !    "test: ", time_now, dt_now, eta_now, ij(1), ij(2), &
-                !    dom%tpo%now%H_ice_pred(ij(1),ij(2)), &
-                !    dom%tpo%now%H_ice_corr(ij(1),ij(2))
+                !    dom%tpo%now%pred%H_ice(ij(1),ij(2)), &
+                !    dom%tpo%now%corr%H_ice(ij(1),ij(2))
                 
                 ! Check if this timestep should be rejected:
                 ! If the redo iteration is not the last allowed and the timestep is still larger  
@@ -384,8 +384,8 @@ end if
 
             ! if (time_now .ge. 10.0) then 
             !     write(*,*) time_now
-            !     write(*,*) maxval(dom%tpo%now%H_ice_pred)
-            !     write(*,*) maxval(dom%tpo%now%H_ice_corr)
+            !     write(*,*) maxval(dom%tpo%now%pred%H_ice)
+            !     write(*,*) maxval(dom%tpo%now%corr%H_ice)
             !     write(*,*) maxval(dom%tpo%now%H_ice)
             !     stop 
             ! end if 

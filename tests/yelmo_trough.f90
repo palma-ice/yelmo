@@ -526,9 +526,9 @@ contains
         call nc_write(filename,"taul_int_acy",ylmo%dyn%now%taul_int_acy,units="Pa m",long_name="Vertically integrated lateral stress (y)", &
                        dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
         
-        call nc_write(filename,"H_ice_pred",ylmo%tpo%now%H_ice_pred,units="m",long_name="Ice thickness (predicted)", &
+        call nc_write(filename,"H_ice_pred",ylmo%tpo%now%pred%H_ice,units="m",long_name="Ice thickness (predicted)", &
                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-        call nc_write(filename,"H_ice_corr",ylmo%tpo%now%H_ice_corr,units="m",long_name="Ice thickness (corrected)", &
+        call nc_write(filename,"H_ice_corr",ylmo%tpo%now%corr%H_ice,units="m",long_name="Ice thickness (corrected)", &
                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
 
         call nc_write(filename,"dzsdt",ylmo%tpo%now%dzsdt,units="m/a",long_name="Surface elevation change", &

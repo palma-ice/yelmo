@@ -155,7 +155,7 @@ contains
 
                 bcs(1) = "free-slip"
                 bcs(2) = "periodic"
-                bcs(3) = "no-slip"
+                bcs(3) = "no-slip"      ! "free-slip"?
                 bcs(4) = "periodic" 
 
             case("periodic")

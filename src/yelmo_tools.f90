@@ -115,6 +115,14 @@ contains
                 jm1 = max(j-1,1)
                 jp1 = min(j+1,ny) 
 
+            case("TROUGH")
+                im1 = max(i-1,1)
+                ip1 = min(i+1,nx) 
+                jm1 = j-1
+                if (jm1 .eq. 0)    jm1 = ny
+                jp1 = j+1
+                if (jp1 .eq. ny+1) jp1 = 1 
+                
             case DEFAULT 
                 ! Periodic
 
@@ -3075,6 +3083,7 @@ end if
             case("infinite","TROUGH") 
                 dvardx(1,:)  = dvardx(2,:)
                 dvardx(nx,:) = dvardx(nx-1,:)
+            
         end select
 
         ! Finally, ensure that gradient is beneath desired limit 

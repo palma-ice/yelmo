@@ -1,6 +1,6 @@
 module solver_advection
     
-    use yelmo_defs, only : sp, dp, wp, tol_underflow
+    use yelmo_defs, only : sp, dp, wp, tol_underflow, io_unit_err
     use yelmo_tools, only : get_neighbor_indices, stagger_aa_ab, stagger_nodes_aa_ab_ice
     
     use solver_linear
@@ -93,8 +93,11 @@ contains
                 
                 ! Solve linear equation
                 adv_lis_opt = "-i bicg -p ilu -maxiter 1000 -tol 1.0e-12 -initx_zeros false"
+                !adv_lis_opt = "-i minres -p jacobi -maxiter 1000 -tol 1.0e-12 -initx_zeros false"
                 call linear_solver_matrix_solve(lgs,adv_lis_opt)
                 
+                !call linear_solver_print_summary(lgs,io_unit_err)
+
                 ! Store advection solution
                 call linear_solver_save_advection(var_now,lgs)
 
@@ -119,7 +122,7 @@ contains
         implicit none 
 
         real(wp), intent(OUT) :: H(:,:)                 ! [X]
-        type(linear_solver_class), intent(IN) :: lgs 
+        type(linear_solver_class), intent(IN) :: lgs
 
         ! Local variables 
         integer :: i, j, nr 
@@ -410,6 +413,11 @@ contains
 
                     lgs%b_value(nr) = 0.0_wp
                     lgs%x_value(nr) = H(i,j)
+
+                    ! Initial guess == previous H
+
+                    lgs%x_value(nr) = H(i,j)                            
+                
 
                 else
                     ! Assume zero for now

@@ -26,6 +26,8 @@ module solver_linear
 
         real(wp), allocatable :: resid(:)
         real(wp) :: L1_norm, L2_norm, L2_rel_norm
+        real(wp) :: solver_time
+        integer  :: lin_iter 
 
     end type
 
@@ -34,6 +36,7 @@ module solver_linear
     public :: linear_solver_class
     public :: linear_solver_init
     public :: linear_solver_matrix_solve
+    public :: linear_solver_print_summary
 
 contains 
     
@@ -240,6 +243,8 @@ contains
         call lis_solver_get_residualnorm(solver,residual,ierr)
 
         ! Store in lgs object too
+        lgs%lin_iter    = lin_iter
+        lgs%solver_time = solver_time
         lgs%L2_rel_norm = residual
 
         ! Print a summary
@@ -270,6 +275,19 @@ contains
         return
 
     end subroutine linear_solver_matrix_solve_lis
+
+    subroutine linear_solver_print_summary(lgs,io)
+
+        implicit none
+
+        type(linear_solver_class), intent(IN) :: lgs 
+        integer, intent(IN) :: io 
+
+        write(io,*) "solve_lis: [time (s), iter, L2_rel_norm] = ", lgs%solver_time, lgs%lin_iter, lgs%L2_rel_norm
+
+        return
+        
+    end subroutine linear_solver_print_summary
 
 ! ==== PETSC SPECIFIC CODE =====
 #ifdef USEPETSC

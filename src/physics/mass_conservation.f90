@@ -711,37 +711,27 @@ contains
 
             case("MISMIP3D","TROUGH")
 
-                ! Do nothing - this should be handled by the ice advection routine
-                ! if the default choice ytopo.solver="impl-lis" is used.
-                
-                !H_ice_new(1,:)    = H_ice_new(2,:)          ! x=0, Symmetry 
-                !H_ice_new(nx,:)   = 0.0                     ! x=max, no ice
+                ! Ensure that x-boundary ice-thickness matches "infinite" and "zero" case.
+                ! This is not fully handled by ytopo.solver="impl-lis", since
+                ! subsequently the mb forcing is applied.
 
-                !H_ice_new(:,1)    = H_ice_new(:,2)          ! y=-50km, Free-slip condition
-                !H_ice_new(:,ny)   = H_ice_new(:,ny-1)       ! y= 50km, Free-slip condition
+                H_ice_new(1,:)    = H_ice_new(2,:)          ! x=0, Symmetry 
+                H_ice_new(nx,:)   = 0.0                     ! x=max, no ice
 
             case("periodic","periodic-xy")
 
                 ! Do nothing - this should be handled by the ice advection routine
                 ! if the default choice ytopo.solver="impl-lis" is used.
 
-            ! case("periodic-x") 
-
-            !     ! Periodic x 
-            !     H_ice_new(1:2,:)     = H_ice_new(nx-3:nx-2,:) 
-            !     H_ice_new(nx-1:nx,:) = H_ice_new(2:3,:) 
-                
-            !     ! Infinite (free-slip too)
-            !     H_ice_new(:,1)  = H_ice_new(:,2)
-            !     H_ice_new(:,ny) = H_ice_new(:,ny-1)
-
             case("infinite")
                 ! Set border points equal to inner neighbors 
-
-                ! Do nothing - this should be handled by the ice advection routine
-                ! if the default choice ytopo.solver="impl-lis" is used.
-
-                !call fill_borders_2D(H_ice_new,nfill=1)
+                ! This is not fully handled by ytopo.solver="impl-lis", since
+                ! subsequently the mb forcing is applied.
+                
+                H_ice_new(1,:)    = H_ice_new(2,:)          ! x=0, Symmetry 
+                H_ice_new(nx,:)   = 0.0                     ! x=max, no ice
+                H_ice_new(:,1)  = H_ice_new(:,2)
+                H_ice_new(:,ny) = H_ice_new(:,ny-1)
 
             case("fixed") 
                 ! Set border points equal to prescribed values from array

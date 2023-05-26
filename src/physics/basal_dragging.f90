@@ -105,7 +105,7 @@ contains
         if (n_sd .eq. 1) then 
             ! No sampling performed
             f_sd = 0.0 
-            w_sd = 0.0
+            w_sd = 1.0
 
         else 
 

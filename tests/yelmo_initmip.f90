@@ -102,13 +102,13 @@ program yelmo_test
     call nml_read(path_par,"ctrl","transient_clim", ctl%transient_clim)     ! Calculate transient climate? 
     call nml_read(path_par,"ctrl","with_ice_sheet", ctl%with_ice_sheet)     ! Include an active ice sheet 
     call nml_read(path_par,"ctrl","optimize",       ctl%optimize)           ! Optimize basal friction cb_ref field
-    call nml_read(path_par,"ctrl","clim_nm",        ctl%clim_nm)                   ! Namelist group holding climate information
+    call nml_read(path_par,"ctrl","clim_nm",        ctl%clim_nm)            ! Namelist group holding climate information
     
-    call nml_read(path_par,"ctrl","load_cb_ref",    ctl%load_cb_ref)               ! Load cb_ref from file? Otherwise define from till_cf_ref + inline tuning
-    call nml_read(path_par,"ctrl","file_cb_ref",    ctl%file_cb_ref)               ! Filename holding cb_ref to load 
+    call nml_read(path_par,"ctrl","load_cb_ref",    ctl%load_cb_ref)        ! Load cb_ref from file? Otherwise define from till_cf_ref + inline tuning
+    call nml_read(path_par,"ctrl","file_cb_ref",    ctl%file_cb_ref)        ! Filename holding cb_ref to load 
 
-    call nml_read(path_par,"ctrl","load_bmelt",     ctl%load_bmelt)                ! Load bmelt from file?
-    call nml_read(path_par,"ctrl","file_bmelt",     ctl%file_bmelt)                ! Filename holding bmelt field to load 
+    call nml_read(path_par,"ctrl","load_bmelt",     ctl%load_bmelt)         ! Load bmelt from file?
+    call nml_read(path_par,"ctrl","file_bmelt",     ctl%file_bmelt)         ! Filename holding bmelt field to load 
         
     ! Load climate (eg, clim_pd or clim_lgm)
     call nml_read(path_par,ctl%clim_nm,  "bmb_shlf_const",  ctl%bmb_shlf_const)            ! [yr] Constant imposed bmb_shlf value

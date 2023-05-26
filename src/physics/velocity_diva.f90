@@ -269,6 +269,11 @@ contains
             call stagger_beta(beta_eff_acx,beta_eff_acy,beta_eff,H_ice,f_ice,ux_bar,uy_bar, &
                         f_grnd,f_grnd_acx,f_grnd_acy,par%beta_gl_stag,par%beta_min,par%boundaries)
             
+            ! write(*,*) "c_bed:    ", minval(c_bed),    maxval(c_bed)
+            ! write(*,*) "beta:     ", minval(beta),     maxval(beta)
+            ! write(*,*) "beta_eff: ", minval(beta_eff), maxval(beta_eff)
+            ! write(*,*) "visc_eff: ", minval(visc_eff), maxval(visc_eff)
+            
             ! =========================================================================================
             ! Step 2: Call the SSA solver to obtain new estimate of ux_bar/uy_bar
             

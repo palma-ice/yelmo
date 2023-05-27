@@ -110,8 +110,9 @@ module yelmo_defs
         real(wp)           :: grad_lim_zb
         real(wp)           :: dist_grz
         integer            :: gl_sep 
-        integer            :: gl_sep_nx 
-        logical            :: diffuse_bmb_shlf 
+        integer            :: gz_nx 
+        real(wp)           :: gz_Hg0
+        real(wp)           :: gz_Hg1
         real(wp)           :: fmb_scale
         real(wp)           :: kt 
         real(wp)           :: w2  

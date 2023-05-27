@@ -75,8 +75,9 @@
     grad_lim_zb         = 0.5               ! [m/m] Maximum allowed sloped in bed gradient (dzb/dx)
     dist_grz            = 200.0             ! [km] Radius to consider part of "grounding-line zone" (grz)
     gl_sep              = 1                 ! 1: Linear f_grnd_acx/acy and binary f_grnd, 2: area f_grnd, average to acx/acy
-    gl_sep_nx           = 15                ! [-] Number of interpolation points (nx*nx) to calculate grounded area at grounding line
-    diffuse_bmb_shlf    = False             ! Allow bmb_shlf to permeate inland at the grounding line 
+    gz_nx               = 15                ! [-] Number of interpolation points (nx*nx) to calculate grounded area at grounding line
+    gz_Hg0              = 0.0               ! Grounding zone, limit of penetration of bmb_grnd 
+    gz_Hg1              = 100.0             ! Grounding zone, limit of penetration of bmb_shlf 
     fmb_scale           = 1.0               ! Scaling of fmb ~ scale*bmb, scale=10 suggested by Pollard and DeConto (2016)
     kt                  = 0.0025            ! [m yr-1 Pa-1] vm-l19 calving scaling parameter
     w2                  = 25                ! [-] vm-l19 calving eigenvalue weighting coefficient

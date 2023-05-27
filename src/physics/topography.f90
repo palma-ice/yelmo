@@ -1,7 +1,8 @@
 module topography 
 
-    use yelmo_defs, only : wp, dp, prec, io_unit_err, pi
-    
+    use yelmo_defs, only : wp, dp, io_unit_err, pi
+    use yelmo_tools, only : get_neighbor_indices
+
     implicit none 
 
     private  
@@ -595,17 +596,17 @@ contains
 
         implicit none 
 
-        real(prec), intent(INOUT) :: z_srf
-        real(prec), intent(IN)    :: H_ice
-        real(prec), intent(IN)    :: f_ice
-        real(prec), intent(IN)    :: H_grnd
-        real(prec), intent(IN)    :: z_bed
-        real(prec), intent(IN)    :: z_sl
-        real(prec), intent(IN)    :: rho_ice 
-        real(prec), intent(IN)    :: rho_sw
+        real(wp), intent(INOUT) :: z_srf
+        real(wp), intent(IN)    :: H_ice
+        real(wp), intent(IN)    :: f_ice
+        real(wp), intent(IN)    :: H_grnd
+        real(wp), intent(IN)    :: z_bed
+        real(wp), intent(IN)    :: z_sl
+        real(wp), intent(IN)    :: rho_ice 
+        real(wp), intent(IN)    :: rho_sw
         
         ! Local variables 
-        real(prec) :: rho_ice_sw
+        real(wp) :: rho_ice_sw
         real(wp)   :: H_eff 
 
         rho_ice_sw = rho_ice/rho_sw ! Ratio of density of ice to seawater [--]
@@ -636,18 +637,18 @@ contains
         
         implicit none 
 
-        real(prec), intent(INOUT) :: z_srf 
-        real(prec), intent(IN)    :: H_ice
-        real(prec), intent(IN)    :: f_ice
-        real(prec), intent(IN)    :: z_bed
-        real(prec), intent(IN)    :: z_sl
-        real(prec), intent(IN)    :: rho_ice 
-        real(prec), intent(IN)    :: rho_sw
+        real(wp), intent(INOUT) :: z_srf 
+        real(wp), intent(IN)    :: H_ice
+        real(wp), intent(IN)    :: f_ice
+        real(wp), intent(IN)    :: z_bed
+        real(wp), intent(IN)    :: z_sl
+        real(wp), intent(IN)    :: rho_ice 
+        real(wp), intent(IN)    :: rho_sw
         
         ! Local variables
         integer :: i, j, nx, ny 
-        real(prec) :: rho_ice_sw
-        real(prec) :: H_eff
+        real(wp) :: rho_ice_sw
+        real(wp) :: H_eff
 
         rho_ice_sw = rho_ice/rho_sw ! Ratio of density of ice to seawater [--]
         
@@ -661,21 +662,21 @@ contains
 
     end subroutine calc_z_srf_max
 
-    subroutine calc_z_srf_gl_subgrid_area(z_srf,f_grnd,H_ice,f_ice,z_bed,z_sl,gl_sep_nx,rho_ice,rho_sw)
+    subroutine calc_z_srf_gl_subgrid_area(z_srf,f_grnd,H_ice,f_ice,z_bed,z_sl,gz_nx,rho_ice,rho_sw)
         ! Interpolate variables at grounding line to subgrid level to 
         ! calculate the average z_srf value for the aa-node cell
 
         implicit none
         
-        real(prec), intent(OUT) :: z_srf(:,:)       ! aa-nodes 
-        real(prec), intent(IN)  :: f_grnd(:,:)      ! aa-nodes
-        real(prec), intent(IN)  :: H_ice(:,:)
-        real(prec), intent(IN)  :: f_ice(:,:)
-        real(prec), intent(IN)  :: z_bed(:,:)
-        real(prec), intent(IN)  :: z_sl(:,:)
-        integer,    intent(IN)  :: gl_sep_nx        ! Number of interpolation points per side (nx*nx)
-        real(prec), intent(IN)  :: rho_ice 
-        real(prec), intent(IN)  :: rho_sw
+        real(wp), intent(OUT) :: z_srf(:,:)       ! aa-nodes 
+        real(wp), intent(IN)  :: f_grnd(:,:)      ! aa-nodes
+        real(wp), intent(IN)  :: H_ice(:,:)
+        real(wp), intent(IN)  :: f_ice(:,:)
+        real(wp), intent(IN)  :: z_bed(:,:)
+        real(wp), intent(IN)  :: z_sl(:,:)
+        integer,    intent(IN)  :: gz_nx        ! Number of interpolation points per side (nx*nx)
+        real(wp), intent(IN)  :: rho_ice 
+        real(wp), intent(IN)  :: rho_sw
         
         ! Local variables
         integer  :: i, j, nx, ny
@@ -685,21 +686,21 @@ contains
         real(wp) :: f_grnd_neighb(4) 
         logical  :: is_grline 
 
-        real(prec), allocatable :: z_srf_int(:,:) 
-        real(prec), allocatable :: H_ice_int(:,:)
-        real(prec), allocatable :: f_ice_int(:,:)  
-        real(prec), allocatable :: z_bed_int(:,:) 
-        real(prec), allocatable :: z_sl_int(:,:) 
+        real(wp), allocatable :: z_srf_int(:,:) 
+        real(wp), allocatable :: H_ice_int(:,:)
+        real(wp), allocatable :: f_ice_int(:,:)  
+        real(wp), allocatable :: z_bed_int(:,:) 
+        real(wp), allocatable :: z_sl_int(:,:) 
         
         nx = size(z_srf,1)
         ny = size(z_srf,2) 
 
         ! Allocate the subgrid arrays 
-        allocate(z_srf_int(gl_sep_nx,gl_sep_nx))
-        allocate(H_ice_int(gl_sep_nx,gl_sep_nx))
-        allocate(f_ice_int(gl_sep_nx,gl_sep_nx))
-        allocate(z_bed_int(gl_sep_nx,gl_sep_nx))
-        allocate(z_sl_int(gl_sep_nx,gl_sep_nx))
+        allocate(z_srf_int(gz_nx,gz_nx))
+        allocate(H_ice_int(gz_nx,gz_nx))
+        allocate(f_ice_int(gz_nx,gz_nx))
+        allocate(z_bed_int(gz_nx,gz_nx))
+        allocate(z_sl_int(gz_nx,gz_nx))
         
         ! ajr: assume f_ice_int=1 everywhere this is used for now. 
         ! Needs to be fixed in the future potentially. 
@@ -749,31 +750,31 @@ contains
                 ! Calculate values at corners (ab-nodes) and interpolate
                 
                 ! == H_ice == 
-                v1 = 0.25_prec*(H_ice(i,j) + H_ice(ip1,j) + H_ice(ip1,jp1) + H_ice(i,jp1))
-                v2 = 0.25_prec*(H_ice(i,j) + H_ice(im1,j) + H_ice(im1,jp1) + H_ice(i,jp1))
-                v3 = 0.25_prec*(H_ice(i,j) + H_ice(im1,j) + H_ice(im1,jm1) + H_ice(i,jm1))
-                v4 = 0.25_prec*(H_ice(i,j) + H_ice(ip1,j) + H_ice(ip1,jm1) + H_ice(i,jm1))
-                call calc_subgrid_array(H_ice_int,v1,v2,v3,v4,gl_sep_nx)
+                v1 = 0.25_wp*(H_ice(i,j) + H_ice(ip1,j) + H_ice(ip1,jp1) + H_ice(i,jp1))
+                v2 = 0.25_wp*(H_ice(i,j) + H_ice(im1,j) + H_ice(im1,jp1) + H_ice(i,jp1))
+                v3 = 0.25_wp*(H_ice(i,j) + H_ice(im1,j) + H_ice(im1,jm1) + H_ice(i,jm1))
+                v4 = 0.25_wp*(H_ice(i,j) + H_ice(ip1,j) + H_ice(ip1,jm1) + H_ice(i,jm1))
+                call calc_subgrid_array(H_ice_int,v1,v2,v3,v4,gz_nx)
                 
                 ! == z_bed == 
-                v1 = 0.25_prec*(z_bed(i,j) + z_bed(ip1,j) + z_bed(ip1,jp1) + z_bed(i,jp1))
-                v2 = 0.25_prec*(z_bed(i,j) + z_bed(im1,j) + z_bed(im1,jp1) + z_bed(i,jp1))
-                v3 = 0.25_prec*(z_bed(i,j) + z_bed(im1,j) + z_bed(im1,jm1) + z_bed(i,jm1))
-                v4 = 0.25_prec*(z_bed(i,j) + z_bed(ip1,j) + z_bed(ip1,jm1) + z_bed(i,jm1))
-                call calc_subgrid_array(z_bed_int,v1,v2,v3,v4,gl_sep_nx)
+                v1 = 0.25_wp*(z_bed(i,j) + z_bed(ip1,j) + z_bed(ip1,jp1) + z_bed(i,jp1))
+                v2 = 0.25_wp*(z_bed(i,j) + z_bed(im1,j) + z_bed(im1,jp1) + z_bed(i,jp1))
+                v3 = 0.25_wp*(z_bed(i,j) + z_bed(im1,j) + z_bed(im1,jm1) + z_bed(i,jm1))
+                v4 = 0.25_wp*(z_bed(i,j) + z_bed(ip1,j) + z_bed(ip1,jm1) + z_bed(i,jm1))
+                call calc_subgrid_array(z_bed_int,v1,v2,v3,v4,gz_nx)
                 
                 ! == z_sl == 
-                v1 = 0.25_prec*(z_sl(i,j) + z_sl(ip1,j) + z_sl(ip1,jp1) + z_sl(i,jp1))
-                v2 = 0.25_prec*(z_sl(i,j) + z_sl(im1,j) + z_sl(im1,jp1) + z_sl(i,jp1))
-                v3 = 0.25_prec*(z_sl(i,j) + z_sl(im1,j) + z_sl(im1,jm1) + z_sl(i,jm1))
-                v4 = 0.25_prec*(z_sl(i,j) + z_sl(ip1,j) + z_sl(ip1,jm1) + z_sl(i,jm1))
-                call calc_subgrid_array(z_sl_int,v1,v2,v3,v4,gl_sep_nx)
+                v1 = 0.25_wp*(z_sl(i,j) + z_sl(ip1,j) + z_sl(ip1,jp1) + z_sl(i,jp1))
+                v2 = 0.25_wp*(z_sl(i,j) + z_sl(im1,j) + z_sl(im1,jp1) + z_sl(i,jp1))
+                v3 = 0.25_wp*(z_sl(i,j) + z_sl(im1,j) + z_sl(im1,jm1) + z_sl(i,jm1))
+                v4 = 0.25_wp*(z_sl(i,j) + z_sl(ip1,j) + z_sl(ip1,jm1) + z_sl(i,jm1))
+                call calc_subgrid_array(z_sl_int,v1,v2,v3,v4,gz_nx)
                 
                 ! Calculate subgrid surface elevations
                 call calc_z_srf_max(z_srf_int,H_ice_int,f_ice_int,z_bed_int,z_sl_int,rho_ice,rho_sw)
 
                 ! Calculate full grid z_srf value as the mean of subgrid values 
-                z_srf(i,j) = sum(z_srf_int) / real(gl_sep_nx*gl_sep_nx,prec)
+                z_srf(i,j) = sum(z_srf_int) / real(gz_nx*gz_nx,wp)
 
             end if 
 
@@ -790,9 +791,9 @@ contains
         
         implicit none
 
-        real(prec), intent(OUT) :: H_eff 
-        real(prec), intent(IN)  :: H_ice 
-        real(prec), intent(IN)  :: f_ice 
+        real(wp), intent(OUT) :: H_eff 
+        real(wp), intent(IN)  :: H_ice 
+        real(wp), intent(IN)  :: f_ice 
         logical,    intent(IN), optional :: set_frac_zero 
 
         if (f_ice .gt. 0.0) then 
@@ -847,7 +848,7 @@ contains
         end if 
 
         ! Calculate new H_grnd (ice thickness overburden)
-        !H_grnd = H_eff - rho_sw_ice*max(z_sl-z_bed,0.0_prec)
+        !H_grnd = H_eff - rho_sw_ice*max(z_sl-z_bed,0.0_wp)
 
         ! ajr: testing. This ensures that ice-free ground above sea level
         ! also has H_grnd > 0.
@@ -910,18 +911,18 @@ contains
 
     end subroutine calc_H_af
 
-    subroutine calc_f_grnd_subgrid_area_aa(f_grnd,H_grnd,gl_sep_nx)
+    subroutine calc_f_grnd_subgrid_area_aa(f_grnd,H_grnd,gz_nx)
         ! Use H_grnd to determined grounded area fraction of grid point.
 
         implicit none
         
-        real(prec), intent(OUT) :: f_grnd(:,:)      ! aa-nodes 
-        real(prec), intent(IN)  :: H_grnd(:,:)      ! aa-nodes
-        integer,    intent(IN)  :: gl_sep_nx        ! Number of interpolation points per side (nx*nx)
+        real(wp), intent(OUT) :: f_grnd(:,:)      ! aa-nodes 
+        real(wp), intent(IN)  :: H_grnd(:,:)      ! aa-nodes
+        integer,    intent(IN)  :: gz_nx        ! Number of interpolation points per side (nx*nx)
 
         ! Local variables
         integer    :: i, j, nx, ny
-        real(prec) :: Hg_1, Hg_2, Hg_3, Hg_4, Hg_mid  
+        real(wp) :: Hg_1, Hg_2, Hg_3, Hg_4, Hg_mid  
         integer    :: im1, ip1, jm1, jp1 
 
         !integer, parameter :: nx_interp = 15
@@ -957,15 +958,15 @@ contains
             end if
   
             ! Calculate Hg at corners (ab-nodes)
-            Hg_1 = 0.25_prec*(H_grnd(i,j) + H_grnd(ip1,j) + H_grnd(ip1,jp1) + H_grnd(i,jp1))
-            Hg_2 = 0.25_prec*(H_grnd(i,j) + H_grnd(im1,j) + H_grnd(im1,jp1) + H_grnd(i,jp1))
-            Hg_3 = 0.25_prec*(H_grnd(i,j) + H_grnd(im1,j) + H_grnd(im1,jm1) + H_grnd(i,jm1))
-            Hg_4 = 0.25_prec*(H_grnd(i,j) + H_grnd(ip1,j) + H_grnd(ip1,jm1) + H_grnd(i,jm1))
+            Hg_1 = 0.25_wp*(H_grnd(i,j) + H_grnd(ip1,j) + H_grnd(ip1,jp1) + H_grnd(i,jp1))
+            Hg_2 = 0.25_wp*(H_grnd(i,j) + H_grnd(im1,j) + H_grnd(im1,jp1) + H_grnd(i,jp1))
+            Hg_3 = 0.25_wp*(H_grnd(i,j) + H_grnd(im1,j) + H_grnd(im1,jm1) + H_grnd(i,jm1))
+            Hg_4 = 0.25_wp*(H_grnd(i,j) + H_grnd(ip1,j) + H_grnd(ip1,jm1) + H_grnd(i,jm1))
             
             if (max(Hg_1,Hg_2,Hg_3,Hg_4) .ge. 0.0 .and. min(Hg_1,Hg_2,Hg_3,Hg_4) .lt. 0.0) then 
                 ! Point contains grounding line, get grounded area  
                 
-                call calc_grounded_fraction_cell(f_grnd(i,j),Hg_1,Hg_2,Hg_3,Hg_4,gl_sep_nx)
+                call calc_grounded_fraction_cell(f_grnd(i,j),Hg_1,Hg_2,Hg_3,Hg_4,gz_nx)
 
             end if 
 
@@ -976,7 +977,7 @@ contains
         
     end subroutine calc_f_grnd_subgrid_area_aa
     
-    subroutine calc_f_grnd_subgrid_area(f_grnd,f_grnd_acx,f_grnd_acy,H_grnd,gl_sep_nx)
+    subroutine calc_f_grnd_subgrid_area(f_grnd,f_grnd_acx,f_grnd_acy,H_grnd,gz_nx)
         ! Use H_grnd to determined grounded area fraction of grid point.
 
         implicit none
@@ -985,7 +986,7 @@ contains
         real(wp), intent(OUT) :: f_grnd_acx(:,:)    ! ac-nodes
         real(wp), intent(OUT) :: f_grnd_acy(:,:)    ! ac-nodes
         real(wp), intent(IN)  :: H_grnd(:,:)        ! aa-nodes
-        integer,  intent(IN)  :: gl_sep_nx          ! Number of interpolation points per side (nx*nx)
+        integer,  intent(IN)  :: gz_nx          ! Number of interpolation points per side (nx*nx)
 
         ! Local variables
         integer  :: i, j, nx, ny
@@ -1040,7 +1041,7 @@ contains
             if (Hg_max .ge. 0.0 .and. Hg_min .lt. 0.0) then 
                 ! Point contains grounding line, get grounded area  
                 
-                call calc_grounded_fraction_cell(f_grnd(i,j),Hg_1,Hg_2,Hg_3,Hg_4,gl_sep_nx)
+                call calc_grounded_fraction_cell(f_grnd(i,j),Hg_1,Hg_2,Hg_3,Hg_4,gz_nx)
 
             else if (Hg_max .ge. 0.0 .and. Hg_min .ge. 0.0) then 
                 ! Fully grounded point
@@ -1063,7 +1064,7 @@ contains
             if (Hg_max .ge. 0.0 .and. Hg_min .lt. 0.0) then 
                 ! Point contains grounding line, get grounded area  
                 
-                call calc_grounded_fraction_cell(f_grnd_acx(i,j),Hg_1,Hg_2,Hg_3,Hg_4,gl_sep_nx)
+                call calc_grounded_fraction_cell(f_grnd_acx(i,j),Hg_1,Hg_2,Hg_3,Hg_4,gz_nx)
 
             else if (Hg_max .ge. 0.0 .and. Hg_min .ge. 0.0) then
                 ! Purely grounded point 
@@ -1086,7 +1087,7 @@ contains
             if (Hg_max .ge. 0.0 .and. Hg_min .lt. 0.0) then 
                 ! Point contains grounding line, get grounded area  
                 
-                call calc_grounded_fraction_cell(f_grnd_acy(i,j),Hg_1,Hg_2,Hg_3,Hg_4,gl_sep_nx)
+                call calc_grounded_fraction_cell(f_grnd_acy(i,j),Hg_1,Hg_2,Hg_3,Hg_4,gz_nx)
 
             else if (Hg_max .ge. 0.0 .and. Hg_min .ge. 0.0) then 
                 ! Purely grounded point 
@@ -1105,7 +1106,7 @@ if (.TRUE.) then
         ! acx-nodes 
         do j = 1, ny 
         do i = 1, nx-1
-            f_grnd_acx(i,j) = 0.5_prec*(f_grnd(i,j) + f_grnd(i+1,j))
+            f_grnd_acx(i,j) = 0.5_wp*(f_grnd(i,j) + f_grnd(i+1,j))
         end do 
         end do
         f_grnd_acx(nx,:) = f_grnd_acx(nx-1,:) 
@@ -1113,7 +1114,7 @@ if (.TRUE.) then
         ! acy-nodes 
         do j = 1, ny-1 
         do i = 1, nx
-            f_grnd_acy(i,j) = 0.5_prec*(f_grnd(i,j) + f_grnd(i,j+1))
+            f_grnd_acy(i,j) = 0.5_wp*(f_grnd(i,j) + f_grnd(i,j+1))
         end do 
         end do
         f_grnd_acy(:,ny) = f_grnd_acy(:,ny-1) 
@@ -1140,14 +1141,14 @@ end if
         
         implicit none 
 
-        real(prec), intent(OUT) :: f_grnd(:,:)
-        real(prec), intent(OUT) :: f_grnd_x(:,:)
-        real(prec), intent(OUT) :: f_grnd_y(:,:)
-        real(prec), intent(IN)  :: H_grnd(:,:)
+        real(wp), intent(OUT) :: f_grnd(:,:)
+        real(wp), intent(OUT) :: f_grnd_x(:,:)
+        real(wp), intent(OUT) :: f_grnd_y(:,:)
+        real(wp), intent(IN)  :: H_grnd(:,:)
 
         ! Local variables  
         integer :: i, j, nx, ny 
-        real(prec) :: H_grnd_1, H_grnd_2
+        real(wp) :: H_grnd_1, H_grnd_2
 
         nx = size(f_grnd,1)
         ny = size(f_grnd,2)
@@ -1581,36 +1582,36 @@ end if
 
     end subroutine calc_grounding_line_zone
 
-    subroutine calc_bmb_total(bmb,bmb_grnd,bmb_shlf,H_ice,H_grnd,f_grnd,bmb_gl_method,diffuse_bmb_shlf)
+    subroutine calc_bmb_total(bmb,bmb_grnd,bmb_shlf,H_ice,H_grnd,f_grnd,gz_Hg0,gz_Hg1, &
+                                                            gz_nx,bmb_gl_method,boundaries)
 
         implicit none 
 
-        real(prec),       intent(OUT) :: bmb(:,:) 
-        real(prec),       intent(IN)  :: bmb_grnd(:,:) 
-        real(prec),       intent(IN)  :: bmb_shlf(:,:) 
-        real(prec),       intent(IN)  :: H_ice(:,:)
-        real(prec),       intent(IN)  :: H_grnd(:,:)
-        real(prec),       intent(IN)  :: f_grnd(:,:) 
+        real(wp),         intent(OUT) :: bmb(:,:) 
+        real(wp),         intent(IN)  :: bmb_grnd(:,:) 
+        real(wp),         intent(IN)  :: bmb_shlf(:,:) 
+        real(wp),         intent(IN)  :: H_ice(:,:)
+        real(wp),         intent(IN)  :: H_grnd(:,:)
+        real(wp),         intent(IN)  :: f_grnd(:,:) 
+        real(wp),         intent(IN)  :: gz_Hg0
+        real(wp),         intent(IN)  :: gz_Hg1
+        integer,          intent(IN)  :: gz_nx
         character(len=*), intent(IN)  :: bmb_gl_method 
-        logical,          intent(IN)  :: diffuse_bmb_shlf 
+        character(len=*), intent(IN)  :: boundaries 
 
         ! Local variables
         integer    :: i, j, nx, ny
         integer    :: n_float  
-        real(prec) :: bmb_shlf_now 
+        real(wp) :: bmb_shlf_now 
 
         nx = size(bmb,1)
         ny = size(bmb,2) 
 
         ! Combine floating and grounded parts into one field =========================
-
-        ! Initialize bmb to zero everywhere to start and apply bmb_grnd to grounded ice 
-        bmb = 0.0_wp 
-        where(f_grnd .eq. 1.0) bmb = bmb_grnd 
-
         ! Apply the floating basal mass balance according 
         ! to different subgridding options at the grounding line
         ! (following the notation of Leguy et al., 2021 - see Fig. 3)
+        
         select case(bmb_gl_method)
 
             case("fcmp")
@@ -1620,6 +1621,10 @@ end if
                 where(H_grnd .le. 0.0_wp)
                     
                     bmb = bmb_shlf
+
+                elsewhere
+
+                    bmb = bmb_grnd 
 
                 end where 
 
@@ -1632,6 +1637,10 @@ end if
 
                     bmb = bmb_shlf 
 
+                elsewhere
+
+                    bmb = bmb_grnd 
+
                 end where 
 
             case("pmp")
@@ -1642,7 +1651,16 @@ end if
 
                     bmb = f_grnd*bmb_grnd + (1.0_wp-f_grnd)*bmb_shlf 
 
+                elsewhere
+
+                    bmb = bmb_grnd 
+
                 end where 
+
+            case("pmpt")
+                ! Partial melt parameterization with tidal grounding zone
+
+                call calc_bmb_gl_pmpt(bmb,bmb_grnd,bmb_shlf,H_grnd,gz_Hg0,gz_Hg1,gz_nx,boundaries)
 
             case("nmp")
                 ! No melt parameterization
@@ -1652,58 +1670,16 @@ end if
 
                     bmb = bmb_shlf 
 
+                elsewhere
+
+                    bmb = bmb_grnd 
+
                 end where 
 
         end select
 
         ! For aesthetics, also make sure that bmb is zero on ice-free land
         where (H_grnd .gt. 0.0_wp .and. H_ice .eq. 0.0_wp) bmb = 0.0_wp 
-
-        if (diffuse_bmb_shlf) then 
-            ! Allow marine melt (bmb_shlf) to permeate inland at the grounding line,
-            ! to induce more effective retreat in warm periods 
-            ! Note: this method is not recommended, especially
-            ! when a subgrid melting parameterization is used above! 
-            
-            do j = 1, ny
-            do i = 1, nx
-
-                if (f_grnd(i,j) .eq. 1.0) then 
-                    ! Grounded point, look for floating neighbors 
-
-                    if (.FALSE.) then
-                        ! 9-neighbor method
-
-                        n_float = count(f_grnd(i-1:i+1,j-1:j+1) .lt. 1.0)
-
-                        if (n_float .gt. 0) then 
-                            ! bmb_shelf is the mean of the neighbours
-                            bmb_shlf_now = sum(bmb_shlf(i-1:i+1,j-1:j+1),mask=f_grnd(i-1:i+1,j-1:j+1) .lt. 1.0) / real(n_float,prec)
-                            bmb(i,j)     = (1.0-n_float/9.0)*bmb_grnd(i,j) + (n_float/9.0)*bmb_shlf_now
-
-                        end if
-
-                    else 
-                        ! 5-neighbor method 
-
-                        n_float = count([f_grnd(i-1,j),f_grnd(i+1,j),f_grnd(i,j-1),f_grnd(i,j+1)].lt. 1.0)
-
-                        if (n_float .gt. 0) then
-                            ! Floating points exist 
-                            bmb_shlf_now = sum([bmb_shlf(i-1,j),bmb_shlf(i+1,j),bmb_shlf(i,j-1),bmb_shlf(i,j+1)], &
-                                            mask=[f_grnd(i-1,j),f_grnd(i+1,j),f_grnd(i,j-1),f_grnd(i,j+1)] .lt. 1.0) / real(n_float,prec)
-                            bmb(i,j)     = (1.0-n_float/5.0)*bmb_grnd(i,j) + (n_float/5.0)*bmb_shlf_now
-                        end if
-
-                    end if
-
-
-                end if
-
-            end do
-            end do
-
-        end if 
 
         return 
 
@@ -1840,19 +1816,124 @@ end if
 
     end subroutine calc_fmb_total
 
+    subroutine calc_bmb_gl_pmpt(bmb,bmb_grnd,bmb_shlf,H_grnd,gz_Hg0,gz_Hg1,nxi,boundaries)
+        ! Calculate basal mass balance, with bmb at the grounding line
+        ! determined via subgrid calculation of flotation and parameterization
+        ! for tidal-induced grounded melt. 
+
+        implicit none
+        
+        real(wp), intent(OUT) :: bmb(:,:)           ! aa-nodes 
+        real(wp), intent(IN)  :: bmb_grnd(:,:)      ! aa-nodes 
+        real(wp), intent(IN)  :: bmb_shlf(:,:)      ! aa-nodes 
+        real(wp), intent(IN)  :: H_grnd(:,:)        ! aa-nodes
+        real(wp), intent(IN)  :: gz_Hg0             ! Lower limit in H_grnd for grounding zone
+        real(wp), intent(IN)  :: gz_Hg1             ! Upper limit in H_grnd for grounding zone
+        integer,  intent(IN)  :: nxi                ! Number of interpolation points per side (nxi*nxi)
+        character(len=*), intent(IN) :: boundaries 
+
+        ! Local variables
+        integer  :: i, j, i1, j1, nx, ny
+        integer  :: im1, ip1, jm1, jp1 
+        real(wp) :: Hg_1, Hg_2, Hg_3, Hg_4, Hg_mid  
+        real(wp) :: wt 
+
+        real(wp), allocatable :: Hg_int(:,:)
+        real(wp), allocatable :: bmb_int(:,:)
+        
+        ! Consistency check
+        if (gz_Hg0 .gt. 0.0) then 
+            write(io_unit_err,*) "calc_bmb_gl_pmpt:: Error: lower limit on grounding zone must be <= 0.0."
+            write(io_unit_err,*) "gz_Hg0 = ", gz_Hg0
+            stop 
+        end if 
+        if (gz_Hg1 .lt. 0.0) then 
+            write(io_unit_err,*) "calc_bmb_gl_pmpt:: Error: upper limit on grounding zone must be >= 0.0."
+            write(io_unit_err,*) "gz_Hg1 = ", gz_Hg1
+            stop 
+        end if 
+
+        nx = size(H_grnd,1)
+        ny = size(H_grnd,2) 
+
+        ! Allocate subgrid arrays
+        allocate(Hg_int(nxi,nxi))
+        allocate(bmb_int(nxi,nxi))
+
+        do j = 1, ny 
+        do i = 1, nx
+
+            ! Get neighbor indices
+            call get_neighbor_indices(im1,ip1,jm1,jp1,i,j,nx,ny,boundaries)
+
+            ! Calculate Hg at corners (ab-nodes)
+            Hg_1 = 0.25_wp*(H_grnd(i,j) + H_grnd(ip1,j) + H_grnd(ip1,jp1) + H_grnd(i,jp1))
+            Hg_2 = 0.25_wp*(H_grnd(i,j) + H_grnd(im1,j) + H_grnd(im1,jp1) + H_grnd(i,jp1))
+            Hg_3 = 0.25_wp*(H_grnd(i,j) + H_grnd(im1,j) + H_grnd(im1,jm1) + H_grnd(i,jm1))
+            Hg_4 = 0.25_wp*(H_grnd(i,j) + H_grnd(ip1,j) + H_grnd(ip1,jm1) + H_grnd(i,jm1))
+            
+            if (max(Hg_1,Hg_2,Hg_3,Hg_4) .ge. gz_Hg1 .and. min(Hg_1,Hg_2,Hg_3,Hg_4) .ge. gz_Hg1) then 
+                ! Entire cell is grounded
+
+                bmb(i,j) = bmb_grnd(i,j)
+            
+            else if (max(Hg_1,Hg_2,Hg_3,Hg_4) .lt. gz_Hg0 .and. min(Hg_1,Hg_2,Hg_3,Hg_4) .lt. gz_Hg0) then 
+                ! Entire cell is floating
+
+                bmb(i,j) = bmb_shlf(i,j) 
+
+            else
+                ! Point contains the grounding zone
+                
+                ! Calculate subgrid values of H_grnd
+                call calc_subgrid_array(Hg_int,Hg_1,Hg_2,Hg_3,Hg_4,nxi)
+                
+                ! Calculate individual bmb values for each subgrid point
+                do j1 = 1, nxi
+                do i1 = 1, nxi
+
+                    if (Hg_int(i1,j1) .lt. gz_Hg0) then
+                        ! Floating, outside of grounding zone 
+                        wt = 0.0
+                    else if (Hg_int(i1,j1) .ge. gz_Hg1) then
+                        ! Grounded, outside of grounding zone
+                        wt = 1.0 
+                    else
+                        ! Within grounding zone
+                        wt = (Hg_int(i1,j1)-gz_Hg0) / (gz_Hg1 - gz_Hg0)
+                    end if 
+
+                    ! Get subgrid bmb weighted between floating and grounded contributions
+                    bmb_int(i1,j1) = wt*bmb_grnd(i,j) + (1.0-wt)*bmb_shlf(i,j) 
+
+                end do
+                end do
+
+                ! Get the mean bmb rate for the entire cell
+                bmb(i,j) = sum(bmb_int) / real(nxi*nxi,wp)
+
+            end if 
+
+        end do 
+        end do 
+
+        return
+        
+    end subroutine calc_bmb_gl_pmpt
+    
     subroutine calc_subgrid_array(vint,v1,v2,v3,v4,nx)
         ! Given the four corners of a cell in quadrants 1,2,3,4,
         ! calculate the subgrid values via linear interpolation
 
         implicit none 
 
-        real(prec), intent(OUT) :: vint(:,:)  
-        real(prec), intent(IN)  :: v1,v2,v3,v4
+        real(wp), intent(OUT) :: vint(:,:)  
+        real(wp), intent(IN)  :: v1,v2,v3,v4
         integer,    intent(IN)  :: nx                    ! Number of interpolation points 
 
         ! Local variables 
         integer :: i, j 
-        real(prec) :: x(nx), y(nx) 
+        real(wp) :: x(nx), y(nx) 
 
         ! Populate x,y axes for interpolation points (between 0 and 1)
         do i = 1, nx 
@@ -1928,13 +2009,13 @@ end if
 
         implicit none 
 
-        real(prec), intent(IN) :: z1, z2, z3, z4 
-        real(prec), intent(IN) :: xout, yout 
-        real(prec) :: zout 
+        real(wp), intent(IN) :: z1, z2, z3, z4 
+        real(wp), intent(IN) :: xout, yout 
+        real(wp) :: zout 
 
         ! Local variables 
-        real(prec) :: x0, x1, y0, y1 
-        real(prec) :: alpha1, alpha2, p0, p1 
+        real(wp) :: x0, x1, y0, y1 
+        real(wp) :: alpha1, alpha2, p0, p1 
 
         x0 = 0.0 
         x1 = 1.0 
@@ -1958,17 +2039,17 @@ end if
 
         implicit none 
 
-        real(prec), intent(IN) :: H_ice(:,:) 
-        real(prec), intent(IN) :: dx 
-        real(prec) :: dist(size(H_ice,1),size(H_ice,2))
+        real(wp), intent(IN) :: H_ice(:,:) 
+        real(wp), intent(IN) :: dx 
+        real(wp) :: dist(size(H_ice,1),size(H_ice,2))
 
         ! Local variables 
         integer :: i, j, nx, ny
         integer :: i1, j1  
-        real(prec) :: dx_km
-        real(prec), allocatable :: dists(:,:) 
+        real(wp) :: dx_km
+        real(wp), allocatable :: dists(:,:) 
 
-        real(prec), parameter :: dist_max = 1e10 
+        real(wp), parameter :: dist_max = 1e10 
 
         nx = size(H_ice,1)
         ny = size(H_ice,2) 
@@ -2017,17 +2098,17 @@ end if
         implicit none 
          
         logical,    intent(IN) :: is_grline(:,:)
-        real(prec), intent(IN) :: f_grnd(:,:) 
-        real(prec), intent(IN) :: dx 
-        real(prec) :: dist(size(is_grline,1),size(is_grline,2))
+        real(wp), intent(IN) :: f_grnd(:,:) 
+        real(wp), intent(IN) :: dx 
+        real(wp) :: dist(size(is_grline,1),size(is_grline,2))
 
         ! Local variables 
         integer :: i, j, nx, ny
         integer :: i1, j1  
-        real(prec) :: dx_km
-        real(prec), allocatable :: dists(:,:) 
+        real(wp) :: dx_km
+        real(wp), allocatable :: dists(:,:) 
 
-        real(prec), parameter :: dist_max = 1e10 
+        real(wp), parameter :: dist_max = 1e10 
 
         nx = size(is_grline,1)
         ny = size(is_grline,2) 
@@ -2571,15 +2652,15 @@ end if
 
         implicit none 
 
-        real(prec), intent(IN)  :: X
-        real(prec) :: ERR
+        real(wp), intent(IN)  :: X
+        real(wp) :: ERR
         
         ! Local variables:
-        real(prec)              :: EPS
-        real(prec)              :: X2
-        real(prec)              :: ER
-        real(prec)              :: R
-        real(prec)              :: C0
+        real(wp)              :: EPS
+        real(wp)              :: X2
+        real(wp)              :: ER
+        real(wp)              :: R
+        real(wp)              :: C0
         integer                 :: k
         
         EPS = 1.0e-15
@@ -2588,7 +2669,7 @@ end if
             ER = 1.0
             R  = 1.0
             do k = 1, 50
-                R  = R * X2 / (real(k, prec) + 0.5)
+                R  = R * X2 / (real(k, wp) + 0.5)
                 ER = ER+R
                 if(abs(R) < abs(ER) * EPS) then
                     C0  = 2.0 / sqrt(pi) * X * exp(-X2)
@@ -2600,7 +2681,7 @@ end if
             ER = 1.0
             R  = 1.0
             do k = 1, 12
-                R  = -R * (real(k, prec) - 0.5) / X2
+                R  = -R * (real(k, wp) - 0.5) / X2
                 ER = ER + R
                 C0  = EXP(-X2) / (abs(X) * sqrt(pi))
                 ERR = 1.0 - C0 * ER

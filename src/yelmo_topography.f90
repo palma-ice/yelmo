@@ -102,8 +102,9 @@ contains
         
         ! Combine basal mass balance into one field accounting for 
         ! grounded/floating fraction of grid cells 
-        call calc_bmb_total(tpo%now%bmb,thrm%now%bmb_grnd,bnd%bmb_shlf,tpo%now%H_ice,tpo%now%H_grnd, &
-                            tpo%now%f_grnd_bmb,tpo%par%bmb_gl_method,tpo%par%diffuse_bmb_shlf)
+        call calc_bmb_total(tpo%now%bmb,thrm%now%bmb_grnd,bnd%bmb_shlf,tpo%now%H_ice, &
+                            tpo%now%H_grnd,tpo%now%f_grnd_bmb,tpo%par%gz_Hg0,tpo%par%gz_Hg1, &
+                            tpo%par%gz_nx,tpo%par%bmb_gl_method,tpo%par%boundaries)
         
         ! Combine frontal mass balance into one field, and 
         ! calculate as needed 
@@ -623,7 +624,7 @@ end if
                 ! Grounded area f_grnd, average to f_grnd_acx/acy 
 
                 call calc_f_grnd_subgrid_area(tpo%now%f_grnd,tpo%now%f_grnd_acx,tpo%now%f_grnd_acy, &
-                                                                            tpo%now%H_grnd,tpo%par%gl_sep_nx)
+                                                                            tpo%now%H_grnd,tpo%par%gz_nx)
             
             case(3) 
                 ! Grounded area using analytical solutions of Leguy et al. (2021)
@@ -926,8 +927,9 @@ end if
         call nml_read(filename,"ytopo","grad_lim_zb",       par%grad_lim_zb,      init=init_pars)
         call nml_read(filename,"ytopo","dist_grz",          par%dist_grz,         init=init_pars)
         call nml_read(filename,"ytopo","gl_sep",            par%gl_sep,           init=init_pars)
-        call nml_read(filename,"ytopo","gl_sep_nx",         par%gl_sep_nx,        init=init_pars)
-        call nml_read(filename,"ytopo","diffuse_bmb_shlf",  par%diffuse_bmb_shlf, init=init_pars)
+        call nml_read(filename,"ytopo","gz_nx",             par%gz_nx,            init=init_pars)
+        call nml_read(filename,"ytopo","gz_Hg0",            par%gz_Hg0,           init=init_pars)
+        call nml_read(filename,"ytopo","gz_Hg1",            par%gz_Hg1,           init=init_pars)
         call nml_read(filename,"ytopo","fmb_scale",         par%fmb_scale,        init=init_pars)
         call nml_read(filename,"ytopo","kt",                par%kt,               init=init_pars)
         call nml_read(filename,"ytopo","w2",                par%w2,               init=init_pars)

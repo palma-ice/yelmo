@@ -5,7 +5,7 @@ NETCDF_FORTRANROOT=/albedo/soft/sw/spack-sw/netcdf-fortran/4.5.4-uwfs3bu
 INC_NC  = -I${NETCDF_FORTRANROOT}/include
 LIB_NC  = -L${NETCDF_FORTRANROOT}/lib -lnetcdff -L${NETCDF_CROOT}/lib -lnetcdf
 
-LISROOT = $HOME/apps/lis/lis
+LISROOT = ${HOME}/apps/lis/lis
 INC_LIS = -I${LISROOT}/include 
 LIB_LIS = -L${LISROOT}/lib/ -llis
 
@@ -18,7 +18,7 @@ FFLAGS = -no-wrap-margin -module $(objdir) -L$(objdir)
 ifeq ($(parallel), 1)
     # Overwrite default choices with openmp relevant choices 
 
-    LISROOT = $HOME/apps/lis/lis-omp
+    LISROOT = ${HOME}/apps/lis/lis-omp
     INC_LIS = -I${LISROOT}/include 
     LIB_LIS = -L${LISROOT}/lib/ -llis
 

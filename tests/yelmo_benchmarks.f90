@@ -20,7 +20,7 @@ program yelmo_benchmarks
     character(len=56)  :: domain    
     character(len=256) :: outfldr, file2D, file1D, file_compare
     character(len=256) :: file_restart
-    character(len=512) :: path_par, path_const 
+    character(len=512) :: path_par 
     character(len=56)  :: experiment
     logical    :: topo_fixed, dyn_fixed, with_bumps, low_z_sl 
     character(len=256) :: topo_fixed_file 
@@ -47,8 +47,7 @@ program yelmo_benchmarks
     ! Determine the parameter file from the command line 
     call yelmo_load_command_line_args(path_par)
     !path_par   = trim(outfldr)//"yelmo_EISMINT.nml" 
-    path_const = trim(outfldr)//"yelmo_const_EISMINT.nml"
-    
+
     ! Define input and output locations 
     file1D       = trim(outfldr)//"yelmo1D.nc"
     file2D       = trim(outfldr)//"yelmo2D.nc"
@@ -118,12 +117,8 @@ program yelmo_benchmarks
     
     ! === Initialize ice sheet model =====
 
-    ! General initialization of yelmo constants (used globally)
-    call yelmo_global_init(path_const)
-
-    ! Next define grid 
+    ! First, define grid 
     call yelmo_init_grid(yelmo1%grd,grid_name,units="km",dx=dx,nx=nx,dy=dx,ny=nx)
-
 
 
     ! Initialize data objects (without loading topography, which will be defined inline below)

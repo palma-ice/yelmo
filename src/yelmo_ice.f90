@@ -622,6 +622,8 @@ end if
         ! Initialize a yelmo domain, including the grid itself, 
         ! and all sub-components (topo,dyn,mat,therm,bound,data)
 
+        !$ use omp_lib 
+
         implicit none
 
         type(yelmo_class) :: dom 
@@ -631,6 +633,39 @@ end if
         logical, optional, intent(IN) :: load_topo 
         character(len=*),  intent(IN), optional :: domain
         character(len=*),  intent(IN), optional :: grid_name 
+
+        ! Local variables
+        integer :: n_threads 
+        character(len=10) :: n_threads_str 
+        
+        ! ==== GLOBAL INIT CHECKS ============================================
+        
+        ! Check openmp status - set global variable to use as a switch 
+        yelmo_use_omp = .FALSE. 
+        !$ yelmo_use_omp = .TRUE.
+
+        ! Output some information about openmp status 
+        if (yelmo_use_omp) then 
+            
+            n_threads = 1
+            !$ n_threads = omp_get_max_threads() 
+
+            write(n_threads_str,"(i10)") n_threads 
+            n_threads_str = adjustl(n_threads_str)
+
+            write(*,*) "yelmo_global_init:: openmp is active, Yelmo will run on "//trim(n_threads_str)//" thread(s)."
+            
+        else 
+            
+            n_threads = 1
+            write(*,*) "yelmo_global_init:: openmp is not active, Yelmo will run on 1 thread."
+
+        end if 
+
+        write(*,*) "yelmo_global_init:: yelmo_log = ", yelmo_log
+
+        ! ==== END GLOBAL INIT CHECKS ============================================
+
 
         ! == yelmo == 
 

@@ -408,24 +408,35 @@ end if
         ! tau_eff = effective stress ~ von Mises stress following Lipscomb et al. (2019)
         call calc_tau_eff(tpo%now%tau_eff,mat%now%strs2D%tau_eig_1,mat%now%strs2D%tau_eig_2,tpo%now%f_ice,tpo%par%w2,tpo%par%boundaries)
 
+        ! Determine thickness threshold for calving spatially
+        !tpo%now%H_calv = tpo%par%calv_H_shallow
+        call define_calving_thickness_threshold(tpo%now%H_calv,bnd%z_bed,bnd%z_sl, &
+                            tpo%par%calv_H_shallow,tpo%par%calv_H_deep,tpo%par%calv_z_shallow, &
+                            tpo%par%calv_z_deep)
+
+        ! Define factor for calving stress spatially
+        call define_calving_stress_factor(tpo%now%kt,bnd%z_bed,bnd%z_sl, &
+                            tpo%par%kt,tpo%par%kt_deep,tpo%par%calv_z_shallow, &
+                            tpo%par%calv_z_deep)
+
         select case(trim(tpo%par%calv_flt_method))
 
             case("zero","none")
 
                 tpo%now%calv_flt = 0.0 
 
-            case("simple") 
-                ! Use simple threshold method
+            case("threshold") 
+                ! Use threshold method
 
-                call calc_calving_rate_simple(tpo%now%calv_flt,tpo%now%H_ice,tpo%now%f_ice,tpo%now%f_grnd, &
-                                                tpo%par%calv_H_lim,tpo%par%calv_tau,tpo%par%boundaries)
+                call calc_calving_rate_threshold(tpo%now%calv_flt,tpo%now%H_ice,tpo%now%f_ice,tpo%now%f_grnd, &
+                                                 tpo%now%H_calv,tpo%par%calv_tau,tpo%par%boundaries)
                 
             case("vm-l19")
                 ! Use von Mises calving as defined by Lipscomb et al. (2019)
 
                 ! Next, diagnose calving
                 call calc_calving_rate_vonmises_l19(tpo%now%calv_flt,tpo%now%H_ice,tpo%now%f_ice,tpo%now%f_grnd, &
-                                                                        tpo%now%tau_eff,tpo%par%dx,tpo%par%kt,tpo%par%boundaries)
+                                                                        tpo%now%tau_eff,tpo%par%dx,tpo%now%kt,tpo%par%boundaries)
 
                 ! Scale calving with 'thin' calving rate to ensure 
                 ! small ice thicknesses are removed.
@@ -520,7 +531,7 @@ end if
             case DEFAULT 
 
                 call calc_calving_ground_rate_stdev(calv_sd,tpo%now%H_ice,tpo%now%f_ice,tpo%now%f_grnd, &
-                                bnd%z_bed_sd,tpo%par%sd_min,tpo%par%sd_max,tpo%par%calv_max,tpo%par%calv_tau,tpo%par%boundaries)
+                                bnd%z_bed_sd,tpo%par%sd_min,tpo%par%sd_max,tpo%par%calv_grnd_max,tpo%par%calv_tau,tpo%par%boundaries)
                 tpo%now%calv_grnd = tpo%now%calv_grnd + calv_sd 
 
         end select
@@ -915,14 +926,13 @@ end if
         call nml_read(filename,"ytopo","topo_rel",          par%topo_rel,         init=init_pars)
         call nml_read(filename,"ytopo","topo_rel_tau",      par%topo_rel_tau,     init=init_pars)
         call nml_read(filename,"ytopo","topo_rel_field",    par%topo_rel_field,   init=init_pars)
-        call nml_read(filename,"ytopo","calv_H_lim",        par%calv_H_lim,       init=init_pars)
         call nml_read(filename,"ytopo","calv_tau",          par%calv_tau,         init=init_pars)
         call nml_read(filename,"ytopo","calv_thin",         par%calv_thin,        init=init_pars)
         call nml_read(filename,"ytopo","H_min_grnd",        par%H_min_grnd,       init=init_pars)
         call nml_read(filename,"ytopo","H_min_flt",         par%H_min_flt,        init=init_pars)
         call nml_read(filename,"ytopo","sd_min",            par%sd_min,           init=init_pars)
         call nml_read(filename,"ytopo","sd_max",            par%sd_max,           init=init_pars)
-        call nml_read(filename,"ytopo","calv_max",          par%calv_max,         init=init_pars)
+        call nml_read(filename,"ytopo","calv_grnd_max",     par%calv_grnd_max,    init=init_pars)
         call nml_read(filename,"ytopo","grad_lim",          par%grad_lim,         init=init_pars)
         call nml_read(filename,"ytopo","grad_lim_zb",       par%grad_lim_zb,      init=init_pars)
         call nml_read(filename,"ytopo","dist_grz",          par%dist_grz,         init=init_pars)
@@ -934,6 +944,12 @@ end if
         call nml_read(filename,"ytopo","kt",                par%kt,               init=init_pars)
         call nml_read(filename,"ytopo","w2",                par%w2,               init=init_pars)
         call nml_read(filename,"ytopo","k2",                par%k2,               init=init_pars)
+        call nml_read(filename,"ytopo","kt_deep",           par%kt_deep,          init=init_pars)
+        
+        call nml_read(filename,"ytopo","calv_H_shallow",    par%calv_H_shallow,   init=init_pars)
+        call nml_read(filename,"ytopo","calv_H_deep",       par%calv_H_deep,      init=init_pars)
+        call nml_read(filename,"ytopo","calv_z_shallow",    par%calv_z_shallow,   init=init_pars)
+        call nml_read(filename,"ytopo","calv_z_deep",       par%calv_z_deep,      init=init_pars)
         
         ! === Set internal parameters =====
 
@@ -1026,6 +1042,8 @@ end if
 
         allocate(now%H_eff(nx,ny))
         allocate(now%H_grnd(nx,ny))
+        allocate(now%H_calv(nx,ny))
+        allocate(now%kt(nx,ny))
 
         ! Masks 
         allocate(now%f_grnd(nx,ny))
@@ -1093,6 +1111,8 @@ end if
         now%dzbdy       = 0.0 
         now%H_eff       = 0.0 
         now%H_grnd      = 0.0  
+        now%H_calv      = 0.0  
+        now%kt          = 0.0  
 
         now%f_grnd      = 0.0  
         now%f_grnd_acx  = 0.0  
@@ -1172,6 +1192,8 @@ end if
         
         if (allocated(now%H_eff))       deallocate(now%H_eff)
         if (allocated(now%H_grnd))      deallocate(now%H_grnd)
+        if (allocated(now%H_calv))      deallocate(now%H_calv)
+        if (allocated(now%kt))          deallocate(now%kt)
 
         if (allocated(now%f_grnd))      deallocate(now%f_grnd)
         if (allocated(now%f_grnd_acx))  deallocate(now%f_grnd_acx)

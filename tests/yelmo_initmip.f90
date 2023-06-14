@@ -18,7 +18,7 @@ program yelmo_test
     type(yelmo_class)       :: yelmo1 
     
     character(len=256) :: outfldr, file1D, file2D, file_restart, domain 
-    character(len=512) :: path_par, path_const  
+    character(len=512) :: path_par  
     real(wp) :: time   
     integer    :: n
     
@@ -138,20 +138,15 @@ program yelmo_test
     outfldr = "./"
 
     ! Define input and output locations 
-    path_const   = trim(outfldr)//"yelmo_const_Earth.nml"
     file1D       = trim(outfldr)//"yelmo1D.nc"
     file2D       = trim(outfldr)//"yelmo2D.nc"
     file_restart = trim(outfldr)//"yelmo_restart.nc"
 
     ! === Initialize ice sheet model =====
 
-    ! General initialization of yelmo constants (used globally)
-    call yelmo_global_init(path_const)
-
     ! Initialize data objects and load initial topography
     call yelmo_init(yelmo1,filename=path_par,grid_def="file",time=ctl%time_init)
-
-
+    
     ! Ensure optimization fields are allocated
     allocate(opt%cf_min(yelmo1%grd%nx,yelmo1%grd%ny))
     allocate(opt%cf_max(yelmo1%grd%nx,yelmo1%grd%ny))

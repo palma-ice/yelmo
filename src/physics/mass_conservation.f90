@@ -164,7 +164,7 @@ contains
     end subroutine apply_tendency
 
     subroutine calc_G_advec_simple(G_advec,H_ice,f_ice,ux,uy,mask_adv, &
-                                        solver,boundaries,dx,dt,F)
+                                                    solver,boundaries,dx,dt,F)
         ! Interface subroutine to update ice thickness through application
         ! of advection, vertical mass balance terms and calving 
 

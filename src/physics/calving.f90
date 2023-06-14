@@ -20,8 +20,12 @@ module calving
     public :: calc_tau_eff
 
     ! Floating calving routines 
-    public :: calc_calving_rate_simple
+    public :: define_calving_thickness_threshold
+    public :: calc_calving_rate_threshold
+
+    public :: define_calving_stress_factor
     public :: calc_calving_rate_vonmises_l19
+
     public :: calc_calving_rate_eigen
     
     ! Grounded calving routines 
@@ -278,8 +282,43 @@ contains
 ! Calving - floating ice 
 !
 ! ===================================================================
+    
+    elemental subroutine define_calving_thickness_threshold(H_calv,z_bed,z_sl,H_calv_shallow,H_calv_deep,z_shallow,z_deep)
 
-    subroutine calc_calving_rate_simple(mb_calv,H_ice,f_ice,f_grnd,H_calv,tau,boundaries)
+        implicit none
+
+        real(wp), intent(OUT) :: H_calv
+        real(wp), intent(IN)  :: z_bed
+        real(wp), intent(IN)  :: z_sl
+        real(wp), intent(IN)  :: H_calv_shallow
+        real(wp), intent(IN)  :: H_calv_deep
+        real(wp), intent(IN)  :: z_shallow 
+        real(wp), intent(IN)  :: z_deep
+
+        ! Local variables
+        integer :: i, j, nx, ny 
+        real(wp) :: z_corr
+
+        ! Bed elevation relative to sea level height (negative value)
+        z_corr = z_bed - z_sl 
+
+        if(z_corr .le. z_deep) then
+            ! Deep water
+            H_calv = H_calv_deep
+        else if(z_corr .ge. z_shallow) then
+            ! Shallow water
+            H_calv = H_calv_shallow
+        else 
+            ! Linear interpolation between thickness thresholds
+            H_calv = H_calv_deep + &
+                    (H_calv_shallow - H_calv_deep) * (z_corr - z_deep)/(z_shallow - z_deep)
+        end if
+
+        return
+        
+    end subroutine define_calving_thickness_threshold
+
+    subroutine calc_calving_rate_threshold(mb_calv,H_ice,f_ice,f_grnd,H_calv,tau,boundaries)
         ! Calculate the calving rate [m/a] based on a simple threshold rule
         ! H_ice < H_calv
 
@@ -289,7 +328,7 @@ contains
         real(wp), intent(IN)  :: H_ice(:,:)                 ! [m] Ice thickness 
         real(wp), intent(IN)  :: f_ice(:,:)                 ! [--] Ice area fraction
         real(wp), intent(IN)  :: f_grnd(:,:)                ! [--] Grounded fraction
-        real(wp), intent(IN)  :: H_calv                     ! [m] Calving thickness threshold
+        real(wp), intent(IN)  :: H_calv(:,:)                ! [m] Calving thickness threshold
         real(wp), intent(IN)  :: tau                        ! [a] Calving timescale, ~ 1yr
         character(len=*), intent(IN) :: boundaries
 
@@ -328,11 +367,11 @@ contains
                     ! Calculate current ice thickness (H_eff = H_ice/f_ice)
                     call calc_H_eff(H_eff,H_ice(i,j),f_ice(i,j))
 
-                    if (H_eff .lt. H_calv) then 
+                    if (H_eff .lt. H_calv(i,j)) then 
                         ! If ice is too thin, diagnose calving rate.
                         ! Scale by f_ice to apply to whole cell (following Lipscomb et al., 2019)
                         
-                        mb_calv(i,j) = - ( f_ice(i,j) * ( (H_calv-H_eff) / tau ) )
+                        mb_calv(i,j) = - ( f_ice(i,j) * ( (H_calv(i,j)-H_eff) / tau ) )
                         
                     end if 
 
@@ -345,8 +384,43 @@ contains
 
         return 
 
-    end subroutine calc_calving_rate_simple
+    end subroutine calc_calving_rate_threshold
     
+    elemental subroutine define_calving_stress_factor(kt,z_bed,z_sl,kt_shallow,kt_deep,z_shallow,z_deep)
+
+        implicit none
+
+        real(wp), intent(OUT) :: kt
+        real(wp), intent(IN)  :: z_bed
+        real(wp), intent(IN)  :: z_sl
+        real(wp), intent(IN)  :: kt_shallow
+        real(wp), intent(IN)  :: kt_deep
+        real(wp), intent(IN)  :: z_shallow 
+        real(wp), intent(IN)  :: z_deep
+
+        ! Local variables
+        integer :: i, j, nx, ny 
+        real(wp) :: z_corr
+
+        ! Bed elevation relative to sea level height (negative value)
+        z_corr = z_bed - z_sl 
+
+        if(z_corr .le. z_deep) then
+            ! Deep water
+            kt = kt_deep
+        else if(z_corr .ge. z_shallow) then
+            ! Shallow water
+            kt = kt_shallow
+        else 
+            ! Linear interpolation between thickness thresholds
+            kt = kt_deep + &
+                    (kt_shallow - kt_deep) * (z_corr - z_deep)/(z_shallow - z_deep)
+        end if
+
+        return
+        
+    end subroutine define_calving_stress_factor
+
     subroutine calc_calving_rate_vonmises_l19(mb_calv,H_ice,f_ice,f_grnd,tau_eff,dx,kt,boundaries)
         ! Calculate the 'horizontal' calving rate [m/yr] based on the 
         ! von Mises stress approach, as outlined by Lipscomb et al. (2019)
@@ -361,7 +435,7 @@ contains
         real(wp), intent(IN)  :: f_grnd(:,:)  
         real(wp), intent(IN)  :: tau_eff(:,:)
         real(wp), intent(IN)  :: dx
-        real(wp), intent(IN)  :: kt
+        real(wp), intent(IN)  :: kt(:,:)
         character(len=*), intent(IN) :: boundaries 
 
         ! Local variables 
@@ -404,7 +478,7 @@ contains
                     ! Point is at calving front 
 
                     ! Calculate lateral calving rate 
-                    calv_ref = kt*tau_eff(i,j) 
+                    calv_ref = kt(i,j)*tau_eff(i,j) 
 
                     ! Get effective ice thickness
                     call calc_H_eff(H_eff,H_ice(i,j),f_ice(i,j))

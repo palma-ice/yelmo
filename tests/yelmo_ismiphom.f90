@@ -13,7 +13,7 @@ program yelmo_ismiphom
     character(len=56)  :: domain    
     character(len=256) :: outfldr, file2D, file1D
     character(len=256) :: file_restart
-    character(len=512) :: path_par, path_const 
+    character(len=512) :: path_par 
     character(len=56)  :: experiment
     real(prec) :: time_init, time_end, time, dtt, dt2D_out, dt1D_out
     integer    :: i, j, n  
@@ -33,8 +33,7 @@ program yelmo_ismiphom
 
     ! Determine the parameter file from the command line 
     call yelmo_load_command_line_args(path_par)
-    path_const = trim(outfldr)//"yelmo_const_EISMINT.nml"
-    
+
     ! Define input and output locations 
     file1D       = trim(outfldr)//"yelmo1D.nc"
     file2D       = trim(outfldr)//"yelmo2D.nc"
@@ -76,10 +75,7 @@ program yelmo_ismiphom
 
     ! === Initialize ice sheet model =====
 
-    ! General initialization of yelmo constants (used globally)
-    call yelmo_global_init(path_const)
-
-    ! Next define grid 
+    ! First, define grid 
     call yelmo_init_grid(yelmo1%grd,grid_name,units="km",x0=x0,dx=dx,nx=nx,y0=x0,dy=dx,ny=nx)
 
 !     do i = 1, yelmo1%grd%nx 

@@ -98,14 +98,13 @@ module yelmo_defs
         integer            :: topo_rel
         real(wp)           :: topo_rel_tau
         character(len=12)  :: topo_rel_field  
-        real(wp)           :: calv_H_lim
         real(wp)           :: calv_tau  
         real(wp)           :: calv_thin
         real(wp)           :: H_min_grnd
         real(wp)           :: H_min_flt 
         real(wp)           :: sd_min 
         real(wp)           :: sd_max 
-        real(wp)           :: calv_max  
+        real(wp)           :: calv_grnd_max  
         real(wp)           :: grad_lim
         real(wp)           :: grad_lim_zb
         real(wp)           :: dist_grz
@@ -114,9 +113,17 @@ module yelmo_defs
         real(wp)           :: gz_Hg0
         real(wp)           :: gz_Hg1
         real(wp)           :: fmb_scale
-        real(wp)           :: kt 
+         
         real(wp)           :: w2  
         real(wp)           :: k2
+        
+        real(wp)           :: kt
+        real(wp)           :: kt_deep 
+
+        real(wp)           :: calv_H_shallow
+        real(wp)           :: calv_H_deep
+        real(wp)           :: calv_z_shallow
+        real(wp)           :: calv_z_deep
         
         ! Internal parameters 
         real(dp)           :: time 
@@ -216,6 +223,8 @@ module yelmo_defs
         
         real(wp), allocatable   :: H_eff(:,:)       ! Effective ice thickness (margin-corrected) [m]
         real(wp), allocatable   :: H_grnd(:,:)      ! Ice thickness overburden [m]
+        real(wp), allocatable   :: H_calv(:,:)
+        real(wp), allocatable   :: kt(:,:)
         
         ! Masks 
         real(wp), allocatable   :: f_grnd(:,:)      ! Grounded fraction (grounding line fraction between 0 and 1)
@@ -1007,46 +1016,6 @@ contains
         return 
 
     end subroutine yelmo_parse_path
-
-    subroutine yelmo_global_init(filename)
-
-        !$ use omp_lib 
-
-        implicit none 
-
-        character(len=*), intent(IN)  :: filename
-        
-        ! Local variables
-        integer :: n_threads 
-        character(len=10) :: n_threads_str 
-        
-        ! Check openmp status - set global variable to use as a switch 
-        yelmo_use_omp = .FALSE. 
-        !$ yelmo_use_omp = .TRUE.
-
-        ! Output some information about openmp status 
-        if (yelmo_use_omp) then 
-            
-            n_threads = 1
-            !$ n_threads = omp_get_max_threads() 
-
-            write(n_threads_str,"(i10)") n_threads 
-            n_threads_str = adjustl(n_threads_str)
-
-            write(*,*) "yelmo_global_init:: openmp is active, Yelmo will run on "//trim(n_threads_str)//" thread(s)."
-            
-        else 
-            
-            n_threads = 1
-            write(*,*) "yelmo_global_init:: openmp is not active, Yelmo will run on 1 thread."
-
-        end if 
-
-        write(*,*) "yelmo_global_init:: yelmo_log = ", yelmo_log
-
-        return
-
-    end subroutine yelmo_global_init
     
     subroutine yelmo_load_command_line_args(path_par)
         ! Load the parameter filename from the command line 

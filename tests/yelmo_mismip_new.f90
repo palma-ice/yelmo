@@ -17,7 +17,7 @@ program yelmo_mismip
 
     character(len=56)  :: domain 
     character(len=256) :: outfldr, file2D, file1D, file_compare
-    character(len=512) :: path_par, path_const 
+    character(len=512) :: path_par 
     character(len=56)  :: experiment
     logical            :: with_ssa  
     real(prec) :: time_init, time_end, time, dtt, dt2D_out, dt1D_out
@@ -45,8 +45,7 @@ program yelmo_mismip
 
     ! Determine the parameter file from the command line 
     call yelmo_load_command_line_args(path_par)
-    path_const = trim(outfldr)//"yelmo_const_EISMINT.nml"
-    
+
     ! Define input and output locations 
     file1D       = trim(outfldr)//"yelmo1D.nc"
     file2D       = trim(outfldr)//"yelmo2D.nc"
@@ -78,10 +77,7 @@ program yelmo_mismip
 
     ! === Initialize ice sheet model =====
 
-    ! General initialization of yelmo constants (used globally)
-    call yelmo_global_init(path_const)
-
-    ! Next define grid 
+    ! First, define grid 
     call yelmo_init_grid(yelmo1%grd,grid_name,units="km",dx=dx,nx=nx,dy=dx,ny=nx)
 
     ! Initialize data objects (without loading topography, which will be defined inline below)

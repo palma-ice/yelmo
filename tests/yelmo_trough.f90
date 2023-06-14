@@ -15,7 +15,7 @@ program yelmo_trough
 
     character(len=56)  :: domain, grid_name  
     character(len=256) :: outfldr, file2D, file1D, file_restart
-    character(len=512) :: path_par, path_const 
+    character(len=512) :: path_par 
     character(len=56)  :: experiment, res  
     real(wp) :: time_init, time_end, time, dtt, dt1D_out, dt2D_out   
     integer    :: n
@@ -52,7 +52,6 @@ program yelmo_trough
     !path_par   = trim(outfldr)//"yelmo_TROUGH-F17.nml" 
     
     ! Define input and output locations 
-    path_const = trim(outfldr)//"yelmo_const_TROUGH.nml"
     file2D     = trim(outfldr)//"yelmo2D.nc"
     file1D     = trim(outfldr)//"yelmo1D.nc"
     
@@ -89,10 +88,7 @@ program yelmo_trough
     
     ! Define default grid name for completeness 
     grid_name = trim(domain)
-
-    ! General initialization of yelmo constants (used globally)
-    call yelmo_global_init(path_const)
-
+    
     ! Define the domain and grid
     xmax =  lx 
     ymax =  ly/2.0_wp

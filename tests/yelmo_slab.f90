@@ -54,7 +54,7 @@ program yelmo_slab
     type(results_class) :: res
         
     character(len=256) :: outfldr, file2D, file1D, file_restart
-    character(len=512) :: path_par, path_const 
+    character(len=512) :: path_par 
     
     integer  :: q, q1, q2, qmax, qmax1
 
@@ -73,7 +73,6 @@ program yelmo_slab
     !path_par   = trim(outfldr)//"yelmo_TROUGH-F17.nml" 
     
     ! Define input and output locations 
-    path_const = trim(outfldr)//"yelmo_const_EISMINT.nml"
     file2D     = trim(outfldr)//"yelmo2D.nc"
     file1D     = trim(outfldr)//"yelmo1D.nc"
     
@@ -105,11 +104,7 @@ program yelmo_slab
     
     ! Define default grid name for completeness 
     ctrl%grid_name = trim(ctrl%domain) 
-
-    ! General initialization of yelmo constants (used globally)
-    call yelmo_global_init(path_const)
-
-
+    
 if (ctrl%dtt .ne. 0.0) then 
     ! == Perform one simulation with an outer timestep of ctrl%dtt =======
     

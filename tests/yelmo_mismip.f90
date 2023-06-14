@@ -16,7 +16,7 @@ program yelmo_mismip
 
     character(len=56)  :: domain, grid_name  
     character(len=256) :: outfldr, file2D, file1D, file_restart
-    character(len=512) :: path_par, path_const 
+    character(len=512) :: path_par 
     character(len=56)  :: experiment, res  
     real(prec) :: time_init, time_end, time, dtt, dt2D_out   
     integer    :: n  
@@ -42,7 +42,6 @@ program yelmo_mismip
     outfldr = "./"
 
     ! Define input and output locations 
-    path_const = trim(outfldr)//"yelmo_const_MISMIP3D.nml"
     path_par   = trim(outfldr)//"yelmo_MISMIP3D.nml" 
     file2D     = trim(outfldr)//"yelmo2D.nc"
     file1D     = trim(outfldr)//"yelmo1D.nc"
@@ -60,10 +59,7 @@ program yelmo_mismip
 
     ! Define default grid name for completeness 
     grid_name = "MISMIP3D" 
-
-    ! General initialization of yelmo constants (used globally)
-    call yelmo_global_init(path_const)
-
+    
     ! Set up timing conditions
     if (trim(experiment) .eq. "Stnd") then 
 

@@ -113,17 +113,14 @@ module yelmo_defs
         real(wp)           :: gz_Hg0
         real(wp)           :: gz_Hg1
         real(wp)           :: fmb_scale
-         
-        real(wp)           :: w2  
         real(wp)           :: k2
-        
-        real(wp)           :: kt
-        real(wp)           :: kt_deep 
-
-        real(wp)           :: calv_H_shallow
-        real(wp)           :: calv_H_deep
-        real(wp)           :: calv_z_shallow
-        real(wp)           :: calv_z_deep
+        real(wp)           :: w2  
+        real(wp)           :: kt_ref
+        real(wp)           :: kt_deep
+        real(wp)           :: Hc_ref
+        real(wp)           :: Hc_deep
+        real(wp)           :: zb_deep_0
+        real(wp)           :: zb_deep_1
         
         ! Internal parameters 
         real(dp)           :: time 
@@ -1016,7 +1013,7 @@ contains
         return 
 
     end subroutine yelmo_parse_path
-    
+
     subroutine yelmo_load_command_line_args(path_par)
         ! Load the parameter filename from the command line 
         ! call eg: ./yelmo_test.x yelmo_Greenland.nml 

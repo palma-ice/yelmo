@@ -69,14 +69,13 @@
     topo_rel            = 0                 ! 0: No relaxation; 1: relax shelf; 2: relax shelf + gl 
     topo_rel_tau        = 10.0              ! [a] Time scale for relaxation 
     topo_rel_field      = "H_ref"           ! "H_ref" or "H_ice_n"
-    calv_H_lim          = 200.0             ! [m] Calving limit in ice thickness (thinner ice calves)
     calv_tau            = 1.0               ! [a] Characteristic calving time
     calv_thin           = 30.0              ! [m/yr] Calving rate to apply to very thin ice
     H_min_grnd          = 5.0               ! [m] Minimum ice thickness at grounded margin (thinner ice is ablated) - helps with stability
     H_min_flt           = 5.0               ! [m] Minimum ice thickness at floating margin (thinner ice is ablated) - helps with stability
     sd_min              = 100.0             ! [m] calv_grnd(z_bed_sd <= sd_min) = 0.0 
     sd_max              = 500.0             ! [m] calv_grnd(z_bed_sd >= sd_max) = calv_max  
-    calv_max            = 0.0               ! [m/a] Maximum grounded calving rate from high stdev(z_bed)
+    calv_grnd_max       = 0.0               ! [m/a] Maximum grounded calving rate from high stdev(z_bed)
     grad_lim            = 0.5               ! [m/m] Maximum allowed sloped in gradient calculations (dz/dx,dH/dx)
     grad_lim_zb         = 0.5               ! [m/m] Maximum allowed sloped in bed gradient (dzb/dx)
     dist_grz            = 200.0             ! [km] Radius to consider part of "grounding-line zone" (grz)
@@ -85,9 +84,14 @@
     gz_Hg0              = 0.0               ! Grounding zone, limit of penetration of bmb_grnd 
     gz_Hg1              = 100.0             ! Grounding zone, limit of penetration of bmb_shlf 
     fmb_scale           = 1.0               ! Scaling of fmb ~ scale*bmb, scale=10 suggested by Pollard and DeConto (2016)
-    kt                  = 0.0025            ! [m yr-1 Pa-1] vm-l19 calving scaling parameter
-    w2                  = 25                ! [-] vm-l19 calving eigenvalue weighting coefficient
     k2                  = 3e9               ! [m yr] eigen calving scaling factor (Albrecht et al, 2021 recommend 1e17 m s == 3.2e9 m yr)
+    w2                  = 25                ! [-] vm-l19 calving eigenvalue weighting coefficient
+    kt_ref              = 0.0025            ! [m yr-1 Pa-1] vm-l19 calving scaling parameter
+    kt_deep             = 0.1               ! [m yr-1 Pa-1] vm-l19 calving scaling parameter for deep ocean
+    Hc_ref              = 200.0             ! [m] Calving limit in ice thickness (thinner ice calves)
+    Hc_deep             = 500.0             ! [m] Calving limit in ice thickness (thinner ice calves)
+    zb_deep_0           = -1000.0           ! [m] Bedrock elevation to begin transition to deep ocean
+    zb_deep_1           = -1500.0           ! [m] Bedrock elevation to end transition to deep ocean
 /
 
 &ydyn

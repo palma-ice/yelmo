@@ -410,14 +410,12 @@ end if
 
         ! Determine thickness threshold for calving spatially
         !tpo%now%H_calv = tpo%par%calv_H_shallow
-        call define_calving_thickness_threshold(tpo%now%H_calv,bnd%z_bed,bnd%z_sl, &
-                            tpo%par%calv_H_shallow,tpo%par%calv_H_deep,tpo%par%calv_z_shallow, &
-                            tpo%par%calv_z_deep)
+        call define_calving_thickness_threshold(tpo%now%H_calv,bnd%z_bed,bnd%z_sl,tpo%par%Hc_ref, &
+                                            tpo%par%Hc_deep,tpo%par%zb_deep_0,tpo%par%zb_deep_1)
 
         ! Define factor for calving stress spatially
-        call define_calving_stress_factor(tpo%now%kt,bnd%z_bed,bnd%z_sl, &
-                            tpo%par%kt,tpo%par%kt_deep,tpo%par%calv_z_shallow, &
-                            tpo%par%calv_z_deep)
+        call define_calving_stress_factor(tpo%now%kt,bnd%z_bed,bnd%z_sl,tpo%par%kt_ref, &
+                                            tpo%par%kt_deep,tpo%par%zb_deep_0,tpo%par%zb_deep_1)
 
         select case(trim(tpo%par%calv_flt_method))
 
@@ -941,15 +939,14 @@ end if
         call nml_read(filename,"ytopo","gz_Hg0",            par%gz_Hg0,           init=init_pars)
         call nml_read(filename,"ytopo","gz_Hg1",            par%gz_Hg1,           init=init_pars)
         call nml_read(filename,"ytopo","fmb_scale",         par%fmb_scale,        init=init_pars)
-        call nml_read(filename,"ytopo","kt",                par%kt,               init=init_pars)
-        call nml_read(filename,"ytopo","w2",                par%w2,               init=init_pars)
         call nml_read(filename,"ytopo","k2",                par%k2,               init=init_pars)
+        call nml_read(filename,"ytopo","w2",                par%w2,               init=init_pars)
+        call nml_read(filename,"ytopo","kt_ref",            par%kt_ref,           init=init_pars)
         call nml_read(filename,"ytopo","kt_deep",           par%kt_deep,          init=init_pars)
-        
-        call nml_read(filename,"ytopo","calv_H_shallow",    par%calv_H_shallow,   init=init_pars)
-        call nml_read(filename,"ytopo","calv_H_deep",       par%calv_H_deep,      init=init_pars)
-        call nml_read(filename,"ytopo","calv_z_shallow",    par%calv_z_shallow,   init=init_pars)
-        call nml_read(filename,"ytopo","calv_z_deep",       par%calv_z_deep,      init=init_pars)
+        call nml_read(filename,"ytopo","Hc_ref",            par%Hc_ref,           init=init_pars)
+        call nml_read(filename,"ytopo","Hc_deep",           par%Hc_deep,          init=init_pars)
+        call nml_read(filename,"ytopo","zb_deep_0",         par%zb_deep_0,        init=init_pars)
+        call nml_read(filename,"ytopo","zb_deep_1",         par%zb_deep_1,        init=init_pars)
         
         ! === Set internal parameters =====
 

@@ -146,7 +146,7 @@ program yelmo_test
 
     ! Initialize data objects and load initial topography
     call yelmo_init(yelmo1,filename=path_par,grid_def="file",time=ctl%time_init)
-    
+
     ! Ensure optimization fields are allocated
     allocate(opt%cf_min(yelmo1%grd%nx,yelmo1%grd%ny))
     allocate(opt%cf_max(yelmo1%grd%nx,yelmo1%grd%ny))
@@ -607,6 +607,10 @@ contains
         
         call nc_write(filename,"f_grnd_pin",ylmo%tpo%now%f_grnd_pin,units="1",long_name="Grounded ice fraction (pinning points)", &
                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
+
+        call nc_write(filename,"kt",ylmo%tpo%now%kt,units="m yr-1 Pa-1",long_name="Von Mises calving scaling factor", &
+                      dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
+
 
         call nc_write(filename,"uxy_s",ylmo%dyn%now%uxy_s,units="m/a",long_name="Surface velocity (magnitude)", &
                        dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)

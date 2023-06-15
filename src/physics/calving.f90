@@ -283,13 +283,12 @@ contains
 !
 ! ===================================================================
     
-    elemental subroutine define_calving_thickness_threshold(H_calv,z_bed,z_sl,H_calv_shallow,H_calv_deep,z_shallow,z_deep)
+    elemental subroutine define_calving_thickness_threshold(H_calv,z_bed_corr,H_calv_shallow,H_calv_deep,z_shallow,z_deep)
 
         implicit none
 
         real(wp), intent(OUT) :: H_calv
-        real(wp), intent(IN)  :: z_bed
-        real(wp), intent(IN)  :: z_sl
+        real(wp), intent(IN)  :: z_bed_corr      ! [m] Bed elevation relative to sea level height (negative value)
         real(wp), intent(IN)  :: H_calv_shallow
         real(wp), intent(IN)  :: H_calv_deep
         real(wp), intent(IN)  :: z_shallow 
@@ -297,21 +296,17 @@ contains
 
         ! Local variables
         integer :: i, j, nx, ny 
-        real(wp) :: z_corr
 
-        ! Bed elevation relative to sea level height (negative value)
-        z_corr = z_bed - z_sl 
-
-        if(z_corr .le. z_deep) then
+        if(z_bed_corr .le. z_deep) then
             ! Deep water
             H_calv = H_calv_deep
-        else if(z_corr .ge. z_shallow) then
+        else if(z_bed_corr .ge. z_shallow) then
             ! Shallow water
             H_calv = H_calv_shallow
         else 
             ! Linear interpolation between thickness thresholds
             H_calv = H_calv_deep + &
-                    (H_calv_shallow - H_calv_deep) * (z_corr - z_deep)/(z_shallow - z_deep)
+                    (H_calv_shallow - H_calv_deep) * (z_bed_corr - z_deep)/(z_shallow - z_deep)
         end if
 
         return
@@ -386,13 +381,12 @@ contains
 
     end subroutine calc_calving_rate_threshold
     
-    elemental subroutine define_calving_stress_factor(kt,z_bed,z_sl,kt_shallow,kt_deep,z_shallow,z_deep)
+    elemental subroutine define_calving_stress_factor(kt,z_bed_corr,kt_shallow,kt_deep,z_shallow,z_deep)
 
         implicit none
 
         real(wp), intent(OUT) :: kt
-        real(wp), intent(IN)  :: z_bed
-        real(wp), intent(IN)  :: z_sl
+        real(wp), intent(IN)  :: z_bed_corr      ! [m] Bed elevation relative to sea level height (negative value)
         real(wp), intent(IN)  :: kt_shallow
         real(wp), intent(IN)  :: kt_deep
         real(wp), intent(IN)  :: z_shallow 
@@ -400,21 +394,17 @@ contains
 
         ! Local variables
         integer :: i, j, nx, ny 
-        real(wp) :: z_corr
 
-        ! Bed elevation relative to sea level height (negative value)
-        z_corr = z_bed - z_sl 
-
-        if(z_corr .le. z_deep) then
+        if(z_bed_corr .le. z_deep) then
             ! Deep water
             kt = kt_deep
-        else if(z_corr .ge. z_shallow) then
+        else if(z_bed_corr .ge. z_shallow) then
             ! Shallow water
             kt = kt_shallow
         else 
             ! Linear interpolation between thickness thresholds
             kt = kt_deep + &
-                    (kt_shallow - kt_deep) * (z_corr - z_deep)/(z_shallow - z_deep)
+                    (kt_shallow - kt_deep) * (z_bed_corr - z_deep)/(z_shallow - z_deep)
         end if
 
         return

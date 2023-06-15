@@ -400,7 +400,7 @@ end if
         
         ! === CALVING ===
 
-        ! Diagnose strains and stresses relevant to calving 
+        ! == Diagnose strains and stresses relevant to calving ==
 
         ! eps_eff = effective strain = eigencalving e+*e- following Levermann et al. (2012)
         call calc_eps_eff(tpo%now%eps_eff,dyn%now%strn2D%eps_eig_1,dyn%now%strn2D%eps_eig_2,tpo%now%f_ice,tpo%par%boundaries)
@@ -408,14 +408,23 @@ end if
         ! tau_eff = effective stress ~ von Mises stress following Lipscomb et al. (2019)
         call calc_tau_eff(tpo%now%tau_eff,mat%now%strs2D%tau_eig_1,mat%now%strs2D%tau_eig_2,tpo%now%f_ice,tpo%par%w2,tpo%par%boundaries)
 
-        ! Determine thickness threshold for calving spatially
-        !tpo%now%H_calv = tpo%par%calv_H_shallow
-        call define_calving_thickness_threshold(tpo%now%H_calv,bnd%z_bed,bnd%z_sl,tpo%par%Hc_ref, &
+        ! == Determine thickness threshold for calving spatially ==
+
+        ! Calculate filtered bedrock elevations adjusted for sea level on top (ie, water depth)
+        tpo%now%z_bed_filt = bnd%z_bed - bnd%z_sl
+        if (tpo%par%zb_sigma .gt. 0.0) then 
+            call smooth_gauss_2D(tpo%now%z_bed_filt,tpo%par%dx, &
+                                        tpo%par%zb_sigma / tpo%par%dx)
+        end if
+
+        call define_calving_thickness_threshold(tpo%now%H_calv,tpo%now%z_bed_filt,tpo%par%Hc_ref, &
                                             tpo%par%Hc_deep,tpo%par%zb_deep_0,tpo%par%zb_deep_1)
 
         ! Define factor for calving stress spatially
-        call define_calving_stress_factor(tpo%now%kt,bnd%z_bed,bnd%z_sl,tpo%par%kt_ref, &
+        call define_calving_stress_factor(tpo%now%kt,tpo%now%z_bed_filt,tpo%par%kt_ref, &
                                             tpo%par%kt_deep,tpo%par%zb_deep_0,tpo%par%zb_deep_1)
+
+        ! == Calculate potential floating calving rate ==
 
         select case(trim(tpo%par%calv_flt_method))
 
@@ -947,6 +956,7 @@ end if
         call nml_read(filename,"ytopo","Hc_deep",           par%Hc_deep,          init=init_pars)
         call nml_read(filename,"ytopo","zb_deep_0",         par%zb_deep_0,        init=init_pars)
         call nml_read(filename,"ytopo","zb_deep_1",         par%zb_deep_1,        init=init_pars)
+        call nml_read(filename,"ytopo","zb_sigma",          par%zb_sigma,         init=init_pars)
         
         ! === Set internal parameters =====
 
@@ -1041,6 +1051,7 @@ end if
         allocate(now%H_grnd(nx,ny))
         allocate(now%H_calv(nx,ny))
         allocate(now%kt(nx,ny))
+        allocate(now%z_bed_filt(nx,ny))
 
         ! Masks 
         allocate(now%f_grnd(nx,ny))
@@ -1110,6 +1121,7 @@ end if
         now%H_grnd      = 0.0  
         now%H_calv      = 0.0  
         now%kt          = 0.0  
+        now%z_bed_filt  = 0.0  
 
         now%f_grnd      = 0.0  
         now%f_grnd_acx  = 0.0  
@@ -1191,6 +1203,7 @@ end if
         if (allocated(now%H_grnd))      deallocate(now%H_grnd)
         if (allocated(now%H_calv))      deallocate(now%H_calv)
         if (allocated(now%kt))          deallocate(now%kt)
+        if (allocated(now%z_bed_filt))  deallocate(now%z_bed_filt)
 
         if (allocated(now%f_grnd))      deallocate(now%f_grnd)
         if (allocated(now%f_grnd_acx))  deallocate(now%f_grnd_acx)

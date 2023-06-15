@@ -121,7 +121,8 @@ module yelmo_defs
         real(wp)           :: Hc_deep
         real(wp)           :: zb_deep_0
         real(wp)           :: zb_deep_1
-        
+        real(wp)           :: zb_sigma
+
         ! Internal parameters 
         real(dp)           :: time 
         real(dp)           :: time_calv
@@ -222,6 +223,7 @@ module yelmo_defs
         real(wp), allocatable   :: H_grnd(:,:)      ! Ice thickness overburden [m]
         real(wp), allocatable   :: H_calv(:,:)
         real(wp), allocatable   :: kt(:,:)
+        real(wp), allocatable   :: z_bed_filt(:,:)
         
         ! Masks 
         real(wp), allocatable   :: f_grnd(:,:)      ! Grounded fraction (grounding line fraction between 0 and 1)

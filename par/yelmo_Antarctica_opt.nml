@@ -111,7 +111,8 @@
     Hc_deep             = 500.0             ! [m] Calving limit in ice thickness (thinner ice calves)
     zb_deep_0           = -1000.0           ! [m] Bedrock elevation to begin transition to deep ocean
     zb_deep_1           = -1500.0           ! [m] Bedrock elevation to end transition to deep ocean
-    /
+    zb_sigma            = 0.0               ! [m] Gaussian filtering of bedrock for calving transition to deep ocean
+/
 
 &ydyn
     solver              = "diva"          ! "fixed", "sia", "ssa", "hybrid", "diva", "diva-noslip", l1l2", "l1l2-noslip"

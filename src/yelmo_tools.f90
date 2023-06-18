@@ -115,7 +115,7 @@ contains
                 jm1 = max(j-1,1)
                 jp1 = min(j+1,ny) 
 
-            case("TROUGH")
+            case("MISMIP3D","TROUGH")
                 im1 = max(i-1,1)
                 ip1 = min(i+1,nx) 
                 jm1 = j-1
@@ -3080,7 +3080,7 @@ end if
         ! is the same, not the variable itself.
         select case(trim(boundaries))
 
-            case("infinite","TROUGH") 
+            case("infinite","MISMIP3D","TROUGH") 
                 dvardx(1,:)  = dvardx(2,:)
                 dvardx(nx,:) = dvardx(nx-1,:)
             

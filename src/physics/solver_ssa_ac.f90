@@ -143,13 +143,19 @@ contains
             case("MISMIP3D")
 
                 bcs(1) = "free-slip"
-                bcs(2) = "free-slip"
+                bcs(2) = "periodic"
                 bcs(3) = "no-slip"
-                bcs(4) = "free-slip" 
+                bcs(4) = "periodic" 
+
+                ! Note: the following BCs might be more correct for
+                ! the experimental design, but they can lead more
+                ! easily to instabilities. Keeping the y-axis periodic
+                ! helps to avoid that, and the results should be 
+                ! effectively the same.
                 ! bcs(1) = "free-slip"
-                ! bcs(2) = "periodic"
+                ! bcs(2) = "free-slip"
                 ! bcs(3) = "no-slip"
-                ! bcs(4) = "periodic" 
+                ! bcs(4) = "free-slip" 
 
             case("TROUGH")
 

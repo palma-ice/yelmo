@@ -313,7 +313,7 @@ contains
 
     end subroutine calc_ice_fraction_new
     
-    subroutine calc_ice_fraction(f_ice,H_ice,z_bed,z_sl,rho_ice,rho_sw,flt_subgrid)
+    subroutine calc_ice_fraction(f_ice,H_ice,z_bed,z_sl,rho_ice,rho_sw,boundaries,flt_subgrid)
         ! Determine the area fraction of a grid cell
         ! that is ice-covered. Assume that marginal points
         ! have equal thickness to inland neighbors 
@@ -326,7 +326,8 @@ contains
         real(wp), intent(IN)  :: z_sl(:,:)              ! [m] Sea-level elevation
         real(wp), intent(IN)  :: rho_ice
         real(wp), intent(IN)  :: rho_sw
-        logical, optional     :: flt_subgrid            ! Option to allow fractions for floating ice margins             
+        character(len=*), intent(IN) :: boundaries
+        logical,  intent(IN), optional :: flt_subgrid   ! Option to allow fractions for floating ice margins             
         
         ! Local variables 
         integer  :: i, j, nx, ny
@@ -375,24 +376,8 @@ contains
             do j = 1, ny
             do i = 1, nx 
 
-                ! BC: Periodic boundary conditions
-                im1 = i-1
-                if (im1 == 0) then
-                    im1 = nx
-                end if
-                ip1 = i+1
-                if (ip1 == nx+1) then
-                    ip1 = 1
-                end if
-
-                jm1 = j-1
-                if (jm1 == 0) then
-                    jm1 = ny
-                end if
-                jp1 = j+1
-                if (jp1 == ny+1) then
-                    jp1 = 1
-                end if
+                ! Get neighbor indices
+                call get_neighbor_indices(im1,ip1,jm1,jp1,i,j,nx,ny,boundaries)
 
                 ! Count how many neighbors are ice covered  
                 H_neighb   = [H_ice(im1,j),H_ice(ip1,j),H_ice(i,jm1),H_ice(i,jp1)]
@@ -415,25 +400,9 @@ contains
             do j = 1, ny
             do i = 1, nx 
 
-                ! BC: Periodic boundary conditions
-                im1 = i-1
-                if (im1 == 0) then
-                    im1 = nx
-                end if
-                ip1 = i+1
-                if (ip1 == nx+1) then
-                    ip1 = 1
-                end if
-
-                jm1 = j-1
-                if (jm1 == 0) then
-                    jm1 = ny
-                end if
-                jp1 = j+1
-                if (jp1 == ny+1) then
-                    jp1 = 1
-                end if
-
+                ! Get neighbor indices
+                call get_neighbor_indices(im1,ip1,jm1,jp1,i,j,nx,ny,boundaries)
+                
                 if (H_ice(i,j) .gt. 0.0_wp .and. n_ice(i,j) .eq. 0) then 
                     ! First, treat a special case:
                     ! Island point, assume the cell is fully covered

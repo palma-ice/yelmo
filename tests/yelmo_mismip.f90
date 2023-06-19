@@ -42,10 +42,11 @@ program yelmo_mismip
     outfldr = "./"
 
     ! Define input and output locations 
-    path_par   = trim(outfldr)//"yelmo_MISMIP3D.nml" 
-    file2D     = trim(outfldr)//"yelmo2D.nc"
-    file1D     = trim(outfldr)//"yelmo1D.nc"
-    
+    path_par     = trim(outfldr)//"yelmo_MISMIP3D.nml" 
+    file2D       = trim(outfldr)//"yelmo2D.nc"
+    file1D       = trim(outfldr)//"yelmo1D.nc"
+    file_restart = trim(outfldr)//"yelmo_restart.nc"
+
     ! Define the domain, grid and experiment from parameter file
     call nml_read(path_par,"ctrl","domain",       domain)        ! MISMIP3D
     call nml_read(path_par,"ctrl","experiment",   experiment)    ! "Std", "RF"
@@ -59,7 +60,7 @@ program yelmo_mismip
 
     ! Define default grid name for completeness 
     grid_name = "MISMIP3D" 
-    
+
     ! Set up timing conditions
     if (trim(experiment) .eq. "Stnd") then 
 
@@ -272,12 +273,19 @@ program yelmo_mismip
 
         if (exit_loop) exit 
 
+        ! AJR: diagnostics for instability, exit time loop early
+        if (time .ge. 11.5e3) dt2D_out = dtt
+        if (time .ge. 12.0e3) exit
+                
     end do 
 
     ! Write summary 
     write(*,*) "====== "//trim(domain)//"-"//trim(experiment)//" ======="
     write(*,*) "nz, H0 = ", yelmo1%par%nz_aa, maxval(yelmo1%tpo%now%H_ice)
 
+    ! Write a resart file for diagnostics
+    call yelmo_restart_write(yelmo1,file_restart,time)
+    
     ! Finalize program
     call yelmo_end(yelmo1,time=time)
 

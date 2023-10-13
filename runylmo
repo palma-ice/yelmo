@@ -7,7 +7,7 @@ jobrun ./runcx -r -- -o output/run -p ctl.nyears=5000
 '''
 import subprocess as subp 
 import sys, os, socket, argparse, shutil, glob, datetime, json
-from distutils.dir_util import copy_tree
+#from distutils.dir_util import copy_tree # Deprecated from v3.12
 from pandas import DataFrame
 
 # Check whether runner library is installed or not:
@@ -430,8 +430,8 @@ def copy_dir(path,rundir,target):
     '''Copy file(s) to run directory.'''
 
     dst = os.path.join(rundir,target)
-    #shutil.copytree(path,dst,dirs_exist_ok=True)  # Only v3.8+
-    copy_tree(path, dst)
+    shutil.copytree(path,dst,dirs_exist_ok=True)  # Only v3.8+
+    #copy_tree(path, dst)  # Deprecated for v3.12+
 
     return 
 

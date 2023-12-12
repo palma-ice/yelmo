@@ -1,10 +1,10 @@
 FC = mpif90
 #FC = gfortran 
 
-NC_CROOT=/usr/local/Cellar/netcdf/4.9.2
-NC_FROOT=/usr/local/Cellar/netcdf-fortran/4.6.0
+NC_CROOT=/usr/local/Cellar/netcdf/4.9.2_1
+NC_FROOT=/usr/local/Cellar/netcdf-fortran/4.6.1
 INC_NC  = -I${NC_FROOT}/include
-LIB_NC  = -L${NC_FROOT}/lib -lnetcdff -L${NC_CROOT}/lib -lnetcdf 
+LIB_NC  = -L${NC_FROOT}/lib -lnetcdff -L${NC_CROOT}/lib -lnetcdf
 
 LISROOT = /Users/robinson/apps/lis/lis
 INC_LIS = -I${LISROOT}/include 

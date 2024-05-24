@@ -104,9 +104,9 @@ contains
             reg%fwf        = -reg%dVidt*conv_km3a_Sv                        ! [Sv]
 
             ! Calving
-            reg%calv       = sum(tpo%now%calv,mask=mask_tot)*tpo%par%dx*tpo%par%dy              ! [m^3/yr]
-            reg%calv_flt   = sum(tpo%now%calv_flt,mask=mask_tot)*tpo%par%dx*tpo%par%dy          ! [m^3/yr]
-            reg%calv_grnd  = sum(tpo%now%calv_grnd,mask=mask_tot)*tpo%par%dx*tpo%par%dy         ! [m^3/yr]
+            reg%cmb        = sum(tpo%now%cmb,mask=mask_tot)*tpo%par%dx*tpo%par%dy              ! [m^3/yr]
+            reg%cmb_flt    = sum(tpo%now%cmb_flt,mask=mask_tot)*tpo%par%dx*tpo%par%dy          ! [m^3/yr]
+            reg%cmb_grnd   = sum(tpo%now%cmb_grnd,mask=mask_tot)*tpo%par%dx*tpo%par%dy         ! [m^3/yr]
             
             ! Volume above sea level
             reg%V_sl       = sum(H_af,mask=mask_tot)*tpo%par%dx*tpo%par%dy*m3_km3   ! [km^3]
@@ -136,9 +136,9 @@ contains
             reg%A_ice       = 0.0_wp 
             reg%dVidt       = 0.0_wp 
             reg%fwf         = 0.0_wp 
-            reg%calv        = 0.0_wp
-            reg%calv_flt    = 0.0_wp
-            reg%calv_grnd   = 0.0_wp
+            reg%cmb         = 0.0_wp
+            reg%cmb_flt     = 0.0_wp
+            reg%cmb_grnd    = 0.0_wp
             reg%V_sl        = 0.0_wp 
             reg%V_sle       = 0.0_wp 
 
@@ -342,11 +342,11 @@ contains
         call nc_write(filename,"fwf",reg%fwf,units="Sv",long_name="Rate volume change", &
                       dim1="time",start=[n],ncid=ncid)
 
-        call nc_write(filename,"calv",reg%calv,units="m^3/yr",long_name="Calving rate", &
+        call nc_write(filename,"cmb",reg%cmb,units="m^3/yr",long_name="Calving mass balance rate", &
                       dim1="time",start=[n],ncid=ncid)
-        call nc_write(filename,"calv_flt",reg%calv_flt,units="m^3/yr",long_name="Potential calving rate (floating)", &
+        call nc_write(filename,"cmb_flt",reg%cmb_flt,units="m^3/yr",long_name="Potential calving mass balance rate (floating)", &
                       dim1="time",start=[n],ncid=ncid)
-        call nc_write(filename,"calv_grnd",reg%calv_grnd,units="m^3/yr",long_name="Potential calving rate (grounded)", &
+        call nc_write(filename,"cmb_grnd",reg%cmb_grnd,units="m^3/yr",long_name="Potential calving mass balance rate (grounded)", &
                       dim1="time",start=[n],ncid=ncid)
 
         call nc_write(filename,"V_sl",reg%V_sl*1e-6,units="1e6 km^3",long_name="Ice volume above flotation", &

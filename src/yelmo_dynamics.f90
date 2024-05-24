@@ -1483,7 +1483,7 @@ contains
         call nc_write(filename,"f_ice",tpo%now%f_ice,units="1",long_name="Ice-covered fraction", &
                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
 
-        call nc_write(filename,"calv",tpo%now%calv,units="m/a",long_name="Calving rate", &
+        call nc_write(filename,"cmb",tpo%now%cmb,units="m/a",long_name="Calving mass balance rate", &
                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
 
         ! == yelmo_dynamics ==

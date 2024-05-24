@@ -74,8 +74,8 @@ contains
                     f_l  = ( dl / (dl + dist_grline(i,j)) )**m_d
                     f_r  = ( dx_km/dl )**m_r 
 
-                    ! Calculate subgrid discharge
-                    mb_discharge(i,j) = f_sd * f_l * f_r * (H_ice(i,j) / tau_mbd)
+                    ! Calculate subgrid discharge mass balance rate (negative, for mass loss)
+                    mb_discharge(i,j) = -( f_sd * f_l * f_r * (H_ice(i,j) / tau_mbd) )
 
                 end if
 

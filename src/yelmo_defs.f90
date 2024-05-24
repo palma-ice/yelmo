@@ -157,11 +157,11 @@ module yelmo_defs
         real(wp), allocatable :: H_ice(:,:)
         real(wp), allocatable :: dHidt_dyn(:,:)
         real(wp), allocatable :: mb_applied(:,:)
-        real(wp), allocatable :: calv_flt(:,:)
-        real(wp), allocatable :: calv_grnd(:,:)
-        real(wp), allocatable :: calv(:,:)
         real(wp), allocatable :: mb_relax(:,:)
         real(wp), allocatable :: mb_resid(:,:)
+        real(wp), allocatable :: cmb_flt(:,:)
+        real(wp), allocatable :: cmb_grnd(:,:)
+        real(wp), allocatable :: cmb(:,:)
     end type
 
     type ytopo_rates_class
@@ -169,15 +169,15 @@ module yelmo_defs
         real(wp), allocatable :: dHidt(:,:)       ! Ice thickness rate of change [m/a] 
         real(wp), allocatable :: dHidt_dyn(:,:)   ! Change in thickness due to dynamics only [m/yr]
         real(wp), allocatable :: mb_applied(:,:)  ! Actual mass balance applied [m/a], for mass balance accounting
-        real(wp), allocatable :: bmb(:,:)         ! Combined field of bmb_grnd and bmb_shlf 
-        real(wp), allocatable :: fmb(:,:)         ! Combined field of fmb_grnd and fmb_shlf 
-        real(wp), allocatable :: dmb(:,:)         ! Subgrid discharge
         real(wp), allocatable :: mb_relax(:,:)    ! Residual mass balance from boundary conditions, cleanup
         real(wp), allocatable :: mb_resid(:,:)    ! Residual mass balance from boundary conditions, cleanup
         real(wp), allocatable :: mb_err(:,:)      ! Residual error in mass balance accounting 
-        real(wp), allocatable :: calv(:,:)        ! Calving rate (applied) [m/a]
-        real(wp), allocatable :: calv_flt(:,:)    ! Reference floating calving rate [m/a]
-        real(wp), allocatable :: calv_grnd(:,:)   ! Reference grounded calving rate [m/a]
+        real(wp), allocatable :: bmb(:,:)         ! Combined field of bmb_grnd and bmb_shlf 
+        real(wp), allocatable :: fmb(:,:)         ! Combined field of fmb_grnd and fmb_shlf 
+        real(wp), allocatable :: dmb(:,:)         ! Subgrid discharge
+        real(wp), allocatable :: cmb(:,:)         ! Calving rate (applied) [m/a]
+        real(wp), allocatable :: cmb_flt(:,:)     ! Reference floating calving rate [m/a]
+        real(wp), allocatable :: cmb_grnd(:,:)    ! Reference grounded calving rate [m/a]
 
         real(wp) :: dt_tot
     end type
@@ -194,9 +194,6 @@ module yelmo_defs
         real(wp), allocatable   :: dHidt(:,:)       ! Ice thickness rate of change [m/a] 
         real(wp), allocatable   :: dHidt_dyn(:,:)
         real(wp), allocatable   :: mb_applied(:,:)  ! Actual mass balance applied [m/a], for mass balance accounting
-        real(wp), allocatable   :: calv_flt(:,:)    ! Reference floating calving rate [m/a]
-        real(wp), allocatable   :: calv_grnd(:,:)   ! Reference grounded calving rate [m/a]
-        real(wp), allocatable   :: calv(:,:)        ! Calving mb rate (applied) [m/a]
         real(wp), allocatable   :: mb_relax(:,:)    ! Change in mass balance to due relaxation
         real(wp), allocatable   :: mb_resid(:,:)    ! Residual mass balance from boundary conditions, cleanup
         real(wp), allocatable   :: mb_err(:,:)      ! Residual error in mass balance accounting 
@@ -204,6 +201,10 @@ module yelmo_defs
         real(wp), allocatable   :: bmb(:,:)         ! Combined field of bmb_grnd and bmb_shlf 
         real(wp), allocatable   :: fmb(:,:)         ! Combined field of fmb_grnd and fmb_shlf    
         real(wp), allocatable   :: dmb(:,:)         ! Subgrid discharge mb rate
+        real(wp), allocatable   :: cmb(:,:)         ! Calving mb rate
+        
+        real(wp), allocatable   :: cmb_flt(:,:)     ! Reference floating calving rate [m/a]
+        real(wp), allocatable   :: cmb_grnd(:,:)    ! Reference grounded calving rate [m/a]
         
         real(wp), allocatable   :: z_srf(:,:)       ! Surface elevation [m]
         real(wp), allocatable   :: dzsdt(:,:)       ! Surface elevation rate of change [m/a] 
@@ -802,7 +803,7 @@ module yelmo_defs
 
         ! ===== Total ice variables =====
         real(wp)   :: H_ice, z_srf,dHidt, H_ice_max, dzsdt
-        real(wp)   :: V_ice, A_ice, dVidt, fwf, calv, calv_flt, calv_grnd
+        real(wp)   :: V_ice, A_ice, dVidt, fwf, cmb, cmb_flt, cmb_grnd
         real(wp)   :: V_sl, V_sle
         real(wp)   :: uxy_bar, uxy_s, uxy_b, z_bed, smb, T_srf, bmb
 

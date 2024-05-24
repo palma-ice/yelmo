@@ -116,16 +116,17 @@ contains
                         tpo%now%H_grnd,tpo%now%f_ice,tpo%par%fmb_method,tpo%par%fmb_scale, &
                         bnd%c%rho_ice,bnd%c%rho_sw,tpo%par%dx)
 
-        ! Calculate additional mass balance term related to sub-grid discharge
-        dist_max  = 500.0       ! [km] Maximum distance from coast to calculate discharge
-        alpha_max = 60.0        ! [deg] Maximum angle of slope from coast at which to allow discharge
-        tau_mbd   = 100.0       ! [yr]  Discharge timescale
-        sigma_ref = 300.0       ! [m]   Reference bed roughness
-        m_d       = 3.0         ! [-]   Discharge distance scaling exponent
-        m_r       = 1.0         ! [-]   Discharge resolution scaling exponent
+        ! ! Calculate additional mass balance term related to sub-grid discharge
+        ! dist_max  = 500.0       ! [km] Maximum distance from coast to calculate discharge
+        ! alpha_max = 60.0        ! [deg] Maximum angle of slope from coast at which to allow discharge
+        ! tau_mbd   = 100.0       ! [yr]  Discharge timescale
+        ! sigma_ref = 300.0       ! [m]   Reference bed roughness
+        ! m_d       = 3.0         ! [-]   Discharge distance scaling exponent
+        ! m_r       = 1.0         ! [-]   Discharge resolution scaling exponent
 
         call calc_mb_discharge(tpo%now%dmb,tpo%now%H_ice,tpo%now%z_srf,bnd%z_bed_sd,tpo%now%dist_grline, &
-                    tpo%now%dist_margin,tpo%now%f_ice,tpo%par%dx,dist_max,alpha_max,tau_mbd,sigma_ref,m_d,m_r)
+                    tpo%now%dist_margin,tpo%now%f_ice,tpo%par%dx,tpo%par%dmb_alpha_max,tpo%par%dmb_tau, &
+                    tpo%par%dmb_sigma_ref,tpo%par%dmb_m_d,tpo%par%dmb_m_r)
 
         write(*,*) "discharge: ", minval(tpo%now%dmb), maxval(tpo%now%dmb)
 
@@ -976,6 +977,11 @@ end if
         call nml_read(filename,"ytopo","zb_deep_0",         par%zb_deep_0,        init=init_pars)
         call nml_read(filename,"ytopo","zb_deep_1",         par%zb_deep_1,        init=init_pars)
         call nml_read(filename,"ytopo","zb_sigma",          par%zb_sigma,         init=init_pars)
+        call nml_read(filename,"ytopo","dmb_alpha_max",     par%dmb_alpha_max,    init=init_pars)
+        call nml_read(filename,"ytopo","dmb_tau",           par%dmb_tau,          init=init_pars)
+        call nml_read(filename,"ytopo","dmb_sigma_ref",     par%dmb_sigma_ref,    init=init_pars)
+        call nml_read(filename,"ytopo","dmb_m_d",           par%dmb_m_d,          init=init_pars)
+        call nml_read(filename,"ytopo","dmb_m_r",           par%dmb_m_r,          init=init_pars)
         
         ! === Set internal parameters =====
 

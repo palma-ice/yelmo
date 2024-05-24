@@ -90,6 +90,7 @@ module yelmo_defs
         character(len=256) :: calv_grnd_method
         character(len=56)  :: bmb_gl_method
         integer            :: fmb_method  
+        integer            :: dmb_method
         integer            :: surf_gl_method 
         logical            :: margin2nd 
         logical            :: margin_flt_subgrid 
@@ -122,6 +123,11 @@ module yelmo_defs
         real(wp)           :: zb_deep_0
         real(wp)           :: zb_deep_1
         real(wp)           :: zb_sigma
+        real(wp)           :: dmb_alpha_max
+        real(wp)           :: dmb_tau
+        real(wp)           :: dmb_sigma_ref
+        real(wp)           :: dmb_m_d 
+        real(wp)           :: dmb_m_r
 
         ! Internal parameters 
         real(dp)           :: time 

@@ -10,7 +10,7 @@ module discharge
 contains
 
     subroutine calc_mb_discharge(mb_discharge,H_ice,z_srf,z_bed_sd,dist_grline, &
-                    dist_margin,f_ice,dx,dist_max,alpha_max,tau_mbd,sigma_ref,m_d,m_r)
+                    dist_margin,f_ice,dx,alpha_max,tau_mbd,sigma_ref,m_d,m_r)
         ! Calculate implicit subgrid calving discharge rate
         ! following Calov et al. (2015)
 
@@ -24,7 +24,6 @@ contains
         real(wp), intent(IN)  :: dist_margin(:,:)       ! [km]
         real(wp), intent(IN)  :: f_ice(:,:)
         real(wp), intent(IN)  :: dx                     ! [m]
-        real(wp), intent(IN)  :: dist_max               ! [km]
         real(wp), intent(IN)  :: alpha_max
         real(wp), intent(IN)  :: tau_mbd
         real(wp), intent(IN)  :: sigma_ref
@@ -40,8 +39,9 @@ contains
         real(wp) :: f_l
         real(wp) :: f_r  
 
-        real(wp) :: dl = 32.0       ! [km] Length scale 
-
+        real(wp), parameter :: dl = 32.0            ! [km] Length scale 
+        real(wp), parameter :: dist_max = 500.0     ! [km] Maximum distance from coast to calculate discharge
+    
         dx_km = dx*1e-3
 
         nx = size(mb_discharge,1)

@@ -62,6 +62,9 @@ $(objdir)/calving.o: $(srcdir)/physics/calving.f90 $(objdir)/yelmo_defs.o $(objd
 $(objdir)/deformation.o: $(srcdir)/physics/deformation.f90 $(objdir)/yelmo_defs.o $(objdir)/grid_calcs.o
 	$(FC) $(DFLAGS) $(FFLAGS) -c -o $@ $<
 
+$(objdir)/discharge.o: $(srcdir)/physics/discharge.f90 $(objdir)/yelmo_defs.o
+	$(FC) $(DFLAGS) $(FFLAGS) -c -o $@ $<
+
 $(objdir)/thermodynamics.o : $(srcdir)/physics/thermodynamics.f90 $(objdir)/yelmo_defs.o \
 						$(objdir)/gaussian_filter.o $(objdir)/grid_calcs.o
 	$(FC) $(DFLAGS) $(FFLAGS) -c -o $@ $<
@@ -154,6 +157,7 @@ $(objdir)/yelmo_timesteps.o : $(srcdir)/yelmo_timesteps.f90 $(objdir)/yelmo_defs
 $(objdir)/yelmo_topography.o: $(srcdir)/yelmo_topography.f90 $(objdir)/yelmo_defs.o \
 							  $(objdir)/yelmo_grid.o $(objdir)/yelmo_tools.o  \
  							  $(objdir)/mass_conservation.o $(objdir)/calving.o \
+							  $(objdir)/discharge.o \
  							  $(objdir)/runge_kutta.o \
  							  $(objdir)/topography.o $(objdir)/grid_calcs.o
 	$(FC) $(DFLAGS) $(FFLAGS) -c -o $@ $<
@@ -241,6 +245,7 @@ yelmo_physics =  	   $(objdir)/basal_dragging.o \
 					   $(objdir)/grounding_line_flux.o \
 					   $(objdir)/calving.o \
 					   $(objdir)/deformation.o \
+					   $(objdir)/discharge.o \
 					   $(objdir)/thermodynamics.o \
 					   $(objdir)/ice_tracer.o \
 					   $(objdir)/ice_enthalpy.o \

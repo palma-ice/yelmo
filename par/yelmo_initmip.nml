@@ -5,7 +5,7 @@
     dtt             = 10.0              ! [yr] Main loop timestep 
     dtt_equil       = 0.05              ! [yr] Timestep to use for dynamic equilibration (if dt_method=0)
     dt1D_out        = 50.0              ! [yr] Frequency of writing 1D output files 
-    dt2D_out        = 200.0             ! [yr] Frequency of writing 2D output files 
+    dt2D_out        = 20.0             ! [yr] Frequency of writing 2D output files 
     
     transient_clim  = False             ! Transient forcing? (not used for now)
     with_ice_sheet  = True              ! Active ice-sheet component? 

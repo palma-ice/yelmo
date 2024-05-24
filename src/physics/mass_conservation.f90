@@ -26,7 +26,7 @@ module mass_conservation
     
 contains 
     
-    subroutine check_mass_conservation(H_ice,f_ice,f_grnd,dHidt,mb_applied,mb_calv,dHidt_dyn,smb,bmb,fmb, &
+    subroutine check_mass_conservation(H_ice,f_ice,f_grnd,dHidt,mb_applied,mb_calv,dHidt_dyn,smb,bmb,fmb,dmb, &
                                                                 mb_resid,dx,sec_year,time,dt,units,label)
 
         implicit none
@@ -41,6 +41,7 @@ contains
         real(wp), intent(IN) :: smb(:,:)
         real(wp), intent(IN) :: bmb(:,:)
         real(wp), intent(IN) :: fmb(:,:)
+        real(wp), intent(IN) :: dmb(:,:)
         real(wp), intent(IN) :: mb_resid(:,:)
         real(wp), intent(IN) :: dx 
         real(wp), intent(IN) :: sec_year

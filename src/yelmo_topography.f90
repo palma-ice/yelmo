@@ -10,6 +10,7 @@ module yelmo_topography
     use mass_conservation
     use calving
     use topography 
+    use discharge
 
     use runge_kutta 
 
@@ -70,6 +71,9 @@ contains
 
         logical, parameter :: use_rk4 = .FALSE. 
 
+        ! ajr: to become discharge parameters eventually...
+        real(wp) :: dist_max,alpha_max,tau_mbd,sigma_ref,m_d,m_r
+
         nx = size(tpo%now%H_ice,1)
         ny = size(tpo%now%H_ice,2)
 
@@ -112,11 +116,23 @@ contains
                         tpo%now%H_grnd,tpo%now%f_ice,tpo%par%fmb_method,tpo%par%fmb_scale, &
                         bnd%c%rho_ice,bnd%c%rho_sw,tpo%par%dx)
 
+        ! Calculate additional mass balance term related to sub-grid discharge
+        dist_max  = 500.0       ! [km] Maximum distance from coast to calculate discharge
+        alpha_max = 60.0        ! [deg] Maximum angle of slope from coast at which to allow discharge
+        tau_mbd   = 100.0       ! [yr]  Discharge timescale
+        sigma_ref = 300.0       ! [m]   Reference bed roughness
+        m_d       = 3.0         ! [-]   Discharge distance scaling exponent
+        m_r       = 1.0         ! [-]   Discharge resolution scaling exponent
 
-        ! Define temporary variable for total column mass balance (without calving)
-        mbal = bnd%smb + tpo%now%bmb + tpo%now%fmb
+        call calc_mb_discharge(tpo%now%dmb,tpo%now%H_ice,tpo%now%z_srf,bnd%z_bed_sd,tpo%now%dist_grline, &
+                    tpo%now%dist_margin,tpo%now%f_ice,tpo%par%dx,dist_max,alpha_max,tau_mbd,sigma_ref,m_d,m_r)
+
+        write(*,*) "discharge: ", minval(tpo%now%dmb), maxval(tpo%now%dmb)
+
+        ! Define temporary variable for total column mass balance (without calving but with subgrid discharge)
+        mbal = bnd%smb + tpo%now%bmb + tpo%now%fmb - tpo%now%dmb
         
-        ! WHEN RUNNING EISMINT1 ensure bmb and fmb are not accounted for here !!!
+        ! WHEN RUNNING EISMINT1 ensure bmb and fmb are not accounted for here (dmb should be zero anyway) !!!
         if (.not. tpo%par%use_bmb) then
             mbal = bnd%smb
         end if
@@ -662,9 +678,8 @@ end if
         ! Define the grounding-zone mask too 
         call calc_grounding_line_zone(tpo%now%mask_grz,tpo%now%dist_grline,tpo%par%dist_grz)
 
-        ! ajr: do not calculate distance to margin unless it is needed (costs some computational time)
         ! Calculate distance to the ice margin
-        !call calc_distance_to_ice_margin(tpo%now%dist_margin,tpo%now%f_ice,tpo%par%dx)
+        call calc_distance_to_ice_margin(tpo%now%dist_margin,tpo%now%f_ice,tpo%par%dx)
 
         ! Calculate the general bed mask
         call gen_mask_bed(tpo%now%mask_bed,tpo%now%f_ice,thrm%now%f_pmp, &
@@ -743,6 +758,7 @@ end if
                 tpo%now%rates%mb_applied    = 0.0
                 tpo%now%rates%bmb           = 0.0
                 tpo%now%rates%fmb           = 0.0
+                tpo%now%rates%dmb           = 0.0
                 tpo%now%rates%mb_relax      = 0.0
                 tpo%now%rates%mb_resid      = 0.0
                 tpo%now%rates%mb_err        = 0.0
@@ -761,6 +777,7 @@ end if
                 tpo%now%rates%mb_applied    = tpo%now%rates%mb_applied + tpo%now%mb_applied*dt
                 tpo%now%rates%bmb           = tpo%now%rates%bmb        + tpo%now%bmb*dt
                 tpo%now%rates%fmb           = tpo%now%rates%fmb        + tpo%now%fmb*dt
+                tpo%now%rates%dmb           = tpo%now%rates%dmb        + tpo%now%dmb*dt
                 tpo%now%rates%mb_relax      = tpo%now%rates%mb_relax   + tpo%now%mb_relax*dt
                 tpo%now%rates%mb_resid      = tpo%now%rates%mb_resid   + tpo%now%mb_resid*dt
                 tpo%now%rates%mb_err        = tpo%now%rates%mb_err     + tpo%now%mb_err*dt
@@ -781,6 +798,7 @@ end if
                     tpo%now%rates%mb_applied    = tpo%now%rates%mb_applied / tpo%now%rates%dt_tot
                     tpo%now%rates%bmb           = tpo%now%rates%bmb / tpo%now%rates%dt_tot
                     tpo%now%rates%fmb           = tpo%now%rates%fmb / tpo%now%rates%dt_tot
+                    tpo%now%rates%dmb           = tpo%now%rates%dmb / tpo%now%rates%dt_tot
                     tpo%now%rates%mb_relax      = tpo%now%rates%mb_relax / tpo%now%rates%dt_tot
                     tpo%now%rates%mb_resid      = tpo%now%rates%mb_resid / tpo%now%rates%dt_tot
                     tpo%now%rates%mb_err        = tpo%now%rates%mb_err / tpo%now%rates%dt_tot
@@ -805,6 +823,7 @@ end if
                         tpo%now%mb_applied  = tpo%now%rates%mb_applied
                         tpo%now%bmb         = tpo%now%rates%bmb
                         tpo%now%fmb         = tpo%now%rates%fmb
+                        tpo%now%dmb         = tpo%now%rates%dmb
                         tpo%now%mb_relax    = tpo%now%rates%mb_relax
                         tpo%now%mb_resid    = tpo%now%rates%mb_resid
                         tpo%now%mb_err      = tpo%now%rates%mb_err
@@ -828,7 +847,7 @@ end if
 
             call check_mass_conservation(tpo%now%H_ice,tpo%now%f_ice,tpo%now%f_grnd,tpo%now%dHidt, &
                         tpo%now%mb_applied,tpo%now%calv,tpo%now%dHidt_dyn,bnd%smb,tpo%now%bmb, &
-                        tpo%now%fmb,tpo%now%mb_resid,tpo%par%dx,bnd%c%sec_year,time,dt, &
+                        tpo%now%fmb,tpo%now%dmb,tpo%now%mb_resid,tpo%par%dx,bnd%c%sec_year,time,dt, &
                         units="km^3/yr",label=step)
                         
         end if 
@@ -1009,6 +1028,7 @@ end if
         allocate(now%rates%mb_applied(nx,ny))
         allocate(now%rates%bmb(nx,ny))
         allocate(now%rates%fmb(nx,ny))
+        allocate(now%rates%dmb(nx,ny))
         allocate(now%rates%mb_relax(nx,ny))
         allocate(now%rates%mb_resid(nx,ny))
         allocate(now%rates%mb_err(nx,ny))
@@ -1028,6 +1048,7 @@ end if
         allocate(now%mb_applied(nx,ny))
         allocate(now%bmb(nx,ny))
         allocate(now%fmb(nx,ny))
+        allocate(now%dmb(nx,ny))
         allocate(now%mb_relax(nx,ny))
         allocate(now%mb_resid(nx,ny))
         allocate(now%mb_err(nx,ny))
@@ -1065,7 +1086,7 @@ end if
 
         allocate(now%dist_margin(nx,ny))
         allocate(now%dist_grline(nx,ny))
-        
+
         allocate(now%mask_bed(nx,ny))
         allocate(now%mask_grz(nx,ny))
         allocate(now%mask_frnt(nx,ny))
@@ -1083,6 +1104,7 @@ end if
         now%rates%mb_applied    = 0.0
         now%rates%bmb           = 0.0
         now%rates%fmb           = 0.0
+        now%rates%dmb           = 0.0
         now%rates%mb_relax      = 0.0
         now%rates%mb_resid      = 0.0
         now%rates%mb_err        = 0.0
@@ -1099,6 +1121,7 @@ end if
         now%mb_applied  = 0.0 
         now%bmb         = 0.0  
         now%fmb         = 0.0
+        now%dmb         = 0.0
         now%mb_relax    = 0.0
         now%mb_resid    = 0.0
         now%mb_err      = 0.0
@@ -1132,7 +1155,7 @@ end if
         now%f_ice       = 0.0  
         now%dist_margin = 0.0
         now%dist_grline = 0.0 
-        
+
         now%mask_bed    = 0 
         now%mask_grz    = 0 
         now%mask_frnt   = 0
@@ -1162,6 +1185,7 @@ end if
         if (allocated(now%rates%dHidt_dyn))     deallocate(now%rates%dHidt_dyn)
         if (allocated(now%rates%bmb))           deallocate(now%rates%bmb)
         if (allocated(now%rates%fmb))           deallocate(now%rates%fmb)
+        if (allocated(now%rates%dmb))           deallocate(now%rates%dmb)
         if (allocated(now%rates%mb_applied))    deallocate(now%rates%mb_applied)
         if (allocated(now%rates%mb_relax))      deallocate(now%rates%mb_relax)
         if (allocated(now%rates%mb_resid))      deallocate(now%rates%mb_resid)
@@ -1179,6 +1203,7 @@ end if
         if (allocated(now%dHidt_dyn))   deallocate(now%dHidt_dyn)
         if (allocated(now%bmb))         deallocate(now%bmb)
         if (allocated(now%fmb))         deallocate(now%fmb)
+        if (allocated(now%dmb))         deallocate(now%dmb)
         if (allocated(now%mb_applied))  deallocate(now%mb_applied)
         if (allocated(now%mb_relax))    deallocate(now%mb_relax)
         if (allocated(now%mb_resid))    deallocate(now%mb_resid)
@@ -1216,7 +1241,7 @@ end if
 
         if (allocated(now%dist_margin)) deallocate(now%dist_margin)
         if (allocated(now%dist_grline)) deallocate(now%dist_grline)
-        
+
         if (allocated(now%mask_bed))    deallocate(now%mask_bed)
         if (allocated(now%mask_grz))    deallocate(now%mask_grz)
         if (allocated(now%mask_frnt))   deallocate(now%mask_frnt)

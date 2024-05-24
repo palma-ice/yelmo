@@ -171,6 +171,7 @@ module yelmo_defs
         real(wp), allocatable :: mb_applied(:,:)  ! Actual mass balance applied [m/a], for mass balance accounting
         real(wp), allocatable :: bmb(:,:)         ! Combined field of bmb_grnd and bmb_shlf 
         real(wp), allocatable :: fmb(:,:)         ! Combined field of fmb_grnd and fmb_shlf 
+        real(wp), allocatable :: dmb(:,:)         ! Subgrid discharge
         real(wp), allocatable :: mb_relax(:,:)    ! Residual mass balance from boundary conditions, cleanup
         real(wp), allocatable :: mb_resid(:,:)    ! Residual mass balance from boundary conditions, cleanup
         real(wp), allocatable :: mb_err(:,:)      ! Residual error in mass balance accounting 
@@ -195,13 +196,14 @@ module yelmo_defs
         real(wp), allocatable   :: mb_applied(:,:)  ! Actual mass balance applied [m/a], for mass balance accounting
         real(wp), allocatable   :: calv_flt(:,:)    ! Reference floating calving rate [m/a]
         real(wp), allocatable   :: calv_grnd(:,:)   ! Reference grounded calving rate [m/a]
-        real(wp), allocatable   :: calv(:,:)        ! Calving rate (applied) [m/a]
+        real(wp), allocatable   :: calv(:,:)        ! Calving mb rate (applied) [m/a]
         real(wp), allocatable   :: mb_relax(:,:)    ! Change in mass balance to due relaxation
         real(wp), allocatable   :: mb_resid(:,:)    ! Residual mass balance from boundary conditions, cleanup
         real(wp), allocatable   :: mb_err(:,:)      ! Residual error in mass balance accounting 
 
         real(wp), allocatable   :: bmb(:,:)         ! Combined field of bmb_grnd and bmb_shlf 
         real(wp), allocatable   :: fmb(:,:)         ! Combined field of fmb_grnd and fmb_shlf    
+        real(wp), allocatable   :: dmb(:,:)         ! Subgrid discharge mb rate
         
         real(wp), allocatable   :: z_srf(:,:)       ! Surface elevation [m]
         real(wp), allocatable   :: dzsdt(:,:)       ! Surface elevation rate of change [m/a] 
@@ -237,7 +239,7 @@ module yelmo_defs
         
         real(wp), allocatable   :: dist_margin(:,:) ! Distance to nearest margin point 
         real(wp), allocatable   :: dist_grline(:,:) ! Distance to nearest grounding-line point 
-        
+
         ! Additional masks 
         integer,  allocatable   :: mask_bed(:,:)    ! Multi-valued bed mask
         integer,  allocatable   :: mask_grz(:,:)    ! Multi-valued mask for the grounding-line zone

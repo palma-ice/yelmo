@@ -10,7 +10,7 @@ module discharge
 contains
 
     subroutine calc_mb_discharge(mb_discharge,H_ice,z_srf,z_bed_sd,dist_grline, &
-                    dist_margin,f_ice,dx,alpha_max,tau_mbd,sigma_ref,m_d,m_r)
+                    dist_margin,f_ice,method,dx,alpha_max,tau_mbd,sigma_ref,m_d,m_r)
         ! Calculate implicit subgrid calving discharge rate
         ! following Calov et al. (2015)
 
@@ -23,6 +23,7 @@ contains
         real(wp), intent(IN)  :: dist_grline(:,:)       ! [km]
         real(wp), intent(IN)  :: dist_margin(:,:)       ! [km]
         real(wp), intent(IN)  :: f_ice(:,:)
+        integer,  intent(IN)  :: method 
         real(wp), intent(IN)  :: dx                     ! [m]
         real(wp), intent(IN)  :: alpha_max
         real(wp), intent(IN)  :: tau_mbd
@@ -41,48 +42,65 @@ contains
 
         real(wp), parameter :: dl = 32.0            ! [km] Length scale 
         real(wp), parameter :: dist_max = 500.0     ! [km] Maximum distance from coast to calculate discharge
-    
-        dx_km = dx*1e-3
 
         nx = size(mb_discharge,1)
         ny = size(mb_discharge,2)
+        
+        dx_km = dx*1e-3
 
         ! Get cosine of alpha_max, alpha=60deg --> cosalpha_max=0.5
         cosalpha_max = cos(alpha_max*degrees_to_radians)
 
-        ! Loop over domain, calculate discharge at each relevant point
-        do j = 1, ny 
-        do i = 1, nx 
+        select case(method)
 
-            ! First assume discharge is zero
-            mb_discharge(i,j) = 0.0
+            case(0)
+                ! No subgrid discharge calculated, set to zero 
 
-            if (H_ice(i,j) .gt. 0.0 .and. dist_grline(i,j) .ge. 0.0 .and. &
-                                                dist_margin(i,j) .le. dist_max) then 
-            !if (H_ice(i,j) .gt. 0.0 .and. dist_grline(i,j) .ge. 0.0) then
-                ! Ice exists, is grounded and lies within dist_max distance
-                ! to the ice margin.
+                mb_discharge = 0.0
 
-                ! Calculate the angle of descent relative to the direction of the coast
-                call calc_coastal_cosine_angle(cosalpha,z_srf,dist_grline,dx,i,j)
+            case(1)
+                ! Calculate subgrid discharge
 
-                if (cosalpha .ge. cosalpha_max) then
-                    ! Ice is flowing towards the coast, more or less, apply parameterization
+                ! Loop over domain, calculate discharge at each relevant point
+                do j = 1, ny 
+                do i = 1, nx 
 
-                    ! Calculate scaling factors (roughness, distance to coast and resolution)
-                    f_sd = tanh(z_bed_sd(i,j)/sigma_ref)
-                    f_l  = ( dl / (dl + dist_grline(i,j)) )**m_d
-                    f_r  = ( dx_km/dl )**m_r 
+                    ! First assume discharge is zero
+                    mb_discharge(i,j) = 0.0
 
-                    ! Calculate subgrid discharge mass balance rate (negative, for mass loss)
-                    mb_discharge(i,j) = -( f_sd * f_l * f_r * (H_ice(i,j) / tau_mbd) )
+                    if (H_ice(i,j) .gt. 0.0 .and. dist_grline(i,j) .ge. 0.0 .and. &
+                                                        dist_margin(i,j) .le. dist_max) then 
+                    !if (H_ice(i,j) .gt. 0.0 .and. dist_grline(i,j) .ge. 0.0) then
+                        ! Ice exists, is grounded and lies within dist_max distance
+                        ! to the ice margin.
 
-                end if
+                        ! Calculate the angle of descent relative to the direction of the coast
+                        call calc_coastal_cosine_angle(cosalpha,z_srf,dist_grline,dx,i,j)
 
-            end if
+                        if (cosalpha .ge. cosalpha_max) then
+                            ! Ice is flowing towards the coast, more or less, apply parameterization
 
-        end do
-        end do
+                            ! Calculate scaling factors (roughness, distance to coast and resolution)
+                            f_sd = tanh(z_bed_sd(i,j)/sigma_ref)
+                            f_l  = ( dl / (dl + dist_grline(i,j)) )**m_d
+                            f_r  = ( dx_km/dl )**m_r 
+
+                            ! Calculate subgrid discharge mass balance rate (negative, for mass loss)
+                            mb_discharge(i,j) = -( f_sd * f_l * f_r * (H_ice(i,j) / tau_mbd) )
+
+                        end if
+
+                    end if
+
+                end do
+                end do
+
+            case DEFAULT
+
+                write(*,*) "calc_mb_discharge:: Error: dmb_method not recognized: ", method
+                stop
+
+        end select
 
         return
 

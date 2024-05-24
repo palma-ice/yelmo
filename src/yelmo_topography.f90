@@ -71,9 +71,6 @@ contains
 
         logical, parameter :: use_rk4 = .FALSE. 
 
-        ! ajr: to become discharge parameters eventually...
-        real(wp) :: dist_max,alpha_max,tau_mbd,sigma_ref,m_d,m_r
-
         nx = size(tpo%now%H_ice,1)
         ny = size(tpo%now%H_ice,2)
 
@@ -116,20 +113,11 @@ contains
                         tpo%now%H_grnd,tpo%now%f_ice,tpo%par%fmb_method,tpo%par%fmb_scale, &
                         bnd%c%rho_ice,bnd%c%rho_sw,tpo%par%dx)
 
-        ! ! Calculate additional mass balance term related to sub-grid discharge
-        ! dist_max  = 500.0       ! [km] Maximum distance from coast to calculate discharge
-        ! alpha_max = 60.0        ! [deg] Maximum angle of slope from coast at which to allow discharge
-        ! tau_mbd   = 100.0       ! [yr]  Discharge timescale
-        ! sigma_ref = 300.0       ! [m]   Reference bed roughness
-        ! m_d       = 3.0         ! [-]   Discharge distance scaling exponent
-        ! m_r       = 1.0         ! [-]   Discharge resolution scaling exponent
 
         call calc_mb_discharge(tpo%now%dmb,tpo%now%H_ice,tpo%now%z_srf,bnd%z_bed_sd,tpo%now%dist_grline, &
-                    tpo%now%dist_margin,tpo%now%f_ice,tpo%par%dx,tpo%par%dmb_alpha_max,tpo%par%dmb_tau, &
-                    tpo%par%dmb_sigma_ref,tpo%par%dmb_m_d,tpo%par%dmb_m_r)
-
-        write(*,*) "discharge: ", minval(tpo%now%dmb), maxval(tpo%now%dmb)
-
+                    tpo%now%dist_margin,tpo%now%f_ice,tpo%par%dmb_method,tpo%par%dx,tpo%par%dmb_alpha_max, &
+                    tpo%par%dmb_tau,tpo%par%dmb_sigma_ref,tpo%par%dmb_m_d,tpo%par%dmb_m_r)
+        
         ! Define temporary variable for total column mass balance (without calving but with subgrid discharge)
         mbal = bnd%smb + tpo%now%bmb + tpo%now%fmb + tpo%now%dmb
         
@@ -946,6 +934,7 @@ end if
         call nml_read(filename,"ytopo","calv_grnd_method",  par%calv_grnd_method, init=init_pars)
         call nml_read(filename,"ytopo","bmb_gl_method",     par%bmb_gl_method,    init=init_pars)
         call nml_read(filename,"ytopo","fmb_method",        par%fmb_method,       init=init_pars)
+        call nml_read(filename,"ytopo","dmb_method",        par%dmb_method,       init=init_pars)
         call nml_read(filename,"ytopo","margin2nd",         par%margin2nd,        init=init_pars)
         call nml_read(filename,"ytopo","margin_flt_subgrid",par%margin_flt_subgrid,init=init_pars)
         call nml_read(filename,"ytopo","use_bmb",           par%use_bmb,          init=init_pars)

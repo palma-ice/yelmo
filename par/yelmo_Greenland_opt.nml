@@ -78,6 +78,7 @@
     calv_flt_method     = "vm-l19"          ! "zero", "simple", "flux", "vm-l19", "kill"
     calv_grnd_method    = "stress-b12"      ! "zero", "stress-b12"
     fmb_method          = 1                 ! 0: prescribe boundary field fmb_shlf; 1: calculate proportional fmb~bmb_shlf.
+    dmb_method          = 1                 ! 0: no subgrid discharge, 1: subgrid discharge on
     surf_gl_method      = 0                 ! 0: binary (max grnd/flt elevation), 1: subgrid average elevation
     margin2nd           = False             ! Apply second-order upwind approximation to gradients at the margin
     margin_flt_subgrid  = True              ! Allow fractional ice area for floating margins
@@ -110,6 +111,12 @@
     zb_deep_0           = -1000.0           ! [m] Bedrock elevation to begin transition to deep ocean
     zb_deep_1           = -1500.0           ! [m] Bedrock elevation to end transition to deep ocean
     zb_sigma            = 0.0               ! [m] Gaussian filtering of bedrock for calving transition to deep ocean
+    dmb_alpha_max       = 60.0              ! [deg] Maximum angle of slope from coast at which to allow discharge
+    dmb_tau             = 100.0             ! [yr]  Discharge timescale
+    dmb_sigma_ref       = 300.0             ! [m]   Reference bed roughness
+    dmb_m_d             = 3.0               ! [-]   Discharge distance scaling exponent
+    dmb_m_r             = 1.0               ! [-]   Discharge resolution scaling exponent
+
 /
 
 &ydyn

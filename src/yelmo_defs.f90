@@ -809,7 +809,7 @@ module yelmo_defs
 
         ! ===== Total ice variables =====
         real(wp)   :: H_ice, z_srf,dHidt, H_ice_max, dzsdt
-        real(wp)   :: V_ice, A_ice, dVidt, fwf, cmb, cmb_flt, cmb_grnd
+        real(wp)   :: V_ice, A_ice, dVidt, fwf, dmb, cmb, cmb_flt, cmb_grnd
         real(wp)   :: V_sl, V_sle
         real(wp)   :: uxy_bar, uxy_s, uxy_b, z_bed, smb, T_srf, bmb
 

@@ -103,6 +103,9 @@ contains
             reg%dVidt      = sum(tpo%now%dHidt,mask=mask_tot)*tpo%par%dx*tpo%par%dy*m3_km3              ! [km^3/yr]
             reg%fwf        = -reg%dVidt*conv_km3a_Sv                        ! [Sv]
 
+            ! Discharge
+            reg%dmb        = sum(tpo%now%dmb,mask=mask_tot)*tpo%par%dx*tpo%par%dy              ! [m^3/yr]
+            
             ! Calving
             reg%cmb        = sum(tpo%now%cmb,mask=mask_tot)*tpo%par%dx*tpo%par%dy              ! [m^3/yr]
             reg%cmb_flt    = sum(tpo%now%cmb_flt,mask=mask_tot)*tpo%par%dx*tpo%par%dy          ! [m^3/yr]
@@ -347,6 +350,9 @@ contains
         call nc_write(filename,"cmb_flt",reg%cmb_flt,units="m^3/yr",long_name="Potential calving mass balance rate (floating)", &
                       dim1="time",start=[n],ncid=ncid)
         call nc_write(filename,"cmb_grnd",reg%cmb_grnd,units="m^3/yr",long_name="Potential calving mass balance rate (grounded)", &
+                      dim1="time",start=[n],ncid=ncid)
+
+        call nc_write(filename,"dmb",reg%dmb,units="m^3/yr",long_name="Discharge mass balance rate", &
                       dim1="time",start=[n],ncid=ncid)
 
         call nc_write(filename,"V_sl",reg%V_sl*1e-6,units="1e6 km^3",long_name="Ice volume above flotation", &

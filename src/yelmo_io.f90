@@ -21,10 +21,50 @@ module yelmo_io
     public :: yelmo_restart_write
     public :: yelmo_restart_read_topo_bnd
     public :: yelmo_restart_read
+    public :: yelmo_initnc_cropped
+
 
 contains
 
+    subroutine yelmo_initnc_cropped(ylmo, filename, time_init, units, &
+        i1, i2, j1, j2)
+
+        implicit none
+
+        type(yelmo_class), intent(IN) :: ylmo 
+        character(len=*),  intent(IN) :: filename, units 
+        real(wp),          intent(IN) :: time_init
+        integer, intent(IN) :: i1, i2, j1, j2
+
+        call yelmo_croppedgrid_write(ylmo%grd, filename, ylmo%par%domain, ylmo%par%grid_name, .TRUE., &
+            i1, i2, j1, j2)
+        call nc_write_dim(filename,"time", x=time_init, dx=1.0_prec, nx=1, units=trim(units), &
+            unlimited=.TRUE.)
+
+    end subroutine yelmo_initnc_cropped
+
     subroutine yelmo_write_init(ylmo,filename,time_init,units)
+
+        implicit none 
+
+        type(yelmo_class), intent(IN) :: ylmo 
+        character(len=*),  intent(IN) :: filename, units 
+        real(wp),          intent(IN) :: time_init
+        
+        call yelmo_write_init_dims(ylmo,filename,time_init,units)
+
+        ! Static information
+        call nc_write(filename,"basins",  ylmo%bnd%basins, dim1="xc",dim2="yc",units="(0 - 8)",long_name="Hydrological basins")
+        call nc_write(filename,"regions", ylmo%bnd%regions,dim1="xc",dim2="yc",units="(0 - 8)",long_name="Domain regions")
+        
+        ! Additional optional static information 
+        call nc_write(filename,"z_bed_sd", ylmo%bnd%z_bed_sd,dim1="xc",dim2="yc",units="m",long_name="Stdev(z_bed)")
+        
+        return
+
+    end subroutine yelmo_write_init
+
+    subroutine yelmo_write_init_dims(ylmo,filename,time_init,units)
 
         implicit none 
 
@@ -47,16 +87,9 @@ contains
         
         call nc_write_dim(filename,"time",      x=time_init,dx=1.0_prec,nx=1,units=trim(units),unlimited=.TRUE.)
 
-        ! Static information
-        call nc_write(filename,"basins",  ylmo%bnd%basins, dim1="xc",dim2="yc",units="(0 - 8)",long_name="Hydrological basins")
-        call nc_write(filename,"regions", ylmo%bnd%regions,dim1="xc",dim2="yc",units="(0 - 8)",long_name="Domain regions")
-        
-        ! Additional optional static information 
-        call nc_write(filename,"z_bed_sd", ylmo%bnd%z_bed_sd,dim1="xc",dim2="yc",units="m",long_name="Stdev(z_bed)")
-        
         return
 
-    end subroutine yelmo_write_init
+    end subroutine yelmo_write_init_dims
 
     subroutine yelmo_write_step(ylmo,filename,time,nms,compare_pd)
 
@@ -208,7 +241,7 @@ contains
         return 
 
     end subroutine yelmo_write_step
-
+    
     subroutine yelmo_write_step_model_metrics(filename,ylmo,n,ncid)
         ! Write model performance metrics (speed, dt, eta) 
 

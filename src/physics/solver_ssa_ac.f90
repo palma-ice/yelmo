@@ -56,7 +56,7 @@ contains
 
     subroutine linear_solver_matrix_ssa_ac_csr_2D(lgs,ux,uy,beta_acx,beta_acy, &
                             N_aa,ssa_mask_acx,ssa_mask_acy,mask_frnt,H_ice,f_ice,taud_acx, &
-                            taud_acy,taul_int_acx,taul_int_acy,dx,dy,boundaries,lateral_bc)
+                            taud_acy,taul_int_acx,taul_int_acy,dx,dy,beta_min,boundaries,lateral_bc)
         ! Define sparse matrices A*x=b in format 'compressed sparse row' (csr)
         ! for the SSA momentum balance equations with velocity components
         ! ux and uy defined on ac-nodes (right and top borders of i,j grid cell)
@@ -80,6 +80,8 @@ contains
         real(wp), intent(IN) :: taul_int_acx(:,:)       ! [Pa m] Vertically integrated lateral stress (acx nodes)
         real(wp), intent(IN) :: taul_int_acy(:,:)       ! [Pa m] Vertically integrated lateral stress (acy nodes) 
         real(wp), intent(IN) :: dx, dy
+        real(wp), intent(IN) :: beta_min                ! [Pa yr m^-1] Minimum allowed basal friction for grounded ice
+
         character(len=*), intent(IN) :: boundaries 
         character(len=*), intent(IN) :: lateral_bc
 
@@ -90,6 +92,7 @@ contains
         real(wp) :: inv_dx, inv_dxdx 
         real(wp) :: inv_dy, inv_dydy 
         real(wp) :: inv_dxdy, inv_2dxdy, inv_4dxdy 
+        real(wp) :: beta_now 
         
         real(wp), allocatable :: N_ab(:,:)
 
@@ -121,17 +124,29 @@ contains
             if ( ( count(ssa_mask_acx .eq. 1 .and. beta_acx .gt. 0.0) .eq. 0 ) .or. & 
                  ( count(ssa_mask_acy .eq. 1 .and. beta_acy .gt. 0.0) .eq. 0 ) ) then  
                 ! No points found with a non-zero beta for grounded ice,
-                ! something was not well-defined/well-initialized
+                ! something was not well-defined/well-initialized, give a warning
+                ! with some statistics. In the actual solver, beta will
+                ! be given a small non-zero value for these points.
 
-                write(*,*) 
-                write(*,"(a)") "linear_solver_matrix_ssa_ac_csr_2D:: Error: beta appears to be zero everywhere for grounded ice."
-                write(*,*) "range(beta_acx): ", minval(beta_acx), maxval(beta_acx)
-                write(*,*) "range(beta_acy): ", minval(beta_acy), maxval(beta_acy)
-                write(*,*) "range(ssa_mask_acx): ", minval(ssa_mask_acx), maxval(ssa_mask_acx)
-                write(*,*) "range(ssa_mask_acy): ", minval(ssa_mask_acy), maxval(ssa_mask_acy)
-                write(*,*) "Stopping."
-                write(*,*) 
-                stop 
+                write(*,*)
+                write(*,"(a)") "linear_solver_matrix_ssa_ac_csr_2D:: Warning: beta appears to be zero everywhere for grounded ice."
+                write(*,*) "count(ssa_mask_acx .eq. 1) = ", count(ssa_mask_acx .eq. 1)
+                write(*,*) "count(ssa_mask_acy .eq. 1) = ", count(ssa_mask_acy .eq. 1)
+                write(*,*) "count(ssa_mask_acx .eq. 1 .and. beta_acx .gt. 0.0) = ", &
+                                        count(ssa_mask_acx .eq. 1 .and. beta_acx .gt. 0.0)
+                write(*,*) "count(ssa_mask_acy .eq. 1 .and. beta_acy .gt. 0.0) = ", &
+                                        count(ssa_mask_acy .eq. 1 .and. beta_acy .gt. 0.0)
+                write(*,*)
+
+                ! write(*,*) 
+                ! write(*,"(a)") "linear_solver_matrix_ssa_ac_csr_2D:: Error: beta appears to be zero everywhere for grounded ice."
+                ! write(*,*) "range(beta_acx): ", minval(beta_acx), maxval(beta_acx)
+                ! write(*,*) "range(beta_acy): ", minval(beta_acy), maxval(beta_acy)
+                ! write(*,*) "range(ssa_mask_acx): ", minval(ssa_mask_acx), maxval(ssa_mask_acx)
+                ! write(*,*) "range(ssa_mask_acy): ", minval(ssa_mask_acy), maxval(ssa_mask_acy)
+                ! write(*,*) "Stopping."
+                ! write(*,*) 
+                ! stop 
                 
             end if 
 
@@ -460,13 +475,16 @@ contains
             else
                 ! === Inner SSA solution === 
 
+                beta_now = beta_acx(i,j)
+                if (ssa_mask_acx(i,j) .eq. 1 .and. beta_acx(i,j) .eq. 0.0) beta_now = beta_min
+
                 ! -- vx terms -- 
 
                 nc = 2*lgs%ij2n(i,j)-1          ! column counter for ux(i,j)
                 k = k+1
                 lgs%a_value(k) = -4.0_wp*inv_dxdx*(N_aa(ip1,j)+N_aa(i,j)) &
                                  -1.0_wp*inv_dydy*(N_ab(i,j)+N_ab(i,jm1)) &
-                                 -beta_acx(i,j)
+                                 -beta_now
                 lgs%a_index(k) = nc
 
                 nc = 2*lgs%ij2n(ip1,j)-1        ! column counter for ux(ip1,j)
@@ -740,13 +758,16 @@ contains
             else
                 ! === Inner SSA solution === 
 
+                beta_now = beta_acy(i,j)
+                if (ssa_mask_acy(i,j) .eq. 1 .and. beta_acy(i,j) .eq. 0.0) beta_now = beta_min
+
                 ! -- vy terms -- 
 
                 nc = 2*lgs%ij2n(i,j)        ! column counter for uy(i,j)
                 k = k+1
                 lgs%a_value(k) = -4.0_wp*inv_dydy*(N_aa(i,jp1)+N_aa(i,j))   &
                                  -1.0_wp*inv_dxdx*(N_ab(i,j)+N_ab(im1,j))   &
-                                 -beta_acy(i,j)
+                                 -beta_min
                 lgs%a_index(k) = nc
 
                 nc = 2*lgs%ij2n(i,jp1)      ! column counter for uy(i,jp1)

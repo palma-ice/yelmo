@@ -310,7 +310,7 @@ end if
             ! Populate ssa matrices Ax=b
             call linear_solver_matrix_ssa_ac_csr_2D(lgs_now,ux_bar,uy_bar,beta_eff_acx,beta_eff_acy,visc_eff_int,  &
                                 ssa_mask_acx,ssa_mask_acy,mask_frnt,H_ice,f_ice,taud_acx,taud_acy, &
-                                taul_int_acx,taul_int_acy,dx,dy,par%boundaries,par%ssa_lateral_bc)
+                                taul_int_acx,taul_int_acy,dx,dy,par%beta_min,par%boundaries,par%ssa_lateral_bc)
 
             ! Solve linear equation
             call linear_solver_matrix_solve(lgs_now,par%ssa_lis_opt)

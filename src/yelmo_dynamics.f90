@@ -818,6 +818,7 @@ contains
 
         ! Local variables 
         real(wp) :: H_w_max
+        real(wp), allocatable :: H_w(:,:) 
 
         if (dyn%par%neff_H_w_max .lt. 0.0) then 
             ! Set the water saturation value to the parameter value
@@ -865,7 +866,19 @@ contains
                                                         H_w_max,dyn%par%neff_N0,dyn%par%neff_delta,dyn%par%neff_e0,dyn%par%neff_Cc, &
                                                         bnd%c%rho_ice,bnd%c%g) 
 
-            case(4) 
+            case(4)
+                ! Effective pressure as basal till pressure
+                ! following van Pelt and Bueler (2015), but
+                ! with constant imposed till water saturation value s_const
+
+                allocate(H_w(dyn%par%nx,dyn%par%ny))
+                H_w = H_w_max*dyn%par%neff_s_const
+
+                call calc_effective_pressure_till(dyn%now%N_eff,H_w,tpo%now%H_ice_dyn,tpo%now%f_ice_dyn,tpo%now%f_grnd, &
+                                                        H_w_max,dyn%par%neff_N0,dyn%par%neff_delta,dyn%par%neff_e0,dyn%par%neff_Cc, &
+                                                        bnd%c%rho_ice,bnd%c%g) 
+
+            case(5) 
                 ! Calculate two-valued effective pressure using till parameter neff_delta 
 
                 call calc_effective_pressure_two_value(dyn%now%N_eff,thrm%now%f_pmp,tpo%now%H_ice_dyn,tpo%now%f_ice_dyn, &
@@ -946,6 +959,7 @@ contains
         call nml_read(filename,"yneff","delta",             par%neff_delta,         init=init_pars)
         call nml_read(filename,"yneff","e0",                par%neff_e0,            init=init_pars)
         call nml_read(filename,"yneff","Cc",                par%neff_Cc,            init=init_pars)
+        call nml_read(filename,"yneff","S_const",           par%neff_S_const,       init=init_pars)
 
         ! === Set internal parameters ======
 

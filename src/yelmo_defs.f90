@@ -366,6 +366,7 @@ module yelmo_defs
         real(wp)   :: neff_delta 
         real(wp)   :: neff_e0 
         real(wp)   :: neff_Cc 
+        real(wp)   :: neff_s_const
 
         ! Internal parameters 
         character(len=256) :: boundaries 

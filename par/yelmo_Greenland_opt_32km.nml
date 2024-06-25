@@ -163,6 +163,7 @@
     delta           = 0.04              ! [--] *neff_method=3* Fraction of overburden pressure for saturated till
     e0              = 0.69              ! [--] *neff_method=3* Reference void ratio at N0 
     Cc              = 0.12              ! [--] *neff_method=3* Till compressibility    
+    s_const         = 0.5               ! [--] *neff_method=4* Imposed constant till water saturation level    
 /
 
 &ymat

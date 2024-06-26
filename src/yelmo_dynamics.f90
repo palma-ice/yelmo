@@ -959,7 +959,7 @@ contains
         call nml_read(filename,"yneff","delta",             par%neff_delta,         init=init_pars)
         call nml_read(filename,"yneff","e0",                par%neff_e0,            init=init_pars)
         call nml_read(filename,"yneff","Cc",                par%neff_Cc,            init=init_pars)
-        call nml_read(filename,"yneff","S_const",           par%neff_S_const,       init=init_pars)
+        call nml_read(filename,"yneff","s_const",           par%neff_S_const,       init=init_pars)
 
         ! === Set internal parameters ======
 

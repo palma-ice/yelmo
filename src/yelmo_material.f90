@@ -80,27 +80,14 @@ contains
         end if 
 
         ! 0. Update strain rate 
-        ! Note: this calculation of strain rate is particular to the material module, and 
-        ! may differ from the effective strain rate calculated locally in the dynamics module
-
-        ! Calculate the strain rate tensor
-
-if (.FALSE.) then 
-        call calc_strain_rate_tensor(mat%now%strn,mat%now%strn2D,dyn%now%ux,dyn%now%uy,dyn%now%uz, &
-                                 tpo%now%H_ice,tpo%now%f_ice,tpo%now%f_grnd,mat%par%zeta_aa, &
-                                 mat%par%zeta_ac,mat%par%dx,mat%par%dx,mat%par%de_max,tpo%par%boundaries)
-
-        ! Assign vertical average of shear for external use 
-        mat%now%f_shear_bar = mat%now%strn2D%f_shear
-
-else 
+        ! Note: due to its relevance to the dynamics solver, the strain rate tensor is
+        ! now calculated within the yelmo_dynamics module, and then it is passed here
+        ! into the yelmo_material module directly since it is already available.
 
         mat%now%strn   = dyn%now%strn 
         mat%now%strn2D = dyn%now%strn2D
         mat%now%f_shear_bar = dyn%now%strn2D%f_shear 
         
-end if 
-
         ! Calculate the deviatoric stress tensor and 2D average
         ! Use the strain rate tensor that is calculated in the dynamics module
         ! ajr: for now, only calculate the 2D stress tensor directly. This is 
